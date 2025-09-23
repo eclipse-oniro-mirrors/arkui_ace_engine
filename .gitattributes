@@ -13,3 +13,4 @@
 *.so filter=lfs diff=lfs merge=lfs -text
 *.bin filter=lfs diff=lfs merge=lfs -text
 *.dll filter=lfs diff=lfs merge=lfs -text
+frameworks/bridge/arkts_frontend/koala_projects/incremental/tools/ets-tsc/lib/tsc.js filter=lfs diff=lfs merge=lfs -text
