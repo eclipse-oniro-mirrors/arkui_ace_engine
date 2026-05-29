@@ -199,6 +199,22 @@ config("ace_test_config") {
     cflags += [ "--coverage" ]
     ldflags += [ "--coverage" ]
   }
+
+  if (is_ohos && is_clang && (target_cpu == "arm" || target_cpu == "arm64") &&
+      enhanced_opt && enable_enhanced_opt) {
+    if (ace_engine_feature_enable_pgo && ace_engine_feature_enable_dtp) {
+      cflags += [
+        "-mllvm",
+        "-enable-vtable-profile-use",
+        "-fwhole-program-vtables",
+      ]
+      ldflags += [
+        "-Wl,-mllvm,-wholeprogramdevirt-check=fallback",
+        "-Wl,-mllvm,-enable-vtable-profile-use",
+        "-fwhole-program-vtables",
+      ]
+    }
+  }
 }
 
 config("ace_coverage_config") {
