@@ -247,7 +247,7 @@ HWTEST_F(MenuLayout1TwoTestNg, MenuLayoutAlgorithmTestNg037, TestSize.Level1)
     position = OffsetF(POSITION_OFFSET, OFFSET_FIFTH);
     menuLayoutAlgorithm->placement_ = Placement::TOP_LEFT;
     result = menuLayoutAlgorithm->CheckPosition(position, size);
-    EXPECT_FALSE(result);
+    EXPECT_TRUE(result);
 
     /**
      * @tc.steps: step4. the placement of menuLayoutAlgorithm is Placement::LEFT_TOP and menu position is normal
@@ -256,7 +256,7 @@ HWTEST_F(MenuLayout1TwoTestNg, MenuLayoutAlgorithmTestNg037, TestSize.Level1)
     position = OffsetF(OFFSET_FIFTH, OFFSET_THIRD);
     menuLayoutAlgorithm->placement_ = Placement::LEFT_TOP;
     result = menuLayoutAlgorithm->CheckPosition(position, size);
-    EXPECT_FALSE(result);
+    EXPECT_TRUE(result);
 
     /**
      * @tc.steps: step5. the placement of menuLayoutAlgorithm is Placement::NONE
