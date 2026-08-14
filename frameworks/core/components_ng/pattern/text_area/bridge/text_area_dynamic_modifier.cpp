@@ -31,7 +31,8 @@
 #include "interfaces/native/node/node_model.h"
 #include "core/components_ng/pattern/text_area/bridge/text_area_custom_modifier.h"
 #include "core/components_ng/pattern/text_area/text_area_pattern.h"
-#include "core/components_ng/pattern/text_field/text_component_decorator.h"
+#include "core/components_ng/pattern/common_text/counter_decorator.h"
+#include "core/components_ng/pattern/text_field/error_decorator.h"
 #include "core/common/text_field_manager_ng.h"
 #include "core/components_ng/pattern/text_field/text_field_pattern.h"
 #include "core/components_ng/pattern/text_field/text_input_response_area.h"
@@ -3735,6 +3736,11 @@ void SetTextAreaFocusableAndFocusNodeImpl()
 {
     GetTextFieldModelImpl()->SetFocusableAndFocusNode();
 }
+
+void SetTextAreaEnablePreviewTextImpl(ArkUINodeHandle node, ArkUI_Uint32 value)
+{
+    return;
+}
 #endif
 } // namespace
 namespace NodeModifier {
@@ -3954,7 +3960,7 @@ const ArkUITextAreaModifier* GetTextAreaDynamicModifier()
             .resetTextAreaOnWillDelete = nullptr,
             .setTextAreaOnDidDelete = nullptr,
             .resetTextAreaOnDidDelete = nullptr,
-            .setTextAreaEnablePreviewText = nullptr,
+            .setTextAreaEnablePreviewText = SetTextAreaEnablePreviewTextImpl,
             .resetTextAreaEnablePreviewText = nullptr,
             .getTextAreaPadding = nullptr,
             .setTextAreaSelectionMenuOptions = nullptr,

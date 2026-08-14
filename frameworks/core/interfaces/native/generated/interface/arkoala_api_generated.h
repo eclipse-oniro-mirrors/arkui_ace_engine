@@ -11598,8 +11598,8 @@ typedef struct Opt_Callback_CopyEvent_Void {
 typedef struct Callback_CreateItem {
     /* kind: Callback */
     Ark_CallbackResource resource;
-    void (*call)(const Ark_Int32 resourceId, const Ark_Int32 index, const Callback_Pointer_Void continuation);
-    void (*callSync)(Ark_VMContext vmContext, const Ark_Int32 resourceId, const Ark_Int32 index, const Callback_Pointer_Void continuation);
+    void (*call)(const Ark_Int32 resourceId, const Ark_Int32 index, Ark_Boolean skipCreate, const Callback_Pointer_Void continuation);
+    void (*callSync)(Ark_VMContext vmContext, const Ark_Int32 resourceId, const Ark_Int32 index, Ark_Boolean skipCreate, const Callback_Pointer_Void continuation);
 } Callback_CreateItem;
 typedef struct Opt_Callback_CreateItem {
     Ark_Tag tag;
@@ -17047,6 +17047,7 @@ typedef struct Opt_NavDestinationModuleInfo {
 typedef struct Ark_NavigationConfiguration {
     /* kind: Interface */
     Opt_Int32 stackSizeLimit;
+    Opt_Boolean clearContentStackOnPrimaryNavigation;
     Opt_Boolean recyclePagesOnLowMemory;
 } Ark_NavigationConfiguration;
 typedef struct Opt_NavigationConfiguration {
@@ -30110,6 +30111,8 @@ typedef struct GENERATED_ArkUIFocusControllerAccessor {
 } GENERATED_ArkUIFocusControllerAccessor;
 
 typedef struct GENERATED_ArkUIForEachOpsAccessor {
+    void (*Sync)(Ark_NativePointer node,
+                 const Callback_RangeUpdate* updater);
     void (*SyncOnMoveOps)(Ark_NativePointer node,
                           const Array_Pointer* additionalChild,
                           const Opt_OnMoveHandler* onMoveOps,
@@ -33721,4 +33724,3 @@ struct OH_AnyAPI {
 /* clang-format on */
 
 #endif  // GENERATED_FOUNDATION_ACE_FRAMEWORKS_CORE_INTERFACES_ARKOALA_API_H
-

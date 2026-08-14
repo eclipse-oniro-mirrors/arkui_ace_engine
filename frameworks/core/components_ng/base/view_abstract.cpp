@@ -61,7 +61,6 @@
 #endif
 #include "core/components_ng/pattern/bubble/bubble_pattern.h"
 #include "core/interfaces/native/node/bubble_modifier.h"
-#include "core/components_ng/pattern/dialog/dialog_pattern.h"
 #include "core/components_ng/pattern/grid/grid_event_hub.h"
 #include "core/components_ng/pattern/list/list_event_hub.h"
 #include "core/components_ng/pattern/menu/wrapper/menu_wrapper_pattern.h"
@@ -1755,6 +1754,8 @@ void ViewAbstract::SetBorderRadius(const Dimension& value)
     if (CheckDimensionUseLPX(value)) {
         auto lpxUpdateFunc = GetBorderRadiusFuncForLPX(value);
         ACE_SET_LPX_UPDATE_CALLBACK(true, LpxAttribute::LPX_BORDER_RADIUS, lpxUpdateFunc);
+    } else {
+        ACE_SET_LPX_UPDATE_CALLBACK(false, LpxAttribute::LPX_BORDER_RADIUS, EMPTY_CALLBACK);
     }
 }
 
@@ -2117,6 +2118,8 @@ void ViewAbstract::SetDashGap(const Dimension& value)
     if (CheckDimensionUseLPX(value)) {
         auto lpxUpdateFunc = GetBorderDashGapFuncForLPX(value);
         ACE_SET_LPX_UPDATE_CALLBACK(true, LpxAttribute::LPX_BORDER_DASH_GAP, lpxUpdateFunc);
+    } else {
+        ACE_SET_LPX_UPDATE_CALLBACK(false, LpxAttribute::LPX_BORDER_DASH_GAP, EMPTY_CALLBACK);
     }
 }
 
@@ -2129,6 +2132,8 @@ void ViewAbstract::SetDashGap(FrameNode *frameNode, const Dimension& value)
     if (CheckDimensionUseLPX(value)) {
         auto lpxUpdateFunc = GetBorderDashGapFuncForLPX(value);
         ACE_SET_NODE_LPX_UPDATE_CALLBACK(true, LpxAttribute::LPX_BORDER_DASH_GAP, lpxUpdateFunc, frameNode);
+    } else {
+        ACE_SET_NODE_LPX_UPDATE_CALLBACK(false, LpxAttribute::LPX_BORDER_DASH_GAP, EMPTY_CALLBACK, frameNode);
     }
 }
 
@@ -2192,6 +2197,8 @@ void ViewAbstract::CheckBorderDashGapLPX(const BorderWidthProperty& value)
     if (CheckDimensionUseLPX(value.topDimen) || CheckDimensionUseLPX(value.bottomDimen) ||
         CheckDimensionUseLPX(value.leftDimen) || CheckDimensionUseLPX(value.rightDimen)) {
         ACE_SET_LPX_UPDATE_CALLBACK(true, LpxAttribute::LPX_BORDER_DASH_GAP, lpxUpdateFunc);
+    } else {
+        ACE_SET_LPX_UPDATE_CALLBACK(false, LpxAttribute::LPX_BORDER_DASH_GAP, EMPTY_CALLBACK);
     }
 }
 
@@ -2202,6 +2209,8 @@ void ViewAbstract::CheckNodeBorderDashGapLPX(
     if (CheckDimensionUseLPX(value.topDimen) || CheckDimensionUseLPX(value.bottomDimen) ||
         CheckDimensionUseLPX(value.leftDimen) || CheckDimensionUseLPX(value.rightDimen)) {
         ACE_SET_NODE_LPX_UPDATE_CALLBACK(true, LpxAttribute::LPX_BORDER_DASH_GAP, lpxUpdateFunc, frameNode);
+    } else {
+        ACE_SET_NODE_LPX_UPDATE_CALLBACK(false, LpxAttribute::LPX_BORDER_DASH_GAP, EMPTY_CALLBACK, frameNode);
     }
 }
 
@@ -2211,6 +2220,8 @@ void ViewAbstract::CheckNodeBorderDashGapLPX(FrameNode* frameNode, const BorderW
     if (CheckDimensionUseLPX(value.topDimen) || CheckDimensionUseLPX(value.bottomDimen) ||
         CheckDimensionUseLPX(value.leftDimen) || CheckDimensionUseLPX(value.rightDimen)) {
         ACE_SET_NODE_LPX_UPDATE_CALLBACK(true, LpxAttribute::LPX_BORDER_DASH_GAP, lpxUpdateFunc, frameNode);
+    } else {
+        ACE_SET_NODE_LPX_UPDATE_CALLBACK(false, LpxAttribute::LPX_BORDER_DASH_GAP, EMPTY_CALLBACK, frameNode);
     }
 }
 
@@ -2226,6 +2237,8 @@ void ViewAbstract::SetDashWidth(const Dimension& value)
     if (CheckDimensionUseLPX(value)) {
         auto lpxUpdateFunc = GetDashWidthFuncForLPX(value);
         ACE_SET_LPX_UPDATE_CALLBACK(true, LpxAttribute::LPX_BORDER_DASH_WIDTH, lpxUpdateFunc);
+    } else {
+        ACE_SET_LPX_UPDATE_CALLBACK(false, LpxAttribute::LPX_BORDER_DASH_WIDTH, EMPTY_CALLBACK);
     }
 }
 
@@ -2238,6 +2251,8 @@ void ViewAbstract::SetDashWidth(FrameNode *frameNode, const Dimension& value)
     if (CheckDimensionUseLPX(value)) {
         auto lpxUpdateFunc = GetDashWidthFuncForLPX(value);
         ACE_SET_NODE_LPX_UPDATE_CALLBACK(true, LpxAttribute::LPX_BORDER_DASH_WIDTH, lpxUpdateFunc, frameNode);
+    } else {
+        ACE_SET_NODE_LPX_UPDATE_CALLBACK(false, LpxAttribute::LPX_BORDER_DASH_WIDTH, EMPTY_CALLBACK, frameNode);
     }
 }
 
@@ -2301,6 +2316,8 @@ void ViewAbstract::CheckBorderDashWidthLPX(const BorderWidthProperty& value)
     if (CheckDimensionUseLPX(value.topDimen) || CheckDimensionUseLPX(value.bottomDimen) ||
         CheckDimensionUseLPX(value.leftDimen) || CheckDimensionUseLPX(value.rightDimen)) {
         ACE_SET_LPX_UPDATE_CALLBACK(true, LpxAttribute::LPX_BORDER_DASH_WIDTH, lpxUpdateFunc);
+    } else {
+        ACE_SET_LPX_UPDATE_CALLBACK(false, LpxAttribute::LPX_BORDER_DASH_WIDTH, EMPTY_CALLBACK);
     }
 }
 
@@ -2402,6 +2419,8 @@ void ViewAbstract::CheckNodeBorderDashWidthLPX(
     if (CheckDimensionUseLPX(value.topDimen) || CheckDimensionUseLPX(value.bottomDimen) ||
         CheckDimensionUseLPX(value.leftDimen) || CheckDimensionUseLPX(value.rightDimen)) {
         ACE_SET_NODE_LPX_UPDATE_CALLBACK(true, LpxAttribute::LPX_BORDER_DASH_WIDTH, lpxUpdateFunc, frameNode);
+    } else {
+        ACE_SET_NODE_LPX_UPDATE_CALLBACK(false, LpxAttribute::LPX_BORDER_DASH_WIDTH, EMPTY_CALLBACK, frameNode);
     }
 }
 
@@ -2411,6 +2430,8 @@ void ViewAbstract::CheckNodeBorderDashWidthLPX(FrameNode* frameNode, const Borde
     if (CheckDimensionUseLPX(value.topDimen) || CheckDimensionUseLPX(value.bottomDimen) ||
         CheckDimensionUseLPX(value.leftDimen) || CheckDimensionUseLPX(value.rightDimen)) {
         ACE_SET_NODE_LPX_UPDATE_CALLBACK(true, LpxAttribute::LPX_BORDER_DASH_WIDTH, lpxUpdateFunc, frameNode);
+    } else {
+        ACE_SET_NODE_LPX_UPDATE_CALLBACK(false, LpxAttribute::LPX_BORDER_DASH_WIDTH, EMPTY_CALLBACK, frameNode);
     }
 }
 
@@ -6707,9 +6728,8 @@ void ViewAbstract::ResetSystemMaterialEffect(FrameNode* frameNode)
                 frameNode->GetTag().c_str());
             return;
         }
-        if (preConfig->key.level == UiMaterialLevel::SMOOTH) {
-            ResetBorderAndBackgroundEffect(frameNode, pattern, renderContext);
-        } else {
+        ResetBorderAndBackgroundEffect(frameNode, pattern, renderContext);
+        if (preConfig->key.level != UiMaterialLevel::SMOOTH) {
             // reset color picker, materialFilter, and transparency callback.
             if (preConfig->colorInvert) {
                 renderContext->BindColorPicker(ColorPlaceholder::SURFACE_CONTRAST, ColorPickStrategy::NONE, 0);
@@ -6779,6 +6799,26 @@ void ViewAbstract::ResetBorderAndBackgroundEffect(
     }
 }
 
+void ViewAbstract::RemoveBorderAndBackgroundEffect(
+    const RefPtr<FrameNode>& frameNode, const RefPtr<RenderContext>& renderContext)
+{
+    // reset the property to no effect to avoid blocking the effect of the material
+    if (renderContext->HasBackgroundColor()) {
+        renderContext->UpdateBackgroundColor(Color::TRANSPARENT);
+    }
+    if (renderContext->HasBorderWidth()) {
+        BorderWidthProperty borderWidth;
+        borderWidth.SetBorderWidth(Dimension(0));
+        ACE_UPDATE_NODE_LAYOUT_PROPERTY(LayoutProperty, BorderWidth, borderWidth, frameNode);
+        ACE_UPDATE_NODE_RENDER_CONTEXT(BorderWidth, borderWidth, frameNode);
+    }
+    if (renderContext->HasBorderColor()) {
+        BorderColorProperty borderColor;
+        borderColor.SetColor(Color::BLACK);
+        renderContext->UpdateBorderColor(borderColor);
+    }
+}
+
 void ViewAbstract::SetSystemMaterialImmediate(FrameNode* frameNode, const UiMaterial* material)
 {
     if (material && !MaterialUtils::IsImmersiveMaterialSupported(material)) {
@@ -6818,9 +6858,13 @@ void ViewAbstract::SetSystemMaterialImmediate(FrameNode* frameNode, const UiMate
     if (SystemProperties::ConfigChangePerform()) {
         auto pattern = frameNode->GetPattern();
         CHECK_NULL_VOID(pattern);
-        updateFunc(nullptr);
-        RefPtr<ResourceObject> resObj = AceType::MakeRefPtr<ResourceObject>("", "", -1);
-        pattern->AddResObj("viewAbstract.uiMaterial", resObj, std::move(updateFunc));
+        if (material != nullptr) {
+            updateFunc(nullptr);
+            RefPtr<ResourceObject> resObj = AceType::MakeRefPtr<ResourceObject>("", "", -1);
+            pattern->AddResObj("viewAbstract.uiMaterial", resObj, std::move(updateFunc));
+        } else {
+            ResetSystemMaterialEffect(frameNode);
+        }
         return;
     }
 
@@ -7011,7 +7055,7 @@ void ViewAbstract::SetImmersiveConfigs(const RefPtr<FrameNode>& frameNode, const
             TAG_LOGW(AceLogTag::ACE_VISUAL_EFFECT, "uiMaterial theme not found");
             return;
         }
-        auto params = materialTheme->GetUiMaterialParam(MaterialType::IMMERSIVE, pipeline);
+        auto params = materialTheme->GetUiMaterialParam(MaterialType::IMMERSIVE, frameNode, config->key.colorMode);
         if (!params) {
             TAG_LOGW(AceLogTag::ACE_VISUAL_EFFECT, "Get immersive param failed");
             return;
@@ -7032,10 +7076,11 @@ void ViewAbstract::SetImmersiveConfigs(const RefPtr<FrameNode>& frameNode, const
         renderContext->SetImmersiveMaterialConfig(config);
         return;
     }
+    // gentle or exquisite
+    RemoveBorderAndBackgroundEffect(frameNode, renderContext);
     if (preConfig == config) {
         return;
     }
-    // gentle or exquisite
     int32_t style = static_cast<int32_t>(config->key.style);
     if (style >= static_cast<int32_t>(UiMaterialStyle::ULTRA_THIN_EC) &&
         style <= static_cast<int32_t>(UiMaterialStyle::ULTRA_THICK_EC)) {
@@ -7600,6 +7645,8 @@ void ViewAbstract::SetBorderRadius(FrameNode* frameNode, const Dimension& value)
     if (CheckDimensionUseLPX(value)) {
         auto lpxUpdateFunc = GetBorderRadiusFuncForLPX(value);
         ACE_SET_NODE_LPX_UPDATE_CALLBACK(true, LpxAttribute::LPX_BORDER_RADIUS, lpxUpdateFunc, frameNode);
+    } else {
+        ACE_SET_NODE_LPX_UPDATE_CALLBACK(false, LpxAttribute::LPX_BORDER_RADIUS, EMPTY_CALLBACK, frameNode);
     }
 }
 

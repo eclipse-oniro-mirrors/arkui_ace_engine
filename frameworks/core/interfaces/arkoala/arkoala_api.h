@@ -7632,7 +7632,8 @@ struct ArkUINavigationModifier {
     void (*setDividerStartMargin)(ArkUINodeHandle node, ArkUI_CharPtr start, ArkUI_VoidPtr startRes);
     void (*setDividerEndMargin)(ArkUINodeHandle node, ArkUI_CharPtr end, ArkUI_VoidPtr endRes);
     void (*resetDividerStyle)(ArkUINodeHandle node);
-    void (*setNavigationConfiguration)(ArkUINodeHandle node, ArkUI_Int32 stackSizeLimit, ArkUI_Bool recyclePagesOnLowMemory);
+    void (*setNavigationConfiguration)(ArkUINodeHandle node, ArkUI_Int32 stackSizeLimit,
+        ArkUI_Bool clearContentStackOnPrimaryNavigation, ArkUI_Bool recyclePagesOnLowMemory);
     void (*resetNavigationConfiguration)(ArkUINodeHandle node);
 };
 
@@ -8320,6 +8321,7 @@ struct ArkUITextClockModifier {
     ArkUINodeHandle (*createTextClockController)();
     void (*createWithTextColorResourceObj)(ArkUINodeHandle node, void* fontColorRawPtr);
     void (*setTextColorByUser)(ArkUINodeHandle node, ArkUI_Bool value);
+    void (*setTextShadowNew)(void* shadowsRaw, ArkUI_Uint32 length);
 };
 
 struct ArkUITextClockControllerModifier {

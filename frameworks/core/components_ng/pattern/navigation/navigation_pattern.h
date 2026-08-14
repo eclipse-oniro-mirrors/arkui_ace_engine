@@ -16,6 +16,8 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_NAVIGATION_NAVIGATION_PATTERN_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_NAVIGATION_NAVIGATION_PATTERN_H
 
+#include <set>
+
 #include "base/memory/referenced.h"
 #include "base/system_bar/system_bar_style.h"
 #include "core/common/display_info.h"
@@ -84,7 +86,6 @@ public:
     void OnAttachToFrameNodeMultiThread();
     void OnDetachFromFrameNode(FrameNode* frameNode) override;
     void OnDetachFromFrameNodeMultiThread(FrameNode* frameNode);
-    void ContentChangeByDetaching(PipelineContext* pipeline) override;
 
     void OnModifyDone() override;
     void OnWindowHide() override;
@@ -445,6 +446,10 @@ public:
 
     void SetSystemBarStyle(const RefPtr<SystemBarStyle>& style);
     void SetSystemBarStyleMultiThread(const RefPtr<SystemBarStyle>& style);
+    void SetBackupStyle(const std::optional<RefPtr<SystemBarStyle>>& style)
+    {
+        backupStyle_ = style;
+    }
 
     void OnAttachToMainTree() override;
     void OnAttachToMainTreeMultiThread();
@@ -993,6 +998,7 @@ private:
     void ContentChangeReport(const RefPtr<FrameNode>& keyNode);
     void ContentChangeOnTransitionStart(const RefPtr<FrameNode>& keyNode);
     void UpdatePlaceholderVisibilityIfNeeded();
+    bool CheckIfLastDestWillBeFullScreenOverlay(const std::vector<RefPtr<NavDestinationGroupNode>>& destList);
 
     //-------for force split------- begin------
     bool IsNavBarValid();

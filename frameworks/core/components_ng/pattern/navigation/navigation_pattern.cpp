@@ -341,6 +341,7 @@ void NavigationPattern::RestoreNodeFromProxyNodeIfNeeded(const RefPtr<FrameNode>
 
     node->SetIndex(proxyNode->GetIndex());
     primaryContentNode->RemoveChildSilently(node);
+    primaryContentNode->MarkNeedSyncRenderTree(true);
     primaryContentNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
 
     navContentNode->RemoveChildSilently(proxyNode);
@@ -1158,6 +1159,20 @@ int32_t NavigationPattern::GetFirstNewDestinationIndex(const NavPathList& preLis
     return firstNewNodeIndex;
 }
 
+bool NavigationPattern::CheckIfLastDestWillBeFullScreenOverlay(
+    const std::vector<RefPtr<NavDestinationGroupNode>>& destList)
+{
+    for (auto it = destList.rbegin(); it != destList.rend(); ++it) {
+        auto dest = *it;
+        CHECK_NULL_CONTINUE(dest);
+        auto userSetFullScreenOverlay = dest->GetUserSetFullScreenOverlay();
+        if (userSetFullScreenOverlay.has_value()) {
+            return userSetFullScreenOverlay.value();
+        }
+    }
+    return false;
+}
+
 void NavigationPattern::ClearContentStackIfNeeded(NavPathList&& preList)
 {
     /**
@@ -1175,9 +1190,16 @@ void NavigationPattern::ClearContentStackIfNeeded(NavPathList&& preList)
     }
     const auto& curTopNode = curList.back().second;
     bool homeTouched = homeNodeTouched_.has_value() && homeNodeTouched_.value();
-    auto topDest = AceType::DynamicCast<NavDestinationGroupNode>(
-            NavigationGroupNode::GetNavDestinationNode(curTopNode));
-    if (forceSplitSuccess_ || IsRealStackDisplay() || !topDest || topDest->IsFullScreenOverlay() || !homeTouched) {
+    auto preTopIsFullScreenOverlay = [&preList]() {
+        if (preList.empty()) {
+            return false;
+        }
+        auto preTopDest = AceType::DynamicCast<NavDestinationGroupNode>(
+            NavigationGroupNode::GetNavDestinationNode(preList.front().second));
+        CHECK_NULL_RETURN(preTopDest, false);
+        return preTopDest->IsFullScreenOverlay();
+    };
+    if (forceSplitSuccess_ || !homeTouched || IsRealStackDisplay() || preTopIsFullScreenOverlay()) {
         return;
     }
     homeNodeTouched_ = std::nullopt;
@@ -1187,7 +1209,6 @@ void NavigationPattern::ClearContentStackIfNeeded(NavPathList&& preList)
     if (it != preList.end()) {
         return;
     }
-
     std::vector<int32_t> removeIndexes;
     int32_t firstNewNodeIndex = GetFirstNewDestinationIndex(preList, curList);
     for (int32_t index = firstNewNodeIndex - 1; index >= 0; --index) {
@@ -1196,6 +1217,19 @@ void NavigationPattern::ClearContentStackIfNeeded(NavPathList&& preList)
     if (removeIndexes.empty()) {
         return;
     }
+    std::vector<RefPtr<NavDestinationGroupNode>> remainDestList;
+    for (int32_t index = std::max(firstNewNodeIndex, 0); index < static_cast<int32_t>(curList.size()); ++index) {
+        auto node = curList[index].second;
+        CHECK_NULL_CONTINUE(node);
+        auto dest = AceType::DynamicCast<NavDestinationGroupNode>(
+            NavigationGroupNode::GetNavDestinationNode(node));
+        CHECK_NULL_CONTINUE(dest);
+        remainDestList.push_back(dest);
+    }
+    if (CheckIfLastDestWillBeFullScreenOverlay(remainDestList)) {
+        return;
+    }
+    remainDestList.clear();
 
     TAG_LOGI(AceLogTag::ACE_NAVIGATION, "Remove content NavDestinationNodes, count:%{public}d",
         static_cast<int32_t>(removeIndexes.size()));
@@ -1220,6 +1254,10 @@ void NavigationPattern::ClearSecondaryNodesIfNeeded(NavPathList&& preList)
      * This will trigger the following logic:
      * The NavDestination between the primary-side anchor and the first newly added NavDestination will be removed.
      */
+    if (!forceSplitSuccess_ && config_.needClearContentStack) {
+        ClearContentStackIfNeeded(std::move(preList));
+        return;
+    }
     auto homeNode = forceSplitHomeDest_.Upgrade();
     auto touchedPrimaryNode = touchedPrimaryColumnDest_.Upgrade();
     bool homeTouched = homeNodeTouched_.has_value() && homeNodeTouched_.value();
@@ -2964,6 +3002,9 @@ void NavigationPattern::TransitionWithAnimation(RefPtr<NavDestinationGroupNode> 
         navigationNode->RemoveDialogDestination();
         ClearRecoveryList();
         OnStartOneTransitionAnimation();
+        if (newTopNavDestination) {
+            ContentChangeReport(newTopNavDestination);
+        }
         OnFinishOneTransitionAnimation();
         if (newTopNavDestination) {
             navigationNode->OnAccessibilityEvent(AccessibilityEventType::PAGE_CHANGE,
@@ -4114,6 +4155,7 @@ bool NavigationPattern::TriggerCustomAnimation(RefPtr<NavDestinationGroupNode> p
     auto homeDestination = AceType::DynamicCast<NavDestinationGroupNode>(hostNode->GetNavBarOrHomeDestinationNode());
     proxy->SetPreDestination(preTopNavDestination ? preTopNavDestination : homeDestination);
     proxy->SetTopDestination(newTopNavDestination ? newTopNavDestination : homeDestination);
+    auto contentChangeTransitionId = newTopNavDestination ? newTopNavDestination->GetId() : -1;
     auto proxyId = proxy->GetProxyId();
     proxyList_.emplace_back(proxy);
     auto navigationTransition = ExecuteTransition(preTopNavDestination, newTopNavDestination, isPopPage);
@@ -4137,7 +4179,7 @@ bool NavigationPattern::TriggerCustomAnimation(RefPtr<NavDestinationGroupNode> p
         std::function<void()> onFinish = [weakNavigation = WeakClaim(this),
                                   weakPreNavDestination = WeakPtr<NavDestinationGroupNode>(preTopNavDestination),
                                   weakNewNavDestination = WeakPtr<NavDestinationGroupNode>(newTopNavDestination),
-                                  isPopPage, proxyId]() {
+                                  isPopPage, proxyId, contentChangeTransitionId]() {
             auto preDestination = weakPreNavDestination.Upgrade();
             auto topDestination = weakNewNavDestination.Upgrade();
             if (preDestination) {
@@ -4171,6 +4213,17 @@ bool NavigationPattern::TriggerCustomAnimation(RefPtr<NavDestinationGroupNode> p
             } else {
                 // fire page cancel transition
                 TAG_LOGI(AceLogTag::ACE_NAVIGATION, "interactive animation canceled");
+#ifndef CROSS_PLATFORM
+                if (contentChangeTransitionId >= 0) {
+                    auto pipeline = pattern->GetContext();
+                    auto mgr = pipeline ? pipeline->GetContentChangeManager() : nullptr;
+                    if (mgr) {
+                        mgr->OnTransitionRemoved(contentChangeTransitionId);
+                    }
+                }
+#else
+                (void)contentChangeTransitionId;
+#endif
                 pattern->RecoveryToLastStack(preDestination, topDestination);
                 pattern->SyncWithJsStackIfNeeded();
             }
@@ -8414,18 +8467,6 @@ void NavigationPattern::ContentChangeOnTransitionStart(const RefPtr<FrameNode>& 
     CHECK_NULL_VOID(mgr);
     CHECK_NULL_VOID(keyNode);
     mgr->OnTransitionAdded(keyNode->GetId());
-#endif
-}
-
-void NavigationPattern::ContentChangeByDetaching(PipelineContext* pipeline)
-{
-#ifndef CROSS_PLATFORM
-    CHECK_NULL_VOID(pipeline);
-    auto mgr = pipeline->GetContentChangeManager();
-    CHECK_NULL_VOID(mgr);
-    auto host = GetHost();
-    CHECK_NULL_VOID(host);
-    mgr->OnTransitionRemoved(host->GetId());
 #endif
 }
 

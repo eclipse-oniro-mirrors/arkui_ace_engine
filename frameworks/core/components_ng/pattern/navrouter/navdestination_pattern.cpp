@@ -22,6 +22,7 @@
 #include "core/common/agingadapation/aging_adapation_dialog_theme.h"
 #include "core/common/agingadapation/aging_adapation_dialog_util.h"
 #include "core/components/theme/app_theme.h"
+#include "core/components_ng/manager/content_change_manager/content_change_manager.h"
 #include "core/components_ng/manager/memory/memory_manager.h"
 #include "core/components_ng/pattern/navigation/navigation_pattern.h"
 #include "core/components_ng/pattern/navigation/navigation_title_util.h"
@@ -563,13 +564,14 @@ void NavDestinationPattern::SetSystemBarStyle(const RefPtr<SystemBarStyle>& styl
     CHECK_NULL_VOID(pipeline);
     auto windowManager = pipeline->GetWindowManager();
     CHECK_NULL_VOID(windowManager);
-    if (!backupStyle_.has_value()) {
-        backupStyle_ = windowManager->GetSystemBarStyle();
-    }
-    currStyle_ = style;
     auto navigationNode = AceType::DynamicCast<NavigationGroupNode>(navigationNode_.Upgrade());
     CHECK_NULL_VOID(navigationNode);
     auto navigationPattern = navigationNode->GetPattern<NavigationPattern>();
+    if (!backupStyle_.has_value()) {
+        backupStyle_ = windowManager->GetSystemBarStyle();
+        navigationPattern->SetBackupStyle(backupStyle_);
+    }
+    currStyle_ = style;
     if (navigationPattern->IsFullPageNavigation() && navigationPattern->IsTopNavDestination(host)) {
         if (currStyle_.value() != nullptr) {
             windowManager->SetSystemBarStyle(currStyle_.value());
@@ -627,6 +629,18 @@ void NavDestinationPattern::OnDetachFromMainTree()
     if (pendingToClean_) {
         SetPendingToClean(false);
     }
+}
+
+void NavDestinationPattern::ContentChangeByDetaching(PipelineContext* pipeline)
+{
+#ifndef CROSS_PLATFORM
+    CHECK_NULL_VOID(pipeline);
+    auto mgr = pipeline->GetContentChangeManager();
+    CHECK_NULL_VOID(mgr);
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    mgr->OnTransitionRemoved(host->GetId());
+#endif
 }
 
 void NavDestinationPattern::DumpInfo(std::unique_ptr<JsonValue>& json)

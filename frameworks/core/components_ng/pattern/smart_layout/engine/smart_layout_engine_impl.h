@@ -45,12 +45,12 @@ public:
     {
         node_->CreateChildrenFromInfos(infos);
     }
-    const std::vector<std::shared_ptr<ISmartLayoutNode>>& GetChildren() const override;
+    std::vector<std::shared_ptr<ISmartLayoutNode>> GetChildren() const override;
 
     void ApplyColumnConstraints() override { node_->ApplyColumnConstraints(); }
     void ApplyRowConstraints() override { node_->ApplyRowConstraints(); }
     void ApplyGeneralConstraints() override { node_->ApplyGeneralConstraints(); }
-    void ApplyScaleUpConstraints(double emptyRatioThreshold = 0.3) override
+    void ApplyScaleUpConstraints(double emptyRatioThreshold = SMART_LAYOUT_EMPTY_RATIO_THRESHOLD) override
     {
         node_->ApplyScaleUpConstraints(emptyRatioThreshold);
     }
@@ -71,7 +71,6 @@ public:
 
 private:
     std::shared_ptr<SmartLayoutNode> node_;
-    mutable std::vector<std::shared_ptr<ISmartLayoutNode>> childrenCache_;
 };
 
 /**
