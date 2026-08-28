@@ -74,6 +74,22 @@ void RadioPattern::OnDetachFromFrameNode(FrameNode* frameNode)
     UpdateGroupStatus(frameNode);
 }
 
+void RadioPattern::OnAttachToMainTree()
+{
+    Pattern::OnAttachToMainTree();
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    if (!isPendingGroupValueUpdate_) {
+        return;
+    }
+    isPendingGroupValueUpdate_ = false;
+    auto groupManager = GetGroupManager();
+    CHECK_NULL_VOID(groupManager);
+    auto radioEventHub = GetEventHub<RadioEventHub>();
+    CHECK_NULL_VOID(radioEventHub);
+    groupManager->UpdateRadioGroupValue(radioEventHub->GetGroup(), host->GetId());
+}
+
 void RadioPattern::OnDetachFromMainTree()
 {
     auto host = GetHost();
@@ -651,6 +667,7 @@ void RadioPattern::UpdateUncheckStatus(const RefPtr<FrameNode>& frameNode)
         isOnAnimationFlag_ = false;
     }
     preCheck_ = false;
+    isPendingGroupValueUpdate_ = false;
 }
 
 void RadioPattern::startEnterAnimation()
@@ -838,8 +855,13 @@ void RadioPattern::UpdateGroupCheckStatus(
     auto radioEventHub = GetEventHub<RadioEventHub>();
     CHECK_NULL_VOID(radioEventHub);
     if (check) {
-        groupManager->UpdateRadioGroupValue(radioEventHub->GetGroup(), frameNode->GetId());
+        if (frameNode->IsOnMainTree()) {
+            groupManager->UpdateRadioGroupValue(radioEventHub->GetGroup(), frameNode->GetId());
+        } else {
+            isPendingGroupValueUpdate_ = true;
+        }
     } else {
+        isPendingGroupValueUpdate_ = false;
         auto radioPaintProperty = frameNode->GetPaintProperty<RadioPaintProperty>();
         CHECK_NULL_VOID(radioPaintProperty);
         radioPaintProperty->UpdateRadioCheck(check);
