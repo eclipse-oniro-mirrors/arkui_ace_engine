@@ -90,7 +90,7 @@ HWTEST_F(ResSchedReportTest, ResSchedReportTest003, TestSize.Level1)
     payload["path"] = "/test[0]/swiper[1]";
     payload["currentIndex"] = "1";
     payload["componentType"] = "1";
-    ResSchedReport::GetInstance().HandleSwiperChange(payload);
+    ResSchedReport::GetInstance().HandleSwiperChange(payload, 0);
     EXPECT_NE(payload.size(), 0);
 }
 
@@ -102,7 +102,7 @@ HWTEST_F(ResSchedReportTest, ResSchedReportTest003, TestSize.Level1)
 HWTEST_F(ResSchedReportTest, ResSchedReportTest004, TestSize.Level1)
 {
     std::unordered_map<std::string, std::string> payload;
-    ResSchedReport::GetInstance().HandleSwiperChange(payload);
+    ResSchedReport::GetInstance().HandleSwiperChange(payload, 0);
     EXPECT_FALSE(payload.empty());
 }
 
@@ -160,7 +160,7 @@ HWTEST_F(ResSchedReportTest, ResSchedReportTest008, TestSize.Level1)
     payload["componentType"] = "1";
     payload["bundleName"] = "com.test.bundle";
     payload["abilityName"] = "MainAbility";
-    ResSchedReport::GetInstance().HandleSwiperChange(payload);
+    ResSchedReport::GetInstance().HandleSwiperChange(payload, 0);
     EXPECT_EQ(payload.size(), 7);
 }
 

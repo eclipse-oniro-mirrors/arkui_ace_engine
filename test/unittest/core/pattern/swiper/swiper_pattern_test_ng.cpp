@@ -3247,4 +3247,29 @@ HWTEST_F(SwiperPatternTestNg, StopPropertyTranslateAnimation002, TestSize.Level1
     EXPECT_TRUE(swiperPattern->fastAnimationRunning_);
     EXPECT_TRUE(swiperPattern->syncCancelAniIsFailed_);
 }
+
+/**
+ * @tc.name: HandleVisibleChange_VerifyReportSwiperChangeContent
+ * @tc.desc: Test HandleVisibleChange calls ReportSwiperChangeContent with correct value
+ * @tc.type: FUNC
+ */
+HWTEST_F(SwiperPatternTestNg, HandleVisibleChange_VerifyReportSwiperChangeContent, TestSize.Level1)
+{
+    SwiperModelNG model = CreateSwiper();
+    model.SetAutoPlay(false);
+    CreateSwiperItems(4);
+    CreateSwiperDone();
+
+    pattern_->isInAutoPlay_ = false;
+
+    pattern_->HandleVisibleChange(false);
+    std::unordered_map<std::string, std::string> payload;
+    int32_t value = -1;
+    OHOS::Ace::GetLastSwiperChangePayload(payload, value);
+    EXPECT_EQ(value, 2);
+
+    pattern_->HandleVisibleChange(true);
+    OHOS::Ace::GetLastSwiperChangePayload(payload, value);
+    EXPECT_EQ(value, 1);
+}
 } // namespace OHOS::Ace::NG

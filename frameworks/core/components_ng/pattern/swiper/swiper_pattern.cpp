@@ -1770,7 +1770,7 @@ void SwiperPattern::FireChangeEvent(int32_t preIndex, int32_t currentIndex, bool
     }
 }
 
-void SwiperPattern::ReportSwiperChangeContent(int32_t currentIndex) const
+void SwiperPattern::ReportSwiperChangeContent(int32_t currentIndex, int32_t value) const
 {
     auto host = GetHost();
     CHECK_NULL_VOID(host);
@@ -1808,7 +1808,7 @@ void SwiperPattern::ReportSwiperChangeContent(int32_t currentIndex) const
         payload["path"] = path;
         payload["currentIndex"] = std::to_string(currentIndex);
         payload["componentType"] = std::to_string(COMPONENT_SWIPER);
-        ResSchedReport::GetInstance().HandleSwiperChange(payload);
+        ResSchedReport::GetInstance().HandleSwiperChange(payload, value);
     }
 #endif
 }
@@ -5713,6 +5713,9 @@ void SwiperPattern::PostTranslateTask(uint32_t delayTime)
 
 void SwiperPattern::HandleVisibleChange(bool visible)
 {
+    TAG_LOGD(AceLogTag::ACE_SWIPER, "SwiperPattern::HandleVisibleChange");
+    auto currentIndex = GetLoopIndex(CurrentIndex());
+    ReportSwiperChangeContent(currentIndex, visible ? COMPONENT_SWIPER_SHOW : COMPONENT_SWIPER_HIDDEN);
     isVisibleArea_ = visible;
     if (!visible) {
         translateTask_.Cancel();

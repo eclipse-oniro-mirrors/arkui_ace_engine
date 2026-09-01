@@ -97,7 +97,7 @@ public:
     void OnAxisEvent(const AxisEvent& axisEvent);
     void AxisEventReportEnd();
     void HandlePageTransition(const PageTransitionInfo& pageTransitionInfo, const uint32_t windowId);
-    ACE_FORCE_EXPORT void HandleSwiperChange(std::unordered_map<std::string, std::string>& payload);
+    ACE_FORCE_EXPORT void HandleSwiperChange(std::unordered_map<std::string, std::string>& payload, int32_t value);
     static std::atomic<int32_t> createPageCount; // not consider multi-instances.
     static bool triggerExecuted; // not consider multi-instances.
     int64_t GetTid();

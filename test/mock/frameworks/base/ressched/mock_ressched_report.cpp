@@ -26,6 +26,8 @@ namespace {
     constexpr char ABILITY_OR_PAGE_SWITCH_START[] = "ability_or_page_switch_start";
     constexpr char ABILITY_OR_PAGE_SWITCH_END[] = "ability_or_page_switch_end";
     constexpr uint64_t RES_TYPE_ABILITY_OR_PAGE_SWITCH = 156;
+    std::unordered_map<std::string, std::string> g_lastSwiperChangePayload;
+    int32_t g_lastSwiperChangeValue = 0;
 }
 
 ResSchedReport::ResSchedReport()
@@ -103,6 +105,15 @@ bool ResSchedReport::AppRVSEnableCheck(const std::unordered_map<std::string, std
     return false;
 }
 
-void ResSchedReport::HandleSwiperChange(std::unordered_map<std::string, std::string>& payload)
-{}
+void ResSchedReport::HandleSwiperChange(std::unordered_map<std::string, std::string>& payload, int32_t value)
+{
+    g_lastSwiperChangePayload = payload;
+    g_lastSwiperChangeValue = value;
+}
+
+void GetLastSwiperChangePayload(std::unordered_map<std::string, std::string>& payload, int32_t& value)
+{
+    payload = g_lastSwiperChangePayload;
+    value = g_lastSwiperChangeValue;
+}
 } // namespace OHOS::Ace
