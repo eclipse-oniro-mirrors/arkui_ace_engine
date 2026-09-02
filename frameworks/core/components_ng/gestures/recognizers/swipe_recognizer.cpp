@@ -55,6 +55,13 @@ double ComputeAngle(double x, double y)
 }
 } // namespace
 
+void SwipeRecognizer::ForceCleanRecognizer()
+{
+    MultiFingersRecognizer::ForceCleanRecognizer();
+    ReleaseTouchEventPayload(lastTouchEvent_);
+    downEvents_.clear();
+}
+
 void SwipeRecognizer::OnAccepted()
 {
     int64_t acceptTime = GetSysTimestamp();
@@ -415,6 +422,7 @@ void SwipeRecognizer::OnResetStatus()
     axisOffset_.Reset();
     resultSpeed_ = 0.0;
     lastTouchEvent_ = TouchEvent();
+    ReleaseTouchEventPayload(lastTouchEvent_);
     downEvents_.clear();
     time_ = TimeStamp();
     touchDownTime_ = TimeStamp();

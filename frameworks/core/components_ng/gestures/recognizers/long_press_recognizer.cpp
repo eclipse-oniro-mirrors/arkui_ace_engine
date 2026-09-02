@@ -513,6 +513,7 @@ void LongPressRecognizer::OnResetStatus()
     MultiFingersRecognizer::OnResetStatus();
     timer_.Cancel();
     deadlineTimer_.Cancel();
+    ReleaseTouchEventPayload(lastTouchEvent_);
     localMatrix_.clear();
     auto context = PipelineContext::GetCurrentContextSafelyWithCheck();
     CHECK_NULL_VOID(context);
@@ -676,6 +677,7 @@ void LongPressRecognizer::ForceCleanRecognizer()
     MultiFingersRecognizer::ForceCleanRecognizer();
     timer_.Cancel();
     deadlineTimer_.Cancel();
+    ReleaseTouchEventPayload(lastTouchEvent_);
     auto context = PipelineContext::GetCurrentContextSafelyWithCheck();
     CHECK_NULL_VOID(context);
     context->RemoveGestureTask(task_);

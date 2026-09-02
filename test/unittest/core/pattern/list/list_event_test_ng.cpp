@@ -1906,6 +1906,7 @@ HWTEST_F(ListEventTestNg, LockDragFingerAndEscapeScrollPan001, TestSize.Level1)
     ASSERT_NE(gestureHub, nullptr);
     auto dragEventActuator = gestureHub->GetDragEventActuator();
     ASSERT_NE(dragEventActuator, nullptr);
+    dragEventActuator->EnsurePanRecognizer();
     auto dragPan = dragEventActuator->GetDragEventPanRecognizer();
     ASSERT_NE(dragPan, nullptr);
 

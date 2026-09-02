@@ -627,6 +627,8 @@ public:
 
     const RefPtr<DragDropRelatedConfigurations>& GetOrCreateDragDropRelatedConfigurations();
 
+    const DragPreviewOption* GetDragPreviewOptionIfExist() const;
+
     void CreateEventHubInner();
 
     const RefPtr<FocusHub>& GetFocusHub() const;

@@ -1838,6 +1838,13 @@ void FrameNode::UpdateGeometryTransition()
     }
 }
 
+const DragPreviewOption* FrameNode::GetDragPreviewOptionIfExist() const
+{
+    return dragDropRelatedConfigurations_
+        ? dragDropRelatedConfigurations_->GetDragPreviewOptionIfExist()
+        : nullptr;
+}
+
 void FrameNode::TriggerRsProfilerNodeMountCallbackIfExist()
 {
 #if !defined(PREVIEW) && !defined(ACE_UNITTEST) && defined(OHOS_PLATFORM)
