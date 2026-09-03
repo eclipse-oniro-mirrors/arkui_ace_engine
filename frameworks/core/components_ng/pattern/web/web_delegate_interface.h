@@ -20,6 +20,7 @@
 #include "base/geometry/offset.h"
 #include "core/pipeline_ng/pipeline_context.h"
 #include "core/event/ace_events.h"
+#include "core/components/common/properties/color.h"
 #include "core/components/web/web_property.h"
 
 namespace OHOS::Ace {
@@ -116,6 +117,7 @@ public:
     virtual void MaximizeResize() = 0;
     virtual void UpdateOptimizeParserBudgetEnabled(const bool enable) = 0;
     virtual void UpdateKeyboardAppearanceMode(const WebKeyboardAppearanceMode& mode) = 0;
+    virtual void UpdateCaretColor(const Color& caretColor) {}
 };
 }
 #endif

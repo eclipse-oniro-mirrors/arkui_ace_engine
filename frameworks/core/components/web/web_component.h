@@ -710,6 +710,22 @@ public:
         isBackgroundColor_ = true;
     }
 
+    const Color& GetCaretColor() const
+    {
+        return caretColor_;
+    }
+
+    bool HasCaretColor() const
+    {
+        return hasCaretColor_;
+    }
+
+    void SetCaretColor(const Color& caretColor)
+    {
+        caretColor_ = caretColor;
+        hasCaretColor_ = true;
+    }
+
     int32_t GetTextZoomRatio() const
     {
         return textZoomRatioNum_;
@@ -1372,6 +1388,8 @@ private:
     bool isInitialScaleSet_ = false;
     int32_t backgroundColor_ = 0;
     bool isBackgroundColor_ = false;
+    Color caretColor_;
+    bool hasCaretColor_ = false;
     bool isNeedGestureAccess_ = true;
     bool isNativeEmbedMode_ = false;
     bool isIntrinsicSize_ = false;

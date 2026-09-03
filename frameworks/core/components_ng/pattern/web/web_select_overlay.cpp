@@ -1339,6 +1339,18 @@ bool WebSelectOverlay::IsNeedMenuShareForWeb()
     return trimmedLen <= maxShareLength;
 }
 
+std::optional<Color> WebSelectOverlay::GetHandleColor()
+{
+    auto pattern = GetPattern<WebPattern>();
+    CHECK_NULL_RETURN(pattern, std::nullopt);
+    std::optional<Color> caretColor = pattern->GetCaretColor();
+    // Fully transparent color is treated as unset, keep the theme default handle color.
+    if (caretColor.has_value() && caretColor.value().GetValue() != 0) {
+        return caretColor;
+    }
+    return std::nullopt;
+}
+
 void WebSelectOverlay::OnHandleMarkInfoChange(
     const std::shared_ptr<SelectOverlayInfo> info, SelectOverlayDirtyFlag flag)
 {

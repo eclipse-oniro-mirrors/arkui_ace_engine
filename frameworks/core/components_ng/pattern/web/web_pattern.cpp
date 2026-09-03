@@ -4515,6 +4515,26 @@ void WebPattern::OnScrollBarColorUpdate(const std::string& value)
     }
 }
 
+void WebPattern::OnCaretColorUpdate(const Color& value)
+{
+    if (delegate_) {
+        delegate_->UpdateCaretColor(value);
+    }
+    if (webSelectOverlay_) {
+        webSelectOverlay_->UpdateHandleColor();
+    }
+}
+
+void WebPattern::UpdatePropertyImpl(const std::string& key, RefPtr<PropertyValueBase> value)
+{
+    if (key != "WebCaretColor" || !value) {
+        return;
+    }
+    if (auto color = std::get_if<Color>(&(value->GetValue()))) {
+        UpdateCaretColor(*color);
+    }
+}
+
 void WebPattern::OnDefaultTextEncodingFormatUpdate(const std::string& value)
 {
     if (delegate_) {
@@ -4752,6 +4772,9 @@ void WebPattern::OnModifyDone()
         delegate_->UpdateHorizontalScrollBarAccess(GetHorizontalScrollBarAccessEnabledValue(true));
         delegate_->UpdateVerticalScrollBarAccess(GetVerticalScrollBarAccessEnabledValue(true));
         delegate_->UpdateScrollBarColor(GetScrollBarColorValue(DEFAULT_SCROLLBAR_COLOR));
+        if (HasCaretColor()) {
+            delegate_->UpdateCaretColor(GetCaretColorValue(Color()));
+        }
         delegate_->UpdateOverlayScrollbarEnabled(GetOverlayScrollbarEnabledValue(false));
         delegate_->UpdateOverScrollMode(GetOverScrollModeValue(OverScrollMode::NEVER));
         delegate_->UpdateBlurOnKeyboardHideMode(GetBlurOnKeyboardHideModeValue(BlurOnKeyboardHideMode::SILENT));

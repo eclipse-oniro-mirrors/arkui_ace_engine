@@ -14,7 +14,9 @@
  */
 #include "core/interfaces/native/node/web_modifier.h"
 
+#include "base/utils/system_properties.h"
 #include "bridge/common/utils/utils.h"
+#include "core/common/resource/resource_object.h"
 #include "core/components_ng/pattern/text/text_model.h"
 #include "core/components_ng/pattern/web/web_model_ng.h"
 #include "core/interfaces/native/node/node_drag_modifier.h"
@@ -1485,6 +1487,35 @@ void ResetOverScrollMode(ArkUINodeHandle node)
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
     CHECK_NULL_VOID(frameNode);
     WebModelNG::SetOverScrollMode(frameNode, DEFAULT_OVERSCROLL_MODE);
+}
+
+void SetWebCaretColor(ArkUINodeHandle node, ArkUI_Uint32 color, void* colorRawPtr)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    WebModelNG::SetCaretColor(frameNode, Color(color));
+    if (SystemProperties::ConfigChangePerform()) {
+        auto pattern = frameNode->GetPattern();
+        CHECK_NULL_VOID(pattern);
+        if (colorRawPtr) {
+            auto resourceObject = AceType::Claim(reinterpret_cast<ResourceObject*>(colorRawPtr));
+            pattern->RegisterResource<Color>("WebCaretColor", resourceObject, Color(color));
+        } else {
+            pattern->UnRegisterResource("WebCaretColor");
+        }
+    }
+}
+
+void ResetWebCaretColor(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    WebModelNG::SetCaretColor(frameNode, Color(0));
+    if (SystemProperties::ConfigChangePerform()) {
+        auto pattern = frameNode->GetPattern();
+        CHECK_NULL_VOID(pattern);
+        pattern->UnRegisterResource("WebCaretColor");
+    }
 }
 
 void SetOnTouchIconUrlReceivedCallBack(ArkUINodeHandle node, void* extraParam)
@@ -3047,6 +3078,8 @@ const ArkUIWebModifier* GetWebModifier()
         .resetOnInputMethodAttached = ResetOnInputMethodAttached,
         .setEnableFullscreenVideoOverlay = SetEnableFullscreenVideoOverlay,
         .resetEnableFullscreenVideoOverlay = ResetEnableFullscreenVideoOverlay,
+        .setCaretColor = SetWebCaretColor,
+        .resetCaretColor = ResetWebCaretColor,
     };
     CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
     return &modifier;
@@ -3314,6 +3347,8 @@ const CJUIWebModifier* GetCJUIWebModifier()
         .resetOnInputMethodAttached = ResetOnInputMethodAttached,
         .setEnableFullscreenVideoOverlay = SetEnableFullscreenVideoOverlay,
         .resetEnableFullscreenVideoOverlay = ResetEnableFullscreenVideoOverlay,
+        .setCaretColor = SetWebCaretColor,
+        .resetCaretColor = ResetWebCaretColor,
     };
     CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
     return &modifier;

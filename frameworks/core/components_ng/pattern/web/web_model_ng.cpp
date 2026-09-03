@@ -768,6 +768,13 @@ void WebModelNG::SetDefaultBackgroundColor()
     webPattern->SetDefaultBackgroundColor();
 }
 
+void WebModelNG::SetCaretColor(const Color& caretColor)
+{
+    auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
+    CHECK_NULL_VOID(webPattern);
+    webPattern->UpdateCaretColor(caretColor);
+}
+
 void WebModelNG::InitialScale(float scale)
 {
     auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
@@ -1890,6 +1897,14 @@ void WebModelNG::SetDefaultFontSize(FrameNode* frameNode, int32_t defaultFontSiz
     auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
     CHECK_NULL_VOID(webPattern);
     webPattern->UpdateDefaultFontSize(defaultFontSize);
+}
+
+void WebModelNG::SetCaretColor(FrameNode* frameNode, const Color& caretColor)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    CHECK_NULL_VOID(webPattern);
+    webPattern->UpdateCaretColor(caretColor);
 }
 
 void WebModelNG::SetDefaultFixedFontSize(FrameNode* frameNode, int32_t defaultFixedFontSize)
