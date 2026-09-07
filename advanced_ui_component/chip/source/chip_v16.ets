@@ -1346,21 +1346,12 @@ export struct ChipComponent {
     return typeof this.chipSize === 'string' && this.chipSize === ChipSize.SMALL;
   }
 
-  getChipBackgroundColor(): ResourceColor | undefined {
+  getChipBackgroundColor(): ResourceColor {
     let themeChipNode = this.theme.chipNode;
     if (this.isChipActivated()) {
-      if (!!this.activatedBackgroundSystemMaterial) {
-        return undefined;
-      }
-
       return this.chipNodeInFocus && !this.isSetActiveChipBgColor() ? themeChipNode.focusActivatedBgColor :
         this.getColor(this.chipNodeActivatedBackgroundColor, themeChipNode.activatedBackgroundColor);
     }
-
-    if (!!this.backgroundSystemMaterial) {
-      return undefined;
-    }
-
     return this.chipNodeInFocus && !this.isSetNormalChipBgColor() ? themeChipNode.focusBgColor :
       this.getColor(this.chipNodeBackgroundColor, this.theme.chipNode.backgroundColor);
   }
@@ -1374,13 +1365,23 @@ export struct ChipComponent {
       return undefined;
     }
     if (this.isChipActivated()) {
-      return info.state === uiMaterial.MaterialState.ENABLE && !this.activatedBackgroundSystemMaterial ?
-        this.theme.chipNode.activatedBackgroundSystemMaterial :
-        this.activatedBackgroundSystemMaterial;
+      if (!this.activatedBackgroundSystemMaterial) {
+        return info.state === uiMaterial.MaterialState.ENABLE ?
+          this.theme.chipNode.activatedBackgroundSystemMaterial : this.activatedBackgroundSystemMaterial;
+      }
+      if (isNullOrEmptyMaterial(this.activatedBackgroundSystemMaterial)) {
+        return undefined;
+      }
+      return this.activatedBackgroundSystemMaterial;
     }
-    return info.state === uiMaterial.MaterialState.ENABLE && !this.backgroundSystemMaterial ?
-      this.theme.chipNode.backgroundSystemMaterial :
-      this.backgroundSystemMaterial;
+    if (!this.backgroundSystemMaterial) {
+      return info.state === uiMaterial.MaterialState.ENABLE ?
+        this.theme.chipNode.backgroundSystemMaterial : this.backgroundSystemMaterial;
+    }
+    if (isNullOrEmptyMaterial(this.backgroundSystemMaterial)) {
+      return undefined;
+    }
+    return this.backgroundSystemMaterial;
   }
 
   getColor(color: ResourceColor | undefined, defaultColor: ResourceColor): ResourceColor {
@@ -1538,4 +1539,14 @@ export struct ChipComponent {
       this.ChipBuilder()
     }
   }
+}
+
+function isNullOrEmptyMaterial(material: uiMaterial.Material | undefined): boolean {
+  if (!material) {
+    return true;
+  }
+  if (material === uiMaterial.Material.empty) {
+    return true;
+  }
+  return false;
 }

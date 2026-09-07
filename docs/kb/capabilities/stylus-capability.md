@@ -80,12 +80,12 @@
 ## 调试入口
 
 - 输入字段检索：`SourceTool`、`PEN`、`pressure`、`tiltX`、`tiltY`、`rollAngle`。
-- 悬停链路检索：`OnPenHoverEvent`、`EventManagerPen`、`HoverEventTarget`。
+- 悬停链路检索：`OnPenHoverEvent`、`PenHoverTest`、`UpdatePenHoverNode`、`HoverEventTarget`。
 - 服务链路检索：`StylusDetectorMgr`、`StylusDetectorLoader`、`Notify`。
 - 编辑命令检索：`StylusDetectorCallBack`、`CommandType`、`TextInputClient`。
 
 ## 相关主题
 
-- 交互归一化：`docs/kb/capabilities/interaction-normalization.md`。
-- 文本交互：`docs/kb/capabilities/text-interaction.md`。
-- 输入法交互：`docs/kb/capabilities/input-method-interaction.md`。
+- [交互归一化。](interaction-normalization.md)
+- [文本交互。](text-interaction.md)
+- [输入法交互。](input-method-interaction.md)

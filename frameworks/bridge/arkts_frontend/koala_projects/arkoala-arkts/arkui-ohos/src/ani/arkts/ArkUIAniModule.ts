@@ -300,6 +300,7 @@ export class ArkUIAniModule {
     native static _Drawable_Load(value: DrawableDescriptor): Promise<DrawableDescriptorLoadedResult>
     native static _Drawable_GetAnimationController(value: AnimatedDrawableDescriptor, id?: string): AnimationController | undefined
     native static _Drawable_SetBlendMode(value: LayeredDrawableDescriptor, mode: drawing.BlendMode): void
+    native static _Drawable_SetSVGResourceLimitLevel(value: DrawableDescriptor, limit: image.SVGResourceLimitLevel): void
     native static _Drawable_SetHdrComposition(value: PictureDrawableDescriptor, config: HdrCompositionConfig): void
     native static _Drawable_Invalidate(value: DrawableDescriptor): void
     native static _Drawable_NativeTransferStatic(input: ESValue, typeName: string): DrawableDescriptor
@@ -353,6 +354,9 @@ export class ArkUIAniModule {
     native static _UiMaterial_ConvertToECSubMaterial(value: long): long
     native static _UiMaterial_GetGlobalMaterialLevel(): int
     native static _UiMaterial_IsImmersiveMaterialSupported(): boolean
+    native static _UiMaterial_GetMaterialState(): int
+    native static _UiMaterial_GetMaterialType(): int
+    native static _UiMaterial_GetEmpty(): long
 
     native static _CreateViewStackProcessor(): KPointer
 
@@ -562,4 +566,6 @@ export class ArkUIAniModule {
     native static _GestureEventUIObserver_RemoveTapListenerCallback(instanceId: KInt, tag: string, callback?: GestureEventListenerCallback): void
     native static _GestureEventUIObserver_AddGlobalGestureListener(resourceId: KInt, type: KInt, callback: GestureListenerCallback): void
     native static _GestureEventUIObserver_RemoveGlobalGestureListener(type: KInt, callback?: GestureListenerCallback): void
+    native static __BuilderNode_GetParentViewId(ptr: KPointer): KInt;
+    native static _ArkTSFrameNode_GetId(peer: KPointer): string
 }

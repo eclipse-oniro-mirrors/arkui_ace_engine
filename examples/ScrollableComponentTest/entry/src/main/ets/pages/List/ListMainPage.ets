@@ -13,9 +13,7 @@
  * limitations under the License.
  */
 
-import router from '@ohos.router';
-
-class TextList {
+export class TextList {
   public id: number;
   public text: string;
   public url: string;
@@ -97,6 +95,7 @@ struct IndexPage {
     new TextList(63, 'ListEmptyBranch', 'pages/List/ListEmptyBranch'),
     new TextList(64, 'ListItemGroupStickyHeaderWithHorizontalList',
       'pages/List/ListItemGroupStickyHeaderWithHorizontalList'),
+    new TextList(65, 'SyncLoadDemo', 'pages/List/syncLoad/SyncLoadDemo'),
   ]
   @State fontSize: Resource | undefined = undefined
   build() {
@@ -110,7 +109,7 @@ struct IndexPage {
               .margin(10)
               .padding({ top: 5, bottom: 5 })
               .onClick(() => {
-                router.pushUrl({ url: item.url })
+                this.getUIContext().getRouter().pushUrl({ url: item.url })
               })
           }, (item: TextList) => JSON.stringify(item.id))
         }

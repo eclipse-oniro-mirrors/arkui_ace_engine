@@ -3942,8 +3942,17 @@ void ViewAbstract::SetOpacity(double opacity)
     if (!ViewStackProcessor::GetInstance()->IsCurrentVisualStateProcess()) {
         return;
     }
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    CHECK_NULL_VOID(frameNode);
+    const auto renderContext = frameNode->GetRenderContext();
+    CHECK_NULL_VOID(renderContext);
+    const auto oldOpacity = renderContext->GetOpacityValue(1.0);
     ACE_UPDATE_RENDER_CONTEXT(Opacity, opacity);
+    if (!NearEqual(oldOpacity, renderContext->GetOpacityValue(1.0))) {
+        frameNode->NotifyPageSceneOpacityChanged();
+    }
 }
+
 void ViewAbstract::SetAllowDrop(const std::set<std::string>& allowDrop)
 {
     auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
@@ -6698,6 +6707,14 @@ void ViewAbstract::SetSystemMaterial(FrameNode* frameNode, const UiMaterial* mat
     CHECK_NULL_VOID(frameNode);
     auto renderContext = frameNode->GetRenderContext();
     CHECK_NULL_VOID(renderContext);
+    // A node already suppressed by the scope gate (not in a titleBar / bottom
+    // TabBar subtree) must not have its material re-applied by external callers,
+    // otherwise the material would take effect again despite the suppression.
+    // MaterialProcessor's own suppress/restore calls set the materialLimiterUpdating
+    // guard to bypass this block.
+    if (renderContext->IsMaterialSuppressed() && !renderContext->IsMaterialLimiterUpdating()) {
+        return;
+    }
     auto nativeMaterial = MaterialUtils::PreProcessMaterial(material);
     if (!MaterialUtils::CallSetMaterial(frameNode, nativeMaterial)) {
         ViewAbstract::SetSystemMaterialImmediate(frameNode, nativeMaterial);
@@ -6706,6 +6723,28 @@ void ViewAbstract::SetSystemMaterial(FrameNode* frameNode, const UiMaterial* mat
         return;
     }
     renderContext->SetSystemMaterial(nativeMaterial ? nativeMaterial->Copy() : nullptr);
+}
+
+void ViewAbstract::SetSystemMaterialForOverlay(FrameNode* frameNode, const UiMaterial* material)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto renderContext = frameNode->GetRenderContext();
+    CHECK_NULL_VOID(renderContext);
+    // Mark the node exempt from the scope gate BEFORE applying the material, so the
+    // node is in the exempt state throughout the entire material-application chain
+    // (SetSystemMaterial -> SetSystemMaterialImmediate -> SetImmersiveOptions ->
+    // SetImmersiveConfigs -> LowerGearLevel).
+    renderContext->SetMaterialScopeExempt(true);
+    ViewAbstract::SetSystemMaterial(frameNode, material);
+}
+
+void ViewAbstract::SetSystemMaterialForOverlay(const UiMaterial* material)
+{
+    if (!ViewStackProcessor::GetInstance()->IsCurrentVisualStateProcess()) {
+        return;
+    }
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    ViewAbstract::SetSystemMaterialForOverlay(frameNode, material);
 }
 
 void ViewAbstract::ResetSystemMaterialEffect(FrameNode* frameNode)
@@ -6738,6 +6777,7 @@ void ViewAbstract::ResetSystemMaterialEffect(FrameNode* frameNode)
             if (preStyle >= static_cast<int32_t>(UiMaterialStyle::ULTRA_THIN_EC_SUB) &&
                 preStyle <= static_cast<int32_t>(UiMaterialStyle::ULTRA_THICK_EC_SUB)) {
                 renderContext->SetMaterialShaderECSub(nullptr);
+                renderContext->SetMaterialShaderECSubOverlay(nullptr);
             } else if (preStyle >= static_cast<int32_t>(UiMaterialStyle::ULTRA_THIN_EC) &&
                        preStyle <= static_cast<int32_t>(UiMaterialStyle::ULTRA_THICK_EC)) {
                 renderContext->SetBackgroundNGFilterEC(nullptr);
@@ -7021,17 +7061,39 @@ void ViewAbstract::RegisterTransparencyListener(const RefPtr<FrameNode>& frameNo
         auto callbackId = TransparencyUtils::RegisterTransparencyListener(weakNode, [weak = weakNode](int32_t _) {
             auto frameNode = weak.Upgrade();
             CHECK_NULL_VOID(frameNode);
-            auto renderContext = frameNode->GetRenderContext();
-            CHECK_NULL_VOID(renderContext);
-            auto material = renderContext->GetSystemMaterial();
-            if (!material || material->GetType() != static_cast<int32_t>(MaterialType::IMMERSIVE)) {
-                TAG_LOGW(AceLogTag::ACE_VISUAL_EFFECT, "material has changed, no need transparency callback");
-                return;
-            }
-            ViewAbstract::SetImmersiveOptions(frameNode, material->GetImmersiveOptions());
+            ViewAbstract::UpdateImmersiveMaterialOnTransparencyChange(frameNode);
         });
         renderContext->SetTransparencyCallbackId(callbackId);
     }
+}
+
+void ViewAbstract::UpdateImmersiveMaterialOnTransparencyChange(const RefPtr<FrameNode>& frameNode)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto renderContext = frameNode->GetRenderContext();
+    CHECK_NULL_VOID(renderContext);
+    auto material = renderContext->GetSystemMaterial();
+    if (!material || material->GetType() != static_cast<int32_t>(MaterialType::IMMERSIVE)) {
+        TAG_LOGW(AceLogTag::ACE_VISUAL_EFFECT, "material has changed, no need transparency callback");
+        return;
+    }
+    auto optionsPtr = material->GetImmersiveOptions();
+    CHECK_NULL_VOID(optionsPtr);
+    auto config = MaterialUtils::GetImmersiveMaterialConfig(optionsPtr, frameNode);
+    if (!config) {
+        return;
+    }
+    if (config->key.level == UiMaterialLevel::SMOOTH) {
+        return;
+    }
+    // Mid/high level materials only refresh the material effect and cache the new config into renderContext.
+    // Other properties such as background color must be kept untouched.
+    auto preConfig = renderContext->GetImmersiveMaterialConfig();
+    if (preConfig == config) {
+        return;
+    }
+    ApplyImmersiveMaterialStyle(renderContext, *config, preConfig);
+    renderContext->SetImmersiveMaterialConfig(config);
 }
 
 void ViewAbstract::SetImmersiveConfigs(const RefPtr<FrameNode>& frameNode, const std::optional<ImmersiveMaterialConfig>& config)
@@ -7081,29 +7143,8 @@ void ViewAbstract::SetImmersiveConfigs(const RefPtr<FrameNode>& frameNode, const
     if (preConfig == config) {
         return;
     }
-    int32_t style = static_cast<int32_t>(config->key.style);
-    if (style >= static_cast<int32_t>(UiMaterialStyle::ULTRA_THIN_EC) &&
-        style <= static_cast<int32_t>(UiMaterialStyle::ULTRA_THICK_EC)) {
-        auto materialFilter = UiMaterialFilterCreator::ConvertToUiMaterialECFilter(*config);
-        renderContext->SetBackgroundNGFilterEC(materialFilter);
-        if (config->colorInvert) {
-            renderContext->BindColorPicker(ColorPlaceholder::SURFACE_CONTRAST, ColorPickStrategy::CONTRAST, 500);
-        } else if (preConfig && preConfig->colorInvert) {
-            renderContext->BindColorPicker(ColorPlaceholder::SURFACE_CONTRAST, ColorPickStrategy::NONE, 500);
-        }
-    } else if (style >= static_cast<int32_t>(UiMaterialStyle::ULTRA_THIN_EC_SUB) &&
-               style <= static_cast<int32_t>(UiMaterialStyle::ULTRA_THICK_EC_SUB)) {
-        auto materialFilter = UiMaterialFilterCreator::ConvertToUiMaterialECSubShader(*config);
-        renderContext->SetMaterialShaderECSub(materialFilter);
-    } else {
-        auto materialFilter = UiMaterialFilterCreator::ConvertToUiMaterialFilter(*config);
-        if (preConfig && preConfig->colorInvert && !config->colorInvert) {
-            // reset color picker
-            renderContext->BindColorPicker(ColorPlaceholder::SURFACE_CONTRAST, ColorPickStrategy::NONE, 0);
-        }
-        renderContext->SetMaterialWithQualityLevel(
-            materialFilter, config->colorInvert ? UiMaterialFilterQuality::ADAPTIVE : UiMaterialFilterQuality::DEFAULT);
-    }
+    ApplyImmersiveMaterialStyle(renderContext, *config, preConfig);
+
     if (config->applyShadow) {
         Shadow shadow = MaterialUtils::GetImmersiveShadow(config->dipScale);
         renderContext->UpdateBackShadow(shadow);
@@ -7124,6 +7165,37 @@ void ViewAbstract::ResetImmersiveShadowToDefault(
         renderContext->ResetBackShadow();
         renderContext->OnBackShadowUpdate(shadow);
         pattern->OnBackShadowReset();
+    }
+}
+
+void ViewAbstract::ApplyImmersiveMaterialStyle(const RefPtr<RenderContext>& renderContext,
+ 	const ImmersiveMaterialConfig& config, const std::optional<ImmersiveMaterialConfig>& preConfig)
+{
+    CHECK_NULL_VOID(renderContext);
+    int32_t style = static_cast<int32_t>(config.key.style);
+    if (style >= static_cast<int32_t>(UiMaterialStyle::ULTRA_THIN_EC) &&
+        style <= static_cast<int32_t>(UiMaterialStyle::ULTRA_THICK_EC)) {
+        auto materialFilter = UiMaterialFilterCreator::ConvertToUiMaterialECFilter(config);
+        renderContext->SetBackgroundNGFilterEC(materialFilter);
+        if (config.colorInvert) {
+            renderContext->BindColorPicker(ColorPlaceholder::SURFACE_CONTRAST, ColorPickStrategy::CONTRAST, 500);
+        } else if (preConfig && preConfig->colorInvert) {
+            renderContext->BindColorPicker(ColorPlaceholder::SURFACE_CONTRAST, ColorPickStrategy::NONE, 500);
+        }
+    } else if (style >= static_cast<int32_t>(UiMaterialStyle::ULTRA_THIN_EC_SUB) &&
+            style <= static_cast<int32_t>(UiMaterialStyle::ULTRA_THICK_EC_SUB)) {
+        auto materialFilter = UiMaterialFilterCreator::ConvertToUiMaterialECSubShader(config);
+        auto materialFilterOverlay = UiMaterialFilterCreator::ConvertToUiMaterialECSubShaderOverlay(config);
+        renderContext->SetMaterialShaderECSub(materialFilter);
+        renderContext->SetMaterialShaderECSubOverlay(materialFilterOverlay);
+    } else {
+        auto materialFilter = UiMaterialFilterCreator::ConvertToUiMaterialFilter(config);
+        if (preConfig && preConfig->colorInvert && !config.colorInvert) {
+            // reset color picker
+            renderContext->BindColorPicker(ColorPlaceholder::SURFACE_CONTRAST, ColorPickStrategy::NONE, 0);
+        }
+        renderContext->SetMaterialWithQualityLevel(
+            materialFilter, config.colorInvert ? UiMaterialFilterQuality::ADAPTIVE : UiMaterialFilterQuality::DEFAULT);
     }
 }
 
@@ -7572,6 +7644,15 @@ void ViewAbstract::SetExcludeFromRenderGroup(bool exclude)
     }
     auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
     ViewAbstract::SetExcludeFromRenderGroup(frameNode, exclude);
+}
+
+void ViewAbstract::SetMarkLayeredRender(bool isLayeredRender)
+{
+    if (!ViewStackProcessor::GetInstance()->IsCurrentVisualStateProcess()) {
+        return;
+    }
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    ViewAbstract::SetMarkLayeredRender(frameNode, isLayeredRender);
 }
 
 void ViewAbstract::SetRenderFit(RenderFit renderFit)
@@ -8189,7 +8270,14 @@ void ViewAbstract::SetHitTestMode(FrameNode* frameNode, HitTestMode hitTestMode)
 
 void ViewAbstract::SetOpacity(FrameNode* frameNode, double opacity)
 {
+    CHECK_NULL_VOID(frameNode);
+    const auto renderContext = frameNode->GetRenderContext();
+    CHECK_NULL_VOID(renderContext);
+    const auto oldOpacity = renderContext->GetOpacityValue(1.0);
     ACE_UPDATE_NODE_RENDER_CONTEXT(Opacity, opacity, frameNode);
+    if (!NearEqual(oldOpacity, renderContext->GetOpacityValue(1.0))) {
+        frameNode->NotifyPageSceneOpacityChanged();
+    }
 }
 
 void ViewAbstract::SetOpacity(FrameNode* frameNode, double opacity, const RefPtr<ResourceObject>& resObj)
@@ -8211,10 +8299,22 @@ void ViewAbstract::SetOpacity(FrameNode* frameNode, double opacity, const RefPtr
         if (viewAbstractOpacity.empty()) {
             pattern->AddResCache("viewAbstract.opacity", std::to_string(result));
         }
+        const auto renderContext = frameNode->GetRenderContext();
+        CHECK_NULL_VOID(renderContext);
+        const auto oldOpacity = renderContext->GetOpacityValue(1.0);
         ACE_UPDATE_NODE_RENDER_CONTEXT(Opacity, result, frameNode);
+        if (!NearEqual(oldOpacity, renderContext->GetOpacityValue(1.0))) {
+            frameNode->NotifyPageSceneOpacityChanged();
+        }
     };
     pattern->AddResObj("viewAbstract.opacity", resObj, std::move(updateFunc));
+    const auto renderContext = frameNode->GetRenderContext();
+    CHECK_NULL_VOID(renderContext);
+    const auto oldOpacity = renderContext->GetOpacityValue(1.0);
     ACE_UPDATE_NODE_RENDER_CONTEXT(Opacity, opacity, frameNode);
+    if (!NearEqual(oldOpacity, renderContext->GetOpacityValue(1.0))) {
+        frameNode->NotifyPageSceneOpacityChanged();
+    }
 }
 
 void ViewAbstract::CreateWithOpacityResourceObj(const RefPtr<ResourceObject>& resObj)
@@ -8543,6 +8643,11 @@ void ViewAbstract::SetRenderGroup(FrameNode* frameNode, bool isRenderGroup)
 void ViewAbstract::SetExcludeFromRenderGroup(FrameNode* frameNode, bool exclude)
 {
     ACE_UPDATE_NODE_RENDER_CONTEXT(ExcludeFromRenderGroup, exclude, frameNode);
+}
+
+void ViewAbstract::SetMarkLayeredRender(FrameNode* frameNode, bool isLayeredRender)
+{
+    ACE_UPDATE_NODE_RENDER_CONTEXT(MarkLayeredRender, isLayeredRender, frameNode);
 }
 
 void ViewAbstract::SetRenderFit(FrameNode* frameNode, RenderFit renderFit)

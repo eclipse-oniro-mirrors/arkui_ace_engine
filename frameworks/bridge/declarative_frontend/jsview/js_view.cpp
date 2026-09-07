@@ -59,26 +59,20 @@
 
 namespace OHOS::Ace {
 
-std::unique_ptr<ViewFullUpdateModel> ViewFullUpdateModel::instance_ = nullptr;
-std::mutex ViewFullUpdateModel::mutex_;
-
 ViewFullUpdateModel* ViewFullUpdateModel::GetInstance()
 {
-    if (!instance_) {
-        std::lock_guard<std::mutex> lock(mutex_);
-        if (!instance_) {
 #ifdef NG_BUILD
-            instance_.reset(new NG::ViewFullUpdateModelNG());
+    static NG::ViewFullUpdateModelNG instance;
+    return &instance;
 #else
-            if (Container::IsCurrentUseNewPipeline()) {
-                instance_.reset(new NG::ViewFullUpdateModelNG());
-            } else {
-                instance_.reset(new Framework::ViewFullUpdateModelImpl());
-            }
-#endif
-        }
+    if (Container::IsCurrentUseNewPipeline()) {
+        static NG::ViewFullUpdateModelNG instance;
+        return &instance;
+    } else {
+        static Framework::ViewFullUpdateModelImpl instance;
+        return &instance;
     }
-    return instance_.get();
+#endif
 }
 
 ViewPartialUpdateModel* ViewPartialUpdateModel::GetInstance()
@@ -130,7 +124,11 @@ std::optional<JSRef<JSVal>> MakeSystemEnvValue(const std::string& key, const std
         }
     }
     if (key == NG::ENV_KEY_FONT_SCALE) {
-        CHECK_NULL_RETURN(value, std::nullopt);
+        if (!value) {
+            auto pipeline = NG::PipelineContext::GetCurrentContextSafelyWithCheck();
+            CHECK_NULL_RETURN(pipeline, JSVal::Undefined());
+            return JSRef<JSVal>::Make(ToJSValue(static_cast<double>(pipeline->GetFontScale())));
+        }
         auto doubleValue = value->GetDouble();
         CHECK_NULL_RETURN(doubleValue, JSVal::Undefined());
         return JSRef<JSVal>::Make(ToJSValue(*doubleValue));
@@ -660,6 +658,7 @@ JSViewPartialUpdate::~JSViewPartialUpdate()
     updateJSInstanceCallback_ = nullptr;
     updateCustomEnvCallback_ = nullptr;
     updateEnvCallback_ = nullptr;
+    updateEnvTreeStateCallback_ = nullptr;
 };
 
 RefPtr<AceType> JSViewPartialUpdate::CreateViewNode(bool isTitleNode, bool isCustomAppBar, int64_t creatorId)
@@ -1021,23 +1020,37 @@ RefPtr<AceType> JSViewPartialUpdate::CreateViewNode(bool isTitleNode, bool isCus
         }
     }
 
-    JSRef<JSVal> customEnvMeta = jsViewObject_->GetProperty("__custom_env_deco_meta__");
-    if (customEnvMeta->ToBoolean()) {
+    const bool hasCustomEnv = jsViewObject_->GetProperty("__custom_env_deco_meta__")->ToBoolean();
+    if (hasCustomEnv) {
         JSRef<JSVal> onCustomEnvUpdateFunc = jsViewObject_->GetProperty("__onCustomEnvValueUpdate__Internal");
         if (onCustomEnvUpdateFunc->IsFunction()) {
             RegisterOnCustomEnvUpdateCallback(JSRef<JSFunc>::Cast(onCustomEnvUpdateFunc));
         }
     }
 
-    JSRef<JSVal> hasEnv = jsViewObject_->GetProperty("__hasEnv__Internal");
-    if (hasEnv->ToBoolean()) {
-        JSRef<JSVal> onSystemEnvUpdateFunc_ = jsViewObject_->GetProperty("__onEnvValueUpdate__Internal");
-        if (onSystemEnvUpdateFunc_->IsFunction()) {
-            RegisterOnSystemEnvUpdateCallback(JSRef<JSFunc>::Cast(onSystemEnvUpdateFunc_));
+    const bool hasEnvValue = jsViewObject_->GetProperty("__hasEnv__Internal")->ToBoolean();
+    if (hasEnvValue) {
+        JSRef<JSVal> onSystemEnvUpdateFunc = jsViewObject_->GetProperty("__onEnvValueUpdate__Internal");
+        if (onSystemEnvUpdateFunc->IsFunction()) {
+            RegisterOnSystemEnvUpdateCallback(JSRef<JSFunc>::Cast(onSystemEnvUpdateFunc));
         }
         JSRef<JSVal> updateForEnvFunc = jsViewObject_->GetProperty("__updateForEnvValue__Internal");
         if (updateForEnvFunc->IsFunction()) {
             RegisterUpdateForEnvCallback(JSRef<JSFunc>::Cast(updateForEnvFunc));
+        }
+    }
+
+    bool hasDirectQueryEnv = false;
+    if (!hasCustomEnv && hasEnvValue) {
+        hasDirectQueryEnv = jsViewObject_->GetProperty("__hasDirectQueryEnv__Internal")->ToBoolean();
+    }
+    if (hasCustomEnv || hasDirectQueryEnv) {
+        auto customNode = AceType::DynamicCast<NG::CustomNode>(node);
+        if (customNode) {
+            customNode->ResetOnEnvTreeStateChangeFunc();
+            if (jsViewObject_->GetProperty("__hasInitializedEnvValue__Internal")->ToBoolean()) {
+                EnsureEnvTreeStateChangeCallback();
+            }
         }
     }
 
@@ -1172,6 +1185,7 @@ void JSViewPartialUpdate::Destroy(JSView* parentCustomView)
     updateJSInstanceCallback_ = nullptr;
     updateCustomEnvCallback_ = nullptr;
     updateEnvCallback_ = nullptr;
+    updateEnvTreeStateCallback_ = nullptr;
 
     // release reference to JS view object, and allow GC, calls DestructorCallback
     jsViewObject_.Reset();
@@ -1544,6 +1558,43 @@ void JSViewPartialUpdate::JSGetDialogController(const JSCallbackInfo& info)
     info.SetReturnValue(jsVal);
 }
 
+void JSViewPartialUpdate::EnsureEnvTreeStateChangeCallback()
+{
+    auto customNode = AceType::DynamicCast<NG::CustomNode>(this->GetViewNode());
+    if (!customNode || customNode->HasOnEnvTreeStateChangeFunc()) {
+        return;
+    }
+    if (!updateEnvTreeStateCallback_) {
+        if (jsViewObject_.IsEmpty() || jsViewObject_->IsUndefined()) {
+            return;
+        }
+        JSRef<JSVal> onEnvTreeStateChange =
+            jsViewObject_->GetProperty("__onWithEnvTreeStateChanged__Internal");
+        if (!onEnvTreeStateChange->IsFunction()) {
+            return;
+        }
+        updateEnvTreeStateCallback_ =
+            [weak = WeakClaim(this), func = JSRef<JSFunc>::Cast(onEnvTreeStateChange)](bool isAttached) {
+                JAVASCRIPT_EXECUTION_SCOPE_STATIC;
+                auto self = weak.Upgrade();
+                CHECK_NULL_VOID(self);
+                ContainerScope scope(self->GetInstanceId());
+                if (self->jsViewObject_.IsEmpty() || self->jsViewObject_->IsUndefined()) {
+                    return;
+                }
+                JSRef<JSVal> params[] = { JSRef<JSVal>::Make(ToJSValue(isAttached)) };
+                func->Call(self->jsViewObject_, 1, params);
+            };
+    }
+    customNode->SetOnEnvTreeStateChangeFunc([weak = WeakClaim(this)](bool isAttached) {
+        auto self = weak.Upgrade();
+        CHECK_NULL_VOID(self);
+        if (self->updateEnvTreeStateCallback_) {
+            self->updateEnvTreeStateCallback_(isAttached);
+        }
+    });
+}
+
 void JSViewPartialUpdate::JSFindCustomValueByKey(const JSCallbackInfo& info)
 {
     auto result = JSRef<JSObject>::New();
@@ -1559,6 +1610,7 @@ void JSViewPartialUpdate::JSFindCustomValueByKey(const JSCallbackInfo& info)
         info.SetReturnValue(result);
         return;
     }
+    EnsureEnvTreeStateChangeCallback();
     auto environmentManager = GetEnvironmentManager(node);
     if (!environmentManager) {
         info.SetReturnValue(result);
@@ -1594,6 +1646,7 @@ void JSViewPartialUpdate::JSFindSystemEnvValueByKey(const JSCallbackInfo& info)
         info.SetReturnValue(JSVal::Undefined());
         return;
     }
+    EnsureEnvTreeStateChangeCallback();
     auto environmentManager = GetEnvironmentManager(node);
     if (!environmentManager) {
         info.SetReturnValue(JSVal::Undefined());

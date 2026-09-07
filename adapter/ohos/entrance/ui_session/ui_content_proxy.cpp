@@ -357,12 +357,16 @@ int32_t UIContentServiceProxy::RegisterComponentChangeEventCallback(const EventC
         LOGW("reportStub is nullptr");
         return FAILED;
     }
+    if (report_->IsComponentChangeEventCallbackRegistered()) {
+        LOGW("RegisterComponentChangeEventCallback callback has already been registered");
+    }
     report_->RegisterComponentChangeEventCallback(eventCallback);
     int32_t sendRequestErrorCode = Remote()->SendRequest(REGISTER_COMPONENT_EVENT, data, reply, option);
     if (sendRequestErrorCode != ERR_NONE) {
         LOGW("RegisterComponentChangeEventCallback send request failed, errorCode is %{public}d", sendRequestErrorCode);
         return REPLY_ERROR;
     }
+    LOGI("RegisterComponentChangeEventCallback success");
     return NO_ERROR;
 }
 
@@ -532,20 +536,30 @@ int32_t UIContentServiceProxy::SendCommand(int32_t id, const std::string& comman
     return NO_ERROR;
 }
 
-int32_t UIContentServiceProxy::SendCommandAsync(int32_t id, const std::string& command)
+int32_t UIContentServiceProxy::SendCommandSync(int32_t id, const std::string& command)
 {
     MessageParcel data;
     MessageParcel reply;
-    MessageOption option(MessageOption::TF_ASYNC);
+    MessageOption option(MessageOption::TF_SYNC);
     if (!data.WriteInterfaceToken(GetDescriptor())) {
-        LOGW("SendCommand Async write interface token failed");
+        LOGW("SendCommandSync write interface token failed");
         return FAILED;
     }
     if (!data.WriteInt32(id) || !data.WriteString(command)) {
-        LOGW("SendCommand Async write data failed");
+        LOGW("SendCommandSync write data failed");
         return FAILED;
     }
-    return Remote()->SendRequest(SENDCOMMAND_ASYNC_EVENT, data, reply, option);
+    int32_t sendRequestErrorCode = Remote()->SendRequest(SENDCOMMAND_SYNC_EVENT, data, reply, option);
+    if (sendRequestErrorCode != ERR_NONE) {
+        LOGW("SendCommandSync send request failed, errorCode is %{public}d", sendRequestErrorCode);
+        return REPLY_ERROR;
+    }
+    int32_t result = 0;
+    if (!reply.ReadInt32(result)) {
+        LOGW("SendCommandSync read reply failed");
+        return REPLY_ERROR;
+    }
+    return result;
 }
 
 int32_t UIContentServiceProxy::SendCommand(const std::string command)
@@ -683,6 +697,7 @@ int32_t UIContentServiceProxy::UnregisterComponentChangeEventCallback()
             sendRequestErrorCode);
         return REPLY_ERROR;
     }
+    LOGI("UnregisterComponentChangeEventCallback success");
     return NO_ERROR;
 }
 
@@ -1235,6 +1250,9 @@ int32_t UIContentServiceProxy::RegisterContentChangeCallback(const ContentChange
         LOGW("RegisterContentChangeCallback is nullptr,connect is not execute");
         return FAILED;
     }
+    if (report_->IsContentChangeCallbackRegistered()) {
+        LOGW("RegisterContentChangeCallback callback has already been registered");
+    }
     report_->RegisterContentChangeCallback(callback);
 
     int32_t sendRequestErrorCode = Remote()->SendRequest(REGISTER_CONTENT_CHANGE, data, reply, option);
@@ -1242,6 +1260,7 @@ int32_t UIContentServiceProxy::RegisterContentChangeCallback(const ContentChange
         LOGW("RegisterContentChangeCallback send request failed, errorCode is %{public}d", sendRequestErrorCode);
         return REPLY_ERROR;
     }
+    LOGI("RegisterContentChangeCallback success");
     return NO_ERROR;
 }
 
@@ -1264,6 +1283,7 @@ int32_t UIContentServiceProxy::UnregisterContentChangeCallback()
         LOGW("UnregisterContentChangeCallback send request failed, errorCode is %{public}d", sendRequestErrorCode);
         return REPLY_ERROR;
     }
+    LOGI("UnregisterContentChangeCallback success");
     return NO_ERROR;
 }
 

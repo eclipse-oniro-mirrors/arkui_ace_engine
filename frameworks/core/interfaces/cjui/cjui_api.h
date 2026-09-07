@@ -692,6 +692,7 @@ struct CJUITextModifier {
     void (*setTextLineSpacing)(
         ArkUINodeHandle node, ArkUI_Float32 value, ArkUI_Int32 unit, ArkUI_Bool isOnlyBetweenLines, void* resObj);
     ArkUI_Float32 (*getTextLineSpacing)(ArkUINodeHandle node);
+    ArkUI_Bool (*getIsOnlyBetweenLines)(ArkUINodeHandle node);
     void (*resetTextLineSpacing)(ArkUINodeHandle node);
     void (*setTextSelectedBackgroundColor)(
         ArkUINodeHandle node, ArkUI_Uint32 color, void* selectedBackgroundColorRawPtr);
@@ -2392,6 +2393,12 @@ struct CJUIImageSpanModifier {
     void (*setImageSpanSrc)(ArkUINodeHandle node, ArkUI_CharPtr src, ArkUI_CharPtr bundleName, ArkUI_CharPtr moduleName,
         ArkUI_Bool isUriPureNumber);
     void (*setImageSpanPlaceHolderStyle)(ArkUINodeHandle node, void* style);
+    void (*setImageSpanResizableSlice)(ArkUINodeHandle node, const ArkUI_Float32* values,
+        const ArkUI_Int32* units, ArkUI_Int32 length);
+    void (*resetImageSpanResizableSlice)(ArkUINodeHandle node);
+    void (*getImageSpanResizableSlice)(ArkUINodeHandle node, ArkUI_Float32* values, ArkUI_Int32* units);
+    void (*setImageSpanResizableLattice)(ArkUINodeHandle node, void* lattice, bool isCapi);
+    void (*resetImageSpanResizableLattice)(ArkUINodeHandle node);
 };
 
 struct CJUIMenuModifier {
@@ -3709,7 +3716,7 @@ struct CJUIFrameNodeModifier {
     ArkUINodeHandle (*getFrameNodeByKey)(ArkUI_CharPtr key);
     ArkUINodeHandle (*getFirstUINode)(ArkUINodeHandle node);
     void (*getLayoutSize)(ArkUINodeHandle node, ArkUI_Int32 (*size)[2]);
-    ArkUI_Float32* (*getLayoutPositionWithoutMargin)(ArkUINodeHandle node);
+    void (*getLayoutPositionWithoutMargin)(ArkUINodeHandle node, ArkUI_Float32 (*position)[2]);
 };
 
 struct CJUINodeContentEvent {

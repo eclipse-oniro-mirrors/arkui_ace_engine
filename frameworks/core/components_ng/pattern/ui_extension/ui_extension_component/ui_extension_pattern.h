@@ -183,7 +183,8 @@ public:
         return sessionWrapper_;
     }
     int64_t WrapExtensionAbilityId(int64_t extensionOffset, int64_t abilityId) override;
-    void DispatchOriginAvoidArea(const Rosen::AvoidArea& avoidArea, uint32_t type);
+    void DispatchOriginAvoidArea(const Rosen::AvoidArea& avoidArea, uint32_t type,
+        WindowSizeChangeReason reason);
     void HandleVisibleAreaChange(bool visible, double ratio);
     void SetWantWrap(const RefPtr<OHOS::Ace::WantWrap>& wantWrap);
     RefPtr<OHOS::Ace::WantWrap> GetWantWrap();
@@ -320,7 +321,7 @@ public:
     {
         isUpdateDisplayArea_ = isUpdate;
     }
-
+    void AddWindowStateChangedCallback();
 protected:
     virtual void DispatchPointerEvent(const std::shared_ptr<MMI::PointerEvent>& pointerEvent);
     virtual void DispatchKeyEvent(const KeyEvent& event);

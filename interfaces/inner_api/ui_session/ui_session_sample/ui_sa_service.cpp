@@ -22,6 +22,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <functional>
 #include <iomanip>
 #include <fstream>
 #include <limits>
@@ -43,6 +44,7 @@ namespace {
 const bool REGISTER_RESULT = SystemAbility::MakeAndRegisterAbility(&UiSaService::GetInstance());
 const std::string UI_SA_PATH = "/data/service/el1/public/ui_sa/";
 constexpr char WEB_INTERFACE_REQUEST_DOM_TREE[] = "RequestArkWebDomTree";
+constexpr char WEB_INTERFACE_REQUEST_DOM_TREE_VIEWPORT[] = "RequestArkWebDomTreeViewport";
 constexpr size_t BITS_UINT32 = sizeof(uint32_t) * 8;
 constexpr int32_t PARAMS_OFFSET = 1;
 constexpr size_t GET_VISIBLE_INTERACTION_INFO_INDEX = 1;
@@ -57,7 +59,6 @@ constexpr size_t SIMPLIFYTREE_WITH_EXTENDED_PARAMCONFIG = GET_VISIBLE_MIN_OPACIT
 constexpr int32_t SEND_COMMAND_WITH_NODEID = 3;
 constexpr int32_t SEND_COMMAND_WITHOUT_NODEID = 2;
 constexpr int32_t START_WEB_VIEW_TRANSLATE = 2;
-constexpr int32_t CONTENT_CHANGE_EVENT_WITH_CONFIG = 6;
 constexpr int32_t GET_WEB_INFO_BY_REQUEST_PARAMS = 3;
 constexpr int32_t EXE_APP_AI_FUNCTION_PARAMS = 3;
 constexpr int32_t GET_STATE_MGMT_INFO_PARAMS = 4;
@@ -179,24 +180,43 @@ float ParseMinOpacityParam(const std::string& param)
     return static_cast<float>(minOpacity);
 }
 
-ContentChangeConfig ParseContentChangeConfig(const std::vector<std::string>& params, bool toFile)
+ContentChangeConfig ParseContentChangeConfig(
+    const std::vector<std::string>& params, bool toFile)
 {
     ContentChangeConfig config;
-    
-    int32_t paramSize = static_cast<int32_t>(params.size());
-    int32_t effectiveParamCount = toFile ? (paramSize - PARAMS_OFFSET - 1) : (paramSize - PARAMS_OFFSET);
-    
-    bool useCustomConfig = (effectiveParamCount == CONTENT_CHANGE_EVENT_WITH_CONFIG);
-    if (!useCustomConfig) {
-        return config;
+
+    using Parser = std::function<void(const std::string&)>;
+    std::vector<Parser> parsers = {
+        [&config](const std::string& value) {
+            config.minReportTime = std::atoi(value.c_str());
+        },
+        [&config](const std::string& value) {
+            config.textContentRatio = std::atof(value.c_str());
+        },
+        [&config](const std::string& value) {
+            config.ignoreEventType = value;
+        },
+        [&config](const std::string& value) {
+            config.minWidth = std::atoi(value.c_str());
+        },
+        [&config](const std::string& value) {
+            config.minHeight = std::atoi(value.c_str());
+        },
+        [&config](const std::string& value) {
+            config.reportDelayTime = std::atoi(value.c_str());
+        },
+    };
+
+    const size_t configStart = static_cast<size_t>(PARAMS_OFFSET);
+    size_t configCount = params.size() > configStart ? params.size() - configStart : 0;
+    if (toFile && configCount > 0) {
+        --configCount;
     }
-    
-    config.minReportTime = std::atoi(params[1].c_str());  // 1 : minReportTime
-    config.textContentRatio = std::atof(params[2].c_str());  // 2 : textContentRatio
-    config.ignoreEventType = params[3];  // 3 : ignoreEventType
-    config.minWidth = std::atoi(params[4].c_str());  // 4 : minWidth
-    config.minHeight = std::atoi(params[5].c_str());  // 5 : minHeight
-    config.reportDelayTime = std::atoi(params[6].c_str());  // 6 : reportDelayTime
+
+    const size_t parseCount = std::min(configCount, parsers.size());
+    for (size_t index = 0; index < parseCount; ++index) {
+        parsers[index](params[configStart + index]);
+    }
 
     return config;
 }
@@ -293,7 +313,7 @@ const std::map<std::string, UiSaService::DumpHandler> UiSaService::DUMP_MAP = {
     { "GetVisibleInspectorTree", &UiSaService::HandleGetVisibleInspectorTree },
     { "GetCurrentPageName", &UiSaService::HandleGetCurrentPageName },
     { "SendCommand", &UiSaService::HandleSendCommand },
-    { "SendCommandAsync", &UiSaService::HandleSendCommandAsync },
+    { "SendCommandSync", &UiSaService::HandleSendCommandSync },
     { "RegisterContentChangeCallback", &UiSaService::HandleRegisterContentChangeCallback },
     { "UnregisterContentChangeCallback", &UiSaService::HandleUnregisterContentChangeCallback },
     { "GetCurrentImagesShowing", &UiSaService::HandleGetCurrentImagesShowing },
@@ -499,12 +519,13 @@ void UiSaService::HandleSendCommand(sptr<IUiContentService> service, std::vector
     }
 }
 
-void UiSaService::HandleSendCommandAsync(sptr<IUiContentService> service, std::vector<std::string> params)
+void UiSaService::HandleSendCommandSync(sptr<IUiContentService> service, std::vector<std::string> params)
 {
     CHECK_EQUAL_VOID(params.size() == SEND_COMMAND_WITH_NODEID, false);
     int32_t id = std::atoi(params[1].c_str());
     std::string command = params[2];
-    service->SendCommandAsync(id, command);
+    int32_t result = service->SendCommandSync(id, command);
+    LOGI("[SendCommandSync] result = %{public}d", result);
 }
 
 void UiSaService::HandleRegisterContentChangeCallback(sptr<IUiContentService> service, std::vector<std::string> params)
@@ -616,6 +637,17 @@ void UiSaService::HandleGetWebInfoByRequest(sptr<IUiContentService> service, std
             LOGI("[GetWebInfoByRequest] finishCallback code=%{public}d", code);
             if (request == WEB_INTERFACE_REQUEST_DOM_TREE) {
                 auto filePath = UI_SA_PATH + "arkweb_tree_" + GetCurrentTimestampStr() + ".json";
+                std::unique_ptr<std::ofstream> ostream = std::make_unique<std::ofstream>(filePath);
+                CHECK_NULL_VOID(ostream);
+                if (!ostream->is_open()) {
+                    LOGW("[GetWebInfoByRequest] filePath is invalid");
+                    return;
+                }
+                ostream->write(result.c_str(), result.length());
+                LOGI("[GetWebInfoByRequest] arkWeb tree is saved to %{public}s", filePath.c_str());
+            }
+            if (request == WEB_INTERFACE_REQUEST_DOM_TREE_VIEWPORT) {
+                auto filePath = UI_SA_PATH + "arkweb_tree_viewport_" + GetCurrentTimestampStr() + ".json";
                 std::unique_ptr<std::ofstream> ostream = std::make_unique<std::ofstream>(filePath);
                 CHECK_NULL_VOID(ostream);
                 if (!ostream->is_open()) {
@@ -815,22 +847,24 @@ void UiSaService::HandleGetPageTranslateText(sptr<IUiContentService> service, st
 {
     std::string request = BuildPageTranslateRequest(params);
     auto callback = [](int32_t nodeId, const std::string& text, int64_t version) {
-        LOGI("[GetPageTranslateText] nodeId=%{public}d, textLen=%{public}zu, version=%{public}" PRId64,
-            nodeId, text.size(), version);
+        LOGI("[GetPageTranslateText] nodeId=%{public}d, textLen=%{public}zu, text=%{public}s, version=%{public}" PRId64,
+            nodeId, text.size(), text.substr(0, 200).c_str(), version);
     };
     auto result = service->GetPageTranslateText(request, callback);
-    LOGI("[GetPageTranslateText] result=%{public}d, requestLen=%{public}zu", result, request.size());
+    LOGI("[GetPageTranslateText] result=%{public}d, requestLen=%{public}zu, request=%{public}s",
+        result, request.size(), request.substr(0, 200).c_str());
 }
 
 void UiSaService::HandleStartPageTranslate(sptr<IUiContentService> service, std::vector<std::string> params)
 {
     std::string request = BuildPageTranslateRequest(params);
     auto callback = [](int32_t nodeId, const std::string& text, int64_t version) {
-        LOGI("[StartPageTranslate] nodeId=%{public}d, textLen=%{public}zu, version=%{public}" PRId64,
-            nodeId, text.size(), version);
+        LOGI("[StartPageTranslate] nodeId=%{public}d, textLen=%{public}zu, text=%{public}s, version=%{public}" PRId64,
+            nodeId, text.size(), text.substr(0, 200).c_str(), version);
     };
     auto result = service->StartPageTranslate(request, callback);
-    LOGI("[StartPageTranslate] result=%{public}d, requestLen=%{public}zu", result, request.size());
+    LOGI("[StartPageTranslate] result=%{public}d, requestLen=%{public}zu, request=%{public}s",
+        result, request.size(), request.substr(0, 200).c_str());
 }
 
 void UiSaService::HandleEndPageTranslate(sptr<IUiContentService> service, std::vector<std::string> params)
@@ -855,7 +889,8 @@ void UiSaService::HandleSendPageTranslateResult(sptr<IUiContentService> service,
     if (params.size() >= PAGE_TRANSLATE_REQUEST_PARAMS) {
         std::string result = params[1];
         auto ret = service->SendPageTranslateResult(result);
-        LOGI("[SendPageTranslateResult] result=%{public}d, resultLen=%{public}zu", ret, result.size());
+        LOGI("[SendPageTranslateResult] result=%{public}d, resultLen=%{public}zu, result=%{public}s",
+            ret, result.size(), result.substr(0, 200).c_str());
     }
 }
 

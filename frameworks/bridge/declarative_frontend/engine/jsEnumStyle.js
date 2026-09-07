@@ -803,18 +803,6 @@ class LayoutPolicy {
 
 globalThis.LayoutPolicy = LayoutPolicy;
 
-var BlurStyle;
-(function (BlurStyle) {
-  BlurStyle[BlurStyle.SmallLight = 100] = 'SmallLight';
-  BlurStyle[BlurStyle.MediumLight = 101] = 'MediumLight';
-  BlurStyle[BlurStyle.LargeLight = 102] = 'LargeLight';
-  BlurStyle[BlurStyle.XlargeLight = 103] = 'XlargeLight';
-  BlurStyle[BlurStyle.SmallDark = 104] = 'SmallDark';
-  BlurStyle[BlurStyle.MediumDark = 105] = 'MediumDark';
-  BlurStyle[BlurStyle.LargeDark = 106] = 'LargeDark';
-  BlurStyle[BlurStyle.XlargeDark = 107] = 'XlargeDark';
-})(BlurStyle || (BlurStyle = {}));
-
 let Edge;
 (function (Edge) {
   Edge[Edge.Top = 0] = 'Top';
@@ -1078,6 +1066,31 @@ let BarPosition;
   BarPosition[BarPosition.Start = 0] = 'Start';
   BarPosition[BarPosition.End = 1] = 'End';
 })(BarPosition || (BarPosition = {}));
+
+let TabBarStyle;
+(function (TabBarStyle) {
+  TabBarStyle[TabBarStyle.BOTTOM = 0] = 'BOTTOM';
+  TabBarStyle[TabBarStyle.SIDEBAR = 1] = 'SIDEBAR';
+  TabBarStyle[TabBarStyle.SIDEBAR_ADAPTABLE = 2] = 'SIDEBAR_ADAPTABLE';
+})(TabBarStyle || (TabBarStyle = {}));
+
+let SidebarDisplayStyle;
+(function (SidebarDisplayStyle) {
+  SidebarDisplayStyle[SidebarDisplayStyle.EMBED = 0] = 'EMBED';
+  SidebarDisplayStyle[SidebarDisplayStyle.DISPLACE = 1] = 'DISPLACE';
+})(SidebarDisplayStyle || (SidebarDisplayStyle = {}));
+
+let TabBarDisplayMode;
+(function (TabBarDisplayMode) {
+  TabBarDisplayMode[TabBarDisplayMode.BOTTOM_TABBAR = 0] = 'BOTTOM_TABBAR';
+  TabBarDisplayMode[TabBarDisplayMode.SIDEBAR = 1] = 'SIDEBAR';
+})(TabBarDisplayMode || (TabBarDisplayMode = {}));
+
+let TabVisibility;
+(function (TabVisibility) {
+  TabVisibility[TabVisibility.VISIBLE = 0] = 'VISIBLE';
+  TabVisibility[TabVisibility.HIDDEN = 1] = 'HIDDEN';
+})(TabVisibility || (TabVisibility = {}));
 
 let SharedTransitionEffectType;
 (function (SharedTransitionEffectType) {
@@ -1859,7 +1872,7 @@ let ListItemAlign;
   ListItemAlign[ListItemAlign.End = 2] = 'End';
 })(ListItemAlign || (ListItemAlign = {}));
 
-var BlurStyle;
+let BlurStyle;
 (function (BlurStyle) {
   BlurStyle[BlurStyle.NoMaterial = 0] = 'NoMaterial';
   BlurStyle[BlurStyle.Thin = 1] = 'Thin';
@@ -1879,6 +1892,14 @@ var BlurStyle;
   BlurStyle[BlurStyle.COMPONENT_THICK = 11] = 'COMPONENT_THICK';
   BlurStyle[BlurStyle.COMPONENT_ULTRA_THICK = 12] = 'COMPONENT_ULTRA_THICK';
   BlurStyle[BlurStyle.NONE = 0] = 'NONE';
+  BlurStyle[BlurStyle.SmallLight = 100] = 'SmallLight';
+  BlurStyle[BlurStyle.MediumLight = 101] = 'MediumLight';
+  BlurStyle[BlurStyle.LargeLight = 102] = 'LargeLight';
+  BlurStyle[BlurStyle.XlargeLight = 103] = 'XlargeLight';
+  BlurStyle[BlurStyle.SmallDark = 104] = 'SmallDark';
+  BlurStyle[BlurStyle.MediumDark = 105] = 'MediumDark';
+  BlurStyle[BlurStyle.LargeDark = 106] = 'LargeDark';
+  BlurStyle[BlurStyle.XlargeDark = 107] = 'XlargeDark';
 })(BlurStyle || (BlurStyle = {}));
 
 let BlurStyleActivePolicy;

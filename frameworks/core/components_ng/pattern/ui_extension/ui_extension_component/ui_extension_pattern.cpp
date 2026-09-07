@@ -252,6 +252,15 @@ void UIExtensionPattern::OnDetachFromMainTree()
     UIEXT_LOGI("OnDetachFromMainTree, isMoving: %{public}d", IsMoving());
 }
 
+void UIExtensionPattern::AddWindowStateChangedCallback()
+{
+    auto context = PipelineContext::GetContextByContainerId(instanceId_);
+    CHECK_NULL_VOID(context);
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    context->AddWindowStateChangedCallback(host->GetId());
+}
+
 void UIExtensionPattern::OnAttachContext(PipelineContext *context)
 {
     CHECK_NULL_VOID(context);
@@ -269,7 +278,7 @@ void UIExtensionPattern::OnAttachContext(PipelineContext *context)
     } else if (detachContextHappened) {
         RegisterEvent(instanceId_);
     }
-
+    AddWindowStateChangedCallback();
     RegisterAvoidInfoChangeListener(instanceId_);
 
     /* only for 1.2 begin */
@@ -282,12 +291,6 @@ void UIExtensionPattern::OnAttachContext(PipelineContext *context)
         hasAttachContext_ = true;
     }
     /* only for 1.2 end */
-
-    auto host = GetHost();
-    CHECK_NULL_VOID(host);
-    auto pipeline = PipelineContext::GetContextByContainerId(instanceId_);
-    CHECK_NULL_VOID(pipeline);
-    pipeline->AddWindowStateChangedCallback(host->GetId());
 }
 
 void UIExtensionPattern::UpdateSessionInstanceId(int32_t instanceId)
@@ -1123,6 +1126,7 @@ void UIExtensionPattern::InitKeyEventOnClearFocusState(const RefPtr<FocusHub>& f
         auto pattern = weak.Upgrade();
         if (pattern) {
             TAG_LOGD(AceLogTag::ACE_UIEXTENSIONCOMPONENT, "Clear FocusState Internal.");
+            pattern->SetForceProcessOnKeyEventInternal(false);
             pattern->DispatchFocusActiveEvent(false);
         }
     });
@@ -1972,10 +1976,11 @@ int32_t UIExtensionPattern::GetInstanceIdFromHost() const
     return instanceId;
 }
 
-void UIExtensionPattern::DispatchOriginAvoidArea(const Rosen::AvoidArea& avoidArea, uint32_t type)
+void UIExtensionPattern::DispatchOriginAvoidArea(const Rosen::AvoidArea& avoidArea, uint32_t type,
+    WindowSizeChangeReason reason)
 {
     CHECK_NULL_VOID(sessionWrapper_);
-    sessionWrapper_->NotifyOriginAvoidArea(avoidArea, type);
+    sessionWrapper_->NotifyOriginAvoidArea(avoidArea, type, reason);
 }
 
 void UIExtensionPattern::SetWantWrap(const RefPtr<OHOS::Ace::WantWrap>& wantWrap)

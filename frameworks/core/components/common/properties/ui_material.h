@@ -55,6 +55,31 @@ enum class EdgeLightMode: int32_t {
     EDGELIGHT_DISABLED = 2,
 };
 
+// Convert DistortionMode / EdgeLightMode values to inspector-friendly strings.
+inline std::string DistortionModeToString(DistortionMode mode)
+{
+    static const std::string modes[] = { "DistortionMode.AUTO", "DistortionMode.ENABLED",
+        "DistortionMode.DISABLED" };
+    auto index = static_cast<int32_t>(mode);
+    if (index >= static_cast<int32_t>(DistortionMode::DISTORTION_AUTO) &&
+        index <= static_cast<int32_t>(DistortionMode::DISTORTION_DISABLED)) {
+        return modes[index];
+    }
+    return modes[static_cast<int32_t>(DistortionMode::DISTORTION_AUTO)];
+}
+
+inline std::string EdgeLightModeToString(EdgeLightMode mode)
+{
+    static const std::string modes[] = { "EdgeLightMode.AUTO", "EdgeLightMode.ENABLED",
+        "EdgeLightMode.DISABLED" };
+    auto index = static_cast<int32_t>(mode);
+    if (index >= static_cast<int32_t>(EdgeLightMode::EDGELIGHT_AUTO) &&
+        index <= static_cast<int32_t>(EdgeLightMode::EDGELIGHT_DISABLED)) {
+        return modes[index];
+    }
+    return modes[static_cast<int32_t>(EdgeLightMode::EDGELIGHT_AUTO)];
+}
+
 struct UiMaterialParam {
     Shadow shadow;
     Color backgroundColor;
@@ -72,6 +97,8 @@ struct ImmersiveMaterialConfig {
     bool interactive = false;
     // Store the lightEffectOptions (color and colorResObj). nullptr means no lightEffect.
     std::shared_ptr<LightEffectOptions> lightEffectOptions;
+    // when needSplitOverlayShader is true, split material shader into base and overlay layers
+    bool needSplitOverlayShader = false;
 
     // return true if same, return false if different.
     bool CompareLightEffectOptions(const ImmersiveMaterialConfig& other) const
@@ -84,7 +111,8 @@ struct ImmersiveMaterialConfig {
     {
         return key == other.key && materialColor == other.materialColor && colorInvert == other.colorInvert &&
                applyShadow == other.applyShadow && interactive == other.interactive &&
-               NearEqual(dipScale, other.dipScale) && CompareLightEffectOptions(other);
+               NearEqual(dipScale, other.dipScale) && CompareLightEffectOptions(other) &&
+               needSplitOverlayShader == other.needSplitOverlayShader;
     }
 
     bool HasLightEffect() const
@@ -125,6 +153,8 @@ public:
         const ImmersiveMaterialConfig& params, std::shared_ptr<Rosen::RSNGFilterBase>& filter);
     static bool GetUiMaterialShaderECSub(
         const ImmersiveMaterialConfig& params, std::shared_ptr<Rosen::RSNGShaderBase>& shader);
+    static bool GetUiMaterialECSubShaderOverlay(
+        const ImmersiveMaterialConfig& params, std::shared_ptr<Rosen::RSNGShaderBase>& shader);
     static Shadow GetImmersiveShadow(float dipScale);
     static Shadow GetImmersiveEmptyShadow();
     static bool GetGlobalMaterialLevel(UiMaterialLevel& result);
@@ -133,6 +163,11 @@ public:
     static MaterialType GetConfiguredMaterialType();
     static bool IsMaterialDisabled();
     static bool IsMaterialEnabled();
+    static bool IsSystemApp();
+    // Components whose SystemMaterial is unrestricted: not gated by the scope
+    // (titleBar / bottom TabBar) or self-drawing-overlap rules, regardless of
+    // system-app status. Identified by tag.
+    static bool IsMaterialUnrestrictedComponent(const std::string& tag);
     static bool IsEmptyMaterial(const RefPtr<UiMaterial>& material);
     static RefPtr<UiMaterial> GetInitMaterial(const UiMaterialStyle style,
         const std::optional<bool>& interactive = std::nullopt,

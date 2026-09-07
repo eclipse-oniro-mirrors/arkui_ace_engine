@@ -221,12 +221,22 @@ bool ScrollPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty,
             ((config.frameSizeChange || config.contentSizeChange) && paintProperty->GetContentClip().has_value());
 }
 
-bool ScrollPattern::IsScrollReachEdge() const
+bool ScrollPattern::IsScrollEdgeFinish() const
 {
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, true);
+    auto child = AceType::DynamicCast<FrameNode>(host->GetChildByIndex(0));
+    CHECK_NULL_RETURN(child, true);
+    if (!child->IsNeedLazyLayout()) {
+        return true;
+    }
+    if (scrollEdgeType_ == ScrollEdgeType::SCROLL_NONE) {
+        return true;
+    }
     if (scrollEdgeType_ == ScrollEdgeType::SCROLL_BOTTOM || scrollEdgeType_ == ScrollEdgeType::SCROLL_RIGHT) {
-        return LessOrEqual(currentOffset_, -scrollableDistance_ - contentEndOffset_);
+        return IsAtBottom();
     } else {
-        return LessOrEqual(currentOffset_, contentStartOffset_);
+        return IsAtTop();
     }
 }
 

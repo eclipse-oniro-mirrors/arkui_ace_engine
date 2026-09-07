@@ -36,7 +36,6 @@
 #include "adapter/ohos/entrance/distributed_ui_manager.h"
 #include "adapter/ohos/entrance/ace_viewport_config.h"
 #include "base/thread/task_executor.h"
-#include "base/utils/delay_task.h"
 #include "base/view_data/view_data_wrap.h"
 #include "core/common/asset_manager_impl.h"
 #include "core/common/update_config_manager.h"
@@ -141,10 +140,12 @@ public:
     void UpdateTitleInTargetPos(bool isShow, int32_t height) override;
     void NotifyRotationAnimationEnd() override;
     void RegisterExeAppAIFunction(const WeakPtr<TaskExecutor>& taskExecutor);
+    void PostTraverseWebTask(const WeakPtr<TaskExecutor>& weakTaskExecutor, std::function<void()>&& task);
     void SaveTraverseWebForPageSceneCallback(const WeakPtr<TaskExecutor>& taskExecutor);
     void SaveGetStateMgmtInfoFunction(const WeakPtr<TaskExecutor>& taskExecutor);
     void SaveGetWebInfoByRequestFunction(const WeakPtr<TaskExecutor>& taskExecutor);
     void SaveArkUIPageTranslateFunctions(const WeakPtr<TaskExecutor>& taskExecutor);
+    void SaveGetCurrentAbilityLanguageInfoFunction(const WeakPtr<TaskExecutor>& taskExecutor);
     void ChangeSensitiveNodes(bool isSensitive) override;
 
     // Window color
@@ -192,6 +193,7 @@ public:
     float GetFormHeight() override { return formHeight_; }
 
     void SetFormViewScale(float width, float height, float formViewScale) override;
+    void SetFormDisplayId(const uint64_t displayId) override;
     void SetActionEventHandler(std::function<void(const std::string& action)>&& actionCallback) override;
     void SetErrorEventHandler(std::function<void(const std::string&, const std::string&)>&& errorCallback) override;
     void SetFormLinkInfoUpdateHandler(std::function<void(const std::vector<std::string>&)>&& callback) override;
@@ -563,6 +565,7 @@ protected:
     bool isBundle_ = false;
     float formWidth_ = 0.0;
     float formHeight_ = 0.0;
+    uint64_t formDisplayId_ = static_cast<uint64_t>(-1);
     std::string formData_;
     bool fontScaleFollowSystem_ = true;
     std::map<std::string, sptr<OHOS::AppExecFwk::FormAshmem>> formImageDataMap_;
@@ -585,8 +588,6 @@ protected:
     RefPtr<UpdateConfigManager<AceViewportConfig>> viewportConfigMgr_ =
         Referenced::MakeRefPtr<UpdateConfigManager<AceViewportConfig>>();
     std::unordered_map<void*, std::function<void()>> destructCallbacks_;
-    TaskTimeRecord taskTimeForComeIn_;
-    TaskTimeRecord taskTimeForExit_;
     SingleTaskExecutor::CancelableTask updateDecorVisibleTask_;
     std::mutex updateDecorVisibleMutex_;
     SingleTaskExecutor::CancelableTask setAppWindowIconTask_;
@@ -610,8 +611,6 @@ protected:
 
 private:
     void ProcessWindowSizeLayoutBreakPointChange(double density);
-    static void PostTraverseWebTask(const WeakPtr<TaskExecutor>& weakTaskExecutor,
-        std::function<void()>&& task);
 };
 
 } // namespace OHOS::Ace

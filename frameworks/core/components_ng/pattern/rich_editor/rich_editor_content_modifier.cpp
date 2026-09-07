@@ -80,6 +80,7 @@ void RichEditorContentModifier::onDraw(DrawingContext& drawingContext)
     }
 
     PaintCustomSpan(drawingContext);
+    contentPattern->ReportPageTranslatePlaceholderDrawn();
 }
 
 float RichEditorContentModifier::AdjustParagraphX(const ParagraphManager::ParagraphInfo& info, const RectF& contentRect)
@@ -129,6 +130,16 @@ void RichEditorContentModifier::SetRichTextRectX(float value)
 void RichEditorContentModifier::SetRichTextRectY(float value)
 {
     richTextRectY_->Set(value);
+}
+
+float RichEditorContentModifier::GetRichTextRectX() const
+{
+    return richTextRectX_ ? richTextRectX_->Get() : 0.0f;
+}
+
+float RichEditorContentModifier::GetRichTextRectY() const
+{
+    return richTextRectY_ ? richTextRectY_->Get() : 0.0f;
 }
 
 void RichEditorContentModifier::SetClipOffset(OffsetF offset)

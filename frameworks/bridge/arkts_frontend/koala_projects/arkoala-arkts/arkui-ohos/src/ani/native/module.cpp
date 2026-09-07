@@ -863,6 +863,9 @@ ANI_EXPORT ani_status ANI_Constructor(ani_vm* vm, uint32_t* result)
         ani_native_function { "_Drawable_SetBlendMode", nullptr,
             reinterpret_cast<void*>(OHOS::Ace::Ani::DrawableSetBlendMode)
         },
+        ani_native_function { "_Drawable_SetSVGResourceLimitLevel", nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::DrawableSetSVGResourceLimitLevel)
+        },
         ani_native_function { "_Drawable_SetHdrComposition", nullptr,
             reinterpret_cast<void*>(OHOS::Ace::Ani::DrawableSetHdrComposition)
         },
@@ -974,6 +977,21 @@ ANI_EXPORT ani_status ANI_Constructor(ani_vm* vm, uint32_t* result)
             "_UiMaterial_IsImmersiveMaterialSupported",
             nullptr,
             reinterpret_cast<void*>(OHOS::Ace::Ani::UiMaterialIsImmersiveMaterialSupported)
+        },
+        ani_native_function {
+            "_UiMaterial_GetMaterialState",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::UiMaterialGetMaterialState)
+        },
+        ani_native_function {
+            "_UiMaterial_GetMaterialType",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::UiMaterialGetMaterialType)
+        },
+        ani_native_function {
+            "_UiMaterial_GetEmpty",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::UiMaterialGetEmpty)
         },
         ani_native_function {
             "_CreateViewStackProcessor",
@@ -2036,6 +2054,16 @@ ANI_EXPORT ani_status ANI_Constructor(ani_vm* vm, uint32_t* result)
             "_DumpLogPrint",
             "iC{std.core.String}:",
             reinterpret_cast<void*>(OHOS::Ace::Ani::DumpLogPrint)
+        },
+        ani_native_function {
+            "__BuilderNode_GetParentViewId",
+            "l:i",
+            reinterpret_cast<void*>(OHOS::Ace::Ani::BuilderNodeGetParentViewId)
+        },
+        ani_native_function {
+            "_ArkTSFrameNode_GetId",
+            "l:C{std.core.String}",
+            reinterpret_cast<void*>(OHOS::Ace::Ani::ArkTSFrameNodeGetId)
         }
     };
 

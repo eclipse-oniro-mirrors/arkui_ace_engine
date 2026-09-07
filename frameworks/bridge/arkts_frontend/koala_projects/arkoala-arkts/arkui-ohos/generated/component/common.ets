@@ -9785,13 +9785,40 @@ export interface CommonMethod {
     }
     // instructive change start
     animationStart(value: AnimateParam | undefined): this {
+        const commonStyle: Array<(instance: CommonMethod) => void> | undefined = this.__get__commonStyles__Internal();
+        if (commonStyle) {
+            (commonStyle as Array<(instance: CommonMethod) => void>).push((instance: CommonMethod): void => instance.animationStart(value));
+            return this;
+        } else {
+            if (this.__is_CustomComponent__Internal()) {
+                throw new Error("Common method 'animationStart' can only be set when creating a custom component")
+            }
+        }
         throw new Error("Unimplemented method animationStart")
     }
     animationStop(value: AnimateParam | undefined): this {
+        const commonStyle: Array<(instance: CommonMethod) => void> | undefined = this.__get__commonStyles__Internal();
+        if (commonStyle) {
+            (commonStyle as Array<(instance: CommonMethod) => void>).push((instance: CommonMethod): void => instance.animationStop(value));
+            return this;
+        } else {
+            if (this.__is_CustomComponent__Internal()) {
+                throw new Error("Common method 'animationStop' can only be set when creating a custom component")
+            }
+        }
         throw new Error("Unimplemented method animationStop")
     }
     __createOrSetAnimatableProperty<T>(functionName: string, value: number | AnimatableArithmetic<T>,
         callback: (value: number | AnimatableArithmetic<T>) => void): void {
+        const commonStyle: Array<(instance: CommonMethod) => void> | undefined = this.__get__commonStyles__Internal();
+        if (commonStyle) {
+            (commonStyle as Array<(instance: CommonMethod) => void>).push((instance: CommonMethod): void => instance.__createOrSetAnimatableProperty(functionName, value, callback));
+            return;
+        } else {
+            if (this.__is_CustomComponent__Internal()) {
+                throw new Error("Common method '__createOrSetAnimatableProperty' can only be set when creating a custom component")
+            }
+        }
         throw new Error("Unimplemented method __createOrSetAnimatableProperty")
     }
     // instructive change end
@@ -12755,16 +12782,15 @@ export class ArkCommonMethodComponent extends ComponentBase implements CommonMet
         callback: (value: number | AnimatableArithmetic<T>) => void): void {
         if (this.getPeer()) {
             const peer = this.getPeer();
-            let isFirst = true;
             const newCallback = (value: number | AnimatableArithmetic<T>): void => {
-                if (isFirst) {
-                    isFirst = false;
+                const lastPeer = this.peer;
+                if (lastPeer) {
                     callback(value);
                     return;
                 }
                 this.setPeer(peer);
                 callback(value);
-                this.setPeer(undefined);
+                this.setPeer(lastPeer);
             }
             ArkUIAniModule._Animation_SetOrCreateAnimatableProperty(this.getPeer().getPeerPtr(), functionName, value, newCallback);
         }

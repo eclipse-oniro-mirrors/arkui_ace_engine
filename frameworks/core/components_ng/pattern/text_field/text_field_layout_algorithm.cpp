@@ -40,6 +40,7 @@
 #include "core/components_ng/pattern/text_field/auto_fill_controller.h"
 #endif
 #include "core/components_ng/pattern/text_field/text_field_content_modifier.h"
+#include "core/components_ng/pattern/common_text/counter_decorator.h"
 #include "core/components_ng/pattern/text_field/text_field_layout_property.h"
 #include "core/components_ng/pattern/text_field/text_field_pattern.h"
 #include "core/components_ng/pattern/text_field/text_selector.h"
@@ -100,6 +101,7 @@ void TextFieldLayoutAlgorithm::ConstructTextStyles(
     } else {
 #endif
         if (!pattern->GetTextUtf16Value().empty()) {
+            pattern->OnPlaceholderSourceTextChanged();
             UpdateTextStyle(frameNode, textFieldLayoutProperty, textFieldTheme, textStyle, pattern->IsDisabled(),
                 textFieldPaintProperty->HasTextColorFlagByUser());
             textContent = pattern->GetTextUtf16Value();
@@ -107,7 +109,10 @@ void TextFieldLayoutAlgorithm::ConstructTextStyles(
                 textStyle, isTextArea, isInlineStyle, textFieldLayoutProperty, textFieldTheme->TextFadeoutEnabled());
         } else {
             showPlaceHolder = true;
-            if (!pattern->GetPlaceholderResponseArea()) {
+            if (auto pageTranslatedPlaceholder = pattern->GetPageTranslatedPlaceholder()) {
+                ConstructTranslatedPlaceholder(frameNode, pattern, textFieldTheme, textStyle);
+                textContent = pageTranslatedPlaceholder.value();
+            } else if (!pattern->GetPlaceholderResponseArea()) {
                 UpdatePlaceholderTextStyle(frameNode, textFieldLayoutProperty, textFieldTheme, textStyle,
                     pattern->IsDisabled(), textFieldPaintProperty->GetPlaceholderColorFlagByUserValue(false));
                 textContent = textFieldLayoutProperty->GetPlaceholderValue(u"");
@@ -123,6 +128,22 @@ void TextFieldLayoutAlgorithm::ConstructTextStyles(
     }
 #endif
     ConstructTextStylesAppend(frameNode, textStyle, pattern, showPlaceHolder);
+}
+
+void TextFieldLayoutAlgorithm::ConstructTranslatedPlaceholder(const RefPtr<FrameNode>& frameNode,
+    const RefPtr<TextFieldPattern>& pattern, const RefPtr<TextFieldTheme>& textFieldTheme,
+    TextStyle& textStyle)
+{
+    CHECK_NULL_VOID(frameNode && pattern && textFieldTheme);
+    auto textFieldLayoutProperty = pattern->GetLayoutProperty<TextFieldLayoutProperty>();
+    CHECK_NULL_VOID(textFieldLayoutProperty);
+    auto textFieldPaintProperty = pattern->GetPaintProperty<TextFieldPaintProperty>();
+    CHECK_NULL_VOID(textFieldPaintProperty);
+    UpdatePlaceholderTextStyle(frameNode, textFieldLayoutProperty, textFieldTheme, textStyle,
+        pattern->IsDisabled(), textFieldPaintProperty->GetPlaceholderColorFlagByUserValue(false));
+    if (pattern->GetPlaceholderResponseArea()) {
+        PlaceholderRemoveFromParent(pattern);
+    }
 }
 
 void TextFieldLayoutAlgorithm::ConstructTextStylesAppend(const RefPtr<FrameNode>& frameNode, TextStyle& textStyle,
@@ -740,14 +761,7 @@ float TextFieldLayoutAlgorithm::CalculateContentHeight(const LayoutConstraintF& 
 
 void TextFieldLayoutAlgorithm::CounterLayout(LayoutWrapper* layoutWrapper)
 {
-    CHECK_NULL_VOID(layoutWrapper);
-    auto frameNode = layoutWrapper->GetHostNode();
-    CHECK_NULL_VOID(frameNode);
-    auto pattern = frameNode->GetPattern<TextFieldPattern>();
-    CHECK_NULL_VOID(pattern);
-    auto counterDecorator = pattern->GetCounterDecorator();
-    CHECK_NULL_VOID(counterDecorator);
-    counterDecorator->LayoutDecorator();
+    CounterDecorator::LayoutCounterNode(layoutWrapper);
 }
 
 void TextFieldLayoutAlgorithm::ErrorLayout(LayoutWrapper* layoutWrapper)
@@ -1771,6 +1785,9 @@ bool TextFieldLayoutAlgorithm::HasCalcMinWidthVersion11OrLarger(
 
 bool TextFieldLayoutAlgorithm::IsStyledPlaceholder(const RefPtr<TextFieldPattern>& pattern)
 {
+    if (pattern->GetPageTranslatedPlaceholder().has_value()) {
+        return false;
+    }
     auto placeholderResponseArea = pattern->GetPlaceholderResponseArea();
     CHECK_NULL_RETURN(placeholderResponseArea, false);
     return showPlaceHolder_;

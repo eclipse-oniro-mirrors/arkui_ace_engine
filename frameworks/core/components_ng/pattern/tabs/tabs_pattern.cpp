@@ -15,12 +15,15 @@
 
 #include "core/components_ng/pattern/tabs/tabs_pattern.h"
 
+#include <algorithm>
+
 #include "interfaces/native/ui_input_event.h"
 
 #include "base/geometry/axis.h"
 #include "base/geometry/dimension.h"
 #include "base/log/ace_checker.h"
 #include "base/log/log_wrapper.h"
+#include "base/utils/system_properties.h"
 #include "base/utils/utils.h"
 #ifndef CROSS_PLATFORM
 #include "core/common/recorder/event_recorder.h"
@@ -28,10 +31,15 @@
 #ifndef CROSS_PLATFORM
 #include "core/common/recorder/node_data_cache.h"
 #endif
+#include "core/common/visual_effect/transparency_utils.h"
 #include "core/components/common/layout/constants.h"
 #include "core/components/tab_bar/tabs_event.h"
 #include "core/components_ng/base/observer_handler.h"
+#include "core/components_ng/base/view_abstract.h"
+#include "core/components_ng/event/pan_event.h"
+#include "core/components_ng/manager/navigation/navigation_manager.h"
 #include "core/components_ng/pattern/divider/divider_layout_property.h"
+#include "core/components_ng/pattern/divider/divider_pattern.h"
 #include "core/components_ng/pattern/divider/divider_render_property.h"
 #include "core/components_ng/pattern/stack/stack_pattern.h"
 #include "core/components_ng/pattern/swiper/swiper_model.h"
@@ -39,11 +47,20 @@
 #include "core/components_ng/pattern/tabs/tab_bar_layout_property.h"
 #include "core/components_ng/pattern/tabs/tab_bar_paint_property.h"
 #include "core/components_ng/pattern/tabs/tab_bar_pattern.h"
+#include "core/components_ng/pattern/tabs/tab_content_model_ng.h"
 #include "core/components_ng/pattern/tabs/tab_content_node.h"
+#include "core/components_ng/pattern/tabs/tab_content_layout_property.h"
 #include "core/components_ng/pattern/tabs/tabs_layout_property.h"
+#include "core/components_ng/pattern/tabs/tabs_declaration.h"
+#include "core/components_ng/pattern/tabs/tabs_controller.h"
 #include "core/components_ng/pattern/tabs/tabs_node.h"
+#include "core/components_ng/pattern/tabs/tabs_side_bar_pattern.h"
+#include "core/components_ng/pattern/tabs/tabs_side_bar_tab_list_pattern.h"
 #include "core/components_ng/property/property.h"
+#include "core/components_ng/render/animation_utils.h"
 #include "core/components_v2/inspector/inspector_constants.h"
+#include "core/gestures/gesture_info.h"
+#include "core/interfaces/native/node/divider_modifier.h"
 #include "core/pipeline_ng/pipeline_context.h"
 #include "core/components_ng/pattern/stage/stage_manager.h"
 namespace OHOS::Ace::NG {
@@ -65,9 +82,16 @@ constexpr uint32_t MASK_COLOR_DARK = 0x99000000;
 
 const RefPtr<Curve> FOLLOW_HAND_ANIMATION_CURVE = AceType::MakeRefPtr<InterpolatingSpring>(0.0, 1.0, 224.0, 25.0);
 constexpr int32_t FOLLOW_HAND_ANIMATION_PART2_DELAY = 150;
+// Color invert constants for auto-inversion
+constexpr uint32_t LUMINANCE_SAMPLER_INTERVAL = 200;
+constexpr uint32_t LUMINANCE_THRESHOLD_LOW = 150;
+constexpr uint32_t LUMINANCE_THRESHOLD_HIGH = 200;
+constexpr int32_t INVERT_COLOR_ANIMATION_DURATION = 133;
 const char TAB_BAR_ETS_TAG[] = "TabBar";
 const char TABS_BACKGROUND_MASK_ETS_TAG[] = "BackgroundMask";
 const char NAVDESTINATION_VIEW_ETS_TAG[] = "NavDestination";
+constexpr Dimension DEFAULT_DIVIDER_STROKE_WIDTH = 1.0_vp;
+constexpr Dimension MIN_SIDEBAR_ADAPTABLE_WIDTH = 600.0_vp;
 } // namespace
 
 void TabsPattern::OnAttachToFrameNode()
@@ -148,6 +172,9 @@ void TabsPattern::SetOnChangeEvent(std::function<void(const BaseEventInfo*)>&& e
         CHECK_NULL_VOID(tabsLayoutProperty);
         tabsLayoutProperty->UpdateIndex(currentIndex);
         tabBarPattern->OnTabBarIndexChange(currentIndex);
+
+        pattern->SyncSideBarTabListIndicator(currentIndex);
+
         pattern->FireTabContentStateCallback(preIndex, currentIndex);
         /* TabChange callback */
         pattern->FireTabChangeCallback(preIndex, currentIndex);
@@ -450,6 +477,11 @@ void TabsPattern::SetOnSelectedEvent(std::function<void(const BaseEventInfo*)>&&
     }
 }
 
+void TabsPattern::SetOnBarDisplayModeChangeEvent(std::function<void(TabBarDisplayMode)>&& event)
+{
+    onBarDisplayModeChangeEvent_ = std::move(event);
+}
+
 void TabsPattern::OnUpdateShowDivider()
 {
     auto host = AceType::DynamicCast<TabsNode>(GetHost());
@@ -502,10 +534,19 @@ void TabsPattern::SetSwiperPaddingAndBorder()
     swiperPattern->SetTabsPaddingAndBorder(layoutProperty->CreatePaddingAndBorder());
 }
 
+bool TabsPattern::GetIsRealDisableSwipe() const
+{
+    if (currentBarDisplayMode_.has_value() && currentBarDisplayMode_.value() == TabBarDisplayMode::SIDEBAR) {
+        return true;
+    }
+    return isCustomAnimation_ ? true : isDisableSwipe_;
+}
+
 void TabsPattern::OnModifyDone()
 {
     Pattern::OnModifyDone();
-    UpdateSwiperDisableSwipe(isCustomAnimation_ ? true : isDisableSwipe_);
+
+    UpdateSwiperDisableSwipe(GetIsRealDisableSwipe());
     SetSwiperPaddingAndBorder();
     InitFocusEvent();
     InitAccessibilityZIndex();
@@ -513,10 +554,81 @@ void TabsPattern::OnModifyDone()
     InitFloatingBar();
     OnUpdateShowDivider();
 
+    UpdateSideBarIfNeeded();
+
     if (onChangeEvent_) {
         return;
     }
     SetOnChangeEvent(nullptr);
+}
+
+TabBarDisplayMode TabsPattern::CalculateTabBarDisplayMode(float width)
+{
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, TabBarDisplayMode::BOTTOMTABBAR);
+    auto property = GetLayoutProperty<TabsLayoutProperty>();
+    CHECK_NULL_RETURN(property, TabBarDisplayMode::BOTTOMTABBAR);
+    auto barLayoutStyle = property->GetBarLayoutStyleValue(TabBarLayoutStyle::BOTTOM);
+    if (barLayoutStyle == TabBarLayoutStyle::SIDEBAR) {
+        return TabBarDisplayMode::SIDEBAR;
+    }
+    if (barLayoutStyle == TabBarLayoutStyle::BOTTOM) {
+        return TabBarDisplayMode::BOTTOMTABBAR;
+    }
+    // adaptable
+    if (width < MIN_SIDEBAR_ADAPTABLE_WIDTH.ConvertToPx()) {
+        return TabBarDisplayMode::BOTTOMTABBAR;
+    }
+    auto context = host->GetContext();
+    CHECK_NULL_RETURN(context, TabBarDisplayMode::BOTTOMTABBAR);
+    auto density = context->GetDensity();
+    auto currentBreakpoint = GetCommonWidthBreakpoint(width, density);
+    if (property->HasBarDisplayModeBreakpoint()) {
+        auto customBreakpoint = property->GetBarDisplayModeBreakpointValue();
+        if (!customBreakpoint.isNull) {
+            switch (currentBreakpoint) {
+                case WidthBreakpoint::WIDTH_SM:
+                    return customBreakpoint.sm;
+                case WidthBreakpoint::WIDTH_MD:
+                    return customBreakpoint.md;
+                case WidthBreakpoint::WIDTH_LG:
+                case WidthBreakpoint::WIDTH_XL:
+                case WidthBreakpoint::WIDTH_XXL:
+                    return customBreakpoint.lg;
+                default:
+                    return TabBarDisplayMode::BOTTOMTABBAR;
+            }
+        }
+    }
+    if (currentBreakpoint >= WidthBreakpoint::WIDTH_LG) {
+        return TabBarDisplayMode::SIDEBAR;
+    }
+    return TabBarDisplayMode::BOTTOMTABBAR;
+}
+
+void TabsPattern::SetCurrentBarDisplayMode(TabBarDisplayMode mode)
+{
+    if (currentBarDisplayMode_.has_value() && currentBarDisplayMode_.value() == mode) {
+        return;
+    }
+    currentBarDisplayMode_ = mode;
+    auto tabsNode = AceType::DynamicCast<TabsNode>(GetHost());
+    CHECK_NULL_VOID(tabsNode);
+    auto swiperNode = AceType::DynamicCast<FrameNode>(tabsNode->GetTabs());
+    CHECK_NULL_VOID(swiperNode);
+    auto swiperPattern = swiperNode->GetPattern<SwiperPattern>();
+    CHECK_NULL_VOID(swiperPattern);
+    auto controller = AceType::DynamicCast<TabsControllerNG>(swiperPattern->GetSwiperController());
+    if (controller) {
+        controller->SetBarDisplayMode(mode);
+    }
+}
+
+void TabsPattern::FireBarDisplayModeChangeEvent(TabBarDisplayMode mode)
+{
+    if (onBarDisplayModeChangeEvent_) {
+        onBarDisplayModeChangeEvent_(mode);
+    }
 }
 
 void TabsPattern::OnAfterModifyDone()
@@ -1203,6 +1315,7 @@ RefPtr<LayoutAlgorithm> TabsPattern::CreateLayoutAlgorithm()
     algo->SetItemIndex(tabsNode->GetItemIndex());
     algo->SetIsFloatingBar(isFloatingBar_);
     algo->SetLastFloatingBar(lastFloatingBar_);
+    algo->SetBarDisplayMode(currentBarDisplayMode_);
     return algo;
 }
 
@@ -1220,6 +1333,7 @@ void TabsPattern::InitFloatingBar()
     lastFloatingBar_ = isFloatingBar_;
     if (isBarOverlap && isHorizontal && isBarPositionEnd && isFloatingStyle) {
         isFloatingBar_ = true;
+        SetTabBarIsFloating(true);
         if (!tabsNode->HasBackgroundMaskNode()) {
             auto backgroundMaskNode = FrameNode::GetOrCreateFrameNode(TABS_BACKGROUND_MASK_ETS_TAG,
                 tabsNode->GetBackgroundMaskId(), []() { return AceType::MakeRefPtr<StackPattern>(); });
@@ -1239,6 +1353,7 @@ void TabsPattern::InitFloatingBar()
             backgroundMaskNode->SetActive(false);
         }
         isFloatingBar_ = false;
+        SetTabBarIsFloating(false);
         if (floatingBarPosition_ != FloatingBarPosition::CENTER) {
             ResetTabBarFollowHandPosition();
         }
@@ -1266,8 +1381,13 @@ void TabsPattern::UpdateBgMaskNode()
     CHECK_NULL_VOID(property);
     auto style = property->GetBarFloatingStyle();
     Color baseColor(MASK_COLOR_LIGHT);
+    ColorMode colorInvertColorMode = GetColorInvertColorMode();
     if (style.has_value() && style->maskColor.has_value()) {
         baseColor = style->maskColor.value();
+    } else if (colorInvertColorMode != ColorMode::COLOR_MODE_UNDEFINED) {
+        if (colorInvertColorMode == ColorMode::DARK) {
+            baseColor = Color(MASK_COLOR_DARK);
+        }
     } else {
         auto context = GetContext();
         if (context && context->GetColorMode() == ColorMode::DARK) {
@@ -1552,6 +1672,24 @@ void TabsPattern::ApplySystemMaterial()
     if (!style.has_value()) {
         return;
     }
+    bool isMaterialDisable =
+        MaterialUtils::IsMaterialDisabled() || (MaterialUtils::GetConfiguredMaterialState() == MaterialState::DEFAULT &&
+                                                   !SystemProperties::IsDeviceSystemMaterialSupported());
+    if (isMaterialDisable) {
+        UnregisterColorPicker();
+        return;
+    }
+    if (MaterialUtils::IsMaterialEnabled() && !style->systemMaterial) {
+        style->systemMaterial = AceType::MakeRefPtr<UiMaterial>();
+        style->systemMaterial->SetType(static_cast<int32_t>(MaterialType::IMMERSIVE));
+        ImmersiveOptions options;
+        options.style = UiMaterialStyle::THIN;
+        options.colorInvert = true;
+        options.interactive = true;
+        options.lightEffectOptions = LightEffectOptions();
+        style->systemMaterial->SetImmersiveOptions(options);
+        property->UpdateBarFloatingStyle(style.value());
+    }
     auto tabsNode = AceType::DynamicCast<TabsNode>(GetHost());
     CHECK_NULL_VOID(tabsNode);
     auto tabBar = AceType::DynamicCast<FrameNode>(tabsNode->GetTabBar());
@@ -1566,9 +1704,13 @@ void TabsPattern::ApplySystemMaterial()
         renderContext->UpdateBackgroundColor(Color::TRANSPARENT);
         renderContext->UpdateBackBlurStyle(std::nullopt);
         ViewAbstract::SetSystemMaterial(AceType::RawPtr(tabBar), uiMaterial.GetRawPtr());
+        // Initialize color picker for auto-inversion when colorInvert is enabled
+        InitColorPickerIfNeeded();
     } else {
         tabBarPattern->SetUseNewMaterial(false);
+        tabBarPattern->SetColorInvertColorMode(ColorMode::COLOR_MODE_UNDEFINED);
         ViewAbstract::SetSystemMaterial(AceType::RawPtr(tabBar), nullptr);
+        UnregisterColorPicker();
     }
 }
 
@@ -1582,6 +1724,7 @@ void TabsPattern::ResetSystemMaterial()
     CHECK_NULL_VOID(tabBarPattern);
     tabBarPattern->SetUseNewMaterial(false);
     ViewAbstract::SetSystemMaterial(AceType::RawPtr(tabBar), nullptr);
+    UnregisterColorPicker();
 }
 
 void TabsPattern::SetFloatingScaleEnabled(bool isFloatingScaleEnabled)
@@ -1598,5 +1741,389 @@ void TabsPattern::SetFloatingScaleEnabled(bool isFloatingScaleEnabled)
         return;
     }
     renderContext->UpdateTransformScale({ baseFloatingScale_, baseFloatingScale_ });
+}
+
+bool TabsPattern::IsColorInvertEnabled()
+{
+    auto property = GetLayoutProperty<TabsLayoutProperty>();
+    CHECK_NULL_RETURN(property, false);
+    auto style = property->GetBarFloatingStyle();
+    if (!style.has_value() || !style->systemMaterial) {
+        return false;
+    }
+    const auto& options = style->systemMaterial->GetImmersiveOptions();
+    if (!options || !options->colorInvert) {
+        return false;
+    }
+    auto materialLevel = SystemProperties::GetUiMaterialLevel();
+    if (materialLevel != UiMaterialLevel::EXQUISITE && materialLevel != UiMaterialLevel::GENTLE) {
+        return false;
+    }
+    auto transparencyLevel = static_cast<UiMaterialTransparency>(
+        TransparencyUtils::GetTransparencyLevel(static_cast<int32_t>(materialLevel)));
+    if (materialLevel == UiMaterialLevel::EXQUISITE) {
+        return transparencyLevel == UiMaterialTransparency::THIN || transparencyLevel == UiMaterialTransparency::NORMAL;
+    }
+    return transparencyLevel == UiMaterialTransparency::GENTLE_THIN;
+}
+
+ColorMode TabsPattern::GetColorInvertColorMode()
+{
+    if (IsColorInvertEnabled() && isColorPickerDark_.has_value()) {
+        return isColorPickerDark_.value() ? ColorMode::DARK : ColorMode::LIGHT;
+    }
+    return ColorMode::COLOR_MODE_UNDEFINED;
+}
+
+void TabsPattern::InitColorPickerIfNeeded()
+{
+    auto tabsNode = AceType::DynamicCast<TabsNode>(GetHost());
+    CHECK_NULL_VOID(tabsNode);
+    if (!tabsNode->HasBackgroundMaskNode()) {
+        return;
+    }
+    auto backgroundMaskNode = AceType::DynamicCast<FrameNode>(tabsNode->GetBackgroundMask());
+    CHECK_NULL_VOID(backgroundMaskNode);
+    if (!IsColorInvertEnabled()) {
+        UnregisterColorPicker();
+        return;
+    }
+    if (hasRegisterColorPicker_) {
+        return;
+    }
+    hasRegisterColorPicker_ = true;
+    auto context = GetContext();
+    CHECK_NULL_VOID(context);
+    auto navMgr = context->GetNavigationManager();
+    CHECK_NULL_VOID(navMgr);
+    navMgr->RegisterColorPicker(backgroundMaskNode, LUMINANCE_SAMPLER_INTERVAL, LUMINANCE_THRESHOLD_HIGH,
+        LUMINANCE_THRESHOLD_LOW, [weakPattern = WeakClaim(this)](uint32_t luminance) {
+            auto pattern = weakPattern.Upgrade();
+            CHECK_NULL_VOID(pattern);
+            pattern->OnLuminanceUpdate(luminance);
+        });
+}
+
+void TabsPattern::UnregisterColorPicker()
+{
+    auto tabsNode = AceType::DynamicCast<TabsNode>(GetHost());
+    CHECK_NULL_VOID(tabsNode);
+    if (!tabsNode->HasBackgroundMaskNode()) {
+        return;
+    }
+    auto backgroundMaskNode = AceType::DynamicCast<FrameNode>(tabsNode->GetBackgroundMask());
+    CHECK_NULL_VOID(backgroundMaskNode);
+    if (hasRegisterColorPicker_) {
+        hasRegisterColorPicker_ = false;
+        auto context = GetContext();
+        CHECK_NULL_VOID(context);
+        auto navMgr = context->GetNavigationManager();
+        CHECK_NULL_VOID(navMgr);
+        navMgr->UnregisterColorPicker(backgroundMaskNode);
+        isColorPickerDark_ = std::nullopt;
+    }
+}
+
+void TabsPattern::OnLuminanceUpdate(uint32_t luminance)
+{
+    if (luminance < LUMINANCE_THRESHOLD_LOW) {
+        isColorPickerDark_ = true;
+    } else if (luminance > LUMINANCE_THRESHOLD_HIGH) {
+        isColorPickerDark_ = false;
+    }
+    if (!IsColorInvertEnabled()) {
+        return;
+    }
+
+    StartColorInvertAnimation();
+}
+
+void TabsPattern::StartColorInvertAnimation()
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto context = host->GetContextRefPtr();
+    AnimationOption option;
+    option.SetDuration(INVERT_COLOR_ANIMATION_DURATION);
+    option.SetCurve(Ace::Curves::LINEAR);
+    AnimationUtils::StartAnimation(
+        option,
+        [weakPattern = WeakClaim(this)]() {
+            auto pattern = weakPattern.Upgrade();
+            CHECK_NULL_VOID(pattern);
+            pattern->HandleColorInvert();
+        },
+        nullptr, nullptr, context);
+}
+
+void TabsPattern::HandleColorInvert()
+{
+    auto tabsNode = AceType::DynamicCast<TabsNode>(GetHost());
+    CHECK_NULL_VOID(tabsNode);
+    auto tabBar = AceType::DynamicCast<FrameNode>(tabsNode->GetTabBar());
+    CHECK_NULL_VOID(tabBar);
+    auto tabBarPattern = tabBar->GetPattern<TabBarPattern>();
+    CHECK_NULL_VOID(tabBarPattern);
+    // Update the color invert color mode on TabBarPattern
+    auto colorMode = GetColorInvertColorMode();
+    tabBarPattern->SetColorInvertColorMode(colorMode);
+
+    UpdateBgMaskNode();
+}
+
+RefPtr<FrameNode> TabsPattern::CreateSideBarNode()
+{
+    auto tabsNode = AceType::DynamicCast<TabsNode>(GetHost());
+    CHECK_NULL_RETURN(tabsNode, nullptr);
+    auto sideBarNode = FrameNode::GetOrCreateFrameNode(V2::TABS_SIDE_BAR_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), []() { return AceType::MakeRefPtr<TabsSideBarPattern>(); });
+    CHECK_NULL_RETURN(sideBarNode, nullptr);
+    auto sideBarPattern = sideBarNode->GetPattern<TabsSideBarPattern>();
+    CHECK_NULL_RETURN(sideBarPattern, nullptr);
+    sideBarPattern->CreateChildNodeIfNeeded(tabsNode);
+    return sideBarNode;
+}
+
+RefPtr<FrameNode> TabsPattern::CreateSideBarDividerNode()
+{
+    auto nodeModifiers = NG::NodeModifier::GetDividerModifier();
+    CHECK_NULL_RETURN(nodeModifiers && nodeModifiers->createFrameNode, nullptr);
+    auto arkUINodeHandle = nodeModifiers->createFrameNode(ElementRegister::GetInstance()->MakeUniqueId());
+    CHECK_NULL_RETURN(arkUINodeHandle, nullptr);
+    CHECK_NULL_RETURN(nodeModifiers->setDividerStrokeWidth, nullptr);
+    nodeModifiers->setDividerStrokeWidth(arkUINodeHandle,
+        static_cast<float>(DEFAULT_DIVIDER_STROKE_WIDTH.Value()),
+        static_cast<int32_t>(DEFAULT_DIVIDER_STROKE_WIDTH.Unit()));
+    CHECK_NULL_RETURN(nodeModifiers->setDividerVertical, nullptr);
+    nodeModifiers->setDividerVertical(arkUINodeHandle, true);
+    return Referenced::Claim<FrameNode>(reinterpret_cast<FrameNode*>(arkUINodeHandle));
+}
+
+void TabsPattern::UpdateSideBarIfNeeded()
+{
+    auto host = AceType::DynamicCast<TabsNode>(GetHost());
+    CHECK_NULL_VOID(host);
+    auto property = host->GetLayoutProperty<TabsLayoutProperty>();
+    CHECK_NULL_VOID(property);
+    auto preStyle = layoutStyle_.value_or(TabBarLayoutStyle::BOTTOM);
+    layoutStyle_ = property->GetBarLayoutStyle();
+    auto newStyle = layoutStyle_.value_or(TabBarLayoutStyle::BOTTOM);
+    if (preStyle == TabBarLayoutStyle::BOTTOM && newStyle == TabBarLayoutStyle::BOTTOM) {
+        return;
+    }
+    if ((preStyle == TabBarLayoutStyle::SIDEBAR_ADAPTABLE || preStyle == TabBarLayoutStyle::SIDEBAR) &&
+        (newStyle == TabBarLayoutStyle::SIDEBAR_ADAPTABLE || newStyle == TabBarLayoutStyle::SIDEBAR)) {
+        // barStyle unchanged, but sidebar properties (header/searchable) may have changed
+        if (sideBarNode_) {
+            SyncPropertiesToSideBar();
+        }
+        return;
+    }
+    // adaptable/sidebar -> bottom
+    if (newStyle == TabBarLayoutStyle::BOTTOM) {
+        // Remove SideBar and SideBarDivider
+        if (sideBarNode_) {
+            host->RemoveChild(sideBarNode_);
+            host->MarkNeedSyncRenderTree();
+            sideBarNode_ = nullptr;
+        }
+        if (sideBarDividerNode_) {
+            host->RemoveChild(sideBarDividerNode_);
+            host->MarkNeedSyncRenderTree();
+            sideBarDividerNode_ = nullptr;
+        }
+        // Reset sideBarTabBarItemId on all TabContentNodes so next sidebar
+        // creation can register fresh tab items without stale ID conflicts
+        ResetSideBarTabListItemIds();
+        // Re-apply per-item defaultVisibility filtering for bottom tab bar
+        auto tabBar = AceType::DynamicCast<FrameNode>(host->GetTabBar());
+        CHECK_NULL_VOID(tabBar);
+        auto tabBarPattern = tabBar->GetPattern<TabBarPattern>();
+        CHECK_NULL_VOID(tabBarPattern);
+        tabBarPattern->ApplyDefaultVisibility();
+        return;
+    }
+    // bottom -> adaptable/sidebar
+    sideBarDividerNode_ = CreateSideBarDividerNode();
+    host->AddChild(sideBarDividerNode_);
+    sideBarNode_ = CreateSideBarNode();
+    host->AddChild(sideBarNode_);
+    host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+    // Sync properties to SideBarPattern, then trigger its OnModifyDone
+    SyncPropertiesToSideBar();
+    // Register all existing TabContent tab items (only when SideBar is first created/recreated)
+    RegisterSideBarTabItems();
+    // Re-apply per-item defaultVisibility filtering
+    if (currentBarDisplayMode_.value_or(TabBarDisplayMode::BOTTOMTABBAR) == TabBarDisplayMode::BOTTOMTABBAR) {
+        auto tabBar = AceType::DynamicCast<FrameNode>(host->GetTabBar());
+        CHECK_NULL_VOID(tabBar);
+        auto tabBarPattern = tabBar->GetPattern<TabBarPattern>();
+        CHECK_NULL_VOID(tabBarPattern);
+        tabBarPattern->ApplyDefaultVisibility();
+        return;
+    }
+    CHECK_NULL_VOID(sideBarNode_);
+    auto sidebarPattern = sideBarNode_->GetPattern<TabsSideBarPattern>();
+    CHECK_NULL_VOID(sidebarPattern);
+    auto sidebarTabList = sidebarPattern->GetTabListNode();
+    CHECK_NULL_VOID(sidebarTabList);
+    auto tabListPattern = sidebarTabList->GetPattern<TabsSideBarTabListPattern>();
+    CHECK_NULL_VOID(tabListPattern);
+    tabListPattern->ApplyDefaultVisibility();
+}
+
+void TabsPattern::AddTabContentNode(const RefPtr<TabContentNode>& tabContentNode)
+{
+    CHECK_NULL_VOID(tabContentNode);
+    // Check if already recorded
+    for (auto& weakNode : tabContentNodes_) {
+        if (weakNode.Upgrade() == tabContentNode) {
+            return;
+        }
+    }
+    // Always append; ordering is determined in RegisterSideBarTabItems by Swiper index
+    tabContentNodes_.emplace_back(tabContentNode);
+}
+
+void TabsPattern::RemoveTabContentNode(const RefPtr<TabContentNode>& tabContentNode)
+{
+    CHECK_NULL_VOID(tabContentNode);
+    tabContentNodes_.erase(
+        std::remove_if(tabContentNodes_.begin(), tabContentNodes_.end(),
+            [&tabContentNode](const WeakPtr<TabContentNode>& weakNode) {
+                auto node = weakNode.Upgrade();
+                return !node || node == tabContentNode;
+            }),
+        tabContentNodes_.end());
+}
+
+void TabsPattern::ResetSideBarTabListItemIds()
+{
+    // Iterate recorded TabContentNodes directly (no tree traversal needed)
+    for (auto& weakNode : tabContentNodes_) {
+        auto tabContentNode = weakNode.Upgrade();
+        if (!tabContentNode) {
+            continue;
+        }
+        tabContentNode->ResetSideBarTabBarItemId();
+    }
+}
+
+void TabsPattern::SyncPropertiesToSideBar()
+{
+    auto tabsNode = AceType::DynamicCast<TabsNode>(GetHost());
+    CHECK_NULL_VOID(tabsNode);
+    CHECK_NULL_VOID(sideBarNode_);
+    auto sideBarPattern = sideBarNode_->GetPattern<TabsSideBarPattern>();
+    CHECK_NULL_VOID(sideBarPattern);
+
+    // 1. Sync SwiperController
+    auto swiperNode = AceType::DynamicCast<FrameNode>(tabsNode->GetTabs());
+    if (swiperNode) {
+        auto swiperPattern = swiperNode->GetPattern<SwiperPattern>();
+        if (swiperPattern) {
+            sideBarPattern->SetSwiperController(swiperPattern->GetSwiperController());
+        }
+    }
+
+    // 2. Sync header
+    sideBarPattern->SetHeaderNode(sidebarHeaderNode_);
+
+    // 3. Sync searchable
+    sideBarPattern->SetSideBarSearchableOptions(searchableOptions_);
+
+    // After all properties are synced, explicitly trigger SideBar Pattern's OnModifyDone
+    sideBarNode_->MarkModifyDone();
+    sideBarNode_->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+}
+
+void TabsPattern::RegisterSideBarTabItems()
+{
+    auto host = AceType::DynamicCast<TabsNode>(GetHost());
+    CHECK_NULL_VOID(host);
+    auto swiperNode = AceType::DynamicCast<FrameNode>(host->GetTabs());
+    CHECK_NULL_VOID(swiperNode);
+    // Clean up expired entries first
+    tabContentNodes_.erase(
+        std::remove_if(tabContentNodes_.begin(), tabContentNodes_.end(),
+            [](const WeakPtr<TabContentNode>& weakNode) { return weakNode.Upgrade() == nullptr; }),
+        tabContentNodes_.end());
+    // Sort by Swiper index to ensure correct display order,
+    // since tabContentNodes_ is append-only and may not reflect actual Swiper order after dynamic add/remove
+    auto swiperRef = RawPtr(swiperNode);
+    std::sort(tabContentNodes_.begin(), tabContentNodes_.end(),
+        [swiperRef](const WeakPtr<TabContentNode>& a, const WeakPtr<TabContentNode>& b) {
+            auto nodeA = a.Upgrade();
+            auto nodeB = b.Upgrade();
+            if (!nodeA || !nodeB) {
+                return false;
+            }
+            auto indexA = swiperRef->GetChildFlatIndex(nodeA->GetId()).second;
+            auto indexB = swiperRef->GetChildFlatIndex(nodeB->GetId()).second;
+            return indexA < indexB;
+        });
+    // Iterate recorded TabContentNodes in Swiper order
+    int32_t position = 0;
+    for (auto& weakNode : tabContentNodes_) {
+        auto tabContentNode = weakNode.Upgrade();
+        if (!tabContentNode) {
+            continue;
+        }
+        TabContentModelNG::AddSideBarTabListItem(host, tabContentNode, position, false);
+        position++;
+    }
+
+    // Set initial selected index on SideBar TabBar (without triggering Swiper animation)
+    CHECK_NULL_VOID(sideBarNode_);
+    auto sideBarPattern = sideBarNode_->GetPattern<TabsSideBarPattern>();
+    CHECK_NULL_VOID(sideBarPattern);
+    auto tabListNode = sideBarPattern->GetTabListNode();
+    CHECK_NULL_VOID(tabListNode);
+    auto tabListPattern = tabListNode->GetPattern<TabsSideBarTabListPattern>();
+    CHECK_NULL_VOID(tabListPattern);
+    auto swiperPattern = swiperNode->GetPattern<SwiperPattern>();
+    if (swiperPattern) {
+        auto currentIndex = swiperPattern->GetCurrentIndex();
+        tabListPattern->InitCurrentIndex(currentIndex);
+    }
+}
+
+void TabsPattern::SyncSideBarTabListIndicator(int32_t currentIndex)
+{
+    CHECK_NULL_VOID(sideBarNode_);
+    auto sideBarPattern = sideBarNode_->GetPattern<TabsSideBarPattern>();
+    CHECK_NULL_VOID(sideBarPattern);
+    auto tabListNode = AceType::DynamicCast<FrameNode>(sideBarPattern->GetTabListNode());
+    CHECK_NULL_VOID(tabListNode);
+    // Use TabsSideBarTabListPattern::SetCurrentIndex instead of TabBarPattern::OnTabBarIndexChange
+    auto tabListPattern = tabListNode->GetPattern<TabsSideBarTabListPattern>();
+    CHECK_NULL_VOID(tabListPattern);
+    tabListPattern->SetCurrentIndex(currentIndex);
+}
+
+TabBarDisplayMode TabsPattern::GetActiveBarDisplayMode() const
+{
+    if (currentBarDisplayMode_.has_value()) {
+        return currentBarDisplayMode_.value();
+    }
+    auto property = GetLayoutProperty<TabsLayoutProperty>();
+    CHECK_NULL_RETURN(property, TabBarDisplayMode::BOTTOMTABBAR);
+    auto barStyle = property->GetBarLayoutStyleValue(TabBarLayoutStyle::BOTTOM);
+    if (barStyle == TabBarLayoutStyle::SIDEBAR) {
+        return TabBarDisplayMode::SIDEBAR;
+    }
+    return TabBarDisplayMode::BOTTOMTABBAR;
+}
+
+bool TabsPattern::IsTabShouldHideByVisibility(const TabContentDefaultVisibility& visibility)
+{
+    if (visibility.isNull || visibility.visibility == TabVisibility::VISIBLE) {
+        return false;
+    }
+    if (!visibility.displayMode.has_value()) {
+        return true;
+    }
+    auto activeDisplayMode = GetActiveBarDisplayMode();
+    return visibility.displayMode.value() == activeDisplayMode;
 }
 } // namespace OHOS::Ace::NG

@@ -6077,7 +6077,7 @@ void SwiperPattern::UpdateItemRenderGroup(bool itemRenderGroup)
     CHECK_NULL_VOID(renderContext);
     // The common attribute rendergroup is set to false, and the default itemrendergroup does not take effect.
     // Clear the cache that has not been closed.
-    if (renderContext->HasRenderGroup() && !renderContext->GetRenderGroupValue()) {
+    if (isRenderGroupExplicitlySet_ && renderContext->HasRenderGroup() && !renderContext->GetRenderGroupValue()) {
         itemRenderGroup = false;
     }
     if (!lastSetRenderGroup_ && !itemRenderGroup) {
@@ -6196,21 +6196,21 @@ void SwiperPattern::SaveArrowProperty(const RefPtr<FrameNode>& arrowNode)
     const auto props = GetLayoutProperty<SwiperLayoutProperty>();
     CHECK_NULL_VOID(props);
     const auto paintProps = GetPaintProperty<SwiperPaintProperty>();
-    CHECK_NULL_VOID(props);
+    CHECK_NULL_VOID(paintProps);
     const auto arrowProps = arrowNode->GetLayoutProperty<SwiperArrowLayoutProperty>();
     CHECK_NULL_VOID(arrowProps);
     arrowProps->UpdateDirection(props->GetDirection().value_or(Axis::HORIZONTAL));
     arrowProps->UpdateIndex(props->GetIndex().value_or(0));
     arrowProps->UpdateLoop(props->GetLoop().value_or(true));
     arrowProps->UpdateEnabled(paintProps->GetEnabled().value_or(true));
-    arrowProps->UpdateDisplayArrow(props->GetDisplayArrowValue());
-    arrowProps->UpdateHoverShow(props->GetHoverShowValue());
-    arrowProps->UpdateIsShowBackground(props->GetIsShowBackgroundValue());
-    arrowProps->UpdateBackgroundSize(props->GetBackgroundSizeValue());
-    arrowProps->UpdateBackgroundColor(props->GetBackgroundColorValue());
-    arrowProps->UpdateArrowSize(props->GetArrowSizeValue());
-    arrowProps->UpdateArrowColor(props->GetArrowColorValue());
-    arrowProps->UpdateIsSidebarMiddle(props->GetIsSidebarMiddleValue());
+    arrowProps->UpdateDisplayArrow(props->GetDisplayArrow().value_or(false));
+    arrowProps->UpdateHoverShow(props->GetHoverShow().value_or(false));
+    arrowProps->UpdateIsShowBackground(props->GetIsShowBackground().value_or(false));
+    arrowProps->UpdateBackgroundSize(props->GetBackgroundSize().value_or(Dimension(0, DimensionUnit::VP)));
+    arrowProps->UpdateBackgroundColor(props->GetBackgroundColor().value_or(Color::TRANSPARENT));
+    arrowProps->UpdateArrowSize(props->GetArrowSize().value_or(Dimension(0, DimensionUnit::VP)));
+    arrowProps->UpdateArrowColor(props->GetArrowColor().value_or(Color::TRANSPARENT));
+    arrowProps->UpdateIsSidebarMiddle(props->GetIsSidebarMiddle().value_or(false));
 }
 
 void SwiperPattern::SetAccessibilityAction()

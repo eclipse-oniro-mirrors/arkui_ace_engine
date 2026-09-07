@@ -57,6 +57,11 @@ class LazyArkTabsComponent extends ArkComponent {
     return this;
   }
 
+  sidebarDisplayStyle(value: SidebarDisplayStyle): this {
+    this.lazyComponent.sidebarDisplayStyle(value);
+    return this;
+  }
+
   barPosition(value: BarPosition): this {
     this.lazyComponent.barPosition(value);
     return this;
@@ -142,6 +147,28 @@ class LazyArkTabsComponent extends ArkComponent {
     return this;
   }
 
+  sidebarSelectedIconColor(value: ResourceColor): this {
+    this.lazyComponent.sidebarSelectedIconColor(value);
+    return this;
+  }
+
+  sidebarSelectedTextColor(value: ResourceColor): this {
+    this.lazyComponent.sidebarSelectedTextColor(value);
+    return this;
+  }
+  sidebarUnselectedIconColor(value: ResourceColor): this {
+    this.lazyComponent.sidebarUnselectedIconColor(value);
+    return this;
+  }
+  sidebarUnselectedTextColor(value: ResourceColor): this {
+    this.lazyComponent.sidebarUnselectedTextColor(value);
+    return this;
+  }
+  sidebarSelectedBoardColor(value: ResourceColor): this {
+    this.lazyComponent.sidebarSelectedBoardColor(value);
+    return this;
+  }
+
   barBackgroundBlurStyle(style: BlurStyle, options?: BackgroundBlurStyleOptions): this {
     this.lazyComponent.barBackgroundBlurStyle(style, options);
     return this;
@@ -199,6 +226,36 @@ class LazyArkTabsComponent extends ArkComponent {
 
   onContentWillChange(handler: (currentIndex: number, targetIndex: number) => void): this {
     this.lazyComponent.onContentWillChange(handler);
+    return this;
+  }
+
+  barStyle(value: TabBarStyle): this {
+    this.lazyComponent.barStyle(value);
+    return this;
+  }
+
+  sidebarPosition(value: BarPosition): this {
+    this.lazyComponent.sidebarPosition(value);
+    return this;
+  }
+
+  sidebarHeader(value: ComponentContent): this {
+    this.lazyComponent.sidebarHeader(value);
+    return this;
+  }
+
+  sidebarSearchable(value: TabsSidebarSearchableOptions): this {
+    this.lazyComponent.sidebarSearchable(value);
+    return this;
+  }
+
+  barDisplayModeBreakpoint(value: TabsBreakpointType<TabBarDisplayMode>): this {
+    this.lazyComponent.barDisplayModeBreakpoint(value);
+    return this;
+  }
+
+  onBarDisplayModeChange(value: (mode: TabBarDisplayMode) => void): this {
+    this.lazyComponent.onBarDisplayModeChange(value);
     return this;
   }
 }

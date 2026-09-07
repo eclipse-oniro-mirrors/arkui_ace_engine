@@ -229,6 +229,7 @@ void TextPattern::OnDetachFromFrameNode(FrameNode* node)
     pipeline->RemoveVisibleAreaChangeNode(node->GetId());
     pipeline->RemoveWindowSizeChangeCallback(node->GetId());
     RemoveFormVisibleChangeCallback(node->GetId());
+    pipeline->UnRegisterListenerForTranslate(node->GetId());
 }
 
 void TextPattern::OnAttachToMainTree()
@@ -691,7 +692,7 @@ SelectionInfo TextPattern::GetSpansInfo(int32_t start, int32_t end, GetSpansMeth
     return selection;
 }
 
-int32_t TextPattern::GetTextContentLength()
+int32_t TextPattern::GetTextContentLength() const
 {
     if (!spans_.empty()) {
         return static_cast<int32_t>(textForDisplay_.length()) + placeholderCount_;
@@ -4779,7 +4780,10 @@ void TextPattern::OnModifyDone()
             textForDisplay_ = textLayoutProperty->GetContent().value_or(u"");
         }
         if (textCache != textForDisplay_) {
-            host->OnAccessibilityEvent(AccessibilityEventType::TEXT_CHANGE, UtfUtils::Str16DebugToStr8(textCache),
+            auto oldDisplayText = pageTranslatedContent_.value_or(textCache);
+            OnPageTranslateSourceTextChanged();
+            host->OnAccessibilityEvent(AccessibilityEventType::TEXT_CHANGE,
+                UtfUtils::Str16DebugToStr8(oldDisplayText),
                 UtfUtils::Str16DebugToStr8(textForDisplay_));
             if (dataDetectorAdapter_) {
                 dataDetectorAdapter_->aiDetectInitialized_ = false;
@@ -4805,6 +4809,12 @@ void TextPattern::OnModifyDone()
     if (dataDetectorAdapter_->textDetectResult_.menuOptionAndAction.empty()) {
         dataDetectorAdapter_->GetAIEntityMenu();
     }
+    CHECK_NULL_VOID(pipeline);
+    // lastDrawn was cleared by OnPageTranslateSourceTextChanged, restore before registering
+    if (lastDrawnPageTranslateContent_.empty() && !textForDisplay_.empty()) {
+        MarkPageTranslateTextDrawn();
+    }
+    pipeline->RegisterListenerForTranslate(WeakPtr<FrameNode>(host));
 }
 
 void TextPattern::UpdateMarqueeStartPolicy()
@@ -5422,18 +5432,7 @@ void TextPattern::InitSpanItem(std::stack<SpanNodeInfo> nodes)
     }
 
     if (textCache != textForDisplay_) {
-        host->OnAccessibilityEvent(AccessibilityEventType::TEXT_CHANGE, UtfUtils::Str16DebugToStr8(textCache),
-            UtfUtils::Str16DebugToStr8(textForDisplay_));
-        OnAfterModifyDone();
-        for (const auto& item : spans_) {
-            if (item->inspectId.empty()) {
-                continue;
-            }
-#ifndef CROSS_PLATFORM
-            Recorder::NodeDataCache::Get().PutString(host, item->inspectId, UtfUtils::Str16DebugToStr8(item->content));
-#endif
-        }
-        ResetAfterTextChange();
+        OnTextContentChanged(textCache);
     }
     InitSpanItemEvent(isSpanHasClick, isSpanHasLongPress);
     if (textForAICache != dataDetectorAdapter_->textForAI_) {
@@ -5453,6 +5452,124 @@ void TextPattern::ResetAfterTextChange()
     CloseSelectOverlay();
     ResetSelection();
     ResetOriginCaretPosition();
+}
+
+void TextPattern::OnTextContentChanged(const std::u16string& textCache)
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto oldDisplayText = pageTranslatedContent_.value_or(textCache);
+    OnPageTranslateSourceTextChanged();
+    host->OnAccessibilityEvent(AccessibilityEventType::TEXT_CHANGE,
+        UtfUtils::Str16DebugToStr8(oldDisplayText),
+        UtfUtils::Str16DebugToStr8(textForDisplay_));
+    OnAfterModifyDone();
+    for (const auto& item : spans_) {
+        if (item->inspectId.empty()) {
+            continue;
+        }
+#ifndef CROSS_PLATFORM
+        Recorder::NodeDataCache::Get().PutString(host, item->inspectId, UtfUtils::Str16DebugToStr8(item->content));
+#endif
+    }
+    ResetAfterTextChange();
+}
+
+bool IsTextFieldPlaceholderTextNode(const RefPtr<FrameNode>& host)
+{
+    CHECK_NULL_RETURN(host, false);
+    auto parent = AceType::DynamicCast<FrameNode>(host->GetParent());
+    CHECK_NULL_RETURN(parent, false);
+    auto parentTag = parent->GetTag();
+    return parentTag == V2::TEXTINPUT_ETS_TAG || parentTag == V2::TEXTAREA_ETS_TAG ||
+           parentTag == V2::SEARCH_Field_ETS_TAG;
+}
+
+void TextPattern::MarkPageTranslateDirty()
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    host->MarkDirtyWithOnProChange(PROPERTY_UPDATE_MEASURE);
+}
+
+const std::optional<std::u16string>& TextPattern::GetPageTranslatedText() const
+{
+    return pageTranslatedContent_;
+}
+
+void TextPattern::MarkPageTranslateTextDrawn()
+{
+    lastDrawnPageTranslateContent_ = textForDisplay_;
+}
+
+int32_t TextPattern::GetPageTranslateNodeId() const
+{
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, -1);
+    return host->GetId();
+}
+
+void TextPattern::OnPageTranslateSourceTextChanged()
+{
+    lastDrawnPageTranslateContent_.clear();
+    // Caller (OnModifyDone/OnTextContentChanged) is already in layout queue — skip dirty marking
+    pageTranslatedContent_.reset();
+    pageTranslateVersion_ = 0;
+}
+
+void TextPattern::ReportPageTranslateTextDrawn()
+{
+#ifndef CROSS_PLATFORM
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    MarkPageTranslateTextDrawn();
+    auto text = GetPageTranslateTextForReport();
+    CHECK_NULL_VOID(!text.empty());
+    auto pipeline = host->GetContext();
+    CHECK_NULL_VOID(pipeline);
+    auto mgr = pipeline->GetContentChangeManager();
+    CHECK_NULL_VOID(mgr);
+    mgr->ReportTranslateTextNode(AceType::WeakClaim<PageTranslateNode>(this), text);
+#endif
+}
+
+bool TextPattern::ApplyPageTranslateResult(const std::string& result, int64_t version)
+{
+    auto oldDisplayText = pageTranslatedContent_.value_or(textForDisplay_);
+    if (!ApplyTranslateResultCommon(result, version)) {
+        return true;
+    }
+    MarkPageTranslateDirty();
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, true);
+    host->OnAccessibilityEvent(AccessibilityEventType::TEXT_CHANGE,
+        UtfUtils::Str16DebugToStr8(oldDisplayText),
+        UtfUtils::Str16DebugToStr8(pageTranslatedContent_.value()));
+    return true;
+}
+
+void TextPattern::ResetPageTranslate()
+{
+    auto translatedText = pageTranslatedContent_.value_or(u"");
+    if (!ResetTranslateCommon()) {
+        return;
+    }
+    MarkPageTranslateDirty();
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    host->OnAccessibilityEvent(AccessibilityEventType::TEXT_CHANGE,
+        UtfUtils::Str16DebugToStr8(translatedText),
+        UtfUtils::Str16DebugToStr8(textForDisplay_));
+}
+
+std::string TextPattern::GetPageTranslateTextForReport() const
+{
+    auto host = GetHost();
+    CHECK_NULL_RETURN(!IsTextFieldPlaceholderTextNode(host), "");
+    if (textForDisplay_.empty() || lastDrawnPageTranslateContent_ != textForDisplay_) {
+        return "";
+    }
+    return UtfUtils::Str16DebugToStr8(textForDisplay_);
 }
 
 void TextPattern::ParseOriText(const std::u16string& currentText)
@@ -6015,6 +6132,7 @@ void TextPattern::DumpInfo()
     if (!IsSetObscured() && !IsSensitiveEnable()) {
         dumpLog.AddDesc(std::string("Content: ").append(
             UtfUtils::Str16DebugToStr8(textLayoutProp->GetContent().value_or(u" "))));
+        DumpPageTranslateInfo();
         auto host = GetHost();
         if (host && host->GetTag() == V2::SYMBOL_ETS_TAG) {
             auto symbolSourceInfo = textLayoutProp->GetSymbolSourceInfo();
@@ -6388,6 +6506,18 @@ void TextPattern::DumpInfoRes()
         }
         dumpLog.AddDesc(keyInfo);
     }
+}
+
+void TextPattern::DumpPageTranslateInfo()
+{
+    if (!pageTranslatedContent_.has_value()) {
+        return;
+    }
+    auto& dumpLog = DumpLog::GetInstance();
+    dumpLog.AddDesc(std::string("PageTranslated: ").append(
+        UtfUtils::Str16DebugToStr8(pageTranslatedContent_.value())));
+    dumpLog.AddDesc(std::string("PageTranslateVersion: ")
+        .append(std::to_string(pageTranslateVersion_)));
 }
 
 void TextPattern::DumpScaleInfo()
@@ -7103,7 +7233,9 @@ bool TextPattern::CanStartAITask() const
 
 bool TextPattern::NeedShowAIDetect()
 {
-    return CanStartAITask() && !GetDataDetectorAdapter()->aiSpanMap_.empty();
+    // AI spans are positioned against original text; translated text differs in content/length.
+    return !GetPageTranslatedText().has_value() && CanStartAITask() &&
+           !GetDataDetectorAdapter()->aiSpanMap_.empty();
 }
 
 bool TextPattern::MaybeNeedShowSelectAIDetect()
@@ -7693,36 +7825,7 @@ void TextPattern::MountImageNode(const RefPtr<ImageSpanItem>& imageItem)
     SetImageNodeGesture(imageNode);
     HandleImageDrag(imageNode);
     if (options.imageAttribute.has_value()) {
-        auto imgAttr = options.imageAttribute.value();
-        SetImageNodePattern(imageNode, imgAttr);
-        if (imgAttr.size.has_value()) {
-            imageLayoutProperty->UpdateUserDefinedIdealSize(imgAttr.size->GetSize());
-        }
-        if (imgAttr.verticalAlign.has_value()) {
-            imageLayoutProperty->UpdateVerticalAlign(imgAttr.verticalAlign.value());
-        }
-        if (imgAttr.objectFit.has_value()) {
-            imageLayoutProperty->UpdateImageFit(imgAttr.objectFit.value());
-        }
-        if (imgAttr.marginProp.has_value()) {
-            imageLayoutProperty->UpdateMargin(imgAttr.marginProp.value());
-        }
-        if (imgAttr.paddingProp.has_value()) {
-            imageLayoutProperty->UpdatePadding(imgAttr.paddingProp.value());
-        }
-        if (imgAttr.borderRadius.has_value()) {
-            auto imageRenderCtx = imageNode->GetRenderContext();
-            imageRenderCtx->UpdateBorderRadius(imgAttr.borderRadius.value());
-            imageRenderCtx->SetClipToBounds(true);
-        }
-        auto paintProperty = imageNode->GetPaintProperty<ImageRenderProperty>();
-        if (imgAttr.colorFilterMatrix.has_value() && paintProperty) {
-            paintProperty->UpdateColorFilter(imgAttr.colorFilterMatrix.value());
-            paintProperty->ResetDrawingColorFilter();
-        } else if (imgAttr.drawingColorFilter.has_value() && paintProperty) {
-            paintProperty->UpdateDrawingColorFilter(imgAttr.drawingColorFilter.value());
-            paintProperty->ResetColorFilter();
-        }
+        ApplyImageSpanAttribute(imageNode, options.imageAttribute.value());
     }
     IF_PRESENT(oneStepDragController_, MarkDirtyNode(WeakClaim((ImageSpanNode*) RawPtr(imageNode))));
     imageNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
@@ -7730,6 +7833,49 @@ void TextPattern::MountImageNode(const RefPtr<ImageSpanItem>& imageItem)
     imageItem->nodeId_ = imageNode->GetId();
     imageNode->SetImageItem(imageItem);
     childNodes_.emplace_back(imageNode);
+}
+
+void TextPattern::ApplyImageSpanAttribute(const RefPtr<ImageSpanNode>& imageNode, const ImageSpanAttribute& imgAttr)
+{
+    SetImageNodePattern(imageNode, imgAttr);
+    auto imageLayoutProperty = imageNode->GetLayoutProperty<ImageLayoutProperty>();
+    CHECK_NULL_VOID(imageLayoutProperty);
+    if (imgAttr.size.has_value()) {
+        imageLayoutProperty->UpdateUserDefinedIdealSize(imgAttr.size->GetSize());
+    }
+    if (imgAttr.verticalAlign.has_value()) {
+        imageLayoutProperty->UpdateVerticalAlign(imgAttr.verticalAlign.value());
+    }
+    if (imgAttr.objectFit.has_value()) {
+        imageLayoutProperty->UpdateImageFit(imgAttr.objectFit.value());
+    }
+    if (imgAttr.marginProp.has_value()) {
+        imageLayoutProperty->UpdateMargin(imgAttr.marginProp.value());
+    }
+    if (imgAttr.paddingProp.has_value()) {
+        imageLayoutProperty->UpdatePadding(imgAttr.paddingProp.value());
+    }
+    if (imgAttr.borderRadius.has_value()) {
+        auto imageRenderCtx = imageNode->GetRenderContext();
+        CHECK_NULL_VOID(imageRenderCtx);
+        imageRenderCtx->UpdateBorderRadius(imgAttr.borderRadius.value());
+        imageRenderCtx->SetClipToBounds(true);
+    }
+    auto paintProperty = imageNode->GetPaintProperty<ImageRenderProperty>();
+    CHECK_NULL_VOID(paintProperty);
+    if (imgAttr.colorFilterMatrix.has_value()) {
+        paintProperty->UpdateColorFilter(imgAttr.colorFilterMatrix.value());
+        paintProperty->ResetDrawingColorFilter();
+    } else if (imgAttr.drawingColorFilter.has_value()) {
+        paintProperty->UpdateDrawingColorFilter(imgAttr.drawingColorFilter.value());
+        paintProperty->ResetColorFilter();
+    }
+    if (imgAttr.resizableSlice.has_value()) {
+        paintProperty->UpdateImageResizableSlice(imgAttr.resizableSlice.value());
+    }
+    if (imgAttr.resizableLattice.has_value() && imgAttr.resizableLattice.value()) {
+        paintProperty->UpdateImageResizableLattice(imgAttr.resizableLattice.value());
+    }
 }
 
 void TextPattern::HandleImageDrag(const RefPtr<ImageSpanNode>& imageNode)

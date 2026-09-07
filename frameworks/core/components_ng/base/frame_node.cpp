@@ -44,6 +44,7 @@
 #include "core/components_ng/render/paint_wrapper.h"
 #include "core/components_ng/render/render_context.h"
 #include "core/pipeline/base/element_register.h"
+#include "core/components_v2/inspector/inspector_constants.h"
 
 #if !defined(PREVIEW) && !defined(ACE_UNITTEST) && defined(OHOS_PLATFORM)
 #include "interfaces/inner_api/ui_session/ui_session_manager.h"
@@ -87,6 +88,7 @@
 #include "core/common/resource/resource_parse_utils.h"
 #include "core/components_ng/base/extension_handler.h"
 #include "core/components_ng/gestures/gesture_info.h"
+#include "core/components_ng/gestures/recognizers/long_press_recognizer.h"
 #include "core/components_ng/manager/drag_drop/drag_drop_related_configuration.h"
 #include "core/components_ng/manager/frame_rate/frame_rate_manager.h"
 #include "core/components_ng/manager/privacy_sensitive/privacy_sensitive_manager.h"
@@ -2026,6 +2028,9 @@ void FrameNode::OnConfigurationUpdate(const ConfigurationChange& configurationCh
         MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
     }
     if (configurationChange.skinUpdate) {
+        if (pattern_) {
+            pattern_->OnSkinConfigurationUpdate();
+        }
         MarkModifyDone();
         MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
     }
@@ -2114,6 +2119,12 @@ void FrameNode::FireFontNDKCallback(const ConfigurationChange& configurationChan
 
 void FrameNode::NotifyVisibleChange(VisibleType preVisibility, VisibleType currentVisibility)
 {
+    NotifyVisibleChange(preVisibility, currentVisibility, true);
+}
+
+void FrameNode::NotifyVisibleChange(
+    VisibleType preVisibility, VisibleType currentVisibility, bool notifyPageScene)
+{
     if (AceApplicationInfo::GetInstance().IsAccessibilityScreenReadEnabled()) {
         if (preVisibility == VisibleType::VISIBLE && currentVisibility != VisibleType::VISIBLE) {
             auto accessibilityProperty = GetAccessibilityProperty<AccessibilityProperty>();
@@ -2140,7 +2151,7 @@ void FrameNode::NotifyVisibleChange(VisibleType preVisibility, VisibleType curre
     }
     pattern_->OnVisibleChange(currentVisibility == VisibleType::VISIBLE);
     UpdateChildrenVisible(preVisibility, currentVisibility);
-    if (preVisibility != currentVisibility) {
+    if (notifyPageScene && preVisibility != currentVisibility) {
         NotifyPageSceneVisibilityChanged();
     }
     auto pipeline = GetContext();
@@ -2189,13 +2200,24 @@ void FrameNode::NotifyPageSceneFocusabilityChanged()
 #endif
 }
 
+void FrameNode::NotifyPageSceneOpacityChanged()
+{
+#if !defined(PREVIEW) && !defined(ACE_UNITTEST) && defined(OHOS_PLATFORM) && defined(WEB_SUPPORTED)
+    if (!IsOnMainTree()) {
+        return;
+    }
+    UiSessionManager::GetInstance()->NotifyPageSceneNodeStateChanged(
+        tag_, UiSessionManager::PageSceneNodeStateChange::OPACITY);
+#endif
+}
+
 void FrameNode::TryVisibleChangeOnDescendant(VisibleType preVisibility, VisibleType currentVisibility)
 {
     auto layoutProperty = GetLayoutProperty();
     if (layoutProperty && layoutProperty->GetVisibilityValue(VisibleType::VISIBLE) != VisibleType::VISIBLE) {
         return;
     }
-    NotifyVisibleChange(preVisibility, currentVisibility);
+    NotifyVisibleChange(preVisibility, currentVisibility, false);
 }
 
 void FrameNode::OnDetachFromMainTree(bool recursive, PipelineContext* context)
@@ -2500,10 +2522,10 @@ void FrameNode::ThrottledAreaChangeTask()
     }
     auto currParentOffsetToWindow =
         CalculateOffsetRelativeToWindow(pipeline->GetVsyncTime(), false) - currFrameRect.GetOffset();
-    eventHub_->HandleOnAreaChange(lastFrameRect_, lastParentOffsetToWindow_,
+    bool areaChanged = eventHub_->HandleOnAreaChange(lastFrameRect_, lastParentOffsetToWindow_,
         currFrameRect, currParentOffsetToWindow);
     throttledAreaChangeCallbackOnTheWay_ = false;
-    lastAreaChangeTriggerTime_ = GetCurrentTimestamp();
+    lastAreaChangeTriggerTime_ = areaChanged ? GetCurrentTimestamp() : lastAreaChangeTriggerTime_;
 }
 
 void FrameNode::ProcessThrottledAreaChangeCallback()
@@ -2529,7 +2551,7 @@ void FrameNode::ProcessThrottledAreaChangeCallback()
         auto delay = static_cast<uint32_t>(static_cast<int64_t>(onAreaChangeMinInterval_) - interval);
         executor->PostDelayedTask(
             std::move(task), TaskExecutor::TaskType::UI, delay < 0 ? 0 : delay, "ThrottledAreaChangeCallback",
-            PriorityType::IDLE);
+            PriorityType::LOW);
     } else {
         ThrottledAreaChangeTask();
     }
@@ -3045,7 +3067,7 @@ void FrameNode::SetNodeFreeze(bool isFreeze)
 
 void FrameNode::CreateLayoutTask(bool forceUseMainThread, LayoutType layoutTaskType)
 {
-    if (!isLayoutDirtyMarked_ && (layoutTaskType == LayoutType::NONE)) {
+    if (!isLayoutDirtyMarked_ && layoutTaskType == LayoutType::NONE && !geometryTransitionNeedLayout_) {
         return;
     }
 
@@ -3087,6 +3109,7 @@ void FrameNode::CreateLayoutTask(bool forceUseMainThread, LayoutType layoutTaskT
         }
     }
     SetRootMeasureNode(false);
+    geometryTransitionNeedLayout_ = false;
 }
 
 std::optional<UITask> FrameNode::CreateRenderTask(bool forceUseMainThread)
@@ -3925,6 +3948,77 @@ RectF FrameNode::CheckResponseRegionForStylus(RectF& rect, const TouchEvent& tou
     return pattern_->ExpandDefaultResponseRegion(rect);
 }
 
+bool FrameNode::IsMouseTargetHit(const MouseEvent& event, const PointF& parentRevertPoint,
+    const std::vector<std::string>* tagWhitelist, bool& isOutOfRegion)
+{
+    CHECK_NULL_RETURN(renderContext_, false);
+    auto origRect = renderContext_->GetPaintRectWithoutTransform();
+    TouchRestrict touchRestrict { TouchRestrict::NONE };
+    touchRestrict.sourceType = event.sourceType;
+    touchRestrict.sourceTool = event.sourceTool;
+    touchRestrict.hitTestType = SourceType::MOUSE;
+    touchRestrict.inputEventType = InputEventType::MOUSE_BUTTON;
+    auto checkedResponseRegion = CheckResponseRegionForStylus(origRect, touchRestrict.touchEvent);
+    auto responseRegionList = GetResponseRegionList(checkedResponseRegion,
+        static_cast<int32_t>(touchRestrict.sourceType), static_cast<int32_t>(touchRestrict.sourceTool));
+    isOutOfRegion = IsOutOfTouchTestRegion(parentRevertPoint, touchRestrict.touchEvent, &responseRegionList);
+
+    bool hasWhitelist = tagWhitelist && !tagWhitelist->empty();
+    bool tagAllowed = !hasWhitelist;
+    if (hasWhitelist) {
+        for (const auto& allowedTag : *tagWhitelist) {
+            if (GetTag() == allowedTag) {
+                tagAllowed = true;
+                break;
+            }
+        }
+    }
+
+    bool ret = tagAllowed && !isOutOfRegion;
+    return ret;
+}
+
+bool FrameNode::HitTestMouseTarget(const MouseEvent& event, const PointF& globalPoint, const PointF& parentLocalPoint,
+    const PointF& parentRevertPoint, const std::vector<std::string>* tagWhitelist)
+{
+    CHECK_NULL_RETURN(renderContext_, false);
+    if (!isActive_) {
+        return false;
+    }
+
+    auto& cacheMatrixInfo = GetOrRefreshMatrixFromCache();
+    localMat_ = cacheMatrixInfo.localMatrix;
+
+    bool ret = false;
+    if (!frameChildren_.empty()) {
+        auto paintRect = cacheMatrixInfo.paintRectWithTransform;
+        auto origRect = renderContext_->GetPaintRectWithoutTransform();
+
+        auto localPoint = parentLocalPoint - paintRect.GetOffset();
+        renderContext_->GetPointWithTransform(localPoint);
+        auto revertPoint = parentRevertPoint;
+        MapPointTo(revertPoint, cacheMatrixInfo.revertMatrix);
+        auto subRevertPoint = revertPoint - origRect.GetOffset();
+
+        for (auto iter = frameChildren_.rbegin(); iter != frameChildren_.rend(); ++iter) {
+            auto child = iter->Upgrade();
+            if (!child) {
+                continue;
+            }
+            if (child->HitTestMouseTarget(event, globalPoint, localPoint, subRevertPoint,
+                tagWhitelist)) {
+                ret = true;
+                break;
+            }
+        }
+    }
+    if (!ret) {
+        bool isOutOfRegion = false;
+        ret = IsMouseTargetHit(event, parentRevertPoint, tagWhitelist, isOutOfRegion);
+    }
+    return ret;
+}
+
 HitTestResult FrameNode::TouchTest(const PointF& globalPoint, const PointF& parentLocalPoint,
     const PointF& parentRevertPoint, TouchRestrict& touchRestrict, TouchTestResult& result, int32_t touchId,
     ResponseLinkResult& responseLinkResult, bool isDispatch)
@@ -4009,7 +4103,7 @@ HitTestResult FrameNode::TouchTest(const PointF& globalPoint, const PointF& pare
 
     HitTestMode onTouchInterceptresult = HitTestMode::HTMDEFAULT;
     if (touchRestrict.inputEventType != InputEventType::MOUSE_BUTTON &&
-        touchRestrict.touchEvent.type != TouchType::HOVER_ENTER) {
+        !IsHoverEventType(touchRestrict.touchEvent.type)) {
         onTouchInterceptresult = TriggerOnTouchIntercept(touchRestrict.touchEvent);
     }
     TouchResult touchRes;
@@ -7430,6 +7524,14 @@ HitTestMode FrameNode::TriggerOnTouchIntercept(const TouchEvent& touchEvent)
     return result;
 }
 
+bool FrameNode::IsHoverEventType(TouchType type) const
+{
+    return type == TouchType::HOVER_ENTER || type == TouchType::HOVER_MOVE || type == TouchType::HOVER_EXIT ||
+           type == TouchType::HOVER_CANCEL || type == TouchType::LEVITATE_IN_WINDOW ||
+           type == TouchType::LEVITATE_MOVE || type == TouchType::LEVITATE_OUT_WINDOW ||
+           type == TouchType::PROXIMITY_IN || type == TouchType::PROXIMITY_OUT;
+}
+
 void FrameNode::AddTouchEventAllFingersInfo(TouchEventInfo& event, const TouchEvent& touchEvent)
 {
     auto frameNodeWeak = WeakClaim(this);
@@ -7642,6 +7744,24 @@ void FrameNode::GetVisibleRectWithClip(
     }
 }
 
+void FrameNode::LogCacheVisibleRect(const CacheVisibleRectResult& result, bool logFlag) const
+{
+    if (!logFlag) {
+        return;
+    }
+    TAG_LOGD(AceLogTag::ACE_UIEVENT,
+        "Node(%{public}s/%{public}d/%{public}s/%{public}s) wo:%{public}s iwo:%{public}s vr:%{public}s ivr:%{public}s "
+        "cs:[%{public}f,%{public}f] ics:[%{public}f,%{public}f] fr:%{public}s ifr:%{public}s ibr:%{public}s",
+        tag_.c_str(), nodeId_, std::to_string(GetAccessibilityId()).c_str(),
+        GetInspectorId().value_or("").c_str(), result.windowOffset.ToString().c_str(),
+        result.innerWindowOffset.ToString().c_str(), result.visibleRect.ToString().c_str(),
+        result.innerVisibleRect.ToString().c_str(),
+        result.cumulativeScale.x, result.cumulativeScale.y,
+        result.innerCumulativeScale.x, result.innerCumulativeScale.y,
+        result.frameRect.ToString().c_str(), result.innerFrameRect.ToString().c_str(),
+        result.innerBoundaryRect.ToString().c_str());
+}
+
 const CacheVisibleRectResult& FrameNode::GetCacheVisibleRect(uint64_t timestamp, bool logFlag)
 {
     RefPtr<FrameNode> parentUi = GetAncestorNodeOfFrame(true);
@@ -7658,6 +7778,7 @@ const CacheVisibleRectResult& FrameNode::GetCacheVisibleRect(uint64_t timestamp,
         cachedVisibleRectResult_ = { timestamp,
             { rectToParent.GetOffset(), rectToParent.GetOffset(), rectToParent, rectToParent, scale, innerScale,
                 rectToParent, rectToParent, rectToParent } };
+        LogCacheVisibleRect(cachedVisibleRectResult_.second, logFlag);
         return cachedVisibleRectResult_.second;
     }
 
@@ -7671,14 +7792,7 @@ const CacheVisibleRectResult& FrameNode::GetCacheVisibleRect(uint64_t timestamp,
         result = &CalculateCacheVisibleRect(
             parentCacheVisibleRectResult, parentUi, rectToParent, { scale, innerScale }, timestamp);
     }
-    if (logFlag) {
-        TAG_LOGD(AceLogTag::ACE_UIEVENT,
-            "OnVisibleAreaChange Node(%{public}s/%{public}d) windowOffset:%{public}s visibleRect:%{public}s "
-            "innerVisibleRect:%{public}s frameRect:%{public}s innerBoundaryRect:%{public}s",
-            tag_.c_str(), nodeId_, result->windowOffset.ToString().c_str(), result->visibleRect.ToString().c_str(),
-            result->innerVisibleRect.ToString().c_str(), result->frameRect.ToString().c_str(),
-            result->innerBoundaryRect.ToString().c_str());
-    }
+    LogCacheVisibleRect(*result, logFlag);
     return *result;
 }
 
@@ -8513,11 +8627,18 @@ void FrameNode::ExtraCustomPropertyToJsonValue(std::unique_ptr<JsonValue>& json,
 
 bool FrameNode::IsDebugInspectorId()
 {
+    static constexpr size_t TAG_PREFIX_LEN = 2;
     if (!SystemProperties::GetDebugEnabled()) {
         return false;
     }
     auto debugInspectorId = SystemProperties::GetDebugInspectorId();
-    return debugInspectorId == GetInspectorId().value_or("");
+    if (debugInspectorId == GetInspectorId().value_or("")) {
+        return true;
+    }
+    if (debugInspectorId.find("T:") == 0) {
+        return GetTag() == debugInspectorId.substr(TAG_PREFIX_LEN);
+    }
+    return false;
 }
 
 RefPtr<UINode> FrameNode::GetCurrentPageRootNode()

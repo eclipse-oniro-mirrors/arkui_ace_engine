@@ -21,7 +21,7 @@
 #include <cmath>
 #include <filesystem>
 #include <iomanip>
-#include <iostream>
+
 #include <string>
 #include <string_view>
 #include <sstream>
@@ -83,6 +83,7 @@
 #include "core/components/text_overlay/text_overlay_theme.h"
 #include "core/components/theme/shadow_theme.h"
 #include "core/components/web/resource/web_delegate.h"
+#include "core/components/web/resource/web_page_scene_manager.h"
 #include "core/components/web/web_property.h"
 #include "core/components_ng/base/view_stack_processor.h"
 #include "core/components_ng/export_texture_info/export_texture_info.h"
@@ -335,6 +336,7 @@ std::string ParseTextJsonValue(const std::string& textJson)
 }
 
 constexpr std::string_view NWEB_AUTOFILL_TYPE_OFF = "off";
+constexpr std::string_view NWEB_VIEW_DATA_KEY_NODE_ID = "nodeId";
 const std::map<std::string, AceAutoFillType> NWEB_AUTOFILL_TYPE_TO_ACE = {
     {OHOS::NWeb::NWEB_AUTOFILL_STREET_ADDRESS, AceAutoFillType::ACE_FULL_STREET_ADDRESS},
     {OHOS::NWeb::NWEB_AUTOFILL_ADDRESS_LEVEL_3, AceAutoFillType::ACE_DISTRICT_ADDRESS},
@@ -6037,10 +6039,12 @@ void WebPattern::ParseViewDataNumber(const std::string& key, int32_t value,
 }
 
 void ParseViewDataString(const std::string& key,
-    const std::string& value, RefPtr<PageNodeInfoWrap> node)
+    const std::string& value, RefPtr<PageNodeInfoWrap> node, std::string& renderNodeId)
 {
     CHECK_NULL_VOID(node);
-    if (key == OHOS::NWeb::NWEB_VIEW_DATA_KEY_VALUE) {
+    if (key == NWEB_VIEW_DATA_KEY_NODE_ID) {
+        renderNodeId = value;
+    } else if (key == OHOS::NWeb::NWEB_VIEW_DATA_KEY_VALUE) {
         node->SetValue(value);
     } else if (key == OHOS::NWeb::NWEB_VIEW_DATA_KEY_PLACEHOLDER) {
         node->SetPlaceholder(value);
@@ -6092,6 +6096,7 @@ void WebPattern::ParseNWebViewDataNode(std::unique_ptr<JsonValue> child,
 
     RefPtr<PageNodeInfoWrap> node = PageNodeInfoWrap::CreatePageNodeInfoWrap();
     std::string attribute = child->GetKey();
+    std::string renderNodeId;
 
     RectT<float> rect;
     int32_t len = child->GetArraySize();
@@ -6108,26 +6113,26 @@ void WebPattern::ParseNWebViewDataNode(std::unique_ptr<JsonValue> child,
                         child->GetArraySize());
                 node->SetMetadata(object->ToString());
             } else if (child->IsString()) {
-                ParseViewDataString(child->GetKey(), child->GetString(), node);
+                ParseViewDataString(child->GetKey(), child->GetString(), node, renderNodeId);
             } else if (child->IsNumber()) {
                 ParseViewDataNumber(child->GetKey(), child->GetInt(), node, rect, viewScale);
             }
         }
     }
 
-    HintToTypeWrap hintToTypeWrap = GetHintTypeAndMetadata(attribute, node);
-    auto type = hintToTypeWrap.autoFillType;
-    if (type != AceAutoFillType::ACE_UNSPECIFIED) {
-        node->SetAutoFillType(type);
+    auto hintToTypeWrap = GetHintTypeAndMetadata(attribute, node);
+    if (hintToTypeWrap.autoFillType != AceAutoFillType::ACE_UNSPECIFIED) {
+        node->SetAutoFillType(hintToTypeWrap.autoFillType);
         node->SetMetadata(hintToTypeWrap.metadata);
     }
 
-    NG::RectF rectF;
-    rectF.SetRect(rect.GetX(), rect.GetY(), rect.Width(), rect.Height());
-    node->SetPageNodeRect(rectF);
+    node->SetPageNodeRect(NG::RectF(rect.GetX(), rect.GetY(), rect.Width(), rect.Height()));
     node->SetId(nodeId);
     node->SetDepth(-1);
-    node->SetKeyAttribute(attribute);
+    node->SetKeyAttribute(renderNodeId.empty() ? attribute : renderNodeId);
+    if (renderNodeId.empty()) {
+        TAG_LOGI(AceLogTag::ACE_WEB, "The renderNodeId of view data node is empty, use attribute as key attribute");
+    }
     nodeInfos.emplace_back(node);
 }
 
@@ -10085,6 +10090,14 @@ int WebPattern::SendCommandToNWeb(std::unique_ptr<JsonValue> comJson)
         return static_cast<int>(WebCommandResult::JSON_IS_INVALID);
     }
 
+    // Batch command: {"command":"inputAutoFill","params":{...}}
+    // Uses "command" key for routing, separate from single-command "event_type" format
+    auto commandValue = comJson->GetValue("command");
+    if (commandValue && commandValue->IsString() && commandValue->GetString() == "inputAutoFill") {
+        return ExecuteAutoFillCommand(comJson);
+    }
+
+    // Single commands: {"event_type":"...","xpath":"...",...}
     auto eventTypeValue = comJson->GetValue("event_type");
     if (!eventTypeValue || !eventTypeValue->IsString()) {
         TAG_LOGE(AceLogTag::ACE_WEB, "[WebCommandAction] CommandError: event_type is missing or not string type");
@@ -10206,6 +10219,40 @@ int WebPattern::ExecuteGestureCommand(const std::unique_ptr<JsonValue>& comJson,
             actionInfo->GetX(), actionInfo->GetY(), actionInfo->GetScale(), actionInfo->GetSpeed());
     }
     return static_cast<int>(WebCommandResult::JSON_INVALID_EVENT_TYPE);
+}
+
+int WebPattern::ExecuteAutoFillCommand(const std::unique_ptr<JsonValue>& comJson)
+{
+    if (!delegate_) {
+        TAG_LOGE(AceLogTag::ACE_WEB, "[WebCommandAction] ExecuteAutoFillCommand: delegate_ is nullptr");
+        return static_cast<int>(WebCommandResult::DELEGATE_NULL);
+    }
+    auto manager = delegate_->GetNWebCommandActionManager();
+    if (!manager) {
+        TAG_LOGE(AceLogTag::ACE_WEB, "[WebCommandAction] ExecuteAutoFillCommand: CommandActionManager is nullptr");
+        return static_cast<int>(WebCommandResult::FAILED);
+    }
+
+    // Batch command format: {"command":"inputAutoFill","params":{...}}
+    // "params" is required, containing defaultMode and items array
+    auto paramsValue = comJson->GetValue("params");
+    if (!paramsValue || !paramsValue->IsObject()) {
+        TAG_LOGE(AceLogTag::ACE_WEB,
+            "[WebCommandAction] ExecuteAutoFillCommand: params is missing or not an object");
+        return static_cast<int>(WebCommandResult::JSON_IS_INVALID);
+    }
+
+    std::shared_ptr<OHOS::NWeb::NWebCommandActionInfo> actionInfo;
+    int result = WebCommandWrapper::BuildAutoFillActionInfo(paramsValue, actionInfo);
+    if (result != WEB_COMMAND_BUILD_SUCCESS) {
+        TAG_LOGE(AceLogTag::ACE_WEB,
+            "[WebCommandAction] ExecuteAutoFillCommand: BuildAutoFillActionInfo failed, result=%{public}d", result);
+        return result;
+    }
+
+    result = manager->HandleAutoFillCommand(actionInfo);
+    TAG_LOGI(AceLogTag::ACE_WEB, "[WebCommandAction] ExecuteAutoFillCommand done, result=%{public}d", result);
+    return result;
 }
 
 int WebPattern::CheckGestureCoordinatesInWebBounds(double screenX, double screenY)
@@ -10616,6 +10663,21 @@ void WebPattern::GetWebInfoByRequest(uint32_t windowId, int32_t webId, const std
             });
         return;
     }
+    if (request == WEB_INTERFACE_REQUEST_DOM_TREE_VIEWPORT) {
+        TAG_LOGI(AceLogTag::ACE_WEB, "WebPattern RequestArkWebDomTreeViewport WebId:%{public}d", webId);
+        delegate_->RequestWebDomJsonStringWithOptions(
+            [weak = AceType::WeakClaim(this), windowId, webId, request, finishCallback](std::string result){
+                TAG_LOGI(AceLogTag::ACE_WEB, "WebPattern RequestArkWebDomTreeViewport callback");
+                auto pattern = weak.Upgrade();
+                CHECK_NULL_VOID(pattern);
+                auto offset = pattern->GetCoordinatePoint().value_or(OffsetF());
+                pattern->webDomDocument_->UpdateOffset(offset);
+                auto jsonValue = pattern->webDomDocument_->CreateTempFromJsonString(result);
+                TAG_LOGI(AceLogTag::ACE_WEB, "WebPattern RequestArkWebDomTreeViewport WebId:%{public}d success", webId);
+                finishCallback(windowId, webId, request, jsonValue->ToString(), WebRequestErrorCode::OK);
+            }, static_cast<int32_t>(OHOS::NWeb::NWebDomExtractionMode::VIEWPORT_ONLY));
+        return;
+    }
     return;
 }
 
@@ -10658,10 +10720,10 @@ void WebPattern::EndTranslate()
         }, TaskExecutor::TaskType::UI, "ArkUIWebEndTranslate");
 }
 
-void WebPattern::RegisterPageSceneRulesForWeb(int32_t processId)
+void WebPattern::ExecuteReportOnRegisterMatch(int32_t processId)
 {
     CHECK_NULL_VOID(delegate_);
-    delegate_->RegisterPageSceneRulesForWeb(processId);
+    delegate_->ExecuteReportOnRegisterMatch(processId);
 }
 
 void WebPattern::GetPageSceneForWeb(int32_t processId, const std::string& ruleJson)

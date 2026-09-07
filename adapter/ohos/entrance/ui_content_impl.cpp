@@ -199,7 +199,6 @@ const std::string UIEXTENSION_CONFIG_WINDOW_MODE = "ohos.system.window.mode";
 constexpr int32_t INVALID_WINDOW_MODE = 1000;
 constexpr char IS_PREFERRED_LANGUAGE[] = "1";
 constexpr uint64_t DISPLAY_ID_INVALID = -1ULL;
-constexpr uint32_t LOG_DELAY_TIME = 250; // 250ms
 constexpr float DEFAULT_VIEW_SCALE = 1.0f;
 static std::atomic<bool> g_isDynamicVsync = false;
 static bool g_isDragging = false;
@@ -599,7 +598,8 @@ std::map<NG::SafeAreaAvoidType, NG::SafeAreaInsets> ParseAvoidAreasToMap(
 }
 
 void AvoidAreasUpdateOnUIExtension(const RefPtr<NG::PipelineContext>& context,
-    const std::map<OHOS::Rosen::AvoidAreaType, OHOS::Rosen::AvoidArea>& avoidAreas)
+    const std::map<OHOS::Rosen::AvoidAreaType, OHOS::Rosen::AvoidArea>& avoidAreas,
+    OHOS::Rosen::WindowSizeChangeReason reason = OHOS::Rosen::WindowSizeChangeReason::UNDEFINED)
 {
     if (avoidAreas.empty()) {
         return;
@@ -607,7 +607,8 @@ void AvoidAreasUpdateOnUIExtension(const RefPtr<NG::PipelineContext>& context,
     CHECK_NULL_VOID(context);
     // for ui extension component
     for (auto& avoidArea : avoidAreas) {
-        context->UpdateOriginAvoidArea(avoidArea.second, static_cast<uint32_t>(avoidArea.first));
+        context->UpdateOriginAvoidArea(avoidArea.second, static_cast<uint32_t>(avoidArea.first),
+            static_cast<OHOS::Ace::WindowSizeChangeReason>(reason));
     }
 }
 
@@ -632,13 +633,14 @@ void AvoidAreasUpdateOnDynamicComponent(const RefPtr<NG::PipelineContext>& conte
 }
 
 std::map<NG::SafeAreaAvoidType, NG::SafeAreaInsets> UpdateSafeArea(const RefPtr<PipelineBase>& pipelineContext,
-    const std::map<OHOS::Rosen::AvoidAreaType, OHOS::Rosen::AvoidArea>& avoidAreas)
+    const std::map<OHOS::Rosen::AvoidAreaType, OHOS::Rosen::AvoidArea>& avoidAreas,
+    OHOS::Rosen::WindowSizeChangeReason reason)
 {
     CHECK_NULL_RETURN(pipelineContext, {});
     auto context = AceType::DynamicCast<NG::PipelineContext>(pipelineContext);
     CHECK_NULL_RETURN(context, {});
     auto safeAreaMap = ParseAvoidAreasToMap(avoidAreas);
-    AvoidAreasUpdateOnUIExtension(context, avoidAreas);
+    AvoidAreasUpdateOnUIExtension(context, avoidAreas, reason);
     return safeAreaMap;
 }
 
@@ -3188,8 +3190,6 @@ void UIContentImpl::Destroy()
         ResschedEventListener::GetInstance()->UnRegisterFromRSS(window_->GetWindowId());
 #endif // RESOURCE_SCHEDULE_SERVICE_ENABLE
     }
-    taskTimeForComeIn_.lastTaskTime = 0;
-    taskTimeForExit_.lastTaskTime = 0;
 }
 
 void UIContentImpl::UnregisterDisplayManagerCallback()
@@ -4066,13 +4066,9 @@ void UIContentImpl::UpdateViewportConfigWithAnimation(const ViewportConfig& conf
                 static_cast<uint32_t>(reason), rsTransaction == nullptr, stringifiedMap.c_str(),
                 keyboardRect.ToString().c_str());
         }
-        auto logTask = [config, reason, rsTransaction, stringifiedMap, keyboardRect]() {
-            TAG_LOGI(ACE_LAYOUT, "UVC %{public}s, WSCR %{public}d, IRN %{public}d, %{public}s, keyboardRect %{public}s",
-                config.ToString().c_str(), static_cast<uint32_t>(reason), rsTransaction == nullptr,
-                stringifiedMap.c_str(), keyboardRect.ToString().c_str());
-        };
-        taskTimeForComeIn_.taskName = "ArkUIUpdateViewportConfigWithKeyboardInfo";
-        ArkUIDelayLogTask::PostReductionTask(logTask, taskTimeForComeIn_, LOG_DELAY_TIME);
+        TAG_LOGD(ACE_LAYOUT, "UVC %{public}s, WSCR %{public}d, IRN %{public}d, %{public}s, keyboardRect %{public}s",
+            config.ToString().c_str(), static_cast<uint32_t>(reason), rsTransaction == nullptr,
+            stringifiedMap.c_str(), keyboardRect.ToString().c_str());
     } else {
         if (SystemProperties::GetSyncDebugTraceEnabled()) {
             ACE_LAYOUT_SCOPED_TRACE(
@@ -4081,13 +4077,9 @@ void UIContentImpl::UpdateViewportConfigWithAnimation(const ViewportConfig& conf
                 bundleName_.c_str(), moduleName_.c_str(), instanceId_, config.ToString().c_str(),
                 static_cast<uint32_t>(reason), rsTransaction == nullptr, stringifiedMap.c_str());
         }
-        auto logTask = [config, reason, rsTransaction, stringifiedMap]() {
-            TAG_LOGI(ACE_LAYOUT, "UVC %{public}s, WSCR %{public}d, IRN %{public}d, %{public}s, keyboardInfo is null",
-                config.ToString().c_str(), static_cast<uint32_t>(reason), rsTransaction == nullptr,
-                stringifiedMap.c_str());
-        };
-        taskTimeForComeIn_.taskName = "ArkUIUpdateViewportConfigWithoutKeyboardInfo";
-        ArkUIDelayLogTask::PostReductionTask(logTask, taskTimeForComeIn_, LOG_DELAY_TIME);
+        TAG_LOGD(ACE_LAYOUT, "UVC %{public}s, WSCR %{public}d, IRN %{public}d, %{public}s, keyboardInfo is null",
+            config.ToString().c_str(), static_cast<uint32_t>(reason), rsTransaction == nullptr,
+            stringifiedMap.c_str());
     }
 
     // Page rotation has most of the same logic as regular rotation,
@@ -4266,7 +4258,7 @@ void UIContentImpl::UpdateViewportConfigWithAnimation(const ViewportConfig& conf
                     taskId, weak = WeakPtr(viewportConfigMgr_), beforeConfig = config]() {
         container->SetWindowPos(config.Left(), config.Top());
         auto pipelineContext = container->GetPipelineContext();
-        auto avoidAreaMap = UpdateSafeArea(pipelineContext, avoidAreas);
+        auto avoidAreaMap = UpdateSafeArea(pipelineContext, avoidAreas, reason);
         if (pipelineContext) {
             if (reason != OHOS::Rosen::WindowSizeChangeReason::ROOT_SCENE_CHANGE) {
                 pipelineContext->SetDisplayWindowRectInfo(
@@ -4941,10 +4933,30 @@ void UIContentImpl::SetFormViewScale(float width, float height, float formViewSc
     CHECK_NULL_VOID(pipelineContext);
 
     float viewScale = LessOrEqual(formViewScale, 0.0f) ? DEFAULT_VIEW_SCALE : formViewScale;
-    auto density = SystemProperties::GetResolution() / viewScale;
-    TAG_LOGD(AceLogTag::ACE_FORM, "SetFormViewScale viewScale: %{public}f, density: %{public}f.", viewScale, density);
+    float density = 0.0f;
+    if (formDisplayId_ != DISPLAY_ID_INVALID) {
+        auto display = Rosen::DisplayManager::GetInstance().GetDisplayById(formDisplayId_);
+        if (display) {
+            auto displayInfo = display->GetDisplayInfo();
+            if (displayInfo) {
+                density = displayInfo->GetDensityInCurResolution();
+            }
+        }
+    }
+    if (!GreatNotEqual(density, 0.0f)) {
+        density = static_cast<float>(SystemProperties::GetResolution());
+    }
+    density = density / viewScale;
+    TAG_LOGD(AceLogTag::ACE_FORM,
+        "SetFormViewScale viewScale: %{public}f, density: %{public}f, displayId: %{public}" PRIu64 ".",
+        viewScale, density, formDisplayId_);
     pipelineContext->OnSurfaceDensityChanged(density);
     pipelineContext->SetRootSize(density, width, height);
+}
+
+void UIContentImpl::SetFormDisplayId(const uint64_t displayId)
+{
+    formDisplayId_ = displayId;
 }
 
 void UIContentImpl::SetActionEventHandler(std::function<void(const std::string& action)>&& actionCallback)
@@ -6284,6 +6296,7 @@ void UIContentImpl::InitUISessionManagerCallbacks(const WeakPtr<TaskExecutor>& t
     SaveGetStateMgmtInfoFunction(taskExecutor);
     SaveGetWebInfoByRequestFunction(taskExecutor);
     SaveArkUIPageTranslateFunctions(taskExecutor);
+    SaveGetCurrentAbilityLanguageInfoFunction(taskExecutor);
     SaveTraverseWebForPageSceneCallback(taskExecutor);
     auto pageSceneMatcher = std::make_shared<NG::PageSceneRuleManager>();
     auto pageSceneDetectCallback = [weakTaskExecutor = taskExecutor, pageSceneMatcher](
@@ -6318,10 +6331,9 @@ void UIContentImpl::InitUISessionManagerCallbacks(const WeakPtr<TaskExecutor>& t
                     }
                     return;
                 }
-                auto stageManager = pipeline->GetStageManager();
-                auto pageRoot = stageManager ? stageManager->GetLastPage() : pipeline->GetRootElement();
+                auto startNodes = pipeline->GetDumpStartNodes();
                 auto result = pageSceneMatcher->MatchPageScene(
-                    processId, ruleJson, pageRoot, pipeline->GetCurrentPageName(), isGetResult);
+                    processId, ruleJson, startNodes, pipeline->GetCurrentPageName(), isGetResult);
                 if (!result.has_value()) {
                     if (isGetResult) {
                         UiSessionManager::GetInstance()->CompleteGetPageScene(processId);
@@ -6409,6 +6421,57 @@ void UIContentImpl::SaveArkUIPageTranslateFunctions(const WeakPtr<TaskExecutor>&
     UiSessionManager::GetInstance()->SaveArkUIPageTranslateFunctions(
         std::move(getTextFunction), std::move(startFunction), std::move(endFunction),
         std::move(resetFunction), std::move(resultFunction));
+}
+
+void UIContentImpl::SaveGetCurrentAbilityLanguageInfoFunction(const WeakPtr<TaskExecutor>& taskExecutor)
+{
+    const int32_t instanceId = instanceId_;
+    auto getAbilityLanguageInfo = [weakTaskExecutor = taskExecutor, instanceId](
+                                      std::string& language, std::string& region) -> int32_t {
+        auto taskExecutor = weakTaskExecutor.Upgrade();
+        if (!taskExecutor) {
+            LOGW("GetCurrentAbilityLanguageInfo task executor is null");
+            return FAILED;
+        }
+
+        int32_t result = FAILED;
+        std::string resultLanguage;
+        std::string resultRegion;
+        constexpr uint32_t GET_ABILITY_LANGUAGE_INFO_TIMEOUT_TIME = 1500;
+        auto task = [instanceId, &result, &resultLanguage, &resultRegion]() {
+            auto container = Platform::AceContainer::GetContainer(instanceId);
+            if (!container) {
+                LOGW("GetCurrentAbilityLanguageInfo container is null");
+                return;
+            }
+            auto languageTag = container->GetResourceInfo().GetResourceConfiguration().GetLanguage();
+            if (languageTag.empty()) {
+                LOGW("GetCurrentAbilityLanguageInfo language tag is empty");
+                return;
+            }
+            std::string script;
+            Localization::ParseLocaleTag(languageTag, resultLanguage, script, resultRegion, false);
+            if (resultLanguage.empty() || resultRegion.empty()) {
+                LOGW("GetCurrentAbilityLanguageInfo locale is empty, languageEmpty=%{public}d, "
+                     "regionEmpty=%{public}d",
+                    resultLanguage.empty(), resultRegion.empty());
+                return;
+            }
+            result = NO_ERROR;
+        };
+        if (!taskExecutor->PostSyncTaskTimeout(task, TaskExecutor::TaskType::UI,
+                GET_ABILITY_LANGUAGE_INFO_TIMEOUT_TIME, "UiSessionGetCurrentAbilityLanguageInfo")) {
+            LOGW("GetCurrentAbilityLanguageInfo post UI task failed");
+            return FAILED;
+        }
+        if (result != NO_ERROR) {
+            return result;
+        }
+        language = std::move(resultLanguage);
+        region = std::move(resultRegion);
+        return NO_ERROR;
+    };
+    UiSessionManager::GetInstance()->SaveGetCurrentAbilityLanguageInfoFunction(std::move(getAbilityLanguageInfo));
 }
 
 void UIContentImpl::SaveGetWebInfoByRequestFunction(const WeakPtr<TaskExecutor>& taskExecutor)
@@ -6574,7 +6637,7 @@ void UIContentImpl::RegisterGetCurrentPageName(const WeakPtr<TaskExecutor>& task
 
 void UIContentImpl::InitSendCommandFunctionsCallbacks(const WeakPtr<TaskExecutor>& taskExecutor)
 {
-    auto sendCommandAsync = [weakTaskExecutor = taskExecutor](int32_t id, const std::string& command) {
+    auto sendCommandSync = [weakTaskExecutor = taskExecutor](int32_t id, const std::string& command) {
         auto taskExecutor = weakTaskExecutor.Upgrade();
         if (!taskExecutor) {
             LOGI("Task executor is null");
@@ -6585,16 +6648,16 @@ void UIContentImpl::InitSendCommandFunctionsCallbacks(const WeakPtr<TaskExecutor
             [id, command, &result]() {
                 auto node = AceType::DynamicCast<NG::FrameNode>(ElementRegister::GetInstance()->GetUINodeById(id));
                 if (!node) {
-                    LOGI("UiSessionSendCommandAsyncPattern: Node is null for id: %{public}d", id);
+                    LOGI("UiSessionSendCommandSyncPattern: Node is null for id: %{public}d", id);
                     result = 13;
                     return;
                 }
                 result = node->OnRecvCommand(command);
             },
-            TaskExecutor::TaskType::UI, "UiSessionSendCommandAsyncPattern");
+            TaskExecutor::TaskType::UI, "UiSessionSendCommandSyncPattern");
         return result;
     };
-    UiSessionManager::GetInstance()->SaveForSendCommandAsyncFunction(sendCommandAsync);
+    UiSessionManager::GetInstance()->SaveForSendCommandSyncFunction(sendCommandSync);
     auto sendCommand = [weakTaskExecutor = taskExecutor](int32_t id, const std::string& command) {
         auto taskExecutor = weakTaskExecutor.Upgrade();
         CHECK_NULL_VOID(taskExecutor);
@@ -7005,11 +7068,15 @@ void UIContentImpl::PostTraverseWebTask(const WeakPtr<TaskExecutor>& weakTaskExe
 void UIContentImpl::SaveTraverseWebForPageSceneCallback(const WeakPtr<TaskExecutor>& taskExecutor)
 {
 #ifdef WEB_SUPPORTED
-    auto&& webPageSceneFunc = [weakTaskExecutor = taskExecutor](
-        UiSessionManager::WebPageSceneOp op, int32_t processId, const std::string& ruleJson, bool isGetResult) {
+    auto&& webPageSceneFunc = [this, weakTaskExecutor = taskExecutor](
+        UiSessionManager::WebPageSceneOp op, int32_t processId, const std::string& ruleJson,
+        bool isGetResult) -> int32_t {
         switch (op) {
-            case UiSessionManager::WebPageSceneOp::RegisterRules:
-                WebPageSceneManager::GetInstance().RegisterPageSceneRules(processId, ruleJson);
+            case UiSessionManager::WebPageSceneOp::RegisterRules: {
+                int32_t ret = WebPageSceneManager::GetInstance().RegisterPageSceneRules(processId, ruleJson);
+                if (ret != PAGE_SCENE_ERR_OK) {
+                    return ret;
+                }
                 PostTraverseWebTask(weakTaskExecutor, [processId]() {
                     auto pipeline = NG::PipelineContext::GetCurrentContextSafely();
                     CHECK_NULL_VOID(pipeline);
@@ -7017,11 +7084,11 @@ void UIContentImpl::SaveTraverseWebForPageSceneCallback(const WeakPtr<TaskExecut
                     CHECK_NULL_VOID(uiTranslateManager);
                     uiTranslateManager->TraverseAndMatchAllWeb(processId, "", false);
                 });
-                break;
+                return PAGE_SCENE_ERR_OK;
+            }
             case UiSessionManager::WebPageSceneOp::UnregisterRules:
-                WebPageSceneManager::GetInstance().UnregisterPageSceneRules(processId);
-                break;
-            case UiSessionManager::WebPageSceneOp::Traverse:
+                return WebPageSceneManager::GetInstance().UnregisterPageSceneRules(processId);
+            case UiSessionManager::WebPageSceneOp::GetPageScene: {
                 PostTraverseWebTask(weakTaskExecutor, [processId, ruleJson, isGetResult]() {
                     auto pipeline = NG::PipelineContext::GetCurrentContextSafely();
                     CHECK_NULL_VOID(pipeline);
@@ -7029,10 +7096,10 @@ void UIContentImpl::SaveTraverseWebForPageSceneCallback(const WeakPtr<TaskExecut
                     CHECK_NULL_VOID(uiTranslateManager);
                     uiTranslateManager->TraverseAndMatchAllWeb(processId, ruleJson, isGetResult);
                 });
-                break;
-            default:
-                break;
+                return PAGE_SCENE_ERR_OK;
+            }
         }
+        return PAGE_SCENE_ERR_FAILED;
     };
     UiSessionManager::GetInstance()->SaveWebPageSceneFunction(std::move(webPageSceneFunc));
 #endif

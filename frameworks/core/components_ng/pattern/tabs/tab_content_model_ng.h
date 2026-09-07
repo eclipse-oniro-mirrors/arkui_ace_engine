@@ -73,6 +73,10 @@ public:
     static void CreateTabContent(std::function<void()>&& deepRenderFunc);
     static void PopTabContent();
     static void RemoveTabBarItem(const RefPtr<TabContentNode>& tabContentNode);
+    static void AddSideBarTabListItem(const RefPtr<TabsNode>& tabsNode,
+        const RefPtr<TabContentNode>& tabContentNode, int32_t position, bool update);
+    static void RemoveSideBarTabBarItem(const RefPtr<TabsNode>& tabsNode,
+        const RefPtr<TabContentNode>& tabContentNode);
     static RefPtr<TabsNode> FindTabsNode(const RefPtr<UINode>& tabContent);
     static RefPtr<FrameNode> CreateFrameNode(int32_t nodeId);
     static void SetTabBarBuilder(FrameNode* node, TabBarBuilderFunc&& builder);
@@ -104,6 +108,8 @@ public:
     void SetOnWillShow(std::function<void()>&& onWillShow) override;
     void SetOnWillHide(std::function<void()>&& onWillHide) override;
     void SetCustomStyleNode(const RefPtr<NG::FrameNode>& customStyleNode) override;
+    void SetDefaultVisibility(const NG::TabContentDefaultVisibility& defaultVisibility) override;
+    static void SetDefaultVisibility(FrameNode* node, const NG::TabContentDefaultVisibility& defaultVisibility);
     static void SetCustomTabBar(FrameNode* node, FrameNode* tabBar);
     static void UpdateDefaultSymbol(RefPtr<TabTheme>& tabTheme, RefPtr<TextLayoutProperty> symbolProperty);
     static void UpdateSymbolEffect(RefPtr<TextLayoutProperty> symbolProperty, bool isActive);
@@ -130,11 +136,15 @@ public:
     static bool CreateIndicatorMarginTopWithResourceObj(FrameNode* frameNode, const RefPtr<ResourceObject>& resObj);
     static void CreateMoreWithResourceObj(TabContentJsType jsType, FrameNode* frameNode,
         const RefPtr<ResourceObject>& resObj);
+    static void InitTabText(const RefPtr<TextLayoutProperty>& textLayoutProperty);
+    static void UpdateLabelStyle(const LabelStyle& labelStyle, RefPtr<TextLayoutProperty> textLayoutProperty);
 
 private:
     static RefPtr<TabContentPattern> GetTabContentPattern(FrameNode* node);
-    static void UpdateLabelStyle(const LabelStyle& labelStyle, RefPtr<TextLayoutProperty> textLayoutProperty);
-    static void InitTabText(const RefPtr<TextLayoutProperty>& textLayoutProperty);
+    static void AddBottomStyleTabBarItem(const RefPtr<UINode>& tabContent, int32_t position, bool update);
+    static void AddSideBarAdaptableStyleTabBarItem(const RefPtr<UINode>& tabContent, int32_t position, bool update);
+    static void RemoveBottomStyleTabBarItem(const RefPtr<TabContentNode>& tabContentNode);
+    static void RemoveSideBarAdaptableStyleTabBarItem(const RefPtr<TabContentNode>& tabContentNode);
 };
 
 } // namespace OHOS::Ace::NG

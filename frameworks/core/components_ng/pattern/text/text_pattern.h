@@ -33,6 +33,7 @@
 #include "core/components_ng/event/long_press_event.h"
 #include "core/components_ng/layout/vertical_overflow_handler.h"
 #include "core/components_ng/pattern/pattern.h"
+#include "core/components_ng/pattern/page_translate/page_translate_node.h"
 #include "core/components_ng/pattern/text/paragraph_manager.h"
 #include "core/components_ng/pattern/text/selection_info.h"
 #include "core/components_ng/pattern/rich_editor_drag/preview_menu_controller.h"
@@ -90,8 +91,10 @@ class ACE_FORCE_EXPORT TextPattern : public virtual Pattern,
                     public TextBase,
                     public TextGestureSelector,
                     public Magnifier,
-                    public LayoutInfoInterface {
-    DECLARE_ACE_TYPE(TextPattern, Pattern, TextDragBase, TextBase, TextGestureSelector, Magnifier);
+                    public LayoutInfoInterface,
+                    public PageTranslateNode {
+    DECLARE_ACE_TYPE(TextPattern, Pattern, TextDragBase, TextBase, TextGestureSelector, Magnifier,
+        PageTranslateNode);
 
 public:
     TextPattern();
@@ -105,7 +108,7 @@ public:
 
     SelectionInfo GetSpansInfo(int32_t start, int32_t end, GetSpansMethod method);
     std::list<ResultObject> GetSpansInfoInStyledString(int32_t start, int32_t end);
-    virtual int32_t GetTextContentLength();
+    virtual int32_t GetTextContentLength() const;
     RefPtr<NodePaintMethod> CreateNodePaintMethod() override;
     RefPtr<LayoutProperty> CreateLayoutProperty() override;
     RefPtr<LayoutAlgorithm> CreateLayoutAlgorithm() override;
@@ -149,6 +152,7 @@ public:
     void DumpSpanItem();
     void DumpScaleInfo();
     void DumpTextEngineInfo();
+    void DumpPageTranslateInfo();
     void DumpParagraphsInfo();
     TextSelector GetTextSelector() const;
     const std::u16string& GetTextForDisplay() const;
@@ -215,6 +219,17 @@ public:
 
     // end of TextDragBase implementations
     // ===========================================================
+
+    // add page translate
+    const std::optional<std::u16string>& GetPageTranslatedText() const;
+    int32_t GetPageTranslateNodeId() const override;
+    void MarkPageTranslateTextDrawn();
+    void OnPageTranslateSourceTextChanged();
+    void ReportPageTranslateTextDrawn();
+    bool ApplyPageTranslateResult(const std::string& result, int64_t version) override;
+    void ResetPageTranslate() override;
+    void MarkPageTranslateDirty();
+    std::string GetPageTranslateTextForReport() const override;
 
     void InitSurfaceChangedCallback();
     void InitSurfacePositionChangedCallback();
@@ -758,6 +773,7 @@ private:
     void FlushContainerOverlayAfterLayout();
     // SpanString
     void MountImageNode(const RefPtr<ImageSpanItem>& imageItem);
+    void ApplyImageSpanAttribute(const RefPtr<ImageSpanNode>& imageNode, const ImageSpanAttribute& imgAttr);
     void ProcessSpanString();
     void SetCurrentDragTool(SourceTool tool);
     std::optional<RenderContext::ContextParam> GetContextParam() const override;
@@ -768,6 +784,7 @@ private:
     void ParseOriText(const std::u16string& currentText);
     bool IsMarqueeOverflow() const;
     virtual void ResetAfterTextChange();
+    void OnTextContentChanged(const std::u16string& textCache);
     bool GlobalOffsetInSelectedArea(const Offset& globalOffset);
     bool LocalOffsetInSelectedArea(const Offset& localOffset);
     bool LocalOffsetInRange(const Offset& localOffset, int32_t start, int32_t end);

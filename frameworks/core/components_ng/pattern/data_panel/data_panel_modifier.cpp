@@ -146,9 +146,6 @@ void DataPanelModifier::UpdateDate()
 
 void DataPanelModifier::PaintCircle(DrawingContext& context, OffsetF offset) const
 {
-    RSCanvas& canvas = context.canvas;
-    canvas.Save();
-
     auto defaultThickness = strokeWidth_->Get();
     ArcData arcData;
     Offset center = Offset(contentSize_.Width() * PERCENT_HALF + offset.GetX(),
@@ -156,11 +153,16 @@ void DataPanelModifier::PaintCircle(DrawingContext& context, OffsetF offset) con
     arcData.center = center;
     // Here radius will minus defaultThickness, when there will be new api to set padding, use the new padding.
     arcData.radius = std::min(contentSize_.Width(), contentSize_.Height()) * PERCENT_HALF - defaultThickness;
+    if (LessOrEqual(arcData.radius, 0.f)) {
+        return;
+    }
     if (defaultThickness >= arcData.radius) {
         arcData.thickness = arcData.radius * DIAMETER_TO_THICKNESS_RATIO;
     } else {
         arcData.thickness = defaultThickness;
     }
+    RSCanvas& canvas = context.canvas;
+    canvas.Save();
     PaintTrackBackground(canvas, arcData, trackBackgroundColor_->Get().ToColor());
     arcData.maxValue = max_->Get();
     for (size_t i = 0; i < valuesLastLength_; ++i) {
@@ -168,6 +170,7 @@ void DataPanelModifier::PaintCircle(DrawingContext& context, OffsetF offset) con
     }
     if (NonPositive(arcData.totalAllValue)) {
         // all values are invalid
+        canvas.Restore();
         return;
     }
 
@@ -262,10 +265,16 @@ void DataPanelModifier::GetPaintPath(ArcData& arcData, RSPath& path, RSPath& end
 
     Offset center = arcData.center;
 
-    float sine = thickness * PERCENT_HALF / (radius - (thickness * PERCENT_HALF));
-    float radian = asin(sine);
-    // the angle of center of start half circle to center and tangent of start half circle to center
-    arcData.circleAngle = radian * HALF_CIRCLE / ACE_PI;
+    float halfThickness = thickness * PERCENT_HALF;
+    float denom = radius - halfThickness;
+    if (LessOrEqual(radius, 0.0f) || LessOrEqual(denom, 0.0f)) {
+        arcData.circleAngle = 0.0f;
+    } else {
+        float sine = std::clamp(halfThickness / denom, -1.0f, 1.0f);
+        float radian = asin(sine);
+        // the angle of center of start half circle to center and tangent of start half circle to center
+        arcData.circleAngle = radian * HALF_CIRCLE / ACE_PI;
+    }
     float circleAngle = arcData.circleAngle;
 
     float startAngle = 0.0f;

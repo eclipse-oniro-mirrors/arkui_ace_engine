@@ -690,8 +690,10 @@ struct ArkUIAniCommonModifier {
     ani_long (*getPageRootNode)();
     ani_boolean(*isEasySplit)(ArkUI_Int32 instanceId);
     void(*dumpLogPrint)(int32_t depth, const char* content);
-    void(*fireArkUIObjectLifecycleCallback)(ani_long nodePtr, const std::string& className, void* data);
+    int32_t (*getBuilderNodeParentViewId)(ani_long nodePtr);
     void (*setOnNodeDestroyEvent)(ArkUINodeHandle node, std::function<void(int32_t)>&& event);
+    void(*fireArkUIObjectLifecycleCallback)(ani_long nodePtr, const std::string& className, void* data);
+    std::string (*GetIdString)(ArkUINodeHandle node);
 };
 struct  ArkUICustomNodeInfo {
     std::function<void()> onPageShowFunc;
@@ -1021,6 +1023,8 @@ struct ArkUIAniVisualEffectModifier {
     OHOS::Ace::UiMaterial* (*convertToECSubMaterial)(OHOS::Ace::UiMaterial* ptr);
     int32_t (*getGlobalMaterialLevel)();
     bool (*isImmersiveMaterialSupported)();
+    int32_t (*getMaterialState)();
+    int32_t (*getMaterialType)();
 };
 
 struct ArkUIAniDetachedFreeRootModifier {

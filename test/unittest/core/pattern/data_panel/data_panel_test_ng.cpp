@@ -1126,6 +1126,7 @@ HWTEST_F(DataPanelTestNg, DataPanelPaintCircleTest001, TestSize.Level0)
     frameNode->AttachContext(MockPipelineContext::GetCurrent().GetRawPtr());
     
     DataPanelModifier dataPanelModifier(pattern);
+    dataPanelModifier.SetContentSize(SizeF(50.0f, 50.0f));
     Testing::MockCanvas rsCanvas;
     DrawingContext context { rsCanvas, -10.0f, -10.0f };
     EXPECT_CALL(rsCanvas, AttachBrush(_)).WillRepeatedly(ReturnRef(rsCanvas));
@@ -1170,6 +1171,7 @@ HWTEST_F(DataPanelTestNg, DataPanelPaintCircleTest002, TestSize.Level0)
     frameNode->AttachContext(MockPipelineContext::GetCurrent().GetRawPtr());
     
     DataPanelModifier dataPanelModifier(pattern);
+    dataPanelModifier.SetContentSize(SizeF(400.0f, 400.0f));
     Testing::MockCanvas rsCanvas;
     DrawingContext context { rsCanvas, 10.0f, 10.0f };
     EXPECT_CALL(rsCanvas, AttachBrush(_)).WillRepeatedly(ReturnRef(rsCanvas));
@@ -1219,6 +1221,7 @@ HWTEST_F(DataPanelTestNg, DataPanelPaintCircleTest003, TestSize.Level1)
     frameNode->AttachContext(MockPipelineContext::GetCurrent().GetRawPtr());
     
     DataPanelModifier dataPanelModifier(pattern);
+    dataPanelModifier.SetContentSize(SizeF(400.0f, 400.0f));
     Testing::MockCanvas rsCanvas;
     DrawingContext context { rsCanvas, 10.0f, 10.0f };
     EXPECT_CALL(rsCanvas, AttachBrush(_)).WillRepeatedly(ReturnRef(rsCanvas));
@@ -1290,6 +1293,7 @@ HWTEST_F(DataPanelTestNg, DataPanelPaintCircleTest004, TestSize.Level0)
     frameNode->AttachContext(MockPipelineContext::GetCurrent().GetRawPtr());
     
     DataPanelModifier dataPanelModifier(pattern);
+    dataPanelModifier.SetContentSize(SizeF(400.0f, 400.0f));
     Testing::MockCanvas rsCanvas;
     DrawingContext context { rsCanvas, 10.0f, 10.0f };
 
@@ -1313,8 +1317,7 @@ HWTEST_F(DataPanelTestNg, DataPanelPaintCircleTest004, TestSize.Level0)
     dataPanelModifier.SetEffect(true);
     dataPanelModifier.SetStrokeWidth(STROKE_WIDTH.ConvertToPx());
     dataPanelModifier.SetMax(100.0f);
-    std::vector<double> VALUES = { 100.0f, 10.0f };
-    dataPanelModifier.SetValues(VALUES);
+    dataPanelModifier.SetValues({ 100.0f, 10.0f });
     EXPECT_CALL(rsCanvas, AttachBrush(_)).WillRepeatedly(ReturnRef(rsCanvas));
     EXPECT_CALL(rsCanvas, DetachBrush()).WillRepeatedly(ReturnRef(rsCanvas));
     EXPECT_CALL(rsCanvas, Save()).Times(AtLeast(1));
@@ -1358,6 +1361,7 @@ HWTEST_F(DataPanelTestNg, DataPanelPaintCircleTest005, TestSize.Level0)
     frameNode->AttachContext(MockPipelineContext::GetCurrent().GetRawPtr());
     
     DataPanelModifier dataPanelModifier(pattern);
+    dataPanelModifier.SetContentSize(SizeF(400.0f, 400.0f));
     Testing::MockCanvas rsCanvas;
     DrawingContext context { rsCanvas, 10.0f, 10.0f };
 
@@ -1381,8 +1385,7 @@ HWTEST_F(DataPanelTestNg, DataPanelPaintCircleTest005, TestSize.Level0)
     dataPanelModifier.SetEffect(true);
     dataPanelModifier.SetStrokeWidth(STROKE_WIDTH.ConvertToPx());
     dataPanelModifier.SetMax(100.0f);
-    std::vector<double> VALUES = { 0.0001f, 99.9f };
-    dataPanelModifier.SetValues(VALUES);
+    dataPanelModifier.SetValues({ 0.0001f, 99.9f });
     EXPECT_CALL(rsCanvas, AttachBrush(_)).WillRepeatedly(ReturnRef(rsCanvas));
     EXPECT_CALL(rsCanvas, DetachBrush()).WillRepeatedly(ReturnRef(rsCanvas));
     EXPECT_CALL(rsCanvas, Save()).Times(AtLeast(1));
@@ -1391,6 +1394,78 @@ HWTEST_F(DataPanelTestNg, DataPanelPaintCircleTest005, TestSize.Level0)
     EXPECT_CALL(rsCanvas, Rotate(_, _, _)).Times(AtLeast(1));
     EXPECT_CALL(rsCanvas, AttachPen(_)).WillOnce(ReturnRef(rsCanvas));
     EXPECT_CALL(rsCanvas, DetachPen()).WillOnce(ReturnRef(rsCanvas));
+    dataPanelModifier.PaintCircle(context, OFFSET);
+
+    Container::Current()->SetApiTargetVersion(backupApiVersion);
+}
+
+/**
+ * @tc.name: DataPanelPaintCircleTest006
+ * @tc.desc: Test DataPanel PaintCircle with zero or negative radius
+ * @tc.type: FUNC
+ */
+HWTEST_F(DataPanelTestNg, DataPanelPaintCircleTest006, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Setup theme and create DataPanelModifier with large strokeWidth.
+     * @tc.desc: When strokeWidth is larger than half of contentSize, radius will be <= 0
+     */
+    int32_t backupApiVersion = Container::Current()->GetApiTargetVersion();
+    Container::Current()->SetApiTargetVersion(26);
+
+    auto themeManager = AceType::MakeRefPtr<MockThemeManager>();
+    MockPipelineContext::GetCurrent()->SetThemeManager(themeManager);
+    auto themeConstants = TestNG::CreateThemeConstants(THEME_PATTERN_DATA_PANEL);
+    auto dataPanelTheme = AceType::DynamicCast<OHOS::Ace::DataPanelTheme>(
+        DataPanelThemeWrapper::WrapperBuilder().BuildWrapper(themeConstants));
+    EXPECT_CALL(*themeManager, GetTheme(_)).WillRepeatedly(Return(dataPanelTheme));
+    EXPECT_CALL(*themeManager, GetTheme(_, _)).WillRepeatedly(Return(dataPanelTheme));
+
+    auto frameNode = FrameNode::CreateFrameNode(
+        "data-panel", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<DataPanelPattern>());
+    auto pattern = frameNode->GetPattern();
+    pattern->AttachToFrameNode(frameNode);
+    frameNode->AttachContext(MockPipelineContext::GetCurrent().GetRawPtr());
+
+    DataPanelModifier dataPanelModifier(pattern);
+    dataPanelModifier.SetContentSize(SizeF(10.0f, 10.0f));
+
+    /**
+     * @tc.steps: step2. Set very large strokeWidth to make radius <= 0.
+     * radius = min(width, height) * 0.5 - strokeWidth
+     * With width=10, height=10, strokeWidth=100: radius = 5 - 100 = -95 (<= 0)
+     */
+    constexpr float LARGE_STROKE_WIDTH = 100.0f;
+    dataPanelModifier.SetStrokeWidth(LARGE_STROKE_WIDTH);
+    dataPanelModifier.SetMax(100.0f);
+    std::vector<double> testValues = { 10.0f };
+    dataPanelModifier.SetValues(testValues);
+
+    Testing::MockCanvas rsCanvas;
+    DrawingContext context { rsCanvas, 10.0f, 10.0f };
+    
+    /**
+     * @tc.steps: step3. Call PaintCircle and verify no crash.
+     * @tc.expected: PaintCircle returns early when radius <= 0, Save/Restore not called.
+     */
+    EXPECT_CALL(rsCanvas, Save()).Times(0);
+    EXPECT_CALL(rsCanvas, Restore()).Times(0);
+    dataPanelModifier.PaintCircle(context, OFFSET);
+
+    /**
+     * @tc.steps: step4. Set strokeWidth to make radius exactly 0.
+     * radius = min(width, height) * 0.5 - strokeWidth
+     * With width=10, height=10, strokeWidth=5: radius = 5 - 5 = 0
+     */
+    constexpr float EXACT_STROKE_WIDTH = 5.0f;
+    dataPanelModifier.SetStrokeWidth(EXACT_STROKE_WIDTH);
+    
+    /**
+     * @tc.steps: step5. Call PaintCircle and verify no crash with zero radius.
+     * @tc.expected: PaintCircle returns early when radius <= 0, Save/Restore not called.
+     */
+    EXPECT_CALL(rsCanvas, Save()).Times(0);
+    EXPECT_CALL(rsCanvas, Restore()).Times(0);
     dataPanelModifier.PaintCircle(context, OFFSET);
 
     Container::Current()->SetApiTargetVersion(backupApiVersion);
@@ -1707,6 +1782,7 @@ HWTEST_F(DataPanelTestNg, DataPanelOnDrawTest001, TestSize.Level0)
     frameNode->AttachContext(MockPipelineContext::GetCurrent().GetRawPtr());
     
     DataPanelModifier dataPanelModifier(pattern);
+    dataPanelModifier.SetContentSize(SizeF(400.0f, 400.0f));
 
     /**
      * @tc.steps: step2. construct context and call onDraw().
@@ -2699,6 +2775,121 @@ HWTEST_F(DataPanelTestNg, DataPanelGetPaintPathTest001, TestSize.Level0)
     dataPanelModifier.PaintProgress(rsCanvas, arcData, path, endPath, true);
     dataPanelModifier.PaintProgress(rsCanvas, arcData, path, endPath, false);
 
+    Container::Current()->SetApiTargetVersion(backupApiVersion);
+}
+
+/**
+ * @tc.name: DataPanelGetPaintPathTest002
+ * @tc.desc: Test GetPaintPath with extreme thickness causing innerRadius <= 0
+ * @tc.type: FUNC
+ */
+HWTEST_F(DataPanelTestNg, DataPanelGetPaintPathTest002, TestSize.Level0)
+{
+    int32_t backupApiVersion = Container::Current()->GetApiTargetVersion();
+    Container::Current()->SetApiTargetVersion(26);
+    
+    auto frameNode = FrameNode::CreateFrameNode(
+        "data-panel", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<DataPanelPattern>());
+    auto pattern = frameNode->GetPattern();
+    pattern->AttachToFrameNode(frameNode);
+    frameNode->AttachContext(MockPipelineContext::GetCurrent().GetRawPtr());
+    
+    DataPanelModifier dataPanelModifier(pattern);
+    
+    /**
+     * @tc.steps: step1. Test with thickness larger than radius*2, causing innerRadius < 0.
+     * @tc.desc: innerRadius = radius - thickness/2. If thickness >= radius*2, innerRadius <= 0
+     *           With radius=10, thickness=25: innerRadius = 10 - 12.5 = -2.5 (< 0)
+     */
+    ArcData arcData;
+    arcData.radius = 10.0f;
+    arcData.thickness = 25.0f;  // thickness > radius * 2
+    arcData.lastAngle = 0.0f;
+    arcData.drawAngle = 180.0f;
+    arcData.totalDrawAngle = 180.0f;
+    
+    RSPath path;
+    RSPath endPath;
+    
+    // Should not crash and should return early
+    dataPanelModifier.GetPaintPath(arcData, path, endPath);
+    
+    // circleAngle should remain 0 since function returned early
+    EXPECT_EQ(arcData.circleAngle, 0.0f);
+    
+    /**
+     * @tc.steps: step2. Test with thickness exactly equal to radius*2, causing innerRadius = 0.
+     * @tc.desc: With radius=10, thickness=20: innerRadius = 10 - 10 = 0
+     */
+    arcData.radius = 10.0f;
+    arcData.thickness = 20.0f;  // thickness == radius * 2
+    arcData.circleAngle = 0.0f;  // Reset for next test
+    
+    dataPanelModifier.GetPaintPath(arcData, path, endPath);
+    
+    // Should return early when innerRadius == 0
+    EXPECT_EQ(arcData.circleAngle, 0.0f);
+    
+    Container::Current()->SetApiTargetVersion(backupApiVersion);
+}
+
+/**
+ * @tc.name: DataPanelGetPaintPathTest003
+ * @tc.desc: Test GetPaintPath with thickness close to radius*2 but not exceeding
+ * @tc.type: FUNC
+ */
+HWTEST_F(DataPanelTestNg, DataPanelGetPaintPathTest003, TestSize.Level0)
+{
+    int32_t backupApiVersion = Container::Current()->GetApiTargetVersion();
+    Container::Current()->SetApiTargetVersion(26);
+    
+    auto frameNode = FrameNode::CreateFrameNode(
+        "data-panel", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<DataPanelPattern>());
+    auto pattern = frameNode->GetPattern();
+    pattern->AttachToFrameNode(frameNode);
+    frameNode->AttachContext(MockPipelineContext::GetCurrent().GetRawPtr());
+    
+    DataPanelModifier dataPanelModifier(pattern);
+    
+    /**
+     * @tc.steps: step1. Test with thickness very close to radius*2 but slightly less.
+     * @tc.desc: This should produce a very large sine value, but clamp should prevent issues.
+     *           With radius=10, thickness=19.9: innerRadius = 10 - 9.95 = 0.05
+     *           sine = 9.95 / 0.05 = 199.0, which would be clamped to 1.0
+     */
+    ArcData arcData;
+    arcData.radius = 10.0f;
+    arcData.thickness = 19.9f;  // thickness close to radius * 2
+    arcData.lastAngle = 0.0f;
+    arcData.drawAngle = 180.0f;
+    arcData.totalDrawAngle = 180.0f;
+    
+    RSPath path;
+    RSPath endPath;
+    
+    // Should not crash even with extreme sine value
+    dataPanelModifier.GetPaintPath(arcData, path, endPath);
+    
+    // circleAngle should be calculated (sine clamped to 1.0)
+    // asin(1.0) = π/2, so circleAngle = (π/2) * 180 / π = 90.0f
+    EXPECT_NEAR(arcData.circleAngle, 90.0f, 0.1f);
+    
+    /**
+     * @tc.steps: step2. Test normal case with reasonable thickness.
+     * @tc.desc: With radius=100, thickness=24: innerRadius = 100 - 12 = 88
+     *           sine = 12 / 88 ≈ 0.1364
+     */
+    arcData.radius = 100.0f;
+    arcData.thickness = 24.0f;  // Normal case
+    arcData.circleAngle = 0.0f;
+    
+    dataPanelModifier.GetPaintPath(arcData, path, endPath);
+    
+    // Should calculate circleAngle normally
+    // sine = 12 / 88 ≈ 0.1364, asin(0.1364) ≈ 0.1368 rad
+    // circleAngle = 0.1368 * 180 / π ≈ 7.84 degrees
+    EXPECT_NEAR(arcData.circleAngle, 7.84f, 0.5f);
+    
     Container::Current()->SetApiTargetVersion(backupApiVersion);
 }
 

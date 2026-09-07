@@ -423,6 +423,8 @@ public:
     static void SetAdaptiveGroup(bool isRenderGroup, bool useAdaptiveFilter);
     // exclude self and children from renderGroup
     static void SetExcludeFromRenderGroup(bool exclude);
+    // mark node for layered render
+    static void SetMarkLayeredRender(bool isLayeredRender);
     // renderFit, i.e. gravity
     static void SetRenderFit(RenderFit renderFit);
     // renderStrategy
@@ -848,6 +850,7 @@ public:
     static void SetSphericalEffect(FrameNode* frameNode, double radio);
     static void SetRenderGroup(FrameNode* frameNode, bool isRenderGroup);
     static void SetExcludeFromRenderGroup(FrameNode* frameNode, bool exclude);
+    static void SetMarkLayeredRender(FrameNode* frameNode, bool isLayeredRender);
     static void SetRenderFit(FrameNode* frameNode, RenderFit renderFit);
     static void SetUseEffect(FrameNode* frameNode, bool useEffect, EffectType effectType);
     static void SetUseUnion(FrameNode* frameNode, bool useUnion);
@@ -1194,6 +1197,12 @@ public:
     static void SetCompositingFilter(FrameNode* frameNode, const OHOS::Rosen::Filter* compositingFilter);
     static void SetMaterialFilter(FrameNode* frameNode, const OHOS::Rosen::Filter* materialFilter);
     static void SetSystemMaterial(FrameNode* frameNode, const UiMaterial* material);
+    // Like SetSystemMaterial but also marks the node exempt from the scope gate
+    // (titleBar / bottom-TabBar) in MaterialProcessor. Use for popup / dialog /
+    // menu / sheet / toast / select-overlay material targets so their material
+    // stays effective for non-system apps too.
+    static void SetSystemMaterialForOverlay(FrameNode* frameNode, const UiMaterial* material);
+    static void SetSystemMaterialForOverlay(const UiMaterial* material);
     // set systemMaterial for inner use, use SetSystemMaterial normally.
     static void SetSystemMaterialImmediate(FrameNode* frameNode, const UiMaterial* material);
     // Set systemMaterial with component scale adjustment (for drag scenario)
@@ -1243,6 +1252,9 @@ public:
     static void ClearJSFrameNodeOnListScrollIndex(FrameNode* frameNode);
     static void SetJSFrameNodeOnScrollVisibleContentChange(
         FrameNode* frameNode, OnScrollVisibleContentChangeEvent&& onScrollVisibleContentChange);
+    static void ApplyImmersiveMaterialStyle(const RefPtr<RenderContext>& renderContext,
+ 	    const ImmersiveMaterialConfig& config, const std::optional<ImmersiveMaterialConfig>& preConfig);
+    static void UpdateImmersiveMaterialOnTransparencyChange(const RefPtr<FrameNode>& frameNode);
     static void ClearJSFrameNodeOnScrollVisibleContentChange(FrameNode* frameNode);
     static void SetJSFrameNodeOnScrollWillScroll(FrameNode* frameNode, ScrollEventWithReturn&& onWillScroll);
     static void ClearJSFrameNodeOnScrollWillScroll(FrameNode* frameNode);

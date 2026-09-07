@@ -1572,6 +1572,39 @@ declare enum TabsCacheMode {
   CACHE_BOTH_SIDE = 0,
   CACHE_LATEST_SWITCHED = 1,
 }
+declare enum TabBarStyle {
+  BOTTOM = 0,
+  SIDEBAR = 1,
+  SIDEBAR_ADAPTABLE = 2,
+}
+declare enum SidebarDisplayStyle {
+  EMBED = 0,
+  DISPLACE = 1,
+}
+declare type TabsSidebarSearchFilterCallback = (tabIndex: number, text: string) => boolean;
+declare interface TabsSidebarSearchableOptions {
+  searchText?: ResourceStr;
+  placeholder?: ResourceStr;
+  searchCallback?: (text: string) => void;
+  searchFilter?: TabsSidebarSearchFilterCallback;
+}
+declare enum TabBarDisplayMode {
+  BOTTOM_TABBAR = 0,
+  SIDEBAR = 1,
+}
+declare enum TabVisibility {
+  VISIBLE = 0,
+  HIDDEN = 1,
+}
+declare interface TabContentTabBarVisibility {
+  visibility?: TabVisibility;
+  displayMode?: TabBarDisplayMode;
+}
+declare interface TabsBreakpointType<T> {
+  sm?: T;
+  md?: T;
+  lg?: T;
+}
 declare enum NestedScrollMode {
   SELF_ONLY,
   SELF_FIRST,

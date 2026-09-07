@@ -701,9 +701,6 @@ export class ChipGroup extends ViewPU {
     return defaultTheme.itemStyle.selectedFillColor;
   }
   getBackgroundColor() {
-    if (!!this.backgroundSystemMaterial) {
-      return undefined;
-    }
     if (this.itemStyle && this.itemStyle.backgroundColor) {
       if (typeof this.itemStyle.backgroundColor === 'object') {
         let temp = this.itemStyle.backgroundColor;
@@ -720,9 +717,6 @@ export class ChipGroup extends ViewPU {
     return defaultTheme.itemStyle.backgroundColor;
   }
   getSelectedBackgroundColor() {
-    if (!!this.selectedBackgroundSystemMaterial) {
-      return undefined;
-    }
     if (this.itemStyle && this.itemStyle.selectedBackgroundColor) {
       if (typeof this.itemStyle.selectedBackgroundColor === 'object') {
         let temp = this.itemStyle.selectedBackgroundColor;
@@ -1077,6 +1071,15 @@ export class ChipGroup extends ViewPU {
     PUV2ViewBase.contextStack && PUV2ViewBase.contextStack.pop();
   }
 }
+function isNullOrEmptyMaterial(material) {
+  if (!material) {
+    return true;
+  }
+  if (material === uiMaterial.Material.empty) {
+    return true;
+  }
+  return false;
+}
 function withDefaultMaterial(material, defaultMaterial) {
   const info = uiMaterial.getMaterialInfo();
   if (info.state === uiMaterial.MaterialState.DISABLE) {
@@ -1088,7 +1091,7 @@ function withDefaultMaterial(material, defaultMaterial) {
   return material;
 }
 function enableEffectComponent(material) {
-  if (material) {
+  if (material && !isNullOrEmptyMaterial(material)) {
     return material instanceof uiMaterial.ImmersiveMaterial;
   }
   return false;

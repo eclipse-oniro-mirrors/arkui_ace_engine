@@ -41,6 +41,7 @@ constexpr float FLOATING_BAR_SCALE_ENLARGED = 1.15f;
 }
 
 class TabsNode;
+class TabContentNode;
 
 class TabsPattern : public Pattern, public virtual RecoverableView {
     DECLARE_ACE_TYPE(TabsPattern, Pattern, RecoverableView);
@@ -94,6 +95,8 @@ public:
 
     void SetOnUnselectedEvent(std::function<void(const BaseEventInfo*)>&& event);
 
+    void SetOnBarDisplayModeChangeEvent(std::function<void(TabBarDisplayMode)>&& event);
+
     void SetOnContentDidScroll(ContentDidScrollEvent&& onContentDidScroll);
 
     ChangeEventPtr GetTabBarClickEvent()
@@ -132,6 +135,7 @@ public:
     {
         isDisableSwipe_ = isDisableSwipe;
     }
+    bool GetIsRealDisableSwipe() const;
 
     void SetOnContentWillChange(std::function<bool(int32_t, int32_t)>&& callback)
     {
@@ -163,6 +167,16 @@ public:
     {
         return animateMode_;
     }
+
+    std::optional<TabBarDisplayMode> GetCurrentBarDisplayMode() const
+    {
+        return currentBarDisplayMode_;
+    }
+    TabBarDisplayMode GetActiveBarDisplayMode() const;
+    void SetCurrentBarDisplayMode(TabBarDisplayMode mode);
+    bool IsTabShouldHideByVisibility(const TabContentDefaultVisibility& visibility);
+
+    void FireBarDisplayModeChangeEvent(TabBarDisplayMode mode);
 
     void HandleChildrenUpdated(const RefPtr<FrameNode>& swiperNode, const RefPtr<FrameNode>& tabBarNode);
 
@@ -201,6 +215,37 @@ public:
         return lastFloatingBar_;
     }
     void SetFloatingScaleEnabled(bool isFloatingScaleEnabled);
+
+    void SetSidebarHeaderNode(const RefPtr<NG::UINode>& header)
+    {
+        sidebarHeaderNode_ = header;
+    }
+    RefPtr<NG::UINode> GetSidebarHeaderNode() const
+    {
+        return sidebarHeaderNode_;
+    }
+
+    TabBarDisplayMode CalculateTabBarDisplayMode(float width);
+
+    RefPtr<FrameNode> GetSideBarNode() const
+    {
+        return sideBarNode_;
+    }
+
+    RefPtr<FrameNode> GetSideBarDividerNode() const
+    {
+        return sideBarDividerNode_;
+    }
+
+    void SetTabsSidebarSearchableOptions(const TabsSidebarSearchableOptions& options)
+    {
+        searchableOptions_ = options;
+    }
+
+    void AddTabContentNode(const RefPtr<TabContentNode>& tabContentNode);
+    void RemoveTabContentNode(const RefPtr<TabContentNode>& tabContentNode);
+    bool IsColorInvertEnabled();
+    ColorMode GetColorInvertColorMode();
 
 private:
     void OnAttachToFrameNode() override;
@@ -245,6 +290,33 @@ private:
     void OnFollowHandAnimationFinish();
     void ApplySystemMaterial();
     void ResetSystemMaterial();
+    void InitColorPickerIfNeeded();
+    void UnregisterColorPicker();
+    void OnLuminanceUpdate(uint32_t luminance);
+    void StartColorInvertAnimation();
+    void HandleColorInvert();
+    void SetTabBarIsFloating(bool isFloating)
+    {
+        auto tabsNode = AceType::DynamicCast<TabsNode>(GetHost());
+        CHECK_NULL_VOID(tabsNode);
+        auto tabBar = AceType::DynamicCast<FrameNode>(tabsNode->GetTabBar());
+        if (tabBar) {
+            auto tabBarPattern = tabBar->GetPattern<TabBarPattern>();
+            if (tabBarPattern) {
+                tabBarPattern->SetIsFloatingBar(isFloating);
+            }
+        }
+    }
+
+    void UpdateSideBarIfNeeded();
+    void UpdateSideBarNode();
+    void UpdateSideBarAttributes();
+    void SyncPropertiesToSideBar();
+    void RegisterSideBarTabItems();
+    void ResetSideBarTabListItemIds();
+    void SyncSideBarTabListIndicator(int32_t currentIndex);
+    RefPtr<FrameNode> CreateSideBarNode();
+    RefPtr<FrameNode> CreateSideBarDividerNode();
 
     bool isCustomAnimation_ = false;
     bool isDisableSwipe_ = false;
@@ -259,6 +331,7 @@ private:
     ChangeEventPtr onIndexChangeEvent_;
     AnimationStartEventPtr animationStartEvent_;
     AnimationEndEventPtr animationEndEvent_;
+    std::function<void(TabBarDisplayMode)> onBarDisplayModeChangeEvent_;
     std::function<bool(int32_t, int32_t)> callback_;
     bool interceptStatus_ = false;
     BarPosition barPosition_ = BarPosition::END; // default accessibilityZIndex is consistent with BarPosition::END
@@ -272,6 +345,17 @@ private:
     std::list<std::shared_ptr<AnimationUtils::Animation>> floatTabBarFollowHandAnimations_;
     std::optional<float> floatingBarMargin_ = 0.0f;
     float baseFloatingScale_ = FLOATING_BAR_SCALE;
+
+    std::optional<TabBarDisplayMode> currentBarDisplayMode_;
+    std::optional<TabBarLayoutStyle> layoutStyle_;
+    RefPtr<FrameNode> sideBarNode_ = nullptr;
+    RefPtr<FrameNode> sideBarDividerNode_ = nullptr;
+    RefPtr<NG::UINode> sidebarHeaderNode_;
+    TabsSidebarSearchableOptions searchableOptions_;
+    std::vector<WeakPtr<TabContentNode>> tabContentNodes_;
+    // Color invert state for auto-inversion
+    std::optional<bool> isColorPickerDark_;
+    bool hasRegisterColorPicker_ = false;
 };
 
 } // namespace OHOS::Ace::NG

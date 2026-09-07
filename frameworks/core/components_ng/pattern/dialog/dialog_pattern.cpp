@@ -474,7 +474,8 @@ bool DialogPattern::SetDialogSystemMaterial(const RefPtr<FrameNode>& columnNode)
             return true;
         }
         // Normal processing for other cases
-        ViewAbstract::SetSystemMaterial(AceType::RawPtr(columnNode), AceType::RawPtr(dialogProperties_.systemMaterial));
+        ViewAbstract::SetSystemMaterialForOverlay(
+            AceType::RawPtr(columnNode), AceType::RawPtr(dialogProperties_.systemMaterial));
         return true;
     }
     return false;
@@ -1738,6 +1739,14 @@ void DialogPattern::ToJsonValue(std::unique_ptr<JsonValue>& json, const Inspecto
     CHECK_NULL_VOID(context);
     json->PutExtAttr("uniRender",
         DialogView::IsSupportBlurStyle(host, dialogProperties_.isShowInSubWindow) ? "true" : "false", filter);
+    json->PutExtAttr("distortionMode",
+        DistortionModeToString(dialogProperties_.distortionMode.value_or(DistortionMode::DISTORTION_AUTO)).c_str(),
+        filter);
+    json->PutExtAttr("edgeLightMode",
+        EdgeLightModeToString(dialogProperties_.edgeLightMode.value_or(EdgeLightMode::EDGELIGHT_AUTO)).c_str(),
+        filter);
+    json->PutExtAttr("distortionEnabled", needDistortion_.value_or(false) ? "true" : "false", filter);
+    json->PutExtAttr("edgeLightEnabled", needFlowLight_.value_or(false) ? "true" : "false", filter);
 }
 
 void DialogPattern::OnColorConfigurationUpdate()

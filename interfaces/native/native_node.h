@@ -2695,9 +2695,18 @@ typedef enum {
      *
      * Format of the {@link ArkUI_AttributeItem} parameter for setting the attribute:\n
      * .value[0].f32: line spacing, in fp.\n
-     * \n
-     * Format of the return value {@link ArkUI_AttributeItem}:\n
-     * .value[0].f32: line spacing, in fp.\n
+     * <li>?.object: Optional. Pointer to {@link OH_ArkUI_NativeModule_LineSpacingOptions} object for line spacing
+     * options. Available since API version 26.0.0.
+     * Use {@link OH_ArkUI_NativeModule_LineSpacingOptions_Create} to create and
+     * {@link OH_ArkUI_NativeModule_LineSpacingOptions_Destroy} to destroy the object.</li>
+     * </ul>
+     *
+     * **Format of the return value {@link ArkUI_AttributeItem}:**
+     * <ul>
+     * <li>.value[0].f32: line spacing, in fp.</li>
+     * <li>.object: pointer to {@link OH_ArkUI_NativeModule_LineSpacingOptions} object for line spacing options.
+     * Available since API version 26.0.0.</li>
+     * </ul>
      *
      */
     NODE_TEXT_LINE_SPACING,
@@ -3312,6 +3321,17 @@ typedef enum {
      * @since 21
      */
     NODE_IMAGE_SPAN_SUPPORT_SVG2 = 3005,
+    /**
+     * @brief Defines the resizable of the <ImageSpan> component.
+     * This attribute can be set and reset as required through APIs.
+     *
+     * Format of the {@link ArkUI_AttributeItem} parameter for setting the attribute:\n
+     * .value[0].f32 to .value[3].f32: slice edges (left, top, right, bottom).\n
+     * .object: lattice object for grid-based resizable.\n
+     *
+     * @since 26
+     */
+    NODE_IMAGE_SPAN_RESIZABLE = 3006,
     /**
      * @brief Defines the image source of the <Image> component.
      * This attribute can be set, reset, and obtained as required through APIs.

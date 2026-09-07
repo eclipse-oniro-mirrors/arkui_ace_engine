@@ -431,7 +431,69 @@ public:
     {
         return fontPrimary_;
     }
-    
+
+    // For Tabs's SideBar
+    const Dimension& GetSideBarListItemCornerRadius() const
+    {
+        return sideBarListItemCornerRadius_;
+    }
+    const Color& GetSideBarListItemActivedColor() const
+    {
+        return sideBarListItemActivedColor_;
+    }
+    const Color& GetSideBarListItemHoverColor() const
+    {
+        return sideBarListItemHoverColor_;
+    }
+    const Color& GetSideBarListItemPressedColor() const
+    {
+        return sideBarListItemPressedColor_;
+    }
+    const Color& GetSideBarListItemFocusColor() const
+    {
+        return sideBarListItemFocusColor_;
+    }
+    const Dimension& GetSideBarListItemFocusWidth() const
+    {
+        return sideBarListItemFocusWidth_;
+    }
+    const Dimension& GetSideBarListItemLeftRightPadding() const
+    {
+        return sideBarListItemLeftRightPadding_;
+    }
+    const Color& GetSideBarSelectedIconColor() const
+    {
+        return sideBarSelectedIconColor_;
+    }
+    const Color& GetSideBarSelectedTextColor() const
+    {
+        return sideBarSelectedTextColor_;
+    }
+    const Color& GetSideBarUnselectedIconColor() const
+    {
+        return sideBarUnselectedIconColor_;
+    }
+    const Color& GetSideBarUnselectedTextColor() const
+    {
+        return sideBarUnselectedTextColor_;
+    }
+    const Dimension& GetSideBarPaddingLevel4() const
+    {
+        return sideBarPaddingLevel4_;
+    }
+    const Dimension& GetSideBarPaddingLevel8() const
+    {
+        return sideBarPaddingLevel8_;
+    }
+    const Dimension& GetSideBarPaddingLevel10() const
+    {
+        return sideBarPaddingLevel10_;
+    }
+    const Dimension& GetSideBarTextFontSize() const
+    {
+        return sideBarTextFontSize_;
+    }
+
 protected:
     TabTheme() = default;
 
@@ -515,6 +577,22 @@ protected:
     Color iconPrimary_;
     Color fontEmphasize_;
     Color fontPrimary_;
+
+    Dimension sideBarListItemCornerRadius_;
+    Color sideBarListItemActivedColor_;
+    Color sideBarListItemHoverColor_;
+    Color sideBarListItemPressedColor_;
+    Color sideBarListItemFocusColor_;
+    Color sideBarSelectedIconColor_;
+    Color sideBarSelectedTextColor_;
+    Color sideBarUnselectedIconColor_;
+    Color sideBarUnselectedTextColor_;
+    Dimension sideBarListItemFocusWidth_;
+    Dimension sideBarListItemLeftRightPadding_ = 8.0_vp;
+    Dimension sideBarPaddingLevel4_ = 8.0_vp;
+    Dimension sideBarPaddingLevel8_ = 16.0_vp;
+    Dimension sideBarPaddingLevel10_ = 20.0_vp;
+    Dimension sideBarTextFontSize_ = 16.0_fp;
 };
 
 } // namespace OHOS::Ace

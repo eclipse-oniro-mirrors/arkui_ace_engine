@@ -798,6 +798,31 @@ Color ButtonPattern::GetDefaultThemeBgColor()
     return buttonTheme->GetBgColor(buttonStyle, buttonRole);
 }
 
+void ButtonPattern::OnMaterialDisable()
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    ACE_UINODE_TRACE(host);
+    auto renderContext = host->GetRenderContext();
+    CHECK_NULL_VOID(renderContext);
+    auto layoutProperty = GetLayoutProperty<ButtonLayoutProperty>();
+    CHECK_NULL_VOID(layoutProperty);
+    auto buttonTheme = host->GetTheme<ButtonTheme>(true);
+    CHECK_NULL_VOID(buttonTheme);
+    ButtonStyleMode buttonStyle = layoutProperty->GetButtonStyle().value_or(ButtonStyleMode::EMPHASIZE);
+    ButtonRole buttonRole = layoutProperty->GetButtonRole().value_or(ButtonRole::NORMAL);
+    if (UseContentModifier()) {
+        renderContext->UpdateBackgroundColor(Color::TRANSPARENT);
+        renderContext->ResetBackgroundColor();
+        return;
+    }
+    if (!renderContext->HasBackgroundColor()) {
+        renderContext->UpdateBackgroundColor(buttonTheme->GetBgColor(buttonStyle, buttonRole));
+    }
+    themeBgColor_ = buttonTheme->GetBgColor(buttonStyle, buttonRole);
+    themeTextColor_ = buttonTheme->GetTextColor(buttonStyle, buttonRole);
+}
+
 void ButtonPattern::InitButtonAlphaOffscreen()
 {
     if (isInitButtonAlphaOffscreen_) {
@@ -1273,7 +1298,8 @@ void ButtonPattern::DumpInfo()
     if (host) {
         DumpLog::GetInstance().AddDesc("BackgroundColor: " + backgroundColor_.ToString());
         auto renderContext = host->GetRenderContext();
-        DumpLog::GetInstance().AddDesc("RenderContext BgColor: " + renderContext->GetBackgroundColorValue().ToString());
+        DumpLog::GetInstance().AddDesc(
+            "RenderContext BgColor: " + renderContext->GetBackgroundColor().value_or(Color::TRANSPARENT).ToString());
         auto buttonTheme = host->GetTheme<ButtonTheme>(true);
         ButtonRole buttonRole = layoutProperty->GetButtonRole().value_or(ButtonRole::NORMAL);
         ButtonStyleMode buttonStyleMode = layoutProperty->GetButtonStyle().value_or(ButtonStyleMode::EMPHASIZE);
@@ -1911,15 +1937,5 @@ void ButtonPattern::HandleFocusStatusStyle()
         pattern->HandleBlurStyleTask();
     };
     focusHub->SetOnBlurInternal(blurTask);
-}
-
-void ButtonPattern::SetNavigationFocusBlendBgColor(const Color& navigationFocusBlendBgColor)
-{
-    navigationFocusBlendBgColor_ = navigationFocusBlendBgColor;
-}
-
-void ButtonPattern::SetNavMenuItemNeedFocus(bool navMenuItemNeedFocus)
-{
-    navMenuItemNeedFocus_ = navMenuItemNeedFocus;
 }
 } // namespace OHOS::Ace::NG

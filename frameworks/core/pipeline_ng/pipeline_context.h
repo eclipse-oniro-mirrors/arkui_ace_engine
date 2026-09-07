@@ -35,6 +35,7 @@
 #include "core/event/pointer_event.h"
 #include "core/components/common/layout/constants.h"
 #include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/dump_utils/dump_util.h"
 #include "core/components_ng/pattern/custom/custom_node.h"
 
 #include "core/common/ace_translate_manager.h"
@@ -102,6 +103,7 @@ class FormGestureManager;
 class RecycleManager;
 class BackPressHandlerManager;
 class DragDropManager;
+class MaterialProcessor;
 class DynamicComponentSafeManager;
 class EnvironmentManager;
 enum class FocusActiveReason : int32_t;
@@ -470,7 +472,8 @@ public:
     
     void UpdateFloatNavSafeAreaWithoutAnimation(const SafeAreaInsets& floatNavSafeArea) override;
 
-    void UpdateOriginAvoidArea(const Rosen::AvoidArea& avoidArea, uint32_t type) override;
+    void UpdateOriginAvoidArea(const Rosen::AvoidArea& avoidArea, uint32_t type,
+        WindowSizeChangeReason reason) override;
 
     float GetPageAvoidOffset() override;
 
@@ -1015,7 +1018,11 @@ public:
     void GetOverlayInfo(bool hasOverlay, std::shared_ptr<JsonValue>& root, std::shared_ptr<JsonValue>& overlayContent,
         std::unique_ptr<JsonValue>& overlayChildrenArray, std::unique_ptr<JsonValue>& overlayArray) const;
 
-    bool IsTagInOverlay(const std::string& tag) const;
+    // Collect Inspector-style visible starting nodes. Delegates the pure
+    // algorithm to DumpUtil so both Inspector dump and PageScene
+    // share one starting-node resolution path (eliminating the redundant
+    // full-tree traversal that previously started from rootNode_).
+    DumpStartNodeSet GetDumpStartNodes() const;
 
     void GetComponentOverlayInspector(std::shared_ptr<JsonValue>& root, RefPtr<NG::FrameNode> startNode,
         ParamConfig config, bool isInSubWindow, double parentFinalOpacity = 1.0) const;
@@ -1055,6 +1062,11 @@ public:
     bool IsDirtyLayoutNodesEmpty() const override
     {
         return taskScheduler_->IsDirtyLayoutNodesEmpty();
+    }
+
+    const std::list<RefPtr<FrameNode>>& GetDirtyLayoutNodes() const
+    {
+        return taskScheduler_->GetDirtyLayoutNodes();
     }
 
     bool IsDirtyPropertyNodesEmpty() const override
@@ -1150,6 +1162,24 @@ public:
     }
 
     void SetIsWindowSizeDragging(bool isDragging);
+
+    bool IsRightMouseMappingActive() const
+    {
+        return isRightMouseMappingActive_;
+    }
+
+    void SetRightMouseMappingActive(bool active)
+    {
+        isRightMouseMappingActive_ = active;
+    }
+    void SetOnRightMouseMappingCancel(std::function<void()>&& callback)
+    {
+        onRightMouseMappingCancel_ = std::move(callback);
+    }
+
+    bool HitTestMouseTargetForMapping(const MouseEvent& event, const RefPtr<NG::FrameNode>& node,
+        const std::vector<std::string>& tagWhitelist) const;
+
     void GetAllPixelMap();
     std::shared_ptr<UiTranslateManagerImpl> GetUiTranslateManagerImpl();
     std::shared_ptr<Rosen::RSUIDirector> GetRSUIDirector();
@@ -1274,6 +1304,12 @@ public:
     {
         return windowSizeChangeReason_;
     }
+
+    // MaterialProcessor support. Appended at the end of the public section;
+    // these are non-virtual, so they do not shift any existing vtable slot.
+    void RegisterMaterialNode(const RefPtr<FrameNode>& node);
+    void UnregisterMaterialNode(int32_t nodeId);
+
 protected:
     void StartWindowSizeChangeAnimate(int32_t width, int32_t height, WindowSizeChangeReason type,
         const std::shared_ptr<Rosen::RSTransaction>& rsTransaction = nullptr,
@@ -1335,8 +1371,8 @@ private:
 
     void FlushWindowSizeChangeCallback(int32_t width, int32_t height, WindowSizeChangeReason type);
 
-    void DumpSimplifyTreeJsonFromTopNavNode(RefPtr<NG::FrameNode> startNode, std::shared_ptr<JsonValue>& root,
-        std::list<RefPtr<NG::FrameNode>>& navNodeList, const ParamConfig& config) const;
+    void DumpSimplifyTreeJsonFromTopNavNode(std::shared_ptr<JsonValue>& root,
+        const std::vector<RefPtr<NG::FrameNode>>& navNodeList, const ParamConfig& config) const;
 
     bool ProcessOverlayChildrenDumpInfo(const RefPtr<FrameNode>& rootNode,
         std::unique_ptr<JsonValue>& overlayChildrenArray, std::unique_ptr<JsonValue>& subWindowOverlayArray,
@@ -1345,8 +1381,8 @@ private:
     void GetOverlayInspector(std::shared_ptr<JsonValue>& root, RefPtr<NG::FrameNode> startNode, ParamConfig config,
         double parentFinalOpacity = 1.0) const;
 
-    void DumpSimplifyTreeJsonEntrance(
-        std::shared_ptr<JsonValue> root, RefPtr<NG::FrameNode> startNode, ParamConfig config) const;
+    void DumpSimplifyTreeJsonEntrance(std::shared_ptr<JsonValue> root, RefPtr<NG::FrameNode> startNode,
+        const std::vector<RefPtr<NG::FrameNode>>& navNodes, ParamConfig config) const;
 
     void DumpVisibleInspectorTree(std::shared_ptr<JsonValue>& rootJson, ParamConfig config) const;
 
@@ -1691,6 +1727,9 @@ private:
     std::list<TouchEvent> compatibleTouchEvents_;
     RefPtr<BackPressHandlerManager> backPressHandlerManager_;
     RefPtr<DynamicComponentSafeManager> dynamicComponentSafeManager_;
+    RefPtr<MaterialProcessor> materialProcessor_;
+    bool isRightMouseMappingActive_ = false;
+    std::function<void()> onRightMouseMappingCancel_;
 };
 
 /**

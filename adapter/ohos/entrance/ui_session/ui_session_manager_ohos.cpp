@@ -43,6 +43,7 @@ constexpr char PAGE_SCENE_SELECTOR[] = "selector";
 constexpr char PAGE_SCENE_NODE_TYPES[] = "nodeTypes";
 constexpr char PAGE_SCENE_SCOPE[] = "scope";
 constexpr char PAGE_SCENE_ONLY_VISIBLE[] = "onlyVisible";
+constexpr char PAGE_SCENE_RECT_CULLING[] = "rectCulling";
 constexpr char PAGE_SCENE_INCLUDE_UNFOCUSABLE_TEXT_INPUT[] = "includeUnfocusableTextInput";
 constexpr char PAGE_SCENE_CONDITION[] = "condition";
 constexpr char PAGE_SCENE_OPERATOR[] = "operator";
@@ -54,8 +55,9 @@ constexpr char PAGE_SCENE_COUNT_GTE_OPERATOR[] = "COUNT_GTE";
 constexpr char PAGE_SCENE_TEXT_INPUT_TAG[] = "TextInput";
 constexpr char PAGE_SCENE_TEXT_AREA_TAG[] = "TextArea";
 constexpr char PAGE_SCENE_SEARCH_TAG[] = "Search";
-constexpr char PAGE_SCENE_SEARCH_FIELD_TAG[] = "SearchField";
 constexpr char PAGE_SCENE_RICH_EDITOR_TAG[] = "RichEditor";
+constexpr char GESTURE_TYPE_KEY[] = "GestureType";
+constexpr char CLICK_GESTURE_TYPE[] = "Click";
 
 bool IsValidPageSceneId(const std::string& id)
 {
@@ -70,19 +72,13 @@ bool IsValidPageSceneId(const std::string& id)
 bool IsPageSceneTextInputNode(const std::string& nodeTag)
 {
     return nodeTag == PAGE_SCENE_TEXT_INPUT_TAG || nodeTag == PAGE_SCENE_TEXT_AREA_TAG ||
-           nodeTag == PAGE_SCENE_SEARCH_TAG || nodeTag == PAGE_SCENE_SEARCH_FIELD_TAG ||
-           nodeTag == PAGE_SCENE_RICH_EDITOR_TAG;
+           nodeTag == PAGE_SCENE_SEARCH_TAG || nodeTag == PAGE_SCENE_RICH_EDITOR_TAG;
 }
 
 bool IsPageSceneInputControlNode(const std::string& nodeTag)
 {
     return nodeTag == PAGE_SCENE_TEXT_INPUT_TAG || nodeTag == PAGE_SCENE_TEXT_AREA_TAG ||
            nodeTag == PAGE_SCENE_SEARCH_TAG || nodeTag == PAGE_SCENE_RICH_EDITOR_TAG;
-}
-
-std::string NormalizePageSceneNodeType(const std::string& nodeTag)
-{
-    return nodeTag == PAGE_SCENE_SEARCH_FIELD_TAG ? PAGE_SCENE_SEARCH_TAG : nodeTag;
 }
 
 std::string GetJsonString(const JsonObject* object, const char* key)
@@ -134,9 +130,9 @@ std::set<std::string> ExtractTextInputNodeTypes(const JsonObject* ruleJsonValue)
         if (!cJSON_IsString(nodeType) || nodeType->valuestring == nullptr) {
             continue;
         }
-        auto normalizedType = NormalizePageSceneNodeType(nodeType->valuestring);
-        if (IsPageSceneTextInputNode(normalizedType)) {
-            nodeTypeSet.emplace(normalizedType);
+        std::string nodeTypeValue = nodeType->valuestring;
+        if (IsPageSceneTextInputNode(nodeTypeValue)) {
+            nodeTypeSet.emplace(nodeTypeValue);
         }
     }
     return nodeTypeSet;
@@ -332,6 +328,12 @@ void UiSessionManagerOhos::ReportComponentChangeEvent(
     if (!GetComponentChangeEventRegistered() || !NeedComponentChangeTypeReporting(eventType)) {
         return;
     }
+    bool isClickGestureEvent = false;
+    if (eventType == ComponentEventType::COMPONENT_EVENT_GESTURE) {
+        auto eventValue = InspectorJsonUtil::ParseJsonString(value);
+        isClickGestureEvent = eventValue != nullptr && eventValue->IsObject() &&
+                              eventValue->GetString(GESTURE_TYPE_KEY) == CLICK_GESTURE_TYPE;
+    }
     std::shared_lock<std::shared_mutex> reportLock(reportObjectMutex_);
     for (const auto& pair : reportObjectMap_) {
         auto reportService = iface_cast<ReportService>(pair.second);
@@ -339,6 +341,10 @@ void UiSessionManagerOhos::ReportComponentChangeEvent(
             auto data = InspectorJsonUtil::Create();
             data->Put("nodeId", nodeId);
             data->Put(key.data(), value.data());
+            if (isClickGestureEvent) {
+                LOGI("[UiSessionManagerOhos] ReportComponentChangeEvent gesture eventType:%{public}u nodeId:%{public}d",
+                    eventType, nodeId);
+            }
             reportService->ReportComponentChangeEvent(data->ToString());
         } else {
             LOGW("report component event failed, process id:%{public}d", pair.first);
@@ -476,6 +482,30 @@ void UiSessionManagerOhos::SaveReportStub(sptr<IRemoteObject> reportStub, int32_
     reportObjectMap_[processId] = reportStub;
 }
 
+int32_t UiSessionManagerOhos::RegisterWebPageSceneRules(int32_t processId, const std::string& ruleJson)
+{
+    WebPageSceneFunction webPageSceneFunc;
+    {
+        std::lock_guard<std::mutex> lock(webPageSceneMutex_);
+        webPageSceneFunc = webPageSceneFunction_;
+    }
+    if (!webPageSceneFunc) {
+        return FAILED;
+    }
+    int32_t webRet = webPageSceneFunc(WebPageSceneOp::RegisterRules, processId, ruleJson, false);
+    if (webRet != NO_ERROR) {
+        LOGW("RegisterPageSceneRules web-side failed ret=%{public}d, rollback processId=%{public}d",
+            webRet, processId);
+        {
+            std::lock_guard<std::mutex> lock(pageSceneMutex_);
+            pageSceneRuleSets_.erase(processId);
+            pageSceneRuleRegisterProcesses_.fetch_sub(1);
+        }
+        EraseProcessId("pageScene", processId);
+    }
+    return webRet;
+}
+
 int32_t UiSessionManagerOhos::RegisterPageSceneRules(int32_t processId, const std::string& ruleJson)
 {
     sptr<IRemoteObject> reportObject;
@@ -511,14 +541,7 @@ int32_t UiSessionManagerOhos::RegisterPageSceneRules(int32_t processId, const st
         TriggerPageSceneDetect(processId, registerRuleJson, false);
     }
     if (webEnabled) {
-        WebPageSceneFunction webPageSceneFunc;
-        {
-            std::lock_guard<std::mutex> lock(webPageSceneMutex_);
-            webPageSceneFunc = webPageSceneFunction_;
-        }
-        if (webPageSceneFunc) {
-            webPageSceneFunc(WebPageSceneOp::RegisterRules, processId, ruleJson, false);
-        }
+        return RegisterWebPageSceneRules(processId, ruleJson);
     }
     return NO_ERROR;
 }
@@ -610,7 +633,15 @@ int32_t UiSessionManagerOhos::GetPageScene(int32_t processId, const std::string&
             webPageSceneFunc = webPageSceneFunction_;
         }
         if (webPageSceneFunc) {
-            webPageSceneFunc(WebPageSceneOp::Traverse, processId, ruleJsonOrRuleSetId, true);
+            int32_t webRet = webPageSceneFunc(WebPageSceneOp::GetPageScene, processId, ruleJsonOrRuleSetId, true);
+            if (webRet != NO_ERROR) {
+                LOGW("GetPageScene web-side failed ret=%{public}d, processId=%{public}d", webRet, processId);
+                {
+                    std::lock_guard<std::mutex> lock(pageSceneMutex_);
+                    pendingPageSceneGets_.erase(processId);
+                }
+                return webRet;
+            }
         }
     }
     return NO_ERROR;
@@ -671,7 +702,8 @@ void UiSessionManagerOhos::NotifyPageSceneNodeChanged(const std::string& nodeTag
 void UiSessionManagerOhos::NotifyPageSceneNodeStateChanged(
     const std::string& nodeTag, PageSceneNodeStateChange stateChange)
 {
-    if (!IsPageSceneInputControlNode(nodeTag) || pageSceneRuleRegisterProcesses_.load() <= 0) {
+    if ((stateChange == PageSceneNodeStateChange::FOCUSABILITY &&
+            !IsPageSceneInputControlNode(nodeTag)) || pageSceneRuleRegisterProcesses_.load() <= 0) {
         return;
     }
     auto ruleJsons = GetPageSceneRuleJsonsForNodeStateChange(nodeTag, PAGE_SCENE_TEXT_EDITOR_SCENE, stateChange);
@@ -836,6 +868,7 @@ UiSessionManagerOhos::PageSceneRuleSetInfo UiSessionManagerOhos::ExtractPageScen
         auto scope = cJSON_GetObjectItem(ruleJsonValue, PAGE_SCENE_SCOPE);
         if (cJSON_IsObject(scope)) {
             ruleInfo.onlyVisible = GetJsonBool(scope, PAGE_SCENE_ONLY_VISIBLE, true);
+            ruleInfo.rectCulling = GetJsonBool(scope, PAGE_SCENE_RECT_CULLING, false);
         }
         auto policy = cJSON_GetObjectItem(ruleJsonValue, PAGE_SCENE_POLICY);
         if (cJSON_IsObject(policy)) {
@@ -918,7 +951,7 @@ std::vector<std::pair<int32_t, std::string>> UiSessionManagerOhos::GetPageSceneR
     const std::string& nodeTag, const std::string& sceneType)
 {
     std::vector<std::pair<int32_t, std::string>> ruleJsons;
-    auto nodeType = NormalizePageSceneNodeType(nodeTag);
+    auto nodeType = nodeTag;
     std::lock_guard<std::mutex> lock(pageSceneMutex_);
     for (const auto& [pid, ruleSetInfo] : pageSceneRuleSets_) {
         auto scopedRuleJsons = GetPageSceneRuleJsons(ruleSetInfo, sceneType, false, nodeType);
@@ -939,6 +972,7 @@ bool UiSessionManagerOhos::IsPageSceneRuleAffectedByNodeStateChange(
             // unfocusable text inputs, so both dimensions must be re-evaluated.
             return rule.onlyVisible || !ruleSetInfo.includeUnfocusableTextInput;
         case PageSceneNodeStateChange::ACTIVE:
+        case PageSceneNodeStateChange::OPACITY:
             return rule.onlyVisible;
         case PageSceneNodeStateChange::FOCUSABILITY:
             return !ruleSetInfo.includeUnfocusableTextInput;
@@ -951,7 +985,7 @@ std::vector<std::pair<int32_t, std::string>> UiSessionManagerOhos::GetPageSceneR
     const std::string& nodeTag, const std::string& sceneType, PageSceneNodeStateChange stateChange)
 {
     std::vector<std::pair<int32_t, std::string>> ruleJsons;
-    auto nodeType = NormalizePageSceneNodeType(nodeTag);
+    auto nodeType = IsPageSceneInputControlNode(nodeTag) ? nodeTag : "";
     std::lock_guard<std::mutex> lock(pageSceneMutex_);
     for (const auto& [pid, ruleSetInfo] : pageSceneRuleSets_) {
         if (!ruleSetInfo.arkuiEnabled) {
@@ -1008,14 +1042,17 @@ void UiSessionManagerOhos::SetComponentChangeEventRegistered(bool status)
 {
     if (status) {
         componentChangeEventRegisterProcesses_.fetch_add(1);
+        LOGI("SetComponentChangeEventRegistered register component change event");
     } else {
         componentChangeEventRegisterProcesses_.fetch_sub(1);
+        LOGI("SetComponentChangeEventRegistered unregister component change event");
     }
 }
 
 void UiSessionManagerOhos::SetComponentChangeEventMask(uint32_t mask)
 {
     componentChangeEventMask_ = mask;
+    LOGI("SetComponentChangeEventMask mask:%{public}u", mask);
 }
 
 void UiSessionManagerOhos::SetScrollEventRegistered(bool status)
@@ -1214,17 +1251,17 @@ void UiSessionManagerOhos::NotifySendCommandPattern(int32_t id, const std::strin
     }
 }
 
-int32_t UiSessionManagerOhos::NotifySendCommandAsyncPattern(int32_t id, const std::string& command)
+int32_t UiSessionManagerOhos::NotifySendCommandSyncPattern(int32_t id, const std::string& command)
 {
-    NotifySendCommandAsyncFunction notifySendCommandAsyncFunction;
+    NotifySendCommandSyncFunction notifySendCommandSyncFunction;
     {
-        std::lock_guard<std::mutex> lock(notifySendCommandAsyncFunctionMutex_);
-        notifySendCommandAsyncFunction = notifySendCommandAsyncFunction_;
+        std::lock_guard<std::mutex> lock(notifySendCommandSyncFunctionMutex_);
+        notifySendCommandSyncFunction = notifySendCommandSyncFunction_;
     }
-    if (!notifySendCommandAsyncFunction) {
+    if (!notifySendCommandSyncFunction) {
         return 11; // 11 is the error code for no callback
     }
-    return notifySendCommandAsyncFunction(id, command);
+    return notifySendCommandSyncFunction(id, command);
 }
 
 void UiSessionManagerOhos::SaveRegisterForWebFunction(NotifyAllWebFunction&& function)
@@ -1280,10 +1317,10 @@ void UiSessionManagerOhos::SaveForSendCommandFunction(NotifySendCommandFunction&
     notifySendCommandFunction_ = std::move(function);
 }
 
-void UiSessionManagerOhos::SaveForSendCommandAsyncFunction(NotifySendCommandAsyncFunction&& function)
+void UiSessionManagerOhos::SaveForSendCommandSyncFunction(NotifySendCommandSyncFunction&& function)
 {
-    std::lock_guard<std::mutex> lock(notifySendCommandAsyncFunctionMutex_);
-    notifySendCommandAsyncFunction_ = std::move(function);
+    std::lock_guard<std::mutex> lock(notifySendCommandSyncFunctionMutex_);
+    notifySendCommandSyncFunction_ = std::move(function);
 }
 
 bool UiSessionManagerOhos::GetWebFocusRegistered()

@@ -364,6 +364,7 @@ bool SmartLayoutAlgorithm::InitializeLayoutContext(LayoutWrapper* layoutWrapper)
 
     auto hostNode = layoutWrapper->GetHostNode();
     auto pipeline = hostNode ? hostNode->GetContext() : nullptr;
+    context.contentPadding = Dimension(SMART_LAYOUT_CONTENT_PADDING, DimensionUnit::VP).ConvertToPx();
     auto layoutProp = layoutWrapper->GetLayoutProperty();
     if (layoutProp) {
         if (pipeline) {
@@ -428,8 +429,8 @@ bool SmartLayoutAlgorithm::HandleTextContentOverflow(LayoutWrapper* layoutWrappe
         propertyChanged = true;
     }
     if (!layoutProperty->HasHeightAdaptivePolicy() ||
-        layoutProperty->GetHeightAdaptivePolicy() != TextHeightAdaptivePolicy::LAYOUT_CONSTRAINT_FIRST) {
-        layoutProperty->UpdateHeightAdaptivePolicy(TextHeightAdaptivePolicy::LAYOUT_CONSTRAINT_FIRST);
+        layoutProperty->GetHeightAdaptivePolicy() != TextHeightAdaptivePolicy::MAX_LINES_FIRST) {
+        layoutProperty->UpdateHeightAdaptivePolicy(TextHeightAdaptivePolicy::MAX_LINES_FIRST);
         propertyChanged = true;
     }
     if (!propertyChanged) {

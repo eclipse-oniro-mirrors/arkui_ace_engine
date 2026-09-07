@@ -55,8 +55,13 @@ int32_t CompatibleManagerExt::GetCompatibleinputMode(const std::string& bundleNa
         }
         isSettingsDataLoaded_ = true;
     }
-    std::string settingJsonStr = GetSettingsModeStringValue();
-    if (ParseSettingJsonToMap(settingJsonStr, compatibleSettingInfoMap_)) {
+    if (!isSettingModeDataLoaded_) {
+        std::string settingJsonStr = GetSettingsModeStringValue();
+        if (ParseSettingJsonToMap(settingJsonStr, compatibleSettingInfoMap_)) {
+            isSettingModeDataLoaded_ = true;
+        }
+    }
+    if (isSettingModeDataLoaded_) {
         int32_t mode = 1;
         auto iter = compatibleSettingInfoMap_.find(bundleName);
         if (iter != compatibleSettingInfoMap_.end()) {
@@ -79,16 +84,14 @@ int32_t CompatibleManagerExt::GetCompatibleinputMode(const std::string& bundleNa
 
 CompatibleInfo CompatibleManagerExt::GetCompatibleMouseTransform(const std::string& bundleName)
 {
+    std::lock_guard<std::mutex> lock(compatibleInfoMapMutex_);
     if (!isSettingsDataLoaded_) {
-        std::lock_guard<std::mutex> lock(compatibleInfoMapMutex_);
-        if (!isSettingsDataLoaded_) {
-            std::string jsonStr = GetSettingsDataStringValue();
-            if (!ParseJsonToMap(jsonStr, compatibleInfoMap_)) {
-                TAG_LOGE(AceLogTag::ACE_XCOMPONENT, "parse json fail");
-                return CompatibleInfo(false);
-            }
-            isSettingsDataLoaded_ = true;
+        std::string jsonStr = GetSettingsDataStringValue();
+        if (!ParseJsonToMap(jsonStr, compatibleInfoMap_)) {
+            TAG_LOGE(AceLogTag::ACE_XCOMPONENT, "parse json fail");
+            return CompatibleInfo(false);
         }
+        isSettingsDataLoaded_ = true;
     }
     CompatibleInfo result;
     auto iter = compatibleInfoMap_.find(bundleName);
@@ -239,6 +242,7 @@ std::string CompatibleManagerExt::GetSettingsModeStringValue()
     TAG_LOGI(AceLogTag::ACE_XCOMPONENT, "get current user id is %{public}d.", userId);
     if (userId == AppExecFwk::Constants::INVALID_USERID) {
         TAG_LOGE(AceLogTag::ACE_XCOMPONENT, "get user id failed");
+        ReleaseDataShareHelper(helper);
         return "";
     }
     std::vector<std::string> columns = { SETTINGS_DATA_COLUMN_VALUE };

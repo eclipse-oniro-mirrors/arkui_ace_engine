@@ -322,7 +322,7 @@ HWTEST_F(FormPatternTest, FormPatternTest_007, TestSize.Level0)
     pipeline->taskExecutor_ = nullptr;
     auto taskExecutor = pipeline->GetTaskExecutor();
     EXPECT_EQ(taskExecutor, nullptr);
-    pattern->HandleSnapshot(delayTime, "1");
+    pattern->HandleSnapshot(delayTime);
     pipeline->taskExecutor_ = AceType::MakeRefPtr<MockTaskExecutor>();
     EXPECT_NE(pipeline->taskExecutor_, nullptr);
 
@@ -333,7 +333,7 @@ HWTEST_F(FormPatternTest, FormPatternTest_007, TestSize.Level0)
     WeakPtr<FormPattern> weak = Referenced::WeakClaim(Referenced::RawPtr(pattern));
     RefCounter* refBak = pattern->refCounter_;
     weak.refCounter_ = nullptr;
-    pattern->HandleSnapshot(delayTime, "1");
+    pattern->HandleSnapshot(delayTime);
     uint32_t taskNum1 = taskExecutor->GetTotalTaskNum(TaskExecutor::TaskType::UI);
     EXPECT_EQ(taskNum, taskNum1);
 
@@ -346,7 +346,7 @@ HWTEST_F(FormPatternTest, FormPatternTest_007, TestSize.Level0)
     pattern->isDynamic_ = false;
     pattern->SetAccessibilityState(true);
     pattern->isStaticFormSnaping_ = false;
-    pattern->HandleSnapshot(delayTime, "1");
+    pattern->HandleSnapshot(delayTime);
 
     EXPECT_EQ(pattern->isStaticFormSnaping_, false);
 }
@@ -1315,6 +1315,18 @@ HWTEST_F(FormPatternTest, FormPatternTest_031, TestSize.Level1)
     pattern->cardInfo_.dimension = static_cast<int32_t>(OHOS::AppExecFwk::Constants::Dimension::DIMENSION_2_4);
     dimensionHeight = pattern->GetFormDimensionHeight(pattern->cardInfo_.dimension);
     EXPECT_EQ(dimensionHeight, 2);
+
+    pattern->cardInfo_.dimension = static_cast<int32_t>(OHOS::AppExecFwk::Constants::Dimension::DIMENSION_2_1);
+    dimensionHeight = pattern->GetFormDimensionHeight(pattern->cardInfo_.dimension);
+    EXPECT_EQ(dimensionHeight, 2);
+
+    pattern->cardInfo_.dimension = static_cast<int32_t>(OHOS::AppExecFwk::Constants::Dimension::DIMENSION_2_3);
+    dimensionHeight = pattern->GetFormDimensionHeight(pattern->cardInfo_.dimension);
+    EXPECT_EQ(dimensionHeight, 2);
+
+    pattern->cardInfo_.dimension = static_cast<int32_t>(OHOS::AppExecFwk::Constants::Dimension::DIMENSION_3_3);
+    dimensionHeight = pattern->GetFormDimensionHeight(pattern->cardInfo_.dimension);
+    EXPECT_EQ(dimensionHeight, 3);
 
     pattern->cardInfo_.dimension = static_cast<int32_t>(OHOS::AppExecFwk::Constants::Dimension::DIMENSION_4_4);
     dimensionHeight = pattern->GetFormDimensionHeight(pattern->cardInfo_.dimension);

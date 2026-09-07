@@ -1622,4 +1622,28 @@ HWTEST_F(TabPatternTestNg, UpdateBackBlurStyleTest003, TestSize.Level1)
     EXPECT_EQ(renderContext->GetBackBlurStyle()->blurStyle, BlurStyle::REGULAR);
     EXPECT_EQ(renderContext->GetBackBlurStyle()->colorMode, ThemeColorMode::DARK);
 }
+
+/**
+ * @tc.name: TabsPatternIsColorInvertEnabled001
+ * @tc.desc: Test TabsPattern IsColorInvertEnabled
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabPatternTestNg, TabsPatternIsColorInvertEnabled001, TestSize.Level1)
+{
+    auto model = CreateTabs();
+    CreateTabContents();
+    GetTabs();
+    CreateTabsDone(model);
+
+    ASSERT_NE(pattern_, nullptr);
+    ASSERT_NE(tabBarPattern_, nullptr);
+
+    // Without color invert active, IsColorInvertEnabled should return false
+    EXPECT_FALSE(tabBarPattern_->IsColorInvertActive());
+
+    // Activate color invert
+    tabBarPattern_->SetColorInvertColorMode(ColorMode::DARK);
+    EXPECT_TRUE(tabBarPattern_->IsColorInvertActive());
+}
+
 } // namespace OHOS::Ace::NG

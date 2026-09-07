@@ -6528,6 +6528,22 @@
         "name": "OH_ArkUI_ImageAttachment_GetSupportSvg"
     },
     {
+        "first_introduced": "26",
+        "name": "OH_ArkUI_ImageAttachment_SetResizableSlice"
+    },
+    {
+        "first_introduced": "26",
+        "name": "OH_ArkUI_ImageAttachment_GetResizableSlice"
+    },
+    {
+        "first_introduced": "26",
+        "name": "OH_ArkUI_ImageAttachment_SetResizableLattice"
+    },
+    {
+        "first_introduced": "26",
+        "name": "OH_ArkUI_ImageAttachment_GetResizableLattice"
+    },
+    {
         "first_introduced": "24",
         "name": "OH_ArkUI_TextEditorStyledStringController_GetSelection"
     },
@@ -6995,5 +7011,21 @@
     {
         "first_introduced": "26.1.0",
         "name": "OH_ArkUI_NodeUtils_SetUiDvsyncSwitch"
+    },
+    {
+        "first_introduced": "26.0.0",
+        "name": "OH_ArkUI_NativeModule_LineSpacingOptions_Create"
+    },
+    {
+        "first_introduced": "26.0.0",
+        "name": "OH_ArkUI_NativeModule_LineSpacingOptions_Destroy"
+    },
+    {
+        "first_introduced": "26.0.0",
+        "name": "OH_ArkUI_NativeModule_LineSpacingOptions_SetOnlyBetweenLines"
+    },
+    {
+        "first_introduced": "26.0.0",
+        "name": "OH_ArkUI_NativeModule_LineSpacingOptions_GetOnlyBetweenLines"
     }
 ]

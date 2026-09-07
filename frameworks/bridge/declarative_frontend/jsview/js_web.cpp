@@ -1253,17 +1253,20 @@ public:
         JSClass<JSWebResourceError>::Declare("WebResourceError");
         JSClass<JSWebResourceError>::CustomMethod("getErrorCode", &JSWebResourceError::GetErrorCode);
         JSClass<JSWebResourceError>::CustomMethod("getErrorInfo", &JSWebResourceError::GetErrorInfo);
+        JSClass<JSWebResourceError>::CustomMethod("getCustomErrorCode", &JSWebResourceError::GetCustomErrorCode);
         JSClass<JSWebResourceError>::Bind(globalObj, &JSWebResourceError::Constructor, &JSWebResourceError::Destructor);
     }
 
     void SetEvent(const ReceivedErrorEvent& eventInfo)
     {
         error_ = eventInfo.GetError();
+        customCode_ = eventInfo.GetCustomCode();
     }
 
     void SetOverrideErrorPageEvent(const OnOverrideErrorPageEvent& eventInfo)
     {
         error_ = eventInfo.GetError();
+        customCode_ = eventInfo.GetCustomCode();
     }
 
     void GetErrorCode(const JSCallbackInfo& args)
@@ -1277,6 +1280,13 @@ public:
     {
         auto info = JSVal(ToJSValue(error_->GetInfo()));
         auto descriptionRef = JSRef<JSVal>::Make(info);
+        args.SetReturnValue(descriptionRef);
+    }
+
+    void GetCustomErrorCode(const JSCallbackInfo& args)
+    {
+        auto code = JSVal(ToJSValue(customCode_));
+        auto descriptionRef = JSRef<JSVal>::Make(code);
         args.SetReturnValue(descriptionRef);
     }
 
@@ -1296,6 +1306,7 @@ private:
     }
 
     RefPtr<WebError> error_;
+    int32_t customCode_ = 0;
 };
 
 class JSWebResourceResponse : public WebTransferBase<RefPtr<WebResponse>> {
@@ -1422,7 +1433,8 @@ public:
             JsiRef<JsiArrayBuffer> arrayBuffer = JsiRef<JsiArrayBuffer>::Cast(args[0]);
             int32_t bufferSize = arrayBuffer->ByteLength();
             void* buffer = arrayBuffer->GetBuffer();
-            if ((buffer == nullptr) || (bufferSize <= 0) || (bufferSize > INT32_MAX - 1)) {
+            if ((bufferSize < 0) || (bufferSize > INT32_MAX - 1) ||
+                ((buffer == nullptr) && (bufferSize > 0))) {
                 TAG_LOGE(AceLogTag::ACE_WEB,
                     "SetResponseData: invalid arrayBuffer, bufferSize=%{public}d", bufferSize);
                 return;
@@ -3471,6 +3483,17 @@ void JSWeb::SetCallbackFromController(const JSRef<JSObject> controller)
                     "innerWebNativeMessageManager received null or unexpected event type");
                 return;
             }
+
+            napi_env env = GetNapiEnv();
+            if (!env) {
+                return;
+            }
+            napi_handle_scope scope = nullptr;
+            auto napi_status = napi_open_handle_scope(env, &scope);
+            if (napi_status != napi_ok) {
+                return;
+            }
+
             JSRef<JSObject> obj = JSRef<JSObject>::New();
             JSRef<JSObject> handlerObj = JSClass<JSFullScreenVideoOverlayHandler>::NewInstance();
             auto callbackEvent = Referenced::Claim(handlerObj->Unwrap<JSFullScreenVideoOverlayHandler>());
@@ -3481,6 +3504,8 @@ void JSWeb::SetCallbackFromController(const JSRef<JSObject> controller)
             obj->SetPropertyObject("mediaInfo", mediaInfo);
             JSRef<JSVal> argv[] = { JSRef<JSVal>::Cast(obj) };
             auto result = func->Call(webviewController, 1, argv);
+
+            napi_close_handle_scope(env, scope);
         };
     }
 
@@ -8226,7 +8251,7 @@ void JSWeb::ScrollbarLayoutPolicy(const JSCallbackInfo& args)
     }
     auto value = args[0]->ToNumber<int32_t>();
     constexpr int32_t POLICY_MIN = static_cast<int32_t>(ScrollbarLayoutPolicy::CONTENT);
-    constexpr int32_t POLICY_MAX = static_cast<int32_t>(ScrollbarLayoutPolicy::CONTENT);
+    constexpr int32_t POLICY_MAX = static_cast<int32_t>(ScrollbarLayoutPolicy::SYSTEM);
     if (value < POLICY_MIN || value > POLICY_MAX) {
         return;
     }

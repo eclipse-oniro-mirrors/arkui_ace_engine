@@ -65,8 +65,9 @@ void SelectModelNG::Create(const std::vector<SelectParam>& params)
     InitSelect(AceType::RawPtr(select), params);
     if (Container::GreatOrEqualAPIVersion(PlatformVersion::VERSION_TWENTY_SIX)
         && MaterialUtils::IsMaterialEnabled()) {
-        auto material = MaterialUtils::GetInitMaterial(UiMaterialStyle::ULTRA_THIN);
-        ViewAbstract::SetSystemMaterial(AceType::RawPtr(material));
+        LightEffectOptions lightEffectOptions;
+        auto material = MaterialUtils::GetInitMaterial(UiMaterialStyle::ULTRA_THIN, true, lightEffectOptions);
+        ViewAbstract::SetSystemMaterialForOverlay(AceType::RawPtr(material));
     }
 }
 
@@ -1591,7 +1592,7 @@ void SelectModelNG::CreateSelect(
         MaterialUtils::IsMaterialEnabled()) {
         LightEffectOptions lightEffectOptions;
         auto material = MaterialUtils::GetInitMaterial(UiMaterialStyle::ULTRA_THIN, true, lightEffectOptions);
-        ViewAbstract::SetSystemMaterial(AceType::RawPtr(material));
+        ViewAbstract::SetSystemMaterialForOverlay(AceType::RawPtr(material));
     }
 
     if (!SystemProperties::ConfigChangePerform()) {

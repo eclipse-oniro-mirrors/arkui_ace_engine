@@ -71,9 +71,9 @@
 
 - API 检索：`onVisibleAreaChange`、`onVisibleAreaApproximateChange`、`VisibleAreaEventOptions`。
 - 核心检索：`VisibleArea`、`VisibleRatio`、`ProcessAllVisibleCallback`、`expectedUpdateInterval`。
-- Native 检索：`VISIBLE_AREA`、`VISIBLE_AREA_APPROXIMATE`、`RegisterCommonVisibleAreaChangeEvent`。
+- Native 检索：`VISIBLE_AREA`、`VISIBLE_AREA_APPROXIMATE`、`NODE_VISIBLE_AREA_APPROXIMATE_CHANGE_EVENT`、`ON_VISIBLE_AREA_APPROXIMATE_CHANGE`。
 
 ## 相关主题
 
-- 组件相关事件：`docs/kb/capabilities/component-related-events.md`。
-- 布局框架：`docs/kb/architecture/layout-framework.md`。
+- [组件相关事件。](component-related-events.md)
+- [布局框架。](../architecture/layout-framework.md)

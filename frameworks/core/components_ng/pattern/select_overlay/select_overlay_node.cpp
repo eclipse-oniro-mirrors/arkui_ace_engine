@@ -24,6 +24,7 @@
 #include <algorithm>
 #include <securec.h>
 
+#include "base/hiviewdfx/histogram_wrapper.h"
 #include "base/geometry/dimension.h"
 #include "base/geometry/ng/offset_t.h"
 #include "base/utils/linear_map.h"
@@ -69,10 +70,6 @@
 
 #include "core/interfaces/native/node/node_symbol_glyph_modifier.h"
 #include "core/components_ng/pattern/stage/stage_manager.h"
-
-#ifdef ENABLE_ROSEN_BACKEND
-#include "frameworks/compatible/components/canvas/rosen_render_custom_paint.h"
-#endif
 
 #include "interfaces/inner_api/ace_kit/include/ui/properties/ui_material_enums.h"
 #include "ui/base/utils/utils.h"
@@ -2959,6 +2956,7 @@ RefPtr<UINode> CreateCustomSelectMenu(const std::shared_ptr<SelectOverlayInfo>& 
     info->menuInfo.menuBuilder();
     auto customNode = NG::ViewStackProcessor::GetInstance()->Finish();
     CHECK_NULL_RETURN(customNode, nullptr);
+    customNode->SetInCustomSelectMenu(true);
     return customNode;
 }
 
@@ -2996,6 +2994,7 @@ RefPtr<FrameNode> SelectOverlayNode::CreateSelectOverlayNode(
 
 void SelectOverlayNode::CreateCustomSelectOverlay(const std::shared_ptr<SelectOverlayInfo>& info)
 {
+    ACE_ENGINE_HISTOGRAM_BOOLEAN("TextAttribute.BindSelectionMenu", 1);
     const auto* menuModifier = NG::NodeModifier::GetMenuInnerModifier();
     CHECK_NULL_VOID(menuModifier);
     selectMenu_ = menuModifier->getOrCreateMenuNode(V2::MENU_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
@@ -3134,6 +3133,7 @@ void SelectOverlayNode::MoreAnimation(bool noAnimation)
 
 void SelectOverlayNode::NewMaterialMoreAnimation(bool noAnimation)
 {
+    ACE_ENGINE_HISTOGRAM_BOOLEAN("TextAttribute.EditMenuOptions", 1);
     CHECK_NULL_VOID(selectMenuInner_);
     CHECK_NULL_VOID(extensionMenu_);
     auto selectMenuInnerContext = selectMenuInner_->GetRenderContext();
@@ -4303,7 +4303,7 @@ void SelectOverlayNode::UpdateNewMaterialProperties(const RefPtr<FrameNode>& fra
         CHECK_NULL_VOID(renderContext);
         if (SystemProperties::GetUiMaterialLevel() != UiMaterialLevel::SMOOTH) {
             renderContext->UpdateBackBlurStyle(std::nullopt);
-            ViewAbstract::SetSystemMaterial(
+            ViewAbstract::SetSystemMaterialForOverlay(
                 AceType::RawPtr(frameNode), AceType::RawPtr(GetMenuUiMaterial(colorMode)));
         } else {
             // 降档材质

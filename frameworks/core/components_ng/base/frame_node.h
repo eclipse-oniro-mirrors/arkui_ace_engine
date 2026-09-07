@@ -20,10 +20,11 @@
 #include <functional>
 #include <list>
 #include <mutex>
-#include <string_view>
+#include <string>
 #include <unordered_set>
 #include <utility>
 #include <vector>
+#include <string_view>
 
 #include "interfaces/inner_api/ace_kit/include/ui/view/ai_caller_helper.h"
 #include "ui/base/modifier_property.h"
@@ -634,6 +635,11 @@ public:
 
     void PostIdleTask(std::function<void(int64_t deadline, bool canUseLongPredictTask)>&& task);
 
+    bool HitTestMouseTarget(const MouseEvent& event, const PointF& globalPoint, const PointF& parentLocalPoint,
+        const PointF& parentRevertPoint, const std::vector<std::string>* tagWhitelist = nullptr);
+    bool IsMouseTargetHit(const MouseEvent& event, const PointF& parentRevertPoint,
+        const std::vector<std::string>* tagWhitelist, bool& isOutOfRegion);
+
     // If return true, will prevent TouchTest Bubbling to parent and brother nodes.
     HitTestResult TouchTest(const PointF& globalPoint, const PointF& parentLocalPoint, const PointF& parentRevertPoint,
         TouchRestrict& touchRestrict, TouchTestResult& result, int32_t touchId, ResponseLinkResult& responseLinkResult,
@@ -840,6 +846,7 @@ public:
     void NotifyPageSceneVisibilityChanged();
     void NotifyPageSceneActiveChanged();
     void NotifyPageSceneFocusabilityChanged();
+    void NotifyPageSceneOpacityChanged();
 
     void PushDestroyCallbackWithTag(std::function<void()>&& callback, const std::string& tag)
     {
@@ -1299,6 +1306,11 @@ public:
     }
 
     void SetGeometryTransitionInRecursive(bool isGeometryTransitionIn) override;
+
+    void SetGeometryTransitionNeedLayout(bool geometryTransitionNeedLayout)
+    {
+        geometryTransitionNeedLayout_ = geometryTransitionNeedLayout;
+    }
     static std::pair<float, float> ContextPositionConvertToPX(
         const RefPtr<RenderContext>& context, const SizeF& percentReference);
 
@@ -1646,6 +1658,8 @@ protected:
     void OnCollectRemoved() override;
 
 private:
+    void NotifyVisibleChange(VisibleType preVisibility, VisibleType currentVisibility, bool notifyPageScene);
+
     static bool ShouldDetectAceObjTypeConvertion();
     void DispatchAreaChangeWithThrottle(const RectF& currFrameRect, const OffsetF& currParentOffsetToWindow);
     void GetCurrentAreaChangeInfo(
@@ -1782,6 +1796,8 @@ private:
 
     HitTestMode TriggerOnTouchIntercept(const TouchEvent& touchEvent);
 
+    bool IsHoverEventType(TouchType type) const;
+
     void TriggerRsProfilerNodeMountCallbackIfExist();
 
     void AddTouchEventAllFingersInfo(TouchEventInfo& event, const TouchEvent& touchEvent);
@@ -1789,6 +1805,8 @@ private:
     RectF ApplyFrameNodeTranformToRect(const RectF& rect, const RefPtr<FrameNode>& parent) const;
 
     const CacheVisibleRectResult& GetCacheVisibleRect(uint64_t timestamp, bool logFlag = false);
+
+    void LogCacheVisibleRect(const CacheVisibleRectResult& result, bool logFlag) const;
 
     const CacheVisibleRectResult& CalculateCacheVisibleRect(const CacheVisibleRectResult& parentCacheVisibleRect,
         const RefPtr<FrameNode>& parentUi, RectF& rectToParent, const std::pair<VectorF, VectorF>& pairScale,
@@ -1931,6 +1949,7 @@ private:
     bool checkboxFlag_ = false;
     bool isDisallowDropForcedly_ = false;
     bool isGeometryTransitionIn_ = false;
+    bool geometryTransitionNeedLayout_ = false;
     bool isLayoutNode_ = false;
     bool isCalculateInnerVisibleRectClip_ = false;
     bool dragHitTestBlock_ = false;

@@ -84,10 +84,10 @@ public:
     void WebTaskNumsChange(int32_t num) override;
     void ReportInspectorTreeValue(const std::string& data) override;
     void SaveForSendCommandFunction(NotifySendCommandFunction&& function) override;
-    void SaveForSendCommandAsyncFunction(NotifySendCommandAsyncFunction&& function) override;
+    void SaveForSendCommandSyncFunction(NotifySendCommandSyncFunction&& function) override;
     void NotifyAllWebPattern(bool isRegister) override;
     void NotifySendCommandPattern(int32_t id, const std::string& command) override;
-    int32_t NotifySendCommandAsyncPattern(int32_t id, const std::string& command) override;
+    int32_t NotifySendCommandSyncPattern(int32_t id, const std::string& command) override;
     void SaveRegisterForWebFunction(NotifyAllWebFunction&& function) override;
     void SaveGetHitTestInfoCallback(GetHitTestInfoFunction&& function) override;
     void GetLatestHitTestNodeInfosForTouch(InteractionParamConfig config) override;
@@ -158,6 +158,7 @@ public:
     void GetWebInfoByRequest(int32_t webId, const std::string& request) override;
     void SendWebInfoByRequest(uint32_t windowId, int32_t webId, const std::string& request,
         const std::string& result, WebRequestErrorCode errorCode) override;
+    int32_t RegisterWebPageSceneRules(int32_t processId, const std::string& ruleJson);
     int32_t RegisterPageSceneRules(int32_t processId, const std::string& ruleJson) override;
     int32_t UnregisterPageSceneRules(int32_t processId, const std::string& ruleSetId) override;
     int32_t GetPageScene(int32_t processId, const std::string& ruleJsonOrRuleSetId) override;
@@ -191,6 +192,7 @@ private:
         bool enabled = true;
         bool reportOnRegister = true;
         bool onlyVisible = true;
+        bool rectCulling = false;
     };
 
     struct PageSceneRuleSetInfo {

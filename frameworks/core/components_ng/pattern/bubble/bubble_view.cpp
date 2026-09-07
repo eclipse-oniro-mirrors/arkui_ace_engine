@@ -37,6 +37,7 @@
 #endif
 #include "interfaces/inner_api/ace_kit/include/ui/view/theme/token_colors.h"
 #include "core/components_ng/layout/layout_wrapper_node.h"
+#include "core/components_ng/pattern/button/button_pattern.h"
 #include "core/components_ng/pattern/linear_layout/linear_layout_pattern.h"
 #include "core/components_ng/pattern/flex/flex_layout_pattern.h"
 #include "core/components_ng/pattern/scroll/scroll_pattern.h"
@@ -56,6 +57,7 @@ constexpr float AGE_SCALE_NUMBER = 1.0f;
 constexpr float AGE_BUTTONS_LAYOUT_HEIGHT_RATE = 15.0f;
 const int32_t PRIMARY_BUTTON_NUMBER = 1;
 const int32_t SECONDARY_BUTTON_NUMBER = 2;
+const char BUTTON_ETS_TAG[] = "Button";
 
 OffsetF GetDisplayWindowRectOffset(int32_t popupNodeId)
 {
@@ -202,6 +204,12 @@ bool BubbleView::SetBubbleSystemMaterial(const RefPtr<FrameNode>& bubbleNode, co
 }
 
 #if defined(ENABLE_ROSEN_BACKEND)
+constexpr float REFRACT_PARAMS_FIRST = -0.03f;
+constexpr float REFRACT_PARAMS_SECOND = 0.4f;
+constexpr float REFRACT_PARAMS_THIRD = 0.13f;
+constexpr size_t REFRACT_PARAMS_FIRST_INDEX = 0;
+constexpr size_t REFRACT_PARAMS_SECOND_INDEX = 1;
+constexpr size_t REFRACT_PARAMS_THIRD_INDEX = 2;
 void BubbleView::ApplyBubbleRefractParam(const RefPtr<FrameNode>& bubbleNode)
 {
     CHECK_NULL_VOID(bubbleNode);
@@ -215,8 +223,13 @@ void BubbleView::ApplyBubbleRefractParam(const RefPtr<FrameNode>& bubbleNode)
     CHECK_NULL_VOID(filter);
     auto glassFilter = std::static_pointer_cast<Rosen::RSNGFrostedGlassFilter>(filter);
     CHECK_NULL_VOID(glassFilter);
+    auto pipelineContext = bubbleNode->GetContextRefPtr();
+    CHECK_NULL_VOID(pipelineContext);
+    float dipScale = static_cast<float>(pipelineContext->GetDipScale());
     auto refractParams = glassFilter->Getter<Rosen::FrostedGlassRefractParamsTag>()->Get();
-    refractParams[1] = 0.3f;
+    refractParams[REFRACT_PARAMS_FIRST_INDEX] = REFRACT_PARAMS_FIRST * dipScale;
+    refractParams[REFRACT_PARAMS_SECOND_INDEX] = REFRACT_PARAMS_SECOND;
+    refractParams[REFRACT_PARAMS_THIRD_INDEX] = REFRACT_PARAMS_THIRD;
     glassFilter->Setter<Rosen::FrostedGlassRefractParamsTag>(refractParams);
     renderContext->SetMaterialWithQualityLevel(filter, UiMaterialFilterQuality::DEFAULT);
 }
@@ -281,7 +294,7 @@ bool BubbleView::ApplySystemMaterialForBubble(
 {
     renderContext->UpdateBackBlurStyle(std::nullopt);
     renderContext->UpdateBackgroundColor(Color::TRANSPARENT);
-    ViewAbstract::SetSystemMaterial(AceType::RawPtr(bubbleNode), AceType::RawPtr(systemMaterial));
+    ViewAbstract::SetSystemMaterialForOverlay(AceType::RawPtr(bubbleNode), AceType::RawPtr(systemMaterial));
     return true;
 }
 
@@ -1221,12 +1234,15 @@ RefPtr<FrameNode> BubbleView::CreateButton(ButtonProperties& buttonParam, int32_
     auto buttonId = ElementRegister::GetInstance()->MakeUniqueId();
     auto* buttonModifier = NodeModifier::GetButtonCustomModifier();
     CHECK_NULL_RETURN(buttonModifier, nullptr);
-    auto nodeHandle = buttonModifier->createFrameNode(buttonId);
-    CHECK_NULL_RETURN(nodeHandle, nullptr);
-    auto buttonNode = AceType::Claim(reinterpret_cast<FrameNode*>(nodeHandle));
+    auto* buttonPattern = reinterpret_cast<ButtonPattern*>(buttonModifier->createButtonPattern());
+    CHECK_NULL_RETURN(buttonPattern, nullptr);
+    // set button focus color
+    buttonPattern->setComponentButtonType(ComponentButtonType::POPUP);
+    buttonPattern->SetFocusBorderColor(focusColor);
+    auto buttonNode = FrameNode::CreateFrameNode(BUTTON_ETS_TAG, buttonId, AceType::Claim(buttonPattern));
     CHECK_NULL_RETURN(buttonNode, nullptr);
-    buttonModifier->setComponentButtonType(nodeHandle, ComponentButtonType::POPUP);
-    buttonModifier->setFocusBorderColor(nodeHandle, focusColor);
+    auto nodeHandle = reinterpret_cast<ArkUINodeHandle>(AceType::RawPtr(buttonNode));
+    CHECK_NULL_RETURN(nodeHandle, nullptr);
     ACE_UINODE_TRACE(buttonNode);
 
     auto buttonProp = buttonNode->GetLayoutProperty();

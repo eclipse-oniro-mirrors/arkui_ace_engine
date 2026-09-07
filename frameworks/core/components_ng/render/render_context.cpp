@@ -21,6 +21,7 @@
 #include "core/components/common/layout/layout_constants_string_utils.h"
 #include "core/components/common/properties/border_image.h"
 #include "core/components/common/properties/ui_material.h"
+#include "core/components_ng/base/frame_node.h"
 #include "core/pipeline_ng/pipeline_context.h"
 
 namespace OHOS::Ace::NG {
@@ -215,6 +216,9 @@ void RenderContext::ToJsonValue(std::unique_ptr<JsonValue>& json, const Inspecto
     if (GetExcludeFromRenderGroup().has_value()) {
         json->PutExtAttr("excludeFromRenderGroup", GetExcludeFromRenderGroupValue() ? "true" : "false", filter);
     }
+    if (GetMarkLayeredRender().has_value()) {
+        json->PutExtAttr("markLayeredRender", GetMarkLayeredRenderValue() ? "true" : "false", filter);
+    }
     ToJsonValuePart1(json, filter);
 }
 
@@ -233,12 +237,27 @@ void RenderContext::ToJsonValuePart1(std::unique_ptr<JsonValue>& json, const Ins
                     immersiveOptions->materialColor.value_or(Color::TRANSPARENT).ColorToString().c_str());
                 immersiveOptionsValue->Put("colorInvert", immersiveOptions->colorInvert ? "true" : "false");
                 immersiveOptionsValue->Put("applyShadow", immersiveOptions->applyShadow ? "true" : "false");
+                immersiveOptionsValue->Put("disableLightEffect",
+                    immersiveOptions->disableLightEffect ? "true" : "false");
+                LightEffectOptionsToJsonValue(immersiveOptionsValue, immersiveOptions->lightEffectOptions);
+                if (immersiveOptions->interactive.has_value()) {
+                    immersiveOptionsValue->Put("interactive",
+                        immersiveOptions->interactive.value() ? "true" : "false");
+                }
                 optJsonValue->Put("immersiveOptions", immersiveOptionsValue);
             }
         }
         auto materialJsonValue = JsonUtil::Create(true);
         materialJsonValue->Put("material", optJsonValue);
         json->PutExtAttr("systemMaterial", materialJsonValue, filter);
+    }
+}
+
+void RenderContext::LightEffectOptionsToJsonValue(
+    const std::unique_ptr<JsonValue>& json, const std::optional<LightEffectOptions>& lightEffectOptions) const
+{
+    if (lightEffectOptions.has_value() && lightEffectOptions->color.has_value()) {
+        json->Put("lightEffectColor", lightEffectOptions->color->ColorToString().c_str());
     }
 }
 
@@ -280,9 +299,24 @@ void RenderContext::SetSystemMaterial(const RefPtr<UiMaterial>& material)
 {
     if (!uiMaterial_) {
         uiMaterial_ = std::make_shared<UiMaterialInfo>(UiMaterialInfo{.material = material});
-        return;
+    } else {
+        uiMaterial_->material = material;
     }
-    uiMaterial_->material = material;
+    // Track the node with its pipeline's MaterialProcessor so the limiter only
+    // iterates material nodes after layout. The IsMaterialSuppressed flag keeps the
+    // node registered while the limiter temporarily clears its material (suppress);
+    // a real clear (developer passing nullptr while not suppressed) unregisters.
+    auto host = GetHost();
+    auto* pipeline = host ? host->GetContext() : nullptr;
+    if (pipeline) {
+        bool intended = (material != nullptr && material->GetType() == static_cast<int32_t>(MaterialType::IMMERSIVE)) ||
+                        IsMaterialSuppressed();
+        if (intended) {
+            pipeline->RegisterMaterialNode(host);
+        } else {
+            pipeline->UnregisterMaterialNode(host->GetId());
+        }
+    }
 }
 
 RefPtr<UiMaterial> RenderContext::GetSystemMaterial() const
@@ -316,6 +350,16 @@ void RenderContext::SetTransparencyCallbackId(const std::optional<int32_t>& id)
         return;
     }
     uiMaterial_->transparencyCallbackId = id;
+}
+
+RefPtr<UiMaterial> RenderContext::GetSavedMaterialForSuppress() const
+{
+    return savedMaterialForSuppress_;
+}
+
+void RenderContext::SetSavedMaterialForSuppress(const RefPtr<UiMaterial>& material)
+{
+    savedMaterialForSuppress_ = material;
 }
 
 const std::unique_ptr<BorderImageProperty>& RenderContext::GetOrCreateBdImage()

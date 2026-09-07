@@ -23,6 +23,7 @@
 #include "base/utils/utf_helper.h"
 #include "base/utils/utils.h"
 #include "core/components_ng/pattern/text_field/text_field_pattern.h"
+#include "core/components_ng/pattern/search/search_text_field.h"
 
 #ifndef ACE_UNITTEST
 #ifdef ENABLE_STANDARD_INPUT
@@ -53,6 +54,21 @@ void RunAsyncTask(const RefPtr<TextFieldSelectOverlay>& overlay, const std::stri
     taskExecutor->PostTask(task, isUITask ? TaskExecutor::TaskType::UI : TaskExecutor::TaskType::PLATFORM, name);
 }
 } // namespace
+
+RefPtr<FrameNode> TextFieldSelectOverlay::GetOwner()
+{
+    auto textFieldPattern = GetPattern<TextFieldPattern>();
+    CHECK_NULL_RETURN(textFieldPattern, nullptr);
+    auto host = textFieldPattern->GetHost();
+    CHECK_NULL_RETURN(host, nullptr);
+    if (AceType::InstanceOf<SearchTextFieldPattern>(textFieldPattern)) {
+        auto parent = host->GetAncestorNodeOfFrame(false);
+        if (parent) {
+            return parent;
+        }
+    }
+    return host;
+}
 
 bool TextFieldSelectOverlay::PreProcessOverlay(const OverlayRequest& request)
 {
@@ -86,14 +102,15 @@ void TextFieldSelectOverlay::UpdatePattern(const OverlayRequest& request)
     CHECK_NULL_VOID(pattern);
     bool isRequestSelectAll = (static_cast<uint32_t>(request.requestCode) & REQUEST_SELECT_ALL) == REQUEST_SELECT_ALL;
     auto selectController = pattern->GetTextSelectController();
-    if (pattern->IsSelected() && selectController->IsHandleSamePosition()) {
+    auto isSelectedLineBreak = selectController->IsSelectedLineBreak();
+    if (pattern->IsSelected() && selectController->IsHandleSamePosition() && !isSelectedLineBreak) {
         SetIsSingleHandle(true);
         selectController->UpdateCaretIndex(selectController->GetFirstHandleIndex());
         selectController->UpdateCaretOffset();
         selectController->MoveCaretToContentRect(selectController->GetCaretIndex());
     } else if (!IsSingleHandle() && !isRequestSelectAll) {
         auto rects = pattern->GetTextBoxes();
-        if (!rects.empty() && NearEqual(rects.size(), 1) && NearZero(rects[0].Width())) {
+        if (!isSelectedLineBreak && !rects.empty() && NearEqual(rects.size(), 1) && NearZero(rects[0].Width())) {
             SetIsSingleHandle(true);
             selectController->UpdateCaretIndex(selectController->GetFirstHandleIndex());
             selectController->UpdateCaretOffset();
@@ -313,49 +330,37 @@ void TextFieldSelectOverlay::OnUpdateMenuInfo(SelectMenuInfo& menuInfo, SelectOv
     CHECK_NULL_VOID(host);
     auto layoutProperty = host->GetLayoutProperty<TextFieldLayoutProperty>();
     CHECK_NULL_VOID(layoutProperty);
-    menuInfo.hasOnPrepareMenuCallback = onPrepareMenuCallback_ ? true : false;
-    auto hasText = pattern->HasText();
-    if ((dirtyFlag & DIRTY_COPY_ALL_ITEM) == DIRTY_COPY_ALL_ITEM) {
-        menuInfo.showCopyAll = hasText && !pattern->IsSelectAll();
+    // Assemble the TextInput menu spec from the shared per-field helpers in BaseTextSelectOverlay.
+    // RichEditor's plain-text-input mode calls the same helpers in the same order, so the two
+    // components share the per-field logic and stay aligned (T030).
+    FillMenuHasOnPrepareMenuCallback(menuInfo);
+    bool hasText = pattern->HasText();
+    bool isSelectAll = pattern->IsSelectAll();
+    if (IsDirtyCopyAllItem(dirtyFlag)) {
+        FillMenuShowCopyAll(menuInfo, hasText, isSelectAll);
         return;
     }
-    bool isHideSelectionMenu = layoutProperty->GetSelectionMenuHiddenValue(false);
-#if defined(ENABLE_STANDARD_INPUT)
-    auto inputMethod = MiscServices::InputMethodController::GetInstance();
-    auto isSupportCameraInput = inputMethod &&
-                                inputMethod->IsInputTypeSupported(MiscServices::InputType::CAMERA_INPUT) &&
-                                !pattern->IsInPasswordMode();
-#else
-    auto isSupportCameraInput = false;
-#endif
-    menuInfo.showCameraInput = !pattern->IsSelected() && isSupportCameraInput && !pattern->HasCustomKeyboard();
+    bool isSelected = pattern->IsSelected();
+    bool isInPasswordMode = pattern->IsInPasswordMode();
+    FillMenuShowCameraInput(menuInfo, isSelected, pattern->IsCameraInputSupported(),
+        isInPasswordMode, pattern->HasCustomKeyboard());
     auto manager = SelectContentOverlayManager::GetOverlayManager();
     CHECK_NULL_VOID(manager);
-    if (IsUsingMouse()) {
-        menuInfo.menuIsShow = !isHideSelectionMenu || manager->IsOpen();
-    } else {
-        menuInfo.menuIsShow = (hasText || IsShowPaste() || menuInfo.showCameraInput || pattern->IsShowAutoFill()) &&
-            !isHideSelectionMenu && IsShowMenu();
-    }
-    menuInfo.menuDisable = isHideSelectionMenu;
-    menuInfo.showPaste = IsShowPaste();
-    menuInfo.menuType = IsUsingMouse() ? OptionMenuType::MOUSE_MENU : OptionMenuType::TOUCH_MENU;
-    menuInfo.showCopy = hasText && pattern->AllowCopy() && pattern->IsSelected();
-    menuInfo.showCut = menuInfo.showCopy;
-    menuInfo.showCopyAll = hasText && !pattern->IsSelectAll();
-    menuInfo.showAutoFill = pattern->IsShowAutoFill();
-    menuInfo.showTranslate = menuInfo.showCopy && pattern->IsShowTranslate() && IsNeedMenuTranslate();
-    menuInfo.showSearch = menuInfo.showCopy && pattern->IsShowSearch() && IsNeedMenuSearch();
-    menuInfo.showShare = menuInfo.showCopy && IsSupportMenuShare() && IsNeedMenuShare();
-    menuInfo.showAIWrite = pattern->IsShowAIWrite();
-    if (pattern->IsShowAIMenuOption() && !pattern->GetAIItemOption().empty() && !pattern->IsInPasswordMode()) {
-        menuInfo.aiMenuOptionType = pattern->GetAIItemOption().begin()->second.type;
-    } else {
-        menuInfo.aiMenuOptionType = TextDataDetectType::INVALID;
-    }
-    if ((dirtyFlag & DIRTY_SELECT_AI_DETECT) == DIRTY_SELECT_AI_DETECT) {
-        menuInfo.menuIsShow = manager->IsMenuShow();
-    }
+    FillMenuVisibility(menuInfo, hasText, menuInfo.showCameraInput, pattern->IsShowAutoFill(),
+        pattern->IsSelectionMenuHidden(), dirtyFlag);
+    FillMenuShowPaste(menuInfo);
+    FillMenuMenuType(menuInfo);
+    FillMenuShowCopyAndCut(menuInfo, hasText, pattern->AllowCopy(), isSelected);
+    FillMenuShowCopyAll(menuInfo, hasText, isSelectAll);
+    FillMenuShowAutoFill(menuInfo, pattern->IsShowAutoFill());
+    FillMenuShowTranslate(menuInfo, menuInfo.showCopy, pattern->IsShowTranslate());
+    FillMenuShowSearch(menuInfo, menuInfo.showCopy, pattern->IsShowSearch());
+    FillMenuShowShare(menuInfo, menuInfo.showCopy);
+    FillMenuShowAIWrite(menuInfo, pattern->IsShowAIWrite());
+    const auto& aiItems = pattern->GetAIItemOption();
+    bool hasAiItem = !aiItems.empty();
+    TextDataDetectType aiType = hasAiItem ? aiItems.begin()->second.type : TextDataDetectType::INVALID;
+    FillMenuAIMenuOptionType(menuInfo, isInPasswordMode, pattern->IsShowAIMenuOption(), hasAiItem, aiType);
 }
 
 void TextFieldSelectOverlay::OnUpdateSelectOverlayInfo(SelectOverlayInfo& overlayInfo, int32_t requestCode)

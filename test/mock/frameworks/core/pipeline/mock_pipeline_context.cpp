@@ -74,6 +74,7 @@
 #include "core/components_ng/manager/navigation/navigation_manager.h"
 #include "core/components_ng/pattern/stage/stage_manager.h"
 #include "core/components_ng/pattern/navigation/navigation_route.h"
+#include "core/components_ng/manager/material/material_processor.h"
 
 namespace OHOS::Ace {
 
@@ -1241,7 +1242,8 @@ void PipelineContext::SetIsDragging(bool isDragging)
 
 void PipelineContext::ResetDragging() {}
 
-void PipelineContext::UpdateOriginAvoidArea(const Rosen::AvoidArea& avoidArea, uint32_t type) {}
+void PipelineContext::UpdateOriginAvoidArea(const Rosen::AvoidArea& avoidArea, uint32_t type,
+    WindowSizeChangeReason reason) {}
 
 void PipelineContext::CheckAndUpdateKeyboardInset(float keyboardHeight) {}
 
@@ -1619,9 +1621,10 @@ RefPtr<AccessibilityManager> PipelineBase::GetAccessibilityManager() const
 }
 
 #ifdef WINDOW_SCENE_SUPPORTED
-const RefPtr<UIExtensionManager>& GetUIExtensionManager()
+const RefPtr<UIExtensionManager>& PipelineContext::GetUIExtensionManager()
 {
-    return AceType::MakeRefPtr<UIExtensionManager>();
+    static const RefPtr<UIExtensionManager> uiExtensionManager = AceType::MakeRefPtr<UIExtensionManager>();
+    return uiExtensionManager;
 }
 #endif
 
@@ -2123,6 +2126,12 @@ int32_t PipelineContext::RegisterRotationEndCallback(std::function<void()>&& cal
 }
 
 void PipelineContext::OnSurfaceDensityChanged(double density) {}
+void PipelineContext::RegisterListenerForTranslate(const WeakPtr<FrameNode> node) {}
+void PipelineContext::UnRegisterListenerForTranslate(int32_t nodeId) {}
+
+void PipelineContext::RegisterMaterialNode(const RefPtr<FrameNode>& node) {}
+
+void PipelineContext::UnregisterMaterialNode(int32_t nodeId) {}
 } // namespace OHOS::Ace::NG
 
 namespace OHOS::Ace {

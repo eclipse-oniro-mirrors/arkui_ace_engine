@@ -50,7 +50,7 @@ public:
     using NotifyAllWebFunction = std::function<void(bool isRegister)>;
     using GetPixelMapFunction = std::function<void()>;
     using NotifySendCommandFunction = std::function<void(int32_t id, const std::string& command)>;
-    using NotifySendCommandAsyncFunction = std::function<int32_t(int32_t id, const std::string& command)>;
+    using NotifySendCommandSyncFunction = std::function<int32_t(int32_t id, const std::string& command)>;
     using SendCommandFunction = std::function<void(int32_t value)>;
     using RelaxedCommandFunction = std::function<void(const std::string& command)>;
     using ExeAppAIFunctionFunction = std::function<std::pair<uint32_t, std::string>(
@@ -70,17 +70,18 @@ public:
     using PageSceneDetectFunction = std::function<void(int32_t, const std::string&, bool)>;
 
     enum class WebPageSceneOp {
-        RegisterRules,    // Register rules + traverse for reportOnRegister
+        RegisterRules,    // Register rules + match for reportOnRegister
         UnregisterRules,  // Unregister rules
-        Traverse,         // Traverse web components (GetPageScene)
+        GetPageScene,     // Get page scene (temp register + match + cleanup)
     };
-    using WebPageSceneFunction = std::function<void(WebPageSceneOp op, int32_t processId, const std::string& ruleJson,
-        bool isGetResult)>;
+    using WebPageSceneFunction = std::function<int32_t(WebPageSceneOp op, int32_t processId,
+        const std::string& ruleJson, bool isGetResult)>;
 
     enum class PageSceneNodeStateChange : uint8_t {
         VISIBILITY,
         ACTIVE,
         FOCUSABILITY,
+        OPACITY,
     };
     /**
      * @description: Get ui_manager instance,this object process singleton
@@ -142,7 +143,7 @@ public:
     virtual void WebTaskNumsChange(int32_t num) {};
     virtual void ReportInspectorTreeValue(const std::string& value) {};
     virtual void SaveForSendCommandFunction(NotifySendCommandFunction&& function) {};
-    virtual void SaveForSendCommandAsyncFunction(NotifySendCommandAsyncFunction&& function) {};
+    virtual void SaveForSendCommandSyncFunction(NotifySendCommandSyncFunction&& function) {};
     virtual void SaveInspectorTreeFunction(InspectorFunction&& function) {};
     virtual void SaveRegisterForWebFunction(NotifyAllWebFunction&& function) {};
     virtual void SaveGetHitTestInfoCallback(GetHitTestInfoFunction&& function) {};
@@ -156,7 +157,7 @@ public:
         int64_t accessibilityId, const std::string& data, const std::string& type = "") {};
     virtual void NotifyAllWebPattern(bool isRegister) {};
     virtual void NotifySendCommandPattern(int32_t id, const std::string& command) {};
-    virtual int32_t NotifySendCommandAsyncPattern(int32_t id, const std::string& command) { return 11; };
+    virtual int32_t NotifySendCommandSyncPattern(int32_t id, const std::string& command) { return 11; };
     virtual void SetClickEventRegistered(bool status) {};
     virtual void SetSearchEventRegistered(bool status) {};
     virtual void SetTextChangeEventRegistered(bool status) {};
@@ -352,8 +353,8 @@ protected:
     std::mutex getImagesByIdFunctionMutex_;
     NotifySendCommandFunction notifySendCommandFunction_ = 0;
     std::mutex notifySendCommandFunctionMutex_;
-    NotifySendCommandAsyncFunction notifySendCommandAsyncFunction_ = 0;
-    std::mutex notifySendCommandAsyncFunctionMutex_;
+    NotifySendCommandSyncFunction notifySendCommandSyncFunction_ = 0;
+    std::mutex notifySendCommandSyncFunctionMutex_;
     GetStateMgmtInfoFunction getStateMgmtInfoFunction_ = 0;
     std::mutex getStateMgmtInfoFunctionMutex_;
     std::shared_ptr<InspectorJsonValue> jsonValue_ = nullptr;

@@ -481,11 +481,7 @@ export struct ChipGroup {
     return defaultTheme.itemStyle.selectedFillColor;
   }
 
-  private getBackgroundColor(): ResourceColor | undefined {
-    if (!!this.backgroundSystemMaterial) {
-      return undefined;
-    }
-
+  private getBackgroundColor(): ResourceColor {
     if (this.itemStyle && this.itemStyle.backgroundColor) {
       if (typeof this.itemStyle.backgroundColor === 'object') {
         let temp: Resource = this.itemStyle.backgroundColor as Resource;
@@ -502,11 +498,7 @@ export struct ChipGroup {
     return defaultTheme.itemStyle.backgroundColor;
   }
 
-  private getSelectedBackgroundColor(): ResourceColor | undefined {
-    if (!!this.selectedBackgroundSystemMaterial) {
-      return undefined;
-    }
-
+  private getSelectedBackgroundColor(): ResourceColor {
     if (this.itemStyle && this.itemStyle.selectedBackgroundColor) {
       if (typeof this.itemStyle.selectedBackgroundColor === 'object') {
         let temp: Resource = this.itemStyle.selectedBackgroundColor as Resource;
@@ -802,6 +794,16 @@ export struct ChipGroup {
   }
 }
 
+function isNullOrEmptyMaterial(material: uiMaterial.Material | undefined): boolean {
+  if (!material) {
+    return true;
+  }
+  if (material === uiMaterial.Material.empty) {
+    return true;
+  }
+  return false;
+}
+
 function withDefaultMaterial(
   material: uiMaterial.Material | undefined, defaultMaterial: uiMaterial.Material | undefined
 ): uiMaterial.Material | undefined {
@@ -819,7 +821,7 @@ function withDefaultMaterial(
 function enableEffectComponent(
   material: uiMaterial.Material | undefined
 ): boolean {
-  if (material) {
+  if (material && !isNullOrEmptyMaterial(material)) {
     return material instanceof uiMaterial.ImmersiveMaterial;
   }
   return false;

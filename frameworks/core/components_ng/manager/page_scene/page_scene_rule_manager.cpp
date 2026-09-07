@@ -25,9 +25,14 @@
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/base/ui_node.h"
 #include "core/components_ng/event/focus_hub.h"
+#include "core/components_ng/pattern/rich_editor/bridge/rich_editor_custom_modifier.h"
+#include "core/components_ng/pattern/rich_editor/rich_editor_layout_property.h"
+#include "core/components_ng/pattern/text_field/text_field_pattern.h"
+#include "core/components_ng/pattern/text_field/text_field_layout_property.h"
+#include "core/components_ng/pattern/text_field/text_field_type_utils.h"
 #include "core/components_v2/inspector/inspector_constants.h"
-#include "core/interfaces/native/node/rich_editor_modifier.h"
 #include "core/interfaces/native/node/node_text_input_modifier.h"
+#include "core/interfaces/native/node/rich_editor_modifier.h"
 
 namespace OHOS::Ace::NG {
 namespace {
@@ -43,10 +48,30 @@ const char COUNT_GTE_OPERATOR[] = "COUNT_GTE";
 const char SOURCE_ARKUI[] = "ARKUI";
 const char SEARCH_FIELD_TAG[] = "SearchField";
 
-bool IsTextCategoryComponent(const std::string& frameTag)
+std::string ExtractTextFieldText(const RefPtr<FrameNode>& node)
 {
-    return frameTag == V2::TEXTAREA_ETS_TAG || frameTag == V2::TEXTINPUT_ETS_TAG ||
-        frameTag == V2::SEARCH_ETS_TAG || frameTag == V2::SEARCH_Field_ETS_TAG;
+    CHECK_NULL_RETURN(node, "");
+    auto customModifier = NodeModifier::GetTextInputCustomModifier();
+    CHECK_NULL_RETURN(customModifier, "");
+    CHECK_NULL_RETURN(customModifier->getTextByPattern, "");
+    std::string text;
+    if (customModifier->getTextByPattern(node, text)) {
+        return text;
+    }
+    return "";
+}
+
+std::string ExtractRichEditorText(const RefPtr<FrameNode>& node)
+{
+    CHECK_NULL_RETURN(node, "");
+    auto customModifier = NodeModifier::GetRichEditorCustomModifier();
+    CHECK_NULL_RETURN(customModifier, "");
+    CHECK_NULL_RETURN(customModifier->getContentBySpans, "");
+    std::u16string text;
+    if (!customModifier->getContentBySpans(node, text)) {
+        return "";
+    }
+    return UtfUtils::Str16DebugToStr8(text);
 }
 
 bool IsValidId(const std::string& id)
@@ -79,7 +104,7 @@ std::string NormalizeNodeType(const std::string& tag)
     if (tag == V2::TEXTAREA_ETS_TAG) {
         return "TextArea";
     }
-    if (tag == V2::SEARCH_ETS_TAG || tag == SEARCH_FIELD_TAG) {
+    if (tag == V2::SEARCH_ETS_TAG) {
         return "Search";
     }
     if (tag == V2::RICH_EDITOR_ETS_TAG) {
@@ -104,54 +129,59 @@ std::unique_ptr<JsonValue> BuildRectJson(const PageSceneRectInfo& rect)
     return rectJson;
 }
 
-std::string ExtractTextFieldText(const RefPtr<FrameNode>& node)
+RefPtr<FrameNode> FindSearchFieldNode(const RefPtr<FrameNode>& node)
 {
-    CHECK_NULL_RETURN(node, "");
-    if (IsTextCategoryComponent(node->GetTag())) {
-        auto textInputCustomModifier = NodeModifier::GetTextInputCustomModifier();
-        CHECK_NULL_RETURN(textInputCustomModifier, "");
-        return textInputCustomModifier->extractTextFieldText(node);
-    }
-    return "";
-}
-
-std::string ExtractSearchText(const RefPtr<FrameNode>& node)
-{
-    CHECK_NULL_RETURN(node, "");
+    CHECK_NULL_RETURN(node, nullptr);
     for (const auto& child : node->GetChildrenForInspector(true)) {
         auto childFrameNode = AceType::DynamicCast<FrameNode>(child);
         if (childFrameNode && childFrameNode->GetTag() == SEARCH_FIELD_TAG) {
-            return ExtractTextFieldText(childFrameNode);
+            return childFrameNode;
         }
     }
-    return "";
+    return nullptr;
 }
 
-std::string ExtractRichEditorText(const RefPtr<FrameNode>& node)
+void FillTextFieldInfo(const RefPtr<FrameNode>& node, PageSceneNodeInfo& info)
 {
-    CHECK_NULL_RETURN(node, "");
-    if (node->GetTag() == V2::RICH_EDITOR_ETS_TAG) {
-        auto* customModifier = NodeModifier::GetRichEditorCustomModifier();
-        CHECK_NULL_RETURN(customModifier, "");
-        return customModifier->extractRichEditorText(node);
+    CHECK_NULL_VOID(node);
+    info.text = ExtractTextFieldText(node);
+    auto layoutProperty = node->GetLayoutProperty<TextFieldLayoutProperty>();
+    CHECK_NULL_VOID(layoutProperty);
+    if (layoutProperty->HasPlaceholder()) {
+        info.placeholder = UtfUtils::Str16DebugToStr8(layoutProperty->GetPlaceholderValue());
     }
-    return "";
+    const bool isTextArea = node->GetTag() == V2::TEXTAREA_ETS_TAG;
+    auto contentType = layoutProperty->GetTextContentTypeValue(TextContentType::UNSPECIFIED);
+    auto inputType = layoutProperty->GetTextInputTypeValue(TextInputType::UNSPECIFIED);
+    info.contentType = TextFieldTypeUtils::ToContentTypeName(contentType);
+    info.inputType = TextFieldTypeUtils::ToInputTypeName(inputType, isTextArea, !isTextArea);
 }
 
-std::string ExtractInputText(const RefPtr<FrameNode>& node)
+void FillRichEditorInfo(const RefPtr<FrameNode>& node, PageSceneNodeInfo& info)
 {
-    CHECK_NULL_RETURN(node, "");
+    CHECK_NULL_VOID(node);
+    info.text = ExtractRichEditorText(node);
+    auto layoutProperty = node->GetLayoutProperty<RichEditorLayoutProperty>();
+    if (layoutProperty && layoutProperty->HasPlaceholder()) {
+        info.placeholder = UtfUtils::Str16DebugToStr8(layoutProperty->GetPlaceholderValue());
+    }
+}
+
+void FillInputInfo(const RefPtr<FrameNode>& node, PageSceneNodeInfo& info)
+{
+    CHECK_NULL_VOID(node);
     auto tag = node->GetTag();
     if (tag == V2::TEXTINPUT_ETS_TAG || tag == V2::TEXTAREA_ETS_TAG || tag == SEARCH_FIELD_TAG) {
-        return ExtractTextFieldText(node);
+        FillTextFieldInfo(node, info);
+        return;
     }
     if (tag == V2::SEARCH_ETS_TAG) {
-        return ExtractSearchText(node);
+        FillTextFieldInfo(FindSearchFieldNode(node), info);
+        return;
     }
     if (tag == V2::RICH_EDITOR_ETS_TAG) {
-        return ExtractRichEditorText(node);
+        FillRichEditorInfo(node, info);
     }
-    return "";
 }
 
 std::string BuildPageSceneEventName(const std::string& sceneType, bool matched, bool forceReportUnmatched)
@@ -164,13 +194,18 @@ std::string BuildPageSceneEventName(const std::string& sceneType, bool matched, 
 } // namespace
 
 void PageSceneInputCountTracker::Initialize(
-    const PageSceneRuleSet& ruleSet, const PageSceneRule& rule, const RefPtr<FrameNode>& pageRoot)
+    const PageSceneRuleSet& ruleSet, const PageSceneRule& rule, const DumpStartNodeSet& startNodes)
 {
     Reset();
-    if (pageRoot) {
-        pageViewportRect_ = pageRoot->GetTransformRectRelativeToWindowOnlyVisible(true);
+    if (rule.rectCulling && startNodes.dumpBeginNode) {
+        pageViewportRect_ = startNodes.dumpBeginNode->GetTransformRectRelativeToWindow(true);
     }
-    CollectInputNodes(ruleSet, rule, pageRoot);
+    for (const auto& node : startNodes.pageStartNodes) {
+        CollectInputNodes(ruleSet, rule, node);
+    }
+    for (const auto& node : startNodes.overlayNodes) {
+        CollectInputNodes(ruleSet, rule, node);
+    }
     std::sort(visibleInputNodes_.begin(), visibleInputNodes_.end(), [](const auto& left, const auto& right) {
         return left.nodeId < right.nodeId;
     });
@@ -185,6 +220,23 @@ void PageSceneInputCountTracker::Reset()
 const std::vector<PageSceneNodeInfo>& PageSceneInputCountTracker::GetVisibleInputNodes() const
 {
     return visibleInputNodes_;
+}
+
+bool PageSceneInputCountTracker::IsOpacityVisible(const RefPtr<FrameNode>& node) const
+{
+    double finalOpacity = 1.0;
+    auto current = node;
+    while (current) {
+        auto renderContext = current->GetRenderContext();
+        if (renderContext) {
+            finalOpacity *= renderContext->GetOpacityValue(1.0);
+            if (NearZero(finalOpacity)) {
+                return false;
+            }
+        }
+        current = current->GetAncestorNodeOfFrame(true);
+    }
+    return !NearZero(finalOpacity);
 }
 
 void PageSceneInputCountTracker::CollectInputNodes(
@@ -219,11 +271,20 @@ std::optional<PageSceneNodeInfo> PageSceneInputCountTracker::BuildNodeInfo(
         return std::nullopt;
     }
 
-    RectF rect = rule.onlyVisible ? node->GetTransformRectRelativeToWindowOnlyVisible(true)
-                                  : node->GetTransformRectRelativeToWindow(true);
-    bool visible = !rule.onlyVisible || (node->IsVisibleAndActive() && rect.Width() > 0.0f && rect.Height() > 0.0f &&
-        pageViewportRect_.IsInnerIntersectWith(rect));
-    if (!visible) {
+    const bool needRect = rule.onlyVisible || rule.rectCulling || rule.includeRect;
+    RectF rect;
+    if (needRect) {
+        rect = rule.onlyVisible ? node->GetTransformRectRelativeToWindowOnlyVisible(true)
+                                : node->GetTransformRectRelativeToWindow(true);
+    }
+    if (rule.onlyVisible) {
+        const bool visible = node->IsVisibleAndActive() && IsOpacityVisible(node) &&
+            rect.Width() > 0.0f && rect.Height() > 0.0f;
+        if (!visible) {
+            return std::nullopt;
+        }
+    }
+    if (rule.rectCulling && !pageViewportRect_.IsInnerIntersectWith(rect)) {
         return std::nullopt;
     }
 
@@ -237,7 +298,7 @@ std::optional<PageSceneNodeInfo> PageSceneInputCountTracker::BuildNodeInfo(
     info.nodeId = node->GetId();
     info.nodeType = nodeType;
     if (rule.includeText) {
-        info.text = ExtractInputText(node);
+        FillInputInfo(node, info);
     }
     info.focusable = focusable;
     info.rect.x = rect.GetX();
@@ -338,11 +399,18 @@ std::vector<std::pair<int32_t, std::string>> PageSceneRuleManager::GetActiveRule
 }
 
 std::optional<PageSceneMatchResult> PageSceneRuleManager::MatchPageScene(
-    int32_t processId, const std::string& ruleJson, const RefPtr<FrameNode>& pageRoot,
+    int32_t processId, const std::string& ruleJson, const DumpStartNodeSet& startNodes,
     const std::string& pageName, bool forceReportUnmatched)
 {
     auto ruleSet = ParseRuleSet(ruleJson);
-    if (!ruleSet.has_value() || !ruleSet->arkuiEnabled || !pageRoot) {
+    // dumpBeginNode is only a viewport source. AtomicService roots are branch
+    // markers used to discover overlays, not PageScene traversal roots.
+    const bool hasPageRoot = std::any_of(startNodes.pageStartNodes.begin(), startNodes.pageStartNodes.end(),
+        [](const auto& node) { return node != nullptr; });
+    const bool hasOverlayRoot = std::any_of(startNodes.overlayNodes.begin(), startNodes.overlayNodes.end(),
+        [](const auto& node) { return node != nullptr; });
+    const bool hasTraversalRoot = hasPageRoot || hasOverlayRoot;
+    if (!ruleSet.has_value() || !ruleSet->arkuiEnabled || !hasTraversalRoot) {
         return std::nullopt;
     }
     std::optional<PageSceneMatchResult> unmatchedResult;
@@ -351,7 +419,7 @@ std::optional<PageSceneMatchResult> PageSceneRuleManager::MatchPageScene(
             continue;
         }
         PageSceneInputCountTracker tracker;
-        tracker.Initialize(ruleSet.value(), rule, pageRoot);
+        tracker.Initialize(ruleSet.value(), rule, startNodes);
         const auto& nodes = tracker.GetVisibleInputNodes();
         bool matched = static_cast<int32_t>(nodes.size()) >= rule.threshold;
         PageSceneMatchResult result;
@@ -484,6 +552,7 @@ std::optional<PageSceneRule> PageSceneRuleManager::ParseRule(const std::unique_p
     auto scope = GetObjectValue(ruleJson, "scope");
     if (scope) {
         rule.onlyVisible = scope->GetBool("onlyVisible", true);
+        rule.rectCulling = scope->GetBool("rectCulling", false);
         rule.includeWeb = scope->GetBool("includeWeb", false);
         rule.includeUIExtension = scope->GetBool("includeUIExtension", false);
     }
@@ -567,6 +636,9 @@ std::string PageSceneRuleManager::BuildSceneJson(const PageSceneRuleSet& ruleSet
         }
         if (rule.includeText) {
             nodeJson->Put("text", node.text.c_str());
+            nodeJson->Put("placeholder", node.placeholder.c_str());
+            nodeJson->Put("contentType", node.contentType.c_str());
+            nodeJson->Put("inputType", node.inputType.c_str());
         }
         nodesJson->Put(nodeJson);
     }

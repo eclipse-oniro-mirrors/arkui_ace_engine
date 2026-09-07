@@ -10,6 +10,7 @@
     "pages/scrollable/RefreshNestedScrollIssueDemo",
     "pages/scrollable/ScrollEventObserver",
     "pages/scrollable/FreeScroll",
+    "pages/scrollable/ComposeListItemV2EmitterOffIssueDemo",
     "pages/Tabs/TabsMainPage",
     "pages/Tabs/BarBackgroundBlurStyle",
     "pages/Tabs/OnContentWillChange",
@@ -38,6 +39,7 @@
     "pages/waterflow/waterFlowModifier/scrollBarColor",
     "pages/waterflow/CAPI/WaterFlowInfiniteScrollingEarly",
     "pages/waterflow/CAPI/WaterFlowCapiShowcase",
+    "pages/waterflow/clipContent/ClipContentMainPage",
     "pages/Swiper/SwiperMainPage",
     "pages/Swiper/OnContentWillScrollNormal",
     "pages/Swiper/OnContentWillScrollNestList",
@@ -197,6 +199,9 @@
     "pages/Scroll/ScrollBarColor",
     "pages/Scroll/ScrollModifier/scrollBarColor",
     "pages/Scroll/CAPI/ScrollableInfiniteScroll",
+    "pages/Scroll/ScrollDashboardInteractiveSample",
+    "pages/Scroll/ScrollNestedListComprehensiveSample",
+    "pages/Scroll/ScrollBarComprehensiveSample",
     "pages/LazyHeaderFooter/LazyHeaderFooterMainPage",
     "pages/LazyHeaderFooter/ScrollSample",
     "pages/LazyHeaderFooter/ListSample",
@@ -241,6 +246,7 @@
     "pages/waterflow/WaterFlowEmptyBranchModifier",
     "pages/waterflow/WaterFlowEmptyBranchSessionEmpty",
     "pages/grid/GridEmptyBranch",
-    "pages/List/ListEmptyBranch"
+    "pages/List/ListEmptyBranch",
+    "pages/List/syncLoad/SyncLoadDemo"
   ]
 }

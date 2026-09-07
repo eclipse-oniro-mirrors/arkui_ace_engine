@@ -287,6 +287,7 @@ public:
     Dimension GetSelectLeftMargin(ControlSize controlSize) const;
     Dimension GetSelectRightMargin(ControlSize controlSize) const;
     bool OnThemeScopeUpdate(int32_t themeScopeId) override;
+    void OnMaterialDisable() override;
     RefPtr<PaintProperty> CreatePaintProperty() override
     {
         return MakeRefPtr<SelectPaintProperty>();
@@ -402,6 +403,7 @@ private:
 
     // change background color when pressed
     void RegisterOnPress();
+    bool IsSystemMaterialLightEffectActive(const RefPtr<RenderContext>& renderContext);
     // change background color when hovered
     void RegisterOnHover();
     // add click event to show menu
@@ -460,6 +462,7 @@ private:
 
     void ToJsonValue(std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const override;
     void ToJsonSelectedOptionFontAndColor(std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const;
+    void ToJsonOptionFontColor(std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const;
     void ToJsonArrowAndText(std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const;
     void ToJsonOptionAlign(std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const;
     void ToJsonMenuBackgroundStyle(std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const;
