@@ -20,7 +20,16 @@
 #include "core/components_ng/syntax/repeat_virtual_scroll_2_node.h"
 #include "core/components_ng/syntax/repeat_virtual_scroll_node.h"
 
+#include "base/ressched/ressched_report.h"
+
+namespace OHOS::Ace {
+extern std::unordered_map<std::string, std::string> g_lastSwiperChangePayload;
+extern int32_t g_lastSwiperChangeValue;
+}
+
 namespace OHOS::Ace::NG {
+constexpr int32_t COMPONENT_SWIPER_SHOW = 1;
+constexpr int32_t COMPONENT_SWIPER_HIDDEN = 2;
 class SwiperPatternTestNg : public SwiperTestNg {
 public:
 };
@@ -3246,5 +3255,162 @@ HWTEST_F(SwiperPatternTestNg, StopPropertyTranslateAnimation002, TestSize.Level1
     swiperPattern->StopPropertyTranslateAnimation(true, false, false);
     EXPECT_TRUE(swiperPattern->fastAnimationRunning_);
     EXPECT_TRUE(swiperPattern->syncCancelAniIsFailed_);
+}
+/**
+ * @tc.name: SwiperHandleVisibleChange001
+ * @tc.desc: test HandleVisibleChange when swiper becomes visible
+ * @tc.type: FUNC
+ */
+HWTEST_F(SwiperPatternTestNg, SwiperHandleVisibleChange001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Init Swiper node.
+     */
+    SwiperModelNG model = CreateSwiper();
+    CreateSwiperItems(4);
+    CreateSwiperDone();
+
+    auto host = pattern_->GetHost();
+    ASSERT_NE(host, nullptr);
+
+    /**
+     * @tc.steps: step2. Call HandleVisibleChange with visible=true.
+     * @tc.expected: Method executes without crash and reports swiper change.
+     */
+    pattern_->HandleVisibleChange(true);
+    EXPECT_TRUE(pattern_->isVisibleArea_);
+}
+
+/**
+ * @tc.name: SwiperHandleVisibleChange002
+ * @tc.desc: test HandleVisibleChange when swiper becomes hidden
+ * @tc.type: FUNC
+ */
+HWTEST_F(SwiperPatternTestNg, SwiperHandleVisibleChange002, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Init Swiper node.
+     */
+    SwiperModelNG model = CreateSwiper();
+    CreateSwiperItems(4);
+    CreateSwiperDone();
+
+    auto host = pattern_->GetHost();
+    ASSERT_NE(host, nullptr);
+
+    pattern_->isVisibleArea_ = true;
+
+    /**
+     * @tc.steps: step2. Call HandleVisibleChange with visible=false.
+     * @tc.expected: Method executes without crash and sets isVisibleArea_ to false.
+     */
+    pattern_->HandleVisibleChange(false);
+    EXPECT_FALSE(pattern_->isVisibleArea_);
+}
+
+/**
+ * @tc.name: SwiperReportSwiperChangeContentWithValue001
+ * @tc.desc: test ReportSwiperChangeContent with value parameter (SWIPER_SHOW)
+ * @tc.type: FUNC
+ */
+HWTEST_F(SwiperPatternTestNg, SwiperReportSwiperChangeContentWithValue001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Init Swiper node.
+     */
+    SwiperModelNG model = CreateSwiper();
+    CreateSwiperItems(4);
+    CreateSwiperDone();
+
+    auto host = pattern_->GetHost();
+    auto geometryNode = host->GetGeometryNode();
+    auto frame = geometryNode->frame_;
+    auto rect = frame.rect_;
+    rect.width_ = 100.0;
+    rect.height_ = 100.0;
+
+    auto context = pattern_->GetContext();
+    CHECK_NULL_VOID(context);
+    
+    context->rootWidth_ = 180.0;
+    context->rootHeight_ = 180.0;
+
+    /**
+     * @tc.steps: step2. Call ReportSwiperChangeContent with value=1 (SHOW).
+     * @tc.expected: Method executes without crash.
+     */
+    pattern_->ReportSwiperChangeContent(0, 1);
+    EXPECT_FALSE(pattern_->isInAutoPlay_);
+}
+
+/**
+ * @tc.name: SwiperReportSwiperChangeContentWithValue002
+ * @tc.desc: test ReportSwiperChangeContent with value parameter (SWIPER_HIDDEN)
+ * @tc.type: FUNC
+ */
+HWTEST_F(SwiperPatternTestNg, SwiperReportSwiperChangeContentWithValue002, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Init Swiper node.
+     */
+    SwiperModelNG model = CreateSwiper();
+    CreateSwiperItems(4);
+    CreateSwiperDone();
+
+    auto host = pattern_->GetHost();
+    auto geometryNode = host->GetGeometryNode();
+    auto frame = geometryNode->frame_;
+    auto rect = frame.rect_;
+    rect.width_ = 100.0;
+    rect.height_ = 100.0;
+
+    auto context = pattern_->GetContext();
+    CHECK_NULL_VOID(context);
+    
+    context->rootWidth_ = 180.0;
+    context->rootHeight_ = 180.0;
+
+    /**
+     * @tc.steps: step2. Call ReportSwiperChangeContent with value=2 (HIDDEN).
+     * @tc.expected: Method executes without crash.
+     */
+    pattern_->ReportSwiperChangeContent(1, 2);
+    EXPECT_FALSE(pattern_->isInAutoPlay_);
+}
+
+/**
+ * @tc.name: SwiperHandleSwiperChangeValue001
+ * @tc.desc: test HandleSwiperChange receives value 1 (SWIPER_SHOW)
+ * @tc.type: FUNC
+ */
+HWTEST_F(SwiperPatternTestNg, SwiperHandleSwiperChangeValue001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Call HandleSwiperChange with value=1 (SHOW).
+     * @tc.expected: The mock records payload and parses value as 1.
+     */
+    std::unordered_map<std::string, std::string> payload;
+    payload["value"] = std::to_string(COMPONENT_SWIPER_SHOW);
+    ResSchedReport::GetInstance().HandleSwiperChange(payload);
+    EXPECT_EQ(g_lastSwiperChangeValue, COMPONENT_SWIPER_SHOW);
+    EXPECT_EQ(g_lastSwiperChangePayload["value"], std::to_string(COMPONENT_SWIPER_SHOW));
+}
+
+/**
+ * @tc.name: SwiperHandleSwiperChangeValue002
+ * @tc.desc: test HandleSwiperChange receives value 2 (SWIPER_HIDDEN)
+ * @tc.type: FUNC
+ */
+HWTEST_F(SwiperPatternTestNg, SwiperHandleSwiperChangeValue002, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Call HandleSwiperChange with value=2 (HIDDEN).
+     * @tc.expected: The mock records payload and parses value as 2.
+     */
+    std::unordered_map<std::string, std::string> payload;
+    payload["value"] = std::to_string(COMPONENT_SWIPER_HIDDEN);
+    ResSchedReport::GetInstance().HandleSwiperChange(payload);
+    EXPECT_EQ(g_lastSwiperChangeValue, COMPONENT_SWIPER_HIDDEN);
+    EXPECT_EQ(g_lastSwiperChangePayload["value"], std::to_string(COMPONENT_SWIPER_HIDDEN));
 }
 } // namespace OHOS::Ace::NG
