@@ -722,7 +722,12 @@ void ResSchedReport::HandlePageTransition(const PageTransitionInfo& pageTransiti
 void ResSchedReport::HandleSwiperChange(std::unordered_map<std::string, std::string>& payload)
 {
     LoadAceApplicationContext(payload);
-    ResSchedDataReport(RES_TYPE_COMPONENT_STATE_CHANGE, 0, payload);
+    int32_t value = 0;
+    auto it = payload.find("value");
+    if (it != payload.end()) {
+        value = std::stoi(it->second);
+    }
+    ResSchedDataReport(RES_TYPE_COMPONENT_STATE_CHANGE, value, payload);
 }
 
 ResSchedReportScope::ResSchedReportScope(const std::string& name,
