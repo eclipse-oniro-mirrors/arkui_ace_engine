@@ -15,6 +15,7 @@
 
 #include "base/ressched/ressched_report.h"
 
+#include "base/utils/string_utils.h"
 #include "core/common/container.h"
 #include "core/event/key_event.h"
 
@@ -725,7 +726,7 @@ void ResSchedReport::HandleSwiperChange(std::unordered_map<std::string, std::str
     int32_t value = 0;
     auto it = payload.find("value");
     if (it != payload.end()) {
-        value = std::stoi(it->second);
+        value = StringUtils::StringToInt(it->second);
     }
     ResSchedDataReport(RES_TYPE_COMPONENT_STATE_CHANGE, value, payload);
 }
