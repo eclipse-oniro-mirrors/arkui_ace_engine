@@ -20,6 +20,13 @@
 #include "core/components_ng/syntax/repeat_virtual_scroll_2_node.h"
 #include "core/components_ng/syntax/repeat_virtual_scroll_node.h"
 
+#include "base/ressched/ressched_report.h"
+
+namespace OHOS::Ace {
+extern std::unordered_map<std::string, std::string> g_lastSwiperChangePayload;
+extern int32_t g_lastSwiperChangeValue;
+}
+
 namespace OHOS::Ace::NG {
 constexpr int32_t COMPONENT_SWIPER_SHOW = 1;
 constexpr int32_t COMPONENT_SWIPER_HIDDEN = 2;
@@ -3385,7 +3392,12 @@ HWTEST_F(SwiperPatternTestNg, SwiperHandleSwiperChangeValue001, TestSize.Level1)
     std::unordered_map<std::string, std::string> payload;
     payload["value"] = std::to_string(COMPONENT_SWIPER_SHOW);
     ResSchedReport::GetInstance().HandleSwiperChange(payload);
+<<<<<<< HEAD
     EXPECT_EQ(GetLastSwiperChangePayload().at["value"], std::to_string(COMPONENT_SWIPER_SHOW));
+=======
+    EXPECT_EQ(g_lastSwiperChangeValue, COMPONENT_SWIPER_SHOW);
+    EXPECT_EQ(g_lastSwiperChangePayload["value"], std::to_string(COMPONENT_SWIPER_SHOW));
+>>>>>>> c39d741c668c1f880f14e5bb8d5c232ec244a32a
 }
 
 /**
@@ -3402,6 +3414,11 @@ HWTEST_F(SwiperPatternTestNg, SwiperHandleSwiperChangeValue002, TestSize.Level1)
     std::unordered_map<std::string, std::string> payload;
     payload["value"] = std::to_string(COMPONENT_SWIPER_HIDDEN);
     ResSchedReport::GetInstance().HandleSwiperChange(payload);
+<<<<<<< HEAD
     EXPECT_EQ(GetLastSwiperChangePayload().at["value"], std::to_string(COMPONENT_SWIPER_HIDDEN));
+=======
+    EXPECT_EQ(g_lastSwiperChangeValue, COMPONENT_SWIPER_HIDDEN);
+    EXPECT_EQ(g_lastSwiperChangePayload["value"], std::to_string(COMPONENT_SWIPER_HIDDEN));
+>>>>>>> c39d741c668c1f880f14e5bb8d5c232ec244a32a
 }
 } // namespace OHOS::Ace::NG
