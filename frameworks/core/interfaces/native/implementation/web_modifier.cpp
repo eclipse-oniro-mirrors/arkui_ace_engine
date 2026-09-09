@@ -3284,7 +3284,6 @@ const GENERATED_ArkUIWebModifier* GetWebModifier()
         WebAttributeModifier::SetBlockNetworkImpl,
         WebAttributeModifier::SetHorizontalScrollBarAccessImpl,
         WebAttributeModifier::SetVerticalScrollBarAccessImpl,
-        WebAttributeModifier::SetCaretColorImpl,
         WebAttributeModifier::SetOnTouchIconUrlReceivedImpl,
         WebAttributeModifier::SetOnFaviconReceivedImpl,
         WebAttributeModifier::SetOnPageVisibleImpl,
@@ -3363,6 +3362,7 @@ const GENERATED_ArkUIWebModifier* GetWebModifier()
         WebAttributeModifier::SetRegisterNativeEmbedRuleImpl,
         WebAttributeModifier::SetBindSelectionMenuImpl,
         WebAttributeModifier::SetEnableScrollDirectionalLockImpl,
+        WebAttributeModifier::SetCaretColorImpl,
     };
     return &ArkUIWebModifierImpl;
 }

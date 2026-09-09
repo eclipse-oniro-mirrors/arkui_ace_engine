@@ -28705,8 +28705,6 @@ typedef struct GENERATED_ArkUIWebModifier {
                                          const Opt_Boolean* value);
     void (*setVerticalScrollBarAccess)(Ark_NativePointer node,
                                        const Opt_Boolean* value);
-    void (*setCaretColor)(Ark_NativePointer node,
-                          const Opt_ResourceColor* value);
     void (*setOnTouchIconUrlReceived)(Ark_NativePointer node,
                                       const Opt_Callback_OnTouchIconUrlReceivedEvent_Void* value);
     void (*setOnFaviconReceived)(Ark_NativePointer node,
@@ -28868,6 +28866,8 @@ typedef struct GENERATED_ArkUIWebModifier {
     void (*setEnableScrollDirectionalLock)(Ark_NativePointer node,
                                            const Opt_Boolean* value,
                                            const Opt_ScrollDirectionalLockType* type);
+    void (*setCaretColor)(Ark_NativePointer node,
+                          const Opt_ResourceColor* value);
 } GENERATED_ArkUIWebModifier;
 
 typedef struct GENERATED_ArkUIWindowSceneModifier {
