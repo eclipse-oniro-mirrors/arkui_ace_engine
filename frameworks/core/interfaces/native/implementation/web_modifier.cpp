@@ -1623,6 +1623,16 @@ void SetVerticalScrollBarAccessImpl(Ark_NativePointer node,
     WebModelStatic::SetVerticalScrollBarAccessEnabled(frameNode, *convValue);
 #endif // WEB_SUPPORTED
 }
+void SetCaretColorImpl(Ark_NativePointer node,
+                       const Opt_ResourceColor* value)
+{
+#ifdef WEB_SUPPORTED
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto convValue = Converter::OptConvertPtr<Color>(value);
+    WebModelStatic::SetCaretColor(frameNode, convValue);
+#endif // WEB_SUPPORTED
+}
 void SetOnTouchIconUrlReceivedImpl(Ark_NativePointer node,
                                    const Opt_Callback_OnTouchIconUrlReceivedEvent_Void* value)
 {
@@ -3274,6 +3284,7 @@ const GENERATED_ArkUIWebModifier* GetWebModifier()
         WebAttributeModifier::SetBlockNetworkImpl,
         WebAttributeModifier::SetHorizontalScrollBarAccessImpl,
         WebAttributeModifier::SetVerticalScrollBarAccessImpl,
+        WebAttributeModifier::SetCaretColorImpl,
         WebAttributeModifier::SetOnTouchIconUrlReceivedImpl,
         WebAttributeModifier::SetOnFaviconReceivedImpl,
         WebAttributeModifier::SetOnPageVisibleImpl,
