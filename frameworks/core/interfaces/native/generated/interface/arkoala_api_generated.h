@@ -28855,6 +28855,8 @@ typedef struct GENERATED_ArkUIWebModifier {
                                             const Opt_Boolean* value);
     void (*setEnableMediaNetworkProxy)(Ark_NativePointer node,
                                        const Opt_Boolean* value);
+    void (*setCaretColor)(Ark_NativePointer node,
+                          const Opt_ResourceColor* value);
     void (*setRegisterNativeEmbedRule)(Ark_NativePointer node,
                                        const Opt_String* tag,
                                        const Opt_String* type);
@@ -28866,8 +28868,6 @@ typedef struct GENERATED_ArkUIWebModifier {
     void (*setEnableScrollDirectionalLock)(Ark_NativePointer node,
                                            const Opt_Boolean* value,
                                            const Opt_ScrollDirectionalLockType* type);
-    void (*setCaretColor)(Ark_NativePointer node,
-                          const Opt_ResourceColor* value);
 } GENERATED_ArkUIWebModifier;
 
 typedef struct GENERATED_ArkUIWindowSceneModifier {

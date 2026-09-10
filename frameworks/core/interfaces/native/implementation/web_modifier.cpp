@@ -3359,10 +3359,10 @@ const GENERATED_ArkUIWebModifier* GetWebModifier()
         WebAttributeModifier::SetOnInputmethodAttachedImpl,
         WebAttributeModifier::SetEnableFullscreenVideoOverlayImpl,
         WebAttributeModifier::SetEnableMediaNetworkProxyImpl,
+        WebAttributeModifier::SetCaretColorImpl,
         WebAttributeModifier::SetRegisterNativeEmbedRuleImpl,
         WebAttributeModifier::SetBindSelectionMenuImpl,
         WebAttributeModifier::SetEnableScrollDirectionalLockImpl,
-        WebAttributeModifier::SetCaretColorImpl,
     };
     return &ArkUIWebModifierImpl;
 }
