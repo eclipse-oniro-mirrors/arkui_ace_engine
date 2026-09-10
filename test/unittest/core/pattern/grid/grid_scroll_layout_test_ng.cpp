@@ -33,11 +33,22 @@
 #include "core/common/text_field_manager_ng.h"
 
 namespace OHOS::Ace::NG {
+namespace {
+// Zero-height-first-line scenario geometry, named per the G.CNS.02
+// magic-number rule: the normal-height lines following the zero-height first
+// line, and the scroll step that moves that first line above the content top.
+constexpr int32_t FIXED_HEIGHT_ITEM_NUMBER = 5;
+constexpr float SCROLL_PAST_ZERO_HEIGHT_LINE = 10.0f;
+} // namespace
+
 class GridScrollLayoutTestNg : public GridTestNg {
 public:
     void UpdateLayoutInfo();
     RefPtr<GridPaintMethod> UpdateOverlayModifier();
     RefPtr<GridPaintMethod> UpdateContentModifier();
+    // Single-column grid with a zero-height first item; captures onScrollIndex into reported when given.
+    void CreateZeroHeightFirstLineGrid(
+        GridModelNG& model, std::vector<std::pair<int32_t, int32_t>>* reported = nullptr);
 };
 
 void GridScrollLayoutTestNg::UpdateLayoutInfo()
@@ -1117,5 +1128,77 @@ HWTEST_F(GridScrollLayoutTestNg, GridScrollLayoutCheckGridMatrixReload001, TestS
     // After reload, matrix should be rebuilt and consistent
     EXPECT_FALSE(info.gridMatrix_.empty());
     EXPECT_TRUE(info.CheckGridMatrix(1));
+}
+
+// Create a single-column grid whose first item is zero-height and the rest are ITEM_MAIN_SIZE.
+// Mimics CreateFixedItems: per-item CreateGridItem + Pop + StopGetAccessRecording.
+void GridScrollLayoutTestNg::CreateZeroHeightFirstLineGrid(
+    GridModelNG& model, std::vector<std::pair<int32_t, int32_t>>* reported)
+{
+    if (reported) {
+        model.SetOnScrollIndex([reported](int32_t first, int32_t last) {
+            reported->emplace_back(first, last);
+        });
+    }
+    CreateGridItem(FILL_VALUE, 0.0f);
+    ViewStackProcessor::GetInstance()->Pop();
+    ViewStackProcessor::GetInstance()->StopGetAccessRecording();
+    CreateFixedHeightItems(FIXED_HEIGHT_ITEM_NUMBER, ITEM_MAIN_SIZE);
+    CreateDone();
+}
+
+/**
+ * @tc.name: GridScrollLayoutReportStartZeroHeightLine001
+ * @tc.desc: A zero-height first line sits at the content-area top (currentOffset_ == 0, bottom edge 0).
+ *           SyncReportRange's report-start walk must not treat it as scrolled-out: reportStartIndex_
+ *           stays 0 and onScrollIndex never reports 1, matching WaterFlow (IsReportStartIndexCandidate)
+ *           and List (GetStartIndex) semantics.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridScrollLayoutTestNg, GridScrollLayoutReportStartZeroHeightLine001, TestSize.Level1)
+{
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1");
+    std::vector<std::pair<int32_t, int32_t>> reported;
+    CreateZeroHeightFirstLineGrid(model, &reported);
+    FlushUITasks(frameNode_);
+
+    auto& info = pattern_->info_;
+    ASSERT_EQ(info.startMainLineIndex_, 0);
+    ASSERT_NE(info.lineHeightMap_.find(0), info.lineHeightMap_.end());
+    EXPECT_EQ(info.lineHeightMap_[0], 0.0f) << "precondition: line 0 is the zero-height item";
+    EXPECT_EQ(info.reportStartIndex_, 0) << "zero-height first line at content top must stay the report start";
+    EXPECT_GE(info.reportStartIndex_, info.startIndex_) << "report range stays within the active range";
+    for (const auto& [first, last] : reported) {
+        EXPECT_EQ(first, 0) << "onScrollIndex must not report startIndex 1 for a zero-height first item";
+    }
+}
+
+/**
+ * @tc.name: GridScrollLayoutReportStartZeroHeightLine002
+ * @tc.desc: Scrolled-past semantics keep working: once the zero-height line 0 moves above the content-area
+ *           top it is skipped (reportStartIndex_ 1). After scrolling back to the top the line fills no blank
+ *           above the anchor, so the active range keeps starting at line 1 — the report range must stay
+ *           within the active range (reportStartIndex_ >= startIndex_ = 1), matching the pre-contentClip
+ *           baseline that reported startIndex_ directly.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridScrollLayoutTestNg, GridScrollLayoutReportStartZeroHeightLine002, TestSize.Level1)
+{
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1");
+    CreateZeroHeightFirstLineGrid(model);
+    FlushUITasks(frameNode_);
+    ASSERT_EQ(pattern_->info_.reportStartIndex_, 0);
+    EXPECT_GE(pattern_->info_.reportStartIndex_, pattern_->info_.startIndex_);
+
+    UpdateCurrentOffset(-SCROLL_PAST_ZERO_HEIGHT_LINE); // line 0 (height 0) now above the content top
+    FlushUITasks(frameNode_);
+    EXPECT_EQ(pattern_->info_.reportStartIndex_, 1);
+
+    UpdateCurrentOffset(SCROLL_PAST_ZERO_HEIGHT_LINE); // back to the top
+    FlushUITasks(frameNode_);
+    EXPECT_EQ(pattern_->info_.reportStartIndex_, 1);
+    EXPECT_GE(pattern_->info_.reportStartIndex_, pattern_->info_.startIndex_);
 }
 } // namespace OHOS::Ace::NG

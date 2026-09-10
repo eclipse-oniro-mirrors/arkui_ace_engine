@@ -1054,7 +1054,17 @@ static int32_t FindReportStartLine(const GridLayoutInfo& info, float mainGap, bo
         if (it == info.lineHeightMap_.end()) {
             break;
         }
-        if (GreatNotEqual(pos + it->second + keepAllowance, 0.0f)) {
+        // A zero-height line at the content top (bottom == top == 0) is kept by
+        // neither rule above — the gap allowance collapses when mainGap is 0 and
+        // the strict rule never passes bottom > 0. Keep it explicitly: it is only
+        // scrolled past once pos leaves the epsilon band (NearEqual keeps the
+        // tolerance symmetric with WaterFlow's IsReportStartIndexCandidate and
+        // List's GetStartIndex). The walk stays within the active range, and a
+        // zero-height line that scrolled out of it fills no blank above the
+        // anchor, so the fill never recomposes it back — startIndex_ matches the
+        // pre-contentClip baseline in that state.
+        if (GreatNotEqual(pos + it->second + keepAllowance, 0.0f) ||
+            (NearZero(it->second) && NearEqual(pos, 0.0f))) {
             reportStartLine = i;
             break;
         }

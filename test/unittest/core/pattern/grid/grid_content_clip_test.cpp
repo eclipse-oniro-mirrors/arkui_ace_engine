@@ -18,6 +18,7 @@
 #include "test/unittest/core/pattern/scrollable/scrollable_test_utils.h"
 
 #include "base/geometry/shape.h"
+#include "core/components_ng/base/view_stack_processor.h"
 #include "core/components_ng/pattern/grid/grid_scroll/grid_scroll_layout_algorithm.h"
 #include "core/components_ng/pattern/grid/grid_scroll/grid_scroll_with_options_layout_algorithm.h"
 
@@ -43,6 +44,10 @@ constexpr float BOUNDARY_ROW_GAP = 10.0f;
 // half-gap increments landing mid-window and on the pitch boundary.
 constexpr int32_t BOUNDARY_STEP_COUNT = 3;
 constexpr float BOUNDARY_HALF_GAP_STEP = BOUNDARY_ROW_GAP / 2.0f;
+// Report-start scenario with a zero-height first line: the normal-height lines
+// that follow it, and the scroll step moving it above the content-area top.
+constexpr int32_t NORMAL_LINE_ITEM_COUNT = 5;
+constexpr float SCROLL_PAST_ZERO_HEIGHT_LINE = 10.0f;
 
 PaddingProperty CreatePadding(float left, float top, float right, float bottom)
 {
@@ -741,5 +746,54 @@ HWTEST_F(GridContentClipTest, GridClipScrollBarUpdateOffsetUnitVp001, TestSize.L
     EXPECT_GT(fireCount, 1) << "onScrollBarUpdate must fire again after scroll";
     EXPECT_EQ(captured.Unit(), DimensionUnit::VP) << "offset argument must stay VP-unit after scroll";
     EXPECT_FLOAT_EQ(captured.Value(), -halfLine) << "vp value equals the px anchor at dipScale 1";
+}
+
+// ===================== report start: zero-height first line with the walk active =====================
+
+// Without an extension band the report fast path returns the active range
+// directly, so the report-start walk only runs when contentClip activates one
+// (here: the bottom band). A zero-height first line at the content top
+// (currentOffset_ == 0, bottom edge 0, rowsGap 0 so the gap allowance
+// collapses) must stay the report start in that walk too — parity with the
+// fast path, List's GetStartIndex and WaterFlow's IsReportStartIndexCandidate.
+HWTEST_F(GridContentClipTest, GridClipReportStartZeroHeightFirstLine001, TestSize.Level1)
+{
+    cbStart_ = -1;
+    cbEnd_ = -1;
+    ClearOldNodes();
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1");
+    model.SetRowsGap(Dimension(0));
+    model.SetOnScrollIndex([this](int32_t s, int32_t e) {
+        cbStart_ = s;
+        cbEnd_ = e;
+    });
+    layoutProperty_->UpdatePadding(CreatePadding(0.0f, 0.0f, 0.0f, 300.0f));
+    SetClip(ContentClipMode::BOUNDARY);
+    CreateGridItem(FILL_VALUE, 0.0f); // first line: zero height
+    ViewStackProcessor::GetInstance()->Pop();
+    ViewStackProcessor::GetInstance()->StopGetAccessRecording();
+    CreateGridItems(NORMAL_LINE_ITEM_COUNT, GRID_ITEM_WIDTH, ITEM_HEIGHT);
+    CreateDone();
+
+    const auto& info = pattern_->GetGridLayoutInfo();
+    EXPECT_EQ(info.startFixOffset_, 0.0f);
+    EXPECT_GT(info.endFixOffset_, 0.0f) << "bottom extension keeps the report-start walk active";
+    ASSERT_NE(info.lineHeightMap_.find(0), info.lineHeightMap_.end());
+    EXPECT_EQ(info.lineHeightMap_.at(0), 0.0f) << "precondition: line 0 is the zero-height item";
+    EXPECT_EQ(info.startIndex_, 0);
+    EXPECT_EQ(info.reportStartIndex_, 0) << "zero-height first line at content top must stay the report start";
+    EXPECT_EQ(info.ReportStartIndex(), 0);
+    EXPECT_EQ(cbStart_, 0) << "onScrollIndex must not report startIndex 1 for a zero-height first item";
+
+    // Scrolled-past semantics: once the zero-height line moves above the content
+    // top it is skipped; scrolling back does not recompose it (it fills no blank
+    // above the anchor), so the report follows the active range at line 1.
+    UpdateCurrentOffset(-SCROLL_PAST_ZERO_HEIGHT_LINE);
+    EXPECT_EQ(pattern_->GetGridLayoutInfo().ReportStartIndex(), 1);
+    UpdateCurrentOffset(SCROLL_PAST_ZERO_HEIGHT_LINE);
+    EXPECT_EQ(pattern_->GetGridLayoutInfo().ReportStartIndex(), 1);
+    EXPECT_EQ(pattern_->GetGridLayoutInfo().ReportStartIndex(),
+        pattern_->GetGridLayoutInfo().startIndex_);
 }
 } // namespace OHOS::Ace::NG
