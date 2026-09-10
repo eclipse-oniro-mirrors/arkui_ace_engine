@@ -1307,6 +1307,7 @@ void WebSelectOverlay::OnUpdateSelectOverlayInfo(SelectOverlayInfo &selectInfo, 
     selectInfo.onCreateCallback = webSelectInfo_.onCreateCallback;
     selectInfo.onClose = webSelectInfo_.onClose;
     selectInfo.onClick = webSelectInfo_.onClick;
+    selectInfo.handlerColor = GetHandleColor();
     selectInfo.enableHandleLevel = true;
     selectInfo.enableSubWindowMenu = true;
     if (IS_CALLING_FROM_M114()) {
