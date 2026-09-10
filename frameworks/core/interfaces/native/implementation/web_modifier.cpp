@@ -3217,9 +3217,20 @@ void SetCaretColorIfSupported(T& modifier, int64_t)
     (void)modifier;
 }
 
-GENERATED_ArkUIWebModifier CreateWebModifier()
+template<typename T>
+const T* InitializeWebModifier(T* modifier)
 {
-    GENERATED_ArkUIWebModifier modifier {
+    SetCaretColorIfSupported(*modifier, 0);
+    modifier->setRegisterNativeEmbedRule = WebAttributeModifier::SetRegisterNativeEmbedRuleImpl;
+    modifier->setBindSelectionMenu = WebAttributeModifier::SetBindSelectionMenuImpl;
+    modifier->setEnableScrollDirectionalLock = WebAttributeModifier::SetEnableScrollDirectionalLockImpl;
+    return modifier;
+}
+} // namespace
+
+const GENERATED_ArkUIWebModifier* GetWebModifier()
+{
+    static GENERATED_ArkUIWebModifier ArkUIWebModifierImpl {
         WebModifier::ConstructImpl,
         WebInterfaceModifier::SetWebOptionsImpl,
         WebAttributeModifier::SetJavaScriptAccessImpl,
@@ -3375,18 +3386,8 @@ GENERATED_ArkUIWebModifier CreateWebModifier()
         WebAttributeModifier::SetEnableFullscreenVideoOverlayImpl,
         WebAttributeModifier::SetEnableMediaNetworkProxyImpl,
     };
-    SetCaretColorIfSupported(modifier, 0);
-    modifier.setRegisterNativeEmbedRule = WebAttributeModifier::SetRegisterNativeEmbedRuleImpl;
-    modifier.setBindSelectionMenu = WebAttributeModifier::SetBindSelectionMenuImpl;
-    modifier.setEnableScrollDirectionalLock = WebAttributeModifier::SetEnableScrollDirectionalLockImpl;
-    return modifier;
-}
-} // namespace
-
-const GENERATED_ArkUIWebModifier* GetWebModifier()
-{
-    static const GENERATED_ArkUIWebModifier ArkUIWebModifierImpl = CreateWebModifier();
-    return &ArkUIWebModifierImpl;
+    static const GENERATED_ArkUIWebModifier* initializedModifier = InitializeWebModifier(&ArkUIWebModifierImpl);
+    return initializedModifier;
 }
 
 }
