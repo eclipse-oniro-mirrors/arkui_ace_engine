@@ -2237,6 +2237,49 @@ void ViewAbstractModelNG::SetSafeAreaPaddings(const std::optional<CalcDimension>
     ViewAbstract::SetSafeAreaPadding(paddings);
 }
 
+void ViewAbstractModelNG::SetSafeAreaInset(
+    const SafeAreaInsetOptions& options, SafeAreaInsetBuilderArray&& builders)
+{
+    if (!ViewStackProcessor::GetInstance()->IsCurrentVisualStateProcess()) {
+        return;
+    }
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    CHECK_NULL_VOID(frameNode);
+    auto effectiveOptions = options;
+    SafeAreaInsetContentArray contents;
+    for (size_t index = 0; index < SAFE_AREA_INSET_EDGE_COUNT; ++index) {
+        if (!effectiveOptions.edges[index].has_value()) {
+            continue;
+        }
+        auto& builder = builders[index];
+        if (!builder) {
+            effectiveOptions.edges[index].reset();
+            continue;
+        }
+        ScopedViewStackProcessor builderViewStackProcessor;
+        builder();
+        contents[index] = ViewStackProcessor::GetInstance()->Finish();
+        if (!contents[index]) {
+            effectiveOptions.edges[index].reset();
+        }
+    }
+    if (effectiveOptions.Empty()) {
+        ViewAbstract::ResetSafeAreaInset(frameNode);
+        return;
+    }
+    ViewAbstract::SetSafeAreaInset(frameNode, effectiveOptions, contents);
+}
+
+void ViewAbstractModelNG::ResetSafeAreaInset()
+{
+    if (!ViewStackProcessor::GetInstance()->IsCurrentVisualStateProcess()) {
+        return;
+    }
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    CHECK_NULL_VOID(frameNode);
+    ViewAbstract::ResetSafeAreaInset(frameNode);
+}
+
 void ViewAbstractModelNG::SetAccessibilityCustomActions(
     FrameNode* frameNode, const std::vector<AccessibilityCustomAction>& actions)
 {

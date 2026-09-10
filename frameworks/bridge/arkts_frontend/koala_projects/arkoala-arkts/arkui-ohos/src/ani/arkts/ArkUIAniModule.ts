@@ -119,6 +119,7 @@ export class ArkUIAniModule {
     native static _Image_SetOnErrorCallback(ptr: KPointer, value: ImageErrorCallback | undefined): void
     native static _ConvertUtils_ConvertFromPixelMapAni(pixelmap: image.PixelMap): KPointer
     native static _ConvertUtils_ConvertToPixelMapAni(ptr: KPointer): image.PixelMap
+    native static _Common_SetSafeAreaInset(ptr: KPointer, edges: Array<Object>): void
     native static _Common_GetHostContext(key: KInt): common.Context
     native static _Common_SetFrameRateRange(ptr: KPointer, value: ExpectedFrameRateRange, type: KInt): void
     native static _Common_Sync_InstanceId(id: KInt): void

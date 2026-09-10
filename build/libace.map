@@ -1504,6 +1504,7 @@
       "OHOS::Ace::NG::FrameNode::IsOutOfTouchTestRegion(OHOS::Ace::NG::PointT<float> const&, OHOS::Ace::TouchEvent const&, std::__h::vector<OHOS::Ace::NG::RectT<float>, std::__h::allocator<OHOS::Ace::NG::RectT<float>>>*)";
       "OHOS::Ace::NG::FrameNode::IsVisibleAndActive() const";
       "OHOS::Ace::NG::FrameNode::Layout()";
+      "OHOS::Ace::NG::FrameNode::LayoutSafeAreaInset()";
       "OHOS::Ace::NG::FrameNode::MarkAndCheckNewOpIncNode(OHOS::Ace::Axis)";
       "OHOS::Ace::NG::FrameNode::MarkDirtyNode(unsigned int)";
       "OHOS::Ace::NG::FrameNode::MarkDirtyWithOnProChange(unsigned int)";
@@ -1512,6 +1513,7 @@
       "OHOS::Ace::NG::FrameNode::MarkNeedSyncRenderTree(bool)";
       "OHOS::Ace::NG::FrameNode::MarkRemoving()";
       "OHOS::Ace::NG::FrameNode::Measure(std::__h::optional<OHOS::Ace::NG::LayoutConstraintT<float>> const&)";
+      "OHOS::Ace::NG::FrameNode::MeasureSafeAreaInset()";
       "OHOS::Ace::NG::FrameNode::MountToParent(OHOS::Ace::RefPtr<OHOS::Ace::NG::UINode> const&, int, bool, bool, bool)";
       "OHOS::Ace::NG::FrameNode::MouseTest(OHOS::Ace::NG::PointT<float> const&, OHOS::Ace::NG::PointT<float> const&, std::__h::list<OHOS::Ace::RefPtr<OHOS::Ace::MouseEventTarget>, std::__h::allocator<OHOS::Ace::RefPtr<OHOS::Ace::MouseEventTarget>>>&, std::__h::list<OHOS::Ace::RefPtr<OHOS::Ace::MouseEventTarget>, std::__h::allocator<OHOS::Ace::RefPtr<OHOS::Ace::MouseEventTarget>>>&, OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode>&)";
       "OHOS::Ace::NG::FrameNode::NotifyChange(int, int, long long, OHOS::Ace::NG::UINode::NotificationType)";

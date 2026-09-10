@@ -16,6 +16,7 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_LAYOUTS_LAYOUT_PROPERTY_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_LAYOUTS_LAYOUT_PROPERTY_H
 
+#include <array>
 #include <cstddef>
 #include <memory>
 #include <optional>
@@ -38,6 +39,7 @@
 #include "core/components_ng/property/magic_layout_property.h"
 #include "core/components_ng/property/measure_property.h"
 #include "core/components_ng/property/property.h"
+#include "core/components_ng/property/safe_area_inset_property.h"
 #include "core/components_ng/manager/environment/env_reader_cache.h"
 #include "ui/properties/safe_area_insets.h"
 
@@ -108,6 +110,22 @@ public:
     void UpdatePadding(const PaddingProperty& value);
     void UpdateSafeAreaPadding(const PaddingProperty& value);
     void ResetSafeAreaPadding();
+    bool HasSafeAreaInset() const
+    {
+        return safeAreaInset_.has_value() && !safeAreaInset_->Empty();
+    }
+    void CheckLocalizedSafeAreaInset(const TextDirection& direction);
+    const SafeAreaInsetResolvedEdge& GetResolvedSafeAreaInsetEdge(SafeAreaInsetEdge edge) const
+    {
+        return resolvedSafeAreaInsetEdges_[SafeAreaInsetOptions::ToIndex(edge)];
+    }
+    void UpdateSafeAreaInset(const SafeAreaInsetOptions& value);
+    void ResetSafeAreaInset();
+    const std::optional<SafeAreaInsetOptions>& GetSafeAreaInset() const;
+    void UpdateSafeAreaInsetContribution(const PaddingPropertyF& value);
+    const PaddingPropertyF& GetSafeAreaInsetContribution() const;
+    bool HasSafeAreaPaddingSource() const;
+    bool HasEffectiveSafeAreaPadding();
 
     void UpdateMargin(const MarginProperty& value);
 
@@ -234,6 +252,7 @@ public:
     void UpdateLayoutConstraintWithLayoutRect();
 
     LayoutConstraintF CreateChildConstraint() const;
+    LayoutConstraintF CreateSafeAreaInsetConstraint();
 
     LayoutConstraintF CreateContentConstraint() const;
 
@@ -372,6 +391,9 @@ private:
     std::pair<std::vector<std::string>, std::vector<std::string>> calcMinSizeRpn_;
     std::pair<std::vector<std::string>, std::vector<std::string>> calcMaxSizeRpn_;
     std::unique_ptr<PaddingProperty> safeAreaPadding_;
+    std::optional<SafeAreaInsetOptions> safeAreaInset_;
+    std::array<SafeAreaInsetResolvedEdge, SAFE_AREA_INSET_EDGE_COUNT> resolvedSafeAreaInsetEdges_;
+    PaddingPropertyF safeAreaInsetContribution_;
     std::unique_ptr<PaddingProperty> padding_;
     std::unique_ptr<MarginProperty> margin_;
     std::optional<MarginPropertyF> marginResult_;
