@@ -853,8 +853,8 @@ void ScrollPattern::ScrollToEdge(ScrollEdgeType scrollEdgeType, bool smooth)
         return;
     }
     float distance = scrollEdgeType == ScrollEdgeType::SCROLL_TOP
-                         ? -currentOffset_ + contentStartOffset_
-                         : (-scrollableDistance_ - currentOffset_ - contentEndOffset_);
+                         ? -currentOffset_
+                         : (-scrollableDistance_ - currentOffset_);
     auto host = GetHost();
     CHECK_NULL_VOID(host);
     ACE_SCOPED_TRACE("Scroll ScrollToEdge scrollEdgeType:%zu, offset:%f, id:%d", scrollEdgeType, distance,
@@ -879,7 +879,8 @@ void ScrollPattern::ScrollBy(float pixelX, float pixelY, bool smooth, const std:
     float position = currentOffset_ + distance;
     SetIsOverScroll(false);
     if (smooth) {
-        AnimateTo(-position, fabs(distance) * UNIT_CONVERT / SCROLL_BY_SPEED, Curves::EASE_OUT, true, false, false);
+        AnimateTo(-position - contentStartOffset_, fabs(distance) * UNIT_CONVERT / SCROLL_BY_SPEED, Curves::EASE_OUT,
+            true, false, false);
         return;
     }
     JumpToPosition(position);
@@ -898,7 +899,7 @@ void ScrollPattern::ScrollPage(bool reverse, bool smooth, AccessibilityScrollTyp
     if (smooth && scrollType == AccessibilityScrollType::SCROLL_HALF) {
         float position = currentOffset_ + distance;
         SetIsOverScroll(false);
-        AnimateTo(-position, HALF_PAGE_SCROLL_DURATION, Curves::LINEAR, false, false, false);
+        AnimateTo(-position - contentStartOffset_, HALF_PAGE_SCROLL_DURATION, Curves::LINEAR, false, false, false);
         return;
     }
     ScrollBy(distance, distance, smooth);

@@ -744,6 +744,99 @@ HWTEST_F(ScrollPatternThreeTestNg, ScrollEdgeAnimationWithContentOffset, TestSiz
 }
 
 /**
+ * @tc.name: ScrollToEdgeBoundaryWithContentStartOffset
+ * @tc.desc: Test ScrollToEdge stops at correct boundary (0) when contentStartOffset is set
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPatternThreeTestNg, ScrollToEdgeBoundaryWithContentStartOffset, TestSize.Level1)
+{
+    ScrollModelNG model = CreateScroll();
+    ScrollableModelNG::SetContentStartOffset(CONTENT_START_OFFSET);
+    CreateContent();
+    CreateScrollDone();
+
+    EXPECT_EQ(pattern_->scrollableDistance_, CONTENT_MAIN_SIZE - HEIGHT + CONTENT_START_OFFSET);
+
+    // Scroll to bottom first
+    ScrollToEdge(ScrollEdgeType::SCROLL_BOTTOM, false);
+    EXPECT_EQ(pattern_->currentOffset_, -CONTENT_MAIN_SIZE + HEIGHT - CONTENT_START_OFFSET);
+
+    // Scroll to top - should stop at 0, not contentStartOffset_
+    ScrollToEdge(ScrollEdgeType::SCROLL_TOP, false);
+    EXPECT_EQ(pattern_->currentOffset_, 0);
+    EXPECT_EQ(pattern_->GetTotalOffset(), -CONTENT_START_OFFSET);
+    EXPECT_FALSE(pattern_->IsOutOfBoundary());
+}
+
+/**
+ * @tc.name: ScrollToEdgeBoundaryWithContentEndOffset
+ * @tc.desc: Test ScrollToEdge stops at correct boundary (-scrollableDistance_) when contentEndOffset is set
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPatternThreeTestNg, ScrollToEdgeBoundaryWithContentEndOffset, TestSize.Level1)
+{
+    ScrollModelNG model = CreateScroll();
+    ScrollableModelNG::SetContentEndOffset(CONTENT_END_OFFSET);
+    CreateContent();
+    CreateScrollDone();
+
+    EXPECT_EQ(pattern_->scrollableDistance_, CONTENT_MAIN_SIZE - HEIGHT + CONTENT_END_OFFSET);
+
+    // Scroll to top first
+    ScrollToEdge(ScrollEdgeType::SCROLL_TOP, false);
+    EXPECT_EQ(pattern_->currentOffset_, 0);
+
+    // Scroll to bottom - should stop at -scrollableDistance_, not beyond
+    ScrollToEdge(ScrollEdgeType::SCROLL_BOTTOM, false);
+    EXPECT_EQ(pattern_->currentOffset_, -CONTENT_MAIN_SIZE + HEIGHT - CONTENT_END_OFFSET);
+    EXPECT_EQ(pattern_->GetTotalOffset(), CONTENT_MAIN_SIZE - HEIGHT + CONTENT_END_OFFSET);
+    EXPECT_FALSE(pattern_->IsOutOfBoundary());
+}
+
+/**
+ * @tc.name: ScrollToEdgeAnimationDomainWithContentOffset
+ * @tc.desc: Test smooth ScrollToEdge animation uses correct coordinate domain with contentOffset
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPatternThreeTestNg, ScrollToEdgeAnimationDomainWithContentOffset, TestSize.Level1)
+{
+    MockAnimationManager::GetInstance().SetTicks(TICK);
+    ScrollModelNG model = CreateScroll();
+    ScrollableModelNG::SetContentStartOffset(CONTENT_START_OFFSET);
+    ScrollableModelNG::SetContentEndOffset(CONTENT_END_OFFSET);
+    CreateContent();
+    CreateScrollDone();
+
+    EXPECT_EQ(pattern_->scrollableDistance_,
+        CONTENT_MAIN_SIZE - HEIGHT + CONTENT_START_OFFSET + CONTENT_END_OFFSET);
+
+    // Smooth scroll to bottom - verify animation reaches correct final position
+    ScrollToEdge(ScrollEdgeType::SCROLL_BOTTOM, true);
+    // Run animation to completion
+    for (int i = 0; i < 100; ++i) {
+        MockAnimationManager::GetInstance().Tick();
+        FlushUITasks();
+        if (!pattern_->AnimateRunning()) {
+            break;
+        }
+    }
+    EXPECT_EQ(pattern_->currentOffset_, -CONTENT_MAIN_SIZE + HEIGHT - CONTENT_START_OFFSET - CONTENT_END_OFFSET);
+    EXPECT_FALSE(pattern_->IsOutOfBoundary());
+
+    // Smooth scroll to top - verify animation reaches correct final position
+    ScrollToEdge(ScrollEdgeType::SCROLL_TOP, true);
+    for (int i = 0; i < 100; ++i) {
+        MockAnimationManager::GetInstance().Tick();
+        FlushUITasks();
+        if (!pattern_->AnimateRunning()) {
+            break;
+        }
+    }
+    EXPECT_EQ(pattern_->currentOffset_, 0);
+    EXPECT_FALSE(pattern_->IsOutOfBoundary());
+}
+
+/**
  * @tc.name: SnapWithContentOffset
  * @tc.desc: Test Snap with contentOffset
  * @tc.type: FUNC
