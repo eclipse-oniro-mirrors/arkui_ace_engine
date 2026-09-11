@@ -3202,9 +3202,35 @@ void SetOnInputmethodAttachedImpl(Ark_NativePointer node,
 #endif // WEB_SUPPORTED
 }
 } // WebAttributeModifier
+
+namespace {
+template<typename T>
+auto SetCaretColorIfSupported(T& modifier, int32_t)
+    -> decltype(modifier.setCaretColor = WebAttributeModifier::SetCaretColorImpl, void())
+{
+    modifier.setCaretColor = WebAttributeModifier::SetCaretColorImpl;
+}
+
+template<typename T>
+void SetCaretColorIfSupported(T& modifier, int64_t)
+{
+    (void)modifier;
+}
+
+template<typename T>
+const T* InitializeWebModifier(T* modifier)
+{
+    SetCaretColorIfSupported(*modifier, 0);
+    modifier->setRegisterNativeEmbedRule = WebAttributeModifier::SetRegisterNativeEmbedRuleImpl;
+    modifier->setBindSelectionMenu = WebAttributeModifier::SetBindSelectionMenuImpl;
+    modifier->setEnableScrollDirectionalLock = WebAttributeModifier::SetEnableScrollDirectionalLockImpl;
+    return modifier;
+}
+} // namespace
+
 const GENERATED_ArkUIWebModifier* GetWebModifier()
 {
-    static const GENERATED_ArkUIWebModifier ArkUIWebModifierImpl {
+    static GENERATED_ArkUIWebModifier ArkUIWebModifierImpl {
         WebModifier::ConstructImpl,
         WebInterfaceModifier::SetWebOptionsImpl,
         WebAttributeModifier::SetJavaScriptAccessImpl,
@@ -3359,12 +3385,9 @@ const GENERATED_ArkUIWebModifier* GetWebModifier()
         WebAttributeModifier::SetOnInputmethodAttachedImpl,
         WebAttributeModifier::SetEnableFullscreenVideoOverlayImpl,
         WebAttributeModifier::SetEnableMediaNetworkProxyImpl,
-        WebAttributeModifier::SetCaretColorImpl,
-        WebAttributeModifier::SetRegisterNativeEmbedRuleImpl,
-        WebAttributeModifier::SetBindSelectionMenuImpl,
-        WebAttributeModifier::SetEnableScrollDirectionalLockImpl,
     };
-    return &ArkUIWebModifierImpl;
+    static const GENERATED_ArkUIWebModifier* initializedModifier = InitializeWebModifier(&ArkUIWebModifierImpl);
+    return initializedModifier;
 }
 
 }
