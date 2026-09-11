@@ -9600,10 +9600,6 @@ class ArkWebComponent extends ArkComponent {
     modifierWithKey(this._modifiersWithKeys, WebDefaultFontSizeModifier.identity, WebDefaultFontSizeModifier, size);
     return this;
   }
-  caretColor(value) {
-    modifierWithKey(this._modifiersWithKeys, WebCaretColorModifier.identity, WebCaretColorModifier, value);
-    return this;
-  }
   minFontSize(size) {
     modifierWithKey(this._modifiersWithKeys, WebMinFontSizeModifier.identity, WebMinFontSizeModifier, size);
     return this;
@@ -10343,23 +10339,6 @@ class WebMinFontSizeModifier extends ModifierWithKey {
   }
 }
 WebMinFontSizeModifier.identity = Symbol('webMinFontSizeModifier');
-
-class WebCaretColorModifier extends ModifierWithKey {
-  constructor (value) {
-    super(value);
-  }
-  applyPeer (node, reset) {
-    if (reset) {
-      getUINativeModule().web.resetCaretColor(node);
-    } else {
-      getUINativeModule().web.setCaretColor(node, this.value);
-    }
-  }
-  checkObjectDiff() {
-    return !isBaseOrResourceEqual(this.stageValue, this.value);
-  }
-}
-WebCaretColorModifier.identity = Symbol('webCaretColorModifier');
 
 class WebDefaultFontSizeModifier extends ModifierWithKey {
   constructor (value) {
