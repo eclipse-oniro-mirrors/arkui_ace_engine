@@ -14,6 +14,7 @@
  */
 
 #include "core/components_ng/pattern/menu/menu_layout_algorithm.h"
+#include "core/components_ng/layout/overlay_safe_area_helper.h"
 #include "core/components_ng/manager/safe_area/safe_area_manager.h"
 #include "core/pipeline/container_window_manager.h"
 
@@ -36,6 +37,36 @@
 #endif
 
 namespace OHOS::Ace::NG {
+
+namespace {
+// Derives per-edge safe area insets from the OverlaySafeAreaHelper result
+// (avoidSafeArea for own-window data plus avoidDisplayLimit for screen-level
+// data of subwindow-hosted menus, Func-04-02-01-Feat-09 ADR-3).
+SafeAreaInsets DeriveInsetsFromHelper(const RefPtr<FrameNode>& frameNode, const RectF& base)
+{
+    AvoidConfig config;
+    config.avoidSafeArea = true;
+    config.avoidDisplayLimit = true;
+    // Pass the menu subwindow type so the display-limit clip resolves the same subwindow as
+    // the legacy fold-expand path (menu_layout_algorithm TYPE_MENU usage).
+    auto displayable = OverlaySafeAreaHelper::ComputeDisplayableRect(frameNode, config,
+        static_cast<int32_t>(SubwindowType::TYPE_MENU));
+    float topShrink = std::max(0.0f, displayable.Top() - base.Top());
+    float bottomShrink = std::max(0.0f, base.Bottom() - displayable.Bottom());
+    float leftShrink = std::max(0.0f, displayable.Left() - base.Left());
+    float rightShrink = std::max(0.0f, base.Right() - displayable.Right());
+    SafeAreaInsets insets;
+    insets.top_ = SafeAreaInsets::Inset { .start = 0, .end = static_cast<uint32_t>(topShrink) };
+    insets.bottom_ = SafeAreaInsets::Inset {
+        .start = static_cast<uint32_t>(std::max(0.0f, base.Height() - bottomShrink)),
+        .end = static_cast<uint32_t>(base.Height()) };
+    insets.left_ = SafeAreaInsets::Inset { .start = 0, .end = static_cast<uint32_t>(leftShrink) };
+    insets.right_ = SafeAreaInsets::Inset {
+        .start = static_cast<uint32_t>(std::max(0.0f, base.Width() - rightShrink)),
+        .end = static_cast<uint32_t>(base.Width()) };
+    return insets;
+}
+} // namespace
 
 namespace {
 constexpr uint32_t MIN_GRID_COUNTS = 2;
@@ -478,7 +509,10 @@ void MenuLayoutAlgorithm::InitializeParam(const RefPtr<MenuPattern>& menuPattern
     auto safeAreaManager = pipelineContext->GetSafeAreaManager();
     CHECK_NULL_VOID(safeAreaManager);
     CHECK_NULL_VOID(menuPattern);
-    auto safeAreaInsets = safeAreaManager->GetSafeAreaWithoutProcess();
+    // Safe area insets are sourced from OverlaySafeAreaHelper
+    // (Func-04-02-01-Feat-09); bottom keeps the dedicated manager logic for
+    // now (see execution-plan deviations).
+    auto safeAreaInsets = DeriveInsetsFromHelper(host, pipelineContext->GetRootRect());
     auto top = safeAreaInsets.top_.Length();
     auto props = menuPattern->GetLayoutProperty<MenuLayoutProperty>();
     CHECK_NULL_VOID(props);
@@ -611,7 +645,7 @@ void MenuLayoutAlgorithm::InitWrapperRect(
     auto safeAreaManager = pipelineContext->GetSafeAreaManager();
     CHECK_NULL_VOID(safeAreaManager);
     // system safeArea(AvoidAreaType.TYPE_SYSTEM) only include status bar,now the bottom is 0
-    auto safeAreaInsets = OverlayManager::GetSafeAreaInsets(menuPattern->GetHost());
+    auto safeAreaInsets = DeriveInsetsFromHelper(host, pipelineContext->GetRootRect());
     bottom_ = static_cast<double>(GetBottomBySafeAreaManager(safeAreaManager, props, menuPattern));
     top_ = static_cast<double>(safeAreaInsets.top_.Length());
     left_ = static_cast<double>(safeAreaInsets.left_.Length());

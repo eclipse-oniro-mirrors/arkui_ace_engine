@@ -420,6 +420,7 @@ ohos_static_library("ace_components_layout") {
     "$ace_root/frameworks/core/components_ng/layout/layout_wrapper.cpp",
     "$ace_root/frameworks/core/components_ng/layout/layout_wrapper_builder.cpp",
     "$ace_root/frameworks/core/components_ng/layout/layout_wrapper_node.cpp",
+    "$ace_root/frameworks/core/components_ng/layout/overlay_safe_area_helper.cpp",
     "$ace_root/frameworks/core/components_ng/layout/vertical_overflow_handler.cpp",
   ]
   deps = []

@@ -4691,6 +4691,8 @@
       "OHOS::Ace::NG::OverlayManager::UpdateImageGeneratorSheetKey(OHOS::Ace::RefPtr<OHOS::Ace::NG::UINode> const&, int)";
       "OHOS::Ace::NG::OverlayManager::UpdateImageGeneratorSheetScale(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&, OHOS::Ace::NG::SheetStyle const&, int, std::__h::function<void (int)>&&, std::__h::function<void ()>&&)";
       "OHOS::Ace::NG::OverlayManager::UpdateSheetPage(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&, OHOS::Ace::NG::SheetStyle const&)";
+      "OHOS::Ace::NG::OverlaySafeAreaHelper::ComputeDisplayableRect(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&, OHOS::Ace::NG::AvoidConfig const&, int)";
+      "OHOS::Ace::NG::OverlaySafeAreaHelper::GetAvoidConfig(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&)";
       "OHOS::Ace::NG::PaddingPropertyF::Plus(OHOS::Ace::NG::PaddingPropertyF const&, bool)";
       "OHOS::Ace::NG::PaddingPropertyF::operator==(OHOS::Ace::NG::PaddingPropertyF const&) const";
       "OHOS::Ace::NG::PaddingPropertyT<OHOS::Ace::NG::CalcLength>::ToJsonString() const";
