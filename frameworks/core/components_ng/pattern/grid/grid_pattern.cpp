@@ -121,7 +121,6 @@ RefPtr<LayoutAlgorithm> GridPattern::CreateScrollableLayoutAlgorithm(bool disabl
         info_.ClearContentClipExtension();
         auto algo = MakeRefPtr<GridCustomLayoutAlgorithm>(
             info_, canOverScrollStart, canOverScrollEnd && (info_.repeatDifference_ == 0));
-        algo->SetScrollSource(GetScrollSource());
         return algo;
     }
     if (UseIrregularLayout()) {
