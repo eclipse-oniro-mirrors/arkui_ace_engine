@@ -46,7 +46,7 @@ export class LocalDecoratedVariable<T> extends DecoratedV2VariableBase<T> implem
         return value;
     }
 
-    set(newValue: T): void {
+    set(newValue: Any): void {
         const value = this.backing_.get(false);
         StateMgmtDFX.enableDebug && StateMgmtDFX.functionTrace(`Local ${value === newValue} ${this.setTraceInfo()}`);
         if (value === newValue) {
@@ -59,7 +59,7 @@ export class LocalDecoratedVariable<T> extends DecoratedV2VariableBase<T> implem
             : (uiUtils.autoProxyObject(newValue) as T);
         this.updateObservedObjectRegistration(value, processedNewValue);
 
-        this.backing_.setNoCheck(processedNewValue);
+        this.backing_.setNoCheck(processedNewValue as T);
     }
 
     resetOnReuse(newValue: T): void {

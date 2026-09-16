@@ -262,7 +262,7 @@ export class ArkListNode extends ArkScrollableNode implements ListAttribute {
         this.markDirty()
         return this
     }
-    onItemDragStart(value: ((event: ItemDragInfo, itemIndex: int32) => CustomBuilder) | undefined): this {
+    onItemDragStart(value: ((event: ItemDragInfo, itemIndex: int32) => CustomBuilder | undefined) | undefined): this {
         const value_casted = value as (((event: ItemDragInfo, itemIndex: int32) => CustomBuilder) | undefined)
         this.getPeer()?.setOnItemDragStartAttribute(value_casted)
         this.markDirty()

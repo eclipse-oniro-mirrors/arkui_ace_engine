@@ -50,7 +50,7 @@ export class ProviderDecoratedVariable<T> extends DecoratedV2VariableBase<T> imp
         return value;
     }
 
-    set(newValue: T): void {
+    set(newValue: Any): void {
         const value = this.backing_.get(false);
         StateMgmtDFX.enableDebug && StateMgmtDFX.functionTrace(`Provider ${value === newValue} ${this.setTraceInfo()}`);
         if (value === newValue) {
@@ -63,7 +63,7 @@ export class ProviderDecoratedVariable<T> extends DecoratedV2VariableBase<T> imp
         // Update ObservedObjectRegistry registration before setting the new value
         this.updateObservedObjectRegistration(value, makeObserved);
 
-        this.backing_.setNoCheck(makeObserved);
+        this.backing_.setNoCheck(makeObserved as T);
         if (this.viewV2) {
             ESValue.wrap(this.viewV2).setProperty(this.varName, ESValue.wrap(makeObserved));
             ESValue.getGlobal().getProperty('runPendingJobs').invoke();

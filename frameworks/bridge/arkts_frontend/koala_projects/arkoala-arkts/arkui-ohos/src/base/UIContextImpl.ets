@@ -79,7 +79,7 @@ import { KBuffer } from '@koalaui/interop';
 import { deserializeAndCallCallback } from 'arkui/framework/peers/CallbackDeserializeCall';
 import { InteropNativeModule } from '@koalaui/interop';
 import { LocalStorage } from '../stateManagement/storage/localStorage';
-import { Router as RouterExt } from 'arkui/base';
+import { Router as RouterExt, AsyncCallback as AsyncCallbackExt } from 'arkui/base';
 import { PromptActionExtender, FrameNodeExtender, AlertDialog, ActionSheet, AnimationExtender,
     DialogExtender, IUIContext, ContextMenu } from '../framework';
 import { EntryPoint, NavInterface } from "../component/customComponent"
@@ -287,7 +287,7 @@ export class ComponentSnapshotImpl extends ComponentSnapshot {
     }
 
     //@ts-ignore
-    public get(id: string, callback: routerAsyncCallback<PixelMap>, options?: componentSnapshot.SnapshotOptions): void {
+    public get(id: string, callback: AsyncCallbackExt<PixelMap>, options?: componentSnapshot.SnapshotOptions): void {
         ArkUIAniModule._Common_Sync_InstanceId(this.instanceId_);
         componentSnapshot.get(id, callback, options);
         ArkUIAniModule._Common_Restore_InstanceId();
@@ -302,7 +302,7 @@ export class ComponentSnapshotImpl extends ComponentSnapshot {
     }
 
     // @ts-ignore
-    public createFromBuilder(builder: CustomBuilder, callback: AsyncCallback<PixelMap>,
+    public createFromBuilder(builder: CustomBuilder, callback: AsyncCallbackExt<PixelMap>,
                              delay?: int32, checkImageStatus?: boolean,
                              options?: componentSnapshot.SnapshotOptions): void {
         ArkUIAniModule._Common_Sync_InstanceId(this.instanceId_);
@@ -314,7 +314,7 @@ export class ComponentSnapshotImpl extends ComponentSnapshot {
             destroyUiDetachedRoot(peerNode.peer.ptr, this.instanceId_);
         }
         ArkUIAniModule._ComponentSnapshot_createFromBuilderWithCallback(
-            rootNode, destroyCallback, callback, delay, checkImageStatus, options);
+            rootNode, destroyCallback, callback as AsyncCallback<PixelMap>, delay, checkImageStatus, options);
         ArkUIAniModule._Common_Restore_InstanceId();
     }
 
@@ -395,13 +395,13 @@ export class DragControllerImpl extends DragController {
 
     //@ts-ignore
     public executeDrag(custom: CustomBuilder | DragItemInfo | undefined, dragInfo: dragController.DragInfo,
-        callback: AsyncCallback<dragController.DragEventParam>): void {
+        callback: AsyncCallbackExt<dragController.DragEventParam>): void {
         ArkUIAniModule._Common_Sync_InstanceId(this.instanceId_);
         if (custom === undefined) {
             let destroyCallback = (): void => {}
             let dragItemInfoNull: DragItemInfo = {};
             ArkUIAniModule._DragController_executeDragWithCallback(dragItemInfoNull, nullptr,
-                destroyCallback, dragInfo, callback);
+                destroyCallback, dragInfo, callback as AsyncCallback<dragController.DragEventParam>);
         } else if (typeof custom === "function") {
             const peerNode = createUiDetachedRoot((): PeerNode => {
                 return ArkComponentRootPeer.create(undefined);
@@ -412,14 +412,14 @@ export class DragControllerImpl extends DragController {
             }
             let dragItemInfoNull: DragItemInfo = {};
             ArkUIAniModule._DragController_executeDragWithCallback(dragItemInfoNull, rootNode,
-                destroyCallback, dragInfo, callback);
+                destroyCallback, dragInfo, callback as AsyncCallback<dragController.DragEventParam>);
         } else {
             let destroyCallback = (): void => { };
             let customDragInfo = custom as DragItemInfo;
 
             if (customDragInfo.pixelMap !== undefined) {
                 ArkUIAniModule._DragController_executeDragWithCallback(custom as DragItemInfo, nullptr,
-                    destroyCallback, dragInfo, callback);
+                    destroyCallback, dragInfo, callback as AsyncCallback<dragController.DragEventParam>);
             } else if (customDragInfo.builder !== undefined) {
                 const peerNode = createUiDetachedRoot((): PeerNode => {
                     return ArkComponentRootPeer.create(undefined);
@@ -430,12 +430,12 @@ export class DragControllerImpl extends DragController {
                 }
                 let dragItemInfoNull: DragItemInfo = {};
                 ArkUIAniModule._DragController_executeDragWithCallback(dragItemInfoNull, rootNode,
-                    destroyCallback, dragInfo, callback);
+                    destroyCallback, dragInfo, callback as AsyncCallback<dragController.DragEventParam>);
             } else {
                 destroyCallback = (): void => {}
                 let dragItemInfoNull: DragItemInfo = {};
                 ArkUIAniModule._DragController_executeDragWithCallback(dragItemInfoNull, nullptr,
-                    destroyCallback, dragInfo, callback);
+                    destroyCallback, dragInfo, callback as AsyncCallback<dragController.DragEventParam>);
             }
         }
         ArkUIAniModule._Common_Restore_InstanceId();
@@ -605,21 +605,21 @@ export class RouterImpl extends Router {
         return result;
     }
 
-    public pushUrl(options: router.RouterOptions, callback: routerAsyncCallback<void>): void {
+    public pushUrl(options: router.RouterOptions, callback: AsyncCallbackExt<void>): void {
         if (this.router_ === undefined) {
             throw Error("router set in uiContext is empty");
         }
         ArkUIAniModule._Common_Sync_InstanceId(this.instanceId_);
-        this.router_!.pushAsync(options, callback);
+        this.router_!.pushAsync(options, callback as AsyncCallback<void>);
         ArkUIAniModule._Common_Restore_InstanceId();
     }
 
-    public pushUrl(options: router.RouterOptions, mode: router.RouterMode, callback: routerAsyncCallback<void>): void {
+    public pushUrl(options: router.RouterOptions, mode: router.RouterMode, callback: AsyncCallbackExt<void>): void {
         if (this.router_ === undefined) {
             throw Error("router set in uiContext is empty");
         }
         ArkUIAniModule._Common_Sync_InstanceId(this.instanceId_);
-        this.router_!.pushAsync(options, callback, mode);
+        this.router_!.pushAsync(options, callback as AsyncCallback<void>, mode);
         ArkUIAniModule._Common_Restore_InstanceId();
     }
 
@@ -643,21 +643,21 @@ export class RouterImpl extends Router {
         return result;
     }
 
-    public pushNamedRoute(options: router.NamedRouterOptions, callback: routerAsyncCallback<void>): void {
+    public pushNamedRoute(options: router.NamedRouterOptions, callback: AsyncCallbackExt<void>): void {
         if (this.router_ === undefined) {
             throw Error("router set in uiContext is empty");
         }
         ArkUIAniModule._Common_Sync_InstanceId(this.instanceId_);
-        this.router_!.pushNamedRouteAsync(options, callback);
+        this.router_!.pushNamedRouteAsync(options, callback as AsyncCallback<void>);
         ArkUIAniModule._Common_Restore_InstanceId();
     }
 
-    public pushNamedRoute(options: router.NamedRouterOptions, mode: router.RouterMode, callback: routerAsyncCallback<void>): void {
+    public pushNamedRoute(options: router.NamedRouterOptions, mode: router.RouterMode, callback: AsyncCallbackExt<void>): void {
         if (this.router_ === undefined) {
             throw Error("router set in uiContext is empty");
         }
         ArkUIAniModule._Common_Sync_InstanceId(this.instanceId_);
-        this.router_!.pushNamedRouteAsync(options, callback, mode);
+        this.router_!.pushNamedRouteAsync(options, callback as AsyncCallback<void>, mode);
         ArkUIAniModule._Common_Restore_InstanceId();
     }
 
@@ -681,21 +681,21 @@ export class RouterImpl extends Router {
         return result;
     }
 
-    public replaceUrl(options: router.RouterOptions, callback: routerAsyncCallback<void>): void {
+    public replaceUrl(options: router.RouterOptions, callback: AsyncCallbackExt<void>): void {
         if (this.router_ === undefined) {
             throw Error("router set in uiContext is empty");
         }
         ArkUIAniModule._Common_Sync_InstanceId(this.instanceId_);
-        this.router_!.replaceAsync(options, callback);
+        this.router_!.replaceAsync(options, callback as AsyncCallback<void>);
         ArkUIAniModule._Common_Restore_InstanceId();
     }
 
-    public replaceUrl(options: router.RouterOptions, mode: router.RouterMode, callback: routerAsyncCallback<void>): void {
+    public replaceUrl(options: router.RouterOptions, mode: router.RouterMode, callback: AsyncCallbackExt<void>): void {
         if (this.router_ === undefined) {
             throw Error("router set in uiContext is empty");
         }
         ArkUIAniModule._Common_Sync_InstanceId(this.instanceId_);
-        this.router_!.replaceAsync(options, callback, mode);
+        this.router_!.replaceAsync(options, callback as AsyncCallback<void>, mode);
         ArkUIAniModule._Common_Restore_InstanceId();
     }
 
@@ -719,21 +719,21 @@ export class RouterImpl extends Router {
         return result;
     }
 
-    public replaceNamedRoute(options: router.NamedRouterOptions, callback: routerAsyncCallback<void>): void {
+    public replaceNamedRoute(options: router.NamedRouterOptions, callback: AsyncCallbackExt<void>): void {
         if (this.router_ === undefined) {
             throw Error("router set in uiContext is empty");
         }
         ArkUIAniModule._Common_Sync_InstanceId(this.instanceId_);
-        this.router_!.replaceNamedRouteAsync(options, callback);
+        this.router_!.replaceNamedRouteAsync(options, callback as AsyncCallback<void>);
         ArkUIAniModule._Common_Restore_InstanceId();
     }
 
-    public replaceNamedRoute(options: router.NamedRouterOptions, mode: router.RouterMode, callback: routerAsyncCallback<void>): void {
+    public replaceNamedRoute(options: router.NamedRouterOptions, mode: router.RouterMode, callback: AsyncCallbackExt<void>): void {
         if (this.router_ === undefined) {
             throw Error("router set in uiContext is empty");
         }
         ArkUIAniModule._Common_Sync_InstanceId(this.instanceId_);
-        this.router_!.replaceNamedRouteAsync(options, callback, mode);
+        this.router_!.replaceNamedRouteAsync(options, callback as AsyncCallback<void>, mode);
         ArkUIAniModule._Common_Restore_InstanceId();
     }
 
@@ -1029,7 +1029,7 @@ export class PromptActionImpl extends PromptAction {
 
     //@ts-ignore
     showDialog(options: promptAction.ShowDialogOptions,
-        callback: AsyncCallback<promptAction.ShowDialogSuccessResponse>): void {
+        callback: AsyncCallbackExt<promptAction.ShowDialogSuccessResponse>): void {
         ArkUIAniModule._Common_Sync_InstanceId(this.instanceId_);
         let optionsInternal: promptAction.ShowDialogOptionsInternal = {};
         const levelOrder = options?.levelOrder?.getOrder?.();
@@ -1063,7 +1063,7 @@ export class PromptActionImpl extends PromptAction {
 
     //@ts-ignore
     showActionMenu(options: promptAction.ActionMenuOptions,
-        callback: AsyncCallback<promptAction.ActionMenuSuccessResponse>): void {
+        callback: AsyncCallbackExt<promptAction.ActionMenuSuccessResponse>): void {
         ArkUIAniModule._Common_Sync_InstanceId(this.instanceId_);
         let optionsInternal: promptAction.ActionMenuOptionsInternal = {};
         const materialPtr = options?.systemMaterial?.getNativeObject();
