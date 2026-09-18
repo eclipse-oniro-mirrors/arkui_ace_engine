@@ -28,6 +28,9 @@
 #include "core/common/dynamic_module_helper.h"
 #include "core/components_ng/pattern/tabs/tabs_model.h"
 #include "core/components_ng/pattern/tabs/tabs_model_ng.h"
+#include "core/components_ng/pattern/tabs/tabs_node.h"
+#include "core/components_ng/base/view_stack_processor.h"
+#include "core/components/tab_bar/tab_theme.h"
 #include "compatible/components/tab_bar/modifier/tab_modifier_api.h"
 #include "core/components_ng/pattern/tabs/bridge/tabs_transition_proxy_modifier_api.h"
 
@@ -387,6 +390,51 @@ void FfiOHOSAceFrameworkTabsSetDivider(CJTabsDividerStyle dividerStyle)
         divider.endMargin.Reset();
     } else {
         divider.endMargin = endMargin;
+    }
+
+    GetTabsModel()->SetDivider(divider);
+}
+
+void FfiOHOSAceFrameworkTabsSetDividerV2(CJTabsDividerStyle dividerStyle, bool hasStrokeWidth,
+    bool hasColor, bool hasStartMargin, bool hasEndMargin)
+{
+    TabsItemDivider divider;
+
+    divider.strokeWidth.Reset();
+    if (hasStrokeWidth) {
+        Dimension strokeWidth(dividerStyle.strokeWidth, static_cast<DimensionUnit>(dividerStyle.strokeWidthUnit));
+        if (strokeWidth.Value() >= 0.0f && strokeWidth.Unit() != DimensionUnit::PERCENT) {
+            divider.strokeWidth = strokeWidth;
+        }
+    }
+
+    if (hasColor) {
+        divider.color = Color(dividerStyle.color);
+    } else {
+        auto tabsNode = AceType::DynamicCast<NG::TabsNode>(NG::ViewStackProcessor::GetInstance()->GetMainFrameNode());
+        if (tabsNode) {
+            auto tabTheme = tabsNode->GetTheme<TabTheme>(true);
+            if (tabTheme) {
+                divider.color = tabTheme->GetDividerColor();
+            }
+        }
+    }
+    GetTabsModel()->SetDividerColorByUser(hasColor);
+
+    divider.startMargin.Reset();
+    if (hasStartMargin) {
+        Dimension startMargin(dividerStyle.startMargin, static_cast<DimensionUnit>(dividerStyle.startMarginUnit));
+        if (startMargin.Value() >= 0.0f && startMargin.Unit() != DimensionUnit::PERCENT) {
+            divider.startMargin = startMargin;
+        }
+    }
+
+    divider.endMargin.Reset();
+    if (hasEndMargin) {
+        Dimension endMargin(dividerStyle.endMargin, static_cast<DimensionUnit>(dividerStyle.endMarginUnit));
+        if (endMargin.Value() >= 0.0f && endMargin.Unit() != DimensionUnit::PERCENT) {
+            divider.endMargin = endMargin;
+        }
     }
 
     GetTabsModel()->SetDivider(divider);

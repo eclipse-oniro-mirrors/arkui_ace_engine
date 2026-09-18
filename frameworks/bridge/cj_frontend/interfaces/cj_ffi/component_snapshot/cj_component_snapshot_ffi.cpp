@@ -18,6 +18,8 @@
 #include "ffi_remote_data.h"
 #include "pixel_map_impl.h"
 #include "bridge/common/utils/utils.h"
+#include "core/common/container.h"
+#include "core/common/container_scope.h"
 #include "core/components_ng/render/adapter/component_snapshot.h"
 #include "core/components_ng/render/snapshot_param.h"
 #include "core/components_ng/base/view_stack_model.h"
@@ -26,6 +28,19 @@ using namespace OHOS;
 using namespace OHOS::Ace;
 
 namespace {
+    NG::SnapshotOptions ConvertSnapshotOptions(const CSnapshotOptionsV2& options)
+    {
+        NG::SnapshotOptions ngOptions(options.scale, options.waitUntilRenderFinished);
+        ngOptions.regionMode = static_cast<NG::SnapshotRegionMode>(options.region.regionMode);
+        ngOptions.snapshotRegion = { options.region.regionStart, options.region.regionTop,
+            options.region.regionEnd, options.region.regionBottom };
+        ngOptions.colorSpaceModeOptions.colorSpaceMode = options.colorMode.colorSpace;
+        ngOptions.colorSpaceModeOptions.isAuto = options.colorMode.isAuto;
+        ngOptions.dynamicRangeModeOptions.dynamicRangeMode = options.dynamicRangeMode.dynamicRangeMode;
+        ngOptions.dynamicRangeModeOptions.isAuto = options.dynamicRangeMode.isAuto;
+        return ngOptions;
+    }
+
     auto GetSnapshotCallback(void (*callback)(NativeOptionInt32 errCode, NativeOptionInt64 pixelMapId))
     {
         auto snapshotCallback = [
@@ -55,6 +70,54 @@ namespace {
 
         return snapshotCallback;
     }
+
+    // V2: post the CJLambda callback to the UI thread before invoking
+    auto GetSnapshotCallbackV2(void (*callback)(NativeOptionInt32 errCode, NativeOptionInt64 pixelMapId))
+    {
+        auto snapshotCallback = [
+            ffiCallback = CJLambda::Create(callback),
+            instanceId = Container::CurrentIdSafely()
+        ](
+            std::shared_ptr<Media::PixelMap> ptr,
+            int32_t code,
+            std::function<void()> finishCallback
+        ) {
+            NativeOptionInt32 errCode = {true, ERROR_CODE_INTERNAL_ERROR};
+            NativeOptionInt64 pixelMapId = {false, -1};
+
+            if (code == ERROR_CODE_NO_ERROR) {
+                auto nativeImage = FFI::FFIData::Create<Media::PixelMapImpl>(move(ptr));
+                pixelMapId = {true, nativeImage->GetID()};
+                errCode = {false, -1};
+            } else {
+                errCode = {true, code};
+            }
+
+            auto container = Container::GetContainer(instanceId);
+            auto taskExecutor = container ? container->GetTaskExecutor() : nullptr;
+            if (!taskExecutor) {
+                LOGE("ComponentSnapshot callback taskExecutor is null, invoke on current thread.");
+                ContainerScope scope(instanceId);
+                ffiCallback(errCode, pixelMapId);
+                if (finishCallback) {
+                    finishCallback();
+                }
+                return;
+            }
+
+            taskExecutor->PostTask(
+                [ffiCallback, errCode, pixelMapId, finishCallback, instanceId]() {
+                    ContainerScope scope(instanceId);
+                    ffiCallback(errCode, pixelMapId);
+                    if (finishCallback) {
+                        finishCallback();
+                    }
+                },
+                TaskExecutor::TaskType::UI, "ArkUIComponentSnapshotComplete");
+        };
+
+        return snapshotCallback;
+    }
 } //namespace
 
 extern "C" {
@@ -68,6 +131,21 @@ extern "C" {
             std::string(id != nullptr ? id : ""),
             GetSnapshotCallback(callback),
             NG::SnapshotOptions(options.scale, options.waitUntilRenderFinished));
+#endif
+    }
+
+    void FfiOHOSAceFrameworkComponentSnapshotGetV2(
+        int32_t instanceId,
+        const char* id,
+        void (*callback)(NativeOptionInt32 errCode, NativeOptionInt64 pixelMapId),
+        CSnapshotOptionsV2 options)
+    {
+#ifdef ENABLE_ROSEN_BACKEND
+        ContainerScope scope(instanceId);
+        NG::ComponentSnapshot::Get(
+            std::string(id != nullptr ? id : ""),
+            GetSnapshotCallbackV2(callback),
+            ConvertSnapshotOptions(options));
 #endif
     }
 

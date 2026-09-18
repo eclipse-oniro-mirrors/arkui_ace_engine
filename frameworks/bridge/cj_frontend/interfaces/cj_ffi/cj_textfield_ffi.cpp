@@ -40,6 +40,8 @@ const std::vector<TextInputType> TEXT_INPUT_TYPES = { TextInputType::TEXT, TextI
     TextInputType::ONE_TIME_CODE };
 const std::vector<TextAlign> TEXT_ALIGNS = { TextAlign::START, TextAlign::CENTER, TextAlign::END };
 const std::vector<TextOverflow> TEXT_OVERFLOWS = { TextOverflow::CLIP, TextOverflow::ELLIPSIS, TextOverflow::NONE };
+const std::vector<EllipsisMode> ELLIPSIS_MODE = { EllipsisMode::HEAD, EllipsisMode::MIDDLE, EllipsisMode::TAIL,
+    EllipsisMode::MULTILINE_HEAD, EllipsisMode::MULTILINE_MIDDLE };
 const std::function<void(std::u16string)> FormatCharFunction(void (*callback)(const char* value))
 {
     const std::function<void(std::u16string)> result = [lambda = CJLambda::Create(callback)]
@@ -437,12 +439,61 @@ void FfiOHOSAceFrameworkTextFieldSetTextIndent(double value, int32_t unit)
     GetTextFieldModel()->SetTextIndent(size);
 }
 
+void FfiOHOSAceFrameworkTextFieldSetTextIndentV2(double value, int32_t unit)
+{
+    Dimension size(value, static_cast<DimensionUnit>(unit));
+    GetTextFieldModel()->SetTextIndent(size);
+}
+
+void FfiOHOSAceFrameworkTextFieldResetTextIndent()
+{
+    GetTextFieldModel()->SetTextIndent(CalcDimension(0, DimensionUnit::VP));
+}
+
+void FfiOHOSAceFrameworkTextFieldSetEllipsisMode(int32_t ellipsisMode)
+{
+    if (ellipsisMode < 0 || ellipsisMode >= static_cast<int32_t>(ELLIPSIS_MODE.size())) {
+        LOGE("invalid value for ellipsis mode");
+        return;
+    }
+    GetTextFieldModel()->SetEllipsisMode(ELLIPSIS_MODE[ellipsisMode]);
+}
+
+void FfiOHOSAceFrameworkTextFieldResetEllipsisMode()
+{
+    GetTextFieldModel()->SetEllipsisMode(EllipsisMode::TAIL);
+}
+
+void FfiOHOSAceFrameworkTextFieldSetHalfLeading(bool value)
+{
+    GetTextFieldModel()->SetHalfLeading(value);
+}
+
+void FfiOHOSAceFrameworkTextFieldResetHalfLeading()
+{
+    GetTextFieldModel()->SetHalfLeading(false);
+}
+
 void FfiOHOSAceFrameworkTextFieldSetTextOverflow(int32_t value)
 {
     if (value < 0 || value >= static_cast<int32_t>(TEXT_OVERFLOWS.size())) {
         value = 0;
     }
     GetTextFieldModel()->SetTextOverflow(TEXT_OVERFLOWS[value]);
+}
+
+void FfiOHOSAceFrameworkTextFieldSetTextOverflowV2(int32_t value)
+{
+    auto textOverflow = TextOverflow::DEFAULT;
+    if (value >= 0 && value < static_cast<int32_t>(TEXT_OVERFLOWS.size())) {
+        textOverflow = TEXT_OVERFLOWS[value];
+    }
+    GetTextFieldModel()->SetTextOverflow(textOverflow);
+}
+
+void FfiOHOSAceFrameworkTextFieldResetTextOverflow()
+{
+    GetTextFieldModel()->SetTextOverflow(TextOverflow::DEFAULT);
 }
 
 void FfiOHOSAceFrameworkTextFieldSetEnablePreviewText(bool value)

@@ -20,6 +20,7 @@
 #include "bridge/common/utils/utils.h"
 #include "core/components/common/properties/text_style.h"
 #include "core/components/common/properties/text_style_parser.h"
+#include "core/components/text/text_theme.h"
 #include "core/components_ng/pattern/text/text_controller.h"
 #include "core/components_ng/pattern/text/text_model_ng.h"
 #include "core/components_ng/pattern/text/text_pattern.h"
@@ -313,6 +314,25 @@ void FfiOHOSAceFrameworkTextSetFont(
     fontFamilies = ConvertStrToFontFamilies(fontFamily);
     font.fontFamilies = fontFamilies;
     TextModel::GetInstance()->SetFont(font);
+}
+
+static Font GetThemeBaseFont(const TextTheme& theme)
+{
+    Font font;
+    font.fontSize = theme.GetTextStyle().GetFontSize();
+    font.fontWeight = theme.GetTextStyle().GetFontWeight();
+    font.fontFamilies = theme.GetTextStyle().GetFontFamilies();
+    font.fontStyle = theme.GetTextStyle().GetFontStyle();
+    return font;
+}
+
+void FfiOHOSAceFrameworkTextResetFont()
+{
+    auto pipelineContext = PipelineContext::GetCurrentContextSafelyWithCheck();
+    CHECK_NULL_VOID(pipelineContext);
+    auto theme = pipelineContext->GetTheme<TextTheme>();
+    CHECK_NULL_VOID(theme);
+    TextModel::GetInstance()->SetFont(GetThemeBaseFont(*theme));
 }
 
 VectorNativeShadowOptionsHandle FFICJCreateVectorNativeShadowOptions(int64_t size)

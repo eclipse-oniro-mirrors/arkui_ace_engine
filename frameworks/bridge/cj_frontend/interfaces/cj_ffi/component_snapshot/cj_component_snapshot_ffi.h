@@ -25,15 +25,53 @@ struct CSnapshotGetSyncRet {
     int64_t pixelMapId;
 };
 
+// NOTE: CSnapshotOptions and the functions taking it are shipped ABI. Do NOT
+// modify this struct in place; passing it by value ties the layout to the
+// calling convention (8-byte structs are passed in registers). Extend via a
+// new V2 struct and a new V2 symbol instead (see CJBadgeStyleV2 precedent).
 struct CSnapshotOptions {
     float scale;
     bool waitUntilRenderFinished;
+};
+
+// Mirrors the Cangjie @C structs in cj_component_snapshot.cj. Field order and
+// types must stay in sync with the Cangjie definitions (C layout rules).
+struct CSnapshotRegion {
+    int32_t regionMode; // 0: COMMON, 1: LOCALIZED, 2: NO_REGION (NG::SnapshotRegionMode)
+    double regionStart; // SnapshotRegion.left or LocalizedSnapshotRegion.start, unit: px
+    double regionEnd; // SnapshotRegion.right or LocalizedSnapshotRegion.end, unit: px
+    double regionTop; // unit: px
+    double regionBottom; // unit: px
+};
+
+struct CColorModeOptions {
+    uint32_t colorSpace; // ArkTS ColorSpace enum value, default 4 (SRGB)
+    bool isAuto;
+};
+
+struct CDynamicRangeModeOptions {
+    uint32_t dynamicRangeMode; // default 2 (STANDARD)
+    bool isAuto;
+};
+
+struct CSnapshotOptionsV2 {
+    float scale;
+    bool waitUntilRenderFinished;
+    CSnapshotRegion region;
+    CColorModeOptions colorMode;
+    CDynamicRangeModeOptions dynamicRangeMode;
 };
 
 CJ_EXPORT void FfiOHOSAceFrameworkComponentSnapshotGet(
     const char* id,
     void (*callback)(NativeOptionInt32 errCode, NativeOptionInt64 pixelMapId),
     CSnapshotOptions options);
+
+CJ_EXPORT void FfiOHOSAceFrameworkComponentSnapshotGetV2(
+    int32_t instanceId,
+    const char* id,
+    void (*callback)(NativeOptionInt32 errCode, NativeOptionInt64 pixelMapId),
+    CSnapshotOptionsV2 options);
 
 CJ_EXPORT void FfiOHOSAceFrameworkComponentSnapshotCreate(
     void (*builder)(),
