@@ -23,6 +23,9 @@ template("cj_frontend") {
     subsystem_name = ace_engine_subsystem
     part_name = ace_engine_part
     innerapi_tags = [ "platformsdk" ]
+    if (platform_config.is_ohos) {
+      version_script = "libcj_frontend.map"
+    }
     defines += invoker.defines
     defines += platform_config.common_defines
     configs = [ "$ace_root:ace_config" ]
