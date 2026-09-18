@@ -82,6 +82,7 @@ public:
     MOCK_METHOD0(GetComponentTypeDescription, std::string());
     MOCK_METHOD0(GetCheckboxGroupSelectedStatus, int32_t());
     MOCK_METHOD0(GetExpandedState, std::string());
+    MOCK_METHOD0(GetZIndex, int32_t());
 };
 }  // namespace OHOS::NWeb
 
@@ -112,8 +113,10 @@ HWTEST_F(TransitionalNodeInfoTest, TransitionalNodeInfo_001, TestSize.Level1)
     EXPECT_CALL(*mockNWebAccessibilityNodeInfo, GetComponentTypeDescription()).WillOnce(Return("button"));
     EXPECT_CALL(*mockNWebAccessibilityNodeInfo, GetExpandedState()).WillOnce(Return("expanded"));
     EXPECT_CALL(*mockNWebAccessibilityNodeInfo, GetCheckboxGroupSelectedStatus()).WillOnce(Return(2));
+    EXPECT_CALL(*mockNWebAccessibilityNodeInfo, GetZIndex()).WillOnce(Return(5));
     EXPECT_EQ(node->GetComponentTypeDescription(), "button");
     EXPECT_EQ(node->GetExpandedState(), "expanded");
     EXPECT_EQ(node->GetCheckboxGroupSelectedStatus(), 2);
+    EXPECT_EQ(node->GetZIndex(), 5);
 }
 }
