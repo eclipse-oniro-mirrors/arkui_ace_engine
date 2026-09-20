@@ -1515,6 +1515,10 @@ void GridCacheLayoutTestNg::CheckSyncPreloadLineShift(
     constexpr int32_t SINGLE_COLUMN_COUNT = 1;
     constexpr int32_t DOUBLE_COLUMN_COUNT = 2;
     constexpr int32_t VISIBLE_LINE_COUNT = 3;
+    if (crossCount <= 0) {
+        ADD_FAILURE() << "crossCount must be positive";
+        return;
+    }
     ASSERT_TRUE(crossCount == SINGLE_COLUMN_COUNT || crossCount == DOUBLE_COLUMN_COUNT);
     ASSERT_EQ(startIndex % crossCount, 0);
     const int32_t endIndex = startIndex + VISIBLE_LINE_COUNT * crossCount - 1;
