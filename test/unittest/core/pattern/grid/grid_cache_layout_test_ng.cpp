@@ -1515,16 +1515,16 @@ void GridCacheLayoutTestNg::CheckSyncPreloadLineShift(
     constexpr int32_t SINGLE_COLUMN_COUNT = 1;
     constexpr int32_t DOUBLE_COLUMN_COUNT = 2;
     constexpr int32_t VISIBLE_LINE_COUNT = 3;
-    if (crossCount <= 0) {
-        ADD_FAILURE() << "crossCount must be positive";
+    if (crossCount != SINGLE_COLUMN_COUNT && crossCount != DOUBLE_COLUMN_COUNT) {
+        ADD_FAILURE() << "crossCount must be one or two";
         return;
     }
-    ASSERT_TRUE(crossCount == SINGLE_COLUMN_COUNT || crossCount == DOUBLE_COLUMN_COUNT);
-    ASSERT_EQ(startIndex % crossCount, 0);
-    const int32_t endIndex = startIndex + VISIBLE_LINE_COUNT * crossCount - 1;
-    const int32_t itemCount = endIndex + 1 + std::max(cacheCount, 1) * crossCount;
+    const int32_t columnCount = crossCount == SINGLE_COLUMN_COUNT ? SINGLE_COLUMN_COUNT : DOUBLE_COLUMN_COUNT;
+    ASSERT_EQ(startIndex % columnCount, 0);
+    const int32_t endIndex = startIndex + VISIBLE_LINE_COUNT * columnCount - 1;
+    const int32_t itemCount = endIndex + 1 + std::max(cacheCount, 1) * columnCount;
     GridModelNG model = CreateGrid();
-    model.SetColumnsTemplate(crossCount == SINGLE_COLUMN_COUNT ? "1fr" : "1fr 1fr");
+    model.SetColumnsTemplate(columnCount == SINGLE_COLUMN_COUNT ? "1fr" : "1fr 1fr");
     model.SetCachedCount(cacheCount, true);
     CreateFixedItems(itemCount);
     CreateDone();
@@ -1536,12 +1536,12 @@ void GridCacheLayoutTestNg::CheckSyncPreloadLineShift(
     auto& info = algorithm.info_;
     info.startIndex_ = startIndex;
     info.endIndex_ = endIndex;
-    info.startMainLineIndex_ = startIndex / crossCount + lineOffset;
-    info.endMainLineIndex_ = endIndex / crossCount + lineOffset;
-    const int32_t recordedEnd = endIndex + (recordedTail ? crossCount : 0);
+    info.startMainLineIndex_ = startIndex / columnCount + lineOffset;
+    info.endMainLineIndex_ = endIndex / columnCount + lineOffset;
+    const int32_t recordedEnd = endIndex + (recordedTail ? columnCount : 0);
     for (int32_t index = startIndex; index <= recordedEnd; ++index) {
-        const int32_t row = index / crossCount + lineOffset;
-        info.gridMatrix_[row][index % crossCount] = index;
+        const int32_t row = index / columnCount + lineOffset;
+        info.gridMatrix_[row][index % columnCount] = index;
         info.lineHeightMap_[row] = ITEM_MAIN_SIZE;
     }
 
@@ -1552,15 +1552,15 @@ void GridCacheLayoutTestNg::CheckSyncPreloadLineShift(
     // Compare the entire matrix to catch gaps, duplicates and extra cache rows.
     decltype(info.gridMatrix_) expectedMatrix;
     decltype(info.lineHeightMap_) expectedHeights;
-    const int32_t expectedStart = std::max(startIndex - cacheCount * crossCount, 0);
-    const int32_t expectedEnd = endIndex + cacheCount * crossCount;
+    const int32_t expectedStart = std::max(startIndex - cacheCount * columnCount, 0);
+    const int32_t expectedEnd = endIndex + cacheCount * columnCount;
     for (int32_t index = expectedStart; index <= expectedEnd; ++index) {
-        expectedMatrix[index / crossCount][index % crossCount] = index;
-        expectedHeights[index / crossCount] = ITEM_MAIN_SIZE;
+        expectedMatrix[index / columnCount][index % columnCount] = index;
+        expectedHeights[index / columnCount] = ITEM_MAIN_SIZE;
     }
     EXPECT_EQ(info.gridMatrix_, expectedMatrix);
     EXPECT_EQ(info.lineHeightMap_, expectedHeights);
-    CheckSyncPreloadRange(info, startIndex, endIndex, startIndex / crossCount, endIndex / crossCount);
+    CheckSyncPreloadRange(info, startIndex, endIndex, startIndex / columnCount, endIndex / columnCount);
     EXPECT_FALSE(algorithm.measureInNextFrame_);
 }
 
