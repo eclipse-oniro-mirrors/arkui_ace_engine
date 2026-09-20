@@ -2161,10 +2161,6 @@ void SelectPattern::ScrollToSelectedOption()
     CHECK_NULL_VOID(scroll);
     auto scrollPattern = scroll->GetPattern<ScrollPattern>();
     CHECK_NULL_VOID(scrollPattern);
-    auto scrollGeometry = scroll->GetGeometryNode();
-    CHECK_NULL_VOID(scrollGeometry);
-    auto scrollLayoutProps = scroll->GetLayoutProperty<ScrollLayoutProperty>();
-    CHECK_NULL_VOID(scrollLayoutProps);
     auto column = DynamicCast<FrameNode>(scroll->GetFirstChild());
     CHECK_NULL_VOID(column);
     if (selected_ >= static_cast<int32_t>(column->GetChildren().size())) {
@@ -2192,6 +2188,10 @@ void SelectPattern::ScrollToSelectedOption()
     if (!reachedScroll) {
         return;
     }
+    auto scrollGeometry = scroll->GetGeometryNode();
+    CHECK_NULL_VOID(scrollGeometry);
+    auto scrollLayoutProps = scroll->GetLayoutProperty<ScrollLayoutProperty>();
+    CHECK_NULL_VOID(scrollLayoutProps);
     auto optionHeight = optionGeometry->GetFrameSize().Height();
     auto scrollHeight = scrollGeometry->GetFrameSize().Height();
     auto viewport = scrollPattern->GetMainContentSize();
