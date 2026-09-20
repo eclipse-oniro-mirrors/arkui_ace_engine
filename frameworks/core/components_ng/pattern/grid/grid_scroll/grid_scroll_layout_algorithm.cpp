@@ -1689,6 +1689,8 @@ void GridScrollLayoutAlgorithm::AddForwardLines(
                 info_.gridMatrix_.emplace(forwardLines + i, std::move(gridMatrix[i]));
                 info_.lineHeightMap_.emplace(forwardLines + i, gridLineHeightMap[i]);
             }
+            // The visible tail moves together with the recorded rows.
+            endMainLineIndex += forwardLines;
         }
     } else {
         // delete more than one line items
@@ -2540,7 +2542,8 @@ void GridScrollLayoutAlgorithm::SyncPreload(
     for (int32_t i = 0; i < cacheLineCnt; ++i, ++line) {
         const int32_t previousEndLine = info_.endMainLineIndex_;
         FillNewLineForward(crossSize, mainSize, wrapper);
-        // Prepending can shift every recorded row, including earlier cache rows.
+        // Prepending shifts the recorded end and this cursor by the same amount,
+        // preserving their distance even when several rows move in one iteration.
         line += info_.endMainLineIndex_ - previousEndLine;
 
         float len = 0.0f;

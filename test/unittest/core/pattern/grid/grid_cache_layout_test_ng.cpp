@@ -26,7 +26,9 @@ class GridCacheLayoutTestNg : public GridTestNg {
 public:
     void CreateItems1();
     void CreateItems2();
-    void CheckSyncPreloadLineShift(int32_t startIndex, int32_t lineOffset, int32_t cacheCount, bool recordedTail);
+    void CheckSyncPreloadLineShift(
+        int32_t startIndex, int32_t lineOffset, int32_t cacheCount, bool recordedTail, int32_t crossCount = 1);
+    void CheckSyncPreloadBigItem(bool moveRecordedRows, int32_t cacheCount);
 };
 
 void GridCacheLayoutTestNg::CreateItems1()
@@ -1476,12 +1478,14 @@ HWTEST_F(GridCacheLayoutTestNg, SyncPreloadAfterDataReloadAndScrollToIndex, Test
 }
 
 void GridCacheLayoutTestNg::CheckSyncPreloadLineShift(
-    int32_t startIndex, int32_t lineOffset, int32_t cacheCount, bool recordedTail)
+    int32_t startIndex, int32_t lineOffset, int32_t cacheCount, bool recordedTail, int32_t crossCount)
 {
-    const int32_t endIndex = startIndex + 2;
-    const int32_t itemCount = endIndex + 1 + std::max(cacheCount, 1);
+    ASSERT_TRUE(crossCount == 1 || crossCount == 2);
+    ASSERT_EQ(startIndex % crossCount, 0);
+    const int32_t endIndex = startIndex + 3 * crossCount - 1;
+    const int32_t itemCount = endIndex + 1 + std::max(cacheCount, 1) * crossCount;
     GridModelNG model = CreateGrid();
-    model.SetColumnsTemplate("1fr");
+    model.SetColumnsTemplate(crossCount == 1 ? "1fr" : "1fr 1fr");
     model.SetCachedCount(cacheCount, true);
     CreateFixedItems(itemCount);
     CreateDone();
@@ -1500,35 +1504,36 @@ void GridCacheLayoutTestNg::CheckSyncPreloadLineShift(
     info.ResetPositionFlags();
     info.startIndex_ = startIndex;
     info.endIndex_ = endIndex;
-    info.startMainLineIndex_ = startIndex + lineOffset;
-    info.endMainLineIndex_ = endIndex + lineOffset;
+    info.startMainLineIndex_ = startIndex / crossCount + lineOffset;
+    info.endMainLineIndex_ = endIndex / crossCount + lineOffset;
     info.currentOffset_ = -20.0f;
     info.prevOffset_ = info.currentOffset_;
-    const int32_t recordedEnd = endIndex + (recordedTail ? 1 : 0);
+    const int32_t recordedEnd = endIndex + (recordedTail ? crossCount : 0);
     for (int32_t index = startIndex; index <= recordedEnd; ++index) {
-        info.gridMatrix_[index + lineOffset] = { { 0, index } };
-        info.lineHeightMap_[index + lineOffset] = ITEM_MAIN_SIZE;
+        const int32_t row = index / crossCount + lineOffset;
+        info.gridMatrix_[row][index % crossCount] = index;
+        info.lineHeightMap_[row] = ITEM_MAIN_SIZE;
     }
 
     algorithm.SyncPreload(AceType::RawPtr(frameNode_), cacheCount,
         algorithm.frameSize_.Width(), algorithm.frameSize_.Height());
 
-    // For one-column, single-row items the canonical row equals the item index.
+    // For regular items the canonical row is the item index divided by the column count.
     // Compare the entire matrix to catch gaps, duplicates and extra cache rows.
     decltype(info.gridMatrix_) expectedMatrix;
     decltype(info.lineHeightMap_) expectedHeights;
-    const int32_t expectedStart = std::max(startIndex - cacheCount, 0);
-    const int32_t expectedEnd = endIndex + cacheCount;
+    const int32_t expectedStart = std::max(startIndex - cacheCount * crossCount, 0);
+    const int32_t expectedEnd = endIndex + cacheCount * crossCount;
     for (int32_t index = expectedStart; index <= expectedEnd; ++index) {
-        expectedMatrix[index] = { { 0, index } };
-        expectedHeights[index] = ITEM_MAIN_SIZE;
+        expectedMatrix[index / crossCount][index % crossCount] = index;
+        expectedHeights[index / crossCount] = ITEM_MAIN_SIZE;
     }
     EXPECT_EQ(info.gridMatrix_, expectedMatrix);
     EXPECT_EQ(info.lineHeightMap_, expectedHeights);
     EXPECT_EQ(info.startIndex_, startIndex);
     EXPECT_EQ(info.endIndex_, endIndex);
-    EXPECT_EQ(info.startMainLineIndex_, startIndex);
-    EXPECT_EQ(info.endMainLineIndex_, endIndex);
+    EXPECT_EQ(info.startMainLineIndex_, startIndex / crossCount);
+    EXPECT_EQ(info.endMainLineIndex_, endIndex / crossCount);
     EXPECT_FLOAT_EQ(info.currentOffset_, -20.0f);
     EXPECT_FLOAT_EQ(info.prevOffset_, -20.0f);
     EXPECT_FALSE(algorithm.measureInNextFrame_);
@@ -1612,6 +1617,144 @@ HWTEST_F(GridCacheLayoutTestNg, SyncPreloadRepeatedForwardShift, TestSize.Level1
 HWTEST_F(GridCacheLayoutTestNg, SyncPreloadZeroCachedLines, TestSize.Level1)
 {
     CheckSyncPreloadLineShift(1, 0, 0, false);
+}
+
+/**
+ * @tc.name: SyncPreloadMultipleColumnsLineShift
+ * @tc.desc: Two-column rows remain continuous after removing three excess row indices.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, SyncPreloadMultipleColumnsLineShift, TestSize.Level1)
+{
+    CheckSyncPreloadLineShift(2, 3, 1, false, 2);
+}
+
+/**
+ * @tc.name: SyncPreloadMultipleColumnsCachedLines
+ * @tc.desc: Reuse a two-column tail row and append three cache rows after a multi-row shift.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, SyncPreloadMultipleColumnsCachedLines, TestSize.Level1)
+{
+    CheckSyncPreloadLineShift(2, 3, 3, true, 2);
+}
+
+/**
+ * @tc.name: SyncPreloadMultipleColumnsRepeatedShift
+ * @tc.desc: Each forward iteration shifts both visible and previously cached two-column rows.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, SyncPreloadMultipleColumnsRepeatedShift, TestSize.Level1)
+{
+    CheckSyncPreloadLineShift(6, -3, 3, false, 2);
+}
+
+void GridCacheLayoutTestNg::CheckSyncPreloadBigItem(bool moveRecordedRows, int32_t cacheCount)
+{
+    constexpr int32_t CROSS_COUNT = 2;
+    constexpr int32_t MAIN_SPAN = 3;
+    const int32_t bigItem = moveRecordedRows ? 0 : 1;
+    const int32_t startIndex = bigItem + 1;
+    const int32_t endIndex = startIndex + 2 * CROSS_COUNT - 1;
+    const int32_t startLine = moveRecordedRows ? 1 : 4;
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetCachedCount(cacheCount, true);
+    if (bigItem != 0) {
+        CreateFixedItems(1);
+    }
+    CreateBigItem(bigItem, bigItem + MAIN_SPAN - 1, 0, CROSS_COUNT - 1,
+        NULL_VALUE, MAIN_SPAN * ITEM_MAIN_SIZE);
+    CreateFixedItems((2 + cacheCount) * CROSS_COUNT);
+    CreateDone();
+
+    GridScrollLayoutAlgorithm algorithm(pattern_->info_);
+    algorithm.wrapper_ = AceType::RawPtr(frameNode_);
+    algorithm.frameSize_ = frameNode_->GetGeometryNode()->GetFrameSize();
+    algorithm.syncLoad_ = true;
+    algorithm.InitialItemsCrossSize(layoutProperty_, algorithm.frameSize_,
+        endIndex + 1 + cacheCount * CROSS_COUNT, algorithm.frameSize_.Width());
+    auto& info = algorithm.info_;
+    info.gridMatrix_.clear();
+    info.lineHeightMap_.clear();
+    info.ResetPositionFlags();
+    info.startIndex_ = startIndex;
+    info.endIndex_ = endIndex;
+    info.startMainLineIndex_ = startLine;
+    info.endMainLineIndex_ = startLine + 1;
+    info.currentOffset_ = -20.0f;
+    info.prevOffset_ = info.currentOffset_;
+    for (int32_t index = startIndex; index <= endIndex; ++index) {
+        const int32_t row = startLine + (index - startIndex) / CROSS_COUNT;
+        info.gridMatrix_[row][(index - startIndex) % CROSS_COUNT] = index;
+        info.lineHeightMap_[row] = ITEM_MAIN_SIZE;
+    }
+
+    algorithm.SyncPreload(AceType::RawPtr(frameNode_), cacheCount,
+        algorithm.frameSize_.Width(), algorithm.frameSize_.Height());
+
+    // The leading item occupies three complete rows. The two visible rows and
+    // every tail cache row must follow it, irrespective of the temporary input row numbers.
+    decltype(info.gridMatrix_) expectedMatrix;
+    decltype(info.lineHeightMap_) expectedHeights;
+    for (int32_t row = bigItem; row < bigItem + MAIN_SPAN; ++row) {
+        expectedMatrix[row] = { { 0, bigItem }, { 1, bigItem } };
+        expectedHeights[row] = ITEM_MAIN_SIZE;
+    }
+    for (int32_t index = startIndex; index <= endIndex + cacheCount * CROSS_COUNT; ++index) {
+        const int32_t row = bigItem + MAIN_SPAN + (index - startIndex) / CROSS_COUNT;
+        expectedMatrix[row][(index - startIndex) % CROSS_COUNT] = index;
+        expectedHeights[row] = ITEM_MAIN_SIZE;
+    }
+    EXPECT_EQ(info.gridMatrix_, expectedMatrix);
+    EXPECT_EQ(info.lineHeightMap_, expectedHeights);
+    EXPECT_EQ(info.startIndex_, startIndex);
+    EXPECT_EQ(info.endIndex_, endIndex);
+    EXPECT_EQ(info.startMainLineIndex_, bigItem + MAIN_SPAN);
+    EXPECT_EQ(info.endMainLineIndex_, bigItem + MAIN_SPAN + 1);
+    EXPECT_FLOAT_EQ(info.currentOffset_, -20.0f);
+    EXPECT_FLOAT_EQ(info.prevOffset_, -20.0f);
+    EXPECT_FALSE(algorithm.measureInNextFrame_);
+}
+
+/**
+ * @tc.name: SyncPreloadBigItemMovesRecordedRows
+ * @tc.desc: Prepending a three-row item moves the old rows and the next tail cache row together.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, SyncPreloadBigItemMovesRecordedRows, TestSize.Level1)
+{
+    CheckSyncPreloadBigItem(true, 1);
+}
+
+/**
+ * @tc.name: SyncPreloadBigItemMovesRecordedRowsMultipleCachedLines
+ * @tc.desc: A positive multi-row shift must retain three consecutive tail cache rows.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, SyncPreloadBigItemMovesRecordedRowsMultipleCachedLines, TestSize.Level1)
+{
+    CheckSyncPreloadBigItem(true, 3);
+}
+
+/**
+ * @tc.name: SyncPreloadBigItemOverlappingMerge
+ * @tc.desc: The overlapping merge preserves old row numbers while shifting the newly filled big item.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, SyncPreloadBigItemOverlappingMerge, TestSize.Level1)
+{
+    CheckSyncPreloadBigItem(false, 1);
+}
+
+/**
+ * @tc.name: SyncPreloadBigItemOverlappingMergeMultipleCachedLines
+ * @tc.desc: An overlapping big-item merge preserves three tail cache rows without shifting them twice.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, SyncPreloadBigItemOverlappingMergeMultipleCachedLines, TestSize.Level1)
+{
+    CheckSyncPreloadBigItem(false, 3);
 }
 
 /**
