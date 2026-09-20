@@ -2161,6 +2161,10 @@ void SelectPattern::ScrollToSelectedOption()
     CHECK_NULL_VOID(scroll);
     auto scrollPattern = scroll->GetPattern<ScrollPattern>();
     CHECK_NULL_VOID(scrollPattern);
+    auto scrollGeometry = scroll->GetGeometryNode();
+    CHECK_NULL_VOID(scrollGeometry);
+    auto scrollLayoutProps = scroll->GetLayoutProperty<ScrollLayoutProperty>();
+    CHECK_NULL_VOID(scrollLayoutProps);
     auto column = DynamicCast<FrameNode>(scroll->GetFirstChild());
     CHECK_NULL_VOID(column);
     if (selected_ >= static_cast<int32_t>(column->GetChildren().size())) {
@@ -2189,11 +2193,13 @@ void SelectPattern::ScrollToSelectedOption()
         return;
     }
     auto optionHeight = optionGeometry->GetFrameSize().Height();
+    auto scrollHeight = scrollGeometry->GetFrameSize().Height();
     auto viewport = scrollPattern->GetMainContentSize();
-    if (optionTop >= 0 && optionTop + optionHeight <= viewport) {
+    if (optionTop >= 0 && optionTop + optionHeight <= scrollHeight) {
         return;
     }
-    auto targetOffset = static_cast<float>(scrollPattern->GetTotalOffset()) + optionTop
+    auto contentOffsetY = scrollLayoutProps->CreatePaddingAndBorder().Offset().GetY();
+    auto targetOffset = static_cast<float>(scrollPattern->GetTotalOffset()) + optionTop - contentOffsetY
         - (viewport - optionHeight) / 2.0f;
     auto maxScrollOffset = scrollPattern->GetScrollableDistance();
     if (targetOffset < 0.0f) {
