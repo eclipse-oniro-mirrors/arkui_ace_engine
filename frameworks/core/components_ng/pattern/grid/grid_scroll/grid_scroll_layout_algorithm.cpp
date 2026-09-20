@@ -2536,12 +2536,15 @@ void GridScrollLayoutAlgorithm::SyncPreload(
 {
     moveToEndLineIndex_ = -1;
     TempLayoutRange scope(info_);
-    for (int32_t i = 0; i < cacheLineCnt; ++i) {
+    int32_t line = info_.endMainLineIndex_ + 1;
+    for (int32_t i = 0; i < cacheLineCnt; ++i, ++line) {
+        const int32_t previousEndLine = info_.endMainLineIndex_;
         FillNewLineForward(crossSize, mainSize, wrapper);
+        // Prepending can shift every recorded row, including earlier cache rows.
+        line += info_.endMainLineIndex_ - previousEndLine;
 
         float len = 0.0f;
         int32_t endIdx = info_.endIndex_;
-        int32_t line = scope.subEndLine_ + i + 1;
         if (!MeasureExistingLine(line, len, endIdx)) {
             currentMainLineIndex_ = line - 1;
             FillCurrentLine(mainSize, crossSize, wrapper);

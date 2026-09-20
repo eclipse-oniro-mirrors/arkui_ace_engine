@@ -17,6 +17,7 @@
 #include "test/mock/frameworks/core/components_ng/render/mock_render_context.h"
 
 #include "core/components_ng/pattern/grid/grid_item_layout_property.h"
+#include "core/components_ng/pattern/grid/grid_scroll/grid_scroll_layout_algorithm.h"
 #include "test/mock/frameworks/core/animation/mock_animation_manager.h"
 
 namespace OHOS::Ace::NG {
@@ -25,6 +26,7 @@ class GridCacheLayoutTestNg : public GridTestNg {
 public:
     void CreateItems1();
     void CreateItems2();
+    void CheckSyncPreloadLineShift(int32_t startIndex, int32_t lineOffset, int32_t cacheCount, bool recordedTail);
 };
 
 void GridCacheLayoutTestNg::CreateItems1()
@@ -1471,5 +1473,180 @@ HWTEST_F(GridCacheLayoutTestNg, SyncPreloadAfterDataReloadAndScrollToIndex, Test
     int32_t cacheItemIdx = info.endIndex_ + 1;
     EXPECT_TRUE(GetItem(cacheItemIdx, true))
         << "Cache item " << cacheItemIdx << " should exist after data reload + ScrollToIndex";
+}
+
+void GridCacheLayoutTestNg::CheckSyncPreloadLineShift(
+    int32_t startIndex, int32_t lineOffset, int32_t cacheCount, bool recordedTail)
+{
+    const int32_t endIndex = startIndex + 2;
+    const int32_t itemCount = endIndex + 1 + std::max(cacheCount, 1);
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr");
+    model.SetCachedCount(cacheCount, true);
+    CreateFixedItems(itemCount);
+    CreateDone();
+
+    // Reproduce the partial matrix left by reload. Exercise the real forward
+    // merge and backward fill; only their input state is supplied by the test.
+    GridScrollLayoutAlgorithm algorithm(pattern_->info_);
+    algorithm.wrapper_ = AceType::RawPtr(frameNode_);
+    algorithm.frameSize_ = frameNode_->GetGeometryNode()->GetFrameSize();
+    algorithm.syncLoad_ = true;
+    algorithm.InitialItemsCrossSize(
+        layoutProperty_, algorithm.frameSize_, itemCount, algorithm.frameSize_.Width());
+    auto& info = algorithm.info_;
+    info.gridMatrix_.clear();
+    info.lineHeightMap_.clear();
+    info.ResetPositionFlags();
+    info.startIndex_ = startIndex;
+    info.endIndex_ = endIndex;
+    info.startMainLineIndex_ = startIndex + lineOffset;
+    info.endMainLineIndex_ = endIndex + lineOffset;
+    info.currentOffset_ = -20.0f;
+    info.prevOffset_ = info.currentOffset_;
+    const int32_t recordedEnd = endIndex + (recordedTail ? 1 : 0);
+    for (int32_t index = startIndex; index <= recordedEnd; ++index) {
+        info.gridMatrix_[index + lineOffset] = { { 0, index } };
+        info.lineHeightMap_[index + lineOffset] = ITEM_MAIN_SIZE;
+    }
+
+    algorithm.SyncPreload(AceType::RawPtr(frameNode_), cacheCount,
+        algorithm.frameSize_.Width(), algorithm.frameSize_.Height());
+
+    // For one-column, single-row items the canonical row equals the item index.
+    // Compare the entire matrix to catch gaps, duplicates and extra cache rows.
+    decltype(info.gridMatrix_) expectedMatrix;
+    decltype(info.lineHeightMap_) expectedHeights;
+    const int32_t expectedStart = std::max(startIndex - cacheCount, 0);
+    const int32_t expectedEnd = endIndex + cacheCount;
+    for (int32_t index = expectedStart; index <= expectedEnd; ++index) {
+        expectedMatrix[index] = { { 0, index } };
+        expectedHeights[index] = ITEM_MAIN_SIZE;
+    }
+    EXPECT_EQ(info.gridMatrix_, expectedMatrix);
+    EXPECT_EQ(info.lineHeightMap_, expectedHeights);
+    EXPECT_EQ(info.startIndex_, startIndex);
+    EXPECT_EQ(info.endIndex_, endIndex);
+    EXPECT_EQ(info.startMainLineIndex_, startIndex);
+    EXPECT_EQ(info.endMainLineIndex_, endIndex);
+    EXPECT_FLOAT_EQ(info.currentOffset_, -20.0f);
+    EXPECT_FLOAT_EQ(info.prevOffset_, -20.0f);
+    EXPECT_FALSE(algorithm.measureInNextFrame_);
+}
+
+/**
+ * @tc.name: SyncPreloadAfterForwardLineShift
+ * @tc.desc: A five-item reload must place the last item on row 4 after prepending item 0.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, SyncPreloadAfterForwardLineShift, TestSize.Level1)
+{
+    CheckSyncPreloadLineShift(1, 1, 1, false);
+}
+
+/**
+ * @tc.name: SyncPreloadMultipleLineShift
+ * @tc.desc: Backward preload must follow a forward merge that removes three excess rows.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, SyncPreloadMultipleLineShift, TestSize.Level1)
+{
+    CheckSyncPreloadLineShift(1, 3, 1, false);
+}
+
+/**
+ * @tc.name: SyncPreloadMultipleLineShiftTwoCachedLines
+ * @tc.desc: A three-row shift must preserve both consecutive backward cache rows.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, SyncPreloadMultipleLineShiftTwoCachedLines, TestSize.Level1)
+{
+    CheckSyncPreloadLineShift(1, 3, 2, false);
+}
+
+/**
+ * @tc.name: SyncPreloadMultipleLineShiftThreeCachedLines
+ * @tc.desc: A three-row shift must not accumulate extra gaps across three cache iterations.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, SyncPreloadMultipleLineShiftThreeCachedLines, TestSize.Level1)
+{
+    CheckSyncPreloadLineShift(1, 3, 3, false);
+}
+
+/**
+ * @tc.name: SyncPreloadMultipleCachedLinesWithoutShift
+ * @tc.desc: Three backward cache rows stay consecutive when the forward merge does not shift rows.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, SyncPreloadMultipleCachedLinesWithoutShift, TestSize.Level1)
+{
+    CheckSyncPreloadLineShift(1, 0, 3, false);
+}
+
+/**
+ * @tc.name: SyncPreloadShiftWithRecordedTail
+ * @tc.desc: Reuse a shifted tail cache row before appending the remaining two cache rows.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, SyncPreloadShiftWithRecordedTail, TestSize.Level1)
+{
+    CheckSyncPreloadLineShift(1, 3, 3, true);
+}
+
+/**
+ * @tc.name: SyncPreloadRepeatedForwardShift
+ * @tc.desc: Each prepended item shifts the matrix, including tail rows added in previous iterations.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, SyncPreloadRepeatedForwardShift, TestSize.Level1)
+{
+    CheckSyncPreloadLineShift(3, -3, 3, false);
+}
+
+/**
+ * @tc.name: SyncPreloadZeroCachedLines
+ * @tc.desc: A zero cache count preserves the partial matrix and the visible range.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, SyncPreloadZeroCachedLines, TestSize.Level1)
+{
+    CheckSyncPreloadLineShift(1, 0, 0, false);
+}
+
+/**
+ * @tc.name: SyncPreloadColumnChange
+ * @tc.desc: Five items remain consecutive after changing from two columns to one with visible cache rows.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridCacheLayoutTestNg, SyncPreloadColumnChange, TestSize.Level1)
+{
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetCachedCount(1, true);
+    CreateFixedItems(5);
+    CreateDone();
+
+    const decltype(pattern_->info_.gridMatrix_) expectedMatrix = {
+        { 0, { { 0, 0 } } }, { 1, { { 0, 1 } } }, { 2, { { 0, 2 } } },
+        { 3, { { 0, 3 } } }, { 4, { { 0, 4 } } }
+    };
+    for (int32_t cacheCount = 1; cacheCount <= 3; ++cacheCount) {
+        SCOPED_TRACE(cacheCount);
+        layoutProperty_->UpdateColumnsTemplate("1fr 1fr");
+        layoutProperty_->UpdateCachedCount(cacheCount);
+        frameNode_->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+        FlushUITasks();
+        ASSERT_EQ(pattern_->info_.crossCount_, 2);
+
+        layoutProperty_->UpdateColumnsTemplate("1fr");
+        frameNode_->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+        FlushUITasks();
+        ASSERT_EQ(pattern_->info_.crossCount_, 1);
+        EXPECT_EQ(pattern_->info_.gridMatrix_, expectedMatrix);
+        for (int32_t index = 0; index < 5; ++index) {
+            EXPECT_FLOAT_EQ(GetChildY(frameNode_, index), index * ITEM_MAIN_SIZE);
+        }
+    }
 }
 } // namespace OHOS::Ace::NG
