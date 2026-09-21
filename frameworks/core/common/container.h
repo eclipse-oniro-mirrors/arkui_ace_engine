@@ -241,6 +241,10 @@ public:
         return displayManager_;
     }
 
+    virtual void RefreshLiveFoldCreaseRegion() {}
+
+    virtual void RefreshFoldCreaseDirection() {}
+
     virtual DisplaySourceMode GetDisplaySourceMode();
 
     virtual bool IsNeedModifySize(const RefPtr<Container>& subContainer = nullptr);
