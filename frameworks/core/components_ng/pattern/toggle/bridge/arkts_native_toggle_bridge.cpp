@@ -23,6 +23,7 @@
 #include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_utils_bridge.h"
 #include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_utils.h"
 #include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/base/view_abstract.h"
 #include "core/components_ng/base/view_stack_model.h"
 #include "core/components_ng/pattern/toggle/toggle_model_ng.h"
 #include "core/pipeline_ng/pipeline_context.h"
@@ -217,6 +218,21 @@ panda::Local<panda::JSValueRef> JsToggleChangeCallback(panda::JsiRuntimeCallInfo
     return panda::JSValueRef::Undefined(vm);
 }
 
+bool TryApplyLayoutPolicy(const EcmaVM* vm, ArkUINodeHandle nativeNode, const Local<JSValueRef>& jsValue, bool isWidth)
+{
+    if (jsValue.IsEmpty() || !jsValue->IsObject(vm)) {
+        return false;
+    }
+    auto obj = jsValue->ToObject(vm);
+    auto layoutPolicy = obj->Get(vm, panda::StringRef::NewFromUtf8(vm, "id_"));
+    if (!layoutPolicy->IsString(vm)) {
+        return false;
+    }
+    auto policy = CommonBridge::ParseLayoutPolicy(layoutPolicy->ToString(vm)->ToString(vm));
+    ViewAbstract::UpdateLayoutPolicyProperty(reinterpret_cast<FrameNode*>(nativeNode), policy, isWidth);
+    return true;
+}
+
 void SetHeightInner(const EcmaVM* vm, ArkUINodeHandle& nativeNode, const Local<JSValueRef>& heightArg)
 {
     auto nodeModifiers = GetArkUINodeModifiers();
@@ -226,8 +242,10 @@ void SetHeightInner(const EcmaVM* vm, ArkUINodeHandle& nativeNode, const Local<J
     CalcDimension height;
     if (ArkTSUtils::ParseJsDimensionVpNG(vm, heightArg, height) && !height.IsNegative()) {
         toggleModifier->setToggleHeight(nativeNode, height.Value(), static_cast<int32_t>(height.Unit()));
-    } else {
+        ViewAbstract::ResetLayoutPolicyProperty(reinterpret_cast<FrameNode*>(nativeNode), false);
+    } else if (!TryApplyLayoutPolicy(vm, nativeNode, heightArg, false)) {
         toggleModifier->resetToggleHeight(nativeNode);
+        ViewAbstract::ResetLayoutPolicyProperty(reinterpret_cast<FrameNode*>(nativeNode), false);
     }
 }
 
@@ -783,6 +801,7 @@ ArkUINativeModuleValue ToggleBridge::ResetHeight(ArkUIRuntimeCallInfo* runtimeCa
     auto toggleModifier = nodeModifiers->getToggleModifier();
     CHECK_NULL_RETURN(toggleModifier, panda::JSValueRef::Undefined(vm));
     toggleModifier->resetToggleHeight(nativeNode);
+    ViewAbstract::ResetLayoutPolicyProperty(reinterpret_cast<FrameNode*>(nativeNode), false);
     return panda::JSValueRef::Undefined(vm);
 }
 
