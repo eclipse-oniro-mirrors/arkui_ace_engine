@@ -81,6 +81,7 @@ ohos_shared_library("arkoala_native_ani") {
     "list/list_module.cpp",
     "list/list_item_group_module.cpp",
     "load.cpp",
+    "modal_ui_extension/modal_ui_extension_module.cpp",
     "module.cpp",
     "node_adapter/node_adapter_module.cpp",
     "security_component/save_button_module.cpp",
@@ -124,6 +125,7 @@ ohos_shared_library("arkoala_native_ani") {
     external_deps += [
       "ability_runtime:abilitykit_native",
       "ability_runtime:ani_base_context",
+      "ability_runtime:ani_common",
     ]
   }
   if (defined(model_component_support) && model_component_support) {
@@ -189,6 +191,7 @@ if (use_linux) {
       external_deps += [
         "ability_runtime:abilitykit_native",
         "ability_runtime:ani_base_context",
+        "ability_runtime:ani_common",
       ]
     }
 

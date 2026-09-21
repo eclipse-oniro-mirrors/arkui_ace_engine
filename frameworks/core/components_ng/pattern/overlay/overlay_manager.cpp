@@ -2907,7 +2907,9 @@ void OverlayManager::PlayTransitionEffectOut(const RefPtr<FrameNode>& topModalNo
     layoutProperty->UpdateVisibility(VisibleType::INVISIBLE, true);
 
     const auto& renderContext = topModalNode->GetRenderContext();
-    if (!renderContext->HasDisappearTransition()) {
+    auto hasDisappear = renderContext->HasDisappearTransition();
+    TAG_LOGI(AceLogTag::ACE_OVERLAY, "PlayTransitionEffectOut hasDisappear=%{public}d", hasDisappear);
+    if (!hasDisappear) {
         const auto& topModalPattern = topModalNode->GetPattern<ModalPresentationPattern>();
         if (!topModalPattern->IsExecuteOnDisappear()) {
             topModalPattern->OnDisappear();
@@ -3371,6 +3373,7 @@ void OverlayManager::HandleModalPop(
     topModalNode->OnAccessibilityEvent(
         AccessibilityEventType::PAGE_CLOSE, WindowsContentChangeTypes::CONTENT_CHANGE_TYPE_SUBTREE);
     if (modalPresentationPattern->HasTransitionEffect()) {
+        TAG_LOGI(AceLogTag::ACE_OVERLAY, "HandleModalPop HasTransitionEffect=true, calling PlayTransitionEffectOut");
         PlayTransitionEffectOut(topModalNode);
     } else if (modalTransition == ModalTransition::DEFAULT) {
         PlayDefaultModalTransition(topModalNode, false);
@@ -5842,6 +5845,7 @@ int32_t OverlayManager::CreateModalUIExtension(
     NG::InnerModalUIExtensionConfig innerModalUIExtensionConfig = { .isAsyncModalBinding = config.isAsyncModalBinding,
         .isDensityFollowHost = config.isDensityFollowHost, .isWindowModeFollowHost = config.isWindowModeFollowHost,
         .isModalRequestFocus = config.isModalRequestFocus, .isModalFixFocus = config.isModalFixFocus };
+    innerModalUIExtensionConfig.transition = config.transition;
     auto uiExtNode = ModalUIExtension::Create(want, callbacks, innerModalUIExtensionConfig);
     if (!HandleUIExtNodeTransform(want, uiExtNode)) {
         return 0;
@@ -5851,13 +5855,21 @@ int32_t OverlayManager::CreateModalUIExtension(
         return uiExtNode;
     };
     auto sessionId = ModalUIExtension::GetSessionId(uiExtNode);
+    RefPtr<NG::ChainedTransitionEffect> transitionEffect;
+    if (config.transition != nullptr) {
+        auto* transitionPtr = static_cast<RefPtr<NG::ChainedTransitionEffect>*>(config.transition);
+        transitionEffect = *transitionPtr;
+        delete transitionPtr;
+    }
     if (!config.isAsyncModalBinding) {
         ModalStyle modalStyle = OverlayManager::SetUIExtensionModalStyleAndGet(config.prohibitedRemoveByRouter,
             config.isAllowAddChildBelowModalUec, config.prohibitedRemoveByNavigation, config.isModalRequestFocus);
         SetIsAllowedBeCovered(config.isAllowedBeCovered);
         // Convert the sessionId into a negative number to distinguish it from the targetId of other modal pages
+        NG::ContentCoverParam contentCoverParam;
+        contentCoverParam.transitionEffect = transitionEffect;
         BindContentCover(true, nullptr, std::move(buildNodeFunc), modalStyle, nullptr, nullptr, nullptr, nullptr,
-            ContentCoverParam(), nullptr, -(sessionId));
+            contentCoverParam, nullptr, -(sessionId));
         SetIsAllowedBeCovered(true); // Reset isAllowedBeCovered
     } else {
         auto bindModalCallback = [weak = WeakClaim(this), buildNodeFunc, sessionId, id = Container::CurrentId(),
@@ -5866,6 +5878,7 @@ int32_t OverlayManager::CreateModalUIExtension(
             isAllowAddChildBelowModalUec = config.isAllowAddChildBelowModalUec,
             prohibitedRemoveByNavigation = config.prohibitedRemoveByNavigation,
             isModalRequestFocus = config.isModalRequestFocus,
+            transitionEffect = transitionEffect,
             doAfterAsyncModalBinding = std::move(config.doAfterAsyncModalBinding)]() {
             ContainerScope scope(id);
             auto overlayManager = weak.Upgrade();
@@ -5873,8 +5886,10 @@ int32_t OverlayManager::CreateModalUIExtension(
             overlayManager->SetIsAllowedBeCovered(isAllowedBeCovered);
             ModalStyle modalStyle = OverlayManager::SetUIExtensionModalStyleAndGet(prohibitedRemoveByRouter,
                 isAllowAddChildBelowModalUec, prohibitedRemoveByNavigation, isModalRequestFocus);
+            NG::ContentCoverParam contentCoverParam;
+            contentCoverParam.transitionEffect = transitionEffect;
             overlayManager->BindContentCover(true, nullptr, std::move(buildNodeFunc), modalStyle, nullptr, nullptr,
-                nullptr, nullptr, ContentCoverParam(), nullptr, -(sessionId));
+                nullptr, nullptr, contentCoverParam, nullptr, -(sessionId));
             overlayManager->SetIsAllowedBeCovered(true);
             if (doAfterAsyncModalBinding) {
                 doAfterAsyncModalBinding();

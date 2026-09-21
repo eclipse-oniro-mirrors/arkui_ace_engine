@@ -48,6 +48,10 @@ import { SheetOptions } from 'arkui/framework';
 import inspector from '@ohos/arkui/inspector';
 import router from '@ohos/router';
 import { ComponentContent, ComponentContentBase } from 'arkui/ComponentContent';
+import Want from "@ohos.app.ability.Want"
+import { DpiFollowStrategy, ReceiveCallback, TerminationInfo, TransitionEffect, UIExtensionProxy,
+    WindowModeFollowStrategy } from 'arkui/component/uiExtensionComponent';
+import { VoidCallback } from 'arkui/component/units';
 import overlayManager from '@ohos/overlayManager';
 import promptAction, { LevelOrder, LevelMode } from '@ohos/promptAction';
 import { LocalStorage } from 'arkui/stateManagement/storage/localStorage';
@@ -58,13 +62,13 @@ import { PeerNode } from 'arkui/PeerNode';
 import { ArkUIAniModule } from 'arkui.ani';
 import { UIContextUtil } from 'arkui/base/UIContextUtil';
 import { int32, int64 } from "@koalaui/common";
-import { KPointer, KSerializerBuffer, KBuffer, DeserializerBase, nullptr, wrapSystemCallback } from '@koalaui/interop';
+import { KPointer, KSerializerBuffer, KBuffer, DeserializerBase, nullptr, wrapSystemCallback, KLong } from '@koalaui/interop';
 import { TabsController } from 'arkui/component/tabs';
 import { Scroller } from 'arkui/component/scroll';
 import { InputEventListener, InputEventMonitor } from 'arkui/component/common';
 import { TextLayoutOptions, Paragraph, StyledString, ContextMenu, FrameNodeExtender, AnimationExtender, AlertDialog, ActionSheet, DialogExtender } from 'arkui/framework';
 import { InnerGestureObserverConfigs, InnerGestureTriggerInfo, IUIContext, UIContextGetInfo, SystemOps } from 'arkui/component/idlize';
-import { BusinessError } from "@ohos.base"
+import { BusinessError, ErrorCallback } from "@ohos.base"
 import { ArkUIGeneratedNativeModule } from '#components';
 import { GlobalScopeUicontextFontScale, GlobalScopeUicontextTextMenu } from "#generated"
 import { deserializeAndCallCallback } from 'arkui/framework/peers/CallbackDeserializeCall';
@@ -732,6 +736,33 @@ export enum ResolveStrategy {
     UNIQUE = 3,
     LAST_FOREGROUND = 4,
     UNDEFINED = 5
+}
+
+export interface ModalUIExtensionOptions {
+    dpiFollowStrategy?: DpiFollowStrategy;
+    windowModeFollowStrategy?: WindowModeFollowStrategy;
+    transition?: TransitionEffect;
+}
+
+export interface ModalUIExtensionCallback {
+    onRemoteReady?: Callback<UIExtensionProxy>;
+    onReceive?: ReceiveCallback;
+    onError?: ErrorCallback<BusinessError>;
+    onTerminated?: Callback<TerminationInfo>;
+    onDrawReady?: VoidCallback;
+}
+
+export class ModalUIExtensionProxy {
+    private proxyPtr_: KLong = 0;
+    constructor(ptr: KLong) {
+        this.proxyPtr_ = ptr;
+    }
+    public send(data: Record<string, Object>): void {
+        if (this.proxyPtr_ === 0) {
+            return;
+        }
+        ArkUIAniModule._ModalUIExtensionProxySend(this.proxyPtr_, data);
+    }
 }
 
 export class UIContext {
@@ -1497,6 +1528,24 @@ export class UIContext {
 
     public isEasySplit(): boolean {
         return ArkUIAniModule._Common_IsEasySplit(this.instanceId_);
+    }
+
+    public createModalUIExtension(want: Want, options?: ModalUIExtensionOptions, callback?: ModalUIExtensionCallback): int {
+        ArkUIAniModule._Common_Sync_InstanceId(this.instanceId_);
+        try {
+            return ArkUIAniModule._CreateModalUIExtension(want, options, callback);
+        } finally {
+            ArkUIAniModule._Common_Restore_InstanceId();
+        }
+    }
+
+    public closeModalUIExtension(sessionId: int): void {
+        ArkUIAniModule._Common_Sync_InstanceId(this.instanceId_);
+        try {
+            ArkUIAniModule._CloseModalUIExtension(sessionId);
+        } finally {
+            ArkUIAniModule._Common_Restore_InstanceId();
+        }
     }
 }
 export abstract class FrameCallback {

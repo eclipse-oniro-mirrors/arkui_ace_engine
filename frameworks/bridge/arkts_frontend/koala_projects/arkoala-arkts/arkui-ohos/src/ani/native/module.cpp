@@ -19,6 +19,7 @@
 #include "animation/animation_ani_impl.h"
 #include "canvas/canvas_module.h"
 #include "common/common_module.h"
+#include "modal_ui_extension/modal_ui_extension_module.h"
 #include "common_node/common_node_module.h"
 #include "component3d/component3d_module_methods.h"
 #include "componentSnapshot/componentSnapshot_module.h"
@@ -2061,6 +2062,21 @@ ANI_EXPORT ani_status ANI_Constructor(ani_vm* vm, uint32_t* result)
             "_ArkTSFrameNode_GetId",
             "l:C{std.core.String}",
             reinterpret_cast<void*>(OHOS::Ace::Ani::ArkTSFrameNodeGetId)
+        },
+        ani_native_function {
+            "_CreateModalUIExtension",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::CreateModalUIExtension)
+        },
+        ani_native_function {
+            "_CloseModalUIExtension",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::CloseModalUIExtension)
+        },
+        ani_native_function {
+            "_ModalUIExtensionProxySend",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::ModalUIExtensionProxySend)
         }
     };
 

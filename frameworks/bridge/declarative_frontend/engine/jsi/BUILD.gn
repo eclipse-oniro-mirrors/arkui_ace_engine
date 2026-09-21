@@ -360,6 +360,7 @@ template("declarative_js_engine_ark") {
       "nativeModule/arkts_native_list_bridge.cpp",
       "nativeModule/arkts_native_list_item_bridge.cpp",
       "nativeModule/arkts_native_list_item_group_bridge.cpp",
+      "nativeModule/arkts_native_modal_ui_extension_bridge.cpp",
       "nativeModule/arkts_native_nav_destination_bridge.cpp",
       "nativeModule/arkts_native_nav_router_bridge.cpp",
       "nativeModule/arkts_native_navigation_bridge.cpp",
@@ -403,6 +404,9 @@ template("declarative_js_engine_ark") {
       "graphic_2d:drawing_napi_impl",
       "graphic_2d:librender_service_client"
     ]
+    if (is_ohos_standard_system) {
+      external_deps += [ "ability_base:want" ]
+    }
     if (!build_ohos_sdk && !is_arkui_x) {
       external_deps += [
         "ets_utils:console",

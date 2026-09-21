@@ -597,6 +597,18 @@ struct ArkUIAniParallelizeUIModifier {
     void (*registerCallback)(
         ArkUINodeHandle, std::function<int32_t()>&&, std::function<ArkUINodeHandle(int32_t, int32_t, int32_t)>&&);
 };
+
+namespace OHOS::AAFwk {
+class Want;
+class WantParams;
+} // namespace OHOS::AAFwk
+
+namespace OHOS::Ace {
+struct ModalUIExtensionCallbacks;
+struct ModalUIExtensionConfig;
+class ModalUIExtensionProxy;
+} // namespace OHOS::Ace
+
 struct ArkUIAniCommonModifier {
     ani_ref* (*getHostContext)(ArkUI_Int32 key);
     void (*setFrameRateRange)(ani_env* env, ani_long peerPtr, ani_object value, ArkUI_Int32 type);
@@ -694,6 +706,11 @@ struct ArkUIAniCommonModifier {
     void (*setOnNodeDestroyEvent)(ArkUINodeHandle node, std::function<void(int32_t)>&& event);
     void(*fireArkUIObjectLifecycleCallback)(ani_long nodePtr, const std::string& className, void* data);
     std::string (*GetIdString)(ArkUINodeHandle node);
+    int32_t (*createModalUIExtension)(const OHOS::AAFwk::Want& want,
+        const OHOS::Ace::ModalUIExtensionCallbacks& callbacks, const OHOS::Ace::ModalUIExtensionConfig& config);
+    void (*closeModalUIExtension)(int32_t sessionId);
+    void (*modalUIExtensionProxySend)(
+        std::shared_ptr<OHOS::Ace::ModalUIExtensionProxy>& proxy, const OHOS::AAFwk::WantParams& params);
 };
 struct  ArkUICustomNodeInfo {
     std::function<void()> onPageShowFunc;

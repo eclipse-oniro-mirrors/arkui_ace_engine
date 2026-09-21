@@ -41,6 +41,7 @@ struct ModalUIExtensionConfig {
     bool isWindowModeFollowHost = false;
     bool isModalRequestFocus = true;
     bool isModalFixFocus = false;
+    void* transition = nullptr;
 };
 
 struct ModalUIExtensionAllowedUpdateConfig {

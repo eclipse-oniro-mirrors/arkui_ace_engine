@@ -14,6 +14,7 @@
  */
 
 #include "common_module.h"
+#include "modal_ui_extension/modal_ui_extension_module.h"
 
 #if !defined(PREVIEW)
 #define OHOS_AAFWK_HILOG_TAG_WRAPPER_H
