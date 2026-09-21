@@ -132,6 +132,70 @@ public:
     RefPtr<VisibleAreaChangeConfig> throttledVisibleAreaChange;
 };
 
+struct AppearCallbackSet : public AceType {
+    DECLARE_ACE_TYPE(AppearCallbackSet, AceType);
+
+public:
+    AppearCallbackSet() = default;
+    ~AppearCallbackSet() override = default;
+    std::function<void()> onAppear;
+    std::function<void()> onJSFrameNodeAppear;
+    std::function<void()> onDisappear;
+    std::function<void()> onJSFrameNodeDisappear;
+};
+
+struct AreaCallbackSet : public AceType {
+    DECLARE_ACE_TYPE(AreaCallbackSet, AceType);
+
+public:
+    AreaCallbackSet() = default;
+    ~AreaCallbackSet() override = default;
+    OnAreaChangedFunc onAreaChanged;
+    std::unordered_map<int32_t, OnAreaChangedFunc> onAreaChangedInnerCallbacks;
+    std::vector<int32_t> hasInnerAreaChangeUntriggered;
+};
+
+struct SizeCallbackSet : public AceType {
+    DECLARE_ACE_TYPE(SizeCallbackSet, AceType);
+
+public:
+    SizeCallbackSet() = default;
+    ~SizeCallbackSet() override = default;
+    OnSizeChangedFunc onSizeChanged;
+    std::unordered_map<int32_t, OnSizeChangedFunc> onSizeChangedInnerCallbacks;
+    OnSizeChangedFunc onJsFrameNodeSizeChanged;
+};
+
+struct AttachDetachCallbackSet : public AceType {
+    DECLARE_ACE_TYPE(AttachDetachCallbackSet, AceType);
+
+public:
+    AttachDetachCallbackSet() = default;
+    ~AttachDetachCallbackSet() override = default;
+    std::function<void()> onAttach;
+    std::function<void()> onDetach;
+};
+
+struct EnabledNdkCallbackSet : public AceType {
+    DECLARE_ACE_TYPE(EnabledNdkCallbackSet, AceType);
+
+public:
+    EnabledNdkCallbackSet() = default;
+    ~EnabledNdkCallbackSet() override = default;
+    std::function<void()> enabledFunc;
+    std::function<void()> ndkDrawCompletedCallback;
+    std::function<void()> ndkLayoutCallback;
+};
+
+struct KeyboardShortcutSet : public AceType {
+    DECLARE_ACE_TYPE(KeyboardShortcutSet, AceType);
+
+public:
+    KeyboardShortcutSet() = default;
+    ~KeyboardShortcutSet() override = default;
+    std::vector<KeyboardShortcut> keyboardShortcut;
+};
+
 
 // The event hub is mainly used to handle common collections of events, such as gesture events, mouse events, etc.
 class ACE_FORCE_EXPORT EventHub : public virtual AceType {
@@ -269,7 +333,8 @@ public:
         const std::string& value, uint8_t keys, const std::function<void()>& onKeyboardShortcutAction);
     void ClearSingleKeyboardShortcut();
     void ClearSingleKeyboardShortcutAll();
-    std::vector<KeyboardShortcut>& GetKeyboardShortcut();
+    bool HasKeyboardShortcut() const;
+    const std::vector<KeyboardShortcut>& GetKeyboardShortcut() const;
     void SetCustomerOnDragFunc(DragFuncType dragFuncType, OnDragFunc&& onDragFunc);
     void SetCustomerOnDragFunc(DragFuncType dragFuncType, OnNewDragFunc&& onDragEnd);
     const OnDragFunc GetCustomerOnDragFunc(DragFuncType dragFuncType) const;
@@ -328,42 +393,38 @@ public:
 
 protected:
     virtual void OnModifyDone() {}
-    std::function<void()> onAppear_;
-    std::function<void()> onJSFrameNodeAppear_;
+    std::function<void()> GetOnAppear() const;
+    std::function<void()> GetOnJSFrameNodeAppear() const;
 
 private:
     void AddPressedListener();
     void AddHoverListener();
     void NotifyPageSceneFocusabilityChanged(bool previousFocusable);
+    RefPtr<AppearCallbackSet> GetOrCreateAppearCallbackSet();
+    RefPtr<AreaCallbackSet> GetOrCreateAreaCallbackSet();
+    RefPtr<SizeCallbackSet> GetOrCreateSizeCallbackSet();
+    RefPtr<AttachDetachCallbackSet> GetOrCreateAttachDetachCallbackSet();
+    RefPtr<EnabledNdkCallbackSet> GetOrCreateEnabledNdkCallbackSet();
+    RefPtr<KeyboardShortcutSet> GetOrCreateKeyboardShortcutSet();
 
     WeakPtr<FrameNode> host_;
     RefPtr<GestureEventHub> gestureEventHub_;
     RefPtr<InputEventHub> inputEventHub_;
     RefPtr<StateStyleManager> stateStyleMgr_;
 
-    std::function<void()> onDisappear_;
-    std::function<void()> onJSFrameNodeDisappear_;
-    OnAreaChangedFunc onAreaChanged_;
-    std::unordered_map<int32_t, OnAreaChangedFunc> onAreaChangedInnerCallbacks_;
-    OnSizeChangedFunc onSizeChanged_;
-    std::unordered_map<int32_t, OnSizeChangedFunc> onSizeChangedInnerCallbacks_;
-    OnSizeChangedFunc onJsFrameNodeSizeChanged_;
-
-    std::function<void()> onAttach_;
-    std::function<void()> onDetach_;
-
     RefPtr<DragDropCallbackSet> dragDropCallbackSet_;
     bool enabled_ { true };
     bool developerEnabled_ { true };
     bool disableDataPrefetch_ { false };
     bool compensateOnSizeChangeEvent_ { false };
-    std::vector<KeyboardShortcut> keyboardShortcut_;
-    std::vector<int32_t> hasInnerAreaChangeUntriggered_;
 
     RefPtr<VisibleAreaChangeCallbackSet> visibleAreaChangeCallbackSet_;
-    std::function<void()> enabledFunc_;
-    std::function<void()> ndkDrawCompletedCallback_;
-    std::function<void()> ndkLayoutCallback_;
+    RefPtr<AppearCallbackSet> appearCallbackSet_;
+    RefPtr<AreaCallbackSet> areaCallbackSet_;
+    RefPtr<SizeCallbackSet> sizeCallbackSet_;
+    RefPtr<AttachDetachCallbackSet> attachDetachCallbackSet_;
+    RefPtr<EnabledNdkCallbackSet> enabledNdkCallbackSet_;
+    RefPtr<KeyboardShortcutSet> keyboardShortcutSet_;
 
     ACE_DISALLOW_COPY_AND_MOVE(EventHub);
 };

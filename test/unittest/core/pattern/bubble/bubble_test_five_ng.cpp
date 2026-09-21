@@ -2161,6 +2161,6 @@ HWTEST_F(BubbleFiveTestNg, BubblePatternPopOnAreaChange001, TestSize.Level0)
     bubblePattern->OnAttachToFrameNode();
     auto eventHub = targetNode->GetEventHub<EventHub>();
     ASSERT_NE(eventHub, nullptr);
-    EXPECT_FALSE(eventHub->onAreaChangedInnerCallbacks_.empty());
+    EXPECT_FALSE(eventHub->GetOrCreateAreaCallbackSet()->onAreaChangedInnerCallbacks.empty());
 }
 } // namespace OHOS::Ace::NG

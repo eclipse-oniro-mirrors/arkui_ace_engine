@@ -425,7 +425,7 @@ HWTEST_F(ContainerPickerPatternTestTwo, InitAreaChangeEvent002, TestSize.Level1)
     pattern->OnAttachToFrameNode();
     auto eventHub = frameNode->GetEventHub<EventHub>();
     ASSERT_NE(eventHub, nullptr);
-    EXPECT_TRUE(eventHub->onAreaChangedInnerCallbacks_.count(frameNode->nodeId_));
+    EXPECT_TRUE(eventHub->GetOrCreateAreaCallbackSet()->onAreaChangedInnerCallbacks.count(frameNode->nodeId_));
 }
 
 /**

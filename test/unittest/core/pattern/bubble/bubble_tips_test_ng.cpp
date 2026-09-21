@@ -938,8 +938,8 @@ HWTEST_F(BubbleTipsTestNg, OnAttachToFrameNode001, TestSize.Level0)
     /**
      * @tc.steps: step2. expect onAreaChangedFunc add.
      */
-    EXPECT_TRUE(eventHub->onAreaChangedInnerCallbacks_.count(tipsNode->nodeId_));
-    eventHub->onAreaChangedInnerCallbacks_[tipsNode->nodeId_]({}, {}, {}, {});
+    EXPECT_TRUE(eventHub->GetOrCreateAreaCallbackSet()->onAreaChangedInnerCallbacks.count(tipsNode->nodeId_));
+    eventHub->GetOrCreateAreaCallbackSet()->onAreaChangedInnerCallbacks[tipsNode->nodeId_]({}, {}, {}, {});
 }
 
 /**

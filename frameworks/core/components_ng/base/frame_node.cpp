@@ -1346,6 +1346,9 @@ void FrameNode::DumpKeyboardShortcutInfo()
     if (!eventHub) {
         return;
     }
+    if (!eventHub->HasKeyboardShortcut()) {
+        return;
+    }
     auto keyboardShortcuts = eventHub->GetKeyboardShortcut();
     std::string result;
     for (auto& keyboardShortcut : keyboardShortcuts) {

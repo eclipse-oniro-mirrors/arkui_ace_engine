@@ -296,7 +296,7 @@ HWTEST_F(DynamicComponentManagerTddTestNg,
 
     auto innerCallback = [](const RectF& oldRect,
         const OffsetF& oldOrigin, const RectF& rect, const OffsetF& origin) {};
-    eventHub->onAreaChangedInnerCallbacks_[0] = std::move(innerCallback);
+    eventHub->GetOrCreateAreaCallbackSet()->onAreaChangedInnerCallbacks[0] = std::move(innerCallback);
     ASSERT_TRUE(eventHub->HasInnerOnAreaChanged());
 
     /**
@@ -468,7 +468,7 @@ HWTEST_F(DynamicComponentManagerTddTestNg,
 
     auto innerCallback = [](const RectF& oldRect,
         const OffsetF& oldOrigin, const RectF& rect, const OffsetF& origin) {};
-    eventHub->onAreaChangedInnerCallbacks_[0] = std::move(innerCallback);
+    eventHub->GetOrCreateAreaCallbackSet()->onAreaChangedInnerCallbacks[0] = std::move(innerCallback);
     ASSERT_TRUE(eventHub->HasInnerOnAreaChanged());
 
     /**
@@ -581,7 +581,7 @@ HWTEST_F(DynamicComponentManagerTddTestNg,
     // Add inner callback
     auto innerCallback = [](const RectF& oldRect,
         const OffsetF& oldOrigin, const RectF& rect, const OffsetF& origin) {};
-    eventHub->onAreaChangedInnerCallbacks_[0] = std::move(innerCallback);
+    eventHub->GetOrCreateAreaCallbackSet()->onAreaChangedInnerCallbacks[0] = std::move(innerCallback);
     ASSERT_TRUE(eventHub->HasInnerOnAreaChanged());
 
     // Add outer callback
@@ -626,7 +626,7 @@ HWTEST_F(DynamicComponentManagerTddTestNg,
 
     auto innerCallback = [](const RectF& oldRect,
         const OffsetF& oldOrigin, const RectF& rect, const OffsetF& origin) {};
-    eventHub->onAreaChangedInnerCallbacks_[0] = std::move(innerCallback);
+    eventHub->GetOrCreateAreaCallbackSet()->onAreaChangedInnerCallbacks[0] = std::move(innerCallback);
     ASSERT_TRUE(eventHub->HasInnerOnAreaChanged());
 
     auto callback = [](const RectF& oldRect,
@@ -737,7 +737,7 @@ HWTEST_F(DynamicComponentManagerTddTestNg,
 
     auto innerCallback = [](const RectF& oldRect,
         const OffsetF& oldOrigin, const RectF& rect, const OffsetF& origin) {};
-    eventHub->onAreaChangedInnerCallbacks_[0] = std::move(innerCallback);
+    eventHub->GetOrCreateAreaCallbackSet()->onAreaChangedInnerCallbacks[0] = std::move(innerCallback);
 
     auto callback = [](const RectF& oldRect,
         const OffsetF& oldOrigin, const RectF& rect, const OffsetF& origin) {};

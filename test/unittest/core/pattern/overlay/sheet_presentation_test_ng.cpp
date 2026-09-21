@@ -350,7 +350,7 @@ HWTEST_F(SheetPresentationTestNg, CheckBuilderChange001, TestSize.Level1)
     OffsetF oldOrigin, origin;
     sheetPattern->CheckBuilderChange();
     EXPECT_NE(sheetStyle.sheetHeight.sheetMode, SheetMode::AUTO);
-    auto innerCallbackInfo = eventHub->onAreaChangedInnerCallbacks_[contentNode->GetId()];
+    auto innerCallbackInfo = eventHub->GetOrCreateAreaCallbackSet()->onAreaChangedInnerCallbacks[contentNode->GetId()];
     ASSERT_NE(innerCallbackInfo, nullptr);
     innerCallbackInfo(oldRect, oldOrigin, rect, origin);
 
@@ -381,7 +381,7 @@ HWTEST_F(SheetPresentationTestNg, OnAttachToFrameNode001, TestSize.Level1)
     sheetPattern->OnAttachToFrameNode();
     auto eventHub = targetNode->GetEventHub<EventHub>();
     ASSERT_NE(eventHub, nullptr);
-    auto innerOnAreaChangeCallback = eventHub->onAreaChangedInnerCallbacks_[sheetNode->GetId()];
+    auto innerOnAreaChangeCallback = eventHub->GetOrCreateAreaCallbackSet()->onAreaChangedInnerCallbacks[sheetNode->GetId()];
     ASSERT_NE(innerOnAreaChangeCallback, nullptr);
     RectF oldRect, rect;
     OffsetF oldOrigin, origin;

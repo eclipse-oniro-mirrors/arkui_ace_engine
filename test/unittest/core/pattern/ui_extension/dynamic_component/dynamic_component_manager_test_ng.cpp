@@ -135,7 +135,7 @@ HWTEST_F(DynamicPatternManagerTestNg, DynamicPatternManagerTestNg002, TestSize.L
     DynamicComponentManager::HandleDynamicRenderOnAreaChange(frameNode, rectF, offsetF, offsetF2);
 
     auto func = [](const RectF& oldRect, const OffsetF& oldOrigin, const RectF& rect, const OffsetF& origin) {};
-    eventHub->onAreaChangedInnerCallbacks_[0] = std::move(func);
+    eventHub->GetOrCreateAreaCallbackSet()->onAreaChangedInnerCallbacks[0] = std::move(func);
     ASSERT_TRUE(eventHub->HasInnerOnAreaChanged());
 
     DynamicComponentManager::HandleDynamicRenderOnAreaChange(frameNode, rectF, offsetF, offsetF2);

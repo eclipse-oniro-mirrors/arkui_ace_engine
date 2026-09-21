@@ -167,12 +167,12 @@ void NavDestinationEventHub::FireOnAppear()
         eventHub->state_ = NavDestinationState::ON_APPEAR;
         UIObserverHandler::GetInstance().NotifyNavigationStateChange(eventHub->GetNavDestinationPattern(),
             NavDestinationState::ON_APPEAR);
-        if (eventHub->onAppear_) {
-            auto onAppear = eventHub->onAppear_;
+        auto onAppear = eventHub->GetOnAppear();
+        if (onAppear) {
             onAppear();
         }
-        if (eventHub->onJSFrameNodeAppear_) {
-            auto onJSFrameNodeAppear = eventHub->onJSFrameNodeAppear_;
+        auto onJSFrameNodeAppear = eventHub->GetOnJSFrameNodeAppear();
+        if (onJSFrameNodeAppear) {
             onJSFrameNodeAppear();
         }
     };
