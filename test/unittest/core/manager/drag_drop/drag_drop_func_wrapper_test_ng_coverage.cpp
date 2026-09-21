@@ -13,7 +13,10 @@
  * limitations under the License.
  */
 
+#include <atomic>
 #include <optional>
+#include <thread>
+#include <vector>
 
 #include "gtest/gtest.h"
 #define private public
@@ -2239,5 +2242,148 @@ HWTEST_F(DragDropFuncWrapperTestNgCoverage, ParseDragPreviewMaterialInfo004, Tes
         EXPECT_EQ(materialInfo.materialId, -1);
         EXPECT_EQ(materialInfo.materialFilter, nullptr);
     }
+}
+
+/**
+ * @tc.name: TryBindAndMarkSending001
+ * @tc.desc: Test DragDropManager::TryBindAndMarkSending session guard
+ * @tc.type: FUNC
+ */
+HWTEST_F(DragDropFuncWrapperTestNgCoverage, TryBindAndMarkSending001, TestSize.Level1)
+{
+    auto dragDropManager = AceType::MakeRefPtr<DragDropManager>();
+    ASSERT_NE(dragDropManager, nullptr);
+    EXPECT_FALSE(dragDropManager->TryBindAndMarkSending(nullptr));
+
+    auto firstAction = std::make_shared<OHOS::Ace::NG::ArkUIInteralDragAction>();
+    EXPECT_TRUE(dragDropManager->TryBindAndMarkSending(firstAction));
+    EXPECT_EQ(firstAction->dragState, DragAdapterState::SENDING);
+    EXPECT_EQ(dragDropManager->GetDragAction(), firstAction);
+
+    // A second session is rejected while the bound action is SENDING.
+    auto secondAction = std::make_shared<OHOS::Ace::NG::ArkUIInteralDragAction>();
+    EXPECT_FALSE(dragDropManager->TryBindAndMarkSending(secondAction));
+    EXPECT_EQ(secondAction->dragState, DragAdapterState::INIT);
+
+    // Once the bound session leaves SENDING, the next session is accepted.
+    {
+        std::lock_guard<std::mutex> lock(firstAction->dragStateMutex);
+        firstAction->dragState = DragAdapterState::INIT;
+    }
+    EXPECT_TRUE(dragDropManager->TryBindAndMarkSending(secondAction));
+    EXPECT_EQ(secondAction->dragState, DragAdapterState::SENDING);
+    EXPECT_EQ(dragDropManager->GetDragAction(), secondAction);
+}
+
+/**
+ * @tc.name: HandleCallbackExactlyOnce001
+ * @tc.desc: STARTED and ENDED are each delivered exactly once per drag session
+ * @tc.type: FUNC
+ */
+HWTEST_F(DragDropFuncWrapperTestNgCoverage, HandleCallbackExactlyOnce001, TestSize.Level1)
+{
+    auto container = Container::Current();
+    AceEngine& aceEngine = AceEngine::Get();
+    aceEngine.AddContainer(0, container);
+    MockContainer::Current()->pipelineContext_ = MockPipelineContext::GetCurrentContext();
+    int32_t startedCount = 0;
+    int32_t endedCount = 0;
+    auto dragAction = std::make_shared<OHOS::Ace::NG::ArkUIInteralDragAction>();
+    dragAction->instanceId = 0;
+    dragAction->callback = [&startedCount, &endedCount](const DragNotifyMsg& info, int32_t status) {
+        if (status == static_cast<int32_t>(DragAdapterStatus::STARTED)) {
+            ++startedCount;
+        } else if (status == static_cast<int32_t>(DragAdapterStatus::ENDED)) {
+            ++endedCount;
+        }
+    };
+    DragDropFuncWrapper::HandleCallback(dragAction, DragNotifyMsg {}, DragAdapterStatus::STARTED);
+    DragDropFuncWrapper::HandleCallback(dragAction, DragNotifyMsg {}, DragAdapterStatus::STARTED);
+    EXPECT_EQ(startedCount, 1);
+    // ENDED must not be masked by an already delivered STARTED.
+    DragDropFuncWrapper::HandleCallback(dragAction, DragNotifyMsg {}, DragAdapterStatus::ENDED);
+    DragDropFuncWrapper::HandleCallback(dragAction, DragNotifyMsg {}, DragAdapterStatus::ENDED);
+    EXPECT_EQ(endedCount, 1);
+}
+
+/**
+ * @tc.name: TryBindAndMarkSendingStress001
+ * @tc.desc: Concurrent StartDrag attempts: exactly one passes the SENDING guard per round
+ * @tc.type: FUNC
+ */
+HWTEST_F(DragDropFuncWrapperTestNgCoverage, TryBindAndMarkSendingStress001, TestSize.Level1)
+{
+    constexpr int32_t threadCount = 8;
+    constexpr int32_t roundCount = 200;
+    auto dragDropManager = AceType::MakeRefPtr<DragDropManager>();
+    ASSERT_NE(dragDropManager, nullptr);
+    for (int32_t round = 0; round < roundCount; ++round) {
+        std::vector<int32_t> results(threadCount, 0);
+        std::vector<std::thread> workers;
+        for (int32_t i = 0; i < threadCount; ++i) {
+            workers.emplace_back([&dragDropManager, &results, i]() {
+                auto action = std::make_shared<OHOS::Ace::NG::ArkUIInteralDragAction>();
+                results[i] = dragDropManager->TryBindAndMarkSending(action) ? 1 : 0;
+            });
+        }
+        for (auto& worker : workers) {
+            worker.join();
+        }
+        int32_t winners = 0;
+        for (auto result : results) {
+            winners += result;
+        }
+        // Exactly one concurrent StartDrag may pass the SENDING guard per round.
+        ASSERT_EQ(winners, 1);
+        auto bound = dragDropManager->GetDragAction();
+        ASSERT_NE(bound, nullptr);
+        {
+            std::lock_guard<std::mutex> lock(bound->dragStateMutex);
+            bound->dragState = DragAdapterState::INIT;
+        }
+    }
+}
+
+/**
+ * @tc.name: HandleCallbackConcurrent001
+ * @tc.desc: Overlapping STARTED/ENDED callbacks (fast swipe): each status exactly once
+ * @tc.type: FUNC
+ */
+HWTEST_F(DragDropFuncWrapperTestNgCoverage, HandleCallbackConcurrent001, TestSize.Level1)
+{
+    auto container = Container::Current();
+    AceEngine& aceEngine = AceEngine::Get();
+    aceEngine.AddContainer(0, container);
+    MockContainer::Current()->pipelineContext_ = MockPipelineContext::GetCurrentContext();
+    std::atomic<int32_t> startedCount { 0 };
+    std::atomic<int32_t> endedCount { 0 };
+    auto dragAction = std::make_shared<OHOS::Ace::NG::ArkUIInteralDragAction>();
+    dragAction->instanceId = 0;
+    dragAction->callback = [&startedCount, &endedCount](const DragNotifyMsg& info, int32_t status) {
+        if (status == static_cast<int32_t>(DragAdapterStatus::STARTED)) {
+            ++startedCount;
+        } else if (status == static_cast<int32_t>(DragAdapterStatus::ENDED)) {
+            ++endedCount;
+        }
+    };
+    constexpr int32_t repeatCount = 100;
+    std::vector<std::thread> workers;
+    // STARTED and ENDED fire concurrently, mimicking a fast swipe where the two msdp
+    // callbacks overlap; each status must still be delivered exactly once.
+    workers.emplace_back([dragAction]() {
+        for (int32_t i = 0; i < repeatCount; ++i) {
+            DragDropFuncWrapper::HandleCallback(dragAction, DragNotifyMsg {}, DragAdapterStatus::STARTED);
+        }
+    });
+    workers.emplace_back([dragAction]() {
+        for (int32_t i = 0; i < repeatCount; ++i) {
+            DragDropFuncWrapper::HandleCallback(dragAction, DragNotifyMsg {}, DragAdapterStatus::ENDED);
+        }
+    });
+    for (auto& worker : workers) {
+        worker.join();
+    }
+    EXPECT_EQ(startedCount.load(), 1);
+    EXPECT_EQ(endedCount.load(), 1);
 }
 } // namespace OHOS::Ace::NG
