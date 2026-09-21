@@ -4532,6 +4532,7 @@ struct ArkUIImageModifier {
     ArkUI_Int32 (*getAntiAlias)(ArkUINodeHandle node);
     void (*setImageFillSetByUser)(ArkUINodeHandle node, ArkUI_Bool value);
     void (*setReloadKey)(ArkUINodeHandle node, ArkUI_CharPtr reloadKey);
+    void* (*getResizableLattice)(ArkUINodeHandle node);
 };
 
 struct ArkUIColumnModifier {

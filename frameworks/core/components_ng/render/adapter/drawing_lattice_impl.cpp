@@ -17,6 +17,10 @@
 
 #include "base/utils/utils.h"
 
+#ifndef PREVIEW
+#include "lattice_napi/js_lattice.h"
+#endif
+
 namespace OHOS::Ace {
 RefPtr<DrawingLattice> DrawingLattice::CreateDrawingLatticeFromSptr(void* sptrAddr)
 {
@@ -41,6 +45,27 @@ Rosen::Drawing::Lattice* DrawingLatticeImpl::GetLattice()
         return latticeNative_;
     }
     return nullptr;
+}
+
+void* DrawingLatticeImpl::GetDrawingLatticeNative()
+{
+    return GetLattice();
+}
+
+napi_value DrawingLatticeImpl::GetDrawingLatticeNapiValue(NativeEngine* nativeEngine)
+{
+#ifdef PREVIEW
+    return nullptr;
+#else
+    CHECK_NULL_RETURN(nativeEngine, nullptr);
+    auto lattice = lattice_;
+    if (!lattice && latticeNative_) {
+        lattice = std::make_shared<Rosen::Drawing::Lattice>(*latticeNative_);
+    }
+    CHECK_NULL_RETURN(lattice, nullptr);
+    auto env = reinterpret_cast<napi_env>(nativeEngine);
+    return Rosen::Drawing::JsLattice::Create(env, lattice);
+#endif
 }
 
 std::string DrawingLatticeImpl::DumpToString()
