@@ -29,6 +29,7 @@
 
 namespace {
 constexpr char GET_INSPECTOR_TREE_CALLBACK_TIMEOUT[] = "GetInspectorTreeCallbackTimeout";
+constexpr char COMPONENT_TREE_QUERY_CALLBACK_TIMEOUT[] = "ComponentTreeQueryCallbackTimeout";
 constexpr char PAGE_TRANSLATE_CALLBACK_TIMEOUT[] = "PageTranslateCallbackTimeout";
 constexpr char PAGE_TRANSLATE_RESULT_WATCHDOG_PREFIX[] = "PageTranslateResultWatchdog";
 constexpr int32_t SPECIFIED_CONTENT_OFFSETS_LOOP_UPPERBOUND = 1024000;
@@ -377,6 +378,22 @@ int32_t UiReportStub::OnRemoteRequest(uint32_t code, MessageParcel& data, Messag
             ReportPageSceneEvent(result, isGetResult);
             break;
         }
+        case REPORT_COMPONENT_TREE_QUERY_RESULT: {
+            sptr<LargeStringAshmem> largeStringAshmem = data.ReadParcelable<LargeStringAshmem>();
+            if (!largeStringAshmem) {
+                LOGW("ReportComponentTreeQueryResult read LargeStringAshmem failed");
+                break;
+            }
+            std::string result;
+            if (!largeStringAshmem->ReadFromAshmem(result)) {
+                LOGW("ReportComponentTreeQueryResult read data failed");
+                break;
+            }
+            int32_t partNum = data.ReadInt32();
+            bool isLastPart = data.ReadBool();
+            ReportComponentTreeQueryResult(result, partNum, isLastPart);
+            break;
+        }
 
         default: {
             LOGI("ui_session unknown transaction code %{public}d", code);
@@ -499,6 +516,85 @@ void UiReportStub::RegisterGetHitTestNodeInfoCallback(
     const std::function<void(std::string, int32_t, bool)>& eventCallback)
 {
     getHitTestNodeInfoCallback_ = std::move(eventCallback);
+}
+
+void UiReportStub::ReportComponentTreeQueryResult(const std::string& data, int32_t partNum, bool isLastPart)
+{
+    std::function<void(std::string, int32_t, bool)> componentTreeQueryCallback;
+    {
+        std::lock_guard<std::mutex> lock(componentTreeQueryCallbackMutex_);
+        if (!componentTreeQueryCallback_) {
+            return;
+        }
+        componentTreeQueryCallback = componentTreeQueryCallback_;
+        if (isLastPart) {
+            CancelComponentTreeQueryCallbackTimeoutTaskLocked();
+            componentTreeQueryCallback_ = nullptr;
+        }
+    }
+    componentTreeQueryCallback(data, partNum, isLastPart);
+}
+
+bool UiReportStub::RegisterComponentTreeQueryCallback(
+    const std::function<void(std::string, int32_t, bool)>& eventCallback)
+{
+    std::lock_guard<std::mutex> lock(componentTreeQueryCallbackMutex_);
+    if (componentTreeQueryCallback_ != nullptr) {
+        return false;
+    }
+    componentTreeQueryCallback_ = eventCallback;
+    return true;
+}
+
+void UiReportStub::UnregisterComponentTreeQueryCallback()
+{
+    std::lock_guard<std::mutex> lock(componentTreeQueryCallbackMutex_);
+    componentTreeQueryCallback_ = nullptr;
+}
+
+bool UiReportStub::PostComponentTreeQueryCallbackRemoveTask(int32_t timeout)
+{
+    auto eventHandler = eventHandler_.lock();
+    if (eventHandler == nullptr) {
+        LOGE("PostComponentTreeQueryCallbackRemoveTask eventHandler is null");
+        std::lock_guard<std::mutex> lock(componentTreeQueryCallbackMutex_);
+        componentTreeQueryCallback_ = nullptr;
+        return false;
+    }
+    wptr<UiReportStub> weakThis = this;
+    bool postTaskSuccess = eventHandler->PostTask([weakThis]() {
+        auto uiReportStub = weakThis.promote();
+        if (uiReportStub == nullptr) {
+            LOGE("PostComponentTreeQueryCallbackRemoveTask uiReportStub is null");
+            return;
+        }
+        uiReportStub->HandleComponentTreeQueryCallbackTimeout();
+    }, COMPONENT_TREE_QUERY_CALLBACK_TIMEOUT,
+        NormalizeTimeout(timeout, DEFAULT_INSPECTOR_TREE_CALLBACK_TIMEOUT_MS));
+    if (!postTaskSuccess) {
+        LOGW("Post ComponentTreeQuery timeout task failed");
+        std::lock_guard<std::mutex> lock(componentTreeQueryCallbackMutex_);
+        componentTreeQueryCallback_ = nullptr;
+        return false;
+    }
+    return true;
+}
+
+void UiReportStub::HandleComponentTreeQueryCallbackTimeout()
+{
+    std::lock_guard<std::mutex> lock(componentTreeQueryCallbackMutex_);
+    LOGW("ComponentTreeQuery callback timeout, clear pending callback");
+    componentTreeQueryCallback_ = nullptr;
+}
+
+void UiReportStub::CancelComponentTreeQueryCallbackTimeoutTaskLocked()
+{
+    auto eventHandler = eventHandler_.lock();
+    if (eventHandler == nullptr) {
+        LOGE("CancelComponentTreeQueryCallbackTimeoutTaskLocked eventHandler is null");
+        return;
+    }
+    eventHandler->RemoveTask(COMPONENT_TREE_QUERY_CALLBACK_TIMEOUT);
 }
 
 void UiReportStub::ReportWebUnfocusEvent(int64_t accessibilityId, const std::string& data)

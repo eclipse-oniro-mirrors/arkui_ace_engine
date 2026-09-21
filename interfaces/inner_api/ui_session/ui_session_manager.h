@@ -28,6 +28,7 @@
 
 #include "base/utils/macros.h"
 
+#include "component_tree_query_type.h"
 #include "param_config.h"
 #include "ui_content_errors.h"
 #include "ui_content_proxy_error_code.h"
@@ -67,6 +68,7 @@ public:
     using PageTranslateResetFunction = std::function<void(int32_t)>;
     using PageTranslateResultFunction = std::function<void(const std::vector<TranslateResult>&)>;
     using PageSceneDetectFunction = std::function<void(int32_t, const std::string&, bool)>;
+    using ComponentTreeQueryFunction = std::function<void(const ComponentTreeQueryRequest&)>;
 
     enum class WebPageSceneOp {
         RegisterRules,    // Register rules + match for reportOnRegister
@@ -322,6 +324,10 @@ public:
     virtual void NotifyPageSceneNodeStateChanged(
         const std::string& nodeTag, PageSceneNodeStateChange stateChange) {};
 
+    virtual void SaveComponentTreeQueryFunction(ComponentTreeQueryFunction&& function) {};
+    virtual void ComponentTreeQuery(const ComponentTreeQueryRequest& request) {};
+    virtual void ReportComponentTreeQueryResult(const std::string& data) {};
+
 protected:
     UiSessionManager() = default;
     virtual ~UiSessionManager() = default;
@@ -397,6 +403,8 @@ protected:
     std::mutex pageSceneDetectFunctionMutex_;
     WebPageSceneFunction webPageSceneFunction_;
     std::mutex webPageSceneMutex_;
+    ComponentTreeQueryFunction componentTreeQueryFunction_;
+    std::mutex componentTreeQueryFunctionMutex_;
 };
 } // namespace OHOS::Ace
 #endif // FOUNDATION_ACE_INTERFACE_UI_SESSION_MANAGER_H

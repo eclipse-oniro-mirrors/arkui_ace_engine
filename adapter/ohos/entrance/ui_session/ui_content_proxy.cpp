@@ -272,6 +272,57 @@ int32_t UIContentServiceProxy::GetPageScene(
     return result;
 }
 
+int32_t UIContentServiceProxy::SendComponentTreeQueryRequest(uint32_t code, const char* caller,
+    const std::function<void(const std::string&, int32_t, bool)>& eventCallback,
+    const std::function<bool(MessageParcel&)>& writeParams,
+    int32_t timeout)
+{
+    if (eventCallback == nullptr) {
+        LOGW("%{public}s invalid callback", caller);
+        return PARAM_INVALID;
+    }
+    if (report_ == nullptr) {
+        LOGW("%{public}s reportStub is nullptr", caller);
+        return FAILED;
+    }
+    MessageParcel data;
+    if (!data.WriteInterfaceToken(GetDescriptor())) {
+        LOGW("%{public}s write interface token failed", caller);
+        return FAILED;
+    }
+    if (!writeParams(data)) {
+        LOGW("%{public}s write parcel failed", caller);
+        return FAILED;
+    }
+    bool registerSuccess = report_->RegisterComponentTreeQueryCallback(eventCallback);
+    if (!registerSuccess) {
+        LOGW("%{public}s register callback failed, previous request unfinished", caller);
+        return LAST_UNFINISH;
+    }
+    MessageParcel reply;
+    MessageOption option;
+    int32_t sendRequestErrorCode = Remote()->SendRequest(code, data, reply, option);
+    if (sendRequestErrorCode != ERR_NONE) {
+        LOGW("%{public}s send request failed, errorCode is %{public}d", caller, sendRequestErrorCode);
+        report_->UnregisterComponentTreeQueryCallback();
+        return REPLY_ERROR;
+    }
+    if (!report_->PostComponentTreeQueryCallbackRemoveTask(timeout)) {
+        return FAILED;
+    }
+    return reply.ReadInt32();
+}
+
+int32_t UIContentServiceProxy::GetNavigationContentByPoint(float x, float y, const std::string& pattern,
+    const std::function<void(const std::string&, int32_t, bool)>& eventCallback,
+    int32_t timeout)
+{
+    return SendComponentTreeQueryRequest(GET_NAVIGATION_CONTENT_BY_POINT, "GetNavigationContentByPoint",
+        eventCallback, [x, y, pattern](MessageParcel& data) {
+            return data.WriteFloat(x) && data.WriteFloat(y) && data.WriteString(pattern);
+        }, timeout);
+}
+
 int32_t UIContentServiceProxy::RegisterClickEventCallback(const EventCallback& eventCallback)
 {
     MessageParcel data;

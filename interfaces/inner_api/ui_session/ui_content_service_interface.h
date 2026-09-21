@@ -22,6 +22,7 @@
 #include <string>
 #include <vector>
 #include "ui/base/macros.h"
+#include "component_tree_query_type.h"
 #include "param_config.h"
 #include "ui_content_errors.h"
 #include "ui_content_proxy_error_code.h"
@@ -102,6 +103,7 @@ public:
         REGISTER_PAGE_SCENE_RULES,
         UNREGISTER_PAGE_SCENE_RULES,
         GET_PAGE_SCENE,
+        GET_NAVIGATION_CONTENT_BY_POINT,
     };
 
     /**
@@ -437,6 +439,17 @@ public:
     {
         return FAILED;
     }
+
+    /**
+     * @description: FEAT-031 FR-2: extract the Navigation content subtree hit
+     * by the window point (x, y) plus NavBar nodes matching pattern (regex).
+     */
+    virtual int32_t GetNavigationContentByPoint(float x, float y, const std::string& pattern,
+        const std::function<void(const std::string&, int32_t, bool)>& eventCallback,
+        int32_t timeout = DEFAULT_INSPECTOR_TREE_CALLBACK_TIMEOUT_MS)
+    {
+        return FAILED;
+    }
 };
 class ACE_FORCE_EXPORT ReportService : public OHOS::IRemoteBroker {
 public:
@@ -470,6 +483,7 @@ public:
         SEND_WEB_INFO_BY_REQUEST,
         SEND_PAGE_TEXT,
         REPORT_PAGE_SCENE_EVENT,
+        REPORT_COMPONENT_TREE_QUERY_RESULT,
     };
 
     /**
@@ -592,6 +606,11 @@ public:
         const std::string& result, WebRequestErrorCode errorCode) = 0;
     virtual void SendPageText(int32_t nodeId, const std::string& text, int64_t version) {}
     virtual void ReportPageSceneEvent(const std::string& sceneJson, bool isGetResult = false) {}
+
+    /**
+     * @description: reports one (partial) component tree query result to the requesting SA process.
+     */
+    virtual void ReportComponentTreeQueryResult(const std::string& data, int32_t partNum, bool isLastPart) {}
 };
 } // namespace OHOS::Ace
 #endif // FOUNDATION_ACE_INTERFACE_UI_CONTENT_SERVICE_INTERFACE_H

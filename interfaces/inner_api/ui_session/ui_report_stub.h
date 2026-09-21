@@ -221,6 +221,25 @@ public:
     void RegisterGetHitTestNodeInfoCallback(const std::function<void(std::string, int32_t, bool)>& eventCallback);
 
     /**
+     * @description: report one (partial) component tree query result
+     */
+    void ReportComponentTreeQueryResult(const std::string& data, int32_t partNum, bool isLastPart) override;
+
+    /**
+     * @description: register a callback for component tree query results.
+     * Returns false if a previous callback is still pending (concurrent query rejection).
+     */
+    bool RegisterComponentTreeQueryCallback(
+        const std::function<void(std::string, int32_t, bool)>& eventCallback);
+
+    /**
+     * @description: unregister component tree query callback (cleanup on IPC failure).
+     */
+    void UnregisterComponentTreeQueryCallback();
+
+    bool PostComponentTreeQueryCallbackRemoveTask(int32_t timeout);
+
+    /**
      * @description: report web unfocus value for SA
      */
     void ReportWebUnfocusEvent(int64_t accessibilityId, const std::string& data) override;
@@ -292,6 +311,8 @@ public:
 private:
     void HandleInspectorTreeCallbackTimeout();
     void CancelGetInspectorTreeCallbackTimeoutTaskLocked();
+    void HandleComponentTreeQueryCallbackTimeout();
+    void CancelComponentTreeQueryCallbackTimeoutTaskLocked();
     void OnGetWebInfoByRequestInner(MessageParcel& data);
     void OnSendPageTextInner(MessageParcel& data);
     void HandlePageTranslateCallbackTimeout(int64_t requestId);
@@ -320,6 +341,8 @@ private:
     std::mutex inspectorTreeCallbackMutex_;
     std::function<void(std::string, int32_t, bool)> inspectorTreeCallback_;
     std::function<void(std::string, int32_t, bool)> getHitTestNodeInfoCallback_;
+    std::mutex componentTreeQueryCallbackMutex_;
+    std::function<void(std::string, int32_t, bool)> componentTreeQueryCallback_;
     std::function<void(int64_t accessibilityId, const std::string& data)> unfocusEvent_;
     std::function<void(std::vector<std::pair<int32_t, std::shared_ptr<Media::PixelMap>>>)> getShowingImageCallback_;
     std::function<void(int32_t, const std::unordered_map<int32_t, std::shared_ptr<Media::PixelMap>>&,

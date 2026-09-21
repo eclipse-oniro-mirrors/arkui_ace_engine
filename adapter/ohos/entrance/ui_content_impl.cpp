@@ -67,6 +67,7 @@
 #include "core/components_ng/manager/form_visible/form_visible_manager.h"
 #include "core/components_ng/manager/page_scene/page_scene_rule_manager.h"
 #include "core/components_ng/manager/page_scene/search_scene_context_collector.h"
+#include "core/components_ng/manager/uisession_query/component_tree_query.h"
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/pattern/ui_extension/ui_extension_manager.h"
 #include "core/components_ng/pattern/xcomponent/xcomponent_resolution_config.h"
@@ -6537,6 +6538,7 @@ void UIContentImpl::InitUISessionManagerCallbacks(const WeakPtr<TaskExecutor>& t
     SaveGetCurrentInstanceId();
     RegisterExeAppAIFunction(taskExecutor);
     SaveGetHitTestInfoCallback(taskExecutor);
+    SaveComponentTreeQueryFunction(taskExecutor);
     SetContentChangeDetectCallback(taskExecutor);
     RegisterGetSpecifiedContentOffsetsCallback(taskExecutor);
     RegisterHighlightSpecifiedContentCallback(taskExecutor);
@@ -6891,6 +6893,27 @@ void UIContentImpl::SaveGetHitTestInfoCallback(const WeakPtr<TaskExecutor>& task
             TaskExecutor::TaskType::UI, "UiSessionGetHitTestInfos");
     };
     UiSessionManager::GetInstance()->SaveGetHitTestInfoCallback(getHitTestInfoCallback);
+}
+
+void UIContentImpl::SaveComponentTreeQueryFunction(const WeakPtr<TaskExecutor>& taskExecutor)
+{
+    auto componentTreeQueryCallback = [weakTaskExecutor = taskExecutor](
+        const ComponentTreeQueryRequest& request) {
+        auto taskExecutor = weakTaskExecutor.Upgrade();
+        CHECK_NULL_VOID(taskExecutor);
+        taskExecutor->PostTask(
+            [request]() {
+                std::string resultJson;
+                int32_t ret = NG::ComponentTreeQuery::Execute(request, resultJson);
+                // ERR_OK: report result to SA (may be empty if Navigation not found).
+                // Other errors: silent drop, SA side waits for timeout.
+                if (ret == static_cast<int32_t>(ComponentTreeQueryError::OK)) {
+                    UiSessionManager::GetInstance()->ReportComponentTreeQueryResult(resultJson);
+                }
+            },
+            TaskExecutor::TaskType::UI, "UiSessionComponentTreeQuery");
+    };
+    UiSessionManager::GetInstance()->SaveComponentTreeQueryFunction(componentTreeQueryCallback);
 }
 
 void UIContentImpl::SetupGetImagesByIdCallback(const WeakPtr<TaskExecutor>& taskExecutor)

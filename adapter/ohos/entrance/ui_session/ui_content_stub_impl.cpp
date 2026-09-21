@@ -363,4 +363,17 @@ int32_t UIContentServiceStubImpl::GetPageScene(
     int32_t processId = IPCSkeleton::GetCallingRealPid();
     return UiSessionManager::GetInstance()->GetPageScene(processId, ruleJsonOrRuleSetId);
 }
+
+int32_t UIContentServiceStubImpl::GetNavigationContentByPoint(float x, float y, const std::string& pattern,
+    [[maybe_unused]] const std::function<void(const std::string&, int32_t, bool)>& eventCallback,
+    [[maybe_unused]] int32_t timeout)
+{
+    ComponentTreeQueryRequest request;
+    request.type = ComponentTreeQueryType::NAVIGATION_CONTENT_BY_POINT;
+    request.x = x;
+    request.y = y;
+    request.pattern = pattern;
+    UiSessionManager::GetInstance()->ComponentTreeQuery(request);
+    return NO_ERROR;
+}
 } // namespace OHOS::Ace
