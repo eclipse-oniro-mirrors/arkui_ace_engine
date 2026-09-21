@@ -1226,6 +1226,27 @@ void DragDropManager::ResetDraggingStatus(const TouchEvent& touchPoint)
     }
 }
 
+bool DragDropManager::TryBindAndMarkSending(const std::shared_ptr<ArkUIInteralDragAction>& dragAction)
+{
+    if (dragAction == nullptr) {
+        return false;
+    }
+    std::lock_guard<std::mutex> lock(dragActionMutex_);
+    if (dragAction_ != nullptr) {
+        std::lock_guard<std::mutex> stateLock(dragAction_->dragStateMutex);
+        if (dragAction_->dragState == DragAdapterState::SENDING) {
+            TAG_LOGI(AceLogTag::ACE_DRAG, "Reject start drag, another session is sending.");
+            return false;
+        }
+    }
+    {
+        std::lock_guard<std::mutex> stateLock(dragAction->dragStateMutex);
+        dragAction->dragState = DragAdapterState::SENDING;
+    }
+    dragAction_ = dragAction;
+    return true;
+}
+
 void DragDropManager::HandleOnDragEnd(const DragPointerEvent& pointerEvent, const std::string& extraInfo,
     const RefPtr<FrameNode>& dragFrameNode)
 {

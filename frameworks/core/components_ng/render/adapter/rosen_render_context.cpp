@@ -142,9 +142,6 @@ namespace OHOS::Ace::NG {
 
 using namespace OHOS::Rosen;
 namespace {
-RefPtr<PixelMap> g_pixelMap {};
-std::mutex g_mutex;
-std::condition_variable thumbnailGet;
 constexpr std::chrono::duration<int, std::milli> PIXELMAP_TIMEOUT_DURATION(1000);
 constexpr float ANIMATION_CURVE_VELOCITY_LIGHT_OR_MIDDLE = 10.0f;
 constexpr float ANIMATION_CURVE_VELOCITY_HEAVY = 0.0f;
@@ -2502,35 +2499,59 @@ void RosenRenderContext::SetAlphaOffscreen(bool isOffScreen)
 
 class DrawDragThumbnailCallback : public SurfaceCaptureCallback {
 public:
+    explicit DrawDragThumbnailCallback(std::function<void(const RefPtr<PixelMap>&)> callback)
+        : callback_(std::move(callback))
+    {}
+
     void OnSurfaceCapture(std::shared_ptr<Media::PixelMap> pixelMap) override
     {
+        RefPtr<PixelMap> thumbnailPixelMap;
         if (pixelMap) {
 #ifdef PIXEL_MAP_SUPPORTED
-            g_pixelMap = PixelMap::CreatePixelMap(reinterpret_cast<void*>(&pixelMap));
+            thumbnailPixelMap = PixelMap::CreatePixelMap(reinterpret_cast<void*>(&pixelMap));
 #endif // PIXEL_MAP_SUPPORTED
         } else {
-            g_pixelMap = nullptr;
             TAG_LOGE(AceLogTag::ACE_DRAG, "get thumbnail pixelMap failed!");
         }
         if (callback_ == nullptr) {
-            std::unique_lock<std::mutex> lock(g_mutex);
-            thumbnailGet.notify_all();
+            {
+                std::lock_guard<std::mutex> lock(mutex_);
+                pixelMap_ = std::move(thumbnailPixelMap);
+                hasResult_ = true;
+            }
+            condvar_.notify_all();
             return;
         }
-        callback_(g_pixelMap);
+        callback_(thumbnailPixelMap);
     }
     void OnSurfaceCaptureHDR(std::shared_ptr<Media::PixelMap> pixelMap,
         std::shared_ptr<Media::PixelMap> hdrPixelMap) override {}
+
+    // Waits until this capture's own result is published. The result slot, mutex and
+    // condvar are per-instance, so concurrent captures cannot tear or mix up results.
+    RefPtr<PixelMap> WaitForResult(std::chrono::milliseconds timeout)
+    {
+        std::unique_lock<std::mutex> lock(mutex_);
+        if (!condvar_.wait_for(lock, timeout, [this]() { return hasResult_; })) {
+            LOGE("get thumbnail pixelMap timeout!");
+            return nullptr;
+        }
+        return pixelMap_;
+    }
+
+private:
     std::function<void(const RefPtr<PixelMap>&)> callback_;
+    std::mutex mutex_;
+    std::condition_variable condvar_;
+    RefPtr<PixelMap> pixelMap_;
+    bool hasResult_ = false;
 };
 
 RefPtr<PixelMap> RosenRenderContext::GetThumbnailPixelMap(bool needScale, bool isOffline)
 {
     CHECK_NULL_RETURN(rsNode_, nullptr);
-    std::shared_ptr<DrawDragThumbnailCallback> drawDragThumbnailCallback =
-        std::make_shared<DrawDragThumbnailCallback>();
+    auto drawDragThumbnailCallback = std::make_shared<DrawDragThumbnailCallback>(nullptr);
     CHECK_NULL_RETURN(drawDragThumbnailCallback, nullptr);
-    drawDragThumbnailCallback->callback_ = nullptr;
     float scaleX = 1.0f;
     float scaleY = 1.0f;
     if (needScale) {
@@ -2548,21 +2569,15 @@ RefPtr<PixelMap> RosenRenderContext::GetThumbnailPixelMap(bool needScale, bool i
         LOGE("TakeSurfaceCaptureForUI failed!");
         return nullptr;
     }
-    std::unique_lock<std::mutex> lock(g_mutex);
-    if (thumbnailGet.wait_for(lock, PIXELMAP_TIMEOUT_DURATION) == std::cv_status::timeout) {
-        LOGE("get thumbnail pixelMap timeout!");
-        return nullptr;
-    }
-    return g_pixelMap;
+    return drawDragThumbnailCallback->WaitForResult(PIXELMAP_TIMEOUT_DURATION);
 }
 
 bool RosenRenderContext::CreateThumbnailPixelMapAsyncTask(
     bool needScale, std::function<void(const RefPtr<PixelMap>)>&& callback)
 {
     CHECK_NULL_RETURN(rsNode_, false);
-    std::shared_ptr<DrawDragThumbnailCallback> thumbnailCallback = std::make_shared<DrawDragThumbnailCallback>();
+    auto thumbnailCallback = std::make_shared<DrawDragThumbnailCallback>(std::move(callback));
     CHECK_NULL_RETURN(thumbnailCallback, false);
-    thumbnailCallback->callback_ = std::move(callback);
     float scaleX = 1.0f;
     float scaleY = 1.0f;
     if (needScale) {
