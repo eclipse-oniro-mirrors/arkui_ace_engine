@@ -2052,6 +2052,7 @@ declare class ArkTabsComponent extends ArkComponent implements TabsAttribute {
     cachedMaxCount(count: number, mode: CacheMode): TabsAttribute;
     barStyle(value: TabBarStyle): TabsAttribute;
     sidebarPosition(value: BarPosition): TabsAttribute;
+    sidebarDisplayStyle(value: SidebarDisplayStyle): TabsAttribute;
     sidebarHeader(value: ComponentContent): TabsAttribute;
     sidebarSearchable(value?: TabsSidebarSearchableOptions): TabsAttribute;
     barDisplayModeBreakpoint(value: TabsBreakpointType<TabBarDisplayMode>): TabsAttribute;
@@ -2064,7 +2065,7 @@ declare class ArkTabContentComponent extends ArkComponent implements TabContentA
     size(value: SizeOptions): this;
     width(value: Length): this;
     height(value: Length): this;
-    defaultVisibility(visibility: TabVisibility, displayMode?: TabBarDisplayMode): this;
+    tabBarVisibility(visibility: TabVisibility, displayMode?: TabBarDisplayMode): this;
 }
 declare class ArkUIExtensionComponentComponent extends ArkComponent implements UIExtensionComponentAttribute {
     constructor(nativePtr: KNode, classType?: ModifierType);

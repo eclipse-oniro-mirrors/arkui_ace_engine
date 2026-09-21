@@ -87,6 +87,7 @@ public:
     void CreateWithResourceObj(TabJsResType colorType, const RefPtr<ResourceObject>& resObj) override;
     void SetBarFloatingStyle(const BarFloatingStyleParameters& parameters) override;
     void ResetBarFloatingStyle() override;
+    void SetSidebarDisplayStyle(SidebarDisplayStyle sidebarDisplayStyle) override;
     void SetBarLayoutStyle(TabBarLayoutStyle barLayoutStyle) override;
     void SetSidebarPosition(BarPosition position) override;
     void SetSidebarHeader(const RefPtr<AceType>& header) override;
@@ -135,14 +136,18 @@ public:
     static void SetAnimateMode(FrameNode* frameNode, TabAnimateMode mode);
     static void SetEdgeEffect(FrameNode* frameNode, int32_t edgeEffect);
     static void SetNestedScroll(FrameNode* frameNode, int32_t nestedOpt);
+    static void SetIndex(FrameNode* frameNode, int32_t index);
     static void SetTabBarIndex(FrameNode* frameNode, int32_t index);
     static void SetTabsController(FrameNode* frameNode, const RefPtr<SwiperController>& tabsController);
     static void SetBarModifier(FrameNode* frameNode, std::function<void(WeakPtr<NG::FrameNode>)>&& onApply);
     static void SetBarBackgroundEffect(FrameNode* frameNode, const EffectOption& effectOption);
     static void SetPageFlipMode(FrameNode* frameNode, int32_t options);
     static void SetCachedMaxCount(FrameNode* frameNode, std::optional<int32_t> cachedMaxCount, TabsCacheMode cacheMode);
+    static void SetCachedMaxCountForJs(
+        FrameNode* frameNode, std::optional<int32_t> cachedMaxCount, TabsCacheMode cacheMode);
     static void SetOnSelected(FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& onSelected);
     static void SetOnChange(FrameNode* frameNode, std::function<void(const BaseEventInfo*)>&& onChange);
+    static void SetOnChangeEvent(FrameNode* frameNode, std::function<void(const BaseEventInfo*)>&& onChangeEvent);
     static void SetOnTabBarClick(FrameNode* frameNode, std::function<void(const BaseEventInfo*)>&& onTabBarClick);
     static void SetOnAnimationStart(FrameNode* frameNode, AnimationStartEvent&& onAnimationStart);
     static void SetOnAnimationEnd(FrameNode* frameNode, AnimationEndEvent&& onAnimationEnd);
@@ -187,6 +192,7 @@ public:
 
     static void SetBarFloatingStyle(FrameNode* frameNode, const BarFloatingStyleParameters& parameters);
     static void ResetBarFloatingStyle(FrameNode* frameNode);
+    static void SetSidebarDisplayStyle(FrameNode* frameNode, SidebarDisplayStyle sidebarDisplayStyle);
     static void SetBarLayoutStyle(FrameNode* frameNode, TabBarLayoutStyle barLayoutStyle);
     static void SetSidebarPosition(FrameNode* frameNode, BarPosition position);
     static void SetSidebarHeader(FrameNode* frameNode, const RefPtr<AceType>& header);

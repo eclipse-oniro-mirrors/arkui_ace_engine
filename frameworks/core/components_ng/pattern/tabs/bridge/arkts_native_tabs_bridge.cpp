@@ -73,6 +73,8 @@ constexpr int32_t SIDEBAR_POSITION_START = static_cast<int32_t>(BarPosition::STA
 constexpr int32_t SIDEBAR_POSITION_END = static_cast<int32_t>(BarPosition::END);
 constexpr int32_t BAR_DISPLAY_MODE_BOTTOMTABBAR = static_cast<int32_t>(TabBarDisplayMode::BOTTOMTABBAR);
 constexpr int32_t BAR_DISPLAY_MODE_SIDEBAR = static_cast<int32_t>(TabBarDisplayMode::SIDEBAR);
+constexpr int32_t SIDEBAR_DISPLAY_STYLE_EMBED = static_cast<int32_t>(SidebarDisplayStyle::EMBED);
+constexpr int32_t SIDEBAR_DISPLAY_STYLE_DISPLACE = static_cast<int32_t>(SidebarDisplayStyle::DISPLACE);
 namespace {
 constexpr int NUM_2 = 2;
 #ifndef NG_BUILD
@@ -167,7 +169,8 @@ void ParseTabsCreateIndexObject(EcmaVM* vm, const Local<JSValueRef>& changeEvent
         auto result = func->Call(vm, func.ToLocal(), args, 1);
         ArkTSUtils::HandleCallbackJobs(vm, trycatch, result);
     };
-    GetArkUINodeModifiers()->getTabsModifier()->setTabsOnChange(nativeNode, reinterpret_cast<void*>(&onChangeEvent));
+    GetArkUINodeModifiers()->getTabsModifier()->setTabsOnChangeEvent(
+        nativeNode, reinterpret_cast<void*>(&onChangeEvent));
 }
 
 void SetCreateBarModifier(EcmaVM* vm, const Local<JSValueRef>& jsValue)
@@ -283,7 +286,8 @@ void TabsBridge::RegisterTabsAttributes(panda::Local<panda::ObjectRef> object, p
         "resetTabsBarFloatingStyle", "setBarStyle", "resetBarStyle", "setSidebarPosition",
         "resetSidebarPosition", "setSidebarHeader", "resetSidebarHeader", "setSidebarSearchable",
         "resetSidebarSearchable", "setBarDisplayModeBreakpoint", "resetBarDisplayModeBreakpoint",
-        "setOnBarDisplayModeChange", "resetOnBarDisplayModeChange"
+        "setOnBarDisplayModeChange", "resetOnBarDisplayModeChange", "setSidebarDisplayStyle",
+        "resetSidebarDisplayStyle"
     };
     Local<JSValueRef> functionValues[] = {
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::Create),
@@ -392,6 +396,8 @@ void TabsBridge::RegisterTabsAttributes(panda::Local<panda::ObjectRef> object, p
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::ResetBarDisplayModeBreakpoint),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::SetOnBarDisplayModeChange),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::ResetOnBarDisplayModeChange),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::SetSidebarDisplayStyle),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::ResetSidebarDisplayStyle),
     };
     auto tabs = panda::ObjectRef::NewWithNamedProperties(vm, ArraySize(functionNames), functionNames, functionValues);
     object->Set(vm, panda::StringRef::NewFromUtf8(vm, "tabs"), tabs);
@@ -1094,7 +1100,8 @@ ArkUINativeModuleValue TabsBridge::SetBarBackgroundColor(ArkUIRuntimeCallInfo* r
     if (ArkTSUtils::IsJsView(firstArg, vm)) {
         Color color = Color::BLACK.BlendOpacity(0.0f);
         RefPtr<ResourceObject> backgroundColorResObj;
-        if (!secondArg.IsNull() && !secondArg->IsUndefined()) {
+        uint32_t argc = runtimeCallInfo->GetArgsNumber();
+        if (argc > TABS_ARG_INDEX_1) {
             bool parseResult = ArkTSUtils::ConvertFromJSValue(vm, secondArg, color, backgroundColorResObj);
             GetArkUINodeModifiers()->getTabsModifier()->setBarBackgroundColorByUser(nativeNode, parseResult);
         }
@@ -1700,7 +1707,11 @@ ArkUINativeModuleValue TabsBridge::SetTabsOptionsIndex(ArkUIRuntimeCallInfo* run
         GetArkUINodeModifiers()->getTabsModifier()->resetTabsOptionsIndex(nativeNode);
     } else {
         int32_t indexVal = indexValArg->Int32Value(vm);
-        GetArkUINodeModifiers()->getTabsModifier()->setTabsOptionsIndex(nativeNode, indexVal);
+        if (ArkTSUtils::IsJsView(nodeArg, vm)) {
+            GetArkUINodeModifiers()->getTabsModifier()->setTabsIndex(nativeNode, indexVal);
+        } else {
+            GetArkUINodeModifiers()->getTabsModifier()->setTabsOptionsIndex(nativeNode, indexVal);
+        }
     }
     return panda::JSValueRef::Undefined(vm);
 }
@@ -1858,13 +1869,15 @@ ArkUINativeModuleValue TabsBridge::SetTabBarWidth(ArkUIRuntimeCallInfo* runtimeC
 
     RefPtr<ResourceObject> widthResObj;
     if (ArkTSUtils::IsJsView(firstArg, vm)) {
-        if (jsValue.IsNull() || jsValue->IsUndefined()) {
+        uint32_t argc = runtimeCallInfo->GetArgsNumber();
+        if (argc < TABS_ARG_INDEX_2) {
             return undefinedRes;
         }
         width = Dimension(-1.0, DimensionUnit::VP);
         GetArkUINodeModifiers()->getTabsModifier()->createTabBarWidthWithResourceObj(nativeNode, nullptr);
         if (Container::GreatOrEqualAPIVersion(PlatformVersion::VERSION_TEN)) {
-            if (!ArkTSUtils::ParseJsDimensionVp(vm, jsValue, width, widthResObj, false)) {
+            if (!ArkTSUtils::ParseJsDimensionVpNG(vm, jsValue, width, widthResObj)) {
+                width = Dimension(-1.0, DimensionUnit::VP);
                 GetArkUINodeModifiers()->getTabsModifier()->setTabBarWidth(
                     nativeNode, width.Value(), static_cast<int>(width.Unit()));
                 return undefinedRes;
@@ -1931,7 +1944,7 @@ ArkUINativeModuleValue TabsBridge::SetTabBarHeight(ArkUIRuntimeCallInfo* runtime
             jsValue->ToString(vm)->ToString(vm) == "auto") {
             adaptiveHeight = true;
         } else if (Container::GreatOrEqualAPIVersion(PlatformVersion::VERSION_TEN)) {
-            if (!ArkTSUtils::ParseJsDimensionVp(vm, jsValue, height, heightResObj, false)) {
+            if (!ArkTSUtils::ParseJsDimensionVpNG(vm, jsValue, height, heightResObj)) {
                 height = Dimension(-1.0, DimensionUnit::VP);
             }
         } else {
@@ -2495,7 +2508,7 @@ ArkUINativeModuleValue TabsBridge::SetCachedMaxCount(ArkUIRuntimeCallInfo* runti
             }
         }
         if (count.has_value()) {
-            GetArkUINodeModifiers()->getTabsModifier()->setCachedMaxCount(nativeNode, count.value(), mode);
+            GetArkUINodeModifiers()->getTabsModifier()->setCachedMaxCountForJs(nativeNode, count.value(), mode);
         } else {
             GetArkUINodeModifiers()->getTabsModifier()->resetCachedMaxCount(nativeNode);
         }
@@ -3054,6 +3067,37 @@ ArkUINativeModuleValue TabsBridge::ResetTabsBarFloatingStyle(ArkUIRuntimeCallInf
     return panda::JSValueRef::Undefined(vm);
 }
 
+ArkUINativeModuleValue TabsBridge::SetSidebarDisplayStyle(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(TABS_ARG_INDEX_0);
+    Local<JSValueRef> styleArg = runtimeCallInfo->GetCallArgRef(TABS_ARG_INDEX_1);
+    ArkUINodeHandle nativeNode = nullptr;
+    CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
+    int32_t sidebarDisplayStyle = SIDEBAR_DISPLAY_STYLE_EMBED;
+    if (runtimeCallInfo->GetArgsNumber() > TABS_ARG_INDEX_1 && !styleArg.IsNull() && !styleArg->IsUndefined() &&
+        styleArg->IsNumber()) {
+        auto sidebarDisplayStyleVal = styleArg->Int32Value(vm);
+        if (sidebarDisplayStyleVal >= SIDEBAR_DISPLAY_STYLE_EMBED &&
+            sidebarDisplayStyleVal <= SIDEBAR_DISPLAY_STYLE_DISPLACE) {
+            sidebarDisplayStyle = sidebarDisplayStyleVal;
+        }
+    }
+    GetArkUINodeModifiers()->getTabsModifier()->setSidebarDisplayStyle(nativeNode, sidebarDisplayStyle);
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue TabsBridge::ResetSidebarDisplayStyle(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(TABS_ARG_INDEX_0);
+    CHECK_NULL_RETURN(firstArg->IsNativePointer(vm), panda::JSValueRef::Undefined(vm));
+    auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
+    GetArkUINodeModifiers()->getTabsModifier()->resetSidebarDisplayStyle(nativeNode);
+    return panda::JSValueRef::Undefined(vm);
+}
 
 ArkUINativeModuleValue TabsBridge::SetBarStyle(ArkUIRuntimeCallInfo* runtimeCallInfo)
 {

@@ -711,6 +711,7 @@ struct ArkUIAniCommonModifier {
     void (*closeModalUIExtension)(int32_t sessionId);
     void (*modalUIExtensionProxySend)(
         std::shared_ptr<OHOS::Ace::ModalUIExtensionProxy>& proxy, const OHOS::AAFwk::WantParams& params);
+    ani_long (*interopProxyNodeConstruct)(ArkUI_Int32 id);
 };
 struct  ArkUICustomNodeInfo {
     std::function<void()> onPageShowFunc;
@@ -740,6 +741,9 @@ struct ArkUIAniCustomNodeModifier {
 struct ArkUIAniKeyboardAvoidModeModifier {
     ArkUI_Int32 (*getKeyboardAvoidMode)();
     void (*setKeyboardAvoidMode)(int32_t index);
+};
+struct ArkUIAniImmersiveStrategyModifier {
+    void (*applyDefaultImmersiveStrategy)(const int32_t* types, int32_t count);
 };
 struct ArkUIAniDrawModifier {
     void (*setDrawModifier)(ani_long ptr, uint32_t flag, void* fnDrawBehindFun, void* fnDrawContentFun,
@@ -1072,6 +1076,7 @@ struct ArkUIAniModifiers {
     const ArkUIAniCommonModifier* (*getCommonAniModifier)();
     const ArkUIAniCustomNodeModifier* (*getCustomNodeAniModifier)();
     const ArkUIAniKeyboardAvoidModeModifier* (*getKeyboardAvoidModeAniModifier)();
+    const ArkUIAniImmersiveStrategyModifier* (*getImmersiveStrategyAniModifier)();
     const ArkUIAniLazyForEachNodeModifier* (*getLazyForEachNodeAniModifier)();
     const ArkUIAniContentSlotModifier* (*getContentSlotAniModifier)();
     const ArkUIAniDrawModifier* (*getArkUIAniDrawModifier)();

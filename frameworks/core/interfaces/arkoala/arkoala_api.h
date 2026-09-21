@@ -844,6 +844,7 @@ struct ArkUIProgressStyleResource {
     void* contentRawPtr;
     void* fontColorRawPtr;
     ArkUIFontResourceStruct fontResource;
+    void* strokeRadiusRawPtr;
 };
 
 struct ArkUIProgressStyle {
@@ -1770,6 +1771,7 @@ enum ArkUIEventSubKind {
     ON_RICH_EDITOR_ON_DID_CHANGE,
     ON_RICH_EDITOR_ON_CONTENT_SCROLL,
     ON_RICH_EDITOR_ON_CONTENT_SIZE_CHANGE,
+    ON_RICH_EDITOR_ON_INPUT_FILTER_ERROR,
 
     ON_LAZY_COLUMN_LAYOUT_SCROLL_INDEX = ARKUI_MAX_EVENT_NUM * ARKUI_LAZY_COLUMN_LAYOUT,
 
@@ -5077,6 +5079,8 @@ struct ArkUILazyGridLayoutModifier {
     void (*resetFooter)(ArkUINodeHandle node);
     void (*setOnVisibleIndexesChange)(ArkUINodeHandle node, void* extraParam);
     void (*resetOnVisibleIndexesChange)(ArkUINodeHandle node);
+    void (*setItemFillPolicy)(ArkUINodeHandle node, ArkUI_Int32 policy);
+    void (*resetItemFillPolicy)(ArkUINodeHandle node);
 };
 
 struct ArkUILazyColumnLayoutModifier {
@@ -5717,6 +5721,7 @@ struct ArkUITabsModifier {
     void (*setTabsOnSelected)(ArkUINodeHandle node, void* callback);
     void (*resetTabsOnSelected)(ArkUINodeHandle node);
     void (*setCachedMaxCount)(ArkUINodeHandle node, ArkUI_Int32 count, ArkUI_Int32 mode);
+    void (*setCachedMaxCountForJs)(ArkUINodeHandle node, ArkUI_Int32 count, ArkUI_Int32 mode);
     void (*resetCachedMaxCount)(ArkUINodeHandle node);
     void (*setTabsOnChange)(ArkUINodeHandle node, void* callback);
     void (*resetTabsOnChange)(ArkUINodeHandle node);
@@ -5759,6 +5764,10 @@ struct ArkUITabsModifier {
     void (*resetBarDisplayModeBreakpoint)(ArkUINodeHandle node);
     void (*setOnBarDisplayModeChange)(ArkUINodeHandle node, void* callback);
     void (*resetOnBarDisplayModeChange)(ArkUINodeHandle node);
+    void (*setSidebarDisplayStyle)(ArkUINodeHandle node, ArkUI_Int32 sidebarDisplayStyle);
+    void (*resetSidebarDisplayStyle)(ArkUINodeHandle node);
+    void (*setTabsIndex)(ArkUINodeHandle node, ArkUI_Int32 indexVal);
+    void (*setTabsOnChangeEvent)(ArkUINodeHandle node, void* callback);
 };
 
 struct ArkUIStepperItemModifier {
@@ -5817,9 +5826,9 @@ struct ArkUITabContentModifier {
     void (*setIconSelectedColorByUser)(ArkUINodeHandle node, ArkUI_Bool isByUser);
     void (*setId)(ArkUINodeHandle node, ArkUI_CharPtr id);
     void (*setTabBar)(ArkUINodeHandle node, void* paramRawPtr, bool fromJsView);
-    void (*setDefaultVisibility)(
+    void (*setTabBarVisibility)(
         ArkUINodeHandle node, ArkUI_Int32 visibility, ArkUI_Int32 displayMode, ArkUI_Bool hasDisplayMode);
-    void (*resetDefaultVisibility)(ArkUINodeHandle node);
+    void (*resetTabBarVisibility)(ArkUINodeHandle node);
 };
 
 struct ArkUITabsControllerModifier {
@@ -6577,6 +6586,7 @@ struct ArkUITextInputModifier {
     void (*resetSelectDetectorEnable)(ArkUINodeHandle node);
     ArkUI_Int32 (*getSelectDetectorEnable)(ArkUINodeHandle node);
     void (*setTextInputCaretColor)(ArkUINodeHandle node, ArkUI_Uint32 color, void* colorRawPtr);
+    void (*setTextInputCaretColorJS)(ArkUINodeHandle node, ArkUI_Uint32 color, void* colorRawPtr);
     void (*resetTextInputCaretColor)(ArkUINodeHandle node);
     void (*setTextInputType)(ArkUINodeHandle node, ArkUI_Int32 value);
     void (*resetTextInputType)(ArkUINodeHandle node);
@@ -9421,6 +9431,9 @@ struct ArkUIRichEditorModifier {
     void (*setRichEditorHorizontalScrolling)(ArkUINodeHandle node, ArkUI_Bool singleLine);
     void (*resetRichEditorHorizontalScrolling)(ArkUINodeHandle node);
     ArkUI_Bool (*getRichEditorHorizontalScrolling)(ArkUINodeHandle node);
+    void (*setRichEditorInputFilter)(ArkUINodeHandle node, ArkUI_CharPtr value);
+    ArkUI_CharPtr (*getRichEditorInputFilter)(ArkUINodeHandle node);
+    void (*resetRichEditorInputFilter)(ArkUINodeHandle node);
     void (*setRichEditorCaretStyle)(ArkUINodeHandle node, ArkUI_Float32 value, ArkUI_Int32 unit);
     ArkUI_Float32 (*getRichEditorCaretStyle)(ArkUINodeHandle node, ArkUI_Int32 unit);
     void (*resetRichEditorCaretStyle)(ArkUINodeHandle node);
@@ -9437,6 +9450,37 @@ struct ArkUIRichEditorModifier {
     void (*setRichEditorEnableSkipPreviewLongPress)(ArkUINodeHandle node, ArkUI_Bool value);
     ArkUI_Int32 (*getRichEditorEnableSkipPreviewLongPress)(ArkUINodeHandle node);
     void (*resetRichEditorEnableSkipPreviewLongPress)(ArkUINodeHandle node);
+    void (*setRichEditorCancelButton)(ArkUINodeHandle node, ArkUI_Int32 style, const struct ArkUISizeType* size,
+        ArkUI_Uint32 color, ArkUI_CharPtr src);
+    void (*resetRichEditorCancelButton)(ArkUINodeHandle node);
+    ArkUI_Int32 (*getRichEditorCancelButtonStyle)(ArkUINodeHandle node);
+    ArkUI_Float32 (*getRichEditorCancelIconSize)(ArkUINodeHandle node, ArkUI_Int32 unit);
+    ArkUI_Uint32 (*getRichEditorCancelIconColor)(ArkUINodeHandle node);
+    ArkUI_CharPtr (*getRichEditorCancelIconSrc)(ArkUINodeHandle node);
+    // ShowCounter
+    void (*setRichEditorShowCounter)(ArkUINodeHandle node, ArkUIShowCountOptions* showCountOptions,
+        void* resourceObject, void* resourceObjectTextOverflowColor);
+    void (*resetRichEditorShowCounter)(ArkUINodeHandle node);
+    void (*getRichEditorShowCounterOptions)(ArkUINodeHandle node, ArkUIShowCountOptions* options);
+    // Border
+    void (*setRichEditorBorderWidth)(ArkUINodeHandle node, const ArkUI_Float32* values,
+        const ArkUI_Int32* units, ArkUI_Int32 size);
+    void (*resetRichEditorBorderWidth)(ArkUINodeHandle node);
+    void (*setRichEditorBorderColor)(ArkUINodeHandle node, ArkUI_Uint32 topColorInt,
+        ArkUI_Uint32 rightColorInt, ArkUI_Uint32 bottomColorInt, ArkUI_Uint32 leftColorInt, void* res);
+    void (*resetRichEditorBorderColor)(ArkUINodeHandle node);
+    void (*setRichEditorBorderStyle)(ArkUINodeHandle node, const ArkUI_Int32* styles, ArkUI_Int32 length);
+    void (*resetRichEditorBorderStyle)(ArkUINodeHandle node);
+    void (*setRichEditorBorderRadius)(ArkUINodeHandle node, const ArkUI_Float32* values,
+        const ArkUI_Int32* units, ArkUI_Int32 size);
+    void (*resetRichEditorBorderRadius)(ArkUINodeHandle node);
+    // Margin
+    void (*setRichEditorMargin)(ArkUINodeHandle node, const struct ArkUISizeType* top,
+        const struct ArkUISizeType* right, const struct ArkUISizeType* bottom,
+        const struct ArkUISizeType* left, ArkUIPaddingRes* marginRes);
+    void (*resetRichEditorMargin)(ArkUINodeHandle node);
+    void (*getRichEditorMargin)(ArkUINodeHandle node, ArkUI_Float32 (*values)[4],
+        ArkUI_Int32 length, ArkUI_Int32 unit);
 };
 
 struct ArkUIRichEditorControllerModifier {

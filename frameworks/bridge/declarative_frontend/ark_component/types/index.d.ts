@@ -1577,6 +1577,10 @@ declare enum TabBarStyle {
   SIDEBAR = 1,
   SIDEBAR_ADAPTABLE = 2,
 }
+declare enum SidebarDisplayStyle {
+  EMBED = 0,
+  DISPLACE = 1,
+}
 declare type TabsSidebarSearchFilterCallback = (tabIndex: number, text: string) => boolean;
 declare interface TabsSidebarSearchableOptions {
   searchText?: ResourceStr;
@@ -1592,7 +1596,7 @@ declare enum TabVisibility {
   VISIBLE = 0,
   HIDDEN = 1,
 }
-declare interface TabContentDefaultVisibility {
+declare interface TabContentTabBarVisibility {
   visibility?: TabVisibility;
   displayMode?: TabBarDisplayMode;
 }
@@ -1837,6 +1841,7 @@ declare type EmbeddedComponentAttribute = any;
 declare interface EmbedOptions {
   supportDefaultIntrinsicSize?: boolean;
   supportCssDisplayChange?: boolean;
+  supportTransformRotateAndSkew?: boolean;
 }
 declare class FileSelectorParam {
   constructor();

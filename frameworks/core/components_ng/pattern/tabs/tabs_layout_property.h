@@ -53,6 +53,7 @@ public:
         value->propHeightAuto_ = CloneHeightAuto();
         value->propCachedMaxCount_ = CloneCachedMaxCount();
         value->propCacheMode_ = CloneCacheMode();
+        value->propSidebarDisplayStyle_ = CloneSidebarDisplayStyle();
         value->propBarLayoutStyle_ = CloneBarLayoutStyle();
         value->propBarDisplayModeBreakpoint_ = CloneBarDisplayModeBreakpoint();
         value->propSidebarPosition_ = CloneSidebarPosition();
@@ -61,6 +62,7 @@ public:
         value->propSidebarUnselectedIconColor_ = CloneSidebarUnselectedIconColor();
         value->propSidebarUnselectedTextColor_ = CloneSidebarUnselectedTextColor();
         value->propSidebarSelectedBoardColor_ = CloneSidebarSelectedBoardColor();
+        value->propBarBackgroundColor_ = CloneBarBackgroundColor();
         return value;
     }
 
@@ -79,6 +81,7 @@ public:
         ResetBarOverlap();
         ResetCachedMaxCount();
         ResetCacheMode();
+        ResetSidebarDisplayStyle();
         ResetBarLayoutStyle();
         ResetBarDisplayModeBreakpoint();
         ResetSidebarPosition();
@@ -87,6 +90,7 @@ public:
         ResetSidebarUnselectedIconColor();
         ResetSidebarUnselectedTextColor();
         ResetSidebarSelectedBoardColor();
+        ResetBarBackgroundColor();
     }
 
     void ToJsonValue(std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const override
@@ -98,6 +102,8 @@ public:
         }
         json->PutExtAttr("vertical", propAxis_.value_or(Axis::HORIZONTAL) == Axis::HORIZONTAL ?
             "false" : "true", filter);
+        json->PutExtAttr("sidebarDisplayStyle", propSidebarDisplayStyle_.value_or(SidebarDisplayStyle::EMBED)
+            == SidebarDisplayStyle::EMBED ? "SidebarDisplayStyle.EMBED" : "SidebarDisplayStyle.DISPLACE", filter);
         json->PutExtAttr("barPosition", propTabBarPosition_.value_or(BarPosition::START) == BarPosition::START
                                      ? "BarPosition.Start"
                                      : "BarPosition.End", filter);
@@ -205,6 +211,7 @@ public:
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(DividerColorSetByUser, bool, PROPERTY_UPDATE_RENDER);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(BarBackgroundColorSetByUser, bool, PROPERTY_UPDATE_RENDER);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(BarFloatingStyle, BarFloatingStyleParameters, PROPERTY_UPDATE_MEASURE);
+    ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(SidebarDisplayStyle, SidebarDisplayStyle, PROPERTY_UPDATE_MEASURE);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(BarLayoutStyle, TabBarLayoutStyle, PROPERTY_UPDATE_MEASURE);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(
         BarDisplayModeBreakpoint, TabBarDisplayModeBreakpoint, PROPERTY_UPDATE_MEASURE);
@@ -214,6 +221,7 @@ public:
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(SidebarUnselectedIconColor, Color, PROPERTY_UPDATE_RENDER);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(SidebarUnselectedTextColor, Color, PROPERTY_UPDATE_RENDER);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(SidebarSelectedBoardColor, Color, PROPERTY_UPDATE_RENDER);
+    ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(BarBackgroundColor, Color, PROPERTY_UPDATE_RENDER);
 };
 
 } // namespace OHOS::Ace::NG

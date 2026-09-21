@@ -1194,7 +1194,9 @@ export class ArkUIGeneratedNativeModule {
     @ani.unsafe.Direct
     native static _LazyVGridLayoutInterface_setLazyVGridLayoutOptions(ptr: KPointer): void
     @ani.unsafe.Direct
-    native static _LazyVGridLayoutAttribute_setColumnsTemplate(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    native static _LazyVGridLayoutAttribute_setColumnsTemplate0(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
+    native static _LazyVGridLayoutAttribute_setColumnsTemplate1(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _Line_construct(id: KInt, flags: KInt): KPointer
     @ani.unsafe.Direct
@@ -2460,6 +2462,8 @@ export class ArkUIGeneratedNativeModule {
     @ani.unsafe.Direct
     native static _TabContentAttribute_setOnWillHide(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
+    native static _TabContentAttribute_setTabBarVisibility(ptr: KPointer, visibility: KInt, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
     native static _Tabs_construct(id: KInt, flags: KInt): KPointer
     @ani.unsafe.Direct
     native static _TabsInterface_setTabsOptions(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
@@ -2521,6 +2525,28 @@ export class ArkUIGeneratedNativeModule {
     native static _TabsAttribute_setOnContentDidScroll(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _TabsAttribute_setBarFloatingStyle(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
+    native static _TabsAttribute_setBarStyle(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
+    native static _TabsAttribute_setSidebarPosition(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
+    native static _TabsAttribute_setSidebarHeader(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
+    native static _TabsAttribute_setSidebarSearchable(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
+    native static _TabsAttribute_setBarDisplayModeBreakpoint(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
+    native static _TabsAttribute_setOnBarDisplayModeChange(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
+    native static _TabsAttribute_setSidebarSelectedIconColor(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
+    native static _TabsAttribute_setSidebarSelectedTextColor(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
+    native static _TabsAttribute_setSidebarUnselectedIconColor(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
+    native static _TabsAttribute_setSidebarUnselectedTextColor(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
+    native static _TabsAttribute_setSidebarSelectedBoardColor(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _TabsAttribute_setBarMode(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
@@ -6435,6 +6461,8 @@ export class ArkUIGeneratedNativeModule {
     @ani.unsafe.Quick
     native static _RichEditorController_addBuilderSpan(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): KInteropReturnBuffer
     @ani.unsafe.Quick
+    native static _RichEditorController_addRichEditorBuilderSpan(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): KInteropReturnBuffer
+    @ani.unsafe.Quick
     native static _RichEditorController_addSymbolSpan(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): KInteropReturnBuffer
     @ani.unsafe.Direct
     native static _RichEditorController_updateSpanStyle(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
@@ -6444,6 +6472,8 @@ export class ArkUIGeneratedNativeModule {
     native static _RichEditorController_deleteSpans(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Quick
     native static _RichEditorController_getSpans(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): KInteropReturnBuffer
+    @ani.unsafe.Quick
+    native static _RichEditorController_getRichEditorBuilderSpans(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): KInteropReturnBuffer
     @ani.unsafe.Quick
     native static _RichEditorController_getParagraphs(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): KInteropReturnBuffer
     @ani.unsafe.Quick
@@ -6828,6 +6858,8 @@ export class ArkUIGeneratedNativeModule {
     native static _TabsController_setTabBarTranslate(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _TabsController_setTabBarOpacity(ptr: KPointer, opacity: KDouble): void
+    @ani.unsafe.Direct
+    native static _TabsController_getBarDisplayMode(ptr: KPointer): KInt
     @ani.unsafe.Direct
     native static _TabsExtender_ApplyAttributesFinish(node: KPointer): void
     @ani.unsafe.Direct

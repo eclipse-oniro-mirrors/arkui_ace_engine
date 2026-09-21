@@ -187,7 +187,21 @@ void TabsModelNG::InitTabsNode(RefPtr<TabsNode> tabsNode, const RefPtr<SwiperCon
     if (auto tabBarPattern = tabBarNode->GetPattern<TabBarPattern>(); tabBarPattern) {
         tabBarPattern->SetController(GetSwiperController(swiperNode, swiperController));
     }
-
+    // Sync current barDisplayMode to the new controller - controller is recreated
+    // every time JSTabs::Create runs, so the new instance has default mode=0.
+    do {
+        auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
+        CHECK_NULL_BREAK(tabsPattern);
+        auto currentMode = tabsPattern->GetCurrentBarDisplayMode();
+        if (!currentMode.has_value()) {
+            break;
+        }
+        auto swiperPattern = swiperNode->GetPattern<SwiperPattern>();
+        CHECK_NULL_BREAK(swiperPattern);
+        auto tabsController = AceType::DynamicCast<TabsControllerNG>(swiperPattern->GetSwiperController());
+        CHECK_NULL_BREAK(tabsController);
+        tabsController->SetBarDisplayMode(currentMode.value());
+    } while (false);
     auto tabBarLayoutProperty = tabBarNode->GetLayoutProperty();
     CHECK_NULL_VOID(tabBarLayoutProperty);
     if (tabBarLayoutProperty->GetPixelRound() == static_cast<uint16_t>(PixelRoundPolicy::ALL_FORCE_ROUND)) {
@@ -318,6 +332,12 @@ void TabsModelNG::SetBarModifier(std::function<void(WeakPtr<NG::FrameNode>)>&& o
     auto tabBarNode = AceType::DynamicCast<FrameNode>(tabsNode->GetTabBar());
     CHECK_NULL_VOID(tabBarNode);
     onApply(tabBarNode);
+    // Store the callback so it can be replayed on the sidebar during SyncPropertiesToSideBar.
+    // No need to apply immediately — OnModifyDone will replay it in the correct order
+    // (modifier first, then bar* properties override), consistent with tabBar execution order.
+    auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
+    CHECK_NULL_VOID(tabsPattern);
+    tabsPattern->SetBarModifierApply(std::move(onApply));
 }
 
 void TabsModelNG::SetWidthAuto(bool isAuto)
@@ -385,6 +405,32 @@ void TabsModelNG::SetIsVertical(bool isVertical)
 void TabsModelNG::SetIndex(int32_t index)
 {
     auto tabsNode = AceType::DynamicCast<TabsNode>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    CHECK_NULL_VOID(tabsNode);
+    auto swiperNode = AceType::DynamicCast<FrameNode>(tabsNode->GetTabs());
+    CHECK_NULL_VOID(swiperNode);
+    auto swiperLayoutProperty = swiperNode->GetLayoutProperty<SwiperLayoutProperty>();
+    CHECK_NULL_VOID(swiperLayoutProperty);
+    swiperLayoutProperty->UpdateIndex(index);
+    auto tabBarNode = AceType::DynamicCast<FrameNode>(tabsNode->GetTabBar());
+    CHECK_NULL_VOID(tabBarNode);
+    auto tabBarPattern = tabBarNode->GetPattern<TabBarPattern>();
+    CHECK_NULL_VOID(tabBarPattern);
+    if (index < 0) {
+        index = 0;
+    }
+    tabBarPattern->UpdateIndicator(index);
+    tabBarPattern->UpdateTextColorAndFontWeight(index);
+    swiperLayoutProperty->UpdateIndex(index);
+    auto tabsFrameNode = AceType::DynamicCast<FrameNode>(tabsNode);
+    CHECK_NULL_VOID(tabsFrameNode);
+    auto tabsLayoutProperty = tabsFrameNode->GetLayoutProperty<TabsLayoutProperty>();
+    tabsLayoutProperty->UpdateIndex(index);
+    swiperNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
+}
+
+void TabsModelNG::SetIndex(FrameNode* frameNode, int32_t index)
+{
+    auto tabsNode = AceType::DynamicCast<TabsNode>(frameNode);
     CHECK_NULL_VOID(tabsNode);
     auto swiperNode = AceType::DynamicCast<FrameNode>(tabsNode->GetTabs());
     CHECK_NULL_VOID(swiperNode);
@@ -579,6 +625,7 @@ void TabsModelNG::SetBarBackgroundColor(const Color& backgroundColor)
 {
     auto tabsNode = AceType::DynamicCast<TabsNode>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
     CHECK_NULL_VOID(tabsNode);
+    ACE_UPDATE_LAYOUT_PROPERTY(TabsLayoutProperty, BarBackgroundColor, backgroundColor);
     auto tabBarNode = AceType::DynamicCast<FrameNode>(tabsNode->GetTabBar());
     CHECK_NULL_VOID(tabBarNode);
     auto tabBarRenderContext = tabBarNode->GetRenderContext();
@@ -741,6 +788,16 @@ RefPtr<TabsNode> TabsModelNG::GetOrCreateTabsNode(
 void TabsModelNG::SetOnChangeEvent(std::function<void(const BaseEventInfo*)>&& onChangeEvent)
 {
     auto tabsNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    CHECK_NULL_VOID(tabsNode);
+    auto tabPattern = tabsNode->GetPattern<TabsPattern>();
+    CHECK_NULL_VOID(tabPattern);
+    tabPattern->SetOnIndexChangeEvent(std::move(onChangeEvent));
+}
+
+void TabsModelNG::SetOnChangeEvent(FrameNode* frameNode, std::function<void(const BaseEventInfo*)>&& onChangeEvent)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto tabsNode = AceType::DynamicCast<TabsNode>(frameNode);
     CHECK_NULL_VOID(tabsNode);
     auto tabPattern = tabsNode->GetPattern<TabsPattern>();
     CHECK_NULL_VOID(tabPattern);
@@ -939,6 +996,7 @@ void TabsModelNG::SetBarBackgroundColor(FrameNode* frameNode, const Color& backg
     CHECK_NULL_VOID(frameNode);
     auto tabsNode = AceType::DynamicCast<TabsNode>(frameNode);
     CHECK_NULL_VOID(tabsNode);
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(TabsLayoutProperty, BarBackgroundColor, backgroundColor, frameNode);
     auto tabBarNode = AceType::DynamicCast<FrameNode>(tabsNode->GetTabBar());
     CHECK_NULL_VOID(tabBarNode);
     auto tabBarRenderContext = tabBarNode->GetRenderContext();
@@ -986,6 +1044,9 @@ void TabsModelNG::SetBarBackgroundBlurStyle(FrameNode* frameNode, const BlurStyl
     CHECK_NULL_VOID(frameNode);
     auto tabsNode = AceType::DynamicCast<TabsNode>(frameNode);
     CHECK_NULL_VOID(tabsNode);
+    auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
+    CHECK_NULL_VOID(tabsPattern);
+    tabsPattern->SetBarBlurStyleOption(styleOption);
     auto tabBarNode = AceType::DynamicCast<FrameNode>(tabsNode->GetTabBar());
     CHECK_NULL_VOID(tabBarNode);
     auto pipeline = tabBarNode->GetContext();
@@ -1341,6 +1402,12 @@ void TabsModelNG::SetBarModifier(FrameNode* frameNode, std::function<void(WeakPt
     auto tabBarNode = AceType::DynamicCast<FrameNode>(tabsNode->GetTabBar());
     CHECK_NULL_VOID(tabBarNode);
     onApply(tabBarNode);
+    // Store the callback so it can be replayed on the sidebar during SyncPropertiesToSideBar.
+    // No need to apply immediately — OnModifyDone will replay it in the correct order
+    // (modifier first, then bar* properties override), consistent with tabBar execution order.
+    auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
+    CHECK_NULL_VOID(tabsPattern);
+    tabsPattern->SetBarModifierApply(std::move(onApply));
 }
 
 void TabsModelNG::SetBarBackgroundEffect(const EffectOption& effectOption)
@@ -1402,6 +1469,19 @@ void TabsModelNG::SetPageFlipMode(FrameNode* frameNode, int32_t options)
 void TabsModelNG::SetCachedMaxCount(std::optional<int32_t> cachedMaxCount, TabsCacheMode cacheMode)
 {
     auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    CHECK_NULL_VOID(frameNode);
+    if (cachedMaxCount.has_value()) {
+        ACE_UPDATE_NODE_LAYOUT_PROPERTY(TabsLayoutProperty, CachedMaxCount, cachedMaxCount.value(), frameNode);
+        ACE_UPDATE_NODE_LAYOUT_PROPERTY(TabsLayoutProperty, CacheMode, cacheMode, frameNode);
+    } else {
+        ACE_RESET_NODE_LAYOUT_PROPERTY(TabsLayoutProperty, CachedMaxCount, frameNode);
+        ACE_RESET_NODE_LAYOUT_PROPERTY(TabsLayoutProperty, CacheMode, frameNode);
+    }
+}
+
+void TabsModelNG::SetCachedMaxCountForJs(
+    FrameNode* frameNode, std::optional<int32_t> cachedMaxCount, TabsCacheMode cacheMode)
+{
     CHECK_NULL_VOID(frameNode);
     if (cachedMaxCount.has_value()) {
         ACE_UPDATE_NODE_LAYOUT_PROPERTY(TabsLayoutProperty, CachedMaxCount, cachedMaxCount.value(), frameNode);
@@ -2180,6 +2260,18 @@ void TabsModelNG::ProcessColorWithResourceObj(
     } else {
         pattern->RemoveResObj("tabs." + name);
     }
+}
+
+void TabsModelNG::SetSidebarDisplayStyle(SidebarDisplayStyle sidebarDisplayStyle)
+{
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    CHECK_NULL_VOID(frameNode);
+    SetSidebarDisplayStyle(frameNode, sidebarDisplayStyle);
+}
+
+void TabsModelNG::SetSidebarDisplayStyle(FrameNode* frameNode, SidebarDisplayStyle sidebarDisplayStyle)
+{
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(TabsLayoutProperty, SidebarDisplayStyle, sidebarDisplayStyle, frameNode);
 }
 
 void TabsModelNG::SetBarLayoutStyle(TabBarLayoutStyle barLayoutStyle)

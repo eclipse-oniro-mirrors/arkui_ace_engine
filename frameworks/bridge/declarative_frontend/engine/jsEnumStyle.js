@@ -369,6 +369,12 @@ let PixelRoundMode;
   PixelRoundMode[PixelRoundMode.PIXEL_ROUND_AFTER_MEASURE = 1] = 'PIXEL_ROUND_AFTER_MEASURE';
 })(PixelRoundMode || (PixelRoundMode = {}));
 
+let ImmersiveStrategy;
+(function (ImmersiveStrategy) {
+  ImmersiveStrategy[ImmersiveStrategy.AVOID_CUTOUT = 0] = 'AVOID_CUTOUT';
+  ImmersiveStrategy[ImmersiveStrategy.AVOID_FLOAT_NAV = 1] = 'AVOID_FLOAT_NAV';
+})(ImmersiveStrategy || (ImmersiveStrategy = {}));
+
 let VerticalAlign;
 (function (VerticalAlign) {
   VerticalAlign[VerticalAlign.Top = 1] = 'Top';
@@ -1073,6 +1079,12 @@ let TabBarStyle;
   TabBarStyle[TabBarStyle.SIDEBAR = 1] = 'SIDEBAR';
   TabBarStyle[TabBarStyle.SIDEBAR_ADAPTABLE = 2] = 'SIDEBAR_ADAPTABLE';
 })(TabBarStyle || (TabBarStyle = {}));
+
+let SidebarDisplayStyle;
+(function (SidebarDisplayStyle) {
+  SidebarDisplayStyle[SidebarDisplayStyle.EMBED = 0] = 'EMBED';
+  SidebarDisplayStyle[SidebarDisplayStyle.DISPLACE = 1] = 'DISPLACE';
+})(SidebarDisplayStyle || (SidebarDisplayStyle = {}));
 
 let TabBarDisplayMode;
 (function (TabBarDisplayMode) {
@@ -2136,6 +2148,18 @@ let SheetKeyboardAvoidMode;
   SheetKeyboardAvoidMode[SheetKeyboardAvoidMode.POPUP_SHEET = 4] = 'POPUP_SHEET';
 })(SheetKeyboardAvoidMode || (SheetKeyboardAvoidMode = {}));
 
+let SheetTitleBarHoverMode;
+(function (SheetTitleBarHoverMode) {
+  SheetTitleBarHoverMode[SheetTitleBarHoverMode.STANDARD = 0] = 'STANDARD';
+  SheetTitleBarHoverMode[SheetTitleBarHoverMode.STACK = 1] = 'STACK';
+})(SheetTitleBarHoverMode || (SheetTitleBarHoverMode = {}));
+
+let SheetTitleBarBackgroundBlur;
+(function (SheetTitleBarBackgroundBlur) {
+  SheetTitleBarBackgroundBlur[SheetTitleBarBackgroundBlur.NONE = 0] = 'NONE';
+  SheetTitleBarBackgroundBlur[SheetTitleBarBackgroundBlur.GRADIENT = 1] = 'GRADIENT';
+})(SheetTitleBarBackgroundBlur || (SheetTitleBarBackgroundBlur = {}));
+
 let FunctionKey;
 (function (FunctionKey) {
   FunctionKey[FunctionKey.ESC = 0] = 'ESC';
@@ -2970,17 +2994,7 @@ class NavPathStack {
     if (ret) {
       return;
     }
-    // find in pop array
-    info.index = -1;
-    info.navDestinationId = undefined;
-    for (let i = this.popArray.length - 1; i >= 0; i--) {
-      if (info.name === this.popArray[i].name) {
-        let infoFind = this.popArray.splice(i, 1);
-        info.index = infoFind[0].index;
-        info.navDestinationId = infoFind[0].navDestinationId;
-        break;
-      }
-    }
+    [info.index, info.navDestinationId] = this.findInPopArray(info.name);
     if (launchMode === LaunchMode.NEW_INSTANCE) {
       info.needBuildNewInstance = true;
     }
@@ -3013,7 +3027,7 @@ class NavPathStack {
     this.preloadItem = {
       info: info,
       paramString: paramString,
-      onDestroy: options !== undefined ? options.onDestroy : undefined
+      onDestroy: options !== undefined && options !== null ? options.onDestroy : undefined
     };
     
     // Create the preloaded node via native stack

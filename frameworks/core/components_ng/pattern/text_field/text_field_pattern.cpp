@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Huawei Device Co., Ltd.
+ * Copyright (c) 2022-2026 Huawei Device Co., Ltd.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -610,8 +610,8 @@ bool TextFieldPattern::ParseCommand(const std::string& command)
     CHECK_NULL_RETURN(json && !cmd.empty(), false);
     auto host = GetHost();
     CHECK_NULL_RETURN(host, RET_FAILED);
-    TAG_LOGI(AceLogTag::ACE_TEXT_FIELD, "%{public}d OnInjectionEvent cmd:%{public}s", host->GetId(),
-        (cmd == "addText" || cmd == "setText") ? cmd.c_str() : command.c_str());
+    TAG_LOGI(AceLogTag::ACE_TEXT_FIELD, "OnInjectionEvent nodeId:%{public}d, commandLength:%{public}zu",
+        host->GetId(), command.size());
     if (cmd == "MSDP_AutoFill") {
         return HandleMSDPAutoFillCommand(json);
     } else if (cmd == "addText" || cmd == "setText" || cmd == "deleteText") {
@@ -650,8 +650,7 @@ bool TextFieldPattern::ParseCommand(const std::string& command)
         int32_t position = json->GetInt("position");
         return HandleSetCaretPositionCommand(position, host->GetId());
     } else {
-        TAG_LOGE(AceLogTag::ACE_TEXT_FIELD, "OnInjectionEvent unknown cmd : %{public}s, nodeId : %{public}d",
-            cmd.c_str(), host->GetId());
+        TAG_LOGE(AceLogTag::ACE_TEXT_FIELD, "OnInjectionEvent unknown command, nodeId : %{public}d", host->GetId());
         return false;
     }
     return true;
@@ -1039,21 +1038,9 @@ void TextFieldPattern::SetAccessibilityPasswordIconAction()
 
 void TextFieldPattern::SetAccessibilityClearAction()
 {
-    CHECK_NULL_VOID(IsShowCancelButtonMode());
     auto cleanNodeResponseArea = AceType::DynamicCast<CleanNodeResponseArea>(cleanNodeResponseArea_);
     CHECK_NULL_VOID(cleanNodeResponseArea);
-    auto stackNode = cleanNodeResponseArea->GetFrameNode();
-    CHECK_NULL_VOID(stackNode);
-    auto textAccessibilityProperty = stackNode->GetAccessibilityProperty<AccessibilityProperty>();
-    CHECK_NULL_VOID(textAccessibilityProperty);
-    textAccessibilityProperty->SetAccessibilityLevel("yes");
-    auto layoutProperty = GetHost()->GetLayoutProperty<TextFieldLayoutProperty>();
-    CHECK_NULL_VOID(layoutProperty);
-    auto cleanNodeStyle = layoutProperty->GetCleanNodeStyleValue(CleanNodeStyle::INPUT);
-    auto hasContent = cleanNodeStyle == CleanNodeStyle::CONSTANT ||
-                        (cleanNodeStyle == CleanNodeStyle::INPUT && HasText());
-    textAccessibilityProperty->SetAccessibilityText(hasContent ? GetCancelButton() : "");
-    textAccessibilityProperty->SetAccessibilityCustomRole("button");
+    cleanNodeResponseArea->SetAccessibilityClearAction();
 }
 
 void TextFieldPattern::SetAccessibilityUnitAction()
@@ -4543,7 +4530,10 @@ void TextFieldPattern::OnModifyDone()
     isModifyDone_ = true;
     lpxInfo_.lastLogicScale = context->GetLogicScale();
     if (host->GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_EIGHTEEN)) {
-        InitCancelButtonMouseEvent();
+        auto cleanNodeResponseArea = AceType::DynamicCast<CleanNodeResponseArea>(cleanNodeResponseArea_);
+        if (cleanNodeResponseArea) {
+            cleanNodeResponseArea->InitCancelButtonMouseEvent();
+        }
         InitPasswordButtonMouseEvent();
     }
     CHECK_NULL_VOID(GetSelectDetectorAdapter());
@@ -7433,30 +7423,48 @@ EmojiRelation TextFieldPattern::GetEmojiRelation(int index)
 }
 
 
+#if defined(CROSS_PLATFORM)
+bool TextFieldPattern::HandleCrossPlatformDeleteEvent(const std::shared_ptr<TextEditingValue>& value)
+{
+    bool shouldHandleDelete = value->isDelete;
+#ifdef IOS_PLATFORM
+    shouldHandleDelete = value->isDelete && !value->discardedMarkedText;
+#endif
+    if (!shouldHandleDelete) {
+        return false;
+    }
+    if (value->compose.IsValid()) {
+        if ((value->compose.GetStart() == 0 && value->text.empty()) ||
+            (value->unmarkText && value->selection.GetStart() == value->selection.GetEnd() &&
+             value->selection.GetEnd() == value->compose.GetStart() &&
+             value->compose.GetEnd() > value->compose.GetStart() + 1)) {
+            InputCommandInfo info;
+            info.deleteRange = { value->compose.GetStart(), value->compose.GetEnd() };
+            info.insertOffset = value->compose.GetStart();
+            info.insertValue = u"";
+            info.reason = InputReason::IME;
+            AddInputCommand(info);
+        } else {
+            EmojiRelation relation = GetEmojiRelation(value->selection.GetEnd());
+            if (relation == EmojiRelation::IN_EMOJI || relation == EmojiRelation::MIDDLE_EMOJI ||
+                relation == EmojiRelation::BEFORE_EMOJI || value->selection.GetEnd() != value->compose.GetStart()) {
+                HandleOnDelete(true);
+            } else {
+                DeleteBackward(value->compose.GetEnd() - value->compose.GetStart());
+            }
+        }
+        value->compose.Update(-1);
+    } else {
+        HandleOnDelete(true);
+    }
+    return true;
+}
+#endif
+
 bool TextFieldPattern::HandleEditingEventCrossPlatform(const std::shared_ptr<TextEditingValue>& value)
 {
 #ifdef CROSS_PLATFORM
-#ifdef IOS_PLATFORM
-    if (value->isDelete && !value->discardedMarkedText) {
-#else
-    if (value->isDelete) {
-#endif
-        if (value->compose.IsValid()) {
-            if (value->compose.GetStart() == 0 && value->text.empty()) {
-                DeleteRange(value->compose.GetStart(), value->compose.GetEnd());
-            } else {
-                EmojiRelation relation = GetEmojiRelation(value->selection.GetEnd());
-                if (relation == EmojiRelation::IN_EMOJI || relation == EmojiRelation::MIDDLE_EMOJI ||
-                    relation == EmojiRelation::BEFORE_EMOJI || value->selection.GetEnd() != value->compose.GetStart()) {
-                    HandleOnDelete(true);
-                } else {
-                    DeleteBackward(value->compose.GetEnd() - value->compose.GetStart());
-                }
-            }
-            value->compose.Update(-1);
-        } else {
-            HandleOnDelete(true);
-        }
+    if (HandleCrossPlatformDeleteEvent(value)) {
         return true;
     }
     editingValue_ = value;
@@ -10004,6 +10012,11 @@ void TextFieldPattern::DumpSimplifyInfo(std::shared_ptr<JsonValue>& json)
 {
     json->Put("content", IsInPasswordMode() ? "" : GetTextValue().c_str());
     json->Put("placeholder", UtfUtils::Str16DebugToStr8(GetPlaceHolder()).c_str());
+    auto layoutProperty = GetLayoutProperty<TextFieldLayoutProperty>();
+    CHECK_NULL_VOID(layoutProperty);
+    if (layoutProperty->HasEnableAutoFill()) {
+        json->Put("enableAutoFill", layoutProperty->GetEnableAutoFillValue(true));
+    }
 }
 
 void TextFieldPattern::DumpFontInfo(const RefPtr<TextFieldLayoutProperty>& layoutProperty)
@@ -10631,21 +10644,6 @@ void TextFieldPattern::CheckPasswordAreaState()
     }
 }
 
-void TextFieldPattern::AfterLayoutProcessCleanResponse(
-    const RefPtr<CleanNodeResponseArea>& cleanNodeResponseArea)
-{
-    CHECK_NULL_VOID(cleanNodeResponseArea);
-    auto host = GetHost();
-    CHECK_NULL_VOID(host);
-    auto pipeline = host->GetContext();
-    CHECK_NULL_VOID(pipeline);
-    pipeline->AddAfterLayoutTask([weak = WeakClaim(Referenced::RawPtr(cleanNodeResponseArea))]() {
-        auto cleanNodeResponseArea = weak.Upgrade();
-        CHECK_NULL_VOID(cleanNodeResponseArea);
-        cleanNodeResponseArea->UpdateCleanNode(cleanNodeResponseArea->IsShow());
-    });
-}
-
 void TextFieldPattern::ProcessCancelButton()
 {
     if (IsShowCancelButtonMode()) {
@@ -10653,7 +10651,7 @@ void TextFieldPattern::ProcessCancelButton()
         if (cleanNodeResponseArea) {
             cleanNodeResponseArea->Refresh();
             if (cleanNodeResponseArea->IsShow()) {
-                AfterLayoutProcessCleanResponse(cleanNodeResponseArea);
+                cleanNodeResponseArea->AfterLayoutProcessCleanResponse();
             } else {
                 UpdateCancelNode();
             }
@@ -10662,7 +10660,7 @@ void TextFieldPattern::ProcessCancelButton()
             cleanNodeResponseArea = AceType::DynamicCast<CleanNodeResponseArea>(cleanNodeResponseArea_);
             cleanNodeResponseArea->InitResponseArea();
             UpdateCancelNode();
-            AfterLayoutProcessCleanResponse(cleanNodeResponseArea);
+            cleanNodeResponseArea->AfterLayoutProcessCleanResponse();
         }
     } else {
         if (cleanNodeResponseArea_) {
@@ -13229,49 +13227,6 @@ void TextFieldPattern::SetIsEnableSubWindowMenu()
     }
 }
 
-void TextFieldPattern::InitCancelButtonMouseEvent()
-{
-    CHECK_NULL_VOID(cleanNodeResponseArea_);
-    auto cleanNodeResponseArea = AceType::DynamicCast<CleanNodeResponseArea>(cleanNodeResponseArea_);
-    CHECK_NULL_VOID(cleanNodeResponseArea);
-    auto stackNode = cleanNodeResponseArea->GetFrameNode();
-    CHECK_NULL_VOID(stackNode);
-    auto imageTouchHub = stackNode->GetOrCreateGestureEventHub();
-    CHECK_NULL_VOID(imageTouchHub);
-    auto imageInputHub = stackNode->GetOrCreateInputEventHub();
-    CHECK_NULL_VOID(imageInputHub);
-    auto imageHoverTask = [weak = WeakClaim(this), cleanNodeResponseAreaWeak =
-        WeakPtr<TextInputResponseArea>(cleanNodeResponseArea_)](bool isHover, const HoverInfo& info) {
-            auto cleanNodeResponseArea = cleanNodeResponseAreaWeak.Upgrade();
-            CHECK_NULL_VOID(cleanNodeResponseArea);
-            auto pattern = weak.Upgrade();
-            if (pattern) {
-                pattern->OnHover(isHover, info);
-                pattern->HandleButtonMouseEvent(cleanNodeResponseArea, isHover);
-            }
-    };
-    imageHoverEvent_ = MakeRefPtr<InputEvent>(std::move(imageHoverTask));
-    imageInputHub->AddOnHoverEvent(imageHoverEvent_);
-
-    auto imageTouchTask = [weak = WeakClaim(this), cleanNodeResponseAreaWeak =
-        WeakPtr<TextInputResponseArea>(cleanNodeResponseArea_)](const TouchEventInfo& info) {
-            auto cleanNodeResponseArea = cleanNodeResponseAreaWeak.Upgrade();
-            CHECK_NULL_VOID(cleanNodeResponseArea);
-            auto pattern = weak.Upgrade();
-            CHECK_NULL_VOID(pattern);
-            auto touchType = info.GetTouches().front().GetTouchType();
-            if (touchType == TouchType::DOWN) {
-                pattern->HandleResponseButtonTouchDown(cleanNodeResponseArea);
-            }
-            if (touchType == TouchType::UP || touchType == TouchType::CANCEL) {
-                pattern->HandleResponseButtonTouchUp();
-            }
-    };
-
-    imageTouchEvent_ = MakeRefPtr<TouchEventImpl>(std::move(imageTouchTask));
-    imageTouchHub->AddTouchEvent(imageTouchEvent_);
-}
-
 void TextFieldPattern::InitPasswordButtonMouseEvent()
 {
     CHECK_NULL_VOID(responseArea_);
@@ -13281,58 +13236,35 @@ void TextFieldPattern::InitPasswordButtonMouseEvent()
     passwordResponseArea->InitTouchEvent();
 }
 
-void TextFieldPattern::HandleResponseButtonTouchDown(const RefPtr<TextInputResponseArea>& responseArea)
+// ICleanNodeHost behavioral hooks — implementations moved to CleanNodeResponseArea.
+
+void TextFieldPattern::SetCleanHoverColorAndRect(const RoundRect& rect, uint32_t color)
 {
-    auto host = GetHost();
-    CHECK_NULL_VOID(host);
-    RoundRect mouseRect;
-    CHECK_NULL_VOID(responseArea);
-    responseArea->CreateIconRect(mouseRect, false);
-    float cornerRadius = mouseRect.GetRect().Width() / 2;
-    mouseRect.SetCornerRadius(cornerRadius);
-    auto textFieldTheme = GetTheme();
-    CHECK_NULL_VOID(textFieldTheme);
-    auto touchColor = textFieldTheme->GetPressColor();
-    std::vector<RoundRect> roundRectVector;
-    roundRectVector.push_back(mouseRect);
     CHECK_NULL_VOID(textFieldOverlayModifier_);
-    textFieldOverlayModifier_->SetHoverColorAndRects(roundRectVector, touchColor.GetValue());
-    cancelButtonTouched_ = true;
-    host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
+    std::vector<RoundRect> roundRectVector;
+    roundRectVector.push_back(rect);
+    textFieldOverlayModifier_->SetHoverColorAndRects(roundRectVector, color);
 }
 
-void TextFieldPattern::HandleResponseButtonTouchUp()
+void TextFieldPattern::ClearCleanHoverColorAndRects()
 {
-    auto host = GetHost();
-    CHECK_NULL_VOID(host);
     CHECK_NULL_VOID(textFieldOverlayModifier_);
     textFieldOverlayModifier_->ClearHoverColorAndRects();
-    cancelButtonTouched_ = false;
-    host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
 }
 
-void TextFieldPattern::HandleButtonMouseEvent(const RefPtr<TextInputResponseArea>& responseArea, bool isHover)
+void TextFieldPattern::OnCleanNodeHover(bool isHover, const HoverInfo& info)
 {
-    auto host = GetHost();
-    CHECK_NULL_VOID(host);
-    CHECK_NULL_VOID(textFieldOverlayModifier_);
-    if (isHover) {
-        RoundRect mouseRect;
-        CHECK_NULL_VOID(responseArea);
-        responseArea->CreateIconRect(mouseRect, false);
-        float cornerRadius = mouseRect.GetRect().Width() / 2;
-        mouseRect.SetCornerRadius(cornerRadius);
-        auto textFieldTheme = GetTheme();
-        CHECK_NULL_VOID(textFieldTheme);
-        auto touchColor = textFieldTheme->GetHoverColor();
-        std::vector<RoundRect> roundRectVector;
-        roundRectVector.push_back(mouseRect);
-        textFieldOverlayModifier_->SetHoverColorAndRects(roundRectVector, touchColor.GetValue());
-        host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
-    } else {
-        textFieldOverlayModifier_->ClearHoverColorAndRects();
-        host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
-    }
+    OnHover(isHover, info);
+}
+
+bool TextFieldPattern::IsCancelButtonTouched() const
+{
+    return cancelButtonTouched_;
+}
+
+void TextFieldPattern::SetCancelButtonTouched(bool touched)
+{
+    cancelButtonTouched_ = touched;
 }
 
 bool TextFieldPattern::SetPasswordIconHoverColor(const std::vector<RoundRect>& rects, uint32_t color)

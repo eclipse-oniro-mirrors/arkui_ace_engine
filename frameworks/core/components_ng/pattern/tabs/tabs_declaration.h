@@ -30,6 +30,11 @@ enum class TabBarLayoutStyle {
     SIDEBAR_ADAPTABLE,
 };
 
+enum class SidebarDisplayStyle {
+    EMBED = 0,
+    DISPLACE,
+};
+
 enum class TabBarDisplayMode {
     BOTTOMTABBAR = 0,
     SIDEBAR,
@@ -66,7 +71,7 @@ struct TabBarDisplayModeBreakpoint {
     TabBarDisplayMode sm = TabBarDisplayMode::BOTTOMTABBAR;
     TabBarDisplayMode md = TabBarDisplayMode::BOTTOMTABBAR;
     TabBarDisplayMode lg = TabBarDisplayMode::SIDEBAR;
-    bool isNull = false;
+    bool isNull = true;
 
     bool operator==(const TabBarDisplayModeBreakpoint& other) const
     {

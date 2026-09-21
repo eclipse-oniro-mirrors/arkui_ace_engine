@@ -266,6 +266,18 @@ ArkUI_Int32 GetFocusedInstanceId()
     return currentInstance;
 }
 
+ani_long InteropProxyNodeConstruct(ArkUI_Int32 id)
+{
+    auto proxyNode = NG::FrameNode::GetOrCreateFrameNode(
+        "InteropProxyNode", id, []() { return AceType::MakeRefPtr<StackPattern>(); });
+    CHECK_NULL_RETURN(proxyNode, 0);
+    auto stackLayoutAlgorithm = proxyNode->GetLayoutProperty<LayoutProperty>();
+    CHECK_NULL_RETURN(stackLayoutAlgorithm, 0);
+    stackLayoutAlgorithm->UpdateAlignment(Alignment::TOP_LEFT);
+    proxyNode->IncRefCount();
+    return reinterpret_cast<ani_long>(AceType::RawPtr(proxyNode));
+}
+
 ani_long BuilderProxyNodeConstruct(ArkUI_Int32 id)
 {
     auto proxyNode = NG::FrameNode::GetOrCreateFrameNode(
@@ -1401,6 +1413,7 @@ const ArkUIAniCommonModifier* GetCommonAniModifier()
         .createModalUIExtension = OHOS::Ace::NG::CreateModalUIExtensionInStatic,
         .closeModalUIExtension = OHOS::Ace::NG::CloseModalUIExtensionInStatic,
         .modalUIExtensionProxySend = OHOS::Ace::NG::ModalUIExtensionProxySendInStatic,
+        .interopProxyNodeConstruct = OHOS::Ace::NG::InteropProxyNodeConstruct,
     };
     return &impl;
 }
