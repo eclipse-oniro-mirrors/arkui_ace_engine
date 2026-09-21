@@ -23,6 +23,7 @@ import unifiedDataChannel from '@ohos.data.unifiedDataChannel';
 import uniformTypeDescriptor from '@ohos.data.uniformTypeDescriptor';
 import { LocalStorage } from '@ohos.arkui.stateManagement';
 import { DrawContext } from 'arkui.Graphics';
+import { RecordData } from '@ohos.base';
 import { AnimatableArithmetic, Callback, DragItemInfo, ResourceColor, DragPreviewOptions, DragInteractionOptions, ExpectedFrameRateRange } from '#generated';
 import { AsyncCallback } from '#external'
 import { ArkCustomComponent } from 'arkui/ArkCustomComponent';
@@ -50,7 +51,7 @@ import { DrawModifier } from "#handwritten"
 import { JavaScriptProxy } from '#generated';
 import { ErrorCallback } from '@ohos.base';
 import { int32 } from '@koalaui/compat';
-import { SaveButtonCallback, PasteButtonCallback } from '#generated';
+import { SaveButtonCallback, PasteButtonCallback, uiextensionProxy } from '#generated';
 import { InputMethodExtraConfig } from '@ohos.inputMethod.ExtraConfig'
 import { default as text } from '@ohos.graphics.text'
 import { StackLayoutAlgorithm } from "arkui/LayoutAlgorithm"
@@ -572,6 +573,12 @@ export class ArkUIAniModule {
     native static __BuilderNode_GetParentViewId(ptr: KPointer): KInt;
     native static _ArkTSFrameNode_GetId(peer: KPointer): string
     native static _CreateModalUIExtension(want: Want, options?: Object, callback?: Object): KInt
-    native static _CloseModalUIExtension(sessionId: KInt): void
+    native static _CloseModalUIExtension(sessionId: KInt, instanceId: KInt): void
     native static _ModalUIExtensionProxySend(proxyPtr: KPointer, data: Object): void
+    native static _ModalUIExtensionProxySendSync(proxyPtr: KPointer, data: Object): Object
+    native static _ModalUIExtensionProxyDestroy(proxyPtr: KPointer): void
+    native static _ModalUIExtensionProxyOnAsyncReceiverRegister(proxyPtr: KPointer, callback: Callback<UIExtensionProxy>): void
+    native static _ModalUIExtensionProxyOnSyncReceiverRegister(proxyPtr: KPointer, callback: Callback<UIExtensionProxy>): void
+    native static _ModalUIExtensionProxyOffAsyncReceiverRegister(proxyPtr: KPointer, callback?: Callback<UIExtensionProxy>): void
+    native static _ModalUIExtensionProxyOffSyncReceiverRegister(proxyPtr: KPointer, callback?: Callback<UIExtensionProxy>): void
 }

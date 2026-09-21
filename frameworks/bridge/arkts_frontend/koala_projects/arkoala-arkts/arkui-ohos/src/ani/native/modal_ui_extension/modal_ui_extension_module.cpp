@@ -21,6 +21,10 @@
 #include "ani_common_want.h"
 #include "core/common/container.h"
 #include "core/common/container_scope.h"
+#include "core/components_ng/pattern/overlay/overlay_manager.h"
+#include "core/components_ng/pattern/ui_extension/ui_extension_component/modal_ui_extension_proxy_impl.h"
+#include "core/components_ng/pattern/ui_extension/ui_extension_component/ui_extension_proxy.h"
+#include "core/components_ng/pattern/ui_extension/ui_extension_component/ui_extension_pattern.h"
 #include "core/interfaces/ani/ani_api.h"
 #include "core/interfaces/native/implementation/transition_effect_peer_impl.h"
 #include "interfaces/inner_api/ace/ui_content.h"
@@ -29,6 +33,24 @@
 
 namespace OHOS::Ace::Ani {
 namespace {
+
+enum class ModalRegisterType {
+    UNKNOWN = 0,
+    SYNC,
+    ASYNC,
+};
+
+using ModalAniCallbackList =
+    std::list<std::pair<ani_ref, std::function<void(const Refptr<NG::UIExtensionProxy>&)>>>;
+
+struct ModalUiExtensionProxyAniHolder {
+    std::shared_ptr<ModalUIExtensionProxy> proxy;
+    int32_t sessionId = 0;
+    ani_env* callbackEnv = nullptr;
+    ModalAniCallbackList onAsyncCallbackList;
+    ModalAniCallbackList onSyncCallbackList;
+    std::mutex callbackLock;
+};
 
 class ScopedAniEnv {
 public:
@@ -59,9 +81,6 @@ std::shared_ptr<CommonModuleCallbackAni> ExtractCallbackAni(ani_env* env, ani_ob
     if (AniUtils::IsUndefined(env, cbRef)) {
         return nullptr;
     }
-    if (!AniUtils::IsFunction(env, static_cast<ani_object>(cbRef))) {
-        return nullptr;
-    }
     return std::make_shared<CommonModuleCallbackAni>(env, cbRef);
 }
 
@@ -73,19 +92,25 @@ void CallAniCallback(CommonModuleCallbackAni* func, ani_env* callbackEnv, ani_si
 }
 
 std::function<void(const std::shared_ptr<ModalUIExtensionProxy>&)> CreateAniOnRemoteReady(
-    ani_env* env, ani_object callback)
+    ani_env* env, ani_object callback, int32_t instanceId)
 {
     auto cb = ExtractCallbackAni(env, callback, "onRemoteReady");
     if (!cb) {
         return nullptr;
     }
-    return [env, func = cb](const std::shared_ptr<ModalUIExtensionProxy>& proxy) {
+    return [env, func = cb, instanceId](const std::shared_ptr<ModalUIExtensionProxy>& proxy) {
         ani_vm* vm = nullptr;
         env->GetVM(&vm);
         CHECK_NULL_VOID(vm);
         ScopedAniEnv scopedEnv(vm);
         ani_env* callbackEnv = scopedEnv.Get();
         CHECK_NULL_VOID(callbackEnv);
+        auto* holder = new ModalUiExtensionProxyAniHolder {
+            .proxy = proxy,
+            .sessionId = instanceId,
+            .callbackEnv = callbackEnv,
+        }
+        ani_long proxyPtr = reinterpret_cast<ani_long>(holder);
         auto proxyStorage = std::make_shared<std::shared_ptr<ModalUIExtensionProxy>>(proxy);
         ani_long proxyPtr = reinterpret_cast<ani_long>(proxyStorage.get());
         ani_ref arg = AniUtils::CreateLong(callbackEnv, proxyPtr);
@@ -108,7 +133,12 @@ std::function<void(const AAFwk::WantParams&)> CreateAniOnReceive(ani_env* env, a
         ScopedAniEnv scopedEnv(vm);
         ani_env* callbackEnv = scopedEnv.Get();
         CHECK_NULL_VOID(callbackEnv);
-        HILOGE("ModalUIExtension onReceive: WantParams to ANI conversion not yet supported");
+        ani_ref wantParamsRef = OHOS::AppExecFwk::WrapWantParams(callbackEnv, wantParams);
+        if (wantParamsRef == nullptr) {
+            return;
+        }
+        AniLocalRefGuard argGuard(callbackEnv, wantParamsRef);
+        CallAniCallback(func.get(), callbackEnv, 1, &wantParamsRef);
     };
 }
 
@@ -170,46 +200,98 @@ std::function<void()> CreateAniOnDrawReady(ani_env* env, ani_object callback)
     };
 }
 
-void ParseAniCallbacks(ani_env* env, ani_object callback, ModalUIExtensionCallbacks& callbacks)
+void ParseAniCallbacks(ani_env* env, ani_object callback, ModalUIExtensionCallbacks& callbacks, int32_t instanceId)
 {
-    callbacks.onRemoteReady = CreateAniOnRemoteReady(env, callback);
+    callbacks.onRemoteReady = CreateAniOnRemoteReady(env, callback, instanceId);
     callbacks.onReceive = CreateAniOnReceive(env, callback);
     callbacks.onError = CreateAniOnError(env, callback);
     callbacks.onRelease = CreateAniOnTerminated(env, callback);
     callbacks.onDrawReady = CreateAniOnDrawReady(env, callback);
 }
 
-ModalUIExtensionConfig ParseConfigFromAniOptions(ani_env* env, ani_object options)
+void ParseTransitionFromAniOptions(ani_env* env, ani_object options, NG::InnerExtraConfig& extraConfig)
 {
-    int32_t dpiStrategy = 0;
-    AniUtils::GetIntByName(env, options, "dpiFollowStrategy", dpiStrategy);
-    int32_t windowModeStrategy = 0;
-    AniUtils::GetIntByName(env, options, "windowModeFollowStrategy", windowModeStrategy);
-    ModalUIExtensionConfig config;
-    config.isDensityFollowHost = (dpiStrategy == 0);
-    config.isWindowModeFollowHost = (windowModeStrategy == 0);
-
     ani_ref transitionRef = nullptr;
-    if (ANI_OK == env->Object_GetPropertyByName_Ref(options, "transition", &transitionRef)) {
-        AniLocalRefGuard transitionGuard(env, transitionRef);
-        if (!AniUtils::IsUndefined(env, transitionRef)) {
-            auto transitionObj = static_cast<ani_object>(transitionRef);
-            ani_ref peerRef = nullptr;
-            if (ANI_OK == env->Object_GetPropertyByName_Ref(transitionObj, "peer", &peerRef)) {
-                AniLocalRefGuard peerGuard(env, peerRef);
-                if (!AniUtils::IsUndefined(env, peerRef)) {
-                    ani_long peerPtr = 0;
-                    if (ANI_OK == env->Object_GetFieldByName_Long(
-                        static_cast<ani_object>(peerRef), "ptr", &peerPtr) && peerPtr != 0) {
-                        auto* peer = reinterpret_cast<TransitionEffectPeer*>(peerPtr);
-                        if (peer && peer->handler) {
-                            config.transition = new RefPtr<NG::ChainedTransitionEffect>(peer->handler);
-                        }
-                    }
-                }
-            }
-        }
+    if (ANI_OK != env->Object_GetPropertyByName_Ref(options, "transition", &transitionRef)) {
+        return;
     }
+    AniLocalRefGuard transitionGuard(env, transitionRef);
+    if (AniUtils::IsUndefined(env, transitionRef)) {
+        return;
+    }
+    auto transitionObj = static_cast<ani_object>(transitionRef);
+    ani_ref peerRef = nullptr;
+    if (ANI_OK != env->Object_GetPropertyByName_Ref(transitionObj, "peer", &peerRef)) {
+        return;
+    }
+    AniLocalRefGuard peerGuard(env, peerRef);
+    if (AniUtils::IsUndefined(env, peerRef)) {
+        return;
+    }
+    ani_long peerPtr = 0;
+    if (ANI_OK != env->Object_GetFieldByName_Long(
+        static_cast<ani_object>(peerRef), "ptr", &peerPtr) || peerPtr == 0) {
+        return;
+    }
+    auto* peer = reinterpret_cast<TransitionEffectPeer*>(peerPtr);
+    if (peer && peer->handler) {
+        extraConfig.transition = peer->handler;
+    }
+}
+
+constexpr int32_t FOLLOW_HOST_STRATEGY = 0;
+
+void ParseDpiFollowStrategy(ani_env* env, ani_object options, ModalUIExtensionConfig& config)
+{
+    ani_ref dpiStrategyRef = nullptr;
+    if (ANI_OK != env->Object_GetPropertyByName_Ref(options, "dpiFollowStrategy", &dpiStrategyRef)
+        || AniUtils::IsUndefined(env, dpiStrategyRef)) {
+        return;
+    }
+    AniLocalRefGuard dpiGuard(env, dpiStrategyRef);
+    auto dpiObj = static_cast<ani_object>(dpiStrategyRef);
+    if (!AniUtils::IsClassObject(env, dpiObj, "std.core.Int")) {
+        return;
+    }
+    ani_int dpiStrategy = 0;
+    if (ANI_OK != env->Object_CallMethodByName_Int(dpiObj, "toInt", ":i", &dpiStrategy)) {
+        return;
+    }
+    config.isDensityFollowHost = (static_cast<int32_t>(dpiStrategy) == FOLLOW_HOST_STRATEGY);
+}
+
+void ParseWindowModeFollowHost(ani_env* env, ani_object options, ModalUIExtensionConfig& config)
+{
+    ani_ref windowModeRef = nullptr;
+    if (ANI_OK != env->Object_GetPropertyByName_Ref(options, "isWindowModeFollowHost", &windowModeRef)
+        || AniUtils::IsUndefined(env, windowModeRef)) {
+        return;
+    }
+    AniLocalRefGuard windowModeGuard(env, windowModeRef);
+    auto windowModeObj = static_cast<ani_object>(windowModeRef);
+    if (!AniUtils::IsClassObject(env, windowModeObj, "std.core.Boolean")) {
+        return;
+    }
+    ani_boolean isWindowModeFollowHost = ANI_FALSE;
+    if (ANI_OK != env->Object_CallMethodByName_Boolean(
+        windowModeObj, "toBoolean", nullptr, &isWindowModeFollowHost)) {
+        return;
+    }
+    config.isWindowModeFollowHost = isWindowModeFollowHost;
+}
+
+ModalUIExtensionConfig ParseConfigFromAniOptions(ani_env* env, ani_object options, NG::InnerExtraConfig& extraConfig)
+{
+    ModalUIExtensionConfig config;
+    config.isProhibitBack = true;
+    config.prohibitedRemoveByRouter = true;
+    config.isAllowAddChildBelowModalUec = true;
+    config.isDensityFollowHost = true;
+    config.isWindowModeFollowHost = true;
+    config.isModalFixFocus = true;
+    ParseDpiFollowStrategy(env, options, config);
+    ParseWindowModeFollowHost(env, options, config);
+    ParseTransitionFromAniOptions(env, options, extraConfig);
     return config;
 }
 } // namespace
@@ -217,47 +299,271 @@ ModalUIExtensionConfig ParseConfigFromAniOptions(ani_env* env, ani_object option
 void ModalUIExtensionProxySend(ani_env* env, [[maybe_unused]] ani_object obj, ani_long proxyPtr, ani_object data)
 {
     CHECK_NULL_VOID(env);
-    auto* proxyStorage = reinterpret_cast<std::shared_ptr<ModalUIExtensionProxy>*>(proxyPtr);
-    CHECK_NULL_VOID(proxyStorage && *proxyStorage);
-    HILOGE("ModalUIExtensionProxySend: WantParams conversion from ANI not yet supported");
+    auto* holder = reinterpret_cast<ModalUiExtensionProxyAniHolder*>(proxyPtr);
+    CHECK_NULL_VOID(holder);
+    CHECK_NULL_VOID(holder->proxy);
+    OHOS::AAFwk::WantParams requestParams;
+    if (!OHOS::AppExecFwk::UnwrapWantParams(env, data, requestParams)) {
+        return;
+    }
+    holder->proxy->SendData(requestParams);
 }
 
-ani_int CreateModalUIExtension(ani_env* env, [[maybe_unused]] ani_object obj, ani_object wantObj, ani_object options, ani_object callback)
+ani_object ModalUIExtensionProxySendSync(
+    ani_env* env, [[maybe_unused]] ani_object obj, ani_long proxyPtr, ani_object data)
+{
+    ani_object resultObj = {};
+    CHECK_NULL_RETURN(env, resultObj);
+    auto* holder = reinterpret_cast<ModalUiExtensionProxyAniHolder*>(proxyPtr);
+    CHECK_NULL_RETURN(holder, resultObj);
+    CHECK_NULL_RETURN(holder->proxy, resultObj);
+    OHOS::AAFwk::WantParams requestParams;
+    if (!OHOS::AppExecFwk::UnwrapWantParams(env, data, requestParams)) {
+        return resultObj;
+    }
+    OHOS::AAFwk::WantParams replyParams;
+    auto* modalProxy = static_cast<OHOS::ACE::NG::ModalUIExtensionProxyImpl*>(holder->proxy.get());
+    CHECK_NULL_RETURN(modalProxy, resultObj);
+    modalProxy->SendDataSync(requestParams, replyParams);
+    ani_ref wantParamsObj = OHOS::AppExecFwk::WrapWantParams(env, replyParams);
+    CHECK_NULL_RETURN(wantParamsObj, resultObj);
+    return static_cast<ani_object>(wantParamsObj);
+}
+
+std::list<std::function<void(const Refptr<NG::UIExtensionProxy>&)>> GetModalOnFuncList(
+    ModalUIExtensionProxyAniHolder* holder, ModalRegisterType type)
+{
+    std::list<std::function<void(const Refptr<NG::UIExtensionProxy>&)>> reList;
+    if (type == ModalRegisterType::SYNC) {
+        for (const auto& item : holder->onSyncCallbackList) {
+            reList.emplace_back(item.second);
+        }
+    } else if (type == ModalRegisterType::ASYNC) {
+        for (const auto& item : holder->onAsyncCallbackList) {
+            reList.emplace_back(item.second);
+        }
+    }
+    return reList;
+}
+
+void PostModalUpdateCallbacksTask(ModalUiExtensionProxyAniHolder* holder, ModalRegisterType type)
+{
+    CHECK_NULL_VOID(holder);
+    auto* modalProxy = static_cast<OHOS::ACE::NG::ModalUIExtensionProxyImpl*>(holder->proxy.get());
+    CHECK_NULL_VOID(modalProxy);
+    auto innerProxy = modalProxy->GetInnerProxy();
+    CHECK_NULL_VOID(innerProxy);
+    auto pattern = innerProxy->GetPattern();
+    CHECK_NULL_VOID(pattern);
+    auto onFuncList = GetModalOnFuncList(holder, type);
+    auto instanceId = holder->instanceId;
+    auto container = Container::GetContainer(instanceId);
+    CHECK_NULL_VOID(container);
+    auto taskExecutor = container->GetTaskExecutor();
+    CHECK_NULL_VOID(taskExecutor);
+    taskExecutor->PostTask([pattern, onFuncList = std::move(onFuncList), type]() {
+        if (type == ModalRegisterType::SYNC) {
+            pattern->SetSyncCallbacks(std::move(onFuncList));
+        } else if (type == ModalRegisterType::ASYNC) {
+            pattern->SetAsyncCallbacks(std::move(onFuncList));
+        }
+    }, TaskExecutor::TaskType::UI, "ArkUIModalUIExtensionProxyUpdateCallbacks");
+}
+
+std::function<void(const Refptr<NG::UIExtensionProxy>&)> CreateAniReceiverCallback(
+    ModalUiExtensionProxyAniHolder* holder, ani_ref cbRef)
+{
+    ani_env* callbackEnv = holder->callbackEnv;
+    int32_t instanceId = holder->instanceId;
+    auto cb = std::make_shared<CommonModuleCallbackAni>(callbackEnv, cbRef);
+    return [callbackEnv, func = cb, instanceId](const Refptr<NG::UIExtensionProxy>& session) {
+        ani_vm* vm = nullptr;
+        callbackEnv->GetVM(&vm);
+        CHECK_NULL_VOID(vm);
+        ScopedAniEnv scopedEnv(vm);
+        ani_env* env = scopedEnv.Get();
+        CHECK_NULL_VOID(env);
+        ContainerScope scope(instanceId);
+        auto modalProxy = std::make_shared<OHOS::ACE::NG::ModalUIExtensionProxyImpl>(session);
+        auto* receiverHolder = new ModalUiExtensionProxyAniHolder {
+            .proxy = modalProxy,
+            .sessionId = instanceId,
+            .callbackEnv = env,
+        };
+        ani_long proxyPtr = reinterpret_cast<ani_long>(receiverHolder);
+        ani_ref arg = AniUtils::CreateLong(env, proxyPtr);
+        CHECK_NULL_VOID(arg);
+        AniLocalRefGuard argGuard(env, arg);
+        CallAniCallback(func.get(), env, 1, &arg);
+    };
+}
+
+void ModalUIExtensionProxyOnAsyncReceiverRegister(
+    ani_env* env, [[maybe_unused]] ani_object obj, ani_long proxyPtr, ani_object callback)
+{
+    CHECK_NULL_VOID(env);
+    auto* holder = reinterpret_cast<ModalUiExtensionProxyAniHolder*>(proxyPtr);
+    CHECK_NULL_VOID(holder);
+    CHECK_NULL_VOID(holder->proxy);
+    if (!callback || AniUtils::IsUndefined(env, callback)) {
+        return;
+    }
+    ani_ref globalCbRef = nullptr;
+    if (ANI_OK != env->GlobalReference_Create(callback, &globalCbRef) || globalCbRef == nullptr) {
+        return;
+    }
+    auto jsFunc = CreateAniReceiverCallback(holder, globalCbRef);
+    {
+        std::lock_guard<std::mutex> lock(holder->callbackLock);
+        holder->onAsyncCallbackList.emplace_back(globalCbRef, jsFunc);
+    }
+    PostModalUpdateCallbacksTask(holder, ModalRegisterType::ASYNC);
+}
+
+void ModalUIExtensionProxyOnSyncReceiverRegister(
+    ani_env* env, [[maybe_unused]] ani_object obj, ani_long proxyPtr, ani_object callback)
+{
+    CHECK_NULL_VOID(env);
+    auto* holder = reinterpret_cast<ModalUiExtensionProxyAniHolder*>(proxyPtr);
+    CHECK_NULL_VOID(holder);
+    CHECK_NULL_VOID(holder->proxy);
+    if (!callback || AniUtils::IsUndefined(env, callback)) {
+        return;
+    }
+    ani_ref globalCbRef = nullptr;
+    if (ANI_OK != env->GlobalReference_Create(callback, &globalCbRef) || globalCbRef == nullptr) {
+        return;
+    }
+    auto jsFunc = CreateAniReceiverCallback(holder, globalCbRef);
+    {
+        std::lock_guard<std::mutex> lock(holder->callbackLock);
+        holder->onSyncCallbackList.emplace_back(globalCbRef, jsFunc);
+    }
+    PostModalUpdateCallbacksTask(holder, ModalRegisterType::SYNC);
+}
+
+void RemoveAniCallbacks(ani_env* env, ani_env* callbackEnv, ani_object callback,
+    ModalAniCallbackList& list)
+{
+    if (!callback || AniUtils::IsUndefined(env, callback)) {
+        for (const auto& item : list) {
+            if (callbackEnv) {
+                callbackEnv->GlobalReference_Delete(item.first);
+            }
+        }
+        list.clear();
+        return;
+    }
+    for (auto iter = list.begin(); iter != list.end();) {
+        ani_boolean equals = ANI_FALSE;
+        env->Reference_Equals(callback, iter->first, &equals);
+        if (equals == ANI_TRUE) {
+            if (callbackEnv) {
+                callbackEnv->GlobalReference_Delete(iter->first);
+            }
+            iter = list.erase(iter);
+        } else {
+            ++iter;
+        }
+    }
+}
+
+void ModalUIExtensionProxyOffAsyncReceiverRegister(
+    ani_env* env, [[maybe_unused]] ani_object obj, ani_long proxyPtr, ani_object callback)
+{
+    CHECK_NULL_VOID(env);
+    auto* holder = reinterpret_cast<ModalUiExtensionProxyAniHolder*>(proxyPtr);
+    CHECK_NULL_VOID(holder);
+    CHECK_NULL_VOID(holder->proxy);
+    ani_env* callbackEnv = holder->callbackEnv;
+    {
+        std::lock_guard<std::mutex> lock(holder->callbackLock);
+        RemoveAniCallbacks(env, callbackEnv, callback, holder->onAsyncCallbackList);
+    }
+    PostModalUpdateCallbacksTask(holder, ModalRegisterType::ASYNC);
+}
+
+void ModalUIExtensionProxyOffSyncReceiverRegister(
+    ani_env* env, [[maybe_unused]] ani_object obj, ani_long proxyPtr, ani_object callback)
+{
+    CHECK_NULL_VOID(env);
+    auto* holder = reinterpret_cast<ModalUiExtensionProxyAniHolder*>(proxyPtr);
+    CHECK_NULL_VOID(holder);
+    CHECK_NULL_VOID(holder->proxy);
+    ani_env* callbackEnv = holder->callbackEnv;
+    {
+        std::lock_guard<std::mutex> lock(holder->callbackLock);
+        RemoveAniCallbacks(env, callbackEnv, callback, holder->onSyncCallbackList);
+    }
+    PostModalUpdateCallbacksTask(holder, ModalRegisterType::SYNC);
+}
+
+void ModalUIExtensionProxyDestroy(ani_env* env, [[maybe_unused]] ani_object obj, ani_long proxyPtr)
+{
+    CHECK_NULL_VOID(env);
+    auto* holder = reinterpret_cast<ModalUiExtensionProxyAniHolder*>(proxyPtr);
+    CHECK_NULL_VOID(holder);
+    CHECK_NULL_VOID(holder->proxy);
+    ani_env* callbackEnv = holder->callbackEnv;
+    if (callbackEnv) {
+        for (const auto& item : holder->onAsyncCallbackList) {
+            callbackEnv->GlobalReference_Delete(item.first);
+        }
+        for (const auto& item : holder->onSyncCallbackList) {
+            callbackEnv->GlobalReference_Delete(item.first);
+        }
+    }
+    delete holder;
+}
+
+ani_int CreateModalUIExtension(ani_env* env, [[maybe_unused]] ani_object obj,
+    ani_object wantObj, ani_object options, ani_object callback)
 {
     CHECK_NULL_RETURN(env, 0);
     CHECK_NULL_RETURN(wantObj, 0);
-    CHECK_NULL_RETURN(callback, 0);
-    HILOGE("CreateModalUIExtension ANI entry called");
+    if (!callback || AniUtils::IsUndefined(env, callback)) {
+        return 0;
+    }
 
     AAFwk::Want want;
     if (!OHOS::AppExecFwk::UnwrapWant(env, wantObj, want)) {
-        HILOGE("UnwrapWant failed when CreateModalUIExtension");
         return 0;
     }
 
     ModalUIExtensionConfig config;
+    NG::InnerExtraConfig extraConfig;
+    ArkUI_Int32 instanceId = -1;
     if (options) {
-        config = ParseConfigFromAniOptions(env, options);
+        config = ParseConfigFromAniOptions(env, options, extraConfig);
+        ani_ref instanceIdRef = nullptr;
+        if (ANI_OK == env->Object_GetPropertyByName_Ref(options, "instanceId", &instanceIdRef)
+            && !AniUtils::IsUndefined(env, instanceIdRef)) {
+            AniLocalRefGuard instanceIdGuard(env, instanceIdRef);
+            ani_int instanceIdVal = 0;
+            if (ANI_OK == env->Object_CallMethodByName_Int(
+                static_cast<ani_object>(instanceIdRef), "toInt", ":i", &instanceIdVal)) {
+                instanceId = instanceIdVal;
+            }
+        }
     }
 
     ModalUIExtensionCallbacks callbacks;
-    ParseAniCallbacks(env, callback, callbacks);
+    ParseAniCallbacks(env, callback, callbacks, instanceId);
 
     const auto* modifier = GetNodeAniModifier();
     CHECK_NULL_RETURN(modifier, 0);
     auto commonModifier = modifier->getCommonAniModifier();
     CHECK_NULL_RETURN(commonModifier, 0);
-    return commonModifier->createModalUIExtension(want, callbacks, config);
+    return commonModifier->createModalUIExtension(want, callbacks, config, extraConfig, instanceId);
 }
 
-void CloseModalUIExtension(ani_env* env, [[maybe_unused]] ani_object obj, ani_int sessionId)
+void CloseModalUIExtension(ani_env* env, [[maybe_unused]] ani_object obj, ani_int sessionId, ani_int instanceId)
 {
     CHECK_NULL_VOID(env);
-    HILOGE("CloseModalUIExtension called, sessionId=%{public}d", static_cast<int32_t>(sessionId));
     const auto* modifier = GetNodeAniModifier();
     CHECK_NULL_VOID(modifier);
     auto commonModifier = modifier->getCommonAniModifier();
     CHECK_NULL_VOID(commonModifier);
-    commonModifier->closeModalUIExtension(sessionId);
+    commonModifier->closeModalUIExtension(sessionId, instanceId);
 }
 } // namespace OHOS::Ace::Ani

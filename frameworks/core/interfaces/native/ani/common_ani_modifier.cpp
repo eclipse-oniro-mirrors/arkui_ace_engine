@@ -49,6 +49,7 @@
 #include "interfaces/inner_api/ace/ui_content.h"
 #include "interfaces/inner_api/ace/modal_ui_extension_config.h"
 #include "interfaces/inner_api/ace/modal_ui_extension_proxy.h"
+#include "core/components_ng/pattern/overlay/overlay_manager.h"
 #include "core/components_ng/token_theme/token_theme_storage.h"
 #include "core/interfaces/native/ani/ani_theme.h"
 #include "core/interfaces/native/ani/ani_theme_module.h"
@@ -1244,22 +1245,23 @@ ani_long GetPageRootNodeInStatic()
 }
 
 int32_t CreateModalUIExtensionInStatic(
-    const AAFwk::Want& want, const ModalUIExtensionCallbacks& callbacks, const ModalUIExtensionConfig& config)
+    const AAFwk::Want& want, const ModalUIExtensionCallbacks& callbacks, const ModalUIExtensionConfig& config,
+    const NG::InnerExtraConfig& extraConfig, ArkUI_Int32 instanceId)
 {
-    auto instanceId = Container::CurrentIdSafely();
-    UIContent* uiContent = UIContent::GetUIContent(instanceId);
-    CHECK_NULL_RETURN(uiContent, 0);
-    return uiContent->CreateModalUIExtension(want, callbacks, config);
+    auto pipeline = NG::PipelineContext::GetContextByContainerId(instanceId);
+    CHECK_NULL_RETURN(pipeline, 0);
+    auto overlay = pipeline->GetOverlayManager();
+    CHECK_NULL_RETURN(overlay, 0);
+    return overlay->CreateModalUIExtension(want, callbacks, config, extraConfig);
 }
 
-void CloseModalUIExtensionInStatic(int32_t sessionId)
+void CloseModalUIExtensionInStatic(int32_t sessionId, ArkUI_Int32 instanceId)
 {
-    auto instanceId = Container::CurrentIdSafely();
-    TAG_LOGE(AceLogTag::ACE_UIEXTENSIONCOMPONENT,
-        "CloseModalUIExtensionInStatic sessionId=%{public}d, instanceId=%{public}d", sessionId, instanceId);
-    UIContent* uiContent = UIContent::GetUIContent(instanceId);
-    CHECK_NULL_VOID(uiContent);
-    uiContent->CloseModalUIExtension(sessionId);
+    auto pipeline = NG::PipelineContext::GetContextByContainerId(instanceId);
+    CHECK_NULL_VOID(pipeline);
+    auto overlay = pipeline->GetOverlayManager();
+    CHECK_NULL_VOID(overlay);
+    overlay->CloseModalUIExtension(sessionId);
 }
 
 void ModalUIExtensionProxySendInStatic(

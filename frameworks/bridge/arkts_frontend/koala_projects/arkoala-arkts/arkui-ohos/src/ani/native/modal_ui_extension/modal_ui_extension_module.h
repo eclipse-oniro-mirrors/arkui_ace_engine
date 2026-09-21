@@ -19,9 +19,22 @@
 #include "ani.h"
 
 namespace OHOS::Ace::Ani {
-ani_int CreateModalUIExtension(ani_env* env, [[maybe_unused]] ani_object obj, ani_object want, ani_object options, ani_object callback);
-void CloseModalUIExtension(ani_env* env, [[maybe_unused]] ani_object obj, ani_int sessionId);
-void ModalUIExtensionProxySend(ani_env* env, [[maybe_unused]] ani_object obj, ani_long proxyPtr, ani_object data);
+ani_int CreateModalUIExtension(ani_env* env, [[maybe_unused]] ani_object obj,
+    ani_object want, ani_object options, ani_object callback);
+void CloseModalUIExtension(ani_env* env, [[maybe_unused]] ani_object obj, ani_int sessionId, ani_int instanceId);
+void ModalUIExtensionProxySend(
+    ani_env* env, [[maybe_unused]] ani_object obj, ani_long proxyPtr, ani_object data);
+ani_object ModalUIExtensionProxySendSync(
+    ani_env* env, [[maybe_unused]] ani_object obj, ani_long proxyPtr, ani_object data);
+void ModalUIExtensionProxyDestroy(ani_env* env, [[maybe_unused]] ani_object obj, ani_long proxyPtr);
+void ModalUIExtensionProxyOnAsyncReceiverRegister(
+    ani_env* env, [[maybe_unused]] ani_object obj, ani_long proxyPtr, ani_object callback);
+void ModalUIExtensionProxyOnSyncReceiverRegister(
+    ani_env* env, [[maybe_unused]] ani_object obj, ani_long proxyPtr, ani_object callback);
+void ModalUIExtensionProxyOffAsyncReceiverRegister(
+    ani_env* env, [[maybe_unused]] ani_object obj, ani_long proxyPtr, ani_object callback);
+void ModalUIExtensionProxyOffSyncReceiverRegister(
+    ani_env* env, [[maybe_unused]] ani_object obj, ani_long proxyPtr, ani_object callback);
 } // namespace OHOS::Ace::Ani
 
 #endif // ARKOALA_ARKTS_ARKUI_OHOS_SRC_ANI_NATIVE_MODAL_UI_EXTENSION_MODAL_UI_EXTENSION_MODULE_H

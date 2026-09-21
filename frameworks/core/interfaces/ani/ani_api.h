@@ -608,6 +608,9 @@ struct ModalUIExtensionCallbacks;
 struct ModalUIExtensionConfig;
 class ModalUIExtensionProxy;
 } // namespace OHOS::Ace
+namespace OHOS::Ace::NG {
+struct InnerExtraConfig;
+} // namespace OHOS::Ace::NG
 
 struct ArkUIAniCommonModifier {
     ani_ref* (*getHostContext)(ArkUI_Int32 key);
@@ -707,8 +710,9 @@ struct ArkUIAniCommonModifier {
     void(*fireArkUIObjectLifecycleCallback)(ani_long nodePtr, const std::string& className, void* data);
     std::string (*GetIdString)(ArkUINodeHandle node);
     int32_t (*createModalUIExtension)(const OHOS::AAFwk::Want& want,
-        const OHOS::Ace::ModalUIExtensionCallbacks& callbacks, const OHOS::Ace::ModalUIExtensionConfig& config);
-    void (*closeModalUIExtension)(int32_t sessionId);
+        const OHOS::Ace::ModalUIExtensionCallbacks& callbacks, const OHOS::Ace::ModalUIExtensionConfig& config,
+        const OHOS::Ace::NG::InnerExtraConfig& extraConfig, ArkUI_Int32 instanceId);
+    void (*closeModalUIExtension)(int32_t sessionId, ArkUI_Int32 instanceId);
     void (*modalUIExtensionProxySend)(
         std::shared_ptr<OHOS::Ace::ModalUIExtensionProxy>& proxy, const OHOS::AAFwk::WantParams& params);
     ani_long (*interopProxyNodeConstruct)(ArkUI_Int32 id);

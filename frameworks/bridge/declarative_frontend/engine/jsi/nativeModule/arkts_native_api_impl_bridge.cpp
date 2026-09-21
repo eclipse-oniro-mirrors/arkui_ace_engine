@@ -68,7 +68,9 @@
 #include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_web_bridge.h"
 #endif
 #include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_container_picker_bridge.h"
+#ifdef MODAL_UI_EXTENSION_SUPPORTED
 #include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_modal_ui_extension_bridge.h"
+#endif
 #include "core/components_ng/manager/navigation/navigation_manager.h"
 
 namespace OHOS::Ace::NG {
@@ -2735,6 +2737,7 @@ ArkUINativeModuleValue ArkUINativeModule::GetPageRootNode(ArkUIRuntimeCallInfo* 
     return panda::NativePointerRef::New(vm, nodePtr);
 }
 
+#ifdef MODAL_UI_EXTENSION_SUPPORTED
 ArkUINativeModuleValue ArkUINativeModule::CreateModalUIExtension(ArkUIRuntimeCallInfo* runtimeCallInfo)
 {
     return ModalUIExtensionBridge::CreateModalUIExtension(runtimeCallInfo);
@@ -2744,6 +2747,7 @@ ArkUINativeModuleValue ArkUINativeModule::CloseModalUIExtension(ArkUIRuntimeCall
 {
     return ModalUIExtensionBridge::CloseModalUIExtension(runtimeCallInfo);
 }
+#endif
 
 void ArkUINativeModule::RegisterGlobalMethods(Local<panda::ObjectRef> object, EcmaVM* vm)
 {
@@ -2775,10 +2779,12 @@ void ArkUINativeModule::RegisterGlobalMethods(Local<panda::ObjectRef> object, Ec
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), LoadNativeModule));
     object->Set(vm, panda::StringRef::NewFromUtf8(vm, "getPageRootNode"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), GetPageRootNode));
+#ifdef MODAL_UI_EXTENSION_SUPPORTED
     object->Set(vm, panda::StringRef::NewFromUtf8(vm, "createModalUIExtension"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CreateModalUIExtension));
     object->Set(vm, panda::StringRef::NewFromUtf8(vm, "closeModalUIExtension"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CloseModalUIExtension));
+#endif
 }
 
 void ArkUINativeModule::RegisterCommonAttributes(Local<panda::ObjectRef> object, EcmaVM* vm)

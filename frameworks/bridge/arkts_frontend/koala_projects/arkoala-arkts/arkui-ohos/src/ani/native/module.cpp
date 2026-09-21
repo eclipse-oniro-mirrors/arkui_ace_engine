@@ -19,7 +19,9 @@
 #include "animation/animation_ani_impl.h"
 #include "canvas/canvas_module.h"
 #include "common/common_module.h"
+#ifdef MODAL_UI_EXTENSION_SUPPORTED
 #include "modal_ui_extension/modal_ui_extension_module.h"
+#endif
 #include "common_node/common_node_module.h"
 #include "component3d/component3d_module_methods.h"
 #include "componentSnapshot/componentSnapshot_module.h"
@@ -2077,6 +2079,7 @@ ANI_EXPORT ani_status ANI_Constructor(ani_vm* vm, uint32_t* result)
             "l:C{std.core.String}",
             reinterpret_cast<void*>(OHOS::Ace::Ani::ArkTSFrameNodeGetId)
         },
+#ifdef MODAL_UI_EXTENSION_SUPPORTED
         ani_native_function {
             "_CreateModalUIExtension",
             nullptr,
@@ -2092,6 +2095,7 @@ ANI_EXPORT ani_status ANI_Constructor(ani_vm* vm, uint32_t* result)
             nullptr,
             reinterpret_cast<void*>(OHOS::Ace::Ani::ModalUIExtensionProxySend)
         }
+#endif
     };
 
     auto bindRst = env->Class_BindStaticNativeMethods(cls, staticMethods.data(), staticMethods.size());

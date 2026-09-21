@@ -2907,9 +2907,7 @@ void OverlayManager::PlayTransitionEffectOut(const RefPtr<FrameNode>& topModalNo
     layoutProperty->UpdateVisibility(VisibleType::INVISIBLE, true);
 
     const auto& renderContext = topModalNode->GetRenderContext();
-    auto hasDisappear = renderContext->HasDisappearTransition();
-    TAG_LOGI(AceLogTag::ACE_OVERLAY, "PlayTransitionEffectOut hasDisappear=%{public}d", hasDisappear);
-    if (!hasDisappear) {
+    if (!renderContext->HasDisappearTransition()) {
         const auto& topModalPattern = topModalNode->GetPattern<ModalPresentationPattern>();
         if (!topModalPattern->IsExecuteOnDisappear()) {
             topModalPattern->OnDisappear();
@@ -3372,23 +3370,7 @@ void OverlayManager::HandleModalPop(
         false, static_cast<int32_t>(NavDestinationActiveReason::CONTENT_COVER));
     topModalNode->OnAccessibilityEvent(
         AccessibilityEventType::PAGE_CLOSE, WindowsContentChangeTypes::CONTENT_CHANGE_TYPE_SUBTREE);
-    if (modalPresentationPattern->HasTransitionEffect()) {
-        TAG_LOGI(AceLogTag::ACE_OVERLAY, "HandleModalPop HasTransitionEffect=true, calling PlayTransitionEffectOut");
-        PlayTransitionEffectOut(topModalNode);
-    } else if (modalTransition == ModalTransition::DEFAULT) {
-        PlayDefaultModalTransition(topModalNode, false);
-    } else if (modalTransition == ModalTransition::ALPHA) {
-        PlayAlphaModalTransition(topModalNode, false);
-    } else if (!builder->GetRenderContext()->HasDisappearTransition()) {
-        if (!modalPresentationPattern->IsExecuteOnDisappear()) {
-            modalPresentationPattern->OnDisappear();
-            // Fire hidden event of navdestination on the disappeared modal
-            FireNavigationStateChange(false, topModalNode);
-        }
-        FireAutoSave(topModalNode);
-        RemoveChildWithService(rootNode, topModalNode);
-        rootNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
-    }
+    ExecuteModalTransitionOut(topModalNode, modalPresentationPattern, modalTransition, builder, rootNode);
     RemoveModal(targetId);
     if (modalTransition == ModalTransition::NONE || builder->GetRenderContext()->HasDisappearTransition()) {
         // Fire shown event of navdestination under the disappeared modal
@@ -3396,6 +3378,29 @@ void OverlayManager::HandleModalPop(
     }
     FireModalPageHide();
     SaveLastModalNode();
+}
+
+void OverlayManager::ExecuteModalTransitionOut(const RefPtr<FrameNode>& topModalNode,
+    const RefPtr<ModalPresentationPattern>& pattern, ModalTransition modalTransition,
+    const RefPtr<FrameNode>& builder, const RefPtr<UINode>& rootNode)
+{
+    CHECK_NULL_VOID(pattern);
+    if (pattern->HasTransitionEffect()) {
+        PlayTransitionEffectOut(topModalNode);
+    } else if (modalTransition == ModalTransition::DEFAULT) {
+        PlayDefaultModalTransition(topModalNode, false);
+    } else if (modalTransition == ModalTransition::ALPHA) {
+        PlayAlphaModalTransition(topModalNode, false);
+    } else if (!builder->GetRenderContext()->HasDisappearTransition()) {
+        if (!pattern->IsExecuteOnDisappear()) {
+            pattern->OnDisappear();
+            // Fire hidden event of navdestination on the disappeared modal
+            FireNavigationStateChange(false, topModalNode);
+        }
+        FireAutoSave(topModalNode);
+        RemoveChildWithService(rootNode, topModalNode);
+        rootNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
+    }
 }
 
 void OverlayManager::FireModalPageShow()
@@ -5744,10 +5749,11 @@ bool OverlayManager::AddCurSessionId(int32_t sessionId)
 }
 
 int32_t OverlayManager::CreateModalUIExtension(const RefPtr<WantWrap>& wantWrap,
-    const ModalUIExtensionCallbacks& callbacks, const ModalUIExtensionConfig& config)
+    const ModalUIExtensionCallbacks& callbacks, const ModalUIExtensionConfig& config,
+    const InnerExtraConfig& extraConfig)
 {
     auto& want = wantWrap->GetWant();
-    return CreateModalUIExtension(want, callbacks, config);
+    return CreateModalUIExtension(want, callbacks, config, extraConfig);
 }
 
 bool OverlayManager::HandleUIExtNodeSize(const AAFwk::Want& want, RefPtr<FrameNode> uiExtNode)
@@ -5841,13 +5847,13 @@ bool OverlayManager::UIExtNodeAngleValid(int32_t uiExtNodeAngle)
 
 int32_t OverlayManager::CreateModalUIExtension(
     const AAFwk::Want& want, const ModalUIExtensionCallbacks& callbacks,
-    const ModalUIExtensionConfig& config)
+    const ModalUIExtensionConfig& config, const InnerExtraConfig& extraConfig)
 {
     isProhibitBack_ = config.isProhibitBack;
     NG::InnerModalUIExtensionConfig innerModalUIExtensionConfig = { .isAsyncModalBinding = config.isAsyncModalBinding,
         .isDensityFollowHost = config.isDensityFollowHost, .isWindowModeFollowHost = config.isWindowModeFollowHost,
         .isModalRequestFocus = config.isModalRequestFocus, .isModalFixFocus = config.isModalFixFocus };
-    innerModalUIExtensionConfig.transition = config.transition;
+    innerModalUIExtensionConfig.transition = extraConfig.transition;
     auto uiExtNode = ModalUIExtension::Create(want, callbacks, innerModalUIExtensionConfig);
     if (!HandleUIExtNodeTransform(want, uiExtNode)) {
         return 0;
@@ -5857,14 +5863,28 @@ int32_t OverlayManager::CreateModalUIExtension(
         return uiExtNode;
     };
     auto sessionId = ModalUIExtension::GetSessionId(uiExtNode);
-    RefPtr<NG::ChainedTransitionEffect> transitionEffect;
-    if (config.transition != nullptr) {
-        auto* transitionPtr = static_cast<RefPtr<NG::ChainedTransitionEffect>*>(config.transition);
-        transitionEffect = *transitionPtr;
-        delete transitionPtr;
+    auto transitionEffect = ExtractTransitionEffect(extraConfig.transition);
+    BindModalUIExtensionContentCover(config, sessionId, std::move(buildNodeFunc), transitionEffect, uiExtNode);
+    return sessionId;
+}
+
+RefPtr<NG::ChainedTransitionEffect> OverlayManager::ExtractTransitionEffect(void* transitionRaw)
+{
+    if (transitionRaw == nullptr) {
+        return nullptr;
     }
+    auto* transitionPtr = static_cast<RefPtr<NG::ChainedTransitionEffect>*>(transitionRaw);
+    auto effect = *transitionPtr;
+    delete transitionPtr;
+    return effect;
+}
+
+void OverlayManager::BindModalUIExtensionContentCover(const ModalUIExtensionConfig& config,
+    int32_t sessionId, std::function<RefPtr<UINode>()>&& buildNodeFunc,
+    const RefPtr<NG::ChainedTransitionEffect>& transitionEffect, const RefPtr<NG::FrameNode>& uiExtNode)
+{
     if (!config.isAsyncModalBinding) {
-        ModalStyle modalStyle = OverlayManager::SetUIExtensionModalStyleAndGet(config.prohibitedRemoveByRouter,
+        ModalStyle modalStyle = SetUIExtensionModalStyleAndGet(config.prohibitedRemoveByRouter,
             config.isAllowAddChildBelowModalUec, config.prohibitedRemoveByNavigation, config.isModalRequestFocus);
         SetIsAllowedBeCovered(config.isAllowedBeCovered);
         // Convert the sessionId into a negative number to distinguish it from the targetId of other modal pages
@@ -5881,12 +5901,12 @@ int32_t OverlayManager::CreateModalUIExtension(
             prohibitedRemoveByNavigation = config.prohibitedRemoveByNavigation,
             isModalRequestFocus = config.isModalRequestFocus,
             transitionEffect = transitionEffect,
-            doAfterAsyncModalBinding = std::move(config.doAfterAsyncModalBinding)]() {
+            doAfterAsyncModalBinding = std::move(config.doAfterAsyncModalBinding)]() mutable {
             ContainerScope scope(id);
             auto overlayManager = weak.Upgrade();
             CHECK_NULL_VOID(overlayManager);
             overlayManager->SetIsAllowedBeCovered(isAllowedBeCovered);
-            ModalStyle modalStyle = OverlayManager::SetUIExtensionModalStyleAndGet(prohibitedRemoveByRouter,
+            ModalStyle modalStyle = overlayManager->SetUIExtensionModalStyleAndGet(prohibitedRemoveByRouter,
                 isAllowAddChildBelowModalUec, prohibitedRemoveByNavigation, isModalRequestFocus);
             NG::ContentCoverParam contentCoverParam;
             contentCoverParam.transitionEffect = transitionEffect;
@@ -5900,7 +5920,6 @@ int32_t OverlayManager::CreateModalUIExtension(
         ModalUIExtension::SetBindModalCallback(uiExtNode, std::move(bindModalCallback));
         uiExtNodes_[sessionId] = WeakClaim(RawPtr(uiExtNode));
     }
-    return sessionId;
 }
 
 ModalStyle OverlayManager::SetUIExtensionModalStyleAndGet(bool prohibitedRemoveByRouter,
