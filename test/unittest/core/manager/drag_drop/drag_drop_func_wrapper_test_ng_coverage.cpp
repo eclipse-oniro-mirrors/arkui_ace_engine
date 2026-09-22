@@ -2383,7 +2383,39 @@ HWTEST_F(DragDropFuncWrapperTestNgCoverage, HandleCallbackConcurrent001, TestSiz
     for (auto& worker : workers) {
         worker.join();
     }
-    EXPECT_EQ(startedCount.load(), 1);
+    // ENDED is always delivered exactly once; STARTED is delivered at most once and is
+    // skipped entirely if ENDED won the race (fast swipe: listeners then see END only).
+    EXPECT_LE(startedCount.load(), 1);
     EXPECT_EQ(endedCount.load(), 1);
+}
+
+/**
+ * @tc.name: HandleCallbackEndedFirstSkipsStarted001
+ * @tc.desc: If ENDED was delivered first, a late STARTED is skipped (no reorder, no resurrect)
+ * @tc.type: FUNC
+ */
+HWTEST_F(DragDropFuncWrapperTestNgCoverage, HandleCallbackEndedFirstSkipsStarted001, TestSize.Level1)
+{
+    auto container = Container::Current();
+    AceEngine& aceEngine = AceEngine::Get();
+    aceEngine.AddContainer(0, container);
+    MockContainer::Current()->pipelineContext_ = MockPipelineContext::GetCurrentContext();
+    int32_t startedCount = 0;
+    int32_t endedCount = 0;
+    auto dragAction = std::make_shared<OHOS::Ace::NG::ArkUIInteralDragAction>();
+    dragAction->instanceId = 0;
+    dragAction->callback = [&startedCount, &endedCount](const DragNotifyMsg& info, int32_t status) {
+        if (status == static_cast<int32_t>(DragAdapterStatus::STARTED)) {
+            ++startedCount;
+        } else if (status == static_cast<int32_t>(DragAdapterStatus::ENDED)) {
+            ++endedCount;
+        }
+    };
+    // ENDED delivered first (fast swipe raced ahead of the posted start task).
+    DragDropFuncWrapper::HandleCallback(dragAction, DragNotifyMsg {}, DragAdapterStatus::ENDED);
+    // The late STARTED must be skipped: no END-then-START reorder, no resurrected flag.
+    DragDropFuncWrapper::HandleCallback(dragAction, DragNotifyMsg {}, DragAdapterStatus::STARTED);
+    EXPECT_EQ(endedCount, 1);
+    EXPECT_EQ(startedCount, 0);
 }
 } // namespace OHOS::Ace::NG

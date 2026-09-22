@@ -323,7 +323,13 @@ public:
 
     // Binds `dragAction` and marks it SENDING atomically under dragActionMutex_, so that two
     // concurrent StartDrag calls can never both pass the "no active SENDING session" guard.
-    // Lock order is one-way: dragActionMutex_ -> ArkUIInteralDragAction::dragStateMutex.
+    //
+    // Lock order (one-way, no exceptions): dragActionMutex_ -> ArkUIInteralDragAction::dragStateMutex.
+    // NEVER call GetDragAction/SetDragAction while holding any action's dragStateMutex, and
+    // never touch an action's dragState/dragStateMutex while holding dragActionMutex_ outside
+    // of this guard. Audited 2026-09: no reverse-order call path exists in frameworks/ or
+    // adapter/ (the two historical callers in drag_adapter_impl.cpp / CheckStartAction were
+    // removed by this change).
     bool TryBindAndMarkSending(const std::shared_ptr<OHOS::Ace::NG::ArkUIInteralDragAction>& dragAction);
     
     RefPtr<FrameNode> FindTargetInChildNodes(const RefPtr<UINode> parentNode,

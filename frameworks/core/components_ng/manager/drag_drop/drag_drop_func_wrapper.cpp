@@ -280,27 +280,38 @@ void DragDropFuncWrapper::HandleCallback(std::shared_ptr<OHOS::Ace::NG::ArkUIInt
 {
     TAG_LOGI(AceLogTag::ACE_DRAG, "drag notify message result is %{public}d.", dragNotifyMsg.result);
     CHECK_NULL_VOID(dragAction);
+    auto container = AceEngine::Get().GetContainer(dragAction->instanceId);
+    CHECK_NULL_VOID(container);
+    auto pipelineContext = container->GetPipelineContext();
     bool hasHandle = false;
     {
         std::lock_guard<std::mutex> lock(dragAction->mutex);
-        // Each status is delivered at most once per drag session (one action per session),
-        // so a racing STARTED can never mask ENDED and a duplicated ENDED never re-fires
-        // the listener.
+        // Each status is delivered at most once per drag session (one action per session).
         if (dragStatus == DragAdapterStatus::STARTED) {
-            hasHandle = dragAction->startedHandled;
+            // If ENDED has already been delivered (a fast swipe raced ahead of the posted
+            // start task), skip STARTED entirely: listeners must never see END before
+            // START, and the dragging flag must not be resurrected for a finished session.
+            hasHandle = dragAction->startedHandled || dragAction->endedHandled;
             dragAction->startedHandled = true;
-        } else {
+            if (!hasHandle && pipelineContext) {
+                // Keep the dragging-flag transition inside the same critical section as
+                // the gate, so a racing ENDED's ResetDragging can never be overridden by
+                // a stale STARTED. SetIsDragging is a lock-free bool store downstream.
+                pipelineContext->SetIsDragging(true);
+            }
+        } else if (dragStatus == DragAdapterStatus::ENDED) {
             hasHandle = dragAction->endedHandled;
             dragAction->endedHandled = true;
+        } else {
+            // Unknown status: deliver once without occupying either status gate.
+            TAG_LOGW(AceLogTag::ACE_DRAG, "unexpected drag status %{public}d, deliver without gate.",
+                static_cast<int32_t>(dragStatus));
         }
     }
     if (hasHandle) {
         return;
     }
-    auto container = AceEngine::Get().GetContainer(dragAction->instanceId);
-    CHECK_NULL_VOID(container);
     if (dragStatus == DragAdapterStatus::ENDED) {
-        auto pipelineContext = container->GetPipelineContext();
         CHECK_NULL_VOID(pipelineContext);
         pipelineContext->ResetDragging();
     }
@@ -372,7 +383,7 @@ int32_t DragDropFuncWrapper::StartDragAction(std::shared_ptr<OHOS::Ace::NG::ArkU
     }
     // The success tail mutates UI-thread-affine state (dragEvents_ map, manager dragging
     // flags), so marshal it to the UI thread the same way PostStopDrag does.
-    auto startDragSuccessTask = [dragAction, pipelineContext]() {
+    auto startDragSuccessTask = [dragAction]() {
         {
             std::lock_guard<std::mutex> lock(dragAction->dragStateMutex);
             // The session may already have ended or been rejected before this task ran;
@@ -384,8 +395,10 @@ int32_t DragDropFuncWrapper::StartDragAction(std::shared_ptr<OHOS::Ace::NG::ArkU
         }
         NG::DragDropFuncWrapper::SetDraggingPointerAndPressedState(
             dragAction->dragPointerEvent.pointerId, dragAction->instanceId);
+        // SetIsDragging(true) is applied inside HandleCallback's STARTED gate, together
+        // with the endedHandled check, so a racing ENDED can neither reorder the
+        // listeners nor resurrect the dragging flag after its ResetDragging.
         HandleCallback(dragAction, DragNotifyMsg {}, DragAdapterStatus::STARTED);
-        pipelineContext->SetIsDragging(true);
         TAG_LOGI(AceLogTag::ACE_DRAG, "msdp start drag successfully.");
         NG::DragDropFuncWrapper::HandleOnDragEvent(dragAction);
     };

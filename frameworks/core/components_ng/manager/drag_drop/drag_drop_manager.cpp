@@ -1233,6 +1233,11 @@ bool DragDropManager::TryBindAndMarkSending(const std::shared_ptr<ArkUIInteralDr
     }
     std::lock_guard<std::mutex> lock(dragActionMutex_);
     if (dragAction_ != nullptr) {
+        // The two dragStateMutex critical sections below are intentionally SEPARATE
+        // scopes and never held together: when `dragAction` is the same object as
+        // `dragAction_` this is lock-release-lock, not recursive locking, so a plain
+        // std::mutex is safe. A same-object SENDING state (duplicate StartDrag for the
+        // live session) is rejected here as well.
         std::lock_guard<std::mutex> stateLock(dragAction_->dragStateMutex);
         if (dragAction_->dragState == DragAdapterState::SENDING) {
             TAG_LOGI(AceLogTag::ACE_DRAG, "Reject start drag, another session is sending.");
