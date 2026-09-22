@@ -1209,6 +1209,8 @@ typedef struct Array_BlankScreenDetectionMethod Array_BlankScreenDetectionMethod
 typedef struct Opt_Array_BlankScreenDetectionMethod Opt_Array_BlankScreenDetectionMethod;
 typedef struct Array_Buffer Array_Buffer;
 typedef struct Opt_Array_Buffer Opt_Array_Buffer;
+typedef struct Array_BuilderSpanInfo Array_BuilderSpanInfo;
+typedef struct Opt_Array_BuilderSpanInfo Opt_Array_BuilderSpanInfo;
 typedef struct Array_ColorMetricsExt Array_ColorMetricsExt;
 typedef struct Opt_Array_ColorMetricsExt Opt_Array_ColorMetricsExt;
 typedef struct Array_ColorMetricsStop Array_ColorMetricsStop;
@@ -1443,6 +1445,8 @@ typedef struct Callback_Boolean_HoverEvent_Void Callback_Boolean_HoverEvent_Void
 typedef struct Opt_Callback_Boolean_HoverEvent_Void Opt_Callback_Boolean_HoverEvent_Void;
 typedef struct Callback_Buffer_Void Callback_Buffer_Void;
 typedef struct Opt_Callback_Buffer_Void Opt_Callback_Buffer_Void;
+typedef struct Callback_BuilderSpanInfo_Void Callback_BuilderSpanInfo_Void;
+typedef struct Opt_Callback_BuilderSpanInfo_Void Opt_Callback_BuilderSpanInfo_Void;
 typedef struct Callback_ClearCache Callback_ClearCache;
 typedef struct Opt_Callback_ClearCache Opt_Callback_ClearCache;
 typedef struct Callback_ClickEvent_Void Callback_ClickEvent_Void;
@@ -2255,6 +2259,8 @@ typedef struct Ark_BreakPoints Ark_BreakPoints;
 typedef struct Opt_BreakPoints Opt_BreakPoints;
 typedef struct Ark_BuilderNodeOptions Ark_BuilderNodeOptions;
 typedef struct Opt_BuilderNodeOptions Opt_BuilderNodeOptions;
+typedef struct Ark_BuilderSpanInfo Ark_BuilderSpanInfo;
+typedef struct Opt_BuilderSpanInfo Opt_BuilderSpanInfo;
 typedef struct Ark_BusinessErrorInterface_Void Ark_BusinessErrorInterface_Void;
 typedef struct Opt_BusinessErrorInterface_Void Opt_BusinessErrorInterface_Void;
 typedef struct Ark_ButtonConfiguration Ark_ButtonConfiguration;
@@ -3499,6 +3505,8 @@ typedef struct Ark_Rectangle Ark_Rectangle;
 typedef struct Opt_Rectangle Opt_Rectangle;
 typedef struct Ark_RectOptions Ark_RectOptions;
 typedef struct Opt_RectOptions Opt_RectOptions;
+typedef struct Ark_RichEditorBuilderSpan Ark_RichEditorBuilderSpan;
+typedef struct Opt_RichEditorBuilderSpan Opt_RichEditorBuilderSpan;
 typedef struct Ark_RichEditorBuilderSpanOptions Ark_RichEditorBuilderSpanOptions;
 typedef struct Opt_RichEditorBuilderSpanOptions Opt_RichEditorBuilderSpanOptions;
 typedef struct Ark_RichEditorSymbolSpanOptions Ark_RichEditorSymbolSpanOptions;
@@ -7436,6 +7444,14 @@ typedef struct Opt_TabsNestedScrollMode {
     Ark_Tag tag;
     Ark_TabsNestedScrollMode value;
 } Opt_TabsNestedScrollMode;
+typedef enum Ark_TabsSidebarDisplayStyle {
+    ARK_TABS_SIDEBAR_DISPLAY_STYLE_EMBED = 0,
+    ARK_TABS_SIDEBAR_DISPLAY_STYLE_DISPLACE = 1,
+} Ark_TabsSidebarDisplayStyle;
+typedef struct Opt_TabsSidebarDisplayStyle {
+    Ark_Tag tag;
+    Ark_TabsSidebarDisplayStyle value;
+} Opt_TabsSidebarDisplayStyle;
 typedef enum Ark_TabVisibility {
     ARK_TAB_VISIBILITY_VISIBLE = 0,
     ARK_TAB_VISIBILITY_HIDDEN = 1,
@@ -10522,6 +10538,15 @@ typedef struct Opt_Array_Buffer {
     Ark_Tag tag;
     Array_Buffer value;
 } Opt_Array_Buffer;
+typedef struct Array_BuilderSpanInfo {
+    /* kind: ContainerType */
+    Ark_BuilderSpanInfo* array;
+    Ark_Int32 length;
+} Array_BuilderSpanInfo;
+typedef struct Opt_Array_BuilderSpanInfo {
+    Ark_Tag tag;
+    Array_BuilderSpanInfo value;
+} Opt_Array_BuilderSpanInfo;
 typedef struct Array_ColorMetricsExt {
     /* kind: ContainerType */
     Ark_ColorMetricsExt* array;
@@ -11590,6 +11615,16 @@ typedef struct Opt_Callback_Buffer_Void {
     Ark_Tag tag;
     Callback_Buffer_Void value;
 } Opt_Callback_Buffer_Void;
+typedef struct Callback_BuilderSpanInfo_Void {
+    /* kind: Callback */
+    Ark_CallbackResource resource;
+    void (*call)(const Ark_Int32 resourceId, const Ark_BuilderSpanInfo data);
+    void (*callSync)(Ark_VMContext vmContext, const Ark_Int32 resourceId, const Ark_BuilderSpanInfo data);
+} Callback_BuilderSpanInfo_Void;
+typedef struct Opt_Callback_BuilderSpanInfo_Void {
+    Ark_Tag tag;
+    Callback_BuilderSpanInfo_Void value;
+} Opt_Callback_BuilderSpanInfo_Void;
 typedef struct Callback_ClearCache {
     /* kind: Callback */
     Ark_CallbackResource resource;
@@ -15620,6 +15655,15 @@ typedef struct Opt_BuilderNodeOptions {
     Ark_Tag tag;
     Ark_BuilderNodeOptions value;
 } Opt_BuilderNodeOptions;
+typedef struct Ark_BuilderSpanInfo {
+    /* kind: Interface */
+    Opt_String id;
+    Opt_Int32 offset;
+} Ark_BuilderSpanInfo;
+typedef struct Opt_BuilderSpanInfo {
+    Ark_Tag tag;
+    Ark_BuilderSpanInfo value;
+} Opt_BuilderSpanInfo;
 typedef struct Ark_BusinessErrorInterface_Void {
     /* kind: Interface */
     Ark_String name;
@@ -16282,6 +16326,7 @@ typedef struct Ark_EmbedOptions {
     /* kind: Interface */
     Opt_Boolean supportDefaultIntrinsicSize;
     Opt_Boolean supportCssDisplayChange;
+    Opt_Boolean supportTransformRotateAndSkew;
 } Ark_EmbedOptions;
 typedef struct Opt_EmbedOptions {
     Ark_Tag tag;
@@ -22347,6 +22392,17 @@ typedef struct Opt_RectOptions {
     Ark_Tag tag;
     Ark_RectOptions value;
 } Opt_RectOptions;
+typedef struct Ark_RichEditorBuilderSpan {
+    /* kind: Interface */
+    CustomNodeBuilder builder;
+    Opt_Callback_BuilderSpanInfo_Void onAttach;
+    Opt_Callback_BuilderSpanInfo_Void onDetach;
+    Opt_AccessibilitySpanOptions accessibilitySpanOptions;
+} Ark_RichEditorBuilderSpan;
+typedef struct Opt_RichEditorBuilderSpan {
+    Ark_Tag tag;
+    Ark_RichEditorBuilderSpan value;
+} Opt_RichEditorBuilderSpan;
 typedef struct Ark_RichEditorBuilderSpanOptions {
     /* kind: Interface */
     Opt_Int32 offset;
@@ -26130,7 +26186,7 @@ typedef struct GENERATED_ArkUILazyVGridLayoutModifier {
     void (*setColumnsTemplate0)(Ark_NativePointer node,
                                 const Opt_String* value);
     void (*setColumnsTemplate1)(Ark_NativePointer node,
-                                const Opt_Union_String_ItemFillPolicy* value);
+                                const Opt_ItemFillPolicy* value);
 } GENERATED_ArkUILazyVGridLayoutModifier;
 
 typedef struct GENERATED_ArkUILineModifier {
@@ -27753,6 +27809,8 @@ typedef struct GENERATED_ArkUITabsModifier {
                                           const Opt_ResourceColor* value);
     void (*setSidebarSelectedBoardColor)(Ark_NativePointer node,
                                          const Opt_ResourceColor* value);
+    void (*setSidebarDisplayStyle)(Ark_NativePointer node,
+                                   const Opt_TabsSidebarDisplayStyle* value);
     void (*setBarMode)(Ark_NativePointer node,
                        const Opt_BarMode* value,
                        const Opt_ScrollableBarModeOptions* options);
@@ -27861,6 +27919,12 @@ typedef struct GENERATED_ArkUITextModifier {
                                      const Opt_Boolean* value);
     void (*setShaderStyle)(Ark_NativePointer node,
                            const Opt_ShaderStyleProxy* value);
+    void (*setStrokeWidth)(Ark_NativePointer node,
+                           const Opt_LengthMetricsProxy* value);
+    void (*setStrokeColor)(Ark_NativePointer node,
+                           const Opt_ResourceColor* value);
+    void (*setStrokeJoinStyle)(Ark_NativePointer node,
+                               const Opt_StrokeJoinStyle* value);
     void (*setEnableAutoSpacing)(Ark_NativePointer node,
                                  const Opt_Boolean* value);
     void (*setTextVerticalAlign)(Ark_NativePointer node,
@@ -31972,6 +32036,9 @@ typedef struct GENERATED_ArkUIRichEditorControllerAccessor {
     Opt_Int32 (*addBuilderSpan)(Ark_RichEditorController peer,
                                 const CustomNodeBuilder* value,
                                 const Opt_RichEditorBuilderSpanOptions* options);
+    Opt_Int32 (*addRichEditorBuilderSpan)(Ark_RichEditorController peer,
+                                          const Ark_RichEditorBuilderSpan* builderSpan,
+                                          const Opt_BuilderSpanInfo* info);
     Opt_Int32 (*addSymbolSpan)(Ark_RichEditorController peer,
                                const Ark_Resource* value,
                                const Opt_RichEditorSymbolSpanOptions* options);
@@ -31983,6 +32050,8 @@ typedef struct GENERATED_ArkUIRichEditorControllerAccessor {
                         const Opt_RichEditorRange* value);
     Opt_Array_Union_RichEditorImageSpanResult_RichEditorTextSpanResult (*getSpans)(Ark_RichEditorController peer,
                                                                                    const Opt_RichEditorRange* value);
+    Opt_Array_BuilderSpanInfo (*getRichEditorBuilderSpans)(Ark_RichEditorController peer,
+                                                           const Opt_RichEditorRange* range);
     Opt_Array_RichEditorParagraphResult (*getParagraphs)(Ark_RichEditorController peer,
                                                          const Opt_RichEditorRange* value);
     Opt_RichEditorSelection (*getSelection)(Ark_RichEditorController peer);

@@ -821,6 +821,9 @@ declare class ArkTextComponent extends ArkComponent implements TextAttribute {
     }): this;
     selectedDragPreviewStyle(value: SelectedDragPreviewStyle): TextAttribute;
     tailIndents(value: LengthMetrics | Array<LengthMetrics>): TextAttribute;
+    strokeWidth(value: LengthMetrics): TextAttribute;
+    strokeColor(value: ResourceColor): TextAttribute;
+    strokeJoinStyle(value: StrokeJoinStyle): TextAttribute;
 }
 declare class ArkTextAreaComponent extends ArkComponent implements CommonMethod<TextAreaAttribute> {
     constructor(nativePtr: KNode, classType?: ModifierType);
@@ -2052,7 +2055,7 @@ declare class ArkTabsComponent extends ArkComponent implements TabsAttribute {
     cachedMaxCount(count: number, mode: CacheMode): TabsAttribute;
     barStyle(value: TabBarStyle): TabsAttribute;
     sidebarPosition(value: BarPosition): TabsAttribute;
-    sidebarDisplayStyle(value: SidebarDisplayStyle): TabsAttribute;
+    sidebarDisplayStyle(value: TabsSidebarDisplayStyle): TabsAttribute;
     sidebarHeader(value: ComponentContent): TabsAttribute;
     sidebarSearchable(value?: TabsSidebarSearchableOptions): TabsAttribute;
     barDisplayModeBreakpoint(value: TabsBreakpointType<TabBarDisplayMode>): TabsAttribute;
