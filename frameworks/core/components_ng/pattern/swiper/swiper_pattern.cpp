@@ -77,6 +77,7 @@ constexpr int32_t MAX_DISPLAY_COUNT_MIN = 6;
 constexpr int32_t MAX_DISPLAY_COUNT_MAX = 9;
 constexpr int32_t MIN_TURN_PAGE_VELOCITY = 1200;
 constexpr Dimension INDICATOR_BORDER_RADIUS = 16.0_vp;
+constexpr int32_t COMPONENT_SWIPER_CHANGE_IDX = 0;
 constexpr int32_t COMPONENT_SWIPER_SHOW = 1;
 constexpr int32_t COMPONENT_SWIPER_HIDDEN = 2;
 
@@ -1802,7 +1803,9 @@ void SwiperPattern::ReportSwiperChangeContent(int32_t currentIndex, int32_t valu
     auto fullPath = pageInfo->GetFullPath();
     auto pageName = pipeline->GetNavDestinationPageName(pageInfo);
     auto jsViewName = pipeline->GetNavDestinationJSViewName(pageInfo);
-    if (pipeline->GetTaihangOptimizer()->CheckSwiperPageValid(fullPath, pageName, jsViewName) && !isInAutoPlay_) {
+    // isInAutoPlay_ 守卫只发生在COMPONENT_SWIPER_CHANGE_IDX 也就是value为0的情况
+    if (pipeline->GetTaihangOptimizer()->CheckSwiperPageValid(fullPath, pageName, jsViewName) &&
+        (value != COMPONENT_SWIPER_CHANGE_IDX || !isInAutoPlay_)) {
         RefPtr<NG::UINode> curUINode = host;
         std::string path = curUINode->GetPath();
         std::unordered_map<std::string, std::string> payload;
@@ -5717,8 +5720,10 @@ void SwiperPattern::PostTranslateTask(uint32_t delayTime)
 void SwiperPattern::HandleVisibleChange(bool visible)
 {
     TAG_LOGD(AceLogTag::ACE_SWIPER, "SwiperPattern::HandleVisibleChange");
-    auto currentIndex = GetLoopIndex(CurrentIndex());
-    ReportSwiperChangeContent(currentIndex, visible ? COMPONENT_SWIPER_SHOW : COMPONENT_SWIPER_HIDDEN);
+    if (isVisibleArea_ != visible) {
+        auto currentIndex = GetLoopIndex(CurrentIndex());
+        ReportSwiperChangeContent(currentIndex, visible ? COMPONENT_SWIPER_SHOW : COMPONENT_SWIPER_HIDDEN);
+    }
     isVisibleArea_ = visible;
     if (!visible) {
         translateTask_.Cancel();
