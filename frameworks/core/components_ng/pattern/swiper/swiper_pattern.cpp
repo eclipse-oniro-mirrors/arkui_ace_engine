@@ -1803,7 +1803,8 @@ void SwiperPattern::ReportSwiperChangeContent(int32_t currentIndex, int32_t valu
     auto fullPath = pageInfo->GetFullPath();
     auto pageName = pipeline->GetNavDestinationPageName(pageInfo);
     auto jsViewName = pipeline->GetNavDestinationJSViewName(pageInfo);
-    // isInAutoPlay_ 守卫只发生在COMPONENT_SWIPER_CHANGE_IDX 也就是value为0的情况
+    // The `isInAutoPlay_` guard applies only to the 
+    // `COMPONENT_SWIPER_CHANGE_IDX` case—specifically, when the value is 0.
     if (pipeline->GetTaihangOptimizer()->CheckSwiperPageValid(fullPath, pageName, jsViewName) &&
         (value != COMPONENT_SWIPER_CHANGE_IDX || !isInAutoPlay_)) {
         RefPtr<NG::UINode> curUINode = host;
