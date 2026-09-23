@@ -686,4 +686,68 @@ HWTEST_F(ScrollControllerTestNg, GetBindingFrameNodeId003, TestSize.Level1)
     auto baseController = AceType::MakeRefPtr<ScrollControllerBase>();
     EXPECT_EQ(baseController->GetBindingFrameNodeId(), -1);
 }
+/**
+ * @tc.name: GetScrollState001
+ * @tc.desc: Test GetScrollState returns IDLE by default
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollControllerTestNg, GetScrollState001, TestSize.Level1)
+{
+    CreateScroll();
+    CreateContent();
+    CreateScrollDone();
+    EXPECT_EQ(pattern_->GetScrollState(), ScrollState::IDLE);
+}
+
+/**
+ * @tc.name: GetScrollState002
+ * @tc.desc: Test GetScrollState returns SCROLL when scrollSource is UPDATE
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollControllerTestNg, GetScrollState002, TestSize.Level1)
+{
+    CreateScroll();
+    CreateContent();
+    CreateScrollDone();
+    pattern_->SetScrollSource(SCROLL_FROM_UPDATE);
+    EXPECT_EQ(pattern_->GetScrollState(), ScrollState::SCROLL);
+}
+
+/**
+ * @tc.name: GetScrollState003
+ * @tc.desc: Test GetScrollState returns FLING when scrollSource is ANIMATION
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollControllerTestNg, GetScrollState003, TestSize.Level1)
+{
+    CreateScroll();
+    CreateContent();
+    CreateScrollDone();
+    pattern_->SetScrollSource(SCROLL_FROM_ANIMATION);
+    EXPECT_EQ(pattern_->GetScrollState(), ScrollState::FLING);
+}
+
+/**
+ * @tc.name: GetScrollState004
+ * @tc.desc: Test ScrollableController GetScrollState delegates to pattern
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollControllerTestNg, GetScrollState004, TestSize.Level1)
+{
+    auto controller = AceType::MakeRefPtr<ScrollableController>();
+    ASSERT_NE(controller, nullptr);
+    EXPECT_EQ(controller->GetScrollState(), ScrollState::IDLE);
+}
+
+/**
+ * @tc.name: GetScrollState005
+ * @tc.desc: Test ScrollControllerBase default GetScrollState returns IDLE
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollControllerTestNg, GetScrollState005, TestSize.Level1)
+{
+    auto baseController = AceType::MakeRefPtr<ScrollControllerBase>();
+    EXPECT_EQ(baseController->GetScrollState(), ScrollState::IDLE);
+}
+
 } // namespace OHOS::Ace::NG

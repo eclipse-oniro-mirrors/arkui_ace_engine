@@ -75,6 +75,13 @@ void ScrollableController::SetCanStayOverScroll(bool canStayOverScroll)
     pattern->SetCanStayOverScroll(canStayOverScroll);
 }
 
+ScrollState ScrollableController::GetScrollState() const
+{
+    auto pattern = scroll_.Upgrade();
+    CHECK_NULL_RETURN(pattern, ScrollState::IDLE);
+    return pattern->GetScrollState();
+}
+
 Offset ScrollableController::GetCurrentOffset() const
 {
     auto pattern = scroll_.Upgrade();

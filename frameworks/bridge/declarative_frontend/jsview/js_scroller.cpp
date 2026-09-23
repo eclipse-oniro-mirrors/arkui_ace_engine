@@ -101,6 +101,7 @@ void JSScrollerBinding::JSBind(BindingTarget globalObj)
     JSClass<JSScroller>::CustomMethod("getItemIndex", &JSScrollerBinding::GetItemIndex);
     JSClass<JSScroller>::CustomMethod("contentSize", &JSScrollerBinding::ContentSize);
     JSClass<JSScroller>::CustomMethod("getFrameNode", &JSScrollerBinding::GetFrameNode);
+    JSClass<JSScroller>::CustomMethod("getScrollState", &JSScrollerBinding::GetScrollState);
     JSClass<JSScroller>::Bind(globalObj, JSScrollerBinding::Constructor, JSScrollerBinding::Destructor);
 }
 
@@ -575,5 +576,22 @@ void JSScrollerBinding::GetFrameNode(const JSCallbackInfo& args)
     params[1] = JSRef<JSVal>::Make(ToJSValue(nodeId));
     auto frameNode = jsFunc->ExecuteJS(2, params);
     args.SetReturnValue(frameNode);
+}
+
+void JSScrollerBinding::GetScrollState(const JSCallbackInfo& args)
+{
+    JSScroller* jsScroller = args.This()->Unwrap<JSScroller>();
+    if (jsScroller == nullptr) {
+        return;
+    }
+    auto scrollController = jsScroller->GetController().Upgrade();
+    if (!scrollController) {
+        JSException::Throw(ERROR_CODE_NAMED_ROUTE_ERROR, "%s", "Controller not bound to component.");
+        return;
+    }
+    ContainerScope scope(jsScroller->GetInstanceId());
+    auto scrollState = scrollController->GetScrollState();
+    auto retVal = JSRef<JSVal>::Make(ToJSValue(static_cast<int32_t>(scrollState)));
+    args.SetReturnValue(retVal);
 }
 } // namespace OHOS::Ace::Framework

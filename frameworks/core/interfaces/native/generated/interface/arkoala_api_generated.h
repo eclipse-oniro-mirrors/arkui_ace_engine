@@ -11660,8 +11660,8 @@ typedef struct Opt_Callback_CopyEvent_Void {
 typedef struct Callback_CreateItem {
     /* kind: Callback */
     Ark_CallbackResource resource;
-    void (*call)(const Ark_Int32 resourceId, const Ark_Int32 index, Ark_Boolean skipCreate, const Callback_Pointer_Void continuation);
-    void (*callSync)(Ark_VMContext vmContext, const Ark_Int32 resourceId, const Ark_Int32 index, Ark_Boolean skipCreate, const Callback_Pointer_Void continuation);
+    void (*call)(const Ark_Int32 resourceId, const Ark_Int32 index, const Ark_Boolean skipCreate, const Callback_Pointer_Void continuation);
+    void (*callSync)(Ark_VMContext vmContext, const Ark_Int32 resourceId, const Ark_Int32 index, const Ark_Boolean skipCreate, const Callback_Pointer_Void continuation);
 } Callback_CreateItem;
 typedef struct Opt_Callback_CreateItem {
     Ark_Tag tag;
@@ -25515,12 +25515,12 @@ typedef struct GENERATED_ArkUICommonMethodModifier {
                                              const Opt_Union_CustomNodeBuilder_Array_MenuElement* content,
                                              const Opt_ResponseType* responseType,
                                              const Opt_ContextMenuOptions* options);
-    void (*setBindContextMenuWithResponse0)(Ark_NativePointer node,
-                                            const Opt_CustomNodeBuilderT_ResponseType* content,
-                                            const Opt_ContextMenuOptions* options);
-    void (*setBindContextMenuWithResponse1)(Ark_NativePointer node,
-                                            const Opt_Union_CustomNodeBuilderT_ResponseType_Array_MenuElement* content,
-                                            const Opt_ContextMenuOptions* options);
+    void (*setBindContextMenuWithResponse)(Ark_NativePointer node,
+                                           const Opt_CustomNodeBuilderT_ResponseType* content,
+                                           const Opt_ContextMenuOptions* options);
+    void (*setBindContextMenuWithResponseArray)(Ark_NativePointer node,
+                                                const Opt_Union_CustomNodeBuilderT_ResponseType_Array_MenuElement* content,
+                                                const Opt_ContextMenuOptions* options);
     void (*setBindContextMenu1)(Ark_NativePointer node,
                                 const Opt_Union_Boolean_Bindable_Boolean* isShow,
                                 const Opt_CustomNodeBuilder* content,
@@ -32240,6 +32240,8 @@ typedef struct GENERATED_ArkUIScrollerAccessor {
     Ark_SizeResult (*contentSize)(Ark_VMContext vmContext,
                                   Ark_Scroller peer);
     Opt_FrameNode (*getFrameNode)(Ark_Scroller peer);
+    Ark_ScrollState (*getScrollState)(Ark_VMContext vmContext,
+                                       Ark_Scroller peer);
 } GENERATED_ArkUIScrollerAccessor;
 
 typedef struct GENERATED_ArkUIScrollResultAccessor {
@@ -33901,3 +33903,4 @@ struct OH_AnyAPI {
 /* clang-format on */
 
 #endif  // GENERATED_FOUNDATION_ACE_FRAMEWORKS_CORE_INTERFACES_ARKOALA_API_H
+
