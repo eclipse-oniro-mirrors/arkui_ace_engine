@@ -1368,6 +1368,7 @@ private:
     void HandleBlurEvent(const BlurReason& blurReason);
     bool HandleKeyEvent(const KeyEvent& keyEvent);
     bool WebOnKeyEvent(const KeyEvent& keyEvent);
+    bool IsShouldTriggerBack(const KeyEvent& event, bool isUsed);
     bool HandleEscToBackSupport(PipelineContext* pipeline);
     void WebRequestFocus();
     void ResetDragAction();
@@ -1853,6 +1854,7 @@ private:
     bool scrollbarLayoutPolicyChanged_ = false;
     bool isLanguageRtl_ = false;
     bool isEscKeyDownConsumed_ = false;
+    bool isEscKeyFromOverlayOrFullScreen_ = false;
 
 protected:
     OnCreateMenuCallback onCreateMenuCallback_;
