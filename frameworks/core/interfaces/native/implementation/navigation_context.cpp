@@ -1431,6 +1431,64 @@ int32_t NavigationStack::GetRecoveredDestinationMode(int32_t index)
     return pathInfo ? pathInfo->mode_ : INVALID_DESTINATION_MODE;
 }
 
+bool NavigationStack::IsAutoCleaned(int32_t index) const
+{
+    auto pathInfo = PathStack::GetPathInfo(static_cast<size_t>(index));
+    return pathInfo ? pathInfo->autoCleaned_ : false;
+}
+
+bool NavigationStack::GetAutoCleanedCanRecovery(int32_t index) const
+{
+    auto pathInfo = PathStack::GetPathInfo(static_cast<size_t>(index));
+    return pathInfo ? pathInfo->autoCleanCanRecovery_ : false;
+}
+
+void NavigationStack::ClearAutoCleanedState(int32_t index)
+{
+    if (auto pathInfo = PathStack::GetPathInfo(static_cast<size_t>(index)); pathInfo) {
+        pathInfo->autoCleaned_ = false;
+        pathInfo->autoCleanCanRecovery_ = true;
+        pathInfo->autoCleanedState_.clear();
+    }
+}
+
+std::string NavigationStack::GetAutoCleanedState(int32_t index) const
+{
+    auto pathInfo = PathStack::GetPathInfo(static_cast<size_t>(index));
+    return pathInfo ? pathInfo->autoCleanedState_ : "";
+}
+
+void NavigationStack::SaveStateToJsCallback(
+    int32_t index, const std::string& name, uint64_t navDestinationId, const std::string& state)
+{
+    auto pathInfo = PathStack::GetPathInfo(static_cast<size_t>(index));
+    if (pathInfo && pathInfo->name_ == name) {
+        pathInfo->autoCleanedState_ = state;
+        return;
+    }
+    auto id = std::to_string(navDestinationId);
+    for (size_t i = 0; i < pathArray_.size(); ++i) {
+        auto& info = pathArray_[i];
+        if (info.navDestinationId_.has_value() && info.navDestinationId_.value() == id) {
+            info.autoCleanedState_ = state;
+            return;
+        }
+    }
+}
+
+void NavigationStack::MarkAutoCleanedFlag(uint64_t navDestinationId, bool canRecovery)
+{
+    auto id = std::to_string(navDestinationId);
+    for (size_t i = 0; i < pathArray_.size(); ++i) {
+        auto& info = pathArray_[i];
+        if (info.navDestinationId_.has_value() && info.navDestinationId_.value() == id) {
+            info.autoCleaned_ = true;
+            info.autoCleanCanRecovery_ = canRecovery;
+            return;
+        }
+    }
+}
+
 void NavigationStack::RegisterOnResultCallback()
 {
     PathStack::RegisterOnResultCallback([weakStack = AceType::WeakClaim(this)](Opt_Object param) {
