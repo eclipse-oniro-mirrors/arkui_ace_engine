@@ -119,4 +119,22 @@ HWTEST_F(TransitionalNodeInfoTest, TransitionalNodeInfo_001, TestSize.Level1)
     EXPECT_EQ(node->GetCheckboxGroupSelectedStatus(), 2);
     EXPECT_EQ(node->GetZIndex(), 5);
 }
+
+/**
+ * @tc.name: TransitionalNodeInfo_ZIndex_001
+ * @tc.desc: Test function GetZIndex with positive, negative and zero values.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TransitionalNodeInfoTest, TransitionalNodeInfo_ZIndex_001, TestSize.Level1)
+{
+    auto mockNWebAccessibilityNodeInfo = std::make_shared<OHOS::NWeb::MockNWebAccessibilityNode>();
+    auto node = std::make_shared<TransitionalNodeInfo>(mockNWebAccessibilityNodeInfo);
+    EXPECT_CALL(*mockNWebAccessibilityNodeInfo, GetZIndex())
+        .WillOnce(Return(100))
+        .WillOnce(Return(-3))
+        .WillOnce(Return(0));
+    EXPECT_EQ(node->GetZIndex(), 100);
+    EXPECT_EQ(node->GetZIndex(), -3);
+    EXPECT_EQ(node->GetZIndex(), 0);
+}
 }
