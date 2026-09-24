@@ -14,6 +14,7 @@
  */
 
 #include "base/ressched/ressched_report.h"
+#include "base/log/ace_trace.h"
 
 #include "base/utils/string_utils.h"
 #include "core/common/container.h"
@@ -42,6 +43,7 @@ constexpr uint32_t RES_TYPE_LONG_FRAME     = 71;
 constexpr uint32_t RES_TYPE_OVERLAY        = 151;
 constexpr uint32_t RES_TYPE_BACKPRESSED_EVENT = 184;
 constexpr uint32_t RES_TYPE_COMPONENT_STATE_CHANGE = 212;
+constexpr uint32_t RES_TYPE_DIALOG_EVENT = 225;
 constexpr int32_t TOUCH_DOWN_EVENT          = 1;
 constexpr int32_t CLICK_EVENT               = 2;
 constexpr int32_t TOUCH_UP_EVENT            = 3;
@@ -729,6 +731,14 @@ void ResSchedReport::HandleSwiperChange(std::unordered_map<std::string, std::str
         value = StringUtils::StringToInt(it->second);
     }
     ResSchedDataReport(RES_TYPE_COMPONENT_STATE_CHANGE, value, payload);
+}
+
+void ResSchedReport::ReportDialogShow()
+{
+    ACE_SCOPED_TRACE_FLAG(SystemProperties::GetDebugEnabled(), "ResSchedReport::ReportDialogShow");
+    std::unordered_map<std::string, std::string> payload;
+    LoadAceApplicationContext(payload);
+    ResSchedDataReport(RES_TYPE_DIALOG_EVENT, 0, payload);
 }
 
 ResSchedReportScope::ResSchedReportScope(const std::string& name,

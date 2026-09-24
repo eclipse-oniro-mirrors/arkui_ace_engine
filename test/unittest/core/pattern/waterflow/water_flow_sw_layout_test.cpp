@@ -1992,6 +1992,10 @@ HWTEST_F(WaterFlowSWTest, EmptySectionsAtBottom001, TestSize.Level1)
     secObj->ChangeData(0, sections.size(), {});
     FlushUITasks();
     EXPECT_TRUE(info_->lanes_.empty());
+    // Edge flags derived from the cleared lanes must not survive ClearData.
+    EXPECT_FALSE(info_->offsetEnd_);
+    EXPECT_FALSE(info_->itemStart_);
+    EXPECT_FALSE(info_->itemEnd_);
     EXPECT_FLOAT_EQ(info_->StartPos(), 0.0f);
     EXPECT_FLOAT_EQ(info_->EndPos(), 0.0f);
 
@@ -2827,7 +2831,8 @@ HWTEST_F(WaterFlowSWTest, DirtyItemWithFooter001, TestSize.Level1)
     auto stack = FrameNode::CreateFrameNode(
         V2::STACK_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<StackPattern>());
     int32_t measureCount = 0;
-    stack->measureCallback_ = [&measureCount](RefPtr<Kit::FrameNode>&) { ++measureCount; };
+    stack->measureCallback_ = std::make_unique<std::function<void(RefPtr<Kit::FrameNode>&)>>(
+        [&measureCount](RefPtr<Kit::FrameNode>&) { ++measureCount; });
     item->AddChild(stack);
     stack->SetActive(false);
     item->MarkDirtyNode(PROPERTY_UPDATE_BY_CHILD_REQUEST);

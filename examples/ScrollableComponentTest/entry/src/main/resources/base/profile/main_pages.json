@@ -10,6 +10,9 @@
     "pages/scrollable/RefreshNestedScrollIssueDemo",
     "pages/scrollable/ScrollEventObserver",
     "pages/scrollable/FreeScroll",
+    "pages/scrollable/ComposeListItemV2EmitterOffIssueDemo",
+    "pages/scrollable/HorizontalListSnapStartBottomDemo",
+    "pages/scrollable/HorizontalListFocusScaleDemo",
     "pages/Tabs/TabsMainPage",
     "pages/Tabs/BarBackgroundBlurStyle",
     "pages/Tabs/OnContentWillChange",
@@ -245,6 +248,7 @@
     "pages/waterflow/WaterFlowEmptyBranchModifier",
     "pages/waterflow/WaterFlowEmptyBranchSessionEmpty",
     "pages/grid/GridEmptyBranch",
-    "pages/List/ListEmptyBranch"
+    "pages/List/ListEmptyBranch",
+    "pages/List/syncLoad/SyncLoadDemo"
   ]
 }

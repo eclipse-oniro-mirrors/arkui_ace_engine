@@ -57,6 +57,11 @@ class LazyArkTabsComponent extends ArkComponent {
     return this;
   }
 
+  sidebarDisplayStyle(value: TabsSidebarDisplayStyle): this {
+    this.lazyComponent.sidebarDisplayStyle(value);
+    return this;
+  }
+
   barPosition(value: BarPosition): this {
     this.lazyComponent.barPosition(value);
     return this;
@@ -251,6 +256,41 @@ class LazyArkTabsComponent extends ArkComponent {
 
   onBarDisplayModeChange(value: (mode: TabBarDisplayMode) => void): this {
     this.lazyComponent.onBarDisplayModeChange(value);
+    return this;
+  }
+
+  sidebarWidth(value: Optional<Length>): this {
+    this.lazyComponent.sidebarWidth(value);
+    return this;
+  }
+
+  minSidebarWidth(value: Optional<Length>): this {
+    this.lazyComponent.minSidebarWidth(value);
+    return this;
+  }
+
+  maxSidebarWidth(value: Optional<Length>): this {
+    this.lazyComponent.maxSidebarWidth(value);
+    return this;
+  }
+
+  minContentWidth(value: Optional<Length>): this {
+    this.lazyComponent.minContentWidth(value);
+    return this;
+  }
+
+  sidebarBackgroundColor(value: Optional<ResourceColor>): this {
+    this.lazyComponent.sidebarBackgroundColor(value);
+    return this;
+  }
+
+  sidebarBackgroundBlurStyle(value: Optional<BlurStyle>): this {
+    this.lazyComponent.sidebarBackgroundBlurStyle(value);
+    return this;
+  }
+
+  sidebarDivider(value: Optional<DividerStyle>): this {
+    this.lazyComponent.sidebarDivider(value);
     return this;
   }
 }

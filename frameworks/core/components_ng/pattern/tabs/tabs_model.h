@@ -60,7 +60,16 @@ enum class TabJsResType {
     SIDEBAR_SELECTED_TEXTCOLOR,
     SIDEBAR_UNSELECTED_ICONCOLOR,
     SIDEBAR_UNSELECTED_TEXTCOLOR,
-    SIDEBAR_SELECTED_BOARDCOLOR
+    SIDEBAR_SELECTED_BOARDCOLOR,
+    SIDEBAR_WIDTH,
+    SIDEBAR_MIN_SIDEBAR_WIDTH,
+    SIDEBAR_MAX_SIDEBAR_WIDTH,
+    SIDEBAR_MIN_CONTENT_WIDTH,
+    SIDEBAR_BACKGROUND_COLOR,
+    SIDEBAR_DIVIDER_STROKE_WIDTH,
+    SIDEBAR_DIVIDER_COLOR,
+    SIDEBAR_DIVIDER_START_MARGIN,
+    SIDEBAR_DIVIDER_END_MARGIN
 };
 
 struct TabsItemDivider final {
@@ -207,6 +216,7 @@ public:
     virtual void SetNestedScroll(const NestedScrollOptions& nestedOpt) {}
     virtual void SetBarFloatingStyle(const BarFloatingStyleParameters& parameters) {}
     virtual void ResetBarFloatingStyle() {}
+    virtual void SetSidebarDisplayStyle(NG::SidebarDisplayStyle sidebarDisplayStyle) {}
     virtual void SetBarLayoutStyle(NG::TabBarLayoutStyle barLayoutStyle) {}
     virtual void SetSidebarPosition(BarPosition position) {}
     virtual void SetSidebarHeader(const RefPtr<AceType>& header) {}

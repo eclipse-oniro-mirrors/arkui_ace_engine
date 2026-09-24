@@ -10243,6 +10243,9 @@ NG::GestureCollectIntervention CommonBridge::ProcessOnGestureCollectIntercept(Ec
     panda::Local<panda::JSValueRef> params[2] = { recognizersArr, touchRecognizersArr };
     auto returnValue = NG::GestureCollectIntervention::CONTINUE;
     auto result = func->Call(vm, func, params, 2);
+    if (result.IsEmpty()) {
+        return returnValue;
+    }
     if (result->IsNumber()) {
         auto interventionValue = result->Int32Value(vm);
         if (interventionValue >= 0 &&
@@ -12185,6 +12188,33 @@ ArkUINativeModuleValue CommonBridge::ResetExcludeFromRenderGroup(ArkUIRuntimeCal
     auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
     CHECK_NULL_RETURN(nativeNode, panda::JSValueRef::Undefined(vm));
     GetArkUINodeModifiers()->getCommonModifier()->resetExcludeFromRenderGroup(nativeNode);
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue CommonBridge::SetMarkLayeredRender(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM *vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::NativePointerRef::New(vm, nullptr));
+    Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(NUM_0);
+    Local<JSValueRef> secondArg = runtimeCallInfo->GetCallArgRef(NUM_1);
+    auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
+    CHECK_NULL_RETURN(nativeNode, panda::JSValueRef::Undefined(vm));
+    auto isLayeredRender = false;
+    if (secondArg->IsBoolean()) {
+        isLayeredRender = secondArg->ToBoolean(vm)->Value();
+    }
+    GetArkUINodeModifiers()->getCommonModifier()->setMarkLayeredRender(nativeNode, isLayeredRender);
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue CommonBridge::ResetMarkLayeredRender(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM *vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::NativePointerRef::New(vm, nullptr));
+    Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(NUM_0);
+    auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
+    CHECK_NULL_RETURN(nativeNode, panda::JSValueRef::Undefined(vm));
+    GetArkUINodeModifiers()->getCommonModifier()->resetMarkLayeredRender(nativeNode);
     return panda::JSValueRef::Undefined(vm);
 }
 

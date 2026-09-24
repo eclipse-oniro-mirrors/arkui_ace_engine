@@ -1412,8 +1412,21 @@ napi_value JsDrawableDescriptor::SetSVGResourceLimitLevel(napi_env env, napi_cal
     if (CheckReleased(env, native, scope)) {
         return nullptr;
     }
+    napi_valuetype valueType;
+    napi_typeof(env, argv[0], &valueType);
+    if (valueType != napi_number && valueType != napi_undefined && valueType != napi_null) {
+        napi_close_escapable_handle_scope(env, scope);
+        return nullptr;
+    }
     int32_t id = 0;
-    napi_get_value_int32(env, argv[0], &id);
+    if (valueType == napi_number) {
+        napi_get_value_int32(env, argv[0], &id);
+    }
+    constexpr int32_t MAX_LEVEL = 4;
+    if (id < 0 || id >= MAX_LEVEL) {
+        id = 0;
+    }
+    HILOGD("SetSVGResourceLimitLevel svgResourceLimitLevel=%{public}d", id);
     napi_value typeName;
     napi_get_named_property(env, thisVar, "typeName", &typeName);
     std::string type;

@@ -20,6 +20,7 @@
 
 #include "base/memory/referenced.h"
 #include "core/components/common/layout/constants.h"
+#include "core/components/common/properties/blur_style_option.h"
 #include "core/components_ng/manager/recoverable/recoverable_view.h"
 #include "core/components_ng/pattern/pattern.h"
 #include "core/components_ng/pattern/swiper/swiper_event_hub.h"
@@ -27,6 +28,8 @@
 #include "core/components_ng/pattern/tabs/tab_bar_pattern.h"
 #include "core/components_ng/pattern/tabs/tabs_layout_algorithm.h"
 #include "core/components_ng/pattern/tabs/tabs_layout_property.h"
+#include "core/components_ng/event/gesture_event_hub.h"
+#include "core/components_ng/event/input_event_hub.h"
 
 namespace OHOS::Ace::NG {
 namespace {
@@ -191,6 +194,10 @@ public:
     {
         OnUpdateShowDivider();
     }
+    void UpdateSidebarDividerStrokeWidth()
+    {
+        UpdateSideBarDivider();
+    }
     int32_t OnInjectionEvent(const std::string& command) override;
     void OnColorConfigurationUpdate() override;
     void OnColorModeChange(uint32_t colorMode) override;
@@ -242,10 +249,78 @@ public:
         searchableOptions_ = options;
     }
 
+    const TabsSidebarSearchableOptions& GetTabsSidebarSearchableOptions() const
+    {
+        return searchableOptions_;
+    }
+
+    void SetBarModifierApply(std::function<void(WeakPtr<NG::FrameNode>)>&& onApply)
+    {
+        barModifierApply_ = std::move(onApply);
+    }
+
+    std::function<void(WeakPtr<NG::FrameNode>)> GetBarModifierApply() const
+    {
+        return barModifierApply_;
+    }
+
+    void SetBarBlurStyleOption(const BlurStyleOption& option)
+    {
+        hasBarBlurStyle_ = true;
+        barBlurStyleOption_ = option;
+    }
+    const BlurStyleOption& GetBarBlurStyleOption() const
+    {
+        return barBlurStyleOption_;
+    }
+    void SetSidebarBlurStyleOptions(const BlurStyleOption& option)
+    {
+        hasSidebarBlurStyle_ = true;
+        sidebarBlurStyleOptions_ = option;
+    }
+    const BlurStyleOption& GetSidebarBlurStyleOption() const
+    {
+        return sidebarBlurStyleOptions_;
+    }
+    const BlurStyleOption& GetEffectiveSidebarBlurStyleOptions() const
+    {
+        if (hasSidebarBlurStyle_) {
+            return sidebarBlurStyleOptions_;
+        }
+        return barBlurStyleOption_;
+    }
+
     void AddTabContentNode(const RefPtr<TabContentNode>& tabContentNode);
     void RemoveTabContentNode(const RefPtr<TabContentNode>& tabContentNode);
     bool IsColorInvertEnabled();
     ColorMode GetColorInvertColorMode();
+
+    const std::optional<float>& GetRealSideBarWidthPx() const
+    {
+        return realSideBarWidthPx_;
+    }
+
+    std::optional<Dimension> GetEffectiveSidebarWidth() const;
+
+    void SetSidebarWidthCalled()
+    {
+        hasSidebarWidth_ = true;
+    }
+
+    // Sync bar* attributes to the sidebar (no-op when sidebar does not exist).
+    void UpdateSideBarDivider();
+    void UpdateSidebarDividerColor();
+    void UpdateSideBarBackgroundColor();
+    void UpdateSideBarBackgroundBlurStyle();
+
+    struct SideBarDragRange {
+        float minPx = 0.0f;
+        float maxPx = 0.0f;
+        bool draggable = false;
+        float initialWidthPx = 0.0f;
+    };
+    SideBarDragRange CalcSideBarDragRange(float tabsWidth);
+    void ClampSideBarWidthToRange();
 
 private:
     void OnAttachToFrameNode() override;
@@ -253,6 +328,7 @@ private:
     void OnUpdateShowDivider();
     WeakPtr<FocusHub> GetNextFocusNode(FocusStep step, const WeakPtr<FocusHub>& currentFocusNode);
     void BeforeCreateLayoutWrapper() override;
+    bool OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, const DirtySwapConfig& config) override;
     std::string GetTabBarTextByIndex(int32_t index) const;
     void UpdateSwiperDisableSwipe(bool disableSwipe);
     void SetSwiperPaddingAndBorder();
@@ -318,6 +394,25 @@ private:
     RefPtr<FrameNode> CreateSideBarNode();
     RefPtr<FrameNode> CreateSideBarDividerNode();
 
+    // Divider drag
+    void InitDividerDragEvent();
+    void ClearDividerDragEvent();
+    void InitDividerPanEvent(const RefPtr<GestureEventHub>& gestureHub);
+    void HandleDividerDragStart();
+    void HandleDividerDragUpdate(float xOffset);
+    void HandleDividerDragEnd();
+    void HandleDividerDragCancel();
+    void InitDividerMouseEvent(const RefPtr<InputEventHub>& inputHub);
+    void OnDividerHover(bool isHover);
+    void OnDividerMouseEvent(MouseInfo& info);
+    void SetMouseStyle(MouseFormat format);
+    void AddDividerHotZoneRect();
+    bool IsDividerDraggable() const;
+
+    TabsItemDivider GetEffectiveSidebarDividerConfig() const;
+    float GetEffectiveSidebarDividerWidthPx() const;
+    std::optional<Color> GetEffectiveSidebarBackgroundColor() const;
+
     bool isCustomAnimation_ = false;
     bool isDisableSwipe_ = false;
     bool isInit_ = true;
@@ -352,10 +447,26 @@ private:
     RefPtr<FrameNode> sideBarDividerNode_ = nullptr;
     RefPtr<NG::UINode> sidebarHeaderNode_;
     TabsSidebarSearchableOptions searchableOptions_;
+    std::function<void(WeakPtr<NG::FrameNode>)> barModifierApply_;
+    bool hasBarBlurStyle_ = false;
+    BlurStyleOption barBlurStyleOption_;
+    bool hasSidebarBlurStyle_ = false;
+    BlurStyleOption sidebarBlurStyleOptions_;
+    bool hasSidebarWidth_ = false;
     std::vector<WeakPtr<TabContentNode>> tabContentNodes_;
     // Color invert state for auto-inversion
     std::optional<bool> isColorPickerDark_;
     bool hasRegisterColorPicker_ = false;
+
+    // Divider drag state
+    RefPtr<PanEvent> dividerPanEvent_;
+    RefPtr<InputEvent> hoverEvent_;
+    RefPtr<InputEvent> dividerMouseEvent_;
+    bool isInDividerDrag_ = false;
+    std::optional<float> realSideBarWidthPx_;
+    float preSideBarWidthPx_ = 0.0f;
+    float minSideBarWidth_ = -1.0f;
+    float maxSideBarWidth_ = -1.0f;
 };
 
 } // namespace OHOS::Ace::NG

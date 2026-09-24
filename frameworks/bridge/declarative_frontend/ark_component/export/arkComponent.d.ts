@@ -422,6 +422,7 @@ declare class ArkImageSpanComponent extends ArkComponent implements ImageSpanAtt
     constructor(nativePtr: KNode, classType?: ModifierType);
     objectFit(value: ImageFit): ImageSpanAttribute;
     verticalAlign(value: ImageSpanAlignment): ImageSpanAttribute;
+    resizable(value: ResizableOptions): ImageSpanAttribute;
     onComplete(callback: (event?: {
         width: number;
         height: number;
@@ -820,6 +821,9 @@ declare class ArkTextComponent extends ArkComponent implements TextAttribute {
     }): this;
     selectedDragPreviewStyle(value: SelectedDragPreviewStyle): TextAttribute;
     tailIndents(value: LengthMetrics | Array<LengthMetrics>): TextAttribute;
+    strokeWidth(value: LengthMetrics): TextAttribute;
+    strokeColor(value: ResourceColor): TextAttribute;
+    strokeJoinStyle(value: StrokeJoinStyle): TextAttribute;
 }
 declare class ArkTextAreaComponent extends ArkComponent implements CommonMethod<TextAreaAttribute> {
     constructor(nativePtr: KNode, classType?: ModifierType);
@@ -2051,10 +2055,18 @@ declare class ArkTabsComponent extends ArkComponent implements TabsAttribute {
     cachedMaxCount(count: number, mode: CacheMode): TabsAttribute;
     barStyle(value: TabBarStyle): TabsAttribute;
     sidebarPosition(value: BarPosition): TabsAttribute;
+    sidebarDisplayStyle(value: TabsSidebarDisplayStyle): TabsAttribute;
     sidebarHeader(value: ComponentContent): TabsAttribute;
     sidebarSearchable(value?: TabsSidebarSearchableOptions): TabsAttribute;
     barDisplayModeBreakpoint(value: TabsBreakpointType<TabBarDisplayMode>): TabsAttribute;
     onBarDisplayModeChange(event: (mode: TabBarDisplayMode) => void): TabsAttribute;
+    sidebarWidth(value: Optional<Length>): TabsAttribute;
+    minSidebarWidth(value: Optional<Length>): TabsAttribute;
+    maxSidebarWidth(value: Optional<Length>): TabsAttribute;
+    minContentWidth(value: Optional<Length>): TabsAttribute;
+    sidebarBackgroundColor(value: Optional<ResourceColor>): TabsAttribute;
+    sidebarBackgroundBlurStyle(value: Optional<BlurStyle>): TabsAttribute;
+    sidebarDivider(value: Optional<DividerStyle>): TabsAttribute;
 }
 declare class ArkTabContentComponent extends ArkComponent implements TabContentAttribute {
     constructor(nativePtr: KNode, classType?: ModifierType);
@@ -2063,7 +2075,7 @@ declare class ArkTabContentComponent extends ArkComponent implements TabContentA
     size(value: SizeOptions): this;
     width(value: Length): this;
     height(value: Length): this;
-    defaultVisibility(visibility: TabVisibility, displayMode?: TabBarDisplayMode): this;
+    tabBarVisibility(visibility: TabVisibility, displayMode?: TabBarDisplayMode): this;
 }
 declare class ArkUIExtensionComponentComponent extends ArkComponent implements UIExtensionComponentAttribute {
     constructor(nativePtr: KNode, classType?: ModifierType);

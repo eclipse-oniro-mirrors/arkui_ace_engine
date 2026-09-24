@@ -23,7 +23,6 @@
 #include "base/utils/utf_helper.h"
 #include "base/utils/utils.h"
 #include "core/components_ng/pattern/text_field/text_field_pattern.h"
-#include "core/components_ng/pattern/search/search_text_field.h"
 
 #ifndef ACE_UNITTEST
 #ifdef ENABLE_STANDARD_INPUT
@@ -54,21 +53,6 @@ void RunAsyncTask(const RefPtr<TextFieldSelectOverlay>& overlay, const std::stri
     taskExecutor->PostTask(task, isUITask ? TaskExecutor::TaskType::UI : TaskExecutor::TaskType::PLATFORM, name);
 }
 } // namespace
-
-RefPtr<FrameNode> TextFieldSelectOverlay::GetOwner()
-{
-    auto textFieldPattern = GetPattern<TextFieldPattern>();
-    CHECK_NULL_RETURN(textFieldPattern, nullptr);
-    auto host = textFieldPattern->GetHost();
-    CHECK_NULL_RETURN(host, nullptr);
-    if (AceType::InstanceOf<SearchTextFieldPattern>(textFieldPattern)) {
-        auto parent = host->GetAncestorNodeOfFrame(false);
-        if (parent) {
-            return parent;
-        }
-    }
-    return host;
-}
 
 bool TextFieldSelectOverlay::PreProcessOverlay(const OverlayRequest& request)
 {
@@ -102,14 +86,15 @@ void TextFieldSelectOverlay::UpdatePattern(const OverlayRequest& request)
     CHECK_NULL_VOID(pattern);
     bool isRequestSelectAll = (static_cast<uint32_t>(request.requestCode) & REQUEST_SELECT_ALL) == REQUEST_SELECT_ALL;
     auto selectController = pattern->GetTextSelectController();
-    if (pattern->IsSelected() && selectController->IsHandleSamePosition()) {
+    auto isSelectedLineBreak = selectController->IsSelectedLineBreak();
+    if (pattern->IsSelected() && selectController->IsHandleSamePosition() && !isSelectedLineBreak) {
         SetIsSingleHandle(true);
         selectController->UpdateCaretIndex(selectController->GetFirstHandleIndex());
         selectController->UpdateCaretOffset();
         selectController->MoveCaretToContentRect(selectController->GetCaretIndex());
     } else if (!IsSingleHandle() && !isRequestSelectAll) {
         auto rects = pattern->GetTextBoxes();
-        if (!rects.empty() && NearEqual(rects.size(), 1) && NearZero(rects[0].Width())) {
+        if (!isSelectedLineBreak && !rects.empty() && NearEqual(rects.size(), 1) && NearZero(rects[0].Width())) {
             SetIsSingleHandle(true);
             selectController->UpdateCaretIndex(selectController->GetFirstHandleIndex());
             selectController->UpdateCaretOffset();
