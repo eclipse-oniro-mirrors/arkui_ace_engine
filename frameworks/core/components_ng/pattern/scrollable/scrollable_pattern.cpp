@@ -1006,7 +1006,55 @@ std::vector<SnapCandidate> ScrollablePattern::BuildTrackedItemSnapCandidates(Scr
     return {};
 }
 
-void ScrollablePattern::PrepareItemSnapFling(float /* motionVelocity */, float /* motionDelta */)
+void ScrollablePattern::RefreshTrackedItemSnap()
+{
+    auto scroll = GetScrollable();
+    CHECK_NULL_VOID(scroll);
+    const auto strategy = GetScrollSnapStrategy();
+    if (strategy.hasProvider || strategy.align == ScrollSnapAlign::NONE) {
+        scroll->SetItemSnapTargetReady(false);
+        scroll->SetItemSnapTakeoverDistance(0.0f);
+        return;
+    }
+    const float current = -scroll->GetCurrentPos();
+    const float natural = -scroll->GetFinalPosition();
+    const float direction = itemSnapReleaseMotionVelocity_ > 0.0f ? 1.0f : -1.0f;
+    const float remaining = direction * (natural - current);
+    const float speed = scroll->GetItemSnapFlingRate() * remaining;
+    auto candidates = BuildTrackedItemSnapCandidates(strategy.align);
+    ScrollSnapUtils::NormalizeCandidates(candidates);
+    scroll->SetItemSnapTargetReady(false);
+    scroll->SetItemSnapTakeoverDistance(0.0f);
+    scroll->SetItemSnapLookaheadDistance(std::max(1.0f, GetMainContentSize() * 0.5f));
+    if (candidates.empty() || remaining <= 0.0f || speed <= 0.0f) {
+        return;
+    }
+    // Begin calibration within one measured item of the frontier. Waiting for
+    // the natural end to be bracketed can pass a closer real anchor (especially END).
+    // The margin only triggers calibration; every selected target remains a real anchor.
+    const float margin = std::max(1.0f, GetItemSnapCalibrationMargin());
+    const float outside = direction > 0.0f ? natural - candidates.back().offset :
+        candidates.front().offset - natural;
+    if (outside > margin) {
+        predictedItemSnapTarget_.reset();
+        return;
+    }
+    auto selected = ScrollSnapUtils::SelectByPredictedLanding(candidates, current, natural,
+        direction > 0.0f, ScrollSnapUtils::DEFAULT_SNAP_THRESHOLD);
+    if (!selected.found || direction * (selected.targetOffset - current) <= 0.0f) {
+        return;
+    }
+    const auto distance = CalculateItemSnapTakeoverDistance(
+        remaining, speed, direction * (selected.targetOffset - natural));
+    if (!distance) {
+        return;
+    }
+    predictedItemSnapTarget_ = selected.targetOffset;
+    scroll->SetItemSnapTargetReady(true);
+    scroll->SetItemSnapTakeoverDistance(distance.value());
+}
+
+void ScrollablePattern::PrepareItemSnapFling(float motionVelocity, float motionDelta)
 {
     auto scrollable = GetScrollable();
     CHECK_NULL_VOID(scrollable);
@@ -1014,6 +1062,24 @@ void ScrollablePattern::PrepareItemSnapFling(float /* motionVelocity */, float /
     scrollable->SetItemSnapFlingRate(0.0f);
     scrollable->SetNeedItemSnapSettle(true);
     scrollable->SetItemSnapTakeoverDistance(0.0f);
+    if (motionDelta == 0.0f || NearZero(motionDelta)) {
+        return;
+    }
+    if (!SupportsTrackedItemSnap() || GetItemSnapCalibrationMargin() <= 0.0f) {
+        return;
+    }
+    itemSnapReleaseMotionVelocity_ = motionVelocity;
+    // Gesture flings use finger coordinates. The prepared endpoint and displacement recover
+    // the animation origin without relying on LazyForEach's changing content-size estimate.
+    BeginTrackedItemSnap(-scrollable->GetFinalPosition() - motionDelta);
+    scrollable->SetItemSnapFlingRate(std::abs(motionVelocity / motionDelta));
+    scrollable->SetItemSnapLookaheadDistance(std::max(1.0f, GetMainContentSize() * 0.5f));
+    scrollable->SetItemSnapTargetReady(false);
+    scrollable->SetItemSnapTrackingCallback([weak = WeakClaim(this)]() {
+        auto pattern = weak.Upgrade();
+        CHECK_NULL_VOID(pattern);
+        pattern->RefreshTrackedItemSnap();
+    });
 }
 
 bool ScrollablePattern::StartItemSnapAnimation(const SnapAnimationOptions& snapAnimationOptions)

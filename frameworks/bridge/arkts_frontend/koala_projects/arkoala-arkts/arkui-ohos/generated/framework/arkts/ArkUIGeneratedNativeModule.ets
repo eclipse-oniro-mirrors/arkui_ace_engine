@@ -976,6 +976,8 @@ export class ArkUIGeneratedNativeModule {
     @ani.unsafe.Direct
     native static _GridAttribute_setNestedScroll(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
+    native static _GridAttribute_setScrollSnapStrategy(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
     native static _GridAttribute_setEnableScrollInteraction(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _GridAttribute_setFriction(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void

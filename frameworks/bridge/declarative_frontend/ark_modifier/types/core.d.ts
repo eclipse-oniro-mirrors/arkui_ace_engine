@@ -738,6 +738,13 @@ type TextDecorationOptions = object;
 type SliderConfiguration = object;
 type DateTimeOptions = object;
 type NestedScrollOptions = object;
+declare enum ScrollSnapAlign {
+    NONE = 0,
+    START = 1,
+    CENTER = 2,
+    END = 3,
+}
+type ScrollSnapOffsetProvider = object;
 
 declare class ArkLogConsole {
     public static log(...args: unknown[]): void;

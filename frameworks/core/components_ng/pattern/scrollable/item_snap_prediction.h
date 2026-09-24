@@ -18,6 +18,9 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <optional>
+
+#include "base/utils/macros.h"
 
 namespace OHOS::Ace::NG {
 
@@ -31,6 +34,8 @@ inline uint64_t ResolveItemSnapStartTime(uint64_t vsync, uint64_t now)
 // Same fixed curve as List slow snapping; only the takeover position changes.
 inline constexpr float ITEM_SNAP_FIXED_RESPONSE = 0.7f;
 inline constexpr float ITEM_SNAP_FIXED_DAMPING = 2.5f;
+
+ACE_EXPORT std::optional<float> CalculateItemSnapTakeoverDistance(float naturalDistance, float speed, float beyond);
 
 // Never apply the part of a delayed friction frame beyond its handoff point.
 inline float ClampItemSnapFrictionFrame(float current, float position, float naturalEnd, float threshold)

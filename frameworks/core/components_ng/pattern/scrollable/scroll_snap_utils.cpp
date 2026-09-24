@@ -17,6 +17,9 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
+
+#include "core/components_ng/pattern/scrollable/item_snap_prediction.h"
 
 #include "base/utils/utils.h"
 
@@ -195,6 +198,61 @@ float ScrollSnapUtils::ClampSnapOffset(float offset, float minOffset, float maxO
         return minOffset;
     }
     return std::clamp(offset, minOffset, maxOffset);
+}
+
+// Prefer a handoff with monotonic deceleration, preserving the real target and fling velocity.
+// If the friction-stop bound makes this impossible, choose the closest bounded plan; the
+// spring sample guard still prevents overshoot, but this cannot guarantee zero acceleration.
+// Safe interval for q=omega*D/V: [1/(zeta+sqrt(zeta*zeta-1)), 2*zeta].
+std::optional<float> CalculateItemSnapTakeoverDistance(float naturalDistance, float speed, float beyond)
+{
+    constexpr float response = ITEM_SNAP_FIXED_RESPONSE;
+    constexpr float damping = ITEM_SNAP_FIXED_DAMPING;
+    if (!std::isfinite(naturalDistance) || !std::isfinite(speed) || !std::isfinite(beyond)) {
+        return std::nullopt;
+    }
+    if (naturalDistance == 0.0f) {
+        return std::nullopt;
+    }
+    if (naturalDistance <= 0.0f || speed <= 0.0f || naturalDistance + beyond <= 0.0f) {
+        return std::nullopt;
+    }
+    const float rate = speed / naturalDistance;
+    const float omega = 2.0f * 3.14159265f / response;
+    const float earliest = naturalDistance - std::min(1.0f, (naturalDistance + beyond) * 0.5f);
+    if (!std::isfinite(rate) || rate <= 0.0f || !std::isfinite(omega) || earliest <= 0.0f) {
+        return std::nullopt;
+    }
+    // The real friction stops below 120px/s, before a mathematically late handoff.
+    // Leave 5px/s of headroom; a fixed curve may become infeasible under this bound.
+    const float latest = std::min(earliest, std::max(125.0f / rate, std::max(1.0f, -beyond + 1.0f)));
+    const float safeLow = 1.01f / (damping + std::sqrt(damping * damping - 1.0f));
+    const float safeHigh = 1.98f * damping;
+    const float desired = 1.9f;
+    float selected = earliest;
+    float best = std::numeric_limits<float>::infinity();
+    auto consider =
+        [latest, earliest, omega, beyond, rate, safeLow, safeHigh, desired, &best, &selected](float remaining) {
+        if (!std::isfinite(remaining) || remaining < latest || remaining > earliest) {
+            return;
+        }
+        const float ratio = omega * (remaining + beyond) / (rate * remaining);
+        const float penalty = std::max(safeLow - ratio, std::max(ratio - safeHigh, 0.0f));
+        const float score = penalty * 1000.0f + std::abs(ratio - desired);
+        if (std::isfinite(score) && score < best) {
+            best = score;
+            selected = remaining;
+        }
+    };
+    consider(earliest);
+    consider(latest);
+    for (float ratio : {desired, safeLow, safeHigh}) {
+        const float denominator = ratio * rate - omega;
+        if (denominator != 0.0f) {
+            consider(omega * beyond / denominator);
+        }
+    }
+    return selected;
 }
 
 } // namespace OHOS::Ace::NG

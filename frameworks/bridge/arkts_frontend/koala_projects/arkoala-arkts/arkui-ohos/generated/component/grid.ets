@@ -22,15 +22,16 @@ import { Scroller_serializer, OnScrollFrameBeginCallback, Scroller } from './scr
 import { ItemFillPolicy_serializer, ItemFillPolicy, Length, Resource as arkui_component_units_Resource } from './units'
 import { global_resource_Resource_serializer } from './../framework/resource'
 import { NestedScrollOptions_serializer, EditModeOptions_serializer, Bindable_Boolean_serializer, EdgeEffectOptions_serializer, ArkScrollableCommonMethodPeer, ScrollableCommonMethod, OnItemDragStartCallback, ItemDragInfo, NestedScrollOptions, EditModeOptions, Bindable, Callback as arkui_component_common_Callback, OnWillScrollCallback, OnScrollCallback, CommonMethod, EdgeEffectOptions, ExtendableCommonMethod, ArkScrollableCommonMethodComponent, ArkCommonMethodComponent, UIScrollableCommonEvent, UIScrollableCommonEventInternal } from './common'
+import { ScrollSnapOffsetProviderProxy, ScrollSnapOffsetProviderProxy_serializer } from './scrollCommon'
+import { extractors, ScrollSnapOffsetProvider, AttributeModifier, hookGridAttributeModifier, AttributeUpdater } from '#handwritten'
 import { int32, int64, float32, unsafeCast } from '@koalaui/common'
 import { ComponentBase } from './../ComponentBase'
 import { PeerNode } from './../PeerNode'
 import { ArkUIGeneratedNativeModule } from '#components'
 import { Resource as global_resource_Resource } from 'global.resource'
 import { Color as arkui_component_enums_Color, BarState, FocusWrapMode, ScrollSource, EdgeEffect } from './enums'
-import { ScrollState } from './list'
+import { ScrollSnapAlign, ScrollState } from './list'
 import { PlaceholderProvider } from '@ohos.arkui.placeholderRegister'
-import { AttributeModifier, hookGridAttributeModifier, AttributeUpdater } from '#handwritten'
 import { CustomBuilder, ConstructorT, CustomBuilderT } from './builder'
 import { CallbackKind } from './../framework/peers/CallbackKind'
 import { CallbackTransformer } from './../CallbackTransformer'
@@ -425,6 +426,27 @@ export class ArkGridPeer extends ArkScrollableCommonMethodPeer {
             thisSerializer.writeInt8(RuntimeType.UNDEFINED)
         }
         ArkUIGeneratedNativeModule._GridAttribute_setNestedScroll(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
+    setScrollSnapStrategyAttribute(value: ScrollSnapAlign | ScrollSnapOffsetProvider | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (value !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueTmpValue = value!
+            if (valueTmpValue instanceof ScrollSnapAlign) {
+                thisSerializer.writeInt8((0).toByte())
+                const valueTmpValueForIdx0 = valueTmpValue as ScrollSnapAlign
+                thisSerializer.writeInt32(valueTmpValueForIdx0.valueOf())
+            } else if (valueTmpValue instanceof ScrollSnapOffsetProvider) {
+                thisSerializer.writeInt8((1).toByte())
+                const valueTmpValueForIdx1 = valueTmpValue as ScrollSnapOffsetProvider
+                const valueTmpValueForIdx1Transformed: ScrollSnapOffsetProviderProxy = extractors.transform_Ark_ScrollSnapOffsetProvider_to_Ark_ScrollSnapOffsetProviderProxy(valueTmpValueForIdx1)
+                ScrollSnapOffsetProviderProxy_serializer.write(thisSerializer, valueTmpValueForIdx1Transformed)
+            }
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._GridAttribute_setScrollSnapStrategy(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
     setEnableScrollInteractionAttribute(value: boolean | undefined): void {
@@ -909,6 +931,18 @@ export interface GridAttribute extends ScrollableCommonMethod {
         throw new Error('Unimplemented method onItemDrop')
     }
     nestedScroll(value: NestedScrollOptions | undefined): this
+    scrollSnapStrategy(value: ScrollSnapAlign | ScrollSnapOffsetProvider | undefined): this {
+        const commonStyle: Array<(instance: CommonMethod) => void> | undefined = this.__get__commonStyles__Internal();
+        if (commonStyle) {
+            (commonStyle as Array<(instance: CommonMethod) => void>).push((instance: CommonMethod): void => (instance as GridAttribute).scrollSnapStrategy(value));
+            return this;
+        } else {
+            if (this.__is_CustomComponent__Internal()) {
+                throw new Error('Grid attribute scrollSnapStrategy can only be set when creating an extendable component.')
+            }
+        }
+        throw new Error('Unimplemented method scrollSnapStrategy')
+    }
     enableScrollInteraction(value: boolean | undefined): this
     friction(value: double | arkui_component_units_Resource | undefined): this
     alignItems(value: GridItemAlignment | undefined): this {
@@ -1240,6 +1274,11 @@ export class ArkGridComponent extends ArkScrollableCommonMethodComponent impleme
     public nestedScroll(value: NestedScrollOptions | undefined): this {
         const value_casted = value as (NestedScrollOptions | undefined)
         this.getPeer()?.setNestedScrollAttribute(value_casted)
+        return this
+    }
+    public scrollSnapStrategy(value: ScrollSnapAlign | ScrollSnapOffsetProvider | undefined): this {
+        const value_casted = value as (ScrollSnapAlign | ScrollSnapOffsetProvider | undefined)
+        this.getPeer()?.setScrollSnapStrategyAttribute(value_casted)
         return this
     }
     public enableScrollInteraction(value: boolean | undefined): this {

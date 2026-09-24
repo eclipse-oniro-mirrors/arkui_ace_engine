@@ -1252,6 +1252,7 @@ private:
     // Pattern owns target selection; Scrollable owns the animation and queued-task generation.
     std::optional<float> predictedItemSnapTarget_;
     float itemSnapReleaseMotionVelocity_ = 0.0f;
+    void RefreshTrackedItemSnap();
     void PrepareItemSnapFling(float motionVelocity, float motionDelta);
     SnapSelectResult SelectItemSnapForAxis(ScrollSnapAlign align, const std::vector<SnapCandidate>& candidates,
         float currentOffset, SnapDirection snapDirection);
