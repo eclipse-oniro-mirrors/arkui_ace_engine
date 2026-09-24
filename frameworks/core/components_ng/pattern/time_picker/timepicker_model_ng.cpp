@@ -74,6 +74,10 @@ void TimePickerModelNG::CreateTimePicker(RefPtr<PickerTheme> pickerTheme, bool h
     CHECK_NULL_VOID(timePickerRowPattern);
     timePickerRowPattern->SetShowCount(showCount);
     timePickerRowPattern->SetPickerTag(true);
+    auto timepickerLayout = timePickerNode->GetLayoutProperty<LayoutProperty>();
+    if (timepickerLayout) {
+        timepickerLayout->UpdateLayoutDirection(TextDirection::LTR);
+    }
     auto hasHourNode = timePickerRowPattern->HasHourNode();
     auto hasMinuteNode = timePickerRowPattern->HasMinuteNode();
     auto hourId = timePickerRowPattern->GetHourId();
@@ -128,9 +132,7 @@ void TimePickerModelNG::CreateTimePicker(RefPtr<PickerTheme> pickerTheme, bool h
         auto layoutProperty = stackMinuteNode->GetLayoutProperty<LayoutProperty>();
         layoutProperty->UpdateAlignment(Alignment::CENTER);
         layoutProperty->UpdateLayoutWeight(1);
-        auto language = AceApplicationInfo::GetInstance().GetLanguage();
-        language == "ug" ? stackMinuteNode->MountToParent(timePickerNode, 0)
-                            : stackMinuteNode->MountToParent(timePickerNode);
+        stackMinuteNode->MountToParent(timePickerNode);
     }
     timePickerRowPattern->SetHasSecond(hasSecond);
     stack->Push(timePickerNode);
@@ -180,6 +182,10 @@ RefPtr<FrameNode> TimePickerModelNG::CreateFrameNode(int32_t nodeId)
     CHECK_NULL_RETURN(timePickerRowPattern, timePickerNode);
     timePickerRowPattern->SetShowCount(showCount);
     timePickerRowPattern->SetPickerTag(true);
+    auto timepickerLayout = timePickerNode->GetLayoutProperty<LayoutProperty>();
+    if (timepickerLayout) {
+        timepickerLayout->UpdateLayoutDirection(TextDirection::LTR);
+    }
     auto hasHourNode = timePickerRowPattern->HasHourNode();
     auto hasMinuteNode = timePickerRowPattern->HasMinuteNode();
     auto hourId = timePickerRowPattern->GetHourId();

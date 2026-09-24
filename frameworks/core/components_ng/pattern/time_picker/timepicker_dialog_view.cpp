@@ -89,6 +89,8 @@ RefPtr<FrameNode> TimePickerDialogView::Show(const DialogProperties& dialogPrope
     timePickerRowPattern->SetBackgroundColor(dialogTheme->GetBackgroundColor());
     timePickerRowPattern->SetTextProperties(settingData.properties);
     auto timePickerLayout = timePickerNode->GetLayoutProperty<TimePickerLayoutProperty>();
+    CHECK_NULL_RETURN(timePickerLayout, nullptr);
+    timePickerLayout->UpdateLayoutDirection(TextDirection::LTR);
     if (Container::GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TWELVE)) {
         ZeroPrefixType hourOptions = settingData.dateTimeOptions.hourType;
         ZeroPrefixType minuteOptions = settingData.dateTimeOptions.minuteType;
@@ -100,11 +102,6 @@ RefPtr<FrameNode> TimePickerDialogView::Show(const DialogProperties& dialogPrope
         timePickerRowPattern->SetPrefixMinute(minuteOptions);
         timePickerLayout->UpdatePrefixHour(static_cast<int32_t>(hourOptions));
         timePickerLayout->UpdatePrefixMinute(static_cast<int32_t>(minuteOptions));
-    }
-
-    auto language = AceApplicationInfo::GetInstance().GetLanguage();
-    if (language == "ar") {
-        timePickerLayout->UpdateLayoutDirection(TextDirection::LTR);
     }
 
     auto hasHourNode = timePickerRowPattern->HasHourNode();

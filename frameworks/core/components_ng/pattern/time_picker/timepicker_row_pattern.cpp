@@ -64,10 +64,7 @@ const int32_t AMPM_FORWARD_WITHSECOND = 3;
 const int32_t AMPM_FORWARD_WITHOUTSECOND = 2;
 const int32_t AMPM_BACKWARD_WITHSECOND = -3;
 const int32_t AMPM_BACKWARD_WITHOUTSECOND = -2;
-const int32_t CHILD_INDEX_FIRST = 0;
-const int32_t CHILD_INDEX_SECOND = 1;
 const int32_t CHILD_INDEX_THIRD = 2;
-const int32_t CHILD_INDEX_FOURTH = 3;
 constexpr float DISABLE_ALPHA = 0.6f;
 const Dimension FOCUS_RADIUS = 3.0_vp;
 const Dimension FOCUS_INTERVAL = 2.0_vp;
@@ -761,16 +758,8 @@ void TimePickerRowPattern::MountSecondNode(const RefPtr<FrameNode>& stackSecondN
     auto host = GetHost();
     CHECK_NULL_VOID(host);
     int32_t secondNodePosition = static_cast<int32_t>(host->GetChildren().size()) - 1;
-    if (!HasAmPmNode()) {
-        if (language_ == "ug") {
-            secondNodePosition = CHILD_INDEX_FIRST;
-        }
-    } else {
-        if (amPmTimeOrder_ == "01") {
-            secondNodePosition = CHILD_INDEX_THIRD;
-        } else if (language_ == "ug") {
-            secondNodePosition = CHILD_INDEX_SECOND;
-        }
+    if (HasAmPmNode() && amPmTimeOrder_ == "01") {
+        secondNodePosition = CHILD_INDEX_THIRD;
     }
     stackSecondNode->MountToParent(host, secondNodePosition);
 }
@@ -780,16 +769,8 @@ void TimePickerRowPattern::RemoveSecondNode()
     auto host = GetHost();
     CHECK_NULL_VOID(host);
     int32_t secondNodePosition = static_cast<int32_t>(host->GetChildren().size()) - 1;
-    if (!HasAmPmNode()) {
-        if (language_ == "ug") {
-            secondNodePosition = CHILD_INDEX_FIRST;
-        }
-    } else {
-        if (amPmTimeOrder_ == "01") {
-            secondNodePosition = CHILD_INDEX_THIRD;
-        } else if (language_ == "ug") {
-            secondNodePosition = CHILD_INDEX_SECOND;
-        }
+    if (HasAmPmNode() && amPmTimeOrder_ == "01") {
+        secondNodePosition = CHILD_INDEX_THIRD;
     }
     host->RemoveChildAtIndex(secondNodePosition);
 }
@@ -1376,7 +1357,6 @@ void TimePickerRowPattern::HandleAmPmReorder()
             candidate->MovePosition(0);
         }
     }
-    UpdateNodePositionForUg();
     host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
 }
 
@@ -1408,48 +1388,6 @@ void TimePickerRowPattern::UpdateDialogButtons()
 
     auto nextPrevButton = nextPrevButtonNode_.Upgrade();
     UpdateDialogAgingButton(nextPrevButton, isNext_);
-}
-
-void TimePickerRowPattern::UpdateNodePositionForUg()
-{
-    if (!isPreLanguageUg_ && language_ != "ug") {
-        return;
-    }
-
-    auto host = GetHost();
-    CHECK_NULL_VOID(host);
-    // ug's node order is S:M:H, need to change it to H:M:S
-    if (isPreLanguageUg_ && isAmPmTimeOrderUpdate_) {
-        if (hasSecond_) {
-            auto secondNode = host->GetChildAtIndex(CHILD_INDEX_FIRST);
-            CHECK_NULL_VOID(secondNode);
-            secondNode->MovePosition(CHILD_INDEX_THIRD);
-
-            auto minuteNode = host->GetChildAtIndex(CHILD_INDEX_FIRST);
-            CHECK_NULL_VOID(minuteNode);
-            minuteNode->MovePosition(CHILD_INDEX_SECOND);
-        } else {
-            auto minuteNode = host->GetChildAtIndex(CHILD_INDEX_FIRST);
-            CHECK_NULL_VOID(minuteNode);
-            minuteNode->MovePosition(CHILD_INDEX_SECOND);
-        }
-    } else if ((isPreLanguageUg_ && !isAmPmTimeOrderUpdate_) || (language_ == "ug")) {
-        if (hasSecond_) {
-            auto hourNode = host->GetChildAtIndex(CHILD_INDEX_FOURTH);
-            CHECK_NULL_VOID(hourNode);
-            hourNode->MovePosition(CHILD_INDEX_SECOND);
-            auto minuteNode = host->GetChildAtIndex(CHILD_INDEX_FOURTH);
-            CHECK_NULL_VOID(minuteNode);
-            minuteNode->MovePosition(CHILD_INDEX_THIRD);
-        } else {
-            auto hourNode = host->GetChildAtIndex(CHILD_INDEX_THIRD);
-            CHECK_NULL_VOID(hourNode);
-            hourNode->MovePosition(CHILD_INDEX_SECOND);
-        }
-    }
-    if (isPreLanguageUg_) {
-        isPreLanguageUg_ = false;
-    }
 }
 
 void TimePickerRowPattern::FlushAmPmFormatString()
@@ -1846,10 +1784,6 @@ void TimePickerRowPattern::UpdateAllChildNode()
     if (!GetHour24() && host->GetChildren().size() != CHILD_WITH_AMPM_SIZE) {
         return;
     }
-    if (language_ == "ug") {
-        UpdateAllChildNodeForUg();
-        return;
-    }
     auto children = host->GetChildren();
     auto iter = children.begin();
     CHECK_NULL_VOID(*iter);
@@ -1875,10 +1809,6 @@ void TimePickerRowPattern::GetAllChildNodeWithSecond()
     }
     if ((GetHour24() && host->GetChildren().size() != CHILD_WITHOUT_AMPM_SIZE + 1) ||
         (!GetHour24() && host->GetChildren().size() != CHILD_WITH_AMPM_SIZE + 1)) {
-        return;
-    }
-    if (language_ == "ug") {
-        UpdateAllChildNodeForUg();
         return;
     }
     auto children = host->GetChildren();
@@ -1960,35 +1890,7 @@ RefPtr<FrameNode> TimePickerRowPattern::GetSecondNode(std::list<RefPtr<UINode>>:
     CHECK_NULL_RETURN(secondBlendNode, nullptr);
     auto secondNode = DynamicCast<FrameNode>(secondBlendNode->GetLastChild());
     CHECK_NULL_RETURN(secondNode, nullptr);
-    if (language_ == "ug") {
-        iter++;
-    }
     return secondNode;
-}
-
-void TimePickerRowPattern::UpdateAllChildNodeForUg()
-{
-    auto host = GetHost();
-    CHECK_NULL_VOID(host);
-    auto children = host->GetChildren();
-    auto iter = children.begin();
-    CHECK_NULL_VOID(*iter);
-    RefPtr<FrameNode> amPmNode;
-    if (!GetHour24()) {
-        auto amPm = (*iter);
-        CHECK_NULL_VOID(amPm);
-        auto amPmStackNode = DynamicCast<FrameNode>(amPm);
-        amPmNode = DynamicCast<FrameNode>(amPmStackNode->GetLastChild()->GetLastChild());
-        CHECK_NULL_VOID(amPmNode);
-        iter++;
-    }
-    auto secondNode = GetSecondNode(iter);
-    auto minuteNode = GetMinuteNode(iter);
-    auto hourNode = GetHourNode(iter);
-    allChildNode_["amPm"] = amPmNode;
-    allChildNode_["hour"] = hourNode;
-    allChildNode_["minute"] = minuteNode;
-    allChildNode_["second"] = secondNode;
 }
 
 void TimePickerRowPattern::HandleHour12Change(bool isAdd, uint32_t index, std::vector<RefPtr<FrameNode>>& resultTags)
