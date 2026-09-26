@@ -59,6 +59,8 @@
       "OHOS::Ace::AccessibilityNode::SetActionUpdateIdsImpl(std::__h::function<void ()> const&)";
       "OHOS::Ace::AccessibilityNode::SetCheckableState(bool)";
       "OHOS::Ace::AccessibilityNode::SetCheckedState(bool)";
+      "OHOS::Ace::NG::InputEventHub::CopyEvent(OHOS::Ace::RefPtr<OHOS::Ace::NG::InputEventHub> const&)";
+      "OHOS::Ace::NG::FocusHub::CopyEvent(OHOS::Ace::RefPtr<OHOS::Ace::NG::FocusHub> const&)";
       "OHOS::Ace::AccessibilityNode::SetClickableState(bool)";
       "OHOS::Ace::AccessibilityNode::SetCollectionInfo(OHOS::Ace::AceCollectionInfo const&)";
       "OHOS::Ace::AccessibilityNode::SetEditable(bool)";
