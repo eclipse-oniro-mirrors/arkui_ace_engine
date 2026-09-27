@@ -87,14 +87,14 @@ void SetTabsBarBackgroundBlurStyle(ArkUINodeHandle node, void* styleOption)
     auto* blurStyle = reinterpret_cast<BlurStyleOption*>(styleOption);
     CHECK_NULL_VOID(frameNode);
     CHECK_NULL_VOID(blurStyle);
-    TabsModelNG::SetBarBackgroundBlurStyle(frameNode, *blurStyle);
+    TabsModelNG::SetBarBackgroundBlurStyle(frameNode, *blurStyle, false);
 }
 
 void SetTabsBarBackgroundColor(ArkUINodeHandle node, ArkUI_Uint32 color)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
     CHECK_NULL_VOID(frameNode);
-    TabsModelNG::SetBarBackgroundColor(frameNode, Color(color));
+    TabsModelNG::SetBarBackgroundColor(frameNode, Color(color), false);
 }
 
 void SetTabsBarBackgroundEffect(ArkUINodeHandle node, void* effectOption)

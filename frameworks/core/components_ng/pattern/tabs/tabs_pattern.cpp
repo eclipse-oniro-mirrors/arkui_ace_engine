@@ -2154,6 +2154,9 @@ std::optional<Color> TabsPattern::GetEffectiveSidebarBackgroundColor() const
     if (property->HasSidebarBackgroundColor()) {
         return property->GetSidebarBackgroundColor();
     }
+    if (property->HasBarBackgroundColorForSideBar()) {
+        return property->GetBarBackgroundColorForSideBar();
+    }
     return property->GetBarBackgroundColor();
 }
 
@@ -2177,6 +2180,11 @@ void TabsPattern::UpdateSideBarBackgroundColor()
         if (tabsProperty->HasSidebarBackgroundColorSetByUser() &&
             tabsProperty->GetSidebarBackgroundColorSetByUserValue()) {
             color = tabsProperty->GetSidebarBackgroundColorValue();
+            hasColor = true;
+        }
+    } else if (tabsProperty->HasBarBackgroundColorForSideBar()) {
+        if (tabsProperty->HasBarBackgroundColorSetByUser() && tabsProperty->GetBarBackgroundColorSetByUserValue()) {
+            color = tabsProperty->GetBarBackgroundColorForSideBarValue();
             hasColor = true;
         }
     } else if (tabsProperty->HasBarBackgroundColor()) {
