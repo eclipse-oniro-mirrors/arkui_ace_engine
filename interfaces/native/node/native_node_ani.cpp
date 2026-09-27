@@ -357,6 +357,10 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_GetNavDestinationAniParam(ArkUI_NodeHandle
 int32_t OH_ArkUI_NativeModule_GetDrawableDescriptorFromAniValue(
     ani_env* env, ani_object value, ArkUI_DrawableDescriptor** drawableDescriptor)
 {
+    CHECK_NULL_RETURN_WITH_MESSAGE(env, OHOS::Ace::ERROR_CODE_PARAM_INVALID, __FUNCTION__, "env is null");
+    CHECK_NULL_RETURN_WITH_MESSAGE(value, OHOS::Ace::ERROR_CODE_PARAM_INVALID, __FUNCTION__, "value is null");
+    CHECK_NULL_RETURN_WITH_MESSAGE(drawableDescriptor, OHOS::Ace::ERROR_CODE_PARAM_INVALID,
+        __FUNCTION__, "drawableDescriptor is null");
     ani_long nativeObj = 0;
     env->Object_GetPropertyByName_Long(value, "nativeObj", &nativeObj);
     if (nativeObj == 0) {
@@ -377,6 +381,10 @@ int32_t OH_ArkUI_NativeModule_GetDrawableDescriptorFromAniValue(
 int32_t OH_ArkUI_NativeModule_GetDrawableDescriptorFromResourceAniValue(
     ani_env* env, ani_object value, ArkUI_DrawableDescriptor** drawableDescriptor)
 {
+    CHECK_NULL_RETURN_WITH_MESSAGE(env, OHOS::Ace::ERROR_CODE_PARAM_INVALID, __FUNCTION__, "env is null");
+    CHECK_NULL_RETURN_WITH_MESSAGE(value, OHOS::Ace::ERROR_CODE_PARAM_INVALID, __FUNCTION__, "value is null");
+    CHECK_NULL_RETURN_WITH_MESSAGE(drawableDescriptor, OHOS::Ace::ERROR_CODE_PARAM_INVALID,
+        __FUNCTION__, "drawableDescriptor is null");
     std::string bundleName = GetPropertyByName(env, value, "bundleName");
     std::string moduleName = GetPropertyByName(env, value, "moduleName");
 
