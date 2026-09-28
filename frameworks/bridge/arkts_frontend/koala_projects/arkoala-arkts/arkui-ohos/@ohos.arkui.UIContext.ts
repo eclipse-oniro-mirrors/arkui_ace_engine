@@ -38,6 +38,7 @@ import { TextMenuOptions, TextMenuItemId } from 'arkui/framework';
 import { Nullable, WidthBreakpoint, HeightBreakpoint } from 'arkui/framework';
 import { KeyProcessingMode } from 'arkui/framework';
 import { default as uiObserver } from '@ohos/arkui/observer';
+import { PlaceholderRegister, createPlaceholderRegister } from '@ohos.arkui.placeholderRegister';
 import { default as mediaquery } from '@ohos/mediaquery';
 import { AlertDialogParamWithConfirm, AlertDialogParamWithButtons, AlertDialogParamWithOptions } from 'arkui/framework';
 import { ActionSheetOptions } from 'arkui/framework';
@@ -742,6 +743,7 @@ export enum ResolveStrategy {
 export class UIContext {
     instanceId_: int32 = -1;
     observer_ :UIObserver |null = null;
+    placeholderRegister_: PlaceholderRegister | null = null;
     router_: Router;
     focusController_: FocusControllerImpl;
     componentUtils_: ComponentUtilsImpl;
@@ -1118,6 +1120,13 @@ export class UIContext {
             this.observer_ = new UIObserver(this.instanceId_);
         }
         return this.observer_ as UIObserver;
+    }
+
+    public getPlaceholderRegister(): PlaceholderRegister {
+        if (!this.placeholderRegister_) {
+            this.placeholderRegister_ = createPlaceholderRegister(this.instanceId_);
+        }
+        return this.placeholderRegister_ as PlaceholderRegister;
     }
 
     public getOverlayManager(): OverlayManager {

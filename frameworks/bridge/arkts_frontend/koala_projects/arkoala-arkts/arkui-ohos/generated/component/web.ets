@@ -1195,9 +1195,6 @@ export class WebResourceError implements MaterializedBase {
         const retval = ArkUIGeneratedNativeModule._WebResourceError_getErrorCode(this.peer!.ptr)
         return retval
     }
-    public getCustomErrorCode(): int32 {
-        return this.getCustomErrorCode_serialize()
-    }
     private getCustomErrorCode_serialize(): int32 {
         const retval = ArkUIGeneratedNativeModule._WebResourceError_getCustomErrorCode(this.peer!.ptr)
         return retval
@@ -1331,11 +1328,6 @@ export class WebResourceResponse implements MaterializedBase {
         this.setResponseData_serialize(data_casted)
         return
     }
-    public setResponseBody(data: string | int32 | global_resource_Resource | ArrayBuffer): void {
-        const data_casted = data as (string | int32 | global_resource_Resource | ArrayBuffer)
-        this.setResponseBody_serialize(data_casted)
-        return
-    }
     public setResponseEncoding(encoding: string): void {
         const encoding_casted = encoding as (string)
         this.setResponseEncoding_serialize(encoding_casted)
@@ -1368,6 +1360,11 @@ export class WebResourceResponse implements MaterializedBase {
     }
     public getResponseIsReady(): boolean {
         return this.getResponseIsReady_serialize()
+    }
+    public setResponseBody(data: string | int32 | global_resource_Resource | ArrayBuffer): void {
+        const data_casted = data as (string | int32 | global_resource_Resource | ArrayBuffer)
+        this.setResponseBody_serialize(data_casted)
+        return
     }
     private getResponseData_serialize(): string {
         const retval = ArkUIGeneratedNativeModule._WebResourceResponse_getResponseData(this.peer!.ptr)
@@ -1459,28 +1456,6 @@ export class WebResourceResponse implements MaterializedBase {
         ArkUIGeneratedNativeModule._WebResourceResponse_setResponseData(this.peer!.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
-    private setResponseBody_serialize(data: string | int32 | global_resource_Resource | ArrayBuffer): void {
-        const thisSerializer: SerializerBase = SerializerBase.hold()
-        if (data instanceof string) {
-            thisSerializer.writeInt8((0).toByte())
-            const dataForIdx0 = data as string
-            thisSerializer.writeString(dataForIdx0)
-        } else if (data instanceof int32) {
-            thisSerializer.writeInt8((1).toByte())
-            const dataForIdx1 = data as int32
-            thisSerializer.writeInt32(dataForIdx1)
-        } else if (data instanceof global_resource_Resource) {
-            thisSerializer.writeInt8((2).toByte())
-            const dataForIdx2 = data as global_resource_Resource
-            global_resource_Resource_serializer.write(thisSerializer, dataForIdx2)
-        } else if (data instanceof ArrayBuffer) {
-            thisSerializer.writeInt8((3).toByte())
-            const dataForIdx3 = data as ArrayBuffer
-            thisSerializer.writeBuffer(dataForIdx3)
-        }
-        ArkUIGeneratedNativeModule._WebResourceResponse_setResponseBody(this.peer!.ptr, thisSerializer.asBuffer(), thisSerializer.length())
-        thisSerializer.release()
-    }
     private setResponseEncoding_serialize(encoding: string): void {
         ArkUIGeneratedNativeModule._WebResourceResponse_setResponseEncoding(this.peer!.ptr, encoding)
     }
@@ -1509,6 +1484,28 @@ export class WebResourceResponse implements MaterializedBase {
     private getResponseIsReady_serialize(): boolean {
         const retval = ArkUIGeneratedNativeModule._WebResourceResponse_getResponseIsReady(this.peer!.ptr)
         return retval
+    }
+    private setResponseBody_serialize(data: string | int32 | global_resource_Resource | ArrayBuffer): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (data instanceof string) {
+            thisSerializer.writeInt8((0).toByte())
+            const dataForIdx0 = data as string
+            thisSerializer.writeString(dataForIdx0)
+        } else if (data instanceof int32) {
+            thisSerializer.writeInt8((1).toByte())
+            const dataForIdx1 = data as int32
+            thisSerializer.writeInt32(dataForIdx1)
+        } else if (data instanceof global_resource_Resource) {
+            thisSerializer.writeInt8((2).toByte())
+            const dataForIdx2 = data as global_resource_Resource
+            global_resource_Resource_serializer.write(thisSerializer, dataForIdx2)
+        } else if (data instanceof ArrayBuffer) {
+            thisSerializer.writeInt8((3).toByte())
+            const dataForIdx3 = data as ArrayBuffer
+            thisSerializer.writeBuffer(dataForIdx3)
+        }
+        ArkUIGeneratedNativeModule._WebResourceResponse_setResponseBody(this.peer!.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
     }
 }
 export class ArkWebPeer extends ArkCommonMethodPeer {
@@ -4029,11 +4026,6 @@ export interface FirstScreenPaint {
 }
 export type OnFirstScreenPaintCallback = (firstScreenPaint: FirstScreenPaint) => void;
 export type OnInputmethodAttachedCallback = () => void;
-export type OnZoomChangeCallback = (zoomChangeInfo: OnZoomChangeEvent) => void;
-export interface OnZoomChangeEvent {
-    oldZoomFactor: double;
-    newZoomFactor: double;
-}
 export interface WebAttribute extends CommonMethod {
     setWebOptions(value: WebOptions): this {
         throw new Error('Unimplemented method setWebOptions')
@@ -4533,6 +4525,7 @@ export interface NestedScrollOptionsExt {
 export interface EmbedOptions {
     supportDefaultIntrinsicSize?: boolean;
     supportCssDisplayChange?: boolean;
+    supportTransformRotateAndSkew?: boolean;
 }
 export enum GestureFocusMode {
     DEFAULT = 0,
@@ -4602,6 +4595,11 @@ export enum AISessionResultType {
     RUNNING = 2
 }
 export type OnAISessionCallback = (state: AISessionResultType, content: string) => void;
+export type OnZoomChangeCallback = (zoomChangeInfo: OnZoomChangeEvent) => void;
+export interface OnZoomChangeEvent {
+    oldZoomFactor: double;
+    newZoomFactor: double;
+}
 export class ArkWebComponent extends ArkCommonMethodComponent implements WebAttribute {
     getPeer(): ArkWebPeer {
         return (this.peer as ArkWebPeer)
@@ -5726,22 +5724,6 @@ export class OnScaleChangeEvent_serializer {
         return value
     }
 }
-export class OnZoomChangeEvent_serializer {
-    public static write(buffer: SerializerBase, value: OnZoomChangeEvent): void {
-        let valueSerializer: SerializerBase = buffer
-        const valueHolderForOldZoomFactor = value.oldZoomFactor
-        valueSerializer.writeFloat64(valueHolderForOldZoomFactor)
-        const valueHolderForNewZoomFactor = value.newZoomFactor
-        valueSerializer.writeFloat64(valueHolderForNewZoomFactor)
-    }
-    public static read(buffer: DeserializerBase): OnZoomChangeEvent {
-        let valueDeserializer: DeserializerBase = buffer
-        const oldZoomFactorTmpResult: double = valueDeserializer.readFloat64()
-        const newZoomFactorTmpResult: double = valueDeserializer.readFloat64()
-        let value: OnZoomChangeEvent = ({oldZoomFactor: oldZoomFactorTmpResult, newZoomFactor: newZoomFactorTmpResult} as OnZoomChangeEvent)
-        return value
-    }
-}
 export class OnScrollEvent_serializer {
     public static write(buffer: SerializerBase, value: OnScrollEvent): void {
         let valueSerializer: SerializerBase = buffer
@@ -5790,6 +5772,22 @@ export class OnShowFileSelectorEvent_serializer {
         const resultTmpResult: FileSelectorResult = (FileSelectorResult_serializer.read(valueDeserializer) as FileSelectorResult)
         const fileSelectorTmpResult: FileSelectorParam = (FileSelectorParam_serializer.read(valueDeserializer) as FileSelectorParam)
         let value: OnShowFileSelectorEvent = ({result: resultTmpResult, fileSelector: fileSelectorTmpResult} as OnShowFileSelectorEvent)
+        return value
+    }
+}
+export class OnZoomChangeEvent_serializer {
+    public static write(buffer: SerializerBase, value: OnZoomChangeEvent): void {
+        let valueSerializer: SerializerBase = buffer
+        const valueHolderForOldZoomFactor = value.oldZoomFactor
+        valueSerializer.writeFloat64(valueHolderForOldZoomFactor)
+        const valueHolderForNewZoomFactor = value.newZoomFactor
+        valueSerializer.writeFloat64(valueHolderForNewZoomFactor)
+    }
+    public static read(buffer: DeserializerBase): OnZoomChangeEvent {
+        let valueDeserializer: DeserializerBase = buffer
+        const oldZoomFactorTmpResult: double = valueDeserializer.readFloat64()
+        const newZoomFactorTmpResult: double = valueDeserializer.readFloat64()
+        let value: OnZoomChangeEvent = ({oldZoomFactor: oldZoomFactorTmpResult, newZoomFactor: newZoomFactorTmpResult} as OnZoomChangeEvent)
         return value
     }
 }
@@ -6176,6 +6174,14 @@ export class EmbedOptions_serializer {
         } else {
             valueSerializer.writeInt8(RuntimeType.UNDEFINED)
         }
+        const valueHolderForSupportTransformRotateAndSkew = value.supportTransformRotateAndSkew
+        if (valueHolderForSupportTransformRotateAndSkew !== undefined) {
+            valueSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueHolderForSupportTransformRotateAndSkewTmpValue = valueHolderForSupportTransformRotateAndSkew!
+            valueSerializer.writeBoolean(valueHolderForSupportTransformRotateAndSkewTmpValue)
+        } else {
+            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
     }
     public static read(buffer: DeserializerBase): EmbedOptions {
         let valueDeserializer: DeserializerBase = buffer
@@ -6191,7 +6197,13 @@ export class EmbedOptions_serializer {
             supportCssDisplayChangeTmpBuf = valueDeserializer.readBoolean()
         }
         const supportCssDisplayChangeTmpResult: boolean | undefined = supportCssDisplayChangeTmpBuf
-        let value: EmbedOptions = ({supportDefaultIntrinsicSize: supportDefaultIntrinsicSizeTmpResult, supportCssDisplayChange: supportCssDisplayChangeTmpResult} as EmbedOptions)
+        const supportTransformRotateAndSkewTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
+        let supportTransformRotateAndSkewTmpBuf: boolean | undefined = undefined
+        if ((supportTransformRotateAndSkewTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
+            supportTransformRotateAndSkewTmpBuf = valueDeserializer.readBoolean()
+        }
+        const supportTransformRotateAndSkewTmpResult: boolean | undefined = supportTransformRotateAndSkewTmpBuf
+        let value: EmbedOptions = ({supportDefaultIntrinsicSize: supportDefaultIntrinsicSizeTmpResult, supportCssDisplayChange: supportCssDisplayChangeTmpResult, supportTransformRotateAndSkew: supportTransformRotateAndSkewTmpResult} as EmbedOptions)
         return value
     }
 }

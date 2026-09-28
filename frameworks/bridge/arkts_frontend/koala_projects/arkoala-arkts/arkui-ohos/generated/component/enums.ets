@@ -709,3 +709,7 @@ export enum EdgeLightPosition {
     LEFT = 6,
     RIGHT = 7
 }
+export enum ImmersiveStrategy {
+    AVOID_CUTOUT = 0,
+    AVOID_FLOAT_NAV = 1
+}

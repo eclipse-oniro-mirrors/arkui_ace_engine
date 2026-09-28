@@ -29,6 +29,7 @@ import { Resource as global_resource_Resource } from 'global.resource'
 import { FlexDirection, ScrollSource } from './enums'
 import { OnScrollFrameBeginCallback, Scroller, Scroller_serializer } from './scroll'
 import { ScrollState } from './list'
+import { PlaceholderProvider } from '@ohos.arkui.placeholderRegister'
 // instructive change start
 import { AttributeModifier, initializers, extractors, WaterFlowSections, hookWaterFlowAttributeModifier, AttributeUpdater, hookWaterFlowOptionsImpl } from '#handwritten'
 // instructive change end
@@ -256,6 +257,18 @@ export class ArkWaterFlowPeer extends ArkScrollableCommonMethodPeer {
         ArkUIGeneratedNativeModule._WaterFlowAttribute_setOnDidScroll(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
+    setScrollPlaceholderAttribute(value: PlaceholderProvider | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (value !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueTmpValue = value!
+            thisSerializer.holdAndWriteCallback(valueTmpValue)
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._WaterFlowAttribute_setScrollPlaceholder(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
     setCachedCount1Attribute(count: int32 | undefined, show: boolean | undefined): void {
         const thisSerializer: SerializerBase = SerializerBase.hold()
         if (count !== undefined) {
@@ -340,6 +353,9 @@ export interface WaterFlowAttribute extends ScrollableCommonMethod {
     onDidScroll(value: OnScrollCallback | undefined): this {
         throw new Error('Unimplemented method onDidScroll')
     }
+    scrollPlaceholder(value: PlaceholderProvider | undefined): this {
+        throw new Error('Unimplemented method scrollPlaceholder')
+    }
     cachedCount(count: int32 | undefined, show: boolean | undefined): this {
         throw new Error('Unimplemented method cachedCount')
     }
@@ -423,6 +439,11 @@ export class ArkWaterFlowComponent extends ArkScrollableCommonMethodComponent im
     public onDidScroll(value: OnScrollCallback | undefined): this {
         const value_casted = value as (OnScrollCallback | undefined)
         this.getPeer()?.setOnDidScrollAttribute(value_casted)
+        return this
+    }
+    public scrollPlaceholder(value: PlaceholderProvider | undefined): this {
+        const value_casted = value as (PlaceholderProvider | undefined)
+        this.getPeer()?.setScrollPlaceholderAttribute(value_casted)
         return this
     }
     public cachedCount(count: int32 | undefined, show: boolean | undefined): this {

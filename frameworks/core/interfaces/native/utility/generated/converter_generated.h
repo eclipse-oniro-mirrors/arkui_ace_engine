@@ -744,6 +744,21 @@ void AssignUnionTo(std::optional<T>& dst,
 
 template<typename T>
 void AssignUnionTo(std::optional<T>& dst,
+                   const Ark_TabBarBadgeType& src)
+{
+    switch (src.selector) {
+        case SELECTOR_ID_0: AssignTo(dst, src.value0); break;
+        case SELECTOR_ID_1: AssignTo(dst, src.value1); break;
+        default:
+        {
+            LOGE("Unexpected src->selector: %{public}d\n", src.selector);
+            return;
+        }
+    }
+}
+
+template<typename T>
+void AssignUnionTo(std::optional<T>& dst,
                    const Ark_TipsMessageType& src)
 {
     switch (src.selector) {
@@ -2250,26 +2265,6 @@ void AssignUnionTo(std::optional<T>& dst,
 
 template<typename T>
 void AssignUnionTo(std::optional<T>& dst,
-                   const Ark_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions& src)
-{
-    switch (src.selector) {
-        case SELECTOR_ID_0: AssignTo(dst, src.value0); break;
-        case SELECTOR_ID_1: AssignTo(dst, src.value1); break;
-        case SELECTOR_ID_2: AssignTo(dst, src.value2); break;
-        case SELECTOR_ID_3: AssignTo(dst, src.value3); break;
-        case SELECTOR_ID_4: AssignTo(dst, src.value4); break;
-        case SELECTOR_ID_5: AssignTo(dst, src.value5); break;
-        case SELECTOR_ID_6: AssignTo(dst, src.value6); break;
-        default:
-        {
-            LOGE("Unexpected src->selector: %{public}d\n", src.selector);
-            return;
-        }
-    }
-}
-
-template<typename T>
-void AssignUnionTo(std::optional<T>& dst,
                    const Ark_Union_Dimension_Array_Dimension& src)
 {
     switch (src.selector) {
@@ -2692,6 +2687,26 @@ void AssignUnionTo(std::optional<T>& dst,
         case SELECTOR_ID_0: AssignTo(dst, src.value0); break;
         case SELECTOR_ID_1: AssignTo(dst, src.value1); break;
         case SELECTOR_ID_2: AssignTo(dst, src.value2); break;
+        default:
+        {
+            LOGE("Unexpected src->selector: %{public}d\n", src.selector);
+            return;
+        }
+    }
+}
+
+template<typename T>
+void AssignUnionTo(std::optional<T>& dst,
+                   const Ark_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions& src)
+{
+    switch (src.selector) {
+        case SELECTOR_ID_0: AssignTo(dst, src.value0); break;
+        case SELECTOR_ID_1: AssignTo(dst, src.value1); break;
+        case SELECTOR_ID_2: AssignTo(dst, src.value2); break;
+        case SELECTOR_ID_3: AssignTo(dst, src.value3); break;
+        case SELECTOR_ID_4: AssignTo(dst, src.value4); break;
+        case SELECTOR_ID_5: AssignTo(dst, src.value5); break;
+        case SELECTOR_ID_6: AssignTo(dst, src.value6); break;
         default:
         {
             LOGE("Unexpected src->selector: %{public}d\n", src.selector);
@@ -3822,6 +3837,7 @@ ASSIGN_OPT(Opt_ImageSourceSize)
 ASSIGN_OPT(Opt_ImageSpanAlignment)
 ASSIGN_OPT(Opt_IMEClient)
 ASSIGN_OPT(Opt_ImmersiveMode)
+ASSIGN_OPT(Opt_ImmersiveStrategy)
 ASSIGN_OPT(Opt_IncrementalUpdatePolicy)
 ASSIGN_OPT(Opt_IndexerAlign)
 ASSIGN_OPT(Opt_Indicator)
@@ -4578,6 +4594,7 @@ ASSIGN_OPT(Opt_Callback_Opt_Map_String_Object_Void)
 ASSIGN_OPT(Opt_Callback_Opt_NavigationAnimatedTransition_Void)
 ASSIGN_OPT(Opt_Callback_Opt_Object_Void)
 ASSIGN_OPT(Opt_Callback_Opt_OffsetResult_Void)
+ASSIGN_OPT(Opt_Callback_Opt_PlaceholderOptions_Void)
 ASSIGN_OPT(Opt_Callback_Opt_ScrollResult_Void)
 ASSIGN_OPT(Opt_Callback_Opt_StyledString_Opt_Array_String_Void)
 ASSIGN_OPT(Opt_Callback_Opt_TabContentAnimatedTransition_Void)
@@ -4761,6 +4778,7 @@ ASSIGN_OPT(Opt_OnZoomChangeCallback)
 ASSIGN_OPT(Opt_Opt_Object)
 ASSIGN_OPT(Opt_PasteButtonCallback)
 ASSIGN_OPT(Opt_PasteEventCallback)
+ASSIGN_OPT(Opt_PlaceholderProvider)
 ASSIGN_OPT(Opt_PluginErrorCallback)
 ASSIGN_OPT(Opt_PopupStateChangeCallback)
 ASSIGN_OPT(Opt_ProgressModifierBuilder)
@@ -5114,6 +5132,7 @@ ASSIGN_OPT(Opt_SurfaceRotationOptions)
 ASSIGN_OPT(Opt_SwiperAutoFill)
 ASSIGN_OPT(Opt_SwiperContentAnimatedTransition)
 ASSIGN_OPT(Opt_SystemAdaptiveOptions)
+ASSIGN_OPT(Opt_TabBarBadgeType)
 ASSIGN_OPT(Opt_TabContentAnimatedTransition)
 ASSIGN_OPT(Opt_TabsBreakpointType_TabBarDisplayMode)
 ASSIGN_OPT(Opt_TargetInfo)
@@ -5364,8 +5383,8 @@ ASSIGN_OPT(Opt_SpatialEffectParams)
 ASSIGN_OPT(Opt_StarStyleOptions)
 ASSIGN_OPT(Opt_StyledStringChangeValue)
 ASSIGN_OPT(Opt_SwitchStyle)
+ASSIGN_OPT(Opt_TabBarBadgeStyle)
 ASSIGN_OPT(Opt_TabBarIconStyle)
-ASSIGN_OPT(Opt_TabBarOptions)
 ASSIGN_OPT(Opt_TabsOptions)
 ASSIGN_OPT(Opt_TabsSidebarSearchableOptions)
 ASSIGN_OPT(Opt_text_Decoration)
@@ -5392,7 +5411,6 @@ ASSIGN_OPT(Opt_Union_BindableResourceStr_BindableResourceStrArray)
 ASSIGN_OPT(Opt_Union_Boolean_MenuMaskType)
 ASSIGN_OPT(Opt_Union_Boolean_PopupMaskType)
 ASSIGN_OPT(Opt_Union_ColumnOptions_ColumnOptionsV2)
-ASSIGN_OPT(Opt_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions)
 ASSIGN_OPT(Opt_Union_Dimension_Array_Dimension)
 ASSIGN_OPT(Opt_Union_Dimension_OptionWidthMode)
 ASSIGN_OPT(Opt_Union_EdgeColors_ResourceColor_LocalizedEdgeColors)
@@ -5499,6 +5517,7 @@ ASSIGN_OPT(Opt_SizeOptions)
 ASSIGN_OPT(Opt_SubTabBarIndicatorStyle)
 ASSIGN_OPT(Opt_SweepGradientOptions)
 ASSIGN_OPT(Opt_SwipeActionItem)
+ASSIGN_OPT(Opt_TabBarOptions)
 ASSIGN_OPT(Opt_text_TextStyle)
 ASSIGN_OPT(Opt_TextAreaOptions)
 ASSIGN_OPT(Opt_TextDataDetectorConfig)
@@ -5511,6 +5530,7 @@ ASSIGN_OPT(Opt_Union_Array_Rectangle_Rectangle)
 ASSIGN_OPT(Opt_Union_ArrowStyle_Boolean)
 ASSIGN_OPT(Opt_Union_BadgePosition_Position)
 ASSIGN_OPT(Opt_Union_BorderRadiuses_Length_LocalizedBorderRadiuses)
+ASSIGN_OPT(Opt_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions)
 ASSIGN_OPT(Opt_Union_CustomNodeBuilder_SwipeActionItem)
 ASSIGN_OPT(Opt_Union_Dimension_BorderRadiuses)
 ASSIGN_OPT(Opt_Union_Dimension_BorderRadiuses_LocalizedBorderRadiuses)
@@ -5584,6 +5604,7 @@ ASSIGN_OPT(Opt_PickerBackgroundStyle)
 ASSIGN_OPT(Opt_PickerDialogButtonStyle)
 ASSIGN_OPT(Opt_PickerIndicatorStyle)
 ASSIGN_OPT(Opt_PickerTextStyle)
+ASSIGN_OPT(Opt_PlaceholderOptions)
 ASSIGN_OPT(Opt_PlaceholderStyle)
 ASSIGN_OPT(Opt_PopupCommonOptions)
 ASSIGN_OPT(Opt_PopupMessageOptions)

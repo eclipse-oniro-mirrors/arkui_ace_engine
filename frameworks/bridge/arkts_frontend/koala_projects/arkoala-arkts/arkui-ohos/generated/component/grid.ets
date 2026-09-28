@@ -29,6 +29,7 @@ import { ArkUIGeneratedNativeModule } from '#components'
 import { Resource as global_resource_Resource } from 'global.resource'
 import { Color as arkui_component_enums_Color, BarState, FocusWrapMode, ScrollSource, EdgeEffect } from './enums'
 import { ScrollState } from './list'
+import { PlaceholderProvider } from '@ohos.arkui.placeholderRegister'
 import { AttributeModifier, hookGridAttributeModifier, AttributeUpdater } from '#handwritten'
 import { CustomBuilder, ConstructorT, CustomBuilderT } from './builder'
 import { CallbackKind } from './../framework/peers/CallbackKind'
@@ -568,6 +569,18 @@ export class ArkGridPeer extends ArkScrollableCommonMethodPeer {
         ArkUIGeneratedNativeModule._GridAttribute_setOnDidScroll(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
+    setScrollPlaceholderAttribute(value: PlaceholderProvider | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (value !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueTmpValue = value!
+            thisSerializer.holdAndWriteCallback(valueTmpValue)
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._GridAttribute_setScrollPlaceholder(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
     setCachedCount1Attribute(count: int32 | undefined, show: boolean | undefined): void {
         const thisSerializer: SerializerBase = SerializerBase.hold()
         if (count !== undefined) {
@@ -1006,6 +1019,18 @@ export interface GridAttribute extends ScrollableCommonMethod {
         }
         throw new Error('Unimplemented method onDidScroll')
     }
+    scrollPlaceholder(value: PlaceholderProvider | undefined): this {
+        const commonStyle: Array<(instance: CommonMethod) => void> | undefined = this.__get__commonStyles__Internal();
+        if (commonStyle) {
+            (commonStyle as Array<(instance: CommonMethod) => void>).push((instance: CommonMethod): void => (instance as GridAttribute).scrollPlaceholder(value));
+            return this;
+        } else {
+            if (this.__is_CustomComponent__Internal()) {
+                throw new Error('Grid attribute scrollPlaceholder can only be set when creating an extendable component.')
+            }
+        }
+        throw new Error('Unimplemented method scrollPlaceholder')
+    }
     cachedCount(count: int32 | undefined, show: boolean | undefined): this {
         const commonStyle: Array<(instance: CommonMethod) => void> | undefined = this.__get__commonStyles__Internal();
         if (commonStyle) {
@@ -1270,6 +1295,11 @@ export class ArkGridComponent extends ArkScrollableCommonMethodComponent impleme
     public onDidScroll(value: OnScrollCallback | undefined): this {
         const value_casted = value as (OnScrollCallback | undefined)
         this.getPeer()?.setOnDidScrollAttribute(value_casted)
+        return this
+    }
+    public scrollPlaceholder(value: PlaceholderProvider | undefined): this {
+        const value_casted = value as (PlaceholderProvider | undefined)
+        this.getPeer()?.setScrollPlaceholderAttribute(value_casted)
         return this
     }
     public cachedCount(count: int32 | undefined, show: boolean | undefined): this {
