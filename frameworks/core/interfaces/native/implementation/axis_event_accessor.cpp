@@ -139,7 +139,7 @@ void SetDisplayXImpl(Ark_AxisEvent peer, Ark_Float64 displayX)
     CHECK_NULL_VOID(info);
     auto screenLocation = info->GetScreenLocation();
     const auto animation = screenLocation.GetXAnimationOption();
-    screenLocation.SetX(displayX, animation);
+    screenLocation.SetX(PipelineBase::Vp2PxWithCurrentDensity(displayX), animation);
     info->SetScreenLocation(screenLocation);
 }
 Ark_Float64 GetDisplayYImpl(Ark_AxisEvent peer)
@@ -159,7 +159,7 @@ void SetDisplayYImpl(Ark_AxisEvent peer, Ark_Float64 displayY)
     CHECK_NULL_VOID(info);
     auto screenLocation = info->GetScreenLocation();
     const auto animation = screenLocation.GetXAnimationOption();
-    screenLocation.SetY(displayY, animation);
+    screenLocation.SetY(PipelineBase::Vp2PxWithCurrentDensity(displayY), animation);
     info->SetScreenLocation(screenLocation);
 }
 Ark_Float64 GetWindowXImpl(Ark_AxisEvent peer)
@@ -179,7 +179,7 @@ void SetWindowXImpl(Ark_AxisEvent peer, Ark_Float64 windowX)
     CHECK_NULL_VOID(info);
     auto globalLocation = info->GetGlobalLocation();
     const auto animation = globalLocation.GetXAnimationOption();
-    globalLocation.SetX(windowX, animation);
+    globalLocation.SetX(PipelineBase::Vp2PxWithCurrentDensity(windowX), animation);
     info->SetGlobalLocation(globalLocation);
 }
 Ark_Float64 GetWindowYImpl(Ark_AxisEvent peer)
@@ -199,7 +199,7 @@ void SetWindowYImpl(Ark_AxisEvent peer, Ark_Float64 windowY)
     CHECK_NULL_VOID(info);
     auto globalLocation = info->GetGlobalLocation();
     const auto animation = globalLocation.GetYAnimationOption();
-    globalLocation.SetY(windowY, animation);
+    globalLocation.SetY(PipelineBase::Vp2PxWithCurrentDensity(windowY), animation);
     info->SetGlobalLocation(globalLocation);
 }
 Ark_Float64 GetXImpl(Ark_AxisEvent peer)
@@ -219,7 +219,7 @@ void SetXImpl(Ark_AxisEvent peer, Ark_Float64 x)
     CHECK_NULL_VOID(info);
     auto localLocation = info->GetLocalLocation();
     const auto animation = localLocation.GetXAnimationOption();
-    localLocation.SetX(x, animation);
+    localLocation.SetX(PipelineBase::Vp2PxWithCurrentDensity(x), animation);
     info->SetLocalLocation(localLocation);
 }
 Ark_Float64 GetYImpl(Ark_AxisEvent peer)
@@ -239,7 +239,7 @@ void SetYImpl(Ark_AxisEvent peer, Ark_Float64 y)
     CHECK_NULL_VOID(info);
     auto localLocation = info->GetLocalLocation();
     const auto animation = localLocation.GetYAnimationOption();
-    localLocation.SetY(y, animation);
+    localLocation.SetY(PipelineBase::Vp2PxWithCurrentDensity(y), animation);
     info->SetLocalLocation(localLocation);
 }
 Opt_Int32 GetScrollStepImpl(Ark_AxisEvent peer)
@@ -295,7 +295,7 @@ void SetGlobalDisplayXImpl(Ark_AxisEvent peer,
     auto globalDisplayLocation = info->GetGlobalDisplayLocation();
     const auto animation = globalDisplayLocation.GetXAnimationOption();
     auto globalDisplayXValue = Converter::OptConvertPtr<double>(globalDisplayX).value_or(DEFAULT_VALUE);
-    globalDisplayLocation.SetX(globalDisplayXValue, animation);
+    globalDisplayLocation.SetX(PipelineBase::Vp2PxWithCurrentDensity(globalDisplayXValue), animation);
     info->SetGlobalDisplayLocation(globalDisplayLocation);
 }
 Opt_Float64 GetGlobalDisplayYImpl(Ark_AxisEvent peer)
@@ -316,7 +316,7 @@ void SetGlobalDisplayYImpl(Ark_AxisEvent peer,
     auto globalDisplayLocation = info->GetGlobalDisplayLocation();
     const auto animation = globalDisplayLocation.GetYAnimationOption();
     auto globalDisplayYValue = Converter::OptConvertPtr<double>(globalDisplayY).value_or(DEFAULT_VALUE);
-    globalDisplayLocation.SetY(globalDisplayYValue, animation);
+    globalDisplayLocation.SetY(PipelineBase::Vp2PxWithCurrentDensity(globalDisplayYValue), animation);
     info->SetGlobalDisplayLocation(globalDisplayLocation);
 }
 } // AxisEventAccessor
