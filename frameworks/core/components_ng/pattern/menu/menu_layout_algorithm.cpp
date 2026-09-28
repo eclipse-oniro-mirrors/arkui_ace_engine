@@ -2697,6 +2697,35 @@ void MenuLayoutAlgorithm::UpdateConstraintWidth(LayoutWrapper* layoutWrapper, La
         maxWidth = std::min(maxHorizontalSpace, maxWidth);
     }
     maxWidth = std::min(constraint.maxSize.Width(), maxWidth);
+    if (LessNotEqual(maxWidth, 0.0f)) {
+        auto parentInfo = columnInfo->GetParent();
+        TAG_LOGW(AceLogTag::ACE_MENU,
+            "UpdateConstraintWidth invalid maxWidth: %{public}f, maxHorizontalSpace: %{public}f, "
+            "leftSpace: %{public}f, rightSpace: %{public}f, paddingWidth: %{public}f, "
+            "constraintMaxWidth: %{public}f, wrapperWidth: %{public}f, gridColumnWidth: %{public}f, "
+            "maxGridCounts: %{public}u, parentColumns: %{public}d, isLessThanAPITen: %{public}d",
+            maxWidth, maxHorizontalSpace, leftSpace_, rightSpace_, padding.Width(),
+            constraint.maxSize.Width(), wrapperSize_.Width(),
+            static_cast<float>(columnInfo->GetWidth(GetMaxGridCounts(columnInfo))),
+            GetMaxGridCounts(columnInfo), parentInfo ? parentInfo->GetColumns() : -1,
+            !Container::GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TEN) ? 1 : 0);
+        TAG_LOGW(AceLogTag::ACE_MENU,
+            "columnInfo grid context: density: %{public}f, dipScale: %{public}f, screenWidth: %{public}f, "
+            "currentSizeType: %{public}d, columnType: %{public}d, parentColumnWidth: %{public}f, "
+            "parentGutterWidth: %{public}s, parentMarginLeft: %{public}s, parentMarginRight: %{public}s, "
+            "parentSizeType: %{public}d",
+            GridSystemManager::GetInstance().GetDensity(),
+            GridSystemManager::GetInstance().GetDipScale(),
+            GridSystemManager::GetInstance().GetScreenWidth(),
+            static_cast<int32_t>(GridSystemManager::GetInstance().GetCurrentSize()),
+            parentInfo ? static_cast<int32_t>(parentInfo->GetColumnType()) : -1,
+            parentInfo ? parentInfo->GetColumnWidth() : -1.0,
+            parentInfo ? parentInfo->GetGutterWidth().ToString().c_str() : "null",
+            parentInfo ? parentInfo->GetMarginLeft().ToString().c_str() : "null",
+            parentInfo ? parentInfo->GetMarginRight().ToString().c_str() : "null",
+            parentInfo ? static_cast<int32_t>(parentInfo->GetSizeType()) : -1);
+        return;
+    }
     constraint.maxSize.SetWidth(maxWidth);
 }
 

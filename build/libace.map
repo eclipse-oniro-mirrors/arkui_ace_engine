@@ -4217,6 +4217,7 @@
       "OHOS::Ace::Frontend::~Frontend()";
       "OHOS::Ace::GridColumnInfo::GetMaxWidth() const";
       "OHOS::Ace::GridContainerInfo::GetMarginLeft() const";
+      "OHOS::Ace::GridContainerInfo::GetMarginRight() const";
       "OHOS::Ace::GridSystemManager::GetCurrentGridInfo()";
       "OHOS::Ace::IfElseModel::GetInstance()";
       "OHOS::Ace::ImageAnalyzerManager::CreateMovingPhotoAnalyzerOverlay(OHOS::Ace::RefPtr<OHOS::Ace::PixelMap> const&, MovingPhotoAnalyzerInfo)";
