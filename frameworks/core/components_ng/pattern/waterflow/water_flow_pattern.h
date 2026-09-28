@@ -19,6 +19,7 @@
 #include <cstdint>
 #include <vector>
 
+#include "core/components_ng/pattern/lazy_layout/lazy_layout_offset.h"
 #include "core/components_ng/pattern/pattern.h"
 #include "core/components_ng/pattern/scrollable/scrollable_pattern.h"
 #include "core/components_ng/pattern/waterflow/layout/water_flow_layout_algorithm_base.h"
@@ -31,7 +32,6 @@ class WaterFlowEventHub;
 class WaterFlowLayoutProperty;
 class WaterFlowSections;
 enum class StickyStyle : uint32_t;
-struct AdjustOffset;
 
 struct WaterFlowEdgeState {
     WaterFlowEdgeState();
@@ -131,7 +131,16 @@ public:
     void UpdateParentLazyRequest();
     void OnAttachToMainTree() override;
     void OnDetachFromMainTree() override;
-    OHOS::Ace::NG::AdjustOffset ConsumeParentAdjustOffset();
+    OHOS::Ace::NG::AdjustOffset ConsumeParentAdjustOffset()
+    {
+        OHOS::Ace::NG::AdjustOffset offset;
+        if (layoutInfo_->parentDriven_) {
+            offset = { layoutInfo_->parentAdjustStart_, layoutInfo_->parentAdjustEnd_ };
+        }
+        layoutInfo_->parentAdjustStart_ = 0.0f;
+        layoutInfo_->parentAdjustEnd_ = 0.0f;
+        return offset;
+    }
     void OnDetachFromFrameNode(FrameNode* frameNode) override;
     const WaterFlowEdgeState& GetEdgeState() const { return edgeState_; }
     WaterFlowChildIndexMap GetEdgeIndexMap() const;

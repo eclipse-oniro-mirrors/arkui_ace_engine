@@ -4466,6 +4466,7 @@
       "OHOS::Ace::NG::HeaderFooterUtils::GetNextStickyHeaderGap(OHOS::Ace::NG::LayoutWrapper*)";
       "OHOS::Ace::NG::HeaderFooterUtils::LayoutEdge(OHOS::Ace::NG::LayoutWrapper*, int, OHOS::Ace::NG::OffsetT<float> const&, bool, bool, float, int)";
       "OHOS::Ace::NG::HeaderFooterUtils::MeasureEdgeMainSize(OHOS::Ace::NG::LayoutWrapper*, OHOS::Ace::WeakPtr<OHOS::Ace::NG::FrameNode> const&, int, OHOS::Ace::NG::LayoutConstraintT<float> const&, OHOS::Ace::Axis)";
+      OHOS::Ace::NG::HeaderFooterUtils::MeasureHeaderFooter*;
       "OHOS::Ace::NG::HeaderFooterUtils::RemoveHeaderFooter(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&, OHOS::Ace::WeakPtr<OHOS::Ace::NG::UINode>&, unsigned int)";
       "OHOS::Ace::NG::HeaderFooterUtils::ReplaceHeaderFooter(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&, OHOS::Ace::WeakPtr<OHOS::Ace::NG::UINode>&, OHOS::Ace::RefPtr<OHOS::Ace::NG::UINode> const&, std::__h::optional<int>, unsigned int)";
       "OHOS::Ace::NG::HeaderFooterUtils::UpdateEdgeAccessibility(OHOS::Ace::RefPtr<OHOS::Ace::NG::UINode> const&)";
@@ -4525,6 +4526,7 @@
       "OHOS::Ace::NG::LayoutProperty::ResetFlexShrink()";
       "OHOS::Ace::NG::LayoutProperty::ResetSafeAreaPadding()";
       "OHOS::Ace::NG::LayoutProperty::SetNeedLazyLayout(bool)";
+      OHOS::Ace::NG::LayoutProperty::SetLazyLayoutRequest*;
       "OHOS::Ace::NG::LayoutProperty::SetUsingPosition(bool)";
       "OHOS::Ace::NG::LayoutProperty::UpdateFlexBasis(OHOS::Ace::Dimension const&)";
       "OHOS::Ace::NG::LayoutProperty::UpdateFlexGrow(float)";
@@ -4536,6 +4538,8 @@
       "OHOS::Ace::NG::LayoutProperty::UpdateSafeAreaExpandOpts(OHOS::Ace::NG::SafeAreaExpandOpts const&)";
       "OHOS::Ace::NG::LayoutProperty::UpdateSafeAreaPadding(OHOS::Ace::NG::PaddingPropertyT<OHOS::Ace::NG::CalcLength> const&)";
       "OHOS::Ace::NG::LazyLayoutUtils::CalculateEstimateSampleCount(int, int)";
+      OHOS::Ace::NG::LazyLayoutUtils::ConsumeNestedLazyAdjustOffset*;
+      OHOS::Ace::NG::PipelineContext::GetScrollViewportCoordinator*;
       "OHOS::Ace::NG::LazyLayoutUtils::CreateEstimateViewPosReference(OHOS::Ace::Axis)";
       "OHOS::Ace::NG::LazyLayoutUtils::EstimateTotalMainSize(float, int, float)";
       "OHOS::Ace::NG::LazyLayoutUtils::FindWaterFlowAncestorInfo(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&)";

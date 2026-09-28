@@ -53,6 +53,10 @@
 #include "core/pipeline_ng/pipeline_context.h"
 
 namespace OHOS::Ace::NG {
+namespace {
+constexpr char PARENT_LIST_ETS_TAG[] = "List";
+constexpr char PARENT_GRID_ETS_TAG[] = "Grid";
+} // namespace
 
 WaterFlowEdgeState::WaterFlowEdgeState() : sticky(StickyStyle::NONE) {}
 
@@ -88,7 +92,7 @@ bool WaterFlowParentContext::Update(const RefPtr<FrameNode>& host, bool enabled)
     if (!LazyLayoutUtils::IsVerticalScrollableParent(parent)) {
         return false;
     }
-    if (parent->GetTag() == V2::LIST_ETS_TAG) {
+    if (parent->GetTag() == PARENT_LIST_ETS_TAG) {
         auto property = parent->GetLayoutProperty<ListLayoutProperty>();
         if (!property || property->HasLanes() || property->HasLaneMinLength() || property->HasLaneMaxLength() ||
             property->HasChainAnimation() || property->HasScrollSnapAlign()) {
@@ -1080,17 +1084,6 @@ void WaterFlowPattern::OnDetachFromMainTree()
     ScrollablePattern::OnDetachFromMainTree();
 }
 
-OHOS::Ace::NG::AdjustOffset WaterFlowPattern::ConsumeParentAdjustOffset()
-{
-    OHOS::Ace::NG::AdjustOffset offset;
-    if (layoutInfo_->parentDriven_) {
-        offset = { layoutInfo_->parentAdjustStart_, layoutInfo_->parentAdjustEnd_ };
-    }
-    layoutInfo_->parentAdjustStart_ = 0.0f;
-    layoutInfo_->parentAdjustEnd_ = 0.0f;
-    return offset;
-}
-
 void WaterFlowPattern::SetEdgeGeometry(const OffsetF& origin, float totalSize)
 {
     edgeOrigin_ = origin;
@@ -1141,10 +1134,10 @@ void WaterFlowPattern::UpdateEdgePositions()
     for (auto parent = host->GetParentFrameNode(); parent; parent = parent->GetParentFrameNode()) {
         auto scroll = parent->GetPattern<ScrollablePattern>();
         const auto& tag = parent->GetTag();
-        const bool scrollBoundary = scroll && (tag != V2::GRID_ETS_TAG || scroll->IsScrollable());
+        const bool scrollBoundary = scroll && (tag != PARENT_GRID_ETS_TAG || scroll->IsScrollable());
         const bool eligible = scrollBoundary && scroll->GetAxis() == Axis::VERTICAL &&
-            (tag == V2::SCROLL_ETS_TAG || tag == V2::LIST_ETS_TAG ||
-             tag == V2::GRID_ETS_TAG || tag == V2::WATERFLOW_ETS_TAG);
+            (tag == V2::SCROLL_ETS_TAG || tag == PARENT_LIST_ETS_TAG ||
+             tag == PARENT_GRID_ETS_TAG || tag == WATERFLOW_ETS_TAG);
         const auto parentY = parent->GetOffsetRelativeToWindow().GetY() - contentY;
         const auto size = parent->GetGeometryNode()->GetFrameSize();
         if (eligible && !resolvedViewport) {
