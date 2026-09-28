@@ -19,6 +19,7 @@
 #include "js_plugin_util.h"
 #include "js_plugin_want.h"
 
+#include "base/utils/napi_scope_raii.h"
 #include "core/common/ace_engine.h"
 #include "core/components/plugin/plugin_component_manager.h"
 
@@ -200,7 +201,6 @@ void JSPluginCallback::OnPushEventInner(const OnPluginUvWorkData* workData)
     napi_value undefined = nullptr;
     napi_value jsResult = nullptr;
     napi_value callbackParam[ACE_ARGS_FOUR] = { nullptr };
-    napi_handle_scope scope = nullptr;
     std::string dataTmp("{}");
     std::string extraDataTmp("{}");
     if (!workData->data.empty()) {
@@ -210,9 +210,8 @@ void JSPluginCallback::OnPushEventInner(const OnPluginUvWorkData* workData)
         extraDataTmp = workData->extraData;
     }
 
-    napi_open_handle_scope(cbInfo_.env, &scope);
-    if (scope == nullptr) {
-        napi_close_handle_scope(cbInfo_.env, scope);
+    ScopeRAII scope(cbInfo_.env);
+    if (!scope) {
         return;
     }
 
@@ -228,7 +227,6 @@ void JSPluginCallback::OnPushEventInner(const OnPluginUvWorkData* workData)
     napi_get_undefined(cbInfo_.env, &undefined);
     napi_get_reference_value(cbInfo_.env, cbInfo_.callback, &jsCallback);
     napi_call_function(cbInfo_.env, undefined, jsCallback, ACE_ARGS_FOUR, callbackParam, &jsResult);
-    napi_close_handle_scope(cbInfo_.env, scope);
 }
 
 void JSPluginCallback::OnPushEvent(const AAFwk::Want& want, const PluginComponentTemplate& pluginTemplate,
@@ -271,15 +269,13 @@ void JSPluginCallback::OnRequestEventInner(const OnPluginUvWorkData* workData)
     napi_value jsCallback = nullptr;
     napi_value undefined = nullptr;
     napi_value jsResult = nullptr;
-    napi_handle_scope scope = nullptr;
     std::string dataTmp("{}");
     if (!workData->data.empty()) {
         dataTmp = workData->data;
     }
 
-    napi_open_handle_scope(cbInfo_.env, &scope);
-    if (scope == nullptr) {
-        napi_close_handle_scope(cbInfo_.env, scope);
+    ScopeRAII scope(cbInfo_.env);
+    if (!scope) {
         return;
     }
     napi_value callbackParam[ACE_ARGS_THREE] = { nullptr };
@@ -294,7 +290,6 @@ void JSPluginCallback::OnRequestEventInner(const OnPluginUvWorkData* workData)
     if (AceIsTypeForNapiValue(cbInfo_.env, jsResult, napi_object)) {
         SendRequestEventResult(jsResult);
     }
-    napi_close_handle_scope(cbInfo_.env, scope);
 }
 
 void JSPluginCallback::OnRequestEvent(const AAFwk::Want& want, const std::string& name, const std::string& data)
@@ -336,10 +331,8 @@ void JSPluginCallback::OnRequestCallBackInner(const OnPluginUvWorkData* workData
     napi_value jsCallback = nullptr;
     napi_value undefined = nullptr;
     napi_value jsResult = nullptr;
-    napi_handle_scope scope = nullptr;
-    napi_open_handle_scope(cbInfo_.env, &scope);
-    if (scope == nullptr) {
-        napi_close_handle_scope(cbInfo_.env, scope);
+    ScopeRAII scope(cbInfo_.env);
+    if (!scope) {
         return;
     }
     PluginComponentTemplate componentTemplate;
@@ -354,7 +347,6 @@ void JSPluginCallback::OnRequestCallBackInner(const OnPluginUvWorkData* workData
         napi_get_reference_value(cbInfo_.env, cbInfo_.callback, &jsCallback);
         napi_call_function(cbInfo_.env, undefined, jsCallback, ACE_ARGS_TWO, callbackParam, &jsResult);
     }
-    napi_close_handle_scope(cbInfo_.env, scope);
 }
 
 void JSPluginCallback::OnRequestCallBack(

@@ -22,6 +22,7 @@
 #include "base/error/error_code.h"
 #include "base/memory/referenced.h"
 #include "base/utils/linear_map.h"
+#include "base/utils/napi_scope_raii.h"
 #include "base/utils/utils.h"
 #include "bridge/common/utils/engine_helper.h"
 #include "bridge/declarative_frontend/engine/js_converter.h"
@@ -73,9 +74,8 @@ void HandleDeferred(const shared_ptr<XComponentAsyncCxt>& asyncCtx, ImageAnalyze
     auto deferred = asyncCtx->deferred;
     CHECK_NULL_VOID(deferred);
 
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env);
+    if (!scope) {
         return;
     }
 
@@ -100,7 +100,6 @@ void HandleDeferred(const shared_ptr<XComponentAsyncCxt>& asyncCtx, ImageAnalyze
         default:
             break;
     }
-    napi_close_handle_scope(env, scope);
 }
 
 void ReturnPromise(const JSCallbackInfo& info, napi_value result)
