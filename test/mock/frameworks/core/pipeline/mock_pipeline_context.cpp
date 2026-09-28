@@ -1132,6 +1132,10 @@ void PipelineContext::UpdateNavSafeAreaWithoutAnimation(
 
 void PipelineContext::UpdateFloatNavSafeAreaWithoutAnimation(const SafeAreaInsets& floatNavSafeArea) {}
 
+void PipelineContext::UpdateTitleButtonSafeArea(const SafeAreaInsets& titleButtonSafeArea) {}
+
+void PipelineContext::UpdateTitleButtonSafeAreaWithoutAnimation(const SafeAreaInsets& titleButtonSafeArea) {}
+
 void PipelineContext::ApplyDefaultImmersiveStrategy(const std::unordered_set<ImmersiveStrategy>& types)
 {
     CHECK_NULL_VOID(safeAreaManager_);

@@ -373,6 +373,7 @@ let ImmersiveStrategy;
 (function (ImmersiveStrategy) {
   ImmersiveStrategy[ImmersiveStrategy.AVOID_CUTOUT = 0] = 'AVOID_CUTOUT';
   ImmersiveStrategy[ImmersiveStrategy.AVOID_FLOAT_NAV = 1] = 'AVOID_FLOAT_NAV';
+  ImmersiveStrategy[ImmersiveStrategy.AVOID_WINDOW_CONTROLS = 6] = 'AVOID_WINDOW_CONTROLS';
 })(ImmersiveStrategy || (ImmersiveStrategy = {}));
 
 let VerticalAlign;

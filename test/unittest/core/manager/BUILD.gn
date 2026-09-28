@@ -255,6 +255,7 @@ ace_unittest("safe_area_manager_test_ng") {
     "safe_area_immersive_strategy_test_ng.cpp",
     "safe_area_manager_test_ng.cpp",
     "safe_area_manager_test_ng_part_two.cpp",
+    "safe_area_title_button_test_ng.cpp",
   ]
 }
 

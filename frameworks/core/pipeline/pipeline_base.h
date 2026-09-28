@@ -1063,6 +1063,8 @@ public:
 
     virtual void UpdateFloatNavSafeArea(const SafeAreaInsets& floatNavSafeArea) {}
 
+    virtual void UpdateTitleButtonSafeArea(const SafeAreaInsets& titleButtonSafeArea) {}
+
     virtual void UpdateSystemSafeAreaWithoutAnimation(
         const SafeAreaInsets& systemSafeArea, bool checkSceneBoardWindow = false)
     {}
@@ -1076,6 +1078,8 @@ public:
     {}
 
     virtual void UpdateFloatNavSafeAreaWithoutAnimation(const SafeAreaInsets& floatNavSafeArea) {}
+
+    virtual void UpdateTitleButtonSafeAreaWithoutAnimation(const SafeAreaInsets& titleButtonSafeArea) {}
 
     virtual void UpdateOriginAvoidArea(const Rosen::AvoidArea& avoidArea, uint32_t type,
         WindowSizeChangeReason reason = WindowSizeChangeReason::UNDEFINED) {}
