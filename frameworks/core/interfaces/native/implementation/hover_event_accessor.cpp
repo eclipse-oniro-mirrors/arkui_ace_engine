@@ -180,8 +180,9 @@ void SetGlobalDisplayXImpl(Ark_HoverEvent peer,
     const auto info = peer->GetEventInfo();
     CHECK_NULL_VOID(info);
     auto globalDisplayLocation = info->GetGlobalDisplayLocation();
+    const auto animation = globalDisplayLocation.GetXAnimationOption();
     auto globalDisplayXValue = Converter::OptConvertPtr<double>(globalDisplayX).value_or(DEFAULT_VALUE);
-    globalDisplayLocation.SetX(PipelineBase::Vp2PxWithCurrentDensity(globalDisplayXValue), globalDisplayLocation.GetXAnimationOption());
+    globalDisplayLocation.SetX(PipelineBase::Vp2PxWithCurrentDensity(globalDisplayXValue), animation);
     info->SetGlobalDisplayLocation(globalDisplayLocation);
 }
 Opt_Float64 GetGlobalDisplayYImpl(Ark_HoverEvent peer)
@@ -199,8 +200,9 @@ void SetGlobalDisplayYImpl(Ark_HoverEvent peer,
     const auto info = peer->GetEventInfo();
     CHECK_NULL_VOID(info);
     auto globalDisplayLocation = info->GetGlobalDisplayLocation();
+    const auto animation = globalDisplayLocation.GetYAnimationOption();
     auto globalDisplayYValue = Converter::OptConvertPtr<double>(globalDisplayY).value_or(DEFAULT_VALUE);
-    globalDisplayLocation.SetY(PipelineBase::Vp2PxWithCurrentDensity(globalDisplayYValue), globalDisplayLocation.GetYAnimationOption());
+    globalDisplayLocation.SetY(PipelineBase::Vp2PxWithCurrentDensity(globalDisplayYValue), animation);
     info->SetGlobalDisplayLocation(globalDisplayLocation);
 }
 } // HoverEventAccessor
