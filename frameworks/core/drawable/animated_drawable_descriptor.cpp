@@ -341,14 +341,14 @@ void AnimatedDrawableDescriptor::FlushUpdateCallbacksByNodeId(int32_t index, int
 RefPtr<PixelMap> AnimatedDrawableDescriptor::GetFrameByIndex(int32_t index, int32_t nodeId)
 {
     std::shared_lock<std::shared_mutex> lock(callMutx_);
-    if (!pixelMapList_.empty()) {
-        return pixelMapList_[index];
-    }
     return GetFrameByIndexInternal(index, nodeId);
 }
 
 RefPtr<PixelMap> AnimatedDrawableDescriptor::GetFrameByIndexInternal(int32_t index, int32_t nodeId)
 {
+    if (!pixelMapList_.empty()) {
+        return pixelMapList_[index];
+    }
     auto it = imageSources_.find(nodeId);
     if (it == imageSources_.end() || !it->second) {
         LOGE("Find imageSource failed, nodeId: %{public}d", nodeId);
