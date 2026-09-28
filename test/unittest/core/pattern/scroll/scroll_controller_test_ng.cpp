@@ -750,4 +750,108 @@ HWTEST_F(ScrollControllerTestNg, GetScrollState005, TestSize.Level1)
     EXPECT_EQ(baseController->GetScrollState(), ScrollState::IDLE);
 }
 
+/**
+ * @tc.name: GetScrollState006
+ * @tc.desc: Test GetScrollState returns SCROLL for all event-driven scroll sources
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollControllerTestNg, GetScrollState006, TestSize.Level1)
+{
+    CreateScroll();
+    CreateContent();
+    CreateScrollDone();
+    const std::vector<int32_t> scrollSources = { SCROLL_FROM_UPDATE, SCROLL_FROM_AXIS, SCROLL_FROM_BAR,
+        SCROLL_FROM_CROWN, SCROLL_FROM_BAR_OVER_DRAG };
+    for (auto source : scrollSources) {
+        pattern_->SetScrollSource(source);
+        EXPECT_EQ(pattern_->GetScrollState(), ScrollState::SCROLL);
+    }
+}
+
+/**
+ * @tc.name: GetScrollState007
+ * @tc.desc: Test GetScrollState returns FLING for all animation-driven scroll sources
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollControllerTestNg, GetScrollState007, TestSize.Level1)
+{
+    CreateScroll();
+    CreateContent();
+    CreateScrollDone();
+    const std::vector<int32_t> animationSources = { SCROLL_FROM_ANIMATION, SCROLL_FROM_ANIMATION_SPRING,
+        SCROLL_FROM_ANIMATION_CONTROLLER, SCROLL_FROM_BAR_FLING };
+    for (auto source : animationSources) {
+        pattern_->SetScrollSource(source);
+        EXPECT_EQ(pattern_->GetScrollState(), ScrollState::FLING);
+    }
+}
+
+/**
+ * @tc.name: GetScrollState008
+ * @tc.desc: Test GetScrollState returns IDLE for non-scrolling sources and default scrollSource_
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollControllerTestNg, GetScrollState008, TestSize.Level1)
+{
+    CreateScroll();
+    CreateContent();
+    CreateScrollDone();
+    EXPECT_EQ(pattern_->GetScrollState(), ScrollState::IDLE);
+    const std::vector<int32_t> idleSources = { SCROLL_FROM_NONE, SCROLL_FROM_JUMP, SCROLL_FROM_CHILD,
+        SCROLL_FROM_FOCUS_JUMP, SCROLL_FROM_ROTATE, SCROLL_FROM_INDEXER, SCROLL_FROM_START, SCROLL_FROM_STATUSBAR,
+        SCROLL_FROM_LAYOUT };
+    for (auto source : idleSources) {
+        pattern_->SetScrollSource(source);
+        EXPECT_EQ(pattern_->GetScrollState(), ScrollState::IDLE);
+    }
+}
+
+/**
+ * @tc.name: GetScrollState009
+ * @tc.desc: Test scrollSource_ persists across frames and switches with source changes
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollControllerTestNg, GetScrollState009, TestSize.Level1)
+{
+    CreateScroll();
+    CreateContent();
+    CreateScrollDone();
+    pattern_->SetScrollSource(SCROLL_FROM_UPDATE);
+    EXPECT_EQ(pattern_->GetScrollState(), ScrollState::SCROLL);
+    pattern_->SetScrollSource(SCROLL_FROM_ANIMATION);
+    EXPECT_EQ(pattern_->GetScrollState(), ScrollState::FLING);
+    pattern_->SetScrollSource(SCROLL_FROM_AXIS);
+    EXPECT_EQ(pattern_->GetScrollState(), ScrollState::SCROLL);
+}
+
+/**
+ * @tc.name: GetScrollState010
+ * @tc.desc: Test FireOnScrollStop resets scroll state to IDLE
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollControllerTestNg, GetScrollState010, TestSize.Level1)
+{
+    CreateScroll();
+    CreateContent();
+    CreateScrollDone();
+    pattern_->SetScrollSource(SCROLL_FROM_UPDATE);
+    EXPECT_EQ(pattern_->GetScrollState(), ScrollState::SCROLL);
+    pattern_->FireOnScrollStop([]() {}, []() {});
+    EXPECT_EQ(pattern_->GetScrollState(), ScrollState::IDLE);
+}
+
+/**
+ * @tc.name: GetScrollState011
+ * @tc.desc: Test JUMP source maps to IDLE for query API
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollControllerTestNg, GetScrollState011, TestSize.Level1)
+{
+    CreateScroll();
+    CreateContent();
+    CreateScrollDone();
+    pattern_->SetScrollSource(SCROLL_FROM_JUMP);
+    EXPECT_EQ(pattern_->GetScrollState(), ScrollState::IDLE);
+}
+
 } // namespace OHOS::Ace::NG
