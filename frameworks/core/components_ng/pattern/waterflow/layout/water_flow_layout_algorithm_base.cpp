@@ -16,6 +16,7 @@
 #include "core/components_ng/pattern/waterflow/layout/water_flow_layout_algorithm_base.h"
 
 #include "core/components_ng/pattern/scrollable/scrollable_paint_property.h"
+#include "core/components_ng/pattern/lazy_layout/lazy_layout_utils.h"
 #include "core/components_ng/pattern/scrollable/scrollable_utils.h"
 #include "core/components_ng/pattern/waterflow/layout/water_flow_layout_utils.h"
 #include "core/components_ng/pattern/waterflow/water_flow_pattern.h"
@@ -227,6 +228,10 @@ int32_t WaterFlowLayoutBase::GetUpdateIdx(LayoutWrapper* host, int32_t footerIdx
     auto layoutHost = host->GetHostNode();
     CHECK_NULL_RETURN(layoutHost, 0);
     int32_t updateIdx = layoutHost->GetChildrenUpdated();
+    auto pattern = layoutHost->GetPattern<WaterFlowPattern>();
+    if (pattern && pattern->GetEdgeState().enabled && updateIdx >= 0) {
+        return std::max(0, pattern->GetEdgeIndexMap().NodeToData(updateIdx));
+    }
     if (updateIdx > 0 && footerIdx == 0) {
         --updateIdx;
     }
@@ -380,6 +385,156 @@ void WaterFlowLayoutBase::ClearUnlayoutedItems(LayoutWrapper* layoutWrapper)
         CHECK_NULL_CONTINUE(frameNode);
         frameNode->ClearSubtreeLayoutAlgorithm();
     }
+}
+
+void WaterFlowLayoutBase::PrepareParentLayout(LayoutWrapper* wrapper,
+    const RefPtr<WaterFlowLayoutInfoBase>& info, SizeF& size, bool matchChildren)
+{
+    auto property = wrapper->GetLayoutProperty();
+    auto constraint = property->GetContentLayoutConstraint();
+    auto reference = constraint ? constraint->viewPosRef : std::nullopt;
+    const bool enabled = info->edgeSlots_ && matchChildren && property->GetNeedLazyLayout() &&
+        reference.has_value() && reference->axis == Axis::VERTICAL &&
+        !GreaterOrEqualToInfinity(reference->viewPosEnd - reference->viewPosStart);
+    if (enabled != info->parentDriven_) {
+        info->Reset();
+        info->UpdateOffset(-info->Offset());
+        info->parentAdjustOffset_ = {};
+        if (enabled) {
+            info->jumpIndex_ = WaterFlowLayoutInfoBase::EMPTY_JUMP_INDEX;
+            info->startIndex_ = 0;
+            info->endIndex_ = -1;
+        }
+    }
+    info->parentDriven_ = enabled;
+    info->parentDeadline_ = enabled ? reference->deadline : std::nullopt;
+    if (!enabled) {
+        return;
+    }
+    auto range = LazyLayoutUtils::CalculateViewRange(*reference, info->parentMainSize_);
+    info->parentViewStart_ = range.start;
+    info->parentViewEnd_ = range.end;
+    // Even a new offscreen host needs a bounded sample to establish its estimated extent.
+    size.SetHeight(std::max(range.end, 1.0f));
+    info->parentViewEnd_ = size.Height();
+    canOverScrollStart_ = true;
+    canOverScrollEnd_ = true;
+}
+
+bool WaterFlowLayoutBase::FinishParentLayout(
+    LayoutWrapper* wrapper, const RefPtr<WaterFlowLayoutInfoBase>& info, SizeF size)
+{
+    if (!info->parentDriven_) {
+        return false;
+    }
+    const float extent = std::max(info->EstimateTotalHeight(), info->headerHeight_ + info->edgeFooterHeight_) +
+        info->contentStartOffset_ + info->contentEndOffset_;
+    info->parentMainSize_ = extent;
+    size.SetHeight(extent);
+    AddPaddingToSize(wrapper->GetLayoutProperty()->CreatePaddingAndBorder(), size);
+    wrapper->GetGeometryNode()->SetFrameSize(size);
+    return true;
+}
+
+void WaterFlowLayoutBase::MeasureEdges(
+    LayoutWrapper* wrapper, const RefPtr<WaterFlowLayoutInfoBase>& info, const SizeF& size)
+{
+    if (!info->edgeSlots_) {
+        return;
+    }
+    auto props = AceType::DynamicCast<WaterFlowLayoutProperty>(wrapper->GetLayoutProperty());
+    CHECK_NULL_VOID(props);
+    auto host = wrapper->GetHostNode();
+    auto pattern = host ? host->GetPattern<WaterFlowPattern>() : nullptr;
+    CHECK_NULL_VOID(pattern);
+    const bool supported = props->GetWaterflowDirectionValue(FlexDirection::COLUMN) == FlexDirection::COLUMN;
+    auto constraint = props->CreateChildConstraint();
+    const auto axis = props->GetAxis();
+    constraint.maxSize.SetMainSize(LayoutInfinity<float>(), axis);
+    if (axis == Axis::VERTICAL) {
+        constraint.maxSize.SetWidth(size.Width());
+        constraint.percentReference.SetWidth(size.Width());
+        constraint.selfIdealSize.SetWidth(size.Width());
+    } else {
+        constraint.maxSize.SetHeight(size.Height());
+        constraint.percentReference.SetHeight(size.Height());
+        constraint.selfIdealSize.SetHeight(size.Height());
+    }
+    const auto headerHeight = supported ? HeaderFooterUtils::MeasureHeaderFooter(
+        wrapper, info->edgeIndexMap_.HeaderIndex(), constraint, axis, MeasureType::MATCH_CONTENT) : 0.0f;
+    const bool showFooter = supported || !pattern->GetEdgeState().footerControlled;
+    info->edgeFooterHeight_ = showFooter ? HeaderFooterUtils::MeasureHeaderFooter(
+        wrapper, info->edgeIndexMap_.FooterIndex(), constraint, axis, MeasureType::MATCH_CONTENT) : 0.0f;
+    info->footerHeight_ = info->edgeFooterHeight_;
+    if (!NearEqual(headerHeight, info->headerHeight_)) {
+        // Cached item positions are body-local and must be invalidated when the prefix changes.
+        if (info->parentDriven_ && Positive(info->parentViewStart_)) {
+            info->parentAdjustOffset_.start += HeaderFooterUtils::CalcHeaderResizeAdjust(
+                headerHeight - info->headerHeight_, info->parentViewStart_ - info->headerHeight_, info->headerHeight_);
+        }
+        info->Reset();
+        if (info->parentDriven_) {
+            info->jumpIndex_ = WaterFlowLayoutInfoBase::EMPTY_JUMP_INDEX;
+            info->startIndex_ = 0;
+            info->endIndex_ = -1;
+        }
+        info->headerHeight_ = headerHeight;
+    }
+    if (pattern->GetSections() && info->segmentTails_.empty()) {
+        info->InitSegments(pattern->GetSections()->GetSectionInfo(), 0);
+    }
+}
+
+void WaterFlowLayoutBase::LayoutEdges(
+    LayoutWrapper* wrapper, const RefPtr<WaterFlowLayoutInfoBase>& info, float bodyEnd)
+{
+    if (!info->edgeSlots_) {
+        return;
+    }
+    auto host = wrapper->GetHostNode();
+    CHECK_NULL_VOID(host);
+    auto pattern = host->GetPattern<WaterFlowPattern>();
+    CHECK_NULL_VOID(pattern);
+    auto props = AceType::DynamicCast<WaterFlowLayoutProperty>(wrapper->GetLayoutProperty());
+    CHECK_NULL_VOID(props);
+    auto padding = props->CreatePaddingAndBorder();
+    if (props->GetWaterflowDirectionValue(FlexDirection::COLUMN) != FlexDirection::COLUMN) {
+        auto header = info->edgeIndexMap_.hasHeader
+            ? wrapper->GetChildByIndex(info->edgeIndexMap_.HeaderIndex()) : nullptr;
+        if (header) {
+            header->SetActive(false);
+        }
+        auto footer = info->edgeIndexMap_.hasFooter
+            ? wrapper->GetChildByIndex(info->edgeIndexMap_.FooterIndex()) : nullptr;
+        if (footer) {
+            if (pattern->GetEdgeState().footerControlled) {
+                footer->SetActive(false);
+            } else {
+                auto mainPos = bodyEnd + info->Offset();
+                if (props->IsReverse()) {
+                    mainPos = info->lastMainSize_ - info->edgeFooterHeight_ - mainPos;
+                }
+                const auto axis = props->GetAxis();
+                auto offset = axis == Axis::VERTICAL ? OffsetF(0.0f, mainPos) : OffsetF(mainPos, 0.0f);
+                offset += OffsetF(padding.left.value_or(0.0f), padding.top.value_or(0.0f));
+                footer->GetGeometryNode()->SetMarginFrameOffset(offset);
+                footer->SetActive(true);
+                footer->Layout();
+            }
+        }
+        return;
+    }
+    OffsetF origin(padding.left.value_or(0.0f), padding.top.value_or(0.0f) + info->Offset());
+    const float crossSize = wrapper->GetGeometryNode()->GetPaddingSize().Width();
+    HeaderFooterUtils::LayoutEdge(wrapper, info->edgeIndexMap_.HeaderIndex(), origin, false, false, crossSize);
+    bodyEnd = std::max(bodyEnd, info->headerHeight_);
+    if (info->parentDriven_ && info->EndIndex() < info->ItemCnt(info->GetChildrenCount()) - 1) {
+        // The footer follows the estimated full body, not the tail of the currently measured window.
+        bodyEnd = std::max(bodyEnd, info->EstimateTotalHeight() - info->edgeFooterHeight_);
+    }
+    HeaderFooterUtils::LayoutEdge(wrapper, info->edgeIndexMap_.FooterIndex(), origin + OffsetF(0.0f, bodyEnd),
+        false, false, crossSize);
+    pattern->SetEdgeGeometry(origin, bodyEnd + info->edgeFooterHeight_);
 }
 
 void WaterFlowLayoutBase::CalcContentOffset(

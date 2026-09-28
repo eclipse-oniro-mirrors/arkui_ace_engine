@@ -12,6 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include "core/components_ng/pattern/lazy_layout/lazy_layout_utils.h"
 #include "frameworks/core/components_ng/pattern/waterflow/layout/water_flow_layout_utils.h"
 
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_observer.h"
@@ -225,25 +226,7 @@ void WaterFlowLayoutUtils::UpdateItemIdealSize(const RefPtr<LayoutWrapper>& item
 
 AdjustOffset WaterFlowLayoutUtils::GetAdjustOffset(const RefPtr<LayoutWrapper>& item)
 {
-    AdjustOffset pos {};
-    RefPtr<UINode> child = AceType::DynamicCast<FrameNode>(item);
-    do {
-        CHECK_NULL_RETURN(child, pos);
-        auto frameNode = AceType::DynamicCast<FrameNode>(child);
-        if (!frameNode) {
-            child = child->GetFirstChild();
-            continue;
-        }
-        if (!frameNode->GetLayoutProperty()->GetNeedLazyLayout()) {
-            return pos;
-        }
-        auto pattern = frameNode->GetPattern<LazyLayoutPattern>();
-        if (pattern) {
-            return pattern->GetAndResetAdjustOffset();
-        }
-        child = child->GetFirstChild();
-    } while (child);
-    return pos;
+    return LazyLayoutUtils::ConsumeNestedLazyAdjustOffset(item ? item->GetHostNode() : nullptr);
 }
 
 RefPtr<LayoutWrapper> WaterFlowLayoutUtils::GetWaterFlowItem(

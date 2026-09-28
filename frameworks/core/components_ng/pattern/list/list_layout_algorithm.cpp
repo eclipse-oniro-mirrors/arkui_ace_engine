@@ -2281,25 +2281,7 @@ void ListLayoutAlgorithm::MeasureLazyChild(const RefPtr<LayoutWrapper>& wrapper,
 
 AdjustOffset ListLayoutAlgorithm::GetAdjustOffset(const RefPtr<LayoutWrapper>& item)
 {
-    AdjustOffset offset {};
-    RefPtr<UINode> child = AceType::DynamicCast<FrameNode>(item);
-    do {
-        CHECK_NULL_RETURN(child, offset);
-        auto frameNode = AceType::DynamicCast<FrameNode>(child);
-        if (!frameNode) {
-            child = child->GetFirstChild();
-            continue;
-        }
-        if (!frameNode->GetLayoutProperty()->GetNeedLazyLayout()) {
-            return offset;
-        }
-        auto pattern = frameNode->GetPattern<LazyLayoutPattern>();
-        if (pattern) {
-            return pattern->GetAndResetAdjustOffset();
-        }
-        child = child->GetFirstChild();
-    } while (child);
-    return offset;
+    return LazyLayoutUtils::ConsumeNestedLazyAdjustOffset(item ? item->GetHostNode() : nullptr);
 }
 
 void ListLayoutAlgorithm::ApplyLazyVGridAdjustOffset(

@@ -923,9 +923,12 @@ float WaterFlowLayoutInfoSW::EstimateTotalHeight() const
     if (knowTotalHeight_ && repeatDifference_ == 0) {
         return maxHeight_;
     }
-    float height = std::max(-totalOffset_, 0.0f) // to eliminate top overScroll
-                   + (endPos_ - startPos_);
+    float height = parentDriven_ ? endPos_ + edgeFooterHeight_ :
+        std::max(-totalOffset_, 0.0f) + (endPos_ - startPos_);
     if (itemEnd_ && repeatDifference_ == 0) {
+        if (parentDriven_) {
+            return height + BotMargin();
+        }
         float bottomOverScroll = std::max(BottomFinalPos(lastMainSize_), 0.0f);
         return height - bottomOverScroll + BotMargin() + footerHeight_;
     }
@@ -1142,8 +1145,8 @@ bool WaterFlowLayoutInfoSW::HaveRecordIdx(int32_t idx) const
 
 float WaterFlowLayoutInfoSW::CalcMaxHeight(int itemCnt)
 {
-    auto footerHeight = 0.0f;
-    if (EndIndex() != itemCnt - 1) {
+    auto footerHeight = edgeSlots_ ? edgeFooterHeight_ : 0.0f;
+    if (!edgeSlots_ && EndIndex() != itemCnt - 1) {
         footerHeight = footerHeight_;
     }
     const float contentEnd = EndPos() + footerHeight + BotMargin();

@@ -25,6 +25,7 @@
     "pages/Tabs/TabsedgeEffect_pan",
     "pages/Tabs/TabBarPaddingAndAlign",
     "pages/waterflow/WaterFlowMainPage",
+    "pages/waterflow/WaterFlowHeaderFooterDraft",
     "pages/waterflow/demo01/WaterFlowDemo",
     "pages/waterflow/demo01/WaterFlowPinchToZoom1",
     "pages/waterflow/demo01/WaterFlowPinchToZoom2",

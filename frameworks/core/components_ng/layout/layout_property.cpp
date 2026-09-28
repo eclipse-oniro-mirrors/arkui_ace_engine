@@ -496,6 +496,8 @@ void LayoutProperty::UpdateLayoutPropertyValues(const LayoutProperty* layoutProp
     isUserSetBackgroundColor_ = layoutProperty->isUserSetBackgroundColor_;
     userDefinedHeightConfigured_ = layoutProperty->userDefinedHeightConfigured_;
     needLazyLayout_ = layoutProperty->needLazyLayout_;
+    lazyLayoutRequests_ = layoutProperty->lazyLayoutRequests_
+        ? std::make_unique<std::set<int32_t>>(*layoutProperty->lazyLayoutRequests_) : nullptr;
 }
 
 void LayoutProperty::UpdateCalcLayoutProperty(const MeasureProperty& constraint)
@@ -607,7 +609,7 @@ void LayoutProperty::UpdateLayoutConstraint(const LayoutConstraintF& parentConst
 {
     auto host = GetHost();
     layoutConstraint_ = parentConstraint;
-    if (!needLazyLayout_) {
+    if (!GetNeedLazyLayout()) {
         layoutConstraint_->viewPosRef.reset();
     }
     ExpandConstraintWithSafeArea(host);
@@ -906,7 +908,7 @@ void LayoutProperty::UpdateContentConstraint()
     ConstraintContentByPadding();
     ConstraintContentByBorder();
     ConstraintContentBySafeAreaPadding();
-    if (needLazyLayout_ && contentConstraint_->viewPosRef.has_value()) {
+    if (GetNeedLazyLayout() && contentConstraint_->viewPosRef.has_value()) {
         ConstraintViewPosRef(contentConstraint_->viewPosRef.value());
     }
 }
@@ -2876,8 +2878,23 @@ void LayoutProperty::SetNeedLazyLayout(bool value)
     needLazyLayout_ = true;
 }
 
+void LayoutProperty::SetLazyLayoutRequest(int32_t owner, bool enabled)
+{
+    if (enabled) {
+        if (!lazyLayoutRequests_) {
+            lazyLayoutRequests_ = std::make_unique<std::set<int32_t>>();
+        }
+        lazyLayoutRequests_->insert(owner);
+    } else if (lazyLayoutRequests_) {
+        lazyLayoutRequests_->erase(owner);
+        if (lazyLayoutRequests_->empty()) {
+            lazyLayoutRequests_.reset();
+        }
+    }
+}
+
 bool LayoutProperty::GetNeedLazyLayout() const
 {
-    return needLazyLayout_;
+    return needLazyLayout_ || (lazyLayoutRequests_ && !lazyLayoutRequests_->empty());
 }
 } // namespace OHOS::Ace::NG

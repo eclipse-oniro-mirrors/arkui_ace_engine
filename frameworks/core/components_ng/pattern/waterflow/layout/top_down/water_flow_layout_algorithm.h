@@ -50,7 +50,7 @@ private:
         int32_t childrenCount, double originalWidth);
     int32_t GetChildIndexWithFooter(int32_t index) const
     {
-        return index + layoutInfo_->footerIndex_ + 1;
+        return layoutInfo_->NodeIdx(index);
     }
     void LayoutFooter(LayoutWrapper* layoutWrapper, const OffsetF& childFrameOffset, bool reverse);
 

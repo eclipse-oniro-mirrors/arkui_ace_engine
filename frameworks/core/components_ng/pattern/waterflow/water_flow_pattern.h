@@ -16,6 +16,7 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_WATERFLOW_WATER_FLOW_PATTERN_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_WATERFLOW_WATER_FLOW_PATTERN_H
 
+#include "core/components_ng/pattern/waterflow/water_flow_parent_context.h"
 #include "core/components_ng/pattern/pattern.h"
 #include "core/components_ng/pattern/scrollable/scrollable_pattern.h"
 #include "core/components_ng/pattern/waterflow/layout/water_flow_layout_algorithm_base.h"
@@ -75,6 +76,20 @@ public:
 
     bool UpdateStartIndex(int32_t index);
 
+    uint64_t BeginEdgeUpdate(bool isHeader);
+    void SetEdge(bool isHeader, const RefPtr<UINode>& edge, uint64_t generation);
+    void SetSticky(StickyStyle style);
+    void SetEdgeGeometry(const OffsetF& origin, float totalSize);
+    void UpdateEdgePositions();
+    void UpdateParentLazyRequest();
+    void OnAttachToMainTree() override;
+    void OnDetachFromMainTree() override;
+    AdjustOffset ConsumeParentAdjustOffset();
+    void OnDetachFromFrameNode(FrameNode* frameNode) override;
+    const WaterFlowEdgeState& GetEdgeState() const { return edgeState_; }
+    WaterFlowChildIndexMap GetEdgeIndexMap() const;
+    int32_t GetDataCount() const;
+    void SyncEdgeSlots();
     void AddFooter(const RefPtr<NG::UINode>& footer);
 
     void ResetLayoutInfo();
@@ -298,6 +313,10 @@ private:
     double prevOffset_ = 0.0;
     SizeF lastSize_;
     std::pair<int32_t, int32_t> itemRange_ = { -1, -1 };
+    WaterFlowParentContext parentContext_;
+    WaterFlowEdgeState edgeState_;
+    OffsetF edgeOrigin_;
+    float edgeTotalSize_ = 0.0f;
     WeakPtr<UINode> footer_;
     // for keepVisiableContentPosition mode temporarily.
     bool keepContentPosition_ = true;

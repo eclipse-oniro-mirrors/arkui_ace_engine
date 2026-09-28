@@ -409,7 +409,53 @@ interface WaterFlowParam {
   footer?: CustomBuilder;
 }
 
+class WaterFlowHeaderModifier extends ModifierWithKey<CustomBuilder | undefined> {
+  static identity: Symbol = Symbol('waterFlowHeader');
+  applyPeer(node: KNode, reset: boolean): void {
+    if (reset) {
+      getUINativeModule().waterFlow.resetHeader(node);
+    } else {
+      getUINativeModule().waterFlow.setHeader(node, this.value);
+    }
+  }
+}
+
+class WaterFlowFooterModifier extends ModifierWithKey<CustomBuilder | undefined> {
+  static identity: Symbol = Symbol('waterFlowFooter');
+  applyPeer(node: KNode, reset: boolean): void {
+    if (reset) {
+      getUINativeModule().waterFlow.resetFooter(node);
+    } else {
+      getUINativeModule().waterFlow.setFooter(node, this.value);
+    }
+  }
+}
+
+class WaterFlowStickyModifier extends ModifierWithKey<StickyStyle | undefined> {
+  static identity: Symbol = Symbol('waterFlowSticky');
+  applyPeer(node: KNode, reset: boolean): void {
+    if (reset) {
+      getUINativeModule().waterFlow.resetSticky(node);
+    } else {
+      getUINativeModule().waterFlow.setSticky(node, this.value);
+    }
+  }
+}
+
 class ArkWaterFlowComponent extends ArkScrollable<WaterFlowAttribute> implements WaterFlowAttribute {
+  header(value: CustomBuilder | undefined): this {
+    modifierWithKey(this._modifiersWithKeys, WaterFlowHeaderModifier.identity, WaterFlowHeaderModifier, value);
+    return this;
+  }
+  footer(value: CustomBuilder | undefined): this {
+    modifierWithKey(this._modifiersWithKeys, WaterFlowFooterModifier.identity, WaterFlowFooterModifier, value);
+    return this;
+  }
+  sticky(value: StickyStyle | undefined): this {
+    modifierWithKey(this._modifiersWithKeys, WaterFlowStickyModifier.identity, WaterFlowStickyModifier, value);
+    return this;
+  }
+
   constructor(nativePtr: KNode, classType?: ModifierType) {
     super(nativePtr, classType);
   }

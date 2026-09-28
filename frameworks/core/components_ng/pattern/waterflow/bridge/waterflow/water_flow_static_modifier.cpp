@@ -17,6 +17,7 @@
 #include "core/components_ng/pattern/scrollable/scrollable_model_static.h"
 #include "core/components_ng/pattern/waterflow/bridge/waterflow/water_flow_sections_accessor_peer_impl.h"
 #include "core/components_ng/pattern/waterflow/water_flow_model_static.h"
+#include "core/components_ng/pattern/waterflow/water_flow_pattern.h"
 #include "core/interfaces/native/implementation/water_flow_scroller_peer_impl.h"
 #include "core/interfaces/native/utility/callback_helper.h"
 #include "core/interfaces/native/utility/converter.h"
@@ -300,12 +301,66 @@ void SetSupportEmptyBranchInLazyLoadingImpl(Ark_NativePointer node, const Opt_Bo
     auto enabled = Converter::OptConvertPtr<bool>(value).value_or(false);
     WaterFlowModelStatic::SetSupportEmptyBranchInLazyLoading(frameNode, enabled);
 }
+void SetEdgeBuilder(Ark_NativePointer node, const Opt_CustomNodeBuilder* builder, bool header)
+{
+    auto frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto pattern = frameNode->GetPattern<WaterFlowPattern>();
+    CHECK_NULL_VOID(pattern);
+    const auto generation = WaterFlowModelStatic::BeginEdgeUpdate(frameNode, header);
+    auto optBuilder = Converter::GetOptPtr(builder);
+    if (!optBuilder) {
+        WaterFlowModelStatic::SetEdge(frameNode, header, nullptr, generation);
+        return;
+    }
+    CallbackHelper(*optBuilder).BuildAsync(
+        [weak = AceType::WeakClaim(frameNode), header, generation](const RefPtr<UINode>& content) {
+            auto host = weak.Upgrade();
+            CHECK_NULL_VOID(host);
+            auto pattern = host->GetPattern<WaterFlowPattern>();
+            CHECK_NULL_VOID(pattern);
+            WaterFlowModelStatic::SetEdge(AceType::RawPtr(host), header, content, generation);
+        }, node);
+}
+
+void SetHeaderImpl(Ark_NativePointer node, const Opt_CustomNodeBuilder* builder)
+{
+    SetEdgeBuilder(node, builder, true);
+}
+
+void SetFooterImpl(Ark_NativePointer node, const Opt_CustomNodeBuilder* builder)
+{
+    SetEdgeBuilder(node, builder, false);
+}
+
+void SetStickyImpl(Ark_NativePointer node, const Opt_StickyStyle* value)
+{
+    auto frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto pattern = frameNode->GetPattern<WaterFlowPattern>();
+    CHECK_NULL_VOID(pattern);
+    auto opt = Converter::GetOptPtr(value);
+    auto style = StickyStyle::NONE;
+    if (opt) {
+        switch (*opt) {
+            case ARK_STICKY_STYLE_HEADER: style = StickyStyle::HEADER; break;
+            case ARK_STICKY_STYLE_FOOTER: style = StickyStyle::FOOTER; break;
+            case ARK_STICKY_STYLE_BOTH: style = StickyStyle::BOTH; break;
+            default: break;
+        }
+    }
+    WaterFlowModelStatic::SetSticky(frameNode, static_cast<int32_t>(style));
+}
+
 } // WaterFlowAttributeModifier
 const GENERATED_ArkUIWaterFlowModifier* GetWaterFlowStaticModifier()
 {
     static const GENERATED_ArkUIWaterFlowModifier ArkUIWaterFlowModifierImpl {
         WaterFlowModifier::ConstructImpl,
         WaterFlowInterfaceModifier::SetWaterFlowOptionsImpl,
+        WaterFlowAttributeModifier::SetHeaderImpl,
+        WaterFlowAttributeModifier::SetFooterImpl,
+        WaterFlowAttributeModifier::SetStickyImpl,
         WaterFlowAttributeModifier::SetColumnsTemplateImpl,
         WaterFlowAttributeModifier::SetItemConstraintSizeImpl,
         WaterFlowAttributeModifier::SetRowsTemplateImpl,

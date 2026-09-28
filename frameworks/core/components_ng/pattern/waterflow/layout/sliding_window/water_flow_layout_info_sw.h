@@ -185,9 +185,9 @@ public:
     inline float TopMargin() const
     {
         if (margins_.empty()) {
-            return 0.0f;
+            return headerHeight_;
         }
-        return (axis_ == Axis::VERTICAL ? margins_.front().top : margins_.front().left).value_or(0.0f);
+        return headerHeight_ + (axis_ == Axis::VERTICAL ? margins_.front().top : margins_.front().left).value_or(0.0f);
     }
     inline float BotMargin() const
     {

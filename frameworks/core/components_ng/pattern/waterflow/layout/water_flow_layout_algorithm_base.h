@@ -79,6 +79,11 @@ public:
     int32_t measuredEndIndex_ = -1;
 
 protected:
+    void PrepareParentLayout(LayoutWrapper* wrapper, const RefPtr<WaterFlowLayoutInfoBase>& info,
+        SizeF& size, bool matchChildren);
+    bool FinishParentLayout(LayoutWrapper* wrapper, const RefPtr<WaterFlowLayoutInfoBase>& info, SizeF size);
+    void MeasureEdges(LayoutWrapper* wrapper, const RefPtr<WaterFlowLayoutInfoBase>& info, const SizeF& size);
+    void LayoutEdges(LayoutWrapper* wrapper, const RefPtr<WaterFlowLayoutInfoBase>& info, float bodyEnd);
     /**
      * @brief Register an IdleTask to preload (create/measure/layout) items in cache range.
      */

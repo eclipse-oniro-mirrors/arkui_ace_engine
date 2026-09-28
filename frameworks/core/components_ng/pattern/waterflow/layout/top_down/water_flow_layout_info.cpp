@@ -153,9 +153,9 @@ float WaterFlowLayoutInfo::GetMaxMainHeight() const
         return endPosArray_.back().first + BotMargin();
     }
     if (items_.empty()) {
-        return 0.0f;
+        return headerHeight_;
     }
-    float result = 0.0f;
+    float result = headerHeight_;
     for (const auto& crossItems : *items_.rbegin()) {
         if (crossItems.second.empty()) {
             continue;
@@ -509,10 +509,10 @@ void WaterFlowLayoutInfo::Sync(float mainSize, bool canOverScrollStart, bool can
     endIndex_ = FastSolveEndIndex(GetViewEndBound(mainSize));
     reportEndIndex_ = FastSolveEndIndex(GetViewEndBound(mainSize, true));
 
-    maxHeight_ = GetMaxMainHeight();
+    maxHeight_ = GetMaxMainHeight() + (edgeSlots_ ? edgeFooterHeight_ : 0.0f);
 
     itemStart_ = GreatOrEqual(currentOffset_, contentStartOffset_);
-    itemEnd_ = reportEndIndex_ >= 0 && reportEndIndex_ == GetChildrenCount() - 1;
+    itemEnd_ = reportEndIndex_ >= 0 && reportEndIndex_ == SegmentedItemCount() - 1;
     offsetEnd_ = itemEnd_ && GreatOrEqual(mainSize - currentOffset_, maxHeight_ + contentEndOffset_);
     // adjust offset when it can't overScroll at bottom
     if (offsetEnd_ && LessNotEqual(currentOffset_, contentStartOffset_) && !canOverScrollEnd) {
@@ -593,9 +593,10 @@ void WaterFlowLayoutInfo::PrepareSegmentStartPos()
 void WaterFlowLayoutInfo::ResetSegmentStartPos()
 {
     if (margins_.empty()) {
-        segmentStartPos_ = { 0.0f };
+        segmentStartPos_ = { headerHeight_ };
     } else {
-        segmentStartPos_ = { (axis_ == Axis::VERTICAL ? margins_[0].top : margins_[0].left).value_or(0.0f) };
+        segmentStartPos_ = { headerHeight_ +
+            (axis_ == Axis::VERTICAL ? margins_[0].top : margins_[0].left).value_or(0.0f) };
     }
 }
 
@@ -714,9 +715,10 @@ float WaterFlowLayoutInfo::EstimateTotalHeight() const
     if (childCount == 0) {
         return 0;
     }
-    auto total = totalChildrenCount - (footerIndex_ >= 0 ? 1 : 0);
+    auto total = edgeSlots_ ? edgeIndexMap_.DataCount(totalChildrenCount)
+                            : totalChildrenCount - (footerIndex_ >= 0 ? 1 : 0);
     auto footHeight = footerIndex_ >= 0 ? footerHeight_ : 0.0f;
-    auto estimateHeight = GetMaxMainHeight() / childCount * total + footHeight;
+    auto estimateHeight = (GetMaxMainHeight() - headerHeight_) / childCount * total + headerHeight_ + footHeight;
     return estimateHeight;
 }
 

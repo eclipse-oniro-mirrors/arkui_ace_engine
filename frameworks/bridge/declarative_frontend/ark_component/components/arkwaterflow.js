@@ -387,7 +387,53 @@ class WaterFlowInitializeModifier extends ModifierWithKey {
 }
 WaterFlowInitializeModifier.identity = Symbol('waterFlowInitialize');
 
+class WaterFlowHeaderModifier extends ModifierWithKey {
+  applyPeer(node, reset) {
+    if (reset) {
+      getUINativeModule().waterFlow.resetHeader(node);
+    } else {
+      getUINativeModule().waterFlow.setHeader(node, this.value);
+    }
+  }
+}
+WaterFlowHeaderModifier.identity = Symbol('waterFlowHeader');
+
+class WaterFlowFooterModifier extends ModifierWithKey {
+  applyPeer(node, reset) {
+    if (reset) {
+      getUINativeModule().waterFlow.resetFooter(node);
+    } else {
+      getUINativeModule().waterFlow.setFooter(node, this.value);
+    }
+  }
+}
+WaterFlowFooterModifier.identity = Symbol('waterFlowFooter');
+
+class WaterFlowStickyModifier extends ModifierWithKey {
+  applyPeer(node, reset) {
+    if (reset) {
+      getUINativeModule().waterFlow.resetSticky(node);
+    } else {
+      getUINativeModule().waterFlow.setSticky(node, this.value);
+    }
+  }
+}
+WaterFlowStickyModifier.identity = Symbol('waterFlowSticky');
+
 class ArkWaterFlowComponent extends ArkScrollable {
+  header(value) {
+    modifierWithKey(this._modifiersWithKeys, WaterFlowHeaderModifier.identity, WaterFlowHeaderModifier, value);
+    return this;
+  }
+  footer(value) {
+    modifierWithKey(this._modifiersWithKeys, WaterFlowFooterModifier.identity, WaterFlowFooterModifier, value);
+    return this;
+  }
+  sticky(value) {
+    modifierWithKey(this._modifiersWithKeys, WaterFlowStickyModifier.identity, WaterFlowStickyModifier, value);
+    return this;
+  }
+
   constructor(nativePtr, classType) {
     super(nativePtr, classType);
   }
@@ -524,6 +570,16 @@ class ArkWaterFlowComponent extends ArkScrollable {
 
 
 class JSWaterFlow extends JSContainerBase {
+  static header(value) {
+    getUINativeModule().waterFlow.setHeader(true, value);
+  }
+  static footer(value) {
+    getUINativeModule().waterFlow.setFooter(true, value);
+  }
+  static sticky(value) {
+    getUINativeModule().waterFlow.setSticky(true, value);
+  }
+
   static create(params) {
     getUINativeModule().waterFlow.create(params);
   }

@@ -17,6 +17,8 @@
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_WATERFLOW_WATER_FLOW_LAYOUT_INFO_BASE_H
 
 #include "base/memory/ace_type.h"
+#include "core/components_ng/pattern/waterflow/water_flow_edge_state.h"
+#include "core/components_ng/pattern/lazy_layout/lazy_layout_offset.h"
 #include "base/utils/noncopyable.h"
 #include "core/components/scroll/scroll_controller_base.h"
 #include "core/components_ng/pattern/scrollable/scrollable.h"
@@ -171,7 +173,7 @@ public:
     // convert FlowItem's index to children node index.
     inline int32_t NodeIdx(int32_t idx) const
     {
-        return idx + footerIndex_ + 1;
+        return edgeSlots_ ? edgeIndexMap_.DataToNode(idx) : idx + footerIndex_ + 1;
     }
 
     /**
@@ -179,7 +181,7 @@ public:
      */
     inline int32_t ItemCnt(int32_t childrenCount) const
     {
-        return childrenCount - footerIndex_ - 1;
+        return edgeSlots_ ? edgeIndexMap_.DataCount(childrenCount) : childrenCount - footerIndex_ - 1;
     }
 
     /**
@@ -230,12 +232,29 @@ public:
 
     float GetViewStartBound(bool ignoreFixOffset = false) const
     {
-        return ignoreFixOffset ? 0.0f : -startFixOffset_;
+        return (parentDriven_ ? parentViewStart_ : 0.0f) - (ignoreFixOffset ? 0.0f : startFixOffset_);
     }
 
     float GetViewEndBound(float mainSize, bool ignoreFixOffset = false) const
     {
-        return mainSize + expandHeight_ + (ignoreFixOffset ? 0.0f : endFixOffset_);
+        return (parentDriven_ ? parentViewEnd_ : mainSize) + expandHeight_ + (ignoreFixOffset ? 0.0f : endFixOffset_);
+    }
+
+    // Only the new edge-attribute path uses this mapping; legacy segmented footer stays unchanged.
+    bool parentDriven_ = false;
+    float parentViewStart_ = 0.0f;
+    float parentViewEnd_ = 0.0f;
+    float parentMainSize_ = 0.0f;
+    std::optional<int64_t> parentDeadline_;
+    AdjustOffset parentAdjustOffset_;
+    bool edgeSlots_ = false;
+    WaterFlowChildIndexMap edgeIndexMap_;
+    float headerHeight_ = 0.0f;
+    float edgeFooterHeight_ = 0.0f;
+
+    int32_t SegmentedItemCount() const
+    {
+        return edgeSlots_ ? ItemCnt(GetChildrenCount()) : GetChildrenCount();
     }
 
     bool itemStart_ = false;

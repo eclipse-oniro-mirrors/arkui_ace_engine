@@ -31,6 +31,32 @@
 #include "core/components_ng/manager/scroll_adjust/scroll_adjust_manager.h"
 
 namespace OHOS::Ace::NG {
+uint64_t WaterFlowModelNG::BeginEdgeUpdate(FrameNode* frameNode, bool header)
+{
+    CHECK_NULL_RETURN(frameNode, 0);
+    auto pattern = frameNode->GetPattern<WaterFlowPattern>();
+    CHECK_NULL_RETURN(pattern, 0);
+    return pattern->BeginEdgeUpdate(header);
+}
+
+void WaterFlowModelNG::SetEdge(FrameNode* frameNode, bool header, const RefPtr<UINode>& content, uint64_t generation)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto pattern = frameNode->GetPattern<WaterFlowPattern>();
+    CHECK_NULL_VOID(pattern);
+    pattern->SetEdge(header, content, generation);
+}
+
+void WaterFlowModelNG::SetSticky(FrameNode* frameNode, int32_t value)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto pattern = frameNode->GetPattern<WaterFlowPattern>();
+    CHECK_NULL_VOID(pattern);
+    const auto style = value >= 0 && value <= static_cast<int32_t>(StickyStyle::BOTH)
+        ? static_cast<StickyStyle>(value) : StickyStyle::NONE;
+    pattern->SetSticky(style);
+}
+
 
 #define SCROLLABLE_WATERFLOW_ATTRIBUTE "Scrollable.WaterFlowAttribute."
 

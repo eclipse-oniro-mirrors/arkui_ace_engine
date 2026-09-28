@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 
+#include "core/components_ng/pattern/scrollable/scroll_viewport_coordinator.h"
 #include <gmock/gmock.h>
 
 #include "core/common/thp_extra_manager.h"
@@ -934,6 +935,14 @@ void PipelineContext::AddBuildFinishCallBack(std::function<void()>&& callback)
 void PipelineContext::AddPredictTask(PredictTask&& task)
 {
     predictTasks_.emplace_back(task);
+}
+
+RefPtr<ScrollViewportCoordinator> PipelineContext::GetScrollViewportCoordinator()
+{
+    if (!scrollViewportCoordinator_) {
+        scrollViewportCoordinator_ = MakeRefPtr<ScrollViewportCoordinator>();
+    }
+    return scrollViewportCoordinator_;
 }
 
 void PipelineContext::AddAfterLayoutTask(std::function<void()>&& task, bool isFlushInImplicitAnimationTask)

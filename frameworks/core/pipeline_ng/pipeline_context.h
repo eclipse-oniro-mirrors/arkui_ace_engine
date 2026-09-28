@@ -87,6 +87,7 @@ class MemoryManager;
 class ContentChangeManager;
 class InspectorOffscreenNodesMgr;
 class OverlayManager;
+class ScrollViewportCoordinator;
 class PostEventManager;
 class PrivacySensitiveManager;
 class SafeAreaManager;
@@ -429,6 +430,8 @@ public:
     void AddAfterLayoutTask(std::function<void()>&& task, bool isFlushInImplicitAnimationTask = false);
 
     void AddPersistAfterLayoutTask(std::function<void()>&& task);
+
+    RefPtr<ScrollViewportCoordinator> GetScrollViewportCoordinator();
 
     void AddAfterModifierTask(std::function<void()>&& task);
 
@@ -1376,6 +1379,7 @@ protected:
     void PostKeyboardAvoidTask();
 
 private:
+    RefPtr<ScrollViewportCoordinator> scrollViewportCoordinator_;
     void ExecuteSurfaceChangedCallbacks(int32_t newWidth, int32_t newHeight, WindowSizeChangeReason type);
 
     void FlushWindowStateChangedCallback(bool isShow);

@@ -19,6 +19,7 @@ export interface routerInfo {
 }
 
 let routerData: routerInfo[] = [
+  { url: 'pages/waterflow/WaterFlowHeaderFooterDraft', info: 'Header/Footer/Sticky draftCode' },
   { url: 'pages/waterflow/demo01/waterFlowFriction', info: 'Friction' }
 ]
 

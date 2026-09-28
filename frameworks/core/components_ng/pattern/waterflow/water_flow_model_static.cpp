@@ -15,6 +15,8 @@
 
 #include "core/components_ng/pattern/waterflow/water_flow_model_static.h"
 
+#include "core/components_ng/pattern/waterflow/water_flow_model_ng.h"
+
 #include "base/geometry/dimension.h"
 #include "core/components_ng/base/view_stack_processor.h"
 #include "core/components_ng/pattern/scrollable/scrollable_controller.h"
@@ -23,6 +25,22 @@
 #include "core/components_ng/pattern/waterflow/water_flow_pattern.h"
 
 namespace OHOS::Ace::NG {
+uint64_t WaterFlowModelStatic::BeginEdgeUpdate(FrameNode* frameNode, bool header)
+{
+    return WaterFlowModelNG::BeginEdgeUpdate(frameNode, header);
+}
+
+void WaterFlowModelStatic::SetEdge(
+    FrameNode* frameNode, bool header, const RefPtr<UINode>& content, uint64_t generation)
+{
+    WaterFlowModelNG::SetEdge(frameNode, header, content, generation);
+}
+
+void WaterFlowModelStatic::SetSticky(FrameNode* frameNode, int32_t value)
+{
+    WaterFlowModelNG::SetSticky(frameNode, value);
+}
+
 
 const auto DEFAULT_CONSTRAINT_SIZE = CalcLength(0.0_vp);
 

@@ -23,6 +23,9 @@
 namespace OHOS::Ace::NG {
 class ACE_EXPORT WaterFlowModelNG : public WaterFlowModel {
 public:
+    static uint64_t BeginEdgeUpdate(FrameNode* frameNode, bool header);
+    static void SetEdge(FrameNode* frameNode, bool header, const RefPtr<UINode>& content, uint64_t generation);
+    static void SetSticky(FrameNode* frameNode, int32_t value);
     void Create() override;
     void SetFooter(std::function<void()>&& footer) override;
     void SetFooterWithFrameNode(const RefPtr<NG::UINode>& footer) override;

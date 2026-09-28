@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/pattern/lazy_layout/lazy_layout_offset.h"
 #include "core/components_ng/property/layout_constraint.h"
 
 namespace OHOS::Ace::NG {
@@ -46,6 +47,7 @@ enum class LazyLayoutMeasureMode {
 };
 
 struct ACE_FORCE_EXPORT LazyLayoutUtils {
+    static AdjustOffset ConsumeNestedLazyAdjustOffset(const RefPtr<UINode>& node);
     static bool IsAllowedIntermediateNode(const RefPtr<UINode>& node);
     static bool IsVerticalScrollableParent(const RefPtr<UINode>& node);
     static bool IsScrollableParent(const RefPtr<UINode>& node, Axis axis);
