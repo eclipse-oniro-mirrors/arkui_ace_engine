@@ -18,7 +18,6 @@
 #include "core/components_ng/pattern/waterflow/bridge/waterflow/water_flow_sections_accessor_peer_impl.h"
 #include "core/components_ng/pattern/waterflow/water_flow_model_static.h"
 #include "core/components_ng/pattern/lazy_layout/header_footer_utils.h"
-#include "core/components_ng/pattern/waterflow/water_flow_pattern.h"
 #include "core/interfaces/native/implementation/water_flow_scroller_peer_impl.h"
 #include "core/interfaces/native/utility/callback_helper.h"
 #include "core/interfaces/native/utility/converter.h"
@@ -306,9 +305,8 @@ void SetEdgeBuilder(Ark_NativePointer node, const Opt_CustomNodeBuilder* builder
 {
     auto frameNode = reinterpret_cast<FrameNode*>(node);
     CHECK_NULL_VOID(frameNode);
-    auto pattern = frameNode->GetPattern<WaterFlowPattern>();
-    CHECK_NULL_VOID(pattern);
     const auto generation = WaterFlowModelStatic::BeginEdgeUpdate(frameNode, header);
+    CHECK_NULL_VOID(generation);
     auto optBuilder = Converter::GetOptPtr(builder);
     if (!optBuilder) {
         WaterFlowModelStatic::SetEdge(frameNode, header, nullptr, generation);
@@ -318,8 +316,6 @@ void SetEdgeBuilder(Ark_NativePointer node, const Opt_CustomNodeBuilder* builder
         [weak = AceType::WeakClaim(frameNode), header, generation](const RefPtr<UINode>& content) {
             auto host = weak.Upgrade();
             CHECK_NULL_VOID(host);
-            auto pattern = host->GetPattern<WaterFlowPattern>();
-            CHECK_NULL_VOID(pattern);
             WaterFlowModelStatic::SetEdge(AceType::RawPtr(host), header, content, generation);
         }, node);
 }
@@ -338,8 +334,6 @@ void SetStickyImpl(Ark_NativePointer node, const Opt_StickyStyle* value)
 {
     auto frameNode = reinterpret_cast<FrameNode*>(node);
     CHECK_NULL_VOID(frameNode);
-    auto pattern = frameNode->GetPattern<WaterFlowPattern>();
-    CHECK_NULL_VOID(pattern);
     auto opt = Converter::GetOptPtr(value);
     auto style = StickyStyle::NONE;
     if (opt) {
