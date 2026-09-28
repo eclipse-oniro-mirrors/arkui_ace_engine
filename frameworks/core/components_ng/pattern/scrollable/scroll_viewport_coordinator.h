@@ -29,6 +29,8 @@ class ScrollViewportCoordinator : public AceType {
 public:
     void Register(const RefPtr<FrameNode>& node, std::function<void()>&& update)
     {
+        CHECK_NULL_VOID(node);
+        CHECK_NULL_VOID(update);
         targets_.insert_or_assign(node->GetId(), Target { node, std::move(update) });
     }
 
@@ -39,6 +41,11 @@ public:
 
     void Flush(PipelineContext* pipeline)
     {
+        if (flushing_) {
+            return;
+        }
+        flushing_ = true;
+        // Callbacks may update the registry; finish collecting the snapshot before invoking them.
         std::vector<std::function<void()>> updates;
         for (auto iter = targets_.begin(); iter != targets_.end();) {
             auto node = iter->second.node.Upgrade();
@@ -52,6 +59,7 @@ public:
         for (const auto& update : updates) {
             update();
         }
+        flushing_ = false;
     }
 
 private:
@@ -60,6 +68,7 @@ private:
         std::function<void()> update;
     };
     std::map<int32_t, Target> targets_;
+    bool flushing_ = false;
 };
 } // namespace OHOS::Ace::NG
 #endif // FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_SCROLLABLE_SCROLL_VIEWPORT_COORDINATOR_H

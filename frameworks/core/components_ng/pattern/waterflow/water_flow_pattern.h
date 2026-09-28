@@ -45,7 +45,6 @@ struct WaterFlowEdgeState {
 
     uint64_t BeginUpdate(bool isHeader)
     {
-        enabled = true;
         if (!isHeader) {
             footerControlled = true;
         }
@@ -55,6 +54,12 @@ struct WaterFlowEdgeState {
     bool IsCurrent(bool isHeader, uint64_t generation) const
     {
         return generation == (isHeader ? headerGeneration : footerGeneration);
+    }
+
+    void InvalidateGenerations()
+    {
+        ++headerGeneration;
+        ++footerGeneration;
     }
 };
 
@@ -126,7 +131,7 @@ public:
     void UpdateParentLazyRequest();
     void OnAttachToMainTree() override;
     void OnDetachFromMainTree() override;
-    AdjustOffset ConsumeParentAdjustOffset();
+    OHOS::Ace::NG::AdjustOffset ConsumeParentAdjustOffset();
     void OnDetachFromFrameNode(FrameNode* frameNode) override;
     const WaterFlowEdgeState& GetEdgeState() const { return edgeState_; }
     WaterFlowChildIndexMap GetEdgeIndexMap() const;
@@ -317,6 +322,7 @@ private:
     double GetTopEdgeEffectPos() const;
     SizeF GetContentSize() const;
     void MarkDirtyNodeSelf();
+    void EnableEdgeSlots();
     // align to the very top via precise index jump when a backToTop animation settles short of the top
     void CheckBackToTopFallback();
     void OnScrollEndCallback() override;

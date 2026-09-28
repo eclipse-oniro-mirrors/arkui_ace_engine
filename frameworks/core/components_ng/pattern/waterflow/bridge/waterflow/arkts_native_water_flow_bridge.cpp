@@ -638,7 +638,7 @@ ArkUINativeModuleValue WaterFlowBridge::SetSticky(ArkUIRuntimeCallInfo* info)
     const bool isNumber = !value.IsEmpty() && value->IsNumber();
     int32_t style = isNumber ? value->Int32Value(vm) : 0;
     if (style < 0 || style > static_cast<int32_t>(StickyStyle::BOTH) ||
-        (isNumber && value->NumberValue(vm) != static_cast<double>(style))) {
+        (isNumber && value->ToNumber(vm)->Value() != static_cast<double>(style))) {
         style = 0;
     }
     WaterFlowModelNG::SetSticky(host, style);

@@ -15,9 +15,10 @@
 
 #include "water_flow_test_ng.h"
 
+#include <memory>
+
 #include "core/components_ng/pattern/lazy_layout/header_footer_utils.h"
 #include "core/components_ng/pattern/lazy_layout/lazy_layout_utils.h"
-
 #include "core/components_ng/pattern/linear_layout/linear_layout_pattern.h"
 #include "core/components_ng/pattern/scroll/scroll_pattern.h"
 #include "core/components_ng/pattern/scrollable/scroll_viewport_coordinator.h"
@@ -135,6 +136,67 @@ HWTEST_F(WaterFlowHeaderFooterTest, WFHF_StaleBuilder, TestSize.Level1)
 }
 
 /**
+ * @tc.name: WFHF_StaleBuilderKeepsLegacyTree
+ * @tc.desc: Starting or rejecting a builder cannot reparent the legacy footer.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowHeaderFooterTest, WFHF_StaleBuilderKeepsLegacyTree, TestSize.Level1)
+{
+    CreateWaterFlow();
+    CreateWaterFlowItems(2);
+    auto legacy = Edge(70.0f);
+    pattern_->AddFooter(legacy);
+    const auto stale = pattern_->BeginEdgeUpdate(true);
+    const auto current = pattern_->BeginEdgeUpdate(true);
+    EXPECT_EQ(legacy->GetParent(), frameNode_);
+    EXPECT_FALSE(pattern_->GetEdgeState().enabled);
+    pattern_->SetEdge(true, Edge(50.0f), stale);
+    EXPECT_EQ(legacy->GetParent(), frameNode_);
+    EXPECT_FALSE(pattern_->GetEdgeState().enabled);
+    pattern_->SetEdge(true, Edge(50.0f), current);
+    EXPECT_NE(legacy->GetParent(), frameNode_);
+    EXPECT_TRUE(pattern_->GetEdgeState().enabled);
+    EXPECT_EQ(pattern_->GetDataCount(), 2);
+    CreateDone();
+}
+
+/**
+ * @tc.name: WFHF_StickyKeepsPendingBuilder
+ * @tc.desc: Enabling sticky does not invalidate a pending header builder.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowHeaderFooterTest, WFHF_StickyKeepsPendingBuilder, TestSize.Level1)
+{
+    CreateWaterFlow();
+    CreateWaterFlowItems(2);
+    const auto generation = pattern_->BeginEdgeUpdate(true);
+    pattern_->SetSticky(StickyStyle::HEADER);
+    pattern_->SetEdge(true, Edge(50.0f), generation);
+    CreateDone();
+    ASSERT_NE(Header(), nullptr);
+    EXPECT_EQ(pattern_->GetDataCount(), 2);
+    EXPECT_FLOAT_EQ(Header()->GetGeometryNode()->GetFrameSize().Height(), 50.0f);
+}
+
+/**
+ * @tc.name: WFHF_IntrinsicEdgeHeight
+ * @tc.desc: An edge with no explicit height measures its content, including beyond the viewport.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowHeaderFooterTest, WFHF_IntrinsicEdgeHeight, TestSize.Level1)
+{
+    CreateWaterFlow();
+    CreateWaterFlowItems(2);
+    auto content = FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), MakeRefPtr<LinearLayoutPattern>(true));
+    content->AddChild(Edge(30.0f));
+    content->AddChild(Edge(WATER_FLOW_HEIGHT));
+    pattern_->SetEdge(true, content, pattern_->BeginEdgeUpdate(true));
+    CreateDone();
+    EXPECT_FLOAT_EQ(Header()->GetGeometryNode()->GetFrameSize().Height(), WATER_FLOW_HEIGHT + 30.0f);
+}
+
+/**
  * @tc.name: WFHF_DetachInvalidatesBuilder
  * @tc.desc: A detached or recycled host rejects its previous asynchronous builder result.
  * @tc.type: FUNC
@@ -216,6 +278,66 @@ HWTEST_F(WaterFlowHeaderFooterTest, WFHF_ParentOnlyMove, TestSize.Level1)
     pattern_->SetSticky(StickyStyle::NONE);
     EXPECT_FLOAT_EQ(Header()->GetGeometryNode()->GetMarginFrameOffset().GetY(), 0.0f);
     EXPECT_FLOAT_EQ(GetChildRect(frameNode_, 0).Top(), 960.0f);
+}
+
+/**
+ * @tc.name: WFHF_ZeroClipRestoresNaturalPosition
+ * @tc.desc: A zero-height clipping ancestor blocks pinning until its next layout gives it a viewport.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowHeaderFooterTest, WFHF_ZeroClipRestoresNaturalPosition, TestSize.Level1)
+{
+    CreateWaterFlow();
+    CreateWaterFlowItems(20);
+    SetEdges();
+    CreateDone();
+    auto parent = ParentScroll(300.0f);
+    auto clip = Edge(0.0f);
+    clip->GetRenderContext()->UpdateClipEdge(true);
+    clip->AddChild(parent);
+    frameNode_->GetGeometryNode()->SetFrameOffset(OffsetF(0.0f, -200.0f));
+    pattern_->SetEdgeGeometry(OffsetF(), 1000.0f);
+    pattern_->SetSticky(StickyStyle::HEADER);
+    auto pipeline = frameNode_->GetContext();
+    ASSERT_NE(pipeline, nullptr);
+    pipeline->GetScrollViewportCoordinator()->Flush(pipeline);
+    EXPECT_FLOAT_EQ(Header()->GetGeometryNode()->GetMarginFrameOffset().GetY(), 0.0f);
+    clip->GetGeometryNode()->SetFrameSize(SizeF(WATER_FLOW_WIDTH, 300.0f));
+    pipeline->GetScrollViewportCoordinator()->Flush(pipeline);
+    EXPECT_FLOAT_EQ(Header()->GetGeometryNode()->GetMarginFrameOffset().GetY(), 200.0f);
+}
+
+/**
+ * @tc.name: WFHF_CoordinatorMutationAndReentry
+ * @tc.desc: Registry mutations use the next snapshot and recursive flush does not re-enter callbacks.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowHeaderFooterTest, WFHF_CoordinatorMutationAndReentry, TestSize.Level1)
+{
+    CreateWaterFlow();
+    CreateDone();
+    auto pipeline = frameNode_->GetContext();
+    ASSERT_NE(pipeline, nullptr);
+    auto coordinator = MakeRefPtr<ScrollViewportCoordinator>();
+    auto* rawCoordinator = AceType::RawPtr(coordinator);
+    auto calls = std::make_shared<int32_t>(0);
+    coordinator->Register(nullptr, [calls]() { ++*calls; });
+    coordinator->Register(frameNode_, {});
+    coordinator->Flush(pipeline);
+    EXPECT_EQ(*calls, 0);
+    WeakPtr<FrameNode> weak = frameNode_;
+    coordinator->Register(frameNode_, [rawCoordinator, weak, pipeline, calls]() {
+        ++*calls;
+        auto node = weak.Upgrade();
+        ASSERT_NE(node, nullptr);
+        rawCoordinator->Unregister(node->GetId());
+        rawCoordinator->Register(node, [calls]() { ++*calls; });
+        rawCoordinator->Flush(pipeline);
+    });
+    coordinator->Flush(pipeline);
+    EXPECT_EQ(*calls, 1);
+    coordinator->Flush(pipeline);
+    EXPECT_EQ(*calls, 2);
 }
 
 /**

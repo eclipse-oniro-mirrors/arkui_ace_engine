@@ -1077,7 +1077,7 @@
                 "replaceImplementation": false
             }
         },
-        "waterFlowAttribute": {
+        "WaterFlowAttribute": {
             "setWaterFlowOptions": {
                 "hookName": "hookWaterFlowOptionsImpl",
                 "replaceImplementation": true
