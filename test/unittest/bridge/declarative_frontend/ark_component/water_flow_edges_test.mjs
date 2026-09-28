@@ -16,6 +16,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import vm from 'node:vm';
+import * as moduleApi from 'node:module';
 
 const file = new URL('../../../../../frameworks/bridge/declarative_frontend/ark_component/components/arkwaterflow.js',
   import.meta.url);
@@ -43,6 +44,26 @@ function load() {
 }
 
 for (const method of ['header', 'footer', 'sticky']) {
+  // Node 24 runs the real TypeScript proxy without adding a test-only compiler dependency.
+  test(`${method}: lazy proxy preserves chaining and undefined`, {
+    skip: typeof moduleApi.stripTypeScriptTypes !== 'function',
+  }, () => {
+    const calls = [];
+    const component = new Proxy({}, { get: (_, name) => (value) => calls.push({ name, value }) });
+    const context = vm.createContext({
+      ArkScrollable: class {},
+      requireNapi: () => ({ createComponent: () => component }),
+    });
+    const proxyFile = new URL('../../../../../frameworks/bridge/declarative_frontend/ark_modifier/src/' +
+      'water_flow_modifier.ts', import.meta.url);
+    vm.runInContext(moduleApi.stripTypeScriptTypes(readFileSync(proxyFile, 'utf8')) +
+      '\nglobalThis.LazyComponent = LazyArkWaterFlowComponent;', context);
+    const proxy = new context.LazyComponent('node', 0);
+    const value = method === 'sticky' ? 3 : () => {};
+    assert.equal(proxy[method](value), proxy);
+    assert.equal(proxy[method](undefined), proxy);
+    assert.deepEqual(calls, [{ name: method, value }, { name: method, value: undefined }]);
+  });
   test(`${method}: declarative entry forwards builder or undefined`, () => {
     const { calls, context } = load();
     const value = method === 'sticky' ? 3 : () => {};

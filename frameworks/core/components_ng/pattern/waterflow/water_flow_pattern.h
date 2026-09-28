@@ -123,14 +123,18 @@ public:
 
     bool UpdateStartIndex(int32_t index);
 
+    // Reserve a per-edge token; only the latest builder result may replace the live subtree.
     uint64_t BeginEdgeUpdate(bool isHeader);
     void SetEdge(bool isHeader, const RefPtr<UINode>& edge, uint64_t generation);
     void SetSticky(StickyStyle style);
+    // Save natural layout geometry and register one weak viewport callback until detach.
     void SetEdgeGeometry(const OffsetF& origin, float totalSize);
     void UpdateEdgePositions();
+    // Own intermediate lazy requests only while attached and eligible for parent-driven layout.
     void UpdateParentLazyRequest();
     void OnAttachToMainTree() override;
     void OnDetachFromMainTree() override;
+    // Qualify the type to avoid ScrollablePattern::AdjustOffset name hiding; consume exactly once.
     OHOS::Ace::NG::AdjustOffset ConsumeParentAdjustOffset()
     {
         OHOS::Ace::NG::AdjustOffset offset;
@@ -145,6 +149,7 @@ public:
     const WaterFlowEdgeState& GetEdgeState() const { return edgeState_; }
     WaterFlowChildIndexMap GetEdgeIndexMap() const;
     int32_t GetDataCount() const;
+    // Keep edge wrappers before data nodes without including them in FlowItem/Sections indices.
     void SyncEdgeSlots();
     void AddFooter(const RefPtr<NG::UINode>& footer);
 
@@ -374,6 +379,7 @@ private:
     WaterFlowEdgeState edgeState_;
     OffsetF edgeOrigin_;
     float edgeTotalSize_ = 0.0f;
+    bool edgeViewportRegistered_ = false;
     WeakPtr<UINode> footer_;
     // for keepVisiableContentPosition mode temporarily.
     bool keepContentPosition_ = true;

@@ -47,7 +47,8 @@ enum class LazyLayoutMeasureMode {
 };
 
 struct ACE_FORCE_EXPORT LazyLayoutUtils {
-    static AdjustOffset ConsumeNestedLazyAdjustOffset(const RefPtr<UINode>& node);
+    // Scroll preserves direct-child consumption for legacy LazyLayoutPattern nodes.
+    static AdjustOffset ConsumeNestedLazyAdjustOffset(const RefPtr<UINode>& node, bool allowNestedLazy = true);
     static bool IsAllowedIntermediateNode(const RefPtr<UINode>& node);
     static bool IsVerticalScrollableParent(const RefPtr<UINode>& node);
     static bool IsScrollableParent(const RefPtr<UINode>& node, Axis axis);

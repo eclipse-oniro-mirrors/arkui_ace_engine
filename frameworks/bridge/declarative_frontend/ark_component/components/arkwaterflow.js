@@ -388,6 +388,9 @@ class WaterFlowInitializeModifier extends ModifierWithKey {
 WaterFlowInitializeModifier.identity = Symbol('waterFlowInitialize');
 
 class WaterFlowHeaderModifier extends ModifierWithKey {
+  constructor(value) {
+    super(value);
+  }
   applyPeer(node, reset) {
     if (reset) {
       getUINativeModule().waterFlow.resetHeader(node);
@@ -399,6 +402,9 @@ class WaterFlowHeaderModifier extends ModifierWithKey {
 WaterFlowHeaderModifier.identity = Symbol('waterFlowHeader');
 
 class WaterFlowFooterModifier extends ModifierWithKey {
+  constructor(value) {
+    super(value);
+  }
   applyPeer(node, reset) {
     if (reset) {
       getUINativeModule().waterFlow.resetFooter(node);
@@ -410,6 +416,9 @@ class WaterFlowFooterModifier extends ModifierWithKey {
 WaterFlowFooterModifier.identity = Symbol('waterFlowFooter');
 
 class WaterFlowStickyModifier extends ModifierWithKey {
+  constructor(value) {
+    super(value);
+  }
   applyPeer(node, reset) {
     if (reset) {
       getUINativeModule().waterFlow.resetSticky(node);
@@ -421,6 +430,9 @@ class WaterFlowStickyModifier extends ModifierWithKey {
 WaterFlowStickyModifier.identity = Symbol('waterFlowSticky');
 
 class ArkWaterFlowComponent extends ArkScrollable {
+  constructor(nativePtr, classType) {
+    super(nativePtr, classType);
+  }
   header(value) {
     modifierWithKey(this._modifiersWithKeys, WaterFlowHeaderModifier.identity, WaterFlowHeaderModifier, value);
     return this;
@@ -434,9 +446,6 @@ class ArkWaterFlowComponent extends ArkScrollable {
     return this;
   }
 
-  constructor(nativePtr, classType) {
-    super(nativePtr, classType);
-  }
   columnsTemplate(value) {
     modifierWithKey(this._modifiersWithKeys, ColumnsTemplateModifier.identity, ColumnsTemplateModifier, value);
     return this;

@@ -13,6 +13,20 @@
  * limitations under the License.
  */
 
+class WaterFlowHeightModifier implements AttributeModifier<WaterFlowAttribute> {
+  private height: Length | undefined;
+
+  constructor(height: Length | undefined) {
+    this.height = height;
+  }
+
+  applyNormalAttribute(instance: WaterFlowAttribute): void {
+    if (this.height !== undefined) {
+      instance.height(this.height);
+    }
+  }
+}
+
 @Entry
 @Component
 struct WaterFlowHeaderFooterDraft {
@@ -48,7 +62,8 @@ struct WaterFlowHeaderFooterDraft {
         }
       }, (index: number) => `${index}`)
     }
-    .width('100%').height(height).columnsTemplate('1fr 1fr').rowsGap(8).columnsGap(8)
+    .width('100%').attributeModifier(new WaterFlowHeightModifier(height))
+    .columnsTemplate('1fr 1fr').rowsGap(8).columnsGap(8)
     .header(this.showHeader ? this.Header : undefined)
     .footer(this.showFooter ? this.Footer : undefined)
     .sticky(this.stickyMode)

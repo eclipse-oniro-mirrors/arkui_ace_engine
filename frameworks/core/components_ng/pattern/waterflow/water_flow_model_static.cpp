@@ -36,11 +36,10 @@ void WaterFlowModelStatic::SetEdge(
     WaterFlowModelNG::SetEdge(frameNode, header, content, generation);
 }
 
-void WaterFlowModelStatic::SetSticky(FrameNode* frameNode, int32_t value)
+void WaterFlowModelStatic::SetSticky(FrameNode* frameNode, StickyStyle style)
 {
-    WaterFlowModelNG::SetSticky(frameNode, value);
+    WaterFlowModelNG::SetSticky(frameNode, style);
 }
-
 
 const auto DEFAULT_CONSTRAINT_SIZE = CalcLength(0.0_vp);
 

@@ -18,12 +18,29 @@
 #include <memory>
 
 #include "core/components_ng/pattern/lazy_layout/header_footer_utils.h"
+#include "core/components_ng/pattern/lazy_layout/lazy_layout_pattern.h"
 #include "core/components_ng/pattern/lazy_layout/lazy_layout_utils.h"
 #include "core/components_ng/pattern/linear_layout/linear_layout_pattern.h"
 #include "core/components_ng/pattern/scroll/scroll_pattern.h"
 #include "core/components_ng/pattern/scrollable/scroll_viewport_coordinator.h"
+#include "core/components_ng/pattern/waterflow/layout/sliding_window/water_flow_layout_sw.h"
+#include "core/components_ng/pattern/waterflow/layout/top_down/water_flow_segmented_layout.h"
 
 namespace OHOS::Ace::NG {
+namespace {
+class EdgeTestLazyPattern : public LazyLayoutPattern {
+    DECLARE_ACE_TYPE(EdgeTestLazyPattern, LazyLayoutPattern);
+public:
+    AdjustOffset GetAdjustOffset() const override { return offset_; }
+    AdjustOffset GetAndResetAdjustOffset() override
+    {
+        const auto result = offset_;
+        offset_ = {};
+        return result;
+    }
+    AdjustOffset offset_ { 12.0f, 8.0f };
+};
+} // namespace
 class WaterFlowHeaderFooterTest : public WaterFlowTestNg {
 protected:
     RefPtr<FrameNode> Edge(float height)
@@ -91,6 +108,85 @@ HWTEST_F(WaterFlowHeaderFooterTest, WFHF_Empty, TestSize.Level1)
     EXPECT_EQ(pattern_->GetDataCount(), 0);
     EXPECT_FLOAT_EQ(GetChildRect(frameNode_, 1).Top(), 0.0f);
     EXPECT_FLOAT_EQ(GetChildRect(frameNode_, 0).Top(), 50.0f);
+}
+
+/**
+ * @tc.name: WFHF_InvalidDataKeepsEdges
+ * @tc.desc: A transient section/data mismatch still lays out active edge wrappers.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowHeaderFooterTest, WFHF_InvalidDataKeepsEdges, TestSize.Level1)
+{
+    CreateWaterFlow();
+    CreateWaterFlowItems(20);
+    SetEdges();
+    CreateDone();
+    auto algorithm = pattern_->CreateLayoutAlgorithm();
+    if (!AceType::DynamicCast<WaterFlowLayoutSW>(algorithm) &&
+        !AceType::DynamicCast<WaterFlowSegmentedLayout>(algorithm)) {
+        GTEST_SKIP() << "Only segmented and sliding-window layouts validate section data";
+    }
+    algorithm->Measure(AceType::RawPtr(frameNode_));
+    pattern_->layoutInfo_->isDataValid_ = false;
+    auto footer = AceType::DynamicCast<FrameNode>(frameNode_->GetChildAtIndex(0));
+    ASSERT_NE(footer, nullptr);
+    Header()->SetActive(false);
+    footer->SetActive(false);
+    algorithm->Layout(AceType::RawPtr(frameNode_));
+    EXPECT_TRUE(Header()->IsActive());
+    EXPECT_TRUE(footer->IsActive());
+    EXPECT_FLOAT_EQ(footer->GetGeometryNode()->GetMarginFrameOffset().GetY(),
+        Header()->GetGeometryNode()->GetMarginFrameOffset().GetY() + 50.0f);
+}
+
+/**
+ * @tc.name: WFHF_TargetMeasureKeepsFooter
+ * @tc.desc: The sliding-window target-measure frame must not deactivate the new footer slot.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowHeaderFooterTest, WFHF_TargetMeasureKeepsFooter, TestSize.Level1)
+{
+    CreateWaterFlow();
+    CreateWaterFlowItems(40);
+    SetEdges();
+    CreateDone();
+    auto algorithm = AceType::DynamicCast<WaterFlowLayoutSW>(pattern_->CreateLayoutAlgorithm());
+    if (!algorithm) {
+        GTEST_SKIP() << "Target-measure early return is specific to sliding-window layout";
+    }
+    algorithm->Measure(AceType::RawPtr(frameNode_));
+    pattern_->layoutInfo_->targetIndex_ = 30;
+    auto footer = AceType::DynamicCast<FrameNode>(frameNode_->GetChildAtIndex(0));
+    ASSERT_NE(footer, nullptr);
+    footer->SetActive(false);
+    algorithm->Layout(AceType::RawPtr(frameNode_));
+    EXPECT_TRUE(footer->IsActive());
+    EXPECT_TRUE(Header()->IsActive());
+}
+
+/**
+ * @tc.name: WFHF_LegacyNestedAdjustCompatibility
+ * @tc.desc: Scroll leaves nested legacy lazy offsets untouched, while List may consume them once.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowHeaderFooterTest, WFHF_LegacyNestedAdjustCompatibility, TestSize.Level1)
+{
+    auto lazy = FrameNode::CreateFrameNode(V2::LAZY_COLUMN_LAYOUT_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), MakeRefPtr<EdgeTestLazyPattern>());
+    auto middle = Edge(100.0f);
+    middle->GetLayoutProperty()->SetNeedLazyLayout(true);
+    middle->AddChild(lazy);
+    auto pattern = lazy->GetPattern<EdgeTestLazyPattern>();
+    auto offset = LazyLayoutUtils::ConsumeNestedLazyAdjustOffset(middle, false);
+    EXPECT_FLOAT_EQ(offset.start, 0.0f);
+    EXPECT_FLOAT_EQ(pattern->GetAdjustOffset().start, 12.0f);
+    offset = LazyLayoutUtils::ConsumeNestedLazyAdjustOffset(middle);
+    EXPECT_FLOAT_EQ(offset.start, 12.0f);
+    EXPECT_FLOAT_EQ(offset.end, 8.0f);
+    EXPECT_FLOAT_EQ(pattern->GetAdjustOffset().start, 0.0f);
+    pattern->offset_ = { 4.0f, 3.0f };
+    offset = LazyLayoutUtils::ConsumeNestedLazyAdjustOffset(lazy, false);
+    EXPECT_FLOAT_EQ(offset.start, 4.0f);
 }
 
 /**

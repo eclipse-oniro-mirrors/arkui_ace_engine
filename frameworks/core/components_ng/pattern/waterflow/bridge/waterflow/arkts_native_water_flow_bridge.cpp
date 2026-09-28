@@ -597,8 +597,16 @@ ArkUINativeModuleValue SetWaterFlowEdge(ArkUIRuntimeCallInfo* info, bool header,
         stack->SetIsBuilderNode(isBuilderNode);
         stack->SetIsExportTexture(isExportTexture);
         panda::LocalScope localScope(vm);
+        panda::TryCatch trycatch(vm);
         panda::Local<panda::FunctionRef> builder = value->ToObject(vm);
-        builder->Call(vm, builder, nullptr, 0);
+        auto result = builder->Call(vm, builder, nullptr, 0);
+        bool failed = result.IsEmpty() || trycatch.HasCaught();
+        if (ArkTSUtils::IsJsView(info->GetCallArgRef(0), vm)) {
+            failed = !ArkTSUtils::HandleCallbackJobs(vm, trycatch, result);
+        }
+        if (failed) {
+            return panda::JSValueRef::Undefined(vm);
+        }
         content = stack->Finish();
     }
     WaterFlowModelNG::SetEdge(AceType::RawPtr(keepAlive), header, content, generation);
@@ -641,7 +649,7 @@ ArkUINativeModuleValue WaterFlowBridge::SetSticky(ArkUIRuntimeCallInfo* info)
         (isNumber && value->ToNumber(vm)->Value() != static_cast<double>(style))) {
         style = 0;
     }
-    WaterFlowModelNG::SetSticky(host, style);
+    WaterFlowModelNG::SetSticky(host, static_cast<StickyStyle>(style));
     return panda::JSValueRef::Undefined(vm);
 }
 
@@ -652,7 +660,7 @@ ArkUINativeModuleValue WaterFlowBridge::ResetSticky(ArkUIRuntimeCallInfo* info)
     auto host = GetWaterFlowEdgeHost(info);
     auto pattern = host ? host->GetPattern<WaterFlowPattern>() : nullptr;
     if (pattern) {
-        WaterFlowModelNG::SetSticky(host, 0);
+        WaterFlowModelNG::SetSticky(host, StickyStyle::NONE);
     }
     return panda::JSValueRef::Undefined(vm);
 }

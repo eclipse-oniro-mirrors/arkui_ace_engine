@@ -411,6 +411,9 @@ interface WaterFlowParam {
 
 class WaterFlowHeaderModifier extends ModifierWithKey<CustomBuilder | undefined> {
   static identity: Symbol = Symbol('waterFlowHeader');
+  constructor(value: CustomBuilder | undefined) {
+    super(value);
+  }
   applyPeer(node: KNode, reset: boolean): void {
     if (reset) {
       getUINativeModule().waterFlow.resetHeader(node);
@@ -422,6 +425,9 @@ class WaterFlowHeaderModifier extends ModifierWithKey<CustomBuilder | undefined>
 
 class WaterFlowFooterModifier extends ModifierWithKey<CustomBuilder | undefined> {
   static identity: Symbol = Symbol('waterFlowFooter');
+  constructor(value: CustomBuilder | undefined) {
+    super(value);
+  }
   applyPeer(node: KNode, reset: boolean): void {
     if (reset) {
       getUINativeModule().waterFlow.resetFooter(node);
@@ -433,6 +439,9 @@ class WaterFlowFooterModifier extends ModifierWithKey<CustomBuilder | undefined>
 
 class WaterFlowStickyModifier extends ModifierWithKey<StickyStyle | undefined> {
   static identity: Symbol = Symbol('waterFlowSticky');
+  constructor(value: StickyStyle | undefined) {
+    super(value);
+  }
   applyPeer(node: KNode, reset: boolean): void {
     if (reset) {
       getUINativeModule().waterFlow.resetSticky(node);
@@ -443,6 +452,9 @@ class WaterFlowStickyModifier extends ModifierWithKey<StickyStyle | undefined> {
 }
 
 class ArkWaterFlowComponent extends ArkScrollable<WaterFlowAttribute> implements WaterFlowAttribute {
+  constructor(nativePtr: KNode, classType?: ModifierType) {
+    super(nativePtr, classType);
+  }
   header(value: CustomBuilder | undefined): this {
     modifierWithKey(this._modifiersWithKeys, WaterFlowHeaderModifier.identity, WaterFlowHeaderModifier, value);
     return this;
@@ -456,9 +468,6 @@ class ArkWaterFlowComponent extends ArkScrollable<WaterFlowAttribute> implements
     return this;
   }
 
-  constructor(nativePtr: KNode, classType?: ModifierType) {
-    super(nativePtr, classType);
-  }
   columnsTemplate(value: string | ItemFillPolicy): this {
     modifierWithKey(this._modifiersWithKeys, ColumnsTemplateModifier.identity, ColumnsTemplateModifier, value);
     return this;

@@ -48,16 +48,13 @@ void WaterFlowModelNG::SetEdge(FrameNode* frameNode, bool header, const RefPtr<U
     pattern->SetEdge(header, content, generation);
 }
 
-void WaterFlowModelNG::SetSticky(FrameNode* frameNode, int32_t value)
+void WaterFlowModelNG::SetSticky(FrameNode* frameNode, StickyStyle style)
 {
     CHECK_NULL_VOID(frameNode);
     auto pattern = frameNode->GetPattern<WaterFlowPattern>();
     CHECK_NULL_VOID(pattern);
-    const auto style = value >= 0 && value <= static_cast<int32_t>(StickyStyle::BOTH)
-        ? static_cast<StickyStyle>(value) : StickyStyle::NONE;
     pattern->SetSticky(style);
 }
-
 
 #define SCROLLABLE_WATERFLOW_ATTRIBUTE "Scrollable.WaterFlowAttribute."
 

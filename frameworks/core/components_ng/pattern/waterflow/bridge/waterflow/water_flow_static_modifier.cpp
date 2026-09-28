@@ -344,7 +344,7 @@ void SetStickyImpl(Ark_NativePointer node, const Opt_StickyStyle* value)
             default: break;
         }
     }
-    WaterFlowModelStatic::SetSticky(frameNode, static_cast<int32_t>(style));
+    WaterFlowModelStatic::SetSticky(frameNode, style);
 }
 
 } // WaterFlowAttributeModifier

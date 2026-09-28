@@ -21,11 +21,12 @@
 #include "core/components_ng/pattern/waterflow/water_flow_model.h"
 
 namespace OHOS::Ace::NG {
+enum class StickyStyle : uint32_t;
 class ACE_EXPORT WaterFlowModelStatic {
 public:
     static uint64_t BeginEdgeUpdate(FrameNode* frameNode, bool header);
     static void SetEdge(FrameNode* frameNode, bool header, const RefPtr<UINode>& content, uint64_t generation);
-    static void SetSticky(FrameNode* frameNode, int32_t value);
+    static void SetSticky(FrameNode* frameNode, StickyStyle style);
     static RefPtr<FrameNode> CreateFrameNode(int32_t nodeId);
     static RefPtr<ScrollControllerBase> GetOrCreateController(FrameNode* frameNode);
     static RefPtr<ScrollProxy> GetOrCreateScrollBarProxy(FrameNode* frameNode);

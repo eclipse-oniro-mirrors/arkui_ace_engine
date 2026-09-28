@@ -2880,6 +2880,8 @@ void LayoutProperty::SetNeedLazyLayout(bool value)
 
 void LayoutProperty::SetLazyLayoutRequest(int32_t owner, bool enabled)
 {
+    // Internal attachment state, like needLazyLayout_: property Reset must not discard active owners.
+    // Each owner removes its request on detach or when it no longer needs parent-driven layout.
     if (enabled) {
         if (!lazyLayoutRequests_) {
             lazyLayoutRequests_ = std::make_unique<std::set<int32_t>>();

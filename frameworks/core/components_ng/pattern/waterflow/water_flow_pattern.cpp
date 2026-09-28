@@ -1074,6 +1074,7 @@ void WaterFlowPattern::OnAttachToMainTree()
 
 void WaterFlowPattern::OnDetachFromMainTree()
 {
+    edgeViewportRegistered_ = false;
     parentContext_.Reset();
     edgeState_.InvalidateGenerations();
     auto host = GetHost();
@@ -1092,15 +1093,25 @@ void WaterFlowPattern::SetEdgeGeometry(const OffsetF& origin, float totalSize)
     CHECK_NULL_VOID(host);
     auto pipeline = host->GetContext();
     CHECK_NULL_VOID(pipeline);
+    if (!edgeState_.header.Upgrade() && !footer_.Upgrade()) {
+        pipeline->GetScrollViewportCoordinator()->Unregister(host->GetId());
+        edgeViewportRegistered_ = false;
+        return;
+    }
+    if (edgeViewportRegistered_) {
+        return;
+    }
     pipeline->GetScrollViewportCoordinator()->Register(host, [weak = WeakClaim(this)]() {
         auto pattern = weak.Upgrade();
         CHECK_NULL_VOID(pattern);
         pattern->UpdateEdgePositions();
     });
+    edgeViewportRegistered_ = true;
 }
 
 void WaterFlowPattern::OnDetachFromFrameNode(FrameNode* frameNode)
 {
+    edgeViewportRegistered_ = false;
     parentContext_.Reset();
     edgeState_.InvalidateGenerations();
     auto pipeline = frameNode ? frameNode->GetContext() : nullptr;
@@ -1112,7 +1123,7 @@ void WaterFlowPattern::OnDetachFromFrameNode(FrameNode* frameNode)
 
 void WaterFlowPattern::UpdateEdgePositions()
 {
-    if (!edgeState_.enabled) {
+    if (!edgeState_.enabled || (!edgeState_.header.Upgrade() && !footer_.Upgrade())) {
         return;
     }
     auto host = GetHost();
@@ -1171,7 +1182,11 @@ void WaterFlowPattern::UpdateEdgePositions()
             y = header ? HeaderFooterUtils::CalcStickyHeaderPos(metrics)
                        : HeaderFooterUtils::CalcStickyFooterPos(metrics);
         }
-        node->GetGeometryNode()->SetMarginFrameOffset(edgeOrigin_ + OffsetF(0.0f, y));
+        const auto offset = edgeOrigin_ + OffsetF(0.0f, y);
+        const bool moved = node->GetGeometryNode()->GetMarginFrameOffset() != offset;
+        if (moved) {
+            node->GetGeometryNode()->SetMarginFrameOffset(offset);
+        }
         // The framework rank belongs to the wrapper; preserve an explicit child zIndex, including zero.
         auto content = node->GetTotalChildCount() == 1
             ? AceType::DynamicCast<FrameNode>(node->GetFrameChildByIndex(0, false)) : nullptr;
@@ -1183,7 +1198,9 @@ void WaterFlowPattern::UpdateEdgePositions()
                                                  : HeaderFooterUtils::STICKY_FOOTER_Z_INDEX) : 0;
             render->UpdateZIndex(userZ.value_or(rank));
         }
-        node->ForceSyncGeometryNode();
+        if (moved) {
+            node->ForceSyncGeometryNode();
+        }
     };
     place(edgeState_.header.Upgrade(), true);
     place(footer_.Upgrade(), false);

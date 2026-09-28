@@ -117,7 +117,11 @@ void WaterFlowLayoutSW::Measure(LayoutWrapper* wrapper)
 
 void WaterFlowLayoutSW::Layout(LayoutWrapper* wrapper)
 {
-    if (info_->edgeSlots_ && itemCnt_ == 0 && info_->isDataValid_) {
+    if (!info_->isDataValid_) {
+        LayoutEdges(wrapper, info_, info_->headerHeight_);
+        return;
+    }
+    if (info_->edgeSlots_ && itemCnt_ == 0) {
         LayoutEdges(wrapper, info_, info_->headerHeight_);
         return;
     }
@@ -125,14 +129,14 @@ void WaterFlowLayoutSW::Layout(LayoutWrapper* wrapper)
         TAG_LOGW(AceLogTag::ACE_WATERFLOW, "Lanes not initialized, can't perform layout");
         return;
     }
-    if (!info_->isDataValid_) {
-        return;
-    }
     if (info_->targetIndex_) {
-        // During target-position measurement the footer may remain active from the previous frame
-        // or become active before normal footer cleanup runs. Layout is skipped here, so explicitly
-        // deactivate it to avoid a one-frame flash.
-        DeactivateFooter();
+        // New edge slots keep their geometry during target-position measurement. Only the legacy
+        // footer is deactivated here to avoid a one-frame flash before normal footer cleanup.
+        if (info_->edgeSlots_) {
+            LayoutEdges(wrapper, info_, info_->EndPos() - info_->Offset() + info_->BotMargin());
+        } else {
+            DeactivateFooter();
+        }
         // no item moves during MeasureToTarget tasks
         return;
     }

@@ -135,6 +135,7 @@ void WaterFlowSegmentedLayout::Measure(LayoutWrapper* wrapper)
 void WaterFlowSegmentedLayout::Layout(LayoutWrapper* wrapper)
 {
     if (!info_->isDataValid_) {
+        LayoutEdges(wrapper, info_, info_->headerHeight_);
         return;
     }
 

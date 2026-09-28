@@ -29,20 +29,24 @@ static bool IsLazyLayoutScrollableContainer(const std::string& tag)
     return tag == V2::SCROLL_ETS_TAG || tag == V2::WATERFLOW_ETS_TAG || tag == V2::LIST_ETS_TAG;
 }
 
-AdjustOffset LazyLayoutUtils::ConsumeNestedLazyAdjustOffset(const RefPtr<UINode>& node)
+AdjustOffset LazyLayoutUtils::ConsumeNestedLazyAdjustOffset(const RefPtr<UINode>& node, bool allowNestedLazy)
 {
     auto child = node;
     while (child) {
         auto frame = AceType::DynamicCast<FrameNode>(child);
         if (frame) {
+            auto lazy = frame->GetPattern<LazyLayoutPattern>();
+            if (!allowNestedLazy && child == node && lazy) {
+                return lazy->GetAndResetAdjustOffset();
+            }
             if (!frame->GetLayoutProperty()->GetNeedLazyLayout()) {
                 return {};
             }
             if (auto waterFlow = frame->GetPattern<WaterFlowPattern>()) {
                 return waterFlow->ConsumeParentAdjustOffset();
             }
-            if (auto lazy = frame->GetPattern<LazyLayoutPattern>()) {
-                return lazy->GetAndResetAdjustOffset();
+            if (lazy) {
+                return allowNestedLazy ? lazy->GetAndResetAdjustOffset() : AdjustOffset {};
             }
         }
         child = child->GetFirstChild();
