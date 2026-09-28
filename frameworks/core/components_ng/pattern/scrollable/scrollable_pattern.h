@@ -979,11 +979,32 @@ public:
 
     void SetIsAllowMouse(bool enableScrollWithMouse)
     {
+        isAllowMouseSet_ = true;
         isAllowMouse_ = enableScrollWithMouse;
+        auto scrollable = GetScrollable();
+        CHECK_NULL_VOID(scrollable);
+        scrollable->SetIsAllowMouse(GetIsAllowMouse());
     }
     virtual bool GetIsAllowMouse() const
     {
-        return isAllowMouse_;
+        if (isAllowMouseSet_) {
+            return isAllowMouse_;
+        }
+        return IsMouseDragScrollDefaultEnabled();
+    }
+    void ResetIsAllowMouse()
+    {
+        isAllowMouseSet_ = false;
+        isAllowMouse_ = false;
+        auto scrollable = GetScrollable();
+        CHECK_NULL_VOID(scrollable);
+        scrollable->SetIsAllowMouse(GetIsAllowMouse());
+    }
+    // Direction-aware default of enableScrollWithMouse: enabled only when scrolling horizontally.
+    // FREE mode (free scroll) and edit mode containers keep the default disabled.
+    virtual bool IsMouseDragScrollDefaultEnabled() const
+    {
+        return GetAxis() == Axis::HORIZONTAL;
     }
 
     void GetRepeatCountInfo(
@@ -1115,6 +1136,7 @@ protected:
     bool lastCanOverScroll_ = false;
     bool lastScrollFromInjection_ = false;
     bool isAllowMouse_ = false;
+    bool isAllowMouseSet_ = false;
 
     void CheckScrollBarOff();
 

@@ -197,6 +197,13 @@ public:
     ACE_FORCE_EXPORT virtual void ApplyEditModeToVisibleItems();
     ACE_FORCE_EXPORT virtual void RemoveEditModeFromItems();
 
+    // In edit mode, mouse drag is reserved for multi-select interactions, so the
+    // direction-aware default of enableScrollWithMouse stays disabled.
+    bool IsMouseDragScrollDefaultEnabled() const override
+    {
+        return !GetEnableEditMode() && ScrollablePattern::IsMouseDragScrollDefaultEnabled();
+    }
+
 protected:
     ACE_FORCE_EXPORT virtual void OnEnableEditModeChanged(bool enable);
     ACE_FORCE_EXPORT virtual void OnEditModeOptionsChanged();

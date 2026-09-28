@@ -1845,6 +1845,87 @@ HWTEST_F(ListAttrTestNg, SetEnableScrollWithMouse001, TestSize.Level1)
 }
 
 /**
+ * @tc.name: SetEnableScrollWithMouse002
+ * @tc.desc: Test default value and Reset behavior (vertical → false)
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListAttrTestNg, SetEnableScrollWithMouse002, TestSize.Level1)
+{
+    ListModelNG model = CreateList();
+    CreateListItems();
+    CreateDone();
+    EXPECT_FALSE(pattern_->GetIsAllowMouse());
+    pattern_->SetIsAllowMouse(true);
+    EXPECT_TRUE(pattern_->GetIsAllowMouse());
+    pattern_->ResetIsAllowMouse();
+    EXPECT_FALSE(pattern_->GetIsAllowMouse());
+}
+
+/**
+ * @tc.name: SetEnableScrollWithMouse003
+ * @tc.desc: Test default value for horizontal layout (horizontal → true)
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListAttrTestNg, SetEnableScrollWithMouse003, TestSize.Level1)
+{
+    ListModelNG model = CreateList();
+    model.SetListDirection(Axis::HORIZONTAL);
+    CreateListItems();
+    CreateDone();
+    EXPECT_TRUE(pattern_->GetIsAllowMouse());
+    auto scrollable = pattern_->GetScrollableEvent()->GetScrollable();
+    EXPECT_TRUE(scrollable->panRecognizerNG_->isAllowMouse_);
+}
+
+/**
+ * @tc.name: SetEnableScrollWithMouse004
+ * @tc.desc: Test multiSelectable has higher priority than enableScrollWithMouse
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListAttrTestNg, SetEnableScrollWithMouse004, TestSize.Level1)
+{
+    ListModelNG model = CreateList();
+    model.SetListDirection(Axis::HORIZONTAL);
+    model.SetMultiSelectable(true);
+    CreateListItems();
+    CreateDone();
+    EXPECT_FALSE(pattern_->GetIsAllowMouse());
+    auto scrollable = pattern_->GetScrollableEvent()->GetScrollable();
+    EXPECT_FALSE(scrollable->panRecognizerNG_->isAllowMouse_);
+    pattern_->SetIsAllowMouse(true);
+    EXPECT_FALSE(pattern_->GetIsAllowMouse());
+}
+
+/**
+ * @tc.name: SetEnableScrollWithMouse005
+ * @tc.desc: Test enableEditMode keeps default value of enableScrollWithMouse false
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListAttrTestNg, SetEnableScrollWithMouse005, TestSize.Level1)
+{
+    ListModelNG model = CreateList();
+    model.SetListDirection(Axis::HORIZONTAL);
+    model.SetEnableEditMode(true);
+    CreateListItems();
+    CreateDone();
+    EXPECT_FALSE(pattern_->GetIsAllowMouse());
+    auto scrollable = pattern_->GetScrollableEvent()->GetScrollable();
+    EXPECT_FALSE(scrollable->panRecognizerNG_->isAllowMouse_);
+    pattern_->SetIsAllowMouse(true);
+    EXPECT_TRUE(pattern_->GetIsAllowMouse());
+    pattern_->ResetIsAllowMouse();
+    EXPECT_FALSE(pattern_->GetIsAllowMouse());
+    // dynamic toggle: edit mode off -> horizontal default enabled
+    pattern_->SetEnableEditMode(false);
+    EXPECT_TRUE(pattern_->GetIsAllowMouse());
+    EXPECT_TRUE(scrollable->panRecognizerNG_->isAllowMouse_);
+    // dynamic toggle: edit mode on -> default disabled again
+    pattern_->SetEnableEditMode(true);
+    EXPECT_FALSE(pattern_->GetIsAllowMouse());
+    EXPECT_FALSE(scrollable->panRecognizerNG_->isAllowMouse_);
+}
+
+/**
  * @tc.name: SetScrollSnapAnimationSpeed001
  * @tc.desc: Test SetScrollSnapAnimationSpeed.
  * @tc.type: FUNC
