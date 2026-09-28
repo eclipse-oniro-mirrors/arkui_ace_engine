@@ -17,6 +17,9 @@
 
 #include <limits>
 
+#include "core/components_ng/pattern/lazy_layout/header_footer_utils.h"
+#include "core/components_ng/pattern/lazy_layout/lazy_layout_utils.h"
+#include "core/components_ng/pattern/list/list_layout_property.h"
 #include "core/components_ng/pattern/linear_layout/linear_layout_pattern.h"
 #include "core/components_ng/pattern/scrollable/scroll_viewport_coordinator.h"
 
@@ -50,6 +53,57 @@
 #include "core/pipeline_ng/pipeline_context.h"
 
 namespace OHOS::Ace::NG {
+
+WaterFlowEdgeState::WaterFlowEdgeState() : sticky(StickyStyle::NONE) {}
+
+WaterFlowParentContext::~WaterFlowParentContext()
+{
+    Reset();
+}
+
+void WaterFlowParentContext::Reset()
+{
+    for (auto& weak : requestPath_) {
+        auto property = weak.Upgrade();
+        if (property) {
+            property->SetLazyLayoutRequest(owner_, false);
+        }
+    }
+    requestPath_.clear();
+}
+
+bool WaterFlowParentContext::Update(const RefPtr<FrameNode>& host, bool enabled)
+{
+    Reset();
+    if (!host || !enabled) {
+        return false;
+    }
+    owner_ = host->GetId();
+    std::vector<RefPtr<FrameNode>> path { host };
+    auto parent = host->GetParentFrameNode();
+    while (parent && LazyLayoutUtils::IsAllowedIntermediateNode(parent)) {
+        path.push_back(parent);
+        parent = parent->GetParentFrameNode();
+    }
+    if (!LazyLayoutUtils::IsVerticalScrollableParent(parent)) {
+        return false;
+    }
+    if (parent->GetTag() == V2::LIST_ETS_TAG) {
+        auto property = parent->GetLayoutProperty<ListLayoutProperty>();
+        if (!property || property->HasLanes() || property->HasLaneMinLength() || property->HasLaneMaxLength() ||
+            property->HasChainAnimation() || property->HasScrollSnapAlign()) {
+            return false;
+        }
+    }
+    for (const auto& node : path) {
+        auto property = node->GetLayoutProperty();
+        property->SetLazyLayoutRequest(owner_, true);
+        requestPath_.emplace_back(property);
+    }
+    return true;
+}
+
+WaterFlowPattern::WaterFlowPattern() = default;
 
 WaterFlowPattern::~WaterFlowPattern() = default;
 
@@ -1018,8 +1072,12 @@ void WaterFlowPattern::OnDetachFromMainTree()
 
 AdjustOffset WaterFlowPattern::ConsumeParentAdjustOffset()
 {
-    auto offset = layoutInfo_->parentDriven_ ? layoutInfo_->parentAdjustOffset_ : AdjustOffset();
-    layoutInfo_->parentAdjustOffset_ = {};
+    AdjustOffset offset;
+    if (layoutInfo_->parentDriven_) {
+        offset = { layoutInfo_->parentAdjustStart_, layoutInfo_->parentAdjustEnd_ };
+    }
+    layoutInfo_->parentAdjustStart_ = 0.0f;
+    layoutInfo_->parentAdjustEnd_ = 0.0f;
     return offset;
 }
 

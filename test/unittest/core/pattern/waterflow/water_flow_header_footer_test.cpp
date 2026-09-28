@@ -15,6 +15,9 @@
 
 #include "water_flow_test_ng.h"
 
+#include "core/components_ng/pattern/lazy_layout/header_footer_utils.h"
+#include "core/components_ng/pattern/lazy_layout/lazy_layout_utils.h"
+
 #include "core/components_ng/pattern/linear_layout/linear_layout_pattern.h"
 #include "core/components_ng/pattern/scroll/scroll_pattern.h"
 #include "core/components_ng/pattern/scrollable/scroll_viewport_coordinator.h"
@@ -267,7 +270,8 @@ HWTEST_F(WaterFlowHeaderFooterTest, WFHF_ParentAdjustConsumedOnce, TestSize.Leve
     CreateDone();
     layoutProperty_->SetLazyLayoutRequest(frameNode_->GetId(), true);
     pattern_->layoutInfo_->parentDriven_ = true;
-    pattern_->layoutInfo_->parentAdjustOffset_ = { 15.0f, -3.0f };
+    pattern_->layoutInfo_->parentAdjustStart_ = 15.0f;
+    pattern_->layoutInfo_->parentAdjustEnd_ = -3.0f;
     const auto first = LazyLayoutUtils::ConsumeNestedLazyAdjustOffset(frameNode_);
     const auto second = LazyLayoutUtils::ConsumeNestedLazyAdjustOffset(frameNode_);
     EXPECT_FLOAT_EQ(first.start, 15.0f);

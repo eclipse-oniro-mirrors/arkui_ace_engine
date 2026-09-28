@@ -16,6 +16,7 @@
 #include "core/components_ng/pattern/waterflow/layout/water_flow_layout_algorithm_base.h"
 
 #include "core/components_ng/pattern/scrollable/scrollable_paint_property.h"
+#include "core/components_ng/pattern/lazy_layout/header_footer_utils.h"
 #include "core/components_ng/pattern/lazy_layout/lazy_layout_utils.h"
 #include "core/components_ng/pattern/scrollable/scrollable_utils.h"
 #include "core/components_ng/pattern/waterflow/layout/water_flow_layout_utils.h"
@@ -399,7 +400,8 @@ void WaterFlowLayoutBase::PrepareParentLayout(LayoutWrapper* wrapper,
     if (enabled != info->parentDriven_) {
         info->Reset();
         info->UpdateOffset(-info->Offset());
-        info->parentAdjustOffset_ = {};
+        info->parentAdjustStart_ = 0.0f;
+        info->parentAdjustEnd_ = 0.0f;
         if (enabled) {
             info->jumpIndex_ = WaterFlowLayoutInfoBase::EMPTY_JUMP_INDEX;
             info->startIndex_ = 0;
@@ -469,7 +471,7 @@ void WaterFlowLayoutBase::MeasureEdges(
     if (!NearEqual(headerHeight, info->headerHeight_)) {
         // Cached item positions are body-local and must be invalidated when the prefix changes.
         if (info->parentDriven_ && Positive(info->parentViewStart_)) {
-            info->parentAdjustOffset_.start += HeaderFooterUtils::CalcHeaderResizeAdjust(
+            info->parentAdjustStart_ += HeaderFooterUtils::CalcHeaderResizeAdjust(
                 headerHeight - info->headerHeight_, info->parentViewStart_ - info->headerHeight_, info->headerHeight_);
         }
         info->Reset();

@@ -26,6 +26,7 @@
 #include "core/components_ng/pattern/scrollable/scrollable_controller.h"
 #include "core/components_ng/pattern/scrollable/scrollable_model_ng.h"
 #include "core/components_ng/pattern/waterflow/water_flow_constants.h"
+#include "core/components_ng/pattern/lazy_layout/header_footer_utils.h"
 #include "core/components_ng/pattern/waterflow/water_flow_pattern.h"
 #include "core/components_v2/inspector/inspector_constants.h"
 #include "core/components_ng/manager/scroll_adjust/scroll_adjust_manager.h"

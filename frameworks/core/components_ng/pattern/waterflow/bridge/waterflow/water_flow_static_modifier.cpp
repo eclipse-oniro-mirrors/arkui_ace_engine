@@ -17,6 +17,7 @@
 #include "core/components_ng/pattern/scrollable/scrollable_model_static.h"
 #include "core/components_ng/pattern/waterflow/bridge/waterflow/water_flow_sections_accessor_peer_impl.h"
 #include "core/components_ng/pattern/waterflow/water_flow_model_static.h"
+#include "core/components_ng/pattern/lazy_layout/header_footer_utils.h"
 #include "core/components_ng/pattern/waterflow/water_flow_pattern.h"
 #include "core/interfaces/native/implementation/water_flow_scroller_peer_impl.h"
 #include "core/interfaces/native/utility/callback_helper.h"

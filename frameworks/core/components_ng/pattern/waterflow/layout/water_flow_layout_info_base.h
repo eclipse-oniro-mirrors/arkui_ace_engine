@@ -16,9 +16,10 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_WATERFLOW_WATER_FLOW_LAYOUT_INFO_BASE_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_WATERFLOW_WATER_FLOW_LAYOUT_INFO_BASE_H
 
+#include <algorithm>
+#include <cstdint>
+
 #include "base/memory/ace_type.h"
-#include "core/components_ng/pattern/waterflow/water_flow_edge_state.h"
-#include "core/components_ng/pattern/lazy_layout/lazy_layout_offset.h"
 #include "base/utils/noncopyable.h"
 #include "core/components/scroll/scroll_controller_base.h"
 #include "core/components_ng/pattern/scrollable/scrollable.h"
@@ -27,6 +28,20 @@
 #include "core/components_ng/property/measure_property.h"
 
 namespace OHOS::Ace::NG {
+
+// New attributes reserve at most two FrameNode slots ahead of the data children.
+// The constructor footer retains its historical mapping until an edge attribute is used.
+struct WaterFlowChildIndexMap {
+    bool hasHeader = false;
+    bool hasFooter = false;
+
+    int32_t EdgeCount() const { return static_cast<int32_t>(hasHeader) + static_cast<int32_t>(hasFooter); }
+    int32_t HeaderIndex() const { return hasHeader ? static_cast<int32_t>(hasFooter) : -1; }
+    int32_t FooterIndex() const { return hasFooter ? 0 : -1; }
+    int32_t DataToNode(int32_t index) const { return index + EdgeCount(); }
+    int32_t NodeToData(int32_t index) const { return index < EdgeCount() ? -1 : index - EdgeCount(); }
+    int32_t DataCount(int32_t rawCount) const { return std::max(0, rawCount - EdgeCount()); }
+};
 
 class WaterFlowLayoutInfoBase : public AceType {
     DECLARE_ACE_TYPE(WaterFlowLayoutInfoBase, AceType);
@@ -246,7 +261,8 @@ public:
     float parentViewEnd_ = 0.0f;
     float parentMainSize_ = 0.0f;
     std::optional<int64_t> parentDeadline_;
-    AdjustOffset parentAdjustOffset_;
+    float parentAdjustStart_ = 0.0f;
+    float parentAdjustEnd_ = 0.0f;
     bool edgeSlots_ = false;
     WaterFlowChildIndexMap edgeIndexMap_;
     float headerHeight_ = 0.0f;

@@ -16,7 +16,9 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_WATERFLOW_WATER_FLOW_PATTERN_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_WATERFLOW_WATER_FLOW_PATTERN_H
 
-#include "core/components_ng/pattern/waterflow/water_flow_parent_context.h"
+#include <cstdint>
+#include <vector>
+
 #include "core/components_ng/pattern/pattern.h"
 #include "core/components_ng/pattern/scrollable/scrollable_pattern.h"
 #include "core/components_ng/pattern/waterflow/layout/water_flow_layout_algorithm_base.h"
@@ -28,11 +30,51 @@ class WaterFlowAccessibilityProperty;
 class WaterFlowEventHub;
 class WaterFlowLayoutProperty;
 class WaterFlowSections;
+enum class StickyStyle : uint32_t;
+struct AdjustOffset;
+
+struct WaterFlowEdgeState {
+    WaterFlowEdgeState();
+
+    bool enabled = false;
+    bool footerControlled = false;
+    WeakPtr<UINode> header;
+    uint64_t headerGeneration = 0;
+    uint64_t footerGeneration = 0;
+    StickyStyle sticky;
+
+    uint64_t BeginUpdate(bool isHeader)
+    {
+        enabled = true;
+        if (!isHeader) {
+            footerControlled = true;
+        }
+        return isHeader ? ++headerGeneration : ++footerGeneration;
+    }
+
+    bool IsCurrent(bool isHeader, uint64_t generation) const
+    {
+        return generation == (isHeader ? headerGeneration : footerGeneration);
+    }
+};
+
+// Request ownership stays local to WaterFlow; qualification is implemented out of line.
+class WaterFlowParentContext {
+public:
+    ~WaterFlowParentContext();
+    void Reset();
+    bool Update(const RefPtr<FrameNode>& host, bool enabled);
+
+private:
+    int32_t owner_ = -1;
+    std::vector<WeakPtr<LayoutProperty>> requestPath_;
+};
 
 class ACE_EXPORT WaterFlowPattern : public ScrollablePattern {
     DECLARE_ACE_TYPE(WaterFlowPattern, ScrollablePattern);
 
 public:
+    WaterFlowPattern();
     ~WaterFlowPattern() override;
 
     bool UpdateCurrentOffset(float delta, int32_t source) override;

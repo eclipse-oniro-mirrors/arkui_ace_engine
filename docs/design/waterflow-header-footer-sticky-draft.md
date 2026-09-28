@@ -60,6 +60,27 @@
 
 TASK-1～5 处于 DraftCode，TASK-6 为 DraftTests/部分脚本检查通过，TASK-7 未闭合。全部 native AC 的验证状态均为 Pending；不得把本提交当作 Approved/Done。服务器失败需区分新增问题、既有基线和环境问题，并回填 SDD。
 
+## 第一轮 PR 评论整改（2026-09-28）
+
+针对实现仓 PR #89677 评论 191847721 的头文件依赖增长问题，仅调整内部依赖与存储组织：
+
+- 将纯数据索引映射放回 `water_flow_layout_info_base.h`，边状态和父请求所有权声明放回 `water_flow_pattern.h`，移除两个将重依赖传递给下游的独立头文件。
+- List 父资格判断、请求清理和默认 StickyStyle 初始化移至 `water_flow_pattern.cpp`；Pattern 默认构造也在该翻译单元实现，避免消费者依赖内部辅助类型的初始化符号。
+- `StickyStyle` 使用匹配原定义的 `uint32_t` 前置声明；实际使用枚举值或 HeaderFooterUtils 的实现文件显式包含其定义。布局状态仅保存首尾两个补偿量，消费边界仍返回原 `AdjustOffset`，并同时清零。
+- 未增加堆分配、系统依赖、生成物或应用侧 API；状态默认值、generation、父资格规则及补偿消费顺序保持原行为。
+
+本地轻量扫描只递归当前仓可解析的引号 include，并计入全部宏分支，不代替编译器或正式门禁。三个被点名文件的仓内可达头文件数量变化如下：
+
+| 文件 | 修改前 | 修改后 |
+|---|---:|---:|
+| `water_flow_layout_info_base.cpp` | 174 | 131 |
+| `water_flow_layout_info_sw.cpp` | 158 | 111 |
+| `water_flow_layout_info.cpp` | 155 | 108 |
+
+Node 入口回归仍为 6/6；12 个 C++ 用例尚未运行，仅同步其中的补偿量设置。独立头文件编译、全量构建、正式头文件门禁复扫和 native 测试均未在本地执行，沿用用户转服务器验证的安排。
+
+评论中的人工检视不足、TDD/XTS/L0 未完成仍待处理，未把未运行项改为通过或不涉及；PR 保持 Draft，检视闭环状态为“否”。接口仓 #36148 仅有 CI 欢迎提示，本轮不修改 SDK。
+
 ## 实际文件清单与变更行数
 
 统计为相对上述实施基线的新增/删除行；本交接文档自身不计入下表。
@@ -79,9 +100,9 @@ TASK-1～5 处于 DraftCode，TASK-6 为 DraftTests/部分脚本检查通过，T
 | engine: `frameworks/core/components_ng/pattern/list/list_layout_algorithm.cpp` | 1 | 19 |
 | engine: `frameworks/core/components_ng/pattern/scroll/scroll_layout_algorithm.cpp` | 1 | 7 |
 | engine: `frameworks/core/components_ng/pattern/scrollable/scroll_viewport_coordinator.h` | 65 | 0 |
-| engine: `frameworks/core/components_ng/pattern/waterflow/bridge/waterflow/arkts_native_water_flow_bridge.cpp` | 105 | 0 |
+| engine: `frameworks/core/components_ng/pattern/waterflow/bridge/waterflow/arkts_native_water_flow_bridge.cpp` | 106 | 0 |
 | engine: `frameworks/core/components_ng/pattern/waterflow/bridge/waterflow/arkts_native_water_flow_bridge.h` | 7 | 0 |
-| engine: `frameworks/core/components_ng/pattern/waterflow/bridge/waterflow/water_flow_static_modifier.cpp` | 55 | 0 |
+| engine: `frameworks/core/components_ng/pattern/waterflow/bridge/waterflow/water_flow_static_modifier.cpp` | 56 | 0 |
 | engine: `frameworks/core/components_ng/pattern/waterflow/layout/sliding_window/water_flow_layout_info_sw.cpp` | 7 | 4 |
 | engine: `frameworks/core/components_ng/pattern/waterflow/layout/sliding_window/water_flow_layout_info_sw.h` | 2 | 2 |
 | engine: `frameworks/core/components_ng/pattern/waterflow/layout/sliding_window/water_flow_layout_sw.cpp` | 41 | 6 |
@@ -89,25 +110,23 @@ TASK-1～5 处于 DraftCode，TASK-6 为 DraftTests/部分脚本检查通过，T
 | engine: `frameworks/core/components_ng/pattern/waterflow/layout/top_down/water_flow_layout_algorithm.h` | 1 | 1 |
 | engine: `frameworks/core/components_ng/pattern/waterflow/layout/top_down/water_flow_layout_info.cpp` | 10 | 8 |
 | engine: `frameworks/core/components_ng/pattern/waterflow/layout/top_down/water_flow_segmented_layout.cpp` | 35 | 15 |
-| engine: `frameworks/core/components_ng/pattern/waterflow/layout/water_flow_layout_algorithm_base.cpp` | 155 | 0 |
+| engine: `frameworks/core/components_ng/pattern/waterflow/layout/water_flow_layout_algorithm_base.cpp` | 157 | 0 |
 | engine: `frameworks/core/components_ng/pattern/waterflow/layout/water_flow_layout_algorithm_base.h` | 5 | 0 |
-| engine: `frameworks/core/components_ng/pattern/waterflow/layout/water_flow_layout_info_base.h` | 23 | 4 |
+| engine: `frameworks/core/components_ng/pattern/waterflow/layout/water_flow_layout_info_base.h` | 39 | 4 |
 | engine: `frameworks/core/components_ng/pattern/waterflow/layout/water_flow_layout_utils.cpp` | 2 | 19 |
 | engine: `frameworks/core/components_ng/pattern/waterflow/water_flow_accessibility_property.cpp` | 1 | 1 |
-| engine: `frameworks/core/components_ng/pattern/waterflow/water_flow_edge_state.h` | 62 | 0 |
-| engine: `frameworks/core/components_ng/pattern/waterflow/water_flow_model_ng.cpp` | 26 | 0 |
+| engine: `frameworks/core/components_ng/pattern/waterflow/water_flow_model_ng.cpp` | 27 | 0 |
 | engine: `frameworks/core/components_ng/pattern/waterflow/water_flow_model_ng.h` | 3 | 0 |
 | engine: `frameworks/core/components_ng/pattern/waterflow/water_flow_model_static.cpp` | 18 | 0 |
 | engine: `frameworks/core/components_ng/pattern/waterflow/water_flow_model_static.h` | 3 | 0 |
-| engine: `frameworks/core/components_ng/pattern/waterflow/water_flow_parent_context.h` | 77 | 0 |
-| engine: `frameworks/core/components_ng/pattern/waterflow/water_flow_pattern.cpp` | 285 | 5 |
-| engine: `frameworks/core/components_ng/pattern/waterflow/water_flow_pattern.h` | 19 | 0 |
+| engine: `frameworks/core/components_ng/pattern/waterflow/water_flow_pattern.cpp` | 343 | 5 |
+| engine: `frameworks/core/components_ng/pattern/waterflow/water_flow_pattern.h` | 61 | 0 |
 | engine: `frameworks/core/pipeline_ng/pipeline_context.cpp` | 15 | 0 |
 | engine: `frameworks/core/pipeline_ng/pipeline_context.h` | 4 | 0 |
 | engine: `test/mock/frameworks/core/pipeline/mock_pipeline_context.cpp` | 9 | 0 |
 | engine: `test/unittest/bridge/declarative_frontend/ark_component/water_flow_edges_test.mjs` | 68 | 0 |
 | engine: `test/unittest/core/pattern/waterflow/BUILD.gn` | 1 | 0 |
-| engine: `test/unittest/core/pattern/waterflow/water_flow_header_footer_test.cpp` | 296 | 0 |
+| engine: `test/unittest/core/pattern/waterflow/water_flow_header_footer_test.cpp` | 300 | 0 |
 | SDK: `api/@internal/component/ets/water_flow.d.ts` | 39 | 0 |
 | SDK: `api/arkui/component/waterFlow.static.d.ets` | 40 | 1 |
 | SDK: `zh-cn/api/@internal/component/ets/water_flow.d.ts` | 39 | 0 |
