@@ -2348,4 +2348,20 @@ HWTEST_F(FormPatternTest, FormPatternTest_UpdateImageNode_Interpolation_001, Tes
     EXPECT_EQ(imageRenderProperty->GetImageInterpolation().value_or(ImageInterpolation::NONE),
         ImageInterpolation::NONE);
 }
+
+/**
+ * @tc.name: FormPatternTest_065
+ * @tc.desc: FireFormSurfaceDetachCallback with formTaskExecutor
+ * @tc.type: FUNC
+ */
+HWTEST_F(FormPatternTest, FormPatternTest_065, TestSize.Level1)
+{
+    RefPtr<FormNode> formNode = CreateFromNode();
+    auto pattern = formNode->GetPattern<FormPattern>();
+    EXPECT_NE(pattern, nullptr);
+
+    pattern->formTaskExecutor_ = AceType::MakeRefPtr<FormTaskExecutor>(0);
+    pattern->FireFormSurfaceDetachCallback();
+    EXPECT_TRUE(pattern->isFrsNodeDetached_);
+}
 } // namespace OHOS::Ace::NG
