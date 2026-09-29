@@ -1675,6 +1675,11 @@ typedef enum {
      */
     ARKUI_ERROR_CODE_ANIMATION_GROUP_INVALID_STATE = 106215,
     /**
+     * @brief The resolved target node does not belong to the same UIContext as the context parameter.
+     * @since 26.0.1
+     */
+    ARKUI_ERROR_CODE_TARGET_NODE_NOT_IN_SAME_CONTEXT = 106216,
+    /**
      * @error The node type is not custom node.
      * @since 20
      */

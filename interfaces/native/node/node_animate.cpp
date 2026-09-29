@@ -1126,7 +1126,6 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_PropertyAnimation_SetCurve(
     OH_ArkUI_PropertyAnimationHandle animation, ArkUI_CurveHandle curve)
 {
     CHECK_NULL_RETURN_WITH_MESSAGE(animation, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "animation is null");
-    CHECK_NULL_RETURN_WITH_MESSAGE(curve, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "curve is null");
     animation->curve = curve;
     return ARKUI_ERROR_CODE_NO_ERROR;
 }
@@ -1137,8 +1136,6 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_PropertyAnimation_GetCurve(
     CHECK_NULL_RETURN_WITH_MESSAGE(animation, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "animation is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(
         outBorrowedCurve, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "outBorrowedCurve is null");
-    CHECK_NULL_RETURN_WITH_MESSAGE(
-        animation->curve, ARKUI_ERROR_CODE_NO_ATTRIBUTE_FOUND, __FUNCTION__, "curve is not set");
     *outBorrowedCurve = animation->curve;
     return ARKUI_ERROR_CODE_NO_ERROR;
 }
@@ -1390,9 +1387,9 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_KeyframeAnimation_SetCurve(
     OH_ArkUI_KeyframeAnimationHandle animation, int32_t index, ArkUI_CurveHandle curve)
 {
     CHECK_NULL_RETURN_WITH_MESSAGE(animation, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "animation is null");
-    CHECK_NULL_RETURN_WITH_MESSAGE(curve, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "curve is null");
-    if (curve->type == ARKUI_CURVE_TYPE_SPRING_MOTION || curve->type == ARKUI_CURVE_TYPE_RESPONSIVE_SPRING_MOTION ||
-        curve->type == ARKUI_CURVE_TYPE_INTERPOLATING_SPRING) {
+    if (curve != nullptr && (curve->type == ARKUI_CURVE_TYPE_SPRING_MOTION ||
+        curve->type == ARKUI_CURVE_TYPE_RESPONSIVE_SPRING_MOTION ||
+        curve->type == ARKUI_CURVE_TYPE_INTERPOLATING_SPRING)) {
         return ARKUI_ERROR_CODE_PARAM_INVALID;
     }
     if (index < 0 || index >= static_cast<int32_t>(animation->keyframes.size())) {
@@ -1617,8 +1614,7 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_PathAnimation_SetCurve(
     OH_ArkUI_PathAnimationHandle animation, ArkUI_CurveHandle curve)
 {
     CHECK_NULL_RETURN_WITH_MESSAGE(animation, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "animation is null");
-    CHECK_NULL_RETURN_WITH_MESSAGE(curve, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "curve is null");
-    if (IsDurationIndependentCurveType(curve->type)) {
+    if (curve != nullptr && IsDurationIndependentCurveType(curve->type)) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "duration-independent curve is not allowed");
         return ARKUI_ERROR_CODE_PARAM_INVALID;
     }
@@ -1632,8 +1628,6 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_PathAnimation_GetCurve(
     CHECK_NULL_RETURN_WITH_MESSAGE(animation, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "animation is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(
         outBorrowedCurve, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "outBorrowedCurve is null");
-    CHECK_NULL_RETURN_WITH_MESSAGE(
-        animation->curve, ARKUI_ERROR_CODE_NO_ATTRIBUTE_FOUND, __FUNCTION__, "curve is not set");
     *outBorrowedCurve = animation->curve;
     return ARKUI_ERROR_CODE_NO_ERROR;
 }
@@ -1798,8 +1792,7 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_AnimationGroup_SetCurve(
     OH_ArkUI_AnimationGroupHandle group, ArkUI_CurveHandle curve)
 {
     CHECK_NULL_RETURN_WITH_MESSAGE(group, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "group is null");
-    CHECK_NULL_RETURN_WITH_MESSAGE(curve, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "curve is null");
-    if (IsDurationIndependentCurveType(curve->type)) {
+    if (curve != nullptr && IsDurationIndependentCurveType(curve->type)) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "duration-independent curve is not allowed");
         return ARKUI_ERROR_CODE_PARAM_INVALID;
     }
@@ -1813,10 +1806,6 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_AnimationGroup_GetCurve(
     CHECK_NULL_RETURN_WITH_MESSAGE(group, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "group is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(
         outBorrowedCurve, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "outBorrowedCurve is null");
-    if (group->curve == nullptr) {
-        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_NO_ATTRIBUTE_FOUND, __FUNCTION__, "curve is not set");
-        return ARKUI_ERROR_CODE_NO_ATTRIBUTE_FOUND;
-    }
     *outBorrowedCurve = group->curve;
     return ARKUI_ERROR_CODE_NO_ERROR;
 }

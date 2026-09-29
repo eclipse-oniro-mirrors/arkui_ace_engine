@@ -37,7 +37,12 @@ class RSNode;
 
 namespace OHOS::Ace::NG {
 
-using CreateAnimationFn = std::function<std::shared_ptr<AnimationUtils::InteractiveAnimation>(
+struct AnimationGroupCreateResult {
+    std::shared_ptr<AnimationUtils::InteractiveAnimation> animation;
+    ArkUI_Int32 errorCode = ERROR_CODE_PARAM_INVALID;
+};
+
+using CreateAnimationFn = std::function<AnimationGroupCreateResult(
     int32_t instanceId, const std::string& key, int64_t generation)>;
 
 struct AnimationGroupEntry {
@@ -48,7 +53,7 @@ struct AnimationGroupEntry {
 bool ValidateRSNodeInstance(
     const std::vector<Rosen::RSNode*>& rsNodes, int32_t instanceId);
 
-std::shared_ptr<AnimationUtils::InteractiveAnimation> CreateAndStartGroupAnimation(
+AnimationGroupCreateResult CreateAndStartGroupAnimation(
     ArkUIAnimationGroupHandle group, const std::vector<Rosen::RSNode*>& childRawRSNodes,
     int32_t instanceId, const std::string& key, int64_t generation);
 
