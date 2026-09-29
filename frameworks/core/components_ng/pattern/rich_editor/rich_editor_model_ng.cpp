@@ -557,6 +557,41 @@ Color RichEditorModelNG::GetCaretColor(FrameNode* frameNode)
     return pattern->GetCaretColor();
 }
 
+void RichEditorModelNG::SetShowUnderline(FrameNode* frameNode, bool showUnderline)
+{
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(RichEditorLayoutProperty, ShowUnderline, showUnderline, frameNode);
+}
+
+bool RichEditorModelNG::GetShowUnderline(FrameNode* frameNode)
+{
+    bool value = false;
+    ACE_GET_NODE_LAYOUT_PROPERTY_WITH_DEFAULT_VALUE(RichEditorLayoutProperty, ShowUnderline, value, frameNode, value);
+    return value;
+}
+
+void RichEditorModelNG::ResetShowUnderline(FrameNode* frameNode)
+{
+    ACE_RESET_NODE_LAYOUT_PROPERTY(RichEditorLayoutProperty, ShowUnderline, frameNode);
+}
+
+void RichEditorModelNG::SetUnderlineColor(FrameNode* frameNode, const UserUnderlineColor& userColor)
+{
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(RichEditorLayoutProperty, UnderlineColor, userColor, frameNode);
+}
+
+UserUnderlineColor RichEditorModelNG::GetUnderlineColor(FrameNode* frameNode)
+{
+    UserUnderlineColor value;
+    ACE_GET_NODE_LAYOUT_PROPERTY_WITH_DEFAULT_VALUE(
+        RichEditorLayoutProperty, UnderlineColor, value, frameNode, value);
+    return value;
+}
+
+void RichEditorModelNG::ResetUnderlineColor(FrameNode* frameNode)
+{
+    ACE_RESET_NODE_LAYOUT_PROPERTY(RichEditorLayoutProperty, UnderlineColor, frameNode);
+}
+
 void RichEditorModelNG::SetOnEditingChange(std::function<void(const bool&)>&& func)
 {
     auto eventHub = ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<RichEditorEventHub>();

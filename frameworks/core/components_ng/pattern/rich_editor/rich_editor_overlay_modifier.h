@@ -47,6 +47,8 @@ public:
     void SetPreviewTextDecorationColor(const Color& value);
     void SetPreviewTextUnderlineWidth(float value);
     void SetShowPreviewTextDecoration(bool value);
+    void SetUnderlineColor(const Color& value);
+    void SetUnderlineWidth(float value);
     void SetPreviewTextStyle(const PreviewTextStyle& value);
     float GetCaretHeight() const;
     float GetCaretWidth() const;
@@ -69,6 +71,7 @@ public:
     void ClearHoverColorAndRects();
 private:
     void PaintPreviewTextDecoration(DrawingContext& drawingContext) const;
+    void PaintUnderline(RSCanvas& canvas) const;
     void PaintCaret(DrawingContext& drawingContext) const;
     void PaintFloatingCaret(DrawingContext& drawingContext) const;
     void PaintScrollBar(DrawingContext& context);
@@ -97,6 +100,8 @@ private:
     RefPtr<PropertyColor> previewTextDecorationColor_;
     RefPtr<PropertyFloat> previewTextUnderlineWidth_;
     RefPtr<PropertyBool> showPreviewTextDecoration_;
+    RefPtr<PropertyColor> underlineColor_;
+    RefPtr<PropertyFloat> underlineWidth_;
     RefPtr<PropertyBool> changeOverlay_;
     PreviewTextStyle previewTextStyle_;
     bool caretLanding_ = false;

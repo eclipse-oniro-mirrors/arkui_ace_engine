@@ -429,6 +429,7 @@ public:
     void ResetAfterPaste();
     void OnModifyDone() override;
     void BeforeCreateLayoutWrapper() override;
+    void AdjustBoundsRect(RectF& bounds);
     bool OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, const DirtySwapConfig& config) override;
     void HandleSelectOverlayOnLayoutSwap();
     void FireOnReady();
@@ -1043,6 +1044,8 @@ public:
     bool HasCounterTextOverflowColor() const override;
     Color GetCounterTextOverflowColor() const override;
     float GetFontScaleFromEnv(const RefPtr<FrameNode>& host) const override;
+    bool IsUnderlineMode() const override;
+    bool IsUnderlineAndButtonMode() const override;
     TextDirection GetLayoutDirection() const override;
     TextDirection GetNonAutoLayoutDirection() const override;
     std::optional<MarginProperty> GetMarginProperty() const override;
@@ -1073,6 +1076,16 @@ public:
     // Public for RichEditorModelNG access
     RefPtr<FrameNode> GetHost() const override;
     void MarkCancelButtonDirty() { cancelButtonDirty_ = true; }
+
+    Color GetUnderlineColor() const;
+    Dimension GetUnderlineWidth() const;
+    void UpdateUnderlineStyle();
+    void UpdateUnderlineErrorStyle();
+    const RectF& GetFrameRect() const
+    {
+        return frameRect_;
+    }
+    float GetAllResponseAreaWidth() const;
 
 protected:
     RefPtr<TextSelectOverlay> GetOrCreateSelectOverlay() override;
@@ -1674,6 +1687,9 @@ private:
     // ===== counter members =====
     RefPtr<CounterDecorator> counterDecorator_;
     bool showCountBorderStyle_ = false;
+
+    Color underlineColor_ = Color::TRANSPARENT;
+    Dimension underlineWidth_ = 0.0_vp;
 
 #if defined(CROSS_PLATFORM)
     std::shared_ptr<TextEditingValue> editingValue_;

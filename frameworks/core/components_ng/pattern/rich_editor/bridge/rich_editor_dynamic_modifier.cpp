@@ -72,6 +72,11 @@ namespace {
     constexpr DisplayMode DEFAULT_BAR_STATE_VALUE = DisplayMode::AUTO;
     constexpr int32_t ERROR_INT_CODE = -1;
     constexpr uint32_t ERROR_UINT_CODE = -1;
+    constexpr int NUM_0 = 0;
+    constexpr int NUM_1 = 1;
+    constexpr int NUM_2 = 2;
+    constexpr int NUM_3 = 3;
+    constexpr int NUM_4 = 4;
     typedef void (*ComponentAsyncEventHandler)(ArkUINodeHandle node, void* extraParam);
     typedef void (*ResetComponentAsyncEventHandler)(ArkUINodeHandle node);
 }
@@ -419,6 +424,66 @@ ArkUI_Uint32 GetRichEditorCaretColor(ArkUINodeHandle node)
     auto *frameNode = reinterpret_cast<FrameNode*>(node);
     CHECK_NULL_RETURN(frameNode, ERROR_UINT_CODE);
     return RichEditorModelNG::GetCaretColor(frameNode).GetValue();
+}
+
+void SetRichEditorShowUnderline(ArkUINodeHandle node, ArkUI_Int32 showUnderline)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    RichEditorModelNG::SetShowUnderline(frameNode, static_cast<bool>(showUnderline));
+}
+
+ArkUI_Int32 GetRichEditorShowUnderline(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_RETURN(frameNode, ERROR_UINT_CODE);
+    return static_cast<ArkUI_Int32>(RichEditorModelNG::GetShowUnderline(frameNode));
+}
+
+void ResetRichEditorShowUnderline(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    RichEditorModelNG::ResetShowUnderline(frameNode);
+}
+
+void SetRichEditorUnderlineColor(ArkUINodeHandle node, const ArkUI_Uint32* colors, ArkUI_Uint32 size)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    CHECK_NULL_VOID(colors);
+    if (size < NUM_4) {
+        return;
+    }
+    UserUnderlineColor userColor {
+        Color(colors[NUM_0]),
+        Color(colors[NUM_1]),
+        Color(colors[NUM_2]),
+        Color(colors[NUM_3]),
+    };
+    RichEditorModelNG::SetUnderlineColor(frameNode, userColor);
+}
+
+const ArkUI_Uint32* GetRichEditorUnderlineColor(ArkUINodeHandle node, ArkUI_Uint32* size)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_RETURN(frameNode, nullptr);
+    CHECK_NULL_RETURN(size, nullptr);
+    auto userColor = RichEditorModelNG::GetUnderlineColor(frameNode);
+    static ArkUI_Uint32 underlineColors[4] = { 0 };
+    underlineColors[0] = userColor.typing.value_or(Color()).GetValue();
+    underlineColors[1] = userColor.normal.value_or(Color()).GetValue();
+    underlineColors[2] = userColor.error.value_or(Color()).GetValue();
+    underlineColors[3] = userColor.disable.value_or(Color()).GetValue();
+    *size = 4;
+    return underlineColors;
+}
+
+void ResetRichEditorUnderlineColor(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    RichEditorModelNG::ResetUnderlineColor(frameNode);
 }
 
 void SetRichEditorOnSelect(ArkUINodeHandle node, void* callback, bool isJsView)
@@ -2907,6 +2972,12 @@ const ArkUIRichEditorModifier* GetRichEditorDynamicModifier()
             .setRichEditorMargin = nullptr,
             .resetRichEditorMargin = nullptr,
             .getRichEditorMargin = nullptr,
+            .setRichEditorShowUnderline = nullptr,
+            .getRichEditorShowUnderline = nullptr,
+            .resetRichEditorShowUnderline = nullptr,
+            .setRichEditorUnderlineColor = nullptr,
+            .getRichEditorUnderlineColor = nullptr,
+            .resetRichEditorUnderlineColor = nullptr,
         };
         CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
         return &modifier;
@@ -3121,6 +3192,12 @@ const ArkUIRichEditorModifier* GetRichEditorDynamicModifier()
         .setRichEditorMargin = SetRichEditorMargin,
         .resetRichEditorMargin = ResetRichEditorMargin,
         .getRichEditorMargin = GetRichEditorMargin,
+        .setRichEditorShowUnderline = SetRichEditorShowUnderline,
+        .getRichEditorShowUnderline = GetRichEditorShowUnderline,
+        .resetRichEditorShowUnderline = ResetRichEditorShowUnderline,
+        .setRichEditorUnderlineColor = SetRichEditorUnderlineColor,
+        .getRichEditorUnderlineColor = GetRichEditorUnderlineColor,
+        .resetRichEditorUnderlineColor = ResetRichEditorUnderlineColor,
     };
     CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
     return &modifier;
