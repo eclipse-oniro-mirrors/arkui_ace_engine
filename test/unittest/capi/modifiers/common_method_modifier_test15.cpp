@@ -30,7 +30,6 @@ namespace OHOS::Ace::NG {
 namespace {
 const auto ACTUAL_TRUE = true;
 const auto ACTUAL_FALSE = false;
-const auto EXPECTED_CONTEXT_ID = 123;
 const auto EXPECTED_NODE_ID = 555;
 const auto INVALID_REASON_MIN_VALUE = -1;
 const auto INVALID_REASON_MAX_VALUE = INT_MAX;
@@ -87,6 +86,18 @@ class CommonMethodModifierTest15 : public ModifierTestBase<GENERATED_ArkUICommon
     GENERATED_ARKUI_BLANK // test common methods on frameNode for Blank component
     > {
 public:
+
+    void TearDown() override
+    {
+        // 用例结束解除本用例回调路由：晚到的回调命中已解绑 token → Upgrade 空 → 可见失败
+        if (lastBuilderToken_ != -1) {
+            CallbackNodeBinder::Unbind(lastBuilderToken_);
+            lastBuilderToken_ = -1;
+        }
+        ModifierTestBase::TearDown();
+    }
+
+    int32_t lastBuilderToken_ = -1;
     static void SetUpTestCase()
     {
         ModifierTestBase::SetUpTestCase();
@@ -99,7 +110,12 @@ public:
     CustomNodeBuilder CreateCustomNodeBuilder(RefPtr<FrameNode>& node)
     {
         checkBuilderEvent.reset();
-        static std::optional<RefPtr<UINode>> uiNode = node;
+        // 每用例自持绑定（无函数级 static）：token→本用例节点登记进 CallbackNodeBinder，
+        // 回调按透传的 resourceId 反查；重复创建时先解除上一个 token。
+        if (lastBuilderToken_ != -1) {
+            CallbackNodeBinder::Unbind(lastBuilderToken_);
+        }
+        lastBuilderToken_ = CallbackNodeBinder::Bind(node);
         auto checkCallback = [](
             const Ark_Int32 resourceId,
             const Ark_NativePointer parentNode,
@@ -108,11 +124,12 @@ public:
                 .resourceId = resourceId,
                 .parentNode = parentNode
             };
-            if (uiNode) {
-                CallbackHelper(continuation).InvokeSync(AceType::RawPtr(uiNode.value()));
+            auto target = CallbackNodeBinder::Upgrade(resourceId);
+            if (target) {
+                CallbackHelper(continuation).InvokeSync(AceType::RawPtr(target));
             }
         };
-        return Converter::ArkValue<CustomNodeBuilder>(checkCallback, EXPECTED_CONTEXT_ID);
+        return Converter::ArkValue<CustomNodeBuilder>(checkCallback, lastBuilderToken_);
     }
     template<typename OptCallback, typename ArkCallback>
     OptCallback CreateOnAppearCallback(FrameNode* frameNode)
@@ -222,7 +239,7 @@ HWTEST_F(CommonMethodModifierTest15, DISABLED_setBindSheetTestIsShow, TestSize.L
     EXPECT_NE(pipeline, nullptr);
     pipeline->FlushAnimationClosure();
     EXPECT_TRUE(checkBuilderEvent.has_value());
-    EXPECT_EQ(checkBuilderEvent->resourceId, EXPECTED_CONTEXT_ID);
+    EXPECT_EQ(checkBuilderEvent->resourceId, lastBuilderToken_);
 
     arkShow = Converter::ArkUnion<Opt_Union_Boolean_Bindable, Ark_Boolean>(ACTUAL_FALSE);
     checkBuilderEvent.reset();
@@ -263,7 +280,7 @@ HWTEST_F(CommonMethodModifierTest15, DISABLED_setBindSheetTestOnAppear, TestSize
     ASSERT_NE(pipeline, nullptr);
     pipeline->FlushAnimationClosure();
     EXPECT_TRUE(checkBuilderEvent.has_value());
-    EXPECT_EQ(checkBuilderEvent->resourceId, EXPECTED_CONTEXT_ID);
+    EXPECT_EQ(checkBuilderEvent->resourceId, lastBuilderToken_);
     auto parentNode = reinterpret_cast<FrameNode*>(checkBuilderEvent->parentNode);
     ASSERT_NE(parentNode, nullptr);
     EXPECT_EQ(parentNode->GetId(), frameNode->GetId());
@@ -304,7 +321,7 @@ HWTEST_F(CommonMethodModifierTest15, DISABLED_setBindSheetTestOnDisAppear, TestS
     ASSERT_NE(pipeline, nullptr);
     pipeline->FlushAnimationClosure();
     EXPECT_TRUE(checkBuilderEvent.has_value());
-    EXPECT_EQ(checkBuilderEvent->resourceId, EXPECTED_CONTEXT_ID);
+    EXPECT_EQ(checkBuilderEvent->resourceId, lastBuilderToken_);
     auto parentNode = reinterpret_cast<FrameNode*>(checkBuilderEvent->parentNode);
     ASSERT_NE(parentNode, nullptr);
     EXPECT_EQ(parentNode->GetId(), frameNode->GetId());
@@ -347,7 +364,7 @@ HWTEST_F(CommonMethodModifierTest15, DISABLED_setBindSheetTestOnWillAppear, Test
     ASSERT_NE(pipeline, nullptr);
     pipeline->FlushAnimationClosure();
     EXPECT_TRUE(checkBuilderEvent.has_value());
-    EXPECT_EQ(checkBuilderEvent->resourceId, EXPECTED_CONTEXT_ID);
+    EXPECT_EQ(checkBuilderEvent->resourceId, lastBuilderToken_);
     auto parentNode = reinterpret_cast<FrameNode*>(checkBuilderEvent->parentNode);
     ASSERT_NE(parentNode, nullptr);
     EXPECT_EQ(parentNode->GetId(), frameNode->GetId());
@@ -387,7 +404,7 @@ HWTEST_F(CommonMethodModifierTest15, DISABLED_setBindSheetTestOnWillDisAppear, T
     ASSERT_NE(pipeline, nullptr);
     pipeline->FlushAnimationClosure();
     EXPECT_TRUE(checkBuilderEvent.has_value());
-    EXPECT_EQ(checkBuilderEvent->resourceId, EXPECTED_CONTEXT_ID);
+    EXPECT_EQ(checkBuilderEvent->resourceId, lastBuilderToken_);
     auto parentNode = reinterpret_cast<FrameNode*>(checkBuilderEvent->parentNode);
     ASSERT_NE(parentNode, nullptr);
     EXPECT_EQ(parentNode->GetId(), frameNode->GetId());
@@ -428,7 +445,7 @@ HWTEST_F(CommonMethodModifierTest15, DISABLED_setBindSheetTestShouldDismiss, Tes
     ASSERT_NE(pipeline, nullptr);
     pipeline->FlushAnimationClosure();
     EXPECT_TRUE(checkBuilderEvent.has_value());
-    EXPECT_EQ(checkBuilderEvent->resourceId, EXPECTED_CONTEXT_ID);
+    EXPECT_EQ(checkBuilderEvent->resourceId, lastBuilderToken_);
     auto parentNode = reinterpret_cast<FrameNode*>(checkBuilderEvent->parentNode);
     ASSERT_NE(parentNode, nullptr);
     EXPECT_EQ(parentNode->GetId(), frameNode->GetId());
@@ -470,7 +487,7 @@ HWTEST_F(CommonMethodModifierTest15, DISABLED_setBindSheetTestWillDismiss, TestS
     ASSERT_NE(pipeline, nullptr);
     pipeline->FlushAnimationClosure();
     EXPECT_TRUE(checkBuilderEvent.has_value());
-    EXPECT_EQ(checkBuilderEvent->resourceId, EXPECTED_CONTEXT_ID);
+    EXPECT_EQ(checkBuilderEvent->resourceId, lastBuilderToken_);
     auto parentNode = reinterpret_cast<FrameNode*>(checkBuilderEvent->parentNode);
     ASSERT_NE(parentNode, nullptr);
     EXPECT_EQ(parentNode->GetId(), frameNode->GetId());
@@ -517,7 +534,7 @@ HWTEST_F(CommonMethodModifierTest15, DISABLED_setBindSheetTestSpringBack, TestSi
     ASSERT_NE(pipeline, nullptr);
     pipeline->FlushAnimationClosure();
     EXPECT_TRUE(checkBuilderEvent.has_value());
-    EXPECT_EQ(checkBuilderEvent->resourceId, EXPECTED_CONTEXT_ID);
+    EXPECT_EQ(checkBuilderEvent->resourceId, lastBuilderToken_);
     auto parentNode = reinterpret_cast<FrameNode*>(checkBuilderEvent->parentNode);
     ASSERT_NE(parentNode, nullptr);
     EXPECT_EQ(parentNode->GetId(), frameNode->GetId());
@@ -558,7 +575,7 @@ HWTEST_F(CommonMethodModifierTest15, DISABLED_setBindSheetTestOnTypeDidChange, T
     ASSERT_NE(pipeline, nullptr);
     pipeline->FlushAnimationClosure();
     EXPECT_TRUE(checkBuilderEvent.has_value());
-    EXPECT_EQ(checkBuilderEvent->resourceId, EXPECTED_CONTEXT_ID);
+    EXPECT_EQ(checkBuilderEvent->resourceId, lastBuilderToken_);
     auto parentNode = reinterpret_cast<FrameNode*>(checkBuilderEvent->parentNode);
     ASSERT_NE(parentNode, nullptr);
     EXPECT_EQ(parentNode->GetId(), frameNode->GetId());
@@ -603,7 +620,7 @@ HWTEST_F(CommonMethodModifierTest15, DISABLED_setBindSheetTestOnHeightDidChange,
     ASSERT_NE(pipeline, nullptr);
     pipeline->FlushAnimationClosure();
     EXPECT_TRUE(checkBuilderEvent.has_value());
-    EXPECT_EQ(checkBuilderEvent->resourceId, EXPECTED_CONTEXT_ID);
+    EXPECT_EQ(checkBuilderEvent->resourceId, lastBuilderToken_);
     auto parentNode = reinterpret_cast<FrameNode*>(checkBuilderEvent->parentNode);
     ASSERT_NE(parentNode, nullptr);
     EXPECT_EQ(parentNode->GetId(), frameNode->GetId());
@@ -648,7 +665,7 @@ HWTEST_F(CommonMethodModifierTest15, DISABLED_setBindSheetTestOnWidthDidChange, 
     ASSERT_NE(pipeline, nullptr);
     pipeline->FlushAnimationClosure();
     EXPECT_TRUE(checkBuilderEvent.has_value());
-    EXPECT_EQ(checkBuilderEvent->resourceId, EXPECTED_CONTEXT_ID);
+    EXPECT_EQ(checkBuilderEvent->resourceId, lastBuilderToken_);
     auto parentNode = reinterpret_cast<FrameNode*>(checkBuilderEvent->parentNode);
     ASSERT_NE(parentNode, nullptr);
     EXPECT_EQ(parentNode->GetId(), frameNode->GetId());
@@ -694,7 +711,7 @@ HWTEST_F(CommonMethodModifierTest15, DISABLED_setBindSheetTestOnDetentsDidChange
 
     pipeline->FlushAnimationClosure();
     EXPECT_TRUE(checkBuilderEvent.has_value());
-    EXPECT_EQ(checkBuilderEvent->resourceId, EXPECTED_CONTEXT_ID);
+    EXPECT_EQ(checkBuilderEvent->resourceId, lastBuilderToken_);
     auto parentNode = reinterpret_cast<FrameNode*>(checkBuilderEvent->parentNode);
     ASSERT_NE(parentNode, nullptr);
     EXPECT_EQ(parentNode->GetId(), frameNode->GetId());

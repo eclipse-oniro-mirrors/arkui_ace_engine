@@ -14,6 +14,9 @@
  */
 
 #include "core/common/dynamic_module_helper.h"
+#include "test/mock/frameworks/core/common/mock_canvas_dynamic_module.h"
+#include "test/mock/frameworks/core/common/mock_swiper_dynamic_module.h"
+#include "test/mock/frameworks/core/common/mock_tabs_dynamic_module.h"
 
 namespace OHOS::Ace {
 
@@ -30,6 +33,22 @@ std::unique_ptr<ComponentLoader> DynamicModuleHelper::GetLoaderByName(const char
 
 DynamicModule* DynamicModuleHelper::GetDynamicModule(const std::string& name)
 {
+#ifdef MOCK_DYNAMIC_MODULE_COMPONENTS
+    // 组件 mock 模块仅供 capi 测试套（ace_core_interfaces_native_node_linux_unittest）使用；
+    // 全局 mock 库（ace_components_mock）未链入 Mock*DynamicModule 实现，必须条件编译避免 vtable 未定义链接错误。
+    static MockSwiperDynamicModule swiperModule;
+    static MockTabsDynamicModule tabsModule;
+    static MockCanvasDynamicModule canvasModule;
+    if (name == "Swiper") {
+        return &swiperModule;
+    }
+    if (name == "TabContent") {
+        return &tabsModule;
+    }
+    if (name == "Canvas") {
+        return &canvasModule;
+    }
+#endif
     return nullptr;
 }
 

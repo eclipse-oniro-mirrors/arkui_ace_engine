@@ -16,6 +16,8 @@
 #define FOUNDATION_ARKUI_ACE_ENGINE_FRAMEWORKS_TEST_UNITTEST_CAPI_MODIFIERS_ACCESSOR_TEST_BASE_H
 
 #include <gtest/gtest.h>
+#include <cstdlib>
+#include <variant>
 
 #include "arkoala_api_generated.h"
 #include "../capi_gen140_compat.h"
@@ -26,7 +28,9 @@
 #include "test/mock/frameworks/core/common/mock_container.h"
 #include "test/mock/frameworks/core/common/mock_theme_manager.h"
 #include "test/mock/frameworks/core/common/mock_theme_style.h"
+#include "test/mock/frameworks/core/common/mock_resource_adapter_v2.h"
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
+#include "test/unittest/capi/utils/mock_resource_registration.h"
 
 using testing::NiceMock;
 
@@ -150,6 +154,10 @@ public:
         themeConstants_ = nullptr;
     }
 
+    // RegisterResourceById / RegisterResourceByName / TryParseAsResourceId 已提取至
+    // test/unittest/capi/utils/mock_resource_registration.h，与 modifier 基类共用；
+    // 下方 AddResource 中的非限定名调用按命名空间查找解析到该处 inline 函数。
+
     static void AddResource(const std::string& key, const ResRawValue& value)
     {
         ThemeConstantsType type = ThemeConstantsType::ERROR;
@@ -168,6 +176,12 @@ public:
         }
         ASSERT_NE(type, ThemeConstantsType::ERROR);
         MockThemeStyle::GetInstance()->SetAttr(key, { .type = type, .value = value });
+        uint32_t id = 0;
+        if (TryParseAsResourceId(key, id)) {
+            RegisterResourceById(id, value);
+        } else {
+            RegisterResourceByName(key, value);
+        }
     }
 
     static void AddResource(int64_t key, const ResRawValue& value)

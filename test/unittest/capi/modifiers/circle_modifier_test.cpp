@@ -110,7 +110,8 @@ HWTEST_F(CircleModifierTest, setStrokeTestResourceColorAndColorMetrics, TestSize
 
 /*
  * @tc.name: setFillTestColorMetricsAndResetSemantics
- * @tc.desc:
+ * @tc.desc: setFill colorMetrics and reset; dump contract: reset clears field, ToJsonValue
+ *             outputs value_or(Color::FOREGROUND) fallback
  * @tc.type: FUNC
  */
 HWTEST_F(CircleModifierTest, setFillTestColorMetricsAndResetSemantics, TestSize.Level1)
@@ -151,7 +152,8 @@ HWTEST_F(CircleModifierTest, setFillTestColorMetricsAndResetSemantics, TestSize.
     fillResult = GetAttrValue<std::string>(node_, ATTRIBUTE_FILL_NAME);
     EXPECT_THAT(fillResult, Eq(ATTRIBUTE_COLOR_DEFAULT_VALUE));
     foregroundResult = GetAttrValue<std::string>(node_, ATTRIBUTE_FOREGROUND_COLOR_NAME);
-    EXPECT_FALSE(foregroundResult.has_value());
+    // dump contract: reset 后 propForegroundColor_ 已清空, ToJsonValue value_or 兜底输出默认前景色
+    EXPECT_THAT(foregroundResult, Eq("#00000001"));
 }
 
 /*
