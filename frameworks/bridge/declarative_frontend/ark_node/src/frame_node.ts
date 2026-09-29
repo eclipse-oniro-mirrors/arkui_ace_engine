@@ -40,6 +40,11 @@ interface ArkComponentCreator {
   createTextTimerComponent?: (node: NodePtr, type: ModifierType) => ArkTextTimerComponent;
   createTextAreaComponent?: (node: NodePtr, type: ModifierType) => ArkTextAreaComponent;
   createTextInputComponent?: (node: NodePtr, type: ModifierType) => ArkTextInputComponent;
+  createGridRowComponent?: (node: NodePtr, type: ModifierType) => ArkGridRowComponent;
+  createGridColComponent?: (node: NodePtr, type: ModifierType) => ArkGridColComponent;
+  createBlankComponent?: (node: NodePtr, type: ModifierType) => ArkBlankComponent;
+  createRelativeContainerComponent?: (node: NodePtr, type: ModifierType) => ArkRelativeContainerComponent;
+  createDividerComponent?: (node: NodePtr, type: ModifierType) => ArkDividerComponent;
 }
 
 const __componentCreator__ : ArkComponentCreator = {};
@@ -1365,9 +1370,12 @@ const __creatorMap__ = new Map<string, (context: UIContext, options?: object) =>
     }],
     ['GridRow', (context: UIContext): FrameNode => {
       let node = new TypedFrameNode(context, 'GridRow', (node: NodePtr, type: ModifierType): ArkGridRowComponent => {
-        getUINativeModule().loadNativeModule('GridRow');
-        let module = globalThis.requireNapi('arkui.components.arkgridrow');
-        return module.createComponent(node, type);
+        if (__componentCreator__.createGridRowComponent === undefined) {
+          getUINativeModule().loadNativeModule('GridRow');
+          let module = globalThis.requireNapi('arkui.components.arkgridrow');
+          __componentCreator__.createGridRowComponent = module.createComponent;
+        }
+        return __componentCreator__.createGridRowComponent!(node, type);
       });
       node.initialize();
       return node;
@@ -1384,18 +1392,24 @@ const __creatorMap__ = new Map<string, (context: UIContext, options?: object) =>
     }],
     ['GridCol', (context: UIContext): FrameNode => {
       let node = new TypedFrameNode(context, 'GridCol', (node: NodePtr, type: ModifierType): ArkGridColComponent => {
-        getUINativeModule().loadNativeModule('GridCol');
-        let module = globalThis.requireNapi('arkui.components.arkgridcol');
-        return module.createComponent(node, type);
+        if (__componentCreator__.createGridColComponent === undefined) {
+          getUINativeModule().loadNativeModule('GridCol');
+          let module = globalThis.requireNapi('arkui.components.arkgridcol');
+          __componentCreator__.createGridColComponent = module.createComponent;
+        }
+        return __componentCreator__.createGridColComponent!(node, type);
       });
       node.initialize();
       return node;
     }],
     ['Blank', (context: UIContext): FrameNode => {
       return new TypedFrameNode(context, 'Blank', (node: NodePtr, type: ModifierType): ArkBlankComponent => {
-        getUINativeModule().loadNativeModule('Blank');
- 	      let module = globalThis.requireNapi('arkui.components.arkblank');
- 	      return module.createComponent(node, type);
+        if (__componentCreator__.createBlankComponent === undefined) {
+          getUINativeModule().loadNativeModule('Blank');
+          let module = globalThis.requireNapi('arkui.components.arkblank');
+          __componentCreator__.createBlankComponent = module.createComponent;
+        }
+        return __componentCreator__.createBlankComponent!(node, type);
       })
     }],
     ['Image', (context: UIContext): FrameNode => {
@@ -1432,9 +1446,12 @@ const __creatorMap__ = new Map<string, (context: UIContext, options?: object) =>
     }],
     ['RelativeContainer', (context: UIContext): FrameNode => {
       return new TypedFrameNode(context, 'RelativeContainer', (node: NodePtr, type: ModifierType): ArkRelativeContainerComponent => {
-        getUINativeModule().loadNativeModule('RelativeContainer');
- 	      let module = globalThis.requireNapi('arkui.components.arkrelativecontainer');
- 	      return module.createComponent(node, type);
+        if (__componentCreator__.createRelativeContainerComponent === undefined) {
+          getUINativeModule().loadNativeModule('RelativeContainer');
+          let module = globalThis.requireNapi('arkui.components.arkrelativecontainer');
+          __componentCreator__.createRelativeContainerComponent = module.createComponent;
+        }
+        return __componentCreator__.createRelativeContainerComponent!(node, type);
       })
     }],
     ['List', (context: UIContext): FrameNode => {
@@ -1449,9 +1466,12 @@ const __creatorMap__ = new Map<string, (context: UIContext, options?: object) =>
     }],
     ['Divider', (context: UIContext): FrameNode => {
       return new TypedFrameNode(context, 'Divider', (node: NodePtr, type: ModifierType): ArkDividerComponent => {
-        getUINativeModule().loadNativeModule('Divider');
- 	      let module = globalThis.requireNapi('arkui.components.arkdivider');
- 	      return module.createComponent(node, type);
+        if (__componentCreator__.createDividerComponent === undefined) {
+          getUINativeModule().loadNativeModule('Divider');
+          let module = globalThis.requireNapi('arkui.components.arkdivider');
+          __componentCreator__.createDividerComponent = module.createComponent;
+        }
+        return __componentCreator__.createDividerComponent!(node, type);
       })
     }],
     ['LoadingProgress', (context: UIContext): FrameNode => {

@@ -794,6 +794,22 @@ void RegisterFormModuleByName(BindingTarget globalObj, const std::string& module
         JSTextTimerController::JSBind(globalObj);
         return;
     }
+    if (module == "__Rect__") {
+        JSRect::JSBind(globalObj);
+        return;
+    }
+    if (module == "__Path__") {
+        JSPath::JSBind(globalObj);
+        return;
+    }
+    if (module == "__Circle__") {
+        JSCircle::JSBind(globalObj);
+        return;
+    }
+    if (module == "__Ellipse__") {
+        JSEllipse::JSBind(globalObj);
+        return;
+    }
 #if !defined(WEARABLE_PRODUCT) && defined(PLAYER_FRAMEWORK_EXISTS) && defined(VIDEO_SUPPORTED)
     if (module == "Video") {
         JSVideoControllerAsyncBinding::JSBind(globalObj);
@@ -933,6 +949,10 @@ void JsBindFormViews(
         JSEllipseShape::JSBind(globalObj);
         JSPathShape::JSBind(globalObj);
         JSWithEnv::JSBind(globalObj);
+        JSRect::JSBind(globalObj);
+        JSCircle::JSBind(globalObj);
+        JSEllipse::JSBind(globalObj);
+        JSPath::JSBind(globalObj);
     }
 
     if (!formModuleList.empty()) {
