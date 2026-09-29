@@ -35,6 +35,8 @@ build_component_ng("rich_editor_pattern_ng") {
     "rich_editor_styled_string_controller.cpp",
     "rich_editor_theme.cpp",
     "rich_editor_undo_manager.cpp",
+    "plain_text_span_string.cpp",
+    "span_string_mode_switcher.cpp",
   ]
 
   ark_sources = [

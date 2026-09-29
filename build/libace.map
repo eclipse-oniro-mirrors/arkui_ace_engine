@@ -883,13 +883,17 @@
       "OHOS::Ace::MultiTypeRecordImpl::SetPlainText(std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>>)";
       "OHOS::Ace::MultiTypeRecordImpl::SetUri(std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>>)";
       "OHOS::Ace::MutableSpanString::AppendSpanString(OHOS::Ace::RefPtr<OHOS::Ace::SpanString> const&)";
+      "OHOS::Ace::MutableSpanString::ClearAllSpans()";
       "OHOS::Ace::MutableSpanString::InsertSpanString(int, OHOS::Ace::RefPtr<OHOS::Ace::SpanString> const&)";
       "OHOS::Ace::MutableSpanString::InsertString(int, std::__h::basic_string<char16_t, std::__h::char_traits<char16_t>, std::__h::allocator<char16_t>> const&)";
       "OHOS::Ace::MutableSpanString::NotifySpanWatcher()";
       "OHOS::Ace::MutableSpanString::RemoveString(int, int)";
       "OHOS::Ace::MutableSpanString::ReplaceSpanString(int, int, OHOS::Ace::RefPtr<OHOS::Ace::SpanString> const&)";
+      "OHOS::Ace::MutableSpanString::ReplaceString(int, int, std::__h::basic_string<char16_t, std::__h::char_traits<char16_t>, std::__h::allocator<char16_t>> const&)";
       "OHOS::Ace::MutableSpanString::SetSpanWatcher(OHOS::Ace::WeakPtr<OHOS::Ace::SpanWatcher> const&)";
       "OHOS::Ace::MutableSpanString::SplitSpansByNewLine()";
+      "vtable for OHOS::Ace::MutableSpanString";
+      "VTT for OHOS::Ace::MutableSpanString";
       "OHOS::Ace::NG::AccessibilityProperty::GetAccessibilityActionOptions()";
       "OHOS::Ace::NG::AccessibilityProperty::GetAccessibilityFocusState() const";
       "OHOS::Ace::NG::AccessibilityProperty::GetAccessibilityVirtualNode() const";
@@ -2649,7 +2653,9 @@
       "OHOS::Ace::NG::TextPattern::SelectAIDetect()";
       "OHOS::Ace::NG::SheetPopupShape::GetPopupStyleSheetClipPathSDF(OHOS::Ace::NG::SizeT<float> const&, OHOS::Ace::NG::BorderRadiusPropertyT<OHOS::Ace::Dimension> const&, OHOS::Ace::Placement, OHOS::Ace::NG::SheetArrowPosition, OHOS::Ace::NG::OffsetT<float> const&)";
       "OHOS::Ace::NG::TextPattern::SetFallbackLineSpacingAndIncludeFontPadding(bool)";
+      "OHOS::Ace::NG::TextPattern::SetIsAskCeliaEnabled(bool)";
       "OHOS::Ace::NG::TextPattern::SetIsMeasureBoundary(bool)";
+      "OHOS::Ace::NG::TextPattern::SetIsShowAskCeliaInRightClick(bool)";
       "OHOS::Ace::NG::TextPattern::SetIsUserSetResponseRegion(bool)";
       "OHOS::Ace::NG::TextPattern::SetOnClickMenu(OHOS::Ace::AISpan const&, std::__h::function<void ()> const&, std::__h::function<void (OHOS::Ace::NG::RectT<float> const&, OHOS::Ace::NG::RectT<float> const&)> const&)";
       "OHOS::Ace::NG::TextPattern::SetResultObjectText(OHOS::Ace::ResultObject&, OHOS::Ace::RefPtr<OHOS::Ace::NG::SpanItem> const&)";
@@ -3383,6 +3389,7 @@
       "OHOS::Ace::SpanString::CheckRange(int, int, bool) const";
       "OHOS::Ace::SpanString::DecodeTlv(std::__h::vector<unsigned char, std::__h::allocator<unsigned char>>&)";
       "OHOS::Ace::SpanString::EncodeTlv(std::__h::vector<unsigned char, std::__h::allocator<unsigned char>>&)";
+      "OHOS::Ace::SpanString::GetDefaultSpanItem(std::__h::basic_string<char16_t, std::__h::char_traits<char16_t>, std::__h::allocator<char16_t>> const&)";
       "OHOS::Ace::SpanString::GetLength() const";
       "OHOS::Ace::SpanString::GetSpan(int, int, OHOS::Ace::SpanType) const";
       "OHOS::Ace::SpanString::GetSpanItems() const";
@@ -3411,6 +3418,7 @@
       "OHOS::Ace::SpanString::ToLineHeightSpan(OHOS::Ace::RefPtr<OHOS::Ace::NG::SpanItem> const&, int, int)";
       "OHOS::Ace::SpanString::ToParagraphStyleSpan(OHOS::Ace::RefPtr<OHOS::Ace::NG::SpanItem> const&, int, int)";
       "OHOS::Ace::SpanString::ToUrlSpan(OHOS::Ace::RefPtr<OHOS::Ace::NG::SpanItem> const&, int, int)";
+      "OHOS::Ace::SpanString::UpdateSpansMap()";
       "OHOS::Ace::SpringAnimation::SpringAnimation(OHOS::Ace::RefPtr<OHOS::Ace::SpringProperty> const&)";
       "OHOS::Ace::SpringChainProperty::GetDefaultOverSpringProperty()";
       "OHOS::Ace::SpringCurve::SpringCurve(float, float, float, float)";
@@ -5029,6 +5037,7 @@
       "OHOS::Ace::NG::ViewStackProcessor::PopContainer()";
       "OHOS::Ace::NG::ViewStackProcessor::ResetGestureProcessor()";
       "OHOS::Ace::NavigationModel::GetInstance()";
+      "OHOS::Ace::NotifyInputMethodConfigChange(OHOS::Ace::TextInputAction, OHOS::Ace::TextInputType)";
       "OHOS::Ace::OptionComponent::CheckOptionModify()";
       "OHOS::Ace::PageTransitionModel::GetInstance()";
       "OHOS::Ace::ParticleModel::GetInstance()";

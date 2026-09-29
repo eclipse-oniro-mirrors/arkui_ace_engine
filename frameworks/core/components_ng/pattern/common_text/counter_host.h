@@ -72,7 +72,6 @@ public:
     virtual bool IsUnderlineAndButtonMode() const { return false; }
     virtual bool IsTextAreaOnCounter() const { return false; }
     virtual bool IsNormalInlineState() const { return false; }
-    virtual bool IsShowPasswordIcon() const { return false; }
     virtual TextDirection GetLayoutDirection() const { return TextDirection::LTR; }
     virtual TextDirection GetNonAutoLayoutDirection() const { return TextDirection::LTR; }
 

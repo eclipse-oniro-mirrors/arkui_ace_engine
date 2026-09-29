@@ -3495,6 +3495,14 @@ struct CJUIRichEditorModifier {
     void (*setRichEditorHorizontalScrolling)(ArkUINodeHandle node, ArkUI_Bool singleLine);
     void (*resetRichEditorHorizontalScrolling)(ArkUINodeHandle node);
     ArkUI_Bool (*getRichEditorHorizontalScrolling)(ArkUINodeHandle node);
+    void (*setRichEditorInputType)(ArkUINodeHandle node, ArkUI_Int32 value);
+    void (*resetRichEditorInputType)(ArkUINodeHandle node);
+    ArkUI_Int32 (*getRichEditorInputType)(ArkUINodeHandle node);
+    void (*setRichEditorShowPasswordIcon)(ArkUINodeHandle node, ArkUI_Uint32 showPasswordIcon);
+    void (*resetRichEditorShowPasswordIcon)(ArkUINodeHandle node);
+    ArkUI_Bool (*getRichEditorShowPasswordIcon)(ArkUINodeHandle node);
+    void (*setRichEditorPasswordIcon)(ArkUINodeHandle node, const struct ArkUIPasswordIconType* passwordIcon);
+    void (*resetRichEditorPasswordIcon)(ArkUINodeHandle node);
 };
 
 struct CJUIRichEditorControllerModifier {

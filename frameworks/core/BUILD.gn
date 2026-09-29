@@ -274,6 +274,7 @@ template("ace_core_source_set") {
       "common/ime/text_input_configuration.cpp",
       "common/ime/text_input_connection.cpp",
       "common/ime/text_input_formatter.cpp",
+      "common/ime/text_input_keyboard_utils.cpp",
       "common/ime/text_input_proxy.cpp",
       "common/ime/text_input_type.cpp",
 
@@ -382,6 +383,10 @@ template("ace_core_source_set") {
     ]
 
     external_deps = []
+    if (defined(config.enable_standard_input) && config.enable_standard_input) {
+      external_deps += [ "imf:inputmethod_client" ]
+      external_deps += [ "input:libmmi-client" ]
+    }
     if (!ace_engine_feature_enable_event_extra_handling) {
       sources += [ "event/event_info_convertor.cpp" ]
     }
@@ -891,6 +896,7 @@ template("ace_core_ng_source_set") {
       "common/ime/text_input_configuration.cpp",
       "common/ime/text_input_connection.cpp",
       "common/ime/text_input_formatter.cpp",
+      "common/ime/text_input_keyboard_utils.cpp",
       "common/ime/text_input_proxy.cpp",
       "common/ime/text_input_type.cpp",
 
@@ -1060,6 +1066,10 @@ template("ace_core_ng_source_set") {
     }
 
     external_deps = []
+    if (defined(config.enable_standard_input) && config.enable_standard_input) {
+      external_deps += [ "imf:inputmethod_client" ]
+      external_deps += [ "input:libmmi-client" ]
+    }
     if (defined(ffrt_support) && ffrt_support) {
       defines += [ "FFRT_SUPPORT" ]
       external_deps += [ "ffrt:libffrt" ]

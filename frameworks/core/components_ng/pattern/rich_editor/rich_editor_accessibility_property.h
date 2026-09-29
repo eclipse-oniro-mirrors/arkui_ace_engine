@@ -28,7 +28,10 @@ public:
 
     bool IsEditable() const override;
     bool IsHint() const override;
+    std::string GetText() const override;
     std::string GetHintText() const override;
+    bool IsPassword() const override;
+    AceTextCategory GetTextInputType() const override;
     bool IsShowCount() const;
     const std::list<RefPtr<UINode>>& GetChildren(const RefPtr<FrameNode>& host) const override;
 

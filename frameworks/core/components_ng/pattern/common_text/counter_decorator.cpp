@@ -20,6 +20,7 @@
 
 #include "base/log/ace_trace.h"
 #include "core/components/common/properties/animation_option.h"
+#include "core/components_ng/pattern/text_field/password_icon_host.h"
 #include "core/components/text_field/textfield_theme.h"
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/layout/layout_wrapper_node.h"
@@ -318,7 +319,8 @@ float CounterDecorator::MeasureDecorator(float contentWidth, const std::u16strin
     CHECK_NULL_RETURN(host, 0.0f);
 
     auto isInlineStyle = host->IsNormalInlineState();
-    auto isShowPassword = host->IsShowPasswordIcon();
+    auto passwordHost = DynamicCast<IPasswordIconHost>(host);
+    bool isShowPassword = passwordHost && passwordHost->IsShowPasswordIcon();
     if (host->GetShowCounterValue() && host->HasMaxLength() &&
         !isInlineStyle && !isShowPassword) {
         auto counterNodeLayoutWrapper = decoratedNode->GetOrCreateChildByIndex(decoratedNode->GetChildIndex(textNode));
@@ -392,7 +394,8 @@ void CounterDecorator::LayoutDecorator()
     CHECK_NULL_VOID(host);
 
     bool isInlineStyle = host->IsNormalInlineState();
-    bool isShowPassword = host->IsShowPasswordIcon();
+    auto passwordHost = DynamicCast<IPasswordIconHost>(host);
+    bool isShowPassword = passwordHost && passwordHost->IsShowPasswordIcon();
     if (!isShowPassword && !isInlineStyle) {
         // ShowCounter is inside of TextArea, while outside of TextInput
         if (!host->IsTextAreaOnCounter()) {

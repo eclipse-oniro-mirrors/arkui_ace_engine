@@ -19,7 +19,7 @@
 #include "base/geometry/ng/size_t.h"
 #include "base/memory/ace_type.h"
 #include "base/memory/referenced.h"
-#include "core/common/password_icon_host.h"
+#include "core/components_ng/pattern/text_field/password_icon_host.h"
 #include "core/components/text_field/textfield_theme.h"
 #include "core/components_ng/pattern/pattern.h"
 #include "core/components_ng/pattern/text/text_layout_property.h"
@@ -77,6 +77,21 @@ protected:
         const CalcSize& userDefinedIdealSize);
     WeakPtr<Pattern> hostPattern_;
     RectF areaRect_;
+};
+
+class ResponseAreaMeasureHelper {
+public:
+    static float MeasureAndDeductConstraint(
+        const RefPtr<TextInputResponseArea>& area, LayoutWrapper* layoutWrapper, LayoutConstraintF& constraint);
+    static void LayoutArea(const RefPtr<TextInputResponseArea>& area, LayoutWrapper* layoutWrapper, float& nodeWidth);
+    static void LayoutArea(const RefPtr<TextInputResponseArea>& area, LayoutWrapper* layoutWrapper)
+    {
+        float nodeWidth = 0.0f;
+        LayoutArea(area, layoutWrapper, nodeWidth);
+    }
+
+    static OffsetF AdjustContentOffsetForRTL(
+        const OffsetF& contentOffset, float areaWidth, LayoutWrapper* layoutWrapper);
 };
 
 class ACE_FORCE_EXPORT PasswordResponseArea : public TextInputResponseArea {

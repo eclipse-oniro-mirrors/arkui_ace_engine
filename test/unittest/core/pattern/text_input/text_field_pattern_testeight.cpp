@@ -1029,7 +1029,7 @@ HWTEST_F(TextFieldPatternTestEight, StopTwinkling001, TestSize.Level0)
     });
     GetFocus();
 
-    pattern_->obscureTickCountDown_ = 1;
+    pattern_->obscureHelper_.tickCountDown_ = 1;
     pattern_->cursorVisible_ = false;
     pattern_->StopTwinkling();
     EXPECT_FALSE(pattern_->isCaretTwinkling_);
@@ -1047,7 +1047,7 @@ HWTEST_F(TextFieldPatternTestEight, ShowCaretAndStopTwinkling001, TestSize.Level
     });
     GetFocus();
 
-    pattern_->obscureTickCountDown_ = 1;
+    pattern_->obscureHelper_.tickCountDown_ = 1;
     pattern_->ShowCaretAndStopTwinkling();
     EXPECT_TRUE(pattern_->cursorVisible_);
 }

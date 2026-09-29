@@ -60,6 +60,7 @@
 #include "core/common/ime/text_input_configuration.h"
 #include "core/common/ime/text_input_connection.h"
 #include "core/common/ime/text_input_formatter.h"
+#include "core/common/ime/text_input_keyboard_utils.h"
 #include "core/common/ime/text_input_proxy.h"
 #include "core/common/ime/text_input_type.h"
 #include "core/common/ime/text_selection.h"
@@ -118,6 +119,15 @@
 
 #include "core/common/ime/input_method_manager.h"
 #include "core/components/common/properties/text_style_gradient.h"
+#include <algorithm>
+#include <cctype>
+#include <string_view>
+#include <unordered_map>
+#include "base/view_data/ace_auto_fill_type.h"
+#include "core/common/ime/text_input_filter.h"
+#include "core/common/ime/text_input_obscure_utils.h"
+#include "core/components_ng/pattern/text_field/text_input_response_area.h"
+#include "core/components/text_field/textfield_theme.h"
 
 namespace OHOS::Ace::NG {
 namespace {
@@ -198,6 +208,7 @@ RichEditorPattern::RichEditorPattern(bool isStyledStringMode) :
     isAPI20Plus(Container::GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TWENTY)),
     isAPI26Plus(Container::GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TWENTY_SIX))
 {
+    action_ = TextInputAction::NEW_LINE;
     SetSpanStringMode(isStyledStringMode);
     magnifierController_ = MakeRefPtr<MagnifierController>(WeakClaim(this));
     selectOverlay_ = AceType::MakeRefPtr<RichEditorSelectOverlay>(WeakClaim(this));
@@ -246,7 +257,7 @@ void RichEditorPattern::SetStyledString(const RefPtr<SpanString>& value)
         return;
     }
     CHECK_NULL_VOID(value && styledString_);
-    auto subValue = value;
+    auto subValue = FilterSpanStringByInputType(value, true);
     if (value->GetLength() != styledString_->GetLength() && value->GetLength() > maxLength_.value_or(INT_MAX)) {
         auto subLength = CalculateTruncationLength(value->GetU16string(), maxLength_.value_or(INT_MAX));
         HandleCounterWithLength(value->GetLength(), maxLength_);
@@ -258,6 +269,7 @@ void RichEditorPattern::SetStyledString(const RefPtr<SpanString>& value)
     }
     IF_TRUE(hasActiveFilter_, FilterStyledStringBeforeInsert(subValue));
     IF_TRUE(IsPreviewTextInputting() && !previewTextRecord_.previewTextExiting, NotifyExitTextPreview(true));
+    ResetObscureTickCountDown();
     auto length = styledString_->GetLength();
     UndoRedoRecord record;
     undoManager_->ApplyOperationToRecord(0, length, subValue, record);
@@ -503,6 +515,7 @@ void RichEditorPattern::InsertValueInStyledString(
             return;
         }
     }
+    FilterTextByInputType(subValue);
     if (!ProcessTextTruncationOperation(subValue, shouldCommitInput)) {
         HandleCounterWithLength(DEFAULT_LENGTH, maxLength_);
         return;
@@ -522,6 +535,7 @@ void RichEditorPattern::InsertValueInStyledString(
         HandleCounterWithLength(static_cast<int32_t>(subValue.length()), maxLength_);
     }
     AfterStyledStringChange(record);
+    IF_TRUE(shouldCommitInput && IsInPasswordMode(), UpdateObscure(subValue, true));
     IF_TRUE(!isPaste, OnReportRichEditorEvent("onIMEInputComplete"));
 }
 
@@ -770,7 +784,7 @@ void RichEditorPattern::OnModifyDone()
     copyOption_ = layoutProperty->GetCopyOption().value_or(CopyOptions::Local);
     auto context = host->GetContext();
     CHECK_NULL_VOID(context);
-    ResetKeyboardIfNeed();
+    CheckIfNeedToResetKeyboard();
     context->AddOnAreaChangeNode(host->GetId());
     if (!clipboard_ && context) {
         clipboard_ = ClipboardProxy::GetInstance()->GetClipboard(context->GetTaskExecutor());
@@ -788,7 +802,7 @@ void RichEditorPattern::OnModifyDone()
     SetAccessibilityAction();
     selectOverlay_->SetMenuTranslateIsSupport(IsShowTranslate());
     selectOverlay_->SetIsSupportMenuSearch(IsShowSearch());
-    if (host->IsDraggable()) {
+    if (host->IsDraggable() && IsCapabilityAllowed(RichEditorCapability::CONTENT_DRAG)) {
         InitDragDropEvent();
     } else {
         ClearDragDropEvent();
@@ -816,6 +830,31 @@ void RichEditorPattern::OnModifyDone()
     RegisterTranslateListener();
     InitMargin();
     ProcessCounter();
+    InitPasswordMode();
+}
+
+void RichEditorPattern::InitPasswordMode()
+{
+    FilterInitializeTextByInputType();
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto richEditorLayoutProperty = host->GetLayoutProperty<RichEditorLayoutProperty>();
+    if (richEditorLayoutProperty && richEditorLayoutProperty->GetTypeChangedValue(false)) {
+        auto currentType = richEditorLayoutProperty->GetTextInputTypeValue(TextInputType::UNSPECIFIED);
+        if (IsDynamicInputTypeSwitchAligned(currentType)) {
+            richEditorLayoutProperty->ResetTypeChanged();
+            ClearOperationRecords();
+        }
+    }
+    SwitchStyledStringByInputMode();
+    SyncTypingStyleToPlainText();
+    IF_TRUE(!ProcessPasswordArea(), ClearLeftoverPasswordArea());
+}
+
+void RichEditorPattern::ClearLeftoverPasswordArea()
+{
+    auto area = GetPasswordResponseArea();
+    IF_PRESENT(area, ClearArea());
 }
 
 void RichEditorPattern::InitGestureEvents()
@@ -872,6 +911,7 @@ void RichEditorPattern::BeforeCreateLayoutWrapper()
         ClearTextForDisplayIfEmpty();
     } else if (contentMod_) {
         contentMod_->ContentChange();
+        IF_TRUE(!ProcessPasswordArea(), ClearLeftoverPasswordArea());
     }
     TryExecuteSelectAll();
     if (IsShowCancelButtonMode()) {
@@ -922,11 +962,6 @@ void RichEditorPattern::SetCancelButtonIconColor(const Color& color)
     CHECK_NULL_VOID(host);
     ACE_UPDATE_NODE_LAYOUT_PROPERTY(RichEditorLayoutProperty, IconColor, color, host);
     MarkCancelButtonDirty();
-}
-
-RefPtr<FrameNode> RichEditorPattern::GetHost() const
-{
-    return Pattern::GetHost();
 }
 
 bool RichEditorPattern::IsShowCancelButtonMode() const
@@ -985,23 +1020,6 @@ bool RichEditorPattern::HasUserAccessibilityText() const
     // RichEditor does not support user-defined accessibilityText; always allow
     // CleanNodeResponseArea to proceed with automatic focus request.
     return false;
-}
-
-void RichEditorPattern::SetCleanHoverColorAndRect(const RoundRect& rect, uint32_t color)
-{
-    auto overlayMod = AceType::DynamicCast<RichEditorOverlayModifier>(hostOverlayMod_);
-    CHECK_NULL_VOID(overlayMod);
-    std::vector<RoundRect> roundRectVector;
-    roundRectVector.push_back(rect);
-    overlayMod->SetHoverColorAndRects(roundRectVector, color);
-}
-
-void RichEditorPattern::ClearCleanHoverColorAndRects()
-{
-    CHECK_NULL_VOID(hostOverlayMod_);
-    auto overlay = AceType::DynamicCast<RichEditorOverlayModifier>(hostOverlayMod_);
-    CHECK_NULL_VOID(overlay);
-    overlay->ClearHoverColorAndRects();
 }
 
 void RichEditorPattern::OnCleanNodeHoverEnter()
@@ -3041,6 +3059,19 @@ void RichEditorPattern::SetTypingStyle(std::optional<struct UpdateSpanStyle> typ
     bool isReset = styleManager_->HasTypingFontStyle() && !typingStyle.has_value();
     styleManager_->SetTypingStyle(typingStyle, textStyle);
     UpdateCaretStyleByTypingStyle(isReset);
+    SyncTypingStyleToPlainText();
+}
+
+void RichEditorPattern::SyncTypingStyleToPlainText()
+{
+    CHECK_NULL_VOID(IsInPlainTextInputMode());
+    auto plainStr = AceType::DynamicCast<PlainTextSpanString>(styledString_);
+    if (plainStr) {
+        styleManager_->ApplyTypingStyleToSpanItem(plainStr);
+        plainStr->NotifySpanWatcher();
+    }
+    auto frameNode = GetHost();
+    IF_PRESENT(frameNode, MarkDirtyNode(PROPERTY_UPDATE_MEASURE));
 }
 
 void RichEditorPattern::SetPlaceholderStyledString(const RefPtr<SpanString>& value)
@@ -4055,6 +4086,7 @@ void RichEditorPattern::OnCaretTwinkling()
     caretTwinklingTask_.Cancel();
     caretVisible_ = !caretVisible_;
     MarkContentNodeForRender();
+    TickDownPasswordObscure();
     ScheduleCaretTwinkling();
 }
 
@@ -4070,6 +4102,7 @@ void RichEditorPattern::StopTwinkling()
         caretVisible_ = false;
         MarkContentNodeForRender();
     }
+    ResetObscureTickCountDown(PROPERTY_UPDATE_MEASURE_SELF);
 }
 
 void RichEditorPattern::HandleClickEvent(GestureEvent& info)
@@ -4108,6 +4141,7 @@ void RichEditorPattern::HandleClickEvent(GestureEvent& info)
         HandleSingleClickEvent(info);
         NotifyCaretChange();
     }
+    ResetObscureTickCountDown(PROPERTY_UPDATE_MEASURE_SELF);
 }
 
 bool RichEditorPattern::HandleClickSelection(const OHOS::Ace::GestureEvent& info)
@@ -4769,6 +4803,10 @@ bool RichEditorPattern::CloseKeyboard(bool forceClose)
 
 void RichEditorPattern::HandleDraggableFlag(bool isTouchSelectArea)
 {
+    if (IsCapabilityDisabled(RichEditorCapability::CONTENT_DRAG)) {
+        SetIsTextDraggable(false);
+        return;
+    }
     if (copyOption_ != CopyOptions::None && (isTouchSelectArea || IsAiSelected())) {
         bool isContentDraggalbe = JudgeContentDraggable();
         if (isContentDraggalbe) {
@@ -4788,6 +4826,7 @@ void RichEditorPattern::SetIsTextDraggable(bool isTextDraggable)
 
 bool RichEditorPattern::JudgeContentDraggable()
 {
+    CHECK_NULL_RETURN(IsCapabilityAllowed(RichEditorCapability::CONTENT_DRAG), false);
     if (!IsSelected() || copyOption_ == CopyOptions::None) {
         return false ;
     }
@@ -4908,6 +4947,7 @@ void RichEditorPattern::HandleLongPress(GestureEvent& info)
     }
 
     TAG_LOGD(AceLogTag::ACE_RICH_TEXT, "HandleLongPress");
+    ResetObscureTickCountDown(PROPERTY_UPDATE_MEASURE_SELF);
     moveCaretState_.Reset();
     caretUpdateType_ = CaretUpdateType::LONG_PRESSED;
     selectionMenuOffsetClick_ = OffsetF(
@@ -5894,7 +5934,9 @@ void RichEditorPattern::CompleteStyledString(RefPtr<SpanString>& spanString)
 
 void RichEditorPattern::InsertStyledStringByPaste(const RefPtr<SpanString>& spanString)
 {
-    InsertStyledString(spanString, caretPosition_, true);
+    CHECK_NULL_VOID(spanString);
+    auto insertSpanString = FilterSpanStringByInputType(spanString, false);
+    InsertStyledString(insertSpanString, caretPosition_, true);
 }
 
 void RichEditorPattern::InsertStyledString(RefPtr<SpanString> spanString, int32_t insertIndex, bool updateCaret)
@@ -5928,12 +5970,15 @@ void RichEditorPattern::InsertStyledString(RefPtr<SpanString> spanString, int32_
     HandleCounterWithLength(subSpanString->GetLength() >= spanString->GetLength() ? 0 : DEFAULT_LENGTH, maxLength_);
     IF_TRUE(updateCaret, SetCaretPosition(changeStart + subSpanString->GetLength()));
     AfterStyledStringChange(changeStart, changeLength, subSpanString->GetU16string());
+    SyncTypingStyleToPlainText();
+    IF_TRUE(IsInPasswordMode(), UpdateObscure(subSpanString->GetU16string(), true));
 }
 
 void RichEditorPattern::HandleOnDragInsertStyledString(RefPtr<SpanString> spanString, bool isCopy)
 {
     CHECK_NULL_VOID(spanString && styledString_);
     IF_TRUE(hasActiveFilter_, FilterStyledStringBeforeInsert(spanString));
+    spanString = FilterSpanStringByInputType(spanString, false);
     int currentCaretPosition = caretPosition_;
     auto strLength = spanString->GetLength();
     insertValueLength_ = strLength;
@@ -5963,6 +6008,7 @@ void RichEditorPattern::HandleOnDragInsertStyledString(RefPtr<SpanString> spanSt
         SetCaretPosition(currentCaretPosition + strLength);
         AfterStyledStringChange(record);
     }
+    SyncTypingStyleToPlainText();
     StartTwinkling();
     auto host = GetContentHost();
     CHECK_NULL_VOID(host);
@@ -6359,6 +6405,12 @@ bool RichEditorPattern::EnableStandardInput(bool needShowSoftKeyboard, SourceTyp
         std::unordered_map<std::string, MiscServices::PrivateDataValue> privateCommand;
         privateCommand.insert(std::make_pair("isEditorConsumeAlphaKey", true));
         inputMethod->SendPrivateCommand(privateCommand);
+        if (keyboard_ == TextInputType::NUMBER_DECIMAL) {
+            std::unordered_map<std::string, MiscServices::PrivateDataValue> actualTypeCommand;
+            actualTypeCommand.insert(
+                std::make_pair("actualTypeOfTheTextBox", static_cast<int32_t>(TextInputType::NUMBER_DECIMAL)));
+            inputMethod->SendPrivateCommand(actualTypeCommand);
+        }
         textFieldManager->SetIsImeAttached(true);
         textFieldManager->SetAttachInputId(host->GetId());
     }
@@ -6413,7 +6465,7 @@ std::optional<MiscServices::TextConfig> RichEditorPattern::GetMiscTextConfig()
         .top = caretLeftTopPoint.GetY() + windowRect.Top(),
         .width = std::abs(caretLeftTopPoint.GetX() - caretRightBottomPoint.GetX()),
         .height = std::abs(caretLeftTopPoint.GetY() - caretRightBottomPoint.GetY()) };
-    MiscServices::InputAttribute inputAttribute = { .inputPattern = (int32_t)TextInputType::UNSPECIFIED,
+    MiscServices::InputAttribute inputAttribute = { .inputPattern = (int32_t)keyboard_,
         .enterKeyType = (int32_t)GetTextInputActionValue(GetDefaultTextInputAction()),
         .isTextPreviewSupported = isTextPreviewSupported_ && (!isSpanStringMode_ || isAPI18Plus),
         .immersiveMode = static_cast<int32_t>(keyboardAppearance_),
@@ -6471,9 +6523,20 @@ bool RichEditorPattern::UnableStandardInput(bool isFocusViewChanged)
         return true;
     }
     TextInputConfiguration config;
-    config.type = TextInputType::UNSPECIFIED;
-    config.action = TextInputAction::DONE;
-    config.obscureText = false;
+    config.type = keyboard_;
+    if (IsInPlainTextInputMode()) {
+        // Input type configured via NODE_TEXT_EDITOR_TYPE: align with TextField spec.
+        config.action = GetTextInputActionValue(GetDefaultTextInputAction());
+        config.inputFilter = GetInputFilter();
+        config.maxLength = maxLength_.value_or(INT_MAX);
+        if (keyboard_ == TextInputType::VISIBLE_PASSWORD || keyboard_ == TextInputType::NEW_PASSWORD) {
+            config.obscureText = IsPasswordObscured();
+        }
+    } else {
+        // No input type configured: preserve original behavior.
+        config.action = TextInputAction::DONE;
+        config.obscureText = IsPasswordObscured();
+    }
     connection_ =
         TextInputProxy::GetInstance().Attach(WeakClaim(this), config, context->GetTaskExecutor(), GetInstanceId());
     if (!HasConnection()) {
@@ -6505,10 +6568,19 @@ bool RichEditorPattern::UnableStandardInputCrossPlatform(bool isFocusViewChanged
     auto context = host->GetContext();
     CHECK_NULL_RETURN(context, false);
     TextInputConfiguration config;
-    config.type = TextInputType::UNSPECIFIED;
+    config.type = keyboard_;
     config.action = GetTextInputActionValue(GetDefaultTextInputAction());
     config.maxLength = maxLength_.value_or(INT_MAX);
-    config.obscureText = false;
+    if (IsInPlainTextInputMode()) {
+        // Input type configured via NODE_TEXT_EDITOR_TYPE: align with TextField spec.
+        config.inputFilter = GetInputFilter();
+        if (keyboard_ == TextInputType::VISIBLE_PASSWORD || keyboard_ == TextInputType::NEW_PASSWORD) {
+            config.obscureText = IsPasswordObscured();
+        }
+    } else {
+        // No input type configured: preserve original behavior.
+        config.obscureText = IsPasswordObscured();
+    }
     auto inputMethodManager = InputMethodManager::GetInstance();
     CHECK_NULL_RETURN(inputMethodManager, false);
     inputMethodManager->Attach(WeakClaim(this), config, context->GetTaskExecutor(), GetInstanceId());
@@ -6669,6 +6741,12 @@ bool RichEditorPattern::OnThemeScopeUpdate(int32_t themeScopeId)
     CHECK_NULL_RETURN(isAPI26Plus, true);
     TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "OnThemeScopeUpdate, id=%{public}d", themeScopeId);
     HandleColorConfigurationUpdate();
+    auto host = GetHost();
+    auto context = host ? host->GetContext() : nullptr;
+    if (context) {
+        auto textFieldTheme = context->GetTheme<TextFieldTheme>(themeScopeId);
+        IF_PRESENT(passwordResponseArea_, OnThemeScopeUpdate(textFieldTheme));
+    }
     return true;
 }
 
@@ -7248,6 +7326,13 @@ std::u16string RichEditorPattern::GetActiveFilter()
     return UtfUtils::Str8ToStr16(inputFilter.value());
 }
 
+std::string RichEditorPattern::GetInputFilter() const
+{
+    auto layoutProperty = GetLayoutProperty<RichEditorLayoutProperty>();
+    CHECK_NULL_RETURN(layoutProperty, "");
+    return layoutProperty->GetInputFilterValue("");
+}
+
 std::function<bool(const std::u16string&)> RichEditorPattern::MakeFilterErrorHandler()
 {
     auto eventHub = GetEventHub<RichEditorEventHub>();
@@ -7477,6 +7562,7 @@ void RichEditorPattern::ProcessInsertValue(const std::u16string& insertValue, Op
             return;
         }
     }
+    FilterTextByInputType(text);
     if (!ProcessTextTruncationOperation(text, shouldCommitInput)) {
         HandleCounterWithLength(DEFAULT_LENGTH, maxLength_);
         return;
@@ -7914,6 +8000,7 @@ void RichEditorPattern::DeleteBackward(int32_t oriLength, TextChangeReason reaso
     TAG_LOGD(AceLogTag::ACE_RICH_TEXT, "oriLength=%{public}d, length=%{public}d, isDragging=%{public}d",
         oriLength, length, IsDragging());
     CHECK_NULL_VOID(!IsDragging());
+    ResetObscureTickCountDown();
     CHECK_NULL_VOID(SetPreviewTextForDelete(oriLength, true, isByIME));
     if (isSpanStringMode_) {
         DeleteBackwardInStyledString(length);
@@ -8008,6 +8095,7 @@ std::u16string RichEditorPattern::DeleteForwardOperation(int32_t length, bool is
 {
     length = CalculateDeleteLength(length, false);
     TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "delete length=%{public}d", length);
+    ResetObscureTickCountDown();
     std::u16string textContent;
     GetContentBySpans(textContent);
     if (static_cast<int32_t>(textContent.length()) != GetTextContentLength()) {
@@ -8530,6 +8618,7 @@ void RichEditorPattern::HandleOnSelectAll(bool isKeyEvent)
     SetCaretPosition(newPos);
     MoveCaretToContentRect();
     IF_TRUE(IsSelected(), StopTwinkling());
+    ResetObscureTickCountDown();
     MarkContentNodeForRender();
     auto host = GetHost();
     CHECK_NULL_VOID(host);
@@ -10249,6 +10338,7 @@ void RichEditorPattern::HandleOnCopy(bool isUsingExternalKeyboard)
     if (copyOption_ == CopyOptions::None) {
         return;
     }
+    CHECK_NULL_VOID(IsCapabilityAllowed(RichEditorCapability::COPY));
     auto eventHub = GetEventHub<RichEditorEventHub>();
     CHECK_NULL_VOID(eventHub);
     TextCommonEvent event;
@@ -10476,6 +10566,10 @@ void RichEditorPattern::HandleOnCut()
         return;
     }
     if (!textSelector_.IsValid()) {
+        suppressAccessibilityEvent_ = true;
+        return;
+    }
+    if (IsCapabilityDisabled(RichEditorCapability::CUT)) {
         suppressAccessibilityEvent_ = true;
         return;
     }
@@ -11452,7 +11546,7 @@ void RichEditorPattern::UpdateSelectMenuInfo(SelectMenuInfo& menuInfo)
         menuInfo.responseType = static_cast<int32_t>(textResponseType_.value());
     }
 
-    if (IsShowAIMenuOption() && !GetAIItemOption().empty()) {
+    if (IsShowAIMenuOption() && !GetAIItemOption().empty() && IsCapabilityAllowed(RichEditorCapability::AI_MENU)) {
         auto firstSpanItem = GetAIItemOption().begin()->second;
         menuInfo.aiMenuOptionType = firstSpanItem.type;
         return;
@@ -11908,6 +12002,10 @@ bool RichEditorPattern::NeedAiAnalysis(
         TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "NeedAiAnalysis IsClickBoundary, return!");
         return false;
     }
+    if (IsCapabilityDisabled(RichEditorCapability::AI_ANALYSIS)) {
+        TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "NeedAiAnalysis IsInPasswordMode, return!");
+        return false;
+    }
     EmojiRelation relation = GetEmojiRelation(pos);
     if (relation == EmojiRelation::IN_EMOJI || relation == EmojiRelation::MIDDLE_EMOJI ||
         relation == EmojiRelation::BEFORE_EMOJI) {
@@ -11954,7 +12052,29 @@ bool RichEditorPattern::AdjustWordSelection(int32_t& start, int32_t& end)
         TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "get ai selector [%{public}d--%{public}d]", start, end);
         return true;
     }
+    CHECK_NULL_RETURN(!IsInPasswordMode(), AdjustWordSelectionForPassword(start, end));
     return false;
+}
+
+bool RichEditorPattern::AdjustWordSelectionForPassword(int32_t& start, int32_t& end)
+{
+    int32_t textLen = GetTextContentLength();
+    int32_t boundaryPos = std::min(start, textLen - 1);
+    CHECK_NULL_RETURN(boundaryPos >= 0, false);
+    int32_t wordStart = start;
+    int32_t wordEnd = end;
+    if (paragraphs_.GetWordBoundary(boundaryPos, wordStart, wordEnd)) {
+        start = std::min(wordStart, textLen);
+        end = std::min(wordEnd, textLen);
+        TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "password word selector [%{public}d--%{public}d]", start, end);
+        return true;
+    }
+    std::u16string textForDisplay;
+    GetContentBySpans(textForDisplay);
+    start = boundaryPos;
+    end = std::min(textLen, boundaryPos + TextBase::GetGraphemeClusterLength(textForDisplay, boundaryPos, true));
+    TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "password grapheme selector [%{public}d--%{public}d]", start, end);
+    return true;
 }
 
 void RichEditorPattern::AdjustPlaceholderSelection(int32_t& start, int32_t& end, const Offset& touchPos)
@@ -12817,43 +12937,6 @@ void RichEditorPattern::HandleOnEditChanged(bool isEditing)
     }
 }
 
-void RichEditorPattern::ResetKeyboardIfNeed()
-{
-    bool needToResetKeyboard = false;
-    auto currentAction = GetTextInputActionValue(GetDefaultTextInputAction());
-    // When the enter key type changes, the keyboard needs to be reset.
-    if (action_ != TextInputAction::UNSPECIFIED) {
-        needToResetKeyboard = action_ != currentAction;
-    }
-    action_ = currentAction;
-#if defined(OHOS_STANDARD_SYSTEM) && !defined(PREVIEW)
-    if (needToResetKeyboard) {
-        // if keyboard attached or keyboard is shown, pull up keyboard again
-        if (imeShown_ || isCustomKeyboardAttached_) {
-            if (HasFocus()) {
-                RequestKeyboard(false, true, true);
-            }
-            return;
-        }
-#if defined(ENABLE_STANDARD_INPUT)
-        auto inputMethod = MiscServices::InputMethodController::GetInstance();
-        CHECK_NULL_VOID(inputMethod);
-        MiscServices::Configuration config;
-        config.SetEnterKeyType(static_cast<MiscServices::EnterKeyType>(action_));
-        config.SetTextInputType(static_cast<MiscServices::TextInputType>(keyboard_));
-        inputMethod->OnConfigurationChange(config);
-#endif
-    }
-#else
-    if (needToResetKeyboard && HasConnection()) {
-        CloseSelectOverlay();
-        ResetSelection();
-        CloseKeyboard(false);
-        RequestKeyboard(false, true, true);
-    }
-#endif
-}
-
 void RichEditorPattern::OnFocusCustomKeyboardChange()
 {
     auto currentNode = GetHost();
@@ -12911,7 +12994,9 @@ void RichEditorPattern::PerformAction(TextInputAction action, bool forceCloseKey
     auto host = GetHost();
     CHECK_NULL_VOID(host);
     // When the Enter key is triggered, perform a line feed operation.
-    if (action == TextInputAction::NEW_LINE) {
+    // When inputType is configured (via NODE_TEXT_EDITOR_TYPE), align with TextInput: do not insert newline.
+    bool inputTypeConfigured = IsInPlainTextInputMode();
+    if (action == TextInputAction::NEW_LINE && !inputTypeConfigured) {
         TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "action=%{public}d, forceCloseKeyboard=%{public}d", action,
             forceCloseKeyboard);
         IF_TRUE(!blurOnSubmit_, InsertValue(u"\n", true));
@@ -12921,7 +13006,7 @@ void RichEditorPattern::PerformAction(TextInputAction action, bool forceCloseKey
     auto eventHub = host->GetEventHub<RichEditorEventHub>();
     eventHub->FireOnSubmit(static_cast<int32_t>(action), event);
     // If the developer wants to keep editing, editing will not stop
-    if (event.IsKeepEditable() || (action == TextInputAction::NEW_LINE && !blurOnSubmit_)) {
+    if (event.IsKeepEditable() || (action == TextInputAction::NEW_LINE && !inputTypeConfigured && !blurOnSubmit_)) {
         return;
     }
     // Exit the editing state
@@ -12938,8 +13023,7 @@ void RichEditorPattern::StopEditing()
 
 TextInputAction RichEditorPattern::GetDefaultTextInputAction() const
 {
-    // As with TextInput, it is a line break by default
-    return TextInputAction::NEW_LINE;
+    return IsInPlainTextInputMode() ? TextInputAction::DONE : TextInputAction::NEW_LINE;
 }
 
 void ParsespanParaStyle(std::optional<TextStyle>& spanTextStyle,
@@ -14443,6 +14527,7 @@ void RichEditorPattern::DeleteRange(int32_t start, int32_t end, bool isIME, Text
         return;
     }
     CHECK_NULL_VOID(!IsPreviewTextInputting());
+    ResetObscureTickCountDown();
     SetCaretPosition(start);
     auto length = end - start;
     if (isSpanStringMode_) {
@@ -14544,7 +14629,7 @@ bool RichEditorPattern::IsTextEditableForStylus() const
     if (NearZero(opacity.value_or(1.0f))) {
         return false;
     }
-    return true;
+    return !(IsInPasswordMode() || IsOneTimeCodeType());
 }
 
 bool RichEditorPattern::IsShowTranslate()
@@ -14571,6 +14656,8 @@ bool RichEditorPattern::IsShowAIWrite()
     if (copyOption_ == CopyOptions::None) {
         return false;
     }
+    CHECK_NULL_RETURN(!IsInPlainTextInputMode() || !IsCapabilityDisabled(TextCapability::AI_ANALYSIS), false);
+    CHECK_NULL_RETURN(ShouldShowAIWriteForInputType(GetTextInputType()), false);
     auto theme = GetTheme<RichEditorTheme>();
     CHECK_NULL_RETURN(theme, false);
     auto bundleName = theme->GetAIWriteBundleName();
@@ -14904,13 +14991,26 @@ void RichEditorPattern::OnAccessibilityEventTextChange(const std::string& change
     AccessibilityEvent event;
     event.type = AccessibilityEventType::TEXT_CHANGE;
     event.nodeId = host->GetAccessibilityId();
-    event.extraEventInfo.insert({changeType, changeString});
+    std::string finalText;
+    if (IsInPasswordMode() && GetTextObscured()) {
+        char16_t obscuring = TextInputObscureUtils::GetObscuringCharacter();
+        finalText = UtfUtils::Str16DebugToStr8(std::u16string(changeString.length(), obscuring));
+    } else {
+        finalText = changeString;
+    }
+    event.extraEventInfo.insert({changeType, finalText});
     pipeline->SendEventToAccessibilityWithNode(event, GetHost());
 }
 
 void RichEditorPattern::ReportComponentChangeEvent() {
 #if !defined(PREVIEW) && !defined(ACE_UNITTEST) && defined(OHOS_PLATFORM)
     std::string str;
+    if (IsInPasswordMode()) {
+        // Do not expose password content in telemetry.
+        TAG_LOGI(AceLogTag::ACE_RICH_TEXT,
+            "nodeId:[%{public}d] RichEditor reportComponentChangeEvent skipped (password mode)", frameId_);
+        return;
+    }
     if (isSpanStringMode_) {
         CHECK_NULL_VOID(styledString_);
         str = styledString_->GetString();
@@ -16124,7 +16224,7 @@ bool RichEditorPattern::IsShowCounterEnabled() const
     CHECK_NULL_RETURN(layoutProperty, false);
     return layoutProperty->GetShowCounterValue(false) &&
            maxLength_.has_value() &&
-           isSpanStringMode_ && styledString_;
+           isSpanStringMode_ && styledString_ && !IsInPasswordMode();
 }
 
 uint32_t RichEditorPattern::GetRealMaxLength() const
@@ -16594,6 +16694,275 @@ Color RichEditorPattern::GetInnerBorderColorValue(const Color& defaultColor) con
 RefPtr<TextComponentDecorator> RichEditorPattern::GetCounterDecorator() const
 {
     return counterDecorator_;
+}
+
+bool RichEditorPattern::IsInPasswordMode() const
+{
+    return isSingleLineMode_ && PasswordIconHostBase::IsInPasswordMode();
+}
+
+void RichEditorPattern::FilterTextStyleForPasswordMode(
+    TextStyle& textStyle, const TextStyle& inheritedStyle) const
+{
+    if (!IsInPasswordMode()) {
+        return;
+    }
+    // Restore password-incompatible properties to their inherited values.
+    // Aligns with TextInput UpdateTextStyleMore IsInPasswordMode() guard.
+    textStyle.SetTextDecoration(inheritedStyle.GetTextDecoration());
+    textStyle.SetTextDecorationColor(inheritedStyle.GetTextDecorationColor());
+    textStyle.SetTextDecorationStyle(inheritedStyle.GetTextDecorationStyle());
+    textStyle.SetLineThicknessScale(inheritedStyle.GetLineThicknessScale());
+    textStyle.SetLetterSpacing(inheritedStyle.GetLetterSpacing());
+    textStyle.SetLineHeight(inheritedStyle.GetLineHeight(), inheritedStyle.HasHeightOverride());
+    textStyle.SetFontFeatures(inheritedStyle.GetFontFeatures());
+    textStyle.SetLineSpacing(inheritedStyle.GetLineSpacing());
+    textStyle.SetIsOnlyBetweenLines(inheritedStyle.GetIsOnlyBetweenLines());
+}
+
+bool RichEditorPattern::IsSingleLineForPassword() const
+{
+    return isSingleLineMode_;
+}
+
+std::u16string RichEditorPattern::GetObscureContent() const
+{
+    std::u16string content;
+    GetContentBySpans(content);
+    return content;
+}
+
+int32_t RichEditorPattern::GetObscureCaretPosition() const
+{
+    return caretPosition_;
+}
+
+void RichEditorPattern::UpdateAIMenuOptions()
+{
+    if (IsCapabilityDisabled(TextCapability::AI_MENU)) {
+        isShowAIMenuOption_ = false;
+        SetIsShowAskCeliaInRightClick(false);
+        SetIsAskCeliaEnabled(false);
+        return;
+    }
+    TextPattern::UpdateAIMenuOptions();
+}
+
+void RichEditorPattern::SelectAIDetect()
+{
+    if (IsCapabilityDisabled(TextCapability::AI_ANALYSIS)) {
+        TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "SelectAIDetect AI_ANALYSIS capability disabled, return!");
+        return;
+    }
+    TextPattern::SelectAIDetect();
+}
+
+void RichEditorPattern::RestoreDefaultMouseState()
+{
+    ChangeMouseStyle(MouseFormat::DEFAULT, true);
+}
+
+bool RichEditorPattern::IsInPlainTextInputMode() const
+{
+    return isSingleLineMode_ && SpanStringModeSwitcher::IsPlainTextInputType(GetTextInputType());
+}
+
+RefPtr<SpanString> RichEditorPattern::FilterSpanStringByInputType(const RefPtr<SpanString>& src, bool checkPreview)
+{
+    CHECK_NULL_RETURN(src, src);
+    CHECK_NULL_RETURN(IsInPlainTextInputMode(), src);
+    CHECK_NULL_RETURN(!(checkPreview && IsPreviewTextInputting()), src);
+    return SpanStringModeSwitcher::FilterSpanString(src, keyboard_);
+}
+
+void RichEditorPattern::FilterTextByInputType(std::u16string& text)
+{
+    CHECK_NULL_VOID(IsInPlainTextInputMode() && !IsPreviewTextInputting());
+    if (!hasActiveFilter_ && styledString_) {
+        auto existing = styledString_->GetU16string();
+        int32_t selStart = textSelector_.GetTextStart();
+        int32_t selEnd = textSelector_.GetTextEnd();
+        std::u16string selected;
+        if (selStart >= 0 && selEnd > selStart && selEnd <= static_cast<int32_t>(existing.length())) {
+            selected = existing.substr(selStart, selEnd - selStart);
+        }
+        text = TextInputFilter::PreprocessValue(keyboard_, existing, text, selected);
+    }
+    TextInputFilter::FilterByInputType(keyboard_, text);
+}
+
+void RichEditorPattern::FilterInitializeTextByInputType()
+{
+    CHECK_NULL_VOID(ConsumeFilterChanged());
+    CHECK_NULL_VOID(isSingleLineMode_ && IsStyledStringModeEnabled());
+    auto original = styledString_->GetU16string();
+    std::u16string filtered = original;
+    TextInputFilter::FilterByInputType(keyboard_, filtered);
+    TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "FilterInitializeTextByInputType completed, keyboard_=%{public}d",
+        static_cast<int32_t>(keyboard_));
+    CHECK_NULL_VOID(filtered != original);
+    auto length = styledString_->GetLength();
+    styledString_->ReplaceString(0, length, filtered);
+    styledString_->NotifySpanWatcher();
+    auto host = GetContentHost();
+    IF_PRESENT(host, MarkDirtyNode(PROPERTY_UPDATE_MEASURE));
+    auto newLength = GetTextContentLength();
+    CHECK_NULL_VOID(caretPosition_ > newLength);
+    SetCaretPosition(newLength, false);
+}
+
+void RichEditorPattern::SwitchStyledStringByInputMode()
+{
+    CHECK_NULL_VOID(styledString_);
+    bool plain = IsInPlainTextInputMode();
+    CHECK_NULL_VOID(modeSwitcher_.ShouldSwitch(plain));
+    if (plain) {
+        modeSwitcher_.SwitchToPlainText(styledString_);
+    } else {
+        modeSwitcher_.SwitchToMutable(styledString_);
+    }
+    paragraphCache_.Clear();
+    styledString_->SetSpanWatcher(WeakClaim(this));
+    auto host = GetContentHost();
+    IF_TRUE(host, styledString_->SetFramNode(host));
+    styledString_->AddCustomSpan();
+    modeSwitcher_.SetLastPlainMode(plain);
+    styledString_->NotifySpanWatcher();
+}
+
+bool RichEditorPattern::HasObscureContent() const
+{
+    return !spans_.empty() && !spans_.front()->content.empty();
+}
+
+void RichEditorPattern::ApplyPasswordObscure(std::u16string& content) const
+{
+    CHECK_NULL_VOID(IsInPasswordMode() && GetTextObscured() && !IsShowPlaceholder() && !content.empty());
+    auto theme = GetTextFieldThemeImpl();
+    bool showPasswordDirectly = theme ? theme->IsShowPasswordDirectly() : false;
+    content = TextInputObscureUtils::CreateDisplayText(content, GetNakedCharPosition(), true, showPasswordDirectly);
+}
+
+void RichEditorPattern::ApplyNewlineFilter(std::u16string& content) const
+{
+    CHECK_NULL_VOID(IsInPlainTextInputMode());
+    std::replace(content.begin(), content.end(), u'\n', u' ');
+}
+
+void RichEditorPattern::OnObscuredChanged(bool isObscured)
+{
+    bool obscuredChanged = (textObscured_ != isObscured);
+    ResetObscureTickCountDown();
+    textObscured_ = isObscured;
+    CloseSelectOverlay();
+    StartTwinkling();
+    CheckPasswordAreaState();
+    CHECK_NULL_VOID(obscuredChanged);
+    SetAccessibilityPasswordIconAction();
+    paragraphCache_.Clear();
+    SetCaretPosition(GetTextContentLength(), false);
+    FireSecurityStateChanged(!isObscured);
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF_AND_PARENT);
+    TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "OnObscuredChanged, isObscured=%{public}d", isObscured);
+}
+
+bool RichEditorPattern::IsDynamicInputTypeSwitchAligned(TextInputType currentType)
+{
+    return IsStyledStringModeEnabled() && isSingleLineMode_ &&
+           currentType != TextInputType::UNSPECIFIED && currentType != TextInputType::TEXT;
+}
+
+void RichEditorPattern::ResetPreviewTextState()
+{
+    CHECK_NULL_VOID(IsPreviewTextInputting());
+    TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "reset preview text state on input type change");
+    NotifyImfFinishTextPreview();
+    FinishTextPreview();
+}
+
+void RichEditorPattern::DoDynamicSwitch(TextInputType currentType)
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    bool needToResetKeyboard = keyboard_ != currentType;
+    if (needToResetKeyboard) {
+        TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "%{public}d KBType %{public}d -> %{public}d",
+            host->GetId(), static_cast<int32_t>(keyboard_), static_cast<int32_t>(currentType));
+        keyboard_ = currentType;
+        SetFilterChanged(true);
+        ResetPreviewTextState();
+    }
+    DoResetKeyboardCommon(host, needToResetKeyboard, true);
+}
+
+void RichEditorPattern::OnKeyboardTypeChanged()
+{
+    SetFilterChanged(true);
+}
+
+void RichEditorPattern::DoKeyboardResetPlatform(
+    const RefPtr<NG::FrameNode>& host, bool needToResetKeyboard, bool isDynamic)
+{
+    if (isDynamic) {
+        DoKeyboardResetPlatformCommon(needToResetKeyboard);
+    } else {
+#if defined(OHOS_STANDARD_SYSTEM) && !defined(PREVIEW)
+        if (needToResetKeyboard) {
+            if (imeShown_ || isCustomKeyboardAttached_) {
+                if (HasFocus()) {
+                    RequestKeyboard(false, true, true);
+                }
+                return;
+            }
+            NotifyInputMethodConfigChange(action_, keyboard_);
+        }
+#else
+        if (needToResetKeyboard && HasConnection()) {
+            CloseSelectOverlay();
+            ResetSelection();
+            CloseKeyboard(false);
+            RequestKeyboard(false, true, true);
+        }
+#endif
+    }
+}
+
+RefPtr<NG::PasswordResponseArea> RichEditorPattern::GetPasswordResponseArea()
+{
+    return passwordResponseArea_;
+}
+
+float RichEditorPattern::GetAllResponseAreaWidth() const
+{
+    float width = 0.0f;
+    IF_TRUE(passwordResponseArea_, width += passwordResponseArea_->GetFrameSize().Width());
+    IF_TRUE(cleanNodeResponseArea_, width += cleanNodeResponseArea_->GetFrameSize().Width());
+    return width;
+}
+
+void RichEditorPattern::OnObscureDirty(PropertyChangeFlag flag)
+{
+    paragraphCache_.Clear();
+    auto host = GetContentHost();
+    IF_PRESENT(host, MarkDirtyNode(flag));
+}
+
+bool RichEditorPattern::SetOverlayHoverColorAndRects(const std::vector<RoundRect>& rects, uint32_t color)
+{
+    auto overlayMod = AceType::DynamicCast<RichEditorOverlayModifier>(hostOverlayMod_);
+    CHECK_NULL_RETURN(overlayMod, false);
+    overlayMod->SetHoverColorAndRects(rects, color);
+    return true;
+}
+
+bool RichEditorPattern::ClearOverlayHoverColorAndRects()
+{
+    auto overlayMod = AceType::DynamicCast<RichEditorOverlayModifier>(hostOverlayMod_);
+    CHECK_NULL_RETURN(overlayMod, false);
+    overlayMod->ClearHoverColorAndRects();
+    return true;
 }
 
 } // namespace OHOS::Ace::NG
