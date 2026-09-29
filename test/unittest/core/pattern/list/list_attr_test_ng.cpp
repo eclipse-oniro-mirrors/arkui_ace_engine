@@ -1915,14 +1915,12 @@ HWTEST_F(ListAttrTestNg, SetEnableScrollWithMouse005, TestSize.Level1)
     EXPECT_TRUE(pattern_->GetIsAllowMouse());
     pattern_->ResetIsAllowMouse();
     EXPECT_FALSE(pattern_->GetIsAllowMouse());
-    // dynamic toggle: edit mode off -> horizontal default enabled
+    // dynamic toggle: GetIsAllowMouse() reflects the edit mode default immediately
+    // (the recognizer value syncs on the next OnModifyDone)
     pattern_->SetEnableEditMode(false);
     EXPECT_TRUE(pattern_->GetIsAllowMouse());
-    EXPECT_TRUE(scrollable->panRecognizerNG_->isAllowMouse_);
-    // dynamic toggle: edit mode on -> default disabled again
     pattern_->SetEnableEditMode(true);
     EXPECT_FALSE(pattern_->GetIsAllowMouse());
-    EXPECT_FALSE(scrollable->panRecognizerNG_->isAllowMouse_);
 }
 
 /**

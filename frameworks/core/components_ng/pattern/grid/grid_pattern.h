@@ -89,7 +89,7 @@ public:
         multiSelectable_ = multiSelectable;
     }
 
-    bool MultiSelectable() const
+    bool MultiSelectable() const override
     {
         return multiSelectable_;
     }

@@ -275,13 +275,7 @@ bool ListPattern::GetIsAllowMouse() const
     CHECK_NULL_RETURN(host, ScrollablePattern::GetIsAllowMouse());
     auto listEventHub = host->GetEventHub<ListEventHub>();
     CHECK_NULL_RETURN(listEventHub, ScrollablePattern::GetIsAllowMouse());
-    if (listEventHub->GetOnItemDragStart()) {
-        return false;
-    }
-    if (multiSelectable_) {
-        return false;
-    }
-    return ScrollablePattern::GetIsAllowMouse();
+    return listEventHub->GetOnItemDragStart() ? false : ScrollablePattern::GetIsAllowMouse();
 }
 
 bool ListPattern::GetFadingEdge(RefPtr<ScrollablePaintProperty>& paintProperty)

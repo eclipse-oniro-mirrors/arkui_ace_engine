@@ -581,11 +581,6 @@ void SelectableContainerPattern::SetEnableEditMode(bool enable)
         editModeChanged_ = true;
         OnEnableEditModeChanged(enable);
         FireEnableEditModeChangeEvent(enable);
-        // Edit mode affects the direction-aware default of enableScrollWithMouse.
-        // Refresh the recognizer immediately in case no explicit value is set.
-        auto scrollable = GetScrollable();
-        CHECK_NULL_VOID(scrollable);
-        scrollable->SetIsAllowMouse(GetIsAllowMouse());
     }
 }
 

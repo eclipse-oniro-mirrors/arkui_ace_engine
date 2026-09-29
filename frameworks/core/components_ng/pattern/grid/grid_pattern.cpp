@@ -329,13 +329,7 @@ bool GridPattern::GetIsAllowMouse() const
     CHECK_NULL_RETURN(host, ScrollablePattern::GetIsAllowMouse());
     auto gridEventHub = host->GetEventHub<GridEventHub>();
     CHECK_NULL_RETURN(gridEventHub, ScrollablePattern::GetIsAllowMouse());
-    if (gridEventHub->GetOnItemDragStart()) {
-        return false;
-    }
-    if (multiSelectable_) {
-        return false;
-    }
-    return ScrollablePattern::GetIsAllowMouse();
+    return gridEventHub->GetOnItemDragStart() ? false : ScrollablePattern::GetIsAllowMouse();
 }
 
 void GridPattern::MultiSelectWithoutKeyboard(const RectF& selectedZone)

@@ -979,7 +979,6 @@ public:
 
     void SetIsAllowMouse(bool enableScrollWithMouse)
     {
-        isAllowMouseSet_ = true;
         isAllowMouse_ = enableScrollWithMouse;
         auto scrollable = GetScrollable();
         CHECK_NULL_VOID(scrollable);
@@ -987,21 +986,39 @@ public:
     }
     virtual bool GetIsAllowMouse() const
     {
-        if (isAllowMouseSet_) {
-            return isAllowMouse_;
+        // Mouse multi-select has higher priority than mouse drag scrolling.
+        if (MultiSelectable()) {
+            return false;
+        }
+        if (isAllowMouse_.has_value()) {
+            return isAllowMouse_.value();
+        }
+        // In edit mode the default value of enableScrollWithMouse stays disabled,
+        // reserving mouse drag for multi-select interactions.
+        if (GetEnableEditMode()) {
+            return false;
         }
         return IsMouseDragScrollDefaultEnabled();
     }
     void ResetIsAllowMouse()
     {
-        isAllowMouseSet_ = false;
-        isAllowMouse_ = false;
+        isAllowMouse_.reset();
         auto scrollable = GetScrollable();
         CHECK_NULL_VOID(scrollable);
         scrollable->SetIsAllowMouse(GetIsAllowMouse());
     }
+    // Whether the container supports mouse multi-select (e.g. multiSelectable Grid/List).
+    virtual bool MultiSelectable() const
+    {
+        return false;
+    }
+    // Whether the container is in edit mode.
+    virtual bool GetEnableEditMode() const
+    {
+        return false;
+    }
     // Direction-aware default of enableScrollWithMouse: enabled only when scrolling horizontally.
-    // FREE mode (free scroll) and edit mode containers keep the default disabled.
+    // FREE mode (free scroll) containers keep the default disabled.
     virtual bool IsMouseDragScrollDefaultEnabled() const
     {
         return GetAxis() == Axis::HORIZONTAL;
@@ -1135,8 +1152,9 @@ protected:
     bool GetCanOverScroll() const;
     bool lastCanOverScroll_ = false;
     bool lastScrollFromInjection_ = false;
-    bool isAllowMouse_ = false;
-    bool isAllowMouseSet_ = false;
+    // Explicit value of enableScrollWithMouse set by the developer.
+    // nullopt means not explicitly set: the direction-aware default applies.
+    std::optional<bool> isAllowMouse_;
 
     void CheckScrollBarOff();
 
