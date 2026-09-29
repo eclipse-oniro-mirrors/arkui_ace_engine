@@ -5487,14 +5487,14 @@ void ResetRichEditorEnableSkipPreviewLongPress(ArkUI_NodeHandle node)
 int32_t SetRichEditorShowUnderline(ArkUI_NodeHandle node, const ArkUI_AttributeItem* item)
 {
     if (item == nullptr || item->size != 1 || !InRegion(DEFAULT_FALSE, DEFAULT_TRUE, item->value[0].i32)) {
-        return ARKUI_ERROR_CODE_PARAM_INVALID;
+        return ERROR_CODE_PARAM_INVALID;
     }
     if (node->type != ARKUI_NODE_TEXT_EDITOR) {
-        return ARKUI_ERROR_CODE_PARAM_INVALID;
+        return ERROR_CODE_PARAM_INVALID;
     }
     GetFullImpl()->getNodeModifiers()->getRichEditorModifier()->setRichEditorShowUnderline(
         node->uiNodeHandle, item->value[0].i32);
-    return ARKUI_ERROR_CODE_NO_ERROR;
+    return ERROR_CODE_NO_ERROR;
 }
 
 const ArkUI_AttributeItem* GetRichEditorShowUnderline(ArkUI_NodeHandle node)
@@ -5529,11 +5529,11 @@ int32_t SetRichEditorUnderlineColor(ArkUI_NodeHandle node, const ArkUI_Attribute
     values[NUM_2] = item->value[NUM_2].u32;
     values[NUM_3] = item->value[NUM_3].u32;
     if (node->type != ARKUI_NODE_TEXT_EDITOR) {
-        return ARKUI_ERROR_CODE_PARAM_INVALID;
+        return ERROR_CODE_PARAM_INVALID;
     }
     GetFullImpl()->getNodeModifiers()->getRichEditorModifier()->setRichEditorUnderlineColor(
         node->uiNodeHandle, values, NUM_4);
-    return ARKUI_ERROR_CODE_NO_ERROR;
+    return ERROR_CODE_NO_ERROR;
 }
 
 const ArkUI_AttributeItem* GetRichEditorUnderlineColor(ArkUI_NodeHandle node)

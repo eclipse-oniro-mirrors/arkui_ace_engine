@@ -775,7 +775,6 @@ bool RichEditorPattern::IsUnderlineAndButtonMode() const
     return IsUnderlineMode() && IsShowCancelButtonMode();
 }
 
-
 void RichEditorPattern::UpdateUnderlineStyle()
 {
     if (!IsUnderlineMode()) {
@@ -1143,7 +1142,7 @@ void RichEditorPattern::AdjustBoundsRect(RectF& bounds)
 {
     if (IsShowCounterEnabled()) {
         auto size = bounds.GetSize();
-        auto countHeight = counterDecorator_? counterDecorator_->GetBoundHeight() : 0.0f;
+        auto countHeight = counterDecorator_ ? counterDecorator_->GetBoundHeight() : 0.0f;
         bounds.SetHeight(size.Height() + countHeight);
     } else if (IsUnderlineMode()) {
         auto size = bounds.GetSize();
@@ -16532,8 +16531,6 @@ void RichEditorPattern::UpdateShowCountBorderStyle()
 void RichEditorPattern::HandleCountStyle()
 {
     if (IsUnderlineMode() && !IsShowCounterEnabled()) {
-        auto theme = GetTheme<TextFieldTheme>();
-        CHECK_NULL_VOID(theme);
         if (showCountBorderStyle_) {
             UpdateUnderlineErrorStyle();
         } else {
