@@ -515,12 +515,7 @@ class FrameNode {
       index = -1;
     }
     const oldParent = this.getParent();
-    const isOldParentCrossLanguage = oldParent && (oldParent.getType() === 'ProxyFrameNode') &&
-      (getUINativeModule().frameNode.checkIfCanCrossLanguageTreeOperating(oldParent.getNodePtr()));
-    const isTargetParentCrossLanguage = (targetParent.getType() === 'ProxyFrameNode') &&
-      (getUINativeModule().frameNode.checkIfCanCrossLanguageTreeOperating(targetParent.getNodePtr()));
-    if ((oldParent && !(oldParent.isModifiable() || isOldParentCrossLanguage)) ||
-      !(targetParent.isModifiable() || isTargetParentCrossLanguage) || !targetParent.checkValid(this)) {
+    if (oldParent && !oldParent.isModifiable() || !targetParent.isModifiable() || !targetParent.checkValid(this)) {
       throw { message: 'The FrameNode is not modifiable.', code: 100021 };
     }
     __JSScopeUtil__.syncInstanceId(this.instanceId_);
@@ -1115,12 +1110,6 @@ class FrameNode {
     }
     return false;
   }
-  __addChildToListInternal__(nodeId: number, node: FrameNode): void {
-    this._childList.set(nodeId, node);
-  }
-  __deleteChildFromListInternal__(nodeId: number): void {
-    this._childList.delete(nodeId);
-  }
 }
 
 class ImmutableFrameNode extends FrameNode {
@@ -1216,39 +1205,7 @@ class ProxyFrameNode extends ImmutableFrameNode {
     return this.nodePtr_;
   }
   moveTo(targetParent: FrameNode, index?: number): void {
-    if (!getUINativeModule().frameNode.checkIfCanCrossLanguageTreeOperating(this.getNodePtr())) {
-      throw { message: 'The FrameNode is not modifiable.', code: 100021 };
-    }
-    if (targetParent === undefined || targetParent === null) {
-      return;
-    }
-    if (index === undefined || index === null) {
-      index = -1;
-    }
-    const oldParent = this.getParent();
-    const isOldParentCrossLanguage = oldParent && (oldParent.getType() === 'ProxyFrameNode') &&
-      (getUINativeModule().frameNode.checkIfCanCrossLanguageTreeOperating(oldParent.getNodePtr()));
-    const isTargetParentCrossLanguage = (targetParent.getType() === 'ProxyFrameNode') &&
-      (getUINativeModule().frameNode.checkIfCanCrossLanguageTreeOperating(targetParent.getNodePtr()));
-    const oldParentValid = (oldParent?.isModifiable() || isOldParentCrossLanguage);
-    const targetParentValid = (targetParent.isModifiable() || isTargetParentCrossLanguage);
-    if (oldParent && (!oldParentValid) || !targetParentValid || !targetParent.checkValid(this)) {
-      throw { message: 'The FrameNode is not modifiable.', code: 100021 };
-    }
-    __JSScopeUtil__.syncInstanceId(this.instanceId_);
-    let result;
-    try {
-      result = getUINativeModule().frameNode.moveTo(this.nodePtr_, targetParent.nodePtr_, index);
-    } finally {
-      __JSScopeUtil__.restoreInstanceId();
-    }
-    if (result === ERROR_CODE_NODE_IS_ADOPTED) {
-      throw { message: 'The current node has already been adopted.', code: 100027 };
-    }
-    if (oldParent) {
-      oldParent.__deleteChildFromListInternal__(this._nodeId);
-    }
-    targetParent.__addChildToListInternal__(this._nodeId, this);
+    throw { message: 'The FrameNode is not modifiable.', code: 100021 };
   }
 }
 
