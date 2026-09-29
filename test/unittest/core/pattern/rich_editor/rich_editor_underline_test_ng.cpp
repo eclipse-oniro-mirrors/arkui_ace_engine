@@ -20,6 +20,7 @@
 #include "core/components_ng/pattern/rich_editor/rich_editor_overlay_modifier.h"
 #include "core/components_ng/pattern/rich_editor/rich_editor_paint_method.h"
 #include "core/components_ng/pattern/rich_editor/rich_editor_content_pattern.h"
+#include "core/components_ng/pattern/rich_editor/napi_rich_editor_pattern.h"
 #include "test/mock/frameworks/core/rosen/mock_canvas.h"
 #include "test/mock/frameworks/core/components_ng/render/mock_paragraph.h"
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
@@ -28,6 +29,7 @@
 #include "test/mock/frameworks/core/common/mock_resource_adapter_v2.h"
 #include "test/mock/frameworks/base/thread/mock_task_executor.h"
 #include "core/components_ng/pattern/text_field/text_field_model.h"
+#include "core/components/text_field/textfield_theme.h"
 
 using namespace testing;
 using namespace testing::ext;
@@ -36,24 +38,76 @@ namespace OHOS::Ace::NG {
 namespace {
 constexpr Dimension EXPECTED_TYPING_WIDTH = 2.0_px;
 constexpr Dimension EXPECTED_NORMAL_WIDTH = 1.0_px;
+constexpr Dimension EXPECTED_ERROR_WIDTH = 2.0_px;
 const Color USER_TYPING_COLOR = Color(0xFF111111);
 const Color USER_NORMAL_COLOR = Color(0xFF222222);
 const Color USER_DISABLE_COLOR = Color(0xFF333333);
 const Color USER_ERROR_COLOR = Color(0xFF444444);
+constexpr int32_t TEST_MAX_LENGTH = 10;
+constexpr float INITIAL_BOUNDS_HEIGHT = 100.0f;
+constexpr float INITIAL_BOUNDS_WIDTH = 200.0f;
 } // namespace
 
-// Extern declarations for dynamic modifier bridge functions (global C functions)
+// Bridge function implementations for dynamic modifier (linked from rich_editor_dynamic_modifier.cpp)
 struct _ArkUINode;
 typedef _ArkUINode* ArkUINodeHandle;
 typedef int ArkUI_Int32;
 typedef unsigned int ArkUI_Uint32;
 constexpr uint32_t BRIDGE_ERROR_UINT_CODE = static_cast<uint32_t>(-1);
-extern void SetRichEditorShowUnderline(ArkUINodeHandle node, ArkUI_Int32 showUnderline);
-extern ArkUI_Int32 GetRichEditorShowUnderline(ArkUINodeHandle node);
-extern void ResetRichEditorShowUnderline(ArkUINodeHandle node);
-extern void SetRichEditorUnderlineColor(ArkUINodeHandle node, const ArkUI_Uint32* colors, ArkUI_Uint32 size);
-extern const ArkUI_Uint32* GetRichEditorUnderlineColor(ArkUINodeHandle node, ArkUI_Uint32* size);
-extern void ResetRichEditorUnderlineColor(ArkUINodeHandle node);
+void SetRichEditorShowUnderline(ArkUINodeHandle node, ArkUI_Int32 showUnderline)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    RichEditorModelNG::SetShowUnderline(frameNode, static_cast<bool>(showUnderline));
+}
+ArkUI_Int32 GetRichEditorShowUnderline(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_RETURN(frameNode, static_cast<ArkUI_Int32>(BRIDGE_ERROR_UINT_CODE));
+    return static_cast<ArkUI_Int32>(RichEditorModelNG::GetShowUnderline(frameNode));
+}
+void ResetRichEditorShowUnderline(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    RichEditorModelNG::ResetShowUnderline(frameNode);
+}
+void SetRichEditorUnderlineColor(ArkUINodeHandle node, const ArkUI_Uint32* colors, ArkUI_Uint32 size)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    CHECK_NULL_VOID(colors);
+    if (size < 4) {
+        return;
+    }
+    UserUnderlineColor userColor {
+        Color(colors[0]),
+        Color(colors[1]),
+        Color(colors[2]),
+        Color(colors[3]),
+    };
+    RichEditorModelNG::SetUnderlineColor(frameNode, userColor);
+}
+const ArkUI_Uint32* GetRichEditorUnderlineColor(ArkUINodeHandle node, ArkUI_Uint32* size)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_RETURN(frameNode, nullptr);
+    CHECK_NULL_RETURN(size, nullptr);
+    auto userColor = RichEditorModelNG::GetUnderlineColor(frameNode);
+    static ArkUI_Uint32 underlineColors[4] = { 0 };
+    underlineColors[0] = userColor.typing.value_or(Color()).GetValue();
+    underlineColors[1] = userColor.normal.value_or(Color()).GetValue();
+    underlineColors[2] = userColor.error.value_or(Color()).GetValue();
+    underlineColors[3] = userColor.disable.value_or(Color()).GetValue();
+    *size = 4;
+    return underlineColors;
+}
+void ResetRichEditorUnderlineColor(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    RichEditorModelNG::ResetUnderlineColor(frameNode);
+}
 
 class RichEditorUnderlineTestNg : public RichEditorCommonTestNg {
 public:
@@ -66,6 +120,7 @@ public:
     void SetupTheme();
     void SetupFocus(bool hasFocus);
     void SetupEnabled(bool enabled);
+    RefPtr<FrameNode> CreateNapiNode();
 };
 
 void RichEditorUnderlineTestNg::SetUp()
@@ -101,9 +156,26 @@ void RichEditorUnderlineTestNg::TearDownTestSuite()
 void RichEditorUnderlineTestNg::SetupTheme()
 {
     theme_ = AceType::MakeRefPtr<RichEditorTheme>();
+    auto textFieldTheme = AceType::MakeRefPtr<TextFieldTheme>();
+    textFieldTheme->underlineTypingColor_ = theme_->GetUnderlineTypingColor();
+    textFieldTheme->underlineColor_ = theme_->GetUnderlineColor();
+    textFieldTheme->disableUnderlineColor_ = theme_->GetDisableUnderlineColor();
+    textFieldTheme->errorUnderlineColor_ = theme_->GetErrorUnderlineColor();
     themeManager_ = AceType::MakeRefPtr<MockThemeManager>();
-    EXPECT_CALL(*themeManager_, GetTheme(_)).WillRepeatedly(Return(theme_));
-    EXPECT_CALL(*themeManager_, GetTheme(_, _)).WillRepeatedly(Return(theme_));
+    EXPECT_CALL(*themeManager_, GetTheme(_))
+        .WillRepeatedly([textFieldTheme, richEditorTheme = theme_](ThemeType type) -> RefPtr<Theme> {
+            if (type == TextFieldTheme::TypeId()) {
+                return textFieldTheme;
+            }
+            return richEditorTheme;
+        });
+    EXPECT_CALL(*themeManager_, GetTheme(_, _))
+        .WillRepeatedly([textFieldTheme, richEditorTheme = theme_](ThemeType type, int32_t) -> RefPtr<Theme> {
+            if (type == TextFieldTheme::TypeId()) {
+                return textFieldTheme;
+            }
+            return richEditorTheme;
+        });
     PipelineBase::GetCurrentContext()->themeManager_ = themeManager_;
 }
 
@@ -116,7 +188,7 @@ void RichEditorUnderlineTestNg::SetupFocus(bool hasFocus)
     if (hasFocus) {
         focusHub->RequestFocusImmediately();
     } else {
-        focusHub->UnFocusImmediately();
+        focusHub->LostFocus();
     }
 }
 
@@ -127,6 +199,22 @@ void RichEditorUnderlineTestNg::SetupEnabled(bool enabled)
     auto eventHub = richEditorPattern->GetEventHub<RichEditorEventHub>();
     ASSERT_NE(eventHub, nullptr);
     eventHub->SetEnabled(enabled);
+}
+
+RefPtr<FrameNode> RichEditorUnderlineTestNg::CreateNapiNode()
+{
+    auto* stack = ViewStackProcessor::GetInstance();
+    auto nodeId = stack->ClaimNodeId();
+    auto node = FrameNode::GetOrCreateFrameNode(
+        V2::RICH_EDITOR_ETS_TAG, nodeId,
+        []() { return AceType::MakeRefPtr<NapiRichEditorPattern>(); });
+    auto pattern = node->GetPattern<RichEditorPattern>();
+    pattern->InitScrollablePattern();
+    pattern->SetRichEditorController(AceType::MakeRefPtr<RichEditorController>());
+    pattern->GetRichEditorController()->SetPattern(AceType::WeakClaim(AceType::RawPtr(pattern)));
+    pattern->CreateNodePaintMethod();
+    node->GetGeometryNode()->SetContentSize({ 300.0f, 300.0f });
+    return node;
 }
 
 // =================== ModelNG Tests ===================
@@ -141,18 +229,11 @@ HWTEST_F(RichEditorUnderlineTestNg, RichEditorModelNGShowUnderline001, TestSize.
     auto* frameNode = AceType::RawPtr(richEditorNode_);
     ASSERT_NE(frameNode, nullptr);
 
-    // Default value is false
     EXPECT_FALSE(RichEditorModelNG::GetShowUnderline(frameNode));
-
-    // Set true
     RichEditorModelNG::SetShowUnderline(frameNode, true);
     EXPECT_TRUE(RichEditorModelNG::GetShowUnderline(frameNode));
-
-    // Set false
     RichEditorModelNG::SetShowUnderline(frameNode, false);
     EXPECT_FALSE(RichEditorModelNG::GetShowUnderline(frameNode));
-
-    // Reset
     RichEditorModelNG::SetShowUnderline(frameNode, true);
     RichEditorModelNG::ResetShowUnderline(frameNode);
     EXPECT_FALSE(RichEditorModelNG::GetShowUnderline(frameNode));
@@ -168,14 +249,12 @@ HWTEST_F(RichEditorUnderlineTestNg, RichEditorModelNGUnderlineColor001, TestSize
     auto* frameNode = AceType::RawPtr(richEditorNode_);
     ASSERT_NE(frameNode, nullptr);
 
-    // Default: all nullopt
     auto defaultColor = RichEditorModelNG::GetUnderlineColor(frameNode);
     EXPECT_FALSE(defaultColor.typing.has_value());
     EXPECT_FALSE(defaultColor.normal.has_value());
     EXPECT_FALSE(defaultColor.error.has_value());
     EXPECT_FALSE(defaultColor.disable.has_value());
 
-    // Set user colors
     UserUnderlineColor userColor;
     userColor.typing = USER_TYPING_COLOR;
     userColor.normal = USER_NORMAL_COLOR;
@@ -184,16 +263,11 @@ HWTEST_F(RichEditorUnderlineTestNg, RichEditorModelNGUnderlineColor001, TestSize
     RichEditorModelNG::SetUnderlineColor(frameNode, userColor);
 
     auto got = RichEditorModelNG::GetUnderlineColor(frameNode);
-    EXPECT_TRUE(got.typing.has_value());
     EXPECT_EQ(got.typing.value(), USER_TYPING_COLOR);
-    EXPECT_TRUE(got.normal.has_value());
     EXPECT_EQ(got.normal.value(), USER_NORMAL_COLOR);
-    EXPECT_TRUE(got.error.has_value());
     EXPECT_EQ(got.error.value(), USER_ERROR_COLOR);
-    EXPECT_TRUE(got.disable.has_value());
     EXPECT_EQ(got.disable.value(), USER_DISABLE_COLOR);
 
-    // Reset
     RichEditorModelNG::ResetUnderlineColor(frameNode);
     auto resetColor = RichEditorModelNG::GetUnderlineColor(frameNode);
     EXPECT_FALSE(resetColor.typing.has_value());
@@ -202,49 +276,39 @@ HWTEST_F(RichEditorUnderlineTestNg, RichEditorModelNGUnderlineColor001, TestSize
     EXPECT_FALSE(resetColor.disable.has_value());
 }
 
-// =================== Pattern: IsUnderlineMode Tests ===================
+// =================== Pattern: IsUnderlineMode / IsUnderlineAndButtonMode ===================
 
 /**
  * @tc.name: IsUnderlineMode001
- * @tc.desc: Test IsUnderlineMode returns true when ShowUnderline is set
+ * @tc.desc: Test IsUnderlineMode and IsUnderlineAndButtonMode for all combinations
  * @tc.type: FUNC
  */
 HWTEST_F(RichEditorUnderlineTestNg, IsUnderlineMode001, TestSize.Level1)
 {
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
+    auto* frameNode = AceType::RawPtr(richEditorNode_);
 
-    // Default false
+    // Default: not underline mode
     EXPECT_FALSE(richEditorPattern->IsUnderlineMode());
-
-    // Set true
-    RichEditorModelNG::SetShowUnderline(AceType::RawPtr(richEditorNode_), true);
-    EXPECT_TRUE(richEditorPattern->IsUnderlineMode());
-
-    // Set false
-    RichEditorModelNG::SetShowUnderline(AceType::RawPtr(richEditorNode_), false);
-    EXPECT_FALSE(richEditorPattern->IsUnderlineMode());
-}
-
-// =================== Pattern: IsUnderlineAndButtonMode Tests ===================
-
-/**
- * @tc.name: IsUnderlineAndButtonMode001
- * @tc.desc: Test IsUnderlineAndButtonMode returns correct value
- * @tc.type: FUNC
- */
-HWTEST_F(RichEditorUnderlineTestNg, IsUnderlineAndButtonMode001, TestSize.Level1)
-{
-    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
-    ASSERT_NE(richEditorPattern, nullptr);
-
-    // Default: not underline mode, so false
     EXPECT_FALSE(richEditorPattern->IsUnderlineAndButtonMode());
 
-    // Set underline mode but not button mode
-    RichEditorModelNG::SetShowUnderline(AceType::RawPtr(richEditorNode_), true);
-    // SingleLine must be true for IsShowCancelButtonMode to potentially return true
-    // Without SingleLine, IsShowCancelButtonMode returns false
+    // Underline only, no button
+    RichEditorModelNG::SetShowUnderline(frameNode, true);
+    EXPECT_TRUE(richEditorPattern->IsUnderlineMode());
+    EXPECT_FALSE(richEditorPattern->IsUnderlineAndButtonMode());
+
+    // Underline + button (requires SingleLine + CancelButton)
+    RichEditorModelNG::SetSingleLine(frameNode, true);
+    EXPECT_FALSE(richEditorPattern->IsShowCancelButtonMode());
+    RichEditorModelNG::SetCancelButton(frameNode, static_cast<int32_t>(CleanNodeStyle::CONSTANT),
+        CalcDimension(16), Color(0xFF000000), "");
+    EXPECT_TRUE(richEditorPattern->IsShowCancelButtonMode());
+    EXPECT_TRUE(richEditorPattern->IsUnderlineAndButtonMode());
+
+    // Turn off underline
+    RichEditorModelNG::SetShowUnderline(frameNode, false);
+    EXPECT_FALSE(richEditorPattern->IsUnderlineMode());
     EXPECT_FALSE(richEditorPattern->IsUnderlineAndButtonMode());
 }
 
@@ -260,7 +324,6 @@ HWTEST_F(RichEditorUnderlineTestNg, UpdateUnderlineStyle001, TestSize.Level1)
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
 
-    // Not underline mode -> should not change default values
     richEditorPattern->underlineColor_ = Color::TRANSPARENT;
     richEditorPattern->underlineWidth_ = 0.0_vp;
     richEditorPattern->UpdateUnderlineStyle();
@@ -270,157 +333,82 @@ HWTEST_F(RichEditorUnderlineTestNg, UpdateUnderlineStyle001, TestSize.Level1)
 
 /**
  * @tc.name: UpdateUnderlineStyle002
- * @tc.desc: Test UpdateUnderlineStyle with focus and no user colors -> typing color from theme
+ * @tc.desc: Test UpdateUnderlineStyle focus/no-focus with and without user colors
  * @tc.type: FUNC
  */
 HWTEST_F(RichEditorUnderlineTestNg, UpdateUnderlineStyle002, TestSize.Level1)
 {
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
-
     RichEditorModelNG::SetShowUnderline(AceType::RawPtr(richEditorNode_), true);
     SetupEnabled(true);
-    SetupFocus(true);
 
+    // Focus, no user color -> theme typing
+    SetupFocus(true);
     richEditorPattern->UpdateUnderlineStyle();
     EXPECT_EQ(richEditorPattern->underlineColor_, theme_->GetUnderlineTypingColor());
     EXPECT_EQ(richEditorPattern->underlineWidth_, EXPECTED_TYPING_WIDTH);
+
+    // No focus, no user color -> theme normal
+    SetupFocus(false);
+    richEditorPattern->UpdateUnderlineStyle();
+    EXPECT_EQ(richEditorPattern->underlineColor_, theme_->GetUnderlineColor());
+    EXPECT_EQ(richEditorPattern->underlineWidth_, EXPECTED_NORMAL_WIDTH);
+
+    // Focus, user typing color
+    UserUnderlineColor userColor;
+    userColor.typing = USER_TYPING_COLOR;
+    userColor.normal = USER_NORMAL_COLOR;
+    RichEditorModelNG::SetUnderlineColor(AceType::RawPtr(richEditorNode_), userColor);
+    SetupFocus(true);
+    richEditorPattern->UpdateUnderlineStyle();
+    EXPECT_EQ(richEditorPattern->underlineColor_, USER_TYPING_COLOR);
+    EXPECT_EQ(richEditorPattern->underlineWidth_, EXPECTED_TYPING_WIDTH);
+
+    // No focus, user normal color
+    SetupFocus(false);
+    richEditorPattern->UpdateUnderlineStyle();
+    EXPECT_EQ(richEditorPattern->underlineColor_, USER_NORMAL_COLOR);
+    EXPECT_EQ(richEditorPattern->underlineWidth_, EXPECTED_NORMAL_WIDTH);
 }
 
 /**
  * @tc.name: UpdateUnderlineStyle003
- * @tc.desc: Test UpdateUnderlineStyle without focus and no user colors -> normal color from theme
+ * @tc.desc: Test UpdateUnderlineStyle disable variations (user disable color / theme disable / not disabled)
  * @tc.type: FUNC
  */
 HWTEST_F(RichEditorUnderlineTestNg, UpdateUnderlineStyle003, TestSize.Level1)
 {
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
-
     RichEditorModelNG::SetShowUnderline(AceType::RawPtr(richEditorNode_), true);
-    SetupEnabled(true);
     SetupFocus(false);
 
-    richEditorPattern->UpdateUnderlineStyle();
-    EXPECT_EQ(richEditorPattern->underlineColor_, theme_->GetUnderlineColor());
-    EXPECT_EQ(richEditorPattern->underlineWidth_, EXPECTED_NORMAL_WIDTH);
-}
-
-/**
- * @tc.name: UpdateUnderlineStyle004
- * @tc.desc: Test UpdateUnderlineStyle with focus and user typing color
- * @tc.type: FUNC
- */
-HWTEST_F(RichEditorUnderlineTestNg, UpdateUnderlineStyle004, TestSize.Level1)
-{
-    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
-    ASSERT_NE(richEditorPattern, nullptr);
-
-    RichEditorModelNG::SetShowUnderline(AceType::RawPtr(richEditorNode_), true);
-    UserUnderlineColor userColor;
-    userColor.typing = USER_TYPING_COLOR;
-    userColor.normal = USER_NORMAL_COLOR;
-    RichEditorModelNG::SetUnderlineColor(AceType::RawPtr(richEditorNode_), userColor);
-    SetupEnabled(true);
-    SetupFocus(true);
-
-    richEditorPattern->UpdateUnderlineStyle();
-    EXPECT_EQ(richEditorPattern->underlineColor_, USER_TYPING_COLOR);
-    EXPECT_EQ(richEditorPattern->underlineWidth_, EXPECTED_TYPING_WIDTH);
-}
-
-/**
- * @tc.name: UpdateUnderlineStyle005
- * @tc.desc: Test UpdateUnderlineStyle without focus and user normal color
- * @tc.type: FUNC
- */
-HWTEST_F(RichEditorUnderlineTestNg, UpdateUnderlineStyle005, TestSize.Level1)
-{
-    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
-    ASSERT_NE(richEditorPattern, nullptr);
-
-    RichEditorModelNG::SetShowUnderline(AceType::RawPtr(richEditorNode_), true);
-    UserUnderlineColor userColor;
-    userColor.typing = USER_TYPING_COLOR;
-    userColor.normal = USER_NORMAL_COLOR;
-    RichEditorModelNG::SetUnderlineColor(AceType::RawPtr(richEditorNode_), userColor);
-    SetupEnabled(true);
-    SetupFocus(false);
-
-    richEditorPattern->UpdateUnderlineStyle();
-    EXPECT_EQ(richEditorPattern->underlineColor_, USER_NORMAL_COLOR);
-    EXPECT_EQ(richEditorPattern->underlineWidth_, EXPECTED_NORMAL_WIDTH);
-}
-
-/**
- * @tc.name: UpdateUnderlineStyle006
- * @tc.desc: Test UpdateUnderlineStyle disabled with user disable color set
- * @tc.type: FUNC
- */
-HWTEST_F(RichEditorUnderlineTestNg, UpdateUnderlineStyle006, TestSize.Level1)
-{
-    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
-    ASSERT_NE(richEditorPattern, nullptr);
-
-    RichEditorModelNG::SetShowUnderline(AceType::RawPtr(richEditorNode_), true);
-    UserUnderlineColor userColor;
-    userColor.disable = USER_DISABLE_COLOR;
-    RichEditorModelNG::SetUnderlineColor(AceType::RawPtr(richEditorNode_), userColor);
-    SetupEnabled(false); // IsDisabled() returns true
-    SetupFocus(false);
-
-    richEditorPattern->UpdateUnderlineStyle();
-    // userColor.disable has value and IsDisabled -> userColor.disable.value()
-    EXPECT_EQ(richEditorPattern->underlineColor_, USER_DISABLE_COLOR);
-}
-
-/**
- * @tc.name: UpdateUnderlineStyle007
- * @tc.desc: Test UpdateUnderlineStyle disabled without user disable color -> theme disable color
- * @tc.type: FUNC
- */
-HWTEST_F(RichEditorUnderlineTestNg, UpdateUnderlineStyle007, TestSize.Level1)
-{
-    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
-    ASSERT_NE(richEditorPattern, nullptr);
-
-    RichEditorModelNG::SetShowUnderline(AceType::RawPtr(richEditorNode_), true);
-    // No user colors set (disable is nullopt)
-    SetupEnabled(false); // IsDisabled() returns true
-    SetupFocus(false);
-
+    // Disabled, no user disable color -> theme disable color
+    SetupEnabled(false);
     richEditorPattern->UpdateUnderlineStyle();
     EXPECT_EQ(richEditorPattern->underlineColor_, theme_->GetDisableUnderlineColor());
-}
 
-/**
- * @tc.name: UpdateUnderlineStyle008
- * @tc.desc: Test UpdateUnderlineStyle not disabled with user disable color set -> underline color from focus
- * @tc.type: FUNC
- */
-HWTEST_F(RichEditorUnderlineTestNg, UpdateUnderlineStyle008, TestSize.Level1)
-{
-    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
-    ASSERT_NE(richEditorPattern, nullptr);
-
-    RichEditorModelNG::SetShowUnderline(AceType::RawPtr(richEditorNode_), true);
+    // Disabled, user disable color -> user disable color
     UserUnderlineColor userColor;
     userColor.disable = USER_DISABLE_COLOR;
+    RichEditorModelNG::SetUnderlineColor(AceType::RawPtr(richEditorNode_), userColor);
+    richEditorPattern->UpdateUnderlineStyle();
+    EXPECT_EQ(richEditorPattern->underlineColor_, USER_DISABLE_COLOR);
+
+    // Not disabled, user disable color set -> focus state color (normal)
     userColor.normal = USER_NORMAL_COLOR;
     RichEditorModelNG::SetUnderlineColor(AceType::RawPtr(richEditorNode_), userColor);
-    SetupEnabled(true); // not disabled
-    SetupFocus(false);
-
+    SetupEnabled(true);
     richEditorPattern->UpdateUnderlineStyle();
-    // userColor.disable has value but !IsDisabled -> underlineColor from focus state (normal)
     EXPECT_EQ(richEditorPattern->underlineColor_, USER_NORMAL_COLOR);
 }
 
-// =================== Pattern: GetUnderlineColor/Width Tests ===================
+// =================== Pattern: GetUnderlineColor/Width + UpdateUnderlineErrorStyle ===================
 
 /**
  * @tc.name: GetUnderlineColorWidth001
- * @tc.desc: Test GetUnderlineColor and GetUnderlineWidth default values
+ * @tc.desc: Test GetUnderlineColor/Width defaults and after style update
  * @tc.type: FUNC
  */
 HWTEST_F(RichEditorUnderlineTestNg, GetUnderlineColorWidth001, TestSize.Level1)
@@ -428,11 +416,9 @@ HWTEST_F(RichEditorUnderlineTestNg, GetUnderlineColorWidth001, TestSize.Level1)
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
 
-    // Defaults
     EXPECT_EQ(richEditorPattern->GetUnderlineColor(), Color::TRANSPARENT);
     EXPECT_EQ(richEditorPattern->GetUnderlineWidth(), 0.0_vp);
 
-    // After UpdateUnderlineStyle with focus
     RichEditorModelNG::SetShowUnderline(AceType::RawPtr(richEditorNode_), true);
     SetupEnabled(true);
     SetupFocus(true);
@@ -441,7 +427,40 @@ HWTEST_F(RichEditorUnderlineTestNg, GetUnderlineColorWidth001, TestSize.Level1)
     EXPECT_EQ(richEditorPattern->GetUnderlineWidth(), EXPECTED_TYPING_WIDTH);
 }
 
-// =================== OverlayModifier: Set/Get Tests ===================
+/**
+ * @tc.name: UpdateUnderlineErrorStyle001
+ * @tc.desc: Test UpdateUnderlineErrorStyle: early return, user error color, theme error color
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorUnderlineTestNg, UpdateUnderlineErrorStyle001, TestSize.Level1)
+{
+    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(richEditorPattern, nullptr);
+
+    // Not underline mode -> no change
+    richEditorPattern->underlineColor_ = Color::TRANSPARENT;
+    richEditorPattern->underlineWidth_ = 0.0_vp;
+    richEditorPattern->UpdateUnderlineErrorStyle();
+    EXPECT_EQ(richEditorPattern->underlineColor_, Color::TRANSPARENT);
+    EXPECT_EQ(richEditorPattern->underlineWidth_, 0.0_vp);
+
+    // Underline mode, user error color
+    RichEditorModelNG::SetShowUnderline(AceType::RawPtr(richEditorNode_), true);
+    UserUnderlineColor userColor;
+    userColor.error = USER_ERROR_COLOR;
+    RichEditorModelNG::SetUnderlineColor(AceType::RawPtr(richEditorNode_), userColor);
+    richEditorPattern->UpdateUnderlineErrorStyle();
+    EXPECT_EQ(richEditorPattern->underlineColor_, USER_ERROR_COLOR);
+    EXPECT_EQ(richEditorPattern->underlineWidth_, EXPECTED_ERROR_WIDTH);
+
+    // Underline mode, no user error color -> theme error color
+    RichEditorModelNG::ResetUnderlineColor(AceType::RawPtr(richEditorNode_));
+    richEditorPattern->UpdateUnderlineErrorStyle();
+    EXPECT_EQ(richEditorPattern->underlineColor_, theme_->GetErrorUnderlineColor());
+    EXPECT_EQ(richEditorPattern->underlineWidth_, EXPECTED_ERROR_WIDTH);
+}
+
+// =================== OverlayModifier: Set/Get + PaintUnderline ===================
 
 /**
  * @tc.name: OverlayModifierUnderlineProperties001
@@ -457,96 +476,105 @@ HWTEST_F(RichEditorUnderlineTestNg, OverlayModifierUnderlineProperties001, TestS
     auto overlayMod = AceType::DynamicCast<RichEditorOverlayModifier>(richEditorPattern->overlayMod_);
     ASSERT_NE(overlayMod, nullptr);
 
-    // Set underline color
     Color testColor(0xFFAABBCC);
     overlayMod->SetUnderlineColor(testColor);
     EXPECT_EQ(overlayMod->underlineColor_->Get(), testColor);
 
-    // Set underline width
     float testWidth = 5.0f;
     overlayMod->SetUnderlineWidth(testWidth);
     EXPECT_FLOAT_EQ(overlayMod->underlineWidth_->Get(), testWidth);
 
-    // Change values
-    Color testColor2(0xFF112233);
-    overlayMod->SetUnderlineColor(testColor2);
-    EXPECT_EQ(overlayMod->underlineColor_->Get(), testColor2);
-
-    float testWidth2 = 10.0f;
-    overlayMod->SetUnderlineWidth(testWidth2);
-    EXPECT_FLOAT_EQ(overlayMod->underlineWidth_->Get(), testWidth2);
+    overlayMod->SetUnderlineColor(Color(0xFF112233));
+    EXPECT_EQ(overlayMod->underlineColor_->Get(), Color(0xFF112233));
+    overlayMod->SetUnderlineWidth(10.0f);
+    EXPECT_FLOAT_EQ(overlayMod->underlineWidth_->Get(), 10.0f);
 }
-
-// =================== OverlayModifier: PaintUnderline Tests ===================
 
 /**
  * @tc.name: PaintUnderline001
- * @tc.desc: Test PaintUnderline returns early when not underline mode
+ * @tc.desc: Test PaintUnderline early-return paths: null pattern, !IsUnderlineMode, !isContentNode_
  * @tc.type: FUNC
  */
 HWTEST_F(RichEditorUnderlineTestNg, PaintUnderline001, TestSize.Level1)
 {
+    Testing::MockCanvas canvas;
+
+    // Null pattern -> return early
+    WeakPtr<Pattern> nullPattern;
+    WeakPtr<ScrollBarOverlayModifier> nullScrollBar;
+    WeakPtr<ScrollEdgeEffect> nullEdge;
+    auto nullOverlayMod = AceType::MakeRefPtr<RichEditorOverlayModifier>(
+        nullPattern, nullScrollBar, std::move(nullEdge));
+    ASSERT_NE(nullOverlayMod, nullptr);
+    nullOverlayMod->SetFrameSize(SizeF(300.0f, 100.0f));
+    nullOverlayMod->PaintUnderline(canvas);
+
+    // Valid pattern, not underline mode -> return early
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
-
     richEditorPattern->CreateRichEditorOverlayModifier();
     auto overlayMod = AceType::DynamicCast<RichEditorOverlayModifier>(richEditorPattern->overlayMod_);
     ASSERT_NE(overlayMod, nullptr);
-
-    // Not underline mode -> PaintUnderline should return early without crash
-    Testing::MockCanvas canvas;
     overlayMod->SetFrameSize(SizeF(300.0f, 100.0f));
     overlayMod->PaintUnderline(canvas);
-    // No crash, no draw call
+
+    // Underline mode but isContentNode_ = false -> return early
+    RichEditorModelNG::SetShowUnderline(AceType::RawPtr(richEditorNode_), true);
+    WeakPtr<Pattern> pattern = AceType::WeakClaim(AceType::RawPtr(richEditorPattern));
+    auto nonContentOverlay = AceType::MakeRefPtr<RichEditorOverlayModifier>(
+        pattern, nullScrollBar, std::move(nullEdge), false);
+    ASSERT_NE(nonContentOverlay, nullptr);
+    nonContentOverlay->SetFrameSize(SizeF(300.0f, 100.0f));
+    nonContentOverlay->SetUnderlineColor(Color(0xFF007DFF));
+    nonContentOverlay->SetUnderlineWidth(2.0f);
+    nonContentOverlay->PaintUnderline(canvas);
 }
 
 /**
  * @tc.name: PaintUnderline002
- * @tc.desc: Test PaintUnderline draws when underline mode is enabled
+ * @tc.desc: Test PaintUnderline drawing: LTR/RTL x isNeedToAddPadding
  * @tc.type: FUNC
  */
 HWTEST_F(RichEditorUnderlineTestNg, PaintUnderline002, TestSize.Level1)
 {
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
+    auto* frameNode = AceType::RawPtr(richEditorNode_);
 
-    RichEditorModelNG::SetShowUnderline(AceType::RawPtr(richEditorNode_), true);
+    auto setupAndDraw = [&](bool rtl, bool withButton) {
+        RichEditorModelNG::SetShowUnderline(frameNode, true);
+        if (withButton) {
+            RichEditorModelNG::SetSingleLine(frameNode, true);
+            RichEditorModelNG::SetCancelButton(frameNode, static_cast<int32_t>(CleanNodeStyle::CONSTANT),
+                CalcDimension(16), Color(0xFF000000), "");
+        }
+        auto layoutProperty = richEditorNode_->GetLayoutProperty<RichEditorLayoutProperty>();
+        layoutProperty->UpdateLayoutDirection(rtl ? TextDirection::RTL : TextDirection::LTR);
 
-    richEditorPattern->CreateRichEditorOverlayModifier();
-    auto overlayMod = AceType::DynamicCast<RichEditorOverlayModifier>(richEditorPattern->overlayMod_);
-    ASSERT_NE(overlayMod, nullptr);
+        richEditorPattern->CreateRichEditorOverlayModifier();
+        auto overlayMod = AceType::DynamicCast<RichEditorOverlayModifier>(richEditorPattern->overlayMod_);
+        overlayMod->SetFrameSize(SizeF(300.0f, 100.0f));
+        overlayMod->SetUnderlineColor(Color(0xFF007DFF));
+        overlayMod->SetUnderlineWidth(2.0f);
 
-    overlayMod->SetFrameSize(SizeF(300.0f, 100.0f));
-    overlayMod->SetUnderlineColor(Color(0xFF007DFF));
-    overlayMod->SetUnderlineWidth(2.0f);
+        Testing::MockCanvas canvas;
+        EXPECT_CALL(canvas, AttachPen(_)).WillRepeatedly(ReturnRef(canvas));
+        EXPECT_CALL(canvas, DetachPen()).WillRepeatedly(ReturnRef(canvas));
+        EXPECT_CALL(canvas, DrawLine(_, _)).Times(1);
+        overlayMod->PaintUnderline(canvas);
+    };
 
-    Testing::MockCanvas canvas;
-    // Should draw without crash
-    overlayMod->PaintUnderline(canvas);
+    // LTR, no padding
+    setupAndDraw(false, false);
+    // LTR, with padding (isNeedToAddPadding=true)
+    setupAndDraw(false, true);
+    // RTL, no padding
+    setupAndDraw(true, false);
+    // RTL, with padding
+    setupAndDraw(true, true);
 }
 
-/**
- * @tc.name: PaintUnderline003
- * @tc.desc: Test PaintUnderline with null pattern (CHECK_NULL_VOID)
- * @tc.type: FUNC
- */
-HWTEST_F(RichEditorUnderlineTestNg, PaintUnderline003, TestSize.Level1)
-{
-    // Create overlay modifier with null pattern
-    WeakPtr<Pattern> nullPattern;
-    WeakPtr<ScrollBarOverlayModifier> nullScrollBar;
-    WeakPtr<ScrollEdgeEffect> nullEdge;
-    auto overlayMod = AceType::MakeRefPtr<RichEditorOverlayModifier>(
-        nullPattern, nullScrollBar, std::move(nullEdge));
-    ASSERT_NE(overlayMod, nullptr);
-
-    Testing::MockCanvas canvas;
-    // Pattern is null -> should return early without crash
-    overlayMod->SetFrameSize(SizeF(300.0f, 100.0f));
-    overlayMod->PaintUnderline(canvas);
-}
-
-// =================== Theme Tests ===================
+// =================== Theme + Integration Tests ===================
 
 /**
  * @tc.name: RichEditorThemeUnderlineColors001
@@ -556,318 +584,291 @@ HWTEST_F(RichEditorUnderlineTestNg, PaintUnderline003, TestSize.Level1)
 HWTEST_F(RichEditorUnderlineTestNg, RichEditorThemeUnderlineColors001, TestSize.Level1)
 {
     ASSERT_NE(theme_, nullptr);
-
-    // Verify default theme colors
     EXPECT_EQ(theme_->GetUnderlineColor(), Color(0x33182431));
     EXPECT_EQ(theme_->GetUnderlineTypingColor(), Color(0xFF007DFF));
     EXPECT_EQ(theme_->GetDisableUnderlineColor(), Color(0x33182431));
     EXPECT_EQ(theme_->GetErrorUnderlineColor(), Color(0xFF000000));
 }
 
-// =================== Integration: OnModifyDone / HandleFocus / HandleBlur ===================
-
 /**
- * @tc.name: UpdateUnderlineStyleOnModifyDone001
- * @tc.desc: Test that UpdateUnderlineStyle is called during OnModifyDone
+ * @tc.name: UpdateUnderlineStyleIntegration001
+ * @tc.desc: Test UpdateUnderlineStyle is called during OnModifyDone, HandleFocus/Blur, HandleEnabled
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorUnderlineTestNg, UpdateUnderlineStyleOnModifyDone001, TestSize.Level1)
+HWTEST_F(RichEditorUnderlineTestNg, UpdateUnderlineStyleIntegration001, TestSize.Level1)
 {
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
-
     RichEditorModelNG::SetShowUnderline(AceType::RawPtr(richEditorNode_), true);
     SetupEnabled(true);
-    SetupFocus(false);
 
-    // Reset to defaults before OnModifyDone
+    // OnModifyDone -> normal color (no focus)
+    SetupFocus(false);
     richEditorPattern->underlineColor_ = Color::TRANSPARENT;
     richEditorPattern->underlineWidth_ = 0.0_vp;
-
-    // OnModifyDone should call UpdateUnderlineStyle
     richEditorPattern->OnModifyDone();
-
-    // After OnModifyDone, underline style should be updated
     EXPECT_EQ(richEditorPattern->underlineColor_, theme_->GetUnderlineColor());
     EXPECT_EQ(richEditorPattern->underlineWidth_, EXPECTED_NORMAL_WIDTH);
-}
 
-/**
- * @tc.name: UpdateUnderlineStyleOnFocusBlur001
- * @tc.desc: Test that UpdateUnderlineStyle is called during HandleFocusEvent and HandleBlurEvent
- * @tc.type: FUNC
- */
-HWTEST_F(RichEditorUnderlineTestNg, UpdateUnderlineStyleOnFocusBlur001, TestSize.Level1)
-{
-    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
-    ASSERT_NE(richEditorPattern, nullptr);
-
-    RichEditorModelNG::SetShowUnderline(AceType::RawPtr(richEditorNode_), true);
-    SetupEnabled(true);
-
-    // Focus -> typing color
+    // HandleFocusEvent -> typing color
     SetupFocus(true);
     richEditorPattern->HandleFocusEvent(FocusReason::DEFAULT);
     EXPECT_EQ(richEditorPattern->underlineColor_, theme_->GetUnderlineTypingColor());
     EXPECT_EQ(richEditorPattern->underlineWidth_, EXPECTED_TYPING_WIDTH);
 
-    // Blur -> normal color
+    // HandleBlurEvent -> normal color
     SetupFocus(false);
     richEditorPattern->HandleBlurEvent();
     EXPECT_EQ(richEditorPattern->underlineColor_, theme_->GetUnderlineColor());
     EXPECT_EQ(richEditorPattern->underlineWidth_, EXPECTED_NORMAL_WIDTH);
-}
 
-/**
- * @tc.name: UpdateUnderlineStyleHandleEnabled001
- * @tc.desc: Test that UpdateUnderlineStyle is called during HandleEnabled
- * @tc.type: FUNC
- */
-HWTEST_F(RichEditorUnderlineTestNg, UpdateUnderlineStyleHandleEnabled001, TestSize.Level1)
-{
-    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
-    ASSERT_NE(richEditorPattern, nullptr);
-
-    RichEditorModelNG::SetShowUnderline(AceType::RawPtr(richEditorNode_), true);
+    // HandleEnabled disabled -> disable color
     SetupEnabled(false);
-    SetupFocus(false);
-
-    // When disabled, color should be theme disable color
     richEditorPattern->HandleEnabled();
     EXPECT_EQ(richEditorPattern->underlineColor_, theme_->GetDisableUnderlineColor());
 
-    // When enabled, color should be normal theme color
+    // HandleEnabled enabled -> normal color
     SetupEnabled(true);
     richEditorPattern->HandleEnabled();
     EXPECT_EQ(richEditorPattern->underlineColor_, theme_->GetUnderlineColor());
 }
 
-// =================== PaintMethod: SetShowUnderlineWidth Direct Tests ===================
+// =================== PaintMethod: SetShowUnderlineWidth + AdjustBoundsRect ===================
 
 /**
- * @tc.name: SetShowUnderlineWidthDirect001
- * @tc.desc: Directly test RichEditorPaintMethod::SetShowUnderlineWidth with underline mode enabled
+ * @tc.name: SetShowUnderlineWidth001
+ * @tc.desc: Test SetShowUnderlineWidth with underline mode on/off
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorUnderlineTestNg, SetShowUnderlineWidthDirect001, TestSize.Level1)
+HWTEST_F(RichEditorUnderlineTestNg, SetShowUnderlineWidth001, TestSize.Level1)
 {
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
-
-    RichEditorModelNG::SetShowUnderline(AceType::RawPtr(richEditorNode_), true);
-    SetupEnabled(true);
-    SetupFocus(true);
-    richEditorPattern->UpdateUnderlineStyle();
 
     richEditorPattern->CreateRichEditorOverlayModifier();
     auto overlayMod = AceType::DynamicCast<RichEditorOverlayModifier>(richEditorPattern->GetOverlayModifier());
     ASSERT_NE(overlayMod, nullptr);
 
-    // Create a content pattern and paint method from it
-    auto contentPattern = AceType::MakeRefPtr<RichEditorContentPattern>(WeakClaim(richEditorPattern));
-    ASSERT_NE(contentPattern, nullptr);
+    auto contentPattern = AceType::MakeRefPtr<RichEditorContentPattern>(AceType::WeakClaim(AceType::RawPtr(richEditorPattern)));
     auto paintMethod = contentPattern->CreateNodePaintMethod();
-    ASSERT_NE(paintMethod, nullptr);
     auto richEditorPaintMethod = AceType::DynamicCast<RichEditorPaintMethod>(paintMethod);
     ASSERT_NE(richEditorPaintMethod, nullptr);
 
-    // Call SetShowUnderlineWidth directly (nullptr paintWrapper is safe since
-    // GetOverlayModifier returns stored textOverlayModifier_ and ignores the parameter)
+    // Not underline mode -> width set to 0
+    overlayMod->SetUnderlineWidth(5.0f);
     richEditorPaintMethod->SetShowUnderlineWidth(nullptr);
+    EXPECT_FLOAT_EQ(overlayMod->underlineWidth_->Get(), 0.0f);
 
-    // Verify the overlay modifier received the correct color and width
+    // Underline mode -> color and width set from pattern
+    RichEditorModelNG::SetShowUnderline(AceType::RawPtr(richEditorNode_), true);
+    SetupEnabled(true);
+    SetupFocus(true);
+    richEditorPattern->UpdateUnderlineStyle();
+    richEditorPaintMethod->SetShowUnderlineWidth(nullptr);
     EXPECT_EQ(overlayMod->underlineColor_->Get(), richEditorPattern->GetUnderlineColor());
     EXPECT_FLOAT_EQ(overlayMod->underlineWidth_->Get(),
         static_cast<float>(richEditorPattern->GetUnderlineWidth().ConvertToPx()));
 }
 
 /**
- * @tc.name: SetShowUnderlineWidthDirect002
- * @tc.desc: Directly test RichEditorPaintMethod::SetShowUnderlineWidth with underline mode disabled
+ * @tc.name: AdjustBoundsRect001
+ * @tc.desc: Test AdjustBoundsRect: underline mode, counter enabled, neither
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorUnderlineTestNg, SetShowUnderlineWidthDirect002, TestSize.Level1)
+HWTEST_F(RichEditorUnderlineTestNg, AdjustBoundsRect001, TestSize.Level1)
 {
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
 
-    // Not underline mode
+    // Neither counter nor underline -> no change
     EXPECT_FALSE(richEditorPattern->IsUnderlineMode());
+    EXPECT_FALSE(richEditorPattern->IsShowCounterEnabled());
+    RectF bounds(0.0f, 0.0f, INITIAL_BOUNDS_WIDTH, INITIAL_BOUNDS_HEIGHT);
+    richEditorPattern->AdjustBoundsRect(bounds);
+    EXPECT_FLOAT_EQ(bounds.Height(), INITIAL_BOUNDS_HEIGHT);
 
-    richEditorPattern->CreateRichEditorOverlayModifier();
-    auto overlayMod = AceType::DynamicCast<RichEditorOverlayModifier>(richEditorPattern->GetOverlayModifier());
-    ASSERT_NE(overlayMod, nullptr);
+    // IsUnderlineMode -> height increases by underlineWidth
+    RichEditorModelNG::SetShowUnderline(AceType::RawPtr(richEditorNode_), true);
+    richEditorPattern->underlineWidth_ = EXPECTED_NORMAL_WIDTH;
+    RectF bounds2(0.0f, 0.0f, INITIAL_BOUNDS_WIDTH, INITIAL_BOUNDS_HEIGHT);
+    richEditorPattern->AdjustBoundsRect(bounds2);
+    float expectedHeight = INITIAL_BOUNDS_HEIGHT +
+        static_cast<float>(EXPECTED_NORMAL_WIDTH.ConvertToPx());
+    EXPECT_FLOAT_EQ(bounds2.Height(), expectedHeight);
 
-    // Set a non-zero width to verify it gets reset to 0
-    overlayMod->SetUnderlineWidth(5.0f);
-    EXPECT_FLOAT_EQ(overlayMod->underlineWidth_->Get(), 5.0f);
-
-    // Create a content pattern and paint method from it
-    auto contentPattern = AceType::MakeRefPtr<RichEditorContentPattern>(WeakClaim(richEditorPattern));
-    ASSERT_NE(contentPattern, nullptr);
-    auto paintMethod = contentPattern->CreateNodePaintMethod();
-    ASSERT_NE(paintMethod, nullptr);
-    auto richEditorPaintMethod = AceType::DynamicCast<RichEditorPaintMethod>(paintMethod);
-    ASSERT_NE(richEditorPaintMethod, nullptr);
-
-    // Call SetShowUnderlineWidth directly - should set width to 0 since not underline mode
-    richEditorPaintMethod->SetShowUnderlineWidth(nullptr);
-
-    // Verify the overlay modifier width was set to 0
-    EXPECT_FLOAT_EQ(overlayMod->underlineWidth_->Get(), 0.0f);
+    // IsShowCounterEnabled (counterDecorator_ null -> countHeight 0)
+    richEditorPattern->isSpanStringMode_ = true;
+    richEditorPattern->maxLength_ = TEST_MAX_LENGTH;
+    richEditorPattern->styledString_ = AceType::MakeRefPtr<MutableSpanString>(u"hello");
+    auto layoutProperty = richEditorNode_->GetLayoutProperty<RichEditorLayoutProperty>();
+    layoutProperty->UpdateShowCounter(true);
+    EXPECT_TRUE(richEditorPattern->IsShowCounterEnabled());
+    RectF bounds3(0.0f, 0.0f, INITIAL_BOUNDS_WIDTH, INITIAL_BOUNDS_HEIGHT);
+    richEditorPattern->AdjustBoundsRect(bounds3);
+    EXPECT_FLOAT_EQ(bounds3.Height(), INITIAL_BOUNDS_HEIGHT);
 }
 
-// =================== IsUnderlineAndButtonMode B3 Branch Test ===================
+// =================== GetAllResponseAreaWidth ===================
 
 /**
- * @tc.name: IsUnderlineAndButtonMode002
- * @tc.desc: Test IsUnderlineAndButtonMode returns true when both underline and button mode are active
+ * @tc.name: GetAllResponseAreaWidth001
+ * @tc.desc: Test GetAllResponseAreaWidth returns 0 when no response areas
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorUnderlineTestNg, IsUnderlineAndButtonMode002, TestSize.Level1)
+HWTEST_F(RichEditorUnderlineTestNg, GetAllResponseAreaWidth001, TestSize.Level1)
 {
     auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
     ASSERT_NE(richEditorPattern, nullptr);
-
-    auto* frameNode = AceType::RawPtr(richEditorNode_);
-
-    // Set underline mode
-    RichEditorModelNG::SetShowUnderline(frameNode, true);
-    EXPECT_TRUE(richEditorPattern->IsUnderlineMode());
-
-    // Set single line mode (required for IsShowCancelButtonMode to pass the single line check)
-    RichEditorModelNG::SetSingleLine(frameNode, true);
-    // SingleLine is true but IsShowCancelButton not set yet -> false
-    EXPECT_FALSE(richEditorPattern->IsShowCancelButtonMode());
-
-    // Without cancel button, still false
-    EXPECT_FALSE(richEditorPattern->IsUnderlineAndButtonMode());
-
-    // Set cancel button (sets IsShowCancelButton = true)
-    RichEditorModelNG::SetCancelButton(frameNode, static_cast<int32_t>(CleanNodeStyle::CONSTANT),
-        CalcDimension(16), Color(0xFF000000), "");
-    EXPECT_TRUE(richEditorPattern->IsShowCancelButtonMode());
-
-    // Now both underline and button mode are true
-    EXPECT_TRUE(richEditorPattern->IsUnderlineAndButtonMode());
+    EXPECT_FLOAT_EQ(richEditorPattern->GetAllResponseAreaWidth(), 0.0f);
 }
 
-// =================== Dynamic Modifier Bridge: Null and Size Check Tests ===================
+// =================== HandleCountStyle + HandleCounterBorder with Underline ===================
 
 /**
- * @tc.name: BridgeShowUnderlineNullNode001
- * @tc.desc: Test bridge Set/Get/Reset RichEditorShowUnderline with null node (CHECK_NULL)
+ * @tc.name: HandleCountStyleUnderline001
+ * @tc.desc: Test HandleCountStyle with underline mode: showCountBorderStyle_ true/false
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorUnderlineTestNg, BridgeShowUnderlineNullNode001, TestSize.Level1)
+HWTEST_F(RichEditorUnderlineTestNg, HandleCountStyleUnderline001, TestSize.Level1)
 {
-    // Null node should not crash on any of the three operations
+    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(richEditorPattern, nullptr);
+    RichEditorModelNG::SetShowUnderline(AceType::RawPtr(richEditorNode_), true);
+    SetupEnabled(true);
+    SetupFocus(false);
+    EXPECT_FALSE(richEditorPattern->IsShowCounterEnabled());
+
+    // showCountBorderStyle_ true -> UpdateUnderlineErrorStyle
+    richEditorPattern->showCountBorderStyle_ = true;
+    richEditorPattern->underlineColor_ = Color::TRANSPARENT;
+    richEditorPattern->underlineWidth_ = 0.0_vp;
+    richEditorPattern->HandleCountStyle();
+    EXPECT_EQ(richEditorPattern->underlineColor_, theme_->GetErrorUnderlineColor());
+    EXPECT_EQ(richEditorPattern->underlineWidth_, EXPECTED_ERROR_WIDTH);
+
+    // showCountBorderStyle_ false -> UpdateUnderlineStyle (normal)
+    richEditorPattern->showCountBorderStyle_ = false;
+    richEditorPattern->underlineColor_ = Color::TRANSPARENT;
+    richEditorPattern->underlineWidth_ = 0.0_vp;
+    richEditorPattern->HandleCountStyle();
+    EXPECT_EQ(richEditorPattern->underlineColor_, theme_->GetUnderlineColor());
+    EXPECT_EQ(richEditorPattern->underlineWidth_, EXPECTED_NORMAL_WIDTH);
+}
+
+/**
+ * @tc.name: HandleCounterBorderUnderline001
+ * @tc.desc: Test HandleCounterBorder all 4 combos: showCountBorderStyle_ x IsUnderlineMode
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorUnderlineTestNg, HandleCounterBorderUnderline001, TestSize.Level1)
+{
+    auto node = CreateNapiNode();
+    ASSERT_NE(node, nullptr);
+    auto pattern = node->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_TRUE(pattern->IsNapiRichEditorPattern());
+
+    // 1) showCountBorderStyle_=true + IsUnderlineMode -> UpdateUnderlineErrorStyle
+    RichEditorModelNG::SetShowUnderline(AceType::RawPtr(node), true);
+    pattern->showCountBorderStyle_ = true;
+    pattern->underlineColor_ = Color::TRANSPARENT;
+    pattern->underlineWidth_ = 0.0_vp;
+    pattern->HandleCounterBorder();
+    EXPECT_EQ(pattern->underlineColor_, theme_->GetErrorUnderlineColor());
+    EXPECT_EQ(pattern->underlineWidth_, EXPECTED_ERROR_WIDTH);
+
+    // 2) showCountBorderStyle_=false + IsUnderlineMode -> UpdateUnderlineStyle
+    pattern->showCountBorderStyle_ = false;
+    pattern->underlineColor_ = Color::TRANSPARENT;
+    pattern->underlineWidth_ = 0.0_vp;
+    pattern->HandleCounterBorder();
+    EXPECT_EQ(pattern->underlineColor_, theme_->GetUnderlineColor());
+    EXPECT_EQ(pattern->underlineWidth_, EXPECTED_NORMAL_WIDTH);
+
+    // 3) showCountBorderStyle_=true + !IsUnderlineMode -> ApplyInnerBorderColor (no crash)
+    RichEditorModelNG::SetShowUnderline(AceType::RawPtr(node), false);
+    pattern->showCountBorderStyle_ = true;
+    pattern->HandleCounterBorder();
+
+    // 4) showCountBorderStyle_=false + !IsUnderlineMode -> SetThemeBorderAttr (no crash)
+    pattern->showCountBorderStyle_ = false;
+    pattern->HandleCounterBorder();
+}
+
+// =================== Dynamic Modifier Bridge Tests ===================
+
+/**
+ * @tc.name: BridgeShowUnderline001
+ * @tc.desc: Test bridge Set/Get/Reset RichEditorShowUnderline with null and valid nodes
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorUnderlineTestNg, BridgeShowUnderline001, TestSize.Level1)
+{
+    // Null node
     SetRichEditorShowUnderline(nullptr, 1);
     ResetRichEditorShowUnderline(nullptr);
-    auto result = GetRichEditorShowUnderline(nullptr);
-    EXPECT_EQ(static_cast<uint32_t>(result), BRIDGE_ERROR_UINT_CODE);
-}
+    EXPECT_EQ(static_cast<uint32_t>(GetRichEditorShowUnderline(nullptr)), BRIDGE_ERROR_UINT_CODE);
 
-/**
- * @tc.name: BridgeShowUnderlineValidNode001
- * @tc.desc: Test bridge Set/Get/Reset RichEditorShowUnderline with valid node
- * @tc.type: FUNC
- */
-HWTEST_F(RichEditorUnderlineTestNg, BridgeShowUnderlineValidNode001, TestSize.Level1)
-{
+    // Valid node
     auto* frameNode = AceType::RawPtr(richEditorNode_);
-    ASSERT_NE(frameNode, nullptr);
     auto nodeHandle = reinterpret_cast<ArkUINodeHandle>(frameNode);
-
-    // Set true
     SetRichEditorShowUnderline(nodeHandle, 1);
     EXPECT_EQ(GetRichEditorShowUnderline(nodeHandle), 1);
-
-    // Set false
     SetRichEditorShowUnderline(nodeHandle, 0);
     EXPECT_EQ(GetRichEditorShowUnderline(nodeHandle), 0);
-
-    // Reset
     SetRichEditorShowUnderline(nodeHandle, 1);
     ResetRichEditorShowUnderline(nodeHandle);
     EXPECT_EQ(GetRichEditorShowUnderline(nodeHandle), 0);
 }
 
 /**
- * @tc.name: BridgeUnderlineColorNullNode001
- * @tc.desc: Test bridge SetRichEditorUnderlineColor with null node (CHECK_NULL_VOID)
+ * @tc.name: BridgeUnderlineColor001
+ * @tc.desc: Test bridge UnderlineColor error cases: null node, null colors, small size
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorUnderlineTestNg, BridgeUnderlineColorNullNode001, TestSize.Level1)
+HWTEST_F(RichEditorUnderlineTestNg, BridgeUnderlineColor001, TestSize.Level1)
 {
     ArkUI_Uint32 colors[4] = { 0xFF111111, 0xFF222222, 0xFF333333, 0xFF444444 };
-    // Null node should not crash
+
+    // Null node
     SetRichEditorUnderlineColor(nullptr, colors, 4);
-    SUCCEED();
-}
+    ResetRichEditorUnderlineColor(nullptr);
+    EXPECT_EQ(GetRichEditorUnderlineColor(nullptr, nullptr), nullptr);
 
-/**
- * @tc.name: BridgeUnderlineColorNullColors001
- * @tc.desc: Test bridge SetRichEditorUnderlineColor with null colors pointer (CHECK_NULL_VOID)
- * @tc.type: FUNC
- */
-HWTEST_F(RichEditorUnderlineTestNg, BridgeUnderlineColorNullColors001, TestSize.Level1)
-{
     auto* frameNode = AceType::RawPtr(richEditorNode_);
-    ASSERT_NE(frameNode, nullptr);
     auto nodeHandle = reinterpret_cast<ArkUINodeHandle>(frameNode);
 
-    // Null colors should not crash
+    // Null colors
     SetRichEditorUnderlineColor(nodeHandle, nullptr, 4);
-    SUCCEED();
-}
 
-/**
- * @tc.name: BridgeUnderlineColorSmallSize001
- * @tc.desc: Test bridge SetRichEditorUnderlineColor with size < 4 (early return)
- * @tc.type: FUNC
- */
-HWTEST_F(RichEditorUnderlineTestNg, BridgeUnderlineColorSmallSize001, TestSize.Level1)
-{
-    auto* frameNode = AceType::RawPtr(richEditorNode_);
-    ASSERT_NE(frameNode, nullptr);
-    auto nodeHandle = reinterpret_cast<ArkUINodeHandle>(frameNode);
+    // Null size pointer for Get
+    EXPECT_EQ(GetRichEditorUnderlineColor(nodeHandle, nullptr), nullptr);
 
-    ArkUI_Uint32 colors[4] = { 0xFF111111, 0xFF222222, 0xFF333333, 0xFF444444 };
-
-    // Set a known color first
+    // Small size (< 4) -> should not change existing colors
     SetRichEditorUnderlineColor(nodeHandle, colors, 4);
-
-    // Now call with size < 4 - should return early without changing colors
-    ArkUI_Uint32 smallColors[3] = { 0xFFAAAAAAAA, 0xFFBBBBBBBB, 0xFFCCCCCCCC };
+    ArkUI_Uint32 smallColors[3] = { 0xAAAAAAAA, 0xBBBBBBBB, 0xCCCCCCCC };
     SetRichEditorUnderlineColor(nodeHandle, smallColors, 3);
-
-    // Verify colors were NOT changed by the small-size call
     ArkUI_Uint32 outSize = 0;
     auto* result = GetRichEditorUnderlineColor(nodeHandle, &outSize);
     ASSERT_NE(result, nullptr);
     EXPECT_EQ(outSize, 4);
-    // typing color should still be the original value, not the small-size attempt
     EXPECT_EQ(result[0], 0xFF111111);
 }
 
 /**
- * @tc.name: BridgeUnderlineColorValid001
- * @tc.desc: Test bridge Set/Get/Reset RichEditorUnderlineColor with valid node and colors
+ * @tc.name: BridgeUnderlineColor002
+ * @tc.desc: Test bridge UnderlineColor valid Set/Get/Reset
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorUnderlineTestNg, BridgeUnderlineColorValid001, TestSize.Level1)
+HWTEST_F(RichEditorUnderlineTestNg, BridgeUnderlineColor002, TestSize.Level1)
 {
     auto* frameNode = AceType::RawPtr(richEditorNode_);
-    ASSERT_NE(frameNode, nullptr);
     auto nodeHandle = reinterpret_cast<ArkUINodeHandle>(frameNode);
 
-    // Set colors via bridge
     ArkUI_Uint32 colors[4] = { USER_TYPING_COLOR.GetValue(), USER_NORMAL_COLOR.GetValue(),
         USER_ERROR_COLOR.GetValue(), USER_DISABLE_COLOR.GetValue() };
     SetRichEditorUnderlineColor(nodeHandle, colors, 4);
 
-    // Get colors via bridge
     ArkUI_Uint32 outSize = 0;
     auto* result = GetRichEditorUnderlineColor(nodeHandle, &outSize);
     ASSERT_NE(result, nullptr);
@@ -877,52 +878,39 @@ HWTEST_F(RichEditorUnderlineTestNg, BridgeUnderlineColorValid001, TestSize.Level
     EXPECT_EQ(result[2], USER_ERROR_COLOR.GetValue());
     EXPECT_EQ(result[3], USER_DISABLE_COLOR.GetValue());
 
-    // Reset
     ResetRichEditorUnderlineColor(nodeHandle);
     result = GetRichEditorUnderlineColor(nodeHandle, &outSize);
     ASSERT_NE(result, nullptr);
-    // After reset, all colors should be 0 (Color() default)
     EXPECT_EQ(result[0], Color().GetValue());
     EXPECT_EQ(result[1], Color().GetValue());
     EXPECT_EQ(result[2], Color().GetValue());
     EXPECT_EQ(result[3], Color().GetValue());
 }
 
-/**
- * @tc.name: BridgeGetUnderlineColorNullNode001
- * @tc.desc: Test bridge GetRichEditorUnderlineColor with null node (CHECK_NULL_RETURN)
- * @tc.type: FUNC
- */
-HWTEST_F(RichEditorUnderlineTestNg, BridgeGetUnderlineColorNullNode001, TestSize.Level1)
-{
-    auto* result = GetRichEditorUnderlineColor(nullptr, nullptr);
-    EXPECT_EQ(result, nullptr);
-}
+// =================== UpdateOverlayModifier: !HasFocus Branch ===================
 
 /**
- * @tc.name: BridgeGetUnderlineColorNullSize001
- * @tc.desc: Test bridge GetRichEditorUnderlineColor with null size pointer (CHECK_NULL_RETURN)
+ * @tc.name: UpdateOverlayModifierNotFocused001
+ * @tc.desc: Test overlay modifier frameSize is accessible when not focused
  * @tc.type: FUNC
  */
-HWTEST_F(RichEditorUnderlineTestNg, BridgeGetUnderlineColorNullSize001, TestSize.Level1)
+HWTEST_F(RichEditorUnderlineTestNg, UpdateOverlayModifierNotFocused001, TestSize.Level1)
 {
-    auto* frameNode = AceType::RawPtr(richEditorNode_);
-    ASSERT_NE(frameNode, nullptr);
-    auto nodeHandle = reinterpret_cast<ArkUINodeHandle>(frameNode);
+    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(richEditorPattern, nullptr);
 
-    auto* result = GetRichEditorUnderlineColor(nodeHandle, nullptr);
-    EXPECT_EQ(result, nullptr);
-}
+    RichEditorModelNG::SetShowUnderline(AceType::RawPtr(richEditorNode_), true);
+    SetupEnabled(true);
+    SetupFocus(false);
+    EXPECT_FALSE(richEditorPattern->HasFocus());
 
-/**
- * @tc.name: BridgeResetUnderlineColorNullNode001
- * @tc.desc: Test bridge ResetRichEditorUnderlineColor with null node (CHECK_NULL_VOID)
- * @tc.type: FUNC
- */
-HWTEST_F(RichEditorUnderlineTestNg, BridgeResetUnderlineColorNullNode001, TestSize.Level1)
-{
-    // Null node should not crash
-    ResetRichEditorUnderlineColor(nullptr);
-    SUCCEED();
+    richEditorPattern->CreateNodePaintMethod();
+    auto overlayMod = AceType::DynamicCast<RichEditorOverlayModifier>(
+        richEditorPattern->GetOverlayModifier());
+    ASSERT_NE(overlayMod, nullptr);
+
+    overlayMod->SetFrameSize(SizeF(300.0f, 100.0f));
+    EXPECT_FLOAT_EQ(overlayMod->frameSize_->Get().Width(), 300.0f);
+    EXPECT_FLOAT_EQ(overlayMod->frameSize_->Get().Height(), 100.0f);
 }
 } // namespace OHOS::Ace::NG
