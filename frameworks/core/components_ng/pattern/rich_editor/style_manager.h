@@ -453,6 +453,26 @@ public:
         UpdateTextStyleByTypingStyle(spanNode);
     }
 
+    void ApplyTypingStyleToSpanItem(const RefPtr<PlainTextSpanString>& plainStr)
+    {
+        CHECK_NULL_VOID(plainStr && typingFontStyle_.has_value() && typingTextStyle_.has_value());
+        auto spanItems = plainStr->GetSpanItems();
+        CHECK_NULL_VOID(!spanItems.empty());
+        auto spanItem = spanItems.front();
+        CHECK_NULL_VOID(spanItem);
+        auto spanNode = AceType::MakeRefPtr<SpanNode>(ElementRegister::GetInstance()->MakeUniqueId());
+        spanNode->SetSpanItem(spanItem);
+        auto& updateSpanStyle = typingFontStyle_.value();
+        spanItem->useThemeFontColor = updateSpanStyle.useThemeFontColor;
+        spanItem->useThemeDecorationColor = updateSpanStyle.useThemeDecorationColor;
+        spanItem->strokeColorFollowFontColor = updateSpanStyle.strokeColorFollowFontColor;
+        if (updateSpanStyle.strokeColorFollowFontColor && updateSpanStyle.updateTextColor.has_value()) {
+            updateSpanStyle.updateStrokeColor = typingTextStyle_.value().GetTextColor();
+        }
+        UpdateTextStyle(spanNode, updateSpanStyle);
+        spanItem->SetTextStyle(typingTextStyle_);
+    }
+
     static RefPtr<FontSpan> CreateFontSpanByTextStyle(
         const struct UpdateSpanStyle& updateSpanStyle, const TextStyle& textStyle, int32_t length)
     {

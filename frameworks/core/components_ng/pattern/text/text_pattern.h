@@ -109,6 +109,10 @@ public:
     SelectionInfo GetSpansInfo(int32_t start, int32_t end, GetSpansMethod method);
     std::list<ResultObject> GetSpansInfoInStyledString(int32_t start, int32_t end);
     virtual int32_t GetTextContentLength() const;
+    virtual void ApplyPasswordObscure(std::u16string& content) const {}
+    virtual void ApplyNewlineFilter(std::u16string& content) const {}
+    virtual bool IsInPasswordMode() const { return false; }
+    virtual void FilterTextStyleForPasswordMode(TextStyle& textStyle, const TextStyle& inheritedStyle) const {}
     RefPtr<NodePaintMethod> CreateNodePaintMethod() override;
     RefPtr<LayoutProperty> CreateLayoutProperty() override;
     RefPtr<LayoutAlgorithm> CreateLayoutAlgorithm() override;
@@ -174,7 +178,7 @@ public:
     void SetSelectDetectConfig(std::vector<TextDataDetectType>& types) {}
     std::vector<TextDataDetectType> GetSelectDetectConfig();
     void ResetSelectDetectConfig() {}
-    void SelectAIDetect();
+    virtual void SelectAIDetect();
     // --------------- select AI detect end -------------------
     void SetTextDetectEnableMultiThread(bool enable);
     bool GetTextDetectEnable();
@@ -364,9 +368,9 @@ public:
     void HandleOnCopy();
     virtual void HandleAIMenuOption(const std::string& labelInfo = "");
     virtual void HandleOnAskCelia();
-    void SetIsAskCeliaEnabled(bool isAskCeliaEnabled);
+    ACE_FORCE_EXPORT void SetIsAskCeliaEnabled(bool isAskCeliaEnabled);
     bool IsAskCeliaEnabled() const;
-    void SetIsShowAskCeliaInRightClick(bool isShowAskCeliaInRightClick);
+    ACE_FORCE_EXPORT void SetIsShowAskCeliaInRightClick(bool isShowAskCeliaInRightClick);
     bool IsShowAskCeliaInRightClick() const;
     bool IsAskCeliaSupported();
     void HandleOnCopySpanString();

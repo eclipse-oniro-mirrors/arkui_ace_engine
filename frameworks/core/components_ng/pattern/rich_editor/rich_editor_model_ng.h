@@ -18,6 +18,7 @@
 
 #include "core/components_ng/pattern/rich_editor/rich_editor_model.h"
 #include "core/components_ng/pattern/text_field/text_keyboard_common_type.h"
+#include "core/image/image_source_info.h"
 
 namespace OHOS::Ace::NG {
 class ACE_EXPORT RichEditorModelNG : public OHOS::Ace::RichEditorModel {
@@ -226,6 +227,14 @@ public:
     static void SetHorizontalScrolling(FrameNode* frameNode, bool enabled);
     static void ResetHorizontalScrolling(FrameNode* frameNode);
     static bool GetHorizontalScrolling(FrameNode* frameNode);
+    static void SetInputType(FrameNode* frameNode, TextInputType type);
+    static void ResetInputType(FrameNode* frameNode);
+    static TextInputType GetInputType(FrameNode* frameNode);
+    static void SetShowPasswordIcon(FrameNode* frameNode, bool show);
+    static void ResetShowPasswordIcon(FrameNode* frameNode);
+    static bool GetShowPasswordIcon(FrameNode* frameNode);
+    static void SetPasswordIcon(FrameNode* frameNode, const ImageSourceInfo& showIcon, const ImageSourceInfo& hideIcon);
+    static void ResetPasswordIcon(FrameNode* frameNode);
     static Color GetScrollBarColor(FrameNode* frameNode);
     static void BindSelectionMenu(FrameNode* frameNode, TextSpanType& spanType,
         TextResponseType& responseType, std::function<void()>& buildFunc, const SelectMenuParam& menuParam);

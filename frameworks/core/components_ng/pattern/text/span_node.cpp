@@ -878,8 +878,11 @@ int32_t SpanItem::UpdateParagraph(const RefPtr<FrameNode>& frameNode, const RefP
     CHECK_NULL_RETURN(frameNode, -1);
     auto pipelineContext = frameNode->GetContextRefPtr();
     CHECK_NULL_RETURN(pipelineContext, -1);
+    auto pattern = frameNode->GetPattern<TextPattern>();
+    CHECK_NULL_RETURN(pattern, -1);
     auto spanTextStyle = textStyle;
     UseSelfStyle(fontStyle, textLineStyle, spanTextStyle, false);
+    pattern->FilterTextStyleForPasswordMode(spanTextStyle, textStyle);
     if (fontStyle && fontStyle->HasFontWeight()) {
         spanTextStyle.SetEnableVariableFontWeight(fontStyle->GetEnableVariableFontWeight().value_or(false));
     }
@@ -889,8 +892,8 @@ int32_t SpanItem::UpdateParagraph(const RefPtr<FrameNode>& frameNode, const RefP
     }
     FontRegisterCallback(frameNode, spanTextStyle);
     auto spanContent = GetSpanContent(content, isMarquee);
-    auto pattern = frameNode->GetPattern<TextPattern>();
-    CHECK_NULL_RETURN(pattern, -1);
+    pattern->ApplyPasswordObscure(spanContent);
+    pattern->ApplyNewlineFilter(spanContent);
     auto paragraphStyle = builder->GetParagraphStyle();
     spanTextStyle.SetColorShaderStyle(paragraphStyle.colorShaderStyle);
     auto gradient = paragraphStyle.GetGradient();
