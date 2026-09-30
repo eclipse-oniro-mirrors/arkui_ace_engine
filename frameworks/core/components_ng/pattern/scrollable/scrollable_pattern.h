@@ -980,49 +980,16 @@ public:
     void SetIsAllowMouse(bool enableScrollWithMouse)
     {
         isAllowMouse_ = enableScrollWithMouse;
-        auto scrollable = GetScrollable();
-        CHECK_NULL_VOID(scrollable);
-        scrollable->SetIsAllowMouse(GetIsAllowMouse());
     }
-    virtual bool GetIsAllowMouse() const
-    {
-        // Mouse multi-select has higher priority than mouse drag scrolling.
-        if (MultiSelectable()) {
-            return false;
-        }
-        if (isAllowMouse_.has_value()) {
-            return isAllowMouse_.value();
-        }
-        // In edit mode the default value of enableScrollWithMouse stays disabled,
-        // reserving mouse drag for multi-select interactions.
-        if (GetEnableEditMode()) {
-            return false;
-        }
-        return IsMouseDragScrollDefaultEnabled();
-    }
-    void ResetIsAllowMouse()
-    {
-        isAllowMouse_.reset();
-        auto scrollable = GetScrollable();
-        CHECK_NULL_VOID(scrollable);
-        scrollable->SetIsAllowMouse(GetIsAllowMouse());
-    }
+    virtual bool GetIsAllowMouse() const;
+    void ResetIsAllowMouse();
     // Whether the container supports mouse multi-select (e.g. multiSelectable Grid/List).
-    virtual bool MultiSelectable() const
-    {
-        return false;
-    }
+    virtual bool MultiSelectable() const;
     // Whether the container is in edit mode.
-    virtual bool GetEnableEditMode() const
-    {
-        return false;
-    }
+    virtual bool GetEnableEditMode() const;
     // Direction-aware default of enableScrollWithMouse: enabled only when scrolling horizontally.
     // FREE mode (free scroll) containers keep the default disabled.
-    virtual bool IsMouseDragScrollDefaultEnabled() const
-    {
-        return GetAxis() == Axis::HORIZONTAL;
-    }
+    virtual bool IsMouseDragScrollDefaultEnabled() const;
 
     void GetRepeatCountInfo(
         RefPtr<UINode> node, int32_t& repeatDifference, int32_t& firstRepeatCount, int32_t& totalChildCount);

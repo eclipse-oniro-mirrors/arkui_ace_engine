@@ -850,7 +850,8 @@ HWTEST_F(ScrollPatternThreeTestNg, SetEnableScrollWithMouse003, TestSize.Level1)
 
 /**
  * @tc.name: SetEnableScrollWithMouse004
- * @tc.desc: Test imperative Set/Reset take effect on recognizer immediately (horizontal)
+ * @tc.desc: Test imperative Set/Reset take effect on GetIsAllowMouse (horizontal);
+ *           the recognizer syncs on the next OnModifyDone
  * @tc.type: FUNC
  */
 HWTEST_F(ScrollPatternThreeTestNg, SetEnableScrollWithMouse004, TestSize.Level1)
@@ -862,16 +863,17 @@ HWTEST_F(ScrollPatternThreeTestNg, SetEnableScrollWithMouse004, TestSize.Level1)
     auto scrollable = pattern_->GetScrollableEvent()->GetScrollable();
     EXPECT_TRUE(scrollable->panRecognizerNG_->isAllowMouse_);
     pattern_->SetIsAllowMouse(false);
-    EXPECT_FALSE(scrollable->panRecognizerNG_->isAllowMouse_);
+    EXPECT_FALSE(pattern_->GetIsAllowMouse());
     pattern_->SetIsAllowMouse(true);
-    EXPECT_TRUE(scrollable->panRecognizerNG_->isAllowMouse_);
+    EXPECT_TRUE(pattern_->GetIsAllowMouse());
     pattern_->ResetIsAllowMouse();
-    EXPECT_TRUE(scrollable->panRecognizerNG_->isAllowMouse_);
+    EXPECT_TRUE(pattern_->GetIsAllowMouse());
 }
 
 /**
  * @tc.name: SetEnableScrollWithMouse005
- * @tc.desc: Test imperative Set/Reset take effect on recognizer immediately (vertical)
+ * @tc.desc: Test imperative Set/Reset take effect on GetIsAllowMouse (vertical);
+ *           the recognizer syncs on the next OnModifyDone
  * @tc.type: FUNC
  */
 HWTEST_F(ScrollPatternThreeTestNg, SetEnableScrollWithMouse005, TestSize.Level1)
@@ -882,9 +884,9 @@ HWTEST_F(ScrollPatternThreeTestNg, SetEnableScrollWithMouse005, TestSize.Level1)
     auto scrollable = pattern_->GetScrollableEvent()->GetScrollable();
     EXPECT_FALSE(scrollable->panRecognizerNG_->isAllowMouse_);
     pattern_->SetIsAllowMouse(true);
-    EXPECT_TRUE(scrollable->panRecognizerNG_->isAllowMouse_);
+    EXPECT_TRUE(pattern_->GetIsAllowMouse());
     pattern_->ResetIsAllowMouse();
-    EXPECT_FALSE(scrollable->panRecognizerNG_->isAllowMouse_);
+    EXPECT_FALSE(pattern_->GetIsAllowMouse());
 }
 
 /**

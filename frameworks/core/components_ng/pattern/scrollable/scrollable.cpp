@@ -205,7 +205,7 @@ void Scrollable::InitPanRecognizerNG()
     }
     panRecognizerNG_ =
         AceType::MakeRefPtr<NG::PanRecognizer>(DEFAULT_PAN_FINGER, panDirection, distanceMap);
-    panRecognizerNG_->SetIsAllowMouse(axis_ == Axis::HORIZONTAL);
+    panRecognizerNG_->SetIsAllowMouse(false);
     SetOnActionStart();
     SetOnActionUpdate();
     SetOnActionExtUpdate();

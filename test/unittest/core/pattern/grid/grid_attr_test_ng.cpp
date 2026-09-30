@@ -833,7 +833,8 @@ HWTEST_F(GridAttrTestNg, SetEnableScrollWithMouse003, TestSize.Level1)
 
 /**
  * @tc.name: SetEnableScrollWithMouse004
- * @tc.desc: Test multiSelectable has higher priority than enableScrollWithMouse
+ * @tc.desc: Test multiSelectable suppresses the default value of enableScrollWithMouse
+ *           (explicit value takes priority)
  * @tc.type: FUNC
  */
 HWTEST_F(GridAttrTestNg, SetEnableScrollWithMouse004, TestSize.Level1)
@@ -847,6 +848,8 @@ HWTEST_F(GridAttrTestNg, SetEnableScrollWithMouse004, TestSize.Level1)
     auto scrollable = pattern_->GetScrollableEvent()->GetScrollable();
     EXPECT_FALSE(scrollable->panRecognizerNG_->isAllowMouse_);
     pattern_->SetIsAllowMouse(true);
+    EXPECT_TRUE(pattern_->GetIsAllowMouse());
+    pattern_->ResetIsAllowMouse();
     EXPECT_FALSE(pattern_->GetIsAllowMouse());
 }
 

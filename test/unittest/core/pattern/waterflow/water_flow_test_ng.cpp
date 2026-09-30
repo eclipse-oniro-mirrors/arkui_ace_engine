@@ -2646,7 +2646,7 @@ HWTEST_F(WaterFlowTestNg, SetEnableScrollWithMouse001, TestSize.Level1)
 
 /**
  * @tc.name: SetEnableScrollWithMouse002
- * @tc.desc: Test default value and Reset behavior (vertical → false)
+ * @tc.desc: Test default value (vertical → false)
  * @tc.type: FUNC
  */
 HWTEST_F(WaterFlowTestNg, SetEnableScrollWithMouse002, TestSize.Level1)
