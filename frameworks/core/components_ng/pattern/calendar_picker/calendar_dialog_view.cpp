@@ -233,18 +233,11 @@ void CalendarDialogView::CreateChildNode(const RefPtr<FrameNode>& contentColumn,
         BorderRadiusProperty radius;
         radius.SetRadius(theme->GetDialogBorderRadius());
         renderContext->UpdateBorderRadius(radius);
-#if defined(PREVIEW)
-        if (dialogTheme) {
-            renderContext->UpdateBackgroundColor(dialogTheme->GetBackgroundColor());
-            renderContext->UpdateBackShadow(Shadow::CreateShadow(ShadowStyle::OuterDefaultSM));
-        }
-#else
         auto shadowTheme = dialogNode->GetTheme<ShadowTheme>(true);
         if (shadowTheme) {
             auto colorMode = dialogNode->GetLocalColorMode();
             renderContext->UpdateBackShadow(shadowTheme->GetShadow(ShadowStyle::OuterDefaultSM, colorMode));
         }
-#endif
     }
     UpdateBackgroundStyle(renderContext, dialogProperties, theme, childNode);
 }
@@ -1171,7 +1164,7 @@ void CalendarDialogView::UpdateBackgroundStyle(const RefPtr<RenderContext>& rend
     const RefPtr<FrameNode>& dialogNode)
 {
     bool enabled = false;
-#if defined(ANDROID_PLATFORM) || defined(IOS_PLATFORM)
+#if defined(ANDROID_PLATFORM) || defined(IOS_PLATFORM) || defined(PREVIEW)
     enabled = Container::GreatOrEqualAPIVersion(PlatformVersion::VERSION_ELEVEN);
 #else
     enabled = Container::GreatOrEqualAPIVersion(PlatformVersion::VERSION_ELEVEN) && renderContext->IsUniRenderEnabled();
