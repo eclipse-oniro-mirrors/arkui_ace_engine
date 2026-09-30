@@ -1405,4 +1405,31 @@ HWTEST_F(TextPickerPatternTestNg, TextPickerPatternOnWindowSizeChanged003, TestS
     EXPECT_FALSE(columnNodes.empty());
 }
 
+/**
+ * @tc.name: LinearFontSizeVP001
+ * @tc.desc: Test TextPickerColumnPattern LinearFontSize with VP unit converted to PX
+ */
+HWTEST_F(TextPickerPatternTestNg, LinearFontSizeVP001, TestSize.Level1)
+{
+    InitTextPickerPatternTestNg();
+    ASSERT_NE(textPickerColumnPattern_, nullptr);
+    Dimension startFontSize(10.0, DimensionUnit::VP);
+    Dimension endFontSize(20.0, DimensionUnit::VP);
+    auto result = textPickerColumnPattern_->LinearFontSize(startFontSize, endFontSize, 0.5);
+    EXPECT_EQ(result.Unit(), DimensionUnit::PX);
+}
+
+/**
+ * @tc.name: LinearFontSizeFP001
+ * @tc.desc: Test TextPickerColumnPattern LinearFontSize with FP unit converted to PX
+ */
+HWTEST_F(TextPickerPatternTestNg, LinearFontSizeFP001, TestSize.Level1)
+{
+    InitTextPickerPatternTestNg();
+    ASSERT_NE(textPickerColumnPattern_, nullptr);
+    Dimension startFontSize(10.0, DimensionUnit::FP);
+    Dimension endFontSize(20.0, DimensionUnit::FP);
+    auto result = textPickerColumnPattern_->LinearFontSize(startFontSize, endFontSize, 0.5);
+    EXPECT_EQ(result.Unit(), DimensionUnit::PX);
+}
 } // namespace OHOS::Ace::NG
