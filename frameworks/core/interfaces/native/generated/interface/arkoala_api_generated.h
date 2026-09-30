@@ -26133,6 +26133,8 @@ typedef struct GENERATED_ArkUIImageAnimatorModifier {
                           const Opt_Int32* value);
     void (*setMonitorInvisibleArea)(Ark_NativePointer node,
                                     const Opt_Boolean* value);
+    void (*setInterpolation)(Ark_NativePointer node,
+                             const Opt_ImageInterpolation* value);
     void (*setOnStart)(Ark_NativePointer node,
                        const Opt_synthetic_Callback_Void* value);
     void (*setOnPause)(Ark_NativePointer node,
