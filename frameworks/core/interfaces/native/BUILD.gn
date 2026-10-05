@@ -58,6 +58,7 @@ template("ace_core_interfaces_native_node") {
       "node/flow_item_modifier.cpp",
       "node/frame_node_modifier.cpp",
       "node/frame_node_modifier_multi_thread.cpp",
+      "node/ui_event_command_processor.cpp",
       "node/gauge_modifier.cpp",
       "node/grid_col_modifier.cpp",
       "node/grid_container_modifier.cpp",

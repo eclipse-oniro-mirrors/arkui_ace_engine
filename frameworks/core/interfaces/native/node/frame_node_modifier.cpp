@@ -30,6 +30,7 @@
 #include "core/components_ng/pattern/custom/custom_measure_layout_node.h"
 #include "core/interfaces/arkoala/arkoala_api.h"
 #include "core/interfaces/native/node/frame_node_modifier_multi_thread.h"
+#include "core/interfaces/native/node/ui_event_command_processor.h"
 #include "core/pipeline_ng/pipeline_context.h"
 #include "core/interfaces/native/utility/error_message_macros.h"
 #include "interfaces/native/native_type.h"
@@ -1325,6 +1326,7 @@ ArkUI_Int32 SetUiDvsyncSwitch(ArkUIContext* context, bool enable)
     return ERROR_CODE_NO_ERROR;
 }
 
+
 namespace NodeModifier {
 const ArkUIFrameNodeModifier* GetFrameNodeModifier()
 {
@@ -1424,6 +1426,7 @@ const ArkUIFrameNodeModifier* GetFrameNodeModifier()
         .getAccessibilityProvider = GetAccessibilityProvider,
         .getPageRootNode = GetPageRootNode,
         .getCommonViewParentId = GetCommonViewParentId,
+        .injectCompositeCommand = InjectCompositeCommandImpl,
     };
     CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
     return &modifier;

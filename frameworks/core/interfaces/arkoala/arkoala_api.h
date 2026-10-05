@@ -9991,6 +9991,9 @@ struct ArkUIFrameNodeModifier {
     ArkUI_AccessibilityProvider* (*getAccessibilityProvider)(ArkUINodeHandle node);
     ArkUINodeHandle (*getPageRootNode)(ArkUI_Int32 instanceId);
     ArkUI_Int32 (*getCommonViewParentId)(ArkUINodeHandle node);
+    ArkUI_Int32 (*injectCompositeCommand)(ArkUI_Int32 instanceId, ArkUI_Uint32 uniqueId,
+        const ArkUI_CharPtr json, ArkUI_Uint32 jsonSize,
+        void (*callback)(ArkUI_Int32, void*), void* userData);
 };
 
 struct ArkUINodeContentEvent {

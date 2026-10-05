@@ -41,6 +41,10 @@ public:
     void SetRootSize(double rootWidth, double rootHeight);
     void SetDensity(double density);
     void SetInstanceId(int32_t instanceId);
+    void SetThisInstanceId(int32_t instanceId)
+    {
+        instanceId_ = instanceId;
+    }
     void SetContainerModalButtonsRect(bool hasModalButtonsRect);
     void SetContainerCustomTitleVisible(bool visible);
     void SetContainerControlButtonVisible(bool visible);

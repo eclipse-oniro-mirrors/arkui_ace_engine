@@ -1780,6 +1780,10 @@ typedef enum {
      * @since 21
      */
     ARKUI_ERROR_CODE_PARAM_ERROR = 100023,
+    /** The previous composite command's completion callback has not yet started. */
+    ARKUI_ERROR_CODE_COMMAND_UNFINISHED = 106409,
+    /** The node is not found, cross-instance, or destroyed before execution. */
+    ARKUI_ERROR_CODE_NODE_NOT_FOUND = 106410,
 } ArkUI_ErrorCode;
 
 /**

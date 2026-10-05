@@ -18,6 +18,7 @@
 #include <limits>
 #include <new>
 
+#include "interfaces/native/native_error_message_macros.h"
 #include "securec.h"
 
 struct OH_ArkUI_NativeModule_UIJsonWrapper {
@@ -29,27 +30,34 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_UIJsonWrapperCreate(const char* data, uint
     OH_ArkUI_NativeModule_UIJsonWrapper** outOwned)
 {
     if (!outOwned) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "outOwned parameter is invalid");
         return ARKUI_ERROR_CODE_PARAM_INVALID;
     }
     *outOwned = nullptr;
     if (!data) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "data parameter is invalid");
         return ARKUI_ERROR_CODE_PARAM_INVALID;
     }
     const size_t dataSize = static_cast<size_t>(size);
     if (dataSize == std::numeric_limits<size_t>::max()) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_INTERNAL_ERROR, __FUNCTION__, "JSON data size overflow");
         return ARKUI_ERROR_CODE_INTERNAL_ERROR;
     }
     const size_t bufferSize = dataSize + 1;
     auto* wrapper = new (std::nothrow) OH_ArkUI_NativeModule_UIJsonWrapper;
     if (!wrapper) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_INTERNAL_ERROR, __FUNCTION__,
+            "Failed to allocate memory for OH_ArkUI_NativeModule_UIJsonWrapper");
         return ARKUI_ERROR_CODE_INTERNAL_ERROR;
     }
     wrapper->data = static_cast<char*>(std::malloc(bufferSize));
     if (!wrapper->data) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_INTERNAL_ERROR, __FUNCTION__, "Failed to allocate memory for JSON data");
         delete wrapper;
         return ARKUI_ERROR_CODE_INTERNAL_ERROR;
     }
     if (memcpy_s(wrapper->data, bufferSize, data, dataSize) != EOK) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_INTERNAL_ERROR, __FUNCTION__, "Failed to copy JSON data");
         std::free(wrapper->data);
         delete wrapper;
         return ARKUI_ERROR_CODE_INTERNAL_ERROR;
