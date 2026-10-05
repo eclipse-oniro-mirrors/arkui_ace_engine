@@ -16,12 +16,14 @@
 
 #include <cmath>
 #include <iterator>
+#include <map>
 
 #include "core/common/container.h"
 #include "core/common/container_scope.h"
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/base/page_text_json.h"
 #include "core/components_ng/pattern/page_translate/page_translate_node.h"
+#include "core/pipeline/base/element_register.h"
 #include "core/pipeline_ng/pipeline_context.h"
 #include "interfaces/native/native_type.h"
 
@@ -38,10 +40,9 @@ RefPtr<Container> GetPageTextContainer(int32_t instanceId)
 }
 
 #ifndef CROSS_PLATFORM
-bool AppendCarrier(const RefPtr<FrameNode>& frame, const RefPtr<PageTranslateNode>& carrier,
+bool AppendCarrier(const RefPtr<FrameNode>& frame, const std::string& text,
     PageTextJson& json, bool& first)
 {
-    const auto text = carrier->GetPageTranslateTextForReport();
     if (text.empty()) {
         return true;
     }
@@ -99,20 +100,49 @@ int32_t CollectPageText(int32_t instanceId, char** data, uint32_t* size, const c
     bool success = json.Append("{\"texts\":[");
 #ifndef CROSS_PLATFORM
     bool first = true;
+    std::map<int32_t, std::pair<RefPtr<FrameNode>, std::string>> texts;
     auto manager = pipeline->GetUiTranslateManagerImpl();
-    auto appendNode = [&success, &json, &first](const WeakPtr<FrameNode>& node) {
-        if (!success) {
-            return;
-        }
+    auto collectNode = [&texts](const WeakPtr<FrameNode>& node) {
         auto frame = node.Upgrade();
         CHECK_NULL_VOID(frame);
         auto carrier = AceType::DynamicCast<PageTranslateNode>(frame->GetPattern());
         CHECK_NULL_VOID(carrier);
-        success = AppendCarrier(frame, carrier, json, first);
+        texts.emplace(frame->GetId(), std::make_pair(frame, carrier->GetPageTranslateTextForReport()));
     };
     if (manager && success) {
         // Reuse the translation registry without starting reports or changing session state.
-        manager->ForEachArkUITranslateFrameNode(appendNode);
+        manager->ForEachArkUITranslateFrameNode(collectNode);
+    }
+    if (success) {
+        // String overlays are drawn by RenderContext and have no translation carrier.
+        // Read existing nodes only; enumerating children could materialize lazy items.
+        ElementRegister::GetInstance()->IterateElements([&texts, instanceId](auto, const RefPtr<AceType>& element) {
+            auto frame = AceType::DynamicCast<FrameNode>(element);
+            if (!frame || frame->GetInstanceId() != instanceId) {
+                return false;
+            }
+            auto renderContext = frame->GetRenderContext();
+            if (!renderContext || !renderContext->HasOverlayText()) {
+                return false;
+            }
+            const auto overlay = renderContext->GetOverlayTextValue(OverlayOptions());
+            if (overlay.content.empty()) {
+                return false;
+            }
+            auto& text = texts.try_emplace(frame->GetId(), frame, std::string()).first->second.second;
+            // Keep one item per host node, including when it also provides body text.
+            if (!text.empty()) {
+                text += '\n';
+            }
+            text += overlay.content;
+            return false;
+        });
+    }
+    for (const auto& [id, entry] : texts) {
+        if (!success) {
+            break;
+        }
+        success = AppendCarrier(entry.first, entry.second, json, first);
     }
 #endif
     if (!success || !json.Append("]}")) {
