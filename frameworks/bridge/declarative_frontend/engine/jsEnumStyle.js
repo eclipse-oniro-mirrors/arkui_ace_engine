@@ -5336,6 +5336,11 @@ let PickerIndicatorType;
   PickerIndicatorType[PickerIndicatorType.DIVIDER = 1] = 'DIVIDER';
 })(PickerIndicatorType || (PickerIndicatorType = {}));
 
+let WebContextMenuItemId;
+(function (WebContextMenuItemId) {
+  WebContextMenuItemId[WebContextMenuItemId.MENU_COPY_LINK = 11] = 'MENU_COPY_LINK';
+})(WebContextMenuItemId || (WebContextMenuItemId = {}));
+
 let BlankScreenDetectionMethod;
 (function (BlankScreenDetectionMethod) {
   BlankScreenDetectionMethod[BlankScreenDetectionMethod.DETECTION_CONTENTFUL_NODES_SEVENTEEN = 0] =

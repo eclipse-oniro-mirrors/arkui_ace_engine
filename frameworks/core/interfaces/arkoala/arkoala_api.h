@@ -7002,6 +7002,8 @@ struct ArkUIWebModifier {
     void (*resetOnRequestSelectedCallBack)(ArkUINodeHandle node);
     void (*setOnContextMenuHideCallBack)(ArkUINodeHandle node, void* callback);
     void (*resetOnContextMenuHideCallBack)(ArkUINodeHandle node);
+    void (*setOnContextMenuUpdateCallBack)(ArkUINodeHandle node, void* callback);
+    void (*resetOnContextMenuUpdateCallBack)(ArkUINodeHandle node);
     void (*setGeolocationAccess)(ArkUINodeHandle node, ArkUI_Bool value);
     void (*resetGeolocationAccess)(ArkUINodeHandle node);
     void (*setDatabaseAccess)(ArkUINodeHandle node, ArkUI_Bool value);

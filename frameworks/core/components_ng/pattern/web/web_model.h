@@ -74,6 +74,8 @@ public:
         const AISessionCallback&& onExecuteAIAction, const AISessionCallback&& onDestroyAISession) {}
     virtual void SetOnContextMenuShow(std::function<bool(const BaseEventInfo* info)>&& jsCallback) = 0;
     virtual void SetOnContextMenuHide(std::function<void(const BaseEventInfo* info)>&& jsCallback) = 0;
+    virtual void SetOnContextMenuUpdate(
+        std::function<void(WebContextMenuItemId menuItemId, const WebContextMenuOptions& options)>&& jsCallback) = 0;
     virtual void SetNewDragStyle(bool isNewDragStyle) {}
     virtual void SetPreviewSelectionMenu(const std::shared_ptr<WebPreviewSelectionMenuParam>& param) {}
     virtual void SetJsEnabled(bool isJsEnabled) = 0;

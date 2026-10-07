@@ -47,6 +47,9 @@ public:
     MOCK_METHOD(std::string, GetSelectionText, (), (const, override));
     MOCK_METHOD(bool, IsAILink, (), (const, override));
     MOCK_METHOD(int, GetSourceTypeV2, (), (const, override));
+    MOCK_METHOD(bool, ShouldOfferLinkToText, (), (const, override));
+    MOCK_METHOD(bool, IsOverTextFragment, (), (const, override));
+    MOCK_METHOD(std::string, GetTextFragmentGeneratedLink, (), (const, override));
 };
 
 class MockWebContextSelectOverlay : public WebContextSelectOverlay {
@@ -82,6 +85,8 @@ public:
     MOCK_METHOD(void, Redo, (), (const, override));
     MOCK_METHOD(void, PasteAndMatchStyle, (), (const, override));
     MOCK_METHOD(void, RequestPasswordAutoFill, (), (const, override));
+    MOCK_METHOD(void, CopyLinkToTextMenu, (), (const, override));
+    MOCK_METHOD(void, RemoveFragments, (), (const, override));
 };
 } // namespace
 

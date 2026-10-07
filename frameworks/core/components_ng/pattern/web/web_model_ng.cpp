@@ -494,6 +494,23 @@ void WebModelNG::SetOnContextMenuHide(std::function<void(const BaseEventInfo* in
     webEventHub->SetOnContextMenuHideEvent(std::move(uiCallback));
 }
 
+void WebModelNG::SetOnContextMenuUpdate(
+    std::function<void(WebContextMenuItemId menuItemId, const WebContextMenuOptions& options)>&& jsCallback)
+{
+    auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
+    CHECK_NULL_VOID(webPattern);
+    webPattern->SetOnContextMenuUpdateCallback(std::move(jsCallback));
+}
+
+void WebModelNG::SetOnContextMenuUpdate(
+    FrameNode* frameNode, std::function<void(WebContextMenuItemId menuItemId, const WebContextMenuOptions& options)>&& jsCallback)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    CHECK_NULL_VOID(webPattern);
+    webPattern->SetOnContextMenuUpdateCallback(std::move(jsCallback));
+}
+
 void WebModelNG::SetJsEnabled(bool isJsEnabled)
 {
     auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();

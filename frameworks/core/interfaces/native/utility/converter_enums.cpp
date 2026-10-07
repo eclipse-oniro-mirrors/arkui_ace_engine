@@ -1431,6 +1431,15 @@ void AssignCast(std::optional<WebKeyboardAvoidMode>& dst, const Ark_WebKeyboardA
 }
 
 template<>
+void AssignCast(std::optional<WebContextMenuItemId>& dst, const Ark_WebContextMenuItemId& src)
+{
+    switch (src) {
+        case ARK_WEB_CONTEXT_MENU_ITEM_ID_MENU_COPY_LINK: dst = WebContextMenuItemId::MENU_COPY_LINK; break;
+        default: LOGE("Unexpected enum value in Ark_WebContextMenuItemId: %{public}d", src);
+    }
+}
+
+template<>
 void AssignCast(std::optional<WebKeyboardAppearanceMode>& dst, const Ark_WebKeyboardAppearanceMode& src)
 {
     switch (src) {

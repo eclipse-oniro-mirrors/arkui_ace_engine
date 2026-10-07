@@ -87,6 +87,16 @@ void SaveImageImpl(Ark_WebContextMenuResult peer)
     CHECK_NULL_VOID(peer && peer->handler);
     peer->handler->SaveImage();
 }
+void CopyLinkToTextMenuImpl(Ark_WebContextMenuResult peer)
+{
+    CHECK_NULL_VOID(peer && peer->handler);
+    peer->handler->CopyLinkToTextMenu();
+}
+void RemoveFragmentsImpl(Ark_WebContextMenuResult peer)
+{
+    CHECK_NULL_VOID(peer && peer->handler);
+    peer->handler->RemoveFragments();
+}
 } // WebContextMenuResultAccessor
 const GENERATED_ArkUIWebContextMenuResultAccessor* GetWebContextMenuResultAccessor()
 {
@@ -105,6 +115,8 @@ const GENERATED_ArkUIWebContextMenuResultAccessor* GetWebContextMenuResultAccess
         WebContextMenuResultAccessor::PasteAndMatchStyleImpl,
         WebContextMenuResultAccessor::RequestPasswordAutoFillImpl,
         WebContextMenuResultAccessor::SaveImageImpl,
+        WebContextMenuResultAccessor::CopyLinkToTextMenuImpl,
+        WebContextMenuResultAccessor::RemoveFragmentsImpl,
     };
     return &WebContextMenuResultAccessorImpl;
 }

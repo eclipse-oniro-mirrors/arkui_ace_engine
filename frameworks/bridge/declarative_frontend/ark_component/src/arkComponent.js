@@ -9861,6 +9861,10 @@ class ArkWebComponent extends ArkComponent {
     modifierWithKey(this._modifiersWithKeys, WebOnContextMenuHideModifier.identity, WebOnContextMenuHideModifier, callback);
     return this;
   }
+  onContextMenuUpdate(callback) {
+    modifierWithKey(this._modifiersWithKeys, WebOnContextMenuUpdateModifier.identity, WebOnContextMenuUpdateModifier, callback);
+    return this;
+  }
   keyboardAvoidMode(mode) {
     modifierWithKey(this._modifiersWithKeys, WebKeyboardAvoidModeModifier.identity, WebKeyboardAvoidModeModifier, mode);
     return this;
@@ -10296,6 +10300,22 @@ class WebOnContextMenuHideModifier extends ModifierWithKey {
   }
 }
 WebOnContextMenuHideModifier.identity = Symbol('webOnContextMenuHideModifier');
+
+class WebOnContextMenuUpdateModifier extends ModifierWithKey {
+  constructor(value) {
+    super(value);
+  }
+  applyPeer(node, reset) {
+    if (reset) {
+      getUINativeModule().web.resetOnContextMenuUpdate(node);
+    }
+    else {
+      getUINativeModule().web.setOnContextMenuUpdate(node, this.value);
+    }
+  }
+}
+WebOnContextMenuUpdateModifier.identity = Symbol('webOnContextMenuUpdateModifier');
+
 class WebGeolocationAccessModifier extends ModifierWithKey {
   constructor (value) {
     super(value);

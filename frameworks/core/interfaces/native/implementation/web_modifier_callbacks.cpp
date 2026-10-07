@@ -780,6 +780,20 @@ void OnContextMenuHide(const CallbackHelper<OnContextMenuHideCallback>& arkCallb
     arkCallback.InvokeSync();
 }
 
+void OnContextMenuUpdate(const CallbackHelper<OnContextMenuUpdateCallback>& arkCallback,
+    WeakPtr<FrameNode> weakNode, int32_t instanceId, WebContextMenuItemId menuItemId,
+    const WebContextMenuOptions& options)
+{
+    ContainerScope scope(instanceId);
+    auto pipelineContext = PipelineContext::GetCurrentContextSafelyWithCheck();
+    CHECK_NULL_VOID(pipelineContext);
+    pipelineContext->UpdateCurrentActiveNode(weakNode);
+    auto arkMenuItemId = static_cast<Ark_WebContextMenuItemId>(menuItemId);
+    Ark_WebContextMenuOptions arkOptions;
+    arkOptions.enable = Converter::ArkValue<Opt_Boolean>(options.enable);
+    arkCallback.InvokeSync(arkMenuItemId, arkOptions);
+}
+
 void OnSearchResultReceive(const CallbackHelper<Callback_OnSearchResultReceiveEvent_Void>& arkCallback,
     WeakPtr<FrameNode> weakNode, int32_t instanceId, const BaseEventInfo* info)
 {

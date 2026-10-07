@@ -1925,6 +1925,12 @@ public:
         JSClass<JSContextMenuParam>::CustomMethod("getPreviewHeight", &JSContextMenuParam::GetPreviewHeight);
         JSClass<JSContextMenuParam>::CustomMethod(
             "getContextMenuMediaType", &JSContextMenuParam::GetContextMenuMediaType);
+        JSClass<JSContextMenuParam>::CustomMethod(
+            "shouldOfferLinkToText", &JSContextMenuParam::ShouldOfferLinkToText);
+        JSClass<JSContextMenuParam>::CustomMethod(
+            "isOverTextFragment", &JSContextMenuParam::IsOverTextFragment);
+        JSClass<JSContextMenuParam>::CustomMethod(
+            "getTextFragmentGeneratedLink", &JSContextMenuParam::GetTextFragmentGeneratedLink);
         JSClass<JSContextMenuParam>::Bind(globalObj, &JSContextMenuParam::Constructor, &JSContextMenuParam::Destructor);
     }
 
@@ -2108,6 +2114,39 @@ public:
         args.SetReturnValue(descriptionRef);
     }
 
+    void ShouldOfferLinkToText(const JSCallbackInfo& args)
+    {
+        bool ret = false;
+        if (param_) {
+            ret = param_->ShouldOfferLinkToText();
+        }
+        auto jsRet = JSVal(ToJSValue(ret));
+        auto descriptionRef = JSRef<JSVal>::Make(jsRet);
+        args.SetReturnValue(descriptionRef);
+    }
+
+    void IsOverTextFragment(const JSCallbackInfo& args)
+    {
+        bool ret = false;
+        if (param_) {
+            ret = param_->IsOverTextFragment();
+        }
+        auto jsRet = JSVal(ToJSValue(ret));
+        auto descriptionRef = JSRef<JSVal>::Make(jsRet);
+        args.SetReturnValue(descriptionRef);
+    }
+
+    void GetTextFragmentGeneratedLink(const JSCallbackInfo& args)
+    {
+        std::string url;
+        if (param_) {
+            url = param_->GetTextFragmentGeneratedLink();
+        }
+        auto jsUrl = JSVal(ToJSValue(url));
+        auto descriptionRef = JSRef<JSVal>::Make(jsUrl);
+        args.SetReturnValue(descriptionRef);
+    }
+
 private:
     static void Constructor(const JSCallbackInfo& args)
     {
@@ -2147,6 +2186,9 @@ public:
         JSClass<JSContextMenuResult>::CustomMethod("requestPasswordAutoFill",
             &JSContextMenuResult::RequestPasswordAutoFill);
         JSClass<JSContextMenuResult>::CustomMethod("saveImage", &JSContextMenuResult::SaveImage);
+        JSClass<JSContextMenuResult>::CustomMethod("copyLinkToTextMenu",
+            &JSContextMenuResult::CopyLinkToTextMenu);
+        JSClass<JSContextMenuResult>::CustomMethod("removeFragments", &JSContextMenuResult::RemoveFragments);
         JSClass<JSContextMenuResult>::Bind(
             globalObj, &JSContextMenuResult::Constructor, &JSContextMenuResult::Destructor);
     }
@@ -2234,6 +2276,20 @@ public:
     {
         if (result_) {
             result_->SaveImage();
+        }
+    }
+
+    void CopyLinkToTextMenu(const JSCallbackInfo& args)
+    {
+        if (result_) {
+            result_->CopyLinkToTextMenu();
+        }
+    }
+
+    void RemoveFragments(const JSCallbackInfo& args)
+    {
+        if (result_) {
+            result_->RemoveFragments();
         }
     }
 
@@ -2560,6 +2616,7 @@ void JSWeb::JSBind(BindingTarget globalObj)
     JSClass<JSWeb>::StaticMethod("onPermissionRequest", &JSWeb::OnPermissionRequest);
     JSClass<JSWeb>::StaticMethod("onContextMenuShow", &JSWeb::OnContextMenuShow);
     JSClass<JSWeb>::StaticMethod("onContextMenuHide", &JSWeb::OnContextMenuHide);
+    JSClass<JSWeb>::StaticMethod("onContextMenuUpdate", &JSWeb::OnContextMenuUpdate);
     JSClass<JSWeb>::StaticMethod("onSearchResultReceive", &JSWeb::OnSearchResultReceive);
     JSClass<JSWeb>::StaticMethod("mediaPlayGestureAccess", &JSWeb::MediaPlayGestureAccess);
     JSClass<JSWeb>::StaticMethod("enableFullscreenVideoOverlay", &JSWeb::EnableFullscreenVideoOverlay);
@@ -4948,6 +5005,34 @@ void JSWeb::OnContextMenuHide(const JSCallbackInfo& args)
         func->Execute(*eventInfo);
     };
     WebModel::GetInstance()->SetOnContextMenuHide(jsCallback);
+}
+
+void JSWeb::OnContextMenuUpdate(const JSCallbackInfo& args)
+{
+    if (!args[0]->IsFunction()) {
+        return;
+    }
+    WeakPtr<NG::FrameNode> frameNode = AceType::WeakClaim(NG::ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    auto jsFunc = AceType::MakeRefPtr<JsFunction>(JSRef<JSObject>(), JSRef<JSFunc>::Cast(args[0]));
+    
+    auto jsCallback = [execCtx = args.GetExecutionContext(), func = std::move(jsFunc), node = frameNode](
+                          WebContextMenuItemId menuItemId, const WebContextMenuOptions& options) {
+        auto webNode = node.Upgrade();
+        CHECK_NULL_VOID(webNode);
+        ContainerScope scope(webNode->GetInstanceId());
+        JAVASCRIPT_EXECUTION_SCOPE_WITH_CHECK(execCtx);
+        auto pipelineContext = PipelineContext::GetCurrentContext();
+        if (pipelineContext) {
+            pipelineContext->UpdateCurrentActiveNode(node);
+        }
+ 
+        JSRef<JSObject> optionsObj = JSRef<JSObject>::New();
+        optionsObj->SetProperty("enable", options.enable);
+        auto itemId = JSRef<JSVal>::Make(ToJSValue(static_cast<int32_t>(menuItemId)));
+        JSRef<JSVal> params[2] = { itemId, optionsObj };
+        func->ExecuteJS(2, params);
+    };
+    WebModel::GetInstance()->SetOnContextMenuUpdate(jsCallback);
 }
 
 void JSWeb::JsEnabled(bool isJsEnabled)
