@@ -53,7 +53,7 @@ struct PageTextContext {
     RefPtr<FrameNode> backgroundRoot;
     bool excluded = false;
     bool inEditor = false;
-    bool offscreen = false;
+    bool detachedOffscreen = false;
 };
 
 // All caches live for one read-only query. Never call GetChildren() while collecting.
@@ -119,7 +119,7 @@ public:
             context.excluded |= item->IsAccessibilityVirtualNode() || item->GetTag() == V2::WEB_ETS_TAG ||
                 placeholderIds_.count(item->GetId()) > 0;
             context.inEditor |= item->GetTag() == V2::RICH_EDITOR_ETS_TAG;
-            context.offscreen |= item->UseOffscreenProcess();
+            context.detachedOffscreen |= item->UseOffscreenProcess() && !item->IsOnMainTree();
             if (AceType::InstanceOf<CustomNode>(item)) {
                 const auto name = item->GetCustomTag();
                 // The nearest custom component owns the input; do not inherit an exception into user builders.
@@ -178,8 +178,9 @@ std::optional<OffsetF> GetPageTextOffset(
         return std::nullopt;
     }
     if (!context.backgroundHost) {
-        // Offscreen snapshot nodes are only eligible while owned by a current builder background.
-        if (context.offscreen || !HasPositivePaintSize(frame)) {
+        // Mounted preload hosts retain the offscreen flag; apply normal eligibility to their visible text.
+        // Detached offscreen nodes still require a current builder-background owner.
+        if (context.detachedOffscreen || !HasPositivePaintSize(frame)) {
             return std::nullopt;
         }
         return frame->GetPaintRectGlobalOffsetWithTranslate(false, true).first;

@@ -5549,12 +5549,12 @@ void TextPattern::ReportPageTranslateTextDrawn()
     auto host = GetHost();
     CHECK_NULL_VOID(host);
     MarkPageTranslateTextDrawn();
-    auto text = GetPageTranslateTextForReport();
-    CHECK_NULL_VOID(!text.empty());
     auto pipeline = host->GetContext();
     CHECK_NULL_VOID(pipeline);
     auto mgr = pipeline->GetContentChangeManager();
     CHECK_NULL_VOID(mgr);
+    auto text = GetPageTranslateTextForReport();
+    CHECK_NULL_VOID(!text.empty());
     mgr->ReportTranslateTextNode(AceType::WeakClaim<PageTranslateNode>(this), text);
 #endif
 }

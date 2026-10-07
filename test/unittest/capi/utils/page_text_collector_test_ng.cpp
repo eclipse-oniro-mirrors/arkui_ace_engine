@@ -401,6 +401,74 @@ TEST_F(PageTextCollectionTest, DirectLayoutContentRequiresPresentationRecord)
     EXPECT_EQ(Collect()->GetArraySize(), 0);
 }
 
+// LazyColumn, LazyGrid, LazyWaterFlow and ListItemGroup use this shared preload entry.
+TEST_F(PageTextCollectionTest, MountedPreloadPreservesVisibleText)
+{
+    auto host = CreateNode("PreloadHost");
+    auto text = Text(u"visible before and after preload");
+    host->AddChild(text);
+    host->AttachToMainTree();
+    ASSERT_TRUE(host->IsOnMainTree());
+    ASSERT_TRUE(text->IsOnMainTree());
+    ASSERT_TRUE(Contains("visible before and after preload"));
+
+    FrameNode::ProcessOffscreenNode(host, true);
+    ASSERT_TRUE(host->UseOffscreenProcess());
+    ASSERT_TRUE(host->IsOnMainTree());
+    ASSERT_TRUE(host->IsActive());
+    ASSERT_TRUE(text->IsActive());
+    EXPECT_TRUE(Contains("visible before and after preload"));
+
+    // A reattached descendant can clear its own flag while the mounted ancestor retains one.
+    text->OnAttachToMainTree(true);
+    ASSERT_FALSE(text->UseOffscreenProcess());
+    ASSERT_TRUE(host->UseOffscreenProcess());
+    EXPECT_TRUE(Contains("visible before and after preload"));
+
+    host->SetActive(false);
+    EXPECT_FALSE(Contains("visible before and after preload"));
+    host->SetActive(true);
+    EXPECT_TRUE(Contains("visible before and after preload"));
+    host->GetLayoutProperty()->UpdateVisibility(VisibleType::INVISIBLE);
+    EXPECT_FALSE(Contains("visible before and after preload"));
+}
+
+TEST_F(PageTextCollectionTest, DetachedOffscreenPreloadStaysExcluded)
+{
+    auto host = CreateNode("DetachedPreloadHost");
+    auto text = Text(u"detached preload");
+    host->AddChild(text);
+    FrameNode::ProcessOffscreenNode(host, true);
+    ASSERT_TRUE(host->UseOffscreenProcess());
+    ASSERT_FALSE(host->IsOnMainTree());
+    ASSERT_TRUE(host->IsActive());
+    EXPECT_FALSE(Contains("detached preload"));
+}
+
+TEST_F(PageTextCollectionTest, DrawReportWithManagerUpdatesBothRecords)
+{
+    auto text = Text(u"old label");
+    auto pattern = text->GetPattern<TextPattern>();
+    ASSERT_NE(pipeline_->GetContentChangeManager(), nullptr);
+    text->GetLayoutProperty<TextLayoutProperty>()->UpdateContent(u"new label");
+    auto modifier = AceType::MakeRefPtr<TextContentModifier>(std::nullopt, WeakPtr<Pattern>(pattern));
+    modifier->ContentChangeReport();
+    EXPECT_EQ(pattern->lastDrawnPageTranslateContent_, u"old label");
+    EXPECT_EQ(pattern->lastDrawnPageTextContent_, u"new label");
+    EXPECT_TRUE(Contains("new label"));
+}
+
+TEST_F(PageTextCollectionTest, SymbolDrawDoesNotMarkTextRecords)
+{
+    auto symbol = CreateNode("SymbolGlyph", AceType::MakeRefPtr<TextPattern>());
+    auto pattern = symbol->GetPattern<TextPattern>();
+    SetText(symbol, u"old symbol");
+    symbol->GetLayoutProperty<TextLayoutProperty>()->UpdateContent(u"new symbol");
+    auto modifier = AceType::MakeRefPtr<TextContentModifier>(std::nullopt, WeakPtr<Pattern>(pattern));
+    modifier->ContentChangeReport();
+    EXPECT_EQ(pattern->lastDrawnPageTextContent_, u"old symbol");
+}
+
 class PageTextReadOnlyParent : public UINode {
     DECLARE_ACE_TYPE(PageTextReadOnlyParent, UINode);
 public:
