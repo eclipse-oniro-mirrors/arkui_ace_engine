@@ -392,23 +392,25 @@ ArkUI_Int32 EnqueueCommand(const CommandContext& ctx, const RefPtr<OHOS::Ace::Ta
 
 } // namespace
 
-ArkUI_Int32 InjectCompositeCommandImpl(ArkUI_Int32 instanceId, ArkUI_Uint32 uniqueId,
-    const ArkUI_CharPtr json, ArkUI_Uint32 jsonSize,
-    void (*callback)(ArkUI_Int32, void*), void* userData)
+ArkUI_Int32 InjectCompositeCommandImpl(const ArkUIInjectCommandParams* params)
 {
-    if (callback == nullptr) {
+    if (params == nullptr) {
+        SET_ERROR_CODE_AND_MESSAGE_IN_BACKEND(ARKUI_ERROR_CODE_PARAM_INVALID, "params must not be null");
+        return static_cast<ArkUI_Int32>(ARKUI_ERROR_CODE_PARAM_INVALID);
+    }
+    if (params->callback == nullptr) {
         SET_ERROR_CODE_AND_MESSAGE_IN_BACKEND(ARKUI_ERROR_CODE_PARAM_INVALID, "callback must not be null");
         return static_cast<ArkUI_Int32>(ARKUI_ERROR_CODE_PARAM_INVALID);
     }
     RefPtr<PipelineContext> pipeline;
     RefPtr<OHOS::Ace::TaskExecutor> taskExecutor;
-    auto rc = PrepareRuntimeContext(instanceId, pipeline, taskExecutor);
+    auto rc = PrepareRuntimeContext(params->instanceId, pipeline, taskExecutor);
     if (rc != static_cast<ArkUI_Int32>(ARKUI_ERROR_CODE_NO_ERROR)) {
         return rc;
     }
     std::string inputJson;
     std::string cmdType;
-    rc = ParseCommandPayload(json, jsonSize, inputJson, cmdType);
+    rc = ParseCommandPayload(params->json, params->jsonSize, inputJson, cmdType);
     if (rc != static_cast<ArkUI_Int32>(ARKUI_ERROR_CODE_NO_ERROR)) {
         return rc;
     }
@@ -418,13 +420,13 @@ ArkUI_Int32 InjectCompositeCommandImpl(ArkUI_Int32 instanceId, ArkUI_Uint32 uniq
         return rc;
     }
     CommandContext ctx;
-    ctx.instanceId = instanceId;
-    ctx.uniqueId = uniqueId;
+    ctx.instanceId = params->instanceId;
+    ctx.uniqueId = params->uniqueId;
     ctx.pipeline = pipeline;
     ctx.taskExecutor = taskExecutor;
     ctx.convertedJson = std::move(convertedJson);
-    ctx.callback = callback;
-    ctx.userData = userData;
+    ctx.callback = params->callback;
+    ctx.userData = params->userData;
     return EnqueueCommand(ctx, taskExecutor);
 }
 

@@ -374,10 +374,14 @@ protected:
     ArkUI_Int32 RunInject(uint32_t uniqueId, const std::string& json,
         CallbackState* slot = nullptr)
     {
-        return InjectCompositeCommandImpl(testInstanceId_, uniqueId, json.c_str(),
-            static_cast<ArkUI_Uint32>(json.size()),
-            ToModifierCallback(RecordCompletion),
-            slot);
+        ArkUIInjectCommandParams params = {};
+        params.instanceId = testInstanceId_;
+        params.uniqueId = uniqueId;
+        params.json = json.c_str();
+        params.jsonSize = static_cast<ArkUI_Uint32>(json.size());
+        params.callback = ToModifierCallback(RecordCompletion);
+        params.userData = slot;
+        return InjectCompositeCommandImpl(&params);
     }
     int32_t testInstanceId_ = 0;
     std::vector<RefPtr<UINode>> nodes_;
@@ -394,10 +398,14 @@ HWTEST_F(UIEventCommandTest, T0CrossInstance001, TestSize.Level1)
     // the T0 probe where the node's GetInstanceId() (testInstanceId_) != 999999 -> rejected.
     auto uid = CreateNode();
     CallbackState slot;
-    auto rc = InjectCompositeCommandImpl(999999, uid, ValidJson(),
-        static_cast<ArkUI_Uint32>(strlen(ValidJson())),
-        ToModifierCallback(RecordCompletion),
-        &slot);
+    ArkUIInjectCommandParams params = {};
+    params.instanceId = 999999;
+    params.uniqueId = uid;
+    params.json = ValidJson();
+    params.jsonSize = static_cast<ArkUI_Uint32>(strlen(ValidJson()));
+    params.callback = ToModifierCallback(RecordCompletion);
+    params.userData = &slot;
+    auto rc = InjectCompositeCommandImpl(&params);
     EXPECT_EQ(rc, static_cast<ArkUI_Int32>(ARKUI_ERROR_CODE_NODE_NOT_FOUND));
     EXPECT_TRUE(ErrorMessageContains("node instance id does not match the specified uiContext instance"));
     EXPECT_EQ(slot.count, 0);
@@ -418,44 +426,43 @@ HWTEST_F(UIEventCommandTest, TaskExecutorNull001, TestSize.Level1)
     EXPECT_EQ(slot.result, INJECTION_SUCCESS);
 }
 
-HWTEST_F(UIEventCommandTest, InvalidJson001, TestSize.Level1)
+// Covers processor.cpp L312: json == nullptr in ParseCommandPayload (defensive branch).
+HWTEST_F(UIEventCommandTest, NullJsonPayloadInProcessor001, TestSize.Level1)
 {
     auto uid = CreateNode();
-    auto rc = RunInject(uid, "not json");
+    ArkUIInjectCommandParams params = {};
+    params.instanceId = testInstanceId_;
+    params.uniqueId = uid;
+    params.json = nullptr;
+    params.jsonSize = 0;
+    params.callback = ToModifierCallback(RecordCompletion);
+    params.userData = nullptr;
+    auto rc = InjectCompositeCommandImpl(&params);
     EXPECT_EQ(rc, static_cast<ArkUI_Int32>(ARKUI_ERROR_CODE_PARAM_INVALID));
-    EXPECT_TRUE(ErrorMessageContains("invalid json payload"));
+    EXPECT_TRUE(ErrorMessageContains("command json is null"));
 }
 
-HWTEST_F(UIEventCommandTest, MissingCmdObject001, TestSize.Level1)
+// Merged: InvalidJson001 + MissingCmdObject001 + EmptyCommandType001 + MissingActionInfo001 + UnknownType001
+// Covers ParseCommandPayload L318/L323/L328/L335/L340 — all 5 structural rejection paths.
+HWTEST_F(UIEventCommandTest, ParseCommandPayloadRejections001, TestSize.Level1)
 {
-    auto uid = CreateNode();
-    auto rc = RunInject(uid, R"({"action_info":{}})");
-    EXPECT_EQ(rc, static_cast<ArkUI_Int32>(ARKUI_ERROR_CODE_PARAM_INVALID));
-    EXPECT_TRUE(ErrorMessageContains("missing cmd object"));
-}
-
-HWTEST_F(UIEventCommandTest, EmptyCommandType001, TestSize.Level1)
-{
-    auto uid = CreateNode();
-    auto rc = RunInject(uid, R"({"cmd":{"type":"","action_info":{}}})");
-    EXPECT_EQ(rc, static_cast<ArkUI_Int32>(ARKUI_ERROR_CODE_PARAM_INVALID));
-    EXPECT_TRUE(ErrorMessageContains("missing cmd.type"));
-}
-
-HWTEST_F(UIEventCommandTest, MissingActionInfo001, TestSize.Level1)
-{
-    auto uid = CreateNode();
-    auto rc = RunInject(uid, R"({"cmd":{"type":"setText"}})");
-    EXPECT_EQ(rc, static_cast<ArkUI_Int32>(ARKUI_ERROR_CODE_PARAM_INVALID));
-    EXPECT_TRUE(ErrorMessageContains("missing action_info object"));
-}
-
-HWTEST_F(UIEventCommandTest, UnknownType001, TestSize.Level1)
-{
-    auto uid = CreateNode();
-    auto rc = RunInject(uid, "{\"cmd\":{\"type\":\"nope\",\"action_info\":{}}}");
-    EXPECT_EQ(rc, static_cast<ArkUI_Int32>(ARKUI_ERROR_CODE_PARAM_INVALID));
-    EXPECT_TRUE(ErrorMessageContains("unknown command type"));
+    const auto uid = CreateNode();
+    struct TestCase { const char* json; const char* expectMsg; };
+    const TestCase cases[] = {
+        {"not json",                                            "invalid json payload"},
+        {R"({"action_info":{}})",                              "missing cmd object"},
+        {R"({"cmd":{"type":"","action_info":{}}})",            "missing cmd.type"},
+        {R"({"cmd":{"type":"setText"}})",                      "missing action_info object"},
+        {"{\"cmd\":{\"type\":\"nope\",\"action_info\":{}}}",   "unknown command type"},
+    };
+    for (const auto& tc : cases) {
+        ResetErrorStore();
+        auto rc = RunInject(uid, tc.json);
+        EXPECT_EQ(rc, static_cast<ArkUI_Int32>(ARKUI_ERROR_CODE_PARAM_INVALID))
+            << "Failed for input: " << tc.json;
+        EXPECT_TRUE(ErrorMessageContains(tc.expectMsg))
+            << "Expected message: " << tc.expectMsg << " for input: " << tc.json;
+    }
 }
 
 HWTEST_F(UIEventCommandTest, InvalidCommandFieldsRejectedBeforeQueue001, TestSize.Level1)
@@ -561,17 +568,18 @@ HWTEST_F(UIEventCommandTest, CommandPayloadSnapshot001, TestSize.Level1)
     ExpectCommandJson(*actual, *expected);
 }
 
-HWTEST_F(UIEventCommandTest, T0NodeNotFound001, TestSize.Level1)
+// Merged: T0NodeNotFound001 + T0HitQueued001
+// Covers EnqueueCommand L365 (node not found) + L390 (success enqueue).
+HWTEST_F(UIEventCommandTest, EnqueueProbeChecks001, TestSize.Level1)
 {
+    // Non-existent uniqueId → 106410
     auto rc = RunInject(999999, ValidJson());
     EXPECT_EQ(rc, static_cast<ArkUI_Int32>(ARKUI_ERROR_CODE_NODE_NOT_FOUND));
     EXPECT_TRUE(ErrorMessageContains("uniqueId does not resolve to a node"));
-}
 
-HWTEST_F(UIEventCommandTest, T0HitQueued001, TestSize.Level1)
-{
+    // Valid uniqueId → 0 (accepted)
     auto uid = CreateNode();
-    auto rc = RunInject(uid, ValidJson());
+    rc = RunInject(uid, ValidJson());
     EXPECT_EQ(rc, static_cast<ArkUI_Int32>(ARKUI_ERROR_CODE_NO_ERROR));
 }
 
@@ -629,43 +637,52 @@ HWTEST_F(UIEventCommandTest, NodeInstanceIdMismatchAfterDispatch001, TestSize.Le
     EXPECT_TRUE(ErrorMessageContains("node instance id changed after dispatch"));
 }
 
-HWTEST_F(UIEventCommandTest, OnRecvCommandSuccess001, TestSize.Level1)
+// Merged: OnRecvCommandSuccess001 + OnRecvCommandNotSupported001 + OnRecvCommandInternalError001
+// Covers MapCommandResultToErrorCode L215 (RET_FAILED→106102) + L218 (other→100001) + L221 (RET_SUCCESS→0).
+HWTEST_F(UIEventCommandTest, OnRecvCommandResultMapping001, TestSize.Level1)
 {
-    auto uid = CreateNode(10); // RET_SUCCESS -> callback SUCCESS.
-    CallbackState slot;
-    auto r = RunInject(uid, ValidJson(), &slot);
-    EXPECT_EQ(r, static_cast<ArkUI_Int32>(ARKUI_ERROR_CODE_NO_ERROR));
-    EXPECT_EQ(slot.count, 1);
-    EXPECT_EQ(slot.result, INJECTION_SUCCESS);
-}
-
-HWTEST_F(UIEventCommandTest, OnRecvCommandNotSupported001, TestSize.Level1)
-{
-    auto uid = CreateNode(11); // RET_FAILED -> callback COMMAND_NOT_SUPPORTED.
-    CallbackState slot;
-    auto r = RunInject(uid, ValidJson(), &slot);
-    EXPECT_EQ(r, static_cast<ArkUI_Int32>(ARKUI_ERROR_CODE_NO_ERROR));
-    EXPECT_EQ(slot.count, 1);
-    EXPECT_EQ(slot.result, COMMAND_NOT_SUPPORTED);
-    EXPECT_TRUE(ErrorMessageContains("command not supported by the node"));
-}
-
-HWTEST_F(UIEventCommandTest, OnRecvCommandInternalError001, TestSize.Level1)
-{
-    auto uid = CreateNode(99); // Other execution failures also map to callback COMMAND_NOT_SUPPORTED.
-    CallbackState slot;
-    auto r = RunInject(uid, ValidJson(), &slot);
-    EXPECT_EQ(r, static_cast<ArkUI_Int32>(ARKUI_ERROR_CODE_NO_ERROR));
-    EXPECT_EQ(slot.count, 1);
-    EXPECT_EQ(slot.result, COMMAND_NOT_SUPPORTED);
-    EXPECT_TRUE(ErrorMessageContains("OnRecvCommand returned an internal error"));
+    // RET_SUCCESS → callback SUCCESS
+    {
+        auto uid = CreateNode(10);
+        CallbackState slot;
+        auto r = RunInject(uid, ValidJson(), &slot);
+        EXPECT_EQ(r, static_cast<ArkUI_Int32>(ARKUI_ERROR_CODE_NO_ERROR));
+        EXPECT_EQ(slot.count, 1);
+        EXPECT_EQ(slot.result, INJECTION_SUCCESS);
+    }
+    // RET_FAILED → callback COMMAND_NOT_SUPPORTED + "command not supported"
+    {
+        auto uid = CreateNode(11);
+        CallbackState slot;
+        auto r = RunInject(uid, ValidJson(), &slot);
+        EXPECT_EQ(r, static_cast<ArkUI_Int32>(ARKUI_ERROR_CODE_NO_ERROR));
+        EXPECT_EQ(slot.count, 1);
+        EXPECT_EQ(slot.result, COMMAND_NOT_SUPPORTED);
+        EXPECT_TRUE(ErrorMessageContains("command not supported by the node"));
+    }
+    // Other error → callback COMMAND_NOT_SUPPORTED + "internal error"
+    {
+        auto uid = CreateNode(99);
+        CallbackState slot;
+        auto r = RunInject(uid, ValidJson(), &slot);
+        EXPECT_EQ(r, static_cast<ArkUI_Int32>(ARKUI_ERROR_CODE_NO_ERROR));
+        EXPECT_EQ(slot.count, 1);
+        EXPECT_EQ(slot.result, COMMAND_NOT_SUPPORTED);
+        EXPECT_TRUE(ErrorMessageContains("OnRecvCommand returned an internal error"));
+    }
 }
 
 HWTEST_F(UIEventCommandTest, NullCallbackRejected001, TestSize.Level1)
 {
     auto uid = CreateNode(10);
-    auto r = InjectCompositeCommandImpl(testInstanceId_, uid, ValidJson(),
-        static_cast<ArkUI_Uint32>(strlen(ValidJson())), nullptr, nullptr);
+    ArkUIInjectCommandParams params = {};
+    params.instanceId = testInstanceId_;
+    params.uniqueId = uid;
+    params.json = ValidJson();
+    params.jsonSize = static_cast<ArkUI_Uint32>(strlen(ValidJson()));
+    params.callback = nullptr;
+    params.userData = nullptr;
+    auto r = InjectCompositeCommandImpl(&params);
     EXPECT_EQ(r, static_cast<ArkUI_Int32>(ARKUI_ERROR_CODE_PARAM_INVALID));
     EXPECT_TRUE(ErrorMessageContains("callback must not be null"));
 }
@@ -698,14 +715,26 @@ HWTEST_F(UIEventCommandTest, CompletionQueueAndReentry001, TestSize.Level1)
         int32_t nextResult = -1;
         CallbackState nextCompletion {};
     } state { testInstanceId_, uid };
-    auto rc = InjectCompositeCommandImpl(testInstanceId_, uid, ValidJson(), strlen(ValidJson()),
-        ToModifierCallback([](InjectionResult code, void* data) {
-            auto& state = *static_cast<CompletionState*>(data);
-            EXPECT_EQ(static_cast<int>(code), static_cast<int>(INJECTION_SUCCESS));
-            ++state.callbacks;
-            state.nextResult = InjectCompositeCommandImpl(state.instanceId, state.uniqueId, ValidJson(),
-                strlen(ValidJson()), ToModifierCallback(RecordCompletion), &state.nextCompletion);
-        }), &state);
+    ArkUIInjectCommandParams params = {};
+    params.instanceId = testInstanceId_;
+    params.uniqueId = uid;
+    params.json = ValidJson();
+    params.jsonSize = static_cast<ArkUI_Uint32>(strlen(ValidJson()));
+    params.callback = ToModifierCallback([](InjectionResult code, void* data) {
+        auto& state = *static_cast<CompletionState*>(data);
+        EXPECT_EQ(static_cast<int>(code), static_cast<int>(INJECTION_SUCCESS));
+        ++state.callbacks;
+        ArkUIInjectCommandParams innerParams = {};
+        innerParams.instanceId = state.instanceId;
+        innerParams.uniqueId = state.uniqueId;
+        innerParams.json = ValidJson();
+        innerParams.jsonSize = static_cast<ArkUI_Uint32>(strlen(ValidJson()));
+        innerParams.callback = ToModifierCallback(RecordCompletion);
+        innerParams.userData = &state.nextCompletion;
+        state.nextResult = InjectCompositeCommandImpl(&innerParams);
+    });
+    params.userData = &state;
+    auto rc = InjectCompositeCommandImpl(&params);
     EXPECT_EQ(rc, ARKUI_ERROR_CODE_NO_ERROR);
     EXPECT_EQ(state.callbacks, 0);
     EXPECT_TRUE(executor->RunNext()); // Execute command; completion must remain queued.
@@ -755,10 +784,16 @@ HWTEST_F(UIEventCommandTest, CompletionPostFailureAndReentry001, TestSize.Level1
         EXPECT_EQ(static_cast<int>(result), static_cast<int>(INJECTION_SUCCESS));
         EXPECT_EQ(RunInject(uid, ValidJson(), &nextResult), ARKUI_ERROR_CODE_NO_ERROR);
     };
-    EXPECT_EQ(InjectCompositeCommandImpl(testInstanceId_, uid, ValidJson(), strlen(ValidJson()),
-        ToModifierCallback([](InjectionResult result, void* data) {
-            (*static_cast<std::function<void(ArkUI_Int32)>*>(data))(result);
-        }), &callback), ARKUI_ERROR_CODE_NO_ERROR);
+    ArkUIInjectCommandParams params2 = {};
+    params2.instanceId = testInstanceId_;
+    params2.uniqueId = uid;
+    params2.json = ValidJson();
+    params2.jsonSize = static_cast<ArkUI_Uint32>(strlen(ValidJson()));
+    params2.callback = ToModifierCallback([](InjectionResult result, void* data) {
+        (*static_cast<std::function<void(ArkUI_Int32)>*>(data))(result);
+    });
+    params2.userData = &callback;
+    EXPECT_EQ(InjectCompositeCommandImpl(&params2), ARKUI_ERROR_CODE_NO_ERROR);
     EXPECT_EQ(callbacks, 0);
     EXPECT_TRUE(executor->RunNext()); // Rejected completion runs on this call stack.
     EXPECT_EQ(callbacks, 1);

@@ -19,10 +19,7 @@
 #include "core/interfaces/arkoala/arkoala_api.h"
 
 namespace OHOS::Ace::NG {
-// callback transports an OH_ArkUI_NativeModule_UIEventInjectionCallback; restore that type before invoking it.
-ArkUI_Int32 InjectCompositeCommandImpl(ArkUI_Int32 instanceId, ArkUI_Uint32 uniqueId,
-    const ArkUI_CharPtr json, ArkUI_Uint32 jsonSize,
-    void (*callback)(ArkUI_Int32, void*), void* userData);
+ArkUI_Int32 InjectCompositeCommandImpl(const ArkUIInjectCommandParams* params);
 } // namespace OHOS::Ace::NG
 
 #endif // FRAMEWORKS_CORE_INTERFACES_NATIVE_NODE_UI_EVENT_COMMAND_PROCESSOR_H

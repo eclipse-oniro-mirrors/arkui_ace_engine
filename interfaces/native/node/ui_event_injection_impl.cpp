@@ -66,8 +66,13 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_UIEventInjectCompositeCommand(
         return ARKUI_ERROR_CODE_PARAM_INVALID;
     }
 
-    // The modifier transports the pointer; the processor restores its original type before calling it.
-    return static_cast<ArkUI_ErrorCode>(frameNodeModifier->injectCompositeCommand(
-        instanceId, uniqueId, jsonData, jsonSize,
-        reinterpret_cast<void (*)(ArkUI_Int32, void*)>(callback), userData));
+    ArkUIInjectCommandParams params = {};
+    params.instanceId = instanceId;
+    params.uniqueId = uniqueId;
+    params.json = jsonData;
+    params.jsonSize = jsonSize;
+    params.callback = reinterpret_cast<void (*)(ArkUI_Int32, void*)>(callback);
+    params.userData = userData;
+
+    return static_cast<ArkUI_ErrorCode>(frameNodeModifier->injectCompositeCommand(&params));
 }

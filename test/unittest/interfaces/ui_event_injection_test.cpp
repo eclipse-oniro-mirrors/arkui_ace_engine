@@ -49,6 +49,7 @@ int32_t g_initializationAttempts = 0;
 bool g_returnNullNodeModifiers = false;
 bool g_returnNullFrameNodeModifier = false;
 bool g_returnNullSlot = false;
+bool g_returnNullJsonData = false;
 ArkUI_Int32 g_capturedInstanceId = -1;
 ArkUI_Uint32 g_capturedUniqueId = 0;
 std::string g_capturedJson;
@@ -86,7 +87,7 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_UIJsonWrapperCreate(const char* data, uint
 
 const char* OH_ArkUI_NativeModule_UIJsonWrapperGetData(const OH_ArkUI_NativeModule_UIJsonWrapper* json)
 {
-    if (json == nullptr) {
+    if (json == nullptr || g_returnNullJsonData) {
         return nullptr;
     }
     return reinterpret_cast<const MockJsonWrapper*>(json)->data.c_str();
@@ -108,19 +109,17 @@ void OH_ArkUI_NativeModule_UIJsonWrapperDestroy(OH_ArkUI_NativeModule_UIJsonWrap
 
 namespace OHOS::Ace::NodeModel {
 namespace {
-ArkUI_Int32 MockInjectCompositeCommand(ArkUI_Int32 instanceId, ArkUI_Uint32 uniqueId,
-    const ArkUI_CharPtr json, ArkUI_Uint32 jsonSize,
-    void (*callback)(ArkUI_Int32, void*), void* userData)
+ArkUI_Int32 MockInjectCompositeCommand(const ArkUIInjectCommandParams* params)
 {
     const auto result = g_mockResult;
-    g_capturedCallback = result == ARKUI_ERROR_CODE_NO_ERROR ? callback : nullptr;
+    g_capturedCallback = result == ARKUI_ERROR_CODE_NO_ERROR ? params->callback : nullptr;
     g_slotCalled = true;
-    g_capturedInstanceId = instanceId;
-    g_capturedUniqueId = uniqueId;
-    if (json != nullptr && jsonSize > 0) {
-        g_capturedJson = std::string(json, jsonSize);
+    g_capturedInstanceId = params->instanceId;
+    g_capturedUniqueId = params->uniqueId;
+    if (params->json != nullptr && params->jsonSize > 0) {
+        g_capturedJson = std::string(params->json, params->jsonSize);
     }
-    g_capturedUserData = result == ARKUI_ERROR_CODE_NO_ERROR ? userData : nullptr;
+    g_capturedUserData = result == ARKUI_ERROR_CODE_NO_ERROR ? params->userData : nullptr;
     if (result == ARKUI_ERROR_CODE_NO_ERROR && g_completeInline) {
         CompleteCapturedCommand();
     }
@@ -253,6 +252,7 @@ public:
         g_returnNullNodeModifiers = false;
         g_returnNullFrameNodeModifier = false;
         g_returnNullSlot = false;
+        g_returnNullJsonData = false;
         g_capturedInstanceId = -1;
         g_capturedUniqueId = 0;
         g_capturedJson.clear();
@@ -304,22 +304,28 @@ static void Callback(OH_ArkUI_NativeModule_UIEventInjection_ResultCode result, v
     }
 }
 
-HWTEST_F(UIEventInjectionTest, InjectNullUiContext001, TestSize.Level1)
+// Merged: InjectNullUiContext001 + InjectNullCommand001 + InjectNullCallbackRejected001
+// Covers impl L31 (uiContext==nullptr→190001) + L35 (command==nullptr→401) + L64 (callback==nullptr→401).
+HWTEST_F(UIEventInjectionTest, InjectNullParamRejections001, TestSize.Level1)
 {
     auto* cmd = MakeCommand("{\"cmd\":\"x\"}");
     ASSERT_NE(cmd, nullptr);
+
+    // NULL uiContext → 190001
     EXPECT_EQ(OH_ArkUI_NativeModule_UIEventInjectCompositeCommand(
         nullptr, 1, cmd, nullptr, nullptr), ARKUI_ERROR_CODE_UI_CONTEXT_INVALID);
     EXPECT_FALSE(g_slotCalled);
-}
 
-HWTEST_F(UIEventInjectionTest, InjectNullCommand001, TestSize.Level1)
-{
+    // NULL command → 401
     EXPECT_EQ(OH_ArkUI_NativeModule_UIEventInjectCompositeCommand(
         uiContext_, 1, nullptr, nullptr, nullptr), ARKUI_ERROR_CODE_PARAM_INVALID);
     EXPECT_FALSE(g_slotCalled);
-}
 
+    // NULL callback → 401
+    EXPECT_EQ(OH_ArkUI_NativeModule_UIEventInjectCompositeCommand(
+        uiContext_, 1, cmd, nullptr, nullptr), ARKUI_ERROR_CODE_PARAM_INVALID);
+    EXPECT_FALSE(g_slotCalled);
+}
 
 HWTEST_F(UIEventInjectionTest, InjectTableNull001, TestSize.Level1)
 {
@@ -349,28 +355,34 @@ HWTEST_F(UIEventInjectionTest, InjectInitializesOnDemand001, TestSize.Level1)
     CompleteCapturedCommand();
 }
 
-HWTEST_F(UIEventInjectionTest, InjectNodeModifiersNull001, TestSize.Level1)
+// Merged: InjectNodeModifiersNull001 + InjectSlotNull001
+// Covers impl L54 (nodeModifiers==nullptr→500) + L59 (frameNodeModifier/slot==nullptr→500).
+HWTEST_F(UIEventInjectionTest, InjectInitFailureChain001, TestSize.Level1)
 {
-    g_returnNullNodeModifiers = true;
     auto* cmd = MakeCommand("{\"cmd\":\"x\"}");
     ASSERT_NE(cmd, nullptr);
-    CallbackState callbackResult;
-    EXPECT_EQ(OH_ArkUI_NativeModule_UIEventInjectCompositeCommand(
-        uiContext_, 1, cmd, Callback, &callbackResult), ARKUI_ERROR_CODE_CAPI_INIT_ERROR);
-    EXPECT_EQ(callbackResult.count, 0);
-    EXPECT_FALSE(g_slotCalled);
-}
 
-HWTEST_F(UIEventInjectionTest, InjectSlotNull001, TestSize.Level1)
-{
+    // nodeModifiers == nullptr → 500
+    g_returnNullNodeModifiers = true;
+    {
+        CallbackState callbackResult;
+        EXPECT_EQ(OH_ArkUI_NativeModule_UIEventInjectCompositeCommand(
+            uiContext_, 1, cmd, Callback, &callbackResult), ARKUI_ERROR_CODE_CAPI_INIT_ERROR);
+        EXPECT_EQ(callbackResult.count, 0);
+        EXPECT_FALSE(g_slotCalled);
+    }
+    g_returnNullNodeModifiers = false;
+
+    // frameNodeModifier/injectCompositeCommand == nullptr → 500
     g_returnNullSlot = true;
-    auto* cmd = MakeCommand("{\"cmd\":\"x\"}");
-    ASSERT_NE(cmd, nullptr);
-    CallbackState callbackResult;
-    EXPECT_EQ(OH_ArkUI_NativeModule_UIEventInjectCompositeCommand(
-        uiContext_, 1, cmd, Callback, &callbackResult), ARKUI_ERROR_CODE_CAPI_INIT_ERROR);
-    EXPECT_EQ(callbackResult.count, 0);
-    EXPECT_FALSE(g_slotCalled);
+    {
+        CallbackState callbackResult;
+        EXPECT_EQ(OH_ArkUI_NativeModule_UIEventInjectCompositeCommand(
+            uiContext_, 1, cmd, Callback, &callbackResult), ARKUI_ERROR_CODE_CAPI_INIT_ERROR);
+        EXPECT_EQ(callbackResult.count, 0);
+        EXPECT_FALSE(g_slotCalled);
+    }
+    g_returnNullSlot = false;
 }
 
 HWTEST_F(UIEventInjectionTest, InjectDelegatesToSlot001, TestSize.Level1)
@@ -493,6 +505,23 @@ HWTEST_F(UIEventInjectionTest, InjectNullCallbackRejected001, TestSize.Level1)
     EXPECT_EQ(OH_ArkUI_NativeModule_UIEventInjectCompositeCommand(
         uiContext_, 1, cmd, nullptr, nullptr), ARKUI_ERROR_CODE_PARAM_INVALID);
     EXPECT_FALSE(g_slotCalled);
+}
+
+// Covers ui_event_injection_impl.cpp L41: jsonData == nullptr (defensive branch).
+HWTEST_F(UIEventInjectionTest, InjectNullJsonDataFromWrapper001, TestSize.Level1)
+{
+    g_returnNullJsonData = true;
+    auto* cmd = MakeCommand("{\"cmd\":\"x\"}");
+    ASSERT_NE(cmd, nullptr);
+    CallbackState callbackResult;
+    EXPECT_EQ(OH_ArkUI_NativeModule_UIEventInjectCompositeCommand(
+        uiContext_, 1, cmd, Callback, &callbackResult), ARKUI_ERROR_CODE_PARAM_INVALID);
+    EXPECT_EQ(callbackResult.count, 0);
+    EXPECT_FALSE(g_slotCalled);
+    const char* msg = OH_ArkUI_NativeModule_GetErrorMessage();
+    ASSERT_NE(msg, nullptr);
+    EXPECT_NE(std::string(msg).find("Command JSON data is null"), std::string::npos);
+    g_returnNullJsonData = false;
 }
 
 HWTEST_F(UIEventInjectionTest, GetErrorMessageAfterNullUiContext001, TestSize.Level1)
