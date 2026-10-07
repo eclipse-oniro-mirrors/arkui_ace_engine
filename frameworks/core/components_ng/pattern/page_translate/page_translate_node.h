@@ -66,6 +66,17 @@ public:
 
     virtual void EndTranslate() {}
 
+    // Page-text collection may include selected composite inputs without changing translation behavior.
+    virtual std::string GetPageTextForReport(bool /* includeInput */ = false) const
+    {
+        return GetPageTranslateTextForReport();
+    }
+
+    virtual int32_t GetPageTextPlaceholderNodeId() const
+    {
+        return -1;
+    }
+
 protected:
     std::optional<std::u16string> pageTranslatedContent_;
     int64_t pageTranslateVersion_ = 0;

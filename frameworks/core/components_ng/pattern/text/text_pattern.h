@@ -232,6 +232,7 @@ public:
     void ResetPageTranslate() override;
     void MarkPageTranslateDirty();
     std::string GetPageTranslateTextForReport() const override;
+    std::string GetPageTextForReport(bool includeInput = false) const override;
 
     void InitSurfaceChangedCallback();
     void InitSurfacePositionChangedCallback();
@@ -654,6 +655,7 @@ protected:
     RefPtr<TextOverlayModifier> overlayMod_;
     std::vector<int32_t> symbolFontColorResObjIndexArr;
     std::u16string textForDisplay_;
+    std::u16string lastDrawnPageTextContent_;
     std::string frameRecord_ = "";
     std::optional<TextStyle> textStyle_;
     std::list<RefPtr<SpanItem>> spans_;

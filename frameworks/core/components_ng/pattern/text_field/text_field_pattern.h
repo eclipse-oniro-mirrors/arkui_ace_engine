@@ -2214,6 +2214,8 @@ private:
     // PageTranslateNode override
     int32_t GetPageTranslateNodeId() const override;
     std::string GetPageTranslateTextForReport() const override;
+    std::string GetPageTextForReport(bool includeInput = false) const override;
+    int32_t GetPageTextPlaceholderNodeId() const override;
     bool ApplyPageTranslateResult(const std::string& result, int64_t version) override;
     void ResetPageTranslate() override;
 

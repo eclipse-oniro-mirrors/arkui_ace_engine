@@ -17,12 +17,17 @@
 #include <cmath>
 #include <iterator>
 #include <map>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
 
 #include "core/common/container.h"
 #include "core/common/container_scope.h"
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/base/page_text_json.h"
 #include "core/components_ng/pattern/page_translate/page_translate_node.h"
+#include "core/components_ng/pattern/custom/custom_node.h"
+#include "core/components_v2/inspector/inspector_constants.h"
 #include "core/pipeline/base/element_register.h"
 #include "core/pipeline_ng/pipeline_context.h"
 #include "interfaces/native/native_type.h"
@@ -40,18 +45,194 @@ RefPtr<Container> GetPageTextContainer(int32_t instanceId)
 }
 
 #ifndef CROSS_PLATFORM
+enum class InputOwner { NONE, ATOMIC_SEARCH, COUNTER };
+
+struct PageTextContext {
+    InputOwner inputOwner = InputOwner::NONE;
+    RefPtr<FrameNode> backgroundHost;
+    RefPtr<FrameNode> backgroundRoot;
+    bool excluded = false;
+    bool inEditor = false;
+    bool offscreen = false;
+};
+
+// All caches live for one read-only query. Never call GetChildren() while collecting.
+class PageTextScan {
+public:
+    void AddFrame(const WeakPtr<FrameNode>& node)
+    {
+        auto frame = node.Upgrade();
+        if (frame) {
+            frames.try_emplace(frame->GetId(), frame);
+        }
+    }
+
+    void Scan(int32_t instanceId)
+    {
+        ElementRegister::GetInstance()->IterateElements([this, instanceId](auto, const RefPtr<AceType>& element) {
+            auto frame = AceType::DynamicCast<FrameNode>(element);
+            if (!frame || frame->GetInstanceId() != instanceId) {
+                return false;
+            }
+            // Keep the association even when disabled, so a retained background cannot leak as ordinary text.
+            if (auto background = frame->GetBackgroundNode()) {
+                backgrounds_[AceType::RawPtr(background)] = frame;
+            }
+            auto render = frame->GetRenderContext();
+            auto carrier = AceType::DynamicCast<PageTranslateNode>(frame->GetPattern());
+            if (carrier && carrier->GetPageTextPlaceholderNodeId() >= 0) {
+                placeholderIds_.emplace(carrier->GetPageTextPlaceholderNodeId());
+            }
+            if (carrier || (render && render->HasOverlayText())) {
+                frames.try_emplace(frame->GetId(), frame);
+            }
+            return false;
+        });
+    }
+
+    PageTextContext Resolve(const RefPtr<UINode>& node)
+    {
+        std::vector<RefPtr<UINode>> path;
+        std::unordered_set<const UINode*> visiting;
+        PageTextContext context;
+        auto current = node;
+        while (current) {
+            if (!visiting.emplace(AceType::RawPtr(current)).second) {
+                context.excluded = true;
+                break;
+            }
+            auto found = contexts_.find(AceType::RawPtr(current));
+            if (found != contexts_.end()) {
+                context = found->second;
+                break;
+            }
+            path.emplace_back(current);
+            auto background = backgrounds_.find(AceType::RawPtr(current));
+            if (background == backgrounds_.end()) {
+                current = current->GetParent();
+            } else {
+                current = background->second;
+            }
+        }
+        for (auto iter = path.rbegin(); iter != path.rend(); ++iter) {
+            auto& item = *iter;
+            context.excluded |= item->IsAccessibilityVirtualNode() || item->GetTag() == V2::WEB_ETS_TAG ||
+                placeholderIds_.count(item->GetId()) > 0;
+            context.inEditor |= item->GetTag() == V2::RICH_EDITOR_ETS_TAG;
+            context.offscreen |= item->UseOffscreenProcess();
+            if (AceType::InstanceOf<CustomNode>(item)) {
+                const auto name = item->GetCustomTag();
+                // The nearest custom component owns the input; do not inherit an exception into user builders.
+                context.inputOwner = name == "AtomicServiceSearch" ? InputOwner::ATOMIC_SEARCH :
+                    (name == "CounterComponent" || name == "CounterV2Component" ? InputOwner::COUNTER : InputOwner::NONE);
+            }
+            auto background = backgrounds_.find(AceType::RawPtr(item));
+            if (background != backgrounds_.end()) {
+                context.backgroundHost = background->second;
+                context.backgroundRoot = AceType::DynamicCast<FrameNode>(item);
+                auto render = background->second->GetRenderContext();
+                context.excluded |= !render || !render->GetBuilderBackgroundFlagValue(false);
+            }
+            contexts_.emplace(AceType::RawPtr(item), context);
+        }
+        return context;
+    }
+
+    std::map<int32_t, RefPtr<FrameNode>> frames;
+
+private:
+    std::unordered_map<const UINode*, RefPtr<FrameNode>> backgrounds_;
+    std::unordered_map<const UINode*, PageTextContext> contexts_;
+    std::unordered_set<int32_t> placeholderIds_;
+};
+
+bool AllowInputText(const RefPtr<FrameNode>& frame, const PageTextContext& context)
+{
+    if (context.inputOwner == InputOwner::ATOMIC_SEARCH && frame->GetTag() == V2::SEARCH_Field_ETS_TAG) {
+        auto parent = frame->GetAncestorNodeOfFrame(false);
+        return parent && parent->GetTag() == V2::SEARCH_ETS_TAG;
+    }
+    if (context.inputOwner != InputOwner::COUNTER || frame->GetTag() != V2::TEXTINPUT_ETS_TAG) {
+        return false;
+    }
+    const auto id = frame->GetInspectorIdValue("");
+    for (const std::string prefix : { "InlineTextInput", "DateTextInput1", "DateTextInput2", "DateTextInput3" }) {
+        if (id.compare(0, prefix.size(), prefix) == 0 && id.size() > prefix.size() &&
+            id.find_first_not_of("0123456789", prefix.size()) == std::string::npos) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool HasPositivePaintSize(const RefPtr<FrameNode>& frame)
+{
+    const auto rect = frame->GetTransformRectRelativeToWindowOnlyVisible();
+    return !LessOrEqual(rect.Width(), 0.0f) && !LessOrEqual(rect.Height(), 0.0f);
+}
+
+std::optional<OffsetF> GetPageTextOffset(
+    const RefPtr<FrameNode>& frame, const PageTextContext& context, PageTextScan& scan)
+{
+    if (context.excluded || (context.inEditor && frame->GetTag() != V2::RICH_EDITOR_ETS_TAG)) {
+        return std::nullopt;
+    }
+    if (!context.backgroundHost) {
+        // Offscreen snapshot nodes are only eligible while owned by a current builder background.
+        if (context.offscreen || !HasPositivePaintSize(frame)) {
+            return std::nullopt;
+        }
+        return frame->GetPaintRectGlobalOffsetWithTranslate(false, true).first;
+    }
+    auto host = context.backgroundHost;
+    auto root = context.backgroundRoot;
+    const auto hostOffset = GetPageTextOffset(host, scan.Resolve(host), scan);
+    if (!host->IsVisible() || !hostOffset) {
+        return std::nullopt;
+    }
+    auto render = frame->GetRenderContext();
+    CHECK_NULL_RETURN(render, std::nullopt);
+    auto paintRect = render->GetPaintRectWithTransform();
+    if (LessOrEqual(paintRect.Width(), 0.0f) || LessOrEqual(paintRect.Height(), 0.0f)) {
+        return std::nullopt;
+    }
+    for (auto current = frame; current; current = current->GetAncestorNodeOfFrame(false)) {
+        if (!current->IsVisible() || (!current->IsActive() && !current->UseOffscreenProcess())) {
+            return std::nullopt;
+        }
+        if (current == root) {
+            break;
+        }
+    }
+    auto offset = frame->GetPaintRectGlobalOffsetWithTranslate(false, true).first -
+        root->GetPaintRectGlobalOffsetWithTranslate(false, true).first;
+    auto region = host->GetBackGroundAccumulatedSafeAreaExpand();
+    const auto& constraint = root->GetGeometryNode()->GetParentLayoutConstraint();
+    auto initialSize = constraint ? constraint->maxSize : region.GetSize();
+    if (!host->GetRenderContext()->GetIsTransitionBackgroundValue(false)) {
+        const auto hostSize = host->GetGeometryNode()->GetFrameSize();
+        initialSize -= region.GetSize() - hostSize;
+        region = RectF(OffsetF(), hostSize);
+    }
+    if (!initialSize.IsPositive()) {
+        return std::nullopt;
+    }
+    const auto sourceSize = root->GetGeometryNode()->GetFrameSize();
+    auto align = host->GetRenderContext()->GetBackgroundAlignValue(Alignment::CENTER);
+    // Use the same source/destination alignment as builder-background drawing.
+    offset += Alignment::GetAlignPosition(initialSize, sourceSize, align) -
+        Alignment::GetAlignPosition(sourceSize, initialSize, align);
+    offset.SetX(offset.GetX() * region.Width() / initialSize.Width());
+    offset.SetY(offset.GetY() * region.Height() / initialSize.Height());
+    return hostOffset.value() + region.GetOffset() + offset;
+}
+
 bool AppendCarrier(const RefPtr<FrameNode>& frame, const std::string& text,
-    PageTextJson& json, bool& first)
+    const OffsetF& offset, PageTextJson& json, bool& first)
 {
     if (text.empty()) {
         return true;
     }
-    // Match GetArkUIPageTranslateText's ReportTranslateTextFrameNode eligibility.
-    const auto visibleRect = frame->GetTransformRectRelativeToWindowOnlyVisible();
-    if (LessOrEqual(visibleRect.Width(), 0.0f) || LessOrEqual(visibleRect.Height(), 0.0f)) {
-        return true;
-    }
-    auto offset = frame->GetPaintRectGlobalOffsetWithTranslate(false, true).first;
     const auto& rect = frame->GetGeometryNode()->GetFrameRect();
     const float values[] = { offset.GetX(), offset.GetY(), rect.Width(), rect.Height() };
     for (auto value : values) {
@@ -100,49 +281,46 @@ int32_t CollectPageText(int32_t instanceId, char** data, uint32_t* size, const c
     bool success = json.Append("{\"texts\":[");
 #ifndef CROSS_PLATFORM
     bool first = true;
-    std::map<int32_t, std::pair<RefPtr<FrameNode>, std::string>> texts;
+    PageTextScan scan;
     auto manager = pipeline->GetUiTranslateManagerImpl();
-    auto collectNode = [&texts](const WeakPtr<FrameNode>& node) {
-        auto frame = node.Upgrade();
-        CHECK_NULL_VOID(frame);
-        auto carrier = AceType::DynamicCast<PageTranslateNode>(frame->GetPattern());
-        CHECK_NULL_VOID(carrier);
-        texts.emplace(frame->GetId(), std::make_pair(frame, carrier->GetPageTranslateTextForReport()));
-    };
     if (manager && success) {
-        // Reuse the translation registry without starting reports or changing session state.
-        manager->ForEachArkUITranslateFrameNode(collectNode);
+        manager->ForEachArkUITranslateFrameNode([&scan](const WeakPtr<FrameNode>& node) { scan.AddFrame(node); });
     }
     if (success) {
-        // String overlays are drawn by RenderContext and have no translation carrier.
-        // Read existing nodes only; enumerating children could materialize lazy items.
-        ElementRegister::GetInstance()->IterateElements([&texts, instanceId](auto, const RefPtr<AceType>& element) {
-            auto frame = AceType::DynamicCast<FrameNode>(element);
-            if (!frame || frame->GetInstanceId() != instanceId) {
-                return false;
-            }
-            auto renderContext = frame->GetRenderContext();
-            if (!renderContext || !renderContext->HasOverlayText()) {
-                return false;
-            }
-            const auto overlay = renderContext->GetOverlayTextValue(OverlayOptions());
-            if (overlay.content.empty()) {
-                return false;
-            }
-            auto& text = texts.try_emplace(frame->GetId(), frame, std::string()).first->second.second;
-            // Keep one item per host node, including when it also provides body text.
-            if (!text.empty()) {
-                text += '\n';
-            }
-            text += overlay.content;
-            return false;
-        });
+        scan.Scan(instanceId);
     }
-    for (const auto& [id, entry] : texts) {
+    for (const auto& [id, frame] : scan.frames) {
         if (!success) {
             break;
         }
-        success = AppendCarrier(entry.first, entry.second, json, first);
+        if (frame->GetInstanceId() != instanceId) {
+            continue;
+        }
+        const auto context = scan.Resolve(frame);
+        if (context.excluded) {
+            continue;
+        }
+        std::string text;
+        if (auto carrier = AceType::DynamicCast<PageTranslateNode>(frame->GetPattern())) {
+            text = carrier->GetPageTextForReport(AllowInputText(frame, context));
+        }
+        auto render = frame->GetRenderContext();
+        if (render && render->HasOverlayText()) {
+            const auto overlay = render->GetOverlayTextValue(OverlayOptions());
+            if (!overlay.content.empty()) {
+                if (!text.empty()) {
+                    text += '\n';
+                }
+                text += overlay.content;
+            }
+        }
+        if (text.empty()) {
+            continue;
+        }
+        const auto offset = GetPageTextOffset(frame, context, scan);
+        if (offset) {
+            success = AppendCarrier(frame, text, offset.value(), json, first);
+        }
     }
 #endif
     if (!success || !json.Append("]}")) {

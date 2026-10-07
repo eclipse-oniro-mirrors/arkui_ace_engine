@@ -922,6 +922,11 @@ public:
 
     void SetBackgroundFunction(std::function<RefPtr<UINode>()>&& buildFunc);
 
+    const RefPtr<FrameNode>& GetBackgroundNode() const
+    {
+        return backgroundNode_;
+    }
+
     void SetIsNeedRefreshBackgroundBuilder(bool isNeedRefreshBackgroundBuilder)
     {
         isNeedRefreshBackgroundBuilder_ = isNeedRefreshBackgroundBuilder;

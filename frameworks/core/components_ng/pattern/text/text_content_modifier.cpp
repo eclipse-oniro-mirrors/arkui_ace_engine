@@ -656,6 +656,8 @@ void TextContentModifier::ContentChangeReport()
     CHECK_NULL_VOID(textPattern);
     auto host = textPattern->GetHost();
     CHECK_NULL_VOID(host);
+    // Standalone page-text queries do not require a content-change reporting session.
+    textPattern->MarkPageTranslateTextDrawn();
     auto pipeline = host->GetContext();
     CHECK_NULL_VOID(pipeline);
     auto mgr = pipeline->GetContentChangeManager();
