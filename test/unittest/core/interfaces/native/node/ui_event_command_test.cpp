@@ -11,11 +11,6 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
- * Framework-level test for InjectCompositeCommandImpl (ui_event_command_processor.cpp).
- * Calls the impl directly (not via the table); uses real ElementRegister/FrameNode +
- * mock PipelineContext/TaskExecutor. Verifies return codes + backend error messages
- * (SET_ERROR_CODE_AND_MESSAGE_IN_BACKEND -> ErrorMessageManager).
  */
 
 #include <cstring>
@@ -65,7 +60,7 @@ using namespace testing::ext;
 
 namespace OHOS::Ace::NG {
 namespace {
-constexpr const char* V2_TEXTINPUT_TAG = "textInput";
+constexpr const char* V2_TEXTINPUT_TAG = "TextInput";
 
 using InjectionResult = OH_ArkUI_NativeModule_UIEventInjection_ResultCode;
 constexpr auto INJECTION_SUCCESS = OH_ARKUI_NATIVE_MODULE_UI_EVENT_INJECTION_RESULT_SUCCESS;
@@ -1167,6 +1162,27 @@ HWTEST_F(UIEventCommandTest, DfxNoLeakOnInvalid001, TestSize.Level1)
     EXPECT_NE(message.find(std::to_string(ARKUI_ERROR_CODE_PARAM_INVALID)), std::string::npos);
     EXPECT_EQ(message.find("synthetic-private-text"), std::string::npos);
     EXPECT_EQ(message.find("synthetic-private-offset"), std::string::npos);
+}
+
+// Covers ExecuteCommandOnUIThread: node type not in SUPPORTED_NODE_TAGS → COMMAND_NOT_SUPPORTED.
+// CreateNode uses tag "textInput" (supported). This test creates a Column-tagged node and injects
+// a known command type. The node type check rejects before OnRecvCommand is called.
+HWTEST_F(UIEventCommandTest, UnsupportedNodeTypeRejected001, TestSize.Level1)
+{
+    auto executor = AceType::MakeRefPtr<DeferTaskExecutor>();
+    MockPipelineContext::GetCurrent()->SetTaskExecutor(executor);
+    auto uniqueId = ElementRegister::GetInstance()->MakeUniqueId();
+    auto node = FrameNode::CreateFrameNode("Column", uniqueId,
+        AceType::MakeRefPtr<TestPattern>(10));
+    ASSERT_NE(node, nullptr);
+    nodes_.push_back(node);
+    CallbackState state;
+    EXPECT_EQ(RunInject(uniqueId, ValidJson(), &state), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(state.count, 0);
+    executor->Drain();
+    EXPECT_EQ(state.count, 1);
+    EXPECT_EQ(state.result, COMMAND_NOT_SUPPORTED);
+    EXPECT_TRUE(ErrorMessageContains("node type not supported for command injection"));
 }
 
 } // namespace OHOS::Ace::NG

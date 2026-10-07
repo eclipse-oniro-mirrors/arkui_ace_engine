@@ -11,10 +11,6 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
- * Standalone test suite for interfaces/native/ui_json_wrapper.cpp.
- * Verifies Create/GetData/GetSize/Destroy, including data ownership and byte-copy
- * consistency guard (rejects truncation/padding/embedded-null).
  */
 
 #include <cstdint>
@@ -40,41 +36,26 @@ static uint32_t StrLen(const char* s)
     return s == nullptr ? 0 : static_cast<uint32_t>(strlen(s));
 }
 
-HWTEST_F(UIJsonWrapperTest, CreateSuccessRoundTrip001, TestSize.Level1)
-{
-    const char* json = "{\"key\":\"value\"}";
-    OH_ArkUI_NativeModule_UIJsonWrapper* w = nullptr;
-    EXPECT_EQ(OH_ArkUI_NativeModule_UIJsonWrapperCreate(json, StrLen(json), &w), ARKUI_ERROR_CODE_NO_ERROR);
-    ASSERT_NE(w, nullptr);
-    EXPECT_STREQ(OH_ArkUI_NativeModule_UIJsonWrapperGetData(w), json);
-    EXPECT_EQ(OH_ArkUI_NativeModule_UIJsonWrapperGetSize(w), StrLen(json));
-    OH_ArkUI_NativeModule_UIJsonWrapperDestroy(w);
-}
-
-HWTEST_F(UIJsonWrapperTest, CreateDeepCopyIndependence001, TestSize.Level1)
-{
-    char buf[8] = "abc";
-    OH_ArkUI_NativeModule_UIJsonWrapper* w = nullptr;
-    EXPECT_EQ(OH_ArkUI_NativeModule_UIJsonWrapperCreate(buf, 3, &w), ARKUI_ERROR_CODE_NO_ERROR);
-    ASSERT_NE(w, nullptr);
-    buf[0] = 'X';
-    EXPECT_STREQ(OH_ArkUI_NativeModule_UIJsonWrapperGetData(w), "abc");
-    OH_ArkUI_NativeModule_UIJsonWrapperDestroy(w);
-}
-
-HWTEST_F(UIJsonWrapperTest, CreateNullData001, TestSize.Level1)
+// Merged: CreateNullData001 + CreateNullOut001 + GetDataNull001 + GetSizeNull001 + DestroyNull001
+// Covers null-param rejections for Create and null-safe accessors for GetData/GetSize/Destroy.
+HWTEST_F(UIJsonWrapperTest, NullParamBoundary001, TestSize.Level1)
 {
     OH_ArkUI_NativeModule_UIJsonWrapper* w = nullptr;
+    // Create null data → 401
     EXPECT_EQ(OH_ArkUI_NativeModule_UIJsonWrapperCreate(nullptr, 3, &w), ARKUI_ERROR_CODE_PARAM_INVALID);
-}
-
-
-HWTEST_F(UIJsonWrapperTest, CreateNullOut001, TestSize.Level1)
-{
+    // Create null out → 401
     EXPECT_EQ(OH_ArkUI_NativeModule_UIJsonWrapperCreate("a", 1, nullptr), ARKUI_ERROR_CODE_PARAM_INVALID);
+    // GetData(nullptr) → nullptr
+    EXPECT_EQ(OH_ArkUI_NativeModule_UIJsonWrapperGetData(nullptr), nullptr);
+    // GetSize(nullptr) → 0
+    EXPECT_EQ(OH_ArkUI_NativeModule_UIJsonWrapperGetSize(nullptr), 0u);
+    // Destroy(nullptr) → no-op
+    OH_ArkUI_NativeModule_UIJsonWrapperDestroy(nullptr);
+    SUCCEED();
 }
 
-HWTEST_F(UIJsonWrapperTest, CreateSingleChar001, TestSize.Level1)
+// Covers single-char payload round-trip and null-terminator guarantee.
+HWTEST_F(UIJsonWrapperTest, CreateSingleCharAndNullTerminator001, TestSize.Level1)
 {
     OH_ArkUI_NativeModule_UIJsonWrapper* w = nullptr;
     EXPECT_EQ(OH_ArkUI_NativeModule_UIJsonWrapperCreate("a", 1, &w), ARKUI_ERROR_CODE_NO_ERROR);
@@ -82,11 +63,7 @@ HWTEST_F(UIJsonWrapperTest, CreateSingleChar001, TestSize.Level1)
     EXPECT_STREQ(OH_ArkUI_NativeModule_UIJsonWrapperGetData(w), "a");
     EXPECT_EQ(OH_ArkUI_NativeModule_UIJsonWrapperGetSize(w), 1u);
     OH_ArkUI_NativeModule_UIJsonWrapperDestroy(w);
-}
 
-HWTEST_F(UIJsonWrapperTest, CreateNullTerminated001, TestSize.Level1)
-{
-    OH_ArkUI_NativeModule_UIJsonWrapper* w = nullptr;
     EXPECT_EQ(OH_ArkUI_NativeModule_UIJsonWrapperCreate("abc", 3, &w), ARKUI_ERROR_CODE_NO_ERROR);
     ASSERT_NE(w, nullptr);
     const char* data = OH_ArkUI_NativeModule_UIJsonWrapperGetData(w);
@@ -95,10 +72,29 @@ HWTEST_F(UIJsonWrapperTest, CreateNullTerminated001, TestSize.Level1)
     OH_ArkUI_NativeModule_UIJsonWrapperDestroy(w);
 }
 
-HWTEST_F(UIJsonWrapperTest, CreateLargePayload001, TestSize.Level1)
+// Merged: CreateSuccessRoundTrip001 + CreateDeepCopyIndependence001 + CreateLargePayload001
+// Covers Create round-trip correctness, deep-copy independence, and large payload handling.
+HWTEST_F(UIJsonWrapperTest, CreateAndDeepCopy001, TestSize.Level1)
 {
-    std::string big(10240, 'x');
+    // Standard round-trip
+    const char* json = "{\"key\":\"value\"}";
     OH_ArkUI_NativeModule_UIJsonWrapper* w = nullptr;
+    EXPECT_EQ(OH_ArkUI_NativeModule_UIJsonWrapperCreate(json, StrLen(json), &w), ARKUI_ERROR_CODE_NO_ERROR);
+    ASSERT_NE(w, nullptr);
+    EXPECT_STREQ(OH_ArkUI_NativeModule_UIJsonWrapperGetData(w), json);
+    EXPECT_EQ(OH_ArkUI_NativeModule_UIJsonWrapperGetSize(w), StrLen(json));
+    OH_ArkUI_NativeModule_UIJsonWrapperDestroy(w);
+
+    // Deep-copy independence: modify source after Create
+    char buf[8] = "abc";
+    EXPECT_EQ(OH_ArkUI_NativeModule_UIJsonWrapperCreate(buf, 3, &w), ARKUI_ERROR_CODE_NO_ERROR);
+    ASSERT_NE(w, nullptr);
+    buf[0] = 'X';
+    EXPECT_STREQ(OH_ArkUI_NativeModule_UIJsonWrapperGetData(w), "abc");
+    OH_ArkUI_NativeModule_UIJsonWrapperDestroy(w);
+
+    // Large payload (10KB)
+    std::string big(10240, 'x');
     EXPECT_EQ(OH_ArkUI_NativeModule_UIJsonWrapperCreate(big.c_str(),
         static_cast<uint32_t>(big.size()), &w), ARKUI_ERROR_CODE_NO_ERROR);
     ASSERT_NE(w, nullptr);
@@ -107,7 +103,9 @@ HWTEST_F(UIJsonWrapperTest, CreateLargePayload001, TestSize.Level1)
     OH_ArkUI_NativeModule_UIJsonWrapperDestroy(w);
 }
 
-HWTEST_F(UIJsonWrapperTest, CreateTwoWrappersIndependent001, TestSize.Level1)
+// Merged: CreateTwoWrappersIndependent001 + DestroyValidNoLeak001
+// Covers two wrappers independent after destroying one, and valid destroy no leak.
+HWTEST_F(UIJsonWrapperTest, TwoWrappersAndDestroy001, TestSize.Level1)
 {
     OH_ArkUI_NativeModule_UIJsonWrapper* w1 = nullptr;
     OH_ArkUI_NativeModule_UIJsonWrapper* w2 = nullptr;
@@ -115,27 +113,10 @@ HWTEST_F(UIJsonWrapperTest, CreateTwoWrappersIndependent001, TestSize.Level1)
     EXPECT_EQ(OH_ArkUI_NativeModule_UIJsonWrapperCreate("second", 6, &w2), ARKUI_ERROR_CODE_NO_ERROR);
     OH_ArkUI_NativeModule_UIJsonWrapperDestroy(w1);
     EXPECT_STREQ(OH_ArkUI_NativeModule_UIJsonWrapperGetData(w2), "second");
+    EXPECT_EQ(OH_ArkUI_NativeModule_UIJsonWrapperGetSize(w2), 6u);
     OH_ArkUI_NativeModule_UIJsonWrapperDestroy(w2);
-}
 
-HWTEST_F(UIJsonWrapperTest, GetDataNull001, TestSize.Level1)
-{
-    EXPECT_EQ(OH_ArkUI_NativeModule_UIJsonWrapperGetData(nullptr), nullptr);
-}
-
-HWTEST_F(UIJsonWrapperTest, GetSizeNull001, TestSize.Level1)
-{
-    EXPECT_EQ(OH_ArkUI_NativeModule_UIJsonWrapperGetSize(nullptr), 0u);
-}
-
-HWTEST_F(UIJsonWrapperTest, DestroyNull001, TestSize.Level1)
-{
-    OH_ArkUI_NativeModule_UIJsonWrapperDestroy(nullptr);
-    SUCCEED();
-}
-
-HWTEST_F(UIJsonWrapperTest, DestroyValidNoLeak001, TestSize.Level1)
-{
+    // Valid destroy — no crash, no leak
     OH_ArkUI_NativeModule_UIJsonWrapper* w = nullptr;
     EXPECT_EQ(OH_ArkUI_NativeModule_UIJsonWrapperCreate("data", 4, &w), ARKUI_ERROR_CODE_NO_ERROR);
     ASSERT_NE(w, nullptr);

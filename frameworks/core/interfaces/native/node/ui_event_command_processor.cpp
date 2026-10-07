@@ -36,6 +36,10 @@ namespace {
 
 const std::string TAG = "UIEventInjection";
 
+const std::unordered_set<std::string> SUPPORTED_NODE_TAGS = {
+    "TextInput", "TextArea", "Text", "RichEditor", "Swiper", "Tabs"
+};
+
 struct CommandContext {
     int32_t instanceId = 0;
     uint32_t uniqueId = 0;
@@ -270,6 +274,12 @@ void ExecuteCommandOnUIThread(const CommandContext& ctx)
     if (frameNode->GetInstanceId() != ctx.instanceId) {
         NotifyFailure(ctx, ARKUI_ERROR_CODE_NODE_NOT_FOUND,
             "node instance id changed after dispatch");
+        return;
+    }
+    const auto& nodeTag = frameNode->GetTag();
+    if (SUPPORTED_NODE_TAGS.find(nodeTag) == SUPPORTED_NODE_TAGS.end()) {
+        NotifyFailure(ctx, ARKUI_ERROR_CODE_ATTRIBUTE_OR_EVENT_NOT_SUPPORTED,
+            "node type not supported for command injection");
         return;
     }
     int32_t result = 0;
