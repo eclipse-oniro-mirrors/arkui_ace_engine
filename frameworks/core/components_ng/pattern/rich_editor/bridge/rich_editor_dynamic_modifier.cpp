@@ -436,7 +436,7 @@ void SetRichEditorShowUnderline(ArkUINodeHandle node, ArkUI_Int32 showUnderline)
 ArkUI_Int32 GetRichEditorShowUnderline(ArkUINodeHandle node)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
-    CHECK_NULL_RETURN(frameNode, ERROR_UINT_CODE);
+    CHECK_NULL_RETURN(frameNode, ERROR_INT_CODE);
     return static_cast<ArkUI_Int32>(RichEditorModelNG::GetShowUnderline(frameNode));
 }
 

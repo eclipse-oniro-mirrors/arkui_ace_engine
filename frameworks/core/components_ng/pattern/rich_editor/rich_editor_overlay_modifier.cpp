@@ -253,7 +253,7 @@ void RichEditorOverlayModifier::PaintUnderline(RSCanvas& canvas) const
     if (isRTL) {
         auto contentLeft = isNeedToAddPadding ? contentRect.Left() - richEditorPattern->GetPaddingLeft() :
             contentRect.Left();
-        leftPoint.SetX(hasResponseArea ? 0.0 : contentLeft);
+        leftPoint.SetX(hasResponseArea ? 0.0f : contentLeft);
         rightPoint.SetX(contentRect.Right());
     } else {
         auto contentRight = isNeedToAddPadding ? contentRect.Right() + richEditorPattern->GetPaddingRight() :

@@ -137,26 +137,6 @@ public:
         return previewUnderlineColor_;
     }
 
-    const Color& GetUnderlineColor() const
-    {
-        return underlineColor_;
-    }
-
-    const Color& GetUnderlineTypingColor() const
-    {
-        return underlineTypingColor_;
-    }
-
-    const Color& GetDisableUnderlineColor() const
-    {
-        return disableUnderlineColor_;
-    }
-
-    const Color& GetErrorUnderlineColor() const
-    {
-        return errorUnderlineColor_;
-    }
-
     const Color& GetPopIconColor() const
     {
         return popIconColor_;
@@ -319,10 +299,6 @@ private:
     Dimension dragCornerRadius_ = 18.0_vp;
     Color previewUnderlineColor_ = Color(0xff007dff);
     Dimension previewUnderlineWidth_ = 2.0_vp;
-    Color underlineColor_ = Color(0x33182431);
-    Color underlineTypingColor_ = Color(0xFF007DFF);
-    Color disableUnderlineColor_ = Color(0x33182431);
-    Color errorUnderlineColor_ = Color(0xFF000000);
     bool richeditorShowHandle_ = false;
     std::string aiWriteBundleName_;
     std::string aiWriteAbilityName_;

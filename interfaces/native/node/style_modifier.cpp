@@ -5523,14 +5523,14 @@ int32_t SetRichEditorUnderlineColor(ArkUI_NodeHandle node, const ArkUI_Attribute
     if (actualSize < 0) {
         return ERROR_CODE_PARAM_INVALID;
     }
+    if (node->type != ARKUI_NODE_TEXT_EDITOR) {
+        return ERROR_CODE_PARAM_INVALID;
+    }
     ArkUI_Uint32 values[NUM_4];
     values[NUM_0] = item->value[NUM_0].u32;
     values[NUM_1] = item->value[NUM_1].u32;
     values[NUM_2] = item->value[NUM_2].u32;
     values[NUM_3] = item->value[NUM_3].u32;
-    if (node->type != ARKUI_NODE_TEXT_EDITOR) {
-        return ERROR_CODE_PARAM_INVALID;
-    }
     GetFullImpl()->getNodeModifiers()->getRichEditorModifier()->setRichEditorUnderlineColor(
         node->uiNodeHandle, values, NUM_4);
     return ERROR_CODE_NO_ERROR;
@@ -5544,12 +5544,13 @@ const ArkUI_AttributeItem* GetRichEditorUnderlineColor(ArkUI_NodeHandle node)
     ArkUI_Uint32 size = 0;
     const ArkUI_Uint32* values = GetFullImpl()->getNodeModifiers()->getRichEditorModifier()->
         getRichEditorUnderlineColor(node->uiNodeHandle, &size);
-    if (values != nullptr && size >= NUM_4) {
-        g_numberValues[NUM_0].u32 = values[NUM_0];
-        g_numberValues[NUM_1].u32 = values[NUM_1];
-        g_numberValues[NUM_2].u32 = values[NUM_2];
-        g_numberValues[NUM_3].u32 = values[NUM_3];
+    if (values == nullptr || size != NUM_4) {
+        return nullptr;
     }
+    g_numberValues[NUM_0].u32 = values[NUM_0];
+    g_numberValues[NUM_1].u32 = values[NUM_1];
+    g_numberValues[NUM_2].u32 = values[NUM_2];
+    g_numberValues[NUM_3].u32 = values[NUM_3];
     g_attributeItem.size = REQUIRED_FOUR_PARAM;
     return &g_attributeItem;
 }
