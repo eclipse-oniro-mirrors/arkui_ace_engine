@@ -358,6 +358,7 @@ public:
     void ClearSheetCloseIconMaterial();
     void SetSheetCloseIconMaterial(RefPtr<UiMaterial> closeButtonNodeMaterial);
     void UpdateSheetScrollBar(const NG::SheetStyle& sheetStyle);
+    void UpdateSheetScrollBarMargin();
 
     double GetTitleBarEffectHeight(const SheetStyle& sheetStyle, float titleBarHeight);
 
