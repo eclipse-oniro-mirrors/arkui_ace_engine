@@ -971,12 +971,12 @@ ANI_EXPORT ani_status ANI_Constructor(ani_vm* vm, uint32_t* result)
         },
         ani_native_function {
             "_UiMaterial_ConvertToECMaterial",
-            nullptr,
+            "ll:",
             reinterpret_cast<void*>(OHOS::Ace::Ani::UiMaterialConvertToECMaterial)
         },
         ani_native_function {
             "_UiMaterial_ConvertToECSubMaterial",
-            nullptr,
+            "ll:",
             reinterpret_cast<void*>(OHOS::Ace::Ani::UiMaterialConvertToECSubMaterial)
         },
         ani_native_function {
@@ -1001,7 +1001,7 @@ ANI_EXPORT ani_status ANI_Constructor(ani_vm* vm, uint32_t* result)
         },
         ani_native_function {
             "_UiMaterial_GetEmpty",
-            nullptr,
+            "l:",
             reinterpret_cast<void*>(OHOS::Ace::Ani::UiMaterialGetEmpty)
         },
         ani_native_function {

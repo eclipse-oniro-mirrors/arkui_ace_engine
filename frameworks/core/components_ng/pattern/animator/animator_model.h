@@ -35,10 +35,6 @@ public:
     virtual RefPtr<Framework::AnimatorInfo> GetAnimatorInfo(const std::string& animatorId);
     virtual void AddEventListener(
         std::function<void()>&& event, Framework::EventOperation operation, const std::string& animatorId);
-
-private:
-    static std::unique_ptr<AnimatorModel> instance_;
-    static std::mutex mutex_;
 };
 } // namespace OHOS::Ace
 
