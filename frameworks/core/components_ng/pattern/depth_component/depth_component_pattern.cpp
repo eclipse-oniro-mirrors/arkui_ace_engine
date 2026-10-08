@@ -35,7 +35,10 @@
 #if defined(KIT_3D_ENABLE) && !defined(PREVIEW)
 #include <surface_utils.h>
 #include <window.h>
+#include "core/animation/curves.h"
 #include "core/common/container.h"
+#include "core/components/common/properties/animation_option.h"
+#include "core/components_ng/render/animation_utils.h"
 #endif
 
 namespace OHOS::Ace::NG {
@@ -55,6 +58,7 @@ constexpr uint32_t ROTATE_90 = 90;
 constexpr uint32_t ROTATE_180 = 180;
 constexpr uint32_t ROTATE_270 = 270;
 constexpr uint32_t ROTATE_0 = 0;
+constexpr int32_t DEPTH_COMPONENT_ANIMATION_DURATION = 300;
 
 GraphicTransformType RotationToTransform(uint32_t rotation)
 {
@@ -131,6 +135,8 @@ void DepthComponentPattern::OnDetachFromFrameNode(FrameNode* node)
             }
         }
     }
+    isDisappearing_ = false;
+    isAppearing_ = false;
     CleanupGltfResources(true);
 #else
     (void)node;
@@ -150,17 +156,17 @@ void DepthComponentPattern::OnModifyDone()
         pendingCleanupImage_ = false;
         if (HasBackgroundImageNode()) {
             pendingCleanupImage_ = true;
-        } else {
-            RemoveBackgroundImageNode();
         }
-        InitGltfAdapter();
-        if (!gltfWindowsInitialized_) {
-            CreateNativeSurfaces(width3d_, height3d_);
+        if (!isDisappearing_ && !isAppearing_) {
+            InitGltfAdapter();
+            if (!gltfWindowsInitialized_) {
+                CreateNativeSurfaces(width3d_, height3d_);
+            }
+            UpdateGltfScene();
+            UpdateWindowChangeSize(true);
+            UpdateWindowInfo();
+            MarkRender3D();
         }
-        UpdateGltfScene();
-        UpdateWindowChangeSize(true);
-        UpdateWindowInfo();
-        MarkRender3D();
 #else
         RemoveBackgroundImageNode();
 #endif
@@ -180,17 +186,28 @@ void DepthComponentPattern::OnModifyDone()
 
 #if defined(ENABLE_ROSEN_BACKEND) && !defined(ACE_UNITTEST)
     if (IsGltfBackground()) {
-        // Clear 2.5D depth map state when switching to GLTF 3D mode
+        // Clear 2.5D depth map loading state when switching to GLTF 3D mode
         lastLoadedDepthMapKey_.clear();
         depthMapLoadingCtx_.Reset();
         auto rsDepthNode = GetRSDepthNode();
-        if (rsDepthNode) {
+        if (rsDepthNode && !pendingCleanupImage_ && !pendingCleanupGltf_) {
             rsDepthNode->SetDepthImage(nullptr);
         }
     } else {
         LoadDepthMap();
     }
+#if defined(KIT_3D_ENABLE) && !defined(PREVIEW)
+    if (isDisappearing_ || isAppearing_ || pendingCleanupImage_ || pendingCleanupGltf_) {
+        isNeedRender_ = true;
+        if (IsGltfBackground()) {
+            UpdateGltfCamera();
+        }
+    } else {
+        TransferDataToRosen();
+    }
+#else
     TransferDataToRosen();
+#endif
 #endif
 }
 
@@ -202,11 +219,6 @@ bool DepthComponentPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>
         return false;
     }
     CHECK_NULL_RETURN(dirty, false);
-#if defined(ENABLE_ROSEN_BACKEND) && !defined(ACE_UNITTEST)
-    auto rsDepthNode = GetRSDepthNode();
-    CHECK_NULL_RETURN(rsDepthNode, false);
-    TransferCameraParams(rsDepthNode);
-#endif
 #if defined(KIT_3D_ENABLE) && !defined(PREVIEW)
     auto geometryNode = dirty->GetGeometryNode();
     CHECK_NULL_RETURN(geometryNode, !(config.skipMeasure || dirty->SkipMeasureContent()));
@@ -214,7 +226,6 @@ bool DepthComponentPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>
     width3d_ = frameRect.Width();
     height3d_ = frameRect.Height();
     if (IsGltfBackground()) {
-        FireGltfLoadCallback();
         UpdateGltfWindowChange(dirty, config);
         auto host = GetHost();
         CHECK_NULL_RETURN(host, false);
@@ -234,8 +245,9 @@ void DepthComponentPattern::OnRebuildFrame()
     CHECK_NULL_VOID(host);
     auto renderContext = host->GetRenderContext();
     CHECK_NULL_VOID(renderContext);
+    size_t surfaceNodeOffset = HasBackgroundImageNode() ? 1 : 0;
     for (size_t i = 0; i < surfaceRenderContext_.size(); ++i) {
-        renderContext->AddChild(surfaceRenderContext_[i], i);
+        renderContext->AddChild(surfaceRenderContext_[i], surfaceNodeOffset + i);
     }
 }
 #endif
@@ -300,7 +312,15 @@ void DepthComponentPattern::ApplyOnCompleteCallback(const RefPtr<FrameNode>& bac
             CHECK_NE_VOID(event.GetLoadingStatus(), LOADING_STATUS_LOAD_SUCCESS);
             auto pattern = weakPattern.Upgrade();
             if (pattern) {
-                pattern->FinishBackgroundSwitch();
+                pattern->pendingCleanupGltf_ = false;
+#if defined(KIT_3D_ENABLE) && !defined(PREVIEW)
+                if (!pattern->IsGltfBackground() && !pattern->surfaceRenderContext_.empty()) {
+                    pattern->CleanupGltfResources(true);
+                }
+#endif
+#if defined(ENABLE_ROSEN_BACKEND) && !defined(ACE_UNITTEST)
+                pattern->TransferDataToRosen();
+#endif
             }
             auto eventHub = weakEventHub.Upgrade();
             if (eventHub && eventHub->GetOnComplete()) {
@@ -310,16 +330,6 @@ void DepthComponentPattern::ApplyOnCompleteCallback(const RefPtr<FrameNode>& bac
                 eventHub->FireCompleteEvent(completeEvent);
             }
         });
-}
-
-void DepthComponentPattern::FinishBackgroundSwitch()
-{
-#if defined(KIT_3D_ENABLE) && !defined(PREVIEW)
-    if (pendingCleanupGltf_) {
-        pendingCleanupGltf_ = false;
-        CleanupGltfResources(true);
-    }
-#endif
 }
 
 void DepthComponentPattern::ApplyOnErrorCallback(const RefPtr<FrameNode>& backgroundImageNode)
@@ -569,8 +579,8 @@ void DepthComponentPattern::TransferDataToRosen()
     auto rsDepthNode = GetRSDepthNode();
     CHECK_NULL_VOID(rsDepthNode);
     TransferDepthSpace(rsDepthNode);
-    TransferCameraParams(rsDepthNode);
     TransferLightParams(rsDepthNode);
+    TransferCameraParams(rsDepthNode);
     TransferImageMatrix(rsDepthNode);
 }
 
@@ -795,33 +805,6 @@ std::function<void(bool)> DepthComponentPattern::CreateGltfLoadCallback()
     };
 }
 
-void DepthComponentPattern::FireGltfLoadCallback()
-{
-    if (!pendingGltfLoadSuccess_.has_value()) {
-        return;
-    }
-    bool success = pendingGltfLoadSuccess_.value();
-    pendingGltfLoadSuccess_.reset();
-    auto eventHub = GetEventHub<DepthComponentEventHub>();
-    CHECK_NULL_VOID(eventHub);
-    if (success) {
-        if (pendingCleanupImage_) {
-            pendingCleanupImage_ = false;
-            RemoveBackgroundImageNode();
-        }
-        DepthComponentCompleteEvent completeEvent;
-        completeEvent.componentWidth = width3d_;
-        completeEvent.componentHeight = height3d_;
-        eventHub->FireCompleteEvent(completeEvent);
-    } else {
-        pendingCleanupImage_ = false;
-        DepthComponentErrorEvent errorEvent;
-        errorEvent.componentWidth = width3d_;
-        errorEvent.componentHeight = height3d_;
-        eventHub->FireErrorEvent(errorEvent);
-    }
-}
-
 void DepthComponentPattern::UpdateGltfCamera()
 {
     ACE_FUNCTION_TRACE();
@@ -869,6 +852,66 @@ void DepthComponentPattern::CleanupGltfResources(bool clearAdapter)
     ACE_SCOPED_TRACE("DepthComponent::CleanupGltfResources clearAdapter=%d surfaces=%zu", clearAdapter,
         nativeSurfaces_.size());
 
+    if (isDisappearing_ || isAppearing_) {
+        return;
+    }
+
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto renderContext = host->GetRenderContext();
+    CHECK_NULL_VOID(renderContext);
+
+    if (surfaceRenderContext_.empty()) {
+        DoCleanupGltfResources(clearAdapter);
+        return;
+    }
+
+    isDisappearing_ = true;
+
+    auto pipeline = host->GetContextRefPtr();
+    AnimationOption option;
+    if (pipeline && pipeline->GetSyncAnimationOption().IsValid()) {
+        option = pipeline->GetSyncAnimationOption();
+    } else {
+        option.SetDuration(DEPTH_COMPONENT_ANIMATION_DURATION);
+        option.SetCurve(Curves::EASE_IN_OUT);
+    }
+    option.SetOnFinishEvent(nullptr);
+    int32_t disappearTraceId = host->GetId();
+    AceAsyncTraceBegin(disappearTraceId, "DepthComponent::DisappearAnimation surfaces=%zu", nativeSurfaceNodes_.size());
+    auto weak = WeakClaim(this);
+    AnimationUtils::Animate(option,
+        [this]() {
+            if (!nativeSurfaceNodes_.empty() && nativeSurfaceNodes_[0]) {
+                nativeSurfaceNodes_[0]->SetAlpha(0.0f);
+            }
+        },
+        [weak, clearAdapter, disappearTraceId]() {
+            AceAsyncTraceEnd(disappearTraceId, "DepthComponent::DisappearAnimation");
+            auto pattern = weak.Upgrade();
+            CHECK_NULL_VOID(pattern);
+            pattern->isDisappearing_ = false;
+            pattern->DoCleanupGltfResources(clearAdapter);
+            if (pattern->IsGltfBackground()) {
+                pattern->InitGltfAdapter();
+                if (!pattern->gltfWindowsInitialized_) {
+                    pattern->CreateNativeSurfaces(pattern->width3d_, pattern->height3d_);
+                }
+                pattern->UpdateGltfScene();
+                pattern->UpdateWindowChangeSize(true);
+                pattern->UpdateWindowInfo();
+#if defined(ENABLE_ROSEN_BACKEND) && !defined(ACE_UNITTEST)
+                pattern->isNeedRender_ = true;
+                pattern->TransferDataToRosen();
+#endif
+                pattern->MarkRender3D();
+            }
+        },
+        nullptr, pipeline);
+}
+
+void DepthComponentPattern::DoCleanupGltfResources(bool clearAdapter)
+{
     // Detach surface render contexts from the parent RSNode tree.
     // This is a best-effort operation — host may be null during detach.
     auto host = GetHost();
@@ -945,7 +988,8 @@ void DepthComponentPattern::CreateNativeSurfaces(float width, float height)
         surfaceRenderContext_.emplace_back(renderContextForSurface);
         auto surfaceNode =
             OHOS::Rosen::RSBaseNode::ReinterpretCast<OHOS::Rosen::RSSurfaceNode>(renderContextForSurface->GetRSNode());
-        renderContext->AddChild(renderContextForSurface, index);
+        size_t surfaceNodeOffset = HasBackgroundImageNode() ? 1 : 0;
+        renderContext->AddChild(renderContextForSurface, surfaceNodeOffset + index);
         CHECK_NULL_VOID(surfaceNode);
         surfaceNode->SetFrameGravity(Rosen::Gravity::RESIZE);
         surfaceNode->SetHardwareEnabled(true);
@@ -960,6 +1004,87 @@ void DepthComponentPattern::CreateNativeSurfaces(float width, float height)
         surface->SetUserData("SURFACE_HEIGHT", std::to_string(static_cast<uint32_t>(height * render3DScale_)));
         if (index == 0) {
             surfaceNode->SetIsDepthBackground(true);
+            isAppearing_ = true;
+
+            // Defer 2D depth image cleanup until AGP renders the first 3D frame.
+            auto weakForBuffer = WeakClaim(this);
+            surfaceNode->SetBufferAvailableCallback([weakForBuffer]() {
+                auto pattern = weakForBuffer.Upgrade();
+                CHECK_NULL_VOID(pattern);
+                auto host = pattern->GetHost();
+                CHECK_NULL_VOID(host);
+                auto context = host->GetContext();
+                CHECK_NULL_VOID(context);
+                context->GetTaskExecutor()->PostTask(
+                    [weakForBuffer]() {
+                        auto pattern = weakForBuffer.Upgrade();
+                        CHECK_NULL_VOID(pattern);
+                        auto rsDepthNode = pattern->GetRSDepthNode();
+                        CHECK_NULL_VOID(rsDepthNode);
+                        rsDepthNode->SetDepthImage(nullptr);
+                        if (pattern->pendingCleanupImage_) {
+                            pattern->pendingCleanupImage_ = false;
+                        }
+                        pattern->isNeedRender_ = true;
+#if defined(ENABLE_ROSEN_BACKEND) && !defined(ACE_UNITTEST)
+                        pattern->TransferDataToRosen();
+#endif
+                        pattern->isGltfReady_ = true;
+                        auto eventHub = pattern->GetEventHub<DepthComponentEventHub>();
+                        CHECK_NULL_VOID(eventHub);
+                        bool success = pattern->pendingGltfLoadSuccess_.value();
+                        pattern->pendingGltfLoadSuccess_.reset();
+                        if (success) {
+                            DepthComponentCompleteEvent completeEvent;
+                            completeEvent.componentWidth = pattern->width3d_;
+                            completeEvent.componentHeight = pattern->height3d_;
+                            eventHub->FireCompleteEvent(completeEvent);
+                        } else {
+                            DepthComponentErrorEvent errorEvent;
+                            errorEvent.componentWidth = pattern->width3d_;
+                            errorEvent.componentHeight = pattern->height3d_;
+                            eventHub->FireErrorEvent(errorEvent);
+                        }
+                        pattern->MarkRender3D();
+                    },
+                    TaskExecutor::TaskType::UI, "ArkUIDepthBufferAvailable");
+            });
+            auto rsUIContext = surfaceNode->GetRSUIContext();
+            OHOS::Rosen::RSNode::ExecuteWithoutAnimation(
+                [&surfaceNode]() {
+                    surfaceNode->SetAlpha(0.0f);
+                }, rsUIContext);
+            auto pipeline = host->GetContextRefPtr();
+            AnimationOption appearOption;
+            if (pipeline && pipeline->GetSyncAnimationOption().IsValid()) {
+                appearOption = pipeline->GetSyncAnimationOption();
+            } else {
+                appearOption.SetDuration(DEPTH_COMPONENT_ANIMATION_DURATION);
+                appearOption.SetCurve(Curves::EASE_OUT);
+            }
+            appearOption.SetOnFinishEvent(nullptr);
+            int32_t appearTraceId = static_cast<int32_t>(surfaceNode->GetId());
+            AceAsyncTraceBegin(appearTraceId, "DepthComponent::AppearAnimation index=%u", index);
+            auto weak = WeakClaim(this);
+            AnimationUtils::Animate(appearOption,
+                [&surfaceNode, index]() {
+                    surfaceNode->SetAlpha(1.0f);
+                },
+                [weak, index, appearTraceId]() {
+                    AceAsyncTraceEnd(appearTraceId, "DepthComponent::AppearAnimation index=%u", index);
+                    auto pattern = weak.Upgrade();
+                    CHECK_NULL_VOID(pattern);
+                    pattern->isAppearing_ = false;
+                    if (!pattern->IsGltfBackground()) {
+                        pattern->CleanupGltfResources(true);
+                    } else {
+                        if (pattern->isGltfReady_) {
+                            pattern->RemoveBackgroundImageNode();
+                            pattern->isGltfReady_ = false;
+                        }
+                    }
+                },
+                nullptr, pipeline);
         } else {
             surfaceNode->SetIsDepthResource(true);
         }
