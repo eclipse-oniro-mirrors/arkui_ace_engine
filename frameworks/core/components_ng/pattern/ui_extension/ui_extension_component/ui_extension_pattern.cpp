@@ -1941,7 +1941,7 @@ void UIExtensionPattern::RegisterVisibleAreaChange()
         uiExtension->HandleVisibleAreaChange(visible, ratio);
     };
     std::vector<double> ratioList = { SHOW_START, SHOW_FULL };
-    pipeline->AddVisibleAreaChangeNode(host, ratioList, callback, false);
+    pipeline->AddVisibleAreaChangeNode(host, ratioList, callback, false, true);
 }
 
 void UIExtensionPattern::HandleVisibleAreaChange(bool visible, double ratio)
