@@ -470,12 +470,12 @@ const ArkUI_Uint32* GetRichEditorUnderlineColor(ArkUINodeHandle node, ArkUI_Uint
     CHECK_NULL_RETURN(frameNode, nullptr);
     CHECK_NULL_RETURN(size, nullptr);
     auto userColor = RichEditorModelNG::GetUnderlineColor(frameNode);
-    static ArkUI_Uint32 underlineColors[4] = { 0 };
-    underlineColors[0] = userColor.typing.value_or(Color()).GetValue();
-    underlineColors[1] = userColor.normal.value_or(Color()).GetValue();
-    underlineColors[2] = userColor.error.value_or(Color()).GetValue();
-    underlineColors[3] = userColor.disable.value_or(Color()).GetValue();
-    *size = 4;
+    static ArkUI_Uint32 underlineColors[NUM_4] = { 0 };
+    underlineColors[NUM_0] = userColor.typing.value_or(Color()).GetValue();
+    underlineColors[NUM_1] = userColor.normal.value_or(Color()).GetValue();
+    underlineColors[NUM_2] = userColor.error.value_or(Color()).GetValue();
+    underlineColors[NUM_3] = userColor.disable.value_or(Color()).GetValue();
+    *size = NUM_4;
     return underlineColors;
 }
 
