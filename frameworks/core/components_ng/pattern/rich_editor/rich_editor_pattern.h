@@ -432,6 +432,8 @@ public:
     void AdjustBoundsRect(RectF& bounds);
     bool OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, const DirtySwapConfig& config) override;
     void HandleSelectOverlayOnLayoutSwap();
+    void ProcessOnLayoutSwap(const RectF& originalFrameRect, const DirtySwapConfig& config);
+    void HandleDragDropOnSwap();
     void FireOnReady();
     void MoveCaretOnLayoutSwap();
     void MoveTextRectOnLayoutSwap();

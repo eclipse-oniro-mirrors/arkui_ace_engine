@@ -1164,18 +1164,7 @@ bool RichEditorPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& di
     UpdateRichTextRect(richTextRectOpt);
     UpdateTextFieldManager(Offset(parentGlobalOffset_.GetX(), parentGlobalOffset_.GetY()), frameRect_.Height());
     bool ret = TextPattern::OnDirtyLayoutWrapperSwap(dirty, config);
-    UpdateScrollStateAfterLayout(config.frameSizeChange);
-    UpdateMagnifierStateAfterLayout(config.frameSizeChange);
-    IF_TRUE(!isRichEditorInit_, FireOnReady());
-    MoveCaretOnLayoutSwap();
-    MoveTextRectOnLayoutSwap();
-    HandleTasksOnLayoutSwap();
-    HandleSelectOverlayOnLayoutSwap();
-    IF_TRUE(originalFrameRect.GetSize() != frameRect_.GetSize(), {
-        TAG_LOGD(AceLogTag::ACE_RICH_TEXT, "frame size change");
-        TriggerAvoidOnCaretChangeNextFrame();
-    });
-    IF_TRUE(!isModifyingContent_, UpdateCaretInfoToController());
+    ProcessOnLayoutSwap(originalFrameRect, config);
     auto host = GetHost();
     CHECK_NULL_RETURN(host, ret);
     auto context = host->GetRenderContext();
@@ -1194,13 +1183,34 @@ bool RichEditorPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& di
         }
     }
     caretUpdateType_ = CaretUpdateType::NONE;
+    HandleDragDropOnSwap();
+    return ret;
+}
+
+void RichEditorPattern::ProcessOnLayoutSwap(const RectF& originalFrameRect, const DirtySwapConfig& config)
+{
+    UpdateScrollStateAfterLayout(config.frameSizeChange);
+    UpdateMagnifierStateAfterLayout(config.frameSizeChange);
+    IF_TRUE(!isRichEditorInit_, FireOnReady());
+    MoveCaretOnLayoutSwap();
+    MoveTextRectOnLayoutSwap();
+    HandleTasksOnLayoutSwap();
+    HandleSelectOverlayOnLayoutSwap();
+    IF_TRUE(originalFrameRect.GetSize() != frameRect_.GetSize(), {
+        TAG_LOGD(AceLogTag::ACE_RICH_TEXT, "frame size change");
+        TriggerAvoidOnCaretChangeNextFrame();
+    });
+    IF_TRUE(!isModifyingContent_, UpdateCaretInfoToController());
+}
+
+void RichEditorPattern::HandleDragDropOnSwap()
+{
     IF_PRESENT(oneStepDragController_, HandleDirtyNodes());
     if (afterDragSelect_) {
         UpdateSelectionAndHandleVisibility();
         afterDragSelect_ = false;
     }
     releaseInDrop_ = false;
-    return ret;
 }
 
 void RichEditorPattern::HandleContentScroll(const OffsetF& preTextOffset, const OffsetF& curTextOffset) const
