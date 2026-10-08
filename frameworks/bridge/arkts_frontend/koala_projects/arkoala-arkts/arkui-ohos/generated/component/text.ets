@@ -16,7 +16,7 @@
 
 // WARNING! THIS FILE IS AUTO-GENERATED, DO NOT MAKE CHANGES, THEY WILL BE LOST ON NEXT GENERATION!
 
-import { LayoutManager_serializer, LayoutManager, LayoutManagerInternal, TextDataDetectorConfig_serializer, EditMenuOptions_serializer, ContentTransition_serializer, SelectedDragPreviewStyle_serializer, FontSettingOptions_serializer, LineSpacingOptions_serializer, TextDataDetectorConfig, EditMenuOptions, StrokeJoinStyle, TextVerticalAlign, ContentTransition, TextContentAlign, SelectedDragPreviewStyle, TextDirection, FontVariation, IncrementalUpdatePolicy, FontSettingOptions, LineSpacingOptions, MenuType } from './textCommon'
+import { LayoutManager_serializer, LayoutManager, LayoutManagerInternal, TextDataDetectorConfig_serializer, EditMenuOptions_serializer, ContentTransition_serializer, SelectedDragPreviewStyle_serializer, FontSettingOptions_serializer, LineSpacingOptions_serializer, TextDataDetectorConfig, EditMenuOptions, TextVerticalAlign, ContentTransition, TextContentAlign, SelectedDragPreviewStyle, TextDirection, FontVariation, IncrementalUpdatePolicy, FontSettingOptions, LineSpacingOptions, MenuType } from './textCommon'
 import { SerializerBase, DeserializerBase, Finalizable, RuntimeType, toPeerPtr, KPointer, MaterializedBase, MaterializedBaseTag, NativeBuffer, nullptr, KInt, KBoolean, KStringPtr, CallbackResource, InteropNativeModule, Tags, KSerializerBuffer, KUint8ArrayPtr } from '@koalaui/interop'
 import { SelectionOptions_serializer, SelectionOptions, ShadowOptions_serializer, ArkCommonMethodPeer, CommonMethod, ShadowOptions, Callback as arkui_component_common_Callback, ExtendableCommonMethod, ArkCommonMethodComponent } from './common'
 import { StyledString, StyledStringInternal, DecorationStyleInterface_serializer, DecorationStyleInterface } from './styledString'
@@ -889,59 +889,6 @@ export class ArkTextPeer extends ArkCommonMethodPeer {
         ArkUIGeneratedNativeModule._TextAttribute_setShaderStyle(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
-    setStrokeWidthAttribute(value: arkui_component_units_LengthMetrics | undefined): void {
-        const thisSerializer: SerializerBase = SerializerBase.hold()
-        if (value !== undefined) {
-            thisSerializer.writeInt8(RuntimeType.OBJECT)
-            const valueTmpValue = value!
-            const valueTmpValueTransformed: LengthMetricsProxy = extractors.transform_Ark_LengthMetrics_to_Ark_LengthMetricsProxy(valueTmpValue)
-            LengthMetricsProxy_serializer.write(thisSerializer, valueTmpValueTransformed)
-        } else {
-            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
-        }
-        ArkUIGeneratedNativeModule._TextAttribute_setStrokeWidth(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
-        thisSerializer.release()
-    }
-    setStrokeColorAttribute(value: ResourceColor | undefined): void {
-        const thisSerializer: SerializerBase = SerializerBase.hold()
-        if (value !== undefined) {
-            thisSerializer.writeInt8(RuntimeType.OBJECT)
-            const valueTmpValue = value!
-            if (valueTmpValue instanceof arkui_component_enums_Color) {
-                thisSerializer.writeInt8((0).toByte())
-                const valueTmpValueForIdx0 = valueTmpValue as arkui_component_enums_Color
-                thisSerializer.writeInt32((valueTmpValueForIdx0.getOrdinal()) % (12))
-            } else if (valueTmpValue instanceof int32) {
-                thisSerializer.writeInt8((1).toByte())
-                const valueTmpValueForIdx1 = valueTmpValue as int32
-                thisSerializer.writeInt32(valueTmpValueForIdx1)
-            } else if (valueTmpValue instanceof string) {
-                thisSerializer.writeInt8((2).toByte())
-                const valueTmpValueForIdx2 = valueTmpValue as string
-                thisSerializer.writeString(valueTmpValueForIdx2)
-            } else if (valueTmpValue instanceof arkui_component_units_Resource) {
-                thisSerializer.writeInt8((3).toByte())
-                const valueTmpValueForIdx3 = valueTmpValue as arkui_component_units_Resource
-                global_resource_Resource_serializer.write(thisSerializer, valueTmpValueForIdx3)
-            }
-        } else {
-            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
-        }
-        ArkUIGeneratedNativeModule._TextAttribute_setStrokeColor(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
-        thisSerializer.release()
-    }
-    setStrokeJoinStyleAttribute(value: StrokeJoinStyle | undefined): void {
-        const thisSerializer: SerializerBase = SerializerBase.hold()
-        if (value !== undefined) {
-            thisSerializer.writeInt8(RuntimeType.OBJECT)
-            const valueTmpValue = (value as StrokeJoinStyle)
-            thisSerializer.writeInt32(valueTmpValue.valueOf())
-        } else {
-            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
-        }
-        ArkUIGeneratedNativeModule._TextAttribute_setStrokeJoinStyle(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
-        thisSerializer.release()
-    }
     setEnableAutoSpacingAttribute(value: boolean | undefined): void {
         const thisSerializer: SerializerBase = SerializerBase.hold()
         if (value !== undefined) {
@@ -1804,42 +1751,6 @@ export interface TextAttribute extends CommonMethod {
         }
         throw new Error('Unimplemented method shaderStyle')
     }
-    strokeWidth(value: arkui_component_units_LengthMetrics | undefined): this {
-        const commonStyle: Array<(instance: CommonMethod) => void> | undefined = this.__get__commonStyles__Internal();
-        if (commonStyle) {
-            (commonStyle as Array<(instance: CommonMethod) => void>).push((instance: CommonMethod): void => (instance as TextAttribute).strokeWidth(value));
-            return this;
-        } else {
-            if (this.__is_CustomComponent__Internal()) {
-                throw new Error('Text attribute strokeWidth can only be set when creating an extendable component.')
-            }
-        }
-        throw new Error('Unimplemented method strokeWidth')
-    }
-    strokeColor(value: ResourceColor | undefined): this {
-        const commonStyle: Array<(instance: CommonMethod) => void> | undefined = this.__get__commonStyles__Internal();
-        if (commonStyle) {
-            (commonStyle as Array<(instance: CommonMethod) => void>).push((instance: CommonMethod): void => (instance as TextAttribute).strokeColor(value));
-            return this;
-        } else {
-            if (this.__is_CustomComponent__Internal()) {
-                throw new Error('Text attribute strokeColor can only be set when creating an extendable component.')
-            }
-        }
-        throw new Error('Unimplemented method strokeColor')
-    }
-    strokeJoinStyle(value: StrokeJoinStyle | undefined): this {
-        const commonStyle: Array<(instance: CommonMethod) => void> | undefined = this.__get__commonStyles__Internal();
-        if (commonStyle) {
-            (commonStyle as Array<(instance: CommonMethod) => void>).push((instance: CommonMethod): void => (instance as TextAttribute).strokeJoinStyle(value));
-            return this;
-        } else {
-            if (this.__is_CustomComponent__Internal()) {
-                throw new Error('Text attribute strokeJoinStyle can only be set when creating an extendable component.')
-            }
-        }
-        throw new Error('Unimplemented method strokeJoinStyle')
-    }
     enableAutoSpacing(value: boolean | undefined): this {
         const commonStyle: Array<(instance: CommonMethod) => void> | undefined = this.__get__commonStyles__Internal();
         if (commonStyle) {
@@ -2422,21 +2333,6 @@ export class ArkTextComponent extends ArkCommonMethodComponent implements TextAt
     public shaderStyle(value: ShaderStyle | undefined): this {
         const value_casted = value as (ShaderStyle | undefined)
         this.getPeer()?.setShaderStyleAttribute(value_casted)
-        return this
-    }
-    public strokeWidth(value: arkui_component_units_LengthMetrics | undefined): this {
-        const value_casted = value as (arkui_component_units_LengthMetrics | undefined)
-        this.getPeer()?.setStrokeWidthAttribute(value_casted)
-        return this
-    }
-    public strokeColor(value: ResourceColor | undefined): this {
-        const value_casted = value as (ResourceColor | undefined)
-        this.getPeer()?.setStrokeColorAttribute(value_casted)
-        return this
-    }
-    public strokeJoinStyle(value: StrokeJoinStyle | undefined): this {
-        const value_casted = value as (StrokeJoinStyle | undefined)
-        this.getPeer()?.setStrokeJoinStyleAttribute(value_casted)
         return this
     }
     public enableAutoSpacing(value: boolean | undefined): this {

@@ -2769,8 +2769,6 @@ typedef struct Ark_SwiperContentAnimatedTransition Ark_SwiperContentAnimatedTran
 typedef struct Opt_SwiperContentAnimatedTransition Opt_SwiperContentAnimatedTransition;
 typedef struct Ark_SystemAdaptiveOptions Ark_SystemAdaptiveOptions;
 typedef struct Opt_SystemAdaptiveOptions Opt_SystemAdaptiveOptions;
-typedef struct Ark_TabBarBadgeType Ark_TabBarBadgeType;
-typedef struct Opt_TabBarBadgeType Opt_TabBarBadgeType;
 typedef struct Ark_TabContentAnimatedTransition Ark_TabContentAnimatedTransition;
 typedef struct Opt_TabContentAnimatedTransition Opt_TabContentAnimatedTransition;
 typedef struct Ark_TabsBreakpointType_TabBarDisplayMode Ark_TabsBreakpointType_TabBarDisplayMode;
@@ -3271,10 +3269,10 @@ typedef struct Ark_StyledStringChangeValue Ark_StyledStringChangeValue;
 typedef struct Opt_StyledStringChangeValue Opt_StyledStringChangeValue;
 typedef struct Ark_SwitchStyle Ark_SwitchStyle;
 typedef struct Opt_SwitchStyle Opt_SwitchStyle;
-typedef struct Ark_TabBarBadgeStyle Ark_TabBarBadgeStyle;
-typedef struct Opt_TabBarBadgeStyle Opt_TabBarBadgeStyle;
 typedef struct Ark_TabBarIconStyle Ark_TabBarIconStyle;
 typedef struct Opt_TabBarIconStyle Opt_TabBarIconStyle;
+typedef struct Ark_TabBarOptions Ark_TabBarOptions;
+typedef struct Opt_TabBarOptions Opt_TabBarOptions;
 typedef struct Ark_TabsOptions Ark_TabsOptions;
 typedef struct Opt_TabsOptions Opt_TabsOptions;
 typedef struct Ark_TabsSidebarSearchableOptions Ark_TabsSidebarSearchableOptions;
@@ -3327,6 +3325,8 @@ typedef struct Ark_Union_Boolean_PopupMaskType Ark_Union_Boolean_PopupMaskType;
 typedef struct Opt_Union_Boolean_PopupMaskType Opt_Union_Boolean_PopupMaskType;
 typedef struct Ark_Union_ColumnOptions_ColumnOptionsV2 Ark_Union_ColumnOptions_ColumnOptionsV2;
 typedef struct Opt_Union_ColumnOptions_ColumnOptionsV2 Opt_Union_ColumnOptions_ColumnOptionsV2;
+typedef struct Ark_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions Ark_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions;
+typedef struct Opt_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions Opt_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions;
 typedef struct Ark_Union_Dimension_Array_Dimension Ark_Union_Dimension_Array_Dimension;
 typedef struct Opt_Union_Dimension_Array_Dimension Opt_Union_Dimension_Array_Dimension;
 typedef struct Ark_Union_Dimension_OptionWidthMode Ark_Union_Dimension_OptionWidthMode;
@@ -3539,8 +3539,6 @@ typedef struct Ark_SweepGradientOptions Ark_SweepGradientOptions;
 typedef struct Opt_SweepGradientOptions Opt_SweepGradientOptions;
 typedef struct Ark_SwipeActionItem Ark_SwipeActionItem;
 typedef struct Opt_SwipeActionItem Opt_SwipeActionItem;
-typedef struct Ark_TabBarOptions Ark_TabBarOptions;
-typedef struct Opt_TabBarOptions Opt_TabBarOptions;
 typedef struct Ark_text_TextStyle Ark_text_TextStyle;
 typedef struct Opt_text_TextStyle Opt_text_TextStyle;
 typedef struct Ark_TextAreaOptions Ark_TextAreaOptions;
@@ -3565,8 +3563,6 @@ typedef struct Ark_Union_BadgePosition_Position Ark_Union_BadgePosition_Position
 typedef struct Opt_Union_BadgePosition_Position Opt_Union_BadgePosition_Position;
 typedef struct Ark_Union_BorderRadiuses_Length_LocalizedBorderRadiuses Ark_Union_BorderRadiuses_Length_LocalizedBorderRadiuses;
 typedef struct Opt_Union_BorderRadiuses_Length_LocalizedBorderRadiuses Opt_Union_BorderRadiuses_Length_LocalizedBorderRadiuses;
-typedef struct Ark_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions Ark_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions;
-typedef struct Opt_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions Opt_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions;
 typedef struct Ark_Union_CustomNodeBuilder_SwipeActionItem Ark_Union_CustomNodeBuilder_SwipeActionItem;
 typedef struct Opt_Union_CustomNodeBuilder_SwipeActionItem Opt_Union_CustomNodeBuilder_SwipeActionItem;
 typedef struct Ark_Union_Dimension_BorderRadiuses Ark_Union_Dimension_BorderRadiuses;
@@ -5659,14 +5655,6 @@ typedef struct Opt_ImmersiveMode {
     Ark_Tag tag;
     Ark_ImmersiveMode value;
 } Opt_ImmersiveMode;
-typedef enum Ark_ImmersiveStrategy {
-    ARK_IMMERSIVE_STRATEGY_AVOID_CUTOUT = 0,
-    ARK_IMMERSIVE_STRATEGY_AVOID_FLOAT_NAV = 1,
-} Ark_ImmersiveStrategy;
-typedef struct Opt_ImmersiveStrategy {
-    Ark_Tag tag;
-    Ark_ImmersiveStrategy value;
-} Opt_ImmersiveStrategy;
 typedef enum Ark_IncrementalUpdatePolicy {
     ARK_INCREMENTAL_UPDATE_POLICY_NONE = 0,
     ARK_INCREMENTAL_UPDATE_POLICY_PARAGRAPH_CACHE = 1,
@@ -11699,8 +11687,8 @@ typedef struct Opt_Callback_CopyEvent_Void {
 typedef struct Callback_CreateItem {
     /* kind: Callback */
     Ark_CallbackResource resource;
-    void (*call)(const Ark_Int32 resourceId, const Ark_Int32 index, const Ark_Boolean skipCreate, const Callback_Pointer_Void continuation);
-    void (*callSync)(Ark_VMContext vmContext, const Ark_Int32 resourceId, const Ark_Int32 index, const Ark_Boolean skipCreate, const Callback_Pointer_Void continuation);
+    void (*call)(const Ark_Int32 resourceId, const Ark_Int32 index, Ark_Boolean skipCreate, const Callback_Pointer_Void continuation);
+    void (*callSync)(Ark_VMContext vmContext, const Ark_Int32 resourceId, const Ark_Int32 index, Ark_Boolean skipCreate, const Callback_Pointer_Void continuation);
 } Callback_CreateItem;
 typedef struct Opt_Callback_CreateItem {
     Ark_Tag tag;
@@ -14679,8 +14667,8 @@ typedef struct Opt_OnWillStopDraggingCallback {
 typedef struct OnZoomChangeCallback {
     /* kind: Callback */
     Ark_CallbackResource resource;
-    void (*call)(const Ark_Int32 resourceId, const Ark_OnZoomChangeEvent zoomChangeInfo);
-    void (*callSync)(Ark_VMContext vmContext, const Ark_Int32 resourceId, const Ark_OnZoomChangeEvent zoomChangeInfo);
+    void (*call)(const Ark_Int32 resourceId, const Ark_OnZoomChangeEvent data);
+    void (*callSync)(Ark_VMContext vmContext, const Ark_Int32 resourceId, const Ark_OnZoomChangeEvent data);
 } OnZoomChangeCallback;
 typedef struct Opt_OnZoomChangeCallback {
     Ark_Tag tag;
@@ -18290,18 +18278,6 @@ typedef struct Opt_SystemAdaptiveOptions {
     Ark_Tag tag;
     Ark_SystemAdaptiveOptions value;
 } Opt_SystemAdaptiveOptions;
-typedef struct Ark_TabBarBadgeType {
-    /* kind: UnionType */
-    Ark_Int32 selector;
-    union {
-        Ark_Int32 value0;
-        Ark_ResourceStr value1;
-    };
-} Ark_TabBarBadgeType;
-typedef struct Opt_TabBarBadgeType {
-    Ark_Tag tag;
-    Ark_TabBarBadgeType value;
-} Opt_TabBarBadgeType;
 typedef struct Ark_TabContentAnimatedTransition {
     /* kind: Interface */
     Opt_Int32 timeout;
@@ -21108,15 +21084,6 @@ typedef struct Opt_SwitchStyle {
     Ark_Tag tag;
     Ark_SwitchStyle value;
 } Opt_SwitchStyle;
-typedef struct Ark_TabBarBadgeStyle {
-    /* kind: Interface */
-    Opt_TabBarBadgeType value;
-    Opt_Int32 maxCount;
-} Ark_TabBarBadgeStyle;
-typedef struct Opt_TabBarBadgeStyle {
-    Ark_Tag tag;
-    Ark_TabBarBadgeStyle value;
-} Opt_TabBarBadgeStyle;
 typedef struct Ark_TabBarIconStyle {
     /* kind: Interface */
     Opt_ResourceColor selectedColor;
@@ -21126,6 +21093,15 @@ typedef struct Opt_TabBarIconStyle {
     Ark_Tag tag;
     Ark_TabBarIconStyle value;
 } Opt_TabBarIconStyle;
+typedef struct Ark_TabBarOptions {
+    /* kind: Interface */
+    Opt_Union_String_Resource icon;
+    Opt_Union_String_Resource text;
+} Ark_TabBarOptions;
+typedef struct Opt_TabBarOptions {
+    Ark_Tag tag;
+    Ark_TabBarOptions value;
+} Opt_TabBarOptions;
 typedef struct Ark_TabsOptions {
     /* kind: Interface */
     Opt_BarPosition barPosition;
@@ -21406,6 +21382,23 @@ typedef struct Opt_Union_ColumnOptions_ColumnOptionsV2 {
     Ark_Tag tag;
     Ark_Union_ColumnOptions_ColumnOptionsV2 value;
 } Opt_Union_ColumnOptions_ColumnOptionsV2;
+typedef struct Ark_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions {
+    /* kind: UnionType */
+    Ark_Int32 selector;
+    union {
+        Ark_ComponentContentBase value0;
+        Ark_SubTabBarStyle value1;
+        Ark_BottomTabBarStyle value2;
+        Ark_String value3;
+        Ark_Resource value4;
+        CustomNodeBuilder value5;
+        Ark_TabBarOptions value6;
+    };
+} Ark_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions;
+typedef struct Opt_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions {
+    Ark_Tag tag;
+    Ark_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions value;
+} Opt_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions;
 typedef struct Ark_Union_Dimension_Array_Dimension {
     /* kind: UnionType */
     Ark_Int32 selector;
@@ -22589,16 +22582,6 @@ typedef struct Opt_SwipeActionItem {
     Ark_Tag tag;
     Ark_SwipeActionItem value;
 } Opt_SwipeActionItem;
-typedef struct Ark_TabBarOptions {
-    /* kind: Interface */
-    Opt_Union_String_Resource icon;
-    Opt_Union_String_Resource text;
-    Opt_TabBarBadgeStyle badge;
-} Ark_TabBarOptions;
-typedef struct Opt_TabBarOptions {
-    Ark_Tag tag;
-    Ark_TabBarOptions value;
-} Opt_TabBarOptions;
 typedef struct Ark_text_TextStyle {
     /* kind: Interface */
     Opt_text_Decoration decoration;
@@ -22770,23 +22753,6 @@ typedef struct Opt_Union_BorderRadiuses_Length_LocalizedBorderRadiuses {
     Ark_Tag tag;
     Ark_Union_BorderRadiuses_Length_LocalizedBorderRadiuses value;
 } Opt_Union_BorderRadiuses_Length_LocalizedBorderRadiuses;
-typedef struct Ark_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions {
-    /* kind: UnionType */
-    Ark_Int32 selector;
-    union {
-        Ark_ComponentContentBase value0;
-        Ark_SubTabBarStyle value1;
-        Ark_BottomTabBarStyle value2;
-        Ark_String value3;
-        Ark_Resource value4;
-        CustomNodeBuilder value5;
-        Ark_TabBarOptions value6;
-    };
-} Ark_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions;
-typedef struct Opt_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions {
-    Ark_Tag tag;
-    Ark_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions value;
-} Opt_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions;
 typedef struct Ark_Union_CustomNodeBuilder_SwipeActionItem {
     /* kind: UnionType */
     Ark_Int32 selector;
@@ -25615,12 +25581,12 @@ typedef struct GENERATED_ArkUICommonMethodModifier {
                                              const Opt_Union_CustomNodeBuilder_Array_MenuElement* content,
                                              const Opt_ResponseType* responseType,
                                              const Opt_ContextMenuOptions* options);
-    void (*setBindContextMenuWithResponse)(Ark_NativePointer node,
-                                           const Opt_CustomNodeBuilderT_ResponseType* content,
-                                           const Opt_ContextMenuOptions* options);
-    void (*setBindContextMenuWithResponseArray)(Ark_NativePointer node,
-                                                const Opt_Union_CustomNodeBuilderT_ResponseType_Array_MenuElement* content,
-                                                const Opt_ContextMenuOptions* options);
+    void (*setBindContextMenuWithResponse0)(Ark_NativePointer node,
+                                            const Opt_CustomNodeBuilderT_ResponseType* content,
+                                            const Opt_ContextMenuOptions* options);
+    void (*setBindContextMenuWithResponse1)(Ark_NativePointer node,
+                                            const Opt_Union_CustomNodeBuilderT_ResponseType_Array_MenuElement* content,
+                                            const Opt_ContextMenuOptions* options);
     void (*setBindContextMenu1)(Ark_NativePointer node,
                                 const Opt_Union_Boolean_Bindable_Boolean* isShow,
                                 const Opt_CustomNodeBuilder* content,
@@ -29474,8 +29440,6 @@ typedef struct GENERATED_ArkUIBottomTabBarStyleAccessor {
                                 const Ark_String* value);
     Ark_BottomTabBarStyle (*iconStyle)(Ark_BottomTabBarStyle peer,
                                        const Ark_TabBarIconStyle* style);
-    Ark_BottomTabBarStyle (*badge)(Ark_BottomTabBarStyle peer,
-                                   const Ark_TabBarBadgeStyle* badgeStyle);
 } GENERATED_ArkUIBottomTabBarStyleAccessor;
 
 typedef struct GENERATED_ArkUIBounceSymbolEffectAccessor {
@@ -32153,7 +32117,7 @@ typedef struct GENERATED_ArkUIRichEditorControllerAccessor {
                                 const CustomNodeBuilder* value,
                                 const Opt_RichEditorBuilderSpanOptions* options);
     Opt_Int32 (*addRichEditorBuilderSpan)(Ark_RichEditorController peer,
-                                          const Ark_RichEditorBuilderSpan* value,
+                                          const Ark_RichEditorBuilderSpan* builderSpan,
                                           const Opt_BuilderSpanInfo* info);
     Opt_Int32 (*addSymbolSpan)(Ark_RichEditorController peer,
                                const Ark_Resource* value,
@@ -32167,7 +32131,7 @@ typedef struct GENERATED_ArkUIRichEditorControllerAccessor {
     Opt_Array_Union_RichEditorImageSpanResult_RichEditorTextSpanResult (*getSpans)(Ark_RichEditorController peer,
                                                                                    const Opt_RichEditorRange* value);
     Opt_Array_BuilderSpanInfo (*getRichEditorBuilderSpans)(Ark_RichEditorController peer,
-                                                           const Opt_RichEditorRange* value);
+                                                           const Opt_RichEditorRange* range);
     Opt_Array_RichEditorParagraphResult (*getParagraphs)(Ark_RichEditorController peer,
                                                          const Opt_RichEditorRange* value);
     Opt_RichEditorSelection (*getSelection)(Ark_RichEditorController peer);
@@ -34029,4 +33993,3 @@ struct OH_AnyAPI {
 /* clang-format on */
 
 #endif  // GENERATED_FOUNDATION_ACE_FRAMEWORKS_CORE_INTERFACES_ARKOALA_API_H
-

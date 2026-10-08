@@ -615,9 +615,9 @@ export class ArkUIGeneratedNativeModule {
     @ani.unsafe.Direct
     native static _CommonMethod_setBindContextMenuByResponseType(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
-    native static _CommonMethod_setBindContextMenuWithResponse(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    native static _CommonMethod_setBindContextMenuWithResponse0(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
-    native static _CommonMethod_setBindContextMenuWithResponseArray(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    native static _CommonMethod_setBindContextMenuWithResponse1(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _CommonMethod_setBindContextMenu1(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
@@ -2552,6 +2552,8 @@ export class ArkUIGeneratedNativeModule {
     @ani.unsafe.Direct
     native static _TabsAttribute_setSidebarSelectedBoardColor(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
+    native static _TabsAttribute_setSidebarDisplayStyle(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
     native static _TabsAttribute_setSidebarWidth(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _TabsAttribute_setMinSidebarWidth(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
@@ -2565,8 +2567,6 @@ export class ArkUIGeneratedNativeModule {
     native static _TabsAttribute_setSidebarBackgroundBlurStyle(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _TabsAttribute_setSidebarDivider(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
-    @ani.unsafe.Direct
-    native static _TabsAttribute_setSidebarDisplayStyle(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _TabsAttribute_setBarMode(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
@@ -2667,12 +2667,6 @@ export class ArkUIGeneratedNativeModule {
     native static _TextAttribute_setOptimizeTrailingSpace(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _TextAttribute_setShaderStyle(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
-    @ani.unsafe.Direct
-    native static _TextAttribute_setStrokeWidth(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
-    @ani.unsafe.Direct
-    native static _TextAttribute_setStrokeColor(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
-    @ani.unsafe.Direct
-    native static _TextAttribute_setStrokeJoinStyle(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _TextAttribute_setEnableAutoSpacing(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
@@ -4044,8 +4038,6 @@ export class ArkUIGeneratedNativeModule {
     @ani.unsafe.Direct
     native static _BottomTabBarStyle_iconStyle(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): KPointer
     @ani.unsafe.Direct
-    native static _BottomTabBarStyle_badge(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): KPointer
-    @ani.unsafe.Direct
     native static _BounceSymbolEffect_construct(thisArray: KSerializerBuffer, thisLength: KInt): KPointer
     @ani.unsafe.Direct
     native static _BounceSymbolEffect_getFinalizer(): KPointer
@@ -4898,8 +4890,6 @@ export class ArkUIGeneratedNativeModule {
     native static _FocusAxisEvent_setAxisMap(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Quick
     native static _FocusController_requestFocus(key: KStringPtr): void
-    @ani.unsafe.Direct
-    native static _ForEachOps_Sync(node: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _ForEachOps_SyncOnMoveOps(node: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Quick
@@ -7542,6 +7532,8 @@ export class ArkUIGeneratedNativeModule {
     native static _WebResourceResponse_getResponseCode(ptr: KPointer): KInt
     @ani.unsafe.Direct
     native static _WebResourceResponse_setResponseData(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
+    native static _WebResourceResponse_setResponseBody(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Quick
     native static _WebResourceResponse_setResponseEncoding(ptr: KPointer, encoding: KStringPtr): void
     @ani.unsafe.Quick
@@ -7556,8 +7548,6 @@ export class ArkUIGeneratedNativeModule {
     native static _WebResourceResponse_setResponseIsReady(ptr: KPointer, IsReady: boolean): void
     @ani.unsafe.Direct
     native static _WebResourceResponse_getResponseIsReady(ptr: KPointer): boolean
-    @ani.unsafe.Direct
-    native static _WebResourceResponse_setResponseBody(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     native static _XComponentControllerExtender_startImageAnalyzer(thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _XComponentControllerNative_construct(): KPointer

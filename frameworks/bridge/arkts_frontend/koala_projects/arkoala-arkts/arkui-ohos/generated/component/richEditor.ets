@@ -4575,10 +4575,10 @@ export class RichEditorController extends RichEditorBaseController implements Ma
         const options_casted = options as (RichEditorBuilderSpanOptions | undefined)
         return this.addBuilderSpan_serialize(value_casted, options_casted)
     }
-    public addRichEditorBuilderSpan(value: RichEditorBuilderSpan, info?: BuilderSpanInfo): int32 | undefined {
-        const value_casted = value as (RichEditorBuilderSpan)
+    public addRichEditorBuilderSpan(builderSpan: RichEditorBuilderSpan, info?: BuilderSpanInfo): int32 | undefined {
+        const builderSpan_casted = builderSpan as (RichEditorBuilderSpan)
         const info_casted = info as (BuilderSpanInfo | undefined)
-        return this.addRichEditorBuilderSpan_serialize(value_casted, info_casted)
+        return this.addRichEditorBuilderSpan_serialize(builderSpan_casted, info_casted)
     }
     public addSymbolSpan(value: global_resource_Resource, options?: RichEditorSymbolSpanOptions): int32 | undefined {
         const value_casted = value as (global_resource_Resource)
@@ -4604,9 +4604,9 @@ export class RichEditorController extends RichEditorBaseController implements Ma
         const value_casted = value as (RichEditorRange | undefined)
         return this.getSpans_serialize(value_casted)
     }
-    public getRichEditorBuilderSpans(value?: RichEditorRange): Array<BuilderSpanInfo> | undefined {
-        const value_casted = value as (RichEditorRange | undefined)
-        return this.getRichEditorBuilderSpans_serialize(value_casted)
+    public getRichEditorBuilderSpans(range?: RichEditorRange): Array<BuilderSpanInfo> | undefined {
+        const range_casted = range as (RichEditorRange | undefined)
+        return this.getRichEditorBuilderSpans_serialize(range_casted)
     }
     public getParagraphs(value?: RichEditorRange): Array<RichEditorParagraphResult> | undefined {
         const value_casted = value as (RichEditorRange | undefined)
@@ -4713,9 +4713,9 @@ export class RichEditorController extends RichEditorBaseController implements Ma
         retvalDeserializer.dispose()
         return (returnResult as int32 | undefined)
     }
-    private addRichEditorBuilderSpan_serialize(value: RichEditorBuilderSpan, info?: BuilderSpanInfo): int32 | undefined {
+    private addRichEditorBuilderSpan_serialize(builderSpan: RichEditorBuilderSpan, info?: BuilderSpanInfo): int32 | undefined {
         const thisSerializer: SerializerBase = SerializerBase.hold()
-        RichEditorBuilderSpan_serializer.write(thisSerializer, value)
+        RichEditorBuilderSpan_serializer.write(thisSerializer, builderSpan)
         if (info !== undefined) {
             thisSerializer.writeInt8(RuntimeType.OBJECT)
             const infoTmpValue = info!
@@ -4827,12 +4827,12 @@ export class RichEditorController extends RichEditorBaseController implements Ma
         retvalDeserializer.dispose()
         return (returnResult as Array<RichEditorImageSpanResult | RichEditorTextSpanResult> | undefined)
     }
-    private getRichEditorBuilderSpans_serialize(value?: RichEditorRange): Array<BuilderSpanInfo> | undefined {
+    private getRichEditorBuilderSpans_serialize(range?: RichEditorRange): Array<BuilderSpanInfo> | undefined {
         const thisSerializer: SerializerBase = SerializerBase.hold()
-        if (value !== undefined) {
+        if (range !== undefined) {
             thisSerializer.writeInt8(RuntimeType.OBJECT)
-            const valueTmpValue = value!
-            RichEditorRange_serializer.write(thisSerializer, valueTmpValue)
+            const rangeTmpValue = range!
+            RichEditorRange_serializer.write(thisSerializer, rangeTmpValue)
         } else {
             thisSerializer.writeInt8(RuntimeType.UNDEFINED)
         }
