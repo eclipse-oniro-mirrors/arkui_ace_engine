@@ -2186,8 +2186,8 @@ HWTEST_F(EventHubTestNg, EventHubTest056, TestSize.Level1)
     eventHub->FireInnerOnAreaChanged(OLD_RECT, OLD_ORIGIN, NEW_RECT, NEW_ORIGIN);
     EXPECT_TRUE(flag1);
     EXPECT_TRUE(flag2);
-    EXPECT_EQ(eventHub->onAreaChangedInnerCallbacks_.count(1), 0u);
-    EXPECT_EQ(eventHub->onAreaChangedInnerCallbacks_.count(2), 1u);
+    EXPECT_EQ(eventHub->GetOrCreateAreaCallbackSet()->onAreaChangedInnerCallbacks.count(1), 0u);
+    EXPECT_EQ(eventHub->GetOrCreateAreaCallbackSet()->onAreaChangedInnerCallbacks.count(2), 1u);
     eventHub->ClearOnAreaChangedInnerCallbacks();
 }
 
@@ -2200,7 +2200,7 @@ HWTEST_F(EventHubTestNg, EventHubTest057, TestSize.Level1)
 {
     /**
      * @tc.steps: step1. Create EventHub and register one inner on-area-changed callback.
-     * @tc.steps: step2. The callback inserts a new entry into onAreaChangedInnerCallbacks_ during invocation.
+     * @tc.steps: step2. The callback inserts a new entry into onAreaChangedInnerCallbacks during invocation.
      * @tc.expected: No crash; the new callback is not invoked this pass because the map is copied before iteration.
      */
     auto frameNode = AceType::MakeRefPtr<FrameNode>(V2::TEXT_ETS_TAG, -1, AceType::MakeRefPtr<Pattern>());
@@ -2213,13 +2213,13 @@ HWTEST_F(EventHubTestNg, EventHubTest057, TestSize.Level1)
     };
     OnAreaChangedFunc cb1 = [&eventHub, &flag1, cb2](const RectF&, const OffsetF&, const RectF&, const OffsetF&) {
         flag1 = true;
-        eventHub->onAreaChangedInnerCallbacks_[2] = cb2;
+        eventHub->GetOrCreateAreaCallbackSet()->onAreaChangedInnerCallbacks[2] = cb2;
     };
     eventHub->AddInnerOnAreaChangedCallback(1, std::move(cb1));
     eventHub->FireInnerOnAreaChanged(OLD_RECT, OLD_ORIGIN, NEW_RECT, NEW_ORIGIN);
     EXPECT_TRUE(flag1);
     EXPECT_FALSE(flag2);
-    EXPECT_EQ(eventHub->onAreaChangedInnerCallbacks_.count(2), 1u);
+    EXPECT_EQ(eventHub->GetOrCreateAreaCallbackSet()->onAreaChangedInnerCallbacks.count(2), 1u);
     eventHub->ClearOnAreaChangedInnerCallbacks();
 }
 
@@ -2279,9 +2279,9 @@ HWTEST_F(EventHubTestNg, EventHubTest059, TestSize.Level1)
     OnAreaChangedFunc cb3 = [&flag3](const RectF&, const OffsetF&, const RectF&, const OffsetF&) {
         flag3 = true;
     };
-    eventHub->onAreaChangedInnerCallbacks_[1] = std::move(nullCb);
-    eventHub->onAreaChangedInnerCallbacks_[2] = std::move(cb2);
-    eventHub->onAreaChangedInnerCallbacks_[3] = std::move(cb3);
+    eventHub->GetOrCreateAreaCallbackSet()->onAreaChangedInnerCallbacks[1] = std::move(nullCb);
+    eventHub->GetOrCreateAreaCallbackSet()->onAreaChangedInnerCallbacks[2] = std::move(cb2);
+    eventHub->GetOrCreateAreaCallbackSet()->onAreaChangedInnerCallbacks[3] = std::move(cb3);
     eventHub->FireInnerOnAreaChanged(OLD_RECT, OLD_ORIGIN, NEW_RECT, NEW_ORIGIN);
     EXPECT_TRUE(flag2);
     EXPECT_TRUE(flag3);
