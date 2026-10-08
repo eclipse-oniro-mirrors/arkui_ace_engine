@@ -1115,6 +1115,14 @@ ImageResizableSlice ImageModelNG::GetResizableSlice(FrameNode* frameNode)
     return renderProperty->GetImageResizableSlice().value_or(resizable);
 }
 
+RefPtr<DrawingLattice> ImageModelNG::GetResizableLattice(FrameNode* frameNode)
+{
+    CHECK_NULL_RETURN(frameNode, nullptr);
+    auto renderProperty = frameNode->GetPaintProperty<ImageRenderProperty>();
+    CHECK_NULL_RETURN(renderProperty, nullptr);
+    return renderProperty->GetImageResizableLatticeValue(nullptr);
+}
+
 void ImageModelNG::EnableAnalyzer(FrameNode* frameNode, bool isEnableAnalyzer)
 {
     CHECK_NULL_VOID(frameNode);

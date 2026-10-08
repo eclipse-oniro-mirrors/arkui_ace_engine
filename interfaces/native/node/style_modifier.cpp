@@ -16422,6 +16422,12 @@ void ResetResizable(ArkUI_NodeHandle node)
 const ArkUI_AttributeItem* GetResizable(ArkUI_NodeHandle node)
 {
     auto fullImpl = GetFullImpl();
+    g_attributeItem.object =
+        fullImpl->getNodeModifiers()->getImageModifier()->getResizableLattice(node->uiNodeHandle);
+    if (g_attributeItem.object) {
+        g_attributeItem.size = 0;
+        return &g_attributeItem;
+    }
     std::array<float, NUM_4> resizableArray;
     fullImpl->getNodeModifiers()->getImageModifier()->getImageResizable(
         node->uiNodeHandle, &resizableArray[0], NUM_4);
