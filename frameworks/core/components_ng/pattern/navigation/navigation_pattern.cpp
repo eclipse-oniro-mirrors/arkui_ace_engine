@@ -6155,8 +6155,6 @@ void NavigationPattern::HandleTouchUp()
     CHECK_NULL_VOID(dragPattern);
     dragPattern->UpdateDefaultColor();
 
-    auto theme = NavigationGetTheme();
-    CHECK_NULL_VOID(theme);
     auto dividerNode = GetDividerNode();
     CHECK_NULL_VOID(dividerNode);
     if (UpdateForceSplitDividerColor(dividerNode)) {
@@ -6168,7 +6166,8 @@ void NavigationPattern::HandleTouchUp()
     gradient.CreateGradientWithType(NG::GradientType::LINEAR);
     gradient.AddColor(CreatePercentGradientColor(0, Color::TRANSPARENT));
     dividerRenderContext->UpdateLinearGradient(gradient);
-    dividerRenderContext->UpdateBackgroundColor(theme->GetNavigationDividerColor());
+    // restore the divider color with user-defined color or theme default color
+    UpdateDividerBackgroundColor();
 }
 
 void NavigationPattern::CheckContentNeedMeasure(const RefPtr<FrameNode>& node)
