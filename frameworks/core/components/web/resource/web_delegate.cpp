@@ -5034,8 +5034,10 @@ void WebDelegate::UpdateCaretColor(const Color& caretColor)
     if (!context) {
         return;
     }
+    auto executor = context->GetTaskExecutor();
+    CHECK_NULL_VOID(executor);
     uint32_t colorValue = caretColor.GetValue();
-    context->GetTaskExecutor()->PostTask(
+    executor->PostTask(
         [weak = WeakClaim(this), colorValue]() {
             auto delegate = weak.Upgrade();
             if (delegate && delegate->nweb_) {
