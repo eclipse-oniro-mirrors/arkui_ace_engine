@@ -596,8 +596,12 @@ void TabsModelNG::SetDivider(const TabsItemDivider& divider)
     CHECK_NULL_VOID(dividerNode);
     auto dividerRenderContext = dividerNode->GetRenderContext();
     CHECK_NULL_VOID(dividerRenderContext);
+    auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
+    bool isOnAnim = tabsPattern && tabsPattern->IsOnDisplayModeSwitchAnimation();
     if (divider.isNull) {
-        dividerRenderContext->UpdateOpacity(0.0f);
+        if (!isOnAnim) {
+            dividerRenderContext->UpdateOpacity(0.0f);
+        }
         auto tabsLayoutProperty = tabsNode->GetLayoutProperty<TabsLayoutProperty>();
         CHECK_NULL_VOID(tabsLayoutProperty);
         auto currentDivider = tabsLayoutProperty->GetDivider().value_or(TabsItemDivider());
@@ -605,7 +609,9 @@ void TabsModelNG::SetDivider(const TabsItemDivider& divider)
         currentDivider.isNull = true;
         ACE_UPDATE_LAYOUT_PROPERTY(TabsLayoutProperty, Divider, currentDivider);
     } else {
-        dividerRenderContext->UpdateOpacity(1.0f);
+        if (!isOnAnim) {
+            dividerRenderContext->UpdateOpacity(1.0f);
+        }
         ACE_CHECK_LPX_ATTRIBUTE(divider.startMargin, LpxAttribute::ALWAYS);
         ACE_CHECK_LPX_ATTRIBUTE(divider.endMargin, LpxAttribute::ALWAYS);
         ACE_CHECK_LPX_ATTRIBUTE(divider.strokeWidth, LpxAttribute::ALWAYS);
@@ -936,8 +942,12 @@ void TabsModelNG::SetDivider(FrameNode* frameNode, const TabsItemDivider& divide
     CHECK_NULL_VOID(dividerNode);
     auto dividerRenderContext = dividerNode->GetRenderContext();
     CHECK_NULL_VOID(dividerRenderContext);
+    auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
+    bool isOnAnim = tabsPattern && tabsPattern->IsOnDisplayModeSwitchAnimation();
     if (divider.isNull) {
-        dividerRenderContext->UpdateOpacity(0.0f);
+        if (!isOnAnim) {
+            dividerRenderContext->UpdateOpacity(0.0f);
+        }
         auto tabsLayoutProperty = frameNode->GetLayoutProperty<TabsLayoutProperty>();
         CHECK_NULL_VOID(tabsLayoutProperty);
         auto currentDivider = tabsLayoutProperty->GetDivider().value_or(TabsItemDivider());
@@ -945,7 +955,9 @@ void TabsModelNG::SetDivider(FrameNode* frameNode, const TabsItemDivider& divide
         currentDivider.isNull = true;
         ACE_UPDATE_NODE_LAYOUT_PROPERTY(TabsLayoutProperty, Divider, currentDivider, frameNode);
     } else {
-        dividerRenderContext->UpdateOpacity(1.0f);
+        if (!isOnAnim) {
+            dividerRenderContext->UpdateOpacity(1.0f);
+        }
         ACE_CHECK_NODE_LPX_ATTRIBUTE(divider.startMargin, LpxAttribute::ALWAYS, frameNode);
         ACE_CHECK_NODE_LPX_ATTRIBUTE(divider.endMargin, LpxAttribute::ALWAYS, frameNode);
         ACE_CHECK_NODE_LPX_ATTRIBUTE(divider.strokeWidth, LpxAttribute::ALWAYS, frameNode);
@@ -2585,6 +2597,24 @@ void TabsModelNG::SetSidebarHeader(FrameNode* frameNode, const RefPtr<AceType>& 
     CHECK_NULL_VOID(pattern);
     auto customHeader = AceType::DynamicCast<NG::UINode>(header);
     pattern->SetSidebarHeaderNode(customHeader);
+}
+
+void TabsModelNG::SetSidebarFooter(FrameNode* frameNode, const RefPtr<AceType>& footer)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto pattern = frameNode->GetPattern<TabsPattern>();
+    CHECK_NULL_VOID(pattern);
+    auto customFooter = AceType::DynamicCast<NG::UINode>(footer);
+    pattern->SetSidebarFooterNode(customFooter);
+}
+
+void TabsModelNG::SetSidebarBottomBar(FrameNode* frameNode, const RefPtr<AceType>& bottomBar)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto pattern = frameNode->GetPattern<TabsPattern>();
+    CHECK_NULL_VOID(pattern);
+    auto customBottomBar = AceType::DynamicCast<NG::UINode>(bottomBar);
+    pattern->SetSidebarBottomBarNode(customBottomBar);
 }
 
 void TabsModelNG::SetSidebarSearchableOptions(const TabsSidebarSearchableOptions& options)

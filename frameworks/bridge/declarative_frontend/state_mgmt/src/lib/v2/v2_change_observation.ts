@@ -1687,13 +1687,13 @@ class ObserveV2 {
     }
   }
 
-  public static notifyCustomEnvOwner(target: ViewPU): void {
+  public static notifyCustomEnvOwner(target: object): void {
     const owners = (target as CustomEnvValue)[ObserveV2.SYMBOL_CUSTOM_ENV_OWNER] as Map<number, Set<string>> | undefined;
     if (!owners) {
       return;
     }
     for (const [viewId, varNames] of owners) {
-      const view = SubscriberManager.Find(viewId) as ViewPU;
+      const view = SubscriberManager.Find(viewId) as PUV2ViewBase;
       if (!view) {
         owners.delete(viewId);
         continue;
@@ -1704,7 +1704,7 @@ class ObserveV2 {
     }
   }
 
-  public static registerCustomEnvOwner(view: ViewPU, proxiedValue: object, varName: string): object {
+  public static registerCustomEnvOwner(view: PUV2ViewBase, proxiedValue: object, varName: string): object {
     if (!proxiedValue || !(Array.isArray(proxiedValue) || proxiedValue instanceof Set ||
       proxiedValue instanceof Map || proxiedValue instanceof Date)) {
       return proxiedValue;
@@ -1724,15 +1724,26 @@ class ObserveV2 {
     return proxiedValue;
   }
 
-  public static removeCustomEnvOwner(view: ViewPU): void {
-    view.__getCustomEnvPropertyNameToKey__Internal();
-    if (!view[CUSTOM_ENV_DECO_META]) {
+  public static unregisterCustomEnvOwner(view: PUV2ViewBase, customEnvValue: object, varName: string): void {
+    if (!customEnvValue || typeof customEnvValue !== 'object') {
       return;
     }
-    const viewId = view.id__();
+    const owners = (customEnvValue as CustomEnvValue)[ObserveV2.SYMBOL_CUSTOM_ENV_OWNER] as
+      Map<number, Set<string>> | undefined;
+    const varNames = owners?.get(view.id__());
+    varNames?.delete(varName);
+    if (varNames?.size === 0) {
+      owners?.delete(view.id__());
+    }
+  }
+
+  public static removeCustomEnvOwner(view: PUV2ViewBase): void {
+    if (!ObserveV2.customEnvInUse_) {
+      return;
+    }
     for (const [varName] of view.__getCustomEnvPropertyNameToKey__Internal()) {
-      const coll = (view as CustomEnvValue)[ObserveV2.OB_PREFIX + varName];
-      coll?.[ObserveV2.SYMBOL_CUSTOM_ENV_OWNER]?.delete(viewId);
+      const customEnvValue = (view as CustomEnvValue)[ObserveV2.OB_PREFIX + varName];
+      ObserveV2.unregisterCustomEnvOwner(view, customEnvValue, varName);
     }
   }
 
@@ -1918,29 +1929,32 @@ class ObserveV2 {
     names.forEach(name => snapshot[name] = this[name]);
     names.forEach(name => this[name] = new Set());
 
-    // Execute the task — any state changes here will be recorded in the cleared sets
-    let retValue;
     try {
-      retValue = task();     
-    } catch (error) {
-      stateMgmtConsole.applicationError(`UIUtils.applySync - task execution caught error ${error} !`);
-      throw error;
+      // Execute the task — any state changes here will be recorded in the cleared sets
+      let retValue;
+      try {
+        retValue = task();
+      } catch (error) {
+        stateMgmtConsole.applicationError(`UIUtils.applySync - task execution caught error ${error} !`);
+        throw error;
+      }
+
+      // Remove IDs added by task() from the original snapshot
+      names.forEach((name) =>
+        this[name].forEach(Set.prototype.delete, snapshot[name])
+      );
+
+      // Process the new changes immediately (may produce further changes) and
+      // remove IDs added by updateDirty2 from the original snapshot
+      this.updateDirty2(false, false, snapshot);
+
+      return retValue;
+    } finally {
+      // Restore unprocessed IDs from the snapshot and reset the counter
+      // on both success and error paths — applySyncRunningCount_ must never leak
+      names.forEach((name) => this[name] = snapshot[name]);
+      this.applySyncRunningCount_--;
     }
-
-    // Remove IDs added by task() from the original snapshot
-    names.forEach((name) =>
-      this[name].forEach(Set.prototype.delete, snapshot[name])
-    );
-
-    // Process the new changes immediately (may produce further changes) and
-    // remove IDs added by updateDirty2 from the original snapshot
-    this.updateDirty2(false, false, snapshot);
-
-    // Restore unprocessed IDs from the snapshot
-    names.forEach((name) => this[name] = snapshot[name]);
-
-    this.applySyncRunningCount_--;
-    return retValue;
   }
 
   // Immediately processes all updates

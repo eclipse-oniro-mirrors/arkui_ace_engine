@@ -353,7 +353,7 @@ int64_t GetDebugFlags()
 
 bool IsContainerDeleteFlag()
 {
-    return (system::GetParameter("persist.container.delete", "true") == "true");
+    return (system::GetParameter("persist.container.delete", "false") == "true");
 }
 
 bool IsMultiInstanceEnabled()

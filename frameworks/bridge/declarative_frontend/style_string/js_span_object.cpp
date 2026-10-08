@@ -1541,17 +1541,33 @@ void JSImageAttachment::GetResizable(const JSCallbackInfo& info)
 {
     CHECK_NULL_VOID(imageSpan_);
     auto imageAttr = imageSpan_->GetImageAttribute();
-    if (!imageAttr.has_value() || !imageAttr->resizableSlice.has_value()) {
+    if (!imageAttr.has_value() ||
+        (!imageAttr->resizableSlice.has_value() && !imageAttr->resizableLattice.value_or(nullptr))) {
         return;
     }
-    auto slice = imageAttr->resizableSlice.value();
-    JSRef<JSObject> sliceObj = JSRef<JSObject>::New();
-    sliceObj->SetProperty<float>("left", slice.left.Value());
-    sliceObj->SetProperty<float>("top", slice.top.Value());
-    sliceObj->SetProperty<float>("right", slice.right.Value());
-    sliceObj->SetProperty<float>("bottom", slice.bottom.Value());
     JSRef<JSObject> resizableObj = JSRef<JSObject>::New();
-    resizableObj->SetProperty("slice", sliceObj);
+    if (imageAttr->resizableSlice.has_value()) {
+        const auto& slice = imageAttr->resizableSlice.value();
+        JSRef<JSObject> sliceObj = JSRef<JSObject>::New();
+        sliceObj->SetProperty<float>("left", slice.left.Value());
+        sliceObj->SetProperty<float>("top", slice.top.Value());
+        sliceObj->SetProperty<float>("right", slice.right.Value());
+        sliceObj->SetProperty<float>("bottom", slice.bottom.Value());
+        resizableObj->SetProperty("slice", sliceObj);
+        info.SetReturnValue(JSRef<JSVal>::Cast(resizableObj));
+        return;
+    }
+    auto lattice = imageAttr->resizableLattice.value_or(nullptr);
+    CHECK_NULL_VOID(lattice);
+    auto engine = EngineHelper::GetCurrentEngine();
+    CHECK_NULL_VOID(engine);
+    auto* nativeEngine = engine->GetNativeEngine();
+    CHECK_NULL_VOID(nativeEngine);
+    auto jsLattice = lattice->GetDrawingLatticeNapiValue(nativeEngine);
+    CHECK_NULL_VOID(jsLattice);
+    auto latticeJsVal = JsConverter::ConvertNapiValueToJsVal(jsLattice);
+    CHECK_NULL_VOID(latticeJsVal->IsObject());
+    resizableObj->SetPropertyObject("lattice", JSRef<JSObject>::Cast(latticeJsVal));
     info.SetReturnValue(JSRef<JSVal>::Cast(resizableObj));
 }
 
