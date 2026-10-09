@@ -1137,6 +1137,44 @@ ArkUINativeModuleValue CalendarPickerBridge::ResetCalendarPickerMarkToday(ArkUIR
     return panda::JSValueRef::Undefined(vm);
 }
 
+ArkUINativeModuleValue CalendarPickerBridge::SetCalendarPickerFirstDayOfWeek(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> nodeArg = runtimeCallInfo->GetCallArgRef(NUM_0);
+    Local<JSValueRef> firstDayOfWeekArg = runtimeCallInfo->GetCallArgRef(NUM_1);
+    ArkUINodeHandle nativeNode = nullptr;
+    CHECK_NE_RETURN(GetNativeNode(nativeNode, nodeArg, vm), true, panda::JSValueRef::Undefined(vm));
+    if (IsJsView(nodeArg, vm)) {
+        nativeNode = nodePtr(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    }
+    auto nodeModifiers = GetArkUINodeModifiers();
+    CHECK_NULL_RETURN(nodeModifiers, panda::JSValueRef::Undefined(vm));
+    if (!firstDayOfWeekArg->IsUndefined() && !firstDayOfWeekArg.IsNull() && firstDayOfWeekArg->IsInt()) {
+        int32_t firstDayOfWeek = firstDayOfWeekArg->Int32Value(vm);
+        nodeModifiers->getCalendarPickerModifier()->setCalendarPickerFirstDayOfWeek(nativeNode, firstDayOfWeek);
+    } else {
+        nodeModifiers->getCalendarPickerModifier()->resetCalendarPickerFirstDayOfWeek(nativeNode);
+    }
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue CalendarPickerBridge::ResetCalendarPickerFirstDayOfWeek(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> nodeArg = runtimeCallInfo->GetCallArgRef(NUM_0);
+    ArkUINodeHandle nativeNode = nullptr;
+    CHECK_NE_RETURN(GetNativeNode(nativeNode, nodeArg, vm), true, panda::JSValueRef::Undefined(vm));
+    if (IsJsView(nodeArg, vm)) {
+        nativeNode = nodePtr(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    }
+    auto nodeModifiers = GetArkUINodeModifiers();
+    CHECK_NULL_RETURN(nodeModifiers, panda::JSValueRef::Undefined(vm));
+    nodeModifiers->getCalendarPickerModifier()->resetCalendarPickerFirstDayOfWeek(nativeNode);
+    return panda::JSValueRef::Undefined(vm);
+}
+
 ArkUINativeModuleValue CalendarPickerBridge::SetCalendarPickerOnChange(ArkUIRuntimeCallInfo* runtimeCallInfo)
 {
     EcmaVM* vm = runtimeCallInfo->GetVM();
@@ -1320,6 +1358,7 @@ void CalendarPickerBridge::RegisterCalendarPickerAttributes(Local<panda::ObjectR
         "resetCalendarPickerBorder", "setCalendarPickerHeight", "resetCalendarPickerHeight",
         "setCalendarPickerBorderColor", "resetCalendarPickerBorderColor", "setCalendarPickerBorderRadius",
         "resetCalendarPickerBorderRadius", "setCalendarPickerMarkToday", "resetCalendarPickerMarkToday",
+        "setCalendarPickerFirstDayOfWeek", "resetCalendarPickerFirstDayOfWeek",
         "setCalendarPickerOnChange", "resetCalendarPickerOnChange" };
 
     Local<JSValueRef> funcValues[] = {
@@ -1340,6 +1379,9 @@ void CalendarPickerBridge::RegisterCalendarPickerAttributes(Local<panda::ObjectR
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CalendarPickerBridge::ResetCalendarPickerBorderRadius),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CalendarPickerBridge::SetCalendarPickerMarkToday),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CalendarPickerBridge::ResetCalendarPickerMarkToday),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CalendarPickerBridge::SetCalendarPickerFirstDayOfWeek),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm),
+            CalendarPickerBridge::ResetCalendarPickerFirstDayOfWeek),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CalendarPickerBridge::SetCalendarPickerOnChange),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CalendarPickerBridge::ResetCalendarPickerOnChange),
     };

@@ -61,6 +61,7 @@ struct CalendarSettingData {
     WeakPtr<FrameNode> entryNode = nullptr;
     std::vector<std::pair<PickerDate, PickerDate>> disabledDateRange;
     bool markToday = false;
+    int32_t firstDayOfWeek = 0;
 };
 
 struct CalendarPickerOption {

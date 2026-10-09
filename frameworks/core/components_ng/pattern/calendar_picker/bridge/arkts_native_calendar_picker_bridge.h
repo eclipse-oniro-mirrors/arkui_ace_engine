@@ -39,6 +39,8 @@ public:
     static ArkUINativeModuleValue ResetCalendarPickerBorderRadius(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static ArkUINativeModuleValue SetCalendarPickerMarkToday(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static ArkUINativeModuleValue ResetCalendarPickerMarkToday(ArkUIRuntimeCallInfo* runtimeCallInfo);
+    static ArkUINativeModuleValue SetCalendarPickerFirstDayOfWeek(ArkUIRuntimeCallInfo* runtimeCallInfo);
+    static ArkUINativeModuleValue ResetCalendarPickerFirstDayOfWeek(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static ArkUINativeModuleValue SetCalendarPickerOnChange(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static ArkUINativeModuleValue ResetCalendarPickerOnChange(ArkUIRuntimeCallInfo* runtimeCallInfo);
 };

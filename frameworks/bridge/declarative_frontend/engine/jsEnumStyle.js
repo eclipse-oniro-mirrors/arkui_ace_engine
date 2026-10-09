@@ -4499,6 +4499,18 @@ let CalendarAlign;
   CalendarAlign[CalendarAlign.END = 2] = 'END';
 })(CalendarAlign || (CalendarAlign = {}));
 
+let CalendarFirstDayOfWeek;
+(function (CalendarFirstDayOfWeek) {
+  CalendarFirstDayOfWeek[CalendarFirstDayOfWeek.LOCAL = 0] = 'LOCAL';
+  CalendarFirstDayOfWeek[CalendarFirstDayOfWeek.MON = 1] = 'MON';
+  CalendarFirstDayOfWeek[CalendarFirstDayOfWeek.TUE = 2] = 'TUE';
+  CalendarFirstDayOfWeek[CalendarFirstDayOfWeek.WED = 3] = 'WED';
+  CalendarFirstDayOfWeek[CalendarFirstDayOfWeek.THU = 4] = 'THU';
+  CalendarFirstDayOfWeek[CalendarFirstDayOfWeek.FRI = 5] = 'FRI';
+  CalendarFirstDayOfWeek[CalendarFirstDayOfWeek.SAT = 6] = 'SAT';
+  CalendarFirstDayOfWeek[CalendarFirstDayOfWeek.SUN = 7] = 'SUN';
+})(CalendarFirstDayOfWeek || (CalendarFirstDayOfWeek = {}));
+
 let DragBehavior;
 (function (DragBehavior) {
   DragBehavior[DragBehavior.COPY = 0] = 'COPY';

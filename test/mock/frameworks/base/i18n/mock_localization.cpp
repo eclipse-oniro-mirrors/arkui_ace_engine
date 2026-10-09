@@ -155,6 +155,25 @@ bool Localization::LocalizeNumber(const std::string& inputNum, std::string& outp
     return true;
 }
 
+int32_t Localization::GetFirstDayOfWeek()
+{
+    return 0;
+}
+
+std::vector<std::string> Localization::GetDateSeparators()
+{
+    return {"/", "/"};
+}
+
+std::string Localization::LocalizeDateNumber(int32_t value, int32_t minDigits)
+{
+    auto str = std::to_string(value);
+    while (static_cast<int32_t>(str.length()) < minDigits) {
+        str = "0" + str;
+    }
+    return str;
+}
+
 bool Localization::GetDateColumnFormatOrder(std::vector<std::string>& outOrder)
 {
     return true;

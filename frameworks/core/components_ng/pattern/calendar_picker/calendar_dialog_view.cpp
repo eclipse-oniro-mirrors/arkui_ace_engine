@@ -54,6 +54,19 @@
 
 namespace OHOS::Ace::NG {
 namespace {
+void SetStartOfWeekInline(FrameNode* frameNode, int32_t startOfWeek)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto swiperNode = frameNode->GetChildren().front();
+    CHECK_NULL_VOID(swiperNode);
+    for (const auto& calNode : swiperNode->GetChildren()) {
+        auto calFn = AceType::DynamicCast<FrameNode>(calNode);
+        CHECK_NULL_VOID(calFn);
+        auto prop = calFn->GetPaintProperty<CalendarPaintProperty>();
+        CHECK_NULL_VOID(prop);
+        prop->UpdateStartOfWeek(NG::Week(startOfWeek));
+    }
+}
 constexpr int32_t SWIPER_MONTHS_COUNT = 3;
 constexpr int32_t CURRENT_MONTH_INDEX = 1;
 constexpr int32_t DAYS_OF_WEEK = 7;
@@ -165,7 +178,9 @@ RefPtr<FrameNode> CalendarDialogView::Show(const DialogProperties& dialogPropert
     CHECK_NULL_RETURN(dialogLayoutProperty, nullptr);
     auto calendarTextDirection = calendarLayoutProperty->GetNonAutoLayoutDirection();
     auto dialogTextDirection = dialogLayoutProperty->GetNonAutoLayoutDirection();
-    SetWeekTextDirection(dialogTextDirection, calendarTextDirection, weekFrameNode);
+    auto dialogPattern = contentColumn->GetPattern<CalendarDialogPattern>();
+    int32_t resolvedFirstDay = dialogPattern ? dialogPattern->GetResolvedFirstDay() : 0;
+    SetWeekTextDirection(dialogTextDirection, calendarTextDirection, weekFrameNode, resolvedFirstDay);
     dialogLayoutProperty->UpdateLayoutDirection(textDirection);
     CreateChildNode(contentColumn, dialogNode, dialogProperties);
     if (!entryNode) {
@@ -182,7 +197,7 @@ RefPtr<FrameNode> CalendarDialogView::Show(const DialogProperties& dialogPropert
 }
 
 void CalendarDialogView::SetWeekTextDirection(const TextDirection& dialogDirection,
-    const TextDirection& calendarDirection, const RefPtr<FrameNode>& weekNode)
+    const TextDirection& calendarDirection, const RefPtr<FrameNode>& weekNode, int32_t resolvedFirstDay)
 {
     RefPtr<CalendarTheme> theme = weekNode->GetTheme<CalendarTheme>(true);
     CHECK_NULL_VOID(theme);
@@ -194,9 +209,9 @@ void CalendarDialogView::SetWeekTextDirection(const TextDirection& dialogDirecti
         int32_t weekId = 0;
         if (calendarDirection == TextDirection::RTL
             && dialogDirection != TextDirection::RTL) {
-            weekId = (DAYS_OF_WEEK - 1) - (column % DAYS_OF_WEEK);
+            weekId = (DAYS_OF_WEEK - 1) - ((column + resolvedFirstDay) % DAYS_OF_WEEK);
         } else {
-            weekId = column % DAYS_OF_WEEK;
+            weekId = (column + resolvedFirstDay) % DAYS_OF_WEEK;
         }
         if (weekId < 0) {
             continue;
@@ -537,6 +552,11 @@ RefPtr<FrameNode> CalendarDialogView::CreateCalendarNode(const RefPtr<FrameNode>
         textDirection)) {
         return nullptr;
     }
+
+    auto dialogPattern = calendarDialogNode->GetPattern<CalendarDialogPattern>();
+    int32_t resolvedFirstDay = dialogPattern ? dialogPattern->GetResolvedFirstDay() : 0;
+    int32_t weekEnumValue = (resolvedFirstDay + 6) % 7;
+    SetStartOfWeekInline(AceType::RawPtr(calendarNode), weekEnumValue);
 
     InitCalendarProperty(calendarNode);
     swiperNode->MarkModifyDone();

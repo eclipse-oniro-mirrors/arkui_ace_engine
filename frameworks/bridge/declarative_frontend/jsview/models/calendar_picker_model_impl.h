@@ -36,6 +36,7 @@ public:
     void ClearBorderWidth() override {};
     void ClearPadding() override {};
     void SetMarkToday(bool isMarkToday) override {};
+    void SetFirstDayOfWeek(int32_t firstDayOfWeek) override {};
     void CalendarPickerRemoveResObj(const std::string& key) override {};
 };
 } // namespace OHOS::Ace::Framework

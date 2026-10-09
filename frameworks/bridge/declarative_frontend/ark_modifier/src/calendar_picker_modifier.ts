@@ -78,6 +78,11 @@ class LazyArkCalendarPickerComponent extends ArkComponent {
     this.lazyComponent.markToday(value);
     return this;
   }
+
+  firstDayOfWeek(value: CalendarFirstDayOfWeek): this {
+    this.lazyComponent.firstDayOfWeek(value);
+    return this;
+  }
 }
 class CalendarPickerModifier extends LazyArkCalendarPickerComponent implements AttributeModifier<CalendarPickerAttribute> {
 

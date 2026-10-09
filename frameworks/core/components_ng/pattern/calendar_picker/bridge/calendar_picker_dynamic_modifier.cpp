@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 #include "bridge/declarative_frontend/jsview/models/view_abstract_model_impl.h"
+#include "base/log/log_wrapper.h"
 #include "core/common/container.h"
 #include "core/common/resource/resource_parse_utils.h"
 #include "core/components/calendar/calendar_theme.h"
@@ -52,7 +53,9 @@ constexpr int NUM_4 = 4;
 constexpr int NUM_12 = 12;
 constexpr int DATE_SIZE = 3;
 const bool DEFAULT_MARK_TODAY = false;
+const ArkUI_Int32 DEFAULT_FIRST_DAY_OF_WEEK = 0;
 thread_local std::string g_strValue;
+thread_local RefPtr<FrameNode> g_dialogNodeHolder;
 constexpr int TEXT_STYLE_FONT_INFO_SIZE = 2;
 constexpr int TEXT_STYLE_FONT_SIZE_INDEX = 0;
 constexpr int TEXT_STYLE_FONT_WEIGHT_INDEX = 1;
@@ -573,6 +576,27 @@ ArkUI_Bool GetCalendarPickerMarkToday(ArkUINodeHandle node)
     return isMarkToday;
 }
 
+void SetCalendarPickerFirstDayOfWeek(ArkUINodeHandle node, ArkUI_Int32 firstDayOfWeek)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    CalendarPickerModelNG::SetFirstDayOfWeek(frameNode, firstDayOfWeek);
+}
+
+void ResetCalendarPickerFirstDayOfWeek(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    CalendarPickerModelNG::SetFirstDayOfWeek(frameNode, DEFAULT_FIRST_DAY_OF_WEEK);
+}
+
+ArkUI_Int32 GetCalendarPickerFirstDayOfWeek(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_RETURN(frameNode, DEFAULT_FIRST_DAY_OF_WEEK);
+    return CalendarPickerModelNG::GetFirstDayOfWeek(frameNode);
+}
+
 bool IsValidDate(uint32_t year, uint32_t month, uint32_t day)
 {
     if (year <= 0) {
@@ -674,6 +698,7 @@ ArkUINodeHandle JSShowCalendarPicker(
     auto frameNode = CalendarDialogView::Show(*dialogPropertiesPtr, *settingDataPtr, *buttonInfosPtr,
         std::move(*dialogEventPtr), std::move(*dialogCancelEventPtr));
     CHECK_NULL_RETURN(frameNode, nullptr);
+    g_dialogNodeHolder = frameNode;
     return reinterpret_cast<ArkUINodeHandle>(AceType::RawPtr(frameNode));
 }
 
@@ -1295,6 +1320,8 @@ const ArkUICalendarPickerModifier* GetCalendarPickerDynamicModifier()
             .resetEndDate = nullptr,
             .setCalendarPickerMarkToday = nullptr,
             .resetCalendarPickerMarkToday = nullptr,
+            .setCalendarPickerFirstDayOfWeek = nullptr,
+            .resetCalendarPickerFirstDayOfWeek = nullptr,
             .setCalendarPickerDisabledDateRange = nullptr,
             .resetCalendarPickerDisabledDateRange = nullptr,
             .setEdgeAlign = nullptr,
@@ -1373,6 +1400,8 @@ const ArkUICalendarPickerModifier* GetCalendarPickerDynamicModifier()
             .resetEndDate = ResetEndDate,
             .setCalendarPickerMarkToday = SetCalendarPickerMarkToday,
             .resetCalendarPickerMarkToday = ResetCalendarPickerMarkToday,
+            .setCalendarPickerFirstDayOfWeek = SetCalendarPickerFirstDayOfWeek,
+            .resetCalendarPickerFirstDayOfWeek = ResetCalendarPickerFirstDayOfWeek,
             .setCalendarPickerDisabledDateRange = SetCalendarPickerDisabledDateRange,
             .resetCalendarPickerDisabledDateRange = ResetCalendarPickerDisabledDateRange,
             .setEdgeAlign = SetEdgeAlign,
@@ -1452,6 +1481,8 @@ const CJUICalendarPickerModifier* GetCJUICalendarPickerModifier()
         .resetEndDate = ResetEndDate,
         .setCalendarPickerMarkToday = SetCalendarPickerMarkToday,
         .resetCalendarPickerMarkToday = ResetCalendarPickerMarkToday,
+        .setCalendarPickerFirstDayOfWeek = SetCalendarPickerFirstDayOfWeek,
+        .resetCalendarPickerFirstDayOfWeek = ResetCalendarPickerFirstDayOfWeek,
         .setCalendarPickerDisabledDateRange = SetCalendarPickerDisabledDateRange,
         .resetCalendarPickerDisabledDateRange = ResetCalendarPickerDisabledDateRange,
         .setEdgeAlign = SetEdgeAlign,

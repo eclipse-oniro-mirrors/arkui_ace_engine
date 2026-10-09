@@ -28,6 +28,7 @@ public:
     static void SetEdgeAlign(FrameNode* frameNode, const std::optional<CalendarEdgeAlign>& alignType,
         const std::optional<DimensionOffset>& offset);
     static void SetMarkToday(FrameNode* frameNode, const std::optional<bool>& isMarkToday);
+    static void SetFirstDayOfWeek(FrameNode* frameNode, const std::optional<int32_t>& firstDayOfWeek);
 };
 
 } // namespace OHOS::Ace::NG

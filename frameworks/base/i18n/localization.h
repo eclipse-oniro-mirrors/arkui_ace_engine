@@ -193,6 +193,16 @@ public:
     std::vector<std::string> GetWeekdays(bool isShortType = false);
 
     /**
+     * Gets the first day of week for the current locale.
+     * @return the first day of week, 0 = Sunday, 1 = Monday, ..., 6 = Saturday.
+     */
+    int32_t GetFirstDayOfWeek();
+
+    std::string LocalizeDateNumber(int32_t value, int32_t minDigits);
+
+    std::vector<std::string> GetDateSeparators();
+
+    /**
      * Gets AM/PM strings. For example: "AM", "PM".
      * @return the AM/PM string vector.
      */

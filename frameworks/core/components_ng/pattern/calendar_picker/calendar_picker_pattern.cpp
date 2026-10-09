@@ -21,6 +21,7 @@
 #include <algorithm>
 
 #include "base/i18n/localization.h"
+#include "base/log/log_wrapper.h"
 #include "base/utils/utf_helper.h"
 #include "core/components/calendar/calendar_theme.h"
 #include "core/components_ng/pattern/calendar_picker/calendar_dialog_view.h"
@@ -46,6 +47,7 @@ constexpr int32_t MONTH_INDEX = 2;
 constexpr int32_t SECOND_SLASH = 3;
 constexpr int32_t DAY_INDEX = 4;
 constexpr int32_t YEAR_LENTH = 4;
+constexpr int32_t MONTH_DAY_DIGITS = 2;
 constexpr int32_t ADD_BUTTON_INDEX = 0;
 constexpr int32_t SUB_BUTTON_INDEX = 1;
 constexpr int32_t DATE_NODE_COUNT = 3;
@@ -541,6 +543,9 @@ void CalendarPickerPattern::ShowDialog()
     auto pipeline = host->GetContext();
     CHECK_NULL_VOID(pipeline);
     auto overlayManager = pipeline->GetOverlayManager();
+    if (!overlayManager) {
+        return;
+    }
 
     std::map<std::string, NG::DialogEvent> dialogEvent;
     auto changeId = [weak = WeakClaim(this)](const std::string& info) {
@@ -1337,6 +1342,43 @@ void CalendarPickerPattern::OnColorConfigurationUpdate()
     ResetTextState();
 }
 
+void CalendarPickerPattern::OnLanguageConfigurationUpdate()
+{
+    InitDateIndex();
+    FlushTextStyle();
+    if (HasContentNode()) {
+        auto host = GetHost();
+        CHECK_NULL_VOID(host);
+        auto contentNode = AceType::DynamicCast<FrameNode>(host->GetFirstChild());
+        CHECK_NULL_VOID(contentNode);
+        auto separators = Localization::GetInstance()->GetDateSeparators();
+        std::string sep1 = separators.size() > 0 ? separators[0] : "/";
+        std::string sep2 = separators.size() > 1 ? separators[1] : "/";
+        auto updateNodeText = [&contentNode](int32_t index, const std::string& text) {
+            auto node = AceType::DynamicCast<FrameNode>(contentNode->GetChildAtIndex(index));
+            CHECK_NULL_VOID(node);
+            auto prop = node->GetLayoutProperty<TextLayoutProperty>();
+            CHECK_NULL_VOID(prop);
+            prop->UpdateContent(text);
+            node->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
+        };
+        updateNodeText(FIRST_SLASH, sep1);
+        updateNodeText(SECOND_SLASH, sep2);
+        uint32_t year = calendarData_.selectedDate.GetYear();
+        uint32_t month = calendarData_.selectedDate.GetMonth();
+        uint32_t day = calendarData_.selectedDate.GetDay();
+        updateNodeText(yearIndex_,
+            Localization::GetInstance()->LocalizeDateNumber(year, YEAR_LENTH));
+        updateNodeText(monthIndex_,
+            Localization::GetInstance()->LocalizeDateNumber(month, MONTH_DAY_DIGITS));
+        updateNodeText(dayIndex_,
+            Localization::GetInstance()->LocalizeDateNumber(day, MONTH_DAY_DIGITS));
+    }
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+}
+
 bool CalendarPickerPattern::OnThemeScopeUpdate(int32_t themeScopeId)
 {
     auto host = GetHost();
@@ -1412,27 +1454,24 @@ void CalendarPickerPattern::SetDate(const std::string& info)
     auto textLayoutProperty = yearNode->GetLayoutProperty<TextLayoutProperty>();
     CHECK_NULL_VOID(textLayoutProperty);
     auto yearNum = json->GetUInt("year");
-    auto yearStr = std::to_string(yearNum);
-    yearStr = (yearNum < 1000 ? "0" : "") + yearStr;
-    yearStr = (yearNum < 100 ? "0" : "") + yearStr;
-    yearStr = (yearNum < 10 ? "0" : "") + yearStr;
-    textLayoutProperty->UpdateContent(yearStr);
+    textLayoutProperty->UpdateContent(
+        Localization::GetInstance()->LocalizeDateNumber(yearNum, YEAR_LENTH));
     yearNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
 
     auto monthNode = AceType::DynamicCast<FrameNode>(contentNode->GetChildAtIndex(monthIndex_));
     CHECK_NULL_VOID(monthNode);
     textLayoutProperty = monthNode->GetLayoutProperty<TextLayoutProperty>();
     CHECK_NULL_VOID(textLayoutProperty);
-    auto monthString = (json->GetUInt("month") < 10 ? "0" : "") + std::to_string(json->GetUInt("month"));
-    textLayoutProperty->UpdateContent(monthString);
+    textLayoutProperty->UpdateContent(
+        Localization::GetInstance()->LocalizeDateNumber(json->GetUInt("month"), MONTH_DAY_DIGITS));
     monthNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
 
     auto dayNode = AceType::DynamicCast<FrameNode>(contentNode->GetChildAtIndex(dayIndex_));
     CHECK_NULL_VOID(dayNode);
     textLayoutProperty = dayNode->GetLayoutProperty<TextLayoutProperty>();
     CHECK_NULL_VOID(textLayoutProperty);
-    auto dayString = (json->GetUInt("day") < 10 ? "0" : "") + std::to_string(json->GetUInt("day"));
-    textLayoutProperty->UpdateContent(dayString);
+    textLayoutProperty->UpdateContent(
+        Localization::GetInstance()->LocalizeDateNumber(json->GetUInt("day"), MONTH_DAY_DIGITS));
     dayNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
     SetSelectedType(selected_);
     UpdateAccessibilityText();
@@ -1540,6 +1579,16 @@ void CalendarPickerPattern::SetMarkToday(bool isMarkToday)
 bool CalendarPickerPattern::GetMarkToday()
 {
     return isMarkToday_;
+}
+
+void CalendarPickerPattern::SetFirstDayOfWeek(int32_t firstDayOfWeek)
+{
+    calendarData_.firstDayOfWeek = firstDayOfWeek;
+}
+
+int32_t CalendarPickerPattern::GetFirstDayOfWeek()
+{
+    return calendarData_.firstDayOfWeek;
 }
 
 void CalendarPickerPattern::SetDisabledDateRange(

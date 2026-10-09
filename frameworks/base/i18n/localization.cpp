@@ -19,6 +19,7 @@
 #include "base/log/log_wrapper.h"
 #include "base/utils/linear_map.h"
 #include "chnsecal.h"
+#include "unicode/calendar.h"
 #if !defined(IOS_PLATFORM) && !defined(ANDROID_PLATFORM)
 #include "lunar_calendar.h"
 #endif
@@ -533,6 +534,93 @@ std::vector<std::string> Localization::GetWeekdays(bool isShortType)
         }
     }
     return weekdays;
+}
+
+int32_t Localization::GetFirstDayOfWeek()
+{
+    WaitingForInit();
+    UErrorCode status = U_ZERO_ERROR;
+    auto cal = Calendar::createInstance(locale_->instance, status);
+    if (status > U_ZERO_ERROR || cal == nullptr) {
+        LOGW("GetFirstDayOfWeek createInstance failed, status = %{public}d", static_cast<int32_t>(status));
+        delete cal;
+        return 0; // Sunday
+    }
+    // ICU getFirstDayOfWeek returns 1=Sunday...7=Saturday, convert to 0=Sunday...6=Saturday
+    int32_t firstDay = cal->getFirstDayOfWeek();
+    delete cal;
+    return firstDay - 1;
+}
+
+std::string Localization::LocalizeDateNumber(int32_t value, int32_t minDigits)
+{
+    WaitingForInit();
+    UErrorCode status = U_ZERO_ERROR;
+    icu::number::LocalizedNumberFormatter formatter = icu::number::NumberFormatter::withLocale(locale_->instance);
+    formatter = formatter.grouping(UNumberGroupingStrategy::UNUM_GROUPING_OFF);
+    formatter = formatter.integerWidth(icu::number::IntegerWidth::zeroFillTo(minDigits));
+    auto result = formatter.formatInt(value, status);
+    if (U_FAILURE(status)) {
+        return std::to_string(value);
+    }
+    icu::UnicodeString us = result.toString(status);
+    if (U_FAILURE(status)) {
+        return std::to_string(value);
+    }
+    std::string s;
+    us.toUTF8String(s);
+    return s;
+}
+
+std::vector<std::string> Localization::GetDateSeparators()
+{
+    WaitingForInit();
+    UErrorCode status = U_ZERO_ERROR;
+    auto* gen = icu::DateTimePatternGenerator::createInstance(locale_->instance, status);
+    if (U_FAILURE(status) || gen == nullptr) {
+        return {"/", "/"};
+    }
+    icu::UnicodeString pattern = gen->getBestPattern(icu::UnicodeString("yMMdd"), status);
+    delete gen;
+    if (U_FAILURE(status)) {
+        return {"/", "/"};
+    }
+    std::string patternStr;
+    pattern.toUTF8String(patternStr);
+
+    std::vector<std::string> separators;
+    std::string currentSep;
+    bool inField = false;
+    bool seenField = false;
+    bool inQuote = false;
+    for (size_t i = 0; i < patternStr.size(); ++i) {
+        unsigned char ch = static_cast<unsigned char>(patternStr[i]);
+        if (ch == '\'') {
+            inQuote = !inQuote;
+            continue;
+        }
+        bool isField = !inQuote &&
+            (ch == 'y' || ch == 'Y' || ch == 'M' || ch == 'L' || ch == 'd' || ch == 'D');
+        if (isField) {
+            if (seenField && !inField && !currentSep.empty()) {
+                separators.push_back(currentSep);
+                currentSep.clear();
+            }
+            inField = true;
+            seenField = true;
+        } else {
+            if (inField) {
+                currentSep.clear();
+            }
+            currentSep += static_cast<char>(ch);
+            inField = false;
+        }
+    }
+    static constexpr size_t MIN_SEPARATOR_COUNT = 2;
+    if (separators.size() < MIN_SEPARATOR_COUNT) {
+        return {"/", "/"};
+    }
+    return {separators[0], separators[1]};
 }
 
 std::vector<std::string> Localization::GetAmPmStrings()

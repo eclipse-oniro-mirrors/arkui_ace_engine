@@ -117,6 +117,13 @@ void SetMarkTodayImpl(Ark_NativePointer node, const Opt_Boolean* value)
     auto convValue = Converter::OptConvertPtr<bool>(value);
     CalendarPickerModelStatic::SetMarkToday(frameNode, convValue);
 }
+void SetFirstDayOfWeekImpl(Ark_NativePointer node, const Opt_Number* value)
+{
+    auto frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto convValue = Converter::OptConvertPtr<int32_t>(value);
+    CalendarPickerModelStatic::SetFirstDayOfWeek(frameNode, convValue);
+}
 void SetEdgeAlignImpl(Ark_NativePointer node, const Opt_CalendarAlign* alignType, const Opt_Offset* offset)
 {
     auto frameNode = reinterpret_cast<FrameNode*>(node);
@@ -134,6 +141,7 @@ const GENERATED_ArkUICalendarPickerModifier* GetCalendarPickerStaticModifier()
         CalendarPickerAttributeModifier::SetTextStyleImpl,
         CalendarPickerAttributeModifier::SetOnChangeImpl,
         CalendarPickerAttributeModifier::SetMarkTodayImpl,
+        nullptr, // setCalendarPickerFirstDayOfWeek (not implemented in static)
         CalendarPickerAttributeModifier::SetEdgeAlignImpl,
     };
     return &ArkUICalendarPickerModifierImpl;
