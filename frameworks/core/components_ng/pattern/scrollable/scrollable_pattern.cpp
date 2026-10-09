@@ -3476,6 +3476,9 @@ void ScrollablePattern::FireOnScrollStart(bool withPerfMonitor)
     }
     ContentChangeOnScrollStart(host);
     FireObserverOnScrollStart();
+    if (pipeline && pipeline->GetFocusManager()) {
+        pipeline->GetFocusManager()->SetNeedTriggerScroll(std::nullopt);
+    }
     auto onScrollStart = hub->GetOnScrollStart();
     auto onJSFrameNodeScrollStart = hub->GetJSFrameNodeOnScrollStart();
     CHECK_NULL_VOID(onScrollStart || onJSFrameNodeScrollStart);

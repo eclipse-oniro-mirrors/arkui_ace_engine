@@ -23,6 +23,7 @@
 #include "core/common/event_manager.h"
 #include "core/components_ng/event/drag_event.h"
 #include "core/components_ng/gestures/recognizers/pan_recognizer.h"
+#include "core/components_ng/manager/focus/focus_manager.h"
 #include "core/components_ng/pattern/list/list_item_drag_manager.h"
 #include "core/components_ng/pattern/list/list_item_event_hub.h"
 #include "core/components_ng/pattern/list/list_item_pattern.h"
@@ -1249,6 +1250,36 @@ HWTEST_F(ListEventTestNg, ScrollSnapAlignWhenHeightEqual, TestSize.Level1)
     pattern_->StartSnapAnimation(snapAnimationOptions);
     FlushUITasks(frameNode_);
     EXPECT_FALSE(isScrollStartCalled);
+}
+
+/**
+ * @tc.name: ListFocusScrollOnMouseWheel001
+ * @tc.desc: Focus auto-scroll is disabled while List is scrolling.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListEventTestNg, ListFocusScrollOnMouseWheel001, TestSize.Level1)
+{
+    CreateList();
+    CreateListItems();
+    CreateDone();
+    auto pipeline = frameNode_->GetContext();
+    ASSERT_NE(pipeline, nullptr);
+    auto focusManager = pipeline->GetFocusManager();
+    ASSERT_NE(focusManager, nullptr);
+    auto focusHub = GetChildFocusHub(frameNode_, 0);
+    ASSERT_NE(focusHub, nullptr);
+
+    focusManager->SetNeedTriggerScroll(true);
+    focusManager->SetLastFocusStateNode(focusHub);
+    pattern_->scrollSource_ = SCROLL_FROM_AXIS;
+    pattern_->FireOnScrollStart();
+    focusManager->SetLastFocusStateNode(focusHub);
+    EXPECT_FALSE(focusManager->GetNeedTriggerScroll());
+
+    pattern_->scrollStop_ = true;
+    pattern_->OnScrollStop(nullptr, nullptr);
+    focusManager->SetLastFocusStateNode(focusHub);
+    EXPECT_TRUE(focusManager->GetNeedTriggerScroll());
 }
 
 /**
