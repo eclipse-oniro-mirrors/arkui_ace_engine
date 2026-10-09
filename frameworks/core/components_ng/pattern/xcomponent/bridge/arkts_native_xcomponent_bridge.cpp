@@ -884,9 +884,6 @@ ArkUINativeModuleValue XComponentBridge::SetOpacity(ArkUIRuntimeCallInfo* runtim
     ACE_UINODE_TRACE(reinterpret_cast<FrameNode*>(nativeNode));
     auto type =
         static_cast<XComponentType>(GetArkUINodeModifiers()->getXComponentModifier()->getXComponentType(nativeNode));
-    if (type != XComponentType::NODE) {
-        return panda::JSValueRef::Undefined(vm);
-    }
     if (ArkTSUtils::IsJsView(firstArg, vm)) {
         if (type == XComponentType::SURFACE || type == XComponentType::COMPONENT) {
             return panda::JSValueRef::Undefined(vm);
@@ -910,6 +907,9 @@ ArkUINativeModuleValue XComponentBridge::SetOpacity(ArkUIRuntimeCallInfo* runtim
             }
         }
         GetArkUINodeModifiers()->getXComponentModifier()->setXComponentOpacity(nativeNode, opacity);
+        return panda::JSValueRef::Undefined(vm);
+    }
+    if (type != XComponentType::NODE) {
         return panda::JSValueRef::Undefined(vm);
     }
     RefPtr<ResourceObject> opacityResObj;
