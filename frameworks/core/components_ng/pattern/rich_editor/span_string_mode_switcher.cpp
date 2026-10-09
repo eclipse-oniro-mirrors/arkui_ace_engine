@@ -14,9 +14,22 @@
  */
 
 #include "core/components_ng/pattern/text/span_node.h"
+#include "core/components_ng/pattern/rich_editor/plain_text_span_string.h"
+#include "core/common/ime/text_input_filter.h"
 #include "span_string_mode_switcher.h"
 
 namespace OHOS::Ace {
+
+RefPtr<SpanString> SpanStringModeSwitcher::FilterSpanString(
+    const RefPtr<SpanString>& src, TextInputType keyboard)
+{
+    CHECK_NULL_RETURN(src, src);
+    auto filtered = src->GetU16string();
+    TextInputFilter::FilterByInputType(keyboard, filtered);
+    // Always create a new plain SpanString to strip any styling from the source,
+    // ensuring pasted/dragged content conforms to the single-style plain text mode.
+    return AceType::MakeRefPtr<SpanString>(filtered);
+}
 
 void SpanStringModeSwitcher::SwitchToPlainText(RefPtr<MutableSpanString>& styledString)
 {

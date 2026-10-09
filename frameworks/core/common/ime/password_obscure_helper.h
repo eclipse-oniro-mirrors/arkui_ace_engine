@@ -21,6 +21,7 @@
 
 #include "core/common/ime/text_input_obscure_utils.h"
 #include "core/common/ime/text_input_type.h"
+#include "ui/base/utils/utils.h"
 
 namespace OHOS::Ace {
 

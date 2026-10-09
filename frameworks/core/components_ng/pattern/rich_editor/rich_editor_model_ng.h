@@ -18,7 +18,10 @@
 
 #include "core/components_ng/pattern/rich_editor/rich_editor_model.h"
 #include "core/components_ng/pattern/text_field/text_keyboard_common_type.h"
-#include "core/image/image_source_info.h"
+
+namespace OHOS::Ace {
+class ImageSourceInfo;
+}
 
 namespace OHOS::Ace::NG {
 class ACE_EXPORT RichEditorModelNG : public OHOS::Ace::RichEditorModel {

@@ -275,6 +275,7 @@ template("ace_core_source_set") {
       "common/ime/text_input_connection.cpp",
       "common/ime/text_input_formatter.cpp",
       "common/ime/text_input_keyboard_utils.cpp",
+      "common/ime/text_input_obscure_utils.cpp",
       "common/ime/text_input_proxy.cpp",
       "common/ime/text_input_type.cpp",
 
@@ -897,6 +898,7 @@ template("ace_core_ng_source_set") {
       "common/ime/text_input_connection.cpp",
       "common/ime/text_input_formatter.cpp",
       "common/ime/text_input_keyboard_utils.cpp",
+      "common/ime/text_input_obscure_utils.cpp",
       "common/ime/text_input_proxy.cpp",
       "common/ime/text_input_type.cpp",
 

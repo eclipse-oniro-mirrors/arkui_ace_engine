@@ -16,16 +16,13 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_RICH_EDITOR_SPAN_STRING_MODE_SWITCHER_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_RICH_EDITOR_SPAN_STRING_MODE_SWITCHER_H
 
-#include <string>
-#include "core/components_ng/pattern/text/span/span_object.h"
-
 #include "base/memory/ace_type.h"
-#include "core/common/ime/text_input_filter.h"
 #include "core/common/ime/text_input_type.h"
-#include "core/components_ng/pattern/rich_editor/plain_text_span_string.h"
-#include "core/components_ng/pattern/text/span/mutable_span_string.h"
 
 namespace OHOS::Ace {
+
+class SpanString;
+class MutableSpanString;
 
 /**
  * @brief Helper for switching styledString_ between PlainTextSpanString and MutableSpanString.
@@ -43,15 +40,7 @@ public:
         return inputType != TextInputType::UNSPECIFIED && inputType != TextInputType::MULTILINE;
     }
 
-    static RefPtr<SpanString> FilterSpanString(const RefPtr<SpanString>& src, TextInputType keyboard)
-    {
-        CHECK_NULL_RETURN(src, src);
-        auto filtered = src->GetU16string();
-        TextInputFilter::FilterByInputType(keyboard, filtered);
-        // Always create a new plain SpanString to strip any styling from the source,
-        // ensuring pasted/dragged content conforms to the single-style plain text mode.
-        return AceType::MakeRefPtr<SpanString>(filtered);
-    }
+    static RefPtr<SpanString> FilterSpanString(const RefPtr<SpanString>& src, TextInputType keyboard);
 
     void SwitchToPlainText(RefPtr<MutableSpanString>& styledString);
     void SwitchToMutable(RefPtr<MutableSpanString>& styledString);

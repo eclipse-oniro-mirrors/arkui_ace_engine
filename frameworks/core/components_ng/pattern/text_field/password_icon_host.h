@@ -17,32 +17,34 @@
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_TEXT_FIELD_PASSWORD_ICON_HOST_H
 
 #include <optional>
+#include <string>
 #include <vector>
 
-#include "base/log/log_wrapper.h"
 #include "base/memory/ace_type.h"
-#include "core/common/ace_application_info.h"
 #include "core/common/ime/password_obscure_helper.h"
 #include "core/common/ime/text_input_action.h"
-#include "core/common/ime/text_input_filter.h"
-#include "core/common/ime/text_input_keyboard_utils.h"
 #include "core/common/ime/text_input_type.h"
 #include "core/common/text_capability_model.h"
-#include "core/common/text_field_manager_ng.h"
-#include "core/components_ng/base/frame_node.h"
-#include "core/components_ng/property/accessibility_property.h"
-#include "core/event/mouse_event.h"
-#include "core/image/image_source_info.h"
+#include "ui/properties/dirty_flag.h"
 
 namespace OHOS::Ace {
 class ImageSourceInfo;
 class TextFieldTheme;
+class HoverInfo;
 enum class TextDirection;
+enum AceLogTag : uint8_t;
+enum class SourceType : int32_t;
 
 namespace NG {
 class RoundRect;
 class EventHub;
 class PasswordResponseArea;
+class AccessibilityProperty;
+class FrameNode;
+class TextFieldPattern;
+class TextFieldLayoutProperty;
+class RichEditorPattern;
+class RichEditorLayoutProperty;
 
 /**
  * @brief Interface for text input mode hosting, decoupling PasswordResponseArea
@@ -80,329 +82,73 @@ public:
 template<typename Derived, typename LayoutPropertyT>
 class PasswordIconHostBase : public IPasswordIconHost {
 public:
-    RefPtr<TextFieldTheme> GetTextFieldTheme() const
-    {
-        return static_cast<const Derived*>(this)->GetTextFieldThemeImpl();
-    }
+    RefPtr<TextFieldTheme> GetTextFieldTheme() const;
 
-    TextDirection GetPasswordIconDirection() const override
-    {
-        auto prop = static_cast<const Derived*>(this)->template GetLayoutProperty<LayoutPropertyT>();
-        CHECK_NULL_RETURN(prop, TextDirection::LTR);
-        return prop->GetNonAutoLayoutDirection();
-    }
+    TextDirection GetPasswordIconDirection() const override;
 
-    bool CheckLayoutProperty() const override
-    {
-        return static_cast<const Derived*>(this)->template GetLayoutProperty<LayoutPropertyT>() != nullptr;
-    }
+    bool CheckLayoutProperty() const override;
 
-    ImageSourceInfo GetShowPasswordSourceInfo(const ImageSourceInfo& defaultInfo) override
-    {
-        auto prop = static_cast<const Derived*>(this)->template GetLayoutProperty<LayoutPropertyT>();
-        CHECK_NULL_RETURN(prop, defaultInfo);
-        return prop->GetShowPasswordSourceInfoValue(defaultInfo);
-    }
+    ImageSourceInfo GetShowPasswordSourceInfo(const ImageSourceInfo& defaultInfo) override;
+    ImageSourceInfo GetHidePasswordSourceInfo(const ImageSourceInfo& defaultInfo) override;
 
-    ImageSourceInfo GetHidePasswordSourceInfo(const ImageSourceInfo& defaultInfo) override
-    {
-        auto prop = static_cast<const Derived*>(this)->template GetLayoutProperty<LayoutPropertyT>();
-        CHECK_NULL_RETURN(prop, defaultInfo);
-        return prop->GetHidePasswordSourceInfoValue(defaultInfo);
-    }
+    bool IsShowPasswordIcon() const override;
 
-    bool IsShowPasswordIcon() const override
-    {
-        auto prop = static_cast<const Derived*>(this)->template GetLayoutProperty<LayoutPropertyT>();
-        CHECK_NULL_RETURN(prop, false);
-        auto theme = GetTextFieldTheme();
-        CHECK_NULL_RETURN(theme, false);
-        return prop->GetShowPasswordIconValue(theme->IsShowPasswordIcon())
-            && static_cast<const Derived*>(this)->IsInPasswordMode();
-    }
+    bool IsTV() const override;
 
-    bool IsTV() const override
-    {
-        auto theme = GetTextFieldTheme();
-        CHECK_NULL_RETURN(theme, false);
-        return theme->GetHoverAndPressBgColorEnabled();
-    }
+    bool IsDisabled() const override;
 
-    bool IsDisabled() const override
-    {
-        auto eventHub = static_cast<const Derived*>(this)->template GetEventHub<EventHub>();
-        CHECK_NULL_RETURN(eventHub, true);
-        auto prop = static_cast<const Derived*>(this)->template GetLayoutProperty<LayoutPropertyT>();
-        CHECK_NULL_RETURN(prop, true);
-        return !eventHub->IsEnabled();
-    }
+    bool GetPasswordIconHoverColor(uint32_t& color) override;
+    bool GetPasswordIconPressColor(uint32_t& color) override;
 
-    bool GetPasswordIconHoverColor(uint32_t& color) override
-    {
-        auto theme = GetTextFieldTheme();
-        CHECK_NULL_RETURN(theme, false);
-        color = theme->GetHoverColor().GetValue();
-        return true;
-    }
-
-    bool GetPasswordIconPressColor(uint32_t& color) override
-    {
-        auto theme = GetTextFieldTheme();
-        CHECK_NULL_RETURN(theme, false);
-        color = theme->GetPressColor().GetValue();
-        return true;
-    }
-
-    bool SetPasswordIconHoverColor(const std::vector<RoundRect>& rects, uint32_t color) override
-    {
-        auto host = static_cast<Derived*>(this)->GetHost();
-        CHECK_NULL_RETURN(host, false);
-        CHECK_NULL_RETURN(SetHoverColorAndRectsOnModifier(rects, color), false);
-        host->MarkDirtyNode(GetHoverDirtyFlag());
-        return true;
-    }
-
-    bool ClearPasswordIconHoverColor() override
-    {
-        auto host = static_cast<Derived*>(this)->GetHost();
-        CHECK_NULL_RETURN(host, false);
-        CHECK_NULL_RETURN(ClearHoverColorAndRectsOnModifier(), false);
-        host->MarkDirtyNode(GetHoverDirtyFlag());
-        return true;
-    }
+    bool SetPasswordIconHoverColor(const std::vector<RoundRect>& rects, uint32_t color) override;
+    bool ClearPasswordIconHoverColor() override;
 
     void SetIsPasswordSymbol(bool isPasswordSymbol)
     {
         isPasswordSymbol_ = isPasswordSymbol;
     }
 
-    bool IsShowPasswordSymbol() const override
-    {
-        return isPasswordSymbol_ &&
-            AceApplicationInfo::GetInstance().GreatOrEqualTargetAPIVersion(PlatformVersion::VERSION_THIRTEEN);
-    }
+    bool IsShowPasswordSymbol() const override;
 
-    TextInputType GetTextInputType() const
-    {
-        auto prop = static_cast<const Derived*>(this)->template GetLayoutProperty<LayoutPropertyT>();
-        return prop ? prop->GetTextInputTypeValue(TextInputType::UNSPECIFIED) : TextInputType::UNSPECIFIED;
-    }
+    TextInputType GetTextInputType() const;
 
-    bool IsOneTimeCodeType() const
-    {
-        return IsOneTimeCodeInputType(GetTextInputType());
-    }
+    bool IsOneTimeCodeType() const;
 
-    bool IsInPasswordMode() const override
-    {
-        return IsPasswordInputType(GetTextInputType());
-    }
+    bool IsInPasswordMode() const override;
 
     virtual bool IsSingleLineForPassword() const = 0;
 
-    void UpdateObscure(const std::u16string& insertValue, bool hasInsert)
-    {
-        CHECK_NULL_VOID(IsSingleLineForPassword() && IsInPasswordMode() && GetTextObscured());
-        auto inputType = GetTextInputType();
-        bool isSingleVisibleChar = hasInsert && insertValue.length() == 1 &&
-            (inputType != TextInputType::NUMBER_PASSWORD || std::isdigit(insertValue[0]));
-        if (isSingleVisibleChar) {
-            obscureHelper_.UpdateObscure(
-                inputType, insertValue, hasInsert, GetObscureContent(), GetObscureCaretPosition());
-        } else {
-            obscureHelper_.ClearState();
-        }
-    }
+    void UpdateObscure(const std::u16string& insertValue, bool hasInsert);
 
-    int32_t GetNakedCharPosition() const
-    {
-        if (!TextInputObscureUtils::ShouldRevealNakedChar(IsSingleLineForPassword(), IsInPasswordMode(),
-                GetTextObscured(), obscureHelper_.GetTickCountDown())) {
-            return -1;
-        }
-        CHECK_NULL_RETURN(CheckLayoutProperty(), -1);
-        return obscureHelper_.GetNakedCharPosition(HasObscureContent());
-    }
+    int32_t GetNakedCharPosition() const;
 
-    bool IsPasswordObscured() const
-    {
-        return IsSingleLineForPassword() && IsInPasswordMode() && GetTextObscured();
-    }
+    bool IsPasswordObscured() const;
 
-    void CheckAndUpdateInputTypeForOtp()
-    {
-        auto host = static_cast<Derived*>(this)->GetHost();
-        CHECK_NULL_VOID(host);
-        auto layoutProperty = static_cast<Derived*>(this)->template GetLayoutProperty<LayoutPropertyT>();
-        CHECK_NULL_VOID(layoutProperty);
-        CHECK_NULL_VOID(TryUpgradeToOtpType(layoutProperty.GetRawPtr(), keyboard_, isFilterChanged_));
-        TAG_LOGI(GetLogTag(), "%{public}d detected verify code, update type to OTC", host->GetId());
-        if (static_cast<Derived*>(this)->HasFocus()) {
-            RequestKeyboardForOTP();
-        }
-    }
+    void CheckAndUpdateInputTypeForOtp();
 
-    bool DoRequestKeyboardNotByFocusSwitch(SourceType sourceType)
-    {
-        CHECK_NULL_RETURN(DoCallRequestKeyboard(sourceType), false);
-        auto textFieldManager = GetTextFieldManager();
-        CHECK_NULL_RETURN(textFieldManager, true);
-        textFieldManager->SetNeedToRequestKeyboard(false);
-        return true;
-    }
+    bool DoRequestKeyboardNotByFocusSwitch(SourceType sourceType);
 
-    RefPtr<TextFieldManagerNG> GetTextFieldManager()
-    {
-        auto pipeline = static_cast<Derived*>(this)->GetContext();
-        CHECK_NULL_RETURN(pipeline, nullptr);
-        return DynamicCast<TextFieldManagerNG>(pipeline->GetTextFieldManager());
-    }
+    void CheckPasswordAreaState();
 
-    void CheckPasswordAreaState()
-    {
-        auto obscuredState = GetObscuredState();
-        CHECK_NULL_VOID(obscuredState.has_value());
-        auto passwordArea = GetPasswordResponseArea();
-        CHECK_NULL_VOID(passwordArea);
-        bool obscured = obscuredState.value();
-        bool showPasswordText = !obscured;
-        if (!showPasswordState_.has_value() || showPasswordState_.value() != showPasswordText) {
-            showPasswordState_ = showPasswordText;
-            passwordArea->SetObscured(obscured);
-        }
-    }
+    bool ResetObscureTickCountDown(PropertyChangeFlag flag = PROPERTY_UPDATE_MEASURE_SELF);
 
-    bool ResetObscureTickCountDown(PropertyChangeFlag flag = PROPERTY_UPDATE_MEASURE_SELF)
-    {
-        CHECK_NULL_RETURN(IsPasswordObscured(), false);
-        bool changed = obscureHelper_.ResetTickCountDown();
-        if (changed) {
-            OnObscureDirty(flag);
-        }
-        return changed;
-    }
+    void TickDownPasswordObscure();
 
-    void TickDownPasswordObscure()
-    {
-        if (!IsPasswordObscured() || obscureHelper_.GetTickCountDown() <= 0) {
-            return;
-        }
-        obscureHelper_.TickDown();
-        if (obscureHelper_.GetTickCountDown() == 0) {
-            OnObscureDirty(PROPERTY_UPDATE_MEASURE);
-        }
-    }
-
-    void CheckIfNeedToResetKeyboard()
-    {
-        auto host = static_cast<Derived*>(this)->GetHost();
-        CHECK_NULL_VOID(host);
-        auto currentType = GetTextInputType();
-        if (ShouldDoDynamicSwitch(currentType)) {
-            DoDynamicSwitch(currentType);
-            return;
-        }
-        bool needToResetKeyboard = false;
-        if (IsKeyboardTypeChanged()) {
-            TAG_LOGI(GetLogTag(), "%{public}d KBType %{public}d -> %{public}d",
-                host->GetId(), static_cast<int32_t>(keyboard_),
-                static_cast<int32_t>(currentType));
-            keyboard_ = currentType;
-            OnKeyboardTypeChanged();
-            needToResetKeyboard = ShouldResetKeyboardOnTypeChange();
-        }
-        DoResetKeyboardCommon(host, needToResetKeyboard, false);
-    }
+    void CheckIfNeedToResetKeyboard();
 
     void DoResetKeyboardCommon(const RefPtr<FrameNode>& host,
-        bool needToResetKeyboard, bool isDynamic)
-    {
-        if (ShouldCheckOtpOnReset(isDynamic)) {
-            CheckAndUpdateInputTypeForOtp();
-        }
-        auto currentAction = static_cast<Derived*>(this)->GetTextInputActionValue(
-            static_cast<Derived*>(this)->GetDefaultTextInputAction());
-        if (!needToResetKeyboard && action_ != TextInputAction::UNSPECIFIED) {
-            needToResetKeyboard = action_ != currentAction;
-        }
-        action_ = currentAction;
-        DoKeyboardResetPlatform(host, needToResetKeyboard, isDynamic);
-    }
+        bool needToResetKeyboard, bool isDynamic);
 
-    TextCapability GetDisabledCapabilities() const
-    {
-        return IsInPasswordMode() ? GetPasswordDisabledCapabilities() : TextCapability::NONE;
-    }
+    TextCapability GetDisabledCapabilities() const;
 
-    bool IsCapabilityAllowed(TextCapability cap) const
-    {
-        return OHOS::Ace::IsCapabilityAllowed(GetDisabledCapabilities(), cap);
-    }
+    bool IsCapabilityAllowed(TextCapability cap) const;
+    bool IsCapabilityDisabled(TextCapability cap) const;
 
-    bool IsCapabilityDisabled(TextCapability cap) const
-    {
-        return OHOS::Ace::IsCapabilityDisabled(GetDisabledCapabilities(), cap);
-    }
+    std::string GetPasswordIconPromptInformation(bool show);
 
-    std::string GetPasswordIconPromptInformation(bool show)
-    {
-        auto theme = GetTextFieldTheme();
-        CHECK_NULL_RETURN(theme, "");
-        return show ? theme->GetShowPasswordPromptInformation()
-                    : theme->GetHiddenPasswordPromptInformation();
-    }
+    void SetAccessibilityPasswordIconAction();
 
-    void SetAccessibilityPasswordIconAction()
-    {
-        CHECK_NULL_VOID(IsShowPasswordIcon());
-        auto passwordArea = GetPasswordResponseArea();
-        CHECK_NULL_VOID(passwordArea);
-        auto node = passwordArea->GetFrameNode();
-        CHECK_NULL_VOID(node);
-        auto textAccessibilityProperty = node->template GetAccessibilityProperty<AccessibilityProperty>();
-        CHECK_NULL_VOID(textAccessibilityProperty);
-        textAccessibilityProperty->SetAccessibilityLevel("yes");
-        textAccessibilityProperty->SetAccessibilityText(GetPasswordIconPromptInformation(passwordArea->IsObscured()));
-        textAccessibilityProperty->SetAccessibilityCustomRole("button");
-    }
-
-    bool ProcessPasswordArea()
-    {
-        auto host = static_cast<Derived*>(this)->GetHost();
-        CHECK_NULL_RETURN(host, false);
-        // Not in password mode: callers own the teardown of any leftover
-        // password area, so the shared base stays free of host-specific cleanup.
-        if (!IsInPasswordMode()) {
-            return false;
-        }
-        auto area = GetPasswordResponseArea();
-        if (area) {
-            // A password area already exists.
-            if (IsShowPasswordIcon()) {
-                area->Refresh();
-            } else {
-                area->ClearArea();
-            }
-            CheckPasswordAreaState();
-            return true;
-        }
-        // No password area yet; the slot may hold a non-password area left over
-        // from a previous mode, tear it down before installing the new one.
-        ClearNonPasswordResponseArea();
-        auto newArea = AceType::MakeRefPtr<PasswordResponseArea>(
-            WeakClaim(static_cast<Derived*>(this)), textObscured_);
-        SetPasswordResponseArea(newArea);
-        if (IsShowPasswordIcon()) {
-            newArea->InitResponseArea();
-        } else {
-            // Legacy behavior: allocate then immediately clear. ClearArea is a
-            // no-op because InitResponseArea was not called; the slot is left
-            // non-null, matching the old inline logic.
-            newArea->ClearArea();
-        }
-        CheckPasswordAreaState();
-        return true;
-    }
+    bool ProcessPasswordArea();
 
 protected:
     PasswordObscureHelper obscureHelper_;
@@ -427,19 +173,11 @@ public:
         isFilterChanged_ = false;
         return v;
     }
-    void RequestKeyboardForOTP()
-    {
-        auto host = static_cast<Derived*>(this)->GetHost();
-        CHECK_NULL_VOID(host);
-        TAG_LOGI(GetLogTag(), "%{public}d requestKB, reason: RESET_KEYBOARD (OTP)", host->GetId());
-        DoRequestKeyboardNotByFocusSwitch(SourceType::NONE);
-    }
+    void RequestKeyboardForOTP();
+
     virtual AceLogTag GetLogTag() const = 0;
 
-    bool DoCallRequestKeyboard(SourceType sourceType)
-    {
-        return static_cast<Derived*>(this)->RequestKeyboard(false, true, true, sourceType);
-    }
+    bool DoCallRequestKeyboard(SourceType sourceType);
 
     virtual std::optional<bool> GetObscuredState() { return textObscured_; }
     virtual RefPtr<PasswordResponseArea> GetPasswordResponseArea() = 0;
@@ -458,33 +196,7 @@ public:
         DoKeyboardResetPlatformCommon(needToResetKeyboard);
     }
 
-    void DoKeyboardResetPlatformCommon(bool needToResetKeyboard)
-    {
-#if defined(OHOS_STANDARD_SYSTEM) && !defined(PREVIEW)
-        if (needToResetKeyboard && static_cast<Derived*>(this)->HasFocus()) {
-            if (IsCustomKeyboardAttached() || IsOneTimeCodeType()) {
-                auto kbHost = static_cast<Derived*>(this)->GetHost();
-                CHECK_NULL_VOID(kbHost);
-                TAG_LOGI(GetLogTag(), "%{public}d requestKB, reason: RESET_KEYBOARD, sourceType:%{public}d",
-                    kbHost->GetId(), static_cast<int32_t>(SourceType::NONE));
-                DoRequestKeyboardNotByFocusSwitch(SourceType::NONE);
-                return;
-            }
-#if defined(ENABLE_STANDARD_INPUT)
-            auto kbHost = static_cast<Derived*>(this)->GetHost();
-            CHECK_NULL_VOID(kbHost);
-            TAG_LOGI(GetLogTag(), "%{public}d KB action:%{public}d",
-                kbHost->GetId(), static_cast<int32_t>(action_));
-#endif
-            NotifyInputMethodConfigChange(action_, keyboard_);
-        }
-#else
-        if (needToResetKeyboard && static_cast<Derived*>(this)->HasConnection()) {
-            static_cast<Derived*>(this)->CloseKeyboard(true);
-            static_cast<Derived*>(this)->RequestKeyboard(false, true, true);
-        }
-#endif
-    }
+    void DoKeyboardResetPlatformCommon(bool needToResetKeyboard);
 
     virtual bool IsCustomKeyboardAttached() const { return false; }
 
@@ -503,12 +215,8 @@ public:
     {
         return PROPERTY_UPDATE_MEASURE_SELF;
     }
-    void FireSecurityStateChanged(bool isSecure)
-    {
-        auto hub = static_cast<Derived*>(this)->GetSecurityEventHubImpl();
-        CHECK_NULL_VOID(hub);
-        hub->FireOnSecurityStateChanged(isSecure);
-    }
+    void FireSecurityStateChanged(bool isSecure);
+
     virtual void SetPasswordResponseArea(const RefPtr<PasswordResponseArea>& area) = 0;
     // Tears down a pre-existing response area that is not a PasswordResponseArea
     // (e.g. a UnitResponseArea left over from a previous non-password mode).
@@ -523,6 +231,10 @@ private:
 
     bool isPasswordSymbol_ = true;
 };
+
+// Suppress implicit instantiation — method bodies are in password_icon_host_base.cpp
+extern template class PasswordIconHostBase<TextFieldPattern, TextFieldLayoutProperty>;
+extern template class PasswordIconHostBase<RichEditorPattern, RichEditorLayoutProperty>;
 
 } // namespace OHOS::Ace::NG
 } // namespace OHOS::Ace
