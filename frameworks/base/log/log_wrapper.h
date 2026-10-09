@@ -294,7 +294,7 @@ private:
     LogWrapper() = delete;
     ~LogWrapper() = delete;
 
-    static LogLevel level_;
+    static LogLevel& GetLogLevelStorage();
 };
 
 ACE_FORCE_EXPORT bool LogBacktrace(size_t maxFrameNums = 256);
