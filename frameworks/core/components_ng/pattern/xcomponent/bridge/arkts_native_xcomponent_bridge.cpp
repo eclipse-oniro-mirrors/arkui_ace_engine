@@ -776,7 +776,7 @@ void XComponentBridge::HandleDetachCallback(ArkUIRuntimeCallInfo* runtimeCallInf
     CHECK_NULL_VOID(runtimeCallInfo->GetArgsNumber() > ARG_FIRST);
     Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(ARG_FIRST);
     CHECK_NULL_VOID(firstArg->IsNativePointer(vm));
-    auto detachCallback = [](const std::string& xcomponentId) {
+    DetachCallback detachCallback = [](const std::string& xcomponentId) {
 #ifdef XCOMPONENT_SUPPORTED
         Framework::XComponentClient::GetInstance().DeleteControllerFromJSXComponentControllersMap(xcomponentId);
         Framework::XComponentClient::GetInstance().DeleteFromJsValMapById(xcomponentId);
