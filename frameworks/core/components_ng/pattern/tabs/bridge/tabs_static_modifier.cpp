@@ -1170,6 +1170,46 @@ void SetSidebarDisplayStyleImpl(Ark_NativePointer node,
     }
     TabsModelNG::SetSidebarDisplayStyle(frameNode, sidebarDisplayStyle);
 }
+void SetSidebarFooterImpl(Ark_NativePointer node,
+                          const Opt_ComponentContentBase* value)
+{
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    if (!value || value->tag == InteropTag::INTEROP_TAG_UNDEFINED) {
+        TabsModelNG::SetSidebarFooter(frameNode, nullptr);
+        return;
+    }
+    auto contentPeer = reinterpret_cast<FrameNodePeer*>(value->value);
+    if (!contentPeer) {
+        TabsModelNG::SetSidebarFooter(frameNode, nullptr);
+        return;
+    }
+    if (auto footerNode = FrameNodePeer::GetFrameNodeByPeer(contentPeer)) {
+        TabsModelNG::SetSidebarFooter(frameNode, footerNode);
+    } else {
+        TabsModelNG::SetSidebarFooter(frameNode, nullptr);
+    }
+}
+void SetSidebarBottomBarImpl(Ark_NativePointer node,
+                             const Opt_ComponentContentBase* value)
+{
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    if (!value || value->tag == InteropTag::INTEROP_TAG_UNDEFINED) {
+        TabsModelNG::SetSidebarBottomBar(frameNode, nullptr);
+        return;
+    }
+    auto contentPeer = reinterpret_cast<FrameNodePeer*>(value->value);
+    if (!contentPeer) {
+        TabsModelNG::SetSidebarBottomBar(frameNode, nullptr);
+        return;
+    }
+    if (auto bottomBarNode = FrameNodePeer::GetFrameNodeByPeer(contentPeer)) {
+        TabsModelNG::SetSidebarBottomBar(frameNode, bottomBarNode);
+    } else {
+        TabsModelNG::SetSidebarBottomBar(frameNode, nullptr);
+    }
+}
 } // TabsAttributeModifier
 const GENERATED_ArkUITabsModifier* GetTabsModifier()
 {
@@ -1224,6 +1264,8 @@ const GENERATED_ArkUITabsModifier* GetTabsModifier()
         TabsAttributeModifier::SetSidebarBackgroundBlurStyleImpl,
         TabsAttributeModifier::SetSidebarDividerImpl,
         TabsAttributeModifier::SetSidebarDisplayStyleImpl,
+        TabsAttributeModifier::SetSidebarFooterImpl,
+        TabsAttributeModifier::SetSidebarBottomBarImpl,
         TabsAttributeModifier::SetBarModeImpl,
         TabsAttributeModifier::SetBarHeight1Impl,
         TabsAttributeModifier::SetBarBackgroundBlurStyle1Impl,
