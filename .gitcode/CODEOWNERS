@@ -3584,6 +3584,7 @@ test/mock/interfaces/native/mock_native_error_message_wrapper.cpp @arkui_framewo
 test/mock/ohos_mock/ @arkui_framework_xnode
 test/unittest/adapter/ @arkui_framework_xnode
 test/unittest/adapter/ohos/capability/html_to_spanstring_test.cpp @huawei_g_five
+test/unittest/bridge/common/media_query @arkuilayout1
 test/unittest/core/accessibility/ @ArkUI_ability_group
 test/unittest/core/animation/ @arkuicodepulse
 test/unittest/core/base/ @arkui_framework_xnode
