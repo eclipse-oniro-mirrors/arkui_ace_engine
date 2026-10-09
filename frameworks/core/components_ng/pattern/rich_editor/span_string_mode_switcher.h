@@ -22,7 +22,6 @@
 #include "base/memory/ace_type.h"
 #include "core/common/ime/text_input_filter.h"
 #include "core/common/ime/text_input_type.h"
-#include "core/components_ng/pattern/rich_editor/plain_text_span_string.h"
 #include "core/components_ng/pattern/text/span/mutable_span_string.h"
 
 namespace OHOS::Ace {

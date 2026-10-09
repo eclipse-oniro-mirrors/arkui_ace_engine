@@ -19,6 +19,7 @@
 #include <string_view>
 
 #include "core/components_ng/pattern/rich_editor/rich_editor_pattern.h"
+#include "core/components_ng/pattern/rich_editor/plain_text_span_string.h"
 #include "core/components_ng/pattern/rich_editor/rich_editor_theme.h"
 #include "core/components_ng/pattern/text/span/mutable_span_string.h"
 

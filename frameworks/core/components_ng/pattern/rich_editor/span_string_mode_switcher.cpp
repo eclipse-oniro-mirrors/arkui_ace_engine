@@ -14,6 +14,7 @@
  */
 
 #include "core/components_ng/pattern/text/span_node.h"
+#include "core/components_ng/pattern/rich_editor/plain_text_span_string.h"
 #include "span_string_mode_switcher.h"
 
 namespace OHOS::Ace {

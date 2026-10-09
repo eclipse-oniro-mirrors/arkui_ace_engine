@@ -46,9 +46,6 @@
 #include "base/view_data/ace_auto_fill_type.h"
 #include "core/components_ng/pattern/text_field/password_icon_host.h"
 #include "core/components/text_field/textfield_theme.h"
-#include "core/common/text_capability_model.h"
-#include "core/common/ime/password_obscure_helper.h"
-#include "core/components_ng/pattern/rich_editor/plain_text_span_string.h"
 #include "core/components_ng/pattern/rich_editor/span_string_mode_switcher.h"
 
 #include "core/components_ng/pattern/text_field/clean_node_host.h"
