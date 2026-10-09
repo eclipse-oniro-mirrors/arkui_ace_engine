@@ -725,22 +725,17 @@ class ObserveV2 {
       // exec a re-render or exec a monitor function changes some state -> calls fireChange -> ...
       const hasPendingChanges = (this.elmtIdsChanged_.size + this.monitorIdsChanged_.size + this.computedPropIdsChanged_.size) > 0;
       const isReuseInProgress = (this.currentReuseId_ !== ObserveV2.NO_REUSE);
-      // force-schedule one recovery round after updateDirty() processing threw,
-      // pending changes from the crashed round are still queued in the sets below
       const isRecoveryPending = this.pendingRecovery_;
       const shouldUpdateDirty = ((isRecoveryPending || !hasPendingChanges) && !this.startDirty_ && !isReuseInProgress);
 
       if (shouldUpdateDirty) {
         if (isRecoveryPending) {
           stateMgmtConsole.warn('Scheduling recovery update round: processing pending state changes from the previously failed update round');
+          this.pendingRecovery_ = false;
         }
-        this.pendingRecovery_ = false;
         Promise.resolve().then(this.updateDirtyBoundFunction_)
           .catch(error => {
             stateMgmtConsole.applicationError(`Exception occurred during the update process involving @Computed properties, @Monitor functions or UINode re-rendering`, error);
-            // reset transient singleton flags before reporting:
-            // keep the update pipeline schedulable once the application
-            // swallows the error via a global uncaught-exception handler
             this.startDirty_ = false;
             this.pendingRecovery_ = true;
             _arkUIUncaughtPromiseError(error);
@@ -765,7 +760,10 @@ class ObserveV2 {
     } // for
 
     // execute the AddMonitor synchronous function and @SyncMonitor function
-    this.executeSyncMonitors_();
+    // inline guard: avoid function call overhead when no sync monitors pending
+    if (this.monitorSyncIdsChangedForAddMonitorBased_.size) {
+      this.executeSyncMonitors_();
+    }
 
     // report the stateVar changed when recording the profiler
     if (stateMgmtDFX.enableProfiler && !ignoreOnProfiler) {
@@ -774,40 +772,58 @@ class ObserveV2 {
   }
 
   // execute the AddMonitor synchronous function and @SyncMonitor function block.
-  // item errors are isolated so the remaining monitors of the batch still run;
-  // the first error is re-thrown after the block, keeping the original
-  // behavior that the assigning application code sees the exception
+  // Caller (fireChange) guarantees monitorSyncIdsChangedForAddMonitorBased_ is non-empty.
+  //
+  // Error isolation: the first item error is stored (firstSyncItemError_), remaining
+  // monitors still run, and the stored error is re-thrown after the block — preserving
+  // the original behavior that the assigning application code sees the exception.
+  //
+  // Reentrancy handling: if a @SyncMonitor function changes state that triggers a
+  // nested fireChange → executeSyncMonitors_, the nested call detects reentrancy by
+  // seeing firstSyncItemError_ non-undefined on entry (outer call stored an error).
+  // Only then does it save/clear/restore. On the normal path (no error, no reentrancy),
+  // firstSyncItemError_ is undefined throughout — zero writes.
+  private firstSyncItemError_: Error | undefined = undefined;
+
+  private syncItemError_: (e: Error, what: string, recordedStackDepth: number) => void =
+      (e: Error, what: string, recordedStackDepth: number): void => {
+        this.unwindRecordingStack_(recordedStackDepth);
+        stateMgmtConsole.applicationError(`Exception during ${what} - continuing with the remaining synchronous monitors of this batch`, e);
+        if (this.firstSyncItemError_ === undefined) {
+          this.firstSyncItemError_ = e;
+        } else {
+          _arkUIUncaughtPromiseError(e);
+        }
+      };
+
   private executeSyncMonitors_(): void {
     const syncBlockStackDepth = this.stackOfRenderedComponents_.size();
-    let firstSyncItemError: Error | undefined = undefined;
-    const onSyncItemError = (e: Error, what: string, recordedStackDepth: number): void => {
-      this.unwindRecordingStack_(recordedStackDepth);
-      stateMgmtConsole.applicationError(`Exception during ${what} - continuing with the remaining synchronous monitors of this batch`, e);
-      if (firstSyncItemError === undefined) {
-        // re-thrown after the block, reaches the assigning application code like before
-        firstSyncItemError = e;
-      } else {
-        // additional errors cannot propagate any more, report them directly
-        _arkUIUncaughtPromiseError(e);
-      }
-    };
+    const savedError = this.firstSyncItemError_;
+    if (savedError !== undefined) {
+      this.firstSyncItemError_ = undefined;
+    }
     try {
       while (this.monitorSyncIdsChangedForAddMonitorBased_.size) {
         stateMgmtConsole.debug(`AddMonitor API/@SyncMonitor monitorSyncIdsChangedForAddMonitorBased_ ${this.monitorSyncIdsChangedForAddMonitorBased_.size}`);
         const monitorIdSet: Set<number> = this.monitorSyncIdsChangedForAddMonitorBased_;
         this.monitorSyncIdsChangedForAddMonitorBased_ = new Set<number>();
-        // update the value and dependency for each path and get the MonitorV2 id needs to be execute
-        let funcsToRun = this.updateDirtyMonitorPath(monitorIdSet, onSyncItemError);
+        let funcsToRun = this.updateDirtyMonitorPath(monitorIdSet, this.syncItemError_);
         if (funcsToRun.size) {
-          this.runAddMonitorBasedFunctions(funcsToRun, onSyncItemError);
+          this.runAddMonitorBasedFunctions(funcsToRun, this.syncItemError_);
         }
       }
     } catch (e) {
       this.unwindRecordingStack_(syncBlockStackDepth);
+      this.firstSyncItemError_ = savedError;
       throw e;
     }
-    if (firstSyncItemError !== undefined) {
-      throw firstSyncItemError;
+    if (this.firstSyncItemError_ !== undefined) {
+      const err = this.firstSyncItemError_;
+      this.firstSyncItemError_ = savedError;
+      throw err;
+    }
+    if (savedError !== undefined) {
+      this.firstSyncItemError_ = savedError;
     }
   }
 
@@ -1100,11 +1116,9 @@ class ObserveV2 {
         }
         this.monitorAsyncIdsChangedForAddMonitorBased_ = new Set<number>();
         // update the value and dependency for each path and get the MonitorV2 id needs to be execute
-        let funcsToRun = this.updateDirtyMonitorPath(monitorIdSet,
-          (e: Error, what: string, recordedStackDepth: number): void => this.handleUpdateItemError_(e, what, recordedStackDepth));
+        let funcsToRun = this.updateDirtyMonitorPath(monitorIdSet, this.handleItemErrorBound_);
         if (funcsToRun.size) {
-          this.runAddMonitorBasedFunctions(funcsToRun,
-            (e: Error, what: string, recordedStackDepth: number): void => this.handleUpdateItemError_(e, what, recordedStackDepth));
+          this.runAddMonitorBasedFunctions(funcsToRun, this.handleItemErrorBound_);
         }
       }
     } while (this.monitorIdsChanged_.size + this.persistenceChanged_.size + this.computedPropIdsChanged_.size > 0);
@@ -1131,15 +1145,20 @@ class ObserveV2 {
     _arkUIUncaughtPromiseError(e);
   }
 
+  // bound method: pass as onItemError callback without creating a lambda per call
+  private handleItemErrorBound_: (e: Error, what: string, recordedStackDepth: number) => void =
+      (e: Error, what: string, recordedStackDepth: number): void => this.handleUpdateItemError_(e, what, recordedStackDepth);
+
   public updateDirtyComputedProps(computed: Array<number>): void {
     stateMgmtConsole.debug(`ObservedV2.updateDirtyComputedProps ${computed.length} props: ${JSON.stringify(computed)} ...`);
     aceDebugTrace.begin(`ObservedV2.updateDirtyComputedProps ${computed.length} @Computed`);
-    computed.forEach((id) => this.updateComputedItem_(id));
+    const recordedStackDepth = this.stackOfRenderedComponents_.size();
+    computed.forEach((id) => this.updateComputedItem_(id, recordedStackDepth));
     aceDebugTrace.end();
   }
 
   // update a single @Computed property, isolate its exceptions from the rest of the batch
-  private updateComputedItem_(id: number): void {
+  private updateComputedItem_(id: number, recordedStackDepth: number): void {
     const comp = this.id2Others_[id]?.deref();
     if (!(comp instanceof ComputedV2)) {
       return;
@@ -1150,7 +1169,6 @@ class ObserveV2 {
       target.addDelayedComputedIds(id);
       return;
     }
-    const recordedStackDepth = this.stackOfRenderedComponents_.size();
     try {
       comp.fireChange();
     } catch (e) {
@@ -1187,12 +1205,13 @@ class ObserveV2 {
   public updateDirtyMonitors(monitors: Set<number>): void {
     stateMgmtConsole.debug(`ObservedV2.updateDirtyMonitors: ${monitors.size} @monitor funcs: ${JSON.stringify(Array.from(monitors))} ...`);
     aceDebugTrace.begin(`ObservedV2.updateDirtyMonitors: ${monitors.size} @monitor`);
-    monitors.forEach((watchId) => this.updateMonitorItem_(watchId));
+    const recordedStackDepth = this.stackOfRenderedComponents_.size();
+    monitors.forEach((watchId) => this.updateMonitorItem_(watchId, recordedStackDepth));
     aceDebugTrace.end();
   }
 
   // run a single @Monitor/AddMonitor, isolate its exceptions from the rest of the batch
-  private updateMonitorItem_(watchId: number): void {
+  private updateMonitorItem_(watchId: number, recordedStackDepth: number): void {
     const monitor = this.id2Others_[watchId]?.deref();
     if (!(monitor instanceof MonitorV2)) {
       return;
@@ -1203,7 +1222,6 @@ class ObserveV2 {
       monitorTarget.addDelayedMonitorIds(watchId);
       return;
     }
-    const recordedStackDepth = this.stackOfRenderedComponents_.size();
     try {
       monitor.notifyChange(); // can delete this.elmtIdsChanged_
     } catch (e) {
@@ -1227,7 +1245,8 @@ class ObserveV2 {
     stateMgmtConsole.debug(`ObservedV2.runAddMonitorBasedFunctions: ${monitors.size}. AddMonitor/@SyncMonitor/@MonitorWithOpts funcs: ${JSON.stringify(Array.from(monitors))} ...`);
     aceDebugTrace.begin(`ObservedV2.runAddMonitorBasedFunctions: ${monitors.size}`);
 
-    monitors.forEach((watchId) => this.runAddMonitorItem_(watchId, onItemError));
+    const recordedStackDepth = onItemError ? this.stackOfRenderedComponents_.size() : 0;
+    monitors.forEach((watchId) => this.runAddMonitorItem_(watchId, onItemError, recordedStackDepth));
 
     aceDebugTrace.end();
   }
@@ -1235,7 +1254,8 @@ class ObserveV2 {
   // run one AddMonitor/@SyncMonitor/@MonitorWithOpts function, isolate its
   // exceptions from the rest of the batch when onItemError is given
   private runAddMonitorItem_(watchId: number,
-      onItemError?: (e: Error, what: string, recordedStackDepth: number) => void): void {
+      onItemError: ((e: Error, what: string, recordedStackDepth: number) => void) | undefined,
+      recordedStackDepth: number): void {
     const monitor = this.id2Others_[watchId]?.deref();
     if (!(monitor instanceof MonitorV2)) {
       return;
@@ -1244,7 +1264,6 @@ class ObserveV2 {
       monitor.runMonitorFunction();
       return;
     }
-    const recordedStackDepth = this.stackOfRenderedComponents_.size();
     try {
       monitor.runMonitorFunction();
     } catch (e) {
@@ -1256,9 +1275,10 @@ class ObserveV2 {
       onItemError?: (e: Error, what: string, recordedStackDepth: number) => void): Set<number> {
     stateMgmtConsole.debug(`ObservedV2.updateDirtyMonitorPath: ${monitorIds.size} addMonitor/@SyncMonitor funcs: ${JSON.stringify(Array.from(monitorIds))} ...`);
     aceDebugTrace.begin(`ObservedV3.updateDirtyMonitorPath: ${monitorIds.size} addMonitor/@SyncMonitor`);
+    const recordedStackDepth = onItemError ? this.stackOfRenderedComponents_.size() : 0;
     const funcsToRun = new Set<number>;
     monitorIds.forEach((monitorId) => {
-      const ret = this.updateMonitorPathItem_(monitorId, onItemError);
+      const ret = this.updateMonitorPathItem_(monitorId, onItemError, recordedStackDepth);
       if (ret > 0) {
         funcsToRun.add(ret);
       }
@@ -1271,7 +1291,8 @@ class ObserveV2 {
   // isolate its exceptions from the rest of the batch when onItemError is given;
   // returns the MonitorV2 id whose function needs to execute, or -1
   private updateMonitorPathItem_(monitorId: number,
-      onItemError?: (e: Error, what: string, recordedStackDepth: number) => void): number {
+      onItemError: ((e: Error, what: string, recordedStackDepth: number) => void) | undefined,
+      recordedStackDepth: number): number {
     const monitor = this.id2Others_[monitorId]?.deref();
     if (!(monitor instanceof MonitorV2)) {
       return -1;
@@ -1284,7 +1305,6 @@ class ObserveV2 {
     if (!onItemError) {
       return monitor.notifyChangeForEachPath(monitorId);
     }
-    const recordedStackDepth = this.stackOfRenderedComponents_.size();
     try {
       // find the path MonitorValue and record dependency again
       // get path owning MonitorV2 id
