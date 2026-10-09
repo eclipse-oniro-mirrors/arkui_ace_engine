@@ -23,13 +23,97 @@
 #include "test/mock/frameworks/core/common/mock_container.h"
 #include "test/mock/frameworks/core/common/mock_theme_manager.h"
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
+#include <thread>
+
 #include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/base/ui_node.h"
+#include "core/components/common/layout/constants.h"
+#include "core/components_v2/inspector/inspector_constants.h"
+#include "frameworks/base/error/error_code.h"
+#include "interfaces/native/native_error_message_wrapper.h"
+#include "core/common/ace_application_info.h"
+#include "interfaces/native/node/config_manager.h"
 #include "interfaces/native/node/node_model.h"
 
 using namespace testing;
 using namespace testing::ext;
 using namespace OHOS::Ace;
 using namespace OHOS::Ace::NG;
+
+ArkUI_Int32 MockListItemExpand(ArkUINodeHandle node, ArkUI_Int32 direction)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    if (frameNode == nullptr) {
+        OHOS::Ace::SetErrorCodeAndMessageByModifier(
+            OHOS::Ace::ERROR_CODE_PARAM_INVALID, "frame node is null");
+        return OHOS::Ace::ERROR_CODE_PARAM_INVALID;
+    }
+    if (frameNode->GetTag() != V2::LIST_ITEM_ETS_TAG) {
+        OHOS::Ace::SetErrorCodeAndMessageByModifier(
+            OHOS::Ace::ERROR_CODE_PARAM_ERROR, "node type is not ListItem");
+        return OHOS::Ace::ERROR_CODE_PARAM_ERROR;
+    }
+    if (static_cast<int32_t>(ListItemSwipeActionDirection::START) > direction ||
+        static_cast<int32_t>(ListItemSwipeActionDirection::END) < direction) {
+        OHOS::Ace::SetErrorCodeAndMessageByModifier(
+            OHOS::Ace::ERROR_CODE_PARAM_INVALID, "direction is invalid");
+        return OHOS::Ace::ERROR_CODE_PARAM_INVALID;
+    }
+    if (!frameNode->IsOnMainTree()) {
+        OHOS::Ace::SetErrorCodeAndMessageByModifier(
+            OHOS::Ace::ERROR_CODE_NATIVE_IMPL_NODE_NOT_ON_MAIN_TREE, "node is not on main tree");
+        return OHOS::Ace::ERROR_CODE_NATIVE_IMPL_NODE_NOT_ON_MAIN_TREE;
+    }
+    return OHOS::Ace::ERROR_CODE_NO_ERROR;
+}
+
+ArkUI_Int32 MockListItemCollapse(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    if (frameNode == nullptr) {
+        OHOS::Ace::SetErrorCodeAndMessageByModifier(
+            OHOS::Ace::ERROR_CODE_PARAM_INVALID, "frame node is null");
+        return OHOS::Ace::ERROR_CODE_PARAM_INVALID;
+    }
+    if (frameNode->GetTag() != V2::LIST_ITEM_ETS_TAG) {
+        OHOS::Ace::SetErrorCodeAndMessageByModifier(
+            OHOS::Ace::ERROR_CODE_PARAM_ERROR, "node type is not ListItem");
+        return OHOS::Ace::ERROR_CODE_PARAM_ERROR;
+    }
+    if (!frameNode->IsOnMainTree()) {
+        OHOS::Ace::SetErrorCodeAndMessageByModifier(
+            OHOS::Ace::ERROR_CODE_NATIVE_IMPL_NODE_NOT_ON_MAIN_TREE, "node is not on main tree");
+        return OHOS::Ace::ERROR_CODE_NATIVE_IMPL_NODE_NOT_ON_MAIN_TREE;
+    }
+    return OHOS::Ace::ERROR_CODE_NO_ERROR;
+}
+
+void MockSetListCloseAllSwipeActions(ArkUINodeHandle node, void* userData, void (*onFinish)(void* userData))
+{
+    // no-op – the test only verifies the C-API wrapper path.
+}
+
+static ArkUIListItemModifier g_mockListItemModifier = {
+    .expand = MockListItemExpand,
+    .collapse = MockListItemCollapse,
+};
+
+static ArkUIListModifier g_mockListModifier = {
+    .setListCloseAllSwipeActions = MockSetListCloseAllSwipeActions,
+};
+
+// Wrapper functions that return the mock modifier structs.
+// getListItemModifier / getListModifier in ArkUINodeModifiers are
+// function pointers:  const ArkUIXxxModifier* (*)()
+const ArkUIListItemModifier* GetMockListItemModifier() { return &g_mockListItemModifier; }
+const ArkUIListModifier* GetMockListModifier() { return &g_mockListModifier; }
+
+// Mock BasicAPI for thread-safety checks inside RuntimeCheckManager.
+// SetRuntimeCheckMode calls IsCurrentThreadSafe() which dereferences
+// getBasicAPI()->isCurrentThreadSafe.  Without a valid mock the call
+// crashes on a NULL pointer (Signal 11 at address 0x4).
+static const ArkUIBasicAPI* g_mockBasicApi = nullptr;
+static ArkUIBasicAPI g_basicApiCopy;
 
 class ScrollableOptionErrorTest : public testing::Test {
 public:
@@ -48,6 +132,73 @@ public:
         NG::MockPipelineContext::TearDown();
         MockContainer::TearDown();
     }
+    void SetUp() override
+    {
+        // Ensure the full node-API impl is initialised.
+        ASSERT_TRUE(OHOS::Ace::NodeModel::InitialFullImpl());
+        fullImpl_ = OHOS::Ace::NodeModel::GetFullImpl();
+        ASSERT_NE(fullImpl_, nullptr);
+
+        // Patch getBasicAPI with a mock that provides valid
+        // isCurrentThreadSafe / isDebugForParallel so that
+        // SetRuntimeCheckMode's internal IsCurrentThreadSafe()
+        // check does not crash on a NULL pointer dereference.
+        const auto* basicApi = fullImpl_->getBasicAPI();
+        ASSERT_NE(basicApi, nullptr);
+        g_basicApiCopy = *basicApi;
+        g_basicApiCopy.isCurrentThreadSafe = []() -> ArkUI_Bool { return 1; };
+        g_basicApiCopy.isDebugForParallel = []() -> ArkUI_Bool { return 0; };
+        g_basicApiCopy.isDebugForParallelSet = []() -> ArkUI_Bool { return 1; };
+        previousBasicApiGetter_ = fullImpl_->getBasicAPI;
+        g_mockBasicApi = &g_basicApiCopy;
+        fullImpl_->getBasicAPI = []() -> const ArkUIBasicAPI* { return g_mockBasicApi; };
+
+        // Now safe to reset check mode to DISABLED (IsCurrentThreadSafe
+        // will use the mock above and return true = safe).
+        NodeModel::ConfigManager::SetRuntimeCheckMode(
+            static_cast<int32_t>(OHOS::Ace::NodeModel::CheckType::UI_THREAD),
+            static_cast<int32_t>(OHOS::Ace::NodeModel::CheckMode::DISABLED));
+
+        // Patch the ListItem / List modifier function pointers with the
+        // test mocks above so that Expand / Collapse / CloseAllSwipeActions
+        // can be exercised even when the on-device library lacks them.
+        auto* modifiers = const_cast<ArkUINodeModifiers*>(fullImpl_->getNodeModifiers());
+        if (modifiers != nullptr) {
+            originalListItemModifier_ = modifiers->getListItemModifier;
+            originalListModifier_ = modifiers->getListModifier;
+            modifiers->getListItemModifier = GetMockListItemModifier;
+            modifiers->getListModifier = GetMockListModifier;
+        }
+    }
+    void TearDown() override
+    {
+        // Restore the check mode to DISABLED first (still using the mock
+        // basic API so IsCurrentThreadSafe is safe).
+        NodeModel::ConfigManager::SetRuntimeCheckMode(
+            static_cast<int32_t>(OHOS::Ace::NodeModel::CheckType::UI_THREAD),
+            static_cast<int32_t>(OHOS::Ace::NodeModel::CheckMode::DISABLED));
+
+        // Restore original modifier pointers so other test suites in the
+        // same binary are not affected.
+        if (fullImpl_ != nullptr) {
+            auto* modifiers = const_cast<ArkUINodeModifiers*>(fullImpl_->getNodeModifiers());
+            if (modifiers != nullptr) {
+                modifiers->getListItemModifier = originalListItemModifier_;
+                modifiers->getListModifier = originalListModifier_;
+            }
+            // Restore the original getBasicAPI getter.
+            if (previousBasicApiGetter_ != nullptr) {
+                fullImpl_->getBasicAPI = previousBasicApiGetter_;
+                g_mockBasicApi = nullptr;
+            }
+        }
+    }
+
+private:
+    ArkUIFullNodeAPI* fullImpl_ = nullptr;
+    const ArkUIBasicAPI* (*previousBasicApiGetter_)() = nullptr;
+    const ArkUIListItemModifier* (*originalListItemModifier_)() = nullptr;
+    const ArkUIListModifier* (*originalListModifier_)() = nullptr;
 };
 
 /**
@@ -777,4 +928,108 @@ HWTEST_F(ScrollableOptionErrorTest, CloseAllSwipeActions_Success_003, TestSize.L
     EXPECT_EQ(result, ARKUI_ERROR_CODE_NO_ERROR);
 
     nodeAPI->disposeNode(listNode);
+}
+
+/**
+ * @tc.name: NonUiThreadCall_Expand_001
+ * @tc.desc: OH_ArkUI_ListItemSwipeAction_Expand from a non-UI thread with
+ *           UI_THREAD check DISABLED does not crash and keeps validating params.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollableOptionErrorTest, NonUiThreadCall_Expand_001, TestSize.Level1)
+{
+    ASSERT_TRUE(OHOS::Ace::NodeModel::ConfigManager::SetRuntimeCheckMode(
+        static_cast<int32_t>(NodeModel::CheckType::UI_THREAD),
+        static_cast<int32_t>(NodeModel::CheckMode::DISABLED)));
+
+    int32_t result = ARKUI_ERROR_CODE_NO_ERROR;
+    std::thread worker([&result]() {
+        result = OH_ArkUI_ListItemSwipeAction_Expand(
+            nullptr, ARKUI_LIST_ITEM_SWIPE_ACTION_DIRECTION_START);
+    });
+    worker.join();
+
+    EXPECT_EQ(result, ARKUI_ERROR_CODE_PARAM_INVALID);
+
+    // Restore the process-level RuntimeCheckManager to DISABLED to avoid
+    // leaking global state into sibling test cases.
+    ASSERT_TRUE(OHOS::Ace::NodeModel::ConfigManager::SetRuntimeCheckMode(
+        static_cast<int32_t>(NodeModel::CheckType::UI_THREAD),
+        static_cast<int32_t>(NodeModel::CheckMode::DISABLED)));
+}
+
+/**
+ * @tc.name: NonUiThreadCall_Collapse_002
+ * @tc.desc: OH_ArkUI_ListItemSwipeAction_Collapse from a non-UI thread with
+ *           UI_THREAD check DISABLED does not crash and keeps validating params.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollableOptionErrorTest, NonUiThreadCall_Collapse_002, TestSize.Level1)
+{
+    ASSERT_TRUE(OHOS::Ace::NodeModel::ConfigManager::SetRuntimeCheckMode(
+        static_cast<int32_t>(NodeModel::CheckType::UI_THREAD),
+        static_cast<int32_t>(NodeModel::CheckMode::DISABLED)));
+
+    int32_t result = ARKUI_ERROR_CODE_NO_ERROR;
+    std::thread worker([&result]() {
+        result = OH_ArkUI_ListItemSwipeAction_Collapse(nullptr);
+    });
+    worker.join();
+
+    EXPECT_EQ(result, ARKUI_ERROR_CODE_PARAM_INVALID);
+
+    ASSERT_TRUE(OHOS::Ace::NodeModel::ConfigManager::SetRuntimeCheckMode(
+        static_cast<int32_t>(NodeModel::CheckType::UI_THREAD),
+        static_cast<int32_t>(NodeModel::CheckMode::DISABLED)));
+}
+
+/**
+ * @tc.name: NonUiThreadCall_CloseAll_003
+ * @tc.desc: OH_ArkUI_List_CloseAllSwipeActions from a non-UI thread with
+ *           UI_THREAD check DISABLED does not crash and keeps validating params.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollableOptionErrorTest, NonUiThreadCall_CloseAll_003, TestSize.Level1)
+{
+    ASSERT_TRUE(OHOS::Ace::NodeModel::ConfigManager::SetRuntimeCheckMode(
+        static_cast<int32_t>(NodeModel::CheckType::UI_THREAD),
+        static_cast<int32_t>(NodeModel::CheckMode::DISABLED)));
+
+    int32_t result = ARKUI_ERROR_CODE_NO_ERROR;
+    std::thread worker([&result]() {
+        result = OH_ArkUI_List_CloseAllSwipeActions(nullptr, nullptr, nullptr);
+    });
+    worker.join();
+
+    EXPECT_EQ(result, ARKUI_ERROR_CODE_PARAM_INVALID);
+
+    ASSERT_TRUE(OHOS::Ace::NodeModel::ConfigManager::SetRuntimeCheckMode(
+        static_cast<int32_t>(NodeModel::CheckType::UI_THREAD),
+        static_cast<int32_t>(NodeModel::CheckMode::DISABLED)));
+}
+
+/**
+ * @tc.name: UiThreadCall_Expand_NoMisreport_004
+ * @tc.desc: OH_ArkUI_ListItemSwipeAction_Expand on the UI thread is not
+ *           affected by the new UI-thread guard (no false positive).
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollableOptionErrorTest, UiThreadCall_Expand_NoMisreport_004, TestSize.Level1)
+{
+    // Explicitly set the UI_THREAD check mode to LOG so the guard is active.
+    // This avoids relying on state left by previous test cases and verifies
+    // that a UI-thread call does not trigger a false-positive report.
+    ASSERT_TRUE(OHOS::Ace::NodeModel::ConfigManager::SetRuntimeCheckMode(
+        static_cast<int32_t>(NodeModel::CheckType::UI_THREAD),
+        static_cast<int32_t>(NodeModel::CheckMode::LOG)));
+
+    auto result = OH_ArkUI_ListItemSwipeAction_Expand(
+        nullptr, ARKUI_LIST_ITEM_SWIPE_ACTION_DIRECTION_START);
+    EXPECT_EQ(result, ARKUI_ERROR_CODE_PARAM_INVALID);
+
+    const char* errorMessage = OH_ArkUI_NativeModule_GetErrorMessage();
+    ASSERT_NE(errorMessage, nullptr);
+    std::string errorMessageStr(errorMessage);
+    EXPECT_NE(errorMessageStr.find("functionName: OH_ArkUI_ListItemSwipeAction_Expand"), std::string::npos);
+    EXPECT_NE(errorMessageStr.find("errorMessage: node is null"), std::string::npos);
 }
