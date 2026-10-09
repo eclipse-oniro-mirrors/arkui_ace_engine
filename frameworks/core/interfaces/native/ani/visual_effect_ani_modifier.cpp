@@ -91,49 +91,53 @@ void DestroyMaterial(UiMaterial* materialPtr)
     materialPtr->DecRefCount();
 }
 
-UiMaterial* ConvertToECMaterial(UiMaterial* materialPtr)
+void ConvertToECMaterial(UiMaterial* src, UiMaterial* dst)
 {
-    CHECK_NULL_RETURN(materialPtr, nullptr);
-    auto options = materialPtr->GetImmersiveOptions();
-    if (materialPtr->GetType() != static_cast<int32_t>(MaterialType::IMMERSIVE) || !options) {
-        return materialPtr;
+    CHECK_NULL_VOID(src);
+    CHECK_NULL_VOID(dst);
+    auto options = src->GetImmersiveOptions();
+    if (src->GetType() != static_cast<int32_t>(MaterialType::IMMERSIVE) || !options) {
+        return;
     }
     if (CheckNotLegalStyle(options->style)) {
-        return materialPtr;
+        return;
     }
-    auto newMaterial = materialPtr->Copy();
-    newMaterial->SetType(static_cast<int32_t>(MaterialType::IMMERSIVE));
-    newMaterial->IncRefCount();
-
-    auto newOptions = newMaterial->GetImmersiveOptions();
-    CHECK_NULL_RETURN(newOptions, materialPtr);
+    // Copy full content of src into dst, then apply EC conversion on dst in place.
+    auto dstRefPtr = Referenced::Claim(dst);
+    src->CopyTo(dstRefPtr);
+    auto newOptions = dstRefPtr->GetImmersiveOptions();
+    CHECK_NULL_VOID(newOptions);
     ConvertToImmersiveOptionsEC(newOptions);
-    return newMaterial.GetRawPtr();
 }
 
-UiMaterial* ConvertToECSubMaterial(UiMaterial* materialPtr)
+void ConvertToECSubMaterial(UiMaterial* src, UiMaterial* dst)
 {
-    CHECK_NULL_RETURN(materialPtr, nullptr);
-    auto options = materialPtr->GetImmersiveOptions();
-    if (materialPtr->GetType() != static_cast<int32_t>(MaterialType::IMMERSIVE) || !options) {
-        return materialPtr;
+    CHECK_NULL_VOID(src);
+    CHECK_NULL_VOID(dst);
+    auto options = src->GetImmersiveOptions();
+    if (src->GetType() != static_cast<int32_t>(MaterialType::IMMERSIVE) || !options) {
+        return;
     }
     if (CheckNotLegalStyle(options->style)) {
-        return materialPtr;
+        return;
     }
-    auto newMaterial = materialPtr->Copy();
-    newMaterial->SetType(static_cast<int32_t>(MaterialType::IMMERSIVE));
-    newMaterial->IncRefCount();
-
-    auto newOptions = newMaterial->GetImmersiveOptions();
-    CHECK_NULL_RETURN(newOptions, materialPtr);
+    // Copy full content of src into dst, then apply EC sub conversion on dst in place.
+    auto dstRefPtr = Referenced::Claim(dst);
+    src->CopyTo(dstRefPtr);
+    auto newOptions = dstRefPtr->GetImmersiveOptions();
+    CHECK_NULL_VOID(newOptions);
     ConvertToImmersiveOptionsECSub(newOptions);
-    return newMaterial.GetRawPtr();
 }
 
 int32_t GetGlobalMaterialLevel()
 {
     return static_cast<int32_t>(SystemProperties::GetUiMaterialLevel());
+}
+
+void GetEmpty(UiMaterial* dst)
+{
+    CHECK_NULL_VOID(dst);
+    dst->SetEmpty(true);
 }
 
 bool IsImmersiveMaterialSupported()
@@ -160,6 +164,7 @@ const ArkUIAniVisualEffectModifier* GetVisualEffectAniModifier()
         .destroyMaterial = OHOS::Ace::NG::DestroyMaterial,
         .convertToECMaterial = OHOS::Ace::NG::ConvertToECMaterial,
         .convertToECSubMaterial = OHOS::Ace::NG::ConvertToECSubMaterial,
+        .getEmpty = OHOS::Ace::NG::GetEmpty,
         .getGlobalMaterialLevel = OHOS::Ace::NG::GetGlobalMaterialLevel,
         .isImmersiveMaterialSupported = OHOS::Ace::NG::IsImmersiveMaterialSupported,
         .getMaterialState = OHOS::Ace::NG::GetMaterialState,

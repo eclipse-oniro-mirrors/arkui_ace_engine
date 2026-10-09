@@ -1023,8 +1023,9 @@ struct ArkUIAniCommonNodeAniModifier {
 struct ArkUIAniVisualEffectModifier {
     OHOS::Ace::UiMaterial* (*constructMaterial)(int32_t type);
     void (*destroyMaterial)(OHOS::Ace::UiMaterial* ptr);
-    OHOS::Ace::UiMaterial* (*convertToECMaterial)(OHOS::Ace::UiMaterial* ptr);
-    OHOS::Ace::UiMaterial* (*convertToECSubMaterial)(OHOS::Ace::UiMaterial* ptr);
+    void (*convertToECMaterial)(OHOS::Ace::UiMaterial* src, OHOS::Ace::UiMaterial* dst);
+    void (*convertToECSubMaterial)(OHOS::Ace::UiMaterial* src, OHOS::Ace::UiMaterial* dst);
+    void (*getEmpty)(OHOS::Ace::UiMaterial* dst);
     int32_t (*getGlobalMaterialLevel)();
     bool (*isImmersiveMaterialSupported)();
     int32_t (*getMaterialState)();

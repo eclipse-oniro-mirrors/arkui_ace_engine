@@ -94,6 +94,9 @@ namespace uiMaterial {
             this.registerCleaner(this.materialObj_);
         }
         registerCleaner(ptr: long): void {
+            if (this.cleaner_ !== undefined) {
+                this.cleaner_!.clean();
+            }
             this.cleaner_ = new Cleaner(ptr)
             destroyRegister.register(this, this.cleaner_!, unregisterToken);
         }
@@ -107,10 +110,8 @@ namespace uiMaterial {
             this.materialObj_ = ptr;
         }
         static get empty(): Material {
-            let nativePtr = ArkUIAniModule._UiMaterial_GetEmpty();    
             let result = new Material();
-            result.setNativeObject(nativePtr);
-            result.registerCleaner(nativePtr);
+            ArkUIAniModule._UiMaterial_GetEmpty(result.getNativeObject());
             return result;
         }
     }
@@ -144,18 +145,14 @@ namespace uiMaterial {
     }
     export function convertToECMaterial(material: ImmersiveMaterial): ImmersiveMaterial {
         let nativePtr = material.getNativeObject();
-        let newPtr = ArkUIAniModule._UiMaterial_ConvertToECMaterial(nativePtr);
         let result = new ImmersiveMaterial();
-        result.setNativeObject(newPtr);
-        result.registerCleaner(newPtr);
+        ArkUIAniModule._UiMaterial_ConvertToECMaterial(nativePtr, result.getNativeObject());
         return result;
     }
     export function convertToECSubMaterial(material: ImmersiveMaterial): ImmersiveMaterial {
         let nativePtr = material.getNativeObject();
-        let newPtr = ArkUIAniModule._UiMaterial_ConvertToECSubMaterial(nativePtr);
         let result = new ImmersiveMaterial();
-        result.setNativeObject(newPtr);
-        result.registerCleaner(newPtr);
+        ArkUIAniModule._UiMaterial_ConvertToECSubMaterial(nativePtr, result.getNativeObject());
         return result;
     }
     export function getGlobalMaterialLevel(): MaterialLevel {
