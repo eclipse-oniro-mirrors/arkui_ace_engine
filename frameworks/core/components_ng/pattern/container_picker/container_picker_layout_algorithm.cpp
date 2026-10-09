@@ -43,7 +43,6 @@ void ContainerPickerLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
     auto pickerLayoutProperty = AceType::DynamicCast<ContainerPickerLayoutProperty>(layoutWrapper->GetLayoutProperty());
     CHECK_NULL_VOID(pickerLayoutProperty);
 
-    // calculate main size.
     auto contentConstraint = pickerLayoutProperty->GetContentLayoutConstraint().value();
 
     OptionalSizeF contentIdealSize =
@@ -52,6 +51,10 @@ void ContainerPickerLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
     HandleLayoutPolicy(layoutWrapper, contentIdealSize);
     MeasureHeight(layoutWrapper, contentIdealSize);
 
+    bool itemCountChanged = (prevTotalItemCount_ > 0 && prevTotalItemCount_ != totalItemCount_);
+    if (itemCountChanged) {
+        currentDelta_ = 0.0f;
+    }
     CalcMainAndMiddlePos();
     auto childLayoutConstraint =
         ContainerPickerUtils::CreateChildConstraint(pickerLayoutProperty, contentIdealSize, pickerItemHeight_);
@@ -272,14 +275,19 @@ void ContainerPickerLayoutAlgorithm::MeasurePickerItems(LayoutWrapper* layoutWra
     float endPos = middleItemEndPos_;
     middleIndexInVisibleWindow_ = selectedIndex_;
     if (!itemPosition_.empty()) {
-        auto prevHeight = GetPatternHeight(layoutWrapper);
-        auto middleItem =
-            ContainerPickerUtils::CalcCurrentMiddleItem(itemPosition_, prevHeight, totalItemCount_, isLoop_);
-        currentOffsetFromMiddle_ = (middleItem.second.startPos + middleItem.second.endPos - prevHeight) / HALF;
-        middleIndexInVisibleWindow_ = middleItem.first;
-        startPos += currentOffsetFromMiddle_;
-        endPos += currentOffsetFromMiddle_;
-        itemPosition_.clear();
+        // When totalItemCount changes, discard old itemPosition_ and use selectedIndex
+        if (prevTotalItemCount_ > 0 && prevTotalItemCount_ != totalItemCount_) {
+            itemPosition_.clear();
+        } else {
+            auto prevHeight = GetPatternHeight(layoutWrapper);
+            auto middleItem =
+                ContainerPickerUtils::CalcCurrentMiddleItem(itemPosition_, prevHeight, totalItemCount_, isLoop_);
+            currentOffsetFromMiddle_ = (middleItem.second.startPos + middleItem.second.endPos - prevHeight) / HALF;
+            middleIndexInVisibleWindow_ = middleItem.first;
+            startPos += currentOffsetFromMiddle_;
+            endPos += currentOffsetFromMiddle_;
+            itemPosition_.clear();
+        }
     }
     MeasureBelow(layoutWrapper, middleIndexInVisibleWindow_, startPos);
     MeasureAbove(layoutWrapper, middleIndexInVisibleWindow_ - 1, GetStartPosition());
