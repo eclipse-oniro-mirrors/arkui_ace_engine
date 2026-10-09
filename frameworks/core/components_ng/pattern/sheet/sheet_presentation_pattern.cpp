@@ -294,6 +294,7 @@ bool SheetPresentationPattern::OnDirtyLayoutWrapperSwap(
     UpdateTitlePadding();
     UpdateSheetTitle();
     ClipSheetNode();
+    UpdateSheetScrollBarMargin();
 
     sheetObject_->AvoidKeyboardInDirtyLayoutProcess();
     SetNeedDoubleAvoidAfterLayout(false);
