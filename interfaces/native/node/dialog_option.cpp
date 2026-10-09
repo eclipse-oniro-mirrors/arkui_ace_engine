@@ -16,6 +16,7 @@
 #include "dialog_option.h"
 
 #include "native_dialog.h"
+#include "node/config_manager.h"
 #include "node_model.h"
 
 #include "base/error/error_code.h"
@@ -200,6 +201,7 @@ ArkUI_CustomDialogOptions* OH_ArkUI_CustomDialog_CreateOptions(ArkUI_NodeHandle 
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "content is null");
         return nullptr;
     }
+    CHECK_NODE_DISPOSED(content, "Node has been disposed");
     auto dialog = impl->getDialogAPI()->create();
     auto options = new ArkUI_CustomDialogOptions({ dialog });
     impl->getDialogAPI()->setContent(options->handle, content->uiNodeHandle);
