@@ -602,12 +602,16 @@ abstract class PUV2ViewBase extends ViewBuildNodeBase {
     });
     this.__getCustomEnvPropertyNameToKey__Internal().forEach(([varName, key]) => {
       const storeProp = ObserveV2.OB_PREFIX + varName;
+      const localValueProp = ObserveV2.CUSTOM_ENV_LOCAL_PREFIX + varName;
       if (!Object.prototype.hasOwnProperty.call(this, storeProp)) {
-        return;
+        if (!Object.prototype.hasOwnProperty.call(this, localValueProp)) {
+          return;
+        }
+        this[storeProp] = this[localValueProp];
       }
-      const defaultValue = this[ObserveV2.CUSTOM_ENV_LOCAL_PREFIX + varName];
       const queriedValue = isAttached ? this.findCustomValueByKey(key) : undefined;
-      const effectiveValue = queriedValue?.found ? queriedValue.value : defaultValue;
+
+      const effectiveValue = queriedValue?.found ? queriedValue.value : this[localValueProp];
       if (this[storeProp] !== effectiveValue) {
         ObserveV2.unregisterCustomEnvOwner(this, this[storeProp], varName);
         this[storeProp] = effectiveValue;
