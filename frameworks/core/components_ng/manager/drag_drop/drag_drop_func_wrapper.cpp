@@ -181,11 +181,9 @@ bool ConfirmCurPointerEventInfo(
         CHECK_NULL_VOID(dragAction);
         CHECK_NULL_VOID(container);
         bool needPostStopDrag = false;
-        if (dragAction->dragState == DragAdapterState::SENDING) {
-            needPostStopDrag = true;
-        }
         {
             std::lock_guard<std::mutex> lock(dragAction->dragStateMutex);
+            needPostStopDrag = (dragAction->dragState == DragAdapterState::SENDING);
             dragAction->dragState = DragAdapterState::REJECT;
         }
         if (needPostStopDrag) {
@@ -282,19 +280,38 @@ void DragDropFuncWrapper::HandleCallback(std::shared_ptr<OHOS::Ace::NG::ArkUIInt
 {
     TAG_LOGI(AceLogTag::ACE_DRAG, "drag notify message result is %{public}d.", dragNotifyMsg.result);
     CHECK_NULL_VOID(dragAction);
+    auto container = AceEngine::Get().GetContainer(dragAction->instanceId);
+    CHECK_NULL_VOID(container);
+    auto pipelineContext = container->GetPipelineContext();
     bool hasHandle = false;
     {
         std::lock_guard<std::mutex> lock(dragAction->mutex);
-        hasHandle = dragAction->hasHandle;
-        dragAction->hasHandle = true;
+        // Each status is delivered at most once per drag session (one action per session).
+        if (dragStatus == DragAdapterStatus::STARTED) {
+            // If ENDED has already been delivered (a fast swipe raced ahead of the posted
+            // start task), skip STARTED entirely: listeners must never see END before
+            // START, and the dragging flag must not be resurrected for a finished session.
+            hasHandle = dragAction->startedHandled || dragAction->endedHandled;
+            dragAction->startedHandled = true;
+            if (!hasHandle && pipelineContext) {
+                // Keep the dragging-flag transition inside the same critical section as
+                // the gate, so a racing ENDED's ResetDragging can never be overridden by
+                // a stale STARTED. SetIsDragging is a lock-free bool store downstream.
+                pipelineContext->SetIsDragging(true);
+            }
+        } else if (dragStatus == DragAdapterStatus::ENDED) {
+            hasHandle = dragAction->endedHandled;
+            dragAction->endedHandled = true;
+        } else {
+            // Unknown status: deliver once without occupying either status gate.
+            TAG_LOGW(AceLogTag::ACE_DRAG, "unexpected drag status %{public}d, deliver without gate.",
+                static_cast<int32_t>(dragStatus));
+        }
     }
     if (hasHandle) {
         return;
     }
-    auto container = AceEngine::Get().GetContainer(dragAction->instanceId);
-    CHECK_NULL_VOID(container);
     if (dragStatus == DragAdapterStatus::ENDED) {
-        auto pipelineContext = container->GetPipelineContext();
         CHECK_NULL_VOID(pipelineContext);
         pipelineContext->ResetDragging();
     }
@@ -303,17 +320,10 @@ void DragDropFuncWrapper::HandleCallback(std::shared_ptr<OHOS::Ace::NG::ArkUIInt
 }
 
 int32_t CheckStartAction(std::shared_ptr<OHOS::Ace::NG::ArkUIInteralDragAction> dragAction,
-    const RefPtr<Container>& container, const RefPtr<DragDropManager>& manager)
+    const RefPtr<Container>& container)
 {
     if (CheckInternalDragging(container)) {
         return -1;
-    }
-    {
-        std::lock_guard<std::mutex> lock(dragAction->dragStateMutex);
-        if (manager->GetDragAction() != nullptr && (manager->GetDragAction())->dragState == DragAdapterState::SENDING) {
-            return -1;
-        }
-        dragAction->dragState = DragAdapterState::SENDING;
     }
     DragDropFuncWrapper::UpdatePreviewOptionDefaultAttr(dragAction->previewOption);
     auto isGetPointSuccess = ConfirmCurPointerEventInfo(dragAction, container);
@@ -321,6 +331,45 @@ int32_t CheckStartAction(std::shared_ptr<OHOS::Ace::NG::ArkUIInteralDragAction> 
         return -1;
     }
     return 0;
+}
+
+void ResetSendingState(std::shared_ptr<OHOS::Ace::NG::ArkUIInteralDragAction> dragAction)
+{
+    CHECK_NULL_VOID(dragAction);
+    // Failure paths reset only this action's own state under its own lock, so they can
+    // never knock a rebinding of another live session back to INIT.
+    std::lock_guard<std::mutex> lock(dragAction->dragStateMutex);
+    dragAction->dragState = DragAdapterState::INIT;
+}
+
+OnDragCallback BuildDragEndedCallback(std::shared_ptr<OHOS::Ace::NG::ArkUIInteralDragAction> dragAction)
+{
+    return [dragAction](const OHOS::Ace::DragNotifyMsg& dragNotifyMsg) {
+        ResetSendingState(dragAction);
+        DragDropFuncWrapper::HandleCallback(dragAction, dragNotifyMsg, DragAdapterStatus::ENDED);
+    };
+}
+
+void HandleDragStartSuccess(std::shared_ptr<OHOS::Ace::NG::ArkUIInteralDragAction> dragAction)
+{
+    CHECK_NULL_VOID(dragAction);
+    {
+        std::lock_guard<std::mutex> lock(dragAction->dragStateMutex);
+        // The session may already have ended or been rejected before this task ran;
+        // do not resurrect dragging state for a finished session.
+        if (dragAction->dragState != DragAdapterState::SENDING) {
+            TAG_LOGI(AceLogTag::ACE_DRAG, "drag session already finished before start task ran.");
+            return;
+        }
+    }
+    NG::DragDropFuncWrapper::SetDraggingPointerAndPressedState(
+        dragAction->dragPointerEvent.pointerId, dragAction->instanceId);
+    // SetIsDragging(true) is applied inside HandleCallback's STARTED gate, together with
+    // the endedHandled check, so a racing ENDED can neither reorder the listeners nor
+    // resurrect the dragging flag after its ResetDragging.
+    DragDropFuncWrapper::HandleCallback(dragAction, DragNotifyMsg {}, DragAdapterStatus::STARTED);
+    TAG_LOGI(AceLogTag::ACE_DRAG, "msdp start drag successfully.");
+    NG::DragDropFuncWrapper::HandleOnDragEvent(dragAction);
 }
 
 int32_t DragDropFuncWrapper::StartDragAction(std::shared_ptr<OHOS::Ace::NG::ArkUIInteralDragAction> dragAction)
@@ -336,40 +385,38 @@ int32_t DragDropFuncWrapper::StartDragAction(std::shared_ptr<OHOS::Ace::NG::ArkU
     CHECK_NULL_RETURN(windowScale, -1);
     dragAction->windowScale = windowScale;
     manager->SetDragAnimationType(DragAnimationType::DEFAULT);
-    manager->SetDragAction(dragAction);
-    if (CheckStartAction(dragAction, container, manager) == -1) {
-        manager->GetDragAction()->dragState = DragAdapterState::INIT;
+    // Bind this action and mark it SENDING atomically under the manager lock, so a
+    // concurrent StartDrag holding an active SENDING session is rejected here instead of
+    // racing through the guard.
+    if (!manager->TryBindAndMarkSending(dragAction)) {
+        return -1;
+    }
+    if (CheckStartAction(dragAction, container) == -1) {
+        ResetSendingState(dragAction);
         return -1;
     }
     std::optional<DragDataCore> dragData;
     EnvelopedDragData(dragAction, dragData);
     if (!dragData) {
-        {
-            std::lock_guard<std::mutex> lock(dragAction->dragStateMutex);
-            manager->GetDragAction()->dragState = DragAdapterState::INIT;
-        }
+        ResetSendingState(dragAction);
         return -1;
     }
-    OnDragCallback callback = [dragAction, manager](const OHOS::Ace::DragNotifyMsg& dragNotifyMsg) {
-        {
-            std::lock_guard<std::mutex> lock(dragAction->dragStateMutex);
-            dragAction->dragState = DragAdapterState::INIT;
-            manager->SetDragAction(dragAction);
-        }
-        HandleCallback(dragAction, dragNotifyMsg, DragAdapterStatus::ENDED);
-    };
-    NG::DragDropFuncWrapper::SetDraggingPointerAndPressedState(
-        dragAction->dragPointerEvent.pointerId, dragAction->instanceId);
+    auto callback = BuildDragEndedCallback(dragAction);
     int32_t ret = InteractionInterface::GetInstance()->StartDrag(dragData.value(), callback);
     if (ret != 0) {
-        manager->GetDragAction()->dragState = DragAdapterState::INIT;
+        ResetSendingState(dragAction);
         TAG_LOGE(AceLogTag::ACE_DRAG, "msdp start drag failed.");
         return -1;
     }
-    HandleCallback(dragAction, DragNotifyMsg {}, DragAdapterStatus::STARTED);
-    pipelineContext->SetIsDragging(true);
-    TAG_LOGI(AceLogTag::ACE_DRAG, "msdp start drag successfully.");
-    NG::DragDropFuncWrapper::HandleOnDragEvent(dragAction);
+    // The success tail mutates UI-thread-affine state (dragEvents_ map, manager dragging
+    // flags), so marshal it to the UI thread the same way PostStopDrag does. If the task
+    // executor is unavailable, run it inline so the session is still initialized.
+    auto taskExecutor = container->GetTaskExecutor();
+    if (taskExecutor == nullptr ||
+        !taskExecutor->PostTask(
+            [dragAction]() { HandleDragStartSuccess(dragAction); }, TaskExecutor::TaskType::UI, "ArkUIDragStart")) {
+        HandleDragStartSuccess(dragAction);
+    }
     return 0;
 }
 

@@ -17,6 +17,7 @@
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_MANAGER_DRAG_DROP_DRAG_DROP_MANAGER_H
 
 #include <cstdint>
+#include <mutex>
 #include <string>
 
 #include "base/memory/ace_type.h"
@@ -316,8 +317,20 @@ public:
 
     std::shared_ptr<OHOS::Ace::NG::ArkUIInteralDragAction> GetDragAction()
     {
+        std::lock_guard<std::mutex> lock(dragActionMutex_);
         return dragAction_;
     }
+
+    // Binds `dragAction` and marks it SENDING atomically under dragActionMutex_, so that two
+    // concurrent StartDrag calls can never both pass the "no active SENDING session" guard.
+    //
+    // Lock order (one-way, no exceptions): dragActionMutex_ -> ArkUIInteralDragAction::dragStateMutex.
+    // NEVER call GetDragAction/SetDragAction while holding any action's dragStateMutex, and
+    // never touch an action's dragState/dragStateMutex while holding dragActionMutex_ outside
+    // of this guard. Audited 2026-09: no reverse-order call path exists in frameworks/ or
+    // adapter/ (the two historical callers in drag_adapter_impl.cpp / CheckStartAction were
+    // removed by this change).
+    bool TryBindAndMarkSending(const std::shared_ptr<OHOS::Ace::NG::ArkUIInteralDragAction>& dragAction);
     
     RefPtr<FrameNode> FindTargetInChildNodes(const RefPtr<UINode> parentNode,
         std::vector<RefPtr<FrameNode>> hitFrameNodes, bool findDrop);
@@ -587,6 +600,7 @@ public:
     
     void SetDragAction(const std::shared_ptr<OHOS::Ace::NG::ArkUIInteralDragAction>& dragAction)
     {
+        std::lock_guard<std::mutex> lock(dragActionMutex_);
         dragAction_ = dragAction;
     }
 
@@ -886,6 +900,9 @@ private:
     uint32_t dampingOverflowCount_ = 0;
     WeakPtr<FrameNode> menuWrapperNode_;
     WeakPtr<OverlayManager> subwindowOverlayManager_;
+    // Protects dragAction_ and the bind-and-mark-SENDING guard sequence; see
+    // TryBindAndMarkSending for the lock order against dragStateMutex.
+    std::mutex dragActionMutex_;
     std::shared_ptr<OHOS::Ace::NG::ArkUIInteralDragAction> dragAction_;
     ACE_DISALLOW_COPY_AND_MOVE(DragDropManager);
     bool grayedState_ = false;
