@@ -15,6 +15,7 @@
 
 
 #include <sys/time.h>
+#include "base/utils/napi_scope_raii.h"
 #include "interfaces/napi/kits/utils/napi_utils.h"
 #include "core/common/container.h"
 #include "core/components_ng/pattern/app_bar/app_bar_view.h"
@@ -106,9 +107,10 @@ void PostBarRectChangeTask(int64_t createTime, WeakPtr<NG::AppBarView> weakAppBa
     if (!ctx || !ctx->env || !ctx->ref) {
         return;
     }
-    napi_handle_scope scope = nullptr;
-    napi_open_handle_scope(ctx->env, &scope);
-    CHECK_NULL_VOID(scope);
+    ScopeRAII scope(ctx->env);
+    if (!scope) {
+        return;
+    }
     napi_value jsCallback = nullptr;
     napi_get_reference_value(ctx->env, ctx->ref, &jsCallback);
     if (jsCallback) {
@@ -116,7 +118,6 @@ void PostBarRectChangeTask(int64_t createTime, WeakPtr<NG::AppBarView> weakAppBa
         napi_value argv[1] = { jsFrame };
         napi_call_function(ctx->env, nullptr, jsCallback, 1, argv, nullptr);
     }
-    napi_close_handle_scope(ctx->env, scope);
 }
 
 void RegisterBarRectChangeCallback(RefPtr<NG::AppBarView> appBar)
@@ -277,26 +278,24 @@ static napi_value JSGetBarRect(napi_env env, napi_callback_info info)
 
 static napi_value JSOnBarRectChange(napi_env env, napi_callback_info info)
 {
-    napi_handle_scope scope = nullptr;
-    napi_open_handle_scope(env, &scope);
-    CHECK_NULL_RETURN(scope, nullptr);
+    ScopeRAII scope(env);
+    if (!scope) {
+        return nullptr;
+    }
     napi_value argv[1] = { 0 };
     napi_valuetype valueType = napi_undefined;
     if (!GetSingleParam(env, info, argv, valueType)) {
         LOGW("invalid function value for callback");
-        napi_close_handle_scope(env, scope);
         return nullptr;
     }
     auto appBar = ObtainAppBar();
     CHECK_NULL_RETURN(appBar, nullptr);
     if (valueType == napi_undefined) {
         UnregisterBarRectChangeCallback(env, appBar);
-        napi_close_handle_scope(env, scope);
         return nullptr;
     }
     UpdateAppBarRectCallback(env, argv[0], appBar);
     RegisterBarRectChangeCallback(appBar);
-    napi_close_handle_scope(env, scope);
     return nullptr;
 }
 

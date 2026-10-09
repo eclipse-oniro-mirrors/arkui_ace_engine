@@ -47,7 +47,7 @@ public:
     std::list<napi_ref>::iterator FindCbList(napi_env env, napi_value cb, CalloutType calloutType);
     void NapiSerializer(napi_env& env, napi_value& result);
     void AddCallbackToList(
-        napi_value cb, std::list<napi_ref>& cbList, CalloutType calloutType, napi_env env, napi_handle_scope scope);
+        napi_value cb, std::list<napi_ref>& cbList, CalloutType calloutType, napi_env env);
     void DeleteCallbackFromList(
         size_t argc, std::list<napi_ref>& cbList, CalloutType calloutType, napi_value cb, napi_env env);
     void DeleteOnDrawChildrenCallbackFromList(

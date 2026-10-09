@@ -57,7 +57,7 @@ private:
     bool CanTurnOn(const JSCallbackInfo& info);
     SecurityCallbackFuncPairList::const_iterator FindCbList(napi_env env, napi_value cb,
         SecurityCallbackFuncPairList& callbackFuncPairList);
-    void AddCallbackToList(napi_env env, napi_value cb, napi_handle_scope scope, RegisterType type,
+    void AddCallbackToList(napi_env env, napi_value cb, RegisterType type,
         const std::function<void(const RefPtr<NG::SecurityUIExtensionProxy>&)>&& onFunc);
     void DeleteCallbackFromList(uint32_t argc, napi_env env, napi_value cb, RegisterType type);
     std::list<std::function<void(const RefPtr<NG::SecurityUIExtensionProxy>&)>> GetOnFuncList(RegisterType type);
