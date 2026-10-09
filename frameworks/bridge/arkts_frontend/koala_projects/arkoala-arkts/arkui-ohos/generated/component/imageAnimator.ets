@@ -24,6 +24,7 @@ import { PeerNode } from './../PeerNode'
 import { ArkUIGeneratedNativeModule } from '#components'
 import { ArkCommonMethodPeer, CommonMethod, PixelMap, ArkCommonMethodComponent } from './common'
 import { AnimationStatus, FillMode } from './enums'
+import { ImageInterpolation } from './image'
 import { AttributeModifier, extractors, hookImageAnimatorAttributeModifier, AttributeUpdater } from '#handwritten'
 import { CallbackKind } from './../framework/peers/CallbackKind'
 import { CallbackTransformer } from './../CallbackTransformer'
@@ -152,6 +153,18 @@ export class ArkImageAnimatorPeer extends ArkCommonMethodPeer {
         ArkUIGeneratedNativeModule._ImageAnimatorAttribute_setMonitorInvisibleArea(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
+    setInterpolationAttribute(value: ImageInterpolation | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (value !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueTmpValue = (value as ImageInterpolation)
+            thisSerializer.writeInt32(valueTmpValue.valueOf())
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._ImageAnimatorAttribute_setInterpolation(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
     setOnStartAttribute(value: (() => void) | undefined): void {
         const thisSerializer: SerializerBase = SerializerBase.hold()
         if (value !== undefined) {
@@ -249,6 +262,9 @@ export interface ImageAnimatorAttribute extends CommonMethod {
     monitorInvisibleArea(value: boolean | undefined): this {
         throw new Error('Unimplemented method monitorInvisibleArea')
     }
+    interpolation(value: ImageInterpolation | undefined): this {
+        throw new Error('Unimplemented method interpolation')
+    }
     onStart(value: (() => void) | undefined): this {
         throw new Error('Unimplemented method onStart')
     }
@@ -316,6 +332,11 @@ export class ArkImageAnimatorComponent extends ArkCommonMethodComponent implemen
     public monitorInvisibleArea(value: boolean | undefined): this {
         const value_casted = value as (boolean | undefined)
         this.getPeer()?.setMonitorInvisibleAreaAttribute(value_casted)
+        return this
+    }
+    public interpolation(value: ImageInterpolation | undefined): this {
+        const value_casted = value as (ImageInterpolation | undefined)
+        this.getPeer()?.setInterpolationAttribute(value_casted)
         return this
     }
     public onStart(value: (() => void) | undefined): this {
