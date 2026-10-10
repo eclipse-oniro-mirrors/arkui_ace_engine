@@ -1430,6 +1430,74 @@ HWTEST_F(EventManagerTestNg, UpdateInfoWhenFinishDispatch001, TestSize.Level1)
 }
 
 /**
+ * @tc.name: UpdateInfoWhenFinishDispatch002
+ * @tc.desc: Test UpdateInfoWhenFinishDispatch L1284 branch: axisTouchTestResults_ not empty
+ *           → touchTestResults_.empty() && axisTouchTestResults_.empty() is false,
+ *           CleanRedundanceScope and SweepEscapeRecognizers NOT called
+ * @tc.type: FUNC
+ */
+HWTEST_F(EventManagerTestNg, UpdateInfoWhenFinishDispatch002, TestSize.Level1)
+{
+    auto eventManager = AceType::MakeRefPtr<EventManager>();
+    ASSERT_NE(eventManager, nullptr);
+    ASSERT_NE(eventManager->refereeNG_, nullptr);
+
+    auto recognizer = AceType::MakeRefPtr<PanRecognizer>(
+        DEFAULT_PAN_FINGER, PanDirection { PanDirection::NONE }, DEFAULT_PAN_DISTANCE.ConvertToPx());
+    ASSERT_NE(recognizer, nullptr);
+
+    TouchTestResult axisResult;
+    axisResult.emplace_back(recognizer);
+    eventManager->axisTouchTestResults_[0] = std::move(axisResult);
+    EXPECT_FALSE(eventManager->axisTouchTestResults_.empty());
+
+    eventManager->escapeRecognizers_.push_back(recognizer);
+    EXPECT_FALSE(eventManager->escapeRecognizers_.empty());
+
+    TouchEvent event;
+    event.id = 0;
+    event.type = TouchType::UP;
+    event.isFalsified = false;
+
+    eventManager->UpdateInfoWhenFinishDispatch(event, true);
+
+    EXPECT_FALSE(eventManager->escapeRecognizers_.empty());
+    EXPECT_FALSE(eventManager->axisTouchTestResults_.empty());
+}
+
+/**
+ * @tc.name: UpdateInfoWhenFinishDispatch003
+ * @tc.desc: Test UpdateInfoWhenFinishDispatch L1284 branch: both touchTestResults_ and
+ *           axisTouchTestResults_ empty → condition true, SweepEscapeRecognizers called
+ * @tc.type: FUNC
+ */
+HWTEST_F(EventManagerTestNg, UpdateInfoWhenFinishDispatch003, TestSize.Level1)
+{
+    auto eventManager = AceType::MakeRefPtr<EventManager>();
+    ASSERT_NE(eventManager, nullptr);
+    ASSERT_NE(eventManager->refereeNG_, nullptr);
+
+    auto recognizer = AceType::MakeRefPtr<PanRecognizer>(
+        DEFAULT_PAN_FINGER, PanDirection { PanDirection::NONE }, DEFAULT_PAN_DISTANCE.ConvertToPx());
+    ASSERT_NE(recognizer, nullptr);
+
+    eventManager->escapeRecognizers_.push_back(recognizer);
+    EXPECT_FALSE(eventManager->escapeRecognizers_.empty());
+
+    EXPECT_TRUE(eventManager->touchTestResults_.empty());
+    EXPECT_TRUE(eventManager->axisTouchTestResults_.empty());
+
+    TouchEvent event;
+    event.id = 0;
+    event.type = TouchType::UP;
+    event.isFalsified = false;
+
+    eventManager->UpdateInfoWhenFinishDispatch(event, true);
+
+    EXPECT_TRUE(eventManager->escapeRecognizers_.empty());
+}
+
+/**
  * @tc.name: CleanRefereeBeforeTouchTest001
  * @tc.desc: Test CleanRefereeBeforeTouchTest function.
  * @tc.type: FUNC
