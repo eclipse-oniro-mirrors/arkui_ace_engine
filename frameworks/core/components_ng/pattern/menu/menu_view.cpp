@@ -2624,7 +2624,9 @@ void InitGridItemFeedback(const RefPtr<FrameNode>& itemNode, const RefPtr<Select
     auto inputHub = itemNode->GetOrCreateInputEventHub();
     auto initialMenuHoverColor = theme->GetGridMenuHoverColor();
     if (inputHub) {
-        inputHub->SetHoverEvent(
+        // Use AddOnHoverEvent (append) instead of SetHoverEvent (replace) so that user-bound
+        // onHover callbacks transferred from the original builder MenuItem are preserved.
+        OnHoverFunc hoverFunc =
             [initialMenuHoverColor, weakItem = AceType::WeakClaim(AceType::RawPtr(itemNode))](
                 bool isHover, HoverInfo& info) {
                 auto item = weakItem.Upgrade();
@@ -2634,11 +2636,15 @@ void InitGridItemFeedback(const RefPtr<FrameNode>& itemNode, const RefPtr<Select
                 auto rc = item->GetRenderContext();
                 CHECK_NULL_VOID(rc);
                 rc->UpdateBackgroundColor(isHover ? gridMenuHoverColor : Color::TRANSPARENT);
-            });
+            };
+        auto hoverEvent = AceType::MakeRefPtr<InputEvent>(std::move(hoverFunc));
+        inputHub->AddOnHoverEvent(hoverEvent);
     }
 
     auto initialMenuClickedColor = theme->GetGridMenuClickedColor();
-    gestureHub->SetTouchEvent(
+    // Use AddTouchEvent (append) instead of SetTouchEvent (replace) so that user-bound
+    // onTouch callbacks transferred from the original builder MenuItem are preserved.
+    TouchEventFunc touchFunc =
         [initialMenuClickedColor, weakItem = AceType::WeakClaim(AceType::RawPtr(itemNode))](
             TouchEventInfo& info) {
             auto item = weakItem.Upgrade();
@@ -2656,7 +2662,9 @@ void InitGridItemFeedback(const RefPtr<FrameNode>& itemNode, const RefPtr<Select
                     rc->UpdateBackgroundColor(Color::TRANSPARENT);
                 }
             }
-        });
+        };
+    auto touchEvent = AceType::MakeRefPtr<TouchEventImpl>(std::move(touchFunc));
+    gestureHub->AddTouchEvent(touchEvent);
 }
 
 void InitGridItemClick(const RefPtr<FrameNode>& itemNode, const std::function<void()>& action,
@@ -2665,7 +2673,9 @@ void InitGridItemClick(const RefPtr<FrameNode>& itemNode, const std::function<vo
     CHECK_NULL_VOID(itemNode);
     auto gestureHub = itemNode->GetOrCreateGestureEventHub();
     CHECK_NULL_VOID(gestureHub);
-    gestureHub->SetUserOnClick([action, menuWeak](GestureEvent& info) {
+    // Use AddClickEvent (append) instead of SetUserOnClick (replace) so that user-bound onClick
+    // callbacks transferred from the original builder MenuItem node via CopyEvent are preserved.
+    auto clickEvent = AceType::MakeRefPtr<ClickEvent>([action, menuWeak](GestureEvent& info) {
         if (action) {
             action();
         }
@@ -2675,12 +2685,41 @@ void InitGridItemClick(const RefPtr<FrameNode>& itemNode, const std::function<vo
         CHECK_NULL_VOID(menuPattern);
         menuPattern->HideMenu();
     });
+    gestureHub->AddClickEvent(clickEvent);
+}
+
+// Transfer all user-registered events from a builder-created MenuItem node to a rebuilt grid item
+// node. This preserves onClick / onTouch / onHover / onMouse / onKeyEvent / etc. that would
+// otherwise be lost when the original node is destroyed during grid layout rebuild.
+void TransferMenuItemEvents(const RefPtr<FrameNode>& srcNode, const RefPtr<FrameNode>& dstNode)
+{
+    CHECK_NULL_VOID(srcNode);
+    CHECK_NULL_VOID(dstNode);
+    // 1. Gesture events: onClick / onTouch / longPress / drag
+    auto srcGestureHub = srcNode->GetOrCreateGestureEventHub();
+    auto dstGestureHub = dstNode->GetOrCreateGestureEventHub();
+    if (srcGestureHub && dstGestureHub) {
+        dstGestureHub->CopyEvent(srcGestureHub);
+    }
+    // 2. Input events: onHover / onMouse / onAxis
+    auto srcInputHub = srcNode->GetOrCreateInputEventHub();
+    auto dstInputHub = dstNode->GetOrCreateInputEventHub();
+    if (srcInputHub && dstInputHub) {
+        dstInputHub->CopyEvent(srcInputHub);
+    }
+    // 3. Focus events: onKeyEvent / onFocus / onBlur
+    auto srcFocusHub = srcNode->GetFocusHub();
+    auto dstFocusHub = dstNode->GetOrCreateFocusHub();
+    if (srcFocusHub && dstFocusHub) {
+        dstFocusHub->CopyEvent(srcFocusHub);
+    }
 }
 
 } // namespace
 
 RefPtr<FrameNode> MenuView::CreateGridItem(const OptionParam& param, int32_t index,
-    const WeakPtr<FrameNode>& menuWeak, int32_t themeScopeId, RefPtr<MenuPattern> customMenuPattern)
+    const WeakPtr<FrameNode>& menuWeak, int32_t themeScopeId, RefPtr<MenuPattern> customMenuPattern,
+    const RefPtr<FrameNode>& srcNode)
 {
     auto contentColumn = CreateGridItemContent(param, themeScopeId, false);
     CHECK_NULL_RETURN(contentColumn, nullptr);
@@ -2689,6 +2728,9 @@ RefPtr<FrameNode> MenuView::CreateGridItem(const OptionParam& param, int32_t ind
     if (customMenuPattern) {
         auto customGridPasteItem = customMenuPattern->BuildGridMenuPasteItem(param, contentColumn, themeScopeId);
         if (customGridPasteItem) {
+            if (srcNode) {
+                TransferMenuItemEvents(srcNode, customGridPasteItem);
+            }
             InitGridItemFeedback(customGridPasteItem, theme);
             customGridPasteItem->MarkModifyDone();
             return customGridPasteItem;
@@ -2697,6 +2739,12 @@ RefPtr<FrameNode> MenuView::CreateGridItem(const OptionParam& param, int32_t ind
     auto eventHub = contentColumn->GetEventHub<EventHub>();
     CHECK_NULL_RETURN(eventHub, nullptr);
     eventHub->SetEnabled(param.enabled);
+    // Transfer events first, then set feedback and click. CopyEvent overwrites touch/click
+    // actuators, so it must run before InitGridItemFeedback (which appends touch/hover via
+    // AddTouchEvent/AddOnHoverEvent) and InitGridItemClick (which appends via AddClickEvent).
+    if (srcNode) {
+        TransferMenuItemEvents(srcNode, contentColumn);
+    }
     InitGridItemFeedback(contentColumn, theme);
     InitGridItemClick(contentColumn, param.action, menuWeak);
     contentColumn->MarkModifyDone();
@@ -2704,7 +2752,8 @@ RefPtr<FrameNode> MenuView::CreateGridItem(const OptionParam& param, int32_t ind
 }
 
 void MenuView::MountGridSection(std::vector<OptionParam>& params, const RefPtr<FrameNode>& menuNode,
-    const MenuParam& menuParam, const RefPtr<FrameNode>& outerColumn, RefPtr<MenuPattern> customMenuPattern)
+    const MenuParam& menuParam, const RefPtr<FrameNode>& outerColumn, RefPtr<MenuPattern> customMenuPattern,
+    const std::vector<RefPtr<FrameNode>>& originalNodes)
 {
     CHECK_NULL_VOID(menuParam.gridStyle);
     const auto& gridStyle = menuParam.gridStyle.value();
@@ -2762,7 +2811,12 @@ void MenuView::MountGridSection(std::vector<OptionParam>& params, const RefPtr<F
         float percentWidth = 1.0f / static_cast<float>(horizontalSize);
 
         for (int32_t col = 0; col < horizontalSize && itemIndex < gridCount; ++col, ++itemIndex) {
-            auto gridItem = CreateGridItem(params[itemIndex], itemIndex, weakMenu, themeScopeId, customMenuPattern);
+            RefPtr<FrameNode> srcNode;
+            if (itemIndex < static_cast<int32_t>(originalNodes.size())) {
+                srcNode = originalNodes[itemIndex];
+            }
+            auto gridItem = CreateGridItem(params[itemIndex], itemIndex, weakMenu, themeScopeId,
+                customMenuPattern, srcNode);
             CHECK_NULL_CONTINUE(gridItem);
             auto itemLayoutProps = gridItem->GetLayoutProperty();
             CHECK_NULL_CONTINUE(itemLayoutProps);
@@ -3479,11 +3533,14 @@ RefPtr<FrameNode> MenuView::BuildGridListColumn(const RefPtr<FrameNode>& customM
 
     // Take first gridCount items as grid params, remove them from parent
     std::vector<OptionParam> gridParams;
+    std::vector<RefPtr<FrameNode>> originalNodes;
     auto childIter = childrenSnapshot.begin();
     for (int32_t gridIdx = 0; gridIdx < gridCount && childIter != childrenSnapshot.end(); gridIdx++, ++childIter) {
         auto childFrame = AceType::DynamicCast<FrameNode>(*childIter);
         if (childFrame) {
             gridParams.push_back(ExtractOneMenuItemParam(childFrame));
+            // Save the inner MenuItem node (not the wrapper) for event transfer
+            originalNodes.push_back(GetMenuItemNodeFromCustomChild(childFrame));
             customMenuNode->RemoveChild(childFrame);
         }
     }
@@ -3500,7 +3557,7 @@ RefPtr<FrameNode> MenuView::BuildGridListColumn(const RefPtr<FrameNode>& customM
     CHECK_NULL_RETURN(gridContainer, nullptr);
     UpdateGridNodeThemeScopeId(gridContainer, themeScopeId);
     auto customMenuPattern = customMenuNode->GetPattern<MenuPattern>();
-    MountGridSection(gridParams, menuNode, menuParam, gridContainer, customMenuPattern);
+    MountGridSection(gridParams, menuNode, menuParam, gridContainer, customMenuPattern, originalNodes);
     gridContainer->MarkModifyDone();
 
     bool hasListContent = !customMenuNode->GetChildren().empty();
