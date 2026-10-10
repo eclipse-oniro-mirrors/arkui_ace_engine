@@ -57,11 +57,31 @@ ace_unittest("immersive_strategy_ani_modifier_test") {
   ]
 }
 
+ace_unittest("ui_event_command_test") {
+  module_name = "UIEngine-Mainprocess"
+  type = "new"
+  sources = [
+    "$ace_root/frameworks/core/interfaces/native/node/ui_event_command_processor.cpp",
+    "$ace_root/frameworks/core/components_ng/pattern/rich_editor/rich_editor_foreground_modifier.cpp",
+    "$ace_root/test/mock/frameworks/core/interfaces/native/utility/mock_error_message_manager.cpp",
+    "native/node/ui_event_command_test.cpp",
+  ]
+  include_dirs = [
+    "$ace_root",
+    "$ace_root/frameworks/",
+    "$ace_root/frameworks/core/interfaces/native/node",
+    "$ace_root/frameworks/core/interfaces/native/utility",
+    "$ace_root/interfaces/native/",
+    "$ace_root/interfaces/native/node",
+  ]
+}
+
 group("core_interfaces_unittest") {
   testonly = true
   deps = [
     ":immersive_strategy_ani_modifier_test",
     ":interfaces_test",
+    ":ui_event_command_test",
     ":visual_effect_ani_modifier_test",
   ]
 }
