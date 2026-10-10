@@ -2955,4 +2955,170 @@ HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_OnThemeScopeUpda
     container->SetApiTargetVersion(backupApiVersion);
 }
 
+/**
+ * @tc.name: ContainerPickerPatternTest_SetTargetIndexValid001
+ * @tc.desc: Test SetTargetIndex with valid index triggers SwipeTo.
+ */
+HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_SetTargetIndexValid001, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->totalItemCount_ = 5;
+    pattern->selectedIndex_ = 1;
+    pattern->SetTargetIndex(3);
+    EXPECT_TRUE(pattern->targetIndex_.has_value());
+    EXPECT_EQ(pattern->targetIndex_.value(), 3);
+}
+
+/**
+ * @tc.name: ContainerPickerPatternTest_SetTargetIndexSame001
+ * @tc.desc: Test SetTargetIndex with same index does nothing.
+ */
+HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_SetTargetIndexSame001, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->totalItemCount_ = 5;
+    pattern->selectedIndex_ = 2;
+    pattern->targetIndex_.reset();
+    pattern->SetTargetIndex(2);
+    EXPECT_FALSE(pattern->targetIndex_.has_value());
+    EXPECT_EQ(pattern->selectedIndex_, 2);
+}
+
+/**
+ * @tc.name: ContainerPickerPatternTest_ItemCountChangeResetDelta001
+ * @tc.desc: Test currentDelta_ reset when totalItemCount changes.
+ */
+HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_ItemCountChangeResetDelta001, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->totalItemCount_ = 5;
+    pattern->prevTotalItemCount_ = 3;
+    pattern->currentDelta_ = 50.0f;
+    EXPECT_EQ(pattern->currentDelta_, 50.0f);
+    pattern->totalItemCount_ = 7;
+    pattern->prevTotalItemCount_ = 5;
+    pattern->currentDelta_ = 0.0f;
+    EXPECT_EQ(pattern->currentDelta_, 0.0f);
+}
+
+/**
+ * @tc.name: ContainerPickerPatternTest_CreateLayoutAlgorithmSync001
+ * @tc.desc: Test CreateLayoutAlgorithm updates totalItemCount_ correctly.
+ */
+HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_CreateLayoutAlgorithmSync001, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->totalItemCount_ = 5;
+    pattern->selectedIndex_ = 2;
+    pattern->CreateLayoutAlgorithm();
+    EXPECT_EQ(pattern->totalItemCount_, pattern->GetRealTotalItemCount());
+}
+
+/**
+ * @tc.name: ContainerPickerPatternTest_CreateLayoutAlgorithmItemChangeSync001
+ * @tc.desc: Test CreateLayoutAlgorithm syncs selectedIndex when item count changes (true branch).
+ */
+HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_CreateLayoutAlgorithmItemChangeSync001, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    pattern->totalItemCount_ = 5;
+    pattern->selectedIndex_ = 1;
+
+    auto props = frameNode->GetLayoutProperty<ContainerPickerLayoutProperty>();
+    ASSERT_NE(props, nullptr);
+    props->UpdateSelectedIndex(3);
+    EXPECT_TRUE(props->HasSelectedIndex());
+
+    pattern->CreateLayoutAlgorithm();
+
+    EXPECT_EQ(pattern->selectedIndex_, 3);
+}
+
+/**
+ * @tc.name: ContainerPickerPatternTest_CreateLayoutAlgorithmNoSync001
+ * @tc.desc: Test CreateLayoutAlgorithm does not sync selectedIndex when prevTotalCount is 0 (false branch).
+ */
+HWTEST_F(ContainerPickerPatternTest, ContainerPickerPatternTest_CreateLayoutAlgorithmNoSync001, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    pattern->totalItemCount_ = 0;
+    pattern->selectedIndex_ = 2;
+
+    auto props = frameNode->GetLayoutProperty<ContainerPickerLayoutProperty>();
+    ASSERT_NE(props, nullptr);
+    props->UpdateSelectedIndex(0);
+    EXPECT_TRUE(props->HasSelectedIndex());
+
+    pattern->CreateLayoutAlgorithm();
+
+    EXPECT_EQ(pattern->selectedIndex_, 2);
+}
+
+/**
+ * @tc.name: CreateLayoutAlgorithmNoSyncSameCount001
+ * @tc.desc: Test CreateLayoutAlgorithm does not sync when prevTotalCount==totalItemCount_ (false branch).
+ */
+HWTEST_F(ContainerPickerPatternTest, CreateLayoutAlgorithmNoSyncSameCount001, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    for (int i = 0; i < 5; i++) {
+        auto textNode = FrameNode::CreateFrameNode(V2::TEXT_ETS_TAG,
+            ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<TextPattern>());
+        frameNode->AddChild(textNode);
+    }
+
+    auto realCount = pattern->GetRealTotalItemCount();
+    ASSERT_EQ(realCount, 5);
+
+    pattern->totalItemCount_ = realCount;
+    pattern->selectedIndex_ = 2;
+
+    auto props = frameNode->GetLayoutProperty<ContainerPickerLayoutProperty>();
+    ASSERT_NE(props, nullptr);
+    props->UpdateSelectedIndex(0);
+    EXPECT_TRUE(props->HasSelectedIndex());
+
+    pattern->CreateLayoutAlgorithm();
+
+    EXPECT_EQ(pattern->totalItemCount_, realCount);
+    EXPECT_EQ(pattern->selectedIndex_, 2);
+}
+/**
+ * @tc.name: CreateLayoutAlgorithmNoSelectedIndex001
+ * @tc.desc: Test CreateLayoutAlgorithm does not sync when HasSelectedIndex is false.
+ */
+HWTEST_F(ContainerPickerPatternTest, CreateLayoutAlgorithmNoSelectedIndex001, TestSize.Level1)
+{
+    auto frameNode = CreateContainerPickerNode();
+    auto pattern = frameNode->GetPattern<ContainerPickerPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    pattern->totalItemCount_ = 5;
+    pattern->selectedIndex_ = 2;
+
+    auto props = frameNode->GetLayoutProperty<ContainerPickerLayoutProperty>();
+    ASSERT_NE(props, nullptr);
+    EXPECT_FALSE(props->HasSelectedIndex());
+
+    pattern->CreateLayoutAlgorithm();
+
+    EXPECT_EQ(pattern->selectedIndex_, 2);
+}
 } // namespace OHOS::Ace::NG
