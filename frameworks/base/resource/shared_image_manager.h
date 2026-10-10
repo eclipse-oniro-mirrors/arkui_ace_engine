@@ -30,9 +30,11 @@
 #include "base/thread/cancelable_callback.h"
 #include "base/thread/task_executor.h"
 #include "base/utils/noncopyable.h"
-#include "base/utils/system_properties.h"
 
 namespace OHOS::Ace {
+
+constexpr int32_t DEFAULT_FORM_SHARED_IMAGE_CACHE_THRESHOLD = 20;
+constexpr int32_t FORM_MULTI_IMAGE_CACHE_THRESHOLD = 30;
 
 using SharedImage = std::vector<uint8_t>;
 using SharedImageMap = std::unordered_map<std::string, SharedImage>;
@@ -46,13 +48,24 @@ class SharedImageManager : public AceType {
 public:
     explicit SharedImageManager(const RefPtr<TaskExecutor>& taskExecutor) :
         sharedImageTotalSize_(0), taskExecutor_(taskExecutor) {
-        sharedImageCacheThreshold_ = SystemProperties::getFormSharedImageCacheThreshold();
-        LOGI("getFormSharedImageCacheThreshold %{public}d", sharedImageCacheThreshold_);
+        sharedImageCacheThreshold_ = DEFAULT_FORM_SHARED_IMAGE_CACHE_THRESHOLD;
+        LOGI("SharedImageManager threshold %{public}d", sharedImageCacheThreshold_);
     }
     ~SharedImageManager() override = default;
     void AddSharedImage(const std::string& name, SharedImage&& sharedImage);
     void AddPictureNamesToReloadMap(std::string&& name);
     bool FindImageInSharedImageMap(const std::string& name, const WeakPtr<ImageProviderLoader>& providerWp);
+
+    void SetImageCacheThreshold(int32_t threshold)
+    {
+        sharedImageCacheThreshold_ = threshold;
+        LOGI("SetImageCacheThreshold %{public}d", threshold);
+    }
+
+    int32_t GetImageCacheThreshold() const
+    {
+        return sharedImageCacheThreshold_;
+    }
 
     const SharedImageMap& GetSharedImageMap() const
     {

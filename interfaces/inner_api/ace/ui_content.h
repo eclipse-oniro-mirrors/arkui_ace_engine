@@ -256,6 +256,7 @@ public:
 
     virtual void UpdateFormData(const std::string& data) = 0;
     virtual void UpdateFormSharedImage(const std::map<std::string, sptr<OHOS::AppExecFwk::FormAshmem>>& imageDataMap) {}
+    virtual void SetFormImageCacheThreshold(int32_t threshold) {}
 
     virtual void SetFormWidth(const float width) = 0;
     virtual void SetFormHeight(const float height) = 0;

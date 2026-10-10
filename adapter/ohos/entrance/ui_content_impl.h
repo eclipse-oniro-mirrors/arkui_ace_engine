@@ -186,6 +186,7 @@ public:
     std::shared_ptr<Rosen::RSSurfaceNode> GetFormRootNode() override;
     void UpdateFormData(const std::string& data) override;
     void UpdateFormSharedImage(const std::map<std::string, sptr<OHOS::AppExecFwk::FormAshmem>>& imageDataMap) override;
+    void SetFormImageCacheThreshold(int32_t threshold) override;
     void ReloadForm(const std::string& url) override;
 
     void SetFormWidth(float width) override { formWidth_ = width; }
