@@ -27850,6 +27850,10 @@ typedef struct GENERATED_ArkUITabsModifier {
                               const Opt_DividerStyle* value);
     void (*setSidebarDisplayStyle)(Ark_NativePointer node,
                                    const Opt_TabsSidebarDisplayStyle* value);
+    void (*setSidebarFooter)(Ark_NativePointer node,
+                             const Opt_ComponentContentBase* value);
+    void (*setSidebarBottomBar)(Ark_NativePointer node,
+                                const Opt_ComponentContentBase* value);
     void (*setBarMode)(Ark_NativePointer node,
                        const Opt_BarMode* value,
                        const Opt_ScrollableBarModeOptions* options);
