@@ -1537,7 +1537,7 @@ void ListLayoutAlgorithm::LayoutForward(LayoutWrapper* layoutWrapper, int32_t st
         } else {
             // adjust offset. If edgeEffect is SPRING, jump adjust to allow list scroll through boundary
             if (!canOverScrollEnd_ || jumpIndex_.has_value()) {
-                currentOffset_ = currentEndPos + contentEndOffset_ - contentMainSize_;
+                currentOffset_ = static_cast<double>(currentEndPos) + contentEndOffset_ - contentMainSize_;
             }
         }
     }
