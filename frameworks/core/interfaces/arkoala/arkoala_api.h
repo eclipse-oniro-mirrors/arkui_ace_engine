@@ -1245,8 +1245,8 @@ struct ArkUIBadgeParam {
 
 struct ArkUIBadgeJSParam {
     ArkUI_CharPtr badgeValue = nullptr;
-    ArkUI_Uint32 badgeCount;
-    ArkUI_Uint32 badgeMaxCount;
+    ArkUI_Int32 badgeCount;
+    ArkUI_Int32 badgeMaxCount;
     ArkUI_Bool isPositionXy;
     ArkUI_Bool isDefaultFontSize = true;
     ArkUI_Bool isDefaultBadgeSize = true;
