@@ -131,6 +131,7 @@ struct ArkUI_AccessibilityProvider;
 struct OH_ArkUI_AnimationGroup;
 typedef struct ArkUI_InnerColor ArkUI_InnerColor;
 typedef struct ArkUI_ImmersiveMaterial ArkUI_ImmersiveMaterial;
+typedef struct OH_ArkUI_LinearGradientBlurOptions OH_ArkUI_LinearGradientBlurOptions;
 struct ArkUI_EditModeOptions {
     ArkUI_Bool enableGatherSelectedItemsAnimation;
     ArkUI_Bool useDefaultMultiSelectStyle;
@@ -3905,6 +3906,7 @@ struct ArkUICommonModifier {
     void (*resetDoubleSided)(ArkUINodeHandle node);
     ArkUINodeHandle (*getNextFocus)(ArkUINodeHandle node, FocusMove idx);
     ArkUI_Bool (*getFocusBoxStyle)(ArkUINodeHandle node, ArkUI_Float32* values, ArkUI_Uint32* color);
+    ArkUI_Bool (*getLinearGradientBlur)(ArkUINodeHandle node, OH_ArkUI_LinearGradientBlurOptions* options);
 };
 
 struct ArkUICommonShapeModifier {
