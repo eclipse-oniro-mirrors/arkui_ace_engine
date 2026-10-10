@@ -1779,7 +1779,7 @@ void SetXComponentDetachCallback(ArkUINodeHandle node, void* callback)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
     CHECK_NULL_VOID(frameNode);
-    auto* detachCallback = reinterpret_cast<std::function<void(const std::string&)>*>(callback);
+    auto* detachCallback = reinterpret_cast<DetachCallback*>(callback);
     XComponentModelNG::SetDetachCallback(frameNode, std::move(*detachCallback));
 }
 
