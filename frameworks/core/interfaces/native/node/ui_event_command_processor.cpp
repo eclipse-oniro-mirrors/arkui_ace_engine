@@ -16,14 +16,16 @@
 #include "ui_event_injection.h"
 
 #include <algorithm>
-#include <atomic>
 #include <cmath>
 #include <limits>
+#include <memory>
+#include <mutex>
 #include <string>
 #include <unordered_set>
 
 #include "base/log/log_wrapper.h"
 #include "base/thread/task_executor.h"
+#include "core/common/container.h"
 #include "core/common/container_scope.h"
 #include "core/components_ng/base/frame_node.h"
 #include "interfaces/native/native_type.h"
@@ -40,6 +42,16 @@ const std::unordered_set<std::string> SUPPORTED_NODE_TAGS = {
     "TextInput", "TextArea", "Text", "RichEditor", "Swiper", "Tabs"
 };
 
+enum class CommandPhase { QUEUED, EXECUTING, COMPLETION_PENDING, COMPLETED, CANCELLED };
+
+struct CommandState {
+    uint64_t token = 0;
+    int32_t instanceId = 0;
+    WeakPtr<Container> owner;
+    CommandPhase phase = CommandPhase::QUEUED;
+    bool cancelRequested = false;
+};
+
 struct CommandContext {
     int32_t instanceId = 0;
     uint32_t uniqueId = 0;
@@ -48,6 +60,7 @@ struct CommandContext {
     std::string convertedJson;
     void (*callback)(ArkUI_Int32, void*) = nullptr;
     void* userData = nullptr;
+    std::shared_ptr<CommandState> state;
 };
 
 OH_ArkUI_NativeModule_UIEventInjection_ResultCode MapErrorCodeToResultCode(ArkUI_ErrorCode code)
@@ -63,17 +76,101 @@ OH_ArkUI_NativeModule_UIEventInjection_ResultCode MapErrorCodeToResultCode(ArkUI
     }
 }
 
-std::atomic<bool> g_commandInFlight { false };
+std::mutex g_commandMutex;
+std::shared_ptr<CommandState> g_currentCommand;
+uint64_t g_nextCommandToken = 0;
 
-bool TryAcquireCommandFlag()
+// Called with g_commandMutex held. State identity also protects against token wraparound.
+bool IsCurrentCommand(const std::shared_ptr<CommandState>& state)
 {
-    bool expected = false;
-    return g_commandInFlight.compare_exchange_strong(expected, true);
+    return state && g_currentCommand == state && g_currentCommand->token == state->token;
 }
 
-void ReleaseCommandFlag()
+// Called with g_commandMutex held after checking or reclaiming the process slot.
+std::shared_ptr<CommandState> CreateCurrentCommand(int32_t instanceId, const RefPtr<Container>& owner)
 {
-    g_commandInFlight.store(false);
+    auto state = std::make_shared<CommandState>();
+    state->token = ++g_nextCommandToken;
+    state->instanceId = instanceId;
+    state->owner = owner;
+    g_currentCommand = state;
+    return state;
+}
+
+std::shared_ptr<CommandState> TryAcquireCommand(int32_t instanceId, const RefPtr<Container>& owner)
+{
+    std::shared_ptr<CommandState> previous;
+    {
+        std::lock_guard<std::mutex> lock(g_commandMutex);
+        if (!g_currentCommand) {
+            return CreateCurrentCommand(instanceId, owner);
+        }
+        previous = g_currentCommand;
+    }
+    // The registry query has its own lock. Never read another UI thread's Pipeline fields here.
+    auto registeredOwner = Container::GetContainer(previous->instanceId);
+    auto originalOwner = previous->owner.Upgrade();
+    bool ownerIsRegistered = originalOwner && registeredOwner == originalOwner;
+    std::lock_guard<std::mutex> lock(g_commandMutex);
+    if (!g_currentCommand) {
+        return CreateCurrentCommand(instanceId, owner);
+    }
+    // A different command won the slot during the lookup. Do not retry against its owner.
+    if (!IsCurrentCommand(previous) || ownerIsRegistered) {
+        return nullptr;
+    }
+    if (previous->phase == CommandPhase::EXECUTING) {
+        previous->cancelRequested = true;
+        return nullptr;
+    }
+    previous->phase = CommandPhase::CANCELLED;
+    return CreateCurrentCommand(instanceId, owner);
+}
+
+void CancelCommand(const std::shared_ptr<CommandState>& state)
+{
+    std::lock_guard<std::mutex> lock(g_commandMutex);
+    if (IsCurrentCommand(state)) {
+        state->phase = CommandPhase::CANCELLED;
+        g_currentCommand.reset();
+    }
+}
+
+bool BeginCommand(const std::shared_ptr<CommandState>& state)
+{
+    std::lock_guard<std::mutex> lock(g_commandMutex);
+    if (!IsCurrentCommand(state) || state->phase != CommandPhase::QUEUED) {
+        return false;
+    }
+    state->phase = CommandPhase::EXECUTING;
+    return true;
+}
+
+bool PrepareCompletion(const std::shared_ptr<CommandState>& state)
+{
+    std::lock_guard<std::mutex> lock(g_commandMutex);
+    if (!IsCurrentCommand(state) || state->phase != CommandPhase::EXECUTING) {
+        return false;
+    }
+    if (state->cancelRequested) {
+        state->phase = CommandPhase::CANCELLED;
+        g_currentCommand.reset();
+        return false;
+    }
+    state->phase = CommandPhase::COMPLETION_PENDING;
+    return true;
+}
+
+bool CompleteOnce(const std::shared_ptr<CommandState>& state)
+{
+    std::lock_guard<std::mutex> lock(g_commandMutex);
+    if (!IsCurrentCommand(state) || state->phase != CommandPhase::COMPLETION_PENDING) {
+        return false;
+    }
+    // Claim callback execution before releasing the slot; a claimed callback is not cancellable.
+    state->phase = CommandPhase::COMPLETED;
+    g_currentCommand.reset();
+    return true;
 }
 
 RefPtr<FrameNode> ResolveFrameNodeRefPtr(uint32_t uniqueId)
@@ -235,12 +332,17 @@ const char* MapResultToMessage(int32_t result)
 
 void PostCompletion(const CommandContext& ctx, ArkUI_ErrorCode code)
 {
+    if (!PrepareCompletion(ctx.state)) {
+        return;
+    }
     auto resultCode = MapErrorCodeToResultCode(code);
     // The modifier's callback type is for transport only. Invoke through the original public type.
     auto callback = reinterpret_cast<OH_ArkUI_NativeModule_UIEventInjectionCallback>(ctx.callback);
-    auto complete = [instanceId = ctx.instanceId, callback, userData = ctx.userData, resultCode]() {
+    auto complete = [state = ctx.state, instanceId = ctx.instanceId, callback, userData = ctx.userData, resultCode]() {
+        if (!CompleteOnce(state)) {
+            return;
+        }
         ContainerScope scope(instanceId);
-        ReleaseCommandFlag();
         callback(resultCode, userData);
     };
     if (!ctx.taskExecutor->PostTask(complete, TaskExecutor::TaskType::UI,
@@ -258,6 +360,9 @@ void NotifyFailure(const CommandContext& ctx, ArkUI_ErrorCode code, const char* 
 
 void ExecuteCommandOnUIThread(const CommandContext& ctx)
 {
+    if (!BeginCommand(ctx.state)) {
+        return;
+    }
     auto pipeline = ctx.pipeline.Upgrade();
     if (!pipeline || pipeline->IsDestroyed() ||
         pipeline != PipelineContext::GetContextByContainerId(ctx.instanceId)) {
@@ -369,7 +474,7 @@ ArkUI_Int32 BuildCommandPayload(const std::string& input, const std::string& cmd
     return static_cast<ArkUI_Int32>(ARKUI_ERROR_CODE_NO_ERROR);
 }
 
-ArkUI_Int32 EnqueueCommand(const CommandContext& ctx, const RefPtr<OHOS::Ace::TaskExecutor>& taskExecutor)
+ArkUI_Int32 EnqueueCommand(CommandContext& ctx, const RefPtr<OHOS::Ace::TaskExecutor>& taskExecutor)
 {
     auto probe = ResolveFrameNodeRefPtr(ctx.uniqueId);
     if (!probe) {
@@ -382,7 +487,14 @@ ArkUI_Int32 EnqueueCommand(const CommandContext& ctx, const RefPtr<OHOS::Ace::Ta
             "node instance id does not match the specified uiContext instance");
         return static_cast<ArkUI_Int32>(ARKUI_ERROR_CODE_NODE_NOT_FOUND);
     }
-    if (!TryAcquireCommandFlag()) {
+    auto owner = Container::GetContainer(ctx.instanceId);
+    if (!owner) {
+        SET_ERROR_CODE_AND_MESSAGE_IN_BACKEND(ARKUI_ERROR_CODE_UI_CONTEXT_INVALID,
+            "UI instance is no longer registered");
+        return static_cast<ArkUI_Int32>(ARKUI_ERROR_CODE_UI_CONTEXT_INVALID);
+    }
+    ctx.state = TryAcquireCommand(ctx.instanceId, owner);
+    if (!ctx.state) {
         SET_ERROR_CODE_AND_MESSAGE_IN_BACKEND(ARKUI_ERROR_CODE_COMMAND_UNFINISHED,
             "a previous composite command is still in-flight");
         return static_cast<ArkUI_Int32>(ARKUI_ERROR_CODE_COMMAND_UNFINISHED);
@@ -392,7 +504,7 @@ ArkUI_Int32 EnqueueCommand(const CommandContext& ctx, const RefPtr<OHOS::Ace::Ta
         OHOS::Ace::TaskExecutor::TaskType::UI,
         "UIEventInjection.InjectCompositeCommand");
     if (!posted) {
-        ReleaseCommandFlag();
+        CancelCommand(ctx.state);
         SET_ERROR_CODE_AND_MESSAGE_IN_BACKEND(ARKUI_ERROR_CODE_PARAM_INVALID,
             "failed to post composite command to UI thread");
         return static_cast<ArkUI_Int32>(ARKUI_ERROR_CODE_PARAM_INVALID);

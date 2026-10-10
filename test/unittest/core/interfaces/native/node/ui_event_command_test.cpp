@@ -157,10 +157,14 @@ public:
     {
         receivedCommand_ = command;
         ++commandCount_;
+        if (onCommand_) {
+            onCommand_();
+        }
         return recvResult_;
     }
     const std::string& GetReceivedCommand() const { return receivedCommand_; }
     int32_t GetCommandCount() const { return commandCount_; }
+    std::function<void()> onCommand_;
 
 private:
     std::string receivedCommand_;
@@ -207,6 +211,12 @@ public:
         queue_.pop();
         task();
         return true;
+    }
+    void DropPendingTasks()
+    {
+        while (!queue_.empty()) {
+            queue_.pop();
+        }
     }
     bool rejectCompletion_ = false;
     bool skipDelayed_ = false;
@@ -271,6 +281,7 @@ public:
     }
     void TearDown() override
     {
+        MockContainer::SetGetContainerCallback({});
         for (const auto& node : nodes_) {
             if (auto parent = node->GetParent()) {
                 parent->RemoveChild(node);
@@ -385,6 +396,222 @@ protected:
 static const char* ValidJson()
 {
     return "{\"schemaVersion\":1,\"cmd\":{\"type\":\"setText\",\"action_info\":{\"value\":\"hi\"}}}";
+}
+
+// D-25: the old owner remains allocated but is no longer the registered instance.
+HWTEST_F(UIEventCommandTest, DestroyedOwnerQueuedRecovery001, TestSize.Level1)
+{
+    auto oldExecutor = AceType::MakeRefPtr<DeferTaskExecutor>();
+    auto nextExecutor = AceType::MakeRefPtr<DeferTaskExecutor>();
+    auto pipeline = MockPipelineContext::GetCurrent();
+    pipeline->SetTaskExecutor(oldExecutor);
+    auto uid = CreateNode();
+    auto pattern = AceType::DynamicCast<FrameNode>(nodes_.back())->GetPattern<TestPattern>();
+    CallbackState oldResult;
+    CallbackState nextResult;
+    EXPECT_EQ(RunInject(uid, ValidJson(), &oldResult), ARKUI_ERROR_CODE_NO_ERROR);
+    oldExecutor->DropPendingTasks(); // Accepted task never runs: production adapters can hide rejection.
+    auto replacement = AceType::MakeRefPtr<MockContainer>();
+    MockContainer::SetGetContainerCallback([replacement](int32_t) { return replacement; });
+    pipeline->SetTaskExecutor(nextExecutor);
+    EXPECT_EQ(RunInject(uid, ValidJson(), &nextResult), ARKUI_ERROR_CODE_NO_ERROR);
+    nextExecutor->Drain();
+    EXPECT_EQ(oldResult.count, 0);
+    EXPECT_EQ(nextResult.count, 1);
+    EXPECT_EQ(pattern->GetCommandCount(), 1);
+}
+
+HWTEST_F(UIEventCommandTest, UnregisteredOwnerOtherInstanceRecovery001, TestSize.Level1)
+{
+    auto oldExecutor = AceType::MakeRefPtr<DeferTaskExecutor>();
+    auto nextExecutor = AceType::MakeRefPtr<DeferTaskExecutor>();
+    auto pipeline = MockPipelineContext::GetCurrent();
+    pipeline->SetTaskExecutor(oldExecutor);
+    auto oldId = testInstanceId_;
+    auto uid = CreateNode();
+    CallbackState oldResult;
+    CallbackState nextResult;
+    EXPECT_EQ(RunInject(uid, ValidJson(), &oldResult), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_TRUE(oldExecutor->RunNext());
+    oldExecutor->DropPendingTasks(); // Lose completion, then unregister A (not merely replace its ID).
+    auto nextOwner = AceType::MakeRefPtr<MockContainer>();
+    MockContainer::SetGetContainerCallback([oldId, nextOwner](int32_t id) -> RefPtr<Container> {
+        if (id == oldId) {
+            return nullptr;
+        }
+        return nextOwner;
+    });
+    testInstanceId_ = oldId + 1;
+    pipeline->SetInstanceId(testInstanceId_);
+    pipeline->SetTaskExecutor(nextExecutor);
+    auto nextUid = CreateNode();
+    nodes_.back()->AttachContext(AceType::RawPtr(pipeline));
+    EXPECT_EQ(RunInject(nextUid, ValidJson(), &nextResult), ARKUI_ERROR_CODE_NO_ERROR);
+    nextExecutor->Drain();
+    EXPECT_EQ(oldResult.count, 0);
+    EXPECT_EQ(nextResult.count, 1);
+    EXPECT_EQ(nextResult.result, INJECTION_SUCCESS);
+    pipeline->SetInstanceId(oldId);
+    testInstanceId_ = oldId;
+}
+
+HWTEST_F(UIEventCommandTest, StaleCommandAfterRecovery001, TestSize.Level1)
+{
+    auto oldExecutor = AceType::MakeRefPtr<DeferTaskExecutor>();
+    auto nextExecutor = AceType::MakeRefPtr<DeferTaskExecutor>();
+    auto pipeline = MockPipelineContext::GetCurrent();
+    pipeline->SetTaskExecutor(oldExecutor);
+    auto uid = CreateNode();
+    auto pattern = AceType::DynamicCast<FrameNode>(nodes_.back())->GetPattern<TestPattern>();
+    CallbackState oldResult;
+    CallbackState nextResult;
+    EXPECT_EQ(RunInject(uid, ValidJson(), &oldResult), ARKUI_ERROR_CODE_NO_ERROR);
+    auto replacement = AceType::MakeRefPtr<MockContainer>();
+    MockContainer::SetGetContainerCallback([replacement](int32_t) { return replacement; });
+    pipeline->SetTaskExecutor(nextExecutor);
+    EXPECT_EQ(RunInject(uid, ValidJson(), &nextResult), ARKUI_ERROR_CODE_NO_ERROR);
+    oldExecutor->Drain();
+    EXPECT_EQ(pattern->GetCommandCount(), 0);
+    EXPECT_EQ(oldResult.count, 0);
+    EXPECT_EQ(RunInject(uid, ValidJson()), ARKUI_ERROR_CODE_COMMAND_UNFINISHED);
+    nextExecutor->Drain();
+    EXPECT_EQ(nextResult.count, 1);
+    EXPECT_EQ(pattern->GetCommandCount(), 1);
+}
+
+HWTEST_F(UIEventCommandTest, StaleCompletionAfterRecovery001, TestSize.Level1)
+{
+    auto oldExecutor = AceType::MakeRefPtr<DeferTaskExecutor>();
+    auto nextExecutor = AceType::MakeRefPtr<DeferTaskExecutor>();
+    auto pipeline = MockPipelineContext::GetCurrent();
+    pipeline->SetTaskExecutor(oldExecutor);
+    auto uid = CreateNode();
+    CallbackState oldResult;
+    CallbackState nextResult;
+    EXPECT_EQ(RunInject(uid, ValidJson(), &oldResult), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_TRUE(oldExecutor->RunNext()); // Only completion is pending now.
+    auto replacement = AceType::MakeRefPtr<MockContainer>();
+    MockContainer::SetGetContainerCallback([replacement](int32_t) { return replacement; });
+    pipeline->SetTaskExecutor(nextExecutor);
+    EXPECT_EQ(RunInject(uid, ValidJson(), &nextResult), ARKUI_ERROR_CODE_NO_ERROR);
+    oldExecutor->Drain();
+    EXPECT_EQ(oldResult.count, 0);
+    EXPECT_EQ(RunInject(uid, ValidJson()), ARKUI_ERROR_CODE_COMMAND_UNFINISHED);
+    nextExecutor->Drain();
+    EXPECT_EQ(nextResult.count, 1);
+}
+
+HWTEST_F(UIEventCommandTest, ExecutingOwnerRecovery001, TestSize.Level1)
+{
+    auto executor = AceType::MakeRefPtr<DeferTaskExecutor>();
+    MockPipelineContext::GetCurrent()->SetTaskExecutor(executor);
+    auto uid = CreateNode();
+    auto pattern = AceType::DynamicCast<FrameNode>(nodes_.back())->GetPattern<TestPattern>();
+    auto replacement = AceType::MakeRefPtr<MockContainer>();
+    pattern->onCommand_ = [this, uid, replacement]() {
+        MockContainer::SetGetContainerCallback([replacement](int32_t) { return replacement; });
+        EXPECT_EQ(RunInject(uid, ValidJson()), ARKUI_ERROR_CODE_COMMAND_UNFINISHED);
+    };
+    CallbackState oldResult;
+    CallbackState nextResult;
+    EXPECT_EQ(RunInject(uid, ValidJson(), &oldResult), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_TRUE(executor->RunNext());
+    EXPECT_FALSE(executor->RunNext()); // Cancel on execution exit; no completion is posted.
+    EXPECT_EQ(oldResult.count, 0);
+    pattern->onCommand_ = {};
+    EXPECT_EQ(RunInject(uid, ValidJson(), &nextResult), ARKUI_ERROR_CODE_NO_ERROR);
+    executor->Drain();
+    EXPECT_EQ(nextResult.count, 1);
+}
+
+HWTEST_F(UIEventCommandTest, AliveOwnerDroppedTask001, TestSize.Level1)
+{
+    auto executor = AceType::MakeRefPtr<DeferTaskExecutor>();
+    MockPipelineContext::GetCurrent()->SetTaskExecutor(executor);
+    auto uid = CreateNode();
+    CallbackState oldResult;
+    CallbackState nextResult;
+    EXPECT_EQ(RunInject(uid, ValidJson(), &oldResult), ARKUI_ERROR_CODE_NO_ERROR);
+    executor->DropPendingTasks();
+    EXPECT_EQ(RunInject(uid, ValidJson(), &nextResult), ARKUI_ERROR_CODE_COMMAND_UNFINISHED);
+    EXPECT_EQ(oldResult.count, 0);
+    EXPECT_EQ(nextResult.count, 0);
+    // Only unregistering/replacing the owner permits recovery; clean up through the real path.
+    auto replacement = AceType::MakeRefPtr<MockContainer>();
+    MockContainer::SetGetContainerCallback([replacement](int32_t) { return replacement; });
+    EXPECT_EQ(RunInject(uid, ValidJson(), &nextResult), ARKUI_ERROR_CODE_NO_ERROR);
+    executor->Drain();
+    EXPECT_EQ(nextResult.count, 1);
+}
+
+HWTEST_F(UIEventCommandTest, MissingOwnerBeforeAccept001, TestSize.Level1)
+{
+    auto uid = CreateNode();
+    CallbackState result;
+    // The mock Pipeline query still succeeds, so exercise the registry check immediately before acquire.
+    MockContainer::SetGetContainerCallback([](int32_t) { return RefPtr<Container>(); });
+    EXPECT_EQ(RunInject(uid, ValidJson(), &result), ARKUI_ERROR_CODE_UI_CONTEXT_INVALID);
+    EXPECT_EQ(result.count, 0);
+    MockContainer::SetGetContainerCallback({});
+    EXPECT_EQ(RunInject(uid, ValidJson(), &result), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(result.count, 1);
+}
+
+// Deterministically interleave another request during the unlocked registry lookup.
+// This tests snapshot revalidation without accessing real UI objects from worker threads.
+HWTEST_F(UIEventCommandTest, InterleavedOwnerRecovery001, TestSize.Level1)
+{
+    auto oldExecutor = AceType::MakeRefPtr<DeferTaskExecutor>();
+    auto nextExecutor = AceType::MakeRefPtr<DeferTaskExecutor>();
+    auto pipeline = MockPipelineContext::GetCurrent();
+    pipeline->SetTaskExecutor(oldExecutor);
+    auto uid = CreateNode();
+    CallbackState oldResult;
+    CallbackState winner;
+    CallbackState loser;
+    EXPECT_EQ(RunInject(uid, ValidJson(), &oldResult), ARKUI_ERROR_CODE_NO_ERROR);
+    auto replacement = AceType::MakeRefPtr<MockContainer>();
+    int lookups = 0;
+    MockContainer::SetGetContainerCallback([&](int32_t) -> RefPtr<Container> {
+        ++lookups;
+        if (lookups == 2) { // Outer request captured A; inner request reclaims A and installs B.
+            EXPECT_EQ(RunInject(uid, ValidJson(), &winner), ARKUI_ERROR_CODE_NO_ERROR);
+        }
+        return replacement;
+    });
+    pipeline->SetTaskExecutor(nextExecutor);
+    EXPECT_EQ(RunInject(uid, ValidJson(), &loser), ARKUI_ERROR_CODE_COMMAND_UNFINISHED);
+    oldExecutor->Drain();
+    nextExecutor->Drain();
+    EXPECT_EQ(oldResult.count, 0);
+    EXPECT_EQ(winner.count, 1);
+    EXPECT_EQ(loser.count, 0);
+    MockContainer::SetGetContainerCallback({});
+}
+
+// Completion may release the captured slot while the registry lookup is unlocked.
+HWTEST_F(UIEventCommandTest, CompletedOwnerDuringLookup001, TestSize.Level1)
+{
+    auto executor = AceType::MakeRefPtr<DeferTaskExecutor>();
+    MockPipelineContext::GetCurrent()->SetTaskExecutor(executor);
+    auto uid = CreateNode();
+    CallbackState previousResult;
+    CallbackState nextResult;
+    EXPECT_EQ(RunInject(uid, ValidJson(), &previousResult), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_TRUE(executor->RunNext());
+    auto owner = MockContainer::Current();
+    int lookups = 0;
+    MockContainer::SetGetContainerCallback([&](int32_t) -> RefPtr<Container> {
+        if (++lookups == 2) {
+            EXPECT_TRUE(executor->RunNext()); // Complete the old command during the owner query.
+        }
+        return owner;
+    });
+    EXPECT_EQ(RunInject(uid, ValidJson(), &nextResult), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(previousResult.count, 1);
+    executor->Drain();
+    EXPECT_EQ(nextResult.count, 1);
+    MockContainer::SetGetContainerCallback({});
 }
 
 HWTEST_F(UIEventCommandTest, T0CrossInstance001, TestSize.Level1)

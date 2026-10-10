@@ -93,7 +93,10 @@ typedef enum {
  * @brief Callback for injection completion.
  *
  * The callback is invoked once when the injected command finishes executing, whether successfully
- * or not.
+ * or not, except when a later injection reclaims a command whose original UI instance
+ * has been unregistered or replaced. In that case, a pending command or unclaimed completion
+ * callback is cancelled. An executing command retains the process slot until it returns;
+ * a callback already claimed for execution completes normally.
  *
  * @param result [in] Result code of the injection execution. For details, see
  *     {@link OH_ArkUI_NativeModule_UIEventInjection_ResultCode}.
@@ -101,7 +104,10 @@ typedef enum {
  *        The type, ownership, and lifetime of the pointed-to data are entirely defined by the
  *        caller. The framework does not dereference or retain this pointer; it is
  *        only passed back to this callback. Must remain valid until the callback
- *        is invoked.
+ *        finishes. Cancellation has no separate notification. Instance unregistration alone
+ *        does not prove that a claimed callback has finished. If no callback is received,
+ *        the caller must synchronize execution-environment shutdown and callback exit
+ *        before releasing the data.
  * @since 26.2.0
  */
 typedef void (*OH_ArkUI_NativeModule_UIEventInjectionCallback)(
@@ -140,10 +146,12 @@ typedef void (*OH_ArkUI_NativeModule_UIEventInjectionCallback)(
  *        The JSON data is internally copied before the function returns; the caller
  *        retains ownership and may destroy the object immediately after return.
  * @param callback [in] Completion callback. Must not be NULL. For an accepted command,
- *        invoked exactly once on the UI thread when command processing completes.
+ *        invoked once on the UI thread when command processing completes, unless cancelled
+ *        by the instance-unregistration recovery described above.
  * @param userData [in] Custom user data pointer passed to the callback. Can be NULL.
- *        If non-NULL, must remain valid until the callback is invoked. The framework
- *        does not dereference or retain this pointer.
+ *        If non-NULL, must remain valid until callback completion or synchronized shutdown
+ *        as described by OH_ArkUI_NativeModule_UIEventInjectionCallback. The framework
+ *        does not dereference or own this pointer.
  * @return <ul>
  *     <li>{@link ARKUI_ERROR_CODE_NO_ERROR} if the command is queued successfully.</li>
  *     <li>{@link ARKUI_ERROR_CODE_PARAM_INVALID} if parameter invalid, including NULL callback, required fields are
