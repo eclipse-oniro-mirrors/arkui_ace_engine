@@ -71,6 +71,7 @@ private:
     void PaintPreviewTextDecoration(DrawingContext& drawingContext) const;
     void PaintCaret(DrawingContext& drawingContext) const;
     void PaintFloatingCaret(DrawingContext& drawingContext) const;
+    void DrawCaretInternal(RSCanvas& canvas, const OffsetF& offset, int32_t caretColor) const;
     void PaintScrollBar(DrawingContext& context);
     void PaintFreeScrollBar(DrawingContext& context, const RefPtr<RichEditorPattern>& pattern);
     void PaintFixedScrollBar(DrawingContext& context);

@@ -9515,8 +9515,11 @@ RectF RichEditorPattern::GetCaretBoundaryRect()
     auto caretBoundaryRect = contentRect_;
     auto overlayModifier = DynamicCast<RichEditorOverlayModifier>(overlayMod_);
     CHECK_NULL_RETURN(overlayModifier, caretBoundaryRect);
-    auto caretWidth = overlayModifier->GetCaretWidth();
-    caretBoundaryRect.SetWidth(caretBoundaryRect.Width() - caretWidth);
+    // Use default caret width for boundary when custom width is set to avoid false line-end detection.
+    float boundaryCaretWidth = customCaretWidth_.has_value()
+        ? static_cast<float>(CARET_WIDTH.ConvertToPx())
+        : overlayModifier->GetCaretWidth();
+    caretBoundaryRect.SetWidth(caretBoundaryRect.Width() - boundaryCaretWidth);
     return caretBoundaryRect;
 }
 
