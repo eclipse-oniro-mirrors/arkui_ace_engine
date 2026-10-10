@@ -2408,6 +2408,31 @@ typedef enum {
     NODE_TRANSFORM_3D = 128,
 
     /**
+     * @brief Defines the linear gradient blur attribute, which can be set, reset, and obtained
+     * as required through APIs.
+     *
+     * **Format of the {@link ArkUI_AttributeItem} parameter for setting the attribute:**
+     * <ul>
+     * <li>.object: linear gradient blur options object. The parameter type is
+     * {@link OH_ArkUI_LinearGradientBlurOptions*}.</li>
+     * </ul>
+     *
+     * **Format of the return value {@link ArkUI_AttributeItem}:**
+     * <ul>
+     * <li>.object: linear gradient blur options object. The type is
+     * {@link OH_ArkUI_LinearGradientBlurOptions*}. The object is an internal static object;
+     * do not release it by calling {@link OH_ArkUI_NativeModule_LinearGradientBlurOptions_Destroy}.
+     * When the attribute is not set or has been reset, the returned object contains default values
+     * (blurRadius = 0, fractionStops = {0.0, 0.0, 0.0, 1.0}, direction =
+     * {@link OH_ARKUI_LINEAR_GRADIENT_BLUR_DIRECTION_BOTTOM}).</li>
+     * </ul>
+     *
+     * @ingroup Visual
+     * @since 26.2.0
+     */
+    NODE_LINEAR_GRADIENT_BLUR = 129,
+
+    /**
      * @brief Defines the text content attribute, which can be set, reset, and obtained as required through APIs.
      *
      * Format of the {@link ArkUI_AttributeItem} parameter for setting the attribute:\n

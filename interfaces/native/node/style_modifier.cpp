@@ -26,6 +26,7 @@
 #include "animate_impl.h"
 #include "native_material_impl.h"
 #include "native_type.h"
+#include "native_type_visual_impl.h"
 #include "node_model.h"
 #include "node_transition.h"
 #include "progress_option.h"
@@ -1307,6 +1308,45 @@ void ResetSystemMaterial(ArkUI_NodeHandle node)
         return;
     }
     materialModifier->resetSystemMaterial(node->uiNodeHandle);
+}
+
+void ResetLinearGradientBlur(ArkUI_NodeHandle node)
+{
+    CHECK_NULL_VOID(node);
+    auto* fullImpl = GetFullImpl();
+    fullImpl->getNodeModifiers()->getCommonModifier()->resetLinearGradientBlur(node->uiNodeHandle);
+}
+
+int32_t SetLinearGradientBlur(ArkUI_NodeHandle node, const ArkUI_AttributeItem* item)
+{
+    if (!node || !item || !node->uiNodeHandle) {
+        return ERROR_CODE_PARAM_INVALID;
+    }
+    const auto* options = reinterpret_cast<OH_ArkUI_LinearGradientBlurOptions*>(item->object);
+    CHECK_NULL_RETURN(options, ERROR_CODE_PARAM_INVALID);
+    auto blurRadius = options->blurRadius;
+    auto* stopsData = options->fractionStops.data();
+    auto stopsLength = static_cast<ArkUI_Uint32>(options->fractionStops.size());
+    const int32_t directionValue = static_cast<int32_t>(options->direction);
+    auto* fullImpl = GetFullImpl();
+    fullImpl->getNodeModifiers()->getCommonModifier()->setLinearGradientBlur(
+        node->uiNodeHandle, blurRadius, stopsData, stopsLength, directionValue);
+    return ERROR_CODE_NO_ERROR;
+}
+
+const ArkUI_AttributeItem* GetLinearGradientBlur(ArkUI_NodeHandle node)
+{
+    thread_local static OH_ArkUI_LinearGradientBlurOptions threadLocalOptions {};
+    auto* fullImpl = GetFullImpl();
+    auto hasValue = fullImpl->getNodeModifiers()->getCommonModifier()->getLinearGradientBlur(
+        node->uiNodeHandle, &threadLocalOptions);
+    if (!hasValue) {
+        threadLocalOptions.blurRadius = 0.0f;
+        threadLocalOptions.fractionStops = { 0.0f, 0.0f, 0.0f, 1.0f };
+        threadLocalOptions.direction = OH_ARKUI_LINEAR_GRADIENT_BLUR_DIRECTION_BOTTOM;
+    }
+    g_attributeItem.object = &threadLocalOptions;
+    return &g_attributeItem;
 }
 
 const ArkUI_AttributeItem* GetSystemMaterial(ArkUI_NodeHandle node)
@@ -21369,6 +21409,7 @@ int32_t SetCommonAttribute(ArkUI_NodeHandle node, int32_t subTypeId, const ArkUI
         SetInspectorLabel,
         SetSystemMaterial,
         SetTransform3D,
+        SetLinearGradientBlur,
     };
     if (static_cast<uint32_t>(subTypeId) >= sizeof(setters) / sizeof(Setter*)) {
         TAG_LOGE(AceLogTag::ACE_NATIVE_NODE, "common node attribute: %{public}d NOT IMPLEMENT", subTypeId);
@@ -21512,6 +21553,7 @@ const ArkUI_AttributeItem* GetCommonAttribute(ArkUI_NodeHandle node, int32_t sub
         GetInspectorLabel,
         GetSystemMaterial,
         GetTransform3D,
+        GetLinearGradientBlur,
     };
     if (static_cast<uint32_t>(subTypeId) >= sizeof(getters) / sizeof(Getter*)) {
         TAG_LOGE(AceLogTag::ACE_NATIVE_NODE, "common node attribute: %{public}d NOT IMPLEMENT", subTypeId);
@@ -21656,6 +21698,7 @@ void ResetCommonAttribute(ArkUI_NodeHandle node, int32_t subTypeId)
         ResetInspectorLabel,
         ResetSystemMaterial,
         ResetTransform3D,
+        ResetLinearGradientBlur,
     };
     if (static_cast<uint32_t>(subTypeId) >= sizeof(resetters) / sizeof(Resetter*)) {
         TAG_LOGE(AceLogTag::ACE_NATIVE_NODE, "common node attribute: %{public}d NOT IMPLEMENT", subTypeId);
