@@ -319,6 +319,7 @@ public:
     bool AdditionalScrollTo(const RefPtr<FrameNode>& scroll, float height);
     void SetColumnMinSize(bool reset = false);
     float InitialSingleGearHeight(NG::SheetStyle& sheetStyle);
+    double GetScreenHeight();
     float GetSheetTopSafeArea();
     float UpdateSheetTransitionOffset();
 
