@@ -101,6 +101,7 @@ public:
     void DestroyUIDirector() override;
     void SetUIContentType(UIContentType uIContentType) override;
     void SetHostParams(const OHOS::AAFwk::WantParams& params) override;
+    void MarkUIExtensionDensityFollowHost() override;
     void UpdateFontScale(const std::shared_ptr<OHOS::AppExecFwk::Configuration>& config);
     static int32_t GetUIContentWindowID(int32_t instanceId);
     OHOS::Rosen::Window* GetUIContentWindow() override;
@@ -611,6 +612,7 @@ protected:
 
 private:
     void ProcessWindowSizeLayoutBreakPointChange(double density);
+    void ApplyFloatNavigationAvoidArea(bool enable);
 };
 
 } // namespace OHOS::Ace

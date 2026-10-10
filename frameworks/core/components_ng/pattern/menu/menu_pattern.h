@@ -919,7 +919,7 @@ private:
     void ShowPreviewMenuScaleAnimation(const RefPtr<MenuTheme>& menuTheme, AnimationOption& option, int32_t delay);
     Placement GetFinalPlacement() const;
     OffsetF GetDistortionMenuOffset(Placement placement) const;
-    MenuParam GetMenuParam() const;
+    const MenuParam& GetMenuParam() const;
     bool IsUseEdgeLightAnimation() const;
     void PlayDistortAnimation(const OffsetF& menuPosition, int32_t delay = 0);
     void PlayTranslateAnimation(
@@ -987,6 +987,8 @@ private:
     std::vector<RefPtr<FrameNode>> menuItems_;
     std::optional<int32_t> foldStatusChangedCallbackId_;
     std::optional<int32_t> halfFoldHoverCallbackId_;
+    WeakPtr<PipelineContext> foldStatusPipeline_;
+    WeakPtr<PipelineContext> halfFoldHoverPipeline_;
 
     bool isSelectMenu_ = false;
     bool isSelectMenuBackgroundColorJsview_ = true;

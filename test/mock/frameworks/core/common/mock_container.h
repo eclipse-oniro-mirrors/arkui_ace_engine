@@ -29,11 +29,23 @@ class MockContainer : public Container {
     DECLARE_ACE_TYPE(MockContainer, Container);
 
 public:
+    using GetContainerCallback = std::function<RefPtr<Container>(int32_t)>;
+
     explicit MockContainer(RefPtr<PipelineBase> pipelineContext = nullptr) : pipelineContext_(pipelineContext) {}
 
     RefPtr<PipelineBase> GetPipelineContext() const override
     {
         return pipelineContext_;
+    }
+
+    void SetMockWindow(Window* window)
+    {
+        window_ = window;
+    }
+
+    Window* GetMockWindow() const
+    {
+        return window_;
     }
 
     RefPtr<TaskExecutor> GetTaskExecutor() const override
@@ -56,6 +68,7 @@ public:
     static void TearDown();
     static RefPtr<MockContainer> Current();
     static RefPtr<MockContainer> GetContainer(int32_t containerId);
+    static void SetGetContainerCallback(GetContainerCallback&& callback);
     static void SetMockColorMode(ColorMode mode);
     static ColorMode GetMockColorMode();
     static void SetMockIsNeedModifySize(bool isNeedModifySize);
@@ -197,15 +210,18 @@ public:
     MOCK_METHOD(bool, WindowIsShow, (), (const, override));
     MOCK_METHOD(bool, IsMainWindow, (), (const, override));
     MOCK_METHOD(bool, IsSubWindow, (), (const, override));
+    MOCK_METHOD(bool, IsPipWindow, (), (const, override));
     MOCK_METHOD(Rect, GetGlobalScaledRect, (), (const, override));
     static RefPtr<MockContainer> container_;
     static ColorMode mockColorMode_;
     static bool mockIsNeedModifySize_;
     static Rect mockDisplayAvailableRect_;
+    static GetContainerCallback getContainerCallback_;
 
 private:
     RefPtr<TaskExecutor> taskExecutor_;
     RefPtr<PipelineBase> pipelineContext_;
+    Window* window_ = nullptr;
     bool isFormRender_ = false;
     bool isUIExtensionWindow_ = false;
     bool isSubContainer_ = false;

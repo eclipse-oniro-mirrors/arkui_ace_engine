@@ -4226,6 +4226,15 @@ bool NavigationPattern::TriggerCustomAnimation(RefPtr<NavDestinationGroupNode> p
 #endif
                 pattern->RecoveryToLastStack(preDestination, topDestination);
                 pattern->SyncWithJsStackIfNeeded();
+#ifndef CROSS_PLATFORM
+                auto pipeline = pattern->GetContext();
+                if (pipeline) {
+                    auto mgr = pipeline->GetContentChangeManager();
+                    if (mgr) {
+                        mgr->OnContentChangeInterrupted(topDestination, ChangeType::PAGE);
+                    }
+                }
+#endif
             }
             proxy->FireEndCallback();
             pattern->RemoveProxyById(proxyId);
@@ -6146,8 +6155,6 @@ void NavigationPattern::HandleTouchUp()
     CHECK_NULL_VOID(dragPattern);
     dragPattern->UpdateDefaultColor();
 
-    auto theme = NavigationGetTheme();
-    CHECK_NULL_VOID(theme);
     auto dividerNode = GetDividerNode();
     CHECK_NULL_VOID(dividerNode);
     if (UpdateForceSplitDividerColor(dividerNode)) {
@@ -6159,7 +6166,8 @@ void NavigationPattern::HandleTouchUp()
     gradient.CreateGradientWithType(NG::GradientType::LINEAR);
     gradient.AddColor(CreatePercentGradientColor(0, Color::TRANSPARENT));
     dividerRenderContext->UpdateLinearGradient(gradient);
-    dividerRenderContext->UpdateBackgroundColor(theme->GetNavigationDividerColor());
+    // restore the divider color with user-defined color or theme default color
+    UpdateDividerBackgroundColor();
 }
 
 void NavigationPattern::CheckContentNeedMeasure(const RefPtr<FrameNode>& node)
@@ -8467,6 +8475,7 @@ void NavigationPattern::ContentChangeOnTransitionStart(const RefPtr<FrameNode>& 
     CHECK_NULL_VOID(mgr);
     CHECK_NULL_VOID(keyNode);
     mgr->OnTransitionAdded(keyNode->GetId());
+    mgr->OnContentChangeStart(keyNode, ChangeType::PAGE);
 #endif
 }
 

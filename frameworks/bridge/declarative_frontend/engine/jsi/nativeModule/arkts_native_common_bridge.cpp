@@ -8431,7 +8431,9 @@ Local<panda::ObjectRef> CommonBridge::CreateFingerInfo(EcmaVM* vm, const FingerI
         panda::FunctionRef::New(vm, Framework::JsGetCurrentLocalPositionForFinger) };
     auto fingerInfoObj = panda::ObjectRef::NewWithNamedProperties(vm, ArraySize(keys), keys, values);
     fingerInfoObj->SetNativePointerFieldCount(vm, 1);
-    fingerInfoObj->SetNativePointerField(vm, 0, const_cast<FingerInfo*>(&fingerInfo));
+    auto* fingerInfoPtr = new FingerInfo(fingerInfo);
+    fingerInfoObj->SetNativePointerField(vm, 0, static_cast<void*>(fingerInfoPtr),
+        &SyncDestructorInterceptor<FingerInfo>);
     return fingerInfoObj;
 }
 
@@ -10243,6 +10245,9 @@ NG::GestureCollectIntervention CommonBridge::ProcessOnGestureCollectIntercept(Ec
     panda::Local<panda::JSValueRef> params[2] = { recognizersArr, touchRecognizersArr };
     auto returnValue = NG::GestureCollectIntervention::CONTINUE;
     auto result = func->Call(vm, func, params, 2);
+    if (result.IsEmpty()) {
+        return returnValue;
+    }
     if (result->IsNumber()) {
         auto interventionValue = result->Int32Value(vm);
         if (interventionValue >= 0 &&

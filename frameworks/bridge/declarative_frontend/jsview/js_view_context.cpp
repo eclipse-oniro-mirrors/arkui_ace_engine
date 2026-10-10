@@ -55,26 +55,20 @@
 
 namespace OHOS::Ace {
 
-std::unique_ptr<ViewContextModel> ViewContextModel::instance_ = nullptr;
-std::mutex ViewContextModel::mutex_;
-
 ViewContextModel* ViewContextModel::GetInstance()
 {
-    if (!instance_) {
-        std::lock_guard<std::mutex> lock(mutex_);
-        if (!instance_) {
 #ifdef NG_BUILD
-            instance_.reset(new NG::ViewContextModelNG());
+    static NG::ViewContextModelNG instance;
+    return &instance;
 #else
-            if (Container::IsCurrentUseNewPipeline()) {
-                instance_.reset(new NG::ViewContextModelNG());
-            } else {
-                instance_.reset(new Framework::ViewContextModelImpl());
-            }
-#endif
-        }
+    if (Container::IsCurrentUseNewPipeline()) {
+        static NG::ViewContextModelNG instance;
+        return &instance;
+    } else {
+        static Framework::ViewContextModelImpl instance;
+        return &instance;
     }
-    return instance_.get();
+#endif
 }
 
 } // namespace OHOS::Ace
@@ -1089,8 +1083,16 @@ int32_t ParseTargetInfo(const JSRef<JSObject>& obj, int32_t& targetId)
     auto targetInfoID = obj->GetProperty("id");
     if (targetInfoID->IsNumber()) {
         targetId = targetInfoID->ToNumber<int32_t>();
+        if (targetId < 0) {
+            return ERROR_CODE_PARAM_INVALID;
+        }
+        auto node = ElementRegister::GetInstance()->GetSpecificItemById<NG::FrameNode>(targetId);
+        CHECK_NULL_RETURN(node, ERROR_CODE_TARGET_INFO_NOT_EXIST);
     } else if (targetInfoID->IsString()) {
         std::string targetIdString = targetInfoID->ToString();
+        if (targetIdString.empty()) {
+            return ERROR_CODE_PARAM_INVALID;
+        }
         auto targetInfoComponentId = obj->GetProperty("componentId");
         if (targetInfoComponentId->IsNumber()) {
             auto componentId = targetInfoComponentId->ToNumber<int32_t>();
@@ -1113,6 +1115,8 @@ int32_t ParseTargetInfo(const JSRef<JSObject>& obj, int32_t& targetId)
             CHECK_NULL_RETURN(targetNode, ERROR_CODE_TARGET_INFO_NOT_EXIST);
             targetId = targetNode->GetId();
         }
+    } else {
+        return ERROR_CODE_PARAM_INVALID;
     }
     if (targetId < 0) {
         return ERROR_CODE_PARAM_INVALID;

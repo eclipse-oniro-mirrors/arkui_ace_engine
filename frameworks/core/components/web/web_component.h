@@ -334,6 +334,17 @@ public:
         return declaration_->GetScaleChangeId();
     }
 
+    void SetZoomChangeId(const EventMarker& zoomChangeId)
+    {
+        CHECK_NULL_VOID(declaration_);
+        declaration_->SetZoomChangeId(zoomChangeId);
+    }
+
+    const EventMarker& GetZoomChangeId() const
+    {
+        return declaration_->GetZoomChangeId();
+    }
+
     void SetScrollId(const EventMarker& scrollId)
     {
         CHECK_NULL_VOID(declaration_);
@@ -749,6 +760,11 @@ public:
     void SetCssDisplayChangeEnabled(bool isEnabled)
     {
         isCssDisplayChangeEnabled_ = isEnabled;
+    }
+
+    void SetTransformRotateAndSkewEnabled(bool isEnabled)
+    {
+        isTransformRotateAndSkewEnabled_ = isEnabled;
     }
 
     const std::tuple<bool, bool>& GetNativeVideoPlayerConfig() const
@@ -1394,6 +1410,7 @@ private:
     bool isNativeEmbedMode_ = false;
     bool isIntrinsicSize_ = false;
     bool isCssDisplayChangeEnabled_ = false;
+    bool isTransformRotateAndSkewEnabled_ = false;
     std::string tag_;
     std::string tag_type_;
     OnDragFunc onDragStartId_;

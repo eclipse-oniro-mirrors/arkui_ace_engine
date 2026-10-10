@@ -342,6 +342,17 @@ PipelineContext::PipelineContext(): safeAreaManager_(MakeRefPtr<SafeAreaManager>
     }
 }
 
+// Host test binary does not link the real pipeline_context.cpp; provide the same lazy
+// creation so syntax-side observation hooks resolve and exercise the real manager.
+const RefPtr<ScrollPlaceholderManager>& PipelineContext::GetOrCreateScrollPlaceholderManager()
+{
+    if (!scrollPlaceholderManager_) {
+        scrollPlaceholderManager_ = MakeRefPtr<ScrollPlaceholderManager>(instanceId_);
+        scrollPlaceholderManager_->SetPipelineContext(WeakClaim(this));
+    }
+    return scrollPlaceholderManager_;
+}
+
 float PipelineContext::GetCurrentRootWidth()
 {
     return static_cast<float>(MockPipelineContext::GetCurrent()->rootWidth_);
@@ -632,7 +643,7 @@ void PipelineContext::DetachNode(RefPtr<UINode>) {}
 
 void PipelineContext::Finish(bool autoFinish) const {}
 
-void PipelineContext::FlushVsync(uint64_t nanoTimestamp, uint64_t frameCount) {}
+void PipelineContext::FlushVsync(uint64_t nanoTimestamp, uint64_t frameCount, int64_t vsyncStartTime) {}
 
 void PipelineContext::FlushPipelineWithoutAnimation() {}
 
@@ -1121,6 +1132,18 @@ void PipelineContext::UpdateNavSafeAreaWithoutAnimation(
 
 void PipelineContext::UpdateFloatNavSafeAreaWithoutAnimation(const SafeAreaInsets& floatNavSafeArea) {}
 
+void PipelineContext::ApplyDefaultImmersiveStrategy(const std::unordered_set<ImmersiveStrategy>& types)
+{
+    CHECK_NULL_VOID(safeAreaManager_);
+    safeAreaManager_->ApplyDefaultImmersiveStrategy(types);
+}
+ 
+bool PipelineContext::IsImmersiveStrategySet(ImmersiveStrategy strategy) const
+{
+    CHECK_NULL_RETURN(safeAreaManager_, false);
+    return safeAreaManager_->IsImmersiveStrategySet(strategy);
+}
+
 KeyBoardAvoidMode PipelineContext::GetEnableKeyBoardAvoidMode()
 {
     return KeyBoardAvoidMode::OFFSET;
@@ -1526,7 +1549,7 @@ void PipelineBase::OnVirtualKeyboardAreaChange(Rect keyboardArea, double positio
     const std::shared_ptr<Rosen::RSTransaction>& rsTransaction, bool forceChange)
 {}
 
-void PipelineBase::OnVsyncEvent(uint64_t nanoTimestamp, uint64_t frameCount) {}
+void PipelineBase::OnVsyncEvent(uint64_t nanoTimestamp, uint64_t frameCount, int64_t vsyncStartTime) {}
 
 bool PipelineBase::ReachResponseDeadline() const
 {
@@ -2126,8 +2149,19 @@ int32_t PipelineContext::RegisterRotationEndCallback(std::function<void()>&& cal
 }
 
 void PipelineContext::OnSurfaceDensityChanged(double density) {}
-void PipelineContext::RegisterListenerForTranslate(const WeakPtr<FrameNode> node) {}
-void PipelineContext::UnRegisterListenerForTranslate(int32_t nodeId) {}
+void PipelineContext::RegisterListenerForTranslate(const WeakPtr<FrameNode> node)
+{
+    CHECK_NULL_VOID(uiTranslateManager_);
+    uiTranslateManager_->AddTranslateListener(node);
+    CHECK_NULL_VOID(contentChangeMgr_);
+    contentChangeMgr_->ReportTranslateTextFrameNode(node);
+}
+
+void PipelineContext::UnRegisterListenerForTranslate(int32_t nodeId)
+{
+    CHECK_NULL_VOID(uiTranslateManager_);
+    uiTranslateManager_->RemoveTranslateListener(nodeId);
+}
 
 void PipelineContext::RegisterMaterialNode(const RefPtr<FrameNode>& node) {}
 
@@ -2151,3 +2185,10 @@ int32_t PipelineBase::RegisterDensityChangedCallback(std::function<void(double)>
 void PipelineBase::UnregisterDensityChangedCallback(int) {}
 
 } // namespace OHOS::Ace
+
+namespace OHOS::Ace::NG {
+std::shared_ptr<UiTranslateManagerImpl> PipelineContext::GetUiTranslateManagerImpl()
+{
+    return uiTranslateManager_;
+}
+} // namespace OHOS::Ace::NG

@@ -1065,6 +1065,26 @@ void SetOnScaleChangeImpl(Ark_NativePointer node,
     WebModelStatic::SetScaleChangeId(frameNode, onScaleChange);
 #endif // WEB_SUPPORTED
 }
+void SetOnZoomChangeImpl(Ark_NativePointer node,
+                         const Opt_OnZoomChangeCallback* value)
+{
+#ifdef WEB_SUPPORTED
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto optValue = Converter::GetOptPtr(value);
+    if (!optValue) {
+        WebModelStatic::SetZoomChangeId(frameNode, nullptr);
+        return;
+    }
+    auto instanceId = Container::CurrentId();
+    WeakPtr<FrameNode> weakNode = AceType::WeakClaim(frameNode);
+    auto onZoomChange = [callback = CallbackHelper(*optValue), weakNode, instanceId](
+        const BaseEventInfo* info) {
+        OnZoomChange(callback, weakNode, instanceId, info);
+    };
+    WebModelStatic::SetZoomChangeId(frameNode, onZoomChange);
+#endif // WEB_SUPPORTED
+}
 void SetOnHttpAuthRequestImpl(Ark_NativePointer node,
                               const Opt_Callback_OnHttpAuthRequestEvent_Boolean* value)
 {
@@ -2449,11 +2469,16 @@ void SetNativeEmbedOptionsImpl(Ark_NativePointer node,
     }
     auto supportDefaultIntrinsicSize = Converter::OptConvert<bool>(convValue.value().supportDefaultIntrinsicSize);
     auto supportCssDisplayChange = Converter::OptConvert<bool>(convValue.value().supportCssDisplayChange);
+    auto supportTransformRotateAndSkew = Converter::OptConvert<bool>(convValue.value().supportTransformRotateAndSkew);
     if (supportCssDisplayChange.has_value()) {
         RETURN_IF_CALLING_FROM_M114();
     }
+    if (supportTransformRotateAndSkew.has_value()) {
+        RETURN_IF_CALLING_FROM_M132();
+    }
 
-    WebModelStatic::SetNativeEmbedOptions(frameNode, *supportDefaultIntrinsicSize, *supportCssDisplayChange);
+    WebModelStatic::SetNativeEmbedOptions(frameNode, *supportDefaultIntrinsicSize, *supportCssDisplayChange,
+        supportTransformRotateAndSkew.value_or(false));
 #endif // WEB_SUPPORTED
 }
 void SetEnableDefaultContextMenuImpl(Ark_NativePointer node,
@@ -3221,6 +3246,7 @@ template<typename T>
 const T* InitializeWebModifier(T* modifier)
 {
     SetCaretColorIfSupported(*modifier, 0);
+    modifier->setOnZoomChange = WebAttributeModifier::SetOnZoomChangeImpl;
     modifier->setRegisterNativeEmbedRule = WebAttributeModifier::SetRegisterNativeEmbedRuleImpl;
     modifier->setBindSelectionMenu = WebAttributeModifier::SetBindSelectionMenuImpl;
     modifier->setEnableScrollDirectionalLock = WebAttributeModifier::SetEnableScrollDirectionalLockImpl;

@@ -233,9 +233,7 @@ template("build_component_ng") {
             "napi:ace_napi",
             "node:node_header_notice",
           ]
-          if (!ace_engine_feature_wearable) {
-            defines += [ "INCLUDE_GENERATED_SOURCES" ]
-          }
+          defines += [ "INCLUDE_GENERATED_SOURCES" ]
         }
       }
 
@@ -289,9 +287,6 @@ template("build_component_ng") {
     build_component_ng_impl(item.name) {
       platform = item.name
       defines = []
-      if (defined(invoker.defines)) {
-        defines += invoker.defines
-      }
       defines += uicast_configs.uicast_defines
 
       if (defined(item.config)) {

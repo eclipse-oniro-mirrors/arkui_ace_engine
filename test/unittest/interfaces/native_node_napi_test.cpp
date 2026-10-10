@@ -13,15 +13,29 @@
  * limitations under the License.
  */
 
+#include <array>
+#include <cstdint>
+#include <string>
+
 #include "frameworks/bridge/declarative_frontend/engine/jsi/jsi_custom_env_view_white_list.h"
 #include "frameworks/base/error/error_code.h"
+#include "frameworks/core/components_ng/base/frame_node.h"
+#include "frameworks/core/components_ng/pattern/pattern.h"
 #include "gtest/gtest.h"
 #include "napi/napi_runtime.cpp"
 #include "native_interface.h"
+#include "native_interface_xcomponent.h"
+#include "native_node.h"
 #include "native_node_napi.h"
 #include "native_type.h"
 #include "node_model.h"
 #include "node_model_safely.h"
+#include "test/mock/frameworks/base/thread/mock_task_executor.h"
+#include "test/mock/frameworks/core/common/mock_container.h"
+#include "test/mock/frameworks/core/common/mock_theme_manager.h"
+#include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
+#include "frameworks/core/components/xcomponent/native_interface_xcomponent_impl.h"
+#include "interfaces/native/node/config_manager.h"
 
 using namespace testing;
 using namespace testing::ext;
@@ -909,6 +923,152 @@ HWTEST_F(NativeNodeNapiTest, NativeNodeNapiTest012, TestSize.Level1)
 }
 
 /**
+ * @tc.name: NativeNodeNapiTest014
+ * @tc.desc: Test OH_ArkUI_GetNodeHandleFromNapiValue with a value without nodePtr_/builderNode_ property.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeNodeNapiTest, NativeNodeNapiTest014, TestSize.Level1)
+{
+    NativeEngineMock engine;
+    napi_env env = napi_env(engine);
+    napi_value value = nullptr;
+    ASSERT_EQ(napi_create_object(env, &value), napi_ok);
+
+    ArkUI_NodeHandle handle = nullptr;
+    int32_t code = OH_ArkUI_GetNodeHandleFromNapiValue(env, value, &handle);
+    EXPECT_EQ(code, OHOS::Ace::ERROR_CODE_PARAM_INVALID);
+    EXPECT_EQ(handle, nullptr);
+}
+
+/**
+ * @tc.name: NativeNodeNapiTest015
+ * @tc.desc: Test OH_ArkUI_GetNodeHandleFromNapiValue with a nodePtr_ property of the wrong type.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeNodeNapiTest, NativeNodeNapiTest015, TestSize.Level1)
+{
+    NativeEngineMock engine;
+    napi_env env = napi_env(engine);
+    napi_value value = nullptr;
+    napi_value nodePtr = nullptr;
+    ASSERT_EQ(napi_create_object(env, &value), napi_ok);
+    ASSERT_EQ(napi_create_string_utf8(env, "invalid", NAPI_AUTO_LENGTH, &nodePtr), napi_ok);
+    ASSERT_EQ(napi_set_named_property(env, value, "nodePtr_", nodePtr), napi_ok);
+
+    ArkUI_NodeHandle handle = nullptr;
+    int32_t code = OH_ArkUI_GetNodeHandleFromNapiValue(env, value, &handle);
+    EXPECT_EQ(code, OHOS::Ace::ERROR_CODE_PARAM_INVALID);
+    EXPECT_EQ(handle, nullptr);
+}
+
+/**
+ * @tc.name: NativeNodeNapiTest016
+ * @tc.desc: Test OH_ArkUI_GetNodeHandleFromNapiValue with a null external pointer in nodePtr_.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeNodeNapiTest, NativeNodeNapiTest016, TestSize.Level1)
+{
+    NativeEngineMock engine;
+    napi_env env = napi_env(engine);
+    napi_value value = nullptr;
+    napi_value nodePtr = nullptr;
+    ASSERT_EQ(napi_create_object(env, &value), napi_ok);
+    ASSERT_EQ(napi_create_external(env, nullptr, nullptr, nullptr, &nodePtr), napi_ok);
+    ASSERT_EQ(napi_set_named_property(env, value, "nodePtr_", nodePtr), napi_ok);
+
+    ArkUI_NodeHandle handle = nullptr;
+    int32_t code = OH_ArkUI_GetNodeHandleFromNapiValue(env, value, &handle);
+    EXPECT_EQ(code, OHOS::Ace::ERROR_CODE_PARAM_INVALID);
+    EXPECT_EQ(handle, nullptr);
+}
+
+/**
+ * @tc.name: NativeNodeNapiTest017
+ * @tc.desc: Test OH_ArkUI_GetNodeHandleFromNapiValue with a builderNode_ that has no nodePtr_ property.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeNodeNapiTest, NativeNodeNapiTest017, TestSize.Level1)
+{
+    NativeEngineMock engine;
+    napi_env env = napi_env(engine);
+    napi_value value = nullptr;
+    napi_value builderNode = nullptr;
+    ASSERT_EQ(napi_create_object(env, &value), napi_ok);
+    ASSERT_EQ(napi_create_object(env, &builderNode), napi_ok);
+    ASSERT_EQ(napi_set_named_property(env, value, "builderNode_", builderNode), napi_ok);
+
+    ArkUI_NodeHandle handle = nullptr;
+    int32_t code = OH_ArkUI_GetNodeHandleFromNapiValue(env, value, &handle);
+    EXPECT_EQ(code, OHOS::Ace::ERROR_CODE_PARAM_INVALID);
+    EXPECT_EQ(handle, nullptr);
+}
+
+/**
+ * @tc.name: NativeNodeNapiTest018
+ * @tc.desc: Test OH_ArkUI_GetNodeHandleFromNapiValue success path with a valid nodePtr_ external.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeNodeNapiTest, NativeNodeNapiTest018, TestSize.Level1)
+{
+    if (OHOS::Ace::NodeModel::GetFullImpl() != nullptr) {
+        GTEST_SKIP() << "FullImpl is initialized, success path is not exercised in the mock environment";
+    }
+    NativeEngineMock engine;
+    napi_env env = napi_env(engine);
+    auto pattern = OHOS::Ace::AceType::MakeRefPtr<OHOS::Ace::NG::Pattern>();
+    auto frameNode = OHOS::Ace::NG::FrameNode::CreateFrameNode("text", 100001, pattern, true);
+    ASSERT_NE(frameNode, nullptr);
+    napi_value value = nullptr;
+    napi_value nodePtr = nullptr;
+    ASSERT_EQ(napi_create_object(env, &value), napi_ok);
+    ASSERT_EQ(napi_create_external(env, OHOS::Ace::AceType::RawPtr(frameNode), nullptr, nullptr, &nodePtr), napi_ok);
+    ASSERT_EQ(napi_set_named_property(env, value, "nodePtr_", nodePtr), napi_ok);
+
+    ArkUI_NodeHandle handle = nullptr;
+    int32_t code = OH_ArkUI_GetNodeHandleFromNapiValue(env, value, &handle);
+    EXPECT_EQ(code, OHOS::Ace::ERROR_CODE_NO_ERROR);
+    ASSERT_NE(handle, nullptr);
+    EXPECT_EQ(handle->type, -1);
+    EXPECT_TRUE(handle->buildNode);
+    EXPECT_FALSE(handle->cNode);
+    delete handle;
+}
+
+/**
+ * @tc.name: NativeNodeNapiTest019
+ * @tc.desc: Test OH_ArkUI_GetNodeHandleFromNapiValue success path with a valid builderNode_.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeNodeNapiTest, NativeNodeNapiTest019, TestSize.Level1)
+{
+    if (OHOS::Ace::NodeModel::GetFullImpl() != nullptr) {
+        GTEST_SKIP() << "FullImpl is initialized, success path is not exercised in the mock environment";
+    }
+    NativeEngineMock engine;
+    napi_env env = napi_env(engine);
+    auto pattern = OHOS::Ace::AceType::MakeRefPtr<OHOS::Ace::NG::Pattern>();
+    auto frameNode = OHOS::Ace::NG::FrameNode::CreateFrameNode("text", 100002, pattern, true);
+    ASSERT_NE(frameNode, nullptr);
+    napi_value value = nullptr;
+    napi_value builderNode = nullptr;
+    napi_value nodePtr = nullptr;
+    ASSERT_EQ(napi_create_object(env, &value), napi_ok);
+    ASSERT_EQ(napi_create_object(env, &builderNode), napi_ok);
+    ASSERT_EQ(napi_create_external(env, OHOS::Ace::AceType::RawPtr(frameNode), nullptr, nullptr, &nodePtr), napi_ok);
+    ASSERT_EQ(napi_set_named_property(env, builderNode, "nodePtr_", nodePtr), napi_ok);
+    ASSERT_EQ(napi_set_named_property(env, value, "builderNode_", builderNode), napi_ok);
+
+    ArkUI_NodeHandle handle = nullptr;
+    int32_t code = OH_ArkUI_GetNodeHandleFromNapiValue(env, value, &handle);
+    EXPECT_EQ(code, OHOS::Ace::ERROR_CODE_NO_ERROR);
+    ASSERT_NE(handle, nullptr);
+    EXPECT_EQ(handle->type, -1);
+    EXPECT_TRUE(handle->buildNode);
+    EXPECT_FALSE(handle->cNode);
+    delete handle;
+}
+
+/**
  * @tc.name: NativeNodeNapiTest013
  * @tc.desc: Test OH_ArkUI_EnableEventPassthrough function.
  * @tc.type: FUNC
@@ -921,3 +1081,435 @@ HWTEST_F(NativeNodeNapiTest, NativeNodeNapiTest013, TestSize.Level1)
     auto code = OH_ArkUI_EnableEventPassthrough(uiContext, enable, eventType);
     EXPECT_EQ(code, ARKUI_ERROR_CODE_PARAM_INVALID);
 }
+
+namespace OHOS::Ace {
+class NativeXComponentUafTest : public testing::Test {
+public:
+    static void SetUpTestSuite()
+    {
+        // This file compiles without `#define private public`, so the mock
+        // environment is wired through public APIs only: the container is
+        // constructed with the mock pipeline via the SetUp overload, the task
+        // executor is installed through the public setter, and the mock pipeline
+        // already carries its own task executor from MockPipelineContext::SetUp.
+        NG::MockPipelineContext::SetUp();
+        MockContainer::SetUp(NG::MockPipelineContext::GetCurrent());
+        MockContainer::Current()->SetTaskExecutor(AceType::MakeRefPtr<MockTaskExecutor>());
+        auto themeManager = AceType::MakeRefPtr<MockThemeManager>();
+        PipelineBase::GetCurrentContext()->SetThemeManager(themeManager);
+    }
+    static void TearDownTestSuite()
+    {
+        NG::MockPipelineContext::TearDown();
+        MockContainer::TearDown();
+    }
+    void SetUp() {}
+    void TearDown() {}
+};
+
+namespace {
+constexpr int32_t RUNTIME_CHECK_TYPE_NODE_DISPOSED_VALUE = 1;
+
+// Leave detection disabled for subsequent tests.
+void RestoreRuntimeCheckMode()
+{
+    EXPECT_TRUE(NodeModel::ConfigManager::SetRuntimeCheckMode(
+        RUNTIME_CHECK_TYPE_NODE_DISPOSED_VALUE, static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_DISABLED)));
+}
+
+void XComponentFrameCallback(ArkUI_NodeHandle node, uint64_t timestamp, uint64_t targetTimestamp)
+{
+    (void)node;
+    (void)timestamp;
+    (void)targetTimestamp;
+}
+
+void ImageAnalyzerCallback(
+    ArkUI_NodeHandle node, ArkUI_XComponent_ImageAnalyzerState statusCode, void* userData)
+{
+    (void)node;
+    (void)statusCode;
+    (void)userData;
+}
+
+// Slot index of each listed API in the result arrays below; the order follows the
+// requirement list and SLOT_COUNT is the number of listed APIs.
+enum XComponentApiSlot : size_t {
+    SLOT_ACCESSIBILITY_PROVIDER_CREATE = 0,
+    SLOT_SURFACE_HOLDER_CREATE,
+    SLOT_XCOMPONENT_FINALIZE,
+    SLOT_XCOMPONENT_INITIALIZE,
+    SLOT_XCOMPONENT_IS_INITIALIZED,
+    SLOT_XCOMPONENT_REGISTER_ON_FRAME_CALLBACK,
+    SLOT_XCOMPONENT_SET_AUTO_INITIALIZE,
+    SLOT_XCOMPONENT_SET_EXPECTED_FRAME_RATE_RANGE,
+    SLOT_XCOMPONENT_SET_NEED_SOFT_KEYBOARD,
+    SLOT_XCOMPONENT_START_IMAGE_ANALYZER,
+    SLOT_XCOMPONENT_STOP_IMAGE_ANALYZER,
+    SLOT_XCOMPONENT_UNREGISTER_ON_FRAME_CALLBACK,
+    SLOT_ATTACH_NATIVE_ROOT_NODE,
+    SLOT_DETACH_NATIVE_ROOT_NODE,
+    SLOT_GET_NATIVE_XCOMPONENT,
+    SLOT_COUNT,
+};
+
+// The entries going through CheckValidXComponentNode and returning a plain code
+// span from SLOT_XCOMPONENT_FINALIZE to SLOT_XCOMPONENT_UNREGISTER_ON_FRAME_CALLBACK.
+constexpr size_t FIRST_VALIDATED_SLOT = SLOT_XCOMPONENT_FINALIZE;
+constexpr size_t LAST_VALIDATED_SLOT = SLOT_XCOMPONENT_UNREGISTER_ON_FRAME_CALLBACK;
+
+// Encodes a pointer result as 1 (non-null) or 0 (null) for the int32 result array.
+int32_t EncodePointerResult(const void* pointer)
+{
+    return pointer != nullptr ? 1 : 0;
+}
+
+// Calls the 15 listed public C APIs one by one and records the observable results:
+// int32 return codes are recorded as-is and pointer-returning entries record the
+// encoded non-null flag. Attach/Detach use a stack OH_NativeXComponent holding a
+// null implementation: for a controlled sample whose uiNodeHandle is null,
+// AttachNativeRootNode/DetachNativeRootNode return on the null parameter before the
+// implementation is touched, so the component is never dereferenced.
+std::array<int32_t, SLOT_COUNT> CallAllXComponentApis(ArkUI_NodeHandle node)
+{
+    std::array<int32_t, SLOT_COUNT> results {};
+    OH_NativeXComponent component(nullptr);
+    bool isInitialized = false;
+    OH_NativeXComponent_ExpectedRateRange range { 1, 120, 60 };
+    results[SLOT_ACCESSIBILITY_PROVIDER_CREATE] =
+        EncodePointerResult(OH_ArkUI_AccessibilityProvider_Create(node));
+    results[SLOT_SURFACE_HOLDER_CREATE] = EncodePointerResult(OH_ArkUI_SurfaceHolder_Create(node));
+    results[SLOT_XCOMPONENT_FINALIZE] = OH_ArkUI_XComponent_Finalize(node);
+    results[SLOT_XCOMPONENT_INITIALIZE] = OH_ArkUI_XComponent_Initialize(node);
+    results[SLOT_XCOMPONENT_IS_INITIALIZED] = OH_ArkUI_XComponent_IsInitialized(node, &isInitialized);
+    results[SLOT_XCOMPONENT_REGISTER_ON_FRAME_CALLBACK] =
+        OH_ArkUI_XComponent_RegisterOnFrameCallback(node, XComponentFrameCallback);
+    results[SLOT_XCOMPONENT_SET_AUTO_INITIALIZE] = OH_ArkUI_XComponent_SetAutoInitialize(node, true);
+    results[SLOT_XCOMPONENT_SET_EXPECTED_FRAME_RATE_RANGE] =
+        OH_ArkUI_XComponent_SetExpectedFrameRateRange(node, range);
+    results[SLOT_XCOMPONENT_SET_NEED_SOFT_KEYBOARD] = OH_ArkUI_XComponent_SetNeedSoftKeyboard(node, true);
+    results[SLOT_XCOMPONENT_START_IMAGE_ANALYZER] =
+        OH_ArkUI_XComponent_StartImageAnalyzer(node, nullptr, ImageAnalyzerCallback);
+    results[SLOT_XCOMPONENT_STOP_IMAGE_ANALYZER] = OH_ArkUI_XComponent_StopImageAnalyzer(node);
+    results[SLOT_XCOMPONENT_UNREGISTER_ON_FRAME_CALLBACK] =
+        OH_ArkUI_XComponent_UnregisterOnFrameCallback(node);
+    results[SLOT_ATTACH_NATIVE_ROOT_NODE] = OH_NativeXComponent_AttachNativeRootNode(&component, node);
+    results[SLOT_DETACH_NATIVE_ROOT_NODE] = OH_NativeXComponent_DetachNativeRootNode(&component, node);
+    results[SLOT_GET_NATIVE_XCOMPONENT] = EncodePointerResult(OH_NativeXComponent_GetNativeXComponent(node));
+    return results;
+}
+
+// In this test environment the mock node modifier table leaves getXComponentModifier
+// null, so entries reaching the modifier lookup deterministically return 401/nullptr;
+// a stack object that is not in the node set deterministically returns 401 from
+// CheckValidXComponentNode.
+constexpr int32_t EXPECTED_INVALID_PARAM = ERROR_CODE_PARAM_INVALID;
+constexpr int32_t EXPECTED_NULL_POINTER = 0;
+constexpr int32_t EXPECTED_BAD_PARAMETER = OH_NATIVEXCOMPONENT_RESULT_BAD_PARAMETER;
+
+void ExpectStackNodeResults(const std::array<int32_t, SLOT_COUNT>& results)
+{
+    // Entries going through CheckValidXComponentNode: a stack object is not in the
+    // node set, so they return 401.
+    for (size_t i = FIRST_VALIDATED_SLOT; i <= LAST_VALIDATED_SLOT; i++) {
+        EXPECT_EQ(results[i], EXPECTED_INVALID_PARAM) << "slot " << i;
+    }
+    // Pointer-returning entries: the modifier is null, so they return nullptr.
+    EXPECT_EQ(results[SLOT_ACCESSIBILITY_PROVIDER_CREATE], EXPECTED_NULL_POINTER);
+    EXPECT_EQ(results[SLOT_SURFACE_HOLDER_CREATE], EXPECTED_NULL_POINTER);
+    EXPECT_EQ(results[SLOT_GET_NATIVE_XCOMPONENT], EXPECTED_NULL_POINTER);
+    // Attach/Detach: the controlled sample has a null uiNodeHandle, so the null
+    // parameter path returns BAD_PARAMETER.
+    EXPECT_EQ(results[SLOT_ATTACH_NATIVE_ROOT_NODE], EXPECTED_BAD_PARAMETER);
+    EXPECT_EQ(results[SLOT_DETACH_NATIVE_ROOT_NODE], EXPECTED_BAD_PARAMETER);
+}
+} // namespace
+
+/**
+ * @tc.name: XComponentUafGuard001
+ * @tc.desc: Controlled disposed samples hit the entry guard on all 15 listed APIs;
+ *           LOG mode keeps the same return values as DISABLED and never pollutes
+ *           the error message channel.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeXComponentUafTest, XComponentUafGuard001, TestSize.Level1)
+{
+    ASSERT_TRUE(NodeModel::InitialFullImpl());
+    // Use a still-alive local object with an invalid magic as the controlled disposed
+    // sample: the memory of this access is readable and the hit is stable.
+    ArkUI_Node node;
+    node.type = ARKUI_NODE_XCOMPONENT;
+    node.cNode = true;
+    node.uiNodeHandle = nullptr;
+    node.magic = ARKUI_NODE_MAGIC_INVALID;
+
+    ASSERT_TRUE(NodeModel::ConfigManager::SetRuntimeCheckMode(
+        RUNTIME_CHECK_TYPE_NODE_DISPOSED_VALUE, static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_DISABLED)));
+    const auto disabledResults = CallAllXComponentApis(&node);
+    ExpectStackNodeResults(disabledResults);
+
+    ASSERT_TRUE(NodeModel::ConfigManager::SetRuntimeCheckMode(
+        RUNTIME_CHECK_TYPE_NODE_DISPOSED_VALUE, static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_LOG)));
+    const auto logResults = CallAllXComponentApis(&node);
+    // LOG only diagnoses and never short-circuits: the return values of all 15 entries
+    // are identical to DISABLED.
+    for (size_t i = 0; i < logResults.size(); i++) {
+        EXPECT_EQ(logResults[i], disabledResults[i]) << "slot " << i;
+    }
+    // The error message query channel does not carry disposed content from this check.
+    const char* errorMessage = OH_ArkUI_NativeModule_GetErrorMessage();
+    if (errorMessage != nullptr) {
+        EXPECT_EQ(std::string(errorMessage).find("has been disposed"), std::string::npos);
+    }
+    RestoreRuntimeCheckMode();
+}
+
+/**
+ * @tc.name: XComponentUafGuard002
+ * @tc.desc: Valid magic never triggers the guard: LOG/DISABLED/CRASH modes keep
+ *           identical return values on all 15 listed APIs for a valid handle.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeXComponentUafTest, XComponentUafGuard002, TestSize.Level1)
+{
+    ASSERT_TRUE(NodeModel::InitialFullImpl());
+    ArkUI_Node node;
+    node.type = ARKUI_NODE_XCOMPONENT;
+    node.cNode = true;
+    node.uiNodeHandle = nullptr;
+    node.magic = ARKUI_NODE_MAGIC_VALID;
+
+    ASSERT_TRUE(NodeModel::ConfigManager::SetRuntimeCheckMode(
+        RUNTIME_CHECK_TYPE_NODE_DISPOSED_VALUE, static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_LOG)));
+    const auto logResults = CallAllXComponentApis(&node);
+    ExpectStackNodeResults(logResults);
+
+    ASSERT_TRUE(NodeModel::ConfigManager::SetRuntimeCheckMode(
+        RUNTIME_CHECK_TYPE_NODE_DISPOSED_VALUE, static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_DISABLED)));
+    const auto disabledResults = CallAllXComponentApis(&node);
+
+    // A valid handle does not trigger the check in CRASH mode either (no termination).
+    ASSERT_TRUE(NodeModel::ConfigManager::SetRuntimeCheckMode(
+        RUNTIME_CHECK_TYPE_NODE_DISPOSED_VALUE, static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_CRASH)));
+    const auto crashResults = CallAllXComponentApis(&node);
+
+    for (size_t i = 0; i < logResults.size(); i++) {
+        EXPECT_EQ(disabledResults[i], logResults[i]) << "slot " << i;
+        EXPECT_EQ(crashResults[i], logResults[i]) << "slot " << i;
+    }
+    RestoreRuntimeCheckMode();
+}
+
+/**
+ * @tc.name: XComponentUafGuard003
+ * @tc.desc: Null inputs keep the existing parameter-error contracts on all 15
+ *           listed APIs; the entry guard is null-safe and stays silent.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeXComponentUafTest, XComponentUafGuard003, TestSize.Level1)
+{
+    ASSERT_TRUE(NodeModel::InitialFullImpl());
+    ASSERT_TRUE(NodeModel::ConfigManager::SetRuntimeCheckMode(
+        RUNTIME_CHECK_TYPE_NODE_DISPOSED_VALUE, static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_LOG)));
+    // The guard macro returns silently for a null pointer, and the existing validation
+    // keeps the original contracts (401/nullptr/BAD_PARAMETER) for null parameters.
+    const auto nullResults = CallAllXComponentApis(nullptr);
+    for (size_t i = FIRST_VALIDATED_SLOT; i <= LAST_VALIDATED_SLOT; i++) {
+        EXPECT_EQ(nullResults[i], EXPECTED_INVALID_PARAM) << "slot " << i;
+    }
+    EXPECT_EQ(nullResults[SLOT_ACCESSIBILITY_PROVIDER_CREATE], EXPECTED_NULL_POINTER);
+    EXPECT_EQ(nullResults[SLOT_SURFACE_HOLDER_CREATE], EXPECTED_NULL_POINTER);
+    EXPECT_EQ(nullResults[SLOT_GET_NATIVE_XCOMPONENT], EXPECTED_NULL_POINTER);
+    EXPECT_EQ(nullResults[SLOT_ATTACH_NATIVE_ROOT_NODE], EXPECTED_BAD_PARAMETER);
+    EXPECT_EQ(nullResults[SLOT_DETACH_NATIVE_ROOT_NODE], EXPECTED_BAD_PARAMETER);
+
+    // When the component is null, the existing null validation of Attach/Detach takes
+    // effect before the entry guard.
+    ArkUI_Node node;
+    node.type = ARKUI_NODE_XCOMPONENT;
+    node.cNode = true;
+    node.uiNodeHandle = nullptr;
+    node.magic = ARKUI_NODE_MAGIC_VALID;
+    EXPECT_EQ(OH_NativeXComponent_AttachNativeRootNode(nullptr, &node), EXPECTED_BAD_PARAMETER);
+    EXPECT_EQ(OH_NativeXComponent_DetachNativeRootNode(nullptr, &node), EXPECTED_BAD_PARAMETER);
+    RestoreRuntimeCheckMode();
+}
+
+// ===== Navigation C API NodeHandle disposed-state (UAF) detection tests =====
+
+class NavigationUafTest : public testing::Test {
+public:
+    static void SetUpTestSuite()
+    {
+        NG::MockPipelineContext::SetUp();
+        MockContainer::SetUp(NG::MockPipelineContext::GetCurrent());
+        MockContainer::Current()->SetTaskExecutor(AceType::MakeRefPtr<MockTaskExecutor>());
+        auto themeManager = AceType::MakeRefPtr<MockThemeManager>();
+        PipelineBase::GetCurrentContext()->SetThemeManager(themeManager);
+    }
+    static void TearDownTestSuite()
+    {
+        NG::MockPipelineContext::TearDown();
+        MockContainer::TearDown();
+    }
+    void SetUp() {}
+    void TearDown() {}
+};
+
+namespace {
+// Slot index of each navigation/router C API in the result arrays below.
+enum NavigationApiSlot : size_t {
+    SLOT_GET_NAVIGATION_ID = 0,
+    SLOT_GET_NAV_DESTINATION_NAME,
+    SLOT_GET_NAV_STACK_LENGTH,
+    SLOT_GET_NAV_DESTINATION_NAME_BY_INDEX,
+    SLOT_GET_NAV_DESTINATION_ID,
+    SLOT_GET_NAV_DESTINATION_STATE,
+    SLOT_GET_NAV_DESTINATION_INDEX,
+    SLOT_GET_NAV_DESTINATION_PARAM,
+    SLOT_GET_ROUTER_PAGE_INDEX,
+    SLOT_GET_ROUTER_PAGE_NAME,
+    SLOT_GET_ROUTER_PAGE_PATH,
+    SLOT_GET_ROUTER_PAGE_STATE,
+    SLOT_GET_ROUTER_PAGE_ID,
+    NAV_SLOT_COUNT,
+};
+
+// Calls all 13 navigation/router C APIs and records their observable results:
+// int32 return codes are stored as-is; OH_ArkUI_GetNavDestinationParam returns a
+// pointer that is encoded as 1 (non-null) or 0 (null).
+std::array<int32_t, NAV_SLOT_COUNT> CallAllNavigationApis(ArkUI_NodeHandle node)
+{
+    std::array<int32_t, NAV_SLOT_COUNT> results {};
+    char buffer[128] = { 0 };
+    int32_t writeLength = 0;
+    int32_t intValue = 0;
+    ArkUI_NavDestinationState navState = ARKUI_NAV_DESTINATION_STATE_ON_SHOW;
+    ArkUI_RouterPageState routerState = ARKUI_ROUTER_PAGE_STATE_ABOUT_TO_APPEAR;
+    results[SLOT_GET_NAVIGATION_ID] =
+        OH_ArkUI_GetNavigationId(node, buffer, sizeof(buffer), &writeLength);
+    results[SLOT_GET_NAV_DESTINATION_NAME] =
+        OH_ArkUI_GetNavDestinationName(node, buffer, sizeof(buffer), &writeLength);
+    results[SLOT_GET_NAV_STACK_LENGTH] = OH_ArkUI_GetNavStackLength(node, &intValue);
+    results[SLOT_GET_NAV_DESTINATION_NAME_BY_INDEX] =
+        OH_ArkUI_GetNavDestinationNameByIndex(node, 0, buffer, sizeof(buffer), &writeLength);
+    results[SLOT_GET_NAV_DESTINATION_ID] =
+        OH_ArkUI_GetNavDestinationId(node, buffer, sizeof(buffer), &writeLength);
+    results[SLOT_GET_NAV_DESTINATION_STATE] =
+        OH_ArkUI_GetNavDestinationState(node, &navState);
+    results[SLOT_GET_NAV_DESTINATION_INDEX] =
+        OH_ArkUI_GetNavDestinationIndex(node, &intValue);
+    results[SLOT_GET_NAV_DESTINATION_PARAM] =
+        EncodePointerResult(OH_ArkUI_GetNavDestinationParam(node));
+    results[SLOT_GET_ROUTER_PAGE_INDEX] = OH_ArkUI_GetRouterPageIndex(node, &intValue);
+    results[SLOT_GET_ROUTER_PAGE_NAME] =
+        OH_ArkUI_GetRouterPageName(node, buffer, sizeof(buffer), &writeLength);
+    results[SLOT_GET_ROUTER_PAGE_PATH] =
+        OH_ArkUI_GetRouterPagePath(node, buffer, sizeof(buffer), &writeLength);
+    results[SLOT_GET_ROUTER_PAGE_STATE] = OH_ArkUI_GetRouterPageState(node, &routerState);
+    results[SLOT_GET_ROUTER_PAGE_ID] =
+        OH_ArkUI_GetRouterPageId(node, buffer, sizeof(buffer), &writeLength);
+    return results;
+}
+} // namespace
+
+/**
+ * @tc.name: NavigationUafGuard001
+ * @tc.desc: Controlled disposed samples hit the entry guard on all 13 listed
+ *           navigation/router APIs; LOG mode keeps the same return values as
+ *           DISABLED and never pollutes the error message channel.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NavigationUafTest, NavigationUafGuard001, TestSize.Level1)
+{
+    ASSERT_TRUE(NodeModel::InitialFullImpl());
+    // A still-alive local object with invalid magic simulates a disposed handle
+    // whose memory is still readable.
+    ArkUI_Node node;
+    node.type = ARKUI_NODE_STACK;
+    node.cNode = true;
+    node.uiNodeHandle = nullptr;
+    node.magic = ARKUI_NODE_MAGIC_INVALID;
+
+    ASSERT_TRUE(NodeModel::ConfigManager::SetRuntimeCheckMode(
+        RUNTIME_CHECK_TYPE_NODE_DISPOSED_VALUE, static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_DISABLED)));
+    const auto disabledResults = CallAllNavigationApis(&node);
+
+    ASSERT_TRUE(NodeModel::ConfigManager::SetRuntimeCheckMode(
+        RUNTIME_CHECK_TYPE_NODE_DISPOSED_VALUE, static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_LOG)));
+    const auto logResults = CallAllNavigationApis(&node);
+    // LOG only diagnoses and never short-circuits: the return values of all 13
+    // entries are identical to DISABLED.
+    for (size_t i = 0; i < logResults.size(); i++) {
+        EXPECT_EQ(logResults[i], disabledResults[i]) << "slot " << i;
+    }
+    // The error message query channel does not carry disposed content from this check.
+    const char* errorMessage = OH_ArkUI_NativeModule_GetErrorMessage();
+    if (errorMessage != nullptr) {
+        EXPECT_EQ(std::string(errorMessage).find("has been disposed"), std::string::npos);
+    }
+    RestoreRuntimeCheckMode();
+}
+
+/**
+ * @tc.name: NavigationUafGuard002
+ * @tc.desc: Valid magic never triggers the guard: LOG/DISABLED/CRASH modes keep
+ *           identical return values on all 13 listed APIs for a valid handle.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NavigationUafTest, NavigationUafGuard002, TestSize.Level1)
+{
+    ASSERT_TRUE(NodeModel::InitialFullImpl());
+    ArkUI_Node node;
+    node.type = ARKUI_NODE_STACK;
+    node.cNode = true;
+    node.uiNodeHandle = nullptr;
+    node.magic = ARKUI_NODE_MAGIC_VALID;
+
+    ASSERT_TRUE(NodeModel::ConfigManager::SetRuntimeCheckMode(
+        RUNTIME_CHECK_TYPE_NODE_DISPOSED_VALUE, static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_LOG)));
+    const auto logResults = CallAllNavigationApis(&node);
+
+    ASSERT_TRUE(NodeModel::ConfigManager::SetRuntimeCheckMode(
+        RUNTIME_CHECK_TYPE_NODE_DISPOSED_VALUE, static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_DISABLED)));
+    const auto disabledResults = CallAllNavigationApis(&node);
+
+    // A valid handle does not trigger the check in CRASH mode either (no termination).
+    ASSERT_TRUE(NodeModel::ConfigManager::SetRuntimeCheckMode(
+        RUNTIME_CHECK_TYPE_NODE_DISPOSED_VALUE, static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_CRASH)));
+    const auto crashResults = CallAllNavigationApis(&node);
+
+    for (size_t i = 0; i < logResults.size(); i++) {
+        EXPECT_EQ(disabledResults[i], logResults[i]) << "slot " << i;
+        EXPECT_EQ(crashResults[i], logResults[i]) << "slot " << i;
+    }
+    RestoreRuntimeCheckMode();
+}
+
+/**
+ * @tc.name: NavigationUafGuard003
+ * @tc.desc: Null inputs keep the existing parameter-error contracts on all 13
+ *           listed navigation/router APIs; the entry guard is null-safe and
+ *           stays silent.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NavigationUafTest, NavigationUafGuard003, TestSize.Level1)
+{
+    ASSERT_TRUE(NodeModel::InitialFullImpl());
+    ASSERT_TRUE(NodeModel::ConfigManager::SetRuntimeCheckMode(
+        RUNTIME_CHECK_TYPE_NODE_DISPOSED_VALUE, static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_LOG)));
+    // The guard macro returns silently for a null pointer, and the existing null
+    // validation keeps the original ARKUI_ERROR_CODE_PARAM_INVALID / nullptr
+    // contracts for null parameters.
+    const auto nullResults = CallAllNavigationApis(nullptr);
+    for (size_t i = 0; i < nullResults.size(); i++) {
+        if (i == SLOT_GET_NAV_DESTINATION_PARAM) {
+            // OH_ArkUI_GetNavDestinationParam returns nullptr for a null node.
+            EXPECT_EQ(nullResults[i], 0) << "slot " << i;
+        } else {
+            EXPECT_EQ(nullResults[i], ARKUI_ERROR_CODE_PARAM_INVALID) << "slot " << i;
+        }
+    }
+    RestoreRuntimeCheckMode();
+}
+} // namespace OHOS::Ace

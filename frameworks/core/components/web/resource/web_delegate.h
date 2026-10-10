@@ -1201,6 +1201,7 @@ public:
 
     WebDelegate() = delete;
     ~WebDelegate() override;
+    bool MaybeRelease() override;
     WebDelegate(const WeakPtr<PipelineBase>& context, ErrorCallback&& onError, const std::string& type)
         : WebResource(type, context, std::move(onError)), instanceId_(Container::CurrentId())
     {}
@@ -1298,6 +1299,7 @@ public:
     void UpdateNativeEmbedModeEnabled(bool isEmbedModeEnabled);
     void UpdateIntrinsicSizeEnabled(bool isIntrinsicSizeEnabled);
     void UpdateCssDisplayChangeEnabled(bool isCssDisplayChangeEnabled);
+    void UpdateTransformRotateAndSkewEnabled(bool isTransformRotateAndSkewEnabled);
     void UpdateBypassVsyncCondition(const WebBypassVsyncCondition& condition);
     void UpdateGestureFocusMode(const GestureFocusMode& mode);
     void UpdateNativeEmbedRuleTag(const std::string& tag);
@@ -1392,6 +1394,8 @@ public:
     bool HandleAutoFillEvent(const std::shared_ptr<OHOS::NWeb::NWebMessage>& viewDataJson);
     bool HandleAutoFillEvent(const std::shared_ptr<OHOS::NWeb::NWebHapValue>& viewDataJson);
     void UpdateOptimizeParserBudgetEnabled(const bool enable);
+    std::vector<uint8_t> SerializeWebState();
+    bool RestoreWebState(const std::vector<uint8_t>& state);
 #endif
     void OnErrorReceive(std::shared_ptr<OHOS::NWeb::NWebUrlResourceRequest> request,
         std::shared_ptr<OHOS::NWeb::NWebUrlResourceError> error);
@@ -1441,6 +1445,7 @@ public:
     void OnDownloadStart(const std::string& url, const std::string& userAgent, const std::string& contentDisposition,
         const std::string& mimetype, long contentLength);
     void OnAccessibilityEvent(int64_t accessibilityId, AccessibilityEventType eventType, const std::string& argument);
+    void FillTextChangeExtraInfo(AccessibilityEvent& event, int64_t accessibilityId);
     void OnPageError(const std::string& param);
     void OnMessage(const std::string& param);
     void OnFullScreenEnter(std::shared_ptr<OHOS::NWeb::NWebFullScreenExitHandler> handler, int videoNaturalWidth,
@@ -1457,6 +1462,7 @@ public:
     bool OnHandleInterceptLoading(std::shared_ptr<OHOS::NWeb::NWebUrlResourceRequest> request);
     void OnResourceLoad(const std::string& url);
     void OnScaleChange(float oldScaleFactor, float newScaleFactor);
+    void OnZoomChange(double oldZoomFactor, double newZoomFactor);
     void OnScroll(double xOffset, double yOffset);
     bool LoadDataWithRichText();
     void OnSearchResultReceive(int activeMatchOrdinal, int numberOfMatches, bool isDoneCounting);
@@ -1827,6 +1833,8 @@ public:
     void ExecuteAllRuleSetMatch();
 
 private:
+    void ExecuteAllRuleSetMatchInternal();
+    void ResetPageSceneOnNavigate();
     void InitWebEvent();
     void RegisterWebEvent();
     void ReleasePlatformResource();
@@ -1929,6 +1937,8 @@ private:
         const MouseInfo& mouseInfo, std::string embedId, const RefPtr<WebDelegate>& delegate);
     void RegisterFreeMultiWindowListener();
     void UnregisterFreeMultiWindowListener();
+    uint64_t GetDelegateRSHandle();
+    uint64_t GetDelegateUIContextToken();
 #endif
 
     WeakPtr<WebComponent> webComponent_;
@@ -1973,6 +1983,7 @@ private:
     EventCallbackV2 onRenderExitedV2_;
     EventCallbackV2 onResourceLoadV2_;
     EventCallbackV2 onScaleChangeV2_;
+    EventCallbackV2 onZoomChangeV2_;
     EventCallbackV2 onScrollV2_;
     EventCallbackV2 onPermissionRequestV2_;
     EventCallbackV2 onSearchResultReceiveV2_;
@@ -2083,6 +2094,7 @@ private:
     double dragResize_preHight_ = 0.0;
     double dragResize_preWidth_ = 0.0;
     bool enableFollowSystemFontWeight_ = false;
+    uint32_t rotation_ = 0;
 
     // autofill sync state
     std::string pendingAutoFillJsonStr_;
@@ -2093,7 +2105,11 @@ private:
     bool initDataDetectorJS_ = false;
     bool isFileSelectorShow_ = false;
 
+    sptr<OHOS::IRemoteObject> connectToRender_ = nullptr;
+
     bool isVisible_ = false;
+    int32_t pageSceneRequeryCount_ = 0;
+    bool isRequeryScheduled_ = false;
 
     sptr<OHOS::Rosen::ISwitchFreeMultiWindowListener> freeMultiWindowListener_ = nullptr;
     sptr<OHOS::Rosen::DisplayManager::IDisplayAttributeListener> displayListener_ = nullptr;

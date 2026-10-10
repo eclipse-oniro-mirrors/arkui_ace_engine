@@ -20,6 +20,8 @@
 #include "want_params.h"
 
 #include "base/log/ace_scoring_log.h"
+#include "base/log/log_wrapper.h"
+#include "base/utils/napi_scope_raii.h"
 #include "base/want/want_wrap.h"
 #include "bridge/common/utils/engine_helper.h"
 #include "bridge/declarative_frontend/engine/js_converter.h"
@@ -28,6 +30,7 @@
 #include "core/components_ng/base/view_abstract_model.h"
 #include "core/components_ng/base/view_stack_processor.h"
 #include "core/components_ng/pattern/ui_extension/preview_ui_extension_component/preview_ui_extension_adapter.h"
+#include "core/components_ng/pattern/ui_extension/ui_extension_utils.h"
 #include "core/components_ng/pattern/ui_extension/ui_extension_model.h"
 #include "core/components_ng/pattern/ui_extension/ui_extension_model_ng.h"
 #include "interfaces/include/ws_common.h"
@@ -138,7 +141,7 @@ SecurityCallbackFuncPairList::const_iterator JSSecurityUIExtensionProxy::FindCbL
 }
 
 void JSSecurityUIExtensionProxy::AddCallbackToList(
-    napi_env env, napi_value cb, napi_handle_scope scope, RegisterType type,
+    napi_env env, napi_value cb, RegisterType type,
     const std::function<void(const RefPtr<NG::SecurityUIExtensionProxy>&)>&& onFunc)
 {
     if (type == RegisterType::SYNC) {
@@ -156,7 +159,6 @@ void JSSecurityUIExtensionProxy::AddCallbackToList(
             onAsyncOnCallbackList_.emplace_back(ref, onFunc);
         }
     }
-    napi_close_handle_scope(env, scope);
 }
 
 void JSSecurityUIExtensionProxy::DeleteCallbackFromList(
@@ -164,11 +166,13 @@ void JSSecurityUIExtensionProxy::DeleteCallbackFromList(
 {
     if (argc == 1) {
         if (type == RegisterType::SYNC) {
+            TAG_LOGI(AceLogTag::ACE_SECURITYUIEXTENSION, "SubEvent op=off_all kit=ArkUI event=syncReceiverRegister");
             for (const auto& item : onSyncOnCallbackList_) {
                 napi_delete_reference(env, item.first);
             }
             onSyncOnCallbackList_.clear();
         } else if (type == RegisterType::ASYNC) {
+            TAG_LOGI(AceLogTag::ACE_SECURITYUIEXTENSION, "SubEvent op=off_all kit=ArkUI event=asyncReceiverRegister");
             for (const auto& item : onAsyncOnCallbackList_) {
                 napi_delete_reference(env, item.first);
             }
@@ -196,10 +200,14 @@ std::list<std::function<void(const RefPtr<NG::SecurityUIExtensionProxy>&)>> JSSe
 {
     std::list<std::function<void(const RefPtr<NG::SecurityUIExtensionProxy>&)>> reList;
     if (type == RegisterType::SYNC) {
+        TAG_LOGI(AceLogTag::ACE_SECURITYUIEXTENSION,
+            "SubEvent op=get_on_func_list kit=ArkUI event=syncReceiverRegister");
         for (const auto& item : onSyncOnCallbackList_) {
             reList.emplace_back(item.second);
         }
     } else if (type == RegisterType::ASYNC) {
+        TAG_LOGI(AceLogTag::ACE_SECURITYUIEXTENSION,
+            "SubEvent op=get_on_func_list kit=ArkUI event=asyncReceiverRegister");
         for (const auto& item : onAsyncOnCallbackList_) {
             reList.emplace_back(item.second);
         }
@@ -290,14 +298,14 @@ void JSSecurityUIExtensionProxy::On(const JSCallbackInfo& info)
     CHECK_NULL_VOID(nativeEngine);
     auto env = reinterpret_cast<napi_env>(nativeEngine);
     ScopeRAII scopeNapi(env);
+    if (!scopeNapi) {
+        return;
+    }
     panda::Local<JsiValue> value = info[1].Get().GetLocalHandle();
     JSValueWrapper valueWrapper = value;
     napi_value cb = nativeEngine->ValueToNapiValue(valueWrapper);
-    napi_handle_scope napiScope = nullptr;
-    napi_open_handle_scope(env, &napiScope);
-    CHECK_NULL_VOID(napiScope);
     std::lock_guard<std::mutex> lock(callbackLisLock_);
-    AddCallbackToList(env, cb, napiScope, registerType, std::move(onOnFunc));
+    AddCallbackToList(env, cb, registerType, std::move(onOnFunc));
     auto pattern = proxy_->GetPattern();
     CHECK_NULL_VOID(pattern);
     auto onFuncList = GetOnFuncList(registerType);
@@ -425,7 +433,7 @@ void JSSecurityUIExtension::Create(const JSCallbackInfo& info)
         }
         JSRef<JSVal> enableDensityDPI = obj->GetProperty("dpiFollowStrategy");
         if (enableDensityDPI->IsNumber()) {
-            config.densityDpi = (enableDensityDPI->ToNumber<int32_t>())==0 ? true : false;
+            config.dpiFollowStrategy = NG::ParseDpiFollowStrategy(enableDensityDPI->ToNumber<int32_t>());
         }
         do {
             JSRef<JSVal> componentContent = obj->GetProperty("placeholder");
@@ -652,7 +660,7 @@ void JSPreviewUIExtension::Create(const JSCallbackInfo& info)
         }
         JSRef<JSVal> enableDensityDPI = obj->GetProperty("dpiFollowStrategy");
         if (enableDensityDPI->IsNumber()) {
-            config.densityDpi = (enableDensityDPI->ToNumber<int32_t>())==0 ? true : false;
+            config.dpiFollowStrategy = NG::ParseDpiFollowStrategy(enableDensityDPI->ToNumber<int32_t>());
         }
         do {
             JSRef<JSVal> componentContent = obj->GetProperty("placeholder");

@@ -358,12 +358,16 @@ public:
     void ClearSheetCloseIconMaterial();
     void SetSheetCloseIconMaterial(RefPtr<UiMaterial> closeButtonNodeMaterial);
     void UpdateSheetScrollBar(const NG::SheetStyle& sheetStyle);
+    void UpdateSheetScrollBarMargin();
 
     double GetTitleBarEffectHeight(const SheetStyle& sheetStyle, float titleBarHeight);
 
     void UpdateCloseIconMaterialByLevel(const RefPtr<UiMaterial>& material);
     void ApplyTitleBarBackgroundBlur();
     void RefreshTitleBarBlurByCurrentOffset();
+    void RegisterTitleBlurNestedScroll(WeakPtr<NestableScrollContainer> child);
+    void UnRegisterTitleBlurNestedScroll();
+    float GetTitleBlurNestedScrollOffset();
     void RegisterTitleBarScrollObserver();
     void UnRegisterTitleBarScrollObserver();
     void UpdateTitleEffectBlurAndMaskColorProgress(float progress);
@@ -1405,6 +1409,7 @@ private:
     bool preTitleStackMode_ = false;
     std::optional<DisplayMode> preScrollBarState_ = std::nullopt;
     std::optional<float> preScrollSelfHeight_ = std::nullopt;
+    std::list<WeakPtr<FrameNode>> nestedScrollNodeList_;
 };
 } // namespace OHOS::Ace::NG
 

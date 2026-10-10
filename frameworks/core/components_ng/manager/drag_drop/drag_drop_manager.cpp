@@ -1226,6 +1226,32 @@ void DragDropManager::ResetDraggingStatus(const TouchEvent& touchPoint)
     }
 }
 
+bool DragDropManager::TryBindAndMarkSending(const std::shared_ptr<ArkUIInteralDragAction>& dragAction)
+{
+    if (dragAction == nullptr) {
+        return false;
+    }
+    std::lock_guard<std::mutex> lock(dragActionMutex_);
+    if (dragAction_ != nullptr) {
+        // The two dragStateMutex critical sections below are intentionally SEPARATE
+        // scopes and never held together: when `dragAction` is the same object as
+        // `dragAction_` this is lock-release-lock, not recursive locking, so a plain
+        // std::mutex is safe. A same-object SENDING state (duplicate StartDrag for the
+        // live session) is rejected here as well.
+        std::lock_guard<std::mutex> stateLock(dragAction_->dragStateMutex);
+        if (dragAction_->dragState == DragAdapterState::SENDING) {
+            TAG_LOGI(AceLogTag::ACE_DRAG, "Reject start drag, another session is sending.");
+            return false;
+        }
+    }
+    {
+        std::lock_guard<std::mutex> stateLock(dragAction->dragStateMutex);
+        dragAction->dragState = DragAdapterState::SENDING;
+    }
+    dragAction_ = dragAction;
+    return true;
+}
+
 void DragDropManager::HandleOnDragEnd(const DragPointerEvent& pointerEvent, const std::string& extraInfo,
     const RefPtr<FrameNode>& dragFrameNode)
 {
@@ -1817,9 +1843,9 @@ bool DragDropManager::InterruptFollowHandMorphDropAnimation()
 void DragDropManager::RequireSummary()
 {
     DragSummaryInfo dragSummaryInfo;
-    int32_t ret =
-        InteractionInterface::GetInstance()->GetDragSummary(dragSummaryInfo.summary, dragSummaryInfo.detailedSummary,
-            dragSummaryInfo.summaryFormat, dragSummaryInfo.version, dragSummaryInfo.totalSize, dragSummaryInfo.tag);
+    int32_t ret = InteractionInterface::GetInstance()->GetDragSummary(dragSummaryInfo);
+    auto extensionCount = dragSummaryInfo.filenameExtensions.size();
+    TAG_LOGI(AceLogTag::ACE_DRAG, "RequireSummary ret: %{public}d, extensionCount: %{public}zu", ret, extensionCount);
     if (ret != 0) {
         TAG_LOGI(AceLogTag::ACE_DRAG, "RequireSummary: Interaction GetSummary failed: %{public}d", ret);
     } else {
@@ -2329,7 +2355,7 @@ void DragDropManager::UpdateNotifyDragEvent(
         if (dragEventType != DragEventType::DROP) {
             notifyEvent->SetVelocity(velocityTracker_.GetVelocity());
         }
-        notifyEvent->SetSummary(summaryMap_);
+        notifyEvent->SetSummaryInfo(dragSummaryInfo_);
         notifyEvent->SetPreviewRect(GetDragWindowRect(point));
     }
 }
@@ -2347,7 +2373,7 @@ void DragDropManager::UpdateDragEvent(
     event->SetGlobalDisplayX(pointerEvent.GetGlobalDisplayX());
     event->SetGlobalDisplayY(pointerEvent.GetGlobalDisplayY());
     event->SetVelocity(velocityTracker_.GetVelocity());
-    event->SetSummary(summaryMap_);
+    event->SetSummaryInfo(dragSummaryInfo_);
     event->SetPreviewRect(GetDragWindowRect(point));
     event->SetPressedKeyCodes(pointerEvent.pressedKeyCodes);
     event->SetSourceTool(pointerEvent.sourceTool);

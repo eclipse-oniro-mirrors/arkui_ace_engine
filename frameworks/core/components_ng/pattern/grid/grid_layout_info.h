@@ -167,8 +167,21 @@ struct GridLayoutInfo {
      * @brief Traverse the matrix backward to find the last item index, starting from Line [endLine].
      *
      * Intended to work on irregular layout.
+     * Origin cells of item i>0 are stored as +i; continuation cells as -i.
+     * Item 0 is encoded as 0 for both origin and continuation (because -0 == 0).
+     * When the matrix is (re)filled from index 0, GridIrregularFiller places
+     * item 0 first, so item 0's origin cell is gridMatrix_[0][0] (row 0,
+     * column 0): a 0 stored in that cell is the origin, never a continuation
+     * cell. Filling restarted at an index > 0 (for example after a jump) leaves
+     * item 0 out of the matrix, so FindEndIdx verifies the cell value (see
+     * @return) instead of assuming item 0 is present.
+     *
      * @param endLine index of the line to start traversing.
-     * @return last item index above endLine (inclusive) and the position it resides in.
+     * @return last positive origin above endLine (inclusive) and the cell it resides in.
+     *         Missing [endLine] key → default {-1,-1,-1}.
+     *         No positive origin in range → {0,0,0} only if gridMatrix_[0][0] is
+     *         item 0; otherwise {-1,-1,-1}. Do not treat a 0 continuation cell as
+     *         the origin; InitPosToLastItem resumes filling from the returned (x, y).
      */
     EndIndexInfo FindEndIdx(int32_t endLine) const;
 
@@ -378,6 +391,19 @@ struct GridLayoutInfo {
     int32_t GetChildrenCount() const
     {
         return firstRepeatCount_ > 0 ? firstRepeatCount_ : childrenCount_;
+    }
+
+    // Effective anchor of the viewport start for cache calculations and preloading.
+    // When the Grid is completely scrolled past the bottom (inverted range with
+    // endMainLineIndex_ >= 0), startIndex_ is stale (it still points at the first
+    // item of the last measured line): all content is above the viewport, so the
+    // children count is the effective start.
+    int32_t GetEffectiveStartIndex() const
+    {
+        if (startMainLineIndex_ > endMainLineIndex_ && endMainLineIndex_ >= 0) {
+            return GetChildrenCount();
+        }
+        return startIndex_;
     }
 
     // Layout viewport bounds while the contentClip extension is active (ADR-3):

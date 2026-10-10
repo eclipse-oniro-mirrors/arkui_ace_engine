@@ -20,6 +20,7 @@
 #include "native_engine/native_engine.h"
 
 #include "base/geometry/dimension.h"
+#include "base/utils/napi_scope_raii.h"
 #include "frameworks/bridge/declarative_frontend/jsview/js_interactable_view.h"
 #include "frameworks/bridge/declarative_frontend/jsview/js_view_abstract.h"
 
@@ -48,20 +49,22 @@ class UiMaterial;
 } // namespace OHOS::Ace
 
 namespace OHOS::Ace::Framework {
-class ScopeRAII {
-public:
-    explicit ScopeRAII(napi_env env) : env_(env)
-    {
-        napi_open_handle_scope(env_, &scope_);
-    }
-    ~ScopeRAII()
-    {
-        napi_close_handle_scope(env_, scope_);
-    };
-private:
-    napi_env env_;
-    napi_handle_scope scope_;
+inline constexpr napi_type_tag VISUAL_EFFECT_TYPE_TAG = {
+    .lower = 0x1c80317fa3b1799d,
+    .upper = 0xbdd640fb06671ad1
 };
+ 
+inline constexpr napi_type_tag FILTER_TYPE_TAG = {
+    .lower = 0x3eb13b9046685257,
+    .upper = 0x23b8c1e9392456de
+};
+ 
+inline constexpr napi_type_tag BLENDER_TYPE_TAG = {
+    .lower = 0x1a3d1fa7bc8960a9,
+    .upper = 0xbd9c66b3ad3c2d6d
+};
+
+using OHOS::Ace::ScopeRAII;
 #if !defined(PREVIEW)
 const std::shared_ptr<Rosen::RSNode> CreateRSNodeFromNapiValue(JSRef<JSVal> obj);
 RefPtr<OHOS::Ace::WantWrap> CreateWantWrapFromNapiValue(JSRef<JSVal> obj);

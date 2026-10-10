@@ -35,6 +35,7 @@
 #include "base/utils/utils.h"
 #include "core/common/container.h"
 #include "core/common/container_scope.h"
+#include "core/components_ng/pattern/ui_extension/ui_extension_utils.h"
 #include "core/components_ng/pattern/ui_extension/session_wrapper.h"
 #include "core/components_ng/pattern/window_scene/helper/window_scene_helper.h"
 #include "core/components_ng/pattern/window_scene/scene/system_window_scene.h"
@@ -155,8 +156,8 @@ void SecuritySessionWrapperImpl::InitAllCallback()
         return;
     }
     auto sessionCallbacks = session_->GetExtensionSessionEventCallback();
-    foregroundCallback_ =
-        [weak = hostPattern_, taskExecutor = taskExecutor_, callSessionId](OHOS::Rosen::WSError errcode) {
+    foregroundCallback_ = [weak = hostPattern_,
+        taskExecutor = taskExecutor_, callSessionId](OHOS::Rosen::WSError errcode, int32_t abilityCode) {
         if (errcode != OHOS::Rosen::WSError::WS_OK) {
             taskExecutor->PostTask(
                 [weak, callSessionId] {
@@ -855,13 +856,11 @@ bool SecuritySessionWrapperImpl::NotifyOccupiedAreaChangeInfo(
     return true;
 }
 
-void SecuritySessionWrapperImpl::SetDensityDpiImpl(bool isDensityDpi)
+void SecuritySessionWrapperImpl::SetDensityDpiImpl(DpiFollowStrategy dpiFollowStrategy)
 {
     CHECK_NULL_VOID(session_);
-    if (isDensityDpi) {
-        float density = PipelineBase::GetCurrentDensity();
-        session_->NotifyDensityFollowHost(isDensityDpi, density);
-    }
+    float density = PipelineBase::GetCurrentDensity();
+    session_->NotifyDensityFollowHost(ConvertToRosenDpiFollowStrategy(dpiFollowStrategy), density);
 }
 
 void SecuritySessionWrapperImpl::SendDataAsync(const AAFwk::WantParams& params) const

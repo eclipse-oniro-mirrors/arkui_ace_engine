@@ -1164,7 +1164,7 @@ void CalendarDialogView::UpdateBackgroundStyle(const RefPtr<RenderContext>& rend
     const RefPtr<FrameNode>& dialogNode)
 {
     bool enabled = false;
-#if defined(ANDROID_PLATFORM) || defined(IOS_PLATFORM)
+#if defined(ANDROID_PLATFORM) || defined(IOS_PLATFORM) || defined(PREVIEW)
     enabled = Container::GreatOrEqualAPIVersion(PlatformVersion::VERSION_ELEVEN);
 #else
     enabled = Container::GreatOrEqualAPIVersion(PlatformVersion::VERSION_ELEVEN) && renderContext->IsUniRenderEnabled();

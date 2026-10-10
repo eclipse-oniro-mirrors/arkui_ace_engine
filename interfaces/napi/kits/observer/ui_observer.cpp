@@ -15,6 +15,7 @@
 
 #include "ui_observer.h"
 
+#include "base/utils/napi_scope_raii.h"
 #include "bridge/common/utils/engine_helper.h"
 #include "core/components_ng/base/node_render_status_monitor.h"
 
@@ -165,6 +166,7 @@ void UIObserver::UnRegisterNavigationCallback(napi_value cb)
 {
     if (cb == nullptr) {
         unspecifiedNavigationListeners_.clear();
+        TAG_LOGI(AceLogTag::ACE_OBSERVER, "SubEvent op=off_all, kit=ArkUI, event=navDestinationUpdate");
         return;
     }
 
@@ -190,6 +192,8 @@ void UIObserver::UnRegisterNavigationCallback(std::string navigationId, napi_val
     auto& holder = iter->second;
     if (cb == nullptr) {
         holder.clear();
+        TAG_LOGI(AceLogTag::ACE_OBSERVER,
+            "SubEvent op=off_all, kit=ArkUI, event=navDestinationUpdate, id=%{public}s", navigationId.c_str());
         return;
     }
     holder.erase(
@@ -214,6 +218,9 @@ void UIObserver::UnRegisterNavigationCallback(int32_t navigationUniqueId, napi_v
     auto& holder = iter->second;
     if (cb == nullptr) {
         holder.clear();
+        TAG_LOGI(AceLogTag::ACE_OBSERVER,
+            "SubEvent op=off_all, kit=ArkUI, event=navDestinationUpdateByUniqueId, uniqueId=%{public}d",
+            navigationUniqueId);
         return;
     }
     holder.erase(
@@ -406,6 +413,7 @@ void UIObserver::UnRegisterRouterPageCallback(napi_env env, napi_value uiAbility
             auto& holder = abilityContextRouterPageListeners_[listenerPair.first];
             if (callback == nullptr) {
                 holder.clear();
+                TAG_LOGI(AceLogTag::ACE_OBSERVER, "SubEvent op=off_all, kit=ArkUI, event=routerPageUpdate");
             } else {
                 holder.erase(
                     std::remove_if(
@@ -439,6 +447,7 @@ void UIObserver::UnRegisterRouterPageCallback(int32_t uiContextInstanceId, napi_
     auto& holder = iter->second;
     if (callback == nullptr) {
         holder.clear();
+        TAG_LOGI(AceLogTag::ACE_OBSERVER, "SubEvent op=off_all, kit=ArkUI, event=routerPageUpdate");
         return;
     }
     holder.erase(
@@ -557,9 +566,8 @@ void UIObserver::UnRegisterLayoutCallback(int32_t uiContextInstanceId, napi_valu
 void UIObserver::HandleRouterPageStateChange(NG::AbilityContextInfo& info, const NG::RouterPageInfoNG& pageInfo)
 {
     auto env = GetCurrentNapiEnv();
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env);
+    if (!scope) {
         return;
     }
     for (auto listenerPair : abilityContextRouterPageListeners_) {
@@ -581,7 +589,6 @@ void UIObserver::HandleRouterPageStateChange(NG::AbilityContextInfo& info, const
     auto currentId = Container::CurrentId();
     auto iter = specifiedRouterPageListeners_.find(currentId);
     if (iter == specifiedRouterPageListeners_.end()) {
-        napi_close_handle_scope(env, scope);
         return;
     }
     auto context = GetContextValue();
@@ -589,7 +596,6 @@ void UIObserver::HandleRouterPageStateChange(NG::AbilityContextInfo& info, const
     for (const auto& listener : holder) {
         listener->OnRouterPageStateChange(pageInfo, context);
     }
-    napi_close_handle_scope(env, scope);
 }
 
 // UIObserver.on(type: "densityUpdate", uiContext | null, callback)
@@ -626,6 +632,7 @@ void UIObserver::UnRegisterDensityCallback(int32_t uiContextInstanceId, napi_val
     auto& holder = iter->second;
     if (callback == nullptr) {
         holder.clear();
+        TAG_LOGI(AceLogTag::ACE_OBSERVER, "SubEvent op=off_all, kit=ArkUI, event=densityUpdate");
         return;
     }
     holder.erase(
@@ -811,6 +818,7 @@ void UIObserver::UnRegisterNavDestinationSwitchCallback(napi_env env, napi_value
         auto& listeners = it->second;
         if (callback == nullptr) {
             listeners.clear();
+            TAG_LOGI(AceLogTag::ACE_OBSERVER, "SubEvent op=off_all, kit=ArkUI, event=navDestinationSwitch");
         } else {
             listeners.erase(std::remove_if(listeners.begin(), listeners.end(),
                 [callback](const std::shared_ptr<UIObserverListener>& registeredListener) {
@@ -857,6 +865,7 @@ void UIObserver::UnRegisterNavDestinationSwitchCallback(int32_t uiContextInstanc
     auto& listeners = it->second;
     if (callback == nullptr) {
         listeners.clear();
+        TAG_LOGI(AceLogTag::ACE_OBSERVER, "SubEvent op=off_all, kit=ArkUI, event=navDestinationSwitch");
     } else {
         listeners.erase(std::remove_if(listeners.begin(), listeners.end(),
             [callback](const std::shared_ptr<UIObserverListener>& registeredListener) {
@@ -875,14 +884,12 @@ void UIObserver::HandleNavDestinationSwitch(
     const NG::AbilityContextInfo& info, NG::NavDestinationSwitchInfo& switchInfo)
 {
     auto env = GetCurrentNapiEnv();
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env);
+    if (!scope) {
         return;
     }
     HandleAbilityUIContextNavDestinationSwitch(info, switchInfo);
     HandleUIContextNavDestinationSwitch(switchInfo);
-    napi_close_handle_scope(env, scope);
 }
 
 void UIObserver::HandleAbilityUIContextNavDestinationSwitch(
@@ -956,9 +963,8 @@ void UIObserver::HandleListenersWithSpecifiedNavigationId(
 void UIObserver::RegisterWillClickCallback(
     napi_env env, napi_value uiAbilityContext, const std::shared_ptr<UIObserverListener>& listener)
 {
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env);
+    if (!scope) {
         return;
     }
     NG::AbilityContextInfo info;
@@ -969,11 +975,9 @@ void UIObserver::RegisterWillClickCallback(
         if (info.IsEqual(localInfo)) {
             auto& holder = abilityContextWillClickListeners_[ref];
             if (std::find(holder.begin(), holder.end(), listener) != holder.end()) {
-                napi_close_handle_scope(env, scope);
                 return;
             }
             holder.emplace_back(listener);
-            napi_close_handle_scope(env, scope);
             return;
         }
     }
@@ -981,7 +985,6 @@ void UIObserver::RegisterWillClickCallback(
     napi_create_reference(env, uiAbilityContext, 1, &newRef);
     abilityContextWillClickListeners_[newRef] = std::list<std::shared_ptr<UIObserverListener>>({ listener });
     willClickInfos_[newRef] = info;
-    napi_close_handle_scope(env, scope);
 }
 
 void UIObserver::RegisterWillClickCallback(
@@ -1005,9 +1008,8 @@ void UIObserver::RegisterWillClickCallback(
 
 void UIObserver::UnRegisterWillClickCallback(napi_env env, napi_value uiAbilityContext, napi_value callback)
 {
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env);
+    if (!scope) {
         return;
     }
     NG::AbilityContextInfo info;
@@ -1021,6 +1023,7 @@ void UIObserver::UnRegisterWillClickCallback(napi_env env, napi_value uiAbilityC
         auto& holder = abilityContextWillClickListeners_[listenerPair.first];
         if (callback == nullptr) {
             holder.clear();
+            TAG_LOGI(AceLogTag::ACE_OBSERVER, "SubEvent op=off_all, kit=ArkUI, event=willClick");
         } else {
             holder.erase(
                 std::remove_if(
@@ -1037,7 +1040,6 @@ void UIObserver::UnRegisterWillClickCallback(napi_env env, napi_value uiAbilityC
             napi_delete_reference(env, ref);
         }
     }
-    napi_close_handle_scope(env, scope);
 }
 
 void UIObserver::UnRegisterWillClickCallback(int32_t uiContextInstanceId, napi_value callback)
@@ -1052,6 +1054,7 @@ void UIObserver::UnRegisterWillClickCallback(int32_t uiContextInstanceId, napi_v
     auto& holder = iter->second;
     if (callback == nullptr) {
         holder.clear();
+        TAG_LOGI(AceLogTag::ACE_OBSERVER, "SubEvent op=off_all, kit=ArkUI, event=willClick");
         return;
     }
     holder.erase(
@@ -1068,9 +1071,8 @@ void UIObserver::HandleWillClick(NG::AbilityContextInfo& info, const GestureEven
     const ClickInfo& clickInfo, const RefPtr<NG::FrameNode>& frameNode)
 {
     auto env = GetCurrentNapiEnv();
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env);
+    if (!scope) {
         return;
     }
     for (auto listenerPair : abilityContextWillClickListeners_) {
@@ -1091,22 +1093,19 @@ void UIObserver::HandleWillClick(NG::AbilityContextInfo& info, const GestureEven
     auto currentId = Container::CurrentId();
     auto iter = specifiedWillClickListeners_.find(currentId);
     if (iter == specifiedWillClickListeners_.end()) {
-        napi_close_handle_scope(env, scope);
         return;
     }
     auto holder = iter->second;
     for (const auto& listener : holder) {
         listener->OnWillClick(gestureEventInfo, clickInfo, frameNode);
     }
-    napi_close_handle_scope(env, scope);
 }
 
 void UIObserver::RegisterDidClickCallback(
     napi_env env, napi_value uiAbilityContext, const std::shared_ptr<UIObserverListener>& listener)
 {
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env);
+    if (!scope) {
         return;
     }
     NG::AbilityContextInfo info;
@@ -1117,11 +1116,9 @@ void UIObserver::RegisterDidClickCallback(
         if (info.IsEqual(localInfo)) {
             auto& holder = abilityContextDidClickListeners_[ref];
             if (std::find(holder.begin(), holder.end(), listener) != holder.end()) {
-                napi_close_handle_scope(env, scope);
                 return;
             }
             holder.emplace_back(listener);
-            napi_close_handle_scope(env, scope);
             return;
         }
     }
@@ -1129,7 +1126,6 @@ void UIObserver::RegisterDidClickCallback(
     napi_create_reference(env, uiAbilityContext, 1, &newRef);
     abilityContextDidClickListeners_[newRef] = std::list<std::shared_ptr<UIObserverListener>>({ listener });
     didClickInfos_[newRef] = info;
-    napi_close_handle_scope(env, scope);
 }
 
 void UIObserver::RegisterDidClickCallback(
@@ -1153,9 +1149,8 @@ void UIObserver::RegisterDidClickCallback(
 
 void UIObserver::UnRegisterDidClickCallback(napi_env env, napi_value uiAbilityContext, napi_value callback)
 {
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env);
+    if (!scope) {
         return;
     }
     NG::AbilityContextInfo info;
@@ -1169,6 +1164,7 @@ void UIObserver::UnRegisterDidClickCallback(napi_env env, napi_value uiAbilityCo
         auto& holder = abilityContextDidClickListeners_[listenerPair.first];
         if (callback == nullptr) {
             holder.clear();
+            TAG_LOGI(AceLogTag::ACE_OBSERVER, "SubEvent op=off_all, kit=ArkUI, event=didClick");
         } else {
             holder.erase(
                 std::remove_if(
@@ -1185,7 +1181,6 @@ void UIObserver::UnRegisterDidClickCallback(napi_env env, napi_value uiAbilityCo
             napi_delete_reference(env, ref);
         }
     }
-    napi_close_handle_scope(env, scope);
 }
 
 void UIObserver::UnRegisterDidClickCallback(int32_t uiContextInstanceId, napi_value callback)
@@ -1200,6 +1195,7 @@ void UIObserver::UnRegisterDidClickCallback(int32_t uiContextInstanceId, napi_va
     auto& holder = iter->second;
     if (callback == nullptr) {
         holder.clear();
+        TAG_LOGI(AceLogTag::ACE_OBSERVER, "SubEvent op=off_all, kit=ArkUI, event=didClick");
         return;
     }
     holder.erase(
@@ -1216,9 +1212,8 @@ void UIObserver::HandleDidClick(NG::AbilityContextInfo& info, const GestureEvent
     const ClickInfo& clickInfo, const RefPtr<NG::FrameNode>& frameNode)
 {
     auto env = GetCurrentNapiEnv();
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env);
+    if (!scope) {
         return;
     }
     for (auto listenerPair : abilityContextDidClickListeners_) {
@@ -1239,22 +1234,19 @@ void UIObserver::HandleDidClick(NG::AbilityContextInfo& info, const GestureEvent
     auto currentId = Container::CurrentId();
     auto iter = specifiedDidClickListeners_.find(currentId);
     if (iter == specifiedDidClickListeners_.end()) {
-        napi_close_handle_scope(env, scope);
         return;
     }
     auto holder = iter->second;
     for (const auto& listener : holder) {
         listener->OnDidClick(gestureEventInfo, clickInfo, frameNode);
     }
-    napi_close_handle_scope(env, scope);
 }
 
 void UIObserver::RegisterBeforePanStartCallback(
     napi_env env, napi_value uiAbilityContext, const std::shared_ptr<UIObserverListener>& listener)
 {
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env);
+    if (!scope) {
         return;
     }
     NG::AbilityContextInfo info;
@@ -1265,11 +1257,9 @@ void UIObserver::RegisterBeforePanStartCallback(
         if (info.IsEqual(localInfo)) {
             auto& holder = listenerPair.second;
             if (std::find(holder.begin(), holder.end(), listener) != holder.end()) {
-                napi_close_handle_scope(env, scope);
                 return;
             }
             holder.emplace_back(listener);
-            napi_close_handle_scope(env, scope);
             return;
         }
     }
@@ -1277,7 +1267,6 @@ void UIObserver::RegisterBeforePanStartCallback(
     napi_create_reference(env, uiAbilityContext, 1, &newRef);
     abilityContextBeforePanStartListeners_[newRef] = std::list<std::shared_ptr<UIObserverListener>>({ listener });
     beforePanStartInfos_[newRef] = info;
-    napi_close_handle_scope(env, scope);
 }
 
 void UIObserver::RegisterBeforePanStartCallback(
@@ -1301,9 +1290,8 @@ void UIObserver::RegisterBeforePanStartCallback(
 
 void UIObserver::UnRegisterBeforePanStartCallback(napi_env env, napi_value uiAbilityContext, napi_value callback)
 {
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env);
+    if (!scope) {
         return;
     }
     NG::AbilityContextInfo info;
@@ -1317,6 +1305,7 @@ void UIObserver::UnRegisterBeforePanStartCallback(napi_env env, napi_value uiAbi
         auto& holder = listenerPair.second;
         if (callback == nullptr) {
             holder.clear();
+            TAG_LOGI(AceLogTag::ACE_OBSERVER, "SubEvent op=off_all, kit=ArkUI, event=beforePanStart");
         } else {
             holder.erase(
                 std::remove_if(
@@ -1333,7 +1322,6 @@ void UIObserver::UnRegisterBeforePanStartCallback(napi_env env, napi_value uiAbi
             napi_delete_reference(env, ref);
         }
     }
-    napi_close_handle_scope(env, scope);
 }
 
 void UIObserver::UnRegisterBeforePanStartCallback(int32_t uiContextInstanceId, napi_value callback)
@@ -1348,6 +1336,7 @@ void UIObserver::UnRegisterBeforePanStartCallback(int32_t uiContextInstanceId, n
     auto& holder = iter->second;
     if (callback == nullptr) {
         holder.clear();
+        TAG_LOGI(AceLogTag::ACE_OBSERVER, "SubEvent op=off_all, kit=ArkUI, event=beforePanStart");
         return;
     }
     holder.erase(
@@ -1363,9 +1352,8 @@ void UIObserver::UnRegisterBeforePanStartCallback(int32_t uiContextInstanceId, n
 void UIObserver::RegisterBeforePanEndCallback(
     napi_env env, napi_value uiAbilityContext, const std::shared_ptr<UIObserverListener>& listener)
 {
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env);
+    if (!scope) {
         return;
     }
     NG::AbilityContextInfo info;
@@ -1376,11 +1364,9 @@ void UIObserver::RegisterBeforePanEndCallback(
         if (info.IsEqual(localInfo)) {
             auto& holder = listenerPair.second;
             if (std::find(holder.begin(), holder.end(), listener) != holder.end()) {
-                napi_close_handle_scope(env, scope);
                 return;
             }
             holder.emplace_back(listener);
-            napi_close_handle_scope(env, scope);
             return;
         }
     }
@@ -1388,7 +1374,6 @@ void UIObserver::RegisterBeforePanEndCallback(
     napi_create_reference(env, uiAbilityContext, 1, &newRef);
     abilityContextBeforePanEndListeners_[newRef] = std::list<std::shared_ptr<UIObserverListener>>({ listener });
     beforePanEndInfos_[newRef] = info;
-    napi_close_handle_scope(env, scope);
 }
 
 void UIObserver::RegisterBeforePanEndCallback(
@@ -1412,9 +1397,8 @@ void UIObserver::RegisterBeforePanEndCallback(
 
 void UIObserver::UnRegisterBeforePanEndCallback(napi_env env, napi_value uiAbilityContext, napi_value callback)
 {
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env);
+    if (!scope) {
         return;
     }
     NG::AbilityContextInfo info;
@@ -1428,6 +1412,7 @@ void UIObserver::UnRegisterBeforePanEndCallback(napi_env env, napi_value uiAbili
         auto& holder = listenerPair.second;
         if (callback == nullptr) {
             holder.clear();
+            TAG_LOGI(AceLogTag::ACE_OBSERVER, "SubEvent op=off_all, kit=ArkUI, event=beforePanEnd");
         } else {
             holder.erase(
                 std::remove_if(
@@ -1444,7 +1429,6 @@ void UIObserver::UnRegisterBeforePanEndCallback(napi_env env, napi_value uiAbili
             napi_delete_reference(env, ref);
         }
     }
-    napi_close_handle_scope(env, scope);
 }
 
 void UIObserver::UnRegisterBeforePanEndCallback(int32_t uiContextInstanceId, napi_value callback)
@@ -1459,6 +1443,7 @@ void UIObserver::UnRegisterBeforePanEndCallback(int32_t uiContextInstanceId, nap
     auto& holder = iter->second;
     if (callback == nullptr) {
         holder.clear();
+        TAG_LOGI(AceLogTag::ACE_OBSERVER, "SubEvent op=off_all, kit=ArkUI, event=beforePanEnd");
         return;
     }
     holder.erase(
@@ -1474,9 +1459,8 @@ void UIObserver::UnRegisterBeforePanEndCallback(int32_t uiContextInstanceId, nap
 void UIObserver::RegisterAfterPanStartCallback(
     napi_env env, napi_value uiAbilityContext, const std::shared_ptr<UIObserverListener>& listener)
 {
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env);
+    if (!scope) {
         return;
     }
     NG::AbilityContextInfo info;
@@ -1487,11 +1471,9 @@ void UIObserver::RegisterAfterPanStartCallback(
         if (info.IsEqual(localInfo)) {
             auto& holder = listenerPair.second;
             if (std::find(holder.begin(), holder.end(), listener) != holder.end()) {
-                napi_close_handle_scope(env, scope);
                 return;
             }
             holder.emplace_back(listener);
-            napi_close_handle_scope(env, scope);
             return;
         }
     }
@@ -1499,7 +1481,6 @@ void UIObserver::RegisterAfterPanStartCallback(
     napi_create_reference(env, uiAbilityContext, 1, &newRef);
     abilityContextAfterPanStartListeners_[newRef] = std::list<std::shared_ptr<UIObserverListener>>({ listener });
     afterPanStartInfos_[newRef] = info;
-    napi_close_handle_scope(env, scope);
 }
 
 void UIObserver::RegisterAfterPanStartCallback(
@@ -1523,9 +1504,8 @@ void UIObserver::RegisterAfterPanStartCallback(
 
 void UIObserver::UnRegisterAfterPanStartCallback(napi_env env, napi_value uiAbilityContext, napi_value callback)
 {
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env);
+    if (!scope) {
         return;
     }
     NG::AbilityContextInfo info;
@@ -1539,6 +1519,7 @@ void UIObserver::UnRegisterAfterPanStartCallback(napi_env env, napi_value uiAbil
         auto& holder = listenerPair.second;
         if (callback == nullptr) {
             holder.clear();
+            TAG_LOGI(AceLogTag::ACE_OBSERVER, "SubEvent op=off_all, kit=ArkUI, event=afterPanStart");
         } else {
             holder.erase(
                 std::remove_if(
@@ -1555,7 +1536,6 @@ void UIObserver::UnRegisterAfterPanStartCallback(napi_env env, napi_value uiAbil
             napi_delete_reference(env, ref);
         }
     }
-    napi_close_handle_scope(env, scope);
 }
 
 void UIObserver::UnRegisterAfterPanStartCallback(int32_t uiContextInstanceId, napi_value callback)
@@ -1570,6 +1550,7 @@ void UIObserver::UnRegisterAfterPanStartCallback(int32_t uiContextInstanceId, na
     auto& holder = iter->second;
     if (callback == nullptr) {
         holder.clear();
+        TAG_LOGI(AceLogTag::ACE_OBSERVER, "SubEvent op=off_all, kit=ArkUI, event=afterPanStart");
         return;
     }
     holder.erase(
@@ -1585,9 +1566,8 @@ void UIObserver::UnRegisterAfterPanStartCallback(int32_t uiContextInstanceId, na
 void UIObserver::RegisterAfterPanEndCallback(
     napi_env env, napi_value uiAbilityContext, const std::shared_ptr<UIObserverListener>& listener)
 {
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env);
+    if (!scope) {
         return;
     }
     NG::AbilityContextInfo info;
@@ -1598,11 +1578,9 @@ void UIObserver::RegisterAfterPanEndCallback(
         if (info.IsEqual(localInfo)) {
             auto& holder = listenerPair.second;
             if (std::find(holder.begin(), holder.end(), listener) != holder.end()) {
-                napi_close_handle_scope(env, scope);
                 return;
             }
             holder.emplace_back(listener);
-            napi_close_handle_scope(env, scope);
             return;
         }
     }
@@ -1610,7 +1588,6 @@ void UIObserver::RegisterAfterPanEndCallback(
     napi_create_reference(env, uiAbilityContext, 1, &newRef);
     abilityContextAfterPanEndListeners_[newRef] = std::list<std::shared_ptr<UIObserverListener>>({ listener });
     afterPanEndInfos_[newRef] = info;
-    napi_close_handle_scope(env, scope);
 }
 
 void UIObserver::RegisterAfterPanEndCallback(
@@ -1634,9 +1611,8 @@ void UIObserver::RegisterAfterPanEndCallback(
 
 void UIObserver::UnRegisterAfterPanEndCallback(napi_env env, napi_value uiAbilityContext, napi_value callback)
 {
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env);
+    if (!scope) {
         return;
     }
     NG::AbilityContextInfo info;
@@ -1650,6 +1626,7 @@ void UIObserver::UnRegisterAfterPanEndCallback(napi_env env, napi_value uiAbilit
         auto& holder = listenerPair.second;
         if (callback == nullptr) {
             holder.clear();
+            TAG_LOGI(AceLogTag::ACE_OBSERVER, "SubEvent op=off_all, kit=ArkUI, event=afterPanEnd");
         } else {
             holder.erase(
                 std::remove_if(
@@ -1666,7 +1643,6 @@ void UIObserver::UnRegisterAfterPanEndCallback(napi_env env, napi_value uiAbilit
             napi_delete_reference(env, ref);
         }
     }
-    napi_close_handle_scope(env, scope);
 }
 
 void UIObserver::UnRegisterAfterPanEndCallback(int32_t uiContextInstanceId, napi_value callback)
@@ -1681,6 +1657,7 @@ void UIObserver::UnRegisterAfterPanEndCallback(int32_t uiContextInstanceId, napi
     auto& holder = iter->second;
     if (callback == nullptr) {
         holder.clear();
+        TAG_LOGI(AceLogTag::ACE_OBSERVER, "SubEvent op=off_all, kit=ArkUI, event=afterPanEnd");
         return;
     }
     holder.erase(
@@ -1698,15 +1675,13 @@ void UIObserver::HandlePanGestureAccept(NG::AbilityContextInfo& info, const Gest
     const NG::PanGestureInfo& panGestureInfo)
 {
     auto env = GetCurrentNapiEnv();
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env);
+    if (!scope) {
         return;
     }
 
     auto [listeners, specifiedListeners] = GetPanGestureListeners(panGestureInfo);
     if (listeners.empty() && specifiedListeners.empty()) {
-        napi_close_handle_scope(env, scope);
         return;
     }
     for (auto& listenerPair : listeners) {
@@ -1727,14 +1702,12 @@ void UIObserver::HandlePanGestureAccept(NG::AbilityContextInfo& info, const Gest
     auto currentId = Container::CurrentId();
     auto iter = specifiedListeners.find(currentId);
     if (iter == specifiedListeners.end()) {
-        napi_close_handle_scope(env, scope);
         return;
     }
     auto holder = iter->second;
     for (const auto& listener : holder) {
         listener->OnPanGestureStateChange(gestureEventInfo, current, frameNode);
     }
-    napi_close_handle_scope(env, scope);
 }
 
 UIObserver::PanGestureListenersPair UIObserver::GetPanGestureListeners(const NG::PanGestureInfo& panGestureInfo)
@@ -1816,6 +1789,7 @@ void UIObserver::UnRegisterNodeRenderStateChangeCallback(
     auto& holder = iter->second->listeners;
     if (callback == nullptr) {
         holder.clear();
+        TAG_LOGI(AceLogTag::ACE_OBSERVER, "SubEvent op=off_all, kit=ArkUI, event=nodeRenderState");
         specifiedNodeRenderStateListeners_.erase(iter);
         monitor->UnRegisterNodeRenderStatusListener(frameNodePtr, id);
         return;
@@ -1867,6 +1841,7 @@ void UIObserver::UnRegisterTabContentStateCallback(napi_value cb)
 {
     if (cb == nullptr) {
         tabContentStateListeners_.clear();
+        TAG_LOGI(AceLogTag::ACE_OBSERVER, "SubEvent op=off_all, kit=ArkUI, event=tabContentState");
         return;
     }
 
@@ -1891,6 +1866,8 @@ void UIObserver::UnRegisterTabContentStateCallback(const std::string& id, napi_v
     auto& holder = iter->second;
     if (cb == nullptr) {
         holder.clear();
+        TAG_LOGI(AceLogTag::ACE_OBSERVER,
+            "SubEvent op=off_all, kit=ArkUI, event=tabContentState, id=%{public}s", id.c_str());
         return;
     }
     holder.erase(
@@ -1949,6 +1926,7 @@ void UIObserver::UnRegisterTabChangeCallback(napi_value cb)
 {
     if (cb == nullptr) {
         tabChangeListeners_.clear();
+        TAG_LOGI(AceLogTag::ACE_OBSERVER, "SubEvent op=off_all, kit=ArkUI, event=tabChange");
         return;
     }
     tabChangeListeners_.erase(
@@ -1971,6 +1949,8 @@ void UIObserver::UnRegisterTabChangeCallback(const std::string& id, napi_value c
     auto& holder = iter->second;
     if (cb == nullptr) {
         holder.clear();
+        TAG_LOGI(AceLogTag::ACE_OBSERVER,
+            "SubEvent op=off_all, kit=ArkUI, event=tabChange, id=%{public}s", id.c_str());
         return;
     }
     holder.erase(
@@ -2187,9 +2167,8 @@ void UIObserver::HandleRouterPageSizeChange(const NG::RouterPageInfoNG& info)
 {
     auto env = GetCurrentNapiEnv();
     CHECK_NULL_VOID(env);
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env);
+    if (!scope) {
         return;
     }
     auto context = GetContextValue();
@@ -2197,7 +2176,6 @@ void UIObserver::HandleRouterPageSizeChange(const NG::RouterPageInfoNG& info)
     for (const auto& listener : listener) {
         listener->OnRouterPageSizeChange(info, context);
     }
-    napi_close_handle_scope(env, scope);
 }
 
 void UIObserver::RegisterNavDestinationSizeChangeCallback(const std::shared_ptr<UIObserverListener>& listener)

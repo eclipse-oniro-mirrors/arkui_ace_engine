@@ -20,12 +20,15 @@
 #include "want_params.h"
 
 #include "base/log/ace_scoring_log.h"
+#include "base/log/log_wrapper.h"
+#include "base/utils/napi_scope_raii.h"
 #include "base/want/want_wrap.h"
 #include "bridge/common/utils/engine_helper.h"
 #include "bridge/declarative_frontend/engine/js_converter.h"
 #include "bridge/declarative_frontend/jsview/js_utils.h"
 #include "core/common/container_scope.h"
 #include "core/components_ng/base/view_stack_processor.h"
+#include "core/components_ng/pattern/ui_extension/ui_extension_utils.h"
 #include "core/components_ng/pattern/ui_extension/ui_extension_model.h"
 #include "core/components_ng/pattern/ui_extension/ui_extension_model_ng.h"
 #include "interfaces/include/ws_common.h"
@@ -144,7 +147,7 @@ CallbackFuncPairList::const_iterator JSUIExtensionProxy::FindCbList(napi_env env
 }
 
 void JSUIExtensionProxy::AddCallbackToList(napi_env env, napi_value cb,
-    napi_handle_scope scope, RegisterType type,
+    RegisterType type,
     const std::function<void(const RefPtr<NG::UIExtensionProxy>&)>&& onFunc)
 {
     if (type == RegisterType::SYNC) {
@@ -162,18 +165,19 @@ void JSUIExtensionProxy::AddCallbackToList(napi_env env, napi_value cb,
             onAsyncOnCallbackList_.emplace_back(ref, onFunc);
         }
     }
-    napi_close_handle_scope(env, scope);
 }
 
 void JSUIExtensionProxy::DeleteCallbackFromList(uint32_t argc, napi_env env, napi_value cb, RegisterType type)
 {
     if (argc == 1) {
         if (type == RegisterType::SYNC) {
+            TAG_LOGI(AceLogTag::ACE_UIEXTENSIONCOMPONENT, "SubEvent op=off_all kit=ArkUI event=syncReceiverRegister");
             for (const auto& item : onSyncOnCallbackList_) {
                 napi_delete_reference(env, item.first);
             }
             onSyncOnCallbackList_.clear();
         } else if (type == RegisterType::ASYNC) {
+            TAG_LOGI(AceLogTag::ACE_UIEXTENSIONCOMPONENT, "SubEvent op=off_all kit=ArkUI event=asyncReceiverRegister");
             for (const auto& item : onAsyncOnCallbackList_) {
                 napi_delete_reference(env, item.first);
             }
@@ -201,10 +205,14 @@ std::list<std::function<void(const RefPtr<NG::UIExtensionProxy>&)>> JSUIExtensio
 {
     std::list<std::function<void(const RefPtr<NG::UIExtensionProxy>&)>> reList;
     if (type == RegisterType::SYNC) {
+        TAG_LOGI(AceLogTag::ACE_UIEXTENSIONCOMPONENT,
+            "SubEvent op=get_on_func_list kit=ArkUI event=syncReceiverRegister");
         for (const auto& item : onSyncOnCallbackList_) {
             reList.emplace_back(item.second);
         }
     } else if (type == RegisterType::ASYNC) {
+        TAG_LOGI(AceLogTag::ACE_UIEXTENSIONCOMPONENT,
+            "SubEvent op=get_on_func_list kit=ArkUI event=asyncReceiverRegister");
         for (const auto& item : onAsyncOnCallbackList_) {
             reList.emplace_back(item.second);
         }
@@ -261,15 +269,15 @@ void JSUIExtensionProxy::On(const JSCallbackInfo& info)
     CHECK_NULL_VOID(nativeEngine);
     auto env = reinterpret_cast<napi_env>(nativeEngine);
     ScopeRAII scopeNapi(env);
+    if (!scopeNapi) {
+        return;
+    }
     panda::Local<JsiValue> value = info[1].Get().GetLocalHandle();
     JSValueWrapper valueWrapper = value;
     napi_value cb = nativeEngine->ValueToNapiValue(valueWrapper);
-    napi_handle_scope napiScope = nullptr;
-    napi_open_handle_scope(env, &napiScope);
-    CHECK_NULL_VOID(napiScope);
 
     std::lock_guard<std::mutex> lock(callbackLisLock_);
-    AddCallbackToList(env, cb, napiScope, registerType, std::move(onOnFunc));
+    AddCallbackToList(env, cb, registerType, std::move(onOnFunc));
     auto pattern = proxy_->GetPattern();
     CHECK_NULL_VOID(pattern);
     auto onFuncList = GetOnFuncList(registerType);
@@ -430,7 +438,7 @@ void JSUIExtension::Create(const JSCallbackInfo& info)
     RefPtr<OHOS::Ace::WantWrap> want = CreateWantWrapFromNapiValue(wantObj);
 
     bool transferringCaller = false;
-    bool densityDpi = false;
+    NG::DpiFollowStrategy dpiFollowStrategy = NG::DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI;
     bool windowModeStrategy = false;
     std::map<NG::PlaceholderType, RefPtr<NG::FrameNode>> placeholderMap;
     if (info.Length() > 1 && info[1]->IsObject()) {
@@ -441,7 +449,7 @@ void JSUIExtension::Create(const JSCallbackInfo& info)
         }
         JSRef<JSVal> enableDensityDPI = obj->GetProperty("dpiFollowStrategy");
         if (enableDensityDPI->IsNumber()) {
-            densityDpi = (enableDensityDPI->ToNumber<int32_t>())==0 ? true : false;
+            dpiFollowStrategy = NG::ParseDpiFollowStrategy(enableDensityDPI->ToNumber<int32_t>());
         }
         JSRef<JSVal> windowModeStrategyValue = obj->GetProperty("windowModeFollowStrategy");
         if (windowModeStrategyValue->IsNumber()) {
@@ -450,7 +458,8 @@ void JSUIExtension::Create(const JSCallbackInfo& info)
         InsertPlaceholderObj(obj, placeholderMap);
         ResolveAreaPlaceholderParams(obj, placeholderMap);
     }
-    UIExtensionModel::GetInstance()->Create(want, placeholderMap, transferringCaller, densityDpi, windowModeStrategy);
+    UIExtensionModel::GetInstance()->Create(
+        want, placeholderMap, transferringCaller, dpiFollowStrategy, windowModeStrategy);
 }
 
 void JSUIExtension::OnRemoteReady(const JSCallbackInfo& info)

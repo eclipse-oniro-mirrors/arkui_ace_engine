@@ -17,11 +17,11 @@
 #include "base/utils/utf_helper.h"
 #include "core/components_ng/pattern/text/span_model_ng.h"
 #include "test/mock/frameworks/core/components_ng/render/mock_paragraph.h"
-#include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
-#include "test/mock/frameworks/core/common/mock_theme_manager.h"
+#include "core/components_ng/base/view_stack_processor.h"
 
 using namespace testing;
 using namespace testing::ext;
+using namespace OHOS::Ace;
 
 namespace OHOS::Ace::NG {
 void RichEditorCommonTestNg::AddSpan(const std::string& content)
@@ -131,4 +131,5 @@ void RichEditorCommonTestNg::ClearSpan()
     richEditorPattern->spans_.clear();
     richEditorPattern->caretPosition_ = 0;
 }
+
 } // namespace OHOS::Ace::NG

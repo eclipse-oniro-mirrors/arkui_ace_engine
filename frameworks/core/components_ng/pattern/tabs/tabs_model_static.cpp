@@ -633,9 +633,14 @@ void TabsModelStatic::SetDivider(FrameNode* frameNode, const TabsItemDivider& di
     CHECK_NULL_VOID(dividerNode);
     auto dividerRenderContext = dividerNode->GetRenderContext();
     CHECK_NULL_VOID(dividerRenderContext);
-
+    auto tabsNode = AceType::DynamicCast<TabsNode>(frameNode);
+    CHECK_NULL_VOID(tabsNode);
+    auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
+    bool isOnAnim = tabsPattern && tabsPattern->IsOnDisplayModeSwitchAnimation();
     if (dividerOpt.isNull) {
-        dividerRenderContext->UpdateOpacity(0.0f);
+        if (!isOnAnim) {
+            dividerRenderContext->UpdateOpacity(0.0f);
+        }
         auto tabsLayoutProperty = frameNode->GetLayoutProperty<TabsLayoutProperty>();
         CHECK_NULL_VOID(tabsLayoutProperty);
         auto currentDivider = tabsLayoutProperty->GetDivider().value_or(TabsItemDivider());
@@ -643,7 +648,9 @@ void TabsModelStatic::SetDivider(FrameNode* frameNode, const TabsItemDivider& di
         currentDivider.isNull = true;
         ACE_UPDATE_NODE_LAYOUT_PROPERTY(TabsLayoutProperty, Divider, currentDivider, frameNode);
     } else {
-        dividerRenderContext->UpdateOpacity(1.0f);
+        if (!isOnAnim) {
+            dividerRenderContext->UpdateOpacity(1.0f);
+        }
         ACE_UPDATE_NODE_LAYOUT_PROPERTY(TabsLayoutProperty, Divider, dividerOpt, frameNode);
     }
 }
@@ -702,6 +709,9 @@ void TabsModelStatic::SetBarBackgroundBlurStyle(FrameNode* frameNode, const Blur
     CHECK_NULL_VOID(frameNode);
     auto tabsNode = AceType::DynamicCast<TabsNode>(frameNode);
     CHECK_NULL_VOID(tabsNode);
+    auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
+    CHECK_NULL_VOID(tabsPattern);
+    tabsPattern->SetBarBlurStyleOption(styleOption);
     auto tabBarNode = AceType::DynamicCast<FrameNode>(tabsNode->GetTabBar());
     CHECK_NULL_VOID(tabBarNode);
     auto pipeline = tabBarNode->GetContext();
@@ -734,8 +744,10 @@ void TabsModelStatic::SetBarBackgroundColor(FrameNode* frameNode, const std::opt
     CHECK_NULL_VOID(tabBarRenderContext);
     if (backgroundColorOpt) {
         tabBarRenderContext->UpdateBackgroundColor(backgroundColorOpt.value());
+        ACE_UPDATE_NODE_LAYOUT_PROPERTY(TabsLayoutProperty, BarBackgroundColor, backgroundColorOpt.value(), frameNode);
     } else {
         tabBarRenderContext->ResetBackgroundColor();
+        ACE_RESET_NODE_LAYOUT_PROPERTY(TabsLayoutProperty, BarBackgroundColor, frameNode);
     }
 }
 

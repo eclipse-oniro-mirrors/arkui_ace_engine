@@ -294,10 +294,10 @@ private:
     LogWrapper() = delete;
     ~LogWrapper() = delete;
 
-    static LogLevel level_;
+    static LogLevel& GetLogLevelStorage();
 };
 
-bool LogBacktrace(size_t maxFrameNums = 256);
+ACE_FORCE_EXPORT bool LogBacktrace(size_t maxFrameNums = 256);
 
 class ACE_FORCE_EXPORT CallbackLogger final {
 public:

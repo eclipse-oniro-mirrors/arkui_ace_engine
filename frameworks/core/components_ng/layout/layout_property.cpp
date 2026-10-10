@@ -1177,10 +1177,6 @@ void LayoutProperty::OnVisibilityUpdate(VisibleType visible, bool allowTransitio
     // store the previous visibility value.
     auto preVisibility = propVisibility_;
 
-    ACE_LAYOUT_SCOPED_TRACE("OnVisibilityUpdate[%s][%d] pre:%d cur:%d trans:%d userSet:%d",
-        host->GetTag().c_str(), host->GetId(), static_cast<int>(preVisibility.value_or(VisibleType::VISIBLE)),
-        static_cast<int>(visible), allowTransition, isUserSet);
-
     // update visibility value.
     propVisibility_ = visible;
 
@@ -1451,6 +1447,16 @@ void LayoutProperty::UpdateChainWeight(const ChainWeightPair& value)
 }
 
 void LayoutProperty::UpdateBorderWidth(const BorderWidthProperty& value)
+{
+    UpdateMaterialBorderWidth(value);
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    const auto& renderContext = host->GetRenderContext();
+    CHECK_NULL_VOID(renderContext);
+    renderContext->UpdatePreBorderWidth(value);
+}
+
+void LayoutProperty::UpdateMaterialBorderWidth(const BorderWidthProperty& value)
 {
     if (!borderWidth_) {
         borderWidth_ = std::make_unique<BorderWidthProperty>();

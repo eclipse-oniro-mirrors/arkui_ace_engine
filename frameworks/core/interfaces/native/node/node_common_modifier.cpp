@@ -8025,6 +8025,16 @@ void GetTransform(ArkUINodeHandle node, ArkUI_Float32 (*values)[16])
     }
 }
 
+void GetTransform3D(ArkUINodeHandle node, ArkUI_Float32 (*values)[16])
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto transforms = ViewAbstract::GetTransform3D(frameNode);
+    for (int i = 0; i < NUM_16; i++) {
+        (*values)[i] = transforms[i];
+    }
+}
+
 ArkUI_Int32 GetHitTestBehavior(ArkUINodeHandle node)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
@@ -9583,6 +9593,9 @@ ArkUI_Int32 PostTouchEvent(ArkUINodeHandle node, const ArkUITouchEvent* arkUITou
         TimeStamp downTime(downNanoseconds);
         point.downTime = downTime;
         point.force = touchPointes[index].pressure;
+        point.tiltX = static_cast<float>(touchPointes[index].tiltX);
+        point.tiltY = static_cast<float>(touchPointes[index].tiltY);
+        point.rollAngle = static_cast<float>(touchPointes[index].rollAngle);
         touchEvent.pointers.emplace_back(point);
     }
     touchEvent.id = arkUITouchEvent->actionTouchPoint.id;
@@ -11820,6 +11833,7 @@ const ArkUICommonModifier* GetCommonModifier()
         .getClip = GetClip,
         .getClipShape = GetClipShape,
         .getTransform = GetTransform,
+        .getTransform3D = GetTransform3D,
         .getHitTestBehavior = GetHitTestBehavior,
         .getPosition = GetPosition,
         .getShadow = GetShadow,

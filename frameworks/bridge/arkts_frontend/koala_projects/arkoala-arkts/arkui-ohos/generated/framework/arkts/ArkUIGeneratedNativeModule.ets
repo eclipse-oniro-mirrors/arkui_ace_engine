@@ -1132,6 +1132,8 @@ export class ArkUIGeneratedNativeModule {
     @ani.unsafe.Direct
     native static _ImageAnimatorAttribute_setMonitorInvisibleArea(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
+    native static _ImageAnimatorAttribute_setInterpolation(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
     native static _ImageAnimatorAttribute_setOnStart(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _ImageAnimatorAttribute_setOnPause(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
@@ -1194,7 +1196,9 @@ export class ArkUIGeneratedNativeModule {
     @ani.unsafe.Direct
     native static _LazyVGridLayoutInterface_setLazyVGridLayoutOptions(ptr: KPointer): void
     @ani.unsafe.Direct
-    native static _LazyVGridLayoutAttribute_setColumnsTemplate(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    native static _LazyVGridLayoutAttribute_setColumnsTemplate0(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
+    native static _LazyVGridLayoutAttribute_setColumnsTemplate1(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _Line_construct(id: KInt, flags: KInt): KPointer
     @ani.unsafe.Direct
@@ -2546,6 +2550,22 @@ export class ArkUIGeneratedNativeModule {
     @ani.unsafe.Direct
     native static _TabsAttribute_setSidebarSelectedBoardColor(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
+    native static _TabsAttribute_setSidebarDisplayStyle(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
+    native static _TabsAttribute_setSidebarWidth(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
+    native static _TabsAttribute_setMinSidebarWidth(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
+    native static _TabsAttribute_setMaxSidebarWidth(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
+    native static _TabsAttribute_setMinContentWidth(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
+    native static _TabsAttribute_setSidebarBackgroundColor(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
+    native static _TabsAttribute_setSidebarBackgroundBlurStyle(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
+    native static _TabsAttribute_setSidebarDivider(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
     native static _TabsAttribute_setBarMode(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _TabsAttribute_setBarHeight1(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
@@ -3581,6 +3601,8 @@ export class ArkUIGeneratedNativeModule {
     native static _WebAttribute_setEnableFullscreenVideoOverlay(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _WebAttribute_setEnableMediaNetworkProxy(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
+    native static _WebAttribute_setOnZoomChange(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _WebAttribute_setRegisterNativeEmbedRule(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
@@ -6459,6 +6481,8 @@ export class ArkUIGeneratedNativeModule {
     @ani.unsafe.Quick
     native static _RichEditorController_addBuilderSpan(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): KInteropReturnBuffer
     @ani.unsafe.Quick
+    native static _RichEditorController_addRichEditorBuilderSpan(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): KInteropReturnBuffer
+    @ani.unsafe.Quick
     native static _RichEditorController_addSymbolSpan(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): KInteropReturnBuffer
     @ani.unsafe.Direct
     native static _RichEditorController_updateSpanStyle(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
@@ -6468,6 +6492,8 @@ export class ArkUIGeneratedNativeModule {
     native static _RichEditorController_deleteSpans(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Quick
     native static _RichEditorController_getSpans(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): KInteropReturnBuffer
+    @ani.unsafe.Quick
+    native static _RichEditorController_getRichEditorBuilderSpans(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): KInteropReturnBuffer
     @ani.unsafe.Quick
     native static _RichEditorController_getParagraphs(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): KInteropReturnBuffer
     @ani.unsafe.Quick
@@ -7502,6 +7528,8 @@ export class ArkUIGeneratedNativeModule {
     native static _WebResourceResponse_getResponseCode(ptr: KPointer): KInt
     @ani.unsafe.Direct
     native static _WebResourceResponse_setResponseData(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
+    native static _WebResourceResponse_setResponseBody(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Quick
     native static _WebResourceResponse_setResponseEncoding(ptr: KPointer, encoding: KStringPtr): void
     @ani.unsafe.Quick

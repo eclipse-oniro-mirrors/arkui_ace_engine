@@ -26,6 +26,7 @@
 #include "detached_free_root_node/detached_free_root_node.h"
 #include "drawable/drawable_module.h"
 #include "keyboard_avoid_mode/keyboard_avoid_mode_module.h"
+#include "immersive_strategy/immersive_strategy_module.h"
 #include "custom_node/custom_node_module.h"
 #include "syntax/lazy_for_each_module.h"
 #include "syntax/syntax_module.h"
@@ -608,6 +609,11 @@ ANI_EXPORT ani_status ANI_Constructor(ani_vm* vm, uint32_t* result)
             reinterpret_cast<void*>(OHOS::Ace::Ani::BuilderProxyNodeMockConstruct)
         },
         ani_native_function {
+            "_InteropProxyNode_Construct",
+            "i:l",
+            reinterpret_cast<void*>(OHOS::Ace::Ani::InteropProxyNodeConstruct)
+        },
+        ani_native_function {
             "_SetOnNodeDestroyEvent",
             "lC{std.core.Function1}:",
             reinterpret_cast<void*>(OHOS::Ace::Ani::SetOnNodeDestroyEvent)
@@ -736,6 +742,11 @@ ANI_EXPORT ani_status ANI_Constructor(ani_vm* vm, uint32_t* result)
             "_SetKeyboardAvoidMode",
             nullptr,
             reinterpret_cast<void*>(OHOS::Ace::Ani::SetKeyboardAvoidMode)
+        },
+        ani_native_function {
+            "_ApplyDefaultImmersiveStrategy",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::ApplyDefaultImmersiveStrategy)
         },
         ani_native_function {
             "_DragEvent_Set_Data",
@@ -960,12 +971,12 @@ ANI_EXPORT ani_status ANI_Constructor(ani_vm* vm, uint32_t* result)
         },
         ani_native_function {
             "_UiMaterial_ConvertToECMaterial",
-            nullptr,
+            "ll:",
             reinterpret_cast<void*>(OHOS::Ace::Ani::UiMaterialConvertToECMaterial)
         },
         ani_native_function {
             "_UiMaterial_ConvertToECSubMaterial",
-            nullptr,
+            "ll:",
             reinterpret_cast<void*>(OHOS::Ace::Ani::UiMaterialConvertToECSubMaterial)
         },
         ani_native_function {
@@ -990,7 +1001,7 @@ ANI_EXPORT ani_status ANI_Constructor(ani_vm* vm, uint32_t* result)
         },
         ani_native_function {
             "_UiMaterial_GetEmpty",
-            nullptr,
+            "l:",
             reinterpret_cast<void*>(OHOS::Ace::Ani::UiMaterialGetEmpty)
         },
         ani_native_function {

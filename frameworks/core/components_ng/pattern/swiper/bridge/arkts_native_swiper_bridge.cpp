@@ -240,6 +240,7 @@ RefPtr<Curve> ParseJsViewCurveObject(ArkUIRuntimeCallInfo* runtimeCallInfo)
         panda::Local<panda::FunctionRef> func = onCallBack->ToObject(vm);
         customCallBack = [func = panda::CopyableGlobal(vm, func), id = Container::CurrentId()](float time) -> float {
             auto vm = func.GetEcmaVM();
+            CHECK_EQUAL_RETURN(ArkTSUtils::CheckJavaScriptScope(vm), false, 1.0f);
             panda::LocalScope pandaScope(vm);
             panda::TryCatch trycatch(vm);
             ContainerScope scope(id);
@@ -1241,7 +1242,7 @@ ArkUINativeModuleValue SwiperBridge::SetSwiperDisplayCount(ArkUIRuntimeCallInfo*
     Local<JSValueRef> valueArg = runtimeCallInfo->GetCallArgRef(CALL_ARG_VALUE_INDEX);
 
     if (isJsView) {
-        if (valueArg.IsNull() || valueArg->IsUndefined()) {
+        if (valueArg.IsNull()) {
             return panda::JSValueRef::Undefined(vm);
         }
         if (argc == NUM_3) {
@@ -1670,11 +1671,10 @@ ArkUINativeModuleValue SwiperBridge::SetSwiperDisplayMode(ArkUIRuntimeCallInfo* 
     ArkUINodeHandle nativeNode = nullptr;
     CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, nodeArg, vm), true, panda::JSValueRef::Undefined(vm));
     Local<JSValueRef> valueArg = runtimeCallInfo->GetCallArgRef(CALL_ARG_VALUE_INDEX);
-    bool isJsView = ArkTSUtils::IsJsView(nodeArg, vm);
     if (!valueArg.IsNull() && !valueArg->IsUndefined() && valueArg->IsNumber()) {
         int32_t index = valueArg->Int32Value(vm);
         GetArkUINodeModifiers()->getSwiperModifier()->setSwiperDisplayMode(nativeNode, index);
-    } else if (!isJsView) {
+    } else {
         GetArkUINodeModifiers()->getSwiperModifier()->resetSwiperDisplayMode(nativeNode);
     }
     return panda::JSValueRef::Undefined(vm);
@@ -2012,7 +2012,7 @@ std::optional<Dimension> ParseJsViewIndicatorDimension(EcmaVM* vm, const Local<J
         return indicatorDimension;
     }
     CalcDimension dimPosition;
-    auto parseOk = ArkTSUtils::ParseJsDimension(vm, value, dimPosition, DimensionUnit::VP, resObj);
+    auto parseOk = ArkTSUtils::ParseJsDimension(vm, value, dimPosition, DimensionUnit::VP, resObj, true, false);
     indicatorDimension = parseOk && dimPosition.ConvertToPx() >= 0.0f ? dimPosition : 0.0_vp;
     return indicatorDimension;
 }
@@ -2323,7 +2323,7 @@ ArkUINativeModuleValue SwiperBridge::SetSwiperIndicator(ArkUIRuntimeCallInfo* ru
             return panda::JSValueRef::Undefined(vm);
         }
         Local<JSValueRef> valueArg = runtimeCallInfo->GetCallArgRef(CALL_ARG_VALUE_INDEX);
-        if (valueArg.IsEmpty() || valueArg->IsUndefined() || valueArg->IsNull()) {
+        if (valueArg.IsEmpty() || valueArg->IsNull()) {
             GetArkUINodeModifiers()->getSwiperModifier()->setSwiperShowIndicator(nativeNode, true);
             return panda::JSValueRef::Undefined(vm);
         }
@@ -3003,7 +3003,11 @@ ArkUINativeModuleValue SwiperBridge::SetSwiperOnContentWillScroll(ArkUIRuntimeCa
     ArkUINodeHandle nativeNode = nullptr;
     CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
     bool isJsView = ArkTSUtils::IsJsView(firstArg, vm);
-    if (callbackArg->IsUndefined() || callbackArg->IsNull() || !callbackArg->IsFunction(vm)) {
+    if (callbackArg->IsUndefined() || callbackArg->IsNull()) {
+        GetArkUINodeModifiers()->getSwiperModifier()->resetSwiperOnContentWillScroll(nativeNode);
+        return panda::JSValueRef::Undefined(vm);
+    }
+    if (!callbackArg->IsFunction(vm)) {
         if (!isJsView) {
             GetArkUINodeModifiers()->getSwiperModifier()->resetSwiperOnContentWillScroll(nativeNode);
         }
@@ -3168,7 +3172,7 @@ ArkUINativeModuleValue SwiperBridge::SetSwiperSize(ArkUIRuntimeCallInfo* runtime
     return result;
 }
 
-Local<panda::ObjectRef> CreateClickInfo(EcmaVM* vm, const ClickInfo& info)
+Local<panda::ObjectRef> CreateClickInfo(EcmaVM* vm, ClickInfo& info)
 {
     auto obj = panda::ObjectRef::New(vm);
     Offset globalOffset = info.GetGlobalLocation();
@@ -3227,7 +3231,10 @@ Local<panda::ObjectRef> CreateClickInfo(EcmaVM* vm, const ClickInfo& info)
         panda::FunctionRef::New(vm, Framework::JsGetCurrentLocalPosition));
 #endif
     obj->SetNativePointerFieldCount(vm, 1);
-    obj->SetNativePointerField(vm, 0, static_cast<void*>(const_cast<ClickInfo*>(&info)));
+    obj->SetConcurrentNativePointerField(vm, 0, static_cast<void*>(&info),
+        [](void* env, void* nativePtr, void* data) {
+            delete static_cast<ClickInfo*>(nativePtr);
+        }, nullptr);
     return obj;
 }
 
@@ -3263,12 +3270,14 @@ ArkUINativeModuleValue SwiperBridge::SetSwiperOnClick(ArkUIRuntimeCallInfo* runt
                 TAG_LOGW(AceLogTag::ACE_SWIPER, "Swiper onClick callback execute failed.");
                 return;
             }
-            auto newInfo = *clickInfo;
+            // The newInfoPtr can only be bound to a JS object, and its lifetime belongs to that object.
+            // It is not allowed to hold this address elsewhere.
+            auto newInfoPtr = new ClickInfo(*clickInfo);
             if (impl) {
-                impl->UpdateEventInfo(newInfo);
+                impl->UpdateEventInfo(*newInfoPtr);
             }
 
-            auto obj = CreateClickInfo(vm, newInfo);
+            auto obj = CreateClickInfo(vm, *newInfoPtr);
             panda::Local<panda::JSValueRef> params[1] = { obj };
             auto result = func->Call(vm, func.ToLocal(), params, 1);
             if (isJsView) {

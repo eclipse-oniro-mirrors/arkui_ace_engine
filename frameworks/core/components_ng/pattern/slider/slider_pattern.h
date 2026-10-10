@@ -179,7 +179,9 @@ public:
     }
     void PlayHapticFeedback(bool isShowSteps);
     bool OnThemeScopeUpdate(int32_t themeScopeId) override;
+    void ToJsonValue(std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const override;
     void DumpInfo() override;
+    void DumpInfo(std::unique_ptr<JsonValue>& json) override;
 
     void InitPrefixSuffixRow();
     void SetPrefix(const RefPtr<NG::UINode>& prefix, const NG::SliderPrefixOptions& options);
@@ -430,7 +432,7 @@ private:
     void UpdateDragFrameNode();
     void UpdateDragPointNode();
     void UpdateBlurCoverNode();
-    void UpdateSelectedTrackFrameNode(float centerX, float centerY);
+    void UpdateSelectedTrackFrameNode();
     void UpdateParticleFrameNode(float centerX, float centerY);
     void UpdateParticleFrameOffset(Axis direction, bool reverse);
     void UpdateEmitterProperties(float centerX, float centerY, Axis direction, bool reverse);
@@ -448,9 +450,11 @@ private:
     void ApplyBlendMode(const RefPtr<FrameNode>& frameNode);
     std::shared_ptr<Rosen::BrightnessBlender> CreateBrightnessBlender();
     void ResetHostMaterialEffects();
+    void ResetHostMaterialEffectsInner();
     AnimationOption CreateDragAnimationOption() const;
     AnimationOption CreateLowGradeSpringOption() const;
     float GetBlockRadius() const;
+    OffsetF GetRealPosition(float x, float y);
     float GetDragFrameBaseScale() const;
     void StartLongPressTimer();
     void HandleLongPress();

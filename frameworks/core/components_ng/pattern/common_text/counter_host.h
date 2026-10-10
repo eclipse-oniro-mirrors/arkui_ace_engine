@@ -29,13 +29,13 @@
 #include "core/components/common/properties/text_style.h"
 #include "core/components_ng/property/border_property.h"
 #include "core/components_ng/property/measure_property.h"
+#include "core/components_ng/pattern/text_field/text_input_response_area.h"
 
 namespace OHOS::Ace::NG {
 
 // Forward declarations to minimize include dependencies in this interface header.
 class FrameNode;
 class RenderContext;
-class TextInputResponseArea;
 class TextComponentDecorator;
 
 class ICounterHost : public virtual AceType {
@@ -54,6 +54,8 @@ public:
     virtual bool HasFocus() const = 0;
 
     virtual bool GetShowCounterValue() const = 0;
+    // RichEditor overrides to return true so MeasureDecorator uses GetTextLength()
+    virtual bool ShouldUseHostTextLength() const { return false; }
     virtual int32_t GetCounterType() const { return -1; }
     virtual bool GetShowHighlightBorder() const { return true; }
     virtual bool HasCounterTextColor() const { return false; }

@@ -118,49 +118,31 @@ void* GetMaterialLib()
 
 SetMaterialFunc GetOrCreateMaterialFunc()
 {
-    static bool isLoaded = false;
     static SetMaterialFunc materialFunc = nullptr;
-    static std::mutex materialMutex;
-    if (isLoaded) {
-        return materialFunc;
-    }
-    std::lock_guard<std::mutex> lock(materialMutex);
-    if (isLoaded) {
-        return materialFunc;
-    }
+    static std::once_flag onceFlag;
+    std::call_once(onceFlag, []() {
 #ifndef _WIN32
-    auto handle = GetMaterialLib();
-    if (!handle) {
-        isLoaded = true;
-        return nullptr;
-    }
-    materialFunc = reinterpret_cast<SetMaterialFunc>(LOADSYM(handle, UI_MATERIAL_FUNC_NAME));
+        auto handle = GetMaterialLib();
+        if (handle) {
+            materialFunc = reinterpret_cast<SetMaterialFunc>(LOADSYM(handle, UI_MATERIAL_FUNC_NAME));
+        }
 #endif
-    isLoaded = true;
+    });
     return materialFunc;
 }
 
 GetMaterialIdFunc GetOrCreateGetMaterialIdFunc()
 {
-    static bool isLoaded = false;
     static GetMaterialIdFunc getMaterialIdFunc = nullptr;
-    static std::mutex materialMutex;
-    if (isLoaded) {
-        return getMaterialIdFunc;
-    }
-    std::lock_guard<std::mutex> lock(materialMutex);
-    if (isLoaded) {
-        return getMaterialIdFunc;
-    }
+    static std::once_flag onceFlag;
+    std::call_once(onceFlag, []() {
 #ifndef _WIN32
-    auto handle = GetMaterialLib();
-    if (!handle) {
-        isLoaded = true;
-        return nullptr;
-    }
-    getMaterialIdFunc = reinterpret_cast<GetMaterialIdFunc>(LOADSYM(handle, UI_MATERIAL_FUNC_GET_ID));
+        auto handle = GetMaterialLib();
+        if (handle) {
+            getMaterialIdFunc = reinterpret_cast<GetMaterialIdFunc>(LOADSYM(handle, UI_MATERIAL_FUNC_GET_ID));
+        }
 #endif
-    isLoaded = true;
+    });
     return getMaterialIdFunc;
 }
 

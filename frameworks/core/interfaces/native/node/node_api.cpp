@@ -13,12 +13,16 @@
  * limitations under the License.
  */
 
+#include "core/components_ng/base/page_text_collector.h"
+#include "core/interfaces/native/node/page_text_api.h"
+
 #include "core/interfaces/native/node/node_api.h"
 
 #include <securec.h>
 #include <vector>
 
 #include "interfaces/native/native_type.h"
+#include "interfaces/native/node/config_manager.h"
 
 #include "core/common/ace_application_info.h"
 #include "core/common/ace_engine.h"
@@ -344,6 +348,23 @@ void SetOnNodeDestroyCallback(ArkUINodeHandle node, void (*onDestroy)(ArkUINodeH
 
 void DisposeNode(ArkUINodeHandle node)
 {
+    auto* uiNode = reinterpret_cast<UINode*>(node);
+    if (uiNode && uiNode->GetParent()) {
+        std::string rectInfo = "unavailable";
+        auto* frameNode = AceType::DynamicCast<FrameNode>(uiNode);
+        if (frameNode && frameNode->GetGeometryNode()) {
+            const auto rect = frameNode->GetGeometryNode()->GetFrameRect();
+            rectInfo = std::to_string(rect.Left()) + ", " + std::to_string(rect.Top()) + ", " +
+                std::to_string(rect.Width()) + ", " + std::to_string(rect.Height());
+        }
+        const auto& componentId = uiNode->GetInspectorId();
+        const std::string componentInfo = componentId.has_value() ? ", ComponentID: " + componentId.value() : "";
+        LOGW("DisposeNode: nodeId: %{public}d, tag: %{public}s, rect [%{public}s]%{public}s",
+            uiNode->GetId(), uiNode->GetTag().c_str(), rectInfo.c_str(), componentInfo.c_str());
+        LOGW("The node to be disposed still has a parent. "
+            "Accessing this node through a NodeHandle obtained by tree traversal after disposal "
+            "may result in undefined behavior, including application crashes.");
+    }
     ViewModel::DisposeNode(node);
 }
 
@@ -2176,6 +2197,22 @@ const char* GetErrorMessage()
     return OHOS::Ace::ErrorMessageManager::GetInstance().GetErrorMessage();
 }
 
+ArkUI_Bool IsCurrentThreadSafe()
+{
+    auto pipeline = PipelineContext::GetCurrentContextSafely();
+    return (pipeline == nullptr || pipeline->IsCurrentThreadSafe()) ? 1 : 0;
+}
+
+ArkUI_Bool IsDebugForParallel()
+{
+    return AceApplicationInfo::GetInstance().IsDebugForParallel() ? 1 : 0;
+}
+
+ArkUI_Bool IsDebugForParallelSet()
+{
+    return AceApplicationInfo::GetInstance().IsDebugForParallelSet() ? 1 : 0;
+}
+
 const ArkUIBasicAPI* GetBasicAPI()
 {
     CHECK_INITIALIZED_FIELDS_BEGIN(); // don't move this line
@@ -2215,6 +2252,9 @@ const ArkUIBasicAPI* GetBasicAPI()
         .setErrorCodeAndMessage = SetErrorCodeAndMessage,
         .setErrorFunctionName = SetErrorFunctionName,
         .getErrorMessage = GetErrorMessage,
+        .isCurrentThreadSafe = IsCurrentThreadSafe,
+        .isDebugForParallel = IsDebugForParallel,
+        .isDebugForParallelSet = IsDebugForParallelSet,
     };
     CHECK_INITIALIZED_FIELDS_END(basicImpl, 0, 0, 0); // don't move this line
     return &basicImpl;
@@ -2515,6 +2555,13 @@ const ArkUIAnimation* GetAnimationAPI()
         .interpolatingSpring = CreateInterpolatingSpring,
         .customCurve = CreateCustomCurve,
         .disposeCurve = DisposeCurve,
+        .addAnimationGroup = ViewAnimate::AddAnimationGroup,
+        .removeAnimationGroup = ViewAnimate::RemoveAnimationGroup,
+        .pauseAnimationGroup = ViewAnimate::PauseAnimationGroup,
+        .resumeAnimationGroup = ViewAnimate::ResumeAnimationGroup,
+        .finishAnimationGroup = ViewAnimate::FinishAnimationGroup,
+        .getAnimationGroupState = ViewAnimate::GetAnimationGroupState,
+        .hasAnimationGroup = ViewAnimate::HasAnimationGroup,
     };
     CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
     return &modifier;
@@ -2797,6 +2844,12 @@ extern "C" {
 ACE_FORCE_EXPORT CJUIFullNodeAPI* GetCJUIFullNodeAPI()
 {
     return &OHOS::Ace::NG::fullCJUIApi;
+}
+
+ACE_FORCE_EXPORT const ArkUIPageTextAPI* GetArkUIPageTextAPI(int32_t version)
+{
+    static const ArkUIPageTextAPI api { OHOS::Ace::NG::CollectPageText, [](char* data) { std::free(data); } };
+    return version == 1 ? &api : nullptr;
 }
 
 ACE_FORCE_EXPORT ArkUIAnyAPI* GetArkUIAnyFullNodeAPI(int version)

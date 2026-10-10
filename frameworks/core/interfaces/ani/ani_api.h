@@ -694,6 +694,7 @@ struct ArkUIAniCommonModifier {
     void (*setOnNodeDestroyEvent)(ArkUINodeHandle node, std::function<void(int32_t)>&& event);
     void(*fireArkUIObjectLifecycleCallback)(ani_long nodePtr, const std::string& className, void* data);
     std::string (*GetIdString)(ArkUINodeHandle node);
+    ani_long (*interopProxyNodeConstruct)(ArkUI_Int32 id);
 };
 struct  ArkUICustomNodeInfo {
     std::function<void()> onPageShowFunc;
@@ -723,6 +724,9 @@ struct ArkUIAniCustomNodeModifier {
 struct ArkUIAniKeyboardAvoidModeModifier {
     ArkUI_Int32 (*getKeyboardAvoidMode)();
     void (*setKeyboardAvoidMode)(int32_t index);
+};
+struct ArkUIAniImmersiveStrategyModifier {
+    void (*applyDefaultImmersiveStrategy)(const int32_t* types, int32_t count);
 };
 struct ArkUIAniDrawModifier {
     void (*setDrawModifier)(ani_long ptr, uint32_t flag, void* fnDrawBehindFun, void* fnDrawContentFun,
@@ -1019,8 +1023,9 @@ struct ArkUIAniCommonNodeAniModifier {
 struct ArkUIAniVisualEffectModifier {
     OHOS::Ace::UiMaterial* (*constructMaterial)(int32_t type);
     void (*destroyMaterial)(OHOS::Ace::UiMaterial* ptr);
-    OHOS::Ace::UiMaterial* (*convertToECMaterial)(OHOS::Ace::UiMaterial* ptr);
-    OHOS::Ace::UiMaterial* (*convertToECSubMaterial)(OHOS::Ace::UiMaterial* ptr);
+    void (*convertToECMaterial)(OHOS::Ace::UiMaterial* src, OHOS::Ace::UiMaterial* dst);
+    void (*convertToECSubMaterial)(OHOS::Ace::UiMaterial* src, OHOS::Ace::UiMaterial* dst);
+    void (*getEmpty)(OHOS::Ace::UiMaterial* dst);
     int32_t (*getGlobalMaterialLevel)();
     bool (*isImmersiveMaterialSupported)();
     int32_t (*getMaterialState)();
@@ -1055,6 +1060,7 @@ struct ArkUIAniModifiers {
     const ArkUIAniCommonModifier* (*getCommonAniModifier)();
     const ArkUIAniCustomNodeModifier* (*getCustomNodeAniModifier)();
     const ArkUIAniKeyboardAvoidModeModifier* (*getKeyboardAvoidModeAniModifier)();
+    const ArkUIAniImmersiveStrategyModifier* (*getImmersiveStrategyAniModifier)();
     const ArkUIAniLazyForEachNodeModifier* (*getLazyForEachNodeAniModifier)();
     const ArkUIAniContentSlotModifier* (*getContentSlotAniModifier)();
     const ArkUIAniDrawModifier* (*getArkUIAniDrawModifier)();

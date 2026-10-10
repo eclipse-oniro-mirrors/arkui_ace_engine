@@ -737,6 +737,16 @@ struct CJUITextModifier {
     ArkUI_Int32 (*getTailIndentsCount)(ArkUINodeHandle node);
     void (*getTailIndents)(ArkUINodeHandle node, ArkUI_Float32* values,
         ArkUI_Int32* units, ArkUI_Int32 size);
+    void (*setStrokeWidth)(ArkUINodeHandle node, ArkUI_Float32 strokeWidthValue, ArkUI_Int32 strokeWidthUnit,
+        void* strokeWidthRawPtr);
+    void (*resetStrokeWidth)(ArkUINodeHandle node);
+    ArkUI_Float32 (*getStrokeWidth)(ArkUINodeHandle node);
+    void (*setStrokeColor)(ArkUINodeHandle node, ArkUI_Uint32 color, void* strokeColorRawPtr);
+    void (*resetStrokeColor)(ArkUINodeHandle node);
+    ArkUI_Uint32 (*getStrokeColor)(ArkUINodeHandle node);
+    void (*setStrokeJoinStyle)(ArkUINodeHandle node, ArkUI_Int32 strokeJoinStyle);
+    void (*resetStrokeJoinStyle)(ArkUINodeHandle node);
+    ArkUI_Int32 (*getStrokeJoinStyle)(ArkUINodeHandle node);
 };
 
 struct CJUIButtonModifier {
@@ -2271,6 +2281,8 @@ struct CJUIWebModifier {
     void (*resetKeyboardAppearance)(ArkUINodeHandle node);
     void (*setEnableFullscreenVideoOverlay)(ArkUINodeHandle node, ArkUI_Bool value);
     void (*resetEnableFullscreenVideoOverlay)(ArkUINodeHandle node);
+    void (*setOnZoomChangeCallBack)(ArkUINodeHandle node, void* callback);
+    void (*resetOnZoomChangeCallBack)(ArkUINodeHandle node);
     void (*setCaretColor)(ArkUINodeHandle node, ArkUI_Uint32 color, void* colorRawPtr);
     void (*resetCaretColor)(ArkUINodeHandle node);
 };
@@ -2731,6 +2743,8 @@ struct CJUIImageAnimatorModifier {
     void (*resetFixedSize)(ArkUINodeHandle node);
     void (*setFillMode)(ArkUINodeHandle node, ArkUI_Int32 fillMode);
     void (*resetFillMode)(ArkUINodeHandle node);
+    void (*setInterpolation)(ArkUINodeHandle node, ArkUI_Int32 interpolation);
+    void (*resetInterpolation)(ArkUINodeHandle node);
     void (*setReverse)(ArkUINodeHandle node, ArkUI_Uint32 value);
     void (*resetReverse)(ArkUINodeHandle node);
     void (*setImages)(ArkUINodeHandle node, struct ArkUIImagePropertiesStruct* images, ArkUI_Int32 length);
@@ -2744,6 +2758,7 @@ struct CJUIImageAnimatorModifier {
     ArkUI_Int32 (*getState)(ArkUINodeHandle node);
     ArkUI_Bool (*getFixedSize)(ArkUINodeHandle node);
     ArkUI_Int32 (*getFillMode)(ArkUINodeHandle node);
+    ArkUI_Int32 (*getInterpolation)(ArkUINodeHandle node);
     ArkUI_Int32 (*getIteration)(ArkUINodeHandle node);
     ArkUI_Int32 (*getImagesSize)(ArkUINodeHandle node);
 };

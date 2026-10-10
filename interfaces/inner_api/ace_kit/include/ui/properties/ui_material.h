@@ -114,10 +114,9 @@ public:
     // Check if material is enabled (state == ENABLE).
     static bool IsMaterialEnabled();
     static RefPtr<UiMaterial> CreateEmpty();
-protected:
     // copy member of self.
     virtual void CopyTo(RefPtr<UiMaterial>& other) const;
-
+protected:
     int32_t type_{0};
     bool isEmpty_{false};
     std::shared_ptr<ImmersiveOptions> immersiveOptions_;

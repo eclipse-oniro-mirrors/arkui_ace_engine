@@ -21,6 +21,7 @@
 #include "napi/native_node_api.h"
 #include "securec.h"
 
+#include "base/utils/napi_scope_raii.h"
 #include "base/json/json_util.h"
 #include "core/common/card_scope.h"
 #include "core/common/container.h"
@@ -60,10 +61,8 @@ NapiAsyncEvnet::~NapiAsyncEvnet()
 napi_value NapiAsyncEvnet::Call(int32_t argc, napi_value* argv)
 {
     napi_value result = nullptr;
-    napi_handle_scope scope;
-    napi_open_handle_scope(env_, &scope);
-    if (scope == nullptr) {
-        napi_close_handle_scope(env_, scope);
+    EscapableScopeRAII scope(env_);
+    if (!scope) {
         return result;
     }
     napi_value callback = nullptr;
@@ -71,8 +70,7 @@ napi_value NapiAsyncEvnet::Call(int32_t argc, napi_value* argv)
     napi_value undefined = nullptr;
     napi_get_undefined(env_, &undefined);
     napi_call_function(env_, undefined, callback, argc, argv, &result);
-    napi_close_handle_scope(env_, scope);
-    return result;
+    return scope.Escape(result);
 }
 
 napi_env NapiAsyncEvnet::GetEnv()

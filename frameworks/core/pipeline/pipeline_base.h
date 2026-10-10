@@ -116,7 +116,7 @@ enum class DragEventAction : int;
 struct AccessibilityEvent;
 using NodeId = int32_t;
 using SharePanelCallback = std::function<void(const std::string& bundleName, const std::string& abilityName)>;
-using AceVsyncCallback = std::function<void(uint64_t, uint64_t)>;
+using AceVsyncCallback = std::function<void(uint64_t, uint64_t, int64_t)>;
 
 class ACE_FORCE_EXPORT PipelineBase : public AceType {
     DECLARE_ACE_TYPE(PipelineBase, AceType);
@@ -241,7 +241,7 @@ public:
     virtual bool OnRotationEvent(const RotationEvent& event) const = 0;
 
     // Called by window when received vsync signal.
-    virtual void OnVsyncEvent(uint64_t nanoTimestamp, uint64_t frameCount);
+    virtual void OnVsyncEvent(uint64_t nanoTimestamp, uint64_t frameCount, int64_t vsyncStartTime);
 
     // Called by viewr
     virtual void OnDragEvent(
@@ -600,6 +600,7 @@ public:
     }
 
     bool CheckThreadSafe();
+    bool IsCurrentThreadSafe() const;
 
     RefPtr<Frontend> GetFrontend() const;
 
@@ -982,6 +983,16 @@ public:
     double GetDensity() const
     {
         return density_;
+    }
+
+    void SetUIExtensionDensityFollowHost(bool isEnabled)
+    {
+        isUIExtensionDensityFollowHost_ = isEnabled;
+    }
+
+    bool IsUIExtensionDensityFollowHost() const
+    {
+        return isUIExtensionDensityFollowHost_;
     }
 
     RefPtr<PlatformResRegister> GetPlatformResRegister() const;
@@ -1647,7 +1658,7 @@ protected:
     {
         return false;
     }
-    virtual void FlushVsync(uint64_t nanoTimestamp, uint64_t frameCount) = 0;
+    virtual void FlushVsync(uint64_t nanoTimestamp, uint64_t frameCount, int64_t vsyncStartTime = -1) = 0;
     virtual void SetRootRect(double width, double height, double offset = 0.0) = 0;
     virtual void FlushPipelineWithoutAnimation() = 0;
 
@@ -1711,6 +1722,7 @@ protected:
     float viewScale_ = 1.0f;
     double density_ = 1.0;
     double dipScale_ = 1.0;
+    std::atomic<bool> isUIExtensionDensityFollowHost_ { false };
     bool isCurrentInForceSplitMode_ = false;
     double rootHeight_ = 0.0;
     double rootWidth_ = 0.0;

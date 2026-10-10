@@ -20,6 +20,7 @@
 #include "jsnapi_expo.h"
 
 #include "base/i18n/localization.h"
+#include "base/log/log_wrapper.h"
 #include "base/utils/string_utils.h"
 #include "base/utils/utils.h"
 #include "bridge/declarative_frontend/engine/js_converter.h"
@@ -420,8 +421,10 @@ bool ArkTSUtils::CheckDarkResource(const RefPtr<ResourceObject>& resObj)
     if (resId == -1 && !params.empty() && params.back().value.has_value()) {
         std::vector<std::string> splitter;
         StringUtils::StringSplitter(params.back().value.value(), '.', splitter);
-        hasDarkRes = resourceAdapter->ExistDarkResByName(splitter.back(),
-            std::to_string(resObj->GetType()));
+        if (!splitter.empty()) {
+            hasDarkRes = resourceAdapter->ExistDarkResByName(splitter.back(),
+                std::to_string(resObj->GetType()));
+        }
     } else {
         hasDarkRes = resourceAdapter->ExistDarkResById(std::to_string(resId));
     }
@@ -1703,7 +1706,7 @@ bool ArkTSUtils::ParseJsDimensionNG(const EcmaVM *vm, const Local<JSValueRef> &j
     }
     if (jsValue->IsString(vm)) {
         auto value = jsValue->ToString(vm)->ToString(vm);
-        if (value.back() == '%' && !isSupportPercent) {
+        if (!value.empty() && value.back() == '%' && !isSupportPercent) {
             return false;
         }
         return StringUtils::StringToCalcDimensionNG(jsValue->ToString(vm)->ToString(vm), result, false, defaultUnit);
@@ -1748,7 +1751,7 @@ bool ArkTSUtils::ParseJsDimension(const EcmaVM *vm, const Local<JSValueRef> &jsV
     }
     if (jsValue->IsString(vm)) {
         auto stringValue = jsValue->ToString(vm)->ToString(vm);
-        if (stringValue.back() == '%' && !isSupportPercent) {
+        if (!stringValue.empty() && stringValue.back() == '%' && !isSupportPercent) {
             return false;
         }
         if (enableCheckInvalidvalue && stringValue.find("calc") == std::string::npos) {
@@ -3928,6 +3931,7 @@ Local<JSValueRef> ArkTSUtils::JsGetModifierKeyState(ArkUIRuntimeCallInfo* info)
     auto eventInfo = static_cast<BaseEventInfo*>(panda::Local<panda::ObjectRef>(thisObj)->GetNativePointerField(
         info->GetVM(), 0));
     if (!eventInfo) {
+        TAG_LOGE(AceLogTag::ACE_UIEVENT, "GetModifierKeyState failed: native pointer is null");
         return JSValueRef::Undefined(info->GetVM());
     }
     auto pressedKeyCodes = eventInfo->GetPressedKeyCodes();
