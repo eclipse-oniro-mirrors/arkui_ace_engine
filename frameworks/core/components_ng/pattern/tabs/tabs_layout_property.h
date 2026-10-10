@@ -63,6 +63,7 @@ public:
         value->propSidebarUnselectedTextColor_ = CloneSidebarUnselectedTextColor();
         value->propSidebarSelectedBoardColor_ = CloneSidebarSelectedBoardColor();
         value->propBarBackgroundColor_ = CloneBarBackgroundColor();
+        value->propBarBackgroundColorForSideBar_ = CloneBarBackgroundColorForSideBar();
         value->propSidebarWidth_ = CloneSidebarWidth();
         value->propMinSidebarWidth_ = CloneMinSidebarWidth();
         value->propMaxSidebarWidth_ = CloneMaxSidebarWidth();
@@ -101,6 +102,7 @@ public:
         ResetSidebarUnselectedTextColor();
         ResetSidebarSelectedBoardColor();
         ResetBarBackgroundColor();
+        ResetBarBackgroundColorForSideBar();
         ResetSidebarWidth();
         ResetMinSidebarWidth();
         ResetMaxSidebarWidth();
@@ -242,6 +244,7 @@ public:
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(SidebarUnselectedTextColor, Color, PROPERTY_UPDATE_RENDER);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(SidebarSelectedBoardColor, Color, PROPERTY_UPDATE_RENDER);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(BarBackgroundColor, Color, PROPERTY_UPDATE_RENDER);
+    ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(BarBackgroundColorForSideBar, Color, PROPERTY_UPDATE_RENDER);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(SidebarWidth, Dimension, PROPERTY_UPDATE_MEASURE);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(MinSidebarWidth, Dimension, PROPERTY_UPDATE_MEASURE);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(MaxSidebarWidth, Dimension, PROPERTY_UPDATE_MEASURE);

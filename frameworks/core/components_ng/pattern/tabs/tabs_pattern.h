@@ -295,6 +295,15 @@ public:
     {
         return barBlurStyleOption_;
     }
+    void SetBarBlurStyleOptionForSideBar(const BlurStyleOption& option)
+    {
+        hasBarBlurStyleForSideBar_ = true;
+        barBlurStyleOptionForSideBar_ = option;
+    }
+    const BlurStyleOption& GetBarBlurStyleOptionForSideBar() const
+    {
+        return barBlurStyleOptionForSideBar_;
+    }
     void SetSidebarBlurStyleOptions(const BlurStyleOption& option)
     {
         hasSidebarBlurStyle_ = true;
@@ -308,6 +317,9 @@ public:
     {
         if (hasSidebarBlurStyle_) {
             return sidebarBlurStyleOptions_;
+        }
+        if (hasBarBlurStyleForSideBar_) {
+            return barBlurStyleOptionForSideBar_;
         }
         return barBlurStyleOption_;
     }
@@ -506,6 +518,8 @@ private:
     std::function<void(WeakPtr<NG::FrameNode>)> barModifierApply_;
     bool hasBarBlurStyle_ = false;
     BlurStyleOption barBlurStyleOption_;
+    bool hasBarBlurStyleForSideBar_ = false;
+    BlurStyleOption barBlurStyleOptionForSideBar_;
     bool hasSidebarBlurStyle_ = false;
     BlurStyleOption sidebarBlurStyleOptions_;
     bool hasSidebarWidth_ = false;
