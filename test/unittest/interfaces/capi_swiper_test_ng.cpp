@@ -13,11 +13,15 @@
  * limitations under the License.
  */
 
+#include <array>
+#include <string>
+
 #include "gtest/gtest.h"
 
 #include "base/error/error_code.h"
 #include "interfaces/native/native_node.h"
 #include "interfaces/native/node/node_model.h"
+#include "interfaces/native/node/config_manager.h"
 #include "native_interface.h"
 
 using namespace testing;
@@ -230,5 +234,138 @@ HWTEST_F(CapiSwiperOptionTestNg, SwiperShowNextTestWrongNodeType, TestSize.Level
     node.magic = ARKUI_NODE_MAGIC_VALID;
     auto ret = OH_ArkUI_Swiper_ShowNext(&node);
     EXPECT_EQ(ret, ERROR_CODE_PARAM_INVALID);
+}
+
+// ===== Swiper C API NodeHandle disposed-state (UAF) detection tests =====
+
+namespace {
+constexpr int32_t RUNTIME_CHECK_TYPE_NODE_DISPOSED_VALUE = 1;
+
+void RestoreRuntimeCheckMode()
+{
+    EXPECT_TRUE(OHOS::Ace::NodeModel::ConfigManager::SetRuntimeCheckMode(
+        RUNTIME_CHECK_TYPE_NODE_DISPOSED_VALUE,
+        static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_DISABLED)));
+}
+
+enum SwiperApiSlot : size_t {
+    SLOT_SWIPER_FINISH_ANIMATION = 0,
+    SLOT_SWIPER_START_FAKE_DRAG,
+    SLOT_SWIPER_FAKE_DRAG_BY,
+    SLOT_SWIPER_STOP_FAKE_DRAG,
+    SLOT_SWIPER_IS_FAKE_DRAGGING,
+    SLOT_SWIPER_SHOW_PREVIOUS,
+    SLOT_SWIPER_SHOW_NEXT,
+    SLOT_ARC_SWIPER_SHOW_NEXT,
+    SLOT_ARC_SWIPER_SHOW_PREVIOUS,
+    SLOT_ARC_SWIPER_FINISH_ANIMATION,
+    SWIPER_SLOT_COUNT,
+};
+
+// Calls all 10 listed swiper/arcSwiper C APIs and records their return codes.
+std::array<int32_t, SWIPER_SLOT_COUNT> CallAllSwiperApis(ArkUI_NodeHandle node)
+{
+    std::array<int32_t, SWIPER_SLOT_COUNT> results {};
+    bool isSuccessful = false;
+    bool isConsumedOffset = false;
+    bool isFakeDragging = false;
+    results[SLOT_SWIPER_FINISH_ANIMATION] = OH_ArkUI_Swiper_FinishAnimation(node);
+    results[SLOT_SWIPER_START_FAKE_DRAG] = OH_ArkUI_Swiper_StartFakeDrag(node, &isSuccessful);
+    results[SLOT_SWIPER_FAKE_DRAG_BY] = OH_ArkUI_Swiper_FakeDragBy(node, 10.0f, &isConsumedOffset);
+    results[SLOT_SWIPER_STOP_FAKE_DRAG] = OH_ArkUI_Swiper_StopFakeDrag(node, &isSuccessful);
+    results[SLOT_SWIPER_IS_FAKE_DRAGGING] = OH_ArkUI_Swiper_IsFakeDragging(node, &isFakeDragging);
+    results[SLOT_SWIPER_SHOW_PREVIOUS] = OH_ArkUI_Swiper_ShowPrevious(node);
+    results[SLOT_SWIPER_SHOW_NEXT] = OH_ArkUI_Swiper_ShowNext(node);
+    results[SLOT_ARC_SWIPER_SHOW_NEXT] = OH_ArkUI_ArcSwiper_ShowNext(node);
+    results[SLOT_ARC_SWIPER_SHOW_PREVIOUS] = OH_ArkUI_ArcSwiper_ShowPrevious(node);
+    results[SLOT_ARC_SWIPER_FINISH_ANIMATION] = OH_ArkUI_ArcSwiper_FinishAnimation(node);
+    return results;
+}
+} // namespace
+
+/**
+ * @tc.name: SwiperUafGuard001
+ * @tc.desc: Controlled disposed samples hit the entry guard on all 10 listed
+ *           swiper/arcSwiper APIs; LOG mode keeps the same return values as
+ *           DISABLED and never pollutes the error message channel.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CapiSwiperOptionTestNg, SwiperUafGuard001, TestSize.Level1)
+{
+    ASSERT_TRUE(NodeModel::InitialFullImpl());
+    ArkUI_Node node;
+    node.type = ARKUI_NODE_SWIPER;
+    node.cNode = true;
+    node.uiNodeHandle = nullptr;
+    node.magic = ARKUI_NODE_MAGIC_INVALID;
+
+    ASSERT_TRUE(NodeModel::ConfigManager::SetRuntimeCheckMode(
+        RUNTIME_CHECK_TYPE_NODE_DISPOSED_VALUE, static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_DISABLED)));
+    const auto disabledResults = CallAllSwiperApis(&node);
+
+    ASSERT_TRUE(NodeModel::ConfigManager::SetRuntimeCheckMode(
+        RUNTIME_CHECK_TYPE_NODE_DISPOSED_VALUE, static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_LOG)));
+    const auto logResults = CallAllSwiperApis(&node);
+    for (size_t i = 0; i < logResults.size(); i++) {
+        EXPECT_EQ(logResults[i], disabledResults[i]) << "slot " << i;
+    }
+    const char* errorMessage = OH_ArkUI_NativeModule_GetErrorMessage();
+    if (errorMessage != nullptr) {
+        EXPECT_EQ(std::string(errorMessage).find("has been disposed"), std::string::npos);
+    }
+    RestoreRuntimeCheckMode();
+}
+
+/**
+ * @tc.name: SwiperUafGuard002
+ * @tc.desc: Valid magic never triggers the guard: LOG/DISABLED/CRASH modes keep
+ *           identical return values on all 10 listed APIs for a valid handle.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CapiSwiperOptionTestNg, SwiperUafGuard002, TestSize.Level1)
+{
+    ASSERT_TRUE(NodeModel::InitialFullImpl());
+    ArkUI_Node node;
+    node.type = ARKUI_NODE_SWIPER;
+    node.cNode = true;
+    node.uiNodeHandle = nullptr;
+    node.magic = ARKUI_NODE_MAGIC_VALID;
+
+    ASSERT_TRUE(NodeModel::ConfigManager::SetRuntimeCheckMode(
+        RUNTIME_CHECK_TYPE_NODE_DISPOSED_VALUE, static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_LOG)));
+    const auto logResults = CallAllSwiperApis(&node);
+
+    ASSERT_TRUE(NodeModel::ConfigManager::SetRuntimeCheckMode(
+        RUNTIME_CHECK_TYPE_NODE_DISPOSED_VALUE, static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_DISABLED)));
+    const auto disabledResults = CallAllSwiperApis(&node);
+
+    ASSERT_TRUE(NodeModel::ConfigManager::SetRuntimeCheckMode(
+        RUNTIME_CHECK_TYPE_NODE_DISPOSED_VALUE, static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_CRASH)));
+    const auto crashResults = CallAllSwiperApis(&node);
+
+    for (size_t i = 0; i < logResults.size(); i++) {
+        EXPECT_EQ(disabledResults[i], logResults[i]) << "slot " << i;
+        EXPECT_EQ(crashResults[i], logResults[i]) << "slot " << i;
+    }
+    RestoreRuntimeCheckMode();
+}
+
+/**
+ * @tc.name: SwiperUafGuard003
+ * @tc.desc: Null inputs keep the existing parameter-error contracts on all 10
+ *           listed swiper/arcSwiper APIs; the entry guard is null-safe and
+ *           stays silent.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CapiSwiperOptionTestNg, SwiperUafGuard003, TestSize.Level1)
+{
+    ASSERT_TRUE(NodeModel::InitialFullImpl());
+    ASSERT_TRUE(NodeModel::ConfigManager::SetRuntimeCheckMode(
+        RUNTIME_CHECK_TYPE_NODE_DISPOSED_VALUE, static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_LOG)));
+    const auto nullResults = CallAllSwiperApis(nullptr);
+    for (size_t i = 0; i < nullResults.size(); i++) {
+        EXPECT_EQ(nullResults[i], ERROR_CODE_PARAM_INVALID) << "slot " << i;
+    }
+    RestoreRuntimeCheckMode();
 }
 }

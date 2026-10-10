@@ -305,6 +305,7 @@ int32_t OH_ArkUI_NativeModule_GetNodeContentFromAniValue(
 ArkUI_ErrorCode OH_ArkUI_NativeModule_GetNavDestinationAniParam(ArkUI_NodeHandle node, ani_env* env, ani_value* param)
 {
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Node is null");
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     CHECK_NULL_RETURN_WITH_MESSAGE(env, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "env is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(param, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "param is null");
