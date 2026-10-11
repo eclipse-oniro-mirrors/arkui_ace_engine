@@ -950,9 +950,11 @@ private:
     static bool isPCMode_;
     static bool isAutoFillSupport_;
     static bool isOpenYuvDecode_;
+    static bool isDeviceSystemMaterialSupported_;
 
     static std::once_flag getSysPropertiesFlag_;
     static int32_t sensorCorrectionEnable_;
+    static UiMaterialLevel uiMaterialLevel_;
 };
 
 } // namespace OHOS::Ace

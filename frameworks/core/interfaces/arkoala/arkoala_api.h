@@ -32,6 +32,7 @@ struct SymbolShadow;
 struct SymbolGradient;
 struct SelectParam;
 struct SelectResObjParam;
+struct ArkUIMaterialKeyParams;
 }
 
 namespace OHOS::Ace::NG {
@@ -159,6 +160,31 @@ typedef ArkUI_EditModeOptions* ArkUIEditModeOptions;
 typedef _ArkUINodeContent* ArkUINodeContentHandle;
 typedef _ArkUIRSNode* ArkUIRSNodeHandle;
 typedef _ArkUI_OEMVisualEffectFunc* ArkUIOEMVisualEffectFuncHandle;
+
+typedef bool (*ArkUISetMaterialFunc)(void*, const void*);
+typedef int32_t (*ArkUIGetMaterialIdFunc)(const void*);
+struct ArkUIMaterialFuncRegistry {
+    ArkUISetMaterialFunc setMaterial;
+    ArkUIGetMaterialIdFunc getMaterialId;
+};
+typedef const ArkUIMaterialFuncRegistry* ArkUIMaterialFuncHandle;
+
+typedef void* (*ArkUICreateMaterialFilterFunc)(const OHOS::Ace::ArkUIMaterialKeyParams*);
+typedef void (*ArkUIReleaseMaterialFilterFunc)(void*);
+typedef void* (*ArkUICreateMaterialFilterWithSplitFunc)(const OHOS::Ace::ArkUIMaterialKeyParams*, bool);
+typedef int32_t (*ArkUIGetEnableColorInvertFunc)(int32_t, int32_t);
+struct ArkUIMaterialFilterFuncRegistry {
+    ArkUICreateMaterialFilterFunc createUiMaterialFilter;
+    ArkUIReleaseMaterialFilterFunc releaseUiMaterialFilter;
+    ArkUICreateMaterialFilterFunc createUiMaterialFilterEC;
+    ArkUIReleaseMaterialFilterFunc releaseUiMaterialFilterEC;
+    ArkUICreateMaterialFilterWithSplitFunc createUiMaterialShaderECSub;
+    ArkUIReleaseMaterialFilterFunc releaseUiMaterialShaderECSub;
+    ArkUICreateMaterialFilterFunc createUiMaterialShaderECSubOverlay;
+    ArkUIReleaseMaterialFilterFunc releaseUiMaterialShaderECSubOverlay;
+    ArkUIGetEnableColorInvertFunc getEnableColorInvert;
+};
+typedef const ArkUIMaterialFilterFuncRegistry* ArkUIMaterialFilterFuncHandle;
 
 struct RangeContent {
     ArkUI_CharPtr icon;
@@ -10745,6 +10771,8 @@ struct ArkUIExtendedNodeAPI {
     void (*setOnNodeDestroyCallback)(ArkUINodeHandle node, void (*onDestroy)(ArkUINodeHandle node));
     ArkUINodeHandle (*createCustomNodeByNodeId)(ArkUI_CharPtr tag, ArkUI_Int32 nodeId);
     ArkUINodeHandle (*createCustomNodeWithParam)(ArkUI_CharPtr tag, const ArkUIRenderContextParam param);
+    void (*registerOEMMaterialFunc)(ArkUIMaterialFuncHandle handle);
+    void (*registerOEMMaterialFilterFunc)(ArkUIMaterialFilterFuncHandle handle);
 };
 
 struct ArkUIStyledStringAPI {
