@@ -1021,10 +1021,15 @@ public:
     {
         isAllowMouse_ = enableScrollWithMouse;
     }
-    virtual bool GetIsAllowMouse() const
-    {
-        return isAllowMouse_;
-    }
+    virtual bool GetIsAllowMouse() const;
+    void ResetIsAllowMouse();
+    // Whether the container supports mouse multi-select (e.g. multiSelectable Grid/List).
+    virtual bool MultiSelectable() const;
+    // Whether the container is in edit mode.
+    virtual bool GetEnableEditMode() const;
+    // Direction-aware default of enableScrollWithMouse: enabled only when scrolling horizontally.
+    // FREE mode (free scroll) containers keep the default disabled.
+    virtual bool IsMouseDragScrollDefaultEnabled() const;
 
     void GetRepeatCountInfo(
         RefPtr<UINode> node, int32_t& repeatDifference, int32_t& firstRepeatCount, int32_t& totalChildCount);
@@ -1154,7 +1159,9 @@ protected:
     bool GetCanOverScroll() const;
     bool lastCanOverScroll_ = false;
     bool lastScrollFromInjection_ = false;
-    bool isAllowMouse_ = false;
+    // Explicit value of enableScrollWithMouse set by the developer.
+    // nullopt means not explicitly set: the direction-aware default applies.
+    std::optional<bool> isAllowMouse_;
 
     void CheckScrollBarOff();
 

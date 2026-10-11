@@ -265,6 +265,11 @@ public:
     {
         multiSelectable_ = multiSelectable;
     }
+
+    bool MultiSelectable() const override
+    {
+        return multiSelectable_;
+    }
     void UpdateBackPressCloseSwipeActionCallback();
     bool NeedBackPressHandler() const override;
     bool HandleBackPress() override;

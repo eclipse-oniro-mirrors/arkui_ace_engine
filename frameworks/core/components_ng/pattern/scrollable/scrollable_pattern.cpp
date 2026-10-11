@@ -308,6 +308,43 @@ void ScrollablePattern::UpdateFadeInfo(
         startPercent_, endPercent_); // 0.5: Half
 }
 
+bool ScrollablePattern::GetIsAllowMouse() const
+{
+    if (isAllowMouse_.has_value()) {
+        return isAllowMouse_.value();
+    }
+    // Mouse multi-select has higher priority than mouse drag scrolling.
+    if (MultiSelectable()) {
+        return false;
+    }
+    // In edit mode the default value of enableScrollWithMouse stays disabled,
+    // reserving mouse drag for multi-select interactions.
+    if (GetEnableEditMode()) {
+        return false;
+    }
+    return IsMouseDragScrollDefaultEnabled();
+}
+
+void ScrollablePattern::ResetIsAllowMouse()
+{
+    isAllowMouse_.reset();
+}
+
+bool ScrollablePattern::MultiSelectable() const
+{
+    return false;
+}
+
+bool ScrollablePattern::GetEnableEditMode() const
+{
+    return false;
+}
+
+bool ScrollablePattern::IsMouseDragScrollDefaultEnabled() const
+{
+    return GetAxis() == Axis::HORIZONTAL;
+}
+
 void ScrollablePattern::ToJsonValue(std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const
 {
     /* no fixed attr below, just return */
