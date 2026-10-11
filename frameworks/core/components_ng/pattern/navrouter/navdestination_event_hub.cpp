@@ -14,9 +14,11 @@
  */
 #include "frameworks/core/components_ng/pattern/navrouter/navdestination_event_hub.h"
 
+#include "core/components_ng/manager/content_change_manager/content_change_manager.h"
 #include "core/components_ng/manager/memory/memory_manager.h"
 #include "core/components_ng/manager/navigation/navigation_manager.h"
 #include "core/components_ng/pattern/navigation/navigation_pattern.h"
+#include "core/pipeline_ng/pipeline_context.h"
 #include "frameworks/core/components_ng/pattern/navrouter/navdestination_pattern.h"
 #include "interfaces/inner_api/ui_session/ui_session_manager.h"
 #include "core/components_ng/manager/navigation/navigation_manager.h"
@@ -121,7 +123,18 @@ void NavDestinationEventHub::FireOnShownEvent(
     if (navigationManager) {
         navigationManager->HandleSequentialRestoreOnShown(navDestination, name);
     }
-    pipelineContext->GetMemoryManager()->RebuildImageByPage(AceType::DynamicCast<FrameNode>(navDestination));
+    pipelineContext->GetMemoryManager()->RebuildImageByPage(navDestination);
+    // AC-6.2/AC-6.4: NavDestination became the new top page. Immediately
+    // trigger a page-scene detection cycle so ExitOtherSearchPresence emits a
+    // false event for the previous NavDestination (A false before B true).
+    // No-op when no search ruleSet is registered.
+    auto ngPipeline = AceType::DynamicCast<NG::PipelineContext>(pipelineContext);
+    if (ngPipeline) {
+        auto contentChangeManager = ngPipeline->GetContentChangeManager();
+        if (contentChangeManager) {
+            contentChangeManager->NotifyPageSceneContentChanged(true);
+        }
+    }
 }
 
 void NavDestinationEventHub::FireOnHiddenEvent(const std::string& name, NavDestVisibilityChangeReason reason)

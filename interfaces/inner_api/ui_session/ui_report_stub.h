@@ -18,6 +18,7 @@
 
 #include <memory>
 #include <mutex>
+#include <unordered_map>
 
 #include <iremote_object.h>
 #include <iremote_stub.h>
@@ -270,8 +271,12 @@ public:
     void UnregisterContentChangeCallback();
     void RegisterGetStateMgmtInfoCallback(const std::function<void(std::vector<std::string>)>& callback);
     void ReportGetStateMgmtInfo(std::vector<std::string> results) override;
-    void RegisterPageSceneEventCallback(const PageSceneEventCallback& eventCallback);
-    void UnregisterPageSceneEventCallback();
+    // Dual ruleSet routing: callback is stored per ruleSetId and dispatched only
+    // to the ruleSets present in an event's hits/exits. Each callback receives
+    // only evidence belonging to its registered ruleSetId.
+    bool RegisterPageSceneEventCallback(const std::string& ruleSetId, const PageSceneEventCallback& eventCallback);
+    bool TryRegisterPageSceneEventCallback(const std::string& ruleSetId, const PageSceneEventCallback& eventCallback);
+    void UnregisterPageSceneEventCallback(const std::string& ruleSetId);
     bool RegisterGetPageSceneCallback(const PageSceneEventCallback& eventCallback);
     void UnregisterGetPageSceneCallback();
     void ReportPageSceneEvent(const std::string& sceneJson, bool isGetResult = false) override;
@@ -325,7 +330,7 @@ private:
     std::function<void(ChangeType type, const std::string& simpleTree)> contentChangeCallback_;
     std::function<void(std::vector<std::string>)> getStateMgmtInfoCallback_;
     std::mutex pageSceneCallbackMutex_;
-    PageSceneEventCallback pageSceneEventCallback_;
+    std::unordered_map<std::string, PageSceneEventCallback> pageSceneEventCallbacks_;
     PageSceneEventCallback getPageSceneCallback_;
 
     GetWebInfoByRequestCallback getWebInfoByRequestCallback_;

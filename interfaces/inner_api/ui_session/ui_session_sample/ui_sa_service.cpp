@@ -79,14 +79,17 @@ constexpr size_t PAGE_SCENE_RULE_PARAM_INDEX = 1;
 constexpr size_t PAGE_SCENE_RULE_SET_ID_PARAM_INDEX = 1;
 constexpr double PERCENT_VALUE = 100.0;
 const char PAGE_SCENE_RULE_FILE[] = "page_scene_rules.json";
+const char PAGE_SCENE_RULE_FILE_B[] = "page_scene_rules_b.json";
 const char DEFAULT_PAGE_SCENE_RULE_SET_ID[] = "default_scene_rules";
 const char NULL_CALLBACK_DUMP_OPTION[] = "-nullcb";
 const char EMPTY_ID_DUMP_OPTION[] = "-emptyid";
+const char DUAL_RULE_SET_DUMP_OPTION[] = "-dual";
 const std::string REPEAT_DUMP_OPTION_PREFIX = "-repeat:";
 
 struct DumpOption {
     bool useNullCallback = false;
     bool useEmptyId = false;
+    bool dualRuleSet = false;
     int32_t repeatCount = 1;
 };
 
@@ -100,6 +103,10 @@ DumpOption ParseDumpOption(std::vector<std::string>& params)
         }
         if (param == EMPTY_ID_DUMP_OPTION) {
             option.useEmptyId = true;
+            return true;
+        }
+        if (param == DUAL_RULE_SET_DUMP_OPTION) {
+            option.dualRuleSet = true;
             return true;
         }
         if (param.rfind(REPEAT_DUMP_OPTION_PREFIX, 0) != 0) {
@@ -359,6 +366,114 @@ std::string ReadPageSceneRuleJson()
         return "";
     }
     return ruleJson;
+}
+
+// --- Search event summary (demo logging; light-weight string parse of our own
+// fixed event contract, no JSON dependency) ---
+std::string ExtractJsonStringField(const std::string& json, const std::string& field)
+{
+    auto key = "\"" + field + "\"";
+    auto pos = json.find(key);
+    if (pos == std::string::npos) {
+        return "";
+    }
+    pos = json.find(':', pos + key.length());
+    if (pos == std::string::npos) {
+        return "";
+    }
+    auto quote = json.find('"', pos);
+    if (quote == std::string::npos) {
+        return "";
+    }
+    auto endQuote = json.find('"', quote + 1);
+    if (endQuote == std::string::npos) {
+        return "";
+    }
+    return json.substr(quote + 1, endQuote - quote - 1);
+}
+
+bool ExtractJsonBoolField(const std::string& json, const std::string& field)
+{
+    constexpr size_t TRUE_BOOL_STR_LEN = 4;
+    auto key = "\"" + field + "\"";
+    auto pos = json.find(key);
+    if (pos == std::string::npos) {
+        return false;
+    }
+    pos = json.find(':', pos + key.length());
+    if (pos == std::string::npos) {
+        return false;
+    }
+    return json.compare(pos + 1, TRUE_BOOL_STR_LEN, "true") == 0;
+}
+
+// Collects "ruleSetId:ruleId" pairs appearing in hits/exits arrays.
+bool AppendRulePair(std::ostringstream& oss, const std::string& json, const std::string& ruleSetId,
+    size_t endQuote, int32_t& count, size_t& nextSearch)
+{
+    auto ruleIdPos = json.find("\"ruleId\"", endQuote);
+    if (ruleIdPos == std::string::npos) {
+        return false;
+    }
+    auto ruleIdColon = json.find(':', ruleIdPos);
+    auto ruleIdQuote = json.find('"', ruleIdColon);
+    auto ruleIdEnd = json.find('"', ruleIdQuote + 1);
+    if (ruleIdColon == std::string::npos || ruleIdQuote == std::string::npos || ruleIdEnd == std::string::npos) {
+        return false;
+    }
+    std::string ruleId = json.substr(ruleIdQuote + 1, ruleIdEnd - ruleIdQuote - 1);
+    if (count++ > 0) {
+        oss << ",";
+    }
+    oss << ruleSetId << ":" << ruleId;
+    nextSearch = ruleIdEnd + 1;
+    return true;
+}
+
+std::string CollectSearchRulePairs(const std::string& json)
+{
+    std::ostringstream oss;
+    int32_t count = 0;
+    size_t searchFrom = 0;
+    while (searchFrom < json.size()) {
+        auto ruleSetPos = json.find("\"ruleSetId\"", searchFrom);
+        if (ruleSetPos == std::string::npos) {
+            break;
+        }
+        auto colon = json.find(':', ruleSetPos);
+        auto quote = json.find('"', colon);
+        auto endQuote = json.find('"', quote + 1);
+        if (colon == std::string::npos || quote == std::string::npos || endQuote == std::string::npos) {
+            break;
+        }
+        std::string ruleSetId = json.substr(quote + 1, endQuote - quote - 1);
+        size_t nextSearch = 0;
+        if (AppendRulePair(oss, json, ruleSetId, endQuote, count, nextSearch)) {
+            searchFrom = nextSearch;
+            continue;
+        }
+        searchFrom = endQuote + 1;
+    }
+    return oss.str();
+}
+
+std::string BuildSearchEventSummary(const std::string& json)
+{
+    std::ostringstream oss;
+    auto eventType = ExtractJsonStringField(json, "eventType");
+    oss << "eventType=" << eventType;
+    auto pageName = ExtractJsonStringField(json, "pageName");
+    oss << ",pageName=" << pageName;
+    if (eventType == "presence") {
+        oss << ",hasSearch=" << (ExtractJsonBoolField(json, "hasSearch") ? "true" : "false");
+    } else if (eventType == "click") {
+        oss << ",matchType=" << ExtractJsonStringField(json, "matchType");
+    }
+    auto rules = CollectSearchRulePairs(json);
+    if (!rules.empty()) {
+        oss << ",rules=" << rules;
+    }
+    return oss.str();
 }
 
 void AppendJsonEscaped(std::string& output, const std::string& value)
@@ -847,6 +962,35 @@ void UiSaService::HandleUnregisterSelectTextEventCallback(
     LOGI("[SelectTextEvent] call UnregisterSelectTextEventCallback");
 }
 
+static void RegisterDualRuleSets(sptr<IUiContentService> service, const std::string& ruleJson,
+    const PageSceneEventCallback& eventCallback, const DumpOption& dumpOption, bool toFile)
+{
+    std::string ruleJsonB;
+    auto filePathB = UI_SA_PATH + PAGE_SCENE_RULE_FILE_B;
+    if (!ReadTextFile(filePathB, ruleJsonB)) {
+        LOGW("[PageScene] dual ruleSet: read ruleSet-B failed, filePath=%{public}s", filePathB.c_str());
+        return;
+    }
+    int32_t resultA = FAILED;
+    int32_t resultB = FAILED;
+    for (int32_t index = 0; index < dumpOption.repeatCount; index++) {
+        resultA = service->RegisterPageSceneRules(ruleJson, eventCallback);
+        resultB = service->RegisterPageSceneRules(ruleJsonB, eventCallback);
+        LOGI("[PageScene] call RegisterPageSceneRules dual repeat=%{public}d/%{public}d, "
+             "ruleSet-A result=%{public}d, ruleSet-B result=%{public}d",
+            index + 1, dumpOption.repeatCount, resultA, resultB);
+    }
+    if (toFile) {
+        std::ostringstream resultJson;
+        resultJson << "{\"command\":\"RegisterPageSceneRules\",\"dual\":true," <<
+            "\"ruleSetA\":\"" << ExtractJsonStringField(ruleJson, "ruleSetId") <<
+            "\",\"ruleSetAResult\":" << resultA <<
+            ",\"ruleSetB\":\"" << ExtractJsonStringField(ruleJsonB, "ruleSetId") <<
+            "\",\"ruleSetBResult\":" << resultB << "}";
+        WriteTextFile("[PageSceneRegisterDual]", "page_scene_register_dual", resultJson.str());
+    }
+}
+
 void UiSaService::HandleRegisterPageSceneRules(sptr<IUiContentService> service, std::vector<std::string> params)
 {
     if (!EnsureConnected(service)) {
@@ -859,15 +1003,23 @@ void UiSaService::HandleRegisterPageSceneRules(sptr<IUiContentService> service, 
     std::string ruleJson = dumpOption.useEmptyId
                                ? ""
                                : (params.size() > PAGE_SCENE_RULE_PARAM_INDEX ? params[PAGE_SCENE_RULE_PARAM_INDEX]
-                                                                              : ReadPageSceneRuleJson());
+                                                                               : ReadPageSceneRuleJson());
     PageSceneEventCallback eventCallback = nullptr;
     if (!dumpOption.useNullCallback) {
         eventCallback = [toFile](const std::string& data) {
-            LOGI("[PageScene] event length=%{public}zu", data.length());
+            LOGI("[PageScene] event length=%{public}zu summary=%{public}s", data.length(),
+                BuildSearchEventSummary(data).c_str());
             if (toFile && !data.empty()) {
                 WriteTextFile("[PageSceneEvent]", "page_scene_event", data);
             }
         };
+    }
+    if (dumpOption.dualRuleSet) {
+        // Same SA registers two independent ruleSets (ruleSet-A + ruleSet-B),
+        // Both rule sets intentionally share the sample collector callback so the merged
+        // event stream can be inspected in one place.
+        RegisterDualRuleSets(service, ruleJson, eventCallback, dumpOption, toFile);
+        return;
     }
     for (int32_t index = 0; index < dumpOption.repeatCount; index++) {
         int32_t result = service->RegisterPageSceneRules(ruleJson, eventCallback);
@@ -918,7 +1070,8 @@ void UiSaService::HandleGetPageScene(sptr<IUiContentService> service, std::vecto
     PageSceneEventCallback eventCallback = nullptr;
     if (!dumpOption.useNullCallback) {
         eventCallback = [toFile](const std::string& data) {
-            LOGI("[PageScene] get result length=%{public}zu", data.length());
+            LOGI("[PageScene] get result length=%{public}zu summary=%{public}s", data.length(),
+                BuildSearchEventSummary(data).c_str());
             if (toFile && !data.empty()) {
                 WriteTextFile("[PageSceneGet]", "page_scene_get", data);
             }

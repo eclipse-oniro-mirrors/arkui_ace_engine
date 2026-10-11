@@ -23,6 +23,7 @@
 #include "interfaces/inner_api/ui_session/ui_content_stub_impl.h"
 #include "interfaces/inner_api/ui_session/ui_content_proxy.h"
 #include "interfaces/inner_api/ui_session/ui_report_stub.h"
+#include "interfaces/inner_api/ui_session/ui_session_json_util.h"
 #include "interfaces/inner_api/ui_session/ui_session_manager.h"
 #include "interfaces/inner_api/ui_session/ui_session_request_guard.h"
 #include "adapter/ohos/entrance/ui_session/ui_translate_request_util.h"
@@ -1400,17 +1401,17 @@ HWTEST_F(UIContentStubTest, UIContentStubTest045, TestSize.Level1)
 HWTEST_F(UIContentStubTest, UIContentStubTest046, TestSize.Level1)
 {
     const TranslateResultParseTestData testData[] = {
-        { R"({"nodeId":6,"version":0,"translatedText":"\u6807\u9898"})", true, 1 },
-        { R"({"nodeId":7,"version":2,"text":"详情中文"})", true, 1 },
-        { R"({"results":[{"nodeId":6,"version":1,"translatedText":"\u6807\u9898"},)"
-          R"({"nodeId":13,"version":1,"text":"输入框提示"}]})",
+        { R"({"nodeId":6, "version":0, "translatedText":"\u6807\u9898"})", true, 1 },
+        { R"({"nodeId":7, "version":2, "text":"详情中文"})", true, 1 },
+        { R"({"results":[{"nodeId":6, "version":1, "translatedText":"\u6807\u9898"},)"
+          R"({"nodeId":13, "version":1, "text":"输入框提示"}]})",
             true, 2 },
-        { R"([{"nodeId":6,"version":3,"translatedText":"标题"},{"nodeId":7,"version":3,"text":"详情"}])", true, 2 },
+        { R"([{"nodeId":6, "version":3, "translatedText":"标题"}, {"nodeId":7, "version":3, "text":"详情"}])", true, 2 },
         { R"({"results":[]})", false, 0 },
-        { R"({"results":[1,false]})", false, 0 },
-        { R"({"version":1,"translatedText":"标题"})", false, 0 },
-        { R"({"nodeId":6,"translatedText":"标题"})", false, 0 },
-        { R"({"nodeId":6,"version":1,"translatedText":""})", false, 0 },
+        { R"({"results":[1, false]})", false, 0 },
+        { R"({"version":1, "translatedText":"标题"})", false, 0 },
+        { R"({"nodeId":6, "translatedText":"标题"})", false, 0 },
+        { R"({"nodeId":6, "version":1, "translatedText":""})", false, 0 },
         { R"("invalid")", false, 0 },
     };
 
@@ -1422,8 +1423,8 @@ HWTEST_F(UIContentStubTest, UIContentStubTest046, TestSize.Level1)
 
     std::vector<TranslateResult> results;
     ASSERT_TRUE(PageTranslateRequestUtil::ParseTranslateResults(
-        R"({"results":[{"nodeId":6,"version":3000000000,"translatedText":"\u6807\u9898"},)"
-        R"({"nodeId":13,"version":2,"text":"输入框提示"}]})",
+        R"({"results":[{"nodeId":6, "version":3000000000, "translatedText":"\u6807\u9898"},)"
+        R"({"nodeId":13, "version":2, "text":"输入框提示"}]})",
         results));
     ASSERT_EQ(results.size(), 2U);
     EXPECT_EQ(results[0].nodeId, 6);
@@ -1442,22 +1443,22 @@ HWTEST_F(UIContentStubTest, UIContentStubTest046, TestSize.Level1)
 HWTEST_F(UIContentStubTest, UIContentStubTest047, TestSize.Level1)
 {
     const TranslateResultIdentityTestData testData[] = {
-        { R"({"nodeId":6,"version":0,"translatedText":"\u6807\u9898"})",
+        { R"({"nodeId":6, "version":0, "translatedText":"\u6807\u9898"})",
             { { TRANSLATE_TITLE_NODE_ID, TRANSLATE_SNAPSHOT_VERSION } } },
-        { R"({"results":[{"nodeId":6,"version":1,"translatedText":"\u6807\u9898"},)"
-          R"({"nodeId":13,"version":2,"text":"输入框提示"},{"nodeId":16,"version":0,"text":"按钮"}]})",
+        { R"({"results":[{"nodeId":6, "version":1, "translatedText":"\u6807\u9898"},)"
+          R"({"nodeId":13, "version":2, "text":"输入框提示"}, {"nodeId":16, "version":0, "text":"按钮"}]})",
             { { TRANSLATE_TITLE_NODE_ID, TRANSLATE_FIRST_VERSION },
                 { TRANSLATE_PLACEHOLDER_NODE_ID, TRANSLATE_SECOND_VERSION },
                 { TRANSLATE_BUTTON_NODE_ID, TRANSLATE_SNAPSHOT_VERSION } } },
-        { R"([{"nodeId":6,"version":3,"translatedText":"标题"},{"nodeId":13,"version":2,"text":"详情"}])",
+        { R"([{"nodeId":6, "version":3, "translatedText":"标题"}, {"nodeId":13, "version":2, "text":"详情"}])",
             { { TRANSLATE_TITLE_NODE_ID, TRANSLATE_THIRD_VERSION },
                 { TRANSLATE_PLACEHOLDER_NODE_ID, TRANSLATE_SECOND_VERSION } } },
-        { R"({"nodeId":6,"version":3000000000,"translatedText":"标题"})",
+        { R"({"nodeId":6, "version":3000000000, "translatedText":"标题"})",
             { { TRANSLATE_TITLE_NODE_ID, TRANSLATE_LARGE_VERSION } } },
-        { R"({"results":[{"nodeId":-1,"version":1},{"nodeId":16,"version":0},{"nodeId":)"
+        { R"({"results":[{"nodeId":-1, "version":1}, {"nodeId":16, "version":0}, {"nodeId":)"
           R"(7}]})",
             { { TRANSLATE_BUTTON_NODE_ID, TRANSLATE_SNAPSHOT_VERSION } } },
-        { R"({"nodeId":6,"translatedText":"missing version"})", {} },
+        { R"({"nodeId":6, "translatedText":"missing version"})", {} },
         { R"({"results":[]})", {} },
         { R"("invalid")", {} },
         { R"(invalid json)", {} },
@@ -1522,7 +1523,7 @@ HWTEST_F(UIContentStubTest, UIContentStubTest049, TestSize.Level1)
         std::function<void(MessageParcel&)> writePayload;
         std::function<void()> expectCall;
     };
-    const std::string translateResult = R"({"nodeId":6,"version":1,"translatedText":"标题"})";
+    const std::string translateResult = R"({"nodeId":6, "version":1, "translatedText":"标题"})";
     const ControlTransactionCase testData[] = {
         {
             IUiContentService::END_PAGE_TRANSLATE,
@@ -1673,6 +1674,260 @@ HWTEST_F(UIContentStubTest, UIContentStubTest054, TestSize.Level1)
     EXPECT_EQ(report->OnRemoteRequest(ReportService::SEND_IMAGES, data, reply, option), 0);
     EXPECT_EQ(callCount, 1);
     EXPECT_EQ(receivedSize, 0u);
+}
+
+/**
+ * @tc.name: UIContentStubTestPageSceneDualRuleSet001
+ * @tc.desc: A merged presence event dispatches only each callback's registered ruleSet evidence.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestPageSceneDualRuleSet001, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    int32_t callbackACount = 0;
+    int32_t callbackBCount = 0;
+    std::string lastA;
+    std::string lastB;
+    report->RegisterPageSceneEventCallback("search-set-a",
+        [&callbackACount, &lastA](const std::string& data) {
+            ++callbackACount;
+            lastA = data;
+        });
+    report->RegisterPageSceneEventCallback("search-set-b",
+        [&callbackBCount, &lastB](const std::string& data) {
+            ++callbackBCount;
+            lastB = data;
+        });
+
+    const std::string mergedJson = R"({"eventType":"presence", "hasSearch":true, "pageName":"Home",
+        "hits":[{"ruleSetId":"search-set-a", "ruleId":"r1"},
+                {"ruleSetId":"search-set-b", "ruleId":"r1"}]})";
+    report->ReportPageSceneEvent(mergedJson, false);
+    EXPECT_EQ(callbackACount, 1);
+    EXPECT_EQ(callbackBCount, 1);
+    for (const auto& [payload, ruleSetId] :
+        { std::make_pair(lastA, "search-set-a"), std::make_pair(lastB, "search-set-b") }) {
+        auto root = InspectorJsonUtil::ParseJsonString(payload);
+        ASSERT_TRUE(root->IsObject());
+        EXPECT_EQ(root->GetString("eventType"), "presence");
+        EXPECT_EQ(root->GetString("pageName"), "Home");
+        EXPECT_EQ(root->GetValue("hasSearch")->ToString(), "true");
+        auto hits = root->GetValue("hits");
+        ASSERT_EQ(hits->GetArraySize(), 1);
+        EXPECT_EQ(hits->GetArrayItem(0)->GetString("ruleSetId"), ruleSetId);
+        EXPECT_EQ(hits->GetArrayItem(0)->GetString("ruleId"), "r1");
+    }
+}
+
+/**
+ * @tc.name: UIContentStubTestPageSceneLegacyCallback001
+ * @tc.desc: Legacy entry/exit payloads route by top-level ruleSetId without changing the JSON.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestPageSceneLegacyCallback001, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    std::vector<std::string> received;
+    int32_t otherCount = 0;
+    report->RegisterPageSceneEventCallback("legacy-set",
+        [&received](const std::string& data) { received.emplace_back(data); });
+    report->RegisterPageSceneEventCallback("search-set",
+        [&otherCount](const std::string&) { ++otherCount; });
+    const std::string entered = R"({"ruleSetId":"legacy-set", "ruleId":"editor",
+        "sceneType":"TEXT_EDITOR", "eventName":"TEXT_EDITOR", "matched":true, "nodes":[]})";
+    const std::string exited = R"({"ruleSetId":"legacy-set", "ruleId":"editor",
+        "sceneType":"TEXT_EDITOR", "eventName":"TEXT_EDITOR_EXIT", "matched":false, "nodes":[]})";
+    report->ReportPageSceneEvent(entered, false);
+    report->ReportPageSceneEvent(exited, false);
+    EXPECT_EQ(received, (std::vector<std::string> { entered, exited }));
+    EXPECT_EQ(otherCount, 0);
+    report->UnregisterPageSceneEventCallback("legacy-set");
+    report->ReportPageSceneEvent(entered, false);
+    EXPECT_EQ(received.size(), 2U);
+}
+
+/**
+ * @tc.name: UIContentStubTestPageSceneLegacyCallback002
+ * @tc.desc: Deduplicate ids across legacy/search fields and retain independent GetPageScene delivery.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestPageSceneLegacyCallback002, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    int32_t eventCount = 0;
+    int32_t getCount = 0;
+    report->RegisterPageSceneEventCallback("legacy-set",
+        [&eventCount](const std::string&) { ++eventCount; });
+    report->RegisterGetPageSceneCallback([&getCount](const std::string&) { ++getCount; });
+    const std::string payload = R"({"ruleSetId":"legacy-set",
+        "hits":[{"ruleSetId":"legacy-set"}], "exits":[{"ruleSetId":"legacy-set"}]})";
+    report->ReportPageSceneEvent(payload, false);
+    EXPECT_EQ(eventCount, 1);
+    report->ReportPageSceneEvent(payload, true);
+    EXPECT_EQ(eventCount, 1);
+    EXPECT_EQ(getCount, 1);
+}
+
+/**
+ * @tc.name: UIContentStubTestPageSceneDualRuleSet002
+ * @tc.desc: Unregister one ruleSet keeps the other; a missing callback does not
+ *           block the present one. Exit events route by ruleSetId.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestPageSceneDualRuleSet002, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    int32_t callbackACount = 0;
+    int32_t callbackBCount = 0;
+    report->RegisterPageSceneEventCallback("search-set-a",
+        [&callbackACount](const std::string&) { ++callbackACount; });
+    report->RegisterPageSceneEventCallback("search-set-b",
+        [&callbackBCount](const std::string&) { ++callbackBCount; });
+
+    const std::string mergedJson = R"({"eventType":"presence", "hasSearch":true, "pageName":"Home",
+        "hits":[{"ruleSetId":"search-set-a", "ruleId":"r1"},
+                {"ruleSetId":"search-set-b", "ruleId":"r1"}]})";
+    report->ReportPageSceneEvent(mergedJson, false);
+    EXPECT_EQ(callbackACount, 1);
+    EXPECT_EQ(callbackBCount, 1);
+
+    report->UnregisterPageSceneEventCallback("search-set-a");
+    report->ReportPageSceneEvent(mergedJson, false);
+    EXPECT_EQ(callbackACount, 1);
+    EXPECT_EQ(callbackBCount, 2);
+
+    // Exit events route by ruleSetId.
+    const std::string falseJson = R"({"eventType":"presence", "hasSearch":false, "pageName":"Home",
+        "exits":[{"ruleSetId":"search-set-b", "ruleId":"r1"}]})";
+    report->ReportPageSceneEvent(falseJson, false);
+    EXPECT_EQ(callbackACount, 1);
+    EXPECT_EQ(callbackBCount, 3);
+}
+
+/**
+ * @tc.name: UIContentStubTestPageSceneFilteredEvent001
+ * @tc.desc: Filter both hits and exits, preserving all matching rules and excluding unowned entries.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestPageSceneFilteredEvent001, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    std::string lastA;
+    std::string lastB;
+    report->RegisterPageSceneEventCallback("a", [&lastA](const std::string& data) { lastA = data; });
+    report->RegisterPageSceneEventCallback("b", [&lastB](const std::string& data) { lastB = data; });
+    report->ReportPageSceneEvent(R"({"eventType":"presence", "hasSearch":false, "pageName":"Home",
+        "hits":[{"ruleSetId":"a", "ruleId":"r1"}, {"ruleSetId":"b", "ruleId":"r2"}],
+        "exits":[{"ruleSetId":"b", "ruleId":"r2"}, {"ruleSetId":"a", "ruleId":"r1"},
+                 {"ruleSetId":"a", "ruleId":"r3"}, {"ruleId":"unowned"}, null]})", false);
+
+    for (const auto& [payload, ruleSetId] : { std::make_pair(lastA, "a"), std::make_pair(lastB, "b") }) {
+        auto root = InspectorJsonUtil::ParseJsonString(payload);
+        ASSERT_TRUE(root->IsObject());
+        EXPECT_EQ(root->GetValue("hasSearch")->ToString(), "false");
+        EXPECT_EQ(root->GetString("pageName"), "Home");
+        auto hits = root->GetValue("hits");
+        ASSERT_EQ(hits->GetArraySize(), 1);
+        EXPECT_EQ(hits->GetArrayItem(0)->GetString("ruleSetId"), ruleSetId);
+        auto exits = root->GetValue("exits");
+        ASSERT_EQ(exits->GetArraySize(), std::string(ruleSetId) == "a" ? 2 : 1);
+        for (int32_t index = 0; index < exits->GetArraySize(); ++index) {
+            EXPECT_EQ(exits->GetArrayItem(index)->GetString("ruleSetId"), ruleSetId);
+        }
+    }
+    auto rootA = InspectorJsonUtil::ParseJsonString(lastA);
+    auto exitsA = rootA->GetValue("exits");
+    EXPECT_EQ(exitsA->GetArrayItem(0)->GetString("ruleId"), "r1");
+    EXPECT_EQ(exitsA->GetArrayItem(1)->GetString("ruleId"), "r3");
+}
+
+/**
+ * @tc.name: UIContentStubTestPageSceneFilteredEvent002
+ * @tc.desc: Click evidence remains complete after filtering, and callbacks can unregister themselves.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestPageSceneFilteredEvent002, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    std::string lastA;
+    std::string lastB;
+    report->RegisterPageSceneEventCallback("a", [&lastA, &report](const std::string& data) {
+        lastA = data;
+        report->UnregisterPageSceneEventCallback("a");
+    });
+    report->RegisterPageSceneEventCallback("b", [&lastB](const std::string& data) { lastB = data; });
+    const std::string payload = R"({"eventType":"click", "pageName":"Home+Dialog", "hits":[
+        {"ruleSetId":"a", "ruleId":"r1", "matchType":"inspectorId", "matchedKeyword":"search",
+         "responseNode":{"inspectorId":"search-button", "nodeId":7, "type":"Button",
+                         "rect":{"x":1, "y":2, "width":30, "height":40}}},
+        {"ruleSetId":"b", "ruleId":"r2", "responseNode":{"nodeId":8}}]})";
+    report->ReportPageSceneEvent(payload, false);
+
+    auto rootA = InspectorJsonUtil::ParseJsonString(lastA);
+    ASSERT_TRUE(rootA->IsObject());
+    EXPECT_EQ(rootA->GetString("eventType"), "click");
+    EXPECT_EQ(rootA->GetString("pageName"), "Home+Dialog");
+    auto hitsA = rootA->GetValue("hits");
+    ASSERT_EQ(hitsA->GetArraySize(), 1);
+    auto hitA = hitsA->GetArrayItem(0);
+    EXPECT_EQ(hitA->GetString("ruleSetId"), "a");
+    EXPECT_EQ(hitA->GetString("matchedKeyword"), "search");
+    auto original = InspectorJsonUtil::ParseJsonString(payload);
+    EXPECT_EQ(hitA->ToString(), original->GetValue("hits")->GetArrayItem(0)->ToString());
+    auto rootB = InspectorJsonUtil::ParseJsonString(lastB);
+    ASSERT_TRUE(rootB->IsObject());
+    ASSERT_EQ(rootB->GetValue("hits")->GetArraySize(), 1);
+    EXPECT_EQ(rootB->GetValue("hits")->GetArrayItem(0)->GetString("ruleSetId"), "b");
+    EXPECT_EQ(report->pageSceneEventCallbacks_.count("a"), 0U);
+}
+
+/**
+ * @tc.name: UIContentStubTestPageSceneFilteredEvent003
+ * @tc.desc: Legacy top-level data cannot be delivered to a different ruleSet named in an array.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestPageSceneFilteredEvent003, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    std::string received;
+    int32_t otherCount = 0;
+    report->RegisterPageSceneEventCallback("legacy", [&received](const std::string& data) { received = data; });
+    report->RegisterPageSceneEventCallback("other", [&otherCount](const std::string&) { ++otherCount; });
+    report->ReportPageSceneEvent(R"({"ruleSetId":"legacy", "nodes":[{"nodeId":1}],
+        "hits":[{"ruleSetId":"other", "ruleId":"r1"}]})", false);
+    auto root = InspectorJsonUtil::ParseJsonString(received);
+    ASSERT_TRUE(root->IsObject());
+    EXPECT_EQ(root->GetString("ruleSetId"), "legacy");
+    EXPECT_EQ(root->GetValue("nodes")->GetArraySize(), 1);
+    EXPECT_EQ(root->GetValue("hits")->GetArraySize(), 0);
+    EXPECT_EQ(otherCount, 0);
+}
+
+/**
+ * @tc.name: UIContentStubTestPageSceneCallbackRegistration001
+ * @tc.desc: Duplicate callback reservation preserves the original callback; unregister permits a retry.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestPageSceneCallbackRegistration001, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    int32_t originalCount = 0;
+    int32_t replacementCount = 0;
+    PageSceneEventCallback original = [&originalCount](const std::string&) { ++originalCount; };
+    PageSceneEventCallback replacement = [&replacementCount](const std::string&) { ++replacementCount; };
+    EXPECT_FALSE(report->TryRegisterPageSceneEventCallback("", original));
+    EXPECT_FALSE(report->TryRegisterPageSceneEventCallback("a", nullptr));
+    ASSERT_TRUE(report->TryRegisterPageSceneEventCallback("a", original));
+    EXPECT_FALSE(report->TryRegisterPageSceneEventCallback("a", replacement));
+    const std::string payload = R"({"eventType":"presence", "hits":[{"ruleSetId":"a", "ruleId":"r1"}]})";
+    report->ReportPageSceneEvent(payload, false);
+    EXPECT_EQ(originalCount, 1);
+    EXPECT_EQ(replacementCount, 0);
+    report->UnregisterPageSceneEventCallback("a");
+    ASSERT_TRUE(report->TryRegisterPageSceneEventCallback("a", replacement));
+    report->ReportPageSceneEvent(payload, false);
+    EXPECT_EQ(originalCount, 1);
+    EXPECT_EQ(replacementCount, 1);
 }
 
 }
