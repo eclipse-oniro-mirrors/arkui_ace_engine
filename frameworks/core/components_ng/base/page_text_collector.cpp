@@ -21,12 +21,15 @@
 #include <unordered_set>
 #include <vector>
 
+#include "base/subwindow/subwindow_manager.h"
 #include "core/common/container.h"
 #include "core/common/container_scope.h"
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/base/page_text_json.h"
 #include "core/components_ng/pattern/page_translate/page_translate_node.h"
 #include "core/components_ng/pattern/custom/custom_node.h"
+#include "core/components_ng/pattern/bubble/bubble_pattern.h"
+#include "core/components_ng/pattern/menu/wrapper/menu_wrapper_pattern.h"
 #include "core/components_v2/inspector/inspector_constants.h"
 #include "core/pipeline/base/element_register.h"
 #include "core/pipeline_ng/pipeline_context.h"
@@ -54,11 +57,50 @@ struct PageTextContext {
     bool excluded = false;
     bool inEditor = false;
     bool detachedOffscreen = false;
+    bool ownedOverlay = false;
 };
 
 // All caches live for one read-only query. Never call GetChildren() while collecting.
 class PageTextScan {
 public:
+    PageTextScan(int32_t instanceId, const RefPtr<PipelineContext>& pipeline) : instanceId_(instanceId)
+    {
+        pipelines_.emplace(instanceId, pipeline);
+    }
+
+    RefPtr<PipelineContext> GetPipeline(int32_t instanceId)
+    {
+        auto [iter, inserted] = pipelines_.try_emplace(instanceId, RefPtr<PipelineContext>());
+        if (!inserted) {
+            return iter->second;
+        }
+        auto manager = SubwindowManager::GetInstance();
+        if (manager->GetParentContainerId(instanceId) != instanceId_) {
+            return nullptr;
+        }
+        auto window = manager->GetSubwindowById(instanceId);
+        if (!window || window->GetChildContainerId() != instanceId || !window->GetShown()) {
+            return nullptr;
+        }
+        auto container = GetPageTextContainer(instanceId);
+        auto executor = container ? container->GetTaskExecutor() : nullptr;
+        if (!executor || !executor->WillRunOnCurrentThread(TaskExecutor::TaskType::UI)) {
+            return nullptr;
+        }
+        auto pipeline = AceType::DynamicCast<PipelineContext>(container->GetPipelineContext());
+        if (pipeline && !pipeline->IsDestroyed() && pipeline->GetInstanceId() == instanceId) {
+            iter->second = pipeline;
+        }
+        return iter->second;
+    }
+
+    OffsetF GetWindowOffset(int32_t instanceId)
+    {
+        const auto& parentRect = pipelines_.at(instanceId_)->GetDisplayWindowRectInfo();
+        const auto& childRect = pipelines_.at(instanceId)->GetDisplayWindowRectInfo();
+        return OffsetF(childRect.Left() - parentRect.Left(), childRect.Top() - parentRect.Top());
+    }
+
     void AddFrame(const WeakPtr<FrameNode>& node)
     {
         auto frame = node.Upgrade();
@@ -67,11 +109,11 @@ public:
         }
     }
 
-    void Scan(int32_t instanceId)
+    void Scan()
     {
-        ElementRegister::GetInstance()->IterateElements([this, instanceId](auto, const RefPtr<AceType>& element) {
+        ElementRegister::GetInstance()->IterateElements([this](auto, const RefPtr<AceType>& element) {
             auto frame = AceType::DynamicCast<FrameNode>(element);
-            if (!frame || frame->GetInstanceId() != instanceId) {
+            if (!frame || !GetPipeline(frame->GetInstanceId())) {
                 return false;
             }
             // Keep the association even when disabled, so a retained background cannot leak as ordinary text.
@@ -118,6 +160,7 @@ public:
             auto& item = *iter;
             context.excluded |= item->IsAccessibilityVirtualNode() || item->GetTag() == V2::WEB_ETS_TAG ||
                 placeholderIds_.count(item->GetId()) > 0;
+            ResolveOverlay(item, context);
             context.inEditor |= item->GetTag() == V2::RICH_EDITOR_ETS_TAG;
             context.detachedOffscreen |= item->UseOffscreenProcess() && !item->IsOnMainTree();
             if (AceType::InstanceOf<CustomNode>(item)) {
@@ -141,6 +184,36 @@ public:
     std::map<int32_t, RefPtr<FrameNode>> frames;
 
 private:
+    bool OwnsTarget(int32_t targetId) const
+    {
+        auto target = ElementRegister::GetInstance()->GetUINodeById(targetId);
+        return target && target->GetInstanceId() == instanceId_;
+    }
+
+    void ResolveOverlay(const RefPtr<UINode>& node, PageTextContext& context)
+    {
+        auto frame = AceType::DynamicCast<FrameNode>(node);
+        CHECK_NULL_VOID(frame);
+        if (frame->GetTag() == V2::MENU_WRAPPER_ETS_TAG) {
+            auto menu = frame->GetPattern<MenuWrapperPattern>();
+            context.ownedOverlay = menu && OwnsTarget(menu->GetTargetId());
+            context.excluded |= !menu || !menu->IsShow();
+        } else if (frame->GetTag() == V2::POPUP_ETS_TAG) {
+            auto bubble = frame->GetPattern<BubblePattern>();
+            auto pipeline = GetPipeline(frame->GetInstanceId());
+            auto overlay = pipeline ? pipeline->GetOverlayManager() : nullptr;
+            if (!bubble || !overlay) {
+                context.excluded = true;
+                return;
+            }
+            auto info = overlay->GetPopupInfo(bubble->GetPopupTargetId());
+            context.ownedOverlay = info.isTips && OwnsTarget(bubble->GetPopupTargetId());
+            context.excluded |= info.popupNode != frame || !info.isCurrentOnShow;
+        }
+    }
+
+    int32_t instanceId_;
+    std::unordered_map<int32_t, RefPtr<PipelineContext>> pipelines_;
     std::unordered_map<const UINode*, RefPtr<FrameNode>> backgrounds_;
     std::unordered_map<const UINode*, PageTextContext> contexts_;
     std::unordered_set<int32_t> placeholderIds_;
@@ -282,23 +355,25 @@ int32_t CollectPageText(int32_t instanceId, char** data, uint32_t* size, const c
     bool success = json.Append("{\"texts\":[");
 #ifndef CROSS_PLATFORM
     bool first = true;
-    PageTextScan scan;
+    PageTextScan scan(instanceId, pipeline);
     auto manager = pipeline->GetUiTranslateManagerImpl();
     if (manager && success) {
         manager->ForEachArkUITranslateFrameNode([&scan](const WeakPtr<FrameNode>& node) { scan.AddFrame(node); });
     }
     if (success) {
-        scan.Scan(instanceId);
+        scan.Scan();
     }
     for (const auto& [id, frame] : scan.frames) {
         if (!success) {
             break;
         }
-        if (frame->GetInstanceId() != instanceId) {
+        const auto nodeInstanceId = frame->GetInstanceId();
+        if (!scan.GetPipeline(nodeInstanceId)) {
             continue;
         }
+        ContainerScope nodeScope(nodeInstanceId);
         const auto context = scan.Resolve(frame);
-        if (context.excluded) {
+        if (context.excluded || (nodeInstanceId != instanceId && !context.ownedOverlay)) {
             continue;
         }
         std::string text;
@@ -320,7 +395,7 @@ int32_t CollectPageText(int32_t instanceId, char** data, uint32_t* size, const c
         }
         const auto offset = GetPageTextOffset(frame, context, scan);
         if (offset) {
-            success = AppendCarrier(frame, text, offset.value(), json, first);
+            success = AppendCarrier(frame, text, offset.value() + scan.GetWindowOffset(nodeInstanceId), json, first);
         }
     }
 #endif

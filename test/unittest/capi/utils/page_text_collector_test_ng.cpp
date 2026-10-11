@@ -25,6 +25,17 @@
 #include "core/components_ng/pattern/progress/progress_pattern.h"
 #include "core/components_ng/pattern/select/select_model_ng.h"
 #include "core/components_ng/pattern/select/select_pattern.h"
+#include "core/components_ng/pattern/menu/wrapper/menu_wrapper_pattern.h"
+#include "core/components_ng/pattern/menu/menu_item/menu_item_model_ng.h"
+#include "core/components_ng/pattern/menu/menu_item/menu_item_pattern.h"
+#include "core/components_ng/pattern/bubble/bubble_pattern.h"
+#include "core/components_ng/pattern/slider/slider_pattern.h"
+#include "core/components_ng/pattern/slider/slider_model_ng.h"
+#include "core/components/slider/slider_theme.h"
+#include "core/components_ng/render/paint_wrapper.h"
+#include "base/subwindow/subwindow_manager.h"
+#include "test/mock/frameworks/base/subwindow/mock_subwindow.h"
+#include "test/mock/frameworks/core/components_ng/render/mock_paragraph.h"
 #include "core/components/scroll/scroll_bar_theme.h"
 #include "core/components/select/select_theme.h"
 #include "core/components/text/text_theme.h"
@@ -598,5 +609,280 @@ TEST_F(PageTextCollectionTest, BackgroundHostStateAndReplacement)
     EXPECT_TRUE(Contains("new background"));
     host->SetBackgroundFunction({});
     EXPECT_FALSE(Contains("new background"));
+}
+class PageTextFloatingTest : public PageTextCollectionTest {
+public:
+    void SetUp() override
+    {
+        PageTextCollectionTest::SetUp();
+        pipeline_->displayWindowRectInfo_ = Rect(100.0, 200.0, 800.0, 600.0);
+        MockPipelineContext::SetUp();
+        childPipeline_ = MockPipelineContext::GetCurrent();
+        MockPipelineContext::pipeline_ = pipeline_;
+        childPipeline_->instanceId_ = CHILD_ID;
+        childPipeline_->displayWindowRectInfo_ = Rect(130.0, 240.0, 800.0, 600.0);
+        auto root = CreateNode("SubwindowRoot");
+        root->AttachContext(AceType::RawPtr(childPipeline_));
+        childPipeline_->overlayManager_ = AceType::MakeRefPtr<OverlayManager>(root);
+        childContainer_ = AceType::MakeRefPtr<testing::NiceMock<MockContainer>>(childPipeline_);
+        childContainer_->SetTaskExecutor(AceType::MakeRefPtr<MockTaskExecutor>());
+        ON_CALL(*childContainer_, GetInstanceId()).WillByDefault(testing::Return(CHILD_ID));
+        MockContainer::SetGetContainerCallback([main = MockContainer::Current(), child = childContainer_](int32_t id) {
+            return id == CHILD_ID ? child : main;
+        });
+        subwindow_ = AceType::MakeRefPtr<testing::NiceMock<MockSubwindow>>();
+        ON_CALL(*subwindow_, GetShown()).WillByDefault([this]() { return shown_; });
+        ON_CALL(*subwindow_, GetChildContainerId()).WillByDefault(testing::Return(CHILD_ID));
+        ON_CALL(*subwindow_, GetOverlayManager()).WillByDefault(testing::Return(childPipeline_->overlayManager_));
+        auto manager = SubwindowManager::GetInstance();
+        manager->AddParentContainerId(CHILD_ID, pipeline_->GetInstanceId());
+        manager->AddInstanceSubwindowMap(CHILD_ID, subwindow_);
+    }
+
+    void TearDown() override
+    {
+        nodes_.clear();
+        childPipeline_->overlayManager_.Reset();
+        SubwindowManager::GetInstance()->instanceSubwindowMap_.erase(CHILD_ID);
+        SubwindowManager::GetInstance()->RemoveParentContainerId(CHILD_ID);
+        subwindow_.Reset();
+        MockContainer::SetGetContainerCallback({});
+        childContainer_.Reset();
+        childPipeline_.Reset();
+        PageTextCollectionTest::TearDown();
+    }
+
+    RefPtr<FrameNode> Menu(const RefPtr<FrameNode>& target, const std::u16string& content)
+    {
+        auto menu = CreateNode(V2::MENU_WRAPPER_ETS_TAG, AceType::MakeRefPtr<MenuWrapperPattern>(target->GetId()));
+        auto themes = AceType::MakeRefPtr<testing::NiceMock<MockThemeManager>>();
+        auto themeFor = [](ThemeType type) -> RefPtr<Theme> {
+            if (type == SelectTheme::TypeId()) { return AceType::MakeRefPtr<SelectTheme>(); }
+            if (type == TextTheme::TypeId()) { return AceType::MakeRefPtr<TextTheme>(); }
+            if (type == IconTheme::TypeId()) { return AceType::MakeRefPtr<IconTheme>(); }
+            return nullptr;
+        };
+        ON_CALL(*themes, GetTheme(testing::_)).WillByDefault(themeFor);
+        ON_CALL(*themes, GetTheme(testing::_, testing::_))
+            .WillByDefault([themeFor](ThemeType type, int32_t) { return themeFor(type); });
+        pipeline_->SetThemeManager(themes);
+        childPipeline_->SetThemeManager(themes);
+        MenuItemProperties properties;
+        properties.content = UtfUtils::Str16ToStr8(content);
+        MenuItemModelNG model;
+        model.Create(properties);
+        auto item = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
+        EXPECT_NE(item, nullptr);
+        menu->AddChild(item);
+        item->MarkModifyDone();
+        auto text = item->GetPattern<MenuItemPattern>()->GetContentNode();
+        EXPECT_NE(text, nullptr);
+        if (text) {
+            for (auto frame = text; frame && frame != menu; frame = frame->GetAncestorNodeOfFrame(false)) {
+                PrepareNode(frame);
+            }
+            text->GetPattern<TextPattern>()->MarkPageTranslateTextDrawn();
+        }
+        menu->AttachContext(AceType::RawPtr(childPipeline_), true);
+        menu->GetPattern<MenuWrapperPattern>()->menuStatus_ = MenuStatus::SHOW;
+        return menu;
+    }
+
+    static constexpr int32_t CHILD_ID = 100001;
+    RefPtr<MockPipelineContext> childPipeline_;
+    RefPtr<MockContainer> childContainer_;
+    RefPtr<MockSubwindow> subwindow_;
+    bool shown_ = true;
+};
+
+TEST_F(PageTextFloatingTest, ContextMenusUseOwnerScopeAndWindowCoordinates)
+{
+    auto button = CreateNode(V2::BUTTON_ETS_TAG);
+    auto longPressMenu = Menu(button, u"T561_155_A");
+    auto controlledMenu = Menu(button, u"T561_272_A");
+    ASSERT_TRUE(Contains("T561_155_A"));
+    ASSERT_TRUE(Contains("T561_272_A"));
+    auto texts = Collect();
+    ASSERT_EQ(texts->GetArraySize(), 2);
+    auto rect = texts->GetArrayItem(0)->GetValue("rect");
+    EXPECT_DOUBLE_EQ(rect->GetArrayItem(0)->GetDouble(), 30.0);
+    EXPECT_DOUBLE_EQ(rect->GetArrayItem(1)->GetDouble(), 40.0);
+    EXPECT_DOUBLE_EQ(rect->GetArrayItem(2)->GetDouble(), FRAME_WIDTH);
+    childPipeline_->displayWindowRectInfo_ = Rect(150.0, 260.0, 800.0, 600.0);
+    auto moved = Collect();
+    auto movedRect = moved->GetArrayItem(0)->GetValue("rect");
+    EXPECT_DOUBLE_EQ(movedRect->GetArrayItem(0)->GetDouble(), 50.0);
+    EXPECT_DOUBLE_EQ(movedRect->GetArrayItem(1)->GetDouble(), 60.0);
+    controlledMenu->GetPattern<MenuWrapperPattern>()->menuStatus_ = MenuStatus::HIDE;
+    EXPECT_FALSE(Contains("T561_272_A"));
+    EXPECT_TRUE(Contains("T561_155_A"));
+    shown_ = false;
+    EXPECT_EQ(Collect()->GetArraySize(), 0);
+}
+
+TEST_F(PageTextFloatingTest, TipsUseDisplayedPopupAndTargetOwnership)
+{
+    auto button = CreateNode(V2::BUTTON_ETS_TAG);
+    auto popup = CreateNode(V2::POPUP_ETS_TAG, AceType::MakeRefPtr<BubblePattern>(button->GetId(), button->GetTag()));
+    auto text = Text(u"T561_075_A");
+    popup->AddChild(text);
+    popup->AttachContext(AceType::RawPtr(childPipeline_), true);
+    PopupInfo info;
+    info.popupId = popup->GetId();
+    info.popupNode = popup;
+    info.target = button;
+    info.isTips = true;
+    info.isCurrentOnShow = true;
+    childPipeline_->overlayManager_->popupMap_[button->GetId()] = info;
+    EXPECT_TRUE(Contains("T561_075_A"));
+    childPipeline_->overlayManager_->popupMap_[button->GetId()].isCurrentOnShow = false;
+    EXPECT_FALSE(Contains("T561_075_A"));
+    childPipeline_->overlayManager_->popupMap_[button->GetId()].isCurrentOnShow = true;
+    EXPECT_TRUE(Contains("T561_075_A"));
+    childPipeline_->overlayManager_->popupMap_.clear();
+    EXPECT_FALSE(Contains("T561_075_A"));
+}
+
+TEST_F(PageTextFloatingTest, SubwindowDoesNotExposeUnrelatedOrCachedText)
+{
+    auto button = CreateNode(V2::BUTTON_ETS_TAG);
+    auto menu = Menu(button, u"owned menu");
+    auto unrelated = Text(u"unrelated subwindow text");
+    unrelated->AttachContext(AceType::RawPtr(childPipeline_));
+    EXPECT_TRUE(Contains("owned menu"));
+    EXPECT_FALSE(Contains("unrelated subwindow text"));
+    SubwindowManager::GetInstance()->RemoveParentContainerId(CHILD_ID);
+    SubwindowManager::GetInstance()->AddParentContainerId(CHILD_ID, pipeline_->GetInstanceId() + 1);
+    EXPECT_FALSE(Contains("owned menu"));
+    SubwindowManager::GetInstance()->RemoveParentContainerId(CHILD_ID);
+    SubwindowManager::GetInstance()->AddParentContainerId(CHILD_ID, pipeline_->GetInstanceId());
+    button->instanceId_ = pipeline_->GetInstanceId() + 1;
+    EXPECT_FALSE(Contains("owned menu"));
+}
+
+TEST_F(PageTextFloatingTest, MainWindowPopupAndMenuRetainExistingScope)
+{
+    auto button = CreateNode(V2::BUTTON_ETS_TAG);
+    auto menu = Menu(button, u"same window menu");
+    menu->AttachContext(AceType::RawPtr(pipeline_), true);
+    auto popup = CreateNode(V2::POPUP_ETS_TAG, AceType::MakeRefPtr<BubblePattern>(button->GetId(), button->GetTag()));
+    popup->AddChild(Text(u"same window popup"));
+    PopupInfo info;
+    info.popupNode = popup;
+    info.target = button;
+    info.isCurrentOnShow = true;
+    pipeline_->GetOverlayManager()->popupMap_[button->GetId()] = info;
+    shown_ = false;
+    EXPECT_TRUE(Contains("same window menu"));
+    EXPECT_TRUE(Contains("same window popup"));
+    menu->GetPattern<MenuWrapperPattern>()->menuStatus_ = MenuStatus::HIDE;
+    pipeline_->GetOverlayManager()->popupMap_[button->GetId()].isCurrentOnShow = false;
+    EXPECT_FALSE(Contains("same window menu"));
+    EXPECT_FALSE(Contains("same window popup"));
+}
+
+class PageTextOtherThreadExecutor : public MockTaskExecutor {
+public:
+    bool WillRunOnCurrentThread(TaskType type) const override
+    {
+        return type != TaskType::UI;
+    }
+};
+
+TEST_F(PageTextFloatingTest, ChildWindowOnAnotherUIThreadIsNotRead)
+{
+    auto button = CreateNode(V2::BUTTON_ETS_TAG);
+    auto menu = Menu(button, u"other thread menu");
+    childContainer_->SetTaskExecutor(AceType::MakeRefPtr<PageTextOtherThreadExecutor>());
+    EXPECT_FALSE(Contains("other thread menu"));
+}
+
+TEST_F(PageTextCollectionTest, SliderPaintMethodSelectsCustomAndGeneratedText)
+{
+    auto slider = CreateNode(V2::SLIDER_ETS_TAG, AceType::MakeRefPtr<SliderPattern>());
+    auto pattern = slider->GetPattern<SliderPattern>();
+    slider->GetRenderContext()->SetHostNode(slider);
+    auto themes = AceType::MakeRefPtr<testing::NiceMock<MockThemeManager>>();
+    auto themeFor = [](ThemeType type) -> RefPtr<Theme> {
+        if (type == SliderTheme::TypeId()) { return AceType::MakeRefPtr<SliderTheme>(); }
+        if (type == TextTheme::TypeId()) { return AceType::MakeRefPtr<TextTheme>(); }
+        return nullptr;
+    };
+    ON_CALL(*themes, GetTheme(testing::_)).WillByDefault(themeFor);
+    ON_CALL(*themes, GetTheme(testing::_, testing::_))
+        .WillByDefault([themeFor](ThemeType type, int32_t) { return themeFor(type); });
+    pipeline_->SetThemeManager(themes);
+    auto paragraph = MockParagraph::GetOrCreateMockParagraph();
+    std::vector<std::u16string> paragraphTexts;
+    EXPECT_CALL(*paragraph, AddText(testing::_)).Times(2)
+        .WillRepeatedly([&paragraphTexts](const std::u16string& text) { paragraphTexts.push_back(text); });
+    auto tip = AceType::MakeRefPtr<SliderTipModifier>(slider, []() { return std::pair<OffsetF, float>(); });
+    pattern->sliderTipModifier_ = tip;
+    SliderPaintMethod::TipParameters tips;
+    tips.isDrawTip_ = true;
+    SliderPaintMethod method(nullptr, SliderContentModifier::Parameters(), FRAME_WIDTH, 0.0f, tip, tips,
+        TextDirection::LTR);
+    auto paint = slider->GetPaintProperty<SliderPaintProperty>();
+    auto wrapper = AceType::MakeRefPtr<PaintWrapper>(slider->GetRenderContext(), slider->GetGeometryNode(), paint);
+    SliderModelNG::SetShowTips(AceType::RawPtr(slider), true, "T561_053_A");
+    method.UpdateOverlayModifier(AceType::RawPtr(wrapper));
+    tip->sizeScale_->Set(1.0f);
+    tip->opacityScale_->Set(1.0f);
+    EXPECT_TRUE(Contains("T561_053_A"));
+    SliderModelNG::SetShowTips(AceType::RawPtr(slider), true, std::nullopt);
+    paint->UpdateMin(0.0f);
+    paint->UpdateMax(100.0f);
+    paint->UpdateValue(47.0f);
+    pattern->CalcSliderValue();
+    pattern->showTips_ = true;
+    pattern->bubbleFlag_ = true;
+    pattern->valueChangeFlag_ = true;
+    pattern->UpdateTipsValue();
+    method.UpdateOverlayModifier(AceType::RawPtr(wrapper));
+    EXPECT_TRUE(Contains("47%"));
+    ASSERT_EQ(paragraphTexts.size(), 2u);
+    EXPECT_EQ(paragraphTexts[0], u"T561_053_A");
+    EXPECT_EQ(paragraphTexts[1], u"47%");
+    auto texts = Collect();
+    ASSERT_EQ(texts->GetArraySize(), 1);
+    EXPECT_EQ(texts->GetArrayItem(0)->GetInt("id"), slider->GetId());
+    EXPECT_DOUBLE_EQ(texts->GetArrayItem(0)->GetValue("rect")->GetArrayItem(2)->GetDouble(), FRAME_WIDTH);
+    MockParagraph::TearDown();
+}
+
+TEST_F(PageTextCollectionTest, SliderTipsCollectCustomAndGeneratedContentOnlyWhileVisible)
+{
+    auto slider = CreateNode(V2::SLIDER_ETS_TAG, AceType::MakeRefPtr<SliderPattern>());
+    auto pattern = slider->GetPattern<SliderPattern>();
+    SliderModelNG::SetShowTips(AceType::RawPtr(slider), true, "T561_053_A");
+    EXPECT_FALSE(Contains("T561_053_A"));
+    auto tip = AceType::MakeRefPtr<SliderTipModifier>(slider, []() { return std::pair<OffsetF, float>(); });
+    pattern->sliderTipModifier_ = tip;
+    tip->SetContent("T561_053_A");
+    tip->tipFlag_->Set(true);
+    tip->sizeScale_->Set(1.0f);
+    tip->opacityScale_->Set(1.0f);
+    EXPECT_FALSE(Contains("T561_053_A"));
+    tip->SetParagraph(MockParagraph::GetOrCreateMockParagraph());
+    EXPECT_TRUE(Contains("T561_053_A"));
+
+    SliderModelNG::SetShowTips(AceType::RawPtr(slider), true, std::nullopt);
+    pattern->showTips_ = true;
+    pattern->bubbleFlag_ = true;
+    pattern->valueChangeFlag_ = true;
+    pattern->valueRatio_ = 0.47f;
+    pattern->UpdateTipsValue();
+    auto paint = slider->GetPaintProperty<SliderPaintProperty>();
+    ASSERT_EQ(paint->GetContentValue(""), "47%");
+    tip->SetContent(paint->GetContentValue(""));
+    EXPECT_TRUE(Contains("47%"));
+    EXPECT_FALSE(Contains("T561_053_A"));
+    tip->tipFlag_->Set(false);
+    // A delayed disappearance can still draw the tip while its scale/opacity remain visible.
+    EXPECT_TRUE(Contains("47%"));
+    tip->sizeScale_->Set(0.6f);
+    tip->opacityScale_->Set(0.0f);
+    EXPECT_FALSE(Contains("47%"));
+    MockParagraph::TearDown();
 }
 } // namespace OHOS::Ace::NG
