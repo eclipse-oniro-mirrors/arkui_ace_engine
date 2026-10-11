@@ -80,8 +80,9 @@ ImageLoadingContext::~ImageLoadingContext()
             }
         }
     }
-    // clear the cache when GetSvgCacheSkipEnabled() is true and the type of image is SVG
-    if (SystemProperties::GetSvgCacheSkipEnabled() && imageObj_ && imageObj_->GetSVGDom()) {
+    // clear the cache for SVG (when GetSvgCacheSkipEnabled() is true) or BASE64 images
+    if (imageObj_ && ((SystemProperties::GetSvgCacheSkipEnabled() && imageObj_->GetSVGDom()) ||
+                      src_.GetSrcType() == SrcType::BASE64)) {
         auto pipelineCtx = PipelineContext::GetCurrentContext();
         if (pipelineCtx) {
             auto cache = pipelineCtx->GetImageCache();
