@@ -480,6 +480,7 @@ bool ListPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, c
     DrivenRender(dirty);
 
     ChangeAnimateOverScroll();
+    SetScrollSourceLayout(SCROLL_FROM_NONE);
     ResetAccessibilityScrollSourceIfIdle();
     MarkSelectedItems();
     UpdateListDirectionInCardStyle();

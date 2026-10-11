@@ -839,6 +839,7 @@ bool GridPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, c
     info_.extraOffset_.reset();
     UpdateScrollBarOffset();
     ChangeAnimateOverScroll();
+    SetScrollSourceLayout(SCROLL_FROM_NONE);
     ResetAccessibilityScrollSourceIfIdle();
     if (config.frameSizeChange) {
         if (GetScrollBar() != nullptr) {

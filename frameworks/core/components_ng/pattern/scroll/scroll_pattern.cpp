@@ -208,6 +208,7 @@ bool ScrollPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty,
     host->SetViewPort(globalViewPort);
     isInitialized_ = true;
     ChangeAnimateOverScroll();
+    SetScrollSourceLayout(SCROLL_FROM_NONE);
     SetAccessibilityFocusScroll(false);
     ResetAccessibilityScrollSourceIfIdle();
     auto paintProperty = GetPaintProperty<ScrollablePaintProperty>();

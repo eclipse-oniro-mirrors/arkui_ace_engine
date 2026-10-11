@@ -2662,7 +2662,9 @@ EdgeEffect ScrollablePattern::GetEdgeEffect() const
 
 ScrollState ScrollablePattern::GetScrollState() const
 {
-    return ScrollablePattern::GetScrollState(scrollSource_);
+    // Query reads the session-level scrollSourceForQuery_: stable FLING/SCROLL while scrolling
+    // (unaffected by layout-level resets)
+    return ScrollablePattern::GetScrollState(scrollSourceForQuery_);
 }
 
 ScrollState ScrollablePattern::GetScrollState(int32_t scrollSource)
