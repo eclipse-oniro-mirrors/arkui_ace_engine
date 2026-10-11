@@ -5862,6 +5862,7 @@ struct ArkUITabContentModifier {
     void (*setTabBarVisibility)(
         ArkUINodeHandle node, ArkUI_Int32 visibility, ArkUI_Int32 displayMode, ArkUI_Bool hasDisplayMode);
     void (*resetTabBarVisibility)(ArkUINodeHandle node);
+    void (*setTabBarBadge)(ArkUINodeHandle node, void* badgeParamRawPtr);
 };
 
 struct ArkUITabsControllerModifier {

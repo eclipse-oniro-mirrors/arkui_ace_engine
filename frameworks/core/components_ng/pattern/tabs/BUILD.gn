@@ -16,6 +16,7 @@ import(
 
 build_component_ng("tabs_pattern_ng") {
   is_component_model = true
+  component_ng_deps = [ "badge" ]
 
   sources = [
     "tab_bar_accessibility_property.cpp",
@@ -25,6 +26,7 @@ build_component_ng("tabs_pattern_ng") {
     "tab_bar_paint_method.cpp",
     "tab_bar_pattern.cpp",
     "tab_bar_pattern_multi_thread.cpp",
+    "tab_content_layout_property.cpp",
     "tab_content_model_ng.cpp",
     "tab_content_model_static.cpp",
     "tab_content_node.cpp",

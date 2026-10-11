@@ -2366,6 +2366,10 @@ class BottomTabBarStyle {
     this.iconStyle = arg;
     return this;
   }
+  badge(arg) {
+    this.badge = arg;
+    return this;
+  }
 }
 
 class Indicator {
