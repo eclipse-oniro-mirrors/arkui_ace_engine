@@ -618,6 +618,12 @@ public:
         scrollSource_ = scrollSource;
     }
 
+    // Direct write to the session-level source only (does not touch the frame-level scrollSource_)
+    void SetScrollSourceForQuery(int32_t scrollSource)
+    {
+        scrollSourceForQuery_ = scrollSource;
+    }
+
     void SetAccessibilityScrollSource(AccessibilityScrollSource source)
     {
         accessibilityScrollSource_ = source;
