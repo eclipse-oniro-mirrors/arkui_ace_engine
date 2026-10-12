@@ -6674,7 +6674,7 @@ struct ArkUITextInputModifier {
     void (*setTextInputShowUnit)(ArkUINodeHandle node, void* callback);
     void (*resetTextInputShowError)(ArkUINodeHandle node);
     void (*setTextInputPlaceholderFont)(ArkUINodeHandle node, const struct ArkUIPlaceholderFontType* placeholderFont,
-        void* fontsizeResRawPtr, void* fontfamilyResRawPtr);
+        void* fontsizeResRawPtr, void* fontfamilyResRawPtr, bool isJsView);
     void (*resetTextInputPlaceholderFont)(ArkUINodeHandle node);
     void (*setTextInputFontColor)(ArkUINodeHandle node, ArkUI_Uint32 color, void* resRawPtr, bool isCapi);
     void (*resetTextInputFontColor)(ArkUINodeHandle node);
