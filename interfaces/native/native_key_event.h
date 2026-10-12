@@ -609,7 +609,7 @@ ArkUI_ErrorCode OH_ArkUI_KeyEvent_IsScrollLockOn(const ArkUI_UIInputEvent* event
  *
  * @since 26.2.0
  */
-typedef ArkUI_KeyIntension ArkUI_KeyIntention;
+typedef ArkUI_KeyIntension OH_ArkUI_KeyIntention;
 
 /**
  * @brief Creates a key event that can be dispatched by {@link OH_ArkUI_KeyEvent_Dispatch}.
@@ -748,7 +748,7 @@ ArkUI_ErrorCode OH_ArkUI_KeyEvent_SetPressedKeys(
  * @since 26.2.0
  */
 ArkUI_ErrorCode OH_ArkUI_KeyEvent_SetKeyIntentionCode(
-    ArkUI_UIInputEvent* event, ArkUI_KeyIntention intentionCode);
+    ArkUI_UIInputEvent* event, OH_ArkUI_KeyIntention intentionCode);
 
 /**
  * @brief Sets the NumLock state of a key event created by {@link OH_ArkUI_KeyEvent_Create}.
