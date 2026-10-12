@@ -858,6 +858,7 @@ ArkUI_ErrorCode OH_ArkUI_AddSupportedUIStates(ArkUI_NodeHandle node, int32_t uiS
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID,
         "OH_ArkUI_AddSupportedUIStates", "Node parameter is null");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     impl->getNodeModifiers()->getFrameNodeModifier()->addSupportedUIStates(node->uiNodeHandle, uiStates,
         reinterpret_cast<void*>(statesChangeHandler), excludeInner, userData);
     return ARKUI_ERROR_CODE_NO_ERROR;
@@ -868,6 +869,7 @@ ArkUI_ErrorCode OH_ArkUI_RemoveSupportedUIStates(ArkUI_NodeHandle node, int32_t 
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID,
         "OH_ArkUI_RemoveSupportedUIStates", "Node parameter is null");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     impl->getNodeModifiers()->getFrameNodeModifier()->removeSupportedUIStates(node->uiNodeHandle, uiStates);
     return ARKUI_ERROR_CODE_NO_ERROR;
 }

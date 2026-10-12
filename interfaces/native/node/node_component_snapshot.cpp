@@ -16,6 +16,7 @@
 #include "node_component_snapshot.h"
 
 #include "node/node_model.h"
+#include "node/config_manager.h"
 #include "pixelmap_native_impl.h"
 
 #include "base/utils/utils.h"
@@ -92,6 +93,7 @@ int32_t OH_ArkUI_GetNodeSnapshot(
     CHECK_NULL_RETURN(pixelmap, ARKUI_ERROR_CODE_PARAM_INVALID);
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     CHECK_NULL_RETURN(impl, ARKUI_ERROR_CODE_INTERNAL_ERROR);
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     auto options = reinterpret_cast<ArkUISnapshotOptions*>(snapshotOptions);
     std::shared_ptr<OHOS::Media::PixelMap> tmpPixel;
     auto result = impl->getSnapshotAPI()->getSyncSnapshot(node->uiNodeHandle, options, &tmpPixel);

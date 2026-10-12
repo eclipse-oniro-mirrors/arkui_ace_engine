@@ -20,6 +20,7 @@
 #include "core/event/touch_event.h"
 #include "interfaces/native/node/event_converter.h"
 #include "interfaces/native/node/node_model.h"
+#include "interfaces/native/node/config_manager.h"
 #include "base/error/error_code.h"
 #include "base/log/log_wrapper.h"
 #include "frameworks/core/common/ace_application_info.h"
@@ -5613,6 +5614,7 @@ ArkUI_ErrorCode OH_ArkUI_PointerEvent_PostClonedEventWithStrategy(ArkUI_NodeHand
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_POST_CLONED_COMPONENT_STATUS_ABNORMAL,
             ARKUI_ERROR_CODE_POST_CLONED_COMPONENT_STATUS_ABNORMAL);
     }
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     int32_t competitionStrategy = 0;
     if (strategy == ArkUI_CompetitionStrategy::ARKUI_COMPETITION_STRATEGY_COMPETITION) {
         competitionStrategy = 1;
@@ -5841,6 +5843,7 @@ int32_t OH_ArkUI_PointerEvent_PostClonedEvent(ArkUI_NodeHandle node, const ArkUI
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_POST_CLONED_COMPONENT_STATUS_ABNORMAL,
             ARKUI_ERROR_CODE_POST_CLONED_COMPONENT_STATUS_ABNORMAL);
     }
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     int32_t res = fullImpl->getNodeModifiers()->getCommonModifier()->postTouchEvent(node->uiNodeHandle, touchEvent);
     RETURN_RET_WITH_STATUS_CHECK(res, ARKUI_ERROR_CODE_NO_ERROR);
 }
