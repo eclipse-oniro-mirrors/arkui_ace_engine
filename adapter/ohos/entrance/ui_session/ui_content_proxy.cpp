@@ -21,8 +21,20 @@
 #include "adapter/ohos/entrance/ui_session/get_inspector_tree_config_impl.h"
 #include "adapter/ohos/entrance/ui_session/include/ui_session_log.h"
 #include "adapter/ohos/entrance/ui_session/ui_translate_request_util.h"
+#include "interfaces/inner_api/ui_session/ui_session_json_util.h"
 
 namespace OHOS::Ace {
+namespace {
+// Extract the ruleSetId used to register and route the event callback.
+std::string ExtractPageSceneRuleSetId(const std::string& ruleJson)
+{
+    auto root = InspectorJsonUtil::ParseJsonString(ruleJson);
+    if (!root || !root->IsObject()) {
+        return "";
+    }
+    return root->GetString("ruleSetId", "");
+}
+} // namespace
 int32_t UIContentServiceProxy::GetInspectorTree(
     const std::function<void(std::string, int32_t, bool)>& eventCallback, ParamConfig config, int32_t timeout)
 {
@@ -179,16 +191,24 @@ int32_t UIContentServiceProxy::RegisterPageSceneRules(
         LOGW("RegisterPageSceneRules write parcel failed");
         return FAILED;
     }
-    report_->RegisterPageSceneEventCallback(eventCallback);
+    auto ruleSetId = ExtractPageSceneRuleSetId(ruleJson);
+    if (ruleSetId.empty()) {
+        LOGW("RegisterPageSceneRules ruleSetId is empty or invalid");
+        return PARAM_INVALID;
+    }
+    if (!report_->TryRegisterPageSceneEventCallback(ruleSetId, eventCallback)) {
+        LOGW("RegisterPageSceneRules callback already registered");
+        return PARAM_INVALID;
+    }
     int32_t sendRequestErrorCode = Remote()->SendRequest(REGISTER_PAGE_SCENE_RULES, data, reply, option);
     if (sendRequestErrorCode != ERR_NONE) {
         LOGW("RegisterPageSceneRules send request failed, errorCode is %{public}d", sendRequestErrorCode);
-        report_->UnregisterPageSceneEventCallback();
+        report_->UnregisterPageSceneEventCallback(ruleSetId);
         return REPLY_ERROR;
     }
     int32_t result = reply.ReadInt32();
     if (result != NO_ERROR) {
-        report_->UnregisterPageSceneEventCallback();
+        report_->UnregisterPageSceneEventCallback(ruleSetId);
     }
     return result;
 }
@@ -212,7 +232,7 @@ int32_t UIContentServiceProxy::UnregisterPageSceneRules(const std::string& ruleS
         return REPLY_ERROR;
     }
     if (report_ != nullptr) {
-        report_->UnregisterPageSceneEventCallback();
+        report_->UnregisterPageSceneEventCallback(ruleSetId);
     }
     return reply.ReadInt32();
 }

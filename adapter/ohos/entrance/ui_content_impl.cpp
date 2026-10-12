@@ -14,6 +14,7 @@
  */
 
 #include "adapter/ohos/entrance/ui_content_impl.h"
+#include "adapter/ohos/entrance/ui_session/ui_session_manager_ohos.h"
 #include "core/accessibility/accessibility_manager.h"
 #include "core/components_ng/manager/safe_area/safe_area_manager.h"
 
@@ -65,6 +66,7 @@
 #include "core/components_ng/manager/force_split/force_split_manager.h"
 #include "core/components_ng/manager/form_visible/form_visible_manager.h"
 #include "core/components_ng/manager/page_scene/page_scene_rule_manager.h"
+#include "core/components_ng/manager/page_scene/search_scene_context_collector.h"
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/pattern/ui_extension/ui_extension_manager.h"
 #include "core/components_ng/pattern/xcomponent/xcomponent_resolution_config.h"
@@ -429,6 +431,116 @@ struct ContainerScopeHilogRegistrar {
 };
 static ContainerScopeHilogRegistrar g_hilogRegistrar;
 #endif // ENABLE_CONTAINER_SCOPE_TRACKING
+
+// Presence event JSON per spec.md: true carries full evidence
+//; false carries exits; subwindow evidence applies
+// `<mainPageName>+Dialog`.
+std::string BuildSearchPresenceEventJson(
+    const NG::SearchPresenceStateMachine::PresenceEvent& event, const std::string& pageName)
+{
+    auto root = JsonUtil::Create(true);
+    root->Put("eventType", "presence");
+    root->Put("hasSearch", event.isTrue);
+    std::string eventPageName = pageName.empty() ? event.pageName : pageName;
+    if (event.anySubwindow && !eventPageName.empty()) {
+        eventPageName += "+Dialog";
+    }
+    if (!eventPageName.empty()) {
+        root->Put("pageName", eventPageName.c_str());
+    }
+    auto rulesJson = JsonUtil::CreateArray(true);
+    if (event.isTrue) {
+        for (const auto& hit : event.hits) {
+            auto item = JsonUtil::Create(true);
+            item->Put("ruleSetId", hit.ruleSetId.c_str());
+            item->Put("ruleId", hit.ruleId.c_str());
+            item->Put("evidenceType", hit.evidenceType.c_str());
+            if (!hit.source.empty()) {
+                item->Put("source", hit.source.c_str());
+            }
+            if (!hit.matchedKeyword.empty()) {
+                item->Put("matchedKeyword", hit.matchedKeyword.c_str());
+            }
+            item->Put("nodeId", hit.nodeId);
+            if (!hit.nodeType.empty()) {
+                item->Put("nodeType", hit.nodeType.c_str());
+            }
+            auto rectJson = JsonUtil::Create(true);
+            rectJson->Put("x", static_cast<double>(hit.rect.GetX()));
+            rectJson->Put("y", static_cast<double>(hit.rect.GetY()));
+            rectJson->Put("width", static_cast<double>(hit.rect.Width()));
+            rectJson->Put("height", static_cast<double>(hit.rect.Height()));
+            item->Put("rect", rectJson);
+            rulesJson->Put(item);
+        }
+        root->Put("hits", rulesJson);
+    } else {
+        for (const auto& rule : event.ruleIds) {
+            auto item = JsonUtil::Create(true);
+            item->Put("ruleSetId", rule.first.c_str());
+            item->Put("ruleId", rule.second.c_str());
+            rulesJson->Put(item);
+        }
+        root->Put("exits", rulesJson);
+    }
+    return root->ToString();
+}
+
+// Click event JSON per spec.md: ruleSetId/ruleId, matchType, matchedKeyword,
+// response node inspectorId/nodeId/type/rect, pageName.
+std::string BuildSearchClickEventJson(
+    const NG::SearchClickMatchResult& result, const std::string& pageName)
+{
+    auto root = JsonUtil::Create(true);
+    root->Put("eventType", "click");
+    if (!pageName.empty()) {
+        root->Put("pageName", pageName.c_str());
+    }
+    auto hitsJson = JsonUtil::CreateArray(true);
+    auto item = JsonUtil::Create(true);
+    item->Put("ruleSetId", result.ruleSetId.c_str());
+    item->Put("ruleId", result.ruleId.c_str());
+    item->Put("matchType", result.matchType.c_str());
+    if (!result.matchedKeyword.empty()) {
+        item->Put("matchedKeyword", result.matchedKeyword.c_str());
+    }
+    auto responseNode = JsonUtil::Create(true);
+    responseNode->Put("inspectorId", result.inspectorId.c_str());
+    responseNode->Put("nodeId", result.nodeId);
+    responseNode->Put("type", result.nodeType.c_str());
+    auto rectJson = JsonUtil::Create(true);
+    rectJson->Put("x", static_cast<double>(result.rect.GetX()));
+    rectJson->Put("y", static_cast<double>(result.rect.GetY()));
+    rectJson->Put("width", static_cast<double>(result.rect.Width()));
+    rectJson->Put("height", static_cast<double>(result.rect.Height()));
+    responseNode->Put("rect", rectJson);
+    item->Put("responseNode", responseNode);
+    hitsJson->Put(item);
+    root->Put("hits", hitsJson);
+    return root->ToString();
+}
+
+bool HandlePageSceneRuleRemoval(int32_t processId, const std::unique_ptr<JsonValue>& ruleRoot,
+    bool isSearchRule, const std::shared_ptr<NG::PageSceneRuleManager>& pageSceneMatcher)
+{
+    if (!ruleRoot || !ruleRoot->IsObject()) {
+        return false;
+    }
+    auto rules = ruleRoot->GetValue("rules");
+    // Detection requests contain rules; an empty array is an internal cleanup notification.
+    if (!rules || !rules->IsArray() || rules->GetArraySize() != 0) {
+        return false;
+    }
+    if (!isSearchRule) {
+        pageSceneMatcher->ClearProcess(processId, false);
+        return true;
+    }
+    auto generation = ruleRoot->GetString("_pageSceneGeneration");
+    if (!generation.empty()) {
+        pageSceneMatcher->UnregisterSearchRuleSet(processId, ruleRoot->GetString("ruleSetId"), generation);
+    }
+    return true;
+}
 
 } // namespace
 
@@ -3039,6 +3151,16 @@ void UIContentImpl::Background()
         PostPreFreezeRegisterTask(true);
     }
     Platform::AceContainer::OnHide(instanceId_);
+
+    // Search presence: app background reports one false for every PRESENT page
+    //.
+    if (pageSceneMatcher_) {
+        auto exitEvents = pageSceneMatcher_->ExitAllSearchPresence();
+        for (const auto& [pid, event] : exitEvents) {
+            UiSessionManager::GetInstance()->ReportPageSceneEvent(
+                pid, BuildSearchPresenceEventJson(event, ""), false);
+        }
+    }
 
     CHECK_NULL_VOID(window_);
     std::string windowName = window_->GetWindowName();
@@ -6425,7 +6547,9 @@ void UIContentImpl::InitUISessionManagerCallbacks(const WeakPtr<TaskExecutor>& t
     SaveGetCurrentAbilityLanguageInfoFunction(taskExecutor);
     SaveTraverseWebForPageSceneCallback(taskExecutor);
     auto pageSceneMatcher = std::make_shared<NG::PageSceneRuleManager>();
-    auto pageSceneDetectCallback = [weakTaskExecutor = taskExecutor, pageSceneMatcher](
+    pageSceneMatcher_ = pageSceneMatcher;
+    auto pageSceneDetectCallback = [weakTaskExecutor = taskExecutor,
+                                      weakPageSceneMatcher = std::weak_ptr<NG::PageSceneRuleManager>(pageSceneMatcher)](
         int32_t processId, const std::string& ruleJson, bool isGetResult) {
         auto taskExecutor = weakTaskExecutor.Upgrade();
         if (!taskExecutor) {
@@ -6445,13 +6569,88 @@ void UIContentImpl::InitUISessionManagerCallbacks(const WeakPtr<TaskExecutor>& t
             return;
         }
         auto posted = taskExecutor->PostTask(
-            [processId, ruleJson, isGetResult, weakTaskExecutor, pageSceneMatcher]() {
+            [processId, ruleJson, isGetResult, weakTaskExecutor, weakPageSceneMatcher, taskExecutor]() {
+                auto pageSceneMatcher = weakPageSceneMatcher.lock();
+                if (!pageSceneMatcher) {
+                    if (isGetResult) {
+                        UiSessionManager::GetInstance()->CompleteGetPageScene(processId);
+                    }
+                    return;
+                }
                 if (ruleJson.empty()) {
-                    pageSceneMatcher->ClearProcess(processId);
+                    // Search removals carry their registration generation separately.
+                    pageSceneMatcher->ClearProcess(processId, false);
+                    return;
+                }
+                auto searchRoot = JsonUtil::ParseJsonString(ruleJson);
+                bool isSearchRule = searchRoot && searchRoot->IsObject() &&
+                    (!searchRoot->GetValue("version") || searchRoot->GetValue("version")->IsNull());
+                if (!isGetResult &&
+                    HandlePageSceneRuleRemoval(processId, searchRoot, isSearchRule, pageSceneMatcher)) {
                     return;
                 }
                 auto pipeline = NG::PipelineContext::GetCurrentContextSafely();
                 if (!pipeline) {
+                    LOGW("PageSceneDetect pipeline is null, processId=%{public}d", processId);
+                    if (isGetResult) {
+                        UiSessionManager::GetInstance()->CompleteGetPageScene(processId);
+                    }
+                    return;
+                }
+                // Search scene ruleJson (frozen schema) carries no "version" field.
+                if (isSearchRule) {
+                    auto sessionManager = UiSessionManager::GetInstance();
+                    if (!isGetResult && !sessionManager->IsSearchPageSceneRuleCurrent(
+                        processId, searchRoot->GetString("ruleSetId"),
+                        searchRoot->GetString("_pageSceneGeneration"))) {
+                        return;
+                    }
+                    // Repeated detection keeps the same generation; a newer
+                    // registration replaces a cache entry awaiting old cleanup.
+                    pageSceneMatcher->RegisterSearchRuleSet(processId, ruleJson);
+                    pageSceneMatcher->RegisterSearchClickObserver(pageSceneMatcher);
+                    NG::SearchSceneContextCollector collector;
+                    auto pageContext = collector.Collect();
+                    NG::SearchSceneSnapshotBuilder builder;
+                    auto snapshot = builder.Build(pageContext.pageName, pageContext.navDestinationName,
+                        pageContext.pageUrl, pageContext.windows);
+                    auto reportSearchEvent = [processId, isGetResult, taskExecutor](const std::string& sceneJson) {
+                        if (!taskExecutor) {
+                            if (isGetResult) {
+                                UiSessionManager::GetInstance()->CompleteGetPageScene(processId);
+                            }
+                            return;
+                        }
+                        auto posted = taskExecutor->PostTask(
+                            [processId, sceneJson, isGetResult]() {
+                                UiSessionManager::GetInstance()->ReportPageSceneEvent(
+                                    processId, sceneJson, isGetResult);
+                            },
+                            TaskExecutor::TaskType::BACKGROUND, "UiSessionSearchPageSceneReport");
+                        if (!posted && isGetResult) {
+                            UiSessionManager::GetInstance()->CompleteGetPageScene(processId);
+                        }
+                    };
+                    // Route transition: exit PRESENT pages of this process other
+                    // than the current one first (A false before B true, AC-6.4).
+                    auto exitEvents = pageSceneMatcher->ExitOtherSearchPresence(processId, snapshot.pageName);
+                    for (const auto& event : exitEvents) {
+                        reportSearchEvent(BuildSearchPresenceEventJson(event, snapshot.pageName));
+                    }
+                    auto hits = pageSceneMatcher->MatchSearchScene(processId, snapshot);
+                    auto events = pageSceneMatcher->UpdateSearchPresence(processId, snapshot, hits);
+                    for (const auto& event : events) {
+                        reportSearchEvent(BuildSearchPresenceEventJson(event, snapshot.pageName));
+                    }
+                    // Consume click candidates buffered since the last stable point
+                    // and report search click events.
+                    NG::SearchClickPageContext clickPage;
+                    clickPage.navDestinationName = snapshot.navDestinationName;
+                    clickPage.pageUrl = snapshot.pageUrl;
+                    auto clickResults = pageSceneMatcher->ConsumeSearchClickCandidates(clickPage);
+                    for (const auto& clickResult : clickResults) {
+                        reportSearchEvent(BuildSearchClickEventJson(clickResult, snapshot.pageName));
+                    }
                     if (isGetResult) {
                         UiSessionManager::GetInstance()->CompleteGetPageScene(processId);
                     }

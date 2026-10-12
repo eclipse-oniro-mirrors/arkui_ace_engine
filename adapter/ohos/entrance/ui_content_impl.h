@@ -52,6 +52,10 @@ class RSSyncTransactionController;
 class RSSyncTransactionHandler;
 } // namespace OHOS::Rosen
 
+namespace OHOS::Ace::NG {
+class PageSceneRuleManager;
+} // namespace OHOS::Ace::NG
+
 namespace OHOS::Ace {
 struct DecorButtonStyle;
 
@@ -543,6 +547,7 @@ protected:
     OHOS::Rosen::Window* window_ = nullptr;
     std::string startUrl_;
     int32_t instanceId_ = -1;
+    std::shared_ptr<NG::PageSceneRuleManager> pageSceneMatcher_;
     int32_t lastRotation = -1;
     OHOS::sptr<OHOS::Rosen::IWindowDragListener> dragWindowListener_ = nullptr;
     OHOS::sptr<OHOS::Rosen::IAvoidAreaChangedListener> avoidAreaChangedListener_ = nullptr;

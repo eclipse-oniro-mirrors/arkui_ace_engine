@@ -315,6 +315,8 @@ public:
     virtual void FlushPageSceneNodeChanged() {};
     virtual void SavePageSceneDetectFunction(PageSceneDetectFunction&& function) {};
     virtual void SaveWebPageSceneFunction(WebPageSceneFunction&& function) {};
+    virtual bool IsSearchPageSceneRuleCurrent(
+        int32_t processId, const std::string& ruleSetId, const std::string& generation) { return false; }
     // Internal PageScene scheduling hook. Keep it at the end of the virtual interface to preserve
     // the slot order of the existing UiSessionManager methods.
     virtual void NotifyPageSceneNodeStateChanged(
