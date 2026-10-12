@@ -293,7 +293,7 @@ HWTEST_F(UISessionBatchCommandParserTest, ParseReportsDecodedNodeIdKeyLength, Te
     for (const auto& testCase : cases) {
         SCOPED_TRACE(testCase.key);
         std::string command = std::string(R"({"cmd":"batch","commands":{")") + testCase.key;
-        command += R"(":{"cmd":"setText","params":{"value":"bad"}},)";
+        command += "\":{\"cmd\":\"setText\",\"params\":{\"value\":\"bad\"}},";
         command += R"("8":{"cmd":"setText","params":{"value":"SURVIVOR"}}}})";
         const auto result = UiSessionBatchCommand::Parse(command);
 
