@@ -402,7 +402,7 @@ ImageSpanSize TLVUtil::ReadImageSpanSize(std::vector<uint8_t>& buff, int32_t& cu
         return imageSpanSize;
     }
     for (uint8_t tag = TLVUtil::ReadUint8(buff, cursor);
-        tag != TLV_IMAGESPANSIZE_END_TAG; tag = TLVUtil::ReadUint8(buff, cursor)) {
+        tag != TLV_IMAGESPANSIZE_END_TAG && tag != TLV_END; tag = TLVUtil::ReadUint8(buff, cursor)) {
         switch (tag) {
             case TLV_IMAGESPANSIZE_WIDTH_TAG: {
                 imageSpanSize.width = ReadCalcDimension(buff, cursor);
@@ -448,7 +448,7 @@ NG::PaddingProperty TLVUtil::ReadPaddingProperty(std::vector<uint8_t>& buff, int
         return pad;
     }
     for (uint8_t tag = TLVUtil::ReadUint8(buff, cursor);
-        tag != TLV_PADDINGPROPERTY_END_TAG; tag = TLVUtil::ReadUint8(buff, cursor)) {
+        tag != TLV_PADDINGPROPERTY_END_TAG && tag != TLV_END; tag = TLVUtil::ReadUint8(buff, cursor)) {
         switch (tag) {
             case TLV_PADDINGPROPERTY_LEFT_TAG: {
                 pad.left = ReadCalcLength(buff, cursor);
@@ -519,7 +519,7 @@ ImageSpanAttribute TLVUtil::ReadImageSpanAttribute(std::vector<uint8_t>& buff, i
         return l;
     }
     for (uint8_t tag = TLVUtil::ReadUint8(buff, cursor);
-        tag != TLV_IMAGESPANATTRIBUTE_END_TAG; tag = TLVUtil::ReadUint8(buff, cursor)) {
+        tag != TLV_IMAGESPANATTRIBUTE_END_TAG && tag != TLV_END; tag = TLVUtil::ReadUint8(buff, cursor)) {
         switch (tag) {
             case TLV_IMAGESPANATTRIBUTE_SIZE_TAG:
                 l.size = ReadImageSpanSize(buff, cursor);
@@ -671,7 +671,7 @@ std::optional<NG::Gradient> TLVUtil::ReadRadialGradient(std::vector<uint8_t>& bu
     std::optional<Dimension> centerY;
     std::optional<Dimension> radius;
     for (uint8_t tag = TLVUtil::ReadUint8(buff, cursor);
-        tag != TLV_SPAN_TEXT_LINE_STYLE_RADIALGRADIENT_END_TAG; tag = TLVUtil::ReadUint8(buff, cursor)) {
+        tag != TLV_SPAN_TEXT_LINE_STYLE_RADIALGRADIENT_END_TAG && tag != TLV_END; tag = TLVUtil::ReadUint8(buff, cursor)) {
         switch (tag) {
             case TLV_SPAN_TEXT_LINE_STYLE_RADIALGRADIENT_CENTERX: {
                 centerX = ReadDimension(buff, cursor);
@@ -746,7 +746,7 @@ std::optional<NG::Gradient> TLVUtil::ReadLinearGradient(std::vector<uint8_t>& bu
     std::optional<int32_t> direction;
     std::optional<Dimension> angle;
     for (uint8_t tag = TLVUtil::ReadUint8(buff, cursor);
-        tag != TLV_SPAN_TEXT_LINE_STYLE_LINEARGRADIENT_END_TAG; tag = TLVUtil::ReadUint8(buff, cursor)) {
+        tag != TLV_SPAN_TEXT_LINE_STYLE_LINEARGRADIENT_END_TAG && tag != TLV_END; tag = TLVUtil::ReadUint8(buff, cursor)) {
         switch (tag) {
             case TLV_SPAN_TEXT_LINE_STYLE_LINEARGRADIENT_DIRECTION: {
                 direction = ReadInt32(buff, cursor);

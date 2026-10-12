@@ -1618,7 +1618,7 @@ RefPtr<SpanItem> SpanItem::DecodeTlv(std::vector<uint8_t>& buff, int32_t& cursor
     sameSpan->content = UtfUtils::Str8DebugToStr16(TLVUtil::ReadString(buff, cursor));
 
     for (uint8_t tag = TLVUtil::ReadUint8(buff, cursor);
-        tag != TLV_SPANITEM_END_TAG; tag = TLVUtil::ReadUint8(buff, cursor)) {
+        tag != TLV_SPANITEM_END_TAG && tag != TLV_END; tag = TLVUtil::ReadUint8(buff, cursor)) {
         switch (tag) {
             READ_TEXT_STYLE_TLV(fontStyle, UpdateFontSize, TLV_SPAN_FONT_STYLE_FONTSIZE, Dimension);
             READ_TEXT_STYLE_TLV(fontStyle, UpdateTextColor, TLV_SPAN_FONT_STYLE_TEXTCOLOR, Color);
@@ -1819,7 +1819,7 @@ RefPtr<ImageSpanItem> ImageSpanItem::DecodeTlv(std::vector<uint8_t>& buff, int32
     sameSpan->content = UtfUtils::Str8DebugToStr16(TLVUtil::ReadString(buff, cursor));
 
     for (uint8_t tag = TLVUtil::ReadUint8(buff, cursor);
-        tag != TLV_SPANITEM_END_TAG; tag = TLVUtil::ReadUint8(buff, cursor)) {
+        tag != TLV_SPANITEM_END_TAG && tag != TLV_END; tag = TLVUtil::ReadUint8(buff, cursor)) {
         switch (tag) {
             case TLV_IMAGESPANOPTION_OFFSET_TAG: {
                 sameSpan->options.offset = TLVUtil::ReadInt32(buff, cursor);
