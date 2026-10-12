@@ -109,7 +109,7 @@ public:
     MOCK_METHOD(void, PasteAndMatchStyle, (), (const, override));
     MOCK_METHOD(void, RequestPasswordAutoFill, (), (const, override));
     MOCK_METHOD(void, CopyLinkToTextMenu, (), (const, override));
-    MOCK_METHOD(void, RemoveFragments, (), (const, override)); 
+    MOCK_METHOD(void, RemoveFragments, (), (const, override));
 };
 
 class WebContextSelectOverlayTest : public testing::Test {
