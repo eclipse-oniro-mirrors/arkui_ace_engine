@@ -150,7 +150,10 @@ ace_unittest("observer_test_ng") {
   if (is_host_product) {
     type = "host_components"
   }
-  sources = [ "observer_test_ng.cpp" ]
+  sources = [
+    "observer_draw_callback_test.cpp",
+    "observer_test_ng.cpp",
+  ]
 }
 
 ace_unittest("view_abstract_model_test_ng") {

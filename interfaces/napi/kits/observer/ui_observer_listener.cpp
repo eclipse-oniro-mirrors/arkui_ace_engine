@@ -14,8 +14,10 @@
  */
 
 #include "ui_observer_listener.h"
+#include "core/components_ng/base/observer_handler.h"
 #include "base/utils/napi_scope_raii.h"
 #include "js_native_api.h"
+#include "napi/native_common.h"
 #include "core/common/container.h"
 #include "core/event/ace_events.h"
 #include "interfaces/napi/kits/observer/gesture/gesture_observer_listener.h"
@@ -373,7 +375,7 @@ static napi_value GetCurrentLocalPositionForGestureEvent(napi_env env, napi_call
 
 void UIObserverListener::OnNavigationStateChange(const NG::NavDestinationInfo& info)
 {
-    if (!env_ || !callback_) {
+    if (!env_ || !callback_.IsValid()) {
         TAG_LOGW(AceLogTag::ACE_OBSERVER,
             "Handle navDestination state change failed, runtime or callback function invalid!");
         return;
@@ -382,8 +384,7 @@ void UIObserverListener::OnNavigationStateChange(const NG::NavDestinationInfo& i
     if (!scope) {
         return;
     }
-    napi_value callback = nullptr;
-    napi_get_reference_value(env_, callback_, &callback);
+    napi_value callback = callback_.GetValue();
     napi_value argv[] = { CreateNavDestinationInfoObj(info) };
     napi_call_function(env_, nullptr, callback, 1, argv, nullptr);
 }
@@ -391,7 +392,7 @@ void UIObserverListener::OnNavigationStateChange(const NG::NavDestinationInfo& i
 void UIObserverListener::OnScrollEventStateChange(
     const std::string& id, int32_t uniqueId, NG::ScrollEventType eventType, float offset, Ace::Axis axis)
 {
-    if (!env_ || !callback_) {
+    if (!env_ || !callback_.IsValid()) {
         TAG_LOGW(AceLogTag::ACE_OBSERVER,
             "Handle scrollEvent state change failed, runtime or callback function invalid!");
         return;
@@ -400,8 +401,7 @@ void UIObserverListener::OnScrollEventStateChange(
     if (!scope) {
         return;
     }
-    napi_value callback = nullptr;
-    napi_get_reference_value(env_, callback_, &callback);
+    napi_value callback = callback_.GetValue();
     napi_value objValue = nullptr;
     napi_create_object(env_, &objValue);
     napi_value scrollId = nullptr;
@@ -425,7 +425,7 @@ void UIObserverListener::OnScrollEventStateChange(
 
 void UIObserverListener::OnRouterPageStateChange(const NG::RouterPageInfoNG& pageInfo, napi_value context)
 {
-    if (!env_ || !callback_) {
+    if (!env_ || !callback_.IsValid()) {
         TAG_LOGW(AceLogTag::ACE_OBSERVER,
             "Handle router page state change failed, runtime or callback function invalid!");
         return;
@@ -434,15 +434,14 @@ void UIObserverListener::OnRouterPageStateChange(const NG::RouterPageInfoNG& pag
     if (!scope) {
         return;
     }
-    napi_value callback = nullptr;
-    napi_get_reference_value(env_, callback_, &callback);
+    napi_value callback = callback_.GetValue();
     napi_value argv[] = { CreateRouterPageInfoObj(pageInfo, context) };
     napi_call_function(env_, nullptr, callback, 1, argv, nullptr);
 }
 
 void UIObserverListener::OnDensityChange(double density)
 {
-    if (!env_ || !callback_) {
+    if (!env_ || !callback_.IsValid()) {
         TAG_LOGW(AceLogTag::ACE_OBSERVER,
             "Handle density change failed, runtime or callback function invalid!");
         return;
@@ -451,8 +450,7 @@ void UIObserverListener::OnDensityChange(double density)
     if (!scope) {
         return;
     }
-    napi_value callback = nullptr;
-    napi_get_reference_value(env_, callback_, &callback);
+    napi_value callback = callback_.GetValue();
     napi_value objValue = nullptr;
     napi_create_object(env_, &objValue);
     napi_value napiDensity = nullptr;
@@ -464,7 +462,7 @@ void UIObserverListener::OnDensityChange(double density)
 
 void UIObserverListener::OnWinSizeLayoutBreakpointChange(const WindowSizeBreakpoint info)
 {
-    if (!env_ || !callback_) {
+    if (!env_ || !callback_.IsValid()) {
         TAG_LOGW(AceLogTag::ACE_OBSERVER,
             "Handle winSizeLayoutBreakpoint change failed, runtime or callback function invalid!");
         return;
@@ -473,8 +471,7 @@ void UIObserverListener::OnWinSizeLayoutBreakpointChange(const WindowSizeBreakpo
     if (!scope) {
         return;
     }
-    napi_value callback = nullptr;
-    napi_get_reference_value(env_, callback_, &callback);
+    napi_value callback = callback_.GetValue();
     napi_value objValue = nullptr;
     napi_create_object(env_, &objValue);
     napi_value widthValue;
@@ -489,7 +486,7 @@ void UIObserverListener::OnWinSizeLayoutBreakpointChange(const WindowSizeBreakpo
 
 void UIObserverListener::OnNodeRenderStateChange(NG::FrameNode* frameNode, NG::NodeRenderState nodeRenderState)
 {
-    if (!env_ || !callback_) {
+    if (!env_ || !callback_.IsValid()) {
         TAG_LOGW(
             AceLogTag::ACE_OBSERVER, "Handle nodeRender state change failed, runtime or callback function invalid!");
         return;
@@ -498,8 +495,7 @@ void UIObserverListener::OnNodeRenderStateChange(NG::FrameNode* frameNode, NG::N
     if (!scope) {
         return;
     }
-    napi_value callback = nullptr;
-    napi_get_reference_value(env_, callback_, &callback);
+    napi_value callback = callback_.GetValue();
 
     napi_value objValueNodeRenderState = nullptr;
     napi_create_int32(env_, static_cast<int32_t>(nodeRenderState), &objValueNodeRenderState);
@@ -524,27 +520,9 @@ void UIObserverListener::OnNodeRenderStateChange(NG::FrameNode* frameNode, NG::N
     }
 }
 
-void UIObserverListener::OnDrawOrLayout()
-{
-    if (!env_ || !callback_) {
-        TAG_LOGW(AceLogTag::ACE_OBSERVER, "Handle draw or layout failed, runtime or callback function invalid!");
-        return;
-    }
-    ScopeRAII scope(env_);
-    if (!scope) {
-        return;
-    }
-    napi_value callback = nullptr;
-    napi_get_reference_value(env_, callback_, &callback);
-    napi_value objValue = nullptr;
-    napi_create_object(env_, &objValue);
-    napi_value argv[] = { objValue };
-    napi_call_function(env_, nullptr, callback, 1, argv, nullptr);
-}
-
 void UIObserverListener::OnNavDestinationSwitch(const NG::NavDestinationSwitchInfo& switchInfo, napi_value context)
 {
-    if (!env_ || !callback_) {
+    if (!env_ || !callback_.IsValid()) {
         TAG_LOGW(AceLogTag::ACE_OBSERVER,
             "Handle navDestination switch failed, runtime or callback function invalid!");
         return;
@@ -553,15 +531,14 @@ void UIObserverListener::OnNavDestinationSwitch(const NG::NavDestinationSwitchIn
     if (!scope) {
         return;
     }
-    napi_value callback = nullptr;
-    napi_get_reference_value(env_, callback_, &callback);
+    napi_value callback = callback_.GetValue();
     napi_value argv[] = { CreateNavDestinationSwitchInfoObj(switchInfo, context) };
     napi_call_function(env_, nullptr, callback, 1, argv, nullptr);
 }
 
 void UIObserverListener::OnTextChangeEvent(const NG::TextChangeEventInfo& info)
 {
-    if (!env_ || !callback_) {
+    if (!env_ || !callback_.IsValid()) {
         TAG_LOGW(AceLogTag::ACE_OBSERVER, "Handle text change event failed, runtime or callback function invalid!");
         return;
     }
@@ -569,8 +546,7 @@ void UIObserverListener::OnTextChangeEvent(const NG::TextChangeEventInfo& info)
     if (!scope) {
         return;
     }
-    napi_value callback = nullptr;
-    napi_get_reference_value(env_, callback_, &callback);
+    napi_value callback = callback_.GetValue();
     napi_value objValue = nullptr;
     napi_value id = nullptr;
     napi_value uniqueId = nullptr;
@@ -588,7 +564,7 @@ void UIObserverListener::OnTextChangeEvent(const NG::TextChangeEventInfo& info)
 
 void UIObserverListener::OnRouterPageSizeChange(const NG::RouterPageInfoNG& info, napi_value context)
 {
-    if (!env_ || !callback_) {
+    if (!env_ || !callback_.IsValid()) {
         TAG_LOGW(
             AceLogTag::ACE_OBSERVER, "Handle router page size change failed, runtime or callback function invalid!");
         return;
@@ -597,15 +573,14 @@ void UIObserverListener::OnRouterPageSizeChange(const NG::RouterPageInfoNG& info
     if (!scope) {
         return;
     }
-    napi_value callback = nullptr;
-    napi_get_reference_value(env_, callback_, &callback);
+    napi_value callback = callback_.GetValue();
     napi_value argv[] = { CreateRouterPageInfoObj(info, context) };
     napi_call_function(env_, nullptr, callback, 1, argv, nullptr);
 }
 
 void UIObserverListener::OnNavDestinationSizeChange(const NG::NavDestinationInfo& info)
 {
-    if (!env_ || !callback_) {
+    if (!env_ || !callback_.IsValid()) {
         TAG_LOGW(AceLogTag::ACE_OBSERVER,
             "Handle NavDestination size change failed, runtime or callback function invalid!");
         return;
@@ -614,15 +589,14 @@ void UIObserverListener::OnNavDestinationSizeChange(const NG::NavDestinationInfo
     if (!scope) {
         return;
     }
-    napi_value callback = nullptr;
-    napi_get_reference_value(env_, callback_, &callback);
+    napi_value callback = callback_.GetValue();
     napi_value argv[] = { CreateNavDestinationInfoObj(info) };
     napi_call_function(env_, nullptr, callback, 1, argv, nullptr);
 }
 
 void UIObserverListener::HandleSwiperContentUpdate(const NG::SwiperContentInfo& info)
 {
-    if (!env_ || !callback_) {
+    if (!env_ || !callback_.IsValid()) {
         TAG_LOGW(AceLogTag::ACE_OBSERVER,
             "Handle swiper content update failed, runtime or callback function invalid!");
         return;
@@ -631,8 +605,7 @@ void UIObserverListener::HandleSwiperContentUpdate(const NG::SwiperContentInfo& 
     if (!scope) {
         return;
     }
-    napi_value callback = nullptr;
-    napi_get_reference_value(env_, callback_, &callback);
+    napi_value callback = callback_.GetValue();
     napi_value objValue = nullptr;
     napi_value id = nullptr;
     napi_value uniqueId = nullptr;
@@ -692,7 +665,7 @@ napi_value UIObserverListener::CreateNavDestinationSwitchInfoObj(
 void UIObserverListener::OnWillClick(
     const GestureEvent& gestureEventInfo, const ClickInfo& clickInfo, const RefPtr<NG::FrameNode> frameNode)
 {
-    if (!env_ || !callback_) {
+    if (!env_ || !callback_.IsValid()) {
         TAG_LOGW(AceLogTag::ACE_OBSERVER,
             "Handle density change failed, runtime or callback function invalid!");
         return;
@@ -702,8 +675,7 @@ void UIObserverListener::OnWillClick(
         return;
     }
 
-    napi_value callback = nullptr;
-    napi_get_reference_value(env_, callback_, &callback);
+    napi_value callback = callback_.GetValue();
     
     napi_value objValueClickEvent = nullptr;
     napi_create_object(env_, &objValueClickEvent);
@@ -727,7 +699,7 @@ void UIObserverListener::OnWillClick(
 void UIObserverListener::OnDidClick(
     const GestureEvent& gestureEventInfo, const ClickInfo& clickInfo, const RefPtr<NG::FrameNode> frameNode)
 {
-    if (!env_ || !callback_) {
+    if (!env_ || !callback_.IsValid()) {
         TAG_LOGW(AceLogTag::ACE_OBSERVER,
             "Handle density change failed, runtime or callback function invalid!");
         return;
@@ -737,8 +709,7 @@ void UIObserverListener::OnDidClick(
         return;
     }
 
-    napi_value callback = nullptr;
-    napi_get_reference_value(env_, callback_, &callback);
+    napi_value callback = callback_.GetValue();
     
     napi_value objValueClickEvent = nullptr;
     napi_create_object(env_, &objValueClickEvent);
@@ -762,7 +733,7 @@ void UIObserverListener::OnDidClick(
 void UIObserverListener::OnPanGestureStateChange(const GestureEvent& gestureEventInfo,
     const RefPtr<NG::PanRecognizer>& current, const RefPtr<NG::FrameNode> frameNode)
 {
-    if (!env_ || !callback_) {
+    if (!env_ || !callback_.IsValid()) {
         TAG_LOGW(AceLogTag::ACE_OBSERVER, "Handle pan gesture change failed, runtime or callback function invalid!");
         return;
     }
@@ -771,8 +742,7 @@ void UIObserverListener::OnPanGestureStateChange(const GestureEvent& gestureEven
         return;
     }
 
-    napi_value callback = nullptr;
-    napi_get_reference_value(env_, callback_, &callback);
+    napi_value callback = callback_.GetValue();
 
     napi_value objValueGestureEvent = nullptr;
     napi_create_object(env_, &objValueGestureEvent);
@@ -800,7 +770,7 @@ void UIObserverListener::OnGestureStateChange(NG::GestureListenerType gestureLis
     const GestureEvent& gestureEventInfo, const RefPtr<NG::NGGestureRecognizer>& current,
     const RefPtr<NG::FrameNode> frameNode, NG::GestureActionPhase phase)
 {
-    if (!env_ || !callback_ || !current) {
+    if (!env_ || !callback_.IsValid() || !current) {
         TAG_LOGW(
             AceLogTag::ACE_OBSERVER, "Handle gesture change failed, runtime, recognizer or callback function invalid!");
         return;
@@ -810,8 +780,7 @@ void UIObserverListener::OnGestureStateChange(NG::GestureListenerType gestureLis
         return;
     }
 
-    napi_value callback = nullptr;
-    napi_get_reference_value(env_, callback_, &callback);
+    napi_value callback = callback_.GetValue();
 
     napi_value objValueGestureTriggerInfo = nullptr;
     napi_create_object(env_, &objValueGestureTriggerInfo);
@@ -847,7 +816,7 @@ void UIObserverListener::OnGestureStateChange(NG::GestureListenerType gestureLis
 
 void UIObserverListener::OnTabContentStateChange(const NG::TabContentInfo& tabContentInfo)
 {
-    if (!env_ || !callback_) {
+    if (!env_ || !callback_.IsValid()) {
         TAG_LOGW(AceLogTag::ACE_OBSERVER,
             "Handle tabContent state change failed, runtime or callback function invalid!");
         return;
@@ -856,8 +825,7 @@ void UIObserverListener::OnTabContentStateChange(const NG::TabContentInfo& tabCo
     if (!scope) {
         return;
     }
-    napi_value callback = nullptr;
-    napi_get_reference_value(env_, callback_, &callback);
+    napi_value callback = callback_.GetValue();
     napi_value objValue = nullptr;
     napi_value param1 = nullptr;
     napi_value param2 = nullptr;
@@ -894,7 +862,7 @@ void UIObserverListener::OnTabContentStateChange(const NG::TabContentInfo& tabCo
 
 void UIObserverListener::OnTabChange(const NG::TabContentInfo& tabContentInfo)
 {
-    if (!env_ || !callback_) {
+    if (!env_ || !callback_.IsValid()) {
         TAG_LOGW(AceLogTag::ACE_OBSERVER,
             "Handle tab change failed, runtime or callback function invalid!");
         return;
@@ -903,8 +871,7 @@ void UIObserverListener::OnTabChange(const NG::TabContentInfo& tabContentInfo)
     if (!scope) {
         return;
     }
-    napi_value callback = nullptr;
-    napi_get_reference_value(env_, callback_, &callback);
+    napi_value callback = callback_.GetValue();
     napi_value objValue = nullptr;
     napi_value param1 = nullptr;
     napi_value param2 = nullptr;
@@ -1545,13 +1512,6 @@ napi_value UIObserverListener::CreateRouterPageInfoObj(const NG::RouterPageInfoN
     return objValue;
 }
 
-napi_value UIObserverListener::GetNapiCallback()
-{
-    napi_value callback = nullptr;
-    napi_get_reference_value(env_, callback_, &callback);
-    return callback;
-}
-
 napi_value UIObserverListener::GetFrameNodeObject(const RefPtr<NG::FrameNode>& frameNode)
 {
     CHECK_NULL_RETURN(frameNode, nullptr);
@@ -1564,10 +1524,4 @@ napi_value UIObserverListener::GetFrameNodeObject(const RefPtr<NG::FrameNode>& f
     return frontEnd->GetFrameNodeValueByNodeId(frameNode->GetId());
 }
 
-bool UIObserverListener::NapiEqual(napi_value cb)
-{
-    bool isEquals = false;
-    napi_strict_equals(env_, cb, GetNapiCallback(), &isEquals);
-    return isEquals;
-}
 } // namespace OHOS::Ace::Napi

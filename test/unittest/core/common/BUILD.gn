@@ -51,11 +51,15 @@ if (is_host_product) {
       sources = [
         "common_test_core.cpp",
         "common_test_min.cpp",
+        "$ace_root/frameworks/core/common/ui_observer/ui_observer_store.cpp",
+        "ui_observer_store_test.cpp",
       ]
     } else {
       sources += [
         "common_test_core.cpp",
         "common_test_min.cpp",
+        "$ace_root/frameworks/core/common/ui_observer/ui_observer_store.cpp",
+        "ui_observer_store_test.cpp",
       ]
     }
   }
@@ -99,11 +103,15 @@ if (is_host_product) {
       sources = [
         "common_test_core.cpp",
         "common_test_min.cpp",
+        "$ace_root/frameworks/core/common/ui_observer/ui_observer_store.cpp",
+        "ui_observer_store_test.cpp",
       ]
     } else {
       sources += [
         "common_test_core.cpp",
         "common_test_min.cpp",
+        "$ace_root/frameworks/core/common/ui_observer/ui_observer_store.cpp",
+        "ui_observer_store_test.cpp",
       ]
     }
 
