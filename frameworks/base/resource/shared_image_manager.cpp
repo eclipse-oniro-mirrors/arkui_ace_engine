@@ -134,9 +134,9 @@ bool SharedImageManager::UpdateImageMap(const std::string& name, const SharedIma
     } else {
         sharedImageTotalSize_ += sharedImage.size();
         sharedImageMap_.emplace(name, sharedImage);
-        if (static_cast<int>(sharedImageMap_.size()) > sharedImageCacheThreshold_) {
+        if (static_cast<int>(sharedImageMap_.size()) > sharedImageCacheThreshold_.load()) {
             LOGW("will clear %{public}s cache, sharedImageMap_ size %{public}d max cache: %{public}d",
-                name.c_str(), static_cast<int>(sharedImageMap_.size()), sharedImageCacheThreshold_);
+                name.c_str(), static_cast<int>(sharedImageMap_.size()), sharedImageCacheThreshold_.load());
             isClear = true;
         }
     }

@@ -16,6 +16,7 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_BASE_RESOURCE_SHARED_IMAGE_MANAGER_H
 #define FOUNDATION_ACE_FRAMEWORKS_BASE_RESOURCE_SHARED_IMAGE_MANAGER_H
 
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -47,9 +48,9 @@ class SharedImageManager : public AceType {
 
 public:
     explicit SharedImageManager(const RefPtr<TaskExecutor>& taskExecutor) :
-        sharedImageTotalSize_(0), taskExecutor_(taskExecutor) {
-        sharedImageCacheThreshold_ = DEFAULT_FORM_SHARED_IMAGE_CACHE_THRESHOLD;
-        LOGI("SharedImageManager threshold %{public}d", sharedImageCacheThreshold_);
+        sharedImageTotalSize_(0), sharedImageCacheThreshold_(DEFAULT_FORM_SHARED_IMAGE_CACHE_THRESHOLD),
+        taskExecutor_(taskExecutor) {
+        LOGI("SharedImageManager threshold %{public}d", sharedImageCacheThreshold_.load());
     }
     ~SharedImageManager() override = default;
     void AddSharedImage(const std::string& name, SharedImage&& sharedImage);
@@ -58,13 +59,13 @@ public:
 
     void SetImageCacheThreshold(int32_t threshold)
     {
-        sharedImageCacheThreshold_ = threshold;
+        sharedImageCacheThreshold_.store(threshold);
         LOGI("SetImageCacheThreshold %{public}d", threshold);
     }
 
     int32_t GetImageCacheThreshold() const
     {
-        return sharedImageCacheThreshold_;
+        return sharedImageCacheThreshold_.load();
     }
 
     const SharedImageMap& GetSharedImageMap() const
@@ -87,7 +88,7 @@ private:
     std::mutex cancelableCallbackMapMutex_;
     SharedImageMap sharedImageMap_;
     size_t sharedImageTotalSize_;
-    int32_t sharedImageCacheThreshold_;
+    std::atomic<int32_t> sharedImageCacheThreshold_;
     ProviderMapToReload providerMapToReload_;
     std::function<void()> clearImageDataCallback_;
     std::unordered_map<std::string, CancelableCallback<void()>> cancelableCallbackMap_;
