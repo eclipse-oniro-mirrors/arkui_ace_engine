@@ -350,7 +350,7 @@ void Tabs::SetOnChange(OnChangeEvent onChangeEvent)
     CHECK_NULL_VOID(frameNodeImpl);
     auto aceFrameNode = frameNodeImpl->GetAceNode();
     CHECK_NULL_VOID(aceFrameNode);
-    auto onChange = [onChangeEvent](const BaseEventInfo* info) {
+    std::function<void(const BaseEventInfo*)> onChange = [onChangeEvent](const BaseEventInfo* info) {
         const auto* tabsInfo = TypeInfoHelper::DynamicCast<TabContentChangeEvent>(info);
         if (!tabsInfo) {
             return;
@@ -368,7 +368,7 @@ void Tabs::SetOnTabBarClick(OnTabBarClickEvent onTabBarClickEvent)
     CHECK_NULL_VOID(frameNodeImpl);
     auto aceFrameNode = frameNodeImpl->GetAceNode();
     CHECK_NULL_VOID(aceFrameNode);
-    auto onTabBarClick = [onTabBarClickEvent](const BaseEventInfo* info) {
+    std::function<void(const BaseEventInfo*)> onTabBarClick = [onTabBarClickEvent](const BaseEventInfo* info) {
         const auto* tabsInfo = TypeInfoHelper::DynamicCast<TabContentChangeEvent>(info);
         if (!tabsInfo) {
             return;
