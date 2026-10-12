@@ -267,7 +267,7 @@ RefPtr<MockPipelineContext> MockPipelineContext::GetCurrent()
 
 const RefPtr<NG::PageInfo> MockPipelineContext::GetLastPageInfo()
 {
-    return nullptr;
+    return PipelineContext::GetLastPageInfo();
 }
 
 

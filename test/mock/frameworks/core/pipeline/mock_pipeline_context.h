@@ -128,10 +128,7 @@ public:
         return "";
     }
 
-    const RefPtr<NG::PageInfo> GetLastPageInfo()
-    {
-        return PipelineContext::GetLastPageInfo();
-    }
+    const RefPtr<NG::PageInfo> GetLastPageInfo();
 
     std::string GetNavDestinationPageName(const RefPtr<NG::PageInfo>& pageInfo)
     {
