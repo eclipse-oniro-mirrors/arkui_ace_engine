@@ -4975,9 +4975,8 @@ void UIContentImpl::SetFormImageCacheThreshold(int32_t threshold)
     auto context = container->GetPipelineContext();
     CHECK_NULL_VOID(context);
     auto sharedImageManager = context->GetOrCreateSharedImageManager();
-    if (sharedImageManager) {
-        sharedImageManager->SetImageCacheThreshold(threshold);
-    }
+    CHECK_NULL_VOID(sharedImageManager);
+    sharedImageManager->SetImageCacheThreshold(threshold);
 }
 
 void UIContentImpl::UpdateFormSharedImage(const std::map<std::string, sptr<OHOS::AppExecFwk::FormAshmem>>& imageDataMap)
