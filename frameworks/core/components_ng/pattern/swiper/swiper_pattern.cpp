@@ -1757,6 +1757,7 @@ void SwiperPattern::FireChangeEvent(int32_t preIndex, int32_t currentIndex, bool
     swiperEventHub->FireChangeEvent(preIndex, currentIndex, isInLayout);
     swiperEventHub->FireIndicatorChangeEvent(currentIndex);
     swiperEventHub->FireIndicatorIndexChangeEvent(currentIndex);
+    FireIndicatorChangeAccessibilityEvent();
     swiperEventHub->FireChangeDoneEvent(moveDirection_);
     ReportSwiperChangeContent(currentIndex);
     if (swiperController_) {
@@ -1768,6 +1769,18 @@ void SwiperPattern::FireChangeEvent(int32_t preIndex, int32_t currentIndex, bool
         CHECK_NULL_VOID(host);
         host->OnAccessibilityEvent(AccessibilityEventType::SCROLL_END);
     }
+}
+
+void SwiperPattern::FireIndicatorChangeAccessibilityEvent() const
+{
+    if (!HasIndicatorNode()) {
+        return;
+    }
+    auto indicatorNode = GetCommonIndicatorNode();
+    CHECK_NULL_VOID(indicatorNode);
+    auto indicatorPattern = indicatorNode->GetPattern<SwiperIndicatorPattern>();
+    CHECK_NULL_VOID(indicatorPattern);
+    indicatorPattern->OnIndicatorChangeAccessibilityEvent();
 }
 
 void SwiperPattern::ReportSwiperChangeContent(int32_t currentIndex) const
@@ -8202,7 +8215,7 @@ void SwiperPattern::SetPageFlipMode(int32_t pageFlipMode)
     pageFlipMode_ = static_cast<PageFlipMode>(pageFlipMode);
 }
 
-RefPtr<FrameNode> SwiperPattern::GetCommonIndicatorNode()
+RefPtr<FrameNode> SwiperPattern::GetCommonIndicatorNode() const
 {
     if (isBindIndicator_) {
         return GetIndicatorNode();

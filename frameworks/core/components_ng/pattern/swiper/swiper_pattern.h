@@ -1117,6 +1117,7 @@ private:
     float MainSize() const;
     float GetMainContentSize() const;
     void FireChangeEvent(int32_t preIndex, int32_t currentIndex, bool isInLayout = false) const;
+    void FireIndicatorChangeAccessibilityEvent() const;
     void ReportSwiperChangeContent(int32_t currentIndex) const;
     void FireAnimationEndEvent(int32_t currentIndex, const AnimationCallbackInfo& info, bool isInterrupt = false) const;
     void FireGestureSwipeEvent(int32_t currentIndex, const AnimationCallbackInfo& info) const;
@@ -1402,7 +1403,7 @@ private:
     void FastAnimation(int32_t targetIndex);
     void MarkDirtyBindIndicatorNode() const;
 
-    RefPtr<FrameNode> GetCommonIndicatorNode();
+    RefPtr<FrameNode> GetCommonIndicatorNode() const;
     bool IsIndicator(const std::string& tag) const
     {
         return tag == SWIPER_INDICATOR_ETS_TAG_PATTERN || tag == INDICATOR_ETS_TAG_PATTERN;
