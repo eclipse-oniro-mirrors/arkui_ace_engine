@@ -32,6 +32,7 @@ namespace {
 
 constexpr size_t MAX_BATCH_COMMAND_COUNT = 50;
 constexpr size_t MAX_SET_TEXT_VALUE_LENGTH = 384;
+constexpr char UNICODE_ESCAPE_PREFIX[] = "\\u";
 constexpr char ESCAPED_NULL_SEQUENCE[] = "\\u0000";
 constexpr char BATCH_COMMAND[] = "batch";
 constexpr char SET_TEXT_COMMAND[] = "setText";
@@ -45,7 +46,7 @@ class BatchJsonStrings {
 public:
     BatchJsonStrings(const cJSON* root, const std::string& source)
     {
-        if (source.find("\\u") != std::string::npos) {
+        if (source.find(UNICODE_ESCAPE_PREFIX) != std::string::npos) {
             size_t position = 0;
             CollectNullStrings(root, source, position);
         }
@@ -83,6 +84,20 @@ public:
     }
 
 private:
+    void CheckUnicodeEscape(const std::string& source, size_t position)
+    {
+        if (source.compare(position, sizeof(UNICODE_ESCAPE_PREFIX) - 1, UNICODE_ESCAPE_PREFIX) != 0) {
+            return;
+        }
+        // cJSON maps invalid hexadecimal digits to NUL instead of rejecting the escape.
+        for (size_t offset = sizeof(UNICODE_ESCAPE_PREFIX) - 1; offset < sizeof(ESCAPED_NULL_SEQUENCE) - 1; ++offset) {
+            if (position + offset >= source.size() ||
+                !std::isxdigit(static_cast<unsigned char>(source[position + offset]))) {
+                hasInvalidUnicodeEscape_ = true;
+            }
+        }
+    }
+
     size_t ReadStringNullCount(const std::string& source, size_t& position)
     {
         position = source.find('"', position);
@@ -96,15 +111,7 @@ private:
                 break;
             }
             if (source[position] == '\\') {
-                // cJSON maps invalid hexadecimal digits to NUL instead of rejecting the escape.
-                if (source.compare(position, 2, "\\u") == 0) {
-                    for (size_t offset = 2; offset < sizeof(ESCAPED_NULL_SEQUENCE) - 1; ++offset) {
-                        if (position + offset >= source.size() ||
-                            !std::isxdigit(static_cast<unsigned char>(source[position + offset]))) {
-                            hasInvalidUnicodeEscape_ = true;
-                        }
-                    }
-                }
+                CheckUnicodeEscape(source, position);
                 if (source.compare(position, sizeof(ESCAPED_NULL_SEQUENCE) - 1, ESCAPED_NULL_SEQUENCE) == 0) {
                     ++nullCount;
                 }

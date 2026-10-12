@@ -292,9 +292,10 @@ HWTEST_F(UISessionBatchCommandParserTest, ParseReportsDecodedNodeIdKeyLength, Te
     };
     for (const auto& testCase : cases) {
         SCOPED_TRACE(testCase.key);
-        const auto result = UiSessionBatchCommand::Parse(std::string(R"({"cmd":"batch","commands":{")") + testCase.key +
-                                                         R"(":{"cmd":"setText","params":{"value":"bad"}},)"
-                                                         R"("8":{"cmd":"setText","params":{"value":"SURVIVOR"}}}})");
+        std::string command = std::string(R"({"cmd":"batch","commands":{")") + testCase.key;
+        command += R"(":{"cmd":"setText","params":{"value":"bad"}},)";
+        command += R"("8":{"cmd":"setText","params":{"value":"SURVIVOR"}}}})";
+        const auto result = UiSessionBatchCommand::Parse(command);
 
         ASSERT_EQ(result.status, BatchParseStatus::VALID_BATCH);
         ASSERT_EQ(result.diagnostics.size(), 1u);
@@ -327,7 +328,7 @@ HWTEST_F(UISessionBatchCommandParserTest, ParseRejectsInvalidUnicodeEscapes, Tes
             R"({"cmd)" + escape + R"(suffix":"batch","commands":{"8":{"cmd":"setText","params":{"value":"bad"}}}})",
             R"({"cmd":"batch","commands)" + escape + R"(suffix":{"8":{"cmd":"setText","params":{"value":"bad"}}}})",
             R"({"cmd":"batch","ignored":[")" + escape +
-                R"("],"commands":{"8":{"cmd":"setText","params":{"value":"bad"}}}})",
+                "\"],\"commands\":{\"8\":{\"cmd\":\"setText\",\"params\":{\"value\":\"bad\"}}}}",
         };
         for (const auto& command : commands) {
             SCOPED_TRACE(command);
@@ -342,10 +343,10 @@ HWTEST_F(UISessionBatchCommandParserTest, ParseRejectsInvalidUnicodeEscapes, Tes
 
 HWTEST_F(UISessionBatchCommandParserTest, ParseAcceptsUnicodeAndEscapedUnicodeLiterals, TestSize.Level1)
 {
-    const auto result =
-        UiSessionBatchCommand::Parse(R"({"\u0063md":"\u0062atch","\u0063ommands":{"\u0038":{"cmd":"setT\u0065xt",)"
-                                     R"("params":{"value":"\u0061\u00E9\u6587\uD83D\uDE00\\uZZZZ"}},)"
-                                     R"("6\\u000Gsuffix":{"cmd":"setText","params":{"value":"bad"}}}})");
+    std::string command = R"({"\u0063md":"\u0062atch","\u0063ommands":{"\u0038":{"cmd":"setT\u0065xt",)";
+    command += R"("params":{"value":"\u0061\u00E9\u6587\uD83D\uDE00\\uZZZZ"}},)";
+    command += R"("6\\u000Gsuffix":{"cmd":"setText","params":{"value":"bad"}}}})";
+    const auto result = UiSessionBatchCommand::Parse(command);
 
     ASSERT_EQ(result.status, BatchParseStatus::VALID_BATCH);
     ASSERT_EQ(result.items.size(), 1u);
