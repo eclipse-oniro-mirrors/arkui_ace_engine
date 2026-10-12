@@ -381,7 +381,8 @@ HWTEST_F(SheetPresentationTestNg, OnAttachToFrameNode001, TestSize.Level1)
     sheetPattern->OnAttachToFrameNode();
     auto eventHub = targetNode->GetEventHub<EventHub>();
     ASSERT_NE(eventHub, nullptr);
-    auto innerOnAreaChangeCallback = eventHub->GetOrCreateAreaCallbackSet()->onAreaChangedInnerCallbacks[sheetNode->GetId()];
+    auto innerOnAreaChangeCallback =
+        eventHub->GetOrCreateAreaCallbackSet()->onAreaChangedInnerCallbacks[sheetNode->GetId()];
     ASSERT_NE(innerOnAreaChangeCallback, nullptr);
     RectF oldRect, rect;
     OffsetF oldOrigin, origin;
