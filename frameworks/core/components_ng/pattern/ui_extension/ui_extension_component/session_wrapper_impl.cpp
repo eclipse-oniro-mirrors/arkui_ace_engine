@@ -729,10 +729,10 @@ void SessionWrapperImpl::CreateSession(const AAFwk::Want& want, const SessionCon
     sessionViewportConfig.orientation_ = static_cast<int32_t>(SystemProperties::GetDeviceOrientation());
     sessionViewportConfig.transform_ = context->GetTransformHint();
     pattern->SetSessionViewportConfig(sessionViewportConfig);
-    UIEXT_LOGI("SessionViewportConfig compose: uiExtensionDensityFollowHost=%{public}d, "
+    UIEXT_LOGI("SessionViewportConfig compose: uiExtensionDpiFollowHost=%{public}d, "
                "dpiFollowStrategy=%{public}d, componentId=%{public}d.",
-        context->IsUIExtensionDensityFollowHost(), static_cast<int32_t>(sessionViewportConfig.dpiFollowStrategy_),
-        GetFrameNodeId());
+        static_cast<int32_t>(context->GetUIExtensionDensityFollowHost()),
+        static_cast<int32_t>(sessionViewportConfig.dpiFollowStrategy_), GetFrameNodeId());
     Rosen::SessionInfo extensionSessionInfo;
     extensionSessionInfo.bundleName_ = want.GetElement().GetBundleName();
     extensionSessionInfo.abilityName_ = want.GetElement().GetAbilityName();

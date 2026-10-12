@@ -35,7 +35,8 @@ public:
     static RefPtr<FrameNode> CreateFrameNode(
         int32_t nodeId, NG::SessionType sessionType = NG::SessionType::UI_EXTENSION_ABILITY);
     static void UpdateUecConfig(FrameNode* frameNode, bool isTransferringCaller, DpiFollowStrategy dpiFollowStrategy,
-        bool isWindowModeFollowHost, const std::map<PlaceholderType, RefPtr<NG::FrameNode>>& placeholderMap);
+        bool isDpiFollowStrategySet, bool isWindowModeFollowHost,
+        const std::map<PlaceholderType, RefPtr<NG::FrameNode>>& placeholderMap);
     static void UpdateWant(FrameNode* frameNode, const AAFwk::Want& want);
     static void SetOnError(FrameNode* frameNode,
         std::function<void(int32_t code, const std::string& name, const std::string& message)>&& onError);

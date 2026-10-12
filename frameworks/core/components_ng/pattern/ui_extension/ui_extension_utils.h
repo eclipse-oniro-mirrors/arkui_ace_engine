@@ -30,6 +30,22 @@ enum class DpiFollowStrategy : uint32_t;
 } // namespace OHOS::Rosen
 
 namespace OHOS::Ace::NG {
+// Mirrors the DTS DpiFollowStrategy enum values (d.ts): FOLLOW_HOST_DPI = 0,
+// FOLLOW_UI_EXTENSION_ABILITY_DPI = 1, FOLLOW_HOST_DPI_ALL = 2. The static frontend passes
+// DTS_DPI_FOLLOW_STRATEGY_UNSET (-1) when the option is not configured.
+constexpr int32_t DTS_FOLLOW_HOST_DPI = 0;
+constexpr int32_t DTS_FOLLOW_UI_EXTENSION_ABILITY_DPI = 1;
+constexpr int32_t DTS_FOLLOW_HOST_DPI_ALL = 2;
+constexpr int32_t DTS_DPI_FOLLOW_STRATEGY_UNSET = -1;
+
+// True only when the raw value is a valid DTS enum member, i.e. the developer explicitly
+// configured the dpi follow strategy; the unset marker and out-of-range values mean unset.
+inline bool IsValidDtsDpiFollowStrategy(int32_t value)
+{
+    return value == DTS_FOLLOW_HOST_DPI || value == DTS_FOLLOW_UI_EXTENSION_ABILITY_DPI ||
+           value == DTS_FOLLOW_HOST_DPI_ALL;
+}
+
 inline DpiFollowStrategy ParseDpiFollowStrategy(int32_t value)
 {
     switch (value) {
@@ -60,6 +76,22 @@ inline Rosen::DpiFollowStrategy ConvertToRosenDpiFollowStrategy(DpiFollowStrateg
         case DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI:
         default:
             return static_cast<Rosen::DpiFollowStrategy>(ROSEN_NONE);
+    }
+}
+
+// Reverse of ConvertToRosenDpiFollowStrategy, e.g. for strategies passed by the window
+// (UIContent::SetUIExtensionDensityFollowHost). Maps by underlying value since the Rosen
+// enum is only forward declared.
+inline DpiFollowStrategy ConvertFromRosenDpiFollowStrategy(Rosen::DpiFollowStrategy dpiFollowStrategy)
+{
+    switch (static_cast<uint32_t>(dpiFollowStrategy)) {
+        case ROSEN_FOLLOW_HOST_DPI_UEA:
+            return DpiFollowStrategy::FOLLOW_HOST_DPI;
+        case ROSEN_FOLLOW_HOST_DPI_ALL:
+            return DpiFollowStrategy::FOLLOW_HOST_DPI_ALL;
+        case ROSEN_NONE:
+        default:
+            return DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI;
     }
 }
 } // namespace OHOS::Ace::NG
