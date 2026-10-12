@@ -285,7 +285,7 @@ void WebModelImpl::SetOnContextMenuHide(std::function<void(const BaseEventInfo* 
 }
 
 void WebModelImpl::SetOnContextMenuUpdate(
-        std::function<void(WebContextMenuItemId menuItemId, const WebContextMenuOptions& options)>&& jsCallback)
+    std::function<void(WebContextMenuItemId menuItemId, const WebContextMenuOptions& options)>&& jsCallback)
 {
     auto webComponent = AceType::DynamicCast<WebComponent>(ViewStackProcessor::GetInstance()->GetMainComponent());
     CHECK_NULL_VOID(webComponent);
