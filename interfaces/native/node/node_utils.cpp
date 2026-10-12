@@ -188,6 +188,7 @@ void OH_ArkUI_UnregisterSystemColorModeChangeEvent(ArkUI_NodeHandle node)
 int32_t OH_ArkUI_RegisterDrawCallbackOnNodeHandle(
     ArkUI_NodeHandle node, void* userData, void (*onDrawCompleted)(void* userData))
 {
+    CHECK_UI_THREAD("OH_ArkUI_RegisterDrawCallbackOnNodeHandle");
     CHECK_NULL_RETURN_WITH_MESSAGE(
         node, OHOS::Ace::ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Node parameter is null");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
@@ -203,6 +204,7 @@ int32_t OH_ArkUI_RegisterDrawCallbackOnNodeHandle(
 
 int32_t OH_ArkUI_UnregisterDrawCallbackOnNodeHandle(ArkUI_NodeHandle node)
 {
+    CHECK_UI_THREAD("OH_ArkUI_UnregisterDrawCallbackOnNodeHandle");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, OHOS::Ace::ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Node parameter is null");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     CHECK_NULL_RETURN_WITH_MESSAGE(impl, OHOS::Ace::ERROR_CODE_CAPI_INIT_ERROR,
@@ -215,6 +217,7 @@ int32_t OH_ArkUI_UnregisterDrawCallbackOnNodeHandle(ArkUI_NodeHandle node)
 int32_t OH_ArkUI_RegisterLayoutCallbackOnNodeHandle(
     ArkUI_NodeHandle node, void* userData, void (*onLayoutCompleted)(void* userData))
 {
+    CHECK_UI_THREAD("OH_ArkUI_RegisterLayoutCallbackOnNodeHandle");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, OHOS::Ace::ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Node parameter is null");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     CHECK_NULL_RETURN_WITH_MESSAGE(impl, OHOS::Ace::ERROR_CODE_CAPI_INIT_ERROR,
@@ -228,6 +231,7 @@ int32_t OH_ArkUI_RegisterLayoutCallbackOnNodeHandle(
 
 int32_t OH_ArkUI_UnregisterLayoutCallbackOnNodeHandle(ArkUI_NodeHandle node)
 {
+    CHECK_UI_THREAD("OH_ArkUI_UnregisterLayoutCallbackOnNodeHandle");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, OHOS::Ace::ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Node parameter is null");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     CHECK_NULL_RETURN_WITH_MESSAGE(impl, OHOS::Ace::ERROR_CODE_CAPI_INIT_ERROR,
@@ -1105,6 +1109,7 @@ ArkUI_ContentTransitionEffect* OH_ArkUI_ContentTransitionEffect_Create(int32_t t
 
 int32_t OH_ArkUI_NativeModule_AtomicServiceMenuBarSetVisible(ArkUI_ContextHandle uiContext, bool visible)
 {
+    CHECK_UI_THREAD("OH_ArkUI_NativeModule_AtomicServiceMenuBarSetVisible");
     CHECK_NULL_RETURN_WITH_MESSAGE(uiContext, ARKUI_ERROR_CODE_UI_CONTEXT_INVALID,
         __FUNCTION__, "UI context parameter is null");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();

@@ -24,6 +24,7 @@
 
 #include "interfaces/native/native_animate.h"
 #include "interfaces/native/native_interface.h"
+#include "interfaces/native/native_interface_accessibility.h"
 #include "interfaces/native/native_interface_xcomponent.h"
 #include "interfaces/native/native_key_event.h"
 #include "interfaces/native/native_node.h"
@@ -391,14 +392,18 @@ TEST_P(UiThreadTableLogTest, LogModeProducesDiagnostic)
 namespace {
 #define SCOPE_ENTRY(api) { #api, [] { CallWithDefaultArgs(api); } }
 const ScopeEntry SCOPE_ENTRIES[] = {
+    SCOPE_ENTRY(OH_ArkUI_AccessibilityProvider_Create),
+    SCOPE_ENTRY(OH_ArkUI_AccessibilityProvider_Dispose),
     SCOPE_ENTRY(OH_ArkUI_GetContextFromNapiValue),
     SCOPE_ENTRY(OH_ArkUI_GetNodeContentFromNapiValue),
     SCOPE_ENTRY(OH_ArkUI_GetNodeHandleFromNapiValue),
     SCOPE_ENTRY(OH_ArkUI_InitModuleForArkTSEnv),
     SCOPE_ENTRY(OH_ArkUI_NativeModule_AdoptChild),
+    SCOPE_ENTRY(OH_ArkUI_NativeModule_AtomicServiceMenuBarSetVisible),
     SCOPE_ENTRY(OH_ArkUI_NativeModule_ConvertPositionFromWindow),
     SCOPE_ENTRY(OH_ArkUI_NativeModule_ConvertPositionToWindow),
     SCOPE_ENTRY(OH_ArkUI_NativeModule_GetChildMountPolicy),
+    SCOPE_ENTRY(OH_ArkUI_NativeModule_GetNativeAccessibilityProvider),
     SCOPE_ENTRY(OH_ArkUI_NativeModule_GetPageRootNodeHandleByContext),
     SCOPE_ENTRY(OH_ArkUI_NativeModule_InvalidateAttributes),
     SCOPE_ENTRY(OH_ArkUI_NativeModule_IsInRenderState),
@@ -459,6 +464,8 @@ const ScopeEntry SCOPE_ENTRIES[] = {
     SCOPE_ENTRY(OH_ArkUI_NotifyArkTSEnvDestroy),
     SCOPE_ENTRY(OH_ArkUI_PostFrameCallback),
     SCOPE_ENTRY(OH_ArkUI_PostIdleCallback),
+    SCOPE_ENTRY(OH_ArkUI_RegisterDrawCallbackOnNodeHandle),
+    SCOPE_ENTRY(OH_ArkUI_RegisterLayoutCallbackOnNodeHandle),
     SCOPE_ENTRY(OH_ArkUI_RenderNodeUtils_AddChild),
     SCOPE_ENTRY(OH_ArkUI_RenderNodeUtils_AddRenderNode),
     SCOPE_ENTRY(OH_ArkUI_RenderNodeUtils_AttachColorAnimatableProperty),
@@ -566,6 +573,21 @@ const ScopeEntry SCOPE_ENTRIES[] = {
     SCOPE_ENTRY(OH_ArkUI_RenderNodeUtils_SetVector2AnimatablePropertyValue),
     SCOPE_ENTRY(OH_ArkUI_RenderNodeUtils_SetVector2PropertyValue),
     SCOPE_ENTRY(OH_ArkUI_RunTaskInScope),
+    SCOPE_ENTRY(OH_ArkUI_SurfaceHolder_Create),
+    SCOPE_ENTRY(OH_ArkUI_SurfaceHolder_Dispose),
+    SCOPE_ENTRY(OH_ArkUI_UnregisterDrawCallbackOnNodeHandle),
+    SCOPE_ENTRY(OH_ArkUI_UnregisterLayoutCallbackOnNodeHandle),
+    SCOPE_ENTRY(OH_ArkUI_XComponent_Finalize),
+    SCOPE_ENTRY(OH_ArkUI_XComponent_Initialize),
+    SCOPE_ENTRY(OH_ArkUI_XComponent_IsInitialized),
+    SCOPE_ENTRY(OH_ArkUI_XComponent_RegisterOnFrameCallback),
+    SCOPE_ENTRY(OH_ArkUI_XComponent_SetAutoInitialize),
+    SCOPE_ENTRY(OH_ArkUI_XComponent_SetExpectedFrameRateRange),
+    SCOPE_ENTRY(OH_ArkUI_XComponent_SetNeedSoftKeyboard),
+    SCOPE_ENTRY(OH_ArkUI_XComponent_StartImageAnalyzer),
+    SCOPE_ENTRY(OH_ArkUI_XComponent_StopImageAnalyzer),
+    SCOPE_ENTRY(OH_ArkUI_XComponent_UnregisterOnFrameCallback),
+    SCOPE_ENTRY(OH_NativeXComponent_GetNativeXComponent),
 };
 #undef SCOPE_ENTRY
 } // namespace
