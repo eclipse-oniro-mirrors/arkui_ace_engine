@@ -110,7 +110,9 @@ bool ResSchedReport::AppRVSEnableCheck(const std::unordered_map<std::string, std
 }
 
 void ResSchedReport::HandleSwiperChange(std::unordered_map<std::string, std::string>& payload)
-{}
+{
+    g_lastSwiperChangePayload = payload;
+}
 
 namespace {
 // Keep in sync with RES_TYPE_DIALOG_EVENT in frameworks/base/ressched/ressched_report.cpp.

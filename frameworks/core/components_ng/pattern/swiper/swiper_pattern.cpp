@@ -77,6 +77,9 @@ constexpr int32_t MAX_DISPLAY_COUNT_MIN = 6;
 constexpr int32_t MAX_DISPLAY_COUNT_MAX = 9;
 constexpr int32_t MIN_TURN_PAGE_VELOCITY = 1200;
 constexpr Dimension INDICATOR_BORDER_RADIUS = 16.0_vp;
+constexpr int32_t COMPONENT_SWIPER_CHANGE_IDX = 0;
+constexpr int32_t COMPONENT_SWIPER_SHOW = 1;
+constexpr int32_t COMPONENT_SWIPER_HIDDEN = 2;
 
 constexpr float PX_EPSILON = 0.01f;
 constexpr float FADE_DURATION = 500.0f;
