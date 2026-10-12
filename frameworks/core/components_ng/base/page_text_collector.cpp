@@ -244,7 +244,13 @@ bool HasPositivePaintSize(const RefPtr<FrameNode>& frame)
     return !LessOrEqual(rect.Width(), 0.0f) && !LessOrEqual(rect.Height(), 0.0f);
 }
 
-std::optional<OffsetF> GetPageTextOffset(
+struct PageTextTransform {
+    OffsetF offset;
+    float scaleX = 1.0f;
+    float scaleY = 1.0f;
+};
+
+std::optional<PageTextTransform> GetPageTextTransform(
     const RefPtr<FrameNode>& frame, const PageTextContext& context, PageTextScan& scan)
 {
     if (context.excluded || (context.inEditor && frame->GetTag() != V2::RICH_EDITOR_ETS_TAG)) {
@@ -256,12 +262,12 @@ std::optional<OffsetF> GetPageTextOffset(
         if (context.detachedOffscreen || !HasPositivePaintSize(frame)) {
             return std::nullopt;
         }
-        return frame->GetPaintRectGlobalOffsetWithTranslate(false, true).first;
+        return PageTextTransform { frame->GetPaintRectGlobalOffsetWithTranslate(false, true).first };
     }
     auto host = context.backgroundHost;
     auto root = context.backgroundRoot;
-    const auto hostOffset = GetPageTextOffset(host, scan.Resolve(host), scan);
-    if (!host->IsVisible() || !hostOffset) {
+    const auto hostTransform = GetPageTextTransform(host, scan.Resolve(host), scan);
+    if (!host->IsVisible() || !hostTransform) {
         return std::nullopt;
     }
     auto render = frame->GetRenderContext();
@@ -296,9 +302,13 @@ std::optional<OffsetF> GetPageTextOffset(
     // Use the same source/destination alignment as builder-background drawing.
     offset += Alignment::GetAlignPosition(initialSize, sourceSize, align) -
         Alignment::GetAlignPosition(sourceSize, initialSize, align);
-    offset.SetX(offset.GetX() * region.Width() / initialSize.Width());
-    offset.SetY(offset.GetY() * region.Height() / initialSize.Height());
-    return hostOffset.value() + region.GetOffset() + offset;
+    const float scaleX = region.Width() / initialSize.Width();
+    const float scaleY = region.Height() / initialSize.Height();
+    // Background-local offsets inherit every outer background's scale; the host offset is already global.
+    offset.SetX((region.Left() + offset.GetX() * scaleX) * hostTransform->scaleX);
+    offset.SetY((region.Top() + offset.GetY() * scaleY) * hostTransform->scaleY);
+    return PageTextTransform { hostTransform->offset + offset,
+        hostTransform->scaleX * scaleX, hostTransform->scaleY * scaleY };
 }
 
 bool AppendCarrier(const RefPtr<FrameNode>& frame, const std::string& text,
@@ -393,9 +403,9 @@ int32_t CollectPageText(int32_t instanceId, char** data, uint32_t* size, const c
         if (text.empty()) {
             continue;
         }
-        const auto offset = GetPageTextOffset(frame, context, scan);
-        if (offset) {
-            success = AppendCarrier(frame, text, offset.value() + scan.GetWindowOffset(nodeInstanceId), json, first);
+        const auto transform = GetPageTextTransform(frame, context, scan);
+        if (transform) {
+            success = AppendCarrier(frame, text, transform->offset + scan.GetWindowOffset(nodeInstanceId), json, first);
         }
     }
 #endif

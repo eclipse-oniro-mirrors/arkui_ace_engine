@@ -587,6 +587,63 @@ TEST_F(PageTextCollectionTest, NestedBackgroundUsesOuterHostPosition)
     EXPECT_EQ(Collect()->GetArraySize(), 0);
 }
 
+TEST_F(PageTextCollectionTest, NestedBackgroundComposesScale)
+{
+    auto host = CreateNode(V2::BLANK_ETS_TAG);
+    auto root = CreateNode(V2::COLUMN_ETS_TAG);
+    auto innerHost = CreateNode(V2::BLANK_ETS_TAG);
+    auto innerRoot = CreateNode(V2::COLUMN_ETS_TAG);
+    auto text = Text(u"scaled nested background");
+    root->AddChild(innerHost);
+    innerRoot->AddChild(text);
+    host->backgroundNode_ = root;
+    innerHost->backgroundNode_ = innerRoot;
+    for (const auto& node : { host, innerHost }) {
+        node->GetRenderContext()->UpdateBuilderBackgroundFlag(true);
+        node->GetRenderContext()->UpdateBackgroundAlign(Alignment::TOP_LEFT);
+    }
+    LayoutConstraintF constraint;
+    constraint.maxSize = SizeF(FRAME_WIDTH, FRAME_HEIGHT);
+    root->GetGeometryNode()->SetParentLayoutConstraint(constraint);
+    innerRoot->GetGeometryNode()->SetParentLayoutConstraint(constraint);
+    AceType::DynamicCast<MockRenderContext>(innerHost->GetRenderContext())->SetPaintRectWithTransform(
+        RectF(10.0f, 7.0f, FRAME_WIDTH, FRAME_HEIGHT));
+    AceType::DynamicCast<MockRenderContext>(text->GetRenderContext())->SetPaintRectWithTransform(
+        RectF(3.0f, 4.0f, FRAME_WIDTH, FRAME_HEIGHT));
+
+    // Outer scale (2, 2), inner scale (1, 1): (10 + 3) * 2, (7 + 4) * 2.
+    host->GetGeometryNode()->SetFrameSize(SizeF(200.0f, 40.0f));
+    auto texts = Collect();
+    ASSERT_EQ(texts->GetArraySize(), 1);
+    auto rect = texts->GetArrayItem(0)->GetValue("rect");
+    EXPECT_DOUBLE_EQ(rect->GetArrayItem(0)->GetDouble(), 26.0);
+    EXPECT_DOUBLE_EQ(rect->GetArrayItem(1)->GetDouble(), 22.0);
+
+    // Outer scale (2, 3), inner scale (4, 0.5), with a nonzero window origin.
+    host->GetGeometryNode()->SetFrameSize(SizeF(200.0f, 60.0f));
+    innerHost->GetGeometryNode()->SetFrameSize(SizeF(400.0f, 10.0f));
+    AceType::DynamicCast<MockRenderContext>(host->GetRenderContext())->SetPaintRectWithTransform(
+        RectF(50.0f, 60.0f, 200.0f, 60.0f));
+    texts = Collect();
+    ASSERT_EQ(texts->GetArraySize(), 1);
+    auto item = texts->GetArrayItem(0);
+    EXPECT_EQ(item->GetInt("id"), text->GetId());
+    rect = item->GetValue("rect");
+    EXPECT_DOUBLE_EQ(rect->GetArrayItem(0)->GetDouble(), 94.0); // 50 + 10 * 2 + 3 * 4 * 2
+    EXPECT_DOUBLE_EQ(rect->GetArrayItem(1)->GetDouble(), 87.0); // 60 + 7 * 3 + 4 * 0.5 * 3
+    EXPECT_DOUBLE_EQ(rect->GetArrayItem(2)->GetDouble(), FRAME_WIDTH);
+    EXPECT_DOUBLE_EQ(rect->GetArrayItem(3)->GetDouble(), FRAME_HEIGHT);
+
+    // Inner alignment is also expressed in the outer background's coordinate space.
+    innerHost->GetRenderContext()->UpdateBackgroundAlign(Alignment::CENTER);
+    innerRoot->GetGeometryNode()->SetFrameSize(SizeF(80.0f, 10.0f));
+    texts = Collect();
+    ASSERT_EQ(texts->GetArraySize(), 1);
+    rect = texts->GetArrayItem(0)->GetValue("rect");
+    EXPECT_DOUBLE_EQ(rect->GetArrayItem(0)->GetDouble(), 174.0); // 50 + 10 * 2 + (3 + 10) * 4 * 2
+    EXPECT_DOUBLE_EQ(rect->GetArrayItem(1)->GetDouble(), 94.5); // 60 + 7 * 3 + (4 + 5) * 0.5 * 3
+}
+
 TEST_F(PageTextCollectionTest, BackgroundHostStateAndReplacement)
 {
     auto host = Text(u"host");
