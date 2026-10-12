@@ -440,13 +440,16 @@ void TabsLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
     } else {
         // Non-animate path: first layout, external animation active, or re-entrant layout
         // (isOnDisplayModeSwitchAnimation_ == true during FlushUITasks inside animation closure).
-        if (!isReentrantDuringAnim) {
-            tabsPattern->SetCurrentBarDisplayMode(curDisplayMode);
-        }
-        if (displayModeChanged && !isReentrantDuringAnim) {
-            UpdateSideBarAndSideBarDividerVisibility(layoutWrapper, curDisplayMode == TabBarDisplayMode::SIDEBAR);
-            UpdateTabBarAndDividerVisibility(layoutWrapper, curDisplayMode == TabBarDisplayMode::BOTTOMTABBAR);
-            UpdateBgMaskNodeVisibility(layoutWrapper, curDisplayMode == TabBarDisplayMode::BOTTOMTABBAR);
+        // In the re-entrant case, SetCurrentBarDisplayMode and FireBarDisplayModeChangeEvent
+        // are still executed so the mode is updated and the developer callback fires at
+        // animation start (matching Navigation's behavior), not at animation finish.
+        tabsPattern->SetCurrentBarDisplayMode(curDisplayMode);
+        if (displayModeChanged) {
+            if (!isReentrantDuringAnim) {
+                UpdateSideBarAndSideBarDividerVisibility(layoutWrapper, curDisplayMode == TabBarDisplayMode::SIDEBAR);
+                UpdateTabBarAndDividerVisibility(layoutWrapper, curDisplayMode == TabBarDisplayMode::BOTTOMTABBAR);
+                UpdateBgMaskNodeVisibility(layoutWrapper, curDisplayMode == TabBarDisplayMode::BOTTOMTABBAR);
+            }
             auto context = tabsNode->GetContext();
             CHECK_NULL_VOID(context);
             context->AddAfterLayoutTask([weakTabsPattern = WeakPtr<TabsPattern>(tabsPattern), curDisplayMode]() {

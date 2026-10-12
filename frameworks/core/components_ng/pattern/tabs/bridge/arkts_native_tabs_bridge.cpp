@@ -1124,11 +1124,14 @@ ArkUINativeModuleValue TabsBridge::SetBarBackgroundColor(ArkUIRuntimeCallInfo* r
         Color color = Color::BLACK.BlendOpacity(0.0f);
         RefPtr<ResourceObject> backgroundColorResObj;
         uint32_t argc = runtimeCallInfo->GetArgsNumber();
+        bool parseResult = false;
         if (argc > TABS_ARG_INDEX_1) {
-            bool parseResult = ArkTSUtils::ConvertFromJSValue(vm, secondArg, color, backgroundColorResObj);
-            GetArkUINodeModifiers()->getTabsModifier()->setBarBackgroundColorByUser(nativeNode, parseResult);
+            parseResult = ArkTSUtils::ConvertFromJSValue(vm, secondArg, color, backgroundColorResObj);
         }
+        // setBarBackgroundColor internally sets SetByUser=true, so call it first
+        // and then override SetByUser with the correct parse result.
         GetArkUINodeModifiers()->getTabsModifier()->setBarBackgroundColor(nativeNode, color.GetValue());
+        GetArkUINodeModifiers()->getTabsModifier()->setBarBackgroundColorByUser(nativeNode, parseResult);
         if (SystemProperties::ConfigChangePerform()) {
             GetArkUINodeModifiers()->getTabsModifier()->createBarBackgroundColorWithResourceObj(
                 nativeNode, AceType::RawPtr(backgroundColorResObj));

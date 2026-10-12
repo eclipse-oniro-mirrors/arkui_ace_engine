@@ -6104,6 +6104,7 @@
       "OHOS::Ace::ThemeConstants::GetPatternByName(std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>> const&)";
       "OHOS::Ace::ThemeConstants::GetSymbolByName(char const*) const";
       "OHOS::Ace::TokenColors::CompBackgroundEmphasize() const";
+      "OHOS::Ace::TokenColors::CompBackgroundGray() const";
       "OHOS::Ace::TokenColors::CompBackgroundPrimary() const";
       "OHOS::Ace::TokenColors::CompEmphasizeSecondary() const";
       "OHOS::Ace::TokenColors::FontEmphasize() const";
@@ -6121,6 +6122,8 @@
       VTT?for?OHOS::Ace::NG::TextFieldManagerNG;
       OHOS::Ace::NG::TokenThemeStorage::GetInstance*;
       OHOS::Ace::NG::TokenThemeStorage::GetDefaultTheme*;
+      OHOS::Ace::NG::TokenThemeStorage::GetTheme*;
+      OHOS::Ace::NG::TokenThemeStorage::ObtainSystemTheme*;
       OHOS::Ace::NG::PanRecognizer::SetEscapeModeForPan*;
     };
   local:

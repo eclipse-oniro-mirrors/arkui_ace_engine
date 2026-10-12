@@ -4094,8 +4094,6 @@ void TabBarPattern::ApplyDefaultVisibility()
     CHECK_NULL_VOID(host);
     auto tabsNode = AceType::DynamicCast<TabsNode>(host->GetParent());
     CHECK_NULL_VOID(tabsNode);
-    auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
-    CHECK_NULL_VOID(tabsPattern);
     auto swiperNode = AceType::DynamicCast<FrameNode>(tabsNode->GetTabs());
     CHECK_NULL_VOID(swiperNode);
     auto tabsLayoutProperty = tabsNode->GetLayoutProperty<TabsLayoutProperty>();
@@ -4107,13 +4105,13 @@ void TabBarPattern::ApplyDefaultVisibility()
     }
 
     auto tabContentNum = swiperNode->TotalChildCount();
-    auto isHiddenByDefaultVisibility = [tabsPattern](
+    auto isHiddenByDefaultVisibility = [](
         const RefPtr<FrameNode>& tabContentNode) -> bool {
         CHECK_NULL_RETURN(tabContentNode, false);
         auto tabContentPattern = tabContentNode->GetPattern<TabContentPattern>();
         CHECK_NULL_RETURN(tabContentPattern, false);
         const auto& defaultVisibility = tabContentPattern->GetDefaultVisibility();
-        return tabsPattern->IsTabShouldHideByVisibility(defaultVisibility);
+        return defaultVisibility.ShouldHide(TabBarDisplayMode::BOTTOMTABBAR);
     };
     // tabBarNode children: columnNodes + maskNodes + imageIndicatorNode
     // columnNodes are at the front, count = tabContentNum
