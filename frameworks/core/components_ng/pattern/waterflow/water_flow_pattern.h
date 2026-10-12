@@ -250,6 +250,8 @@ private:
         return DisplayMode::OFF;
     }
     void OnModifyDone() override;
+    void InitOnKeyEvent();
+    bool OnKeyEvent(const KeyEvent& event);
     bool OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, const DirtySwapConfig& config) override;
     void CheckScrollable();
     bool IsOutOfBoundary(bool useCurrentDelta = true) override;

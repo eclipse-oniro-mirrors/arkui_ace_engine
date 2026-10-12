@@ -27208,6 +27208,8 @@ typedef struct GENERATED_ArkUIScrollableCommonMethodModifier {
                          const Opt_Boolean* value);
     void (*setScrollBarHeight)(Ark_NativePointer node,
                                const Opt_LengthMetricsProxy* value);
+    void (*setEnableScrollWithKeyboard)(Ark_NativePointer node,
+                                        const Opt_Boolean* value);
     void (*setEdgeEffect)(Ark_NativePointer node,
                           const Opt_EdgeEffect* edgeEffect,
                           const Opt_EdgeEffectOptions* options);

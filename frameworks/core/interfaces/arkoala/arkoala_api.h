@@ -5535,6 +5535,9 @@ struct ArkUIScrollableModifier {
     ArkUI_Float32 (*getContentEndOffset)(ArkUINodeHandle node);
     void (*createWithResourceObjContentStartOffset)(ArkUINodeHandle node, void* resObj);
     void (*createWithResourceObjContentEndOffset)(ArkUINodeHandle node, void* resObj);
+    void (*setEnableScrollWithKeyboard)(ArkUINodeHandle node, ArkUI_Bool value);
+    void (*resetEnableScrollWithKeyboard)(ArkUINodeHandle node);
+    ArkUI_Int32 (*getEnableScrollWithKeyboard)(ArkUINodeHandle node);
 };
 
 struct ArkUIScrollModifier {

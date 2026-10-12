@@ -246,6 +246,7 @@ build_component_ng("pattern_ng") {
     "scroll_bar/scroll_bar_pattern.cpp",
     "scrollable/axis/axis_animator.cpp",
     "scrollable/axis/axis_scroll_motion.cpp",
+    "scrollable/keyboard_scroll_settings_utils.cpp",
     "scrollable/nestable_scroll_container.cpp",
     "scrollable/refresh_coordination.cpp",
     "scrollable/scroll_snap_utils.cpp",

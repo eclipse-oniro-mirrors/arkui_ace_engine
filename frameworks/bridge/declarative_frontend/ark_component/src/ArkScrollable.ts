@@ -150,6 +150,20 @@ class EnableScrollWithMouseModifier extends ModifierWithKey<boolean> {
   }
 }
 
+class EnableScrollWithKeyboardModifier extends ModifierWithKey<boolean> {
+  constructor(value: boolean) {
+    super(value);
+  }
+  static identity: Symbol = Symbol('enableScrollWithKeyboard');
+  applyPeer(node: KNode, reset: boolean): void {
+    if (reset) {
+      getUINativeModule().scrollable.resetEnableScrollWithKeyboard(node);
+    } else {
+      getUINativeModule().scrollable.setEnableScrollWithKeyboard(node, this.value);
+    }
+  }
+}
+
 class ScrollBarMarginModifier extends ModifierWithKey<ScrollBarMargin> {
   constructor(value: ScrollBarMargin) {
     super(value);
@@ -324,6 +338,10 @@ class ArkScrollable<T> extends ArkComponent {
     }
     enableScrollWithMouse(value: boolean): this {
       modifierWithKey(this._modifiersWithKeys, EnableScrollWithMouseModifier.identity, EnableScrollWithMouseModifier, value);
+      return this;
+    }
+    enableScrollWithKeyboard(value: boolean): this {
+      modifierWithKey(this._modifiersWithKeys, EnableScrollWithKeyboardModifier.identity, EnableScrollWithKeyboardModifier, value);
       return this;
     }
     scrollBarMargin(value: ScrollBarMargin): this {

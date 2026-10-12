@@ -7882,6 +7882,18 @@ export class ArkScrollableCommonMethodPeer extends ArkCommonMethodPeer {
         ArkUIGeneratedNativeModule._ScrollableCommonMethod_setScrollBarHeight(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
+    setEnableScrollWithKeyboardAttribute(value: boolean | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (value !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueTmpValue = value!
+            thisSerializer.writeBoolean(valueTmpValue)
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._ScrollableCommonMethod_setEnableScrollWithKeyboard(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
     setEdgeEffectAttribute(edgeEffect: EdgeEffect | undefined, options?: EdgeEffectOptions): void {
         const thisSerializer: SerializerBase = SerializerBase.hold()
         if (edgeEffect !== undefined) {
@@ -12357,6 +12369,20 @@ export interface ScrollableCommonMethod extends CommonMethod {
         }
         throw new Error('Unimplemented method scrollBarHeight')
     }
+    enableScrollWithKeyboard(value: boolean | undefined): this {
+        const commonStyle: Array<(instance: CommonMethod) => void> | undefined = this.__get__commonStyles__Internal();
+        if (commonStyle) {
+            (commonStyle as Array<(instance: CommonMethod) => void>).push(
+                (instance: CommonMethod): void => (instance as ScrollableCommonMethod).enableScrollWithKeyboard(value)
+            );
+            return this;
+        } else {
+            if (this.__is_CustomComponent__Internal()) {
+                throw new Error("Scrollable CommonMethod 'enableScrollWithKeyboard' can only be set when creating an extendable component.")
+            }
+        }
+        throw new Error('Unimplemented method enableScrollWithKeyboard')
+    }
     edgeEffect(edgeEffect: EdgeEffect | undefined, options?: EdgeEffectOptions): this {
         const commonStyle: Array<(instance: CommonMethod) => void> | undefined = this.__get__commonStyles__Internal();
         if (commonStyle) {
@@ -13966,6 +13992,11 @@ export class ArkScrollableCommonMethodComponent extends ArkCommonMethodComponent
     public scrollBarHeight(value: arkui_Graphics_LengthMetrics | undefined): this {
         const value_casted = value as (arkui_Graphics_LengthMetrics | undefined)
         this.getPeer()?.setScrollBarHeightAttribute(value_casted)
+        return this
+    }
+    public enableScrollWithKeyboard(value: boolean | undefined): this {
+        const value_casted = value as (boolean | undefined)
+        this.getPeer()?.setEnableScrollWithKeyboardAttribute(value_casted)
         return this
     }
     public edgeEffect(edgeEffect: EdgeEffect | undefined, options?: EdgeEffectOptions): this {

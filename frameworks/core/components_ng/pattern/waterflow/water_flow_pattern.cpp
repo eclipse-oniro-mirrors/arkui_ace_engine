@@ -325,6 +325,7 @@ void WaterFlowPattern::OnModifyDone()
         SetScrollBar(paintProperty->GetScrollBarProperty());
     }
     SetAccessibilityAction();
+    InitOnKeyEvent();
     Register2DragDropManager();
     auto host = GetHost();
     CHECK_NULL_VOID(host);
@@ -1291,4 +1292,24 @@ void WaterFlowPattern::PostAsyncLoadTask()
         }
     });
 }
+
+void WaterFlowPattern::InitOnKeyEvent()
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto focusHub = host->GetOrCreateFocusHub();
+    CHECK_NULL_VOID(focusHub);
+    auto onKeyEvent = [wp = WeakClaim(this)](const KeyEvent& event) -> bool {
+        auto pattern = wp.Upgrade();
+        CHECK_NULL_RETURN(pattern, false);
+        return pattern->OnKeyEvent(event);
+    };
+    focusHub->SetOnKeyEventInternal(std::move(onKeyEvent));
+}
+
+bool WaterFlowPattern::OnKeyEvent(const KeyEvent& event)
+{
+    return HandleArrowKeyScroll(event);
+}
+
 } // namespace OHOS::Ace::NG
