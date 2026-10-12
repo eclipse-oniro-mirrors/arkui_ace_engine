@@ -148,5 +148,31 @@ private:
 
     ACE_DISALLOW_COPY_AND_MOVE(SelectOverlayHolder);
 };
+
+// Tag of the text field node inside a Search component.
+const char SEARCH_FIELD_TAG[] = "SearchField";
+
+/**
+ * @brief Get the frame node that the select overlay should be mounted on.
+ *
+ * In most cases the select overlay is mounted on the owner node itself.
+ * However, some owner nodes clip their children (for example, the SearchField
+ * inside a Search component). If the overlay were mounted on such a node, the
+ * selection handles would be clipped and could not be displayed completely.
+ * In that case, mount the overlay on the nearest ancestor frame node (the
+ * Search node itself) instead, which does not clip the overlay.
+ *
+ * @param owner The owner node of the select overlay holder.
+ * @return The frame node that the select overlay should be mounted on.
+ */
+inline RefPtr<FrameNode> GetSelectOverlayMountNode(const RefPtr<FrameNode>& owner)
+{
+    CHECK_NULL_RETURN(owner, nullptr);
+    if (owner->GetTag() != SEARCH_FIELD_TAG) {
+        return owner;
+    }
+    auto parent = owner->GetAncestorNodeOfFrame(false);
+    return parent ? parent : owner;
+}
 } // namespace OHOS::Ace::NG
 #endif // FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_MANAGER_SELECT_CONTENT_OVERLAY_SELECT_OVERLAY_HOLDER_H
