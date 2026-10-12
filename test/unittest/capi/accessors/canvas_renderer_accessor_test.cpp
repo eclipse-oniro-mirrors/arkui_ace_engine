@@ -1643,10 +1643,6 @@ HWTEST_F(CanvasRendererAccessorTest, createPatternTest, TestSize.Level1)
 
             std::optional<Matrix2DPeer*> optMatrix = PeerUtils::CreatePeer<Matrix2DPeer>();
             patternPeer->SetTransform(optMatrix);
-            // Since commit 148789bf8cf ("Fix CanvasPattern memory leak") the pattern transform
-            // is owned directly by CanvasPatternPeer (SetTransform writes into the pattern);
-            // the renderer no longer forwards it to RenderingContext2DModel::SetTransform.
-            // Read the created pattern from the peer itself via the public GetPattern().
             auto target = patternPeer->GetPattern();
             ASSERT_NE(target, nullptr);
             EXPECT_NEAR(target->GetImageWidth(), actualW, FLT_PRECISION);

@@ -89,7 +89,6 @@ public:
 
     void TearDown() override
     {
-        // 用例结束解除本用例回调路由：晚到的回调命中已解绑 token → Upgrade 空 → 可见失败
         if (lastBuilderToken_ != -1) {
             CallbackNodeBinder::Unbind(lastBuilderToken_);
             lastBuilderToken_ = -1;
@@ -110,8 +109,6 @@ public:
     CustomNodeBuilder CreateCustomNodeBuilder(RefPtr<FrameNode>& node)
     {
         checkBuilderEvent.reset();
-        // 每用例自持绑定（无函数级 static）：token→本用例节点登记进 CallbackNodeBinder，
-        // 回调按透传的 resourceId 反查；重复创建时先解除上一个 token。
         if (lastBuilderToken_ != -1) {
             CallbackNodeBinder::Unbind(lastBuilderToken_);
         }

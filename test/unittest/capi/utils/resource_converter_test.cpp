@@ -60,7 +60,6 @@ public:
         }
         ASSERT_NE(type, ThemeConstantsType::ERROR);
         MockThemeStyle::GetInstance()->SetAttr(key, { .type = type, .value = value });
-        // ResourceConverter resolves named resources through MockResourceAdapterV2.
         if (std::holds_alternative<std::string>(value)) {
             AddMockResourceDataByName(key, std::get<std::string>(value));
         }

@@ -22,10 +22,8 @@
 namespace OHOS::Ace {
 
 namespace {
-// Mock implementations for SwiperContentTransitionProxyAccessor
 void MockDestroyPeerImpl(Ark_SwiperContentTransitionProxy peer)
 {
-    // No-op in mock
 }
 
 Ark_SwiperContentTransitionProxy MockConstructImpl()
@@ -40,7 +38,6 @@ Ark_NativePointer MockGetFinalizerImpl()
 
 void MockFinishTransitionImpl(Ark_SwiperContentTransitionProxy peer)
 {
-    // No-op in mock
 }
 
 Ark_Int32 MockGetSelectedIndexImpl(Ark_SwiperContentTransitionProxy peer)
@@ -50,7 +47,6 @@ Ark_Int32 MockGetSelectedIndexImpl(Ark_SwiperContentTransitionProxy peer)
 
 void MockSetSelectedIndexImpl(Ark_SwiperContentTransitionProxy peer, Ark_Int32 selectedIndex)
 {
-    // No-op in mock
 }
 
 Ark_Int32 MockGetIndexImpl(Ark_SwiperContentTransitionProxy peer)
@@ -100,9 +96,6 @@ void MockSetMainAxisLengthImpl(Ark_SwiperContentTransitionProxy peer, Ark_Float6
     }
     peer->handler->SetMainAxisLength(static_cast<float>(mainAxisLength));
 }
-
-// designated init：字段名显式绑定，generated 结构体字段序变更时编译期即错，
-// 不会静默错位（canvas mock 已用此风格，保持一致）。
 const GENERATED_ArkUISwiperContentTransitionProxyAccessor g_swiperContentTransitionProxyAccessor = {
     .destroyPeer = MockDestroyPeerImpl,
     .construct = MockConstructImpl,
@@ -121,7 +114,6 @@ const GENERATED_ArkUISwiperContentTransitionProxyAccessor g_swiperContentTransit
 
 void MockSwiperDynamicModule::RegisterAttributes(panda::Local<panda::ObjectRef> object, panda::ecmascript::EcmaVM* vm)
 {
-    // No-op in mock
 }
 
 const void* MockSwiperDynamicModule::GetCustomModifier(const std::string& name)

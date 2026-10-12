@@ -154,10 +154,6 @@ public:
         themeConstants_ = nullptr;
     }
 
-    // RegisterResourceById / RegisterResourceByName / TryParseAsResourceId 已提取至
-    // test/unittest/capi/utils/mock_resource_registration.h，与 modifier 基类共用；
-    // 下方 AddResource 中的非限定名调用按命名空间查找解析到该处 inline 函数。
-
     static void AddResource(const std::string& key, const ResRawValue& value)
     {
         ThemeConstantsType type = ThemeConstantsType::ERROR;

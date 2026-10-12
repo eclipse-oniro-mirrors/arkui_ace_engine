@@ -156,8 +156,6 @@ HWTEST_F(TextInputModifierTest, DISABLED_setShowUnitTest, TestSize.Level1)
     int32_t nodeId = 555;
     auto node = BlankModelNG::CreateFrameNode(nodeId);
     EXPECT_NE(node, nullptr);
-    // 同 test8/test15：每用例自持绑定（无函数级 static）：token→本用例节点登记进
-    // CallbackNodeBinder，回调按透传的 resourceId 反查；晚到回调 Upgrade 空→可见失败。
     const int32_t token = CallbackNodeBinder::Bind(node);
 
     auto checkCallback = [](

@@ -295,8 +295,6 @@ public:
 
         SetupTheme<IndexerTheme>();
         AddResource(RES_NAME, CHECK_RESOURCE_STR);
-        // COLOR_TEST_PLAN_RES contract: color resource lookup (by name / by id / invalid id)
-        // must resolve to COLOR_RED; register the values into the resource adapter mock data.
         AddMockResourceDataByName(std::get<0>(RES_COLOR_NAME), Color::FromString(COLOR_RED));
         AddMockResourceData(static_cast<uint32_t>(std::get<0>(RES_COLOR_ID)), Color::FromString(COLOR_RED));
         AddMockResourceData(static_cast<uint32_t>(std::get<0>(INVALID_ID_COLOR)), Color::FromString(COLOR_RED));

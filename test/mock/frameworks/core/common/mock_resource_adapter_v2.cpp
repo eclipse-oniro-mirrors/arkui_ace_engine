@@ -21,9 +21,6 @@
 namespace OHOS::Ace {
 namespace {
 std::map<uint32_t, Color> g_colorMap;
-// FAKE_RES_ID(1234)/FAKE_RES_ID_2(1235) are dimension resources used across the capi modifier
-// tests; their contract value is 10px (see common_method/grid/tabs/text_area modifier tests).
-// 种子表单点定义：静态初始化与 ResetMockResourceData 共用，避免两处字面量漂移。
 constexpr uint32_t FAKE_RES_ID = 1234;
 constexpr uint32_t FAKE_RES_ID_2 = 1235;
 std::map<uint32_t, Dimension> MakeDefaultDimensionResources()

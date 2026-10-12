@@ -19,8 +19,6 @@
 #include "core/components/theme/resource_adapter.h"
 
 namespace OHOS::Ace {
-// 未注册 dimension 资源的 mock 默认值：10px，与 mock_theme_constants.cpp 的
-// DIMENSION_DEFAULT=10 契约一致（如 TextModifierTest setMin/MaxFontSizeTest）。
 constexpr float MOCK_DIMENSION_DEFAULT = 10.0f;
 class MockResourceAdapterV2 : public ResourceAdapter {
     DECLARE_ACE_TYPE(MockResourceAdapterV2, ResourceAdapter);
@@ -32,8 +30,6 @@ public:
     Color GetColor(uint32_t resId) override
     {
         Color data;
-        // Mirrors mock_theme_constants.cpp: Color::RED is the default mocked color
-        // (see e.g. tabs/text modifier tests "Color::RED is default mocked color").
         return GetMockResourceData(resId, data) ? data : Color::RED;
     }
 
@@ -45,7 +41,6 @@ public:
     Dimension GetDimension(uint32_t resId) override
     {
         Dimension data;
-        // 默认值语义见 MOCK_DIMENSION_DEFAULT 定义处注释。
         return GetMockResourceData(resId, data) ? data :
             Dimension(MOCK_DIMENSION_DEFAULT, DimensionUnit::PX);
     }

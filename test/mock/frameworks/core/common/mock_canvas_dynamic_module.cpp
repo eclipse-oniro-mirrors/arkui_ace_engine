@@ -23,14 +23,6 @@
 namespace OHOS::Ace {
 
 namespace {
-// Test-side replacement of the 'canvasBridge' exported by libarkui_canvas.z.so
-// (frameworks/core/components_ng/pattern/canvas/bridge/canvas_runtime_bridge.cpp),
-// which is never dlopen-ed in unit tests. Without it,
-// NG::GetCanvasRuntimeBridgeFromModule() resolves to nullptr and
-// CanvasRendererPeerImpl::TransferFromImageBitmap() aborts silently, leaving the
-// mock RenderingContext2DModel uncalled. Mirrors the real bridge semantics of the
-// entry exercised through the C API in UT, compiled with the same build polarity
-// as its callers in this binary.
 #ifdef PIXEL_MAP_SUPPORTED
 void TransferCanvasRenderingContext2DFromImageBitmapMockImpl(
     const RefPtr<RenderingContext2DModel>& context, const RefPtr<AceType>& pixelMap)
@@ -52,23 +44,12 @@ void TransferCanvasRenderingContext2DFromImageBitmapMockImpl(
 const ArkUICanvasRuntimeBridge g_canvasRuntimeBridgeMock = {
     .transferCanvasRenderingContext2DFromImageBitmap = TransferCanvasRenderingContext2DFromImageBitmapMockImpl,
 };
-
-// Minimal test-side ArkUICanvasModifier served through GetDynamicModifier().
-// Only the entries consumed through NodeModifier::GetCanvasModifier() in this
-// binary are provided; every other field stays null so callers that check fields
-// before use keep the same silent behavior as with a missing module.
-// createFrameNode returns null so view_model's CHECK on the returned handle
-// behaves as with a null modifier.
 void NoopCanvasInvalidate(ArkUINodeHandle node)
 {
-    // no-op in mock
 }
 
 void NoopCanvasRSCallback(ArkUINodeHandle node, void* callback)
 {
-    // no-op in mock: DrawingRenderingContextPeerImpl registers the callback into
-    // the unit-test TestHolder itself under ACE_UNITTEST; pattern-side storage is
-    // not observable through the C API in UT.
 }
 
 ArkUINodeHandle NoopCreateCanvasFrameNode(ArkUI_Int32 nodeId)
@@ -98,7 +79,6 @@ const ArkUICanvasModifier g_canvasModifierMock = {
 
 void MockCanvasDynamicModule::RegisterAttributes(panda::Local<panda::ObjectRef> object, panda::ecmascript::EcmaVM* vm)
 {
-    // No-op in mock
 }
 
 const void* MockCanvasDynamicModule::GetDynamicModifier()

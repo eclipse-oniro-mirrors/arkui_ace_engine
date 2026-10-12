@@ -28,20 +28,12 @@
 #include "test/mock/frameworks/core/common/mock_resource_adapter_v2.h"
 
 namespace OHOS::Ace::NG {
-// CAPI 资源解析（Converter 资源路径）从 MockResourceAdapterV2 读取数据，而
-// MockThemeStyle 只服务主题查找，因此资源注册必须双写两侧。modifier 与
-// accessor 两套测试基类共用本文件，避免注册逻辑复制后各自漂移。
-
-// 十进制基数（抽自字面量，避免魔法数）。
 constexpr int32_t DECIMAL_RADIX = 10;
 
 inline bool IsDecimalDigit(char c)
 {
     return c >= '0' && c <= '9';
 }
-
-// 资源 id 键为纯十进制数字（对应 AddResource(int64_t) 的 std::to_string 正向输出）；
-// 含 '-' 或其它非数字字符的键一律走按名注册路径。
 inline bool TryParseAsResourceId(const std::string& key, uint32_t& id)
 {
     if (key.empty() || !std::all_of(key.begin(), key.end(), IsDecimalDigit)) {
@@ -50,9 +42,6 @@ inline bool TryParseAsResourceId(const std::string& key, uint32_t& id)
     id = static_cast<uint32_t>(std::strtoll(key.c_str(), nullptr, DECIMAL_RADIX));
     return true;
 }
-
-// uint32_t/string 变体按消费侧查表要求双写（int32+double / string+vector<string>）；
-// 其余 ResRawValue 变体（ResourceId/ThemePtr 等）no-op 跳过，与原 if-constexpr 链一致。
 template <typename T>
 inline void AddMockResourceById(uint32_t id, const T& value)
 {

@@ -33,7 +33,7 @@ namespace  {
     const auto ATTRIBUTE_IMAGES_DEFAULT_VALUE = "[]";
     const auto ATTRIBUTE_IMAGES_SRC_NAME = "src";
     const auto ATTRIBUTE_IMAGES_SRC_TEST_VALUE = "test";
-    const int64_t IMAGES_OK_ID = 9876; // 数字资源 id；AddResource(int64_t) 已自动双写 MockResourceAdapterV2
+    const int64_t IMAGES_OK_ID = 9876;
     const auto ATTRIBUTE_IMAGES_LEFT_NAME = "left";
     const auto ATTRIBUTE_IMAGES_LEFT_TEST_VALUE = "100.00vp";
     const auto ATTRIBUTE_IMAGES_TOP_NAME = "top";

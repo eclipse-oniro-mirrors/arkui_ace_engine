@@ -99,13 +99,6 @@ MATCHER_P(CompareMarginPadding, expected, "Compare margins and paddings")
         arg.bottom == expected;
 }
 
-// CAPI 回调是无捕获函数指针，用例无法携带局部节点跨回调边界。生成层
-// Converter::ArkValue<T>(async, sync, id)（reverse_converter.h）把 id 写入
-// builder.resource.resourceId，框架触发回调时原样回传 resourceId
-// （同 test/unittest/capi/utils/custom_node_builder_test_helper.h 的路由机制）。
-// 因此每次 builder 创建登记 token→本用例节点的 WeakPtr，回调按 resourceId
-// 反查自己绑定的节点：不再依赖函数级 static 跨用例共享；晚到回调命中已销毁/
-// 已解绑 token 时 Upgrade 空指针→可见失败而非错发。
 class CallbackNodeBinder final {
 public:
     static int32_t Bind(const RefPtr<FrameNode>& node)
@@ -165,9 +158,6 @@ public:
 
     static void SetUpTestCase()
     {
-        // Isolate this test case: MockResourceAdapterV2 keeps static maps that persist
-        // across test cases in the same binary. Reset them so one test's AddResource does
-        // not pollute another's resource lookups (e.g. the shared "aa.bb.cc" name).
         ResetMockResourceData();
         MockPipelineContext::SetUp();
         themeManager_ = AceType::MakeRefPtr<::testing::NiceMock<MockThemeManager>>();
@@ -221,10 +211,6 @@ public:
         MockThemeStyle::GetInstance()->SetAttr(pattern, { .value = themeStyle });
         return themeStyle;
     }
-
-    // RegisterResourceById / RegisterResourceByName / TryParseAsResourceId 已提取至
-    // test/unittest/capi/utils/mock_resource_registration.h，与 accessor 基类共用；
-    // 下方 AddResource 中的非限定名调用按命名空间查找解析到该处 inline 函数。
 
     static void AddResource(std::string key, const ResRawValue& value)
     {

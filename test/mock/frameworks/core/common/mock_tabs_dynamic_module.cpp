@@ -21,10 +21,8 @@
 namespace OHOS::Ace {
 
 namespace {
-// Mock implementations for TabContentTransitionProxyAccessor
 void MockDestroyPeerImpl(Ark_TabContentTransitionProxy peer)
 {
-    // No-op in mock
 }
 
 Ark_TabContentTransitionProxy MockConstructImpl()
@@ -39,7 +37,6 @@ Ark_NativePointer MockGetFinalizerImpl()
 
 void MockFinishTransitionImpl(Ark_TabContentTransitionProxy peer)
 {
-    // No-op in mock
 }
 
 Ark_Int32 MockGetFromImpl(Ark_TabContentTransitionProxy peer)
@@ -49,7 +46,6 @@ Ark_Int32 MockGetFromImpl(Ark_TabContentTransitionProxy peer)
 
 void MockSetFromImpl(Ark_TabContentTransitionProxy peer, Ark_Int32 from)
 {
-    // No-op in mock
 }
 
 Ark_Int32 MockGetToImpl(Ark_TabContentTransitionProxy peer)
@@ -59,11 +55,7 @@ Ark_Int32 MockGetToImpl(Ark_TabContentTransitionProxy peer)
 
 void MockSetToImpl(Ark_TabContentTransitionProxy peer, Ark_Int32 to)
 {
-    // No-op in mock
 }
-
-// designated init：字段名显式绑定，generated 结构体字段序变更时编译期即错，
-// 不会静默错位（canvas mock 已用此风格，保持一致）。
 const GENERATED_ArkUITabContentTransitionProxyAccessor g_tabContentTransitionProxyAccessor = {
     .destroyPeer = MockDestroyPeerImpl,
     .construct = MockConstructImpl,
@@ -78,7 +70,6 @@ const GENERATED_ArkUITabContentTransitionProxyAccessor g_tabContentTransitionPro
 
 void MockTabsDynamicModule::RegisterAttributes(panda::Local<panda::ObjectRef> object, panda::ecmascript::EcmaVM* vm)
 {
-    // No-op in mock
 }
 
 const void* MockTabsDynamicModule::GetCustomModifier(const std::string& name)

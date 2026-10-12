@@ -34,7 +34,7 @@ namespace  {
     constexpr auto ATTRIBUTE_RAWSRC_NAME = "rawSrc";
     constexpr auto ATTRIBUTE_RAWSRC_DEFAULT_VALUE = "";
     const auto TEST_VALUE = "test";
-    const int64_t IMAGES_OK_ID = 9877; // 数字资源 id；AddResource(int64_t) 已自动双写 MockResourceAdapterV2
+    const int64_t IMAGES_OK_ID = 9877;
 } // namespace
 
 class ImageSpanModifierTest : public ModifierTestBase<

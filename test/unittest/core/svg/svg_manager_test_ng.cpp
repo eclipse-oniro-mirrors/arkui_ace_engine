@@ -87,7 +87,6 @@ const std::string IMAGE_LABEL =
     "</svg>";
 constexpr float IMAGE_COMPONENT_WIDTH = 100.0f;
 constexpr float IMAGE_COMPONENT_HEIGHT = 100.0f;
-// translate+rotate+scale 三变换组合串解析出的变换函数个数（SvgTransform005 断言用）
 constexpr int32_t COMBINED_TRANSFORM_NUM = 3;
 const std::string URL_1 = "file://data/data/com.example.test/res/example.svg";
 const std::string URL_2 = "data://data/data/com.example.test/res/exampleAlt.jpg";
@@ -440,8 +439,6 @@ HWTEST_F(SvgManagerTestNg, SvgEllipse003, TestSize.Level1)
     EXPECT_NE(ellipse, nullptr);
     auto ellipseNode = AceType::DynamicCast<SvgEllipse>(ellipse);
     ASSERT_NE(ellipseNode, nullptr);
-    // UT（ACE_UNITTEST）配置下 AsPath 返回 mock 路径（TestingPath::IsValid 恒 false），
-    // 断言改为节点可观测默认值，保留 AsPath 调用以维持覆盖意图
     EXPECT_FLOAT_EQ(static_cast<float>(ellipseNode->ellipseAttr_.rx.Value()), -1.0f);
     EXPECT_FLOAT_EQ(static_cast<float>(ellipseNode->ellipseAttr_.ry.Value()), -1.0f);
     Size viewPort(200.0, 200.0);
@@ -464,12 +461,10 @@ HWTEST_F(SvgManagerTestNg, SvgEllipse004, TestSize.Level1)
     ellipse->SetAttr("fill", "green");
     auto ellipseNode = AceType::DynamicCast<SvgEllipse>(ellipse);
     ASSERT_NE(ellipseNode, nullptr);
-    // 断言目标改为属性解析结果（路径内容在 UT mock 下不可观测，见 SvgEllipse003）
     EXPECT_FLOAT_EQ(static_cast<float>(ellipseNode->ellipseAttr_.cx.Value()), 100.0f);
     EXPECT_FLOAT_EQ(static_cast<float>(ellipseNode->ellipseAttr_.cy.Value()), 50.0f);
     EXPECT_FLOAT_EQ(static_cast<float>(ellipseNode->ellipseAttr_.rx.Value()), 50.0f);
     EXPECT_FLOAT_EQ(static_cast<float>(ellipseNode->ellipseAttr_.ry.Value()), 25.0f);
-    // 无单位数字按 SVG 惯例解析为 PX（实测 StringToDimension 路径，DimensionUnit::PX=0）
     EXPECT_EQ(ellipseNode->ellipseAttr_.rx.Unit(), DimensionUnit::PX);
     Size viewPort(200.0, 200.0);
     ellipse->AsPath(viewPort);
@@ -488,7 +483,6 @@ HWTEST_F(SvgManagerTestNg, SvgEllipse005, TestSize.Level1)
     ellipse->SetAttr("ry", "12.5%");
     auto ellipseNode = AceType::DynamicCast<SvgEllipse>(ellipse);
     ASSERT_NE(ellipseNode, nullptr);
-    // 百分比解析：25% -> 0.25(PERCENT)；断言可证伪（路径内容 UT mock 下不可观测）
     EXPECT_FLOAT_EQ(static_cast<float>(ellipseNode->ellipseAttr_.rx.Value()), 0.25f);
     EXPECT_EQ(ellipseNode->ellipseAttr_.rx.Unit(), DimensionUnit::PERCENT);
     EXPECT_FLOAT_EQ(static_cast<float>(ellipseNode->ellipseAttr_.ry.Value()), 0.125f);
@@ -536,7 +530,6 @@ HWTEST_F(SvgManagerTestNg, SvgLine003, TestSize.Level1)
     EXPECT_NE(line, nullptr);
     auto lineNode = AceType::DynamicCast<SvgLine>(line);
     ASSERT_NE(lineNode, nullptr);
-    // 覆盖意图：AsPath 执行且默认属性可观测（path.IsValid 在 UT mock 下非目标，见 SvgEllipse003）
     EXPECT_FLOAT_EQ(static_cast<float>(lineNode->lineAttr_.x1.Value()), 0.0f);
     EXPECT_FLOAT_EQ(static_cast<float>(lineNode->lineAttr_.y2.Value()), 0.0f);
     Size viewPort(200.0, 200.0);
@@ -584,7 +577,6 @@ HWTEST_F(SvgManagerTestNg, SvgLine005, TestSize.Level1)
     line->SetAttr("y2", "50%");
     auto lineNode = AceType::DynamicCast<SvgLine>(line);
     ASSERT_NE(lineNode, nullptr);
-    // 10% -> 0.1(PERCENT)，50% -> 0.5(PERCENT)
     EXPECT_FLOAT_EQ(static_cast<float>(lineNode->lineAttr_.x1.Value()), 0.1f);
     EXPECT_EQ(lineNode->lineAttr_.x1.Unit(), DimensionUnit::PERCENT);
     EXPECT_FLOAT_EQ(static_cast<float>(lineNode->lineAttr_.x2.Value()), 0.5f);
@@ -659,7 +651,6 @@ HWTEST_F(SvgManagerTestNg, SvgPolygon005, TestSize.Level1)
     polygon->SetAttr("points", "50,10 90,90 10,90");
     auto polyNode = AceType::DynamicCast<SvgPolygon>(polygon);
     ASSERT_NE(polyNode, nullptr);
-    // 断言 points 属性解析入位（路径内容 UT mock 下不可观测，见 SvgEllipse003）
     EXPECT_EQ(polyNode->polyAttr_.points, "50,10 90,90 10,90");
     Size viewPort(200.0, 200.0);
     polygon->AsPath(viewPort);
@@ -759,7 +750,6 @@ HWTEST_F(SvgManagerTestNg, SvgPath003, TestSize.Level1)
     path->SetAttr("d", "M10,10 L20,20 L30,10");
     auto pathNode = AceType::DynamicCast<SvgPath>(path);
     ASSERT_NE(pathNode, nullptr);
-    // 断言 d 属性路由入位（AsPath 内部 Build 在 UT mock 下不可观测，见 SvgEllipse003）
     EXPECT_EQ(pathNode->d_, "M10,10 L20,20 L30,10");
     Size viewPort(200.0, 200.0);
     path->AsPath(viewPort);
@@ -1370,7 +1360,6 @@ HWTEST_F(SvgManagerTestNg, SvgDefs002, TestSize.Level1)
     EXPECT_NE(defs, nullptr);
     auto defsNode = AceType::DynamicCast<SvgDefs>(defs);
     ASSERT_NE(defsNode, nullptr);
-    // 空 defs 的 AsPath 返回空路径（真实语义下也非有效路径）；断言可证伪的节点结构
     EXPECT_EQ(static_cast<int>(defsNode->children_.size()), 0);
     SvgLengthScaleRule rule;
     defs->AsPath(rule);
@@ -1415,7 +1404,6 @@ HWTEST_F(SvgManagerTestNg, SvgG003, TestSize.Level1)
     EXPECT_NE(g, nullptr);
     auto gNode = AceType::DynamicCast<SvgG>(g);
     ASSERT_NE(gNode, nullptr);
-    // 空分组路径内容不可观测（UT mock，见 SvgEllipse003）；断言子节点结构
     EXPECT_EQ(static_cast<int>(gNode->children_.size()), 0);
     Size viewPort(200.0, 200.0);
     g->AsPath(viewPort);
@@ -1459,7 +1447,6 @@ HWTEST_F(SvgManagerTestNg, SvgTransform002, TestSize.Level1)
     auto rect = SvgRect::Create();
     EXPECT_NE(rect, nullptr);
     rect->SetAttr("transform", "translate(20,20)");
-    // transform 解析结果是可证伪观测点（路径内容 UT mock 下不可观测，见 SvgEllipse003）
     EXPECT_EQ(rect->GetBaseAttributes().transform, "translate(20,20)");
     EXPECT_EQ(static_cast<int>(rect->GetBaseAttributes().transformVec.size()), 1);
     Size viewPort(200.0, 200.0);
@@ -1973,8 +1960,6 @@ HWTEST_F(SvgManagerTestNg, SvgAttributesParser009, TestSize.Level1)
  */
 HWTEST_F(SvgManagerTestNg, SvgAttributesParser010, TestSize.Level1)
 {
-    // 该函数契约是无 '#' 的 RRGGBBAA 输入（ParseColor 链先 substr(1) 去前缀，见 svg_attributes_parser.cpp:261）；
-    // 原传 "#FF0000" 使 strtoul 解析失败返回 0 -> 透明，属用例入参格式误用
     auto color = SvgAttributesParser::GetColorFromHexString("FF0000FF");
     EXPECT_TRUE(color.GetValue() != Color::TRANSPARENT.GetValue());
 
@@ -2294,7 +2279,6 @@ HWTEST_F(SvgManagerTestNg, SvgNode010, TestSize.Level1)
     rect->SetAttr("height", "50");
     auto rectNode = AceType::DynamicCast<SvgRect>(rect);
     ASSERT_NE(rectNode, nullptr);
-    // AsRSPath 基类实现返回空路径，断言改为 SetAttr 解析结果 + 保留调用（路径 mock 不可观测）
     EXPECT_FLOAT_EQ(static_cast<float>(rectNode->rectAttr_.x.Value()), 10.0f);
     EXPECT_FLOAT_EQ(static_cast<float>(rectNode->rectAttr_.y.Value()), 10.0f);
     EXPECT_FLOAT_EQ(static_cast<float>(rectNode->rectAttr_.width.Value()), 100.0f);
