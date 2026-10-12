@@ -56,12 +56,6 @@ const DiagnosticLog* GetLastDiagnosticLog()
 
 namespace OHOS::Ace {
 
-LogLevel& LogWrapper::GetLogLevelStorage()
-{
-    static LogLevel level_ = LogLevel::DEBUG;
-    return level_;
-}
-
 bool LogWrapper::JudgeLevel(LogLevel level)
 {
     (void)level;
@@ -70,12 +64,12 @@ bool LogWrapper::JudgeLevel(LogLevel level)
 
 void LogWrapper::SetLogLevel(LogLevel level)
 {
-    GetLogLevelStorage() = level;
+    level_ = level;
 }
 
 LogLevel LogWrapper::GetLogLevel()
 {
-    return GetLogLevelStorage();
+    return level_;
 }
 
 const char* LogWrapper::GetBriefFileName(const char* filePath)
