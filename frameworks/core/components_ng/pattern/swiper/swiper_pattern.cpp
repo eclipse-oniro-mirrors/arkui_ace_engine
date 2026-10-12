@@ -1815,8 +1815,8 @@ void SwiperPattern::ReportSwiperChangeContent(int32_t currentIndex, int32_t comp
     auto fullPath = pageInfo->GetFullPath();
     auto pageName = pipeline->GetNavDestinationPageName(pageInfo);
     auto jsViewName = pipeline->GetNavDestinationJSViewName(pageInfo);
-    // The `isInAutoPlay_` guard applies only to the
-    // `COMPONENT_STATE_CHANGE_IDX` case—specifically, when the state is 0.
+    // The `isInAutoPlay_` guard only applies to `COMPONENT_STATE_CHANGE_IDX`;
+    // SHOW/HIDDEN reports bypass it.
     if (pipeline->GetTaihangOptimizer()->CheckSwiperPageValid(fullPath, pageName, jsViewName) &&
         (componentState != COMPONENT_STATE_CHANGE_IDX || !isInAutoPlay_)) {
         RefPtr<NG::UINode> curUINode = host;
@@ -5743,7 +5743,6 @@ void SwiperPattern::PostTranslateTask(uint32_t delayTime)
 
 void SwiperPattern::HandleVisibleChange(bool visible)
 {
-    TAG_LOGD(AceLogTag::ACE_SWIPER, "SwiperPattern::HandleVisibleChange");
     if (isVisibleArea_ != visible) {
         auto currentIndex = GetLoopIndex(CurrentIndex());
         ReportSwiperChangeContent(currentIndex, visible ? COMPONENT_STATE_SHOW : COMPONENT_STATE_HIDDEN);
