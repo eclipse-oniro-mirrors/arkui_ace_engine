@@ -1590,7 +1590,6 @@ frameworks/bridge/declarative_frontend/ng/page_router_manager.cpp @arkui_navigat
 frameworks/bridge/declarative_frontend/ng/page_router_manager.h @arkui_navigation
 frameworks/bridge/declarative_frontend/ng/page_router_manager_factory.cpp @arkui_navigation
 frameworks/bridge/declarative_frontend/ng/page_router_manager_factory.h @arkui_navigation
-frameworks/bridge/declarative_frontend/sharedata/ @arkui_framework_xnode
 frameworks/bridge/declarative_frontend/state_mgmt/ @arkui_statemgmt
 frameworks/bridge/declarative_frontend/state_mgmt/src/lib @arkui_statemgmt
 frameworks/bridge/declarative_frontend/state_mgmt/src/lib/common/ifelse_native.d.ts @arkuieco3
@@ -1893,7 +1892,6 @@ frameworks/core/common/share/text_share_adapter.h @huawei_g_five
 frameworks/core/common/share/text_share_default.h @huawei_g_five
 frameworks/core/common/share/text_share_loader.h @huawei_g_five
 frameworks/core/common/share/text_share_mgr.h @huawei_g_five
-frameworks/core/common/sharedata/ @arkui_framework_xnode
 frameworks/core/common/statistic_event_reporter.cpp @arkui_framework_xnode
 frameworks/core/common/statistic_event_reporter.h @arkui_framework_xnode
 frameworks/core/common/storage/ @arkui_statemgmt
@@ -3608,7 +3606,6 @@ test/unittest/core/common/recorder/ @arkui_framework_xnode
 test/unittest/core/common/resource/ @arkui_framework_resource
 test/unittest/core/common/resource/resource_parse_utils_test_ng.cpp @arkui_framework_resource
 test/unittest/core/common/rosen/ @arkui_framework_xnode
-test/unittest/core/common/sharedata/ @arkui_framework_xnode
 test/unittest/core/common/statistic_event/ @arkui_framework_xnode
 test/unittest/core/common/storage/ @arkui_statemgmt
 test/unittest/core/common/task/ @arkui_framework_xnode

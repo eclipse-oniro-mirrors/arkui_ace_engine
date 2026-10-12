@@ -127,7 +127,6 @@
 #include "bridge/declarative_frontend/jsview/js_water_flow_sections_binding.h"
 #include "bridge/declarative_frontend/jsview/menu/js_context_menu.h"
 #include "bridge/declarative_frontend/jsview/scroll_bar/js_scroll_bar.h"
-#include "bridge/declarative_frontend/sharedata/js_share_data.h"
 #include "bridge/declarative_frontend/style_string/js_span_string.h"
 #include "bridge/declarative_frontend/style_string/js_text_layout.h"
 #include "core/components_ng/pattern/custom/custom_title_node.h"
@@ -1002,7 +1001,6 @@ void JsBindViews(BindingTarget globalObj, void* nativeEngine, bool isCustomEnvSu
     JSPanGestureOption::JSBind(globalObj);
     JsDragFunction::JSBind(globalObj);
     JSCustomDialogController::JSBind(globalObj);
-    JSShareData::JSBind(globalObj);
     JSPersistent::JSBind(globalObj);
     JSScrollerBinding::JSBind(globalObj);
     JSListScroller::JSBind(globalObj);
