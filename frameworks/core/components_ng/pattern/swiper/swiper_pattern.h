@@ -1118,7 +1118,7 @@ private:
     float GetMainContentSize() const;
     void FireChangeEvent(int32_t preIndex, int32_t currentIndex, bool isInLayout = false) const;
     void FireIndicatorChangeAccessibilityEvent() const;
-    void ReportSwiperChangeContent(int32_t currentIndex) const;
+    void ReportSwiperChangeContent(int32_t currentIndex, int32_t componentState = 0) const;
     void FireAnimationEndEvent(int32_t currentIndex, const AnimationCallbackInfo& info, bool isInterrupt = false) const;
     void FireGestureSwipeEvent(int32_t currentIndex, const AnimationCallbackInfo& info) const;
     void FireUnselectedEvent(int32_t currentIndex, int32_t targetIndex);

@@ -33,6 +33,10 @@
 #include "core/components_ng/pattern/swiper_indicator/indicator_common/indicator_model_ng.h"
 #include "core/components_ng/pattern/swiper_indicator/indicator_common/indicator_pattern.h"
 
+namespace OHOS::Ace {
+const std::unordered_map<std::string, std::string>& GetLastSwiperChangePayload();
+}
+
 namespace OHOS::Ace::NG {
 using namespace testing;
 using namespace testing::ext;

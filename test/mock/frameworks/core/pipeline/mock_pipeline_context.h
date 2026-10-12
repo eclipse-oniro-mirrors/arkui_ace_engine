@@ -38,6 +38,7 @@ public:
     static void TearDown();
     static void SetCurrentWindowRect(Rect rect);
     static RefPtr<MockPipelineContext> GetCurrent();
+    static void SetLastPageInfo(const RefPtr<NG::PageInfo>& pageInfo);
     void SetRootSize(double rootWidth, double rootHeight);
     void SetDensity(double density);
     void SetInstanceId(int32_t instanceId);
@@ -127,7 +128,11 @@ public:
         return "";
     }
 
-    const RefPtr<NG::PageInfo> GetLastPageInfo();
+    const RefPtr<NG::PageInfo> GetLastPageInfo()
+    {
+        return PipelineContext::GetLastPageInfo();
+    }
+
     std::string GetNavDestinationPageName(const RefPtr<NG::PageInfo>& pageInfo)
     {
         return "";

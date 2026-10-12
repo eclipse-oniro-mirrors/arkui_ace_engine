@@ -43,6 +43,7 @@ constexpr uint32_t RES_TYPE_OVERLAY        = 151;
 constexpr uint32_t RES_TYPE_BACKPRESSED_EVENT = 184;
 constexpr uint32_t RES_TYPE_COMPONENT_STATE_CHANGE = 212;
 constexpr uint32_t RES_TYPE_DIALOG_EVENT = 225;
+constexpr int32_t COMPONENT_TYPE_SWIPER = 1;
 constexpr int32_t TOUCH_DOWN_EVENT          = 1;
 constexpr int32_t CLICK_EVENT               = 2;
 constexpr int32_t TOUCH_UP_EVENT            = 3;
@@ -724,7 +725,7 @@ void ResSchedReport::HandlePageTransition(const PageTransitionInfo& pageTransiti
 void ResSchedReport::HandleSwiperChange(std::unordered_map<std::string, std::string>& payload)
 {
     LoadAceApplicationContext(payload);
-    ResSchedDataReport(RES_TYPE_COMPONENT_STATE_CHANGE, 0, payload);
+    ResSchedDataReport(RES_TYPE_COMPONENT_STATE_CHANGE, COMPONENT_TYPE_SWIPER, payload);
 }
 
 void ResSchedReport::ReportDialogShow()
