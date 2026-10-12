@@ -3644,6 +3644,8 @@ export class ArkUIGeneratedNativeModule {
     @ani.unsafe.Direct
     native static _XComponentAttribute_setHdrBrightness1(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
+    native static _XComponentAttribute_setBufferQueueCount(ptr: KPointer, count: KInt): void
+    @ani.unsafe.Direct
     native static _Root_construct(id: KInt, flags: KInt): KPointer
     @ani.unsafe.Direct
     native static _ComponentRoot_construct(id: KInt, flags: KInt): KPointer

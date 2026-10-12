@@ -438,6 +438,16 @@ function loadComponent(): ComponentObj | undefined {
         modifierWithKey(this._modifiersWithKeys, XComponentEnableTransparentLayerModifier.identity, XComponentEnableTransparentLayerModifier, value);
         return this;
       }
+      bufferQueueCount(count: number): this {
+        if (isUndefined(count) || isNull(count)) {
+          modifierWithKey(this._modifiersWithKeys, XComponentBufferQueueCountModifier.identity,
+            XComponentBufferQueueCountModifier, undefined);
+          return this;
+        }
+        modifierWithKey(this._modifiersWithKeys, XComponentBufferQueueCountModifier.identity,
+          XComponentBufferQueueCountModifier, count);
+        return this;
+      }
     }
 
     class XComponentInitializeModifier extends ModifierWithKey<XComponentParam> {
@@ -606,6 +616,24 @@ function loadComponent(): ComponentObj | undefined {
       }
     }
 
+    class XComponentBufferQueueCountModifier extends ModifierWithKey<number> {
+      constructor(value: number) {
+        super(value);
+      }
+      static identity: Symbol = Symbol('xComponentBufferQueueCount');
+      applyPeer(node: KNode, reset: boolean): void {
+        if (reset) {
+          getUINativeModule().xComponent.resetBufferQueueCount(node);
+        } else {
+          getUINativeModule().xComponent.setBufferQueueCount(node, this.value);
+        }
+      }
+
+      checkObjectDiff(): boolean {
+        return !isBaseOrResourceEqual(this.stageValue, this.value);
+      }
+    }
+
     class XComponentRenderFitModifier extends ModifierWithKey<number> {
       constructor(value: number) {
         super(value);
@@ -760,6 +788,10 @@ class JSXComponent extends JSContainerBase {
 
   static enableTransparentLayer(value: any): void {
     getUINativeModule().xComponent.setEnableTransparentLayer(true, value);
+  }
+
+  static bufferQueueCount(count: any): void {
+    getUINativeModule().xComponent.setBufferQueueCount(true, count);
   }
   
   static blendMode(blendMode: any, blendApplyType: any): void {
