@@ -4909,6 +4909,10 @@ export class ArkUIGeneratedNativeModule {
     @ani.unsafe.Direct
     native static _FrameNodeExtender_isModifiable(peer: KPointer): boolean
     @ani.unsafe.Direct
+    native static _FrameNodeExtender_dispatchInputEvent(peer: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): boolean
+    @ani.unsafe.Direct
+    native static _FrameNodeExtender_dispatchKeyEvent(peer: KPointer, event: KPointer): boolean
+    @ani.unsafe.Direct
     native static _FrameNodeExtender_appendChild(peer: KPointer, child: KPointer): KInt
     @ani.unsafe.Direct
     native static _FrameNodeExtender_insertChildAfter(peer: KPointer, child: KPointer, sibling: KPointer): KInt
@@ -5060,10 +5064,6 @@ export class ArkUIGeneratedNativeModule {
     native static _FrameNodeExtender_getFrameNodeByUniqueId1(peer: KPointer, id: KInt): KPointer
     @ani.unsafe.Quick
     native static _FrameNodeExtender_getFrameNodeCreateInfoArray(count: KInt): KInteropReturnBuffer
-    @ani.unsafe.Direct
-    native static _FrameNodeExtender_dispatchInputEvent(peer: KPointer, event: KPointer, competitionStrategy: KInt): boolean
-    @ani.unsafe.Direct
-    native static _FrameNodeExtender_dispatchKeyEvent(peer: KPointer, event: KPointer): boolean
     @ani.unsafe.Direct
     native static _FullScreenExitHandler_construct(): KPointer
     @ani.unsafe.Direct

@@ -30413,6 +30413,11 @@ typedef struct GENERATED_ArkUIFrameNodeExtenderAccessor {
     Ark_NativePointer (*getDestroy)();
     void (*destroyPeer)(Ark_FrameNode peer);
     Ark_Boolean (*isModifiable)(Ark_NativePointer peer);
+    Ark_Boolean (*dispatchInputEvent)(Ark_FrameNode peer,
+                                      const Ark_InputEventType* event,
+                                      const Opt_CompetitionStrategy* competitionStrategy);
+    Ark_Boolean (*dispatchKeyEvent)(Ark_FrameNode peer,
+                                    Ark_KeyEvent event);
     Ark_Int32 (*appendChild)(Ark_FrameNode peer,
                              Ark_FrameNode child);
     Ark_Int32 (*insertChildAfter)(Ark_NativePointer peer,
@@ -30524,11 +30529,6 @@ typedef struct GENERATED_ArkUIFrameNodeExtenderAccessor {
     Ark_NativePointer (*getFrameNodeByUniqueId1)(Ark_FrameNode peer,
                                                  Ark_Int32 id);
     Array_FrameNodeCreateInfo (*getFrameNodeCreateInfoArray)(Ark_Int32 count);
-    Ark_Boolean (*dispatchInputEvent)(Ark_FrameNode peer,
-                                      Ark_NativePointer event,
-                                      Ark_Int32 competitionStrategy);
-    Ark_Boolean (*dispatchKeyEvent)(Ark_FrameNode peer,
-                                    Ark_NativePointer event);
 } GENERATED_ArkUIFrameNodeExtenderAccessor;
 
 typedef struct GENERATED_ArkUIFullScreenExitHandlerAccessor {
