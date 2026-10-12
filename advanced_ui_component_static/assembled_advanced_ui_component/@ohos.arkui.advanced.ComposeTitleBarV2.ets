@@ -511,7 +511,7 @@ struct CollapsibleMenuSectionV2 {
             .backgroundColor(this.getMoreIconBgColor())
             .border({
               radius: $r('sys.float.ohos_id_corner_radius_clicked'),
-              width: this.isMoreIconOnFocus ? ImageMenuItemV2.focusBorderWidth : 0,
+              width: this.isMoreIconOnFocus ? ImageMenuItemV2.focusBorderWidth : 0.0,
               color: $r('sys.color.ohos_id_color_focused_outline'),
               style: BorderStyle.Solid
             })
@@ -914,7 +914,7 @@ struct ImageMenuItemV2 {
       .backgroundColor(this.getBgColor())
       .border({
         radius: $r('sys.float.ohos_id_corner_radius_clicked'),
-        width: this.isOnFocus ? ImageMenuItemV2.focusBorderWidth : 0,
+        width: this.isOnFocus ? ImageMenuItemV2.focusBorderWidth : 0.0,
         color: $r('sys.color.ohos_id_color_focused_outline'),
         style: BorderStyle.Solid
       })
@@ -1009,7 +1009,7 @@ struct ImageMenuItemV2 {
       .backgroundColor(this.getBgColor())
       .border({
         radius: $r('sys.float.ohos_id_corner_radius_clicked'),
-        width: this.isOnFocus ? ImageMenuItemV2.focusBorderWidth : 0,
+        width: this.isOnFocus ? ImageMenuItemV2.focusBorderWidth : 0.0,
         color: $r('sys.color.ohos_id_color_focused_outline'),
         style: BorderStyle.Solid
       })

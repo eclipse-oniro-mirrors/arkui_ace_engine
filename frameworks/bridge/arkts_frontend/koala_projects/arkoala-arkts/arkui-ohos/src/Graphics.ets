@@ -251,7 +251,7 @@ export class ColorMetrics {
         this.blue_ = 0;
         this.alpha_ = MAX_CHANNEL_VALUE;
     }
-    constructor(red: number, green: number, blue: number, alpha: number = MAX_CHANNEL_VALUE) {
+    constructor(red: number, green: number, blue: number, alpha: number = Int.toDouble(MAX_CHANNEL_VALUE)) {
         this.red_ = ColorMetrics.clamp(red).toInt();
         this.green_ = ColorMetrics.clamp(green).toInt();
         this.blue_ = ColorMetrics.clamp(blue).toInt();

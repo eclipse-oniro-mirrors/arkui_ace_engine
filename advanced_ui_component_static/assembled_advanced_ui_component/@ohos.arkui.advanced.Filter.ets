@@ -335,7 +335,7 @@ struct ListFilterRow {
                 })
               }
             })
-            .margin({ start: LengthMetrics.vp(colIndex === 0 ? -TEXT_HOT_AREA_WIDTH : 0) } as LocalizedMargin)
+            .margin({ start: LengthMetrics.vp(colIndex === 0 ? -TEXT_HOT_AREA_WIDTH : 0.0) } as LocalizedMargin)
             .tabIndex(colIndex === 0 ? 1 : -1)
           })
         }

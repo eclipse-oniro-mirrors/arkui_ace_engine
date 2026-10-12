@@ -598,8 +598,8 @@ export struct PopupV2Component {
 
     let regionWidth = needExpandWidth ? minSizeVp : '100%';
     let regionHeight = needExpandHeight ? minSizeVp : '100%';
-    let offsetX = needExpandWidth ? (minSizeVp - actualWidth) / 2 : 0;
-    let offsetY = needExpandHeight ? (minSizeVp - actualHeight) / 2 : 0;
+    let offsetX = needExpandWidth ? (minSizeVp - actualWidth) / 2 : 0.0;
+    let offsetY = needExpandHeight ? (minSizeVp - actualHeight) / 2 : 0.0;
 
     return {
       x: -offsetX,

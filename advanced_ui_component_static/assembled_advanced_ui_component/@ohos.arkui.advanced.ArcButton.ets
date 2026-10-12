@@ -625,11 +625,11 @@ export struct ArcButton {
     }
     .enabled(this.options.status !== ArcButtonStatus.DISABLED)
     .opacity((this.options.styleMode === ArcButtonStyleMode.EMPHASIZED_LIGHT &&
-      this.options.status === ArcButtonStatus.DISABLED) ? Constants.DEFAULT_TRANSPARENCY : 1)
+      this.options.status === ArcButtonStatus.DISABLED) ? Constants.DEFAULT_TRANSPARENCY : 1.0)
     .animation({ curve: this.curves })
     .width(this.canvasWidth)
     .height(this.canvasHeight)
-    .scale({ x: this.scaleX, y: this.scaleY, centerY: this.isUp ? 0 : this.canvasHeight })
+    .scale({ x: this.scaleX, y: this.scaleY, centerY: this.isUp ? 0.0 : this.canvasHeight })
     .onTouch((event: TouchEvent) => {
       this.dealTouchEvent(event)
     })
