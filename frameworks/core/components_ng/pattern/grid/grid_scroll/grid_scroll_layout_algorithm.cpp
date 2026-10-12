@@ -305,8 +305,8 @@ void GridScrollLayoutAlgorithm::Layout(LayoutWrapper* layoutWrapper)
     int32_t endIndex = -1;
     if (info_.hasMultiLineItem_) {
         layoutWrapper->RemoveAllChildInRenderTree();
+        LargeItemForwardLineHeight(info_.startMainLineIndex_, layoutWrapper);
     }
-    LargeItemForwardLineHeight(info_.startMainLineIndex_, layoutWrapper);
     const int32_t cacheCount = props->GetCachedCountValue(info_.defCachedCount_);
     if (!props->HasCachedCount()) {
         info_.UpdateDefaultCachedCount();
@@ -349,7 +349,9 @@ void GridScrollLayoutAlgorithm::Layout(LayoutWrapper* layoutWrapper)
             }
             auto crossOffset = crossIter->second;
             auto offset = childFrameOffset_ + prevLineOffset;
-            offset = CalculateLargeItemOffset(offset, itemIdex, i, iter->first);
+            if (info_.hasMultiLineItem_) {
+                offset = CalculateLargeItemOffset(offset, itemIdex, i, iter->first);
+            }
             if (info_.axis_ == Axis::VERTICAL) {
                 offset.SetX(crossOffset);
             } else {
@@ -896,10 +898,12 @@ OffsetF GridScrollLayoutAlgorithm::CalculateLargeItemOffset(
     OffsetF currOffset, int32_t itemIndex, int32_t currLineIndex, int32_t currentCrossIndex)
 {
     OffsetF offset = currOffset;
-    for (int32_t lastCrossIndex = currLineIndex - 1; lastCrossIndex >= 0; lastCrossIndex--) {
-        auto lastGridMatrixIter = info_.gridMatrix_.find(lastCrossIndex);
-        if (lastGridMatrixIter == info_.gridMatrix_.end()) {
-            continue;
+    auto lastGridMatrixIter = info_.gridMatrix_.lower_bound(currLineIndex);
+    while (lastGridMatrixIter != info_.gridMatrix_.begin()) {
+        --lastGridMatrixIter;
+        const auto lastCrossIndex = lastGridMatrixIter->first;
+        if (lastCrossIndex < 0) {
+            break;
         }
         const auto& lastGridItemRecord = lastGridMatrixIter->second;
         auto lastLineCrossItem = lastGridItemRecord.find(currentCrossIndex);
@@ -1814,7 +1818,7 @@ void GridScrollLayoutAlgorithm::LargeItemForwardLineHeight(int32_t currentLineIn
     auto currentIndex = -1;
 
     lineIndex = CalculateLineIndexForLargeItem(gridMatrixIter, currentIndex, lineIndex, layoutWrapper);
-    CalculateLineHeightForLargeItem(lineIndex, currentLineIndex, gridMatrixIter, layoutWrapper);
+    CalculateLineHeightForLargeItem(lineIndex, currentLineIndex, layoutWrapper);
 }
 
 int32_t GridScrollLayoutAlgorithm::CalculateLineIndexForLargeItem(
@@ -1831,12 +1835,13 @@ int32_t GridScrollLayoutAlgorithm::CalculateLineIndexForLargeItem(
             break;
         }
         AdjustRowColSpan(itemWrapper, layoutWrapper, currentIndex);
-        for (int32_t lastCrossIndex = lineIndex - 1; lastCrossIndex >= 0; lastCrossIndex--) {
-            auto lastGridMatrixIter = info_.gridMatrix_.find(lastCrossIndex);
-            if (lastGridMatrixIter == info_.gridMatrix_.end()) {
-                continue;
+        auto lastGridMatrixIter = info_.gridMatrix_.lower_bound(lineIndex);
+        while (lastGridMatrixIter != info_.gridMatrix_.begin()) {
+            --lastGridMatrixIter;
+            if (lastGridMatrixIter->first < 0) {
+                break;
             }
-            auto lastGridItemRecord = lastGridMatrixIter->second;
+            const auto& lastGridItemRecord = lastGridMatrixIter->second;
             auto lastLineCrossItem = lastGridItemRecord.find(gridItemRecord.first);
             if (lastLineCrossItem == lastGridItemRecord.end()) {
                 continue;
@@ -1851,18 +1856,19 @@ int32_t GridScrollLayoutAlgorithm::CalculateLineIndexForLargeItem(
     return lineIndex;
 }
 
-void GridScrollLayoutAlgorithm::CalculateLineHeightForLargeItem(int32_t lineIndex, int32_t currentLineIndex,
-    std::map<int32_t, std::map<int32_t, int32_t>>::iterator gridMatrixIter, LayoutWrapper* layoutWrapper)
+void GridScrollLayoutAlgorithm::CalculateLineHeightForLargeItem(
+    int32_t lineIndex, int32_t currentLineIndex, LayoutWrapper* layoutWrapper)
 {
     for (int32_t i = lineIndex; i <= currentLineIndex; i++) {
         auto currentGridMatrixIter = info_.gridMatrix_.find(i);
         if (currentGridMatrixIter == info_.gridMatrix_.end()) {
             continue;
         }
-        auto currentIndex = 0;
+        auto currentIndex = -1;
         cellAveLength_ = -1.0f;
-        for (auto itemIter = gridMatrixIter->second.rbegin(); itemIter != gridMatrixIter->second.rend(); ++itemIter) {
-            if (currentIndex == itemIter->second) {
+        for (auto itemIter = currentGridMatrixIter->second.rbegin(); itemIter != currentGridMatrixIter->second.rend();
+             ++itemIter) {
+            if (currentIndex == itemIter->second || itemIter->second == -1) {
                 continue;
             }
             currentIndex = itemIter->second;

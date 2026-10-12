@@ -152,8 +152,7 @@ private:
     void LargeItemForwardLineHeight(int32_t currentLineIndex, LayoutWrapper* LayoutWrapper);
     int32_t CalculateLineIndexForLargeItem(std::map<int32_t, std::map<int32_t, int32_t>>::iterator gridMatrixIter,
         int32_t currentIndex, int32_t lineIndex, LayoutWrapper* layoutWrapper);
-    void CalculateLineHeightForLargeItem(int32_t lineIndex, int32_t currentLineIndex,
-        std::map<int32_t, std::map<int32_t, int32_t>>::iterator gridMatrixIter, LayoutWrapper* layoutWrapper);
+    void CalculateLineHeightForLargeItem(int32_t lineIndex, int32_t currentLineIndex, LayoutWrapper* layoutWrapper);
     void ScrollToIndexStart(LayoutWrapper* layoutWrapper, int32_t targetIndex);
     void ScrollToIndexAuto(LayoutWrapper* layoutWrapper, float mainSize, int32_t targetIndex);
     bool IsScrollToEndLine() const;
