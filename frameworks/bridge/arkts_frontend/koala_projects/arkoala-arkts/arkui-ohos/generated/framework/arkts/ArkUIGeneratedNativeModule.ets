@@ -4044,6 +4044,8 @@ export class ArkUIGeneratedNativeModule {
     @ani.unsafe.Direct
     native static _BottomTabBarStyle_iconStyle(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): KPointer
     @ani.unsafe.Direct
+    native static _BottomTabBarStyle_badge(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): KPointer
+    @ani.unsafe.Direct
     native static _BounceSymbolEffect_construct(thisArray: KSerializerBuffer, thisLength: KInt): KPointer
     @ani.unsafe.Direct
     native static _BounceSymbolEffect_getFinalizer(): KPointer

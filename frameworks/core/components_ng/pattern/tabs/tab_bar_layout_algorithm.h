@@ -21,9 +21,11 @@
 
 #include "base/geometry/axis.h"
 #include "base/memory/referenced.h"
+#include "core/components/tab_bar/tab_theme.h"
 #include "core/components_ng/layout/layout_algorithm.h"
 #include "core/components_ng/layout/layout_wrapper.h"
 #include "core/components_ng/pattern/tabs/tab_bar_layout_property.h"
+#include "core/components_ng/pattern/tabs/tab_content_model.h"
 #include "core/components_ng/pattern/tabs/tabs_declaration.h"
 
 namespace OHOS::Ace::NG {
@@ -147,6 +149,11 @@ private:
     void MeasureSubTabBarImageIndicator(LayoutWrapper* layoutWrapper) const;
     void LayoutSubTabBarImageIndicator(LayoutWrapper* layoutWrapper) const;
     void UpdateEffectiveChildIndices(LayoutWrapper* layoutWrapper);
+    void SyncBadgeContentChildLayout(const RefPtr<FrameNode>& childNode, bool isVertical,
+        const RefPtr<TabTheme>& tabTheme, const BottomTabBarStyle& bottomTabBarStyle);
+    void ResetBottomTabItemMargin(const RefPtr<FrameNode>& columnFrameNode);
+    void ResetIconMargin(const RefPtr<FrameNode>& iconFrameNode);
+    void ResetScrollableMarqueeOverflow(const RefPtr<FrameNode>& columnFrameNode);
 
     bool isRTL_ = false;
     Axis axis_ = Axis::NONE;

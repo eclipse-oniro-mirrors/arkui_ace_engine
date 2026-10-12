@@ -312,6 +312,12 @@ void SetTabBarVisibilityImpl(
     ArkUINodeHandle node, ArkUI_Int32 visibility, ArkUI_Int32 displayMode, ArkUI_Bool hasDisplayMode) {}
 
 void ResetTabBarVisibilityImpl(ArkUINodeHandle node) {}
+
+void SetTabBarBadgeImpl(ArkUINodeHandle node, void* badgeParamRawPtr)
+{
+    (void)node;
+    (void)badgeParamRawPtr;
+}
 #endif
 } // namespace
 
@@ -537,6 +543,10 @@ void SetTabBar(ArkUINodeHandle node, void* paramRawPtr, bool fromJsView)
     }
 #if defined(IOS_PLATFORM)
     TabContentModelNG::AddTabBarItem(AceType::Claim(frameNode), DEFAULT_NODE_SLOT, true);
+#else
+    if (!fromJsView) {
+        TabContentModelNG::AddTabBarItem(AceType::Claim(frameNode), DEFAULT_NODE_SLOT, true);
+    }
 #endif
 }
 
@@ -629,6 +639,15 @@ void ResetTabBarVisibility(ArkUINodeHandle node)
     TabContentModelNG::SetDefaultVisibility(frameNode, defaultVisibility);
 }
 
+void SetTabBarBadge(ArkUINodeHandle node, void* badgeParamRawPtr)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto* param = reinterpret_cast<std::optional<TabBarBadgeParam>*>(badgeParamRawPtr);
+    CHECK_NULL_VOID(param);
+    TabContentModelNG::SetTabBarBadge(frameNode, *param);
+}
+
 namespace NodeModifier {
 const ArkUITabContentModifier* GetTabContentDynamicModifier()
 {
@@ -669,6 +688,7 @@ const ArkUITabContentModifier* GetTabContentDynamicModifier()
             .setTabBar = SetTabBar,
             .setTabBarVisibility = SetTabBarVisibility,
             .resetTabBarVisibility = ResetTabBarVisibility,
+            .setTabBarBadge = SetTabBarBadge,
         };
         CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
         return &modifier;
@@ -709,6 +729,7 @@ const ArkUITabContentModifier* GetTabContentDynamicModifier()
         .setTabBar = SetTabBarImpl,
         .setTabBarVisibility = SetTabBarVisibilityImpl,
         .resetTabBarVisibility = ResetTabBarVisibilityImpl,
+        .setTabBarBadge = SetTabBarBadgeImpl,
     };
     CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
     return &modifier;

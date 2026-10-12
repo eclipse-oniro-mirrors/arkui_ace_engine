@@ -46,10 +46,12 @@
 #include "core/components_ng/pattern/tabs/tabs_pattern.h"
 #include "core/components_ng/pattern/tabs/tab_content_model_ng.h"
 #include "core/components_ng/pattern/tabs/tab_content_pattern.h"
+#include "core/components_ng/pattern/badge/badge_model_ng.h"
 #include "core/components_ng/pattern/tabs/tabs_declaration.h"
 #include "core/components_ng/pattern/text/text_layout_property.h"
 #include "base/perfmonitor/perf_constants.h"
 #include "base/perfmonitor/perf_monitor.h"
+#include "core/components_v2/inspector/inspector_constants.h"
 namespace OHOS::Ace::NG {
 namespace {
 constexpr int8_t LEFT_GRADIENT = 0;
@@ -93,6 +95,53 @@ ImageSourceInfo CreateSourceInfo(const std::shared_ptr<std::string>& src, RefPtr
     return { src, bundleName, moduleName };
 }
 } // namespace
+
+RefPtr<FrameNode> TabBarPattern::GetIconNodeFromColumn(const RefPtr<UINode>& columnNode)
+{
+    auto columnFrame = AceType::DynamicCast<FrameNode>(columnNode);
+    CHECK_NULL_RETURN(columnFrame, nullptr);
+    if (columnFrame->GetChildren().empty()) {
+        return nullptr;
+    }
+    auto firstChild = AceType::DynamicCast<FrameNode>(columnFrame->GetChildren().front());
+    if (firstChild && firstChild->GetTag() == BADGE_ETS_TAG) {
+        auto& badgeChildren = firstChild->GetChildren();
+        if (badgeChildren.empty()) {
+            return nullptr;
+        }
+        auto contentChild = AceType::DynamicCast<FrameNode>(badgeChildren.front());
+        CHECK_NULL_RETURN(contentChild, nullptr);
+        if (contentChild->GetChildren().empty()) {
+            return nullptr;
+        }
+        return AceType::DynamicCast<FrameNode>(contentChild->GetChildren().front());
+    }
+    return firstChild;
+}
+
+RefPtr<FrameNode> TabBarPattern::GetTextNodeFromColumn(const RefPtr<UINode>& columnNode)
+{
+    auto columnFrame = AceType::DynamicCast<FrameNode>(columnNode);
+    CHECK_NULL_RETURN(columnFrame, nullptr);
+    if (columnFrame->GetChildren().empty()) {
+        return nullptr;
+    }
+    auto firstChild = AceType::DynamicCast<FrameNode>(columnFrame->GetChildren().front());
+    if (firstChild && firstChild->GetTag() == BADGE_ETS_TAG) {
+        auto& badgeChildren = firstChild->GetChildren();
+        if (badgeChildren.empty()) {
+            return nullptr;
+        }
+        auto contentChild = AceType::DynamicCast<FrameNode>(badgeChildren.front());
+        CHECK_NULL_RETURN(contentChild, nullptr);
+        // text and image node size count 2,
+        if (contentChild->GetChildren().size() < 2) {
+            return nullptr;
+        }
+        return AceType::DynamicCast<FrameNode>(contentChild->GetChildren().back());
+    }
+    return AceType::DynamicCast<FrameNode>(columnFrame->GetChildren().back());
+}
 
 TabBarPattern::TabBarPattern() = default;
 
@@ -1341,6 +1390,16 @@ void TabBarPattern::UpdateChildrenClipEdge()
         for (int32_t index = 0; index < totalCount; index++) {
             auto childNode = AceType::DynamicCast<FrameNode>(tabBarNode->GetChildAtIndex(index));
             CHECK_NULL_VOID(childNode);
+            // Skip clipEdge update for columns wrapped with badge — badge text may
+            // extend beyond the column frame and must not be clipped.
+            bool hasBadge = false;
+            if (!childNode->GetChildren().empty()) {
+                auto firstChild = AceType::DynamicCast<FrameNode>(childNode->GetChildren().front());
+                hasBadge = firstChild && firstChild->GetTag() == BADGE_ETS_TAG;
+            }
+            if (hasBadge) {
+                continue;
+            }
             auto renderContext = childNode->GetRenderContext();
             CHECK_NULL_VOID(renderContext);
             renderContext->UpdateClipEdge(clipEdge);
@@ -1699,7 +1758,7 @@ bool TabBarPattern::CheckSvg(int32_t index) const
     CHECK_NULL_RETURN(host, false);
     auto columnNode = AceType::DynamicCast<FrameNode>(host->GetChildAtIndex(index));
     CHECK_NULL_RETURN(columnNode && !columnNode->GetChildren().empty(), false);
-    auto imageNode = AceType::DynamicCast<FrameNode>(columnNode->GetChildren().front());
+    auto imageNode = GetIconNodeFromColumn(columnNode);
     CHECK_NULL_RETURN(imageNode, false);
     auto imageLayoutProperty = imageNode->GetLayoutProperty<ImageLayoutProperty>();
     CHECK_NULL_RETURN(imageLayoutProperty, false);
@@ -1749,7 +1808,7 @@ void TabBarPattern::GetBottomTabBarImageSizeAndOffset(const std::vector<int32_t>
     CHECK_NULL_VOID(host);
     auto columnNode = AceType::DynamicCast<FrameNode>(host->GetChildAtIndex(selectedIndexes[maskIndex]));
     CHECK_NULL_VOID(columnNode && !columnNode->GetChildren().empty());
-    auto imageNode = AceType::DynamicCast<FrameNode>(columnNode->GetChildren().front());
+    auto imageNode = GetIconNodeFromColumn(columnNode);
     CHECK_NULL_VOID(imageNode);
     auto imageGeometryNode = imageNode->GetGeometryNode();
     CHECK_NULL_VOID(imageGeometryNode);
@@ -1800,7 +1859,7 @@ void TabBarPattern::UpdateBottomTabBarImageColor(const std::vector<int32_t>& sel
     auto tabTheme = host->GetTheme<TabTheme>(true);
     auto columnNode = AceType::DynamicCast<FrameNode>(host->GetChildAtIndex(selectedIndexes[maskIndex]));
     CHECK_NULL_VOID(columnNode && !columnNode->GetChildren().empty());
-    auto imageNode = AceType::DynamicCast<FrameNode>(columnNode->GetChildren().front());
+    auto imageNode = GetIconNodeFromColumn(columnNode);
     CHECK_NULL_VOID(imageNode);
 
     auto maskPosition = GetChildrenSize();
@@ -1906,7 +1965,7 @@ void TabBarPattern::MaskAnimationFinish(const RefPtr<FrameNode>& host, int32_t s
 
     auto columnNode = AceType::DynamicCast<FrameNode>(host->GetChildAtIndex(selectedIndex));
     CHECK_NULL_VOID(columnNode && !columnNode->GetChildren().empty());
-    auto imageNode = AceType::DynamicCast<FrameNode>(columnNode->GetChildren().front());
+    auto imageNode = GetIconNodeFromColumn(columnNode);
     CHECK_NULL_VOID(imageNode);
 
     auto imageLayoutProperty = imageNode->GetLayoutProperty<ImageLayoutProperty>();
@@ -2346,7 +2405,7 @@ void TabBarPattern::UpdateTextColorAndFontWeight(int32_t indicator)
             index++;
             continue;
         }
-        auto textNode = AceType::DynamicCast<FrameNode>(columnNode->GetChildren().back());
+        auto textNode = GetTextNodeFromColumn(columnNode);
         CHECK_NULL_VOID(textNode);
         auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
         CHECK_NULL_VOID(textLayoutProperty);
@@ -2396,7 +2455,7 @@ void TabBarPattern::UpdateImageColor(int32_t indicator)
     for (int32_t index = 0; index < childCount; index++) {
         auto columnNode = DynamicCast<FrameNode>(tabBarNode->GetChildAtIndex(index));
         CHECK_NULL_VOID(columnNode && !columnNode->GetChildren().empty());
-        auto imageNode = AceType::DynamicCast<FrameNode>(columnNode->GetChildren().front());
+        auto imageNode = GetIconNodeFromColumn(columnNode);
         CHECK_NULL_VOID(imageNode);
         if (imageNode->GetTag() != V2::IMAGE_ETS_TAG) {
             continue;
@@ -2441,7 +2500,7 @@ void TabBarPattern::UpdateSymbolStats(int32_t index, int32_t preIndex)
         }
         auto columnNode = DynamicCast<FrameNode>(tabBarNode->GetChildAtIndex(indexes[i]));
         CHECK_NULL_VOID(columnNode && !columnNode->GetChildren().empty());
-        auto symbolNode = AceType::DynamicCast<FrameNode>(columnNode->GetChildren().front());
+        auto symbolNode = GetIconNodeFromColumn(columnNode);
         CHECK_NULL_VOID(symbolNode);
         if (symbolNode->GetTag() != V2::SYMBOL_ETS_TAG) {
             continue;
@@ -2505,7 +2564,7 @@ void TabBarPattern::UpdateSymbolEffect(int32_t index)
     CHECK_NULL_VOID(tabBarNode);
     auto columnNode = DynamicCast<FrameNode>(tabBarNode->GetChildAtIndex(index));
     CHECK_NULL_VOID(columnNode && !columnNode->GetChildren().empty());
-    auto symbolNode = AceType::DynamicCast<FrameNode>(columnNode->GetChildren().front());
+    auto symbolNode = GetIconNodeFromColumn(columnNode);
     CHECK_NULL_VOID(symbolNode);
     if (symbolNode->GetTag() == V2::SYMBOL_ETS_TAG) {
         auto symbolLayoutProperty = symbolNode->GetLayoutProperty<TextLayoutProperty>();
