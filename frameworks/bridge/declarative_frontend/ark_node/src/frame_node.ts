@@ -359,6 +359,20 @@ class FrameNode {
     return this._nativeRef !== undefined && this._nativeRef !== null;
   }
 
+  dispatchInputEvent(event: InputEventType, competitionStrategy?: CompetitionStrategy): boolean {
+    if (!this.nodePtr_ || !this.uiContext_) {
+      return false;
+    }
+    return getUINativeModule().frameNode.dispatchInputEvent(this.nodePtr_, event, competitionStrategy);
+  }
+
+  dispatchKeyEvent(event: KeyEvent): boolean {
+    if (!this.nodePtr_ || !this.uiContext_) {
+      return false;
+    }
+    return getUINativeModule().frameNode.dispatchKeyEvent(this.nodePtr_, event);
+  }
+
   convertToFrameNode(nodePtr: NodePtr, nodeId: number = -1): FrameNode | null {
     if (nodeId === -1) {
       __JSScopeUtil__.syncInstanceId(this.instanceId_);

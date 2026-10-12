@@ -30524,6 +30524,11 @@ typedef struct GENERATED_ArkUIFrameNodeExtenderAccessor {
     Ark_NativePointer (*getFrameNodeByUniqueId1)(Ark_FrameNode peer,
                                                  Ark_Int32 id);
     Array_FrameNodeCreateInfo (*getFrameNodeCreateInfoArray)(Ark_Int32 count);
+    Ark_Boolean (*dispatchInputEvent)(Ark_FrameNode peer,
+                                      Ark_NativePointer event,
+                                      Ark_Int32 competitionStrategy);
+    Ark_Boolean (*dispatchKeyEvent)(Ark_FrameNode peer,
+                                    Ark_NativePointer event);
 } GENERATED_ArkUIFrameNodeExtenderAccessor;
 
 typedef struct GENERATED_ArkUIFullScreenExitHandlerAccessor {

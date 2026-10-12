@@ -1335,6 +1335,10 @@ void ArkUINativeModule::RegisterFrameNodeAttributes(Local<panda::ObjectRef> obje
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), FrameNodeBridge::SetOnDetach));
     frameNode->Set(vm, panda::StringRef::NewFromUtf8(vm, "setOnKeyEvent"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), FrameNodeBridge::SetOnKeyEvent));
+    frameNode->Set(vm, panda::StringRef::NewFromUtf8(vm, "dispatchInputEvent"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), FrameNodeBridge::DispatchInputEvent));
+    frameNode->Set(vm, panda::StringRef::NewFromUtf8(vm, "dispatchKeyEvent"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), FrameNodeBridge::DispatchKeyEvent));
     frameNode->Set(vm, panda::StringRef::NewFromUtf8(vm, "setOnFocus"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), FrameNodeBridge::SetOnFocus));
     frameNode->Set(vm, panda::StringRef::NewFromUtf8(vm, "setOnBlur"),
