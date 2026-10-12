@@ -389,9 +389,7 @@ int32_t UiReportStub::OnRemoteRequest(uint32_t code, MessageParcel& data, Messag
                 LOGW("ReportComponentTreeQueryResult read data failed");
                 break;
             }
-            int32_t partNum = data.ReadInt32();
-            bool isLastPart = data.ReadBool();
-            ReportComponentTreeQueryResult(result, partNum, isLastPart);
+            ReportComponentTreeQueryResult(result);
             break;
         }
 
@@ -518,25 +516,23 @@ void UiReportStub::RegisterGetHitTestNodeInfoCallback(
     getHitTestNodeInfoCallback_ = std::move(eventCallback);
 }
 
-void UiReportStub::ReportComponentTreeQueryResult(const std::string& data, int32_t partNum, bool isLastPart)
+void UiReportStub::ReportComponentTreeQueryResult(const std::string& data)
 {
-    std::function<void(std::string, int32_t, bool)> componentTreeQueryCallback;
+    std::function<void(const std::string&)> componentTreeQueryCallback;
     {
         std::lock_guard<std::mutex> lock(componentTreeQueryCallbackMutex_);
         if (!componentTreeQueryCallback_) {
             return;
         }
         componentTreeQueryCallback = componentTreeQueryCallback_;
-        if (isLastPart) {
-            CancelComponentTreeQueryCallbackTimeoutTaskLocked();
-            componentTreeQueryCallback_ = nullptr;
-        }
+        CancelComponentTreeQueryCallbackTimeoutTaskLocked();
+        componentTreeQueryCallback_ = nullptr;
     }
-    componentTreeQueryCallback(data, partNum, isLastPart);
+    componentTreeQueryCallback(data);
 }
 
 bool UiReportStub::RegisterComponentTreeQueryCallback(
-    const std::function<void(std::string, int32_t, bool)>& eventCallback)
+    const std::function<void(const std::string&)>& eventCallback)
 {
     std::lock_guard<std::mutex> lock(componentTreeQueryCallbackMutex_);
     if (componentTreeQueryCallback_ != nullptr) {

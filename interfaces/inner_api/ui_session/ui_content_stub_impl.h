@@ -116,7 +116,7 @@ public:
     int32_t GetPageScene(
         const std::string& ruleJsonOrRuleSetId, const PageSceneEventCallback& eventCallback) override;
     int32_t GetNavigationContentByPoint(float x, float y, const std::string& pattern,
-        const std::function<void(const std::string&, int32_t, bool)>& eventCallback,
+        const std::function<void(const std::string&)>& eventCallback,
         int32_t timeout = DEFAULT_INSPECTOR_TREE_CALLBACK_TIMEOUT_MS) override;
 };
 } // namespace OHOS::Ace

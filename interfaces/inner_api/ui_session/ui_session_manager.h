@@ -28,7 +28,6 @@
 
 #include "base/utils/macros.h"
 
-#include "component_tree_query_type.h"
 #include "param_config.h"
 #include "ui_content_errors.h"
 #include "ui_content_proxy_error_code.h"
@@ -44,6 +43,7 @@ class PixelMap;
 } // namespace Media
 } // namespace OHOS
 namespace OHOS::Ace {
+struct ComponentTreeQueryRequest;
 class ACE_FORCE_EXPORT UiSessionManager {
 public:
     using InspectorFunction = std::function<void(bool onlyNeedVisible, ParamConfig config)>;

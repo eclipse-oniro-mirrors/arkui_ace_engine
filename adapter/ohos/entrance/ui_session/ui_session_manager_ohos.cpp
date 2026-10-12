@@ -2652,7 +2652,7 @@ void UiSessionManagerOhos::ReportComponentTreeQueryResult(const std::string& dat
             LOGW("Report ComponentTreeQueryResult failed, process id:%{public}d", pid);
             continue;
         }
-        reportService->ReportComponentTreeQueryResult(data, 1, true);
+        reportService->ReportComponentTreeQueryResult(data);
     }
     processIter->second.clear();
 }

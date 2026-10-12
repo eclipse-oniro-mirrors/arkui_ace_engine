@@ -22,7 +22,7 @@
 
 namespace OHOS::Ace {
 
-// Structured error codes for component tree spatial/context queries (FEAT-031).
+// Structured error codes for component tree spatial/context queries.
 // Keep in sync with NG::ComponentTreeQuery usage; positive small ints are safe
 // to cross the UISession IPC boundary inside the reported JSON payload.
 enum class ComponentTreeQueryError : int32_t {
@@ -34,6 +34,7 @@ enum class ComponentTreeQueryError : int32_t {
     SERIALIZATION_ERROR = 5, // data can not be serialized to JSON
     RESOURCE_LIMIT = 6,      // regex > 1024B / scan > 10000 nodes / serialized > 4MiB
     INTERNAL_ERROR = 7,      // no pipeline / no root node
+    TIMEOUT = 8,             // execution exceeded time limit
 };
 
 enum class ComponentTreeQueryType : int32_t {
@@ -45,9 +46,7 @@ enum class ComponentTreeQueryType : int32_t {
 
 struct ComponentTreeQueryRequest {
     ComponentTreeQueryType type = ComponentTreeQueryType::LAZY_FOREACH_DATA_BY_POINT;
-    // Window physical pixel coordinates. Used as point (x, y) for point based
-    // queries, as circle center (x, y) + radius for circle queries and as the
-    // two rect diagonal corners (x, y) / (extraX, extraY) for rect queries.
+    // Window physical pixel coordinates (SA input). Converted to vp internally.
     float x = 0.0f;
     float y = 0.0f;
     float extraX = 0.0f;
@@ -60,6 +59,7 @@ struct ComponentTreeQueryRequest {
 constexpr size_t COMPONENT_TREE_QUERY_MAX_REGEX_BYTES = 1024;
 constexpr int32_t COMPONENT_TREE_QUERY_MAX_SCAN_NODES = 10000;
 constexpr size_t COMPONENT_TREE_QUERY_MAX_SERIALIZED_BYTES = 4 * 1024 * 1024; // 4 MiB
+constexpr int32_t COMPONENT_TREE_QUERY_MAX_EXECUTION_MS = 500;
 
 } // namespace OHOS::Ace
 

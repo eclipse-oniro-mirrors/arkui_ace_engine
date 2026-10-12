@@ -1261,10 +1261,9 @@ void UiSaService::HandleGetNavigationContent(
         }
         std::string pattern = params[3];
         bool toFile = params.size() > GET_NAVIGATION_CONTENT_PARAMS && params.back() == "-tofile";
-        auto navigationContentCallback = [toFile](const std::string& data, int32_t partNum, bool isLastPart) {
-            LOGI("[GetNavigationContent] partNum=%{public}d, isLastPart=%{public}d, data = %{public}s",
-                partNum, isLastPart, data.substr(0, 200).c_str());
-            if (isLastPart && toFile) {
+        auto navigationContentCallback = [toFile](const std::string& data) {
+            LOGI("[GetNavigationContent] data = %{public}s", data.substr(0, 200).c_str());
+            if (toFile) {
                 auto filePath = UI_SA_PATH + "navigation_content_" + GetCurrentTimestampStr() + ".json";
                 std::unique_ptr<std::ofstream> ostream = std::make_unique<std::ofstream>(filePath);
                 CHECK_NULL_VOID(ostream);

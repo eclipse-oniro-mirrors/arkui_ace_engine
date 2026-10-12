@@ -15,6 +15,7 @@
 
 #include "frameworks/core/components_ng/manager/uisession_query/component_tree_query.h"
 
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <functional>
@@ -39,8 +40,8 @@ constexpr int32_t ERR_INVALID_PARAMETER = static_cast<int32_t>(ComponentTreeQuer
 constexpr int32_t ERR_TARGET_NOT_FOUND = static_cast<int32_t>(ComponentTreeQueryError::TARGET_NOT_FOUND);
 constexpr int32_t ERR_RESOURCE_LIMIT = static_cast<int32_t>(ComponentTreeQueryError::RESOURCE_LIMIT);
 constexpr int32_t ERR_INTERNAL_ERROR = static_cast<int32_t>(ComponentTreeQueryError::INTERNAL_ERROR);
+constexpr int32_t ERR_TIMEOUT = static_cast<int32_t>(ComponentTreeQueryError::TIMEOUT);
 
-const char QUERY_KEY_TYPE[] = "type";
 const char QUERY_KEY_CONTENT[] = "content";
 const char QUERY_KEY_NAV_BAR_MATCHES[] = "navBarMatches";
 
@@ -48,6 +49,8 @@ const char QUERY_KEY_NAV_BAR_MATCHES[] = "navBarMatches";
 struct ScanState {
     int32_t scanned = 0; // nodes visited so far (resource limit)
     bool limitExceeded = false;
+    bool timedOut = false;
+    std::chrono::steady_clock::time_point startTime = std::chrono::steady_clock::now();
 };
 
 // Accumulated match results during NavBar walk. Bundles the output list,
@@ -79,8 +82,7 @@ RectF GetVisibleRectRelativeToWindow(const RefPtr<FrameNode>& node)
     if (!node) {
         return RectF();
     }
-    // ADR-2: filters inactive nodes and nodes under invisible ancestors by
-    // returning an invalid rect (INT32_MAX offset, zero size).
+    // ADR-2: returns invalid rect for inactive nodes and nodes under invisible ancestors.
     return node->GetTransformRectRelativeToWindowOnlyVisible();
 }
 
@@ -111,6 +113,13 @@ bool ConsumeScanQuota(ScanState& state)
         state.limitExceeded = true;
         return false;
     }
+    auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - state.startTime).count();
+    if (elapsedMs >= COMPONENT_TREE_QUERY_MAX_EXECUTION_MS) {
+        state.timedOut = true;
+        state.limitExceeded = true;
+        return false;
+    }
     return true;
 }
 
@@ -118,6 +127,10 @@ void VisitForPointHit(const RefPtr<UINode>& node, int32_t depth,
     PointHitQuery& query, ScanState& state)
 {
     if (!node || !ConsumeScanQuota(state)) {
+        return;
+    }
+    // Skip invisible/inactive nodes entirely.
+    if (!node->IsVisibleAndActive()) {
         return;
     }
     auto frameNode = AceType::DynamicCast<FrameNode>(node);
@@ -131,9 +144,6 @@ void VisitForPointHit(const RefPtr<UINode>& node, int32_t depth,
                 query.best.depth = depth;
             }
         }
-    }
-    if (!node->IsVisibleAndActive()) {
-        return;
     }
     for (const auto& child : GetTraversalChildren(node)) {
         VisitForPointHit(child, depth + 1, query, state);
@@ -196,6 +206,10 @@ RefPtr<NavigationGroupNode> FindNavigationByPoint(float x, float y, ScanState& s
     query.x = x;
     query.y = y;
     VisitForPointHit(root, 0, query, state);
+    if (state.timedOut) {
+        errorCode = ERR_TIMEOUT;
+        return nullptr;
+    }
     if (state.limitExceeded) {
         errorCode = ERR_RESOURCE_LIMIT;
         return nullptr;
@@ -296,35 +310,7 @@ int32_t ComponentTreeQuery::CheckRegex(const std::string& pattern)
     if (pattern.size() > COMPONENT_TREE_QUERY_MAX_REGEX_BYTES) {
         return ERR_RESOURCE_LIMIT;
     }
-    int32_t bracketDepth = 0;
-    int32_t parenDepth = 0;
-    int32_t braceDepth = 0;
-    for (size_t i = 0; i < pattern.size(); ++i) {
-        char c = pattern[i];
-        if (c == '\\') {
-            ++i; // skip escaped char
-            continue;
-        }
-        if (c == '[') {
-            bracketDepth++;
-        } else if (c == ']') {
-            bracketDepth--;
-        } else if (c == '(') {
-            parenDepth++;
-        } else if (c == ')') {
-            parenDepth--;
-        } else if (c == '{') {
-            braceDepth++;
-        } else if (c == '}') {
-            braceDepth--;
-        }
-        if (bracketDepth < 0 || parenDepth < 0 || braceDepth < 0) {
-            return ERR_INVALID_PARAMETER;
-        }
-    }
-    if (bracketDepth != 0 || parenDepth != 0 || braceDepth != 0) {
-        return ERR_INVALID_PARAMETER;
-    }
+    // Caller is responsible for pattern validity (std::regex aborts under -fno-exceptions).
     return ERR_OK;
 }
 
@@ -334,11 +320,35 @@ int32_t ComponentTreeQuery::QueryNavigationContentByPoint(
 {
     ACE_SCOPED_TRACE("QueryNavigationContentByPoint[x:%f][y:%f][patternLen:%zu]", x, y, pattern.size());
 
+    auto buildResult = [](int32_t code) {
+        auto json = JsonUtil::CreateSharedPtrJson(true);
+        json->Put("errorCode", code);
+        auto ctx = PipelineContext::GetCurrentContextSafely();
+        if (ctx) {
+            ctx->GetAppInfo(json);
+        }
+        return json->ToString();
+    };
+
+    // Convert physical pixel coordinates (from SA) to vp used by component tree rects.
+    auto pipeline = PipelineContext::GetCurrentContextSafely();
+    if (!pipeline) {
+        resultJson = buildResult(ERR_INTERNAL_ERROR);
+        return ERR_INTERNAL_ERROR;
+    }
+    float viewScale = pipeline->GetViewScale();
+    if (viewScale > 0.0f) {
+        x /= viewScale;
+        y /= viewScale;
+    }
+
     auto regexCheck = CheckRegex(pattern);
     if (regexCheck != ERR_OK) {
+        resultJson = buildResult(regexCheck);
         return regexCheck;
     }
     if (!IsFinitePoint(x, y)) {
+        resultJson = buildResult(ERR_INVALID_PARAMETER);
         return ERR_INVALID_PARAMETER;
     }
 
@@ -347,24 +357,32 @@ int32_t ComponentTreeQuery::QueryNavigationContentByPoint(
     auto navGroupNode = FindNavigationByPoint(x, y, state, errorCode);
     if (!navGroupNode) {
         if (errorCode != ERR_TARGET_NOT_FOUND) {
+            resultJson = buildResult(errorCode);
             return errorCode;
         }
-        // Navigation not found — return ERR_OK with empty resultJson so
-        // the caller reports empty content to SA side.
+        // Navigation not found.
+        resultJson = buildResult(ERR_OK);
         return ERR_OK;
     }
 
     auto contentNode = navGroupNode->GetContentNode();
     if (!contentNode) {
-        // Navigation exists but no content — same as not found.
+        resultJson = buildResult(ERR_OK);
         return ERR_OK;
+    }
+    // Check remaining time budget before subtree serialization.
+    auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - state.startTime).count();
+    if (elapsedMs >= COMPONENT_TREE_QUERY_MAX_EXECUTION_MS) {
+        resultJson = buildResult(ERR_TIMEOUT);
+        return ERR_TIMEOUT;
     }
     auto contentJsonStr = Inspector::GetInspectorOfNodeSubtree(contentNode);
     if (!CheckSerializedSize(contentJsonStr.size())) {
+        resultJson = buildResult(ERR_RESOURCE_LIMIT);
         return ERR_RESOURCE_LIMIT;
     }
 
-    // Pattern already validated by CheckRegex — safe to construct std::regex.
     std::regex regex(pattern);
     MatchResult matchResult;
     matchResult.serializedSize = contentJsonStr.size();
@@ -373,12 +391,21 @@ int32_t ComponentTreeQuery::QueryNavigationContentByPoint(
         WalkNavBarAndMatch(navBarNode, regex, state, matchResult);
     }
 
+    if (state.timedOut) {
+        resultJson = buildResult(ERR_TIMEOUT);
+        return ERR_TIMEOUT;
+    }
     if (state.limitExceeded) {
+        resultJson = buildResult(ERR_RESOURCE_LIMIT);
         return ERR_RESOURCE_LIMIT;
     }
 
-    auto json = JsonUtil::Create(true);
-    json->Put(QUERY_KEY_TYPE, "navigationContent");
+    auto json = JsonUtil::CreateSharedPtrJson(true);
+    json->Put("errorCode", ERR_OK);
+    auto context = PipelineContext::GetCurrentContextSafely();
+    if (context) {
+        context->GetAppInfo(json);
+    }
     json->PutRef(QUERY_KEY_CONTENT, ParseJsonOrEmpty(contentJsonStr));
     auto matches = JsonUtil::CreateArray(true);
     for (const auto& matchStr : matchResult.matchJsonStrs) {
@@ -387,7 +414,7 @@ int32_t ComponentTreeQuery::QueryNavigationContentByPoint(
     json->PutRef(QUERY_KEY_NAV_BAR_MATCHES, std::move(matches));
     resultJson = json->ToString();
     if (!CheckSerializedSize(resultJson.size())) {
-        resultJson.clear();
+        resultJson = buildResult(ERR_RESOURCE_LIMIT);
         return ERR_RESOURCE_LIMIT;
     }
     return ERR_OK;

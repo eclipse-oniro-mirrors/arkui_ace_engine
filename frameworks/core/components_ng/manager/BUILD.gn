@@ -79,7 +79,6 @@ build_component_ng("manager_ng") {
     "toolbar/toolbar_manager.cpp",
     "uisession_query/component_tree_query.cpp",
   ]
-
   inspector_event_reporting_sources = [
     "event/json_child_report.cpp",
     "drag_drop/drag_drop_behavior_reporter/drag_drop_behavior_reporter.cpp",

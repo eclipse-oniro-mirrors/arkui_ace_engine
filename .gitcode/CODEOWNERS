@@ -2434,6 +2434,7 @@ frameworks/core/components_ng/manager/select_overlay/service_collaboration_menu_
 frameworks/core/components_ng/manager/shared_overlay/ @arkui_framework_xnode
 frameworks/core/components_ng/manager/smart_gesture/ @ArkUI_Event
 frameworks/core/components_ng/manager/toolbar/ @ArkUI_Event
+frameworks/core/components_ng/manager/uisession_query/ @arkuiscroll
 frameworks/core/components_ng/pattern/ability_component/ @arkuieco3
 frameworks/core/components_ng/pattern/animator/ @arkuicodepulse
 frameworks/core/components_ng/pattern/app_bar/ @ArkUI_ability_group
@@ -3201,6 +3202,7 @@ interfaces/inner_api/drawable_descriptor/ @arkui001
 interfaces/inner_api/form_render/ @form_framework
 interfaces/inner_api/ui_service_manager/ @ArkUI_ability_group
 interfaces/inner_api/ui_session/ @arkui_framework_xnode
+interfaces/inner_api/ui_session/component_tree_query_type.h @arkuiscroll
 interfaces/inner_api/xcomponent_controller/ @ArkUI_ability_group
 
 [NAPI Interfaces]
@@ -3631,6 +3633,7 @@ test/unittest/core/manager/content_change_manager_test_ng.cpp @arkui_framework_x
 test/unittest/core/manager/force_split_manager_test_ng.cpp @arkui_navigation
 test/unittest/core/manager/navigation_manager_test_ng.cpp @arkui_navigation
 test/unittest/core/manager/safe_area_manager_test_ng.cpp @arkuilayout1
+test/unittest/core/manager/component_tree_query_test_ng.cpp @arkuiscroll
 test/unittest/core/pattern/animator/ @arkuicodepulse
 test/unittest/core/pattern/app_bar/ @ArkUI_ability_group
 test/unittest/core/pattern/arc_list/ @arkuiscroll

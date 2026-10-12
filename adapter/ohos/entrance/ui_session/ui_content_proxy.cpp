@@ -273,12 +273,16 @@ int32_t UIContentServiceProxy::GetPageScene(
 }
 
 int32_t UIContentServiceProxy::SendComponentTreeQueryRequest(uint32_t code, const char* caller,
-    const std::function<void(const std::string&, int32_t, bool)>& eventCallback,
+    const std::function<void(const std::string&)>& eventCallback,
     const std::function<bool(MessageParcel&)>& writeParams,
     int32_t timeout)
 {
     if (eventCallback == nullptr) {
         LOGW("%{public}s invalid callback", caller);
+        return PARAM_INVALID;
+    }
+    if (writeParams == nullptr) {
+        LOGW("%{public}s invalid writeParams", caller);
         return PARAM_INVALID;
     }
     if (report_ == nullptr) {
@@ -314,7 +318,7 @@ int32_t UIContentServiceProxy::SendComponentTreeQueryRequest(uint32_t code, cons
 }
 
 int32_t UIContentServiceProxy::GetNavigationContentByPoint(float x, float y, const std::string& pattern,
-    const std::function<void(const std::string&, int32_t, bool)>& eventCallback,
+    const std::function<void(const std::string&)>& eventCallback,
     int32_t timeout)
 {
     return SendComponentTreeQueryRequest(GET_NAVIGATION_CONTENT_BY_POINT, "GetNavigationContentByPoint",

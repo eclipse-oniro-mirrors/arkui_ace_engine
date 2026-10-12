@@ -6904,12 +6904,8 @@ void UIContentImpl::SaveComponentTreeQueryFunction(const WeakPtr<TaskExecutor>& 
         taskExecutor->PostTask(
             [request]() {
                 std::string resultJson;
-                int32_t ret = NG::ComponentTreeQuery::Execute(request, resultJson);
-                // ERR_OK: report result to SA (may be empty if Navigation not found).
-                // Other errors: silent drop, SA side waits for timeout.
-                if (ret == static_cast<int32_t>(ComponentTreeQueryError::OK)) {
-                    UiSessionManager::GetInstance()->ReportComponentTreeQueryResult(resultJson);
-                }
+                NG::ComponentTreeQuery::Execute(request, resultJson);
+                UiSessionManager::GetInstance()->ReportComponentTreeQueryResult(resultJson);
             },
             TaskExecutor::TaskType::UI, "UiSessionComponentTreeQuery");
     };

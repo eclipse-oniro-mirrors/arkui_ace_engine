@@ -22,7 +22,6 @@
 #include <string>
 #include <vector>
 #include "ui/base/macros.h"
-#include "component_tree_query_type.h"
 #include "param_config.h"
 #include "ui_content_errors.h"
 #include "ui_content_proxy_error_code.h"
@@ -441,11 +440,11 @@ public:
     }
 
     /**
-     * @description: FEAT-031 FR-2: extract the Navigation content subtree hit
+     * @description: extract the Navigation content subtree hit
      * by the window point (x, y) plus NavBar nodes matching pattern (regex).
      */
     virtual int32_t GetNavigationContentByPoint(float x, float y, const std::string& pattern,
-        const std::function<void(const std::string&, int32_t, bool)>& eventCallback,
+        const std::function<void(const std::string&)>& eventCallback,
         int32_t timeout = DEFAULT_INSPECTOR_TREE_CALLBACK_TIMEOUT_MS)
     {
         return FAILED;
@@ -608,9 +607,9 @@ public:
     virtual void ReportPageSceneEvent(const std::string& sceneJson, bool isGetResult = false) {}
 
     /**
-     * @description: reports one (partial) component tree query result to the requesting SA process.
+     * @description: reports component tree query result to the requesting SA process.
      */
-    virtual void ReportComponentTreeQueryResult(const std::string& data, int32_t partNum, bool isLastPart) {}
+    virtual void ReportComponentTreeQueryResult(const std::string& data) {}
 };
 } // namespace OHOS::Ace
 #endif // FOUNDATION_ACE_INTERFACE_UI_CONTENT_SERVICE_INTERFACE_H

@@ -608,7 +608,7 @@ void UiReportProxy::ReportPageSceneEvent(const std::string& sceneJson, bool isGe
     }
 }
 
-void UiReportProxy::ReportComponentTreeQueryResult(const std::string& data, int32_t partNum, bool isLastPart)
+void UiReportProxy::ReportComponentTreeQueryResult(const std::string& data)
 {
     MessageParcel messageData;
     MessageParcel reply;
@@ -629,14 +629,6 @@ void UiReportProxy::ReportComponentTreeQueryResult(const std::string& data, int3
     }
     if (!messageData.WriteParcelable(largeStringAshmem)) {
         LOGW("ReportComponentTreeQueryResult write data failed");
-        return;
-    }
-    if (!messageData.WriteInt32(partNum)) {
-        LOGW("ReportComponentTreeQueryResult write partNum failed");
-        return;
-    }
-    if (!messageData.WriteBool(isLastPart)) {
-        LOGW("ReportComponentTreeQueryResult write isLastPart failed");
         return;
     }
     int32_t sendRequestErrorCode =
