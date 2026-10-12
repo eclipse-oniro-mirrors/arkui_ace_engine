@@ -37,6 +37,12 @@ if (use_mac) {
 
 common_bin = [
   {
+    label = "//third_party/zlib:shared_libz"
+    subsystem_name = "thirdparty"
+    part_name = "zlib"
+    lib_names = [ "shared_libz" ]
+  },
+  {
     label = "//third_party/curl:curl_shared"
     subsystem_name = "thirdparty"
     part_name = "curl"
@@ -1066,12 +1072,6 @@ if (use_mac || use_mingw_win) {
       label = "//foundation/distributeddatamgr/kv_store/kvstoremock/distributeddb:distributeddb_mock"
       subsystem_name = "distributeddatamgr"
       part_name = "kv_store"
-    },
-    {
-      label = "//third_party/zlib:shared_libz"
-      subsystem_name = "thirdparty"
-      part_name = "zlib"
-      lib_names = [ "shared_libz" ]
     },
     {
       label = "//foundation/filemanagement/file_api/utils/filemgmt_libhilog:filemgmt_libhilog"
