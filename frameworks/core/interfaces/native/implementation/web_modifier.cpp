@@ -1207,7 +1207,7 @@ void SetOnContextMenuHideImpl(Ark_NativePointer node,
 }
 
 void SetOnContextMenuUpdateImpl(Ark_NativePointer node,
-                              const Opt_OnContextMenuUpdateCallback* value)
+                                const Opt_OnContextMenuUpdateCallback* value)
 {
 #ifdef WEB_SUPPORTED
     auto frameNode = reinterpret_cast<FrameNode *>(node);
