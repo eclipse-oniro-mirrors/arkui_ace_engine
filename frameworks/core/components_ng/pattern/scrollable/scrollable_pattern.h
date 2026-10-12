@@ -655,6 +655,9 @@ public:
 
     ScrollState GetScrollState() const;
 
+    // Query API: reads the session-level scrollSourceForQuery_, unaffected by layout-level resets.
+    ScrollState GetScrollStateForQuery() const;
+
     static ScrollState GetScrollState(int32_t scrollSource);
 
     static ScrollSource ConvertScrollSource(int32_t source);

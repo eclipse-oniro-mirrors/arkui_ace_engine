@@ -696,7 +696,7 @@ HWTEST_F(ScrollControllerTestNg, GetScrollState001, TestSize.Level1)
     CreateScroll();
     CreateContent();
     CreateScrollDone();
-    EXPECT_EQ(pattern_->GetScrollState(), ScrollState::IDLE);
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::IDLE);
 }
 
 /**
@@ -710,7 +710,7 @@ HWTEST_F(ScrollControllerTestNg, GetScrollState002, TestSize.Level1)
     CreateContent();
     CreateScrollDone();
     pattern_->SetScrollSource(SCROLL_FROM_UPDATE);
-    EXPECT_EQ(pattern_->GetScrollState(), ScrollState::SCROLL);
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::SCROLL);
 }
 
 /**
@@ -724,7 +724,7 @@ HWTEST_F(ScrollControllerTestNg, GetScrollState003, TestSize.Level1)
     CreateContent();
     CreateScrollDone();
     pattern_->SetScrollSource(SCROLL_FROM_ANIMATION);
-    EXPECT_EQ(pattern_->GetScrollState(), ScrollState::FLING);
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::FLING);
 }
 
 /**
@@ -764,7 +764,7 @@ HWTEST_F(ScrollControllerTestNg, GetScrollState006, TestSize.Level1)
         SCROLL_FROM_CROWN, SCROLL_FROM_BAR_OVER_DRAG };
     for (auto source : scrollSources) {
         pattern_->SetScrollSource(source);
-        EXPECT_EQ(pattern_->GetScrollState(), ScrollState::SCROLL);
+        EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::SCROLL);
     }
 }
 
@@ -782,7 +782,7 @@ HWTEST_F(ScrollControllerTestNg, GetScrollState007, TestSize.Level1)
         SCROLL_FROM_ANIMATION_CONTROLLER, SCROLL_FROM_BAR_FLING };
     for (auto source : animationSources) {
         pattern_->SetScrollSource(source);
-        EXPECT_EQ(pattern_->GetScrollState(), ScrollState::FLING);
+        EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::FLING);
     }
 }
 
@@ -796,13 +796,13 @@ HWTEST_F(ScrollControllerTestNg, GetScrollState008, TestSize.Level1)
     CreateScroll();
     CreateContent();
     CreateScrollDone();
-    EXPECT_EQ(pattern_->GetScrollState(), ScrollState::IDLE);
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::IDLE);
     const std::vector<int32_t> idleSources = { SCROLL_FROM_NONE, SCROLL_FROM_JUMP, SCROLL_FROM_CHILD,
         SCROLL_FROM_FOCUS_JUMP, SCROLL_FROM_ROTATE, SCROLL_FROM_INDEXER, SCROLL_FROM_START, SCROLL_FROM_STATUSBAR,
         SCROLL_FROM_LAYOUT };
     for (auto source : idleSources) {
         pattern_->SetScrollSource(source);
-        EXPECT_EQ(pattern_->GetScrollState(), ScrollState::IDLE);
+        EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::IDLE);
     }
 }
 
@@ -817,11 +817,11 @@ HWTEST_F(ScrollControllerTestNg, GetScrollState009, TestSize.Level1)
     CreateContent();
     CreateScrollDone();
     pattern_->SetScrollSource(SCROLL_FROM_UPDATE);
-    EXPECT_EQ(pattern_->GetScrollState(), ScrollState::SCROLL);
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::SCROLL);
     pattern_->SetScrollSource(SCROLL_FROM_ANIMATION);
-    EXPECT_EQ(pattern_->GetScrollState(), ScrollState::FLING);
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::FLING);
     pattern_->SetScrollSource(SCROLL_FROM_AXIS);
-    EXPECT_EQ(pattern_->GetScrollState(), ScrollState::SCROLL);
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::SCROLL);
 }
 
 /**
@@ -835,9 +835,9 @@ HWTEST_F(ScrollControllerTestNg, GetScrollState010, TestSize.Level1)
     CreateContent();
     CreateScrollDone();
     pattern_->SetScrollSource(SCROLL_FROM_UPDATE);
-    EXPECT_EQ(pattern_->GetScrollState(), ScrollState::SCROLL);
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::SCROLL);
     pattern_->FireOnScrollStop([]() {}, []() {});
-    EXPECT_EQ(pattern_->GetScrollState(), ScrollState::IDLE);
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::IDLE);
 }
 
 /**
@@ -851,7 +851,29 @@ HWTEST_F(ScrollControllerTestNg, GetScrollState011, TestSize.Level1)
     CreateContent();
     CreateScrollDone();
     pattern_->SetScrollSource(SCROLL_FROM_JUMP);
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::IDLE);
+}
+
+/**
+ * @tc.name: GetScrollState012
+ * @tc.desc: Test layout-level reset affects GetScrollState only, GetScrollStateForQuery keeps session-level state
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollControllerTestNg, GetScrollState012, TestSize.Level1)
+{
+    CreateScroll();
+    CreateContent();
+    CreateScrollDone();
+    pattern_->SetScrollSource(SCROLL_FROM_UPDATE);
+    EXPECT_EQ(pattern_->GetScrollState(), ScrollState::SCROLL);
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::SCROLL);
+    /**
+     * @tc.steps: Layout reset touches only the frame-level source.
+     * @tc.expected: GetScrollState becomes IDLE while GetScrollStateForQuery stays SCROLL.
+     */
+    pattern_->SetScrollSourceLayout(SCROLL_FROM_NONE);
     EXPECT_EQ(pattern_->GetScrollState(), ScrollState::IDLE);
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::SCROLL);
 }
 
 } // namespace OHOS::Ace::NG

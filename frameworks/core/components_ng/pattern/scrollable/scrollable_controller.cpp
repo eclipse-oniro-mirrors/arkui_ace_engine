@@ -79,7 +79,7 @@ ScrollState ScrollableController::GetScrollState() const
 {
     auto pattern = scroll_.Upgrade();
     CHECK_NULL_RETURN(pattern, ScrollState::IDLE);
-    return pattern->GetScrollState();
+    return pattern->GetScrollStateForQuery();
 }
 
 Offset ScrollableController::GetCurrentOffset() const

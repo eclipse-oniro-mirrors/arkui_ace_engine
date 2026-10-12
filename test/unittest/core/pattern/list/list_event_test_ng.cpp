@@ -1900,7 +1900,7 @@ HWTEST_F(ListEventTestNg, StartSnapAnimation003, TestSize.Level1)
     };
     pattern_->StartSnapAnimation(snapAnimationOptions);
     EXPECT_TRUE(pattern_->lastSnapTargetIndex_.has_value());
-    EXPECT_NE(pattern_->GetScrollState(), ScrollState::IDLE);
+    EXPECT_NE(pattern_->GetScrollStateForQuery(), ScrollState::IDLE);
 
     /**
      * @tc.steps: step3. Run the snap animation frames.
@@ -1908,6 +1908,6 @@ HWTEST_F(ListEventTestNg, StartSnapAnimation003, TestSize.Level1)
      */
     MockAnimationManager::GetInstance().Tick();
     FlushUITasks();
-    EXPECT_NE(pattern_->GetScrollState(), ScrollState::IDLE);
+    EXPECT_NE(pattern_->GetScrollStateForQuery(), ScrollState::IDLE);
 }
 } // namespace OHOS::Ace::NG
