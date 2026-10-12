@@ -503,7 +503,8 @@ void WebModelNG::SetOnContextMenuUpdate(
 }
 
 void WebModelNG::SetOnContextMenuUpdate(
-    FrameNode* frameNode, std::function<void(WebContextMenuItemId menuItemId, const WebContextMenuOptions& options)>&& jsCallback)
+    FrameNode* frameNode,
+    std::function<void(WebContextMenuItemId menuItemId, const WebContextMenuOptions& options)>&& jsCallback)
 {
     CHECK_NULL_VOID(frameNode);
     auto webPattern = frameNode->GetPattern<WebPattern>();
