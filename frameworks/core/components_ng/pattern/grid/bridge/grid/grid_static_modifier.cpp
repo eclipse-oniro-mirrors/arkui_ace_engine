@@ -698,6 +698,14 @@ void SetOnDidScrollImpl(Ark_NativePointer node,
     };
     ScrollableModelStatic::SetOnDidScroll(frameNode, std::move(onDidScroll));
 }
+void SetScrollPlaceholderImpl(Ark_NativePointer node,
+                              const Opt_PlaceholderProvider* value)
+{
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    //auto convValue = value ? Converter::OptConvert<type>(*value) : std::nullopt;
+    // GridModelNG::SetSetScrollPlaceholder(frameNode, convValue);
+}
 void SetCachedCount1Impl(Ark_NativePointer node,
                          const Opt_Int32* count,
                          const Opt_Boolean* show)
@@ -794,6 +802,7 @@ const GENERATED_ArkUIGridModifier* GetGridStaticModifier()
         GridAttributeModifier::SetOnScrollFrameBeginImpl,
         GridAttributeModifier::SetOnWillScrollImpl,
         GridAttributeModifier::SetOnDidScrollImpl,
+        GridAttributeModifier::SetScrollPlaceholderImpl,
         GridAttributeModifier::SetCachedCount1Impl,
         GridAttributeModifier::SetEdgeEffectImpl,
     };

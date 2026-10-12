@@ -43,6 +43,7 @@ import { NavDestinationContext_serializer, NavDestinationTransition_serializer, 
 import { NavigationTransitionProxy_serializer, NavigationAnimatedTransition_serializer, PopInfo_serializer, InterceptionCallback, NavPathInfo_serializer, NavPathStack_serializer, InterceptionModeCallback, InterceptionShowCallback, NavContentInfo_serializer, UpdateTransitionCallback, NavigationMode, NavigationTitleMode, NavigationTransitionProxy, NavigationAnimatedTransition, PopInfo, NavPathInfo, NavBar, NavPathStack, NavigationOperation, NavContentInfo } from './../../component/navigation'
 import { OnScrollFrameBeginHandlerResult_serializer, OffsetResult_serializer, OnScrollEdgeCallback, OnScrollFrameBeginCallback, ScrollOnDidZoomCallback, ScrollOnScrollCallback, ScrollOnWillScrollCallback, OnScrollFrameBeginHandlerResult, OffsetResult } from './../../component/scroll'
 import { DrawingRenderingContext_serializer, DrawingRenderingContext } from './../../component/canvas'
+import { PlaceholderOptions_serializer } from './../ohos.arkui.placeholderRegister'
 import { TabContentAnimatedTransition_serializer, TabContentTransitionProxy_serializer, OnTabsAnimationEndCallback, TabsAnimationEvent_serializer, OnTabsAnimationStartCallback, OnTabsContentDidScrollCallback, OnTabsContentWillChangeCallback, OnTabsGestureSwipeCallback, TabsCustomContentTransitionCallback, TabsSidebarSearchFilterCallback, TabContentAnimatedTransition, TabBarDisplayMode, TabContentTransitionProxy, TabsAnimationEvent } from './../../component/tabs'
 import { TextPickerResult_serializer, OnTextPickerChangeCallback, TextPickerEnterSelectedAreaCallback, TextPickerScrollStopCallback, TextPickerResult } from './../../component/textPicker'
 import { TimePickerResult_serializer, OnTimePickerChangeCallback, TimePickerResult } from './../../component/timePicker'
@@ -69,6 +70,7 @@ import { SurfaceRect_serializer, SurfaceRect } from './../../component/xcomponen
 import { OnUIPickerComponentCallback } from './../../component/uiPickerComponent'
 import { OnWaterFlowScrollIndexCallback } from './../../component/waterFlow'
 import { PasteButtonCallback, PasteButtonOnClickResult } from './../../component/pasteButton'
+import { PlaceholderProvider, PlaceholderOptions } from '@ohos.arkui.placeholderRegister'
 import { PluginErrorCallback, PluginErrorData_serializer, PluginErrorData } from './../../component/pluginComponent'
 import { ProgressConfiguration_serializer, ProgressConfiguration } from './../../component/progress'
 import { SaveButtonCallback, SaveButtonOnClickResult } from './../../component/saveButton'
@@ -1614,6 +1616,17 @@ export function deserializeAndCallCallback_Opt_OffsetResult_Void(thisDeserialize
         valueTmpBuf = OffsetResult_serializer.read(thisDeserializer)
     }
     let value: OffsetResult | undefined = valueTmpBuf
+    call(value)
+}
+export function deserializeAndCallCallback_Opt_PlaceholderOptions_Void(thisDeserializer: DeserializerBase): void {
+    const resourceId: int32 = thisDeserializer.readInt32()
+    const call = (ResourceHolder.instance().get(resourceId) as ((value: PlaceholderOptions | undefined) => void))
+    const valueTmpBufRuntimeType = thisDeserializer.readInt8()!.toInt()
+    let valueTmpBuf: PlaceholderOptions | undefined = undefined
+    if ((valueTmpBufRuntimeType) != (RuntimeType.UNDEFINED)) {
+        valueTmpBuf = PlaceholderOptions_serializer.read(thisDeserializer)
+    }
+    let value: PlaceholderOptions | undefined = valueTmpBuf
     call(value)
 }
 export function deserializeAndCallCallback_Opt_ScrollResult_Void(thisDeserializer: DeserializerBase): void {
@@ -3620,6 +3633,35 @@ export function deserializeAndCallPasteEventCallback(thisDeserializer: Deseriali
     let event: PasteEvent | undefined = eventTmpBuf
     call(event)
 }
+export function deserializeAndCallPlaceholderProvider(thisDeserializer: DeserializerBase): void {
+    const resourceId: int32 = thisDeserializer.readInt32()
+    const call = (ResourceHolder.instance().get(resourceId) as PlaceholderProvider)
+    let index: int32 = thisDeserializer.readInt32()
+    const continuationBufferBufResource: CallbackResource = thisDeserializer.readCallbackResource()
+    const continuationBufferBufCall: KPointer = thisDeserializer.readPointer()
+    const continuationBufferBufCallSync: KPointer = thisDeserializer.readPointer()
+    const continuationBufferClosure = (value?: PlaceholderOptions | undefined):void => {
+        const continuationBufferBufArgsSerializer: SerializerBase = SerializerBase.hold();
+        continuationBufferBufArgsSerializer.writeInt32(continuationBufferBufResource.resourceId);
+        continuationBufferBufArgsSerializer.writePointer(continuationBufferBufCall);
+        continuationBufferBufArgsSerializer.writePointer(continuationBufferBufCallSync);
+        if (value !== undefined) {
+            continuationBufferBufArgsSerializer.writeInt8(RuntimeType.OBJECT);
+            const valueTmpValue = value!;
+            PlaceholderOptions_serializer.write(continuationBufferBufArgsSerializer, valueTmpValue);
+        } else {
+            continuationBufferBufArgsSerializer.writeInt8(RuntimeType.UNDEFINED);
+        }
+        InteropNativeModule._CallCallbackSync(10, -1837789688,
+            continuationBufferBufArgsSerializer.asBuffer(), continuationBufferBufArgsSerializer.length());
+        continuationBufferBufArgsSerializer.release();
+        return;
+    }
+    resourceFinalizerRegister(continuationBufferClosure, continuationBufferBufResource)
+    let continuationResult: ((value: PlaceholderOptions | undefined) => void) = continuationBufferClosure
+    const callResult = call(index)
+    continuationResult(callResult)
+}
 export function deserializeAndCallPluginErrorCallback(thisDeserializer: DeserializerBase): void {
     const resourceId: int32 = thisDeserializer.readInt32()
     const call = (ResourceHolder.instance().get(resourceId) as PluginErrorCallback)
@@ -4668,6 +4710,8 @@ export function deserializeAndCallCallback(thisDeserializer: DeserializerBase): 
         case CallbackKind.KIND_CALLBACK_OPT_NAVIGATIONANIMATEDTRANSITION_VOID: return deserializeAndCallCallback_Opt_NavigationAnimatedTransition_Void(thisDeserializer);
         case CallbackKind.KIND_CALLBACK_OPT_OBJECT_VOID: return deserializeAndCallCallback_Opt_Object_Void(thisDeserializer);
         case CallbackKind.KIND_CALLBACK_OPT_OFFSETRESULT_VOID: return deserializeAndCallCallback_Opt_OffsetResult_Void(thisDeserializer);
+        case CallbackKind.KIND_CALLBACK_OPT_PLACEHOLDEROPTIONS_VOID:
+            return deserializeAndCallCallback_Opt_PlaceholderOptions_Void(thisDeserializer);
         case CallbackKind.KIND_CALLBACK_OPT_SCROLLRESULT_VOID: return deserializeAndCallCallback_Opt_ScrollResult_Void(thisDeserializer);
         case CallbackKind.KIND_CALLBACK_OPT_STYLEDSTRING_OPT_ARRAY_STRING_VOID: return deserializeAndCallCallback_Opt_StyledString_Opt_Array_String_Void(thisDeserializer);
         case CallbackKind.KIND_CALLBACK_OPT_TABCONTENTANIMATEDTRANSITION_VOID: return deserializeAndCallCallback_Opt_TabContentAnimatedTransition_Void(thisDeserializer);
@@ -4842,6 +4886,7 @@ export function deserializeAndCallCallback(thisDeserializer: DeserializerBase): 
         case CallbackKind.KIND_ONZOOMCHANGECALLBACK: return deserializeAndCallOnZoomChangeCallback(thisDeserializer);
         case CallbackKind.KIND_PASTEBUTTONCALLBACK: return deserializeAndCallPasteButtonCallback(thisDeserializer);
         case CallbackKind.KIND_PASTEEVENTCALLBACK: return deserializeAndCallPasteEventCallback(thisDeserializer);
+        case CallbackKind.KIND_PLACEHOLDERPROVIDER: return deserializeAndCallPlaceholderProvider(thisDeserializer);
         case CallbackKind.KIND_PLUGINERRORCALLBACK: return deserializeAndCallPluginErrorCallback(thisDeserializer);
         case CallbackKind.KIND_POPUPSTATECHANGECALLBACK: return deserializeAndCallPopupStateChangeCallback(thisDeserializer);
         case CallbackKind.KIND_PROGRESSMODIFIERBUILDER: return deserializeAndCallProgressModifierBuilder(thisDeserializer);

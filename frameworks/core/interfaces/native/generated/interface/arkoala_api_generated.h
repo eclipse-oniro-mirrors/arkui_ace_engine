@@ -1693,6 +1693,8 @@ typedef struct Callback_Opt_Object_Void Callback_Opt_Object_Void;
 typedef struct Opt_Callback_Opt_Object_Void Opt_Callback_Opt_Object_Void;
 typedef struct Callback_Opt_OffsetResult_Void Callback_Opt_OffsetResult_Void;
 typedef struct Opt_Callback_Opt_OffsetResult_Void Opt_Callback_Opt_OffsetResult_Void;
+typedef struct Callback_Opt_PlaceholderOptions_Void Callback_Opt_PlaceholderOptions_Void;  // NOLINT
+typedef struct Opt_Callback_Opt_PlaceholderOptions_Void Opt_Callback_Opt_PlaceholderOptions_Void;  // NOLINT
 typedef struct Callback_Opt_ScrollResult_Void Callback_Opt_ScrollResult_Void;
 typedef struct Opt_Callback_Opt_ScrollResult_Void Opt_Callback_Opt_ScrollResult_Void;
 typedef struct Callback_Opt_StyledString_Opt_Array_String_Void Callback_Opt_StyledString_Opt_Array_String_Void;
@@ -2059,6 +2061,8 @@ typedef struct PasteButtonCallback PasteButtonCallback;
 typedef struct Opt_PasteButtonCallback Opt_PasteButtonCallback;
 typedef struct PasteEventCallback PasteEventCallback;
 typedef struct Opt_PasteEventCallback Opt_PasteEventCallback;
+typedef struct PlaceholderProvider PlaceholderProvider;
+typedef struct Opt_PlaceholderProvider Opt_PlaceholderProvider;  // NOLINT
 typedef struct PluginErrorCallback PluginErrorCallback;
 typedef struct Opt_PluginErrorCallback Opt_PluginErrorCallback;
 typedef struct PopupStateChangeCallback PopupStateChangeCallback;
@@ -3705,6 +3709,8 @@ typedef struct Ark_PickerIndicatorStyle Ark_PickerIndicatorStyle;
 typedef struct Opt_PickerIndicatorStyle Opt_PickerIndicatorStyle;
 typedef struct Ark_PickerTextStyle Ark_PickerTextStyle;
 typedef struct Opt_PickerTextStyle Opt_PickerTextStyle;
+typedef struct Ark_PlaceholderOptions Ark_PlaceholderOptions;  // NOLINT
+typedef struct Opt_PlaceholderOptions Opt_PlaceholderOptions;  // NOLINT
 typedef struct Ark_PlaceholderStyle Ark_PlaceholderStyle;
 typedef struct Opt_PlaceholderStyle Opt_PlaceholderStyle;
 typedef struct Ark_PopupCommonOptions Ark_PopupCommonOptions;
@@ -12858,6 +12864,16 @@ typedef struct Opt_Callback_Opt_OffsetResult_Void {
     Ark_Tag tag;
     Callback_Opt_OffsetResult_Void value;
 } Opt_Callback_Opt_OffsetResult_Void;
+typedef struct Callback_Opt_PlaceholderOptions_Void {  // NOLINT
+    /* kind: Callback */
+    Ark_CallbackResource resource;
+    void (*call)(const Ark_Int32 resourceId, const Opt_PlaceholderOptions value);
+    void (*callSync)(Ark_VMContext vmContext, const Ark_Int32 resourceId, const Opt_PlaceholderOptions value);
+} Callback_Opt_PlaceholderOptions_Void;  // NOLINT
+typedef struct Opt_Callback_Opt_PlaceholderOptions_Void {  // NOLINT
+    Ark_Tag tag;
+    Callback_Opt_PlaceholderOptions_Void value;
+} Opt_Callback_Opt_PlaceholderOptions_Void;  // NOLINT
 typedef struct Callback_Opt_ScrollResult_Void {
     /* kind: Callback */
     Ark_CallbackResource resource;
@@ -14686,6 +14702,16 @@ typedef struct Opt_PasteEventCallback {
     Ark_Tag tag;
     PasteEventCallback value;
 } Opt_PasteEventCallback;
+typedef struct PlaceholderProvider {
+    /* kind: Callback */
+    Ark_CallbackResource resource;
+    void (*call)(const Ark_Int32 resourceId, const Ark_Int32 index, const Callback_Opt_PlaceholderOptions_Void continuation);
+    void (*callSync)(Ark_VMContext vmContext, const Ark_Int32 resourceId, const Ark_Int32 index, const Callback_Opt_PlaceholderOptions_Void continuation);
+} PlaceholderProvider;
+typedef struct Opt_PlaceholderProvider {  // NOLINT
+    Ark_Tag tag;
+    PlaceholderProvider value;
+} Opt_PlaceholderProvider;  // NOLINT
 typedef struct PluginErrorCallback {
     /* kind: Callback */
     Ark_CallbackResource resource;
@@ -23931,6 +23957,15 @@ typedef struct Opt_PickerTextStyle {
     Ark_Tag tag;
     Ark_PickerTextStyle value;
 } Opt_PickerTextStyle;
+typedef struct Ark_PlaceholderOptions {  // NOLINT
+    /* kind: Interface */
+    Opt_String id;
+    Opt_SizeOptions size;
+} Ark_PlaceholderOptions;  // NOLINT
+typedef struct Opt_PlaceholderOptions {  // NOLINT
+    Ark_Tag tag;
+    Ark_PlaceholderOptions value;
+} Opt_PlaceholderOptions;  // NOLINT
 typedef struct Ark_PlaceholderStyle {
     /* kind: Interface */
     Opt_arkui_component_units_Font font;
@@ -25973,6 +26008,8 @@ typedef struct GENERATED_ArkUIGridModifier {
                             const Opt_OnWillScrollCallback* value);
     void (*setOnDidScroll)(Ark_NativePointer node,
                            const Opt_OnScrollCallback* value);
+    void (*setScrollPlaceholder)(Ark_NativePointer node,
+                                 const Opt_PlaceholderProvider* value);
     void (*setCachedCount1)(Ark_NativePointer node,
                             const Opt_Int32* count,
                             const Opt_Boolean* show);
@@ -26294,6 +26331,8 @@ typedef struct GENERATED_ArkUIListModifier {
                             const Opt_OnWillScrollCallback* value);
     void (*setOnDidScroll)(Ark_NativePointer node,
                            const Opt_OnScrollCallback* value);
+    void (*setScrollPlaceholder)(Ark_NativePointer node,
+                                 const Opt_PlaceholderProvider* value);
     void (*setLanes)(Ark_NativePointer node,
                      const Opt_Union_I32_LengthConstrain_ItemFillPolicy* value,
                      const Opt_Dimension* gutter);
@@ -28650,6 +28689,8 @@ typedef struct GENERATED_ArkUIWaterFlowModifier {
                             const Opt_OnWillScrollCallback* value);
     void (*setOnDidScroll)(Ark_NativePointer node,
                            const Opt_OnScrollCallback* value);
+    void (*setScrollPlaceholder)(Ark_NativePointer node,
+                                 const Opt_PlaceholderProvider* value);
     void (*setCachedCount1)(Ark_NativePointer node,
                             const Opt_Int32* count,
                             const Opt_Boolean* show);
