@@ -22,28 +22,22 @@
 
 namespace OHOS::Ace {
 
-LogLevel& LogWrapper::GetLogLevelStorage()
-{
-    static LogLevel level_ = LogLevel::DEBUG;
-    return level_;
-}
-
 bool LogWrapper::JudgeLevel(LogLevel level)
 {
     if (level == LogLevel::DEBUG) {
         return SystemProperties::GetDebugEnabled();
     }
-    return GetLogLevelStorage() <= level;
+    return level_ <= level;
 }
 
 void LogWrapper::SetLogLevel(LogLevel level)
 {
-    GetLogLevelStorage() = level;
+    level_ = level;
 }
 
 LogLevel LogWrapper::GetLogLevel()
 {
-    return GetLogLevelStorage();
+    return level_;
 }
 
 const char* LogWrapper::GetBriefFileName(const char* name)
