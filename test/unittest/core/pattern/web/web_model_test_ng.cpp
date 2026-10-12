@@ -539,7 +539,7 @@ HWTEST_F(WebModelTestNg, SetOnContextMenuHide002, TestSize.Level1)
 
 /**
  * @tc.name: SetOnContextMenuUpdate001
- * @tc.desc: Test WebModelNG::SetOnContextMenuUpdate() callback 
+ * @tc.desc: Test WebModelNG::SetOnContextMenuUpdate() callback
  * @tc.type: FUNC
  */
 HWTEST_F(WebModelTestNg, SetOnContextMenuUpdate001, TestSize.Level1)
