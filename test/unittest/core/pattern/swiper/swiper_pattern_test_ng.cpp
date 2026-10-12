@@ -23,6 +23,10 @@
 #include "core/components_ng/syntax/repeat_virtual_scroll_2_node.h"
 #include "core/components_ng/syntax/repeat_virtual_scroll_node.h"
 
+namespace OHOS::Ace {
+const std::unordered_map<std::string, std::string>& GetLastSwiperChangePayload();
+}
+
 namespace OHOS::Ace::NG {
 constexpr int32_t COMPONENT_STATE_CHANGE_IDX = 0;
 constexpr int32_t COMPONENT_STATE_SHOW = 1;

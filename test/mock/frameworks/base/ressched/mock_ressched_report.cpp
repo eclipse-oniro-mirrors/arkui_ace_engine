@@ -127,8 +127,4 @@ void ResSchedReport::ReportDialogShow()
     }
 }
 
-void ResSchedReport::HandleSwiperChange(std::unordered_map<std::string, std::string>& payload)
-{
-    g_lastSwiperChangePayload = payload;
-}
 } // namespace OHOS::Ace

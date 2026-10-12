@@ -16,7 +16,6 @@
 #include "base/ressched/ressched_report.h"
 #include "base/log/ace_trace.h"
 
-#include "base/utils/string_utils.h"
 #include "core/common/container.h"
 #include "core/event/key_event.h"
 
