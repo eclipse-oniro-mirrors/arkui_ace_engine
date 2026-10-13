@@ -135,6 +135,7 @@ public:
     void SetOnLoadFinished(std::function<void(const BaseEventInfo* info)>&& jsCallback) override;
     void SetBypassVsyncCondition(WebBypassVsyncCondition condition) override;
     void SetForceEnableZoom(bool isForceEnableZoom) override;
+    void SetFlingSpeedLimit(float speedLimit) override;
     void SetOnVerifyPinRequest(std::function<bool(const BaseEventInfo* info)>&& jsCallback) override;
 };
 } // namespace OHOS::Ace::Framework

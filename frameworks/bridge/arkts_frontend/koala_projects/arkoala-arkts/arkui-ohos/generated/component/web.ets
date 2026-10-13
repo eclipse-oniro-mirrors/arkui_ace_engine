@@ -3398,6 +3398,18 @@ export class ArkWebPeer extends ArkCommonMethodPeer {
         ArkUIGeneratedNativeModule._WebAttribute_setOnZoomChange(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
+    setFlingSpeedLimitAttribute(value: double | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (value !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueTmpValue = value!
+            thisSerializer.writeFloat64(valueTmpValue)
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._WebAttribute_setFlingSpeedLimit(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
     setRegisterNativeEmbedRuleAttribute(tag: string | undefined, type: string | undefined): void {
         const thisSerializer: SerializerBase = SerializerBase.hold()
         if (tag !== undefined) {
@@ -4497,6 +4509,9 @@ export interface WebAttribute extends CommonMethod {
     onZoomChange(value: OnZoomChangeCallback | undefined): this {
         throw new Error('Unimplemented method onZoomChange')
     }
+    flingSpeedLimit(value: double | undefined): this {
+        throw new Error('Unimplemented method flingSpeedLimit')
+    }
     registerNativeEmbedRule(tag: string | undefined, type: string | undefined): this {
         throw new Error('Unimplemented method registerNativeEmbedRule')
     }
@@ -5376,6 +5391,11 @@ export class ArkWebComponent extends ArkCommonMethodComponent implements WebAttr
     public onZoomChange(value: OnZoomChangeCallback | undefined): this {
         const value_casted = value as (OnZoomChangeCallback | undefined)
         this.getPeer()?.setOnZoomChangeAttribute(value_casted)
+        return this
+    }
+    public flingSpeedLimit(value: double | undefined): this {
+        const value_casted = value as (double | undefined)
+        this.getPeer()?.setFlingSpeedLimitAttribute(value_casted)
         return this
     }
     public registerNativeEmbedRule(tag: string | undefined, type: string | undefined): this {

@@ -105,6 +105,7 @@ public:
     void SetImageAccessEnabled(bool isImageAccessEnabled) override;
     void SetMixedMode(MixedModeContent mixedMode) override;
     void SetZoomAccessEnabled(bool isZoomAccessEnabled) override;
+    void SetFlingSpeedLimit(float speedLimit) override;
     void SetZoomControlAccess(bool zoomControlAccess) override;
     void SetGeolocationAccessEnabled(bool isGeolocationAccessEnabled) override;
     void SetJsProxyCallback(std::function<void()>&& jsProxyCallback) override;
@@ -437,6 +438,7 @@ public:
         FrameNode* frameNode, std::function<bool(const BaseEventInfo* info)>&& jsCallback, int dialogEventType);
     static void SetJavaScriptProxy(FrameNode* frameNode, std::function<void()>&& jsProxyCallback);
     static void SetForceEnableZoom(FrameNode* frameNode, bool isEnabled);
+    static void SetFlingSpeedLimit(FrameNode* frameNode, float speedLimit);
     static void SetOnSafeBrowsingCheckFinish(FrameNode* frameNode,
         std::function<void(const std::shared_ptr<BaseEventInfo>& info)>&& safeBrowsingCheckFinish);
     static void SetBackToTop(FrameNode* frameNode, bool isBackToTop);

@@ -92,6 +92,7 @@ public:
     static void WebRotate(const JSCallbackInfo& args);
     static void BackgroundColor(const JSCallbackInfo& info);
     static void InitialScale(float scale);
+    static void FlingSpeedLimit(float speedLimit);
     static void Password(bool password);
     static void TableData(bool tableData);
     static void OnFileSelectorShowAbandoned(const JSCallbackInfo& args);

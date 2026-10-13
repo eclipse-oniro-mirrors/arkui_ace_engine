@@ -789,6 +789,13 @@ void WebModelImpl::SetForceEnableZoom(bool isForceEnableZoom)
     webComponent->SetForceEnableZoom(isForceEnableZoom);
 }
 
+void WebModelImpl::SetFlingSpeedLimit(float speedLimit)
+{
+    auto webComponent = AceType::DynamicCast<WebComponent>(ViewStackProcessor::GetInstance()->GetMainComponent());
+    CHECK_NULL_VOID(webComponent);
+    webComponent->SetFlingSpeedLimit(NormalizeFlingSpeedLimit(speedLimit));
+}
+
 void WebModelImpl::SetOnVerifyPinRequest(std::function<bool(const BaseEventInfo* info)>&& jsCallback)
 {
     auto webComponent = AceType::DynamicCast<WebComponent>(ViewStackProcessor::GetInstance()->GetMainComponent());

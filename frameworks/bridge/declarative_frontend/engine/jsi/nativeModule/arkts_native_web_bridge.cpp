@@ -25,6 +25,7 @@
 #include "bridge/js_frontend/engine/jsi/ark_js_value.h"
 #include "core/components/web/web_property.h"
 #include "core/components_ng/pattern/text/text_model.h"
+#include "core/components_ng/pattern/web/web_model.h"
 #include "core/components_ng/pattern/web/web_model_ng.h"
 
 namespace OHOS::Ace::NG {
@@ -4637,6 +4638,39 @@ ArkUINativeModuleValue WebBridge::ResetForceEnableZoom(ArkUIRuntimeCallInfo* run
     }
     auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
     GetArkUINodeModifiers()->getWebModifier()->resetForceEnableZoom(nativeNode);
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue WebBridge::SetFlingSpeedLimit(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::NativePointerRef::New(vm, nullptr));
+    Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(CALL_ARG_0);
+    Local<JSValueRef> secondArg = runtimeCallInfo->GetCallArgRef(CALL_ARG_1);
+    if (!firstArg->IsNativePointer(vm)) {
+        return panda::JSValueRef::Undefined(vm);
+    }
+    auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
+    if (secondArg->IsNumber()) {
+        float value = static_cast<float>(secondArg->ToNumber(vm)->Value());
+        GetArkUINodeModifiers()->getWebModifier()->setFlingSpeedLimit(
+            nativeNode, NormalizeFlingSpeedLimit(value));
+    } else {
+        GetArkUINodeModifiers()->getWebModifier()->resetFlingSpeedLimit(nativeNode);
+    }
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue WebBridge::ResetFlingSpeedLimit(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::NativePointerRef::New(vm, nullptr));
+    Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(CALL_ARG_0);
+    if (!firstArg->IsNativePointer(vm)) {
+        return panda::NativePointerRef::New(vm, nullptr);
+    }
+    auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
+    GetArkUINodeModifiers()->getWebModifier()->resetFlingSpeedLimit(nativeNode);
     return panda::JSValueRef::Undefined(vm);
 }
 

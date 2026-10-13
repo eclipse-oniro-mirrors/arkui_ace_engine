@@ -7195,6 +7195,8 @@ struct ArkUIWebModifier {
     void (*resetEnableImageAnalyzer)(ArkUINodeHandle node);
     void (*setForceEnableZoom)(ArkUINodeHandle node, ArkUI_Bool value);
     void (*resetForceEnableZoom)(ArkUINodeHandle node);
+    void (*setFlingSpeedLimit)(ArkUINodeHandle node, ArkUI_Float32 value);
+    void (*resetFlingSpeedLimit)(ArkUINodeHandle node);
     void (*setBackToTop)(ArkUINodeHandle node, ArkUI_Bool value);
     void (*resetBackToTop)(ArkUINodeHandle node);
     void (*setOnCameraCaptureStateChanged)(ArkUINodeHandle node, void* callback);

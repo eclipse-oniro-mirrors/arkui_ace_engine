@@ -2565,6 +2565,10 @@ void ArkUINativeModule::RegisterWebAttributes(Local<panda::ObjectRef> object, Ec
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::SetForceEnableZoom));
     web->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetForceEnableZoom"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::ResetForceEnableZoom));
+    web->Set(vm, panda::StringRef::NewFromUtf8(vm, "setFlingSpeedLimit"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::SetFlingSpeedLimit));
+    web->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetFlingSpeedLimit"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::ResetFlingSpeedLimit));
     web->Set(vm, panda::StringRef::NewFromUtf8(vm, "setBackToTop"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::SetBackToTop));
     web->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetBackToTop"),
