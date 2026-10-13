@@ -417,6 +417,9 @@ void JSRichEditor::SetJSSpanResultObject(JSRef<JSObject>& resultObj, const Resul
             resultObj->SetProperty<std::u16string>("valueResourceStr", resultObject.valueString);
         }
         resultObj->SetPropertyObject("imageStyle", CreateJSImageStyleResult(resultObject.imageStyle));
+        if (resultObject.imageTag.has_value()) {
+            resultObj->SetProperty<std::u16string>("imageTag", resultObject.imageTag.value());
+        }
     }
 }
 
@@ -759,6 +762,37 @@ void JSRichEditorController::ParseUserClickEvent(const JSCallbackInfo& args, con
     }
 }
 
+void JSRichEditorController::ParseImageSpanOptions(const JSCallbackInfo& args, ImageSpanOptions& options)
+{
+    if (args.Length() <= 1 || !args[1]->IsObject()) {
+        return;
+    }
+    JSRef<JSObject> imageObject = JSRef<JSObject>::Cast(args[1]);
+
+    JSRef<JSVal> offset = imageObject->GetProperty("offset");
+    int32_t imageOffset = 0;
+    if (!offset->IsNull() && JSContainerBase::ParseJsInt32(offset, imageOffset)) {
+        options.offset = imageOffset > 0 ? imageOffset : 0;
+    }
+    JSRef<JSVal> imageTagVal = imageObject->GetProperty("imageTag");
+    std::u16string imageTag;
+    if (!imageTagVal->IsNull() && !imageTagVal->IsUndefined() &&
+        JSContainerBase::ParseJsString(imageTagVal, imageTag)) {
+        options.imageTag = imageTag;
+    }
+    auto imageAttribute = JSObjectCast(imageObject->GetProperty("imageStyle"));
+    if (!imageAttribute->IsUndefined()) {
+        ImageSpanAttribute imageStyle = ParseJsImageSpanAttribute(imageAttribute);
+        options.imageAttribute = imageStyle;
+    }
+    UserGestureOptions gestureOption;
+    ParseUserGesture(args, gestureOption, "ImageSpan");
+    UserMouseOptions mouseOption;
+    ParseUserMouseOption(args, mouseOption, "ImageSpan");
+    options.userGestureOption = std::move(gestureOption);
+    options.userMouseOption = std::move(mouseOption);
+}
+
 void JSRichEditorController::AddImageSpan(const JSCallbackInfo& args)
 {
     ContainerScope scope(instanceId_ < 0 ? Container::CurrentId() : instanceId_);
@@ -780,26 +814,7 @@ void JSRichEditorController::AddImageSpan(const JSCallbackInfo& args)
             return;
         }
     }
-    if (args.Length() > 1 && args[1]->IsObject()) {
-        JSRef<JSObject> imageObject = JSRef<JSObject>::Cast(args[1]);
-
-        JSRef<JSVal> offset = imageObject->GetProperty("offset");
-        int32_t imageOffset = 0;
-        if (!offset->IsNull() && JSContainerBase::ParseJsInt32(offset, imageOffset)) {
-            options.offset = imageOffset > 0 ? imageOffset : 0;
-        }
-        auto imageAttribute = JSObjectCast(imageObject->GetProperty("imageStyle"));
-        if (!imageAttribute->IsUndefined()) {
-            ImageSpanAttribute imageStyle = ParseJsImageSpanAttribute(imageAttribute);
-            options.imageAttribute = imageStyle;
-        }
-        UserGestureOptions gestureOption;
-        ParseUserGesture(args, gestureOption, "ImageSpan");
-        UserMouseOptions mouseOption;
-        ParseUserMouseOption(args, mouseOption, "ImageSpan");
-        options.userGestureOption = std::move(gestureOption);
-        options.userMouseOption = std::move(mouseOption);
-    }
+    ParseImageSpanOptions(args, options);
     auto controller = controllerWeak_.Upgrade();
     auto richEditorController = AceType::DynamicCast<RichEditorControllerBase>(controller);
     int32_t spanIndex = 0;

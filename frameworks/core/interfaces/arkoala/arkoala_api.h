@@ -3086,6 +3086,7 @@ struct ArkUIImageAttachment {
     void* pixelMap = nullptr;
     std::vector<uint8_t> pixelMapRawData;
     std::string resource;
+    std::optional<std::string> imageTag = std::nullopt;
     std::optional<float> width;
     std::optional<float> height;
     ArkUI_Int32 verticalAlign;

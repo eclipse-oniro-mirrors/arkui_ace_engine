@@ -5316,6 +5316,8 @@ export class ArkUIGeneratedNativeModule {
     native static _ImageAttachment_getSupportSvg2(ptr: KPointer): KInteropReturnBuffer
     @ani.unsafe.Quick
     native static _ImageAttachment_getSizeInVp(ptr: KPointer): KInteropReturnBuffer
+    @ani.unsafe.Quick
+    native static _ImageAttachment_getImageTag(ptr: KPointer): KInteropReturnBuffer
     @ani.unsafe.Direct
     native static _ImageBitmap_construct0(thisArray: KSerializerBuffer, thisLength: KInt): KPointer
     @ani.unsafe.Direct

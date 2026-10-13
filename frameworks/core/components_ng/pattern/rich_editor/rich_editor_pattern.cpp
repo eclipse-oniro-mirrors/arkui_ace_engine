@@ -8913,6 +8913,10 @@ int32_t RichEditorPattern::DeleteValueSetImageSpan(
     if (imageLayoutProperty->HasVerticalAlign()) {
         spanResult.SetVerticalAlign(imageLayoutProperty->GetVerticalAlignValue());
     }
+    auto imageSpanItem = AceType::DynamicCast<ImageSpanItem>(spanItem);
+    if (imageSpanItem) {
+        spanResult.SetImageTag(imageSpanItem->options.imageTag);
+    }
     return IMAGE_SPAN_LENGTH;
 }
 
@@ -13461,6 +13465,7 @@ void RichEditorPattern::UpdateImageSpanResultByOptions(RichEditorAbstractSpanRes
             retInfo.SetBorderRadius(imgAttr.borderRadius.value().ToString());
         }
     }
+    retInfo.SetImageTag(options.imageTag);
 }
 
 RichEditorAbstractSpanResult RichEditorPattern::GetResultByImageSpanOptions(const ImageSpanOptions& options,

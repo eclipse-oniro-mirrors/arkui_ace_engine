@@ -24348,6 +24348,7 @@ typedef struct Ark_ImageAttachmentInterface {
     Opt_ImageFit objectFit;
     Opt_ImageAttachmentLayoutStyle layoutStyle;
     Opt_ColorFilterType colorFilter;
+    Opt_String imageTag;
 } Ark_ImageAttachmentInterface;
 typedef struct Opt_ImageAttachmentInterface {
     Ark_Tag tag;
@@ -24477,6 +24478,7 @@ typedef struct Ark_ResourceImageAttachmentOptions {
     Opt_ColorFilterType colorFilter;
     Opt_Boolean syncLoad;
     Opt_Boolean supportSvg2;
+    Opt_String imageTag;
 } Ark_ResourceImageAttachmentOptions;
 typedef struct Opt_ResourceImageAttachmentOptions {
     Ark_Tag tag;
@@ -24774,6 +24776,7 @@ typedef struct Ark_RichEditorImageSpanOptions {
     Opt_RichEditorImageSpanStyle imageStyle;
     Opt_RichEditorGesture gesture;
     Opt_OnHoverCallback onHover;
+    Opt_String imageTag;
 } Ark_RichEditorImageSpanOptions;
 typedef struct Opt_RichEditorImageSpanOptions {
     Ark_Tag tag;
@@ -24786,6 +24789,7 @@ typedef struct Ark_RichEditorImageSpanResult {
     Opt_ResourceStr valueResourceStr;
     Ark_RichEditorImageSpanStyleResult imageStyle;
     Ark_Tuple_I32_I32 offsetInSpan;
+    Opt_String imageTag;
 } Ark_RichEditorImageSpanResult;
 typedef struct Opt_RichEditorImageSpanResult {
     Ark_Tag tag;
@@ -30711,6 +30715,7 @@ typedef struct GENERATED_ArkUIImageAttachmentAccessor {
     Opt_ColorFilterType (*getColorFilter)(Ark_ImageAttachment peer);
     Opt_Boolean (*getSupportSvg2)(Ark_ImageAttachment peer);
     Opt_SizeOptions (*getSizeInVp)(Ark_ImageAttachment peer);
+    Opt_String (*getImageTag)(Ark_ImageAttachment peer);
 } GENERATED_ArkUIImageAttachmentAccessor;
 
 typedef struct GENERATED_ArkUIImageBitmapAccessor {
