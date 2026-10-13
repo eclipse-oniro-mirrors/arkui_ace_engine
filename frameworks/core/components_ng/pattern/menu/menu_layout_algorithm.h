@@ -182,7 +182,8 @@ private:
     void InitializeSecurityPadding();
     void InitializeParam(const RefPtr<MenuPattern>& menuPattern);
     void InitializeLayoutRegionMargin(const RefPtr<MenuPattern>& menuPattern);
-    void InitWrapperRect(const RefPtr<MenuLayoutProperty>& props, const RefPtr<MenuPattern>& menuPattern);
+    void InitWrapperRect(const RefPtr<MenuLayoutProperty>& props, const RefPtr<MenuPattern>& menuPattern,
+        const SafeAreaInsets& safeAreaInsets);
     void CalcWrapperRectForHoverMode(const RefPtr<MenuPattern>& menuPattern, bool isAvoidKeyboard);
     void UpdateWrapperRectForHoverMode(const RefPtr<MenuLayoutProperty>& props, const RefPtr<MenuPattern>& menuPattern,
         double creaseHeightOffset, bool isAvoidKeyboard);
@@ -433,12 +434,6 @@ private:
     float optionPadding_ = 0.0f;
     float selectMenuAdditionX_ = 0.0f;
     float selectMenuAdditionY_ = 0.0f;
-    float top_ = 0.0;
-    float bottom_ = 0.0;
-    float left_ = 0.0;
-    float right_ = 0.0;
-    double width_ = 0.0;
-    double height_ = 0.0;
     OffsetF targetCenterOffset_;
     OffsetF previewOriginOffset_;
     OffsetF previewOffset_;

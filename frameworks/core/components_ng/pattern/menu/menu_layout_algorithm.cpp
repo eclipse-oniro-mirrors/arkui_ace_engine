@@ -513,7 +513,6 @@ void MenuLayoutAlgorithm::InitializeParam(const RefPtr<MenuPattern>& menuPattern
     // (Func-04-02-01-Feat-09); bottom keeps the dedicated manager logic for
     // now (see execution-plan deviations).
     auto safeAreaInsets = DeriveInsetsFromHelper(host, pipelineContext->GetRootRect());
-    auto top = safeAreaInsets.top_.Length();
     auto props = menuPattern->GetLayoutProperty<MenuLayoutProperty>();
     CHECK_NULL_VOID(props);
     auto bottom = GetBottomBySafeAreaManager(safeAreaManager, props, menuPattern);
@@ -531,7 +530,7 @@ void MenuLayoutAlgorithm::InitializeParam(const RefPtr<MenuPattern>& menuPattern
     }
     param_.menuWindowRect = menuWindowRect;
     param_.windowGlobalSizeF = windowGlobalSizeF;
-    param_.top = top;
+    param_.top = safeAreaInsets.top_.Length();
     param_.bottom = bottom;
     param_.left = safeAreaInsets.left_.Length();
     param_.right = safeAreaInsets.right_.Length();
@@ -540,7 +539,7 @@ void MenuLayoutAlgorithm::InitializeParam(const RefPtr<MenuPattern>& menuPattern
         "safeAreaInsets in InitializeParam: (top: %{public}f, bottom: %{public}f, left: %{public}f, right: %{public}f)",
         param_.top, param_.bottom, param_.left, param_.right);
 
-    InitWrapperRect(props, menuPattern);
+    InitWrapperRect(props, menuPattern, safeAreaInsets);
     InitializeLayoutRegionMargin(menuPattern);
 
     param_.leftSecurity = paddingStart_;
@@ -624,14 +623,13 @@ bool MenuLayoutAlgorithm::IsExpandDisplay()
 }
 
 void MenuLayoutAlgorithm::InitWrapperRect(
-    const RefPtr<MenuLayoutProperty>& props, const RefPtr<MenuPattern>& menuPattern)
+    const RefPtr<MenuLayoutProperty>& props, const RefPtr<MenuPattern>& menuPattern,
+    const SafeAreaInsets& safeAreaInsets)
 {
     if (canExpandCurrentWindow_ && isExpandDisplay_) {
         wrapperRect_ = param_.menuWindowRect;
         wrapperSize_ = SizeF(wrapperRect_.Width(), wrapperRect_.Height());
         dumpInfo_.wrapperRect = wrapperRect_;
-        width_ = wrapperRect_.Width();
-        height_ = wrapperRect_.Height();
         TAG_LOGI(
             AceLogTag::ACE_MENU, "InitWrapperRect with menuWindowRect : %{public}s", wrapperRect_.ToString().c_str());
         return;
@@ -644,33 +642,22 @@ void MenuLayoutAlgorithm::InitWrapperRect(
     CHECK_NULL_VOID(pipelineContext);
     auto safeAreaManager = pipelineContext->GetSafeAreaManager();
     CHECK_NULL_VOID(safeAreaManager);
-    // system safeArea(AvoidAreaType.TYPE_SYSTEM) only include status bar,now the bottom is 0
-    auto safeAreaInsets = DeriveInsetsFromHelper(host, pipelineContext->GetRootRect());
-    bottom_ = static_cast<double>(GetBottomBySafeAreaManager(safeAreaManager, props, menuPattern));
-    top_ = static_cast<double>(safeAreaInsets.top_.Length());
-    left_ = static_cast<double>(safeAreaInsets.left_.Length());
-    right_ = static_cast<double>(safeAreaInsets.right_.Length());
-    dumpInfo_.top = top_;
-    dumpInfo_.bottom = bottom_;
-    dumpInfo_.left = left_;
-    dumpInfo_.right = right_;
-    width_ = param_.menuWindowRect.Width();
-    height_ = param_.menuWindowRect.Height();
+    dumpInfo_.top = param_.top;
+    dumpInfo_.bottom = param_.bottom;
+    dumpInfo_.left = param_.left;
+    dumpInfo_.right = param_.right;
     TAG_LOGI(AceLogTag::ACE_MENU,
         "safeAreaInsets in InitWrapperRect : (top: %{public}f, bottom: %{public}f, left: %{public}f, right: "
         "%{public}f)",
-        top_, bottom_, left_, right_);
+        param_.top, param_.bottom, param_.left, param_.right);
     auto windowManager = pipelineContext->GetWindowManager();
     isContainerModal_ = pipelineContext->GetWindowModal() == WindowModal::CONTAINER_MODAL && windowManager &&
                             windowManager->GetWindowMode() == WindowMode::WINDOW_MODE_FLOATING;
-    auto parentOffset = host->GetPaintRectOffset(true, true);
-    width_ -= parentOffset.GetX();
-    height_ -= parentOffset.GetY();
     CalculateSafeAreaIntersection(safeAreaInsets, safeAreaManager, props, menuPattern);
     wrapperSize_ = SizeF(wrapperRect_.Width(), wrapperRect_.Height());
     dumpInfo_.wrapperRect = wrapperRect_;
-    TAG_LOGI(AceLogTag::ACE_MENU, "InitWrapperRect with safeAreaInsets : %{public}s offset: %{public}s",
-        wrapperRect_.ToString().c_str(), parentOffset.ToString().c_str());
+    TAG_LOGI(AceLogTag::ACE_MENU, "InitWrapperRect with safeAreaInsets : %{public}s",
+        wrapperRect_.ToString().c_str());
 }
 
 void MenuLayoutAlgorithm::CalculateSafeAreaIntersection(const SafeAreaInsets& safeAreaInsets,
@@ -678,12 +665,19 @@ void MenuLayoutAlgorithm::CalculateSafeAreaIntersection(const SafeAreaInsets& sa
     const RefPtr<MenuPattern>& menuPattern)
 {
     if (!targetInUIExtension_ || showInSubWindow_) {
-        wrapperRect_.SetRect(left_, top_, width_ - left_ - right_, height_ - top_ - bottom_);
+        CHECK_NULL_VOID(menuPattern);
+        auto host = menuPattern->GetHost();
+        CHECK_NULL_VOID(host);
+        auto parentOffset = host->GetPaintRectOffset(true, true);
+        double width = param_.menuWindowRect.Width() - parentOffset.GetX();
+        double height = param_.menuWindowRect.Height() - parentOffset.GetY();
+        wrapperRect_.SetRect(param_.left, param_.top,
+            width - param_.left - param_.right, height - param_.top - param_.bottom);
         return;
     }
     auto rectOffset = Offset(0.0, 0.0);
     auto rectSize = Size(param_.menuWindowRect.Width(), param_.menuWindowRect.Height());
-    auto topSafeAreaRect = Rect(param_.menuWindowRect.Left(), safeAreaInsets.top_.start,
+    auto topSafeAreaRect = Rect(param_.menuWindowRect.Left(), UIExtensionHostWindowRect_.Top(),
         param_.menuWindowRect.Width(), safeAreaInsets.top_.Length());
     auto topIntersectRect = topSafeAreaRect.IntersectRect(param_.menuWindowRect);
     if (GreatNotEqual(topIntersectRect.Height(), 0.0)) {
@@ -701,7 +695,8 @@ void MenuLayoutAlgorithm::CalculateSafeAreaIntersection(const SafeAreaInsets& sa
         keyboardHandled = true;
     }
     if (!keyboardHandled) {
-        auto bottomSafeAreaRect = Rect(param_.menuWindowRect.Left(), safeAreaInsets.bottom_.start,
+        auto bottomSafeAreaRect = Rect(param_.menuWindowRect.Left(),
+            UIExtensionHostWindowRect_.Bottom() - safeAreaInsets.bottom_.Length(),
             param_.menuWindowRect.Width(), safeAreaInsets.bottom_.Length());
         auto bottomIntersectRect = bottomSafeAreaRect.IntersectRect(param_.menuWindowRect);
         if (GreatNotEqual(bottomIntersectRect.Height(), 0.0)) {
