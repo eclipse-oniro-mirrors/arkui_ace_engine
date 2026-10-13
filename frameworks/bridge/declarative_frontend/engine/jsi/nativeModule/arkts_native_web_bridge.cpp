@@ -2221,8 +2221,8 @@ ArkUINativeModuleValue WebBridge::SetOnContextMenuUpdate(ArkUIRuntimeCallInfo* r
     panda::Local<panda::FunctionRef> func = callbackArg->ToObject(vm);
 
     std::function<void(WebContextMenuItemId, const WebContextMenuOptions&)> callback =
-        [vm, weak = AceType::WeakClaim(frameNode),
-         func = panda::CopyableGlobal(vm, func)](WebContextMenuItemId menuItemId, const WebContextMenuOptions& options) {
+        [vm, weak = AceType::WeakClaim(frameNode), func = panda::CopyableGlobal(vm, func)](
+            WebContextMenuItemId menuItemId, const WebContextMenuOptions& options) {
             panda::LocalScope pandaScope(vm);
             panda::TryCatch trycatch(vm);
             PipelineContext::SetCallBackNode(weak);
