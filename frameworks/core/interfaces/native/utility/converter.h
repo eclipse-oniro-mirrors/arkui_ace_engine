@@ -1162,7 +1162,7 @@ namespace Converter {
     template<> void AssignCast(std::optional<ImmersiveOptions>& dst, const Ark_ImmersiveOptionsInner& src);
     template<> void AssignCast(std::optional<BlurSnapshotOptions>& dst, const Ark_BlurSnapshotOptions& src);
     template<> void AssignCast(std::optional<LightEffectOptions>& dst, const Ark_LightEffectOptionsInner& src);
-    template<> void AssignCast(std::optional<WebContextMenuItemId>& dst, const Ark_WebContextMenuItemId& src);
+    template<> void AssignCast(std::optional<WebContextMenuItemId>& dst, const WebContextMenuItemId& src);
     // DO NOT ADD NEW DECLARATIONS HERE!!! Add in alphabetic order above!
 
     template<typename From>
