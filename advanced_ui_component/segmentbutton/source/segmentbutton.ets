@@ -36,6 +36,13 @@ const ACCESSIBILITY_DEFAULT_DESCRIPTION = '';
 const CAPSULE_FOCUS_SELECTED_OFFSET: number = 4;
 const SDK_API_VERSION_TWENTY_SIX: number = 26;
 
+@Extend(Stack)
+function normalDragMaterialLight(enabled: boolean) {
+  if (enabled) {
+    $.pointLight({ illuminated: 0 });
+  }
+}
+
 interface SegmentButtonThemeInterface {
   SEGMENT_TEXT_VERTICAL_PADDING: Resource;
   SEGMENT_TEXT_HORIZONTAL_PADDING: Resource;
@@ -1588,9 +1595,7 @@ export struct SegmentButton {
     if ((this.componentSize.height as number) === 0) {
       return undefined;
     }
-    // NORMAL retains the existing visual background, which does not receive touch.
-    return this.options.interactionMode === SegmentButtonInteractionMode.NORMAL_DRAG ?
-      undefined : this.options.backgroundSystemMaterial;
+    return this.options.backgroundSystemMaterial;
   }
 
   private isSegmentFocusStyleCustomized(): boolean {
@@ -1637,9 +1642,7 @@ export struct SegmentButton {
             .borderColor(this.options.backgroundSystemMaterial ? undefined
               : segmentButtonTheme.SEGMENT_BUTTON_BORDER_COLOR)
             .systemMaterial(this.options.backgroundSystemMaterial)
-            .hitTestBehavior(this.isBackgroundSystemMaterialEnabled() &&
-              this.options.interactionMode === SegmentButtonInteractionMode.NORMAL_DRAG ?
-              HitTestMode.None : HitTestMode.Default)
+            .normalDragMaterialLight(this.options?.interactionMode === SegmentButtonInteractionMode.NORMAL_DRAG && this.isBackgroundSystemMaterialEnabled() && !this.isMultiplyCapsule())
             .visibility((this.componentSize.height as number) > 0 ? Visibility.Visible : Visibility.None)
           }
           Stack() {
@@ -1687,6 +1690,7 @@ export struct SegmentButton {
     .borderRadius(this.getButtonBorderRadius())
     .clip(false)
     .systemMaterial(this.getButtonSystemMaterial())
+    .normalDragMaterialLight(this.options?.interactionMode === SegmentButtonInteractionMode.NORMAL_DRAG && this.isBackgroundSystemMaterialEnabled() && !this.isMultiplyCapsule())
     .onBlur(() => {
       this.focusIndex = -1
     })

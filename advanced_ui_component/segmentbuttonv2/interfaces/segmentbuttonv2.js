@@ -417,6 +417,12 @@ __decorate([Computed], SegmentButtonV2Items.prototype, 'hasHybrid', null);
 SegmentButtonV2Items = __decorate([ObservedV2], SegmentButtonV2Items);
 export { SegmentButtonV2Items };
 const EMPTY_ITEMS = new SegmentButtonV2Items([]);
+function __Stack__normalDragMaterialLight(enabled) {
+  if (enabled) {
+    Stack.pointLight({ illuminated: 0 });
+  }
+}
+
 export var SegmentButtonV2InteractionMode;
 (function (SegmentButtonV2InteractionMode) {
   SegmentButtonV2InteractionMode[SegmentButtonV2InteractionMode['FOLLOWING_DRAG'] = 0] = 'FOLLOWING_DRAG';
@@ -2209,8 +2215,8 @@ class SimpleSegmentButtonV2 extends ViewV2 {
     this.observeComponentCreation2((elmtId, isInitialRender) => {
       Stack.create();
       Stack.backgroundColor(this.getButtonBackgroundColor());
-      Stack.systemMaterial((this.isBackgroundSystemMaterialEnabled() && this.interactionMode === SegmentButtonV2InteractionMode.NORMAL_DRAG) ?
-        undefined : this.getSystemMaterial(this.backgroundSystemMaterial));
+      Stack.systemMaterial(this.getSystemMaterial(this.backgroundSystemMaterial));
+      __Stack__normalDragMaterialLight(this.interactionMode === SegmentButtonV2InteractionMode.NORMAL_DRAG && this.isBackgroundSystemMaterialEnabled());
       Stack.backgroundEffect(this.buttonBackgroundEffect, { disableSystemAdaptation: true });
       Stack.borderRadius(this.getButtonBorderRadius());
       Stack.clip(false);
@@ -2220,25 +2226,6 @@ class SimpleSegmentButtonV2 extends ViewV2 {
       });
       Stack.direction(this.languageDirection);
     }, Stack);
-    this.observeComponentCreation2((elmtId, isInitialRender) => {
-      If.create();
-      if (this.isBackgroundSystemMaterialEnabled() && this.interactionMode === SegmentButtonV2InteractionMode.NORMAL_DRAG) {
-        this.ifElseBranchUpdateFunction(0, () => {
-          this.observeComponentCreation2((elmtId, isInitialRender) => {
-            Stack.create();
-            Stack.width(LayoutPolicy.matchParent);
-            Stack.height(LayoutPolicy.matchParent);
-            Stack.borderRadius(this.getButtonBorderRadius());
-            Stack.systemMaterial(this.getSystemMaterial(this.backgroundSystemMaterial));
-            Stack.hitTestBehavior(HitTestMode.None);
-          }, Stack);
-          Stack.pop();
-        });
-      } else {
-        this.ifElseBranchUpdateFunction(1, () => {});
-      }
-    }, If);
-    If.pop();
     this.observeComponentCreation2((elmtId, isInitialRender) => {
       Stack.create();
       Stack.borderRadius(this.getButtonBorderRadius());

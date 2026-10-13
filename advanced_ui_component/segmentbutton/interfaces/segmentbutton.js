@@ -273,6 +273,12 @@ function initFontWeight(defaultValue) {
       return defaultValue;
   }
 }
+function __Stack__normalDragMaterialLight(enabled) {
+  if (enabled) {
+    Stack.pointLight({ illuminated: 0 });
+  }
+}
+
 export var SegmentButtonInteractionMode;
 (function (SegmentButtonInteractionMode) {
   SegmentButtonInteractionMode[SegmentButtonInteractionMode['FOLLOWING_DRAG'] = 0] = 'FOLLOWING_DRAG';
@@ -2807,9 +2813,7 @@ export class SegmentButton extends ViewPU {
     if (this.componentSize.height === 0) {
       return undefined;
     }
-    // NORMAL retains the existing visual background, which does not receive touch.
-    return this.options.interactionMode === SegmentButtonInteractionMode.NORMAL_DRAG ?
-      undefined : this.options.backgroundSystemMaterial;
+    return this.options.backgroundSystemMaterial;
   }
   isSegmentFocusStyleCustomized() {
     if (this.isCustomizedCache === undefined) {
@@ -2830,6 +2834,7 @@ export class SegmentButton extends ViewPU {
       Stack.borderRadius(this.getButtonBorderRadius());
       Stack.clip(false);
       Stack.systemMaterial(this.getButtonSystemMaterial());
+      __Stack__normalDragMaterialLight(this.options?.interactionMode === SegmentButtonInteractionMode.NORMAL_DRAG && this.isBackgroundSystemMaterialEnabled() && !this.isMultiplyCapsule());
       Stack.onBlur(() => {
         this.focusIndex = -1;
       });
@@ -3320,9 +3325,7 @@ export class SegmentButton extends ViewPU {
                     this.options.backgroundSystemMaterial ? undefined : segmentButtonTheme.SEGMENT_BUTTON_BORDER_COLOR
                   );
                   Stack.systemMaterial(this.options.backgroundSystemMaterial);
-                  Stack.hitTestBehavior(this.isBackgroundSystemMaterialEnabled() &&
-                    this.options.interactionMode === SegmentButtonInteractionMode.NORMAL_DRAG ?
-                    HitTestMode.None : HitTestMode.Default);
+                  __Stack__normalDragMaterialLight(this.options?.interactionMode === SegmentButtonInteractionMode.NORMAL_DRAG && this.isBackgroundSystemMaterialEnabled() && !this.isMultiplyCapsule());
                   Stack.visibility(this.componentSize.height > 0 ? Visibility.Visible : Visibility.None);
                 }, Stack);
                 this.observeComponentCreation2((elmtId, isInitialRender) => {

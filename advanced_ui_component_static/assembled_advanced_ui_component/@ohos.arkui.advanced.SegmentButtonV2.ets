@@ -36,6 +36,7 @@ import {
   FontWeight,
   HoverEffect,
   HitTestMode,
+  IlluminatedType,
   LayoutPolicy,
   Image,
   ItemAlign,
@@ -56,6 +57,8 @@ import {
   ShadowOptions,
   ShadowStyle,
   Stack,
+  StackAttribute,
+  AttributeModifier,
   SymbolGlyph,
   TapGesture,
   Text,
@@ -128,6 +131,20 @@ export interface SegmentButtonV2ContentTheme {
   itemMinFontScale: double | Resource;
   itemMinFontScaleSmallest: double;
   itemMinFontScaleLargest: double;
+}
+
+class NormalDragMaterialLightModifier implements AttributeModifier<StackAttribute> {
+  private enabled: boolean;
+
+  constructor(enabled: boolean) {
+    this.enabled = enabled;
+  }
+
+  applyNormalAttribute(instance: StackAttribute): void {
+    if (this.enabled) {
+      instance.pointLight({ illuminated: IlluminatedType.NONE });
+    }
+  }
 }
 
 export interface SimpleSegmentButtonV2Theme extends SegmentButtonV2ContentTheme {
@@ -1029,14 +1046,6 @@ struct SimpleSegmentButtonV2 {
 
   build() {
     Stack() {
-      if (this.isBackgroundSystemMaterialEnabled() && this.interactionMode === SegmentButtonV2InteractionMode.NORMAL_DRAG) {
-        Stack() {}
-          .width(LayoutPolicy.matchParent)
-          .height(LayoutPolicy.matchParent)
-          .borderRadius(this.getButtonBorderRadius())
-          .systemMaterial(this.backgroundSystemMaterial)
-          .hitTestBehavior(HitTestMode.None)
-      }
       Stack() {
         this.EffectLayer()
         this.BackplateLayer()
@@ -1049,8 +1058,8 @@ struct SimpleSegmentButtonV2 {
       .direction(this.languageDirection)
     }
     .backgroundColor(this.getButtonBackgroundColor())
-    .systemMaterial((this.isBackgroundSystemMaterialEnabled() && this.interactionMode === SegmentButtonV2InteractionMode.NORMAL_DRAG) ?
-      undefined : this.backgroundSystemMaterial)
+    .systemMaterial(this.backgroundSystemMaterial)
+    .attributeModifier(new NormalDragMaterialLightModifier(this.interactionMode === SegmentButtonV2InteractionMode.NORMAL_DRAG && this.isBackgroundSystemMaterialEnabled()))
     .backgroundEffect(this.buttonBackgroundEffect, { disableSystemAdaptation: true })
     .borderRadius(this.getButtonBorderRadius())
     .clip(false)

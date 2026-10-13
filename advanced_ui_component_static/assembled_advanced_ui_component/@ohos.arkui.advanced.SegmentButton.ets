@@ -36,6 +36,8 @@ import {
   Row,
   ForEach,
   Stack,
+  StackAttribute,
+  AttributeModifier,
   LocalizedEdges,
   ShadowStyle,
   Color,
@@ -55,6 +57,7 @@ import {
   ButtonType,
   HoverEffect,
   HitTestMode,
+  IlluminatedType,
   TapGesture,
   TouchEvent,
   SourceType,
@@ -118,6 +121,20 @@ const MAX_MAX_FONT_SCALE: double = 2.0;
 const MIN_MAX_FONT_SCALE: double = 1.0;
 const RESOURCE_TYPE_FLOAT: int = 10002;
 const RESOURCE_TYPE_INTEGER: int = 10007;
+
+class NormalDragMaterialLightModifier implements AttributeModifier<StackAttribute> {
+  private enabled: boolean;
+
+  constructor(enabled: boolean) {
+    this.enabled = enabled;
+  }
+
+  applyNormalAttribute(instance: StackAttribute): void {
+    if (this.enabled) {
+      instance.pointLight({ illuminated: IlluminatedType.NONE });
+    }
+  }
+}
 
 interface SegmentButtonThemeInterface {
   SEGMENT_TEXT_VERTICAL_PADDING: Resource,
@@ -1825,9 +1842,7 @@ export struct SegmentButton {
     if ((this.componentSize.height as double) === 0) {
       return undefined;
     }
-    // NORMAL retains the existing visual background, which does not receive touch.
-    return this.options.interactionMode === SegmentButtonInteractionMode.NORMAL_DRAG ?
-      undefined : this.options.backgroundSystemMaterial;
+    return this.options.backgroundSystemMaterial;
   }
 
   build() {
@@ -1857,9 +1872,7 @@ export struct SegmentButton {
             .borderRadius(this.getBackgroundBorderRadius())
             .backgroundBlurStyle(this.options.backgroundBlurStyle, undefined, { disableSystemAdaptation: true })
             .systemMaterial(this.options.backgroundSystemMaterial)
-            .hitTestBehavior(this.isBackgroundSystemMaterialEnabled() &&
-              this.options.interactionMode === SegmentButtonInteractionMode.NORMAL_DRAG ?
-              HitTestMode.None : HitTestMode.Default)
+            .attributeModifier(new NormalDragMaterialLightModifier(this.options?.interactionMode === SegmentButtonInteractionMode.NORMAL_DRAG && this.isBackgroundSystemMaterialEnabled() && !this.isMultiplyCapsule()))
             .visibility((this.componentSize.height as double) > 0 ? Visibility.Visible : Visibility.None)
           }
           Stack() {
@@ -1904,6 +1917,7 @@ export struct SegmentButton {
     .borderRadius(this.getButtonBorderRadius())
     .clip(false)
     .systemMaterial(this.getButtonSystemMaterial())
+    .attributeModifier(new NormalDragMaterialLightModifier(this.options?.interactionMode === SegmentButtonInteractionMode.NORMAL_DRAG && this.isBackgroundSystemMaterialEnabled() && !this.isMultiplyCapsule()))
     .onBlur(() => {
       this.focusIndex = -1
     })

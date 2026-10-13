@@ -72,6 +72,13 @@ interface SegmentButtonV2ContentTheme {
   itemMinFontScaleLargest: number;
 }
 
+@Extend(Stack)
+function normalDragMaterialLight(enabled: boolean) {
+  if (enabled) {
+    $.pointLight({ illuminated: 0 });
+  }
+}
+
 interface SimpleSegmentButtonV2Theme extends SegmentButtonV2ContentTheme {
   buttonBackgroundColor: Resource;
   buttonBorderRadius: Resource;
@@ -1135,14 +1142,6 @@ struct SimpleSegmentButtonV2 {
 
   build() {
     Stack() {
-      if (this.isBackgroundSystemMaterialEnabled() && this.interactionMode === SegmentButtonV2InteractionMode.NORMAL_DRAG) {
-        Stack() {}
-          .width(LayoutPolicy.matchParent)
-          .height(LayoutPolicy.matchParent)
-          .borderRadius(this.getButtonBorderRadius())
-          .systemMaterial(this.getSystemMaterial(this.backgroundSystemMaterial))
-          .hitTestBehavior(HitTestMode.None)
-      }
       Stack() {
         this.EffectLayer()
         this.BackplateLayer()
@@ -1155,8 +1154,8 @@ struct SimpleSegmentButtonV2 {
       .direction(this.languageDirection)
     }
     .backgroundColor(this.getButtonBackgroundColor())
-    .systemMaterial((this.isBackgroundSystemMaterialEnabled() && this.interactionMode === SegmentButtonV2InteractionMode.NORMAL_DRAG) ?
-      undefined : this.getSystemMaterial(this.backgroundSystemMaterial))
+    .systemMaterial(this.getSystemMaterial(this.backgroundSystemMaterial))
+    .normalDragMaterialLight(this.interactionMode === SegmentButtonV2InteractionMode.NORMAL_DRAG && this.isBackgroundSystemMaterialEnabled())
     .backgroundEffect(this.buttonBackgroundEffect, { disableSystemAdaptation: true })
     .borderRadius(this.getButtonBorderRadius())
     .clip(false)
