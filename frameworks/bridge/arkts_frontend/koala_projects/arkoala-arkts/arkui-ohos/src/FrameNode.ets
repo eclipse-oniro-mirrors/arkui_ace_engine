@@ -331,10 +331,10 @@ export class FrameNode implements MaterializedBase {
         return FrameNodeExtender.isModifiable(this.peer!.ptr);
     }
     public dispatchInputEvent(event: InputEventType, competitionStrategy?: CompetitionStrategy): boolean {
-        return FrameNodeExtender.dispatchInputEvent(this.peer!.ptr, event, competitionStrategy);
+        return FrameNodeExtender.dispatchInputEvent(this, event, competitionStrategy);
     }
     public dispatchKeyEvent(event: KeyEvent): boolean {
-        return FrameNodeExtender.dispatchKeyEvent(this.peer!.ptr, event);
+        return FrameNodeExtender.dispatchKeyEvent(this, event);
     }
     public checkIfCanCrossLanguageTreeOperating(): boolean {
         return FrameNodeExtender.checkIfCanCrossLanguageTreeOperating(this);
