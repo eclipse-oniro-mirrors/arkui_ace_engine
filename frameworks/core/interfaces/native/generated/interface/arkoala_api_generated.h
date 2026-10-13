@@ -29083,6 +29083,8 @@ typedef struct GENERATED_ArkUIXComponentModifier {
                                       const Opt_Boolean* value);
     void (*setHdrBrightness0)(Ark_NativePointer node,
                               const Opt_Float64* value);
+    void (*setBufferQueueCount)(Ark_NativePointer node,
+                                Ark_Int32 value);
     void (*setHdrBrightness1)(Ark_NativePointer node,
                               const Opt_Float64* brightness,
                               const Opt_HdrType* type);

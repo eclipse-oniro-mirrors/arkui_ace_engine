@@ -351,6 +351,7 @@ ArkUI_ErrorCode OH_ArkUI_KeyEvent_Create(ArkUI_UIInputEvent** event)
     auto* uiInputEvent = new ArkUI_UIInputEvent();
     uiInputEvent->inputEvent = keyEvent;
     uiInputEvent->eventTypeId = C_KEY_EVENT_ID;
+    uiInputEvent->isCreatedByUser = true;
     *event = uiInputEvent;
     RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_NO_ERROR, ARKUI_ERROR_CODE_NO_ERROR);
 }
@@ -365,7 +366,7 @@ ArkUI_ErrorCode OH_ArkUI_KeyEvent_Destroy(ArkUI_UIInputEvent** event)
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_NO_ERROR, ARKUI_ERROR_CODE_NO_ERROR);
     }
     auto* uiInputEvent = *event;
-    if (uiInputEvent->eventTypeId != C_KEY_EVENT_ID) {
+    if (uiInputEvent->eventTypeId != C_KEY_EVENT_ID || !uiInputEvent->isCreatedByUser) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_Destroy",
             "event was not created by OH_ArkUI_KeyEvent_Create");
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
@@ -389,7 +390,7 @@ ArkUI_ErrorCode OH_ArkUI_KeyEvent_SetType(ArkUI_UIInputEvent* event, ArkUI_KeyEv
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetType", "event is null");
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
     }
-    if (event->eventTypeId != C_KEY_EVENT_ID) {
+    if (event->eventTypeId != C_KEY_EVENT_ID || !event->isCreatedByUser) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetType",
             "event was not created by OH_ArkUI_KeyEvent_Create");
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
@@ -409,7 +410,7 @@ ArkUI_ErrorCode OH_ArkUI_KeyEvent_SetKeyCode(ArkUI_UIInputEvent* event, int32_t 
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetKeyCode", "event is null");
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
     }
-    if (event->eventTypeId != C_KEY_EVENT_ID) {
+    if (event->eventTypeId != C_KEY_EVENT_ID || !event->isCreatedByUser) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetKeyCode",
             "event was not created by OH_ArkUI_KeyEvent_Create");
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
@@ -429,7 +430,7 @@ ArkUI_ErrorCode OH_ArkUI_KeyEvent_SetKeyText(ArkUI_UIInputEvent* event, const ch
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetKeyText", "event is null");
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
     }
-    if (event->eventTypeId != C_KEY_EVENT_ID) {
+    if (event->eventTypeId != C_KEY_EVENT_ID || !event->isCreatedByUser) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetKeyText",
             "event was not created by OH_ArkUI_KeyEvent_Create");
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
@@ -453,7 +454,7 @@ ArkUI_ErrorCode OH_ArkUI_KeyEvent_SetKeySource(ArkUI_UIInputEvent* event, ArkUI_
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetKeySource", "event is null");
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
     }
-    if (event->eventTypeId != C_KEY_EVENT_ID) {
+    if (event->eventTypeId != C_KEY_EVENT_ID || !event->isCreatedByUser) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetKeySource",
             "event was not created by OH_ArkUI_KeyEvent_Create");
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
@@ -473,7 +474,7 @@ ArkUI_ErrorCode OH_ArkUI_KeyEvent_SetDeviceId(ArkUI_UIInputEvent* event, int32_t
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetDeviceId", "event is null");
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
     }
-    if (event->eventTypeId != C_KEY_EVENT_ID) {
+    if (event->eventTypeId != C_KEY_EVENT_ID || !event->isCreatedByUser) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetDeviceId",
             "event was not created by OH_ArkUI_KeyEvent_Create");
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
@@ -493,7 +494,7 @@ ArkUI_ErrorCode OH_ArkUI_KeyEvent_SetUnicode(ArkUI_UIInputEvent* event, uint32_t
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetUnicode", "event is null");
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
     }
-    if (event->eventTypeId != C_KEY_EVENT_ID) {
+    if (event->eventTypeId != C_KEY_EVENT_ID || !event->isCreatedByUser) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetUnicode",
             "event was not created by OH_ArkUI_KeyEvent_Create");
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
@@ -513,7 +514,7 @@ ArkUI_ErrorCode OH_ArkUI_KeyEvent_SetEventTime(ArkUI_UIInputEvent* event, int64_
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetEventTime", "event is null");
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
     }
-    if (event->eventTypeId != C_KEY_EVENT_ID) {
+    if (event->eventTypeId != C_KEY_EVENT_ID || !event->isCreatedByUser) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetEventTime",
             "event was not created by OH_ArkUI_KeyEvent_Create");
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
@@ -534,7 +535,7 @@ ArkUI_ErrorCode OH_ArkUI_KeyEvent_SetPressedKeys(
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetPressedKeys", "event is null");
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
     }
-    if (event->eventTypeId != C_KEY_EVENT_ID) {
+    if (event->eventTypeId != C_KEY_EVENT_ID || !event->isCreatedByUser) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetPressedKeys",
             "event was not created by OH_ArkUI_KeyEvent_Create");
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
@@ -565,7 +566,7 @@ ArkUI_ErrorCode OH_ArkUI_KeyEvent_SetKeyIntentionCode(
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetKeyIntentionCode", "event is null");
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
     }
-    if (event->eventTypeId != C_KEY_EVENT_ID) {
+    if (event->eventTypeId != C_KEY_EVENT_ID || !event->isCreatedByUser) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetKeyIntentionCode",
             "event was not created by OH_ArkUI_KeyEvent_Create");
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
@@ -585,7 +586,7 @@ ArkUI_ErrorCode OH_ArkUI_KeyEvent_SetNumLockOn(ArkUI_UIInputEvent* event, bool i
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetNumLockOn", "event is null");
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
     }
-    if (event->eventTypeId != C_KEY_EVENT_ID) {
+    if (event->eventTypeId != C_KEY_EVENT_ID || !event->isCreatedByUser) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetNumLockOn",
             "event was not created by OH_ArkUI_KeyEvent_Create");
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
@@ -605,7 +606,7 @@ ArkUI_ErrorCode OH_ArkUI_KeyEvent_SetCapsLockOn(ArkUI_UIInputEvent* event, bool 
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetCapsLockOn", "event is null");
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
     }
-    if (event->eventTypeId != C_KEY_EVENT_ID) {
+    if (event->eventTypeId != C_KEY_EVENT_ID || !event->isCreatedByUser) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetCapsLockOn",
             "event was not created by OH_ArkUI_KeyEvent_Create");
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
@@ -625,7 +626,7 @@ ArkUI_ErrorCode OH_ArkUI_KeyEvent_SetScrollLockOn(ArkUI_UIInputEvent* event, boo
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetScrollLockOn", "event is null");
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
     }
-    if (event->eventTypeId != C_KEY_EVENT_ID) {
+    if (event->eventTypeId != C_KEY_EVENT_ID || !event->isCreatedByUser) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetScrollLockOn",
             "event was not created by OH_ArkUI_KeyEvent_Create");
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
