@@ -68,6 +68,22 @@ void FfiOHOSAceFrameworkRadioSetStyle(
     GetRadioModel()->SetIndicatorColor(Color(indicatorColor));
 }
 
+void FfiOHOSAceFrameworkRadioSetStyleV2(CJRadioStyleOptions options)
+{
+    if (options.hasCheckedBackgroundColor) {
+        GetRadioModel()->SetCheckedBackgroundColor(Color(options.checkedBackgroundColor));
+        GetRadioModel()->SetCheckedBackgroundColorSetByUser(true);
+    }
+    if (options.hasUncheckedBorderColor) {
+        GetRadioModel()->SetUncheckedBorderColor(Color(options.uncheckedBorderColor));
+        GetRadioModel()->SetUncheckedBorderColorSetByUser(true);
+    }
+    if (options.hasIndicatorColor) {
+        GetRadioModel()->SetIndicatorColor(Color(options.indicatorColor));
+        GetRadioModel()->SetIndicatorColorSetByUser(true);
+    }
+}
+
 void FfiOHOSAceFrameworkRadioSetSize(double width, int32_t widthUnit, double height, int32_t heightUnit)
 {
     Dimension widthValue(width, static_cast<DimensionUnit>(widthUnit));
