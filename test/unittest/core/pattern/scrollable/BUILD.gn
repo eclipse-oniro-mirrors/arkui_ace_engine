@@ -17,6 +17,7 @@ ace_unittest("scrollable_test_ng") {
   module_name = "ScrollingSet-Scrollable"
   type = "new"
   sources = [
+    "scroll_snap_utils_test_ng.cpp",
     "scrollable_axis_test_ng.cpp",
     "scrollable_cover_test_ng.cpp",
     "scrollable_event_test.cpp",
@@ -27,7 +28,6 @@ ace_unittest("scrollable_test_ng") {
     "scrollable_pattern_test_ng.cpp",
     "scrollable_pattern_test_ng_two.cpp",
     "scrollable_property_test_ng.cpp",
-    "scroll_snap_utils_test_ng.cpp",
     "scrollable_test_ng.cpp",
     "scrollable_testtwo_ng.cpp",
     "scrollable_utils_test.cpp",

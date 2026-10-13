@@ -2109,6 +2109,7 @@
       "OHOS::Ace::NG::ScopedViewStackProcessor::~ScopedViewStackProcessor()";
       "OHOS::Ace::NG::ScopedViewStackProcessor::ScopedViewStackProcessor(int)";
       "OHOS::Ace::NG::Scrollable::Initialize(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&)";
+      "OHOS::Ace::NG::Scrollable::IsItemSnapTracking() const";
       "OHOS::Ace::NG::Scrollable::Scrollable(std::__h::function<bool (double, int)>&&, OHOS::Ace::Axis)";
       "OHOS::Ace::NG::Scrollable::SetMaxFlingVelocity(double)";
       "OHOS::Ace::NG::Scrollable::StopScrollable()";

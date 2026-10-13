@@ -40,6 +40,11 @@ public:
     static RefPtr<MockPipelineContext> GetCurrent();
     void SetRootSize(double rootWidth, double rootHeight);
     void SetDensity(double density);
+    void SetDipScale(double scale)
+    {
+        dipScale_ = scale;
+        PipelineBase::dipScale_ = scale;
+    }
     void SetInstanceId(int32_t instanceId);
     void SetThisInstanceId(int32_t instanceId)
     {

@@ -21,6 +21,7 @@ COMMON_SRC = [
   "grid_common_test_ng.cpp",
   "grid_common_testtwo_ng.cpp",
   "grid_option_layout_test_ng.cpp",
+  "grid_scroll_snap_test_ng.cpp",
   "grid_scroller_test_ng.cpp",
   "grid_scroller_testtwo_ng.cpp",
   "grid_test_ng.cpp",
@@ -32,7 +33,6 @@ COMMON_SRC = [
   "grid_two_finger_select_test_ng.cpp",
   "grid_item_edit_mode_test.cpp",
   "grid_pattern_test_ng.cpp",
-  "grid_scroll_snap_test_ng.cpp",
   "selectable_item_test.cpp",
 ]
 
@@ -85,7 +85,7 @@ PARITY_SRC = [
 if (is_host_product) {
   ace_unittest("grid_test_regular") {
     type = "host_components"
-      cflags = [ "-fno-access-control" ]
+    cflags = [ "-fno-access-control" ]
     module_name = "ScrollingSet-GridAndGridItem"
     sources = COMMON_SRC + REGULAR_SRC + [ "grid_test_core.cpp" ]
     sources += PARITY_SRC
@@ -111,7 +111,7 @@ if (is_host_product) {
   ace_unittest("grid_test_ng") {
     module_name = "ScrollingSet-GridAndGridItem"
     type = "host_components"
-      cflags = [ "-fno-access-control" ]
+    cflags = [ "-fno-access-control" ]
     sources = COMMON_SRC + IRREGULAR_SRC + [ "grid_test_core.cpp" ]
     sources += PARITY_SRC
     defines = [ "TEST_IRREGULAR_GRID" ]
@@ -138,7 +138,7 @@ if (is_host_product) {
   ace_unittest("grid_static_test_ng") {
     module_name = "ScrollingSet-GridAndGridItem"
     type = "host_components"
-      cflags = [ "-fno-access-control" ]
+    cflags = [ "-fno-access-control" ]
     sources = [
       "grid_static_test_ng.cpp",
       "grid_test_ng.cpp",
