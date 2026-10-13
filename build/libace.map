@@ -4269,8 +4269,6 @@
       "OHOS::Ace::MaterialUtils::CheckMaterialValid(int)";
       "OHOS::Ace::MaterialUtils::GetConfiguredMaterialState()";
       "OHOS::Ace::MaterialUtils::GetConfiguredMaterialType()";
-      "OHOS::Ace::MaterialUtils::GetDeviceUiMaterialEnabled(bool&)";
-      "OHOS::Ace::MaterialUtils::GetGlobalMaterialLevel(OHOS::Ace::UiMaterialLevel&)";
       "OHOS::Ace::MaterialUtils::GetImmersiveShadow(float)";
       "OHOS::Ace::MaterialUtils::GetInitMaterial(OHOS::Ace::UiMaterialStyle, std::__h::optional<bool> const&, std::__h::optional<OHOS::Ace::LightEffectOptions> const&)";
       "OHOS::Ace::MaterialUtils::GetTypeFromMaterial(OHOS::Ace::UiMaterial const*)";

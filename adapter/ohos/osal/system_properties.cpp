@@ -28,7 +28,6 @@
 #include "parameters.h"
 
 #include "adapter/ohos/osal/window_utils.h"
-#include "base/thread/background_task_executor.h"
 #include "core/common/ace_application_info.h"
 #include "core/components/common/properties/ui_material.h"
 
@@ -596,11 +595,8 @@ int32_t ReadTouchAccelarateMode()
 UiMaterialLevel ReadUiMaterialLevel()
 {
     UiMaterialLevel result = UiMaterialLevel::DEFAULT;
-    if (MaterialUtils::GetGlobalMaterialLevel(result)) {
-        return result;
-    }
     int32_t level =
-        system::GetIntParameter("const.immersive_material_level", static_cast<int32_t>(UiMaterialLevel::DEFAULT));
+        system::GetIntParameter("const.hds.immersive_material_level", static_cast<int32_t>(UiMaterialLevel::DEFAULT));
     if (level >= static_cast<int32_t>(UiMaterialLevel::EXQUISITE) &&
         level <= static_cast<int32_t>(UiMaterialLevel::MAX)) {
         result = static_cast<UiMaterialLevel>(level);
@@ -610,12 +606,8 @@ UiMaterialLevel ReadUiMaterialLevel()
 
 bool ReadUiMaterialEnabled()
 {
-    bool result = true;
-    if (MaterialUtils::GetDeviceUiMaterialEnabled(result)) {
-        return result;
-    }
-    result = system::GetBoolParameter("const.support_immersive", true);
-    return result;
+    // rk default true, else default false
+    return system::GetBoolParameter("const.hds.support_immersive", true);
 }
 
 bool IsAscending(const std::vector<double>& nums)
@@ -882,6 +874,8 @@ bool SystemProperties::autoResizeEnabled_ = false;
 int32_t SystemProperties::syntaxMemOptStrategy_ = ReadSyntaxMemOptStrategy();
 int32_t SystemProperties::bootVendorDdrSize_ = ReadBootVendorDdrSize();
 int32_t SystemProperties::sensorCorrectionEnable_ = 0;
+bool SystemProperties::isDeviceSystemMaterialSupported_ = false;
+UiMaterialLevel SystemProperties::uiMaterialLevel_ = UiMaterialLevel::DEFAULT;
 
 std::once_flag SystemProperties::getSysPropertiesFlag_;
 
@@ -1087,10 +1081,9 @@ void SystemProperties::ReadSystemParametersCallOnce()
             "const.form.shared_image.cache_threshold", DEFAULT_FORM_SHARED_IMAGE_CACHE_THRESHOLD);
 
         InitDeviceTypeBySystemProperty();
-        BackgroundTaskExecutor::GetInstance().PostTask([]() {
-            [[maybe_unused]] auto supported = SystemProperties::IsDeviceSystemMaterialSupported();
-            [[maybe_unused]] auto level = SystemProperties::GetUiMaterialLevel();
-        });
+
+        isDeviceSystemMaterialSupported_ = ReadUiMaterialEnabled();
+        uiMaterialLevel_ = ReadUiMaterialLevel();
     });
 }
 
@@ -1607,6 +1600,16 @@ int32_t SystemProperties::GetPreviewStatus()
     return previewStatus_;
 }
 
+UiMaterialLevel SystemProperties::GetUiMaterialLevel()
+{
+    return uiMaterialLevel_;
+}
+
+bool SystemProperties::IsDeviceSystemMaterialSupported()
+{
+    return isDeviceSystemMaterialSupported_;
+}
+
 void SystemProperties::SetDeviceType(DeviceType deviceType)
 {
     deviceType_ = deviceType;
@@ -1664,18 +1667,6 @@ void SystemProperties::SetStateManagerEnabled(bool stateManagerEnable)
 void SystemProperties::SetFaultInjectEnabled(bool faultInjectEnable)
 {
     faultInjectEnabled_ = faultInjectEnable;
-}
-
-UiMaterialLevel SystemProperties::GetUiMaterialLevel()
-{
-    static auto uiMaterialLevel = ReadUiMaterialLevel();
-    return uiMaterialLevel;
-}
-
-bool SystemProperties::IsDeviceSystemMaterialSupported()
-{
-    static auto enabled = ReadUiMaterialEnabled();
-    return enabled;
 }
 
 int32_t SystemProperties::GetFormTaskPriority()
