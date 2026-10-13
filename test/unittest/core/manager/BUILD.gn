@@ -125,6 +125,12 @@ ace_unittest("json_report_test_ng") {
   ]
 }
 
+ace_unittest("post_event_manager_test_ng") {
+  module_name = "StateManagement-InClass"
+  type = "new"
+  sources = [ "post_event_manager_test_ng.cpp" ]
+}
+
 manager_test_sources = [
   "select_overlay_manager_test_ng.cpp",
   "select_overlay_manager_testtwo_ng.cpp",
@@ -447,6 +453,7 @@ group("core_manager_unittest") {
     ":json_report_test_ng",
     ":navigation_manager_test_ng",
     ":page_scene_rule_manager_test_ng",
+    ":post_event_manager_test_ng",
     ":recoverable_manager_test_ng",
     ":safe_area_manager_test_ng",
     ":scroll_adjust_manager_test_ng",
