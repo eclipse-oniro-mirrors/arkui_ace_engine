@@ -467,7 +467,7 @@ public:
     virtual void SetRight(const Dimension& right) // add for animation
     {
         if (positionParam_.right.first != right) {
-            positionParam_.top = std::make_pair(right, true);
+            positionParam_.right = std::make_pair(right, true);
             MarkNeedLayout();
         }
     }
