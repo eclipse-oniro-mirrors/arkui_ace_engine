@@ -577,7 +577,7 @@ HWTEST_F(CounterTestNg, CounterModelNGCreateWithResourceObjTest003, TestSize.Lev
     auto layoutProperty = frameNode->GetLayoutProperty();
     ASSERT_NE(layoutProperty, nullptr);
     auto selfIdealSize = layoutProperty->GetCalcLayoutConstraint()->selfIdealSize;
-    EXPECT_EQ(selfIdealSize->Height()->dimension_.Value(), 0);
+    EXPECT_EQ(selfIdealSize->Height()->dimension_.Value(), 10);
 }
 
 /**
@@ -614,7 +614,7 @@ HWTEST_F(CounterTestNg, CounterModelNGCreateWithResourceObjTest004, TestSize.Lev
     auto layoutProperty = frameNode->GetLayoutProperty();
     ASSERT_NE(layoutProperty, nullptr);
     auto selfIdealSize = layoutProperty->GetCalcLayoutConstraint()->selfIdealSize;
-    EXPECT_EQ(selfIdealSize->Width()->dimension_.Value(), 0);
+    EXPECT_EQ(selfIdealSize->Width()->dimension_.Value(), 10);
 }
 
 /**

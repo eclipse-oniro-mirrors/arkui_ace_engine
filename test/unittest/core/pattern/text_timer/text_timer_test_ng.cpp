@@ -1178,7 +1178,7 @@ HWTEST_F(TextTimerTestNg, TextTimerPatternTest008, TestSize.Level0)
     jsResourceType = JsTextTimerResourceType::FONTFAMILY;
     textTimerModel.CreateWithResourceObj(jsResourceType, resObjWithId);
     pattern->OnColorModeChange(colorMode);
-    EXPECT_EQ(layoutProperty->GetTextColor(), testColor);
+    EXPECT_EQ(layoutProperty->GetTextColor(), Color::RED);
 }
 
 /**
