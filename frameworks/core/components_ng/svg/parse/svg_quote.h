@@ -16,6 +16,7 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_SVG_PARSE_SVG_QUOTE_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_SVG_PARSE_SVG_QUOTE_H
 
+#include "core/components_ng/svg/svg_context.h"
 #include "frameworks/core/components_ng/svg/parse/svg_node.h"
 #include "include/pathops/SkPathOps.h"
 
@@ -33,6 +34,11 @@ public:
 
     RSRecordingPath AsPath(const Size& viewPort) const override
     {
+        auto svgContext = svgContext_.Upgrade();
+        if (svgContext && !svgContext->IncrementAsPathDepth()) {
+            return RSRecordingPath();
+        }
+        AsPathDepthGuard depthGuard(svgContext);
         RSRecordingPath path;
         for (const auto& child : children_) {
             auto childPath = child->AsPath(viewPort);
@@ -43,6 +49,11 @@ public:
 
     RSRecordingPath AsPath(const SvgLengthScaleRule& lengthRule) override
     {
+        auto svgContext = svgContext_.Upgrade();
+        if (svgContext && !svgContext->IncrementAsPathDepth()) {
+            return RSRecordingPath();
+        }
+        AsPathDepthGuard depthGuard(svgContext);
         RSRecordingPath path;
 
         for (const auto& child : children_) {
@@ -54,7 +65,11 @@ public:
 
     void Draw(RSCanvas& canvas, const Size& viewPort, const std::optional<Color>& color) override
     {
-        // render composition on other svg tags
+        auto svgContext = svgContext_.Upgrade();
+        if (svgContext && !svgContext->IncrementDrawDepth()) {
+            return;
+        }
+        DrawDepthGuard drawGuard(svgContext);
         if (!OnCanvas(canvas)) {
             return;
         }
@@ -65,7 +80,11 @@ public:
 
     void Draw(RSCanvas& canvas, const SvgLengthScaleRule& lengthRule) override
     {
-        // render composition on other svg tags
+        auto svgContext = svgContext_.Upgrade();
+        if (svgContext && !svgContext->IncrementDrawDepth()) {
+            return;
+        }
+        DrawDepthGuard drawGuard(svgContext);
         OnDrawTraversedBefore(canvas, lengthRule);
         OnDrawTraversed(canvas, lengthRule);
         OnDrawTraversedAfter(canvas, lengthRule);

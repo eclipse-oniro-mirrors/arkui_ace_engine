@@ -928,6 +928,7 @@ void RosenSvgPainter::StringToPoints(const char str[], std::vector<SkPoint>& poi
 void RosenSvgPainter::StringToPoints(const char str[], std::vector<RSPoint>& points)
 #endif
 {
+    constexpr size_t MAX_POINT_COUNT = 1024 * 10;
     for (;;) {
         double x = 0.0;
         str = FindDoubleValue(str, x);
@@ -945,6 +946,10 @@ void RosenSvgPainter::StringToPoints(const char str[], std::vector<RSPoint>& poi
 #else
         points.emplace_back(RSPoint(x, y));
 #endif
+        if (points.size() >= MAX_POINT_COUNT) {
+            LOGW("SVG polygon point count exceeds limit (%{public}zu), truncating", MAX_POINT_COUNT);
+            break;
+        }
     }
 }
 
