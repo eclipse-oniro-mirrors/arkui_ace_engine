@@ -101,5 +101,6 @@ RefPtr<DrawingColorFilter> CreateDrawingColorFilter(JSRef<JSVal> obj);
 bool CheckRegexValid(const std::string& pattern);
 napi_env GetCurrentEnv();
 void* UnwrapNapiValue(const JSRef<JSVal>& obj);
+void* UnwrapNapiValueWithType(const JSRef<JSVal>& obj, const napi_type_tag* typeTag);
 } // namespace OHOS::Ace::Framework
 #endif // FRAMEWORKS_BRIDGE_DECLARATIVE_FRONTEND_JS_VIEW_JS_UTILS_H
