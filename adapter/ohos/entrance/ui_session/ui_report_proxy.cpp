@@ -608,6 +608,36 @@ void UiReportProxy::ReportPageSceneEvent(const std::string& sceneJson, bool isGe
     }
 }
 
+void UiReportProxy::ReportComponentTreeQueryResult(const std::string& data)
+{
+    MessageParcel messageData;
+    MessageParcel reply;
+    MessageOption option(MessageOption::TF_ASYNC);
+    if (!messageData.WriteInterfaceToken(GetDescriptor())) {
+        LOGW("ReportComponentTreeQueryResult write interface token failed");
+        return;
+    }
+    sptr<LargeStringAshmem> largeStringAshmem = new (std::nothrow) LargeStringAshmem();
+    if (largeStringAshmem == nullptr) {
+        LOGW("ReportComponentTreeQueryResult alloc shmem failed");
+        return;
+    }
+    if (!largeStringAshmem->WriteToAshmem(
+        std::to_string(REPORT_COMPONENT_TREE_QUERY_RESULT), data, data.length())) {
+        LOGW("ReportComponentTreeQueryResult write to shmem failed");
+        return;
+    }
+    if (!messageData.WriteParcelable(largeStringAshmem)) {
+        LOGW("ReportComponentTreeQueryResult write data failed");
+        return;
+    }
+    int32_t sendRequestErrorCode =
+        Remote()->SendRequest(REPORT_COMPONENT_TREE_QUERY_RESULT, messageData, reply, option);
+    if (sendRequestErrorCode != ERR_NONE) {
+        LOGW("ReportComponentTreeQueryResult send request failed, errorCode is %{public}d", sendRequestErrorCode);
+    }
+}
+
 void UiReportProxy::SendWebInfoRequestResult(
     uint32_t windowId,
     int32_t webId,
