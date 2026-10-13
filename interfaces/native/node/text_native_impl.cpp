@@ -17,6 +17,7 @@
 #include <securec.h>
 
 #include "node_extened.h"
+#include "node/config_manager.h"
 #include "node_model.h"
 
 #include "base/utils/utils.h"
@@ -422,6 +423,7 @@ ArkUI_ErrorCode OH_ArkUI_TextSelectionMenuOptions_SetContentNode(
     CHECK_NULL_RETURN_WITH_MESSAGE(selectionMenuOptions, ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__,
         "selectionMenuOptions is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "node is null");
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     selectionMenuOptions->contentNode = node;
     return ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR;
 }
@@ -432,6 +434,7 @@ ArkUI_ErrorCode OH_ArkUI_TextSelectionMenuOptions_GetContentNode(
     CHECK_NULL_RETURN_WITH_MESSAGE(selectionMenuOptions, ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__,
         "selectionMenuOptions is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "node is null");
+    CHECK_NODE_DISPOSED(selectionMenuOptions->contentNode, "Node has been disposed");
     *node = selectionMenuOptions->contentNode;
     return ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR;
 }
