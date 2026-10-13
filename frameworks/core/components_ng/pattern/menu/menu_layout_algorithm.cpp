@@ -663,7 +663,7 @@ void MenuLayoutAlgorithm::InitWrapperRect(
     auto windowManager = pipelineContext->GetWindowManager();
     isContainerModal_ = pipelineContext->GetWindowModal() == WindowModal::CONTAINER_MODAL && windowManager &&
                             windowManager->GetWindowMode() == WindowMode::WINDOW_MODE_FLOATING;
-    auto parentOffset = host->GetPaintRectOffset(true, true);
+    auto parentOffset = GetParentOffset(host, menuPattern);
     width_ -= parentOffset.GetX();
     height_ -= parentOffset.GetY();
     CalculateSafeAreaIntersection(safeAreaInsets, safeAreaManager, props, menuPattern);
@@ -3068,7 +3068,8 @@ OffsetF MenuLayoutAlgorithm::GetArrowPositionWithPlacement(const SizeF& menuSize
     return childPosition;
 }
 
-OffsetF MenuLayoutAlgorithm::GetMenuWrapperOffset(const LayoutWrapper* layoutWrapper)
+OffsetF MenuLayoutAlgorithm::GetMenuWrapperOffset(
+    const LayoutWrapper* layoutWrapper, const RefPtr<MenuPattern>& menuPattern)
 {
     CHECK_NULL_RETURN(layoutWrapper, OffsetF());
     auto menuNode = layoutWrapper->GetHostNode();
@@ -3076,9 +3077,27 @@ OffsetF MenuLayoutAlgorithm::GetMenuWrapperOffset(const LayoutWrapper* layoutWra
     ACE_UINODE_TRACE(menuNode);
     auto menuLayoutProperty = layoutWrapper->GetLayoutProperty();
     if (menuLayoutProperty && menuLayoutProperty->GetNonAutoLayoutDirection() == TextDirection::RTL) {
-        return menuNode->GetPaintRectOffset(true, true);
+        return GetParentOffset(menuNode, menuPattern);
     }
     return menuNode->GetParentGlobalOffsetDuringLayout();
+}
+
+OffsetF MenuLayoutAlgorithm::GetParentOffset(const RefPtr<FrameNode>& host, const RefPtr<MenuPattern>& menuPattern)
+{
+    CHECK_NULL_RETURN(menuPattern, OffsetF());
+    auto menuWrapper = menuPattern->GetMenuWrapper();
+    CHECK_NULL_RETURN(menuWrapper, OffsetF());
+    auto menuWrapperPattern = menuWrapper->GetPattern<MenuWrapperPattern>();
+    if (menuWrapperPattern && menuWrapperPattern->IsHide()) {
+        auto cachedOffset = menuPattern->GetWrapperParentOffset();
+        TAG_LOGI(AceLogTag::ACE_MENU, "wrapper parentOffset hold by menu hide: %{public}s",
+            cachedOffset.ToString().c_str());
+        return cachedOffset;
+    }
+    CHECK_NULL_RETURN(host, OffsetF());
+    auto parentOffset = host->GetPaintRectOffset(true, true);
+    menuPattern->SetWrapperParentOffset(parentOffset);
+    return parentOffset;
 }
 
 bool MenuLayoutAlgorithm::NeedHoldTargetOffset(
@@ -3168,7 +3187,7 @@ void MenuLayoutAlgorithm::InitTargetSizeAndPosition(
             ModifyOffset(targetOffset_, menuPattern);
             menuPattern->SetTargetOffset(targetOffset_);
         }
-        OffsetF offset = GetMenuWrapperOffset(layoutWrapper);
+        OffsetF offset = GetMenuWrapperOffset(layoutWrapper, menuPattern);
         targetOffset_ -= offset;
         UpdateTargetValue(layoutWrapper);
         return;
@@ -3180,7 +3199,7 @@ void MenuLayoutAlgorithm::InitTargetSizeAndPosition(
                           static_cast<float>(CONTAINER_BORDER_WIDTH.ConvertToPx());
         targetOffset_ -= OffsetF(newOffsetX, newOffsetY);
     } else {
-        OffsetF offset = GetMenuWrapperOffset(layoutWrapper);
+        OffsetF offset = GetMenuWrapperOffset(layoutWrapper, menuPattern);
         targetOffset_ -= offset;
     }
     UpdateTargetValue(layoutWrapper);
