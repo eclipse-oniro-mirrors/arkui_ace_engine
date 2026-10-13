@@ -3228,35 +3228,9 @@ void SetOnInputmethodAttachedImpl(Ark_NativePointer node,
 }
 } // WebAttributeModifier
 
-namespace {
-template<typename T>
-auto SetCaretColorIfSupported(T& modifier, int32_t)
-    -> decltype(modifier.setCaretColor = WebAttributeModifier::SetCaretColorImpl, void())
-{
-    modifier.setCaretColor = WebAttributeModifier::SetCaretColorImpl;
-}
-
-template<typename T>
-void SetCaretColorIfSupported(T& modifier, int64_t)
-{
-    (void)modifier;
-}
-
-template<typename T>
-const T* InitializeWebModifier(T* modifier)
-{
-    SetCaretColorIfSupported(*modifier, 0);
-    modifier->setOnZoomChange = WebAttributeModifier::SetOnZoomChangeImpl;
-    modifier->setRegisterNativeEmbedRule = WebAttributeModifier::SetRegisterNativeEmbedRuleImpl;
-    modifier->setBindSelectionMenu = WebAttributeModifier::SetBindSelectionMenuImpl;
-    modifier->setEnableScrollDirectionalLock = WebAttributeModifier::SetEnableScrollDirectionalLockImpl;
-    return modifier;
-}
-} // namespace
-
 const GENERATED_ArkUIWebModifier* GetWebModifier()
 {
-    static GENERATED_ArkUIWebModifier ArkUIWebModifierImpl {
+    static const GENERATED_ArkUIWebModifier ArkUIWebModifierImpl {
         WebModifier::ConstructImpl,
         WebInterfaceModifier::SetWebOptionsImpl,
         WebAttributeModifier::SetJavaScriptAccessImpl,
@@ -3336,6 +3310,7 @@ const GENERATED_ArkUIWebModifier* GetWebModifier()
         WebAttributeModifier::SetBlockNetworkImpl,
         WebAttributeModifier::SetHorizontalScrollBarAccessImpl,
         WebAttributeModifier::SetVerticalScrollBarAccessImpl,
+        WebAttributeModifier::SetCaretColorImpl,
         WebAttributeModifier::SetOnTouchIconUrlReceivedImpl,
         WebAttributeModifier::SetOnFaviconReceivedImpl,
         WebAttributeModifier::SetOnPageVisibleImpl,
@@ -3411,9 +3386,12 @@ const GENERATED_ArkUIWebModifier* GetWebModifier()
         WebAttributeModifier::SetOnInputmethodAttachedImpl,
         WebAttributeModifier::SetEnableFullscreenVideoOverlayImpl,
         WebAttributeModifier::SetEnableMediaNetworkProxyImpl,
+        WebAttributeModifier::SetOnZoomChangeImpl,
+        WebAttributeModifier::SetRegisterNativeEmbedRuleImpl,
+        WebAttributeModifier::SetBindSelectionMenuImpl,
+        WebAttributeModifier::SetEnableScrollDirectionalLockImpl,
     };
-    static const GENERATED_ArkUIWebModifier* initializedModifier = InitializeWebModifier(&ArkUIWebModifierImpl);
-    return initializedModifier;
+    return &ArkUIWebModifierImpl;
 }
 
 }

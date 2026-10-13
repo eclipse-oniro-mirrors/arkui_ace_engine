@@ -29,8 +29,8 @@ import { NestedScrollOptions_serializer, ArkCommonMethodPeer, CommonMethod, Call
 import { EditMenuOptions_serializer, TextDataDetectorConfig_serializer, EditMenuOptions, TextDataDetectorConfig, MenuType } from './textCommon'
 import { ComponentBase } from './../ComponentBase'
 import { PeerNode } from './../PeerNode'
-import { CopyOptions, NestedScrollMode } from './enums'
-import { VoidCallback, Position, Position_serializer } from './units'
+import { CopyOptions, NestedScrollMode, Color as arkui_component_enums_Color } from './enums'
+import { VoidCallback, Position, Position_serializer, ResourceColor, Resource as arkui_component_units_Resource } from './units'
 import { CustomBuilder } from './builder'
 import { PreviewMenuOptions, PreviewMenuOptions_serializer } from './richEditor'
 import { CallbackKind } from './../framework/peers/CallbackKind'
@@ -2454,6 +2454,34 @@ export class ArkWebPeer extends ArkCommonMethodPeer {
         ArkUIGeneratedNativeModule._WebAttribute_setVerticalScrollBarAccess(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
+    setCaretColorAttribute(value: ResourceColor | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (value !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueTmpValue = value!
+            if (valueTmpValue instanceof arkui_component_enums_Color) {
+                thisSerializer.writeInt8((0).toByte())
+                const valueTmpValueForIdx0 = valueTmpValue as arkui_component_enums_Color
+                thisSerializer.writeInt32((valueTmpValueForIdx0.getOrdinal()) % (12))
+            } else if (valueTmpValue instanceof int32) {
+                thisSerializer.writeInt8((1).toByte())
+                const valueTmpValueForIdx1 = valueTmpValue as int32
+                thisSerializer.writeInt32(valueTmpValueForIdx1)
+            } else if (valueTmpValue instanceof string) {
+                thisSerializer.writeInt8((2).toByte())
+                const valueTmpValueForIdx2 = valueTmpValue as string
+                thisSerializer.writeString(valueTmpValueForIdx2)
+            } else if (valueTmpValue instanceof arkui_component_units_Resource) {
+                thisSerializer.writeInt8((3).toByte())
+                const valueTmpValueForIdx3 = valueTmpValue as arkui_component_units_Resource
+                global_resource_Resource_serializer.write(thisSerializer, valueTmpValueForIdx3)
+            }
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._WebAttribute_setCaretColor(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
     setOnTouchIconUrlReceivedAttribute(value: arkui_component_common_Callback<OnTouchIconUrlReceivedEvent, void> | undefined): void {
         const thisSerializer: SerializerBase = SerializerBase.hold()
         if (value !== undefined) {
@@ -4269,6 +4297,9 @@ export interface WebAttribute extends CommonMethod {
     verticalScrollBarAccess(value: boolean | undefined): this {
         throw new Error('Unimplemented method verticalScrollBarAccess')
     }
+    caretColor(value: ResourceColor | undefined): this {
+        throw new Error('Unimplemented method caretColor')
+    }
     onTouchIconUrlReceived(value: arkui_component_common_Callback<OnTouchIconUrlReceivedEvent, void> | undefined): this {
         throw new Error('Unimplemented method onTouchIconUrlReceived')
     }
@@ -4996,6 +5027,11 @@ export class ArkWebComponent extends ArkCommonMethodComponent implements WebAttr
     public verticalScrollBarAccess(value: boolean | undefined): this {
         const value_casted = value as (boolean | undefined)
         this.getPeer()?.setVerticalScrollBarAccessAttribute(value_casted)
+        return this
+    }
+    public caretColor(value: ResourceColor | undefined): this {
+        const value_casted = value as (ResourceColor | undefined)
+        this.getPeer()?.setCaretColorAttribute(value_casted)
         return this
     }
     public onTouchIconUrlReceived(value: arkui_component_common_Callback<OnTouchIconUrlReceivedEvent, void> | undefined): this {
