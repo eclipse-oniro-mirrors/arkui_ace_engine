@@ -3452,8 +3452,6 @@ export class ArkUIGeneratedNativeModule {
     @ani.unsafe.Direct
     native static _WebAttribute_setVerticalScrollBarAccess(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
-    native static _WebAttribute_setCaretColor(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
-    @ani.unsafe.Direct
     native static _WebAttribute_setOnTouchIconUrlReceived(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _WebAttribute_setOnFaviconReceived(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
@@ -3603,6 +3601,8 @@ export class ArkUIGeneratedNativeModule {
     native static _WebAttribute_setEnableFullscreenVideoOverlay(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _WebAttribute_setEnableMediaNetworkProxy(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
+    native static _WebAttribute_setCaretColor(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _WebAttribute_setOnZoomChange(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
