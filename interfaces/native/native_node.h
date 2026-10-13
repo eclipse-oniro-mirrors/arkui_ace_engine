@@ -8220,14 +8220,16 @@ typedef enum {
     NODE_SCROLL_BAR_HEIGHT = 1002029,
 
     /**
-     * @brief Defines the current scroll state of the scrollable container. This attribute can be obtained as
-     * required through APIs.
+     * @brief 获取当前滚动状态。
+     * 该属性可以通过API获取。
      *
-     * Format of the return value {@link ArkUI_AttributeItem}:
-     * .value[0].i32: current scroll state. The parameter type is {@link ArkUI_ScrollState}.
-     * 0: idle. 1: scroll. 2: fling.
+     * **{@link ArkUI_AttributeItem}返回值的格式：**
+     * <ul>
+     * <li>.value[0].i32：当前滚动状态。参数类型为{@link ArkUI_ScrollState}。</li>
+     * </ul>
      *
-     * @since 26.0.0
+     * @ingroup Scrollable Container Component[滚动容器类组件]
+     * @since 26.2.0
      */
     NODE_SCROLL_STATE = 1002030,
 
