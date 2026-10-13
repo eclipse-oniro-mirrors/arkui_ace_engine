@@ -2470,6 +2470,9 @@ private:
     void HandleOnPasteCommon(const std::string& data);
     void HandleOnAutoFillSecurePaste(const std::string& data);
     void RemoveFillContentMap();
+    void TryRecommendTypedUserName(const RefPtr<TextFieldManagerNG>& textFieldManager,
+        FillContentMap& fillContentMap);
+    void SendAccountRecommendCommand(const RefPtr<TextFieldManagerNG>& textFieldManager);
     void RemoveMSDPAutoFillType();
     bool NeedsSendFillContent();
     void UpdateSelectOverlay(const RefPtr<OHOS::Ace::TextFieldTheme>& textFieldTheme);
