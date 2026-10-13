@@ -36,7 +36,6 @@ import {
   FontWeight,
   HoverEffect,
   HitTestMode,
-  IlluminatedType,
   LayoutPolicy,
   Image,
   ItemAlign,
@@ -57,8 +56,6 @@ import {
   ShadowOptions,
   ShadowStyle,
   Stack,
-  StackAttribute,
-  AttributeModifier,
   SymbolGlyph,
   TapGesture,
   Text,
@@ -131,20 +128,6 @@ export interface SegmentButtonV2ContentTheme {
   itemMinFontScale: double | Resource;
   itemMinFontScaleSmallest: double;
   itemMinFontScaleLargest: double;
-}
-
-class NormalDragMaterialLightModifier implements AttributeModifier<StackAttribute> {
-  private enabled: boolean;
-
-  constructor(enabled: boolean) {
-    this.enabled = enabled;
-  }
-
-  applyNormalAttribute(instance: StackAttribute): void {
-    if (this.enabled) {
-      instance.pointLight({ illuminated: IlluminatedType.NONE });
-    }
-  }
 }
 
 export interface SimpleSegmentButtonV2Theme extends SegmentButtonV2ContentTheme {
@@ -946,7 +929,7 @@ struct SimpleSegmentButtonV2 {
   }
 
   private isMaterialInteractionEnabled(): boolean {
-    // Deformation follows material; light and position are guarded separately.
+    // Material feedback is independent of drag positioning and selection timing.
     return this.isBackgroundSystemMaterialEnabled();
   }
 
@@ -999,8 +982,7 @@ struct SimpleSegmentButtonV2 {
   }
 
   getBackplateOpacity(): double {
-    if (this.openSelectedItemSystemMaterial &&
-      this.interactionMode !== SegmentButtonV2InteractionMode.NORMAL_DRAG) {
+    if (this.openSelectedItemSystemMaterial) {
       return 0.7;
     } else {
       return 1;
@@ -1008,9 +990,7 @@ struct SimpleSegmentButtonV2 {
   }
 
   getBackplateScale(): ScaleOptions | undefined {
-    if (this.openSelectedItemSystemMaterial &&
-      (this.interactionMode !== SegmentButtonV2InteractionMode.NORMAL_DRAG ||
-        this.isBackgroundSystemMaterialEnabled())) {
+    if (this.openSelectedItemSystemMaterial) {
       return this.selectedItemScale;
     } else {
       return { x: this.itemScale, y: this.itemScale };
@@ -1059,7 +1039,6 @@ struct SimpleSegmentButtonV2 {
     }
     .backgroundColor(this.getButtonBackgroundColor())
     .systemMaterial(this.backgroundSystemMaterial)
-    .attributeModifier(new NormalDragMaterialLightModifier(this.interactionMode === SegmentButtonV2InteractionMode.NORMAL_DRAG && this.isBackgroundSystemMaterialEnabled()))
     .backgroundEffect(this.buttonBackgroundEffect, { disableSystemAdaptation: true })
     .borderRadius(this.getButtonBorderRadius())
     .clip(false)
@@ -1196,8 +1175,10 @@ struct SimpleSegmentButtonV2 {
       return;
     }
 
-    const isNormalInteraction = this.interactionMode === SegmentButtonV2InteractionMode.NORMAL_DRAG;
-    if (this.isBackgroundSystemMaterialEnabled() && !this.tempDisableAnimation && !isNormalInteraction) {
+    // Cross-item selection must not replay material press/release while dragging.
+    const isNormalDragSelection = this.interactionMode === SegmentButtonV2InteractionMode.NORMAL_DRAG &&
+      this.isDragging;
+    if (this.isBackgroundSystemMaterialEnabled() && !this.tempDisableAnimation && !isNormalDragSelection) {
       this.getUIContext().animateTo({
         curve: curves.interpolatingSpring(0, 1, 195, 14),
       }, () => {
@@ -1214,7 +1195,7 @@ struct SimpleSegmentButtonV2 {
       }
     });
 
-    if (this.isBackgroundSystemMaterialEnabled() && !this.tempDisableAnimation && !isNormalInteraction) {
+    if (this.isBackgroundSystemMaterialEnabled() && !this.tempDisableAnimation && !isNormalDragSelection) {
       this.getUIContext().animateTo({
         curve: curves.interpolatingSpring(0, 1, 195, 14),
         delay: 250

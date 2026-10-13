@@ -417,12 +417,6 @@ __decorate([Computed], SegmentButtonV2Items.prototype, 'hasHybrid', null);
 SegmentButtonV2Items = __decorate([ObservedV2], SegmentButtonV2Items);
 export { SegmentButtonV2Items };
 const EMPTY_ITEMS = new SegmentButtonV2Items([]);
-function __Stack__normalDragMaterialLight(enabled) {
-  if (enabled) {
-    Stack.pointLight({ illuminated: 0 });
-  }
-}
-
 export var SegmentButtonV2InteractionMode;
 (function (SegmentButtonV2InteractionMode) {
   SegmentButtonV2InteractionMode[SegmentButtonV2InteractionMode['FOLLOWING_DRAG'] = 0] = 'FOLLOWING_DRAG';
@@ -2156,7 +2150,7 @@ class SimpleSegmentButtonV2 extends ViewV2 {
   }
 
   isMaterialInteractionEnabled() {
-    // Deformation follows material; light and position are guarded separately.
+    // Material feedback is independent of drag positioning and selection timing.
     return this.isBackgroundSystemMaterialEnabled();
   }
 
@@ -2185,17 +2179,14 @@ class SimpleSegmentButtonV2 extends ViewV2 {
     }
   }
   getBackplateOpacity() {
-    if (this.openSelectedItemSystemMaterial &&
-      this.interactionMode !== SegmentButtonV2InteractionMode.NORMAL_DRAG) {
+    if (this.openSelectedItemSystemMaterial) {
       return 0.7;
     } else {
       return 1;
     }
   }
   getBackplateScale() {
-    if (this.openSelectedItemSystemMaterial &&
-      (this.interactionMode !== SegmentButtonV2InteractionMode.NORMAL_DRAG ||
-        this.isBackgroundSystemMaterialEnabled())) {
+    if (this.openSelectedItemSystemMaterial) {
       return this.selectedItemScale;
     } else {
       return { x: this.itemScale, y: this.itemScale };
@@ -2216,7 +2207,6 @@ class SimpleSegmentButtonV2 extends ViewV2 {
       Stack.create();
       Stack.backgroundColor(this.getButtonBackgroundColor());
       Stack.systemMaterial(this.getSystemMaterial(this.backgroundSystemMaterial));
-      __Stack__normalDragMaterialLight(this.interactionMode === SegmentButtonV2InteractionMode.NORMAL_DRAG && this.isBackgroundSystemMaterialEnabled());
       Stack.backgroundEffect(this.buttonBackgroundEffect, { disableSystemAdaptation: true });
       Stack.borderRadius(this.getButtonBorderRadius());
       Stack.clip(false);
@@ -2365,8 +2355,10 @@ class SimpleSegmentButtonV2 extends ViewV2 {
       this.isTapGesture = false;
       return;
     }
-    const isNormalInteraction = this.interactionMode === SegmentButtonV2InteractionMode.NORMAL_DRAG;
-    if (this.isBackgroundSystemMaterialEnabled() && !this.tempDisableAnimation && !isNormalInteraction) {
+    // Cross-item selection must not replay material press/release while dragging.
+    const isNormalDragSelection = this.interactionMode === SegmentButtonV2InteractionMode.NORMAL_DRAG &&
+      this.isDragging && !this.isTapGesture;
+    if (this.isBackgroundSystemMaterialEnabled() && !this.tempDisableAnimation && !isNormalDragSelection) {
       if (this.isTapGesture) {
         this.openSelectedItemSystemMaterial = true;
       } else {
@@ -2392,7 +2384,7 @@ class SimpleSegmentButtonV2 extends ViewV2 {
         y: targetRect.position.y,
       };
     });
-    if (this.isBackgroundSystemMaterialEnabled() && !this.tempDisableAnimation && !isNormalInteraction) {
+    if (this.isBackgroundSystemMaterialEnabled() && !this.tempDisableAnimation && !isNormalDragSelection) {
       if (this.isTapGesture) {
         this.openSelectedItemSystemMaterial = false;
       } else {

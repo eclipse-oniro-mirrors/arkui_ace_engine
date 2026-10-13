@@ -36,13 +36,6 @@ const ACCESSIBILITY_DEFAULT_DESCRIPTION = '';
 const CAPSULE_FOCUS_SELECTED_OFFSET: number = 4;
 const SDK_API_VERSION_TWENTY_SIX: number = 26;
 
-@Extend(Stack)
-function normalDragMaterialLight(enabled: boolean) {
-  if (enabled) {
-    $.pointLight({ illuminated: 0 });
-  }
-}
-
 interface SegmentButtonThemeInterface {
   SEGMENT_TEXT_VERTICAL_PADDING: Resource;
   SEGMENT_TEXT_HORIZONTAL_PADDING: Resource;
@@ -568,9 +561,7 @@ struct SelectItem {
   }
 
   getScale(): ScaleOptions | undefined {
-    if (this.openSelectedItemSystemMaterial &&
-      (this.options.interactionMode !== SegmentButtonInteractionMode.NORMAL_DRAG ||
-        this.options.backgroundSystemMaterial !== undefined)) {
+    if (this.openSelectedItemSystemMaterial) {
       return this.selectedItemScale;
     } else {
       return {
@@ -581,8 +572,7 @@ struct SelectItem {
   }
 
   getOpacity() {
-    if (this.openSelectedItemSystemMaterial &&
-      this.options.interactionMode !== SegmentButtonInteractionMode.NORMAL_DRAG) {
+    if (this.openSelectedItemSystemMaterial) {
       return 0.7;
     } else {
       return 1;
@@ -1642,7 +1632,6 @@ export struct SegmentButton {
             .borderColor(this.options.backgroundSystemMaterial ? undefined
               : segmentButtonTheme.SEGMENT_BUTTON_BORDER_COLOR)
             .systemMaterial(this.options.backgroundSystemMaterial)
-            .normalDragMaterialLight(this.options?.interactionMode === SegmentButtonInteractionMode.NORMAL_DRAG && this.isBackgroundSystemMaterialEnabled() && !this.isMultiplyCapsule())
             .visibility((this.componentSize.height as number) > 0 ? Visibility.Visible : Visibility.None)
           }
           Stack() {
@@ -1690,7 +1679,6 @@ export struct SegmentButton {
     .borderRadius(this.getButtonBorderRadius())
     .clip(false)
     .systemMaterial(this.getButtonSystemMaterial())
-    .normalDragMaterialLight(this.options?.interactionMode === SegmentButtonInteractionMode.NORMAL_DRAG && this.isBackgroundSystemMaterialEnabled() && !this.isMultiplyCapsule())
     .onBlur(() => {
       this.focusIndex = -1
     })
@@ -1970,7 +1958,7 @@ export struct SegmentButton {
               this.panGestureStartPoint = { x: fingerInfo.globalX, y: fingerInfo.globalY };
             }
           }
-          if (!isMaterialEnabled || this.options?.interactionMode === SegmentButtonInteractionMode.NORMAL_DRAG) {
+          if (!isMaterialEnabled) {
             this.zoomScaleArray.forEach((_, index) => {
               if (index === this.selectedIndexes[0]) {
                 animateTo({ curve: curves.interpolatingSpring(10, 1, 410, 38) }, () => {
@@ -2154,7 +2142,7 @@ export struct SegmentButton {
   }
 
   private isMaterialInteractionEnabled(): boolean {
-    // Deformation follows material; light and position are guarded separately.
+    // Material feedback is independent of drag positioning and selection timing.
     return this.isBackgroundSystemMaterialEnabled();
   }
 
@@ -2217,7 +2205,9 @@ export struct SegmentButton {
   }
 
   updateAnimatedProperty(curve: ICurve | null) {
-    const isNormalInteraction = this.options?.interactionMode === SegmentButtonInteractionMode.NORMAL_DRAG;
+    // Cross-item selection must not replay material press/release while dragging.
+    const isNormalDragSelection = this.options?.interactionMode === SegmentButtonInteractionMode.NORMAL_DRAG &&
+      this.isGestureInProgress && !this.isTapGesture;
     let setAnimatedPropertyFunc = () => {
       this.selectedItemOffsetX = 0
       this.buttonItemsSelected.forEach((selected, index) => {
@@ -2233,7 +2223,7 @@ export struct SegmentButton {
       this.isTapGesture = false;
       return;
     }
-    if (this.options.backgroundSystemMaterial && !isNormalInteraction) {
+    if (this.options.backgroundSystemMaterial && !isNormalDragSelection) {
       if (this.isTapGesture) {
         this.openSelectedItemSystemMaterial = true;
         this.getUIContext().animateTo({ curve: curve }, setAnimatedPropertyFunc);

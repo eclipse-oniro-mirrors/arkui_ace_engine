@@ -72,13 +72,6 @@ interface SegmentButtonV2ContentTheme {
   itemMinFontScaleLargest: number;
 }
 
-@Extend(Stack)
-function normalDragMaterialLight(enabled: boolean) {
-  if (enabled) {
-    $.pointLight({ illuminated: 0 });
-  }
-}
-
 interface SimpleSegmentButtonV2Theme extends SegmentButtonV2ContentTheme {
   buttonBackgroundColor: Resource;
   buttonBorderRadius: Resource;
@@ -1045,7 +1038,7 @@ struct SimpleSegmentButtonV2 {
   }
 
   private isMaterialInteractionEnabled(): boolean {
-    // Deformation follows material; light and position are guarded separately.
+    // Material feedback is independent of drag positioning and selection timing.
     return this.isBackgroundSystemMaterialEnabled();
   }
 
@@ -1094,8 +1087,7 @@ struct SimpleSegmentButtonV2 {
   }
 
   getBackplateOpacity() {
-    if (this.openSelectedItemSystemMaterial &&
-      this.interactionMode !== SegmentButtonV2InteractionMode.NORMAL_DRAG) {
+    if (this.openSelectedItemSystemMaterial) {
       return 0.7;
     } else {
       return 1;
@@ -1103,9 +1095,7 @@ struct SimpleSegmentButtonV2 {
   }
 
   getBackplateScale(): ScaleOptions | undefined {
-    if (this.openSelectedItemSystemMaterial &&
-      (this.interactionMode !== SegmentButtonV2InteractionMode.NORMAL_DRAG ||
-        this.isBackgroundSystemMaterialEnabled())) {
+    if (this.openSelectedItemSystemMaterial) {
       return this.selectedItemScale;
     } else {
       return { x: this.itemScale, y: this.itemScale };
@@ -1155,7 +1145,6 @@ struct SimpleSegmentButtonV2 {
     }
     .backgroundColor(this.getButtonBackgroundColor())
     .systemMaterial(this.getSystemMaterial(this.backgroundSystemMaterial))
-    .normalDragMaterialLight(this.interactionMode === SegmentButtonV2InteractionMode.NORMAL_DRAG && this.isBackgroundSystemMaterialEnabled())
     .backgroundEffect(this.buttonBackgroundEffect, { disableSystemAdaptation: true })
     .borderRadius(this.getButtonBorderRadius())
     .clip(false)
@@ -1289,8 +1278,10 @@ struct SimpleSegmentButtonV2 {
       return;
     }
 
-    const isNormalInteraction = this.interactionMode === SegmentButtonV2InteractionMode.NORMAL_DRAG;
-    if (this.isBackgroundSystemMaterialEnabled() && !this.tempDisableAnimation && !isNormalInteraction) {
+    // Cross-item selection must not replay material press/release while dragging.
+    const isNormalDragSelection = this.interactionMode === SegmentButtonV2InteractionMode.NORMAL_DRAG &&
+      this.isDragging && !this.isTapGesture;
+    if (this.isBackgroundSystemMaterialEnabled() && !this.tempDisableAnimation && !isNormalDragSelection) {
       if (this.isTapGesture) {
         this.openSelectedItemSystemMaterial = true;
       } else {
@@ -1315,7 +1306,7 @@ struct SimpleSegmentButtonV2 {
       }
     });
 
-    if (this.isBackgroundSystemMaterialEnabled() && !this.tempDisableAnimation && !isNormalInteraction) {
+    if (this.isBackgroundSystemMaterialEnabled() && !this.tempDisableAnimation && !isNormalDragSelection) {
       if (this.isTapGesture) {
         this.openSelectedItemSystemMaterial = false;
       } else {

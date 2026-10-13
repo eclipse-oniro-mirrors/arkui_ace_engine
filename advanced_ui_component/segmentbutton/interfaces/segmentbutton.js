@@ -273,12 +273,6 @@ function initFontWeight(defaultValue) {
       return defaultValue;
   }
 }
-function __Stack__normalDragMaterialLight(enabled) {
-  if (enabled) {
-    Stack.pointLight({ illuminated: 0 });
-  }
-}
-
 export var SegmentButtonInteractionMode;
 (function (SegmentButtonInteractionMode) {
   SegmentButtonInteractionMode[SegmentButtonInteractionMode['FOLLOWING_DRAG'] = 0] = 'FOLLOWING_DRAG';
@@ -714,9 +708,7 @@ class SelectItem extends ViewPU {
     }
   }
   getScale() {
-    if (this.openSelectedItemSystemMaterial &&
-      (this.options.interactionMode !== SegmentButtonInteractionMode.NORMAL_DRAG ||
-        this.options.backgroundSystemMaterial !== undefined)) {
+    if (this.openSelectedItemSystemMaterial) {
       return this.selectedItemScale;
     } else {
       return {
@@ -726,8 +718,7 @@ class SelectItem extends ViewPU {
     }
   }
   getOpacity() {
-    if (this.openSelectedItemSystemMaterial &&
-      this.options.interactionMode !== SegmentButtonInteractionMode.NORMAL_DRAG) {
+    if (this.openSelectedItemSystemMaterial) {
       return 0.7;
     } else {
       return 1;
@@ -2834,7 +2825,6 @@ export class SegmentButton extends ViewPU {
       Stack.borderRadius(this.getButtonBorderRadius());
       Stack.clip(false);
       Stack.systemMaterial(this.getButtonSystemMaterial());
-      __Stack__normalDragMaterialLight(this.options?.interactionMode === SegmentButtonInteractionMode.NORMAL_DRAG && this.isBackgroundSystemMaterialEnabled() && !this.isMultiplyCapsule());
       Stack.onBlur(() => {
         this.focusIndex = -1;
       });
@@ -3096,7 +3086,7 @@ export class SegmentButton extends ViewPU {
             this.panGestureStartPoint = { x: fingerInfo.globalX, y: fingerInfo.globalY };
           }
         }
-        if (!isMaterialEnabled || this.options?.interactionMode === SegmentButtonInteractionMode.NORMAL_DRAG) {
+        if (!isMaterialEnabled) {
           this.zoomScaleArray.forEach((_, index) => {
             if (index === this.selectedIndexes[0]) {
               Context.animateTo({ curve: curves.interpolatingSpring(10, 1, 410, 38) }, () => {
@@ -3325,7 +3315,6 @@ export class SegmentButton extends ViewPU {
                     this.options.backgroundSystemMaterial ? undefined : segmentButtonTheme.SEGMENT_BUTTON_BORDER_COLOR
                   );
                   Stack.systemMaterial(this.options.backgroundSystemMaterial);
-                  __Stack__normalDragMaterialLight(this.options?.interactionMode === SegmentButtonInteractionMode.NORMAL_DRAG && this.isBackgroundSystemMaterialEnabled() && !this.isMultiplyCapsule());
                   Stack.visibility(this.componentSize.height > 0 ? Visibility.Visible : Visibility.None);
                 }, Stack);
                 this.observeComponentCreation2((elmtId, isInitialRender) => {
@@ -3543,7 +3532,7 @@ export class SegmentButton extends ViewPU {
   }
 
   isMaterialInteractionEnabled() {
-    // Deformation follows material; light and position are guarded separately.
+    // Material feedback is independent of drag positioning and selection timing.
     return this.isBackgroundSystemMaterialEnabled();
   }
 
@@ -3606,7 +3595,9 @@ export class SegmentButton extends ViewPU {
     return curves.springMotion(0.347, 0.99);
   }
   updateAnimatedProperty(curve) {
-    const isNormalInteraction = this.options?.interactionMode === SegmentButtonInteractionMode.NORMAL_DRAG;
+    // Cross-item selection must not replay material press/release while dragging.
+    const isNormalDragSelection = this.options?.interactionMode === SegmentButtonInteractionMode.NORMAL_DRAG &&
+      this.isGestureInProgress && !this.isTapGesture;
     let setAnimatedPropertyFunc = () => {
       this.selectedItemOffsetX = 0;
       this.buttonItemsSelected.forEach((selected, index) => {
@@ -3624,7 +3615,7 @@ export class SegmentButton extends ViewPU {
       this.isTapGesture = false;
       return;
     }
-    if (this.options.backgroundSystemMaterial && !isNormalInteraction) {
+    if (this.options.backgroundSystemMaterial && !isNormalDragSelection) {
       if (this.isTapGesture) {
         this.openSelectedItemSystemMaterial = true;
         this.getUIContext().animateTo({ curve: curve }, setAnimatedPropertyFunc);

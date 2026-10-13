@@ -36,8 +36,6 @@ import {
   Row,
   ForEach,
   Stack,
-  StackAttribute,
-  AttributeModifier,
   LocalizedEdges,
   ShadowStyle,
   Color,
@@ -57,7 +55,6 @@ import {
   ButtonType,
   HoverEffect,
   HitTestMode,
-  IlluminatedType,
   TapGesture,
   TouchEvent,
   SourceType,
@@ -121,20 +118,6 @@ const MAX_MAX_FONT_SCALE: double = 2.0;
 const MIN_MAX_FONT_SCALE: double = 1.0;
 const RESOURCE_TYPE_FLOAT: int = 10002;
 const RESOURCE_TYPE_INTEGER: int = 10007;
-
-class NormalDragMaterialLightModifier implements AttributeModifier<StackAttribute> {
-  private enabled: boolean;
-
-  constructor(enabled: boolean) {
-    this.enabled = enabled;
-  }
-
-  applyNormalAttribute(instance: StackAttribute): void {
-    if (this.enabled) {
-      instance.pointLight({ illuminated: IlluminatedType.NONE });
-    }
-  }
-}
 
 interface SegmentButtonThemeInterface {
   SEGMENT_TEXT_VERTICAL_PADDING: Resource,
@@ -779,9 +762,7 @@ struct SelectItem {
   }
 
   getScale(): ScaleOptions | undefined {
-    if (this.openSelectedItemSystemMaterial &&
-      (this.options.interactionMode !== SegmentButtonInteractionMode.NORMAL_DRAG ||
-        this.options.backgroundSystemMaterial !== undefined)) {
+    if (this.openSelectedItemSystemMaterial) {
       return this.selectedItemScale;
     } else {
       return {
@@ -792,8 +773,7 @@ struct SelectItem {
   }
 
   getOpacity(): double {
-    if (this.openSelectedItemSystemMaterial &&
-      this.options.interactionMode !== SegmentButtonInteractionMode.NORMAL_DRAG) {
+    if (this.openSelectedItemSystemMaterial) {
       return 0.7;
     } else {
       return 1;
@@ -1872,7 +1852,6 @@ export struct SegmentButton {
             .borderRadius(this.getBackgroundBorderRadius())
             .backgroundBlurStyle(this.options.backgroundBlurStyle, undefined, { disableSystemAdaptation: true })
             .systemMaterial(this.options.backgroundSystemMaterial)
-            .attributeModifier(new NormalDragMaterialLightModifier(this.options?.interactionMode === SegmentButtonInteractionMode.NORMAL_DRAG && this.isBackgroundSystemMaterialEnabled() && !this.isMultiplyCapsule()))
             .visibility((this.componentSize.height as double) > 0 ? Visibility.Visible : Visibility.None)
           }
           Stack() {
@@ -1917,7 +1896,6 @@ export struct SegmentButton {
     .borderRadius(this.getButtonBorderRadius())
     .clip(false)
     .systemMaterial(this.getButtonSystemMaterial())
-    .attributeModifier(new NormalDragMaterialLightModifier(this.options?.interactionMode === SegmentButtonInteractionMode.NORMAL_DRAG && this.isBackgroundSystemMaterialEnabled() && !this.isMultiplyCapsule()))
     .onBlur(() => {
       this.focusIndex = -1
     })
@@ -2216,7 +2194,7 @@ export struct SegmentButton {
                 this.panGestureStartPoint = { x: (fingerInfo?.globalX ?? 0) as number, y: (fingerInfo?.globalY ?? 0) as number };
               }
             }
-            if (!isMaterialEnabled || this.options?.interactionMode === SegmentButtonInteractionMode.NORMAL_DRAG) {
+            if (!isMaterialEnabled) {
               this.zoomScaleArray.forEach((_, index) => {
                 if (index === this.selectedIndexes[0]) {
                   this.getUIContext()?.animateTo({
@@ -2343,7 +2321,7 @@ export struct SegmentButton {
   }
 
   private isMaterialInteractionEnabled(): boolean {
-    // Deformation follows material; light and position are guarded separately.
+    // Material feedback is independent of drag positioning and selection timing.
     return this.isBackgroundSystemMaterialEnabled();
   }
 
@@ -2427,7 +2405,9 @@ export struct SegmentButton {
   }
 
   updateAnimatedProperty(curve: ICurve | null) {
-    const isNormalInteraction = this.options?.interactionMode === SegmentButtonInteractionMode.NORMAL_DRAG;
+    // Cross-item selection must not replay material press/release while dragging.
+    const isNormalDragSelection = this.options?.interactionMode === SegmentButtonInteractionMode.NORMAL_DRAG &&
+      this.isGestureInProgress;
 
     let setAnimatedPropertyFunc = () => {
       this.selectedItemOffsetX = 0
@@ -2441,7 +2421,7 @@ export struct SegmentButton {
       })
     }
     if (curve) {
-      if (this.options.backgroundSystemMaterial && !isNormalInteraction) {
+      if (this.options.backgroundSystemMaterial && !isNormalDragSelection) {
         this.getUIContext().animateTo({
           curve: curves.interpolatingSpring(0, 1, 195, 14),
         }, () => {
