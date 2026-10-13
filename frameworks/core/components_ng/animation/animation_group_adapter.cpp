@@ -133,12 +133,13 @@ ArkUI_Int32 AnimationGroupAdapter::AddAnimationGroup(
 
     int64_t gen = ++generationCounter_;
 
-    auto interactiveAnimation = createFn(instanceId, key, gen);
-    if (!interactiveAnimation) {
+    auto createResult = createFn(instanceId, key, gen);
+    if (!createResult.animation) {
         TAG_LOGE(AceLogTag::ACE_ANIMATION, "AddAnimationGroup failed: createFn returned null, instanceId=%{public}d",
             instanceId);
-        return ERROR_CODE_PARAM_INVALID;
+        return createResult.errorCode;
     }
+    auto interactiveAnimation = std::move(createResult.animation);
 
     std::shared_ptr<AnimationUtils::InteractiveAnimation> raceAnim;
     int64_t raceGen = 0;
