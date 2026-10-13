@@ -22,6 +22,9 @@ OAT.xml @arkui_architecture
 README.md @arkui_architecture
 README_zh.md @arkui_architecture
 
+[UIObserver design indexes]
+docs/ui-observer-container-bound-refactor-feasibility.md @arkui_framework_xnode
+
 [OpenHarmony adapter]
 
 adapter/ohos/build/ @arkui_architecture
@@ -1920,6 +1923,7 @@ frameworks/core/common/thread_model_impl.cpp @arkui_framework_xnode
 frameworks/core/common/thread_model_impl.h @arkui_framework_xnode
 frameworks/core/common/transform/input_compatible_manager.h @ArkUI_Event
 frameworks/core/common/udmf/ @ArkUI_Event
+frameworks/core/common/ui_observer/ @arkui_framework_xnode
 frameworks/core/common/update_config_manager.h @arkui_framework_xnode
 frameworks/core/common/vibrator/ @arkuiscroll
 frameworks/core/common/visual_effect/ @arkuicodepulse
@@ -3225,6 +3229,8 @@ interfaces/napi/kits/measure/ @huawei_g_five
 interfaces/napi/kits/mediaquery/ @arkuilayout1
 interfaces/napi/kits/napi_lib.gni @arkui_architecture
 interfaces/napi/kits/observer/ @arkui_framework_xnode
+interfaces/napi/kits/observer/common/ @arkui_framework_xnode
+interfaces/napi/kits/observer/render/ @arkui_framework_xnode
 interfaces/napi/kits/overlay/ @arkuipopupwindow_all
 interfaces/napi/kits/performancemonitor/ @arkui_framework_xnode
 interfaces/napi/kits/plugincomponent/ @ArkUI_ability_group
@@ -3592,6 +3598,7 @@ test/unittest/core/base/frame_node_test_ng.cpp @arkui_framework_xnode
 test/unittest/core/base/frame_node_test_ng_coverage.cpp @arkui_architecture
 test/unittest/core/base/frame_node_test_ng_v3.cpp @arkui_framework_xnode
 test/unittest/core/base/inspector_test_ng.cpp @ArkUI_ability_group
+test/unittest/core/base/observer_draw_callback_test.cpp @arkui_framework_xnode
 test/unittest/core/base/observer_test_ng.cpp @arkui_framework_resource
 test/unittest/core/base/simplified_inspector_test_ng.cpp @arkui_framework_xnode
 test/unittest/core/base/view_abstract_model_test_ng.cpp @ArkUI_Event
@@ -3614,6 +3621,7 @@ test/unittest/core/common/storage/ @arkui_statemgmt
 test/unittest/core/common/task/ @arkui_framework_xnode
 test/unittest/core/common/task_runner_adapter_impl/task_runner_adapter_test.cpp @arkui_framework_xnode
 test/unittest/core/common/transform/ @ArkUI_Event
+test/unittest/core/common/ui_observer_store_test.cpp @arkui_framework_xnode
 test/unittest/core/common/vibrator/ @arkui_framework_xnode
 test/unittest/core/components/BUILD.gn @arkuiscroll
 test/unittest/core/components/common/properties/os_content_test.cpp @arkuiscroll
@@ -3795,6 +3803,7 @@ test/unittest/interfaces/ace_kit/symbol_test.cpp @huawei_g_five
 test/unittest/interfaces/ace_ui_input_event/ @ArkUI_Event
 test/unittest/interfaces/drawable_descriptor_test.cpp @arkui001
 test/unittest/interfaces/form_render/ @form_framework
+test/unittest/interfaces/napi/render_layout_observer_listener_test.cpp @arkui_framework_xnode
 test/unittest/interfaces/native_styled_string_test.cpp @arkui_rich_editor
 test/unittest/interfaces/scrollable_option_test.cpp @arkuiscroll
 test/unittest/interfaces/ui_input_event_test.cpp @ArkUI_Event

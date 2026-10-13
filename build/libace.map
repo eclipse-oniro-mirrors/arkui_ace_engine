@@ -4120,6 +4120,8 @@
       "OHOS::Ace::Container::GetActive()";
       "OHOS::Ace::Container::GetAppBar() const";
       "OHOS::Ace::Container::GetCurrentApiTargetVersion()";
+      "OHOS::Ace::Container::GetUIObserverStore(bool)";
+      "OHOS::Ace::UIObserverStore::GetRenderStore()";
       "OHOS::Ace::Container::GetWindow() const";
       "OHOS::Ace::Container::GreatOrEqualAPITargetVersion(OHOS::Ace::PlatformVersion)";
       "OHOS::Ace::Container::IsCurrentUsePartialUpdate()";
