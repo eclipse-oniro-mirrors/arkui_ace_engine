@@ -789,8 +789,8 @@ void OnContextMenuUpdate(const CallbackHelper<OnContextMenuUpdateCallback>& arkC
     CHECK_NULL_VOID(pipelineContext);
     pipelineContext->UpdateCurrentActiveNode(weakNode);
     auto arkMenuItemId = static_cast<Ark_WebContextMenuItemId>(menuItemId);
-    Ark_WebContextMenuOptions arkOptions;
-    arkOptions.enable = Converter::ArkValue<Opt_Boolean>(options.enable);
+    Opt_WebContextMenuOptions arkOptions;
+    arkOptions.value.enable = Converter::ArkValue<Opt_Boolean>(options.enable);
     arkCallback.InvokeSync(arkMenuItemId, arkOptions);
 }
 
