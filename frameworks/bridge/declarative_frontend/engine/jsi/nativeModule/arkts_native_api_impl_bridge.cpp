@@ -190,6 +190,7 @@ ArkUINativeModuleValue ArkUINativeModule::PreviewMockComponent(ArkUIRuntimeCallI
     return panda::JSValueRef::Undefined(vm);
 }
 
+#ifdef PREVIEW
 ArkUINativeModuleValue ArkUINativeModule::CreatePreviewMock(ArkUIRuntimeCallInfo* runtimeCallInfo)
 {
     EcmaVM* vm = runtimeCallInfo->GetVM();
@@ -203,6 +204,7 @@ ArkUINativeModuleValue ArkUINativeModule::CreatePreviewMock(ArkUIRuntimeCallInfo
     PreviewMockModel::GetInstance()->Create(tag);
     return panda::JSValueRef::Undefined(vm);
 }
+#endif
 
 ArkUINativeModuleValue ArkUINativeModule::GetFrameNodeById(ArkUIRuntimeCallInfo* runtimeCallInfo)
 {
