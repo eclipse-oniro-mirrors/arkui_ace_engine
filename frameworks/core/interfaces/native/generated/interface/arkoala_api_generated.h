@@ -574,8 +574,6 @@ typedef struct Ark_InnerGestureTriggerInfo Ark_InnerGestureTriggerInfo;
 typedef struct Opt_InnerGestureTriggerInfo Opt_InnerGestureTriggerInfo;
 typedef struct Ark_InputEventInterceptResult Ark_InputEventInterceptResult;
 typedef struct Opt_InputEventInterceptResult Opt_InputEventInterceptResult;
-typedef struct Ark_InputEventMonitor Ark_InputEventMonitor;
-typedef struct Opt_InputEventMonitor Opt_InputEventMonitor;
 typedef struct InputMethodExtraConfigPeer InputMethodExtraConfigPeer;
 typedef struct InputMethodExtraConfigPeer* Ark_InputMethodExtraConfig;
 typedef struct Opt_InputMethodExtraConfig Opt_InputMethodExtraConfig;
@@ -8721,14 +8719,6 @@ typedef struct Opt_InputEventInterceptResult {
     Ark_Tag tag;
     Ark_InputEventInterceptResult value;
 } Opt_InputEventInterceptResult;
-typedef struct Ark_InputEventMonitor {
-    /* kind: Interface */
-    void *handle;
-} Ark_InputEventMonitor;
-typedef struct Opt_InputEventMonitor {
-    Ark_Tag tag;
-    Ark_InputEventMonitor value;
-} Opt_InputEventMonitor;
 typedef struct Opt_InputMethodExtraConfig {
     Ark_Tag tag;
     Ark_InputMethodExtraConfig value;
@@ -30819,9 +30809,9 @@ typedef struct GENERATED_ArkUIIUIContextAccessor {
                             const Opt_Int32* focusY);
     void (*enableEventPassthrough)(const Opt_Boolean* enabled,
                                    Ark_RawInputEventType eventType);
-    Ark_InputEventMonitor (*addLocalInputEventMonitor)(Ark_Int32 eventMask,
-                                                       const InputEventListener* listener);
-    void (*removeLocalInputEventMonitor)(const Ark_InputEventMonitor* monitor);
+    Ark_NativePointer (*addLocalInputEventMonitor)(Ark_Int32 eventMask,
+                                                   const InputEventListener* listener);
+    void (*removeLocalInputEventMonitor)(Ark_NativePointer monitor);
     void (*setTextSelectionClearPolicy)(Ark_TextSelectionClearPolicy policy);
 } GENERATED_ArkUIIUIContextAccessor;
 
