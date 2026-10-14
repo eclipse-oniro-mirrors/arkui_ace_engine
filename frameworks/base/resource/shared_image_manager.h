@@ -47,9 +47,9 @@ class SharedImageManager : public AceType {
     DECLARE_ACE_TYPE(SharedImageManager, AceType);
 
 public:
-    explicit SharedImageManager(const RefPtr<TaskExecutor>& taskExecutor) :
-        sharedImageTotalSize_(0), sharedImageCacheThreshold_(DEFAULT_FORM_SHARED_IMAGE_CACHE_THRESHOLD),
-        taskExecutor_(taskExecutor) {
+    explicit SharedImageManager(const RefPtr<TaskExecutor>& taskExecutor)
+        : sharedImageTotalSize_(0), sharedImageCacheThreshold_(DEFAULT_FORM_SHARED_IMAGE_CACHE_THRESHOLD),
+          taskExecutor_(taskExecutor) {
         LOGI("SharedImageManager threshold %{public}d", sharedImageCacheThreshold_.load());
     }
     ~SharedImageManager() override = default;
