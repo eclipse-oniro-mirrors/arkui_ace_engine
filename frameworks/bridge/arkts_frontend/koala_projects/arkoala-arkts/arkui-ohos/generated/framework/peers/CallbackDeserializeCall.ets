@@ -74,6 +74,7 @@ import { PlaceholderProvider, PlaceholderOptions } from '@ohos.arkui.placeholder
 import { PluginErrorCallback, PluginErrorData_serializer, PluginErrorData } from './../../component/pluginComponent'
 import { ProgressConfiguration_serializer, ProgressConfiguration } from './../../component/progress'
 import { SaveButtonCallback, SaveButtonOnClickResult } from './../../component/saveButton'
+import { ScrollSnapApproachCallback, ScrollSnapTargetCallback } from './../../component/scrollCommon'
 import { SearchSubmitCallback } from './../../component/search'
 import { SearchValueCallback } from './../searchOps'
 import { SliderConfiguration_serializer, SliderTriggerChangeCallback, SliderChangeMode, SliderConfiguration } from './../../component/slider'
@@ -3906,6 +3907,51 @@ export function deserializeAndCallScrollOnWillScrollCallback(thisDeserializer: D
     const callResult = call(xOffset, yOffset, scrollState, scrollSource)
     continuationResult(callResult)
 }
+export function deserializeAndCallScrollSnapApproachCallback(thisDeserializer: DeserializerBase): void {
+    const resourceId: int32 = thisDeserializer.readInt32()
+    const call = (ResourceHolder.instance().get(resourceId) as ScrollSnapApproachCallback)
+    let velocity: double = thisDeserializer.readFloat64()
+    let decayOffset: double = thisDeserializer.readFloat64()
+    const continuationBufferBufResource: CallbackResource = thisDeserializer.readCallbackResource()
+    const continuationBufferBufCall: KPointer = thisDeserializer.readPointer()
+    const continuationBufferBufCallSync: KPointer = thisDeserializer.readPointer()
+    const continuationBufferClosure = (progress: double):void => {
+        const continuationBufferBufArgsSerializer: SerializerBase = SerializerBase.hold();
+        continuationBufferBufArgsSerializer.writeInt32(continuationBufferBufResource.resourceId);
+        continuationBufferBufArgsSerializer.writePointer(continuationBufferBufCall);
+        continuationBufferBufArgsSerializer.writePointer(continuationBufferBufCallSync);
+        continuationBufferBufArgsSerializer.writeFloat64(progress);
+        InteropNativeModule._CallCallbackSync(10, -1748561129, continuationBufferBufArgsSerializer.asBuffer(), continuationBufferBufArgsSerializer.length());
+        continuationBufferBufArgsSerializer.release();
+        return;
+    }
+    resourceFinalizerRegister(continuationBufferClosure, continuationBufferBufResource)
+    let continuationResult: ((progress: double) => void) = continuationBufferClosure
+    const callResult = call(velocity, decayOffset)
+    continuationResult(callResult)
+}
+export function deserializeAndCallScrollSnapTargetCallback(thisDeserializer: DeserializerBase): void {
+    const resourceId: int32 = thisDeserializer.readInt32()
+    const call = (ResourceHolder.instance().get(resourceId) as ScrollSnapTargetCallback)
+    let velocity: double = thisDeserializer.readFloat64()
+    const continuationBufferBufResource: CallbackResource = thisDeserializer.readCallbackResource()
+    const continuationBufferBufCall: KPointer = thisDeserializer.readPointer()
+    const continuationBufferBufCallSync: KPointer = thisDeserializer.readPointer()
+    const continuationBufferClosure = (progress: double):void => {
+        const continuationBufferBufArgsSerializer: SerializerBase = SerializerBase.hold();
+        continuationBufferBufArgsSerializer.writeInt32(continuationBufferBufResource.resourceId);
+        continuationBufferBufArgsSerializer.writePointer(continuationBufferBufCall);
+        continuationBufferBufArgsSerializer.writePointer(continuationBufferBufCallSync);
+        continuationBufferBufArgsSerializer.writeFloat64(progress);
+        InteropNativeModule._CallCallbackSync(10, -1748561129, continuationBufferBufArgsSerializer.asBuffer(), continuationBufferBufArgsSerializer.length());
+        continuationBufferBufArgsSerializer.release();
+        return;
+    }
+    resourceFinalizerRegister(continuationBufferClosure, continuationBufferBufResource)
+    let continuationResult: ((progress: double) => void) = continuationBufferClosure
+    const callResult = call(velocity)
+    continuationResult(callResult)
+}
 export function deserializeAndCallSearchSubmitCallback(thisDeserializer: DeserializerBase): void {
     const resourceId: int32 = thisDeserializer.readInt32()
     const call = (ResourceHolder.instance().get(resourceId) as SearchSubmitCallback)
@@ -4904,6 +4950,8 @@ export function deserializeAndCallCallback(thisDeserializer: DeserializerBase): 
         case CallbackKind.KIND_SCROLLONDIDZOOMCALLBACK: return deserializeAndCallScrollOnDidZoomCallback(thisDeserializer);
         case CallbackKind.KIND_SCROLLONSCROLLCALLBACK: return deserializeAndCallScrollOnScrollCallback(thisDeserializer);
         case CallbackKind.KIND_SCROLLONWILLSCROLLCALLBACK: return deserializeAndCallScrollOnWillScrollCallback(thisDeserializer);
+        case CallbackKind.KIND_SCROLLSNAPAPPROACHCALLBACK: return deserializeAndCallScrollSnapApproachCallback(thisDeserializer);
+        case CallbackKind.KIND_SCROLLSNAPTARGETCALLBACK: return deserializeAndCallScrollSnapTargetCallback(thisDeserializer);
         case CallbackKind.KIND_SEARCHSUBMITCALLBACK: return deserializeAndCallSearchSubmitCallback(thisDeserializer);
         case CallbackKind.KIND_SEARCHVALUECALLBACK: return deserializeAndCallSearchValueCallback(thisDeserializer);
         case CallbackKind.KIND_SHOULDBUILTINRECOGNIZERPARALLELWITHCALLBACK: return deserializeAndCallShouldBuiltInRecognizerParallelWithCallback(thisDeserializer);

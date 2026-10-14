@@ -2097,6 +2097,10 @@ typedef struct ScrollOnScrollCallback ScrollOnScrollCallback;
 typedef struct Opt_ScrollOnScrollCallback Opt_ScrollOnScrollCallback;
 typedef struct ScrollOnWillScrollCallback ScrollOnWillScrollCallback;
 typedef struct Opt_ScrollOnWillScrollCallback Opt_ScrollOnWillScrollCallback;
+typedef struct ScrollSnapApproachCallback ScrollSnapApproachCallback;
+typedef struct Opt_ScrollSnapApproachCallback Opt_ScrollSnapApproachCallback;
+typedef struct ScrollSnapTargetCallback ScrollSnapTargetCallback;
+typedef struct Opt_ScrollSnapTargetCallback Opt_ScrollSnapTargetCallback;
 typedef struct SearchSubmitCallback SearchSubmitCallback;
 typedef struct Opt_SearchSubmitCallback Opt_SearchSubmitCallback;
 typedef struct SearchValueCallback SearchValueCallback;
@@ -2725,6 +2729,8 @@ typedef struct Ark_ScrollEdgeOptions Ark_ScrollEdgeOptions;
 typedef struct Opt_ScrollEdgeOptions Opt_ScrollEdgeOptions;
 typedef struct Ark_ScrollPageOptions Ark_ScrollPageOptions;
 typedef struct Opt_ScrollPageOptions Opt_ScrollPageOptions;
+typedef struct Ark_ScrollSnapOffsetProviderProxy Ark_ScrollSnapOffsetProviderProxy;
+typedef struct Opt_ScrollSnapOffsetProviderProxy Opt_ScrollSnapOffsetProviderProxy;
 typedef struct Ark_SelectionContainerEditMenuOptions Ark_SelectionContainerEditMenuOptions;
 typedef struct Opt_SelectionContainerEditMenuOptions Opt_SelectionContainerEditMenuOptions;
 typedef struct Ark_SelectionContainerMenuOptions Ark_SelectionContainerMenuOptions;
@@ -2959,6 +2965,8 @@ typedef struct Ark_Union_RotateOptions_RotateAngleOptions Ark_Union_RotateOption
 typedef struct Opt_Union_RotateOptions_RotateAngleOptions Opt_Union_RotateOptions_RotateAngleOptions;
 typedef struct Ark_Union_ScrollAnimationOptions_Boolean Ark_Union_ScrollAnimationOptions_Boolean;
 typedef struct Opt_Union_ScrollAnimationOptions_Boolean Opt_Union_ScrollAnimationOptions_Boolean;
+typedef struct Ark_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy Ark_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy;
+typedef struct Opt_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy Opt_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy;
 typedef struct Ark_Union_SpatialPosition_F64 Ark_Union_SpatialPosition_F64;
 typedef struct Opt_Union_SpatialPosition_F64 Opt_Union_SpatialPosition_F64;
 typedef struct Ark_Union_String_Array_String Ark_Union_String_Array_String;
@@ -14900,6 +14908,26 @@ typedef struct Opt_ScrollOnWillScrollCallback {
     Ark_Tag tag;
     ScrollOnWillScrollCallback value;
 } Opt_ScrollOnWillScrollCallback;
+typedef struct ScrollSnapApproachCallback {
+    /* kind: Callback */
+    Ark_CallbackResource resource;
+    void (*call)(const Ark_Int32 resourceId, const Ark_Float64 velocity, const Ark_Float64 decayOffset, const synthetic_Callback_F64_Void continuation);
+    void (*callSync)(Ark_VMContext vmContext, const Ark_Int32 resourceId, const Ark_Float64 velocity, const Ark_Float64 decayOffset, const synthetic_Callback_F64_Void continuation);
+} ScrollSnapApproachCallback;
+typedef struct Opt_ScrollSnapApproachCallback {
+    Ark_Tag tag;
+    ScrollSnapApproachCallback value;
+} Opt_ScrollSnapApproachCallback;
+typedef struct ScrollSnapTargetCallback {
+    /* kind: Callback */
+    Ark_CallbackResource resource;
+    void (*call)(const Ark_Int32 resourceId, const Ark_Float64 velocity, const synthetic_Callback_F64_Void continuation);
+    void (*callSync)(Ark_VMContext vmContext, const Ark_Int32 resourceId, const Ark_Float64 velocity, const synthetic_Callback_F64_Void continuation);
+} ScrollSnapTargetCallback;
+typedef struct Opt_ScrollSnapTargetCallback {
+    Ark_Tag tag;
+    ScrollSnapTargetCallback value;
+} Opt_ScrollSnapTargetCallback;
 typedef struct SearchSubmitCallback {
     /* kind: Callback */
     Ark_CallbackResource resource;
@@ -18064,6 +18092,15 @@ typedef struct Opt_ScrollPageOptions {
     Ark_Tag tag;
     Ark_ScrollPageOptions value;
 } Opt_ScrollPageOptions;
+typedef struct Ark_ScrollSnapOffsetProviderProxy {
+    /* kind: Interface */
+    ScrollSnapApproachCallback calculateApproachOffset;
+    ScrollSnapTargetCallback calculateSnapOffset;
+} Ark_ScrollSnapOffsetProviderProxy;
+typedef struct Opt_ScrollSnapOffsetProviderProxy {
+    Ark_Tag tag;
+    Ark_ScrollSnapOffsetProviderProxy value;
+} Opt_ScrollSnapOffsetProviderProxy;
 typedef struct Ark_SelectionContainerEditMenuOptions {
     /* kind: Interface */
     Opt_OnCreateMenuCallback onCreateMenu;
@@ -19414,6 +19451,18 @@ typedef struct Opt_Union_ScrollAnimationOptions_Boolean {
     Ark_Tag tag;
     Ark_Union_ScrollAnimationOptions_Boolean value;
 } Opt_Union_ScrollAnimationOptions_Boolean;
+typedef struct Ark_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy {
+    /* kind: UnionType */
+    Ark_Int32 selector;
+    union {
+        Ark_ScrollSnapAlign value0;
+        Ark_ScrollSnapOffsetProviderProxy value1;
+    };
+} Ark_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy;
+typedef struct Opt_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy {
+    Ark_Tag tag;
+    Ark_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy value;
+} Opt_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy;
 typedef struct Ark_Union_SpatialPosition_F64 {
     /* kind: UnionType */
     Ark_Int32 selector;
@@ -26029,6 +26078,8 @@ typedef struct GENERATED_ArkUIGridModifier {
                           const Opt_Callback_ItemDragInfo_I32_I32_Boolean_Void* value);
     void (*setNestedScroll)(Ark_NativePointer node,
                             const Opt_NestedScrollOptions* value);
+    void (*setScrollSnapStrategy)(Ark_NativePointer node,
+                                  const Opt_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy* value);
     void (*setEnableScrollInteraction)(Ark_NativePointer node,
                                        const Opt_Boolean* value);
     void (*setFriction)(Ark_NativePointer node,

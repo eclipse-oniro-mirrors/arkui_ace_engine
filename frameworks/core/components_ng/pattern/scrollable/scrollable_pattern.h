@@ -48,9 +48,15 @@
 #endif
 
 namespace OHOS::Ace {
+class Animator;
 class BezierVariableVelocityMotion;
 class ScrollControllerBase;
 class VelocityMotion;
+// Item snap types are defined in scroll_snap_strategy.h and scroll_snap_utils.h;
+// keep them incomplete here to avoid spreading their dependencies.
+struct ScrollSnapStrategy;
+struct SnapCandidate;
+struct SnapSelectResult;
 enum class ScrollAlign : int;
 enum class ScrollEdgeType : size_t;
 } // namespace OHOS::Ace
@@ -447,27 +453,10 @@ public:
     double GetMaxFlingVelocity() const;
 
     virtual void StopAnimate();
-    bool AnimateRunning() const
-    {
-        return (animator_ && animator_->IsRunning()) || !isAnimationStop_;
-    }
-    bool AnimateStoped() const
-    {
-        return (!animator_ || animator_->IsStopped()) && isAnimationStop_;
-    }
+    bool AnimateRunning() const;
+    bool AnimateStoped() const;
 
-    void AbortScrollAnimator()
-    {
-        if (animator_ && !animator_->IsStopped()) {
-            scrollAbort_ = true;
-            animator_->Stop();
-        }
-        if (!isAnimationStop_) {
-            scrollAbort_ = true;
-            StopAnimation(springAnimation_);
-            StopAnimation(curveAnimation_);
-        }
-    }
+    void AbortScrollAnimator();
     bool GetScrollAbort() const
     {
         return scrollAbort_;
@@ -806,6 +795,32 @@ public:
     {
         return SnapType::NONE_SNAP;
     }
+
+    // Feat-20260806915268 item snap contract. Value types are forward-declared above;
+    // defaults are out-of-line in scrollable_pattern.cpp
+    // so this widely-included header stays lean. Overridden by List/Grid/WaterFlow properties.
+    virtual ScrollSnapStrategy GetScrollSnapStrategy() const;
+    // Snap candidates from the currently materialized (visible + cached) items only.
+    virtual std::vector<SnapCandidate> BuildItemSnapCandidates(ScrollSnapAlign align);
+    // Axis fallback anchor one row beyond the materialized window (details in the .cpp default).
+    virtual std::optional<float> GetItemSnapNeighborAnchor(ScrollSnapAlign align, bool towardSmaller);
+    // Legal scroll range bounds for clamping item snap targets (R-3/R-7; AC-2.4 leading gap).
+    virtual float GetItemSnapMaxOffset() const;
+    virtual float GetItemSnapCalibrationMargin() const
+    {
+        return 0.0f;
+    }
+
+    virtual float GetItemSnapMinOffset() const;
+    virtual bool SupportsTrackedItemSnap() const
+    {
+        return false;
+    }
+    virtual void BeginTrackedItemSnap(float) {}
+    virtual std::vector<SnapCandidate> BuildTrackedItemSnapCandidates(ScrollSnapAlign align);
+    // Shared item snap execution for align strategies and custom providers; false = capability off.
+    bool StartItemSnapAnimation(const SnapAnimationOptions& snapAnimationOptions);
+    void RunPendingItemSnapProvider(const SnapAnimationOptions& snapAnimationOptions);
 
     virtual bool IsScrollSnap()
     {
@@ -1234,7 +1249,26 @@ protected:
     void StopHotzoneScroll();
 
 private:
+    // Pattern owns target selection; Scrollable owns the animation and queued-task generation.
+    std::optional<float> predictedItemSnapTarget_;
+    float itemSnapReleaseMotionVelocity_ = 0.0f;
+    void RefreshTrackedItemSnap();
+    void PrepareItemSnapFling(float motionVelocity, float motionDelta);
+    SnapSelectResult SelectItemSnapForAxis(ScrollSnapAlign align, const std::vector<SnapCandidate>& candidates,
+        float currentOffset, SnapDirection snapDirection);
+    SnapSelectResult SelectItemSnapForAlign(const ScrollSnapStrategy& strategy,
+        const SnapAnimationOptions& snapAnimationOptions, std::vector<SnapCandidate>& candidates,
+        float currentOffset, bool& forward, bool tracked);
+
     virtual void OnScrollEndCallback() {};
+
+    // Feat-20260806915268 item snap paths, split out of StartItemSnapAnimation (drag-frame targets).
+    bool StartItemSnapWithProvider(const ScrollSnapStrategy& strategy, const SnapAnimationOptions& snapAnimationOptions,
+        float currentOffset, float maxOffset, float motionVelocity, float motionDelta);
+    bool StartItemSnapWithAlign(const ScrollSnapStrategy& strategy, const SnapAnimationOptions& snapAnimationOptions,
+        float currentOffset, float maxOffset, float motionVelocity, float motionDelta);
+    float ResolveItemSnapTarget(const ScrollSnapStrategy& strategy, float currentOffset, float minOffset,
+        float maxOffset, float velocityPos, float predictDeltaPos);
 
     void RegisterScrollBarEventTask();
     void RegisterScrollBarOverDragEventTask();

@@ -1644,6 +1644,10 @@ declare enum ScrollSnapAlign {
   CENTER = 2,
   END = 3,
 }
+declare interface ScrollSnapOffsetProvider {
+  calculateSnapOffset: (velocity: number) => number;
+  calculateApproachOffset?: (velocity: number, decayOffset: number) => number;
+}
 declare class SymbolEffect {}
 declare enum TextDataDetectorType {
   PHONE_NUMBER = 0,
