@@ -2458,7 +2458,8 @@ HWTEST_F(UIExtensionComponentTestNg, UIExtensionComponentEmbeddedInitOptionsTest
 
 /**
  * @tc.name: UIExtensionPatternDpiWhitelist001
- * @tc.desc: Test pattern GetEffectiveDpiFollowStrategy composes dpi follow strategy tri-state with window switch.
+ * @tc.desc: Test pattern GetEffectiveDpiFollowStrategy: developer-configured strategy takes
+ *           precedence, otherwise the host saved strategy (UIContent::SetUIExtensionDensityFollowHost) applies.
  * @tc.type: FUNC
  */
 HWTEST_F(UIExtensionComponentTestNg, UIExtensionPatternDpiWhitelist001, TestSize.Level1)
@@ -2469,43 +2470,49 @@ HWTEST_F(UIExtensionComponentTestNg, UIExtensionPatternDpiWhitelist001, TestSize
     ASSERT_NE(pipeline, nullptr);
 
     /**
-     * @tc.steps: step1. strategy FOLLOW_UI_EXTENSION_ABILITY_DPI (default), window switch off
-     * @tc.expected: effective value is false (same as current behavior)
+     * @tc.steps: step1. developer strategy not set (default), host strategy not set (default)
+     * @tc.expected: effective value is default
      */
-    pipeline->SetUIExtensionDensityFollowHost(false);
-    pattern->SetDpiFollowStrategy(DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
+    pipeline->SetUIExtensionDensityFollowHost(DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
+    pattern->SetDpiFollowStrategy(DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI, false);
     EXPECT_EQ(pattern->GetEffectiveDpiFollowStrategy(), DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
 
     /**
-     * @tc.steps: step2. strategy FOLLOW_HOST_DPI_ALL, window switch on
-     * @tc.expected: effective value is true (follows switch)
+     * @tc.steps: step2. developer strategy not set, host strategy FOLLOW_HOST_DPI_ALL (whitelist)
+     * @tc.expected: effective value follows the host saved strategy
      */
-    pipeline->SetUIExtensionDensityFollowHost(true);
-    pattern->SetDpiFollowStrategy(DpiFollowStrategy::FOLLOW_HOST_DPI_ALL);
-    EXPECT_NE(pattern->GetEffectiveDpiFollowStrategy(), DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
+    pipeline->SetUIExtensionDensityFollowHost(DpiFollowStrategy::FOLLOW_HOST_DPI_ALL);
+    EXPECT_EQ(pattern->GetEffectiveDpiFollowStrategy(), DpiFollowStrategy::FOLLOW_HOST_DPI_ALL);
 
     /**
-     * @tc.steps: step3. strategy FOLLOW_HOST_DPI_ALL, window switch off
-     * @tc.expected: effective value is false (follows switch)
+     * @tc.steps: step3. developer strategy FOLLOW_HOST_DPI, host strategy FOLLOW_HOST_DPI_ALL
+     * @tc.expected: developer-configured strategy takes precedence over host strategy
      */
-    pipeline->SetUIExtensionDensityFollowHost(false);
-    EXPECT_EQ(pattern->GetEffectiveDpiFollowStrategy(), DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
-
-    /**
-     * @tc.steps: step4. strategy FOLLOW_UI_EXTENSION_ABILITY_DPI (default), window switch on
-     * @tc.expected: effective value is true (window switch forces default/provider strategy as
-     * FOLLOW_HOST_DPI_ALL)
-     */
-    pattern->SetDpiFollowStrategy(DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
-    pipeline->SetUIExtensionDensityFollowHost(true);
-    EXPECT_NE(pattern->GetEffectiveDpiFollowStrategy(), DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
-
-    /**
-     * @tc.steps: step5. strategy FOLLOW_HOST_DPI, window switch off
-     * @tc.expected: effective value is true (developer semantics kept)
-     */
-    pipeline->SetUIExtensionDensityFollowHost(false);
     pattern->SetDpiFollowStrategy(DpiFollowStrategy::FOLLOW_HOST_DPI);
-    EXPECT_NE(pattern->GetEffectiveDpiFollowStrategy(), DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
+    EXPECT_EQ(pattern->GetEffectiveDpiFollowStrategy(), DpiFollowStrategy::FOLLOW_HOST_DPI);
+
+    /**
+     * @tc.steps: step4. developer strategy FOLLOW_HOST_DPI_ALL, host strategy default
+     * @tc.expected: developer-configured strategy takes precedence over default
+     */
+    pipeline->SetUIExtensionDensityFollowHost(DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
+    pattern->SetDpiFollowStrategy(DpiFollowStrategy::FOLLOW_HOST_DPI_ALL);
+    EXPECT_EQ(pattern->GetEffectiveDpiFollowStrategy(), DpiFollowStrategy::FOLLOW_HOST_DPI_ALL);
+
+    /**
+     * @tc.steps: step5. developer strategy not set, host strategy replaced with FOLLOW_HOST_DPI
+     * @tc.expected: saved value is replaced by the passed one and becomes the effective strategy
+     */
+    pattern->SetDpiFollowStrategy(DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI, false);
+    pipeline->SetUIExtensionDensityFollowHost(DpiFollowStrategy::FOLLOW_HOST_DPI);
+    EXPECT_EQ(pattern->GetEffectiveDpiFollowStrategy(), DpiFollowStrategy::FOLLOW_HOST_DPI);
+
+    /**
+     * @tc.steps: step6. developer explicitly configured the default strategy (opt-out), host FOLLOW_HOST_DPI_ALL
+     * @tc.expected: developer explicit configuration takes precedence, effective value is the default strategy
+     */
+    pipeline->SetUIExtensionDensityFollowHost(DpiFollowStrategy::FOLLOW_HOST_DPI_ALL);
+    pattern->SetDpiFollowStrategy(DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI, true);
+    EXPECT_EQ(pattern->GetEffectiveDpiFollowStrategy(), DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
 }
 } // namespace OHOS::Ace::NG

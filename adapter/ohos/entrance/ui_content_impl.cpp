@@ -70,6 +70,7 @@
 #include "core/components_ng/manager/uisession_query/component_tree_query.h"
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/pattern/ui_extension/ui_extension_manager.h"
+#include "core/components_ng/pattern/ui_extension/ui_extension_utils.h"
 #include "core/components_ng/pattern/xcomponent/xcomponent_resolution_config.h"
 #include "core/components_ng/render/animation_utils.h"
 #include "core/components_ng/render/detached_rs_node_manager.h"
@@ -2845,6 +2846,9 @@ UIContentErrorCode UIContentImpl::CommonInitialize(
     errorCode = Platform::AceContainer::SetViewNew(aceView, density, 0, 0, window_);
     CHECK_ERROR_CODE_RETURN(errorCode);
 #endif
+    // SetView has created the pipeline (AttachView) synchronously; apply the strategy cached
+    // from a pre-initialization window call here, before RunPage builds the page content.
+    ApplyPendingDpiFollowStrategy();
     // set focus window id for ui extension after pipeline context created.
     if (focusWindowId != 0) {
         container->SetFocusWindowId(focusWindowId);
@@ -4664,29 +4668,58 @@ void UIContentImpl::SetHostParams(const OHOS::AAFwk::WantParams& params)
     uIExtensionContainerHandler->SetHostParams(hostWindowInfo_.hostWantParams);
 }
 
-void UIContentImpl::MarkUIExtensionDensityFollowHost()
+void UIContentImpl::SetUIExtensionDensityFollowHost(OHOS::Rosen::DpiFollowStrategy dpiFollowStrategy)
 {
+    // The call may arrive before Initialize assigns instanceId_ (the container is not
+    // resolvable yet), so cache the latest strategy and re-apply it in ApplyPendingDpiFollowStrategy.
+    isDpiFollowStrategyReceived_ = true;
+    pendingDpiFollowStrategy_ = dpiFollowStrategy;
+    NG::DpiFollowStrategy strategy = NG::ConvertFromRosenDpiFollowStrategy(dpiFollowStrategy);
     TAG_LOGI(AceLogTag::ACE_UIEXTENSIONCOMPONENT,
-        "[%{public}s][%{public}s][%{public}d]: MarkUIExtensionDensityFollowHost", bundleName_.c_str(),
-        moduleName_.c_str(), instanceId_);
+        "[%{public}s][%{public}s][%{public}d]: SetUIExtensionDensityFollowHost, rosenStrategy=%{public}u, "
+        "strategy=%{public}d",
+        bundleName_.c_str(), moduleName_.c_str(), instanceId_, static_cast<uint32_t>(dpiFollowStrategy),
+        static_cast<int32_t>(strategy));
+    ApplyUIExtensionDensityFollowHost(strategy);
+}
+
+void UIContentImpl::ApplyUIExtensionDensityFollowHost(NG::DpiFollowStrategy strategy)
+{
     auto container = Platform::AceContainer::GetContainer(instanceId_);
-    CHECK_NULL_VOID(container);
-    ContainerScope scope(instanceId_);
-    auto taskExecutor = container->GetTaskExecutor();
-    CHECK_NULL_VOID(taskExecutor);
-    auto task = [instanceId = instanceId_]() {
-        auto container = Platform::AceContainer::GetContainer(instanceId);
-        CHECK_NULL_VOID(container);
-        auto pipelineContext = container->GetPipelineContext();
-        CHECK_NULL_VOID(pipelineContext);
-        pipelineContext->SetUIExtensionDensityFollowHost(true);
-    };
-    auto uiTaskRunner = SingleTaskExecutor::Make(taskExecutor, TaskExecutor::TaskType::UI);
-    if (uiTaskRunner.IsRunOnCurrentThread()) {
-        task();
-    } else {
-        taskExecutor->PostTask(std::move(task), TaskExecutor::TaskType::UI, "ArkUIMarkUIExtensionDensityFollowHost");
+    if (!container) {
+        TAG_LOGW(AceLogTag::ACE_UIEXTENSIONCOMPONENT,
+            "[%{public}s][%{public}s][%{public}d]: ApplyUIExtensionDensityFollowHost container is not ready, "
+            "strategy=%{public}d is kept pending",
+            bundleName_.c_str(), moduleName_.c_str(), instanceId_, static_cast<int32_t>(strategy));
+        return;
     }
+    ContainerScope scope(instanceId_);
+    // The pipeline is created synchronously in SetView (AttachView) during CommonInitialize,
+    // so it is expected to exist here for both the post-initialization direct calls and the
+    // pending-strategy application.
+    auto pipelineContext = container->GetPipelineContext();
+    if (!pipelineContext) {
+        TAG_LOGW(AceLogTag::ACE_UIEXTENSIONCOMPONENT,
+            "[%{public}s][%{public}s][%{public}d]: pipeline is not ready, strategy=%{public}d is dropped",
+            bundleName_.c_str(), moduleName_.c_str(), instanceId_, static_cast<int32_t>(strategy));
+        return;
+    }
+    pipelineContext->SetUIExtensionDensityFollowHost(strategy);
+    TAG_LOGI(AceLogTag::ACE_UIEXTENSIONCOMPONENT,
+        "[%{public}s][%{public}s][%{public}d]: strategy=%{public}d applied to pipeline",
+        bundleName_.c_str(), moduleName_.c_str(), instanceId_, static_cast<int32_t>(strategy));
+}
+
+void UIContentImpl::ApplyPendingDpiFollowStrategy()
+{
+    if (!isDpiFollowStrategyReceived_) {
+        return;
+    }
+    NG::DpiFollowStrategy strategy = NG::ConvertFromRosenDpiFollowStrategy(pendingDpiFollowStrategy_);
+    TAG_LOGI(AceLogTag::ACE_UIEXTENSIONCOMPONENT,
+        "[%{public}s][%{public}s][%{public}d]: ApplyPendingDpiFollowStrategy, strategy=%{public}d",
+        bundleName_.c_str(), moduleName_.c_str(), instanceId_, static_cast<int32_t>(strategy));
+    ApplyUIExtensionDensityFollowHost(strategy);
 }
 
 void UIContentImpl::UpdateMaximizeMode(OHOS::Rosen::MaximizeMode mode)
