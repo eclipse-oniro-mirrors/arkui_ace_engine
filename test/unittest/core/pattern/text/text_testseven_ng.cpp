@@ -770,6 +770,58 @@ HWTEST_F(TextTestSevenNg, ToJsonValue002, TestSize.Level1)
 }
 
 /**
+ * @tc.name: ToJsonValue003
+ * @tc.desc: Test TextLayoutProperty ToJsonValue strokeColor follows fontColor when strokeColor is not set.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextTestSevenNg, ToJsonValue003, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. create textFrameNode and set theme.
+     */
+    auto textFrameNode = FrameNode::CreateFrameNode(V2::TEXT_ETS_TAG, 0, AceType::MakeRefPtr<TextPattern>());
+    ASSERT_NE(textFrameNode, nullptr);
+    auto pipeline = PipelineContext::GetCurrentContext();
+    ASSERT_NE(pipeline, nullptr);
+    auto theme = AceType::MakeRefPtr<MockThemeManager>();
+    pipeline->SetThemeManager(theme);
+    EXPECT_CALL(*theme, GetTheme(_, _)).WillRepeatedly(Return(AceType::MakeRefPtr<TextTheme>()));
+    auto textPattern = textFrameNode->GetPattern<TextPattern>();
+    ASSERT_NE(textPattern, nullptr);
+    auto textLayoutProperty = textPattern->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_NE(textLayoutProperty, nullptr);
+
+    /**
+     * @tc.steps: step2. only set fontColor and strokeWidth, strokeColor falls back to fontColor.
+     */
+    textLayoutProperty->UpdateTextColor(Color::RED);
+    textLayoutProperty->UpdateStrokeWidth(Dimension(2.0, DimensionUnit::VP));
+    auto json = JsonUtil::Create(true);
+    textLayoutProperty->ToJsonValue(json, filter);
+    EXPECT_EQ(json->GetString("fontColor"), Color::RED.ColorToString());
+    EXPECT_EQ(json->GetString("strokeColor"), Color::RED.ColorToString());
+
+    /**
+     * @tc.steps: step3. set strokeColor explicitly, strokeColor uses the explicit value.
+     */
+    textLayoutProperty->UpdateStrokeColor(Color::BLUE);
+    json = JsonUtil::Create(true);
+    textLayoutProperty->ToJsonValue(json, filter);
+    EXPECT_EQ(json->GetString("strokeColor"), Color::BLUE.ColorToString());
+
+    /**
+     * @tc.steps: step4. neither strokeColor nor fontColor is set, strokeColor falls back to theme default color.
+     */
+    textLayoutProperty->ResetStrokeColor();
+    textLayoutProperty->ResetTextColor();
+    json = JsonUtil::Create(true);
+    textLayoutProperty->ToJsonValue(json, filter);
+    auto defaultTextColor = AceType::MakeRefPtr<TextTheme>()->GetTextStyle().GetTextColor().ColorToString();
+    EXPECT_EQ(json->GetString("fontColor"), defaultTextColor);
+    EXPECT_EQ(json->GetString("strokeColor"), defaultTextColor);
+}
+
+/**
  * @tc.name: SpanBuildParagraph001
  * @tc.desc: test InheritParentTextStyle of multiple paragraph.
  * @tc.type: FUNC
