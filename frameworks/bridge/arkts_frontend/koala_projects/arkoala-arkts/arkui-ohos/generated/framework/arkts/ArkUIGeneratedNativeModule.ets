@@ -131,6 +131,8 @@ export class ArkUIGeneratedNativeModule {
     @ani.unsafe.Direct
     native static _CalendarPickerAttribute_setMarkToday(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
+    native static _CalendarPickerAttribute_setFirstDayOfWeek(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
     native static _CalendarPickerAttribute_setEdgeAlign(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _Canvas_construct(id: KInt, flags: KInt): KPointer

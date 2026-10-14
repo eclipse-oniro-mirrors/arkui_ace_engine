@@ -296,6 +296,8 @@ constexpr float ARC_ALPHABET_DEFAULT_ITEM_SIZE = 24.0f;
 constexpr const char* ARC_ALPHABET_DEFAULT_FONT_FAMILY = "HarmonyOS Sans";
 constexpr int32_t ARC_SWIPER_MASK_COLOR_SIZE = 10;
 constexpr int32_t ARC_SWIPER_DEFAULT_DURATION = 400;
+constexpr int32_t CALENDAR_PICKER_FIRST_DAY_OF_WEEK_MIN = 0;
+constexpr int32_t CALENDAR_PICKER_FIRST_DAY_OF_WEEK_MAX = 7;
 const std::string EMPTY_STR = "";
 const std::vector<std::string> ACCESSIBILITY_LEVEL_VECTOR = { "auto", "yes", "no", "no-hide-descendants" };
 std::map<std::string, int32_t> ACCESSIBILITY_LEVEL_MAP = { { "auto", 0 }, { "yes", 1 }, { "no", 2 },
@@ -16922,6 +16924,45 @@ void ResetCalendarPickerMarkToday(ArkUI_NodeHandle node)
     }
 }
 
+int32_t SetCalendarPickerFirstDayOfWeek(ArkUI_NodeHandle node, const ArkUI_AttributeItem* item)
+{
+    if (item->size == 0 ||
+        item->value[0].i32 < CALENDAR_PICKER_FIRST_DAY_OF_WEEK_MIN ||
+        item->value[0].i32 > CALENDAR_PICKER_FIRST_DAY_OF_WEEK_MAX) {
+        return ERROR_CODE_PARAM_INVALID;
+    }
+
+    auto* fullImpl = GetFullImpl();
+    if (fullImpl && fullImpl->getNodeModifiers() && fullImpl->getNodeModifiers()->getCalendarPickerModifier()) {
+        fullImpl->getNodeModifiers()->getCalendarPickerModifier()->setCalendarPickerFirstDayOfWeek(
+            node->uiNodeHandle, item->value[0].i32);
+    } else {
+        return ERROR_CODE_INTERNAL_ERROR;
+    }
+    return ERROR_CODE_NO_ERROR;
+}
+
+const ArkUI_AttributeItem* GetCalendarPickerFirstDayOfWeek(ArkUI_NodeHandle node)
+{
+    auto* fullImpl = GetFullImpl();
+    if (fullImpl && fullImpl->getNodeModifiers() && fullImpl->getNodeModifiers()->getCalendarPickerModifier()) {
+        auto firstDayOfWeek =
+            fullImpl->getNodeModifiers()->getCalendarPickerModifier()->getCalendarPickerFirstDayOfWeek(
+                node->uiNodeHandle);
+        g_numberValues[0].i32 = firstDayOfWeek;
+    }
+    return &g_attributeItem;
+}
+
+void ResetCalendarPickerFirstDayOfWeek(ArkUI_NodeHandle node)
+{
+    auto* fullImpl = GetFullImpl();
+    if (fullImpl && fullImpl->getNodeModifiers() && fullImpl->getNodeModifiers()->getCalendarPickerModifier()) {
+        fullImpl->getNodeModifiers()->getCalendarPickerModifier()->resetCalendarPickerFirstDayOfWeek(
+            node->uiNodeHandle);
+    }
+}
+
 void ResetCalendarPickerDisabledDateRange(ArkUI_NodeHandle node)
 {
     auto* fullImpl = GetFullImpl();
@@ -22518,7 +22559,7 @@ int32_t SetCalendarPickerAttribute(ArkUI_NodeHandle node, int32_t subTypeId, con
 {
     static Setter* setters[] = { SetHintRadius, SetSelectedDate, SetEdgeAlignment, SetCalendarPickerTextStyle,
         SetCalendarPickerStartDate, SetCalendarPickerEndDate, SetCalendarPickerDisabledDateRange,
-        SetCalendarPickerMarkToday };
+        SetCalendarPickerMarkToday, SetCalendarPickerFirstDayOfWeek };
     if (static_cast<uint32_t>(subTypeId) >= sizeof(setters) / sizeof(Setter*)) {
         TAG_LOGE(AceLogTag::ACE_NATIVE_NODE, "calendar picker node attribute: %{public}d NOT IMPLEMENT", subTypeId);
         return ERROR_CODE_NATIVE_IMPL_TYPE_NOT_SUPPORTED;
@@ -22530,7 +22571,8 @@ void ResetCalendarPickerAttribute(ArkUI_NodeHandle node, int32_t subTypeId)
 {
     static Resetter* resetters[] = { ResetHintRadius, ResetSelectedDate, ResetEdgeAlignment,
         ResetCalendarPickerTextStyle, ResetCalendarPickerStartDate, ResetCalendarPickerEndDate,
-        ResetCalendarPickerDisabledDateRange, ResetCalendarPickerMarkToday };
+        ResetCalendarPickerDisabledDateRange, ResetCalendarPickerMarkToday,
+        ResetCalendarPickerFirstDayOfWeek };
     if (static_cast<uint32_t>(subTypeId) >= sizeof(resetters) / sizeof(Resetter*)) {
         TAG_LOGE(AceLogTag::ACE_NATIVE_NODE, "calendar picker node attribute: %{public}d NOT IMPLEMENT", subTypeId);
         return;
@@ -22542,7 +22584,7 @@ const ArkUI_AttributeItem* GetCalendarPickerAttribute(ArkUI_NodeHandle node, int
 {
     static Getter* getters[] = { GetHintRadius, GetSelectedDate, GetEdgeAlignment, GetCalendarPickerTextStyle,
         GetCalendarPickerStartDate, GetCalendarPickerEndDate, GetCalendarPickerDisabledDateRange,
-        GetCalendarPickerMarkToday };
+        GetCalendarPickerMarkToday, GetCalendarPickerFirstDayOfWeek };
     if (static_cast<uint32_t>(subTypeId) >= sizeof(getters) / sizeof(Getter*)) {
         TAG_LOGE(AceLogTag::ACE_NATIVE_NODE, "calendar picker node attribute: %{public}d NOT IMPLEMENT", subTypeId);
         return nullptr;

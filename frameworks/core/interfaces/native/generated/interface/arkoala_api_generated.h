@@ -4454,6 +4454,20 @@ typedef struct Opt_CalendarAlign {
     Ark_Tag tag;
     Ark_CalendarAlign value;
 } Opt_CalendarAlign;
+typedef enum Ark_CalendarFirstDayOfWeek {
+    ARK_CALENDAR_FIRST_DAY_OF_WEEK_LOCAL = 0,
+    ARK_CALENDAR_FIRST_DAY_OF_WEEK_MON = 1,
+    ARK_CALENDAR_FIRST_DAY_OF_WEEK_TUE = 2,
+    ARK_CALENDAR_FIRST_DAY_OF_WEEK_WED = 3,
+    ARK_CALENDAR_FIRST_DAY_OF_WEEK_THU = 4,
+    ARK_CALENDAR_FIRST_DAY_OF_WEEK_FRI = 5,
+    ARK_CALENDAR_FIRST_DAY_OF_WEEK_SAT = 6,
+    ARK_CALENDAR_FIRST_DAY_OF_WEEK_SUN = 7,
+} Ark_CalendarFirstDayOfWeek;
+typedef struct Opt_CalendarFirstDayOfWeek {
+    Ark_Tag tag;
+    Ark_CalendarFirstDayOfWeek value;
+} Opt_CalendarFirstDayOfWeek;
 typedef enum Ark_CameraCaptureState {
     ARK_CAMERA_CAPTURE_STATE_NONE = 0,
     ARK_CAMERA_CAPTURE_STATE_PAUSED = 1,
@@ -24328,6 +24342,7 @@ typedef struct Ark_CalendarDialogOptions {
     Opt_uiMaterial_Material systemMaterial;
     Opt_DistortionMode distortionMode;
     Opt_EdgeLightMode edgeLightMode;
+    Opt_CalendarFirstDayOfWeek firstDayOfWeek;
 } Ark_CalendarDialogOptions;
 typedef struct Opt_CalendarDialogOptions {
     Ark_Tag tag;
@@ -25060,6 +25075,8 @@ typedef struct GENERATED_ArkUICalendarPickerModifier {
                         const Opt_Callback_Date_Void* value);
     void (*setMarkToday)(Ark_NativePointer node,
                          const Opt_Boolean* value);
+    void (*setFirstDayOfWeek)(Ark_NativePointer node,
+                              const Opt_CalendarFirstDayOfWeek* value);
     void (*setEdgeAlign)(Ark_NativePointer node,
                          const Opt_CalendarAlign* alignType,
                          const Opt_Offset* offset);

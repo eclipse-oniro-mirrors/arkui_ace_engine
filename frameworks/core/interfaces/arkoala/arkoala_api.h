@@ -53,7 +53,7 @@ extern "C" {
 #define ARKUI_FULL_API_VERSION 144
 // When changing ARKUI_BASIC_API_VERSION, ARKUI_FULL_API_VERSION must be
 // increased as well.
-#define ARKUI_NODE_API_VERSION 144
+#define ARKUI_NODE_API_VERSION 145
 
 #define ARKUI_BASIC_API_VERSION 8
 #define ARKUI_EXTENDED_API_VERSION 8
@@ -8151,6 +8151,8 @@ struct ArkUICalendarPickerModifier {
     void (*resetEndDate)(ArkUINodeHandle node);
     void (*setCalendarPickerMarkToday)(ArkUINodeHandle node, ArkUI_Bool isMarkToday);
     void (*resetCalendarPickerMarkToday)(ArkUINodeHandle node);
+    void (*setCalendarPickerFirstDayOfWeek)(ArkUINodeHandle node, ArkUI_Int32 firstDayOfWeek);
+    void (*resetCalendarPickerFirstDayOfWeek)(ArkUINodeHandle node);
     void (*setCalendarPickerDisabledDateRange)(ArkUINodeHandle node, ArkUI_CharPtr disabledDateRangeStr);
     void (*resetCalendarPickerDisabledDateRange)(ArkUINodeHandle node);
     void (*setEdgeAlign)(ArkUINodeHandle node, const ArkUI_Float32* values, const ArkUI_Int32* units, ArkUI_Int32 size,
@@ -8168,6 +8170,7 @@ struct ArkUICalendarPickerModifier {
     ArkUI_CharPtr (*getStartDate)(ArkUINodeHandle node);
     ArkUI_CharPtr (*getEndDate)(ArkUINodeHandle node);
     ArkUI_Bool (*getCalendarPickerMarkToday)(ArkUINodeHandle node);
+    ArkUI_Int32 (*getCalendarPickerFirstDayOfWeek)(ArkUINodeHandle node);
     ArkUI_CharPtr (*getCalendarPickerDisabledDateRange)(ArkUINodeHandle node);
     ArkUIEdgeAlignType (*getEdgeAlign)(ArkUINodeHandle node);
     void (*setCalendarPickerHeight)(ArkUINodeHandle node, ArkUI_Float32 value, ArkUI_Int32 unit);

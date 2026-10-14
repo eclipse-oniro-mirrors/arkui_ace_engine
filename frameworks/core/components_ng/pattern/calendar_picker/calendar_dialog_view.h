@@ -129,7 +129,7 @@ private:
         const Dimension& weekHeight);
     static void SetTitleIdealSize(const RefPtr<CalendarTheme>& theme, const RefPtr<LinearLayoutProperty>& layoutProps);
     static void SetWeekTextDirection(const TextDirection& dialogDirection, const TextDirection& calendarDirection,
-        const RefPtr<FrameNode>& weekNode);
+        const RefPtr<FrameNode>& weekNode, int32_t resolvedFirstDay);
     static DialogEvent GetChangeEvent(const CalendarSettingData& settingData, const RefPtr<FrameNode>& frameNode,
         const std::map<std::string, NG::DialogEvent>& dialogEvent);
     static bool ReportChangeEvent(const RefPtr<FrameNode>& frameNode, const std::string& compName,
