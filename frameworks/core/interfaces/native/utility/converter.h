@@ -1163,7 +1163,11 @@ namespace Converter {
     template<> void AssignCast(std::optional<BlurSnapshotOptions>& dst, const Ark_BlurSnapshotOptions& src);
     template<> void AssignCast(std::optional<LightEffectOptions>& dst, const Ark_LightEffectOptionsInner& src);
 #ifndef WINDOWS_PLATFORM
+#ifdef ARKUI_CAPI_UNITTEST
+    template<> void AssignCast(std::optional<WebContextMenuItemId>& dst, const WebContextMenuItemId& src);
+#else
     template<> void AssignCast(std::optional<WebContextMenuItemId>& dst, const Ark_WebContextMenuItemId& src);
+#endif
 #endif
     // DO NOT ADD NEW DECLARATIONS HERE!!! Add in alphabetic order above!
 
