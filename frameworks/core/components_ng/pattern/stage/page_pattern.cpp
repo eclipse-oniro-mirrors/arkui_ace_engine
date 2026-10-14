@@ -396,15 +396,17 @@ void PagePattern::OnShow(bool isFromWindow)
         FireOnHiddenChange(true);
     }
     RecordPageEvent(true);
-    // AC-6.2/AC-6.4: route entered a new top page. Immediately trigger a
+    // route entered a new top page. Immediately trigger a
     // page-scene detection cycle so ExitOtherSearchPresence emits a false
     // event for the page that just left (A false before B true), without
     // waiting for the next ContentChange stable point. No-op when no search
     // ruleSet is registered (NeedPageSceneDetect fast-returns).
+#ifndef CROSS_PLATFORM
     auto contentChangeManager = context->GetContentChangeManager();
     if (contentChangeManager) {
         contentChangeManager->NotifyPageSceneContentChanged(true);
     }
+#endif
 }
 
 void PagePattern::RecordPageEvent(bool isShow)
