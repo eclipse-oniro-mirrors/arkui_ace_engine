@@ -35,6 +35,7 @@
 #include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_utils.h"
 #include "bridge/declarative_frontend/jsview/js_utils.h"
 #include "bridge/declarative_frontend/jsview/js_xcomponent.h"
+#include "bridge/declarative_frontend/jsview/js_xcomponent_controller_binding.h"
 #include "core/common/statistic_event_reporter.h"
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/pattern/xcomponent/bridge/xcomponent_dynamic_modifier.h"
@@ -994,6 +995,14 @@ ArkUINativeModuleValue XComponentBridge::SetOnLoad(ArkUIRuntimeCallInfo* runtime
         Local<JSValueRef> jsVal;
         if (Framework::XComponentClient::GetInstance().GetJSVal(const_cast<EcmaVM*>(vm), xcomponentId, jsVal)) {
             argv.emplace_back(jsVal);
+            auto controller = Framework::XComponentClient::GetInstance()
+                                  .GetControllerFromJSXComponentControllersMap(xcomponentId);
+            auto* bindingController = controller
+                ? static_cast<Framework::JSXComponentControllerBinding*>(AceType::RawPtr(controller))
+                : nullptr;
+            if (bindingController) {
+                bindingController->SetXComponentContext(Framework::JSRef<Framework::JSVal>(Framework::JSVal(jsVal)));
+            }
         }
 #endif
         auto result = func->Call(vm, func.ToLocal(), argv.data(), argv.size());
@@ -1078,14 +1087,14 @@ ArkUINativeModuleValue XComponentBridge::SetEnableAnalyzer(ArkUIRuntimeCallInfo*
         if (type == XComponentType::COMPONENT || type == XComponentType::NODE) {
             return panda::JSValueRef::Undefined(vm);
         }
-        if (secondArg->IsNumber()) {
-            bool boolValue = static_cast<bool>(secondArg->Uint32Value(vm));
+        if (secondArg->IsBoolean()) {
+            bool boolValue = secondArg->ToBoolean(vm)->Value();
             GetArkUINodeModifiers()->getXComponentModifier()->setXComponentEnableAnalyzer(nativeNode, boolValue);
         }
         return panda::JSValueRef::Undefined(vm);
     }
-    if (secondArg->IsNumber()) {
-        bool boolValue = static_cast<bool>(secondArg->Uint32Value(vm));
+    if (secondArg->IsBoolean()) {
+        bool boolValue = secondArg->ToBoolean(vm)->Value();
         GetArkUINodeModifiers()->getXComponentModifier()->setXComponentEnableAnalyzer(nativeNode, boolValue);
     } else {
         GetArkUINodeModifiers()->getXComponentModifier()->resetXComponentEnableAnalyzer(nativeNode);
@@ -1123,8 +1132,8 @@ ArkUINativeModuleValue XComponentBridge::SetEnableSecure(ArkUIRuntimeCallInfo* r
         if (type != XComponentType::SURFACE) {
             return panda::JSValueRef::Undefined(vm);
         }
-        if (secondArg->IsNumber()) {
-            bool boolValue = static_cast<bool>(secondArg->Uint32Value(vm));
+        if (secondArg->IsBoolean()) {
+            bool boolValue = secondArg->ToBoolean(vm)->Value();
             GetArkUINodeModifiers()->getXComponentModifier()->setXComponentEnableSecure(nativeNode, boolValue);
         }
         return panda::JSValueRef::Undefined(vm);
@@ -1228,8 +1237,8 @@ ArkUINativeModuleValue XComponentBridge::SetEnableTransparentLayer(ArkUIRuntimeC
     if (type != XComponentType::SURFACE) {
         return panda::JSValueRef::Undefined(vm);
     }
-    if (secondArg->IsNumber()) {
-        bool enableTransparentLayer = static_cast<bool>(secondArg->Uint32Value(vm));
+    if (secondArg->IsBoolean()) {
+        bool enableTransparentLayer = secondArg->ToBoolean(vm)->Value();
         GetArkUINodeModifiers()->getXComponentModifier()->setXComponentEnableTransparentLayer(
             nativeNode, enableTransparentLayer);
     } else if (isJsView) {
@@ -1635,8 +1644,8 @@ ArkUINativeModuleValue XComponentBridge::SetBlur(ArkUIRuntimeCallInfo* runtimeCa
         auto disableSystemAdaptationArgObj = disableSystemAdaptationArg->ToObject(vm);
         auto disableAdaptationVal =
             disableSystemAdaptationArgObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "disableSystemAdaptation"));
-        if (disableAdaptationVal->IsNumber()) {
-            disableSystemAdaptation = static_cast<bool>(disableAdaptationVal->Int32Value(vm));
+        if (disableAdaptationVal->IsBoolean()) {
+            disableSystemAdaptation = disableAdaptationVal->ToBoolean(vm)->Value();
         }
     }
     GetArkUINodeModifiers()->getXComponentModifier()->setBlur(nativeNode, static_cast<ArkUI_Float32>(blur),
@@ -1678,8 +1687,8 @@ ArkUINativeModuleValue XComponentBridge::SetBackdropBlur(ArkUIRuntimeCallInfo* r
         auto disableSystemAdaptationArgObj = disableSystemAdaptationArg->ToObject(vm);
         auto disableAdaptationVal =
             disableSystemAdaptationArgObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "disableSystemAdaptation"));
-        if (disableAdaptationVal->IsNumber()) {
-            disableSystemAdaptation = static_cast<bool>(disableAdaptationVal->Int32Value(vm));
+        if (disableAdaptationVal->IsBoolean()) {
+            disableSystemAdaptation = disableAdaptationVal->ToBoolean(vm)->Value();
         }
     }
     GetArkUINodeModifiers()->getXComponentModifier()->setBackdropBlur(nativeNode, static_cast<ArkUI_Float32>(blur),
