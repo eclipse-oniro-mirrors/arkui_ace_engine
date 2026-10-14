@@ -281,15 +281,24 @@ uint32_t AxisInfo::GetAxes() const
 }
 
 
-AxisEvent AxisInfo::ConvertToAxisEvent() const
+AxisEvent AxisInfo::ConvertToAxisEvent(bool isForStatic, float density) const
 {
     AxisEvent axisEvent;
-    axisEvent.x = static_cast<float>(globalLocation_.GetX());
-    axisEvent.y = static_cast<float>(globalLocation_.GetY());
-    axisEvent.screenX = static_cast<float>(screenLocation_.GetX());
-    axisEvent.screenY = static_cast<float>(screenLocation_.GetY());
-    axisEvent.globalDisplayX = static_cast<float>(globalDisplayLocation_.GetX());
-    axisEvent.globalDisplayY = static_cast<float>(globalDisplayLocation_.GetY());
+    if (isForStatic) {
+        axisEvent.x = static_cast<float>(globalLocation_.GetX() / density);
+        axisEvent.y = static_cast<float>(globalLocation_.GetY() / density);
+        axisEvent.screenX = static_cast<float>(screenLocation_.GetX() / density);
+        axisEvent.screenY = static_cast<float>(screenLocation_.GetY() / density);
+        axisEvent.globalDisplayX = static_cast<float>(globalDisplayLocation_.GetX() / density);
+        axisEvent.globalDisplayY = static_cast<float>(globalDisplayLocation_.GetY() / density);
+    } else {
+        axisEvent.x = static_cast<float>(globalLocation_.GetX());
+        axisEvent.y = static_cast<float>(globalLocation_.GetY());
+        axisEvent.screenX = static_cast<float>(screenLocation_.GetX());
+        axisEvent.screenY = static_cast<float>(screenLocation_.GetY());
+        axisEvent.globalDisplayX = static_cast<float>(globalDisplayLocation_.GetX());
+        axisEvent.globalDisplayY = static_cast<float>(globalDisplayLocation_.GetY());
+    }
     axisEvent.scrollStep = scrollStep_;
     axisEvent.axes = axes_;
     axisEvent.horizontalAxis = horizontalAxis_;

@@ -277,7 +277,8 @@ Ark_Boolean DispatchInputEventImpl(Ark_FrameNode peer,
             CHECK_NULL_RETURN(event->value2, Converter::ArkValue<Ark_Boolean>(false));
             auto axisEventInfo = event->value2->GetEventInfo();
             CHECK_NULL_RETURN(axisEventInfo, Converter::ArkValue<Ark_Boolean>(false));
-            auto axisEvent = axisEventInfo->ConvertToAxisEvent();
+            auto density = static_cast<float>(pipelineContext->GetDensity());
+            auto axisEvent = axisEventInfo->ConvertToAxisEvent(true, density);
             axisEvent.pressedCodes = axisEventInfo->GetPressedKeyCodes();
             axisEvent.isNewReferee = useCompetition ? false : true;
             result = useCompetition ? postEventManager->PostAxisEventWithStrategy(node, std::move(axisEvent))
