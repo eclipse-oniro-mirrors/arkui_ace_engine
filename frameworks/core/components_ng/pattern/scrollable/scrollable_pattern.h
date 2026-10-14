@@ -605,6 +605,18 @@ public:
 
     void SetScrollSource(int32_t scrollSource)
     {
+        scrollSourceForQuery_ = scrollSource;      // Session-level: updated only by event/stop-chain entries
+        SetScrollSourceInternal(scrollSource);
+    }
+
+    // Layout entry: updates only the frame-level scrollSource_, does not touch the session-level source
+    void SetScrollSourceLayout(int32_t scrollSource)
+    {
+        SetScrollSourceInternal(scrollSource);
+    }
+
+    void SetScrollSourceInternal(int32_t scrollSource)
+    {
         if (scrollSource == SCROLL_FROM_NONE) {
             if (lastScrollSource_ != scrollSource_) {
                 AddScrollableFrameInfo(scrollSource_);
@@ -612,6 +624,12 @@ public:
             lastScrollSource_ = scrollSource_;
         }
         scrollSource_ = scrollSource;
+    }
+
+    // Direct write to the session-level source only (does not touch the frame-level scrollSource_)
+    void SetScrollSourceForQuery(int32_t scrollSource)
+    {
+        scrollSourceForQuery_ = scrollSource;
     }
 
     void SetAccessibilityScrollSource(AccessibilityScrollSource source)
@@ -644,6 +662,9 @@ public:
     }
 
     ScrollState GetScrollState() const;
+
+    // Query API: reads the session-level scrollSourceForQuery_, unaffected by layout-level resets.
+    ScrollState GetScrollStateForQuery() const;
 
     static ScrollState GetScrollState(int32_t scrollSource);
 
@@ -1345,6 +1366,7 @@ private:
     RefPtr<ScrollEdgeEffect> scrollEffect_;
     RefPtr<RefreshCoordination> refreshCoordination_;
     int32_t scrollSource_ = SCROLL_FROM_NONE;
+    int32_t scrollSourceForQuery_ = SCROLL_FROM_NONE;
     int32_t lastScrollSource_ = SCROLL_FROM_NONE;
     AccessibilityScrollSource accessibilityScrollSource_ = AccessibilityScrollSource::NONE;
     // scrollBar

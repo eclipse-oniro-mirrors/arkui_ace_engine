@@ -1282,6 +1282,7 @@
         "arkui.component.scroll.Scroller.getItemRect",
         "arkui.component.scroll.Scroller.getItemIndex",
         "arkui.component.scroll.Scroller.contentSize",
+        "arkui.component.scroll.Scroller.getScrollState",
         "arkui.component.grid.GridInterface.invoke"
     ],
     "constants": {

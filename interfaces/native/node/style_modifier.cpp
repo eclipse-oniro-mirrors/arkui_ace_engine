@@ -8299,6 +8299,16 @@ const ArkUI_AttributeItem* GetScrollContentSize(ArkUI_NodeHandle node)
     return &g_attributeItem;
 }
 
+const ArkUI_AttributeItem* GetScrollStateAttribute(ArkUI_NodeHandle node)
+{
+    auto scrollerHandle = GetFullImpl()->getNodeModifiers()->getScrollerModifier()->
+        getScroller(node->uiNodeHandle, 0);
+    CHECK_NULL_RETURN(scrollerHandle, &g_attributeItem);
+    g_numberValues[NUM_0].i32 = GetFullImpl()->getNodeModifiers()->getScrollerModifier()->
+        getScrollState(scrollerHandle);
+    return &g_attributeItem;
+}
+
 void ResetFlingSpeedLimit(ArkUI_NodeHandle node)
 {
     GetFullImpl()->getNodeModifiers()->getScrollableModifier()->resetFlingSpeedLimit(node->uiNodeHandle);
@@ -23256,7 +23266,7 @@ int32_t SetScrollAttribute(ArkUI_NodeHandle node, int32_t subTypeId, const ArkUI
         SetScrollBy, SetScrollFling, SetScrollFadingEdge, nullptr, SetContentStartOffset, SetContentEndOffset,
         SetFlingSpeedLimit, SetScrollContentClip, SetScrollBackToTop, SetScrollBarMargin, SetMaxZoomScale,
         SetMinZoomScale, SetZoomScale, SetEnableBouncesZoom, SetEnableScrollWithMouse, SetAutoAdjustScrollBarMargin,
-        SetScrollBarHeight };
+        SetScrollBarHeight, nullptr };
     if (static_cast<uint32_t>(subTypeId) >= sizeof(setters) / sizeof(Setter*)) {
         TAG_LOGE(AceLogTag::ACE_NATIVE_NODE, "scroll node attribute: %{public}d NOT IMPLEMENT", subTypeId);
         return ERROR_CODE_NATIVE_IMPL_TYPE_NOT_SUPPORTED;
@@ -23272,7 +23282,7 @@ const ArkUI_AttributeItem* GetScrollAttribute(ArkUI_NodeHandle node, int32_t sub
         nullptr, nullptr, GetScrollFadingEdge, GetScrollContentSize, GetContentStartOffset,
         GetContentEndOffset, GetFlingSpeedLimit, GetScrollContentClip, GetScrollBackToTop, GetScrollBarMargin,
         GetMaxZoomScale, GetMinZoomScale, GetZoomScale, GetEnableBouncesZoom, GetEnableScrollWithMouse,
-        GetAutoAdjustScrollBarMargin, GetScrollBarHeight };
+        GetAutoAdjustScrollBarMargin, GetScrollBarHeight, GetScrollStateAttribute };
     if (static_cast<uint32_t>(subTypeId) >= sizeof(getters) / sizeof(Getter*)) {
         TAG_LOGE(AceLogTag::ACE_NATIVE_NODE, "slider node attribute: %{public}d NOT IMPLEMENT", subTypeId);
         return nullptr;
@@ -23289,7 +23299,7 @@ void ResetScrollAttribute(ArkUI_NodeHandle node, int32_t subTypeId)
         nullptr, nullptr, nullptr, ResetScrollFadingEdge, nullptr, ResetContentStartOffset,
         ResetContentEndOffset, ResetFlingSpeedLimit, ResetScrollContentClip, ResetScrollBackToTop, ResetScrollBarMargin,
         ResetMaxZoomScale, ResetMinZoomScale, ResetZoomScale, ResetEnableBouncesZoom, ResetEnableScrollWithMouse,
-        ResetAutoAdjustScrollBarMargin, ResetScrollBarHeight };
+        ResetAutoAdjustScrollBarMargin, ResetScrollBarHeight, nullptr };
     if (static_cast<uint32_t>(subTypeId) >= sizeof(resetters) / sizeof(Resetter*)) {
         TAG_LOGE(AceLogTag::ACE_NATIVE_NODE, "list node attribute: %{public}d NOT IMPLEMENT", subTypeId);
         return;
