@@ -265,7 +265,8 @@ Ark_Boolean DispatchInputEventImpl(Ark_FrameNode peer,
             CHECK_NULL_RETURN(event->value1, Converter::ArkValue<Ark_Boolean>(false));
             auto mouseEventInfo = event->value1->GetEventInfo();
             CHECK_NULL_RETURN(mouseEventInfo, Converter::ArkValue<Ark_Boolean>(false));
-            auto mouseEvent = mouseEventInfo->ConvertToMouseEventForStatic();
+            auto density = static_cast<float>(pipelineContext->GetDensity());
+            auto mouseEvent = mouseEventInfo->ConvertToMouseEventForStatic(density);
             mouseEvent.time = mouseEventInfo->GetTimeStamp();
             mouseEvent.isNewReferee = useCompetition ? false : true;
             result = useCompetition ? postEventManager->PostMouseEventWithStrategy(node, std::move(mouseEvent))
