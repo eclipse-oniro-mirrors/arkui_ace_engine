@@ -705,6 +705,9 @@ template("ace_core_source_set") {
     if (ace_engine_feature_enable_material_customized) {
       defines += [ "ACE_ENGINE_IMMERSIVE_MATERIAL_CUSTOMIZED" ]
     }
+    if (ace_engine_feature_enable_material_tv) {
+      defines += [ "ACE_ENGINE_IMMERSIVE_MATERIAL_TV" ]
+    }
 
     # arkoala C interface
     deps += [ "$ace_root/frameworks/core/interfaces/native:ace_core_interfaces_native_node_$platform" ]
@@ -1252,6 +1255,9 @@ template("ace_core_ng_source_set") {
 
     if (ace_engine_feature_enable_material_customized) {
       defines += [ "ACE_ENGINE_IMMERSIVE_MATERIAL_CUSTOMIZED" ]
+    }
+    if (ace_engine_feature_enable_material_tv) {
+      defines += [ "ACE_ENGINE_IMMERSIVE_MATERIAL_TV" ]
     }
 
     cflags_cc = []
