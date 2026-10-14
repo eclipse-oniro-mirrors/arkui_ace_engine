@@ -741,7 +741,7 @@ HWTEST_F(NativeKeyEventTest, NativeKeyEventTest0019, TestSize.Level1)
 
 /**
  * @tc.name: NativeKeyEventTest0020
- * @tc.desc: Test OH_ArkUI_KeyEvent_Destroy null/*event null/non-Create/valid (AC-05).
+ * @tc.desc: Test OH_ArkUI_KeyEvent_Destroy null event null/non-Create/valid (AC-05).
  * @tc.type: FUNC
  */
 HWTEST_F(NativeKeyEventTest, NativeKeyEventTest0020, TestSize.Level1)
