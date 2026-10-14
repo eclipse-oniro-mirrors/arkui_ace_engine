@@ -10006,6 +10006,26 @@ typedef enum {
      * @since 19
      */
     NODE_CALENDAR_PICKER_MARK_TODAY = 16007,
+    /**
+     * @brief Defines the first day of the week for the calendar picker.
+     * This attribute can be set, reset, and obtained as required through APIs.
+     *
+     * **Format of the {@link ArkUI_AttributeItem} parameter for setting the attribute:**
+     * <ul>
+     * <li>value[0].i32: first day of the week. The value range is [0, 7].
+     * <b>0</b>: follows the system region. <b>1</b>: Monday. <b>2</b>: Tuesday. <b>3</b>: Wednesday. <b>4</b>: Thursday.
+     * <b>5</b>: Friday. <b>6</b>: Saturday. <b>7</b>: Sunday. The default value is <b>0</b> (follows the system region).</li>
+     * </ul>
+     *
+     * **Format of the return value {@link ArkUI_AttributeItem}:**
+     * <ul>
+     * <li>value[0].i32: first day of the week.</li>
+     * </ul>
+     *
+     * @ingroup Calendarpicker
+     * @since 26.2.0
+     */
+    NODE_CALENDAR_PICKER_FIRST_DAY_OF_WEEK = 16008,
 
     /**
      * @brief Defines the want used to start EmbeddedAbility.
