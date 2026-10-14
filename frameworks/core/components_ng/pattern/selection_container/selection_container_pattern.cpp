@@ -15,6 +15,8 @@
 
 #include "core/components_ng/pattern/selection_container/selection_container_pattern.h"
 
+#include <atomic>
+
 #include "adapter/ohos/capability/clipboard/clipboard_impl.h"
 #include "base/geometry/ng/point_t.h"
 #include "base/json/json_util.h"
@@ -177,8 +179,8 @@ void SelectionContainerPattern::CloseSelectOverlay(bool animation, CloseReason r
 
 int32_t SelectionContainerPattern::ClaimSelectionContainerEpoch()
 {
-    static int32_t counter = 0;
-    return counter++;
+    static std::atomic<int32_t> counter { 0 };
+    return counter.fetch_add(1, std::memory_order_relaxed);
 }
 
 void SelectionContainerPattern::CloseSelectionMenu()

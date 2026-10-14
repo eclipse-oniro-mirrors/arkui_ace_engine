@@ -1720,8 +1720,7 @@ bool TextPattern::ParseCommand(const std::string& command)
         }
         ReportCommandResult(host->GetId(), "Text.onCopyComplete");
     } else {
-        TAG_LOGE(AceLogTag::ACE_TEXT, "OnInjectionEvent unknown cmd : %{public}s, nodeId : %{public}d",
-            cmd.c_str(), host->GetId());
+        TAG_LOGE(AceLogTag::ACE_TEXT, "OnInjectionEvent unknown cmd nodeId : %{public}d", host->GetId());
         return false;
     }
     return true;
