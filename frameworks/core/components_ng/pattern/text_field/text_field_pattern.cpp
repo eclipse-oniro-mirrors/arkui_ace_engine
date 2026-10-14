@@ -4673,15 +4673,13 @@ void TextFieldPattern::AutoFillValueChanged()
 
 std::string TextFieldPattern::GetInspectorId() const
 {
-    std:: string inspectorId = "";
     auto host = GetHost();
     CHECK_NULL_RETURN(host, "");
     auto parent = host->GetParent();
     CHECK_NULL_RETURN(parent, "");
-    if (host->GetInspectorId()->find(INSPECTOR_PREFIX) != std::string::npos && parent->GetTag() == "Search") {
-        inspectorId = host->GetParent()->GetInspectorId().value_or("");
-    } else {
-        inspectorId = host->GetInspectorId().value_or("");
+    auto inspectorId = host->GetInspectorId().value_or("");
+    if (inspectorId.find(INSPECTOR_PREFIX) != std::string::npos && parent->GetTag() == "Search") {
+        inspectorId = parent->GetInspectorId().value_or("");
     }
     return inspectorId;
 }
