@@ -1268,7 +1268,7 @@ void SpanString::DecodeTlvExt(std::vector<uint8_t>& buff, SpanString* spanString
                 CHECK_NULL_BREAK(unmarshallCallback);
                 auto start = TLVUtil::ReadInt32(buff, cursor);
                 auto length = TLVUtil::ReadInt32(buff, cursor);
-                auto endOfUserDataArrBuff = buffLength + cursor + cursor - lastCursor;
+                auto endOfUserDataArrBuff = lastCursor + buffLength;
                 std::vector<uint8_t> bufferSubVec(buff.begin() + cursor, buff.begin() + endOfUserDataArrBuff);
                 ContainerScope scope(instanceId);
                 auto container = AceEngine::Get().GetContainer(instanceId);

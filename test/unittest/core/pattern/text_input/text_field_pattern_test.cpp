@@ -324,9 +324,15 @@ HWTEST_F(TextFieldPatternTest, TextPattern012, TestSize.Level1)
     auto textFieldNode = FrameNode::GetOrCreateFrameNode(V2::TEXTINPUT_ETS_TAG,
         ElementRegister::GetInstance()->MakeUniqueId(), []() { return AceType::MakeRefPtr<TextFieldPattern>(); });
     ASSERT_NE(textFieldNode, nullptr);
+    /**
+     * @tc.steps: step2. textFieldNode->GetPattern
+     */
     RefPtr<TextFieldPattern> pattern = textFieldNode->GetPattern<TextFieldPattern>();
     ASSERT_NE(pattern, nullptr);
     pattern->hasPreviewText_ = true;
+    /**
+     * @tc.steps: step3. HandleDoubleClickEvent
+     */
     pattern->HandleDoubleClickEvent(info);
     pattern->showSelect_ = false;
     pattern->hasPreviewText_ = false;
