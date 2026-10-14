@@ -1431,6 +1431,16 @@ void AssignCast(std::optional<WebKeyboardAvoidMode>& dst, const Ark_WebKeyboardA
 }
 
 #ifndef WINDOWS_PLATFORM
+#ifdef ARKUI_CAPI_UNITTEST
+template<>
+void AssignCast(std::optional<WebContextMenuItemId>& dst, const WebContextMenuItemId& src)
+{
+    switch (src) {
+        case WebContextMenuItemId::MENU_COPY_LINK: dst = WebContextMenuItemId::MENU_COPY_LINK; break;
+        default: LOGE("Unexpected enum value in WebContextMenuItemId: %{public}d", static_cast<int32_t>(src));
+    }
+}
+#else
 template<>
 void AssignCast(std::optional<WebContextMenuItemId>& dst, const Ark_WebContextMenuItemId& src)
 {
@@ -1439,6 +1449,7 @@ void AssignCast(std::optional<WebContextMenuItemId>& dst, const Ark_WebContextMe
         default: LOGE("Unexpected enum value in Ark_WebContextMenuItemId: %{public}d", src);
     }
 }
+#endif
 #endif
 
 template<>
