@@ -44,6 +44,7 @@
 #include "core/components_ng/manager/avoid_info/avoid_info_manager.h"
 #include "core/components_ng/manager/content_change_manager/content_change_manager.h"
 #include "core/components_ng/manager/focus/focus_manager.h"
+#include "core/components_ng/pattern/stage/page_info.h"
 #include "core/components_ng/manager/force_split/force_split_manager.h"
 #include "core/components_ng/manager/form_event/form_event_manager.h"
 #include "core/components_ng/manager/form_gesture/form_gesture_manager.h"
@@ -191,6 +192,7 @@ static bool g_isContainerCustomTitleVisible = false;
 static bool g_isContainerControlButtonVisible = false;
 static RectF g_buttonRect = RectF(0.0f, 0.0f, 0.0f, 0.0f);
 static int32_t g_containerModalTitleHeight = 0;
+static RefPtr<NG::PageInfo> g_lastPageInfo;
 } // namespace
 
 RefPtr<MockPipelineContext> MockPipelineContext::pipeline_;
@@ -265,7 +267,7 @@ RefPtr<MockPipelineContext> MockPipelineContext::GetCurrent()
 
 const RefPtr<NG::PageInfo> MockPipelineContext::GetLastPageInfo()
 {
-    return nullptr;
+    return PipelineContext::GetLastPageInfo();
 }
 
 
@@ -1925,9 +1927,14 @@ std::string NG::PipelineContext::GetCurrentPageNameCallback()
     return "";
 }
 
+void NG::MockPipelineContext::SetLastPageInfo(const RefPtr<NG::PageInfo>& pageInfo)
+{
+    g_lastPageInfo = pageInfo;
+}
+
 const RefPtr<NG::PageInfo> NG::PipelineContext::GetLastPageInfo() const
 {
-    return nullptr;
+    return g_lastPageInfo;
 }
 
 std::string NG::PipelineContext::GetNavDestinationPageName(const RefPtr<NG::PageInfo>& pageInfo) const
