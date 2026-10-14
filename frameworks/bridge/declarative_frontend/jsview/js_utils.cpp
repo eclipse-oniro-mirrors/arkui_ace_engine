@@ -43,6 +43,7 @@
 #include "frameworks/bridge/declarative_frontend/jsview/js_view_abstract.h"
 #include "frameworks/bridge/declarative_frontend/view_stack_processor.h"
 #include "frameworks/bridge/js_frontend/engine/common/js_engine.h"
+#include "interfaces/napi/kits/ui_material/ui_material_napi.h"
 
 namespace OHOS::Ace::Framework {
 namespace {
@@ -149,25 +150,27 @@ RefPtr<OHOS::Ace::WantWrap> CreateWantWrapFromNapiValue(JSRef<JSVal> obj)
 
 const Rosen::VisualEffect* CreateRSEffectFromNapiValue(JSRef<JSVal> obj)
 {
-    auto visualEffectPtr = static_cast<Rosen::VisualEffect*>(UnwrapNapiValue(obj));
+    auto visualEffectPtr = static_cast<Rosen::VisualEffect*>(
+        UnwrapNapiValueWithType(obj, &VISUAL_EFFECT_TYPE_TAG));
     return visualEffectPtr;
 }
 
 const Rosen::Filter* CreateRSFilterFromNapiValue(JSRef<JSVal> obj)
 {
-    auto filterPtr = static_cast<Rosen::Filter*>(UnwrapNapiValue(obj));
+    auto filterPtr = static_cast<Rosen::Filter*>(UnwrapNapiValueWithType(obj, &FILTER_TYPE_TAG));
     return filterPtr;
 }
 
 const UiMaterial* CreateUiMaterialFromNapiValue(JSRef<JSVal> obj)
 {
-    auto uiMaterialPtr = static_cast<UiMaterial*>(UnwrapNapiValue(obj));
+    auto uiMaterialPtr = static_cast<UiMaterial*>(
+        UnwrapNapiValueWithType(obj, &OHOS::Ace::Napi::UI_MATERIAL_TYPE_TAG));
     return uiMaterialPtr;
 }
 
 const Rosen::Blender* CreateRSBlenderFromNapiValue(JSRef<JSVal> obj)
 {
-    auto blenderPtr = static_cast<Rosen::Blender*>(UnwrapNapiValue(obj));
+    auto blenderPtr = static_cast<Rosen::Blender*>(UnwrapNapiValueWithType(obj, &BLENDER_TYPE_TAG));
     return blenderPtr;
 }
 
@@ -424,6 +427,44 @@ void* UnwrapNapiValue(const JSRef<JSVal>& obj)
     }
     void* objectNapi = nullptr;
     napi_unwrap(env, napiValue, &objectNapi);
+    return objectNapi;
+#else
+    return nullptr;
+#endif
+}
+
+void* UnwrapNapiValueWithType(const JSRef<JSVal>& obj, const napi_type_tag* typeTag)
+{
+#ifdef ENABLE_ROSEN_BACKEND
+    if (!obj->IsObject()) {
+        LOGE("info[0] is not an object when try UnwrapNapiValueWithType");
+        return nullptr;
+    }
+    CHECK_NULL_RETURN(typeTag, nullptr);
+    auto engine = EngineHelper::GetCurrentEngine();
+    CHECK_NULL_RETURN(engine, nullptr);
+    auto nativeEngine = engine->GetNativeEngine();
+    CHECK_NULL_RETURN(nativeEngine, nullptr);
+#ifdef USE_ARK_ENGINE
+    panda::Local<JsiValue> value = obj.Get().GetLocalHandle();
+#endif
+    JSValueWrapper valueWrapper = value;
+ 
+    ScopeRAII scope(reinterpret_cast<napi_env>(nativeEngine));
+    napi_value napiValue = nativeEngine->ValueToNapiValue(valueWrapper);
+    auto env = reinterpret_cast<napi_env>(nativeEngine);
+    napi_valuetype valueType = napi_undefined;
+    napi_typeof(env, napiValue, &valueType);
+    if (valueType != napi_object) {
+        LOGE("napiValue is not napi_object");
+        return nullptr;
+    }
+    void* objectNapi = nullptr;
+    napi_status status = napi_unwrap_s(env, napiValue, typeTag, &objectNapi);
+    if (status != napi_ok) {
+        LOGE("napi_unwrap_s type tag mismatch, status=%{public}d", static_cast<int32_t>(status));
+        return nullptr;
+    }
     return objectNapi;
 #else
     return nullptr;
