@@ -35,6 +35,8 @@ public:
     using DefaultFileSelectorShowCallback = std::function<void(const std::shared_ptr<BaseEventInfo>&)>;
     using OnFullScreenVideoOverlayEnterCallback = std::function<void(const std::shared_ptr<BaseEventInfo>&)>;
     using PermissionClipboardCallback = std::function<void(const std::shared_ptr<BaseEventInfo>&)>;
+    using OnContextMenuUpdateCallback =
+        std::function<void(WebContextMenuItemId menuItemId, const WebContextMenuOptions& options)>;
     WebPattern();
     ~WebPattern() override;
 
@@ -160,6 +162,15 @@ public:
     OnFullScreenVideoOverlayEnterCallback GetOnFullScreenVideoOverlayEnterCallback() const
     {
         return onFullScreenVideoOverlayEnterCallback_;
+    }
+
+    void SetOnContextMenuUpdateCallback(OnContextMenuUpdateCallback&& Callback)
+    {
+        onContextMenuUpdateCallback_ = std::move(Callback);
+    }
+    OnContextMenuUpdateCallback GetOnContextMenuUpdateCallback()
+    {
+        return onContextMenuUpdateCallback_;
     }
 
     void SetOnControllerAttachedCallback(OnControllerAttachedCallback&& callback);
@@ -303,6 +314,7 @@ private:
     OnCreateMenuCallback onCreateMenuCallback_ = nullptr;
     OnMenuItemClickCallback onMenuItemClick_ = nullptr;
     OnFullScreenVideoOverlayEnterCallback onFullScreenVideoOverlayEnterCallback_ = nullptr;
+    OnContextMenuUpdateCallback onContextMenuUpdateCallback_ = nullptr;
 };
 } // namespace OHOS::Ace::NG
 #endif // CAPI_STUBS_MOCK_WEB_PATTERN_H
