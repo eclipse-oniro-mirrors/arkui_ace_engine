@@ -1242,6 +1242,7 @@ ohos_unittest("text_native_impl_error_test") {
     "$ace_root/interfaces/native/node/config_manager.cpp",
     "$ace_root/test/mock/interfaces/native/mock_native_error_message_wrapper.cpp",
     "$ace_root/interfaces/native/node/node_transition.cpp",
+    "$ace_root/interfaces/native/node/node_utils.cpp",
     "$ace_root/interfaces/native/node/node_visual_effect.cpp",
     "$ace_root/interfaces/native/node/progress_option.cpp",
     "$ace_root/interfaces/native/node/render_node.cpp",
