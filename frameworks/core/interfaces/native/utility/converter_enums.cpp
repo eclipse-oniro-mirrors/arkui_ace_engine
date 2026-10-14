@@ -1430,6 +1430,7 @@ void AssignCast(std::optional<WebKeyboardAvoidMode>& dst, const Ark_WebKeyboardA
     }
 }
 
+#ifndef WINDOWS_PLATFORM
 template<>
 void AssignCast(std::optional<WebContextMenuItemId>& dst, const Ark_WebContextMenuItemId& src)
 {
@@ -1438,6 +1439,7 @@ void AssignCast(std::optional<WebContextMenuItemId>& dst, const Ark_WebContextMe
         default: LOGE("Unexpected enum value in Ark_WebContextMenuItemId: %{public}d", src);
     }
 }
+#endif
 
 template<>
 void AssignCast(std::optional<WebKeyboardAppearanceMode>& dst, const Ark_WebKeyboardAppearanceMode& src)
