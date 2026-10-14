@@ -5355,4 +5355,14 @@ void AceContainer::GetOriginalEventInfo(const EventPositionInfo& eventPositionIn
     originalPos.displayX = winOriginalPos.displayX;
     originalPos.displayY = winOriginalPos.displayY;
 }
+
+void AceContainer::RefreshLiveFoldCreaseRegion()
+{
+    displayManager_->GetLiveFoldCreaseRegion();
+}
+
+void AceContainer::RefreshFoldCreaseDirection()
+{
+    displayManager_->GetFoldCreaseDirection();
+}
 } // namespace OHOS::Ace::Platform
