@@ -69,6 +69,13 @@ public:
         return isVertical_;
     }
 
+    // Restricted scroll-placeholder whitelist clone: plain layout-only container,
+    // no callbacks or cross-node state to carry over.
+    RefPtr<Pattern> CloneForPlaceholder() override
+    {
+        return MakeRefPtr<LinearLayoutPattern>(isVertical_);
+    }
+
     void SetFlexMeasureResult(FlexMeasureResult measureResult, uintptr_t addr)
     {
         measureResult_ = measureResult;

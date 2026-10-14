@@ -188,6 +188,37 @@ class ComponentSnapshot {
     }
 }
 
+class PlaceholderRegister {
+    /**
+     * Registry of scroll placeholder builders of this UI instance. Do not create
+     * instances directly: obtain the handle through UIContext.getPlaceholderRegister().
+     * @param instanceId obtained on the c++ side.
+     * @since 26
+     */
+    constructor(instanceId) {
+        this.instanceId_ = instanceId;
+        this.ohos_placeholderRegister = getUINativeModule().scrollPlaceholderRegister;
+    }
+
+    register(id, builder) {
+        withInstanceId(this.instanceId_, () => {
+            this.ohos_placeholderRegister.register(id, builder);
+        });
+    }
+
+    unregister(id) {
+        withInstanceId(this.instanceId_, () => {
+            this.ohos_placeholderRegister.unregister(id);
+        });
+    }
+
+    isRegistered(id) {
+        return withInstanceId(this.instanceId_, () => {
+            return this.ohos_placeholderRegister.isRegistered(id);
+        });
+    }
+}
+
 class DragController {
     /**
      * Construct new instance of DragController.
@@ -490,6 +521,13 @@ class UIContext {
     getDragController() {
         this.dragController_ = new DragController(this.instanceId_);
         return this.dragController_;
+    }
+
+    getPlaceholderRegister() {
+        if (this.placeholderRegister_ == null) {
+            this.placeholderRegister_ = new PlaceholderRegister(this.instanceId_);
+        }
+        return this.placeholderRegister_;
     }
 
     getFont() {

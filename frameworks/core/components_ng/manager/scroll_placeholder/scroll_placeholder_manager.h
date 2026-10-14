@@ -82,6 +82,14 @@ public:
     uint64_t RegisterTemplate(const std::string& templateId, ScrollPlaceholderBuilder&& builder);
     bool UnregisterTemplate(const std::string& templateId);
     bool IsTemplateRegistered(const std::string& templateId) const;
+    // ADR-14 registration probe: synchronously runs one restricted-protocol subtree
+    // clone of the resident source instance on the UI thread (validation is the
+    // clone itself — same path production clones take). Returns false when any node
+    // of the template is not copyable, with the offending subtree path in
+    // subtreePath for diagnostics; on success the probe product is cached into the
+    // instance pool. The template itself stays registered either way: the caller
+    // (registration bridge) unregisters and reports the rejection.
+    bool ProbeTemplateClone(const std::string& templateId, std::string& subtreePath);
     std::optional<ScrollPlaceholderTemplateSnapshot> LookupTemplateForCreate(const std::string& templateId);
     // Resident copy source of the template (built by the builder on the UI thread); never
     // handed out, only traversed and copied by background clone tasks.

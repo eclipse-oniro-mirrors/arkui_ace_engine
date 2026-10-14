@@ -16,12 +16,15 @@
 #include "core/components_ng/pattern/list/list_pattern.h"
 
 #include <limits>
+#include <set>
+#include <vector>
 #include "core/common/container.h"
 #include "core/common/statistic_event_reporter.h"
 
 #include "base/geometry/rect.h"
 #include "base/log/dump_log.h"
 #include "base/log/event_report.h"
+#include "base/log/log_wrapper.h"
 #include "base/utils/multi_thread.h"
 #include "base/utils/system_properties.h"
 #include "base/memory/referenced.h"
@@ -31,12 +34,17 @@
 #include "core/components/list/list_theme.h"
 #include "core/components_ng/base/inspector_filter.h"
 #include "core/components_ng/manager/content_change_manager/content_change_manager.h"
+#include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_manager.h"
+#include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_shell_node.h"
+#include "core/components_ng/pattern/list/list_item_pattern.h"
+#include "core/components_v2/inspector/inspector_constants.h"
+#include "core/pipeline/base/element_register.h"
+#include "base/log/ace_trace.h"
 #include "core/components_ng/pattern/list/list_accessibility_property.h"
 #include "core/components_ng/pattern/list/list_content_modifier.h"
 #include "core/components_ng/pattern/list/list_event_hub.h"
 #include "core/components_ng/pattern/list/list_height_offset_calculator.h"
 #include "core/components_ng/pattern/list/list_item_group_pattern.h"
-#include "core/components_ng/pattern/list/list_item_pattern.h"
 #include "core/components_ng/pattern/list/list_lanes_layout_algorithm.h"
 #include "core/components_ng/pattern/list/list_layout_algorithm.h"
 #include "core/components_ng/pattern/list/list_layout_property.h"
@@ -179,7 +187,325 @@ PaddingPropertyF* GetPaddingFromHost(RefPtr<FrameNode> node)
     return nullptr;
 }
 
-ListPattern::~ListPattern() = default;
+ListPattern::~ListPattern()
+{
+    ResetScrollPlaceholder();
+}
+
+void ListPattern::SetScrollPlaceholder(ScrollPlaceholderProvider&& provider)
+{
+    // Provider replacement bumps the host fact implicitly: pending real-build tasks
+    // carry the host node id and are cancelled below, already-created real nodes
+    // stay under the normal component management, and unfilled placeholder slots
+    // rebuild through the existing path. syncLoad keeps its semantics: prediction
+    // only ever defers builds the lazy path would have deferred as well.
+    scrollPlaceholderProvider_ = std::move(provider);
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    if (!scrollPlaceholderProvider_) {
+        ResetScrollPlaceholder();
+        return;
+    }
+    auto* context = host->GetContext();
+    if (context) {
+        const auto& manager = context->GetOrCreateScrollPlaceholderManager();
+        if (manager) {
+            // Selector replacement invalidates in-flight placeholder work of this
+            // host; the new provider's decisions start from a clean queue.
+            manager->CancelHostRealBuilds(host->GetId(), ScrollPlaceholderCancelReason::RE_REGISTER);
+        }
+    }
+    host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
+}
+
+void ListPattern::ResetScrollPlaceholder()
+{
+    scrollPlaceholderProvider_ = nullptr;
+    // Host reset/destroy: retire every mounted placeholder shell (unmount +
+    // content back to the pool); unfilled slots rebuild through the existing path.
+    for (auto& [index, info] : scrollPlaceholderItems_) {
+        RetireScrollPlaceholderShell(info.shell, info.templateId);
+    }
+    scrollPlaceholderItems_.clear();
+    for (auto& [shell, templateId] : retiringPlaceholderShells_) {
+        // Shells of committed items awaiting the layout-round reconcile are mounted
+        // too; the reset must retire them, not just forget them.
+        RetireScrollPlaceholderShell(shell, templateId);
+    }
+    retiringPlaceholderShells_.clear();
+    SweepOrphanPlaceholderShells();
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto* context = host->GetContext();
+    CHECK_NULL_VOID(context);
+    const auto& manager = context->GetOrCreateScrollPlaceholderManager();
+    CHECK_NULL_VOID(manager);
+    // Pending placeholder real-builds of this host turn stale immediately; the
+    // manager never calls back into a detached pattern.
+    manager->CancelHostRealBuilds(host->GetId(), ScrollPlaceholderCancelReason::HOST_RESET);
+}
+namespace {
+// Placeholder shell: a plain ListItem carrying only the placeholder visual
+// subtree (template instance) or just the suggested size - no swipe/sticky
+// business logic, no business events by construction. The shell node type keeps
+// a zero FrameCount so host-level child-slot enumerations never count it as an
+// item (index-space integrity, see ScrollPlaceholderShellNode).
+RefPtr<FrameNode> CreatePlaceholderShellNode(
+    const ScrollPlaceholderOptions& options, const RefPtr<ScrollPlaceholderManager>& manager)
+{
+    auto shell = ScrollPlaceholderShellNode::CreateScrollPlaceholderShellNode(V2::LIST_ITEM_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<ListItemPattern>(nullptr, V2::ListItemStyle::NONE));
+    CHECK_NULL_RETURN(shell, nullptr);
+    if (!options.id.empty() && manager->IsTemplateRegistered(options.id)) {
+        auto instance = manager->AcquireTemplateInstance(options.id);
+        if (instance) {
+            shell->AddChild(instance);
+        }
+    }
+    if (options.size.has_value()) {
+        CalcSize idealSize;
+        if (options.size->width.has_value()) {
+            idealSize.SetWidth(CalcLength(options.size->width.value()));
+        }
+        if (options.size->height.has_value()) {
+            idealSize.SetHeight(CalcLength(options.size->height.value()));
+        }
+        shell->GetLayoutProperty()->UpdateUserDefinedIdealSize(idealSize);
+    }
+    return shell;
+}
+
+// Mounted as a direct child of the List host, like other non-item direct
+// children; indexing is unaffected (syntax proxies own index resolution).
+void MountPlaceholderShellOnHost(const RefPtr<FrameNode>& host, const RefPtr<FrameNode>& shell)
+{
+    auto* context = host->GetContext();
+    CHECK_NULL_VOID(context);
+    // AddChild assigns parent and depth (UINode::DoAddChild).
+    host->AddChild(shell);
+    shell->SetActive(true);
+    if (host->IsOnMainTree()) {
+        shell->AttachToMainTree(false, context);
+    }
+    shell->MarkNeedSyncRenderTree();
+}
+} // namespace
+
+RefPtr<FrameNode> ListPattern::CreateScrollPlaceholderShell(int32_t index)
+{
+    // Component call-site decision (ADR-2): called from the List layout child
+    // acquisition for a not-yet-built visible index. Predicts with the remaining
+    // frame budget before the real builder would run; on USE_PLACEHOLDER mounts a
+    // placeholder shell on the List host and defers the real build into the
+    // pipeline framed queue. Returns null to keep the existing acquisition.
+    CHECK_NULL_RETURN(scrollPlaceholderProvider_, nullptr);
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, nullptr);
+    if (scrollPlaceholderItems_.find(index) != scrollPlaceholderItems_.end()) {
+        // Safety: never stack a second placeholder on the same index.
+        return scrollPlaceholderItems_[index].shell;
+    }
+    if (index < 0 || index >= host->GetTotalChildCount()) {
+        return nullptr;
+    }
+    if (host->GetChildByIndex(static_cast<uint32_t>(index))) {
+        // The real child at this index is already built (a committed real-build or a
+        // normal-path rebuild): never place a placeholder over it. Same predicate as
+        // the commit/reconcile paths; shells carry a zero frame count and never
+        // resolve here, so this sees real children only.
+        return nullptr;
+    }
+    auto* context = host->GetContext();
+    CHECK_NULL_RETURN(context, nullptr);
+    const auto& manager = context->GetOrCreateScrollPlaceholderManager();
+    CHECK_NULL_RETURN(manager, nullptr);
+    // Provider first: an item returning nullopt keeps the synchronous build path.
+    auto options = scrollPlaceholderProvider_(index);
+    CHECK_NULL_RETURN(options.has_value(), nullptr);
+    ScrollPlaceholderPredictParams params;
+    params.componentType = ScrollPlaceholderComponentType::LIST;
+    params.templateId = options->id;
+    params.hostNodeId = host->GetId();
+    params.index = index;
+    params.cacheBuild = false;
+    auto result = manager->Predict(params, manager->GetVsyncDerivedFrameDeadlineNs());
+    if (result.decision != ScrollPlaceholderDecision::USE_PLACEHOLDER) {
+        return nullptr;
+    }
+
+    auto shell = CreatePlaceholderShellNode(*options, manager);
+    CHECK_NULL_RETURN(shell, nullptr);
+    MountPlaceholderShellOnHost(host, shell);
+    ACE_SCOPED_TRACE("ScrollPlaceholder::Defer hostId:%d index:%d", host->GetId(), index);
+
+    ScrollPlaceholderItemInfo info;
+    info.shell = shell;
+    info.templateId = options->id;
+    if (!info.templateId.empty()) {
+        auto snapshot = manager->LookupTemplateForCreate(info.templateId);
+        info.templateGen = snapshot.has_value() ? snapshot->generation : 0;
+    }
+    scrollPlaceholderItems_[index] = info;
+    mountedPlaceholderShells_[shell] = info.templateId;
+    EnqueueScrollPlaceholderRealBuild(manager, params, info.templateGen);
+    return shell;
+}
+
+void ListPattern::EnqueueScrollPlaceholderRealBuild(
+    const RefPtr<ScrollPlaceholderManager>& manager,
+    const ScrollPlaceholderPredictParams& params, uint64_t templateGen)
+{
+    auto weak = WeakClaim(this);
+    manager->EnqueueRealBuild(params, templateGen,
+        [weak, index = params.index]() -> bool {
+            auto pattern = weak.Upgrade();
+            CHECK_NULL_RETURN(pattern, false);
+            return pattern->CommitScrollPlaceholderRealBuild(index);
+        },
+        ScrollPlaceholderRealBuildPriority::VISIBLE);
+}
+
+bool ListPattern::HasScrollPlaceholderItem(int32_t index) const
+{
+    return scrollPlaceholderItems_.find(index) != scrollPlaceholderItems_.end();
+}
+
+bool ListPattern::CommitScrollPlaceholderRealBuild(int32_t index)
+{
+    // Framed real-build closure (UI thread, pipeline OnIdle flush). The real item
+    // is produced by the existing build-style acquisition — the syntax layer path
+    // is untouched — and enters the tree there; the replacement completes with
+    // the next local remeasure (List's existing item-size anchor rules), after
+    // which the shell is retired (ReconcileScrollPlaceholderItems).
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, false);
+    auto iter = scrollPlaceholderItems_.find(index);
+    if (iter == scrollPlaceholderItems_.end()) {
+        return false;
+    }
+    if (index < 0 || index >= host->GetTotalChildCount()) {
+        // Data shrank below this index: drop the placeholder, never mount.
+        RetireScrollPlaceholderShell(iter->second.shell, iter->second.templateId);
+        scrollPlaceholderItems_.erase(iter);
+        return false;
+    }
+    // A real child already present at the index (built through the normal path
+    // after a data change): keep it, retire the placeholder.
+    if (host->GetChildByIndex(static_cast<uint32_t>(index))) {
+        RetireScrollPlaceholderShell(iter->second.shell, iter->second.templateId);
+        scrollPlaceholderItems_.erase(iter);
+        return false;
+    }
+    ACE_SCOPED_TRACE("ScrollPlaceholder::BuildReal hostId:%d index:%d", host->GetId(), index);
+    auto realWrapper = host->GetOrCreateChildByIndex(static_cast<uint32_t>(index), true);
+    if (!realWrapper) {
+        // Keep the placeholder; the item rebuilds through the layout path.
+        return false;
+    }
+    // Transaction: the real node is in the tree; the remeasure re-lays the item
+    // range (anchors follow the existing item size-change rules). The shell stays
+    // mounted until that layout completes, then the reconcile retires it (content
+    // back to the pool, shell unmounted outside the transaction).
+    retiringPlaceholderShells_.emplace_back(iter->second.shell, iter->second.templateId);
+    scrollPlaceholderItems_.erase(iter);
+    host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
+    return true;
+}
+
+void ListPattern::RetireScrollPlaceholderShell(const RefPtr<FrameNode>& shell, const std::string& templateId)
+{
+    CHECK_NULL_VOID(shell);
+    mountedPlaceholderShells_.erase(shell);
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    // Return the template content subtree to the per-template instance pool —
+    // the expensive part (builder/clone) — and drop the cheap shell.
+    bool contentPooled = false;
+    if (!templateId.empty() && shell->GetChildren().size() == 1) {
+        auto* context = host->GetContext();
+        const auto& manager = context ? context->GetOrCreateScrollPlaceholderManager() : nullptr;
+        if (manager) {
+            auto content = shell->GetChildren().front();
+            shell->RemoveChild(content);
+            manager->CacheTemplateInstance(templateId, content);
+            contentPooled = true;
+        }
+    }
+    if (!templateId.empty() && !contentPooled && !shell->GetChildren().empty()) {
+        // Content existed but missed the pool (unexpected child count or no manager):
+        // it degrades to the re-clone cost path; log to make pool anomalies visible.
+        TAG_LOGD(AceLogTag::ACE_SCROLL,
+            "ScrollPlaceholder content dropped without pooling: children=%{public}d, templateId=%{public}s",
+            static_cast<int32_t>(shell->GetChildren().size()), templateId.c_str());
+    }
+    host->RemoveChild(shell);
+    shell->DetachFromMainTree();
+}
+
+void ListPattern::ReconcileScrollPlaceholderItems()
+{
+    // Layout-round reconcile (ADR-7): placeholders whose index already holds a
+    // real child (normal-path rebuild after data change) or fell out of range are
+    // dropped; shells of committed items are retired after the replacement
+    // layout finished (removed outside the transaction, per the commit ordering).
+    // The orphan sweep at the end also runs with both tables empty: an empty
+    // table with a mounted shell is exactly the residual it exists to catch.
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    int32_t totalCount = host->GetTotalChildCount();
+    for (auto iter = scrollPlaceholderItems_.begin(); iter != scrollPlaceholderItems_.end();) {
+        bool drop = iter->first >= totalCount ||
+            (host->GetChildByIndex(static_cast<uint32_t>(iter->first)) != nullptr);
+        if (drop) {
+            RetireScrollPlaceholderShell(iter->second.shell, iter->second.templateId);
+            iter = scrollPlaceholderItems_.erase(iter);
+        } else {
+            ++iter;
+        }
+    }
+    for (auto& [shell, templateId] : retiringPlaceholderShells_) {
+        RetireScrollPlaceholderShell(shell, templateId);
+    }
+    retiringPlaceholderShells_.clear();
+    SweepOrphanPlaceholderShells();
+}
+
+void ListPattern::SweepOrphanPlaceholderShells()
+{
+    // Shells carry a zero frame count, so index-based cleanup (data shrink child
+    // removal, syntax rebuilds) never touches them: every retirement goes through
+    // the two tables. This sweep closes the residual path — a shell still mounted
+    // on the host (per the mounted-shell registry) that neither table tracks (a
+    // missed erase/retire somewhere) is retired here, with the template id from the
+    // registry so the content still finds its way back to the instance pool.
+    if (mountedPlaceholderShells_.empty()) {
+        return;
+    }
+    std::set<const FrameNode*> tracked;
+    for (const auto& [index, info] : scrollPlaceholderItems_) {
+        if (info.shell) {
+            tracked.insert(AceType::RawPtr(info.shell));
+        }
+    }
+    for (const auto& [shell, templateId] : retiringPlaceholderShells_) {
+        if (shell) {
+            tracked.insert(AceType::RawPtr(shell));
+        }
+    }
+    std::vector<std::pair<RefPtr<FrameNode>, std::string>> orphans;
+    for (const auto& [shell, templateId] : mountedPlaceholderShells_) {
+        if (shell && tracked.find(AceType::RawPtr(shell)) == tracked.end()) {
+            orphans.emplace_back(shell, templateId);
+        }
+    }
+    for (const auto& [shell, templateId] : orphans) {
+        TAG_LOGD(AceLogTag::ACE_SCROLL, "ScrollPlaceholder orphan shell swept: shellId=%{public}d",
+            shell->GetId());
+        RetireScrollPlaceholderShell(shell, templateId);
+    }
+}
+
 
 RefPtr<LayoutProperty> ListPattern::CreateLayoutProperty()
 {
@@ -350,6 +676,9 @@ bool ListPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, c
     if (config.skipMeasure && config.skipLayout) {
         return false;
     }
+    // Scroll placeholder layout-round reconcile: retire shells whose replacement
+    // layout finished and drop placeholders overtaken by real children.
+    ReconcileScrollPlaceholderItems();
     auto layoutAlgorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
     CHECK_NULL_RETURN(layoutAlgorithmWrapper, false);
     auto listLayoutAlgorithm = DynamicCast<ListLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());

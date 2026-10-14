@@ -109,6 +109,64 @@ bool ScrollPlaceholderManager::IsTemplateRegistered(const std::string& templateI
     return registry_.IsRegistered(templateId);
 }
 
+bool ScrollPlaceholderManager::ProbeTemplateClone(const std::string& templateId, std::string& subtreePath)
+{
+    subtreePath.clear();
+    if (destroyed_.load(std::memory_order_relaxed)) {
+        return false;
+    }
+    auto source = registry_.GetTemplateSourceInstance(templateId);
+    if (!source) {
+        subtreePath = "<no source instance>";
+        return false;
+    }
+    // Validation is the clone itself: the real production copy path runs here on the
+    // UI thread, so probe success and later background-clone success share behavior.
+    // A walk over the copy fn accumulates the failing node's tag path so the
+    // rejection diagnostic pinpoints the offending subtree location.
+    std::function<bool(const RefPtr<UINode>&, std::string&)> probeNode =
+        [&probeNode](const RefPtr<UINode>& node, std::string& path) -> bool {
+        auto frame = AceType::DynamicCast<FrameNode>(node);
+        if (!frame) {
+            path = node->GetTag();
+            return false;
+        }
+        const auto& pattern = frame->GetPattern();
+        if (!pattern || !pattern->CloneForPlaceholder()) {
+            path = node->GetTag();
+            return false;
+        }
+        for (const auto& child : node->GetChildren()) {
+            std::string childPath;
+            if (!probeNode(child, childPath)) {
+                path = node->GetTag() + " > " + childPath;
+                return false;
+            }
+        }
+        return true;
+    };
+    if (!probeNode(source, subtreePath)) {
+        registerRejected_.fetch_add(1, std::memory_order_relaxed);
+        TAG_LOGW(AceLogTag::ACE_SCROLL,
+            "ScrollPlaceholder register probe rejected: unsupported component at %{public}s, "
+            "templateId=%{public}s, instanceId=%{public}d",
+            subtreePath.c_str(), templateId.c_str(), instanceId_);
+        return false;
+    }
+    // Successful probe: the clone itself joins the instance pool (probing and
+    // production share the copy path, so the product is a valid spare).
+    auto copy = CloneScrollPlaceholderSubtreeTopDown(
+        source, [this](const RefPtr<UINode>& node) { return CreatePlaceholderNodeCopy(node); });
+    if (!copy) {
+        subtreePath = source->GetTag();
+        registerRejected_.fetch_add(1, std::memory_order_relaxed);
+        return false;
+    }
+    registry_.CacheTemplateInstance(templateId, copy);
+    ScheduleBackgroundReplenish(templateId);
+    return true;
+}
+
 std::optional<ScrollPlaceholderTemplateSnapshot> ScrollPlaceholderManager::LookupTemplateForCreate(
     const std::string& templateId)
 {
@@ -275,19 +333,32 @@ RefPtr<UINode> ScrollPlaceholderManager::CreatePlaceholderNodeCopy(const RefPtr<
     // Same-type creation through the frame node creation interface, then property copy from
     // the source node. The caller runs this inside a thread-safe node scope, so the created
     // node registers into the mutex-guarded multi-thread registry instead of racing the
-    // global element register; no JS VM is involved. Stage scope: plain frame nodes of the
-    // restricted render-only placeholder subtree copy their (concrete) layout property —
-    // pattern-specific paint state and JS custom nodes are covered by the compiler
-    // restricted factory contract (step2) plugging into this hook; until then such nodes
-    // make the whole clone fail and the pool degrades to the UI-thread paths.
+    // global element register; no JS VM is involved.
+    // Restricted copy protocol (step2): the pattern participates through
+    // Pattern::CloneForPlaceholder — the base returns nullptr (component not on the
+    // restricted whitelist), which fails the whole subtree copy; whitelisted
+    // render-only components return a fresh pattern that restores their
+    // self-measure/layout algorithms without any callbacks or cross-thread state.
+    // The layout property (text content / image src / border width) is copied
+    // wholesale — a placeholder is a snapshot of the template — and the
+    // layout-relevant render geometry (zIndex, stacking order) is carried over.
     auto source = AceType::DynamicCast<FrameNode>(node);
     CHECK_NULL_RETURN(source, nullptr);
+    const auto& sourcePattern = source->GetPattern();
+    CHECK_NULL_RETURN(sourcePattern, nullptr);
+    auto clonedPattern = sourcePattern->CloneForPlaceholder();
+    CHECK_NULL_RETURN(clonedPattern, nullptr);
     auto copy = FrameNode::CreateFrameNode(
-        source->GetTag(), ElementRegister::GetInstance()->MakeUniqueId(), MakeRefPtr<Pattern>());
+        source->GetTag(), ElementRegister::GetInstance()->MakeUniqueId(), std::move(clonedPattern));
     CHECK_NULL_RETURN(copy, nullptr);
     const auto& layoutProperty = source->GetLayoutProperty();
     if (layoutProperty) {
         copy->SetLayoutProperty(layoutProperty->Clone());
+    }
+    const auto& sourceRenderContext = source->GetRenderContext();
+    auto copyRenderContext = copy->GetRenderContext();
+    if (sourceRenderContext && copyRenderContext && sourceRenderContext->HasZIndex()) {
+        copyRenderContext->UpdateZIndex(sourceRenderContext->GetZIndex().value_or(0));
     }
     return copy;
 }

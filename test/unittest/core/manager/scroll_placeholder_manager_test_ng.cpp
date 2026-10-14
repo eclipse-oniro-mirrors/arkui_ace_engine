@@ -32,6 +32,7 @@
 #include "core/components_ng/layout/layout_wrapper_node.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_observer.h"
 #include "core/components_ng/pattern/pattern.h"
+#include "core/components_ng/pattern/linear_layout/linear_layout_pattern.h"
 #include "core/pipeline/base/element_register.h"
 #include "core/pipeline/base/element_register_multi_thread.h"
 #include "core/pipeline_ng/pipeline_context.h"
@@ -147,11 +148,15 @@ ScrollPlaceholderBuilder MakeTreeBuilder(int32_t baseId)
 // Builder producing a frame-node placeholder subtree for the production copy protocol.
 ScrollPlaceholderBuilder MakeFrameTreeBuilder()
 {
+    // Restricted copy protocol (step2): only whitelisted patterns clone, so the
+    // production copy path needs whitelisted pattern nodes (plain containers).
     return ScrollPlaceholderBuilder([]() -> RefPtr<UINode> {
-        auto root = FrameNode::CreateFrameNode(
-            "placeholder_root", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
-        auto child = FrameNode::CreateFrameNode(
-            "placeholder_child", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+        auto root = FrameNode::CreateFrameNode("placeholder_root",
+            ElementRegister::GetInstance()->MakeUniqueId(),
+            AceType::MakeRefPtr<LinearLayoutPattern>(false));
+        auto child = FrameNode::CreateFrameNode("placeholder_child",
+            ElementRegister::GetInstance()->MakeUniqueId(),
+            AceType::MakeRefPtr<LinearLayoutPattern>(true));
         child->GetLayoutProperty()->UpdateAspectRatio(1.5f);
         root->AddChild(child);
         return root;
@@ -526,10 +531,13 @@ HWTEST_F(ScrollPlaceholderManagerTestNg, PlaceholderPoolDefaultCopyCreatesSameTy
 {
     manager_->useDefaultCopyProtocol = true;
     auto builder = []() -> RefPtr<UINode> {
-        auto root = FrameNode::CreateFrameNode(
-            "placeholder_root", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
-        auto child = FrameNode::CreateFrameNode(
-            "placeholder_child", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+        // Whitelisted (restricted copy protocol) patterns: plain containers.
+        auto root = FrameNode::CreateFrameNode("placeholder_root",
+            ElementRegister::GetInstance()->MakeUniqueId(),
+            AceType::MakeRefPtr<LinearLayoutPattern>(false));
+        auto child = FrameNode::CreateFrameNode("placeholder_child",
+            ElementRegister::GetInstance()->MakeUniqueId(),
+            AceType::MakeRefPtr<LinearLayoutPattern>(true));
         child->GetLayoutProperty()->UpdateAspectRatio(1.5f);
         root->AddChild(child);
         return root;

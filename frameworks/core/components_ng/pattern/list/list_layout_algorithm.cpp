@@ -40,6 +40,7 @@
 #include "core/components_ng/property/layout_constraint.h"
 #include "core/components_ng/property/measure_property.h"
 #include "core/components_ng/property/measure_utils.h"
+#include "core/components_ng/layout/layout_wrapper_node.h"
 #include "core/components_ng/pattern/list/list_properties.h"
 #include "core/pipeline_ng/pipeline_context.h"
 
@@ -81,6 +82,19 @@ static RefPtr<LayoutWrapper> GetListItemWithEmptyBranch(
     auto wrapper = layoutWrapper->GetOrCreateChildByIndex(index, addToRenderTree, isCache);
     buildScope.SetAcquiredWrapper(wrapper);
     return wrapper;
+}
+
+// Fast flag check on the List host pattern: with the scroll placeholder provider
+// set, the layout loops keep filling the viewport past the response deadline with
+// cheap placeholder items (deferred real builds) instead of stopping early.
+bool IsScrollPlaceholderEnabled(const LayoutWrapper* layoutWrapper)
+{
+    CHECK_NULL_RETURN(layoutWrapper, false);
+    const auto& host = layoutWrapper->GetHostNode();
+    CHECK_NULL_RETURN(host, false);
+    const auto& pattern = host->GetPattern<ListPattern>();
+    CHECK_NULL_RETURN(pattern, false);
+    return pattern->IsScrollPlaceholderEnabled();
 }
 } // namespace
 
@@ -1481,7 +1495,10 @@ void ListLayoutAlgorithm::LayoutForward(LayoutWrapper* layoutWrapper, int32_t st
     auto chainOffset = 0.0f;
     do {
         if ((static_cast<int32_t>(itemPosition_.size()) > prevItemPosCount_) && !syncLoad_ &&
-            layoutWrapper->ReachResponseDeadline()) {
+            layoutWrapper->ReachResponseDeadline() && !IsScrollPlaceholderEnabled(layoutWrapper)) {
+            // With scroll placeholder enabled the loop keeps filling the viewport
+            // with cheap placeholder items instead of deferring the whole tail to
+            // the next frame (which would show a blank area while scrolling).
             measureInNextFrame_ = true;
             return;
         }
@@ -1572,7 +1589,10 @@ void ListLayoutAlgorithm::LayoutBackward(LayoutWrapper* layoutWrapper, int32_t e
     auto chainOffset = 0.0f;
     do {
         if ((static_cast<int32_t>(itemPosition_.size()) > prevItemPosCount_) && !syncLoad_ &&
-            layoutWrapper->ReachResponseDeadline()) {
+            layoutWrapper->ReachResponseDeadline() && !IsScrollPlaceholderEnabled(layoutWrapper)) {
+            // With scroll placeholder enabled the loop keeps filling the viewport
+            // with cheap placeholder items instead of deferring the whole tail to
+            // the next frame (which would show a blank area while scrolling).
             measureInNextFrame_ = true;
             return;
         }
@@ -3351,6 +3371,22 @@ RefPtr<LayoutWrapper> ListLayoutAlgorithm::GetListItem(
 {
     index = (!isStackFromEnd_ ? index : totalItemCount_ - index - 1) + itemStartIndex_;
 
+    // FEAT scroll placeholder — component call-site intercept (ADR-2, 2026-10-12):
+    // for a not-yet-built visible index, decide with the remaining frame budget
+    // before the real builder would run. A deferred index returns the mounted
+    // placeholder shell's wrapper (synthesized like the empty-branch dummy) and
+    // its real build enters the pipeline framed queue; BUILD_REAL_NOW keeps the
+    // existing acquisition untouched. Cache/preload paths are never deferred.
+    if (!isCache && layoutWrapper) {
+        const auto& host = layoutWrapper->GetHostNode();
+        const auto& pattern = host ? host->GetPattern<ListPattern>() : nullptr;
+        if (pattern && pattern->IsScrollPlaceholderEnabled()) {
+            auto shell = pattern->CreateScrollPlaceholderShell(index);
+            if (shell) {
+                return shell->CreateLayoutWrapper(true, true);
+            }
+        }
+    }
     return GetListItemWithEmptyBranch(layoutWrapper, index, addToRenderTree, isCache);
 }
 } // namespace OHOS::Ace::NG

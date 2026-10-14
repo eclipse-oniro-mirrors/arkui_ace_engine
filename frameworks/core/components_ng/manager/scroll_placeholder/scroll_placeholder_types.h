@@ -18,6 +18,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <string>
 
 #include "base/memory/ace_type.h"
@@ -71,6 +72,25 @@ enum class ScrollPlaceholderCancelReason : int32_t {
 // capability check are delivered by the compiler-contract step; until then the handle stays an
 // internal registration entry keyed for cost prediction.
 using ScrollPlaceholderBuilder = std::function<RefPtr<UINode>()>;
+
+// Per-item placeholder description returned by the scrollPlaceholder provider
+// (List/Grid/WaterFlow attribute). Suggested size only influences the placeholder
+// measurement, never the real item layout; invalid dimensions are ignored in favor
+// of the component's own estimate. Added by the component adapter steps (step2/3).
+struct ScrollPlaceholderSizeOption {
+    std::optional<float> width;
+    std::optional<float> height;
+};
+
+struct ScrollPlaceholderOptions {
+    // Registered placeholder template id; empty means the system default placeholder.
+    std::string id;
+    std::optional<ScrollPlaceholderSizeOption> size;
+};
+
+// Northbound provider: called synchronously on the UI thread while scrolling; a pure
+// calculation that must not trigger builds. nullopt means the item needs no placeholder.
+using ScrollPlaceholderProvider = std::function<std::optional<ScrollPlaceholderOptions>(int32_t index)>;
 
 } // namespace OHOS::Ace::NG
 

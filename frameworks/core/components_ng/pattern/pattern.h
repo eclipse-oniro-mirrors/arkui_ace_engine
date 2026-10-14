@@ -193,6 +193,19 @@ public:
 
     virtual RefPtr<LayoutAlgorithm> CreateLayoutAlgorithm();
 
+    // Restricted scroll-placeholder copy protocol: clones an offline-renderable
+    // placeholder counterpart of this pattern for the template instance pool
+    // (background traversal clones copy the node's layout property wholesale —
+    // text content / image src ride along — plus the layout-relevant render
+    // geometry). The base returns nullptr = the component does not support
+    // placeholder templates; only restricted render-only components override it.
+    // Implementations must not copy callbacks, closures, cross-thread handles
+    // or weak pointers to other nodes.
+    virtual RefPtr<Pattern> CloneForPlaceholder()
+    {
+        return nullptr;
+    }
+
     virtual RefPtr<NodePaintMethod> CreateNodePaintMethod()
     {
         return nullptr;
