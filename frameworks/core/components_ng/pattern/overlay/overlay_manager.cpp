@@ -355,7 +355,7 @@ std::unordered_map<SheetKey, WeakPtr<FrameNode>, SheetKeyHash> OverlayManager::G
 
 void OverlayManager::SetFilterActive(bool actived)
 {
-    hasFilterActived = actived;
+    hasFilterActived_ = actived;
 }
 
 void OverlayManager::SetDismissPopupId(int32_t targetId)
@@ -5643,6 +5643,13 @@ void OverlayManager::RemoveFilterAnimation()
     auto filterNode = filterColumnNodeWeak_.Upgrade();
     if (!filterNode) {
         hasFilter_ = false;
+        return;
+    }
+
+    if (hasFilterActived_) {
+        TAG_LOGI(AceLogTag::ACE_OVERLAY,
+            "filter show animation still active (hasFilterActived_=true), skip disappear for filterId=%{public}d",
+            filterNode->GetId());
         return;
     }
 
