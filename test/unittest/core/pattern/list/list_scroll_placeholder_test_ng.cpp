@@ -487,6 +487,12 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderRegisteredTemplateFlow001
     // stays invisible to host child-slot enumerations by design.
     EXPECT_EQ(info.shell->GetChildren().size(), 1u);
     EXPECT_EQ(info.shell->FrameCount(), 0);
+    // Device blank-shell finding: the offline-built instance subtree must be activated
+    // on mount — FrameNode::SetActive does not recurse, and inactive content is dropped
+    // from layout participation and render sync.
+    auto instance = AceType::DynamicCast<FrameNode>(info.shell->GetChildren().front());
+    ASSERT_TRUE(instance);
+    EXPECT_TRUE(instance->IsActive());
 
     EXPECT_TRUE(pattern_->CommitScrollPlaceholderRealBuild(index));
     pattern_->ReconcileScrollPlaceholderItems();

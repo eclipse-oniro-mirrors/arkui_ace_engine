@@ -35,6 +35,7 @@
 #include "core/components_ng/base/inspector_filter.h"
 #include "core/components_ng/manager/content_change_manager/content_change_manager.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_manager.h"
+#include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_node_clone.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_shell_node.h"
 #include "core/components_ng/pattern/list/list_item_pattern.h"
 #include "core/components_v2/inspector/inspector_constants.h"
@@ -245,6 +246,47 @@ void ListPattern::ResetScrollPlaceholder()
     manager->CancelHostRealBuilds(host->GetId(), ScrollPlaceholderCancelReason::HOST_RESET);
 }
 namespace {
+// The instance subtree is built offline (isolated view stack at registration or a
+// background clone): every node still carries the default inactive flag, and
+// FrameNode::SetActive - unlike the UINode base - activates only the node itself.
+// An inactive subtree is dropped from layout participation and render sync
+// (SetRerenderable gates on IsActive), which is exactly the blank-but-sized
+// placeholder shell observed on device: activate the whole subtree on mount.
+void ActivatePlaceholderSubtree(const RefPtr<UINode>& node)
+{
+    auto frame = AceType::DynamicCast<FrameNode>(node);
+    if (frame) {
+        frame->SetActive(true);
+    }
+    for (const auto& child : node->GetChildren()) {
+        ActivatePlaceholderSubtree(child);
+    }
+}
+
+// Post-layout state of one live shell for on-device triage: distinguishes "content
+// never mounted" (none), "content never measured" (zero-size content) and
+// "measured but not painted" (non-zero size, still blank visually).
+void LogScrollPlaceholderShellState(int32_t index, const RefPtr<FrameNode>& shell)
+{
+    auto shellSize = shell->GetGeometryNode()->GetFrameSize();
+    if (shell->GetChildren().empty()) {
+        TAG_LOGD(AceLogTag::ACE_SCROLL,
+            "ScrollPlaceholder shell live: index=%{public}d, shellId=%{public}d, "
+            "shellSize=%{public}fx%{public}f, content=none",
+            index, shell->GetId(), shellSize.Width(), shellSize.Height());
+        return;
+    }
+    auto content = AceType::DynamicCast<FrameNode>(shell->GetChildren().front());
+    CHECK_NULL_VOID(content);
+    auto contentSize = content->GetGeometryNode()->GetFrameSize();
+    TAG_LOGD(AceLogTag::ACE_SCROLL,
+        "ScrollPlaceholder shell live: index=%{public}d, shellId=%{public}d, "
+        "shellSize=%{public}fx%{public}f, contentTag=%{public}s, contentActive=%{public}d, "
+        "contentSize=%{public}fx%{public}f",
+        index, shell->GetId(), shellSize.Width(), shellSize.Height(), content->GetTag().c_str(),
+        static_cast<int32_t>(content->IsActive()), contentSize.Width(), contentSize.Height());
+}
+
 // Placeholder shell: a plain ListItem carrying only the placeholder visual
 // subtree (template instance) or just the suggested size - no swipe/sticky
 // business logic, no business events by construction. The shell node type keeps
@@ -272,6 +314,14 @@ RefPtr<FrameNode> CreatePlaceholderShellNode(
         auto instance = manager->AcquireTemplateInstance(options.id);
         if (instance) {
             shell->AddChild(instance);
+            ActivatePlaceholderSubtree(instance);
+            int32_t nodeCount = 0;
+            int32_t depth = 0;
+            CountScrollPlaceholderSubtree(instance, nodeCount, depth);
+            TAG_LOGD(AceLogTag::ACE_SCROLL,
+                "ScrollPlaceholder shell mounted with template content: templateId=%{public}s, "
+                "rootTag=%{public}s, nodeCount=%{public}d, depth=%{public}d",
+                options.id.c_str(), instance->GetTag().c_str(), nodeCount, depth);
         }
     }
     if (options.size.has_value()) {
@@ -493,6 +543,9 @@ void ListPattern::ReconcileScrollPlaceholderItems()
     CHECK_NULL_VOID(host);
     int32_t totalCount = host->GetTotalChildCount();
     for (auto iter = scrollPlaceholderItems_.begin(); iter != scrollPlaceholderItems_.end();) {
+        if (iter->second.shell) {
+            LogScrollPlaceholderShellState(iter->first, iter->second.shell);
+        }
         bool drop = iter->first >= totalCount ||
             (host->GetChildByIndex(static_cast<uint32_t>(iter->first)) != nullptr);
         if (drop) {

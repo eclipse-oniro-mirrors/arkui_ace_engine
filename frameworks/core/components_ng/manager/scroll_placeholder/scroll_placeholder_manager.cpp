@@ -164,6 +164,16 @@ bool ScrollPlaceholderManager::ProbeTemplateClone(const std::string& templateId,
     }
     registry_.CacheTemplateInstance(templateId, copy);
     ScheduleBackgroundReplenish(templateId);
+    // One-shot source shape for on-device triage of blank-shell reports: an empty or
+    // unexpectedly tiny source subtree here means the template itself produced no
+    // visual content, which no shell-side log can distinguish later.
+    int32_t nodeCount = 0;
+    int32_t depth = 0;
+    CountScrollPlaceholderSubtree(source, nodeCount, depth);
+    TAG_LOGI(AceLogTag::ACE_SCROLL,
+        "ScrollPlaceholder template source admitted: templateId=%{public}s, rootTag=%{public}s, "
+        "nodeCount=%{public}d, depth=%{public}d, instanceId=%{public}d",
+        templateId.c_str(), source->GetTag().c_str(), nodeCount, depth, instanceId_);
     return true;
 }
 
