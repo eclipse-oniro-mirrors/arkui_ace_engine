@@ -286,7 +286,8 @@ Ark_Boolean PostInputEventImpl(Ark_BuilderNodeOps peer, const Opt_InputEventType
         case SELECTOR_ID_1: {
             auto mouseEventInfo = arkEevent.value1->GetEventInfo();
             CHECK_NULL_RETURN(mouseEventInfo, errValue);
-            auto mouseEvent = mouseEventInfo->ConvertToMouseEventForStatic();
+            auto density = static_cast<float>(pipelineContext->GetDensity());
+            auto mouseEvent = mouseEventInfo->ConvertToMouseEventForStatic(density);
             mouseEvent.time = mouseEventInfo->GetTimeStamp();
             result = postEventManager->PostMouseEvent(peer->realNode_, std::move(mouseEvent));
             break;
@@ -358,7 +359,8 @@ Ark_Boolean PostInputEventWithStrategyImpl(Ark_BuilderNodeOps peer, const Opt_In
         case SELECTOR_ID_1: {
             auto mouseEventInfo = arkEvent.value1->GetEventInfo();
             CHECK_NULL_RETURN(mouseEventInfo, errValue);
-            auto mouseEvent = mouseEventInfo->ConvertToMouseEventForStatic();
+            auto density = static_cast<float>(pipelineContext->GetDensity());
+            auto mouseEvent = mouseEventInfo->ConvertToMouseEventForStatic(density);
             mouseEvent.time = mouseEventInfo->GetTimeStamp();
             mouseEvent.isNewReferee = isNewReferee;
             result = postEventManager->PostMouseEventWithStrategy(peer->realNode_, std::move(mouseEvent));
