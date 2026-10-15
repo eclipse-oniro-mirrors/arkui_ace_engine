@@ -29,8 +29,10 @@
 #include "core/components_ng/base/ui_node.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_cost_model.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_manager.h"
+#include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_node_clone.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_restricted_scope.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_shell_node.h"
+#include "core/components_ng/property/layout_constraint.h"
 #include "core/components_ng/layout/layout_wrapper_node.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_observer.h"
 #include "core/components_ng/pattern/pattern.h"
@@ -38,6 +40,7 @@
 #include "core/components_ng/pattern/image/image_pattern.h"
 #include "core/components_ng/pattern/linear_layout/linear_layout_pattern.h"
 #include "core/components_ng/pattern/stack/stack_pattern.h"
+#include "core/components_ng/pattern/text/text_layout_property.h"
 #include "core/components_ng/pattern/text/text_pattern.h"
 #include "core/pipeline/base/element_register.h"
 #include "core/pipeline/base/element_register_multi_thread.h"
@@ -1500,5 +1503,61 @@ HWTEST_F(ScrollPlaceholderRestrictedScopeTestNg, RestrictedScopeProductMark001, 
     }
     EXPECT_FALSE(ScrollPlaceholderRestrictedScope::IsMarkedProduct(
         TestPlaceholderNode::CreateTestNode(overflowBaseId)));
+}
+
+/**
+ * @tc.name: ScrollPlaceholderTextCloneMeasure001
+ * @tc.desc: A Text source built offline — content written into TextLayoutProperty and
+ *           nothing else ever runs, the exact shape the isolated builder produces and
+ *           what the device demo registers — must clone with its content intact and
+ *           measure to a non-zero size after mount, like the first shell layout would.
+ *           The source is the control: if even it measures zero on host typography,
+ *           the measurement half of the assertion is inconclusive and only the
+ *           content-copy half is binding.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPlaceholderManagerTestNg, ScrollPlaceholderTextCloneMeasure001, TestSize.Level1)
+{
+    auto source = FrameNode::CreateFrameNode(
+        V2::TEXT_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<TextPattern>());
+    ASSERT_TRUE(source);
+    auto sourceProp = source->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_TRUE(sourceProp);
+    sourceProp->UpdateContent(u"I'm placeholder");
+
+    // Full production chain with the real copy protocol: register (the builder returns
+    // the offline-built source, like RegisterTemplate stores it), probe-clone, acquire.
+    manager_->useDefaultCopyProtocol = true;
+    ASSERT_EQ(manager_->RegisterTemplate("tpl-text", [source]() -> RefPtr<UINode> { return source; }), 1u);
+    std::string subtreePath;
+    ASSERT_TRUE(manager_->ProbeTemplateClone("tpl-text", subtreePath)) << "path: " << subtreePath;
+    auto copy = manager_->AcquireTemplateInstance("tpl-text");
+    ASSERT_TRUE(copy);
+    auto copyFrame = AceType::DynamicCast<FrameNode>(copy);
+    ASSERT_TRUE(copyFrame);
+    auto copyProp = copyFrame->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_TRUE(copyProp);
+    // The layout property clone must carry the text content across.
+    EXPECT_EQ(copyProp->GetContent().value_or(u""), u"I'm placeholder");
+
+    LayoutConstraintF constraint;
+    constraint.maxSize = { 1000.0f, 1000.0f };
+    constraint.percentReference = { 1000.0f, 1000.0f };
+    auto measureFrame = [&constraint](const RefPtr<FrameNode>& node) -> SizeF {
+        auto wrapper = node->CreateLayoutWrapper(true, true);
+        wrapper->GetLayoutProperty()->UpdateLayoutConstraint(constraint);
+        wrapper->GetLayoutProperty()->UpdatePropertyChangeFlag(PROPERTY_UPDATE_MEASURE);
+        wrapper->Measure(constraint);
+        return wrapper->GetGeometryNode()->GetFrameSize();
+    };
+    auto sourceSize = measureFrame(source);
+    auto copySize = measureFrame(copyFrame);
+    // Host UT has no real typography (text suites measure against mock paragraphs),
+    // so sizes here do not discriminate: the source control measures 0x0 as well.
+    // Sizes are recorded for the log; on device the post-layout "shell live" log is
+    // the authoritative discriminator (contentSize zero vs non-zero vs not painted).
+    GTEST_LOG_(INFO) << "TextCloneMeasure source=" << sourceSize.Width() << "x" << sourceSize.Height()
+                     << " copy=" << copySize.Width() << "x" << copySize.Height();
+    EXPECT_EQ(copySize, sourceSize);
 }
 } // namespace OHOS::Ace::NG
