@@ -386,7 +386,7 @@ interface ChipItemsBuilderOptions {
 
 @Component
 export struct ChipGroup {
-  @Prop @Watch('onItemsChange') items: ChipGroupItemOptions[] = [];
+  @Prop @Watch('onItemsChangeInternal') items: ChipGroupItemOptions[] = [];
   @Prop @Watch('itemStyleOnChange') itemStyle: ChipItemStyle = defaultTheme.itemStyle;
   @Provide chipSize: ChipSize | SizeOptions = defaultTheme.itemStyle.size;
   @Provide inGroup: boolean = true;
@@ -397,12 +397,17 @@ export struct ChipGroup {
   @Prop selectedBackgroundSystemMaterial?: uiMaterial.Material = undefined;
   @BuilderParam suffix?: Callback<void>;
   public onChange: Callback<Array<number>> = noop;
+  public onItemsChange?: Callback<ChipGroupItemOptions[]> = undefined;
   private scroller: Scroller = new Scroller();
   @State isReachEnd: boolean = this.scroller.isAtEnd();
   @Prop chipGroupPadding: ChipGroupPaddingOptions = defaultTheme.chipGroupPadding;
   @State isRefresh: boolean = true;
+  private closedIndexes: number[] = [];
 
-  onItemsChange() {
+  onItemsChangeInternal() {
+    if (this.closedIndexes.length > 0) {
+      this.closedIndexes = [];
+    }
     this.isRefresh = !this.isRefresh;
   }
 
@@ -578,6 +583,14 @@ export struct ChipGroup {
     return this.onChange ?? noop;
   }
 
+  private onItemClose(index: number): void {
+    if (!this.onItemsChange || this.closedIndexes.includes(index)) {
+      return;
+    }
+    this.closedIndexes.push(index);
+    this.onItemsChange?.(this.items.filter((element, i) => !this.closedIndexes.includes(i)));
+  }
+
   private isSelected(itemIndex: number): boolean {
     if (!this.isMultiple()) {
       return itemIndex == this.getSelectedIndexes()[0];
@@ -658,6 +671,11 @@ export struct ChipGroup {
                 this.selectedIndexes.push(index);
               }
               this.getOnChange()(this.getSelectedIndexes());
+            },
+            onClose: () => {
+              if (this.onItemsChange) {
+                this.onItemClose(index);
+              }
             }
           })
         }

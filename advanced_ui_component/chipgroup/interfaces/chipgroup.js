@@ -461,12 +461,14 @@ export class ChipGroup extends ViewPU {
     );
     this.suffix = undefined;
     this.onChange = noop;
+    this.onItemsChange = undefined;
     this.scroller = new Scroller();
     this.__isReachEnd = new ObservedPropertySimplePU(this.scroller.isAtEnd(), this, 'isReachEnd');
     this.__chipGroupPadding = new SynchedPropertyObjectOneWayPU(params.chipGroupPadding, this, 'chipGroupPadding');
     this.__isRefresh = new ObservedPropertySimplePU(true, this, 'isRefresh');
+    this.closedIndexes = [];
     this.setInitiallyProvidedValue(params);
-    this.declareWatch('items', this.onItemsChange);
+    this.declareWatch('items', this.onItemsChangeInternal);
     this.declareWatch('itemStyle', this.itemStyleOnChange);
     this.declareWatch('multiple', this.onMultipleChange);
     this.finalizeConstruction();
@@ -505,6 +507,9 @@ export class ChipGroup extends ViewPU {
     if (params.onChange !== undefined) {
       this.onChange = params.onChange;
     }
+    if (params.onItemsChange !== undefined) {
+      this.onItemsChange = params.onItemsChange;
+    }
     if (params.scroller !== undefined) {
       this.scroller = params.scroller;
     }
@@ -516,6 +521,9 @@ export class ChipGroup extends ViewPU {
     }
     if (params.isRefresh !== undefined) {
       this.isRefresh = params.isRefresh;
+    }
+    if (params.closedIndexes !== undefined) {
+      this.closedIndexes = params.closedIndexes;
     }
   }
   updateStateVars(params) {
@@ -630,7 +638,10 @@ export class ChipGroup extends ViewPU {
   set isRefresh(newValue) {
     this.__isRefresh.set(newValue);
   }
-  onItemsChange() {
+  onItemsChangeInternal() {
+    if (this.closedIndexes.length > 0) {
+      this.closedIndexes = [];
+    }
     this.isRefresh = !this.isRefresh;
   }
   onMultipleChange() {
@@ -788,6 +799,13 @@ export class ChipGroup extends ViewPU {
   getOnChange() {
     return this.onChange ?? noop;
   }
+  onItemClose(index) {
+    if (!this.onItemsChange || this.closedIndexes.includes(index)) {
+      return;
+    }
+    this.closedIndexes.push(index);
+    this.onItemsChange?.(this.items.filter((element, i) => !this.closedIndexes.includes(i)));
+  }
   isSelected(itemIndex) {
     if (!this.isMultiple()) {
       return itemIndex == this.getSelectedIndexes()[0];
@@ -879,6 +897,11 @@ export class ChipGroup extends ViewPU {
                     }
                     this.getOnChange()(this.getSelectedIndexes());
                   },
+                  onClose: () => () => {
+                    if (this.onItemsChange) {
+                      this.onItemClose(index);
+                    }
+                  }
                 })
               );
             });
