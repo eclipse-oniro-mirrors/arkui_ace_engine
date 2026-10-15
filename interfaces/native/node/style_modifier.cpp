@@ -5305,7 +5305,7 @@ void ResetPunctuationOverflow(ArkUI_NodeHandle node)
 int32_t SetRichEditorCaretStyle(ArkUI_NodeHandle node, const ArkUI_AttributeItem* item)
 {
     auto actualSize = CheckAttributeItemArray(item, REQUIRED_ONE_PARAM);
-    if (actualSize < 0 || LessNotEqual(item->value[NUM_0].f32, 0.0f)) {
+    if (actualSize < 0 || LessOrEqual(item->value[NUM_0].f32, 0.0f)) {
         return ARKUI_ERROR_CODE_PARAM_INVALID;
     }
     auto* fullImpl = GetFullImpl();
