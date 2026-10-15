@@ -18,14 +18,15 @@
 #include <algorithm>
 #include <optional>
 #include <set>
+#include <utility>
 #include <vector>
 
 #include "base/utils/time_util.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_manager.h"
+#include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_shell_node.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_types.h"
 #include "core/components_ng/pattern/linear_layout/linear_layout_pattern.h"
 #include "core/components_ng/pattern/list/list_item_pattern.h"
-#include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_shell_node.h"
 #include "core/pipeline/base/element_register.h"
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 
@@ -40,6 +41,17 @@ ScrollPlaceholderOptions MakeDefaultPlaceholderOptions()
 {
     ScrollPlaceholderOptions options;
     ScrollPlaceholderSizeOption sizeOption;
+    sizeOption.height = ITEM_MAIN_SIZE;
+    options.size = sizeOption;
+    return options;
+}
+
+ScrollPlaceholderOptions MakeSizedPlaceholderOptions(const std::string& id)
+{
+    ScrollPlaceholderOptions options;
+    options.id = id;
+    ScrollPlaceholderSizeOption sizeOption;
+    sizeOption.width = ITEM_MAIN_SIZE;
     sizeOption.height = ITEM_MAIN_SIZE;
     options.size = sizeOption;
     return options;
@@ -95,22 +107,79 @@ class ListScrollPlaceholderTestNg : public ListTestNg {
 public:
     // Anchor a frame whose derived deadline is already reached: every prediction defers
     // (remaining budget 0) regardless of the cost-model samples recorded by other tests
-    // in this binary, so the placeholder path is deterministic.
-    void AnchorExpiredFrame()
+    // in this binary, so the placeholder path is deterministic. A live anchor instead
+    // puts the deadline a long period ahead, so the stage-1 budget gate (aggregate
+    // estimate) keeps BUILD_REAL_NOW.
+    void AnchorFrame(bool expired)
     {
         auto manager = MockPipelineContext::GetCurrent()->GetOrCreateScrollPlaceholderManager();
         ASSERT_TRUE(manager);
-        manager->NotifyVsync(GetSysTimestamp() - TEST_VSYNC_PERIOD_NS, TEST_VSYNC_PERIOD_NS);
+        int64_t timestamp = expired ? GetSysTimestamp() - TEST_VSYNC_PERIOD_NS : GetSysTimestamp();
+        int64_t period = expired ? TEST_VSYNC_PERIOD_NS : TEST_VSYNC_PERIOD_NS * 1000;
+        manager->NotifyVsync(timestamp, period);
     }
 
-    // Anchor a frame whose derived deadline lies far ahead (a long anchor period, so
-    // the remaining budget also survives slow emulated test runs): with the cold start
-    // / small-sample estimate the stage-1 budget gate keeps BUILD_REAL_NOW.
-    void AnchorLiveFrame()
+    // CreateList + anchor + provider in one step: the scaffold every deferring test
+    // starts with (the model-level setter applies while the List is under construction).
+    ListModelNG CreatePlaceholderList(ScrollPlaceholderProvider provider, bool expiredAnchor)
     {
-        auto manager = MockPipelineContext::GetCurrent()->GetOrCreateScrollPlaceholderManager();
-        ASSERT_TRUE(manager);
-        manager->NotifyVsync(GetSysTimestamp(), TEST_VSYNC_PERIOD_NS * 1000);
+        ListModelNG model = CreateList();
+        AnchorFrame(expiredAnchor);
+        model.SetScrollPlaceholder(std::move(provider));
+        return model;
+    }
+
+    void CreateItemsAndDone()
+    {
+        CreateItemsInLazyForEach(TOTAL_ITEM_NUMBER, ITEM_MAIN_SIZE);
+        CreateDone();
+    }
+
+    bool IsChildOfHost(const RefPtr<FrameNode>& node) const
+    {
+        for (const auto& child : frameNode_->GetChildren()) {
+            if (AceType::RawPtr(child) == AceType::RawPtr(node)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // First slot with neither a placeholder entry nor a built real child.
+    int32_t FindUnbuiltSlot() const
+    {
+        for (int32_t slot = 0; slot < TOTAL_ITEM_NUMBER; slot++) {
+            if (!pattern_->HasScrollPlaceholderItem(slot) &&
+                frameNode_->GetChildByIndex(static_cast<uint32_t>(slot)) == nullptr) {
+                return slot;
+            }
+        }
+        return -1;
+    }
+
+    // First slot already holding a real child (built really, never deferred).
+    int32_t FindBuiltSlot() const
+    {
+        for (int32_t slot = 0; slot < TOTAL_ITEM_NUMBER; slot++) {
+            if (frameNode_->GetChildByIndex(static_cast<uint32_t>(slot)) != nullptr) {
+                return slot;
+            }
+        }
+        return -1;
+    }
+
+    // A zero-frame-count shell for direct table injection (never resolved by the
+    // host child-slot enumeration, like every production shell).
+    RefPtr<FrameNode> MakeInjectedShell()
+    {
+        return ScrollPlaceholderShellNode::CreateScrollPlaceholderShellNode(V2::LIST_ITEM_ETS_TAG,
+            ElementRegister::GetInstance()->MakeUniqueId(),
+            AceType::MakeRefPtr<ListItemPattern>(nullptr, V2::ListItemStyle::NONE));
+    }
+
+    void InjectTableEntry(int32_t index, const RefPtr<FrameNode>& shell, const std::string& templateId)
+    {
+        pattern_->scrollPlaceholderItems_[index] = { shell, templateId, 0 };
     }
 };
 
@@ -124,15 +193,14 @@ public:
 HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderStackFromEndIndex001, TestSize.Level1)
 {
     std::vector<int32_t> providerIndexes;
-    ListModelNG model = CreateList();
+    auto model = CreatePlaceholderList(
+        [&providerIndexes](int32_t index) -> std::optional<ScrollPlaceholderOptions> {
+            providerIndexes.push_back(index);
+            return MakeDefaultPlaceholderOptions();
+        },
+        true);
     model.SetStackFromEnd(true);
-    AnchorExpiredFrame();
-    model.SetScrollPlaceholder([&providerIndexes](int32_t index) -> std::optional<ScrollPlaceholderOptions> {
-        providerIndexes.push_back(index);
-        return MakeDefaultPlaceholderOptions();
-    });
-    CreateItemsInLazyForEach(TOTAL_ITEM_NUMBER, ITEM_MAIN_SIZE);
-    CreateDone();
+    CreateItemsAndDone();
 
     ASSERT_FALSE(providerIndexes.empty());
     // All provider indexes live in the host child-slot space, never out of range.
@@ -162,15 +230,15 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderStackFromEndIndex001, Tes
 HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderGroupMixedIndex001, TestSize.Level1)
 {
     std::vector<int32_t> providerIndexes;
-    ListModelNG model = CreateList();
-    AnchorExpiredFrame();
-    model.SetScrollPlaceholder([&providerIndexes](int32_t index) -> std::optional<ScrollPlaceholderOptions> {
-        providerIndexes.push_back(index);
-        if (index % EVEN_NUMBER_MOD != 0) {
-            return std::nullopt; // group slots keep the synchronous build path
-        }
-        return MakeDefaultPlaceholderOptions();
-    });
+    CreatePlaceholderList(
+        [&providerIndexes](int32_t index) -> std::optional<ScrollPlaceholderOptions> {
+            providerIndexes.push_back(index);
+            if (index % EVEN_NUMBER_MOD != 0) {
+                return std::nullopt; // group slots keep the synchronous build path
+            }
+            return MakeDefaultPlaceholderOptions();
+        },
+        true);
     RefPtr<LazyForEachActuator> mockLazy = AceType::MakeRefPtr<MixedGroupItemMockLazy>();
     ViewStackProcessor::GetInstance()->StartGetAccessRecordingFor(GetElmtId());
     LazyForEachModelNG lazyForEachModelNG;
@@ -204,13 +272,12 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderGroupMixedIndex001, TestS
  */
 HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderCommitAndRetire001, TestSize.Level1)
 {
-    ListModelNG model = CreateList();
-    AnchorExpiredFrame();
-    model.SetScrollPlaceholder([](int32_t index) -> std::optional<ScrollPlaceholderOptions> {
-        return MakeDefaultPlaceholderOptions();
-    });
-    CreateItemsInLazyForEach(TOTAL_ITEM_NUMBER, ITEM_MAIN_SIZE);
-    CreateDone();
+    CreatePlaceholderList(
+        [](int32_t index) -> std::optional<ScrollPlaceholderOptions> {
+            return MakeDefaultPlaceholderOptions();
+        },
+        true);
+    CreateItemsAndDone();
 
     // The layout cache path may have built some slots really; those indexes never
     // get a placeholder anymore (create refuses built slots) and stale entries are
@@ -221,14 +288,7 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderCommitAndRetire001, TestS
     }
 
     // Stage a deferred, genuinely unbuilt slot and drive the full commit flow.
-    int32_t index = -1;
-    for (int32_t slot = 0; slot < TOTAL_ITEM_NUMBER; slot++) {
-        if (!pattern_->HasScrollPlaceholderItem(slot) &&
-            frameNode_->GetChildByIndex(static_cast<uint32_t>(slot)) == nullptr) {
-            index = slot;
-            break;
-        }
-    }
+    int32_t index = FindUnbuiltSlot();
     ASSERT_GE(index, 0);
     auto shell = pattern_->CreateScrollPlaceholderShell(index);
     ASSERT_TRUE(shell);
@@ -236,10 +296,9 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderCommitAndRetire001, TestS
     // A second acquisition of the same index returns the same shell, never a stack.
     EXPECT_EQ(pattern_->CreateScrollPlaceholderShell(index), shell);
     // A slot whose real child is already built never gets a placeholder.
-    for (int32_t slot = 0; slot < TOTAL_ITEM_NUMBER; slot++) {
-        if (frameNode_->GetChildByIndex(static_cast<uint32_t>(slot)) != nullptr) {
-            EXPECT_TRUE(pattern_->CreateScrollPlaceholderShell(slot) == nullptr);
-        }
+    int32_t builtSlot = FindBuiltSlot();
+    if (builtSlot >= 0) {
+        EXPECT_TRUE(pattern_->CreateScrollPlaceholderShell(builtSlot) == nullptr);
     }
 
     // Real build: the real child enters the tree at the same slot index.
@@ -251,10 +310,7 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderCommitAndRetire001, TestS
     pattern_->ReconcileScrollPlaceholderItems();
     EXPECT_FALSE(pattern_->HasScrollPlaceholderItem(index));
     EXPECT_TRUE(pattern_->retiringPlaceholderShells_.empty());
-    auto* shellRaw = AceType::RawPtr(shell);
-    for (const auto& child : frameNode_->GetChildren()) {
-        EXPECT_NE(AceType::RawPtr(child), shellRaw);
-    }
+    EXPECT_FALSE(IsChildOfHost(shell));
 }
 
 /**
@@ -268,45 +324,29 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderCommitAndRetire001, TestS
  */
 HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderOrphanShellSweep001, TestSize.Level1)
 {
-    ListModelNG model = CreateList();
-    AnchorExpiredFrame();
-    model.SetScrollPlaceholder([](int32_t index) -> std::optional<ScrollPlaceholderOptions> {
-        return MakeDefaultPlaceholderOptions();
-    });
-    CreateItemsInLazyForEach(TOTAL_ITEM_NUMBER, ITEM_MAIN_SIZE);
-    CreateDone();
+    CreatePlaceholderList(
+        [](int32_t index) -> std::optional<ScrollPlaceholderOptions> {
+            return MakeDefaultPlaceholderOptions();
+        },
+        true);
+    CreateItemsAndDone();
     pattern_->ReconcileScrollPlaceholderItems();
 
     // Find a genuinely unbuilt slot and mount a shell on it.
-    int32_t index = -1;
-    for (int32_t slot = 0; slot < TOTAL_ITEM_NUMBER; slot++) {
-        if (!pattern_->HasScrollPlaceholderItem(slot) &&
-            frameNode_->GetChildByIndex(static_cast<uint32_t>(slot)) == nullptr) {
-            index = slot;
-            break;
-        }
-    }
+    int32_t index = FindUnbuiltSlot();
     ASSERT_GE(index, 0);
     auto shell = pattern_->CreateScrollPlaceholderShell(index);
     ASSERT_TRUE(shell);
-    auto isChildOfHost = [this](const RefPtr<FrameNode>& node) {
-        for (const auto& child : frameNode_->GetChildren()) {
-            if (AceType::RawPtr(child) == AceType::RawPtr(node)) {
-                return true;
-            }
-        }
-        return false;
-    };
-    EXPECT_TRUE(isChildOfHost(shell));
+    EXPECT_TRUE(IsChildOfHost(shell));
 
     // Simulate a bookkeeping miss: the entry disappears without retiring the shell.
     pattern_->scrollPlaceholderItems_.erase(index);
     EXPECT_FALSE(pattern_->HasScrollPlaceholderItem(index));
-    EXPECT_TRUE(isChildOfHost(shell));
+    EXPECT_TRUE(IsChildOfHost(shell));
 
     // The next layout-round reconcile sweeps the orphan off the host.
     pattern_->ReconcileScrollPlaceholderItems();
-    EXPECT_FALSE(isChildOfHost(shell));
+    EXPECT_FALSE(IsChildOfHost(shell));
 
     // A committed shell awaiting the reconcile is retired by the reset as well.
     auto retiringShell = pattern_->CreateScrollPlaceholderShell(index);
@@ -314,7 +354,7 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderOrphanShellSweep001, Test
     pattern_->scrollPlaceholderItems_.erase(index);
     pattern_->retiringPlaceholderShells_.emplace_back(retiringShell, std::string());
     pattern_->ResetScrollPlaceholder();
-    EXPECT_FALSE(isChildOfHost(retiringShell));
+    EXPECT_FALSE(IsChildOfHost(retiringShell));
     EXPECT_TRUE(pattern_->scrollPlaceholderItems_.empty());
     EXPECT_TRUE(pattern_->retiringPlaceholderShells_.empty());
 }
@@ -330,26 +370,20 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderOrphanShellSweep001, Test
 HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderLightLoadSkipsProvider001, TestSize.Level1)
 {
     int32_t providerCalls = 0;
-    ListModelNG model = CreateList();
-    AnchorLiveFrame();
-    model.SetScrollPlaceholder([&providerCalls](int32_t index) -> std::optional<ScrollPlaceholderOptions> {
-        providerCalls++;
-        return MakeDefaultPlaceholderOptions();
-    });
-    CreateItemsInLazyForEach(TOTAL_ITEM_NUMBER, ITEM_MAIN_SIZE);
-    CreateDone();
+    CreatePlaceholderList(
+        [&providerCalls](int32_t index) -> std::optional<ScrollPlaceholderOptions> {
+            providerCalls++;
+            return MakeDefaultPlaceholderOptions();
+        },
+        false);
+    CreateItemsAndDone();
 
     // Budget gate first: a plentiful remaining budget keeps the synchronous build
     // path without the provider ever being called.
     EXPECT_EQ(providerCalls, 0);
     EXPECT_TRUE(pattern_->scrollPlaceholderItems_.empty());
-    int32_t builtCount = 0;
-    for (int32_t slot = 0; slot < TOTAL_ITEM_NUMBER; slot++) {
-        if (frameNode_->GetChildByIndex(static_cast<uint32_t>(slot))) {
-            builtCount++;
-        }
-    }
-    EXPECT_GE(builtCount, 1);
+    int32_t builtSlot = FindBuiltSlot();
+    EXPECT_GE(builtSlot, 0);
 }
 
 /**
@@ -361,14 +395,12 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderLightLoadSkipsProvider001
 HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderNoAnchorSkipsProvider001, TestSize.Level1)
 {
     int32_t providerCalls = 0;
-    ListModelNG model = CreateList();
-    // No AnchorExpiredFrame/AnchorLiveFrame: the manager never received a vsync.
+    ListModelNG model = CreateList(); // no anchor: the manager never received a vsync
     model.SetScrollPlaceholder([&providerCalls](int32_t index) -> std::optional<ScrollPlaceholderOptions> {
         providerCalls++;
         return MakeDefaultPlaceholderOptions();
     });
-    CreateItemsInLazyForEach(TOTAL_ITEM_NUMBER, ITEM_MAIN_SIZE);
-    CreateDone();
+    CreateItemsAndDone();
 
     EXPECT_EQ(providerCalls, 0);
     EXPECT_TRUE(pattern_->scrollPlaceholderItems_.empty());
@@ -385,7 +417,7 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderNoAnchorSkipsProvider001,
 HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderStageTwoTemplateFlip001, TestSize.Level1)
 {
     ListModelNG model = CreateList();
-    AnchorLiveFrame();
+    AnchorFrame(false);
     auto manager = MockPipelineContext::GetCurrent()->GetOrCreateScrollPlaceholderManager();
     ASSERT_TRUE(manager);
     ScrollPlaceholderPredictParams mineParams;
@@ -409,8 +441,7 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderStageTwoTemplateFlip001, 
         options.id = "tpl-flip-mine";
         return options;
     });
-    CreateItemsInLazyForEach(TOTAL_ITEM_NUMBER, ITEM_MAIN_SIZE);
-    CreateDone();
+    CreateItemsAndDone();
 
     // Pressure was reached, so the provider ran; the template-specific estimate
     // fits the budget, so no slot deferred to a placeholder.
@@ -427,45 +458,31 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderStageTwoTemplateFlip001, 
  */
 HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderRegisteredTemplateFlow001, TestSize.Level1)
 {
-    ListModelNG model = CreateList();
-    AnchorExpiredFrame();
     auto manager = MockPipelineContext::GetCurrent()->GetOrCreateScrollPlaceholderManager();
     ASSERT_TRUE(manager);
     manager->RegisterTemplate("tpl-shell", ScrollPlaceholderBuilder([]() -> RefPtr<UINode> {
         return FrameNode::CreateFrameNode("tpl_root", ElementRegister::GetInstance()->MakeUniqueId(),
             AceType::MakeRefPtr<LinearLayoutPattern>(false));
     }));
-    model.SetScrollPlaceholder([](int32_t index) -> std::optional<ScrollPlaceholderOptions> {
-        ScrollPlaceholderOptions options;
-        options.id = "tpl-shell";
-        ScrollPlaceholderSizeOption sizeOption;
-        sizeOption.height = ITEM_MAIN_SIZE;
-        options.size = sizeOption;
-        return options;
-    });
-    CreateItemsInLazyForEach(TOTAL_ITEM_NUMBER, ITEM_MAIN_SIZE);
-    CreateDone();
+    CreatePlaceholderList(
+        [](int32_t index) -> std::optional<ScrollPlaceholderOptions> {
+            return MakeSizedPlaceholderOptions("tpl-shell");
+        },
+        true);
+    CreateItemsAndDone();
 
-    ASSERT_FALSE(pattern_->scrollPlaceholderItems_.empty());
     // The layout cache path may have built deferred slots really in the meantime
     // (real child wins): drop those entries, then defer a genuinely unbuilt slot
     // fresh (the expired anchor still holds) and drive it through the full flow.
+    ASSERT_FALSE(pattern_->scrollPlaceholderItems_.empty());
     pattern_->ReconcileScrollPlaceholderItems();
-    int32_t index = -1;
-    for (int32_t slot = 0; slot < TOTAL_ITEM_NUMBER; slot++) {
-        if (!pattern_->HasScrollPlaceholderItem(slot) &&
-            frameNode_->GetChildByIndex(static_cast<uint32_t>(slot)) == nullptr) {
-            index = slot;
-            break;
-        }
-    }
+    int32_t index = FindUnbuiltSlot();
     ASSERT_GE(index, 0);
     auto shell = pattern_->CreateScrollPlaceholderShell(index);
     ASSERT_TRUE(shell);
     const auto& info = pattern_->scrollPlaceholderItems_[index];
     EXPECT_EQ(info.templateId, "tpl-shell");
     EXPECT_GT(info.templateGen, 0u);
-    ASSERT_TRUE(info.shell);
     // Registered template: the shell carries exactly one template instance child and
     // stays invisible to host child-slot enumerations by design.
     EXPECT_EQ(info.shell->GetChildren().size(), 1u);
@@ -488,28 +505,19 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderRegisteredTemplateFlow001
  */
 HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderReplaceCancelsPending001, TestSize.Level1)
 {
-    ListModelNG model = CreateList();
-    AnchorExpiredFrame();
     auto manager = MockPipelineContext::GetCurrent()->GetOrCreateScrollPlaceholderManager();
     ASSERT_TRUE(manager);
-    model.SetScrollPlaceholder([](int32_t index) -> std::optional<ScrollPlaceholderOptions> {
-        return MakeDefaultPlaceholderOptions();
-    });
-    CreateItemsInLazyForEach(TOTAL_ITEM_NUMBER, ITEM_MAIN_SIZE);
-    CreateDone();
+    CreatePlaceholderList(
+        [](int32_t index) -> std::optional<ScrollPlaceholderOptions> {
+            return MakeDefaultPlaceholderOptions();
+        },
+        true);
+    CreateItemsAndDone();
     ASSERT_FALSE(pattern_->scrollPlaceholderItems_.empty());
     ASSERT_GE(manager->GetPendingRealBuildCount(), 1u);
     auto shell = pattern_->scrollPlaceholderItems_.begin()->second.shell;
     ASSERT_TRUE(shell);
-    auto isChildOfHost = [this](const RefPtr<FrameNode>& node) {
-        for (const auto& child : frameNode_->GetChildren()) {
-            if (AceType::RawPtr(child) == AceType::RawPtr(node)) {
-                return true;
-            }
-        }
-        return false;
-    };
-    EXPECT_TRUE(isChildOfHost(shell));
+    EXPECT_TRUE(IsChildOfHost(shell));
 
     // Provider replacement: the new provider's decisions start from a clean queue.
     // (The pattern-level entry is used because the model-level setter only applies
@@ -521,7 +529,7 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderReplaceCancelsPending001,
     // Mounted shells keep serving until the reset; the capability stays enabled.
     EXPECT_TRUE(pattern_->IsScrollPlaceholderEnabled());
     EXPECT_FALSE(pattern_->scrollPlaceholderItems_.empty());
-    EXPECT_TRUE(isChildOfHost(shell));
+    EXPECT_TRUE(IsChildOfHost(shell));
 
     // A null provider fully resets the capability and retires every mounted shell.
     pattern_->SetScrollPlaceholder(nullptr);
@@ -529,7 +537,7 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderReplaceCancelsPending001,
     EXPECT_TRUE(pattern_->scrollPlaceholderItems_.empty());
     EXPECT_TRUE(pattern_->retiringPlaceholderShells_.empty());
     EXPECT_TRUE(pattern_->mountedPlaceholderShells_.empty());
-    EXPECT_FALSE(isChildOfHost(shell));
+    EXPECT_FALSE(IsChildOfHost(shell));
     EXPECT_EQ(manager->GetPendingRealBuildCount(), 0u);
 }
 
@@ -542,59 +550,36 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderReplaceCancelsPending001,
  */
 HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderCommitEdgeBranches001, TestSize.Level1)
 {
-    ListModelNG model = CreateList();
-    AnchorExpiredFrame();
-    model.SetScrollPlaceholder([](int32_t index) -> std::optional<ScrollPlaceholderOptions> {
-        return MakeDefaultPlaceholderOptions();
-    });
-    CreateItemsInLazyForEach(TOTAL_ITEM_NUMBER, ITEM_MAIN_SIZE);
-    CreateDone();
+    CreatePlaceholderList(
+        [](int32_t index) -> std::optional<ScrollPlaceholderOptions> {
+            return MakeDefaultPlaceholderOptions();
+        },
+        true);
+    CreateItemsAndDone();
 
     // (a) Out of range at commit time: the placeholder is dropped, never mounted.
     int32_t goneIndex = TOTAL_ITEM_NUMBER + 3;
-    auto orphan = ScrollPlaceholderShellNode::CreateScrollPlaceholderShellNode(V2::LIST_ITEM_ETS_TAG,
-        ElementRegister::GetInstance()->MakeUniqueId(),
-        AceType::MakeRefPtr<ListItemPattern>(nullptr, V2::ListItemStyle::NONE));
-    ASSERT_TRUE(orphan);
-    pattern_->scrollPlaceholderItems_[goneIndex] = { orphan, std::string(), 0 };
+    InjectTableEntry(goneIndex, MakeInjectedShell(), std::string());
     EXPECT_FALSE(pattern_->CommitScrollPlaceholderRealBuild(goneIndex));
     EXPECT_FALSE(pattern_->HasScrollPlaceholderItem(goneIndex));
 
     // (b) Already built through the normal path: the real child wins, the placeholder
     // is retired without touching the built child.
-    int32_t builtSlot = -1;
-    for (int32_t slot = 0; slot < TOTAL_ITEM_NUMBER; slot++) {
-        if (frameNode_->GetChildByIndex(static_cast<uint32_t>(slot)) != nullptr) {
-            builtSlot = slot;
-            break;
-        }
-    }
+    int32_t builtSlot = FindBuiltSlot();
     if (builtSlot < 0) {
-        // Nothing built really yet (every visible slot deferred): build one unbuilt,
-        // non-deferred slot through the existing acquisition first.
-        for (int32_t slot = 0; slot < TOTAL_ITEM_NUMBER; slot++) {
-            if (!pattern_->HasScrollPlaceholderItem(slot) &&
-                frameNode_->GetChildByIndex(static_cast<uint32_t>(slot)) == nullptr) {
-                builtSlot = slot;
-                break;
-            }
-        }
+        builtSlot = FindUnbuiltSlot();
         ASSERT_GE(builtSlot, 0);
         ASSERT_TRUE(frameNode_->GetOrCreateChildByIndex(static_cast<uint32_t>(builtSlot), true));
     }
     ASSERT_TRUE(frameNode_->GetChildByIndex(static_cast<uint32_t>(builtSlot)) != nullptr);
-    auto stale = ScrollPlaceholderShellNode::CreateScrollPlaceholderShellNode(V2::LIST_ITEM_ETS_TAG,
-        ElementRegister::GetInstance()->MakeUniqueId(),
-        AceType::MakeRefPtr<ListItemPattern>(nullptr, V2::ListItemStyle::NONE));
-    ASSERT_TRUE(stale);
-    pattern_->scrollPlaceholderItems_[builtSlot] = { stale, std::string(), 0 };
+    InjectTableEntry(builtSlot, MakeInjectedShell(), std::string());
     EXPECT_FALSE(pattern_->CommitScrollPlaceholderRealBuild(builtSlot));
     EXPECT_FALSE(pattern_->HasScrollPlaceholderItem(builtSlot));
     EXPECT_TRUE(frameNode_->GetChildByIndex(static_cast<uint32_t>(builtSlot)) != nullptr);
 
     // (c) The reconcile drops entries whose index fell out of the data range.
     int32_t staleIndex = TOTAL_ITEM_NUMBER + 4;
-    pattern_->scrollPlaceholderItems_[staleIndex] = { stale, std::string(), 0 };
+    InjectTableEntry(staleIndex, MakeInjectedShell(), std::string());
     pattern_->ReconcileScrollPlaceholderItems();
     EXPECT_FALSE(pattern_->HasScrollPlaceholderItem(staleIndex));
 }
@@ -608,21 +593,20 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderCommitEdgeBranches001, Te
  */
 HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderRetirePoolMiss001, TestSize.Level1)
 {
-    ListModelNG model = CreateList();
-    AnchorExpiredFrame();
     auto manager = MockPipelineContext::GetCurrent()->GetOrCreateScrollPlaceholderManager();
     ASSERT_TRUE(manager);
     manager->RegisterTemplate("tpl-miss", ScrollPlaceholderBuilder([]() -> RefPtr<UINode> {
         return FrameNode::CreateFrameNode("tpl_miss_root", ElementRegister::GetInstance()->MakeUniqueId(),
             AceType::MakeRefPtr<LinearLayoutPattern>(false));
     }));
-    model.SetScrollPlaceholder([](int32_t index) -> std::optional<ScrollPlaceholderOptions> {
-        ScrollPlaceholderOptions options;
-        options.id = "tpl-miss";
-        return options;
-    });
-    CreateItemsInLazyForEach(TOTAL_ITEM_NUMBER, ITEM_MAIN_SIZE);
-    CreateDone();
+    CreatePlaceholderList(
+        [](int32_t index) -> std::optional<ScrollPlaceholderOptions> {
+            ScrollPlaceholderOptions options;
+            options.id = "tpl-miss";
+            return options;
+        },
+        true);
+    CreateItemsAndDone();
     ASSERT_FALSE(pattern_->scrollPlaceholderItems_.empty());
     auto shell = pattern_->scrollPlaceholderItems_.begin()->second.shell;
     ASSERT_TRUE(shell);
@@ -646,20 +630,13 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderRetirePoolMiss001, TestSi
  */
 HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderProviderShapeEdgeBranches001, TestSize.Level1)
 {
-    ListModelNG model = CreateList();
-    AnchorExpiredFrame();
-    model.SetScrollPlaceholder([](int32_t index) -> std::optional<ScrollPlaceholderOptions> {
-        ScrollPlaceholderOptions options;
-        // Non-empty but never registered: the shell mounts without template content.
-        options.id = "tpl-unregistered";
-        ScrollPlaceholderSizeOption sizeOption;
-        sizeOption.width = ITEM_MAIN_SIZE;
-        sizeOption.height = ITEM_MAIN_SIZE;
-        options.size = sizeOption;
-        return options;
-    });
-    CreateItemsInLazyForEach(TOTAL_ITEM_NUMBER, ITEM_MAIN_SIZE);
-    CreateDone();
+    CreatePlaceholderList(
+        [](int32_t index) -> std::optional<ScrollPlaceholderOptions> {
+            // Non-empty but never registered: the shell mounts without template content.
+            return MakeSizedPlaceholderOptions("tpl-unregistered");
+        },
+        true);
+    CreateItemsAndDone();
 
     ASSERT_FALSE(pattern_->scrollPlaceholderItems_.empty());
     for (const auto& [slot, info] : pattern_->scrollPlaceholderItems_) {
@@ -672,17 +649,10 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderProviderShapeEdgeBranches
     // index without a placeholder entry never commits either.
     EXPECT_TRUE(pattern_->CreateScrollPlaceholderShell(-1) == nullptr);
     EXPECT_FALSE(pattern_->CommitScrollPlaceholderRealBuild(-5));
-    int32_t unknownSlot = -1;
-    for (int32_t slot = 0; slot < TOTAL_ITEM_NUMBER; slot++) {
-        if (!pattern_->HasScrollPlaceholderItem(slot) &&
-            frameNode_->GetChildByIndex(static_cast<uint32_t>(slot)) == nullptr) {
-            unknownSlot = slot;
-            break;
-        }
-    }
+    int32_t unknownSlot = FindUnbuiltSlot();
     ASSERT_GE(unknownSlot, 0);
     EXPECT_FALSE(pattern_->CommitScrollPlaceholderRealBuild(unknownSlot));
-    EXPECT_TRUE(pattern_->HasScrollPlaceholderItem(unknownSlot) == false);
+    EXPECT_FALSE(pattern_->HasScrollPlaceholderItem(unknownSlot));
 
     // Retire with a non-empty template id but no shell children: the content
     // misses the pool and the anomaly path runs instead of pooling.

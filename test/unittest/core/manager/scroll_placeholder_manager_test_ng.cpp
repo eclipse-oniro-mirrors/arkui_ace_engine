@@ -1175,6 +1175,24 @@ HWTEST_F(ScrollPlaceholderManagerTestNg, ProbeTemplateCloneNoSource001, TestSize
     EXPECT_FALSE(manager_->IsTemplateRegistered("tpl-no-source"));
 }
 
+namespace {
+// Shared probe scaffold: registers a template, runs the admission probe and reports
+// (admitted, failing subtree path). unregisters afterwards unless keepRegistered
+// (the admitted case asserts on the pool the probe product joined).
+std::pair<bool, std::string> ProbeRegisteredTemplate(const RefPtr<TestableScrollPlaceholderManager>& manager,
+    ScrollPlaceholderBuilder&& builder, bool keepRegistered = false)
+{
+    const std::string templateId = "tpl-probe-case";
+    manager->RegisterTemplate(templateId, std::move(builder));
+    std::string subtreePath;
+    bool admitted = manager->ProbeTemplateClone(templateId, subtreePath);
+    if (!keepRegistered) {
+        manager->UnregisterTemplate(templateId);
+    }
+    return { admitted, subtreePath };
+}
+} // namespace
+
 /**
  * @tc.name: ProbeTemplateCloneUnsupportedRoot001
  * @tc.desc: A template whose root pattern is not on the restricted copy whitelist
@@ -1183,16 +1201,14 @@ HWTEST_F(ScrollPlaceholderManagerTestNg, ProbeTemplateCloneNoSource001, TestSize
  */
 HWTEST_F(ScrollPlaceholderManagerTestNg, ProbeTemplateCloneUnsupportedRoot001, TestSize.Level1)
 {
-    manager_->RegisterTemplate("tpl-unsupported-root", ScrollPlaceholderBuilder([]() -> RefPtr<UINode> {
-        return FrameNode::CreateFrameNode("plain_root", ElementRegister::GetInstance()->MakeUniqueId(),
-            AceType::MakeRefPtr<Pattern>());
-    }));
     auto rejectedBefore = manager_->GetDiagnostics().registerRejected;
-    std::string subtreePath;
-    EXPECT_FALSE(manager_->ProbeTemplateClone("tpl-unsupported-root", subtreePath));
+    auto [admitted, subtreePath] = ProbeRegisteredTemplate(manager_, ScrollPlaceholderBuilder([]() -> RefPtr<UINode> {
+        return FrameNode::CreateFrameNode(
+            "plain_root", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    }));
+    EXPECT_FALSE(admitted);
     EXPECT_EQ(subtreePath, "plain_root");
     EXPECT_GE(manager_->GetDiagnostics().registerRejected, rejectedBefore + 1);
-    manager_->UnregisterTemplate("tpl-unsupported-root");
 }
 
 /**
@@ -1203,17 +1219,15 @@ HWTEST_F(ScrollPlaceholderManagerTestNg, ProbeTemplateCloneUnsupportedRoot001, T
  */
 HWTEST_F(ScrollPlaceholderManagerTestNg, ProbeTemplateCloneUnsupportedNested001, TestSize.Level1)
 {
-    manager_->RegisterTemplate("tpl-unsupported-nested", ScrollPlaceholderBuilder([]() -> RefPtr<UINode> {
+    auto [admitted, subtreePath] = ProbeRegisteredTemplate(manager_, ScrollPlaceholderBuilder([]() -> RefPtr<UINode> {
         auto root = FrameNode::CreateFrameNode("nested_root", ElementRegister::GetInstance()->MakeUniqueId(),
             AceType::MakeRefPtr<LinearLayoutPattern>(false));
         root->AddChild(FrameNode::CreateFrameNode("bad_child", ElementRegister::GetInstance()->MakeUniqueId(),
             AceType::MakeRefPtr<Pattern>()));
         return root;
     }));
-    std::string subtreePath;
-    EXPECT_FALSE(manager_->ProbeTemplateClone("tpl-unsupported-nested", subtreePath));
+    EXPECT_FALSE(admitted);
     EXPECT_EQ(subtreePath, "nested_root > bad_child");
-    manager_->UnregisterTemplate("tpl-unsupported-nested");
 }
 
 /**
@@ -1225,13 +1239,12 @@ HWTEST_F(ScrollPlaceholderManagerTestNg, ProbeTemplateCloneUnsupportedNested001,
  */
 HWTEST_F(ScrollPlaceholderManagerTestNg, ProbeTemplateCloneAdmitted001, TestSize.Level1)
 {
-    manager_->RegisterTemplate("tpl-probe-ok", MakeFrameTreeBuilder());
-    std::string subtreePath = "stale";
-    EXPECT_TRUE(manager_->ProbeTemplateClone("tpl-probe-ok", subtreePath));
+    auto [admitted, subtreePath] = ProbeRegisteredTemplate(manager_, MakeFrameTreeBuilder(), true);
+    EXPECT_TRUE(admitted);
     EXPECT_TRUE(subtreePath.empty());
-    EXPECT_GE(manager_->GetCachedInstanceCount("tpl-probe-ok"), 1u);
+    EXPECT_GE(manager_->GetCachedInstanceCount("tpl-probe-case"), 1u);
     EXPECT_GE(manager_->CapturedTaskCount(), 1u);
-    manager_->UnregisterTemplate("tpl-probe-ok");
+    manager_->UnregisterTemplate("tpl-probe-case");
 }
 
 /**
@@ -1242,13 +1255,11 @@ HWTEST_F(ScrollPlaceholderManagerTestNg, ProbeTemplateCloneAdmitted001, TestSize
  */
 HWTEST_F(ScrollPlaceholderManagerTestNg, ProbeTemplateCloneCloneFails001, TestSize.Level1)
 {
-    manager_->RegisterTemplate("tpl-probe-clonefail", MakeFrameTreeBuilder());
     manager_->copyProtocolEnabled = false;
-    std::string subtreePath;
-    EXPECT_FALSE(manager_->ProbeTemplateClone("tpl-probe-clonefail", subtreePath));
-    EXPECT_EQ(subtreePath, "placeholder_root");
+    auto [admitted, subtreePath] = ProbeRegisteredTemplate(manager_, MakeFrameTreeBuilder());
     manager_->copyProtocolEnabled = true;
-    manager_->UnregisterTemplate("tpl-probe-clonefail");
+    EXPECT_FALSE(admitted);
+    EXPECT_EQ(subtreePath, "placeholder_root");
 }
 
 /**
@@ -1273,15 +1284,13 @@ HWTEST_F(ScrollPlaceholderManagerTestNg, ProbeTemplateCloneDestroyedManager001, 
  */
 HWTEST_F(ScrollPlaceholderManagerTestNg, ProbeTemplateCloneNonFrameNode001, TestSize.Level1)
 {
-    manager_->RegisterTemplate("tpl-non-frame", ScrollPlaceholderBuilder([]() -> RefPtr<UINode> {
+    auto [admitted, subtreePath] = ProbeRegisteredTemplate(manager_, ScrollPlaceholderBuilder([]() -> RefPtr<UINode> {
         auto root = TestPlaceholderNode::CreateTestNode(930001);
         root->AddChild(TestPlaceholderNode::CreateTestNode(930002));
         return root;
     }));
-    std::string subtreePath;
-    EXPECT_FALSE(manager_->ProbeTemplateClone("tpl-non-frame", subtreePath));
+    EXPECT_FALSE(admitted);
     EXPECT_EQ(subtreePath, "TestPlaceholderNode");
-    manager_->UnregisterTemplate("tpl-non-frame");
 }
 
 /**
