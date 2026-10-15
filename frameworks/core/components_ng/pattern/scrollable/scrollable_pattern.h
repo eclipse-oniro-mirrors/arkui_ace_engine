@@ -805,6 +805,12 @@ public:
     // Axis fallback anchor one row beyond the materialized window (details in the .cpp default).
     virtual std::optional<float> GetItemSnapNeighborAnchor(ScrollSnapAlign align, bool towardSmaller);
     // Legal scroll range bounds for clamping item snap targets (R-3/R-7; AC-2.4 leading gap).
+    // Live content offset for snap selection and animation origins. Layouts that defer
+    // applying motion deltas must include those deltas without changing GetTotalOffset().
+    virtual double GetItemSnapCurrentOffset() const
+    {
+        return GetTotalOffset();
+    }
     virtual float GetItemSnapMaxOffset() const;
     virtual float GetItemSnapCalibrationMargin() const
     {

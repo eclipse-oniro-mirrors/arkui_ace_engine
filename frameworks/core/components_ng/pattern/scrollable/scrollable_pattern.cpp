@@ -1137,7 +1137,7 @@ bool ScrollablePattern::StartItemSnapAnimation(const SnapAnimationOptions& snapA
             });
         return true;
     }
-    auto currentOffset = static_cast<float>(GetTotalOffset());
+    auto currentOffset = static_cast<float>(GetItemSnapCurrentOffset());
     if (snapAnimationOptions.fromItemSnapFlingStop && scrollable->IsItemSnapTracking()) {
         currentOffset = -scrollable->GetCurrentPos();
     }
@@ -1174,7 +1174,7 @@ void ScrollablePattern::RunPendingItemSnapProvider(const SnapAnimationOptions& s
     }
     auto scrollable = GetScrollable();
     CHECK_NULL_VOID(scrollable);
-    auto currentOffset = static_cast<float>(GetTotalOffset());
+    auto currentOffset = static_cast<float>(GetItemSnapCurrentOffset());
     scrollable->SetCurrentPos(-currentOffset);
     auto motionVelocity = -snapAnimationOptions.animationVelocity;
     auto motionDelta = -snapAnimationOptions.snapDelta;
@@ -1199,7 +1199,7 @@ float ScrollablePattern::ResolveItemSnapTarget(const ScrollSnapStrategy& strateg
     // PRE-approach position; at handoff time the live total offset is the approach endpoint, so
     // falling back to the stale capture would rewind the approach motion.
     if (strategy.align == ScrollSnapAlign::NONE) {
-        return -static_cast<float>(GetTotalOffset());
+        return -static_cast<float>(GetItemSnapCurrentOffset());
     }
     auto candidates = BuildItemSnapCandidates(strategy.align);
     // Subclasses normally normalize inside BuildItemSnapCandidates; normalize again here so
@@ -1207,7 +1207,7 @@ float ScrollablePattern::ResolveItemSnapTarget(const ScrollSnapStrategy& strateg
     // the LIVE offset: at handoff time the approach stage has already moved the position, and
     // the captured pre-approach offset could pick a target behind it (reverse-direction bounce).
     ScrollSnapUtils::NormalizeCandidates(candidates);
-    auto liveOffset = static_cast<float>(GetTotalOffset());
+    auto liveOffset = static_cast<float>(GetItemSnapCurrentOffset());
     auto selection = ScrollSnapUtils::SelectSnapTarget(candidates, liveOffset, velocityPos, predictDeltaPos,
         ScrollSnapUtils::DEFAULT_SNAP_THRESHOLD, Scrollable::GetVelocityScale());
     if (!selection.found) {
@@ -1306,6 +1306,12 @@ SnapSelectResult ScrollablePattern::SelectItemSnapForAlign(const ScrollSnapStrat
         forward = itemSnapReleaseMotionVelocity_ > 0.0f;
         selection = ScrollSnapUtils::SelectByPredictedLanding(candidates, currentOffset,
             -GetScrollable()->GetFinalPosition(), forward, ScrollSnapUtils::DEFAULT_SNAP_THRESHOLD);
+    } else if ((!std::isfinite(snapAnimationOptions.animationVelocity) ||
+                   NearZero(snapAnimationOptions.animationVelocity)) &&
+               (!std::isfinite(snapAnimationOptions.snapDelta) || NearZero(snapAnimationOptions.snapDelta))) {
+        // No effective direction: nearest anchor, equal distances resolved by the smaller item index.
+        selection = ScrollSnapUtils::SelectSnapTarget(candidates, currentOffset, 0.0f, 0.0f,
+            ScrollSnapUtils::DEFAULT_SNAP_THRESHOLD, Scrollable::GetVelocityScale());
     } else {
         selection = ScrollSnapUtils::SelectByThreshold(
             candidates, currentOffset, ScrollSnapUtils::DEFAULT_SNAP_THRESHOLD, forward);
@@ -1322,7 +1328,7 @@ bool ScrollablePattern::StartItemSnapWithAlign(const ScrollSnapStrategy& strateg
         trackingScroll->IsItemSnapTracking();
     float minOffset = GetItemSnapMinOffset();
     if (tracked) {
-        const float shift = currentOffset - static_cast<float>(GetTotalOffset());
+        const float shift = currentOffset - static_cast<float>(GetItemSnapCurrentOffset());
         minOffset += shift;
         maxOffset += shift;
     }

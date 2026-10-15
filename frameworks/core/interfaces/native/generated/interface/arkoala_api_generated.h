@@ -28769,6 +28769,8 @@ typedef struct GENERATED_ArkUIWaterFlowModifier {
                        const Opt_Length* value);
     void (*setLayoutDirection)(Ark_NativePointer node,
                                const Opt_FlexDirection* value);
+    void (*setScrollSnapStrategy)(Ark_NativePointer node,
+                                  const Opt_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy* value);
     void (*setCachedCount0)(Ark_NativePointer node,
                             const Opt_Int32* value);
     void (*setSyncLoad)(Ark_NativePointer node,

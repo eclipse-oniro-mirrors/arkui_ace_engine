@@ -16,7 +16,6 @@
             "component/tabs.ets",
             "component/uiExtensionComponent.ets",
             "component/video.ets",
-            "component/waterFlow.ets",
             "component/withTheme.ets",
             "framework/index.ets",
             "#handwritten.ets"
