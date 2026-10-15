@@ -7445,6 +7445,28 @@ void OverlayManager::ResetDetachedFreeRootProxy(int32_t targetId)
     }
 }
 
+bool OverlayManager::GetMenuWrapperState(const RefPtr<FrameNode>& node, int32_t& targetId, bool& isShown)
+{
+    targetId = -1;
+    isShown = false;
+    CHECK_NULL_RETURN(node, false);
+    auto menu = node->GetPattern<MenuWrapperPattern>();
+    CHECK_NULL_RETURN(menu, false);
+    targetId = menu->GetTargetId();
+    isShown = menu->IsShow();
+    return true;
+}
+
+bool OverlayManager::GetPopupTargetId(const RefPtr<FrameNode>& node, int32_t& targetId)
+{
+    targetId = -1;
+    CHECK_NULL_RETURN(node, false);
+    auto bubble = node->GetPattern<BubblePattern>();
+    CHECK_NULL_RETURN(bubble, false);
+    targetId = bubble->GetPopupTargetId();
+    return true;
+}
+
 PopupInfo OverlayManager::GetPopupInfo(int32_t targetId) const
 {
     auto it = popupMap_.find(targetId);

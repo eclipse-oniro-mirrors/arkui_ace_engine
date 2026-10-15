@@ -17,6 +17,8 @@
 #include <cmath>
 #include <iterator>
 #include <map>
+#include <optional>
+#include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -28,8 +30,7 @@
 #include "core/components_ng/base/page_text_json.h"
 #include "core/components_ng/pattern/page_translate/page_translate_node.h"
 #include "core/components_ng/pattern/custom/custom_node.h"
-#include "core/components_ng/pattern/bubble/bubble_pattern.h"
-#include "core/components_ng/pattern/menu/wrapper/menu_wrapper_pattern.h"
+#include "core/components_ng/pattern/overlay/overlay_manager.h"
 #include "core/components_v2/inspector/inspector_constants.h"
 #include "core/pipeline/base/element_register.h"
 #include "core/pipeline_ng/pipeline_context.h"
@@ -195,19 +196,22 @@ private:
         auto frame = AceType::DynamicCast<FrameNode>(node);
         CHECK_NULL_VOID(frame);
         if (frame->GetTag() == V2::MENU_WRAPPER_ETS_TAG) {
-            auto menu = frame->GetPattern<MenuWrapperPattern>();
-            context.ownedOverlay = menu && OwnsTarget(menu->GetTargetId());
-            context.excluded |= !menu || !menu->IsShow();
+            int32_t targetId = -1;
+            bool isShown = false;
+            const bool hasMenu = OverlayManager::GetMenuWrapperState(frame, targetId, isShown);
+            context.ownedOverlay = hasMenu && OwnsTarget(targetId);
+            context.excluded |= !hasMenu || !isShown;
         } else if (frame->GetTag() == V2::POPUP_ETS_TAG) {
-            auto bubble = frame->GetPattern<BubblePattern>();
+            int32_t targetId = -1;
+            const bool hasBubble = OverlayManager::GetPopupTargetId(frame, targetId);
             auto pipeline = GetPipeline(frame->GetInstanceId());
             auto overlay = pipeline ? pipeline->GetOverlayManager() : nullptr;
-            if (!bubble || !overlay) {
+            if (!hasBubble || !overlay) {
                 context.excluded = true;
                 return;
             }
-            auto info = overlay->GetPopupInfo(bubble->GetPopupTargetId());
-            context.ownedOverlay = info.isTips && OwnsTarget(bubble->GetPopupTargetId());
+            auto info = overlay->GetPopupInfo(targetId);
+            context.ownedOverlay = info.isTips && OwnsTarget(targetId);
             context.excluded |= info.popupNode != frame || !info.isCurrentOnShow;
         }
     }
