@@ -2583,4 +2583,28 @@ HWTEST_F(DragEventTestNg, DragEventSummaryInfo001, TestSize.Level1)
     EXPECT_EQ(dragEvent->GetSummaryInfo().summary, legacySummary);
 }
 
+/**
+ * @tc.name: DragSpringLoadingContextSummaryInfo001
+ * @tc.desc: Test the complete spring loading summary information.
+ * @tc.type: FUNC
+ */
+HWTEST_F(DragEventTestNg, DragSpringLoadingContextSummaryInfo001, TestSize.Level1)
+{
+    auto context = AceType::MakeRefPtr<OHOS::Ace::DragSpringLoadingContext>();
+    ASSERT_NE(context, nullptr);
+    DragSummaryInfo summaryInfo;
+    summaryInfo.summary = { { "general.file", 2 } };
+    summaryInfo.filenameExtensions = { ".jpg", ".png" };
+
+    context->SetSummaryInfo(summaryInfo);
+
+    EXPECT_EQ(context->GetSummary(), summaryInfo.summary);
+    EXPECT_EQ(context->GetSummaryInfo().filenameExtensions, summaryInfo.filenameExtensions);
+
+    std::map<std::string, int64_t> legacySummary = { { "general.text", 1 } };
+    context->SetSummary(legacySummary);
+    EXPECT_EQ(context->GetSummary(), legacySummary);
+    EXPECT_EQ(context->GetSummaryInfo().summary, legacySummary);
+}
+
 } // namespace OHOS::Ace::NG

@@ -38,6 +38,7 @@ import { TextMenuOptions, TextMenuItemId } from 'arkui/framework';
 import { Nullable, WidthBreakpoint, HeightBreakpoint } from 'arkui/framework';
 import { KeyProcessingMode } from 'arkui/framework';
 import { default as uiObserver } from '@ohos/arkui/observer';
+import { PlaceholderRegister, createPlaceholderRegister } from '@ohos.arkui.placeholderRegister';
 import { default as mediaquery } from '@ohos/mediaquery';
 import { AlertDialogParamWithConfirm, AlertDialogParamWithButtons, AlertDialogParamWithOptions } from 'arkui/framework';
 import { ActionSheetOptions } from 'arkui/framework';
@@ -739,9 +740,17 @@ export enum ResolveStrategy {
     UNDEFINED = 5
 }
 
+class InputEventMonitorHandle implements InputEventMonitor {
+    handle?: KPointer;
+    constructor(handle: KPointer) {
+        this.handle = handle;
+    }
+}
+
 export class UIContext {
     instanceId_: int32 = -1;
     observer_ :UIObserver |null = null;
+    placeholderRegister_: PlaceholderRegister | null = null;
     router_: Router;
     focusController_: FocusControllerImpl;
     componentUtils_: ComponentUtilsImpl;
@@ -892,14 +901,17 @@ export class UIContext {
     }
     public addLocalInputEventMonitor(eventMask: int32, listener: InputEventListener): InputEventMonitor {
         ArkUIAniModule._Common_Sync_InstanceId(this.instanceId_);
-        const monitor = IUIContext.addLocalInputEventMonitor(eventMask as int32, listener);
+        const monitorHandle = IUIContext.addLocalInputEventMonitor(eventMask as int32, listener);
         ArkUIAniModule._Common_Restore_InstanceId();
-        return monitor;
+        return new InputEventMonitorHandle(monitorHandle);
     }
-
     public removeLocalInputEventMonitor(monitor: InputEventMonitor): void {
         ArkUIAniModule._Common_Sync_InstanceId(this.instanceId_);
-        IUIContext.removeLocalInputEventMonitor(monitor);
+        const handle = (monitor as InputEventMonitorHandle).handle;
+        if (handle !== undefined) {
+            IUIContext.removeLocalInputEventMonitor(handle);
+            (monitor as InputEventMonitorHandle).handle = undefined;
+        }
         ArkUIAniModule._Common_Restore_InstanceId();
     }
     public setTextSelectionClearPolicy(policy: TextSelectionClearPolicy): void {
@@ -1118,6 +1130,13 @@ export class UIContext {
             this.observer_ = new UIObserver(this.instanceId_);
         }
         return this.observer_ as UIObserver;
+    }
+
+    public getPlaceholderRegister(): PlaceholderRegister {
+        if (!this.placeholderRegister_) {
+            this.placeholderRegister_ = createPlaceholderRegister(this.instanceId_);
+        }
+        return this.placeholderRegister_ as PlaceholderRegister;
     }
 
     public getOverlayManager(): OverlayManager {

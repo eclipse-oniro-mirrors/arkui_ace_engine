@@ -126,6 +126,13 @@ struct TabBarSymbol {
     bool selectedFlag = false;
 };
 
+struct TabBarBadgeParam {
+    std::optional<std::string> badgeValue;
+    std::optional<int32_t> badgeCount;
+    std::optional<int32_t> badgeMaxCount;
+    RefPtr<ResourceObject> resourceBadgeValueObject;
+};
+
 enum class TabContentJsType {
     INDICATOR_COLOR,
     FONT_SIZE,

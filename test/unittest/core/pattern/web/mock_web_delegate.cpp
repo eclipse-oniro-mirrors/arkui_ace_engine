@@ -921,6 +921,7 @@ bool WebDelegate::OnContextMenuShow(const std::shared_ptr<BaseEventInfo>& info)
 #endif
 }
 void WebDelegate::OnContextMenuHide(const std::string& info) {}
+void WebDelegate::OnContextMenuUpdate(WebContextMenuItemId menuItemId, WebContextMenuOptions options) {}
 bool WebDelegate::OnHandleInterceptUrlLoading(const std::string& data)
 {
     return false;
@@ -1586,6 +1587,7 @@ bool WebDelegate::RestoreWebState(const std::vector<uint8_t>& state)
 {
     return g_restoreWebStateResult;
 }
+void WebDelegate::SetFlingSpeedLimit(float speedLimit) {}
 void WebDelegate::SetEnableAutoFill(bool isEnabled) {}
 void WebDelegate::SetEnableDrag(bool isEnabled) {}
 void WebDelegate::UpdateWebMediaNetworkProxyEnabled(bool isEnabled) {}

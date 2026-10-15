@@ -798,6 +798,89 @@ HWTEST_F(GridAttrTestNg, SetEnableScrollWithMouse001, TestSize.Level1)
 }
 
 /**
+ * @tc.name: SetEnableScrollWithMouse002
+ * @tc.desc: Test default value and Reset behavior (vertical → false)
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridAttrTestNg, SetEnableScrollWithMouse002, TestSize.Level1)
+{
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr 1fr 1fr");
+    CreateGridItems(16, NULL_VALUE, NULL_VALUE);
+    CreateDone();
+    EXPECT_FALSE(pattern_->GetIsAllowMouse());
+    pattern_->SetIsAllowMouse(true);
+    EXPECT_TRUE(pattern_->GetIsAllowMouse());
+    pattern_->ResetIsAllowMouse();
+    EXPECT_FALSE(pattern_->GetIsAllowMouse());
+}
+
+/**
+ * @tc.name: SetEnableScrollWithMouse003
+ * @tc.desc: Test default value for horizontal layout (horizontal → true)
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridAttrTestNg, SetEnableScrollWithMouse003, TestSize.Level1)
+{
+    GridModelNG model = CreateGrid();
+    model.SetRowsTemplate("1fr 1fr");
+    CreateGridItems(16, NULL_VALUE, NULL_VALUE);
+    CreateDone();
+    EXPECT_TRUE(pattern_->GetIsAllowMouse());
+    auto scrollable = pattern_->GetScrollableEvent()->GetScrollable();
+    EXPECT_TRUE(scrollable->panRecognizerNG_->isAllowMouse_);
+}
+
+/**
+ * @tc.name: SetEnableScrollWithMouse004
+ * @tc.desc: Test multiSelectable suppresses the default value of enableScrollWithMouse
+ *           (explicit value takes priority)
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridAttrTestNg, SetEnableScrollWithMouse004, TestSize.Level1)
+{
+    GridModelNG model = CreateGrid();
+    model.SetRowsTemplate("1fr 1fr");
+    model.SetMultiSelectable(true);
+    CreateGridItems(16, NULL_VALUE, NULL_VALUE);
+    CreateDone();
+    EXPECT_FALSE(pattern_->GetIsAllowMouse());
+    auto scrollable = pattern_->GetScrollableEvent()->GetScrollable();
+    EXPECT_FALSE(scrollable->panRecognizerNG_->isAllowMouse_);
+    pattern_->SetIsAllowMouse(true);
+    EXPECT_TRUE(pattern_->GetIsAllowMouse());
+    pattern_->ResetIsAllowMouse();
+    EXPECT_FALSE(pattern_->GetIsAllowMouse());
+}
+
+/**
+ * @tc.name: SetEnableScrollWithMouse005
+ * @tc.desc: Test enableEditMode keeps default value of enableScrollWithMouse false
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridAttrTestNg, SetEnableScrollWithMouse005, TestSize.Level1)
+{
+    GridModelNG model = CreateGrid();
+    model.SetRowsTemplate("1fr 1fr");
+    model.SetEnableEditMode(true);
+    CreateGridItems(16, NULL_VALUE, NULL_VALUE);
+    CreateDone();
+    EXPECT_FALSE(pattern_->GetIsAllowMouse());
+    auto scrollable = pattern_->GetScrollableEvent()->GetScrollable();
+    EXPECT_FALSE(scrollable->panRecognizerNG_->isAllowMouse_);
+    pattern_->SetIsAllowMouse(true);
+    EXPECT_TRUE(pattern_->GetIsAllowMouse());
+    pattern_->ResetIsAllowMouse();
+    EXPECT_FALSE(pattern_->GetIsAllowMouse());
+    // dynamic toggle: GetIsAllowMouse() reflects the edit mode default immediately
+    // (the recognizer value syncs on the next OnModifyDone)
+    pattern_->SetEnableEditMode(false);
+    EXPECT_TRUE(pattern_->GetIsAllowMouse());
+    pattern_->SetEnableEditMode(true);
+    EXPECT_FALSE(pattern_->GetIsAllowMouse());
+}
+
+/**
  * @tc.name: Gap001
  * @tc.desc: Test gap
  * @tc.type: FUNC

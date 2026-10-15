@@ -519,4 +519,9 @@ bool SafeAreaManager::CheckPageNeedAvoidKeyboard(const RefPtr<FrameNode>& frameN
     CHECK_NULL_RETURN(overlay, true);
     return overlay->CheckPageNeedAvoidKeyboard();
 }
+
+bool SafeAreaManager::IsImmersiveEffectEnabled() const
+{
+    return false;
+}
 } // namespace OHOS::Ace::NG

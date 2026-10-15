@@ -220,6 +220,10 @@ public:
     {
         return summaryMap_;
     }
+    const DragSummaryInfo& GetSummaryInfo()
+    {
+        return dragSummaryInfo_;
+    }
     void ResetRecordSize(uint32_t recordSize = 0);
     uint32_t GetRecordSize() const;
     Rect GetDragWindowRect(const Point& point);

@@ -850,6 +850,8 @@ void ContentChangeManager::ResetTranslateTextNode(int32_t nodeId)
     ResetTranslateNodes(translateTextNodes_, nodeId);
     ResetTranslateNodes(translateTextSnapshotNodes_, nodeId);
     if (nodeId < 0) {
+        // Reset-all keeps the live-node tracking set but clears the snapshot cache.
+        translateTextSnapshotNodes_.clear();
         translateTextVersions_.clear();
         translateTextSnapshotVersions_.clear();
         return;

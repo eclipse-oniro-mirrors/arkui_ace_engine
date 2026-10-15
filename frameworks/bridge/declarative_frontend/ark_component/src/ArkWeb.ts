@@ -362,6 +362,20 @@ class WebEnableFollowSystemFontWeightModifier extends ModifierWithKey<boolean> {
   }
 }
 
+class WebOnContextMenuUpdateModifier extends ModifierWithKey<OnContextMenuUpdateCallback> {
+  constructor(value: OnContextMenuUpdateCallback) {
+    super(value);
+  }
+  static identity: Symbol = Symbol('webOnContextMenuUpdateModifier');
+  applyPeer(node: KNode, reset: boolean): void {
+    if (reset) {
+      getUINativeModule().web.resetOnContextMenuUpdate(node);
+    } else {
+      getUINativeModule().web.setOnContextMenuUpdate(node, this.value);
+    }
+  }
+}
+
 class WebVerticalScrollBarAccessModifier extends ModifierWithKey<boolean> {
   constructor(value: boolean) {
     super(value);
@@ -1633,6 +1647,20 @@ class WebForceEnableZoomModifier extends ModifierWithKey<boolean> {
   }
 }
 
+class WebFlingSpeedLimitModifier extends ModifierWithKey<number> {
+  constructor(value: number) {
+    super(value);
+  }
+  static identity: Symbol = Symbol('webFlingSpeedLimit');
+  applyPeer(node: KNode, reset: boolean): void {
+    if (reset) {
+      getUINativeModule().web.resetFlingSpeedLimit(node);
+    } else {
+      getUINativeModule().web.setFlingSpeedLimit(node, this.value);
+    }
+  }
+}
+
 class WebBackToTopModifier extends ModifierWithKey<boolean> {
   constructor(value: boolean) {
     super(value);
@@ -2356,6 +2384,10 @@ class ArkWebComponent extends ArkComponent implements WebAttribute {
     modifierWithKey(this._modifiersWithKeys, WebOnContextMenuHideModifier.identity, WebOnContextMenuHideModifier, callback);
     return this;
   }
+  onContextMenuUpdate(callback: OnContextMenuUpdateCallback): this {
+    modifierWithKey(this._modifiersWithKeys, WebOnContextMenuUpdateModifier.identity, WebOnContextMenuUpdateModifier, callback);
+    return this;
+  }
   copyOptions(value: CopyOptions): this {
     modifierWithKey(this._modifiersWithKeys, WebCopyOptionsModifier.identity, WebCopyOptionsModifier, value);
     return this;
@@ -2390,6 +2422,10 @@ class ArkWebComponent extends ArkComponent implements WebAttribute {
   }
   forceEnableZoom(forceEnableZoom: boolean): this {
     modifierWithKey(this._modifiersWithKeys, WebForceEnableZoomModifier.identity, WebForceEnableZoomModifier, forceEnableZoom);
+    return this;
+  }
+  flingSpeedLimit(value: number): this {
+    modifierWithKey(this._modifiersWithKeys, WebFlingSpeedLimitModifier.identity, WebFlingSpeedLimitModifier, value);
     return this;
   }
   rotateRenderEffect(effect: WebRotateEffect): this {

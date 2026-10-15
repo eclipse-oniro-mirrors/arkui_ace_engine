@@ -74,6 +74,8 @@ const Dimension GRADUAL_BLUR_SCROLL_THRESHOLD = 56.0_vp;
 const Dimension GRADUAL_BLUR_MAX_RADIUS = 12.0_vp;
 constexpr double GRADUAL_BLUR_MAX_OPACITY = 0.8;
 
+const Color DEFAULT_GRADIENT_MASK_BLEND_COLOR = Color(0xFFF1F3F5);
+
 const std::vector<std::pair<float, float>> MASK_BLUR_STOPS = {
     { 1.0f, 0.0f }, { 0.6f, 0.6f }, { 0.0f, 1.0f }
 };
@@ -625,6 +627,13 @@ void TabsSideBarPattern::UpdateBlurStyleImpl(float scrollScale, float& cachedSca
     if (!isEnabled) {
         return;
     }
+    UpdateBlurStyleImplInner(scrollScale, maskBlurNode, maskNode, direction);
+}
+
+void TabsSideBarPattern::UpdateBlurStyleImplInner(
+    float scrollScale, const RefPtr<FrameNode>& maskBlurNode, const RefPtr<FrameNode>& maskNode,
+    GradientDirection direction)
+{
     CHECK_NULL_VOID(maskBlurNode && maskNode);
     auto maskBlurRenderContext = maskBlurNode->GetRenderContext();
     auto maskRenderContext = maskNode->GetRenderContext();
@@ -649,8 +658,8 @@ void TabsSideBarPattern::UpdateBlurStyleImpl(float scrollScale, float& cachedSca
         emptyGradient.CreateGradientWithType(GradientType::LINEAR);
         maskRenderContext->UpdateLinearGradient(emptyGradient);
     } else {
-        Color blendColor = Color::FromARGB(
-            static_cast<uint8_t>(opacity * 255), 0xF1, 0xF3, 0xF5);
+        auto bgColor = GetGradientMaskBlendColor();
+        Color blendColor = bgColor.BlendOpacity(opacity);
         Gradient gradient;
         gradient.CreateGradientWithType(GradientType::LINEAR);
         gradient.SetDirection(direction);
@@ -660,6 +669,33 @@ void TabsSideBarPattern::UpdateBlurStyleImpl(float scrollScale, float& cachedSca
             gradient.AddColor(stepColor);
         }
         maskRenderContext->UpdateLinearGradient(gradient);
+    }
+}
+
+Color TabsSideBarPattern::GetGradientMaskBlendColor()
+{
+    auto tabsNode = tabsNode_.Upgrade();
+    CHECK_NULL_RETURN(tabsNode, DEFAULT_GRADIENT_MASK_BLEND_COLOR);
+    auto themeScopeId = tabsNode->GetThemeScopeId();
+    auto tokenTheme = TokenThemeStorage::GetInstance()->GetTheme(themeScopeId);
+    if (!tokenTheme) {
+        tokenTheme = TokenThemeStorage::GetInstance()->ObtainSystemTheme();
+    }
+    CHECK_NULL_RETURN(tokenTheme, DEFAULT_GRADIENT_MASK_BLEND_COLOR);
+    auto tokenColors = tokenTheme->Colors();
+    CHECK_NULL_RETURN(tokenColors, DEFAULT_GRADIENT_MASK_BLEND_COLOR);
+    return tokenColors->CompBackgroundGray();
+}
+
+void TabsSideBarPattern::OnColorConfigurationUpdate()
+{
+    if (isScrollEffectEnabled_) {
+        UpdateBlurStyleImplInner(scrollScale_,
+            headerContainerMaskBlurNode_, headerContainerMaskNode_, GradientDirection::BOTTOM);
+    }
+    if (isBottomBarScrollEffectEnabled_) {
+        UpdateBlurStyleImplInner(bottomBarScrollScale_,
+            bottomBarMaskBlurNode_, bottomBarMaskNode_, GradientDirection::TOP);
     }
 }
 } // namespace OHOS::Ace::NG

@@ -48,9 +48,15 @@
 #endif
 
 namespace OHOS::Ace {
+class Animator;
 class BezierVariableVelocityMotion;
 class ScrollControllerBase;
 class VelocityMotion;
+// Item snap types are defined in scroll_snap_strategy.h and scroll_snap_utils.h;
+// keep them incomplete here to avoid spreading their dependencies.
+struct ScrollSnapStrategy;
+struct SnapCandidate;
+struct SnapSelectResult;
 enum class ScrollAlign : int;
 enum class ScrollEdgeType : size_t;
 } // namespace OHOS::Ace
@@ -447,27 +453,10 @@ public:
     double GetMaxFlingVelocity() const;
 
     virtual void StopAnimate();
-    bool AnimateRunning() const
-    {
-        return (animator_ && animator_->IsRunning()) || !isAnimationStop_;
-    }
-    bool AnimateStoped() const
-    {
-        return (!animator_ || animator_->IsStopped()) && isAnimationStop_;
-    }
+    bool AnimateRunning() const;
+    bool AnimateStoped() const;
 
-    void AbortScrollAnimator()
-    {
-        if (animator_ && !animator_->IsStopped()) {
-            scrollAbort_ = true;
-            animator_->Stop();
-        }
-        if (!isAnimationStop_) {
-            scrollAbort_ = true;
-            StopAnimation(springAnimation_);
-            StopAnimation(curveAnimation_);
-        }
-    }
+    void AbortScrollAnimator();
     bool GetScrollAbort() const
     {
         return scrollAbort_;
@@ -605,6 +594,18 @@ public:
 
     void SetScrollSource(int32_t scrollSource)
     {
+        scrollSourceForQuery_ = scrollSource;      // Session-level: updated only by event/stop-chain entries
+        SetScrollSourceInternal(scrollSource);
+    }
+
+    // Layout entry: updates only the frame-level scrollSource_, does not touch the session-level source
+    void SetScrollSourceLayout(int32_t scrollSource)
+    {
+        SetScrollSourceInternal(scrollSource);
+    }
+
+    void SetScrollSourceInternal(int32_t scrollSource)
+    {
         if (scrollSource == SCROLL_FROM_NONE) {
             if (lastScrollSource_ != scrollSource_) {
                 AddScrollableFrameInfo(scrollSource_);
@@ -612,6 +613,12 @@ public:
             lastScrollSource_ = scrollSource_;
         }
         scrollSource_ = scrollSource;
+    }
+
+    // Direct write to the session-level source only (does not touch the frame-level scrollSource_)
+    void SetScrollSourceForQuery(int32_t scrollSource)
+    {
+        scrollSourceForQuery_ = scrollSource;
     }
 
     void SetAccessibilityScrollSource(AccessibilityScrollSource source)
@@ -644,6 +651,9 @@ public:
     }
 
     ScrollState GetScrollState() const;
+
+    // Query API: reads the session-level scrollSourceForQuery_, unaffected by layout-level resets.
+    ScrollState GetScrollStateForQuery() const;
 
     static ScrollState GetScrollState(int32_t scrollSource);
 
@@ -785,6 +795,32 @@ public:
     {
         return SnapType::NONE_SNAP;
     }
+
+    // Feat-20260806915268 item snap contract. Value types are forward-declared above;
+    // defaults are out-of-line in scrollable_pattern.cpp
+    // so this widely-included header stays lean. Overridden by List/Grid/WaterFlow properties.
+    virtual ScrollSnapStrategy GetScrollSnapStrategy() const;
+    // Snap candidates from the currently materialized (visible + cached) items only.
+    virtual std::vector<SnapCandidate> BuildItemSnapCandidates(ScrollSnapAlign align);
+    // Axis fallback anchor one row beyond the materialized window (details in the .cpp default).
+    virtual std::optional<float> GetItemSnapNeighborAnchor(ScrollSnapAlign align, bool towardSmaller);
+    // Legal scroll range bounds for clamping item snap targets (R-3/R-7; AC-2.4 leading gap).
+    virtual float GetItemSnapMaxOffset() const;
+    virtual float GetItemSnapCalibrationMargin() const
+    {
+        return 0.0f;
+    }
+
+    virtual float GetItemSnapMinOffset() const;
+    virtual bool SupportsTrackedItemSnap() const
+    {
+        return false;
+    }
+    virtual void BeginTrackedItemSnap(float) {}
+    virtual std::vector<SnapCandidate> BuildTrackedItemSnapCandidates(ScrollSnapAlign align);
+    // Shared item snap execution for align strategies and custom providers; false = capability off.
+    bool StartItemSnapAnimation(const SnapAnimationOptions& snapAnimationOptions);
+    void RunPendingItemSnapProvider(const SnapAnimationOptions& snapAnimationOptions);
 
     virtual bool IsScrollSnap()
     {
@@ -1021,10 +1057,15 @@ public:
     {
         isAllowMouse_ = enableScrollWithMouse;
     }
-    virtual bool GetIsAllowMouse() const
-    {
-        return isAllowMouse_;
-    }
+    virtual bool GetIsAllowMouse() const;
+    void ResetIsAllowMouse();
+    // Whether the container supports mouse multi-select (e.g. multiSelectable Grid/List).
+    virtual bool MultiSelectable() const;
+    // Whether the container is in edit mode.
+    virtual bool GetEnableEditMode() const;
+    // Direction-aware default of enableScrollWithMouse: enabled only when scrolling horizontally.
+    // FREE mode (free scroll) containers keep the default disabled.
+    virtual bool IsMouseDragScrollDefaultEnabled() const;
 
     void GetRepeatCountInfo(
         RefPtr<UINode> node, int32_t& repeatDifference, int32_t& firstRepeatCount, int32_t& totalChildCount);
@@ -1154,7 +1195,9 @@ protected:
     bool GetCanOverScroll() const;
     bool lastCanOverScroll_ = false;
     bool lastScrollFromInjection_ = false;
-    bool isAllowMouse_ = false;
+    // Explicit value of enableScrollWithMouse set by the developer.
+    // nullopt means not explicitly set: the direction-aware default applies.
+    std::optional<bool> isAllowMouse_;
 
     void CheckScrollBarOff();
 
@@ -1206,7 +1249,26 @@ protected:
     void StopHotzoneScroll();
 
 private:
+    // Pattern owns target selection; Scrollable owns the animation and queued-task generation.
+    std::optional<float> predictedItemSnapTarget_;
+    float itemSnapReleaseMotionVelocity_ = 0.0f;
+    void RefreshTrackedItemSnap();
+    void PrepareItemSnapFling(float motionVelocity, float motionDelta);
+    SnapSelectResult SelectItemSnapForAxis(ScrollSnapAlign align, const std::vector<SnapCandidate>& candidates,
+        float currentOffset, SnapDirection snapDirection);
+    SnapSelectResult SelectItemSnapForAlign(const ScrollSnapStrategy& strategy,
+        const SnapAnimationOptions& snapAnimationOptions, std::vector<SnapCandidate>& candidates,
+        float currentOffset, bool& forward, bool tracked);
+
     virtual void OnScrollEndCallback() {};
+
+    // Feat-20260806915268 item snap paths, split out of StartItemSnapAnimation (drag-frame targets).
+    bool StartItemSnapWithProvider(const ScrollSnapStrategy& strategy, const SnapAnimationOptions& snapAnimationOptions,
+        float currentOffset, float maxOffset, float motionVelocity, float motionDelta);
+    bool StartItemSnapWithAlign(const ScrollSnapStrategy& strategy, const SnapAnimationOptions& snapAnimationOptions,
+        float currentOffset, float maxOffset, float motionVelocity, float motionDelta);
+    float ResolveItemSnapTarget(const ScrollSnapStrategy& strategy, float currentOffset, float minOffset,
+        float maxOffset, float velocityPos, float predictDeltaPos);
 
     void RegisterScrollBarEventTask();
     void RegisterScrollBarOverDragEventTask();
@@ -1338,6 +1400,7 @@ private:
     RefPtr<ScrollEdgeEffect> scrollEffect_;
     RefPtr<RefreshCoordination> refreshCoordination_;
     int32_t scrollSource_ = SCROLL_FROM_NONE;
+    int32_t scrollSourceForQuery_ = SCROLL_FROM_NONE;
     int32_t lastScrollSource_ = SCROLL_FROM_NONE;
     AccessibilityScrollSource accessibilityScrollSource_ = AccessibilityScrollSource::NONE;
     // scrollBar

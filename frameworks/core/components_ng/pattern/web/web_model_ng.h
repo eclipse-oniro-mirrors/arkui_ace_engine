@@ -96,6 +96,9 @@ public:
         const AISessionCallback&& onExecuteAIAction, const AISessionCallback&& onDestroyAISession) override;
     void SetOnContextMenuShow(std::function<bool(const BaseEventInfo* info)>&& jsCallback) override;
     void SetOnContextMenuHide(std::function<void(const BaseEventInfo* info)>&& jsCallback) override;
+    void SetOnContextMenuUpdate(
+        std::function<void(WebContextMenuItemId menuItemId, const WebContextMenuOptions& options)>&& jsCallback)
+        override;
     void SetNewDragStyle(bool isNewDragStyle) override;
     void SetPreviewSelectionMenu(const std::shared_ptr<WebPreviewSelectionMenuParam>& param) override;
     void SetJsEnabled(bool isJsEnabled) override;
@@ -105,6 +108,7 @@ public:
     void SetImageAccessEnabled(bool isImageAccessEnabled) override;
     void SetMixedMode(MixedModeContent mixedMode) override;
     void SetZoomAccessEnabled(bool isZoomAccessEnabled) override;
+    void SetFlingSpeedLimit(float speedLimit) override;
     void SetZoomControlAccess(bool zoomControlAccess) override;
     void SetGeolocationAccessEnabled(bool isGeolocationAccessEnabled) override;
     void SetJsProxyCallback(std::function<void()>&& jsProxyCallback) override;
@@ -311,6 +315,9 @@ public:
     static void SetOnZoomChange(FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& jsCallback);
     static void SetOnRequestFocus(FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& jsCallback);
     static void SetOnContextMenuHide(FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& jsCallback);
+    static void SetOnContextMenuUpdate(
+        FrameNode* frameNode,
+        std::function<void(WebContextMenuItemId menuItemId, const WebContextMenuOptions& options)>&& jsCallback);
     static void SetGeolocationAccessEnabled(FrameNode* frameNode, bool isGeolocationAccessEnabled);
     static void SetDatabaseAccessEnabled(FrameNode* frameNode, bool isDatabaseAccessEnabled);
     static void SetOnGeolocationShow(FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& jsCallback);
@@ -438,6 +445,7 @@ public:
         FrameNode* frameNode, std::function<bool(const BaseEventInfo* info)>&& jsCallback, int dialogEventType);
     static void SetJavaScriptProxy(FrameNode* frameNode, std::function<void()>&& jsProxyCallback);
     static void SetForceEnableZoom(FrameNode* frameNode, bool isEnabled);
+    static void SetFlingSpeedLimit(FrameNode* frameNode, float speedLimit);
     static void SetOnSafeBrowsingCheckFinish(FrameNode* frameNode,
         std::function<void(const std::shared_ptr<BaseEventInfo>& info)>&& safeBrowsingCheckFinish);
     static void SetBackToTop(FrameNode* frameNode, bool isBackToTop);

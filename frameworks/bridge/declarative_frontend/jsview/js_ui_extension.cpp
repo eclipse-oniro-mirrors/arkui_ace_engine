@@ -439,6 +439,7 @@ void JSUIExtension::Create(const JSCallbackInfo& info)
 
     bool transferringCaller = false;
     NG::DpiFollowStrategy dpiFollowStrategy = NG::DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI;
+    bool isDpiFollowStrategySet = false;
     bool windowModeStrategy = false;
     std::map<NG::PlaceholderType, RefPtr<NG::FrameNode>> placeholderMap;
     if (info.Length() > 1 && info[1]->IsObject()) {
@@ -450,6 +451,7 @@ void JSUIExtension::Create(const JSCallbackInfo& info)
         JSRef<JSVal> enableDensityDPI = obj->GetProperty("dpiFollowStrategy");
         if (enableDensityDPI->IsNumber()) {
             dpiFollowStrategy = NG::ParseDpiFollowStrategy(enableDensityDPI->ToNumber<int32_t>());
+            isDpiFollowStrategySet = true;
         }
         JSRef<JSVal> windowModeStrategyValue = obj->GetProperty("windowModeFollowStrategy");
         if (windowModeStrategyValue->IsNumber()) {
@@ -459,7 +461,7 @@ void JSUIExtension::Create(const JSCallbackInfo& info)
         ResolveAreaPlaceholderParams(obj, placeholderMap);
     }
     UIExtensionModel::GetInstance()->Create(
-        want, placeholderMap, transferringCaller, dpiFollowStrategy, windowModeStrategy);
+        want, placeholderMap, transferringCaller, dpiFollowStrategy, isDpiFollowStrategySet, windowModeStrategy);
 }
 
 void JSUIExtension::OnRemoteReady(const JSCallbackInfo& info)

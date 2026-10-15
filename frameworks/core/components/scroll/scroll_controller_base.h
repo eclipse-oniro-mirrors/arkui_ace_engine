@@ -84,6 +84,10 @@ public:
     {
         return Axis::NONE;
     }
+    virtual ScrollState GetScrollState() const
+    {
+        return ScrollState::IDLE;
+    }
 
     virtual bool AnimateTo(
         const Dimension& position, float duration, const RefPtr<Curve>& curve, bool smooth, bool canOverScroll = false)

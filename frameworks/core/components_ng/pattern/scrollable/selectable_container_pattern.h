@@ -94,7 +94,7 @@ public:
     void UpdateMouseStart(float offset);
 
     ACE_FORCE_EXPORT void SetEnableEditMode(bool enable);
-    ACE_FORCE_EXPORT bool GetEnableEditMode() const;
+    ACE_FORCE_EXPORT bool GetEnableEditMode() const override;
     bool ShouldIgnoreTouchUpWithActiveFingers() const override
     {
         return GetEnableEditMode();

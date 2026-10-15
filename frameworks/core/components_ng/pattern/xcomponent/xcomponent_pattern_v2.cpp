@@ -335,6 +335,7 @@ void XComponentPatternV2::InitSurface()
         renderSurface_->SetSurfaceBufferOpaque(isOpaque_);
     }
     renderSurface_->InitSurface();
+    renderSurface_->SetSurfaceQueueSize(bufferQueueCount_);
     renderSurface_->UpdateSurfaceConfig();
     if (type_ == XComponentType::TEXTURE) {
         renderSurface_->RegisterBufferCallback();

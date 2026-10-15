@@ -36,13 +36,7 @@ class AxisAnimator : public AceType {
 public:
     AxisAnimator();
     AxisAnimator(AxisAnimationCallback&& axisAnimationCallback, AxisAnimationStartCallback&& axisAnimationStartCallback,
-        AxisAnimationFinishCallback&& axisAnimationFinishCallback)
-        : axisAnimationCallback_(std::move(axisAnimationCallback)),
-          axisAnimationStartCallback_(std::move(axisAnimationStartCallback)),
-          axisAnimationFinishCallback_(std::move(axisAnimationFinishCallback))
-    {
-        CreateAnimator();
-    }
+        AxisAnimationFinishCallback&& axisAnimationFinishCallback);
 
     ~AxisAnimator() override;
 

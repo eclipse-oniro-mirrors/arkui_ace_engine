@@ -627,7 +627,7 @@ void ScrollableModelNG::ResetEnableScrollWithMouse(FrameNode* frameNode)
     CHECK_NULL_VOID(frameNode);
     auto pattern = frameNode->GetPattern<ScrollablePattern>();
     CHECK_NULL_VOID(pattern);
-    pattern->SetIsAllowMouse(false);
+    pattern->ResetIsAllowMouse();
 }
 
 bool ScrollableModelNG::GetEnableScrollWithMouse(FrameNode* frameNode)

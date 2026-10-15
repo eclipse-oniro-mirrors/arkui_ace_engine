@@ -56,7 +56,7 @@ void DragDropSpringLoadingStateBase::UpdateDragSpringLoadingContext(
     CHECK_NULL_VOID(dragManager);
     context->SetExtraInfos(
         eventHub->GetDragExtraParams(extraInfo.data(), stateMachine->GetPoint(), DragEventType::MOVE));
-    context->SetSummary(dragManager->GetSummaryMap());
+    context->SetSummaryInfo(dragManager->GetSummaryInfo());
     context->SetState(ConvertDragSpringLoadingState(stateMachine->GetCurrentState()));
     context->SetDragSpringLoadingConfiguration(stateMachine->GetUserConfig());
 }

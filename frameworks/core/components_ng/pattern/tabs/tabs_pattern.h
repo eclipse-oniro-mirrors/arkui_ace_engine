@@ -177,12 +177,9 @@ public:
     }
     TabBarDisplayMode GetActiveBarDisplayMode() const;
     void SetCurrentBarDisplayMode(TabBarDisplayMode mode);
-    bool IsTabShouldHideByVisibility(const TabContentDefaultVisibility& visibility);
 
     void FireBarDisplayModeChangeEvent(TabBarDisplayMode mode);
 
-    // Called by TabsLayoutAlgorithm's AfterLayoutTask to kick off the display-mode switch
-    // animation after the fromMode layout pass (which also measured the entering element).
     void StartDisplayModeSwitchAnimation(TabBarDisplayMode fromMode, TabBarDisplayMode toMode);
 
     void HandleChildrenUpdated(const RefPtr<FrameNode>& swiperNode, const RefPtr<FrameNode>& tabBarNode);
@@ -427,8 +424,7 @@ private:
     void UpdateSideBarNode();
     void UpdateSideBarAttributes();
     void SyncPropertiesToSideBar();
-    void RegisterSideBarTabItems();
-    void ResetSideBarTabListItemIds();
+    void RegisterSideBarTabItems(bool update);
     void SyncSideBarTabListIndicator(int32_t currentIndex);
     RefPtr<FrameNode> CreateSideBarNode();
     RefPtr<FrameNode> CreateSideBarDividerNode();
@@ -466,15 +462,12 @@ private:
         const RefPtr<FrameNode>& tabBarDivider);
     // Reset all transform/opacity previously applied by the mode-switch animation.
     void ResetDisplayModeSwitchTransforms();
-    void StartNonFloatingTabBarAnimation(
-        TabBarDisplayMode toMode, bool toSidebar, float outsideX, float tabHeight,
+    void StartNonFloatingTabBarAnimation(bool toSidebar, float outsideX, float tabHeight,
         const std::function<void()>& finishCb);
-    void ApplyNonFloatingTabBarAnimClosure(
-        TabBarDisplayMode toMode, bool toSidebar, float outsideX, float tabHeight);
-    void StartFloatingTabBarAnimation(
-        TabBarDisplayMode toMode, bool toSidebar, float outsideX, float baseScale,
+    void ApplyNonFloatingTabBarAnimClosure(bool toSidebar, float outsideX, float tabHeight);
+    void StartFloatingTabBarAnimation(bool toSidebar, float outsideX, float baseScale,
         const std::function<void()>& finishCb);
-    void StartFloatingSidebarTranslateAnim(TabBarDisplayMode toMode,
+    void StartFloatingSidebarTranslateAnim(
         bool toSidebar, float outsideX, const std::function<void()>& finishCb);
     void StartFloatingTabBarExitAnim(float baseScale, const std::function<void()>& finishCb);
     void StartFloatingTabBarEnterAnim(float baseScale, const std::function<void()>& finishCb);

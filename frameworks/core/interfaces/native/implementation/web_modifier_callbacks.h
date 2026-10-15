@@ -102,6 +102,9 @@ bool OnContextMenuShow(const CallbackHelper<Callback_OnContextMenuShowEvent_Bool
     WeakPtr<FrameNode> weakNode, int32_t instanceId, const BaseEventInfo* info);
 void OnContextMenuHide(const CallbackHelper<OnContextMenuHideCallback>& arkCallback,
     WeakPtr<FrameNode> weakNode, int32_t instanceId, const BaseEventInfo* info);
+void OnContextMenuUpdate(const CallbackHelper<OnContextMenuUpdateCallback>& arkCallback,
+    WeakPtr<FrameNode> weakNode, int32_t instanceId, WebContextMenuItemId menuItemId,
+    const WebContextMenuOptions& options);
 void OnSearchResultReceive(const CallbackHelper<Callback_OnSearchResultReceiveEvent_Void>& arkCallback,
     WeakPtr<FrameNode> weakNode, int32_t instanceId, const BaseEventInfo* info);
 void OnScroll(const CallbackHelper<Callback_OnScrollEvent_Void>& arkCallback,

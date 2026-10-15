@@ -559,6 +559,20 @@ void SetInitialScaleImpl(Ark_NativePointer node,
     WebModelStatic::InitialScale(frameNode, *convValue);
 #endif // WEB_SUPPORTED
 }
+void SetFlingSpeedLimitImpl(Ark_NativePointer node,
+                            const Opt_Float64* value)
+{
+#ifdef WEB_SUPPORTED
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto convValue = Converter::OptConvert<float>(*value);
+    if (!convValue) {
+        WebModelStatic::SetFlingSpeedLimit(frameNode, 0.0f);
+        return;
+    }
+    WebModelStatic::SetFlingSpeedLimit(frameNode, *convValue);
+#endif // WEB_SUPPORTED
+}
 void UserAgentImpl(Ark_NativePointer node,
                    const Opt_String* value)
 {
@@ -1205,6 +1219,30 @@ void SetOnContextMenuHideImpl(Ark_NativePointer node,
     WebModelStatic::SetOnContextMenuHide(frameNode, onContextMenuHide);
 #endif // WEB_SUPPORTED
 }
+
+#if !defined(WINDOWS_PLATFORM) && !defined(LINUX_PLATFORM) && !defined(MAC_PLATFORM)
+void SetOnContextMenuUpdateImpl(Ark_NativePointer node,
+                                const Opt_OnContextMenuUpdateCallback* value)
+{
+#ifdef WEB_SUPPORTED
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto optValue = Converter::GetOptPtr(value);
+    if (!optValue) {
+        // Implement Reset value
+        return;
+    }
+    auto instanceId = Container::CurrentId();
+    WeakPtr<FrameNode> weakNode = AceType::WeakClaim(frameNode);
+    auto onContextMenuUpdate = [callback = CallbackHelper(*optValue), weakNode, instanceId](
+        WebContextMenuItemId menuItemId, const WebContextMenuOptions& options) {
+        OnContextMenuUpdate(callback, weakNode, instanceId, menuItemId, options);
+    };
+    WebModelStatic::SetOnContextMenuUpdate(frameNode, onContextMenuUpdate);
+#endif // WEB_SUPPORTED
+}
+#endif
+
 void SetMediaPlayGestureAccessImpl(Ark_NativePointer node,
                                    const Opt_Boolean* value)
 {
@@ -3283,6 +3321,9 @@ const GENERATED_ArkUIWebModifier* GetWebModifier()
         WebAttributeModifier::SetOnScreenCaptureRequestImpl,
         WebAttributeModifier::SetOnContextMenuShowImpl,
         WebAttributeModifier::SetOnContextMenuHideImpl,
+#if !defined(WINDOWS_PLATFORM) && !defined(LINUX_PLATFORM) && !defined(MAC_PLATFORM)
+        WebAttributeModifier::SetOnContextMenuUpdateImpl,
+#endif
         WebAttributeModifier::SetMediaPlayGestureAccessImpl,
         WebAttributeModifier::SetOnSearchResultReceiveImpl,
         WebAttributeModifier::SetOnScrollImpl,
@@ -3387,6 +3428,7 @@ const GENERATED_ArkUIWebModifier* GetWebModifier()
         WebAttributeModifier::SetEnableMediaNetworkProxyImpl,
         WebAttributeModifier::SetCaretColorImpl,
         WebAttributeModifier::SetOnZoomChangeImpl,
+        WebAttributeModifier::SetFlingSpeedLimitImpl,
         WebAttributeModifier::SetRegisterNativeEmbedRuleImpl,
         WebAttributeModifier::SetBindSelectionMenuImpl,
         WebAttributeModifier::SetEnableScrollDirectionalLockImpl,

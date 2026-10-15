@@ -317,6 +317,11 @@ struct SnapAnimationOptions {
     SnapDirection snapDirection = SnapDirection::NONE;
     int32_t source = SCROLL_FROM_NONE;
     bool fromScrollBar = false; // stop spring animation? true: stop spring animation,false: continue spring animation
+    // Feat-20260806915268 item snap: this invocation is the fling-stop settle (the release already deferred
+    // to the friction pipeline) — never re-defer regardless of the residual velocity the stop
+    // reports (the per-frame velocity update is not guaranteed to have reached ~0 here).
+    bool fromItemSnapFlingStop = false;
+    bool fromItemSnapTakeover = false;
 };
 
 // app tail animation

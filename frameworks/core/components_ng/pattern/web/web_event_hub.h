@@ -190,6 +190,8 @@ public:
     ACE_WEB_EVENT_PROPERTY(OnMicrophoneCaptureStateChanged, void);
     ACE_WEB_EVENT_PROPERTY(OnTextSelectionChange, void);
     ACE_WEB_EVENT_PROPERTY(OnInputMethodAttached, void);
+    // OnContextMenuUpdate uses a custom (menuItemId, options) signature, so it is stored on
+    // WebPattern directly rather than via ACE_WEB_EVENT_PROPERTY.
 
 private:
     std::function<void(KeyEventInfo& keyEventInfo)> propOnKeyEvent_;

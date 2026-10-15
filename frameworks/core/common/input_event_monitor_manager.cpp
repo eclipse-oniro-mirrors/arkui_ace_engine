@@ -57,8 +57,14 @@ RefPtr<MonitorIdentity> InputEventMonitorManager::AddLocalInputMonitor(
 void InputEventMonitorManager::RemoveLocalInputMonitor(const RefPtr<MonitorIdentity>& identity)
 {
     CHECK_NULL_VOID(identity);
+    RemoveLocalInputMonitor(identity.GetRawPtr());
+}
+
+void InputEventMonitorManager::RemoveLocalInputMonitor(MonitorIdentity* identity)
+{
+    CHECK_NULL_VOID(identity);
     monitors_.erase(std::remove_if(monitors_.begin(), monitors_.end(),
-        [&identity](const MonitorInfo& info) { return info.identity == identity; }), monitors_.end());
+        [identity](const MonitorInfo& info) { return info.identity == identity; }), monitors_.end());
 }
 
 bool InputEventMonitorManager::ProcessMouseEvent(MouseEvent& event)

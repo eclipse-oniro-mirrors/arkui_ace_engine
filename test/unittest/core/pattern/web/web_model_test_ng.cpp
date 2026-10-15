@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include <limits>
+
 #include "gtest/gtest.h"
 #include "core/accessibility/accessibility_manager.h"
 
@@ -534,6 +536,37 @@ HWTEST_F(WebModelTestNg, SetOnContextMenuHide002, TestSize.Level1)
     WebModelNG webModelNG;
     webModelNG.SetOnContextMenuHide(callback);
     EXPECT_EQ(ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>(), nullptr);
+#endif
+}
+
+/**
+ * @tc.name: SetOnContextMenuUpdate001
+ * @tc.desc: Test WebModelNG::SetOnContextMenuUpdate() callback
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebModelTestNg, SetOnContextMenuUpdate001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    int callCount = 0;
+    auto* stack = ViewStackProcessor::GetInstance();
+    stack->ClearStack();
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+
+    WebModelNG webModelNG;
+    auto enterFunction =
+        [&callCount](WebContextMenuItemId menuItemId, const WebContextMenuOptions& options) { callCount++; };
+    webModelNG.SetOnContextMenuUpdate(std::move(enterFunction));
+
+    auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    auto callback = webPattern->GetOnContextMenuUpdateCallback();
+    ASSERT_TRUE(callback);
+    callback(WebContextMenuItemId::MENU_COPY_LINK, WebContextMenuOptions {});
+    EXPECT_EQ(callCount, 1);
 #endif
 }
 
@@ -6501,6 +6534,82 @@ HWTEST_F(WebModelTestNg, SetEnableFullscreenVideoOverlay004, TestSize.Level1)
     WebModelNG webModelNG;
     webModelNG.SetEnableFullscreenVideoOverlay(AccessibilityManager::RawPtr(frameNode), false);
     EXPECT_EQ(webPattern->GetOrCreateWebProperty()->CheckFullScreenVideoOverlay(false), true);
+#endif
+}
+
+/**
+ * @tc.name: SetFlingSpeedLimit001
+ * @tc.desc: Test WebModelNG::SetFlingSpeedLimit updates WebPattern property.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebModelTestNg, SetFlingSpeedLimit001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
+
+    WebModelNG webModelNG;
+    webModelNG.SetFlingSpeedLimit(5000.0f);
+    EXPECT_EQ(webPattern->GetOrCreateWebProperty()->CheckFlingSpeedLimit(5000.0f), true);
+#endif
+}
+
+/**
+ * @tc.name: SetFlingSpeedLimit002
+ * @tc.desc: Test WebModelNG::SetFlingSpeedLimit with different value updates property.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebModelTestNg, SetFlingSpeedLimit002, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
+
+    WebModelNG webModelNG;
+    webModelNG.SetFlingSpeedLimit(9000.0f);
+    EXPECT_EQ(webPattern->GetOrCreateWebProperty()->CheckFlingSpeedLimit(9000.0f), true);
+    EXPECT_NE(webPattern->GetOrCreateWebProperty()->CheckFlingSpeedLimit(5000.0f), true);
+#endif
+}
+
+/**
+ * @tc.name: SetFlingSpeedLimitInvalid001
+ * @tc.desc: Invalid fling speed values are normalized to the default sentinel.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebModelTestNg, SetFlingSpeedLimitInvalid001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+
+    WebModelNG webModelNG;
+    webModelNG.SetFlingSpeedLimit(std::numeric_limits<float>::quiet_NaN());
+    EXPECT_TRUE(webPattern->GetOrCreateWebProperty()->CheckFlingSpeedLimit(0.0f));
+    webModelNG.SetFlingSpeedLimit(std::numeric_limits<float>::infinity());
+    EXPECT_TRUE(webPattern->GetOrCreateWebProperty()->CheckFlingSpeedLimit(0.0f));
+    webModelNG.SetFlingSpeedLimit(-1.0f);
+    EXPECT_TRUE(webPattern->GetOrCreateWebProperty()->CheckFlingSpeedLimit(0.0f));
+    WebModelNG::SetFlingSpeedLimit(AceType::RawPtr(frameNode), 5000.0f);
+    EXPECT_TRUE(webPattern->GetOrCreateWebProperty()->CheckFlingSpeedLimit(5000.0f));
+    WebModelNG::SetFlingSpeedLimit(AceType::RawPtr(frameNode), std::numeric_limits<float>::infinity());
+    EXPECT_TRUE(webPattern->GetOrCreateWebProperty()->CheckFlingSpeedLimit(0.0f));
 #endif
 }
 } // namespace OHOS::Ace::NG

@@ -231,6 +231,11 @@ public:
 
     std::string GetCurrentPageName();
 
+    // Search scene page matching by pageType: top NavDestination name and top
+    // pageUrl fetched independently, never the concatenated string (ADR-2).
+    std::string GetCurrentNavDestinationName();
+    std::string GetCurrentPageUrl();
+
     void OnTouchEvent(const TouchEvent& point, const RefPtr<NG::FrameNode>& node, bool isSubPipe = false) override;
 
     void OnAccessibilityHoverEvent(const TouchEvent& point, const RefPtr<NG::FrameNode>& node) override;

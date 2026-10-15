@@ -1035,9 +1035,9 @@ void LazyGridLayoutAlgorithm::LayoutCachedItemsBackward(LayoutWrapper* layoutWra
     auto rIter = layoutInfo_->posMap_.rbegin();
     // h/f/s: see note in LayoutCachedItemsForward — sentinel uses body-local end (bodyEnd) to match cacheStartPos_.
     const float bodyEnd = totalMainSize_ - layoutInfo_->headerMainSize_ - layoutInfo_->footerMainSize_;
-    if (layoutInfo_->startIndex_ == 0) {
+    if (layoutInfo_->startIndex_ <= 0) {
         layoutedStart_ = 0.0f;
-        cachedStartIndex_ = 0;
+        cachedStartIndex_ = layoutInfo_->startIndex_;
     } else if (layoutInfo_->startIndex_ >= totalItemCount_) {
         layoutedStart_ = bodyEnd;
         cachedStartIndex_ = totalItemCount_;
@@ -1085,10 +1085,10 @@ bool LazyGridLayoutAlgorithm::InitPredictForwardState(int32_t& currIndex, int32_
     currLane = 0;
     currPos = layoutedEnd;
     mainSize = 0.0f;
-    // Allow forward prediction when not yet laid out (currIndex<0) and forward layout,
-    // or when already laid out (currIndex>=0) and item exists in posMap
-    if (currIndex < 0 && forwardLayout_) {
+    // Before-first is a head anchor whatever the parent's reference edge, unless the grid can only start from its tail.
+    if (currIndex < 0 && !StartsFromTail()) {
         currIndex = -1;
+        currLane = -1;
         return true;
     } else if (currIndex >= 0 && layoutInfo_->posMap_.find(currIndex) != layoutInfo_->posMap_.end()) {
         auto iter = layoutInfo_->posMap_.find(currIndex);
@@ -1164,10 +1164,13 @@ bool LazyGridLayoutAlgorithm::InitPredictBackwardState(int32_t& currIndex, int32
     currLane = lanes_ - 1;
     currPos = layoutedStart;
     mainSize = 0.0f;
-    // Allow backward prediction when not yet laid out (currIndex<0) and backward layout,
-    // or when already laid out (currIndex>=0) and item exists in posMap
-    if (currIndex < 0 && !forwardLayout_) {
+    // Only the past-last sentinel anchors the tail; a negative index is before the grid unless it starts from its tail.
+    const bool tailAnchor = currIndex >= totalItemCount_ || (currIndex < 0 && StartsFromTail());
+    if (tailAnchor && totalItemCount_ > 0) {
         currIndex = totalItemCount_;
+        currLane = totalItemCount_ % lanes_;
+        layoutedStart = hadMeasuredItems_ ? EstimateTailPos(layoutedStart) : AnchorUnmeasuredTail();
+        currPos = layoutedStart;
         return true;
     } else if (currIndex >= 0 && layoutInfo_->posMap_.find(currIndex) != layoutInfo_->posMap_.end()) {
         auto iter = layoutInfo_->posMap_.find(currIndex);
@@ -1239,6 +1242,49 @@ void LazyGridLayoutAlgorithm::PredictLayoutBackward(LayoutWrapper* layoutWrapper
     layoutedStart_ = layoutedStart;
 }
 
+bool LazyGridLayoutAlgorithm::StartsFromTail() const
+{
+    // Without a baseline, an end reference gives this grid an end-relative window, so it is predicted from the tail.
+    return !hadMeasuredItems_ && !forwardLayout_;
+}
+
+float LazyGridLayoutAlgorithm::AnchorUnmeasuredTail()
+{
+    // The extent is unknown yet: predict against a tail at 0, and SyncPredictLayoutInfo rebases by the new extent.
+    // Nothing follows the tail, so the forward side is complete.
+    rebaseTail_ = true;
+    layoutedEndIndex_ = totalItemCount_ - 1;
+    cachedEndIndex_ = totalItemCount_ - 1;
+    layoutedEnd_ = 0.0f;
+    return 0.0f;
+}
+
+float LazyGridLayoutAlgorithm::EstimateTailPos(float storedTail)
+{
+    // The stored tail is an earlier extent, stale once the item count changes without a relayout. Derive it from the
+    // last placed row instead (posMap_ is trimmed to the count), estimating any unplaced rows like UpdateTotalMainSize.
+    const auto& posMap = layoutInfo_->posMap_;
+    if (posMap.empty()) {
+        return storedTail;
+    }
+    auto last = posMap.rbegin();
+    const int32_t missingLines = std::max(0, layoutInfo_->LineCount(last->first, totalItemCount_ - 1));
+    if (missingLines > 0 && !Positive(layoutInfo_->estimateItemSize_)) {
+        layoutInfo_->EstimateItemSize();
+    }
+    return last->second.endPos + missingLines * (layoutInfo_->estimateItemSize_ + spaceWidth_);
+}
+
+void LazyGridLayoutAlgorithm::RebaseTailWindow()
+{
+    // UpdatePosMap moved the items ending at 0 to the new extent; move the end-relative window with them.
+    const float delta = totalMainSize_;
+    layoutInfo_->layoutedStart_ += delta;
+    layoutInfo_->layoutedEnd_ += delta;
+    layoutInfo_->cacheStartPos_ += delta;
+    layoutInfo_->cacheEndPos_ += delta;
+}
+
 void LazyGridLayoutAlgorithm::SyncPredictLayoutInfo(LayoutWrapper* layoutWrapper)
 {
     // Recycle items outside visible and cache range
@@ -1271,13 +1317,17 @@ void LazyGridLayoutAlgorithm::SyncPredictLayoutInfo(LayoutWrapper* layoutWrapper
     // Skip posMap update if only self measure changed, as child positions remain valid
     auto layoutProperty = layoutWrapper->GetLayoutProperty();
     CHECK_NULL_VOID(layoutProperty);
-    if (layoutProperty->GetPropertyChangeFlag() == PROPERTY_UPDATE_MEASURE_SELF) {
+    // Without a baseline there is no previous body to reuse, and a tail prediction still has to be rebased.
+    if (hadMeasuredItems_ && layoutProperty->GetPropertyChangeFlag() == PROPERTY_UPDATE_MEASURE_SELF) {
         // Reuse last frame's body; old section minus CURRENT edges would lock the total across an edge resize.
         totalMainSize_ = prevBodyMainSize_;
         return;
     }
     layoutInfo_->UpdatePosMap(prevBodyMainSize_);
     totalMainSize_ = layoutInfo_->totalMainSize_;
+    if (rebaseTail_) {
+        RebaseTailWindow();
+    }
 }
 
 void LazyGridLayoutAlgorithm::FixPosMapBackward(int32_t index)

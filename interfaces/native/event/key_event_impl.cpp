@@ -16,6 +16,7 @@
 #include "interfaces/native/native_key_event.h"
 #include "interfaces/native/node/event_converter.h"
 #include "interfaces/native/node/node_model.h"
+#include "interfaces/native/node/config_manager.h"
 #include "interfaces/native/event/ui_input_event_impl.h"
 #include "frameworks/core/interfaces/arkoala/arkoala_api.h"
 #include "interfaces/native/native_error_message_macros.h"
@@ -224,6 +225,7 @@ void OH_ArkUI_KeyEvent_Dispatch(ArkUI_NodeHandle node, const ArkUI_UIInputEvent*
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_Dispatch", "event is null");
         RETURN_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID);
     }
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     switch (event->eventTypeId) {
         case C_KEY_EVENT_ID: {
             auto* keyEvent = reinterpret_cast<ArkUIKeyEvent*>(event->inputEvent);

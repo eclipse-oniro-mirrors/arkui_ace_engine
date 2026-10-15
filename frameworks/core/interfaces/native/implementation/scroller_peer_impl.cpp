@@ -407,6 +407,18 @@ Ark_Int32 ScrollerPeerImpl::TriggerGetItemIndex(Ark_VMContext vmContext, const A
     return Converter::ArkValue<Ark_Int32>(scrollController->GetItemIndex(deltaX, deltaY));
 }
 
+Ark_ScrollState ScrollerPeerImpl::TriggerGetScrollState(Ark_VMContext vmContext)
+{
+    auto scrollController = controllerWeak_.Upgrade();
+    if (!scrollController) {
+        LOGE("ARKOALA ScrollerPeerImpl::TriggerGetScrollState Controller not bound to component.");
+        ScrollerPeerImpl::ThrowControllerError(vmContext);
+        return static_cast<Ark_ScrollState>(ScrollState::IDLE);
+    }
+    ContainerScope scope(instanceId_);
+    return static_cast<Ark_ScrollState>(scrollController->GetScrollState());
+}
+
 Ark_SizeResult ScrollerPeerImpl::TriggerContentSize(Ark_VMContext vmContext)
 {
     auto scrollController = controllerWeak_.Upgrade();

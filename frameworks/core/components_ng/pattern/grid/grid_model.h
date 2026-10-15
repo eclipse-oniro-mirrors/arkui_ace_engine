@@ -34,6 +34,7 @@ namespace OHOS::Ace {
 class ResourceObject;
 class ScrollControllerBase;
 class ScrollProxy;
+struct ScrollSnapStrategy;
 } // namespace OHOS::Ace
 
 namespace OHOS::Ace::NG {
@@ -73,6 +74,9 @@ public:
     virtual void SetSupportDragAnimation(bool value) = 0;
     virtual void SetEdgeEffect(EdgeEffect edgeEffect, bool alwaysEnabled, EffectEdge effectEdge = EffectEdge::ALL) = 0;
     virtual void SetNestedScroll(const NestedScrollOptions& nestedOpt) = 0;
+    // Feat-20260806915268: two-stage item scroll snap strategy (built-in align or custom offset provider).
+    virtual void SetScrollSnapStrategy(const ScrollSnapStrategy& scrollSnapStrategy) {}
+    virtual void ResetScrollSnapStrategy() {}
     virtual void SetScrollEnabled(bool scrollEnabled) = 0;
     virtual void SetFriction(double friction) = 0;
     virtual void SetFocusWrapMode(const std::optional<FocusWrapMode>& focusWrapMode) {}

@@ -14,6 +14,7 @@
  */
 #include "dialog_model.h"
 
+#include "node/config_manager.h"
 #include "node_model.h"
 
 #include "base/error/error_code.h"
@@ -223,6 +224,7 @@ int32_t SetContent(ArkUI_NativeDialogHandle handle, ArkUI_NodeHandle content)
     }
     CHECK_NULL_RETURN_WITH_MESSAGE(handle, ERROR_CODE_PARAM_INVALID, __FUNCTION__, "handle is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(content, ERROR_CODE_PARAM_INVALID, __FUNCTION__, "content is null");
+    CHECK_NODE_DISPOSED(content, "Node has been disposed");
     auto result = impl->getDialogAPI()->setContent(handle->controller, content->uiNodeHandle);
     if (result != ARKUI_ERROR_CODE_NO_ERROR) {
         SET_ERROR_FUNCTION_NAME(__FUNCTION__);

@@ -970,6 +970,21 @@ public:
         onContextMenuHideImpl_ = std::move(onContextMenuHideImpl);
     }
 
+    using OnContextMenuUpdateImpl = std::function<void(WebContextMenuItemId, const WebContextMenuOptions&)>;
+    void OnContextMenuUpdate(WebContextMenuItemId menuItemId, const WebContextMenuOptions& options) const
+    {
+        if (onContextMenuUpdateImpl_) {
+            onContextMenuUpdateImpl_(menuItemId, options);
+        }
+    }
+    void SetOnContextMenuUpdate(OnContextMenuUpdateImpl&& onContextMenuUpdateImpl)
+    {
+        if (onContextMenuUpdateImpl == nullptr) {
+            return;
+        }
+        onContextMenuUpdateImpl_ = std::move(onContextMenuUpdateImpl);
+    }
+
     using OnUrlLoadInterceptImpl = std::function<bool(const BaseEventInfo* info)>;
     bool OnUrlLoadIntercept(const BaseEventInfo* info) const
     {
@@ -1325,6 +1340,16 @@ public:
         isForceEnableZoom_ = isEnabled;
     }
 
+    float GetFlingSpeedLimit() const
+    {
+        return flingSpeedLimit_;
+    }
+
+    void SetFlingSpeedLimit(float speedLimit)
+    {
+        flingSpeedLimit_ = speedLimit;
+    }
+
     using OnVerifyPinRequestImpl = std::function<bool(const BaseEventInfo* info)>;
     bool OnVerifyPinRequest(const BaseEventInfo* info) const
     {
@@ -1367,6 +1392,7 @@ private:
     OnSslSelectCertRequestImpl onSslSelectCertRequestImpl_;
     OnContextMenuImpl onContextMenuImpl_;
     OnContextMenuHideImpl onContextMenuHideImpl_;
+    OnContextMenuUpdateImpl onContextMenuUpdateImpl_;
     OnInterceptRequestImpl onInterceptRequestImpl_ = nullptr;
     OnOverrideErrorPageImpl onOverrideErrorPageImpl_ = nullptr;
     OnProgressChangeImpl onProgressChangeImpl_ = nullptr;
@@ -1429,6 +1455,8 @@ private:
     bool emulateTouchFromMouseEvent_ = false;
     bool isParserBudgetOptimized_ = false;
     bool isForceEnableZoom_ = true;
+    // 0.0f means no override; NWeb uses its default (9000 on PC, 17000 on non-PC)
+    float flingSpeedLimit_ = 0.0f;
 };
 
 } // namespace OHOS::Ace

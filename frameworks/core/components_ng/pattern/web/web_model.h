@@ -16,6 +16,7 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_WEB_WEB_MODEL_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_WEB_WEB_MODEL_H
 
+#include <cmath>
 #include <mutex>
 
 #include "bridge/declarative_frontend/view_stack_processor.h"
@@ -23,6 +24,13 @@
 #include "core/components_ng/property/menu_property.h"
 
 namespace OHOS::Ace {
+inline float NormalizeFlingSpeedLimit(float speedLimit)
+{
+    // NaN, Inf, and values <= 0 are clamped to 0.0, which clears the TS override
+    // and restores viewport control (see WebViewImpl::SetFlingSpeedLimit).
+    return std::isfinite(speedLimit) && speedLimit > 0.0f ? speedLimit : 0.0f;
+}
+
 struct TextDetectConfig;
 using ScriptItems = std::map<std::string, std::vector<std::string>>;
 using ScriptRegexItems = std::map<std::string, std::vector<std::pair<std::string, std::string>>>;
@@ -74,6 +82,8 @@ public:
         const AISessionCallback&& onExecuteAIAction, const AISessionCallback&& onDestroyAISession) {}
     virtual void SetOnContextMenuShow(std::function<bool(const BaseEventInfo* info)>&& jsCallback) = 0;
     virtual void SetOnContextMenuHide(std::function<void(const BaseEventInfo* info)>&& jsCallback) = 0;
+    virtual void SetOnContextMenuUpdate(
+        std::function<void(WebContextMenuItemId menuItemId, const WebContextMenuOptions& options)>&& jsCallback) = 0;
     virtual void SetNewDragStyle(bool isNewDragStyle) {}
     virtual void SetPreviewSelectionMenu(const std::shared_ptr<WebPreviewSelectionMenuParam>& param) {}
     virtual void SetJsEnabled(bool isJsEnabled) = 0;
@@ -83,6 +93,7 @@ public:
     virtual void SetImageAccessEnabled(bool isImageAccessEnabled) = 0;
     virtual void SetMixedMode(MixedModeContent mixedMode) = 0;
     virtual void SetZoomAccessEnabled(bool isZoomAccessEnabled) = 0;
+    virtual void SetFlingSpeedLimit(float speedLimit) {}
     virtual void SetZoomControlAccess(bool zoomControlAccess) {}
     virtual void SetGeolocationAccessEnabled(bool isGeolocationAccessEnabled) = 0;
     virtual void SetJsProxyCallback(std::function<void()>&& jsProxyCallback) = 0;

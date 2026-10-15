@@ -14,6 +14,9 @@
  */
 
 #include "base/log/ace_performance_check.h"
+
+#include <fstream>
+
 #include "base/i18n/localization.h"
 #include "base/log/ace_checker.h"
 #include "base/log/dump_log.h"
