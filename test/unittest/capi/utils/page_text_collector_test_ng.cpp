@@ -129,7 +129,7 @@ public:
 // String overlays use the same RenderContext property for every component tag.
 TEST_F(PageTextOverlayTest, CommonOverlayWithoutTranslationManager)
 {
-    constexpr int32_t RECT_FIELD_COUNT = 4;
+    constexpr int32_t rectFieldCount = 4;
     const std::vector<std::string> tags = { "Blank", "Text", "Divider", "DataPanel", "LoadingProgress",
         "PatternLock", "Circle", "Ellipse", "Line", "Polyline", "Polygon", "Path", "Rect", "XComponent",
         "ScrollBar", "ArcScrollBar", "Component3D", "EmbeddedComponent", "Particle" };
@@ -144,7 +144,7 @@ TEST_F(PageTextOverlayTest, CommonOverlayWithoutTranslationManager)
         EXPECT_EQ(item->GetInt("id"), nodes_[index]->GetId());
         EXPECT_EQ(item->GetString("content"), tags[index] + " overlay");
         auto rect = item->GetValue("rect");
-        ASSERT_EQ(rect->GetArraySize(), RECT_FIELD_COUNT); // Four entries: x, y, width, height.
+        ASSERT_EQ(rect->GetArraySize(), rectFieldCount); // Four entries: x, y, width, height.
         EXPECT_EQ(rect->GetArrayItem(2)->GetDouble(), FRAME_WIDTH); // Index 2 is width.
         EXPECT_EQ(rect->GetArrayItem(3)->GetDouble(), FRAME_HEIGHT); // Index 3 is height.
     }
@@ -270,7 +270,7 @@ public:
 
 TEST_F(PageTextCollectionTest, UnregisteredTextAndInputAffixes)
 {
-    constexpr int32_t EXPECTED_AFFIX_COUNT = 2;
+    constexpr int32_t expectedAffixCount = 2;
     auto field = Input(V2::TEXTINPUT_ETS_TAG, u"private input");
     auto pattern = field->GetPattern<TextFieldPattern>();
     auto errorDecorator = AceType::MakeRefPtr<ErrorDecorator>(field);
@@ -291,7 +291,7 @@ TEST_F(PageTextCollectionTest, UnregisteredTextAndInputAffixes)
     pipeline_->uiTranslateManager_.reset();
     auto texts = Collect();
     // Only the error message and unit label are collected, giving two entries.
-    EXPECT_EQ(texts->GetArraySize(), EXPECTED_AFFIX_COUNT);
+    EXPECT_EQ(texts->GetArraySize(), expectedAffixCount);
     EXPECT_TRUE(Contains("error message"));
     EXPECT_TRUE(Contains("kg"));
     EXPECT_FALSE(Contains("private input"));
@@ -356,7 +356,7 @@ TEST_F(PageTextCollectionTest, InputEditorAndVirtualTextRemainExcluded)
 
 TEST_F(PageTextCollectionTest, ReadyTextDeduplicationAndUpdate)
 {
-    constexpr int32_t EXPECTED_SLASH_COUNT = 2;
+    constexpr int32_t expectedSlashCount = 2;
     auto text = Text(u"label");
     auto pattern = text->GetPattern<TextPattern>();
     pipeline_->uiTranslateManager_->AddTranslateListener(WeakPtr<FrameNode>(text));
@@ -370,7 +370,7 @@ TEST_F(PageTextCollectionTest, ReadyTextDeduplicationAndUpdate)
     auto firstSlash = Text(u"/");
     auto secondSlash = Text(u"/");
     // The two distinct slash nodes remain separate entries even though their content is identical.
-    EXPECT_EQ(Collect()->GetArraySize(), EXPECTED_SLASH_COUNT);
+    EXPECT_EQ(Collect()->GetArraySize(), expectedSlashCount);
 }
 
 TEST_F(PageTextCollectionTest, SelectModelValueUsesInternalText)
@@ -534,14 +534,14 @@ TEST_F(PageTextCollectionTest, ScanDoesNotEnumerateChildrenOrMutateRegistry)
 
 TEST_F(PageTextCollectionTest, ProgressUsesGeneratedTextOnly)
 {
-    constexpr double MAX_PROGRESS_VALUE = 100.0;
-    constexpr double PROGRESS_VALUE = 37.0;
+    constexpr double maxProgressValue = 100.0;
+    constexpr double progressValue = 37.0;
     auto progress = CreateNode(V2::PROGRESS_ETS_TAG, AceType::MakeRefPtr<ProgressPattern>());
     auto text = Text(u"");
     progress->AddChild(text);
     auto paint = progress->GetPaintProperty<ProgressPaintProperty>();
-    paint->UpdateMaxValue(MAX_PROGRESS_VALUE); // A full range of 100 makes the value a percentage.
-    paint->UpdateValue(PROGRESS_VALUE); // Produces the expected "37%" label.
+    paint->UpdateMaxValue(maxProgressValue); // A full range of 100 makes the value a percentage.
+    paint->UpdateValue(progressValue); // Produces the expected "37%" label.
     paint->UpdateEnableShowText(true);
     ProgressModelNG::SetText(AceType::RawPtr(progress), std::nullopt);
     SetText(text, text->GetLayoutProperty<TextLayoutProperty>()->GetContentValue(u""));
@@ -557,10 +557,10 @@ TEST_F(PageTextCollectionTest, ProgressUsesGeneratedTextOnly)
 
 TEST_F(PageTextCollectionTest, BackgroundAlignmentUsesHostWindowOffset)
 {
-    constexpr double EXPECTED_TEXT_X = 160.0;
-    constexpr double EXPECTED_TEXT_Y = 235.0;
-    constexpr float TEXT_WIDTH = 20.0f;
-    constexpr float TEXT_HEIGHT = 10.0f;
+    constexpr double expectedTextX = 160.0;
+    constexpr double expectedTextY = 235.0;
+    constexpr float textWidth = 20.0f;
+    constexpr float textHeight = 10.0f;
     auto host = CreateNode(V2::BLANK_ETS_TAG);
     auto root = CreateNode(V2::COLUMN_ETS_TAG);
     auto text = Text(u"background position");
@@ -570,30 +570,30 @@ TEST_F(PageTextCollectionTest, BackgroundAlignmentUsesHostWindowOffset)
     host->GetRenderContext()->UpdateBackgroundAlign(Alignment::CENTER);
     host->GetGeometryNode()->SetFrameSize(SizeF(200.0f, 100.0f));
     root->GetGeometryNode()->SetFrameSize(SizeF(100.0f, 40.0f));
-    text->GetGeometryNode()->SetFrameSize(SizeF(TEXT_WIDTH, TEXT_HEIGHT));
+    text->GetGeometryNode()->SetFrameSize(SizeF(textWidth, textHeight));
     AceType::DynamicCast<MockRenderContext>(host->GetRenderContext())->SetPaintRectWithTransform(
         RectF(100.0f, 200.0f, 200.0f, 100.0f));
     AceType::DynamicCast<MockRenderContext>(root->GetRenderContext())->SetPaintRectWithTransform(
         RectF(0.0f, 0.0f, 100.0f, 40.0f));
     AceType::DynamicCast<MockRenderContext>(text->GetRenderContext())->SetPaintRectWithTransform(
-        RectF(10.0f, 5.0f, TEXT_WIDTH, TEXT_HEIGHT));
+        RectF(10.0f, 5.0f, textWidth, textHeight));
     auto texts = Collect();
     ASSERT_EQ(texts->GetArraySize(), 1);
     auto item = texts->GetArrayItem(0);
     EXPECT_EQ(item->GetInt("id"), text->GetId());
     auto rect = item->GetValue("rect");
     // x = host origin 100 + centered offset (200 - 100) / 2 + text offset 10 = 160.
-    EXPECT_DOUBLE_EQ(rect->GetArrayItem(0)->GetDouble(), EXPECTED_TEXT_X);
+    EXPECT_DOUBLE_EQ(rect->GetArrayItem(0)->GetDouble(), expectedTextX);
     // y = host origin 200 + centered offset (100 - 40) / 2 + text offset 5 = 235.
-    EXPECT_DOUBLE_EQ(rect->GetArrayItem(1)->GetDouble(), EXPECTED_TEXT_Y);
-    EXPECT_DOUBLE_EQ(rect->GetArrayItem(2)->GetDouble(), TEXT_WIDTH); // Index 2 is the text frame width.
-    EXPECT_DOUBLE_EQ(rect->GetArrayItem(3)->GetDouble(), TEXT_HEIGHT); // Index 3 is the text frame height.
+    EXPECT_DOUBLE_EQ(rect->GetArrayItem(1)->GetDouble(), expectedTextY);
+    EXPECT_DOUBLE_EQ(rect->GetArrayItem(2)->GetDouble(), textWidth); // Index 2 is the text frame width.
+    EXPECT_DOUBLE_EQ(rect->GetArrayItem(3)->GetDouble(), textHeight); // Index 3 is the text frame height.
 }
 
 TEST_F(PageTextCollectionTest, NestedBackgroundUsesOuterHostPosition)
 {
-    constexpr double EXPECTED_TEXT_X = 63.0;
-    constexpr double EXPECTED_TEXT_Y = 69.0;
+    constexpr double expectedTextX = 63.0;
+    constexpr double expectedTextY = 69.0;
     auto host = CreateNode(V2::BLANK_ETS_TAG);
     auto root = CreateNode(V2::COLUMN_ETS_TAG);
     auto innerHost = CreateNode(V2::BLANK_ETS_TAG);
@@ -615,21 +615,21 @@ TEST_F(PageTextCollectionTest, NestedBackgroundUsesOuterHostPosition)
     ASSERT_EQ(texts->GetArraySize(), 1);
     auto rect = texts->GetArrayItem(0)->GetValue("rect");
     // x = outer host 50 + inner host 10 + text offset 3 = 63.
-    EXPECT_DOUBLE_EQ(rect->GetArrayItem(0)->GetDouble(), EXPECTED_TEXT_X);
+    EXPECT_DOUBLE_EQ(rect->GetArrayItem(0)->GetDouble(), expectedTextX);
     // y = outer host 60 + inner host 5 + text offset 4 = 69.
-    EXPECT_DOUBLE_EQ(rect->GetArrayItem(1)->GetDouble(), EXPECTED_TEXT_Y);
+    EXPECT_DOUBLE_EQ(rect->GetArrayItem(1)->GetDouble(), expectedTextY);
     host->SetActive(false);
     EXPECT_EQ(Collect()->GetArraySize(), 0);
 }
 
 TEST_F(PageTextCollectionTest, NestedBackgroundComposesScale)
 {
-    constexpr double EXPECTED_OUTER_SCALED_TEXT_X = 26.0;
-    constexpr double EXPECTED_OUTER_SCALED_TEXT_Y = 22.0;
-    constexpr double EXPECTED_NESTED_SCALED_TEXT_X = 94.0;
-    constexpr double EXPECTED_NESTED_SCALED_TEXT_Y = 87.0;
-    constexpr double EXPECTED_CENTERED_TEXT_X = 174.0;
-    constexpr double EXPECTED_CENTERED_TEXT_Y = 94.5;
+    constexpr double expectedOuterScaledTextX = 26.0;
+    constexpr double expectedOuterScaledTextY = 22.0;
+    constexpr double expectedNestedScaledTextX = 94.0;
+    constexpr double expectedNestedScaledTextY = 87.0;
+    constexpr double expectedCenteredTextX = 174.0;
+    constexpr double expectedCenteredTextY = 94.5;
     auto host = CreateNode(V2::BLANK_ETS_TAG);
     auto root = CreateNode(V2::COLUMN_ETS_TAG);
     auto innerHost = CreateNode(V2::BLANK_ETS_TAG);
@@ -658,9 +658,9 @@ TEST_F(PageTextCollectionTest, NestedBackgroundComposesScale)
     ASSERT_EQ(texts->GetArraySize(), 1);
     auto rect = texts->GetArrayItem(0)->GetValue("rect");
     // x = (inner host offset 10 + text offset 3) * outer scale 2 = 26.
-    EXPECT_DOUBLE_EQ(rect->GetArrayItem(0)->GetDouble(), EXPECTED_OUTER_SCALED_TEXT_X);
+    EXPECT_DOUBLE_EQ(rect->GetArrayItem(0)->GetDouble(), expectedOuterScaledTextX);
     // y = (inner host offset 7 + text offset 4) * outer scale 2 = 22.
-    EXPECT_DOUBLE_EQ(rect->GetArrayItem(1)->GetDouble(), EXPECTED_OUTER_SCALED_TEXT_Y);
+    EXPECT_DOUBLE_EQ(rect->GetArrayItem(1)->GetDouble(), expectedOuterScaledTextY);
 
     // Outer scale (2, 3), inner scale (4, 0.5), with a nonzero window origin.
     host->GetGeometryNode()->SetFrameSize(SizeF(200.0f, 60.0f));
@@ -673,8 +673,8 @@ TEST_F(PageTextCollectionTest, NestedBackgroundComposesScale)
     EXPECT_EQ(item->GetInt("id"), text->GetId());
     rect = item->GetValue("rect");
     // The window origin and scaled inner-host/text offsets produce x = 94 and y = 87.
-    EXPECT_DOUBLE_EQ(rect->GetArrayItem(0)->GetDouble(), EXPECTED_NESTED_SCALED_TEXT_X); // 50 + 10 * 2 + 3 * 4 * 2
-    EXPECT_DOUBLE_EQ(rect->GetArrayItem(1)->GetDouble(), EXPECTED_NESTED_SCALED_TEXT_Y); // 60 + 7 * 3 + 4 * 0.5 * 3
+    EXPECT_DOUBLE_EQ(rect->GetArrayItem(0)->GetDouble(), expectedNestedScaledTextX); // 50 + 10 * 2 + 3 * 4 * 2
+    EXPECT_DOUBLE_EQ(rect->GetArrayItem(1)->GetDouble(), expectedNestedScaledTextY); // 60 + 7 * 3 + 4 * 0.5 * 3
     EXPECT_DOUBLE_EQ(rect->GetArrayItem(2)->GetDouble(), FRAME_WIDTH); // Index 2 is width.
     EXPECT_DOUBLE_EQ(rect->GetArrayItem(3)->GetDouble(), FRAME_HEIGHT); // Index 3 is height.
 
@@ -685,8 +685,8 @@ TEST_F(PageTextCollectionTest, NestedBackgroundComposesScale)
     ASSERT_EQ(texts->GetArraySize(), 1);
     rect = texts->GetArrayItem(0)->GetValue("rect");
     // Centering adds local offsets (10, 5) before scaling, giving the window position (174, 94.5).
-    EXPECT_DOUBLE_EQ(rect->GetArrayItem(0)->GetDouble(), EXPECTED_CENTERED_TEXT_X); // 50 + 10 * 2 + (3 + 10) * 4 * 2
-    EXPECT_DOUBLE_EQ(rect->GetArrayItem(1)->GetDouble(), EXPECTED_CENTERED_TEXT_Y); // 60 + 7 * 3 + (4 + 5) * 0.5 * 3
+    EXPECT_DOUBLE_EQ(rect->GetArrayItem(0)->GetDouble(), expectedCenteredTextX); // 50 + 10 * 2 + (3 + 10) * 4 * 2
+    EXPECT_DOUBLE_EQ(rect->GetArrayItem(1)->GetDouble(), expectedCenteredTextY); // 60 + 7 * 3 + (4 + 5) * 0.5 * 3
 }
 
 TEST_F(PageTextCollectionTest, BackgroundHostStateAndReplacement)
@@ -718,13 +718,13 @@ public:
     {
         PageTextCollectionTest::SetUp();
         // Main window: screen origin (100, 200), width 800, height 600.
-        pipeline_->displayWindowRectInfo_ = Rect(MAIN_WINDOW_X, MAIN_WINDOW_Y, WINDOW_WIDTH, WINDOW_HEIGHT);
+        pipeline_->displayWindowRectInfo_ = Rect(mainWindowX, mainWindowY, windowWidth, windowHeight);
         MockPipelineContext::SetUp();
         childPipeline_ = MockPipelineContext::GetCurrent();
         MockPipelineContext::pipeline_ = pipeline_;
         childPipeline_->instanceId_ = CHILD_ID;
         // Child window: screen origin (130, 240), offset (30, 40) from the main window, same size.
-        childPipeline_->displayWindowRectInfo_ = Rect(CHILD_WINDOW_X, CHILD_WINDOW_Y, WINDOW_WIDTH, WINDOW_HEIGHT);
+        childPipeline_->displayWindowRectInfo_ = Rect(childWindowX, childWindowY, windowWidth, windowHeight);
         auto root = CreateNode("SubwindowRoot");
         root->AttachContext(AceType::RawPtr(childPipeline_));
         childPipeline_->overlayManager_ = AceType::MakeRefPtr<OverlayManager>(root);
@@ -793,12 +793,12 @@ public:
     }
 
     static constexpr int32_t CHILD_ID = 100001;
-    static constexpr double MAIN_WINDOW_X = 100.0;
-    static constexpr double MAIN_WINDOW_Y = 200.0;
-    static constexpr double CHILD_WINDOW_X = 130.0;
-    static constexpr double CHILD_WINDOW_Y = 240.0;
-    static constexpr double WINDOW_WIDTH = 800.0;
-    static constexpr double WINDOW_HEIGHT = 600.0;
+    static constexpr double mainWindowX = 100.0;
+    static constexpr double mainWindowY = 200.0;
+    static constexpr double childWindowX = 130.0;
+    static constexpr double childWindowY = 240.0;
+    static constexpr double windowWidth = 800.0;
+    static constexpr double windowHeight = 600.0;
     RefPtr<MockPipelineContext> childPipeline_;
     RefPtr<MockContainer> childContainer_;
     RefPtr<MockSubwindow> subwindow_;
@@ -807,9 +807,9 @@ public:
 
 TEST_F(PageTextFloatingTest, ContextMenusUseOwnerScopeAndWindowCoordinates)
 {
-    constexpr int32_t EXPECTED_MENU_COUNT = 2;
-    constexpr double MOVED_CHILD_WINDOW_X = 150.0;
-    constexpr double MOVED_CHILD_WINDOW_Y = 260.0;
+    constexpr int32_t expectedMenuCount = 2;
+    constexpr double movedChildWindowX = 150.0;
+    constexpr double movedChildWindowY = 260.0;
     auto button = CreateNode(V2::BUTTON_ETS_TAG);
     auto longPressMenu = Menu(button, u"T561_155_A");
     auto controlledMenu = Menu(button, u"T561_272_A");
@@ -817,18 +817,18 @@ TEST_F(PageTextFloatingTest, ContextMenusUseOwnerScopeAndWindowCoordinates)
     ASSERT_TRUE(Contains("T561_272_A"));
     auto texts = Collect();
     // The long-press menu and controlled menu each contribute one text entry.
-    ASSERT_EQ(texts->GetArraySize(), EXPECTED_MENU_COUNT);
+    ASSERT_EQ(texts->GetArraySize(), expectedMenuCount);
     auto rect = texts->GetArrayItem(0)->GetValue("rect");
-    EXPECT_DOUBLE_EQ(rect->GetArrayItem(0)->GetDouble(), CHILD_WINDOW_X - MAIN_WINDOW_X);
-    EXPECT_DOUBLE_EQ(rect->GetArrayItem(1)->GetDouble(), CHILD_WINDOW_Y - MAIN_WINDOW_Y);
+    EXPECT_DOUBLE_EQ(rect->GetArrayItem(0)->GetDouble(), childWindowX - mainWindowX);
+    EXPECT_DOUBLE_EQ(rect->GetArrayItem(1)->GetDouble(), childWindowY - mainWindowY);
     EXPECT_DOUBLE_EQ(rect->GetArrayItem(2)->GetDouble(), FRAME_WIDTH); // Index 2 is width.
     // Move the child window to screen origin (150, 260), retaining its size of 800 by 600.
     childPipeline_->displayWindowRectInfo_ =
-        Rect(MOVED_CHILD_WINDOW_X, MOVED_CHILD_WINDOW_Y, WINDOW_WIDTH, WINDOW_HEIGHT);
+        Rect(movedChildWindowX, movedChildWindowY, windowWidth, windowHeight);
     auto moved = Collect();
     auto movedRect = moved->GetArrayItem(0)->GetValue("rect");
-    EXPECT_DOUBLE_EQ(movedRect->GetArrayItem(0)->GetDouble(), MOVED_CHILD_WINDOW_X - MAIN_WINDOW_X);
-    EXPECT_DOUBLE_EQ(movedRect->GetArrayItem(1)->GetDouble(), MOVED_CHILD_WINDOW_Y - MAIN_WINDOW_Y);
+    EXPECT_DOUBLE_EQ(movedRect->GetArrayItem(0)->GetDouble(), movedChildWindowX - mainWindowX);
+    EXPECT_DOUBLE_EQ(movedRect->GetArrayItem(1)->GetDouble(), movedChildWindowY - mainWindowY);
     controlledMenu->GetPattern<MenuWrapperPattern>()->menuStatus_ = MenuStatus::HIDE;
     EXPECT_FALSE(Contains("T561_272_A"));
     EXPECT_TRUE(Contains("T561_155_A"));
@@ -915,7 +915,7 @@ TEST_F(PageTextFloatingTest, ChildWindowOnAnotherUIThreadIsNotRead)
 
 TEST_F(PageTextCollectionTest, SliderPaintMethodSelectsCustomAndGeneratedText)
 {
-    constexpr int32_t EXPECTED_TEXT_DRAW_COUNT = 2;
+    constexpr int32_t expectedTextDrawCount = 2;
     auto slider = CreateNode(V2::SLIDER_ETS_TAG, AceType::MakeRefPtr<SliderPattern>());
     auto pattern = slider->GetPattern<SliderPattern>();
     slider->GetRenderContext()->SetHostNode(slider);
@@ -923,7 +923,7 @@ TEST_F(PageTextCollectionTest, SliderPaintMethodSelectsCustomAndGeneratedText)
     auto paragraph = MockParagraph::GetOrCreateMockParagraph();
     std::vector<std::u16string> paragraphTexts;
     // AddText runs twice: once for the custom tip and once for the generated percentage.
-    EXPECT_CALL(*paragraph, AddText(testing::_)).Times(EXPECTED_TEXT_DRAW_COUNT)
+    EXPECT_CALL(*paragraph, AddText(testing::_)).Times(expectedTextDrawCount)
         .WillRepeatedly([&paragraphTexts](const std::u16string& text) { paragraphTexts.push_back(text); });
     auto tip = AceType::MakeRefPtr<SliderTipModifier>(slider, []() { return std::pair<OffsetF, float>(); });
     pattern->sliderTipModifier_ = tip;
@@ -949,7 +949,7 @@ TEST_F(PageTextCollectionTest, SliderPaintMethodSelectsCustomAndGeneratedText)
     pattern->UpdateTipsValue();
     method.UpdateOverlayModifier(AceType::RawPtr(wrapper));
     EXPECT_TRUE(Contains("47%"));
-    ASSERT_EQ(paragraphTexts.size(), EXPECTED_TEXT_DRAW_COUNT);
+    ASSERT_EQ(paragraphTexts.size(), expectedTextDrawCount);
     EXPECT_EQ(paragraphTexts[0], u"T561_053_A");
     EXPECT_EQ(paragraphTexts[1], u"47%");
     auto texts = Collect();
