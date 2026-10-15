@@ -24,7 +24,12 @@ namespace OHOS::Ace::NG {
 // (js_scroll_placeholder_register). Exposed on the internal ArkUI native module
 // surface as `scrollPlaceholderRegister`; the northbound handle is the
 // PlaceholderRegister instance returned by UIContext.getPlaceholderRegister(),
-// whose methods call into this surface inside the UI instance scope.
+// whose methods call into this surface inside the UI instance scope. Register()
+// receives (id, wrappedBuilder, executionClosure): the closure is injected by
+// the JS-side PlaceholderRegister and binds the unwrapped builder to a view-like
+// probe `this` before invoking it — the bridge never calls the compiled builder
+// with a bare-function `this` (the conversion product dereferences
+// `(parent ? parent : this).observeComponentCreation2`).
 //
 // Register() performs the single-layer-instrumentation admission (ADR-11): the
 // template builder closure runs inside an isolated creation context (independent

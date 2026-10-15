@@ -43,25 +43,32 @@ void ThrowRejected(EcmaVM* vm)
         ERROR_CODE_SCROLL_PLACEHOLDER_REGISTER_REJECTED);
 }
 
-// Validates the (id, WrappedBuilder) argument pair and unwraps the inner builder
-// function. Throws the parameter error (401) itself and returns false on any
-// invalid form; only the wrapBuilder-wrapped form is accepted - a bare builder
-// function or an arbitrary object is a parameter error.
+// Validates the (id, WrappedBuilder, execution closure) argument triple and
+// returns the execution closure. Throws the parameter error (401) itself and
+// returns false on any invalid form; only the wrapBuilder-wrapped form is
+// accepted as the northbound builder argument - a bare builder function or an
+// arbitrary object is a parameter error. The closure is framework-internal
+// (injected by jsUIContext PlaceholderRegister): it binds the unwrapped builder
+// to a view-like probe object before invoking it, because the conversion product
+// dereferences `(parent ? parent : this).observeComponentCreation2` and a
+// bare-function `this` crashes (device verification finding; same convention as
+// BuilderNode executing `builder.builder.bind(this)`).
 bool ParseRegisterArguments(EcmaVM* vm, ArkUIRuntimeCallInfo* runtimeCallInfo,
-    std::string& templateId, panda::Local<panda::FunctionRef>& builderFunc)
+    std::string& templateId, panda::Local<panda::FunctionRef>& execClosure)
 {
-    if (runtimeCallInfo->GetArgsNumber() < 2) { // 2: id + builder
+    if (runtimeCallInfo->GetArgsNumber() < 3) { // 3: id + wrapped builder + execution closure
         ArkTSUtils::ThrowError(vm, "Parameter error.", ERROR_CODE_PARAM_INVALID);
         return false;
     }
     Local<JSValueRef> idArg = runtimeCallInfo->GetCallArgRef(0);
     Local<JSValueRef> builderArg = runtimeCallInfo->GetCallArgRef(1);
+    Local<JSValueRef> closureArg = runtimeCallInfo->GetCallArgRef(2);
     if (!idArg->IsString(vm)) {
         ArkTSUtils::ThrowError(vm, "Parameter error.", ERROR_CODE_PARAM_INVALID);
         return false;
     }
     templateId = idArg->ToString(vm)->ToString(vm);
-    if (templateId.empty() || !builderArg->IsObject(vm)) {
+    if (templateId.empty() || !builderArg->IsObject(vm) || !closureArg->IsFunction(vm)) {
         ArkTSUtils::ThrowError(vm, "Parameter error.", ERROR_CODE_PARAM_INVALID);
         return false;
     }
@@ -71,26 +78,28 @@ bool ParseRegisterArguments(EcmaVM* vm, ArkUIRuntimeCallInfo* runtimeCallInfo,
         ArkTSUtils::ThrowError(vm, "Parameter error.", ERROR_CODE_PARAM_INVALID);
         return false;
     }
-    builderFunc = builderProp;
+    execClosure = closureArg;
     return true;
 }
 
-// Wraps the unwrapped builder into the template builder closure: every execution
-// runs inside an isolated creation context (independent view stack, product never
+// Wraps the execution closure into the template builder: every execution runs
+// inside an isolated creation context (independent view stack, product never
 // mounted, no LRU) and records its instrumentation-signal snapshot for admission.
 ScrollPlaceholderBuilder MakeIsolatedTemplateBuilder(EcmaVM* vm,
-    const panda::Local<panda::FunctionRef>& builderFunc,
+    const panda::Local<panda::FunctionRef>& execClosure,
     const std::shared_ptr<ScrollPlaceholderRestrictedScope::Probe>& admission)
 {
-    auto globalFunc = panda::CopyableGlobal<panda::FunctionRef>(vm, builderFunc);
+    auto globalFunc = panda::CopyableGlobal<panda::FunctionRef>(vm, execClosure);
     return ScrollPlaceholderBuilder(
-        [vm, builderFunc = std::move(globalFunc), admission]() -> RefPtr<UINode> {
+        [vm, execClosure = std::move(globalFunc), admission]() -> RefPtr<UINode> {
             ScopedViewStackProcessor isolatedStack;
             ScrollPlaceholderRestrictedScope::Probe probe;
             {
                 panda::LocalScope localScope(vm);
                 panda::TryCatch tryCatch(vm);
-                builderFunc->Call(vm, builderFunc.ToLocal(), nullptr, 0);
+                // thisArg is irrelevant: the closure already binds the builder's
+                // view-like `this`; never call the unwrapped builder here.
+                execClosure->Call(vm, panda::JSValueRef::Undefined(vm), nullptr, 0);
                 if (tryCatch.HasCaught()) {
                     // A throwing builder is a half-failed execution: record it as
                     // a violation so the admission probe rejects the template
@@ -148,10 +157,12 @@ RegisterProbeStatus RunRegistrationAdmissionProbe(const RefPtr<ScrollPlaceholder
 } // namespace
 
 // Registration flow (single-layer instrumentation admission, ADR-11 + ADR-14):
-//  1. parameter validation — id must be a non-empty string and the builder a
-//     WrappedBuilder wrapping a function; anything else is a parameter error (401);
-//  2. the builder closure runs every execution inside an isolated creation context
-//     (independent view stack, product never mounted, no LRU) and observes the
+//  1. parameter validation — id must be a non-empty string, the builder a
+//     WrappedBuilder wrapping a function, and the framework execution closure a
+//     function; anything else is a parameter error (401);
+//  2. the execution closure runs every builder execution inside an isolated
+//     creation context (independent view stack, product never mounted, no LRU)
+//     with the builder bound to a view-like probe `this`, and observes the
 //     instrumentation signals of that execution; RegisterTemplate's synchronous
 //     source build IS the admission try-execute — one execution, no extra runs;
 //  3. begin never fired → the builder was not compiled under
@@ -164,8 +175,8 @@ ArkUINativeModuleValue ScrollPlaceholderRegisterBridge::Register(ArkUIRuntimeCal
     EcmaVM* vm = runtimeCallInfo->GetVM();
     CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
     std::string templateId;
-    panda::Local<panda::FunctionRef> builderFunc;
-    if (!ParseRegisterArguments(vm, runtimeCallInfo, templateId, builderFunc)) {
+    panda::Local<panda::FunctionRef> execClosure;
+    if (!ParseRegisterArguments(vm, runtimeCallInfo, templateId, execClosure)) {
         return panda::JSValueRef::Undefined(vm);
     }
     auto context = PipelineContext::GetCurrentContext();
@@ -181,7 +192,7 @@ ArkUINativeModuleValue ScrollPlaceholderRegisterBridge::Register(ArkUIRuntimeCal
     // Latest-execution admission result, shared between the closure (which runs
     // inside RegisterTemplate's synchronous source build) and this call site.
     auto admission = std::make_shared<ScrollPlaceholderRestrictedScope::Probe>();
-    auto builderClosure = MakeIsolatedTemplateBuilder(vm, builderFunc, admission);
+    auto builderClosure = MakeIsolatedTemplateBuilder(vm, execClosure, admission);
     uint64_t generation = manager->RegisterTemplate(templateId, std::move(builderClosure));
     if (generation == 0) {
         TAG_LOGW(AceLogTag::ACE_SCROLL,

@@ -188,6 +188,91 @@ class ComponentSnapshot {
     }
 }
 
+// View-like `this` for executing a compiled global @Builder from the C++ side
+// without an owning custom component. The conversion product dereferences
+// `(parent ? parent : this).observeComponentCreation2(...)` (plus if/else and
+// custom-component entries), so `this` must implement the state management view
+// protocol - the same reason BuilderNode executes builders against JSBuilderNode
+// (see ark_node/src/builder_node.ts). The class is built lazily inside the
+// factory: it extends ViewBuildNodeBase from the separately loaded state
+// management bundle, which must not be resolved at this script's load time.
+// A fresh instance per execution keeps each template's update functions
+// collectable - the product snapshot is never re-rendered.
+let placeholderProbeViewClass = null;
+function createPlaceholderProbeView(instanceId) {
+    if (placeholderProbeViewClass === null) {
+        class PlaceholderProbeView extends ViewBuildNodeBase {
+            constructor(instanceId) {
+                super(false);
+                this.probeInstanceId_ = instanceId;
+            }
+
+            getInstanceId() {
+                return this.probeInstanceId_;
+            }
+
+            // Single-execution probe: rerender and lifecycle entries are never
+            // reached because the template product is an immutable snapshot.
+            UpdateElement(elmtId) { }
+            forceCompleteRerender(deep) { }
+            forceRerenderNode(elmtId) { }
+            purgeDeleteElmtId(rmElmtId) {
+                return false;
+            }
+            ifElseBranchUpdateFunctionDirtyRetaken() { }
+            findProvidePU__(providePropName) {
+                return undefined;
+            }
+
+            // Mirrors JSBuilderNode.observeComponentCreation2: allocate the
+            // element id, register the owning view, and run the compiled update
+            // function inside the instance scope.
+            observeComponentCreation2(compilerAssignedUpdateFunc, classObject) {
+                const componentName =
+                    classObject && 'name' in classObject ? classObject.name : 'unspecified UINode';
+                if (componentName === '__Recycle__') {
+                    return;
+                }
+                const popFunc = classObject && 'pop' in classObject ? classObject.pop : () => { };
+                const updateFunc = (elmtId, isFirstRender) => {
+                    __JSScopeUtil__.syncInstanceId(this.probeInstanceId_);
+                    try {
+                        ViewBuildNodeBase.arkThemeScopeManager?.onComponentCreateEnter(
+                            componentName, elmtId, isFirstRender, this);
+                        ViewStackProcessor.StartGetAccessRecordingFor(elmtId);
+                        compilerAssignedUpdateFunc(elmtId, isFirstRender);
+                        if (!isFirstRender) {
+                            popFunc();
+                        }
+                        ViewStackProcessor.StopGetAccessRecording();
+                        ViewBuildNodeBase.arkThemeScopeManager?.onComponentCreateExit(elmtId);
+                    } finally {
+                        __JSScopeUtil__.restoreInstanceId();
+                    }
+                };
+                const elmtId = ViewStackProcessor.AllocateNewElmetIdForNextComponent();
+                UINodeRegisterProxy.ElementIdToOwningViewPU_.set(elmtId, new WeakRef(this));
+                try {
+                    updateFunc(elmtId, true);
+                } catch (error) {
+                    UINodeRegisterProxy.ElementIdToOwningViewPU_.delete(elmtId);
+                    throw error;
+                }
+            }
+
+            observeRecycleComponentCreation(name, recycleUpdateFunc) {
+                throw new Error('custom component in a placeholder builder does not support @Reusable');
+            }
+
+            forEachUpdateFunction(elmtId, itemArray, itemGenFunc) {
+                throw new Error('ForEach is not supported inside a placeholder builder');
+            }
+        }
+        placeholderProbeViewClass = PlaceholderProbeView;
+    }
+    return new placeholderProbeViewClass(instanceId);
+}
+
 class PlaceholderRegister {
     /**
      * Registry of scroll placeholder builders of this UI instance. Do not create
@@ -202,7 +287,12 @@ class PlaceholderRegister {
 
     register(id, builder) {
         withInstanceId(this.instanceId_, () => {
-            this.ohos_placeholderRegister.register(id, builder);
+            // The third argument is the execution closure: it binds the unwrapped
+            // builder to a fresh probe view, so the native side never calls the
+            // compiled builder with a bare-function `this` (device crash at
+            // `(parent ? parent : this).observeComponentCreation2`).
+            this.ohos_placeholderRegister.register(
+                id, builder, () => builder.builder.call(createPlaceholderProbeView(this.instanceId_)));
         });
     }
 
