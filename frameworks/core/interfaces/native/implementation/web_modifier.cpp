@@ -1206,7 +1206,7 @@ void SetOnContextMenuHideImpl(Ark_NativePointer node,
 #endif // WEB_SUPPORTED
 }
 
-#ifndef WINDOWS_PLATFORM
+#if !defined(WINDOWS_PLATFORM) && !defined(LINUX_PLATFORM) && !defined(MAC_PLATFORM)
 void SetOnContextMenuUpdateImpl(Ark_NativePointer node,
                                 const Opt_OnContextMenuUpdateCallback* value)
 {
@@ -3296,7 +3296,7 @@ const GENERATED_ArkUIWebModifier* GetWebModifier()
         WebAttributeModifier::SetOnScreenCaptureRequestImpl,
         WebAttributeModifier::SetOnContextMenuShowImpl,
         WebAttributeModifier::SetOnContextMenuHideImpl,
-#ifndef WINDOWS_PLATFORM
+#if !defined(WINDOWS_PLATFORM) && !defined(LINUX_PLATFORM) && !defined(MAC_PLATFORM)
         WebAttributeModifier::SetOnContextMenuUpdateImpl,
 #endif
         WebAttributeModifier::SetMediaPlayGestureAccessImpl,
