@@ -17,6 +17,7 @@
 #include "adapter/ohos/entrance/ui_session/ui_session_manager_ohos.h"
 #include "core/accessibility/accessibility_manager.h"
 #include "core/components_ng/manager/safe_area/safe_area_manager.h"
+#include "base/resource/shared_image_manager.h"
 
 #include <atomic>
 #include <cinttypes>
@@ -5121,6 +5122,17 @@ void UIContentImpl::UpdateFormData(const std::string& data)
     } else {
         formData_ = data;
     }
+}
+
+void UIContentImpl::SetFormImageCacheThreshold(int32_t threshold)
+{
+    auto container = Platform::AceContainer::GetContainer(instanceId_);
+    CHECK_NULL_VOID(container);
+    auto context = container->GetPipelineContext();
+    CHECK_NULL_VOID(context);
+    auto sharedImageManager = context->GetOrCreateSharedImageManager();
+    CHECK_NULL_VOID(sharedImageManager);
+    sharedImageManager->SetImageCacheThreshold(threshold);
 }
 
 void UIContentImpl::UpdateFormSharedImage(const std::map<std::string, sptr<OHOS::AppExecFwk::FormAshmem>>& imageDataMap)
