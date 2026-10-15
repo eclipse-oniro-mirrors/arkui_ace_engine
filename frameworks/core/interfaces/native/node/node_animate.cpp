@@ -672,15 +672,15 @@ ArkUI_Int32 AddAnimationGroup(ArkUIContext* context, ArkUIAnimationGroupHandle g
     for (ArkUI_Uint32 i = 0; i < targetCount; i++) {
         auto rsNodeHandle = renderNodeModifier->getRSNode(resolvedTargets[i]);
         auto* rawRSNode = reinterpret_cast<OHOS::Rosen::RSNode*>(rsNodeHandle);
-        CHECK_NULL_RETURN(rawRSNode, ERROR_CODE_PARAM_INVALID);
+        CHECK_NULL_RETURN(rawRSNode, ERROR_CODE_SUB_ANIMATION_INVALID);
         childRawRSNodes.push_back(rawRSNode);
     }
     if (!ValidateRSNodeInstance(childRawRSNodes, instanceId)) {
-        return ERROR_CODE_PARAM_INVALID;
+        return ERROR_CODE_TARGET_NODE_NOT_IN_SAME_CONTEXT;
     }
     auto createFn = [childRawRSNodes = std::move(childRawRSNodes), group](
         int32_t instanceId, const std::string& k, int64_t gen)
-        -> std::shared_ptr<AnimationUtils::InteractiveAnimation> {
+        -> AnimationGroupCreateResult {
         return CreateAndStartGroupAnimation(group, childRawRSNodes, instanceId, k, gen);
     };
     return AnimationGroupAdapter::GetInstance().AddAnimationGroup(instanceId, keyStr, createFn);

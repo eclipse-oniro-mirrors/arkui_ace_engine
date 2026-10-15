@@ -835,7 +835,7 @@ std::string Inspector::GetInspectorOfNode(RefPtr<NG::UINode> node)
 {
     auto jsonRoot = JsonUtil::Create(true);
 
-    auto context = NG::PipelineContext::GetCurrentContext();
+    auto context = NG::PipelineContext::GetCurrentContextSafely();
     CHECK_NULL_RETURN(context, jsonRoot->ToString());
     GetContextInfo(context, jsonRoot);
     CHECK_NULL_RETURN(node, jsonRoot->ToString());
@@ -851,6 +851,25 @@ std::string Inspector::GetInspectorOfNode(RefPtr<NG::UINode> node)
         GetContextInfo(context, jsonRoot);
     }
 
+    return jsonRoot->ToString();
+}
+
+std::string Inspector::GetInspectorOfNodeSubtree(RefPtr<NG::UINode> node)
+{
+    auto context = NG::PipelineContext::GetCurrentContextSafely();
+    CHECK_NULL_RETURN(context, "{}");
+    CHECK_NULL_RETURN(node, "{}");
+    auto jsonRoot = JsonUtil::CreateSharedPtrJson(true);
+    auto scale = context->GetViewScale();
+    auto rootHeight = context->GetRootHeight();
+    auto rootWidth = context->GetRootWidth();
+    deviceRect.SetRect(0, 0, rootWidth * scale, rootHeight * scale);
+    jsonRoot->Put(INSPECTOR_WIDTH, std::to_string(rootWidth * scale).c_str());
+    jsonRoot->Put(INSPECTOR_HEIGHT, std::to_string(rootHeight * scale).c_str());
+    jsonRoot->Put(INSPECTOR_RESOLUTION, std::to_string(PipelineBase::GetCurrentDensity()).c_str());
+#ifndef CROSS_PLATFORM
+    node->DumpSimplifyTreeWithParamConfig(0, jsonRoot, false);
+#endif
     return jsonRoot->ToString();
 }
 

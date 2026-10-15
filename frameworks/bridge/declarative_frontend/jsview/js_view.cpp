@@ -1048,7 +1048,9 @@ RefPtr<AceType> JSViewPartialUpdate::CreateViewNode(bool isTitleNode, bool isCus
         auto customNode = AceType::DynamicCast<NG::CustomNode>(node);
         if (customNode) {
             customNode->ResetOnEnvTreeStateChangeFunc();
-            if (jsViewObject_->GetProperty("__hasInitializedEnvValue__Internal")->ToBoolean()) {
+            // V1 @CustomEnv may not be read before the node is attached, so its backing value is not initialized
+            // yet. Register the tree-state callback from decorator metadata to keep V1 @Watch consistent with V2.
+            if (hasCustomEnv || jsViewObject_->GetProperty("__hasInitializedEnvValue__Internal")->ToBoolean()) {
                 EnsureEnvTreeStateChangeCallback();
             }
         }

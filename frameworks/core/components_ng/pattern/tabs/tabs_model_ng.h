@@ -113,14 +113,16 @@ public:
     static void SetDividerColorByUser(FrameNode* frameNode, bool isByUser);
     static void SetEffectNodeOption(FrameNode* frameNode, const TabsEffectNodeOption& option);
     static void SetFadingEdge(FrameNode* frameNode, bool fadingEdge);
-    static void SetBarBackgroundColor(FrameNode* frameNode, const Color& backgroundColor);
+    static void SetBarBackgroundColor(FrameNode* frameNode, const Color& backgroundColor,
+        bool updateForSideBar = true);
     static void SetBarBackgroundColorByUser(FrameNode* frameNode, bool isByUser);
     static void SetSidebarSelectedIconColor(FrameNode* frameNode, const Color& color);
     static void SetSidebarSelectedTextColor(FrameNode* frameNode, const Color& color);
     static void SetSidebarUnselectedIconColor(FrameNode* frameNode, const Color& color);
     static void SetSidebarUnselectedTextColor(FrameNode* frameNode, const Color& color);
     static void SetSidebarSelectedBoardColor(FrameNode* frameNode, const Color& color);
-    static void SetBarBackgroundBlurStyle(FrameNode* frameNode, const BlurStyleOption& styleOption);
+    static void SetBarBackgroundBlurStyle(FrameNode* frameNode, const BlurStyleOption& styleOption,
+        bool updateForSideBar = true);
     static void SetBarOverlap(FrameNode* frameNode, bool barOverlap);
     static void SetIsVertical(FrameNode* frameNode, bool isVertical);
     static void SetTabBarPosition(FrameNode* frameNode, BarPosition tabBarPosition);

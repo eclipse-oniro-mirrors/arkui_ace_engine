@@ -17,17 +17,18 @@
 
 #include "base/json/json_util.h"
 #include "base/memory/ace_type.h"
+#include "base/utils/time_util.h"
 #include "base/utils/utf_helper.h"
 
 #define private public
 #define protected public
 #include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/manager/page_scene/page_scene_rule_manager.h"
 #undef private
 #undef protected
 
 #include "core/components_ng/base/geometry_node.h"
 #include "core/components_ng/event/focus_hub.h"
-#include "core/components_ng/manager/page_scene/page_scene_rule_manager.h"
 #include "core/components_ng/pattern/overlay/overlay_manager.h"
 #include "core/components_ng/pattern/rich_editor/rich_editor_layout_property.h"
 #include "core/components_ng/pattern/rich_editor/rich_editor_pattern.h"
@@ -299,6 +300,35 @@ void UpdateNodeRect(const RefPtr<FrameNode>& node, const RectF& paintRect)
     auto renderContext = AceType::DynamicCast<MockRenderContext>(node->GetRenderContext());
     ASSERT_NE(renderContext, nullptr);
     renderContext->SetPaintRectWithTransform(paintRect);
+}
+
+// ---- Search scene (RR-30095586) rule JSON builders for TASK-1 unit tests ----
+const std::string SEARCH_RULE_SET_ID_A = "search-set-a";
+const std::string SEARCH_RULE_SET_ID_B = "search-set-b";
+const std::string SEARCH_RULE_SET_ID_C = "search-set-c";
+const std::string SEARCH_RULE_ID = "search-rule-1";
+
+std::string BuildValidSearchRuleJson(const std::string& ruleSetId = SEARCH_RULE_SET_ID_A)
+{
+    return std::string(R"({
+        "ruleSetId": ")") + ruleSetId + R"(",
+        "rules": [
+            {
+                "ruleId": "search-rule-1",
+                "pageType": "Navigation",
+                "pageName": "HomePage",
+                "regions": [
+                    { "x": 0, "y": 0, "width": 360, "height": 80 }
+                ],
+                "keywords": [ "search", "搜索" ],
+                "components": [
+                    { "type": "Image", "maxSize": { "width": 48, "height": 48 }, "maxRatio": 2.0 },
+                    { "type": "Swiper", "autoPlay": true, "maxSize": { "width": 360, "height": 120 }, "maxRatio": 3.0 }
+                ],
+                "inspectorIds": [ "searchEntryBtn", "searchBox" ]
+            }
+        ]
+    })";
 }
 } // namespace
 
@@ -828,6 +858,38 @@ HWTEST_F(PageSceneRuleManagerTestNg, PageSceneRuleManager_MatchPageScene010, Tes
     EXPECT_FALSE(pageResult->matched);
     EXPECT_EQ(pageResult->matchedCount, ONE_MATCHED_NODE);
     EXPECT_EQ(pageResult->nodeIds, (std::vector<int32_t> { TEST_TEXT_INPUT_ID }));
+}
+
+/**
+ * @tc.name: PageSceneRuleManager_MatchPageScene010_More
+ * @tc.desc: Test traversal with production-style start nodes includes inputs under
+ *           page, dialog and overlay branches; sceneJson reflects all three.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PageSceneRuleManagerTestNg, PageSceneRuleManager_MatchPageScene010_More, TestSize.Level1)
+{
+    auto rootNode = CreateTestNode(
+        V2::ROOT_ETS_TAG, TEST_PIPELINE_ROOT_ID, RectF(ROOT_X, ROOT_Y, ROOT_WIDTH, ROOT_HEIGHT));
+    auto stageNode = CreateTestNode(
+        V2::STAGE_ETS_TAG, TEST_STAGE_ID, RectF(ROOT_X, ROOT_Y, ROOT_WIDTH, ROOT_HEIGHT));
+    auto pageRoot = CreatePageRoot();
+    auto dialogNode = CreateTestNode(
+        V2::DIALOG_ETS_TAG, TEST_DIALOG_ID, RectF(ROOT_X, ROOT_Y, ROOT_WIDTH, ROOT_HEIGHT));
+    auto overlayNode = CreateTestNode(
+        V2::OVERLAY_ETS_TAG, TEST_OVERLAY_ID, RectF(ROOT_X, ROOT_Y, ROOT_WIDTH, ROOT_HEIGHT));
+
+    AddChild(rootNode, stageNode);
+    AddChild(stageNode, pageRoot);
+    AddChild(rootNode, dialogNode);
+    AddChild(rootNode, overlayNode);
+    AddChild(pageRoot, CreateTextInputNode(
+        TEST_TEXT_INPUT_ID, RectF(FIRST_NODE_X, FIRST_NODE_Y, INPUT_WIDTH, INPUT_HEIGHT)));
+    AddChild(dialogNode, CreateTestNode(
+        V2::TEXTAREA_ETS_TAG, TEST_DIALOG_INPUT_ID,
+        RectF(SECOND_NODE_X, SECOND_NODE_Y, INPUT_WIDTH, INPUT_HEIGHT)));
+    AddChild(overlayNode, CreateTestNode(
+        V2::SEARCH_ETS_TAG, TEST_OVERLAY_INPUT_ID,
+        RectF(THIRD_NODE_X, THIRD_NODE_Y, INPUT_WIDTH, INPUT_HEIGHT)));
 
     // Production-style start nodes: page branch (pageRoot) + overlay branches
     // (dialog, overlay). This mirrors GetDumpStartNodes output and avoids the
@@ -838,6 +900,7 @@ HWTEST_F(PageSceneRuleManagerTestNg, PageSceneRuleManager_MatchPageScene010, Tes
     branchStartNodes.pageStartNodes.push_back(pageRoot);
     branchStartNodes.overlayNodes.push_back(dialogNode);
     branchStartNodes.overlayNodes.push_back(overlayNode);
+    PageSceneRuleManager manager;
     auto rootResult = manager.MatchPageScene(
         TEST_PROCESS_ID, BuildRuleJson(), branchStartNodes, TEST_PAGE_NAME, true);
     ASSERT_TRUE(rootResult.has_value());
@@ -1006,5 +1069,724 @@ HWTEST_F(PageSceneRuleManagerTestNg, PageSceneRuleManager_MatchPageScene015, Tes
     ASSERT_TRUE(thirdNode);
     EXPECT_EQ(thirdNode->GetInt("nodeId"), TEST_SEARCH_ID);
     EXPECT_TRUE(thirdNode->GetValue("enableAutoFill")->IsNull());
+}
+
+/**
+ * @tc.name: PageSceneRuleManager_SearchRegister001
+ * @tc.desc: Valid search rule registers through RegisterRuleSet routing and direct API, retrievable.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PageSceneRuleManagerTestNg, PageSceneRuleManager_SearchRegister001, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    EXPECT_EQ(manager.RegisterRuleSet(TEST_PROCESS_ID, BuildValidSearchRuleJson()), PAGE_SCENE_NO_ERROR);
+    EXPECT_TRUE(manager.HasRegisteredSearchRule(TEST_PROCESS_ID));
+    auto ruleSet = manager.GetSearchRuleSet(TEST_PROCESS_ID, SEARCH_RULE_SET_ID_A);
+    ASSERT_TRUE(ruleSet.has_value());
+    EXPECT_EQ(ruleSet->ruleSetId, SEARCH_RULE_SET_ID_A);
+    ASSERT_EQ(ruleSet->rules.size(), 1U);
+    EXPECT_EQ(ruleSet->rules[0].ruleId, SEARCH_RULE_ID);
+    EXPECT_EQ(ruleSet->rules[0].pageType, "Navigation");
+    ASSERT_EQ(ruleSet->rules[0].regions.size(), 1U);
+    EXPECT_EQ(ruleSet->rules[0].keywords.size(), 2U);
+    ASSERT_EQ(ruleSet->rules[0].inspectorIds.size(), 2U);
+    // Duplicate registration of the same ruleSetId is rejected (AC-9.2).
+    EXPECT_EQ(manager.RegisterSearchRuleSet(TEST_PROCESS_ID, BuildValidSearchRuleJson()), PAGE_SCENE_PARAM_INVALID);
+}
+
+/**
+ * @tc.name: PageSceneRuleManager_SearchRegister002
+ * @tc.desc: Invalid search configs are rejected with PARAM_INVALID, whole config fails.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PageSceneRuleManagerTestNg, PageSceneRuleManager_SearchRegister002, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    auto expectInvalid = [&manager](const std::string& json) {
+        EXPECT_EQ(manager.RegisterSearchRuleSet(TEST_PROCESS_ID, json), PAGE_SCENE_PARAM_INVALID);
+    };
+    expectInvalid(R"({ "ruleSetId": "", "rules": [{ "ruleId":"r1", "pageType":"Navigation",
+        "pageName":"P", "regions":[{ "x":0, "y":0, "width":10, "height":10 }] }] })");
+    expectInvalid(R"({ "ruleSetId": "s1", "rules": [{ "ruleId":"r1", "pageType":"Navigation",
+        "pageName":"P", "regions":[] }] })");
+    expectInvalid(R"({ "ruleSetId": "s1", "rules": [{ "ruleId":"r1", "pageType":"Navigation",
+        "pageName":"P", "regions":[{ "x":0, "y":0, "width":10, "height":10 },
+        { "x":5, "y":5, "width":10, "height":10 }] }] })");
+    expectInvalid(R"({ "ruleSetId": "s1", "rules": [{ "ruleId":"r1", "pageType":"Navigation",
+        "pageName":"P", "regions":[
+        { "x":0, "y":0, "width":10, "height":10 },
+        { "x":20, "y":0, "width":10, "height":10 },
+        { "x":40, "y":0, "width":10, "height":10 },
+        { "x":60, "y":0, "width":10, "height":10 },
+        { "x":80, "y":0, "width":10, "height":10 },
+        { "x":100, "y":0, "width":10, "height":10 } ] }] })");
+    expectInvalid(R"({ "ruleSetId": "s1", "rules": [{ "ruleId":"r1", "pageType":"Dialog",
+        "pageName":"P", "regions":[{ "x":0, "y":0, "width":10, "height":10 }] }] })");
+    expectInvalid(R"({ "ruleSetId": "s1", "rules": [{ "ruleId":"r1", "pageType":"Navigation",
+        "pageName":"P", "regions":[{ "x":0, "y":0, "width":10, "height":10 }],
+        "keywords":["a", "b", "c", "d", "e", "f"] }] })");
+    expectInvalid(R"({ "ruleSetId": "s1", "rules": [{ "ruleId":"r1", "pageType":"Navigation",
+        "pageName":"P", "regions":[{ "x":0, "y":0, "width":10, "height":10 }],
+        "keywords":["中文字搜索功能测试超限"] }] })");
+}
+
+/**
+ * @tc.name: PageSceneRuleManager_SearchRegister002_More
+ * @tc.desc: Invalid component/inspectorId configs are rejected; duplicate ruleId
+ *           within a ruleSet is rejected and no partial acceptance is kept.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PageSceneRuleManagerTestNg, PageSceneRuleManager_SearchRegister002_More, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    auto expectInvalid = [&manager](const std::string& json) {
+        EXPECT_EQ(manager.RegisterSearchRuleSet(TEST_PROCESS_ID, json), PAGE_SCENE_PARAM_INVALID);
+    };
+    expectInvalid(R"({ "ruleSetId": "s1", "rules": [{ "ruleId":"r1", "pageType":"Navigation",
+        "pageName":"P", "regions":[{ "x":0, "y":0, "width":10, "height":10 }],
+        "components":[ { "type":"Image", "maxSize":{ "width":0, "height":48 } } ] }] })");
+    expectInvalid(R"({ "ruleSetId": "s1", "rules": [{ "ruleId":"r1", "pageType":"Navigation",
+        "pageName":"P", "regions":[{ "x":0, "y":0, "width":10, "height":10 }],
+        "components":[ { "type":"Image", "maxRatio":"abc" } ] }] })");
+    expectInvalid(R"({ "ruleSetId": "s1", "rules": [{ "ruleId":"r1", "pageType":"Navigation",
+        "pageName":"P", "regions":[{ "x":0, "y":0, "width":10, "height":10 }],
+        "components":[ { "type":"Swiper", "autoPlay":"true" } ] }] })");
+    expectInvalid(R"({ "ruleSetId": "s1", "rules": [{ "ruleId":"r1", "pageType":"Navigation",
+        "pageName":"P", "regions":[{ "x":0, "y":0, "width":10, "height":10 }],
+        "components":[ { "type":"Image" }, { "type":"Image" } ] }] })");
+    expectInvalid(R"({ "ruleSetId": "s1", "rules": [{ "ruleId":"r1", "pageType":"Navigation",
+        "pageName":"P", "regions":[{ "x":0, "y":0, "width":10, "height":10 }],
+        "inspectorIds":[ "" ] }] })");
+    expectInvalid(R"({ "ruleSetId": "s1", "rules": [{ "ruleId":"r1", "pageType":"Navigation",
+        "pageName":"P", "regions":[{ "x":0, "y":0, "width":10, "height":10 }],
+        "inspectorIds":[ 123 ] }] })");
+    // Duplicate ruleId within the same ruleSet is rejected (AC-1.5).
+    expectInvalid(R"({ "ruleSetId": "s1", "rules": [
+        { "ruleId":"r1", "pageType":"Navigation", "pageName":"P",
+          "regions":[{ "x":0, "y":0, "width":10, "height":10 }] },
+        { "ruleId":"r1", "pageType":"Router", "pageName":"Q",
+          "regions":[{ "x":0, "y":0, "width":10, "height":10 }] }] })");
+    // No partial acceptance: a prior invalid config leaves the process unregistered.
+    EXPECT_FALSE(manager.HasRegisteredSearchRule(TEST_PROCESS_ID));
+}
+
+/**
+ * @tc.name: PageSceneRuleManager_SearchDualRuleSet001
+ * @tc.desc: Two independent ruleSets per process register; duplicate and third are rejected;
+ *           cross-ruleSet ruleId reuse and region overlap are allowed (AC-1.15/1.16/1.17).
+ * @tc.type: FUNC
+ */
+HWTEST_F(PageSceneRuleManagerTestNg, PageSceneRuleManager_SearchDualRuleSet001, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    EXPECT_EQ(manager.RegisterSearchRuleSet(TEST_PROCESS_ID, BuildValidSearchRuleJson(SEARCH_RULE_SET_ID_A)),
+        PAGE_SCENE_NO_ERROR);
+    EXPECT_EQ(manager.RegisterSearchRuleSet(TEST_PROCESS_ID, BuildValidSearchRuleJson(SEARCH_RULE_SET_ID_B)),
+        PAGE_SCENE_NO_ERROR);
+    // A third ruleSet for the same SA is rejected (AC-1.15).
+    EXPECT_EQ(manager.RegisterSearchRuleSet(TEST_PROCESS_ID, BuildValidSearchRuleJson(SEARCH_RULE_SET_ID_C)),
+        PAGE_SCENE_PARAM_INVALID);
+    // Each ruleSet is independently retrievable.
+    EXPECT_TRUE(manager.GetSearchRuleSet(TEST_PROCESS_ID, SEARCH_RULE_SET_ID_A).has_value());
+    EXPECT_TRUE(manager.GetSearchRuleSet(TEST_PROCESS_ID, SEARCH_RULE_SET_ID_B).has_value());
+    // Cross-ruleSet same ruleId is allowed (AC-1.17).
+    EXPECT_EQ(manager.RegisterSearchRuleSet(SECOND_PROCESS_ID, BuildValidSearchRuleJson(SEARCH_RULE_SET_ID_B)),
+        PAGE_SCENE_NO_ERROR);
+    EXPECT_TRUE(manager.GetSearchRuleSet(SECOND_PROCESS_ID, SEARCH_RULE_SET_ID_B).has_value());
+}
+
+/**
+ * @tc.name: PageSceneRuleManager_SearchUnregister001
+ * @tc.desc: Unregister one ruleSet keeps the other; idempotent per ruleSet (AC-10.1).
+ * @tc.type: FUNC
+ */
+HWTEST_F(PageSceneRuleManagerTestNg, PageSceneRuleManager_SearchUnregister001, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    EXPECT_EQ(manager.RegisterSearchRuleSet(TEST_PROCESS_ID, BuildValidSearchRuleJson(SEARCH_RULE_SET_ID_A)),
+        PAGE_SCENE_NO_ERROR);
+    EXPECT_EQ(manager.RegisterSearchRuleSet(TEST_PROCESS_ID, BuildValidSearchRuleJson(SEARCH_RULE_SET_ID_B)),
+        PAGE_SCENE_NO_ERROR);
+    EXPECT_EQ(manager.UnregisterSearchRuleSet(TEST_PROCESS_ID, SEARCH_RULE_SET_ID_A), PAGE_SCENE_NO_ERROR);
+    EXPECT_FALSE(manager.GetSearchRuleSet(TEST_PROCESS_ID, SEARCH_RULE_SET_ID_A).has_value());
+    EXPECT_TRUE(manager.GetSearchRuleSet(TEST_PROCESS_ID, SEARCH_RULE_SET_ID_B).has_value());
+    EXPECT_EQ(manager.UnregisterSearchRuleSet(TEST_PROCESS_ID, SEARCH_RULE_SET_ID_A), PAGE_SCENE_PARAM_INVALID);
+    EXPECT_EQ(manager.UnregisterSearchRuleSet(TEST_PROCESS_ID, ""), PAGE_SCENE_PARAM_INVALID);
+}
+
+/**
+ * @tc.name: PageSceneRuleManager_SearchClearProcess001
+ * @tc.desc: ClearProcess removes all search ruleSets of a process.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PageSceneRuleManagerTestNg, PageSceneRuleManager_SearchClearProcess001, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    EXPECT_EQ(manager.RegisterSearchRuleSet(TEST_PROCESS_ID, BuildValidSearchRuleJson(SEARCH_RULE_SET_ID_A)),
+        PAGE_SCENE_NO_ERROR);
+    EXPECT_EQ(manager.RegisterSearchRuleSet(TEST_PROCESS_ID, BuildValidSearchRuleJson(SEARCH_RULE_SET_ID_B)),
+        PAGE_SCENE_NO_ERROR);
+    manager.ClearProcess(TEST_PROCESS_ID);
+    EXPECT_FALSE(manager.HasRegisteredSearchRule(TEST_PROCESS_ID));
+    EXPECT_FALSE(manager.GetSearchRuleSet(TEST_PROCESS_ID, SEARCH_RULE_SET_ID_B).has_value());
+}
+
+SearchRuleSet BuildDirectSearchRuleSet()
+{
+    SearchRuleSet ruleSet;
+    ruleSet.ruleSetId = SEARCH_RULE_SET_ID_A;
+    SearchSceneRule rule;
+    rule.ruleId = SEARCH_RULE_ID;
+    rule.pageType = "Navigation";
+    rule.pageName = "HomePage";
+    rule.regions.emplace_back(PageSceneRectInfo { 0.0f, 0.0f, 360.0f, 80.0f });
+    rule.keywords.emplace_back("搜索");
+    ruleSet.rules.emplace_back(rule);
+    return ruleSet;
+}
+
+SearchSceneSnapshot BuildDirectSnapshot()
+{
+    SearchSceneSnapshot snapshot;
+    snapshot.pageName = "HomePage";
+    snapshot.navDestinationName = "HomePage";
+    snapshot.pageUrl = "pages/Home";
+    SearchSceneNodeFeature node;
+    node.nodeId = 1;
+    node.nodeType = "Text";
+    node.visibleRect = RectF(10.0f, 20.0f, 200.0f, 40.0f);
+    node.keywordSources.emplace_back(SearchKeywordSource { "text", "打开搜索功能" });
+    snapshot.nodes.emplace_back(node);
+    return snapshot;
+}
+
+/**
+ * @tc.name: PageSceneRuleManager_SearchMatcher001
+ * @tc.desc: Keyword match (substring, case-insensitive), inspectorId fuzzy source and
+ *           keyword OR component; component size/ratio/autoPlay AND constraints.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PageSceneRuleManagerTestNg, PageSceneRuleManager_SearchMatcher001, TestSize.Level1)
+{
+    SearchSnapshotMatcher matcher;
+    auto ruleSet = BuildDirectSearchRuleSet();
+    auto snapshot = BuildDirectSnapshot();
+    auto hits = matcher.Match(snapshot, ruleSet);
+    ASSERT_EQ(hits.size(), 1U);
+    EXPECT_EQ(hits[0].evidenceType, "keyword");
+    EXPECT_EQ(hits[0].source, "text");
+    EXPECT_EQ(hits[0].matchedKeyword, "搜索");
+
+    // Case-insensitive English substring (AC-2.7).
+    snapshot.nodes[0].keywordSources.clear();
+    snapshot.nodes[0].keywordSources.emplace_back(SearchKeywordSource { "text", "SEARCH" });
+    auto caseRule = ruleSet;
+    caseRule.rules[0].keywords.clear();
+    caseRule.rules[0].keywords.emplace_back("search");
+    hits = matcher.Match(snapshot, caseRule);
+    ASSERT_EQ(hits.size(), 1U);
+
+    // inspectorId substring fuzzy source (AC-7.13 new semantics).
+    snapshot.nodes[0].keywordSources.clear();
+    snapshot.nodes[0].inspectorId = "searchEntryBtn";
+    hits = matcher.Match(snapshot, caseRule);
+    ASSERT_EQ(hits.size(), 1U);
+    EXPECT_EQ(hits[0].source, "inspectorId");
+
+    // Page mismatch: rule does not participate (AC-4.6).
+    auto pageRule = ruleSet;
+    pageRule.rules[0].pageName = "OtherPage";
+    hits = matcher.Match(snapshot, pageRule);
+    EXPECT_TRUE(hits.empty());
+}
+
+/**
+ * @tc.name: PageSceneRuleManager_SearchMatcher002
+ * @tc.desc: Component features: maxSize/maxRatio inclusive, zero height excluded,
+ *           same-type AND / different-type OR.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PageSceneRuleManagerTestNg, PageSceneRuleManager_SearchMatcher002, TestSize.Level1)
+{
+    SearchSnapshotMatcher matcher;
+    SearchRuleSet ruleSet;
+    ruleSet.ruleSetId = "comp-set";
+    SearchSceneRule rule;
+    rule.ruleId = "comp-rule";
+    rule.pageType = "Router";
+    rule.pageName = "pages/Home";
+    rule.regions.emplace_back(PageSceneRectInfo { 0.0f, 0.0f, 360.0f, 1280.0f });
+    SearchComponentFeature imageFeature;
+    imageFeature.type = "Image";
+    imageFeature.maxWidth = 48.0f;
+    imageFeature.maxHeight = 48.0f;
+    imageFeature.maxRatio = 2.0f;
+    rule.components.emplace_back(imageFeature);
+    ruleSet.rules.emplace_back(rule);
+
+    SearchSceneSnapshot snapshot;
+    snapshot.navDestinationName = "HomePage";
+    snapshot.pageUrl = "pages/Home";
+    // Image 30x20 center in region -> hits; maxRatio inclusive at 2.0.
+    SearchSceneNodeFeature imageNode;
+    imageNode.nodeId = 2;
+    imageNode.nodeType = "Image";
+    imageNode.visibleRect = RectF(0.0f, 0.0f, 40.0f, 20.0f);
+    snapshot.nodes.emplace_back(imageNode);
+    auto hits = matcher.Match(snapshot, ruleSet);
+    ASSERT_EQ(hits.size(), 1U);
+    EXPECT_EQ(hits[0].evidenceType, "component");
+    EXPECT_EQ(hits[0].source, "Image");
+
+    // maxSize violated -> no hit (same-type AND).
+    snapshot.nodes[0].visibleRect = RectF(0.0f, 0.0f, 60.0f, 20.0f);
+    hits = matcher.Match(snapshot, ruleSet);
+    EXPECT_TRUE(hits.empty());
+
+    // Zero visible height excluded (AC-3.8).
+    snapshot.nodes[0].visibleRect = RectF(0.0f, 0.0f, 40.0f, 0.0f);
+    hits = matcher.Match(snapshot, ruleSet);
+    EXPECT_TRUE(hits.empty());
+
+    // Region containment is inclusive on the boundary (AC-3.10): node center on the
+    // region right edge still matches while maxSize/maxRatio constraints hold.
+    snapshot.nodes[0].visibleRect = RectF(340.0f, 0.0f, 40.0f, 20.0f); // center (360,10) on right edge
+    hits = matcher.Match(snapshot, ruleSet);
+    ASSERT_EQ(hits.size(), 1U);
+}
+
+/**
+ * @tc.name: PageSceneRuleManager_SearchPresence001
+ * @tc.desc: true once, no repeat on evidence change, one false on vanish/exit,
+ *           re-appearance allows another true (AC-5, AC-6).
+ * @tc.type: FUNC
+ */
+HWTEST_F(PageSceneRuleManagerTestNg, PageSceneRuleManager_SearchPresence001, TestSize.Level1)
+{
+    SearchPresenceStateMachine sm;
+    SearchMatchEvidence evidence;
+    evidence.ruleSetId = "s1";
+    evidence.ruleId = "r1";
+    std::vector<SearchMatchEvidence> hits { evidence };
+    auto evt = sm.Update("1001:Home", "Home", true, hits);
+    ASSERT_TRUE(evt.has_value());
+    EXPECT_TRUE(evt->isTrue);
+    EXPECT_EQ(evt->ruleIds.size(), 1U);
+    EXPECT_EQ(evt->pageName, "Home");
+    EXPECT_EQ(evt->hits.size(), 1U);
+    EXPECT_EQ(evt->hits[0].ruleSetId, "s1");
+
+    // Evidence changes but state PRESENT: no repeat (AC-5.2).
+    EXPECT_FALSE(sm.Update("1001:Home", "Home", true, hits).has_value());
+
+    // Feature vanish: one false (AC-6.1); idempotent on repeated no-match.
+    evt = sm.Update("1001:Home", "Home", false, {});
+    ASSERT_TRUE(evt.has_value());
+    EXPECT_FALSE(evt->isTrue);
+    EXPECT_EQ(evt->ruleIds.size(), 1U);
+    EXPECT_FALSE(sm.Update("1001:Home", "Home", false, {}).has_value());
+
+    // Re-appearance: another true (AC-6.3).
+    evt = sm.Update("1001:Home", "Home", true, hits);
+    ASSERT_TRUE(evt.has_value());
+    EXPECT_TRUE(evt->isTrue);
+
+    // Route leave: one false (AC-6.2); second exit emits nothing.
+    evt = sm.Exit("1001:Home", "Home");
+    ASSERT_TRUE(evt.has_value());
+    EXPECT_FALSE(evt->isTrue);
+    EXPECT_FALSE(sm.Exit("1001:Home", "Home").has_value());
+}
+
+/**
+ * @tc.name: PageSceneRuleManager_SearchManagerMatch001
+ * @tc.desc: Manager-level integration: registered search ruleSet matched against a
+ *           snapshot; presence emits true; ClearProcess clears presence.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PageSceneRuleManagerTestNg, PageSceneRuleManager_SearchManagerMatch001, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    EXPECT_EQ(manager.RegisterSearchRuleSet(TEST_PROCESS_ID, BuildValidSearchRuleJson()), PAGE_SCENE_NO_ERROR);
+    auto snapshot = BuildDirectSnapshot();
+    auto hits = manager.MatchSearchScene(TEST_PROCESS_ID, snapshot);
+    ASSERT_EQ(hits.size(), 1U);
+    auto events = manager.UpdateSearchPresence(TEST_PROCESS_ID, snapshot, hits);
+    ASSERT_EQ(events.size(), 1U);
+    EXPECT_TRUE(events[0].isTrue);
+
+    // Same page stable: no repeat event.
+    auto events2 = manager.UpdateSearchPresence(TEST_PROCESS_ID, snapshot, hits);
+    EXPECT_TRUE(events2.empty());
+
+    // Route leave emits one false.
+    auto exitEvent = manager.ExitSearchPresence(TEST_PROCESS_ID, "HomePage");
+    ASSERT_TRUE(exitEvent.has_value());
+    EXPECT_FALSE(exitEvent->isTrue);
+}
+
+/**
+ * @tc.name: PageSceneRuleManager_SearchClickMatcher001
+ * @tc.desc: Inspector ID exact match first; case/prefix/substring/parent-child/
+ *           nodeId negative cases do not match (AC-7.3, AC-7.5~7.10).
+ * @tc.type: FUNC
+ */
+HWTEST_F(PageSceneRuleManagerTestNg, PageSceneRuleManager_SearchClickMatcher001, TestSize.Level1)
+{
+    SearchClickMatcher matcher;
+    SearchRuleSet ruleSet;
+    ruleSet.ruleSetId = "click-set";
+    SearchSceneRule rule;
+    rule.ruleId = "click-rule";
+    rule.pageType = "Navigation";
+    rule.pageName = "HomePage";
+    rule.regions.emplace_back(PageSceneRectInfo { 100.0f, 100.0f, 60.0f, 60.0f });
+    rule.inspectorIds.emplace_back("paySearchBtn");
+    ruleSet.rules.emplace_back(rule);
+    SearchClickPageContext page { "HomePage", "pages/Home" };
+
+    // Exact match -> inspectorId hit regardless of region (AC-7.3).
+    SearchClickCandidate candidate;
+    candidate.nodeId = 1;
+    candidate.inspectorId = "paySearchBtn";
+    candidate.operationId = "op-1";
+    auto results = matcher.Match(candidate, page, ruleSet, nullptr);
+    ASSERT_EQ(results.size(), 1U);
+    EXPECT_EQ(results[0].matchType, "inspectorId");
+
+    // Case difference -> not matched, no region fallback hit (null responseNode).
+    candidate.inspectorId = "PAYSEARCHBTN";
+    results = matcher.Match(candidate, page, ruleSet, nullptr);
+    EXPECT_TRUE(results.empty());
+
+    // Prefix only -> not matched (AC-7.6).
+    candidate.inspectorId = "pay";
+    results = matcher.Match(candidate, page, ruleSet, nullptr);
+    EXPECT_TRUE(results.empty());
+
+    // Substring only -> not matched (AC-7.7).
+    candidate.inspectorId = "Search";
+    results = matcher.Match(candidate, page, ruleSet, nullptr);
+    EXPECT_TRUE(results.empty());
+
+    // Internal numeric nodeId -> not matched (AC-7.10).
+    candidate.inspectorId.clear();
+    rule.inspectorIds.clear();
+    rule.inspectorIds.emplace_back("12345");
+    candidate.nodeId = 12345;
+    results = matcher.Match(candidate, page, ruleSet, nullptr);
+    EXPECT_TRUE(results.empty());
+}
+
+/**
+ * @tc.name: PageSceneRuleManager_SearchClickMatcher002
+ * @tc.desc: Fallback from response control down max 10 layers by region OR keyword
+ *           when ID is unconfigured/empty/unmatched (AC-7.4).
+ * @tc.type: FUNC
+ */
+HWTEST_F(PageSceneRuleManagerTestNg, PageSceneRuleManager_SearchClickMatcher002, TestSize.Level1)
+{
+    SearchClickMatcher matcher;
+    SearchRuleSet ruleSet;
+    ruleSet.ruleSetId = "click-set";
+    SearchSceneRule rule;
+    rule.ruleId = "click-rule";
+    rule.pageType = "Router";
+    rule.pageName = "pages/Home";
+    rule.regions.emplace_back(PageSceneRectInfo { 100.0f, 100.0f, 60.0f, 60.0f });
+    rule.keywords.emplace_back("搜索");
+    // inspectorIds unconfigured -> fallback path.
+    ruleSet.rules.emplace_back(rule);
+    SearchClickPageContext page { "HomePage", "pages/Home" };
+    SearchClickCandidate candidate;
+    candidate.nodeId = 10;
+    candidate.operationId = "op-2";
+
+    // Response node subtree: grandchild Search node center inside region -> region hit.
+    auto pageRoot = CreatePageRoot();
+    auto responseNode = CreateTestNode(V2::ROW_ETS_TAG, 10, RectF(0.0f, 0.0f, 360.0f, 1280.0f));
+    AddChild(pageRoot, responseNode);
+    auto searchNode = CreateTestNode(V2::SEARCH_ETS_TAG, 11, RectF(110.0f, 110.0f, 40.0f, 40.0f));
+    AddChild(responseNode, searchNode);
+    auto results = matcher.Match(candidate, page, ruleSet, responseNode, 10);
+    ASSERT_EQ(results.size(), 1U);
+    EXPECT_EQ(results[0].matchType, "region");
+
+    // Keyword hit in subtree -> keyword match type (checked first).
+    auto keywordNode = CreateTestNode(V2::TEXT_ETS_TAG, 12, RectF(0.0f, 500.0f, 200.0f, 40.0f));
+    AddChild(responseNode, keywordNode);
+    // Give the node an a11y keyword source via a second child whose text matches.
+    auto textNode = CreateTextFieldNode(V2::TEXTINPUT_ETS_TAG, 13, RectF(0.0f, 500.0f, 200.0f, 40.0f), "搜索入口");
+    AddChild(responseNode, textNode);
+    results = matcher.Match(candidate, page, ruleSet, responseNode, 10);
+    ASSERT_FALSE(results.empty());
+    EXPECT_EQ(results[0].matchType, "keyword");
+}
+
+namespace {
+SearchClickCandidate BuildPendingSearchClick(int32_t nodeId, int64_t timestampMs)
+{
+    SearchClickCandidate candidate;
+    candidate.nodeId = nodeId;
+    candidate.inspectorId = "searchEntryBtn";
+    candidate.nodeType = "Button";
+    auto pressedTimeNs = std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::milliseconds(timestampMs)).count();
+    candidate.operationId = SearchClickObserver::BuildOperationId(1, 0, pressedTimeNs, nodeId);
+    candidate.operationTimestampMs = timestampMs;
+    return candidate;
+}
+
+int64_t SearchClickNowMs()
+{
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::nanoseconds(GetSysTimestamp())).count();
+}
+} // namespace
+
+/**
+ * @tc.name: PageSceneRuleManager_SearchClickNoRules001
+ * @tc.desc: Applications without search rules neither subscribe nor retain click candidates.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PageSceneRuleManagerTestNg, PageSceneRuleManager_SearchClickNoRules001, TestSize.Level1)
+{
+    auto manager = std::make_shared<PageSceneRuleManager>();
+    EXPECT_EQ(manager->RegisterSearchClickObserver(manager), 0U);
+    const auto nowMs = SearchClickNowMs();
+    for (int32_t index = 0; index < 10000; ++index) {
+        manager->AddPendingClickCandidate(BuildPendingSearchClick(index, nowMs));
+    }
+    EXPECT_TRUE(manager->pendingClickCandidates_.empty());
+    ASSERT_EQ(manager->RegisterRuleSet(TEST_PROCESS_ID, BuildRuleJson()), PAGE_SCENE_NO_ERROR);
+    manager->AddPendingClickCandidate(BuildPendingSearchClick(TEST_TEXT_INPUT_ID, SearchClickNowMs()));
+    EXPECT_TRUE(manager->pendingClickCandidates_.empty());
+    ASSERT_EQ(manager->RegisterSearchRuleSet(TEST_PROCESS_ID, BuildValidSearchRuleJson()), PAGE_SCENE_NO_ERROR);
+    SearchClickPageContext page { "HomePage", "pages/Home" };
+    EXPECT_TRUE(manager->ConsumeSearchClickCandidates(page).empty());
+    manager->AddPendingClickCandidate(BuildPendingSearchClick(TEST_TEXT_INPUT_ID, SearchClickNowMs()));
+    EXPECT_EQ(manager->ConsumeSearchClickCandidates(page).size(), 1U);
+}
+
+/**
+ * @tc.name: PageSceneRuleManager_SearchClickBounded001
+ * @tc.desc: A stalled consumer has a bounded backlog; expired clicks are not delivered later.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PageSceneRuleManagerTestNg, PageSceneRuleManager_SearchClickBounded001, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    ASSERT_EQ(manager.RegisterSearchRuleSet(TEST_PROCESS_ID, BuildValidSearchRuleJson()), PAGE_SCENE_NO_ERROR);
+    const auto nowMs = SearchClickNowMs();
+    manager.AddPendingClickCandidate(BuildPendingSearchClick(TEST_TEXT_INPUT_ID, nowMs - 6000));
+    EXPECT_TRUE(manager.pendingClickCandidates_.empty());
+    auto oldest = BuildPendingSearchClick(TEST_TEXT_INPUT_ID, nowMs - 1000);
+    manager.AddPendingClickCandidate(oldest);
+    for (int32_t index = 0; index < 300; ++index) {
+        manager.AddPendingClickCandidate(BuildPendingSearchClick(index, nowMs));
+    }
+    EXPECT_EQ(manager.pendingClickCandidates_.size(), 256U);
+    EXPECT_EQ(manager.recentClickOperations_.size(), 256U);
+    EXPECT_EQ(manager.pendingClickCandidates_.count(oldest.operationId), 0U);
+    // Simulate elapsed time without sleeping in a unit test.
+    for (auto& [id, candidate] : manager.pendingClickCandidates_) {
+        candidate.operationTimestampMs = nowMs - 6000;
+    }
+    for (auto& [id, timestamp] : manager.recentClickOperations_) {
+        timestamp = nowMs - 6000;
+    }
+    SearchClickPageContext page { "HomePage", "pages/Home" };
+    EXPECT_TRUE(manager.ConsumeSearchClickCandidates(page).empty());
+    EXPECT_TRUE(manager.pendingClickCandidates_.empty());
+    EXPECT_TRUE(manager.recentClickOperations_.empty());
+}
+
+/**
+ * @tc.name: PageSceneRuleManager_SearchClickDeduplicate001
+ * @tc.desc: DOWN and click of the same press report once, including across consumes.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PageSceneRuleManagerTestNg, PageSceneRuleManager_SearchClickDeduplicate001, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    ASSERT_EQ(manager.RegisterSearchRuleSet(TEST_PROCESS_ID, BuildValidSearchRuleJson()), PAGE_SCENE_NO_ERROR);
+    const auto nowMs = SearchClickNowMs();
+    auto down = BuildPendingSearchClick(TEST_TEXT_INPUT_ID, nowMs - 200);
+    auto click = down;
+    click.operationTimestampMs = nowMs;
+    manager.AddPendingClickCandidate(down);
+    manager.AddPendingClickCandidate(click);
+    EXPECT_EQ(manager.pendingClickCandidates_.size(), 1U);
+    SearchClickPageContext page { "HomePage", "pages/Home" };
+    EXPECT_EQ(manager.ConsumeSearchClickCandidates(page).size(), 1U);
+    manager.AddPendingClickCandidate(click);
+    EXPECT_TRUE(manager.ConsumeSearchClickCandidates(page).empty());
+}
+
+/**
+ * @tc.name: PageSceneRuleManager_SearchClickRapid001
+ * @tc.desc: Two independent presses on the same node 200 ms apart must both be reported.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PageSceneRuleManagerTestNg, PageSceneRuleManager_SearchClickRapid001, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    ASSERT_EQ(manager.RegisterSearchRuleSet(TEST_PROCESS_ID, BuildValidSearchRuleJson()), PAGE_SCENE_NO_ERROR);
+    const auto nowMs = SearchClickNowMs();
+    auto first = BuildPendingSearchClick(TEST_TEXT_INPUT_ID, nowMs - 200);
+    auto second = BuildPendingSearchClick(TEST_TEXT_INPUT_ID, nowMs);
+    ASSERT_NE(first.operationId, second.operationId);
+    manager.AddPendingClickCandidate(first);
+    manager.AddPendingClickCandidate(second);
+    SearchClickPageContext page { "HomePage", "pages/Home" };
+    EXPECT_EQ(manager.ConsumeSearchClickCandidates(page).size(), 2U);
+}
+
+/**
+ * @tc.name: PageSceneRuleManager_SearchClickIdentity001
+ * @tc.desc: Operation identity separates devices, pointers, presses and response nodes.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PageSceneRuleManagerTestNg, PageSceneRuleManager_SearchClickIdentity001, TestSize.Level1)
+{
+    auto id = SearchClickObserver::BuildOperationId(1, 2, 3000, 4);
+    EXPECT_EQ(id, SearchClickObserver::BuildOperationId(1, 2, 3000, 4));
+    EXPECT_NE(id, SearchClickObserver::BuildOperationId(2, 2, 3000, 4));
+    EXPECT_NE(id, SearchClickObserver::BuildOperationId(1, 3, 3000, 4));
+    EXPECT_NE(id, SearchClickObserver::BuildOperationId(1, 2, 3001, 4));
+    EXPECT_NE(id, SearchClickObserver::BuildOperationId(1, 2, 3000, 5));
+}
+
+/**
+ * @tc.name: PageSceneRuleManager_SearchClickUnregister001
+ * @tc.desc: Removing the last rule clears pending clicks and stale callbacks cannot refill the queue.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PageSceneRuleManagerTestNg, PageSceneRuleManager_SearchClickUnregister001, TestSize.Level1)
+{
+    auto manager = std::make_shared<PageSceneRuleManager>();
+    ASSERT_EQ(manager->RegisterSearchRuleSet(TEST_PROCESS_ID, BuildValidSearchRuleJson()), PAGE_SCENE_NO_ERROR);
+    ASSERT_EQ(manager->RegisterSearchRuleSet(TEST_PROCESS_ID, BuildValidSearchRuleJson(SEARCH_RULE_SET_ID_B)),
+        PAGE_SCENE_NO_ERROR);
+    ASSERT_EQ(manager->RegisterSearchRuleSet(SECOND_PROCESS_ID, BuildValidSearchRuleJson()), PAGE_SCENE_NO_ERROR);
+    auto handlerId = manager->RegisterSearchClickObserver(manager);
+    ASSERT_NE(handlerId, 0U);
+    auto& observer = SearchClickObserver::GetInstance();
+    auto copiedCallback = observer.handlers_.at(handlerId);
+    auto candidate = BuildPendingSearchClick(TEST_TEXT_INPUT_ID, SearchClickNowMs());
+    observer.Publish(candidate);
+    ASSERT_EQ(manager->pendingClickCandidates_.size(), 1U);
+    EXPECT_EQ(manager->UnregisterSearchRuleSet(TEST_PROCESS_ID, SEARCH_RULE_SET_ID_A), PAGE_SCENE_NO_ERROR);
+    EXPECT_EQ(manager->searchClickObserverId_, handlerId);
+    EXPECT_EQ(manager->pendingClickCandidates_.size(), 1U);
+    EXPECT_EQ(manager->UnregisterSearchRuleSet(TEST_PROCESS_ID, SEARCH_RULE_SET_ID_B), PAGE_SCENE_NO_ERROR);
+    EXPECT_EQ(manager->searchClickObserverId_, handlerId);
+    manager->ClearProcess(SECOND_PROCESS_ID);
+    EXPECT_EQ(manager->searchClickObserverId_, 0U);
+    EXPECT_TRUE(manager->pendingClickCandidates_.empty());
+    EXPECT_EQ(observer.handlers_.count(handlerId), 0U);
+    copiedCallback(candidate);
+    EXPECT_TRUE(manager->pendingClickCandidates_.empty());
+    ASSERT_EQ(manager->RegisterSearchRuleSet(TEST_PROCESS_ID, BuildValidSearchRuleJson()), PAGE_SCENE_NO_ERROR);
+    EXPECT_NE(manager->RegisterSearchClickObserver(manager), 0U);
+    observer.Publish(candidate);
+    EXPECT_EQ(manager->pendingClickCandidates_.size(), 1U);
+    EXPECT_EQ(manager->UnregisterSearchRuleSet(TEST_PROCESS_ID, SEARCH_RULE_SET_ID_A), PAGE_SCENE_NO_ERROR);
+    EXPECT_TRUE(manager->pendingClickCandidates_.empty());
+    EXPECT_EQ(manager->searchClickObserverId_, 0U);
+}
+
+/**
+ * @tc.name: PageSceneRuleManager_SearchClickLifetime001
+ * @tc.desc: A callback copied before destruction must not keep or access the destroyed manager.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PageSceneRuleManagerTestNg, PageSceneRuleManager_SearchClickLifetime001, TestSize.Level1)
+{
+    auto manager = std::make_shared<PageSceneRuleManager>();
+    ASSERT_EQ(manager->RegisterSearchRuleSet(TEST_PROCESS_ID, BuildValidSearchRuleJson()), PAGE_SCENE_NO_ERROR);
+    auto handlerId = manager->RegisterSearchClickObserver(manager);
+    ASSERT_NE(handlerId, 0U);
+    auto& observer = SearchClickObserver::GetInstance();
+    auto copiedCallback = observer.handlers_.at(handlerId);
+    std::weak_ptr<PageSceneRuleManager> weakManager = manager;
+    manager.reset();
+    EXPECT_TRUE(weakManager.expired());
+    EXPECT_EQ(observer.handlers_.count(handlerId), 0U);
+    auto candidate = BuildPendingSearchClick(TEST_TEXT_INPUT_ID, SearchClickNowMs());
+    copiedCallback(candidate);
+    observer.Publish(candidate);
+}
+
+/**
+ * @tc.name: PageSceneRuleManager_SearchClickLegacyClear001
+ * @tc.desc: Removing legacy rules preserves the search subscription of the same process.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PageSceneRuleManagerTestNg, PageSceneRuleManager_SearchClickLegacyClear001, TestSize.Level1)
+{
+    auto manager = std::make_shared<PageSceneRuleManager>();
+    ASSERT_EQ(manager->RegisterRuleSet(TEST_PROCESS_ID, BuildRuleJson()), PAGE_SCENE_NO_ERROR);
+    ASSERT_EQ(manager->RegisterSearchRuleSet(TEST_PROCESS_ID, BuildValidSearchRuleJson()), PAGE_SCENE_NO_ERROR);
+    auto handlerId = manager->RegisterSearchClickObserver(manager);
+    ASSERT_NE(handlerId, 0U);
+    manager->ClearProcess(TEST_PROCESS_ID, false);
+    EXPECT_TRUE(manager->GetActiveRuleJsons().empty());
+    EXPECT_TRUE(manager->HasRegisteredSearchRule(TEST_PROCESS_ID));
+    EXPECT_EQ(manager->searchClickObserverId_, handlerId);
+    SearchClickObserver::GetInstance().Publish(BuildPendingSearchClick(TEST_TEXT_INPUT_ID, SearchClickNowMs()));
+    SearchClickPageContext page { "HomePage", "pages/Home" };
+    EXPECT_EQ(manager->ConsumeSearchClickCandidates(page).size(), 1U);
+}
+
+namespace {
+std::string BuildSearchRuleWithGeneration(const std::string& generation)
+{
+    auto root = JsonUtil::ParseJsonString(BuildValidSearchRuleJson());
+    root->Put("_pageSceneGeneration", generation.c_str());
+    return root->ToString();
+}
+} // namespace
+
+/**
+ * @tc.name: PageSceneRuleManager_SearchGeneration001
+ * @tc.desc: A newer registration replaces stale cache; old detection/cleanup cannot overwrite or remove it.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PageSceneRuleManagerTestNg, PageSceneRuleManager_SearchGeneration001, TestSize.Level1)
+{
+    PageSceneRuleManager manager;
+    const auto oldRules = BuildSearchRuleWithGeneration("9");
+    const auto newRules = BuildSearchRuleWithGeneration("10");
+    ASSERT_EQ(manager.RegisterSearchRuleSet(TEST_PROCESS_ID, oldRules), PAGE_SCENE_NO_ERROR);
+    ASSERT_EQ(manager.RegisterSearchRuleSet(TEST_PROCESS_ID, newRules), PAGE_SCENE_NO_ERROR);
+    EXPECT_EQ(manager.RegisterSearchRuleSet(TEST_PROCESS_ID, oldRules), PAGE_SCENE_PARAM_INVALID);
+    EXPECT_EQ(manager.UnregisterSearchRuleSet(TEST_PROCESS_ID, SEARCH_RULE_SET_ID_A, "9"), PAGE_SCENE_PARAM_INVALID);
+    auto current = manager.GetSearchRuleSet(TEST_PROCESS_ID, SEARCH_RULE_SET_ID_A);
+    ASSERT_TRUE(current.has_value());
+    EXPECT_EQ(current->registrationGeneration, "10");
+    EXPECT_EQ(current->rawJson, newRules);
+    EXPECT_EQ(manager.UnregisterSearchRuleSet(TEST_PROCESS_ID, SEARCH_RULE_SET_ID_A, "10"), PAGE_SCENE_NO_ERROR);
+    EXPECT_FALSE(manager.HasRegisteredSearchRule(TEST_PROCESS_ID));
+}
+
+/**
+ * @tc.name: PageSceneRuleManager_SearchGeneration002
+ * @tc.desc: Re-registering after cleanup is not undone by a delayed duplicate cleanup from the old generation.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PageSceneRuleManagerTestNg, PageSceneRuleManager_SearchGeneration002, TestSize.Level1)
+{
+    auto manager = std::make_shared<PageSceneRuleManager>();
+    ASSERT_EQ(manager->RegisterSearchRuleSet(TEST_PROCESS_ID, BuildSearchRuleWithGeneration("1")), PAGE_SCENE_NO_ERROR);
+    ASSERT_NE(manager->RegisterSearchClickObserver(manager), 0U);
+    ASSERT_EQ(manager->UnregisterSearchRuleSet(TEST_PROCESS_ID, SEARCH_RULE_SET_ID_A, "1"), PAGE_SCENE_NO_ERROR);
+    ASSERT_EQ(manager->RegisterSearchRuleSet(TEST_PROCESS_ID, BuildSearchRuleWithGeneration("2")), PAGE_SCENE_NO_ERROR);
+    auto newHandler = manager->RegisterSearchClickObserver(manager);
+    ASSERT_NE(newHandler, 0U);
+    EXPECT_EQ(manager->UnregisterSearchRuleSet(TEST_PROCESS_ID, SEARCH_RULE_SET_ID_A, "1"), PAGE_SCENE_PARAM_INVALID);
+    manager->ClearProcess(TEST_PROCESS_ID, false);
+    EXPECT_TRUE(manager->HasRegisteredSearchRule(TEST_PROCESS_ID));
+    EXPECT_EQ(manager->searchClickObserverId_, newHandler);
 }
 } // namespace OHOS::Ace::NG

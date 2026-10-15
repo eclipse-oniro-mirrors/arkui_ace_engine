@@ -408,6 +408,7 @@ ArkUI_ErrorCode  OH_ArkUI_GetNavigationId(
 {
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Node is null");
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     CHECK_NULL_RETURN_WITH_MESSAGE(buffer, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Buffer is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(writeLength, ARKUI_ERROR_CODE_PARAM_INVALID,
@@ -428,6 +429,7 @@ ArkUI_ErrorCode OH_ArkUI_GetNavDestinationName(
 {
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Node is null");
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     CHECK_NULL_RETURN_WITH_MESSAGE(buffer, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Buffer is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(writeLength, ARKUI_ERROR_CODE_PARAM_INVALID,
@@ -447,6 +449,7 @@ ArkUI_ErrorCode OH_ArkUI_GetNavStackLength(ArkUI_NodeHandle node, int32_t* lengt
 {
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Node is null");
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     CHECK_NULL_RETURN_WITH_MESSAGE(length, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Length is null");
     auto* fullImpl = OHOS::Ace::NodeModel::GetFullImpl();
@@ -470,6 +473,7 @@ ArkUI_ErrorCode OH_ArkUI_GetNavDestinationNameByIndex(
 {
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Node is null");
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     CHECK_NULL_RETURN_WITH_MESSAGE(buffer, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Buffer is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(writeLength, ARKUI_ERROR_CODE_PARAM_INVALID,
@@ -490,6 +494,7 @@ ArkUI_ErrorCode OH_ArkUI_GetNavDestinationId(
 {
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Node is null");
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     CHECK_NULL_RETURN_WITH_MESSAGE(buffer, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Buffer is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(writeLength, ARKUI_ERROR_CODE_PARAM_INVALID,
@@ -509,6 +514,7 @@ ArkUI_ErrorCode OH_ArkUI_GetNavDestinationState(ArkUI_NodeHandle node, ArkUI_Nav
 {
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Node is null");
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     CHECK_NULL_RETURN_WITH_MESSAGE(state, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "State is null");
     auto* fullImpl = OHOS::Ace::NodeModel::GetFullImpl();
@@ -532,6 +538,7 @@ ArkUI_ErrorCode OH_ArkUI_GetNavDestinationIndex(ArkUI_NodeHandle node, int32_t* 
 {
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Node is null");
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     CHECK_NULL_RETURN_WITH_MESSAGE(index, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Index is null");
     auto* fullImpl = OHOS::Ace::NodeModel::GetFullImpl();
@@ -557,6 +564,7 @@ napi_value OH_ArkUI_GetNavDestinationParam(ArkUI_NodeHandle node)
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Node is null");
         return nullptr;
     }
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     auto* fullImpl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!fullImpl) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_GET_INFO_FAILED, __FUNCTION__,
@@ -576,6 +584,7 @@ ArkUI_ErrorCode OH_ArkUI_GetRouterPageIndex(ArkUI_NodeHandle node, int32_t* inde
 {
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Node is null");
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     CHECK_NULL_RETURN_WITH_MESSAGE(index, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Index is null");
     auto* fullImpl = OHOS::Ace::NodeModel::GetFullImpl();
@@ -600,6 +609,7 @@ ArkUI_ErrorCode OH_ArkUI_GetRouterPageName(
 {
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Node is null");
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     CHECK_NULL_RETURN_WITH_MESSAGE(buffer, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Buffer is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(writeLength, ARKUI_ERROR_CODE_PARAM_INVALID,
@@ -620,6 +630,7 @@ ArkUI_ErrorCode OH_ArkUI_GetRouterPagePath(
 {
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Node is null");
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     CHECK_NULL_RETURN_WITH_MESSAGE(buffer, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Buffer is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(writeLength, ARKUI_ERROR_CODE_PARAM_INVALID,
@@ -639,6 +650,7 @@ ArkUI_ErrorCode OH_ArkUI_GetRouterPageState(ArkUI_NodeHandle node, ArkUI_RouterP
 {
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Node is null");
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     CHECK_NULL_RETURN_WITH_MESSAGE(state, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "State is null");
     auto* fullImpl = OHOS::Ace::NodeModel::GetFullImpl();
@@ -663,6 +675,7 @@ ArkUI_ErrorCode OH_ArkUI_GetRouterPageId(
 {
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Node is null");
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     CHECK_NULL_RETURN_WITH_MESSAGE(buffer, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Buffer is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(writeLength, ARKUI_ERROR_CODE_PARAM_INVALID,

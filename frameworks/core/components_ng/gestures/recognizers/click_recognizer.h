@@ -139,6 +139,7 @@ private:
         tapDeadlineTimer_.Cancel();
         currentTouchPointsNum_ = 0;
         responseRegionBuffer_.clear();
+        lastSearchClickPoint_ = {};
     }
 
     void HandleOverdueDeadline();
@@ -158,6 +159,7 @@ private:
     void RecordClickEventIfNeed(const GestureEvent& info) const;
 #endif
     bool CheckNeedReceiveEvent();
+    void PublishSearchClickCandidate(const TouchEvent& touchPoint);
 
     bool IsFormRenderClickRejected(const TouchEvent& event);
     void TriggerClickAccepted(const TouchEvent& event);
@@ -193,6 +195,7 @@ private:
     InteractiveSoundEffectsFunc interactiveSoundEffectsFunc_ = nullptr;
 
     bool shouldReportTouchDown_ {false};
+    TouchEvent lastSearchClickPoint_;
 };
 
 } // namespace OHOS::Ace::NG

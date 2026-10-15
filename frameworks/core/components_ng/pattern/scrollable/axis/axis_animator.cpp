@@ -24,6 +24,15 @@ namespace OHOS::Ace::NG {
 
 AxisAnimator::AxisAnimator() = default;
 
+AxisAnimator::AxisAnimator(AxisAnimationCallback&& axisAnimationCallback,
+    AxisAnimationStartCallback&& axisAnimationStartCallback, AxisAnimationFinishCallback&& axisAnimationFinishCallback)
+    : axisAnimationCallback_(std::move(axisAnimationCallback)),
+      axisAnimationStartCallback_(std::move(axisAnimationStartCallback)),
+      axisAnimationFinishCallback_(std::move(axisAnimationFinishCallback))
+{
+    CreateAnimator();
+}
+
 AxisAnimator::~AxisAnimator() = default;
 
 void AxisAnimator::Initialize(const WeakPtr<PipelineBase>& context)

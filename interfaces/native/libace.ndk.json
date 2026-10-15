@@ -7415,5 +7415,41 @@
     {
         "first_introduced": "26.2.0",
         "name": "OH_ArkUI_NativeModule_SetRuntimeCheckMode"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIEventInjectCompositeCommand"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_LinearGradientBlurOptions_Create"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_LinearGradientBlurOptions_Destroy"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_LinearGradientBlurOptions_SetBlurRadius"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_LinearGradientBlurOptions_GetBlurRadius"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_LinearGradientBlurOptions_SetFractionStops"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_LinearGradientBlurOptions_GetFractionStops"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_LinearGradientBlurOptions_SetDirection"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_LinearGradientBlurOptions_GetDirection"
     }
 ]

@@ -38,6 +38,7 @@ constexpr bool DEFAULT_VERTICAL_SCROLL_BAR_ACCESS_ENABLED = false;
 constexpr bool DEFAULT_HORIZONTAL_SCROLL_BAR_ACCESS_ENABLED = false;
 constexpr int32_t DEFAULT_TEXT_ZOOM_RATIO = 100;
 constexpr float DEFAULT_INITIAL_SCALE = 100.0f;
+constexpr float DEFAULT_FLING_SPEED_LIMIT = 0.0f;
 constexpr bool DEFAULT_GEOLOCATION_ACCESS_ENABLED = false;
 constexpr bool DEFAULT_DATABASE_ACCESS_ENABLED = false;
 constexpr bool DEFAULT_OVERVIEW_MODE_ACCESS = false;
@@ -2648,6 +2649,20 @@ void ResetForceEnableZoom(ArkUINodeHandle node)
     WebModelNG::SetForceEnableZoom(frameNode, DEFAULT_FORCE_ENABLE_ZOOM_ENABLED);
 }
 
+void SetFlingSpeedLimit(ArkUINodeHandle node, ArkUI_Float32 value)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    WebModelNG::SetFlingSpeedLimit(frameNode, value);
+}
+
+void ResetFlingSpeedLimit(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    WebModelNG::SetFlingSpeedLimit(frameNode, DEFAULT_FLING_SPEED_LIMIT);
+}
+
 void SetBackToTop(ArkUINodeHandle node, ArkUI_Bool value)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
@@ -3045,6 +3060,8 @@ const ArkUIWebModifier* GetWebModifier()
         .resetJavaScriptProxy = ResetJavaScriptProxy,
         .setForceEnableZoom = SetForceEnableZoom,
         .resetForceEnableZoom = ResetForceEnableZoom,
+        .setFlingSpeedLimit = SetFlingSpeedLimit,
+        .resetFlingSpeedLimit = ResetFlingSpeedLimit,
         .setBackToTop = SetBackToTop,
         .resetBackToTop = ResetBackToTop,
         .setOnCameraCaptureStateChanged = SetOnCameraCaptureStateChanged,
@@ -3314,6 +3331,8 @@ const CJUIWebModifier* GetCJUIWebModifier()
         .resetJavaScriptProxy = ResetJavaScriptProxy,
         .setForceEnableZoom = SetForceEnableZoom,
         .resetForceEnableZoom = ResetForceEnableZoom,
+        .setFlingSpeedLimit = SetFlingSpeedLimit,
+        .resetFlingSpeedLimit = ResetFlingSpeedLimit,
         .setBackToTop = SetBackToTop,
         .resetBackToTop = ResetBackToTop,
         .setOnCameraCaptureStateChanged = SetOnCameraCaptureStateChanged,

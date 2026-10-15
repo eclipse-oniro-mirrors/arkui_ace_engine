@@ -458,6 +458,7 @@ public:
 
     void SetShow(bool show);
     void SetEnabled(bool enabled);
+    void CopyEvent(const RefPtr<FocusHub>& source);
 
     bool IsShow() const;
 

@@ -358,17 +358,17 @@ HWTEST_F(UIContentTddTest, XComponentAngleConcurrentSetAndGet001, TestSize.Level
 }
 
 /**
- * @tc.name: MarkUIExtensionDensityFollowHost001
- * @tc.desc: Test MarkUIExtensionDensityFollowHost interface existence
+ * @tc.name: SetUIExtensionDensityFollowHost001
+ * @tc.desc: Test SetUIExtensionDensityFollowHost interface existence
  * @tc.type: FUNC
  */
-HWTEST_F(UIContentTddTest, MarkUIExtensionDensityFollowHost001, TestSize.Level1)
+HWTEST_F(UIContentTddTest, SetUIExtensionDensityFollowHost001, TestSize.Level1)
 {
     /**
-     * @tc.steps1: Take pointer-to-member of UIContent::MarkUIExtensionDensityFollowHost
+     * @tc.steps1: Take pointer-to-member of UIContent::SetUIExtensionDensityFollowHost
      * @tc.expected: The virtual interface is declared (compile-time contract)
      */
-    void (UIContent::*setter)() = &UIContent::MarkUIExtensionDensityFollowHost;
+    void (UIContent::*setter)(OHOS::Rosen::DpiFollowStrategy) = &UIContent::SetUIExtensionDensityFollowHost;
     EXPECT_NE(setter, nullptr);
 }
 

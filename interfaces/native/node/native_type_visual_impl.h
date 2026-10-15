@@ -13,16 +13,17 @@
  * limitations under the License.
  */
 
-#include "core/components/common/properties/ui_material.h"
+#ifndef FOUNDATION_ACE_INTERFACES_NATIVE_NODE_NATIVE_TYPE_VISUAL_IMPL_H
+#define FOUNDATION_ACE_INTERFACES_NATIVE_NODE_NATIVE_TYPE_VISUAL_IMPL_H
 
-namespace OHOS::Ace {
-bool MaterialUtils::GetGlobalMaterialLevel(UiMaterialLevel& result)
-{
-    return false;
-}
+#include <vector>
 
-bool MaterialUtils::GetDeviceUiMaterialEnabled(bool& result)
-{
-    return false;
-}
-} // namespace OHOS::Ace
+#include "native_type.h"
+
+struct OH_ArkUI_LinearGradientBlurOptions {
+    float blurRadius = 0.0f;
+    std::vector<float> fractionStops = { 0.0f, 0.0f, 0.0f, 1.0f };
+    OH_ArkUI_LinearGradientBlurDirection direction = OH_ARKUI_LINEAR_GRADIENT_BLUR_DIRECTION_BOTTOM;
+};
+
+#endif // FOUNDATION_ACE_INTERFACES_NATIVE_NODE_NATIVE_TYPE_VISUAL_IMPL_H

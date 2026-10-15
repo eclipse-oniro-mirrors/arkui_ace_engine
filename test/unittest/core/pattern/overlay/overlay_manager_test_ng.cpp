@@ -4262,7 +4262,7 @@ HWTEST_F(OverlayManagerTestNg, SheetPresentationPattern15, TestSize.Level1)
     sheetStyle.detents.emplace_back(detent);
     topSheetPattern->sheetHeightForTranslate_ = 0;
     overlayManager->ComputeSheetOffset(sheetStyle, topSheetNode);
-    EXPECT_TRUE(NearEqual(topSheetPattern->sheetHeightForTranslate_, 234));
+    EXPECT_TRUE(NearEqual(topSheetPattern->sheetHeightForTranslate_, 250));
 
     /**
      * @tc.steps: step6. test sheetStyle.detents.height has value, height unit is vp, setHeight > maxHeight.
@@ -4273,7 +4273,7 @@ HWTEST_F(OverlayManagerTestNg, SheetPresentationPattern15, TestSize.Level1)
     sheetStyle.detents.emplace_back(detent);
     topSheetPattern->sheetHeightForTranslate_ = 0;
     overlayManager->ComputeSheetOffset(sheetStyle, topSheetNode);
-    EXPECT_TRUE(NearEqual(topSheetPattern->sheetHeightForTranslate_, 460));
+    EXPECT_TRUE(NearEqual(topSheetPattern->sheetHeightForTranslate_, 492));
 }
 
 /**

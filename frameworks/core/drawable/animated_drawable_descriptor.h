@@ -111,6 +111,9 @@ private:
 
     RefPtr<PixelMap> GetFrameByIndex(int32_t index, int32_t nodeId);
 
+    // Must be called with callMutx_ already held (shared or unique)
+    RefPtr<PixelMap> GetFrameByIndexInternal(int32_t index, int32_t nodeId);
+
     void CreateParamsFromImageSource(int32_t nodeId);
 
     void CreateAnimator(int32_t nodeId);

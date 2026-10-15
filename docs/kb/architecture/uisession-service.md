@@ -81,6 +81,7 @@ UISession 是框架内部 IPC 通道，没有独立 SDK API。IPC 接口通过 `
 | 关注点 | 路径 | 说明 |
 |--------|------|------|
 | Mock Manager | `test/mock/interfaces/inner_api/ui_session/mock_ui_session_manager.*` | UiSessionManager mock |
+| 页面场景回调回归 | `test/unittest/adapter/ohos/entrance/ui_session/ui_content_stub_test.cpp` | `UIContentStubTestPageScene*`：规则集数据隔离、旧版事件兼容和重复注册保护 |
 | SA 验证构建 | `interfaces/inner_api/ui_session:ui_session_example` | ui_sa 构建 target |
 | 内容变化 Dump | `PipelineContext::DumpInfo -contentChange` | 非 release 版本调试入口 |
 
@@ -104,6 +105,7 @@ UISession 是框架内部 IPC 通道，没有独立 SDK API。IPC 接口通过 `
 | 问题 | 定位路径 | 说明 |
 |------|----------|------|
 | 事件上报 SA 未收到 | `ui_session_manager_ohos.cpp` | 检查 ReportService 非空 + 注册计数 > 0 + mask 命中 |
+| 页面场景回调串集 / 重复注册后无事件 | `ui_report_stub.cpp`、`ui_content_proxy.cpp` | 检查按 ruleSetId 过滤 hits/exits；检查失败注册是否覆盖或删除已有回调。回归用例应验证回调所属数据和原注册仍有效，不能用合并 JSON 原样分发的断言代替隔离验证 |
 | InspectorTree 无结果 | `ui_session_manager_ohos.cpp` | 检查 processMap_ / inspectorFunction_ / webTaskNums_ |
 | 翻译请求 PARAM_INVALID | `ui_session_manager_ohos.cpp` | 检查 scope 格式和 IsTranslateScopeValid |
 | 内容变化无 TEXT 上报 | `content_change_manager.cpp` | 检查 ContentChangeConfig 阈值和滚动/过渡状态 |

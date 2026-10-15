@@ -55,26 +55,20 @@
 
 namespace OHOS::Ace {
 
-std::unique_ptr<ViewContextModel> ViewContextModel::instance_ = nullptr;
-std::mutex ViewContextModel::mutex_;
-
 ViewContextModel* ViewContextModel::GetInstance()
 {
-    if (!instance_) {
-        std::lock_guard<std::mutex> lock(mutex_);
-        if (!instance_) {
 #ifdef NG_BUILD
-            instance_.reset(new NG::ViewContextModelNG());
+    static NG::ViewContextModelNG instance;
+    return &instance;
 #else
-            if (Container::IsCurrentUseNewPipeline()) {
-                instance_.reset(new NG::ViewContextModelNG());
-            } else {
-                instance_.reset(new Framework::ViewContextModelImpl());
-            }
-#endif
-        }
+    if (Container::IsCurrentUseNewPipeline()) {
+        static NG::ViewContextModelNG instance;
+        return &instance;
+    } else {
+        static Framework::ViewContextModelImpl instance;
+        return &instance;
     }
-    return instance_.get();
+#endif
 }
 
 } // namespace OHOS::Ace

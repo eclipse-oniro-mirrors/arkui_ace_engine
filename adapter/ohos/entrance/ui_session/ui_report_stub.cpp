@@ -18,6 +18,8 @@
 #include <algorithm>
 #include <cinttypes>
 
+#include "cJSON.h"
+
 #include "pixel_map.h"
 
 #include "adapter/ohos/entrance/ui_session/include/large_string_ashmem.h"
@@ -27,9 +29,101 @@
 
 namespace {
 constexpr char GET_INSPECTOR_TREE_CALLBACK_TIMEOUT[] = "GetInspectorTreeCallbackTimeout";
+constexpr char COMPONENT_TREE_QUERY_CALLBACK_TIMEOUT[] = "ComponentTreeQueryCallbackTimeout";
 constexpr char PAGE_TRANSLATE_CALLBACK_TIMEOUT[] = "PageTranslateCallbackTimeout";
 constexpr char PAGE_TRANSLATE_RESULT_WATCHDOG_PREFIX[] = "PageTranslateResultWatchdog";
 constexpr int32_t SPECIFIED_CONTENT_OFFSETS_LOOP_UPPERBOUND = 1024000;
+constexpr char PAGE_SCENE_RULE_SET_ID[] = "ruleSetId";
+constexpr char PAGE_SCENE_HITS[] = "hits";
+constexpr char PAGE_SCENE_EXITS[] = "exits";
+
+// Legacy events carry a top-level ruleSetId; search events use hits/exits.
+// Dispatch once per referenced ruleSet, filtering search evidence before delivery.
+std::vector<std::string> ExtractPageSceneRuleSetIds(const std::string& sceneJson)
+{
+    std::vector<std::string> ruleSetIds;
+    auto root = cJSON_ParseWithOpts(sceneJson.c_str(), nullptr, true);
+    if (!cJSON_IsObject(root)) {
+        cJSON_Delete(root);
+        return ruleSetIds;
+    }
+    auto addRuleSetId = [&ruleSetIds](const cJSON* value) {
+        if (!cJSON_IsString(value) || value->valuestring == nullptr || value->valuestring[0] == '\0') {
+            return;
+        }
+        std::string ruleSetId(value->valuestring);
+        if (std::find(ruleSetIds.begin(), ruleSetIds.end(), ruleSetId) == ruleSetIds.end()) {
+            ruleSetIds.emplace_back(std::move(ruleSetId));
+        }
+    };
+    addRuleSetId(cJSON_GetObjectItem(root, PAGE_SCENE_RULE_SET_ID));
+    for (const auto* key : { PAGE_SCENE_HITS, PAGE_SCENE_EXITS }) {
+        auto array = cJSON_GetObjectItem(root, key);
+        if (!cJSON_IsArray(array)) {
+            continue;
+        }
+        for (int32_t index = 0; index < cJSON_GetArraySize(array); ++index) {
+            auto item = cJSON_GetArrayItem(array, index);
+            if (!cJSON_IsObject(item)) {
+                continue;
+            }
+            addRuleSetId(cJSON_GetObjectItem(item, PAGE_SCENE_RULE_SET_ID));
+        }
+    }
+    cJSON_Delete(root);
+    return ruleSetIds;
+}
+
+std::string FilterPageSceneEvent(const std::string& sceneJson, const std::string& ruleSetId)
+{
+    auto root = cJSON_ParseWithOpts(sceneJson.c_str(), nullptr, true);
+    if (!cJSON_IsObject(root)) {
+        cJSON_Delete(root);
+        return "";
+    }
+    auto legacyRuleSetId = cJSON_GetObjectItem(root, PAGE_SCENE_RULE_SET_ID);
+    if (cJSON_IsString(legacyRuleSetId) && legacyRuleSetId->valuestring != nullptr &&
+        ruleSetId != legacyRuleSetId->valuestring) {
+        cJSON_Delete(root);
+        return "";
+    }
+    bool filtered = false;
+    for (const auto* key : { PAGE_SCENE_HITS, PAGE_SCENE_EXITS }) {
+        auto array = cJSON_GetObjectItem(root, key);
+        if (array == nullptr) {
+            continue;
+        }
+        if (!cJSON_IsArray(array)) {
+            cJSON_Delete(root);
+            return "";
+        }
+        for (int32_t index = cJSON_GetArraySize(array) - 1; index >= 0; --index) {
+            auto item = cJSON_GetArrayItem(array, index);
+            if (item == nullptr) {
+                cJSON_DeleteItemFromArray(array, index);
+                filtered = true;
+                continue;
+            }
+            auto id = cJSON_GetObjectItem(item, PAGE_SCENE_RULE_SET_ID);
+            if (!cJSON_IsString(id) || id->valuestring == nullptr || ruleSetId != id->valuestring) {
+                cJSON_DeleteItemFromArray(array, index);
+                filtered = true;
+            }
+        }
+    }
+    if (!filtered) {
+        cJSON_Delete(root);
+        return sceneJson;
+    }
+    char* serialized = cJSON_PrintUnformatted(root);
+    std::string result = serialized == nullptr ? "" : serialized;
+    if (serialized != nullptr) {
+        cJSON_free(serialized);
+    }
+    cJSON_Delete(root);
+    return result;
+}
+
 
 inline int32_t NormalizeTimeout(int32_t timeout, int32_t defaultTimeout)
 {
@@ -284,6 +378,20 @@ int32_t UiReportStub::OnRemoteRequest(uint32_t code, MessageParcel& data, Messag
             ReportPageSceneEvent(result, isGetResult);
             break;
         }
+        case REPORT_COMPONENT_TREE_QUERY_RESULT: {
+            sptr<LargeStringAshmem> largeStringAshmem = data.ReadParcelable<LargeStringAshmem>();
+            if (!largeStringAshmem) {
+                LOGW("ReportComponentTreeQueryResult read LargeStringAshmem failed");
+                break;
+            }
+            std::string result;
+            if (!largeStringAshmem->ReadFromAshmem(result)) {
+                LOGW("ReportComponentTreeQueryResult read data failed");
+                break;
+            }
+            ReportComponentTreeQueryResult(result);
+            break;
+        }
 
         default: {
             LOGI("ui_session unknown transaction code %{public}d", code);
@@ -406,6 +514,83 @@ void UiReportStub::RegisterGetHitTestNodeInfoCallback(
     const std::function<void(std::string, int32_t, bool)>& eventCallback)
 {
     getHitTestNodeInfoCallback_ = std::move(eventCallback);
+}
+
+void UiReportStub::ReportComponentTreeQueryResult(const std::string& data)
+{
+    std::function<void(const std::string&)> componentTreeQueryCallback;
+    {
+        std::lock_guard<std::mutex> lock(componentTreeQueryCallbackMutex_);
+        if (!componentTreeQueryCallback_) {
+            return;
+        }
+        componentTreeQueryCallback = componentTreeQueryCallback_;
+        CancelComponentTreeQueryCallbackTimeoutTaskLocked();
+        componentTreeQueryCallback_ = nullptr;
+    }
+    componentTreeQueryCallback(data);
+}
+
+bool UiReportStub::RegisterComponentTreeQueryCallback(
+    const std::function<void(const std::string&)>& eventCallback)
+{
+    std::lock_guard<std::mutex> lock(componentTreeQueryCallbackMutex_);
+    if (componentTreeQueryCallback_ != nullptr) {
+        return false;
+    }
+    componentTreeQueryCallback_ = eventCallback;
+    return true;
+}
+
+void UiReportStub::UnregisterComponentTreeQueryCallback()
+{
+    std::lock_guard<std::mutex> lock(componentTreeQueryCallbackMutex_);
+    componentTreeQueryCallback_ = nullptr;
+}
+
+bool UiReportStub::PostComponentTreeQueryCallbackRemoveTask(int32_t timeout)
+{
+    auto eventHandler = eventHandler_.lock();
+    if (eventHandler == nullptr) {
+        LOGE("PostComponentTreeQueryCallbackRemoveTask eventHandler is null");
+        std::lock_guard<std::mutex> lock(componentTreeQueryCallbackMutex_);
+        componentTreeQueryCallback_ = nullptr;
+        return false;
+    }
+    wptr<UiReportStub> weakThis = this;
+    bool postTaskSuccess = eventHandler->PostTask([weakThis]() {
+        auto uiReportStub = weakThis.promote();
+        if (uiReportStub == nullptr) {
+            LOGE("PostComponentTreeQueryCallbackRemoveTask uiReportStub is null");
+            return;
+        }
+        uiReportStub->HandleComponentTreeQueryCallbackTimeout();
+    }, COMPONENT_TREE_QUERY_CALLBACK_TIMEOUT,
+        NormalizeTimeout(timeout, DEFAULT_INSPECTOR_TREE_CALLBACK_TIMEOUT_MS));
+    if (!postTaskSuccess) {
+        LOGW("Post ComponentTreeQuery timeout task failed");
+        std::lock_guard<std::mutex> lock(componentTreeQueryCallbackMutex_);
+        componentTreeQueryCallback_ = nullptr;
+        return false;
+    }
+    return true;
+}
+
+void UiReportStub::HandleComponentTreeQueryCallbackTimeout()
+{
+    std::lock_guard<std::mutex> lock(componentTreeQueryCallbackMutex_);
+    LOGW("ComponentTreeQuery callback timeout, clear pending callback");
+    componentTreeQueryCallback_ = nullptr;
+}
+
+void UiReportStub::CancelComponentTreeQueryCallbackTimeoutTaskLocked()
+{
+    auto eventHandler = eventHandler_.lock();
+    if (eventHandler == nullptr) {
+        LOGE("CancelComponentTreeQueryCallbackTimeoutTaskLocked eventHandler is null");
+        return;
+    }
+    eventHandler->RemoveTask(COMPONENT_TREE_QUERY_CALLBACK_TIMEOUT);
 }
 
 void UiReportStub::ReportWebUnfocusEvent(int64_t accessibilityId, const std::string& data)
@@ -911,16 +1096,30 @@ void UiReportStub::ReportGetStateMgmtInfo(std::vector<std::string> results)
     }
 }
 
-void UiReportStub::RegisterPageSceneEventCallback(const PageSceneEventCallback& eventCallback)
+bool UiReportStub::RegisterPageSceneEventCallback(
+    const std::string& ruleSetId, const PageSceneEventCallback& eventCallback)
 {
-    std::lock_guard<std::mutex> lock(pageSceneCallbackMutex_);
-    pageSceneEventCallback_ = eventCallback;
+    return TryRegisterPageSceneEventCallback(ruleSetId, eventCallback);
 }
 
-void UiReportStub::UnregisterPageSceneEventCallback()
+bool UiReportStub::TryRegisterPageSceneEventCallback(
+    const std::string& ruleSetId, const PageSceneEventCallback& eventCallback)
 {
+    if (ruleSetId.empty() || eventCallback == nullptr) {
+        LOGW("TryRegisterPageSceneEventCallback invalid ruleSetId or callback");
+        return false;
+    }
     std::lock_guard<std::mutex> lock(pageSceneCallbackMutex_);
-    pageSceneEventCallback_ = nullptr;
+    return pageSceneEventCallbacks_.emplace(ruleSetId, eventCallback).second;
+}
+
+void UiReportStub::UnregisterPageSceneEventCallback(const std::string& ruleSetId)
+{
+    if (ruleSetId.empty()) {
+        return;
+    }
+    std::lock_guard<std::mutex> lock(pageSceneCallbackMutex_);
+    pageSceneEventCallbacks_.erase(ruleSetId);
 }
 
 bool UiReportStub::RegisterGetPageSceneCallback(const PageSceneEventCallback& eventCallback)
@@ -938,11 +1137,9 @@ void UiReportStub::UnregisterGetPageSceneCallback()
 
 void UiReportStub::ReportPageSceneEvent(const std::string& sceneJson, bool isGetResult)
 {
-    PageSceneEventCallback pageSceneEventCallback;
     PageSceneEventCallback getPageSceneCallback;
     {
         std::lock_guard<std::mutex> lock(pageSceneCallbackMutex_);
-        pageSceneEventCallback = pageSceneEventCallback_;
         getPageSceneCallback = getPageSceneCallback_;
     }
     if (isGetResult) {
@@ -951,8 +1148,26 @@ void UiReportStub::ReportPageSceneEvent(const std::string& sceneJson, bool isGet
         }
         return;
     }
-    if (pageSceneEventCallback) {
-        pageSceneEventCallback(sceneJson);
+    // Snapshot callbacks, then filter and invoke outside the lock. Each callback
+    // receives only its own ruleSet's hits/exits; shared event metadata is preserved.
+    auto ruleSetIds = ExtractPageSceneRuleSetIds(sceneJson);
+    std::vector<std::pair<std::string, PageSceneEventCallback>> callbackSnapshot;
+    {
+        std::lock_guard<std::mutex> lock(pageSceneCallbackMutex_);
+        for (const auto& ruleSetId : ruleSetIds) {
+            auto iter = pageSceneEventCallbacks_.find(ruleSetId);
+            if (iter != pageSceneEventCallbacks_.end()) {
+                callbackSnapshot.emplace_back(ruleSetId, iter->second);
+            }
+        }
+    }
+    for (const auto& [ruleSetId, callback] : callbackSnapshot) {
+        if (callback) {
+            auto filteredJson = FilterPageSceneEvent(sceneJson, ruleSetId);
+            if (!filteredJson.empty()) {
+                callback(filteredJson);
+            }
+        }
     }
 }
 } // namespace OHOS::Ace

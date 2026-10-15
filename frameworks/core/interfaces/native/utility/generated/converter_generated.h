@@ -1809,6 +1809,21 @@ void AssignUnionTo(std::optional<T>& dst,
 
 template<typename T>
 void AssignUnionTo(std::optional<T>& dst,
+                   const Ark_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy& src)
+{
+    switch (src.selector) {
+        case SELECTOR_ID_0: AssignTo(dst, src.value0); break;
+        case SELECTOR_ID_1: AssignTo(dst, src.value1); break;
+        default:
+        {
+            LOGE("Unexpected src->selector: %{public}d\n", src.selector);
+            return;
+        }
+    }
+}
+
+template<typename T>
+void AssignUnionTo(std::optional<T>& dst,
                    const Ark_Union_SpatialPosition_F64& src)
 {
     switch (src.selector) {
@@ -4578,6 +4593,7 @@ ASSIGN_OPT(Opt_Callback_Opt_Map_String_Object_Void)
 ASSIGN_OPT(Opt_Callback_Opt_NavigationAnimatedTransition_Void)
 ASSIGN_OPT(Opt_Callback_Opt_Object_Void)
 ASSIGN_OPT(Opt_Callback_Opt_OffsetResult_Void)
+ASSIGN_OPT(Opt_Callback_Opt_PlaceholderOptions_Void)
 ASSIGN_OPT(Opt_Callback_Opt_ScrollResult_Void)
 ASSIGN_OPT(Opt_Callback_Opt_StyledString_Opt_Array_String_Void)
 ASSIGN_OPT(Opt_Callback_Opt_TabContentAnimatedTransition_Void)
@@ -4761,6 +4777,7 @@ ASSIGN_OPT(Opt_OnZoomChangeCallback)
 ASSIGN_OPT(Opt_Opt_Object)
 ASSIGN_OPT(Opt_PasteButtonCallback)
 ASSIGN_OPT(Opt_PasteEventCallback)
+ASSIGN_OPT(Opt_PlaceholderProvider)
 ASSIGN_OPT(Opt_PluginErrorCallback)
 ASSIGN_OPT(Opt_PopupStateChangeCallback)
 ASSIGN_OPT(Opt_ProgressModifierBuilder)
@@ -4778,6 +4795,8 @@ ASSIGN_OPT(Opt_SaveStateCallback)
 ASSIGN_OPT(Opt_ScrollOnDidZoomCallback)
 ASSIGN_OPT(Opt_ScrollOnScrollCallback)
 ASSIGN_OPT(Opt_ScrollOnWillScrollCallback)
+ASSIGN_OPT(Opt_ScrollSnapApproachCallback)
+ASSIGN_OPT(Opt_ScrollSnapTargetCallback)
 ASSIGN_OPT(Opt_SearchSubmitCallback)
 ASSIGN_OPT(Opt_SearchValueCallback)
 ASSIGN_OPT(Opt_ShouldBuiltInRecognizerParallelWithCallback)
@@ -5092,6 +5111,7 @@ ASSIGN_OPT(Opt_ScrollAnimationOptions)
 ASSIGN_OPT(Opt_ScrollBarOptions)
 ASSIGN_OPT(Opt_ScrollEdgeOptions)
 ASSIGN_OPT(Opt_ScrollPageOptions)
+ASSIGN_OPT(Opt_ScrollSnapOffsetProviderProxy)
 ASSIGN_OPT(Opt_SelectionContainerEditMenuOptions)
 ASSIGN_OPT(Opt_SelectionContainerMenuOptions)
 ASSIGN_OPT(Opt_SelectionOptions)
@@ -5208,6 +5228,7 @@ ASSIGN_OPT(Opt_Union_ResourceStr_SymbolGlyphModifier)
 ASSIGN_OPT(Opt_Union_ResourceStr_TabBarSymbol)
 ASSIGN_OPT(Opt_Union_RotateOptions_RotateAngleOptions)
 ASSIGN_OPT(Opt_Union_ScrollAnimationOptions_Boolean)
+ASSIGN_OPT(Opt_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy)
 ASSIGN_OPT(Opt_Union_SpatialPosition_F64)
 ASSIGN_OPT(Opt_Union_String_Array_String)
 ASSIGN_OPT(Opt_Union_String_Bindable_String)
@@ -5584,6 +5605,7 @@ ASSIGN_OPT(Opt_PickerBackgroundStyle)
 ASSIGN_OPT(Opt_PickerDialogButtonStyle)
 ASSIGN_OPT(Opt_PickerIndicatorStyle)
 ASSIGN_OPT(Opt_PickerTextStyle)
+ASSIGN_OPT(Opt_PlaceholderOptions)
 ASSIGN_OPT(Opt_PlaceholderStyle)
 ASSIGN_OPT(Opt_PopupCommonOptions)
 ASSIGN_OPT(Opt_PopupMessageOptions)

@@ -1985,7 +1985,10 @@ void TabsPattern::UpdateSideBarIfNeeded()
     // adaptable/sidebar -> bottom
     if (newStyle == TabBarLayoutStyle::BOTTOM) {
         ClearDividerDragEvent();
-        ResetSideBarTabListItemIds();
+        // Keep sideBarTabBarItemId on each TabContentNode so that GetOrCreateTabItemNode
+        // can reuse existing tab item nodes on the next bottom->sidebar switch.
+        // Resetting the ids here would cause fresh ids to be generated, leading to
+        // duplicate tab items accumulating in the sidebar tab list across switches.
         // Re-apply per-item defaultVisibility filtering for bottom tab bar
         auto tabBar = AceType::DynamicCast<FrameNode>(host->GetTabBar());
         CHECK_NULL_VOID(tabBar);
@@ -1995,8 +1998,10 @@ void TabsPattern::UpdateSideBarIfNeeded()
         return;
     }
     // bottom -> adaptable/sidebar
+    bool isFirstTime = false;
     if (!sideBarNode_ && !sideBarDividerNode_) {
         // First time: create and add sidebar nodes to the tree.
+        isFirstTime = true;
         sideBarDividerNode_ = CreateSideBarDividerNode();
         host->AddChild(sideBarDividerNode_);
         sideBarNode_ = CreateSideBarNode();
@@ -2019,17 +2024,15 @@ void TabsPattern::UpdateSideBarIfNeeded()
     }
     // Sync properties to SideBarPattern, then trigger its OnModifyDone
     SyncPropertiesToSideBar();
-    // Register all existing TabContent tab items
-    RegisterSideBarTabItems();
-    // Re-apply per-item defaultVisibility filtering
-    if (currentBarDisplayMode_.value_or(TabBarDisplayMode::BOTTOMTABBAR) == TabBarDisplayMode::BOTTOMTABBAR) {
-        auto tabBar = AceType::DynamicCast<FrameNode>(host->GetTabBar());
-        CHECK_NULL_VOID(tabBar);
-        auto tabBarPattern = tabBar->GetPattern<TabBarPattern>();
-        CHECK_NULL_VOID(tabBarPattern);
-        tabBarPattern->ApplyDefaultVisibility();
-        return;
-    }
+    // Register all existing TabContent tab items.
+    // First time: update=false to create items and bind click events.
+    // Subsequent switches: update=true to update existing items in place
+    // (avoids re-binding click events and relies on GetOrCreateTabItemNode
+    // reusing nodes by their preserved sideBarTabBarItemId).
+    RegisterSideBarTabItems(!isFirstTime);
+    // Re-apply per-item defaultVisibility filtering for sidebar tab list.
+    // Use newStyle (not currentBarDisplayMode_) because during a mode switch
+    // currentBarDisplayMode_ may still hold the old value.
     CHECK_NULL_VOID(sideBarNode_);
     auto sidebarPattern = sideBarNode_->GetPattern<TabsSideBarPattern>();
     CHECK_NULL_VOID(sidebarPattern);
@@ -2063,18 +2066,6 @@ void TabsPattern::RemoveTabContentNode(const RefPtr<TabContentNode>& tabContentN
                 return !node || node == tabContentNode;
             }),
         tabContentNodes_.end());
-}
-
-void TabsPattern::ResetSideBarTabListItemIds()
-{
-    // Iterate recorded TabContentNodes directly (no tree traversal needed)
-    for (auto& weakNode : tabContentNodes_) {
-        auto tabContentNode = weakNode.Upgrade();
-        if (!tabContentNode) {
-            continue;
-        }
-        tabContentNode->ResetSideBarTabBarItemId();
-    }
 }
 
 void TabsPattern::UpdateSideBarAttributes()
@@ -2178,6 +2169,9 @@ std::optional<Color> TabsPattern::GetEffectiveSidebarBackgroundColor() const
     if (property->HasSidebarBackgroundColor()) {
         return property->GetSidebarBackgroundColor();
     }
+    if (property->HasBarBackgroundColorForSideBar()) {
+        return property->GetBarBackgroundColorForSideBar();
+    }
     return property->GetBarBackgroundColor();
 }
 
@@ -2201,6 +2195,11 @@ void TabsPattern::UpdateSideBarBackgroundColor()
         if (tabsProperty->HasSidebarBackgroundColorSetByUser() &&
             tabsProperty->GetSidebarBackgroundColorSetByUserValue()) {
             color = tabsProperty->GetSidebarBackgroundColorValue();
+            hasColor = true;
+        }
+    } else if (tabsProperty->HasBarBackgroundColorForSideBar()) {
+        if (tabsProperty->HasBarBackgroundColorSetByUser() && tabsProperty->GetBarBackgroundColorSetByUserValue()) {
+            color = tabsProperty->GetBarBackgroundColorForSideBarValue();
             hasColor = true;
         }
     } else if (tabsProperty->HasBarBackgroundColor()) {
@@ -2301,7 +2300,7 @@ void TabsPattern::SyncPropertiesToSideBar()
     sideBarNode_->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
 }
 
-void TabsPattern::RegisterSideBarTabItems()
+void TabsPattern::RegisterSideBarTabItems(bool update)
 {
     auto host = AceType::DynamicCast<TabsNode>(GetHost());
     CHECK_NULL_VOID(host);
@@ -2333,7 +2332,7 @@ void TabsPattern::RegisterSideBarTabItems()
         if (!tabContentNode) {
             continue;
         }
-        TabContentModelNG::AddSideBarTabListItem(host, tabContentNode, position, false);
+        TabContentModelNG::AddSideBarTabListItem(host, tabContentNode, position, update);
         position++;
     }
 
@@ -2377,18 +2376,6 @@ TabBarDisplayMode TabsPattern::GetActiveBarDisplayMode() const
         return TabBarDisplayMode::SIDEBAR;
     }
     return TabBarDisplayMode::BOTTOMTABBAR;
-}
-
-bool TabsPattern::IsTabShouldHideByVisibility(const TabContentDefaultVisibility& visibility)
-{
-    if (visibility.isNull || visibility.visibility == TabVisibility::VISIBLE) {
-        return false;
-    }
-    if (!visibility.displayMode.has_value()) {
-        return true;
-    }
-    auto activeDisplayMode = GetActiveBarDisplayMode();
-    return visibility.displayMode.value() == activeDisplayMode;
 }
 
 void TabsPattern::InitDividerDragEvent()
@@ -2860,8 +2847,7 @@ float TabsPattern::CalcSidebarOutsideTranslateX() const
     bool sideBarOnLeft = (!isRTL && sideBarPos == BarPosition::START) ||
                          (isRTL && sideBarPos == BarPosition::END);
     float outsideOffset = sideBarWidth + dividerWidth;
-    float result = sideBarOnLeft ? -outsideOffset : outsideOffset;
-    return result;
+    return sideBarOnLeft ? -outsideOffset : outsideOffset;
 }
 
 void TabsPattern::ApplyEnteringElementInitialTransform(TabBarDisplayMode toMode)
@@ -2970,7 +2956,13 @@ void TabsPattern::ResetDisplayModeSwitchTransforms()
         auto renderContext = tabBarDivider->GetRenderContext();
         CHECK_NULL_VOID(renderContext);
         renderContext->UpdateTransformTranslate({ 0.0f, 0.0f, 0.0f });
-        renderContext->UpdateOpacity(1.0);
+        auto property = host->GetLayoutProperty<TabsLayoutProperty>();
+        CHECK_NULL_VOID(property);
+        float opacity = 1.0f;
+        if (property->HasDivider() && property->GetDividerValue().isNull) {
+            opacity = 0.0f;
+        }
+        renderContext->UpdateOpacity(opacity);
     }
     if (bgMaskNode) {
         auto renderContext = bgMaskNode->GetRenderContext();
@@ -2998,7 +2990,7 @@ void TabsPattern::StartDisplayModeSwitchAnimation(TabBarDisplayMode fromMode, Ta
     bool toSidebar = (toMode == TabBarDisplayMode::SIDEBAR);
     float outsideX = CalcSidebarOutsideTranslateX();
     if (isFloatingBar_) {
-        StartFloatingTabBarAnimation(toMode, toSidebar, outsideX, baseFloatingScale_, finishCb);
+        StartFloatingTabBarAnimation(toSidebar, outsideX, baseFloatingScale_, finishCb);
         return;
     }
     auto tabBar = AceType::DynamicCast<FrameNode>(host->GetTabBar());
@@ -3012,12 +3004,11 @@ void TabsPattern::StartDisplayModeSwitchAnimation(TabBarDisplayMode fromMode, Ta
         CHECK_NULL_VOID(geometry);
         tabHeight += geometry->GetFrameSize().Height();
     }
-    StartNonFloatingTabBarAnimation(toMode, toSidebar, outsideX, tabHeight, finishCb);
+    StartNonFloatingTabBarAnimation(toSidebar, outsideX, tabHeight, finishCb);
 }
 
 void TabsPattern::StartNonFloatingTabBarAnimation(
-    TabBarDisplayMode toMode, bool toSidebar, float outsideX, float tabHeight,
-    const std::function<void()>& finishCb)
+    bool toSidebar, float outsideX, float tabHeight, const std::function<void()>& finishCb)
 {
     auto host = GetHost();
     CHECK_NULL_VOID(host);
@@ -3028,25 +3019,22 @@ void TabsPattern::StartNonFloatingTabBarAnimation(
     opt.SetCurve(DISPLAY_MODE_TRANSLATE_CURVE);
     opt.SetDuration(DISPLAY_MODE_ANIMATION_DURATION);
     opt.SetOnFinishEvent(finishCb);
+    displayModeAnimCount_++;
     tabBarEnterExitAnim_ = AnimationUtils::StartAnimation(opt,
-        [weakPattern = WeakClaim(this), toMode, toSidebar, outsideX, tabHeight]() {
+        [weakPattern = WeakClaim(this), toSidebar, outsideX, tabHeight]() {
         auto pattern = weakPattern.Upgrade();
         CHECK_NULL_VOID(pattern);
-        pattern->ApplyNonFloatingTabBarAnimClosure(toMode, toSidebar, outsideX, tabHeight);
-        ++pattern->displayModeAnimCount_;
+        pattern->ApplyNonFloatingTabBarAnimClosure(toSidebar, outsideX, tabHeight);
     }, opt.GetOnFinishEvent(), nullptr, context);
 }
 
-void TabsPattern::ApplyNonFloatingTabBarAnimClosure(
-    TabBarDisplayMode toMode, bool toSidebar, float outsideX, float tabHeight)
+void TabsPattern::ApplyNonFloatingTabBarAnimClosure(bool toSidebar, float outsideX, float tabHeight)
 {
     auto tabsNode = AceType::DynamicCast<TabsNode>(GetHost());
     CHECK_NULL_VOID(tabsNode);
     auto context = tabsNode->GetContext();
     CHECK_NULL_VOID(context);
 
-    // Re-layout in toMode: sidebar, swiper, tabbar all get their toMode positions/sizes.
-    SetCurrentBarDisplayMode(toMode);
     tabsNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
     context->FlushUITasks();
 
@@ -3099,10 +3087,9 @@ void TabsPattern::ApplyNonFloatingTabBarAnimClosure(
 }
 
 void TabsPattern::StartFloatingTabBarAnimation(
-    TabBarDisplayMode toMode, bool toSidebar, float outsideX, float baseScale,
-    const std::function<void()>& finishCb)
+    bool toSidebar, float outsideX, float baseScale, const std::function<void()>& finishCb)
 {
-    StartFloatingSidebarTranslateAnim(toMode, toSidebar, outsideX, finishCb);
+    StartFloatingSidebarTranslateAnim(toSidebar, outsideX, finishCb);
     if (toSidebar) {
         StartFloatingTabBarExitAnim(baseScale, finishCb);
     } else {
@@ -3111,7 +3098,7 @@ void TabsPattern::StartFloatingTabBarAnimation(
 }
 
 void TabsPattern::StartFloatingSidebarTranslateAnim(
-    TabBarDisplayMode toMode, bool toSidebar, float outsideX, const std::function<void()>& finishCb)
+    bool toSidebar, float outsideX, const std::function<void()>& finishCb)
 {
     auto host = GetHost();
     CHECK_NULL_VOID(host);
@@ -3122,8 +3109,9 @@ void TabsPattern::StartFloatingSidebarTranslateAnim(
     sidebarOpt.SetCurve(DISPLAY_MODE_TRANSLATE_CURVE);
     sidebarOpt.SetOnFinishEvent(finishCb);
     sidebarOpt.SetDuration(DISPLAY_MODE_ANIMATION_DURATION);
+    displayModeAnimCount_++;
     sidebarTranslateAnim_ = AnimationUtils::StartAnimation(sidebarOpt,
-        [weakPattern = WeakClaim(this), toMode, toSidebar, outsideX]() {
+        [weakPattern = WeakClaim(this), toSidebar, outsideX]() {
         auto pattern = weakPattern.Upgrade();
         CHECK_NULL_VOID(pattern);
         auto host = pattern->GetHost();
@@ -3137,7 +3125,6 @@ void TabsPattern::StartFloatingSidebarTranslateAnim(
         auto dividerRC = sideBarDivider->GetRenderContext();
         CHECK_NULL_VOID(sideBarRC && dividerRC);
 
-        pattern->SetCurrentBarDisplayMode(toMode);
         host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
         context->FlushUITasks();
 
@@ -3148,7 +3135,6 @@ void TabsPattern::StartFloatingSidebarTranslateAnim(
             sideBarRC->UpdateTransformTranslate({ outsideX, 0.0f, 0.0f });
             dividerRC->UpdateTransformTranslate({ outsideX, 0.0f, 0.0f });
         }
-        ++pattern->displayModeAnimCount_;
     }, sidebarOpt.GetOnFinishEvent(), nullptr, context);
 }
 
@@ -3181,6 +3167,7 @@ void TabsPattern::StartFloatingTabBarExitAnim(float baseScale, const std::functi
     phase2Opt.SetDelay(DISPLAY_MODE_FLOATING_PHASE2_DELAY);
     phase2Opt.SetDuration(DISPLAY_MODE_ANIMATION_DURATION);
     phase2Opt.SetOnFinishEvent(finishCb);
+    displayModeAnimCount_++;
     AnimationUtils::StartAnimation(phase2Opt, [weakPattern = WeakClaim(this), baseScale]() {
         auto pattern = weakPattern.Upgrade();
         CHECK_NULL_VOID(pattern);
@@ -3202,7 +3189,6 @@ void TabsPattern::StartFloatingTabBarExitAnim(float baseScale, const std::functi
         if (bgMaskNode) {
             bgMaskNode->GetRenderContext()->UpdateOpacity(0.0);
         }
-        ++pattern->displayModeAnimCount_;
     }, phase2Opt.GetOnFinishEvent(), nullptr, context);
 }
 
@@ -3217,6 +3203,7 @@ void TabsPattern::StartFloatingTabBarEnterAnim(float baseScale, const std::funct
     opt.SetCurve(DISPLAY_MODE_FLOATING_CURVE);
     opt.SetDuration(DISPLAY_MODE_ANIMATION_DURATION);
     opt.SetOnFinishEvent(finishCb);
+    displayModeAnimCount_++;
     tabBarEnterExitAnim_ = AnimationUtils::StartAnimation(opt, [weakPattern = WeakClaim(this), baseScale]() {
         auto pattern = weakPattern.Upgrade();
         CHECK_NULL_VOID(pattern);
@@ -3237,7 +3224,6 @@ void TabsPattern::StartFloatingTabBarEnterAnim(float baseScale, const std::funct
         if (bgMaskNode) {
             bgMaskNode->GetRenderContext()->UpdateOpacity(1.0);
         }
-        ++pattern->displayModeAnimCount_;
     }, opt.GetOnFinishEvent(), nullptr, context);
 }
 
@@ -3254,13 +3240,11 @@ void TabsPattern::OnDisplayModeSwitchAnimationsFinished()
     }
     auto host = AceType::DynamicCast<TabsNode>(GetHost());
     CHECK_NULL_VOID(host);
-    auto targetMode = displayModeAnimTarget_.value_or(GetCurrentBarDisplayMode().value_or(TabBarDisplayMode::BOTTOMTABBAR));
+    auto targetMode = displayModeAnimTarget_.value_or(
+        GetCurrentBarDisplayMode().value_or(TabBarDisplayMode::BOTTOMTABBAR));
 
     ResetDisplayModeSwitchTransforms();
     SetElementVisibilityForMode(targetMode);
-
-    SetCurrentBarDisplayMode(targetMode);
-    FireBarDisplayModeChangeEvent(targetMode);
 
     isOnDisplayModeSwitchAnimation_ = false;
     displayModeAnimTarget_.reset();

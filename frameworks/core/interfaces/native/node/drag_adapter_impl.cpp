@@ -73,16 +73,9 @@ ArkUI_Int32 StartDrag(ArkUIDragAction* dragAction)
                          instanceId = dragAction->instanceId](const DragNotifyMsg& dragNotifyMsg, int32_t status) {
         auto pipelineContext = NG::PipelineContext::GetContextByContainerId(instanceId);
         CHECK_NULL_VOID(pipelineContext);
-        auto manager = pipelineContext->GetDragDropManager();
-        CHECK_NULL_VOID(manager);
         ArkUIDragEvent dragEvent;
         dragEvent.dragResult = static_cast<int32_t>(dragNotifyMsg.result);
         dragEvent.dragBehavior = static_cast<int32_t>(dragNotifyMsg.dragBehavior);
-
-        auto action = manager->GetDragAction();
-        if (action != nullptr) {
-            action->hasHandle = false;
-        }
         ArkUIDragAndDropInfo outInfo;
         outInfo.status = status;
         outInfo.dragEvent = &dragEvent;

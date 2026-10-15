@@ -1027,6 +1027,9 @@ void SwitchPattern::HideMaterialNodes()
     if (blurCoverNode_) {
         host->RemoveChild(blurCoverNode_);
     }
+
+    host->RebuildRenderContextTree();
+
     auto renderContext = host->GetRenderContext();
     CHECK_NULL_VOID(renderContext);
     renderContext->SetAlphaOffscreen(true);

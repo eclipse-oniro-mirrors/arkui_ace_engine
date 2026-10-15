@@ -719,79 +719,63 @@ HWTEST_F(SessionWrapperImplNewTestNg, SessionWrapperImplNewDpiWhitelist001, Test
     ASSERT_NE(pipeline, nullptr);
 
     /**
-     * @tc.steps: step1. strategy FOLLOW_UI_EXTENSION_ABILITY_DPI (default), window switch off
-     * @tc.expected: config carries raw strategy, effective value is false (same as current behavior)
+     * @tc.steps: step1. developer strategy not configured, host strategy not set (default)
+     * @tc.expected: config carries default strategy, effective value is default
      */
-    pipeline->SetUIExtensionDensityFollowHost(false);
-    pattern->SetDpiFollowStrategy(DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
+    pipeline->SetUIExtensionDensityFollowHost(DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
+    pattern->SetDpiFollowStrategy(DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI, false);
     sessionWrapper->CreateSession(want, config);
     EXPECT_EQ(pattern->GetSessionViewportConfig().dpiFollowStrategy_,
         DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
     EXPECT_EQ(pattern->GetEffectiveDpiFollowStrategy(), DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
 
     /**
-     * @tc.steps: step2. strategy FOLLOW_HOST_DPI_ALL, window switch on
-     * @tc.expected: config carries raw strategy, effective value is true (follows switch)
+     * @tc.steps: step2. developer strategy not configured, host strategy FOLLOW_HOST_DPI_ALL (whitelist)
+     * @tc.expected: effective value follows the host saved strategy
      */
-    pipeline->SetUIExtensionDensityFollowHost(true);
-    pattern->SetDpiFollowStrategy(DpiFollowStrategy::FOLLOW_HOST_DPI_ALL);
+    pipeline->SetUIExtensionDensityFollowHost(DpiFollowStrategy::FOLLOW_HOST_DPI_ALL);
     sessionWrapper->CreateSession(want, config);
-    EXPECT_EQ(pattern->GetSessionViewportConfig().dpiFollowStrategy_,
-        DpiFollowStrategy::FOLLOW_HOST_DPI_ALL);
-    EXPECT_NE(pattern->GetEffectiveDpiFollowStrategy(), DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
+    EXPECT_EQ(pattern->GetSessionViewportConfig().dpiFollowStrategy_, DpiFollowStrategy::FOLLOW_HOST_DPI_ALL);
+    EXPECT_EQ(pattern->GetEffectiveDpiFollowStrategy(), DpiFollowStrategy::FOLLOW_HOST_DPI_ALL);
 
     /**
-     * @tc.steps: step3. strategy FOLLOW_HOST_DPI_ALL, window switch off
-     * @tc.expected: effective value is false (follows switch)
+     * @tc.steps: step3. developer strategy FOLLOW_HOST_DPI, host strategy FOLLOW_HOST_DPI_ALL
+     * @tc.expected: developer-configured strategy takes precedence over host strategy
      */
-    pipeline->SetUIExtensionDensityFollowHost(false);
-    sessionWrapper->CreateSession(want, config);
-    EXPECT_EQ(pattern->GetSessionViewportConfig().dpiFollowStrategy_,
-        DpiFollowStrategy::FOLLOW_HOST_DPI_ALL);
-    EXPECT_EQ(pattern->GetEffectiveDpiFollowStrategy(), DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
-
-    /**
-     * @tc.steps: step4. strategy FOLLOW_UI_EXTENSION_ABILITY_DPI (default), window switch on
-     * @tc.expected: effective value is true (window switch forces default/provider strategy
-     * as FOLLOW_HOST_DPI_ALL)
-     */
-    pattern->SetDpiFollowStrategy(DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
-    pipeline->SetUIExtensionDensityFollowHost(true);
-    sessionWrapper->CreateSession(want, config);
-    EXPECT_EQ(pattern->GetSessionViewportConfig().dpiFollowStrategy_,
-        DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
-    EXPECT_NE(pattern->GetEffectiveDpiFollowStrategy(), DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
-
-    /**
-     * @tc.steps: step5. strategy FOLLOW_HOST_DPI, window switch off
-     * @tc.expected: config carries raw strategy, effective value is true (developer semantics kept)
-     */
-    pipeline->SetUIExtensionDensityFollowHost(false);
     pattern->SetDpiFollowStrategy(DpiFollowStrategy::FOLLOW_HOST_DPI);
     sessionWrapper->CreateSession(want, config);
     EXPECT_EQ(pattern->GetSessionViewportConfig().dpiFollowStrategy_, DpiFollowStrategy::FOLLOW_HOST_DPI);
-    EXPECT_NE(pattern->GetEffectiveDpiFollowStrategy(), DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
+    EXPECT_EQ(pattern->GetEffectiveDpiFollowStrategy(), DpiFollowStrategy::FOLLOW_HOST_DPI);
 
     /**
-     * @tc.steps: step6. strategy FOLLOW_HOST_DPI_ALL, window switch on (switch overrides strategy)
-     * @tc.expected: Rosen config receives FOLLOW_HOST_DPI_ALL (switch-prioritized effective strategy)
+     * @tc.steps: step4. developer strategy FOLLOW_HOST_DPI_ALL, host strategy default
+     * @tc.expected: developer-configured strategy takes precedence over default
      */
+    pipeline->SetUIExtensionDensityFollowHost(DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
     pattern->SetDpiFollowStrategy(DpiFollowStrategy::FOLLOW_HOST_DPI_ALL);
-    pipeline->SetUIExtensionDensityFollowHost(true);
     sessionWrapper->CreateSession(want, config);
-    EXPECT_EQ(pattern->GetSessionViewportConfig().dpiFollowStrategy_,
-        DpiFollowStrategy::FOLLOW_HOST_DPI_ALL);
-    EXPECT_NE(pattern->GetEffectiveDpiFollowStrategy(), DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
+    EXPECT_EQ(pattern->GetSessionViewportConfig().dpiFollowStrategy_, DpiFollowStrategy::FOLLOW_HOST_DPI_ALL);
+    EXPECT_EQ(pattern->GetEffectiveDpiFollowStrategy(), DpiFollowStrategy::FOLLOW_HOST_DPI_ALL);
 
     /**
-     * @tc.steps: step7. strategy FOLLOW_HOST_DPI, window switch on (switch overrides developer strategy)
-     * @tc.expected: effective strategy is FOLLOW_HOST_DPI_ALL (switch takes priority), raw stays FOLLOW_HOST_DPI
+     * @tc.steps: step5. developer strategy not configured, host strategy replaced with FOLLOW_HOST_DPI
+     * @tc.expected: saved value is replaced by the passed one and becomes the effective strategy
      */
-    pattern->SetDpiFollowStrategy(DpiFollowStrategy::FOLLOW_HOST_DPI);
+    pattern->SetDpiFollowStrategy(DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI, false);
+    pipeline->SetUIExtensionDensityFollowHost(DpiFollowStrategy::FOLLOW_HOST_DPI);
     sessionWrapper->CreateSession(want, config);
-    EXPECT_EQ(pattern->GetSessionViewportConfig().dpiFollowStrategy_,
-        DpiFollowStrategy::FOLLOW_HOST_DPI_ALL);
-    EXPECT_EQ(pattern->GetDpiFollowStrategy(), DpiFollowStrategy::FOLLOW_HOST_DPI);
+    EXPECT_EQ(pattern->GetSessionViewportConfig().dpiFollowStrategy_, DpiFollowStrategy::FOLLOW_HOST_DPI);
+    EXPECT_EQ(pattern->GetEffectiveDpiFollowStrategy(), DpiFollowStrategy::FOLLOW_HOST_DPI);
+    EXPECT_EQ(pattern->GetDpiFollowStrategy(), DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
+
+    /**
+     * @tc.steps: step6. developer explicitly configured the default strategy (opt-out), host FOLLOW_HOST_DPI_ALL
+     * @tc.expected: developer explicit configuration takes precedence, effective value is the default strategy
+     */
+    pipeline->SetUIExtensionDensityFollowHost(DpiFollowStrategy::FOLLOW_HOST_DPI_ALL);
+    pattern->SetDpiFollowStrategy(DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI, true);
+    sessionWrapper->CreateSession(want, config);
+    EXPECT_EQ(pattern->GetEffectiveDpiFollowStrategy(), DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
 }
 
 /**
@@ -805,16 +789,45 @@ HWTEST_F(SessionWrapperImplNewTestNg, SessionWrapperImplNewParseDpiFollowStrateg
      * @tc.steps: step1. valid enum values (dts DpiFollowStrategy members)
      * @tc.expected: mapped to corresponding native strategy
      */
-    EXPECT_EQ(ParseDpiFollowStrategy(0), DpiFollowStrategy::FOLLOW_HOST_DPI);
-    EXPECT_EQ(ParseDpiFollowStrategy(1), DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
-    EXPECT_EQ(ParseDpiFollowStrategy(2), DpiFollowStrategy::FOLLOW_HOST_DPI_ALL);
+    EXPECT_EQ(ParseDpiFollowStrategy(DTS_FOLLOW_HOST_DPI), DpiFollowStrategy::FOLLOW_HOST_DPI);
+    EXPECT_EQ(ParseDpiFollowStrategy(DTS_FOLLOW_UI_EXTENSION_ABILITY_DPI),
+        DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
+    EXPECT_EQ(ParseDpiFollowStrategy(DTS_FOLLOW_HOST_DPI_ALL), DpiFollowStrategy::FOLLOW_HOST_DPI_ALL);
 
     /**
      * @tc.steps: step2. invalid values (unset static frontend default -1, out-of-range)
      * @tc.expected: fall back to default provider strategy
      */
-    EXPECT_EQ(ParseDpiFollowStrategy(-1), DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
-    EXPECT_EQ(ParseDpiFollowStrategy(3), DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
+    EXPECT_EQ(ParseDpiFollowStrategy(DTS_DPI_FOLLOW_STRATEGY_UNSET),
+        DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
+    EXPECT_EQ(ParseDpiFollowStrategy(DTS_FOLLOW_HOST_DPI_ALL + 1), DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
+}
+
+/**
+ * @tc.name: SessionWrapperImplNewConvertFromRosenDpiFollowStrategy001
+ * @tc.desc: Test ConvertFromRosenDpiFollowStrategy maps Rosen strategy values to native enum
+ *           with default fallback (mirrors window_manager wm_layout_common.h values).
+ * @tc.type: FUNC
+ */
+HWTEST_F(SessionWrapperImplNewTestNg, SessionWrapperImplNewConvertFromRosenDpiFollowStrategy001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. valid Rosen enum values (NONE = 0, FOLLOW_HOST_DPI_UEA = 1, FOLLOW_HOST_DPI_ALL = 2)
+     * @tc.expected: mapped to corresponding native strategy
+     */
+    EXPECT_EQ(ConvertFromRosenDpiFollowStrategy(static_cast<Rosen::DpiFollowStrategy>(ROSEN_NONE)),
+        DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
+    EXPECT_EQ(ConvertFromRosenDpiFollowStrategy(static_cast<Rosen::DpiFollowStrategy>(ROSEN_FOLLOW_HOST_DPI_UEA)),
+        DpiFollowStrategy::FOLLOW_HOST_DPI);
+    EXPECT_EQ(ConvertFromRosenDpiFollowStrategy(static_cast<Rosen::DpiFollowStrategy>(ROSEN_FOLLOW_HOST_DPI_ALL)),
+        DpiFollowStrategy::FOLLOW_HOST_DPI_ALL);
+
+    /**
+     * @tc.steps: step2. invalid value (out-of-range)
+     * @tc.expected: fall back to default provider strategy
+     */
+    EXPECT_EQ(ConvertFromRosenDpiFollowStrategy(static_cast<Rosen::DpiFollowStrategy>(ROSEN_FOLLOW_HOST_DPI_ALL + 1)),
+        DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
 }
 
 /**

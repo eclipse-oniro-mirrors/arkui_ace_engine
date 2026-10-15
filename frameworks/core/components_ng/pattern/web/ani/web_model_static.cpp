@@ -1442,6 +1442,14 @@ void WebModelStatic::SetForceEnableZoom(FrameNode* frameNode, bool isForceEnable
     webPatternStatic->UpdateForceEnableZoom(isForceEnableZoom);
 }
 
+void WebModelStatic::SetFlingSpeedLimit(FrameNode* frameNode, float speedLimit)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto webPatternStatic = AceType::DynamicCast<WebPatternStatic>(frameNode->GetPattern());
+    CHECK_NULL_VOID(webPatternStatic);
+    webPatternStatic->UpdateFlingSpeedLimit(NormalizeFlingSpeedLimit(speedLimit));
+}
+
 void WebModelStatic::SetRotateRenderEffect(FrameNode* frameNode, const std::optional<WebRotateEffect>& effect)
 {
     CHECK_NULL_VOID(frameNode);

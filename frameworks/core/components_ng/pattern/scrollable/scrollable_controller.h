@@ -45,6 +45,7 @@ public:
         bool canOverScroll = false);
     void SetCanStayOverScroll(bool canStayOverScroll) override;
     Offset GetCurrentOffset() const override;
+    ScrollState GetScrollState() const override;
     Axis GetScrollDirection() const override;
     void ScrollBy(double pixelX, double pixelY, bool smooth) override;
     void ScrollByMultiThread(double pixelX, double pixelY, bool smooth);

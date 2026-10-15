@@ -1738,6 +1738,62 @@ HWTEST_F(WebPatternWebTest, OnForceEnableZoomUpdate, TestSize.Level1)
 }
 
 /**
+ * @tc.name: OnFlingSpeedLimitUpdate
+ * @tc.desc: OnFlingSpeedLimitUpdate callback routes to delegate_->SetFlingSpeedLimit.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternWebTest, OnFlingSpeedLimitUpdate, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+    float speedLimit = 5000.0f;
+    OHOS::ArkWeb::setActiveWebEngineVersion(OHOS::ArkWeb::ArkWebEngineVersion::M132);
+    webPattern->OnFlingSpeedLimitUpdate(speedLimit);
+    OHOS::ArkWeb::setActiveWebEngineVersion(OHOS::ArkWeb::ArkWebEngineVersion::M114);
+    webPattern->OnFlingSpeedLimitUpdate(speedLimit);
+    OHOS::ArkWeb::setActiveWebEngineVersion(OHOS::ArkWeb::ArkWebEngineVersion::M132);
+    webPattern->delegate_ = nullptr;
+    webPattern->OnFlingSpeedLimitUpdate(speedLimit);
+#endif
+}
+
+/**
+ * @tc.name: OnFlingSpeedLimitUpdate002
+ * @tc.desc: OnFlingSpeedLimitUpdate with invalid values (0, negative) does not crash.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternWebTest, OnFlingSpeedLimitUpdate002, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+    OHOS::ArkWeb::setActiveWebEngineVersion(OHOS::ArkWeb::ArkWebEngineVersion::M132);
+    EXPECT_NO_FATAL_FAILURE(webPattern->OnFlingSpeedLimitUpdate(0.0f));
+    EXPECT_NO_FATAL_FAILURE(webPattern->OnFlingSpeedLimitUpdate(-1.0f));
+    EXPECT_NO_FATAL_FAILURE(webPattern->OnFlingSpeedLimitUpdate(-9999.0f));
+#endif
+}
+
+/**
  * @tc.name: OnScrollbarLayoutPolicyUpdate001
  * @tc.desc: Test OnScrollbarLayoutPolicyUpdate with same policy (no change branch).
  * @tc.type: FUNC

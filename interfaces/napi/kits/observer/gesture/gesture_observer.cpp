@@ -16,6 +16,7 @@
 #include "gesture_observer.h"
 
 #include "gesture_observer_listener.h"
+#include "napi/native_common.h"
 #include "interfaces/napi/kits/observer/ui_observer_listener.h"
 
 #include "base/utils/napi_scope_raii.h"

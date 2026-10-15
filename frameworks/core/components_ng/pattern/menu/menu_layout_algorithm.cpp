@@ -668,7 +668,7 @@ void MenuLayoutAlgorithm::CalculateSafeAreaIntersection(const SafeAreaInsets& sa
         CHECK_NULL_VOID(menuPattern);
         auto host = menuPattern->GetHost();
         CHECK_NULL_VOID(host);
-        auto parentOffset = host->GetPaintRectOffset(true, true);
+        auto parentOffset = GetParentOffset(host, menuPattern);
         double width = param_.menuWindowRect.Width() - parentOffset.GetX();
         double height = param_.menuWindowRect.Height() - parentOffset.GetY();
         wrapperRect_.SetRect(param_.left, param_.top,
@@ -2726,6 +2726,35 @@ void MenuLayoutAlgorithm::UpdateConstraintWidth(LayoutWrapper* layoutWrapper, La
         maxWidth = std::min(maxHorizontalSpace, maxWidth);
     }
     maxWidth = std::min(constraint.maxSize.Width(), maxWidth);
+    if (LessNotEqual(maxWidth, 0.0f)) {
+        auto parentInfo = columnInfo->GetParent();
+        TAG_LOGW(AceLogTag::ACE_MENU,
+            "UpdateConstraintWidth invalid maxWidth: %{public}f, maxHorizontalSpace: %{public}f, "
+            "leftSpace: %{public}f, rightSpace: %{public}f, paddingWidth: %{public}f, "
+            "constraintMaxWidth: %{public}f, wrapperWidth: %{public}f, gridColumnWidth: %{public}f, "
+            "maxGridCounts: %{public}u, parentColumns: %{public}d, isLessThanAPITen: %{public}d",
+            maxWidth, maxHorizontalSpace, leftSpace_, rightSpace_, padding.Width(),
+            constraint.maxSize.Width(), wrapperSize_.Width(),
+            static_cast<float>(columnInfo->GetWidth(GetMaxGridCounts(columnInfo))),
+            GetMaxGridCounts(columnInfo), parentInfo ? parentInfo->GetColumns() : -1,
+            !Container::GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TEN) ? 1 : 0);
+        TAG_LOGW(AceLogTag::ACE_MENU,
+            "columnInfo grid context: density: %{public}f, dipScale: %{public}f, screenWidth: %{public}f, "
+            "currentSizeType: %{public}d, columnType: %{public}d, parentColumnWidth: %{public}f, "
+            "parentGutterWidth: %{public}s, parentMarginLeft: %{public}s, parentMarginRight: %{public}s, "
+            "parentSizeType: %{public}d",
+            GridSystemManager::GetInstance().GetDensity(),
+            GridSystemManager::GetInstance().GetDipScale(),
+            GridSystemManager::GetInstance().GetScreenWidth(),
+            static_cast<int32_t>(GridSystemManager::GetInstance().GetCurrentSize()),
+            parentInfo ? static_cast<int32_t>(parentInfo->GetColumnType()) : -1,
+            parentInfo ? parentInfo->GetColumnWidth() : -1.0,
+            parentInfo ? parentInfo->GetGutterWidth().ToString().c_str() : "null",
+            parentInfo ? parentInfo->GetMarginLeft().ToString().c_str() : "null",
+            parentInfo ? parentInfo->GetMarginRight().ToString().c_str() : "null",
+            parentInfo ? static_cast<int32_t>(parentInfo->GetSizeType()) : -1);
+        return;
+    }
     constraint.maxSize.SetWidth(maxWidth);
 }
 
@@ -3063,7 +3092,8 @@ OffsetF MenuLayoutAlgorithm::GetArrowPositionWithPlacement(const SizeF& menuSize
     return childPosition;
 }
 
-OffsetF MenuLayoutAlgorithm::GetMenuWrapperOffset(const LayoutWrapper* layoutWrapper)
+OffsetF MenuLayoutAlgorithm::GetMenuWrapperOffset(
+    const LayoutWrapper* layoutWrapper, const RefPtr<MenuPattern>& menuPattern)
 {
     CHECK_NULL_RETURN(layoutWrapper, OffsetF());
     auto menuNode = layoutWrapper->GetHostNode();
@@ -3071,9 +3101,27 @@ OffsetF MenuLayoutAlgorithm::GetMenuWrapperOffset(const LayoutWrapper* layoutWra
     ACE_UINODE_TRACE(menuNode);
     auto menuLayoutProperty = layoutWrapper->GetLayoutProperty();
     if (menuLayoutProperty && menuLayoutProperty->GetNonAutoLayoutDirection() == TextDirection::RTL) {
-        return menuNode->GetPaintRectOffset(true, true);
+        return GetParentOffset(menuNode, menuPattern);
     }
     return menuNode->GetParentGlobalOffsetDuringLayout();
+}
+
+OffsetF MenuLayoutAlgorithm::GetParentOffset(const RefPtr<FrameNode>& host, const RefPtr<MenuPattern>& menuPattern)
+{
+    CHECK_NULL_RETURN(menuPattern, OffsetF());
+    auto menuWrapper = menuPattern->GetMenuWrapper();
+    CHECK_NULL_RETURN(menuWrapper, OffsetF());
+    auto menuWrapperPattern = menuWrapper->GetPattern<MenuWrapperPattern>();
+    if (menuWrapperPattern && menuWrapperPattern->IsHide()) {
+        auto cachedOffset = menuPattern->GetWrapperParentOffset();
+        TAG_LOGI(AceLogTag::ACE_MENU, "wrapper parentOffset hold by menu hide: %{public}s",
+            cachedOffset.ToString().c_str());
+        return cachedOffset;
+    }
+    CHECK_NULL_RETURN(host, OffsetF());
+    auto parentOffset = host->GetPaintRectOffset(true, true);
+    menuPattern->SetWrapperParentOffset(parentOffset);
+    return parentOffset;
 }
 
 bool MenuLayoutAlgorithm::NeedHoldTargetOffset(
@@ -3163,7 +3211,7 @@ void MenuLayoutAlgorithm::InitTargetSizeAndPosition(
             ModifyOffset(targetOffset_, menuPattern);
             menuPattern->SetTargetOffset(targetOffset_);
         }
-        OffsetF offset = GetMenuWrapperOffset(layoutWrapper);
+        OffsetF offset = GetMenuWrapperOffset(layoutWrapper, menuPattern);
         targetOffset_ -= offset;
         UpdateTargetValue(layoutWrapper);
         return;
@@ -3175,7 +3223,7 @@ void MenuLayoutAlgorithm::InitTargetSizeAndPosition(
                           static_cast<float>(CONTAINER_BORDER_WIDTH.ConvertToPx());
         targetOffset_ -= OffsetF(newOffsetX, newOffsetY);
     } else {
-        OffsetF offset = GetMenuWrapperOffset(layoutWrapper);
+        OffsetF offset = GetMenuWrapperOffset(layoutWrapper, menuPattern);
         targetOffset_ -= offset;
     }
     UpdateTargetValue(layoutWrapper);

@@ -597,6 +597,10 @@ void AceContainer::Destroy()
 {
     LOGI("AceContainer Destroy begin");
     ContainerScope scope(instanceId_);
+    // UIObserver is Stage-thread confined. Clear the container-owned store
+    // before frontend/pipeline teardown so NAPI listeners are released on the
+    // owner thread and cannot observe a partially destroyed container.
+    ClearUIObserverStore();
     RemoveWatchSystemParameter();
     RemoveUISessionCallbacks();
     ReleaseResourceAdapter();
@@ -5350,5 +5354,15 @@ void AceContainer::GetOriginalEventInfo(const EventPositionInfo& eventPositionIn
     uiWindow_->GetEventOriginalPosition(winEventPositionInfo, winOriginalPos);
     originalPos.displayX = winOriginalPos.displayX;
     originalPos.displayY = winOriginalPos.displayY;
+}
+
+void AceContainer::RefreshLiveFoldCreaseRegion()
+{
+    displayManager_->GetLiveFoldCreaseRegion();
+}
+
+void AceContainer::RefreshFoldCreaseDirection()
+{
+    displayManager_->GetFoldCreaseDirection();
 }
 } // namespace OHOS::Ace::Platform

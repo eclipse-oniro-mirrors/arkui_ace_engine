@@ -340,6 +340,10 @@ public:
     void CreateCoastingAxisEventActuator();
     void CreateAccessibilityHoverEventActuator();
 
+    // Copy all user-registered input event callbacks (hover/mouse/axis/etc.) from source hub.
+    // Used when transferring events from a builder-created MenuItem to a rebuilt grid item.
+    ACE_FORCE_EXPORT void CopyEvent(const RefPtr<InputEventHub>& source);
+
 private:
     WeakPtr<EventHub> eventHub_;
 

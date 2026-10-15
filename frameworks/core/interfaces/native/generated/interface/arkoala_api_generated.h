@@ -1693,6 +1693,8 @@ typedef struct Callback_Opt_Object_Void Callback_Opt_Object_Void;
 typedef struct Opt_Callback_Opt_Object_Void Opt_Callback_Opt_Object_Void;
 typedef struct Callback_Opt_OffsetResult_Void Callback_Opt_OffsetResult_Void;
 typedef struct Opt_Callback_Opt_OffsetResult_Void Opt_Callback_Opt_OffsetResult_Void;
+typedef struct Callback_Opt_PlaceholderOptions_Void Callback_Opt_PlaceholderOptions_Void;  // NOLINT
+typedef struct Opt_Callback_Opt_PlaceholderOptions_Void Opt_Callback_Opt_PlaceholderOptions_Void;  // NOLINT
 typedef struct Callback_Opt_ScrollResult_Void Callback_Opt_ScrollResult_Void;
 typedef struct Opt_Callback_Opt_ScrollResult_Void Opt_Callback_Opt_ScrollResult_Void;
 typedef struct Callback_Opt_StyledString_Opt_Array_String_Void Callback_Opt_StyledString_Opt_Array_String_Void;
@@ -2059,6 +2061,8 @@ typedef struct PasteButtonCallback PasteButtonCallback;
 typedef struct Opt_PasteButtonCallback Opt_PasteButtonCallback;
 typedef struct PasteEventCallback PasteEventCallback;
 typedef struct Opt_PasteEventCallback Opt_PasteEventCallback;
+typedef struct PlaceholderProvider PlaceholderProvider;
+typedef struct Opt_PlaceholderProvider Opt_PlaceholderProvider;  // NOLINT
 typedef struct PluginErrorCallback PluginErrorCallback;
 typedef struct Opt_PluginErrorCallback Opt_PluginErrorCallback;
 typedef struct PopupStateChangeCallback PopupStateChangeCallback;
@@ -2093,6 +2097,10 @@ typedef struct ScrollOnScrollCallback ScrollOnScrollCallback;
 typedef struct Opt_ScrollOnScrollCallback Opt_ScrollOnScrollCallback;
 typedef struct ScrollOnWillScrollCallback ScrollOnWillScrollCallback;
 typedef struct Opt_ScrollOnWillScrollCallback Opt_ScrollOnWillScrollCallback;
+typedef struct ScrollSnapApproachCallback ScrollSnapApproachCallback;
+typedef struct Opt_ScrollSnapApproachCallback Opt_ScrollSnapApproachCallback;
+typedef struct ScrollSnapTargetCallback ScrollSnapTargetCallback;
+typedef struct Opt_ScrollSnapTargetCallback Opt_ScrollSnapTargetCallback;
 typedef struct SearchSubmitCallback SearchSubmitCallback;
 typedef struct Opt_SearchSubmitCallback Opt_SearchSubmitCallback;
 typedef struct SearchValueCallback SearchValueCallback;
@@ -2721,6 +2729,8 @@ typedef struct Ark_ScrollEdgeOptions Ark_ScrollEdgeOptions;
 typedef struct Opt_ScrollEdgeOptions Opt_ScrollEdgeOptions;
 typedef struct Ark_ScrollPageOptions Ark_ScrollPageOptions;
 typedef struct Opt_ScrollPageOptions Opt_ScrollPageOptions;
+typedef struct Ark_ScrollSnapOffsetProviderProxy Ark_ScrollSnapOffsetProviderProxy;
+typedef struct Opt_ScrollSnapOffsetProviderProxy Opt_ScrollSnapOffsetProviderProxy;
 typedef struct Ark_SelectionContainerEditMenuOptions Ark_SelectionContainerEditMenuOptions;
 typedef struct Opt_SelectionContainerEditMenuOptions Opt_SelectionContainerEditMenuOptions;
 typedef struct Ark_SelectionContainerMenuOptions Ark_SelectionContainerMenuOptions;
@@ -2765,6 +2775,8 @@ typedef struct Ark_SwiperContentAnimatedTransition Ark_SwiperContentAnimatedTran
 typedef struct Opt_SwiperContentAnimatedTransition Opt_SwiperContentAnimatedTransition;
 typedef struct Ark_SystemAdaptiveOptions Ark_SystemAdaptiveOptions;
 typedef struct Opt_SystemAdaptiveOptions Opt_SystemAdaptiveOptions;
+typedef struct Ark_TabBarBadgeType Ark_TabBarBadgeType;
+typedef struct Opt_TabBarBadgeType Opt_TabBarBadgeType;
 typedef struct Ark_TabContentAnimatedTransition Ark_TabContentAnimatedTransition;
 typedef struct Opt_TabContentAnimatedTransition Opt_TabContentAnimatedTransition;
 typedef struct Ark_TabsBreakpointType_TabBarDisplayMode Ark_TabsBreakpointType_TabBarDisplayMode;
@@ -2953,6 +2965,8 @@ typedef struct Ark_Union_RotateOptions_RotateAngleOptions Ark_Union_RotateOption
 typedef struct Opt_Union_RotateOptions_RotateAngleOptions Opt_Union_RotateOptions_RotateAngleOptions;
 typedef struct Ark_Union_ScrollAnimationOptions_Boolean Ark_Union_ScrollAnimationOptions_Boolean;
 typedef struct Opt_Union_ScrollAnimationOptions_Boolean Opt_Union_ScrollAnimationOptions_Boolean;
+typedef struct Ark_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy Ark_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy;
+typedef struct Opt_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy Opt_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy;
 typedef struct Ark_Union_SpatialPosition_F64 Ark_Union_SpatialPosition_F64;
 typedef struct Opt_Union_SpatialPosition_F64 Opt_Union_SpatialPosition_F64;
 typedef struct Ark_Union_String_Array_String Ark_Union_String_Array_String;
@@ -3265,10 +3279,10 @@ typedef struct Ark_StyledStringChangeValue Ark_StyledStringChangeValue;
 typedef struct Opt_StyledStringChangeValue Opt_StyledStringChangeValue;
 typedef struct Ark_SwitchStyle Ark_SwitchStyle;
 typedef struct Opt_SwitchStyle Opt_SwitchStyle;
+typedef struct Ark_TabBarBadgeStyle Ark_TabBarBadgeStyle;
+typedef struct Opt_TabBarBadgeStyle Opt_TabBarBadgeStyle;
 typedef struct Ark_TabBarIconStyle Ark_TabBarIconStyle;
 typedef struct Opt_TabBarIconStyle Opt_TabBarIconStyle;
-typedef struct Ark_TabBarOptions Ark_TabBarOptions;
-typedef struct Opt_TabBarOptions Opt_TabBarOptions;
 typedef struct Ark_TabsOptions Ark_TabsOptions;
 typedef struct Opt_TabsOptions Opt_TabsOptions;
 typedef struct Ark_TabsSidebarSearchableOptions Ark_TabsSidebarSearchableOptions;
@@ -3321,8 +3335,6 @@ typedef struct Ark_Union_Boolean_PopupMaskType Ark_Union_Boolean_PopupMaskType;
 typedef struct Opt_Union_Boolean_PopupMaskType Opt_Union_Boolean_PopupMaskType;
 typedef struct Ark_Union_ColumnOptions_ColumnOptionsV2 Ark_Union_ColumnOptions_ColumnOptionsV2;
 typedef struct Opt_Union_ColumnOptions_ColumnOptionsV2 Opt_Union_ColumnOptions_ColumnOptionsV2;
-typedef struct Ark_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions Ark_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions;
-typedef struct Opt_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions Opt_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions;
 typedef struct Ark_Union_Dimension_Array_Dimension Ark_Union_Dimension_Array_Dimension;
 typedef struct Opt_Union_Dimension_Array_Dimension Opt_Union_Dimension_Array_Dimension;
 typedef struct Ark_Union_Dimension_OptionWidthMode Ark_Union_Dimension_OptionWidthMode;
@@ -3535,6 +3547,8 @@ typedef struct Ark_SweepGradientOptions Ark_SweepGradientOptions;
 typedef struct Opt_SweepGradientOptions Opt_SweepGradientOptions;
 typedef struct Ark_SwipeActionItem Ark_SwipeActionItem;
 typedef struct Opt_SwipeActionItem Opt_SwipeActionItem;
+typedef struct Ark_TabBarOptions Ark_TabBarOptions;
+typedef struct Opt_TabBarOptions Opt_TabBarOptions;
 typedef struct Ark_text_TextStyle Ark_text_TextStyle;
 typedef struct Opt_text_TextStyle Opt_text_TextStyle;
 typedef struct Ark_TextAreaOptions Ark_TextAreaOptions;
@@ -3559,6 +3573,8 @@ typedef struct Ark_Union_BadgePosition_Position Ark_Union_BadgePosition_Position
 typedef struct Opt_Union_BadgePosition_Position Opt_Union_BadgePosition_Position;
 typedef struct Ark_Union_BorderRadiuses_Length_LocalizedBorderRadiuses Ark_Union_BorderRadiuses_Length_LocalizedBorderRadiuses;
 typedef struct Opt_Union_BorderRadiuses_Length_LocalizedBorderRadiuses Opt_Union_BorderRadiuses_Length_LocalizedBorderRadiuses;
+typedef struct Ark_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions Ark_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions;
+typedef struct Opt_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions Opt_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions;
 typedef struct Ark_Union_CustomNodeBuilder_SwipeActionItem Ark_Union_CustomNodeBuilder_SwipeActionItem;
 typedef struct Opt_Union_CustomNodeBuilder_SwipeActionItem Opt_Union_CustomNodeBuilder_SwipeActionItem;
 typedef struct Ark_Union_Dimension_BorderRadiuses Ark_Union_Dimension_BorderRadiuses;
@@ -3705,6 +3721,8 @@ typedef struct Ark_PickerIndicatorStyle Ark_PickerIndicatorStyle;
 typedef struct Opt_PickerIndicatorStyle Opt_PickerIndicatorStyle;
 typedef struct Ark_PickerTextStyle Ark_PickerTextStyle;
 typedef struct Opt_PickerTextStyle Opt_PickerTextStyle;
+typedef struct Ark_PlaceholderOptions Ark_PlaceholderOptions;  // NOLINT
+typedef struct Opt_PlaceholderOptions Opt_PlaceholderOptions;  // NOLINT
 typedef struct Ark_PlaceholderStyle Ark_PlaceholderStyle;
 typedef struct Opt_PlaceholderStyle Opt_PlaceholderStyle;
 typedef struct Ark_PopupCommonOptions Ark_PopupCommonOptions;
@@ -4444,6 +4462,20 @@ typedef struct Opt_CalendarAlign {
     Ark_Tag tag;
     Ark_CalendarAlign value;
 } Opt_CalendarAlign;
+typedef enum Ark_CalendarFirstDayOfWeek {
+    ARK_CALENDAR_FIRST_DAY_OF_WEEK_LOCAL = 0,
+    ARK_CALENDAR_FIRST_DAY_OF_WEEK_MON = 1,
+    ARK_CALENDAR_FIRST_DAY_OF_WEEK_TUE = 2,
+    ARK_CALENDAR_FIRST_DAY_OF_WEEK_WED = 3,
+    ARK_CALENDAR_FIRST_DAY_OF_WEEK_THU = 4,
+    ARK_CALENDAR_FIRST_DAY_OF_WEEK_FRI = 5,
+    ARK_CALENDAR_FIRST_DAY_OF_WEEK_SAT = 6,
+    ARK_CALENDAR_FIRST_DAY_OF_WEEK_SUN = 7,
+} Ark_CalendarFirstDayOfWeek;
+typedef struct Opt_CalendarFirstDayOfWeek {
+    Ark_Tag tag;
+    Ark_CalendarFirstDayOfWeek value;
+} Opt_CalendarFirstDayOfWeek;
 typedef enum Ark_CameraCaptureState {
     ARK_CAMERA_CAPTURE_STATE_NONE = 0,
     ARK_CAMERA_CAPTURE_STATE_PAUSED = 1,
@@ -12858,6 +12890,16 @@ typedef struct Opt_Callback_Opt_OffsetResult_Void {
     Ark_Tag tag;
     Callback_Opt_OffsetResult_Void value;
 } Opt_Callback_Opt_OffsetResult_Void;
+typedef struct Callback_Opt_PlaceholderOptions_Void {  // NOLINT
+    /* kind: Callback */
+    Ark_CallbackResource resource;
+    void (*call)(const Ark_Int32 resourceId, const Opt_PlaceholderOptions value);
+    void (*callSync)(Ark_VMContext vmContext, const Ark_Int32 resourceId, const Opt_PlaceholderOptions value);
+} Callback_Opt_PlaceholderOptions_Void;  // NOLINT
+typedef struct Opt_Callback_Opt_PlaceholderOptions_Void {  // NOLINT
+    Ark_Tag tag;
+    Callback_Opt_PlaceholderOptions_Void value;
+} Opt_Callback_Opt_PlaceholderOptions_Void;  // NOLINT
 typedef struct Callback_Opt_ScrollResult_Void {
     /* kind: Callback */
     Ark_CallbackResource resource;
@@ -14686,6 +14728,16 @@ typedef struct Opt_PasteEventCallback {
     Ark_Tag tag;
     PasteEventCallback value;
 } Opt_PasteEventCallback;
+typedef struct PlaceholderProvider {
+    /* kind: Callback */
+    Ark_CallbackResource resource;
+    void (*call)(const Ark_Int32 resourceId, const Ark_Int32 index, const Callback_Opt_PlaceholderOptions_Void continuation);
+    void (*callSync)(Ark_VMContext vmContext, const Ark_Int32 resourceId, const Ark_Int32 index, const Callback_Opt_PlaceholderOptions_Void continuation);
+} PlaceholderProvider;
+typedef struct Opt_PlaceholderProvider {  // NOLINT
+    Ark_Tag tag;
+    PlaceholderProvider value;
+} Opt_PlaceholderProvider;  // NOLINT
 typedef struct PluginErrorCallback {
     /* kind: Callback */
     Ark_CallbackResource resource;
@@ -14856,6 +14908,26 @@ typedef struct Opt_ScrollOnWillScrollCallback {
     Ark_Tag tag;
     ScrollOnWillScrollCallback value;
 } Opt_ScrollOnWillScrollCallback;
+typedef struct ScrollSnapApproachCallback {
+    /* kind: Callback */
+    Ark_CallbackResource resource;
+    void (*call)(const Ark_Int32 resourceId, const Ark_Float64 velocity, const Ark_Float64 decayOffset, const synthetic_Callback_F64_Void continuation);
+    void (*callSync)(Ark_VMContext vmContext, const Ark_Int32 resourceId, const Ark_Float64 velocity, const Ark_Float64 decayOffset, const synthetic_Callback_F64_Void continuation);
+} ScrollSnapApproachCallback;
+typedef struct Opt_ScrollSnapApproachCallback {
+    Ark_Tag tag;
+    ScrollSnapApproachCallback value;
+} Opt_ScrollSnapApproachCallback;
+typedef struct ScrollSnapTargetCallback {
+    /* kind: Callback */
+    Ark_CallbackResource resource;
+    void (*call)(const Ark_Int32 resourceId, const Ark_Float64 velocity, const synthetic_Callback_F64_Void continuation);
+    void (*callSync)(Ark_VMContext vmContext, const Ark_Int32 resourceId, const Ark_Float64 velocity, const synthetic_Callback_F64_Void continuation);
+} ScrollSnapTargetCallback;
+typedef struct Opt_ScrollSnapTargetCallback {
+    Ark_Tag tag;
+    ScrollSnapTargetCallback value;
+} Opt_ScrollSnapTargetCallback;
 typedef struct SearchSubmitCallback {
     /* kind: Callback */
     Ark_CallbackResource resource;
@@ -18020,6 +18092,15 @@ typedef struct Opt_ScrollPageOptions {
     Ark_Tag tag;
     Ark_ScrollPageOptions value;
 } Opt_ScrollPageOptions;
+typedef struct Ark_ScrollSnapOffsetProviderProxy {
+    /* kind: Interface */
+    ScrollSnapApproachCallback calculateApproachOffset;
+    ScrollSnapTargetCallback calculateSnapOffset;
+} Ark_ScrollSnapOffsetProviderProxy;
+typedef struct Opt_ScrollSnapOffsetProviderProxy {
+    Ark_Tag tag;
+    Ark_ScrollSnapOffsetProviderProxy value;
+} Opt_ScrollSnapOffsetProviderProxy;
 typedef struct Ark_SelectionContainerEditMenuOptions {
     /* kind: Interface */
     Opt_OnCreateMenuCallback onCreateMenu;
@@ -18252,6 +18333,18 @@ typedef struct Opt_SystemAdaptiveOptions {
     Ark_Tag tag;
     Ark_SystemAdaptiveOptions value;
 } Opt_SystemAdaptiveOptions;
+typedef struct Ark_TabBarBadgeType {
+    /* kind: UnionType */
+    Ark_Int32 selector;
+    union {
+        Ark_Int32 value0;
+        Ark_ResourceStr value1;
+    };
+} Ark_TabBarBadgeType;
+typedef struct Opt_TabBarBadgeType {
+    Ark_Tag tag;
+    Ark_TabBarBadgeType value;
+} Opt_TabBarBadgeType;
 typedef struct Ark_TabContentAnimatedTransition {
     /* kind: Interface */
     Opt_Int32 timeout;
@@ -19358,6 +19451,18 @@ typedef struct Opt_Union_ScrollAnimationOptions_Boolean {
     Ark_Tag tag;
     Ark_Union_ScrollAnimationOptions_Boolean value;
 } Opt_Union_ScrollAnimationOptions_Boolean;
+typedef struct Ark_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy {
+    /* kind: UnionType */
+    Ark_Int32 selector;
+    union {
+        Ark_ScrollSnapAlign value0;
+        Ark_ScrollSnapOffsetProviderProxy value1;
+    };
+} Ark_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy;
+typedef struct Opt_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy {
+    Ark_Tag tag;
+    Ark_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy value;
+} Opt_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy;
 typedef struct Ark_Union_SpatialPosition_F64 {
     /* kind: UnionType */
     Ark_Int32 selector;
@@ -21058,6 +21163,15 @@ typedef struct Opt_SwitchStyle {
     Ark_Tag tag;
     Ark_SwitchStyle value;
 } Opt_SwitchStyle;
+typedef struct Ark_TabBarBadgeStyle {
+    /* kind: Interface */
+    Opt_TabBarBadgeType value;
+    Opt_Int32 maxCount;
+} Ark_TabBarBadgeStyle;
+typedef struct Opt_TabBarBadgeStyle {
+    Ark_Tag tag;
+    Ark_TabBarBadgeStyle value;
+} Opt_TabBarBadgeStyle;
 typedef struct Ark_TabBarIconStyle {
     /* kind: Interface */
     Opt_ResourceColor selectedColor;
@@ -21067,15 +21181,6 @@ typedef struct Opt_TabBarIconStyle {
     Ark_Tag tag;
     Ark_TabBarIconStyle value;
 } Opt_TabBarIconStyle;
-typedef struct Ark_TabBarOptions {
-    /* kind: Interface */
-    Opt_Union_String_Resource icon;
-    Opt_Union_String_Resource text;
-} Ark_TabBarOptions;
-typedef struct Opt_TabBarOptions {
-    Ark_Tag tag;
-    Ark_TabBarOptions value;
-} Opt_TabBarOptions;
 typedef struct Ark_TabsOptions {
     /* kind: Interface */
     Opt_BarPosition barPosition;
@@ -21356,23 +21461,6 @@ typedef struct Opt_Union_ColumnOptions_ColumnOptionsV2 {
     Ark_Tag tag;
     Ark_Union_ColumnOptions_ColumnOptionsV2 value;
 } Opt_Union_ColumnOptions_ColumnOptionsV2;
-typedef struct Ark_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions {
-    /* kind: UnionType */
-    Ark_Int32 selector;
-    union {
-        Ark_ComponentContentBase value0;
-        Ark_SubTabBarStyle value1;
-        Ark_BottomTabBarStyle value2;
-        Ark_String value3;
-        Ark_Resource value4;
-        CustomNodeBuilder value5;
-        Ark_TabBarOptions value6;
-    };
-} Ark_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions;
-typedef struct Opt_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions {
-    Ark_Tag tag;
-    Ark_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions value;
-} Opt_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions;
 typedef struct Ark_Union_Dimension_Array_Dimension {
     /* kind: UnionType */
     Ark_Int32 selector;
@@ -22556,6 +22644,16 @@ typedef struct Opt_SwipeActionItem {
     Ark_Tag tag;
     Ark_SwipeActionItem value;
 } Opt_SwipeActionItem;
+typedef struct Ark_TabBarOptions {
+    /* kind: Interface */
+    Opt_Union_String_Resource icon;
+    Opt_Union_String_Resource text;
+    Opt_TabBarBadgeStyle badge;
+} Ark_TabBarOptions;
+typedef struct Opt_TabBarOptions {
+    Ark_Tag tag;
+    Ark_TabBarOptions value;
+} Opt_TabBarOptions;
 typedef struct Ark_text_TextStyle {
     /* kind: Interface */
     Opt_text_Decoration decoration;
@@ -22727,6 +22825,23 @@ typedef struct Opt_Union_BorderRadiuses_Length_LocalizedBorderRadiuses {
     Ark_Tag tag;
     Ark_Union_BorderRadiuses_Length_LocalizedBorderRadiuses value;
 } Opt_Union_BorderRadiuses_Length_LocalizedBorderRadiuses;
+typedef struct Ark_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions {
+    /* kind: UnionType */
+    Ark_Int32 selector;
+    union {
+        Ark_ComponentContentBase value0;
+        Ark_SubTabBarStyle value1;
+        Ark_BottomTabBarStyle value2;
+        Ark_String value3;
+        Ark_Resource value4;
+        CustomNodeBuilder value5;
+        Ark_TabBarOptions value6;
+    };
+} Ark_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions;
+typedef struct Opt_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions {
+    Ark_Tag tag;
+    Ark_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions value;
+} Opt_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions;
 typedef struct Ark_Union_CustomNodeBuilder_SwipeActionItem {
     /* kind: UnionType */
     Ark_Int32 selector;
@@ -23931,6 +24046,15 @@ typedef struct Opt_PickerTextStyle {
     Ark_Tag tag;
     Ark_PickerTextStyle value;
 } Opt_PickerTextStyle;
+typedef struct Ark_PlaceholderOptions {  // NOLINT
+    /* kind: Interface */
+    Opt_String id;
+    Opt_SizeOptions size;
+} Ark_PlaceholderOptions;  // NOLINT
+typedef struct Opt_PlaceholderOptions {  // NOLINT
+    Ark_Tag tag;
+    Ark_PlaceholderOptions value;
+} Opt_PlaceholderOptions;  // NOLINT
 typedef struct Ark_PlaceholderStyle {
     /* kind: Interface */
     Opt_arkui_component_units_Font font;
@@ -24267,6 +24391,7 @@ typedef struct Ark_CalendarDialogOptions {
     Opt_uiMaterial_Material systemMaterial;
     Opt_DistortionMode distortionMode;
     Opt_EdgeLightMode edgeLightMode;
+    Opt_CalendarFirstDayOfWeek firstDayOfWeek;
 } Ark_CalendarDialogOptions;
 typedef struct Opt_CalendarDialogOptions {
     Ark_Tag tag;
@@ -24999,6 +25124,8 @@ typedef struct GENERATED_ArkUICalendarPickerModifier {
                         const Opt_Callback_Date_Void* value);
     void (*setMarkToday)(Ark_NativePointer node,
                          const Opt_Boolean* value);
+    void (*setFirstDayOfWeek)(Ark_NativePointer node,
+                              const Opt_CalendarFirstDayOfWeek* value);
     void (*setEdgeAlign)(Ark_NativePointer node,
                          const Opt_CalendarAlign* alignType,
                          const Opt_Offset* offset);
@@ -25951,6 +26078,8 @@ typedef struct GENERATED_ArkUIGridModifier {
                           const Opt_Callback_ItemDragInfo_I32_I32_Boolean_Void* value);
     void (*setNestedScroll)(Ark_NativePointer node,
                             const Opt_NestedScrollOptions* value);
+    void (*setScrollSnapStrategy)(Ark_NativePointer node,
+                                  const Opt_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy* value);
     void (*setEnableScrollInteraction)(Ark_NativePointer node,
                                        const Opt_Boolean* value);
     void (*setFriction)(Ark_NativePointer node,
@@ -25973,6 +26102,8 @@ typedef struct GENERATED_ArkUIGridModifier {
                             const Opt_OnWillScrollCallback* value);
     void (*setOnDidScroll)(Ark_NativePointer node,
                            const Opt_OnScrollCallback* value);
+    void (*setScrollPlaceholder)(Ark_NativePointer node,
+                                 const Opt_PlaceholderProvider* value);
     void (*setCachedCount1)(Ark_NativePointer node,
                             const Opt_Int32* count,
                             const Opt_Boolean* show);
@@ -26133,6 +26264,8 @@ typedef struct GENERATED_ArkUIImageAnimatorModifier {
                           const Opt_Int32* value);
     void (*setMonitorInvisibleArea)(Ark_NativePointer node,
                                     const Opt_Boolean* value);
+    void (*setInterpolation)(Ark_NativePointer node,
+                             const Opt_ImageInterpolation* value);
     void (*setOnStart)(Ark_NativePointer node,
                        const Opt_synthetic_Callback_Void* value);
     void (*setOnPause)(Ark_NativePointer node,
@@ -26292,6 +26425,8 @@ typedef struct GENERATED_ArkUIListModifier {
                             const Opt_OnWillScrollCallback* value);
     void (*setOnDidScroll)(Ark_NativePointer node,
                            const Opt_OnScrollCallback* value);
+    void (*setScrollPlaceholder)(Ark_NativePointer node,
+                                 const Opt_PlaceholderProvider* value);
     void (*setLanes)(Ark_NativePointer node,
                      const Opt_Union_I32_LengthConstrain_ItemFillPolicy* value,
                      const Opt_Dimension* gutter);
@@ -27848,6 +27983,10 @@ typedef struct GENERATED_ArkUITabsModifier {
                               const Opt_DividerStyle* value);
     void (*setSidebarDisplayStyle)(Ark_NativePointer node,
                                    const Opt_TabsSidebarDisplayStyle* value);
+    void (*setSidebarFooter)(Ark_NativePointer node,
+                             const Opt_ComponentContentBase* value);
+    void (*setSidebarBottomBar)(Ark_NativePointer node,
+                                const Opt_ComponentContentBase* value);
     void (*setBarMode)(Ark_NativePointer node,
                        const Opt_BarMode* value,
                        const Opt_ScrollableBarModeOptions* options);
@@ -28644,6 +28783,8 @@ typedef struct GENERATED_ArkUIWaterFlowModifier {
                             const Opt_OnWillScrollCallback* value);
     void (*setOnDidScroll)(Ark_NativePointer node,
                            const Opt_OnScrollCallback* value);
+    void (*setScrollPlaceholder)(Ark_NativePointer node,
+                                 const Opt_PlaceholderProvider* value);
     void (*setCachedCount1)(Ark_NativePointer node,
                             const Opt_Int32* count,
                             const Opt_Boolean* show);
@@ -28960,6 +29101,8 @@ typedef struct GENERATED_ArkUIWebModifier {
                                        const Opt_Boolean* value);
     void (*setOnZoomChange)(Ark_NativePointer node,
                             const Opt_OnZoomChangeCallback* value);
+    void (*setFlingSpeedLimit)(Ark_NativePointer node,
+                               const Opt_Float64* value);
     void (*setRegisterNativeEmbedRule)(Ark_NativePointer node,
                                        const Opt_String* tag,
                                        const Opt_String* type);
@@ -29010,6 +29153,8 @@ typedef struct GENERATED_ArkUIXComponentModifier {
                                       const Opt_Boolean* value);
     void (*setHdrBrightness0)(Ark_NativePointer node,
                               const Opt_Float64* value);
+    void (*setBufferQueueCount)(Ark_NativePointer node,
+                                Ark_Int32 value);
     void (*setHdrBrightness1)(Ark_NativePointer node,
                               const Opt_Float64* brightness,
                               const Opt_HdrType* type);
@@ -29399,6 +29544,8 @@ typedef struct GENERATED_ArkUIBottomTabBarStyleAccessor {
                                 const Ark_String* value);
     Ark_BottomTabBarStyle (*iconStyle)(Ark_BottomTabBarStyle peer,
                                        const Ark_TabBarIconStyle* style);
+    Ark_BottomTabBarStyle (*badge)(Ark_BottomTabBarStyle peer,
+                                   const Ark_TabBarBadgeStyle* badgeStyle);
 } GENERATED_ArkUIBottomTabBarStyleAccessor;
 
 typedef struct GENERATED_ArkUIBounceSymbolEffectAccessor {
@@ -32289,6 +32436,8 @@ typedef struct GENERATED_ArkUIScrollerAccessor {
     Ark_SizeResult (*contentSize)(Ark_VMContext vmContext,
                                   Ark_Scroller peer);
     Opt_FrameNode (*getFrameNode)(Ark_Scroller peer);
+    Ark_ScrollState (*getScrollState)(Ark_VMContext vmContext,
+                                       Ark_Scroller peer);
 } GENERATED_ArkUIScrollerAccessor;
 
 typedef struct GENERATED_ArkUIScrollResultAccessor {

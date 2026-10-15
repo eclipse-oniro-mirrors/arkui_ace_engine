@@ -49,6 +49,21 @@ class UiMaterial;
 } // namespace OHOS::Ace
 
 namespace OHOS::Ace::Framework {
+inline constexpr napi_type_tag VISUAL_EFFECT_TYPE_TAG = {
+    .lower = 0x1c80317fa3b1799d,
+    .upper = 0xbdd640fb06671ad1
+};
+ 
+inline constexpr napi_type_tag FILTER_TYPE_TAG = {
+    .lower = 0x3eb13b9046685257,
+    .upper = 0x23b8c1e9392456de
+};
+ 
+inline constexpr napi_type_tag BLENDER_TYPE_TAG = {
+    .lower = 0x1a3d1fa7bc8960a9,
+    .upper = 0xbd9c66b3ad3c2d6d
+};
+
 using OHOS::Ace::ScopeRAII;
 #if !defined(PREVIEW)
 const std::shared_ptr<Rosen::RSNode> CreateRSNodeFromNapiValue(JSRef<JSVal> obj);

@@ -319,6 +319,7 @@ public:
     bool AdditionalScrollTo(const RefPtr<FrameNode>& scroll, float height);
     void SetColumnMinSize(bool reset = false);
     float InitialSingleGearHeight(NG::SheetStyle& sheetStyle);
+    double GetScreenHeight();
     float GetSheetTopSafeArea();
     float UpdateSheetTransitionOffset();
 
@@ -358,6 +359,7 @@ public:
     void ClearSheetCloseIconMaterial();
     void SetSheetCloseIconMaterial(RefPtr<UiMaterial> closeButtonNodeMaterial);
     void UpdateSheetScrollBar(const NG::SheetStyle& sheetStyle);
+    void UpdateSheetScrollBarMargin();
 
     double GetTitleBarEffectHeight(const SheetStyle& sheetStyle, float titleBarHeight);
 

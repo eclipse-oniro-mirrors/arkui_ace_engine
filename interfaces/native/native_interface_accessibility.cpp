@@ -790,6 +790,7 @@ int32_t OH_ArkUI_AccessibilityElementInfoSetComponentIdentifier(
 int32_t OH_ArkUI_NativeModule_GetNativeAccessibilityProvider(
     ArkUI_NodeHandle* node, ArkUI_AccessibilityProvider** provider)
 {
+    CHECK_UI_THREAD("OH_ArkUI_NativeModule_GetNativeAccessibilityProvider");
     if ((node == nullptr) || (provider == nullptr)) {
         SET_ERROR_MESSAGE(
             ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__,

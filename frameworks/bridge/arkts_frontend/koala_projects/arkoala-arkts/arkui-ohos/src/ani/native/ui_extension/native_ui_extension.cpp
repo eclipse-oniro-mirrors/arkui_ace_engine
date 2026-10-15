@@ -273,8 +273,12 @@ ani_status NativeUiExtension::SetUiextensionOption(
         "isWindowModeFollowHost: %{public}d, placeholderMap size: %{public}d",
         isTransferringCaller, dpiFollowStrategy, isWindowModeFollowHost, static_cast<int32_t>(placeholderMap.size()));
     NG::DpiFollowStrategy dpiFollowStrategyValue = NG::ParseDpiFollowStrategy(dpiFollowStrategy);
+    // Only valid DTS enum values mean the developer explicitly configured the strategy;
+    // the unset static frontend option (-1) and out-of-range values mean unset.
+    bool isDpiFollowStrategySet = NG::IsValidDtsDpiFollowStrategy(dpiFollowStrategy);
     NG::UIExtensionStatic::UpdateUecConfig(
-        frameNode, isTransferringCaller, dpiFollowStrategyValue, isWindowModeFollowHost, placeholderMap);
+        frameNode, isTransferringCaller, dpiFollowStrategyValue, isDpiFollowStrategySet, isWindowModeFollowHost,
+        placeholderMap);
 #endif
     return ANI_OK;
 }

@@ -1585,6 +1585,7 @@ bool WebDelegate::RestoreWebState(const std::vector<uint8_t>& state)
 {
     return g_restoreWebStateResult;
 }
+void WebDelegate::SetFlingSpeedLimit(float speedLimit) {}
 void WebDelegate::SetEnableAutoFill(bool isEnabled) {}
 void WebDelegate::SetEnableDrag(bool isEnabled) {}
 void WebDelegate::UpdateWebMediaNetworkProxyEnabled(bool isEnabled) {}

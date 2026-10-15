@@ -273,7 +273,11 @@ void SetEnableScrollWithMouse(Ark_NativePointer node, const Opt_Boolean* value)
     auto frameNode = reinterpret_cast<FrameNode *>(node);
     CHECK_NULL_VOID(frameNode);
     auto convValue = Converter::GetOptPtr(value);
-    ScrollableModelStatic::SetEnableScrollWithMouse(frameNode, convValue.value_or(false));
+    if (convValue) {
+        ScrollableModelStatic::SetEnableScrollWithMouse(frameNode, convValue.value());
+    } else {
+        ScrollableModelStatic::ResetEnableScrollWithMouse(frameNode);
+    }
 }
 void SetOnReachStartImpl(Ark_NativePointer node,
                          const Opt_synthetic_Callback_Void* value)

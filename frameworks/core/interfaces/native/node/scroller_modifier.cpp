@@ -60,6 +60,13 @@ void GetCurrentOffset(ArkUINodeHandle node, ArkUI_Float32* out)
     out[1] = offset.GetY();
 }
 
+ArkUI_Int32 GetScrollState(ArkUINodeHandle node)
+{
+    auto* scrollController = reinterpret_cast<NG::ScrollableController*>(node);
+    CHECK_NULL_RETURN(scrollController, 0);
+    return static_cast<ArkUI_Int32>(scrollController->GetScrollState());
+}
+
 void ScrollTo(ArkUINodeHandle node, ArkUI_Float32* xOffsetArray, ArkUI_Float32* yOffsetArray,
     ArkUI_Bool animation, const struct ArkUIScrollerAnimationType* animationType)
 {
@@ -85,6 +92,7 @@ const ArkUIScrollerModifier* GetScrollerModifier()
         .scrollBy = ScrollBy,
         .getCurrentOffset = GetCurrentOffset,
         .scrollTo = ScrollTo,
+        .getScrollState = GetScrollState,
     };
     CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
 

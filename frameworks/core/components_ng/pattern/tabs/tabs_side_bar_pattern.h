@@ -161,7 +161,12 @@ private:
     void UpdateBlurStyleImpl(float scrollScale, float& cachedScale, bool isEnabled,
         const RefPtr<FrameNode>& maskBlurNode, const RefPtr<FrameNode>& maskNode,
         GradientDirection direction);
+    void UpdateBlurStyleImplInner(
+        float scrollScale, const RefPtr<FrameNode>& maskBlurNode, const RefPtr<FrameNode>& maskNode,
+        GradientDirection direction);
     RefPtr<FrameNode> CreateEffectNode(const std::string& tag);
+    Color GetGradientMaskBlendColor();
+    void OnColorConfigurationUpdate() override;
 
     WeakPtr<FrameNode> tabsNode_ = nullptr;
     RefPtr<UINode> headerNode_ = nullptr;

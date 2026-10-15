@@ -265,21 +265,6 @@ bool NestedScrollOptions::operator!=(const NestedScrollOptions& other) const
     return !(*this == other);
 }
 
-bool ScrollBarMargin::operator==(const ScrollBarMargin& other) const
-{
-    return this->start_ == other.start_ && this->end_ == other.end_;
-}
-
-bool ScrollBarMargin::operator!=(const ScrollBarMargin& other) const
-{
-    return !(*this == other);
-}
-
-std::string ScrollBarMargin::ToString() const
-{
-    return "ScrollBarMargin start: " + start_.ToString() + ", end: " + end_.ToString();
-}
-
 } // namespace OHOS::Ace
 
 namespace OHOS::Ace::NG {

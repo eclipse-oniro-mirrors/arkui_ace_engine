@@ -459,6 +459,145 @@ HWTEST_F(MenuLayout3TwoTestNg, InitWrapperRect003, TestSize.Level1)
 }
 
 /**
+ * @tc.name: GetParentOffset001
+ * @tc.desc: When the menu wrapper is hiding, GetParentOffset returns the cached wrapper parent offset.
+ * @tc.type: FUNC
+ */
+HWTEST_F(MenuLayout3TwoTestNg, GetParentOffset001, TestSize.Level1)
+{
+    auto wrapperNode =
+        FrameNode::CreateFrameNode(V2::MENU_WRAPPER_ETS_TAG, TARGET_ID, AceType::MakeRefPtr<MenuWrapperPattern>(1));
+    auto menuNode = FrameNode::CreateFrameNode(
+        V2::MENU_ETS_TAG, NODE_ID, AceType::MakeRefPtr<MenuPattern>(NODE_ID, "", MenuType::MENU));
+    ASSERT_NE(menuNode, nullptr);
+    menuNode->MountToParent(wrapperNode);
+    auto menuPattern = menuNode->GetPattern<MenuPattern>();
+    ASSERT_NE(menuPattern, nullptr);
+    auto menuWrapper = menuPattern->GetMenuWrapper();
+    ASSERT_NE(menuWrapper, nullptr);
+    auto menuWrapperPattern = menuWrapper->GetPattern<MenuWrapperPattern>();
+    ASSERT_NE(menuWrapperPattern, nullptr);
+    // cache a known parent offset and mark the wrapper as hiding
+    OffsetF cachedOffset(TEN, FIFTY);
+    menuPattern->SetWrapperParentOffset(cachedOffset);
+    menuWrapperPattern->SetMenuStatus(MenuStatus::HIDE);
+    ASSERT_TRUE(menuWrapperPattern->IsHide());
+    RefPtr<MenuLayoutAlgorithm> layoutAlgorithm = AceType::MakeRefPtr<MenuLayoutAlgorithm>();
+    auto parentOffset = layoutAlgorithm->GetParentOffset(menuNode, menuPattern);
+    EXPECT_EQ(parentOffset, cachedOffset);
+    // the cache must be preserved untouched while hiding
+    EXPECT_EQ(menuPattern->GetWrapperParentOffset(), cachedOffset);
+}
+
+/**
+ * @tc.name: GetParentOffset002
+ * @tc.desc: When the wrapper is visible, GetParentOffset refreshes the cache from the host paint offset.
+ * @tc.type: FUNC
+ */
+HWTEST_F(MenuLayout3TwoTestNg, GetParentOffset002, TestSize.Level1)
+{
+    auto wrapperNode =
+        FrameNode::CreateFrameNode(V2::MENU_WRAPPER_ETS_TAG, TARGET_ID, AceType::MakeRefPtr<MenuWrapperPattern>(1));
+    auto menuNode = FrameNode::CreateFrameNode(
+        V2::MENU_ETS_TAG, NODE_ID, AceType::MakeRefPtr<MenuPattern>(NODE_ID, "", MenuType::MENU));
+    ASSERT_NE(menuNode, nullptr);
+    menuNode->MountToParent(wrapperNode);
+    auto menuPattern = menuNode->GetPattern<MenuPattern>();
+    ASSERT_NE(menuPattern, nullptr);
+    auto menuWrapper = menuPattern->GetMenuWrapper();
+    ASSERT_NE(menuWrapper, nullptr);
+    auto menuWrapperPattern = menuWrapper->GetPattern<MenuWrapperPattern>();
+    ASSERT_NE(menuWrapperPattern, nullptr);
+    // a stale cached value that must be overwritten by the host offset
+    menuPattern->SetWrapperParentOffset(OffsetF(TEN, FIFTY));
+    menuWrapperPattern->SetMenuStatus(MenuStatus::SHOW);
+    ASSERT_FALSE(menuWrapperPattern->IsHide());
+    RefPtr<MenuLayoutAlgorithm> layoutAlgorithm = AceType::MakeRefPtr<MenuLayoutAlgorithm>();
+    auto parentOffset = layoutAlgorithm->GetParentOffset(menuNode, menuPattern);
+    auto hostOffset = menuNode->GetPaintRectOffset(true, true);
+    EXPECT_EQ(parentOffset, hostOffset);
+    // the cache must be refreshed to the host offset instead of the stale value
+    EXPECT_EQ(menuPattern->GetWrapperParentOffset(), hostOffset);
+}
+
+/**
+ * @tc.name: GetParentOffset003
+ * @tc.desc: GetParentOffset returns OffsetF() when the menuPattern is null.
+ * @tc.type: FUNC
+ */
+HWTEST_F(MenuLayout3TwoTestNg, GetParentOffset003, TestSize.Level1)
+{
+    auto menuNode = FrameNode::CreateFrameNode(
+        V2::MENU_ETS_TAG, NODE_ID, AceType::MakeRefPtr<MenuPattern>(NODE_ID, "", MenuType::MENU));
+    ASSERT_NE(menuNode, nullptr);
+    RefPtr<MenuLayoutAlgorithm> layoutAlgorithm = AceType::MakeRefPtr<MenuLayoutAlgorithm>();
+    auto parentOffset = layoutAlgorithm->GetParentOffset(menuNode, nullptr);
+    EXPECT_EQ(parentOffset, OffsetF());
+}
+
+/**
+ * @tc.name: GetParentOffset004
+ * @tc.desc: GetParentOffset returns OffsetF() when the menu has no wrapper node.
+ * @tc.type: FUNC
+ */
+HWTEST_F(MenuLayout3TwoTestNg, GetParentOffset004, TestSize.Level1)
+{
+    auto menuNode = FrameNode::CreateFrameNode(
+        V2::MENU_ETS_TAG, NODE_ID, AceType::MakeRefPtr<MenuPattern>(NODE_ID, "", MenuType::MENU));
+    ASSERT_NE(menuNode, nullptr);
+    auto menuPattern = menuNode->GetPattern<MenuPattern>();
+    ASSERT_NE(menuPattern, nullptr);
+    ASSERT_EQ(menuPattern->GetMenuWrapper(), nullptr);
+    RefPtr<MenuLayoutAlgorithm> layoutAlgorithm = AceType::MakeRefPtr<MenuLayoutAlgorithm>();
+    auto parentOffset = layoutAlgorithm->GetParentOffset(menuNode, menuPattern);
+    EXPECT_EQ(parentOffset, OffsetF());
+}
+
+/**
+ * @tc.name: GetParentOffset005
+ * @tc.desc: GetParentOffset returns the cached offset while the wrapper is in ON_HIDE_ANIMATION.
+ * @tc.type: FUNC
+ */
+HWTEST_F(MenuLayout3TwoTestNg, GetParentOffset005, TestSize.Level1)
+{
+    auto wrapperNode =
+        FrameNode::CreateFrameNode(V2::MENU_WRAPPER_ETS_TAG, TARGET_ID, AceType::MakeRefPtr<MenuWrapperPattern>(1));
+    auto menuNode = FrameNode::CreateFrameNode(
+        V2::MENU_ETS_TAG, NODE_ID, AceType::MakeRefPtr<MenuPattern>(NODE_ID, "", MenuType::MENU));
+    ASSERT_NE(menuNode, nullptr);
+    menuNode->MountToParent(wrapperNode);
+    auto menuPattern = menuNode->GetPattern<MenuPattern>();
+    ASSERT_NE(menuPattern, nullptr);
+    auto menuWrapper = menuPattern->GetMenuWrapper();
+    ASSERT_NE(menuWrapper, nullptr);
+    auto menuWrapperPattern = menuWrapper->GetPattern<MenuWrapperPattern>();
+    ASSERT_NE(menuWrapperPattern, nullptr);
+    OffsetF cachedOffset(ONE_HUNDRED, FIFTY);
+    menuPattern->SetWrapperParentOffset(cachedOffset);
+    menuWrapperPattern->SetMenuStatus(MenuStatus::ON_HIDE_ANIMATION);
+    ASSERT_TRUE(menuWrapperPattern->IsHide());
+    RefPtr<MenuLayoutAlgorithm> layoutAlgorithm = AceType::MakeRefPtr<MenuLayoutAlgorithm>();
+    auto parentOffset = layoutAlgorithm->GetParentOffset(menuNode, menuPattern);
+    EXPECT_EQ(parentOffset, cachedOffset);
+    EXPECT_EQ(menuPattern->GetWrapperParentOffset(), cachedOffset);
+}
+
+/**
+ * @tc.name: WrapperParentOffset001
+ * @tc.desc: Verify SetWrapperParentOffset/GetWrapperParentOffset round trip on MenuPattern.
+ * @tc.type: FUNC
+ */
+HWTEST_F(MenuLayout3TwoTestNg, WrapperParentOffset001, TestSize.Level1)
+{
+    RefPtr<MenuPattern> menuPattern = AceType::MakeRefPtr<MenuPattern>(NODE_ID, "", MenuType::MENU);
+    ASSERT_NE(menuPattern, nullptr);
+    EXPECT_EQ(menuPattern->GetWrapperParentOffset(), OffsetF());
+    OffsetF offset(ONE_HUNDRED, FIFTY);
+    menuPattern->SetWrapperParentOffset(offset);
+    EXPECT_EQ(menuPattern->GetWrapperParentOffset(), offset);
+}
+
+/**
  * @tc.name: GetBottomBySafeAreaManager001
  * @tc.desc: Verify GetBottomBySafeAreaManager.
  * @tc.type: FUNC

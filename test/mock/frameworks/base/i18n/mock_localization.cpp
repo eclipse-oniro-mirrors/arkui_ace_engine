@@ -104,6 +104,11 @@ std::string Localization::GetLanguage()
     return languageTag_;
 }
 
+std::string Localization::GetLanguageTag()
+{
+    return languageTag_;
+}
+
 std::string Localization::GetLunarMonth(uint32_t month, bool isLeapMonth)
 {
     return "";

@@ -139,7 +139,7 @@ protected:
     float HorizontalLayout(const SizeF& size, float clickPosition, bool IsSelectMenu = false);
 
     RefPtr<MenuPaintProperty> GetPaintProperty(const LayoutWrapper* layoutWrapper);
-    OffsetF GetMenuWrapperOffset(const LayoutWrapper* layoutWrapper);
+    OffsetF GetMenuWrapperOffset(const LayoutWrapper* layoutWrapper, const RefPtr<MenuPattern>& menuPattern);
     void ClipMenuPath(LayoutWrapper* layoutWrapper);
     float GetFirstItemBottomPositionY(const RefPtr<FrameNode>& menu);
     float GetLastItemTopPositionY(const RefPtr<FrameNode>& menu);
@@ -220,6 +220,7 @@ private:
     void UpdateArrowOffsetWithMenuLimit(const SizeF& menuSize, const LayoutWrapper* layoutWrapper);
     void UpdatePropArrowOffset();
     void LimitContainerModalMenuRect(double& rectWidth, double& rectHeight, const RefPtr<MenuPattern>& menuPattern);
+    OffsetF GetParentOffset(const RefPtr<FrameNode>& host, const RefPtr<MenuPattern>& menuPattern);
 
     // get option LayoutWrapper for measure get max width
     std::list<RefPtr<LayoutWrapper>> GetOptionsLayoutWrappper(LayoutWrapper* layoutWrapper);

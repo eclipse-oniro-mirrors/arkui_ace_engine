@@ -27,6 +27,7 @@
 #include "core/common/ace_application_info.h"
 #include "core/common/ace_engine.h"
 #include "core/common/container.h"
+#include "core/components/common/properties/ui_material.h"
 #include "core/components_ng/base/observer_handler.h"
 #include "core/components_ng/base/view_stack_model.h"
 #include "core/components_ng/manager/navigation/navigation_manager.h"
@@ -334,6 +335,16 @@ void RegisterOEMVisualEffect(ArkUIOEMVisualEffectFuncHandle func)
 {
     OEMVisualEffectFunc oemFunc = reinterpret_cast<OEMVisualEffectFunc>(func);
     ViewAbstract::RegisterOEMVisualEffect(oemFunc);
+}
+
+void RegisterOEMMaterialFunc(ArkUIMaterialFuncHandle handle)
+{
+    MaterialUtils::RegisterMaterialFunc(handle);
+}
+
+void RegisterOEMMaterialFilterFunc(ArkUIMaterialFilterFuncHandle handle)
+{
+    MaterialUtils::RegisterMaterialFilterFunc(handle);
 }
 
 void SetOnNodeDestroyCallback(ArkUINodeHandle node, void (*onDestroy)(ArkUINodeHandle node))
@@ -2349,6 +2360,8 @@ ArkUIExtendedNodeAPI impl_extended = {
     .setOnNodeDestroyCallback = SetOnNodeDestroyCallback,
     .createCustomNodeByNodeId = CreateCustomNodeByNodeId,
     .createCustomNodeWithParam = CreateCustomNodeWithParam,
+    .registerOEMMaterialFunc = RegisterOEMMaterialFunc,
+    .registerOEMMaterialFilterFunc = RegisterOEMMaterialFilterFunc,
 };
 /* clang-format on */
 

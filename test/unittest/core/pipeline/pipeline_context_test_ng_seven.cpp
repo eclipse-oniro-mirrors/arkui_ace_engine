@@ -51,6 +51,11 @@ using namespace testing::ext;
 
 namespace OHOS::Ace::NG {
 namespace {
+class ThreadCheckTaskExecutor : public MockTaskExecutor {
+public:
+    MOCK_METHOD(bool, WillRunOnCurrentThread, (TaskType type), (const, override));
+};
+
 class MockTouchEventCallback : public ITouchEventCallback {
 public:
     MockTouchEventCallback() = default;
@@ -558,6 +563,109 @@ HWTEST_F(PipelineContextFourTestNg, PipelineContextSevenTest023, TestSize.Level1
     EXPECT_TRUE(context_->CheckThreadSafe());
 
     context_->isFormRender_ = false;
+}
+
+/**
+ * @tc.name: IsCurrentThreadSafeWithoutExecutor
+ * @tc.desc: A missing executor remains permissive for all form and dynamic rendering combinations.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextFourTestNg, IsCurrentThreadSafeWithoutExecutor, TestSize.Level1)
+{
+    ASSERT_NE(context_, nullptr);
+    auto originalExecutor = context_->taskExecutor_;
+    const bool originalFormRender = context_->IsFormRender();
+    const bool originalDynamicRender = context_->IsDynamicRender();
+    context_->taskExecutor_.Reset();
+
+    for (bool formRender : { false, true }) {
+        for (bool dynamicRender : { false, true }) {
+            SCOPED_TRACE(testing::Message() << "form=" << formRender << ", dynamic=" << dynamicRender);
+            context_->SetIsFormRender(formRender);
+            context_->SetIsDynamicRender(dynamicRender);
+            EXPECT_TRUE(context_->IsCurrentThreadSafe());
+        }
+    }
+
+    context_->taskExecutor_ = originalExecutor;
+    context_->SetIsFormRender(originalFormRender);
+    context_->SetIsDynamicRender(originalDynamicRender);
+}
+
+/**
+ * @tc.name: IsCurrentThreadSafeForNonDynamicForm
+ * @tc.desc: Non-dynamic form rendering bypasses the executor's thread check.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextFourTestNg, IsCurrentThreadSafeForNonDynamicForm, TestSize.Level1)
+{
+    ASSERT_NE(context_, nullptr);
+    auto originalExecutor = context_->taskExecutor_;
+    const bool originalFormRender = context_->IsFormRender();
+    const bool originalDynamicRender = context_->IsDynamicRender();
+    const bool originalJsCard = context_->IsJsCard();
+    auto executor = AceType::MakeRefPtr<ThreadCheckTaskExecutor>();
+    context_->taskExecutor_ = executor;
+    context_->SetIsFormRender(true);
+    context_->SetIsDynamicRender(false);
+    context_->SetIsJsCard(false);
+
+    EXPECT_CALL(*executor, WillRunOnCurrentThread(_)).Times(0);
+    EXPECT_TRUE(context_->IsCurrentThreadSafe());
+
+    context_->taskExecutor_ = originalExecutor;
+    context_->SetIsFormRender(originalFormRender);
+    context_->SetIsDynamicRender(originalDynamicRender);
+    context_->SetIsJsCard(originalJsCard);
+}
+
+/**
+ * @tc.name: IsCurrentThreadSafeUsesUIThreadCheck
+ * @tc.desc: Ordinary, dynamic and JS card pipelines honor the executor's UI thread result.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextFourTestNg, IsCurrentThreadSafeUsesUIThreadCheck, TestSize.Level1)
+{
+    ASSERT_NE(context_, nullptr);
+    auto originalExecutor = context_->taskExecutor_;
+    const bool originalFormRender = context_->IsFormRender();
+    const bool originalDynamicRender = context_->IsDynamicRender();
+    const bool originalJsCard = context_->IsJsCard();
+    auto executor = AceType::MakeRefPtr<ThreadCheckTaskExecutor>();
+    context_->taskExecutor_ = executor;
+
+    struct ThreadCheckCase {
+        const char* name;
+        bool formRender;
+        bool dynamicRender;
+        bool jsCard;
+        bool onUIThread;
+    };
+    const ThreadCheckCase cases[] = {
+        { "ordinary on UI thread", false, false, false, true },
+        { "ordinary off UI thread", false, false, false, false },
+        { "dynamic non-form on UI thread", false, true, false, true },
+        { "dynamic non-form off UI thread", false, true, false, false },
+        { "dynamic form on UI thread", true, true, false, true },
+        { "dynamic form off UI thread", true, true, false, false },
+        { "JS card on UI thread", false, false, true, true },
+        { "JS card off UI thread", false, false, true, false },
+    };
+    for (const auto& testCase : cases) {
+        SCOPED_TRACE(testCase.name);
+        context_->SetIsFormRender(testCase.formRender);
+        context_->SetIsDynamicRender(testCase.dynamicRender);
+        context_->SetIsJsCard(testCase.jsCard);
+        EXPECT_CALL(*executor, WillRunOnCurrentThread(TaskExecutor::TaskType::UI))
+            .WillOnce(Return(testCase.onUIThread));
+        EXPECT_EQ(context_->IsCurrentThreadSafe(), testCase.onUIThread);
+        EXPECT_TRUE(testing::Mock::VerifyAndClearExpectations(AceType::RawPtr(executor)));
+    }
+
+    context_->taskExecutor_ = originalExecutor;
+    context_->SetIsFormRender(originalFormRender);
+    context_->SetIsDynamicRender(originalDynamicRender);
+    context_->SetIsJsCard(originalJsCard);
 }
 
 /**

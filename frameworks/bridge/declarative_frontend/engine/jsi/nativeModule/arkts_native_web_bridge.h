@@ -251,6 +251,8 @@ public:
     static ArkUINativeModuleValue ResetEnableImageAnalyzer(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static ArkUINativeModuleValue SetForceEnableZoom(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static ArkUINativeModuleValue ResetForceEnableZoom(ArkUIRuntimeCallInfo* runtimeCallInfo);
+    static ArkUINativeModuleValue SetFlingSpeedLimit(ArkUIRuntimeCallInfo* runtimeCallInfo);
+    static ArkUINativeModuleValue ResetFlingSpeedLimit(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static ArkUINativeModuleValue SetBackToTop(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static ArkUINativeModuleValue ResetBackToTop(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static ArkUINativeModuleValue SetOnNativeEmbedObjectParamChange(ArkUIRuntimeCallInfo* runtimeCallInfo);

@@ -21,6 +21,7 @@
 
 #include "base/log/ace_scoring_log.h"
 #include "base/log/log_wrapper.h"
+#include "base/utils/napi_scope_raii.h"
 #include "base/want/want_wrap.h"
 #include "bridge/common/utils/engine_helper.h"
 #include "bridge/declarative_frontend/engine/js_converter.h"
@@ -39,6 +40,15 @@ namespace {
     constexpr uint8_t ARGC_TWO = 2;
     const CalcDimension SECURITY_UEC_MIN_WIDTH(10.0f, DimensionUnit::VP);
     const CalcDimension SECURITY_UEC_MIN_HEIGHT(10.0f, DimensionUnit::VP);
+
+    void ParseDpiFollowStrategyOption(const JSRef<JSObject>& obj, NG::UIExtensionConfig& config)
+    {
+        JSRef<JSVal> enableDensityDPI = obj->GetProperty("dpiFollowStrategy");
+        if (enableDensityDPI->IsNumber()) {
+            config.dpiFollowStrategy = NG::ParseDpiFollowStrategy(enableDensityDPI->ToNumber<int32_t>());
+            config.isDpiFollowStrategySet = true;
+        }
+    }
 }
 void JSSecurityUIExtensionProxy::JSBind(BindingTarget globalObj)
 {
@@ -140,7 +150,7 @@ SecurityCallbackFuncPairList::const_iterator JSSecurityUIExtensionProxy::FindCbL
 }
 
 void JSSecurityUIExtensionProxy::AddCallbackToList(
-    napi_env env, napi_value cb, napi_handle_scope scope, RegisterType type,
+    napi_env env, napi_value cb, RegisterType type,
     const std::function<void(const RefPtr<NG::SecurityUIExtensionProxy>&)>&& onFunc)
 {
     if (type == RegisterType::SYNC) {
@@ -158,7 +168,6 @@ void JSSecurityUIExtensionProxy::AddCallbackToList(
             onAsyncOnCallbackList_.emplace_back(ref, onFunc);
         }
     }
-    napi_close_handle_scope(env, scope);
 }
 
 void JSSecurityUIExtensionProxy::DeleteCallbackFromList(
@@ -298,14 +307,14 @@ void JSSecurityUIExtensionProxy::On(const JSCallbackInfo& info)
     CHECK_NULL_VOID(nativeEngine);
     auto env = reinterpret_cast<napi_env>(nativeEngine);
     ScopeRAII scopeNapi(env);
+    if (!scopeNapi) {
+        return;
+    }
     panda::Local<JsiValue> value = info[1].Get().GetLocalHandle();
     JSValueWrapper valueWrapper = value;
     napi_value cb = nativeEngine->ValueToNapiValue(valueWrapper);
-    napi_handle_scope napiScope = nullptr;
-    napi_open_handle_scope(env, &napiScope);
-    CHECK_NULL_VOID(napiScope);
     std::lock_guard<std::mutex> lock(callbackLisLock_);
-    AddCallbackToList(env, cb, napiScope, registerType, std::move(onOnFunc));
+    AddCallbackToList(env, cb, registerType, std::move(onOnFunc));
     auto pattern = proxy_->GetPattern();
     CHECK_NULL_VOID(pattern);
     auto onFuncList = GetOnFuncList(registerType);
@@ -431,10 +440,7 @@ void JSSecurityUIExtension::Create(const JSCallbackInfo& info)
         if (transferringCallerValue->IsBoolean()) {
             config.transferringCaller = transferringCallerValue->ToBoolean();
         }
-        JSRef<JSVal> enableDensityDPI = obj->GetProperty("dpiFollowStrategy");
-        if (enableDensityDPI->IsNumber()) {
-            config.dpiFollowStrategy = NG::ParseDpiFollowStrategy(enableDensityDPI->ToNumber<int32_t>());
-        }
+        ParseDpiFollowStrategyOption(obj, config);
         do {
             JSRef<JSVal> componentContent = obj->GetProperty("placeholder");
             if (!componentContent->IsObject()) {
@@ -658,10 +664,7 @@ void JSPreviewUIExtension::Create(const JSCallbackInfo& info)
         if (transferringCallerValue->IsBoolean()) {
             config.transferringCaller = transferringCallerValue->ToBoolean();
         }
-        JSRef<JSVal> enableDensityDPI = obj->GetProperty("dpiFollowStrategy");
-        if (enableDensityDPI->IsNumber()) {
-            config.dpiFollowStrategy = NG::ParseDpiFollowStrategy(enableDensityDPI->ToNumber<int32_t>());
-        }
+        ParseDpiFollowStrategyOption(obj, config);
         do {
             JSRef<JSVal> componentContent = obj->GetProperty("placeholder");
             if (!componentContent->IsObject()) {

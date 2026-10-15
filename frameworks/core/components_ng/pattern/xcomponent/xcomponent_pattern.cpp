@@ -246,6 +246,7 @@ void XComponentPattern::InitSurface()
         renderContext->OnNodeNameUpdate(GetId());
     }
     renderSurface_->InitSurface();
+    renderSurface_->SetSurfaceQueueSize(bufferQueueCount_);
     renderSurface_->UpdateSurfaceConfig();
     if (type_ == XComponentType::TEXTURE) {
         renderSurface_->RegisterBufferCallback();
@@ -932,6 +933,7 @@ void XComponentPattern::ToJsonValue(std::unique_ptr<JsonValue>& json, const Insp
     json->PutExtAttr("enableSecure", isEnableSecure_ ? "true" : "false", filter);
     json->PutExtAttr("hdrBrightness", std::to_string(hdrBrightness_).c_str(), filter);
     json->PutExtAttr("enableTransparentLayer", isTransparentLayer_ ? "true" : "false", filter);
+    json->PutExtAttr("bufferQueueCount", std::to_string(bufferQueueCount_).c_str(), filter);
     json->PutExtAttr("screenId", screenId_.has_value() ? std::to_string(screenId_.value()).c_str() : "", filter);
     if (type_ == XComponentType::SURFACE) {
         json->PutExtAttr(
@@ -1046,6 +1048,7 @@ void XComponentPattern::DumpAdvanceInfo()
     DumpLog::GetInstance().AddDesc(
         std::string("screenId: ").append(screenId_.has_value() ? std::to_string(screenId_.value()).c_str() : ""));
     DumpLog::GetInstance().AddDesc(std::string("isOpaque: ").append(isOpaque_ ? "true" : "false"));
+    DumpLog::GetInstance().AddDesc(std::string("bufferQueueCount: ").append(std::to_string(bufferQueueCount_)));
     if (renderSurface_) {
         renderSurface_->DumpInfo();
     }
@@ -2657,6 +2660,19 @@ void XComponentPattern::EnableTransparentLayer(bool isTransparentLayer)
     CHECK_NULL_VOID(renderContextForSurface_);
     renderContextForSurface_->SetTransparentLayer(isTransparentLayer);
     isTransparentLayer_ = isTransparentLayer;
+}
+
+void XComponentPattern::SetBufferQueueCount(int32_t bufferQueueCount)
+{
+    bufferQueueCount_ = std::clamp(bufferQueueCount, MIN_BUFFER_QUEUE_COUNT, MAX_BUFFER_QUEUE_COUNT);
+    CHECK_NULL_VOID(renderSurface_);
+    renderSurface_->SetSurfaceQueueSize(bufferQueueCount_);
+    renderSurface_->UpdateSurfaceConfig();
+}
+
+int32_t XComponentPattern::GetBufferQueueCount() const
+{
+    return bufferQueueCount_;
 }
 
 RenderFit XComponentPattern::GetSurfaceRenderFit() const

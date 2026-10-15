@@ -3902,6 +3902,23 @@ void WebDelegate::InitWebViewWithSurface()
             pattern->InitDataDetector();
             pattern->InitSelectDataDetector();
             pattern->InitAIDetectResult();
+            if (!Container::IsCurrentUseNewPipeline()) {
+                auto webCom = delegate->webComponent_.Upgrade();
+                if (!webCom) {
+                    return;
+                }
+                // 0.0f is the default sentinel meaning "not set"; skip to avoid
+                // sending an ineffective call to NWeb during initialization.
+                float speedLimit = webCom->GetFlingSpeedLimit();
+                if (speedLimit > 0.0f) {
+                    delegate->SetFlingSpeedLimit(speedLimit);
+                }
+            } else {
+                auto flingSpeedLimit = pattern->GetFlingSpeedLimit();
+                if (flingSpeedLimit.has_value()) {
+                    delegate->SetFlingSpeedLimit(flingSpeedLimit.value());
+                }
+            }
         },
         TaskExecutor::TaskType::PLATFORM, "ArkUIWebInitWebViewWithSurface");
 }
@@ -10699,6 +10716,12 @@ void WebDelegate::SetForceEnableZoom(bool isEnabled)
 {
     CHECK_NULL_VOID(nweb_);
     nweb_->SetForceEnableZoomPublic(isEnabled);
+}
+
+void WebDelegate::SetFlingSpeedLimit(float speedLimit)
+{
+    CHECK_NULL_VOID(nweb_);
+    nweb_->SetFlingSpeedLimit(speedLimit);
 }
 
 void WebDelegate::OnExtensionDisconnect(int32_t connectId)
