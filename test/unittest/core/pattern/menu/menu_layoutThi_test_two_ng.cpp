@@ -428,7 +428,7 @@ HWTEST_F(MenuLayout3TwoTestNg, InitWrapperRect002, TestSize.Level1)
     layoutAlgorithm->canExpandCurrentWindow_ = true;
     layoutAlgorithm->isExpandDisplay_ = true;
     layoutAlgorithm->param_.menuWindowRect = Rect(ZERO, ZERO, WIDTH, HEIGHT);
-    layoutAlgorithm->InitWrapperRect(property, menuPattern);
+    layoutAlgorithm->InitWrapperRect(property, menuPattern, SafeAreaInsets{});
     EXPECT_EQ(layoutAlgorithm->wrapperSize_.width_, TEN);
 }
 
@@ -454,7 +454,7 @@ HWTEST_F(MenuLayout3TwoTestNg, InitWrapperRect003, TestSize.Level1)
     layoutAlgorithm->canExpandCurrentWindow_ = true;
     layoutAlgorithm->isExpandDisplay_ = true;
     layoutAlgorithm->param_.menuWindowRect = Rect(ZERO, ZERO, WIDTH, HEIGHT);
-    layoutAlgorithm->InitWrapperRect(property, menuPattern);
+    layoutAlgorithm->InitWrapperRect(property, menuPattern, SafeAreaInsets{});
     EXPECT_EQ(layoutAlgorithm->wrapperSize_.width_, TEN);
 }
 
@@ -1305,13 +1305,16 @@ HWTEST_F(MenuLayout3TwoTestNg, CalculateSafeAreaIntersection001, TestSize.Level1
 {
     auto menuAlgorithm = AceType::MakeRefPtr<MenuLayoutAlgorithm>();
     ASSERT_NE(menuAlgorithm, nullptr);
+    auto menuNode = FrameNode::CreateFrameNode(
+        V2::MENU_ETS_TAG, NODE_ID, AceType::MakeRefPtr<MenuPattern>(NODE_ID, "", MenuType::MENU));
+    auto menuPattern = menuNode->GetPattern<MenuPattern>();
+    ASSERT_NE(menuPattern, nullptr);
     menuAlgorithm->targetInUIExtension_ = false;
-    menuAlgorithm->left_ = 10.0f;
-    menuAlgorithm->top_ = 20.0f;
-    menuAlgorithm->right_ = 30.0f;
-    menuAlgorithm->bottom_ = 40.0f;
-    menuAlgorithm->width_ = 500.0f;
-    menuAlgorithm->height_ = 800.0f;
+    menuAlgorithm->param_.left = 10.0f;
+    menuAlgorithm->param_.top = 20.0f;
+    menuAlgorithm->param_.right = 30.0f;
+    menuAlgorithm->param_.bottom = 40.0f;
+    menuAlgorithm->param_.menuWindowRect = Rect(0, 0, 500.0f, 800.0f);
     SafeAreaInsets safeAreaInsets;
     SafeAreaInsets::Inset topInset;
     topInset.start = 0;
@@ -1321,13 +1324,13 @@ HWTEST_F(MenuLayout3TwoTestNg, CalculateSafeAreaIntersection001, TestSize.Level1
     bottomInset.start = 700;
     bottomInset.end = 800;
     safeAreaInsets.bottom_ = bottomInset;
-    menuAlgorithm->CalculateSafeAreaIntersection(safeAreaInsets, nullptr, nullptr, nullptr);
-    float expectedWidth = menuAlgorithm->width_ - menuAlgorithm->left_ - menuAlgorithm->right_;
-    float expectedHeight = menuAlgorithm->height_ - menuAlgorithm->top_ - menuAlgorithm->bottom_;
+    menuAlgorithm->CalculateSafeAreaIntersection(safeAreaInsets, nullptr, nullptr, menuPattern);
+    float expectedWidth = 500.0f - menuAlgorithm->param_.left - menuAlgorithm->param_.right;
+    float expectedHeight = 800.0f - menuAlgorithm->param_.top - menuAlgorithm->param_.bottom;
     EXPECT_EQ(menuAlgorithm->wrapperRect_.Width(), expectedWidth);
     EXPECT_EQ(menuAlgorithm->wrapperRect_.Height(), expectedHeight);
-    EXPECT_EQ(menuAlgorithm->wrapperRect_.Left(), menuAlgorithm->left_);
-    EXPECT_EQ(menuAlgorithm->wrapperRect_.Top(), menuAlgorithm->top_);
+    EXPECT_EQ(menuAlgorithm->wrapperRect_.Left(), menuAlgorithm->param_.left);
+    EXPECT_EQ(menuAlgorithm->wrapperRect_.Top(), menuAlgorithm->param_.top);
 }
 
 /**
@@ -1368,6 +1371,7 @@ HWTEST_F(MenuLayout3TwoTestNg, CalculateSafeAreaIntersection003, TestSize.Level1
     ASSERT_NE(menuAlgorithm, nullptr);
     menuAlgorithm->targetInUIExtension_ = true;
     menuAlgorithm->param_.menuWindowRect = Rect(0.0f, 700.0f, 500.0f, 300.0f);
+    menuAlgorithm->UIExtensionHostWindowRect_ = RectF(0.0f, 0.0f, 500.0f, 1000.0f);
     SafeAreaInsets safeAreaInsets;
     SafeAreaInsets::Inset topInset;
     topInset.start = 0;
@@ -1394,6 +1398,7 @@ HWTEST_F(MenuLayout3TwoTestNg, CalculateSafeAreaIntersection004, TestSize.Level1
     ASSERT_NE(menuAlgorithm, nullptr);
     menuAlgorithm->targetInUIExtension_ = true;
     menuAlgorithm->param_.menuWindowRect = Rect(0.0f, 0.0f, 500.0f, 1000.0f);
+    menuAlgorithm->UIExtensionHostWindowRect_ = RectF(0.0f, 0.0f, 500.0f, 1050.0f);
     SafeAreaInsets safeAreaInsets;
     SafeAreaInsets::Inset topInset;
     topInset.start = 0;
@@ -1504,6 +1509,7 @@ HWTEST_F(MenuLayout3TwoTestNg, CalculateSafeAreaIntersection008, TestSize.Level1
     ASSERT_NE(menuAlgorithm, nullptr);
     menuAlgorithm->targetInUIExtension_ = true;
     menuAlgorithm->param_.menuWindowRect = Rect(0.0f, 0.0f, 500.0f, 800.0f);
+    menuAlgorithm->UIExtensionHostWindowRect_ = RectF(0.0f, 0.0f, 500.0f, 800.0f);
     SafeAreaInsets safeAreaInsets;
     SafeAreaInsets::Inset topInset;
     topInset.start = 0;
@@ -1545,6 +1551,7 @@ HWTEST_F(MenuLayout3TwoTestNg, CalculateSafeAreaIntersection009, TestSize.Level1
     ASSERT_NE(menuAlgorithm, nullptr);
     menuAlgorithm->targetInUIExtension_ = true;
     menuAlgorithm->param_.menuWindowRect = Rect(0.0f, 0.0f, 500.0f, 1000.0f);
+    menuAlgorithm->UIExtensionHostWindowRect_ = RectF(0.0f, 0.0f, 500.0f, 1000.0f);
     SafeAreaInsets safeAreaInsets;
     SafeAreaInsets::Inset topInset;
     topInset.start = 0;
