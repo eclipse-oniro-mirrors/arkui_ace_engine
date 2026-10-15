@@ -95,6 +95,7 @@
 #ifdef WEB_SUPPORTED
 #include "core/components/web/resource/web_page_scene_manager.h"
 #endif
+#include "interfaces/inner_api/ui_session/component_tree_query_type.h"
 #include "interfaces/inner_api/ui_session/ui_session_manager.h"
 #include "interfaces/napi/kits/observer/ui_observer.h"
 
@@ -6938,7 +6939,11 @@ void UIContentImpl::SaveComponentTreeQueryFunction(const WeakPtr<TaskExecutor>& 
             [request]() {
                 std::string resultJson;
                 NG::ComponentTreeQuery::Execute(request, resultJson);
-                UiSessionManager::GetInstance()->ReportComponentTreeQueryResult(resultJson);
+                if (request.type == ComponentTreeQueryType::LAZY_FOREACH_DATA_BY_POINT) {
+                    UiSessionManager::GetInstance()->ReportLazyForEachQueryResult(resultJson);
+                } else {
+                    UiSessionManager::GetInstance()->ReportNavigationQueryResult(resultJson);
+                }
             },
             TaskExecutor::TaskType::UI, "UiSessionComponentTreeQuery");
     };

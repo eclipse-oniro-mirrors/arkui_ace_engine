@@ -608,34 +608,42 @@ void UiReportProxy::ReportPageSceneEvent(const std::string& sceneJson, bool isGe
     }
 }
 
-void UiReportProxy::ReportComponentTreeQueryResult(const std::string& data)
+void UiReportProxy::SendQueryResultReport(uint32_t code, const char* caller, const std::string& data)
 {
     MessageParcel messageData;
     MessageParcel reply;
     MessageOption option(MessageOption::TF_ASYNC);
     if (!messageData.WriteInterfaceToken(GetDescriptor())) {
-        LOGW("ReportComponentTreeQueryResult write interface token failed");
+        LOGW("%{public}s write interface token failed", caller);
         return;
     }
     sptr<LargeStringAshmem> largeStringAshmem = new (std::nothrow) LargeStringAshmem();
     if (largeStringAshmem == nullptr) {
-        LOGW("ReportComponentTreeQueryResult alloc shmem failed");
+        LOGW("%{public}s alloc shmem failed", caller);
         return;
     }
-    if (!largeStringAshmem->WriteToAshmem(
-        std::to_string(REPORT_COMPONENT_TREE_QUERY_RESULT), data, data.length())) {
-        LOGW("ReportComponentTreeQueryResult write to shmem failed");
+    if (!largeStringAshmem->WriteToAshmem(std::to_string(code), data, data.length())) {
+        LOGW("%{public}s write to shmem failed", caller);
         return;
     }
     if (!messageData.WriteParcelable(largeStringAshmem)) {
-        LOGW("ReportComponentTreeQueryResult write data failed");
+        LOGW("%{public}s write data failed", caller);
         return;
     }
-    int32_t sendRequestErrorCode =
-        Remote()->SendRequest(REPORT_COMPONENT_TREE_QUERY_RESULT, messageData, reply, option);
+    int32_t sendRequestErrorCode = Remote()->SendRequest(code, messageData, reply, option);
     if (sendRequestErrorCode != ERR_NONE) {
-        LOGW("ReportComponentTreeQueryResult send request failed, errorCode is %{public}d", sendRequestErrorCode);
+        LOGW("%{public}s send request failed, errorCode is %{public}d", caller, sendRequestErrorCode);
     }
+}
+
+void UiReportProxy::ReportNavigationQueryResult(const std::string& data)
+{
+    SendQueryResultReport(REPORT_NAVIGATION_QUERY_RESULT, "ReportNavigationQueryResult", data);
+}
+
+void UiReportProxy::ReportLazyForEachQueryResult(const std::string& data)
+{
+    SendQueryResultReport(REPORT_LAZY_FOREACH_QUERY_RESULT, "ReportLazyForEachQueryResult", data);
 }
 
 void UiReportProxy::SendWebInfoRequestResult(

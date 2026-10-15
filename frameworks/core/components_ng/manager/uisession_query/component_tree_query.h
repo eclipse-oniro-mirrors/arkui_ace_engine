@@ -40,6 +40,7 @@ public:
 private:
     static int32_t QueryNavigationContentByPoint(float x, float y, const std::string& pattern,
         std::string& resultJson);
+    static int32_t QueryLazyForEachDataByPoint(float x, float y, std::string& resultJson);
 };
 
 } // namespace OHOS::Ace::NG
