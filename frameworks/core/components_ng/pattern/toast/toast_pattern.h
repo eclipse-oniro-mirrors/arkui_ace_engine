@@ -161,6 +161,16 @@ public:
         originalTextHeight_ = originalTextHeight;
     }
 
+    void SetIsUserSetMaterial(bool isUserSetMaterial)
+    {
+        isUserSetMaterial_ = isUserSetMaterial;
+    }
+
+    bool IsUserSetMaterial() const
+    {
+        return isUserSetMaterial_;
+    }
+
 private:
     void BeforeCreateLayoutWrapper() override;
     void UpdateToastSize(const RefPtr<FrameNode>& toast);
@@ -233,6 +243,7 @@ private:
     Dimension limitPos_;
     int32_t rowKeyboardCallbackId_ = -1;
     double originalTextHeight_ = 0;
+    bool isUserSetMaterial_ = false;
 };
 } // namespace OHOS::Ace::NG
 #endif // FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_TOAST_TOAST_PATTERN_H
