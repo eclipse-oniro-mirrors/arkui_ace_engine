@@ -2031,6 +2031,7 @@ declare interface NestedScrollOptionsExt {
 }
 declare type OnCameraCaptureStateChangeCallback = (event: any) => void;
 declare type OnContextMenuHideCallback = () => void;
+declare type OnContextMenuUpdateCallback = () => void;
 declare type OnDetectBlankScreenCallback = (event: any) => void;
 declare type OnFirstScreenPaintCallback = (firstScreenPaint: any) => void;
 declare type OnMicrophoneCaptureStateChangeCallback = (event: any) => void;

@@ -920,6 +920,7 @@ bool WebDelegate::OnContextMenuShow(const std::shared_ptr<BaseEventInfo>& info)
 #endif
 }
 void WebDelegate::OnContextMenuHide(const std::string& info) {}
+void WebDelegate::OnContextMenuUpdate(WebContextMenuItemId menuItemId, WebContextMenuOptions options) {}
 bool WebDelegate::OnHandleInterceptUrlLoading(const std::string& data)
 {
     return false;

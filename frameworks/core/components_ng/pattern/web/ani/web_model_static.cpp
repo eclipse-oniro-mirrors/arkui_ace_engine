@@ -1153,6 +1153,15 @@ void WebModelStatic::SetOnContextMenuHide(
     webEventHub->SetOnContextMenuHideEvent(std::move(uiCallback));
 }
 
+void WebModelStatic::SetOnContextMenuUpdate(FrameNode* frameNode,
+    std::function<void(WebContextMenuItemId menuItemId, const WebContextMenuOptions& options)>&& callback)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto webPatternStatic = AceType::DynamicCast<WebPatternStatic>(frameNode->GetPattern());
+    CHECK_NULL_VOID(webPatternStatic);
+    webPatternStatic->SetOnContextMenuUpdateCallback(std::move(callback));
+}
+
 void WebModelStatic::SetSearchResultReceiveEventId(
     FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& callback)
 {

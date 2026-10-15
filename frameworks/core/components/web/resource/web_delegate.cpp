@@ -834,6 +834,29 @@ bool ContextMenuParamOhos::IsAILink() const
     return false;
 }
 
+bool ContextMenuParamOhos::ShouldOfferLinkToText() const
+{
+    if (param_) {
+        return param_->ShouldOfferLinkToText();
+    }
+    return false;
+}
+
+bool ContextMenuParamOhos::IsOverTextFragment() const
+{
+    if (param_) {
+        return param_->IsOverTextFragment();
+    }
+    return false;
+}
+
+std::string ContextMenuParamOhos::GetTextFragmentGeneratedLink() const
+{
+    if (param_) {
+        return param_->GetTextFragmentGeneratedLink();
+    }
+    return "";
+}
 void ContextMenuResultOhos::Cancel() const
 {
     if (callback_) {
@@ -916,6 +939,21 @@ void ContextMenuResultOhos::RequestPasswordAutoFill() const
     auto delegate = delegate_.Upgrade();
     if (delegate) {
         delegate->OnRequestAutofill(static_cast<int32_t>(NG::WebMenuType::TYPE_CONTEXTMENU));
+    }
+}
+
+void ContextMenuResultOhos::CopyLinkToTextMenu() const
+{
+    TAG_LOGI(AceLogTag::ACE_WEB, "ContextMenuResultOhos::CopyLinkToTextMenu");
+    if (callback_) {
+        callback_->Continue(CI_COPY_LINK_TO_HIGHLIGHT, EF_NONE);
+    }
+}
+
+void ContextMenuResultOhos::RemoveFragments() const
+{
+    if (callback_) {
+        callback_->Continue(CI_CLEAR_HIGHLIGHT, EF_NONE);
     }
 }
 
@@ -6950,6 +6988,43 @@ void WebDelegate::OnContextMenuDismissed()
     auto webPattern = webPattern_.Upgrade();
     CHECK_NULL_VOID(webPattern);
     webPattern->OnCloseContextMenu();
+}
+
+void WebDelegate::OnContextMenuUpdate(WebContextMenuItemId menuItemId, WebContextMenuOptions options)
+{
+    CHECK_NULL_VOID(taskExecutor_);
+    auto jsTaskExecutor = SingleTaskExecutor::Make(taskExecutor_, TaskExecutor::TaskType::JS);
+    jsTaskExecutor.PostSyncTask([weak = WeakClaim(this), itemId_ = menuItemId, options_ = options]() {
+        auto delegate = weak.Upgrade();
+        CHECK_NULL_VOID(delegate);
+#ifdef NG_BUILD
+        auto webPattern = delegate->webPattern_.Upgrade();
+        CHECK_NULL_VOID(webPattern);
+        auto menuUpdateCallback = webPattern->GetOnContextMenuUpdateCallback();
+        if (menuUpdateCallback) {
+            TAG_LOGI(AceLogTag::ACE_WEB, "OnContextMenuUpdate menuItemId:%{public}d, enable:%{public}d",
+                itemId_, options_.enable);
+            menuUpdateCallback(itemId_, options_);
+        }
+#else
+        if (Container::IsCurrentUseNewPipeline()) {
+            auto webPattern = delegate->webPattern_.Upgrade();
+            CHECK_NULL_VOID(webPattern);
+            auto menuUpdateCallback = webPattern->GetOnContextMenuUpdateCallback();
+            if (menuUpdateCallback) {
+                TAG_LOGI(AceLogTag::ACE_WEB, "OnContextMenuUpdate new itemId:%{public}d, enable:%{public}d",
+                    itemId_, options_.enable);
+                menuUpdateCallback(itemId_, options_);
+            }
+            return;
+        }
+        auto webCom = delegate->webComponent_.Upgrade();
+        CHECK_NULL_VOID(webCom);
+        TAG_LOGI(AceLogTag::ACE_WEB, "OnContextMenuUpdate itemId:%{public}d, enable:%{public}d",
+            itemId_, options_.enable);
+        webCom->OnContextMenuUpdate(itemId_, options_);
+#endif
+    }, "ArkUIWebContextMenuUpdate");
 }
 
 bool WebDelegate::OnContextMenuShow(const std::shared_ptr<BaseEventInfo>& info)

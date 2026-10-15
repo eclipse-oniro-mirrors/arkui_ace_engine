@@ -362,6 +362,20 @@ class WebEnableFollowSystemFontWeightModifier extends ModifierWithKey<boolean> {
   }
 }
 
+class WebOnContextMenuUpdateModifier extends ModifierWithKey<OnContextMenuUpdateCallback> {
+  constructor(value: OnContextMenuUpdateCallback) {
+    super(value);
+  }
+  static identity: Symbol = Symbol('webOnContextMenuUpdateModifier');
+  applyPeer(node: KNode, reset: boolean): void {
+    if (reset) {
+      getUINativeModule().web.resetOnContextMenuUpdate(node);
+    } else {
+      getUINativeModule().web.setOnContextMenuUpdate(node, this.value);
+    }
+  }
+}
+
 class WebVerticalScrollBarAccessModifier extends ModifierWithKey<boolean> {
   constructor(value: boolean) {
     super(value);
@@ -2347,6 +2361,10 @@ class ArkWebComponent extends ArkComponent implements WebAttribute {
   }
   onContextMenuHide(callback: OnContextMenuHideCallback): this {
     modifierWithKey(this._modifiersWithKeys, WebOnContextMenuHideModifier.identity, WebOnContextMenuHideModifier, callback);
+    return this;
+  }
+  onContextMenuUpdate(callback: OnContextMenuUpdateCallback): this {
+    modifierWithKey(this._modifiersWithKeys, WebOnContextMenuUpdateModifier.identity, WebOnContextMenuUpdateModifier, callback);
     return this;
   }
   copyOptions(value: CopyOptions): this {

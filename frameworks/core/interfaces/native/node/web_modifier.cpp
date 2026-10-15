@@ -1967,6 +1967,31 @@ void ResetOnContextMenuShow(ArkUINodeHandle node)
     WebModelNG::SetOnContextMenuShow(frameNode, nullptr);
 }
 
+void SetOnContextMenuUpdateCallBack(ArkUINodeHandle node, void* extraParam)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    if (extraParam) {
+        using UpdateCallback = std::function<void(WebContextMenuItemId, const WebContextMenuOptions&)>;
+        auto* originalCallbackPtr = reinterpret_cast<UpdateCallback*>(extraParam);
+        CHECK_NULL_VOID(originalCallbackPtr);
+        auto callback = [originalCallback = *originalCallbackPtr](
+            WebContextMenuItemId menuItemId, const WebContextMenuOptions& options) {
+            originalCallback(menuItemId, options);
+        };
+        WebModelNG::SetOnContextMenuUpdate(frameNode, std::move(callback));
+    } else {
+        WebModelNG::SetOnContextMenuUpdate(frameNode, nullptr);
+    }
+}
+
+void ResetOnContextMenuUpdateCallBack(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    WebModelNG::SetOnContextMenuUpdate(frameNode, nullptr);
+}
+
 void SetOnSafeBrowsingCheckResultCallBack(ArkUINodeHandle node, void* extraParam)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
@@ -2878,6 +2903,8 @@ const ArkUIWebModifier* GetWebModifier()
         .resetOnRequestSelectedCallBack = ResetOnRequestSelectedCallBack,
         .setOnContextMenuHideCallBack = SetOnContextMenuHideCallBack,
         .resetOnContextMenuHideCallBack = ResetOnContextMenuHideCallBack,
+        .setOnContextMenuUpdateCallBack = SetOnContextMenuUpdateCallBack,
+        .resetOnContextMenuUpdateCallBack = ResetOnContextMenuUpdateCallBack,
         .setGeolocationAccess = SetGeolocationAccess,
         .resetGeolocationAccess = ResetGeolocationAccess,
         .setDatabaseAccess = SetDatabaseAccess,
@@ -3149,6 +3176,8 @@ const CJUIWebModifier* GetCJUIWebModifier()
         .resetOnRequestSelectedCallBack = ResetOnRequestSelectedCallBack,
         .setOnContextMenuHideCallBack = SetOnContextMenuHideCallBack,
         .resetOnContextMenuHideCallBack = ResetOnContextMenuHideCallBack,
+        .setOnContextMenuUpdateCallBack = SetOnContextMenuUpdateCallBack,
+        .resetOnContextMenuUpdateCallBack = ResetOnContextMenuUpdateCallBack,
         .setGeolocationAccess = SetGeolocationAccess,
         .resetGeolocationAccess = ResetGeolocationAccess,
         .setDatabaseAccess = SetDatabaseAccess,

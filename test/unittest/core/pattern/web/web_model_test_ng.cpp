@@ -540,6 +540,37 @@ HWTEST_F(WebModelTestNg, SetOnContextMenuHide002, TestSize.Level1)
 }
 
 /**
+ * @tc.name: SetOnContextMenuUpdate001
+ * @tc.desc: Test WebModelNG::SetOnContextMenuUpdate() callback
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebModelTestNg, SetOnContextMenuUpdate001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    int callCount = 0;
+    auto* stack = ViewStackProcessor::GetInstance();
+    stack->ClearStack();
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+
+    WebModelNG webModelNG;
+    auto enterFunction =
+        [&callCount](WebContextMenuItemId menuItemId, const WebContextMenuOptions& options) { callCount++; };
+    webModelNG.SetOnContextMenuUpdate(std::move(enterFunction));
+
+    auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    auto callback = webPattern->GetOnContextMenuUpdateCallback();
+    ASSERT_TRUE(callback);
+    callback(WebContextMenuItemId::MENU_COPY_LINK, WebContextMenuOptions {});
+    EXPECT_EQ(callCount, 1);
+#endif
+}
+
+/**
  * @tc.name: SetOnHttpAuthRequest001
  * @tc.desc: Test web_model_ng.cpp
  * @tc.type: FUNC

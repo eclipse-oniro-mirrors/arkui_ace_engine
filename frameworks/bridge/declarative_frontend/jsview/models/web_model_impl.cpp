@@ -284,6 +284,14 @@ void WebModelImpl::SetOnContextMenuHide(std::function<void(const BaseEventInfo* 
     webComponent->SetOnContextMenuHide(std::move(jsCallback));
 }
 
+void WebModelImpl::SetOnContextMenuUpdate(
+    std::function<void(WebContextMenuItemId menuItemId, const WebContextMenuOptions& options)>&& jsCallback)
+{
+    auto webComponent = AceType::DynamicCast<WebComponent>(ViewStackProcessor::GetInstance()->GetMainComponent());
+    CHECK_NULL_VOID(webComponent);
+    webComponent->SetOnContextMenuUpdate(std::move(jsCallback));
+}
+
 void WebModelImpl::SetJsEnabled(bool isJsEnabled)
 {
     auto webComponent = AceType::DynamicCast<WebComponent>(ViewStackProcessor::GetInstance()->GetMainComponent());

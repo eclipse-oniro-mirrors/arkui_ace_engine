@@ -106,6 +106,7 @@ public:
     static void BindSelectionMenu(const JSCallbackInfo& info);
     static void OnContextMenuHide(const JSCallbackInfo& args);
     static void OnContextMenuShow(const JSCallbackInfo& args);
+    static void OnContextMenuUpdate(const JSCallbackInfo& args);
     static void OnSearchResultReceive(const JSCallbackInfo& args);
     static void MediaPlayGestureAccess(bool isNeedGestureAccess);
     static void OnKeyEvent(const JSCallbackInfo& args);

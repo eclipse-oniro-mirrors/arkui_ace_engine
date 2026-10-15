@@ -2203,6 +2203,10 @@ void ArkUINativeModule::RegisterWebAttributes(Local<panda::ObjectRef> object, Ec
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::SetOnContextMenuHide));
     web->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetOnContextMenuHide"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::ResetOnContextMenuHide));
+    web->Set(vm, panda::StringRef::NewFromUtf8(vm, "setOnContextMenuUpdate"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::SetOnContextMenuUpdate));
+    web->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetOnContextMenuUpdate"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::ResetOnContextMenuUpdate));
     web->Set(vm, panda::StringRef::NewFromUtf8(vm, "setGeolocationAccess"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::SetGeolocationAccess));
     web->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetGeolocationAccess"),

@@ -2629,6 +2629,35 @@ HWTEST_F(WebModelStaticTest, SetOnContextMenuHide001, TestSize.Level1)
 }
 
 /**
+ * @tc.name: SetOnContextMenuUpdate001
+ * @tc.desc: Test web_model_static.cpp
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebModelStaticTest, SetOnContextMenuUpdate001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    int callCount = 0;
+    auto* stack = ViewStackProcessor::GetInstance();
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode = WebModelStatic::CreateFrameNode(nodeId);
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+
+    auto callback =
+        [&callCount](WebContextMenuItemId menuItemId, const WebContextMenuOptions& options) { callCount++; };
+
+    WebModelStatic::SetOnContextMenuUpdate(AccessibilityManager::RawPtr(frameNode), callback);
+
+    auto webPattern = AceType::DynamicCast<WebPattern>(frameNode->GetPattern());
+    ASSERT_NE(webPattern, nullptr);
+    auto updateCallback = webPattern->GetOnContextMenuUpdateCallback();
+    ASSERT_NE(updateCallback, nullptr);
+    updateCallback(WebContextMenuItemId::MENU_COPY_LINK, WebContextMenuOptions {});
+    EXPECT_EQ(callCount, 1);
+#endif
+}
+
+/**
  * @tc.name: SetOnSslErrorRequest001
  * @tc.desc: Test web_model_static.cpp
  * @tc.type: FUNC

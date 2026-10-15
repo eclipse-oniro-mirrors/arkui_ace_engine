@@ -218,6 +218,8 @@ public:
     using WebNodeInfoCallback = const std::function<void(std::shared_ptr<JsonValue>& jsonNodeArray, int32_t webId)>;
     using TextBlurCallback = std::function<void(int64_t, const std::string)>;
     using OnMediaCastEnterCallback = std::function<void()>;
+    using OnContextMenuUpdateCallback =
+        std::function<void(WebContextMenuItemId menuItemId, const WebContextMenuOptions& options)>;
     using WebComponentClickCallback = std::function<void(int64_t, const std::string)>;
     using OnWebNativeMessageConnectCallback = std::function<void(const std::shared_ptr<BaseEventInfo>&)>;
     using OnFullScreenVideoOverlayEnterCallback = std::function<void(const std::shared_ptr<BaseEventInfo>&)>;
@@ -418,6 +420,16 @@ public:
     OnMediaCastEnterCallback GetOnMediaCastEnterCallback()
     {
         return onMediaCastEnterCallback_;
+    }
+
+    void SetOnContextMenuUpdateCallback(OnContextMenuUpdateCallback&& callback)
+    {
+        onContextMenuUpdateCallback_ = std::move(callback);
+    }
+
+    OnContextMenuUpdateCallback GetOnContextMenuUpdateCallback()
+    {
+        return onContextMenuUpdateCallback_;
     }
 
     PermissionClipboardCallback GetPermissionClipboardCallback() const
@@ -1575,6 +1587,7 @@ private:
     SetWebIdCallback setWebIdCallback_ = nullptr;
     SetWebDetachCallback setWebDetachCallback_ = nullptr;
     OnMediaCastEnterCallback onMediaCastEnterCallback_ = nullptr;
+    OnContextMenuUpdateCallback onContextMenuUpdateCallback_ = nullptr;
     PermissionClipboardCallback permissionClipboardCallback_ = nullptr;
     OnOpenAppLinkCallback onOpenAppLinkCallback_ = nullptr;
     SetFaviconCallback setFaviconCallback_ = nullptr;
