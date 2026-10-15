@@ -16,6 +16,7 @@
 #include "bridge/declarative_frontend/jsview/js_view_abstract.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -7188,10 +7189,12 @@ bool JSViewAbstract::ParseJsColorFromResourceForMaterial(
     if (ok) {
         JSRef<JSVal> jsOpacityRatio = jsObj->GetProperty("opacityRatio");
         if (jsOpacityRatio->IsNumber()) {
-            auto placeholder = result.GetPlaceholder();
             double opacityRatio = jsOpacityRatio->ToNumber<double>();
-            result = result.BlendOpacity(opacityRatio);
-            result.SetPlaceholder(placeholder);
+            if (std::isfinite(opacityRatio)) {
+                auto placeholder = result.GetPlaceholder();
+                result = result.BlendOpacity(opacityRatio);
+                result.SetPlaceholder(placeholder);
+            }
         }
     }
     return ok;
