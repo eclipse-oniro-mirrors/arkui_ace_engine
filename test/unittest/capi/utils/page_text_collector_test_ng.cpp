@@ -238,6 +238,16 @@ public:
         return owner;
     }
 
+    void SetUpBackground(const RefPtr<FrameNode>& host, const RefPtr<FrameNode>& root)
+    {
+        host->backgroundNode_ = root;
+        host->GetRenderContext()->UpdateBuilderBackgroundFlag(true);
+        host->GetRenderContext()->UpdateBackgroundAlign(Alignment::TOP_LEFT);
+        LayoutConstraintF constraint;
+        constraint.maxSize = SizeF(FRAME_WIDTH, FRAME_HEIGHT);
+        root->GetGeometryNode()->SetParentLayoutConstraint(constraint);
+    }
+
     void SetUpSliderThemes()
     {
         auto themes = AceType::MakeRefPtr<testing::NiceMock<MockThemeManager>>();
@@ -637,16 +647,8 @@ TEST_F(PageTextCollectionTest, NestedBackgroundComposesScale)
     auto text = Text(u"scaled nested background");
     root->AddChild(innerHost);
     innerRoot->AddChild(text);
-    host->backgroundNode_ = root;
-    innerHost->backgroundNode_ = innerRoot;
-    for (const auto& node : { host, innerHost }) {
-        node->GetRenderContext()->UpdateBuilderBackgroundFlag(true);
-        node->GetRenderContext()->UpdateBackgroundAlign(Alignment::TOP_LEFT);
-    }
-    LayoutConstraintF constraint;
-    constraint.maxSize = SizeF(FRAME_WIDTH, FRAME_HEIGHT);
-    root->GetGeometryNode()->SetParentLayoutConstraint(constraint);
-    innerRoot->GetGeometryNode()->SetParentLayoutConstraint(constraint);
+    SetUpBackground(host, root);
+    SetUpBackground(innerHost, innerRoot);
     AceType::DynamicCast<MockRenderContext>(innerHost->GetRenderContext())->SetPaintRectWithTransform(
         RectF(10.0f, 7.0f, FRAME_WIDTH, FRAME_HEIGHT));
     AceType::DynamicCast<MockRenderContext>(text->GetRenderContext())->SetPaintRectWithTransform(
