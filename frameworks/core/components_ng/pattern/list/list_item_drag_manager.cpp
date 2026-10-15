@@ -166,6 +166,7 @@ void ListItemDragManager::DeInitDragDropEvent()
     auto pattern = parent->GetPattern<ListPattern>();
     CHECK_NULL_VOID(pattern);
     pattern->SetDragScrollCallback(nullptr);
+    isMouseDrag_ = false;
 }
 
 void ListItemDragManager::HandleOnItemDragStart(const GestureEvent& info)
@@ -185,6 +186,9 @@ void ListItemDragManager::HandleOnItemDragStart(const GestureEvent& info)
     CHECK_NULL_VOID(parent);
     auto paddingOffset = GetParentPaddingOffset();
     dragOffset_ = dragOffset_ - paddingOffset;
+    // A container scroll frame may arrive before the first drag update, seed the drag
+    // position with the slot the item was picked up from instead of leaving it at zero.
+    realOffset_ = dragOffset_;
     auto pattern = parent->GetPattern<ListPattern>();
     CHECK_NULL_VOID(pattern);
     isRtl_ = pattern->IsRTL();
@@ -203,6 +207,7 @@ void ListItemDragManager::HandleOnItemLongPress(const GestureEvent& info)
 {
     dragState_ = ListItemDragState::LONG_PRESS;
     suppressAutoScroll_ = false;
+    isMouseDrag_ = (info.GetSourceTool() == SourceTool::MOUSE);
     SetIsNeedDividerAnimation(false);
     auto host = GetHost();
     CHECK_NULL_VOID(host);
@@ -297,11 +302,12 @@ void ListItemDragManager::HandleContainerScroll(int32_t source)
     CHECK_NULL_VOID(parent);
     auto pattern = parent->GetPattern<ListPattern>();
     CHECK_NULL_VOID(pattern);
-    // Both actions need a second finger on the List that really drives it: a finger
-    // merely resting on the container, a wheel/crown scroll or a programmatic scroll
-    // must neither drop the float nor disable the drag edge auto-scroll.
-    if (pattern->GetActiveTouchFingerIdsSize() <= 1 ||
-        !ScrollablePattern::IsFingerDrivenScrollSource(source)) {
+    // For a mouse drag a single touch finger already is the "second finger" scrolling the
+    // container; for a touch drag 2+ touch fingers are needed, one dragging plus one scrolling.
+    bool isSecondPointerScrolling = isMouseDrag_
+        ? (pattern->GetActiveTouchFingerIdsSize() >= 1)
+        : (pattern->GetActiveTouchFingerIdsSize() > 1);
+    if (!isSecondPointerScrolling) {
         return;
     }
     if (dragState_ == ListItemDragState::LONG_PRESS) {
@@ -313,6 +319,9 @@ void ListItemDragManager::HandleContainerScroll(int32_t source)
     // One finger dragging while another scrolls is the supported coexistence case, the
     // drag is kept alive, only its edge auto-scroll is handed over to that finger.
     suppressAutoScroll_ = true;
+    // A finger driven scroll moved the List content, so the item swap has to be re-evaluated
+    // even when the drag pointer (e.g. the mouse) never moved.
+    TriggerSwapOnContainerScroll();
 }
 
 void ListItemDragManager::StopAutoScroll()
@@ -663,6 +672,31 @@ void ListItemDragManager::HandleScrollCallback()
     forEach->FireOnMoveThrough(fromIndex_, to);
 }
 
+void ListItemDragManager::TriggerSwapOnContainerScroll()
+{
+    if (dragState_ != ListItemDragState::DRAGGING || !isMouseDrag_) {
+        return;
+    }
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto geometry = host->GetGeometryNode();
+    CHECK_NULL_VOID(geometry);
+    auto frameRect = geometry->GetMarginFrameRect();
+    int32_t from = GetIndex();
+    if (from < 0) {
+        return;
+    }
+    auto paddingOffset = GetParentPaddingOffset();
+    int32_t to = ScaleNearItem(from, frameRect, realOffset_ - frameRect.GetOffset() + paddingOffset);
+    if (to == from) {
+        return;
+    }
+    HandleSwapAnimation(from, to);
+    auto forEach = forEachNode_.Upgrade();
+    CHECK_NULL_VOID(forEach);
+    forEach->FireOnMoveThrough(fromIndex_, to);
+}
+
 void ListItemDragManager::SetPosition(const OffsetF& offset)
 {
     auto host = GetHost();
@@ -876,6 +910,7 @@ void ListItemDragManager::HandleOnItemDragEnd(const GestureEvent& info)
     forEach->FireOnMove(fromIndex_, to);
     forEach->FireOnDrop(to);
     dragState_ = ListItemDragState::IDLE;
+    isMouseDrag_ = false;
     if (isDragAnimationStopped_) {
         SetIsNeedDividerAnimation(true);
     }
@@ -904,6 +939,7 @@ void ListItemDragManager::HandleOnItemDragCancel()
         forEach->FireOnDrop(to);
     }
     dragState_ = ListItemDragState::IDLE;
+    isMouseDrag_ = false;
     if (isDragAnimationStopped_) {
         SetIsNeedDividerAnimation(true);
     }
