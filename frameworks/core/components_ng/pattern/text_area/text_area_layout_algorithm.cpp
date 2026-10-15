@@ -351,9 +351,7 @@ void TextAreaLayoutAlgorithm::LayoutCounterAndVoiceButton(LayoutWrapper* layoutW
     }
     auto voiceArea = pattern->GetVoiceResponseArea();
     if (pattern->IsShowVoiceButtonMode() && voiceArea) {
-        auto nodeWidth = 0.0f;
-        int32_t childIndex = frameNode->GetChildIndex(voiceArea->GetFrameNode());
-        voiceArea->Layout(layoutWrapper, childIndex, nodeWidth);
+        ResponseAreaMeasureHelper::LayoutArea(voiceArea, layoutWrapper);
     }
 }
 
@@ -417,16 +415,9 @@ LayoutConstraintF TextAreaLayoutAlgorithm::BuildLayoutConstraintWithoutResponseA
     CHECK_NULL_RETURN(frameNode, contentConstraint);
     auto pattern = frameNode->GetPattern<TextFieldPattern>();
     CHECK_NULL_RETURN(pattern, contentConstraint);
-    auto voiceArea = pattern->GetVoiceResponseArea();
-    CHECK_NULL_RETURN(voiceArea, contentConstraint);
-    auto childIndex = frameNode->GetChildIndex(voiceArea->GetFrameNode());
-    auto childWidth = voiceArea->Measure(layoutWrapper, childIndex).Width();
     auto newLayoutConstraint = contentConstraint;
-    newLayoutConstraint.maxSize.SetWidth(std::max(newLayoutConstraint.maxSize.Width() - childWidth, 0.0f));
-    newLayoutConstraint.minSize.SetWidth(std::max(newLayoutConstraint.minSize.Width() - childWidth, 0.0f));
-    if (newLayoutConstraint.selfIdealSize.Width()) {
-        newLayoutConstraint.selfIdealSize.SetWidth(newLayoutConstraint.selfIdealSize.Width().value() - childWidth);
-    }
+    ResponseAreaMeasureHelper::MeasureAndDeductConstraint(
+        pattern->GetVoiceResponseArea(), layoutWrapper, newLayoutConstraint);
     return newLayoutConstraint;
 }
 } // namespace OHOS::Ace::NG

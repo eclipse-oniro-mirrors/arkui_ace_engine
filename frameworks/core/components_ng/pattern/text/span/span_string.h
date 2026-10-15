@@ -86,7 +86,7 @@ public:
     static void DecodeSpanItemListExt(std::vector<uint8_t>& buff, int32_t& cursor, SpanString* spanStr);
     void ClearSpans();
     void AppendSpanItem(const RefPtr<NG::SpanItem>& spanItem);
-    void UpdateSpansMap();
+    ACE_FORCE_EXPORT void UpdateSpansMap();
     static std::vector<RefPtr<NG::Paragraph>> GetLayoutInfo(const RefPtr<SpanString>& spanStr,
         std::optional<double>& maxWidth);
     RefPtr<LineHeightSpan> ToLineHeightSpan(const RefPtr<NG::SpanItem>& spanItem, int32_t start, int32_t end);
@@ -115,7 +115,7 @@ protected:
     void ApplyToSpans(const RefPtr<SpanBase>& span, std::pair<int32_t, int32_t> interval, SpanOperation operation);
     void SortSpans(std::list<RefPtr<SpanBase>>& spans);
     bool CanMerge(const RefPtr<SpanBase>& a, const RefPtr<SpanBase>& b);
-    static RefPtr<NG::SpanItem> GetDefaultSpanItem(const std::u16string& text);
+    ACE_FORCE_EXPORT static RefPtr<NG::SpanItem> GetDefaultSpanItem(const std::u16string& text);
     static RefPtr<SpanBase> GetDefaultSpan(SpanType type);
     void AddSpecialSpan(const RefPtr<SpanBase>& span, SpanType type, int32_t start);
     int32_t GetStepsByPosition(int32_t pos);
