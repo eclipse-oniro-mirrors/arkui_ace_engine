@@ -266,19 +266,16 @@ void ActivatePlaceholderSubtree(const RefPtr<UINode>& node)
 // Offline-built instance subtrees also never went through the pipeline dirty flow:
 // their patterns never ran OnModifyDone, and on device a text template measured
 // 0x0 from the shell wrapper's forceMeasure alone. BuilderNode does the same when
-// attaching an offline tree — mark the subtree dirty for measure+layout so the
-// pipeline runs the full modify/measure/layout/paint initialization, and the host
-// re-measures once the content gains its real extent. Must run after the shell is
-// mounted, so the subtree is on the main tree with a pipeline context attached.
-void MarkPlaceholderSubtreeDirty(const RefPtr<UINode>& node)
+// attaching an offline tree. One dirty mark on the subtree root is enough — no
+// per-node walking: the mark's measure flag makes the pipeline rebuild the root
+// wrapper with forceChildMeasure, which propagates down through the whole subtree,
+// and the non-boundary root bubbles RequestParentDirty up through the shell to the
+// host, so the List re-measures once the content gains its real extent. Must run
+// after the shell is mounted, so the subtree is on the main tree with a pipeline
+// context attached.
+void DirtyMarkInstanceRoot(const RefPtr<FrameNode>& instanceRoot)
 {
-    auto frame = AceType::DynamicCast<FrameNode>(node);
-    if (frame) {
-        frame->MarkDirtyNode(PROPERTY_UPDATE_MEASURE | PROPERTY_UPDATE_LAYOUT);
-    }
-    for (const auto& child : node->GetChildren()) {
-        MarkPlaceholderSubtreeDirty(child);
-    }
+    instanceRoot->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
 }
 
 // Post-layout state of one live shell for on-device triage: distinguishes "content
@@ -369,7 +366,10 @@ void MountPlaceholderShellOnHost(const RefPtr<FrameNode>& host, const RefPtr<Fra
     }
     shell->MarkNeedSyncRenderTree();
     for (const auto& child : shell->GetChildren()) {
-        MarkPlaceholderSubtreeDirty(child);
+        auto instanceRoot = AceType::DynamicCast<FrameNode>(child);
+        if (instanceRoot) {
+            DirtyMarkInstanceRoot(instanceRoot);
+        }
     }
 }
 } // namespace
