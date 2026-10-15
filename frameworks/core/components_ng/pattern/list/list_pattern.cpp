@@ -292,6 +292,38 @@ void MountPlaceholderShellOnHost(const RefPtr<FrameNode>& host, const RefPtr<Fra
 }
 } // namespace
 
+// Two-stage budget decision for one not-yet-built index (ADR-2 + 2026-10-14 device
+// finding): the provider callback crosses into ArkTS (VM entry + object marshalling),
+// so it must only run under real budget pressure. Stage 1 predicts with the
+// empty-templateId component-aggregate estimate — no JS. Light load / no vsync anchor
+// keeps the synchronous build path without the provider ever being consulted. Stage 2,
+// under pressure only, asks the item provider (nullopt keeps the synchronous path) and
+// the template-specific estimate may flip the decision back to BUILD_REAL_NOW (ADR-4
+// per-template precision is preserved for the final decision and the flush queue).
+// Returns the provider options when the index should defer to a placeholder.
+std::optional<ScrollPlaceholderOptions> ListPattern::PredictScrollPlaceholderDefer(
+    const RefPtr<ScrollPlaceholderManager>& manager, const RefPtr<FrameNode>& host, int32_t index)
+{
+    ScrollPlaceholderPredictParams params;
+    params.componentType = ScrollPlaceholderComponentType::LIST;
+    params.hostNodeId = host->GetId();
+    params.index = index;
+    params.cacheBuild = false;
+    auto deadline = manager->GetVsyncDerivedFrameDeadlineNs();
+    if (manager->Predict(params, deadline).decision != ScrollPlaceholderDecision::USE_PLACEHOLDER) {
+        return std::nullopt;
+    }
+    auto options = scrollPlaceholderProvider_(index);
+    if (!options.has_value()) {
+        return std::nullopt;
+    }
+    params.templateId = options->id;
+    if (manager->Predict(params, deadline).decision != ScrollPlaceholderDecision::USE_PLACEHOLDER) {
+        return std::nullopt;
+    }
+    return options;
+}
+
 RefPtr<FrameNode> ListPattern::CreateScrollPlaceholderShell(int32_t index)
 {
     // Component call-site decision (ADR-2): called from the List layout child
@@ -320,34 +352,8 @@ RefPtr<FrameNode> ListPattern::CreateScrollPlaceholderShell(int32_t index)
     CHECK_NULL_RETURN(context, nullptr);
     const auto& manager = context->GetOrCreateScrollPlaceholderManager();
     CHECK_NULL_RETURN(manager, nullptr);
-    // Two-stage decision (budget gate first): the provider callback crosses into
-    // ArkTS (VM entry + object marshalling), so it must only run under real budget
-    // pressure. Stage 1 predicts with the empty-templateId component-aggregate
-    // estimate — no JS. Light load / no vsync anchor keeps the synchronous build
-    // path without the provider ever being consulted (device finding 2026-10-14:
-    // provider-first fired the callback for every index on every light-load frame).
-    ScrollPlaceholderPredictParams params;
-    params.componentType = ScrollPlaceholderComponentType::LIST;
-    params.hostNodeId = host->GetId();
-    params.index = index;
-    params.cacheBuild = false;
-    auto deadline = manager->GetVsyncDerivedFrameDeadlineNs();
-    auto gate = manager->Predict(params, deadline);
-    if (gate.decision != ScrollPlaceholderDecision::USE_PLACEHOLDER) {
-        return nullptr;
-    }
-    // Stage 2, under pressure only: ask the item provider; nullopt keeps the
-    // synchronous build path.
-    auto options = scrollPlaceholderProvider_(index);
+    auto options = PredictScrollPlaceholderDefer(manager, host, index);
     CHECK_NULL_RETURN(options.has_value(), nullptr);
-    params.templateId = options->id;
-    // The template-specific estimate may flip the decision back to BUILD_REAL_NOW
-    // (ADR-4 per-template precision is preserved for the final decision and the
-    // flush-queue estimate).
-    auto result = manager->Predict(params, deadline);
-    if (result.decision != ScrollPlaceholderDecision::USE_PLACEHOLDER) {
-        return nullptr;
-    }
 
     auto shell = CreatePlaceholderShellNode(*options, manager);
     CHECK_NULL_RETURN(shell, nullptr);
@@ -363,6 +369,12 @@ RefPtr<FrameNode> ListPattern::CreateScrollPlaceholderShell(int32_t index)
     }
     scrollPlaceholderItems_[index] = info;
     mountedPlaceholderShells_[shell] = info.templateId;
+    ScrollPlaceholderPredictParams params;
+    params.componentType = ScrollPlaceholderComponentType::LIST;
+    params.templateId = options->id;
+    params.hostNodeId = host->GetId();
+    params.index = index;
+    params.cacheBuild = false;
     EnqueueScrollPlaceholderRealBuild(manager, params, info.templateGen);
     return shell;
 }

@@ -756,6 +756,10 @@ private:
     // cleanup (zero frame count by design), so retirement bookkeeping misses are
     // caught here rather than leaking a mounted shell onto the tree.
     std::map<RefPtr<FrameNode>, std::string> mountedPlaceholderShells_;
+    // Two-stage budget gate (aggregate estimate first, provider only under pressure);
+    // returns the provider options when the index should defer to a placeholder.
+    std::optional<ScrollPlaceholderOptions> PredictScrollPlaceholderDefer(
+        const RefPtr<ScrollPlaceholderManager>& manager, const RefPtr<FrameNode>& host, int32_t index);
     void RetireScrollPlaceholderShell(const RefPtr<FrameNode>& shell, const std::string& templateId);
     // Submits the deferred real-build closure for a placeholder item into the
     // framed UI-thread queue (flushed by the pipeline).
