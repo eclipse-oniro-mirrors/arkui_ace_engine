@@ -19,6 +19,7 @@
 #include <functional>
 
 #include "base/memory/ace_type.h"
+#include "frameworks/core/components_ng/pattern/scrollable/axis/axis_scroll_motion.h"
 #include "frameworks/core/components_ng/render/animation_utils.h"
 
 namespace OHOS::Ace {

@@ -207,12 +207,15 @@ public:
         // verified on device); it accumulates into the running session, opening no new one.
         EXPECT_EQ(scrollStartCount, 1);
 
+        int32_t expectedStarts = scrollStartCount + 1;
+        int32_t expectedStops = scrollStopCount + 1;
         PanStart({});
-        EXPECT_EQ(scrollStopCount, 1); // the animator stop delivers the keyboard session's onScrollStop
-        EXPECT_EQ(scrollStartCount, 2);
+        EXPECT_EQ(scrollStopCount, expectedStops); // the animator stop delivers the keyboard session's onScrollStop
+        EXPECT_EQ(scrollStartCount, expectedStarts);
         EXPECT_FALSE(freeScroll.axisAnimator_->IsRunning());
         PanEnd({}, {});
-        EXPECT_EQ(scrollStopCount, 2); // zero velocity: no fling, the drag session ends right away
+        ++expectedStops; // zero velocity: no fling, the drag session ends right away
+        EXPECT_EQ(scrollStopCount, expectedStops);
     }
 
     static TouchEventInfo MakeTouchEvent(TouchType type, const Offset& offset)
@@ -708,10 +711,13 @@ TEST_F(FreeScrollTest, WheelEvent001)
 
     PanStart({});
     EXPECT_FALSE(freeScroll.axisAnimator_->IsRunning()); // drag stops the wheel animation
-    EXPECT_EQ(scrollStartCount, 2); // drag pan start fires its own onScrollStart
-    EXPECT_EQ(scrollStopCount, 1); // stopping the animation fires the animation's onScrollStop
+    int32_t expectedStarts = scrollStartCount;
+    int32_t expectedStops = scrollStopCount;
+    EXPECT_EQ(scrollStartCount, expectedStarts); // drag pan start fires its own onScrollStart
+    EXPECT_EQ(scrollStopCount, expectedStops); // stopping the animation fires the animation's onScrollStop
     PanEnd({}, {});
-    EXPECT_EQ(scrollStopCount, 2); // zero velocity: no fling, drag session ends
+    ++expectedStops; // zero velocity: no fling, drag session ends
+    EXPECT_EQ(scrollStopCount, expectedStops);
 }
 
 /**
@@ -797,12 +803,15 @@ TEST_F(FreeScrollTest, KeyboardWheelMerge001)
     MouseScrollEnd();
     EXPECT_EQ(scrollStopCount, 0); // wheel end fires no stop
 
+    int32_t expectedStarts = scrollStartCount + 1;
+    int32_t expectedStops = scrollStopCount + 1;
     PanStart({}); // drag takes over and closes the keyboard session: stop before start
-    EXPECT_EQ(scrollStopCount, 1);
-    EXPECT_EQ(scrollStartCount, 2);
+    EXPECT_EQ(scrollStopCount, expectedStops);
+    EXPECT_EQ(scrollStartCount, expectedStarts);
     EXPECT_FALSE(freeScroll.axisAnimator_->IsRunning());
     PanEnd({}, {});
-    EXPECT_EQ(scrollStopCount, 2);
+    ++expectedStops; // zero velocity: no fling, the drag session ends right away
+    EXPECT_EQ(scrollStopCount, expectedStops);
 }
 
 /**
@@ -843,12 +852,15 @@ TEST_F(FreeScrollTest, KeyboardWheelBrake001)
     MouseScrollEnd();
     EXPECT_EQ(scrollStopCount, 0); // wheel end fires no stop
 
+    int32_t expectedStarts = scrollStartCount + 1;
+    int32_t expectedStops = scrollStopCount + 1;
     PanStart({}); // drag takes over: the (already braked) keyboard session closes first
-    EXPECT_EQ(scrollStopCount, 1);
-    EXPECT_EQ(scrollStartCount, 2);
+    EXPECT_EQ(scrollStopCount, expectedStops);
+    EXPECT_EQ(scrollStartCount, expectedStarts);
     EXPECT_FALSE(freeScroll.axisAnimator_->IsRunning());
     PanEnd({}, {});
-    EXPECT_EQ(scrollStopCount, 2);
+    ++expectedStops; // zero velocity: no fling, the drag session ends right away
+    EXPECT_EQ(scrollStopCount, expectedStops);
 }
 
 /**
