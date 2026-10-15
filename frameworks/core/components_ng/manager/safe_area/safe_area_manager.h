@@ -403,6 +403,8 @@ public:
         getKeyboardInset = method;
     }
 
+    bool IsImmersiveEffectEnabled() const;
+
 private:
     bool isAtomicService_ = false;
 
