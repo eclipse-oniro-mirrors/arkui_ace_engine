@@ -1504,6 +1504,7 @@
       "OHOS::Ace::NG::FrameNode::IsOutOfTouchTestRegion(OHOS::Ace::NG::PointT<float> const&, OHOS::Ace::TouchEvent const&, std::__h::vector<OHOS::Ace::NG::RectT<float>, std::__h::allocator<OHOS::Ace::NG::RectT<float>>>*)";
       "OHOS::Ace::NG::FrameNode::IsVisibleAndActive() const";
       "OHOS::Ace::NG::FrameNode::Layout()";
+      "OHOS::Ace::NG::FrameNode::LayoutSafeAreaInset()";
       "OHOS::Ace::NG::FrameNode::MarkAndCheckNewOpIncNode(OHOS::Ace::Axis)";
       "OHOS::Ace::NG::FrameNode::MarkDirtyNode(unsigned int)";
       "OHOS::Ace::NG::FrameNode::MarkDirtyWithOnProChange(unsigned int)";
@@ -1512,6 +1513,7 @@
       "OHOS::Ace::NG::FrameNode::MarkNeedSyncRenderTree(bool)";
       "OHOS::Ace::NG::FrameNode::MarkRemoving()";
       "OHOS::Ace::NG::FrameNode::Measure(std::__h::optional<OHOS::Ace::NG::LayoutConstraintT<float>> const&)";
+      "OHOS::Ace::NG::FrameNode::MeasureSafeAreaInset()";
       "OHOS::Ace::NG::FrameNode::MountToParent(OHOS::Ace::RefPtr<OHOS::Ace::NG::UINode> const&, int, bool, bool, bool)";
       "OHOS::Ace::NG::FrameNode::MouseTest(OHOS::Ace::NG::PointT<float> const&, OHOS::Ace::NG::PointT<float> const&, std::__h::list<OHOS::Ace::RefPtr<OHOS::Ace::MouseEventTarget>, std::__h::allocator<OHOS::Ace::RefPtr<OHOS::Ace::MouseEventTarget>>>&, std::__h::list<OHOS::Ace::RefPtr<OHOS::Ace::MouseEventTarget>, std::__h::allocator<OHOS::Ace::RefPtr<OHOS::Ace::MouseEventTarget>>>&, OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode>&)";
       "OHOS::Ace::NG::FrameNode::NotifyChange(int, int, long long, OHOS::Ace::NG::UINode::NotificationType)";
@@ -2095,6 +2097,13 @@
       "OHOS::Ace::NG::RosenRenderContext::GetBitmap(OHOS::Rosen::Drawing::Bitmap&, std::__h::shared_ptr<OHOS::Rosen::Drawing::DrawCmdList>)";
       "OHOS::Ace::NG::RosenRenderContext::GetPixelMap(std::__h::shared_ptr<OHOS::Media::PixelMap> const&, std::__h::shared_ptr<OHOS::Rosen::Drawing::DrawCmdList>, OHOS::Rosen::Drawing::RectF*)";
       "OHOS::Ace::NG::RosenRenderContext::SetHDRColorHeadRoom(float)";
+      "OHOS::Ace::NG::SafeAreaInsetEdgeOptions::operator!=(OHOS::Ace::NG::SafeAreaInsetEdgeOptions const&) const";
+      "OHOS::Ace::NG::SafeAreaInsetEdgeOptions::operator==(OHOS::Ace::NG::SafeAreaInsetEdgeOptions const&) const";
+      "OHOS::Ace::NG::SafeAreaInsetOptions::Empty() const";
+      "OHOS::Ace::NG::SafeAreaInsetOptions::GetEdge(OHOS::Ace::NG::SafeAreaInsetEdge)";
+      "OHOS::Ace::NG::SafeAreaInsetOptions::GetEdge(OHOS::Ace::NG::SafeAreaInsetEdge) const";
+      "OHOS::Ace::NG::SafeAreaInsetOptions::operator!=(OHOS::Ace::NG::SafeAreaInsetOptions const&) const";
+      "OHOS::Ace::NG::SafeAreaInsetOptions::operator==(OHOS::Ace::NG::SafeAreaInsetOptions const&) const";
       "OHOS::Ace::NG::SafeAreaInsets::Inset::ToString() const";
       "OHOS::Ace::NG::SafeAreaInsets::ToString() const";
       "OHOS::Ace::NG::RosenRenderContext::SetUIFirstSwitch(OHOS::Rosen::RSUIFirstSwitch)";
@@ -4540,11 +4549,13 @@
       "OHOS::Ace::NG::LayoutProperty::GetPaddingProperty() const";
       "OHOS::Ace::NG::LayoutProperty::GetPixelRound() const";
       "OHOS::Ace::NG::LayoutProperty::GetPositionProperty() const";
+      "OHOS::Ace::NG::LayoutProperty::GetResolvedSafeAreaInsetEdge(OHOS::Ace::NG::SafeAreaInsetEdge) const";
       "OHOS::Ace::NG::LayoutProperty::GetSafeAreaExpandOpts() const";
       "OHOS::Ace::NG::LayoutProperty::GetSafeAreaInsets() const";
       "OHOS::Ace::NG::LayoutProperty::GetSafeAreaPaddingProperty() const";
       "OHOS::Ace::NG::LayoutProperty::HasFixedHeight(bool) const";
       "OHOS::Ace::NG::LayoutProperty::HasFixedWidth(bool) const";
+      "OHOS::Ace::NG::LayoutProperty::HasSafeAreaInset() const";
       "OHOS::Ace::NG::LayoutProperty::HasUserDefinedHeightConfig() const";
       "OHOS::Ace::NG::LayoutProperty::IsIgnoreOptsValid() const";
       "OHOS::Ace::NG::LayoutProperty::ResetAlignSelf()";

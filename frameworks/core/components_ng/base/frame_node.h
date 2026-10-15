@@ -333,6 +333,7 @@ enum class LpxAttribute {
     LPX_STROKE_WIDTH,
     LPX_TEXT_INDENT,
     LPX_TEXT_SPAN,
+    LPX_SAFE_AREA_INSET_SPACING,
     ALWAYS
 };
 
@@ -998,6 +999,13 @@ public:
     RefPtr<FrameNode> GetOverlayNode() const
     {
         return overlayNode_;
+    }
+
+    void SetSafeAreaInsetNode(const RefPtr<FrameNode>& safeAreaInsetNode);
+
+    RefPtr<FrameNode> GetSafeAreaInsetNode() const
+    {
+        return safeAreaInsetNode_;
     }
 
     RefPtr<FrameNode> FindChildByPosition(float x, float y);
@@ -1667,7 +1675,10 @@ public:
     void UnRegisterLpxUpdateCallback(LpxAttribute attribute);
     void FireLpxUpdateCallbacks();
     bool IsNeedLazyLayout() const;
+    void MeasureSafeAreaInset() override;
 protected:
+    void LayoutSafeAreaInset() override;
+
     void DumpInfo() override;
     std::unordered_map<std::string, std::function<void()>> destroyCallbacksMap_;
     void DumpInfo(std::unique_ptr<JsonValue>& json) override;
@@ -1988,6 +1999,8 @@ private:
     bool hasPreMake_ = false;
 
     RefPtr<FrameNode> overlayNode_;
+
+    RefPtr<FrameNode> safeAreaInsetNode_;
 
     RefPtr<FrameNode> paintNode_;
 

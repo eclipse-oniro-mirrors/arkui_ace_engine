@@ -162,6 +162,7 @@ ohos_unittest("arkui_rosen_render_context_test") {
     "$ace_root/test/mock/frameworks/core/common/mock_theme_constants.cpp",
     "$ace_root/test/mock/frameworks/core/common/mock_udmf.cpp",
     "$ace_root/test/mock/frameworks/core/common/mock_window.cpp",
+    "$ace_root/test/mock/frameworks/core/common/mock_xcollieInterface.cpp",
     "$ace_root/test/mock/frameworks/core/event/mock_point_event.cpp",
     "$ace_root/test/mock/frameworks/core/event/mock_statusbar_event_proxy.cpp",
     "$ace_root/test/mock/frameworks/core/event/mock_touch_event.cpp",

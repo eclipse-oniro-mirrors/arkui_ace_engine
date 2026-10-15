@@ -424,6 +424,7 @@ ohos_static_library("ace_components_layout") {
     "$ace_root/frameworks/core/components_ng/layout/layout_wrapper_node.cpp",
     "$ace_root/frameworks/core/components_ng/layout/overlay_safe_area_helper.cpp",
     "$ace_root/frameworks/core/components_ng/layout/vertical_overflow_handler.cpp",
+    "$ace_root/frameworks/core/components_ng/pattern/safe_area_inset/safe_area_inset_pattern.cpp",
   ]
   deps = []
   configs = [ ":ace_unittest_config" ]
@@ -1518,6 +1519,8 @@ ohos_static_library("ace_components_pattern") {
     "$ace_root/frameworks/core/components_ng/pattern/scrollable/selectable_item_event_hub.cpp",
     "$ace_root/frameworks/core/components_ng/pattern/scrollable/selectable_item_pattern.cpp",
     "$ace_root/frameworks/core/components_ng/pattern/scrollable/selectable_utils.cpp",
+    "$ace_root/frameworks/core/components_ng/pattern/safe_area_inset/safe_area_inset_layout_algorithm.cpp",
+    "$ace_root/frameworks/core/components_ng/pattern/safe_area_inset/safe_area_inset_pattern.cpp",
     "$ace_root/frameworks/core/components_ng/pattern/search/search_event_hub.cpp",
     "$ace_root/frameworks/core/components_ng/pattern/search/search_gesture_event_hub.cpp",
     "$ace_root/frameworks/core/components_ng/pattern/search/search_layout_algorithm.cpp",

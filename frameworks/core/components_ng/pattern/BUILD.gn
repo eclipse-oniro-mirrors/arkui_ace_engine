@@ -363,9 +363,11 @@ build_component_ng("pattern_ng") {
     "container_modal/interfaces:customtitle",
   ]
 
+  component_ng_deps = [ "safe_area_inset" ]
+
   if (!is_arkui_x) {
     deps += [ "smart_layout/engine:smartlayout" ]
-    component_ng_deps = [
+    component_ng_deps += [
       "arc_list",
       "arc_scroll_bar",
     ]
