@@ -5426,6 +5426,13 @@ void OverlayManager::RemoveFilterAnimation()
         return;
     }
 
+    if (hasFilterActived_) {
+        TAG_LOGI(AceLogTag::ACE_OVERLAY,
+            "filter show animation still active (hasFilterActived_=true), skip disappear for filterId=%{public}d",
+            filterNode->GetId());
+        return;
+    }
+
     ShowFilterDisappearAnimation(filterNode);
 }
 

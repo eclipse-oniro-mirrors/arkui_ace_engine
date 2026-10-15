@@ -628,7 +628,7 @@ public:
 
     void SetFilterActive(bool actived)
     {
-        hasFilterActived = actived;
+        hasFilterActived_ = actived;
     }
 
     void SetDismissPopupId(int32_t targetId)
@@ -979,7 +979,7 @@ private:
     bool keyboardAvoidance_ = false;
     ACE_DISALLOW_COPY_AND_MOVE(OverlayManager);
 
-    bool hasFilterActived {false};
+    bool hasFilterActived_ {false};
 
     std::function<void()> onSheetMiniDragStart_;
     std::function<void()> onSheetMiniDragResume_;
