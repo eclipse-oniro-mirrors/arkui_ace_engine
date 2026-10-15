@@ -29101,6 +29101,8 @@ typedef struct GENERATED_ArkUIWebModifier {
                                        const Opt_Boolean* value);
     void (*setOnZoomChange)(Ark_NativePointer node,
                             const Opt_OnZoomChangeCallback* value);
+    void (*setFlingSpeedLimit)(Ark_NativePointer node,
+                               const Opt_Float64* value);
     void (*setRegisterNativeEmbedRule)(Ark_NativePointer node,
                                        const Opt_String* tag,
                                        const Opt_String* type);

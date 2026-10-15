@@ -1798,6 +1798,7 @@ public:
 #endif
     }
     void SetForceEnableZoom(bool isEnabled);
+    void SetFlingSpeedLimit(float speedLimit);
     bool IsShowHandle();
     void OnSafeBrowsingCheckFinish(int threat_type);
     bool IsPcMode();

@@ -684,6 +684,7 @@ public:
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, GestureFocusMode, GestureFocusMode);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, RotateRenderEffect, WebRotateEffect);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, ForceEnableZoom, bool);
+    ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, FlingSpeedLimit, float);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, BackToTop, bool);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, EnableAutoFill, bool);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, EnableDefaultContextMenu, bool);
@@ -1314,6 +1315,7 @@ private:
     void OnRotateRenderEffectUpdate(WebRotateEffect effect);
     void WebRotateRenderEffect(WindowSizeChangeReason type);
     void OnForceEnableZoomUpdate(bool value);
+    void OnFlingSpeedLimitUpdate(float value);
     void OnEnableAutoFillUpdate(bool isEnabled);
     void OnEnableDefaultContextMenuUpdate(bool isEnabled);
     void OnEnableDragUpdate(bool isEnabled);

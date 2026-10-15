@@ -9914,6 +9914,10 @@ class ArkWebComponent extends ArkComponent {
     modifierWithKey(this._modifiersWithKeys, WebForceEnableZoomModifier.identity, WebForceEnableZoomModifier, enabled);
     return this;
   }
+  flingSpeedLimit(value) {
+    modifierWithKey(this._modifiersWithKeys, WebFlingSpeedLimitModifier.identity, WebFlingSpeedLimitModifier, value);
+    return this;
+  }
   rotateRenderEffect(effect) {
     modifierWithKey(this._modifiersWithKeys, WebRotateRenderEffectModifier.identity, WebRotateRenderEffectModifier, effect);
     return this;
@@ -11662,6 +11666,20 @@ class WebForceEnableZoomModifier extends ModifierWithKey {
   }
 }
 WebForceEnableZoomModifier.identity = Symbol('webForceEnableZoomModifier');
+
+class WebFlingSpeedLimitModifier extends ModifierWithKey {
+  constructor(value) {
+    super(value);
+  }
+  applyPeer(node, reset) {
+    if (reset) {
+      getUINativeModule().web.resetFlingSpeedLimit(node);
+    } else {
+      getUINativeModule().web.setFlingSpeedLimit(node, this.value);
+    }
+  }
+}
+WebFlingSpeedLimitModifier.identity = Symbol('webFlingSpeedLimit');
 
 class WebBackToTopModifier extends ModifierWithKey {
   constructor(value) {

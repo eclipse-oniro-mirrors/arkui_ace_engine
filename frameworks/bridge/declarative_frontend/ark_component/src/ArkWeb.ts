@@ -1616,6 +1616,20 @@ class WebForceEnableZoomModifier extends ModifierWithKey<boolean> {
   }
 }
 
+class WebFlingSpeedLimitModifier extends ModifierWithKey<number> {
+  constructor(value: number) {
+    super(value);
+  }
+  static identity: Symbol = Symbol('webFlingSpeedLimit');
+  applyPeer(node: KNode, reset: boolean): void {
+    if (reset) {
+      getUINativeModule().web.resetFlingSpeedLimit(node);
+    } else {
+      getUINativeModule().web.setFlingSpeedLimit(node, this.value);
+    }
+  }
+}
+
 class WebBackToTopModifier extends ModifierWithKey<boolean> {
   constructor(value: boolean) {
     super(value);
@@ -2369,6 +2383,10 @@ class ArkWebComponent extends ArkComponent implements WebAttribute {
   }
   forceEnableZoom(forceEnableZoom: boolean): this {
     modifierWithKey(this._modifiersWithKeys, WebForceEnableZoomModifier.identity, WebForceEnableZoomModifier, forceEnableZoom);
+    return this;
+  }
+  flingSpeedLimit(value: number): this {
+    modifierWithKey(this._modifiersWithKeys, WebFlingSpeedLimitModifier.identity, WebFlingSpeedLimitModifier, value);
     return this;
   }
   rotateRenderEffect(effect: WebRotateEffect): this {

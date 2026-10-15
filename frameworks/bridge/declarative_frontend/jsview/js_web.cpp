@@ -2542,6 +2542,7 @@ void JSWeb::JSBind(BindingTarget globalObj)
     JSClass<JSWeb>::StaticMethod("textZoomRatio", &JSWeb::TextZoomRatio);
     JSClass<JSWeb>::StaticMethod("textZoomAtio", &JSWeb::TextZoomRatio);
     JSClass<JSWeb>::StaticMethod("initialScale", &JSWeb::InitialScale);
+    JSClass<JSWeb>::StaticMethod("flingSpeedLimit", &JSWeb::FlingSpeedLimit);
     JSClass<JSWeb>::StaticMethod("backgroundColor", &JSWeb::BackgroundColor);
     JSClass<JSWeb>::StaticMethod("onKeyEvent", &JSWeb::OnKeyEvent);
     JSClass<JSWeb>::StaticMethod("onTouch", &JSInteractableView::JsOnTouch);
@@ -5511,6 +5512,11 @@ void JSWeb::BackgroundColor(const JSCallbackInfo& info)
 void JSWeb::InitialScale(float scale)
 {
     WebModel::GetInstance()->InitialScale(scale);
+}
+
+void JSWeb::FlingSpeedLimit(float speedLimit)
+{
+    WebModel::GetInstance()->SetFlingSpeedLimit(speedLimit);
 }
 
 void JSWeb::Password(bool password)

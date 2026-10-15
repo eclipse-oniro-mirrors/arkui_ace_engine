@@ -107,6 +107,7 @@ public:
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, BlankScreenDetectionConfig, BlankScreenDetectionConfig);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, RotateRenderEffect, WebRotateEffect);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, ForceEnableZoom, bool);
+    ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, FlingSpeedLimit, float);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, BackToTop, bool);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, EnableSelectedDataDetector, bool);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, ZoomControlAccess, bool);
@@ -280,6 +281,7 @@ private:
     void OnBlankScreenDetectionConfigUpdate(const BlankScreenDetectionConfig &config) {}
     void OnRotateRenderEffectUpdate(WebRotateEffect effect) {}
     void OnForceEnableZoomUpdate(bool value) {}
+    void OnFlingSpeedLimitUpdate(float value) {}
     void OnBackToTopUpdate(bool isBackToTop) {}
     void OnEnableSelectedDataDetectorUpdate(bool enable) {}
     void OnZoomControlAccessUpdate(bool zoomControlAccess) {}

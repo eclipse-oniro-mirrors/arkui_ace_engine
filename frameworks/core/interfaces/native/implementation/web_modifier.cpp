@@ -559,6 +559,20 @@ void SetInitialScaleImpl(Ark_NativePointer node,
     WebModelStatic::InitialScale(frameNode, *convValue);
 #endif // WEB_SUPPORTED
 }
+void SetFlingSpeedLimitImpl(Ark_NativePointer node,
+                            const Opt_Float64* value)
+{
+#ifdef WEB_SUPPORTED
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto convValue = Converter::OptConvert<float>(*value);
+    if (!convValue) {
+        WebModelStatic::SetFlingSpeedLimit(frameNode, 0.0f);
+        return;
+    }
+    WebModelStatic::SetFlingSpeedLimit(frameNode, *convValue);
+#endif // WEB_SUPPORTED
+}
 void UserAgentImpl(Ark_NativePointer node,
                    const Opt_String* value)
 {
@@ -3375,6 +3389,7 @@ const GENERATED_ArkUIWebModifier* GetWebModifier()
         WebAttributeModifier::SetEnableFullscreenVideoOverlayImpl,
         WebAttributeModifier::SetEnableMediaNetworkProxyImpl,
         WebAttributeModifier::SetOnZoomChangeImpl,
+        WebAttributeModifier::SetFlingSpeedLimitImpl,
         WebAttributeModifier::SetRegisterNativeEmbedRuleImpl,
         WebAttributeModifier::SetBindSelectionMenuImpl,
         WebAttributeModifier::SetEnableScrollDirectionalLockImpl,

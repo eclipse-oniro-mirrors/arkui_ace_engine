@@ -550,6 +550,13 @@ void WebModelNG::SetZoomAccessEnabled(bool isZoomAccessEnabled)
     webPattern->UpdateZoomAccessEnabled(isZoomAccessEnabled);
 }
 
+void WebModelNG::SetFlingSpeedLimit(float speedLimit)
+{
+    auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
+    CHECK_NULL_VOID(webPattern);
+    webPattern->UpdateFlingSpeedLimit(NormalizeFlingSpeedLimit(speedLimit));
+}
+
 void WebModelNG::SetZoomControlAccess(bool zoomControlAccess)
 {
     auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
@@ -2892,6 +2899,14 @@ void WebModelNG::SetForceEnableZoom(FrameNode* frameNode, bool isEnabled)
     auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
     CHECK_NULL_VOID(webPattern);
     webPattern->UpdateForceEnableZoom(isEnabled);
+}
+
+void WebModelNG::SetFlingSpeedLimit(FrameNode* frameNode, float speedLimit)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    CHECK_NULL_VOID(webPattern);
+    webPattern->UpdateFlingSpeedLimit(NormalizeFlingSpeedLimit(speedLimit));
 }
 
 void WebModelNG::SetSafeBrowsingCheckFinishId(

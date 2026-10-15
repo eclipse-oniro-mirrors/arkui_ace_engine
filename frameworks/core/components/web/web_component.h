@@ -1309,6 +1309,16 @@ public:
         isForceEnableZoom_ = isEnabled;
     }
 
+    float GetFlingSpeedLimit() const
+    {
+        return flingSpeedLimit_;
+    }
+
+    void SetFlingSpeedLimit(float speedLimit)
+    {
+        flingSpeedLimit_ = speedLimit;
+    }
+
     using OnVerifyPinRequestImpl = std::function<bool(const BaseEventInfo* info)>;
     bool OnVerifyPinRequest(const BaseEventInfo* info) const
     {
@@ -1411,6 +1421,8 @@ private:
     bool emulateTouchFromMouseEvent_ = false;
     bool isParserBudgetOptimized_ = false;
     bool isForceEnableZoom_ = true;
+    // 0.0f means no override; NWeb uses its default (9000 on PC, 17000 on non-PC)
+    float flingSpeedLimit_ = 0.0f;
 };
 
 } // namespace OHOS::Ace

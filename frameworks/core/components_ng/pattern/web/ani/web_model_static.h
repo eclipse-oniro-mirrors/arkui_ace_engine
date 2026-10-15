@@ -216,6 +216,7 @@ public:
     static void SetNativeEmbedObjectParamChangeId(
         FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& callback);
     static void SetForceEnableZoom(FrameNode* frameNode, bool isForceEnableZoom);
+    static void SetFlingSpeedLimit(FrameNode* frameNode, float speedLimit);
     static void SetRotateRenderEffect(FrameNode* frameNode, const std::optional<WebRotateEffect>& effect);
     static void SetNativeEmbedGestureEventId(
         FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& callback);
