@@ -22,6 +22,7 @@
 #include <vector>
 
 #include "base/utils/time_util.h"
+#include "core/components_ng/property/layout_constraint.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_manager.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_shell_node.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_types.h"
@@ -500,6 +501,125 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderRegisteredTemplateFlow001
     EXPECT_TRUE(pattern_->retiringPlaceholderShells_.empty());
     // The template content went back to the per-template instance pool.
     EXPECT_GE(manager->GetCachedInstanceCount("tpl-shell"), 1u);
+}
+
+/**
+ * @tc.name: ScrollPlaceholderShellMeasure001
+ * @tc.desc: Device finding: every live shell measures 0x0 (shell and content). This
+ *           case discriminates on host without typography: a template source with an
+ *           explicit ideal size must measure through the exact wrapper path GetListItem
+ *           hands to the list layout. If this measures 0x0 here, the shell measurement
+ *           chain itself is broken (list side); if it measures the source size, the
+ *           chain is fine and the device zero comes from text-specific measurement.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderShellMeasure001, TestSize.Level1)
+{
+    constexpr float sourceWidth = 100.0f;
+    constexpr float sourceHeight = 50.0f;
+    auto manager = MockPipelineContext::GetCurrent()->GetOrCreateScrollPlaceholderManager();
+    ASSERT_TRUE(manager);
+    manager->RegisterTemplate("tpl-sized", []() -> RefPtr<UINode> {
+        auto root = FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG,
+            ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<LinearLayoutPattern>(false));
+        root->GetLayoutProperty()->UpdateUserDefinedIdealSize(
+            CalcSize(CalcLength(sourceWidth), CalcLength(sourceHeight)));
+        return root;
+    });
+    CreatePlaceholderList(
+        [](int32_t index) -> std::optional<ScrollPlaceholderOptions> {
+            return MakeSizedPlaceholderOptions("tpl-sized");
+        },
+        true);
+    CreateItemsAndDone();
+
+    int32_t index = FindUnbuiltSlot();
+    ASSERT_GE(index, 0);
+    auto shell = pattern_->CreateScrollPlaceholderShell(index);
+    ASSERT_TRUE(shell);
+    ASSERT_EQ(shell->GetChildren().size(), 1u);
+
+    // Measure the wrapper exactly the way GetListItem hands it to the list layout.
+    LayoutConstraintF constraint;
+    constraint.maxSize = { 1080.0f, 5000.0f };
+    constraint.percentReference = { 1080.0f, 5000.0f };
+    auto wrapper = shell->CreateLayoutWrapper(true, true);
+    wrapper->GetLayoutProperty()->UpdateLayoutConstraint(constraint);
+    wrapper->GetLayoutProperty()->UpdatePropertyChangeFlag(PROPERTY_UPDATE_MEASURE);
+    wrapper->Measure(constraint);
+    auto shellSize = wrapper->GetGeometryNode()->GetFrameSize();
+    GTEST_LOG_(INFO) << "ShellMeasure shell=" << shellSize.Width() << "x" << shellSize.Height();
+    // LayoutWrapperNode::GetChildByIndex hard-returns nullptr; the wrapper tree is
+    // addressed through the children list.
+    auto contentWrappers = wrapper->GetAllChildrenWithBuild(false);
+    ASSERT_FALSE(contentWrappers.empty());
+    auto contentSize = (*contentWrappers.begin())->GetGeometryNode()->GetFrameSize();
+    GTEST_LOG_(INFO) << "ShellMeasure content=" << contentSize.Width() << "x" << contentSize.Height();
+
+    EXPECT_FLOAT_EQ(contentSize.Width(), sourceWidth);
+    EXPECT_FLOAT_EQ(contentSize.Height(), sourceHeight);
+    // With a provider size the shell takes it as its ideal size (ListItem semantics).
+    EXPECT_FLOAT_EQ(shellSize.Width(), ITEM_MAIN_SIZE);
+    EXPECT_FLOAT_EQ(shellSize.Height(), ITEM_MAIN_SIZE);
+}
+
+/**
+ * @tc.name: ScrollPlaceholderShellMeasureNoProviderSize001
+ * @tc.desc: The device demo shape: the provider returns only the template id, so the
+ *           shell has no ideal size and its extent must come from measuring the content
+ *           through the ListItem constraint chain. A sized template source must still
+ *           measure through (device shows 0x0 there with a text source). This case
+ *           decides on host whether the no-size shell constraint chain itself is broken.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderShellMeasureNoProviderSize001, TestSize.Level1)
+{
+    constexpr float sourceWidth = 100.0f;
+    constexpr float sourceHeight = 50.0f;
+    auto manager = MockPipelineContext::GetCurrent()->GetOrCreateScrollPlaceholderManager();
+    ASSERT_TRUE(manager);
+    manager->RegisterTemplate("tpl-sized-nosize", []() -> RefPtr<UINode> {
+        auto root = FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG,
+            ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<LinearLayoutPattern>(false));
+        root->GetLayoutProperty()->UpdateUserDefinedIdealSize(
+            CalcSize(CalcLength(sourceWidth), CalcLength(sourceHeight)));
+        return root;
+    });
+    CreatePlaceholderList(
+        [](int32_t index) -> std::optional<ScrollPlaceholderOptions> {
+            ScrollPlaceholderOptions options;
+            options.id = "tpl-sized-nosize";
+            return options;
+        },
+        true);
+    CreateItemsAndDone();
+
+    int32_t index = FindUnbuiltSlot();
+    ASSERT_GE(index, 0);
+    auto shell = pattern_->CreateScrollPlaceholderShell(index);
+    ASSERT_TRUE(shell);
+    ASSERT_EQ(shell->GetChildren().size(), 1u);
+
+    LayoutConstraintF constraint;
+    constraint.maxSize = { 1080.0f, 5000.0f };
+    constraint.percentReference = { 1080.0f, 5000.0f };
+    auto wrapper = shell->CreateLayoutWrapper(true, true);
+    wrapper->GetLayoutProperty()->UpdateLayoutConstraint(constraint);
+    wrapper->GetLayoutProperty()->UpdatePropertyChangeFlag(PROPERTY_UPDATE_MEASURE);
+    wrapper->Measure(constraint);
+    auto shellSize = wrapper->GetGeometryNode()->GetFrameSize();
+    auto contentWrappers = wrapper->GetAllChildrenWithBuild(false);
+    ASSERT_FALSE(contentWrappers.empty());
+    auto contentSize = (*contentWrappers.begin())->GetGeometryNode()->GetFrameSize();
+    GTEST_LOG_(INFO) << "ShellMeasureNoSize shell=" << shellSize.Width() << "x" << shellSize.Height()
+                     << " content=" << contentSize.Width() << "x" << contentSize.Height();
+
+    // Without a provider size the shell sizes to its content: the sized template source
+    // must measure through the ListItem constraint chain.
+    EXPECT_FLOAT_EQ(contentSize.Width(), sourceWidth);
+    EXPECT_FLOAT_EQ(contentSize.Height(), sourceHeight);
+    EXPECT_FLOAT_EQ(shellSize.Width(), sourceWidth);
+    EXPECT_FLOAT_EQ(shellSize.Height(), sourceHeight);
 }
 
 /**

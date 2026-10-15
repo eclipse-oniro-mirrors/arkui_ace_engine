@@ -263,6 +263,24 @@ void ActivatePlaceholderSubtree(const RefPtr<UINode>& node)
     }
 }
 
+// Offline-built instance subtrees also never went through the pipeline dirty flow:
+// their patterns never ran OnModifyDone, and on device a text template measured
+// 0x0 from the shell wrapper's forceMeasure alone. BuilderNode does the same when
+// attaching an offline tree — mark the subtree dirty for measure+layout so the
+// pipeline runs the full modify/measure/layout/paint initialization, and the host
+// re-measures once the content gains its real extent. Must run after the shell is
+// mounted, so the subtree is on the main tree with a pipeline context attached.
+void MarkPlaceholderSubtreeDirty(const RefPtr<UINode>& node)
+{
+    auto frame = AceType::DynamicCast<FrameNode>(node);
+    if (frame) {
+        frame->MarkDirtyNode(PROPERTY_UPDATE_MEASURE | PROPERTY_UPDATE_LAYOUT);
+    }
+    for (const auto& child : node->GetChildren()) {
+        MarkPlaceholderSubtreeDirty(child);
+    }
+}
+
 // Post-layout state of one live shell for on-device triage: distinguishes "content
 // never mounted" (none), "content never measured" (zero-size content) and
 // "measured but not painted" (non-zero size, still blank visually).
@@ -350,6 +368,9 @@ void MountPlaceholderShellOnHost(const RefPtr<FrameNode>& host, const RefPtr<Fra
         shell->AttachToMainTree(false, context);
     }
     shell->MarkNeedSyncRenderTree();
+    for (const auto& child : shell->GetChildren()) {
+        MarkPlaceholderSubtreeDirty(child);
+    }
 }
 } // namespace
 
