@@ -143,9 +143,9 @@ TEST_F(PageTextOverlayTest, CommonOverlayWithoutTranslationManager)
         EXPECT_EQ(item->GetInt("id"), nodes_[index]->GetId());
         EXPECT_EQ(item->GetString("content"), tags[index] + " overlay");
         auto rect = item->GetValue("rect");
-        ASSERT_EQ(rect->GetArraySize(), 4);
-        EXPECT_EQ(rect->GetArrayItem(2)->GetDouble(), FRAME_WIDTH);
-        EXPECT_EQ(rect->GetArrayItem(3)->GetDouble(), FRAME_HEIGHT);
+        ASSERT_EQ(rect->GetArraySize(), 4); // Four entries: x, y, width, height.
+        EXPECT_EQ(rect->GetArrayItem(2)->GetDouble(), FRAME_WIDTH); // Index 2 is width.
+        EXPECT_EQ(rect->GetArrayItem(3)->GetDouble(), FRAME_HEIGHT); // Index 3 is height.
     }
 }
 
@@ -237,6 +237,24 @@ public:
         return owner;
     }
 
+    void SetUpSliderThemes()
+    {
+        auto themes = AceType::MakeRefPtr<testing::NiceMock<MockThemeManager>>();
+        auto themeFor = [](ThemeType type) -> RefPtr<Theme> {
+            if (type == SliderTheme::TypeId()) {
+                return AceType::MakeRefPtr<SliderTheme>();
+            }
+            if (type == TextTheme::TypeId()) {
+                return AceType::MakeRefPtr<TextTheme>();
+            }
+            return nullptr;
+        };
+        ON_CALL(*themes, GetTheme(testing::_)).WillByDefault(themeFor);
+        ON_CALL(*themes, GetTheme(testing::_, testing::_))
+            .WillByDefault([themeFor](ThemeType type, int32_t) { return themeFor(type); });
+        pipeline_->SetThemeManager(themes);
+    }
+
     bool Contains(const std::string& content)
     {
         auto texts = Collect();
@@ -270,6 +288,7 @@ TEST_F(PageTextCollectionTest, UnregisteredTextAndInputAffixes)
     pattern->placeholderResponseArea_ = area;
     pipeline_->uiTranslateManager_.reset();
     auto texts = Collect();
+    // Only the error message and unit label are collected, giving two entries.
     EXPECT_EQ(texts->GetArraySize(), 2);
     EXPECT_TRUE(Contains("error message"));
     EXPECT_TRUE(Contains("kg"));
@@ -347,6 +366,7 @@ TEST_F(PageTextCollectionTest, ReadyTextDeduplicationAndUpdate)
     EXPECT_EQ(Collect()->GetArraySize(), 0);
     auto firstSlash = Text(u"/");
     auto secondSlash = Text(u"/");
+    // The two distinct slash nodes remain separate entries even though their content is identical.
     EXPECT_EQ(Collect()->GetArraySize(), 2);
 }
 
@@ -515,8 +535,8 @@ TEST_F(PageTextCollectionTest, ProgressUsesGeneratedTextOnly)
     auto text = Text(u"");
     progress->AddChild(text);
     auto paint = progress->GetPaintProperty<ProgressPaintProperty>();
-    paint->UpdateMaxValue(100.0);
-    paint->UpdateValue(37.0);
+    paint->UpdateMaxValue(100.0); // A full range of 100 makes the value a percentage.
+    paint->UpdateValue(37.0); // Produces the expected "37%" label.
     paint->UpdateEnableShowText(true);
     ProgressModelNG::SetText(AceType::RawPtr(progress), std::nullopt);
     SetText(text, text->GetLayoutProperty<TextLayoutProperty>()->GetContentValue(u""));
@@ -553,10 +573,12 @@ TEST_F(PageTextCollectionTest, BackgroundAlignmentUsesHostWindowOffset)
     auto item = texts->GetArrayItem(0);
     EXPECT_EQ(item->GetInt("id"), text->GetId());
     auto rect = item->GetValue("rect");
+    // x = host origin 100 + centered offset (200 - 100) / 2 + text offset 10 = 160.
     EXPECT_DOUBLE_EQ(rect->GetArrayItem(0)->GetDouble(), 160.0);
+    // y = host origin 200 + centered offset (100 - 40) / 2 + text offset 5 = 235.
     EXPECT_DOUBLE_EQ(rect->GetArrayItem(1)->GetDouble(), 235.0);
-    EXPECT_DOUBLE_EQ(rect->GetArrayItem(2)->GetDouble(), 20.0);
-    EXPECT_DOUBLE_EQ(rect->GetArrayItem(3)->GetDouble(), 10.0);
+    EXPECT_DOUBLE_EQ(rect->GetArrayItem(2)->GetDouble(), 20.0); // Index 2 is the text frame width.
+    EXPECT_DOUBLE_EQ(rect->GetArrayItem(3)->GetDouble(), 10.0); // Index 3 is the text frame height.
 }
 
 TEST_F(PageTextCollectionTest, NestedBackgroundUsesOuterHostPosition)
@@ -581,7 +603,9 @@ TEST_F(PageTextCollectionTest, NestedBackgroundUsesOuterHostPosition)
     auto texts = Collect();
     ASSERT_EQ(texts->GetArraySize(), 1);
     auto rect = texts->GetArrayItem(0)->GetValue("rect");
+    // x = outer host 50 + inner host 10 + text offset 3 = 63.
     EXPECT_DOUBLE_EQ(rect->GetArrayItem(0)->GetDouble(), 63.0);
+    // y = outer host 60 + inner host 5 + text offset 4 = 69.
     EXPECT_DOUBLE_EQ(rect->GetArrayItem(1)->GetDouble(), 69.0);
     host->SetActive(false);
     EXPECT_EQ(Collect()->GetArraySize(), 0);
@@ -616,7 +640,9 @@ TEST_F(PageTextCollectionTest, NestedBackgroundComposesScale)
     auto texts = Collect();
     ASSERT_EQ(texts->GetArraySize(), 1);
     auto rect = texts->GetArrayItem(0)->GetValue("rect");
+    // x = (inner host offset 10 + text offset 3) * outer scale 2 = 26.
     EXPECT_DOUBLE_EQ(rect->GetArrayItem(0)->GetDouble(), 26.0);
+    // y = (inner host offset 7 + text offset 4) * outer scale 2 = 22.
     EXPECT_DOUBLE_EQ(rect->GetArrayItem(1)->GetDouble(), 22.0);
 
     // Outer scale (2, 3), inner scale (4, 0.5), with a nonzero window origin.
@@ -629,10 +655,11 @@ TEST_F(PageTextCollectionTest, NestedBackgroundComposesScale)
     auto item = texts->GetArrayItem(0);
     EXPECT_EQ(item->GetInt("id"), text->GetId());
     rect = item->GetValue("rect");
+    // The window origin and scaled inner-host/text offsets produce x = 94 and y = 87.
     EXPECT_DOUBLE_EQ(rect->GetArrayItem(0)->GetDouble(), 94.0); // 50 + 10 * 2 + 3 * 4 * 2
     EXPECT_DOUBLE_EQ(rect->GetArrayItem(1)->GetDouble(), 87.0); // 60 + 7 * 3 + 4 * 0.5 * 3
-    EXPECT_DOUBLE_EQ(rect->GetArrayItem(2)->GetDouble(), FRAME_WIDTH);
-    EXPECT_DOUBLE_EQ(rect->GetArrayItem(3)->GetDouble(), FRAME_HEIGHT);
+    EXPECT_DOUBLE_EQ(rect->GetArrayItem(2)->GetDouble(), FRAME_WIDTH); // Index 2 is width.
+    EXPECT_DOUBLE_EQ(rect->GetArrayItem(3)->GetDouble(), FRAME_HEIGHT); // Index 3 is height.
 
     // Inner alignment is also expressed in the outer background's coordinate space.
     innerHost->GetRenderContext()->UpdateBackgroundAlign(Alignment::CENTER);
@@ -640,6 +667,7 @@ TEST_F(PageTextCollectionTest, NestedBackgroundComposesScale)
     texts = Collect();
     ASSERT_EQ(texts->GetArraySize(), 1);
     rect = texts->GetArrayItem(0)->GetValue("rect");
+    // Centering adds local offsets (10, 5) before scaling, giving the window position (174, 94.5).
     EXPECT_DOUBLE_EQ(rect->GetArrayItem(0)->GetDouble(), 174.0); // 50 + 10 * 2 + (3 + 10) * 4 * 2
     EXPECT_DOUBLE_EQ(rect->GetArrayItem(1)->GetDouble(), 94.5); // 60 + 7 * 3 + (4 + 5) * 0.5 * 3
 }
@@ -672,11 +700,13 @@ public:
     void SetUp() override
     {
         PageTextCollectionTest::SetUp();
+        // Main window: screen origin (100, 200), width 800, height 600.
         pipeline_->displayWindowRectInfo_ = Rect(100.0, 200.0, 800.0, 600.0);
         MockPipelineContext::SetUp();
         childPipeline_ = MockPipelineContext::GetCurrent();
         MockPipelineContext::pipeline_ = pipeline_;
         childPipeline_->instanceId_ = CHILD_ID;
+        // Child window: screen origin (130, 240), offset (30, 40) from the main window, same size.
         childPipeline_->displayWindowRectInfo_ = Rect(130.0, 240.0, 800.0, 600.0);
         auto root = CreateNode("SubwindowRoot");
         root->AttachContext(AceType::RawPtr(childPipeline_));
@@ -760,16 +790,18 @@ TEST_F(PageTextFloatingTest, ContextMenusUseOwnerScopeAndWindowCoordinates)
     ASSERT_TRUE(Contains("T561_155_A"));
     ASSERT_TRUE(Contains("T561_272_A"));
     auto texts = Collect();
+    // The long-press menu and controlled menu each contribute one text entry.
     ASSERT_EQ(texts->GetArraySize(), 2);
     auto rect = texts->GetArrayItem(0)->GetValue("rect");
-    EXPECT_DOUBLE_EQ(rect->GetArrayItem(0)->GetDouble(), 30.0);
-    EXPECT_DOUBLE_EQ(rect->GetArrayItem(1)->GetDouble(), 40.0);
-    EXPECT_DOUBLE_EQ(rect->GetArrayItem(2)->GetDouble(), FRAME_WIDTH);
+    EXPECT_DOUBLE_EQ(rect->GetArrayItem(0)->GetDouble(), 30.0); // x = child origin 130 - main origin 100.
+    EXPECT_DOUBLE_EQ(rect->GetArrayItem(1)->GetDouble(), 40.0); // y = child origin 240 - main origin 200.
+    EXPECT_DOUBLE_EQ(rect->GetArrayItem(2)->GetDouble(), FRAME_WIDTH); // Index 2 is width.
+    // Move the child window to screen origin (150, 260), retaining its size of 800 by 600.
     childPipeline_->displayWindowRectInfo_ = Rect(150.0, 260.0, 800.0, 600.0);
     auto moved = Collect();
     auto movedRect = moved->GetArrayItem(0)->GetValue("rect");
-    EXPECT_DOUBLE_EQ(movedRect->GetArrayItem(0)->GetDouble(), 50.0);
-    EXPECT_DOUBLE_EQ(movedRect->GetArrayItem(1)->GetDouble(), 60.0);
+    EXPECT_DOUBLE_EQ(movedRect->GetArrayItem(0)->GetDouble(), 50.0); // x = moved origin 150 - main origin 100.
+    EXPECT_DOUBLE_EQ(movedRect->GetArrayItem(1)->GetDouble(), 60.0); // y = moved origin 260 - main origin 200.
     controlledMenu->GetPattern<MenuWrapperPattern>()->menuStatus_ = MenuStatus::HIDE;
     EXPECT_FALSE(Contains("T561_272_A"));
     EXPECT_TRUE(Contains("T561_155_A"));
@@ -859,18 +891,10 @@ TEST_F(PageTextCollectionTest, SliderPaintMethodSelectsCustomAndGeneratedText)
     auto slider = CreateNode(V2::SLIDER_ETS_TAG, AceType::MakeRefPtr<SliderPattern>());
     auto pattern = slider->GetPattern<SliderPattern>();
     slider->GetRenderContext()->SetHostNode(slider);
-    auto themes = AceType::MakeRefPtr<testing::NiceMock<MockThemeManager>>();
-    auto themeFor = [](ThemeType type) -> RefPtr<Theme> {
-        if (type == SliderTheme::TypeId()) { return AceType::MakeRefPtr<SliderTheme>(); }
-        if (type == TextTheme::TypeId()) { return AceType::MakeRefPtr<TextTheme>(); }
-        return nullptr;
-    };
-    ON_CALL(*themes, GetTheme(testing::_)).WillByDefault(themeFor);
-    ON_CALL(*themes, GetTheme(testing::_, testing::_))
-        .WillByDefault([themeFor](ThemeType type, int32_t) { return themeFor(type); });
-    pipeline_->SetThemeManager(themes);
+    SetUpSliderThemes();
     auto paragraph = MockParagraph::GetOrCreateMockParagraph();
     std::vector<std::u16string> paragraphTexts;
+    // AddText runs twice: once for the custom tip and once for the generated percentage.
     EXPECT_CALL(*paragraph, AddText(testing::_)).Times(2)
         .WillRepeatedly([&paragraphTexts](const std::u16string& text) { paragraphTexts.push_back(text); });
     auto tip = AceType::MakeRefPtr<SliderTipModifier>(slider, []() { return std::pair<OffsetF, float>(); });
@@ -903,6 +927,7 @@ TEST_F(PageTextCollectionTest, SliderPaintMethodSelectsCustomAndGeneratedText)
     auto texts = Collect();
     ASSERT_EQ(texts->GetArraySize(), 1);
     EXPECT_EQ(texts->GetArrayItem(0)->GetInt("id"), slider->GetId());
+    // The rect array is [x, y, width, height], so index 2 contains the slider frame width.
     EXPECT_DOUBLE_EQ(texts->GetArrayItem(0)->GetValue("rect")->GetArrayItem(2)->GetDouble(), FRAME_WIDTH);
     MockParagraph::TearDown();
 }

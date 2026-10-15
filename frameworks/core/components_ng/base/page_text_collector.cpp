@@ -168,7 +168,8 @@ public:
                 const auto name = item->GetCustomTag();
                 // The nearest custom component owns the input; do not inherit an exception into user builders.
                 context.inputOwner = name == "AtomicServiceSearch" ? InputOwner::ATOMIC_SEARCH :
-                    (name == "CounterComponent" || name == "CounterV2Component" ? InputOwner::COUNTER : InputOwner::NONE);
+                    (name == "CounterComponent" || name == "CounterV2Component" ?
+                        InputOwner::COUNTER : InputOwner::NONE);
             }
             auto background = backgrounds_.find(AceType::RawPtr(item));
             if (background != backgrounds_.end()) {
@@ -254,6 +255,38 @@ struct PageTextTransform {
     float scaleY = 1.0f;
 };
 
+std::optional<PageTextTransform> GetBackgroundTextTransform(const RefPtr<FrameNode>& frame,
+    const PageTextContext& context, const PageTextTransform& hostTransform)
+{
+    auto host = context.backgroundHost;
+    auto root = context.backgroundRoot;
+    auto offset = frame->GetPaintRectGlobalOffsetWithTranslate(false, true).first -
+        root->GetPaintRectGlobalOffsetWithTranslate(false, true).first;
+    auto region = host->GetBackGroundAccumulatedSafeAreaExpand();
+    const auto& constraint = root->GetGeometryNode()->GetParentLayoutConstraint();
+    auto initialSize = constraint ? constraint->maxSize : region.GetSize();
+    if (!host->GetRenderContext()->GetIsTransitionBackgroundValue(false)) {
+        const auto hostSize = host->GetGeometryNode()->GetFrameSize();
+        initialSize -= region.GetSize() - hostSize;
+        region = RectF(OffsetF(), hostSize);
+    }
+    if (!initialSize.IsPositive()) {
+        return std::nullopt;
+    }
+    const auto sourceSize = root->GetGeometryNode()->GetFrameSize();
+    auto align = host->GetRenderContext()->GetBackgroundAlignValue(Alignment::CENTER);
+    // Use the same source/destination alignment as builder-background drawing.
+    offset += Alignment::GetAlignPosition(initialSize, sourceSize, align) -
+        Alignment::GetAlignPosition(sourceSize, initialSize, align);
+    const float scaleX = region.Width() / initialSize.Width();
+    const float scaleY = region.Height() / initialSize.Height();
+    // Background-local offsets inherit every outer background's scale; the host offset is already global.
+    offset.SetX((region.Left() + offset.GetX() * scaleX) * hostTransform.scaleX);
+    offset.SetY((region.Top() + offset.GetY() * scaleY) * hostTransform.scaleY);
+    return PageTextTransform { hostTransform.offset + offset,
+        hostTransform.scaleX * scaleX, hostTransform.scaleY * scaleY };
+}
+
 std::optional<PageTextTransform> GetPageTextTransform(
     const RefPtr<FrameNode>& frame, const PageTextContext& context, PageTextScan& scan)
 {
@@ -288,31 +321,7 @@ std::optional<PageTextTransform> GetPageTextTransform(
             break;
         }
     }
-    auto offset = frame->GetPaintRectGlobalOffsetWithTranslate(false, true).first -
-        root->GetPaintRectGlobalOffsetWithTranslate(false, true).first;
-    auto region = host->GetBackGroundAccumulatedSafeAreaExpand();
-    const auto& constraint = root->GetGeometryNode()->GetParentLayoutConstraint();
-    auto initialSize = constraint ? constraint->maxSize : region.GetSize();
-    if (!host->GetRenderContext()->GetIsTransitionBackgroundValue(false)) {
-        const auto hostSize = host->GetGeometryNode()->GetFrameSize();
-        initialSize -= region.GetSize() - hostSize;
-        region = RectF(OffsetF(), hostSize);
-    }
-    if (!initialSize.IsPositive()) {
-        return std::nullopt;
-    }
-    const auto sourceSize = root->GetGeometryNode()->GetFrameSize();
-    auto align = host->GetRenderContext()->GetBackgroundAlignValue(Alignment::CENTER);
-    // Use the same source/destination alignment as builder-background drawing.
-    offset += Alignment::GetAlignPosition(initialSize, sourceSize, align) -
-        Alignment::GetAlignPosition(sourceSize, initialSize, align);
-    const float scaleX = region.Width() / initialSize.Width();
-    const float scaleY = region.Height() / initialSize.Height();
-    // Background-local offsets inherit every outer background's scale; the host offset is already global.
-    offset.SetX((region.Left() + offset.GetX() * scaleX) * hostTransform->scaleX);
-    offset.SetY((region.Top() + offset.GetY() * scaleY) * hostTransform->scaleY);
-    return PageTextTransform { hostTransform->offset + offset,
-        hostTransform->scaleX * scaleX, hostTransform->scaleY * scaleY };
+    return GetBackgroundTextTransform(frame, context, *hostTransform);
 }
 
 bool AppendCarrier(const RefPtr<FrameNode>& frame, const std::string& text,
@@ -346,6 +355,59 @@ bool AppendCarrier(const RefPtr<FrameNode>& frame, const std::string& text,
     return json.Append("],\"content\":") && json.String(text) && json.Append("}");
 }
 
+std::string GetFramePageText(const RefPtr<FrameNode>& frame, const PageTextContext& context)
+{
+    std::string text;
+    if (auto carrier = AceType::DynamicCast<PageTranslateNode>(frame->GetPattern())) {
+        text = carrier->GetPageTextForReport(AllowInputText(frame, context));
+    }
+    auto render = frame->GetRenderContext();
+    if (!render || !render->HasOverlayText()) {
+        return text;
+    }
+    const auto overlay = render->GetOverlayTextValue(OverlayOptions());
+    if (overlay.content.empty()) {
+        return text;
+    }
+    if (!text.empty()) {
+        text += '\n';
+    }
+    text += overlay.content;
+    return text;
+}
+
+bool AppendPageText(int32_t instanceId, const RefPtr<PipelineContext>& pipeline, PageTextJson& json)
+{
+    bool first = true;
+    PageTextScan scan(instanceId, pipeline);
+    auto manager = pipeline->GetUiTranslateManagerImpl();
+    if (manager) {
+        manager->ForEachArkUITranslateFrameNode([&scan](const WeakPtr<FrameNode>& node) { scan.AddFrame(node); });
+    }
+    scan.Scan();
+    for (const auto& [id, frame] : scan.frames) {
+        const auto nodeInstanceId = frame->GetInstanceId();
+        if (!scan.GetPipeline(nodeInstanceId)) {
+            continue;
+        }
+        ContainerScope nodeScope(nodeInstanceId);
+        const auto context = scan.Resolve(frame);
+        if (context.excluded || (nodeInstanceId != instanceId && !context.ownedOverlay)) {
+            continue;
+        }
+        const auto text = GetFramePageText(frame, context);
+        if (text.empty()) {
+            continue;
+        }
+        const auto transform = GetPageTextTransform(frame, context, scan);
+        if (transform &&
+            !AppendCarrier(frame, text, transform->offset + scan.GetWindowOffset(nodeInstanceId), json, first)) {
+            return false;
+        }
+    }
+    return true;
+}
+
 #endif
 } // namespace
 
@@ -368,50 +430,7 @@ int32_t CollectPageText(int32_t instanceId, char** data, uint32_t* size, const c
     PageTextJson json;
     bool success = json.Append("{\"texts\":[");
 #ifndef CROSS_PLATFORM
-    bool first = true;
-    PageTextScan scan(instanceId, pipeline);
-    auto manager = pipeline->GetUiTranslateManagerImpl();
-    if (manager && success) {
-        manager->ForEachArkUITranslateFrameNode([&scan](const WeakPtr<FrameNode>& node) { scan.AddFrame(node); });
-    }
-    if (success) {
-        scan.Scan();
-    }
-    for (const auto& [id, frame] : scan.frames) {
-        if (!success) {
-            break;
-        }
-        const auto nodeInstanceId = frame->GetInstanceId();
-        if (!scan.GetPipeline(nodeInstanceId)) {
-            continue;
-        }
-        ContainerScope nodeScope(nodeInstanceId);
-        const auto context = scan.Resolve(frame);
-        if (context.excluded || (nodeInstanceId != instanceId && !context.ownedOverlay)) {
-            continue;
-        }
-        std::string text;
-        if (auto carrier = AceType::DynamicCast<PageTranslateNode>(frame->GetPattern())) {
-            text = carrier->GetPageTextForReport(AllowInputText(frame, context));
-        }
-        auto render = frame->GetRenderContext();
-        if (render && render->HasOverlayText()) {
-            const auto overlay = render->GetOverlayTextValue(OverlayOptions());
-            if (!overlay.content.empty()) {
-                if (!text.empty()) {
-                    text += '\n';
-                }
-                text += overlay.content;
-            }
-        }
-        if (text.empty()) {
-            continue;
-        }
-        const auto transform = GetPageTextTransform(frame, context, scan);
-        if (transform) {
-            success = AppendCarrier(frame, text, transform->offset + scan.GetWindowOffset(nodeInstanceId), json, first);
-        }
-    }
+    success = success && AppendPageText(instanceId, pipeline, json);
 #endif
     if (!success || !json.Append("]}")) {
         *reason = json.GetError();
