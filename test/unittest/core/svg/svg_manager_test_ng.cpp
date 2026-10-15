@@ -1961,10 +1961,16 @@ HWTEST_F(SvgManagerTestNg, SvgAttributesParser009, TestSize.Level1)
 HWTEST_F(SvgManagerTestNg, SvgAttributesParser010, TestSize.Level1)
 {
     auto color = SvgAttributesParser::GetColorFromHexString("FF0000FF");
-    EXPECT_TRUE(color.GetValue() != Color::TRANSPARENT.GetValue());
+    EXPECT_EQ(color.GetValue(), 0xFFFF0000U);
+
+    color = SvgAttributesParser::GetColorFromHexString("00FF00FF");
+    EXPECT_EQ(color.GetValue(), 0xFF00FF00U);
 
     color = SvgAttributesParser::GetColorFrom4HexString("F00F");
-    EXPECT_TRUE(color.GetValue() != Color::TRANSPARENT.GetValue());
+    EXPECT_EQ(color.GetValue(), 0xFFFF0000U);
+
+    color = SvgAttributesParser::GetColorFrom4HexString("0F0F");
+    EXPECT_EQ(color.GetValue(), 0xFF00FF00U);
 }
 
 // ========== Complex SVG Tests (001-002) ==========

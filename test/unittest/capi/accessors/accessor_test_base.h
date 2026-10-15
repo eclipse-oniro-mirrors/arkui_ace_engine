@@ -107,6 +107,7 @@ class AccessorTestBaseParent : public testing::Test {
 public:
     static void SetUpTestCase()
     {
+        ResetMockResourceData();
         fullAPI_ = reinterpret_cast<const GENERATED_ArkUIFullNodeAPI *>(
             GENERATED_GetArkAnyAPI(GENERATED_Ark_APIVariantKind::GENERATED_FULL, GENERATED_ARKUI_FULL_API_VERSION)
         );

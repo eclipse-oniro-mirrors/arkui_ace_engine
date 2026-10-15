@@ -24,6 +24,7 @@
 #include "test/mock/adapter/ohos/osal/mock_system_properties.h"
 #include "test/mock/frameworks/core/common/mock_theme_manager.h"
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
+#include "test/mock/frameworks/core/common/mock_resource_adapter_v2.h"
 #include "test/unittest/core/pattern/test_ng.h"
 
 #include "core/accessibility/accessibility_manager.h"
@@ -554,9 +555,12 @@ HWTEST_F(CounterTestNg, CounterModelNGCreateWithResourceObjTest003, TestSize.Lev
     model.Create();
 
     auto jsResourceType = JsCounterResourceType::Height;
+    const std::string COUNTER_HEIGHT_RES_NAME = "counterHeight003";
+    const float COUNTER_HEIGHT_RES_VALUE = 42.0f;
     std::vector<ResourceObjectParams> resObjParamsList;
-    ResourceObjectParams params { .value = "test", .type = ResourceObjectParamType::STRING };
+    ResourceObjectParams params { .value = COUNTER_HEIGHT_RES_NAME, .type = ResourceObjectParamType::STRING };
     resObjParamsList.push_back(params);
+    AddMockResourceDataByName(COUNTER_HEIGHT_RES_NAME, Dimension(COUNTER_HEIGHT_RES_VALUE, DimensionUnit::VP));
     RefPtr<ResourceObject> resObj =
         AceType::MakeRefPtr<ResourceObject>(-1, -1, resObjParamsList, "com.example.test", "entry", 100000);
     model.CreateWithResourceObj(jsResourceType, resObj);
@@ -577,7 +581,7 @@ HWTEST_F(CounterTestNg, CounterModelNGCreateWithResourceObjTest003, TestSize.Lev
     auto layoutProperty = frameNode->GetLayoutProperty();
     ASSERT_NE(layoutProperty, nullptr);
     auto selfIdealSize = layoutProperty->GetCalcLayoutConstraint()->selfIdealSize;
-    EXPECT_EQ(selfIdealSize->Height()->dimension_.Value(), 10);
+    EXPECT_EQ(selfIdealSize->Height()->dimension_.Value(), COUNTER_HEIGHT_RES_VALUE);
 }
 
 /**
@@ -591,9 +595,12 @@ HWTEST_F(CounterTestNg, CounterModelNGCreateWithResourceObjTest004, TestSize.Lev
     model.Create();
 
     auto jsResourceType = JsCounterResourceType::Width;
+    const std::string COUNTER_WIDTH_RES_NAME = "counterWidth004";
+    const float COUNTER_WIDTH_RES_VALUE = 43.0f;
     std::vector<ResourceObjectParams> resObjParamsList;
-    ResourceObjectParams params { .value = "test", .type = ResourceObjectParamType::STRING };
+    ResourceObjectParams params { .value = COUNTER_WIDTH_RES_NAME, .type = ResourceObjectParamType::STRING };
     resObjParamsList.push_back(params);
+    AddMockResourceDataByName(COUNTER_WIDTH_RES_NAME, Dimension(COUNTER_WIDTH_RES_VALUE, DimensionUnit::VP));
     RefPtr<ResourceObject> resObj =
         AceType::MakeRefPtr<ResourceObject>(-1, -1, resObjParamsList, "com.example.test", "entry", 100000);
     model.CreateWithResourceObj(jsResourceType, resObj);
@@ -614,7 +621,7 @@ HWTEST_F(CounterTestNg, CounterModelNGCreateWithResourceObjTest004, TestSize.Lev
     auto layoutProperty = frameNode->GetLayoutProperty();
     ASSERT_NE(layoutProperty, nullptr);
     auto selfIdealSize = layoutProperty->GetCalcLayoutConstraint()->selfIdealSize;
-    EXPECT_EQ(selfIdealSize->Width()->dimension_.Value(), 10);
+    EXPECT_EQ(selfIdealSize->Width()->dimension_.Value(), COUNTER_WIDTH_RES_VALUE);
 }
 
 /**

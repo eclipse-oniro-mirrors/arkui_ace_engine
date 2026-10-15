@@ -30,7 +30,7 @@ public:
     Color GetColor(uint32_t resId) override
     {
         Color data;
-        return GetMockResourceData(resId, data) ? data : Color::RED;
+        return GetMockResourceData(resId, data) ? data : Color();
     }
 
     Color GetColor(uint32_t resId, ColorMode /*colorMode*/) override
@@ -41,8 +41,7 @@ public:
     Dimension GetDimension(uint32_t resId) override
     {
         Dimension data;
-        return GetMockResourceData(resId, data) ? data :
-            Dimension(MOCK_DIMENSION_DEFAULT, DimensionUnit::PX);
+        return GetMockResourceData(resId, data) ? data : Dimension();
     }
 
     std::string GetString(uint32_t resId) override
@@ -72,14 +71,13 @@ public:
     Color GetColorByName(const std::string& resName) override
     {
         Color data;
-        return GetMockResourceDataByName(resName, data) ? data : Color::RED;
+        return GetMockResourceDataByName(resName, data) ? data : Color();
     }
 
     Dimension GetDimensionByName(const std::string& resName) override
     {
         Dimension data;
-        return GetMockResourceDataByName(resName, data) ? data :
-            Dimension(MOCK_DIMENSION_DEFAULT, DimensionUnit::PX);
+        return GetMockResourceDataByName(resName, data) ? data : Dimension();
     }
 
     std::string GetStringByName(const std::string& resName) override
