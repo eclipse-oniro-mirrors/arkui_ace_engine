@@ -254,20 +254,4 @@ ArkUINativeModuleValue ScrollPlaceholderRegisterBridge::IsRegistered(ArkUIRuntim
     return panda::BooleanRef::New(vm, registered);
 }
 
-ArkUINativeModuleValue ScrollPlaceholderRegisterBridge::BeginPlaceholderScope(ArkUIRuntimeCallInfo* runtimeCallInfo)
-{
-    EcmaVM* vm = runtimeCallInfo->GetVM();
-    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
-    ScrollPlaceholderRestrictedScope::Begin();
-    return panda::JSValueRef::Undefined(vm);
-}
-
-ArkUINativeModuleValue ScrollPlaceholderRegisterBridge::EndPlaceholderScope(ArkUIRuntimeCallInfo* runtimeCallInfo)
-{
-    EcmaVM* vm = runtimeCallInfo->GetVM();
-    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
-    ScrollPlaceholderRestrictedScope::End();
-    return panda::JSValueRef::Undefined(vm);
-}
-
 } // namespace OHOS::Ace::NG

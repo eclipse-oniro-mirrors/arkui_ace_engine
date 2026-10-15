@@ -35,9 +35,11 @@ class UINode;
 // isolated try-execute is therefore the sole legality signal for registration
 // admission, and the scope state below is what the begin/end entries drive.
 //
-// The helpers are injected by the compiler as module-level bindings and never land on
-// globalThis, so dynamic JS cannot reference (and thus cannot forge) them. The native
-// entry points live on the internal scrollPlaceholderRegister native module surface.
+// Binding form (re-decided 2026-10-14 for device verification): JsRegisterViews
+// mounts __aceBegin/EndScrollPlaceholder__ on globalThis as native functions so
+// compiler products can call them bare without imports. Unlike the original ADR-11
+// module-binding-only form this is referenceable by dynamic JS, so the admission
+// signal is a compiler-product convention rather than an unforgeable guarantee.
 //
 // UI thread only: builder execution never leaves the UI thread.
 class ScrollPlaceholderRestrictedScope {
@@ -111,7 +113,10 @@ private:
 // balanced on every exit path.
 class ScopedScrollPlaceholderRestricted {
 public:
-    ScopedScrollPlaceholderRestricted() = default;
+    ScopedScrollPlaceholderRestricted()
+    {
+        ScrollPlaceholderRestrictedScope::Begin();
+    }
     ~ScopedScrollPlaceholderRestricted();
 
 private:

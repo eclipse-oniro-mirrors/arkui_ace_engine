@@ -894,14 +894,9 @@ void ArkUINativeModule::RegisterScrollPlaceholderRegisterModule(Local<panda::Obj
     placeholderRegister->Set(vm, panda::StringRef::NewFromUtf8(vm, "isRegistered"),
         panda::FunctionRef::New(
             const_cast<panda::EcmaVM*>(vm), ScrollPlaceholderRegisterBridge::IsRegistered));
-    // Restricted-builder instrumentation runtime entries (module-level binding
-    // contract consumed by @Builder({ isPlaceholder: true }) conversion products).
-    placeholderRegister->Set(vm, panda::StringRef::NewFromUtf8(vm, "__aceBeginScrollPlaceholder__"),
-        panda::FunctionRef::New(
-            const_cast<panda::EcmaVM*>(vm), ScrollPlaceholderRegisterBridge::BeginPlaceholderScope));
-    placeholderRegister->Set(vm, panda::StringRef::NewFromUtf8(vm, "__aceEndScrollPlaceholder__"),
-        panda::FunctionRef::New(
-            const_cast<panda::EcmaVM*>(vm), ScrollPlaceholderRegisterBridge::EndPlaceholderScope));
+    // The restricted-builder instrumentation entries (__aceBegin/EndScrollPlaceholder__)
+    // are NOT members of this surface: they are mounted on globalThis directly by
+    // JsRegisterViews so @Builder({ isPlaceholder: true }) products can call them bare.
     object->Set(vm, panda::StringRef::NewFromUtf8(vm, "scrollPlaceholderRegister"), placeholderRegister);
 }
 

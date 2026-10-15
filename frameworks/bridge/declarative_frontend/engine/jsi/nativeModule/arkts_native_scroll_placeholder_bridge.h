@@ -39,14 +39,6 @@ public:
     static ArkUINativeModuleValue Register(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static ArkUINativeModuleValue Unregister(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static ArkUINativeModuleValue IsRegistered(ArkUIRuntimeCallInfo* runtimeCallInfo);
-
-    // Runtime entries of the restricted-builder instrumentation contract: the
-    // compiler emits paired calls at the first/last line of every
-    // @Builder({ isPlaceholder: true }) conversion product, injected as
-    // module-level bindings (never globalThis properties, so dynamic JS cannot
-    // reference or forge them). They drive the restricted-scope state machine.
-    static ArkUINativeModuleValue BeginPlaceholderScope(ArkUIRuntimeCallInfo* runtimeCallInfo);
-    static ArkUINativeModuleValue EndPlaceholderScope(ArkUIRuntimeCallInfo* runtimeCallInfo);
 };
 
 } // namespace OHOS::Ace::NG
