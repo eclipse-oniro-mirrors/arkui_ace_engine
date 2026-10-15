@@ -205,9 +205,19 @@ RefPtr<UINode> ScrollPlaceholderManager::AcquireTemplateInstance(const std::stri
     // background clones of the resident source refill the spares afterwards.
     auto snapshot = registry_.LookupForCreate(templateId);
     if (!snapshot.has_value() || !snapshot->builder) {
+        TAG_LOGW(AceLogTag::ACE_SCROLL,
+            "ScrollPlaceholder acquire missed: template not in registry, templateId=%{public}s, "
+            "instanceId=%{public}d", templateId.c_str(), instanceId_);
         return nullptr;
     }
     auto instance = snapshot->builder();
+    if (!instance) {
+        TAG_LOGW(AceLogTag::ACE_SCROLL,
+            "ScrollPlaceholder acquire failed: template rebuild produced no product, "
+            "templateId=%{public}s, instanceId=%{public}d (see the builder-exception log)",
+            templateId.c_str(), instanceId_);
+        return nullptr;
+    }
     ScheduleBackgroundReplenish(templateId);
     return instance;
 }

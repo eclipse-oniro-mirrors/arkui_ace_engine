@@ -104,6 +104,17 @@ ScrollPlaceholderBuilder MakeIsolatedTemplateBuilder(EcmaVM* vm,
                     // A throwing builder is a half-failed execution: record it as
                     // a violation so the admission probe rejects the template
                     // instead of misreading a fired begin as admission success.
+                    // The swallowed exception text is the only on-device trace of
+                    // why an isolated execution (admission probe or runtime
+                    // rebuild) produced no product, so surface it here.
+                    std::string exceptionText;
+                    auto exception = tryCatch.GetException();
+                    if (!exception.IsEmpty() && !exception.IsNull()) {
+                        exceptionText = exception->ToString(vm)->ToString(vm);
+                    }
+                    TAG_LOGW(AceLogTag::ACE_SCROLL,
+                        "ScrollPlaceholder builder threw during isolated execution: %{public}s",
+                        exceptionText.c_str());
                     ScrollPlaceholderRestrictedScope::NotifyViolation();
                 }
             }

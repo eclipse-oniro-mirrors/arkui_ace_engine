@@ -257,7 +257,18 @@ RefPtr<FrameNode> CreatePlaceholderShellNode(
         ElementRegister::GetInstance()->MakeUniqueId(),
         AceType::MakeRefPtr<ListItemPattern>(nullptr, V2::ListItemStyle::NONE));
     CHECK_NULL_RETURN(shell, nullptr);
-    if (!options.id.empty() && manager->IsTemplateRegistered(options.id)) {
+    // Distinguish the three content-less shell causes for on-device triage: a
+    // size-only default shell is a designed provider choice, the other two are
+    // wiring anomalies (acquire failures log on the manager side).
+    if (options.id.empty()) {
+        TAG_LOGD(AceLogTag::ACE_SCROLL,
+            "ScrollPlaceholder size-only default shell mounted: provider returned no template id");
+    } else if (!manager->IsTemplateRegistered(options.id)) {
+        TAG_LOGW(AceLogTag::ACE_SCROLL,
+            "ScrollPlaceholder shell mounted without template content: templateId=%{public}s "
+            "is not registered (check the provider id matches PlaceholderRegister.register)",
+            options.id.c_str());
+    } else {
         auto instance = manager->AcquireTemplateInstance(options.id);
         if (instance) {
             shell->AddChild(instance);
