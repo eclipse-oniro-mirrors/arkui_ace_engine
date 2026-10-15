@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 
+#include <algorithm>
 #include <functional>
 #include <string>
 #include <cstring>
@@ -28,6 +29,7 @@
 #include "interfaces/native/native_interface_xcomponent.h"
 #include "interfaces/native/native_key_event.h"
 #include "interfaces/native/native_node.h"
+#include "interfaces/native/native_dialog.h"
 #include "interfaces/native/native_node_napi.h"
 #include "interfaces/native/native_render.h"
 #include "interfaces/native/node/animate_impl.h"
@@ -387,13 +389,244 @@ TEST_P(UiThreadTableLogTest, LogModeProducesDiagnostic)
     RunAndExpectDiagnostic([api, this] { GetParam().invoke(api); });
 }
 
-// === Scope entries（175 导出函数，排除 5 个范围外 + 2 个 ANI）===
+
+// === 表单弹窗类绑定表参数化测试（41 × 5 模式）===
+// 覆盖 ArkUI_NativeDialogAPI_1/2/3 经 dialogImpl_1/2/3 绑定 DialogModel::* 的全部入口，
+// 权威清单见 .codespec/changes/issue-20260831442009-thread-check-dialog-api/evidence/inputs/onebox-interface-list.txt。
+
+struct DialogTableScopeEntry {
+    const char* name;
+    void (*invoke)(ArkUI_NativeDialogAPI_3*);
+};
+
+#define DIALOG_TABLE_ENTRY_1(member)                                                                \
+    {                                                                                               \
+        "ArkUI_NativeDialogAPI_1." #member,                                                         \
+            [](ArkUI_NativeDialogAPI_3* api) { CallWithDefaultArgs(api->nativeDialogAPI1.member); } \
+    }
+#define DIALOG_TABLE_ENTRY_2(member)                                                                \
+    {                                                                                               \
+        "ArkUI_NativeDialogAPI_2." #member,                                                         \
+            [](ArkUI_NativeDialogAPI_3* api) { CallWithDefaultArgs(api->nativeDialogAPI2.member); } \
+    }
+#define DIALOG_TABLE_ENTRY_3(member)                                                                \
+    {                                                                                               \
+        "ArkUI_NativeDialogAPI_3." #member,                                                         \
+            [](ArkUI_NativeDialogAPI_3* api) { CallWithDefaultArgs(api->member); }                  \
+    }
+const DialogTableScopeEntry DIALOG_TABLE_SCOPE_ENTRIES[] = {
+    DIALOG_TABLE_ENTRY_1(create),
+    DIALOG_TABLE_ENTRY_1(dispose),
+    DIALOG_TABLE_ENTRY_1(setContent),
+    DIALOG_TABLE_ENTRY_1(removeContent),
+    DIALOG_TABLE_ENTRY_1(setContentAlignment),
+    DIALOG_TABLE_ENTRY_1(resetContentAlignment),
+    DIALOG_TABLE_ENTRY_1(setModalMode),
+    DIALOG_TABLE_ENTRY_1(setAutoCancel),
+    DIALOG_TABLE_ENTRY_1(setMask),
+    DIALOG_TABLE_ENTRY_1(setBackgroundColor),
+    DIALOG_TABLE_ENTRY_1(setCornerRadius),
+    DIALOG_TABLE_ENTRY_1(setGridColumnCount),
+    DIALOG_TABLE_ENTRY_1(enableCustomStyle),
+    DIALOG_TABLE_ENTRY_1(enableCustomAnimation),
+    DIALOG_TABLE_ENTRY_1(registerOnWillDismiss),
+    DIALOG_TABLE_ENTRY_1(show),
+    DIALOG_TABLE_ENTRY_1(close),
+    DIALOG_TABLE_ENTRY_1(registerOnWillDismissWithUserData),
+    DIALOG_TABLE_ENTRY_2(setKeyboardAvoidDistance),
+    DIALOG_TABLE_ENTRY_2(setLevelMode),
+    DIALOG_TABLE_ENTRY_2(setLevelUniqueId),
+    DIALOG_TABLE_ENTRY_2(setImmersiveMode),
+    DIALOG_TABLE_ENTRY_3(setLevelOrder),
+    DIALOG_TABLE_ENTRY_3(registerOnWillAppear),
+    DIALOG_TABLE_ENTRY_3(registerOnDidAppear),
+    DIALOG_TABLE_ENTRY_3(registerOnWillDisappear),
+    DIALOG_TABLE_ENTRY_3(registerOnDidDisappear),
+    DIALOG_TABLE_ENTRY_3(setBorderWidth),
+    DIALOG_TABLE_ENTRY_3(setBorderColor),
+    DIALOG_TABLE_ENTRY_3(setBorderStyle),
+    DIALOG_TABLE_ENTRY_3(setWidth),
+    DIALOG_TABLE_ENTRY_3(setHeight),
+    DIALOG_TABLE_ENTRY_3(setShadow),
+    DIALOG_TABLE_ENTRY_3(setCustomShadow),
+    DIALOG_TABLE_ENTRY_3(setBackgroundBlurStyle),
+    DIALOG_TABLE_ENTRY_3(setKeyboardAvoidMode),
+    DIALOG_TABLE_ENTRY_3(enableHoverMode),
+    DIALOG_TABLE_ENTRY_3(setHoverModeArea),
+    DIALOG_TABLE_ENTRY_3(setFocusable),
+    DIALOG_TABLE_ENTRY_3(setBackgroundBlurStyleOptions),
+    DIALOG_TABLE_ENTRY_3(setBackgroundEffect),
+};
+#undef DIALOG_TABLE_ENTRY_1
+#undef DIALOG_TABLE_ENTRY_2
+#undef DIALOG_TABLE_ENTRY_3
+
+class UiThreadDialogTableLogTest : public UiThreadDetectionTest, public WithParamInterface<DialogTableScopeEntry> {};
+
+static ArkUI_NativeDialogAPI_3* GetDialogApi()
+{
+    return static_cast<ArkUI_NativeDialogAPI_3*>(
+        OH_ArkUI_QueryModuleInterfaceByName(ARKUI_NATIVE_DIALOG, "ArkUI_NativeDialogAPI_3"));
+}
+
+// 模式 1：默认-debug + 安全线程 → 无诊断
+TEST_P(UiThreadDialogTableLogTest, DebugDefaultSafeThreadNoDiagnostic)
+{
+    auto* api = GetDialogApi();
+    ASSERT_NE(api, nullptr);
+    AceApplicationInfo::GetInstance().SetDebugForParallel(true);
+    ResetToUnresolved();
+    SetupDiagnosticMatch(GetParam().name);
+    SetMockIsCurrentThreadSafe(SafeThread);
+    RunAndExpectNoDiagnostic([api, this] { GetParam().invoke(api); });
+}
+
+// 模式 2：默认-release + 不安全线程 → 无诊断（release 默认 DISABLED）
+TEST_P(UiThreadDialogTableLogTest, ReleaseDefaultUnsafeThreadNoDiagnostic)
+{
+    auto* api = GetDialogApi();
+    ASSERT_NE(api, nullptr);
+    AceApplicationInfo::GetInstance().SetDebugForParallel(false);
+    ResetToUnresolved();
+    SetupDiagnosticMatch(GetParam().name);
+    SetMockIsCurrentThreadSafe(UnsafeThread);
+    RunAndExpectNoDiagnostic([api, this] { GetParam().invoke(api); });
+}
+
+// 模式 3：DISABLED + 不安全线程 → 无诊断
+TEST_P(UiThreadDialogTableLogTest, DisabledModeNoDiagnostic)
+{
+    auto* api = GetDialogApi();
+    ASSERT_NE(api, nullptr);
+    EnableMode(OH_ARKUI_NATIVEMODULE_CHECK_MODE_DISABLED);
+    SetupDiagnosticMatch(GetParam().name);
+    SetMockIsCurrentThreadSafe(UnsafeThread);
+    RunAndExpectNoDiagnostic([api, this] { GetParam().invoke(api); });
+}
+
+// 模式 4：LOG + 不安全线程 → 有诊断
+TEST_P(UiThreadDialogTableLogTest, LogModeProducesDiagnostic)
+{
+    auto* api = GetDialogApi();
+    ASSERT_NE(api, nullptr);
+    EnableMode(OH_ARKUI_NATIVEMODULE_CHECK_MODE_LOG);
+    SetupDiagnosticMatch(GetParam().name);
+    SetMockIsCurrentThreadSafe(UnsafeThread);
+    RunAndExpectDiagnostic([api, this] { GetParam().invoke(api); });
+}
+
+// 模式 5：LOG + 不安全线程 → 恰好一条诊断且 apiName 为公开接口名（INV-1 / ADR-2）
+TEST_P(UiThreadDialogTableLogTest, LogModeProducesSingleNamedDiagnostic)
+{
+    auto* api = GetDialogApi();
+    ASSERT_NE(api, nullptr);
+    EnableMode(OH_ARKUI_NATIVEMODULE_CHECK_MODE_LOG);
+    ResetDiagnosticLog();
+    SetMockIsCurrentThreadSafe(UnsafeThread);
+    GetParam().invoke(api);
+    EXPECT_EQ(GetDiagnosticLogCount(), 1);
+    const auto* diag = GetLastDiagnosticLog();
+    ASSERT_NE(diag, nullptr);
+    ASSERT_NE(diag->apiName, nullptr);
+    EXPECT_STREQ(diag->apiName, GetParam().name);
+    ASSERT_NE(diag->checkName, nullptr);
+    EXPECT_TRUE(strstr(diag->checkName, "UI_THREAD") != nullptr);
+    ASSERT_NE(diag->reason, nullptr);
+    EXPECT_TRUE(strstr(diag->reason, "C API must be called on the UI thread") != nullptr);
+}
+
+INSTANTIATE_TEST_SUITE_P(AllDialogTableMembers, UiThreadDialogTableLogTest, ValuesIn(DIALOG_TABLE_SCOPE_ENTRIES),
+    [](const TestParamInfo<DialogTableScopeEntry>& info) {
+        std::string name = info.param.name;
+        name.erase(std::remove(name.begin(), name.end(), '.'), name.end());
+        return name;
+    });
+
+// === 表单弹窗类专项：导出函数强断言 + 线程安全接口排除 + UI 线程零诊断（ADR-2 / R-6 / AC-1.5）===
+
+HWTEST_F(UiThreadDetectionTest, DialogExportLogModeSingleNamedDiagnostic, TestSize.Level1)
+{
+    EnableMode(OH_ARKUI_NATIVEMODULE_CHECK_MODE_LOG);
+    ResetDiagnosticLog();
+    SetMockIsCurrentThreadSafe(UnsafeThread);
+    OH_ArkUI_CustomDialog_CloseDialog(0);
+    EXPECT_EQ(GetDiagnosticLogCount(), 1);
+    const auto* diag = GetLastDiagnosticLog();
+    ASSERT_NE(diag, nullptr);
+    ASSERT_NE(diag->apiName, nullptr);
+    EXPECT_STREQ(diag->apiName, "OH_ArkUI_CustomDialog_CloseDialog");
+}
+
+HWTEST_F(UiThreadDetectionTest, DialogDismissEventApisNeverTriggerThreadCheck, TestSize.Level1)
+{
+    EnableMode(OH_ARKUI_NATIVEMODULE_CHECK_MODE_LOG);
+    // 三个 DialogDismissEvent 接口为线程安全接口（仅操作入参字段），不铺设检测点
+    SetMockIsCurrentThreadSafe(UnsafeThread);
+    RunAndExpectNoDiagnostic([] { OH_ArkUI_DialogDismissEvent_SetShouldBlockDismiss(nullptr, true); });
+    RunAndExpectNoDiagnostic([] { return OH_ArkUI_DialogDismissEvent_GetUserData(nullptr); });
+    RunAndExpectNoDiagnostic([] { return OH_ArkUI_DialogDismissEvent_GetDismissReason(nullptr); });
+    SetMockIsCurrentThreadSafe(SafeThread);
+    RunAndExpectNoDiagnostic([] { OH_ArkUI_DialogDismissEvent_SetShouldBlockDismiss(nullptr, true); });
+}
+
+HWTEST_F(UiThreadDetectionTest, DialogApisOnUiThreadNeverTriggerThreadCheck, TestSize.Level1)
+{
+    EnableMode(OH_ARKUI_NATIVEMODULE_CHECK_MODE_LOG);
+    SetMockIsCurrentThreadSafe(SafeThread);
+    RunAndExpectNoDiagnostic([] { OH_ArkUI_CustomDialog_CloseDialog(0); });
+    ArkUI_DialogState state {};
+    RunAndExpectNoDiagnostic([&state] { return OH_ArkUI_CustomDialog_GetState(0, &state); });
+    RunAndExpectNoDiagnostic(
+        [] { return OH_ArkUI_CustomDialog_SetWidth(nullptr, 0.0f, ARKUI_LENGTH_METRIC_UNIT_DEFAULT); });
+    auto* api = GetDialogApi();
+    ASSERT_NE(api, nullptr);
+    RunAndExpectNoDiagnostic([api] { CallWithDefaultArgs(api->nativeDialogAPI1.show); });
+    RunAndExpectNoDiagnostic([api] { CallWithDefaultArgs(api->setWidth); });
+}
+
+// === Scope entries（234 导出函数：原 196 + 表单弹窗类 38）===
 
 namespace {
 #define SCOPE_ENTRY(api) { #api, [] { CallWithDefaultArgs(api); } }
 const ScopeEntry SCOPE_ENTRIES[] = {
     SCOPE_ENTRY(OH_ArkUI_AccessibilityProvider_Create),
     SCOPE_ENTRY(OH_ArkUI_AccessibilityProvider_Dispose),
+    SCOPE_ENTRY(OH_ArkUI_CustomDialog_CloseDialog),
+    SCOPE_ENTRY(OH_ArkUI_CustomDialog_CreateOptions),
+    SCOPE_ENTRY(OH_ArkUI_CustomDialog_DisposeOptions),
+    SCOPE_ENTRY(OH_ArkUI_CustomDialog_GetState),
+    SCOPE_ENTRY(OH_ArkUI_CustomDialog_OpenDialog),
+    SCOPE_ENTRY(OH_ArkUI_CustomDialog_OpenDialogWithCallback),
+    SCOPE_ENTRY(OH_ArkUI_CustomDialog_RegisterOnDidAppearCallback),
+    SCOPE_ENTRY(OH_ArkUI_CustomDialog_RegisterOnDidDisappearCallback),
+    SCOPE_ENTRY(OH_ArkUI_CustomDialog_RegisterOnWillAppearCallback),
+    SCOPE_ENTRY(OH_ArkUI_CustomDialog_RegisterOnWillDisappearCallback),
+    SCOPE_ENTRY(OH_ArkUI_CustomDialog_RegisterOnWillDismissCallback),
+    SCOPE_ENTRY(OH_ArkUI_CustomDialog_SetAlignment),
+    SCOPE_ENTRY(OH_ArkUI_CustomDialog_SetAutoCancel),
+    SCOPE_ENTRY(OH_ArkUI_CustomDialog_SetBackgroundBlurStyle),
+    SCOPE_ENTRY(OH_ArkUI_CustomDialog_SetBackgroundBlurStyleOptions),
+    SCOPE_ENTRY(OH_ArkUI_CustomDialog_SetBackgroundColor),
+    SCOPE_ENTRY(OH_ArkUI_CustomDialog_SetBackgroundEffect),
+    SCOPE_ENTRY(OH_ArkUI_CustomDialog_SetBorderColor),
+    SCOPE_ENTRY(OH_ArkUI_CustomDialog_SetBorderStyle),
+    SCOPE_ENTRY(OH_ArkUI_CustomDialog_SetBorderWidth),
+    SCOPE_ENTRY(OH_ArkUI_CustomDialog_SetCornerRadius),
+    SCOPE_ENTRY(OH_ArkUI_CustomDialog_SetCustomShadow),
+    SCOPE_ENTRY(OH_ArkUI_CustomDialog_SetDisplayModeInSubWindow),
+    SCOPE_ENTRY(OH_ArkUI_CustomDialog_SetHeight),
+    SCOPE_ENTRY(OH_ArkUI_CustomDialog_SetHoverModeArea),
+    SCOPE_ENTRY(OH_ArkUI_CustomDialog_SetHoverModeEnabled),
+    SCOPE_ENTRY(OH_ArkUI_CustomDialog_SetImmersiveMode),
+    SCOPE_ENTRY(OH_ArkUI_CustomDialog_SetKeyboardAvoidMode),
+    SCOPE_ENTRY(OH_ArkUI_CustomDialog_SetLevelMode),
+    SCOPE_ENTRY(OH_ArkUI_CustomDialog_SetLevelUniqueId),
+    SCOPE_ENTRY(OH_ArkUI_CustomDialog_SetMask),
+    SCOPE_ENTRY(OH_ArkUI_CustomDialog_SetModalMode),
+    SCOPE_ENTRY(OH_ArkUI_CustomDialog_SetShadow),
+    SCOPE_ENTRY(OH_ArkUI_CustomDialog_SetSubwindowMode),
+    SCOPE_ENTRY(OH_ArkUI_CustomDialog_SetWidth),
+    SCOPE_ENTRY(OH_ArkUI_CustomDialog_UpdateDialog),
     SCOPE_ENTRY(OH_ArkUI_GetContextFromNapiValue),
     SCOPE_ENTRY(OH_ArkUI_GetNodeContentFromNapiValue),
     SCOPE_ENTRY(OH_ArkUI_GetNodeHandleFromNapiValue),
@@ -402,6 +635,8 @@ const ScopeEntry SCOPE_ENTRIES[] = {
     SCOPE_ENTRY(OH_ArkUI_NativeModule_AtomicServiceMenuBarSetVisible),
     SCOPE_ENTRY(OH_ArkUI_NativeModule_ConvertPositionFromWindow),
     SCOPE_ENTRY(OH_ArkUI_NativeModule_ConvertPositionToWindow),
+    SCOPE_ENTRY(OH_ArkUI_NativeModule_CustomDialog_SetSystemMaterial),
+    SCOPE_ENTRY(OH_ArkUI_NativeModule_CustomDialog_SetSystemMaterialInOptions),
     SCOPE_ENTRY(OH_ArkUI_NativeModule_GetChildMountPolicy),
     SCOPE_ENTRY(OH_ArkUI_NativeModule_GetNativeAccessibilityProvider),
     SCOPE_ENTRY(OH_ArkUI_NativeModule_GetPageRootNodeHandleByContext),

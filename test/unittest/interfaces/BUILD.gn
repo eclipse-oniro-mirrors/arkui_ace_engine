@@ -328,6 +328,7 @@ ohos_unittest("native_node_napi_test") {
     "$ace_root/interfaces/native/node/animate_impl.cpp",
     "$ace_root/interfaces/native/node/container_picker_option.cpp",
     "$ace_root/interfaces/native/node/dialog_model.cpp",
+    "$ace_root/interfaces/native/node/dialog_option.cpp",
     "$ace_root/interfaces/native/node/event_converter.cpp",
     "$ace_root/interfaces/native/node/gesture_impl.cpp",
     "$ace_root/interfaces/native/node/grid_layout_option.cpp",
