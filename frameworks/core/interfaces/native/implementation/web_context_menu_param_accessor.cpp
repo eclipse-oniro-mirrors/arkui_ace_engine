@@ -122,6 +122,8 @@ Ark_ContextMenuDataMediaType GetContextMenuMediaTypeImpl(Ark_WebContextMenuParam
     CHECK_NULL_RETURN(peer && peer->handler, value);
     return static_cast<Ark_ContextMenuDataMediaType>(peer->handler->GetContextMenuMediaType());
 }
+
+#if !defined(WINDOWS_PLATFORM) && !defined(LINUX_PLATFORM) && !defined(MAC_PLATFORM)
 Ark_Boolean ShouldOfferLinkToTextImpl(Ark_WebContextMenuParam peer)
 {
     CHECK_NULL_RETURN(peer && peer->handler, false);
@@ -139,6 +141,7 @@ Ark_Boolean IsOverTextFragmentImpl(Ark_WebContextMenuParam peer)
     CHECK_NULL_RETURN(peer && peer->handler, false);
     return Converter::ArkValue<Ark_Boolean>(peer->handler->IsOverTextFragment());
 }
+#endif
 } // WebContextMenuParamAccessor
 const GENERATED_ArkUIWebContextMenuParamAccessor* GetWebContextMenuParamAccessor()
 {
@@ -161,9 +164,11 @@ const GENERATED_ArkUIWebContextMenuParamAccessor* GetWebContextMenuParamAccessor
         WebContextMenuParamAccessor::GetPreviewWidthImpl,
         WebContextMenuParamAccessor::GetPreviewHeightImpl,
         WebContextMenuParamAccessor::GetContextMenuMediaTypeImpl,
+#if !defined(WINDOWS_PLATFORM) && !defined(LINUX_PLATFORM) && !defined(MAC_PLATFORM)
         WebContextMenuParamAccessor::ShouldOfferLinkToTextImpl,
         WebContextMenuParamAccessor::GetTextFragmentGeneratedLinkImpl,
         WebContextMenuParamAccessor::IsOverTextFragmentImpl,
+#endif
     };
     return &WebContextMenuParamAccessorImpl;
 }
