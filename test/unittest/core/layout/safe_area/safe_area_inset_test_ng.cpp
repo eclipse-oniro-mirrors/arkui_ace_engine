@@ -26,7 +26,7 @@
 #include "core/components_ng/syntax/if_else_node.h"
 #include "core/components_ng/pattern/safe_area_inset/safe_area_inset_pattern.h"
 #include "core/components_ng/pattern/stage/stage_manager.h"
-#include "core/components_ng/property/safe_area_inset_property.h"
+#include "core/components_ng/property/measure_property.h"
 
 using namespace testing;
 using namespace testing::ext;

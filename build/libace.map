@@ -2097,6 +2097,13 @@
       "OHOS::Ace::NG::RosenRenderContext::GetBitmap(OHOS::Rosen::Drawing::Bitmap&, std::__h::shared_ptr<OHOS::Rosen::Drawing::DrawCmdList>)";
       "OHOS::Ace::NG::RosenRenderContext::GetPixelMap(std::__h::shared_ptr<OHOS::Media::PixelMap> const&, std::__h::shared_ptr<OHOS::Rosen::Drawing::DrawCmdList>, OHOS::Rosen::Drawing::RectF*)";
       "OHOS::Ace::NG::RosenRenderContext::SetHDRColorHeadRoom(float)";
+      "OHOS::Ace::NG::SafeAreaInsetEdgeOptions::operator!=(OHOS::Ace::NG::SafeAreaInsetEdgeOptions const&) const";
+      "OHOS::Ace::NG::SafeAreaInsetEdgeOptions::operator==(OHOS::Ace::NG::SafeAreaInsetEdgeOptions const&) const";
+      "OHOS::Ace::NG::SafeAreaInsetOptions::Empty() const";
+      "OHOS::Ace::NG::SafeAreaInsetOptions::GetEdge(OHOS::Ace::NG::SafeAreaInsetEdge)";
+      "OHOS::Ace::NG::SafeAreaInsetOptions::GetEdge(OHOS::Ace::NG::SafeAreaInsetEdge) const";
+      "OHOS::Ace::NG::SafeAreaInsetOptions::operator!=(OHOS::Ace::NG::SafeAreaInsetOptions const&) const";
+      "OHOS::Ace::NG::SafeAreaInsetOptions::operator==(OHOS::Ace::NG::SafeAreaInsetOptions const&) const";
       "OHOS::Ace::NG::SafeAreaInsets::Inset::ToString() const";
       "OHOS::Ace::NG::SafeAreaInsets::ToString() const";
       "OHOS::Ace::NG::RosenRenderContext::SetUIFirstSwitch(OHOS::Rosen::RSUIFirstSwitch)";
@@ -4542,11 +4549,13 @@
       "OHOS::Ace::NG::LayoutProperty::GetPaddingProperty() const";
       "OHOS::Ace::NG::LayoutProperty::GetPixelRound() const";
       "OHOS::Ace::NG::LayoutProperty::GetPositionProperty() const";
+      "OHOS::Ace::NG::LayoutProperty::GetResolvedSafeAreaInsetEdge(OHOS::Ace::NG::SafeAreaInsetEdge) const";
       "OHOS::Ace::NG::LayoutProperty::GetSafeAreaExpandOpts() const";
       "OHOS::Ace::NG::LayoutProperty::GetSafeAreaInsets() const";
       "OHOS::Ace::NG::LayoutProperty::GetSafeAreaPaddingProperty() const";
       "OHOS::Ace::NG::LayoutProperty::HasFixedHeight(bool) const";
       "OHOS::Ace::NG::LayoutProperty::HasFixedWidth(bool) const";
+      "OHOS::Ace::NG::LayoutProperty::HasSafeAreaInset() const";
       "OHOS::Ace::NG::LayoutProperty::HasUserDefinedHeightConfig() const";
       "OHOS::Ace::NG::LayoutProperty::IsIgnoreOptsValid() const";
       "OHOS::Ace::NG::LayoutProperty::ResetAlignSelf()";

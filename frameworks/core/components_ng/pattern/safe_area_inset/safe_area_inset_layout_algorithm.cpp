@@ -19,7 +19,7 @@
 #include "core/components_ng/layout/layout_property.h"
 #include "core/components_ng/layout/layout_wrapper.h"
 #include "core/components_ng/pattern/safe_area_inset/safe_area_inset_pattern.h"
-#include "core/components_ng/property/safe_area_inset_property.h"
+#include "core/components_ng/property/measure_property.h"
 
 namespace OHOS::Ace::NG {
 

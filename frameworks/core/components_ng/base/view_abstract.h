@@ -60,7 +60,6 @@
 #include "core/components_ng/property/measure_property.h"
 #include "core/components_ng/property/menu_property.h"
 #include "core/components_ng/property/overlay_property.h"
-#include "core/components_ng/property/safe_area_inset_property.h"
 #include "core/components_ng/pattern/overlay/overlay_manager.h"
 #include "core/components_ng/property/progress_mask_property.h"
 #include "core/components_ng/property/transition_property.h"

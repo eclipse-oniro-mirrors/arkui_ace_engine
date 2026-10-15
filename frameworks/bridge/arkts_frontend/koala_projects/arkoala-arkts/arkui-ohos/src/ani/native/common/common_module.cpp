@@ -17,7 +17,7 @@
 
 #include <array>
 
-#include "core/components_ng/property/safe_area_inset_property.h"
+#include "core/components_ng/property/measure_property.h"
 
 #if !defined(PREVIEW)
 #define OHOS_AAFWK_HILOG_TAG_WRAPPER_H

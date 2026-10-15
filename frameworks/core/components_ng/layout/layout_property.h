@@ -39,7 +39,6 @@
 #include "core/components_ng/property/magic_layout_property.h"
 #include "core/components_ng/property/measure_property.h"
 #include "core/components_ng/property/property.h"
-#include "core/components_ng/property/safe_area_inset_property.h"
 #include "core/components_ng/manager/environment/env_reader_cache.h"
 #include "ui/properties/safe_area_insets.h"
 
@@ -110,15 +109,9 @@ public:
     void UpdatePadding(const PaddingProperty& value);
     void UpdateSafeAreaPadding(const PaddingProperty& value);
     void ResetSafeAreaPadding();
-    bool HasSafeAreaInset() const
-    {
-        return safeAreaInset_.has_value() && !safeAreaInset_->Empty();
-    }
+    bool HasSafeAreaInset() const;
     void CheckLocalizedSafeAreaInset(const TextDirection& direction);
-    const SafeAreaInsetResolvedEdge& GetResolvedSafeAreaInsetEdge(SafeAreaInsetEdge edge) const
-    {
-        return resolvedSafeAreaInsetEdges_[SafeAreaInsetOptions::ToIndex(edge)];
-    }
+    const SafeAreaInsetResolvedEdge& GetResolvedSafeAreaInsetEdge(SafeAreaInsetEdge edge) const;
     void UpdateSafeAreaInset(const SafeAreaInsetOptions& value);
     void ResetSafeAreaInset();
     const std::optional<SafeAreaInsetOptions>& GetSafeAreaInset() const;

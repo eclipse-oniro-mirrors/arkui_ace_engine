@@ -1627,6 +1627,16 @@ void LayoutProperty::ResetSafeAreaPadding()
     safeAreaPadding_.reset();
 }
 
+bool LayoutProperty::HasSafeAreaInset() const
+{
+    return safeAreaInset_.has_value() && !safeAreaInset_->Empty();
+}
+
+const SafeAreaInsetResolvedEdge& LayoutProperty::GetResolvedSafeAreaInsetEdge(SafeAreaInsetEdge edge) const
+{
+    return resolvedSafeAreaInsetEdges_[SafeAreaInsetOptions::ToIndex(edge)];
+}
+
 void LayoutProperty::CheckLocalizedSafeAreaInset(const TextDirection& direction)
 {
     if (!HasSafeAreaInset()) {
