@@ -783,7 +783,10 @@ void SheetPresentationPattern::InitPanEvent()
         return;
     }
 
-    auto actionStartTask = [weak = WeakClaim(this)](const GestureEvent& event) {
+    auto actionStartTask = [weak = WeakClaim(this)](const GestureEvent& info) {
+        if (info.GetInputEventType() == InputEventType::AXIS && info.GetSourceTool() == SourceTool::MOUSE) {
+            return;
+        }
         auto pattern = weak.Upgrade();
         if (pattern && pattern->enableDragControl_) {
             pattern->HandleDragStart();
@@ -791,6 +794,9 @@ void SheetPresentationPattern::InitPanEvent()
     };
 
     auto actionUpdateTask = [weak = WeakClaim(this)](const GestureEvent& info) {
+        if (info.GetInputEventType() == InputEventType::AXIS && info.GetSourceTool() == SourceTool::MOUSE) {
+            return;
+        }
         auto pattern = weak.Upgrade();
         if (pattern && pattern->enableDragControl_) {
             pattern->HandleDragUpdate(info);
@@ -798,6 +804,9 @@ void SheetPresentationPattern::InitPanEvent()
     };
 
     auto actionEndTask = [weak = WeakClaim(this)](const GestureEvent& info) {
+        if (info.GetInputEventType() == InputEventType::AXIS && info.GetSourceTool() == SourceTool::MOUSE) {
+            return;
+        }
         auto pattern = weak.Upgrade();
         if (pattern && pattern->enableDragControl_) {
             pattern->HandleDragEnd(info.GetMainVelocity());
