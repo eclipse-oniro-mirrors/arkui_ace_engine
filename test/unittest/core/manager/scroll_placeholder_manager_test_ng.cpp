@@ -29,10 +29,16 @@
 #include "core/components_ng/base/ui_node.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_cost_model.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_manager.h"
+#include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_restricted_scope.h"
+#include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_shell_node.h"
 #include "core/components_ng/layout/layout_wrapper_node.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_observer.h"
 #include "core/components_ng/pattern/pattern.h"
+#include "core/components_ng/pattern/flex/flex_layout_pattern.h"
+#include "core/components_ng/pattern/image/image_pattern.h"
 #include "core/components_ng/pattern/linear_layout/linear_layout_pattern.h"
+#include "core/components_ng/pattern/stack/stack_pattern.h"
+#include "core/components_ng/pattern/text/text_pattern.h"
 #include "core/pipeline/base/element_register.h"
 #include "core/pipeline/base/element_register_multi_thread.h"
 #include "core/pipeline_ng/pipeline_context.h"
@@ -1153,5 +1159,337 @@ HWTEST_F(ScrollPlaceholderObserverTestNg, ObserverScopeObservesRealAcquisition00
     // The tiny measured duration replaced the 5ms cold start estimate.
     auto probe = MakeParams(ScrollPlaceholderComponentType::LIST, std::string(), 0, 0);
     EXPECT_LT(manager->EstimateRealBuildDuration(probe), COLD_START_NS);
+}
+
+/**
+ * @tc.name: ProbeTemplateCloneNoSource001
+ * @tc.desc: A probe for a template without a resident source instance reports the
+ *           dedicated diagnostic path and keeps the template unregistered state.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPlaceholderManagerTestNg, ProbeTemplateCloneNoSource001, TestSize.Level1)
+{
+    std::string subtreePath = "untouched";
+    EXPECT_FALSE(manager_->ProbeTemplateClone("tpl-no-source", subtreePath));
+    EXPECT_EQ(subtreePath, "<no source instance>");
+    EXPECT_FALSE(manager_->IsTemplateRegistered("tpl-no-source"));
+}
+
+/**
+ * @tc.name: ProbeTemplateCloneUnsupportedRoot001
+ * @tc.desc: A template whose root pattern is not on the restricted copy whitelist
+ *           (base Pattern) is rejected with the offending node tag as the path.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPlaceholderManagerTestNg, ProbeTemplateCloneUnsupportedRoot001, TestSize.Level1)
+{
+    manager_->RegisterTemplate("tpl-unsupported-root", ScrollPlaceholderBuilder([]() -> RefPtr<UINode> {
+        return FrameNode::CreateFrameNode("plain_root", ElementRegister::GetInstance()->MakeUniqueId(),
+            AceType::MakeRefPtr<Pattern>());
+    }));
+    auto rejectedBefore = manager_->GetDiagnostics().registerRejected;
+    std::string subtreePath;
+    EXPECT_FALSE(manager_->ProbeTemplateClone("tpl-unsupported-root", subtreePath));
+    EXPECT_EQ(subtreePath, "plain_root");
+    EXPECT_GE(manager_->GetDiagnostics().registerRejected, rejectedBefore + 1);
+    manager_->UnregisterTemplate("tpl-unsupported-root");
+}
+
+/**
+ * @tc.name: ProbeTemplateCloneUnsupportedNested001
+ * @tc.desc: A whitelisted root with an unsupported descendant is rejected with the
+ *           full subtree route to the offending node in the diagnostic path.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPlaceholderManagerTestNg, ProbeTemplateCloneUnsupportedNested001, TestSize.Level1)
+{
+    manager_->RegisterTemplate("tpl-unsupported-nested", ScrollPlaceholderBuilder([]() -> RefPtr<UINode> {
+        auto root = FrameNode::CreateFrameNode("nested_root", ElementRegister::GetInstance()->MakeUniqueId(),
+            AceType::MakeRefPtr<LinearLayoutPattern>(false));
+        root->AddChild(FrameNode::CreateFrameNode("bad_child", ElementRegister::GetInstance()->MakeUniqueId(),
+            AceType::MakeRefPtr<Pattern>()));
+        return root;
+    }));
+    std::string subtreePath;
+    EXPECT_FALSE(manager_->ProbeTemplateClone("tpl-unsupported-nested", subtreePath));
+    EXPECT_EQ(subtreePath, "nested_root > bad_child");
+    manager_->UnregisterTemplate("tpl-unsupported-nested");
+}
+
+/**
+ * @tc.name: ProbeTemplateCloneAdmitted001
+ * @tc.desc: A whitelisted subtree passes the admission probe: validation is the clone
+ *           itself, the probe product joins the instance pool and a background
+ *           replenish is scheduled.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPlaceholderManagerTestNg, ProbeTemplateCloneAdmitted001, TestSize.Level1)
+{
+    manager_->RegisterTemplate("tpl-probe-ok", MakeFrameTreeBuilder());
+    std::string subtreePath = "stale";
+    EXPECT_TRUE(manager_->ProbeTemplateClone("tpl-probe-ok", subtreePath));
+    EXPECT_TRUE(subtreePath.empty());
+    EXPECT_GE(manager_->GetCachedInstanceCount("tpl-probe-ok"), 1u);
+    EXPECT_GE(manager_->CapturedTaskCount(), 1u);
+    manager_->UnregisterTemplate("tpl-probe-ok");
+}
+
+/**
+ * @tc.name: ProbeTemplateCloneCloneFails001
+ * @tc.desc: A probe whose production copy hook refuses every node fails at the
+ *           source root and reports the root tag as the failing path.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPlaceholderManagerTestNg, ProbeTemplateCloneCloneFails001, TestSize.Level1)
+{
+    manager_->RegisterTemplate("tpl-probe-clonefail", MakeFrameTreeBuilder());
+    manager_->copyProtocolEnabled = false;
+    std::string subtreePath;
+    EXPECT_FALSE(manager_->ProbeTemplateClone("tpl-probe-clonefail", subtreePath));
+    EXPECT_EQ(subtreePath, "placeholder_root");
+    manager_->copyProtocolEnabled = true;
+    manager_->UnregisterTemplate("tpl-probe-clonefail");
+}
+
+/**
+ * @tc.name: ProbeTemplateCloneDestroyedManager001
+ * @tc.desc: A destroyed manager rejects every probe outright.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPlaceholderManagerTestNg, ProbeTemplateCloneDestroyedManager001, TestSize.Level1)
+{
+    manager_->Destroy();
+    std::string subtreePath = "untouched";
+    EXPECT_FALSE(manager_->ProbeTemplateClone("tpl-any", subtreePath));
+    EXPECT_TRUE(subtreePath.empty());
+}
+
+/**
+ * @tc.name: ProbeTemplateCloneNonFrameNode001
+ * @tc.desc: A template whose source root is not a frame node at all is rejected
+ *           with the node tag as the diagnostic path (the walk stops before any
+ *           pattern check).
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPlaceholderManagerTestNg, ProbeTemplateCloneNonFrameNode001, TestSize.Level1)
+{
+    manager_->RegisterTemplate("tpl-non-frame", ScrollPlaceholderBuilder([]() -> RefPtr<UINode> {
+        auto root = TestPlaceholderNode::CreateTestNode(930001);
+        root->AddChild(TestPlaceholderNode::CreateTestNode(930002));
+        return root;
+    }));
+    std::string subtreePath;
+    EXPECT_FALSE(manager_->ProbeTemplateClone("tpl-non-frame", subtreePath));
+    EXPECT_EQ(subtreePath, "TestPlaceholderNode");
+    manager_->UnregisterTemplate("tpl-non-frame");
+}
+
+/**
+ * @tc.name: RestrictedCopyWhitelistPatterns001
+ * @tc.desc: Every whitelisted render-only pattern clones through the production
+ *           restricted copy protocol (fresh same-type pattern + wholesale layout
+ *           property + zIndex), and the copy restores the pattern type.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPlaceholderManagerTestNg, RestrictedCopyWhitelistPatterns001, TestSize.Level1)
+{
+    // Route the clone through the production copy protocol (the Testable default
+    // stub would produce plain test nodes instead of frame nodes).
+    manager_->useDefaultCopyProtocol = true;
+    struct WhitelistCase {
+        std::string tag;
+        RefPtr<Pattern> pattern;
+    };
+    std::vector<WhitelistCase> cases = {
+        { "text_node", AceType::MakeRefPtr<TextPattern>() },
+        { "image_node", AceType::MakeRefPtr<ImagePattern>() },
+        { "linear_node", AceType::MakeRefPtr<LinearLayoutPattern>(false) },
+        { "stack_node", AceType::MakeRefPtr<StackPattern>() },
+        { "flex_node", AceType::MakeRefPtr<FlexLayoutPattern>(true) },
+    };
+    for (const auto& entry : cases) {
+        std::string templateId = "tpl-whitelist-" + entry.tag;
+        ScrollPlaceholderBuilder builder = [entry]() -> RefPtr<UINode> {
+            auto node = FrameNode::CreateFrameNode(
+                entry.tag, ElementRegister::GetInstance()->MakeUniqueId(), entry.pattern);
+            node->GetRenderContext()->UpdateZIndex(7);
+            return node;
+        };
+        manager_->RegisterTemplate(templateId, std::move(builder));
+        std::string subtreePath;
+        EXPECT_TRUE(manager_->ProbeTemplateClone(templateId, subtreePath)) << entry.tag;
+        // The probe product (a spare clone) carries the copied layout-relevant state.
+        auto instance = manager_->AcquireTemplateInstance(templateId);
+        ASSERT_TRUE(instance) << entry.tag;
+        auto frame = AceType::DynamicCast<FrameNode>(instance);
+        ASSERT_TRUE(frame) << entry.tag;
+        EXPECT_EQ(frame->GetTag(), entry.tag);
+        EXPECT_EQ(frame->GetRenderContext()->GetZIndex().value_or(0), 7) << entry.tag;
+        manager_->UnregisterTemplate(templateId);
+    }
+    manager_->useDefaultCopyProtocol = false;
+}
+
+/**
+ * @tc.name: ShellNodeInvisibleToChildEnumeration001
+ * @tc.desc: A placeholder shell keeps a zero frame count on purpose: host-level
+ *           child-slot enumerations must never count it as an item.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPlaceholderManagerTestNg, ShellNodeInvisibleToChildEnumeration001, TestSize.Level1)
+{
+    auto shell = ScrollPlaceholderShellNode::CreateScrollPlaceholderShellNode(
+        "shell", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    ASSERT_TRUE(shell);
+    EXPECT_EQ(shell->FrameCount(), 0);
+    EXPECT_EQ(shell->CurrentFrameCount(), 0);
+}
+
+// The restricted-scope counters are process-global statics shared by every test of this
+// binary, so each case balances its own Begin/End pairs and the TearDown drains any
+// depth a failed assertion may have left behind.
+class ScrollPlaceholderRestrictedScopeTestNg : public testing::Test {
+public:
+    void TearDown() override
+    {
+        while (ScrollPlaceholderRestrictedScope::IsInRestrictedScope()) {
+            ScrollPlaceholderRestrictedScope::End();
+        }
+    }
+};
+
+/**
+ * @tc.name: RestrictedScopePairingAndUnderflow001
+ * @tc.desc: Nested Begin/End pairs keep the scope depth, and an unpaired End
+ *           underflows safely (the depth never goes negative).
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPlaceholderRestrictedScopeTestNg, RestrictedScopePairingAndUnderflow001, TestSize.Level1)
+{
+    EXPECT_FALSE(ScrollPlaceholderRestrictedScope::IsInRestrictedScope());
+    ScrollPlaceholderRestrictedScope::Begin();
+    EXPECT_TRUE(ScrollPlaceholderRestrictedScope::IsInRestrictedScope());
+    ScrollPlaceholderRestrictedScope::Begin(); // re-entrant nesting
+    EXPECT_TRUE(ScrollPlaceholderRestrictedScope::IsInRestrictedScope());
+    ScrollPlaceholderRestrictedScope::End();
+    EXPECT_TRUE(ScrollPlaceholderRestrictedScope::IsInRestrictedScope());
+    ScrollPlaceholderRestrictedScope::End();
+    EXPECT_FALSE(ScrollPlaceholderRestrictedScope::IsInRestrictedScope());
+    // Unpaired End (underflow guard): the depth stays at zero instead of wrapping.
+    ScrollPlaceholderRestrictedScope::End();
+    EXPECT_FALSE(ScrollPlaceholderRestrictedScope::IsInRestrictedScope());
+}
+
+/**
+ * @tc.name: RestrictedScopeRaiiGuard001
+ * @tc.desc: The RAII guard opens the scope on construction and closes it on every
+ *           exit path, keeping the pairing balanced.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPlaceholderRestrictedScopeTestNg, RestrictedScopeRaiiGuard001, TestSize.Level1)
+{
+    {
+        ScopedScrollPlaceholderRestricted guard;
+        EXPECT_TRUE(ScrollPlaceholderRestrictedScope::IsInRestrictedScope());
+    }
+    EXPECT_FALSE(ScrollPlaceholderRestrictedScope::IsInRestrictedScope());
+}
+
+/**
+ * @tc.name: RestrictedScopeProbeAdmitsPairedScope001
+ * @tc.desc: A probe window covering one paired Begin/End admits the product.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPlaceholderRestrictedScopeTestNg, RestrictedScopeProbeAdmitsPairedScope001, TestSize.Level1)
+{
+    ScrollPlaceholderRestrictedScope::Probe probe;
+    ScrollPlaceholderRestrictedScope::Begin();
+    ScrollPlaceholderRestrictedScope::End();
+    probe.Close();
+    EXPECT_TRUE(probe.RestrictedScopeEntered());
+    EXPECT_TRUE(probe.ScopeClosed());
+    EXPECT_FALSE(probe.OutOfScopeTriggered());
+    EXPECT_TRUE(probe.Admitted());
+}
+
+/**
+ * @tc.name: RestrictedScopeProbeRejectsMissingScope001
+ * @tc.desc: A probe window without any Begin (a plain uninstrumented builder)
+ *           never admits: no restricted scope was entered at all.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPlaceholderRestrictedScopeTestNg, RestrictedScopeProbeRejectsMissingScope001, TestSize.Level1)
+{
+    ScrollPlaceholderRestrictedScope::Probe probe;
+    probe.Close();
+    EXPECT_FALSE(probe.RestrictedScopeEntered());
+    EXPECT_FALSE(probe.ScopeClosed());
+    EXPECT_FALSE(probe.Admitted());
+}
+
+/**
+ * @tc.name: RestrictedScopeProbeRejectsOpenScope001
+ * @tc.desc: A probe window whose Begin never paired its End (a half-executed
+ *           builder) does not close the pairing and never admits.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPlaceholderRestrictedScopeTestNg, RestrictedScopeProbeRejectsOpenScope001, TestSize.Level1)
+{
+    ScrollPlaceholderRestrictedScope::Probe probe;
+    ScrollPlaceholderRestrictedScope::Begin();
+    probe.Close();
+    EXPECT_TRUE(probe.RestrictedScopeEntered());
+    EXPECT_FALSE(probe.ScopeClosed());
+    EXPECT_FALSE(probe.Admitted());
+    ScrollPlaceholderRestrictedScope::End(); // rebalance the global depth
+}
+
+/**
+ * @tc.name: RestrictedScopeProbeRejectsViolation001
+ * @tc.desc: A violation reported inside the probe window (out-of-scope behavior
+ *           while the restricted scope is active) rejects the admission.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPlaceholderRestrictedScopeTestNg, RestrictedScopeProbeRejectsViolation001, TestSize.Level1)
+{
+    ScrollPlaceholderRestrictedScope::Probe probe;
+    ScrollPlaceholderRestrictedScope::Begin();
+    ScrollPlaceholderRestrictedScope::NotifyViolation();
+    ScrollPlaceholderRestrictedScope::End();
+    probe.Close();
+    EXPECT_TRUE(probe.RestrictedScopeEntered());
+    EXPECT_TRUE(probe.ScopeClosed());
+    EXPECT_TRUE(probe.OutOfScopeTriggered());
+    EXPECT_FALSE(probe.Admitted());
+}
+
+/**
+ * @tc.name: RestrictedScopeProductMark001
+ * @tc.desc: Product marks answer per node root (null roots are inert), and the
+ *           bounded registry discards the whole set on overflow (marks are
+ *           advisory defense-in-depth, never correctness).
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPlaceholderRestrictedScopeTestNg, RestrictedScopeProductMark001, TestSize.Level1)
+{
+    RefPtr<UINode> nullRoot;
+    EXPECT_FALSE(ScrollPlaceholderRestrictedScope::IsMarkedProduct(nullRoot));
+    ScrollPlaceholderRestrictedScope::MarkProduct(nullRoot);    // inert on null
+    ScrollPlaceholderRestrictedScope::ClearProductMark(nullRoot);
+
+    auto root = TestPlaceholderNode::CreateTestNode(910001);
+    ScrollPlaceholderRestrictedScope::MarkProduct(root);
+    EXPECT_TRUE(ScrollPlaceholderRestrictedScope::IsMarkedProduct(root));
+    ScrollPlaceholderRestrictedScope::ClearProductMark(root);
+    EXPECT_FALSE(ScrollPlaceholderRestrictedScope::IsMarkedProduct(root));
+
+    // Overflow the bounded registry: the set is cleared instead of growing unbounded.
+    constexpr int32_t overflowBaseId = 920000;
+    constexpr int32_t overflowCount = 2048; // beyond MAX_MARKED_PRODUCTS
+    for (int32_t i = 0; i < overflowCount; i++) {
+        ScrollPlaceholderRestrictedScope::MarkProduct(TestPlaceholderNode::CreateTestNode(overflowBaseId + i));
+    }
+    EXPECT_FALSE(ScrollPlaceholderRestrictedScope::IsMarkedProduct(
+        TestPlaceholderNode::CreateTestNode(overflowBaseId)));
 }
 } // namespace OHOS::Ace::NG

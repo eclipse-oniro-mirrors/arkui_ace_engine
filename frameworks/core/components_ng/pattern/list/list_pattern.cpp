@@ -320,16 +320,31 @@ RefPtr<FrameNode> ListPattern::CreateScrollPlaceholderShell(int32_t index)
     CHECK_NULL_RETURN(context, nullptr);
     const auto& manager = context->GetOrCreateScrollPlaceholderManager();
     CHECK_NULL_RETURN(manager, nullptr);
-    // Provider first: an item returning nullopt keeps the synchronous build path.
-    auto options = scrollPlaceholderProvider_(index);
-    CHECK_NULL_RETURN(options.has_value(), nullptr);
+    // Two-stage decision (budget gate first): the provider callback crosses into
+    // ArkTS (VM entry + object marshalling), so it must only run under real budget
+    // pressure. Stage 1 predicts with the empty-templateId component-aggregate
+    // estimate — no JS. Light load / no vsync anchor keeps the synchronous build
+    // path without the provider ever being consulted (device finding 2026-10-14:
+    // provider-first fired the callback for every index on every light-load frame).
     ScrollPlaceholderPredictParams params;
     params.componentType = ScrollPlaceholderComponentType::LIST;
-    params.templateId = options->id;
     params.hostNodeId = host->GetId();
     params.index = index;
     params.cacheBuild = false;
-    auto result = manager->Predict(params, manager->GetVsyncDerivedFrameDeadlineNs());
+    auto deadline = manager->GetVsyncDerivedFrameDeadlineNs();
+    auto gate = manager->Predict(params, deadline);
+    if (gate.decision != ScrollPlaceholderDecision::USE_PLACEHOLDER) {
+        return nullptr;
+    }
+    // Stage 2, under pressure only: ask the item provider; nullopt keeps the
+    // synchronous build path.
+    auto options = scrollPlaceholderProvider_(index);
+    CHECK_NULL_RETURN(options.has_value(), nullptr);
+    params.templateId = options->id;
+    // The template-specific estimate may flip the decision back to BUILD_REAL_NOW
+    // (ADR-4 per-template precision is preserved for the final decision and the
+    // flush-queue estimate).
+    auto result = manager->Predict(params, deadline);
     if (result.decision != ScrollPlaceholderDecision::USE_PLACEHOLDER) {
         return nullptr;
     }
