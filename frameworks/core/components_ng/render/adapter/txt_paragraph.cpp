@@ -1135,7 +1135,11 @@ RSParagraph* TxtParagraph::GetParagraph()
     if (paragraph_) {
         return paragraph_.get();
     }
+#ifndef ACE_UNITTEST
+    return externalParagraph_.Get();
+#else
     return externalParagraph_;
+#endif
 }
 
 std::unique_ptr<RSParagraph> TxtParagraph::GetParagraphUniquePtr()

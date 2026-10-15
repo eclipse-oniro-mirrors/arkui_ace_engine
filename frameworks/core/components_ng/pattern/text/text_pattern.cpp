@@ -15,6 +15,10 @@
 
 #include "core/components_ng/pattern/text/text_pattern.h"
 #include "core/components_ng/manager/safe_area/safe_area_manager.h"
+#include "core/components_ng/render/drawing.h"
+#ifndef ACE_UNITTEST
+#include "rosen_text/ref_count_holder.h"
+#endif
 
 #include <cstdint>
 #include <iterator>
@@ -111,6 +115,7 @@ TextPattern::TextPattern()
 
 TextPattern::~TextPattern()
 {
+    ReleaseExternalParagraphRef();
     // node destruct, need to stop text race animation
     CHECK_NULL_VOID(contentMod_);
     contentMod_->StopTextRace();
@@ -118,6 +123,16 @@ TextPattern::~TextPattern()
         paragraphCache_->Clear();
         paragraphCache_.Reset();
     }
+}
+
+void TextPattern::ReleaseExternalParagraphRef()
+{
+    CHECK_NULL_VOID(externalParagraph_.has_value());
+#ifndef ACE_UNITTEST
+    auto* holder = reinterpret_cast<Rosen::RefCountedHolder<RSParagraph>*>(externalParagraph_.value());
+    holder->Release();
+#endif
+    externalParagraph_ = std::nullopt;
 }
 
 void TextPattern::InitParagraphCache()
@@ -9760,7 +9775,17 @@ const std::list<RefPtr<UINode>>& TextPattern::GetChildNodes() const
 void TextPattern::SetExternalParagraph(void* paragraph)
 {
     ACE_TEXT_SCOPED_TRACE("SetExternalParagraph");
-    externalParagraph_ = paragraph;
+    if (externalParagraph_.has_value() && externalParagraph_.value() == paragraph) {
+        return;
+    }
+    ReleaseExternalParagraphRef();
+    if (paragraph) {
+#ifndef ACE_UNITTEST
+        auto* holder = reinterpret_cast<Rosen::RefCountedHolder<RSParagraph>*>(paragraph);
+        holder->AddRef();
+#endif
+        externalParagraph_ = paragraph;
+    }
 }
 
 const std::optional<void*>& TextPattern::GetExternalParagraph()
