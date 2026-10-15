@@ -2393,9 +2393,6 @@ void SelectPattern::SetOptionBgColorByUser(const Color& color, const RefPtr<Sele
 
 void SelectPattern::SetColorByUser(const RefPtr<FrameNode>& host, const RefPtr<SelectTheme>& theme)
 {
-    if (!SystemProperties::ConfigChangePerform()) {
-        return;
-    }
     CHECK_NULL_VOID(host);
     CHECK_NULL_VOID(theme);
     auto props = host->GetPaintProperty<SelectPaintProperty>();
@@ -2466,7 +2463,9 @@ bool SelectPattern::OnThemeScopeUpdate(int32_t themeScopeId)
 
     if (!fontColor_.has_value()) {
         ResetFontColor();
-        text_->MarkDirtyNode();
+        if (text_) {
+            text_->MarkDirtyNode();
+        }
         result = true;
     }
 
@@ -2939,9 +2938,7 @@ bool SelectPattern::GetShadowFromTheme(ShadowStyle shadowStyle, Shadow& shadow)
 
 void SelectPattern::SetDivider(const SelectDivider& divider)
 {
-    if (SystemProperties::ConfigChangePerform()) {
-        divider_ = divider;
-    }
+    divider_ = divider;
     const auto* menuItemModifier = NG::NodeModifier::GetMenuItemInnerModifier();
     CHECK_NULL_VOID(menuItemModifier);
     for (auto&& option : options_) {
