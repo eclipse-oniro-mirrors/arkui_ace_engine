@@ -83,6 +83,7 @@ public:
     std::string GetExpandedState();
     std::string GetAddText();
     std::string GetRemoveText();
+    int32_t GetZIndex();
 
 private:
     std::shared_ptr<NWeb::NWebAccessibilityNodeInfo> node_;
