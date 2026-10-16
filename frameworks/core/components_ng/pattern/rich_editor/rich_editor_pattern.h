@@ -1167,8 +1167,6 @@ public:
     {
         return frameRect_;
     }
-    float GetAllResponseAreaWidth() const;
-
 protected:
     RefPtr<TextSelectOverlay> GetOrCreateSelectOverlay() override;
     RefPtr<TextSelectOverlay> GetSelectOverlay() const override;

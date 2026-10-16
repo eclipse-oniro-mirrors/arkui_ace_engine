@@ -229,7 +229,6 @@ void RichEditorOverlayModifier::PaintPreviewTextDecoration(DrawingContext& drawi
     drawingContext.canvas.Restore();
 }
 
-<<<<<<< HEAD
 void RichEditorOverlayModifier::PaintUnderline(RSCanvas& canvas) const
 {
     auto richEditorPattern = AceType::DynamicCast<RichEditorPattern>(pattern_.Upgrade());
@@ -271,11 +270,7 @@ void RichEditorOverlayModifier::PaintUnderline(RSCanvas& canvas) const
     canvas.DetachPen();
 }
 
-
-void RichEditorOverlayModifier::PaintCaret(DrawingContext& drawingContext) const
-=======
 void RichEditorOverlayModifier::DrawCaretInternal(RSCanvas& canvas, const OffsetF& offset, int32_t caretColor) const
->>>>>>> origin/master
 {
     canvas.Save();
     RSPen pen;

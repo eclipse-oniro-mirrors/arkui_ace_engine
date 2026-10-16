@@ -897,9 +897,7 @@ void RichEditorPattern::OnModifyDone()
     RegisterTranslateListener();
     InitMargin();
     ProcessCounter();
-<<<<<<< HEAD
     UpdateUnderlineStyle();
-=======
     InitPasswordMode();
 }
 
@@ -925,7 +923,6 @@ void RichEditorPattern::ClearLeftoverPasswordArea()
 {
     auto area = GetPasswordResponseArea();
     IF_PRESENT(area, ClearArea());
->>>>>>> origin/master
 }
 
 void RichEditorPattern::InitGestureEvents()
@@ -10504,17 +10501,6 @@ void RichEditorPattern::DumpViewDataPageNode(RefPtr<ViewDataWrap> viewDataWrap, 
     info->SetPageNodeRect(pageNodeRect);
     info->SetIsFocus(HasFocus());
     viewDataWrap->AddPageNodeInfoWrap(info);
-}
-
-float RichEditorPattern::GetAllResponseAreaWidth() const
-{
-    float responseAreaWidth = 0.0f;
-    for (const auto& area : GetAllResponseArea()) {
-        if (area) {
-            responseAreaWidth += area->GetAreaRect().Width();
-        }
-    }
-    return responseAreaWidth;
 }
 
 void RichEditorPattern::HandleOnPaste()
