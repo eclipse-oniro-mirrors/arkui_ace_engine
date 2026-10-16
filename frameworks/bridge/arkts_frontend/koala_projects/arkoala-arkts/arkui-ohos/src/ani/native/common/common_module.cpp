@@ -1393,6 +1393,15 @@ ani_int getWindowHeightBreakpoint(ani_env* env, ani_object obj)
     return modifier->getCommonAniModifier()->getWindowHeightBreakpoint();
 }
 
+ani_boolean isWindowInfoInitialized(ani_env* env, ani_object obj, ani_int instanceId)
+{
+    const auto* modifier = GetNodeAniModifier();
+    if (!modifier || !modifier->getCommonAniModifier() || !env) {
+        return false;
+    }
+    return modifier->getCommonAniModifier()->isWindowInfoInitialized(instanceId);
+}
+
 void* TransferKeyEventPointer(ani_env* env, ani_object obj, ani_long pointer)
 {
     const auto* modifier = GetNodeAniModifier();

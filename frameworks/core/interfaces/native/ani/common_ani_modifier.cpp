@@ -746,6 +746,15 @@ ani_int GetWindowHeightBreakpoint()
     return ViewAbstract::GetWindowHeightBreakpoint();
 }
 
+ani_boolean IsWindowInfoInitialized(ani_int instanceId)
+{
+    auto context = NG::PipelineContext::GetContextByContainerId(instanceId);
+    CHECK_NULL_RETURN(context, false);
+    auto window = context->GetWindow();
+    CHECK_NULL_RETURN(window, false);
+    return window->IsWindowInfoInitialized();
+}
+
 void* TransferKeyEventPointer(ani_long nativePtr)
 {
     CHECK_NULL_RETURN(nativePtr, nullptr);
@@ -1328,6 +1337,7 @@ const ArkUIAniCommonModifier* GetCommonAniModifier()
         .getWindowId = OHOS::Ace::NG::GetWindowId,
         .getWindowHeightBreakpoint = OHOS::Ace::NG::GetWindowHeightBreakpoint,
         .getWindowWidthBreakpoint = OHOS::Ace::NG::GetWindowWidthBreakpoint,
+        .isWindowInfoInitialized = OHOS::Ace::NG::IsWindowInfoInitialized,
         .transferKeyEventPointer = OHOS::Ace::NG::TransferKeyEventPointer,
         .createKeyEventAccessorWithPointer = OHOS::Ace::NG::CreateKeyEventAccessorWithPointer,
         .createEventTargetInfoAccessor = OHOS::Ace::NG::CreateEventTargetInfoAccessor,

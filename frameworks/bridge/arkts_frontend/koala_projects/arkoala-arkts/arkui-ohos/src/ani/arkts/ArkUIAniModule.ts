@@ -455,6 +455,7 @@ export class ArkUIAniModule {
     native static _Common_getWindowId(instanceId: KInt): int32
     native static _Common_getWindowWidthBreakpoint(): KInt
     native static _Common_getWindowHeightBreakpoint(): KInt
+    native static _Common_isWindowInfoInitialized(instanceId: KInt): boolean
 
     native static _Common_IsEasySplit(instanceId: KInt): boolean
 

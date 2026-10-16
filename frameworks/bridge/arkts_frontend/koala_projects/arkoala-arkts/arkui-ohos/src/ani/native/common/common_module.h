@@ -89,6 +89,7 @@ ani_string getWindowName(ani_env* env, ani_object obj, ani_int instanceId);
 ani_int getWindowId(ani_env* env, ani_object obj, ani_int instanceId);
 ani_int getWindowWidthBreakpoint(ani_env* env, ani_object obj);
 ani_int getWindowHeightBreakpoint(ani_env* env, ani_object obj);
+ani_boolean isWindowInfoInitialized(ani_env* env, ani_object obj, ani_int instanceId);
 void* TransferKeyEventPointer(ani_env* env, ani_object obj, ani_long pointer);
 void* CreateKeyEventAccessorWithPointer(ani_env* env, [[maybe_unused]] ani_object obj, ani_long pointer);
 void* CreateEventTargetInfoAccessor(ani_env* env, [[maybe_unused]] ani_object obj);
