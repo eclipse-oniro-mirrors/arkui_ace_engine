@@ -271,6 +271,7 @@ public:
     void SetRotateRenderEffect(WebRotateEffect effect) override;
     void SetOnTextSelectionChange(std::function<void(const BaseEventInfo *info)> &&jsCallback) override;
     void SetOnDetectedBlankScreen(std::function<void(const BaseEventInfo *info)> &&jsCallback) override;
+    void SetOnMonitoredBlankScreen(std::function<void(const BaseEventInfo *info)> &&jsCallback) override;
     void SetBlankScreenDetectionConfig(bool enable, const std::vector<double> &detectionTiming,
         const std::vector<int32_t> &detectionMethods, int32_t contentfulNodesCountThreshold) override;
     void SetOnFirstScreenPaint(std::function<void(const BaseEventInfo *info)> &&jsCallback) override;
@@ -405,6 +406,8 @@ public:
     static void SetOnTextSelectionChange(
         FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& jsCallback);
     static void SetOnDetectedBlankScreen(
+        FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& jsCallback);
+    static void SetOnMonitoredBlankScreen(
         FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& jsCallback);
     static void SetBlankScreenDetectionConfig(
         FrameNode* frameNode, const BlankScreenDetectionConfig& detectConfig);

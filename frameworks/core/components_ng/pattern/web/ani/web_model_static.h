@@ -140,6 +140,8 @@ public:
         FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& callback);
     static void SetOnDetectedBlankScreen(
         FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& callback);
+    static void SetOnMonitoredBlankScreen(
+        FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& callback);
     static void SetBlankScreenDetectionConfig(FrameNode* frameNode, const BlankScreenDetectionConfig& detectConfig);
     static void SetOnFirstScreenPaint(FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& callback);
     static void SetResourceLoadId(FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& callback);

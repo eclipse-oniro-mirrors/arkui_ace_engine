@@ -242,6 +242,7 @@ public:
     static void GestureFocusMode(int32_t gestureFocusMode);
     static void RotateRenderEffect(int32_t webRotateEffect);
     static void OnDetectedBlankScreen(const JSCallbackInfo& args);
+    static void OnMonitoredBlankScreen(const JSCallbackInfo& args);
     static void BlankScreenDetectionConfig(const JSCallbackInfo& args);
     static void OnFirstScreenPaint(const JSCallbackInfo& args);
     static void OnTextSelectionChange(const JSCallbackInfo& args);

@@ -1889,6 +1889,36 @@ void ResetOnDetectedBlankScreen(ArkUINodeHandle node)
     WebModelNG::SetOnDetectedBlankScreen(frameNode, callback);
 }
 
+void SetOnMonitoredBlankScreen(ArkUINodeHandle node, void* extraParam)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    if (extraParam) {
+        auto* onMonitoredBlankScreenCallBackPtr =
+            reinterpret_cast<std::function<void(const MonitoredBlankScreenEvent&)>*>(extraParam);
+        CHECK_NULL_VOID(onMonitoredBlankScreenCallBackPtr);
+        auto onMonitoredBlankScreenCallBack = *onMonitoredBlankScreenCallBackPtr;
+        auto callback = [onMonitoredBlankScreenCallBack](const BaseEventInfo* event) {
+            CHECK_NULL_VOID(event);
+            auto monitoredBlankScreenEvent = static_cast<const MonitoredBlankScreenEvent*>(event);
+            if (monitoredBlankScreenEvent) {
+                auto& nonConstEvent = const_cast<MonitoredBlankScreenEvent&>(*monitoredBlankScreenEvent);
+                onMonitoredBlankScreenCallBack(nonConstEvent);
+            }
+        };
+        WebModelNG::SetOnMonitoredBlankScreen(frameNode, std::move(callback));
+    } else {
+        WebModelNG::SetOnMonitoredBlankScreen(frameNode, nullptr);
+    }
+}
+ 
+void ResetOnMonitoredBlankScreen(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto callback = [](const BaseEventInfo* info) {};
+    WebModelNG::SetOnMonitoredBlankScreen(frameNode, callback);
+}
+
 void SetBlankScreenDetectionConfig(
     ArkUINodeHandle node, const struct ArkUIBlankScreenDetectionConfigStruct* arkUIBlankScreenDetectionConfig)
 {
@@ -3033,6 +3063,8 @@ const ArkUIWebModifier* GetWebModifier()
         .resetOnTextSelectionChange = ResetOnTextSelectionChange,
         .setOnDetectedBlankScreen = SetOnDetectedBlankScreen,
         .resetOnDetectedBlankScreen = ResetOnDetectedBlankScreen,
+        .setOnMonitoredBlankScreen = SetOnMonitoredBlankScreen,
+        .resetOnMonitoredBlankScreen = ResetOnMonitoredBlankScreen,
         .setBlankScreenDetectionConfig = SetBlankScreenDetectionConfig,
         .resetBlankScreenDetectionConfig = ResetBlankScreenDetectionConfig,
         .setOnFirstScreenPaint = SetOnFirstScreenPaint,
@@ -3306,6 +3338,8 @@ const CJUIWebModifier* GetCJUIWebModifier()
         .resetOnTextSelectionChange = ResetOnTextSelectionChange,
         .setOnDetectedBlankScreen = SetOnDetectedBlankScreen,
         .resetOnDetectedBlankScreen = ResetOnDetectedBlankScreen,
+        .setOnMonitoredBlankScreen = SetOnMonitoredBlankScreen,
+        .resetOnMonitoredBlankScreen = ResetOnMonitoredBlankScreen,
         .setBlankScreenDetectionConfig = SetBlankScreenDetectionConfig,
         .resetBlankScreenDetectionConfig = ResetBlankScreenDetectionConfig,
         .setOnFirstScreenPaint = SetOnFirstScreenPaint,

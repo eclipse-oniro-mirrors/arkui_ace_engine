@@ -2722,6 +2722,7 @@ void JSWeb::JSBind(BindingTarget globalObj)
     JSClass<JSWeb>::StaticMethod("onPdfLoadEvent", &JSWeb::OnPdfLoadEvent);
     JSClass<JSWeb>::StaticMethod("forceEnableZoom", &JSWeb::SetForceEnableZoom);
     JSClass<JSWeb>::StaticMethod("onDetectedBlankScreen", &JSWeb::OnDetectedBlankScreen);
+    JSClass<JSWeb>::StaticMethod("onMonitoredBlankScreen", &JSWeb::OnMonitoredBlankScreen);
     JSClass<JSWeb>::StaticMethod("blankScreenDetectionConfig", &JSWeb::BlankScreenDetectionConfig);
     JSClass<JSWeb>::StaticMethod("onFirstScreenPaint", &JSWeb::OnFirstScreenPaint);
     JSClass<JSWeb>::StaticMethod("onTextSelectionChange", &JSWeb::OnTextSelectionChange);
@@ -2889,6 +2890,15 @@ JSRef<JSVal> DetectedBlankScreenEventToJSValue(const DetectedBlankScreenEvent &e
         detailsObj->SetProperty("detectedContentfulNodesCount", eventInfo.GetDetectedContentfulNodesCount());
         obj->SetPropertyObject("blankScreenDetails", detailsObj);
     }
+    return JSRef<JSVal>::Cast(obj);
+}
+
+JSRef<JSVal> MonitoredBlankScreenEventToJSValue(const MonitoredBlankScreenEvent &eventInfo)
+{
+    JSRef<JSObject> obj = JSRef<JSObject>::New();
+    obj->SetProperty("url", eventInfo.GetUrl());
+    obj->SetProperty("reason", eventInfo.GetReason());
+    obj->SetProperty("extraMsg", eventInfo.GetExtraMsg());
     return JSRef<JSVal>::Cast(obj);
 }
 
@@ -8107,6 +8117,39 @@ void JSWeb::OnDetectedBlankScreen(const JSCallbackInfo& args)
         func->Execute(*eventInfo);
     };
     WebModel::GetInstance()->SetOnDetectedBlankScreen(jsCallback);
+}
+
+void JSWeb::OnMonitoredBlankScreen(const JSCallbackInfo& args)
+{
+    RETURN_IF_CALLING_FROM_M114();
+    TAG_LOGI(AceLogTag::ACE_WEB, "JSWeb::OnMonitoredBlankScreen, callback set");
+    if (args.Length() < 1 || !args[0]->IsFunction()) {
+        return;
+    }
+#ifdef ACE_ENGINE_API_METRICS_EXT_ENABLE
+    HISTOGRAM_BOOLEAN("ArkWeb.Render.onMonitoredBlankScreen", HISTOGRAM_API_BOOL_COUNTS);
+#endif
+    auto jsFunc = AceType::MakeRefPtr<JsEventFunction<MonitoredBlankScreenEvent, 1>>(
+        JSRef<JSFunc>::Cast(args[0]), MonitoredBlankScreenEventToJSValue);
+ 
+    WeakPtr<NG::FrameNode> frameNode = AceType::WeakClaim(NG::ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    auto jsCallback = [execCtx = args.GetExecutionContext(), func = std::move(jsFunc), node = frameNode](
+                          const BaseEventInfo* info) {
+        auto webNode = node.Upgrade();
+        CHECK_NULL_VOID(webNode);
+        ContainerScope scope(webNode->GetInstanceId());
+        JAVASCRIPT_EXECUTION_SCOPE_WITH_CHECK(execCtx);
+        CHECK_NULL_VOID(func);
+        auto pipelineContext = PipelineContext::GetCurrentContext();
+ 
+        if (pipelineContext) {
+            pipelineContext->UpdateCurrentActiveNode(node);
+        }
+        auto* eventInfo = TypeInfoHelper::DynamicCast<MonitoredBlankScreenEvent>(info);
+        CHECK_NULL_VOID(eventInfo);
+        func->Execute(*eventInfo);
+    };
+    WebModel::GetInstance()->SetOnMonitoredBlankScreen(jsCallback);
 }
 
 void JSWeb::OnFirstScreenPaint(const JSCallbackInfo& args)

@@ -1923,6 +1923,8 @@ typedef struct OnDestroyAISession OnDestroyAISession;
 typedef struct Opt_OnDestroyAISession Opt_OnDestroyAISession;
 typedef struct OnDetectBlankScreenCallback OnDetectBlankScreenCallback;
 typedef struct Opt_OnDetectBlankScreenCallback Opt_OnDetectBlankScreenCallback;
+typedef struct OnMonitorBlankScreenCallback OnMonitorBlankScreenCallback;
+typedef struct Opt_OnMonitorBlankScreenCallback Opt_OnMonitorBlankScreenCallback;
 typedef struct OnDidChangeCallback OnDidChangeCallback;
 typedef struct Opt_OnDidChangeCallback Opt_OnDidChangeCallback;
 typedef struct OnDidStopDraggingCallback OnDidStopDraggingCallback;
@@ -3061,6 +3063,8 @@ typedef struct Ark_BindableResourceStr Ark_BindableResourceStr;
 typedef struct Opt_BindableResourceStr Opt_BindableResourceStr;
 typedef struct Ark_BlankScreenDetectionEventInfo Ark_BlankScreenDetectionEventInfo;
 typedef struct Opt_BlankScreenDetectionEventInfo Opt_BlankScreenDetectionEventInfo;
+typedef struct Ark_MonitoredBlankScreenEventInfo Ark_MonitoredBlankScreenEventInfo;
+typedef struct Opt_MonitoredBlankScreenEventInfo Opt_MonitoredBlankScreenEventInfo;
 typedef struct Ark_ButtonIconOptions Ark_ButtonIconOptions;
 typedef struct Opt_ButtonIconOptions Opt_ButtonIconOptions;
 typedef struct Ark_cacheDownload_DownloadInfo Ark_cacheDownload_DownloadInfo;
@@ -4316,6 +4320,38 @@ typedef struct Opt_BlankScreenDetectionMethod {
     Ark_Tag tag;
     Ark_BlankScreenDetectionMethod value;
 } Opt_BlankScreenDetectionMethod;
+typedef enum Ark_BlankScreenReason {
+    ARK_BLANK_SCREEN_REASON_DNS_RESOLVE_FAILED = 101,
+    ARK_BLANK_SCREEN_REASON_REQUEST_TIMED_OUT = 102,
+    ARK_BLANK_SCREEN_REASON_CONNECTION_REFUSED = 103,
+    ARK_BLANK_SCREEN_REASON_CONNECTION_RESET = 104,
+    ARK_BLANK_SCREEN_REASON_SSL_ERROR = 105,
+    ARK_BLANK_SCREEN_REASON_CERT_ERROR = 106,
+    ARK_BLANK_SCREEN_REASON_INTERNET_DISCONNECTED = 107,
+    ARK_BLANK_SCREEN_REASON_REDIRECT_LOOP = 108,
+    ARK_BLANK_SCREEN_REASON_PROXY_ERROR = 109,
+    ARK_BLANK_SCREEN_REASON_OTHER_NETWORK_ERROR = 199,
+    ARK_BLANK_SCREEN_REASON_MAIN_DOC_EMPTY = 201,
+    ARK_BLANK_SCREEN_REASON_HTTP_4XX_ERROR = 202,
+    ARK_BLANK_SCREEN_REASON_HTTP_5XX_ERROR = 203,
+    ARK_BLANK_SCREEN_REASON_JS_GLOBAL_BUNDLE_LOAD_FAILED = 210,
+    ARK_BLANK_SCREEN_REASON_CSS_LOAD_FAILED = 211,
+    ARK_BLANK_SCREEN_REASON_MULTI_RESOURCE_LOAD_FAILED = 212,
+    ARK_BLANK_SCREEN_REASON_CORS_BLOCKED = 213,
+    ARK_BLANK_SCREEN_REASON_CSP_BLOCKED = 214,
+    ARK_BLANK_SCREEN_REASON_MIXED_CONTENT_BLOCKED = 215,
+    ARK_BLANK_SCREEN_REASON_JS_RUNTIME_ERROR = 301,
+    ARK_BLANK_SCREEN_REASON_NO_FIRST_CONTENTFUL_PAINT = 312,
+    ARK_BLANK_SCREEN_REASON_RENDERER_CRASHED = 401,
+    ARK_BLANK_SCREEN_REASON_RENDERER_KILLED = 402,
+    ARK_BLANK_SCREEN_REASON_GPU_PROCESS_CRASHED = 403,
+    ARK_BLANK_SCREEN_REASON_GPU_PROCESS_WATCHDOG_TIMEOUT = 404,
+    ARK_BLANK_SCREEN_REASON_WEB_VIEW_ZERO_SIZE = 501,
+} Ark_BlankScreenReason;
+typedef struct Opt_BlankScreenReason {
+    Ark_Tag tag;
+    Ark_BlankScreenReason value;
+} Opt_BlankScreenReason;
 typedef enum Ark_BlendApplyType {
     ARK_BLEND_APPLY_TYPE_FAST = 0,
     ARK_BLEND_APPLY_TYPE_OFFSCREEN = 1,
@@ -14040,6 +14076,16 @@ typedef struct Opt_OnDetectBlankScreenCallback {
     Ark_Tag tag;
     OnDetectBlankScreenCallback value;
 } Opt_OnDetectBlankScreenCallback;
+typedef struct OnMonitorBlankScreenCallback {
+    /* kind: Callback */
+    Ark_CallbackResource resource;
+    void (*call)(const Ark_Int32 resourceId, const Ark_MonitoredBlankScreenEventInfo event);
+    void (*callSync)(Ark_VMContext vmContext, const Ark_Int32 resourceId, const Ark_MonitoredBlankScreenEventInfo event);
+} OnMonitorBlankScreenCallback;
+typedef struct Opt_OnMonitorBlankScreenCallback {
+    Ark_Tag tag;
+    OnMonitorBlankScreenCallback value;
+} Opt_OnMonitorBlankScreenCallback;
 typedef struct OnDidChangeCallback {
     /* kind: Callback */
     Ark_CallbackResource resource;
@@ -20017,6 +20063,16 @@ typedef struct Opt_BlankScreenDetectionEventInfo {
     Ark_Tag tag;
     Ark_BlankScreenDetectionEventInfo value;
 } Opt_BlankScreenDetectionEventInfo;
+typedef struct Ark_MonitoredBlankScreenEventInfo {
+    /* kind: Interface */
+    Ark_String url;
+    Ark_BlankScreenReason reason;
+    Ark_String extraMsg;
+} Ark_MonitoredBlankScreenEventInfo;
+typedef struct Opt_MonitoredBlankScreenEventInfo {
+    Ark_Tag tag;
+    Ark_MonitoredBlankScreenEventInfo value;
+} Opt_MonitoredBlankScreenEventInfo;
 typedef struct Ark_ButtonIconOptions {
     /* kind: Interface */
     Ark_Union_String_image_PixelMap_Resource shown;
@@ -29055,6 +29111,8 @@ typedef struct GENERATED_ArkUIWebModifier {
                                  const Opt_Boolean* value);
     void (*setOnDetectedBlankScreen)(Ark_NativePointer node,
                                      const Opt_OnDetectBlankScreenCallback* value);
+    void (*setOnMonitoredBlankScreen)(Ark_NativePointer node,
+                                      const Opt_OnMonitorBlankScreenCallback* value);
     void (*setBlankScreenDetectionConfig)(Ark_NativePointer node,
                                           const Opt_BlankScreenDetectionConfig* value);
     void (*setBackToTop)(Ark_NativePointer node,

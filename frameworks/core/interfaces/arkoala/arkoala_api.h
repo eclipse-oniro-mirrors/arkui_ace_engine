@@ -7167,6 +7167,8 @@ struct ArkUIWebModifier {
     void (*resetOnTextSelectionChange)(ArkUINodeHandle node);
     void (*setOnDetectedBlankScreen)(ArkUINodeHandle node, void* callback);
     void (*resetOnDetectedBlankScreen)(ArkUINodeHandle node);
+    void (*setOnMonitoredBlankScreen)(ArkUINodeHandle node, void* callback);
+    void (*resetOnMonitoredBlankScreen)(ArkUINodeHandle node);
     void (*setBlankScreenDetectionConfig)(
         ArkUINodeHandle node, const struct ArkUIBlankScreenDetectionConfigStruct* arkUITextDetectConfig);
     void (*resetBlankScreenDetectionConfig)(ArkUINodeHandle node);

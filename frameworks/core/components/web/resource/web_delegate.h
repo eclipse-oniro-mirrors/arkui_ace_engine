@@ -1783,6 +1783,8 @@ public:
     std::string GetLastSelectionText() const;
     void OnTextSelectionChange(const std::string& selectionText);
     void OnDetectedBlankScreen(const std::string& url, int32_t blankScreenReason, int32_t detectedContentfulNodesCount);
+    void OnMonitoredBlankScreen(const std::string& url, int32_t reason,
+        const std::string& extraMsg);
     void UpdateBlankScreenDetectionConfig(bool enable, const std::vector<double>& detectionTiming,
         const std::vector<int32_t>& detectionMethods, int32_t contentfulNodesCountThreshold);
     void OnFirstScreenPaint(const std::string& url, int64_t navigationStartTime, int64_t firstScreenPaintTime);
