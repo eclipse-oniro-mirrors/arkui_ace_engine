@@ -80,6 +80,7 @@ constexpr WebRotateEffect DEFAULT_WEB_ROTATE_EFFECT = WebRotateEffect::TOPLEFT_E
 constexpr bool DEFAULT_ENABLE_DATA_DETECTOR = false;
 constexpr bool DEFAULT_ENABLE_SELECTED_DATA_DETECTOR = true;
 const std::vector<double> BLANK_SCREEN_DETECTION_DEFAULT_TIMING = { 1.0, 3.0, 5.0 };
+constexpr bool DEFAULT_WEB_BLANK_SCREEN_MONITOR_ENABLED = false;
 constexpr bool DEFAULT_WEB_MEDIA_AV_SESSION_ENABLED = true;
 constexpr bool DEFAULT_WEB_MEDIA_NETWORK_PROXY_ENABLED = false;
 constexpr bool DEFAULT_NATIVE_MEDIA_PLAYER_ENABLED = false;
@@ -1940,6 +1941,20 @@ void ResetBlankScreenDetectionConfig(ArkUINodeHandle node)
     WebModelNG::SetBlankScreenDetectionConfig(frameNode, detectConfig);
 }
 
+void SetEnableBlankScreenMonitor(ArkUINodeHandle node, ArkUI_Bool value)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    WebModelNG::SetWebBlankScreenMonitorEnabled(frameNode, value);
+}
+
+void ResetEnableBlankScreenMonitor(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    WebModelNG::SetWebBlankScreenMonitorEnabled(frameNode, DEFAULT_WEB_BLANK_SCREEN_MONITOR_ENABLED);
+}
+
 void SetOnContextMenuShow(ArkUINodeHandle node, void* extraParam)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
@@ -3035,6 +3050,8 @@ const ArkUIWebModifier* GetWebModifier()
         .resetOnDetectedBlankScreen = ResetOnDetectedBlankScreen,
         .setBlankScreenDetectionConfig = SetBlankScreenDetectionConfig,
         .resetBlankScreenDetectionConfig = ResetBlankScreenDetectionConfig,
+        .setEnableBlankScreenMonitor = SetEnableBlankScreenMonitor,
+        .resetEnableBlankScreenMonitor = ResetEnableBlankScreenMonitor,
         .setOnFirstScreenPaint = SetOnFirstScreenPaint,
         .resetOnFirstScreenPaint = ResetOnFirstScreenPaint,
         .setEnableImageAnalyzer = SetEnableImageAnalyzer,
@@ -3308,6 +3325,8 @@ const CJUIWebModifier* GetCJUIWebModifier()
         .resetOnDetectedBlankScreen = ResetOnDetectedBlankScreen,
         .setBlankScreenDetectionConfig = SetBlankScreenDetectionConfig,
         .resetBlankScreenDetectionConfig = ResetBlankScreenDetectionConfig,
+        .setEnableBlankScreenMonitor = SetEnableBlankScreenMonitor,
+        .resetEnableBlankScreenMonitor = ResetEnableBlankScreenMonitor,
         .setOnFirstScreenPaint = SetOnFirstScreenPaint,
         .resetOnFirstScreenPaint = ResetOnFirstScreenPaint,
         .setEnableImageAnalyzer = SetEnableImageAnalyzer,

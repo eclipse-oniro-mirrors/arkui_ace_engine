@@ -273,6 +273,7 @@ public:
     void SetOnDetectedBlankScreen(std::function<void(const BaseEventInfo *info)> &&jsCallback) override;
     void SetBlankScreenDetectionConfig(bool enable, const std::vector<double> &detectionTiming,
         const std::vector<int32_t> &detectionMethods, int32_t contentfulNodesCountThreshold) override;
+    void SetWebBlankScreenMonitorEnabled(bool isEnabled) override;
     void SetOnFirstScreenPaint(std::function<void(const BaseEventInfo *info)> &&jsCallback) override;
     void SetEnableImageAnalyzer(bool isEnabled) override;
     void SetEnableAutoFill(bool isEnabled) override;
@@ -408,6 +409,7 @@ public:
         FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& jsCallback);
     static void SetBlankScreenDetectionConfig(
         FrameNode* frameNode, const BlankScreenDetectionConfig& detectConfig);
+    static void SetWebBlankScreenMonitorEnabled(FrameNode* frameNode, bool isEnabled);
     static void SetOnFirstScreenPaint(
         FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& jsCallback);
     static void SetEnableImageAnalyzer(FrameNode* frameNode, bool isEnabled);

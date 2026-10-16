@@ -29057,6 +29057,8 @@ typedef struct GENERATED_ArkUIWebModifier {
                                      const Opt_OnDetectBlankScreenCallback* value);
     void (*setBlankScreenDetectionConfig)(Ark_NativePointer node,
                                           const Opt_BlankScreenDetectionConfig* value);
+    void (*setEnableBlankScreenMonitor)(Ark_NativePointer node,
+                                        const Opt_Boolean* value);
     void (*setBackToTop)(Ark_NativePointer node,
                          const Opt_Boolean* value);
     void (*setEnableSelectedDataDetector)(Ark_NativePointer node,

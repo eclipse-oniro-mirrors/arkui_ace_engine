@@ -3099,6 +3099,16 @@ void SetBlankScreenDetectionConfigImpl(Ark_NativePointer node,
     WebModelStatic::SetBlankScreenDetectionConfig(frameNode, config);
 #endif // WEB_SUPPORTED
 }
+void SetEnableBlankScreenMonitorImpl(Ark_NativePointer node,
+                                     const Opt_Boolean* value)
+{
+#ifdef WEB_SUPPORTED
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto convValue = Converter::OptConvert<bool>(*value);
+    WebModelStatic::SetWebBlankScreenMonitorEnabled(frameNode, convValue);
+#endif // WEB_SUPPORTED
+}
 
 void SetZoomControlAccessImpl(Ark_NativePointer node,
                               const Opt_Boolean* value)
@@ -3399,6 +3409,7 @@ const GENERATED_ArkUIWebModifier* GetWebModifier()
         WebAttributeModifier::SetZoomControlAccessImpl,
         WebAttributeModifier::SetOnDetectedBlankScreenImpl,
         WebAttributeModifier::SetBlankScreenDetectionConfigImpl,
+        WebAttributeModifier::SetEnableBlankScreenMonitorImpl,
         WebAttributeModifier::SetBackToTopImpl,
         WebAttributeModifier::SetEnableSelectedDataDetectorImpl,
         WebAttributeModifier::SetOnFirstScreenPaintImpl,

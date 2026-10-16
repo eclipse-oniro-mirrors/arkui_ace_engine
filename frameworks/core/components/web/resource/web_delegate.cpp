@@ -10685,6 +10685,25 @@ void WebDelegate::UpdateBlankScreenDetectionConfig(bool enable, const std::vecto
         TaskExecutor::TaskType::PLATFORM, "ArkUIWebUpdateBlankScreenDetectionConfig");
 }
 
+void WebDelegate::UpdateWebBlankScreenMonitorEnabled(bool isEnabled)
+{
+    auto context = context_.Upgrade();
+    if (!context) {
+        return;
+    }
+    context->GetTaskExecutor()->PostTask(
+        [weak = WeakClaim(this), isEnabled]() {
+            auto delegate = weak.Upgrade();
+            if (delegate && delegate->nweb_) {
+                std::shared_ptr<OHOS::NWeb::NWebPreference> setting = delegate->nweb_->GetPreference();
+                if (setting) {
+                    setting->PutWebBlankScreenMonitorEnabled(isEnabled);
+                }
+            }
+        },
+        TaskExecutor::TaskType::PLATFORM, "ArkUIWebUpdateWebBlankScreenMonitorEnabled");
+}
+
 void WebDelegate::UpdateEnableImageAnalyzer(bool enable)
 {
     auto context = context_.Upgrade();

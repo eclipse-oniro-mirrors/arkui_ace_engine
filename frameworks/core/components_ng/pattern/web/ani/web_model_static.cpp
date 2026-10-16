@@ -1014,6 +1014,14 @@ void WebModelStatic::SetBlankScreenDetectionConfig(
     webPatternStatic->UpdateBlankScreenDetectionConfig(detectConfig);
 }
 
+void WebModelStatic::SetWebBlankScreenMonitorEnabled(FrameNode *frameNode, const std::optional<bool>& enable)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto webPatternStatic = AceType::DynamicCast<WebPatternStatic>(frameNode->GetPattern());
+    CHECK_NULL_VOID(webPatternStatic);
+    webPatternStatic->UpdateWebBlankScreenMonitorEnabled(enable.value_or(false));
+}
+
 void WebModelStatic::SetResourceLoadId(FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& callback)
 {
     CHECK_NULL_VOID(frameNode);

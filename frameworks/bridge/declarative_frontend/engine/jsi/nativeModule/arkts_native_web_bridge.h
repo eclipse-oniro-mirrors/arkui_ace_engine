@@ -195,6 +195,8 @@ public:
     static ArkUINativeModuleValue ResetOnDetectedBlankScreen(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static ArkUINativeModuleValue SetBlankScreenDetectionConfig(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static ArkUINativeModuleValue ResetBlankScreenDetectionConfig(ArkUIRuntimeCallInfo* runtimeCallInfo);
+    static ArkUINativeModuleValue SetEnableBlankScreenMonitor(ArkUIRuntimeCallInfo* runtimeCallInfo);
+    static ArkUINativeModuleValue ResetEnableBlankScreenMonitor(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static ArkUINativeModuleValue SetOnFirstScreenPaint(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static ArkUINativeModuleValue ResetOnFirstScreenPaint(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static ArkUINativeModuleValue SetOnContextMenuShow(ArkUIRuntimeCallInfo* runtimeCallInfo);

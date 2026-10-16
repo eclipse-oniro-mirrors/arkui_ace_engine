@@ -3190,6 +3190,18 @@ export class ArkWebPeer extends ArkCommonMethodPeer {
         ArkUIGeneratedNativeModule._WebAttribute_setBlankScreenDetectionConfig(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
+    setEnableBlankScreenMonitorAttribute(value: boolean | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (value !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueTmpValue = value!
+            thisSerializer.writeBoolean(valueTmpValue)
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._WebAttribute_setEnableBlankScreenMonitor(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
     setBackToTopAttribute(value: boolean | undefined): void {
         const thisSerializer: SerializerBase = SerializerBase.hold()
         if (value !== undefined) {
@@ -4458,6 +4470,9 @@ export interface WebAttribute extends CommonMethod {
     blankScreenDetectionConfig(value: BlankScreenDetectionConfig | undefined): this {
         throw new Error('Unimplemented method blankScreenDetectionConfig')
     }
+    enableBlankScreenMonitor(value: boolean | undefined): this {
+        throw new Error('Unimplemented method enableBlankScreenMonitor')
+    }
     backToTop(value: boolean | undefined): this {
         throw new Error('Unimplemented method backToTop')
     }
@@ -5306,6 +5321,11 @@ export class ArkWebComponent extends ArkCommonMethodComponent implements WebAttr
     public blankScreenDetectionConfig(value: BlankScreenDetectionConfig | undefined): this {
         const value_casted = value as (BlankScreenDetectionConfig | undefined)
         this.getPeer()?.setBlankScreenDetectionConfigAttribute(value_casted)
+        return this
+    }
+    public enableBlankScreenMonitor(value: boolean | undefined): this {
+        const value_casted = value as (boolean | undefined)
+        this.getPeer()?.setEnableBlankScreenMonitorAttribute(value_casted)
         return this
     }
     public backToTop(value: boolean | undefined): this {

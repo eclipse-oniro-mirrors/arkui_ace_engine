@@ -2467,6 +2467,10 @@ void ArkUINativeModule::RegisterWebAttributes(Local<panda::ObjectRef> object, Ec
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::SetBlankScreenDetectionConfig));
     web->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetBlankScreenDetectionConfig"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::ResetBlankScreenDetectionConfig));
+    web->Set(vm, panda::StringRef::NewFromUtf8(vm, "setEnableBlankScreenMonitor"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::SetEnableBlankScreenMonitor));
+    web->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetEnableBlankScreenMonitor"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::ResetEnableBlankScreenMonitor));
     web->Set(vm, panda::StringRef::NewFromUtf8(vm, "setOnFirstScreenPaint"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::SetOnFirstScreenPaint));
     web->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetOnFirstScreenPaint"),

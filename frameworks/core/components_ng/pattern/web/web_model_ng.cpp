@@ -2859,6 +2859,21 @@ void WebModelNG::SetBlankScreenDetectionConfig(FrameNode* frameNode, const Blank
     webPattern->UpdateBlankScreenDetectionConfig(detectConfig);
 }
 
+void WebModelNG::SetWebBlankScreenMonitorEnabled(bool isEnabled)
+{
+    auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
+    CHECK_NULL_VOID(webPattern);
+    webPattern->UpdateWebBlankScreenMonitorEnabled(isEnabled);
+}
+
+void WebModelNG::SetWebBlankScreenMonitorEnabled(FrameNode* frameNode, bool isEnabled)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
+    CHECK_NULL_VOID(webPattern);
+    webPattern->UpdateWebBlankScreenMonitorEnabled(isEnabled);
+}
+
 void WebModelNG::SetOnFirstScreenPaint(
     FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& jsCallback)
 {

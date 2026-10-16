@@ -1604,6 +1604,7 @@ void WebDelegate::OnDetectedBlankScreen(
     const std::string& url, int32_t blankScreenReason, int32_t detectedContentfulNodesCount) {}
 void WebDelegate::UpdateBlankScreenDetectionConfig(bool enable, const std::vector<double>& detectionTiming,
     const std::vector<int32_t>& detectionMethods, int32_t contentfulNodesCountThreshold) {}
+void WebDelegate::UpdateWebBlankScreenMonitorEnabled(bool isEnabled) {}
 void WebDelegate::OnRequestAutofill(int32_t menuType) {}
 void WebDelegate::OnSwitchFreeMultiWindow(bool enable) {}
 void WebDelegate::RegisterFreeMultiWindowListener() {}
