@@ -2947,6 +2947,8 @@ frameworks/core/interfaces/native/node/node_folder_stack_modifier.cpp @arkuilayo
 frameworks/core/interfaces/native/node/node_folder_stack_modifier.h @arkuilayout1
 frameworks/core/interfaces/native/node/node_gesture_modifier.cpp @ArkUI_Event
 frameworks/core/interfaces/native/node/node_gesture_modifier.h @ArkUI_Event
+frameworks/core/interfaces/native/node/node_image_collection.cpp @arkui_framework_xnode
+frameworks/core/interfaces/native/node/node_image_collection.h @arkui_framework_xnode
 frameworks/core/interfaces/native/node/node_image_modifier.cpp @arkui001
 frameworks/core/interfaces/native/node/node_image_modifier.h @arkui001
 frameworks/core/interfaces/native/node/node_image_span_modifier.cpp @huawei_g_five
@@ -3098,6 +3100,7 @@ interfaces/native/native_render.h @arkui_framework_xnode
 interfaces/native/native_styled_string.h @huawei_g_five
 interfaces/native/native_type.h @arkui_architecture
 interfaces/native/native_xcomponent_key_event.h @ArkUI_ability_group
+interfaces/native/ui_info_collection.h @arkui_framework_xnode
 interfaces/native/node/animate_impl.cpp @arkuicodepulse
 interfaces/native/node/animate_impl.h @arkuicodepulse
 interfaces/native/node/dialog_model.cpp @arkuipopupwindow_all
@@ -3121,6 +3124,7 @@ interfaces/native/node/node_adapter_impl.cpp @arkui_framework_xnode
 interfaces/native/node/node_animate.cpp @arkuicodepulse
 interfaces/native/node/node_extened.cpp @arkui_framework_xnode
 interfaces/native/node/node_extened.h @arkui_framework_xnode
+interfaces/native/node/node_image_collection.cpp @arkui_framework_xnode
 interfaces/native/node/node_model.cpp @arkui_framework_xnode
 interfaces/native/node/node_model.h @arkui_framework_xnode
 interfaces/native/node/node_model_safely.cpp @arkui_framework_xnode
@@ -3798,6 +3802,7 @@ test/unittest/frameworks/core/common/ace_engine_test.cpp @arkui_framework_xnode
 test/unittest/frameworks/core/common/BUILD.gn @arkui_framework_xnode
 test/unittest/frameworks/core/common/container_scope_test.cpp @arkui_framework_xnode
 test/unittest/interfaces/ @arkui_framework_xnode
+test/unittest/interfaces/image_collection_capi_test.cpp @arkui_framework_xnode
 test/unittest/interfaces/ace_gesture/ @ArkUI_Event
 test/unittest/interfaces/ace_kit/symbol_test.cpp @huawei_g_five
 test/unittest/interfaces/ace_ui_input_event/ @ArkUI_Event

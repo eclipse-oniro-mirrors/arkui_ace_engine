@@ -10917,6 +10917,10 @@ typedef struct {
         ArkUISnapshotOptions* snapshotOptions, ArkUI_Int32 dynamicRangeMode, bool isAuto);
     ArkUI_Int32 (*getSyncSnapshot)(ArkUINodeHandle node, ArkUISnapshotOptions* snapshotOptions, void* mediaPixel);
     ArkUI_Int32 (*getSizeLimitation)(ArkUI_Int32* maxWidth, ArkUI_Int32* maxHeight);
+    // Collection tasks always run on the Context UI thread, including invalidation callbacks.
+    ArkUI_Int32 (*postImageCollectionTask)(ArkUI_Int32 contextId, void* data,
+        void (*task)(void* data, ArkUI_Int32 error));
+    ArkUI_Int32 (*getImageByNodeId)(ArkUI_Int32 nodeId, void* mediaPixel);
 } ArkUISnapshotAPI;
 
 typedef struct {

@@ -7394,6 +7394,18 @@
     },
     {
         "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_GetImagesByNodeIdAsync"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_ImageCollectionTakeItemByNodeId"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_ImageCollectionDestroy"
+    },
+    {
+        "first_introduced": "26.2.0",
         "name": "OH_ArkUI_NativeModule_UIAgentGetPageText"
     },
     {
