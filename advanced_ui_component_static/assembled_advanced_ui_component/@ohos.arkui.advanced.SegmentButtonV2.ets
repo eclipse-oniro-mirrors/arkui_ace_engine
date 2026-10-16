@@ -74,7 +74,7 @@ import {
 } from '@ohos.arkui.modifier';
 import curves from '@ohos.curves';
 import {
-  Computed, Event, Local, Monitor, ObservedV2, Param, Require, Trace,
+  Computed, Event, Local, ObservedV2, Param, Require, Trace,
 } from '@ohos.arkui.stateManagement'
 import {
   ColorMetrics, LengthMetrics, LengthUnit, PositionT, SizeT
@@ -648,10 +648,6 @@ struct SimpleSegmentButtonV2 {
           }
         })
         .onActionCancel((event: GestureEvent) => {
-          if (this.isFollowingDragEnabled() && !this.hasValidFollowingDragData()) {
-            this.cancelFollowingDrag();
-            return;
-          }
           if (!this.isMaterialInteractionEnabled()) {
             if (this.interactionMode === SegmentButtonV2InteractionMode.NORMAL_DRAG) {
               this.isPressing = false;
@@ -670,10 +666,6 @@ struct SimpleSegmentButtonV2 {
           this.isPressing = false;
         })
         .onActionEnd((event: GestureEvent) => {
-          if (this.isFollowingDragEnabled() && !this.hasValidFollowingDragData()) {
-            this.cancelFollowingDrag();
-            return;
-          }
           if (!this.isMaterialInteractionEnabled()) {
             if (this.interactionMode === SegmentButtonV2InteractionMode.NORMAL_DRAG) {
               this.isPressing = false;
@@ -707,10 +699,6 @@ struct SimpleSegmentButtonV2 {
           }
           if (index === this.normalizedSelectedIndex) {
             this.isDragging = true;
-          }
-          if (this.isDragging && this.isFollowingDragEnabled() && !this.hasValidFollowingDragData()) {
-            this.cancelFollowingDrag();
-            return;
           }
           if (this.isPressing) {
             this.dragWithPress = true;
@@ -749,10 +737,6 @@ struct SimpleSegmentButtonV2 {
           if (!this.isDragging) {
             return;
           }
-          if (this.isFollowingDragEnabled() && !this.hasValidFollowingDragData()) {
-            this.cancelFollowingDrag();
-            return;
-          }
           const finger = event.fingerList.find((element) => Boolean(element));
           if (!finger) {
             return;
@@ -782,11 +766,6 @@ struct SimpleSegmentButtonV2 {
           }
         })
         .onActionEnd((event) => {
-          if (this.isFollowingDragEnabled() && (this.isDragging || this.isPressing || this.followingDragActive) &&
-            !this.hasValidFollowingDragData()) {
-            this.cancelFollowingDrag();
-            return;
-          }
           if (!this.isItemEnabled(this.panStartIndex)) {
             return;
           }
@@ -840,17 +819,16 @@ struct SimpleSegmentButtonV2 {
                   }
                 }
               }, () => {
-                const targetRect = this.itemRects.get(realIndex);
-                if (!targetRect) {
-                  this.cancelFollowingDrag();
+                const targetRect = !isMaterialEnabled ? this.itemRects.get(realIndex) : undefined;
+                if (!isMaterialEnabled && !targetRect) {
                   return;
                 }
                 if (shouldUpdateSelectedIndex) {
                   this.$selectedIndex?.(realIndex);
                 }
                 this.backplatePosition = {
-                  x: targetRect!.position.x,
-                  y: targetRect!.position.y
+                  x: isMaterialEnabled ? this.itemRects.get(realIndex)!.position.x : targetRect!.position.x,
+                  y: isMaterialEnabled ? this.itemRects.get(realIndex)!.position.y : targetRect!.position.y
                 }
               })
             }
@@ -912,10 +890,6 @@ struct SimpleSegmentButtonV2 {
   }
 
   startSelectMaterialAnimation() {
-    if (!this.selectedItemRect) {
-      this.cancelFollowingDrag();
-      return;
-    }
     this.backplatePosition = {
       x: this.selectedItemRect!.position.x,
       y: this.selectedItemRect!.position.y
@@ -946,43 +920,6 @@ struct SimpleSegmentButtonV2 {
           this.selectedItemScale = undefined
         })
     }
-  }
-
-  @Monitor(['items', 'items.length'])
-  private onItemsChange(): void {
-    if (this.isFollowingDragEnabled() && (this.isDragging || this.isPressing || this.followingDragActive) &&
-      !this.hasValidFollowingDragData()) {
-      this.cancelFollowingDrag();
-    }
-  }
-
-  private hasValidFollowingDragData(): boolean {
-    const items = this.getItems();
-    if (items.length === 0 || this.itemRects.size < items.length || !this.selectedItemRect ||
-      this.panStartIndex >= items.length) {
-      return false;
-    }
-    for (let i = 0; i < items.length; i++) {
-      if (!this.itemRects.get(i)) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  private cancelFollowingDrag(): void {
-    this.isDragging = false;
-    this.followingDragActive = false;
-    this.isPressing = false;
-    this.dragWithPress = false;
-    this.panStartIndex = -1;
-    this.isMouseWheelScroll = false;
-    this.openSelectedItemSystemMaterial = false;
-    this.selectedItemScale = undefined;
-    this.tempDisableAnimation = false;
-    this.touchPressedItemIndex = -1;
-    this.mousePressedItemIndex = -1;
-    this.itemScale = 1;
   }
 
   private isFollowingDragEnabled(): boolean {
@@ -1038,8 +975,8 @@ struct SimpleSegmentButtonV2 {
       return this.backplatePosition;
     } else {
       return {
-        x: this.selectedItemRect?.position.x ?? 0,
-        y: this.selectedItemRect?.position.y ?? 0,
+        x: this.selectedItemRect!.position.x,
+        y: this.selectedItemRect!.position.y,
       } as Position;
     }
   }
