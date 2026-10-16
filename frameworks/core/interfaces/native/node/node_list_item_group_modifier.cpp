@@ -93,19 +93,26 @@ void ListItemGroupResetFooter(ArkUINodeHandle node)
 
 void SetListItemGroupChildrenMainSize(ArkUINodeHandle node, ArkUIListChildrenMainSize option, int32_t unit)
 {
+    CHECK_NULL_VOID(option);
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
     CHECK_NULL_VOID(frameNode);
-    for (uint32_t i = 0; i < option->mainSize.size(); i++) {
+    std::vector<float> tmpMainSize;
+    const size_t arrLength = option->mainSize.size();
+    tmpMainSize.reserve(arrLength);
+    float defaultValue = -1.0f;
+    float defaultSize = 0.0f;
+    for (uint32_t i = 0; i < arrLength; i++) {
         if (option->mainSize[i] > 0) {
-            option->mainSize[i] =
-                Dimension(option->mainSize[i], static_cast<OHOS::Ace::DimensionUnit>(unit)).ConvertToPx();
+            float tmpSize = Dimension(option->mainSize[i], static_cast<OHOS::Ace::DimensionUnit>(unit)).ConvertToPx();
+            tmpMainSize.emplace_back(tmpSize);
+        } else {
+            tmpMainSize.emplace_back(defaultValue);
         }
     }
     if (option->defaultMainSize > 0) {
-        option->defaultMainSize =
-            Dimension(option->defaultMainSize, static_cast<OHOS::Ace::DimensionUnit>(unit)).ConvertToPx();
+        defaultSize = Dimension(option->defaultMainSize, static_cast<OHOS::Ace::DimensionUnit>(unit)).ConvertToPx();
     }
-    ListItemGroupModelNG::SetListChildrenMainSize(frameNode, option->defaultMainSize, option->mainSize);
+    ListItemGroupModelNG::SetListChildrenMainSize(frameNode, defaultSize, tmpMainSize);
 }
 
 void ResetListItemGroupChildrenMainSize(ArkUINodeHandle node)
