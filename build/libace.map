@@ -2243,12 +2243,14 @@
       "OHOS::Ace::NG::ScrollablePattern::HandleLeaveHotzoneEvent()";
       "OHOS::Ace::NG::ScrollablePattern::HandleMoveEventInComp(OHOS::Ace::NG::PointT<float> const&, bool)";
       "OHOS::Ace::NG::ScrollablePattern::HandleOnDragStatusCallback(OHOS::Ace::NG::DragEventType const&, OHOS::Ace::RefPtr<OHOS::Ace::NotifyDragEvent> const&)";
+      "OHOS::Ace::NG::ScrollablePattern::HandleArrowKeyScroll(OHOS::Ace::KeyEvent const&)";
       "OHOS::Ace::NG::ScrollablePattern::HandleScroll(float, int, OHOS::Ace::NG::NestedState, float)";
       "OHOS::Ace::NG::ScrollablePattern::HandleScrollBarOutBoundary(float)";
       "OHOS::Ace::NG::ScrollablePattern::HandleScrollVelocity(float, OHOS::Ace::RefPtr<OHOS::Ace::NG::NestableScrollContainer> const&)";
       "OHOS::Ace::NG::ScrollablePattern::InitScrollBarClickEvent()";
       "OHOS::Ace::NG::ScrollablePattern::IsMouseDragScrollDefaultEnabled() const";
       "OHOS::Ace::NG::ScrollablePattern::IsScrollableSpringEffect() const";
+      "OHOS::Ace::NG::ScrollablePattern::ScrollByArrowKey(OHOS::Ace::KeyCode, float)";
       "OHOS::Ace::NG::ScrollablePattern::MarkScrollBarProxyDirty()";
       "OHOS::Ace::NG::ScrollablePattern::MultiSelectable() const";
       "OHOS::Ace::NG::ScrollablePattern::MarkUserScrollSource(int)";
@@ -5982,7 +5984,9 @@
       virtual?thunk?to?OHOS::Ace::NG::ScrollablePattern::CustomizeSafeAreaPadding*;
       virtual?thunk?to?OHOS::Ace::NG::ScrollablePattern::DumpAdvanceInfo*;
       virtual?thunk?to?OHOS::Ace::NG::ScrollablePattern::FireAndCleanScrollingListener*;
+      virtual?thunk?to?OHOS::Ace::NG::ScrollablePattern::HandleArrowKeyScroll*;
       virtual?thunk?to?OHOS::Ace::NG::ScrollablePattern::HandleOnDragStatusCallback*;
+      virtual?thunk?to?OHOS::Ace::NG::ScrollablePattern::ScrollByArrowKey*;
       virtual?thunk?to?OHOS::Ace::NG::ScrollablePattern::OnAttachToFrameNode*;
       virtual?thunk?to?OHOS::Ace::NG::ScrollablePattern::OnAttachToMainTree*;
       virtual?thunk?to?OHOS::Ace::NG::ScrollablePattern::OnColorConfigurationUpdate*;

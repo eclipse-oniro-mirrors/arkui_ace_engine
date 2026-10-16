@@ -416,6 +416,9 @@ public:
 
 protected:
     void DoJump(float position, int32_t source = SCROLL_FROM_JUMP);
+    bool ScrollByArrowKey(KeyCode code, float delta) override;
+    void InitOnKeyEvent();
+    bool OnKeyEvent(const KeyEvent& event);
 
 private:
     void OnModifyDone() override;

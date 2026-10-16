@@ -32,6 +32,7 @@ public:
     static void SetScrollBarMargin(const JSCallbackInfo& info);
     static void JSBackToTop(const JSCallbackInfo& info);
     static void JSEnableScrollWithMouse(const JSCallbackInfo& info);
+    static void JSEnableScrollWithKeyboard(const JSCallbackInfo& info);
     static void JSOnWillStopDragging(const JSCallbackInfo& args);
     static void JSOnWillStartDragging(const JSCallbackInfo& info);
     static void JSOnDidStopDragging(const JSCallbackInfo& info);

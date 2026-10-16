@@ -197,7 +197,6 @@ bool Scrollable::HandleAxisSnapUpdate(float mainDelta, bool fromScrollBar)
     CHECK_NULL_RETURN(context, true);
     auto currentVsyncTime = context->GetVsyncTime();
     CHECK_NULL_RETURN(lastAxisVsyncTime_ != currentVsyncTime, true);
-    lastAxisVsyncTime_ = currentVsyncTime;
     auto snapDelta = 0.f;
     auto snapDirection = SnapDirection::NONE;
     auto isInitScroll = (snapType == SnapType::LIST_SNAP && snapDirection_ == SnapDirection::NONE) ||
@@ -223,6 +222,9 @@ bool Scrollable::HandleAxisSnapUpdate(float mainDelta, bool fromScrollBar)
     SnapAnimationOptions snapAnimationOptions = { .snapDelta = snapDelta, .animationVelocity = currentVelocity_,
         .snapDirection = snapDirection, .source = SCROLL_FROM_AXIS, .fromScrollBar = fromScrollBar };
     if (startSnapAnimationCallback_(snapAnimationOptions)) {
+        // Only a started snap animation consumes the vsync slot; a declined attempt must
+        // stay retryable within the same frame (keyboard reverse key declines with zero delta).
+        lastAxisVsyncTime_ = currentVsyncTime;
         // A provider strategy only PARKS its kickoff (StartItemSnapAnimation returns true
         // before running). The axis path has no HandleDragEnd / StartScrollAnimation exit
         // that would flush it, so without this the wheel scrolls nothing on provider

@@ -60,6 +60,7 @@
 #include "core/components_ng/pattern/scroll/scroll_spring_effect.h"
 #include "core/components_ng/pattern/scroll_bar/proxy/scroll_bar_proxy.h"
 #include "core/components_ng/property/measure_utils.h"
+#include "core/components_ng/pattern/scrollable/keyboard_scroll_settings_utils.h"
 #include "core/components_ng/pattern/scrollable/refresh_coordination.h"
 #include "core/components_ng/pattern/scrollable/scrollable.h"
 #include "core/components_ng/pattern/scrollable/scrollable_event_hub.h"
@@ -381,6 +382,7 @@ void ScrollablePattern::ToJsonValue(std::unique_ptr<JsonValue>& json, const Insp
     nestedScrollOptions->Put("scrollBackward", nestedScroll.GetNestedScrollModeStr(nestedScroll.backward).c_str());
     json->PutExtAttr("nestedScroll", nestedScrollOptions, filter);
     json->PutExtAttr("enableScrollWithMouse", GetIsAllowMouse(), filter);
+    json->PutExtAttr("enableScrollWithKeyboard", GetIsAllowKeyboard(), filter);
     if (NearEqual(GetFriction(), -1.0) && scrollableEvent_) {
         auto scrollable = scrollableEvent_->GetScrollable();
         CHECK_NULL_VOID(scrollable);
@@ -5959,4 +5961,74 @@ void ScrollablePattern::HandleScrollByTargetId(int32_t targetId, int reportEvent
         ReportScroll(false, ScrollError::SCROLL_ERROR_OTHER, reportEventId);
     }
 }
+
+bool ScrollablePattern::HandleArrowKeyScroll(const KeyEvent& keyEventInfo)
+{
+    if (!GetScrollEnabled()) {
+        return false;
+    }
+    if (!GetIsAllowKeyboard()) {
+        return false;
+    }
+    if (keyEventInfo.action != KeyAction::DOWN) {
+        return false;
+    }
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, false);
+    auto* pipeline = host->GetContext();
+    CHECK_NULL_RETURN(pipeline, false);
+    if (pipeline->GetIsFocusActive()) {
+        return false;
+    }
+    auto code = keyEventInfo.code;
+    if (!IsArrowKeyMatchAxis(code)) {
+        return false;
+    }
+    float delta = CalculateScrollDelta(GetMouseScrollRows());
+    return ScrollByArrowKey(code, delta);
+}
+
+bool ScrollablePattern::ScrollByArrowKey(KeyCode code, float delta)
+{
+    auto scrollable = GetScrollable();
+    CHECK_NULL_RETURN(scrollable, false);
+    if (code == KeyCode::KEY_DPAD_DOWN || code == KeyCode::KEY_DPAD_RIGHT) {
+        delta = -delta;
+    }
+    TAG_LOGD(AceLogTag::ACE_SCROLLABLE,
+        "ScrollByArrowKey code:%{public}d, delta:%{public}f, axis:%{public}d",
+        code, delta, static_cast<int32_t>(axis_));
+    scrollable->ProcessAxisScroll(delta);
+    return true;
+}
+
+bool ScrollablePattern::IsArrowKeyMatchAxis(KeyCode code) const
+{
+    if (axis_ == Axis::FREE) {
+        // FREE axis exists only on Scroll: any arrow key matches.
+        return code == KeyCode::KEY_DPAD_UP || code == KeyCode::KEY_DPAD_DOWN ||
+               code == KeyCode::KEY_DPAD_LEFT || code == KeyCode::KEY_DPAD_RIGHT;
+    }
+    if (axis_ == Axis::VERTICAL) {
+        return code == KeyCode::KEY_DPAD_UP || code == KeyCode::KEY_DPAD_DOWN;
+    }
+    if (axis_ == Axis::HORIZONTAL) {
+        return code == KeyCode::KEY_DPAD_LEFT || code == KeyCode::KEY_DPAD_RIGHT;
+    }
+    return false;
+}
+
+int32_t ScrollablePattern::GetMouseScrollRows()
+{
+    return KeyboardScrollSettingsUtils::GetMouseScrollRows();
+}
+
+float ScrollablePattern::CalculateScrollDelta(int32_t rows)
+{
+    double result = static_cast<double>(rows) * MOUSE_WHEEL_DEGREES;
+    Dimension linePerDegree = LINE_HEIGHT_DESKTOP / MOUSE_WHEEL_DEGREES;
+    double factorPx = linePerDegree.ConvertToPx();
+    return static_cast<float>(result * factorPx);
+}
+
 } // namespace OHOS::Ace::NG
