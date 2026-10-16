@@ -281,6 +281,11 @@ uint32_t AxisInfo::GetAxes() const
 }
 
 
+AxisEvent AxisInfo::ConvertToAxisEvent() const
+{
+    return ConvertToAxisEvent(false, 1.0f);
+}
+
 AxisEvent AxisInfo::ConvertToAxisEvent(bool isForStatic, float density) const
 {
     AxisEvent axisEvent;

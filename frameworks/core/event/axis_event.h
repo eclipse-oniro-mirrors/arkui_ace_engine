@@ -156,7 +156,8 @@ public:
         return *this;
     }
     const Offset& GetGlobalLocation() const;
-    AxisEvent ConvertToAxisEvent(bool isForStatic = false, float density = 1.0f) const;
+    AxisEvent ConvertToAxisEvent() const;
+    AxisEvent ConvertToAxisEvent(bool isForStatic, float density) const;
     const std::shared_ptr<const MMI::PointerEvent>& GetPointerEvent() const;
 private:
     AxisAction action_ = AxisAction::NONE;
