@@ -1153,6 +1153,15 @@ void WebModelStatic::SetOnContextMenuHide(
     webEventHub->SetOnContextMenuHideEvent(std::move(uiCallback));
 }
 
+void WebModelStatic::SetOnContextMenuUpdate(FrameNode* frameNode,
+    std::function<void(WebContextMenuItemId menuItemId, const WebContextMenuOptions& options)>&& callback)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto webPatternStatic = AceType::DynamicCast<WebPatternStatic>(frameNode->GetPattern());
+    CHECK_NULL_VOID(webPatternStatic);
+    webPatternStatic->SetOnContextMenuUpdateCallback(std::move(callback));
+}
+
 void WebModelStatic::SetSearchResultReceiveEventId(
     FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& callback)
 {
@@ -1440,6 +1449,14 @@ void WebModelStatic::SetForceEnableZoom(FrameNode* frameNode, bool isForceEnable
     auto webPatternStatic = AceType::DynamicCast<WebPatternStatic>(frameNode->GetPattern());
     CHECK_NULL_VOID(webPatternStatic);
     webPatternStatic->UpdateForceEnableZoom(isForceEnableZoom);
+}
+
+void WebModelStatic::SetFlingSpeedLimit(FrameNode* frameNode, float speedLimit)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto webPatternStatic = AceType::DynamicCast<WebPatternStatic>(frameNode->GetPattern());
+    CHECK_NULL_VOID(webPatternStatic);
+    webPatternStatic->UpdateFlingSpeedLimit(NormalizeFlingSpeedLimit(speedLimit));
 }
 
 void WebModelStatic::SetRotateRenderEffect(FrameNode* frameNode, const std::optional<WebRotateEffect>& effect)

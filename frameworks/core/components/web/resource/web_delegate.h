@@ -314,6 +314,9 @@ public:
     std::string GetSelectionText() const override;
     void GetImageRect(int32_t& x, int32_t& y, int32_t& width, int32_t& height) const override;
     bool IsAILink() const override;
+    bool ShouldOfferLinkToText() const override;
+    bool IsOverTextFragment() const override;
+    std::string GetTextFragmentGeneratedLink() const override;
     int GetSourceTypeV2() const override;
     int GetMediaTypeV2() const override;
     int GetContextMenuMediaType() const override;
@@ -341,6 +344,8 @@ public:
     void Redo() const override;
     void PasteAndMatchStyle() const override;
     void RequestPasswordAutoFill() const override;
+    void CopyLinkToTextMenu() const override;
+    void RemoveFragments() const override;
 
 private:
     std::shared_ptr<OHOS::NWeb::NWebContextMenuCallback> callback_;
@@ -1455,6 +1460,7 @@ public:
     void OnRefreshAccessedHistory(const std::string& url, bool isRefreshed, bool isMainFrame = false);
     bool OnFileSelectorShow(const std::shared_ptr<BaseEventInfo>& info);
     void OnContextMenuDismissed();
+    void OnContextMenuUpdate(WebContextMenuItemId menuItemId, WebContextMenuOptions options);
     bool OnContextMenuShow(const std::shared_ptr<BaseEventInfo>& info);
     void OnContextMenuHide(const std::string& info);
     bool OnHandleInterceptUrlLoading(const std::string& url);
@@ -1798,6 +1804,7 @@ public:
 #endif
     }
     void SetForceEnableZoom(bool isEnabled);
+    void SetFlingSpeedLimit(float speedLimit);
     bool IsShowHandle();
     void OnSafeBrowsingCheckFinish(int threat_type);
     bool IsPcMode();

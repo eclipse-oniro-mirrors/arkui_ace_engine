@@ -14,8 +14,10 @@
  */
 
 #include "adapter/ohos/entrance/ui_content_impl.h"
+#include "adapter/ohos/entrance/ui_session/ui_session_manager_ohos.h"
 #include "core/accessibility/accessibility_manager.h"
 #include "core/components_ng/manager/safe_area/safe_area_manager.h"
+#include "base/resource/shared_image_manager.h"
 
 #include <atomic>
 #include <cinttypes>
@@ -65,8 +67,11 @@
 #include "core/components_ng/manager/force_split/force_split_manager.h"
 #include "core/components_ng/manager/form_visible/form_visible_manager.h"
 #include "core/components_ng/manager/page_scene/page_scene_rule_manager.h"
+#include "core/components_ng/manager/page_scene/search_scene_context_collector.h"
+#include "core/components_ng/manager/uisession_query/component_tree_query.h"
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/pattern/ui_extension/ui_extension_manager.h"
+#include "core/components_ng/pattern/ui_extension/ui_extension_utils.h"
 #include "core/components_ng/pattern/xcomponent/xcomponent_resolution_config.h"
 #include "core/components_ng/render/animation_utils.h"
 #include "core/components_ng/render/detached_rs_node_manager.h"
@@ -429,6 +434,116 @@ struct ContainerScopeHilogRegistrar {
 };
 static ContainerScopeHilogRegistrar g_hilogRegistrar;
 #endif // ENABLE_CONTAINER_SCOPE_TRACKING
+
+// Presence event JSON per spec.md: true carries full evidence
+//; false carries exits; subwindow evidence applies
+// `<mainPageName>+Dialog`.
+std::string BuildSearchPresenceEventJson(
+    const NG::SearchPresenceStateMachine::PresenceEvent& event, const std::string& pageName)
+{
+    auto root = JsonUtil::Create(true);
+    root->Put("eventType", "presence");
+    root->Put("hasSearch", event.isTrue);
+    std::string eventPageName = pageName.empty() ? event.pageName : pageName;
+    if (event.anySubwindow && !eventPageName.empty()) {
+        eventPageName += "+Dialog";
+    }
+    if (!eventPageName.empty()) {
+        root->Put("pageName", eventPageName.c_str());
+    }
+    auto rulesJson = JsonUtil::CreateArray(true);
+    if (event.isTrue) {
+        for (const auto& hit : event.hits) {
+            auto item = JsonUtil::Create(true);
+            item->Put("ruleSetId", hit.ruleSetId.c_str());
+            item->Put("ruleId", hit.ruleId.c_str());
+            item->Put("evidenceType", hit.evidenceType.c_str());
+            if (!hit.source.empty()) {
+                item->Put("source", hit.source.c_str());
+            }
+            if (!hit.matchedKeyword.empty()) {
+                item->Put("matchedKeyword", hit.matchedKeyword.c_str());
+            }
+            item->Put("nodeId", hit.nodeId);
+            if (!hit.nodeType.empty()) {
+                item->Put("nodeType", hit.nodeType.c_str());
+            }
+            auto rectJson = JsonUtil::Create(true);
+            rectJson->Put("x", static_cast<double>(hit.rect.GetX()));
+            rectJson->Put("y", static_cast<double>(hit.rect.GetY()));
+            rectJson->Put("width", static_cast<double>(hit.rect.Width()));
+            rectJson->Put("height", static_cast<double>(hit.rect.Height()));
+            item->Put("rect", rectJson);
+            rulesJson->Put(item);
+        }
+        root->Put("hits", rulesJson);
+    } else {
+        for (const auto& rule : event.ruleIds) {
+            auto item = JsonUtil::Create(true);
+            item->Put("ruleSetId", rule.first.c_str());
+            item->Put("ruleId", rule.second.c_str());
+            rulesJson->Put(item);
+        }
+        root->Put("exits", rulesJson);
+    }
+    return root->ToString();
+}
+
+// Click event JSON per spec.md: ruleSetId/ruleId, matchType, matchedKeyword,
+// response node inspectorId/nodeId/type/rect, pageName.
+std::string BuildSearchClickEventJson(
+    const NG::SearchClickMatchResult& result, const std::string& pageName)
+{
+    auto root = JsonUtil::Create(true);
+    root->Put("eventType", "click");
+    if (!pageName.empty()) {
+        root->Put("pageName", pageName.c_str());
+    }
+    auto hitsJson = JsonUtil::CreateArray(true);
+    auto item = JsonUtil::Create(true);
+    item->Put("ruleSetId", result.ruleSetId.c_str());
+    item->Put("ruleId", result.ruleId.c_str());
+    item->Put("matchType", result.matchType.c_str());
+    if (!result.matchedKeyword.empty()) {
+        item->Put("matchedKeyword", result.matchedKeyword.c_str());
+    }
+    auto responseNode = JsonUtil::Create(true);
+    responseNode->Put("inspectorId", result.inspectorId.c_str());
+    responseNode->Put("nodeId", result.nodeId);
+    responseNode->Put("type", result.nodeType.c_str());
+    auto rectJson = JsonUtil::Create(true);
+    rectJson->Put("x", static_cast<double>(result.rect.GetX()));
+    rectJson->Put("y", static_cast<double>(result.rect.GetY()));
+    rectJson->Put("width", static_cast<double>(result.rect.Width()));
+    rectJson->Put("height", static_cast<double>(result.rect.Height()));
+    responseNode->Put("rect", rectJson);
+    item->Put("responseNode", responseNode);
+    hitsJson->Put(item);
+    root->Put("hits", hitsJson);
+    return root->ToString();
+}
+
+bool HandlePageSceneRuleRemoval(int32_t processId, const std::unique_ptr<JsonValue>& ruleRoot,
+    bool isSearchRule, const std::shared_ptr<NG::PageSceneRuleManager>& pageSceneMatcher)
+{
+    if (!ruleRoot || !ruleRoot->IsObject()) {
+        return false;
+    }
+    auto rules = ruleRoot->GetValue("rules");
+    // Detection requests contain rules; an empty array is an internal cleanup notification.
+    if (!rules || !rules->IsArray() || rules->GetArraySize() != 0) {
+        return false;
+    }
+    if (!isSearchRule) {
+        pageSceneMatcher->ClearProcess(processId, false);
+        return true;
+    }
+    auto generation = ruleRoot->GetString("_pageSceneGeneration");
+    if (!generation.empty()) {
+        pageSceneMatcher->UnregisterSearchRuleSet(processId, ruleRoot->GetString("ruleSetId"), generation);
+    }
+    return true;
+}
 
 } // namespace
 
@@ -2732,6 +2847,9 @@ UIContentErrorCode UIContentImpl::CommonInitialize(
     errorCode = Platform::AceContainer::SetViewNew(aceView, density, 0, 0, window_);
     CHECK_ERROR_CODE_RETURN(errorCode);
 #endif
+    // SetView has created the pipeline (AttachView) synchronously; apply the strategy cached
+    // from a pre-initialization window call here, before RunPage builds the page content.
+    ApplyPendingDpiFollowStrategy();
     // set focus window id for ui extension after pipeline context created.
     if (focusWindowId != 0) {
         container->SetFocusWindowId(focusWindowId);
@@ -3039,6 +3157,16 @@ void UIContentImpl::Background()
         PostPreFreezeRegisterTask(true);
     }
     Platform::AceContainer::OnHide(instanceId_);
+
+    // Search presence: app background reports one false for every PRESENT page
+    //.
+    if (pageSceneMatcher_) {
+        auto exitEvents = pageSceneMatcher_->ExitAllSearchPresence();
+        for (const auto& [pid, event] : exitEvents) {
+            UiSessionManager::GetInstance()->ReportPageSceneEvent(
+                pid, BuildSearchPresenceEventJson(event, ""), false);
+        }
+    }
 
     CHECK_NULL_VOID(window_);
     std::string windowName = window_->GetWindowName();
@@ -4541,6 +4669,60 @@ void UIContentImpl::SetHostParams(const OHOS::AAFwk::WantParams& params)
     uIExtensionContainerHandler->SetHostParams(hostWindowInfo_.hostWantParams);
 }
 
+void UIContentImpl::SetUIExtensionDensityFollowHost(OHOS::Rosen::DpiFollowStrategy dpiFollowStrategy)
+{
+    // The call may arrive before Initialize assigns instanceId_ (the container is not
+    // resolvable yet), so cache the latest strategy and re-apply it in ApplyPendingDpiFollowStrategy.
+    isDpiFollowStrategyReceived_ = true;
+    pendingDpiFollowStrategy_ = dpiFollowStrategy;
+    NG::DpiFollowStrategy strategy = NG::ConvertFromRosenDpiFollowStrategy(dpiFollowStrategy);
+    TAG_LOGI(AceLogTag::ACE_UIEXTENSIONCOMPONENT,
+        "[%{public}s][%{public}s][%{public}d]: SetUIExtensionDensityFollowHost, rosenStrategy=%{public}u, "
+        "strategy=%{public}d",
+        bundleName_.c_str(), moduleName_.c_str(), instanceId_, static_cast<uint32_t>(dpiFollowStrategy),
+        static_cast<int32_t>(strategy));
+    ApplyUIExtensionDensityFollowHost(strategy);
+}
+
+void UIContentImpl::ApplyUIExtensionDensityFollowHost(NG::DpiFollowStrategy strategy)
+{
+    auto container = Platform::AceContainer::GetContainer(instanceId_);
+    if (!container) {
+        TAG_LOGW(AceLogTag::ACE_UIEXTENSIONCOMPONENT,
+            "[%{public}s][%{public}s][%{public}d]: ApplyUIExtensionDensityFollowHost container is not ready, "
+            "strategy=%{public}d is kept pending",
+            bundleName_.c_str(), moduleName_.c_str(), instanceId_, static_cast<int32_t>(strategy));
+        return;
+    }
+    ContainerScope scope(instanceId_);
+    // The pipeline is created synchronously in SetView (AttachView) during CommonInitialize,
+    // so it is expected to exist here for both the post-initialization direct calls and the
+    // pending-strategy application.
+    auto pipelineContext = container->GetPipelineContext();
+    if (!pipelineContext) {
+        TAG_LOGW(AceLogTag::ACE_UIEXTENSIONCOMPONENT,
+            "[%{public}s][%{public}s][%{public}d]: pipeline is not ready, strategy=%{public}d is dropped",
+            bundleName_.c_str(), moduleName_.c_str(), instanceId_, static_cast<int32_t>(strategy));
+        return;
+    }
+    pipelineContext->SetUIExtensionDensityFollowHost(strategy);
+    TAG_LOGI(AceLogTag::ACE_UIEXTENSIONCOMPONENT,
+        "[%{public}s][%{public}s][%{public}d]: strategy=%{public}d applied to pipeline",
+        bundleName_.c_str(), moduleName_.c_str(), instanceId_, static_cast<int32_t>(strategy));
+}
+
+void UIContentImpl::ApplyPendingDpiFollowStrategy()
+{
+    if (!isDpiFollowStrategyReceived_) {
+        return;
+    }
+    NG::DpiFollowStrategy strategy = NG::ConvertFromRosenDpiFollowStrategy(pendingDpiFollowStrategy_);
+    TAG_LOGI(AceLogTag::ACE_UIEXTENSIONCOMPONENT,
+        "[%{public}s][%{public}s][%{public}d]: ApplyPendingDpiFollowStrategy, strategy=%{public}d",
+        bundleName_.c_str(), moduleName_.c_str(), instanceId_, static_cast<int32_t>(strategy));
+    ApplyUIExtensionDensityFollowHost(strategy);
+}
+
 void UIContentImpl::UpdateMaximizeMode(OHOS::Rosen::MaximizeMode mode)
 {
     LOGI("[%{public}s][%{public}s][%{public}d]: UpdateMaximizeMode: %{public}d", bundleName_.c_str(),
@@ -4940,6 +5122,17 @@ void UIContentImpl::UpdateFormData(const std::string& data)
     } else {
         formData_ = data;
     }
+}
+
+void UIContentImpl::SetFormImageCacheThreshold(int32_t threshold)
+{
+    auto container = Platform::AceContainer::GetContainer(instanceId_);
+    CHECK_NULL_VOID(container);
+    auto context = container->GetPipelineContext();
+    CHECK_NULL_VOID(context);
+    auto sharedImageManager = context->GetOrCreateSharedImageManager();
+    CHECK_NULL_VOID(sharedImageManager);
+    sharedImageManager->SetImageCacheThreshold(threshold);
 }
 
 void UIContentImpl::UpdateFormSharedImage(const std::map<std::string, sptr<OHOS::AppExecFwk::FormAshmem>>& imageDataMap)
@@ -5761,10 +5954,21 @@ void UIContentImpl::SetContainerModalTitleHeight(int32_t height)
     ContainerScope scope(instanceId_);
     auto taskExecutor = Container::CurrentTaskExecutor();
     CHECK_NULL_VOID(taskExecutor);
-    auto task = [height]() {
-        auto pipeline = NG::PipelineContext::GetCurrentContext();
+    auto task = [height, instanceId = instanceId_]() {
+        ContainerScope scope(instanceId);
+        auto container = Platform::AceContainer::GetContainer(instanceId);
+        CHECK_NULL_VOID(container);
+        auto pipeline = AceType::DynamicCast<NG::PipelineContext>(container->GetPipelineContext());
         CHECK_NULL_VOID(pipeline);
-        pipeline->SetContainerModalTitleHeight(height);
+        auto display = Rosen::DisplayManager::GetInstance().GetDisplayById(container->GetDisplayId());
+        float vpr = display ? display->GetVirtualPixelRatio() : 0.0f;
+        if (NearZero(static_cast<double>(vpr))) {
+            // Fallback when the display or its vpr is unavailable, so no DM-side scale can be used here.
+            pipeline->SetContainerModalTitleHeight(height);
+        } else {
+            double heightVp = height / static_cast<double>(vpr);
+            pipeline->SetContainerModalTitleHeightWithVp(heightVp);
+        }
     };
     auto uiTaskRunner = SingleTaskExecutor::Make(taskExecutor, TaskExecutor::TaskType::UI);
     if (uiTaskRunner.IsRunOnCurrentThread()) {
@@ -6379,6 +6583,7 @@ void UIContentImpl::InitUISessionManagerCallbacks(const WeakPtr<TaskExecutor>& t
     SaveGetCurrentInstanceId();
     RegisterExeAppAIFunction(taskExecutor);
     SaveGetHitTestInfoCallback(taskExecutor);
+    SaveComponentTreeQueryFunction(taskExecutor);
     SetContentChangeDetectCallback(taskExecutor);
     RegisterGetSpecifiedContentOffsetsCallback(taskExecutor);
     RegisterHighlightSpecifiedContentCallback(taskExecutor);
@@ -6389,7 +6594,9 @@ void UIContentImpl::InitUISessionManagerCallbacks(const WeakPtr<TaskExecutor>& t
     SaveGetCurrentAbilityLanguageInfoFunction(taskExecutor);
     SaveTraverseWebForPageSceneCallback(taskExecutor);
     auto pageSceneMatcher = std::make_shared<NG::PageSceneRuleManager>();
-    auto pageSceneDetectCallback = [weakTaskExecutor = taskExecutor, pageSceneMatcher](
+    pageSceneMatcher_ = pageSceneMatcher;
+    auto pageSceneDetectCallback = [weakTaskExecutor = taskExecutor,
+                                      weakPageSceneMatcher = std::weak_ptr<NG::PageSceneRuleManager>(pageSceneMatcher)](
         int32_t processId, const std::string& ruleJson, bool isGetResult) {
         auto taskExecutor = weakTaskExecutor.Upgrade();
         if (!taskExecutor) {
@@ -6409,13 +6616,88 @@ void UIContentImpl::InitUISessionManagerCallbacks(const WeakPtr<TaskExecutor>& t
             return;
         }
         auto posted = taskExecutor->PostTask(
-            [processId, ruleJson, isGetResult, weakTaskExecutor, pageSceneMatcher]() {
+            [processId, ruleJson, isGetResult, weakTaskExecutor, weakPageSceneMatcher, taskExecutor]() {
+                auto pageSceneMatcher = weakPageSceneMatcher.lock();
+                if (!pageSceneMatcher) {
+                    if (isGetResult) {
+                        UiSessionManager::GetInstance()->CompleteGetPageScene(processId);
+                    }
+                    return;
+                }
                 if (ruleJson.empty()) {
-                    pageSceneMatcher->ClearProcess(processId);
+                    // Search removals carry their registration generation separately.
+                    pageSceneMatcher->ClearProcess(processId, false);
+                    return;
+                }
+                auto searchRoot = JsonUtil::ParseJsonString(ruleJson);
+                bool isSearchRule = searchRoot && searchRoot->IsObject() &&
+                    (!searchRoot->GetValue("version") || searchRoot->GetValue("version")->IsNull());
+                if (!isGetResult &&
+                    HandlePageSceneRuleRemoval(processId, searchRoot, isSearchRule, pageSceneMatcher)) {
                     return;
                 }
                 auto pipeline = NG::PipelineContext::GetCurrentContextSafely();
                 if (!pipeline) {
+                    LOGW("PageSceneDetect pipeline is null, processId=%{public}d", processId);
+                    if (isGetResult) {
+                        UiSessionManager::GetInstance()->CompleteGetPageScene(processId);
+                    }
+                    return;
+                }
+                // Search scene ruleJson (frozen schema) carries no "version" field.
+                if (isSearchRule) {
+                    auto sessionManager = UiSessionManager::GetInstance();
+                    if (!isGetResult && !sessionManager->IsSearchPageSceneRuleCurrent(
+                        processId, searchRoot->GetString("ruleSetId"),
+                        searchRoot->GetString("_pageSceneGeneration"))) {
+                        return;
+                    }
+                    // Repeated detection keeps the same generation; a newer
+                    // registration replaces a cache entry awaiting old cleanup.
+                    pageSceneMatcher->RegisterSearchRuleSet(processId, ruleJson);
+                    pageSceneMatcher->RegisterSearchClickObserver(pageSceneMatcher);
+                    NG::SearchSceneContextCollector collector;
+                    auto pageContext = collector.Collect();
+                    NG::SearchSceneSnapshotBuilder builder;
+                    auto snapshot = builder.Build(pageContext.pageName, pageContext.navDestinationName,
+                        pageContext.pageUrl, pageContext.windows);
+                    auto reportSearchEvent = [processId, isGetResult, taskExecutor](const std::string& sceneJson) {
+                        if (!taskExecutor) {
+                            if (isGetResult) {
+                                UiSessionManager::GetInstance()->CompleteGetPageScene(processId);
+                            }
+                            return;
+                        }
+                        auto posted = taskExecutor->PostTask(
+                            [processId, sceneJson, isGetResult]() {
+                                UiSessionManager::GetInstance()->ReportPageSceneEvent(
+                                    processId, sceneJson, isGetResult);
+                            },
+                            TaskExecutor::TaskType::BACKGROUND, "UiSessionSearchPageSceneReport");
+                        if (!posted && isGetResult) {
+                            UiSessionManager::GetInstance()->CompleteGetPageScene(processId);
+                        }
+                    };
+                    // Route transition: exit PRESENT pages of this process other
+                    // than the current one first (A false before B true, AC-6.4).
+                    auto exitEvents = pageSceneMatcher->ExitOtherSearchPresence(processId, snapshot.pageName);
+                    for (const auto& event : exitEvents) {
+                        reportSearchEvent(BuildSearchPresenceEventJson(event, snapshot.pageName));
+                    }
+                    auto hits = pageSceneMatcher->MatchSearchScene(processId, snapshot);
+                    auto events = pageSceneMatcher->UpdateSearchPresence(processId, snapshot, hits);
+                    for (const auto& event : events) {
+                        reportSearchEvent(BuildSearchPresenceEventJson(event, snapshot.pageName));
+                    }
+                    // Consume click candidates buffered since the last stable point
+                    // and report search click events.
+                    NG::SearchClickPageContext clickPage;
+                    clickPage.navDestinationName = snapshot.navDestinationName;
+                    clickPage.pageUrl = snapshot.pageUrl;
+                    auto clickResults = pageSceneMatcher->ConsumeSearchClickCandidates(clickPage);
+                    for (const auto& clickResult : clickResults) {
+                        reportSearchEvent(BuildSearchClickEventJson(clickResult, snapshot.pageName));
+                    }
                     if (isGetResult) {
                         UiSessionManager::GetInstance()->CompleteGetPageScene(processId);
                     }
@@ -6656,6 +6938,23 @@ void UIContentImpl::SaveGetHitTestInfoCallback(const WeakPtr<TaskExecutor>& task
             TaskExecutor::TaskType::UI, "UiSessionGetHitTestInfos");
     };
     UiSessionManager::GetInstance()->SaveGetHitTestInfoCallback(getHitTestInfoCallback);
+}
+
+void UIContentImpl::SaveComponentTreeQueryFunction(const WeakPtr<TaskExecutor>& taskExecutor)
+{
+    auto componentTreeQueryCallback = [weakTaskExecutor = taskExecutor](
+        const ComponentTreeQueryRequest& request) {
+        auto taskExecutor = weakTaskExecutor.Upgrade();
+        CHECK_NULL_VOID(taskExecutor);
+        taskExecutor->PostTask(
+            [request]() {
+                std::string resultJson;
+                NG::ComponentTreeQuery::Execute(request, resultJson);
+                UiSessionManager::GetInstance()->ReportComponentTreeQueryResult(resultJson);
+            },
+            TaskExecutor::TaskType::UI, "UiSessionComponentTreeQuery");
+    };
+    UiSessionManager::GetInstance()->SaveComponentTreeQueryFunction(componentTreeQueryCallback);
 }
 
 void UIContentImpl::SetupGetImagesByIdCallback(const WeakPtr<TaskExecutor>& taskExecutor)

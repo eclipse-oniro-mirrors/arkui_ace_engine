@@ -954,6 +954,10 @@ private:
     ColorMode colorInvertColorMode_ = ColorMode::COLOR_MODE_UNDEFINED;
 
     ACE_DISALLOW_COPY_AND_MOVE(TabBarPattern);
+
+public:
+    static RefPtr<FrameNode> GetIconNodeFromColumn(const RefPtr<UINode>& columnNode);
+    static RefPtr<FrameNode> GetTextNodeFromColumn(const RefPtr<UINode>& columnNode);
 };
 } // namespace OHOS::Ace::NG
 

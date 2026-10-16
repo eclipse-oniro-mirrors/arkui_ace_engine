@@ -17,6 +17,7 @@
 #include "core/components_ng/manager/safe_area/safe_area_manager.h"
 #include "core/components_ng/syntax/with_theme_node.h"
 
+#include "base/display_manager/display_manager.h"
 #include "base/geometry/dimension.h"
 #include "base/hiviewdfx/histogram_wrapper.h"
 #include "base/json/json_util.h"
@@ -203,6 +204,23 @@ bool SheetPresentationPattern::IsPhoneInLandScape()
     return false;
 }
 
+double SheetPresentationPattern::GetScreenHeight()
+{
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, 0.0);
+    auto pipelineContext = host->GetContext();
+    CHECK_NULL_RETURN(pipelineContext, 0.0);
+    double deviceHeight = 0.0;
+    auto container = Container::GetContainer(pipelineContext->GetInstanceId());
+    if (container) {
+        auto displayId = container->GetCurrentDisplayId();
+        auto info = DisplayManager::GetInstance().GetCachedDisplayInfo(displayId);
+        CHECK_NULL_RETURN(info, 0.0);
+        deviceHeight = info->GetHeight();
+    }
+    return deviceHeight;
+}
+
 float SheetPresentationPattern::GetSheetTopSafeArea()
 {
     auto host = GetHost();
@@ -214,7 +232,7 @@ float SheetPresentationPattern::GetSheetTopSafeArea()
     auto windowManager = pipelineContext->GetWindowManager();
     auto sheetType = sheetType_;
     auto windowGlobalRect = pipelineContext->GetDisplayWindowRectInfo();
-    double deviceHeight = static_cast<double>(SystemProperties::GetDeviceHeight());
+    auto deviceHeight = GetScreenHeight();
 
     // full screen subwindow sheet is also WINDOW_MODE_FLOATING, can not enter
     if (windowManager && windowManager->GetWindowMode() == WindowMode::WINDOW_MODE_FLOATING &&
@@ -294,6 +312,7 @@ bool SheetPresentationPattern::OnDirtyLayoutWrapperSwap(
     UpdateTitlePadding();
     UpdateSheetTitle();
     ClipSheetNode();
+    UpdateSheetScrollBarMargin();
 
     sheetObject_->AvoidKeyboardInDirtyLayoutProcess();
     SetNeedDoubleAvoidAfterLayout(false);
@@ -764,7 +783,10 @@ void SheetPresentationPattern::InitPanEvent()
         return;
     }
 
-    auto actionStartTask = [weak = WeakClaim(this)](const GestureEvent& event) {
+    auto actionStartTask = [weak = WeakClaim(this)](const GestureEvent& info) {
+        if (info.GetInputEventType() == InputEventType::AXIS && info.GetSourceTool() == SourceTool::MOUSE) {
+            return;
+        }
         auto pattern = weak.Upgrade();
         if (pattern && pattern->enableDragControl_) {
             pattern->HandleDragStart();
@@ -772,6 +794,9 @@ void SheetPresentationPattern::InitPanEvent()
     };
 
     auto actionUpdateTask = [weak = WeakClaim(this)](const GestureEvent& info) {
+        if (info.GetInputEventType() == InputEventType::AXIS && info.GetSourceTool() == SourceTool::MOUSE) {
+            return;
+        }
         auto pattern = weak.Upgrade();
         if (pattern && pattern->enableDragControl_) {
             pattern->HandleDragUpdate(info);
@@ -779,6 +804,9 @@ void SheetPresentationPattern::InitPanEvent()
     };
 
     auto actionEndTask = [weak = WeakClaim(this)](const GestureEvent& info) {
+        if (info.GetInputEventType() == InputEventType::AXIS && info.GetSourceTool() == SourceTool::MOUSE) {
+            return;
+        }
         auto pattern = weak.Upgrade();
         if (pattern && pattern->enableDragControl_) {
             pattern->HandleDragEnd(info.GetMainVelocity());

@@ -18,6 +18,7 @@
 #include "form_mgr_errors.h"
 #include "form_renderer_hilog.h"
 #include "form_event_report.h"
+#include "base/resource/shared_image_manager.h"
 #include "base/utils/utils.h"
 #include "configuration.h"
 
@@ -67,6 +68,8 @@ void FormRenderer::PreInitUIContent(const OHOS::AAFwk::Want& want, const OHOS::A
     uiContent_->SetFormHeight(uiHeight > 0.0f ? uiHeight : 0.0f);
     lastBorderWidth_ = borderWidth_;
     uiContent_->SetFontScaleFollowSystem(fontScaleFollowSystem_);
+    uiContent_->SetFormImageCacheThreshold(formJsInfo.isSupportMoreImages ?
+        FORM_MULTI_IMAGE_CACHE_THRESHOLD : DEFAULT_FORM_SHARED_IMAGE_CACHE_THRESHOLD);
     uiContent_->UpdateFormSharedImage(formJsInfo.imageDataMap);
     uiContent_->UpdateFormData(formJsInfo.formData);
     auto connectToRender = want.GetRemoteObject(CONNECT_TO_RENDER);
@@ -295,6 +298,8 @@ void FormRenderer::UpdateForm(const OHOS::AppExecFwk::FormJsInfo& formJsInfo)
     }
     uiContent_->ForceRequestFrame();
     uiContent_->SetFontScaleFollowSystem(fontScaleFollowSystem_);
+    uiContent_->SetFormImageCacheThreshold(formJsInfo.isSupportMoreImages ?
+        FORM_MULTI_IMAGE_CACHE_THRESHOLD : DEFAULT_FORM_SHARED_IMAGE_CACHE_THRESHOLD);
     uiContent_->UpdateFormSharedImage(formJsInfo.imageDataMap);
     uiContent_->UpdateFormData(formJsInfo.formData);
     HILOG_INFO("FormRender UpdateForm end. formJsInfo.formData.size = %{public}zu. \

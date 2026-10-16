@@ -2978,16 +2978,14 @@ void JsiDeclarativeEngine::FireExternalEvent(
             return;
         }
 
-        napi_handle_scope handleScope;
-        napi_status status = napi_open_handle_scope(reinterpret_cast<napi_env>(nativeEngine_), &handleScope);
-        if (status != napi_ok) {
+        ScopeRAII handleScope(reinterpret_cast<napi_env>(nativeEngine_));
+        if (!handleScope) {
             return;
         }
         CHECK_NULL_VOID(xcomponentModifier->getSoPath);
         auto soPath = std::string(xcomponentModifier->getSoPath(frameNode));
         auto loadSuccess =
             LoadNativeXComponentModule(arkNativeEngine, nativeXComponent, libraryName, componentId, soPath);
-        napi_close_handle_scope(reinterpret_cast<napi_env>(nativeEngine_), handleScope);
         if (!loadSuccess) {
             return;
         }
@@ -3057,15 +3055,13 @@ void JsiDeclarativeEngine::FireExternalEvent(
         return;
     }
 
-    napi_handle_scope handleScope;
-    napi_status status = napi_open_handle_scope(reinterpret_cast<napi_env>(nativeEngine_), &handleScope);
-    if (status != napi_ok) {
+    ScopeRAII handleScope(reinterpret_cast<napi_env>(nativeEngine_));
+    if (!handleScope) {
         return;
     }
     auto soPath = xcomponent->GetSoPath().value_or("");
     auto loadSuccess = LoadNativeXComponentModule(
         arkNativeEngine, nativeXComponent_, xcomponent->GetLibraryName(), componentId, soPath);
-    napi_close_handle_scope(reinterpret_cast<napi_env>(nativeEngine_), handleScope);
     if (!loadSuccess) {
         return;
     }

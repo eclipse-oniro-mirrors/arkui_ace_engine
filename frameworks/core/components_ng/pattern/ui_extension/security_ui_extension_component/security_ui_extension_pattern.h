@@ -21,6 +21,7 @@
 #include "core/components_ng/pattern/ui_extension/platform_accessibility_child_tree_callback.h"
 #include "core/components_ng/pattern/ui_extension/platform_event_proxy.h"
 #include "core/components_ng/pattern/ui_extension/platform_pattern.h"
+#include "core/components_ng/pattern/ui_extension/ui_extension_config.h"
 #include "core/components_ng/pattern/ui_extension/ui_extension_hub.h"
 #include "core/components_ng/pattern/ui_extension/ui_extension_model_ng.h"
 
@@ -122,9 +123,14 @@ public:
     virtual void FireAsyncCallbacks();
 
     // Dpi
-    void SetDensityDpi(bool densityDpi);
-    bool GetDensityDpi();
-    void DispatchFollowHostDensity(bool densityDpi);
+    void SetDpiFollowStrategy(DpiFollowStrategy dpiFollowStrategy, bool isDpiFollowStrategySet = true);
+    DpiFollowStrategy GetDpiFollowStrategy();
+    bool IsDpiFollowStrategySet()
+    {
+        return isDpiFollowStrategySet_;
+    }
+    DpiFollowStrategy GetEffectiveDpiFollowStrategy();
+    void DispatchFollowHostDensity(DpiFollowStrategy dpiFollowStrategy);
     void OnDpiConfigurationUpdate() override;
 
     void OnAccessibilityChildTreeRegister(uint32_t windowId, int32_t treeId, int64_t accessibilityId) const override;
@@ -203,7 +209,8 @@ protected:
     AbilityState state_ = AbilityState::NONE;
     bool isVisible_ = true;
     bool isShowPlaceholder_ = false;
-    bool densityDpi_ = false;
+    DpiFollowStrategy dpiFollowStrategy_ = DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI;
+    bool isDpiFollowStrategySet_ = false;
 
     // StartUIExtension should after mountToParent
     bool hasMountToParent_ = false;

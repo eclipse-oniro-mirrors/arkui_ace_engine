@@ -651,7 +651,8 @@ HWTEST_F(FolderStackCreaseHoverTest, CreaseHoverAC8c_OnHoverStatusChangeNoDevice
 /**
  * @tc.name: CreaseHoverAC8d_DisplayInfoUtilsUsesLiveNotCached
  * @tc.desc: AC-8: DisplayInfoUtils::GetFoldCreaseDirection reads from live crease region (not cached).
- *               Verifies that GetDisplayInfo() populates liveFoldCreaseRegion_ and foldCreaseDirection_.
+ *               Verifies that on-demand GetLiveFoldCreaseRegion() + GetFoldCreaseDirection() populate
+ *               liveFoldCreaseRegion_ and foldCreaseDirection_ on the shared displayInfo_ object.
  * @tc.type: FUNC
  */
 HWTEST_F(FolderStackCreaseHoverTest, CreaseHoverAC8d_DisplayInfoUtilsUsesLiveNotCached, TestSize.Level0)
@@ -661,13 +662,15 @@ HWTEST_F(FolderStackCreaseHoverTest, CreaseHoverAC8d_DisplayInfoUtilsUsesLiveNot
     auto displayInfoUtils = Container::Current()->GetDisplayInfoUtils();
     ASSERT_NE(displayInfoUtils, nullptr);
 
-    auto displayInfo = displayInfoUtils->GetDisplayInfo();
-    ASSERT_NE(displayInfo, nullptr);
-
-    auto liveRects = displayInfo->GetLiveFoldCreaseRegion();
+    auto liveRects = displayInfoUtils->GetLiveFoldCreaseRegion();
     EXPECT_FALSE(liveRects.empty());
     EXPECT_GT(liveRects[0].Width(), liveRects[0].Height());
 
+    auto direction = displayInfoUtils->GetFoldCreaseDirection();
+    EXPECT_EQ(direction, FoldCreaseDirection::HORIZONTAL);
+
+    auto displayInfo = displayInfoUtils->GetDisplayInfo();
+    ASSERT_NE(displayInfo, nullptr);
     EXPECT_EQ(displayInfo->GetFoldCreaseDirection(), FoldCreaseDirection::HORIZONTAL);
 
     ResetMockRosenLiveCrease();
@@ -675,7 +678,8 @@ HWTEST_F(FolderStackCreaseHoverTest, CreaseHoverAC8d_DisplayInfoUtilsUsesLiveNot
 
 /**
  * @tc.name: CreaseHoverAC8e_GetDisplayInfoRefreshesLiveData
- * @tc.desc: AC-8: GetDisplayInfo() refreshes live crease data each call (not cached across calls).
+ * @tc.desc: AC-8: On-demand GetLiveFoldCreaseRegion() + GetFoldCreaseDirection() refresh live crease
+ *               data each call (not cached across calls).
  * @tc.type: FUNC
  */
 HWTEST_F(FolderStackCreaseHoverTest, CreaseHoverAC8e_GetDisplayInfoRefreshesLiveData, TestSize.Level0)
@@ -685,21 +689,16 @@ HWTEST_F(FolderStackCreaseHoverTest, CreaseHoverAC8e_GetDisplayInfoRefreshesLive
     auto displayInfoUtils = Container::Current()->GetDisplayInfoUtils();
     ASSERT_NE(displayInfoUtils, nullptr);
 
-    auto displayInfo1 = displayInfoUtils->GetDisplayInfo();
-    ASSERT_NE(displayInfo1, nullptr);
-    EXPECT_EQ(displayInfo1->GetFoldCreaseDirection(), FoldCreaseDirection::HORIZONTAL);
+    displayInfoUtils->GetLiveFoldCreaseRegion();
+    EXPECT_EQ(displayInfoUtils->GetFoldCreaseDirection(), FoldCreaseDirection::HORIZONTAL);
 
     SetupMockRosenLiveCrease(MakeVerticalCreaseRects(), true);
-
-    auto displayInfo2 = displayInfoUtils->GetDisplayInfo();
-    ASSERT_NE(displayInfo2, nullptr);
-    EXPECT_EQ(displayInfo2->GetFoldCreaseDirection(), FoldCreaseDirection::VERTICAL);
+    displayInfoUtils->GetLiveFoldCreaseRegion();
+    EXPECT_EQ(displayInfoUtils->GetFoldCreaseDirection(), FoldCreaseDirection::VERTICAL);
 
     SetupMockRosenLiveCrease({}, false);
-
-    auto displayInfo3 = displayInfoUtils->GetDisplayInfo();
-    ASSERT_NE(displayInfo3, nullptr);
-    EXPECT_EQ(displayInfo3->GetFoldCreaseDirection(), FoldCreaseDirection::UNKNOWN);
+    displayInfoUtils->GetLiveFoldCreaseRegion();
+    EXPECT_EQ(displayInfoUtils->GetFoldCreaseDirection(), FoldCreaseDirection::UNKNOWN);
 
     ResetMockRosenLiveCrease();
 }

@@ -65,9 +65,12 @@ public:
     static WeakPtr<GroupManager> GetGroupManager();
 
 private:
+    RefPtr<FrameNode> PromoteRepeatedCheckBoxGroup(const std::string& group);
+
     std::unordered_map<std::string, std::list<int32_t>> radioGroupNotify_;
     std::unordered_map<std::string, std::list<WeakPtr<FrameNode>>> checkBoxListMap_;
     std::unordered_map<std::string, WeakPtr<FrameNode>> checkBoxGroupMap_;
+    std::unordered_map<std::string, WeakPtr<FrameNode>> checkBoxGroupRepeatMap_;
     std::optional<std::string> lastNavId_;
     std::unordered_map<std::string, bool> checkboxChangedMap_;
 };

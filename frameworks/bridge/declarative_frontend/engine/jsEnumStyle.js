@@ -2366,6 +2366,10 @@ class BottomTabBarStyle {
     this.iconStyle = arg;
     return this;
   }
+  badge(arg) {
+    this.badge = arg;
+    return this;
+  }
 }
 
 class Indicator {
@@ -4455,6 +4459,13 @@ let SafeAreaEdge;
   SafeAreaEdge[SafeAreaEdge.END = 3] = 'END';
 })(SafeAreaEdge || (SafeAreaEdge = {}));
 
+let SafeAreaInsetAlignment;
+(function (SafeAreaInsetAlignment) {
+  SafeAreaInsetAlignment[SafeAreaInsetAlignment.START = 0] = 'START';
+  SafeAreaInsetAlignment[SafeAreaInsetAlignment.CENTER = 1] = 'CENTER';
+  SafeAreaInsetAlignment[SafeAreaInsetAlignment.END = 2] = 'END';
+})(SafeAreaInsetAlignment || (SafeAreaInsetAlignment = {}));
+
 let LayoutSafeAreaType;
 (function (LayoutSafeAreaType) {
   LayoutSafeAreaType[LayoutSafeAreaType.SYSTEM = 0] = 'SYSTEM';
@@ -4504,6 +4515,18 @@ let CalendarAlign;
   CalendarAlign[CalendarAlign.CENTER = 1] = 'CENTER';
   CalendarAlign[CalendarAlign.END = 2] = 'END';
 })(CalendarAlign || (CalendarAlign = {}));
+
+let CalendarFirstDayOfWeek;
+(function (CalendarFirstDayOfWeek) {
+  CalendarFirstDayOfWeek[CalendarFirstDayOfWeek.LOCAL = 0] = 'LOCAL';
+  CalendarFirstDayOfWeek[CalendarFirstDayOfWeek.MON = 1] = 'MON';
+  CalendarFirstDayOfWeek[CalendarFirstDayOfWeek.TUE = 2] = 'TUE';
+  CalendarFirstDayOfWeek[CalendarFirstDayOfWeek.WED = 3] = 'WED';
+  CalendarFirstDayOfWeek[CalendarFirstDayOfWeek.THU = 4] = 'THU';
+  CalendarFirstDayOfWeek[CalendarFirstDayOfWeek.FRI = 5] = 'FRI';
+  CalendarFirstDayOfWeek[CalendarFirstDayOfWeek.SAT = 6] = 'SAT';
+  CalendarFirstDayOfWeek[CalendarFirstDayOfWeek.SUN = 7] = 'SUN';
+})(CalendarFirstDayOfWeek || (CalendarFirstDayOfWeek = {}));
 
 let DragBehavior;
 (function (DragBehavior) {
@@ -5335,6 +5358,11 @@ let PickerIndicatorType;
   PickerIndicatorType[PickerIndicatorType.BACKGROUND = 0] = 'BACKGROUND';
   PickerIndicatorType[PickerIndicatorType.DIVIDER = 1] = 'DIVIDER';
 })(PickerIndicatorType || (PickerIndicatorType = {}));
+
+let WebContextMenuItemId;
+(function (WebContextMenuItemId) {
+  WebContextMenuItemId[WebContextMenuItemId.MENU_COPY_LINK = 11] = 'MENU_COPY_LINK';
+})(WebContextMenuItemId || (WebContextMenuItemId = {}));
 
 let BlankScreenDetectionMethod;
 (function (BlankScreenDetectionMethod) {

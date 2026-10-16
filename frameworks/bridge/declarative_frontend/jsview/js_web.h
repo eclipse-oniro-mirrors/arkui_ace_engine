@@ -92,6 +92,7 @@ public:
     static void WebRotate(const JSCallbackInfo& args);
     static void BackgroundColor(const JSCallbackInfo& info);
     static void InitialScale(float scale);
+    static void FlingSpeedLimit(float speedLimit);
     static void Password(bool password);
     static void TableData(bool tableData);
     static void OnFileSelectorShowAbandoned(const JSCallbackInfo& args);
@@ -105,6 +106,7 @@ public:
     static void BindSelectionMenu(const JSCallbackInfo& info);
     static void OnContextMenuHide(const JSCallbackInfo& args);
     static void OnContextMenuShow(const JSCallbackInfo& args);
+    static void OnContextMenuUpdate(const JSCallbackInfo& args);
     static void OnSearchResultReceive(const JSCallbackInfo& args);
     static void MediaPlayGestureAccess(bool isNeedGestureAccess);
     static void OnKeyEvent(const JSCallbackInfo& args);

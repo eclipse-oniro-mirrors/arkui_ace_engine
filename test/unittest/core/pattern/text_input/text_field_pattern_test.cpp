@@ -377,7 +377,13 @@ HWTEST_F(TextFieldPatternTest, TextPattern014, TestSize.Level1)
     ASSERT_NE(textFieldNode, nullptr);
     RefPtr<TextFieldPattern> pattern = textFieldNode->GetPattern<TextFieldPattern>();
     ASSERT_NE(pattern, nullptr);
+    /**
+     * @tc.steps: step2. SetAutoFillTriggeredStateByType ACE_USER_NAME
+     */
     pattern->SetAutoFillTriggeredStateByType(AceAutoFillType::ACE_USER_NAME);
+    /**
+     * @tc.steps: step3. SetAutoFillTriggeredStateByType ACE_PASSWORD
+     */
     pattern->SetAutoFillTriggeredStateByType(AceAutoFillType::ACE_PASSWORD);
     pattern->SetAutoFillTriggeredStateByType(AceAutoFillType::ACE_NEW_PASSWORD);
 }

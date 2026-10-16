@@ -165,6 +165,8 @@ public:
         FrameNode* frameNode, std::function<bool(const BaseEventInfo* info)>&& callback);
     static void SetOnContextMenuHide(
         FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& callback);
+    static void SetOnContextMenuUpdate(FrameNode* frameNode,
+        std::function<void(WebContextMenuItemId menuItemId, const WebContextMenuOptions& options)>&& callback);
     static void SetSearchResultReceiveEventId(
         FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& callback);
     static void SetScrollId(FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& callback);
@@ -216,6 +218,7 @@ public:
     static void SetNativeEmbedObjectParamChangeId(
         FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& callback);
     static void SetForceEnableZoom(FrameNode* frameNode, bool isForceEnableZoom);
+    static void SetFlingSpeedLimit(FrameNode* frameNode, float speedLimit);
     static void SetRotateRenderEffect(FrameNode* frameNode, const std::optional<WebRotateEffect>& effect);
     static void SetNativeEmbedGestureEventId(
         FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& callback);

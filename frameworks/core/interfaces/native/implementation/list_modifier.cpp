@@ -711,6 +711,14 @@ void SetOnDidScrollImpl(Ark_NativePointer node,
     };
     ScrollableModelStatic::SetOnDidScroll(frameNode, std::move(onDidScroll));
 }
+void SetScrollPlaceholderImpl(Ark_NativePointer node,
+                              const Opt_PlaceholderProvider* value)
+{
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    //auto convValue = value ? Converter::OptConvert<type>(*value) : std::nullopt;
+    // ListModelNG::SetSetScrollPlaceholder(frameNode, convValue);
+}
 void SetLanesImpl(Ark_NativePointer node,
                   const Opt_Union_I32_LengthConstrain_ItemFillPolicy* value,
                   const Opt_Dimension* gutter)
@@ -813,6 +821,7 @@ const GENERATED_ArkUIListModifier* GetListModifier()
         ListAttributeModifier::SetOnScrollFrameBeginImpl,
         ListAttributeModifier::SetOnWillScrollImpl,
         ListAttributeModifier::SetOnDidScrollImpl,
+        ListAttributeModifier::SetScrollPlaceholderImpl,
         ListAttributeModifier::SetLanesImpl,
         ListAttributeModifier::SetCachedCount1Impl,
     };

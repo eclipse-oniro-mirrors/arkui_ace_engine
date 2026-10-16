@@ -640,6 +640,35 @@ void SheetPresentationPattern::UpdateSheetScrollBar(const NG::SheetStyle& sheetS
     scrollNode->MarkDirtyNode(PROPERTY_UPDATE_RENDER);
 }
 
+void SheetPresentationPattern::UpdateSheetScrollBarMargin()
+{
+    auto layoutProperty = GetLayoutProperty<SheetPresentationProperty>();
+    CHECK_NULL_VOID(layoutProperty);
+    auto sheetStyle = layoutProperty->GetSheetStyleValue(SheetStyle());
+    if (sheetStyle.scrollBarState.value_or(DisplayMode::OFF) != DisplayMode::OFF) {
+        auto scrollNode = GetSheetScrollNode();
+        CHECK_NULL_VOID(scrollNode);
+        auto scrollPattern = scrollNode->GetPattern<ScrollPattern>();
+        CHECK_NULL_VOID(scrollPattern);
+        ScrollBarMargin margin;
+        if (CheckTitleIsStackMode(sheetStyle)) {
+            margin.start_ = Dimension(GetTitleBuilderHeight(), DimensionUnit::PX);
+        } else {
+            margin.start_ = Dimension(0.0f, DimensionUnit::PX);
+        }
+        auto scrollBar = scrollPattern->GetScrollBar();
+        CHECK_NULL_VOID(scrollBar);
+        const auto& currentMargin = scrollBar->GetScrollBarMargin();
+        if (currentMargin.has_value() && NearEqual(currentMargin->start_, margin.start_)) {
+            return;
+        }
+        auto paintProperty = scrollPattern->GetPaintProperty<ScrollablePaintProperty>();
+        CHECK_NULL_VOID(paintProperty);
+        paintProperty->UpdateScrollBarMargin(margin);
+        scrollPattern->SetScrollBar(paintProperty->GetScrollBarProperty());
+    }
+}
+
 void SheetPresentationPattern::UpdateZIndexAndTitleEffectNode()
 {
     auto host = GetHost();

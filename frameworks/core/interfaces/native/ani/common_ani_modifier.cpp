@@ -19,7 +19,9 @@
 
 #include "core/interfaces/native/implementation/render_node_peer_impl.h"
 #include "common_ani_modifier.h"
+#include "safe_area_inset_ani_modifier.h"
 #include "securec.h"
+
 #include "ui/properties/color.h"
 #include "base/log/container_scope_wrapper.h"
 #include "base/log/log.h"
@@ -1382,6 +1384,7 @@ const ArkUIAniCommonModifier* GetCommonAniModifier()
         .fireArkUIObjectLifecycleCallback = OHOS::Ace::NG::FireArkUIObjectLifecycleCallbackImpl,
         .GetIdString = OHOS::Ace::NG::GetIdString,
         .interopProxyNodeConstruct = OHOS::Ace::NG::InteropProxyNodeConstruct,
+        .setSafeAreaInset = OHOS::Ace::NG::SetSafeAreaInsetStatic,
     };
     return &impl;
 }

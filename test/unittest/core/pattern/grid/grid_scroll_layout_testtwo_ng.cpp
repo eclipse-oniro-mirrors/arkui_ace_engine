@@ -22,6 +22,20 @@
 
 namespace OHOS::Ace::NG {
 class GridScrollLayoutTestNg : public GridTestNg {
+protected:
+    static constexpr int32_t OPTIONS_ITEM_COUNT = 10;
+
+    RefPtr<GridScrollWithOptionsLayoutAlgorithm> CreateOptionsAlgorithm(const GridLayoutOptions& option)
+    {
+        GridModelNG model = CreateGrid();
+        model.SetColumnsTemplate("1fr 1fr 1fr 1fr");
+        model.SetLayoutOptions(option);
+        CreateFixedItems(OPTIONS_ITEM_COUNT);
+        CreateDone();
+        auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+        return AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(
+            layoutAlgorithmWrapper->GetLayoutAlgorithm());
+    }
 };
 
 /**
@@ -565,6 +579,293 @@ HWTEST_F(GridScrollLayoutTestNg, GridScrollWithOptionsCrossCountZero, TestSize.L
         AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     layoutAlgorithm->info_.crossCount_ = 0;
     EXPECT_EQ(layoutAlgorithm->GetCrossStartAndSpanWithUserFunction(1, option, 0), std::make_pair(-1, 1));
+}
+
+/**
+ * @tc.name: GridScrollWithOptionsPartialLastLineBackward001
+ * @tc.desc: WithOptions reverse scrollToIndex resumes a partial last line for regular items.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridScrollLayoutTestNg, GridScrollWithOptionsPartialLastLineBackward001, TestSize.Level1)
+{
+    GridLayoutOptions option;
+    option.regularSize.rows = 1;
+    option.regularSize.columns = 1;
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr 1fr 1fr");
+    model.SetLayoutOptions(option);
+    CreateFixedItems(10);
+    CreateDone();
+
+    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithm =
+        AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
+    ASSERT_NE(layoutAlgorithm, nullptr);
+    layoutAlgorithm->info_.crossCount_ = 4;
+    layoutAlgorithm->info_.gridMatrix_ = { { 0, { { 0, 0 } } } };
+    layoutAlgorithm->GetTargetIndexInfoWithBenchMark(AccessibilityManager::RawPtr(frameNode_), true, 1);
+    EXPECT_EQ(layoutAlgorithm->info_.startMainLineIndex_, 0);
+    EXPECT_EQ(layoutAlgorithm->info_.startIndex_, 0);
+}
+
+/**
+ * @tc.name: GridScrollWithOptionsFullLastLineBackward001
+ * @tc.desc: WithOptions reverse scrollToIndex still starts at lastLine+1 when the last line is full.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridScrollLayoutTestNg, GridScrollWithOptionsFullLastLineBackward001, TestSize.Level1)
+{
+    GridLayoutOptions option;
+    option.regularSize.rows = 1;
+    option.regularSize.columns = 1;
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr 1fr 1fr");
+    model.SetLayoutOptions(option);
+    CreateFixedItems(10);
+    CreateDone();
+
+    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithm =
+        AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
+    ASSERT_NE(layoutAlgorithm, nullptr);
+    layoutAlgorithm->info_.crossCount_ = 4;
+    layoutAlgorithm->info_.gridMatrix_ = { { 0, { { 0, 0 }, { 1, 1 }, { 2, 2 }, { 3, 3 } } } };
+    layoutAlgorithm->GetTargetIndexInfoWithBenchMark(AccessibilityManager::RawPtr(frameNode_), true, 5);
+    EXPECT_EQ(layoutAlgorithm->info_.startMainLineIndex_, 1);
+    EXPECT_EQ(layoutAlgorithm->info_.startIndex_, 4);
+}
+
+/**
+ * @tc.name: GridScrollWithOptionsIrregularDoesNotFitBackward001
+ * @tc.desc: Irregular leftover on the last line still starts at lastLine+1 when the next item cannot fit.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridScrollLayoutTestNg, GridScrollWithOptionsIrregularDoesNotFitBackward001, TestSize.Level1)
+{
+    GridLayoutOptions option;
+    option.regularSize.rows = 1;
+    option.regularSize.columns = 1;
+    option.irregularIndexes = { 1 };
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr 1fr 1fr");
+    model.SetLayoutOptions(option);
+    CreateFixedItems(10);
+    CreateDone();
+
+    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithm =
+        AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
+    ASSERT_NE(layoutAlgorithm, nullptr);
+    layoutAlgorithm->info_.crossCount_ = 4;
+    layoutAlgorithm->info_.gridMatrix_ = { { 0, { { 0, 0 } } } };
+    layoutAlgorithm->GetTargetIndexInfoWithBenchMark(AccessibilityManager::RawPtr(frameNode_), true, 1);
+    EXPECT_EQ(layoutAlgorithm->info_.startMainLineIndex_, 1);
+    EXPECT_EQ(layoutAlgorithm->info_.startIndex_, 1);
+}
+
+/**
+ * @tc.name: GridScrollWithOptionsComputedStartWrapBackward001
+ * @tc.desc: Reverse scrollToIndex does not resume leftover last-line slots when the next item's
+ *           computed crossStart is before the last-line cursor and must wrap.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridScrollLayoutTestNg, GridScrollWithOptionsComputedStartWrapBackward001, TestSize.Level1)
+{
+    GridLayoutOptions option;
+    option.regularSize.rows = 1;
+    option.regularSize.columns = 1;
+    option.irregularIndexes = { 1 };
+    option.getSizeByIndex = [](int32_t /* index */) {
+        return GridItemSize { 1, 2 };
+    };
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr 1fr 1fr");
+    model.SetLayoutOptions(option);
+    CreateFixedItems(10);
+    CreateDone();
+
+    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithm =
+        AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
+    ASSERT_NE(layoutAlgorithm, nullptr);
+    layoutAlgorithm->info_.crossCount_ = 4;
+    layoutAlgorithm->info_.gridMatrix_ = { { 0, { { 0, 0 }, { 1, 0 } } } };
+    layoutAlgorithm->GetTargetIndexInfoWithBenchMark(AccessibilityManager::RawPtr(frameNode_), true, 1);
+    EXPECT_EQ(layoutAlgorithm->info_.startMainLineIndex_, 1);
+    EXPECT_EQ(layoutAlgorithm->info_.startIndex_, 1);
+}
+
+/**
+ * @tc.name: GridScrollWithOptionsComputedStartResumeBackward001
+ * @tc.desc: Reverse scrollToIndex resumes the last line when the next item's computed crossStart
+ *           packs after the last-line cursor.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridScrollLayoutTestNg, GridScrollWithOptionsComputedStartResumeBackward001, TestSize.Level1)
+{
+    GridLayoutOptions option;
+    option.regularSize.rows = 1;
+    option.regularSize.columns = 1;
+    option.irregularIndexes = { 1 };
+    option.getSizeByIndex = [](int32_t /* index */) {
+        return GridItemSize { 1, 2 };
+    };
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr 1fr 1fr");
+    model.SetLayoutOptions(option);
+    CreateFixedItems(10);
+    CreateDone();
+
+    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithm =
+        AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
+    ASSERT_NE(layoutAlgorithm, nullptr);
+    layoutAlgorithm->info_.crossCount_ = 4;
+    layoutAlgorithm->info_.gridMatrix_ = { { 0, { { 0, 0 } } } };
+    layoutAlgorithm->GetTargetIndexInfoWithBenchMark(AccessibilityManager::RawPtr(frameNode_), true, 1);
+    EXPECT_EQ(layoutAlgorithm->info_.startMainLineIndex_, 0);
+    EXPECT_EQ(layoutAlgorithm->info_.startIndex_, 0);
+}
+
+/**
+ * @tc.name: GridScrollWithOptionsPartialLastLineWrapBackward001
+ * @tc.desc: After resuming a 4-col last line with only item 0, reverse scrollToIndex wraps when
+ *           remaining slots are exhausted: target 2 stays on line 0, 4 and 8 start later lines.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridScrollLayoutTestNg, GridScrollWithOptionsPartialLastLineWrapBackward001, TestSize.Level1)
+{
+    GridLayoutOptions option;
+    option.regularSize.rows = 1;
+    option.regularSize.columns = 1;
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr 1fr 1fr");
+    model.SetLayoutOptions(option);
+    CreateFixedItems(10);
+    CreateDone();
+
+    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithm =
+        AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
+    ASSERT_NE(layoutAlgorithm, nullptr);
+    const int32_t targets[] = { 2, 4, 8 };
+    const int32_t expectMainLines[] = { 0, 1, 2 };
+    const int32_t expectStartIndexes[] = { 0, 4, 8 };
+    for (int32_t i = 0; i < 3; ++i) {
+        layoutAlgorithm->info_.crossCount_ = 4;
+        layoutAlgorithm->info_.gridMatrix_ = { { 0, { { 0, 0 } } } };
+        layoutAlgorithm->GetTargetIndexInfoWithBenchMark(
+            AccessibilityManager::RawPtr(frameNode_), true, targets[i]);
+        EXPECT_EQ(layoutAlgorithm->info_.startMainLineIndex_, expectMainLines[i]);
+        EXPECT_EQ(layoutAlgorithm->info_.startIndex_, expectStartIndexes[i]);
+    }
+}
+
+/**
+ * @tc.name: GridScrollWithOptionsEmptyLastLineBackward001
+ * @tc.desc: Reverse scrollToIndex falls back to the (0, 0) benchmark when the matrix is non-empty
+ *           but its last line is empty.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridScrollLayoutTestNg, GridScrollWithOptionsEmptyLastLineBackward001, TestSize.Level1)
+{
+    GridLayoutOptions option;
+    option.regularSize.rows = 1;
+    option.regularSize.columns = 1;
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr 1fr 1fr");
+    model.SetLayoutOptions(option);
+    CreateFixedItems(10);
+    CreateDone();
+
+    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithm =
+        AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
+    ASSERT_NE(layoutAlgorithm, nullptr);
+    layoutAlgorithm->info_.crossCount_ = 4;
+    layoutAlgorithm->info_.gridMatrix_ = { { 0, { } } };
+    layoutAlgorithm->GetTargetIndexInfoWithBenchMark(AccessibilityManager::RawPtr(frameNode_), true, 5);
+    EXPECT_EQ(layoutAlgorithm->info_.startMainLineIndex_, 1);
+    EXPECT_EQ(layoutAlgorithm->info_.startIndex_, 4);
+}
+
+/**
+ * @tc.name: GridScrollWithOptionsEmptyMatrixBackward001
+ * @tc.desc: Reverse scrollToIndex keeps the (0, 0) benchmark when the matrix is empty.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridScrollLayoutTestNg, GridScrollWithOptionsEmptyMatrixBackward001, TestSize.Level1)
+{
+    GridLayoutOptions option;
+    option.regularSize.rows = 1;
+    option.regularSize.columns = 1;
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr 1fr 1fr");
+    model.SetLayoutOptions(option);
+    CreateFixedItems(10);
+    CreateDone();
+
+    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithm =
+        AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
+    ASSERT_NE(layoutAlgorithm, nullptr);
+    layoutAlgorithm->info_.crossCount_ = 4;
+    layoutAlgorithm->info_.gridMatrix_.clear();
+    layoutAlgorithm->GetTargetIndexInfoWithBenchMark(AccessibilityManager::RawPtr(frameNode_), true, 5);
+    EXPECT_EQ(layoutAlgorithm->info_.startMainLineIndex_, 1);
+    EXPECT_EQ(layoutAlgorithm->info_.startIndex_, 4);
+}
+
+/**
+ * @tc.name: GridScrollWithOptionsCrossCountZeroBackward001
+ * @tc.desc: Reverse scrollToIndex rejects last-line resume when crossCount is zero, so the benchmark
+ *           still starts at lastLine + 1.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridScrollLayoutTestNg, GridScrollWithOptionsCrossCountZeroBackward001, TestSize.Level1)
+{
+    GridLayoutOptions option;
+    option.regularSize.rows = 1;
+    option.regularSize.columns = 1;
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr 1fr 1fr");
+    model.SetLayoutOptions(option);
+    CreateFixedItems(10);
+    CreateDone();
+
+    auto layoutAlgorithmWrapper = AceType::DynamicCast<LayoutAlgorithmWrapper>(frameNode_->GetLayoutAlgorithm());
+    auto layoutAlgorithm =
+        AceType::DynamicCast<GridScrollWithOptionsLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
+    ASSERT_NE(layoutAlgorithm, nullptr);
+    layoutAlgorithm->info_.crossCount_ = 0;
+    layoutAlgorithm->info_.gridMatrix_ = { { 2, { { 0, 4 }, { 1, 5 } } } };
+    layoutAlgorithm->GetTargetIndexInfoWithBenchMark(AccessibilityManager::RawPtr(frameNode_), true, 6);
+    EXPECT_EQ(layoutAlgorithm->info_.startMainLineIndex_, 3);
+    EXPECT_EQ(layoutAlgorithm->info_.startIndex_, 6);
+}
+
+/**
+ * @tc.name: GetTargetIndexInfoWithBenchMarkSpanWrap001
+ * @tc.desc: Filling toward the target wraps to the next line when the item span exceeds the
+ *           leftover slots but still fits a full line.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridScrollLayoutTestNg, GetTargetIndexInfoWithBenchMarkSpanWrap001, TestSize.Level1)
+{
+    GridLayoutOptions option;
+    option.regularSize.rows = 1;
+    option.regularSize.columns = 1;
+    option.irregularIndexes = { 6 };
+    option.getSizeByIndex = [](int32_t index) {
+        return index == 6 ? GridItemSize { 1, 3 } : GridItemSize { 1, 1 };
+    };
+    auto algorithm = CreateOptionsAlgorithm(option);
+    ASSERT_NE(algorithm, nullptr);
+    algorithm->info_.crossCount_ = 4;
+    algorithm->info_.gridMatrix_ = { { 0, { { 0, 0 }, { 1, 1 }, { 2, 2 }, { 3, 3 } } } };
+    algorithm->GetTargetIndexInfoWithBenchMark(AccessibilityManager::RawPtr(frameNode_), true, 6);
+    EXPECT_EQ(algorithm->info_.startMainLineIndex_, 2);
+    EXPECT_EQ(algorithm->info_.startIndex_, 6);
 }
 } // namespace OHOS::Ace::NG
  

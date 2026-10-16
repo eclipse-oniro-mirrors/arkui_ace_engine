@@ -131,6 +131,8 @@ export class ArkUIGeneratedNativeModule {
     @ani.unsafe.Direct
     native static _CalendarPickerAttribute_setMarkToday(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
+    native static _CalendarPickerAttribute_setFirstDayOfWeek(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
     native static _CalendarPickerAttribute_setEdgeAlign(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _Canvas_construct(id: KInt, flags: KInt): KPointer
@@ -974,6 +976,8 @@ export class ArkUIGeneratedNativeModule {
     @ani.unsafe.Direct
     native static _GridAttribute_setNestedScroll(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
+    native static _GridAttribute_setScrollSnapStrategy(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
     native static _GridAttribute_setEnableScrollInteraction(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _GridAttribute_setFriction(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
@@ -995,6 +999,8 @@ export class ArkUIGeneratedNativeModule {
     native static _GridAttribute_setOnWillScroll(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _GridAttribute_setOnDidScroll(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
+    native static _GridAttribute_setScrollPlaceholder(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _GridAttribute_setCachedCount1(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
@@ -1131,6 +1137,8 @@ export class ArkUIGeneratedNativeModule {
     native static _ImageAnimatorAttribute_setIterations(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _ImageAnimatorAttribute_setMonitorInvisibleArea(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
+    native static _ImageAnimatorAttribute_setInterpolation(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _ImageAnimatorAttribute_setOnStart(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
@@ -1273,6 +1281,8 @@ export class ArkUIGeneratedNativeModule {
     native static _ListAttribute_setOnWillScroll(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _ListAttribute_setOnDidScroll(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
+    native static _ListAttribute_setScrollPlaceholder(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _ListAttribute_setLanes(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
@@ -2564,6 +2574,10 @@ export class ArkUIGeneratedNativeModule {
     @ani.unsafe.Direct
     native static _TabsAttribute_setSidebarDivider(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
+    native static _TabsAttribute_setSidebarFooter(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
+    native static _TabsAttribute_setSidebarBottomBar(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
     native static _TabsAttribute_setBarMode(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _TabsAttribute_setBarHeight1(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
@@ -3290,6 +3304,8 @@ export class ArkUIGeneratedNativeModule {
     @ani.unsafe.Direct
     native static _WaterFlowAttribute_setOnDidScroll(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
+    native static _WaterFlowAttribute_setScrollPlaceholder(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
     native static _WaterFlowAttribute_setCachedCount1(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _Web_construct(id: KInt, flags: KInt): KPointer
@@ -3602,6 +3618,8 @@ export class ArkUIGeneratedNativeModule {
     @ani.unsafe.Direct
     native static _WebAttribute_setOnZoomChange(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
+    native static _WebAttribute_setFlingSpeedLimit(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
     native static _WebAttribute_setRegisterNativeEmbedRule(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _WebAttribute_setBindSelectionMenu(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
@@ -3637,6 +3655,8 @@ export class ArkUIGeneratedNativeModule {
     native static _XComponentAttribute_setHdrBrightness0(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _XComponentAttribute_setHdrBrightness1(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
+    @ani.unsafe.Direct
+    native static _XComponentAttribute_setBufferQueueCount(ptr: KPointer, count: KInt): void
     @ani.unsafe.Direct
     native static _Root_construct(id: KInt, flags: KInt): KPointer
     @ani.unsafe.Direct
@@ -4031,6 +4051,8 @@ export class ArkUIGeneratedNativeModule {
     native static _BottomTabBarStyle_id(ptr: KPointer, value: KStringPtr): KPointer
     @ani.unsafe.Direct
     native static _BottomTabBarStyle_iconStyle(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): KPointer
+    @ani.unsafe.Direct
+    native static _BottomTabBarStyle_badge(ptr: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): KPointer
     @ani.unsafe.Direct
     native static _BounceSymbolEffect_construct(thisArray: KSerializerBuffer, thisLength: KInt): KPointer
     @ani.unsafe.Direct
@@ -5395,10 +5417,10 @@ export class ArkUIGeneratedNativeModule {
     native static _IUIContext_setCustomCursor(value: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): void
     @ani.unsafe.Direct
     native static _IUIContext_enableEventPassthrough(thisArray: KSerializerBuffer, thisLength: KInt, eventType: KInt): void
-    @ani.unsafe.Quick
-    native static _IUIContext_addLocalInputEventMonitor(eventMask: KInt, thisArray: KSerializerBuffer, thisLength: KInt): KInteropReturnBuffer
     @ani.unsafe.Direct
-    native static _IUIContext_removeLocalInputEventMonitor(thisArray: KSerializerBuffer, thisLength: KInt): void
+    native static _IUIContext_addLocalInputEventMonitor(eventMask: KInt, thisArray: KSerializerBuffer, thisLength: KInt): KPointer
+    @ani.unsafe.Direct
+    native static _IUIContext_removeLocalInputEventMonitor(monitor: KPointer): void
     @ani.unsafe.Direct
     native static _IUIContext_setTextSelectionClearPolicy(policy: KInt): void
     @ani.unsafe.Direct

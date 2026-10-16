@@ -99,6 +99,10 @@ enum class  WebKeyboardAppearanceMode : int32_t {
     DARK_IMMERSIVE = 3
 };
 
+enum class WebContextMenuItemId : int32_t {
+    MENU_COPY_LINK = 11,
+};
+
 enum class WebElementType : int32_t {
     IMAGE = 1,
     LINK = 2,

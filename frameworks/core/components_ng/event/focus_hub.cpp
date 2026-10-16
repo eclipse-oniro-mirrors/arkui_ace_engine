@@ -3444,4 +3444,33 @@ bool FocusHub::IsFocusStepForward(FocusStep step, bool isRtl)
     }
     return isForward;
 }
+
+void FocusHub::CopyEvent(const RefPtr<FocusHub>& source)
+{
+    CHECK_NULL_VOID(source);
+    auto onKey = source->GetOnKeyCallback();
+    if (onKey) {
+        SetOnKeyCallback(std::move(onKey));
+    }
+    auto onClick = source->GetOnClickCallback();
+    if (onClick) {
+        SetOnClickCallback(std::move(onClick));
+    }
+    auto onFocus = source->GetOnFocusCallback();
+    if (onFocus) {
+        SetOnFocusCallback(std::move(onFocus));
+    }
+    auto onBlur = source->GetOnBlurCallback();
+    if (onBlur) {
+        SetOnBlurCallback(std::move(onBlur));
+    }
+    auto onKeyPreIme = source->GetOnKeyPreIme();
+    if (onKeyPreIme) {
+        SetOnKeyPreIme(std::move(onKeyPreIme));
+    }
+    auto onFocusAxis = source->GetOnFocusAxisCallback();
+    if (onFocusAxis) {
+        SetOnFocusAxisCallback(std::move(onFocusAxis));
+    }
+}
 } // namespace OHOS::Ace::NG

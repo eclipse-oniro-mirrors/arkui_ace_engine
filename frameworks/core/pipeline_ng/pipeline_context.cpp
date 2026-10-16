@@ -600,6 +600,20 @@ std::string PipelineContext::GetCurrentPageName()
     return url;
 }
 
+std::string PipelineContext::GetCurrentNavDestinationName()
+{
+    auto pageInfo = GetLastPageInfo();
+    CHECK_NULL_RETURN(pageInfo, "");
+    return GetNavDestinationPageName(pageInfo);
+}
+
+std::string PipelineContext::GetCurrentPageUrl()
+{
+    auto pageInfo = GetLastPageInfo();
+    CHECK_NULL_RETURN(pageInfo, "");
+    return pageInfo->GetPageUrl();
+}
+
 void PipelineContext::ReportSelectedText()
 {
     CHECK_NULL_VOID(selectOverlayManager_);
@@ -6996,18 +7010,32 @@ void PipelineContext::SetContainerModalTitleVisible(bool customTitleSettedShow, 
     customTitleSettedShow_ = customTitleSettedShow;
 }
 
-void PipelineContext::SetContainerModalTitleHeight(int32_t height)
+RefPtr<ContainerModalPattern> PipelineContext::GetContainerModalPatternForTitleHeight()
 {
     if (windowModal_ != WindowModal::CONTAINER_MODAL) {
-        return;
+        return nullptr;
     }
-    CHECK_NULL_VOID(rootNode_);
+    CHECK_NULL_RETURN(rootNode_, nullptr);
     auto containerNode = AceType::DynamicCast<FrameNode>(rootNode_->GetFirstChild());
-    CHECK_NULL_VOID(containerNode);
+    CHECK_NULL_RETURN(containerNode, nullptr);
     auto containerPattern = containerNode->GetPattern<ContainerModalPattern>();
-    CHECK_NULL_VOID(containerPattern);
+    CHECK_NULL_RETURN(containerPattern, nullptr);
     containerPattern->IsSetContainerModalTitleHeight(true);
+    return containerPattern;
+}
+
+void PipelineContext::SetContainerModalTitleHeight(int32_t height)
+{
+    auto containerPattern = GetContainerModalPatternForTitleHeight();
+    CHECK_NULL_VOID(containerPattern);
     containerPattern->SetContainerModalTitleHeight(height);
+}
+
+void PipelineContext::SetContainerModalTitleHeightWithVp(double heightVp)
+{
+    auto containerPattern = GetContainerModalPatternForTitleHeight();
+    CHECK_NULL_VOID(containerPattern);
+    containerPattern->SetContainerModalTitleHeightWithVp(heightVp);
 }
 
 int32_t PipelineContext::GetContainerModalTitleHeight()

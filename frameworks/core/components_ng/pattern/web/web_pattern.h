@@ -218,6 +218,8 @@ public:
     using WebNodeInfoCallback = const std::function<void(std::shared_ptr<JsonValue>& jsonNodeArray, int32_t webId)>;
     using TextBlurCallback = std::function<void(int64_t, const std::string)>;
     using OnMediaCastEnterCallback = std::function<void()>;
+    using OnContextMenuUpdateCallback =
+        std::function<void(WebContextMenuItemId menuItemId, const WebContextMenuOptions& options)>;
     using WebComponentClickCallback = std::function<void(int64_t, const std::string)>;
     using OnWebNativeMessageConnectCallback = std::function<void(const std::shared_ptr<BaseEventInfo>&)>;
     using OnFullScreenVideoOverlayEnterCallback = std::function<void(const std::shared_ptr<BaseEventInfo>&)>;
@@ -418,6 +420,16 @@ public:
     OnMediaCastEnterCallback GetOnMediaCastEnterCallback()
     {
         return onMediaCastEnterCallback_;
+    }
+
+    void SetOnContextMenuUpdateCallback(OnContextMenuUpdateCallback&& callback)
+    {
+        onContextMenuUpdateCallback_ = std::move(callback);
+    }
+
+    OnContextMenuUpdateCallback GetOnContextMenuUpdateCallback()
+    {
+        return onContextMenuUpdateCallback_;
     }
 
     PermissionClipboardCallback GetPermissionClipboardCallback() const
@@ -684,6 +696,7 @@ public:
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, GestureFocusMode, GestureFocusMode);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, RotateRenderEffect, WebRotateEffect);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, ForceEnableZoom, bool);
+    ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, FlingSpeedLimit, float);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, BackToTop, bool);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, EnableAutoFill, bool);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, EnableDefaultContextMenu, bool);
@@ -1314,6 +1327,7 @@ private:
     void OnRotateRenderEffectUpdate(WebRotateEffect effect);
     void WebRotateRenderEffect(WindowSizeChangeReason type);
     void OnForceEnableZoomUpdate(bool value);
+    void OnFlingSpeedLimitUpdate(float value);
     void OnEnableAutoFillUpdate(bool isEnabled);
     void OnEnableDefaultContextMenuUpdate(bool isEnabled);
     void OnEnableDragUpdate(bool isEnabled);
@@ -1573,6 +1587,7 @@ private:
     SetWebIdCallback setWebIdCallback_ = nullptr;
     SetWebDetachCallback setWebDetachCallback_ = nullptr;
     OnMediaCastEnterCallback onMediaCastEnterCallback_ = nullptr;
+    OnContextMenuUpdateCallback onContextMenuUpdateCallback_ = nullptr;
     PermissionClipboardCallback permissionClipboardCallback_ = nullptr;
     OnOpenAppLinkCallback onOpenAppLinkCallback_ = nullptr;
     SetFaviconCallback setFaviconCallback_ = nullptr;

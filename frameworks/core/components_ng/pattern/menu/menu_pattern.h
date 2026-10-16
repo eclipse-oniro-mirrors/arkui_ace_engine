@@ -546,6 +546,16 @@ public:
         return targetOffset_;
     }
 
+    void SetWrapperParentOffset(const OffsetF& offset)
+    {
+        wrapperParentOffset_ = offset;
+    }
+
+    OffsetF GetWrapperParentOffset() const
+    {
+        return wrapperParentOffset_;
+    }
+
     void SetIsHeightModifiedBySelect(bool isModified)
     {
         isHeightModifiedBySelect_ = isModified;
@@ -987,6 +997,8 @@ private:
     std::vector<RefPtr<FrameNode>> menuItems_;
     std::optional<int32_t> foldStatusChangedCallbackId_;
     std::optional<int32_t> halfFoldHoverCallbackId_;
+    WeakPtr<PipelineContext> foldStatusPipeline_;
+    WeakPtr<PipelineContext> halfFoldHoverPipeline_;
 
     bool isSelectMenu_ = false;
     bool isSelectMenuBackgroundColorJsview_ = true;
@@ -1022,6 +1034,7 @@ private:
     bool hasOptionWidth_ = false;
     OffsetF targetOffset_;
     SizeF targetSize_;
+    OffsetF wrapperParentOffset_;
     bool expandDisplay_ = false;
     RefPtr<FrameNode> lastSelectedItem_ = nullptr;
     bool isEmbedded_ = false;

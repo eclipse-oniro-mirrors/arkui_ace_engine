@@ -17,6 +17,7 @@
 
 #include <cmath>
 
+#include "core/animation/animator.h"
 #include "core/common/back_press_handler_manager.h"
 #include "core/components_ng/base/inspector_filter.h"
 #include "core/components_ng/event/gesture_event_hub.h"

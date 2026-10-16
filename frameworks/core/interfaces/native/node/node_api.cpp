@@ -27,6 +27,7 @@
 #include "core/common/ace_application_info.h"
 #include "core/common/ace_engine.h"
 #include "core/common/container.h"
+#include "core/components/common/properties/ui_material.h"
 #include "core/components_ng/base/observer_handler.h"
 #include "core/components_ng/base/view_stack_model.h"
 #include "core/components_ng/manager/navigation/navigation_manager.h"
@@ -336,6 +337,16 @@ void RegisterOEMVisualEffect(ArkUIOEMVisualEffectFuncHandle func)
     ViewAbstract::RegisterOEMVisualEffect(oemFunc);
 }
 
+void RegisterOEMMaterialFunc(ArkUIMaterialFuncHandle handle)
+{
+    MaterialUtils::RegisterMaterialFunc(handle);
+}
+
+void RegisterOEMMaterialFilterFunc(ArkUIMaterialFilterFuncHandle handle)
+{
+    MaterialUtils::RegisterMaterialFilterFunc(handle);
+}
+
 void SetOnNodeDestroyCallback(ArkUINodeHandle node, void (*onDestroy)(ArkUINodeHandle node))
 {
     auto* uiNode = reinterpret_cast<UINode*>(node);
@@ -348,6 +359,23 @@ void SetOnNodeDestroyCallback(ArkUINodeHandle node, void (*onDestroy)(ArkUINodeH
 
 void DisposeNode(ArkUINodeHandle node)
 {
+    auto* uiNode = reinterpret_cast<UINode*>(node);
+    if (uiNode && uiNode->GetParent()) {
+        std::string rectInfo = "unavailable";
+        auto* frameNode = AceType::DynamicCast<FrameNode>(uiNode);
+        if (frameNode && frameNode->GetGeometryNode()) {
+            const auto rect = frameNode->GetGeometryNode()->GetFrameRect();
+            rectInfo = std::to_string(rect.Left()) + ", " + std::to_string(rect.Top()) + ", " +
+                std::to_string(rect.Width()) + ", " + std::to_string(rect.Height());
+        }
+        const auto& componentId = uiNode->GetInspectorId();
+        const std::string componentInfo = componentId.has_value() ? ", ComponentID: " + componentId.value() : "";
+        LOGW("DisposeNode: nodeId: %{public}d, tag: %{public}s, rect [%{public}s]%{public}s",
+            uiNode->GetId(), uiNode->GetTag().c_str(), rectInfo.c_str(), componentInfo.c_str());
+        LOGW("The node to be disposed still has a parent. "
+            "Accessing this node through a NodeHandle obtained by tree traversal after disposal "
+            "may result in undefined behavior, including application crashes.");
+    }
     ViewModel::DisposeNode(node);
 }
 
@@ -2332,6 +2360,8 @@ ArkUIExtendedNodeAPI impl_extended = {
     .setOnNodeDestroyCallback = SetOnNodeDestroyCallback,
     .createCustomNodeByNodeId = CreateCustomNodeByNodeId,
     .createCustomNodeWithParam = CreateCustomNodeWithParam,
+    .registerOEMMaterialFunc = RegisterOEMMaterialFunc,
+    .registerOEMMaterialFilterFunc = RegisterOEMMaterialFilterFunc,
 };
 /* clang-format on */
 
@@ -2538,6 +2568,13 @@ const ArkUIAnimation* GetAnimationAPI()
         .interpolatingSpring = CreateInterpolatingSpring,
         .customCurve = CreateCustomCurve,
         .disposeCurve = DisposeCurve,
+        .addAnimationGroup = ViewAnimate::AddAnimationGroup,
+        .removeAnimationGroup = ViewAnimate::RemoveAnimationGroup,
+        .pauseAnimationGroup = ViewAnimate::PauseAnimationGroup,
+        .resumeAnimationGroup = ViewAnimate::ResumeAnimationGroup,
+        .finishAnimationGroup = ViewAnimate::FinishAnimationGroup,
+        .getAnimationGroupState = ViewAnimate::GetAnimationGroupState,
+        .hasAnimationGroup = ViewAnimate::HasAnimationGroup,
     };
     CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
     return &modifier;

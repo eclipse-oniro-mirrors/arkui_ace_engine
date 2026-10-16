@@ -1286,4 +1286,32 @@ HWTEST_F(RichEditorCaretTestNg, CalculateCaretOffsetAndHeight002, TestSize.Level
     EXPECT_EQ(result.first.GetX(), 50.0f);
     EXPECT_EQ(result.second, 20.0f);
 }
+
+/**
+ * @tc.name: GetCaretBoundaryRect001
+ * @tc.desc: test GetCaretBoundaryRect covering customCaretWidth has_value and not has_value branches
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorCaretTestNg, GetCaretBoundaryRect001, TestSize.Level0)
+{
+    ASSERT_NE(richEditorNode_, nullptr);
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->CreateNodePaintMethod();
+    auto overlayMod = AceType::DynamicCast<RichEditorOverlayModifier>(pattern->overlayMod_);
+    ASSERT_NE(overlayMod, nullptr);
+    overlayMod->SetCaretWidth(10.0f);
+    pattern->contentRect_ = RectF(0.0f, 0.0f, 200.0f, 200.0f);
+
+    // Branch: customCaretWidth_ has_value -> use CARET_WIDTH
+    pattern->SetCustomCaretWidth(Dimension(5.0f, DimensionUnit::VP));
+    float defaultCaretWidth = static_cast<float>(Dimension(2.0f, DimensionUnit::VP).ConvertToPx());
+    auto rect = pattern->GetCaretBoundaryRect();
+    EXPECT_EQ(rect.Width(), 200.0f - defaultCaretWidth);
+
+    // Branch: customCaretWidth_ not has_value -> use overlay caret width
+    pattern->ResetCustomCaretWidth();
+    rect = pattern->GetCaretBoundaryRect();
+    EXPECT_EQ(rect.Width(), 200.0f - 10.0f);
+}
 }

@@ -2408,6 +2408,31 @@ typedef enum {
     NODE_TRANSFORM_3D = 128,
 
     /**
+     * @brief Defines the linear gradient blur attribute, which can be set, reset, and obtained
+     * as required through APIs.
+     *
+     * **Format of the {@link ArkUI_AttributeItem} parameter for setting the attribute:**
+     * <ul>
+     * <li>.object: linear gradient blur options object. The parameter type is
+     * {@link OH_ArkUI_LinearGradientBlurOptions*}.</li>
+     * </ul>
+     *
+     * **Format of the return value {@link ArkUI_AttributeItem}:**
+     * <ul>
+     * <li>.object: linear gradient blur options object. The type is
+     * {@link OH_ArkUI_LinearGradientBlurOptions*}. The object is an internal static object;
+     * do not release it by calling {@link OH_ArkUI_NativeModule_LinearGradientBlurOptions_Destroy}.
+     * When the attribute is not set or has been reset, the returned object contains default values
+     * (blurRadius = 0, fractionStops = {0.0, 0.0, 0.0, 1.0}, direction =
+     * {@link OH_ARKUI_LINEAR_GRADIENT_BLUR_DIRECTION_BOTTOM}).</li>
+     * </ul>
+     *
+     * @ingroup Visual
+     * @since 26.2.0
+     */
+    NODE_LINEAR_GRADIENT_BLUR = 129,
+
+    /**
      * @brief Defines the text content attribute, which can be set, reset, and obtained as required through APIs.
      *
      * Format of the {@link ArkUI_AttributeItem} parameter for setting the attribute:\n
@@ -5603,6 +5628,21 @@ typedef enum {
     NODE_XCOMPONENT_ENABLE_ANALYZER,
 
     /**
+     * @brief Defines the buffer queue size for the <b><XComponent></b> component.
+     * This attribute can be set, reset, and obtained as required through APIs.
+     *
+     * Format of the {@link ArkUI_AttributeItem} parameter for setting the attribute:\n
+     * value[0].i32: the buffer queue size, in the range [2, 5]. If the value is less than <b>2</b>,
+     * <b>2</b> is used; if the value is greater than <b>5</b>, <b>5</b> is used.
+     * If this attribute is not set, the default value <b>5</b> is used. \n
+     * \n
+     * Format of the return value {@link ArkUI_AttributeItem}:\n
+     * value[0].i32: the buffer queue size currently in effect.
+     * @since 26
+     */
+    NODE_XCOMPONENT_BUFFER_QUEUE_SIZE,
+
+    /**
      * @brief Defines whether to display the lunar calendar in the date picker.
      * This attribute can be set, reset, and obtained as required through APIs.
      *
@@ -8242,6 +8282,20 @@ typedef enum {
     NODE_SCROLL_BAR_HEIGHT = 1002029,
 
     /**
+     * @brief Obtains the current scroll state.
+     * This attribute can be obtained as required through APIs.
+     *
+     * **Format of the return value {@link ArkUI_AttributeItem}:**
+     * <ul>
+     * <li>.value[0].i32: current scroll state. The parameter type is {@link ArkUI_ScrollState}.</li>
+     * </ul>
+     *
+     * @ingroup Scrollable Container Component
+     * @since 26.2.0
+     */
+    NODE_SCROLL_STATE = 1002030,
+
+    /**
      * @brief Defines the direction in which the list items are arranged. This attribute can be set, reset, and
      * obtained as required through APIs.
      *
@@ -9968,6 +10022,17 @@ typedef enum {
     */
     NODE_IMAGE_ANIMATOR_ITERATION = 19006,
     /**
+     * @brief 设置帧动画中帧图片缩放时的插值质量。支持属性设置，属性重置和属性获取接口。
+     *
+     * 属性设置方法参数{@link ArkUI_AttributeItem}格式： \n
+     * .value[0].i32：图片缩放插值质量，参数类型为{@link ArkUI_ImageInterpolation}，默认值为LOW。 \n
+     *
+     * 属性获取方法返回值{@link ArkUI_AttributeItem}格式： \n
+     * .value[0].i32：图片缩放插值质量，参数类型为{@link ArkUI_ImageInterpolation}。 \n
+     *
+    */
+    NODE_IMAGE_ANIMATOR_INTERPOLATION = 19007,
+    /**
      * @brief Defines the disabled date range of the calendar picker.
      * This attribute can be set, reset, and obtained as required through APIs.
      *
@@ -9995,6 +10060,26 @@ typedef enum {
      * @since 19
      */
     NODE_CALENDAR_PICKER_MARK_TODAY = 16007,
+    /**
+     * @brief Defines the first day of the week for the calendar picker.
+     * This attribute can be set, reset, and obtained as required through APIs.
+     *
+     * **Format of the {@link ArkUI_AttributeItem} parameter for setting the attribute:**
+     * <ul>
+     * <li>value[0].i32: first day of the week. The value range is [0, 7].
+     * <b>0</b>: follows the system region. <b>1</b>: Monday. <b>2</b>: Tuesday. <b>3</b>: Wednesday. <b>4</b>: Thursday.
+     * <b>5</b>: Friday. <b>6</b>: Saturday. <b>7</b>: Sunday. The default value is <b>0</b> (follows the system region).</li>
+     * </ul>
+     *
+     * **Format of the return value {@link ArkUI_AttributeItem}:**
+     * <ul>
+     * <li>value[0].i32: first day of the week.</li>
+     * </ul>
+     *
+     * @ingroup Calendarpicker
+     * @since 26.2.0
+     */
+    NODE_CALENDAR_PICKER_FIRST_DAY_OF_WEEK = 16008,
 
     /**
      * @brief Defines the want used to start EmbeddedAbility.

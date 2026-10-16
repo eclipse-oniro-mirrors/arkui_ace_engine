@@ -300,6 +300,10 @@ bool FrameNode::IsOutOfLayout() const
 void FrameNode::Layout()
 {}
 
+void FrameNode::MeasureSafeAreaInset() {}
+
+void FrameNode::LayoutSafeAreaInset() {}
+
 void FrameNode::MarkDirtyNode(PropertyChangeFlag extraFlag)
 {
     (void)extraFlag;

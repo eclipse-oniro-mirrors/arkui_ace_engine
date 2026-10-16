@@ -44,6 +44,7 @@
 #include "core/common/resource/resource_parse_utils.h"
 #include "core/components_ng/pattern/common_text/text_border_utils.h"
 #include "core/components_ng/pattern/common_text/text_margin_utils.h"
+#include "core/common/ime/text_input_type.h"
 
 namespace OHOS::Ace {
 #ifndef CROSS_PLATFORM
@@ -1749,6 +1750,71 @@ void ResetRichEditorHorizontalScrolling(ArkUINodeHandle node)
     RichEditorModelNG::ResetHorizontalScrolling(frameNode);
 }
 
+void SetRichEditorInputType(ArkUINodeHandle node, ArkUI_Int32 value)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    RichEditorModelNG::SetInputType(frameNode, CastToTextInputType(value));
+}
+
+void ResetRichEditorInputType(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    RichEditorModelNG::ResetInputType(frameNode);
+}
+
+ArkUI_Int32 GetRichEditorInputType(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_RETURN(frameNode, ERROR_UINT_CODE);
+    return static_cast<ArkUI_Int32>(RichEditorModelNG::GetInputType(frameNode));
+}
+
+void SetRichEditorShowPasswordIcon(ArkUINodeHandle node, ArkUI_Uint32 showPasswordIcon)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    RichEditorModelNG::SetShowPasswordIcon(frameNode, static_cast<bool>(showPasswordIcon));
+}
+
+void ResetRichEditorShowPasswordIcon(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    RichEditorModelNG::ResetShowPasswordIcon(frameNode);
+}
+
+ArkUI_Bool GetRichEditorShowPasswordIcon(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_RETURN(frameNode, ERROR_UINT_CODE);
+    return RichEditorModelNG::GetShowPasswordIcon(frameNode);
+}
+
+void SetRichEditorPasswordIcon(ArkUINodeHandle node, const struct ArkUIPasswordIconType* passwordIcon)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    CHECK_NULL_VOID(passwordIcon);
+    auto parseIcon = [](const char* result, const char* bundle, const char* module) {
+        if (result != nullptr && result[0] != '\0') {
+            return ImageSourceInfo { result, "", "" };
+        }
+        return ImageSourceInfo { "", bundle ? bundle : "", module ? module : "" };
+    };
+    auto showIcon = parseIcon(passwordIcon->showResult, passwordIcon->showBundleName, passwordIcon->showModuleName);
+    auto hideIcon = parseIcon(passwordIcon->hideResult, passwordIcon->hideBundleName, passwordIcon->hideModuleName);
+    RichEditorModelNG::SetPasswordIcon(frameNode, showIcon, hideIcon);
+}
+
+void ResetRichEditorPasswordIcon(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    RichEditorModelNG::ResetPasswordIcon(frameNode);
+}
+
 void SetRichEditorSingleLine(ArkUINodeHandle node, ArkUI_Bool singleLine)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
@@ -2631,6 +2697,7 @@ void SetRichEditorShowCounter(ArkUINodeHandle node, ArkUIShowCountOptions* showC
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
     CHECK_NULL_VOID(frameNode);
+    CHECK_NULL_VOID(showCountOptions);
     RichEditorModelNG::SetShowCounter(frameNode, static_cast<bool>(showCountOptions->open));
     RichEditorModelNG::SetCounter(frameNode, showCountOptions->thresholdPercentage);
     RichEditorModelNG::SetShowHighlightBorder(frameNode, static_cast<bool>(showCountOptions->highlightBorder));
@@ -2936,6 +3003,14 @@ const ArkUIRichEditorModifier* GetRichEditorDynamicModifier()
             .setRichEditorHorizontalScrolling = nullptr,
             .resetRichEditorHorizontalScrolling = nullptr,
             .getRichEditorHorizontalScrolling = nullptr,
+            .setRichEditorInputType = nullptr,
+            .resetRichEditorInputType = nullptr,
+            .getRichEditorInputType = nullptr,
+            .setRichEditorShowPasswordIcon = nullptr,
+            .resetRichEditorShowPasswordIcon = nullptr,
+            .getRichEditorShowPasswordIcon = nullptr,
+            .setRichEditorPasswordIcon = nullptr,
+            .resetRichEditorPasswordIcon = nullptr,
             .setRichEditorCaretStyle = nullptr,
             .getRichEditorCaretStyle = nullptr,
             .resetRichEditorCaretStyle = nullptr,
@@ -3156,6 +3231,14 @@ const ArkUIRichEditorModifier* GetRichEditorDynamicModifier()
         .setRichEditorHorizontalScrolling = SetRichEditorHorizontalScrolling,
         .resetRichEditorHorizontalScrolling = ResetRichEditorHorizontalScrolling,
         .getRichEditorHorizontalScrolling = GetRichEditorHorizontalScrolling,
+        .setRichEditorInputType = SetRichEditorInputType,
+        .resetRichEditorInputType = ResetRichEditorInputType,
+        .getRichEditorInputType = GetRichEditorInputType,
+        .setRichEditorShowPasswordIcon = SetRichEditorShowPasswordIcon,
+        .resetRichEditorShowPasswordIcon = ResetRichEditorShowPasswordIcon,
+        .getRichEditorShowPasswordIcon = GetRichEditorShowPasswordIcon,
+        .setRichEditorPasswordIcon = SetRichEditorPasswordIcon,
+        .resetRichEditorPasswordIcon = ResetRichEditorPasswordIcon,
         .setRichEditorCaretStyle = SetRichEditorCaretStyle,
         .getRichEditorCaretStyle = GetRichEditorCaretStyle,
         .resetRichEditorCaretStyle = ResetRichEditorCaretStyle,
@@ -3239,6 +3322,14 @@ const CJUIRichEditorModifier* GetCJUIRichEditorDynamicModifier()
         .setRichEditorHorizontalScrolling = SetRichEditorHorizontalScrolling,
         .resetRichEditorHorizontalScrolling = ResetRichEditorHorizontalScrolling,
         .getRichEditorHorizontalScrolling = GetRichEditorHorizontalScrolling,
+        .setRichEditorInputType = SetRichEditorInputType,
+        .resetRichEditorInputType = ResetRichEditorInputType,
+        .getRichEditorInputType = GetRichEditorInputType,
+        .setRichEditorShowPasswordIcon = SetRichEditorShowPasswordIcon,
+        .resetRichEditorShowPasswordIcon = ResetRichEditorShowPasswordIcon,
+        .getRichEditorShowPasswordIcon = GetRichEditorShowPasswordIcon,
+        .setRichEditorPasswordIcon = SetRichEditorPasswordIcon,
+        .resetRichEditorPasswordIcon = ResetRichEditorPasswordIcon,
     };
     CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
     return &modifier;

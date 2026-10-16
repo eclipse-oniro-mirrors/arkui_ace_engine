@@ -85,6 +85,7 @@ constexpr int32_t MEMORY_LEVEL_LOW = 1;
 constexpr int32_t MEMORY_LEVEL_CRITICAL = 2;
 constexpr int32_t MEMORY_LEVEL_BACKGROUND_LOW = 5;
 constexpr int32_t MEMORY_LEVEL_BACKGROUND_CRITICAL = 6;
+constexpr int32_t START_ANIMATION_INVALID_ANIMATIONS = 2;
 
 namespace {
 constexpr int32_t MODE_SWITCH_ANIMATION_DURATION = 500; // ms
@@ -4261,7 +4262,10 @@ bool NavigationPattern::TriggerCustomAnimation(RefPtr<NavDestinationGroupNode> p
         isFinishInteractiveAnimation_ = false;
         navigationManager->FinishInteractiveAnimation();
         OnStartOneTransitionAnimation();
-        proxy->StartAnimation();
+        int32_t errorCode = proxy->StartAnimation();
+        if (errorCode == START_ANIMATION_INVALID_ANIMATIONS) {
+            proxy->FireFinishCallback();
+        }
     } else {
 #ifndef CROSS_PLATFORM
         PerfMonitor::GetPerfMonitor()->Start(PerfConstants::ABILITY_OR_PAGE_SWITCH, PerfActionType::LAST_UP, "");
@@ -6155,8 +6159,6 @@ void NavigationPattern::HandleTouchUp()
     CHECK_NULL_VOID(dragPattern);
     dragPattern->UpdateDefaultColor();
 
-    auto theme = NavigationGetTheme();
-    CHECK_NULL_VOID(theme);
     auto dividerNode = GetDividerNode();
     CHECK_NULL_VOID(dividerNode);
     if (UpdateForceSplitDividerColor(dividerNode)) {
@@ -6168,7 +6170,8 @@ void NavigationPattern::HandleTouchUp()
     gradient.CreateGradientWithType(NG::GradientType::LINEAR);
     gradient.AddColor(CreatePercentGradientColor(0, Color::TRANSPARENT));
     dividerRenderContext->UpdateLinearGradient(gradient);
-    dividerRenderContext->UpdateBackgroundColor(theme->GetNavigationDividerColor());
+    // restore the divider color with user-defined color or theme default color
+    UpdateDividerBackgroundColor();
 }
 
 void NavigationPattern::CheckContentNeedMeasure(const RefPtr<FrameNode>& node)

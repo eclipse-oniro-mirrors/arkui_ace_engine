@@ -17,6 +17,7 @@
 #include <chrono>
 #include "gtest/gtest.h"
 #include "form_mgr_errors.h"
+#include "base/resource/shared_image_manager.h"
 #include "test/mock/interfaces/mock_uicontent.h"
 #include "test/unittest/interfaces/form_render/mock/mock_form_render_delegate_stub.h"
 #include "ui_content.h"
@@ -1080,5 +1081,131 @@ HWTEST_F(FormRenderTest, FormRenderTest_UpdateConfiguration_001, TestSize.Level0
     EXPECT_CALL(*((MockUIContent *)(formRenderer->uiContent_.get())), UpdateConfiguration(_)).Times(Exactly(1));
     std::shared_ptr<AppExecFwk::Configuration> config = std::make_shared<AppExecFwk::Configuration>();
     formRenderer->UpdateConfiguration(config);
+}
+
+/**
+ * @tc.name: FormRenderPreInitUIContent_IsSupportMoreImages_001
+ * @tc.desc: Verify PreInitUIContent sets FORM_MULTI_IMAGE_CACHE_THRESHOLD when isSupportMoreImages=true.
+ * @tc.type: FUNC
+ */
+HWTEST_F(FormRenderTest, FormRenderPreInitUIContent_IsSupportMoreImages_001, TestSize.Level1)
+{
+    auto formRenderer = CreateFormRenderer("PreInitMoreImages001");
+    ASSERT_TRUE(formRenderer);
+    formRenderer->uiContent_ = UIContent::Create(nullptr, nullptr);
+    ASSERT_TRUE(formRenderer->uiContent_);
+    formRenderer->allowUpdate_ = true;
+    formRenderer->width_ = FORM_WIDTH;
+    formRenderer->height_ = FORM_HEIGHT;
+
+    OHOS::AAFwk::Want want;
+    want.SetParam(FORM_WIDTH_KEY, FORM_WIDTH);
+    want.SetParam(FORM_HEIGHT_KEY, FORM_HEIGHT);
+    want.SetParam(FORM_RENDERER_COMP_ID, FORM_COMPONENT_ID_1);
+    want.SetParam(FORM_RENDERER_ALLOW_UPDATE, true);
+    want.SetParam(FORM_RENDER_STATE, true);
+    OHOS::AppExecFwk::FormJsInfo formJsInfo;
+    formJsInfo.isSupportMoreImages = true;
+
+    EXPECT_CALL(*((MockUIContent*)(formRenderer->uiContent_.get())), SetFormWidth(_)).WillOnce(Return());
+    EXPECT_CALL(*((MockUIContent*)(formRenderer->uiContent_.get())), SetFormHeight(_)).WillOnce(Return());
+    EXPECT_CALL(*((MockUIContent*)(formRenderer->uiContent_.get())), SetFormImageCacheThreshold(
+        FORM_MULTI_IMAGE_CACHE_THRESHOLD)).WillOnce(Return());
+    EXPECT_CALL(*((MockUIContent*)(formRenderer->uiContent_.get())), UpdateFormSharedImage(_)).WillOnce(Return());
+    EXPECT_CALL(*((MockUIContent*)(formRenderer->uiContent_.get())), UpdateFormData(_)).WillOnce(Return());
+    EXPECT_CALL(*((MockUIContent*)(formRenderer->uiContent_.get())),
+        PreInitializeForm(An<OHOS::Rosen::Window*>(), _, _, _)).WillOnce(Return());
+    std::string surfaceNodeName = "ArkTSCardNode";
+    struct Rosen::RSSurfaceNodeConfig surfaceNodeConfig = { .SurfaceNodeName = surfaceNodeName };
+    std::shared_ptr<Rosen::RSSurfaceNode> rsNode = OHOS::Rosen::RSSurfaceNode::Create(surfaceNodeConfig, true);
+    EXPECT_CALL(*((MockUIContent*)(formRenderer->uiContent_.get())), GetFormRootNode()).WillOnce(Return(rsNode));
+    EXPECT_CALL(*((MockUIContent*)(formRenderer->uiContent_.get())), SetFormViewScale(_, _, _)).WillOnce(Return());
+    formRenderer->PreInitUIContent(want, formJsInfo);
+}
+
+/**
+ * @tc.name: FormRenderPreInitUIContent_IsSupportMoreImages_002
+ * @tc.desc: Verify PreInitUIContent sets DEFAULT_FORM_SHARED_IMAGE_CACHE_THRESHOLD when isSupportMoreImages=false.
+ * @tc.type: FUNC
+ */
+HWTEST_F(FormRenderTest, FormRenderPreInitUIContent_IsSupportMoreImages_002, TestSize.Level1)
+{
+    auto formRenderer = CreateFormRenderer("PreInitMoreImages002");
+    ASSERT_TRUE(formRenderer);
+    formRenderer->uiContent_ = UIContent::Create(nullptr, nullptr);
+    ASSERT_TRUE(formRenderer->uiContent_);
+    formRenderer->allowUpdate_ = true;
+    formRenderer->width_ = FORM_WIDTH;
+    formRenderer->height_ = FORM_HEIGHT;
+
+    OHOS::AAFwk::Want want;
+    want.SetParam(FORM_WIDTH_KEY, FORM_WIDTH);
+    want.SetParam(FORM_HEIGHT_KEY, FORM_HEIGHT);
+    want.SetParam(FORM_RENDERER_COMP_ID, FORM_COMPONENT_ID_1);
+    want.SetParam(FORM_RENDERER_ALLOW_UPDATE, true);
+    want.SetParam(FORM_RENDER_STATE, true);
+    OHOS::AppExecFwk::FormJsInfo formJsInfo;
+    formJsInfo.isSupportMoreImages = false;
+
+    EXPECT_CALL(*((MockUIContent*)(formRenderer->uiContent_.get())), SetFormWidth(_)).WillOnce(Return());
+    EXPECT_CALL(*((MockUIContent*)(formRenderer->uiContent_.get())), SetFormHeight(_)).WillOnce(Return());
+    EXPECT_CALL(*((MockUIContent*)(formRenderer->uiContent_.get())), SetFormImageCacheThreshold(
+        DEFAULT_FORM_SHARED_IMAGE_CACHE_THRESHOLD)).WillOnce(Return());
+    EXPECT_CALL(*((MockUIContent*)(formRenderer->uiContent_.get())), UpdateFormSharedImage(_)).WillOnce(Return());
+    EXPECT_CALL(*((MockUIContent*)(formRenderer->uiContent_.get())), UpdateFormData(_)).WillOnce(Return());
+    EXPECT_CALL(*((MockUIContent*)(formRenderer->uiContent_.get())),
+        PreInitializeForm(An<OHOS::Rosen::Window*>(), _, _, _)).WillOnce(Return());
+    std::string surfaceNodeName = "ArkTSCardNode";
+    struct Rosen::RSSurfaceNodeConfig surfaceNodeConfig = { .SurfaceNodeName = surfaceNodeName };
+    std::shared_ptr<Rosen::RSSurfaceNode> rsNode = OHOS::Rosen::RSSurfaceNode::Create(surfaceNodeConfig, true);
+    EXPECT_CALL(*((MockUIContent*)(formRenderer->uiContent_.get())), GetFormRootNode()).WillOnce(Return(rsNode));
+    EXPECT_CALL(*((MockUIContent*)(formRenderer->uiContent_.get())), SetFormViewScale(_, _, _)).WillOnce(Return());
+    formRenderer->PreInitUIContent(want, formJsInfo);
+}
+
+/**
+ * @tc.name: FormRenderUpdateForm_IsSupportMoreImages_001
+ * @tc.desc: Verify UpdateForm sets FORM_MULTI_IMAGE_CACHE_THRESHOLD when isSupportMoreImages=true.
+ * @tc.type: FUNC
+ */
+HWTEST_F(FormRenderTest, FormRenderUpdateForm_IsSupportMoreImages_001, TestSize.Level1)
+{
+    auto formRenderer = CreateFormRenderer("UpdateFormMoreImages001");
+    ASSERT_TRUE(formRenderer);
+    formRenderer->uiContent_ = UIContent::Create(nullptr, nullptr);
+    ASSERT_TRUE(formRenderer->uiContent_);
+    formRenderer->allowUpdate_ = true;
+
+    OHOS::AppExecFwk::FormJsInfo formJsInfo;
+    formJsInfo.isSupportMoreImages = true;
+
+    EXPECT_CALL(*((MockUIContent*)(formRenderer->uiContent_.get())), SetFormImageCacheThreshold(
+        FORM_MULTI_IMAGE_CACHE_THRESHOLD)).WillOnce(Return());
+    EXPECT_CALL(*((MockUIContent*)(formRenderer->uiContent_.get())), UpdateFormSharedImage(_)).WillOnce(Return());
+    EXPECT_CALL(*((MockUIContent*)(formRenderer->uiContent_.get())), UpdateFormData(_)).WillOnce(Return());
+    formRenderer->UpdateForm(formJsInfo);
+}
+
+/**
+ * @tc.name: FormRenderUpdateForm_IsSupportMoreImages_002
+ * @tc.desc: Verify UpdateForm sets DEFAULT_FORM_SHARED_IMAGE_CACHE_THRESHOLD when isSupportMoreImages=false.
+ * @tc.type: FUNC
+ */
+HWTEST_F(FormRenderTest, FormRenderUpdateForm_IsSupportMoreImages_002, TestSize.Level1)
+{
+    auto formRenderer = CreateFormRenderer("UpdateFormMoreImages002");
+    ASSERT_TRUE(formRenderer);
+    formRenderer->uiContent_ = UIContent::Create(nullptr, nullptr);
+    ASSERT_TRUE(formRenderer->uiContent_);
+    formRenderer->allowUpdate_ = true;
+
+    OHOS::AppExecFwk::FormJsInfo formJsInfo;
+    formJsInfo.isSupportMoreImages = false;
+
+    EXPECT_CALL(*((MockUIContent*)(formRenderer->uiContent_.get())), SetFormImageCacheThreshold(
+        DEFAULT_FORM_SHARED_IMAGE_CACHE_THRESHOLD)).WillOnce(Return());
+    EXPECT_CALL(*((MockUIContent*)(formRenderer->uiContent_.get())), UpdateFormSharedImage(_)).WillOnce(Return());
+    EXPECT_CALL(*((MockUIContent*)(formRenderer->uiContent_.get())), UpdateFormData(_)).WillOnce(Return());
+    formRenderer->UpdateForm(formJsInfo);
 }
 } // namespace OHOS::Ace

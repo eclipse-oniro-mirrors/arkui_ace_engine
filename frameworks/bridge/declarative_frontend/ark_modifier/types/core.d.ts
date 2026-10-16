@@ -550,6 +550,7 @@ type DistortionMode = 'distortion_auto' | 'distortion_enabled' | 'distortion_dis
 type EdgeLightMode = 'edgeLight_auto' | 'edgeLight_enabled' | 'edgeLight_disabled';
 
 type CalendarAlign = 'start' | 'center' | 'end';
+type CalendarFirstDayOfWeek = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
 type CalendarTextStyle = object;
 type DatePickerResult = { year: number; month: number; day: number };
 type PickerTextStyle = object;
@@ -737,6 +738,13 @@ type TextDecorationOptions = object;
 type SliderConfiguration = object;
 type DateTimeOptions = object;
 type NestedScrollOptions = object;
+declare enum ScrollSnapAlign {
+    NONE = 0,
+    START = 1,
+    CENTER = 2,
+    END = 3,
+}
+type ScrollSnapOffsetProvider = object;
 
 declare class ArkLogConsole {
     public static log(...args: unknown[]): void;

@@ -15,6 +15,7 @@
 
 #include "interfaces/native/native_interface_focus.h"
 #include "interfaces/native/node/node_model.h"
+#include "interfaces/native/node/config_manager.h"
 #include "interfaces/native/native_error_message_macros.h"
 
 #ifdef __cplusplus
@@ -28,6 +29,7 @@ ArkUI_ErrorCode OH_ArkUI_FocusRequest(ArkUI_NodeHandle node)
         "OH_ArkUI_FocusRequest", "Native module not initialized");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_FOCUS_NON_EXISTENT,
         "OH_ArkUI_FocusRequest", "Node parameter is null");
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     auto ret = impl->getNodeModifiers()->getFrameNodeModifier()->requestFocus(node->uiNodeHandle);
     return static_cast<ArkUI_ErrorCode>(ret);
 }

@@ -616,7 +616,7 @@ void UIExtensionPattern::UpdateSessionViewportConfigFromContext()
     auto pipeline = PipelineContext::GetCurrentContext();
     CHECK_NULL_VOID(pipeline);
     SessionViewportConfig sessionViewportConfig;
-    sessionViewportConfig.isDensityFollowHost_ = GetDensityDpi();
+    sessionViewportConfig.dpiFollowStrategy_ = GetEffectiveDpiFollowStrategy();
     sessionViewportConfig.density_ = pipeline->GetCurrentDensity();
     sessionViewportConfig.displayId_ = container->GetCurrentDisplayId();
     sessionViewportConfig.orientation_ = static_cast<int32_t>(SystemProperties::GetDeviceOrientation());
@@ -1758,14 +1758,32 @@ void UIExtensionPattern::FireBindModalCallback()
     }
 }
 
-void UIExtensionPattern::SetDensityDpi(bool densityDpi)
+void UIExtensionPattern::SetDpiFollowStrategy(DpiFollowStrategy dpiFollowStrategy, bool isDpiFollowStrategySet)
 {
-    densityDpi_ = densityDpi;
+    dpiFollowStrategy_ = dpiFollowStrategy;
+    isDpiFollowStrategySet_ = isDpiFollowStrategySet;
 }
 
-bool UIExtensionPattern::GetDensityDpi()
+DpiFollowStrategy UIExtensionPattern::GetDpiFollowStrategy()
 {
-    return densityDpi_;
+    return dpiFollowStrategy_;
+}
+
+DpiFollowStrategy UIExtensionPattern::GetEffectiveDpiFollowStrategy()
+{
+    ContainerScope scope(instanceId_);
+    auto context = PipelineBase::GetCurrentContext();
+    DpiFollowStrategy hostDpiFollowStrategy =
+        context ? context->GetUIExtensionDensityFollowHost() : DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI;
+    // Developer-configured strategy takes precedence (even when it is the default value,
+    // i.e. an explicit opt-out); when not configured at all, fall back to the strategy
+    // saved from UIContent::SetUIExtensionDensityFollowHost.
+    DpiFollowStrategy effectiveStrategy = isDpiFollowStrategySet_ ? dpiFollowStrategy_ : hostDpiFollowStrategy;
+    UIEXT_LOGI("GetEffectiveDpiFollowStrategy: dpiFollowStrategy=%{public}d, isDpiFollowStrategySet=%{public}d, "
+               "hostDpiFollowStrategy=%{public}d, effective=%{public}d, instanceId=%{public}d.",
+        static_cast<int32_t>(dpiFollowStrategy_), isDpiFollowStrategySet_, static_cast<int32_t>(hostDpiFollowStrategy),
+        static_cast<int32_t>(effectiveStrategy), instanceId_);
+    return effectiveStrategy;
 }
 
 void UIExtensionPattern::OnVisibleChange(bool visible)
@@ -1927,7 +1945,7 @@ void UIExtensionPattern::RegisterVisibleAreaChange()
         uiExtension->HandleVisibleAreaChange(visible, ratio);
     };
     std::vector<double> ratioList = { SHOW_START, SHOW_FULL };
-    pipeline->AddVisibleAreaChangeNode(host, ratioList, callback, false);
+    pipeline->AddVisibleAreaChangeNode(host, ratioList, callback, false, true);
 }
 
 void UIExtensionPattern::HandleVisibleAreaChange(bool visible, double ratio)
@@ -2036,6 +2054,20 @@ const char* UIExtensionPattern::ToString(AbilityState state)
     }
 }
 
+void UIExtensionPattern::DumpDpiFollowInfo()
+{
+    ContainerScope dpiScope(instanceId_);
+    auto dpiContext = PipelineBase::GetCurrentContext();
+    DumpLog::GetInstance().AddDesc(std::string("dpiFollowStrategy: ")
+        .append(std::to_string(static_cast<int32_t>(dpiFollowStrategy_))));
+    DumpLog::GetInstance().AddDesc(std::string("isDpiFollowStrategySet: ")
+        .append(std::to_string(isDpiFollowStrategySet_)));
+    DumpLog::GetInstance().AddDesc(std::string("uiExtensionDpiFollowHost: ")
+        .append(std::to_string(dpiContext ? static_cast<int32_t>(dpiContext->GetUIExtensionDensityFollowHost()) : -1)));
+    DumpLog::GetInstance().AddDesc(std::string("dpiFollowStrategyEffective: ")
+        .append(std::to_string(static_cast<int32_t>(GetEffectiveDpiFollowStrategy()))));
+}
+
 void UIExtensionPattern::DumpInfo()
 {
     CHECK_NULL_VOID(sessionWrapper_);
@@ -2047,6 +2079,7 @@ void UIExtensionPattern::DumpInfo()
     DumpLog::GetInstance().AddDesc(std::string("reason: ").append(std::to_string(sessionWrapper_->GetReasonDump())));
     DumpLog::GetInstance().AddDesc(std::string("focusStatus: ").append(std::to_string(focusState_)));
     DumpLog::GetInstance().AddDesc(std::string("abilityState: ").append(ToString(state_)));
+    DumpDpiFollowInfo();
     std::string eventProxyStr = "[]";
     if (platformEventProxy_) {
         eventProxyStr = platformEventProxy_->GetCurEventProxyToString();
@@ -2094,6 +2127,14 @@ void UIExtensionPattern::DumpInfo(std::unique_ptr<JsonValue>& json)
     json->Put("reason: ", std::to_string(sessionWrapper_->GetReasonDump()).c_str());
     json->Put("focusStatus: ", std::to_string(focusState_).c_str());
     json->Put("abilityState: ", ToString(state_));
+    ContainerScope dpiScope(instanceId_);
+    auto dpiContext = PipelineBase::GetCurrentContext();
+    json->Put("dpiFollowStrategy: ", std::to_string(static_cast<int32_t>(dpiFollowStrategy_)).c_str());
+    json->Put("isDpiFollowStrategySet: ", std::to_string(isDpiFollowStrategySet_).c_str());
+    json->Put("uiExtensionDpiFollowHost: ",
+        std::to_string(dpiContext ? static_cast<int32_t>(dpiContext->GetUIExtensionDensityFollowHost()) : -1).c_str());
+    json->Put("dpiFollowStrategyEffective: ",
+        std::to_string(static_cast<int32_t>(GetEffectiveDpiFollowStrategy())).c_str());
     std::string eventProxyStr = "[]";
     if (platformEventProxy_) {
         eventProxyStr = platformEventProxy_->GetCurEventProxyToString();

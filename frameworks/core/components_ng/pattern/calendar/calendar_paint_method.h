@@ -109,7 +109,7 @@ private:
     bool showHoliday_ = true;
     bool showLunar_ = false;
     bool isCalendarDialog_ = false;
-    int32_t startOfWeek_ = 64;
+    int32_t startOfWeek_ = static_cast<int32_t>(Week::Sun);
 
     // Default it exists 5 weeks in a month.
     int32_t rowCount_ = 5;

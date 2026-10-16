@@ -224,6 +224,7 @@ public:
         const std::vector<std::string>& issuers) override;
     void OnPermissionRequest(std::shared_ptr<NWeb::NWebAccessRequest> request) override;
     void OnContextMenuDismissed() override;
+    void OnContextMenuUpdate(int32_t menuItemId, std::shared_ptr<NWeb::NWebContextMenuOptions> options) override;
     bool RunContextMenu(std::shared_ptr<NWeb::NWebContextMenuParams> params,
         std::shared_ptr<NWeb::NWebContextMenuCallback> callback) override;
     void UpdateClippedSelectionBounds(int x, int y, int w, int h) override;

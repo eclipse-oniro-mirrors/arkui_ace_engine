@@ -127,7 +127,6 @@
 #include "bridge/declarative_frontend/jsview/js_water_flow_sections_binding.h"
 #include "bridge/declarative_frontend/jsview/menu/js_context_menu.h"
 #include "bridge/declarative_frontend/jsview/scroll_bar/js_scroll_bar.h"
-#include "bridge/declarative_frontend/sharedata/js_share_data.h"
 #include "bridge/declarative_frontend/style_string/js_span_string.h"
 #include "bridge/declarative_frontend/style_string/js_text_layout.h"
 #include "core/components_ng/pattern/custom/custom_title_node.h"
@@ -794,6 +793,22 @@ void RegisterFormModuleByName(BindingTarget globalObj, const std::string& module
         JSTextTimerController::JSBind(globalObj);
         return;
     }
+    if (module == "__Rect__") {
+        JSRect::JSBind(globalObj);
+        return;
+    }
+    if (module == "__Path__") {
+        JSPath::JSBind(globalObj);
+        return;
+    }
+    if (module == "__Circle__") {
+        JSCircle::JSBind(globalObj);
+        return;
+    }
+    if (module == "__Ellipse__") {
+        JSEllipse::JSBind(globalObj);
+        return;
+    }
 #if !defined(WEARABLE_PRODUCT) && defined(PLAYER_FRAMEWORK_EXISTS) && defined(VIDEO_SUPPORTED)
     if (module == "Video") {
         JSVideoControllerAsyncBinding::JSBind(globalObj);
@@ -933,6 +948,10 @@ void JsBindFormViews(
         JSEllipseShape::JSBind(globalObj);
         JSPathShape::JSBind(globalObj);
         JSWithEnv::JSBind(globalObj);
+        JSRect::JSBind(globalObj);
+        JSCircle::JSBind(globalObj);
+        JSEllipse::JSBind(globalObj);
+        JSPath::JSBind(globalObj);
     }
 
     if (!formModuleList.empty()) {
@@ -982,7 +1001,6 @@ void JsBindViews(BindingTarget globalObj, void* nativeEngine, bool isCustomEnvSu
     JSPanGestureOption::JSBind(globalObj);
     JsDragFunction::JSBind(globalObj);
     JSCustomDialogController::JSBind(globalObj);
-    JSShareData::JSBind(globalObj);
     JSPersistent::JSBind(globalObj);
     JSScrollerBinding::JSBind(globalObj);
     JSListScroller::JSBind(globalObj);

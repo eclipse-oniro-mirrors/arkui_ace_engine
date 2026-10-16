@@ -4691,6 +4691,17 @@ void WebPattern::OnForceEnableZoomUpdate(bool isEnabled)
     }
 }
 
+void WebPattern::OnFlingSpeedLimitUpdate(float speedLimit)
+{
+    // M114 engine version does not support FlingSpeedLimit; skip is expected.
+    RETURN_IF_CALLING_FROM_M114();
+    TAG_LOGD(AceLogTag::ACE_WEB, "OnFlingSpeedLimitUpdate speedLimit=%{public}f", speedLimit);
+    if (delegate_) {
+        TAG_LOGD(AceLogTag::ACE_WEB, "SetFlingSpeedLimit :%{public}f", speedLimit);
+        delegate_->SetFlingSpeedLimit(speedLimit);
+    }
+}
+
 void WebPattern::RegistVirtualKeyBoardListener(const RefPtr<PipelineContext> &pipelineContext)
 {
     if (!needUpdateWeb_ || !GetHost()) {
