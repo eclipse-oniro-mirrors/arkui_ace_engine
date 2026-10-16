@@ -24,7 +24,11 @@ extern "C" {
 
 typedef struct OH_ArkUI_NativeModule_UIJsonWrapper OH_ArkUI_NativeModule_UIJsonWrapper;
 
-/** Copies size UTF-8 bytes. The result is immutable and independently owned. */
+/**
+ * Copies size UTF-8 bytes. The result is immutable and independently owned.
+ * data and outOwned must not be NULL, and size must be greater than 0.
+ * Invalid arguments return ARKUI_ERROR_CODE_PARAM_INVALID; a valid output slot is set to NULL on failure.
+ */
 ArkUI_ErrorCode OH_ArkUI_NativeModule_UIJsonWrapperCreate(const char* data, uint32_t size,
     OH_ArkUI_NativeModule_UIJsonWrapper** outOwned);
 /** Borrowed, NUL-terminated bytes; NULL wrapper returns NULL. */

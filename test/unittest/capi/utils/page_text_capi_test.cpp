@@ -177,6 +177,42 @@ TEST_F(PageTextCapiTest, originalErrorChannelAvailabilityAndThreadIsolation)
     EXPECT_NE(std::string(OH_ArkUI_NativeModule_GetErrorMessage()).find("anotherAPI"), std::string::npos);
 }
 
+TEST(UIJsonWrapperTest, createRejectsNullDataAndZeroSize)
+{
+    const char source[] = "{}";
+    OH_ArkUI_NativeModule_UIJsonWrapper* original = nullptr;
+    ASSERT_EQ(OH_ArkUI_NativeModule_UIJsonWrapperCreate(source, 2, &original), ARKUI_ERROR_CODE_NO_ERROR);
+    ASSERT_NE(original, nullptr);
+
+    auto* result = original;
+    EXPECT_EQ(OH_ArkUI_NativeModule_UIJsonWrapperCreate(nullptr, 2, &result), ARKUI_ERROR_CODE_PARAM_INVALID);
+    EXPECT_EQ(result, nullptr);
+
+    result = original;
+    EXPECT_EQ(OH_ArkUI_NativeModule_UIJsonWrapperCreate(source, 0, &result), ARKUI_ERROR_CODE_PARAM_INVALID);
+    EXPECT_EQ(result, nullptr);
+
+    result = original;
+    EXPECT_EQ(OH_ArkUI_NativeModule_UIJsonWrapperCreate(nullptr, 0, &result), ARKUI_ERROR_CODE_PARAM_INVALID);
+    EXPECT_EQ(result, nullptr);
+    EXPECT_EQ(OH_ArkUI_NativeModule_UIJsonWrapperCreate(source, 2, nullptr), ARKUI_ERROR_CODE_PARAM_INVALID);
+
+    // Rejecting a request must not destroy the object previously stored in the output slot.
+    EXPECT_STREQ(OH_ArkUI_NativeModule_UIJsonWrapperGetData(original), source);
+    OH_ArkUI_NativeModule_UIJsonWrapperDestroy(original);
+}
+
+TEST(UIJsonWrapperTest, createCopiesNonTerminatedBufferBySize)
+{
+    const char source[] = { '{', '}', 'x' };
+    OH_ArkUI_NativeModule_UIJsonWrapper* result = nullptr;
+    ASSERT_EQ(OH_ArkUI_NativeModule_UIJsonWrapperCreate(source, 2, &result), ARKUI_ERROR_CODE_NO_ERROR);
+    ASSERT_NE(result, nullptr);
+    EXPECT_STREQ(OH_ArkUI_NativeModule_UIJsonWrapperGetData(result), "{}");
+    EXPECT_EQ(OH_ArkUI_NativeModule_UIJsonWrapperGetSize(result), 2u);
+    OH_ArkUI_NativeModule_UIJsonWrapperDestroy(result);
+}
+
 TEST(UIJsonWrapperTest, immutableCopyMetadataNullAndConcurrentReaders)
 {
     char source[] = "{\"texts\":[]}";

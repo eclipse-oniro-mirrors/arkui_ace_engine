@@ -32,7 +32,7 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_UIJsonWrapperCreate(const char* data, uint
         return ARKUI_ERROR_CODE_PARAM_INVALID;
     }
     *outOwned = nullptr;
-    if (!data) {
+    if (!data || size == 0) {
         return ARKUI_ERROR_CODE_PARAM_INVALID;
     }
     const size_t dataSize = static_cast<size_t>(size);
