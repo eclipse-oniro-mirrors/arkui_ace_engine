@@ -1395,6 +1395,10 @@ class SimpleSegmentButtonV2 extends ViewV2 {
           }
         });
         LongPressGesture.onActionCancel(event => {
+          if (this.isFollowingDragEnabled() && !this.hasValidFollowingDragData()) {
+            this.cancelFollowingDrag();
+            return;
+          }
           if (!this.isMaterialInteractionEnabled()) {
             if (this.interactionMode === SegmentButtonV2InteractionMode.NORMAL_DRAG) {
               this.isPressing = false;
@@ -1413,6 +1417,10 @@ class SimpleSegmentButtonV2 extends ViewV2 {
           this.isPressing = false;
         });
         LongPressGesture.onActionEnd(event => {
+          if (this.isFollowingDragEnabled() && !this.hasValidFollowingDragData()) {
+            this.cancelFollowingDrag();
+            return;
+          }
           if (!this.isMaterialInteractionEnabled()) {
             if (this.interactionMode === SegmentButtonV2InteractionMode.NORMAL_DRAG) {
               this.isPressing = false;
@@ -1447,6 +1455,10 @@ class SimpleSegmentButtonV2 extends ViewV2 {
           }
           if (index === this.normalizedSelectedIndex) {
             this.isDragging = true;
+          }
+          if (this.isDragging && this.isFollowingDragEnabled() && !this.hasValidFollowingDragData()) {
+            this.cancelFollowingDrag();
+            return;
           }
           if (this.isPressing) {
             this.dragWithPress = true;
@@ -1490,6 +1502,10 @@ class SimpleSegmentButtonV2 extends ViewV2 {
           if (!this.isDragging) {
             return;
           }
+          if (this.isFollowingDragEnabled() && !this.hasValidFollowingDragData()) {
+            this.cancelFollowingDrag();
+            return;
+          }
           const finger = event.fingerList.find(Boolean);
           if (!finger) {
             return;
@@ -1518,6 +1534,11 @@ class SimpleSegmentButtonV2 extends ViewV2 {
           }
         });
         PanGesture.onActionEnd(event => {
+          if (this.isFollowingDragEnabled() && (this.isDragging || this.isPressing || this.followingDragActive) &&
+            !this.hasValidFollowingDragData()) {
+            this.cancelFollowingDrag();
+            return;
+          }
           if (!this.isItemEnabled(this.panStartIndex)) {
             return;
           }
@@ -1569,16 +1590,17 @@ class SimpleSegmentButtonV2 extends ViewV2 {
                   }
                 }
               }, () => {
-                const targetRect = !isMaterialEnabled ? this.itemRects[realIndex] : undefined;
-                if (!isMaterialEnabled && !targetRect) {
+                const targetRect = this.itemRects[realIndex];
+                if (!targetRect) {
+                  this.cancelFollowingDrag();
                   return;
                 }
                 if (shouldUpdateSelectedIndex) {
                   this.$selectedIndex?.(realIndex);
                 }
                 this.backplatePosition = {
-                  x: isMaterialEnabled ? this.itemRects[realIndex].position.x : targetRect.position.x,
-                  y: isMaterialEnabled ? this.itemRects[realIndex].position.y : targetRect.position.y,
+                  x: targetRect.position.x,
+                  y: targetRect.position.y,
                 };
               });
             }
@@ -2106,6 +2128,10 @@ class SimpleSegmentButtonV2 extends ViewV2 {
     return inputMaterial;
   }
   startSelectMaterialAnimation() {
+    if (!this.selectedItemRect) {
+      this.cancelFollowingDrag();
+      return;
+    }
     this.backplatePosition = {
       x: this.selectedItemRect.position.x,
       y: this.selectedItemRect.position.y,
@@ -2143,6 +2169,42 @@ class SimpleSegmentButtonV2 extends ViewV2 {
       );
     }
   }
+  onItemsChange() {
+    if (this.isFollowingDragEnabled() && (this.isDragging || this.isPressing || this.followingDragActive) &&
+      !this.hasValidFollowingDragData()) {
+      this.cancelFollowingDrag();
+    }
+  }
+
+  hasValidFollowingDragData() {
+    const items = this.getItems();
+    if (items.length === 0 || this.itemRects.length < items.length || !this.selectedItemRect ||
+      this.panStartIndex >= items.length) {
+      return false;
+    }
+    for (let i = 0; i < items.length; i++) {
+      if (!this.itemRects[i]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  cancelFollowingDrag() {
+    this.isDragging = false;
+    this.followingDragActive = false;
+    this.isPressing = false;
+    this.dragWithPress = false;
+    this.panStartIndex = -1;
+    this.isMouseWheelScroll = false;
+    this.openSelectedItemSystemMaterial = false;
+    this.selectedItemScale = undefined;
+    this.tempDisableAnimation = false;
+    this.touchPressedItemIndex = -1;
+    this.mousePressedItemIndex = -1;
+    this.itemScale = 1;
+  }
+
   isFollowingDragEnabled() {
     return this.interactionMode === SegmentButtonV2InteractionMode.FOLLOWING_DRAG ||
       (this.isBackgroundSystemMaterialEnabled() &&
@@ -2173,8 +2235,8 @@ class SimpleSegmentButtonV2 extends ViewV2 {
       return this.backplatePosition;
     } else {
       return {
-        x: this.selectedItemRect.position.x,
-        y: this.selectedItemRect.position.y,
+        x: this.selectedItemRect?.position.x ?? 0,
+        y: this.selectedItemRect?.position.y ?? 0,
       };
     }
   }
@@ -2335,7 +2397,7 @@ class SimpleSegmentButtonV2 extends ViewV2 {
     let index = 0;
     while (index < this.itemRects.length) {
       const rect = this.itemRects[index];
-      if (this.isPointOnRect(globalX, globalY, rect)) {
+      if (rect && this.isPointOnRect(globalX, globalY, rect)) {
         return index;
       }
       ++index;
@@ -2602,6 +2664,7 @@ __decorate([Local], SimpleSegmentButtonV2.prototype, 'selectedItemScale', void 0
 __decorate([Local], SimpleSegmentButtonV2.prototype, 'tempDisableAnimation', void 0);
 __decorate([Local], SimpleSegmentButtonV2.prototype, 'backplatePosition', void 0);
 __decorate([Local], SimpleSegmentButtonV2.prototype, 'followingDragActive', void 0);
+__decorate([Monitor('items', 'items.length')], SimpleSegmentButtonV2.prototype, 'onItemsChange', null);
 __decorate([Computed], SimpleSegmentButtonV2.prototype, 'normalizedSelectedIndex', null);
 __decorate([Computed], SimpleSegmentButtonV2.prototype, 'selectedItemRect', null);
 const multiplyCapsuleTheme = {
