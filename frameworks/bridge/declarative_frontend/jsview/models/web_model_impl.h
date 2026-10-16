@@ -93,6 +93,7 @@ public:
     void SetScrollId(std::function<void(const BaseEventInfo* info)>&& jsCallback) override;
     void SetPermissionRequestEventId(std::function<void(const BaseEventInfo* info)>&& jsCallback) override;
     void SetBackgroundColor(Color backgroundColor) override;
+    void SetCaretColor(const Color& caretColor) override;
     void InitialScale(float scale) override;
     void SetSearchResultReceiveEventId(std::function<void(const BaseEventInfo* info)>&& jsCallback) override;
 

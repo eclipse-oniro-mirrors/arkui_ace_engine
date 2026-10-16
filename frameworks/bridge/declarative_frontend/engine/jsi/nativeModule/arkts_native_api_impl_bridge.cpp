@@ -2247,6 +2247,10 @@ void ArkUINativeModule::RegisterWebAttributes(Local<panda::ObjectRef> object, Ec
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::SetDefaultFontSize));
     web->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetDefaultFontSize"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::ResetDefaultFontSize));
+    web->Set(vm, panda::StringRef::NewFromUtf8(vm, "setCaretColor"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::SetCaretColor));
+    web->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetCaretColor"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::ResetCaretColor));
     web->Set(vm, panda::StringRef::NewFromUtf8(vm, "setDefaultFixedFontSize"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::SetDefaultFixedFontSize));
     web->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetDefaultFixedFontSize"),

@@ -277,6 +277,7 @@ public:
     virtual void SetEnableScrollDirectionalLock(bool enabled, int32_t type) {}
     virtual void SetScrollbarLayoutPolicy(ScrollbarLayoutPolicy layoutPolicy) {}
     virtual void SetInputMethodAttachedId(std::function<void()> && jsCallback) {}
+    virtual void SetCaretColor(const Color& caretColor) {}
 private:
     static std::unique_ptr<WebModel> instance_;
     static std::mutex mutex_;

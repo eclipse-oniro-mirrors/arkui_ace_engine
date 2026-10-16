@@ -29091,6 +29091,8 @@ typedef struct GENERATED_ArkUIWebModifier {
                                             const Opt_Boolean* value);
     void (*setEnableMediaNetworkProxy)(Ark_NativePointer node,
                                        const Opt_Boolean* value);
+    void (*setCaretColor)(Ark_NativePointer node,
+                          const Opt_ResourceColor* value);
     void (*setOnZoomChange)(Ark_NativePointer node,
                             const Opt_OnZoomChangeCallback* value);
     void (*setFlingSpeedLimit)(Ark_NativePointer node,

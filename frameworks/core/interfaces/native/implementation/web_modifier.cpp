@@ -1681,6 +1681,16 @@ void SetVerticalScrollBarAccessImpl(Ark_NativePointer node,
     WebModelStatic::SetVerticalScrollBarAccessEnabled(frameNode, *convValue);
 #endif // WEB_SUPPORTED
 }
+void SetCaretColorImpl(Ark_NativePointer node,
+                       const Opt_ResourceColor* value)
+{
+#ifdef WEB_SUPPORTED
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto convValue = Converter::OptConvertPtr<Color>(value);
+    WebModelStatic::SetCaretColor(frameNode, convValue);
+#endif // WEB_SUPPORTED
+}
 void SetOnTouchIconUrlReceivedImpl(Ark_NativePointer node,
                                    const Opt_Callback_OnTouchIconUrlReceivedEvent_Void* value)
 {
@@ -3255,6 +3265,7 @@ void SetOnInputmethodAttachedImpl(Ark_NativePointer node,
 #endif // WEB_SUPPORTED
 }
 } // WebAttributeModifier
+
 const GENERATED_ArkUIWebModifier* GetWebModifier()
 {
     static const GENERATED_ArkUIWebModifier ArkUIWebModifierImpl {
@@ -3415,6 +3426,7 @@ const GENERATED_ArkUIWebModifier* GetWebModifier()
         WebAttributeModifier::SetOnInputmethodAttachedImpl,
         WebAttributeModifier::SetEnableFullscreenVideoOverlayImpl,
         WebAttributeModifier::SetEnableMediaNetworkProxyImpl,
+        WebAttributeModifier::SetCaretColorImpl,
         WebAttributeModifier::SetOnZoomChangeImpl,
         WebAttributeModifier::SetFlingSpeedLimitImpl,
         WebAttributeModifier::SetRegisterNativeEmbedRuleImpl,

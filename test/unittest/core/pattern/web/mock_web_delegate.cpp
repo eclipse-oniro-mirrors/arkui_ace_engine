@@ -749,6 +749,7 @@ void WebDelegate::UpdateGestureFocusMode(const GestureFocusMode& mode) {}
 void WebDelegate::UpdateNativeEmbedRuleTag(const std::string& tag) {}
 void WebDelegate::UpdateNativeEmbedRuleType(const std::string& type) {}
 void WebDelegate::UpdateScrollBarColor(const std::string& colorValue) {}
+void WebDelegate::UpdateCaretColor(const Color& caretColor) {}
 void WebDelegate::LoadUrl() {}
 void WebDelegate::OnInactive() {}
 void WebDelegate::SetOfflineWebActiveStatus(bool isActive) {}

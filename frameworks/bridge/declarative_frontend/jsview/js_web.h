@@ -91,6 +91,7 @@ public:
     static void OnScroll(const JSCallbackInfo& args);
     static void WebRotate(const JSCallbackInfo& args);
     static void BackgroundColor(const JSCallbackInfo& info);
+    static void CaretColor(const JSCallbackInfo& info);
     static void InitialScale(float scale);
     static void FlingSpeedLimit(float speedLimit);
     static void Password(bool password);

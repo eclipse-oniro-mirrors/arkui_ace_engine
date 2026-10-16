@@ -505,6 +505,13 @@ void WebModelImpl::SetBackgroundColor(Color backgroundColor)
     webComponent->SetBackgroundColor(backgroundColor.GetValue());
 }
 
+void WebModelImpl::SetCaretColor(const Color& caretColor)
+{
+    auto webComponent = AceType::DynamicCast<WebComponent>(ViewStackProcessor::GetInstance()->GetMainComponent());
+    CHECK_NULL_VOID(webComponent);
+    webComponent->SetCaretColor(caretColor);
+}
+
 void WebModelImpl::InitialScale(float scale)
 {
     auto webComponent = AceType::DynamicCast<WebComponent>(ViewStackProcessor::GetInstance()->GetMainComponent());

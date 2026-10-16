@@ -2600,6 +2600,7 @@ void JSWeb::JSBind(BindingTarget globalObj)
     JSClass<JSWeb>::StaticMethod("initialScale", &JSWeb::InitialScale);
     JSClass<JSWeb>::StaticMethod("flingSpeedLimit", &JSWeb::FlingSpeedLimit);
     JSClass<JSWeb>::StaticMethod("backgroundColor", &JSWeb::BackgroundColor);
+    JSClass<JSWeb>::StaticMethod("caretColor", &JSWeb::CaretColor);
     JSClass<JSWeb>::StaticMethod("onKeyEvent", &JSWeb::OnKeyEvent);
     JSClass<JSWeb>::StaticMethod("onTouch", &JSInteractableView::JsOnTouch);
     JSClass<JSWeb>::StaticMethod("onMouse", &JSWeb::OnMouse);
@@ -5591,6 +5592,20 @@ void JSWeb::BackgroundColor(const JSCallbackInfo& info)
         WebModel::GetInstance()->SetDefaultBackgroundColor();
     } else {
         WebModel::GetInstance()->SetBackgroundColor(backgroundColor);
+    }
+}
+
+void JSWeb::CaretColor(const JSCallbackInfo& info)
+{
+    if (info.Length() < 1) {
+        WebModel::GetInstance()->SetCaretColor(Color(0));
+        return;
+    }
+    Color caretColor;
+    if (ParseJsColor(info[0], caretColor)) {
+        WebModel::GetInstance()->SetCaretColor(caretColor);
+    } else {
+        WebModel::GetInstance()->SetCaretColor(Color(0));
     }
 }
 
