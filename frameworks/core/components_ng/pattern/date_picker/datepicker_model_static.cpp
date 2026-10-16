@@ -65,6 +65,46 @@ void DatePickerModelStatic::SetupDateOrder(const RefPtr<FrameNode>& dateNode, co
         if (!hasYearNode) {
             CreateDateColumn(yearColumnNode, dateNode);
         }
+    } else if (dateOrder == "d-M-y") {
+        if (!hasDayNode) {
+            CreateDateColumn(dayColumnNode, dateNode);
+        }
+        if (!hasMonthNode) {
+            CreateDateColumn(monthColumnNode, dateNode);
+        }
+        if (!hasYearNode) {
+            CreateDateColumn(yearColumnNode, dateNode);
+        }
+    } else if (dateOrder == "y-d-M") {
+        if (!hasYearNode) {
+            CreateDateColumn(yearColumnNode, dateNode);
+        }
+        if (!hasDayNode) {
+            CreateDateColumn(dayColumnNode, dateNode);
+        }
+        if (!hasMonthNode) {
+            CreateDateColumn(monthColumnNode, dateNode);
+        }
+    } else if (dateOrder == "d-y-M") {
+        if (!hasDayNode) {
+            CreateDateColumn(dayColumnNode, dateNode);
+        }
+        if (!hasYearNode) {
+            CreateDateColumn(yearColumnNode, dateNode);
+        }
+        if (!hasMonthNode) {
+            CreateDateColumn(monthColumnNode, dateNode);
+        }
+    } else if (dateOrder == "M-y-d") {
+        if (!hasMonthNode) {
+            CreateDateColumn(monthColumnNode, dateNode);
+        }
+        if (!hasYearNode) {
+            CreateDateColumn(yearColumnNode, dateNode);
+        }
+        if (!hasDayNode) {
+            CreateDateColumn(dayColumnNode, dateNode);
+        }
     } else {
         if (!hasYearNode) {
             CreateDateColumn(yearColumnNode, dateNode);
