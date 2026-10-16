@@ -90,7 +90,7 @@ void ParallelPageRouterManager::LoadPage(
     std::copy(pageRouterStack_.begin(), pageRouterStack_.end(), std::back_inserter(prevPageRouterStack));
     int32_t removePageSize = stageManager->IsTopFullScreenPage() ?
         0 : stageManager->UpdateSecondaryPageNeedRemoved(needClearSecondaryPage);
-    while (removePageSize > 0) {
+    while (removePageSize > 0 && !pageRouterStack_.empty()) {
         pageRouterStack_.pop_back();
         removePageSize--;
     };
@@ -151,7 +151,7 @@ void ParallelPageRouterManager::LoadPageExtender(
     std::list<WeakPtr<FrameNode>> prevPageRouterStack;
     std::copy(pageRouterStack_.begin(), pageRouterStack_.end(), std::back_inserter(prevPageRouterStack));
     auto removePageSize = stageManager->UpdateSecondaryPageNeedRemoved(needClearSecondaryPage);
-    while (removePageSize > 0) {
+    while (removePageSize > 0 && !pageRouterStack_.empty()) {
         pageRouterStack_.pop_back();
         removePageSize--;
     };
