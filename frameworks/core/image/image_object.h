@@ -29,7 +29,7 @@
 namespace OHOS::Ace {
 
 class RenderImage;
-class ImageObject : public virtual AceType {
+class ImageObject : public AceType {
     DECLARE_ACE_TYPE(ImageObject, AceType);
 
 public:

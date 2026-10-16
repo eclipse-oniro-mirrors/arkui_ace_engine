@@ -20,7 +20,7 @@
 
 namespace OHOS::Ace::NG {
 class IndicatorPattern;
-class IndicatorController : public virtual AceType {
+class IndicatorController : public AceType {
     DECLARE_ACE_TYPE(IndicatorController, AceType);
 
 public:

@@ -39,7 +39,7 @@ class BorderImage;
 class Decoration;
 class Gradient;
 
-class BorderImagePainter : public virtual AceType {
+class BorderImagePainter : public AceType {
     DECLARE_ACE_TYPE(BorderImagePainter, AceType);
 public:
 #ifndef USE_ROSEN_DRAWING

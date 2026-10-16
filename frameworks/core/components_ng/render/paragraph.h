@@ -274,7 +274,7 @@ struct PositionWithAffinity {
 };
 
 // Paragraph is interface for drawing text and text paragraph.
-class Paragraph : public virtual AceType {
+class Paragraph : public AceType {
     DECLARE_ACE_TYPE(NG::Paragraph, AceType);
 
 public:

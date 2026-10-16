@@ -47,7 +47,7 @@ using DialogGestureEvent = std::function<void(const GestureEvent& info)>;
 using DialogCancelEvent = std::function<void()>;
 using DialogTextEvent = std::function<void(const std::string&)>;
 
-class ACE_EXPORT DialogInnerManager : public virtual AceType {
+class ACE_EXPORT DialogInnerManager : public AceType {
     DECLARE_ACE_TYPE(DialogInnerManager, AceType);
 
 public:

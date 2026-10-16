@@ -26,7 +26,7 @@ namespace OHOS::Ace {
 namespace NG {
 class WebPattern;
 }; // namespace NG
-class WebDelegateInterface : public virtual AceType {
+class WebDelegateInterface : public AceType {
     DECLARE_ACE_TYPE(WebDelegateInterface, AceType);
 public:
     using CreatedCallback = std::function<void()>;

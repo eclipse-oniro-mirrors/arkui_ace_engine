@@ -23,7 +23,7 @@ namespace OHOS::Ace {
 using TimerFuncImpl = std::function<void()>;
 using TimerInputImpl = std::function<void(int32_t)>;
 
-class TextTimerController : public virtual AceType {
+class TextTimerController : public AceType {
     DECLARE_ACE_TYPE(TextTimerController, AceType);
 
 public:

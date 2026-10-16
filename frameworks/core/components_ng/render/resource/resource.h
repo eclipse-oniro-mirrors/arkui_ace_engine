@@ -34,7 +34,7 @@ extern const char METHOD[];
 extern const char EVENT[];
 extern const char RESULT_FAIL[];
 
-class Resource : public virtual AceType {
+class Resource : public AceType {
     DECLARE_ACE_TYPE(Resource, AceType);
 
 public:

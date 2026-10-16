@@ -23,7 +23,7 @@
 #include "core/pipeline_ng/pipeline_context.h"
 
 namespace OHOS::Ace::Framework {
-class JSRenderingContextBase : public virtual AceType {
+class JSRenderingContextBase : public AceType {
     DECLARE_ACE_TYPE(JSRenderingContextBase, AceType);
 public:
     JSRenderingContextBase() = default;

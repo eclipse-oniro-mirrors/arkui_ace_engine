@@ -18,7 +18,7 @@
 #include "base/memory/ace_type.h"
 
 namespace OHOS::Ace {
-class ACE_EXPORT PluginSubContainer : public virtual AceType {
+class ACE_EXPORT PluginSubContainer : public AceType {
 };
 } // namespace OHOS::Ace
 

@@ -33,7 +33,7 @@ enum class TextEffectAttribute {
 
 class Paragraph;
 
-class TextEffect : public virtual AceType {
+class TextEffect : public AceType {
     DECLARE_ACE_TYPE(NG::TextEffect, AceType);
 
 public:

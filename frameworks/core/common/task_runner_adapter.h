@@ -23,7 +23,7 @@
 #include "base/thread/task_executor.h"
 
 namespace OHOS::Ace {
-class TaskRunnerAdapter : public virtual AceType {
+class TaskRunnerAdapter : public AceType {
     DECLARE_ACE_TYPE(TaskRunnerAdapter, AceType);
 
 public:

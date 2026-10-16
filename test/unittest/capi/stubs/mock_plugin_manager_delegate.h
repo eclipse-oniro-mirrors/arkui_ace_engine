@@ -19,7 +19,7 @@
 #include "base/memory/ace_type.h"
 
 namespace OHOS::Ace {
-class PluginManagerDelegate : public virtual AceType {
+class PluginManagerDelegate : public AceType {
 };
 } // namespace OHOS::Ace
 

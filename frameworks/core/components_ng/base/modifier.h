@@ -68,7 +68,7 @@ private:
     ACE_DISALLOW_COPY_AND_MOVE(Modifier);
 };
 
-class PropertyBase : public virtual AceType {
+class PropertyBase : public AceType {
     DECLARE_ACE_TYPE(PropertyBase, AceType);
 
 public:
@@ -87,7 +87,7 @@ struct DrawingContext {
 
 using DrawModifierFunc = std::function<void(NG::DrawingContext& drawingContext)>;
 
-class ACE_EXPORT DrawModifier : public virtual AceType {
+class ACE_EXPORT DrawModifier : public AceType {
 public:
     DECLARE_ACE_TYPE(DrawModifier, AceType);
 
