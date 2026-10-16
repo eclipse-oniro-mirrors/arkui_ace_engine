@@ -623,6 +623,72 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderShellMeasureNoProviderSiz
 }
 
 /**
+ * @tc.name: ScrollPlaceholderShellSwapBack001
+ * @tc.desc: Device finding round 4: a detached shell wrapper gets measured and
+ *           positioned by the list algorithm, but its results never land on the
+ *           nodes (geometry 0x0, blank). Attaching the shell wrapper to the host
+ *           wrapper out-of-index puts it into the flush swap-back chain: after
+ *           measure + SwapDirtyLayoutWrapperOnMainThread the shell and content
+ *           NODES must carry the measured sizes.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderShellSwapBack001, TestSize.Level1)
+{
+    constexpr float sourceWidth = 100.0f;
+    constexpr float sourceHeight = 50.0f;
+    auto manager = MockPipelineContext::GetCurrent()->GetOrCreateScrollPlaceholderManager();
+    ASSERT_TRUE(manager);
+    manager->RegisterTemplate("tpl-sized-swap", []() -> RefPtr<UINode> {
+        auto root = FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG,
+            ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<LinearLayoutPattern>(false));
+        root->GetLayoutProperty()->UpdateUserDefinedIdealSize(
+            CalcSize(CalcLength(sourceWidth), CalcLength(sourceHeight)));
+        return root;
+    });
+    CreatePlaceholderList(
+        [](int32_t index) -> std::optional<ScrollPlaceholderOptions> {
+            ScrollPlaceholderOptions options;
+            options.id = "tpl-sized-swap";
+            return options;
+        },
+        true);
+    CreateItemsAndDone();
+
+    int32_t index = FindUnbuiltSlot();
+    ASSERT_GE(index, 0);
+    auto shell = pattern_->CreateScrollPlaceholderShell(index);
+    ASSERT_TRUE(shell);
+    ASSERT_EQ(shell->GetChildren().size(), 1u);
+    auto content = AceType::DynamicCast<FrameNode>(shell->GetChildren().front());
+    ASSERT_TRUE(content);
+
+    // Attach the shell wrapper to the host wrapper exactly like GetListItem does,
+    // measure it, then run the flush swap-back: the nodes must receive the sizes.
+    auto hostWrapper = AceType::DynamicCast<LayoutWrapperNode>(frameNode_->CreateLayoutWrapper(true, true));
+    ASSERT_TRUE(hostWrapper);
+    auto shellWrapper = AceType::DynamicCast<LayoutWrapperNode>(shell->CreateLayoutWrapper(true, true));
+    ASSERT_TRUE(shellWrapper);
+    hostWrapper->AppendChildOutOfIndex(shellWrapper);
+
+    LayoutConstraintF constraint;
+    constraint.maxSize = { 1080.0f, 5000.0f };
+    constraint.percentReference = { 1080.0f, 5000.0f };
+    shellWrapper->GetLayoutProperty()->UpdateLayoutConstraint(constraint);
+    shellWrapper->GetLayoutProperty()->UpdatePropertyChangeFlag(PROPERTY_UPDATE_MEASURE);
+    shellWrapper->Measure(constraint);
+    shellWrapper->SwapDirtyLayoutWrapperOnMainThread();
+
+    auto shellNodeSize = shell->GetGeometryNode()->GetFrameSize();
+    auto contentNodeSize = content->GetGeometryNode()->GetFrameSize();
+    GTEST_LOG_(INFO) << "ShellSwapBack shellNode=" << shellNodeSize.Width() << "x" << shellNodeSize.Height()
+                     << " contentNode=" << contentNodeSize.Width() << "x" << contentNodeSize.Height();
+    EXPECT_FLOAT_EQ(contentNodeSize.Width(), sourceWidth);
+    EXPECT_FLOAT_EQ(contentNodeSize.Height(), sourceHeight);
+    EXPECT_FLOAT_EQ(shellNodeSize.Width(), sourceWidth);
+    EXPECT_FLOAT_EQ(shellNodeSize.Height(), sourceHeight);
+}
+
+/**
  * @tc.name: ScrollPlaceholderReplaceCancelsPending001
  * @tc.desc: Replacing the provider cancels the host's pending real-builds
  *           (RE_REGISTER) while mounted shells keep serving until the reset;

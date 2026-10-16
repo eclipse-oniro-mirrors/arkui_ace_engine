@@ -44,6 +44,44 @@ void LayoutWrapperNode::AppendChild(const RefPtr<LayoutWrapperNode>& child, bool
         overlayChild_ = child;
     }
 }
+
+void LayoutWrapperNode::AppendChildOutOfIndex(const RefPtr<LayoutWrapperNode>& child)
+{
+    CHECK_NULL_VOID(child);
+    auto host = child->GetHostNode();
+    if (host) {
+        RemoveOutOfIndexChildByHost(host->GetId());
+    }
+    outOfIndexChildren_.emplace_back(child);
+    if (!cachedList_.empty()) {
+        // The build cache is already materialized: keep it consistent so render-area
+        // walks see the freshly attached wrapper without a rebuild.
+        cachedList_.emplace_back(child);
+    }
+}
+
+void LayoutWrapperNode::RemoveOutOfIndexChildByHost(int32_t hostId)
+{
+    // Call contract: hostId belongs to an out-of-index child host. Such a host never
+    // appears among the index children, so dropping everything with this host id
+    // from the build cache cannot touch an index child's wrapper.
+    for (auto iter = outOfIndexChildren_.begin(); iter != outOfIndexChildren_.end();) {
+        auto host = (*iter)->GetHostNode();
+        if (host && host->GetId() == hostId) {
+            iter = outOfIndexChildren_.erase(iter);
+        } else {
+            ++iter;
+        }
+    }
+    for (auto iter = cachedList_.begin(); iter != cachedList_.end();) {
+        auto host = (*iter)->GetHostNode();
+        if (host && host->GetId() == hostId) {
+            iter = cachedList_.erase(iter);
+        } else {
+            ++iter;
+        }
+    }
+}
 RefPtr<LayoutWrapper> LayoutWrapperNode::GetOrCreateChildByIndex(uint32_t index, bool addToRenderTree, bool isCache)
 {
     if ((index >= static_cast<uint32_t>(currentChildCount_)) || (index < 0)) {
@@ -75,6 +113,9 @@ void LayoutWrapperNode::SetCacheCount(int32_t cacheCount, const std::optional<La
 void LayoutWrapperNode::Build(bool addToRenderTree)
 {
     for (const auto& child : children_) {
+        cachedList_.push_back(child);
+    }
+    for (const auto& child : outOfIndexChildren_) {
         cachedList_.push_back(child);
     }
     if (layoutWrapperBuilder_) {
@@ -309,6 +350,10 @@ void LayoutWrapperNode::SwapDirtyLayoutWrapperOnMainThread()
 {
     if (IsActive()) {
         for (const auto& child : children_) {
+            SwapDirtyLayoutWrapperOnMainThreadForChild(child);
+        }
+
+        for (const auto& child : outOfIndexChildren_) {
             SwapDirtyLayoutWrapperOnMainThreadForChild(child);
         }
 

@@ -3383,7 +3383,19 @@ RefPtr<LayoutWrapper> ListLayoutAlgorithm::GetListItem(
         if (pattern && pattern->IsScrollPlaceholderEnabled()) {
             auto shell = pattern->CreateScrollPlaceholderShell(index);
             if (shell) {
-                return shell->CreateLayoutWrapper(true, true);
+                auto wrapper = shell->CreateLayoutWrapper(true, true);
+                // The shell wrapper must be attached to the host wrapper — outside the
+                // index space, since the shell stays invisible to index-based
+                // enumeration. A detached wrapper still gets measured and positioned
+                // by this algorithm, but its results never land on the nodes at the
+                // flush swap-back and never enter the render area (device finding:
+                // sized blank shells, node geometry 0x0). Attachment without an index
+                // slot keeps lazy child resolution untouched.
+                auto hostWrapper = AceType::DynamicCast<LayoutWrapperNode>(layoutWrapper);
+                if (hostWrapper) {
+                    hostWrapper->AppendChildOutOfIndex(AceType::DynamicCast<LayoutWrapperNode>(wrapper));
+                }
+                return wrapper;
             }
         }
     }
