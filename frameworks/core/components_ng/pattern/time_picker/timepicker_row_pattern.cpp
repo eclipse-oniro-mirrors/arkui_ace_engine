@@ -665,9 +665,7 @@ void TimePickerRowPattern::CreateAmPmNode()
             ElementRegister::GetInstance()->MakeUniqueId(), []() -> RefPtr<Pattern> {
                 auto* buttonModifier = NodeModifier::GetButtonCustomModifier();
                 CHECK_NULL_RETURN(buttonModifier, nullptr);
-                auto* rawPattern = reinterpret_cast<Pattern*>(buttonModifier->createButtonPattern());
-                CHECK_NULL_RETURN(rawPattern, nullptr);
-                return AceType::Claim(rawPattern);
+                return buttonModifier->createButtonPattern();
             });
         auto blendNodeId = ElementRegister::GetInstance()->MakeUniqueId();
         auto columnBlendNode = FrameNode::GetOrCreateFrameNode(TimePickerUtil::COLUMN_ETS_TAG, blendNodeId,
@@ -724,9 +722,7 @@ void TimePickerRowPattern::CreateOrDeleteSecondNode()
                 ElementRegister::GetInstance()->MakeUniqueId(), []() -> RefPtr<Pattern> {
                     auto* buttonModifier = NodeModifier::GetButtonCustomModifier();
                     CHECK_NULL_RETURN(buttonModifier, nullptr);
-                    auto* rawPattern = reinterpret_cast<Pattern*>(buttonModifier->createButtonPattern());
-                    CHECK_NULL_RETURN(rawPattern, nullptr);
-                    return AceType::Claim(rawPattern);
+                    return buttonModifier->createButtonPattern();
                 });
             auto blendNodeId = ElementRegister::GetInstance()->MakeUniqueId();
             auto columnBlendNode = FrameNode::GetOrCreateFrameNode(TimePickerUtil::COLUMN_ETS_TAG, blendNodeId,

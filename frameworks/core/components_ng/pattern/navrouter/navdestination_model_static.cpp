@@ -243,10 +243,10 @@ void NavDestinationModelStatic::CreateBackButton(const RefPtr<NavDestinationGrou
     int32_t backButtonNodeId = ElementRegister::GetInstance()->MakeUniqueId();
     auto* buttonModifier = NodeModifier::GetButtonCustomModifier();
     CHECK_NULL_VOID(buttonModifier);
-    auto* rawPattern = reinterpret_cast<Pattern*>(buttonModifier->createButtonPattern());
-    CHECK_NULL_VOID(rawPattern);
+    auto buttonPattern = buttonModifier->createButtonPattern();
+    CHECK_NULL_VOID(buttonPattern);
     auto backButtonNode =
-        FrameNode::CreateFrameNode(V2::BACK_BUTTON_ETS_TAG, backButtonNodeId, AceType::Claim(rawPattern));
+        FrameNode::CreateFrameNode(V2::BACK_BUTTON_ETS_TAG, backButtonNodeId, buttonPattern);
     auto focusHub = backButtonNode->GetOrCreateFocusHub();
     CHECK_NULL_VOID(focusHub);
     focusHub->SetFocusDependence(FocusDependence::SELF);

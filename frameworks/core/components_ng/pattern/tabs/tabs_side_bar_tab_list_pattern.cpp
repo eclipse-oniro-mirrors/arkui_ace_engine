@@ -686,7 +686,7 @@ RefPtr<FrameNode> TabsSideBarTabListPattern::GetOrCreateTabItemNode(int32_t id)
             RefPtr<Pattern> buttonPattern = nullptr;
             auto* buttonModifier = NodeModifier::GetButtonCustomModifier();
             CHECK_NULL_RETURN(buttonModifier, buttonPattern);
-            return AceType::Claim(reinterpret_cast<Pattern*>(buttonModifier->createButtonPattern()));
+            return buttonModifier->createButtonPattern();
         });
     CHECK_NULL_RETURN(tabItemNode, nullptr);
     auto nodeHandle = reinterpret_cast<ArkUINodeHandle>(AceType::RawPtr(tabItemNode));
