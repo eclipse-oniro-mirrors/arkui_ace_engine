@@ -326,7 +326,8 @@ public:
 
     virtual void SaveComponentTreeQueryFunction(ComponentTreeQueryFunction&& function) {};
     virtual void ComponentTreeQuery(const ComponentTreeQueryRequest& request) {};
-    virtual void ReportComponentTreeQueryResult(const std::string& data) {};
+    virtual void ReportNavigationQueryResult(const std::string& data) {};
+    virtual void ReportLazyForEachQueryResult(const std::string& data) {};
 
 protected:
     UiSessionManager() = default;

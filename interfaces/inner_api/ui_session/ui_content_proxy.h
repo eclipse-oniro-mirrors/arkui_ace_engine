@@ -119,6 +119,9 @@ public:
     virtual int32_t GetNavigationContentByPoint(float x, float y, const std::string& pattern,
         const std::function<void(const std::string&)>& eventCallback,
         int32_t timeout = DEFAULT_INSPECTOR_TREE_CALLBACK_TIMEOUT_MS) override;
+    virtual int32_t GetLazyForEachDataByPoint(float x, float y,
+        const std::function<void(const std::string&)>& eventCallback,
+        int32_t timeout = DEFAULT_INSPECTOR_TREE_CALLBACK_TIMEOUT_MS) override;
 
 private:
     int32_t SendPageTranslateRequest(uint32_t code, const char* caller, const std::string& request,

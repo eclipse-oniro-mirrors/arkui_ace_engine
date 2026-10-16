@@ -296,6 +296,31 @@ public:
         return LazyForEachMemOptStrategy::DEFAULT;
     }
 
+    /**
+     * @brief Whether this builder frontend supports LazyForEach data extraction
+     * (getData(index) serialization). Only the dynamic ArkTS builder (which
+     * holds the raw JS getData function) overrides this to true; static ArkTS
+     * (Arkoala) and CJ builders keep the default so the query reports
+     * UNSUPPORTED_FRONTEND instead of fabricating data.
+     */
+    virtual bool IsDataExtractionSupported() const
+    {
+        return false;
+    }
+
+    /**
+     * @brief Serialize getData(index) of the instantiated item into a JSON
+     * string. Must not build uninstantiated items.
+     * @param index item index inside the LazyForEach data source.
+     * @param errorCode out param, 0 on success, non-zero on failure.
+     * @return serialized JSON string; empty string on failure.
+     */
+    virtual std::string GetDataByIndexAsJson(int32_t index, int32_t& errorCode)
+    {
+        errorCode = 0;
+        return "";
+    }
+
     void UpdateThemeScopeUpdate(int32_t themeScopeId);
 
     /*

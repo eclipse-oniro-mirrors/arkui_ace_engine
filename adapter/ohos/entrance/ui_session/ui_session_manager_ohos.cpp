@@ -2635,13 +2635,13 @@ void UiSessionManagerOhos::ComponentTreeQuery(const ComponentTreeQueryRequest& r
     }
 }
 
-void UiSessionManagerOhos::ReportComponentTreeQueryResult(const std::string& data)
+void UiSessionManagerOhos::ReportNavigationQueryResult(const std::string& data)
 {
     std::shared_lock<std::shared_mutex> reportLock(reportObjectMutex_);
     std::unique_lock<std::shared_mutex> processMapLock(processMapMutex_);
     auto processIter = processMap_.find("componentTreeQuery");
     if (processIter == processMap_.end() || processIter->second.empty()) {
-        LOGW("ReportComponentTreeQueryResult no report proxy");
+        LOGW("ReportNavigationQueryResult no report proxy");
         return;
     }
     for (const auto& pid : processIter->second) {
@@ -2649,10 +2649,32 @@ void UiSessionManagerOhos::ReportComponentTreeQueryResult(const std::string& dat
         auto reportService =
             (reportIter != reportObjectMap_.end()) ? iface_cast<ReportService>(reportIter->second) : nullptr;
         if (reportService == nullptr) {
-            LOGW("Report ComponentTreeQueryResult failed, process id:%{public}d", pid);
+            LOGW("Report NavigationQueryResult failed, process id:%{public}d", pid);
             continue;
         }
-        reportService->ReportComponentTreeQueryResult(data);
+        reportService->ReportNavigationQueryResult(data);
+    }
+    processIter->second.clear();
+}
+
+void UiSessionManagerOhos::ReportLazyForEachQueryResult(const std::string& data)
+{
+    std::shared_lock<std::shared_mutex> reportLock(reportObjectMutex_);
+    std::unique_lock<std::shared_mutex> processMapLock(processMapMutex_);
+    auto processIter = processMap_.find("lazyForEachQuery");
+    if (processIter == processMap_.end() || processIter->second.empty()) {
+        LOGW("ReportLazyForEachQueryResult no report proxy");
+        return;
+    }
+    for (const auto& pid : processIter->second) {
+        auto reportIter = reportObjectMap_.find(pid);
+        auto reportService =
+            (reportIter != reportObjectMap_.end()) ? iface_cast<ReportService>(reportIter->second) : nullptr;
+        if (reportService == nullptr) {
+            LOGW("Report LazyForEachQueryResult failed, process id:%{public}d", pid);
+            continue;
+        }
+        reportService->ReportLazyForEachQueryResult(data);
     }
     processIter->second.clear();
 }
