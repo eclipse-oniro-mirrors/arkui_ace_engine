@@ -347,8 +347,10 @@ void SmartLayoutConstraints::AddScaleUpConstraints(SmartLayoutNode& parent)
     if (LessOrEqual(availableWidth, 0.0) || LessOrEqual(availableHeight, 0.0)) {
         return;
     }
-    if (GreatOrEqual(boundingBox.width, availableWidth) ||
-        GreatOrEqual(boundingBox.height, availableHeight)) {
+    // 1px tolerance for floor-based padding sub-pixel bias; keep in sync with the entry check.
+    constexpr double SPARE_SPACE_EPSILON = 1.0;
+    if (GreatOrEqual(boundingBox.width, availableWidth - SPARE_SPACE_EPSILON) ||
+        GreatOrEqual(boundingBox.height, availableHeight - SPARE_SPACE_EPSILON)) {
         return;
     }
 
