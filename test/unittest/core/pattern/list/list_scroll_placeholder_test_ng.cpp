@@ -28,6 +28,7 @@
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_types.h"
 #include "core/components_ng/pattern/linear_layout/linear_layout_pattern.h"
 #include "core/components_ng/pattern/list/list_item_pattern.h"
+#include "core/components_ng/pattern/list/list_layout_algorithm.h"
 #include "core/pipeline/base/element_register.h"
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 
@@ -737,6 +738,55 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderRetirePoolMiss001, TestSi
     pattern_->ResetScrollPlaceholder();
     EXPECT_TRUE(pattern_->scrollPlaceholderItems_.empty());
     EXPECT_TRUE(pattern_->mountedPlaceholderShells_.empty());
+}
+
+/**
+ * @tc.name: ScrollPlaceholderAcquisitionParity001
+ * @tc.desc: A shell returned by the acquisition intercept carries the same
+ *           post-acquisition state as a child of the standard path: the host's
+ *           skip-sync flag is inherited on every acquisition and an
+ *           addToRenderTree acquisition leaves the shell active. Sentinel for
+ *           drift if FrameNode::GetOrCreateChildByIndex ever grows new
+ *           standard actions the intercept has to mirror.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderAcquisitionParity001, TestSize.Level1)
+{
+    CreatePlaceholderList(
+        [](int32_t index) -> std::optional<ScrollPlaceholderOptions> {
+            return MakeDefaultPlaceholderOptions();
+        },
+        true);
+    CreateItemsAndDone();
+
+    // Host flag inherited as-is: skip=true reaches the shell through the
+    // acquisition intercept, exactly like GetOrCreateChildByIndex does for a
+    // normally acquired child.
+    int32_t index = FindUnbuiltSlot();
+    ASSERT_GE(index, 0);
+    frameNode_->SetSkipSyncGeometryNode(true);
+    ListLayoutAlgorithm algorithm;
+    auto shell = algorithm.GetListItem(AceType::RawPtr(frameNode_), index, true, false);
+    ASSERT_TRUE(shell);
+    EXPECT_TRUE(shell->IsActive());
+    EXPECT_TRUE(shell->SkipSyncGeometryNode());
+    EXPECT_EQ(shell->SkipSyncGeometryNode(), frameNode_->SkipSyncGeometryNode());
+
+    // Re-acquisition of the same deferred index keeps the parity (the dedup
+    // returns the mounted shell and the standard actions re-apply idempotently).
+    auto shellAgain = algorithm.GetListItem(AceType::RawPtr(frameNode_), index, true, false);
+    EXPECT_EQ(shellAgain, shell);
+    EXPECT_EQ(shellAgain->SkipSyncGeometryNode(), frameNode_->SkipSyncGeometryNode());
+
+    // Host flag cleared: a fresh acquisition on another unbuilt slot inherits
+    // skip=false the same way.
+    frameNode_->SetSkipSyncGeometryNode(false);
+    int32_t second = FindUnbuiltSlot();
+    if (second >= 0) {
+        auto shellTwo = algorithm.GetListItem(AceType::RawPtr(frameNode_), second, true, false);
+        ASSERT_TRUE(shellTwo);
+        EXPECT_FALSE(shellTwo->SkipSyncGeometryNode());
+    }
 }
 
 /**

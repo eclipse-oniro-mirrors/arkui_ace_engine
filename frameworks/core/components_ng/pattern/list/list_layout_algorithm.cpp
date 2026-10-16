@@ -3383,6 +3383,19 @@ RefPtr<LayoutWrapper> ListLayoutAlgorithm::GetListItem(
         if (pattern && pattern->IsScrollPlaceholderEnabled()) {
             auto shell = pattern->CreateScrollPlaceholderShell(index);
             if (shell) {
+                // Mirror the standard acquisition actions of
+                // FrameNode::GetOrCreateChildByIndex so every downstream
+                // consumer (layout loop branching, geometry sync, render tree
+                // rebuild) treats the shell exactly like a normally acquired
+                // item: the skip flag decides which geometry-sync path the
+                // layout loop takes and must be inherited from the host, and
+                // activation follows the same addToRenderTree gate (the mount
+                // path has already activated the shell, so the gated call is a
+                // no-op kept for parity).
+                shell->SetSkipSyncGeometryNode(host->SkipSyncGeometryNode());
+                if (addToRenderTree) {
+                    shell->SetActive(true);
+                }
                 // Node-as-wrapper: return the shell itself. FrameNode IS a
                 // LayoutWrapper, so the list algorithm measures and lays it out
                 // directly like any item and the geometry lands on the node. A
