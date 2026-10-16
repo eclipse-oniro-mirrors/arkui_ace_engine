@@ -3374,28 +3374,25 @@ RefPtr<LayoutWrapper> ListLayoutAlgorithm::GetListItem(
     // FEAT scroll placeholder — component call-site intercept (ADR-2, 2026-10-12):
     // for a not-yet-built visible index, decide with the remaining frame budget
     // before the real builder would run. A deferred index returns the mounted
-    // placeholder shell's wrapper (synthesized like the empty-branch dummy) and
-    // its real build enters the pipeline framed queue; BUILD_REAL_NOW keeps the
-    // existing acquisition untouched. Cache/preload paths are never deferred.
+    // placeholder shell and its real build enters the pipeline framed queue;
+    // BUILD_REAL_NOW keeps the existing acquisition untouched. Cache/preload paths
+    // are never deferred.
     if (!isCache && layoutWrapper) {
         const auto& host = layoutWrapper->GetHostNode();
         const auto& pattern = host ? host->GetPattern<ListPattern>() : nullptr;
         if (pattern && pattern->IsScrollPlaceholderEnabled()) {
             auto shell = pattern->CreateScrollPlaceholderShell(index);
             if (shell) {
-                auto wrapper = shell->CreateLayoutWrapper(true, true);
-                // The shell wrapper must be attached to the host wrapper — outside the
-                // index space, since the shell stays invisible to index-based
-                // enumeration. A detached wrapper still gets measured and positioned
-                // by this algorithm, but its results never land on the nodes at the
-                // flush swap-back and never enter the render area (device finding:
-                // sized blank shells, node geometry 0x0). Attachment without an index
-                // slot keeps lazy child resolution untouched.
-                auto hostWrapper = AceType::DynamicCast<LayoutWrapperNode>(layoutWrapper);
-                if (hostWrapper) {
-                    hostWrapper->AppendChildOutOfIndex(AceType::DynamicCast<LayoutWrapperNode>(wrapper));
-                }
-                return wrapper;
+                // Node-as-wrapper: return the shell itself. FrameNode IS a
+                // LayoutWrapper, so the list algorithm measures and lays it out
+                // directly like any item and the geometry lands on the node. A
+                // separate LayoutWrapperNode instead measures into its cloned
+                // geometry, which never reaches the node or the render tree —
+                // the device finding behind the sized-but-blank shells.
+                // The measure flag was set once when the shell was created, so
+                // this branch keeps returning an already-measured shell without
+                // re-flagging it every layout round.
+                return shell;
             }
         }
     }

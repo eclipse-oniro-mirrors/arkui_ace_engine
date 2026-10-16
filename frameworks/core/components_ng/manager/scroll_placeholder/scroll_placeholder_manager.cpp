@@ -207,6 +207,11 @@ RefPtr<UINode> ScrollPlaceholderManager::AcquireTemplateInstance(const std::stri
     }
     auto cached = registry_.AcquireTemplateInstance(templateId);
     if (cached) {
+        // Pool-hit path: distinguishes from the synchronous rebuild below for
+        // pool-effectiveness triage (hit rate vs rebuild frequency).
+        TAG_LOGD(AceLogTag::ACE_SCROLL,
+            "ScrollPlaceholder instance from pool: templateId=%{public}s, instanceId=%{public}d",
+            templateId.c_str(), instanceId_);
         ScheduleBackgroundReplenish(templateId);
         return cached;
     }
@@ -220,7 +225,9 @@ RefPtr<UINode> ScrollPlaceholderManager::AcquireTemplateInstance(const std::stri
             "instanceId=%{public}d", templateId.c_str(), instanceId_);
         return nullptr;
     }
+    int64_t rebuildStartNs = GetSysTimestamp();
     auto instance = snapshot->builder();
+    int64_t rebuildCostUs = (GetSysTimestamp() - rebuildStartNs) / 1000;
     if (!instance) {
         TAG_LOGW(AceLogTag::ACE_SCROLL,
             "ScrollPlaceholder acquire failed: template rebuild produced no product, "
@@ -228,6 +235,11 @@ RefPtr<UINode> ScrollPlaceholderManager::AcquireTemplateInstance(const std::stri
             templateId.c_str(), instanceId_);
         return nullptr;
     }
+    // Rebuild path (pool was empty): a full JS builder execution served this acquire —
+    // exactly the cost the placeholder feature exists to avoid, so keep it observable.
+    TAG_LOGD(AceLogTag::ACE_SCROLL,
+        "ScrollPlaceholder instance rebuilt synchronously: templateId=%{public}s, costUs=%{public}" PRId64
+        ", instanceId=%{public}d", templateId.c_str(), rebuildCostUs, instanceId_);
     ScheduleBackgroundReplenish(templateId);
     return instance;
 }
@@ -297,13 +309,17 @@ void ScrollPlaceholderManager::RunBackgroundClone(const std::string& templateId,
     // same-type node with the source properties copied over. The traversal runs inside a
     // thread-safe node scope, so the created nodes register into the mutex-guarded
     // multi-thread registry instead of racing the global element register. Every exit path
-    // releases the pending slot.
+    // releases the pending slot; the skip reason is logged because a silently never
+    // refilling pool turns every acquire into a synchronous UI-thread rebuild.
+    const char* skipReason = nullptr;
     do {
         if (destroyed_.load(std::memory_order_relaxed)) {
+            skipReason = "manager destroyed";
             break;
         }
         auto source = registry_.GetTemplateSourceInstance(templateId);
         if (!source) {
+            skipReason = "no resident source";
             break;
         }
         bool previousScope = MultiThreadBuildManager::IsThreadSafeNodeScope();
@@ -312,15 +328,22 @@ void ScrollPlaceholderManager::RunBackgroundClone(const std::string& templateId,
             source, [this](const RefPtr<UINode>& node) { return CreatePlaceholderNodeCopy(node); });
         MultiThreadBuildManager::SetIsThreadSafeNodeScope(previousScope);
         if (!instance) {
+            skipReason = "clone produced no instance";
             break;
         }
         if (registry_.GetCurrentGeneration(templateId) != generation) {
             // Template re-registered or unregistered while the clone was in flight: the
             // stale result is dropped and never cached.
+            skipReason = "stale generation";
             break;
         }
         registry_.CacheTemplateInstance(templateId, instance);
     } while (false);
+    if (skipReason != nullptr) {
+        TAG_LOGD(AceLogTag::ACE_SCROLL,
+            "ScrollPlaceholder background clone skipped: reason=%{public}s, templateId=%{public}s, "
+            "instanceId=%{public}d", skipReason, templateId.c_str(), instanceId_);
+    }
     ReleasePendingCloneSlot(templateId);
 }
 

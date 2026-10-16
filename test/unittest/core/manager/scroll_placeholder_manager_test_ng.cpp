@@ -329,18 +329,24 @@ HWTEST_F(ScrollPlaceholderManagerTestNg, TemplateGenerationMonotonic001, TestSiz
 HWTEST_F(ScrollPlaceholderManagerTestNg, TemplateInstanceCache001, TestSize.Level1)
 {
     manager_->RegisterTemplate("tpl", MakeTreeBuilder(1));
-    auto first = TestPlaceholderNode::CreateTestNode(11);
-    auto second = TestPlaceholderNode::CreateTestNode(12);
-    manager_->CacheTemplateInstance("tpl", first);
-    manager_->CacheTemplateInstance("tpl", second); // over the spare capacity, dropped
-    EXPECT_EQ(manager_->GetCachedInstanceCount("tpl"), 1u); // spares only; source is resident
+    constexpr size_t spareSlots = SCROLL_PLACEHOLDER_INSTANCE_CACHE_CAPACITY - 1;
+    std::vector<RefPtr<TestPlaceholderNode>> nodes;
+    for (size_t i = 0; i < spareSlots + 1; ++i) { // one over the spare capacity
+        nodes.emplace_back(TestPlaceholderNode::CreateTestNode(10 + static_cast<int32_t>(i)));
+    }
+    for (const auto& node : nodes) {
+        manager_->CacheTemplateInstance("tpl", node);
+    }
+    EXPECT_EQ(manager_->GetCachedInstanceCount("tpl"), spareSlots); // overflow dropped
     ASSERT_TRUE(manager_->GetTemplateSourceInstance("tpl"));
 
     auto acquired = manager_->AcquireTemplateInstance("tpl");
     ASSERT_TRUE(acquired);
-    EXPECT_EQ(acquired, first);
-    EXPECT_EQ(manager_->GetCachedInstanceCount("tpl"), 0u);
-    // No spare with a working template: acquire never fails, it creates one on the UI thread.
+    EXPECT_EQ(acquired, AceType::DynamicCast<UINode>(nodes[spareSlots - 1])); // LIFO: last accepted
+    // Drain the remaining spares, then the empty-pool path serves a synchronous build.
+    while (manager_->GetCachedInstanceCount("tpl") > 0) {
+        ASSERT_TRUE(manager_->AcquireTemplateInstance("tpl"));
+    }
     auto synced = manager_->AcquireTemplateInstance("tpl");
     EXPECT_TRUE(synced);
     EXPECT_EQ(manager_->GetCachedInstanceCount("tpl"), 0u); // created for use, not cached
@@ -415,11 +421,11 @@ HWTEST_F(ScrollPlaceholderManagerTestNg, PlaceholderPoolRegisterSeedAndReplenish
     ASSERT_TRUE(source);                       // synchronous source build at registration
     EXPECT_EQ(source->GetChildren().size(), 1u);
     EXPECT_EQ(manager_->GetCachedInstanceCount("tpl"), 0u); // no spare yet
-    EXPECT_EQ(manager_->GetPendingCloneCount("tpl"), 1u);
-    EXPECT_EQ(manager_->CapturedTaskCount(), 1u);
+    EXPECT_EQ(manager_->GetPendingCloneCount("tpl"), SCROLL_PLACEHOLDER_INSTANCE_CACHE_CAPACITY - 1);
+    EXPECT_EQ(manager_->CapturedTaskCount(), SCROLL_PLACEHOLDER_INSTANCE_CACHE_CAPACITY - 1);
 
     manager_->RunCapturedTasks();
-    EXPECT_EQ(manager_->copiedNodeCount, 2u);  // top-down copy visited root and child
+    EXPECT_EQ(manager_->copiedNodeCount, 2u * (SCROLL_PLACEHOLDER_INSTANCE_CACHE_CAPACITY - 1)); // root + child per submitted clone
     EXPECT_EQ(manager_->GetCachedInstanceCount("tpl"), SCROLL_PLACEHOLDER_INSTANCE_CACHE_CAPACITY - 1);
     EXPECT_EQ(manager_->GetPendingCloneCount("tpl"), 0u);
     EXPECT_EQ(manager_->CapturedTaskCount(), 0u); // no extra tasks once at capacity
@@ -444,7 +450,7 @@ HWTEST_F(ScrollPlaceholderManagerTestNg, PlaceholderPoolAcquireTakesAndReplenish
     ASSERT_TRUE(acquired);
     EXPECT_NE(acquired, source);               // a spare copy, not the resident source
     EXPECT_EQ(acquired->GetChildren().size(), 1u); // structural copy kept the subtree
-    EXPECT_EQ(manager_->GetCachedInstanceCount("tpl"), 0u);
+    EXPECT_EQ(manager_->GetCachedInstanceCount("tpl"), SCROLL_PLACEHOLDER_INSTANCE_CACHE_CAPACITY - 1 - 1);
     EXPECT_EQ(manager_->GetPendingCloneCount("tpl"), 1u);
     manager_->RunCapturedTasks();
     EXPECT_EQ(manager_->GetCachedInstanceCount("tpl"), SCROLL_PLACEHOLDER_INSTANCE_CACHE_CAPACITY - 1);
@@ -461,13 +467,13 @@ HWTEST_F(ScrollPlaceholderManagerTestNg, PlaceholderPoolAcquireTakesAndReplenish
 HWTEST_F(ScrollPlaceholderManagerTestNg, PlaceholderPoolSyncCreateWhenEmpty001, TestSize.Level1)
 {
     manager_->RegisterTemplate("tpl", MakeTreeBuilder(1));
-    EXPECT_EQ(manager_->CapturedTaskCount(), 1u); // replenish pending, not run yet
+    EXPECT_EQ(manager_->CapturedTaskCount(), SCROLL_PLACEHOLDER_INSTANCE_CACHE_CAPACITY - 1); // replenish pending, not run yet
 
     auto synced = manager_->AcquireTemplateInstance("tpl"); // no spare path
     ASSERT_TRUE(synced);
     EXPECT_EQ(synced->GetChildren().size(), 1u);  // built by the builder on the UI thread
     EXPECT_EQ(manager_->GetCachedInstanceCount("tpl"), 0u); // served directly, not cached
-    EXPECT_EQ(manager_->CapturedTaskCount(), 1u); // spare slot already in flight
+    EXPECT_EQ(manager_->CapturedTaskCount(), SCROLL_PLACEHOLDER_INSTANCE_CACHE_CAPACITY - 1); // spare slots already in flight
     manager_->RunCapturedTasks();
     EXPECT_EQ(manager_->GetCachedInstanceCount("tpl"), SCROLL_PLACEHOLDER_INSTANCE_CACHE_CAPACITY - 1);
     EXPECT_EQ(manager_->GetPendingCloneCount("tpl"), 0u);
@@ -489,7 +495,7 @@ HWTEST_F(ScrollPlaceholderManagerTestNg, PlaceholderPoolStaleCloneDroppedOnReReg
     ASSERT_TRUE(secondSource);
     EXPECT_NE(secondSource, firstSource);      // re-register rebuilt the source on the UI thread
     EXPECT_EQ(manager_->GetCachedInstanceCount("tpl"), 0u);
-    EXPECT_EQ(manager_->CapturedTaskCount(), 2u); // stale clone + current clone
+    EXPECT_EQ(manager_->CapturedTaskCount(), 2u * (SCROLL_PLACEHOLDER_INSTANCE_CACHE_CAPACITY - 1)); // stale clones + current clones
 
     manager_->RunCapturedTasks();
     EXPECT_EQ(manager_->GetCachedInstanceCount("tpl"), SCROLL_PLACEHOLDER_INSTANCE_CACHE_CAPACITY - 1);
@@ -504,7 +510,7 @@ HWTEST_F(ScrollPlaceholderManagerTestNg, PlaceholderPoolStaleCloneDroppedOnReReg
 HWTEST_F(ScrollPlaceholderManagerTestNg, PlaceholderPoolDestroyDropsInFlight001, TestSize.Level1)
 {
     manager_->RegisterTemplate("tpl", MakeTreeBuilder(1));
-    ASSERT_EQ(manager_->CapturedTaskCount(), 1u);
+    ASSERT_EQ(manager_->CapturedTaskCount(), SCROLL_PLACEHOLDER_INSTANCE_CACHE_CAPACITY - 1);
     manager_->Destroy();
     manager_->RunCapturedTasks();
     EXPECT_FALSE(manager_->GetTemplateSourceInstance("tpl")); // registry cleared

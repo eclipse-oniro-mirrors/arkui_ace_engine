@@ -263,20 +263,11 @@ void ActivatePlaceholderSubtree(const RefPtr<UINode>& node)
     }
 }
 
-// Offline-built instance subtrees also never went through the pipeline dirty flow:
-// their patterns never ran OnModifyDone, and on device a text template measured
-// 0x0 from the shell wrapper's forceMeasure alone. BuilderNode does the same when
-// attaching an offline tree. One dirty mark on the subtree root is enough — no
-// per-node walking: the mark's measure flag makes the pipeline rebuild the root
-// wrapper with forceChildMeasure, which propagates down through the whole subtree,
-// and the non-boundary root bubbles RequestParentDirty up through the shell to the
-// host, so the List re-measures once the content gains its real extent. Must run
-// after the shell is mounted, so the subtree is on the main tree with a pipeline
-// context attached.
-void DirtyMarkInstanceRoot(const RefPtr<FrameNode>& instanceRoot)
-{
-    instanceRoot->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
-}
+// Offline-built instance subtrees also never went through the pipeline dirty flow
+// (their patterns never ran OnModifyDone). In the node-as-wrapper architecture the
+// list algorithm drives the shell node itself through FrameNode::Measure, which
+// covers the whole subtree; the earlier extra dirty mark on the instance root is
+// no longer needed and only caused a redundant standalone layout round.
 
 // Post-layout state of one live shell for on-device triage: distinguishes "content
 // never mounted" (none), "content never measured" (zero-size content) and
@@ -349,6 +340,11 @@ RefPtr<FrameNode> CreatePlaceholderShellNode(
         }
         shell->GetLayoutProperty()->UpdateUserDefinedIdealSize(idealSize);
     }
+    // Node-as-wrapper: the list algorithm will drive this shell through
+    // FrameNode::Measure directly. The measure flag is consumed by that first
+    // measure (CheckNeedMeasure in the item loop), so it is set once here — later
+    // layout rounds keep returning the shell without re-measuring it.
+    shell->GetLayoutProperty()->UpdatePropertyChangeFlag(PROPERTY_UPDATE_MEASURE);
     return shell;
 }
 
@@ -365,12 +361,6 @@ void MountPlaceholderShellOnHost(const RefPtr<FrameNode>& host, const RefPtr<Fra
         shell->AttachToMainTree(false, context);
     }
     shell->MarkNeedSyncRenderTree();
-    for (const auto& child : shell->GetChildren()) {
-        auto instanceRoot = AceType::DynamicCast<FrameNode>(child);
-        if (instanceRoot) {
-            DirtyMarkInstanceRoot(instanceRoot);
-        }
-    }
 }
 } // namespace
 

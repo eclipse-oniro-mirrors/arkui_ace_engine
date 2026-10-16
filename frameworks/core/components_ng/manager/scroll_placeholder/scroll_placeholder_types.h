@@ -37,8 +37,11 @@ enum class ScrollPlaceholderComponentType : int32_t {
 // Placeholder instance pool policy: per template id the pool totals at most this many
 // instances — one resident, immutable copy source built by the builder on the UI thread at
 // registration, plus capacity - 1 spare copies handed out on acquire and refilled by
-// background traversal clones of the source.
-inline constexpr size_t SCROLL_PLACEHOLDER_INSTANCE_CACHE_CAPACITY = 2;
+// background traversal clones of the source. A fast fling keeps dozens of shells alive at
+// once; with a single spare the pool empties after the first acquire and every further
+// acquire degrades to a synchronous UI-thread builder run — the cost the feature exists
+// to avoid — so the spares must cover the concurrent-shell order of magnitude.
+inline constexpr size_t SCROLL_PLACEHOLDER_INSTANCE_CACHE_CAPACITY = 8;
 
 // Prediction result decided before the real item builder runs:
 // - BUILD_REAL_NOW: estimated cost fits the remaining frame budget, caller builds synchronously.

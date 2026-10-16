@@ -63,17 +63,6 @@ public:
 
     void AppendChild(const RefPtr<LayoutWrapperNode>& child, bool isOverlayNode = false);
 
-    // Attaches a wrapper for a direct child that lives outside the index-based child
-    // space (e.g. a scroll placeholder shell mounted on the host while staying
-    // invisible to index-based enumeration). Unlike AppendChild it never takes an
-    // index slot in childrenMap_, so index-addressed child resolution is untouched.
-    // The attached wrapper participates in build/render-area activation and in the
-    // dirty swap-back (measured geometry lands on the nodes); the caller remains
-    // responsible for measuring and positioning it. RemoveOutOfIndexChildByHost
-    // detaches any previous wrapper of the same host before a fresh one attaches.
-    void AppendChildOutOfIndex(const RefPtr<LayoutWrapperNode>& child);
-    void RemoveOutOfIndexChildByHost(int32_t hostId);
-
     void SetLayoutWrapperBuilder(const RefPtr<LayoutWrapperBuilder>& builder)
     {
         CHECK_NULL_VOID(builder);
@@ -240,10 +229,6 @@ private:
     void LayoutOverlay();
     // Used to save a persist wrapper created by child, ifElse, ForEach, the map stores [index, Wrapper].
     std::list<RefPtr<LayoutWrapperNode>> children_;
-    // Wrappers of direct children outside the index-based child space; see
-    // AppendChildOutOfIndex. Kept separate from children_/childrenMap_ so no
-    // index slot is ever taken.
-    std::list<RefPtr<LayoutWrapperNode>> outOfIndexChildren_;
     // Speed up the speed of getting child by index.
     std::unordered_map<int32_t, RefPtr<LayoutWrapperNode>> childrenMap_;
     RefPtr<LayoutWrapperNode> overlayChild_;

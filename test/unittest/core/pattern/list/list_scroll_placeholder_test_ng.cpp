@@ -539,22 +539,18 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderShellMeasure001, TestSize
     ASSERT_TRUE(shell);
     ASSERT_EQ(shell->GetChildren().size(), 1u);
 
-    // Measure the wrapper exactly the way GetListItem hands it to the list layout.
+    // Node-as-wrapper: the list algorithm drives the shell node itself through
+    // FrameNode::Measure (CreateLayoutTask path); geometry must land on the NODES.
     LayoutConstraintF constraint;
     constraint.maxSize = { 1080.0f, 5000.0f };
     constraint.percentReference = { 1080.0f, 5000.0f };
-    auto wrapper = shell->CreateLayoutWrapper(true, true);
-    wrapper->GetLayoutProperty()->UpdateLayoutConstraint(constraint);
-    wrapper->GetLayoutProperty()->UpdatePropertyChangeFlag(PROPERTY_UPDATE_MEASURE);
-    wrapper->Measure(constraint);
-    auto shellSize = wrapper->GetGeometryNode()->GetFrameSize();
-    GTEST_LOG_(INFO) << "ShellMeasure shell=" << shellSize.Width() << "x" << shellSize.Height();
-    // LayoutWrapperNode::GetChildByIndex hard-returns nullptr; the wrapper tree is
-    // addressed through the children list.
-    auto contentWrappers = wrapper->GetAllChildrenWithBuild(false);
-    ASSERT_FALSE(contentWrappers.empty());
-    auto contentSize = (*contentWrappers.begin())->GetGeometryNode()->GetFrameSize();
-    GTEST_LOG_(INFO) << "ShellMeasure content=" << contentSize.Width() << "x" << contentSize.Height();
+    shell->Measure(constraint);
+    auto shellSize = shell->GetGeometryNode()->GetFrameSize();
+    auto content = AceType::DynamicCast<FrameNode>(shell->GetChildren().front());
+    ASSERT_TRUE(content);
+    auto contentSize = content->GetGeometryNode()->GetFrameSize();
+    GTEST_LOG_(INFO) << "ShellMeasure shellNode=" << shellSize.Width() << "x" << shellSize.Height()
+                     << " contentNode=" << contentSize.Width() << "x" << contentSize.Height();
 
     EXPECT_FLOAT_EQ(contentSize.Width(), sourceWidth);
     EXPECT_FLOAT_EQ(contentSize.Height(), sourceHeight);
@@ -600,93 +596,24 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderShellMeasureNoProviderSiz
     ASSERT_TRUE(shell);
     ASSERT_EQ(shell->GetChildren().size(), 1u);
 
+    // Node-as-wrapper, no provider size: the shell must size to its measured content.
     LayoutConstraintF constraint;
     constraint.maxSize = { 1080.0f, 5000.0f };
     constraint.percentReference = { 1080.0f, 5000.0f };
-    auto wrapper = shell->CreateLayoutWrapper(true, true);
-    wrapper->GetLayoutProperty()->UpdateLayoutConstraint(constraint);
-    wrapper->GetLayoutProperty()->UpdatePropertyChangeFlag(PROPERTY_UPDATE_MEASURE);
-    wrapper->Measure(constraint);
-    auto shellSize = wrapper->GetGeometryNode()->GetFrameSize();
-    auto contentWrappers = wrapper->GetAllChildrenWithBuild(false);
-    ASSERT_FALSE(contentWrappers.empty());
-    auto contentSize = (*contentWrappers.begin())->GetGeometryNode()->GetFrameSize();
-    GTEST_LOG_(INFO) << "ShellMeasureNoSize shell=" << shellSize.Width() << "x" << shellSize.Height()
-                     << " content=" << contentSize.Width() << "x" << contentSize.Height();
+    shell->Measure(constraint);
+    auto shellSize = shell->GetGeometryNode()->GetFrameSize();
+    auto content = AceType::DynamicCast<FrameNode>(shell->GetChildren().front());
+    ASSERT_TRUE(content);
+    auto contentSize = content->GetGeometryNode()->GetFrameSize();
+    GTEST_LOG_(INFO) << "ShellMeasureNoSize shellNode=" << shellSize.Width() << "x" << shellSize.Height()
+                     << " contentNode=" << contentSize.Width() << "x" << contentSize.Height();
 
-    // Without a provider size the shell sizes to its content: the sized template source
-    // must measure through the ListItem constraint chain.
     EXPECT_FLOAT_EQ(contentSize.Width(), sourceWidth);
     EXPECT_FLOAT_EQ(contentSize.Height(), sourceHeight);
     EXPECT_FLOAT_EQ(shellSize.Width(), sourceWidth);
     EXPECT_FLOAT_EQ(shellSize.Height(), sourceHeight);
 }
 
-/**
- * @tc.name: ScrollPlaceholderShellSwapBack001
- * @tc.desc: Device finding round 4: a detached shell wrapper gets measured and
- *           positioned by the list algorithm, but its results never land on the
- *           nodes (geometry 0x0, blank). Attaching the shell wrapper to the host
- *           wrapper out-of-index puts it into the flush swap-back chain: after
- *           measure + SwapDirtyLayoutWrapperOnMainThread the shell and content
- *           NODES must carry the measured sizes.
- * @tc.type: FUNC
- */
-HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderShellSwapBack001, TestSize.Level1)
-{
-    constexpr float sourceWidth = 100.0f;
-    constexpr float sourceHeight = 50.0f;
-    auto manager = MockPipelineContext::GetCurrent()->GetOrCreateScrollPlaceholderManager();
-    ASSERT_TRUE(manager);
-    manager->RegisterTemplate("tpl-sized-swap", []() -> RefPtr<UINode> {
-        auto root = FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG,
-            ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<LinearLayoutPattern>(false));
-        root->GetLayoutProperty()->UpdateUserDefinedIdealSize(
-            CalcSize(CalcLength(sourceWidth), CalcLength(sourceHeight)));
-        return root;
-    });
-    CreatePlaceholderList(
-        [](int32_t index) -> std::optional<ScrollPlaceholderOptions> {
-            ScrollPlaceholderOptions options;
-            options.id = "tpl-sized-swap";
-            return options;
-        },
-        true);
-    CreateItemsAndDone();
-
-    int32_t index = FindUnbuiltSlot();
-    ASSERT_GE(index, 0);
-    auto shell = pattern_->CreateScrollPlaceholderShell(index);
-    ASSERT_TRUE(shell);
-    ASSERT_EQ(shell->GetChildren().size(), 1u);
-    auto content = AceType::DynamicCast<FrameNode>(shell->GetChildren().front());
-    ASSERT_TRUE(content);
-
-    // Attach the shell wrapper to the host wrapper exactly like GetListItem does,
-    // measure it, then run the flush swap-back: the nodes must receive the sizes.
-    auto hostWrapper = AceType::DynamicCast<LayoutWrapperNode>(frameNode_->CreateLayoutWrapper(true, true));
-    ASSERT_TRUE(hostWrapper);
-    auto shellWrapper = AceType::DynamicCast<LayoutWrapperNode>(shell->CreateLayoutWrapper(true, true));
-    ASSERT_TRUE(shellWrapper);
-    hostWrapper->AppendChildOutOfIndex(shellWrapper);
-
-    LayoutConstraintF constraint;
-    constraint.maxSize = { 1080.0f, 5000.0f };
-    constraint.percentReference = { 1080.0f, 5000.0f };
-    shellWrapper->GetLayoutProperty()->UpdateLayoutConstraint(constraint);
-    shellWrapper->GetLayoutProperty()->UpdatePropertyChangeFlag(PROPERTY_UPDATE_MEASURE);
-    shellWrapper->Measure(constraint);
-    shellWrapper->SwapDirtyLayoutWrapperOnMainThread();
-
-    auto shellNodeSize = shell->GetGeometryNode()->GetFrameSize();
-    auto contentNodeSize = content->GetGeometryNode()->GetFrameSize();
-    GTEST_LOG_(INFO) << "ShellSwapBack shellNode=" << shellNodeSize.Width() << "x" << shellNodeSize.Height()
-                     << " contentNode=" << contentNodeSize.Width() << "x" << contentNodeSize.Height();
-    EXPECT_FLOAT_EQ(contentNodeSize.Width(), sourceWidth);
-    EXPECT_FLOAT_EQ(contentNodeSize.Height(), sourceHeight);
-    EXPECT_FLOAT_EQ(shellNodeSize.Width(), sourceWidth);
-    EXPECT_FLOAT_EQ(shellNodeSize.Height(), sourceHeight);
-}
 
 /**
  * @tc.name: ScrollPlaceholderReplaceCancelsPending001
