@@ -43,21 +43,15 @@ void JSImmersiveStrategy::ApplyDefaultImmersiveStrategy(const JSCallbackInfo& in
     CHECK_NULL_VOID(pipeline);
     auto ngPipeline = AceType::DynamicCast<NG::PipelineContext>(pipeline);
     // C8 gate: apply is only effective before the first layout flow is entered.
-    if (!ngPipeline || !ngPipeline->IsFirstRootLayout()) {
+    if (!ngPipeline || !ngPipeline->IsFirstFlushMessages()) {
+        LOGW("applyDefaultImmersiveStrategy is only effective before the first layout flow is entered.");
         return;
     }
     std::unordered_set<ImmersiveStrategy> types;
-    if (info.Length() >= 1 && info[0]->IsArray()) {
-        auto array = JSRef<JSArray>::Cast(info[0]);
-        for (size_t i = 0; i < array->Length(); i++) {
-            auto elem = array->GetValueAt(i);
-            if (elem->IsNumber()) {
-                AddValidStrategy(types, elem->ToNumber<int32_t>());
-            }
-        }
-    } else {
+    if (info.Length() >= 1) {
         for (size_t i = 0; i < info.Length(); i++) {
-            if (info[i]->IsNumber()) {
+            auto vm = JsiValueConvertor::getEcmaVm();
+            if (JsiValueConvertor::Validate<int32_t>(vm, info[i]->GetLocalHandle())) {
                 AddValidStrategy(types, info[i]->ToNumber<int32_t>());
             }
         }
