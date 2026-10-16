@@ -369,11 +369,18 @@ void MountPlaceholderShellOnHost(const RefPtr<FrameNode>& host, const RefPtr<Fra
     // The layout-time AddChild only sets sync flags, and the device rounds showed
     // no consumer ever picked them up for the shell (shellRs=0 across every
     // layout round): the RS node tree of a newly mounted subtree only takes
-    // shape when a rebuild actually runs. Force it after layout — the host
+    // shape when a rebuild actually runs. Schedule it after layout — the host
     // rebuild enters the shell into the host's RS tree (ProcessRenderTreeDiff
     // -> AttachToRenderTree), the shell rebuild enters the content into the
     // shell's RS tree (the shell's frameChildren_ only fill during its own
     // rebuild, so skipping it would strand the content one level down).
+    // All shells of a frame mount during the layout pass and the tasks drain
+    // after it, so the FIRST host rebuild of a drain already collects every
+    // pending shell: no force-mark on the host here, its natural
+    // needSyncRenderTree_ flag (set by AddChild) dedups the remaining tasks
+    // to a one-line guard, instead of N full host rebuilds for N shells.
+    // The shell rebuild stays per-shell — nothing else ever consumes a
+    // shell's own flag, so it is force-marked here.
     auto weakHost = AceType::WeakClaim(AceType::RawPtr(host));
     auto weakShell = AceType::WeakClaim(AceType::RawPtr(shell));
     context->AddAfterLayoutTask([weakHost, weakShell]() {
@@ -382,7 +389,6 @@ void MountPlaceholderShellOnHost(const RefPtr<FrameNode>& host, const RefPtr<Fra
         if (!host || !shell) {
             return;
         }
-        host->MarkNeedSyncRenderTree();
         host->RebuildRenderContextTree();
         shell->MarkNeedSyncRenderTree();
         shell->RebuildRenderContextTree();
