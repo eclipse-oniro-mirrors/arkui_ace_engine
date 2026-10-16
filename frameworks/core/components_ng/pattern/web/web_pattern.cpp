@@ -813,6 +813,8 @@ void WebPattern::CloseContextSelectionMenu()
 {
     if (contextSelectOverlay_ && contextSelectOverlay_->IsCurrentMenuVisibile()) {
         contextSelectOverlay_->CloseOverlay(true, CloseReason::CLOSE_REASON_NORMAL);
+        // Set isEscKeyFromOverlayOrFullScreen_ to true, so that the next ESC key event will not be sent to web.
+        isEscKeyFromOverlayOrFullScreen_ = true;
     }
 }
 
@@ -820,6 +822,8 @@ void WebPattern::CloseDefaultContextMenu()
 {
     if (contextMenuOverlay_ && contextMenuOverlay_->IsCurrentMenuVisibile()) {
         contextMenuOverlay_->CloseOverlay(true, CloseReason::CLOSE_REASON_NORMAL);
+        // Set isEscKeyFromOverlayOrFullScreen_ to true, so that the next ESC key event will not be sent to web.
+        isEscKeyFromOverlayOrFullScreen_ = true;
     }
 }
 
@@ -838,6 +842,8 @@ void WebPattern::RemovePreviewMenuNode()
     parent->RemoveChild(previewNode);
     previewImageNodeId_.reset();
     parent->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
+    // Set isEscKeyFromOverlayOrFullScreen_ to true, so that the next ESC key event will not be sent to web.
+    isEscKeyFromOverlayOrFullScreen_ = true;
 }
 
 bool WebPattern::IsPreviewMenuNotNeedShowPreview()
@@ -3665,6 +3671,27 @@ bool WebPattern::IsContextMenuShow()
            (contextMenuOverlay_ && contextMenuOverlay_->IsCurrentMenuVisibile());
 }
 
+bool WebPattern::IsShouldTriggerBack(const KeyEvent& event, bool isUsed)
+{
+    bool isEscKey = event.code == KeyCode::KEY_ESCAPE;
+    bool isKeyDown = event.action == KeyAction::DOWN;
+    bool isKeyUp = event.action == KeyAction::UP;
+    if (isEscKey && isKeyDown) {
+        isEscKeyDownConsumed_ = isUsed;
+    }
+    bool shouldTriggerBack = false;
+    if (isEscKey && isKeyUp) {
+        if (isEscKeyFromOverlayOrFullScreen_) {
+            shouldTriggerBack = false;
+        } else if (!isEscKeyDownConsumed_ && !isUsed) {
+            shouldTriggerBack = true;
+        }
+        isEscKeyDownConsumed_ = true;
+        isEscKeyFromOverlayOrFullScreen_ = false;
+    }
+    return shouldTriggerBack;
+}
+
 bool WebPattern::HandleEscToBackSupport(PipelineContext* pipeline)
 {
     // 1. FullScreen
@@ -3695,6 +3722,7 @@ bool WebPattern::HandleEscToBackSupport(PipelineContext* pipeline)
 bool WebPattern::HandleKeyEvent(const KeyEvent& keyEvent)
 {
     if (IsContextMenuShow() && keyEvent.code == KeyCode::KEY_ESCAPE && keyEvent.action == KeyAction::DOWN) {
+        isEscKeyFromOverlayOrFullScreen_ = true;
         bool isKeyNull = !(keyEvent.HasKey(KeyCode::KEY_ALT_LEFT) || keyEvent.HasKey(KeyCode::KEY_ALT_RIGHT) ||
                            keyEvent.HasKey(KeyCode::KEY_SHIFT_LEFT) || keyEvent.HasKey(KeyCode::KEY_SHIFT_RIGHT) ||
                            keyEvent.HasKey(KeyCode::KEY_CTRL_LEFT) || keyEvent.HasKey(KeyCode::KEY_CTRL_RIGHT) ||
@@ -3806,17 +3834,16 @@ void WebPattern::KeyboardReDispatch(
         TAG_LOGW(AceLogTag::ACE_WEB, "KeyEvent is not find keycode");
         return;
     }
-    if (keyEvent->code == KeyCode::KEY_ESCAPE && keyEvent->action == KeyAction::DOWN) {
-        isEscKeyDownConsumed_ = isUsed;
-    }
-    if (keyEvent->code == KeyCode::KEY_ESCAPE && keyEvent->action == KeyAction::UP) {
-        if(!isUsed && !isEscKeyDownConsumed_ && system::GetBoolParameter(std::string(ESC_TO_BACK_SUPPORT), false)) {
-            if(HandleEscToBackSupport(pipelineContext)) {
+    bool isEscKey = keyEvent->code == KeyCode::KEY_ESCAPE;
+    if (isEscKey && system::GetBoolParameter(std::string(ESC_TO_BACK_SUPPORT), false)) {
+        if (IsShouldTriggerBack(*keyEvent, isUsed)) {
+            if (HandleEscToBackSupport(pipelineContext)) {
                 webKeyEvent_.erase((++keyEvent).base());
                 return;
             }
         }
     }
+
     if (!isUsed) {
         taskExecutor->PostTask([context = AceType::WeakClaim(pipelineContext),
             event = *keyEvent] () {
@@ -5767,6 +5794,7 @@ bool WebPattern::ParseTouchInfo(const TouchEventInfo& info, std::list<TouchInfo>
 void WebPattern::RequestFullScreen()
 {
     isFullScreen_ = true;
+    isEscKeyFromOverlayOrFullScreen_ = true;
 }
 
 void WebPattern::ExitFullScreen()
@@ -9546,6 +9574,7 @@ void WebPattern::OnShowAutofillPopupV2(
     CHECK_NULL_VOID(overlayManager);
     menu->GetOrCreateFocusHub()->SetFocusable(false);
     overlayManager->ShowMenu(dataListNode->GetId(), OffsetF(), menu);
+    isEscKeyFromOverlayOrFullScreen_ = true;
 }
 
 void WebPattern::OnHideAutofillPopup()
