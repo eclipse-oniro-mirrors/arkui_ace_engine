@@ -1312,6 +1312,7 @@ public:
         JSClass<JSWebResourceResponse>::CustomMethod("getResponseCode", &JSWebResourceResponse::GetResponseCode);
         JSClass<JSWebResourceResponse>::CustomMethod("getResponseHeader", &JSWebResourceResponse::GetResponseHeader);
         JSClass<JSWebResourceResponse>::CustomMethod("setResponseData", &JSWebResourceResponse::SetResponseData);
+        JSClass<JSWebResourceResponse>::CustomMethod("setResponseBody", &JSWebResourceResponse::SetResponseBody);
         JSClass<JSWebResourceResponse>::CustomMethod(
             "setResponseEncoding", &JSWebResourceResponse::SetResponseEncoding);
         JSClass<JSWebResourceResponse>::CustomMethod(
@@ -1402,6 +1403,16 @@ public:
 
     void SetResponseData(const JSCallbackInfo& args)
     {
+        DoSetResponseData(args, false);
+    }
+
+    void SetResponseBody(const JSCallbackInfo& args)
+    {
+        DoSetResponseData(args, true);
+    }
+
+    void DoSetResponseData(const JSCallbackInfo& args, bool parseRawfile)
+    {
         if (args.Length() <= 0) {
             return;
         }
@@ -1433,7 +1444,9 @@ public:
             if (!JSViewAbstract::ParseJsMedia(args[0], resourceUrl)) {
                 return;
             }
-            JSWeb::ParseRawfileWebSrc(args[0], resourceUrl);
+            if (parseRawfile) {
+                JSWeb::ParseRawfileWebSrc(args[0], resourceUrl);
+            }
             auto np = resourceUrl.find_first_of("/");
             url = (np == std::string::npos) ? resourceUrl : resourceUrl.erase(np, 1);
             response_->SetResourceUrl(url);
