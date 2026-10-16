@@ -364,13 +364,29 @@ void MountPlaceholderShellOnHost(const RefPtr<FrameNode>& host, const RefPtr<Fra
         shell->AttachToMainTree(false, context);
     }
     shell->MarkNeedSyncRenderTree();
-    // needRebuildRenderContext schedules an after-layout RebuildRenderContextTree
-    // on the parent (the BuilderNode convention for mounting an offline-built
-    // tree): the layout-time AddChild alone marks the sync flags, but the RS
-    // node tree of a freshly mounted subtree only materializes when the parent
-    // runs the rebuild — device finding: measured geometry never got painted
-    // without it.
-    shell->SetActive(true, true);
+    shell->SetActive(true);
+    // Explicit render-tree materialization for the freshly mounted subtree.
+    // The layout-time AddChild only sets sync flags, and the device rounds showed
+    // no consumer ever picked them up for the shell (shellRs=0 across every
+    // layout round): the RS node tree of a newly mounted subtree only takes
+    // shape when a rebuild actually runs. Force it after layout — the host
+    // rebuild enters the shell into the host's RS tree (ProcessRenderTreeDiff
+    // -> AttachToRenderTree), the shell rebuild enters the content into the
+    // shell's RS tree (the shell's frameChildren_ only fill during its own
+    // rebuild, so skipping it would strand the content one level down).
+    auto weakHost = AceType::WeakClaim(AceType::RawPtr(host));
+    auto weakShell = AceType::WeakClaim(AceType::RawPtr(shell));
+    context->AddAfterLayoutTask([weakHost, weakShell]() {
+        auto host = weakHost.Upgrade();
+        auto shell = weakShell.Upgrade();
+        if (!host || !shell) {
+            return;
+        }
+        host->MarkNeedSyncRenderTree();
+        host->RebuildRenderContextTree();
+        shell->MarkNeedSyncRenderTree();
+        shell->RebuildRenderContextTree();
+    });
 }
 } // namespace
 
