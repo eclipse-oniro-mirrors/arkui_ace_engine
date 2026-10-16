@@ -2758,6 +2758,12 @@ UIContentErrorCode UIContentImpl::CommonInitialize(
     bool halfLeading = std::any_of(metaData.begin(), metaData.end(),
         [](const auto& metaDataItem) { return metaDataItem.name == "half_leading" && metaDataItem.value == "true"; });
     pipeline->SetHalfLeading(halfLeading);
+    // Use metadata to control text style optimization flag for fallbackLineSpacing/includeFontPadding.
+    bool configTextStyleOptimizeFlag = std::any_of(metaData.begin(), metaData.end(),
+        [](const auto& metaDataItem) {
+            return metaDataItem.name == "configTextStyleOptimizeFlagInArkUI" && metaDataItem.value == "true";
+        });
+    pipeline->SetConfigTextStyleOptimizeFlag(configTextStyleOptimizeFlag);
     bool hasPreviewTextOption = std::any_of(metaData.begin(), metaData.end(),
         [pipelineWeak = AceType::WeakClaim(AceType::RawPtr(pipeline))](const auto& metaDataItem) {
                 if (metaDataItem.name == "can_preview_text") {

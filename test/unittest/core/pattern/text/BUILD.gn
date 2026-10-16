@@ -24,6 +24,7 @@ test_sources = [
   "text_test_core.cpp",
   "text_test_min.cpp",
   "text_test_ng.cpp",
+  "text_style_optimization_test_ng.cpp",
   "text_testeight_ng.cpp",
   "text_testeleven_ng.cpp",
   "text_testfive_ng.cpp",
