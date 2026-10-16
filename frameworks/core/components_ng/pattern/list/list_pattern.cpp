@@ -271,15 +271,18 @@ void ActivatePlaceholderSubtree(const RefPtr<UINode>& node)
 
 // Post-layout state of one live shell for on-device triage: distinguishes "content
 // never mounted" (none), "content never measured" (zero-size content) and
-// "measured but not painted" (non-zero size, still blank visually).
+// "measured but not painted" (non-zero size; shellRs/contentRs report whether each
+// node ever entered the render-tree lifecycle via AttachToRenderTree).
 void LogScrollPlaceholderShellState(int32_t index, const RefPtr<FrameNode>& shell)
 {
     auto shellSize = shell->GetGeometryNode()->GetFrameSize();
+    bool shellOnRenderTree = shell->IsPendingOnMainRenderTree();
     if (shell->GetChildren().empty()) {
         TAG_LOGD(AceLogTag::ACE_SCROLL,
             "ScrollPlaceholder shell live: index=%{public}d, shellId=%{public}d, "
-            "shellSize=%{public}fx%{public}f, content=none",
-            index, shell->GetId(), shellSize.Width(), shellSize.Height());
+            "shellSize=%{public}fx%{public}f, shellRs=%{public}d, content=none",
+            index, shell->GetId(), shellSize.Width(), shellSize.Height(),
+            static_cast<int32_t>(shellOnRenderTree));
         return;
     }
     auto content = AceType::DynamicCast<FrameNode>(shell->GetChildren().front());
@@ -287,10 +290,11 @@ void LogScrollPlaceholderShellState(int32_t index, const RefPtr<FrameNode>& shel
     auto contentSize = content->GetGeometryNode()->GetFrameSize();
     TAG_LOGD(AceLogTag::ACE_SCROLL,
         "ScrollPlaceholder shell live: index=%{public}d, shellId=%{public}d, "
-        "shellSize=%{public}fx%{public}f, contentTag=%{public}s, contentActive=%{public}d, "
-        "contentSize=%{public}fx%{public}f",
-        index, shell->GetId(), shellSize.Width(), shellSize.Height(), content->GetTag().c_str(),
-        static_cast<int32_t>(content->IsActive()), contentSize.Width(), contentSize.Height());
+        "shellSize=%{public}fx%{public}f, shellRs=%{public}d, contentTag=%{public}s, contentActive=%{public}d, "
+        "contentSize=%{public}fx%{public}f, contentRs=%{public}d",
+        index, shell->GetId(), shellSize.Width(), shellSize.Height(), static_cast<int32_t>(shellOnRenderTree),
+        content->GetTag().c_str(), static_cast<int32_t>(content->IsActive()), contentSize.Width(),
+        contentSize.Height(), static_cast<int32_t>(content->IsPendingOnMainRenderTree()));
 }
 
 // Placeholder shell: a plain ListItem carrying only the placeholder visual
@@ -356,11 +360,17 @@ void MountPlaceholderShellOnHost(const RefPtr<FrameNode>& host, const RefPtr<Fra
     CHECK_NULL_VOID(context);
     // AddChild assigns parent and depth (UINode::DoAddChild).
     host->AddChild(shell);
-    shell->SetActive(true);
     if (host->IsOnMainTree()) {
         shell->AttachToMainTree(false, context);
     }
     shell->MarkNeedSyncRenderTree();
+    // needRebuildRenderContext schedules an after-layout RebuildRenderContextTree
+    // on the parent (the BuilderNode convention for mounting an offline-built
+    // tree): the layout-time AddChild alone marks the sync flags, but the RS
+    // node tree of a freshly mounted subtree only materializes when the parent
+    // runs the rebuild — device finding: measured geometry never got painted
+    // without it.
+    shell->SetActive(true, true);
 }
 } // namespace
 
