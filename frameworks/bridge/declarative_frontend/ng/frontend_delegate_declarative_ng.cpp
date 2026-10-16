@@ -955,8 +955,7 @@ void FrontendDelegateDeclarativeNG::CloseCustomDialog(const int32_t dialogId, st
 {
     auto task = [dialogId, callback](const RefPtr<NG::OverlayManager>& overlayManager) mutable {
         CHECK_NULL_VOID(overlayManager);
-        auto needCallback = true;
-        auto finalCallback = [&needCallback, callback](int32_t errorCode) {
+        auto finalCallback = [callback](int32_t errorCode) {
             callback(errorCode);
         };
         overlayManager->CloseCustomDialog(dialogId, std::move(finalCallback));
