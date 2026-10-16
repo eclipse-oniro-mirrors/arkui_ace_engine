@@ -288,6 +288,9 @@ AxisEvent AxisInfo::ConvertToAxisEvent() const
 
 AxisEvent AxisInfo::ConvertToAxisEvent(bool isForStatic, float density) const
 {
+    if (NearEqual(density, 0.f)) {
+        density = 1.0f;
+    }
     AxisEvent axisEvent;
     if (isForStatic) {
         axisEvent.x = static_cast<float>(globalLocation_.GetX() / density);

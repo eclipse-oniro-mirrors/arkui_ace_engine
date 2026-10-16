@@ -364,6 +364,9 @@ MouseEvent MouseInfo::ConvertToMouseEvent() const
 
 MouseEvent MouseInfo::ConvertToMouseEventForStatic(float density) const
 {
+    if (NearEqual(density, 0.f)) {
+        density = 1.0f;
+    }
     MouseEvent mouseEvent;
     mouseEvent.sourceType = GetSourceDevice();
     mouseEvent.sourceTool = GetSourceTool();
