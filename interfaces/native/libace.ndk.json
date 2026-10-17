@@ -7230,14 +7230,6 @@
     },
     {
         "first_introduced": "26.0.1",
-        "name": "OH_ArkUI_NativeModule_PathAnimation_SetCurve"
-    },
-    {
-        "first_introduced": "26.0.1",
-        "name": "OH_ArkUI_NativeModule_PathAnimation_GetCurve"
-    },
-    {
-        "first_introduced": "26.0.1",
         "name": "OH_ArkUI_NativeModule_PathAnimation_SetTempo"
     },
     {

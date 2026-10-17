@@ -24,6 +24,7 @@
 #include "securec.h"
 
 #include "base/log/log_wrapper.h"
+#include "core/common/container_scope.h"
 #include "core/components_ng/render/animation_utils.h"
 
 namespace OHOS::Ace::NG {
@@ -110,6 +111,7 @@ ArkUI_Int32 AnimationGroupAdapter::AddAnimationGroup(
         return ERROR_CODE_PARAM_INVALID;
     }
 
+    ContainerScope scope(instanceId);
     std::shared_ptr<AnimationUtils::InteractiveAnimation> oldAnim;
     int64_t oldGen = 0;
     {
