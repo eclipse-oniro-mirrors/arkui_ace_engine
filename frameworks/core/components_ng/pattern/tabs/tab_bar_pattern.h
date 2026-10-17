@@ -49,7 +49,7 @@ const auto TabBarPhysicalCurve = AceType::MakeRefPtr<InterpolatingSpring>(-1.0f,
 
 using TabBarBuilderFunc = std::function<void()>;
 using OnTabBarItemsChangeEvent = std::function<void()>;
-class TabBarParam : public virtual Referenced {
+class TabBarParam : public Referenced {
 public:
     TabBarParam(const std::string& textParam, const std::string& iconParam, TabBarBuilderFunc&& builderParam)
         : text_(textParam), icon_(iconParam), builder_(std::move(builderParam)) {};

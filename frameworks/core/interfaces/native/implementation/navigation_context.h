@@ -26,7 +26,7 @@
 
 namespace OHOS::Ace::NG::GeneratedModifier::NavigationContext {
 
-class ExternalDataKeeper : public virtual Referenced {
+class ExternalDataKeeper : public Referenced {
 public:
     ExternalDataKeeper() = default;
     ~ExternalDataKeeper() override

@@ -21,7 +21,7 @@
 
 namespace OHOS::Ace::Framework {
 
-class JsiInputBridge : virtual public AceType {
+class JsiInputBridge : public AceType {
     DECLARE_ACE_TYPE(JsiInputBridge, AceType);
 
 public:

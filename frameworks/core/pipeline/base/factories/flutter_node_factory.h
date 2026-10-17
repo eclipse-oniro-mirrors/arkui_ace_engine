@@ -28,7 +28,7 @@ constexpr size_t TEXT_CACHE_SIZE = 100;
 constexpr size_t IMAGE_CACHE_SIZE = 100;
 constexpr size_t BOX_CACHE_SIZE = 200;
 
-class FlutterTextFactory final : public virtual RenderNodeFactory {
+class FlutterTextFactory final : public RenderNodeFactory {
     DECLARE_ACE_TYPE(FlutterTextFactory, RenderNodeFactory);
 
 public:
@@ -37,7 +37,7 @@ public:
     ACE_DISALLOW_COPY_AND_MOVE(FlutterTextFactory);
 };
 
-class FlutterImageFactory final : public virtual RenderNodeFactory {
+class FlutterImageFactory final : public RenderNodeFactory {
     DECLARE_ACE_TYPE(FlutterImageFactory, RenderNodeFactory);
 
 public:
@@ -46,7 +46,7 @@ public:
     ACE_DISALLOW_COPY_AND_MOVE(FlutterImageFactory);
 };
 
-class FlutterBoxFactory final : public virtual RenderNodeFactory {
+class FlutterBoxFactory final : public RenderNodeFactory {
     DECLARE_ACE_TYPE(FlutterBoxFactory, RenderNodeFactory);
 
 public:

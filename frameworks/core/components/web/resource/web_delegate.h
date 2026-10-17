@@ -782,7 +782,7 @@ private:
     WeakPtr<PipelineBase> context_ = nullptr;
 };
 
-class WebDelegateObserver : public virtual AceType {
+class WebDelegateObserver : public AceType {
 DECLARE_ACE_TYPE(WebDelegateObserver, AceType);
 public:
     WebDelegateObserver(const RefPtr<WebDelegate>& delegate, WeakPtr<PipelineBase> context)

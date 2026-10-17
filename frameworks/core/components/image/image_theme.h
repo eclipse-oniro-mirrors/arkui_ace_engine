@@ -27,7 +27,7 @@ namespace OHOS::Ace {
  * ImageTheme defines color and styles of Image. ImageTheme should be built
  * using ImageTheme::Builder.
  */
-class ImageTheme : public virtual Theme {
+class ImageTheme : public Theme {
     DECLARE_ACE_TYPE(ImageTheme, Theme);
 
 public:

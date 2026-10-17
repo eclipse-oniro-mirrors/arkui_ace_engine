@@ -21,7 +21,7 @@
 
 namespace OHOS::Ace::NG {
 
-class ScrollableTheme : public virtual Theme {
+class ScrollableTheme : public Theme {
     DECLARE_ACE_TYPE(ScrollableTheme, Theme);
 
 public:

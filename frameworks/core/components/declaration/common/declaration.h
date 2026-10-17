@@ -45,7 +45,7 @@ using CachePseudoClassStyleFunc = std::function<void(std::pair<std::string, std:
 #define DECLARATION_EXPORT ACE_FORCE_EXPORT
 #endif
 
-class DECLARATION_EXPORT Declaration : public virtual AceType {
+class DECLARATION_EXPORT Declaration : public AceType {
     DECLARE_ACE_TYPE(Declaration, AceType);
 
 public:

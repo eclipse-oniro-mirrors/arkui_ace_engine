@@ -25,7 +25,7 @@ namespace OHOS::Ace {
 enum class BlurStyle;
 enum class ThemeColorMode;
 
-class BlurStyleTheme : public virtual Theme {
+class BlurStyleTheme : public Theme {
     DECLARE_ACE_TYPE(BlurStyleTheme, Theme);
 
 public:

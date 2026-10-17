@@ -25,7 +25,7 @@
 #include "core/components_ng/pattern/text/text_layout_property.h"
 
 namespace OHOS::Ace::NG {
-class TextInputResponseArea : public virtual AceType {
+class TextInputResponseArea : public AceType {
     DECLARE_ACE_TYPE(TextInputResponseArea, AceType);
 
 public:

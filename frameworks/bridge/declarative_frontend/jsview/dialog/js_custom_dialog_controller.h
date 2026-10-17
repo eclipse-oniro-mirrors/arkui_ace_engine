@@ -22,7 +22,7 @@
 
 namespace OHOS::Ace::Framework {
 
-class JSCustomDialogController : public virtual AceType {
+class JSCustomDialogController : public AceType {
     DECLARE_ACE_TYPE(JSCustomDialogController, AceType);
 
 public:
