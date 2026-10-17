@@ -2201,7 +2201,9 @@
       "OHOS::Ace::NG::ScrollablePattern::AddScrollableFrameInfo(int)";
       "OHOS::Ace::NG::ScrollablePattern::AddScrollEvent()";
       "OHOS::Ace::NG::ScrollablePattern::AnimateTo(float, float, OHOS::Ace::RefPtr<OHOS::Ace::Curve> const&, bool, bool, bool)";
+      "OHOS::Ace::NG::ScrollablePattern::CalcSpringAdjustOffset(float) const";
       "OHOS::Ace::NG::ScrollablePattern::CanOverScrollWithDelta(double, bool)";
+      "OHOS::Ace::NG::ScrollablePattern::CancelFastScroll()";
       "OHOS::Ace::NG::ScrollablePattern::CheckRestartSpring(bool, bool)";
       "OHOS::Ace::NG::ScrollablePattern::CalculateFriction(float)";
       "OHOS::Ace::NG::ScrollablePattern::CheckScrollBarOff()";
@@ -2255,6 +2257,7 @@
       "OHOS::Ace::NG::ScrollablePattern::MarkScrollBarProxyDirty()";
       "OHOS::Ace::NG::ScrollablePattern::MultiSelectable() const";
       "OHOS::Ace::NG::ScrollablePattern::MarkUserScrollSource(int)";
+      "OHOS::Ace::NG::ScrollablePattern::OnAnimateStop()";
       "OHOS::Ace::NG::ScrollablePattern::OnAttachToFrameNode()";
       "OHOS::Ace::NG::ScrollablePattern::OnAttachToMainTree()";
       "OHOS::Ace::NG::ScrollablePattern::OnColorConfigurationUpdate()";
@@ -4593,6 +4596,9 @@
       "OHOS::Ace::NG::LazyLayoutUtils::GetLazyLayoutPattern(OHOS::Ace::RefPtr<OHOS::Ace::NG::UINode> const&)";
       "OHOS::Ace::NG::LazyLayoutUtils::GetViewPosReference(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&, std::__h::vector<std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>>, std::__h::allocator<std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>>>> const&)";
       "OHOS::Ace::NG::LazyLayoutPattern::AfterMountToParent()";
+      OHOS::Ace::NG::LazyLayoutPattern::GetPreparedGeometry*;
+      OHOS::Ace::NG::LazyLayoutPattern::RestorePreparedGeometry*;
+      OHOS::Ace::NG::LazyLayoutPattern::SwapPremeasureWrapper*;
       "OHOS::Ace::NG::LazyLayoutPattern::DumpStickyHeaderHandoffInfo() const";
       "OHOS::Ace::NG::LazyLayoutPattern::DumpStickyHeaderHandoffInfo(std::__h::unique_ptr<OHOS::Ace::JsonValue, std::__h::default_delete<OHOS::Ace::JsonValue>>&) const";
       "OHOS::Ace::NG::LazyLayoutPattern::NotifyParentOnStickyHeaderChange()";
@@ -4601,7 +4607,10 @@
       "OHOS::Ace::NG::LazyLayoutPattern::PublishNextStickyHeaderGap(std::__h::optional<float> const&)";
       "OHOS::Ace::NG::LazyLayoutUtils::HasDirectWaterFlowAncestor(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&)";
       "OHOS::Ace::NG::LazyLayoutUtils::IsAllowedIntermediateNode(OHOS::Ace::RefPtr<OHOS::Ace::NG::UINode> const&)";
+      "OHOS::Ace::NG::LazyLayoutUtils::IsChildMeasureComplete(OHOS::Ace::RefPtr<OHOS::Ace::NG::LayoutWrapper> const&)";
+      OHOS::Ace::NG::LazyLayoutUtils::MeasurePreparedBoundary*;
       "OHOS::Ace::NG::LazyLayoutUtils::IsVerticalScrollableParent(OHOS::Ace::RefPtr<OHOS::Ace::NG::UINode> const&)";
+      "OHOS::Ace::NG::LazyLayoutUtils::Premeasure(OHOS::Ace::RefPtr<OHOS::Ace::NG::LayoutWrapper> const&, OHOS::Ace::NG::LayoutConstraintT<float> const&, std::__h::vector<OHOS::Ace::WeakPtr<OHOS::Ace::NG::FrameNode>, std::__h::allocator<OHOS::Ace::WeakPtr<OHOS::Ace::NG::FrameNode>>>*)";
       "OHOS::Ace::NG::LazyLayoutUtils::ResolveMeasureMode(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&, OHOS::Ace::Axis, std::__h::optional<OHOS::Ace::NG::ViewPosReference> const&, int, int, bool)";
       "OHOS::Ace::NG::LazyLayoutUtils::ValidateAndSetLazyLayoutParent(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&, OHOS::Ace::Axis)";
       "OHOS::Ace::NG::LazyLayoutUtils::ValidateLazyLayoutParent(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&, std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>> const&)";

@@ -40,7 +40,7 @@
 #include "core/components/web/web_property.h" // Unscoped enum types
 #include "core/common/ime/text_range.h"
 #include "core/components/common/properties/text_style.h"
-#include "core/components_ng/pattern/list/list_item_group_pattern.h" // Unscoped enum types
+#include "core/components_ng/pattern/list/list_properties.h" // Unscoped enum types
 #include "core/components_ng/pattern/slider/slider_model.h" // Inner types
 #include "core/components_ng/pattern/tabs/tab_content_model.h"
 #include "core/components_ng/pattern/text/text_styles.h"
@@ -85,6 +85,7 @@ enum class LineJoinStyle;
 enum class MenuPolicy;
 enum class NavigationType;
 enum class ParticleDisturbanceShapeType : uint32_t;
+enum class ScrollAlign;
 enum class TabBarDisplayMode;
 enum class SidebarDisplayStyle;
 enum class TabsCacheMode;
@@ -98,6 +99,7 @@ class PickerDate;
 class PickerTime;
 struct DateTimeType;
 struct Font;
+struct ListItemGroupIndex;
 struct PickerIndicatorStyle;
 struct PreviewText;
 struct SelectionOptions;

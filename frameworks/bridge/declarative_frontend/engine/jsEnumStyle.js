@@ -4450,6 +4450,13 @@ let ScrollAlign;
   ScrollAlign[ScrollAlign.AUTO = 3] = 'AUTO';
 })(ScrollAlign || (ScrollAlign = {}));
 
+let FastScrollMode;
+(function (FastScrollMode) {
+  FastScrollMode[FastScrollMode.NONE = 0] = 'NONE';
+  FastScrollMode[FastScrollMode.SKIP_MEASURE = 1] = 'SKIP_MEASURE';
+  FastScrollMode[FastScrollMode.SKIP_CREATE_AND_MEASURE = 2] = 'SKIP_CREATE_AND_MEASURE';
+})(FastScrollMode || (FastScrollMode = {}));
+
 let SafeAreaType;
 (function (SafeAreaType) {
   SafeAreaType[SafeAreaType.SYSTEM = 0] = 'SYSTEM';

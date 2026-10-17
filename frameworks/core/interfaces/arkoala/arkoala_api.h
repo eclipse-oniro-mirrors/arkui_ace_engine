@@ -4626,6 +4626,8 @@ struct ArkUIFlexModifier {
     void (*getFlexSpace)(ArkUINodeHandle node, ArkUI_Float32 (*values)[2]);
 };
 
+struct ArkUIScrollToIndexOptions;
+
 struct ArkUIListModifier {
     void (*setListLanes)(ArkUINodeHandle node, ArkUI_Int32 lanesNum, const struct ArkUIDimensionType* minLength,
         const struct ArkUIDimensionType* maxLength, const struct ArkUIDimensionType* gutter);
@@ -4793,6 +4795,8 @@ struct ArkUIListModifier {
     void (*resetBackPressCloseSwipeAction)(ArkUINodeHandle node);
     ArkUI_Bool (*getBackPressCloseSwipeAction)(ArkUINodeHandle node);
     ArkUI_Bool (*getChainAnimation)(ArkUINodeHandle node);
+    void (*setScrollToIndexWithOptions)(ArkUINodeHandle node, ArkUI_Int32 index,
+        const ArkUIScrollToIndexOptions* options);
 };
 
 struct ArkUIArcListModifier {
