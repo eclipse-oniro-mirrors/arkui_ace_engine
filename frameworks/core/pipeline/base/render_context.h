@@ -30,7 +30,7 @@ T* CastLayerAs(RenderLayer layer)
 }
 
 class RenderNode;
-class RenderContext : public AceType {
+class RenderContext : public virtual AceType {
     DECLARE_ACE_TYPE(RenderContext, AceType);
 
 public:

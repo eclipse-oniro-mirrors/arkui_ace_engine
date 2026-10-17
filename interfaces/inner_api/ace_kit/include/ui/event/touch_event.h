@@ -325,7 +325,7 @@ using OnTouchEventCallback = std::function<void(const TouchEventInfo&)>;
 using CatchTouchEventCallback = std::function<void()>;
 
 namespace NG {
-class TouchEventImpl : public virtual AceType {
+class TouchEventImpl : public AceType {
     DECLARE_ACE_TYPE(TouchEventImpl, AceType);
 public:
     explicit TouchEventImpl(TouchEventFunc&& callback) : callback_(std::move(callback)) {}

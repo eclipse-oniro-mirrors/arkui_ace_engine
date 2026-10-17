@@ -24,7 +24,7 @@ class FrameNode;
 
 enum class FillDirection { START, END, INITIAL };
 
-class FillAlgorithm : public AceType {
+class FillAlgorithm : public virtual AceType {
     DECLARE_ACE_TYPE(FillAlgorithm, AceType);
 
 public:

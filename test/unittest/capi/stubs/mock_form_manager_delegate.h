@@ -18,7 +18,7 @@
 #include "base/memory/ace_type.h"
 
 namespace OHOS::Ace {
-class FormManagerDelegate : public AceType {
+class FormManagerDelegate : public virtual AceType {
     DECLARE_ACE_TYPE(FormManagerDelegate, AceType);
 };
 }

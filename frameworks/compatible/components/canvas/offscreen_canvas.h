@@ -23,7 +23,7 @@
 #include "core/components/common/properties/paint_state.h"
 
 namespace OHOS::Ace {
-class OffscreenCanvas : public AceType {
+class OffscreenCanvas : public virtual AceType {
     DECLARE_ACE_TYPE(OffscreenCanvas, AceType);
 
 public:

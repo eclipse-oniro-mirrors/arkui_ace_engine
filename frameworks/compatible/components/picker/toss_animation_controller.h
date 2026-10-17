@@ -20,7 +20,7 @@
 #include "core/pipeline/base/render_node.h"
 namespace OHOS::Ace {
 
-class TossAnimationController : public AceType {
+class TossAnimationController : public virtual AceType {
     DECLARE_ACE_TYPE(TossAnimationController, AceType);
 
 public:

@@ -121,7 +121,7 @@ private:
     std::function<void(size_t)> queryStateFunc_;
 };
 
-class GestureReferee : public AceType {
+class GestureReferee : public virtual AceType {
     DECLARE_ACE_TYPE(GestureReferee, AceType);
 
 public:

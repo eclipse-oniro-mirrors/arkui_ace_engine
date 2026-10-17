@@ -33,7 +33,7 @@ class OverlayManager;
 using IsPageInStackCallback = std::function<bool(const RefPtr<FrameNode>& page)>;
 
 // StageManager is the base class for root render node to perform page switch.
-class ACE_FORCE_EXPORT StageManager : public AceType {
+class ACE_FORCE_EXPORT StageManager : public virtual AceType {
     DECLARE_ACE_TYPE(StageManager, AceType);
 
 public:

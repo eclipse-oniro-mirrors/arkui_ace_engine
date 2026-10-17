@@ -47,7 +47,7 @@ using InspectorFunc = std::function<void()>;
 using InspectorFuncWithParameter = std::function<void(std::vector<int32_t>)>;
 using CounterFunc = std::function<bool()>;
 using MediaQueryCallback = std::function<void(const std::string& callbackId, const std::string& args)>;
-class InspectorEvent : public AceType {
+class InspectorEvent : public virtual AceType {
     DECLARE_ACE_TYPE(InspectorEvent, AceType)
 public:
     explicit InspectorEvent(InspectorFunc&& callback, CounterFunc&& counter)

@@ -32,7 +32,7 @@ namespace {
     constexpr uint64_t MAX_WAITING_TIME = 1000; // 1000ms
 }
 
-class ImageObject : public AceType {
+class ImageObject : public virtual AceType {
     DECLARE_ACE_TYPE(ImageObject, AceType);
 
 public:

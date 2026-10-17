@@ -30,7 +30,7 @@ template<typename T, typename S>
 class NodeAnimatableProperty;
 using NodeAnimatablePropertyFloat = NodeAnimatableProperty<float, AnimatablePropertyFloat>;
 class PickerColumnPattern;
-class ACE_FORCE_EXPORT TossAnimationController : public AceType {
+class ACE_FORCE_EXPORT TossAnimationController : public virtual AceType {
     DECLARE_ACE_TYPE(TossAnimationController, AceType);
 
 public:

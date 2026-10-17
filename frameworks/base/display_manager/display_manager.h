@@ -25,7 +25,7 @@
 
 namespace OHOS::Ace {
 
-class ACE_FORCE_EXPORT DisplayManager : public AceType {
+class ACE_FORCE_EXPORT DisplayManager : public virtual AceType {
     DECLARE_ACE_TYPE(DisplayManager, AceType);
 
 public:

@@ -40,7 +40,7 @@ struct ExtensionLayoutConstraint {
 
 class FrameNode;
 
-class ACE_EXPORT ExtensionHandler : public AceType {
+class ACE_EXPORT ExtensionHandler : public virtual AceType {
     DECLARE_ACE_TYPE(ExtensionHandler, AceType);
 
 public:

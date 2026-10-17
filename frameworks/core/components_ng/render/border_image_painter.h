@@ -30,7 +30,7 @@ struct DisplayScaleInfo {
     double vpScale = 0.0;
     double lpxScale = 0.0;
 };
-class BorderImagePainter : public AceType {
+class BorderImagePainter : public virtual AceType {
     DECLARE_ACE_TYPE(BorderImagePainter, AceType);
 
 public:

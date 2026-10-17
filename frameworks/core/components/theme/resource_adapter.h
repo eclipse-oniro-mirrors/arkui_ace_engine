@@ -46,7 +46,7 @@ struct RawfileDescription {
     long length = 0;
 };
 
-class ResourceAdapter : public AceType {
+class ResourceAdapter : public virtual AceType {
     DECLARE_ACE_TYPE(ResourceAdapter, AceType);
 
 public:

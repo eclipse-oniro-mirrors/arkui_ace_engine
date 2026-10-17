@@ -34,7 +34,7 @@ extern const char WEB_METHOD[];
 extern const char WEB_EVENT[];
 extern const char WEB_RESULT_FAIL[];
 
-class WebResource : public AceType {
+class WebResource : public virtual AceType {
     DECLARE_ACE_TYPE(WebResource, AceType);
 
 public:

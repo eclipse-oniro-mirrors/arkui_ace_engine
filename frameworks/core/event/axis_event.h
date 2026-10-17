@@ -233,7 +233,7 @@ private:
 using OnAxisEventFunc = std::function<void(AxisInfo&)>;
 using OnCoastingAxisEventFunc = std::function<void(CoastingAxisInfo&)>;
 
-class AxisEventTarget : public virtual TouchEventTarget {
+class AxisEventTarget : public TouchEventTarget {
     DECLARE_ACE_TYPE(AxisEventTarget, TouchEventTarget);
 
 public:

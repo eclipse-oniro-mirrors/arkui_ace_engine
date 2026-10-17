@@ -25,7 +25,7 @@
 #include "core/pipeline_ng/pipeline_context.h"
 
 namespace OHOS::Ace {
-class ACE_EXPORT PluginSubContainer : public AceType {
+class ACE_EXPORT PluginSubContainer : public virtual AceType {
     DECLARE_ACE_TYPE(PluginSubContainer, AceType);
 
 public:

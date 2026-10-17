@@ -103,7 +103,7 @@ struct HitTestRecordInfo {
     TouchType type;
 };
 
-class EventManager : virtual public NG::KeyEventManager {
+class EventManager : public NG::KeyEventManager {
     DECLARE_ACE_TYPE(EventManager, KeyEventManager);
 
 public:
