@@ -106,6 +106,20 @@ public:
         return IsDefaultToast();
     }
 
+    // Safe area avoidance is handled entirely by OverlaySafeAreaHelper via DeriveInsetsFromHelper,
+    // matching the Menu path. AvoidBottom/AvoidCutout return false so the framework's
+    // ContentRootPattern::CreateSafeAreaInsets does not record separate insets that could
+    // double-stack with the helper-derived ones (Func-04-02-01-Feat-09).
+    bool AvoidBottom() const override
+    {
+        return false;
+    }
+
+    bool AvoidCutout() const override
+    {
+        return false;
+    }
+
     void UpdateFoldDisplayModeChangedCallbackId(std::optional<int32_t> id)
     {
         foldDisplayModeChangedCallbackId_ = id;
