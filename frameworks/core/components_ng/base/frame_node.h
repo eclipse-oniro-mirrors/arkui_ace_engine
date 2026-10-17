@@ -1122,8 +1122,8 @@ public:
         return layoutProperty_;
     }
 
-    RefPtr<LayoutWrapper> GetOrCreateChildByIndex(
-        uint32_t index, bool addToRenderTree = true, bool isCache = false) override;
+    RefPtr<LayoutWrapper> GetOrCreateChildByIndex(uint32_t index, bool addToRenderTree = true,
+        bool isCache = false, bool allowPlaceholderSubstitution = false) override;
     RefPtr<LayoutWrapper> GetChildByIndex(uint32_t index, bool isCache = false) override;
 
     FrameNode* GetFrameNodeChildByIndex(uint32_t index, bool isCache = false, bool isExpand = true);

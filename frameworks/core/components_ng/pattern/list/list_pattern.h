@@ -93,7 +93,15 @@ public:
     // Decision + acquire + mount + framed enqueue at the child build call point.
     // Returns the mounted shell when this index is deferred to a placeholder,
     // null when the caller should keep the existing (build-real) acquisition.
+    // A deferred index is also recorded in the manager's deferral table, so the
+    // acquisition itself (FrameProxy::GetFrameNodeByIndex) substitutes the shell.
     RefPtr<FrameNode> CreateScrollPlaceholderShell(int32_t index);
+    // Decision-side entry invoked from the layout fill loop right before the normal
+    // child acquisition: predicts with the remaining frame budget and, on defer,
+    // mounts the shell and records the deferral. The wrapper substitution itself is
+    // NOT done here — the acquisition below flows through FrameProxy, which resolves
+    // the recorded deferral, so skip-flag inheritance and activation match real items.
+    void PrepareScrollPlaceholderForAcquisition(int32_t index);
     bool HasScrollPlaceholderItem(int32_t index) const;
     // Real-build closure executed by the pipeline framed flush: builds the real
     // item through the existing build-style acquisition (syntax path as-is),

@@ -389,6 +389,12 @@ void MountPlaceholderShellOnHost(const RefPtr<FrameNode>& host, const RefPtr<Fra
         if (!host || !shell) {
             return;
         }
+        // Framework pattern (z-index path, RosenRenderContext::OnZIndexUpdate): the
+        // rebuild must be preceded by MarkNeedSyncRenderTree — the flag set at AddChild
+        // may already have been consumed by a mid-layout rebuild, and a bare rebuild
+        // silently no-ops on the stale flag (the v6 device finding: shellRs=0 across
+        // every round exactly matches that early-return).
+        host->MarkNeedSyncRenderTree();
         host->RebuildRenderContextTree();
         shell->MarkNeedSyncRenderTree();
         shell->RebuildRenderContextTree();
@@ -445,11 +451,12 @@ RefPtr<FrameNode> ListPattern::CreateScrollPlaceholderShell(int32_t index)
     if (index < 0 || index >= host->GetTotalChildCount()) {
         return nullptr;
     }
-    if (host->GetChildByIndex(static_cast<uint32_t>(index))) {
+    // Deferral-blind built-probe (UINode window walk, no FrameProxy): once a deferral
+    // for this index is recorded, the index acquisition itself resolves to the shell,
+    // so the plain GetChildByIndex here would mistake our own shell for a real child.
+    if (host->GetFrameNodeChildByIndexWithoutBuild(static_cast<uint32_t>(index))) {
         // The real child at this index is already built (a committed real-build or a
-        // normal-path rebuild): never place a placeholder over it. Same predicate as
-        // the commit/reconcile paths; shells carry a zero frame count and never
-        // resolve here, so this sees real children only.
+        // normal-path rebuild): never place a placeholder over it.
         return nullptr;
     }
     auto* context = host->GetContext();
@@ -473,6 +480,9 @@ RefPtr<FrameNode> ListPattern::CreateScrollPlaceholderShell(int32_t index)
     }
     scrollPlaceholderItems_[index] = info;
     mountedPlaceholderShells_[shell] = info.templateId;
+    // Acquisition substitution table (ADR-2 rev): FrameProxy::GetFrameNodeByIndex
+    // resolves this index to the shell until the real build commits and clears it.
+    manager->RecordDeferral(host->GetId(), index, shell);
     ScrollPlaceholderPredictParams params;
     params.componentType = ScrollPlaceholderComponentType::LIST;
     params.templateId = options->id;
@@ -497,6 +507,17 @@ void ListPattern::EnqueueScrollPlaceholderRealBuild(
         ScrollPlaceholderRealBuildPriority::VISIBLE);
 }
 
+void ListPattern::PrepareScrollPlaceholderForAcquisition(int32_t index)
+{
+    // Decision-side pre-check for the FrameProxy acquisition substitution: predicts
+    // with the remaining frame budget and, on defer, mounts the shell and records the
+    // deferral. The wrapper substitution is deliberately NOT done here — the normal
+    // acquisition right after this call flows through GetOrCreateChildByIndex ->
+    // FrameProxy::GetFrameNodeByIndex, which resolves the deferral so the shell picks
+    // up the same skip-flag inheritance and activation as a real item.
+    CreateScrollPlaceholderShell(index);
+}
+
 bool ListPattern::HasScrollPlaceholderItem(int32_t index) const
 {
     return scrollPlaceholderItems_.find(index) != scrollPlaceholderItems_.end();
@@ -515,6 +536,13 @@ bool ListPattern::CommitScrollPlaceholderRealBuild(int32_t index)
     if (iter == scrollPlaceholderItems_.end()) {
         return false;
     }
+    auto* context = host->GetContext();
+    const auto& manager = context ? context->GetOrCreateScrollPlaceholderManager() : nullptr;
+    // Drop the acquisition deferral FIRST: the real acquisition below must resolve
+    // through FrameProxy's normal path, not back into this shell.
+    if (manager) {
+        manager->ClearDeferral(host->GetId(), index);
+    }
     if (index < 0 || index >= host->GetTotalChildCount()) {
         // Data shrank below this index: drop the placeholder, never mount.
         RetireScrollPlaceholderShell(iter->second.shell, iter->second.templateId);
@@ -522,8 +550,10 @@ bool ListPattern::CommitScrollPlaceholderRealBuild(int32_t index)
         return false;
     }
     // A real child already present at the index (built through the normal path
-    // after a data change): keep it, retire the placeholder.
-    if (host->GetChildByIndex(static_cast<uint32_t>(index))) {
+    // after a data change): keep it, retire the placeholder. Deferral-blind probe —
+    // plain GetChildByIndex would still see this index's own shell without the
+    // clear above, and any other deferred index must not resolve here either.
+    if (host->GetFrameNodeChildByIndexWithoutBuild(static_cast<uint32_t>(index))) {
         RetireScrollPlaceholderShell(iter->second.shell, iter->second.templateId);
         scrollPlaceholderItems_.erase(iter);
         return false;
@@ -550,12 +580,18 @@ void ListPattern::RetireScrollPlaceholderShell(const RefPtr<FrameNode>& shell, c
     mountedPlaceholderShells_.erase(shell);
     auto host = GetHost();
     CHECK_NULL_VOID(host);
+    auto* context = host->GetContext();
+    const auto& manager = context ? context->GetOrCreateScrollPlaceholderManager() : nullptr;
+    // Retirement funnel for every path (commit drops, reconcile drops, the retiring
+    // list and the orphan sweep): drop any deferral still pointing at this shell so
+    // the index resolves through the normal acquisition again.
+    if (manager) {
+        manager->RemoveDeferralsByShell(host->GetId(), shell);
+    }
     // Return the template content subtree to the per-template instance pool —
     // the expensive part (builder/clone) — and drop the cheap shell.
     bool contentPooled = false;
     if (!templateId.empty() && shell->GetChildren().size() == 1) {
-        auto* context = host->GetContext();
-        const auto& manager = context ? context->GetOrCreateScrollPlaceholderManager() : nullptr;
         if (manager) {
             auto content = shell->GetChildren().front();
             shell->RemoveChild(content);
@@ -590,7 +626,7 @@ void ListPattern::ReconcileScrollPlaceholderItems()
             LogScrollPlaceholderShellState(iter->first, iter->second.shell);
         }
         bool drop = iter->first >= totalCount ||
-            (host->GetChildByIndex(static_cast<uint32_t>(iter->first)) != nullptr);
+            (host->GetFrameNodeChildByIndexWithoutBuild(static_cast<uint32_t>(iter->first)) != nullptr);
         if (drop) {
             RetireScrollPlaceholderShell(iter->second.shell, iter->second.templateId);
             iter = scrollPlaceholderItems_.erase(iter);

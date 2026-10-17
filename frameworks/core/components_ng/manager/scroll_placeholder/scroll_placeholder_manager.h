@@ -33,6 +33,7 @@
 namespace OHOS::Ace::NG {
 
 class PipelineContext;
+class FrameNode;
 
 // Prediction request for one real item about to be created inside a scroll container.
 struct ScrollPlaceholderPredictParams {
@@ -126,6 +127,29 @@ public:
     void Destroy();
     bool IsDestroyed() const;
 
+    // ---- Acquisition deferral table (ADR-2 rev: the index->wrapper substitution itself
+    // executes in FrameProxy::GetFrameNodeByIndex, one choke point above every lazy
+    // syntax node). The container pattern stays the decision side: on defer it mounts
+    // the shell and records (hostId, index) -> shell here; FrameProxy queries the table
+    // on every non-cache index acquisition and returns the shell as the index's current
+    // occupant until the real build commits and the entry is cleared. Registered shells
+    // never enter FrameProxy's partFrameNodeChildren_: the index slot stays reserved
+    // for the real item. Threading: UI thread only.
+    // Records one live deferral; replaces any previous shell for the same (hostId, index).
+    void RecordDeferral(int32_t hostNodeId, int32_t index, const RefPtr<FrameNode>& shell);
+    // Drops the deferral so the index resolves through the normal acquisition again.
+    void ClearDeferral(int32_t hostNodeId, int32_t index);
+    // Drops every deferral whose recorded shell is the given node (the retirement
+    // funnel covers paths that do not know the index, e.g. the orphan sweep).
+    void RemoveDeferralsByShell(int32_t hostNodeId, const RefPtr<FrameNode>& shell);
+    // Returns the deferred shell for the index, or null when nothing is deferred (a
+    // dead weak reference is treated as no deferral and swept).
+    RefPtr<FrameNode> QueryDeferredShell(int32_t hostNodeId, int32_t index);
+    // Process-wide fast gate for the FrameProxy hot path: false when no deferral was
+    // ever recorded and not yet cleared, letting non-placeholder acquisitions skip the
+    // context/manager lookup entirely.
+    static bool HasAnyDeferrals();
+
     // Observation hooks for scroll container item builds (no behavior impact: the real item
     // is still built synchronously; these only sample its cost and let the prediction say,
     // per frame, how many items it would have built now and how many it would defer to
@@ -208,6 +232,18 @@ private:
     void RequestFrameIfAlive();
     void PurgeTemplateRealBuilds(const std::string& templateId, ScrollPlaceholderCancelReason reason);
 
+    // Deferral table key: host id and item index packed into one 64-bit key. Host ids
+    // and lazy-container indexes are generated positive int32s, so the packing is
+    // collision-free for every real pair.
+    static uint64_t DeferralKey(int32_t hostNodeId, int32_t index)
+    {
+        return (static_cast<uint64_t>(static_cast<uint32_t>(hostNodeId)) << 32) |
+               static_cast<uint64_t>(static_cast<uint32_t>(index));
+    }
+    // Erases one table entry and keeps the live count in step; true when an entry
+    // was actually removed.
+    bool TakeDeferralEntry(uint64_t key);
+
     int32_t instanceId_ = -1;
     WeakPtr<PipelineContext> pipeline_;
     ScrollPlaceholderCostModel costModel_;
@@ -224,6 +260,14 @@ private:
     // background clone tasks.
     mutable std::mutex cloneMutex_;
     std::unordered_map<std::string, uint32_t> pendingCloneCount_;
+
+    // (hostId, index) -> mounted shell of a deferred index. Weak so a leaked pattern
+    // bookkeeping bug can never keep a retired shell alive through this table.
+    std::unordered_map<uint64_t, WeakPtr<FrameNode>> deferrals_;
+    // Process-wide live-deferral count behind HasAnyDeferrals(): relaxed atomic, the
+    // FrameProxy fast gate reads it from the UI thread while record/clear run on the
+    // UI thread as well (the atomic only keeps the read well-defined off-contract).
+    inline static std::atomic<int32_t> liveDeferralCount_ = 0;
 
     mutable std::atomic<uint64_t> predictBuildRealNow_ = 0;
     mutable std::atomic<uint64_t> predictUsePlaceholder_ = 0;

@@ -1566,4 +1566,56 @@ HWTEST_F(ScrollPlaceholderManagerTestNg, ScrollPlaceholderTextCloneMeasure001, T
                      << " copy=" << copySize.Width() << "x" << copySize.Height();
     EXPECT_EQ(copySize, sourceSize);
 }
+
+/**
+ * @tc.name: ScrollPlaceholderDeferralTable001
+ * @tc.desc: The acquisition deferral table (ADR-2 rev, consumed by
+ *           FrameProxy::GetFrameNodeByIndex): records key by (host, index),
+ *           replaces instead of stacking, answers only for its own key, clears
+ *           by index and by shell, sweeps dead entries on query, and drives the
+ *           process-wide HasAnyDeferrals gate used as the FrameProxy fast path.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPlaceholderManagerTestNg, ScrollPlaceholderDeferralTable001, TestSize.Level1)
+{
+    const int32_t hostId = 4242;
+    auto shellA = FrameNode::CreateFrameNode("deferral_shell_a",
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    auto shellB = FrameNode::CreateFrameNode("deferral_shell_b",
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    ASSERT_TRUE(shellA && shellB);
+
+    // HasAnyDeferrals is process-wide and shared with other fixtures, so only the
+    // per-manager table semantics are asserted here.
+    EXPECT_TRUE(manager_->QueryDeferredShell(hostId, 0) == nullptr);
+
+    // Record answers only for its own (host, index) and a re-record replaces.
+    manager_->RecordDeferral(hostId, 7, shellA);
+    EXPECT_EQ(manager_->QueryDeferredShell(hostId, 7), shellA);
+    EXPECT_TRUE(manager_->QueryDeferredShell(hostId, 8) == nullptr);
+    EXPECT_TRUE(manager_->QueryDeferredShell(hostId + 1, 7) == nullptr);
+    manager_->RecordDeferral(hostId, 7, shellB);
+    EXPECT_EQ(manager_->QueryDeferredShell(hostId, 7), shellB);
+
+    // Clear-by-shell removes whatever index the shell sits on (retirement funnel).
+    manager_->RecordDeferral(hostId, 9, shellA);
+    manager_->RemoveDeferralsByShell(hostId, shellA);
+    EXPECT_TRUE(manager_->QueryDeferredShell(hostId, 9) == nullptr);
+
+    // Clear-by-index drops a single entry; the gate follows the table.
+    manager_->ClearDeferral(hostId, 7);
+    EXPECT_TRUE(manager_->QueryDeferredShell(hostId, 7) == nullptr);
+
+    // A dead weak reference is treated as no deferral and swept on query.
+    manager_->RecordDeferral(hostId, 11, shellB);
+    shellB = nullptr;
+    EXPECT_TRUE(manager_->QueryDeferredShell(hostId, 11) == nullptr);
+
+    // Destroy clears everything (pipeline teardown).
+    auto shellC = FrameNode::CreateFrameNode("deferral_shell_c",
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    manager_->RecordDeferral(hostId, 12, shellC);
+    manager_->Destroy();
+    EXPECT_TRUE(manager_->QueryDeferredShell(hostId, 12) == nullptr);
+}
 } // namespace OHOS::Ace::NG

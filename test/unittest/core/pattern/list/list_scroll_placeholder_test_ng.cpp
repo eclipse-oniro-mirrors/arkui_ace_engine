@@ -152,7 +152,7 @@ public:
     {
         for (int32_t slot = 0; slot < TOTAL_ITEM_NUMBER; slot++) {
             if (!pattern_->HasScrollPlaceholderItem(slot) &&
-                frameNode_->GetChildByIndex(static_cast<uint32_t>(slot)) == nullptr) {
+                frameNode_->GetFrameNodeChildByIndexWithoutBuild(static_cast<uint32_t>(slot)) == nullptr) {
                 return slot;
             }
         }
@@ -163,7 +163,7 @@ public:
     int32_t FindBuiltSlot() const
     {
         for (int32_t slot = 0; slot < TOTAL_ITEM_NUMBER; slot++) {
-            if (frameNode_->GetChildByIndex(static_cast<uint32_t>(slot)) != nullptr) {
+            if (frameNode_->GetFrameNodeChildByIndexWithoutBuild(static_cast<uint32_t>(slot)) != nullptr) {
                 return slot;
             }
         }
@@ -256,7 +256,7 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderGroupMixedIndex001, TestS
     }
     // First viewport: slot 0 (item) is deferred to a shell, slot 1 (group) built real.
     EXPECT_TRUE(pattern_->HasScrollPlaceholderItem(0));
-    EXPECT_TRUE(frameNode_->GetChildByIndex(1) != nullptr);
+    EXPECT_TRUE(frameNode_->GetFrameNodeChildByIndexWithoutBuild(1) != nullptr);
     // Placeholders never sit on group slots.
     for (const auto& [index, info] : pattern_->scrollPlaceholderItems_) {
         EXPECT_EQ(index % EVEN_NUMBER_MOD, 0);
@@ -286,7 +286,7 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderCommitAndRetire001, TestS
     // dropped by the reconcile: the real child always wins over the shell.
     pattern_->ReconcileScrollPlaceholderItems();
     for (const auto& [index, info] : pattern_->scrollPlaceholderItems_) {
-        EXPECT_TRUE(frameNode_->GetChildByIndex(static_cast<uint32_t>(index)) == nullptr);
+        EXPECT_TRUE(frameNode_->GetFrameNodeChildByIndexWithoutBuild(static_cast<uint32_t>(index)) == nullptr);
     }
 
     // Stage a deferred, genuinely unbuilt slot and drive the full commit flow.
@@ -305,7 +305,7 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderCommitAndRetire001, TestS
 
     // Real build: the real child enters the tree at the same slot index.
     EXPECT_TRUE(pattern_->CommitScrollPlaceholderRealBuild(index));
-    EXPECT_TRUE(frameNode_->GetChildByIndex(static_cast<uint32_t>(index)) != nullptr);
+    EXPECT_TRUE(frameNode_->GetFrameNodeChildByIndexWithoutBuild(static_cast<uint32_t>(index)) != nullptr);
     EXPECT_FALSE(pattern_->retiringPlaceholderShells_.empty());
 
     // Reconcile retires the shell: unmounted from the host, tables cleared.
@@ -691,11 +691,11 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderCommitEdgeBranches001, Te
         ASSERT_GE(builtSlot, 0);
         ASSERT_TRUE(frameNode_->GetOrCreateChildByIndex(static_cast<uint32_t>(builtSlot), true));
     }
-    ASSERT_TRUE(frameNode_->GetChildByIndex(static_cast<uint32_t>(builtSlot)) != nullptr);
+    ASSERT_TRUE(frameNode_->GetFrameNodeChildByIndexWithoutBuild(static_cast<uint32_t>(builtSlot)) != nullptr);
     InjectTableEntry(builtSlot, MakeInjectedShell(), std::string());
     EXPECT_FALSE(pattern_->CommitScrollPlaceholderRealBuild(builtSlot));
     EXPECT_FALSE(pattern_->HasScrollPlaceholderItem(builtSlot));
-    EXPECT_TRUE(frameNode_->GetChildByIndex(static_cast<uint32_t>(builtSlot)) != nullptr);
+    EXPECT_TRUE(frameNode_->GetFrameNodeChildByIndexWithoutBuild(static_cast<uint32_t>(builtSlot)) != nullptr);
 
     // (c) The reconcile drops entries whose index fell out of the data range.
     int32_t staleIndex = TOTAL_ITEM_NUMBER + 4;
@@ -828,5 +828,128 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderProviderShapeEdgeBranches
     pattern_->ResetScrollPlaceholder();
     EXPECT_TRUE(pattern_->scrollPlaceholderItems_.empty());
     EXPECT_TRUE(pattern_->mountedPlaceholderShells_.empty());
+}
+
+/**
+ * @tc.name: ScrollPlaceholderFrameProxySubstitution001
+ * @tc.desc: ADR-2 rev: the index->wrapper substitution executes in
+ *           FrameProxy::GetFrameNodeByIndex. A recorded deferral resolves the
+ *           normal host acquisition to the mounted shell (with the standard
+ *           skip-flag/active actions), a cache acquisition never substitutes,
+ *           the built-probe stays deferral-blind, and the commit clears the
+ *           deferral so the index resolves to the real child again.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderFrameProxySubstitution001, TestSize.Level1)
+{
+    auto manager = MockPipelineContext::GetCurrent()->GetOrCreateScrollPlaceholderManager();
+    ASSERT_TRUE(manager);
+    CreatePlaceholderList(
+        [](int32_t index) -> std::optional<ScrollPlaceholderOptions> {
+            return MakeDefaultPlaceholderOptions();
+        },
+        true);
+    CreateItemsAndDone();
+
+    int32_t index = FindUnbuiltSlot();
+    ASSERT_GE(index, 0);
+    auto shell = pattern_->CreateScrollPlaceholderShell(index);
+    ASSERT_TRUE(shell);
+    EXPECT_TRUE(IsChildOfHost(shell));
+
+    // The deferral table answers for the shell's host and index only.
+    EXPECT_EQ(manager->QueryDeferredShell(frameNode_->GetId(), index), shell);
+    EXPECT_TRUE(manager->QueryDeferredShell(frameNode_->GetId() + 1, index) == nullptr);
+    EXPECT_TRUE(manager->QueryDeferredShell(frameNode_->GetId(), index + 1) == nullptr);
+
+    // The plain host acquisition substitutes the shell only when THIS acquisition
+    // explicitly declares it open to substitution; the declaration path also applies
+    // the standard acquisition actions, exactly like a normally acquired child.
+    frameNode_->SetSkipSyncGeometryNode(true);
+    auto acquired = frameNode_->GetOrCreateChildByIndex(static_cast<uint32_t>(index), true, false, true);
+    ASSERT_EQ(AceType::RawPtr(acquired), AceType::RawPtr(shell));
+    EXPECT_TRUE(shell->IsActive());
+    EXPECT_EQ(shell->SkipSyncGeometryNode(), frameNode_->SkipSyncGeometryNode());
+
+    // The built-probe stays deferral-blind: the deferred index still reads as
+    // unbuilt (the shell never occupies the index slot).
+    EXPECT_TRUE(frameNode_->GetFrameNodeChildByIndexWithoutBuild(static_cast<uint32_t>(index)) == nullptr);
+
+    // Commit: the deferral is dropped first, the real child is built through the
+    // normal acquisition and the index resolves to it afterwards.
+    ASSERT_TRUE(pattern_->CommitScrollPlaceholderRealBuild(index));
+    EXPECT_TRUE(manager->QueryDeferredShell(frameNode_->GetId(), index) == nullptr);
+    EXPECT_TRUE(frameNode_->GetFrameNodeChildByIndexWithoutBuild(static_cast<uint32_t>(index)) != nullptr);
+    auto realAcquired = frameNode_->GetOrCreateChildByIndex(static_cast<uint32_t>(index), false, false);
+    ASSERT_TRUE(realAcquired);
+    EXPECT_NE(AceType::RawPtr(realAcquired), AceType::RawPtr(shell));
+
+    // Declaration gates, not just the table: with a live deferral on a second slot,
+    // an acquisition WITH the declaration substitutes, and one WITHOUT it never
+    // substitutes (it builds the real item, which then also wins a later declared
+    // acquisition through the registration-first rule).
+    int32_t second = FindUnbuiltSlot();
+    if (second >= 0) {
+        auto secondShell = pattern_->CreateScrollPlaceholderShell(second);
+        ASSERT_TRUE(secondShell);
+        EXPECT_EQ(manager->QueryDeferredShell(frameNode_->GetId(), second), secondShell);
+        auto declared = frameNode_->GetOrCreateChildByIndex(static_cast<uint32_t>(second), false, false, true);
+        EXPECT_EQ(AceType::RawPtr(declared), AceType::RawPtr(secondShell));
+        auto undeclared = frameNode_->GetOrCreateChildByIndex(static_cast<uint32_t>(second), false, false);
+        ASSERT_TRUE(undeclared);
+        EXPECT_NE(AceType::RawPtr(undeclared), AceType::RawPtr(secondShell));
+        auto declaredAgain = frameNode_->GetOrCreateChildByIndex(static_cast<uint32_t>(second), false, false, true);
+        EXPECT_NE(AceType::RawPtr(declaredAgain), AceType::RawPtr(secondShell));
+    }
+
+    // Retire funnels clear any deferral still pointing at a retired shell, and the
+    // test leaves no process-wide deferral behind (the static fast gate is shared).
+    pattern_->ReconcileScrollPlaceholderItems();
+    EXPECT_FALSE(IsChildOfHost(shell));
+    pattern_->ResetScrollPlaceholder();
+    EXPECT_TRUE(pattern_->scrollPlaceholderItems_.empty());
+}
+
+/**
+ * @tc.name: ScrollPlaceholderFrameProxyRealChildWins001
+ * @tc.desc: A registered real child always wins over a deferral: once the real
+ *           item sits in FrameProxy's partFrameNodeChildren_, a stale deferral
+ *           entry for the same index must not substitute anymore (the hook
+ *           checks the registered child first).
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderFrameProxyRealChildWins001, TestSize.Level1)
+{
+    auto manager = MockPipelineContext::GetCurrent()->GetOrCreateScrollPlaceholderManager();
+    ASSERT_TRUE(manager);
+    CreatePlaceholderList(
+        [](int32_t index) -> std::optional<ScrollPlaceholderOptions> {
+            return MakeDefaultPlaceholderOptions();
+        },
+        false); // live anchor: no deferral happens during the layout
+    CreateItemsAndDone();
+
+    // Build one slot really through the acquisition itself (no deferral recorded:
+    // live anchor), which registers the real child into FrameProxy's cache; then
+    // record a stale deferral for the same index pointing at a foreign shell: the
+    // hook must still answer with the real child.
+    int32_t index = FindUnbuiltSlot();
+    ASSERT_GE(index, 0);
+    auto realChild = frameNode_->GetOrCreateChildByIndex(static_cast<uint32_t>(index), false, false);
+    ASSERT_TRUE(realChild);
+    auto staleShell = MakeInjectedShell();
+    manager->RecordDeferral(frameNode_->GetId(), index, staleShell);
+    EXPECT_TRUE(ScrollPlaceholderManager::HasAnyDeferrals());
+    // Even an acquisition that explicitly declares substitution openness answers
+    // with the registered real child.
+    auto acquired = frameNode_->GetOrCreateChildByIndex(static_cast<uint32_t>(index), false, false, true);
+    EXPECT_EQ(AceType::RawPtr(acquired), AceType::RawPtr(realChild));
+    EXPECT_NE(AceType::RawPtr(acquired), AceType::RawPtr(staleShell));
+
+    // Cleanup via the by-shell funnel matches the recorded shell whatever its index.
+    manager->RemoveDeferralsByShell(frameNode_->GetId(), staleShell);
+    EXPECT_TRUE(manager->QueryDeferredShell(frameNode_->GetId(), index) == nullptr);
+    // Leave no process-wide deferral behind for later fixtures.
+    pattern_->ResetScrollPlaceholder();
 }
 } // namespace OHOS::Ace::NG

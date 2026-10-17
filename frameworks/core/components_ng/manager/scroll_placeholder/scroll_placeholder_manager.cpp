@@ -575,6 +575,10 @@ void ScrollPlaceholderManager::Destroy()
     }
     size_t dropped = pendingRealBuilds_.size();
     pendingRealBuilds_.clear();
+    if (!deferrals_.empty()) {
+        liveDeferralCount_.fetch_sub(static_cast<int32_t>(deferrals_.size()), std::memory_order_relaxed);
+        deferrals_.clear();
+    }
     if (dropped > 0) {
         cancelledByReason_[static_cast<size_t>(ScrollPlaceholderCancelReason::PIPELINE_DESTROYED)]
             .fetch_add(dropped, std::memory_order_relaxed);
@@ -589,6 +593,75 @@ bool ScrollPlaceholderManager::IsDestroyed() const
 {
     return destroyed_.load(std::memory_order_relaxed);
 }
+
+bool ScrollPlaceholderManager::TakeDeferralEntry(uint64_t key)
+{
+    if (deferrals_.erase(key) == 0) {
+        return false;
+    }
+    liveDeferralCount_.fetch_sub(1, std::memory_order_relaxed);
+    return true;
+}
+
+void ScrollPlaceholderManager::RecordDeferral(int32_t hostNodeId, int32_t index, const RefPtr<FrameNode>& shell)
+{
+    CHECK_NULL_VOID(shell);
+    auto key = DeferralKey(hostNodeId, index);
+    auto iter = deferrals_.find(key);
+    if (iter != deferrals_.end()) {
+        iter->second = WeakPtr<FrameNode>(shell);
+        return;
+    }
+    deferrals_.emplace(key, WeakPtr<FrameNode>(shell));
+    liveDeferralCount_.fetch_add(1, std::memory_order_relaxed);
+}
+
+void ScrollPlaceholderManager::ClearDeferral(int32_t hostNodeId, int32_t index)
+{
+    TakeDeferralEntry(DeferralKey(hostNodeId, index));
+}
+
+void ScrollPlaceholderManager::RemoveDeferralsByShell(int32_t hostNodeId, const RefPtr<FrameNode>& shell)
+{
+    // The table is keyed by (hostId, index) but the retirement funnel (RetireShell ->
+    // sweep) does not know the index, so entries are matched by shell identity; the
+    // host parameter only documents intent — a shell is only ever mounted on its own
+    // host. Dead weak references are swept on the way through.
+    (void)hostNodeId;
+    for (auto iter = deferrals_.begin(); iter != deferrals_.end();) {
+        auto recorded = iter->second.Upgrade();
+        if (!recorded || recorded == shell) {
+            auto key = iter->first;
+            ++iter;
+            TakeDeferralEntry(key);
+            continue;
+        }
+        ++iter;
+    }
+}
+
+RefPtr<FrameNode> ScrollPlaceholderManager::QueryDeferredShell(int32_t hostNodeId, int32_t index)
+{
+    auto key = DeferralKey(hostNodeId, index);
+    auto iter = deferrals_.find(key);
+    if (iter == deferrals_.end()) {
+        return nullptr;
+    }
+    auto shell = iter->second.Upgrade();
+    if (!shell) {
+        // The retired shell's cleanup missed this entry: sweep it now so the index
+        // resolves through the normal acquisition again.
+        TakeDeferralEntry(key);
+        return nullptr;
+    }
+    return shell;
+}
+
+bool ScrollPlaceholderManager::HasAnyDeferrals()
+{
+    return liveDeferralCount_.load(std::memory_order_relaxed) > 0;
+}
+
 
 ScrollPlaceholderPredictResult ScrollPlaceholderManager::NotifyRealBuildStart(
     const ScrollPlaceholderPredictParams& params)

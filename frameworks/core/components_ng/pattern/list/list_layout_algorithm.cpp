@@ -62,7 +62,8 @@ RefPtr<LayoutWrapper> CreateDummyListItemChild()
  *        LazyForEach/RepeatVirtualScroll, try to create empty branch LayoutWrapper for the index.
  */
 static RefPtr<LayoutWrapper> GetListItemWithEmptyBranch(
-    LayoutWrapper* layoutWrapper, int32_t index, bool addToRenderTree, bool isCache)
+    LayoutWrapper* layoutWrapper, int32_t index, bool addToRenderTree, bool isCache,
+    bool allowPlaceholderSubstitution = false)
 {
     const auto& layoutProperty = AceType::DynamicCast<ListLayoutProperty>(layoutWrapper->GetLayoutProperty());
     // Scroll placeholder load observation at the List child build call point: predict before
@@ -72,14 +73,16 @@ static RefPtr<LayoutWrapper> GetListItemWithEmptyBranch(
     ScrollPlaceholderItemBuildScope buildScope(
         ScrollPlaceholderComponentType::LIST, layoutWrapper, index, isCache);
     if (layoutProperty->GetSupportLazyLoadingEmptyBranch().value_or(false)) {
-        auto wrapper = layoutWrapper->GetOrCreateChildByIndex(index, addToRenderTree, isCache);
+        auto wrapper = layoutWrapper->GetOrCreateChildByIndex(index, addToRenderTree, isCache,
+            allowPlaceholderSubstitution);
         buildScope.SetAcquiredWrapper(wrapper);
         if (!wrapper) {
             wrapper = CreateDummyListItemChild();
         }
         return wrapper;
     }
-    auto wrapper = layoutWrapper->GetOrCreateChildByIndex(index, addToRenderTree, isCache);
+    auto wrapper = layoutWrapper->GetOrCreateChildByIndex(
+        index, addToRenderTree, isCache, allowPlaceholderSubstitution);
     buildScope.SetAcquiredWrapper(wrapper);
     return wrapper;
 }
@@ -3371,42 +3374,20 @@ RefPtr<LayoutWrapper> ListLayoutAlgorithm::GetListItem(
 {
     index = (!isStackFromEnd_ ? index : totalItemCount_ - index - 1) + itemStartIndex_;
 
-    // FEAT scroll placeholder — component call-site intercept (ADR-2, 2026-10-12):
-    // for a not-yet-built visible index, decide with the remaining frame budget
-    // before the real builder would run. A deferred index returns the mounted
-    // placeholder shell and its real build enters the pipeline framed queue;
-    // BUILD_REAL_NOW keeps the existing acquisition untouched. Cache/preload paths
-    // are never deferred.
+    // FEAT scroll placeholder — acquisition pre-check (ADR-2 rev, 2026-10-16): the
+    // budget decision and shell mounting stay with the pattern (it owns the frame
+    // context); the index->wrapper substitution itself executes in
+    // FrameProxy::GetFrameNodeByIndex, gated by an explicit per-acquisition
+    // declaration. Only a fill loop with the capability verified passes the
+    // declaration down, so every other caller of the host acquisition keeps the
+    // unmodified semantics. Cache/preload paths never substitute.
     if (!isCache && layoutWrapper) {
         const auto& host = layoutWrapper->GetHostNode();
         const auto& pattern = host ? host->GetPattern<ListPattern>() : nullptr;
         if (pattern && pattern->IsScrollPlaceholderEnabled()) {
-            auto shell = pattern->CreateScrollPlaceholderShell(index);
-            if (shell) {
-                // Mirror the standard acquisition actions of
-                // FrameNode::GetOrCreateChildByIndex so every downstream
-                // consumer (layout loop branching, geometry sync, render tree
-                // rebuild) treats the shell exactly like a normally acquired
-                // item: the skip flag decides which geometry-sync path the
-                // layout loop takes and must be inherited from the host, and
-                // activation follows the same addToRenderTree gate (the mount
-                // path has already activated the shell, so the gated call is a
-                // no-op kept for parity).
-                shell->SetSkipSyncGeometryNode(host->SkipSyncGeometryNode());
-                if (addToRenderTree) {
-                    shell->SetActive(true);
-                }
-                // Node-as-wrapper: return the shell itself. FrameNode IS a
-                // LayoutWrapper, so the list algorithm measures and lays it out
-                // directly like any item and the geometry lands on the node. A
-                // separate LayoutWrapperNode instead measures into its cloned
-                // geometry, which never reaches the node or the render tree —
-                // the device finding behind the sized-but-blank shells.
-                // The measure flag was set once when the shell was created, so
-                // this branch keeps returning an already-measured shell without
-                // re-flagging it every layout round.
-                return shell;
-            }
+            pattern->PrepareScrollPlaceholderForAcquisition(index);
+            return GetListItemWithEmptyBranch(
+                layoutWrapper, index, addToRenderTree, isCache, /*allowPlaceholderSubstitution=*/true);
         }
     }
     return GetListItemWithEmptyBranch(layoutWrapper, index, addToRenderTree, isCache);

@@ -44,8 +44,13 @@ void LayoutWrapperNode::AppendChild(const RefPtr<LayoutWrapperNode>& child, bool
         overlayChild_ = child;
     }
 }
-RefPtr<LayoutWrapper> LayoutWrapperNode::GetOrCreateChildByIndex(uint32_t index, bool addToRenderTree, bool isCache)
+// allowPlaceholderSubstitution is accepted for signature parity with the node-side
+// acquisition; this snapshot-era channel has no FrameProxy deferral hook, so the
+// declaration is intentionally unused here.
+RefPtr<LayoutWrapper> LayoutWrapperNode::GetOrCreateChildByIndex(
+    uint32_t index, bool addToRenderTree, bool isCache, bool allowPlaceholderSubstitution)
 {
+    (void)allowPlaceholderSubstitution;
     if ((index >= static_cast<uint32_t>(currentChildCount_)) || (index < 0)) {
         return nullptr;
     }

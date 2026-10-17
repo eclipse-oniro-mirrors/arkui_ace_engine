@@ -20,6 +20,7 @@
 #include "core/components_ng/manager/drag_drop/drag_drop_manager.h"
 #include "core/components_ng/manager/safe_area/safe_area_manager.h"
 #include "core/components_ng/manager/privacy_sensitive/privacy_sensitive_manager.h"
+#include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_manager.h"
 
 #include <cinttypes>
 #include <unordered_set>
@@ -424,10 +425,36 @@ public:
         return nullptr;
     }
 
-    RefPtr<LayoutWrapper> GetFrameNodeByIndex(uint32_t index, bool needBuild, bool isCache, bool addToRenderTree)
+    RefPtr<LayoutWrapper> GetFrameNodeByIndex(
+        uint32_t index, bool needBuild, bool isCache, bool addToRenderTree, bool allowPlaceholderSubstitution)
     {
         auto itor = partFrameNodeChildren_.find(index);
         if (itor == partFrameNodeChildren_.end()) {
+            // FEAT scroll placeholder — acquisition substitution (ADR-2 rev): a deferral
+            // recorded by the container pattern for this (host, index) resolves to the
+            // mounted placeholder shell, one choke point above every lazy syntax node
+            // (LazyForEach/Repeat/ForEach/Arkoala). Explicit-declaration only: the
+            // caller stated this acquisition is open to substitution (a scroll
+            // container fill loop with the capability verified) — focus resolution,
+            // jump-to-index, plain queries and the real-build commit keep the
+            // unmodified semantics whatever the deferral table holds. The shell never
+            // lands in partFrameNodeChildren_: the index slot stays reserved for the
+            // real item, and a registered real child (checked above) always wins over
+            // a deferral. The process-wide gate keeps the non-placeholder path at one
+            // atomic read.
+            if (allowPlaceholderSubstitution && !isCache && ScrollPlaceholderManager::HasAnyDeferrals()) {
+                auto* context = hostNode_->GetContext();
+                if (context) {
+                    const auto& manager = context->GetOrCreateScrollPlaceholderManager();
+                    if (manager) {
+                        auto shell = manager->QueryDeferredShell(
+                            hostNode_->GetId(), static_cast<int32_t>(index));
+                        if (shell) {
+                            return shell;
+                        }
+                    }
+                }
+            }
             Build();
             auto child = FindFrameNodeByIndex(index, needBuild, isCache, addToRenderTree);
             if (child && !isCache) {
@@ -6751,9 +6778,11 @@ void FrameNode::SyncGeometryNode(bool needSyncRsNode, const DirtySwapConfig& con
     AdjustGridOffset();
 }
 
-RefPtr<LayoutWrapper> FrameNode::GetOrCreateChildByIndex(uint32_t index, bool addToRenderTree, bool isCache)
+RefPtr<LayoutWrapper> FrameNode::GetOrCreateChildByIndex(
+    uint32_t index, bool addToRenderTree, bool isCache, bool allowPlaceholderSubstitution)
 {
-    auto child = frameProxy_->GetFrameNodeByIndex(index, true, isCache, addToRenderTree);
+    auto child = frameProxy_->GetFrameNodeByIndex(index, true, isCache, addToRenderTree,
+        allowPlaceholderSubstitution);
     if (child) {
         child->SetSkipSyncGeometryNode(SkipSyncGeometryNode());
         if (addToRenderTree) {
@@ -6765,12 +6794,12 @@ RefPtr<LayoutWrapper> FrameNode::GetOrCreateChildByIndex(uint32_t index, bool ad
 
 RefPtr<LayoutWrapper> FrameNode::GetChildByIndex(uint32_t index, bool isCache)
 {
-    return frameProxy_->GetFrameNodeByIndex(index, false, isCache, false);
+    return frameProxy_->GetFrameNodeByIndex(index, false, isCache, false, false);
 }
 
 FrameNode* FrameNode::GetFrameNodeChildByIndex(uint32_t index, bool isCache, bool isExpand)
 {
-    auto frameNode = isExpand ? DynamicCast<FrameNode>(frameProxy_->GetFrameNodeByIndex(index, true, isCache, false))
+    auto frameNode = isExpand ? DynamicCast<FrameNode>(frameProxy_->GetFrameNodeByIndex(index, true, isCache, false, false))
                               : DynamicCast<FrameNode>(UINode::GetFrameChildByIndexWithoutExpanded(index));
     return RawPtr(frameNode);
 }
