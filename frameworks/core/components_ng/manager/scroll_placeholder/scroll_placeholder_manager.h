@@ -56,7 +56,7 @@ struct ScrollPlaceholderPredictResult {
     bool budgetAvailable = false;
 };
 
-// Per pipeline scroll placeholder scheduler core (design ADR-1/ADR-4/ADR-6/ADR-9):
+// Per pipeline scroll placeholder scheduler core:
 // - lazy created by PipelineContext, isolated per container instance;
 // - predicts, before the real builder runs, whether the estimated item build cost fits the
 //   remaining frame budget anchored to the current vsync period;
@@ -83,7 +83,7 @@ public:
     uint64_t RegisterTemplate(const std::string& templateId, ScrollPlaceholderBuilder&& builder);
     bool UnregisterTemplate(const std::string& templateId);
     bool IsTemplateRegistered(const std::string& templateId) const;
-    // ADR-14 registration probe: synchronously runs one restricted-protocol subtree
+    // Registration probe: synchronously runs one restricted-protocol subtree
     // clone of the resident source instance on the UI thread (validation is the
     // clone itself — same path production clones take). Returns false when any node
     // of the template is not copyable, with the offending subtree path in
@@ -97,9 +97,10 @@ public:
     void SetTemplateSourceInstance(const std::string& templateId, const RefPtr<UINode>& instance);
     RefPtr<UINode> GetTemplateSourceInstance(const std::string& templateId) const;
     void CacheTemplateInstance(const std::string& templateId, const RefPtr<UINode>& instance);
-    // Takes a spare copy when the pool still holds one; with no spare the instance is
-    // synchronously created from the current template on the UI thread. Either way the pool
-    // is replenished by background clones of the resident source.
+    // Always executes the template builder synchronously on the UI thread and returns
+    // the product. The instance pool stays maintained (registration seeds it, retirement
+    // returns content to it) but is not consumed on acquire: pooled clones carry layout
+    // properties only (no paint properties), which visibly degrades the placeholder.
     RefPtr<UINode> AcquireTemplateInstance(const std::string& templateId);
     size_t GetCachedInstanceCount(const std::string& templateId) const;
     size_t GetHotTemplateCount() const;
@@ -127,7 +128,7 @@ public:
     void Destroy();
     bool IsDestroyed() const;
 
-    // ---- Acquisition deferral table (ADR-2 rev: the index->wrapper substitution itself
+    // ---- Acquisition deferral table (the index->wrapper substitution itself
     // executes in FrameProxy::GetFrameNodeByIndex, one choke point above every lazy
     // syntax node). The container pattern stays the decision side: on defer it mounts
     // the shell and records (hostId, index) -> shell here; FrameProxy queries the table

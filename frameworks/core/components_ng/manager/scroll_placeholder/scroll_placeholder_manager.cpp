@@ -164,9 +164,9 @@ bool ScrollPlaceholderManager::ProbeTemplateClone(const std::string& templateId,
     }
     registry_.CacheTemplateInstance(templateId, copy);
     ScheduleBackgroundReplenish(templateId);
-    // One-shot source shape for on-device triage of blank-shell reports: an empty or
-    // unexpectedly tiny source subtree here means the template itself produced no
-    // visual content, which no shell-side log can distinguish later.
+    // One-shot source shape log: an empty or unexpectedly tiny source subtree here
+    // means the template itself produced no visual content, which no shell-side log
+    // can distinguish later.
     int32_t nodeCount = 0;
     int32_t depth = 0;
     CountScrollPlaceholderSubtree(source, nodeCount, depth);
@@ -205,19 +205,12 @@ RefPtr<UINode> ScrollPlaceholderManager::AcquireTemplateInstance(const std::stri
     if (destroyed_.load(std::memory_order_relaxed) || templateId.empty()) {
         return nullptr;
     }
-    auto cached = registry_.AcquireTemplateInstance(templateId);
-    if (cached) {
-        // Pool-hit path: distinguishes from the synchronous rebuild below for
-        // pool-effectiveness triage (hit rate vs rebuild frequency).
-        TAG_LOGD(AceLogTag::ACE_SCROLL,
-            "ScrollPlaceholder instance from pool: templateId=%{public}s, instanceId=%{public}d",
-            templateId.c_str(), instanceId_);
-        ScheduleBackgroundReplenish(templateId);
-        return cached;
-    }
-    // No spare copy: synchronously create one instance from the current template on the UI
-    // thread (the builder only ever runs here) so the request is served right away;
-    // background clones of the resident source refill the spares afterwards.
+    // The instance pool stays maintained (registration seeds it, retirement returns
+    // content to it) but an acquire always executes the template builder
+    // synchronously on the UI thread: the restricted clone protocol copies layout
+    // properties only, so a pooled clone renders without paint properties such as
+    // the background color, while a builder product is full fidelity. Serve acquires
+    // from the pool again once the clone protocol covers paint properties.
     auto snapshot = registry_.LookupForCreate(templateId);
     if (!snapshot.has_value() || !snapshot->builder) {
         TAG_LOGW(AceLogTag::ACE_SCROLL,
@@ -225,22 +218,19 @@ RefPtr<UINode> ScrollPlaceholderManager::AcquireTemplateInstance(const std::stri
             "instanceId=%{public}d", templateId.c_str(), instanceId_);
         return nullptr;
     }
-    int64_t rebuildStartNs = GetSysTimestamp();
+    int64_t buildStartNs = GetSysTimestamp();
     auto instance = snapshot->builder();
-    int64_t rebuildCostUs = (GetSysTimestamp() - rebuildStartNs) / 1000;
+    int64_t buildCostUs = (GetSysTimestamp() - buildStartNs) / 1000;
     if (!instance) {
         TAG_LOGW(AceLogTag::ACE_SCROLL,
-            "ScrollPlaceholder acquire failed: template rebuild produced no product, "
+            "ScrollPlaceholder acquire failed: builder produced no product, "
             "templateId=%{public}s, instanceId=%{public}d (see the builder-exception log)",
             templateId.c_str(), instanceId_);
         return nullptr;
     }
-    // Rebuild path (pool was empty): a full JS builder execution served this acquire —
-    // exactly the cost the placeholder feature exists to avoid, so keep it observable.
     TAG_LOGD(AceLogTag::ACE_SCROLL,
-        "ScrollPlaceholder instance rebuilt synchronously: templateId=%{public}s, costUs=%{public}" PRId64
-        ", instanceId=%{public}d", templateId.c_str(), rebuildCostUs, instanceId_);
-    ScheduleBackgroundReplenish(templateId);
+        "ScrollPlaceholder instance built synchronously: templateId=%{public}s, costUs=%{public}" PRId64
+        ", instanceId=%{public}d", templateId.c_str(), buildCostUs, instanceId_);
     return instance;
 }
 

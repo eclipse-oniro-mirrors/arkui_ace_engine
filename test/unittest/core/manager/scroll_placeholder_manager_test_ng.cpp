@@ -323,7 +323,8 @@ HWTEST_F(ScrollPlaceholderManagerTestNg, TemplateGenerationMonotonic001, TestSiz
 
 /**
  * @tc.name: TemplateInstanceCache001
- * @tc.desc: Built instances are retained per template and handed out on acquire.
+ * @tc.desc: Built instances are retained per template with capacity and LIFO intake;
+ *           acquires never consume the pool - every acquire is a fresh builder product.
  * @tc.type: FUNC
  */
 HWTEST_F(ScrollPlaceholderManagerTestNg, TemplateInstanceCache001, TestSize.Level1)
@@ -340,16 +341,15 @@ HWTEST_F(ScrollPlaceholderManagerTestNg, TemplateInstanceCache001, TestSize.Leve
     EXPECT_EQ(manager_->GetCachedInstanceCount("tpl"), spareSlots); // overflow dropped
     ASSERT_TRUE(manager_->GetTemplateSourceInstance("tpl"));
 
+    // The pool is not consumed on acquire: every call returns a fresh builder product
+    // (distinct from the cached spares) and the cached count stays untouched.
     auto acquired = manager_->AcquireTemplateInstance("tpl");
     ASSERT_TRUE(acquired);
-    EXPECT_EQ(acquired, AceType::DynamicCast<UINode>(nodes[spareSlots - 1])); // LIFO: last accepted
-    // Drain the remaining spares, then the empty-pool path serves a synchronous build.
-    while (manager_->GetCachedInstanceCount("tpl") > 0) {
-        ASSERT_TRUE(manager_->AcquireTemplateInstance("tpl"));
-    }
+    EXPECT_NE(acquired, AceType::DynamicCast<UINode>(nodes[spareSlots - 1])); // fresh build, not the spare
+    EXPECT_EQ(manager_->GetCachedInstanceCount("tpl"), spareSlots); // pool untouched by acquire
     auto synced = manager_->AcquireTemplateInstance("tpl");
     EXPECT_TRUE(synced);
-    EXPECT_EQ(manager_->GetCachedInstanceCount("tpl"), 0u); // created for use, not cached
+    EXPECT_NE(synced, acquired); // each acquire builds its own product
     EXPECT_TRUE(manager_->GetTemplateSourceInstance("tpl")); // source never leaves the pool
 }
 
@@ -433,12 +433,13 @@ HWTEST_F(ScrollPlaceholderManagerTestNg, PlaceholderPoolRegisterSeedAndReplenish
 }
 
 /**
- * @tc.name: PlaceholderPoolAcquireTakesAndReplenishes001
- * @tc.desc: Acquire hands out a spare copy (never the source) and the background clone
- *           refills the spare slot from the resident source.
+ * @tc.name: PlaceholderPoolAcquireAlwaysBuilds001
+ * @tc.desc: Acquire always executes the builder (full-fidelity product, never the
+ *           resident source and never a pooled clone) and leaves the pool untouched:
+ *           no spare is consumed and no replenish task is scheduled by the acquire.
  * @tc.type: FUNC
  */
-HWTEST_F(ScrollPlaceholderManagerTestNg, PlaceholderPoolAcquireTakesAndReplenishes001, TestSize.Level1)
+HWTEST_F(ScrollPlaceholderManagerTestNg, PlaceholderPoolAcquireAlwaysBuilds001, TestSize.Level1)
 {
     manager_->RegisterTemplate("tpl", MakeTreeBuilder(1));
     manager_->RunCapturedTasks();
@@ -448,13 +449,12 @@ HWTEST_F(ScrollPlaceholderManagerTestNg, PlaceholderPoolAcquireTakesAndReplenish
 
     auto acquired = manager_->AcquireTemplateInstance("tpl");
     ASSERT_TRUE(acquired);
-    EXPECT_NE(acquired, source);               // a spare copy, not the resident source
-    EXPECT_EQ(acquired->GetChildren().size(), 1u); // structural copy kept the subtree
-    EXPECT_EQ(manager_->GetCachedInstanceCount("tpl"), SCROLL_PLACEHOLDER_INSTANCE_CACHE_CAPACITY - 1 - 1);
-    EXPECT_EQ(manager_->GetPendingCloneCount("tpl"), 1u);
-    manager_->RunCapturedTasks();
+    EXPECT_NE(acquired, source);                   // a builder product, not the resident source
+    EXPECT_NE(manager_->GetCachedInstanceCount("tpl"), 0u); // spares still cached
+    EXPECT_EQ(acquired->GetChildren().size(), 1u); // builder kept the subtree shape
     EXPECT_EQ(manager_->GetCachedInstanceCount("tpl"), SCROLL_PLACEHOLDER_INSTANCE_CACHE_CAPACITY - 1);
-    EXPECT_EQ(manager_->GetPendingCloneCount("tpl"), 0u);
+    EXPECT_EQ(manager_->GetPendingCloneCount("tpl"), 0u);   // acquire schedules no clone
+    EXPECT_EQ(manager_->CapturedTaskCount(), 0u);
     EXPECT_EQ(manager_->GetTemplateSourceInstance("tpl"), source);
 }
 
@@ -469,7 +469,7 @@ HWTEST_F(ScrollPlaceholderManagerTestNg, PlaceholderPoolSyncCreateWhenEmpty001, 
     manager_->RegisterTemplate("tpl", MakeTreeBuilder(1));
     EXPECT_EQ(manager_->CapturedTaskCount(), SCROLL_PLACEHOLDER_INSTANCE_CACHE_CAPACITY - 1); // replenish pending, not run yet
 
-    auto synced = manager_->AcquireTemplateInstance("tpl"); // no spare path
+    auto synced = manager_->AcquireTemplateInstance("tpl"); // acquire always builds
     ASSERT_TRUE(synced);
     EXPECT_EQ(synced->GetChildren().size(), 1u);  // built by the builder on the UI thread
     EXPECT_EQ(manager_->GetCachedInstanceCount("tpl"), 0u); // served directly, not cached
@@ -580,8 +580,10 @@ HWTEST_F(ScrollPlaceholderManagerTestNg, PlaceholderPoolDefaultCopyCreatesSameTy
 
 /**
  * @tc.name: PlaceholderPoolParallelCloneFillsPool001
- * @tc.desc: With the real BackgroundTaskExecutor a worker thread clones the resident source:
- *           same-type creation, property copy and free-node registration all run off-thread.
+ * @tc.desc: With the real BackgroundTaskExecutor a worker thread clones the resident
+ *           source and fills the pool off-thread; an acquire executes the builder on
+ *           the UI thread instead, so the product registers in the global element
+ *           register rather than the thread-safe registry the clones use.
  * @tc.type: FUNC
  */
 HWTEST_F(ScrollPlaceholderManagerTestNg, PlaceholderPoolParallelCloneFillsPool001, TestSize.Level1)
@@ -594,19 +596,21 @@ HWTEST_F(ScrollPlaceholderManagerTestNg, PlaceholderPoolParallelCloneFillsPool00
 
     auto source = AceType::DynamicCast<FrameNode>(manager_->GetTemplateSourceInstance("tpl"));
     ASSERT_TRUE(source);
-    auto acquired = manager_->AcquireTemplateInstance("tpl"); // main thread takes worker output
+    auto acquired = manager_->AcquireTemplateInstance("tpl"); // builder runs on the UI thread
     ASSERT_TRUE(acquired);
     auto copyRoot = AceType::DynamicCast<FrameNode>(acquired);
     ASSERT_TRUE(copyRoot);
-    EXPECT_EQ(copyRoot->GetTag(), source->GetTag());   // same type
+    EXPECT_EQ(copyRoot->GetTag(), source->GetTag());   // builder kept the template type
     EXPECT_NE(copyRoot->GetId(), source->GetId());     // fresh node, not the resident source
     ASSERT_EQ(copyRoot->GetChildren().size(), 1u);
     auto copyChild = AceType::DynamicCast<FrameNode>(copyRoot->GetChildren().front());
     ASSERT_TRUE(copyChild);
-    EXPECT_FLOAT_EQ(copyChild->GetLayoutProperty()->GetAspectRatio(), 1.5f); // property copied
-    // Created under the thread-safe node scope on the worker: registered as a free node in
-    // the mutex-guarded registry instead of the global element register.
-    EXPECT_EQ(ElementRegisterMultiThread::GetInstance()->GetThreadSafeNodeById(copyRoot->GetId()), acquired);
+    EXPECT_FLOAT_EQ(copyChild->GetLayoutProperty()->GetAspectRatio(), 1.5f); // builder set the property
+    // Builder product created on the UI thread: registered in the global element
+    // register, not the thread-safe registry the worker clones use.
+    EXPECT_EQ(ElementRegisterMultiThread::GetInstance()->GetThreadSafeNodeById(copyRoot->GetId()), nullptr);
+    // The pool of worker clones stays untouched by the acquire.
+    EXPECT_EQ(manager_->GetCachedInstanceCount("tpl"), SCROLL_PLACEHOLDER_INSTANCE_CACHE_CAPACITY - 1);
 }
 
 /**
@@ -626,7 +630,7 @@ HWTEST_F(ScrollPlaceholderManagerTestNg, PlaceholderPoolParallelReplenishLoop001
     std::vector<RefPtr<UINode>> held;
     for (int i = 0; i < 6; i++) {
         auto instance = manager_->AcquireTemplateInstance("tpl");
-        ASSERT_TRUE(instance); // spare taken, or built synchronously while the worker refills
+        ASSERT_TRUE(instance); // built synchronously on the UI thread
         auto frame = AceType::DynamicCast<FrameNode>(instance);
         ASSERT_TRUE(frame);
         EXPECT_EQ(seenIds.count(frame->GetId()), 0u); // unique instance every time
@@ -1569,7 +1573,7 @@ HWTEST_F(ScrollPlaceholderManagerTestNg, ScrollPlaceholderTextCloneMeasure001, T
 
 /**
  * @tc.name: ScrollPlaceholderDeferralTable001
- * @tc.desc: The acquisition deferral table (ADR-2 rev, consumed by
+ * @tc.desc: The acquisition deferral table (consumed by
  *           FrameProxy::GetFrameNodeByIndex): records key by (host, index),
  *           replaces instead of stacking, answers only for its own key, clears
  *           by index and by shell, sweeps dead entries on query, and drives the
