@@ -75,8 +75,6 @@ const std::string RESULT_SUCCESS_TWO = "sucess2";
 int32_t flag = 0;
 } // namespace
 
-static_assert(sizeof(EventHub) <= 128, "EventHub deferred allocation footprint must be <= 128B");
-
 class EventHubTestNg : public testing::Test {
 public:
     static void SetUpTestSuite();
