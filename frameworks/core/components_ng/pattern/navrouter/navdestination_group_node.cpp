@@ -975,12 +975,18 @@ std::string NavDestinationGroupNode::ToDumpString()
     return dumpString;
 }
 
-int32_t NavDestinationGroupNode::DoTransition(NavigationOperation operation, bool isEnter)
+int32_t NavDestinationGroupNode::DoTransition(
+    NavigationOperation operation, bool isEnter, bool reportHomeTransition)
 {
-    if (navDestinationTransitionDelegate_) {
-        return DoCustomTransition(operation, isEnter);
+    // Set before starting animations: a zero-duration custom transition may finish synchronously.
+    needReportHomeTransition_ = reportHomeTransition;
+    isPopTransition_ = operation == NavigationOperation::POP;
+    auto id = navDestinationTransitionDelegate_ ? DoCustomTransition(operation, isEnter) :
+        DoSystemTransition(operation, isEnter);
+    if (id == INVALID_ANIMATION_ID) {
+        needReportHomeTransition_ = false;
     }
-    return DoSystemTransition(operation, isEnter);
+    return id;
 }
 
 int32_t NavDestinationGroupNode::DoSystemTransition(NavigationOperation operation, bool isEnter)
@@ -1271,7 +1277,7 @@ std::function<void()> NavDestinationGroupNode::BuildTransitionFinishCallback(
     bool needReport, bool isSystemTransition, std::function<void()>&& extraOption)
 {
     std::function<void()> finish = [extraOption = std::move(extraOption), weak = WeakClaim(this),
-        animationId = animationId_, isSystemTransition, needReport]() {
+        animationId = animationId_, isSystemTransition, needReport, isPopPage = isPopTransition_]() {
             auto navDestination = weak.Upgrade();
             CHECK_NULL_VOID(navDestination);
             auto destinationPattern = navDestination->GetPattern<NavDestinationPattern>();
@@ -1300,6 +1306,10 @@ std::function<void()> NavDestinationGroupNode::BuildTransitionFinishCallback(
                     navDestination->SetJSViewActive(false);
                 }
                 navDestination->SetIsOnAnimation(false);
+                if (needReport && navDestination->needReportHomeTransition_) {
+                    navDestination->needReportHomeTransition_ = false;
+                    navDestination->ContentChangeReport(isPopPage);
+                }
                 return;
             }
             // only handle current node in latest finish callback.
@@ -1320,7 +1330,7 @@ std::function<void()> NavDestinationGroupNode::BuildTransitionFinishCallback(
             }
             navDestination->SetIsOnAnimation(false);
             if (needReport) {
-                navDestination->ContentChangeReport();
+                navDestination->ContentChangeReport(isPopPage);
             }
         };
     auto navigationNode = AceType::DynamicCast<NavigationGroupNode>(GetNavigationNode());
@@ -1617,14 +1627,20 @@ bool NavDestinationGroupNode::GetCanReused() const
     return canReused_;
 }
 
-void NavDestinationGroupNode::ContentChangeReport()
+void NavDestinationGroupNode::ContentChangeReport(bool isPopPage)
 {
 #ifndef CROSS_PLATFORM
     auto context = GetContext();
     CHECK_NULL_VOID(context);
     auto mgr = context->GetContentChangeManager();
     CHECK_NULL_VOID(mgr);
-    mgr->OnPageTransitionEnd(WeakClaim(this).Upgrade());
+    if (isPopPage) {
+        auto navigation = AceType::DynamicCast<NavigationGroupNode>(GetNavigationNode());
+        CHECK_NULL_VOID(navigation);
+        mgr->OnPageTransitionEnd(WeakClaim(this).Upgrade(), navigation->GetId());
+    } else {
+        mgr->OnPageTransitionEnd(WeakClaim(this).Upgrade());
+    }
 #endif
 }
 } // namespace OHOS::Ace::NG
