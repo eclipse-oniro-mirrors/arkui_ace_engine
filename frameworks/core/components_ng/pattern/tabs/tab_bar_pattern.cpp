@@ -1532,7 +1532,7 @@ bool TabBarPattern::CustomizeExpandSafeArea()
     CHECK_NULL_RETURN(tabsNode, false);
     auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
     CHECK_NULL_RETURN(tabsPattern, false);
-    if (tabsPattern->IsFloatingBar()) {
+    if (IsFloatingBar() || IsFloatingTopBar()) {
         return true;
     }
 
@@ -2238,7 +2238,7 @@ void TabBarPattern::PlayPressAnimation(int32_t index, const Color& pressColor, A
         CHECK_NULL_VOID(tabsPattern);
         bool needSetRadius = selectedIndex < static_cast<int32_t>(tabBar->tabBarStyles_.size()) &&
                              tabBar->tabBarStyles_[selectedIndex] != TabBarStyle::SUBTABBATSTYLE &&
-                             !tabsPattern->IsFloatingBar();
+                             !(tabBar->IsFloatingBar() || tabBar->IsFloatingTopBar());
         if (needSetRadius) {
             BorderRadiusProperty borderRadiusProperty;
             auto tabTheme = host->GetTheme<TabTheme>(true);
@@ -2414,6 +2414,9 @@ void TabBarPattern::UpdateTextColorAndFontWeight(int32_t indicator)
             UpdateSelectedTextColor(tabTheme, axis, textLayoutProperty, index, columnId);
         } else {
             auto defaultColor = useNewMaterial_ ? tabTheme->GetFontPrimary() : tabTheme->GetSubTabTextOffColor();
+            if (isFloatingTopBar_) {
+                defaultColor = tabTheme->GetSubTabTextOffColor();
+            }
             textLayoutProperty->UpdateTextColor(
                 labelStyles_[columnId].unselectedColor.value_or(defaultColor));
         }
@@ -2436,6 +2439,9 @@ void TabBarPattern::UpdateSelectedTextColor(const RefPtr<TabTheme>& tabTheme, OH
                              ? tabTheme->GetSubTabBoardTextOnColor()
                              : tabTheme->GetSubTabTextOnColor();
     auto defaultColor = useNewMaterial_ ? tabTheme->GetFontEmphasize() : selectedColor;
+    if (isFloatingTopBar_) {
+        defaultColor = tabTheme->GetFontPrimary();
+    }
     textLayoutProperty->UpdateTextColor(labelStyles_[columnId].selectedColor.value_or(defaultColor));
 }
 
@@ -2879,6 +2885,9 @@ RefPtr<NodePaintMethod> TabBarPattern::CreateNodePaintMethod()
     RectF tabBarItemRect;
     auto layoutProperty = GetLayoutProperty<TabBarLayoutProperty>();
     auto paintProperty = GetPaintProperty<TabBarPaintProperty>();
+    auto tabsNode = AceType::DynamicCast<TabsNode>(host->GetParent());
+    auto tabsPattern = tabsNode ? tabsNode->GetPattern<TabsPattern>() : nullptr;
+    bool isTopFloating = IsFloatingTopBar();
     if (layoutProperty && paintProperty && paintProperty->GetIndicator().has_value()) {
         tabBarItemRect = layoutProperty->GetIndicatorRect(paintProperty->GetIndicator().value());
     }
@@ -2891,7 +2900,7 @@ RefPtr<NodePaintMethod> TabBarPattern::CreateNodePaintMethod()
         static_cast<int32_t>(selectedModes_.size()) && !NearZero(tabBarItemRect.Height()) : 0;
     hasIndicator = GetDrawableIndicatorFlagByIndex(indicator_) ? 0 : hasIndicator;
     return MakeRefPtr<TabBarPaintMethod>(tabBarModifier_, tabBarRect, gradientRegions_, bgColor, indicatorStyle,
-        indicatorOffset, hasIndicator);
+        indicatorOffset, hasIndicator, isTopFloating);
 }
 
 Color TabBarPattern::GetTabBarBackgroundColor() const
@@ -3820,6 +3829,38 @@ void TabBarPattern::UpdateFocusTabBarPageState()
         UpdateSubTabBoard(indicator_);
         UpdateTextColorAndFontWeight(indicator_);
     }
+    auto tabsNode = AceType::DynamicCast<TabsNode>(GetHost() ? GetHost()->GetParent() : nullptr);
+    auto tabsPattern = tabsNode ? tabsNode->GetPattern<TabsPattern>() : nullptr;
+    if (IsFloatingTopBar()) {
+        UpdateTopFloatingFocusBorder(isTabBarFocusActive_, focusIndicator_);
+    }
+}
+
+void TabBarPattern::UpdateTopFloatingFocusBorder(bool isFocused, int32_t index)
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto tabTheme = host->GetTheme<TabTheme>(true);
+    CHECK_NULL_VOID(tabTheme);
+    auto columnNode = AceType::DynamicCast<FrameNode>(host->GetChildAtIndex(index));
+    CHECK_NULL_VOID(columnNode);
+    auto renderContext = columnNode->GetRenderContext();
+    CHECK_NULL_VOID(renderContext);
+    if (!isFocused) {
+        renderContext->ResetBorder();
+        return;
+    }
+    bool isSelected = index == indicator_;
+    Dimension borderWidth = isSelected ? tabTheme->GetBorderExtraLarger() : tabTheme->GetOutlineExtraLarger();
+    NG::BorderWidthProperty borderWidthProperty;
+    borderWidthProperty.SetBorderWidth(borderWidth);
+    renderContext->UpdateBorderWidth(borderWidthProperty);
+    NG::BorderStyleProperty borderStyle;
+    borderStyle.SetBorderStyle(BorderStyle::SOLID);
+    renderContext->UpdateBorderStyle(borderStyle);
+    NG::BorderColorProperty borderColor;
+    borderColor.SetColor(Color::WHITE);
+    renderContext->UpdateBorderColor(borderColor);
 }
 
 void TabBarPattern::HandleFocusEvent()
@@ -4072,8 +4113,8 @@ void TabBarPattern::CheckFloatingStyle(int32_t index)
     CHECK_NULL_VOID(tabsNode);
     auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
     CHECK_NULL_VOID(tabsPattern);
-    if (!tabsPattern->IsFloatingBar()) {
-        if (tabsPattern->LastFloatingBar()) {
+    if (!(IsFloatingBar() || IsFloatingTopBar())) {
+        if (tabsPattern->LastFloatingBar() || tabsPattern->LastFloatingTopBar()) {
             BorderRadiusProperty borderRadius;
             renderContext->UpdateBorderRadius(borderRadius);
         }
@@ -4105,13 +4146,16 @@ void TabBarPattern::ApplyDefaultVisibility()
     }
 
     auto tabContentNum = swiperNode->TotalChildCount();
-    auto isHiddenByDefaultVisibility = [](
+    auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
+    auto activeDisplayMode = tabsPattern ? tabsPattern->GetActiveBarDisplayMode()
+                                         : TabBarDisplayMode::BOTTOMTABBAR;
+    auto isHiddenByDefaultVisibility = [activeDisplayMode](
         const RefPtr<FrameNode>& tabContentNode) -> bool {
         CHECK_NULL_RETURN(tabContentNode, false);
         auto tabContentPattern = tabContentNode->GetPattern<TabContentPattern>();
         CHECK_NULL_RETURN(tabContentPattern, false);
         const auto& defaultVisibility = tabContentPattern->GetDefaultVisibility();
-        return defaultVisibility.ShouldHide(TabBarDisplayMode::BOTTOMTABBAR);
+        return defaultVisibility.ShouldHide(activeDisplayMode);
     };
     // tabBarNode children: columnNodes + maskNodes + imageIndicatorNode
     // columnNodes are at the front, count = tabContentNum

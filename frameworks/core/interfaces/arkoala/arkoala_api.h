@@ -5769,6 +5769,8 @@ struct ArkUITabsModifier {
         void* colorRawPtr, void* inactiveColorRawPtr);
     void (*setTabsBarFloatingStyle)(ArkUINodeHandle node, void* paramRawPtr);
     void (*resetTabsBarFloatingStyle)(ArkUINodeHandle node);
+    void (*setTabsBarTopFloatingStyle)(ArkUINodeHandle node, void* paramRawPtr);
+    void (*resetTabsBarTopFloatingStyle)(ArkUINodeHandle node);
     void (*createWithResourceObj)(ArkUINodeHandle node, void* paramRawPtr);
     void (*setBarStyle)(ArkUINodeHandle node, ArkUI_Int32 barStyle);
     void (*resetBarStyle)(ArkUINodeHandle node);

@@ -1078,6 +1078,7 @@ let TabBarStyle;
   TabBarStyle[TabBarStyle.BOTTOM = 0] = 'BOTTOM';
   TabBarStyle[TabBarStyle.SIDEBAR = 1] = 'SIDEBAR';
   TabBarStyle[TabBarStyle.SIDEBAR_ADAPTABLE = 2] = 'SIDEBAR_ADAPTABLE';
+  TabBarStyle[TabBarStyle.TOP = 3] = 'TOP';
 })(TabBarStyle || (TabBarStyle = {}));
 
 let TabsSidebarDisplayStyle;
@@ -1090,6 +1091,7 @@ let TabBarDisplayMode;
 (function (TabBarDisplayMode) {
   TabBarDisplayMode[TabBarDisplayMode.BOTTOM_TABBAR = 0] = 'BOTTOM_TABBAR';
   TabBarDisplayMode[TabBarDisplayMode.SIDEBAR = 1] = 'SIDEBAR';
+  TabBarDisplayMode[TabBarDisplayMode.TOP_TABBAR = 2] = 'TOP_TABBAR';
 })(TabBarDisplayMode || (TabBarDisplayMode = {}));
 
 let TabVisibility;

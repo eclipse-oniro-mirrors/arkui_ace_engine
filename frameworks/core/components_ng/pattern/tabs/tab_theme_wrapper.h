@@ -57,6 +57,7 @@ public:
             bottomTabIconOn_ = colors->IconEmphasize();
             bottomTabIconOff_ = colors->IconFourth();
             bottomTabSymbolOff_ = colors->IconTertiary();
+            topTabBarBackgroundColor_ = colors->CompBackgroundSecondary();
         }
     }
 

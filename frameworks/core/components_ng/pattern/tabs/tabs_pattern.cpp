@@ -602,6 +602,9 @@ TabBarDisplayMode TabsPattern::CalculateTabBarDisplayMode(float width)
     if (barLayoutStyle == TabBarLayoutStyle::BOTTOM) {
         return TabBarDisplayMode::BOTTOMTABBAR;
     }
+    if (barLayoutStyle == TabBarLayoutStyle::TOP) {
+        return TabBarDisplayMode::TOP_TABBAR;
+    }
     // minSidebarWidth and minContentWidth constraints only apply when a visible
     // divider exists (i.e., the sidebar is draggable). Without a divider, these
     // range properties should have no effect on display mode determination.
@@ -1260,6 +1263,9 @@ void TabsPattern::OnColorModeChange(uint32_t colorMode)
     }
     UpdateBackBlurStyle(tabBarNode);
     UpdateBgMaskNode();
+    if (isFloatingTopBar_) {
+        UpdateTopBgMaskNode();
+    }
     tabBarNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
     // Sync divider color and background blur style to the sidebar on color mode change.
     UpdateSideBarAttributes();
@@ -1289,6 +1295,9 @@ bool TabsPattern::OnThemeScopeUpdate(int32_t themeScopeId)
         dividerRenderProperty->UpdateDividerColor(currentDivider.color);
     }
     UpdateBgMaskNode();
+    if (isFloatingTopBar_) {
+        UpdateTopBgMaskNode();
+    }
     // Sync divider/background to the sidebar on theme scope update.
     UpdateSideBarAttributes();
     return false;
@@ -1369,6 +1378,8 @@ RefPtr<LayoutAlgorithm> TabsPattern::CreateLayoutAlgorithm()
     algo->SetItemIndex(tabsNode->GetItemIndex());
     algo->SetIsFloatingBar(isFloatingBar_);
     algo->SetLastFloatingBar(lastFloatingBar_);
+    algo->SetIsFloatingTopBar(isFloatingTopBar_);
+    algo->SetLastFloatingTopBar(lastFloatingTopBar_);
     algo->SetBarDisplayMode(currentBarDisplayMode_);
     return algo;
 }
@@ -1381,13 +1392,26 @@ void TabsPattern::InitFloatingBar()
     bool isHorizontal = property->GetAxis().value_or(Axis::HORIZONTAL) == Axis::HORIZONTAL;
     bool isBarPositionEnd = property->GetTabBarPosition().value_or(BarPosition::START) == BarPosition::END;
     bool isFloatingStyle = property->HasBarFloatingStyle();
+    auto barLayoutStyle = property->GetBarLayoutStyleValue(TabBarLayoutStyle::BOTTOM);
 
     auto tabsNode = AceType::DynamicCast<TabsNode>(GetHost());
     CHECK_NULL_VOID(tabsNode);
+
     lastFloatingBar_ = isFloatingBar_;
-    if (isBarOverlap && isHorizontal && isBarPositionEnd && isFloatingStyle) {
+    lastFloatingTopBar_ = isFloatingTopBar_;
+
+    bool shouldBottomFloating = isBarOverlap && isHorizontal && isBarPositionEnd && isFloatingStyle &&
+        barLayoutStyle != TabBarLayoutStyle::TOP;
+    bool shouldTopFloating = isHorizontal && barLayoutStyle == TabBarLayoutStyle::TOP;
+
+    auto tabBar = AceType::DynamicCast<FrameNode>(tabsNode->GetTabBar());
+    auto renderContext = tabBar ? tabBar->GetRenderContext() : nullptr;
+
+    if (shouldBottomFloating) {
         isFloatingBar_ = true;
+        isFloatingTopBar_ = false;
         SetTabBarIsFloating(true);
+        SetTabBarIsFloatingTopBar(false);
         if (!tabsNode->HasBackgroundMaskNode()) {
             auto backgroundMaskNode = FrameNode::GetOrCreateFrameNode(TABS_BACKGROUND_MASK_ETS_TAG,
                 tabsNode->GetBackgroundMaskId(), []() { return AceType::MakeRefPtr<StackPattern>(); });
@@ -1397,25 +1421,107 @@ void TabsPattern::InitFloatingBar()
             tabsNode->SetItemIndex(itemIndex);
         }
         UpdateBgMaskNode();
-
         InitTouchEvent();
+        if (renderContext && lastFloatingTopBar_) {
+            renderContext->UpdateBackgroundColor(Color::TRANSPARENT);
+            renderContext->UpdateBackBlurStyle(std::nullopt);
+            renderContext->ResetBorder();
+        }
         ApplySystemMaterial();
+        if (renderContext) {
+            auto style = property->GetBarFloatingStyle();
+            float offsetX = 0.0f;
+            float offsetY = 0.0f;
+            if (style.has_value()) {
+                if (style->offsetX.has_value()) {
+                    offsetX = style->offsetX.value().ConvertToPx();
+                }
+                if (style->offsetY.has_value()) {
+                    offsetY = style->offsetY.value().ConvertToPx();
+                }
+            }
+            renderContext->UpdateTransformTranslate({offsetX, offsetY, 0.0f});
+            renderContext->UpdateTransformScale({baseFloatingScale_, baseFloatingScale_});
+        }
+    } else if (shouldTopFloating) {
+        isFloatingBar_ = false;
+        isFloatingTopBar_ = true;
+        SetTabBarIsFloating(false);
+        SetTabBarIsFloatingTopBar(true);
+        auto topStyle = property->GetBarTopFloatingStyle();
+        bool hasMask = topStyle.has_value() && topStyle->maskHeight.has_value() &&
+            topStyle->maskHeight->IsNonNegative();
+        if (hasMask) {
+            if (!tabsNode->HasBackgroundMaskNode()) {
+                auto backgroundMaskNode = FrameNode::GetOrCreateFrameNode(TABS_BACKGROUND_MASK_ETS_TAG,
+                    tabsNode->GetBackgroundMaskId(), []() { return AceType::MakeRefPtr<StackPattern>(); });
+                backgroundMaskNode->MountToParent(tabsNode, BG_MASK_INDEX);
+                backgroundMaskNode->SetHitTestMode(HitTestMode::HTMNONE);
+                ItemIndex itemIndex = { 0, 1, 2, 3, 4 };
+                tabsNode->SetItemIndex(itemIndex);
+            }
+            UpdateTopBgMaskNode();
+        } else if (tabsNode->HasBackgroundMaskNode() && lastFloatingBar_) {
+            auto backgroundMaskNode = AceType::DynamicCast<FrameNode>(tabsNode->GetBackgroundMask());
+            CHECK_NULL_VOID(backgroundMaskNode);
+            backgroundMaskNode->SetActive(false);
+        }
+        if (renderContext) {
+            auto tabTheme = tabBar->GetTheme<TabTheme>(true);
+            if (tabTheme) {
+                renderContext->UpdateBackgroundColor(tabTheme->GetTopTabBarBackgroundColor());
+                BlurStyleOption blurOption;
+                blurOption.blurStyle = BlurStyle::COMPONENT_THIN;
+                renderContext->UpdateBackBlurStyle(blurOption);
+                NG::BorderWidthProperty borderWidthProperty;
+                borderWidthProperty.SetBorderWidth(Dimension(1, DimensionUnit::VP));
+                renderContext->UpdateBorderWidth(borderWidthProperty);
+                NG::BorderStyleProperty borderStyle;
+                borderStyle.SetBorderStyle(BorderStyle::SOLID);
+                renderContext->UpdateBorderStyle(borderStyle);
+                NG::BorderColorProperty borderColor;
+                borderColor.SetColor(tabTheme->GetTopTabBarBackgroundColor());
+                renderContext->UpdateBorderColor(borderColor);
+            }
+            float offsetX = 0.0f;
+            float offsetY = 0.0f;
+            if (topStyle.has_value()) {
+                if (topStyle->offsetX.has_value()) {
+                    offsetX = topStyle->offsetX.value().ConvertToPx();
+                }
+                if (topStyle->offsetY.has_value()) {
+                    offsetY = topStyle->offsetY.value().ConvertToPx();
+                }
+            }
+            renderContext->UpdateTransformTranslate({offsetX, offsetY, 0.0f});
+            renderContext->UpdateTransformScale({1.0f, 1.0f});
+        }
     } else {
+        isFloatingBar_ = false;
+        isFloatingTopBar_ = false;
+        SetTabBarIsFloating(false);
+        SetTabBarIsFloatingTopBar(false);
         if (tabsNode->HasBackgroundMaskNode()) {
             auto backgroundMaskNode = AceType::DynamicCast<FrameNode>(tabsNode->GetBackgroundMask());
             CHECK_NULL_VOID(backgroundMaskNode);
             backgroundMaskNode->SetActive(false);
         }
-        isFloatingBar_ = false;
-        SetTabBarIsFloating(false);
         if (floatingBarPosition_ != FloatingBarPosition::CENTER) {
             ResetTabBarFollowHandPosition();
         }
         if (lastFloatingBar_) {
             ResetSystemMaterial();
         }
+        if (renderContext && (lastFloatingBar_ || lastFloatingTopBar_)) {
+            renderContext->UpdateTransformTranslate({0.0f, 0.0f, 0.0f});
+            renderContext->UpdateTransformScale({1.0f, 1.0f});
+            if (lastFloatingTopBar_) {
+                renderContext->UpdateBackBlurStyle(std::nullopt);
+                renderContext->ResetBorder();
+            }
+        }
     }
-    if (isFloatingBar_ != lastFloatingBar_) {
+    if (isFloatingBar_ != lastFloatingBar_ || isFloatingTopBar_ != lastFloatingTopBar_) {
         tabsNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
     }
 }
@@ -1454,6 +1560,51 @@ void TabsPattern::UpdateBgMaskNode()
     Gradient gradient;
     gradient.CreateGradientWithType(GradientType::LINEAR);
     gradient.SetDirection(GradientDirection::TOP);
+
+    for (uint32_t index = 0; index < DEFAULT_GRADIENT_COLOR_NUM; ++index) {
+        double ratio = DEFAULT_GRADIENT_COLOR_RATIO[index];
+        Color stepColor = Color(
+            static_cast<uint32_t>(baseColor.GetAlpha() * ratio) << LEFT_SHIFT_24 | (baseColor.GetValue() & RGB_MASK));
+        gradient.AddColor(CreatePercentGradientColor(DEFAULT_GRADIENT_COLOR_DIMENSION[index], stepColor));
+    }
+
+    stackRenderContext->UpdateLinearGradient(gradient);
+}
+
+void TabsPattern::UpdateTopBgMaskNode()
+{
+    auto tabsNode = AceType::DynamicCast<TabsNode>(GetHost());
+    CHECK_NULL_VOID(tabsNode);
+    if (!tabsNode->HasBackgroundMaskNode()) {
+        return;
+    }
+    auto backgroundMaskNode = AceType::DynamicCast<FrameNode>(tabsNode->GetBackgroundMask());
+    CHECK_NULL_VOID(backgroundMaskNode);
+    auto stackRenderContext = backgroundMaskNode->GetRenderContext();
+    CHECK_NULL_VOID(stackRenderContext);
+    auto property = GetLayoutProperty<TabsLayoutProperty>();
+    CHECK_NULL_VOID(property);
+    auto style = property->GetBarTopFloatingStyle();
+    Color baseColor(MASK_COLOR_LIGHT);
+    ColorMode colorInvertColorMode = GetColorInvertColorMode();
+    if (style.has_value() && style->maskColor.has_value()) {
+        baseColor = style->maskColor.value();
+    } else if (colorInvertColorMode != ColorMode::COLOR_MODE_UNDEFINED) {
+        if (colorInvertColorMode == ColorMode::DARK) {
+            baseColor = Color(MASK_COLOR_DARK);
+        }
+    } else {
+        auto context = GetContext();
+        if (context && context->GetColorMode() == ColorMode::DARK) {
+            baseColor = Color(MASK_COLOR_DARK);
+        } else if (tabsNode->GetLocalColorMode() == ColorMode::DARK) {
+            baseColor = Color(MASK_COLOR_DARK);
+        }
+    }
+
+    Gradient gradient;
+    gradient.CreateGradientWithType(GradientType::LINEAR);
+    gradient.SetDirection(GradientDirection::BOTTOM);
 
     for (uint32_t index = 0; index < DEFAULT_GRADIENT_COLOR_NUM; ++index) {
         double ratio = DEFAULT_GRADIENT_COLOR_RATIO[index];
@@ -1592,7 +1743,21 @@ void TabsPattern::ResetTabBarFollowHandPosition()
         return;
     }
     renderContext->UpdateTransformScale({ baseFloatingScale_, baseFloatingScale_ });
-    renderContext->UpdateTransformTranslate({ 0.0f, 0.0f, 0.0f });
+    float offsetX = 0.0f;
+    float offsetY = 0.0f;
+    auto property = GetLayoutProperty<TabsLayoutProperty>();
+    if (property) {
+        auto style = property->GetBarFloatingStyle();
+        if (style.has_value()) {
+            if (style->offsetX.has_value()) {
+                offsetX = style->offsetX.value().ConvertToPx();
+            }
+            if (style->offsetY.has_value()) {
+                offsetY = style->offsetY.value().ConvertToPx();
+            }
+        }
+    }
+    renderContext->UpdateTransformTranslate({offsetX, offsetY, 0.0f});
 }
 
 void TabsPattern::OnWindowSizeChanged(int32_t /*width*/, int32_t /*height*/, WindowSizeChangeReason type)
@@ -1784,6 +1949,73 @@ void TabsPattern::ResetSystemMaterial()
     UnregisterColorPicker();
 }
 
+void TabsPattern::ClampTabBarTransformOffset()
+{
+    if (!isFloatingBar_ && !isFloatingTopBar_) {
+        return;
+    }
+    auto tabsNode = AceType::DynamicCast<TabsNode>(GetHost());
+    CHECK_NULL_VOID(tabsNode);
+    auto tabBar = AceType::DynamicCast<FrameNode>(tabsNode->GetTabBar());
+    CHECK_NULL_VOID(tabBar);
+    auto renderContext = tabBar->GetRenderContext();
+    CHECK_NULL_VOID(renderContext);
+    if (!renderContext->HasTransformTranslate()) {
+        return;
+    }
+    auto translate = renderContext->GetTransformTranslate().value();
+    float offsetX = translate.x.ConvertToPx();
+    float offsetY = translate.y.ConvertToPx();
+    auto tabBarGeo = tabBar->GetGeometryNode();
+    auto tabsGeo = tabsNode->GetGeometryNode();
+    if (!tabBarGeo || !tabsGeo) {
+        return;
+    }
+    float barLeft = tabBarGeo->GetFrameOffset().GetX();
+    float barTop = tabBarGeo->GetFrameOffset().GetY();
+    float barWidth = tabBarGeo->GetFrameSize().Width();
+    float barHeight = tabBarGeo->GetFrameSize().Height();
+    float tabsWidth = tabsGeo->GetFrameSize().Width();
+    float tabsHeight = tabsGeo->GetFrameSize().Height();
+    float tabsOffsetX = tabsGeo->GetFrameOffset().GetX();
+    float tabsOffsetY = tabsGeo->GetFrameOffset().GetY();
+
+    float minOffsetX = -barLeft;
+    float maxOffsetX = tabsWidth - barLeft - barWidth;
+    float minOffsetY = -barTop;
+    float maxOffsetY = tabsHeight - barTop - barHeight;
+
+    auto context = tabsNode->GetContext();
+    if (context) {
+        auto safeArea = context->GetSafeArea();
+        auto titleHeight = context->GetContainerModalTitleHeight();
+        float titleAvoidance = titleHeight > 0 ? static_cast<float>(titleHeight) : 0.0f;
+        float safeLeftPx = static_cast<float>(safeArea.left_.Length());
+        float safeRightPx = static_cast<float>(safeArea.right_.Length());
+        float safeTopPx = static_cast<float>(safeArea.top_.Length()) + titleAvoidance;
+        float safeBottomPx = static_cast<float>(safeArea.bottom_.Length());
+
+        if (LessNotEqual(tabsOffsetX, safeLeftPx)) {
+            minOffsetX = std::max(minOffsetX, safeLeftPx - tabsOffsetX - barLeft);
+        }
+        if (GreatNotEqual(tabsOffsetX + tabsWidth, safeRightPx)) {
+            maxOffsetX = std::min(maxOffsetX, tabsOffsetX + tabsWidth - safeRightPx - barLeft - barWidth);
+        }
+        if (LessNotEqual(tabsOffsetY, safeTopPx)) {
+            minOffsetY = std::max(minOffsetY, safeTopPx - tabsOffsetY - barTop);
+        }
+        if (GreatNotEqual(tabsOffsetY + tabsHeight, safeBottomPx)) {
+            maxOffsetY = std::min(maxOffsetY, tabsOffsetY + tabsHeight - safeBottomPx - barTop - barHeight);
+        }
+    }
+
+    float clampedX = std::clamp(offsetX, minOffsetX, std::max(minOffsetX, maxOffsetX));
+    float clampedY = std::clamp(offsetY, minOffsetY, std::max(minOffsetY, maxOffsetY));
+    if (!NearEqual(clampedX, offsetX) || !NearEqual(clampedY, offsetY)) {
+        renderContext->UpdateTransformTranslate({clampedX, clampedY, 0.0f});
+    }
+}
+
 void TabsPattern::SetFloatingScaleEnabled(bool isFloatingScaleEnabled)
 {
     baseFloatingScale_ = isFloatingScaleEnabled ? FLOATING_BAR_SCALE_ENLARGED : FLOATING_BAR_SCALE;
@@ -1929,6 +2161,9 @@ void TabsPattern::HandleColorInvert()
     tabBarPattern->SetColorInvertColorMode(colorMode);
 
     UpdateBgMaskNode();
+    if (isFloatingTopBar_) {
+        UpdateTopBgMaskNode();
+    }
 }
 
 RefPtr<FrameNode> TabsPattern::CreateSideBarNode()
@@ -1971,7 +2206,9 @@ void TabsPattern::UpdateSideBarIfNeeded()
     auto preStyle = layoutStyle_.value_or(TabBarLayoutStyle::BOTTOM);
     layoutStyle_ = property->GetBarLayoutStyle();
     auto newStyle = layoutStyle_.value_or(TabBarLayoutStyle::BOTTOM);
-    if (preStyle == TabBarLayoutStyle::BOTTOM && newStyle == TabBarLayoutStyle::BOTTOM) {
+    bool preIsNonSidebar = preStyle == TabBarLayoutStyle::BOTTOM || preStyle == TabBarLayoutStyle::TOP;
+    bool newIsNonSidebar = newStyle == TabBarLayoutStyle::BOTTOM || newStyle == TabBarLayoutStyle::TOP;
+    if (preIsNonSidebar && newIsNonSidebar) {
         return;
     }
     if ((preStyle == TabBarLayoutStyle::SIDEBAR_ADAPTABLE || preStyle == TabBarLayoutStyle::SIDEBAR) &&
@@ -1982,8 +2219,8 @@ void TabsPattern::UpdateSideBarIfNeeded()
         }
         return;
     }
-    // adaptable/sidebar -> bottom
-    if (newStyle == TabBarLayoutStyle::BOTTOM) {
+    // adaptable/sidebar -> bottom/top
+    if (newIsNonSidebar) {
         ClearDividerDragEvent();
         // Keep sideBarTabBarItemId on each TabContentNode so that GetOrCreateTabItemNode
         // can reuse existing tab item nodes on the next bottom->sidebar switch.
@@ -2374,6 +2611,9 @@ TabBarDisplayMode TabsPattern::GetActiveBarDisplayMode() const
     auto barStyle = property->GetBarLayoutStyleValue(TabBarLayoutStyle::BOTTOM);
     if (barStyle == TabBarLayoutStyle::SIDEBAR) {
         return TabBarDisplayMode::SIDEBAR;
+    }
+    if (barStyle == TabBarLayoutStyle::TOP) {
+        return TabBarDisplayMode::TOP_TABBAR;
     }
     return TabBarDisplayMode::BOTTOMTABBAR;
 }
@@ -2939,7 +3179,9 @@ void TabsPattern::ResetDisplayModeSwitchTransforms()
         auto renderContext = tabBar->GetRenderContext();
         CHECK_NULL_VOID(renderContext);
         renderContext->UpdateTransformScale({ baseFloatingScale_, baseFloatingScale_ });
-        renderContext->UpdateTransformTranslate({ 0.0f, 0.0f, 0.0f });
+        if (!isFloatingTopBar_) {
+            renderContext->UpdateTransformTranslate({ 0.0f, 0.0f, 0.0f });
+        }
         renderContext->UpdateOpacity(1.0);
     }
     if (sideBar) {
@@ -3062,7 +3304,7 @@ void TabsPattern::ApplyNonFloatingTabBarAnimClosure(bool toSidebar, float outsid
         if (toSidebar) {
             renderContext->UpdateTransformTranslate({ 0.0f, tabHeight, 0.0f });
             renderContext->UpdateOpacity(0.0);
-        } else {
+        } else if (!isFloatingTopBar_) {
             renderContext->UpdateTransformTranslate({ 0.0f, 0.0f, 0.0f });
             renderContext->UpdateOpacity(1.0);
         }

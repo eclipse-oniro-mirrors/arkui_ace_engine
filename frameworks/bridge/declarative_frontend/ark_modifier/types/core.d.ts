@@ -314,10 +314,11 @@ type TabBarSymbol = object;
 type LayoutMode = object;
 type TabBarIconStyle = object;
 type barFloatingStyleOptions = object;
-type TabBarStyle = 'bottom' | 'sidebar' | 'sidebarAdaptable';
+type topBarFloatingStyleOptions = object;
+type TabBarStyle = 'bottom' | 'sidebar' | 'sidebarAdaptable' | 'top';
 type TabsSidebarDisplayStyle = 'embed' | 'displace';
 type TabsSidebarSearchableOptions = object;
-type TabBarDisplayMode = 'bottomTabbar' | 'sidebar';
+type TabBarDisplayMode = 'bottomTabbar' | 'sidebar' | 'topTabbar';
 type TabsBreakpointType<T> = object;
 type TabVisibility = 'visible' | 'hidden';
 

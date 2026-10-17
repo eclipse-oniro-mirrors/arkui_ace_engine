@@ -45,7 +45,7 @@ constexpr int TABCONTENT_ARG_INDEX_2 = 2;
 constexpr int32_t TAB_VISIBILITY_VISIBLE = static_cast<int32_t>(TabVisibility::VISIBLE);
 constexpr int32_t TAB_VISIBILITY_HIDDEN = static_cast<int32_t>(TabVisibility::HIDDEN);
 constexpr int32_t BAR_DISPLAY_MODE_BOTTOMTABBAR = static_cast<int32_t>(TabBarDisplayMode::BOTTOMTABBAR);
-constexpr int32_t BAR_DISPLAY_MODE_SIDEBAR = static_cast<int32_t>(TabBarDisplayMode::SIDEBAR);
+constexpr int32_t BAR_DISPLAY_MODE_TOP = static_cast<int32_t>(TabBarDisplayMode::TOP_TABBAR);
 #ifdef PIXEL_MAP_SUPPORTED
 constexpr char DRAWABLE_DESCRIPTOR_NAME[] = "DrawableDescriptor";
 constexpr char LAYERED_DRAWABLE_DESCRIPTOR_NAME[] = "LayeredDrawableDescriptor";
@@ -1246,7 +1246,7 @@ ArkUINativeModuleValue TabContentBridge::SetTabBarVisibility(ArkUIRuntimeCallInf
     ArkUI_Bool hasDisplayMode = false;
     if (!displayModeArg.IsNull() && !displayModeArg->IsUndefined() && displayModeArg->IsNumber()) {
         auto displayModeVal = displayModeArg->Int32Value(vm);
-        if (displayModeVal >= BAR_DISPLAY_MODE_BOTTOMTABBAR && displayModeVal <= BAR_DISPLAY_MODE_SIDEBAR) {
+        if (displayModeVal >= BAR_DISPLAY_MODE_BOTTOMTABBAR && displayModeVal <= BAR_DISPLAY_MODE_TOP) {
             displayMode = displayModeVal;
             hasDisplayMode = true;
         }
