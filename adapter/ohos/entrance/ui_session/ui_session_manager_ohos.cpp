@@ -1043,6 +1043,19 @@ int32_t UiSessionManagerOhos::ExtractRuleJsonAndWebEnabled(int32_t processId,
             ruleJson = ruleJsons.front();
         }
     } else {
+        // Look up search rule sets by ruleSetId (searchPageSceneRuleSets_:
+        // pid -> ruleSetId -> SearchPageSceneRuleSetInfo)
+        auto searchIter = searchPageSceneRuleSets_.find(processId);
+        if (searchIter != searchPageSceneRuleSets_.end()) {
+            auto setIter = searchIter->second.find(ruleJsonOrRuleSetId);
+            if (setIter != searchIter->second.end()) {
+                // Search rules use ArkUI detection and do not use the legacy Web rule schema.
+                webEnabled = false;
+                ruleJson = setIter->second.ruleJson;
+                pendingPageSceneGets_.insert(processId);
+                return NO_ERROR;
+            }
+        }
         auto ruleSetInfo = ExtractPageSceneRuleSetInfo(ruleJsonOrRuleSetId);
         webEnabled = ruleSetInfo.webEnabled;
         auto ruleJsons = GetPageSceneRuleJsons(ruleSetInfo, PAGE_SCENE_TEXT_EDITOR_SCENE, false, "");
@@ -1203,6 +1216,11 @@ void UiSessionManagerOhos::FlushPageSceneNodeChanged()
     for (const auto& [pid, ruleJson] : ruleJsons) {
         TriggerPageSceneDetect(pid, ruleJson, false);
     }
+}
+
+void UiSessionManagerOhos::FlushPendingSearchClicksIfStable()
+{
+    UiSessionManager::FlushPendingSearchClicksIfStable();
 }
 
 void UiSessionManagerOhos::SavePageSceneDetectFunction(PageSceneDetectFunction&& function)

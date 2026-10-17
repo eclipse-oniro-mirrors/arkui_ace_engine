@@ -19,9 +19,12 @@
 #include "core/components_ng/manager/safe_area/safe_area_manager.h"
 #include "base/resource/shared_image_manager.h"
 
+#include <map>
+
 #include <atomic>
 #include <cinttypes>
 #include <optional>
+#include <tuple>
 
 #include "ability_context.h"
 #include "ability_info.h"
@@ -438,16 +441,17 @@ static ContainerScopeHilogRegistrar g_hilogRegistrar;
 
 // Presence event JSON per spec.md: true carries full evidence
 //; false carries exits; subwindow evidence applies
-// `<mainPageName>+Dialog`.
+// `<mainPageName>+Dialog` or `<mainPageName>+Sheet`.
 std::string BuildSearchPresenceEventJson(
-    const NG::SearchPresenceStateMachine::PresenceEvent& event, const std::string& pageName)
+    const NG::SearchPresenceStateMachine::PresenceEvent& event)
 {
     auto root = JsonUtil::Create(true);
     root->Put("eventType", "presence");
     root->Put("hasSearch", event.isTrue);
-    std::string eventPageName = pageName.empty() ? event.pageName : pageName;
-    if (event.anySubwindow && !eventPageName.empty()) {
-        eventPageName += "+Dialog";
+    std::string eventPageName = event.pageName;
+    if (event.anySubwindow) {
+        const auto suffix = event.subwindowSuffix.empty() ? NG::SUBWINDOW_DIALOG_SUFFIX : event.subwindowSuffix;
+        eventPageName = NG::BuildSearchSubwindowPageName(eventPageName, suffix);
     }
     if (!eventPageName.empty()) {
         root->Put("pageName", eventPageName.c_str());
@@ -522,6 +526,86 @@ std::string BuildSearchClickEventJson(
     hitsJson->Put(item);
     root->Put("hits", hitsJson);
     return root->ToString();
+}
+
+// Aggregate multi-rule click hits: a single click matching multiple rules
+// (including cross-ruleSet) produces one JSON with all hits, sent in a single
+// IPC. Group globally by response control (inspectorId+nodeId): cross-ruleSet
+// hits on the same control merge into one event; different controls stay separate.
+std::vector<std::string> BuildSearchClickEventsJson(
+    const std::vector<NG::SearchClickMatchResult>& results, const std::string& pageName)
+{
+    std::vector<std::string> eventJsons;
+    if (results.empty()) {
+        return eventJsons;
+    }
+    // Group by response control (inspectorId+nodeId); cross-ruleSet hits merge into one JSON.
+    std::map<std::tuple<int32_t, std::string, std::string, int32_t>,
+        std::vector<const NG::SearchClickMatchResult*>> groups;
+    for (const auto& r : results) {
+        auto gk = std::make_tuple(r.processId, r.operationId, r.inspectorId, r.nodeId);
+        groups[gk].push_back(&r);
+    }
+    // Each group produces one click event (one IPC) with all matched ruleSet/rule hits.
+    for (auto& [gk, vec] : groups) {
+        auto root = JsonUtil::Create(true);
+        root->Put("eventType", "click");
+        if (!pageName.empty()) {
+            root->Put("pageName", pageName.c_str());
+        }
+        auto hitsJson = JsonUtil::CreateArray(true);
+        for (const auto* result : vec) {
+            auto item = JsonUtil::Create(true);
+            item->Put("ruleSetId", result->ruleSetId.c_str());
+            item->Put("ruleId", result->ruleId.c_str());
+            item->Put("matchType", result->matchType.c_str());
+            if (!result->matchedKeyword.empty()) {
+                item->Put("matchedKeyword", result->matchedKeyword.c_str());
+            }
+            auto responseNode = JsonUtil::Create(true);
+            responseNode->Put("inspectorId", result->inspectorId.c_str());
+            responseNode->Put("nodeId", result->nodeId);
+            responseNode->Put("type", result->nodeType.c_str());
+            auto rectJson = JsonUtil::Create(true);
+            rectJson->Put("x", static_cast<double>(result->rect.GetX()));
+            rectJson->Put("y", static_cast<double>(result->rect.GetY()));
+            rectJson->Put("width", static_cast<double>(result->rect.Width()));
+            rectJson->Put("height", static_cast<double>(result->rect.Height()));
+            responseNode->Put("rect", rectJson);
+            item->Put("responseNode", responseNode);
+            hitsJson->Put(item);
+        }
+        root->Put("hits", hitsJson);
+        eventJsons.emplace_back(root->ToString());
+    }
+    return eventJsons;
+}
+
+void PostSearchClickEvent(int32_t processId, const std::string& json, const RefPtr<TaskExecutor>& executor)
+{
+    executor->PostTask(
+        [processId, json] {
+            auto session = UiSessionManager::GetInstance();
+            if (session) {
+                session->ReportPageSceneEvent(processId, json, false);
+            }
+        },
+        TaskExecutor::TaskType::BACKGROUND, "UiSessionSearchClickReport");
+}
+
+void ReportSearchClickEvents(const std::vector<NG::SearchClickMatchResult>& results,
+    const std::string& pageName, const RefPtr<TaskExecutor>& executor)
+{
+    CHECK_NULL_VOID(executor);
+    std::map<int32_t, std::vector<NG::SearchClickMatchResult>> byProcess;
+    for (const auto& result : results) {
+        byProcess[result.processId].emplace_back(result);
+    }
+    for (const auto& [processId, processResults] : byProcess) {
+        for (const auto& json : BuildSearchClickEventsJson(processResults, pageName)) {
+            PostSearchClickEvent(processId, json, executor);
+        }
+    }
 }
 
 bool HandlePageSceneRuleRemoval(int32_t processId, const std::unique_ptr<JsonValue>& ruleRoot,
@@ -3165,7 +3249,7 @@ void UIContentImpl::Background()
         auto exitEvents = pageSceneMatcher_->ExitAllSearchPresence();
         for (const auto& [pid, event] : exitEvents) {
             UiSessionManager::GetInstance()->ReportPageSceneEvent(
-                pid, BuildSearchPresenceEventJson(event, ""), false);
+                pid, BuildSearchPresenceEventJson(event), false);
         }
     }
 
@@ -6596,6 +6680,50 @@ void UIContentImpl::InitUISessionManagerCallbacks(const WeakPtr<TaskExecutor>& t
     SaveTraverseWebForPageSceneCallback(taskExecutor);
     auto pageSceneMatcher = std::make_shared<NG::PageSceneRuleManager>();
     pageSceneMatcher_ = pageSceneMatcher;
+    const auto instanceId = instanceId_;
+    pageSceneMatcher->SetIsContentStableFunction([instanceId]() -> bool {
+        ContainerScope scope(instanceId);
+        auto pipeline = NG::PipelineContext::GetCurrentContextSafely();
+        if (!pipeline) {
+            return false;
+        }
+        auto& manager = pipeline->GetContentChangeManager();
+        return !manager || (!manager->IsScrolling() && !manager->IsTransitioning() && !manager->IsSwiperScrolling());
+    });
+    // One delayed flush per UIContent batches rapid clicks. It never queues a
+    // presence scan, and content-change consumption can safely drain it first.
+    auto flushScheduled = std::make_shared<std::atomic<bool>>(false);
+    UiSessionManager::GetInstance()->SaveSearchClickFlushFunction(
+        [weakExecutor = taskExecutor, weakManager = std::weak_ptr<NG::PageSceneRuleManager>(pageSceneMatcher),
+            flushScheduled, instanceId] {
+            auto executor = weakExecutor.Upgrade();
+            if (!executor || weakManager.expired() || flushScheduled->exchange(true)) {
+                return;
+            }
+            auto posted = executor->PostDelayedTask([weakExecutor, weakManager, flushScheduled, instanceId] {
+                flushScheduled->store(false);
+                auto manager = weakManager.lock();
+                auto executor = weakExecutor.Upgrade();
+                if (!manager || !executor) {
+                    return;
+                }
+                ContainerScope scope(instanceId);
+                auto pipeline = NG::PipelineContext::GetCurrentContextSafely();
+                if (!pipeline) {
+                    return;
+                }
+                NG::SearchClickPageContext page {
+                    pipeline->GetCurrentNavDestinationName(), pipeline->GetCurrentPageUrl()
+                };
+                auto results = manager->FlushPendingSearchClicksIfStable(page);
+                const auto pageName = !page.navDestinationName.empty() ? page.navDestinationName
+                    : (!page.pageUrl.empty() ? page.pageUrl : pipeline->GetCurrentPageName());
+                ReportSearchClickEvents(results, pageName, executor);
+            }, TaskExecutor::TaskType::UI, 250, "ArkUISearchClickFlushIfStable");
+            if (!posted) {
+                flushScheduled->store(false);
+            }
+        });
     auto pageSceneDetectCallback = [weakTaskExecutor = taskExecutor,
                                       weakPageSceneMatcher = std::weak_ptr<NG::PageSceneRuleManager>(pageSceneMatcher)](
         int32_t processId, const std::string& ruleJson, bool isGetResult) {
@@ -6679,26 +6807,39 @@ void UIContentImpl::InitUISessionManagerCallbacks(const WeakPtr<TaskExecutor>& t
                             UiSessionManager::GetInstance()->CompleteGetPageScene(processId);
                         }
                     };
+                    // Derive eventPageName by pageType instead of the concatenated
+                    // snapshot.pageName ("route,navName"). Navigation → navDestinationName;
+                    // Router → pageUrl; fallback → pageName.
+                    std::string eventPageName = !snapshot.navDestinationName.empty()
+                        ? snapshot.navDestinationName
+                        : (!snapshot.pageUrl.empty() ? snapshot.pageUrl : snapshot.pageName);
                     // Route transition: exit PRESENT pages of this process other
                     // than the current one first (A false before B true, AC-6.4).
-                    auto exitEvents = pageSceneMatcher->ExitOtherSearchPresence(processId, snapshot.pageName);
-                    for (const auto& event : exitEvents) {
-                        reportSearchEvent(BuildSearchPresenceEventJson(event, snapshot.pageName));
+                    // Skip exit when eventPageName is empty (subwindow UIContent) to
+                    // avoid clearing the main-window presence (AC-5.1).
+                    if (!eventPageName.empty()) {
+                        auto exitEvents = pageSceneMatcher->ExitOtherSearchPresence(processId, eventPageName);
+                        for (const auto& event : exitEvents) {
+                            reportSearchEvent(BuildSearchPresenceEventJson(event));
+                        }
                     }
                     auto hits = pageSceneMatcher->MatchSearchScene(processId, snapshot);
                     auto events = pageSceneMatcher->UpdateSearchPresence(processId, snapshot, hits);
+                    LOGD("SearchDetect: pageName=%{public}s nav=%{public}s url=%{public}s "
+                         "hits=%{public}zu events=%{public}zu",
+                        snapshot.pageName.c_str(), snapshot.navDestinationName.c_str(),
+                        snapshot.pageUrl.c_str(), hits.size(), events.size());
                     for (const auto& event : events) {
-                        reportSearchEvent(BuildSearchPresenceEventJson(event, snapshot.pageName));
+                        reportSearchEvent(BuildSearchPresenceEventJson(event));
                     }
                     // Consume click candidates buffered since the last stable point
-                    // and report search click events.
+                    // and report search click events. Use FlushPendingSearchClicksIfStable
+                    // to reuse the stability gate.
                     NG::SearchClickPageContext clickPage;
                     clickPage.navDestinationName = snapshot.navDestinationName;
                     clickPage.pageUrl = snapshot.pageUrl;
-                    auto clickResults = pageSceneMatcher->ConsumeSearchClickCandidates(clickPage);
-                    for (const auto& clickResult : clickResults) {
-                        reportSearchEvent(BuildSearchClickEventJson(clickResult, snapshot.pageName));
-                    }
+                    auto clickResults = pageSceneMatcher->FlushPendingSearchClicksIfStable(clickPage);
+                    ReportSearchClickEvents(clickResults, eventPageName, taskExecutor);
                     if (isGetResult) {
                         UiSessionManager::GetInstance()->CompleteGetPageScene(processId);
                     }

@@ -31,6 +31,24 @@ struct SearchComponentFeature;
 struct SearchRuleSet;
 struct SearchSceneRule;
 
+// Subwindow pageName suffixes. Shared so that the matcher, the presence
+// state machine, and the event JSON builder reference the same constants
+// instead of duplicating magic string literals.
+// A subwindow rule's pageName is "<mainPageName>+Dialog" or "<mainPageName>+Sheet".
+inline constexpr char SUBWINDOW_DIALOG_SUFFIX[] = "+Dialog";
+inline constexpr char SUBWINDOW_SHEET_SUFFIX[] = "+Sheet";
+
+inline bool HasSearchPageSuffix(const std::string& pageName, const std::string& suffix)
+{
+    return pageName.size() >= suffix.size() &&
+        pageName.compare(pageName.size() - suffix.size(), suffix.size(), suffix) == 0;
+}
+
+inline std::string BuildSearchSubwindowPageName(const std::string& pageName, const std::string& suffix)
+{
+    return pageName.empty() || HasSearchPageSuffix(pageName, suffix) ? pageName : pageName + suffix;
+}
+
 // Per-rule match evidence. evidenceType is "keyword" or "component"; for a
 // keyword hit, source carries the keyword source name and matchedKeyword the
 // matched keyword; for a component hit, source carries the component type.
@@ -45,6 +63,11 @@ struct SearchMatchEvidence {
     RectF rect;
     // True when the evidence node belongs to an ArkUI subwindow (AC-4.5).
     bool isSubwindow = false;
+    // Subwindow suffix extracted from the matching rule's pageName ("+Dialog"
+    // or "+Sheet"); empty for main-window hits. Carried through the evidence
+    // chain so the presence state machine and event JSON use the correct suffix
+    // instead of a hardcoded one.
+    std::string subwindowSuffix;
 };
 
 // Role that matches a single search snapshot against all rules of one ruleSet.
@@ -62,7 +85,8 @@ private:
     std::optional<SearchMatchEvidence> FindKeywordHit(
         const SearchSceneSnapshot& snapshot, const SearchRuleSet& ruleSet, const SearchSceneRule& rule) const;
     std::optional<SearchMatchEvidence> FindKeywordHitInNode(
-        const SearchSceneNodeFeature& node, const SearchRuleSet& ruleSet, const SearchSceneRule& rule) const;
+        const SearchSceneNodeFeature& node, const SearchRuleSet& ruleSet, const SearchSceneRule& rule,
+        const std::string& suffix) const;
     std::optional<SearchMatchEvidence> FindComponentHit(
         const SearchSceneSnapshot& snapshot, const SearchRuleSet& ruleSet, const SearchSceneRule& rule) const;
     static bool IsComponentFeatureMatched(
@@ -89,8 +113,10 @@ public:
         // (AC-8.1: evidenceType/source/matchedKeyword/nodeId/type/rect).
         std::vector<SearchMatchEvidence> hits;
         // True when any evidence node belongs to an ArkUI subwindow; event
-        // PageName then becomes `<mainPageName>+Dialog` (AC-4.5).
+        // PageName then becomes `<mainPageName>+Dialog` or `<mainPageName>+Sheet`
+        // (AC-4.5). subwindowSuffix carries the actual suffix from the hits.
         bool anySubwindow = false;
+        std::string subwindowSuffix;
     };
 
     // Returns an event only on a state transition; otherwise std::nullopt.
@@ -101,6 +127,8 @@ public:
     // Emits one false for every PRESENT page whose key starts with prefix but is
     // not keepKey; used for route transition ordering (A false before B true).
     std::vector<PresenceEvent> ExitAllExcept(const std::string& prefix, const std::string& keepKey);
+    // Preserve the main page and its exact Dialog/Sheet states on same-page scans.
+    std::vector<PresenceEvent> ExitOtherPages(const std::string& prefix, const std::string& pageName);
     // Clears states whose key starts with prefix (e.g. "<pid>:" on SA death).
     void ClearPrefix(const std::string& prefix);
     void ClearRuleSet(const std::string& processId, const std::string& ruleSetId);

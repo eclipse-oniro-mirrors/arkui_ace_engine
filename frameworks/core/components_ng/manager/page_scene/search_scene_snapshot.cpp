@@ -15,6 +15,7 @@
 
 #include "core/components_ng/manager/page_scene/search_scene_snapshot.h"
 
+#include <algorithm>
 #include <utility>
 
 #include "base/log/log_wrapper.h"
@@ -33,19 +34,19 @@
 namespace OHOS::Ace::NG {
 namespace {
 constexpr float ZERO_RECT_SIZE = 0.0f;
-// Keyword source names align with spec R-3 contract:
-// text / buttonText / placeholder / value / customName / subtreeText / a11y / inspectorId.
-const char SOURCE_PLACEHOLDER[] = "placeholder";
-const char SOURCE_VALUE[] = "value";
+// Keyword source names align with the spec R-23 enum:
+// text|buttonText|placeholderValue|customName|subtreeText|accessibility|inspectorId
+const char SOURCE_PLACEHOLDER_VALUE[] = "placeholderValue";
 const char SOURCE_TEXT[] = "text";
 const char SOURCE_BUTTON_TEXT[] = "buttonText";
-const char SOURCE_A11Y[] = "a11y";
+const char SOURCE_ACCESSIBILITY[] = "accessibility";
 const char SOURCE_CUSTOM_NAME[] = "customName";
 const char SOURCE_SUBTREE_TEXT[] = "subtreeText";
 
 void AddSource(SearchSceneNodeFeature& feature, const std::string& name, const std::string& value)
 {
-    if (!value.empty()) {
+    if (!value.empty() && std::none_of(feature.keywordSources.begin(), feature.keywordSources.end(),
+        [&name, &value](const auto& source) { return source.name == name && source.value == value; })) {
         feature.keywordSources.emplace_back(SearchKeywordSource { name, value });
     }
 }
@@ -56,12 +57,24 @@ void CollectPlaceholderValue(const RefPtr<FrameNode>& frameNode, SearchSceneNode
     auto layoutProperty = frameNode->GetLayoutProperty<TextFieldLayoutProperty>();
     if (layoutProperty && layoutProperty->HasPlaceholder()) {
         auto placeholder = UtfUtils::Str16DebugToStr8(layoutProperty->GetPlaceholderValue());
-        AddSource(feature, SOURCE_PLACEHOLDER, placeholder);
+        // Report placeholder and value uniformly as placeholderValue
+        AddSource(feature, SOURCE_PLACEHOLDER_VALUE, placeholder);
     }
     auto textFieldPattern = frameNode->GetPattern<TextFieldPattern>();
     if (textFieldPattern) {
-        AddSource(feature, SOURCE_VALUE, textFieldPattern->GetTextValue());
+        AddSource(feature, SOURCE_PLACEHOLDER_VALUE, textFieldPattern->GetTextValue());
     }
+}
+
+void AppendGroupText(std::string& text, const std::string& childText)
+{
+    if (childText.empty()) {
+        return;
+    }
+    if (!text.empty()) {
+        text += ", ";
+    }
+    text += childText;
 }
 
 void CollectAccessibilitySources(const RefPtr<FrameNode>& frameNode, SearchSceneNodeFeature& feature)
@@ -71,10 +84,10 @@ void CollectAccessibilitySources(const RefPtr<FrameNode>& frameNode, SearchScene
     if (!accessibilityProperty) {
         return;
     }
-    // a11y text.
-    AddSource(feature, SOURCE_A11Y, accessibilityProperty->GetAccessibilityText());
-    AddSource(feature, SOURCE_A11Y, accessibilityProperty->GetAccessibilityDescription());
-    // Generic node text / button text (R-3: 文本/按钮文字).
+    // Report accessibility text and description under the same source name.
+    AddSource(feature, SOURCE_ACCESSIBILITY, accessibilityProperty->GetAccessibilityText());
+    AddSource(feature, SOURCE_ACCESSIBILITY, accessibilityProperty->GetAccessibilityDescription());
+    // Generic node text / button text (R-3: text/button text).
     auto nodeText = accessibilityProperty->GetText();
     if (!nodeText.empty()) {
         auto tag = frameNode->GetTag();
@@ -84,16 +97,22 @@ void CollectAccessibilitySources(const RefPtr<FrameNode>& frameNode, SearchScene
             AddSource(feature, SOURCE_TEXT, nodeText);
         }
     }
-    // Subtree text.
-    AddSource(feature, SOURCE_SUBTREE_TEXT, accessibilityProperty->GetGroupText(true));
 }
 
 void CollectCustomName(const RefPtr<FrameNode>& frameNode, SearchSceneNodeFeature& feature)
 {
     CHECK_NULL_VOID(frameNode);
-    auto customNode = AceType::DynamicCast<CustomNodeBase>(frameNode);
-    if (customNode) {
-        AddSource(feature, SOURCE_CUSTOM_NAME, customNode->GetJSViewName());
+    // ArkTS @Component structs are CustomNode (a UINode, not a FrameNode), so the
+    // frameNode itself is never a CustomNodeBase. Walk the parent chain and collect
+    // GetJSViewName() from every enclosing CustomNodeBase so nodes inside a custom
+    // component carry the component name as a customName keyword source.
+    auto ancestor = frameNode->GetParent();
+    while (ancestor) {
+        auto ancestorCustom = AceType::DynamicCast<CustomNodeBase>(ancestor);
+        if (ancestorCustom) {
+            AddSource(feature, SOURCE_CUSTOM_NAME, ancestorCustom->GetJSViewName());
+        }
+        ancestor = ancestor->GetParent();
     }
 }
 
@@ -109,7 +128,7 @@ bool IsSearchExcludedTag(const std::string& tag)
            tag == V2::UI_EXTENSION_COMPONENT_TAG || tag == V2::UI_EXTENSION_SURFACE_TAG;
 }
 
-// Pragmatic clip container (方案2 / O-1): scroll-family containers and nodes
+// Pragmatic clip container (approach 2 / O-1): scroll-family containers and nodes
 // whose render context has clipEdge enabled clip their content to their bounds.
 bool IsSearchClipContainer(const RefPtr<FrameNode>& node)
 {
@@ -138,22 +157,54 @@ SearchSceneSnapshot SearchSceneSnapshotBuilder::Build(
     return snapshot;
 }
 
-void SearchSceneSnapshotBuilder::CollectNode(
-    const SearchWindowContext& window, const RefPtr<UINode>& node, SearchSceneSnapshot& snapshot) const
+std::string SearchSceneSnapshotBuilder::CollectNode(
+    const SearchWindowContext& window, const RefPtr<UINode>& node, SearchSceneSnapshot& snapshot,
+    int32_t remainingDepth) const
 {
-    CHECK_NULL_VOID(node);
+    CHECK_NULL_RETURN(node, "");
     auto frameNode = AceType::DynamicCast<FrameNode>(node);
     if (frameNode && IsSearchExcludedTag(frameNode->GetTag())) {
-        // Excluded subtrees (Web/UIExtension) are not included in search evidence.
-        return;
+        return "";
     }
+    const size_t featureIndex = snapshot.nodes.size();
     if (frameNode && !BuildNodeFeature(window, frameNode, snapshot.nodes)) {
-        // Node is invisible or fully clipped: no need to traverse children.
-        return;
+        return "";
     }
-    for (const auto& child : node->GetChildrenForInspector(true)) {
-        CollectNode(window, child, snapshot);
+    // Preserve GetGroupText(true)'s default-group behavior and accessibility
+    // levels, but reuse this traversal's visibility and click-depth checks.
+    // Each node's visible rect is computed once, including for group text.
+    std::string groupText;
+    bool includeSubtree = true;
+    if (frameNode) {
+        auto property = frameNode->GetAccessibilityProperty<AccessibilityProperty>();
+        includeSubtree = property && !frameNode->IsInternal();
+        if (includeSubtree) {
+            auto level = property->GetAccessibilityLevel();
+            auto customProperty = property->GetCustomAccessibilityProperty();
+            if (customProperty && !customProperty->GetAccessibilityLevel().empty()) {
+                level = customProperty->GetAccessibilityLevel();
+            }
+            includeSubtree = level != AccessibilityProperty::Level::NO_HIDE_DESCENDANTS;
+            if (level == AccessibilityProperty::Level::AUTO || level == AccessibilityProperty::Level::YES_STR) {
+                groupText = property->GetText();
+            }
+        }
     }
+    if (remainingDepth != 0) {
+        for (const auto& child : node->GetChildrenForInspector(true)) {
+            auto childText = CollectNode(window, child, snapshot, remainingDepth < 0 ? -1 : remainingDepth - 1);
+            if (includeSubtree) {
+                AppendGroupText(groupText, childText);
+            }
+        }
+    }
+    if (!includeSubtree) {
+        return "";
+    }
+    if (frameNode) {
+        AddSource(snapshot.nodes[featureIndex], SOURCE_SUBTREE_TEXT, groupText);
+    }
+    return groupText;
 }
 
 SearchSceneSnapshot SearchSceneSnapshotBuilder::BuildLocal(
@@ -164,28 +215,8 @@ SearchSceneSnapshot SearchSceneSnapshotBuilder::BuildLocal(
         return snapshot;
     }
     SearchWindowContext window { responseNode, 0.0f, 0.0f, false };
-    CollectNodeWithDepth(window, responseNode, maxDepth, 0, snapshot);
+    CollectNode(window, responseNode, snapshot, maxDepth);
     return snapshot;
-}
-
-void SearchSceneSnapshotBuilder::CollectNodeWithDepth(
-    const SearchWindowContext& window, const RefPtr<UINode>& node,
-    int32_t maxDepth, int32_t depth, SearchSceneSnapshot& snapshot) const
-{
-    CHECK_NULL_VOID(node);
-    auto frameNode = AceType::DynamicCast<FrameNode>(node);
-    if (frameNode) {
-        BuildNodeFeature(window, frameNode, snapshot.nodes);
-    }
-    if (depth >= maxDepth) {
-        return;
-    }
-    if (frameNode && IsSearchExcludedTag(frameNode->GetTag())) {
-        return;
-    }
-    for (const auto& child : node->GetChildrenForInspector(true)) {
-        CollectNodeWithDepth(window, child, maxDepth, depth + 1, snapshot);
-    }
 }
 
 bool SearchSceneSnapshotBuilder::BuildNodeFeature(
@@ -193,6 +224,9 @@ bool SearchSceneSnapshotBuilder::BuildNodeFeature(
     std::vector<SearchSceneNodeFeature>& nodes) const
 {
     CHECK_NULL_RETURN(frameNode, false);
+    if (!frameNode->IsVisibleAndActive()) {
+        return false;
+    }
     // Final visible rect is relative to the node's own window; the collector
     // already provided the main-window coordinate offset for subwindows.
     RectF rect = frameNode->GetTransformRectRelativeToWindowOnlyVisible(true);

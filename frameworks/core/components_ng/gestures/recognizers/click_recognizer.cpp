@@ -25,6 +25,7 @@
 #include "core/common/event_manager.h"
 #include "core/common/reporter/reporter.h"
 #include "core/components_ng/event/event_constants.h"
+#include "interfaces/inner_api/ui_session/ui_session_manager.h"
 #include "core/components_ng/property/accessibility_property.h"
 
 #ifndef CROSS_PLATFORM
@@ -234,6 +235,10 @@ void ClickRecognizer::PublishSearchClickCandidate(const TouchEvent& touchPoint)
         effectivePoint.deviceId, effectivePoint.id, pressedTime > 0 ? pressedTime : now, candidate.nodeId);
     candidate.responseNode = WeakPtr<FrameNode>(responseNode);
     SearchClickObserver::GetInstance().Publish(candidate);
+    auto session = UiSessionManager::GetInstance();
+    if (session) {
+        session->FlushPendingSearchClicksIfStable();
+    }
 }
 
 void ClickRecognizer::OnAccepted()
