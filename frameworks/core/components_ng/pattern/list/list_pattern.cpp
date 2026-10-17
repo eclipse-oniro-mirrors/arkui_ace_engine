@@ -58,6 +58,9 @@
 #include "core/components_ng/pattern/scrollable/selectable_theme.h"
 #include "core/components_ng/pattern/scrollable/scrollable_utils.h"
 #include "core/components_ng/property/measure_utils.h"
+#ifndef ACE_UNITTEST
+#include "core/components_ng/render/adapter/rosen_render_context.h"
+#endif
 #include "core/components_ng/syntax/lazy_for_each_node.h"
 #include "core/components_ng/syntax/repeat_virtual_scroll_2_node.h"
 #include "core/components_ng/syntax/repeat_virtual_scroll_node.h"
@@ -273,16 +276,69 @@ void ActivatePlaceholderSubtree(const RefPtr<UINode>& node)
 // never mounted" (none), "content never measured" (zero-size content) and
 // "measured but not painted" (non-zero size; shellRs/contentRs report whether each
 // node ever entered the render-tree lifecycle via AttachToRenderTree).
-void LogScrollPlaceholderShellState(int32_t index, const RefPtr<FrameNode>& shell)
+// v8 attach-gate triage fields (2026-10-17 v7 device round: shellRs=0 across 7002
+// samples while real items paint): isPendingState_ and painting are independent
+// gates — painting needs a slot in the host rebuild's collected children plus a
+// live RS node (GetChildrenRSNodes silently drops children whose render context
+// has none), while isPendingState_ only propagates from hosts that already carry
+// it. The realPending/realRsNode contrast against a built neighbor item settles
+// the three remaining hypotheses with one line: realPending=0 → the lifecycle
+// metric itself is inert on this pipeline (chase the RS layer instead);
+// shellRsNode=0 while realRsNode=1 → the shell never got an RS node (InitContext
+// path of the offline-built node); both 1 and still invisible → collection
+// exclusion (instrument GenerateOneDepthVisibleFrameWithTransition next).
+// RS-node probe: 1 = render context holds a live RS node, 0 = none (the
+// GetChildrenRSNodes drop condition), -1 = probe unavailable in this build
+// (host TDD: mocked render layer, no Rosen headers).
+int32_t ProbeRsNodeState(const RefPtr<FrameNode>& node)
+{
+#ifndef ACE_UNITTEST
+    auto rosen = AceType::DynamicCast<RosenRenderContext>(node->GetRenderContext());
+    return (rosen && rosen->GetRSNode() != nullptr) ? 1 : 0;
+#else
+    (void)node;
+    return -1;
+#endif
+}
+
+// Deferral-blind probe around the shell's index for an already-built real item of
+// the same host (GetFrameNodeChildByIndexWithoutBuild never resolves a deferral or
+// a shell, and never builds). Raw pointer: the host tree owns the node, the
+// caller only reads state within one log statement.
+FrameNode* FindNeighborRealItem(const RefPtr<FrameNode>& host, int32_t index)
+{
+    constexpr int32_t probeRadius = 3;
+    const int32_t totalCount = host->GetTotalChildCount();
+    for (int32_t step = 1; step <= probeRadius; step++) {
+        for (int32_t probe : { index - step, index + step }) {
+            if (probe < 0 || probe >= totalCount) {
+                continue;
+            }
+            auto* real = host->GetFrameNodeChildByIndexWithoutBuild(static_cast<uint32_t>(probe));
+            if (real != nullptr) {
+                return real;
+            }
+        }
+    }
+    return nullptr;
+}
+
+void LogScrollPlaceholderShellState(const RefPtr<FrameNode>& host, int32_t index, const RefPtr<FrameNode>& shell)
 {
     auto shellSize = shell->GetGeometryNode()->GetFrameSize();
     bool shellOnRenderTree = shell->IsPendingOnMainRenderTree();
+    auto* realItem = host ? FindNeighborRealItem(host, index) : nullptr;
     if (shell->GetChildren().empty()) {
         TAG_LOGD(AceLogTag::ACE_SCROLL,
             "ScrollPlaceholder shell live: index=%{public}d, shellId=%{public}d, "
-            "shellSize=%{public}fx%{public}f, shellRs=%{public}d, content=none",
+            "shellSize=%{public}fx%{public}f, shellRs=%{public}d, content=none, "
+            "shellActive=%{public}d, shellRsNode=%{public}d, realIdx=%{public}d, realPending=%{public}d, "
+            "realRsNode=%{public}d",
             index, shell->GetId(), shellSize.Width(), shellSize.Height(),
-            static_cast<int32_t>(shellOnRenderTree));
+            static_cast<int32_t>(shellOnRenderTree), static_cast<int32_t>(shell->IsActive()),
+            ProbeRsNodeState(shell), realItem ? realItem->GetId() : -1,
+            static_cast<int32_t>(realItem && realItem->IsPendingOnMainRenderTree()),
+            (realItem ? ProbeRsNodeState(AceType::Claim(realItem)) : -1));
         return;
     }
     auto content = AceType::DynamicCast<FrameNode>(shell->GetChildren().front());
@@ -291,10 +347,15 @@ void LogScrollPlaceholderShellState(int32_t index, const RefPtr<FrameNode>& shel
     TAG_LOGD(AceLogTag::ACE_SCROLL,
         "ScrollPlaceholder shell live: index=%{public}d, shellId=%{public}d, "
         "shellSize=%{public}fx%{public}f, shellRs=%{public}d, contentTag=%{public}s, contentActive=%{public}d, "
-        "contentSize=%{public}fx%{public}f, contentRs=%{public}d",
+        "contentSize=%{public}fx%{public}f, contentRs=%{public}d, shellActive=%{public}d, shellRsNode=%{public}d, "
+        "realIdx=%{public}d, realPending=%{public}d, realRsNode=%{public}d",
         index, shell->GetId(), shellSize.Width(), shellSize.Height(), static_cast<int32_t>(shellOnRenderTree),
         content->GetTag().c_str(), static_cast<int32_t>(content->IsActive()), contentSize.Width(),
-        contentSize.Height(), static_cast<int32_t>(content->IsPendingOnMainRenderTree()));
+        contentSize.Height(), static_cast<int32_t>(content->IsPendingOnMainRenderTree()),
+        static_cast<int32_t>(shell->IsActive()), ProbeRsNodeState(shell),
+        realItem ? realItem->GetId() : -1,
+        static_cast<int32_t>(realItem && realItem->IsPendingOnMainRenderTree()),
+        (realItem ? ProbeRsNodeState(AceType::Claim(realItem)) : -1));
 }
 
 // Placeholder shell: a plain ListItem carrying only the placeholder visual
@@ -623,7 +684,7 @@ void ListPattern::ReconcileScrollPlaceholderItems()
     int32_t totalCount = host->GetTotalChildCount();
     for (auto iter = scrollPlaceholderItems_.begin(); iter != scrollPlaceholderItems_.end();) {
         if (iter->second.shell) {
-            LogScrollPlaceholderShellState(iter->first, iter->second.shell);
+            LogScrollPlaceholderShellState(host, iter->first, iter->second.shell);
         }
         bool drop = iter->first >= totalCount ||
             (host->GetFrameNodeChildByIndexWithoutBuild(static_cast<uint32_t>(iter->first)) != nullptr);
