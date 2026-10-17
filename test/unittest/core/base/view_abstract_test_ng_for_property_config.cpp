@@ -23,6 +23,7 @@
 #include "core/common/resource/resource_manager.h"
 #include "core/components/theme/resource_adapter.h"
 #include "core/common/resource/resource_parse_utils.h"
+#include "core/components_ng/event/event_hub_callback_sets.h"
 #include "core/components_ng/manager/focus/focus_manager.h"
 
 using namespace testing;
@@ -343,7 +344,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractDisableOnAttachTest, TestSize.Level1)
     std::function<void()> onAttachCallback = []() {};
     ViewAbstract::SetOnAttach(AceType::RawPtr(node), std::move(onAttachCallback));
     auto eventHub = node->GetEventHub<EventHub>();
-    auto& callback = eventHub->onAttach_;
+    auto& callback = eventHub->GetOrCreateAttachDetachCallbackSet()->onAttach;
     EXPECT_NE(callback, nullptr);
 
     /**
@@ -377,7 +378,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractDisableOnDetachTest, TestSize.Level1)
     std::function<void()> onDetachCallback = []() {};
     ViewAbstract::SetOnDetach(AceType::RawPtr(node), std::move(onDetachCallback));
     auto eventHub = node->GetEventHub<EventHub>();
-    auto& callback = eventHub->onDetach_;
+    auto& callback = eventHub->GetOrCreateAttachDetachCallbackSet()->onDetach;
     EXPECT_NE(callback, nullptr);
 
     /**
@@ -411,7 +412,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractDisableOnAttachByFrameNodeTest, TestSiz
     std::function<void()> onAttachCallback = []() {};
     ViewAbstract::SetOnAttach(AceType::RawPtr(node), std::move(onAttachCallback));
     auto eventHub = node->GetEventHub<EventHub>();
-    auto& callback = eventHub->onAttach_;
+    auto& callback = eventHub->GetOrCreateAttachDetachCallbackSet()->onAttach;
     EXPECT_NE(callback, nullptr);
 
     /**
@@ -445,7 +446,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractDisableOnDetachByFrameNodeTest, TestSiz
     std::function<void()> onDetachCallback = []() {};
     ViewAbstract::SetOnDetach(AceType::RawPtr(node), std::move(onDetachCallback));
     auto eventHub = node->GetEventHub<EventHub>();
-    auto& callback = eventHub->onDetach_;
+    auto& callback = eventHub->GetOrCreateAttachDetachCallbackSet()->onDetach;
     EXPECT_NE(callback, nullptr);
 
     /**
@@ -756,7 +757,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractOnAttach001, TestSize.Level1)
     std::function<void()> onAttachCallback = []() {};
     ViewAbstract::SetOnAttach(AceType::RawPtr(node), std::move(onAttachCallback));
     auto eventHub = node->GetEventHub<EventHub>();
-    auto& callback = eventHub->onAttach_;
+    auto& callback = eventHub->GetOrCreateAttachDetachCallbackSet()->onAttach;
     EXPECT_NE(callback, nullptr);
 
     /**
@@ -795,7 +796,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractOnDetach001, TestSize.Level1)
     std::function<void()> onDetachCallback = []() {};
     ViewAbstract::SetOnDetach(std::move(onDetachCallback));
     auto eventHub = node->GetEventHub<EventHub>();
-    auto& callback = eventHub->onDetach_;
+    auto& callback = eventHub->GetOrCreateAttachDetachCallbackSet()->onDetach;
     EXPECT_NE(callback, nullptr);
 
     /**
@@ -834,7 +835,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractOnAttach002, TestSize.Level1)
     std::function<void()> onAttachCallback = []() {};
     ViewAbstract::SetOnAttach(std::move(onAttachCallback));
     auto eventHub = node->GetEventHub<EventHub>();
-    auto& callback = eventHub->onAttach_;
+    auto& callback = eventHub->GetOrCreateAttachDetachCallbackSet()->onAttach;
     EXPECT_NE(callback, nullptr);
 
     /**
