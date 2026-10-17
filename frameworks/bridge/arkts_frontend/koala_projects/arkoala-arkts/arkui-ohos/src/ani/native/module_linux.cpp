@@ -495,6 +495,11 @@ ANI_EXPORT ani_status ANI_Constructor(ani_vm* vm, uint32_t* result)
             reinterpret_cast<void*>(OHOS::Ace::Ani::getWindowHeightBreakpoint)
         },
         ani_native_function {
+            "_Common_isWindowInfoInitialized",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::isWindowInfoInitialized)
+        },
+        ani_native_function {
             "_SyntaxItem_Construct",
             "i:l",
             reinterpret_cast<void*>(OHOS::Ace::Ani::ConstructSyntaxItem)
