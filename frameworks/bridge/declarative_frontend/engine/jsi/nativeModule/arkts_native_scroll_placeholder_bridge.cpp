@@ -51,7 +51,7 @@ void ThrowRejected(EcmaVM* vm)
 // (injected by jsUIContext PlaceholderRegister): it binds the unwrapped builder
 // to a view-like probe object before invoking it, because the conversion product
 // dereferences `(parent ? parent : this).observeComponentCreation2` and a
-// bare-function `this` crashes (device verification finding; same convention as
+// bare-function `this` crashes (same convention as
 // BuilderNode executing `builder.builder.bind(this)`).
 bool ParseRegisterArguments(EcmaVM* vm, ArkUIRuntimeCallInfo* runtimeCallInfo,
     std::string& templateId, panda::Local<panda::FunctionRef>& execClosure)
@@ -104,7 +104,7 @@ ScrollPlaceholderBuilder MakeIsolatedTemplateBuilder(EcmaVM* vm,
                     // A throwing builder is a half-failed execution: record it as
                     // a violation so the admission probe rejects the template
                     // instead of misreading a fired begin as admission success.
-                    // The swallowed exception text is the only on-device trace of
+                    // The swallowed exception text is the only trace of
                     // why an isolated execution (admission probe or runtime
                     // rebuild) produced no product, so surface it here.
                     std::string exceptionText;
@@ -139,7 +139,7 @@ enum class RegisterProbeStatus : int32_t {
 };
 
 // Post-registration admission checks: an uninstrumented (or mis-paired) builder
-// (ADR-11) and an uncopyable template subtree (ADR-14 probe clone) both roll the
+// and an uncopyable template subtree (probe clone) both roll the
 // registration back so the registry stays clean; diagnostics distinguish the two.
 RegisterProbeStatus RunRegistrationAdmissionProbe(const RefPtr<ScrollPlaceholderManager>& manager,
     const std::string& templateId, const ScrollPlaceholderRestrictedScope::Probe& admission,
@@ -167,7 +167,7 @@ RegisterProbeStatus RunRegistrationAdmissionProbe(const RefPtr<ScrollPlaceholder
 
 } // namespace
 
-// Registration flow (single-layer instrumentation admission, ADR-11 + ADR-14):
+// Registration flow (single-layer instrumentation admission):
 //  1. parameter validation — id must be a non-empty string, the builder a
 //     WrappedBuilder wrapping a function, and the framework execution closure a
 //     function; anything else is a parameter error (401);
@@ -178,7 +178,7 @@ RegisterProbeStatus RunRegistrationAdmissionProbe(const RefPtr<ScrollPlaceholder
 //     source build IS the admission try-execute — one execution, no extra runs;
 //  3. begin never fired → the builder was not compiled under
 //     @Builder({ isPlaceholder: true }) → rollback + BusinessError 100031;
-//  4. admission passed → the ADR-14 probe clone validates the source subtree
+//  4. admission passed → the probe clone validates the source subtree
 //     against the restricted copy protocol on the same execution's product;
 //     an uncopyable node rejects the whole template (rollback + 100031).
 ArkUINativeModuleValue ScrollPlaceholderRegisterBridge::Register(ArkUIRuntimeCallInfo* runtimeCallInfo)

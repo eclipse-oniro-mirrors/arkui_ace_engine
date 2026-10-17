@@ -3374,7 +3374,7 @@ RefPtr<LayoutWrapper> ListLayoutAlgorithm::GetListItem(
 {
     index = (!isStackFromEnd_ ? index : totalItemCount_ - index - 1) + itemStartIndex_;
 
-    // FEAT scroll placeholder — acquisition pre-check (ADR-2 rev, 2026-10-16): the
+    // Scroll placeholder acquisition pre-check: the
     // budget decision and shell mounting stay with the pattern (it owns the frame
     // context); the index->wrapper substitution itself executes in
     // FrameProxy::GetFrameNodeByIndex, gated by an explicit per-acquisition

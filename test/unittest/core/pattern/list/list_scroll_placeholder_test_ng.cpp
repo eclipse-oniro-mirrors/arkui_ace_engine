@@ -364,8 +364,8 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderOrphanShellSweep001, Test
 
 /**
  * @tc.name: ScrollPlaceholderLightLoadSkipsProvider001
- * @tc.desc: Two-stage decision, stage 1 (the fix for the 2026-10-14 device finding):
- *           with a live frame budget the aggregate prediction already says
+ * @tc.desc: Two-stage decision, stage 1: with a live frame budget the aggregate
+ *           prediction already says
  *           BUILD_REAL_NOW, so the ArkTS provider is never consulted - no per-index
  *           callback on light-load frames - and every visible slot builds real.
  * @tc.type: FUNC
@@ -490,8 +490,8 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderRegisteredTemplateFlow001
     // stays invisible to host child-slot enumerations by design.
     EXPECT_EQ(info.shell->GetChildren().size(), 1u);
     EXPECT_EQ(info.shell->FrameCount(), 0);
-    // Device blank-shell finding: the offline-built instance subtree must be activated
-    // on mount — FrameNode::SetActive does not recurse, and inactive content is dropped
+    // The offline-built instance subtree must be activated on mount —
+    // FrameNode::SetActive does not recurse, and inactive content is dropped
     // from layout participation and render sync.
     auto instance = AceType::DynamicCast<FrameNode>(info.shell->GetChildren().front());
     ASSERT_TRUE(instance);
@@ -507,12 +507,11 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderRegisteredTemplateFlow001
 
 /**
  * @tc.name: ScrollPlaceholderShellMeasure001
- * @tc.desc: Device finding: every live shell measures 0x0 (shell and content). This
- *           case discriminates on host without typography: a template source with an
- *           explicit ideal size must measure through the exact wrapper path GetListItem
- *           hands to the list layout. If this measures 0x0 here, the shell measurement
- *           chain itself is broken (list side); if it measures the source size, the
- *           chain is fine and the device zero comes from text-specific measurement.
+ * @tc.desc: A template source with an explicit ideal size must measure through the
+ *           exact wrapper path GetListItem hands to the list layout. A 0x0 result
+ *           here means the shell measurement chain itself is broken (list side);
+ *           the source size means the chain is fine and any remaining zero-size
+ *           report is content-specific measurement.
  * @tc.type: FUNC
  */
 HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderShellMeasure001, TestSize.Level1)
@@ -833,7 +832,7 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderProviderShapeEdgeBranches
 
 /**
  * @tc.name: ScrollPlaceholderFrameProxySubstitution001
- * @tc.desc: ADR-2 rev: the index->wrapper substitution executes in
+ * @tc.desc: The index->wrapper substitution executes in
  *           FrameProxy::GetFrameNodeByIndex. A recorded deferral resolves the
  *           normal host acquisition to the mounted shell (with the standard
  *           skip-flag/active actions), a cache acquisition never substitutes,
@@ -956,15 +955,14 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderFrameProxyRealChildWins00
 
 /**
  * @tc.name: ScrollPlaceholderActiveRangeImmunity001
- * @tc.desc: v8 device root cause: FrameProxy::SetActiveChildRange derived an index
- *           window for the zero-frame-count shell too; the shell's startIndex is the
- *           total item count, so every real viewport window turned negative there and
- *           FrameNode::DoSetActiveChildRange deactivated the shell on every layout
- *           round (shellActive=0 in all device samples -> render-tree collection
- *           exclusion -> white gaps). The range dispatch must pass over an
- *           index-less direct FrameNode child: the shell stays active through an
- *           active-range update, while a built real item in the range keeps the
- *           normal activation semantics.
+ * @tc.desc: The shell keeps a zero frame count, so its entry in FrameProxy's child
+ *           table starts at the total item count and any real viewport window is
+ *           negative in its coordinates; the inherited
+ *           FrameNode::DoSetActiveChildRange would read that as out-of-range and
+ *           deactivate the shell on every layout round, which then drops it from
+ *           the render-tree children collection. The shell must stay active
+ *           through an active-range update, while a built real item in the range
+ *           keeps the normal activation semantics.
  * @tc.type: FUNC
  */
 HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderActiveRangeImmunity001, TestSize.Level1)

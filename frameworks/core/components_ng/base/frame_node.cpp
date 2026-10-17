@@ -430,7 +430,7 @@ public:
     {
         auto itor = partFrameNodeChildren_.find(index);
         if (itor == partFrameNodeChildren_.end()) {
-            // FEAT scroll placeholder — acquisition substitution (ADR-2 rev): a deferral
+            // Scroll placeholder acquisition substitution: a deferral
             // recorded by the container pattern for this (host, index) resolves to the
             // mounted placeholder shell, one choke point above every lazy syntax node
             // (LazyForEach/Repeat/ForEach/Arkoala). Explicit-declaration only: the

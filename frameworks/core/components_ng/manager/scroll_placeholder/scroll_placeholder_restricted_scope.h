@@ -28,17 +28,17 @@ namespace OHOS::Ace::NG {
 class UINode;
 
 // Runtime consumption of the restricted-builder instrumentation contract (single-layer
-// instrumentation, ADR-11): the compiler emits a paired
+// instrumentation): the compiler emits a paired
 // __aceBeginScrollPlaceholder__ / __aceEndScrollPlaceholder__ call at the first/last
 // line of every @Builder({ isPlaceholder: true }) conversion product; plain builders
 // are not instrumented at all (zero-overhead rule). Whether "begin" fires during an
 // isolated try-execute is therefore the sole legality signal for registration
 // admission, and the scope state below is what the begin/end entries drive.
 //
-// Binding form (re-decided 2026-10-14 for device verification): JsRegisterViews
+// Binding form: JsRegisterViews
 // mounts __aceBegin/EndScrollPlaceholder__ on globalThis as native functions so
-// compiler products can call them bare without imports. Unlike the original ADR-11
-// module-binding-only form this is referenceable by dynamic JS, so the admission
+// compiler products can call them bare without imports. Unlike a module-binding-only
+// form this is referenceable by dynamic JS, so the admission
 // signal is a compiler-product convention rather than an unforgeable guarantee.
 //
 // UI thread only: builder execution never leaves the UI thread.
@@ -65,7 +65,7 @@ public:
 
     // Per-execution observation of the instrumentation signals: armed around one
     // isolated try-execute of a builder (registration admission shares this execution
-    // with the ADR-14 registration probe). RestrictedScopeEntered() answers whether
+    // with the registration probe). RestrictedScopeEntered() answers whether
     // begin fired (an uninstrumented plain builder never fires it); ScopeClosed()
     // whether the pairing closed; OutOfScopeTriggered() whether a violation was
     // reported in between.

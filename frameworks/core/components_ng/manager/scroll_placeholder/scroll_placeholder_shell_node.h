@@ -73,9 +73,8 @@ public:
     // starts at the total item count, so every real viewport window maps to a
     // negative window in its coordinates, which the inherited FrameNode
     // implementation reads as out-of-range and deactivates the shell on every
-    // layout round (v8 device finding: shellActive=0 across all samples; the
-    // inactive shell is then dropped by the render-tree children collection —
-    // the white-gap root cause). The shell manages its own and its content's
+    // layout round; the inactive shell is then dropped by the render-tree
+    // children collection. The shell manages its own and its content's
     // activation explicitly at mount (ActivatePlaceholderSubtree), so the
     // inherited range math is replaced by a no-op. This covers every dispatch
     // path into the shell, not only FrameProxy::SetActiveChildRange.

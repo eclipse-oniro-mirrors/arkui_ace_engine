@@ -37,7 +37,7 @@ struct ScrollPlaceholderTemplateSnapshot {
     ScrollPlaceholderBuilder builder;
 };
 
-// Per container template registry (design ADR-3/ADR-12):
+// Per container template registry:
 // - registration relation (id + builder handle + generation) persists without bound;
 // - built placeholder instances are retained per template entry under an LRU of hot entries
 //   (capacity 20), each hot entry holding one resident copy source plus at most

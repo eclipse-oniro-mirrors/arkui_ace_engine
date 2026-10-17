@@ -253,8 +253,8 @@ namespace {
 // background clone): every node still carries the default inactive flag, and
 // FrameNode::SetActive - unlike the UINode base - activates only the node itself.
 // An inactive subtree is dropped from layout participation and render sync
-// (SetRerenderable gates on IsActive), which is exactly the blank-but-sized
-// placeholder shell observed on device: activate the whole subtree on mount.
+// (SetRerenderable gates on IsActive): a shell subtree left inactive renders
+// blank inside the sized shell. Activate the whole subtree on mount.
 void ActivatePlaceholderSubtree(const RefPtr<UINode>& node)
 {
     auto frame = AceType::DynamicCast<FrameNode>(node);
@@ -272,21 +272,18 @@ void ActivatePlaceholderSubtree(const RefPtr<UINode>& node)
 // covers the whole subtree; the earlier extra dirty mark on the instance root is
 // no longer needed and only caused a redundant standalone layout round.
 
-// Post-layout state of one live shell for on-device triage: distinguishes "content
+// Post-layout state of one live shell for diagnostics: distinguishes "content
 // never mounted" (none), "content never measured" (zero-size content) and
 // "measured but not painted" (non-zero size; shellRs/contentRs report whether each
 // node ever entered the render-tree lifecycle via AttachToRenderTree).
-// v8 attach-gate triage fields (2026-10-17 v7 device round: shellRs=0 across 7002
-// samples while real items paint): isPendingState_ and painting are independent
+// The attach-gate contrast fields: isPendingState_ and painting are independent
 // gates — painting needs a slot in the host rebuild's collected children plus a
 // live RS node (GetChildrenRSNodes silently drops children whose render context
 // has none), while isPendingState_ only propagates from hosts that already carry
-// it. The realPending/realRsNode contrast against a built neighbor item settles
-// the three remaining hypotheses with one line: realPending=0 → the lifecycle
-// metric itself is inert on this pipeline (chase the RS layer instead);
-// shellRsNode=0 while realRsNode=1 → the shell never got an RS node (InitContext
-// path of the offline-built node); both 1 and still invisible → collection
-// exclusion (instrument GenerateOneDepthVisibleFrameWithTransition next).
+// it. The realPending/realRsNode contrast against a built neighbor item separates
+// the gate layers in one line: realPending=0 → the pending-state metric is inert
+// on this pipeline; shellRsNode=0 while realRsNode=1 → the shell holds no RS node;
+// both 1 while the shell stays invisible → collection exclusion.
 // RS-node probe: 1 = render context holds a live RS node, 0 = none (the
 // GetChildrenRSNodes drop condition), -1 = probe unavailable in this build
 // (host TDD: mocked render layer, no Rosen headers).
@@ -370,7 +367,7 @@ RefPtr<FrameNode> CreatePlaceholderShellNode(
         ElementRegister::GetInstance()->MakeUniqueId(),
         AceType::MakeRefPtr<ListItemPattern>(nullptr, V2::ListItemStyle::NONE));
     CHECK_NULL_RETURN(shell, nullptr);
-    // Distinguish the three content-less shell causes for on-device triage: a
+    // Distinguish the three content-less shell causes in the mount log: a
     // size-only default shell is a designed provider choice, the other two are
     // wiring anomalies (acquire failures log on the manager side).
     if (options.id.empty()) {
@@ -398,7 +395,7 @@ RefPtr<FrameNode> CreatePlaceholderShellNode(
     if (options.size.has_value()) {
         // The provider size is a plain northbound number, so it carries the ArkTS
         // Length convention (vp). CalcLength's single-argument constructor defaults
-        // to DimensionUnit::PX — the v7 device round reserved 100 physical px for a
+        // to DimensionUnit::PX, which would reserve 100 physical px for a
         // {width:100, height:100} option (one third of the intended 100vp slot on a
         // 3.16-density screen), so the unit must be stated explicitly here.
         CalcSize idealSize;
@@ -432,10 +429,10 @@ void MountPlaceholderShellOnHost(const RefPtr<FrameNode>& host, const RefPtr<Fra
     shell->MarkNeedSyncRenderTree();
     shell->SetActive(true);
     // Explicit render-tree materialization for the freshly mounted subtree.
-    // The layout-time AddChild only sets sync flags, and the device rounds showed
-    // no consumer ever picked them up for the shell (shellRs=0 across every
-    // layout round): the RS node tree of a newly mounted subtree only takes
-    // shape when a rebuild actually runs. Schedule it after layout — the host
+    // The layout-time AddChild only sets sync flags, and no consumer is
+    // guaranteed to pick them up for the shell within the same frame: the RS
+    // node tree of a newly mounted subtree only takes shape when a rebuild
+    // actually runs. Schedule it after layout — the host
     // rebuild enters the shell into the host's RS tree (ProcessRenderTreeDiff
     // -> AttachToRenderTree), the shell rebuild enters the content into the
     // shell's RS tree (the shell's frameChildren_ only fill during its own
@@ -458,8 +455,7 @@ void MountPlaceholderShellOnHost(const RefPtr<FrameNode>& host, const RefPtr<Fra
         // Framework pattern (z-index path, RosenRenderContext::OnZIndexUpdate): the
         // rebuild must be preceded by MarkNeedSyncRenderTree — the flag set at AddChild
         // may already have been consumed by a mid-layout rebuild, and a bare rebuild
-        // silently no-ops on the stale flag (the v6 device finding: shellRs=0 across
-        // every round exactly matches that early-return).
+        // silently no-ops on the stale flag.
         host->MarkNeedSyncRenderTree();
         host->RebuildRenderContextTree();
         shell->MarkNeedSyncRenderTree();
@@ -468,14 +464,14 @@ void MountPlaceholderShellOnHost(const RefPtr<FrameNode>& host, const RefPtr<Fra
 }
 } // namespace
 
-// Two-stage budget decision for one not-yet-built index (ADR-2 + 2026-10-14 device
-// finding): the provider callback crosses into ArkTS (VM entry + object marshalling),
+// Two-stage budget decision for one not-yet-built index: the provider callback
+// crosses into ArkTS (VM entry + object marshalling),
 // so it must only run under real budget pressure. Stage 1 predicts with the
 // empty-templateId component-aggregate estimate — no JS. Light load / no vsync anchor
 // keeps the synchronous build path without the provider ever being consulted. Stage 2,
 // under pressure only, asks the item provider (nullopt keeps the synchronous path) and
-// the template-specific estimate may flip the decision back to BUILD_REAL_NOW (ADR-4
-// per-template precision is preserved for the final decision and the flush queue).
+// the template-specific estimate may flip the decision back to BUILD_REAL_NOW
+// (per-template precision is preserved for the final decision and the flush queue).
 // Returns the provider options when the index should defer to a placeholder.
 std::optional<ScrollPlaceholderOptions> ListPattern::PredictScrollPlaceholderDefer(
     const RefPtr<ScrollPlaceholderManager>& manager, const RefPtr<FrameNode>& host, int32_t index)
@@ -502,7 +498,7 @@ std::optional<ScrollPlaceholderOptions> ListPattern::PredictScrollPlaceholderDef
 
 RefPtr<FrameNode> ListPattern::CreateScrollPlaceholderShell(int32_t index)
 {
-    // Component call-site decision (ADR-2): called from the List layout child
+    // Component call-site decision: called from the List layout child
     // acquisition for a not-yet-built visible index. Predicts with the remaining
     // frame budget before the real builder would run; on USE_PLACEHOLDER mounts a
     // placeholder shell on the List host and defers the real build into the
@@ -546,7 +542,7 @@ RefPtr<FrameNode> ListPattern::CreateScrollPlaceholderShell(int32_t index)
     }
     scrollPlaceholderItems_[index] = info;
     mountedPlaceholderShells_[shell] = info.templateId;
-    // Acquisition substitution table (ADR-2 rev): FrameProxy::GetFrameNodeByIndex
+    // Acquisition substitution table: FrameProxy::GetFrameNodeByIndex
     // resolves this index to the shell until the real build commits and clears it.
     manager->RecordDeferral(host->GetId(), index, shell);
     ScrollPlaceholderPredictParams params;
@@ -678,7 +674,7 @@ void ListPattern::RetireScrollPlaceholderShell(const RefPtr<FrameNode>& shell, c
 
 void ListPattern::ReconcileScrollPlaceholderItems()
 {
-    // Layout-round reconcile (ADR-7): placeholders whose index already holds a
+    // Layout-round reconcile: placeholders whose index already holds a
     // real child (normal-path rebuild after data change) or fell out of range are
     // dropped; shells of committed items are retired after the replacement
     // layout finished (removed outside the transaction, per the commit ordering).
