@@ -54,6 +54,7 @@
 #include "core/interfaces/native/node/node_date_picker_modifier.h"
 #include "core/interfaces/native/node/node_drag_modifier.h"
 #include "core/interfaces/native/node/node_image_modifier.h"
+#include "core/interfaces/native/node/node_image_collection.h"
 #include "core/interfaces/native/node/node_image_span_modifier.h"
 #include "core/interfaces/native/node/node_list_item_modifier.h"
 #include "core/interfaces/native/node/node_list_modifier.h"
@@ -2696,7 +2697,9 @@ const ArkUISnapshotAPI* GetComponentSnapshotAPI()
         .snapshotOptionsSetColorMode = SnapshotOptionsSetColorMode,
         .snapshotOptionsSetDynamicRangeMode = SnapshotOptionsSetDynamicRangeMode,
         .getSyncSnapshot = GetNodeSnapshot,
-        .getSizeLimitation = GetSnapshotSizeLimitation
+        .getSizeLimitation = GetSnapshotSizeLimitation,
+        .postImageCollectionTask = PostImageCollectionTask,
+        .getImageByNodeId = GetImageByNodeId
     };
     CHECK_INITIALIZED_FIELDS_END(impl, 0, 0, 0); // don't move this line
     return &impl;
