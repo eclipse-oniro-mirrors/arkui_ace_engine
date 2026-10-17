@@ -68,7 +68,8 @@ enum WebAccFun {
     WEB_NEXT,
     WEB_EXE_ACTION,
     WEB_SEND_EVENT,
-    WEB_HOVER
+    WEB_HOVER,
+    WEB_ACC_JSON
 };
 
 using CheckAndGetEmbedFunc = std::function<int64_t(const RefPtr<NG::FrameNode>& node)>;
