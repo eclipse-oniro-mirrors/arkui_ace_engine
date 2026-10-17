@@ -14764,6 +14764,25 @@ std::string TextFieldPattern::GetPageTranslateTextForReport() const
     return UtfUtils::Str16DebugToStr8(currentPlaceholder);
 }
 
+std::string TextFieldPattern::GetPageTextForReport(bool includeInput) const
+{
+    if (includeInput && !IsInPasswordMode() && !GetTextUtf16Value().empty()) {
+        return UtfUtils::Str16DebugToStr8(GetTextUtf16Value());
+    }
+    return GetPageTranslateTextForReport();
+}
+
+int32_t TextFieldPattern::GetPageTextPlaceholderNodeId() const
+{
+    if (placeholderResponseArea_) {
+        auto node = placeholderResponseArea_->GetFrameNode();
+        if (node) {
+            return node->GetId();
+        }
+    }
+    return -1;
+}
+
 bool TextFieldPattern::ApplyPageTranslateResult(const std::string& result, int64_t version)
 {
     if (!ApplyTranslateResultCommon(result, version)) {

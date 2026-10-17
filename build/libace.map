@@ -2585,6 +2585,7 @@
       "OHOS::Ace::NG::TextPattern::GetMenuParams(OHOS::Ace::NG::TextSpanType, OHOS::Ace::NG::TextResponseType)";
       "OHOS::Ace::NG::TextPattern::GetPageTranslateNodeId() const";
       "OHOS::Ace::NG::TextPattern::GetPageTranslateTextForReport() const";
+      "OHOS::Ace::NG::TextPattern::GetPageTextForReport(bool) const";
       "OHOS::Ace::NG::TextPattern::GetParentGlobalOffset() const";
       "OHOS::Ace::NG::TextPattern::GetParagraphManager() const";
       "OHOS::Ace::NG::TextPattern::GetParagraphs() const";
@@ -5845,6 +5846,7 @@
       non-virtual?thunk?to?OHOS::Ace::NG::TextPattern::ApplyPageTranslateResult*;
       non-virtual?thunk?to?OHOS::Ace::NG::TextPattern::GetPageTranslateNodeId*;
       non-virtual?thunk?to?OHOS::Ace::NG::TextPattern::GetPageTranslateTextForReport*;
+      non-virtual?thunk?to?OHOS::Ace::NG::TextPattern::GetPageTextForReport*;
       non-virtual?thunk?to?OHOS::Ace::NG::TextPattern::ResetPageTranslate*;
       non-virtual?thunk?to?OHOS::Ace::NG::TextSelectOverlay::OnCloseOverlay*;
       non-virtual?thunk?to?OHOS::Ace::NG::TextSelectOverlay::OnHandleGlobalTouchEvent*;
