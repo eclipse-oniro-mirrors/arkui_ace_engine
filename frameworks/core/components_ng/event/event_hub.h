@@ -132,70 +132,12 @@ public:
     RefPtr<VisibleAreaChangeConfig> throttledVisibleAreaChange;
 };
 
-struct AppearCallbackSet : public AceType {
-    DECLARE_ACE_TYPE(AppearCallbackSet, AceType);
-
-public:
-    AppearCallbackSet() = default;
-    ~AppearCallbackSet() override = default;
-    std::function<void()> onAppear;
-    std::function<void()> onJSFrameNodeAppear;
-    std::function<void()> onDisappear;
-    std::function<void()> onJSFrameNodeDisappear;
-};
-
-struct AreaCallbackSet : public AceType {
-    DECLARE_ACE_TYPE(AreaCallbackSet, AceType);
-
-public:
-    AreaCallbackSet() = default;
-    ~AreaCallbackSet() override = default;
-    OnAreaChangedFunc onAreaChanged;
-    std::unordered_map<int32_t, OnAreaChangedFunc> onAreaChangedInnerCallbacks;
-    std::vector<int32_t> hasInnerAreaChangeUntriggered;
-};
-
-struct SizeCallbackSet : public AceType {
-    DECLARE_ACE_TYPE(SizeCallbackSet, AceType);
-
-public:
-    SizeCallbackSet() = default;
-    ~SizeCallbackSet() override = default;
-    OnSizeChangedFunc onSizeChanged;
-    std::unordered_map<int32_t, OnSizeChangedFunc> onSizeChangedInnerCallbacks;
-    OnSizeChangedFunc onJsFrameNodeSizeChanged;
-};
-
-struct AttachDetachCallbackSet : public AceType {
-    DECLARE_ACE_TYPE(AttachDetachCallbackSet, AceType);
-
-public:
-    AttachDetachCallbackSet() = default;
-    ~AttachDetachCallbackSet() override = default;
-    std::function<void()> onAttach;
-    std::function<void()> onDetach;
-};
-
-struct EnabledNdkCallbackSet : public AceType {
-    DECLARE_ACE_TYPE(EnabledNdkCallbackSet, AceType);
-
-public:
-    EnabledNdkCallbackSet() = default;
-    ~EnabledNdkCallbackSet() override = default;
-    std::function<void()> enabledFunc;
-    std::function<void()> ndkDrawCompletedCallback;
-    std::function<void()> ndkLayoutCallback;
-};
-
-struct KeyboardShortcutSet : public AceType {
-    DECLARE_ACE_TYPE(KeyboardShortcutSet, AceType);
-
-public:
-    KeyboardShortcutSet() = default;
-    ~KeyboardShortcutSet() override = default;
-    std::vector<KeyboardShortcut> keyboardShortcut;
-};
-
+struct AppearCallbackSet;
+struct AreaCallbackSet;
+struct SizeCallbackSet;
+struct AttachDetachCallbackSet;
+struct EnabledNdkCallbackSet;
+struct KeyboardShortcutSet;
 
 // The event hub is mainly used to handle common collections of events, such as gesture events, mouse events, etc.
 class ACE_FORCE_EXPORT EventHub : public virtual AceType {

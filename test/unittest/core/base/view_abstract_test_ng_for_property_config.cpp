@@ -23,6 +23,7 @@
 #include "core/common/resource/resource_manager.h"
 #include "core/components/theme/resource_adapter.h"
 #include "core/common/resource/resource_parse_utils.h"
+#include "core/components_ng/event/event_hub_callback_sets.h"
 #include "core/components_ng/manager/focus/focus_manager.h"
 
 using namespace testing;

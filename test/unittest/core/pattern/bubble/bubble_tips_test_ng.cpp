@@ -29,6 +29,7 @@
 #include "core/common/ace_engine.h"
 #include "core/components/theme/shadow_theme.h"
 #include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/event/event_hub_callback_sets.h"
 #include "core/components_ng/layout/layout_wrapper_node.h"
 #include "core/components_ng/pattern/bubble/bubble_event_hub.h"
 #include "core/components_ng/pattern/bubble/bubble_layout_algorithm.h"

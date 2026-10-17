@@ -14,6 +14,7 @@
  */
 
 #include "core/components_ng/event/event_hub.h"
+#include "core/components_ng/event/event_hub_callback_sets.h"
 #include "core/components_ng/event/state_style_manager.h"
 
 #include "core/common/event_manager.h"

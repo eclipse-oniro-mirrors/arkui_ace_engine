@@ -16,6 +16,7 @@
 #include "test/unittest/core/base/view_abstract_test_ng.h"
 
 #include "base/subwindow/subwindow_manager.h"
+#include "core/components_ng/event/event_hub_callback_sets.h"
 #include "core/components_ng/event/focus_hub.h"
 #include "core/event/key_event.h"
 #include "test/mock/adapter/ohos/osal/mock_system_properties.h"
