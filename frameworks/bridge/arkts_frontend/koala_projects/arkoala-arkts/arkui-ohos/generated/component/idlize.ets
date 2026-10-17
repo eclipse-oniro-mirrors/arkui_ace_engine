@@ -2445,6 +2445,17 @@ export class FrameNodeExtender {
         const peer_casted = peer as (KPointer)
         return FrameNodeExtender.isModifiable_serialize(peer_casted)
     }
+    public static dispatchInputEvent(peer: FrameNode, event: InputEventType, competitionStrategy?: CompetitionStrategy): boolean {
+        const peer_casted = peer as (FrameNode)
+        const event_casted = event as (InputEventType)
+        const competitionStrategy_casted = competitionStrategy as (CompetitionStrategy | undefined)
+        return FrameNodeExtender.dispatchInputEvent_serialize(peer_casted, event_casted, competitionStrategy_casted)
+    }
+    public static dispatchKeyEvent(peer: FrameNode, event: KeyEvent): boolean {
+        const peer_casted = peer as (FrameNode)
+        const event_casted = event as (KeyEvent)
+        return FrameNodeExtender.dispatchKeyEvent_serialize(peer_casted, event_casted)
+    }
     public static appendChild(peer: FrameNode, child: FrameNode): int32 {
         const peer_casted = peer as (FrameNode)
         const child_casted = child as (FrameNode)
@@ -2812,6 +2823,37 @@ export class FrameNodeExtender {
     }
     private static isModifiable_serialize(peer: KPointer): boolean {
         const retval = ArkUIGeneratedNativeModule._FrameNodeExtender_isModifiable(peer)
+        return retval
+    }
+    private static dispatchInputEvent_serialize(peer: FrameNode, event: InputEventType, competitionStrategy?: CompetitionStrategy): boolean {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (event instanceof TouchEvent) {
+            thisSerializer.writeInt8((0).toByte())
+            const eventForIdx0 = event as TouchEvent
+            const eventForIdx0Transformed: TouchEventProxy = extractors.transform_Ark_TouchEvent_to_Ark_TouchEventProxy(eventForIdx0)
+            TouchEventProxy_serializer.write(thisSerializer, eventForIdx0Transformed)
+        } else if (event instanceof MouseEvent) {
+            thisSerializer.writeInt8((1).toByte())
+            const eventForIdx1 = event as MouseEvent
+            MouseEvent_serializer.write(thisSerializer, eventForIdx1)
+        } else if (event instanceof AxisEvent) {
+            thisSerializer.writeInt8((2).toByte())
+            const eventForIdx2 = event as AxisEvent
+            AxisEvent_serializer.write(thisSerializer, eventForIdx2)
+        }
+        if (competitionStrategy !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const competitionStrategyTmpValue = (competitionStrategy as CompetitionStrategy)
+            thisSerializer.writeInt32(competitionStrategyTmpValue.valueOf())
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        const retval = ArkUIGeneratedNativeModule._FrameNodeExtender_dispatchInputEvent(extractors.toFrameNodePtr(peer), thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+        return retval
+    }
+    private static dispatchKeyEvent_serialize(peer: FrameNode, event: KeyEvent): boolean {
+        const retval = ArkUIGeneratedNativeModule._FrameNodeExtender_dispatchKeyEvent(extractors.toFrameNodePtr(peer), toPeerPtr(event))
         return retval
     }
     private static appendChild_serialize(peer: FrameNode, child: FrameNode): int32 {

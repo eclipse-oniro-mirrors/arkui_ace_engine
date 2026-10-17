@@ -4919,6 +4919,10 @@ export class ArkUIGeneratedNativeModule {
     @ani.unsafe.Direct
     native static _FrameNodeExtender_isModifiable(peer: KPointer): boolean
     @ani.unsafe.Direct
+    native static _FrameNodeExtender_dispatchInputEvent(peer: KPointer, thisArray: KSerializerBuffer, thisLength: KInt): boolean
+    @ani.unsafe.Direct
+    native static _FrameNodeExtender_dispatchKeyEvent(peer: KPointer, event: KPointer): boolean
+    @ani.unsafe.Direct
     native static _FrameNodeExtender_appendChild(peer: KPointer, child: KPointer): KInt
     @ani.unsafe.Direct
     native static _FrameNodeExtender_insertChildAfter(peer: KPointer, child: KPointer, sibling: KPointer): KInt

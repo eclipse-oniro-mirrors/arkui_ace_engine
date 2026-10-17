@@ -30481,6 +30481,11 @@ typedef struct GENERATED_ArkUIFrameNodeExtenderAccessor {
     Ark_NativePointer (*getDestroy)();
     void (*destroyPeer)(Ark_FrameNode peer);
     Ark_Boolean (*isModifiable)(Ark_NativePointer peer);
+    Ark_Boolean (*dispatchInputEvent)(Ark_FrameNode peer,
+                                      const Ark_InputEventType* event,
+                                      const Opt_CompetitionStrategy* competitionStrategy);
+    Ark_Boolean (*dispatchKeyEvent)(Ark_FrameNode peer,
+                                    Ark_KeyEvent event);
     Ark_Int32 (*appendChild)(Ark_FrameNode peer,
                              Ark_FrameNode child);
     Ark_Int32 (*insertChildAfter)(Ark_NativePointer peer,

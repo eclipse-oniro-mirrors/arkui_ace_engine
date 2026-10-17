@@ -22,6 +22,9 @@ import arkui.FrameNode;
 import arkui.RenderNode;
 import arkui.FrameNode.InteractionEventBindingInfo as InteractionEventBindingInfo;
 import arkui.FrameNode.UIStatesChangeHandler as UIStatesChangeHandler;
+import arkui.component.common.KeyEvent as KeyEvent;
+import arkui.component.enums.CompetitionStrategy as CompetitionStrategy;
+typedef InputEventType = (TouchEvent or MouseEvent or AxisEvent);
 
 [Entity=Interface]
 interface NodeEdgesLengthMetrics {
@@ -50,6 +53,8 @@ interface FrameNodeExtender {
   static pointer getDestroy();
   static void destroyPeer(FrameNode peer);
   static boolean isModifiable(pointer peer);
+  static boolean dispatchInputEvent(FrameNode peer, InputEventType event, optional CompetitionStrategy competitionStrategy);
+  static boolean dispatchKeyEvent(FrameNode peer, KeyEvent event);
   static i32 appendChild(FrameNode peer, FrameNode child);
   static i32 insertChildAfter(pointer peer, pointer child, pointer sibling);
   static void removeChild(FrameNode peer, FrameNode child);
