@@ -530,7 +530,7 @@ const RefPtr<LayoutAlgorithmWrapper>& FrameNode::GetLayoutAlgorithm(bool)
 {
     return layoutAlgorithm_;
 }
-RefPtr<LayoutWrapper> FrameNode::GetOrCreateChildByIndex(uint32_t, bool, bool)
+RefPtr<LayoutWrapper> FrameNode::GetOrCreateChildByIndex(uint32_t, bool, bool, bool)
 {
     return nullptr;
 }
