@@ -101,8 +101,8 @@ constexpr std::string_view SCROLL_BAR_DRAG_SCENE = "scrollBar_drag_scene";
 constexpr std::string_view SCROLLABLE_MULTI_TASK_SCENE = "scrollable_multi_task_scene";
 constexpr std::string_view SCROLL_IN_HOTZONE_SCENE = "scroll_in_hotzone_scene";
 constexpr std::string_view CUSTOM_SCROLL_BAR_SCENE = "custom_scroll_bar_scene";
-// Threshold for back to top performance optimization (5 screen sizes)
-constexpr uint32_t BACK_TO_TOP_THRESHOLD_SCREEN = 5;
+// Threshold for back to top performance optimization (4 screen sizes)
+constexpr uint32_t BACK_TO_TOP_THRESHOLD_SCREEN = 4;
 
 bool IsScrollable(const RefPtr<FrameNode>& frameNode)
 {
@@ -1750,6 +1750,9 @@ void ScrollablePattern::OnDetachFromFrameNode(FrameNode* frameNode)
 {
     // call OnDetachFromFrameNodeMultiThread() by multi thread
     THREAD_SAFE_NODE_CHECK(frameNode, OnDetachFromFrameNode, frameNode);
+    if (GetFastScrollRequest()) {
+        StopAnimate();
+    }
     activeTouchFingerIds_.clear();
     CHECK_NULL_VOID(frameNode);
     UnRegister2DragDropManager(frameNode);
@@ -1765,12 +1768,14 @@ void ScrollablePattern::OnDetachFromMainTree()
     THREAD_SAFE_NODE_CHECK(host, OnDetachFromMainTree);
     // Only notify the parent of scroll end when a scroll session is actually in progress,
     // and only when the parent is a scrollable component or a Refresh component.
-    if (!isScrolling_ || scrollStop_) {
-        return;
+    if (isScrolling_ && !scrollStop_) {
+        auto parent = GetNestedScrollParent();
+        if (parent && (AceType::InstanceOf<ScrollablePattern>(parent) || AceType::InstanceOf<RefreshPattern>(parent))) {
+            parent->OnScrollEndRecursive(GetVelocity());
+        }
     }
-    auto parent = GetNestedScrollParent();
-    if (parent && (AceType::InstanceOf<ScrollablePattern>(parent) || AceType::InstanceOf<RefreshPattern>(parent))) {
-        parent->OnScrollEndRecursive(GetVelocity());
+    if (GetFastScrollRequest()) {
+        StopAnimate();
     }
 }
 
@@ -2639,6 +2644,7 @@ void ScrollablePattern::AbortScrollAnimator()
 
 void ScrollablePattern::StopAnimate()
 {
+    CancelFastScroll();
     if (!IsScrollableStopped()) {
         StopScrollable();
     }
@@ -2723,6 +2729,7 @@ void ScrollablePattern::AnimateTo(
     float position, float duration, const RefPtr<Curve>& curve, bool smooth, bool canOverScroll, bool useTotalOffset)
 {
     StopScrollableAndAnimate();
+    startingFastScroll_ = false;
     if (NearEqual(position, GetTotalOffset())) {
         scrollAbort_ = false;
         return;
@@ -2755,6 +2762,45 @@ void ScrollablePattern::AnimateTo(
     auto pipeline = GetContext();
     CHECK_NULL_VOID(pipeline);
     pipeline->RequestFrame();
+}
+
+void ScrollablePattern::StartFastScrollAnimation(float position)
+{
+    CHECK_NULL_VOID(GetFastScrollRequest());
+    auto& request = *GetFastScrollRequest();
+    const float viewportSize = GetMainContentSize();
+    const float distance = position - GetTotalOffset();
+    float retainedDistance = viewportSize * 4.0f;
+    if (AnimateRunning() && request.skipPending && NearEqual(request.viewportSize, viewportSize) &&
+        Positive(distance) == Positive(request.skipDistance)) {
+        // Exclude the pending skip from the old segment's remaining distance; do not grant another approach interval.
+        const float remainingAnimationDistance =
+            std::abs(request.targetOffset - lastPosition_) - std::abs(request.skipDistance);
+        retainedDistance = std::clamp(remainingAnimationDistance, 2.0f * viewportSize, retainedDistance);
+    }
+    request.skipDistance = GreatNotEqual(std::abs(distance), retainedDistance) ?
+        distance - std::copysign(retainedDistance, distance) : 0.0f;
+    request.viewportSize = viewportSize;
+    request.targetOffset = position;
+    request.skipPending = !NearZero(request.skipDistance);
+    // Preserve the target across the synchronous stop of the previous animation segment.
+    startingFastScroll_ = true;
+    AnimateTo(position, -1, nullptr, true, false, false);
+}
+
+void ScrollablePattern::CancelFastScroll()
+{
+    if (GetFastScrollRequest()) {
+        scrollTarget_.reset();
+    }
+    fastScrollSkip_ = false;
+}
+
+void ScrollablePattern::OnAnimateStop()
+{
+    if (!startingFastScroll_) {
+        scrollTarget_.reset();
+    }
 }
 
 void ScrollablePattern::OnAnimateFinish()
@@ -2884,6 +2930,13 @@ float ScrollablePattern::GetScrollDelta(float offset, bool& stopAnimation)
 
 float ScrollablePattern::CalcSpringAdjustOffset(float offset) const
 {
+    if (GetFastScrollRequest() && Positive(GetFastScrollRequest()->viewportSize)) {
+        const auto& request = *GetFastScrollRequest();
+        const float skipPosition = request.targetOffset -
+            std::copysign(2.0f * request.viewportSize, request.skipDistance);
+        return ((Positive(request.skipDistance) && LessNotEqual(offset, skipPosition)) ||
+            (Negative(request.skipDistance) && GreatNotEqual(offset, skipPosition))) ? -request.skipDistance : 0.0f;
+    }
     CHECK_NULL_RETURN(isBackToTopRunning_, 0.0f);
     CHECK_NULL_RETURN(backToTopSkipDistance_, 0.0f);
     float mainContentSize = GetMainContentSize();
@@ -2904,7 +2957,13 @@ void ScrollablePattern::ProcessSpringOffsetCallback(float offset)
     bool stopAnimation = false;
     // Check if we should trigger the skip for back to top optimization
     // Add skip distance to delta when reaching animation midpoint
-    offset += CalcSpringAdjustOffset(offset);
+    const float adjustment = CalcSpringAdjustOffset(offset);
+    auto request = GetFastScrollRequest();
+    const bool skipped = request && request->skipPending && NearZero(adjustment);
+    if (skipped) {
+        request->skipPending = false;
+    }
+    offset += adjustment;
     auto delta = GetScrollDelta(offset, stopAnimation);
 
     auto source = SCROLL_FROM_ANIMATION_CONTROLLER;
@@ -2921,7 +2980,9 @@ void ScrollablePattern::ProcessSpringOffsetCallback(float offset)
             !LessNotEqual(totalOffset, finalPosition_))) {
         delta = 0;
     }
-    if (!UpdateCurrentOffset(delta, source) || stopAnimation || isAnimateOverScroll_) {
+    const bool updated = UpdateCurrentOffset(delta, source);
+    fastScrollSkip_ = fastScrollSkip_ || (skipped && updated && !NearZero(delta));
+    if (!updated || stopAnimation || isAnimateOverScroll_) {
         if (isAnimateOverScroll_ && GetCanStayOverScroll()) {
             isAnimateOverScroll_ = false;
             SetIsOverScroll(true);
@@ -5534,6 +5595,9 @@ void ScrollablePattern::StopScrollableAndAnimate()
     if (animator_ && !animator_->IsStopped()) {
         scrollAbort_ = true;
         animator_->Stop();
+    }
+    if (!startingFastScroll_) {
+        CancelFastScroll();
     }
 }
 
