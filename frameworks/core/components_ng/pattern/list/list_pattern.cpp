@@ -396,12 +396,17 @@ RefPtr<FrameNode> CreatePlaceholderShellNode(
         }
     }
     if (options.size.has_value()) {
+        // The provider size is a plain northbound number, so it carries the ArkTS
+        // Length convention (vp). CalcLength's single-argument constructor defaults
+        // to DimensionUnit::PX — the v7 device round reserved 100 physical px for a
+        // {width:100, height:100} option (one third of the intended 100vp slot on a
+        // 3.16-density screen), so the unit must be stated explicitly here.
         CalcSize idealSize;
         if (options.size->width.has_value()) {
-            idealSize.SetWidth(CalcLength(options.size->width.value()));
+            idealSize.SetWidth(CalcLength(options.size->width.value(), DimensionUnit::VP));
         }
         if (options.size->height.has_value()) {
-            idealSize.SetHeight(CalcLength(options.size->height.value()));
+            idealSize.SetHeight(CalcLength(options.size->height.value(), DimensionUnit::VP));
         }
         shell->GetLayoutProperty()->UpdateUserDefinedIdealSize(idealSize);
     }
