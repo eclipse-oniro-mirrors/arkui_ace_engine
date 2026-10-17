@@ -366,7 +366,7 @@ void LogScrollPlaceholderShellState(const RefPtr<FrameNode>& host, int32_t index
 RefPtr<FrameNode> CreatePlaceholderShellNode(
     const ScrollPlaceholderOptions& options, const RefPtr<ScrollPlaceholderManager>& manager)
 {
-    auto shell = ScrollPlaceholderShellNode::CreateScrollPlaceholderShellNode(V2::LIST_ITEM_ETS_TAG,
+    auto shell = ScrollPlaceholderShellNode::CreateScrollPlaceholderShellNode(V2::SCROLL_PLACEHOLDER_SHELL_ETS_TAG,
         ElementRegister::GetInstance()->MakeUniqueId(),
         AceType::MakeRefPtr<ListItemPattern>(nullptr, V2::ListItemStyle::NONE));
     CHECK_NULL_RETURN(shell, nullptr);

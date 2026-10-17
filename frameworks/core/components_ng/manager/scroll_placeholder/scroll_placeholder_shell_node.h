@@ -24,6 +24,12 @@
 
 namespace OHOS::Ace::NG {
 
+// Dedicated tag of the placeholder shell node (V2::SCROLL_PLACEHOLDER_SHELL_ETS_TAG,
+// maintained in inspector_constants.h with the other component tags). The shell
+// deliberately carries a ListItem pattern but NOT the ListItem tag (e.g. the focus
+// path's IsListItem must not mistake a shell for a focusable item), and
+// dumps/inspector output distinguish shells from real items at a glance.
+
 // A placeholder shell is mounted as a direct child of the scroll container host but
 // is NOT a list/grid/waterflow item: it must stay invisible to every child-slot
 // enumeration — TotalChildCount, the repeat/total item count walk and index-based
@@ -60,6 +66,27 @@ public:
     int32_t CurrentFrameCount() const override
     {
         return 0;
+    }
+
+    // The shell owns no index slot, so index-derived activation windows are
+    // meaningless for it — and actively harmful: the shell's FrameProxy entry
+    // starts at the total item count, so every real viewport window maps to a
+    // negative window in its coordinates, which the inherited FrameNode
+    // implementation reads as out-of-range and deactivates the shell on every
+    // layout round (v8 device finding: shellActive=0 across all samples; the
+    // inactive shell is then dropped by the render-tree children collection —
+    // the white-gap root cause). The shell manages its own and its content's
+    // activation explicitly at mount (ActivatePlaceholderSubtree), so the
+    // inherited range math is replaced by a no-op. This covers every dispatch
+    // path into the shell, not only FrameProxy::SetActiveChildRange.
+    void DoSetActiveChildRange(
+        int32_t start, int32_t end, int32_t cacheStart, int32_t cacheEnd, bool showCache = false) override
+    {
+        (void)start;
+        (void)end;
+        (void)cacheStart;
+        (void)cacheEnd;
+        (void)showCache;
     }
 };
 } // namespace OHOS::Ace::NG

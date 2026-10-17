@@ -25,6 +25,7 @@
 #include "core/components_ng/property/layout_constraint.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_manager.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_shell_node.h"
+#include "core/components_v2/inspector/inspector_constants.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_types.h"
 #include "core/components_ng/pattern/linear_layout/linear_layout_pattern.h"
 #include "core/components_ng/pattern/list/list_item_pattern.h"
@@ -951,5 +952,55 @@ HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderFrameProxyRealChildWins00
     EXPECT_TRUE(manager->QueryDeferredShell(frameNode_->GetId(), index) == nullptr);
     // Leave no process-wide deferral behind for later fixtures.
     pattern_->ResetScrollPlaceholder();
+}
+
+/**
+ * @tc.name: ScrollPlaceholderActiveRangeImmunity001
+ * @tc.desc: v8 device root cause: FrameProxy::SetActiveChildRange derived an index
+ *           window for the zero-frame-count shell too; the shell's startIndex is the
+ *           total item count, so every real viewport window turned negative there and
+ *           FrameNode::DoSetActiveChildRange deactivated the shell on every layout
+ *           round (shellActive=0 in all device samples -> render-tree collection
+ *           exclusion -> white gaps). The range dispatch must pass over an
+ *           index-less direct FrameNode child: the shell stays active through an
+ *           active-range update, while a built real item in the range keeps the
+ *           normal activation semantics.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListScrollPlaceholderTestNg, ScrollPlaceholderActiveRangeImmunity001, TestSize.Level1)
+{
+    CreatePlaceholderList(
+        [](int32_t index) -> std::optional<ScrollPlaceholderOptions> {
+            return MakeDefaultPlaceholderOptions();
+        },
+        true);
+    CreateItemsAndDone();
+
+    // Mount one shell through the production mount path (host child, zero frame
+    // count, deferral recorded), then rebuild the FrameProxy child table so the
+    // shell is present in it (AddChild reset the table; the acquisition below
+    // rebuilds it lazily).
+    int32_t shellIndex = FindUnbuiltSlot();
+    ASSERT_GE(shellIndex, 0);
+    auto shell = pattern_->CreateScrollPlaceholderShell(shellIndex);
+    ASSERT_TRUE(shell);
+    // Exact identity: the shell carries its dedicated tag, so the active-range
+    // dispatch recognizes it by tag instead of inferring from its zero frame count.
+    EXPECT_EQ(shell->GetTag(), V2::SCROLL_PLACEHOLDER_SHELL_ETS_TAG);
+    ASSERT_TRUE(shell->IsActive());
+    auto rangeChild = frameNode_->GetOrCreateChildByIndex(0, false, false);
+    ASSERT_TRUE(rangeChild);
+
+    // A viewport window over the first items: without the fix the shell's window is
+    // (start - totalCount, end - totalCount), deeply negative, which reads as
+    // out-of-range and deactivates the shell.
+    frameNode_->SetActiveChildRange(0, 3, 0, 0, false);
+    EXPECT_TRUE(shell->IsActive()) << "index-less shell deactivated by active-range dispatch";
+    // The built real item inside the window keeps the normal activation semantics.
+    EXPECT_TRUE(rangeChild->IsActive());
+
+    // Cleanup: retire the shell and leave no deferral behind for later fixtures.
+    pattern_->ResetScrollPlaceholder();
+    EXPECT_FALSE(ScrollPlaceholderManager::HasAnyDeferrals());
 }
 } // namespace OHOS::Ace::NG
