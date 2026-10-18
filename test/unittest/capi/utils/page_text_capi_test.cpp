@@ -39,17 +39,15 @@ int32_t Collect(int32_t id, char** data, uint32_t* size, const char** reason)
     if (collectCode) {
         return collectCode;
     }
-    // The UTF-8 payload {"texts":[]} contains 12 bytes, excluding its terminating NUL.
-    *size = 12;
-    // Allocate 13 bytes for the 12-byte JSON payload plus its terminating NUL.
-    *data = static_cast<char*>(std::malloc(13));
+    const char payload[] = "{\"schemaVersion\":1,\"texts\":[]}";
+    *size = sizeof(payload) - 1;
+    *data = static_cast<char*>(std::malloc(sizeof(payload)));
     if (!*data) {
         *reason = "Page text allocation failed.";
         // 100001 is ARKUI_ERROR_CODE_INTERNAL_ERROR for an allocation failure.
         return 100001;
     }
-    // Copy all 13 bytes so the 12-byte JSON payload remains NUL-terminated.
-    EXPECT_EQ(memcpy_s(*data, 13, "{\"texts\":[]}", 13), EOK);
+    EXPECT_EQ(memcpy_s(*data, sizeof(payload), payload, sizeof(payload)), EOK);
     return 0;
 }
 void SetCode(int32_t code, const char* reason)
@@ -140,7 +138,7 @@ TEST_F(PageTextCapiTest, failureRecoveryAndIndependentSnapshots)
     collectCode = 0;
     ASSERT_EQ(OH_ArkUI_NativeModule_UIAgentGetPageText(&context, &result), 0);
     EXPECT_EQ(OH_ArkUI_NativeModule_GetErrorMessage(), error);
-    EXPECT_STREQ(OH_ArkUI_NativeModule_UIJsonWrapperGetData(old), "{\"texts\":[]}");
+    EXPECT_STREQ(OH_ArkUI_NativeModule_UIJsonWrapperGetData(old), "{\"schemaVersion\":1,\"texts\":[]}");
     EXPECT_NE(old, result);
     OH_ArkUI_NativeModule_UIJsonWrapperDestroy(result);
     OH_ArkUI_NativeModule_UIJsonWrapperDestroy(old);

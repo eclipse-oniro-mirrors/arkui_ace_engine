@@ -42,9 +42,9 @@ extern "C" {
 
 /**
  * @brief Collects texts from the current ArkUI page synchronously as JSON.
- * The returned JSON contains a "texts" array, for example:
+ * The returned JSON contains a "schemaVersion" field fixed at 1 and a "texts" array, for example:
  * @code{.json}
- * {"texts":[
+ * {"schemaVersion":1,"texts":[
  *     {"id":101,"rect":[0,0,120,32],"content":"hello"},
  *     {"id":102,"rect":[0,40,160,32],"content":"world"}
  * ]}
@@ -83,7 +83,7 @@ extern "C" {
  * their entered body text is not collected.
  * Independently eligible child text components are evaluated separately.
  * Different components have distinct IDs within a snapshot, even if their
- * text is identical. With no eligible text, the result is {"texts":[]}.
+ * text is identical. With no eligible text, the result is {"schemaVersion":1,"texts":[]}.
  * A missing page alone is not an error.
  * Use OH_ArkUI_NativeModule_UIJsonWrapperGetData and
  * OH_ArkUI_NativeModule_UIJsonWrapperGetSize to read the JSON. The size is the
