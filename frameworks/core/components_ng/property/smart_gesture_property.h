@@ -39,7 +39,7 @@ struct SmartGestureShortcutConfig {
     bool selectable = false;
 };
 
-class ACE_FORCE_EXPORT SmartGestureProperty : public virtual AceType {
+class ACE_FORCE_EXPORT SmartGestureProperty : public AceType {
     DECLARE_ACE_TYPE(SmartGestureProperty, AceType);
 
 public:

@@ -930,6 +930,10 @@ public:
         foldStatusFromListener_ = GetCurrentFoldStatus();
     }
 
+    void RefreshLiveFoldCreaseRegion() override;
+
+    void RefreshFoldCreaseDirection() override;
+
     void DispatchExtensionDataToHostWindow(uint32_t code, const AAFwk::Want& data, int32_t persistentId);
 
     void DistributeIntentInfo(const std::string& intentInfoSerialized, bool isColdStart,

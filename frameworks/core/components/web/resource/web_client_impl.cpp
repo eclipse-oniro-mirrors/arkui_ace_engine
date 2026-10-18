@@ -793,6 +793,23 @@ void WebClientImpl::OnContextMenuDismissed()
     delegate->OnContextMenuDismissed();
 }
 
+void WebClientImpl::OnContextMenuUpdate(int32_t menuItemId, std::shared_ptr<NWeb::NWebContextMenuOptions> options)
+{
+    bool enable = false;
+    if (options) {
+        enable = options->Enable();
+    }
+    TAG_LOGI(AceLogTag::ACE_WEB, "OnContextMenuUpdate menuItemId:%{public}d, enable:%{public}d",
+        menuItemId, enable);
+    auto delegate = webDelegate_.Upgrade();
+    CHECK_NULL_VOID(delegate);
+    ContainerScope scope(delegate->GetInstanceId());
+
+    WebContextMenuOptions contextMenuOptions;
+    contextMenuOptions.enable = enable;
+    delegate->OnContextMenuUpdate(static_cast<WebContextMenuItemId>(menuItemId), contextMenuOptions);
+}
+
 bool WebClientImpl::RunContextMenu(
     std::shared_ptr<NWeb::NWebContextMenuParams> params,
     std::shared_ptr<NWeb::NWebContextMenuCallback> callback)

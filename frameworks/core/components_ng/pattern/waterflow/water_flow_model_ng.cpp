@@ -15,6 +15,8 @@
 
 #include "core/components_ng/pattern/waterflow/water_flow_model_ng.h"
 
+#include "core/components_ng/pattern/scrollable/scroll_snap_strategy.h"
+
 #include <string>
 #include "base/geometry/dimension.h"
 #include "base/hiviewdfx/histogram_wrapper.h"
@@ -1129,6 +1131,34 @@ void WaterFlowModelNG::ParseResObjItemMaxHeight(FrameNode* frameNode, const RefP
 void WaterFlowModelNG::SetSupportLazyLoadingEmptyBranch(bool enable)
 {
     ACE_UPDATE_LAYOUT_PROPERTY(WaterFlowLayoutProperty, SupportLazyLoadingEmptyBranch, enable);
+}
+
+void WaterFlowModelNG::SetScrollSnapStrategy(const ScrollSnapStrategy& strategy)
+{
+    SetScrollSnapStrategy(ViewStackProcessor::GetInstance()->GetMainFrameNode(), strategy);
+}
+
+void WaterFlowModelNG::ResetScrollSnapStrategy()
+{
+    ResetScrollSnapStrategy(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+}
+
+void WaterFlowModelNG::SetScrollSnapStrategy(FrameNode* frameNode, const ScrollSnapStrategy& strategy)
+{
+    CHECK_NULL_VOID(frameNode);
+    // NONE, out-of-range aligns and a provider without calculateSnapOffset clear the configuration.
+    const bool validAlign = strategy.align == ScrollSnapAlign::START || strategy.align == ScrollSnapAlign::CENTER ||
+                            strategy.align == ScrollSnapAlign::END;
+    if (strategy.hasProvider ? !strategy.calculateSnapOffset : !validAlign) {
+        ResetScrollSnapStrategy(frameNode);
+        return;
+    }
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(WaterFlowLayoutProperty, ScrollSnapStrategy, strategy, frameNode);
+}
+
+void WaterFlowModelNG::ResetScrollSnapStrategy(FrameNode* frameNode)
+{
+    ACE_RESET_NODE_LAYOUT_PROPERTY(WaterFlowLayoutProperty, ScrollSnapStrategy, frameNode);
 }
 
 void WaterFlowModelNG::SetSupportLazyLoadingEmptyBranch(FrameNode* frameNode, bool enable)

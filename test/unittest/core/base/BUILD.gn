@@ -150,7 +150,10 @@ ace_unittest("observer_test_ng") {
   if (is_host_product) {
     type = "host_components"
   }
-  sources = [ "observer_test_ng.cpp" ]
+  sources = [
+    "observer_draw_callback_test.cpp",
+    "observer_test_ng.cpp",
+  ]
 }
 
 ace_unittest("view_abstract_model_test_ng") {
@@ -247,6 +250,16 @@ ace_unittest("modifier_test_ng") {
   sources = [ "modifier_test_ng.cpp" ]
 }
 
+ace_unittest("material_registry_test_ng") {
+  module_name = "Animation-TransitionEffect"
+  type = "new"
+  if (defined(is_host_product) && is_host_product) {
+    type = "host_components"
+  }
+  sources = [ "material_registry_test_ng.cpp" ]
+  cflags = [ "-fno-access-control" ]
+}
+
 group("core_base_unittest") {
   testonly = true
   if (is_host_product) {
@@ -256,6 +269,7 @@ group("core_base_unittest") {
       ":frame_node_test_ng",
       ":geometry_node_test_ng",
       ":inspector_test_ng",
+      ":material_registry_test_ng",
       ":modifier_test_ng",
       ":node_render_status_monitor_test_ng",
       ":observer_test_ng",
@@ -274,6 +288,7 @@ group("core_base_unittest") {
       ":frame_node_test_ng",
       ":geometry_node_test_ng",
       ":inspector_test_ng",
+      ":material_registry_test_ng",
       ":node_render_status_monitor_test_ng",
       ":observer_test_ng",
       ":short_cuts_little_test_ng",

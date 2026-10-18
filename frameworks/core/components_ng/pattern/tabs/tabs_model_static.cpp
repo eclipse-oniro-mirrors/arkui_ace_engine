@@ -633,10 +633,12 @@ void TabsModelStatic::SetDivider(FrameNode* frameNode, const TabsItemDivider& di
     CHECK_NULL_VOID(dividerNode);
     auto dividerRenderContext = dividerNode->GetRenderContext();
     CHECK_NULL_VOID(dividerRenderContext);
+    bool isOnAnim = false;
     auto tabsNode = AceType::DynamicCast<TabsNode>(frameNode);
-    CHECK_NULL_VOID(tabsNode);
-    auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
-    bool isOnAnim = tabsPattern && tabsPattern->IsOnDisplayModeSwitchAnimation();
+    if (tabsNode) {
+        auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
+        isOnAnim = tabsPattern && tabsPattern->IsOnDisplayModeSwitchAnimation();
+    }
     if (dividerOpt.isNull) {
         if (!isOnAnim) {
             dividerRenderContext->UpdateOpacity(0.0f);
@@ -745,10 +747,19 @@ void TabsModelStatic::SetBarBackgroundColor(FrameNode* frameNode, const std::opt
     if (backgroundColorOpt) {
         tabBarRenderContext->UpdateBackgroundColor(backgroundColorOpt.value());
         ACE_UPDATE_NODE_LAYOUT_PROPERTY(TabsLayoutProperty, BarBackgroundColor, backgroundColorOpt.value(), frameNode);
+        ACE_UPDATE_NODE_LAYOUT_PROPERTY(
+            TabsLayoutProperty, BarBackgroundColorForSideBar, backgroundColorOpt.value(), frameNode);
     } else {
         tabBarRenderContext->ResetBackgroundColor();
         ACE_RESET_NODE_LAYOUT_PROPERTY(TabsLayoutProperty, BarBackgroundColor, frameNode);
+        ACE_RESET_NODE_LAYOUT_PROPERTY(TabsLayoutProperty, BarBackgroundColorForSideBar, frameNode);
     }
+}
+
+void TabsModelStatic::SetBarBackgroundColorByUser(FrameNode* frameNode, bool isByUser)
+{
+    CHECK_NULL_VOID(frameNode);
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(TabsLayoutProperty, BarBackgroundColorSetByUser, isByUser, frameNode);
 }
 
 void TabsModelStatic::SetBarGridAlign(FrameNode* frameNode, const BarGridColumnOptions& BarGridColumnOptions)

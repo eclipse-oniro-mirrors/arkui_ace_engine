@@ -43,6 +43,7 @@ class PixelMap;
 } // namespace Media
 } // namespace OHOS
 namespace OHOS::Ace {
+struct ComponentTreeQueryRequest;
 class ACE_FORCE_EXPORT UiSessionManager {
 public:
     using InspectorFunction = std::function<void(bool onlyNeedVisible, ParamConfig config)>;
@@ -67,6 +68,7 @@ public:
     using PageTranslateResetFunction = std::function<void(int32_t)>;
     using PageTranslateResultFunction = std::function<void(const std::vector<TranslateResult>&)>;
     using PageSceneDetectFunction = std::function<void(int32_t, const std::string&, bool)>;
+    using ComponentTreeQueryFunction = std::function<void(const ComponentTreeQueryRequest&)>;
 
     enum class WebPageSceneOp {
         RegisterRules,    // Register rules + match for reportOnRegister
@@ -315,10 +317,17 @@ public:
     virtual void FlushPageSceneNodeChanged() {};
     virtual void SavePageSceneDetectFunction(PageSceneDetectFunction&& function) {};
     virtual void SaveWebPageSceneFunction(WebPageSceneFunction&& function) {};
+    virtual bool IsSearchPageSceneRuleCurrent(
+        int32_t processId, const std::string& ruleSetId, const std::string& generation) { return false; }
     // Internal PageScene scheduling hook. Keep it at the end of the virtual interface to preserve
     // the slot order of the existing UiSessionManager methods.
     virtual void NotifyPageSceneNodeStateChanged(
         const std::string& nodeTag, PageSceneNodeStateChange stateChange) {};
+
+    virtual void SaveComponentTreeQueryFunction(ComponentTreeQueryFunction&& function) {};
+    virtual void ComponentTreeQuery(const ComponentTreeQueryRequest& request) {};
+    virtual void ReportNavigationQueryResult(const std::string& data) {};
+    virtual void ReportLazyForEachQueryResult(const std::string& data) {};
 
 protected:
     UiSessionManager() = default;
@@ -395,6 +404,8 @@ protected:
     std::mutex pageSceneDetectFunctionMutex_;
     WebPageSceneFunction webPageSceneFunction_;
     std::mutex webPageSceneMutex_;
+    ComponentTreeQueryFunction componentTreeQueryFunction_;
+    std::mutex componentTreeQueryFunctionMutex_;
 };
 } // namespace OHOS::Ace
 #endif // FOUNDATION_ACE_INTERFACE_UI_SESSION_MANAGER_H

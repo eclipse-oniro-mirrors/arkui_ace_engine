@@ -42,7 +42,7 @@ import { dragController_DragSpringLoadingConfiguration_serializer } from './../f
 import { ComponentContent_serializer } from './../framework/ComponentContent'
 import { ComponentBase } from './../ComponentBase'
 import { PeerNode } from './../PeerNode'
-import { LengthMetrics as arkui_Graphics_LengthMetrics, ColorMetrics as arkui_Graphics_ColorMetrics, DrawContext as arkui_Graphics_DrawContext } from 'arkui.Graphics'
+import { LengthUnit, LengthMetrics as arkui_Graphics_LengthMetrics, ColorMetrics as arkui_Graphics_ColorMetrics, DrawContext as arkui_Graphics_DrawContext } from 'arkui.Graphics'
 import { default as image } from '@ohos.multimedia.image'
 import { default as uiEffect } from '@ohos.graphics.uiEffect'
 import { default as matrix4 } from '@ohos.matrix4'
@@ -3608,6 +3608,35 @@ export class ArkCommonMethodPeer extends PeerNode {
         }
         ArkUIGeneratedNativeModule._CommonMethod_setSafeAreaPadding(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
+    }
+    setSafeAreaInsetAttribute(value: SafeAreaInsetOptions | undefined): void {
+        const edges: Array<SafeAreaInsetEdgeConfig | undefined> =
+            [value?.top, value?.end, value?.bottom, value?.start];
+        const snapshot: Array<Object> = [];
+        for (let i = 0; i < edges.length; i++) {
+            snapshot.push(new SafeAreaInsetNativeEdge());
+        }
+        try {
+            for (let i = 0; i < edges.length; i++) {
+                const edge = edges[i];
+                if (edge === undefined) {
+                    continue;
+                }
+                const target = snapshot[i] as SafeAreaInsetNativeEdge;
+                const spacing = edge.spacing;
+                if (spacing !== undefined && spacing.res === undefined) {
+                    target.spacing = spacing.value;
+                    target.unit = spacing.unit.valueOf();
+                }
+                target.alignment = edge.alignment?.valueOf() ?? SafeAreaInsetAlignment.CENTER.valueOf();
+                target.content = CallbackTransformer.transformFromCustomBuilder(edge.content)(this.peer.ptr);
+            }
+        } catch (error) {
+            // Dispose any already built detached roots without changing the host snapshot.
+            ArkUIAniModule._Common_SetSafeAreaInset(nullptr, snapshot);
+            throw error;
+        }
+        ArkUIAniModule._Common_SetSafeAreaInset(this.peer.ptr, snapshot);
     }
     setMarginAttribute(value: Margin | Length | LocalizedMargin | undefined): void {
         const thisSerializer: SerializerBase = SerializerBase.hold()
@@ -7853,6 +7882,18 @@ export class ArkScrollableCommonMethodPeer extends ArkCommonMethodPeer {
         ArkUIGeneratedNativeModule._ScrollableCommonMethod_setScrollBarHeight(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
+    setEnableScrollWithKeyboardAttribute(value: boolean | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (value !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueTmpValue = value!
+            thisSerializer.writeBoolean(valueTmpValue)
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._ScrollableCommonMethod_setEnableScrollWithKeyboard(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
     setEdgeEffectAttribute(edgeEffect: EdgeEffect | undefined, options?: EdgeEffectOptions): void {
         const thisSerializer: SerializerBase = SerializerBase.hold()
         if (edgeEffect !== undefined) {
@@ -8406,6 +8447,30 @@ export enum SafeAreaEdge {
     START = 2,
     END = 3
 }
+// System API; keep in sync with the dynamic/static SDK declarations.
+export enum SafeAreaInsetAlignment {
+    START = 0,
+    CENTER = 1,
+    END = 2
+}
+export interface SafeAreaInsetEdgeConfig {
+    content: CustomBuilder;
+    spacing?: arkui_Graphics_LengthMetrics;
+    alignment?: SafeAreaInsetAlignment;
+}
+export interface SafeAreaInsetOptions {
+    top?: SafeAreaInsetEdgeConfig;
+    end?: SafeAreaInsetEdgeConfig;
+    bottom?: SafeAreaInsetEdgeConfig;
+    start?: SafeAreaInsetEdgeConfig;
+}
+class SafeAreaInsetNativeEdge {
+    content: KPointer = nullptr;
+    spacing: double = 0.0;
+    unit: int32 = LengthUnit.VP.valueOf();
+    alignment: int32 = SafeAreaInsetAlignment.CENTER.valueOf();
+}
+
 export enum LayoutSafeAreaType {
     SYSTEM = 0
 }
@@ -9194,6 +9259,14 @@ export interface CommonMethod {
             }
         }
         throw new Error('Unimplemented method safeAreaPadding')
+    }
+    safeAreaInset(options?: SafeAreaInsetOptions): this {
+        const commonStyle = this.__get__commonStyles__Internal();
+        if (commonStyle) {
+            commonStyle.push((instance: CommonMethod): void => instance.safeAreaInset(options));
+            return this;
+        }
+        throw new Error('Common method safeAreaInset can only be set when creating a custom component.');
     }
     margin(value: Margin | Length | LocalizedMargin | undefined): this {
         const commonStyle: Array<(instance: CommonMethod) => void> | undefined = this.__get__commonStyles__Internal();
@@ -12296,6 +12369,20 @@ export interface ScrollableCommonMethod extends CommonMethod {
         }
         throw new Error('Unimplemented method scrollBarHeight')
     }
+    enableScrollWithKeyboard(value: boolean | undefined): this {
+        const commonStyle: Array<(instance: CommonMethod) => void> | undefined = this.__get__commonStyles__Internal();
+        if (commonStyle) {
+            (commonStyle as Array<(instance: CommonMethod) => void>).push(
+                (instance: CommonMethod): void => (instance as ScrollableCommonMethod).enableScrollWithKeyboard(value)
+            );
+            return this;
+        } else {
+            if (this.__is_CustomComponent__Internal()) {
+                throw new Error("Scrollable CommonMethod 'enableScrollWithKeyboard' can only be set when creating an extendable component.")
+            }
+        }
+        throw new Error('Unimplemented method enableScrollWithKeyboard')
+    }
     edgeEffect(edgeEffect: EdgeEffect | undefined, options?: EdgeEffectOptions): this {
         const commonStyle: Array<(instance: CommonMethod) => void> | undefined = this.__get__commonStyles__Internal();
         if (commonStyle) {
@@ -12517,6 +12604,10 @@ export class ArkCommonMethodComponent extends ComponentBase implements CommonMet
         const value_casted = value as (Padding | arkui_Graphics_LengthMetrics | LocalizedPadding | undefined)
         this.getPeer()?.setSafeAreaPaddingAttribute(value_casted)
         return this
+    }
+    public safeAreaInset(options?: SafeAreaInsetOptions): this {
+        this.getPeer()?.setSafeAreaInsetAttribute(options);
+        return this;
     }
     public margin(value: Margin | Length | LocalizedMargin | undefined): this {
         const value_casted = value as (Margin | Length | LocalizedMargin | undefined)
@@ -13901,6 +13992,11 @@ export class ArkScrollableCommonMethodComponent extends ArkCommonMethodComponent
     public scrollBarHeight(value: arkui_Graphics_LengthMetrics | undefined): this {
         const value_casted = value as (arkui_Graphics_LengthMetrics | undefined)
         this.getPeer()?.setScrollBarHeightAttribute(value_casted)
+        return this
+    }
+    public enableScrollWithKeyboard(value: boolean | undefined): this {
+        const value_casted = value as (boolean | undefined)
+        this.getPeer()?.setEnableScrollWithKeyboardAttribute(value_casted)
         return this
     }
     public edgeEffect(edgeEffect: EdgeEffect | undefined, options?: EdgeEffectOptions): this {

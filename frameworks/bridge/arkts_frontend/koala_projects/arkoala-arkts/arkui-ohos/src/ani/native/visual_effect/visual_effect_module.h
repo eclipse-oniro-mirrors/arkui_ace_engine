@@ -35,13 +35,13 @@ ani_long ExtractorsToUiEffectVisualEffectPtr(ani_env* env, ani_object aniClass, 
 ani_long ExtractorsToUiMaterialMaterialPtr(ani_env* env, ani_object aniClass, ani_object obj);
 ani_long UiMaterialConstructMaterial(ani_env* env, ani_object aniClass, ani_object obj);
 void UiMaterialDestroyMaterial(ani_env* env, ani_object aniClass, ani_long ptr);
-ani_long UiMaterialConvertToECMaterial(ani_env* env, ani_object aniClass, ani_long ptr);
-ani_long UiMaterialConvertToECSubMaterial(ani_env* env, ani_object aniClass, ani_long ptr);
+void UiMaterialConvertToECMaterial(ani_env* env, ani_object aniClass, ani_long srcPtr, ani_long dstPtr);
+void UiMaterialConvertToECSubMaterial(ani_env* env, ani_object aniClass, ani_long srcPtr, ani_long dstPtr);
 ani_int UiMaterialGetGlobalMaterialLevel(ani_env* env, ani_object aniClass);
 ani_boolean UiMaterialIsImmersiveMaterialSupported(ani_env* env, ani_object aniClass);
 ani_int UiMaterialGetMaterialState(ani_env* env, ani_object aniClass);
 ani_int UiMaterialGetMaterialType(ani_env* env, ani_object aniClass);
-ani_long UiMaterialGetEmpty(ani_env* env, ani_object aniClass, ani_object obj);
+void UiMaterialGetEmpty(ani_env* env, ani_object aniClass, ani_long dstPtr);
 } // namespace OHOS::Ace::Ani
 
 #endif // KOALA_PROJECTS_ARKOALA_ARKTS_ARKUI_OHOS_ANI_NATIVE_VISUAL_EFFECT_VISUAL_EFFECT_MODULE_H

@@ -5521,6 +5521,10 @@ const std::optional<std::u16string>& TextPattern::GetPageTranslatedText() const
 void TextPattern::MarkPageTranslateTextDrawn()
 {
     lastDrawnPageTranslateContent_ = textForDisplay_;
+    auto property = GetLayoutProperty<TextLayoutProperty>();
+    // Internal labels may update layout content without going through OnModifyDone.
+    lastDrawnPageTextContent_ = property && !isSpanStringMode_ && spans_.empty() ?
+        property->GetContentValue(textForDisplay_) : textForDisplay_;
 }
 
 int32_t TextPattern::GetPageTranslateNodeId() const
@@ -5533,6 +5537,7 @@ int32_t TextPattern::GetPageTranslateNodeId() const
 void TextPattern::OnPageTranslateSourceTextChanged()
 {
     lastDrawnPageTranslateContent_.clear();
+    lastDrawnPageTextContent_.clear();
     // Caller (OnModifyDone/OnTextContentChanged) is already in layout queue — skip dirty marking
     pageTranslatedContent_.reset();
     pageTranslateVersion_ = 0;
@@ -5544,12 +5549,12 @@ void TextPattern::ReportPageTranslateTextDrawn()
     auto host = GetHost();
     CHECK_NULL_VOID(host);
     MarkPageTranslateTextDrawn();
-    auto text = GetPageTranslateTextForReport();
-    CHECK_NULL_VOID(!text.empty());
     auto pipeline = host->GetContext();
     CHECK_NULL_VOID(pipeline);
     auto mgr = pipeline->GetContentChangeManager();
     CHECK_NULL_VOID(mgr);
+    auto text = GetPageTranslateTextForReport();
+    CHECK_NULL_VOID(!text.empty());
     mgr->ReportTranslateTextNode(AceType::WeakClaim<PageTranslateNode>(this), text);
 #endif
 }
@@ -5591,6 +5596,24 @@ std::string TextPattern::GetPageTranslateTextForReport() const
         return "";
     }
     return UtfUtils::Str16DebugToStr8(textForDisplay_);
+}
+
+std::string TextPattern::GetPageTextForReport(bool /* includeInput */) const
+{
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, "");
+    // RichEditor and other derived patterns retain their own collection rules.
+    if (host->GetTag() != V2::TEXT_ETS_TAG) {
+        return GetPageTranslateTextForReport();
+    }
+    auto property = GetLayoutProperty<TextLayoutProperty>();
+    const auto content = property && !isSpanStringMode_ && spans_.empty() ?
+        property->GetContentValue(textForDisplay_) : textForDisplay_;
+    if (content.empty() || lastDrawnPageTextContent_ != content) {
+        return "";
+    }
+    // The collector excludes the actual placeholder node by identity, not every child of an input.
+    return UtfUtils::Str16DebugToStr8(content);
 }
 
 void TextPattern::ParseOriText(const std::u16string& currentText)

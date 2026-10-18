@@ -55,26 +55,20 @@
 
 namespace OHOS::Ace {
 
-std::unique_ptr<ViewContextModel> ViewContextModel::instance_ = nullptr;
-std::mutex ViewContextModel::mutex_;
-
 ViewContextModel* ViewContextModel::GetInstance()
 {
-    if (!instance_) {
-        std::lock_guard<std::mutex> lock(mutex_);
-        if (!instance_) {
 #ifdef NG_BUILD
-            instance_.reset(new NG::ViewContextModelNG());
+    static NG::ViewContextModelNG instance;
+    return &instance;
 #else
-            if (Container::IsCurrentUseNewPipeline()) {
-                instance_.reset(new NG::ViewContextModelNG());
-            } else {
-                instance_.reset(new Framework::ViewContextModelImpl());
-            }
-#endif
-        }
+    if (Container::IsCurrentUseNewPipeline()) {
+        static NG::ViewContextModelNG instance;
+        return &instance;
+    } else {
+        static Framework::ViewContextModelImpl instance;
+        return &instance;
     }
-    return instance_.get();
+#endif
 }
 
 } // namespace OHOS::Ace
@@ -122,9 +116,11 @@ void PrintAnimationInfo(const AnimationOption& option, AnimationInterface interf
             TAG_LOGI(AceLogTag::ACE_ANIMATION,
                 "keyframe inf iteration. dur:%{public}d", option.GetDuration());
         } else {
+            const auto& curve = option.GetCurve();
             TAG_LOGI(AceLogTag::ACE_ANIMATION,
                 "%{public}s inf iteration. dur:%{public}d, curve:%{public}s",
-                animationInterfaceName, option.GetDuration(), option.GetCurve()->ToString().c_str());
+                animationInterfaceName, option.GetDuration(),
+                curve ? curve->ToString().c_str() : "");
         }
         return;
     }
@@ -303,10 +299,11 @@ void StartAnimateToForFaMode(const RefPtr<PipelineBase>& pipelineContext, Animat
     PrintAnimationInfo(
         option, immediately ? AnimationInterface::ANIMATE_TO_IMMEDIATELY : AnimationInterface::ANIMATE_TO, count);
     if (!ViewStackModel::GetInstance()->IsEmptyStack()) {
+        const auto& curve = option.GetCurve();
         TAG_LOGW(AceLogTag::ACE_ANIMATION,
             "when call animateTo, node stack is not empty, not suitable for animateTo. param is [duration:%{public}d, "
             "curve:%{public}s, iteration:%{public}d]",
-            option.GetDuration(), option.GetCurve()->ToString().c_str(), option.GetIteration());
+            option.GetDuration(), curve ? curve->ToString().c_str() : "", option.GetIteration());
     }
     NG::ScopedViewStackProcessor scopedProcessor;
     pipelineContext->FlushBuild();
@@ -695,8 +692,9 @@ void JSViewContext::JSAnimation(const JSCallbackInfo& info)
         option.SetAllowRunningAsynchronously(true);
     }
     PrintAnimationInfo(option, AnimationInterface::ANIMATION, std::nullopt);
+    const auto& curveTrace = option.GetCurve();
     AceScopedTrace paramTrace("duration:%d, curve:%s, iteration:%d", option.GetDuration(),
-        option.GetCurve()->ToString().c_str(), option.GetIteration());
+        curveTrace ? curveTrace->ToString().c_str() : "", option.GetIteration());
     option.SetAnimationInterface(AnimationInterface::ANIMATION);
     ViewContextModel::GetInstance()->openAnimation(option);
 #ifndef CROSS_PLATFORM

@@ -182,6 +182,10 @@ public:
 
     PopupInfo GetPopupInfo(int32_t targetId) const;
 
+    // Read pattern state without exposing concrete Menu/Bubble pattern headers to callers.
+    static bool GetMenuWrapperState(const RefPtr<FrameNode>& node, int32_t& targetId, bool& isShown);
+    static bool GetPopupTargetId(const RefPtr<FrameNode>& node, int32_t& targetId);
+
     bool HasPopupInfo(int32_t targetId) const;
 
     void ErasePopupInfo(int32_t targetId);
@@ -828,7 +832,7 @@ private:
     bool keyboardAvoidance_ = false;
     ACE_DISALLOW_COPY_AND_MOVE(OverlayManager);
 
-    bool hasFilterActived {false};
+    bool hasFilterActived_ {false};
 
     std::function<void()> onSheetMiniDragStart_;
     std::function<void()> onSheetMiniDragResume_;

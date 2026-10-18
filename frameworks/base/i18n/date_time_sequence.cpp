@@ -74,20 +74,6 @@ OrderResult DateTimeSequence::GetDateTimeOrder(const std::string& locale)
         orderResult.dateTimeOrder = "-1";
         return orderResult;
     }
-    const std::unordered_map<std::string, std::string> DATETIME_ORDER_MAP = {
-        { "ug", "01" },
-        { "ar", "10" },
-        { "fa", "01" },
-        { "ur", "10" },
-        { "iw", "10" },
-        { "he", "10" },
-    };
-    const char* language = localeObj.getBaseName();
-    std::string languageTag = language == nullptr ? "" : language;
-    if (DATETIME_ORDER_MAP.find(languageTag) != DATETIME_ORDER_MAP.end()) {
-        orderResult.dateTimeOrder = DATETIME_ORDER_MAP.find(languageTag)->second;
-        return orderResult;
-    }
     icu::SimpleDateFormat* formatter = static_cast<icu::SimpleDateFormat*>
         (icu::DateFormat::createDateInstance(icu::DateFormat::EStyle::kDateTime, localeObj));
     if (status != U_ZERO_ERROR || formatter == nullptr) {
@@ -118,24 +104,9 @@ OrderResult DateTimeSequence::GetAmPmTimeOrder(const std::string& locale)
         orderResult.amPmTimeOrder = "-1";
         return orderResult;
     }
-    const char* language = localeObj.getBaseName();
     // 0 represents am/pm position, 1 represents time position
     const std::string amPmFirst = "10";
     const std::string amPmLast = "01";
-    const std::unordered_map<std::string, std::string> AM_PM_TIME_ORDER_MAP = {
-        { "ug", amPmFirst },
-        { "ar", amPmFirst },
-        { "fa", amPmLast },
-        { "ur", amPmFirst },
-        { "iw", amPmLast },
-        { "he", amPmLast },
-        { "bo", amPmFirst },
-    };
-    std::string languageTag = language == nullptr ? "" : language;
-    if (AM_PM_TIME_ORDER_MAP.find(languageTag) != AM_PM_TIME_ORDER_MAP.end()) {
-        orderResult.amPmTimeOrder = AM_PM_TIME_ORDER_MAP.find(languageTag)->second;
-        return orderResult;
-    }
     icu::DateTimePatternGenerator* gen = icu::DateTimePatternGenerator::createInstance(localeObj, status);
     icu::UnicodeString skeleton("h");
     if (gen == nullptr) {

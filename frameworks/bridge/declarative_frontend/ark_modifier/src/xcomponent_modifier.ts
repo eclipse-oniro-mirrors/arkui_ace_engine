@@ -67,6 +67,11 @@ class LazyArkXComponentComponent extends ArkComponent {
     return this;
   }
 
+  bufferQueueCount(count: number): LazyArkXComponentComponent {
+    this.lazyComponent.bufferQueueCount(count);
+    return this;
+  }
+
   onLoad(callback: Callback<object>): LazyArkXComponentComponent {
     this.lazyComponent.onLoad(callback);
     return this;

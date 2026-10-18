@@ -65,6 +65,17 @@ struct TabContentDefaultVisibility {
     {
         return !(*this == other);
     }
+
+    bool ShouldHide(TabBarDisplayMode activeDisplayMode) const
+    {
+        if (isNull || visibility == TabVisibility::VISIBLE) {
+            return false;
+        }
+        if (!displayMode.has_value()) {
+            return true;
+        }
+        return displayMode.value() == activeDisplayMode;
+    }
 };
 
 struct TabBarDisplayModeBreakpoint {

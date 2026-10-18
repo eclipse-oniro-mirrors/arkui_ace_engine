@@ -24,6 +24,22 @@ declare interface AxisEvent {
 
 declare interface Position { x?: number; y?: number; }
 
+declare interface KeyEvent {
+  type?: number;
+  keyCode?: number;
+  keyText?: string;
+  keySource?: number;
+  keyIntention?: number;
+  deviceId?: number;
+  unicode?: number;
+  timestamp?: number;
+  pressedKeyCodes?: number[];
+  metaKey?: number;
+  isNumLockOn?: boolean;
+  isCapsLockOn?: boolean;
+  isScrollLockOn?: boolean;
+}
+
 declare type InputEventType = TouchEvent | MouseEvent | AxisEvent;
 
 interface UpdateFuncRecord {
@@ -383,6 +399,8 @@ declare interface FrameNodeNativeModule {
   getNodePropertyValue(...args: any[]): any;
   addSupportedStates(...args: any[]): any;
   removeSupportedStates(...args: any[]): any;
+  dispatchInputEvent(nodePtr: NodePtr, event: InputEventType, competitionStrategy?: CompetitionStrategy): boolean;
+  dispatchKeyEvent(nodePtr: NodePtr, event: KeyEvent): boolean;
 }
 
 declare interface RenderNodeNativeModule {

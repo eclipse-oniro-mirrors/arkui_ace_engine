@@ -536,26 +536,11 @@ public:
 
     void UpdateLanguageAndAmPmTimeOrder()
     {
-        if (language_ == "ug") {
-            isPreLanguageUg_ = true;
-        }
         language_ = AceApplicationInfo::GetInstance().GetLanguage();
 
         auto preAmPmTimeOrder = amPmTimeOrder_;
         amPmTimeOrder_ = DateTimeSequence::GetAmPmTimeOrder(language_).amPmTimeOrder;
         preAmPmTimeOrder == amPmTimeOrder_ ? isAmPmTimeOrderUpdate_ = false : isAmPmTimeOrderUpdate_ = true;
-
-        auto host = GetHost();
-        CHECK_NULL_VOID(host);
-        auto layoutProperty = host->GetLayoutProperty();
-        CHECK_NULL_VOID(layoutProperty);
-        if (language_ == "ar" && layoutProperty->GetLayoutDirection() != TextDirection::RTL) {
-            layoutProperty->UpdateLayoutDirection(TextDirection::LTR);
-            isDirectionSetByAr = true;
-        } else if (isDirectionSetByAr) {
-            layoutProperty->UpdateLayoutDirection(TextDirection::AUTO);
-            isDirectionSetByAr = false;
-        }
     }
 
     void HasUserDefinedDisappearFontFamily(bool isUserDefined)
@@ -741,8 +726,6 @@ private:
     RefPtr<FrameNode> GetHourNode(std::list<RefPtr<UINode>>::iterator& iter);
     RefPtr<FrameNode> GetMinuteNode(std::list<RefPtr<UINode>>::iterator& iter);
     RefPtr<FrameNode> GetSecondNode(std::list<RefPtr<UINode>>::iterator& iter);
-    void UpdateAllChildNodeForUg();
-    void UpdateNodePositionForUg();
     void MountSecondNode(const RefPtr<FrameNode>& stackSecondNode);
     void RemoveSecondNode();
     void UpdateButtonMargin(
@@ -860,7 +843,6 @@ private:
     std::string language_;
     std::string amPmTimeOrder_;
     bool isAmPmTimeOrderUpdate_ = false;
-    bool isPreLanguageUg_ = false;
     bool isShowInDialog_ = false;
     bool isShowInSubWindow_ = false;
     bool showLunarSwitch_ = false;
@@ -883,7 +865,6 @@ private:
     std::string selectedColumnId_;
     bool isUserSetSelectColor_ = false;
     bool isClearFocus_ = true;
-    bool isDirectionSetByAr = false;
 
     bool focusEventInitialized_ = false;
     bool haveFocus_ = false;

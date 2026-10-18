@@ -341,6 +341,11 @@ std::vector<ParticleVelocityField> CreateParticleVelocityFields(
 
 } // namespace
 
+std::string SliderPattern::GetPageTextForReport(bool /* includeInput */) const
+{
+    return sliderTipModifier_ ? sliderTipModifier_->GetVisibleText() : "";
+}
+
 RefPtr<NodePaintMethod> SliderPattern::CreateNodePaintMethod()
 {
     if (!IsSliderVisible()) {
@@ -3043,6 +3048,8 @@ void SliderPattern::OnDetachFromMainTree()
 {
     auto host = GetHost();
     THREAD_SAFE_NODE_CHECK(host, OnDetachFromMainTree, host);
+    CHECK_NULL_VOID(host);
+    host->ResetRenderDirtyMarked(false);
 }
 
 void SliderPattern::InitOrRefreshSlipFactor()

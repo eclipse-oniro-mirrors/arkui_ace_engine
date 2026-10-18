@@ -30,7 +30,7 @@ namespace OHOS::Ace::NG {
 
 using OHOS::Ace::ForceSplitMode;
 
-class ForceSplitManager : public virtual AceType {
+class ForceSplitManager : public AceType {
     DECLARE_ACE_TYPE(ForceSplitManager, AceType);
 public:
     ForceSplitManager();

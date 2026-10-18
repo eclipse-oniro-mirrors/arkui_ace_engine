@@ -1159,4 +1159,115 @@ HWTEST_F(MediaQueryerTest, MediaQueryerMatchConditionTest050, TestSize.Level1)
     EXPECT_TRUE(queryer.MatchCondition("(aspect-ratio>=0.33)", json));
 }
 
+/**
+ * @tc.name: MinMaxPxUnit001
+ * @tc.desc: (max-height:800px) should match when height <= 800 (Syntax example)
+ * @tc.type: FUNC
+ */
+HWTEST_F(MediaQueryTest, MinMaxPxUnit001, TestSize.Level1)
+{
+    Framework::MediaQueryer queryer;
+    auto f = JsonUtil::Create(true);
+    f->Put("width", 100);
+    f->Put("height", 400);
+    EXPECT_TRUE(queryer.MatchCondition("(max-height:800px)", f));
+}
+
+/**
+ * @tc.name: MinMaxPxUnit002
+ * @tc.desc: (max-height:Npx) is equivalent to (max-height:N) — px is identity by default
+ * @tc.type: FUNC
+ */
+HWTEST_F(MediaQueryTest, MinMaxPxUnit002, TestSize.Level1)
+{
+    Framework::MediaQueryer queryer;
+    auto f = JsonUtil::Create(true);
+    f->Put("width", 100);
+    f->Put("height", 400);
+    EXPECT_EQ(queryer.MatchCondition("(max-height:800px)", f), queryer.MatchCondition("(max-height:800)", f));
+    EXPECT_EQ(queryer.MatchCondition("(max-height:100px)", f), queryer.MatchCondition("(max-height:100)", f));
+}
+
+/**
+ * @tc.name: MinMaxPxUnit003
+ * @tc.desc: (min-width:1px) should match when width >= 1
+ * @tc.type: FUNC
+ */
+HWTEST_F(MediaQueryTest, MinMaxPxUnit003, TestSize.Level1)
+{
+    Framework::MediaQueryer queryer;
+    auto f = JsonUtil::Create(true);
+    f->Put("width", 1);
+    EXPECT_TRUE(queryer.MatchCondition("(min-width:1px)", f));
+    EXPECT_FALSE(queryer.MatchCondition("(min-width:2px)", f));
+}
+
+/**
+ * @tc.name: OrMonotonicity001
+ * @tc.desc: c1=true implies (c1 or c2)=true — and-group true at non-last position must short-circuit
+ * @tc.type: FUNC
+ */
+HWTEST_F(MediaQueryTest, OrMonotonicity001, TestSize.Level1)
+{
+    Framework::MediaQueryer queryer;
+    auto f = JsonUtil::Create(true);
+    f->Put("width", 1);
+    // c1 alone is true
+    EXPECT_TRUE(queryer.MatchCondition("(min-width:1)and(min-width:1)", f));
+    // c1 or c2: c1 true (and-group), c2 false → must be true (OR monotonicity)
+    EXPECT_TRUE(queryer.MatchCondition("(min-width:1)and(min-width:1) or (min-width:2)", f));
+}
+
+/**
+ * @tc.name: OrMonotonicity002
+ * @tc.desc: comma list is synonymous with or — same monotonicity via ','
+ * @tc.type: FUNC
+ */
+HWTEST_F(MediaQueryTest, OrMonotonicity002, TestSize.Level1)
+{
+    Framework::MediaQueryer queryer;
+    auto f = JsonUtil::Create(true);
+    f->Put("width", 1);
+    EXPECT_TRUE(queryer.MatchCondition("(min-width:1)and(min-width:1),(min-width:2)", f));
+}
+
+/**
+ * @tc.name: OrMonotonicity003
+ * @tc.desc: all-false OR list returns false (no false-positive introduced by the fix)
+ * @tc.type: FUNC
+ */
+HWTEST_F(MediaQueryTest, OrMonotonicity003, TestSize.Level1)
+{
+    Framework::MediaQueryer queryer;
+    auto f = JsonUtil::Create(true);
+    f->Put("width", 1);
+    EXPECT_FALSE(queryer.MatchCondition("(min-width:2)and(min-width:2) or (min-width:3)", f));
+}
+
+/**
+ * @tc.name: OrMonotonicity004
+ * @tc.desc: and-group at last position still returns true (end-position behavior preserved)
+ * @tc.type: FUNC
+ */
+HWTEST_F(MediaQueryTest, OrMonotonicity004, TestSize.Level1)
+{
+    Framework::MediaQueryer queryer;
+    auto f = JsonUtil::Create(true);
+    f->Put("width", 1);
+    // single-condition false first, true and-group last
+    EXPECT_TRUE(queryer.MatchCondition("(min-width:2) or (min-width:1)and(min-width:1)", f));
+}
+
+/**
+ * @tc.name: PxUnitAndOrCombined
+ * @tc.desc: both fixes interact — (min-width:1px) parsed by px fix, short-circuited by OR fix
+ * @tc.type: FUNC
+ */
+HWTEST_F(MediaQueryTest, PxUnitAndOrCombined, TestSize.Level1)
+{
+    Framework::MediaQueryer queryer;
+    auto f = JsonUtil::Create(true);
+    f->Put("width", 1);
+    EXPECT_TRUE(queryer.MatchCondition("(min-width:1px)and(min-width:1px) or (min-width:2px)", f));
+}
 } // namespace OHOS::Ace::NG

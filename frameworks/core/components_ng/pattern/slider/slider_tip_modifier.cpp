@@ -377,6 +377,17 @@ void SliderTipModifier::PaintBubble(DrawingContext& context)
     canvas.DetachPen();
 }
 
+std::string SliderTipModifier::GetVisibleText() const
+{
+    // Match onDraw, including a still-visible delayed disappearance, without creating a paragraph.
+    if (!paragraph_ || !content_ || !tipFlag_ || !sizeScale_ || !opacityScale_ ||
+        LessOrEqual(opacityScale_->Get(), 0.0f) ||
+        (!tipFlag_->Get() && !GreatNotEqual(sizeScale_->Get(), BUBBLE_SIZE_MIN_SCALE))) {
+        return "";
+    }
+    return content_->Get();
+}
+
 void SliderTipModifier::onDraw(DrawingContext& context)
 {
     if (tipFlag_->Get() || GreatNotEqual(sizeScale_->Get(), BUBBLE_SIZE_MIN_SCALE)) {

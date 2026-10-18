@@ -29,8 +29,8 @@ import { NestedScrollOptions_serializer, ArkCommonMethodPeer, CommonMethod, Call
 import { EditMenuOptions_serializer, TextDataDetectorConfig_serializer, EditMenuOptions, TextDataDetectorConfig, MenuType } from './textCommon'
 import { ComponentBase } from './../ComponentBase'
 import { PeerNode } from './../PeerNode'
-import { CopyOptions, NestedScrollMode } from './enums'
-import { VoidCallback, Position, Position_serializer } from './units'
+import { CopyOptions, NestedScrollMode, Color as arkui_component_enums_Color } from './enums'
+import { VoidCallback, Position, Position_serializer, ResourceColor, Resource as arkui_component_units_Resource } from './units'
 import { CustomBuilder } from './builder'
 import { PreviewMenuOptions, PreviewMenuOptions_serializer } from './richEditor'
 import { CallbackKind } from './../framework/peers/CallbackKind'
@@ -3386,6 +3386,34 @@ export class ArkWebPeer extends ArkCommonMethodPeer {
         ArkUIGeneratedNativeModule._WebAttribute_setEnableMediaNetworkProxy(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
+    setCaretColorAttribute(value: ResourceColor | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (value !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueTmpValue = value!
+            if (valueTmpValue instanceof arkui_component_enums_Color) {
+                thisSerializer.writeInt8((0).toByte())
+                const valueTmpValueForIdx0 = valueTmpValue as arkui_component_enums_Color
+                thisSerializer.writeInt32((valueTmpValueForIdx0.getOrdinal()) % (12))
+            } else if (valueTmpValue instanceof int32) {
+                thisSerializer.writeInt8((1).toByte())
+                const valueTmpValueForIdx1 = valueTmpValue as int32
+                thisSerializer.writeInt32(valueTmpValueForIdx1)
+            } else if (valueTmpValue instanceof string) {
+                thisSerializer.writeInt8((2).toByte())
+                const valueTmpValueForIdx2 = valueTmpValue as string
+                thisSerializer.writeString(valueTmpValueForIdx2)
+            } else if (valueTmpValue instanceof arkui_component_units_Resource) {
+                thisSerializer.writeInt8((3).toByte())
+                const valueTmpValueForIdx3 = valueTmpValue as arkui_component_units_Resource
+                global_resource_Resource_serializer.write(thisSerializer, valueTmpValueForIdx3)
+            }
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._WebAttribute_setCaretColor(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
     setOnZoomChangeAttribute(value: OnZoomChangeCallback | undefined): void {
         const thisSerializer: SerializerBase = SerializerBase.hold()
         if (value !== undefined) {
@@ -3396,6 +3424,18 @@ export class ArkWebPeer extends ArkCommonMethodPeer {
             thisSerializer.writeInt8(RuntimeType.UNDEFINED)
         }
         ArkUIGeneratedNativeModule._WebAttribute_setOnZoomChange(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
+    setFlingSpeedLimitAttribute(value: double | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (value !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueTmpValue = value!
+            thisSerializer.writeFloat64(valueTmpValue)
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._WebAttribute_setFlingSpeedLimit(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
     setRegisterNativeEmbedRuleAttribute(tag: string | undefined, type: string | undefined): void {
@@ -4494,8 +4534,14 @@ export interface WebAttribute extends CommonMethod {
     enableMediaNetworkProxy(value: boolean | undefined): this {
         throw new Error('Unimplemented method enableMediaNetworkProxy')
     }
+    caretColor(value: ResourceColor | undefined): this {
+        throw new Error('Unimplemented method caretColor')
+    }
     onZoomChange(value: OnZoomChangeCallback | undefined): this {
         throw new Error('Unimplemented method onZoomChange')
+    }
+    flingSpeedLimit(value: double | undefined): this {
+        throw new Error('Unimplemented method flingSpeedLimit')
     }
     registerNativeEmbedRule(tag: string | undefined, type: string | undefined): this {
         throw new Error('Unimplemented method registerNativeEmbedRule')
@@ -5373,9 +5419,19 @@ export class ArkWebComponent extends ArkCommonMethodComponent implements WebAttr
         this.getPeer()?.setEnableMediaNetworkProxyAttribute(value_casted)
         return this
     }
+    public caretColor(value: ResourceColor | undefined): this {
+        const value_casted = value as (ResourceColor | undefined)
+        this.getPeer()?.setCaretColorAttribute(value_casted)
+        return this
+    }
     public onZoomChange(value: OnZoomChangeCallback | undefined): this {
         const value_casted = value as (OnZoomChangeCallback | undefined)
         this.getPeer()?.setOnZoomChangeAttribute(value_casted)
+        return this
+    }
+    public flingSpeedLimit(value: double | undefined): this {
+        const value_casted = value as (double | undefined)
+        this.getPeer()?.setFlingSpeedLimitAttribute(value_casted)
         return this
     }
     public registerNativeEmbedRule(tag: string | undefined, type: string | undefined): this {

@@ -24,7 +24,7 @@ namespace OHOS::Ace {
 
 using TokenThemeScopeId = int32_t;
 
-class ACE_FORCE_EXPORT TokenTheme : public virtual AceType {
+class ACE_FORCE_EXPORT TokenTheme : public AceType {
     DECLARE_ACE_TYPE(TokenTheme, AceType);
 
 public:

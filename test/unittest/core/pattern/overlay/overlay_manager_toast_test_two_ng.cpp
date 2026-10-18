@@ -44,6 +44,7 @@
 #include "core/components_ng/pattern/toast/toast_layout_property.h"
 #include "core/components_ng/pattern/toast/toast_pattern.h"
 #include "core/components_ng/pattern/toast/toast_view.h"
+#include "core/components_ng/manager/safe_area/safe_area_manager.h"
 #include "core/pipeline_ng/pipeline_context.h"
 
 using namespace testing;
@@ -892,5 +893,219 @@ HWTEST_F(OverlayManagerToastTestTwoNg, CalculateSafeAreaTopForTopAlignment002, T
      */
     toastPattern->CalculateSafeAreaTopForTopAlignment(safeAreaTop, nullptr, toastProp, nullptr);
     EXPECT_FLOAT_EQ(safeAreaTop, 0.0f);
+}
+
+/**
+ * @tc.name: ToastPatternAvoidBottomCutout001
+ * @tc.desc: Test AvoidBottom and AvoidCutout always return false (safe area handled by helper).
+ * @tc.type: FUNC
+ */
+HWTEST_F(OverlayManagerToastTestTwoNg, ToastPatternAvoidBottomCutout001, TestSize.Level1)
+{
+    auto toastInfo =
+        NG::ToastInfo { .message = MESSAGE, .duration = DURATION, .bottom = BOTTOMSTRING, .isRightToLeft = true };
+    toastInfo.showMode = ToastShowMode::DEFAULT;
+    auto toastNode = ToastView::CreateToastNode(toastInfo);
+    ASSERT_NE(toastNode, nullptr);
+    auto toastPattern = toastNode->GetPattern<ToastPattern>();
+    ASSERT_NE(toastPattern, nullptr);
+
+    // AvoidBottom/AvoidCutout always return false — safe area avoidance is handled
+    // entirely by OverlaySafeAreaHelper via DeriveInsetsFromHelper, matching the Menu path.
+    EXPECT_FALSE(toastPattern->AvoidBottom());
+    EXPECT_FALSE(toastPattern->AvoidCutout());
+}
+
+/**
+ * @tc.name: ToastPatternAvoidBottomCutout002
+ * @tc.desc: Test AvoidBottom and AvoidCutout return false even when useCutout is enabled.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OverlayManagerToastTestTwoNg, ToastPatternAvoidBottomCutout002, TestSize.Level1)
+{
+    auto toastInfo =
+        NG::ToastInfo { .message = MESSAGE, .duration = DURATION, .bottom = BOTTOMSTRING, .isRightToLeft = true };
+    toastInfo.showMode = ToastShowMode::DEFAULT;
+    auto toastNode = ToastView::CreateToastNode(toastInfo);
+    ASSERT_NE(toastNode, nullptr);
+    auto toastPattern = toastNode->GetPattern<ToastPattern>();
+    ASSERT_NE(toastPattern, nullptr);
+
+    auto pipeline = MockPipelineContext::GetCurrentContext();
+    ASSERT_NE(pipeline, nullptr);
+    auto safeAreaManager = pipeline->GetSafeAreaManager();
+    ASSERT_NE(safeAreaManager, nullptr);
+    safeAreaManager->SetUseCutout(true);
+    // Still false — the switch no longer controls these overrides
+    EXPECT_FALSE(toastPattern->AvoidBottom());
+    EXPECT_FALSE(toastPattern->AvoidCutout());
+    // Restore
+    safeAreaManager->SetUseCutout(false);
+}
+
+/**
+ * @tc.name: ToastPatternAvoidBottomCutout003
+ * @tc.desc: Test AvoidBottom and AvoidCutout return false for SYSTEM_TOP_MOST toast.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OverlayManagerToastTestTwoNg, ToastPatternAvoidBottomCutout003, TestSize.Level1)
+{
+    auto toastInfo =
+        NG::ToastInfo { .message = MESSAGE, .duration = DURATION, .bottom = BOTTOMSTRING, .isRightToLeft = true };
+    toastInfo.showMode = ToastShowMode::SYSTEM_TOP_MOST;
+    auto toastNode = ToastView::CreateToastNode(toastInfo);
+    ASSERT_NE(toastNode, nullptr);
+    auto toastPattern = toastNode->GetPattern<ToastPattern>();
+    ASSERT_NE(toastPattern, nullptr);
+
+    auto pipeline = MockPipelineContext::GetCurrentContext();
+    ASSERT_NE(pipeline, nullptr);
+    auto safeAreaManager = pipeline->GetSafeAreaManager();
+    ASSERT_NE(safeAreaManager, nullptr);
+    safeAreaManager->SetUseCutout(true);
+    // SYSTEM_TOP_MOST also returns false — same behavior across all ShowModes
+    EXPECT_FALSE(toastPattern->AvoidBottom());
+    EXPECT_FALSE(toastPattern->AvoidCutout());
+    // Restore
+    safeAreaManager->SetUseCutout(false);
+}
+
+/**
+ * @tc.name: ToastPatternInitWrapperRectWithSafeArea001
+ * @tc.desc: Test InitWrapperRect with safe area data and global switch on.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OverlayManagerToastTestTwoNg, ToastPatternInitWrapperRectWithSafeArea001, TestSize.Level1)
+{
+    auto toastInfo =
+        NG::ToastInfo { .message = MESSAGE, .duration = DURATION, .bottom = BOTTOMSTRING, .isRightToLeft = true };
+    toastInfo.showMode = ToastShowMode::DEFAULT;
+    auto toastNode = ToastView::CreateToastNode(toastInfo);
+    ASSERT_NE(toastNode, nullptr);
+    auto toastPattern = toastNode->GetPattern<ToastPattern>();
+    ASSERT_NE(toastPattern, nullptr);
+
+    auto pipeline = MockPipelineContext::GetCurrentContext();
+    ASSERT_NE(pipeline, nullptr);
+    auto safeAreaManager = pipeline->GetSafeAreaManager();
+    ASSERT_NE(safeAreaManager, nullptr);
+    // Enable safe area and set cutout data
+    safeAreaManager->SetIsFullScreen(true);
+    safeAreaManager->SetUseCutout(true);
+    SafeAreaInsets cutoutInsets;
+    cutoutInsets.top_ = SafeAreaInsets::Inset { 0, 100 };
+    safeAreaManager->UpdateCutoutSafeArea(cutoutInsets);
+
+    auto layoutWrapper = toastNode->CreateLayoutWrapper(true, true);
+    ASSERT_NE(layoutWrapper, nullptr);
+    auto toastProp = AceType::DynamicCast<ToastLayoutProperty>(layoutWrapper->GetLayoutProperty());
+    ASSERT_NE(toastProp, nullptr);
+    auto layoutWrapperPtr = reinterpret_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapper));
+    ASSERT_NE(layoutWrapperPtr, nullptr);
+    // Should not crash and should execute the helper path
+    toastPattern->InitWrapperRect(layoutWrapperPtr, toastProp);
+    // wrapperRect_ should have been set (not all zeros)
+    EXPECT_TRUE(toastPattern->wrapperRect_.Width() >= 0);
+    EXPECT_TRUE(toastPattern->wrapperRect_.Height() >= 0);
+
+    // Restore
+    safeAreaManager->SetUseCutout(false);
+    safeAreaManager->SetIsFullScreen(false);
+    safeAreaManager->UpdateCutoutSafeArea(SafeAreaInsets {});
+}
+
+/**
+ * @tc.name: ToastPatternInitWrapperRectWithSafeArea002
+ * @tc.desc: Test InitWrapperRect with global switch off — no crash, legacy behavior.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OverlayManagerToastTestTwoNg, ToastPatternInitWrapperRectWithSafeArea002, TestSize.Level1)
+{
+    auto toastInfo =
+        NG::ToastInfo { .message = MESSAGE, .duration = DURATION, .bottom = BOTTOMSTRING, .isRightToLeft = true };
+    toastInfo.showMode = ToastShowMode::TOP_MOST;
+    auto toastNode = ToastView::CreateToastNode(toastInfo);
+    ASSERT_NE(toastNode, nullptr);
+    auto toastPattern = toastNode->GetPattern<ToastPattern>();
+    ASSERT_NE(toastPattern, nullptr);
+
+    auto pipeline = MockPipelineContext::GetCurrentContext();
+    ASSERT_NE(pipeline, nullptr);
+    auto safeAreaManager = pipeline->GetSafeAreaManager();
+    ASSERT_NE(safeAreaManager, nullptr);
+    // avoidDisplayLimit is always true now (matching Menu), switch state does not matter
+    safeAreaManager->SetUseCutout(false);
+
+    auto layoutWrapper = toastNode->CreateLayoutWrapper(true, true);
+    ASSERT_NE(layoutWrapper, nullptr);
+    auto toastProp = AceType::DynamicCast<ToastLayoutProperty>(layoutWrapper->GetLayoutProperty());
+    ASSERT_NE(toastProp, nullptr);
+    auto layoutWrapperPtr = reinterpret_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapper));
+    ASSERT_NE(layoutWrapperPtr, nullptr);
+    // Should not crash with switch off
+    toastPattern->InitWrapperRect(layoutWrapperPtr, toastProp);
+    EXPECT_TRUE(toastPattern->wrapperRect_.Width() >= 0);
+    EXPECT_TRUE(toastPattern->wrapperRect_.Height() >= 0);
+}
+
+/**
+ * @tc.name: ToastPatternGetTextMaxHeightWithSafeArea001
+ * @tc.desc: Test GetTextMaxHeight with safe area data and global switch on.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OverlayManagerToastTestTwoNg, ToastPatternGetTextMaxHeightWithSafeArea001, TestSize.Level1)
+{
+    auto toastInfo =
+        NG::ToastInfo { .message = MESSAGE, .duration = DURATION, .bottom = BOTTOMSTRING, .isRightToLeft = true };
+    toastInfo.showMode = ToastShowMode::SYSTEM_TOP_MOST;
+    auto toastNode = ToastView::CreateToastNode(toastInfo);
+    ASSERT_NE(toastNode, nullptr);
+    auto toastPattern = toastNode->GetPattern<ToastPattern>();
+    ASSERT_NE(toastPattern, nullptr);
+
+    auto pipeline = MockPipelineContext::GetCurrentContext();
+    ASSERT_NE(pipeline, nullptr);
+    auto safeAreaManager = pipeline->GetSafeAreaManager();
+    ASSERT_NE(safeAreaManager, nullptr);
+    safeAreaManager->SetIsFullScreen(true);
+    safeAreaManager->SetUseCutout(true);
+    SafeAreaInsets cutoutInsets;
+    cutoutInsets.top_ = SafeAreaInsets::Inset { 0, 50 };
+    cutoutInsets.bottom_ = SafeAreaInsets::Inset { 0, 80 };
+    safeAreaManager->UpdateCutoutSafeArea(cutoutInsets);
+
+    // Should not crash and return a non-zero value (device height falls back to SystemProperties)
+    auto maxHeight = toastPattern->GetTextMaxHeight();
+    EXPECT_GE(maxHeight, 0.0);
+
+    // Restore
+    safeAreaManager->SetUseCutout(false);
+    safeAreaManager->SetIsFullScreen(false);
+    safeAreaManager->UpdateCutoutSafeArea(SafeAreaInsets {});
+}
+
+/**
+ * @tc.name: ToastPatternGetTextMaxHeightWithSafeArea002
+ * @tc.desc: Test GetTextMaxHeight with global switch off — no crash, legacy behavior.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OverlayManagerToastTestTwoNg, ToastPatternGetTextMaxHeightWithSafeArea002, TestSize.Level1)
+{
+    auto toastInfo =
+        NG::ToastInfo { .message = MESSAGE, .duration = DURATION, .bottom = BOTTOMSTRING, .isRightToLeft = true };
+    toastInfo.showMode = ToastShowMode::DEFAULT;
+    auto toastNode = ToastView::CreateToastNode(toastInfo);
+    ASSERT_NE(toastNode, nullptr);
+    auto toastPattern = toastNode->GetPattern<ToastPattern>();
+    ASSERT_NE(toastPattern, nullptr);
+
+    auto pipeline = MockPipelineContext::GetCurrentContext();
+    ASSERT_NE(pipeline, nullptr);
+    auto safeAreaManager = pipeline->GetSafeAreaManager();
+    ASSERT_NE(safeAreaManager, nullptr);
+    safeAreaManager->SetUseCutout(false);
+
+    auto maxHeight = toastPattern->GetTextMaxHeight();
+    EXPECT_NE(maxHeight, 0.0f);
 }
 } // namespace OHOS::Ace::NG

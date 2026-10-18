@@ -23,22 +23,23 @@ build_component_ng("calendar_picker_pattern_ng") {
       "calendar_dialog_layout_algorithm.cpp",
       "calendar_dialog_pattern.cpp",
       "calendar_dialog_view.cpp",
+      "calendar_picker_i18n.cpp",
       "calendar_picker_layout_algorithm.cpp",
       "calendar_picker_model_ng.cpp",
       "calendar_picker_model_static.cpp",
       "calendar_picker_pattern.cpp",
     ]
   }
-  
+
   ark_sources = []
   if (!ace_engine_feature_wearable) {
     ark_sources += [
       "bridge/arkts_native_calendar_picker_bridge.cpp",
       "bridge/arkts_native_calendar_picker_dialog_bridge.cpp",
       "bridge/calendar_picker_dialog_dynamic_modifier.cpp",
+      "bridge/calendar_picker_dialog_dynamic_module.cpp",
       "bridge/calendar_picker_dynamic_modifier.cpp",
       "bridge/calendar_picker_dynamic_module.cpp",
-      "bridge/calendar_picker_dialog_dynamic_module.cpp",
       "bridge/calendar_picker_utils.cpp",
     ]
   }
@@ -49,16 +50,12 @@ build_component_ng("calendar_picker_pattern_ng") {
         "bridge/calendar_picker_dialog_static_modifier.cpp",
         "bridge/calendar_picker_static_modifier.cpp",
       ]
-    }    
+    }
   }
 
   if (!build_ohos_sdk) {
     if (!is_arkui_x) {
-      deps = [
-        "$ace_root/interfaces/inner_api/ui_session:ui_session",
-      ]
+      deps = [ "$ace_root/interfaces/inner_api/ui_session" ]
     }
   }
 }
-
-

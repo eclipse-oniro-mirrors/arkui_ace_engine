@@ -13,6 +13,8 @@
  * limitations under the License.
  */
 
+#include <limits>
+
 #include "gtest/gtest.h"
 #include "core/accessibility/accessibility_manager.h"
 
@@ -2627,6 +2629,35 @@ HWTEST_F(WebModelStaticTest, SetOnContextMenuHide001, TestSize.Level1)
 }
 
 /**
+ * @tc.name: SetOnContextMenuUpdate001
+ * @tc.desc: Test web_model_static.cpp
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebModelStaticTest, SetOnContextMenuUpdate001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    int callCount = 0;
+    auto* stack = ViewStackProcessor::GetInstance();
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode = WebModelStatic::CreateFrameNode(nodeId);
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+
+    auto callback =
+        [&callCount](WebContextMenuItemId menuItemId, const WebContextMenuOptions& options) { callCount++; };
+
+    WebModelStatic::SetOnContextMenuUpdate(AccessibilityManager::RawPtr(frameNode), callback);
+
+    auto webPattern = AceType::DynamicCast<WebPattern>(frameNode->GetPattern());
+    ASSERT_NE(webPattern, nullptr);
+    auto updateCallback = webPattern->GetOnContextMenuUpdateCallback();
+    ASSERT_NE(updateCallback, nullptr);
+    updateCallback(WebContextMenuItemId::MENU_COPY_LINK, WebContextMenuOptions {});
+    EXPECT_EQ(callCount, 1);
+#endif
+}
+
+/**
  * @tc.name: SetOnSslErrorRequest001
  * @tc.desc: Test web_model_static.cpp
  * @tc.type: FUNC
@@ -3451,6 +3482,49 @@ HWTEST_F(WebModelStaticTest, SetInputMethodAttachedId001, TestSize.Level1)
     CHECK_NULL_VOID(webEventHub);
     webEventHub->FireOnInputMethodAttachedEvent(mockEventInfo);
     EXPECT_TRUE(callbackCalled);
+#endif
+}
+
+/**
+ * @tc.name: SetFlingSpeedLimit001
+ * @tc.desc: Test WebModelStatic::SetFlingSpeedLimit updates WebPatternStatic property.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebModelStaticTest, SetFlingSpeedLimit001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode = WebModelStatic::CreateFrameNode(nodeId);
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+
+    WebModelStatic::SetFlingSpeedLimit(AccessibilityManager::RawPtr(frameNode), 5000.0f);
+    auto webPatternStatic = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPatternStatic>();
+    ASSERT_NE(webPatternStatic, nullptr);
+    EXPECT_EQ(webPatternStatic->GetOrCreateWebProperty()->CheckFlingSpeedLimit(5000.0f), true);
+#endif
+}
+
+/**
+ * @tc.name: SetFlingSpeedLimitInvalid001
+ * @tc.desc: Invalid fling speed values are normalized to the default sentinel.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebModelStaticTest, SetFlingSpeedLimitInvalid001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode = WebModelStatic::CreateFrameNode(nodeId);
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+
+    WebModelStatic::SetFlingSpeedLimit(
+        AccessibilityManager::RawPtr(frameNode), std::numeric_limits<float>::infinity());
+    auto webPatternStatic = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPatternStatic>();
+    ASSERT_NE(webPatternStatic, nullptr);
+    EXPECT_TRUE(webPatternStatic->GetOrCreateWebProperty()->CheckFlingSpeedLimit(0.0f));
 #endif
 }
 } // namespace OHOS::Ace::NG

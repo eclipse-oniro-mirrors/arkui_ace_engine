@@ -23,7 +23,7 @@
 
 namespace OHOS::Ace::NG {
 class CanvasPaintMethod;
-class ACE_EXPORT CanvasRenderContext : public virtual AceType {
+class ACE_EXPORT CanvasRenderContext : public AceType {
     DECLARE_ACE_TYPE(CanvasRenderContext, AceType);
 
 public:

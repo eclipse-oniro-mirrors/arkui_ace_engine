@@ -2065,6 +2065,8 @@ struct CJUIWebModifier {
     void (*resetOnRequestSelectedCallBack)(ArkUINodeHandle node);
     void (*setOnContextMenuHideCallBack)(ArkUINodeHandle node, void* callback);
     void (*resetOnContextMenuHideCallBack)(ArkUINodeHandle node);
+    void (*setOnContextMenuUpdateCallBack)(ArkUINodeHandle node, void* callback);
+    void (*resetOnContextMenuUpdateCallBack)(ArkUINodeHandle node);
     void (*setGeolocationAccess)(ArkUINodeHandle node, ArkUI_Bool value);
     void (*resetGeolocationAccess)(ArkUINodeHandle node);
     void (*setDatabaseAccess)(ArkUINodeHandle node, ArkUI_Bool value);
@@ -2250,6 +2252,8 @@ struct CJUIWebModifier {
     void (*resetEnableImageAnalyzer)(ArkUINodeHandle node);
     void (*setForceEnableZoom)(ArkUINodeHandle node, ArkUI_Bool value);
     void (*resetForceEnableZoom)(ArkUINodeHandle node);
+    void (*setFlingSpeedLimit)(ArkUINodeHandle node, ArkUI_Float32 value);
+    void (*resetFlingSpeedLimit)(ArkUINodeHandle node);
     void (*setBackToTop)(ArkUINodeHandle node, ArkUI_Bool value);
     void (*resetBackToTop)(ArkUINodeHandle node);
     void (*setOnCameraCaptureStateChanged)(ArkUINodeHandle node, void* callback);
@@ -2283,6 +2287,8 @@ struct CJUIWebModifier {
     void (*resetEnableFullscreenVideoOverlay)(ArkUINodeHandle node);
     void (*setOnZoomChangeCallBack)(ArkUINodeHandle node, void* callback);
     void (*resetOnZoomChangeCallBack)(ArkUINodeHandle node);
+    void (*setCaretColor)(ArkUINodeHandle node, ArkUI_Uint32 color, void* colorRawPtr);
+    void (*resetCaretColor)(ArkUINodeHandle node);
 };
 
 struct CJUIBlankModifier {
@@ -2806,6 +2812,8 @@ struct CJUICalendarPickerModifier {
     void (*resetEndDate)(ArkUINodeHandle node);
     void (*setCalendarPickerMarkToday)(ArkUINodeHandle node, ArkUI_Bool isMarkToday);
     void (*resetCalendarPickerMarkToday)(ArkUINodeHandle node);
+    void (*setCalendarPickerFirstDayOfWeek)(ArkUINodeHandle node, ArkUI_Int32 firstDayOfWeek);
+    void (*resetCalendarPickerFirstDayOfWeek)(ArkUINodeHandle node);
     void (*setCalendarPickerDisabledDateRange)(ArkUINodeHandle node, ArkUI_CharPtr disabledDateRangeStr);
     void (*resetCalendarPickerDisabledDateRange)(ArkUINodeHandle node);
     void (*setEdgeAlign)(ArkUINodeHandle node, const ArkUI_Float32* values, const ArkUI_Int32* units, ArkUI_Int32 size,
@@ -2822,6 +2830,7 @@ struct CJUICalendarPickerModifier {
     ArkUI_CharPtr (*getStartDate)(ArkUINodeHandle node);
     ArkUI_CharPtr (*getEndDate)(ArkUINodeHandle node);
     ArkUI_Bool (*getCalendarPickerMarkToday)(ArkUINodeHandle node);
+    ArkUI_Int32 (*getCalendarPickerFirstDayOfWeek)(ArkUINodeHandle node);
     ArkUI_CharPtr (*getCalendarPickerDisabledDateRange)(ArkUINodeHandle node);
     ArkUIEdgeAlignType (*getEdgeAlign)(ArkUINodeHandle node);
     void (*setCalendarPickerHeight)(ArkUINodeHandle node, ArkUI_Float32 value, ArkUI_Int32 unit);
@@ -3500,6 +3509,14 @@ struct CJUIRichEditorModifier {
     void (*setRichEditorHorizontalScrolling)(ArkUINodeHandle node, ArkUI_Bool singleLine);
     void (*resetRichEditorHorizontalScrolling)(ArkUINodeHandle node);
     ArkUI_Bool (*getRichEditorHorizontalScrolling)(ArkUINodeHandle node);
+    void (*setRichEditorInputType)(ArkUINodeHandle node, ArkUI_Int32 value);
+    void (*resetRichEditorInputType)(ArkUINodeHandle node);
+    ArkUI_Int32 (*getRichEditorInputType)(ArkUINodeHandle node);
+    void (*setRichEditorShowPasswordIcon)(ArkUINodeHandle node, ArkUI_Uint32 showPasswordIcon);
+    void (*resetRichEditorShowPasswordIcon)(ArkUINodeHandle node);
+    ArkUI_Bool (*getRichEditorShowPasswordIcon)(ArkUINodeHandle node);
+    void (*setRichEditorPasswordIcon)(ArkUINodeHandle node, const struct ArkUIPasswordIconType* passwordIcon);
+    void (*resetRichEditorPasswordIcon)(ArkUINodeHandle node);
 };
 
 struct CJUIRichEditorControllerModifier {

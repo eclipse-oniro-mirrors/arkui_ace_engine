@@ -21,6 +21,7 @@
 
 #include "base/log/ace_scoring_log.h"
 #include "base/log/log_wrapper.h"
+#include "base/utils/napi_scope_raii.h"
 #include "base/want/want_wrap.h"
 #include "bridge/common/utils/engine_helper.h"
 #include "bridge/declarative_frontend/engine/js_converter.h"
@@ -146,7 +147,7 @@ CallbackFuncPairList::const_iterator JSUIExtensionProxy::FindCbList(napi_env env
 }
 
 void JSUIExtensionProxy::AddCallbackToList(napi_env env, napi_value cb,
-    napi_handle_scope scope, RegisterType type,
+    RegisterType type,
     const std::function<void(const RefPtr<NG::UIExtensionProxy>&)>&& onFunc)
 {
     if (type == RegisterType::SYNC) {
@@ -164,7 +165,6 @@ void JSUIExtensionProxy::AddCallbackToList(napi_env env, napi_value cb,
             onAsyncOnCallbackList_.emplace_back(ref, onFunc);
         }
     }
-    napi_close_handle_scope(env, scope);
 }
 
 void JSUIExtensionProxy::DeleteCallbackFromList(uint32_t argc, napi_env env, napi_value cb, RegisterType type)
@@ -269,15 +269,15 @@ void JSUIExtensionProxy::On(const JSCallbackInfo& info)
     CHECK_NULL_VOID(nativeEngine);
     auto env = reinterpret_cast<napi_env>(nativeEngine);
     ScopeRAII scopeNapi(env);
+    if (!scopeNapi) {
+        return;
+    }
     panda::Local<JsiValue> value = info[1].Get().GetLocalHandle();
     JSValueWrapper valueWrapper = value;
     napi_value cb = nativeEngine->ValueToNapiValue(valueWrapper);
-    napi_handle_scope napiScope = nullptr;
-    napi_open_handle_scope(env, &napiScope);
-    CHECK_NULL_VOID(napiScope);
 
     std::lock_guard<std::mutex> lock(callbackLisLock_);
-    AddCallbackToList(env, cb, napiScope, registerType, std::move(onOnFunc));
+    AddCallbackToList(env, cb, registerType, std::move(onOnFunc));
     auto pattern = proxy_->GetPattern();
     CHECK_NULL_VOID(pattern);
     auto onFuncList = GetOnFuncList(registerType);
@@ -439,6 +439,7 @@ void JSUIExtension::Create(const JSCallbackInfo& info)
 
     bool transferringCaller = false;
     NG::DpiFollowStrategy dpiFollowStrategy = NG::DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI;
+    bool isDpiFollowStrategySet = false;
     bool windowModeStrategy = false;
     std::map<NG::PlaceholderType, RefPtr<NG::FrameNode>> placeholderMap;
     if (info.Length() > 1 && info[1]->IsObject()) {
@@ -450,6 +451,7 @@ void JSUIExtension::Create(const JSCallbackInfo& info)
         JSRef<JSVal> enableDensityDPI = obj->GetProperty("dpiFollowStrategy");
         if (enableDensityDPI->IsNumber()) {
             dpiFollowStrategy = NG::ParseDpiFollowStrategy(enableDensityDPI->ToNumber<int32_t>());
+            isDpiFollowStrategySet = true;
         }
         JSRef<JSVal> windowModeStrategyValue = obj->GetProperty("windowModeFollowStrategy");
         if (windowModeStrategyValue->IsNumber()) {
@@ -459,7 +461,7 @@ void JSUIExtension::Create(const JSCallbackInfo& info)
         ResolveAreaPlaceholderParams(obj, placeholderMap);
     }
     UIExtensionModel::GetInstance()->Create(
-        want, placeholderMap, transferringCaller, dpiFollowStrategy, windowModeStrategy);
+        want, placeholderMap, transferringCaller, dpiFollowStrategy, isDpiFollowStrategySet, windowModeStrategy);
 }
 
 void JSUIExtension::OnRemoteReady(const JSCallbackInfo& info)

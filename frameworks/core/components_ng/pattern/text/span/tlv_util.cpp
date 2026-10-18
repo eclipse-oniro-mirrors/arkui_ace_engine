@@ -98,6 +98,9 @@ float TLVUtil::ReadFloat(std::vector<uint8_t>& buff, int32_t& cursor)
     if (ReadUint8(buff, cursor) != TLV_FLOAT_TAG) {
         return 0.0;
     }
+    if (cursor < 0 || static_cast<size_t>(cursor) + sizeof(float) > buff.size()) {
+        return 0.0;
+    }
     auto start = buff.begin() + cursor;
     auto end = start + sizeof(float);
     float value;
@@ -163,7 +166,7 @@ std::vector<std::string> TLVUtil::ReadFontFamily(std::vector<uint8_t>& buff, int
     if (fontFamilySize < 0) {
         return fontFamilies;
     }
-    for (auto i = 0; i < fontFamilySize; i++) {
+    for (auto i = 0; i < fontFamilySize && static_cast<size_t>(cursor) < buff.size(); i++) {
         auto fontFamily = ReadString(buff, cursor);
         fontFamilies.emplace_back(fontFamily);
     }
@@ -220,7 +223,7 @@ std::vector<Shadow> TLVUtil::ReadTextShadows(std::vector<uint8_t>& buff, int32_t
     if (shadowSize < 0) {
         return shadows;
     }
-    for (auto i = 0; i < shadowSize; i++) {
+    for (auto i = 0; i < shadowSize && static_cast<size_t>(cursor) < buff.size(); i++) {
         shadows.emplace_back(ReadTextShadow(buff, cursor));
     }
     return shadows;
@@ -242,7 +245,7 @@ std::vector<TextDecoration> TLVUtil::ReadTextDecorations(std::vector<uint8_t>& b
     if (size < 0) {
         return textDecorations;
     }
-    for (auto i = 0; i < size; i++) {
+    for (auto i = 0; i < size && static_cast<size_t>(cursor) < buff.size(); i++) {
         int32_t value = ReadInt32(buff, cursor);
         textDecorations.emplace_back(static_cast<TextDecoration>(value));
     }
@@ -270,7 +273,7 @@ std::list<std::pair<std::string, int32_t>> TLVUtil::ReadFontFeature(std::vector<
     if (len < 0) {
         return fontFeatureList;
     }
-    for (auto i = 0; i < len; i++) {
+    for (auto i = 0; i < len && static_cast<size_t>(cursor) < buff.size(); i++) {
         std::string first = ReadString(buff, cursor);
         int32_t second = ReadInt32(buff, cursor);
         fontFeatureList.push_back({first, second});
@@ -619,7 +622,7 @@ std::optional<NG::Gradient> TLVUtil::ReadGradientColors(std::vector<uint8_t>& bu
         return gradient;
     }
     NG::Gradient value;
-    for (auto i = 0; i < size; i++) {
+    for (auto i = 0; i < size && static_cast<size_t>(cursor) < buff.size(); i++) {
         if (ReadUint8(buff, cursor) != TLV_SPAN_TEXT_LINE_STYLE_GRADIENT_COLOR) {
             continue;
         }

@@ -121,7 +121,8 @@ void EventManager::TouchTest(const TouchEvent& touchPoint, const RefPtr<NG::Fram
         FalsifyHoverCancelEventAndDispatch(touchPoint);
     }
     
-    if (lastDownFingerNumber_ == 0 && touchPoint.type == TouchType::DOWN && !needAppend) {
+    if (lastDownFingerNumber_ == 0 && touchPoint.type == TouchType::DOWN &&
+        !needAppend && axisTouchTestResults_.empty()) {
         auto activeRecognizerManager = GetOrCreateActiveRecognizerManager();
         if (activeRecognizerManager) {
             activeRecognizerManager->CheckAndCleanBeforeNewTouch(touchPoint.id);
@@ -1280,7 +1281,7 @@ void EventManager::UpdateInfoWhenFinishDispatch(const TouchEvent& point, bool se
         if (sendOnTouch) {
             touchTestResults_.erase(point.id);
         }
-        if (touchTestResults_.empty()) {
+        if (touchTestResults_.empty() && axisTouchTestResults_.empty()) {
             currentReferee->CleanRedundanceScope();
             if (!escapeRecognizers_.empty()) {
                 SweepEscapeRecognizers();

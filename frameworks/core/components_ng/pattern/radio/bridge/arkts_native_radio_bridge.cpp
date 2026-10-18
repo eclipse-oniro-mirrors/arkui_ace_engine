@@ -797,6 +797,7 @@ ArkUINativeModuleValue RadioBridge::SetContentModifierBuilder(ArkUIRuntimeCallIn
         [vm, frameNode, obj = std::move(obj), containerId = Container::CurrentId()](
             RadioConfiguration config) -> RefPtr<FrameNode> {
             ContainerScope scope(containerId);
+            panda::LocalScope pandaScope(vm);
             auto context = ArkTSUtils::GetContext(vm);
             CHECK_EQUAL_RETURN(context->IsUndefined(), true, nullptr);
             const char* keysOfRadio[] = { "value", "checked", "enabled", "triggerChange"};
@@ -809,7 +810,6 @@ ArkUINativeModuleValue RadioBridge::SetContentModifierBuilder(ArkUIRuntimeCallIn
             auto* weak = new NG::NativeWeakRef(static_cast<AceType*>(frameNode));
             radio->SetNativePointerField(vm, 0, weak, &NG::DestructorInterceptor<NG::NativeWeakRef>);
             panda::Local<panda::JSValueRef> params[NUM_2] = { context, radio };
-            panda::LocalScope pandaScope(vm);
             panda::TryCatch trycatch(vm);
             auto jsObject = obj.ToLocal();
             auto makeFunc = jsObject->Get(vm, panda::StringRef::NewFromUtf8(vm, "makeContentModifierNode"));

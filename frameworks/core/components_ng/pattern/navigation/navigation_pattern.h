@@ -995,8 +995,8 @@ private:
     bool GetHomeDestinationName(const RefPtr<FrameNode>& hostNode, std::string& name);
     void TriggerPerformanceCheck(const RefPtr<NavDestinationGroupNode>& topDestination, std::string fromPath);
     NavigateChangeInfo ConvertNavDestinationContext(const RefPtr<NavDestinationContext>& context);
-    void ContentChangeReport(const RefPtr<FrameNode>& keyNode);
-    void ContentChangeOnTransitionStart(const RefPtr<FrameNode>& keyNode);
+    void ContentChangeReport(const RefPtr<FrameNode>& keyNode, bool isPopPage = false);
+    void ContentChangeOnTransitionStart(const RefPtr<FrameNode>& keyNode, bool isPopPage = false);
     void UpdatePlaceholderVisibilityIfNeeded();
     bool CheckIfLastDestWillBeFullScreenOverlay(const std::vector<RefPtr<NavDestinationGroupNode>>& destList);
 

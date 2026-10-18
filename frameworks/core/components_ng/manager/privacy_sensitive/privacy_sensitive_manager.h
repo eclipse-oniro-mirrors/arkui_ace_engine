@@ -25,7 +25,7 @@
 
 namespace OHOS::Ace::NG {
 // PrivacySensitiveManager stores sensitive node to apply style correctly.
-class PrivacySensitiveManager : public virtual AceType {
+class PrivacySensitiveManager : public AceType {
     DECLARE_ACE_TYPE(PrivacySensitiveManager, AceType);
 
 public:

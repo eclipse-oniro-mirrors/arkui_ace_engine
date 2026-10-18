@@ -16,6 +16,7 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_COMMON_PROPERTIES_UI_MATERIAL_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_COMMON_PROPERTIES_UI_MATERIAL_H
 
+#include <atomic>
 #include <memory>
 #include <optional>
 
@@ -27,6 +28,9 @@
 #include "core/components/common/properties/shadow.h"
 #include "core/components_ng/property/border_property.h"
 
+struct ArkUIMaterialFuncRegistry;
+struct ArkUIMaterialFilterFuncRegistry;
+
 namespace OHOS::Rosen {
 class Filter;
 class RSNGFilterBase;
@@ -34,9 +38,6 @@ class RSNGShaderBase;
 }
 
 namespace OHOS::Ace {
-extern const char UI_MATERIAL_EXTENSION_SO_PATH[];
-extern const char UI_MATERIAL_FUNC_NAME[];
-extern const char UI_MATERIAL_FUNC_GET_ID[];
 
 namespace NG {
 class PipelineContext;
@@ -158,8 +159,6 @@ public:
         const ImmersiveMaterialConfig& params, std::shared_ptr<Rosen::RSNGShaderBase>& shader);
     static Shadow GetImmersiveShadow(float dipScale);
     static Shadow GetImmersiveEmptyShadow();
-    static bool GetGlobalMaterialLevel(UiMaterialLevel& result);
-    static bool GetDeviceUiMaterialEnabled(bool& result);
     static MaterialState GetConfiguredMaterialState();
     static MaterialType GetConfiguredMaterialType();
     static bool IsMaterialDisabled();
@@ -177,12 +176,16 @@ public:
     static const UiMaterial* PreProcessMaterial(const UiMaterial* material);
     static std::shared_ptr<Rosen::Filter> CreateRosenFilter(const ImmersiveMaterialConfig& params);
     static ColorMode GetNodeColorMode(const RefPtr<NG::FrameNode>& node);
+    static void RegisterMaterialFunc(const ArkUIMaterialFuncRegistry* registry);
+    static void RegisterMaterialFilterFunc(const ArkUIMaterialFilterFuncRegistry* registry);
 
 private:
     static bool ValidColorInvert(const std::shared_ptr<ImmersiveOptions>& options, UiMaterialLevel systemLevel,
         UiMaterialTransparency systemTransparency);
     static MaterialState ParseMaterialState(const std::string& value);
     static MaterialType ParseMaterialType(const std::string& value);
+    static std::atomic<const ArkUIMaterialFuncRegistry*> materialFuncRegistry_;
+    static std::atomic<const ArkUIMaterialFilterFuncRegistry*> materialFilterFuncRegistry_;
 };
 } // namespace OHOS::Ace
 

@@ -87,7 +87,8 @@
     ],
     "DeletedMembers": {
         "CommonMethod": [
-            "attributeModifier"
+            "attributeModifier",
+            "safeAreaInset"
         ],
         "ScrollableCommonMethod": [
             "onWillScroll",

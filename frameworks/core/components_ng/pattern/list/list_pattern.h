@@ -265,6 +265,11 @@ public:
     {
         multiSelectable_ = multiSelectable;
     }
+
+    bool MultiSelectable() const override
+    {
+        return multiSelectable_;
+    }
     void UpdateBackPressCloseSwipeActionCallback();
     bool NeedBackPressHandler() const override;
     bool HandleBackPress() override;
@@ -603,7 +608,6 @@ private:
 
     void InitOnKeyEvent(const RefPtr<FocusHub>& focusHub);
     bool OnKeyEvent(const KeyEvent& event);
-    bool HandleDirectionKey(const KeyEvent& event);
     WeakPtr<FocusHub> GetNextFocusNode(FocusStep step, const WeakPtr<FocusHub>& currentFocusNode);
     WeakPtr<FocusHub> GetChildFocusNodeByIndex(int32_t tarMainIndex, int32_t tarGroupIndex);
     WeakPtr<FocusHub> ScrollAndFindFocusNode(int32_t nextIndex, int32_t curIndex, int32_t& nextIndexInGroup,

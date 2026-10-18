@@ -25,26 +25,20 @@
 
 namespace OHOS::Ace {
 
-std::unique_ptr<AnimatorModel> AnimatorModel::instance_ = nullptr;
-std::mutex AnimatorModel::mutex_;
-
 AnimatorModel* AnimatorModel::GetInstance()
 {
-    if (!instance_) {
-        std::lock_guard<std::mutex> lock(mutex_);
-        if (!instance_) {
 #ifdef NG_BUILD
-            instance_.reset(new Framework::AnimatorModelNG());
+    static Framework::AnimatorModelNG instance;
+    return &instance;
 #else
-            if (Container::IsCurrentUseNewPipeline()) {
-                instance_.reset(new Framework::AnimatorModelNG());
-            } else {
-                instance_.reset(new Framework::AnimatorModelImpl());
-            }
-#endif
-        }
+    if (Container::IsCurrentUseNewPipeline()) {
+        static Framework::AnimatorModelNG instance;
+        return &instance;
+    } else {
+        static Framework::AnimatorModelImpl instance;
+        return &instance;
     }
-    return instance_.get();
+#endif
 }
 
 } // namespace OHOS::Ace

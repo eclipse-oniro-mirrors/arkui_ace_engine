@@ -28,7 +28,7 @@ class TextPattern;
 
 using AIPreviewMenuErrorCallback =
     std::function<void(int32_t code, const std::string& name, const std::string& message)>;
-class PreviewMenuController : public virtual AceType {
+class PreviewMenuController : public AceType {
     DECLARE_ACE_TYPE(PreviewMenuController, AceType);
 
 public:

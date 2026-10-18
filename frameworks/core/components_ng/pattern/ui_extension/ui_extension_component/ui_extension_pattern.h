@@ -168,8 +168,12 @@ public:
     bool GetIsTransferringCaller();
     void SetIsTransferringCaller(bool isTransferringCaller);
     /* only for 1.2 end */
-    void SetDpiFollowStrategy(DpiFollowStrategy dpiFollowStrategy);
+    void SetDpiFollowStrategy(DpiFollowStrategy dpiFollowStrategy, bool isDpiFollowStrategySet = true);
     DpiFollowStrategy GetDpiFollowStrategy();
+    bool IsDpiFollowStrategySet()
+    {
+        return isDpiFollowStrategySet_;
+    }
     DpiFollowStrategy GetEffectiveDpiFollowStrategy();
     bool IsCompatibleOldVersion();
 
@@ -481,6 +485,7 @@ private:
     bool isFoldStatusChanged_ = false;
     bool isRotateStatusChanged_ = false;
     DpiFollowStrategy dpiFollowStrategy_ = DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI;
+    bool isDpiFollowStrategySet_ = false;
     WeakPtr<Pattern> weakSystemWindowScene_;
     SessionViewportConfig sessionViewportConfig_;
     bool viewportConfigChanged_ = false;

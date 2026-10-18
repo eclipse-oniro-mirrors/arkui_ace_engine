@@ -600,6 +600,20 @@ std::string PipelineContext::GetCurrentPageName()
     return url;
 }
 
+std::string PipelineContext::GetCurrentNavDestinationName()
+{
+    auto pageInfo = GetLastPageInfo();
+    CHECK_NULL_RETURN(pageInfo, "");
+    return GetNavDestinationPageName(pageInfo);
+}
+
+std::string PipelineContext::GetCurrentPageUrl()
+{
+    auto pageInfo = GetLastPageInfo();
+    CHECK_NULL_RETURN(pageInfo, "");
+    return pageInfo->GetPageUrl();
+}
+
 void PipelineContext::ReportSelectedText()
 {
     CHECK_NULL_VOID(selectOverlayManager_);
@@ -8132,6 +8146,9 @@ void PipelineContext::SetDisplayWindowRectInfo(const Rect& displayWindowRectInfo
         }
     }
     displayWindowRectInfo_ = displayWindowRectInfo;
+    if (displayWindowRectInfo.Width() > 0.0f && displayWindowRectInfo.Height() > 0.0f && window_) {
+        window_->SetWindowInfoInitialized(true);
+    }
 }
 
 void PipelineContext::SetIsTransFlag(bool result)

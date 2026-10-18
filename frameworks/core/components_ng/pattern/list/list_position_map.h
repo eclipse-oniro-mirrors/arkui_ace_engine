@@ -45,7 +45,7 @@ enum class ListPosMapUpdate {
     RE_CALCULATE,
 };
 
-class ACE_FORCE_EXPORT ListPositionMap : public virtual AceType {
+class ACE_FORCE_EXPORT ListPositionMap : public AceType {
     DECLARE_ACE_TYPE(ListPositionMap, AceType);
 public:
     ListPositionMap() = default;

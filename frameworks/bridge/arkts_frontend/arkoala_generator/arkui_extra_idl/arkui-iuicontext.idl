@@ -13,7 +13,6 @@
  * limitations under the License.
  */
 package arkui.component.idlize;
-import arkui.component.common.InputEventMonitor as InputEventMonitor;
 import arkui.component.common.InputEventListener as InputEventListener;
 import arkui.component.common.KeyEvent as KeyEvent;
 import arkui.component.Scroller as Scroller;
@@ -43,7 +42,7 @@ interface IUIContext {
     static void setCustomKeyboardContinueFeature(CustomKeyboardContinueFeature feature);
     static void setCustomCursor(image.PixelMap value, optional i32 focusX, optional i32 focusY);
     static void enableEventPassthrough((boolean or undefined) enabled, RawInputEventType eventType);
-    static InputEventMonitor addLocalInputEventMonitor(i32 eventMask, InputEventListener listener);
-    static void removeLocalInputEventMonitor(InputEventMonitor monitor);
+    static pointer addLocalInputEventMonitor(i32 eventMask, InputEventListener listener);
+    static void removeLocalInputEventMonitor(pointer monitor);
     static void setTextSelectionClearPolicy(TextSelectionClearPolicy policy);
 };

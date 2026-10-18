@@ -23,6 +23,7 @@
 #include "core/components_ng/pattern/rich_editor/style_manager.h"
 #include "core/components_ng/pattern/text/multiple_paragraph_layout_algorithm.h"
 #include "core/components_ng/pattern/text/paragraph_util.h"
+#include "core/components_ng/pattern/text_field/text_input_response_area.h"
 #include "core/components_ng/property/measure_utils.h"
 
 namespace OHOS::Ace::NG {
@@ -359,29 +360,25 @@ std::optional<SizeF> RichEditorLayoutAlgorithm::MeasureContent(
     ACE_SCOPED_TRACE("RichEditorMeasureContent");
     pManager_->Reset();
     SetPlaceholder(layoutWrapper);
-    MeasureCancelButton(layoutWrapper);
 
-    auto adjustedConstraint = contentConstraint;
-    if (GreatNotEqual(cancelButtonWidth_, 0.0f)) {
-        adjustedConstraint.maxSize.SetWidth(std::max(adjustedConstraint.maxSize.Width() - cancelButtonWidth_, 0.0f));
-        adjustedConstraint.minSize.SetWidth(std::max(adjustedConstraint.minSize.Width() - cancelButtonWidth_, 0.0f));
-        if (adjustedConstraint.selfIdealSize.Width()) {
-            adjustedConstraint.selfIdealSize.SetWidth(
-                std::max(adjustedConstraint.selfIdealSize.Width().value() - cancelButtonWidth_, 0.0f));
-        }
-    }
-    auto optionalTextSize = MeasureContentSize(adjustedConstraint, layoutWrapper);
+    // Align with TextInput: measure password response area first, then cancel button,
+    // matching GetAllResponseArea() ordering: { responseArea_, ..., cleanNodeResponseArea_ }.
+    auto newContentConstraint = contentConstraint;
+    MeasurePasswordResponseArea(layoutWrapper, newContentConstraint);
+    MeasureCancelButton(layoutWrapper, newContentConstraint);
+
+    auto optionalTextSize = MeasureContentSize(newContentConstraint, layoutWrapper);
     CHECK_NULL_RETURN(optionalTextSize.has_value(), {});
-    auto newContentConstraint = ReMeasureContent(optionalTextSize.value(), adjustedConstraint, layoutWrapper);
+    auto newReMeasureConstraint = ReMeasureContent(optionalTextSize.value(), newContentConstraint, layoutWrapper);
     HandleTextSizeWhenEmpty(layoutWrapper, optionalTextSize.value());
     SizeF res = optionalTextSize.value();
     res.AddHeight(spans_.empty() ? 0 : shadowOffset_);
     CHECK_NULL_RETURN(res.IsNonNegative(), {});
     UpdateRichTextRect(optionalTextSize.value(), layoutWrapper);
-    auto maxHeight = newContentConstraint.selfIdealSize.Height().value_or(newContentConstraint.maxSize.Height());
+    auto maxHeight = newReMeasureConstraint.selfIdealSize.Height().value_or(newReMeasureConstraint.maxSize.Height());
     auto contentHeight = std::min(res.Height(), maxHeight);
     auto contentWidth = IsContentWidthUnlimited() ?
-        MultipleParagraphLayoutAlgorithm::GetMaxMeasureSize(adjustedConstraint).Width() : res.Width();
+        MultipleParagraphLayoutAlgorithm::GetMaxMeasureSize(newContentConstraint).Width() : res.Width();
     auto layoutProperty = DynamicCast<TextLayoutProperty>(layoutWrapper->GetLayoutProperty());
     if (layoutProperty) {
         RelayoutShaderStyle(layoutProperty);
@@ -655,7 +652,9 @@ void RichEditorLayoutAlgorithm::UpdateFrameSizeWithLayoutPolicy(LayoutWrapper* l
     const auto& content = layoutWrapper->GetGeometryNode()->GetContent();
     CHECK_NULL_VOID(content);
     auto contentSize = content->GetRect().GetSize();
-    contentSize.SetWidth(contentSize.Width() + cancelButtonWidth_);
+    auto pattern = GetRichEditorPattern(layoutWrapper);
+    auto responseAreaWidth = pattern ? pattern->GetAllResponseAreaWidth() : 0.0f;
+    contentSize.SetWidth(contentSize.Width() + responseAreaWidth);
     const auto& padding = layoutProperty->CreatePaddingAndBorder();
     AddPaddingToSize(padding, contentSize);
     auto fixIdealSize = UpdateOptionSizeByCalcLayoutConstraint(OptionalSizeF(contentSize),
@@ -670,13 +669,7 @@ void RichEditorLayoutAlgorithm::LayoutCancelButton(LayoutWrapper* layoutWrapper)
 {
     auto pattern = GetRichEditorPattern(layoutWrapper);
     CHECK_NULL_VOID(pattern);
-    auto cleanNodeArea = pattern->GetCleanNodeResponseArea();
-    CHECK_NULL_VOID(cleanNodeArea);
-    auto frameNode = layoutWrapper->GetHostNode();
-    CHECK_NULL_VOID(frameNode);
-    auto childIndex = frameNode->GetChildIndex(cleanNodeArea->GetFrameNode());
-    float nodeWidth = 0.0f;
-    cleanNodeArea->Layout(layoutWrapper, childIndex, nodeWidth);
+    ResponseAreaMeasureHelper::LayoutArea(pattern->GetCleanNodeResponseArea(), layoutWrapper);
 }
 
 void RichEditorLayoutAlgorithm::Layout(LayoutWrapper* layoutWrapper)
@@ -688,20 +681,6 @@ void RichEditorLayoutAlgorithm::Layout(LayoutWrapper* layoutWrapper)
     CHECK_NULL_VOID(context);
     parentGlobalOffset_ = layoutWrapper->GetHostNode()->GetPaintRectOffsetNG() - context->GetRootRect().GetOffset();
     MultipleParagraphLayoutAlgorithm::Layout(layoutWrapper);
-
-    // RTL: the cancelButton is laid out on the left side (CleanNodeResponseArea::Layout isRTL branch).
-    // Since contentRect_ excludes the cancelButton width, shift the content offset right by the
-    // cancelButton width so text does not overlap the left-side cancelButton.
-    if (GreatNotEqual(cancelButtonWidth_, 0.0f)) {
-        auto layoutProperty = layoutWrapper->GetLayoutProperty();
-        if (layoutProperty && layoutProperty->GetNonAutoLayoutDirection() == TextDirection::RTL) {
-            const auto& content = layoutWrapper->GetGeometryNode()->GetContent();
-            if (content) {
-                auto offset = content->GetRect().GetOffset();
-                content->SetOffset(OffsetF(offset.GetX() + cancelButtonWidth_, offset.GetY()));
-            }
-        }
-    }
 
     const auto& children = layoutWrapper->GetAllChildrenWithBuild();
     auto contentLayoutWrapper = FindContentLayoutWrapper(children);
@@ -719,6 +698,9 @@ void RichEditorLayoutAlgorithm::Layout(LayoutWrapper* layoutWrapper)
             CounterLayout(layoutWrapper);
         }
     }
+    // Align with TextInput: layout password response area first, then cancel button,
+    // matching GetAllResponseArea() ordering.
+    LayoutPasswordResponseArea(layoutWrapper);
     LayoutCancelButton(layoutWrapper);
 }
 
@@ -747,40 +729,40 @@ RefPtr<LayoutWrapper> RichEditorLayoutAlgorithm::FindContentLayoutWrapper(const 
     return nullptr;
 }
 
-void RichEditorLayoutAlgorithm::MeasureCancelButton(LayoutWrapper* layoutWrapper)
+void RichEditorLayoutAlgorithm::MeasureCancelButton(LayoutWrapper* layoutWrapper, LayoutConstraintF& constraint)
 {
-    cancelButtonWidth_ = 0.0f;
     auto pattern = GetRichEditorPattern(layoutWrapper);
     CHECK_NULL_VOID(pattern);
-    auto cleanNodeArea = pattern->GetCleanNodeResponseArea();
-    CHECK_NULL_VOID(cleanNodeArea);
-    auto frameNode = layoutWrapper->GetHostNode();
-    CHECK_NULL_VOID(frameNode);
-    auto cleanFrameNode = cleanNodeArea->GetFrameNode();
-    CHECK_NULL_VOID(cleanFrameNode);
-    auto childIndex = frameNode->GetChildIndex(cleanFrameNode);
-    TAG_LOGD(AceLogTag::ACE_RICH_TEXT,
-        "MeasureCancelButton: childIndex=%{public}d, cleanNodeId=%{public}d, childrenCount=%{public}zu",
-        childIndex, cleanFrameNode->GetId(), frameNode->GetChildren().size());
-    auto iconSize = cleanNodeArea->Measure(layoutWrapper, childIndex);
-    cancelButtonWidth_ = iconSize.Width();
-    TAG_LOGD(AceLogTag::ACE_RICH_TEXT,
-        "MeasureCancelButton: iconSize w=%{public}f h=%{public}f, cancelButtonWidth_=%{public}f",
-        iconSize.Width(), iconSize.Height(), cancelButtonWidth_);
+    ResponseAreaMeasureHelper::MeasureAndDeductConstraint(
+        pattern->GetCleanNodeResponseArea(), layoutWrapper, constraint);
+}
+
+
+void RichEditorLayoutAlgorithm::MeasurePasswordResponseArea(
+    LayoutWrapper* layoutWrapper, LayoutConstraintF& constraint)
+{
+    auto pattern = GetRichEditorPattern(layoutWrapper);
+    CHECK_NULL_VOID(pattern);
+    ResponseAreaMeasureHelper::MeasureAndDeductConstraint(
+        pattern->GetPasswordResponseArea(), layoutWrapper, constraint);
+}
+
+void RichEditorLayoutAlgorithm::LayoutPasswordResponseArea(LayoutWrapper* layoutWrapper)
+{
+    auto pattern = GetRichEditorPattern(layoutWrapper);
+    CHECK_NULL_VOID(pattern);
+    ResponseAreaMeasureHelper::LayoutArea(pattern->GetPasswordResponseArea(), layoutWrapper);
 }
 
 OffsetF RichEditorLayoutAlgorithm::GetContentOffset(LayoutWrapper* layoutWrapper)
 {
     auto contentOffset = SetContentOffset(layoutWrapper);
-    // RTL: the cancelButton is laid out on the left side (CleanNodeResponseArea::Layout isRTL branch).
-    // Since contentRect_ excludes the cancelButton width, shift the content offset right by the
-    // cancelButton width so text does not overlap the left-side cancelButton.
-    if (GreatNotEqual(cancelButtonWidth_, 0.0f)) {
-        auto layoutProperty = layoutWrapper->GetLayoutProperty();
-        if (layoutProperty && layoutProperty->GetNonAutoLayoutDirection() == TextDirection::RTL) {
-            contentOffset.SetX(contentOffset.GetX() + cancelButtonWidth_);
-        }
-    }
+    // Apply RTL offset for all response areas in a single call with combined width,
+    // reducing geometry node writes from 2 (per-area) to 1 (total).
+    auto richPattern = GetRichEditorPattern(layoutWrapper);
+    float totalResponseAreaWidth = richPattern ? richPattern->GetAllResponseAreaWidth() : 0.0f;
+    contentOffset = ResponseAreaMeasureHelper::AdjustContentOffsetForRTL(
+        contentOffset, totalResponseAreaWidth, layoutWrapper);
     auto host = layoutWrapper->GetHostNode();
     CHECK_NULL_RETURN(host, contentOffset);
     auto pattern = host->GetPattern<RichEditorPattern>();

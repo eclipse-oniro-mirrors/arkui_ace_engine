@@ -634,6 +634,7 @@ void TabsModelNG::SetBarBackgroundColor(const Color& backgroundColor)
     auto tabsNode = AceType::DynamicCast<TabsNode>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
     CHECK_NULL_VOID(tabsNode);
     ACE_UPDATE_LAYOUT_PROPERTY(TabsLayoutProperty, BarBackgroundColor, backgroundColor);
+    ACE_UPDATE_LAYOUT_PROPERTY(TabsLayoutProperty, BarBackgroundColorForSideBar, backgroundColor);
     auto tabBarNode = AceType::DynamicCast<FrameNode>(tabsNode->GetTabBar());
     CHECK_NULL_VOID(tabBarNode);
     auto tabBarRenderContext = tabBarNode->GetRenderContext();
@@ -1005,12 +1006,16 @@ void TabsModelNG::SetFadingEdge(FrameNode* frameNode, bool fadingEdge)
     tabBarPaintProperty->UpdateFadingEdge(fadingEdge);
 }
 
-void TabsModelNG::SetBarBackgroundColor(FrameNode* frameNode, const Color& backgroundColor)
+void TabsModelNG::SetBarBackgroundColor(FrameNode* frameNode, const Color& backgroundColor,
+    bool updateForSideBar)
 {
     CHECK_NULL_VOID(frameNode);
     auto tabsNode = AceType::DynamicCast<TabsNode>(frameNode);
     CHECK_NULL_VOID(tabsNode);
     ACE_UPDATE_NODE_LAYOUT_PROPERTY(TabsLayoutProperty, BarBackgroundColor, backgroundColor, frameNode);
+    if (updateForSideBar) {
+        ACE_UPDATE_NODE_LAYOUT_PROPERTY(TabsLayoutProperty, BarBackgroundColorForSideBar, backgroundColor, frameNode);
+    }
     auto tabBarNode = AceType::DynamicCast<FrameNode>(tabsNode->GetTabBar());
     CHECK_NULL_VOID(tabBarNode);
     auto tabBarRenderContext = tabBarNode->GetRenderContext();
@@ -1053,7 +1058,8 @@ void TabsModelNG::SetSidebarSelectedBoardColor(FrameNode* frameNode, const Color
     ACE_UPDATE_NODE_LAYOUT_PROPERTY(TabsLayoutProperty, SidebarSelectedBoardColor, color, frameNode);
 }
 
-void TabsModelNG::SetBarBackgroundBlurStyle(FrameNode* frameNode, const BlurStyleOption& styleOption)
+void TabsModelNG::SetBarBackgroundBlurStyle(FrameNode* frameNode, const BlurStyleOption& styleOption,
+    bool updateForSideBar)
 {
     CHECK_NULL_VOID(frameNode);
     auto tabsNode = AceType::DynamicCast<TabsNode>(frameNode);
@@ -1061,6 +1067,9 @@ void TabsModelNG::SetBarBackgroundBlurStyle(FrameNode* frameNode, const BlurStyl
     auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
     CHECK_NULL_VOID(tabsPattern);
     tabsPattern->SetBarBlurStyleOption(styleOption);
+    if (updateForSideBar) {
+        tabsPattern->SetBarBlurStyleOptionForSideBar(styleOption);
+    }
     auto tabBarNode = AceType::DynamicCast<FrameNode>(tabsNode->GetTabBar());
     CHECK_NULL_VOID(tabBarNode);
     auto pipeline = tabBarNode->GetContext();
