@@ -404,6 +404,12 @@ ArkUI_ErrorCode OH_ArkUI_KeyEvent_SetType(ArkUI_UIInputEvent* event, ArkUI_KeyEv
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetType", "keyEvent is null");
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
     }
+    int32_t typeVal = static_cast<int32_t>(type);
+    if (typeVal < static_cast<int32_t>(ArkUI_KeyEventType::ARKUI_KEY_EVENT_UNKNOWN) ||
+        typeVal > static_cast<int32_t>(ArkUI_KeyEventType::ARKUI_KEY_EVENT_CLICK)) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetType", "type is out of range");
+        RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
+    }
     keyEvent->type = static_cast<ArkUI_Int32>(type);
     RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_NO_ERROR, ARKUI_ERROR_CODE_NO_ERROR);
 }
