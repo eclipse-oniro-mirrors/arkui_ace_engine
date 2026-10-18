@@ -3801,20 +3801,62 @@ void InitMouseEventFromObj(EcmaVM* vm, const Local<panda::ObjectRef>& eventObj, 
     mouseEvent.rawDeltaX = GetFloatProperty(vm, eventObj, "rawDeltaX");
     mouseEvent.rawDeltaY = GetFloatProperty(vm, eventObj, "rawDeltaY");
     auto pressedButtonsVal = eventObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "pressedButtons"));
-    if (pressedButtonsVal->IsArray(vm)) {
-        Local<panda::ArrayRef> pressedArray(pressedButtonsVal);
-        auto pressedLen = ArkTSUtils::GetArrayLength(vm, pressedArray);
-        for (size_t i = 0; i < pressedLen; ++i) {
-            auto item = panda::ArrayRef::GetValueAt(vm, pressedArray, i);
-            if (item->IsNumber()) {
-                int32_t button = static_cast<int32_t>(item->ToNumber(vm)->Value());
-                if (button >= 0 && button <= static_cast<int32_t>(MouseButton::TASK_BUTTON)) {
-                    mouseEvent.pressedButtonsArray.push_back(static_cast<MouseButton>(button));
-                }
-            }
+    if (!pressedButtonsVal->IsArray(vm)) {
+        return;
+    }
+    Local<panda::ArrayRef> pressedArray(pressedButtonsVal);
+    auto pressedLen = ArkTSUtils::GetArrayLength(vm, pressedArray);
+    for (size_t i = 0; i < pressedLen; ++i) {
+        auto item = panda::ArrayRef::GetValueAt(vm, pressedArray, i);
+        if (!item->IsNumber()) {
+            continue;
         }
+        int32_t button = static_cast<int32_t>(item->ToNumber(vm)->Value());
+        if (button < 0 || button > static_cast<int32_t>(MouseButton::TASK_BUTTON)) {
+            continue;
+        }
+        mouseEvent.pressedButtonsArray.push_back(static_cast<MouseButton>(button));
     }
 }
+
+void InitKeyEventFromObj(EcmaVM* vm, const Local<panda::ObjectRef>& eventObj, KeyEvent& keyEvent)
+{
+    auto keyCodeVal = GetIntProperty(vm, eventObj, "keyCode");
+    if (keyCodeVal >= static_cast<int32_t>(KeyCode::KEY_UNKNOWN) &&
+        keyCodeVal <= static_cast<int32_t>(KeyCode::KEY_WRIST_TURN)) {
+        keyEvent.code = static_cast<KeyCode>(keyCodeVal);
+    }
+    auto keyTextVal = eventObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "keyText"));
+    if (keyTextVal->IsString(vm)) {
+        keyEvent.key = keyTextVal->ToString(vm)->ToString(vm);
+    }
+    auto keyActionVal = GetIntProperty(vm, eventObj, "type");
+    if (keyActionVal >= static_cast<int32_t>(KeyAction::UNKNOWN) &&
+        keyActionVal <= static_cast<int32_t>(KeyAction::CANCEL)) {
+        keyEvent.action = static_cast<KeyAction>(keyActionVal);
+    }
+    auto keySourceVal = GetIntProperty(vm, eventObj, "keySource");
+    if (keySourceVal >= 0 && keySourceVal <= static_cast<int32_t>(SourceType::CROWN)) {
+        keyEvent.sourceType = static_cast<SourceType>(keySourceVal);
+    }
+    keyEvent.deviceId = GetIntProperty(vm, eventObj, "deviceId");
+    keyEvent.unicode = static_cast<uint32_t>(GetIntProperty(vm, eventObj, "unicode"));
+    keyEvent.metaKey = GetIntProperty(vm, eventObj, "metaKey");
+    auto intentionVal = GetIntProperty(vm, eventObj, "intentionCode");
+    if (intentionVal >= static_cast<int32_t>(KeyIntention::INTENTION_UNKNOWN) &&
+        intentionVal <= static_cast<int32_t>(KeyIntention::INTENTION_CAMERA)) {
+        keyEvent.keyIntention = static_cast<KeyIntention>(intentionVal);
+    }
+    keyEvent.numLock = GetBoolProperty(vm, eventObj, "isNumLockOn");
+    keyEvent.enableCapsLock = GetBoolProperty(vm, eventObj, "isCapsLockOn");
+    keyEvent.scrollLock = GetBoolProperty(vm, eventObj, "isScrollLockOn");
+    auto timestampVal = eventObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "timestamp"));
+    if (timestampVal->IsNumber()) {
+        keyEvent.timeStamp =
+            TimeStamp(std::chrono::nanoseconds(static_cast<int64_t>(timestampVal->ToNumber(vm)->Value())));
+    }
+}
+
 } // namespace
 
 ArkUINativeModuleValue FrameNodeBridge::DispatchInputEvent(ArkUIRuntimeCallInfo* runtimeCallInfo)
@@ -3888,40 +3930,7 @@ ArkUINativeModuleValue FrameNodeBridge::DispatchKeyEvent(ArkUIRuntimeCallInfo* r
     auto eventObj = eventArg->ToObject(vm);
 
     KeyEvent keyEvent;
-    auto keyCodeVal = GetIntProperty(vm, eventObj, "keyCode");
-    if (keyCodeVal >= static_cast<int32_t>(KeyCode::KEY_UNKNOWN) &&
-        keyCodeVal <= static_cast<int32_t>(KeyCode::KEY_WRIST_TURN)) {
-        keyEvent.code = static_cast<KeyCode>(keyCodeVal);
-    }
-    auto keyTextVal = eventObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "keyText"));
-    if (keyTextVal->IsString(vm)) {
-        keyEvent.key = keyTextVal->ToString(vm)->ToString(vm);
-    }
-    auto keyActionVal = GetIntProperty(vm, eventObj, "type");
-    if (keyActionVal >= static_cast<int32_t>(KeyAction::UNKNOWN) &&
-        keyActionVal <= static_cast<int32_t>(KeyAction::CANCEL)) {
-        keyEvent.action = static_cast<KeyAction>(keyActionVal);
-    }
-    auto keySourceVal = GetIntProperty(vm, eventObj, "keySource");
-    if (keySourceVal >= 0 && keySourceVal <= static_cast<int32_t>(SourceType::CROWN)) {
-        keyEvent.sourceType = static_cast<SourceType>(keySourceVal);
-    }
-    keyEvent.deviceId = GetIntProperty(vm, eventObj, "deviceId");
-    keyEvent.unicode = static_cast<uint32_t>(GetIntProperty(vm, eventObj, "unicode"));
-    keyEvent.metaKey = GetIntProperty(vm, eventObj, "metaKey");
-    auto intentionVal = GetIntProperty(vm, eventObj, "intentionCode");
-    if (intentionVal >= static_cast<int32_t>(KeyIntention::INTENTION_UNKNOWN) &&
-        intentionVal <= static_cast<int32_t>(KeyIntention::INTENTION_CAMERA)) {
-        keyEvent.keyIntention = static_cast<KeyIntention>(intentionVal);
-    }
-    keyEvent.numLock = GetBoolProperty(vm, eventObj, "isNumLockOn");
-    keyEvent.enableCapsLock = GetBoolProperty(vm, eventObj, "isCapsLockOn");
-    keyEvent.scrollLock = GetBoolProperty(vm, eventObj, "isScrollLockOn");
-    auto timestampVal = eventObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "timestamp"));
-    if (timestampVal->IsNumber()) {
-        keyEvent.timeStamp =
-            TimeStamp(std::chrono::nanoseconds(static_cast<int64_t>(timestampVal->ToNumber(vm)->Value())));
-    }
+    InitKeyEventFromObj(vm, eventObj, keyEvent);
 
     auto pipelineContext = frameNode->GetContext();
     CHECK_NULL_RETURN(pipelineContext, panda::JSValueRef::Undefined(vm));
