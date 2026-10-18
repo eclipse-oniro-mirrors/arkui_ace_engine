@@ -305,16 +305,19 @@ Color SheetPresentationPattern::GetTitleBarEffectBgColor(
         isDarkMode ? SHEET_TITLE_MASK_ALPHA_NON_SMOOTH_DARK : SHEET_TITLE_MASK_ALPHA_NON_SMOOTH_LIGHT);
 }
 
-void SheetPresentationPattern::UpdateStackModeZIndex()
+void SheetPresentationPattern::UpdateTitleBarZIndex()
 {
     auto layoutProperty = GetLayoutProperty<SheetPresentationProperty>();
     CHECK_NULL_VOID(layoutProperty);
     auto sheetStyle = layoutProperty->GetSheetStyleValue();
     bool titleUseStackMode = CheckTitleIsStackMode(sheetStyle);
     bool hasEffectNode = CheckTitleIsHasEffectNode(sheetStyle);
-    UpdateNodeZIndex(GetTitleBuilderNode(), titleUseStackMode || hasEffectNode ? SHEET_TITLE_STACK_Z_INDEX : 0);
-    UpdateNodeZIndex(GetSheetCloseIcon(), titleUseStackMode || hasEffectNode ? SHEET_TITLE_STACK_Z_INDEX : 0);
-    UpdateNodeZIndex(GetDragBarNode(), titleUseStackMode || hasEffectNode ? SHEET_TITLE_STACK_Z_INDEX : 0);
+    bool isSafeAreaPadding = sheetStyle.titleBarHoverMode.value_or(SheetTitleBarHoverMode::STANDARD) ==
+                             SheetTitleBarHoverMode::SAFE_AREA_PADDING;
+    bool needStackZIndex = titleUseStackMode || hasEffectNode || isSafeAreaPadding;
+    UpdateNodeZIndex(GetTitleBuilderNode(), needStackZIndex ? SHEET_TITLE_STACK_Z_INDEX : 0);
+    UpdateNodeZIndex(GetSheetCloseIcon(), needStackZIndex ? SHEET_TITLE_STACK_Z_INDEX : 0);
+    UpdateNodeZIndex(GetDragBarNode(), needStackZIndex ? SHEET_TITLE_STACK_Z_INDEX : 0);
 
     if (preScrollSelfHeight_.has_value() && preTitleStackMode_ != titleUseStackMode) {
         auto scrollNode = GetSheetScrollNode();
@@ -689,7 +692,7 @@ void SheetPresentationPattern::UpdateZIndexAndTitleEffectNode()
         preTitleBlurOptions_ = sheetStyle.titleBarBackgroundBlur;
     }
     if (sheetStyle.titleBarHoverMode.has_value() || currentIsTitleStackMode != preTitleStackMode_) {
-        UpdateStackModeZIndex();
+        UpdateTitleBarZIndex();
         preTitleStackMode_ = currentIsTitleStackMode;
     }
 }

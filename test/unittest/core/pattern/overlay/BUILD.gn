@@ -48,6 +48,7 @@ test_sources = [
   "sheet_presentation_test_five_ng.cpp",
   "sheet_presentation_test_four_ng.cpp",
   "sheet_presentation_test_ng.cpp",
+  "sheet_presentation_test_nine_ng.cpp",
   "sheet_presentation_test_seven_ng.cpp",
   "sheet_presentation_test_six_ng.cpp",
   "sheet_presentation_test_three_ng.cpp",

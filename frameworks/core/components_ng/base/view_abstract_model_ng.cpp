@@ -1223,6 +1223,26 @@ RefPtr<PipelineContext> ViewAbstractModelNG::GetSheetContext(NG::SheetStyle& she
     return context;
 }
 
+void ViewAbstractModelNG::ApplySheetImmersiveStrategyDefaults(
+    const RefPtr<PipelineContext>& context, NG::SheetStyle& sheetStyle)
+{
+    CHECK_NULL_VOID(context);
+    if (!context->IsImmersiveStrategySet(ImmersiveStrategy::BIND_SHEET_EXPAND_SAFE_AREA)) {
+        return;
+    }
+    if (!sheetStyle.titleBarHoverMode.has_value()) {
+        sheetStyle.titleBarHoverMode = SheetTitleBarHoverMode::SAFE_AREA_PADDING;
+    }
+    const auto hoverMode = sheetStyle.titleBarHoverMode.value();
+    if (!sheetStyle.titleBarBackgroundBlur.has_value() &&
+        hoverMode == SheetTitleBarHoverMode::SAFE_AREA_PADDING &&
+        context->GetImmersiveEffectMode() == ImmersiveEffectMode::ENABLED) {
+        sheetStyle.titleBarBackgroundBlur = NG::SheetTitleBarBackgroundBlurOptions {
+            .blurStyle = NG::SheetTitleBarBackgroundBlur::GRADIENT,
+        };
+    }
+}
+
 void ViewAbstractModelNG::BindSheet(bool isShow, std::function<void(const std::string&)>&& callback,
     std::function<void()>&& buildFunc, std::function<void()>&& titleBuildFunc, NG::SheetStyle& sheetStyle,
     std::function<void()>&& onAppear, std::function<void()>&& onDisappear, std::function<void()>&& shouldDismiss,
@@ -1250,6 +1270,7 @@ void ViewAbstractModelNG::BindSheet(bool isShow, std::function<void(const std::s
     };
     auto context = GetSheetContext(sheetStyle);
     CHECK_NULL_VOID(context);
+    ApplySheetImmersiveStrategyDefaults(context, sheetStyle);
     auto overlayManager = context->GetOverlayManager();
     auto* sheetModifier = NodeModifier::GetSheetManagerInnerModifier();
     CHECK_NULL_VOID(sheetModifier);
