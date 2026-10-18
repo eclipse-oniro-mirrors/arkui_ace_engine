@@ -430,6 +430,11 @@ ArkUI_ErrorCode OH_ArkUI_KeyEvent_SetKeyCode(ArkUI_UIInputEvent* event, int32_t 
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetKeyCode", "keyEvent is null");
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
     }
+    if (keyCode < static_cast<int32_t>(ArkUI_KeyCode::ARKUI_KEYCODE_UNKNOWN) ||
+        keyCode > static_cast<int32_t>(ArkUI_KeyCode::ARKUI_KEYCODE_BUTTON_THUMBR)) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetKeyCode", "keyCode is out of range");
+        RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
+    }
     keyEvent->keyCode = keyCode;
     RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_NO_ERROR, ARKUI_ERROR_CODE_NO_ERROR);
 }
@@ -472,6 +477,13 @@ ArkUI_ErrorCode OH_ArkUI_KeyEvent_SetKeySource(ArkUI_UIInputEvent* event, ArkUI_
     auto* keyEvent = reinterpret_cast<ArkUIKeyEvent*>(event->inputEvent);
     if (!keyEvent) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetKeySource", "keyEvent is null");
+        RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
+    }
+    int32_t keySourceVal = static_cast<int32_t>(keySource);
+    if (keySourceVal < static_cast<int32_t>(ArkUI_KeySourceType::ARKUI_KEY_SOURCE_TYPE_MOUSE) ||
+        keySourceVal > static_cast<int32_t>(ArkUI_KeySourceType::ARKUI_KEY_SOURCE_TYPE_JOYSTICK)) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetKeySource",
+            "keySource is out of range");
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
     }
     keyEvent->keySource = keySource;
@@ -564,6 +576,11 @@ ArkUI_ErrorCode OH_ArkUI_KeyEvent_SetPressedKeys(
             "pressedKeyCodes is null when length is positive");
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
     }
+    if (length == 0 && pressedKeyCodes) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetPressedKeys",
+            "pressedKeyCodes is not null when length is 0");
+        RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
+    }
     if (keyEvent->pressedKeyCodes) {
         delete[] keyEvent->pressedKeyCodes;
         keyEvent->pressedKeyCodes = nullptr;
@@ -593,6 +610,13 @@ ArkUI_ErrorCode OH_ArkUI_KeyEvent_SetKeyIntentionCode(
     auto* keyEvent = reinterpret_cast<ArkUIKeyEvent*>(event->inputEvent);
     if (!keyEvent) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetKeyIntentionCode", "keyEvent is null");
+        RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
+    }
+    int32_t intentionVal = static_cast<int32_t>(intentionCode);
+    if (intentionVal < static_cast<int32_t>(ArkUI_KeyIntension::ARKUI_KEY_INTENSION_UNKNOWN) ||
+        intentionVal > static_cast<int32_t>(ArkUI_KeyIntension::ARKUI_KEY_INTENTION_CAMERA)) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetKeyIntentionCode",
+            "intentionCode is out of range");
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
     }
     keyEvent->intentionCode = intentionCode;
