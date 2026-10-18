@@ -22,6 +22,7 @@
 #include "interfaces/native/node/node_model.h"
 #include "interfaces/native/node/config_manager.h"
 #include "interfaces/native/event/ui_input_event_impl.h"
+#include "frameworks/core/common/ace_application_info.h"
 #include "frameworks/core/interfaces/arkoala/arkoala_api.h"
 #include "interfaces/native/native_error_message_macros.h"
 
@@ -352,6 +353,8 @@ ArkUI_ErrorCode OH_ArkUI_KeyEvent_Create(ArkUI_UIInputEvent** event)
     uiInputEvent->inputEvent = keyEvent;
     uiInputEvent->eventTypeId = C_KEY_EVENT_ID;
     uiInputEvent->isCreatedByUser = true;
+    uiInputEvent->inputType = ARKUI_UIINPUTEVENT_TYPE_KEY;
+    uiInputEvent->apiVersion = static_cast<int32_t>(OHOS::Ace::PlatformVersion::VERSION_TWENTY);
     *event = uiInputEvent;
     RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_NO_ERROR, ARKUI_ERROR_CODE_NO_ERROR);
 }
@@ -363,7 +366,8 @@ ArkUI_ErrorCode OH_ArkUI_KeyEvent_Destroy(ArkUI_UIInputEvent** event)
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
     }
     if (!(*event)) {
-        RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_NO_ERROR, ARKUI_ERROR_CODE_NO_ERROR);
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_Destroy", "event is null");
+        RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
     }
     auto* uiInputEvent = *event;
     if (uiInputEvent->eventTypeId != C_KEY_EVENT_ID || !uiInputEvent->isCreatedByUser) {
@@ -543,6 +547,15 @@ ArkUI_ErrorCode OH_ArkUI_KeyEvent_SetPressedKeys(
     auto* keyEvent = reinterpret_cast<ArkUIKeyEvent*>(event->inputEvent);
     if (!keyEvent) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetPressedKeys", "keyEvent is null");
+        RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
+    }
+    if (length < 0) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetPressedKeys", "length is negative");
+        RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
+    }
+    if (length > 0 && !pressedKeyCodes) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetPressedKeys",
+            "pressedKeyCodes is null when length is positive");
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
     }
     if (keyEvent->pressedKeyCodes) {
