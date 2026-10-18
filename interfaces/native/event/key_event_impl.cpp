@@ -354,7 +354,7 @@ ArkUI_ErrorCode OH_ArkUI_KeyEvent_Create(ArkUI_UIInputEvent** event)
     uiInputEvent->eventTypeId = C_KEY_EVENT_ID;
     uiInputEvent->isCreatedByUser = true;
     uiInputEvent->inputType = ARKUI_UIINPUTEVENT_TYPE_KEY;
-    uiInputEvent->apiVersion = static_cast<int32_t>(OHOS::Ace::PlatformVersion::VERSION_TWENTY);
+    uiInputEvent->apiVersion = static_cast<int32_t>(OHOS::Ace::PlatformVersion::VERSION_TWENTY_SIX);
     *event = uiInputEvent;
     RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_NO_ERROR, ARKUI_ERROR_CODE_NO_ERROR);
 }
