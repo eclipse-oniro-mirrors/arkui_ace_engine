@@ -88,6 +88,8 @@ constexpr int32_t MEMORY_LEVEL_BACKGROUND_CRITICAL = 6;
 constexpr int32_t START_ANIMATION_INVALID_ANIMATIONS = 2;
 
 namespace {
+// Offset from the stack end to the destination immediately below the top.
+constexpr size_t SECOND_FROM_TOP_OFFSET = 2;
 constexpr int32_t MODE_SWITCH_ANIMATION_DURATION = 500; // ms
 const RefPtr<CubicCurve> MODE_SWITCH_CURVE = AceType::MakeRefPtr<CubicCurve>(0.2f, 0.2f, 0.1f, 1.0f);
 static const auto DIVIDER_DRAG_ANIMATION_CURVE = AceType::MakeRefPtr<InterpolatingSpring>(0.0f, 1.0f, 228.0f, 30.0f);
@@ -1648,8 +1650,8 @@ void NavigationPattern::InitializePageLevelSplitHome(
     // NAVIGATION uses the current split page as home.
     // DISPLACE uses the page directly below it as home.
     auto homeDest = topDest;
-    if (isDisplace && allDestNodes.size() >= 2) {
-        homeDest = allDestNodes[allDestNodes.size() - 2];
+    if (isDisplace && allDestNodes.size() >= SECOND_FROM_TOP_OFFSET) {
+        homeDest = allDestNodes[allDestNodes.size() - SECOND_FROM_TOP_OFFSET];
     }
 
     auto homePattern = homeDest->GetPattern<NavDestinationPattern>();
@@ -1695,8 +1697,8 @@ bool NavigationPattern::ShouldKeepPageLevelSplitHome(
             }
         }
         bool belowTopIsSplit = false;
-        if (allDestNodes.size() >= SECOND_ZINDEX_VALUE) {
-            auto belowDest = allDestNodes[allDestNodes.size() - SECOND_ZINDEX_VALUE];
+        if (allDestNodes.size() >= SECOND_FROM_TOP_OFFSET) {
+            auto belowDest = allDestNodes[allDestNodes.size() - SECOND_FROM_TOP_OFFSET];
             auto belowPattern = belowDest ? belowDest->GetPattern<NavDestinationPattern>() : nullptr;
             belowTopIsSplit = belowPattern && !forceSplitMgr->IsPageSplitDisabled(belowPattern->GetName());
         }
@@ -1717,7 +1719,7 @@ void NavigationPattern::ReanchorPageLevelSplitHome(
 {
     // In DISPLACE mode, a valid NavBar acts as the page below a sole destination.
     bool isDisplaceWithBelow = forceSplitMgr->GetBehaviorMode() == ForceSplitBehaviorMode::DISPLACE &&
-        allDestNodes.size() >= 2;
+        allDestNodes.size() >= SECOND_FROM_TOP_OFFSET;
     if (isDisplace && IsNavBarValid() && !isDisplaceWithBelow) {
         // Demote the previous destination home before switching to the NavBar home,
         // e.g. popping back to a single destination in DISPLACE mode restores the
@@ -1735,10 +1737,10 @@ void NavigationPattern::ReanchorPageLevelSplitHome(
     // destination in the consecutive split-active suffix of the stack.
     auto homeDest = allDestNodes.back();
     if (isDisplaceWithBelow) {
-        homeDest = allDestNodes[allDestNodes.size() - 2];
+        homeDest = allDestNodes[allDestNodes.size() - SECOND_FROM_TOP_OFFSET];
     } else if (!isDisplace) {
-        for (size_t index = allDestNodes.size(); index > 1; --index) {
-            auto previousDest = allDestNodes[index - 2];
+        for (size_t index = allDestNodes.size(); index >= SECOND_FROM_TOP_OFFSET; --index) {
+            auto previousDest = allDestNodes[index - SECOND_FROM_TOP_OFFSET];
             auto previousPattern = previousDest
                 ? previousDest->GetPattern<NavDestinationPattern>() : nullptr;
             if (!previousPattern ||
@@ -8080,8 +8082,7 @@ void NavigationPattern::UpdatePageLevelDisplaceColumns(
     const bool isNewPush = containsCurrent(preDest) &&
         !curWasInPrevious && navigationStack_->GetReplaceValue() == 0;
 
-    if (isNewPush &&
-        preDest->GetNavDestinationType() == NavDestinationType::DETAIL &&
+    if (isNewPush && preDest->GetNavDestinationType() == NavDestinationType::DETAIL &&
         curDest->GetNavDestinationType() == NavDestinationType::DETAIL &&
         preDest->GetColumnType() == ForceSplitPageColumnType::SECONDARY &&
         (navBarIsHome_ || (home && preDest->GetIndex() > home->GetIndex())) &&
@@ -8091,16 +8092,14 @@ void NavigationPattern::UpdatePageLevelDisplaceColumns(
 
     // When popping back to the original primary-column page, that page becomes the
     // new top of the secondary column; the home itself still retains its home identity.
-    if (curDest != home &&
-        curDest->GetNavDestinationType() == NavDestinationType::DETAIL) {
+    if (curDest != home && curDest->GetNavDestinationType() == NavDestinationType::DETAIL) {
         curDest->SetColumnType(ForceSplitPageColumnType::SECONDARY);
     }
 
     TAG_LOGI(AceLogTag::ACE_NAVIGATION,
         "pageLevelSplit stackDisplay columns, pre:%{public}d, cur:%{public}d, "
         "newPush:%{public}d, preColumn:%{public}d, curColumn:%{public}d",
-        preDest->GetId(), curDest->GetId(), isNewPush,
-        static_cast<int32_t>(preDest->GetColumnType()),
+        preDest->GetId(), curDest->GetId(), isNewPush, static_cast<int32_t>(preDest->GetColumnType()),
         static_cast<int32_t>(curDest->GetColumnType()));
 }
 
@@ -8231,7 +8230,8 @@ void NavigationPattern::TryForceSplitIfNeeded()
             pageLevelDisplaceSessionActive_ = true;
         }
     }
-    if (forceSplitSuccess == forceSplitSuccess_ && forceSplitUseNavBar_ == forceSplitUseNavBar && !pageLevelHomeChanged) {
+    if (forceSplitSuccess == forceSplitSuccess_ && forceSplitUseNavBar_ == forceSplitUseNavBar &&
+        !pageLevelHomeChanged) {
         // the pipeline state may have been update earlier by forceSplitManager
         // before navigation completed its first layout calculate
         context->SetIsCurrentInForceSplitMode(forceSplitSuccess_);

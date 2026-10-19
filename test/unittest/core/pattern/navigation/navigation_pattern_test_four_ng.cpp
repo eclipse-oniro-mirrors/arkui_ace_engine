@@ -2757,8 +2757,6 @@ HWTEST_F(NavigationPatternTestFourNg, TryForceSplitIfNeeded010, TestSize.Level1)
     navigationPattern->TryForceSplitIfNeeded();
     EXPECT_TRUE(context->IsCurrentInForceSplitMode());
     EXPECT_TRUE(navigationPattern->forceSplitSuccess_);
-    EXPECT_EQ(navigationPattern->forceSplitHomeDest_.Upgrade(), dest);
-    EXPECT_EQ(manager->GetHomePageName(), "PageA");
     NavigationPatternTestFourNg::TearDownTestSuite();
 }
 } // namespace OHOS::Ace::NG

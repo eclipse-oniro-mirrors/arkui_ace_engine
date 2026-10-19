@@ -91,7 +91,8 @@ void ParallelPageRouterManager::NotifyForceFullScreenChangeIfNeeded(
         forceSplitMgr->SetPageStack(CollectPageStackNames(curTopPageName));
         bool isPageSplitDisabled = forceSplitMgr->IsPageSplitDisabled(curTopPageName);
         isTopPageSplitDisabledChanged = forceSplitMgr->UpdateIsTopPageSplitDisabled(isPageSplitDisabled);
-        TAG_LOGI(AceLogTag::ACE_ROUTER, "pageLevelSplit notify: page=%{public}s, disabled=%{public}d, changed=%{public}d",
+        TAG_LOGI(AceLogTag::ACE_ROUTER,
+            "pageLevelSplit notify: page=%{public}s, disabled=%{public}d, changed=%{public}d",
             curTopPageName.c_str(), isPageSplitDisabled, isTopPageSplitDisabledChanged);
     }
     auto stageManager = AceType::DynamicCast<ParallelStageManager>(context->GetStageManager());
@@ -127,7 +128,7 @@ void ParallelPageRouterManager::TryEstablishPageLevelSplitHome(
     CHECK_NULL_VOID(pageNode);
 
     // Collect the effective stack by target page instance, preserving distinct instances of pages that share the
-    //same name. LoadPage collects the newly pushed page; StartPop collects the pop target page.
+    // same name. LoadPage collects the newly pushed page; StartPop collects the pop target page.
     std::vector<std::string> pageNames;
     std::vector<RefPtr<FrameNode>> effectivePages;
     RefPtr<FrameNode> belowTopPage;
@@ -165,7 +166,14 @@ void ParallelPageRouterManager::TryEstablishPageLevelSplitHome(
         return;
     }
 
-    // Falls through to the original home-page continuity check below.
+    UpdatePageLevelSplitHome(pageNode, belowTopPage, effectivePages, forceSplitMgr, context);
+}
+
+void ParallelPageRouterManager::UpdatePageLevelSplitHome(const RefPtr<FrameNode>& pageNode,
+    const RefPtr<FrameNode>& belowTopPage, const std::vector<RefPtr<FrameNode>>& effectivePages,
+    const RefPtr<ForceSplitManager>& forceSplitMgr, const RefPtr<PipelineContext>& context)
+{
+    // Keep the existing home while the split session remains continuous.
     if (!forceSplitMgr->GetHomePageName().empty()) {
         auto stageManager = context->GetStageManager();
         CHECK_NULL_VOID(stageManager);
