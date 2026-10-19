@@ -245,6 +245,7 @@ public:
     static void OnDetectedBlankScreen(const JSCallbackInfo& args);
     static void OnMonitoredBlankScreen(const JSCallbackInfo& args);
     static void BlankScreenDetectionConfig(const JSCallbackInfo& args);
+    static void EnableBlankScreenMonitor(const JSCallbackInfo& args);
     static void OnFirstScreenPaint(const JSCallbackInfo& args);
     static void OnTextSelectionChange(const JSCallbackInfo& args);
     static void EnableImageAnalyzer(const JSCallbackInfo& args);

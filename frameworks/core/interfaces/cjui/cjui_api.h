@@ -2200,6 +2200,8 @@ struct CJUIWebModifier {
     void (*setBlankScreenDetectionConfig)(
         ArkUINodeHandle node, const struct ArkUIBlankScreenDetectionConfigStruct* arkUITextDetectConfig);
     void (*resetBlankScreenDetectionConfig)(ArkUINodeHandle node);
+    void (*setEnableBlankScreenMonitor)(ArkUINodeHandle node, ArkUI_Bool value);
+    void (*resetEnableBlankScreenMonitor)(ArkUINodeHandle node);
     void (*setOnFirstScreenPaint)(ArkUINodeHandle node, void* callback);
     void (*resetOnFirstScreenPaint)(ArkUINodeHandle node);
     void (*setOnContextMenuShow)(ArkUINodeHandle node, void* callback);

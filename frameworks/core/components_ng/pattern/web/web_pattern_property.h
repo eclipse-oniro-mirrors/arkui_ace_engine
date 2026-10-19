@@ -101,6 +101,7 @@ struct WebPatternProperty {
     ACE_DEFINE_PROPERTY_GROUP_ITEM(EnableSelectedDataDetector, bool);
     ACE_DEFINE_PROPERTY_GROUP_ITEM(EnableFollowSystemFontWeight, bool);
     ACE_DEFINE_PROPERTY_GROUP_ITEM(BlankScreenDetectionConfig, BlankScreenDetectionConfig);
+    ACE_DEFINE_PROPERTY_GROUP_ITEM(WebBlankScreenMonitorEnabled, bool);
     ACE_DEFINE_PROPERTY_GROUP_ITEM(EnableImageAnalyzer, bool);
     ACE_DEFINE_PROPERTY_GROUP_ITEM(EnableAutoFill, bool);
     ACE_DEFINE_PROPERTY_GROUP_ITEM(EnableDefaultContextMenu, bool);

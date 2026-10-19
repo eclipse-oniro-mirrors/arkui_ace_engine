@@ -1607,6 +1607,7 @@ void WebDelegate::OnMonitoredBlankScreen(
     const std::string& url, int32_t reason, const std::string& extraMsg) {}
 void WebDelegate::UpdateBlankScreenDetectionConfig(bool enable, const std::vector<double>& detectionTiming,
     const std::vector<int32_t>& detectionMethods, int32_t contentfulNodesCountThreshold) {}
+void WebDelegate::UpdateWebBlankScreenMonitorEnabled(bool isEnabled) {}
 void WebDelegate::OnRequestAutofill(int32_t menuType) {}
 void WebDelegate::OnSwitchFreeMultiWindow(bool enable) {}
 void WebDelegate::RegisterFreeMultiWindowListener() {}

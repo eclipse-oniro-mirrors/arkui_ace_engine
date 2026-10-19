@@ -9602,6 +9602,10 @@ class ArkWebComponent extends ArkComponent {
     modifierWithKey(this._modifiersWithKeys, WebBlankScreenDetectionConfigModifier.identity, WebBlankScreenDetectionConfigModifier, detectConfig);
     return this;
   }
+  enableBlankScreenMonitor(enabled) {
+    modifierWithKey(this._modifiersWithKeys, WebEnableBlankScreenMonitorModifier.identity, WebEnableBlankScreenMonitorModifier, enabled);
+    return this;
+  }
   onFirstScreenPaint(callback) {
     modifierWithKey(this._modifiersWithKeys, WebOnFirstScreenPaintModifier.identity, WebOnFirstScreenPaintModifier, callback);
     return this;
@@ -11361,6 +11365,20 @@ class WebBlankScreenDetectionConfigModifier extends ModifierWithKey {
   }
 }
 WebBlankScreenDetectionConfigModifier.identity = Symbol('webBlankScreenDetectionConfigModifier');
+
+class WebEnableBlankScreenMonitorModifier extends ModifierWithKey {
+  constructor(value) {
+      super(value);
+  }
+  applyPeer(node, reset) {
+      if (reset) {
+          getUINativeModule().web.resetEnableBlankScreenMonitor(node);
+      } else {
+          getUINativeModule().web.setEnableBlankScreenMonitor(node, this.value);
+      }
+  }
+}
+WebEnableBlankScreenMonitorModifier.identity = Symbol('webEnableBlankScreenMonitorModifier');
 
 class WebOnFirstScreenPaintModifier extends ModifierWithKey {
   constructor(value) {

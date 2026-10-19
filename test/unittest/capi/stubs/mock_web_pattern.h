@@ -107,6 +107,7 @@ public:
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, BypassVsyncCondition, WebBypassVsyncCondition);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, AudioSessionType, WebAudioSessionType);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, BlankScreenDetectionConfig, BlankScreenDetectionConfig);
+    ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, WebBlankScreenMonitorEnabled, bool);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, RotateRenderEffect, WebRotateEffect);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, ForceEnableZoom, bool);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, FlingSpeedLimit, float);
@@ -290,6 +291,7 @@ private:
     void OnBypassVsyncConditionUpdate(WebBypassVsyncCondition condition) {}
     void OnAudioSessionTypeUpdate(WebAudioSessionType value) {}
     void OnBlankScreenDetectionConfigUpdate(const BlankScreenDetectionConfig &config) {}
+    void OnWebBlankScreenMonitorEnabledUpdate(bool enable) {}
     void OnRotateRenderEffectUpdate(WebRotateEffect effect) {}
     void OnForceEnableZoomUpdate(bool value) {}
     void OnFlingSpeedLimitUpdate(float value) {}

@@ -5745,6 +5745,54 @@ HWTEST_F(WebModelTestNg, SetBlankScreenDetectionConfig001, TestSize.Level1)
 }
 
 /**
+ * @tc.name: SetWebBlankScreenMonitorEnabled001
+ * @tc.desc: Test web_model_ng.cpp
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebModelTestNg, SetWebBlankScreenMonitorEnabled001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
+
+    WebModelNG webModelNG;
+    webModelNG.SetWebBlankScreenMonitorEnabled(false);
+    EXPECT_EQ(webPattern->GetOrCreateWebProperty()->CheckWebBlankScreenMonitorEnabled(false), true);
+    webModelNG.SetWebBlankScreenMonitorEnabled(true);
+    EXPECT_EQ(webPattern->GetOrCreateWebProperty()->CheckWebBlankScreenMonitorEnabled(true), true);
+#endif
+}
+
+/**
+ * @tc.name: SetWebBlankScreenMonitorEnabled002
+ * @tc.desc: Test web_model_ng.cpp
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebModelTestNg, SetWebBlankScreenMonitorEnabled002, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
+
+    WebModelNG webModelNG;
+    webModelNG.SetWebBlankScreenMonitorEnabled(AccessibilityManager::RawPtr(frameNode), false);
+    EXPECT_EQ(webPattern->GetOrCreateWebProperty()->CheckWebBlankScreenMonitorEnabled(false), true);
+    webModelNG.SetWebBlankScreenMonitorEnabled(AccessibilityManager::RawPtr(frameNode), true);
+    EXPECT_EQ(webPattern->GetOrCreateWebProperty()->CheckWebBlankScreenMonitorEnabled(true), true);
+#endif
+}
+
+/**
  * @tc.name: SetOnFirstScreenPaint001
  * @tc.desc: Test web_model_ng.cpp
  * @tc.type: FUNC

@@ -4996,6 +4996,7 @@ void WebPattern::OnModifyDone()
             delegate_->UpdateBlankScreenDetectionConfig(
                 config.enable, config.detectionTiming, config.detectionMethods, config.contentfulNodesCountThreshold);
         }
+        delegate_->UpdateWebBlankScreenMonitorEnabled(GetWebBlankScreenMonitorEnabledValue(false));
         delegate_->UpdateEnableImageAnalyzer(GetEnableImageAnalyzerValue(true));
         isAllowWindowOpenMethod_ = SystemProperties::GetAllowWindowOpenMethodEnabled();
         delegate_->UpdateAllowWindowOpenMethod(GetAllowWindowOpenMethodValue(isAllowWindowOpenMethod_));
@@ -5958,6 +5959,14 @@ void WebPattern::OnBlankScreenDetectionConfigUpdate(const BlankScreenDetectionCo
     if (delegate_) {
         delegate_->UpdateBlankScreenDetectionConfig(
             config.enable, config.detectionTiming, config.detectionMethods, config.contentfulNodesCountThreshold);
+    }
+}
+
+void WebPattern::OnWebBlankScreenMonitorEnabledUpdate(bool enable)
+{
+    RETURN_IF_CALLING_FROM_M132();
+    if (delegate_) {
+        delegate_->UpdateWebBlankScreenMonitorEnabled(enable);
     }
 }
 

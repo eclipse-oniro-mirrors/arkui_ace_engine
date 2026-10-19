@@ -2725,6 +2725,7 @@ void JSWeb::JSBind(BindingTarget globalObj)
     JSClass<JSWeb>::StaticMethod("onDetectedBlankScreen", &JSWeb::OnDetectedBlankScreen);
     JSClass<JSWeb>::StaticMethod("onMonitoredBlankScreen", &JSWeb::OnMonitoredBlankScreen);
     JSClass<JSWeb>::StaticMethod("blankScreenDetectionConfig", &JSWeb::BlankScreenDetectionConfig);
+    JSClass<JSWeb>::StaticMethod("enableBlankScreenMonitor", &JSWeb::EnableBlankScreenMonitor);
     JSClass<JSWeb>::StaticMethod("onFirstScreenPaint", &JSWeb::OnFirstScreenPaint);
     JSClass<JSWeb>::StaticMethod("onTextSelectionChange", &JSWeb::OnTextSelectionChange);
     JSClass<JSWeb>::StaticMethod("enableImageAnalyzer", &JSWeb::EnableImageAnalyzer);
@@ -8273,6 +8274,15 @@ void JSWeb::BlankScreenDetectionConfig(const JSCallbackInfo& args)
     }
     WebModel::GetInstance()->SetBlankScreenDetectionConfig(
         enable, detectionTiming, detectionMethods, contentfulNodesCountThreshold);
+}
+
+void JSWeb::EnableBlankScreenMonitor(const JSCallbackInfo& args)
+{
+    if (args.Length() < 1 || !args[0]->IsBoolean()) {
+        return;
+    }
+    bool isEnabled = args[0]->ToBoolean();
+    WebModel::GetInstance()->SetWebBlankScreenMonitorEnabled(isEnabled);
 }
 
 void JSWeb::EnableImageAnalyzer(const JSCallbackInfo& args)
