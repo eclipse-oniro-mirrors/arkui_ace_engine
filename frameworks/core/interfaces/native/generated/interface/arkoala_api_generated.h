@@ -27546,13 +27546,17 @@ typedef struct GENERATED_ArkUISelectModifier {
                                        const Opt_BlurStyle* value);
     void (*setControlSize)(Ark_NativePointer node,
                            const Opt_ControlSize* value);
-    void (*setTextModifier)(Ark_NativePointer node,
+    void (*setTextModifier)(Ark_VMContext vmContext,
+                            Ark_NativePointer node,
                             const Opt_TextModifier* value);
-    void (*setArrowModifier)(Ark_NativePointer node,
+    void (*setArrowModifier)(Ark_VMContext vmContext,
+                             Ark_NativePointer node,
                              const Opt_SymbolGlyphModifier* value);
-    void (*setOptionTextModifier)(Ark_NativePointer node,
+    void (*setOptionTextModifier)(Ark_VMContext vmContext,
+                                  Ark_NativePointer node,
                                   const Opt_TextModifier* value);
-    void (*setSelectedOptionTextModifier)(Ark_NativePointer node,
+    void (*setSelectedOptionTextModifier)(Ark_VMContext vmContext,
+                                          Ark_NativePointer node,
                                           const Opt_TextModifier* value);
     void (*setDividerStyle)(Ark_NativePointer node,
                             const Opt_DividerStyleOptions* value);
