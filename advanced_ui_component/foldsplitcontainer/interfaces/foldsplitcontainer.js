@@ -301,7 +301,9 @@ export class FoldSplitContainer extends ViewPU {
           return;
         }
         this.windowInstance = f4;
+        this.windowStatusType = f4.getWindowStatus();
         this.updatePreferredOrientation();
+        this.updateLayout();
         this.dealWindowStatusChange();
       });
     } catch (exception) {
@@ -312,7 +314,12 @@ export class FoldSplitContainer extends ViewPU {
   dealWindowStatusChange() {
     try {
       this.windowInstance.on('windowStatusChange', (i4) => {
+        const wasFullScreen = this.windowStatusType === window.WindowStatusType.FULL_SCREEN;
+        const isFullScreen = i4 === window.WindowStatusType.FULL_SCREEN;
         this.windowStatusType = i4;
+        if (wasFullScreen !== isFullScreen) {
+          this.updateLayout();
+        }
       });
     } catch (exception) {
       Logger.error('Failed windowInstance.on windowStatusChange. code:%{public}d, message:%{public}s',
@@ -465,7 +472,9 @@ export class FoldSplitContainer extends ViewPU {
       g1 = this.getExpandedRegionLayouts();
     } else if (this.foldStatus === display.FoldStatus.FOLD_STATUS_HALF_FOLDED) {
       const creaseRegion = this.getLiveFoldCreaseRegion();
-      if (this.isHorizontalCrease(creaseRegion)) {
+      const isHorizontal = this.isHorizontalCrease(creaseRegion);
+      const isFullScreen = this.windowStatusType === window.WindowStatusType.FULL_SCREEN;
+      if (isHorizontal && isFullScreen) {
         g1 = this.getHoverModeRegionLayouts(creaseRegion);
         t1 = true;
       } else {
