@@ -1116,4 +1116,27 @@ HWTEST_F(UIInputEventTest, PostClonedEventWithStrategy_MousePressedButtonsNull, 
     nodeAPI->disposeNode(node);
 }
 
+HWTEST_F(UIInputEventTest, ClonedEventSetActionType_NullEvent, TestSize.Level0)
+{
+    EXPECT_EQ(OH_ArkUI_ClonedEvent_SetActionType(nullptr, UI_TOUCH_EVENT_ACTION_DOWN), ARKUI_ERROR_CODE_PARAM_INVALID);
+}
+
+HWTEST_F(UIInputEventTest, CreateClonedPointerEvent_NullEvent, TestSize.Level0)
+{
+    ArkUI_UIInputEvent* clonedEvent = nullptr;
+    EXPECT_EQ(OH_ArkUI_PointerEvent_CreateClonedPointerEvent(nullptr, &clonedEvent), ARKUI_ERROR_CODE_PARAM_INVALID);
+    EXPECT_EQ(clonedEvent, nullptr);
+}
+
+HWTEST_F(UIInputEventTest, CreatePointerEvent_NullOutput, TestSize.Level0)
+{
+    EXPECT_EQ(OH_ArkUI_PointerEvent_CreatePointerEvent(nullptr, ARKUI_UIINPUTEVENT_TYPE_TOUCH),
+        ARKUI_ERROR_CODE_PARAM_INVALID);
+}
+
+HWTEST_F(UIInputEventTest, DestroyClonedPointerEvent_NullEvent, TestSize.Level0)
+{
+    EXPECT_EQ(OH_ArkUI_PointerEvent_DestroyClonedPointerEvent(nullptr), ARKUI_ERROR_CODE_PARAM_INVALID);
+}
+
 } // namespace OHOS::Ace
