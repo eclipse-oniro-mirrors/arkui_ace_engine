@@ -1232,8 +1232,9 @@ void NavigationGroupNode::CreateAnimationWithPush(const TransitionUnitInfo& preI
             PerfMonitor::GetPerfMonitor()->Start(PerfConstants::ABILITY_OR_PAGE_SWITCH, PerfActionType::LAST_UP, "");
 #endif
             TAG_LOGI(AceLogTag::ACE_NAVIGATION, "navigation push animation start");
-            if (!overlayPush && ((isNavBarOrHomeDestination && !pattern->IsForceSplitSuccess()) ||
-                (preNode && !preUseCustomTransition))) {
+            if (preNode && !overlayPush &&
+                ((isNavBarOrHomeDestination && !pattern->IsForceSplitSuccess()) ||
+                    (!isNavBarOrHomeDestination && !preUseCustomTransition))) {
                 auto nodeBase = AceType::DynamicCast<NavDestinationNodeBase>(preNode);
                 CHECK_NULL_VOID(nodeBase);
                 nodeBase->SystemTransitionPushEnd(false);
@@ -1673,12 +1674,21 @@ void NavigationGroupNode::TransitionWithPush(const RefPtr<FrameNode>& preNode, c
                     }
                     navBarOrHomeDestination->GetRenderContext()->SetOpacity(1.0f);
                 } else {
-                    auto preDestination = AceType::DynamicCast<NavDestinationGroupNode>(preNode);
-                    CHECK_NULL_VOID(preDestination);
                     if (overlayPush || preUseCustomTransition) {
-                        // no need handle pre node here. it will be handled in its custom transition callback.
+                        // Overlay does not animate preNode. Custom transitions own their cleanup.
                         break;
                     }
+
+                    auto preNavBar = AceType::DynamicCast<NavBarNode>(preNode);
+                    if (preNavBar) {
+                        // Force split keeps NavBar visible; only finalize its system transition.
+                        preNavBar->SystemTransitionPushFinish(false, preAnimationId);
+                        preNavBar->GetRenderContext()->SetOpacity(1.0f);
+                        break;
+                    }
+
+                    auto preDestination = AceType::DynamicCast<NavDestinationGroupNode>(preNode);
+                    CHECK_NULL_BREAK(preDestination);
                     if (preDestination->NeedRemoveInPush()) {
                         navigation->hideNodes_.emplace_back(std::make_pair(preDestination, true));
                         break;

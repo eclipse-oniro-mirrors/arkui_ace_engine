@@ -44,6 +44,7 @@ struct NavigateChangeInfo;
 }
 
 namespace OHOS::Ace::NG {
+class ForceSplitManager;
 class ToolbarManager;
 
 using namespace Framework;
@@ -633,6 +634,7 @@ public:
     void TryForceSplitIfNeeded();
     bool IsTopNavDestinationSplitDisabled();
     void TryEstablishPageLevelSplitHome();
+    void TryEstablishPageLevelDisplaceHome();
     void SwapNavDestinationAndProxyNode(bool needFireLifecycle);
     bool IsPrimaryNode(const RefPtr<NavDestinationGroupNode>& destNode) const;
     // Only used for the toolbar in 'container_modal' component
@@ -1082,6 +1084,19 @@ private:
         std::optional<std::pair<std::string, RefPtr<UINode>>> preTop,
         std::optional<std::pair<std::string, RefPtr<UINode>>> curTop);
     void AdjustNodeForStackSyncWhenStackDisplay();
+    std::vector<RefPtr<NavDestinationGroupNode>> CollectPageLevelSplitDestinations(
+        const RefPtr<ForceSplitManager>& forceSplitMgr, int32_t navigationId);
+    bool ShouldKeepPageLevelSplitSession(const std::vector<RefPtr<NavDestinationGroupNode>>& allDestNodes,
+        bool isDisplace, int32_t navigationId);
+    void InitializePageLevelSplitHome(const std::vector<RefPtr<NavDestinationGroupNode>>& allDestNodes,
+        const RefPtr<ForceSplitManager>& forceSplitMgr, bool isDisplace, int32_t navigationId);
+    bool ShouldKeepPageLevelSplitHome(const std::vector<RefPtr<NavDestinationGroupNode>>& allDestNodes,
+        const RefPtr<ForceSplitManager>& forceSplitMgr, bool isDisplace, int32_t navigationId);
+    void ReanchorPageLevelSplitHome(const std::vector<RefPtr<NavDestinationGroupNode>>& allDestNodes,
+        const RefPtr<ForceSplitManager>& forceSplitMgr, bool isDisplace);
+    void UpdatePageLevelDisplaceColumns(
+        const std::optional<std::pair<std::string, RefPtr<UINode>>>& preTop,
+        const std::optional<std::pair<std::string, RefPtr<UINode>>>& curTop);
 
     void AdjustNodeForLayout();
     void AdjustNodeForSplitDisplayReconfigure();
@@ -1180,6 +1195,10 @@ private:
     bool navBarIsHome_ = false;
     bool isTargetForceSplitNav_ = false;
     WeakPtr<NavDestinationGroupNode> forceSplitHomeDest_;
+    // Whether the stack has been synchronized since the last successful page-level split.
+    bool pageLevelSplitStackChanged_ = true;
+    // Logical DISPLACE sessions survive changes between split and stack display.
+    bool pageLevelDisplaceSessionActive_ = false;
     std::vector<WeakPtr<NavDestinationGroupNode>> prePrimaryNodes_;
     std::vector<WeakPtr<NavDestinationGroupNode>> primaryNodes_;
     std::vector<RefPtr<NavDestinationGroupNode>> primaryNodesToBeRemoved_;

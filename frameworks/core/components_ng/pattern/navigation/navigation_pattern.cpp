@@ -1342,6 +1342,15 @@ void NavigationPattern::NotifyForceFullScreenChangeIfNeeded(const std::vector<st
     }
     auto forceSplitMgr = context->GetForceSplitManager();
     CHECK_NULL_VOID(forceSplitMgr);
+
+    // With an explicit Navigation selector, only the target Navigation
+    // may update shared page-level split state.
+    if (forceSplitMgr->IsPageLevelSplitEnabled()) {
+        auto navManager = context->GetNavigationManager();
+        if (navManager && navManager->TargetIdOrDepthExists() && !GetIsTargetForceSplitNav()) {
+            return;
+        }
+    }
     auto isCurTopFullScreenPage = false;
     if (!allNames.empty()) {
         if (forceSplitMgr->IsPageLevelSplitEnabled()) {
@@ -1520,16 +1529,54 @@ void NavigationPattern::TryEstablishPageLevelSplitHome()
     if (!forceSplitMgr->IsPageLevelSplitEnabled()) {
         return;
     }
+
+    auto navManager = context->GetNavigationManager();
+    bool hasNavigationSelector = navManager && navManager->TargetIdOrDepthExists();
+    if (hasNavigationSelector) {
+        if (!GetIsTargetForceSplitNav()) {
+            return;
+        }
+        // Query inherited split policies using the target Navigation's own stack.
+        auto pathNames = navigationStack_->GetAllPathName();
+        forceSplitMgr->SetPageStack(
+            std::vector<std::string>(pathNames.begin(), pathNames.end()));
+    }
+    auto allDestNodes = CollectPageLevelSplitDestinations(forceSplitMgr, host->GetId());
+    if (allDestNodes.empty()) {
+        return;
+    }
+    const bool isDisplace = forceSplitMgr->GetBehaviorMode() == ForceSplitBehaviorMode::DISPLACE;
+    if (ShouldKeepPageLevelSplitSession(allDestNodes, isDisplace, host->GetId())) {
+        return;
+    }
+    // Initialize a new split session before checking home continuity in an active split.
+    if (!forceSplitSuccess_) {
+        InitializePageLevelSplitHome(allDestNodes, forceSplitMgr, isDisplace, host->GetId());
+        return;
+    }
+    if (ShouldKeepPageLevelSplitHome(allDestNodes, forceSplitMgr, isDisplace, host->GetId())) {
+        return;
+    }
+    ReanchorPageLevelSplitHome(allDestNodes, forceSplitMgr, isDisplace);
+}
+
+std::vector<RefPtr<NavDestinationGroupNode>> NavigationPattern::CollectPageLevelSplitDestinations(
+    const RefPtr<ForceSplitManager>& forceSplitMgr, int32_t navigationId)
+{
     auto topNavPath = navigationStack_->GetTopNavPath();
     if (!topNavPath.has_value()) {
-        return;
+        TAG_LOGI(AceLogTag::ACE_NAVIGATION, "pageLevelSplit home skip:emptyStack, nav:%{public}d", navigationId);
+        return {};
     }
     auto topDest = AceType::DynamicCast<NavDestinationGroupNode>(
         NavigationGroupNode::GetNavDestinationNode(topNavPath->second));
     auto topPattern = topDest ? topDest->GetPattern<NavDestinationPattern>() : nullptr;
-    CHECK_NULL_VOID(topPattern);
+    CHECK_NULL_RETURN(topPattern, {});
     if (forceSplitMgr->IsPageSplitDisabled(topPattern->GetName())) {
-        return;
+        TAG_LOGI(AceLogTag::ACE_NAVIGATION,
+            "pageLevelSplit home skip:topSplitDisabled, nav:%{public}d, top:%{public}s, dest:%{public}d",
+            navigationId, topPattern->GetName().c_str(), topDest->GetId());
+        return {};
     }
     std::vector<RefPtr<NavDestinationGroupNode>> allDestNodes;
     const auto& curList = navigationStack_->GetAllNavDestinationNodes();
@@ -1541,15 +1588,102 @@ void NavigationPattern::TryEstablishPageLevelSplitHome()
         }
     }
     if (allDestNodes.empty() || allDestNodes.back() != topDest) {
+        TAG_LOGI(AceLogTag::ACE_NAVIGATION,
+            "pageLevelSplit home skip:stackTopMismatch, nav:%{public}d, top:%{public}d, size:%{public}zu",
+            navigationId, topDest->GetId(), allDestNodes.size());
+        return {};
+    }
+    return allDestNodes;
+}
+
+bool NavigationPattern::ShouldKeepPageLevelSplitSession(
+    const std::vector<RefPtr<NavDestinationGroupNode>>& allDestNodes, bool isDisplace, int32_t navigationId)
+{
+    auto existingHome = forceSplitHomeDest_.Upgrade();
+    const bool existingHomeInStack = existingHome &&
+        std::find(allDestNodes.begin(), allDestNodes.end(), existingHome) != allDestNodes.end();
+
+    const bool keepDisplaceSession = isDisplace && pageLevelDisplaceSessionActive_;
+
+    const bool keepNavBarHome = navBarIsHome_ && IsNavBarValid() &&
+        (forceSplitSuccess_ || !pageLevelSplitStackChanged_ || keepDisplaceSession);
+
+    const bool keepDestinationHome = existingHomeInStack &&
+        (!pageLevelSplitStackChanged_ || keepDisplaceSession);
+
+    if (keepNavBarHome || keepDestinationHome) {
+        TAG_LOGI(AceLogTag::ACE_NAVIGATION,
+            "pageLevelSplit home keep:existingSession, nav:%{public}d, "
+            "stackChanged:%{public}d, split:%{public}d, navBarHome:%{public}d, home:%{public}d",
+            navigationId, pageLevelSplitStackChanged_, forceSplitSuccess_,
+            navBarIsHome_, existingHome ? existingHome->GetId() : -1);
+        return true;
+    }
+    return false;
+}
+
+void NavigationPattern::InitializePageLevelSplitHome(
+    const std::vector<RefPtr<NavDestinationGroupNode>>& allDestNodes,
+    const RefPtr<ForceSplitManager>& forceSplitMgr, bool isDisplace, int32_t navigationId)
+{
+    const auto& curList = navigationStack_->GetAllNavDestinationNodes();
+    auto topDest = allDestNodes.back();
+    auto previousHome = forceSplitHomeDest_.Upgrade();
+    // Use the NavBar only when the current destination is the sole stack entry and the NavBar is valid.
+    const bool useNavBar = curList.size() == 1 &&
+        allDestNodes.size() == 1 && IsNavBarValid();
+    if (useNavBar) {
+        if (previousHome) {
+            previousHome->SetNavDestinationType(NavDestinationType::DETAIL);
+        }
+        navBarIsHome_ = true;
+        forceSplitHomeDest_ = nullptr;
+
+        TAG_LOGI(AceLogTag::ACE_NAVIGATION,
+            "pageLevelSplit enterSplit home:navBar, nav:%{public}d, top:%{public}d",
+            navigationId, topDest->GetId());
         return;
     }
 
+    // NAVIGATION uses the current split page as home.
+    // DISPLACE uses the page directly below it as home.
+    auto homeDest = topDest;
+    if (isDisplace && allDestNodes.size() >= 2) {
+        homeDest = allDestNodes[allDestNodes.size() - 2];
+    }
+
+    auto homePattern = homeDest->GetPattern<NavDestinationPattern>();
+    CHECK_NULL_VOID(homePattern);
+
+    if (previousHome && previousHome != homeDest) {
+        previousHome->SetNavDestinationType(NavDestinationType::DETAIL);
+    }
+    homeDest->SetNavDestinationType(NavDestinationType::HOME);
+    forceSplitHomeDest_ = WeakPtr(homeDest);
+    navBarIsHome_ = false;
+    forceSplitMgr->SetHomePageName(homePattern->GetName());
+
+    TAG_LOGI(AceLogTag::ACE_NAVIGATION,
+        "pageLevelSplit enterSplit home:destination, nav:%{public}d, mode:%{public}d, "
+        "size:%{public}zu, home:%{public}d, page:%{public}s, top:%{public}d",
+        navigationId, static_cast<int32_t>(forceSplitMgr->GetBehaviorMode()),
+        allDestNodes.size(), homeDest->GetId(),
+        homePattern->GetName().c_str(), topDest->GetId());
+}
+
+bool NavigationPattern::ShouldKeepPageLevelSplitHome(
+    const std::vector<RefPtr<NavDestinationGroupNode>>& allDestNodes,
+    const RefPtr<ForceSplitManager>& forceSplitMgr, bool isDisplace, int32_t navigationId)
+{
+    // Preserve a valid NavBar home in an active DISPLACE split.
+    if (isDisplace && navBarIsHome_ && IsNavBarValid()) {
+        return true;
+    }
     if (!forceSplitMgr->GetHomePageName().empty()) {
         // Session continuity: keep the established home only when it is still in the
         // nav destination stack and the page directly below the top is also
         // split-active, so popping back into a split page restores [home | detail].
-        // when a non-split page sits below the top, split is freshly activated from
-        // a full-screen excursion and the current top starts a new session as home.
+        // A non-split page below the top requires selecting a new session home.
         auto homeDest = forceSplitHomeDest_.Upgrade();
         bool homeInStack = false;
         if (homeDest) {
@@ -1562,26 +1696,66 @@ void NavigationPattern::TryEstablishPageLevelSplitHome()
         }
         bool belowTopIsSplit = false;
         if (allDestNodes.size() >= SECOND_ZINDEX_VALUE) {
-            auto belowDest = allDestNodes[allDestNodes.size() -SECOND_ZINDEX_VALUE];
+            auto belowDest = allDestNodes[allDestNodes.size() - SECOND_ZINDEX_VALUE];
             auto belowPattern = belowDest ? belowDest->GetPattern<NavDestinationPattern>() : nullptr;
             belowTopIsSplit = belowPattern && !forceSplitMgr->IsPageSplitDisabled(belowPattern->GetName());
         }
+        TAG_LOGI(AceLogTag::ACE_NAVIGATION,
+            "pageLevelSplit home continuity, nav:%{public}d, homeInStack:%{public}d, belowTopSplit:%{public}d, "
+            "action:%{public}s", navigationId, homeInStack, belowTopIsSplit,
+            homeInStack && belowTopIsSplit ? "keep" : "reanchor");
         if (homeInStack && belowTopIsSplit) {
-            return;
+            return true;
         }
-        // home popped out or fresh activation from full-screen: re-anchor below
     }
-    // NAVIGATION: current B is home -> [B | empty].
-    // DISPLACE: page A directly below B is home -> [A | B].
-    auto homeDest = topDest;
-    if (forceSplitMgr->GetBehaviorMode() == ForceSplitBehaviorMode::DISPLACE &&
-        allDestNodes.size() >= 2) {
+    return false;
+}
+
+void NavigationPattern::ReanchorPageLevelSplitHome(
+    const std::vector<RefPtr<NavDestinationGroupNode>>& allDestNodes,
+    const RefPtr<ForceSplitManager>& forceSplitMgr, bool isDisplace)
+{
+    // In DISPLACE mode, a valid NavBar acts as the page below a sole destination.
+    bool isDisplaceWithBelow = forceSplitMgr->GetBehaviorMode() == ForceSplitBehaviorMode::DISPLACE &&
+        allDestNodes.size() >= 2;
+    if (isDisplace && IsNavBarValid() && !isDisplaceWithBelow) {
+        // Demote the previous destination home before switching to the NavBar home,
+        // e.g. popping back to a single destination in DISPLACE mode restores the
+        // navBar as home and the old home dest returns to the right column.
+        auto preHome = forceSplitHomeDest_.Upgrade();
+        if (preHome) {
+            preHome->SetNavDestinationType(NavDestinationType::DETAIL);
+        }
+        navBarIsHome_ = true;
+        forceSplitHomeDest_ = nullptr;
+        return;
+    }
+
+    // DISPLACE selects the page below the top; NAVIGATION selects the earliest
+    // destination in the consecutive split-active suffix of the stack.
+    auto homeDest = allDestNodes.back();
+    if (isDisplaceWithBelow) {
         homeDest = allDestNodes[allDestNodes.size() - 2];
+    } else if (!isDisplace) {
+        for (size_t index = allDestNodes.size(); index > 1; --index) {
+            auto previousDest = allDestNodes[index - 2];
+            auto previousPattern = previousDest
+                ? previousDest->GetPattern<NavDestinationPattern>() : nullptr;
+            if (!previousPattern ||
+                forceSplitMgr->IsPageSplitDisabled(previousPattern->GetName())) {
+                break;
+            }
+            homeDest = previousDest;
+        }
     }
 
     auto homePattern = homeDest ? homeDest->GetPattern<NavDestinationPattern>() : nullptr;
     CHECK_NULL_VOID(homePattern);
 
+    auto preHome = forceSplitHomeDest_.Upgrade();
+    if (preHome && preHome != homeDest) {
+        preHome->SetNavDestinationType(NavDestinationType::DETAIL);
+    }
     homeDest->SetNavDestinationType(NavDestinationType::HOME);
     forceSplitHomeDest_ = WeakPtr(homeDest);
     navBarIsHome_ = false;
@@ -1591,6 +1765,11 @@ void NavigationPattern::TryEstablishPageLevelSplitHome()
 void NavigationPattern::UpdateNavPathList()
 {
     CHECK_NULL_VOID(navigationStack_);
+    auto splitContext = GetContext();
+    auto splitManager = splitContext ? splitContext->GetForceSplitManager() : nullptr;
+    if (splitManager && splitManager->IsPageLevelSplitEnabled()) {
+        pageLevelSplitStackChanged_ = true;
+    }
     auto pathNames = navigationStack_->GetAllPathName();
     NotifyForceFullScreenChangeIfNeeded(pathNames);
     auto indexes = navigationStack_->GetAllPathIndex();
@@ -7859,6 +8038,72 @@ void NavigationPattern::AdjustNodeForStackSyncWhenSplitDisplay(
     UpdateSplitDisplayDestinationVisibility(navNode, deferredTransitionNode);
 }
 
+void NavigationPattern::UpdatePageLevelDisplaceColumns(
+    const std::optional<std::pair<std::string, RefPtr<UINode>>>& preTop,
+    const std::optional<std::pair<std::string, RefPtr<UINode>>>& curTop)
+{
+    if (!pageLevelDisplaceSessionActive_ || !preTop || !curTop) {
+        return;
+    }
+    CHECK_NULL_VOID(navigationStack_);
+
+    auto preDest = AceType::DynamicCast<NavDestinationGroupNode>(
+        NavigationGroupNode::GetNavDestinationNode(preTop->second));
+    auto curDest = AceType::DynamicCast<NavDestinationGroupNode>(
+        NavigationGroupNode::GetNavDestinationNode(curTop->second));
+    CHECK_NULL_VOID(preDest);
+    CHECK_NULL_VOID(curDest);
+    if (preDest == curDest) {
+        return;
+    }
+
+    const auto& current = navigationStack_->GetAllNavDestinationNodes();
+    auto containsCurrent = [&current](const RefPtr<NavDestinationGroupNode>& target) {
+        return std::any_of(current.begin(), current.end(), [&target](const auto& item) {
+            return NavigationGroupNode::GetNavDestinationNode(item.second) == target;
+        });
+    };
+
+    auto home = forceSplitHomeDest_.Upgrade();
+    if (!navBarIsHome_ && (!home || !containsCurrent(home))) {
+        pageLevelDisplaceSessionActive_ = false;
+        return;
+    }
+
+    // Use node instances saved before the sync for comparison to avoid confusing pages that share the same name.
+    const auto& previous = GetAllNavDestinationNodesPrev();
+    const bool curWasInPrevious = std::any_of(previous.begin(), previous.end(),
+        [&curTop](const auto& item) {
+            return item.first == curTop->first &&
+                item.second.Upgrade() == curTop->second;
+        });
+    const bool isNewPush = containsCurrent(preDest) &&
+        !curWasInPrevious && navigationStack_->GetReplaceValue() == 0;
+
+    if (isNewPush &&
+        preDest->GetNavDestinationType() == NavDestinationType::DETAIL &&
+        curDest->GetNavDestinationType() == NavDestinationType::DETAIL &&
+        preDest->GetColumnType() == ForceSplitPageColumnType::SECONDARY &&
+        (navBarIsHome_ || (home && preDest->GetIndex() > home->GetIndex())) &&
+        IsTransitionShouldMovePageToPrimary(preDest, curDest)) {
+        preDest->SetColumnType(ForceSplitPageColumnType::PRIMARY);
+    }
+
+    // When popping back to the original primary-column page, that page becomes the
+    // new top of the secondary column; the home itself still retains its home identity.
+    if (curDest != home &&
+        curDest->GetNavDestinationType() == NavDestinationType::DETAIL) {
+        curDest->SetColumnType(ForceSplitPageColumnType::SECONDARY);
+    }
+
+    TAG_LOGI(AceLogTag::ACE_NAVIGATION,
+        "pageLevelSplit stackDisplay columns, pre:%{public}d, cur:%{public}d, "
+        "newPush:%{public}d, preColumn:%{public}d, curColumn:%{public}d",
+        preDest->GetId(), curDest->GetId(), isNewPush,
+        static_cast<int32_t>(preDest->GetColumnType()),
+        static_cast<int32_t>(curDest->GetColumnType()));
+}
+
 void NavigationPattern::AdjustNodeForStackSyncWhenStackDisplay()
 {
     // Leaving split display only restores the physical node tree and logical stack cache.
@@ -7904,13 +8149,42 @@ void NavigationPattern::AdjustNodeForStackSync(
     CHECK_NULL_VOID(context);
     auto forceSplitMgr = context->GetForceSplitManager();
     CHECK_NULL_VOID(forceSplitMgr);
+    auto host = AceType::DynamicCast<NavigationGroupNode>(GetHost());
+    if (forceSplitMgr->IsPageLevelSplitEnabled() && navigationStack_) {
+        TAG_LOGI(AceLogTag::ACE_NAVIGATION,
+            "pageLevelSplit stackSync, nav:%{public}d, pre:%{public}s, cur:%{public}s, "
+            "previousSplit:%{public}d, useNavBar:%{public}d, canPushPrimary:%{public}d",
+            host ? host->GetId() : -1, preTop ? preTop->first.c_str() : "NA",
+            curTop ? curTop->first.c_str() : "NA", forceSplitSuccess_, forceSplitUseNavBar_,
+            forceSplitMgr->CanPushPageToPrimary());
+        LogPageLevelSplitStack("beforeStackSync", host, navigationStack_->GetAllNavDestinationNodes());
+    }
     if (!forceSplitMgr->CanPushPageToPrimary()) {
         SwapNavDestinationAndProxyNode(false);
+        if (navigationStack_) {
+            LogPageLevelSplitStack("afterProxySwap", host, navigationStack_->GetAllNavDestinationNodes());
+        }
         return;
     }
+    // Page-level policy takes precedence over the previous display state.
+    const bool pageLevelDisplace = forceSplitMgr->IsPageLevelSplitEnabled() &&
+    forceSplitMgr->GetBehaviorMode() == ForceSplitBehaviorMode::DISPLACE;
+
+    if (forceSplitMgr->IsPageLevelSplitEnabled() &&
+        IsTopNavDestinationSplitDisabled()) {
+        if (pageLevelDisplace) {
+            pageLevelDisplaceSessionActive_ = false;
+        }
+        AdjustNodeForStackSyncWhenStackDisplay();
+        return;
+    }
+
     if (forceSplitSuccess_) {
         AdjustNodeForStackSyncWhenSplitDisplay(preTop, curTop);
     } else {
+        if (pageLevelDisplace) {
+            UpdatePageLevelDisplaceColumns(preTop, curTop);
+        }
         AdjustNodeForStackSyncWhenStackDisplay();
     }
 }
@@ -7933,6 +8207,10 @@ void NavigationPattern::TryForceSplitIfNeeded()
     bool forceSplitUseNavBar = false;
     auto forceSplitMgr = context->GetForceSplitManager();
     CHECK_NULL_VOID(forceSplitMgr);
+
+    const bool pageLevelSplit = forceSplitMgr->IsPageLevelSplitEnabled();
+    auto previousHome = forceSplitHomeDest_.Upgrade();
+    const bool previousNavBarIsHome = navBarIsHome_;
     UpdateCanForceSplitLayout();
     if (forceSplitMgr->IsForceSplitEnable(false) && !isTopFullScreenPage_) {
         // page-level split: ensure the session home exists before computing the layout
@@ -7945,7 +8223,18 @@ void NavigationPattern::TryForceSplitIfNeeded()
             "navBarIsHome:%{public}d, forceSplitSuccess:%{public}d, forceSplitUseNavBar:%{public}d",
             isNavBarValid, navBarIsHome_, forceSplitSuccess, forceSplitUseNavBar);
     }
-    if (forceSplitSuccess == forceSplitSuccess_ && forceSplitUseNavBar_ == forceSplitUseNavBar) {
+    const bool pageLevelHomeChanged = pageLevelSplit && (previousHome != forceSplitHomeDest_.Upgrade() ||
+        previousNavBarIsHome != navBarIsHome_);
+    if (forceSplitMgr->IsPageLevelSplitEnabled() && forceSplitSuccess) {
+        pageLevelSplitStackChanged_ = false;
+        if (forceSplitMgr->GetBehaviorMode() == ForceSplitBehaviorMode::DISPLACE) {
+            pageLevelDisplaceSessionActive_ = true;
+        }
+    }
+    if (forceSplitSuccess == forceSplitSuccess_ && forceSplitUseNavBar_ == forceSplitUseNavBar && !pageLevelHomeChanged) {
+        // the pipeline state may have been update earlier by forceSplitManager
+        // before navigation completed its first layout calculate
+        context->SetIsCurrentInForceSplitMode(forceSplitSuccess_);
         return;
     }
     forceSplitSuccess_ = forceSplitSuccess;
@@ -7962,8 +8251,20 @@ bool NavigationPattern::IsTopNavDestinationSplitDisabled()
     auto forceSplitMgr = context->GetForceSplitManager();
     CHECK_NULL_RETURN(forceSplitMgr, false);
     CHECK_NULL_RETURN(navigationStack_, false);
+
+    // Page policy cannot enable split for a Navigation excluded by the selector.
+    if (forceSplitMgr->IsPageLevelSplitEnabled()) {
+        auto navManager = context->GetNavigationManager();
+        if (navManager && navManager->TargetIdOrDepthExists() && !GetIsTargetForceSplitNav()) {
+            return true;
+        }
+    }
+
     auto pathNames = navigationStack_->GetAllPathName();
     if (pathNames.empty()) {
+        if (forceSplitMgr->IsPageLevelSplitEnabled()) {
+            TAG_LOGI(AceLogTag::ACE_NAVIGATION, "pageLevelSplit topPolicy emptyStack, splitDisabled:1");
+        }
         return forceSplitMgr->IsPageLevelSplitEnabled();
     }
     // sync the nav destination stack for upstream inheritance queries

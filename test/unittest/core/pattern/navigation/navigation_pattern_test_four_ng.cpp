@@ -2621,6 +2621,9 @@ HWTEST_F(NavigationPatternTestFourNg, TryForceSplitIfNeeded008, TestSize.Level1)
     manager->pageSplitOptions_ = { { "PageA", true } };
     manager->SetHomePageName("");
     manager->pageStack_.clear();
+    auto navManager = context->GetNavigationManager();
+    ASSERT_NE(navManager, nullptr);
+    navManager->SetForceSplitNavigationId("target");
 
     auto dest = NavDestinationGroupNode::GetOrCreateGroupNode(V2::NAVDESTINATION_VIEW_ETS_TAG,
         ElementRegister::GetInstance()->MakeUniqueId(), []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
@@ -2630,6 +2633,7 @@ HWTEST_F(NavigationPatternTestFourNg, TryForceSplitIfNeeded008, TestSize.Level1)
     navigationStack->navPathList_.push_back({ "PageA", dest });
     navigationPattern->forceSplitHomeDest_ = nullptr;
 
+    navigationNode->GetLayoutProperty<NavigationLayoutProperty>()->UpdateHideNavBar(true);
     navigationPattern->TryForceSplitIfNeeded();
     // canForceSplitLayout_ is false (no pageNode), but home is still established and stack synced
     EXPECT_FALSE(navigationPattern->forceSplitSuccess_);
@@ -2745,7 +2749,13 @@ HWTEST_F(NavigationPatternTestFourNg, TryForceSplitIfNeeded010, TestSize.Level1)
     navigationStack->navPathList_.push_back({ "PageA", dest });
     navigationPattern->forceSplitHomeDest_ = nullptr;
 
+    // Preserve the same home so the unchanged-result branch restores pipeline state.
+    navigationPattern->forceSplitHomeDest_ = WeakPtr(dest);
+    dest->SetNavDestinationType(NavDestinationType::HOME);
+    manager->SetHomePageName("PageA");
+    context->SetIsCurrentInForceSplitMode(false);
     navigationPattern->TryForceSplitIfNeeded();
+    EXPECT_TRUE(context->IsCurrentInForceSplitMode());
     EXPECT_TRUE(navigationPattern->forceSplitSuccess_);
     EXPECT_EQ(navigationPattern->forceSplitHomeDest_.Upgrade(), dest);
     EXPECT_EQ(manager->GetHomePageName(), "PageA");

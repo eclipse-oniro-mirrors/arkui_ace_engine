@@ -1737,4 +1737,135 @@ HWTEST_F(ForceSplitManagerTestNg, IsTransitionShouldMovePageToPrimary004, TestSi
     manager->SetTransPages(std::move(transPages));
     EXPECT_FALSE(manager->IsTransitionShouldMovePageToPrimary("fullScreen", "transparent"));
 }
+/**
+ * @tc.name: IsPageSplitDisabled007
+ * @tc.desc: Repeated unconfigured names inherit by the last stack position without cycling.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitManagerTestNg, IsPageSplitDisabled007, TestSize.Level1)
+{
+    auto manager = GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    manager->SetEnablePageLevelSplit(true);
+    manager->SetEnableInheritSplitStrategy(true);
+    manager->SetPageSplitOptions({ { "split", true }, { "fullScreen", false } });
+    manager->SetPageStack({ "split", "default", "fullScreen", "default" });
+    EXPECT_TRUE(manager->IsPageSplitDisabled("default"));
+    EXPECT_EQ(manager->GetLastPageStackIndex("default"), 3);
+    manager->SetPageStack({ "fullScreen", "default", "split", "default" });
+    EXPECT_FALSE(manager->IsPageSplitDisabled("default"));
+    manager->SetPageStack({ "default", "default", "default" });
+    EXPECT_TRUE(manager->IsPageSplitDisabled("default"));
+}
+
+/**
+ * @tc.name: IsPageSplitDisabled008
+ * @tc.desc: Explicit policy overrides inheritance and an absent or bottom page uses the no-split default.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitManagerTestNg, IsPageSplitDisabled008, TestSize.Level1)
+{
+    auto manager = GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    manager->SetEnablePageLevelSplit(true);
+    manager->SetEnableInheritSplitStrategy(true);
+    manager->SetPageSplitOptions({ { "split", true }, { "fullScreen", false } });
+    manager->SetPageStack({ "fullScreen", "split" });
+    EXPECT_FALSE(manager->IsPageSplitDisabled("split"));
+    manager->SetPageStack({ "split", "fullScreen" });
+    EXPECT_TRUE(manager->IsPageSplitDisabled("fullScreen"));
+    EXPECT_TRUE(manager->IsPageSplitDisabled("missing"));
+    manager->SetPageStack({ "default" });
+    EXPECT_TRUE(manager->IsPageSplitDisabled("default"));
+    manager->SetPageStack({});
+    EXPECT_TRUE(manager->IsPageSplitDisabled("default"));
+    EXPECT_EQ(manager->GetLastPageStackIndex("default"), -1);
+}
+
+/**
+ * @tc.name: SetPageLevelSplitConfig002
+ * @tc.desc: Replacing policies and disabling inheritance do not retain old session results.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitManagerTestNg, SetPageLevelSplitConfig002, TestSize.Level1)
+{
+    auto manager = GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    manager->SetEnablePageLevelSplit(true);
+    manager->SetEnableInheritSplitStrategy(true);
+    manager->SetPageSplitOptions({ { "split", true } });
+    manager->SetPageStack({ "split", "default" });
+    EXPECT_FALSE(manager->IsPageSplitDisabled("default"));
+    manager->SetEnableInheritSplitStrategy(false);
+    EXPECT_TRUE(manager->IsPageSplitDisabled("default"));
+    manager->SetPageSplitOptions({});
+    EXPECT_TRUE(manager->IsPageSplitDisabled("split"));
+    manager->SetEnablePageLevelSplit(false);
+    EXPECT_FALSE(manager->IsPageSplitDisabled("default"));
+    EXPECT_FALSE(manager->IsTopPageSplitDisabled());
+}
+
+/**
+ * @tc.name: IsTransitionShouldMovePageToPrimary005
+ * @tc.desc: Page-level NAVIGATION respects pair direction and ignores legacy fullscreen policy on either page.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitManagerTestNg, IsTransitionShouldMovePageToPrimary005, TestSize.Level1)
+{
+    auto manager = GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    manager->SetEnablePageLevelSplit(true);
+    manager->SetBehaviorMode(ForceSplitBehaviorMode::NAVIGATION);
+    manager->SetFullScreenPages({ "from", "to" });
+    manager->SetPagePairs({ { "from", { "to" } } });
+    EXPECT_TRUE(manager->IsTransitionShouldMovePageToPrimary("from", "to"));
+    EXPECT_FALSE(manager->IsTransitionShouldMovePageToPrimary("to", "from"));
+    EXPECT_FALSE(manager->IsTransitionShouldMovePageToPrimary("unknown", "to"));
+    manager->SetEnablePageLevelSplit(false);
+    EXPECT_FALSE(manager->IsTransitionShouldMovePageToPrimary("from", "to"));
+    manager->SetFullScreenPages({ "to" });
+    EXPECT_FALSE(manager->IsTransitionShouldMovePageToPrimary("from", "to"));
+    manager->SetFullScreenPages({});
+    EXPECT_TRUE(manager->IsTransitionShouldMovePageToPrimary("from", "to"));
+}
+
+/**
+ * @tc.name: IsTransitionShouldMovePageToPrimary006
+ * @tc.desc: DISPLACE transPages suppress movement on either side with page-level control on or off.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitManagerTestNg, IsTransitionShouldMovePageToPrimary006, TestSize.Level1)
+{
+    auto manager = GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    manager->SetBehaviorMode(ForceSplitBehaviorMode::DISPLACE);
+    manager->SetTransPages({ "transparent" });
+    for (bool enabled : { false, true }) {
+        manager->SetEnablePageLevelSplit(enabled);
+        EXPECT_TRUE(manager->IsTransitionShouldMovePageToPrimary("from", "to"));
+        EXPECT_FALSE(manager->IsTransitionShouldMovePageToPrimary("transparent", "to"));
+        EXPECT_FALSE(manager->IsTransitionShouldMovePageToPrimary("from", "transparent"));
+        EXPECT_FALSE(manager->IsTransitionShouldMovePageToPrimary("transparent", "transparent"));
+    }
+}
+
+/**
+ * @tc.name: UpdateIsTopPageSplitDisabled002
+ * @tc.desc: Repeated split notifications are idempotent after both state transitions.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitManagerTestNg, UpdateIsTopPageSplitDisabled002, TestSize.Level1)
+{
+    auto manager = GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    manager->SetEnablePageLevelSplit(true);
+    EXPECT_TRUE(manager->IsTopPageSplitDisabled());
+    EXPECT_TRUE(manager->UpdateIsTopPageSplitDisabled(false));
+    EXPECT_FALSE(manager->UpdateIsTopPageSplitDisabled(false));
+    EXPECT_FALSE(manager->IsTopPageSplitDisabled());
+    EXPECT_TRUE(manager->UpdateIsTopPageSplitDisabled(true));
+    EXPECT_FALSE(manager->UpdateIsTopPageSplitDisabled(true));
+    EXPECT_TRUE(manager->IsTopPageSplitDisabled());
+}
+
 } // namespace OHOS::Ace::NG

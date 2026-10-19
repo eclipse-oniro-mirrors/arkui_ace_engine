@@ -524,6 +524,11 @@ bool ForceSplitUtils::ParsePageSplitOptions(const std::unique_ptr<JsonValue>& pa
             continue;
         }
         config.pageSplitOptions[page] = splitJson->GetBool();
+        if (config.enablePageLevelSplit) {
+            TAG_LOGI(AceLogTag::ACE_NAVIGATION,
+                "pageLevelSplit config option index:%{public}d, page:%{public}s, split:%{public}d",
+                idx, page.c_str(), splitJson->GetBool());
+        }
     }
     return true;
 }
