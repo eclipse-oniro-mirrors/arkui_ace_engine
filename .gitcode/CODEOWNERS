@@ -3829,7 +3829,6 @@ frameworks/core/interfaces/native/utility/generated/ @arkui-idlize
 
 [UT for CAPI]
 
-test/unittest/capi/ @huaweimaxuchu
 test/unittest/capi/BUILD.gn @arkui_architecture
 test/unittest/capi/accessors/BUILD.gn @arkui_architecture
 test/unittest/capi/accessors/accessibility_hover_event_accessor_test.cpp @ArkUI_Event
