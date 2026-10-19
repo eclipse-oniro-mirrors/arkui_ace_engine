@@ -394,9 +394,9 @@ void* PixelMapOhos::GetWritablePixels() const
 bool PixelMapOhos::GetPixelsVec(std::vector<uint8_t>& data) const
 {
     CHECK_NULL_RETURN(pixmap_, false);
-    data.resize(pixmap_->GetByteCount());
+    data.resize(pixmap_->GetAllocationByteCount());
     uint8_t* dst = data.data();
-    uint32_t errCode = pixmap_->ReadPixels(pixmap_->GetByteCount(), dst);
+    uint32_t errCode = pixmap_->ReadPixels(pixmap_->GetAllocationByteCount(), dst);
     if (errCode) {
         TAG_LOGW(AceLogTag::ACE_IMAGE, "GetPixelsVec error, errCode=%{public}d", errCode);
         return false;
