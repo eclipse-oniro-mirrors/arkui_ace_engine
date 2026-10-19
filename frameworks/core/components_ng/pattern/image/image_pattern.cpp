@@ -1959,6 +1959,14 @@ void ImagePattern::CancelNavDestRecycleTask()
 void ImagePattern::ExecuteNavDestRecycle()
 {
     navDestRecycleCallback_.reset();
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto pipeline = host->GetContext();
+    CHECK_NULL_VOID(pipeline);
+    auto memoryManager = pipeline->GetMemoryManager();
+    if (memoryManager && memoryManager->CheckNeedSkipRecycle(host->GetId())) {
+        return;
+    }
     DoRecycleImageData("recycleImageData for Nav", "OnRecycleImageDataForNav");
 }
 
