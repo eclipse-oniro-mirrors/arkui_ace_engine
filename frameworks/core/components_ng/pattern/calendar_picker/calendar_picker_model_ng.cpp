@@ -229,7 +229,6 @@ RefPtr<FrameNode> CalendarPickerModelNG::CreateCalendarNodeChild(int32_t content
     padding.right = CalcLength(theme->GetEntryDateLeftRightMargin());
     padding.bottom = CalcLength(theme->GetEntryDateTopBottomMargin());
     linearLayoutProperty->UpdatePadding(padding);
-    linearLayoutProperty->UpdateLayoutDirection(TextDirection::LTR);
 
     CreateDateNode(contentNode, settingData);
     contentNode->MarkModifyDone();
