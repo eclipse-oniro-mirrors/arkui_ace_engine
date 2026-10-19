@@ -1603,6 +1603,8 @@ void WebDelegate::OnTextSelectionChange(const std::string& selectionText) {}
 std::string WebDelegate::GetLastSelectionText() const { return ""; }
 void WebDelegate::OnDetectedBlankScreen(
     const std::string& url, int32_t blankScreenReason, int32_t detectedContentfulNodesCount) {}
+void WebDelegate::OnMonitoredBlankScreen(
+    const std::string& url, int32_t reason, const std::string& extraMsg) {}
 void WebDelegate::UpdateBlankScreenDetectionConfig(bool enable, const std::vector<double>& detectionTiming,
     const std::vector<int32_t>& detectionMethods, int32_t contentfulNodesCountThreshold) {}
 void WebDelegate::OnRequestAutofill(int32_t menuType) {}

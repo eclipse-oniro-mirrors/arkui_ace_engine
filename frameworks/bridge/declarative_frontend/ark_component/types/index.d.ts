@@ -2034,6 +2034,7 @@ declare type OnContextMenuHideCallback = () => void;
 declare type OnContextMenuUpdateCallback = () => void;
 declare type OnDetectBlankScreenCallback = (event: any) => void;
 declare type OnFirstScreenPaintCallback = (firstScreenPaint: any) => void;
+declare type OnMonitorBlankScreenCallback = (event: any) => void;
 declare type OnMicrophoneCaptureStateChangeCallback = (event: any) => void;
 declare type OnNavigationEntryCommittedCallback = (loadCommittedDetails: any) => void;
 declare type OnOverrideUrlLoadingCallback = (webResourceRequest: WebResourceRequest) => boolean;

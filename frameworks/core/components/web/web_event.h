@@ -1007,6 +1007,28 @@ private:
     int32_t detectedContentfulNodesCount_;
 };
 
+class ACE_EXPORT MonitoredBlankScreenEvent : public BaseEventInfo {
+    DECLARE_RELATIONSHIP_OF_CLASSES(MonitoredBlankScreenEvent, BaseEventInfo);
+ 
+public:
+    MonitoredBlankScreenEvent(
+        const std::string& url, int32_t reason,
+        const std::string& extraMsg)
+        : BaseEventInfo("MonitoredBlankScreenEvent"), url_(url), reason_(reason),
+          extraMsg_(extraMsg)
+    {}
+    ~MonitoredBlankScreenEvent() = default;
+ 
+    const std::string& GetUrl() const { return url_; }
+    int32_t GetReason() const { return reason_; }
+    const std::string& GetExtraMsg() const { return extraMsg_; }
+ 
+private:
+    std::string url_;
+    int32_t reason_;
+    std::string extraMsg_;
+};
+
 class ACE_EXPORT FirstScreenPaintEvent : public BaseEventInfo {
     DECLARE_RELATIONSHIP_OF_CLASSES(FirstScreenPaintEvent, BaseEventInfo);
 

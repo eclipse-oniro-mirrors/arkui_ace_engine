@@ -388,6 +388,9 @@ public:
     void OnTextSelectionChange(const std::string& selectionText) override;
     void OnDetectedBlankScreen(
         const std::string& url, int32_t blankScreenReason, int32_t detectedContentfulNodesCount) override;
+    void OnMonitoredBlankScreen(
+        const std::string& url, int32_t reason,
+        const std::string& extraMsg) override;
     void OnFirstScreenPaint(const std::string& url, int64_t navigationStartTime, int64_t firstScreenPaintTime) override;
     void OnPdfScrollAtBottom(const std::string& url) override;
     void OnPdfLoadEvent(int32_t result, const std::string& url) override;

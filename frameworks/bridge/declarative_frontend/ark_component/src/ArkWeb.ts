@@ -1258,6 +1258,20 @@ class WebOnDetectedBlankScreenModifier extends ModifierWithKey<OnDetectBlankScre
   }
 }
 
+class WebOnMonitoredBlankScreenModifier extends ModifierWithKey<OnMonitorBlankScreenCallback> {
+  constructor (value: OnMonitorBlankScreenCallback) {
+    super(value);
+  }
+  static identity: Symbol = Symbol('webOnMonitoredBlankScreenModifier');
+  applyPeer(node: KNode, reset: boolean): void {
+    if (reset) {
+      getUINativeModule().web.resetOnMonitoredBlankScreen(node);
+    } else {
+      getUINativeModule().web.setOnMonitoredBlankScreen(node, this.value);
+    }
+  }
+}
+
 class WebBlankScreenDetectionConfigModifier extends ModifierWithKey<BlankScreenDetectionConfig> {
   constructor(value: BlankScreenDetectionConfig) {
     super(value);
@@ -2055,6 +2069,10 @@ class ArkWebComponent extends ArkComponent implements WebAttribute {
   }
   onDetectedBlankScreen(callback: OnDetectBlankScreenCallback): this {
     modifierWithKey(this._modifiersWithKeys, WebOnDetectedBlankScreenModifier.identity, WebOnDetectedBlankScreenModifier, callback);
+    return this;
+  }
+  onMonitoredBlankScreen(callback: OnMonitorBlankScreenCallback): this {
+    modifierWithKey(this._modifiersWithKeys, WebOnMonitoredBlankScreenModifier.identity, WebOnMonitoredBlankScreenModifier, callback);
     return this;
   }
   blankScreenDetectionConfig(config: BlankScreenDetectionConfig): this {

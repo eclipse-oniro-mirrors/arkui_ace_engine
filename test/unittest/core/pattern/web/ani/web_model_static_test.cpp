@@ -2515,6 +2515,33 @@ HWTEST_F(WebModelStaticTest, SetOnDetectedBlankScreen, TestSize.Level1)
 }
 
 /**
+ * @tc.name: SetOnMonitoredBlankScreen
+ * @tc.desc: Test web_model_static.cpp
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebModelStaticTest, SetOnMonitoredBlankScreen, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    int callCount = 0;
+    auto* stack = ViewStackProcessor::GetInstance();
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode = WebModelStatic::CreateFrameNode(nodeId);
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto callback = [&callCount](const BaseEventInfo* info) {
+        callCount++;
+    };
+    WebModelStatic::SetOnMonitoredBlankScreen(AccessibilityManager::RawPtr(frameNode), callback);
+    auto webEventHub = ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>();
+    ASSERT_NE(webEventHub, nullptr);
+ 
+    auto mockEventInfo = std::make_shared<MockBaseEventInfo>();
+    webEventHub->FireOnMonitoredBlankScreenEvent(mockEventInfo);
+    EXPECT_NE(callCount, 0);
+#endif
+}
+
+/**
  * @tc.name: SetOnFirstScreenPaint
  * @tc.desc: Test web_model_static.cpp
  * @tc.type: FUNC

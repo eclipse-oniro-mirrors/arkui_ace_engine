@@ -2796,6 +2796,19 @@ void WebModelNG::SetOnDetectedBlankScreen(std::function<void(const BaseEventInfo
     webEventHub->SetOnDetectedBlankScreenEvent(std::move(uiCallback));
 }
 
+void WebModelNG::SetOnMonitoredBlankScreen(
+    FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& jsCallback)
+{
+    auto func = jsCallback;
+    auto uiCallback = [func](const std::shared_ptr<BaseEventInfo> &info) {
+        CHECK_NULL_VOID(info);
+        func(info.get());
+    };
+    auto webEventHub = ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>();
+    CHECK_NULL_VOID(webEventHub);
+    webEventHub->SetOnMonitoredBlankScreenEvent(std::move(uiCallback));
+}
+
 void WebModelNG::SetEnableAutoFill(bool isEnabled)
 {
     auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
@@ -2865,6 +2878,18 @@ void WebModelNG::SetOnDetectedBlankScreen(
     auto webEventHub = ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>();
     CHECK_NULL_VOID(webEventHub);
     webEventHub->SetOnDetectedBlankScreenEvent(std::move(uiCallback));
+}
+
+void WebModelNG::SetOnMonitoredBlankScreen(std::function<void(const BaseEventInfo *info)> &&jsCallback)
+{
+    auto func = std::move(jsCallback);
+    auto uiCallback = [func](const std::shared_ptr<BaseEventInfo> &info) {
+        CHECK_NULL_VOID(info);
+        func(info.get());
+    };
+    auto webEventHub = ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>();
+    CHECK_NULL_VOID(webEventHub);
+    webEventHub->SetOnMonitoredBlankScreenEvent(std::move(uiCallback));
 }
 
 void WebModelNG::SetBlankScreenDetectionConfig(FrameNode* frameNode, const BlankScreenDetectionConfig& detectConfig)

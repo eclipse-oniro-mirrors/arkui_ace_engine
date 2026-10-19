@@ -4448,6 +4448,36 @@ HWTEST_F(WebModelTestNg, SetOnFileSelectorShow002, TestSize.Level1)
 }
 
 /**
+ * @tc.name: SetOnMonitoredBlankScreenEvent
+ * @tc.desc: Test web_model_ng.cpp
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebModelTestNg, SetOnMonitoredBlankScreenEvent, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    bool callbackCalled = false;
+    auto* stack = ViewStackProcessor::GetInstance();
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    WebModelNG webModelNG;
+    webModelNG.SetOnMonitoredBlankScreen(
+        AccessibilityManager::RawPtr(frameNode), [&callbackCalled](const BaseEventInfo* info) {
+            callbackCalled = true;
+        });
+ 
+    auto webEventHub = ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>();
+    ASSERT_NE(webEventHub, nullptr);
+ 
+    auto mockEventInfo = std::make_shared<MockBaseEventInfo>();
+    webEventHub->FireOnMonitoredBlankScreenEvent(mockEventInfo);
+    EXPECT_TRUE(callbackCalled);
+#endif
+}
+
+/**
  * @tc.name: SetOnContextMenuShow002
  * @tc.desc: Test web_model_ng.cpp
  * @tc.type: FUNC
@@ -5665,6 +5695,28 @@ HWTEST_F(WebModelTestNg, SetOnDetectedBlankScreen001, TestSize.Level1)
     auto webEventHub = ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>();
     ASSERT_NE(webEventHub, nullptr);
     webEventHub->FireOnDetectedBlankScreenEvent(mockEventInfo);
+    EXPECT_NE(callCount, 0);
+#endif
+}
+
+/**
+ * @tc.name: SetOnMonitoredBlankScreen001
+ * @tc.desc: Test web_model_ng.cpp
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebModelTestNg, SetOnMonitoredBlankScreen001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    int callCount = 0;
+    WebModelNG webModelNG;
+    auto onMonitoredBlankScreen = [&callCount](const BaseEventInfo* info) {
+        callCount++;
+    };
+    webModelNG.SetOnMonitoredBlankScreen(std::move(onMonitoredBlankScreen));
+    auto mockEventInfo = std::make_shared<MockBaseEventInfo>();
+    auto webEventHub = ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>();
+    ASSERT_NE(webEventHub, nullptr);
+    webEventHub->FireOnMonitoredBlankScreenEvent(mockEventInfo);
     EXPECT_NE(callCount, 0);
 #endif
 }

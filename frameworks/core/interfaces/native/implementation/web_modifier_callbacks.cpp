@@ -531,6 +531,24 @@ void OnDetectedBlankScreen(const CallbackHelper<OnDetectBlankScreenCallback>& ar
     arkCallback.InvokeSync(parameter);
 }
 
+void OnMonitoredBlankScreen(const CallbackHelper<OnMonitorBlankScreenCallback>& arkCallback,
+    WeakPtr<FrameNode> weakNode, int32_t instanceId, const BaseEventInfo* info)
+{
+    const auto refNode = weakNode.Upgrade();
+    CHECK_NULL_VOID(refNode);
+    ContainerScope scope(instanceId);
+    auto pipelineContext = PipelineContext::GetCurrentContextSafelyWithCheck();
+    CHECK_NULL_VOID(pipelineContext);
+    pipelineContext->UpdateCurrentActiveNode(weakNode);
+    auto* eventInfo = TypeInfoHelper::DynamicCast<MonitoredBlankScreenEvent>(info);
+    CHECK_NULL_VOID(eventInfo);
+    Ark_MonitoredBlankScreenEventInfo parameter;
+    parameter.url = Converter::ArkValue<Ark_String>(eventInfo->GetUrl());
+    parameter.reason = static_cast<Ark_BlankScreenReason>(eventInfo->GetReason());
+    parameter.extraMsg = Converter::ArkValue<Ark_String>(eventInfo->GetExtraMsg());
+    arkCallback.InvokeSync(parameter);
+}
+
 void OnTextSelectionChange(const CallbackHelper<TextSelectionChangeCallback>& arkCallback,
     WeakPtr<FrameNode> weakNode, int32_t instanceId, const BaseEventInfo* info)
 {
