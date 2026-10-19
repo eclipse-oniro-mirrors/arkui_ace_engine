@@ -22,12 +22,12 @@
 
 namespace OHOS::Ace {
 
-class ACE_FORCE_EXPORT SlidingPanelSizeChangeEvent : public BaseEventInfo, public EventToJSONStringAdapter {
-    DECLARE_RELATIONSHIP_OF_CLASSES(SlidingPanelSizeChangeEvent, BaseEventInfo, EventToJSONStringAdapter);
+class ACE_FORCE_EXPORT SlidingPanelSizeChangeEvent : public JSONStringifiableEventInfo {
+    DECLARE_RELATIONSHIP_OF_CLASSES(SlidingPanelSizeChangeEvent, JSONStringifiableEventInfo);
 
 public:
     SlidingPanelSizeChangeEvent(PanelMode mode, double width, double height)
-        : BaseEventInfo("SlidingPanelSizeChangeEvent"), mode_(mode), width_(width), height_(height)
+        : JSONStringifiableEventInfo("SlidingPanelSizeChangeEvent"), mode_(mode), width_(width), height_(height)
     {}
 
     ~SlidingPanelSizeChangeEvent() = default;
