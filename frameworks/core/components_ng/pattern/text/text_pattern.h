@@ -399,6 +399,7 @@ public:
     const std::list<RefPtr<UINode>>& GetChildNodes() const;
     void SetExternalParagraph(void* paragraph);
     const std::optional<void*>& GetExternalParagraph();
+    void ReleaseExternalParagraphRef();
     void SetExternalSpanItem(const std::list<RefPtr<SpanItem>>& spans);
     void SetExternalSpanItemMultiThread(const std::list<RefPtr<SpanItem>>& spans);
     void SetExternalParagraphStyle(const std::optional<ParagraphStyle>& paragraphStyle);
