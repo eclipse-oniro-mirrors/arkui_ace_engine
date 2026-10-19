@@ -204,6 +204,14 @@ public:
     {
         transPages_ = std::move(transPages);
     }
+    void SetTransPageEnabled(bool enabled)
+    {
+        transPageEnabled_ = enabled;
+    }
+    bool IsTransPageEnabled() const
+    {
+        return transPageEnabled_;
+    }
     bool IsTransPage(const std::string& name) const;
     bool CanPushPageToPrimary() const;
     bool IsTransitionShouldMovePageToPrimary(const std::string& from, const std::string& to) const;
@@ -249,6 +257,7 @@ private:
     ForceSplitBehaviorMode behaviorMode_ = ForceSplitBehaviorMode::NAVIGATION;
     std::unordered_map<std::string, std::unordered_set<std::string>> pagePairs_;
     std::unordered_set<std::string> transPages_;
+    bool transPageEnabled_ = true;
     std::unordered_map<int32_t, std::function<void()>> forceSplitListeners_;
     std::unordered_map<int32_t, std::function<void(float)>> forceSplitRatioListeners_;
     std::unordered_map<int32_t, std::function<void(bool isDraggable)>> isDraggableListeners_;

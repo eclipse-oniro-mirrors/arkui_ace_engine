@@ -8857,6 +8857,17 @@ const RefPtr<ForceSplitManager>& PipelineContext::GetForceSplitManager() const
     return forceSplitMgr_;
 }
 
+void PipelineContext::SetTransPageEnabled(bool enabled)
+{
+    CHECK_NULL_VOID(forceSplitMgr_);
+    forceSplitMgr_->SetTransPageEnabled(enabled);
+}
+
+bool PipelineContext::IsTransPageEnabled() const
+{
+    return forceSplitMgr_ ? forceSplitMgr_->IsTransPageEnabled() : true;
+}
+
 const RefPtr<RecoverableManager>& PipelineContext::GetRecoverableManager() const
 {
     return recoverableMgr_;

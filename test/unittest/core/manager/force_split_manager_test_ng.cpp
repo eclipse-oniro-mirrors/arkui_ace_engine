@@ -589,6 +589,175 @@ HWTEST_F(ForceSplitManagerTestNg, IsTransitionShouldMovePageToPrimary002, TestSi
 }
 
 /**
+ * @tc.name: SetTransPageEnabledFalse_DisplaceMode_SkipsTransPageCheck
+ * @tc.desc: Test setTransPageEnabled(false) makes transPages check skipped in displace mode
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitManagerTestNg, SetTransPageEnabledFalse_DisplaceMode_SkipsTransPageCheck, TestSize.Level1)
+{
+    auto manager = GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    ResetForceSplitBehaviorConfig(manager);
+    manager->SetTransPageEnabled(true);
+
+    manager->SetBehaviorMode(ForceSplitBehaviorMode::DISPLACE);
+    std::unordered_set<std::string> transPages = { "AddressEditPage" };
+    manager->SetTransPages(std::move(transPages));
+    EXPECT_TRUE(manager->IsTransPageEnabled());
+    EXPECT_FALSE(manager->IsTransitionShouldMovePageToPrimary("AddressEditPage", "OtherPage"));
+
+    manager->SetTransPageEnabled(false);
+    EXPECT_FALSE(manager->IsTransPageEnabled());
+    EXPECT_TRUE(manager->IsTransitionShouldMovePageToPrimary("AddressEditPage", "OtherPage"));
+    EXPECT_TRUE(manager->IsTransitionShouldMovePageToPrimary("OtherPage", "AddressEditPage"));
+}
+
+/**
+ * @tc.name: SetTransPageEnabledTrue_DisplaceMode_RestoresTransPageCheck
+ * @tc.desc: Test setTransPageEnabled(true) restores transPages check in displace mode
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitManagerTestNg, SetTransPageEnabledTrue_DisplaceMode_RestoresTransPageCheck, TestSize.Level1)
+{
+    auto manager = GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    ResetForceSplitBehaviorConfig(manager);
+
+    manager->SetBehaviorMode(ForceSplitBehaviorMode::DISPLACE);
+    std::unordered_set<std::string> transPages = { "AddressEditPage" };
+    manager->SetTransPages(std::move(transPages));
+    manager->SetTransPageEnabled(false);
+    EXPECT_TRUE(manager->IsTransitionShouldMovePageToPrimary("AddressEditPage", "OtherPage"));
+
+    manager->SetTransPageEnabled(true);
+    EXPECT_TRUE(manager->IsTransPageEnabled());
+    EXPECT_FALSE(manager->IsTransitionShouldMovePageToPrimary("AddressEditPage", "OtherPage"));
+    EXPECT_FALSE(manager->IsTransitionShouldMovePageToPrimary("OtherPage", "AddressEditPage"));
+}
+
+/**
+ * @tc.name: IsTransPageEnabled_ReturnsCorrectValue
+ * @tc.desc: Test isTransPageEnabled returns value consistent with setter and default true
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitManagerTestNg, IsTransPageEnabled_ReturnsCorrectValue, TestSize.Level1)
+{
+    auto manager = GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    ResetForceSplitBehaviorConfig(manager);
+
+    EXPECT_TRUE(manager->IsTransPageEnabled());
+    manager->SetTransPageEnabled(false);
+    EXPECT_FALSE(manager->IsTransPageEnabled());
+    manager->SetTransPageEnabled(true);
+    EXPECT_TRUE(manager->IsTransPageEnabled());
+}
+
+/**
+ * @tc.name: SetTransPageEnabled_NavigationMode_NoSideEffect
+ * @tc.desc: Test transPage switch does not affect navigation mode pagePairs check
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitManagerTestNg, SetTransPageEnabled_NavigationMode_NoSideEffect, TestSize.Level1)
+{
+    auto manager = GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    ResetForceSplitBehaviorConfig(manager);
+
+    manager->SetBehaviorMode(ForceSplitBehaviorMode::NAVIGATION);
+    std::unordered_map<std::string, std::unordered_set<std::string>> pagePairs = {
+        { "home", { "detail" } },
+    };
+    manager->SetPagePairs(std::move(pagePairs));
+
+    manager->SetTransPageEnabled(false);
+    EXPECT_FALSE(manager->IsTransPageEnabled());
+    EXPECT_TRUE(manager->IsTransitionShouldMovePageToPrimary("home", "detail"));
+    EXPECT_FALSE(manager->IsTransitionShouldMovePageToPrimary("home", "dialog"));
+}
+
+/**
+ * @tc.name: SetTransPageEnabled_FullScreenPagePriority
+ * @tc.desc: Test fullScreenPages check has higher priority than transPage switch
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitManagerTestNg, SetTransPageEnabled_FullScreenPagePriority, TestSize.Level1)
+{
+    auto manager = GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    ResetForceSplitBehaviorConfig(manager);
+
+    manager->SetBehaviorMode(ForceSplitBehaviorMode::DISPLACE);
+    std::unordered_set<std::string> fullScreenPages = { "fullScreen" };
+    manager->SetFullScreenPages(std::move(fullScreenPages));
+    manager->SetTransPageEnabled(false);
+
+    EXPECT_FALSE(manager->IsTransitionShouldMovePageToPrimary("fullScreen", "detail"));
+    EXPECT_FALSE(manager->IsTransitionShouldMovePageToPrimary("home", "fullScreen"));
+}
+
+/**
+ * @tc.name: SetTransPageEnabled_MultiInstance_Isolated
+ * @tc.desc: Test transPage switch state is isolated between ForceSplitManager instances
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitManagerTestNg, SetTransPageEnabled_MultiInstance_Isolated, TestSize.Level1)
+{
+    auto managerA = AceType::MakeRefPtr<ForceSplitManager>();
+    auto managerB = AceType::MakeRefPtr<ForceSplitManager>();
+    ASSERT_NE(managerA, nullptr);
+    ASSERT_NE(managerB, nullptr);
+
+    EXPECT_TRUE(managerA->IsTransPageEnabled());
+    EXPECT_TRUE(managerB->IsTransPageEnabled());
+
+    managerA->SetTransPageEnabled(false);
+    EXPECT_FALSE(managerA->IsTransPageEnabled());
+    EXPECT_TRUE(managerB->IsTransPageEnabled());
+}
+
+/**
+ * @tc.name: SetTransPageEnabled_RapidToggle_FinalValueWins
+ * @tc.desc: Test rapid toggle of transPage switch only the final value takes effect
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitManagerTestNg, SetTransPageEnabled_RapidToggle_FinalValueWins, TestSize.Level1)
+{
+    auto manager = AceType::MakeRefPtr<ForceSplitManager>();
+    ASSERT_NE(manager, nullptr);
+
+    manager->SetTransPageEnabled(false);
+    manager->SetTransPageEnabled(true);
+    manager->SetTransPageEnabled(false);
+    EXPECT_FALSE(manager->IsTransPageEnabled());
+
+    manager->SetTransPageEnabled(true);
+    manager->SetTransPageEnabled(false);
+    manager->SetTransPageEnabled(true);
+    EXPECT_TRUE(manager->IsTransPageEnabled());
+}
+
+/**
+ * @tc.name: SetTransPageEnabled_DefaultValue_NoRegression
+ * @tc.desc: Test default transPageEnabled value keeps existing displace behavior unchanged
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitManagerTestNg, SetTransPageEnabled_DefaultValue_NoRegression, TestSize.Level1)
+{
+    auto manager = GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    ResetForceSplitBehaviorConfig(manager);
+
+    manager->SetBehaviorMode(ForceSplitBehaviorMode::DISPLACE);
+    std::unordered_set<std::string> transPages = { "dialog", "transparent" };
+    manager->SetTransPages(std::move(transPages));
+
+    EXPECT_TRUE(manager->IsTransitionShouldMovePageToPrimary("home", "detail"));
+    EXPECT_FALSE(manager->IsTransitionShouldMovePageToPrimary("dialog", "detail"));
+    EXPECT_FALSE(manager->IsTransitionShouldMovePageToPrimary("home", "transparent"));
+}
+
+/**
  * @tc.name: ForceSplitManagerConstructor001
  * @tc.desc: Test ForceSplitManager constructor initializes default values
  * @tc.type: FUNC

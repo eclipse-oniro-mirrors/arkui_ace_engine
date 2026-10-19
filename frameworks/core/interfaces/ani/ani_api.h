@@ -711,6 +711,7 @@ struct ArkUIAniCommonModifier {
     void(*resolveUIContext)(std::vector<int32_t>& instance);
     ani_long (*getPageRootNode)();
     ani_boolean(*isEasySplit)(ArkUI_Int32 instanceId);
+    ani_boolean(*isTransPageEnabled)(ArkUI_Int32 instanceId);
     void(*dumpLogPrint)(int32_t depth, const char* content);
     int32_t (*getBuilderNodeParentViewId)(ani_long nodePtr);
     void (*setOnNodeDestroyEvent)(ArkUINodeHandle node, std::function<void(int32_t)>&& event);

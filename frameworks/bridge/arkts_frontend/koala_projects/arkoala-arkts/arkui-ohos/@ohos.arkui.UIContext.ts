@@ -1580,6 +1580,12 @@ export class UIContext {
         ArkUIAniModule._Common_Restore_InstanceId();
     }
 
+    public setTransPageEnabled(enabled: boolean): void {
+        ArkUIAniModule._Common_Sync_InstanceId(this.instanceId_);
+        IUIContext.setTransPageEnabled(enabled);
+        ArkUIAniModule._Common_Restore_InstanceId();
+    }
+
     public setRouter(router: RouterExt) {
         if (this.router_ === undefined) {
             this.router_ = new RouterImpl(this.instanceId_)
@@ -1610,6 +1616,10 @@ export class UIContext {
 
     public isEasySplit(): boolean {
         return ArkUIAniModule._Common_IsEasySplit(this.instanceId_);
+    }
+
+    public isTransPageEnabled(): boolean {
+        return ArkUIAniModule._Common_IsTransPageEnabled(this.instanceId_);
     }
 
     public createModalUIExtension(want: Want, options?: ModalUIExtensionOptions, callback?: ModalUIExtensionCallback): int {

@@ -42,6 +42,13 @@ bool PipelineBase::GetSystemFont(const std::string& fontName, FontInfo& fontInfo
 
 void NG::PipelineContext::SetCallBackNode(const WeakPtr<NG::FrameNode>& node) {}
 
+void NG::PipelineContext::SetTransPageEnabled(bool enabled) {}
+
+bool NG::PipelineContext::IsTransPageEnabled() const
+{
+    return true;
+}
+
 RefPtr<NG::FrameNode> NG::CircleModelNG::CreateFrameNode(int32_t nodeId)
 {
     return FrameNode::CreateFrameNode(

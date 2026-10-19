@@ -462,6 +462,7 @@ export class ArkUIAniModule {
     native static _Common_isWindowInfoInitialized(instanceId: KInt): boolean
 
     native static _Common_IsEasySplit(instanceId: KInt): boolean
+    native static _Common_IsTransPageEnabled(instanceId: KInt): boolean
 
     // for transfer
     native static _createTouchEventAccessorWithPointer(input: KPointer): KPointer
