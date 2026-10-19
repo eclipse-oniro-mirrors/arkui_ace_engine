@@ -311,6 +311,7 @@ public:
     virtual void SetIsBackground(bool isBackground) {}
     virtual void SetHDRBrightness(float hdrBrightness) {}
     virtual void SetHDRBrightness(float hdrBrightness, uint32_t type) {}
+    virtual void SetSolidLayerEnabled(bool enabled) {}
     virtual void SetImageHDRBrightness(float hdrBrightness) {}
     virtual void SetImageHDRPresent(bool hdrPresent) {}
     virtual void SetHDRColorHeadRoom(float headRoom) {}

@@ -449,6 +449,8 @@ void XComponentBridge::RegisterXComponentAttributes(Local<panda::ObjectRef> obje
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), XComponentBridge::SetHdrBrightness));
     xComponent->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetHdrBrightness"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), XComponentBridge::ResetHdrBrightness));
+    xComponent->Set(vm, panda::StringRef::NewFromUtf8(vm, "setExtraFlag"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), XComponentBridge::SetExtraFlag));
     xComponent->Set(vm, panda::StringRef::NewFromUtf8(vm, "setEnableTransparentLayer"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), XComponentBridge::SetEnableTransparentLayer));
     xComponent->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetEnableTransparentLayer"),
@@ -1207,6 +1209,31 @@ ArkUINativeModuleValue XComponentBridge::ResetHdrBrightness(ArkUIRuntimeCallInfo
     auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
     ACE_UINODE_TRACE(reinterpret_cast<FrameNode*>(nativeNode));
     GetArkUINodeModifiers()->getXComponentModifier()->resetXComponentHdrBrightness(nativeNode);
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue XComponentBridge::SetExtraFlag(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    TAG_LOGI(AceLogTag::ACE_XCOMPONENT, "XComponent SetExtraFlag (bridge) entry");
+    Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(ARG_FIRST);
+    Local<JSValueRef> secondArg = runtimeCallInfo->GetCallArgRef(ARG_ID);
+    if (secondArg.IsNull() || secondArg->IsUndefined()) {
+        TAG_LOGI(AceLogTag::ACE_XCOMPONENT, "XComponent SetExtraFlag (bridge) arg is null or undefined, ignore");
+        return panda::JSValueRef::Undefined(vm);
+    }
+    ArkUINodeHandle nativeNode = nullptr;
+    CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(vm, firstArg, nativeNode), true, panda::JSValueRef::Undefined(vm));
+    ACE_UINODE_TRACE(reinterpret_cast<FrameNode*>(nativeNode));
+    if (secondArg->IsNumber()) {
+        auto extraFlag = static_cast<ArkUI_Uint32>(secondArg->Uint32Value(vm));
+        TAG_LOGI(AceLogTag::ACE_XCOMPONENT, "XComponent SetExtraFlag (bridge) forward to modifier, flag: 0x%{public}x",
+            extraFlag);
+        GetArkUINodeModifiers()->getXComponentModifier()->setXComponentExtraFlag(nativeNode, extraFlag);
+    } else {
+        TAG_LOGI(AceLogTag::ACE_XCOMPONENT, "XComponent SetExtraFlag (bridge) arg is not a number, ignore");
+    }
     return panda::JSValueRef::Undefined(vm);
 }
 

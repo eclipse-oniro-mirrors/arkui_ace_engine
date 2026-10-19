@@ -219,6 +219,17 @@ void SetHdrBrightness1Impl(Ark_NativePointer node, const Opt_Float64* brightness
     }
 #endif // XCOMPONENT_SUPPORTED
 }
+void SetExtraFlagImpl(Ark_NativePointer node, Ark_Int32 value)
+{
+    TAG_LOGI(AceLogTag::ACE_XCOMPONENT, "XComponent SetExtraFlag (static modifier) entry, flag: 0x%{public}x",
+        static_cast<int32_t>(value));
+    auto frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    ACE_UINODE_TRACE(frameNode);
+#ifdef XCOMPONENT_SUPPORTED
+    XComponentModelNG::SetExtraFlag(frameNode, static_cast<uint32_t>(value));
+#endif // XCOMPONENT_SUPPORTED
+}
 void SetEnableTransparentLayerImpl(Ark_NativePointer node,
                                    const Opt_Boolean* value)
 {
@@ -252,6 +263,7 @@ const GENERATED_ArkUIXComponentModifier* GetXComponentStaticModifier()
         XComponentAttributeModifier::SetEnableSecureImpl,
         XComponentAttributeModifier::SetEnableTransparentLayerImpl,
         XComponentAttributeModifier::SetHdrBrightness0Impl,
+        XComponentAttributeModifier::SetExtraFlagImpl,
         XComponentAttributeModifier::SetBufferQueueCountImpl,
         XComponentAttributeModifier::SetHdrBrightness1Impl,
     };

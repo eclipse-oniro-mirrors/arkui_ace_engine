@@ -434,6 +434,11 @@ function loadComponent(): ComponentObj | undefined {
           XComponentHdrBrightnessModifier, { brightness: value, hdrType: hdrType });
         return this;
       }
+      setExtraFlag(value: number): this {
+        modifierWithKey(this._modifiersWithKeys, XComponentExtraFlagModifier.identity,
+          XComponentExtraFlagModifier, value);
+        return this;
+      }
       enableTransparentLayer(value: any): this {
         modifierWithKey(this._modifiersWithKeys, XComponentEnableTransparentLayerModifier.identity, XComponentEnableTransparentLayerModifier, value);
         return this;
@@ -595,6 +600,19 @@ function loadComponent(): ComponentObj | undefined {
       checkObjectDiff(): boolean {
         return !isBaseOrResourceEqual(this.stageValue.brightness, this.value.brightness) ||
           !isBaseOrResourceEqual(this.stageValue.hdrType, this.value.hdrType);
+      }
+    }
+
+    class XComponentExtraFlagModifier extends ModifierWithKey<number> {
+      constructor(value: number) {
+        super(value);
+      }
+      static identity: Symbol = Symbol('xComponentExtraFlag');
+      applyPeer(node: KNode, reset: boolean): void {
+        if (reset) {
+          return;
+        }
+        getUINativeModule().xComponent.setExtraFlag(node, this.value);
       }
     }
 
@@ -784,6 +802,10 @@ class JSXComponent extends JSContainerBase {
 
   static hdrBrightness(hdrBrightness: any, hdrType: any): void {
     getUINativeModule().xComponent.setHdrBrightness(true, hdrBrightness, hdrType);
+  }
+
+  static setExtraFlag(extraFlag: number): void {
+    getUINativeModule().xComponent.setExtraFlag(true, extraFlag);
   }
 
   static enableTransparentLayer(value: any): void {

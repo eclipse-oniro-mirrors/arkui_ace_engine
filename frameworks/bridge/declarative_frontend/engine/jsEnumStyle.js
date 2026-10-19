@@ -4418,6 +4418,12 @@ let XComponentType;
   XComponentType[XComponentType.NODE = 3] = 'NODE';
 })(XComponentType || (XComponentType = {}));
 
+let XComponentExtraFlag;
+(function (XComponentExtraFlag) {
+  XComponentExtraFlag[XComponentExtraFlag.ENABLE_SOLID_COLOR = 1] = 'ENABLE_SOLID_COLOR';
+})(XComponentExtraFlag || (XComponentExtraFlag = {}));
+
+
 let NestedScrollMode;
 (function (NestedScrollMode) {
   NestedScrollMode[NestedScrollMode.SELF_ONLY = 0] = 'SELF_ONLY';
