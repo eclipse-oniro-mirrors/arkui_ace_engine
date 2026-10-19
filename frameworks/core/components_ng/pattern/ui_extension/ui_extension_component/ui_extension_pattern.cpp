@@ -94,12 +94,12 @@ bool StartWith(const std::string &source, const std::string &prefix)
     return source.find(prefix) == 0;
 }
 
-void ParseDumpInfoToJson(const std::shared_ptr<JsonValue>& json, const std::vector<std::string>& dumpInfo,
+std::unique_ptr<JsonValue> ParseDumpInfoToJson(const std::vector<std::string>& dumpInfo,
     const std::shared_ptr<std::atomic_bool>& taskValid)
 {
     for (const auto& dumpStr : dumpInfo) {
         if (!taskValid->load(std::memory_order_acquire)) {
-            return;
+            return nullptr;
         }
         size_t pos = dumpStr.find("UINodeCount:");
         if (pos == std::string::npos) {
@@ -112,30 +112,25 @@ void ParseDumpInfoToJson(const std::shared_ptr<JsonValue>& json, const std::vect
         std::string filteredData = dumpStr.substr(start + 1);
         filteredData.erase(filteredData.find_last_not_of("\n") + 1);
         auto childJson = JsonUtil::ParseJsonString(filteredData);
-        if (childJson && taskValid->load(std::memory_order_acquire)) {
-            json->Put("$child-uec", childJson);
+        if (childJson && childJson->IsObject() && taskValid->load(std::memory_order_acquire)) {
+            return childJson;
         }
-        return;
+        return nullptr;
     }
+    return nullptr;
 }
 
-void ExecuteNotifyDumpTask(const std::shared_ptr<JsonValue>& json, const std::vector<std::string>& params,
-    const RefPtr<SessionWrapper>& sessionWrapper, const std::shared_ptr<std::promise<void>>& promise,
+void ExecuteNotifyDumpTask(const std::vector<std::string>& params, const RefPtr<SessionWrapper>& sessionWrapper,
+    const std::shared_ptr<std::promise<std::unique_ptr<JsonValue>>>& promise,
     const std::shared_ptr<std::atomic_bool>& taskValid)
 {
-    auto notifyOnExit = [&promise]() { promise->set_value(); };
     if (!taskValid->load(std::memory_order_acquire)) {
-        notifyOnExit();
+        promise->set_value(nullptr);
         return;
     }
     std::vector<std::string> dumpInfo;
     sessionWrapper->NotifyUieDump(params, dumpInfo);
-    if (!taskValid->load(std::memory_order_acquire)) {
-        notifyOnExit();
-        return;
-    }
-    ParseDumpInfoToJson(json, dumpInfo, taskValid);
-    notifyOnExit();
+    promise->set_value(ParseDumpInfoToJson(dumpInfo, taskValid));
 }
 }
 UIExtensionPattern::UIExtensionPattern(
@@ -2227,6 +2222,8 @@ void UIExtensionPattern::AddExtraInfoWithParamConfig(std::shared_ptr<JsonValue>&
     params.push_back(config.withUIExtension ? "1" : "0");
     params.push_back(config.rectCulling ? "1" : "0");
     params.push_back(std::to_string(config.minOpacity));
+    params.push_back(config.withResponseRegion ? "1" : "0");
+    params.push_back(config.withXComponent ? "1" : "0");
     auto host = GetHost();
     CHECK_NULL_VOID(host);
     if (!container->IsUIExtensionWindow()) {
@@ -2260,11 +2257,11 @@ void UIExtensionPattern::ExecuteDumpTask(
 
     auto taskValid = std::make_shared<std::atomic_bool>(true);
     CHECK_NULL_VOID(taskValid);
-    auto promise = std::make_shared<std::promise<void>>();
+    auto promise = std::make_shared<std::promise<std::unique_ptr<JsonValue>>>();
     CHECK_NULL_VOID(promise);
     auto future = promise->get_future();
-    auto postResult = taskExecutor->PostTask([json, params, sessionWrapper, promise, taskValid]() {
-        ExecuteNotifyDumpTask(json, params, sessionWrapper, promise, taskValid);
+    auto postResult = taskExecutor->PostTask([params, sessionWrapper, promise, taskValid]() {
+        ExecuteNotifyDumpTask(params, sessionWrapper, promise, taskValid);
     }, TaskExecutor::TaskType::BACKGROUND, "UiSessionGetInspectorTree");
     if (!postResult) {
         taskValid->store(false, std::memory_order_release);
@@ -2274,6 +2271,13 @@ void UIExtensionPattern::ExecuteDumpTask(
     auto result = future.wait_for(std::chrono::milliseconds(GET_INSPECTOR_TREE_TIMEOUT_TIME));
     if (result == std::future_status::timeout) {
         taskValid->store(false, std::memory_order_release);
+        return;
+    }
+    // Only the UI thread mutates the native snapshot. A late task owns its
+    // separate result and cannot write after PutRef transfers the node JSON.
+    auto child = future.get();
+    if (child) {
+        json->Put("$child-uec", child);
     }
 }
 

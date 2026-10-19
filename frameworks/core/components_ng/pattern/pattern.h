@@ -331,6 +331,15 @@ public:
 
     RenderContext* GetRenderContext() const;
 
+    virtual void DumpInspectorTreeInfo(std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context)
+    {
+        InspectorDumpOptions options;
+        options.includeDiagnostic = true;
+        DumpSimplifyInfo(attrs, options);
+    }
+    virtual void AddInspectorTreeInfo(std::shared_ptr<JsonValue>& node, InspectorTreeRequestContext& context) {}
+    virtual bool HasInspectorSelection() const { return false; }
+
     virtual void DumpInfo() {}
     virtual void DumpInfo(std::unique_ptr<JsonValue>& json) {}
     virtual void DumpSimplifyInfo(std::unique_ptr<JsonValue>& json) {}

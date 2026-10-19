@@ -49,6 +49,8 @@ class TextPickerPattern : public LinearLayoutPattern {
     DECLARE_ACE_TYPE(TextPickerPattern, LinearLayoutPattern);
 
 public:
+    void DumpInspectorTreeInfo(std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context) override;
+
     TextPickerPattern() : LinearLayoutPattern(false) {};
 
     ~TextPickerPattern() override = default;

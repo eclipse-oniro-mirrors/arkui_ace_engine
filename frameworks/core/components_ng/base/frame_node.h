@@ -1703,6 +1703,8 @@ public:
     void UnRegisterLpxAttribute(LpxAttribute attribute);
     void RegisterLpxUpdateCallback(LpxAttribute attribute, std::function<void()>&& callback);
     void UnRegisterLpxUpdateCallback(LpxAttribute attribute);
+    void DumpInspectorTreeInfo(std::shared_ptr<JsonValue>& json, ParamConfig config) override;
+    void DumpInspectorResponseRegions(std::shared_ptr<JsonValue>& json, const InspectorTreeRequestContext& context);
     void FireLpxUpdateCallbacks();
     bool IsNeedLazyLayout() const;
     void MeasureSafeAreaInset() override;

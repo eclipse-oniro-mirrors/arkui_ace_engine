@@ -15,6 +15,8 @@
 
 #include "interfaces/inner_api/ui_session/ui_content_stub.h"
 
+#include <atomic>
+
 #include "accesstoken_kit.h"
 #include "ipc_skeleton.h"
 
@@ -27,6 +29,83 @@
 #include "adapter/ohos/entrance/ui_session/ui_translate_request_util.h"
 
 namespace OHOS::Ace {
+namespace {
+class InspectorReportDeathRecipient final : public IRemoteObject::DeathRecipient {
+public:
+    explicit InspectorReportDeathRecipient(std::function<void()> callback) : callback_(std::move(callback)) {}
+    void OnRemoteDied(const wptr<IRemoteObject>&) override
+    {
+        auto callback = callback_;
+        callback();
+    }
+private:
+    std::function<void()> callback_;
+};
+} // namespace
+
+bool UiContentStub::SaveInspectorReport(sptr<IRemoteObject> object, int32_t pid)
+{
+    if (!object) {
+        return false;
+    }
+    auto state = inspectorReports_;
+    uint64_t generation;
+    {
+        std::lock_guard<std::mutex> lock(state->mutex);
+        generation = ++state->generation;
+    }
+    std::weak_ptr<InspectorReportConnections> weak = state;
+    auto died = std::make_shared<std::atomic_bool>(false);
+    sptr<IRemoteObject::DeathRecipient> recipient = new InspectorReportDeathRecipient([weak, died, pid, generation]() {
+        died->store(true, std::memory_order_release);
+        auto state = weak.lock();
+        if (!state) {
+            return;
+        }
+        InspectorReportConnection removed;
+        {
+            std::lock_guard<std::mutex> lock(state->mutex);
+            auto found = state->reports.find(pid);
+            if (found != state->reports.end() && found->second.generation == generation) {
+                removed = std::move(found->second);
+                state->reports.erase(found);
+            }
+        }
+    });
+    const bool remote = object->IsProxyObject();
+    if (remote && !object->AddDeathRecipient(recipient)) {
+        return false;
+    }
+    InspectorReportConnection previous;
+    bool installed = false;
+    {
+        std::lock_guard<std::mutex> lock(state->mutex);
+        auto found = state->reports.find(pid);
+        if (!died->load(std::memory_order_acquire) &&
+            (found == state->reports.end() || found->second.generation < generation)) {
+            if (found != state->reports.end()) {
+                previous = std::move(found->second);
+            }
+            state->reports[pid] = { object, remote ? recipient : nullptr, generation };
+            installed = true;
+        }
+    }
+    if (previous.object && previous.recipient) {
+        previous.object->RemoveDeathRecipient(previous.recipient);
+    }
+    if (!installed && remote) {
+        object->RemoveDeathRecipient(recipient);
+    }
+    return installed;
+}
+
+sptr<IRemoteObject> UiContentStub::GetInspectorReport(int32_t pid)
+{
+    std::lock_guard<std::mutex> lock(inspectorReports_->mutex);
+    auto found = inspectorReports_->reports.find(pid);
+    return found == inspectorReports_->reports.end() ? nullptr : found->second.object;
+}
+
 bool UiContentStub::IsSACalling() const
 {
     using namespace Security::AccessToken;
@@ -277,10 +356,17 @@ int32_t UiContentStub::GetInspectorTreeInner(MessageParcel& data, MessageParcel&
         LOGW("GetInspectorTreeInner read GetInspectorTreeConfigImpl failed");
         return FAILED;
     }
-    int32_t processId = IPCSkeleton::GetCallingRealPid();
-    UiSessionManager::GetInstance()->SaveProcessId("getInspectorTree", processId);
-    GetInspectorTree(nullptr, configImplPtr->GetConfig());
+    auto config = configImplPtr->GetConfig();
     delete configImplPtr;
+    if (!data.ReadUint64(config.inspectorRoute.token.connectionEpoch) ||
+        !data.ReadUint64(config.inspectorRoute.token.generation) ||
+        config.inspectorRoute.token.connectionEpoch == 0 || config.inspectorRoute.token.generation == 0) {
+        return FAILED;
+    }
+    config.inspectorRoute.callerPid = IPCSkeleton::GetCallingRealPid();
+    config.inspectorReporter = UiSessionManager::GetInstance()->BindInspectorTreeReporter(
+        config.inspectorRoute, GetInspectorReport(config.inspectorRoute.callerPid));
+    GetInspectorTree(nullptr, config);
     return NO_ERROR;
 }
 
@@ -292,6 +378,10 @@ int32_t UiContentStub::ConnectInner(MessageParcel& data, MessageParcel& reply, M
         return FAILED;
     }
     int32_t processId = IPCSkeleton::GetCallingRealPid();
+    if (!SaveInspectorReport(reportProxy, processId)) {
+        LOGW("Inspector report connection could not be registered");
+        return FAILED;
+    }
     UiSessionManagerOhos* uisession = reinterpret_cast<UiSessionManagerOhos*>(UiSessionManager::GetInstance());
     uisession->SaveReportProxy(reportProxy, processId);
     uisession->SendBaseInfo(processId);
@@ -602,10 +692,17 @@ int32_t UiContentStub::GetVisibleInspectorTreeInner(MessageParcel& data, Message
         LOGW("GetVisibleInspectorTreeInner read GetInspectorTreeConfigImpl failed");
         return FAILED;
     }
-    int32_t processId = IPCSkeleton::GetCallingRealPid();
-    UiSessionManager::GetInstance()->SaveProcessId("getInspectorTree", processId);
-    GetVisibleInspectorTree(nullptr, configImplPtr->GetConfig());
+    auto config = configImplPtr->GetConfig();
     delete configImplPtr;
+    if (!data.ReadUint64(config.inspectorRoute.token.connectionEpoch) ||
+        !data.ReadUint64(config.inspectorRoute.token.generation) ||
+        config.inspectorRoute.token.connectionEpoch == 0 || config.inspectorRoute.token.generation == 0) {
+        return FAILED;
+    }
+    config.inspectorRoute.callerPid = IPCSkeleton::GetCallingRealPid();
+    config.inspectorReporter = UiSessionManager::GetInstance()->BindInspectorTreeReporter(
+        config.inspectorRoute, GetInspectorReport(config.inspectorRoute.callerPid));
+    GetVisibleInspectorTree(nullptr, config);
     return NO_ERROR;
 }
 

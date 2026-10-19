@@ -17,6 +17,7 @@
 #define FOUNDATION_ACE_INTERFACE_UI_CONTENT_PROXY_H
 
 #include <atomic>
+#include <mutex>
 
 #include "iremote_proxy.h"
 #include "ui_content_errors.h"
@@ -132,6 +133,7 @@ private:
         const std::function<bool(MessageParcel&)>& writeParams,
         int32_t timeout = DEFAULT_INSPECTOR_TREE_CALLBACK_TIMEOUT_MS);
     static inline BrokerDelegator<UIContentServiceProxy> delegator_;
+    std::mutex inspectorConnectionMutex_;
     sptr<UiReportStub> report_ = nullptr;
     bool isConnected_ = false;
     std::atomic_bool currentAbilityLanguageInfoPending_ = false;

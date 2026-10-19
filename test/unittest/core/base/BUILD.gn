@@ -40,12 +40,18 @@ ace_unittest("frame_node_test_ng") {
   }
   sources = [
     "frame_node_test_ng.cpp",
+    "inspector_tree_context_test_ng.cpp",
+    "inspector_tree_native_fields_test_ng.cpp",
+    "inspector_tree_response_region_test_ng.cpp",
     "frame_node_test_ng_coverage.cpp",
     "frame_node_test_ng_coverage_new.cpp",
     "frame_node_test_ng_dump.cpp",
     "frame_node_test_ng_new.cpp",
     "frame_node_test_ng_v3.cpp",
   ]
+  if (is_host_product) {
+    sources += [ "$ace_root/test/unittest/core/pattern/menu/menu_inspector_tree_test.cpp" ]
+  }
 }
 
 ace_unittest("frame_node_drop_test_ng") {

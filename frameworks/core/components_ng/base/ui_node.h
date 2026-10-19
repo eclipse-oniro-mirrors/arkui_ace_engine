@@ -353,6 +353,7 @@ public:
     // DFX info.
     virtual void DumpTree(int32_t depth, bool hasJson = false, const std::string& desc = "");
     void DumpTreeJsonForDiff(std::unique_ptr<JsonValue>& json);
+    virtual void DumpInspectorTreeInfo(std::shared_ptr<JsonValue>& current, ParamConfig config);
     void DumpSimplifyTreeBase(std::shared_ptr<JsonValue>& current);
     void DumpSimplifyTree(int32_t depth, std::shared_ptr<JsonValue>& current);
     void DumpSimplifyTreeNode(std::shared_ptr<JsonValue>& current, ParamConfig config);

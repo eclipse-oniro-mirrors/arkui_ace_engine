@@ -97,6 +97,8 @@ class ACE_FORCE_EXPORT TextPattern : public virtual Pattern,
         PageTranslateNode);
 
 public:
+    void DumpInspectorTreeInfo(std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context) override;
+
     TextPattern();
     ~TextPattern() override;
     virtual RefPtr<FrameNode> GetContentHost() const;

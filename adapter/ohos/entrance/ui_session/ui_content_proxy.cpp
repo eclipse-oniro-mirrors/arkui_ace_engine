@@ -49,7 +49,9 @@ int32_t UIContentServiceProxy::GetInspectorTree(
         LOGW("GetInspectorTree write interface token failed");
         return FAILED;
     }
-    if (report_ == nullptr) {
+    std::unique_lock<std::mutex> connectionLock(inspectorConnectionMutex_);
+    auto report = report_;
+    if (report == nullptr) {
         LOGW("reportStub is nullptr");
         return FAILED;
     }
@@ -60,20 +62,26 @@ int32_t UIContentServiceProxy::GetInspectorTree(
         return FAILED;
     }
 
-    bool registerSuccess = report_->RegisterGetInspectorTreeCallback(eventCallback);
+    InspectorTreeRequestToken token;
+    bool registerSuccess = report->RegisterInspectorTreeRequest(eventCallback, token);
     if (!registerSuccess) {
         LOGW("GetInspectorTree register callback failed");
         return LAST_UNFINISH;
     }
 
+    connectionLock.unlock();
+    if (!data.WriteUint64(token.connectionEpoch) || !data.WriteUint64(token.generation)) {
+        report->UnregisterInspectorTreeRequest(token);
+        return FAILED;
+    }
+    // Start the wait before synchronous IPC can block in the target's UI task.
+    report->PostInspectorTreeRequestTimeout(timeout, token);
     int32_t sendRequestErrorCode = Remote()->SendRequest(UI_CONTENT_SERVICE_GET_TREE, data, reply, option);
     if (sendRequestErrorCode != ERR_NONE) {
         LOGW("GetInspectorTree send request failed, errorCode is %{public}d", sendRequestErrorCode);
-        report_->UnregisterGetInspectorTreeCallback();
+        report->UnregisterInspectorTreeRequest(token);
         return REPLY_ERROR;
     }
-    // Post timeoutCallbackRemove at last to avoid clear next callback register
-    report_->PostGetInspectorTreeCallbackRemoveTask(timeout);
     return NO_ERROR;
 }
 
@@ -91,7 +99,9 @@ int32_t UIContentServiceProxy::GetVisibleInspectorTree(
         LOGW("GetVisibleInspectorTree write interface token failed");
         return FAILED;
     }
-    if (report_ == nullptr) {
+    std::unique_lock<std::mutex> connectionLock(inspectorConnectionMutex_);
+    auto report = report_;
+    if (report == nullptr) {
         LOGW("reportStub is nullptr");
         return FAILED;
     }
@@ -101,19 +111,25 @@ int32_t UIContentServiceProxy::GetVisibleInspectorTree(
         LOGW("GetVisibleInspectorTree write config failed");
         return FAILED;
     }
-    bool registerSuccess = report_->RegisterGetInspectorTreeCallback(eventCallback);
+    InspectorTreeRequestToken token;
+    bool registerSuccess = report->RegisterInspectorTreeRequest(eventCallback, token);
     if (!registerSuccess) {
         LOGW("GetVisibleInspectorTree register callback failed");
         return LAST_UNFINISH;
     }
+    connectionLock.unlock();
+    if (!data.WriteUint64(token.connectionEpoch) || !data.WriteUint64(token.generation)) {
+        report->UnregisterInspectorTreeRequest(token);
+        return FAILED;
+    }
+    // Start the wait before synchronous IPC can block in the target's UI task.
+    report->PostInspectorTreeRequestTimeout(timeout, token);
     int32_t sendRequestErrorCode = Remote()->SendRequest(GET_VISIBLE_TREE, data, reply, option);
     if (sendRequestErrorCode != ERR_NONE) {
         LOGW("GetVisibleInspectorTree send request failed, errorCode is %{public}d", sendRequestErrorCode);
-        report_->UnregisterGetInspectorTreeCallback();
+        report->UnregisterInspectorTreeRequest(token);
         return REPLY_ERROR;
     }
-    // Post timeoutCallbackRemove at last to avoid clear next callback register
-    report_->PostGetInspectorTreeCallbackRemoveTask(timeout);
     return NO_ERROR;
 }
 
@@ -153,15 +169,25 @@ int32_t UIContentServiceProxy::Connect(const EventCallback& eventCallback,
         LOGW("connect write interface token failed");
         return FAILED;
     }
-    report_ = new (std::nothrow) UiReportStub();
-    if (report_ == nullptr) {
+    sptr<UiReportStub> nextReport = new (std::nothrow) UiReportStub();
+    if (nextReport == nullptr) {
         LOGW("connect failed,create reportStub failed");
         return FAILED;
     }
-    report_->RegisterGetBaseInfoCallback(eventCallback);
-    if (!data.WriteRemoteObject(report_)) {
+    nextReport->RegisterGetBaseInfoCallback(eventCallback);
+    nextReport->SetEventHandler(eventHandler);
+    if (!data.WriteRemoteObject(nextReport)) {
         LOGW("write reportStub failed");
         return FAILED;
+    }
+    sptr<UiReportStub> previous;
+    {
+        std::lock_guard<std::mutex> lock(inspectorConnectionMutex_);
+        previous = report_;
+        report_ = nextReport;
+    }
+    if (previous) {
+        previous->UnregisterGetInspectorTreeCallback();
     }
     int32_t sendRequestErrorCode = Remote()->SendRequest(UI_CONTENT_CONNECT, data, reply, option);
     if (sendRequestErrorCode != ERR_NONE) {
@@ -169,7 +195,6 @@ int32_t UIContentServiceProxy::Connect(const EventCallback& eventCallback,
         return REPLY_ERROR;
     }
     isConnected_ = true;
-    report_->SetEventHandler(eventHandler);
     return NO_ERROR;
 }
 

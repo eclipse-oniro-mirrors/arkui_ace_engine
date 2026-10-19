@@ -16,6 +16,8 @@
 #include "ui_sa_service.h"
 
 #include <algorithm>
+#include <atomic>
+#include <chrono>
 #include <cerrno>
 #include <cctype>
 #include <cinttypes>
@@ -528,6 +530,7 @@ std::string BuildBatchSetTextCommand(const std::vector<std::string>& params)
 const std::map<std::string, UiSaService::DumpHandler> UiSaService::DUMP_MAP = {
     { "Connect", &UiSaService::HandleConnect },
     { "GetVisibleInspectorTree", &UiSaService::HandleGetVisibleInspectorTree },
+    { "GetInspectorTree", &UiSaService::HandleGetInspectorTree },
     { "GetCurrentPageName", &UiSaService::HandleGetCurrentPageName },
     { "SendCommand", &UiSaService::HandleSendCommand },
     { "SendBatchSetText", &UiSaService::HandleSendBatchSetText },
@@ -687,38 +690,125 @@ void UiSaService::HandleConnect(sptr<IUiContentService> service, std::vector<std
 
 void UiSaService::HandleGetVisibleInspectorTree(sptr<IUiContentService> service, std::vector<std::string> params)
 {
-    bool toFile = params.back() == "-tofile";
-    auto visibleInspectorTreeCallBack = [toFile](const std::string& data, int32_t index, bool isEnd) {
-        LOGI("[GetVisibleInspectorTree] data = %{public}s", data.substr(0, 200).c_str());
-        if (isEnd && toFile) {
-            auto filePath = UI_SA_PATH + "arkui_tree_" + GetCurrentTimestampStr() + ".json";
-            std::unique_ptr<std::ofstream> ostream = std::make_unique<std::ofstream>(filePath);
-            CHECK_NULL_VOID(ostream);
-            if (!ostream->is_open()) {
-                LOGW("[GetVisibleInspectorTree] filePath is invalid");
+    HandleInspectorTree(service, params, true);
+}
+
+void UiSaService::HandleGetInspectorTree(sptr<IUiContentService> service, std::vector<std::string> params)
+{
+    HandleInspectorTree(service, params, false);
+}
+
+void UiSaService::HandleInspectorTree(
+    sptr<IUiContentService> service, const std::vector<std::string>& params, bool visible)
+{
+    CHECK_NULL_VOID(service);
+    ParamConfig config;
+    int32_t timeout = DEFAULT_INSPECTOR_TREE_CALLBACK_TIMEOUT_MS;
+    bool toFile = false;
+    std::string caseId = "manual";
+    // Preserve the historical Visible positional form.
+    if (params.size() >= SIMPLIFYTREE_WITH_PARAMCONFIG && params[1].rfind("--", 0) != 0) {
+        config.interactionInfo = params[GET_VISIBLE_INTERACTION_INFO_INDEX] == "true";
+        config.accessibilityInfo = params[GET_VISIBLE_ACCESSIBILITY_INFO_INDEX] == "true";
+        config.cacheNodes = params[GET_VISIBLE_CACHE_NODES_INDEX] == "true";
+        config.withWeb = params[GET_VISIBLE_WITH_WEB_INDEX] == "true";
+        config.withUIExtension = params[GET_VISIBLE_WITH_UI_EXTENSION_INDEX] == "true";
+        if (params.size() >= SIMPLIFYTREE_WITH_EXTENDED_PARAMCONFIG) {
+            config.rectCulling = params[GET_VISIBLE_RECT_CULLING_INDEX] == "true";
+            config.minOpacity = ParseMinOpacityParam(params[GET_VISIBLE_MIN_OPACITY_INDEX]);
+        }
+        if (params.size() >= SIMPLIFYTREE_WITH_THIRD_PROVIDER_PARAMCONFIG) {
+            config.withThirdProvider = params[GET_VISIBLE_WITH_THIRD_PROVIDER_INDEX] == "true";
+        }
+    }
+    const std::map<std::string, bool*> flags {
+        { "--interactionInfo", &config.interactionInfo }, { "--accessibilityInfo", &config.accessibilityInfo },
+        { "--cacheNodes", &config.cacheNodes }, { "--withWeb", &config.withWeb },
+        { "--withUIExtension", &config.withUIExtension }, { "--rectCulling", &config.rectCulling },
+        { "--withThirdProvider", &config.withThirdProvider },
+        { "--withResponseRegion", &config.withResponseRegion }, { "--withXComponent", &config.withXComponent }
+    };
+    for (size_t i = 1; i < params.size(); ++i) {
+        if (params[i] == "-tofile") {
+            toFile = true;
+            continue;
+        }
+        if (params[i].rfind("--", 0) != 0) {
+            continue;
+        }
+        auto separator = params[i].find('=');
+        auto key = params[i].substr(0, separator);
+        std::string value;
+        if (separator != std::string::npos) {
+            value = params[i].substr(separator + 1);
+        } else if (i + 1 < params.size()) {
+            value = params[++i];
+        } else {
+            LOGW("[InspectorTree] missing option value");
+            return;
+        }
+        auto flag = flags.find(key);
+        if (flag != flags.end()) {
+            if (value != "true" && value != "false" && value != "1" && value != "0") {
+                LOGW("[InspectorTree] invalid boolean option");
                 return;
             }
-            ostream->write(data.c_str(), data.length());
-            LOGI("[GetVisibleInspectorTree] tree is saved to %{public}s", filePath.c_str());
+            *flag->second = value == "true" || value == "1";
+        } else if (key == "--minOpacity") {
+            config.minOpacity = ParseMinOpacityParam(value);
+        } else if (key == "--timeout") {
+            char* end = nullptr;
+            errno = 0;
+            auto parsed = std::strtol(value.c_str(), &end, 10);
+            if (errno || end == value.c_str() || *end || parsed < INT32_MIN || parsed > INT32_MAX) {
+                LOGW("[InspectorTree] invalid timeout option");
+                return;
+            }
+            timeout = static_cast<int32_t>(parsed);
+        } else if (key == "--caseId") {
+            if (value.empty() || value.size() > 64 || !std::all_of(value.begin(), value.end(), [](unsigned char c) {
+                return std::isalnum(c) || c == '_' || c == '-';
+            })) {
+                LOGW("[InspectorTree] invalid case identifier");
+                return;
+            }
+            caseId = value;
+        } else {
+            LOGW("[InspectorTree] unknown option");
+            return;
+        }
+    }
+    if (!EnsureConnected(service)) {
+        return;
+    }
+    auto now = []() {
+        return std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count();
+    };
+    const auto start = now();
+    const std::string api = visible ? "GetVisibleInspectorTree" : "GetInspectorTree";
+    auto count = std::make_shared<std::atomic<int32_t>>(0);
+    const auto filePath = UI_SA_PATH + "arkui_tree_" + caseId + "_" + GetCurrentTimestampStr() + ".json";
+    auto callback = [toFile, filePath, start, now, api, caseId, count](std::string data, int32_t part, bool last) {
+        const auto calls = ++*count;
+        LOGI("[InspectorTree] caseId=%{public}s api=%{public}s bytes=%{public}zu part=%{public}d "
+            "lastPart=%{public}d callbackCount=%{public}d startMs=%{public}" PRId64 " endMs=%{public}" PRId64,
+            caseId.c_str(), api.c_str(), data.size(), part, last, calls, start, now());
+        if (toFile && last) {
+            std::ofstream output(filePath, std::ios::binary | std::ios::trunc);
+            output.write(data.data(), static_cast<std::streamsize>(data.size()));
+            LOGI("[InspectorTree] fileSaved=%{public}d dataFile=%{public}s", output.good(), filePath.c_str());
         }
     };
-    if (params.size() >= SIMPLIFYTREE_WITH_EXTENDED_PARAMCONFIG) {
-        service->GetVisibleInspectorTree(visibleInspectorTreeCallBack,
-            { params[GET_VISIBLE_INTERACTION_INFO_INDEX] == "true",
-                params[GET_VISIBLE_ACCESSIBILITY_INFO_INDEX] == "true",
-                params[GET_VISIBLE_CACHE_NODES_INDEX] == "true", params[GET_VISIBLE_WITH_WEB_INDEX] == "true",
-                params[GET_VISIBLE_WITH_UI_EXTENSION_INDEX] == "true",
-                params[GET_VISIBLE_RECT_CULLING_INDEX] == "true",
-                ParseMinOpacityParam(params[GET_VISIBLE_MIN_OPACITY_INDEX]) });
-    } else if (params.size() >= SIMPLIFYTREE_WITH_PARAMCONFIG) {
-        service->GetVisibleInspectorTree(visibleInspectorTreeCallBack,
-            { params[GET_VISIBLE_INTERACTION_INFO_INDEX] == "true",
-                params[GET_VISIBLE_ACCESSIBILITY_INFO_INDEX] == "true",
-                params[GET_VISIBLE_CACHE_NODES_INDEX] == "true", params[GET_VISIBLE_WITH_WEB_INDEX] == "true",
-                params[GET_VISIBLE_WITH_UI_EXTENSION_INDEX] == "true" });
-    } else {
-        service->GetVisibleInspectorTree(visibleInspectorTreeCallBack);
-    }
+    LOGI("[InspectorTree] caseId=%{public}s api=%{public}s config=%{public}d,%{public}d,%{public}d,"
+        "%{public}d,%{public}d,%{public}d,%{public}f,%{public}d,%{public}d,%{public}d timeout=%{public}d",
+        caseId.c_str(), api.c_str(), config.interactionInfo, config.accessibilityInfo, config.cacheNodes,
+        config.withWeb, config.withUIExtension, config.rectCulling, config.minOpacity,
+        config.withThirdProvider, config.withResponseRegion, config.withXComponent, timeout);
+    const auto result = visible ? service->GetVisibleInspectorTree(callback, config, timeout) :
+        service->GetInspectorTree(callback, config, timeout);
+    LOGI("[InspectorTree] caseId=%{public}s api=%{public}s returnCode=%{public}d startMs=%{public}" PRId64,
+        caseId.c_str(), api.c_str(), result, start);
 }
 
 void UiSaService::HandleGetCurrentPageName(sptr<IUiContentService> service, std::vector<std::string> params)

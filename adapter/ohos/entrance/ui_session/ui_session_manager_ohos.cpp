@@ -1639,6 +1639,18 @@ void UiSessionManagerOhos::SaveInspectorTreeFunction(InspectorFunction&& functio
     inspectorFunction_ = std::move(function);
 }
 
+std::function<void(const std::string&)> UiSessionManagerOhos::BindInspectorTreeReporter(
+    const InspectorTreeRequestRoute& route, const sptr<IRemoteObject>& report)
+{
+    auto service = report ? iface_cast<ReportService>(report) : nullptr;
+    // An absent/dead original endpoint must never redirect this request to a new connection.
+    return [service, token = route.token](const std::string& data) {
+        if (service) {
+            service->ReportInspectorTreeForRequest(data, 1, true, token);
+        }
+    };
+}
+
 void UiSessionManagerOhos::ReportInspectorTreeValue(const std::string& data)
 {
     UI_SESSION_SCOPED_TRACE("[UiSessionManagerOhos] ReportInspectorTreeValue");

@@ -498,6 +498,11 @@ void FrameNode::MarkModifyDone() {}
 void FrameNode::DumpInfo(std::unique_ptr<JsonValue>&) {}
 void FrameNode::DumpAdvanceInfo() {}
 void FrameNode::DumpAdvanceInfo(std::unique_ptr<JsonValue>&) {}
+void FrameNode::DumpInspectorTreeInfo(std::shared_ptr<JsonValue>& json, ParamConfig config)
+{
+    UINode::DumpInspectorTreeInfo(json, config);
+}
+
 void FrameNode::DumpSimplifyInfo(std::shared_ptr<JsonValue>&) {}
 void FrameNode::DumpSimplifyInfoWithParamConfig(std::shared_ptr<JsonValue>& json, ParamConfig config)
 {

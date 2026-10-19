@@ -29,6 +29,11 @@
 
 namespace {
 constexpr char GET_INSPECTOR_TREE_CALLBACK_TIMEOUT[] = "GetInspectorTreeCallbackTimeout";
+std::string InspectorTimeoutName(const OHOS::Ace::InspectorTreeRequestToken& token)
+{
+    return std::string(GET_INSPECTOR_TREE_CALLBACK_TIMEOUT) + ":" + std::to_string(token.connectionEpoch) +
+        ":" + std::to_string(token.generation);
+}
 constexpr char NAVIGATION_QUERY_CALLBACK_TIMEOUT[] = "NavigationQueryCallbackTimeout";
 constexpr char LAZY_FOREACH_QUERY_CALLBACK_TIMEOUT[] = "LazyForEachQueryCallbackTimeout";
 constexpr char PAGE_TRANSLATE_CALLBACK_TIMEOUT[] = "PageTranslateCallbackTimeout";
@@ -231,9 +236,14 @@ int32_t UiReportStub::OnRemoteRequest(uint32_t code, MessageParcel& data, Messag
                 LOGW("ReportInspectorTreeValue read data failed");
                 break;
             }
-            int32_t partNum = data.ReadInt32();
-            bool isLastPart = data.ReadBool();
-            ReportInspectorTreeValue(result, partNum, isLastPart);
+            int32_t partNum = 0;
+            bool isLastPart = false;
+            InspectorTreeRequestToken token;
+            if (!data.ReadInt32(partNum) || !data.ReadBool(isLastPart) ||
+                !data.ReadUint64(token.connectionEpoch) || !data.ReadUint64(token.generation)) {
+                break;
+            }
+            ReportInspectorTreeForRequest(result, partNum, isLastPart, token);
             break;
         }
         case REPORT_WEB_UNFOCUS_EVENT: {
@@ -503,19 +513,30 @@ void UiReportStub::ReportSearchEvent(const std::string& data)
 
 void UiReportStub::ReportInspectorTreeValue(const std::string& data, int32_t partNum, bool isLastPart)
 {
-    std::function<void(std::string, int32_t, bool)> inspectorTreeCallback;
+    InspectorTreeRequestToken token;
     {
         std::lock_guard<std::mutex> lock(inspectorTreeCallbackMutex_);
-        if (inspectorTreeCallback_ == nullptr) {
+        token = inspectorToken_;
+    }
+    ReportInspectorTreeForRequest(data, partNum, isLastPart, token);
+}
+
+void UiReportStub::ReportInspectorTreeForRequest(const std::string& data, int32_t partNum, bool isLastPart,
+    const InspectorTreeRequestToken& token)
+{
+    std::function<void(std::string, int32_t, bool)> callback;
+    {
+        std::lock_guard<std::mutex> lock(inspectorTreeCallbackMutex_);
+        if (!inspectorTreeCallback_ || !(token == inspectorToken_)) {
             return;
         }
-        inspectorTreeCallback = inspectorTreeCallback_;
+        callback = inspectorTreeCallback_;
         if (isLastPart) {
             CancelGetInspectorTreeCallbackTimeoutTaskLocked();
             inspectorTreeCallback_ = nullptr;
         }
     }
-    inspectorTreeCallback(data, partNum, isLastPart);
+    callback(data, partNum, isLastPart);
 }
 
 void UiReportStub::ReportHitTestNodeInfos(const std::string& data, int32_t partNum, bool isLastPart)
@@ -781,30 +802,59 @@ void UiReportStub::RegisterClickEventCallback(const EventCallback& eventCallback
 
 void UiReportStub::UnregisterGetInspectorTreeCallback()
 {
-    std::lock_guard<std::mutex> lock(inspectorTreeCallbackMutex_);
-    inspectorTreeCallback_ = nullptr;
+    std::function<void(std::string, int32_t, bool)> released;
+    {
+        std::lock_guard<std::mutex> lock(inspectorTreeCallbackMutex_);
+        CancelGetInspectorTreeCallbackTimeoutTaskLocked();
+        released = std::move(inspectorTreeCallback_);
+    }
+}
+
+void UiReportStub::UnregisterInspectorTreeRequest(const InspectorTreeRequestToken& token)
+{
+    std::function<void(std::string, int32_t, bool)> released;
+    {
+        std::lock_guard<std::mutex> lock(inspectorTreeCallbackMutex_);
+        if (!(token == inspectorToken_)) {
+            return;
+        }
+        CancelGetInspectorTreeCallbackTimeoutTaskLocked();
+        released = std::move(inspectorTreeCallback_);
+    }
 }
 
 void UiReportStub::PostGetInspectorTreeCallbackRemoveTask(int32_t timeout)
 {
-    auto eventHandler = eventHandler_.lock();
-    if (eventHandler == nullptr) {
-        LOGE("PostGetInspectorTreeCallbackRemoveTask eventHandler is null");
+    InspectorTreeRequestToken token;
+    {
+        std::lock_guard<std::mutex> lock(inspectorTreeCallbackMutex_);
+        token = inspectorToken_;
+    }
+    PostInspectorTreeRequestTimeout(timeout, token);
+}
+
+void UiReportStub::PostInspectorTreeRequestTimeout(int32_t timeout, const InspectorTreeRequestToken& token)
+{
+    auto handler = eventHandler_.lock();
+    if (!handler) {
+        LOGW("InspectorTree timeout handler unavailable");
+        return;
+    }
+    std::function<void(std::string, int32_t, bool)> released;
+    std::lock_guard<std::mutex> lock(inspectorTreeCallbackMutex_);
+    if (!inspectorTreeCallback_ || !(token == inspectorToken_)) {
         return;
     }
     wptr<UiReportStub> weakThis = this;
-    bool postTaskSuccess = eventHandler->PostTask([weakThis]() {
-        auto uiReportStub = weakThis.promote();
-        if (uiReportStub == nullptr) {
-            LOGE("PostGetInspectorTreeCallbackRemoveTask uiReportStub is null");
-            return;
+    const bool posted = handler->PostTask([weakThis, token]() {
+        auto stub = weakThis.promote();
+        if (stub) {
+            stub->UnregisterInspectorTreeRequest(token);
         }
-        uiReportStub->HandleInspectorTreeCallbackTimeout();
-    }, GET_INSPECTOR_TREE_CALLBACK_TIMEOUT, NormalizeTimeout(timeout, DEFAULT_INSPECTOR_TREE_CALLBACK_TIMEOUT_MS));
-    if (!postTaskSuccess) {
-        LOGW("Post GetInspectorTree timeout task failed");
-        std::lock_guard<std::mutex> lock(inspectorTreeCallbackMutex_);
-        inspectorTreeCallback_ = nullptr;
+    }, InspectorTimeoutName(token), NormalizeTimeout(timeout, DEFAULT_INSPECTOR_TREE_CALLBACK_TIMEOUT_MS));
+    if (!posted) {
+        released = std::move(inspectorTreeCallback_);
+        LOGW("InspectorTree timeout task submission failed");
     }
 }
 
@@ -869,13 +919,22 @@ void UiReportStub::CancelPageTranslateResultWatchdogTask(int32_t nodeId, int64_t
 }
 
 bool UiReportStub::RegisterGetInspectorTreeCallback(
-    const std::function<void(std::string, int32_t, bool)>& eventCallback)
+    const std::function<void(std::string, int32_t, bool)>& callback)
+{
+    InspectorTreeRequestToken token;
+    return RegisterInspectorTreeRequest(callback, token);
+}
+
+bool UiReportStub::RegisterInspectorTreeRequest(
+    const std::function<void(std::string, int32_t, bool)>& callback, InspectorTreeRequestToken& token)
 {
     std::lock_guard<std::mutex> lock(inspectorTreeCallbackMutex_);
-    if (inspectorTreeCallback_ != nullptr) {
+    if (inspectorTreeCallback_) {
         return false;
     }
-    inspectorTreeCallback_ = eventCallback;
+    ++inspectorToken_.generation;
+    token = inspectorToken_;
+    inspectorTreeCallback_ = callback;
     return true;
 }
 
@@ -968,7 +1027,7 @@ void UiReportStub::CancelGetInspectorTreeCallbackTimeoutTaskLocked()
         LOGE("CancelGetInspectorTreeCallbackTimeoutTaskLocked eventHandler is null");
         return;
     }
-    eventHandler->RemoveTask(GET_INSPECTOR_TREE_CALLBACK_TIMEOUT);
+    eventHandler->RemoveTask(InspectorTimeoutName(inspectorToken_));
 }
 
 void UiReportStub::ClearPageTranslateCallbackLocked()

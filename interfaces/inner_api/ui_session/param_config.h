@@ -18,6 +18,9 @@
 
 #include <cstdint>
 #include <string>
+#include <functional>
+
+#include "interfaces/inner_api/ui_session/inspector_tree_request.h"
 
 namespace OHOS::Ace::NG {
 class InspectorTreeRequestContext;
@@ -48,6 +51,13 @@ struct ParamConfig {
     bool withCustomContent = false;
     // Borrowed request state; never serialized into the configuration parcel.
     NG::InspectorTreeRequestContext* inspectorContext = nullptr;
+
+    bool withResponseRegion = false;
+    // Compatibility entry for the third-provider data returned by XComponent/Custom hooks.
+    bool withXComponent = false;
+    // Internal request values are never included in the public configuration parcel.
+    InspectorTreeRequestRoute inspectorRoute;
+    std::function<void(const std::string&)> inspectorReporter;
 
     bool IsPublicTree() const
     {

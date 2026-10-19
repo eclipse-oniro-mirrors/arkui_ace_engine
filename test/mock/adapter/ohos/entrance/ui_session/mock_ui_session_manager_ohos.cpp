@@ -19,4 +19,9 @@ namespace OHOS::Ace {
 void UiSessionManagerOhos::SaveReportProxy(sptr<IRemoteObject> reportProxy, int32_t processId)
 {
 }
+std::function<void(const std::string&)> UiSessionManagerOhos::BindInspectorTreeReporter(
+    const InspectorTreeRequestRoute& route, const sptr<IRemoteObject>& report)
+{
+    return {};
+}
 } // namespace OHOS::Ace

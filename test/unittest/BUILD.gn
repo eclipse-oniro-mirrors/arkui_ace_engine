@@ -292,6 +292,7 @@ ohos_static_library("ace_components_base") {
     "$ace_root/frameworks/core/components_ng/base/geometry_node.cpp",
     "$ace_root/frameworks/core/components_ng/base/inspector.cpp",
     "$ace_root/frameworks/core/components_ng/base/inspector_filter.cpp",
+    "$ace_root/frameworks/core/components_ng/base/inspector_tree_request_context.cpp",
     "$ace_root/frameworks/core/components_ng/base/mixed_mount_registry.cpp",
     "$ace_root/frameworks/core/components_ng/base/modifier.cpp",
     "$ace_root/frameworks/core/components_ng/base/navigation_register.cpp",

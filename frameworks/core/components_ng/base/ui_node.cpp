@@ -1591,6 +1591,16 @@ void UINode::DumpSimplifyTreeNode(std::shared_ptr<JsonValue>& current, ParamConf
 
 void UINode::DumpSimplifyInfoWithParamConfig(std::shared_ptr<JsonValue>& current, ParamConfig config)
 {
+    if (config.inspectorContext) {
+        DumpInspectorTreeInfo(current, config);
+        return;
+    }
+    DumpSimplifyInfo(current);
+    DumpSimplifyInfoOnlyForParamConfig(current, config);
+}
+
+void UINode::DumpInspectorTreeInfo(std::shared_ptr<JsonValue>& current, ParamConfig config)
+{
     DumpSimplifyInfo(current);
     DumpSimplifyInfoOnlyForParamConfig(current, config);
 }

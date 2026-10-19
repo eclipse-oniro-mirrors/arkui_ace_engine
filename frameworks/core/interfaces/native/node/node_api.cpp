@@ -20,6 +20,7 @@
 #include "core/interfaces/native/node/interaction_observer_api.h"
 
 #include "core/interfaces/native/node/node_api.h"
+#include "core/interfaces/native/node/ui_tree_api.h"
 
 #include <securec.h>
 #include <vector>

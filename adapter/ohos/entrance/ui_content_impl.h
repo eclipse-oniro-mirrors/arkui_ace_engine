@@ -598,7 +598,7 @@ protected:
     std::vector<std::string> registerComponents_;
 
     sptr<IRemoteObject> parentToken_ = nullptr;
-    sptr<IRemoteObject> instance_ = new (std::nothrow) UIContentServiceStubImpl();
+    sptr<UIContentServiceStubImpl> instance_ = new (std::nothrow) UIContentServiceStubImpl();
     bool isUIExtensionSubWindow_ = false;
     bool isUIExtensionAbilityProcess_ = false;
     bool isUIExtensionAbilityHost_ = false;

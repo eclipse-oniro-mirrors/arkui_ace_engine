@@ -20,8 +20,11 @@
 #include "core/accessibility/accessibility_manager_ng.h"
 
 #include <cmath>
+#include <cstdlib>
 #include <unistd.h>
 #include "base/resource/data_provider_manager.h"
+#include "core/components_ng/base/inspector_tree_request_context.h"
+#include "base/json/json_util_internal.h"
 #include "base/subwindow/subwindow_manager.h"
 #include "core/common/draw_delegate.h"
 #include "core/common/event_manager.h"
@@ -169,6 +172,8 @@ constexpr size_t DUMP_PARAM_WITH_WEB_OFFSET = 3;
 constexpr size_t DUMP_PARAM_WITH_UI_EXTENSION_OFFSET = 4;
 constexpr size_t DUMP_PARAM_RECT_CULLING_OFFSET = 5;
 constexpr size_t DUMP_PARAM_MIN_OPACITY_OFFSET = 6;
+constexpr size_t DUMP_PARAM_WITH_RESPONSE_REGION_OFFSET = 8;
+constexpr size_t DUMP_PARAM_WITH_XCOMPONENT_OFFSET = 9;
 constexpr size_t SIMPLIFYTREE_WITH_PARAMCONFIG =
     DUMP_PARAM_DEFAULT_START_INDEX + DUMP_PARAM_WITH_WEB_OFFSET + 1;
 constexpr size_t SIMPLIFYTREE_WITH_EXTENDED_PARAMCONFIG =
@@ -288,6 +293,17 @@ ParamConfig ParseDumpParamConfig(const std::vector<std::string>& params, size_t 
     if (params.size() > minOpacityIndex && params[rectCullingIndex] != PID_FLAG &&
         params[minOpacityIndex] != PID_FLAG) {
         config.minOpacity = ParseMinOpacityParam(params[minOpacityIndex]);
+    }
+    // PID_FLAG terminates the configuration in UIExtension dump requests.
+    const auto responseRegionIndex = startIndex + DUMP_PARAM_WITH_RESPONSE_REGION_OFFSET;
+    const auto xComponentIndex = startIndex + DUMP_PARAM_WITH_XCOMPONENT_OFFSET;
+    const auto configEnd = std::find(params.begin() + startIndex, params.end(), PID_FLAG);
+    const auto configSize = static_cast<size_t>(std::distance(params.begin(), configEnd));
+    if (configSize > responseRegionIndex) {
+        config.withResponseRegion = ParseBoolParam(params[responseRegionIndex]);
+    }
+    if (configSize > xComponentIndex) {
+        config.withXComponent = ParseBoolParam(params[xComponentIndex]);
     }
     return config;
 }
@@ -4736,11 +4752,30 @@ bool PipelineContext::OnDumpInfo(const std::vector<std::string>& params) const
         DumpLog::GetInstance().OutPutDefault();
 #ifndef CROSS_PLATFORM
     } else if (params[0] == "-allInfoWithParamConfigTotal" && params.size() >= SIMPLIFYTREE_WITH_PARAMCONFIG) {
+        JsonWriteErrorScope errors;
         auto root = JsonUtil::CreateSharedPtrJson(true);
         GetAppInfo(root);
         auto config = ParseDumpParamConfig(params);
+        auto snapshot = inspectorWindowSnapshot_ ? inspectorWindowSnapshot_() :
+            std::make_optional(InspectorWindowSnapshot {});
+        if (!snapshot) {
+            return true;
+        }
+        InspectorTreeRequestContext context(config, {}, std::move(*snapshot));
+        config.inspectorContext = &context;
+        auto appInfo = root->GetObject("appInfo");
+        appInfo->Put("WindowTitle", context.window.windowTitle.c_str());
+        appInfo->Put("PID", context.window.pid);
         rootNode_->DumpSimplifyTreeWithParamConfig(0, root, params[1] == "1", config);
-        DumpLog::GetInstance().Print(root->ToString());
+        context.FinalizeNativeTree(root);
+        char* data = nullptr;
+        size_t size = 0;
+        constexpr size_t MAX_REPORT_BYTES = 100 * 1024 * 1024;
+        if (!errors.HasError() &&
+            WriteJsonBounded(*root, false, MAX_REPORT_BYTES, &data, &size) == JsonWriteResult::SUCCESS) {
+            DumpLog::GetInstance().Print(std::string(data, size));
+        }
+        std::free(data);
 #endif
 #ifndef IS_RELEASE_VERSION
 #ifndef CROSS_PLATFORM
@@ -5999,6 +6034,7 @@ void PipelineContext::SetAppBgColor(const Color& color)
 
 void PipelineContext::SetAppTitle(const std::string& title)
 {
+    inspectorAppTitle_ = title;
     if (windowModal_ != WindowModal::CONTAINER_MODAL) {
         return;
     }
@@ -7721,14 +7757,43 @@ void PipelineContext::GetInspectorTree(bool onlyNeedVisible, ParamConfig config)
 {
     CHECK_NULL_VOID(taskExecutor_);
     CHECK_NULL_VOID(rootNode_);
+    auto snapshot = inspectorWindowSnapshot_ ? inspectorWindowSnapshot_() :
+        std::make_optional(InspectorWindowSnapshot {});
+    if (!snapshot) {
+        return;
+    }
+    auto reporter = std::move(config.inspectorReporter);
+    InspectorTreeRequestContext context(config, config.inspectorRoute, std::move(*snapshot));
+    config.inspectorContext = &context;
+    JsonWriteErrorScope errors;
     auto root = JsonUtil::CreateSharedPtrJson(true);
     GetAppInfo(root);
-    auto cb = [root]() {
-        auto json = root->ToString();
+    auto appInfo = root->GetObject("appInfo");
+    appInfo->Put("WindowTitle", context.window.windowTitle.c_str());
+    appInfo->Put("PID", context.window.pid);
+    auto cb = [root, reporter = std::move(reporter)]() {
+        constexpr size_t MAX_REPORT_BYTES = 100 * 1024 * 1024;
+        JsonWriteErrorScope errors;
+        char* data = nullptr;
+        size_t size = 0;
+        if (WriteJsonBounded(*root, false, MAX_REPORT_BYTES, &data, &size) != JsonWriteResult::SUCCESS) {
+            return;
+        }
         auto res = JsonUtil::Create(true);
-        res->Put("0", json.c_str());
+        res->Put("0", data);
+        std::free(data);
+        if (errors.HasError() ||
+            WriteJsonBounded(*res, false, MAX_REPORT_BYTES, &data, &size) != JsonWriteResult::SUCCESS) {
+            return;
+        }
+        std::string result(data, size);
+        std::free(data);
 #ifndef CROSS_PLATFORM
-        UiSessionManager::GetInstance()->ReportInspectorTreeValue(res->ToString());
+        if (reporter) {
+            reporter(result);
+        } else {
+            UiSessionManager::GetInstance()->ReportInspectorTreeValue(result);
+        }
 #endif
     };
     ACE_SCOPED_TRACE("GetInspectorTree[onlyNeedVisible:%d][config.interactionInfo:%d]"
@@ -7737,6 +7802,10 @@ void PipelineContext::GetInspectorTree(bool onlyNeedVisible, ParamConfig config)
         onlyNeedVisible, config.interactionInfo, config.accessibilityInfo, config.cacheNodes, config.withWeb,
         config.rectCulling, config.minOpacity);
     CollectInspectorTreeInto(root, onlyNeedVisible, config);
+    context.FinalizeNativeTree(root);
+    if (errors.HasError()) {
+        return;
+    }
     taskExecutor_->PostTask(cb, TaskExecutor::TaskType::BACKGROUND,
         onlyNeedVisible ? "ArkUIGetVisibleInspectorTree" : "ArkUIGetInspectorTree");
 }

@@ -2784,4 +2784,13 @@ bool TimePickerRowPattern::ReportCommandResult(int32_t nodeId, const std::string
 #endif
     return true;
 }
+void TimePickerRowPattern::DumpInspectorTreeInfo(
+    std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context)
+{
+    Pattern::DumpInspectorTreeInfo(attrs, context);
+    if (!GetIsShowInDialog()) {
+        attrs->Put("expanded", true);
+    }
+}
+
 } // namespace OHOS::Ace::NG

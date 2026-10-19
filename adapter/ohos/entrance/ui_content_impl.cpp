@@ -6664,21 +6664,49 @@ void UIContentImpl::InitUISessionManagerCallbacks(const WeakPtr<TaskExecutor>& t
 {
     const int32_t GET_INSPECTOR_TREE_TIMEOUT_TIME = 1500;
     // set get inspector tree function for ui session manager
-    auto callback = [weakTaskExecutor = taskExecutor](bool onlyNeedVisible, ParamConfig config) {
+    auto container = Platform::AceContainer::GetContainer(instanceId_);
+    auto pipeline = container ? AceType::DynamicCast<NG::PipelineContext>(container->GetPipelineContext()) : nullptr;
+    WeakPtr<NG::PipelineContext> weakPipeline = pipeline;
+    wptr<OHOS::Rosen::Window> weakWindow = Platform::AceContainer::GetUIWindow(instanceId_);
+    auto snapshot = [weakPipeline, weakWindow]() -> std::optional<InspectorWindowSnapshot> {
+        auto window = weakWindow.promote();
+        auto pipeline = weakPipeline.Upgrade();
+        CHECK_NULL_RETURN(window, std::nullopt);
+        CHECK_NULL_RETURN(pipeline, std::nullopt);
+        if (pipeline->IsDestroyed()) {
+            return std::nullopt;
+        }
+        std::string title = pipeline->GetInspectorAppTitle();
+        if (title.empty()) {
+            auto themes = pipeline->GetThemeManager();
+            auto constants = themes ? themes->GetThemeConstants() : nullptr;
+            auto manager = pipeline->GetWindowManager();
+            if (constants && manager) {
+                title = constants->GetString(manager->GetAppLabelId());
+            }
+        }
+        return InspectorWindowSnapshot { window->IsPrivacyMode(), std::move(title), getpid() };
+    };
+    if (pipeline) {
+        pipeline->SetInspectorWindowSnapshotCallback(std::move(snapshot));
+    }
+    auto callback = [weakTaskExecutor = taskExecutor, weakPipeline, instanceId = instanceId_](
+        bool onlyNeedVisible, ParamConfig config) {
         auto taskExecutor = weakTaskExecutor.Upgrade();
         CHECK_NULL_VOID(taskExecutor);
         taskExecutor->PostSyncTaskTimeout(
-            [onlyNeedVisible, config]() {
-                auto pipeline = NG::PipelineContext::GetCurrentContextSafely();
+            [onlyNeedVisible, config, weakPipeline, instanceId]() mutable {
+                ContainerScope scope(instanceId);
+                auto pipeline = weakPipeline.Upgrade();
                 CHECK_NULL_VOID(pipeline);
-                if (onlyNeedVisible) {
-                    pipeline->GetInspectorTree(true, config);
-                } else {
-                    pipeline->GetInspectorTree(false, config);
-                }
+                config.inspectorRoute.windowId = static_cast<int32_t>(pipeline->GetWindowId());
+                pipeline->GetInspectorTree(onlyNeedVisible, config);
             },
             TaskExecutor::TaskType::UI, GET_INSPECTOR_TREE_TIMEOUT_TIME, "UiSessionGetInspectorTree");
     };
+    if (instance_) {
+        instance_->SetInspectorFunction(callback);
+    }
     UiSessionManager::GetInstance()->SaveInspectorTreeFunction(callback);
     auto webCallback = [weakTaskExecutor = taskExecutor](bool isRegister) {
         auto taskExecutor = weakTaskExecutor.Upgrade();

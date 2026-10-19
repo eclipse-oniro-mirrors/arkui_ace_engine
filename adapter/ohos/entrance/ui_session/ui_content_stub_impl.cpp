@@ -25,7 +25,12 @@ int32_t UIContentServiceStubImpl::GetInspectorTree(
     const std::function<void(std::string, int32_t, bool)>& eventCallback, ParamConfig config,
     [[maybe_unused]] int32_t timeout)
 {
-    UiSessionManager::GetInstance()->GetInspectorTree(config);
+    auto inspector = GetInspectorFunction();
+    if (inspector) {
+        inspector(false, config);
+    } else if (config.inspectorRoute.token.generation == 0) {
+        UiSessionManager::GetInstance()->GetInspectorTree(config);
+    }
     return NO_ERROR;
 }
 
@@ -272,7 +277,12 @@ int32_t UIContentServiceStubImpl::GetVisibleInspectorTree(
     const std::function<void(std::string, int32_t, bool)>& eventCallback, ParamConfig config,
     [[maybe_unused]] int32_t timeout)
 {
-    UiSessionManager::GetInstance()->GetVisibleInspectorTree(config);
+    auto inspector = GetInspectorFunction();
+    if (inspector) {
+        inspector(true, config);
+    } else if (config.inspectorRoute.token.generation == 0) {
+        UiSessionManager::GetInstance()->GetVisibleInspectorTree(config);
+    }
     return NO_ERROR;
 }
 

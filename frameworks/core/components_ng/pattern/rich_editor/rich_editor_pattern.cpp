@@ -15,6 +15,7 @@
 
 #define NAPI_VERSION 8 
 
+#include "core/components_ng/base/inspector_tree_request_context.h"
 #include "core/components_ng/pattern/rich_editor/rich_editor_pattern.h"
 #include "core/components_ng/pattern/rich_editor/plain_text_span_string.h"
 #include "core/pipeline/container_window_manager.h"
@@ -1698,6 +1699,42 @@ RefPtr<FrameNode> RichEditorPattern::GetContentHost() const
         return nullptr;
     }
     return contentPattern_->GetHost();
+}
+
+void RichEditorPattern::DumpInspectorTreeInfo(
+    std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context)
+{
+    const auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    const bool canExport = context.CanExportText(
+        InspectorTextKind::EDITABLE_TEXT, false, IsSetObscured() || IsPasswordObscured());
+    std::u16string content;
+    if (canExport) {
+        for (const auto& span : spans_) {
+            if (span && span->spanItemType == SpanItemType::NORMAL) {
+                content += span->content;
+            }
+        }
+    }
+    attrs->Put("content", StringUtils::Str16ToStr8(content).c_str());
+    if (!context.config.accessibilityInfo) {
+        return;
+    }
+    attrs->Put("password", false);
+    attrs->Put("multiLine", true);
+    const auto property = host->GetAccessibilityProperty<AccessibilityProperty>();
+    CHECK_NULL_VOID(property);
+    attrs->Put("selectionStart", property->GetTextSelectionStart());
+    attrs->Put("selectionEnd", property->GetTextSelectionEnd());
+    attrs->Put("inputType", static_cast<int32_t>(property->GetTextInputType()));
+    const auto limit = GetMaxLength();
+    if (HasMaxLength() && limit >= 0) {
+        attrs->Put("textLengthLimit", limit);
+    }
+    const auto error = property->GetErrorText();
+    if (!error.empty()) {
+        attrs->Put("error", error.c_str());
+    }
 }
 
 void RichEditorPattern::OnAttachToFrameNode()

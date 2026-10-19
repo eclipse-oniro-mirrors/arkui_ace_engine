@@ -1,0 +1,7 @@
+{
+  "name": "entry",
+  "version": "1.0.0",
+  "dependencies": {
+    "libinspector_tree_provider.so": "file:./src/main/cpp/types/libinspector_tree_provider"
+  }
+}

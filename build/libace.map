@@ -2,6 +2,26 @@
   global:
     extern "C++" {
       "OHOS::Ace::JsonValue::Put(char const*, std::__h::shared_ptr<OHOS::Ace::JsonValue> const&)";
+      "OHOS::Ace::JsonValue::Put(std::__h::shared_ptr<OHOS::Ace::JsonValue> const&)";
+      OHOS::Ace::NG::FrameNode::GetPositionToWindowWithTransform*;
+      "OHOS::Ace::JsonValue::Replace(char const*, bool)";
+      OHOS::Ace::NG::TextPattern::IsSetObscured*;
+      "OHOS::Ace::JsonValue::Put(double)";
+      OHOS::Ace::NG::TextPattern::CollectVisualTreeProperties*;
+      OHOS::Ace::NG::TextPattern::CollectFunctionalTreeProperties*;
+      virtual?thunk?to?OHOS::Ace::NG::TextPattern::CollectVisualTreeProperties*;
+      virtual?thunk?to?OHOS::Ace::NG::TextPattern::CollectFunctionalTreeProperties*;
+      OHOS::Ace::NG::FrameNode::DumpSimplifyInfoWithParamConfig*;
+      OHOS::Ace::NG::ScrollablePattern::CollectVisualTreeProperties*;
+      OHOS::Ace::NG::ScrollablePattern::CollectFunctionalTreeProperties*;
+      virtual?thunk?to?OHOS::Ace::NG::ScrollablePattern::CollectVisualTreeProperties*;
+      virtual?thunk?to?OHOS::Ace::NG::ScrollablePattern::CollectFunctionalTreeProperties*;
+      OHOS::Ace::NG::InspectorTreeRequestContext::InspectorTreeRequestContext*;
+      OHOS::Ace::NG::InspectorTreeRequestContext::CanExportText*;
+      OHOS::Ace::NG::InspectorTreeRequestContext::MarkPrivacyReasonOnce*;
+      OHOS::Ace::NG::FrameNode::DumpInspectorTreeInfo*;
+      OHOS::Ace::NG::UINode::DumpInspectorTreeInfo*;
+      OHOS::Ace::NG::TextPattern::DumpInspectorTreeInfo*;
       "bool OHOS::Ace::NG::ArkTSUtils::ConvertFromJSValue<OHOS::Ace::CalcDimension>(panda::ecmascript::EcmaVM const*, panda::Local<panda::JSValueRef> const&, OHOS::Ace::CalcDimension&, OHOS::Ace::RefPtr<OHOS::Ace::ResourceObject>&)";
       "bool OHOS::Ace::NG::ArkTSUtils::ConvertFromJSValue<OHOS::Ace::Color>(panda::ecmascript::EcmaVM const*, panda::Local<panda::JSValueRef> const&, OHOS::Ace::Color&, OHOS::Ace::RefPtr<OHOS::Ace::ResourceObject>&)";
       "bool OHOS::Ace::NG::ArkTSUtils::ConvertFromJSValueNG<OHOS::Ace::Dimension>(panda::ecmascript::EcmaVM const*, panda::Local<panda::JSValueRef> const&, OHOS::Ace::Dimension&, OHOS::Ace::RefPtr<OHOS::Ace::ResourceObject>&)";
@@ -6070,6 +6090,7 @@
       virtual?thunk?to?OHOS::Ace::NG::TextPattern::DumpAdvanceInfo*;
       virtual?thunk?to?OHOS::Ace::NG::TextPattern::DumpInfo*;
       virtual?thunk?to?OHOS::Ace::NG::TextPattern::DumpSimplifyInfo*;
+      virtual?thunk?to?OHOS::Ace::NG::TextPattern::DumpInspectorTreeInfo*;
       virtual?thunk?to?OHOS::Ace::NG::TextPattern::GetContextParam*;
       virtual?thunk?to?OHOS::Ace::NG::TextPattern::GetDragRecordSize*;
       virtual?thunk?to?OHOS::Ace::NG::TextPattern::GetFocusPattern*;

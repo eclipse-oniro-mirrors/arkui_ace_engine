@@ -774,6 +774,9 @@ void MenuItemPattern::ShowSubMenu(ShowSubMenuType type)
 void MenuItemPattern::ShowSubMenuWithAnimation(const RefPtr<FrameNode>& subMenu)
 {
     CHECK_NULL_VOID(subMenu);
+    inspectorSubMenu_ = subMenu;
+    inspectorExpanded_ = false;
+    const auto generation = ++inspectorExpansionGeneration_;
     auto pipeline = subMenu->GetContext();
     CHECK_NULL_VOID(pipeline);
     auto menuTheme = subMenu->GetTheme<SelectTheme>(true);
@@ -798,7 +801,19 @@ void MenuItemPattern::ShowSubMenuWithAnimation(const RefPtr<FrameNode>& subMenu)
                 renderContext->UpdateTransformScale(VectorF(MENU_ANIMATION_MAX_SCALE, MENU_ANIMATION_MAX_SCALE));
                 renderContext->UpdateOpacity(MENU_ANIMATION_MAX_OPACITY);
             },
-            animationOption.GetOnFinishEvent(), nullptr, subMenu->GetContextRefPtr());
+            [weak = WeakClaim(this), expected = WeakPtr<FrameNode>(subMenu), generation,
+                original = animationOption.GetOnFinishEvent()]() {
+                if (original) {
+                    original();
+                }
+                auto pattern = weak.Upgrade();
+                if (pattern && pattern->inspectorExpansionGeneration_ == generation &&
+                    pattern->inspectorSubMenu_.Upgrade() == expected.Upgrade()) {
+                    pattern->inspectorExpanded_ = true;
+                }
+            }, nullptr, subMenu->GetContextRefPtr());
+    } else {
+        inspectorExpanded_ = true;
     }
     auto overlayManager = pipeline->GetOverlayManager();
     CHECK_NULL_VOID(overlayManager);
@@ -994,6 +1009,7 @@ void MenuItemPattern::OnExpandChanged(const RefPtr<FrameNode>& expandableNode)
 
 void MenuItemPattern::HideEmbedded(bool isNeedAnimation)
 {
+    ++inspectorExpansionGeneration_;
     auto host = GetHost();
     CHECK_NULL_VOID(host);
     isExpanded_ = false;
@@ -1073,6 +1089,9 @@ void MenuItemPattern::UpdatePreviewPosition(SizeF oldMenuSize, SizeF menuSize)
 void MenuItemPattern::ShowEmbeddedExpandMenu(const RefPtr<FrameNode>& expandableNode)
 {
     CHECK_NULL_VOID(expandableNode);
+    inspectorSubMenu_ = expandableNode;
+    inspectorExpanded_ = false;
+    const auto generation = ++inspectorExpansionGeneration_;
     auto host = GetHost();
     CHECK_NULL_VOID(host);
     auto menuWrapper = GetMenuWrapper();
@@ -1112,7 +1131,13 @@ void MenuItemPattern::ShowEmbeddedExpandMenu(const RefPtr<FrameNode>& expandable
             pattern->SetShowEmbeddedMenuParams(expandableNode);
             menuRenderContext->UpdateSubmenuDistortionParam();
         },
-        nullptr, nullptr, host->GetContextRefPtr());
+        [weak = WeakClaim(this), expected = WeakPtr<FrameNode>(expandableNode), generation]() {
+            auto pattern = weak.Upgrade();
+            if (pattern && pattern->inspectorExpansionGeneration_ == generation &&
+                    pattern->inspectorSubMenu_.Upgrade() == expected.Upgrade()) {
+                pattern->inspectorExpanded_ = true;
+            }
+        }, nullptr, host->GetContextRefPtr());
 }
 
 void MenuItemPattern::SetShowEmbeddedMenuParams(const RefPtr<FrameNode>& expandableNode)
@@ -3974,4 +3999,22 @@ void MenuItemPattern::ReportEvent()
         ComponentEventType::COMPONENT_EVENT_MENU);
 #endif
 }
+void MenuItemPattern::DumpInspectorTreeInfo(
+    std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context)
+{
+    Pattern::DumpInspectorTreeInfo(attrs, context);
+    if (!subBuilderFunc_ && !subSelectMenuBuilderFunc_) {
+        return;
+    }
+    auto subMenu = inspectorSubMenu_.Upgrade();
+    bool retained = false;
+    for (RefPtr<UINode> node = subMenu; node; node = node->GetParent()) {
+        if (node->IsOnMainTree() || node->IsDisappearing()) {
+            retained = true;
+            break;
+        }
+    }
+    attrs->Put("expanded", inspectorExpanded_ && retained);
+}
+
 } // namespace OHOS::Ace::NG

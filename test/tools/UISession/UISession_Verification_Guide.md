@@ -354,3 +354,26 @@ hdc shell hidumper -s 16666 -a "GetCurrentAbilityLanguageInfo"
 2. 真机验证至少包含一次 `Connect`、一次目标能力调用和一次恢复/取消路径。
 3. 若命令会生成文件，验证 `/data/service/el1/public/ui_sa/` 的权限和文件名规则。
 4. 若能力涉及翻译、文本或截图等敏感数据，sample 日志不得输出完整业务正文。
+
+
+## InspectorTree 信息扩展验证
+
+输入工程见 [inspector_tree_sample/README.md](./inspector_tree_sample/README.md)。先建立 SA 连接，再分别执行 `GetInspectorTree` 与 `GetVisibleInspectorTree`。两个入口均支持 `--interactionInfo true --accessibilityInfo true --withResponseRegion true --withThirdProvider true --caseId native_fields -tofile`；`--withXComponent true` 保留为第三方通路的兼容开关，与 withThirdProvider 取 OR。cacheNodes/withWeb/withUIExtension/rectCulling/minOpacity/timeout 命名参数及 Visible 位置参数继续支持。正文只落盘，日志仅记录配置、同步返回、耗时、字节数及回调次数。
+
+从 `/data/service/el1/public/ui_sa/` 拉取实际回调文件后运行：
+
+```bash
+python3 test/tools/UISession/verify_inspector_tree.py callback.json --case native_fields \
+  --with-response-region --with-third-provider --accessibility-info \
+  --device-build '<实际系统构建号>' --report report.json
+```
+
+验证器检查双层 JSON、原生字段类型、隐私输入和三方树通路。报告必须有实际非零断言。延迟 Provider 使用较长 timeout 观察自然返回；独立以默认 1500 ms 验证过期请求、下一请求和晚到结果隔离。未执行设备交互/窗口/跨进程场景时记录 NotRun，不以样例 JSON 或 Host 测试替代。
+
+### 三方无障碍返回通路
+
+数据查询与编码复用 PR #90035 的 `ThirdProviderTreeExporter`，XComponent/Custom 的 `AddExtraInfoWithParamConfig` 将结果挂到宿主 `$children-third`。本需求透传其 JSON，保留 `$ID`、`$type`、`type=third`、`$rect`、`$attrs` 及 `$children` 层级，不再二次查询、转换为扁平数组或覆盖返回字段。
+
+当前导出器在未注册、空树、查询失败或节点数量超限时省略字段；根选择、坐标、节点/深度上限及字段类型由该 PR 定义。旧的 `accessibilityTree/accessibilityTreeComplete/errorMessage` 和本需求独立 Provider 预算已撤除。原生 `accessibilityId` 的十进制字符串协议不变；不要把原生 ID 规则套到三方 `$ID`。
+
+两种开关均通过 Parcel、UIExtension/Dump 参数通路传递，原生无障碍字段仍独立受 `accessibilityInfo` 控制。整包有界输出及异步回调隔离保持。编译时须临时叠加 #90061 和 #90035 的对应版本，验证后撤回；两个依赖 PR 的原始实现不进入本功能提交。

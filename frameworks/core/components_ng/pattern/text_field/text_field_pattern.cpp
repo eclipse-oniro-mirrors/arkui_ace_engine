@@ -15,6 +15,7 @@
 
 #define NAPI_VERSION 8
 
+#include "core/components_ng/base/inspector_tree_request_context.h"
 #include "core/components_ng/pattern/text_field/text_field_pattern.h"
 #include "core/pipeline/container_window_manager.h"
 #include "core/accessibility/accessibility_manager.h"
@@ -9888,6 +9889,40 @@ void TextFieldPattern::DumpInfo()
     DumpScaleInfo();
     DumpTextEngineInfo();
     DumpAdvanceInfo();
+}
+
+void TextFieldPattern::DumpInspectorTreeInfo(
+    std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context)
+{
+    const auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    const auto render = host->GetRenderContext();
+    const bool obscured = render && !render->GetObscuredValue({}).empty();
+    const bool password = IsInPasswordMode();
+    const bool canExport = context.CanExportText(InspectorTextKind::INPUT_VALUE, password, obscured);
+    attrs->Put("content", canExport ? GetTextValue().c_str() : "");
+    attrs->Put("placeholder", UtfUtils::Str16ToStr8(GetPlaceHolder()).c_str());
+    const auto layout = GetLayoutProperty<TextFieldLayoutProperty>();
+    if (layout && layout->HasEnableAutoFill()) {
+        attrs->Put("enableAutoFill", layout->GetEnableAutoFillValue(true));
+    }
+    if (!context.config.accessibilityInfo) {
+        return;
+    }
+    attrs->Put("password", password);
+    attrs->Put("multiLine", IsTextArea());
+    const auto property = host->GetAccessibilityProperty<AccessibilityProperty>();
+    CHECK_NULL_VOID(property);
+    attrs->Put("selectionStart", property->GetTextSelectionStart());
+    attrs->Put("selectionEnd", property->GetTextSelectionEnd());
+    attrs->Put("inputType", static_cast<int32_t>(property->GetTextInputType()));
+    if (layout && layout->HasMaxLength() && GetMaxLength() < Infinity<uint32_t>()) {
+        attrs->Put("textLengthLimit", static_cast<int64_t>(GetMaxLength()));
+    }
+    const auto error = GetErrorTextState() ? UtfUtils::Str16ToStr8(GetErrorTextString()) : "";
+    if (!error.empty()) {
+        attrs->Put("error", error.c_str());
+    }
 }
 
 void TextFieldPattern::DumpSimplifyInfo(std::shared_ptr<JsonValue>& json)

@@ -16,6 +16,10 @@
 #ifndef FOUNDATION_ACE_INTERFACE_UI_CONTENT_STUB_H
 #define FOUNDATION_ACE_INTERFACE_UI_CONTENT_STUB_H
 
+#include <map>
+#include <memory>
+#include <mutex>
+
 #include "iremote_object.h"
 #include "iremote_stub.h"
 
@@ -27,7 +31,31 @@ public:
     virtual int32_t OnRemoteRequest(
         uint32_t code, MessageParcel& data, MessageParcel& reply, MessageOption& option) override;
 
+protected:
+    bool SaveInspectorReport(sptr<IRemoteObject> object, int32_t pid);
+    sptr<IRemoteObject> GetInspectorReport(int32_t pid);
+
 private:
+    struct InspectorReportConnection {
+        sptr<IRemoteObject> object;
+        sptr<IRemoteObject::DeathRecipient> recipient;
+        uint64_t generation = 0;
+    };
+    struct InspectorReportConnections {
+        ~InspectorReportConnections()
+        {
+            for (auto& entry : reports) {
+                if (entry.second.recipient) {
+                    entry.second.object->RemoveDeathRecipient(entry.second.recipient);
+                }
+            }
+        }
+        std::mutex mutex;
+        uint64_t generation = 0;
+        std::map<int32_t, InspectorReportConnection> reports;
+    };
+    std::shared_ptr<InspectorReportConnections> inspectorReports_ = std::make_shared<InspectorReportConnections>();
+
     int32_t GetInspectorTreeInner(MessageParcel& data, MessageParcel& reply, MessageOption& option);
     int32_t ConnectInner(MessageParcel& data, MessageParcel& reply, MessageOption& option);
     int32_t RegisterClickEventCallbackInner(MessageParcel& data, MessageParcel& reply, MessageOption& option);

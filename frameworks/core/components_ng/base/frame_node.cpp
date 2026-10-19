@@ -14,6 +14,10 @@
  */
 
 #include "core/components_ng/base/frame_node.h"
+
+#include <cmath>
+#include <limits>
+#include <tuple>
 #include "core/components_ng/base/modifier.h"
 #include "core/pipeline/container_window_manager.h"
 #include "core/accessibility/accessibility_manager.h"
@@ -34,6 +38,8 @@
 #endif
 
 #include "core/components_ng/base/node_render_status_monitor.h"
+#include "core/components_ng/base/inspector_tree_request_context.h"
+#include "core/components_ng/pattern/menu/wrapper/menu_wrapper_pattern.h"
 #include "core/components_ng/base/ui_node.h"
 #include "core/components_ng/event/event_constants.h"
 #include "core/components_ng/layout/layout_algorithm.h"
@@ -1702,6 +1708,8 @@ void FrameNode::MergeAttributesIntoJson(std::shared_ptr<JsonValue>& json, const 
 void FrameNode::DumpSimplifyInfoOnlyForParamConfig(std::shared_ptr<JsonValue>& json, ParamConfig config)
 {
     CHECK_NULL_VOID(json);
+    // Reuse the third-provider hook for both the native switch and our compatibility option.
+    config.withThirdProvider = config.withThirdProvider || config.withXComponent;
     DumpSimplifyCommonInfoOnlyForParamConfig(json, config);
     if (pattern_) {
         auto child = JsonUtil::CreateSharedPtrJson();
@@ -1710,6 +1718,147 @@ void FrameNode::DumpSimplifyInfoOnlyForParamConfig(std::shared_ptr<JsonValue>& j
         MergeAttributesIntoJson(json, child);
     }
     DumpAdvancedNodeProperties(*this, json, config);
+}
+
+void FrameNode::DumpInspectorTreeInfo(std::shared_ptr<JsonValue>& json, ParamConfig config)
+{
+    CHECK_NULL_VOID(json);
+    CHECK_NULL_VOID(config.inspectorContext);
+    auto& context = *config.inspectorContext;
+    DumpSimplifyCommonInfo(json);
+    if (pattern_) {
+        auto attrs = JsonUtil::CreateSharedPtrJson();
+        pattern_->DumpInspectorTreeInfo(attrs, context);
+        json->Put("$attrs", std::move(attrs));
+    }
+    // Reuse the existing/ UIAgent property readers and Web/UIExtension routing.
+    DumpSimplifyInfoOnlyForParamConfig(json, config);
+    auto gesture = eventHub_ ? eventHub_->GetGestureEventHub() : nullptr;
+    if (config.interactionInfo) {
+        json->Put("touchable", !gesture || gesture->GetTouchable());
+        const bool checkable = accessibilityProperty_ && accessibilityProperty_->IsCheckable();
+        json->Put("checkable", checkable);
+        if (checkable) {
+            json->Put("checked", accessibilityProperty_->IsChecked());
+        }
+        if (accessibilityProperty_) {
+            const auto actions = accessibilityProperty_->GetSupportAction();
+            const bool hasSelection = (pattern_ && pattern_->HasInspectorSelection()) ||
+                accessibilityProperty_->IsEditable() || accessibilityProperty_->HasUserSelected() ||
+                actions.count(AceAction::ACTION_SELECT) || actions.count(AceAction::ACTION_CLEAR_SELECTION);
+            if (hasSelection) {
+                json->Put("selected", accessibilityProperty_->HasUserSelected() ?
+                    accessibilityProperty_->IsUserSelected() : accessibilityProperty_->IsSelected());
+            }
+        }
+    }
+    if (config.accessibilityInfo) {
+        const auto id = GetAccessibilityId();
+        if (id >= 0) {
+            json->Put("accessibilityId", std::to_string(id).c_str());
+        }
+        const auto putText = [&json](const char* key, const std::string& value) {
+            if (!value.empty()) {
+                json->Put(key, value.c_str());
+            }
+        };
+        if (accessibilityProperty_) {
+            putText("description", accessibilityProperty_->GetAccessibilityDescription());
+            putText("hint", accessibilityProperty_->GetHintText());
+            putText("accessibilityLevel", accessibilityProperty_->GetAccessibilityLevel());
+        }
+        json->Put("accessibilityGroup", accessibilityProperty_ && accessibilityProperty_->IsAccessibilityGroup());
+    }
+    if (config.withResponseRegion) {
+        DumpInspectorResponseRegions(json, context);
+    }
+    if (gesture && gesture->HasInspectorMenu()) {
+        auto pipeline = GetContextRefPtr();
+        auto overlay = pipeline ? pipeline->GetOverlayManager() : nullptr;
+        auto wrapperNode = overlay ? overlay->GetMenuNode(GetId()) : nullptr;
+        auto wrapper = wrapperNode ? wrapperNode->GetPattern<MenuWrapperPattern>() : nullptr;
+        const auto status = wrapper ? wrapper->GetMenuStatus() : MenuStatus::INIT;
+        auto attrs = json->GetObject("$attrs");
+        attrs->Put("expanded", status == MenuStatus::SHOW || status == MenuStatus::ON_HIDE_ANIMATION);
+    }
+    if (pattern_) {
+        pattern_->AddInspectorTreeInfo(json, context);
+    }
+}
+
+void FrameNode::DumpInspectorResponseRegions(
+    std::shared_ptr<JsonValue>& json, const InspectorTreeRequestContext& context)
+{
+    if (!context.config.withResponseRegion || !renderContext_) {
+        return;
+    }
+    auto gesture = eventHub_ ? eventHub_->GetGestureEventHub() : nullptr;
+    CHECK_NULL_VOID(gesture);
+    const auto raw = renderContext_->GetPaintRectWithoutTransform();
+    const auto encode = [this](const std::vector<RectF>& regions) {
+        auto array = JsonUtil::CreateArray();
+        for (const auto& rect : regions) {
+            // Transform every corner; two opposite corners lose rotated extents.
+            const OffsetF corners[] = {
+                { rect.Left(), rect.Top() }, { rect.Right(), rect.Top() },
+                { rect.Right(), rect.Bottom() }, { rect.Left(), rect.Bottom() }
+            };
+            float left = std::numeric_limits<float>::max();
+            float top = left;
+            float right = std::numeric_limits<float>::lowest();
+            float bottom = right;
+            bool finite = true;
+            for (const auto& corner : corners) {
+                auto point = GetPositionToWindowWithTransform(corner);
+                finite = finite && std::isfinite(point.GetX()) && std::isfinite(point.GetY());
+                left = std::min(left, point.GetX());
+                top = std::min(top, point.GetY());
+                right = std::max(right, point.GetX());
+                bottom = std::max(bottom, point.GetY());
+            }
+            if (!finite) {
+                continue;
+            }
+            RectF result(left, top, right - left, bottom - top);
+            for (auto node = Claim(this); node; node = node->GetAncestorNodeOfFrame(true)) {
+                auto render = node->GetRenderContext();
+                if (render && render->GetClipEdgeValue(false)) {
+                    result = result.IntersectRectT(node->GetTransformRectRelativeToWindow());
+                }
+            }
+            array->Put(std::to_string(array->GetArraySize()).c_str(), result.ToBounds().c_str());
+        }
+        return array;
+    };
+    const auto& map = gesture->GetResponseRegionMap();
+    if (!map.empty()) {
+        auto output = JsonUtil::Create();
+        const std::tuple<ResponseRegionSupportedTool, SourceTool, const char*> tools[] = {
+            { ResponseRegionSupportedTool::ALL, SourceTool::UNKNOWN, "all" },
+            { ResponseRegionSupportedTool::FINGER, SourceTool::FINGER, "finger" },
+            { ResponseRegionSupportedTool::PEN, SourceTool::PEN, "pen" },
+            { ResponseRegionSupportedTool::MOUSE, SourceTool::MOUSE, "mouse" }
+        };
+        for (const auto& [tool, source, name] : tools) {
+            auto found = map.find(tool);
+            if (found == map.end() || found->second.empty()) {
+                continue;
+            }
+            auto regions = GetResponseRegionList(raw, static_cast<int32_t>(SourceType::TOUCH),
+                static_cast<int32_t>(source));
+            output->Put(name, encode(regions));
+        }
+        if (output->GetChild()->IsValid()) {
+            json->Put("responseRegionMap", output);
+        }
+        return;
+    }
+    if (!gesture->GetResponseRegion().empty()) {
+        json->Put("responseRegion", encode(GetResponseRegionListRaw(raw, static_cast<int32_t>(SourceType::TOUCH))));
+    }
+    if (!gesture->GetMouseResponseRegion().empty()) {
+        json->Put("mouseResponseRegion", encode(GetResponseRegionListRaw(raw, static_cast<int32_t>(SourceType::MOUSE))));
+    }
 }
 
 void FrameNode::DumpInfo()

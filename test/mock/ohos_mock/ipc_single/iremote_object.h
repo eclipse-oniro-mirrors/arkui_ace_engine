@@ -83,13 +83,15 @@ public:
         virtual void OnRemoteDied(const wptr<IRemoteObject> &object) = 0;
     };
 
-    bool AddDeathRecipient(const sptr<DeathRecipient>& recipient)
+    virtual bool IsProxyObject() const { return false; }
+
+    virtual bool AddDeathRecipient(const sptr<DeathRecipient>& recipient)
     {
         (void)recipient;
         return true;
     }
 
-    bool RemoveDeathRecipient(const sptr<DeathRecipient>& recipient)
+    virtual bool RemoveDeathRecipient(const sptr<DeathRecipient>& recipient)
     {
         (void)recipient;
         return true;

@@ -1,0 +1,126 @@
+{
+  "cases": {
+    "native_fields": {
+      "requiredIds": [
+        "label",
+        "button-one",
+        "button-two",
+        "search",
+        "input",
+        "area",
+        "rich",
+        "marquee",
+        "clock",
+        "timer",
+        "select",
+        "text-picker",
+        "date-picker",
+        "time-picker"
+      ]
+    },
+    "privacy_password": {
+      "emptyContentIds": [
+        "input"
+      ],
+      "text": {
+        "label": "ordinary-label"
+      }
+    },
+    "privacy_obscured": {
+      "emptyContentIds": [
+        "input",
+        "label"
+      ]
+    },
+    "privacy_window": {
+      "emptyContentIds": [
+        "input",
+        "area",
+        "rich"
+      ],
+      "text": {
+        "label": "ordinary-label"
+      }
+    },
+    "response_regions": {
+      "requiredIds": [
+        "tool-regions",
+        "traditional-regions",
+        "transformed-region",
+        "no-region"
+      ],
+      "regionTools": [
+        "all",
+        "finger",
+        "pen",
+        "mouse"
+      ]
+    },
+    "expanded_states": {
+      "requiredIds": [
+        "menu-trigger",
+        "select",
+        "text-picker",
+        "date-picker",
+        "time-picker"
+      ]
+    },
+    "window_titles": {
+      "windowMetadata": true
+    },
+    "provider_normal": {
+      "requiredIds": [
+        "provider-first",
+        "provider-second"
+      ],
+      "providerNonempty": true
+    },
+    "provider_empty": {
+      "requiredIds": [
+        "provider-first",
+        "provider-second"
+      ],
+      "providerOmitted": true
+    },
+    "provider_failure": {
+      "requiredIds": [
+        "provider-first",
+        "provider-second"
+      ],
+      "providerOmitted": true
+    },
+    "provider_delay": {
+      "requiredIds": [
+        "provider-first",
+        "provider-second"
+      ],
+      "providerNonempty": true
+    },
+    "provider_invalid": {
+      "requiredIds": [
+        "provider-first",
+        "provider-second"
+      ],
+      "providerNonempty": true
+    },
+    "provider_limits": {
+      "requiredIds": [
+        "provider-first",
+        "provider-second"
+      ],
+      "providerOmitted": true
+    },
+    "web_uie": {
+      "requiredIds": [
+        "web-host"
+      ]
+    },
+    "provider_large_payload": {
+      "requiredIds": [
+        "provider-first",
+        "provider-second"
+      ],
+      "providerNonempty": true
+    }
+  }
+}

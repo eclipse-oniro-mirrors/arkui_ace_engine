@@ -254,6 +254,7 @@ public:
     void RemoveClickEvent(const RefPtr<ClickEvent>& clickEvent);
     bool IsClickEventsEmpty() const;
     GestureEventFunc GetClickEvent();
+    bool HasInspectorMenu() const { return static_cast<bool>(showMenu_) || bindMenuTouch_ != nullptr; }
     void BindMenu(GestureEventFunc&& showMenu);
     void RemoveBindMenu();
     void RegisterMenuOnTouch(TouchEventFunc&& callback);

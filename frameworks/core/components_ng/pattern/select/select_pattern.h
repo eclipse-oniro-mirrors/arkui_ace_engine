@@ -50,6 +50,11 @@ class SelectPattern : public Pattern {
     DECLARE_ACE_TYPE(SelectPattern, Pattern);
 
 public:
+    void AddInspectorTreeInfo(std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context) override;
+
+    void DumpInspectorTreeInfo(std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context) override;
+
+    bool HasInspectorSelection() const override { return true; }
     SelectPattern() = default;
     ~SelectPattern() override = default;
 

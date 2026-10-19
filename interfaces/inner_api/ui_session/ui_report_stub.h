@@ -18,6 +18,7 @@
 
 #include <memory>
 #include <mutex>
+#include <atomic>
 #include <unordered_map>
 
 #include <iremote_object.h>
@@ -120,6 +121,10 @@ public:
      * @description: unregister get inspector tree callback
      */
     void UnregisterGetInspectorTreeCallback();
+    bool RegisterInspectorTreeRequest(const std::function<void(std::string, int32_t, bool)>& callback,
+        InspectorTreeRequestToken& token);
+    void UnregisterInspectorTreeRequest(const InspectorTreeRequestToken& token);
+    void PostInspectorTreeRequestTimeout(int32_t timeout, const InspectorTreeRequestToken& token);
 
     /**
      * @description: register a callback when get inspector tree
@@ -208,6 +213,8 @@ public:
      * @description: report whole inspectorTree for SA
      */
     void ReportInspectorTreeValue(const std::string& data, int32_t partNum, bool isLastPart) override;
+    void ReportInspectorTreeForRequest(const std::string& data, int32_t partNum, bool isLastPart,
+        const InspectorTreeRequestToken& token) override;
 
     /**
      * @description: notify stub side to report the information of hit test node
@@ -336,6 +343,8 @@ private:
     bool pageTranslateContinuous_ = false;
     int64_t pageTranslateRequestId_ = 0;
     std::mutex inspectorTreeCallbackMutex_;
+    inline static std::atomic<uint64_t> nextInspectorEpoch_ { 0 };
+    InspectorTreeRequestToken inspectorToken_ { ++nextInspectorEpoch_, 0 };
     std::function<void(std::string, int32_t, bool)> inspectorTreeCallback_;
     std::function<void(std::string, int32_t, bool)> getHitTestNodeInfoCallback_;
     std::mutex navigationQueryCallbackMutex_;

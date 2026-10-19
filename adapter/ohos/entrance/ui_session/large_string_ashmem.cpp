@@ -48,7 +48,9 @@ bool LargeStringAshmem::Marshalling(Parcel& parcel) const
 bool LargeStringAshmem::ReadFromParcel(Parcel& parcel)
 {
     MessageParcel* messageParcel = static_cast<MessageParcel*>(&parcel);
-    stringSize_ = messageParcel->ReadInt32();
+    if (!messageParcel->ReadInt32(stringSize_) || stringSize_ < 0 || stringSize_ > MAX_ASHMEM_SIZE) {
+        return false;
+    }
     if (stringSize_ != 0) {
         ashmem_ = messageParcel->ReadAshmem();
         if (ashmem_ == nullptr) {
@@ -71,10 +73,11 @@ LargeStringAshmem* LargeStringAshmem::Unmarshalling(Parcel& parcel)
 
 bool LargeStringAshmem::WriteToAshmem(std::string name, std::string content, int32_t size)
 {
-    if (size < 0 || size > MAX_ASHMEM_SIZE) {
+    if (size < 0 || size > MAX_ASHMEM_SIZE || static_cast<size_t>(size) > content.size()) {
         LOGW("LargeStringAshmem invalid size = %{public}d", size);
         return false;
     }
+    ClearAshmem();
     stringSize_ = size;
     // Handle zero-size string: no need to create ashmem
     if (size == 0) {
@@ -108,20 +111,27 @@ bool LargeStringAshmem::ReadFromAshmem(std::string& content)
         content.clear();
         return true;
     }
+    if (stringSize_ < 0 || stringSize_ > MAX_ASHMEM_SIZE || !ashmem_) {
+        return false;
+    }
     if (!ashmem_->MapReadOnlyAshmem()) {
         LOGW("LargeStringAshmem map readonly shared memory fail");
         ClearAshmem();
         return false;
     }
     int32_t ashmemSize = ashmem_->GetAshmemSize();
+    if (ashmemSize < stringSize_ || ashmemSize > MAX_ASHMEM_SIZE) {
+        ClearAshmem();
+        return false;
+    }
     int32_t offset = 0;
-    const char* ashDataPtr = reinterpret_cast<const char*>(ashmem_->ReadFromAshmem(ashmemSize, offset));
+    const char* ashDataPtr = reinterpret_cast<const char*>(ashmem_->ReadFromAshmem(stringSize_, offset));
     if (ashDataPtr == nullptr) {
         LOGW("LargeStringAshmem read ashData fail");
         ClearAshmem();
         return false;
     }
-    content.assign(ashDataPtr, ashmemSize);
+    content.assign(ashDataPtr, stringSize_);
     ClearAshmem();
     return true;
 }
@@ -131,6 +141,7 @@ void LargeStringAshmem::ClearAshmem()
     if (ashmem_ != nullptr) {
         ashmem_->UnmapAshmem();
         ashmem_->CloseAshmem();
+        ashmem_ = nullptr;
     }
 }
 } // namespace OHOS::Ace

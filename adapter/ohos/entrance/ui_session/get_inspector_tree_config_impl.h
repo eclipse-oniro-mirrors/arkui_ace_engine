@@ -25,7 +25,8 @@ struct GetInspectorTreeConfigImpl : public Parcelable {
 public:
     GetInspectorTreeConfigImpl() = default;
     GetInspectorTreeConfigImpl(bool interactionInfo, bool accessibilityInfo, bool cacheNodes, bool withWeb,
-        bool withUIExtension, bool rectCulling, float minOpacity);
+        bool withUIExtension, bool rectCulling, float minOpacity,
+        bool withResponseRegion = false, bool withXComponent = false);
     GetInspectorTreeConfigImpl(const ParamConfig& config);
     bool Marshalling(Parcel& parcel) const override;
     static GetInspectorTreeConfigImpl* Unmarshalling(Parcel& parcel);
