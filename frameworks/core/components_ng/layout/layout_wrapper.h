@@ -331,6 +331,10 @@ public:
 protected:
     void CreateRootConstraint();
     void ApplyConstraint(LayoutConstraintF constraint);
+    virtual void MeasureSafeAreaInset() {}
+    virtual void LayoutSafeAreaInset() {}
+    void MeasureSafeAreaInsetContainer(LayoutWrapper* insetContainer);
+    void LayoutSafeAreaInsetContainer(LayoutWrapper* insetContainer);
 
     // keyboard avoidance is done by offsetting, to expand into keyboard area, reverse the offset.
     OffsetF ExpandIntoKeyboard(RefPtr<FrameNode>& host, RefPtr<FrameNode>& parentNode);

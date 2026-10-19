@@ -16,6 +16,9 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PROPERTIES_MEASURE_PROPERTIES_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PROPERTIES_MEASURE_PROPERTIES_H
 
+#include <array>
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
@@ -30,6 +33,59 @@ class JsonValue;
 
 namespace OHOS::Ace::NG {
 class InspectorFilter;
+
+enum class SafeAreaInsetEdge : int32_t {
+    TOP = 0,
+    END,
+    BOTTOM,
+    START,
+};
+
+inline constexpr size_t SAFE_AREA_INSET_EDGE_COUNT = 4;
+
+enum class SafeAreaInsetAlignment : int32_t {
+    START = 0,
+    CENTER,
+    END,
+};
+
+enum class SafeAreaInsetPhysicalEdge { TOP, RIGHT, BOTTOM, LEFT };
+
+struct SafeAreaInsetResolvedEdge {
+    SafeAreaInsetPhysicalEdge edge = SafeAreaInsetPhysicalEdge::TOP;
+    SafeAreaInsetAlignment alignment = SafeAreaInsetAlignment::CENTER;
+};
+
+struct SafeAreaInsetEdgeOptions {
+    CalcLength spacing;
+    SafeAreaInsetAlignment alignment = SafeAreaInsetAlignment::CENTER;
+
+    ACE_FORCE_EXPORT bool operator==(const SafeAreaInsetEdgeOptions& other) const;
+
+    ACE_FORCE_EXPORT bool operator!=(const SafeAreaInsetEdgeOptions& other) const;
+};
+
+struct SafeAreaInsetOptions {
+    using EdgeOptionsArray =
+        std::array<std::optional<SafeAreaInsetEdgeOptions>, SAFE_AREA_INSET_EDGE_COUNT>;
+
+    EdgeOptionsArray edges;
+
+    static constexpr size_t ToIndex(SafeAreaInsetEdge edge)
+    {
+        return static_cast<size_t>(edge);
+    }
+
+    ACE_FORCE_EXPORT const std::optional<SafeAreaInsetEdgeOptions>& GetEdge(SafeAreaInsetEdge edge) const;
+
+    ACE_FORCE_EXPORT std::optional<SafeAreaInsetEdgeOptions>& GetEdge(SafeAreaInsetEdge edge);
+
+    ACE_FORCE_EXPORT bool Empty() const;
+
+    ACE_FORCE_EXPORT bool operator==(const SafeAreaInsetOptions& other) const;
+
+    ACE_FORCE_EXPORT bool operator!=(const SafeAreaInsetOptions& other) const;
+};
 
 class ACE_FORCE_EXPORT CalcSize {
 public:

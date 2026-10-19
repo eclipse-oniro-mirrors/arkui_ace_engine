@@ -1795,6 +1795,42 @@ typedef enum {
      * @since 26.2.0
      */
     ARKUI_ERROR_CODE_NODE_NOT_FOUND = 106410,
+    /**
+     * @brief Result too large.
+     *
+     * @since 26.2.0
+     */
+    ARKUI_ERROR_CODE_RESULT_TOO_LARGE = 106411,
+    /**
+     * @brief Resource exhausted.
+     *
+     * @since 26.2.0
+     */
+    ARKUI_ERROR_CODE_RESOURCE_EXHAUSTED = 106412,
+    /**
+     * @brief The node ID is duplicated.
+     *
+     * @since 26.2.0
+     */
+    ARKUI_ERROR_CODE_DUPLICATE_NODE_ID = 106413,
+    /**
+     * @brief Some collection items failed.
+     *
+     * @since 26.2.0
+     */
+    ARKUI_ERROR_CODE_COLLECTION_PARTIAL_FAILED = 106414,
+    /**
+     * @brief The collection item is not found.
+     *
+     * @since 26.2.0
+     */
+    ARKUI_ERROR_CODE_COLLECTION_ITEM_NOT_FOUND = 106415,
+    /**
+     * @brief The collection item has already been taken.
+     *
+     * @since 26.2.0
+     */
+    ARKUI_ERROR_CODE_COLLECTION_ITEM_ALREADY_TAKEN = 106416,
 } ArkUI_ErrorCode;
 
 /**

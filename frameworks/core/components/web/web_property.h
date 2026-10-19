@@ -195,7 +195,7 @@ const std::string DEFAULT_SCROLLBAR_COLOR = "sys.color.ohos_id_color_foreground"
 
 constexpr uint32_t MAX_AI_SESSION_TYPE = 7;
 
-class HitTestResult : public virtual AceType {
+class HitTestResult : public AceType {
     DECLARE_ACE_TYPE(HitTestResult, AceType);
 
 public:
@@ -228,7 +228,7 @@ private:
     int hitType_ = static_cast<int>(WebHitTestType::UNKNOWN);
 };
 
-class WebMessagePort : public virtual AceType {
+class WebMessagePort : public AceType {
     DECLARE_ACE_TYPE(WebMessagePort, AceType);
 
 public:
@@ -241,7 +241,7 @@ public:
     virtual void SetWebMessageCallback(std::function<void(const std::string&)>&& callback) = 0;
 };
 
-class WebCookie : public virtual AceType {
+class WebCookie : public AceType {
     DECLARE_ACE_TYPE(WebCookie, AceType);
 
 public:
@@ -307,7 +307,7 @@ private:
     SaveCookieSyncImpl saveCookieSyncImpl_;
 };
 
-class WebController : public virtual AceType {
+class WebController : public AceType {
     DECLARE_ACE_TYPE(WebController, AceType);
 
 public:

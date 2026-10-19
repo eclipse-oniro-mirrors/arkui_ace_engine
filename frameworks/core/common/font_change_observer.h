@@ -19,7 +19,7 @@
 #include "base/memory/ace_type.h"
 
 namespace OHOS::Ace {
-class ACE_EXPORT FontChangeObserver : public virtual AceType {
+class ACE_EXPORT FontChangeObserver : public AceType {
     DECLARE_ACE_TYPE(FontChangeObserver, AceType);
 
 public:

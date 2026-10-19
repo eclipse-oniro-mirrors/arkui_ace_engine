@@ -166,6 +166,11 @@ public:
     void StartExitingTransitionEffects(const RefPtr<FrameNode>& popupNode, const std::function<void()>& finish);
     void StartEnteringAnimation(std::function<void()> finish);
     void StartExitingAnimation(std::function<void()> finish);
+    int32_t GetPopupTargetId() const
+    {
+        return targetNodeId_;
+    }
+
     bool IsOnShow();
     bool IsExiting();
     void OnColorConfigurationUpdate() override;

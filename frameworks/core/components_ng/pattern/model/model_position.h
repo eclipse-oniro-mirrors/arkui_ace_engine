@@ -20,7 +20,7 @@
 #include "base/geometry/animatable_float.h"
 
 namespace OHOS::Ace::NG {
-class ModelPosition : public virtual AceType {
+class ModelPosition : public AceType {
     DECLARE_ACE_TYPE(ModelPosition, AceType);
 public:
     ModelPosition() = default;

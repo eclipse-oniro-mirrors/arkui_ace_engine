@@ -1610,28 +1610,6 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_PathAnimation_GetDelay(OH_ArkUI_PathAnimat
     return ARKUI_ERROR_CODE_NO_ERROR;
 }
 
-ArkUI_ErrorCode OH_ArkUI_NativeModule_PathAnimation_SetCurve(
-    OH_ArkUI_PathAnimationHandle animation, ArkUI_CurveHandle curve)
-{
-    CHECK_NULL_RETURN_WITH_MESSAGE(animation, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "animation is null");
-    if (curve != nullptr && IsDurationIndependentCurveType(curve->type)) {
-        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "duration-independent curve is not allowed");
-        return ARKUI_ERROR_CODE_PARAM_INVALID;
-    }
-    animation->curve = curve;
-    return ARKUI_ERROR_CODE_NO_ERROR;
-}
-
-ArkUI_ErrorCode OH_ArkUI_NativeModule_PathAnimation_GetCurve(
-    OH_ArkUI_PathAnimationHandle animation, ArkUI_CurveHandle* outBorrowedCurve)
-{
-    CHECK_NULL_RETURN_WITH_MESSAGE(animation, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "animation is null");
-    CHECK_NULL_RETURN_WITH_MESSAGE(
-        outBorrowedCurve, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "outBorrowedCurve is null");
-    *outBorrowedCurve = animation->curve;
-    return ARKUI_ERROR_CODE_NO_ERROR;
-}
-
 ArkUI_ErrorCode OH_ArkUI_NativeModule_PathAnimation_SetTempo(OH_ArkUI_PathAnimationHandle animation, float tempo)
 {
     CHECK_NULL_RETURN_WITH_MESSAGE(animation, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "animation is null");
@@ -2002,11 +1980,6 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_AnimationGroup_AddPathAnimation(
     CHECK_NULL_RETURN_WITH_MESSAGE(animation, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "animation is null");
     if (animation->path == nullptr) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_SUB_ANIMATION_INVALID, __FUNCTION__, "path is null");
-        return ARKUI_ERROR_CODE_SUB_ANIMATION_INVALID;
-    }
-    if (animation->curve && IsDurationIndependentCurveType(animation->curve->type)) {
-        SET_ERROR_MESSAGE(
-            ARKUI_ERROR_CODE_SUB_ANIMATION_INVALID, __FUNCTION__, "duration-independent curve is not allowed");
         return ARKUI_ERROR_CODE_SUB_ANIMATION_INVALID;
     }
     for (const auto& child : group->childAnimations) {

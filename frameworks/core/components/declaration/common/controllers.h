@@ -24,7 +24,7 @@ namespace OHOS::Ace {
 
 using RequestFocusImpl = std::function<void(bool)>;
 
-class FocusableController : public virtual AceType {
+class FocusableController : public AceType {
     DECLARE_ACE_TYPE(FocusableController, AceType);
 
 public:

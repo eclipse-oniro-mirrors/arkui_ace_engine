@@ -65,6 +65,7 @@ if (is_host_product) {
 addition_sources = [
   "paragraph_cache_test_ng.cpp",
   "text_base.cpp",
+  "text_external_paragraph_test_ng.cpp",
   "text_pattern_multi_thread_test_ng.cpp",
   "text_scroll_bar_2d_test.cpp",
   "text_test_min.cpp",

@@ -1275,6 +1275,9 @@ export class UIContext {
         ArkUIAniModule._Common_Restore_InstanceId();
         return HeightBreakpoint.fromValue(ret);
     }
+    public isWindowInfoInitialized(): boolean {
+        return ArkUIAniModule._Common_isWindowInfoInitialized(this.instanceId_);
+    }
     public vp2px(value: double): double {
         return ArkUIAniModule._Common_vp2px(value, this.instanceId_);
     }

@@ -208,7 +208,7 @@ HWTEST_F(TextFieldPatternTestTwo, HandleClickEvent001, TestSize.Level0)
     layoutProperty->UpdateMaxLines(0);
     layoutProperty->UpdateTextInputType(TextInputType::VISIBLE_PASSWORD);
 
-    pattern->obscureTickCountDown_ = 1;
+    pattern->obscureHelper_.tickCountDown_ = 1;
     pattern->multipleClickRecognizer_ = pattern->GetOrCreateMultipleClickRecognizer();
     pattern->multipleClickRecognizer_->clickCountTask_.Reset([] {});
     pattern->HandleClickEvent(info);
@@ -1039,7 +1039,7 @@ HWTEST_F(TextFieldPatternTestTwo, GetNakedCharPosition001, TestSize.Level0)
     layoutProperty->GetOrCreateTextLineStyle();
     ASSERT_NE(layoutProperty->propTextLineStyle_, nullptr);
     layoutProperty->propTextLineStyle_->UpdateMaxLines(1);
-    pattern->obscureTickCountDown_ = 1;
+    pattern->obscureHelper_.tickCountDown_ = 1;
     layoutProperty->UpdateTextInputType(TextInputType::VISIBLE_PASSWORD);
 
     int32_t ret = pattern->GetNakedCharPosition();

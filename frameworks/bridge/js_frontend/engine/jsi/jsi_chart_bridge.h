@@ -21,7 +21,7 @@
 
 namespace OHOS::Ace::Framework {
 
-class JsiChartBridge : virtual public AceType {
+class JsiChartBridge : public AceType {
     DECLARE_ACE_TYPE(JsiChartBridge, AceType);
 
 public:

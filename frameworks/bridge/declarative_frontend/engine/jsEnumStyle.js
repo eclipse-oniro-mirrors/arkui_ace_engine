@@ -4459,6 +4459,13 @@ let SafeAreaEdge;
   SafeAreaEdge[SafeAreaEdge.END = 3] = 'END';
 })(SafeAreaEdge || (SafeAreaEdge = {}));
 
+let SafeAreaInsetAlignment;
+(function (SafeAreaInsetAlignment) {
+  SafeAreaInsetAlignment[SafeAreaInsetAlignment.START = 0] = 'START';
+  SafeAreaInsetAlignment[SafeAreaInsetAlignment.CENTER = 1] = 'CENTER';
+  SafeAreaInsetAlignment[SafeAreaInsetAlignment.END = 2] = 'END';
+})(SafeAreaInsetAlignment || (SafeAreaInsetAlignment = {}));
+
 let LayoutSafeAreaType;
 (function (LayoutSafeAreaType) {
   LayoutSafeAreaType[LayoutSafeAreaType.SYSTEM = 0] = 'SYSTEM';

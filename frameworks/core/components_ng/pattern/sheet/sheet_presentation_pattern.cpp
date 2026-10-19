@@ -1534,18 +1534,21 @@ void SheetPresentationPattern::ChangeScrollHeight(float height)
     CHECK_NULL_VOID(scrollNode);
     auto scrollProps = scrollNode->GetLayoutProperty<ScrollLayoutProperty>();
     CHECK_NULL_VOID(scrollProps);
-    auto scrollHeight = height - GetTitleBuilderHeightStackMode() - resizeDecreasedHeight_;
+    float titleHeightStackMode = GetTitleBuilderHeightStackMode();
+    bool useTitleHeightStackMode = true;
+    auto scrollHeight = height - titleHeightStackMode - resizeDecreasedHeight_;
     auto sheetType = GetSheetTypeNoProcess();
     if (sheetType == SheetType::SHEET_POPUP || sheetType == SheetType::SHEET_CENTER ||
         sheetType == SheetType::SHEET_BOTTOM_OFFSET) {
         auto sheetHeight = geometryNode->GetFrameSize().Height();
-        scrollHeight = sheetHeight - GetTitleBuilderHeightStackMode() - resizeDecreasedHeight_;
+        scrollHeight = sheetHeight - titleHeightStackMode - resizeDecreasedHeight_;
     }
     if (sheetType == SheetType::SHEET_MINIMIZE) {
         scrollHeight = geometryNode->GetFrameSize().Height();
+        useTitleHeightStackMode = false;
     }
     scrollProps->UpdateUserDefinedIdealSize(CalcSize(std::nullopt, CalcLength(scrollHeight)));
-    preScrollSelfHeight_ = scrollHeight;
+    preScrollSelfHeight_ = GetRealPreScrollHeight(scrollHeight, titleHeightStackMode, useTitleHeightStackMode);
     scrollNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
 }
 
@@ -2938,9 +2941,8 @@ void SheetPresentationPattern::ScrollTo(float height)
             maxScrollDecreaseHeight = maxAvoidSize - sheetHeightUp_;
         }
         auto scrollSelfHeight = GetScrollHeight() - maxScrollDecreaseHeight;
-        layoutProp->UpdateUserDefinedIdealSize(CalcSize(std::nullopt,
-            CalcLength(scrollSelfHeight)));
-        preScrollSelfHeight_ = scrollSelfHeight;
+        layoutProp->UpdateUserDefinedIdealSize(CalcSize(std::nullopt, CalcLength(scrollSelfHeight)));
+        preScrollSelfHeight_ = GetRealPreScrollHeight(scrollSelfHeight, GetTitleBuilderHeightStackMode(), true);
         auto curScrollOffset = (useCaretAvoidMode && Positive(height)) ? scrollPattern->GetTotalOffset() : 0.f;
         // ScrollTo is only invoked from keyboard-avoid / rotation paths (user-triggered), classify as USER
         scrollPattern->SetAccessibilityScrollSource(AccessibilityScrollSource::USER);
@@ -2982,7 +2984,7 @@ bool SheetPresentationPattern::AdditionalScrollTo(const RefPtr<FrameNode>& scrol
     scrollHeight_ = scrollHeight - childHeight + height;
     auto scrollSelfHeight = GetScrollHeight() - (scrollHeight - childHeight + height);
     layoutProp->UpdateUserDefinedIdealSize(CalcSize(std::nullopt, CalcLength(scrollSelfHeight)));
-    preScrollSelfHeight_ = scrollSelfHeight;
+    preScrollSelfHeight_ = GetRealPreScrollHeight(scrollSelfHeight, GetTitleBuilderHeightStackMode(), true);
     // And then scroll move the content with '-height' offset
     auto curScrollOffset = (useCaretAvoidMode && Positive(height)) ? scrollPattern->GetTotalOffset() : 0.f;
     // Same passive keyboard-avoid pan as ScrollTo — only reached from internal ScrollTo call, classify as USER
@@ -3131,7 +3133,7 @@ float SheetPresentationPattern::GetFitContentHeight()
     auto builderNode = GetFirstFrameNodeOfBuilder();
     CHECK_NULL_RETURN(builderNode, 0.0f);
     auto builderGeometryNode = builderNode->GetGeometryNode();
-    return builderGeometryNode->GetMarginFrameSize().Height() + GetTitleBuilderHeight();
+    return builderGeometryNode->GetMarginFrameSize().Height() + GetTitleBuilderHeightStackMode();
 }
 
 float SheetPresentationPattern::GetTitleBuilderHeightStackMode() const
@@ -3146,6 +3148,15 @@ float SheetPresentationPattern::GetTitleBuilderHeightStackMode() const
         result = 0.0f;
     }
     return result;
+}
+
+float SheetPresentationPattern::GetRealPreScrollHeight(
+    float scrollHeight, float titleHeightStackMode, bool useStackModeHeight) const
+{
+    if (useStackModeHeight && NearZero(titleHeightStackMode)) {
+        return scrollHeight - GetTitleBuilderHeight();
+    }
+    return scrollHeight;
 }
 
 float SheetPresentationPattern::GetTitleBuilderHeight() const
@@ -3746,7 +3757,7 @@ void SheetPresentationPattern::DecreaseScrollHeightInSheet(float decreaseHeight)
     TAG_LOGD(AceLogTag::ACE_SHEET, "To avoid Keyboard, Scroll Height reduces by height %{public}f.", decreaseHeight);
     auto scrollSelfHeight = GetScrollHeight() - decreaseHeight;
     layoutProp->UpdateUserDefinedIdealSize(CalcSize(std::nullopt, CalcLength(scrollSelfHeight)));
-    preScrollSelfHeight_ = scrollSelfHeight;
+    preScrollSelfHeight_ = GetRealPreScrollHeight(scrollSelfHeight, GetTitleBuilderHeightStackMode(), true);
     resizeDecreasedHeight_ = decreaseHeight;
     scroll->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
 }
@@ -4280,7 +4291,7 @@ void SheetPresentationPattern::RecoverScrollOrResizeAvoidStatus()
     CHECK_NULL_VOID(layoutProp);
     auto scrollSelfHeight = GetScrollHeight();
     layoutProp->UpdateUserDefinedIdealSize(CalcSize(std::nullopt, CalcLength(scrollSelfHeight)));
-    preScrollSelfHeight_ = scrollSelfHeight;
+    preScrollSelfHeight_ = GetRealPreScrollHeight(scrollSelfHeight, GetTitleBuilderHeightStackMode(), true);
     resizeDecreasedHeight_ = 0.f;
     scrollHeight_ = 0.f;
     ScrollTo(0.f);

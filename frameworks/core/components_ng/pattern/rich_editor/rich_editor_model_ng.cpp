@@ -1502,6 +1502,59 @@ void RichEditorModelNG::ResetCancelButton(FrameNode* frameNode)
     }
 }
 
+void RichEditorModelNG::SetInputType(FrameNode* frameNode, TextInputType type)
+{
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(RichEditorLayoutProperty, TextInputType, type, frameNode);
+}
+
+void RichEditorModelNG::ResetInputType(FrameNode* frameNode)
+{
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(RichEditorLayoutProperty, TextInputType, TextInputType::UNSPECIFIED, frameNode);
+}
+
+TextInputType RichEditorModelNG::GetInputType(FrameNode* frameNode)
+{
+    TextInputType value = TextInputType::UNSPECIFIED;
+    ACE_GET_NODE_LAYOUT_PROPERTY_WITH_DEFAULT_VALUE(
+        RichEditorLayoutProperty, TextInputType, value, frameNode, TextInputType::UNSPECIFIED);
+    return value;
+}
+
+void RichEditorModelNG::SetShowPasswordIcon(FrameNode* frameNode, bool show)
+{
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(RichEditorLayoutProperty, ShowPasswordIcon, show, frameNode);
+}
+
+void RichEditorModelNG::ResetShowPasswordIcon(FrameNode* frameNode)
+{
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(RichEditorLayoutProperty, ShowPasswordIcon, true, frameNode);
+}
+
+bool RichEditorModelNG::GetShowPasswordIcon(FrameNode* frameNode)
+{
+    bool value = false;
+    ACE_GET_NODE_LAYOUT_PROPERTY_WITH_DEFAULT_VALUE(RichEditorLayoutProperty,
+        ShowPasswordIcon, value, frameNode, value);
+    return value;
+}
+
+void RichEditorModelNG::SetPasswordIcon(
+    FrameNode* frameNode, const ImageSourceInfo& showIcon, const ImageSourceInfo& hideIcon)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto pattern = frameNode->GetPattern<RichEditorPattern>();
+    CHECK_NULL_VOID(pattern);
+    pattern->SetIsPasswordSymbol(false);
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(RichEditorLayoutProperty, ShowPasswordSourceInfo, showIcon, frameNode);
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(RichEditorLayoutProperty, HidePasswordSourceInfo, hideIcon, frameNode);
+}
+
+void RichEditorModelNG::ResetPasswordIcon(FrameNode* frameNode)
+{
+    ACE_RESET_NODE_LAYOUT_PROPERTY(RichEditorLayoutProperty, ShowPasswordSourceInfo, frameNode);
+    ACE_RESET_NODE_LAYOUT_PROPERTY(RichEditorLayoutProperty, HidePasswordSourceInfo, frameNode);
+}
+
 Color RichEditorModelNG::GetScrollBarColor(FrameNode* frameNode)
 {
     CHECK_NULL_RETURN(frameNode, Color());

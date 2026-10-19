@@ -656,14 +656,16 @@ void TextContentModifier::ContentChangeReport()
     CHECK_NULL_VOID(textPattern);
     auto host = textPattern->GetHost();
     CHECK_NULL_VOID(host);
+    if (host->GetTag() == "SymbolGlyph") {
+        return;
+    }
+    // This marks the text once, including when no content-change manager is installed.
+    textPattern->ReportPageTranslateTextDrawn();
     auto pipeline = host->GetContext();
     CHECK_NULL_VOID(pipeline);
     auto mgr = pipeline->GetContentChangeManager();
     CHECK_NULL_VOID(mgr);
-    if (host->GetTag() != "SymbolGlyph") {
-        textPattern->ReportPageTranslateTextDrawn();
-    }
-    if (!mgr->IsTextAABBCollecting() || host->GetTag() == "SymbolGlyph") {
+    if (!mgr->IsTextAABBCollecting()) {
         return;
     }
     auto textRect = host->GetTransformRectRelativeToWindowOnlyVisible();

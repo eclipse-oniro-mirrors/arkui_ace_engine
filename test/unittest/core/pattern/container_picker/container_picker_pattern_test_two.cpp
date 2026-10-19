@@ -27,6 +27,7 @@
 #include "test/unittest/core/pattern/test_ng.h"
 #include "test/unittest/core/syntax/mock_lazy_for_each_builder.h"
 
+#include "core/components_ng/event/event_hub_callback_sets.h"
 #include "core/components_ng/pattern/container_picker/container_picker_layout_property.h"
 #include "core/components_ng/pattern/container_picker/container_picker_model.h"
 #include "core/components_ng/pattern/container_picker/container_picker_paint_method.h"
@@ -425,7 +426,7 @@ HWTEST_F(ContainerPickerPatternTestTwo, InitAreaChangeEvent002, TestSize.Level1)
     pattern->OnAttachToFrameNode();
     auto eventHub = frameNode->GetEventHub<EventHub>();
     ASSERT_NE(eventHub, nullptr);
-    EXPECT_TRUE(eventHub->onAreaChangedInnerCallbacks_.count(frameNode->nodeId_));
+    EXPECT_TRUE(eventHub->GetOrCreateAreaCallbackSet()->onAreaChangedInnerCallbacks.count(frameNode->nodeId_));
 }
 
 /**

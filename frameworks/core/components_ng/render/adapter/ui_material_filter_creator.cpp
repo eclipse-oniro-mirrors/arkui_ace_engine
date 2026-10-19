@@ -385,7 +385,11 @@ constexpr FrostedGlassParam Gentle_UltraThick_Transparency3_Light {
     .edLightAngles = { 75.0f, 85.0f },
     .edLightDir = { 0.0f, -1.0f },
     .edLightRates = {},
+#if defined(ACE_ENGINE_IMMERSIVE_MATERIAL_TV)
+    .edLightKBS = { 1.5f, 0.15f, 1.5f },
+#else
     .edLightKBS = { 0.8f, 0.3922f, 1.5f },
+#endif
     .edLightPos = { 1.0f, 1.5f, 2.0f },
     .edLightNeg = { 1.7f, 3.0f, 1.0f },
     .darkModeBlurParams = { 12.0f, 1.0f },
@@ -395,7 +399,11 @@ constexpr FrostedGlassParam Gentle_UltraThick_Transparency3_Light {
     .darkModeBgPos = { 0.5f, 0.7f, 2.0f },
     .darkModeBgNeg = { 1.0f, 1.0f, 1.0f },
     .darkModeEdLightAngles = { 75.0f, 120.0f },
+#if defined(ACE_ENGINE_IMMERSIVE_MATERIAL_TV)
+    .darkModeEdLightKBS = { 1.5f, 0.15f, 1.5f },
+#else
     .darkModeEdLightKBS = { 1.2f, 0.294f, 1.5f },
+#endif
 };
 constexpr FrostedGlassParam Gentle_UltraThick_Transparency3_Dark {
     .blurParams = { 12.0f, 1.0f },
@@ -410,7 +418,11 @@ constexpr FrostedGlassParam Gentle_UltraThick_Transparency3_Dark {
     .edLightAngles = { 75.0f, 120.0f },
     .edLightDir = { 0.0f, -1.0f },
     .edLightRates = {},
+#if defined(ACE_ENGINE_IMMERSIVE_MATERIAL_TV)
+    .edLightKBS = { 1.5f, 0.15f, 1.5f },
+#else
     .edLightKBS = { 1.2f, 0.294f, 1.5f },
+#endif
     .edLightPos = { 1.0f, 1.5f, 2.0f },
     .edLightNeg = { 1.7f, 3.0f, 1.0f },
     .darkModeBlurParams = { 12.0f, 1.0f },
@@ -420,7 +432,11 @@ constexpr FrostedGlassParam Gentle_UltraThick_Transparency3_Dark {
     .darkModeBgPos = { 0.5f, 0.7f, 2.0f },
     .darkModeBgNeg = { 1.0f, 1.0f, 1.0f },
     .darkModeEdLightAngles = { 75.0f, 120.0f },
+#if defined(ACE_ENGINE_IMMERSIVE_MATERIAL_TV)
+    .darkModeEdLightKBS = { 1.5f, 0.15f, 1.5f },
+#else
     .darkModeEdLightKBS = { 1.2f, 0.294f, 1.5f },
+#endif
 };
 constexpr FrostedGlassParam Gentle_UltraThick_Transparency4_Light {
     .blurParams = { 25.0f, 1.0f },
@@ -499,7 +515,11 @@ constexpr FrostedGlassParam Gentle_Thick_Transparency3_Light {
     .edLightAngles = { 75.0f, 85.0f },
     .edLightDir = { 0.0f, -1.0f },
     .edLightRates = {},
+#if defined(ACE_ENGINE_IMMERSIVE_MATERIAL_TV)
+    .edLightKBS = { 1.5f, 0.15f, 1.5f },
+#else
     .edLightKBS = { 0.8f, 0.3922f, 1.5f },
+#endif
     .edLightPos = { 1.0f, 1.5f, 2.0f },
     .edLightNeg = { 1.7f, 3.0f, 1.0f },
     .darkModeBlurParams = { 12.0f, 1.0f },
@@ -509,7 +529,11 @@ constexpr FrostedGlassParam Gentle_Thick_Transparency3_Light {
     .darkModeBgPos = { 1.7f, 1.5f, 1.5f },
     .darkModeBgNeg = { 1.2f, 2.5f, 1.0f },
     .darkModeEdLightAngles = { 75.0f, 120.0f },
+#if defined(ACE_ENGINE_IMMERSIVE_MATERIAL_TV)
+    .darkModeEdLightKBS = { 1.5f, 0.15f, 1.5f },
+#else
     .darkModeEdLightKBS = { 1.2f, 0.294f, 1.5f },
+#endif
 };
 constexpr FrostedGlassParam Gentle_Thick_Transparency3_Dark {
     .blurParams = { 12.0f, 1.0f },
@@ -524,7 +548,11 @@ constexpr FrostedGlassParam Gentle_Thick_Transparency3_Dark {
     .edLightAngles = { 75.0f, 120.0f },
     .edLightDir = { 0.0f, -1.0f },
     .edLightRates = {},
+#if defined(ACE_ENGINE_IMMERSIVE_MATERIAL_TV)
+    .edLightKBS = { 1.5f, 0.15f, 1.5f },
+#else
     .edLightKBS = { 1.2f, 0.294f, 1.5f },
+#endif
     .edLightPos = { 1.0f, 1.5f, 2.0f },
     .edLightNeg = { 1.7f, 3.0f, 1.0f },
     .darkModeBlurParams = { 12.0f, 1.0f },
@@ -534,7 +562,11 @@ constexpr FrostedGlassParam Gentle_Thick_Transparency3_Dark {
     .darkModeBgPos = { 1.7f, 1.5f, 1.5f },
     .darkModeBgNeg = { 1.2f, 2.5f, 1.0f },
     .darkModeEdLightAngles = { 75.0f, 120.0f },
+#if defined(ACE_ENGINE_IMMERSIVE_MATERIAL_TV)
+    .darkModeEdLightKBS = { 1.5f, 0.15f, 1.5f },
+#else
     .darkModeEdLightKBS = { 1.2f, 0.294f, 1.5f },
+#endif
 };
 constexpr FrostedGlassParam Gentle_Thick_Transparency4_Light {
     .blurParams = { 25.0f, 1.0f },

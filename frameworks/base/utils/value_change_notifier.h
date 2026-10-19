@@ -45,7 +45,7 @@ protected:
  * @tparam U is the value type.
  */
 template<class U>
-class ValueChangeNotifier : public virtual AceType {
+class ValueChangeNotifier : public AceType {
     DECLARE_ACE_TYPE(ValueChangeNotifier<U>, AceType);
 
 public:

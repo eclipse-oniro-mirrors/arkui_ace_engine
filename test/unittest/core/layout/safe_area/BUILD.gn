@@ -49,6 +49,23 @@ if (is_host_product) {
 
 ignore_layout_safe_area_scheduling_sources = [ "ignore_layout_safe_area_scheduling_test_ng.cpp" ]
 
+safe_area_inset_sources = [ "safe_area_inset_test_ng.cpp" ]
+
+if (is_host_product) {
+  ace_unittest("safe_area_inset_test_ng") {
+    type = "host_components"
+    module_name = "CommonProperties-SafeAreaInset"
+    sources = safe_area_inset_sources
+    cflags = [ "-fno-access-control" ]
+  }
+} else {
+  ace_unittest("safe_area_inset_test_ng") {
+    type = "new"
+    module_name = "CommonProperties-SafeAreaInset"
+    sources = safe_area_inset_sources
+  }
+}
+
 if (is_host_product) {
   ace_unittest("ignore_layout_safe_area_scheduling_test_ng") {
     type = "host_components"

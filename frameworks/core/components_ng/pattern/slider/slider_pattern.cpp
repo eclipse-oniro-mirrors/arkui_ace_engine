@@ -341,6 +341,11 @@ std::vector<ParticleVelocityField> CreateParticleVelocityFields(
 
 } // namespace
 
+std::string SliderPattern::GetPageTextForReport(bool /* includeInput */) const
+{
+    return sliderTipModifier_ ? sliderTipModifier_->GetVisibleText() : "";
+}
+
 RefPtr<NodePaintMethod> SliderPattern::CreateNodePaintMethod()
 {
     if (!IsSliderVisible()) {

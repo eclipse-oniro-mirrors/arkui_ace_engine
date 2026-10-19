@@ -87,6 +87,7 @@ ohos_source_set("ace_kit") {
       "${ace_graphic}/rosen/modules/render_service_client:librender_service_client_static",
       "//third_party/libuv:uv_static",
     ]
+    defines += [ "CROSS_PLATFORM" ]
   } else {
     external_deps += [
       "graphic_2d:librender_service_client",

@@ -46,6 +46,10 @@ public:
     void SetLayoutDirection(FlexDirection value) override;
     void SetNestedScroll(const NestedScrollOptions& nestedOpt) override;
     void SetScrollEnabled(bool scrollEnabled) override;
+    void SetScrollSnapStrategy(const ScrollSnapStrategy& strategy) override;
+    void ResetScrollSnapStrategy() override;
+    static void SetScrollSnapStrategy(FrameNode* frameNode, const ScrollSnapStrategy& strategy);
+    static void ResetScrollSnapStrategy(FrameNode* frameNode);
 
     void SetOnReachStart(OnReachEvent&& onReachStart) override;
     void SetOnReachEnd(OnReachEvent&& onReachEnd) override;

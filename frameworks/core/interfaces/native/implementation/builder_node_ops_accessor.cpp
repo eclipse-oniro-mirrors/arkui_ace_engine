@@ -286,7 +286,8 @@ Ark_Boolean PostInputEventImpl(Ark_BuilderNodeOps peer, const Opt_InputEventType
         case SELECTOR_ID_1: {
             auto mouseEventInfo = arkEevent.value1->GetEventInfo();
             CHECK_NULL_RETURN(mouseEventInfo, errValue);
-            auto mouseEvent = mouseEventInfo->ConvertToMouseEventForStatic();
+            auto density = static_cast<float>(pipelineContext->GetDensity());
+            auto mouseEvent = mouseEventInfo->ConvertToMouseEventForStatic(density);
             mouseEvent.time = mouseEventInfo->GetTimeStamp();
             result = postEventManager->PostMouseEvent(peer->realNode_, std::move(mouseEvent));
             break;
@@ -294,7 +295,8 @@ Ark_Boolean PostInputEventImpl(Ark_BuilderNodeOps peer, const Opt_InputEventType
         case SELECTOR_ID_2: {
             auto axisEventInfo = arkEevent.value2->GetEventInfo();
             CHECK_NULL_RETURN(axisEventInfo, errValue);
-            auto axisEvent = axisEventInfo->ConvertToAxisEvent();
+            auto density = static_cast<float>(pipelineContext->GetDensity());
+            auto axisEvent = axisEventInfo->ConvertToAxisEvent(true, density);
             axisEvent.pressedCodes = axisEventInfo->GetPressedKeyCodes();
             result = postEventManager->PostAxisEvent(peer->realNode_, std::move(axisEvent));
             break;
@@ -357,7 +359,8 @@ Ark_Boolean PostInputEventWithStrategyImpl(Ark_BuilderNodeOps peer, const Opt_In
         case SELECTOR_ID_1: {
             auto mouseEventInfo = arkEvent.value1->GetEventInfo();
             CHECK_NULL_RETURN(mouseEventInfo, errValue);
-            auto mouseEvent = mouseEventInfo->ConvertToMouseEventForStatic();
+            auto density = static_cast<float>(pipelineContext->GetDensity());
+            auto mouseEvent = mouseEventInfo->ConvertToMouseEventForStatic(density);
             mouseEvent.time = mouseEventInfo->GetTimeStamp();
             mouseEvent.isNewReferee = isNewReferee;
             result = postEventManager->PostMouseEventWithStrategy(peer->realNode_, std::move(mouseEvent));
@@ -366,7 +369,8 @@ Ark_Boolean PostInputEventWithStrategyImpl(Ark_BuilderNodeOps peer, const Opt_In
         case SELECTOR_ID_2: {
             auto axisEventInfo = arkEvent.value2->GetEventInfo();
             CHECK_NULL_RETURN(axisEventInfo, errValue);
-            auto axisEvent = axisEventInfo->ConvertToAxisEvent();
+            auto density = static_cast<float>(pipelineContext->GetDensity());
+            auto axisEvent = axisEventInfo->ConvertToAxisEvent(true, density);
             axisEvent.pressedCodes = axisEventInfo->GetPressedKeyCodes();
             axisEvent.isNewReferee = isNewReferee;
             result = postEventManager->PostAxisEventWithStrategy(peer->realNode_, std::move(axisEvent));

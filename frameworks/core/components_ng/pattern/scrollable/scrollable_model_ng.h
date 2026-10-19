@@ -166,6 +166,11 @@ public:
     static void SetEnableScrollWithMouse(FrameNode* frameNode, bool enableScrollWithMouse);
     static void ResetEnableScrollWithMouse(FrameNode* frameNode);
     static bool GetEnableScrollWithMouse(FrameNode* frameNode);
+    static void SetEnableScrollWithKeyboard(bool enableScrollWithKeyboard);
+    static void ResetEnableScrollWithKeyboard();
+    static void SetEnableScrollWithKeyboard(FrameNode* frameNode, bool enableScrollWithKeyboard);
+    static void ResetEnableScrollWithKeyboard(FrameNode* frameNode);
+    static bool GetEnableScrollWithKeyboard(FrameNode* frameNode);
     static void SetScrollBarMargin(const ScrollBarMargin& scrollBarMargin);
     static void SetScrollBarMargin(FrameNode* frameNode, const ScrollBarMargin& scrollBarMargin);
     static void ResetScrollBarMargin(FrameNode* frameNode);

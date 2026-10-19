@@ -22,6 +22,10 @@
 
 namespace OHOS::Ace::NG {
 
+template<typename T>
+class OffsetT;
+using OffsetF = OffsetT<float>;
+
 using MoveCallbck = std::function<float(float)>;
 constexpr int32_t AXIS_DISTANCE_THRESHOLD = 720;
 constexpr int32_t AXIS_KEY_DISTANCE = 240;
@@ -85,5 +89,6 @@ private:
 
     ACE_DISALLOW_COPY_AND_MOVE(AxisScrollMotion);
 };
+
 } // namespace OHOS::Ace::NG
 #endif // FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_SCROLLABLE_AXIS_AXIS_SCROLL_ANIMATOR_H

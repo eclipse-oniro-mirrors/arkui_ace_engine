@@ -366,7 +366,7 @@ HWTEST_F(TextFieldModifyTest, OnCursorTwinkling001, TestSize.Level1)
      * @tc.steps: step2. Set single clickevent. Call function OnCursorTwinkling.
      * @tc.expected: Check if return true.
      */
-    pattern_->obscureTickCountDown_ = 1;
+    pattern_->obscureHelper_.tickCountDown_ = 1;
     GestureEvent gestureEvent;
     pattern_->HandleSingleClickEvent(gestureEvent);
     pattern_->OnCursorTwinkling();

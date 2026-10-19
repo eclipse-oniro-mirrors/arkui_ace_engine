@@ -3780,6 +3780,12 @@ void MenuLayoutAlgorithm::InitCanExpandCurrentWindow(bool isContextMenu,
     }
     CHECK_NULL_VOID(container);
     targetInUIExtension_ = container->IsUIExtensionWindow();
+    if (targetInUIExtension_) {
+        auto rect = container->GetUIExtensionHostWindowRect();
+        UIExtensionHostWindowRect_ = RectF(rect.Left(), rect.Top(), rect.Width(), rect.Height());
+        TAG_LOGI(AceLogTag::ACE_MENU, "GetUIExtensionHostWindowRect : %{public}s",
+            UIExtensionHostWindowRect_.ToString().c_str());
+    }
     showInSubWindow_ = menuLayoutProperty->GetShowInSubWindowValue(false) || isContextMenu ||
         menuPattern->IsSelectOverlayShowInSubWindow();
     dumpInfo_.showInSubWindow = showInSubWindow_;
@@ -3795,12 +3801,6 @@ void MenuLayoutAlgorithm::InitCanExpandCurrentWindow(bool isContextMenu,
         if (isUIExtensionSubWindow_) {
             // menu can show expand the UIExtension window
             canExpandCurrentWindow_ = true;
-            auto subwindow = SubwindowManager::GetInstance()->GetSubwindowById(containerId);
-            CHECK_NULL_VOID(subwindow);
-            auto rect = subwindow->GetUIExtensionHostWindowRect();
-            UIExtensionHostWindowRect_ = RectF(rect.Left(), rect.Top(), rect.Width(), rect.Height());
-            TAG_LOGI(AceLogTag::ACE_MENU, "GetUIExtensionHostWindowRect : %{public}s",
-                UIExtensionHostWindowRect_.ToString().c_str());
         }
     }
 }

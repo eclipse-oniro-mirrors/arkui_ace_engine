@@ -83,6 +83,21 @@ namespace OHOS::Ace {
 
 namespace {
 
+template<typename T>
+auto PutCaretColorIfSupported(T& preference, uint32_t colorValue, int32_t)
+    -> decltype(preference.PutCaretColor(colorValue), void())
+{
+    preference.PutCaretColor(colorValue);
+}
+
+template<typename T>
+void PutCaretColorIfSupported(T& preference, uint32_t colorValue, int64_t)
+{
+    // The web_webview interface can be updated after ArkUI in a staged rollout.
+    (void)preference;
+    (void)colorValue;
+}
+
 constexpr char WEB_METHOD_ROUTER_BACK[] = "routerBack";
 constexpr char WEB_METHOD_UPDATEURL[] = "updateUrl";
 constexpr char WEB_METHOD_CHANGE_PAGE_URL[] = "changePageUrl";
@@ -5133,6 +5148,28 @@ void WebDelegate::UpdateScrollBarColor(const std::string& colorValue)
             }
         },
         TaskExecutor::TaskType::PLATFORM, "ArkUIWebPutScrollBarColor");
+}
+
+void WebDelegate::UpdateCaretColor(const Color& caretColor)
+{
+    auto context = context_.Upgrade();
+    if (!context) {
+        return;
+    }
+    auto executor = context->GetTaskExecutor();
+    CHECK_NULL_VOID(executor);
+    uint32_t colorValue = caretColor.GetValue();
+    executor->PostTask(
+        [weak = WeakClaim(this), colorValue]() {
+            auto delegate = weak.Upgrade();
+            if (delegate && delegate->nweb_) {
+                std::shared_ptr<OHOS::NWeb::NWebPreference> setting = delegate->nweb_->GetPreference();
+                if (setting) {
+                    PutCaretColorIfSupported(*setting, colorValue, 0);
+                }
+            }
+        },
+        TaskExecutor::TaskType::PLATFORM, "ArkUIWebPutCaretColor");
 }
 
 void WebDelegate::UpdateEnableFollowSystemFontWeight(bool enableFollowSystemFontWeight)

@@ -104,6 +104,9 @@ declare_args() {
 
   #Enable material param customized
   ace_engine_feature_enable_material_customized = false
+
+  #Enable material param TV
+  ace_engine_feature_enable_material_tv = false
 }
 
 enable_dump_drawcmd = false

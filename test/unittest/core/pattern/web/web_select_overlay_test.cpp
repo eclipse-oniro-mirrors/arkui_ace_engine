@@ -24,6 +24,7 @@
 #include "test/mock/frameworks/core/common/mock_container.h"
 
 #include "core/components_ng/pattern/web/web_pattern.h"
+#include "core/components_ng/pattern/web/web_model_ng.h"
 #include "core/components_ng/pattern/web/web_select_overlay.h"
 #undef protected
 #undef private
@@ -1951,6 +1952,37 @@ void WebSelectOverlayTest::TearDownTestCase()
 }
 void WebSelectOverlayTest::SetUp() {}
 void WebSelectOverlayTest::TearDown() {}
+
+/**
+ * @tc.name: CaretColorUpdatesOuterHandleOnly
+ * @tc.desc: Verify a non-zero Web caret color overrides the handle outer color and zero restores the theme fallback.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebSelectOverlayTest, CaretColorUpdatesOuterHandleOnly, TestSize.Level1)
+{
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    auto overlay = AceType::MakeRefPtr<WebSelectOverlay>(AceType::WeakClaim(AceType::RawPtr(webPattern)));
+
+    WebModelNG::SetCaretColor(AceType::RawPtr(frameNode), Color::RED);
+    ASSERT_TRUE(overlay->GetHandleColor().has_value());
+    EXPECT_EQ(overlay->GetHandleColor().value(), Color::RED);
+    SelectOverlayInfo selectInfo;
+    overlay->OnUpdateSelectOverlayInfo(selectInfo, 0);
+    ASSERT_TRUE(selectInfo.handlerColor.has_value());
+    EXPECT_EQ(selectInfo.handlerColor.value(), Color::RED);
+
+    WebModelNG::SetCaretColor(AceType::RawPtr(frameNode), Color(0));
+    EXPECT_FALSE(overlay->GetHandleColor().has_value());
+    overlay->OnUpdateSelectOverlayInfo(selectInfo, 0);
+    EXPECT_FALSE(selectInfo.handlerColor.has_value());
+}
 
 std::vector<MenuOptionsParam> CreateMenuOptionsV2(const std::vector<NG::MenuItemParam>&)
 {

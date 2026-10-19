@@ -24,7 +24,7 @@ namespace OHOS::Ace {
 
 using ProgressCallback = std::function<void(uint32_t)>;
 
-class ButtonProgressController : public virtual AceType {
+class ButtonProgressController : public AceType {
     DECLARE_ACE_TYPE(ButtonProgressController, AceType);
 
 public:

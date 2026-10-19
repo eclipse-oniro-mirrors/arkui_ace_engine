@@ -51,6 +51,7 @@ public:
     static void SetBlockNetwork(FrameNode* frameNode, bool isNetworkBlocked);
     static void SetHorizontalScrollBarAccessEnabled(FrameNode* frameNode, bool isHorizontalScrollBarAccessEnabled);
     static void SetVerticalScrollBarAccessEnabled(FrameNode* frameNode, bool isVerticalScrollBarAccessEnabled);
+    static void SetCaretColor(FrameNode* frameNode, const std::optional<Color>& caretColor);
     static void SetPinchSmoothModeEnabled(FrameNode* frameNode, bool isPinchSmoothModeEnabled);
     static void SetNativeEmbedModeEnabled(FrameNode* frameNode, bool isEmbedModeEnabled);
     static void SetTextAutosizing(FrameNode* frameNode, bool isTextAutosizing);

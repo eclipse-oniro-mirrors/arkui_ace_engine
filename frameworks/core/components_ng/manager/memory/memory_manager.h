@@ -28,7 +28,7 @@ namespace OHOS::Ace::NG {
 class FrameNode;
 class UINode;
 
-class MemoryManager : public virtual AceType {
+class MemoryManager : public AceType {
     DECLARE_ACE_TYPE(MemoryManager, AceType);
 public:
     using RecycleImageByPageCallback = std::function<RefPtr<FrameNode>()>;

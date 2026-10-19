@@ -1431,7 +1431,7 @@ void AssignCast(std::optional<WebKeyboardAvoidMode>& dst, const Ark_WebKeyboardA
 }
 
 #ifndef WINDOWS_PLATFORM
-#if defined(ARKUI_CAPI_UNITTEST) || defined(LINUX_PLATFORM) || defined(MAC_PLATFORM)
+#if defined(ARKUI_CAPI_UNITTEST) || defined(LINUX_PLATFORM) || defined(MAC_PLATFORM) || defined(CROSS_PLATFORM)
 template<>
 void AssignCast(std::optional<WebContextMenuItemId>& dst, const WebContextMenuItemId& src)
 {

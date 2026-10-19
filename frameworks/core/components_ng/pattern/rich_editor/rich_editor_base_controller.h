@@ -50,7 +50,7 @@ public:
     void SetSelection(int32_t selectionStart, int32_t selectionEnd,
         const std::optional<SelectionOptions>& options = std::nullopt, bool isForward = false) override;
     WeakPtr<LayoutInfoInterface> GetLayoutInfoInterface() override;
-    const PreviewTextInfo GetPreviewTextInfo() const override;
+    const OHOS::Ace::PreviewTextInfo GetPreviewTextInfo() const override;
     ColorMode GetColorMode() const override;
 
 protected:

@@ -53,7 +53,7 @@ class ActiveRecognizerManager;
 #ifdef RELAXED_INTERACTION_SUPPORT
 class RelaxedInteractionManager;
 #endif
-class TouchDelegate : public virtual AceType {
+class TouchDelegate : public AceType {
     DECLARE_ACE_TYPE(TouchDelegate, AceType);
 public:
     virtual void DelegateTouchEvent(const TouchEvent& point) {};
@@ -103,7 +103,7 @@ struct HitTestRecordInfo {
     TouchType type;
 };
 
-class EventManager : virtual public NG::KeyEventManager {
+class EventManager : public NG::KeyEventManager {
     DECLARE_ACE_TYPE(EventManager, KeyEventManager);
 
 public:

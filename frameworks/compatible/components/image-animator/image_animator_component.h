@@ -25,7 +25,7 @@ namespace OHOS::Ace {
 using AnimatorFunc = std::function<void(const std::string& method)>;
 using AnimatorGetStatusFunc = std::function<Animator::Status()>;
 
-class ImageAnimatorController : public virtual AceType {
+class ImageAnimatorController : public AceType {
     DECLARE_ACE_TYPE(ImageAnimatorController, AceType);
 
 public:

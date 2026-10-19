@@ -37,6 +37,10 @@ ace_unittest("interfaces_test") {
       "core_interfaces_test_min.cpp",
     ]
   }
+  sources += [
+    "$ace_root/frameworks/core/interfaces/native/ani/safe_area_inset_ani_modifier.cpp",
+    "native/ani/safe_area_inset_ani_modifier_test.cpp",
+  ]
 }
 
 ace_unittest("visual_effect_ani_modifier_test") {

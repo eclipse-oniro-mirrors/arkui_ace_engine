@@ -1307,6 +1307,7 @@ void WebSelectOverlay::OnUpdateSelectOverlayInfo(SelectOverlayInfo &selectInfo, 
     selectInfo.onCreateCallback = webSelectInfo_.onCreateCallback;
     selectInfo.onClose = webSelectInfo_.onClose;
     selectInfo.onClick = webSelectInfo_.onClick;
+    selectInfo.handlerColor = GetHandleColor();
     selectInfo.enableHandleLevel = true;
     selectInfo.enableSubWindowMenu = true;
     if (IS_CALLING_FROM_M114()) {
@@ -1337,6 +1338,18 @@ bool WebSelectOverlay::IsNeedMenuShareForWeb()
     const auto trimmedLen = end - start + 1;
     const auto maxShareLength = static_cast<size_t>(TextShareAdapter::GetMaxTextShareLength());
     return trimmedLen <= maxShareLength;
+}
+
+std::optional<Color> WebSelectOverlay::GetHandleColor()
+{
+    auto pattern = GetPattern<WebPattern>();
+    CHECK_NULL_RETURN(pattern, std::nullopt);
+    std::optional<Color> caretColor = pattern->GetCaretColor();
+    // Fully transparent color is treated as unset, keep the theme default handle color.
+    if (caretColor.has_value() && caretColor.value().GetValue() != 0) {
+        return caretColor;
+    }
+    return std::nullopt;
 }
 
 void WebSelectOverlay::OnHandleMarkInfoChange(

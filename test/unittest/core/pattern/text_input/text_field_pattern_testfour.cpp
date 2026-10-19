@@ -261,7 +261,7 @@ HWTEST_F(TextFieldPatternTestFour, OnCursorMoveDone001, TestSize.Level0)
     layoutProperty->UpdateMaxLines(0);
     layoutProperty->UpdateTextInputType(TextInputType::VISIBLE_PASSWORD);
     pattern->OnObscuredChanged(true);
-    pattern->obscureTickCountDown_ = 1024;
+    pattern->obscureHelper_.tickCountDown_ = 1024;
     pattern->OnCursorMoveDone();
 }
 

@@ -299,6 +299,7 @@ public:
     static void JsPadding(const JSCallbackInfo& info);
     static void JsMargin(const JSCallbackInfo& info);
     static void SetSafeAreaPadding(const JSCallbackInfo& info);
+    static void SetSafeAreaInset(const JSCallbackInfo& info);
     static void ParseMarginOrPadding(const JSCallbackInfo& info, EdgeType type);
     static void ParseMarginOrPaddingCorner(JSRef<JSObject> obj, std::optional<CalcDimension>& top,
         std::optional<CalcDimension>& bottom, std::optional<CalcDimension>& left, std::optional<CalcDimension>& right);

@@ -32,7 +32,7 @@ extern const char ABILITY_COMPONENT_PARAM_BEGIN[];
 extern const char ABILITY_COMPONENT_METHOD[];
 extern const char ABILITY_COMPONENT_EVENT[];
 
-class AbilityComponentResource : public virtual AceType {
+class AbilityComponentResource : public AceType {
     DECLARE_ACE_TYPE(AbilityComponentResource, AceType);
 
 public:

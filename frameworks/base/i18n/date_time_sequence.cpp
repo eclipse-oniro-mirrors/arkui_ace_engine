@@ -29,23 +29,6 @@ OrderResult DateTimeSequence::GetDateOrder(const std::string& locale)
     if (U_FAILURE(icuStatus)) {
         return orderResult;
     }
-    const char* language = localeObj.getBaseName();
-    if (language == nullptr) {
-        return orderResult;
-    }
-    const std::unordered_map<std::string, std::string> DATE_ORDER_MAP = {
-        { "ug", "M-d-y" },
-        { "ar", "y-M-d" },
-        { "fa", "y-M-d" },
-        { "ur", "y-M-d" },
-        { "iw", "y-M-d" },
-        { "he", "y-M-d" },
-    };
-    std::string languageTag = language;
-    if (DATE_ORDER_MAP.find(languageTag) != DATE_ORDER_MAP.end()) {
-        orderResult.dateOrder = DATE_ORDER_MAP.find(languageTag)->second;
-        return orderResult;
-    }
     icu::SimpleDateFormat* formatter = static_cast<icu::SimpleDateFormat*>
         (icu::DateFormat::createDateInstance(icu::DateFormat::EStyle::kDefault, localeObj));
     if (U_FAILURE(icuStatus) || formatter == nullptr) {

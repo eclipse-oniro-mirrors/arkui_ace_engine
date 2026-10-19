@@ -263,6 +263,11 @@ void WebModelStatic::SetVerticalScrollBarAccessEnabled(FrameNode* frameNode, boo
     webPatternStatic->UpdateVerticalScrollBarAccessEnabled(isVerticalScrollBarAccessEnabled);
 }
 
+void WebModelStatic::SetCaretColor(FrameNode* frameNode, const std::optional<Color>& caretColor)
+{
+    WebModelNG::SetCaretColor(frameNode, caretColor.value_or(Color(0)));
+}
+
 void WebModelStatic::SetPinchSmoothModeEnabled(FrameNode* frameNode, bool isPinchSmoothModeEnabled)
 {
     CHECK_NULL_VOID(frameNode);

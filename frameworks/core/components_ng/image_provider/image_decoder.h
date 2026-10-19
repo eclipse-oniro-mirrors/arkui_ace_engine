@@ -34,7 +34,7 @@ struct ImageDecoderConfig {
     PixelFormat photoDecodeFormat_ = PixelFormat::UNKNOWN;
 };
 
-class ImageDecoder : public virtual AceType {
+class ImageDecoder : public AceType {
 public:
     // decode image using Skia, return true if process is successful.
     static RefPtr<CanvasImage> MakeDrawingImage(

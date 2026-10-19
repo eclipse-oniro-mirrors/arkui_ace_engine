@@ -387,7 +387,7 @@ TEST_P(UiThreadTableLogTest, LogModeProducesDiagnostic)
     RunAndExpectDiagnostic([api, this] { GetParam().invoke(api); });
 }
 
-// === Scope entries（175 导出函数，排除 5 个范围外 + 2 个 ANI）===
+// === Scope entries（175 导出函数 + 17 TextEditorStyledStringController，排除 5 个范围外 + 2 个 ANI）===
 
 namespace {
 #define SCOPE_ENTRY(api) { #api, [] { CallWithDefaultArgs(api); } }
@@ -573,6 +573,24 @@ const ScopeEntry SCOPE_ENTRIES[] = {
     SCOPE_ENTRY(OH_ArkUI_RenderNodeUtils_SetVector2AnimatablePropertyValue),
     SCOPE_ENTRY(OH_ArkUI_RenderNodeUtils_SetVector2PropertyValue),
     SCOPE_ENTRY(OH_ArkUI_RunTaskInScope),
+    // === TextEditorStyledStringController (17 APIs with CHECK_UI_THREAD guard) ===
+    SCOPE_ENTRY(OH_ArkUI_TextEditorStyledStringController_CloseSelectionMenu),
+    SCOPE_ENTRY(OH_ArkUI_TextEditorStyledStringController_DeleteBackward),
+    SCOPE_ENTRY(OH_ArkUI_TextEditorStyledStringController_GetCaretOffset),
+    SCOPE_ENTRY(OH_ArkUI_TextEditorStyledStringController_GetCaretRect),
+    SCOPE_ENTRY(OH_ArkUI_TextEditorStyledStringController_GetPreviewText),
+    SCOPE_ENTRY(OH_ArkUI_TextEditorStyledStringController_GetSelection),
+    SCOPE_ENTRY(OH_ArkUI_TextEditorStyledStringController_GetStyledString),
+    SCOPE_ENTRY(OH_ArkUI_TextEditorStyledStringController_GetTypingStyle),
+    SCOPE_ENTRY(OH_ArkUI_TextEditorStyledStringController_IsEditing),
+    SCOPE_ENTRY(OH_ArkUI_TextEditorStyledStringController_ScrollToVisible),
+    SCOPE_ENTRY(OH_ArkUI_TextEditorStyledStringController_SetCaretOffset),
+    SCOPE_ENTRY(OH_ArkUI_TextEditorStyledStringController_SetSelection),
+    SCOPE_ENTRY(OH_ArkUI_TextEditorStyledStringController_SetStyledPlaceholder),
+    SCOPE_ENTRY(OH_ArkUI_TextEditorStyledStringController_SetStyledString),
+    SCOPE_ENTRY(OH_ArkUI_TextEditorStyledStringController_SetTypingParagraphStyle),
+    SCOPE_ENTRY(OH_ArkUI_TextEditorStyledStringController_SetTypingStyle),
+    SCOPE_ENTRY(OH_ArkUI_TextEditorStyledStringController_StopEditing),
     SCOPE_ENTRY(OH_ArkUI_SurfaceHolder_Create),
     SCOPE_ENTRY(OH_ArkUI_SurfaceHolder_Dispose),
     SCOPE_ENTRY(OH_ArkUI_UnregisterDrawCallbackOnNodeHandle),

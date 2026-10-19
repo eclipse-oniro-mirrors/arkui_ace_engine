@@ -15,16 +15,29 @@
 
 #include "core/components_ng/pattern/waterflow/water_flow_model_static.h"
 
+#include "core/components_ng/pattern/scrollable/scroll_snap_strategy.h"
+
 #include "base/geometry/dimension.h"
 #include "core/components_ng/base/view_stack_processor.h"
 #include "core/components_ng/pattern/scrollable/scrollable_controller.h"
 #include "core/components_ng/pattern/scrollable/scrollable_model_ng.h"
 #include "core/components_ng/pattern/waterflow/water_flow_constants.h"
+#include "core/components_ng/pattern/waterflow/water_flow_model_ng.h"
 #include "core/components_ng/pattern/waterflow/water_flow_pattern.h"
 
 namespace OHOS::Ace::NG {
 
 const auto DEFAULT_CONSTRAINT_SIZE = CalcLength(0.0_vp);
+
+void WaterFlowModelStatic::SetScrollSnapStrategy(
+    FrameNode* frameNode, const std::optional<ScrollSnapStrategy>& strategy)
+{
+    if (strategy.has_value()) {
+        WaterFlowModelNG::SetScrollSnapStrategy(frameNode, strategy.value());
+    } else {
+        WaterFlowModelNG::ResetScrollSnapStrategy(frameNode);
+    }
+}
 
 RefPtr<FrameNode> WaterFlowModelStatic::CreateFrameNode(int32_t nodeId)
 {

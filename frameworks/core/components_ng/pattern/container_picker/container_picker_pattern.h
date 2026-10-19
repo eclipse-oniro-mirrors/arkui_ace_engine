@@ -37,7 +37,7 @@ class AnimatablePropertyFloat;
 template<typename T, typename S>
 class NodeAnimatableProperty;
 using NodeAnimatablePropertyFloat = NodeAnimatableProperty<float, AnimatablePropertyFloat>;
-class ContainerPickerEventParam : public virtual AceType {
+class ContainerPickerEventParam : public AceType {
     DECLARE_ACE_TYPE(ContainerPickerEventParam, AceType);
 
 public:

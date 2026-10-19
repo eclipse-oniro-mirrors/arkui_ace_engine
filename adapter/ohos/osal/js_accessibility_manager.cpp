@@ -1798,6 +1798,8 @@ void JsAccessibilityManager::UpdateWebAccessibilityElementInfo(
     extraElementInfo.SetExtraElementInfo("CheckboxGroupSelectedStatus", node->GetCheckboxGroupSelectedStatus());
     extraElementInfo.SetExtraElementInfo("expandedState", node->GetExpandedState());
     nodeInfo.SetExtraElement(extraElementInfo);
+
+    nodeInfo.SetZIndex(node->GetZIndex());
 }
 
 #endif

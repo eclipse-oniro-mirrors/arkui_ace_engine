@@ -56,6 +56,7 @@ public:
             closeIconColor_ = colors->CompBackgroundTertiary();
             closeIconImageColor_ = colors->IconPrimary();
             closeIconSymbolColor_ = colors->IconPrimary();
+            titleMaskColor_ = sheetBackgoundColor_;
         }
     }
 

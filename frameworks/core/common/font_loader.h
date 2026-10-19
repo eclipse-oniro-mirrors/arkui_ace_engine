@@ -22,7 +22,7 @@
 namespace OHOS::Ace {
 class RenderNode;
 
-class FontLoader : public virtual AceType {
+class FontLoader : public AceType {
     DECLARE_ACE_TYPE(FontLoader, AceType);
 
 public:

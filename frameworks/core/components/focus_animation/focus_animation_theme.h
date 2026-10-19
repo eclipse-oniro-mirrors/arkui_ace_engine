@@ -26,7 +26,7 @@ namespace OHOS::Ace {
  * FocusAnimationTheme defines color of FocusAnimationTheme. FocusAnimationTheme should be built
  * using FocusAnimationTheme::Builder.
  */
-class FocusAnimationTheme : public virtual Theme {
+class FocusAnimationTheme : public Theme {
     DECLARE_ACE_TYPE(FocusAnimationTheme, Theme);
 
 public:

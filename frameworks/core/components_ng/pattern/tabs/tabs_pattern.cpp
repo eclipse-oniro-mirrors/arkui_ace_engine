@@ -40,6 +40,9 @@
 #include "core/components_ng/event/input_event_hub.h"
 #include "core/components_ng/event/gesture_event_hub.h"
 #include "core/components_ng/event/pan_event.h"
+#ifndef CROSS_PLATFORM
+#include "core/components_ng/manager/content_change_manager/content_change_manager.h"
+#endif
 #include "core/components_ng/manager/navigation/navigation_manager.h"
 #include "core/components_ng/pattern/divider/divider_layout_property.h"
 #include "core/components_ng/pattern/divider/divider_pattern.h"
@@ -1040,6 +1043,13 @@ void TabsPattern::UpdateIndex(const RefPtr<FrameNode>& tabsNode, const RefPtr<Fr
                 return;
             }
         }
+#ifndef CROSS_PLATFORM
+        auto pipeline = swiperNode->GetContext();
+        auto manager = pipeline ? pipeline->GetContentChangeManager() : nullptr;
+        if (manager) {
+            manager->OnSwiperChangeStart(swiperNode, true);
+        }
+#endif
         AceAsyncTraceBeginCommercial(0, APP_TABS_NO_ANIMATION_SWITCH);
         tabBarPattern->SetMaskAnimationByCreate(true);
         UpdateSelectedState(swiperNode, tabBarPattern, tabsLayoutProperty, index);

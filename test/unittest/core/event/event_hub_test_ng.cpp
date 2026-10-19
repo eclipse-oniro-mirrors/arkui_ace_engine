@@ -24,6 +24,7 @@
 #include "base/memory/referenced.h"
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/event/event_hub.h"
+#include "core/components_ng/event/event_hub_callback_sets.h"
 #include "core/components_ng/event/state_style_manager.h"
 #include "core/components_ng/pattern/pattern.h"
 #include "core/components_v2/inspector/inspector_constants.h"
@@ -101,6 +102,39 @@ void EventHubTestNg::SetUp()
 void EventHubTestNg::TearDown()
 {
     MockPipelineContext::TearDown();
+}
+
+/**
+ * @tc.name: EventHubDeferredAllocationTest
+ * @tc.desc: EventHub 回调集合仅在注册事件时才按需分配（无事件注册时所有槽位为 null）。
+ * @tc.type: FUNC
+ */
+HWTEST_F(EventHubTestNg, EventHubDeferredAllocationTest, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create EventHub without registering any event.
+     * @tc.expected: all six callback sets are null.
+     */
+    auto eventHub = AceType::MakeRefPtr<EventHub>();
+    ASSERT_NE(eventHub, nullptr);
+    EXPECT_EQ(eventHub->appearCallbackSet_, nullptr);
+    EXPECT_EQ(eventHub->areaCallbackSet_, nullptr);
+    EXPECT_EQ(eventHub->sizeCallbackSet_, nullptr);
+    EXPECT_EQ(eventHub->attachDetachCallbackSet_, nullptr);
+    EXPECT_EQ(eventHub->enabledNdkCallbackSet_, nullptr);
+    EXPECT_EQ(eventHub->keyboardShortcutSet_, nullptr);
+
+    /**
+     * @tc.steps: step2. Register onAppear only.
+     * @tc.expected: only appearCallbackSet_ is created, others stay null.
+     */
+    eventHub->SetOnAppear([]() {});
+    EXPECT_NE(eventHub->appearCallbackSet_, nullptr);
+    EXPECT_EQ(eventHub->areaCallbackSet_, nullptr);
+    EXPECT_EQ(eventHub->sizeCallbackSet_, nullptr);
+    EXPECT_EQ(eventHub->attachDetachCallbackSet_, nullptr);
+    EXPECT_EQ(eventHub->enabledNdkCallbackSet_, nullptr);
+    EXPECT_EQ(eventHub->keyboardShortcutSet_, nullptr);
 }
 
 /**
@@ -534,15 +568,15 @@ HWTEST_F(EventHubTestNg, EventHubDisableAppear001, TestSize.Level1)
     auto onAppear = [&result]() { result = RESULT_SUCCESS_ONE; };
 
     eventHub->SetOnAppear(onAppear);
-    EXPECT_NE(eventHub->onAppear_, nullptr);
-    eventHub->onAppear_();
+    EXPECT_NE(eventHub->GetOrCreateAppearCallbackSet()->onAppear, nullptr);
+    eventHub->GetOrCreateAppearCallbackSet()->onAppear();
     EXPECT_EQ(result, RESULT_SUCCESS_ONE);
     /**
      * @tc.steps: step3. Clear the callback.
      * @tc.expected: onAppear is empty.
      */
     eventHub->ClearUserOnAppear();
-    EXPECT_EQ(eventHub->onAppear_, nullptr);
+    EXPECT_EQ(eventHub->GetOrCreateAppearCallbackSet()->onAppear, nullptr);
 
     /**
      * @tc.steps: step3. Set/fire EventHub onAppear function.
@@ -551,8 +585,8 @@ HWTEST_F(EventHubTestNg, EventHubDisableAppear001, TestSize.Level1)
     auto onAppear2 = [&result]() { result = RESULT_SUCCESS_TWO; };
 
     eventHub->SetOnAppear(onAppear2);
-    EXPECT_NE(eventHub->onAppear_, nullptr);
-    eventHub->onAppear_();
+    EXPECT_NE(eventHub->GetOrCreateAppearCallbackSet()->onAppear, nullptr);
+    eventHub->GetOrCreateAppearCallbackSet()->onAppear();
     EXPECT_EQ(result, RESULT_SUCCESS_TWO);
 }
 
@@ -578,15 +612,15 @@ HWTEST_F(EventHubTestNg, EventHubDisableDisAppear001, TestSize.Level1)
     auto onDisAppear = [&result]() { result = RESULT_SUCCESS_ONE; };
 
     eventHub->SetOnDisappear(onDisAppear);
-    EXPECT_NE(eventHub->onDisappear_, nullptr);
-    eventHub->onDisappear_();
+    EXPECT_NE(eventHub->GetOrCreateAppearCallbackSet()->onDisappear, nullptr);
+    eventHub->GetOrCreateAppearCallbackSet()->onDisappear();
     EXPECT_EQ(result, RESULT_SUCCESS_ONE);
     /**
      * @tc.steps: step3. Clear the callback.
      * @tc.expected: onDisAppear is empty.
      */
     eventHub->ClearUserOnDisAppear();
-    EXPECT_EQ(eventHub->onDisappear_, nullptr);
+    EXPECT_EQ(eventHub->GetOrCreateAppearCallbackSet()->onDisappear, nullptr);
 
     /**
      * @tc.steps: step3. Set/fire EventHub onDisappear function.
@@ -595,8 +629,8 @@ HWTEST_F(EventHubTestNg, EventHubDisableDisAppear001, TestSize.Level1)
     auto onDisAppear2 = [&result]() { result = RESULT_SUCCESS_TWO; };
 
     eventHub->SetOnDisappear(onDisAppear2);
-    EXPECT_NE(eventHub->onDisappear_, nullptr);
-    eventHub->onDisappear_();
+    EXPECT_NE(eventHub->GetOrCreateAppearCallbackSet()->onDisappear, nullptr);
+    eventHub->GetOrCreateAppearCallbackSet()->onDisappear();
     EXPECT_EQ(result, RESULT_SUCCESS_TWO);
 }
 
@@ -850,11 +884,11 @@ HWTEST_F(EventHubTestNg, EventHubFrameNodeTest001, TestSize.Level1)
 
     /**
      * @tc.steps: step2. Call ClearJSFrameNodeOnDisappear with onJSFrameNodeDisappear_ is nullptr.
-     * @tc.expected: eventHub->onJSFrameNodeDisappear_ is nullptr.
+     * @tc.expected: eventHub->GetOrCreateAppearCallbackSet()->onJSFrameNodeDisappear is nullptr.
      */
-    eventHub->onJSFrameNodeDisappear_ = nullptr;
+    eventHub->GetOrCreateAppearCallbackSet()->onJSFrameNodeDisappear = nullptr;
     eventHub->ClearJSFrameNodeOnDisappear();
-    EXPECT_EQ(eventHub->onJSFrameNodeDisappear_, nullptr);
+    EXPECT_EQ(eventHub->GetOrCreateAppearCallbackSet()->onJSFrameNodeDisappear, nullptr);
 
     /**
      * @tc.steps: step3. Call ClearJSFrameNodeOnDisappear with onJSFrameNodeDisappear_ is not nullptr.
@@ -862,9 +896,9 @@ HWTEST_F(EventHubTestNg, EventHubFrameNodeTest001, TestSize.Level1)
      */
     std::function<void()> flagFunc = []() { ++flag; };
     eventHub->SetFrameNodeCommonOnDisappear(std::move(flagFunc));
-    EXPECT_NE(eventHub->onJSFrameNodeDisappear_, nullptr);
+    EXPECT_NE(eventHub->GetOrCreateAppearCallbackSet()->onJSFrameNodeDisappear, nullptr);
     eventHub->ClearJSFrameNodeOnDisappear();
-    EXPECT_EQ(eventHub->onJSFrameNodeDisappear_, nullptr);
+    EXPECT_EQ(eventHub->GetOrCreateAppearCallbackSet()->onJSFrameNodeDisappear, nullptr);
 }
 
 /**
@@ -883,11 +917,11 @@ HWTEST_F(EventHubTestNg, EventHubFrameNodeTest002, TestSize.Level1)
 
     /**
      * @tc.steps: step2. Call ClearJSFrameNodeOnAppear with onJSFrameNodeAppear_ is nullptr.
-     * @tc.expected: eventHub->onJSFrameNodeAppear_ is nullptr.
+     * @tc.expected: eventHub->GetOrCreateAppearCallbackSet()->onJSFrameNodeAppear is nullptr.
      */
-    eventHub->onJSFrameNodeAppear_ = nullptr;
+    eventHub->GetOrCreateAppearCallbackSet()->onJSFrameNodeAppear = nullptr;
     eventHub->ClearJSFrameNodeOnAppear();
-    EXPECT_EQ(eventHub->onJSFrameNodeAppear_, nullptr);
+    EXPECT_EQ(eventHub->GetOrCreateAppearCallbackSet()->onJSFrameNodeAppear, nullptr);
 
     /**
      * @tc.steps: step3. Call ClearJSFrameNodeOnAppear with onJSFrameNodeDisappear_ is not nullptr.
@@ -895,9 +929,9 @@ HWTEST_F(EventHubTestNg, EventHubFrameNodeTest002, TestSize.Level1)
      */
     std::function<void()> flagFunc = []() { ++flag; };
     eventHub->SetFrameNodeCommonOnAppear(std::move(flagFunc));
-    EXPECT_NE(eventHub->onJSFrameNodeAppear_, nullptr);
+    EXPECT_NE(eventHub->GetOrCreateAppearCallbackSet()->onJSFrameNodeAppear, nullptr);
     eventHub->ClearJSFrameNodeOnAppear();
-    EXPECT_EQ(eventHub->onJSFrameNodeAppear_, nullptr);
+    EXPECT_EQ(eventHub->GetOrCreateAppearCallbackSet()->onJSFrameNodeAppear, nullptr);
 }
 
 /**
@@ -918,8 +952,8 @@ HWTEST_F(EventHubTestNg, EventHubFrameNodeTest003, TestSize.Level1)
      * @tc.steps: step2. Call FireOnAppear with onAppear_ and onJSFrameNodeAppear_ are both nullptr.
      * @tc.expected: flag is equal 0.
      */
-    eventHub->onAppear_ = nullptr;
-    eventHub->onJSFrameNodeAppear_ = nullptr;
+    eventHub->GetOrCreateAppearCallbackSet()->onAppear = nullptr;
+    eventHub->GetOrCreateAppearCallbackSet()->onJSFrameNodeAppear = nullptr;
     eventHub->FireOnAppear();
     EXPECT_EQ(flag, 0);
 
@@ -930,7 +964,7 @@ HWTEST_F(EventHubTestNg, EventHubFrameNodeTest003, TestSize.Level1)
     std::function<void()> flagFunc = []() { ++flag; };
     eventHub->SetFrameNodeCommonOnAppear(std::move(flagFunc));
     eventHub->FireOnAppear();
-    EXPECT_NE(eventHub->onJSFrameNodeAppear_, nullptr);
+    EXPECT_NE(eventHub->GetOrCreateAppearCallbackSet()->onJSFrameNodeAppear, nullptr);
 
     /**
      * @tc.steps: step4. Call FireOnAppear with onAppear_  is and onJSFrameNodeAppear_ are both not nullptr.
@@ -938,7 +972,7 @@ HWTEST_F(EventHubTestNg, EventHubFrameNodeTest003, TestSize.Level1)
      */
     eventHub->SetOnAppear(std::move(flagFunc));
     eventHub->FireOnAppear();
-    EXPECT_NE(eventHub->onAppear_, nullptr);
+    EXPECT_NE(eventHub->GetOrCreateAppearCallbackSet()->onAppear, nullptr);
 }
 
 /**
@@ -959,8 +993,8 @@ HWTEST_F(EventHubTestNg, EventHubFrameNodeTest004, TestSize.Level1)
      * @tc.steps: step2. Call FireOnDisappear with onAppear_ and onJSFrameNodeAppear_ are both nullptr.
      * @tc.expected: flag is equal 0.
      */
-    eventHub->onDisappear_ = nullptr;
-    eventHub->onJSFrameNodeDisappear_ = nullptr;
+    eventHub->GetOrCreateAppearCallbackSet()->onDisappear = nullptr;
+    eventHub->GetOrCreateAppearCallbackSet()->onJSFrameNodeDisappear = nullptr;
     eventHub->FireOnDisappear();
     EXPECT_EQ(flag, 0);
 
@@ -969,8 +1003,8 @@ HWTEST_F(EventHubTestNg, EventHubFrameNodeTest004, TestSize.Level1)
      * @tc.expected: flag is equal 2.
      */
     std::function<void()> flagFunc = []() { flag++; };
-    eventHub->onDisappear_ = flagFunc;
-    eventHub->onJSFrameNodeDisappear_ = flagFunc;
+    eventHub->GetOrCreateAppearCallbackSet()->onDisappear = flagFunc;
+    eventHub->GetOrCreateAppearCallbackSet()->onJSFrameNodeDisappear = flagFunc;
     eventHub->FireOnDisappear();
     EXPECT_EQ(flag, 2);
 }
@@ -1770,10 +1804,10 @@ HWTEST_F(EventHubTestNg, EventHubTest038, TestSize.Level1)
     EXPECT_NE(eventHub, nullptr);
     int count = 0;
     auto callback = [&count]() { count++; };
-    eventHub->enabledFunc_ = callback;
+    eventHub->GetOrCreateEnabledNdkCallbackSet()->enabledFunc = callback;
     eventHub->FireEnabledTask();
     EXPECT_EQ(count, 1);
-    EXPECT_EQ(eventHub->enabledFunc_, nullptr);
+    EXPECT_EQ(eventHub->GetOrCreateEnabledNdkCallbackSet()->enabledFunc, nullptr);
     eventHub->FireEnabledTask();
     EXPECT_EQ(count, 1);
 }
@@ -2088,12 +2122,12 @@ HWTEST_F(EventHubTestNg, EventHubTest054, TestSize.Level1)
     EXPECT_NE(eventHub, nullptr);
     eventHub->SetOnAttach([]() {});
     eventHub->SetOnDetach([]() {});
-    EXPECT_NE(eventHub->onAttach_, nullptr);
-    EXPECT_NE(eventHub->onDetach_, nullptr);
+    EXPECT_NE(eventHub->GetOrCreateAttachDetachCallbackSet()->onAttach, nullptr);
+    EXPECT_NE(eventHub->GetOrCreateAttachDetachCallbackSet()->onDetach, nullptr);
     eventHub->ClearOnAttach();
     eventHub->ClearOnDetach();
-    EXPECT_EQ(eventHub->onAttach_, nullptr);
-    EXPECT_EQ(eventHub->onDetach_, nullptr);
+    EXPECT_EQ(eventHub->GetOrCreateAttachDetachCallbackSet()->onAttach, nullptr);
+    EXPECT_EQ(eventHub->GetOrCreateAttachDetachCallbackSet()->onDetach, nullptr);
     eventHub->FireOnAttach();
     eventHub->FireOnDetach();
 }
@@ -2151,8 +2185,8 @@ HWTEST_F(EventHubTestNg, EventHubTest056, TestSize.Level1)
     eventHub->FireInnerOnAreaChanged(OLD_RECT, OLD_ORIGIN, NEW_RECT, NEW_ORIGIN);
     EXPECT_TRUE(flag1);
     EXPECT_TRUE(flag2);
-    EXPECT_EQ(eventHub->onAreaChangedInnerCallbacks_.count(1), 0u);
-    EXPECT_EQ(eventHub->onAreaChangedInnerCallbacks_.count(2), 1u);
+    EXPECT_EQ(eventHub->GetOrCreateAreaCallbackSet()->onAreaChangedInnerCallbacks.count(1), 0u);
+    EXPECT_EQ(eventHub->GetOrCreateAreaCallbackSet()->onAreaChangedInnerCallbacks.count(2), 1u);
     eventHub->ClearOnAreaChangedInnerCallbacks();
 }
 
@@ -2165,7 +2199,7 @@ HWTEST_F(EventHubTestNg, EventHubTest057, TestSize.Level1)
 {
     /**
      * @tc.steps: step1. Create EventHub and register one inner on-area-changed callback.
-     * @tc.steps: step2. The callback inserts a new entry into onAreaChangedInnerCallbacks_ during invocation.
+     * @tc.steps: step2. The callback inserts a new entry into onAreaChangedInnerCallbacks during invocation.
      * @tc.expected: No crash; the new callback is not invoked this pass because the map is copied before iteration.
      */
     auto frameNode = AceType::MakeRefPtr<FrameNode>(V2::TEXT_ETS_TAG, -1, AceType::MakeRefPtr<Pattern>());
@@ -2178,13 +2212,13 @@ HWTEST_F(EventHubTestNg, EventHubTest057, TestSize.Level1)
     };
     OnAreaChangedFunc cb1 = [&eventHub, &flag1, cb2](const RectF&, const OffsetF&, const RectF&, const OffsetF&) {
         flag1 = true;
-        eventHub->onAreaChangedInnerCallbacks_[2] = cb2;
+        eventHub->GetOrCreateAreaCallbackSet()->onAreaChangedInnerCallbacks[2] = cb2;
     };
     eventHub->AddInnerOnAreaChangedCallback(1, std::move(cb1));
     eventHub->FireInnerOnAreaChanged(OLD_RECT, OLD_ORIGIN, NEW_RECT, NEW_ORIGIN);
     EXPECT_TRUE(flag1);
     EXPECT_FALSE(flag2);
-    EXPECT_EQ(eventHub->onAreaChangedInnerCallbacks_.count(2), 1u);
+    EXPECT_EQ(eventHub->GetOrCreateAreaCallbackSet()->onAreaChangedInnerCallbacks.count(2), 1u);
     eventHub->ClearOnAreaChangedInnerCallbacks();
 }
 
@@ -2244,9 +2278,9 @@ HWTEST_F(EventHubTestNg, EventHubTest059, TestSize.Level1)
     OnAreaChangedFunc cb3 = [&flag3](const RectF&, const OffsetF&, const RectF&, const OffsetF&) {
         flag3 = true;
     };
-    eventHub->onAreaChangedInnerCallbacks_[1] = std::move(nullCb);
-    eventHub->onAreaChangedInnerCallbacks_[2] = std::move(cb2);
-    eventHub->onAreaChangedInnerCallbacks_[3] = std::move(cb3);
+    eventHub->GetOrCreateAreaCallbackSet()->onAreaChangedInnerCallbacks[1] = std::move(nullCb);
+    eventHub->GetOrCreateAreaCallbackSet()->onAreaChangedInnerCallbacks[2] = std::move(cb2);
+    eventHub->GetOrCreateAreaCallbackSet()->onAreaChangedInnerCallbacks[3] = std::move(cb3);
     eventHub->FireInnerOnAreaChanged(OLD_RECT, OLD_ORIGIN, NEW_RECT, NEW_ORIGIN);
     EXPECT_TRUE(flag2);
     EXPECT_TRUE(flag3);

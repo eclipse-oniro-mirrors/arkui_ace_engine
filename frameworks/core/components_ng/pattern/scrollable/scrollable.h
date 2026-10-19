@@ -222,6 +222,7 @@ public:
     ScrollResult HandleScroll(double offset, int32_t source, NestedState state);
     void ProcessAxisUpdateEvent(float mainDelta, bool fromScrollBar = false);
     void ProcessAxisEndEvent();
+    void ProcessAxisScroll(float mainDelta);
     void LayoutDirectionEst(double correctVelocity, double velocityScale, bool isScrollFromTouchPad);
     void ReportToDragFRCScene(double velocity, NG::SceneStatus sceneStatus);
 

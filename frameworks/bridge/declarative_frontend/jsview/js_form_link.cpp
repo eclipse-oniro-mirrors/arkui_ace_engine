@@ -20,26 +20,19 @@
 
 namespace OHOS::Ace {
 
-std::unique_ptr<FormLinkModel> FormLinkModel::instance_ = nullptr;
-std::mutex FormLinkModel::mutex_;
-
 FormLinkModel* FormLinkModel::GetInstance()
 {
-    if (!instance_) {
-        std::lock_guard<std::mutex> lock(mutex_);
-        if (!instance_) {
 #ifdef NG_BUILD
-            instance_.reset(new NG::FormLinkModelNG());
+    static NG::FormLinkModelNG instance;
+    return &instance;
 #else
-            if (Container::IsCurrentUseNewPipeline()) {
-                instance_.reset(new NG::FormLinkModelNG());
-            } else {
-                instance_.reset(nullptr);
-            }
-#endif
-        }
+    if (Container::IsCurrentUseNewPipeline()) {
+        static NG::FormLinkModelNG instance;
+        return &instance;
+    } else {
+        return nullptr;
     }
-    return instance_.get();
+#endif
 }
 } // namespace OHOS::Ace
 

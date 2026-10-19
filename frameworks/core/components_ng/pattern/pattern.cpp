@@ -190,6 +190,7 @@ void Pattern::CheckLocalized()
     // Reset for safeAreaExpand's Cache in GeometryNode
     host->ResetSafeAreaPadding();
     layoutProperty->CheckLocalizedSafeAreaPadding(layoutDirection);
+    layoutProperty->CheckLocalizedSafeAreaInset(layoutDirection);
     layoutProperty->CheckIgnoreLayoutSafeArea(layoutDirection);
     layoutProperty->CheckBackgroundLayoutSafeAreaEdges(layoutDirection);
 }

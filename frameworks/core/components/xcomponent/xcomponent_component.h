@@ -36,7 +36,7 @@ class NativeXComponentImpl;
 using TaskFunction = std::function<void(RenderXComponent&, const Offset&)>;
 using PushTaskFunction = std::function<void(const TaskFunction&)>;
 
-class ACE_EXPORT XComponentTaskPool : virtual public AceType {
+class ACE_EXPORT XComponentTaskPool : public AceType {
     DECLARE_ACE_TYPE(XComponentTaskPool, AceType);
 
 public:

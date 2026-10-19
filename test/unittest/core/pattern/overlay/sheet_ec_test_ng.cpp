@@ -907,12 +907,14 @@ HWTEST_F(SheetECTestNg, SheetECUpdateSheetRenderProperty002, TestSize.Level1)
     auto stageNode = FrameNode::CreateFrameNode(
         V2::STAGE_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<StagePattern>());
     auto rootNode = FrameNode::CreateFrameNode(V2::ROOT_ETS_TAG, 1, AceType::MakeRefPtr<RootPattern>());
+
     stageNode->MountToParent(rootNode);
     targetNode->MountToParent(stageNode);
     rootNode->MarkDirtyNode();
 
     SheetStyle sheetStyle;
     sheetStyle.sheetHeight.sheetMode = SheetMode::MEDIUM;
+
     sheetStyle.showDragBar = true;
     sheetStyle.sheetEdgeLightMode = EdgeLightMode::EDGELIGHT_DISABLED;
 
@@ -924,6 +926,7 @@ HWTEST_F(SheetECTestNg, SheetECUpdateSheetRenderProperty002, TestSize.Level1)
 
     auto topModalNode = overlayManager->modalStack_.top().Upgrade();
     ASSERT_TRUE(topModalNode);
+
     auto sheetPattern = topModalNode->GetPattern<SheetPresentationPattern>();
     ASSERT_TRUE(sheetPattern);
 
@@ -941,17 +944,20 @@ HWTEST_F(SheetECTestNg, SheetECUpdateSheetRenderProperty003, TestSize.Level1)
     auto stageNode = FrameNode::CreateFrameNode(
         V2::STAGE_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<StagePattern>());
     auto rootNode = FrameNode::CreateFrameNode(V2::ROOT_ETS_TAG, 1, AceType::MakeRefPtr<RootPattern>());
+
     stageNode->MountToParent(rootNode);
     targetNode->MountToParent(stageNode);
     rootNode->MarkDirtyNode();
 
     SheetStyle sheetStyle;
     sheetStyle.sheetHeight.sheetMode = SheetMode::MEDIUM;
+
     sheetStyle.showDragBar = true;
     sheetStyle.sheetEffectEdge = SheetEffectEdge::END;
 
     auto overlayManager = AceType::MakeRefPtr<OverlayManager>(rootNode);
     CreateSheetBuilder();
+
     overlayManager->OnBindSheet(true, nullptr, std::move(builderFunc_), std::move(titleBuilderFunc_), sheetStyle,
         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, targetNode);
 

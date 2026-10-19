@@ -28,7 +28,7 @@
 
 namespace OHOS::Ace::Framework {
 
-class JSView : public JSViewAbstract, public virtual AceType {
+class JSView : public JSViewAbstract, public AceType {
     DECLARE_ACE_TYPE(JSView, AceType);
 
 public:

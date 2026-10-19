@@ -20,7 +20,7 @@
 
 namespace OHOS::Ace::NG {
 
-class ColorFilter : public virtual AceType {
+class ColorFilter : public AceType {
     DECLARE_ACE_TYPE(NG::ColorFilter, AceType);
 
 public:

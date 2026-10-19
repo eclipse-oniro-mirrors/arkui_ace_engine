@@ -69,7 +69,7 @@ struct FocusEvent {
     static FocusIntension GetFocusIntensionFromKey(KeyIntention keyIntention);
 };
 
-class ACE_EXPORT FocusCallbackEvents : public virtual AceType {
+class ACE_EXPORT FocusCallbackEvents : public AceType {
     DECLARE_ACE_TYPE(FocusCallbackEvents, AceType);
 public:
     FocusCallbackEvents() = default;

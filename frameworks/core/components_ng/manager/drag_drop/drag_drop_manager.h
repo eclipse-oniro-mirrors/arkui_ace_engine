@@ -70,7 +70,7 @@ struct ScaleDataInfo {
     float shortSide = 0.0f;
 };
 
-class ACE_EXPORT DragDropManager : public virtual AceType {
+class ACE_EXPORT DragDropManager : public AceType {
     DECLARE_ACE_TYPE(DragDropManager, AceType);
 
 public:

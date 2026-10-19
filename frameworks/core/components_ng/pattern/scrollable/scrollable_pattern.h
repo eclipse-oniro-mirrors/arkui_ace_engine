@@ -805,6 +805,12 @@ public:
     // Axis fallback anchor one row beyond the materialized window (details in the .cpp default).
     virtual std::optional<float> GetItemSnapNeighborAnchor(ScrollSnapAlign align, bool towardSmaller);
     // Legal scroll range bounds for clamping item snap targets (R-3/R-7; AC-2.4 leading gap).
+    // Live content offset for snap selection and animation origins. Layouts that defer
+    // applying motion deltas must include those deltas without changing GetTotalOffset().
+    virtual double GetItemSnapCurrentOffset() const
+    {
+        return GetTotalOffset();
+    }
     virtual float GetItemSnapMaxOffset() const;
     virtual float GetItemSnapCalibrationMargin() const
     {
@@ -1067,6 +1073,15 @@ public:
     // FREE mode (free scroll) containers keep the default disabled.
     virtual bool IsMouseDragScrollDefaultEnabled() const;
 
+    void SetIsAllowKeyboard(bool enableScrollWithKeyboard)
+    {
+        isAllowKeyboard_ = enableScrollWithKeyboard;
+    }
+    bool GetIsAllowKeyboard() const
+    {
+        return isAllowKeyboard_;
+    }
+
     void GetRepeatCountInfo(
         RefPtr<UINode> node, int32_t& repeatDifference, int32_t& firstRepeatCount, int32_t& totalChildCount);
 
@@ -1198,6 +1213,7 @@ protected:
     // Explicit value of enableScrollWithMouse set by the developer.
     // nullopt means not explicitly set: the direction-aware default applies.
     std::optional<bool> isAllowMouse_;
+    bool isAllowKeyboard_ = true;
 
     void CheckScrollBarOff();
 
@@ -1247,6 +1263,9 @@ protected:
     float IsInHotZone(const PointF& point, bool needExpandHotZone = false);
     void HotZoneScroll(const float offset);
     void StopHotzoneScroll();
+
+    virtual bool ScrollByArrowKey(KeyCode code, float delta);
+    bool HandleArrowKeyScroll(const KeyEvent& keyEventInfo);
 
 private:
     // Pattern owns target selection; Scrollable owns the animation and queued-task generation.
@@ -1392,6 +1411,10 @@ private:
     virtual void ResetForExtScroll() {};
     void OnSyncGeometryNode(const DirtySwapConfig& config) override;
     void ReportOnItemStopEvent();
+
+    bool IsArrowKeyMatchAxis(KeyCode code) const;
+    int32_t GetMouseScrollRows();
+    float CalculateScrollDelta(int32_t rows);
 
     Axis axis_ = Axis::VERTICAL;
     RefPtr<ScrollableEvent> scrollableEvent_;

@@ -60,6 +60,7 @@
 #include "core/components_ng/pattern/scroll/scroll_spring_effect.h"
 #include "core/components_ng/pattern/scroll_bar/proxy/scroll_bar_proxy.h"
 #include "core/components_ng/property/measure_utils.h"
+#include "core/components_ng/pattern/scrollable/keyboard_scroll_settings_utils.h"
 #include "core/components_ng/pattern/scrollable/refresh_coordination.h"
 #include "core/components_ng/pattern/scrollable/scrollable.h"
 #include "core/components_ng/pattern/scrollable/scrollable_event_hub.h"
@@ -381,6 +382,7 @@ void ScrollablePattern::ToJsonValue(std::unique_ptr<JsonValue>& json, const Insp
     nestedScrollOptions->Put("scrollBackward", nestedScroll.GetNestedScrollModeStr(nestedScroll.backward).c_str());
     json->PutExtAttr("nestedScroll", nestedScrollOptions, filter);
     json->PutExtAttr("enableScrollWithMouse", GetIsAllowMouse(), filter);
+    json->PutExtAttr("enableScrollWithKeyboard", GetIsAllowKeyboard(), filter);
     if (NearEqual(GetFriction(), -1.0) && scrollableEvent_) {
         auto scrollable = scrollableEvent_->GetScrollable();
         CHECK_NULL_VOID(scrollable);
@@ -1137,7 +1139,7 @@ bool ScrollablePattern::StartItemSnapAnimation(const SnapAnimationOptions& snapA
             });
         return true;
     }
-    auto currentOffset = static_cast<float>(GetTotalOffset());
+    auto currentOffset = static_cast<float>(GetItemSnapCurrentOffset());
     if (snapAnimationOptions.fromItemSnapFlingStop && scrollable->IsItemSnapTracking()) {
         currentOffset = -scrollable->GetCurrentPos();
     }
@@ -1174,7 +1176,7 @@ void ScrollablePattern::RunPendingItemSnapProvider(const SnapAnimationOptions& s
     }
     auto scrollable = GetScrollable();
     CHECK_NULL_VOID(scrollable);
-    auto currentOffset = static_cast<float>(GetTotalOffset());
+    auto currentOffset = static_cast<float>(GetItemSnapCurrentOffset());
     scrollable->SetCurrentPos(-currentOffset);
     auto motionVelocity = -snapAnimationOptions.animationVelocity;
     auto motionDelta = -snapAnimationOptions.snapDelta;
@@ -1199,7 +1201,7 @@ float ScrollablePattern::ResolveItemSnapTarget(const ScrollSnapStrategy& strateg
     // PRE-approach position; at handoff time the live total offset is the approach endpoint, so
     // falling back to the stale capture would rewind the approach motion.
     if (strategy.align == ScrollSnapAlign::NONE) {
-        return -static_cast<float>(GetTotalOffset());
+        return -static_cast<float>(GetItemSnapCurrentOffset());
     }
     auto candidates = BuildItemSnapCandidates(strategy.align);
     // Subclasses normally normalize inside BuildItemSnapCandidates; normalize again here so
@@ -1207,7 +1209,7 @@ float ScrollablePattern::ResolveItemSnapTarget(const ScrollSnapStrategy& strateg
     // the LIVE offset: at handoff time the approach stage has already moved the position, and
     // the captured pre-approach offset could pick a target behind it (reverse-direction bounce).
     ScrollSnapUtils::NormalizeCandidates(candidates);
-    auto liveOffset = static_cast<float>(GetTotalOffset());
+    auto liveOffset = static_cast<float>(GetItemSnapCurrentOffset());
     auto selection = ScrollSnapUtils::SelectSnapTarget(candidates, liveOffset, velocityPos, predictDeltaPos,
         ScrollSnapUtils::DEFAULT_SNAP_THRESHOLD, Scrollable::GetVelocityScale());
     if (!selection.found) {
@@ -1306,6 +1308,12 @@ SnapSelectResult ScrollablePattern::SelectItemSnapForAlign(const ScrollSnapStrat
         forward = itemSnapReleaseMotionVelocity_ > 0.0f;
         selection = ScrollSnapUtils::SelectByPredictedLanding(candidates, currentOffset,
             -GetScrollable()->GetFinalPosition(), forward, ScrollSnapUtils::DEFAULT_SNAP_THRESHOLD);
+    } else if ((!std::isfinite(snapAnimationOptions.animationVelocity) ||
+                   NearZero(snapAnimationOptions.animationVelocity)) &&
+               (!std::isfinite(snapAnimationOptions.snapDelta) || NearZero(snapAnimationOptions.snapDelta))) {
+        // No effective direction: nearest anchor, equal distances resolved by the smaller item index.
+        selection = ScrollSnapUtils::SelectSnapTarget(candidates, currentOffset, 0.0f, 0.0f,
+            ScrollSnapUtils::DEFAULT_SNAP_THRESHOLD, Scrollable::GetVelocityScale());
     } else {
         selection = ScrollSnapUtils::SelectByThreshold(
             candidates, currentOffset, ScrollSnapUtils::DEFAULT_SNAP_THRESHOLD, forward);
@@ -1322,7 +1330,7 @@ bool ScrollablePattern::StartItemSnapWithAlign(const ScrollSnapStrategy& strateg
         trackingScroll->IsItemSnapTracking();
     float minOffset = GetItemSnapMinOffset();
     if (tracked) {
-        const float shift = currentOffset - static_cast<float>(GetTotalOffset());
+        const float shift = currentOffset - static_cast<float>(GetItemSnapCurrentOffset());
         minOffset += shift;
         maxOffset += shift;
     }
@@ -5953,4 +5961,74 @@ void ScrollablePattern::HandleScrollByTargetId(int32_t targetId, int reportEvent
         ReportScroll(false, ScrollError::SCROLL_ERROR_OTHER, reportEventId);
     }
 }
+
+bool ScrollablePattern::HandleArrowKeyScroll(const KeyEvent& keyEventInfo)
+{
+    if (!GetScrollEnabled()) {
+        return false;
+    }
+    if (!GetIsAllowKeyboard()) {
+        return false;
+    }
+    if (keyEventInfo.action != KeyAction::DOWN) {
+        return false;
+    }
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, false);
+    auto* pipeline = host->GetContext();
+    CHECK_NULL_RETURN(pipeline, false);
+    if (pipeline->GetIsFocusActive()) {
+        return false;
+    }
+    auto code = keyEventInfo.code;
+    if (!IsArrowKeyMatchAxis(code)) {
+        return false;
+    }
+    float delta = CalculateScrollDelta(GetMouseScrollRows());
+    return ScrollByArrowKey(code, delta);
+}
+
+bool ScrollablePattern::ScrollByArrowKey(KeyCode code, float delta)
+{
+    auto scrollable = GetScrollable();
+    CHECK_NULL_RETURN(scrollable, false);
+    if (code == KeyCode::KEY_DPAD_DOWN || code == KeyCode::KEY_DPAD_RIGHT) {
+        delta = -delta;
+    }
+    TAG_LOGD(AceLogTag::ACE_SCROLLABLE,
+        "ScrollByArrowKey code:%{public}d, delta:%{public}f, axis:%{public}d",
+        code, delta, static_cast<int32_t>(axis_));
+    scrollable->ProcessAxisScroll(delta);
+    return true;
+}
+
+bool ScrollablePattern::IsArrowKeyMatchAxis(KeyCode code) const
+{
+    if (axis_ == Axis::FREE) {
+        // FREE axis exists only on Scroll: any arrow key matches.
+        return code == KeyCode::KEY_DPAD_UP || code == KeyCode::KEY_DPAD_DOWN ||
+               code == KeyCode::KEY_DPAD_LEFT || code == KeyCode::KEY_DPAD_RIGHT;
+    }
+    if (axis_ == Axis::VERTICAL) {
+        return code == KeyCode::KEY_DPAD_UP || code == KeyCode::KEY_DPAD_DOWN;
+    }
+    if (axis_ == Axis::HORIZONTAL) {
+        return code == KeyCode::KEY_DPAD_LEFT || code == KeyCode::KEY_DPAD_RIGHT;
+    }
+    return false;
+}
+
+int32_t ScrollablePattern::GetMouseScrollRows()
+{
+    return KeyboardScrollSettingsUtils::GetMouseScrollRows();
+}
+
+float ScrollablePattern::CalculateScrollDelta(int32_t rows)
+{
+    double result = static_cast<double>(rows) * MOUSE_WHEEL_DEGREES;
+    Dimension linePerDegree = LINE_HEIGHT_DESKTOP / MOUSE_WHEEL_DEGREES;
+    double factorPx = linePerDegree.ConvertToPx();
+    return static_cast<float>(result * factorPx);
+}
+
 } // namespace OHOS::Ace::NG

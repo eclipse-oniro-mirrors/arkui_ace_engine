@@ -28,7 +28,7 @@ struct DragEventData {
     double coordinateY = 0.0;
 };
 
-class PropagationEventInfo : public virtual TypeInfoBase {
+class PropagationEventInfo : public TypeInfoBase {
     DECLARE_RELATIONSHIP_OF_CLASSES(PropagationEventInfo, TypeInfoBase);
 
 public:

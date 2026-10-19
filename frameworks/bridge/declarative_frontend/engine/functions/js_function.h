@@ -27,7 +27,7 @@
 
 namespace OHOS::Ace::Framework {
 
-class ACE_EXPORT JsFunctionBase : public virtual AceType {
+class ACE_EXPORT JsFunctionBase : public AceType {
     DECLARE_ACE_TYPE(JsFunctionBase, AceType);
 
 public:

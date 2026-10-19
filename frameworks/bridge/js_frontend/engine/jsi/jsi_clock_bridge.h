@@ -23,7 +23,7 @@
 
 namespace OHOS::Ace::Framework {
 
-class JsiClockBridge : virtual public AceType {
+class JsiClockBridge : public AceType {
     DECLARE_ACE_TYPE(JsiClockBridge, AceType);
 
 public:

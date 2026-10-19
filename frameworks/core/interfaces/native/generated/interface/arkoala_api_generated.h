@@ -27208,6 +27208,8 @@ typedef struct GENERATED_ArkUIScrollableCommonMethodModifier {
                          const Opt_Boolean* value);
     void (*setScrollBarHeight)(Ark_NativePointer node,
                                const Opt_LengthMetricsProxy* value);
+    void (*setEnableScrollWithKeyboard)(Ark_NativePointer node,
+                                        const Opt_Boolean* value);
     void (*setEdgeEffect)(Ark_NativePointer node,
                           const Opt_EdgeEffect* edgeEffect,
                           const Opt_EdgeEffectOptions* options);
@@ -28759,6 +28761,8 @@ typedef struct GENERATED_ArkUIWaterFlowModifier {
                        const Opt_Length* value);
     void (*setLayoutDirection)(Ark_NativePointer node,
                                const Opt_FlexDirection* value);
+    void (*setScrollSnapStrategy)(Ark_NativePointer node,
+                                  const Opt_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy* value);
     void (*setCachedCount0)(Ark_NativePointer node,
                             const Opt_Int32* value);
     void (*setSyncLoad)(Ark_NativePointer node,
@@ -29089,6 +29093,8 @@ typedef struct GENERATED_ArkUIWebModifier {
                                             const Opt_Boolean* value);
     void (*setEnableMediaNetworkProxy)(Ark_NativePointer node,
                                        const Opt_Boolean* value);
+    void (*setCaretColor)(Ark_NativePointer node,
+                          const Opt_ResourceColor* value);
     void (*setOnZoomChange)(Ark_NativePointer node,
                             const Opt_OnZoomChangeCallback* value);
     void (*setFlingSpeedLimit)(Ark_NativePointer node,
@@ -30475,6 +30481,11 @@ typedef struct GENERATED_ArkUIFrameNodeExtenderAccessor {
     Ark_NativePointer (*getDestroy)();
     void (*destroyPeer)(Ark_FrameNode peer);
     Ark_Boolean (*isModifiable)(Ark_NativePointer peer);
+    Ark_Boolean (*dispatchInputEvent)(Ark_FrameNode peer,
+                                      const Ark_InputEventType* event,
+                                      const Opt_CompetitionStrategy* competitionStrategy);
+    Ark_Boolean (*dispatchKeyEvent)(Ark_FrameNode peer,
+                                    Ark_KeyEvent event);
     Ark_Int32 (*appendChild)(Ark_FrameNode peer,
                              Ark_FrameNode child);
     Ark_Int32 (*insertChildAfter)(Ark_NativePointer peer,

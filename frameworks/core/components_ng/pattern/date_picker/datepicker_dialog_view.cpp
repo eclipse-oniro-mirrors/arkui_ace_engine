@@ -122,15 +122,7 @@ RefPtr<FrameNode> DatePickerDialogView::Show(const DialogProperties& dialogPrope
     DateTimeSequence sequence;
     auto language = AceApplicationInfo::GetInstance().GetLanguage();
     OrderResult orderResult = sequence.GetDateOrder(language);
-    if (language == "ug") {
-        pickerPattern->SetDateOrder("y-d-M");
-    } else {
-        auto dateOrder = orderResult.dateOrder;
-        pickerPattern->SetDateOrder(dateOrder);
-    }
-    if (language == "ar" && dateNode->GetLayoutProperty()) {
-        dateNode->GetLayoutProperty()->UpdateLayoutDirection(TextDirection::LTR);
-    }
+    pickerPattern->SetDateOrder(orderResult.dateOrder);
     pickerPattern->SetIsShowInDialog(true);
     pickerPattern->SetIsShowInSubwindow(dialogProperties.isShowInSubWindow);
     pickerPattern->SetShowLunarSwitch(settingData.lunarswitch);

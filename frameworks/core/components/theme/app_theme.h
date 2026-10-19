@@ -30,7 +30,7 @@ constexpr float DEFAULT_AMPLITUDE_RATIO = 0.005f;
  * AppTheme defines color and styles of whole app. AppTheme should be built
  * using AppTheme::Builder.
  */
-class AppTheme : public virtual Theme {
+class AppTheme : public Theme {
     DECLARE_ACE_TYPE(AppTheme, Theme);
 
 public:

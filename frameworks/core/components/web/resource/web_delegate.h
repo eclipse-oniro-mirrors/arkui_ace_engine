@@ -782,7 +782,7 @@ private:
     WeakPtr<PipelineBase> context_ = nullptr;
 };
 
-class WebDelegateObserver : public virtual AceType {
+class WebDelegateObserver : public AceType {
 DECLARE_ACE_TYPE(WebDelegateObserver, AceType);
 public:
     WebDelegateObserver(const RefPtr<WebDelegate>& delegate, WeakPtr<PipelineBase> context)
@@ -1298,6 +1298,7 @@ public:
     void UpdateVerticalScrollBarAccess(bool isVerticalScrollBarAccessEnabled);
     void UpdateOverlayScrollbarEnabled(bool isEnabled);
     void UpdateScrollBarColor(const std::string& colorValue);
+    void UpdateCaretColor(const Color& caretColor);
     void UpdateOverScrollMode(const int32_t overscrollModeValue);
     void UpdateBlurOnKeyboardHideMode(const int32_t isBlurOnKeyboardHideEnable);
     void UpdateNativeEmbedModeEnabled(bool isEmbedModeEnabled);

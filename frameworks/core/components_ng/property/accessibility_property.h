@@ -117,7 +117,7 @@ class UINode;
 class FrameNode;
 using AccessibilityHoverTestPath = std::vector<RefPtr<FrameNode>>;
 
-class CustomAccessibilityProperty : public virtual AceType {
+class CustomAccessibilityProperty : public AceType {
     DECLARE_ACE_TYPE(CustomAccessibilityProperty, AceType);
 
 public:
@@ -175,7 +175,7 @@ private:
     std::string text_;
 };
 
-class ACE_FORCE_EXPORT AccessibilityProperty : public virtual AceType,
+class ACE_FORCE_EXPORT AccessibilityProperty : public AceType,
                                                public AccessibilityPropertyInnerFunction,
                                                public AccessibilityPropertyInterfaceFunction {
     DECLARE_ACE_TYPE(AccessibilityProperty, AceType);

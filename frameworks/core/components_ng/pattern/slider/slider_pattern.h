@@ -20,6 +20,7 @@
 #include <optional>
 
 #include "core/components_ng/pattern/pattern.h"
+#include "core/components_ng/pattern/page_translate/page_translate_node.h"
 #include "core/components_ng/pattern/slider/slider_content_modifier.h"
 #include "core/components_ng/pattern/slider/slider_event_hub.h"
 #include "core/components_ng/pattern/slider/slider_layout_algorithm.h"
@@ -38,14 +39,15 @@ class BrightnessBlender;
 }
 
 namespace OHOS::Ace::NG {
-class SliderPattern : public Pattern {
-    DECLARE_ACE_TYPE(SliderPattern, Pattern);
+class SliderPattern : public Pattern, public PageTranslateNode {
+    DECLARE_ACE_TYPE(SliderPattern, Pattern, PageTranslateNode);
 
 public:
     SliderPattern() = default;
     ~SliderPattern() override = default;
 
     RefPtr<NodePaintMethod> CreateNodePaintMethod() override;
+    std::string GetPageTextForReport(bool includeInput = false) const override;
 
     void InitSliderEndsState()
     {

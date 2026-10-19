@@ -31,7 +31,7 @@
 #include "core/components_ng/render/drawing_forward.h"
 
 namespace OHOS::Ace {
-class ACE_FORCE_EXPORT DebugBoundaryPainter : public virtual AceType {
+class ACE_FORCE_EXPORT DebugBoundaryPainter : public AceType {
     DECLARE_ACE_TYPE(DebugBoundaryPainter, AceType);
 public:
 #ifndef USE_ROSEN_DRAWING

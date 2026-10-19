@@ -446,6 +446,23 @@ class WebTextZoomRatioModifier extends ModifierWithKey<number> {
   }
 }
 
+class WebCaretColorModifier extends ModifierWithKey<ResourceColor> {
+  constructor(value: ResourceColor) {
+    super(value);
+  }
+  static identity: Symbol = Symbol('webCaretColor');
+  applyPeer(node: KNode, reset: boolean): void {
+    if (reset) {
+      getUINativeModule().web.resetCaretColor(node);
+    } else {
+      getUINativeModule().web.setCaretColor(node, this.value!);
+    }
+  }
+  checkObjectDiff(): boolean {
+    return !isBaseOrResourceEqual(this.stageValue, this.value);
+  }
+}
+
 class WebDefaultFontSizeModifier extends ModifierWithKey<number> {
   constructor (value: number) {
     super(value);
@@ -2174,6 +2191,10 @@ class ArkWebComponent extends ArkComponent implements WebAttribute {
   }
   defaultFontSize(size: number): this {
     modifierWithKey(this._modifiersWithKeys, WebDefaultFontSizeModifier.identity, WebDefaultFontSizeModifier, size);
+    return this;
+  }
+  caretColor(value: ResourceColor): this {
+    modifierWithKey(this._modifiersWithKeys, WebCaretColorModifier.identity, WebCaretColorModifier, value);
     return this;
   }
   minFontSize(size: number): this {

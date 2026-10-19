@@ -636,4 +636,32 @@ HWTEST_F(SmartLayoutConstraintsTest, SmartLayoutConstraintsScaleUpTest006, TestS
     EXPECT_NEAR(children[0]->GetPosition().offsetY.value, 0.0, 0.01);
 }
 
+/**
+ * @tc.name: SmartLayoutConstraintsScaleUpTest007
+ * @tc.desc: 1px epsilon: BB 175.5 (within) no scale-up, BB 174 (beyond) scales up to fill 176.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SmartLayoutConstraintsTest, SmartLayoutConstraintsScaleUpTest007, TestSize.Level1)
+{
+    auto solveScaleUp = [](double bbSize) {
+        auto rootNode = SmartLayoutNode::CreateRootNode();
+        rootNode->SetLayoutType(SmartLayoutType::COLUMN);
+        rootNode->SetLayoutSize(200.0, 200.0);
+        rootNode->SetFixedSizeConstraints(200.0, 200.0);
+        rootNode->GetContext().padding = {12.0, 12.0, 12.0, 12.0};
+        ChildLayoutInfo info;
+        info.id = 1;
+        info.width = bbSize;
+        info.height = bbSize;
+        rootNode->CreateChildrenFromInfos({info});
+        rootNode->SetBoundingBox(rootNode->GetChildrenBoundingBox());
+        SmartLayoutConstraints constraints;
+        constraints.AddScaleUpConstraints(*rootNode);
+        rootNode->SolveLayout();
+        return rootNode->GetScaleInfo().sizeScale.value;
+    };
+    EXPECT_NEAR(solveScaleUp(175.5), 1.0, 0.01);           // within epsilon -> no scale-up
+    EXPECT_NEAR(solveScaleUp(174.0), 176.0 / 174.0, 0.01); // beyond epsilon -> fill available 176
+}
+
 } // namespace OHOS::Ace::NG

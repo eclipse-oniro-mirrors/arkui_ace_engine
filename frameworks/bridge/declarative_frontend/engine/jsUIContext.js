@@ -965,6 +965,12 @@ class UIContext {
         });
     }
 
+    isWindowInfoInitialized() {
+        return withInstanceId(this.instanceId_, () => {
+            return getUINativeModule().common.isWindowInfoInitialized();
+        });
+    }
+
     clearResourceCache() {
         getUINativeModule().resource.clearCache();
     }

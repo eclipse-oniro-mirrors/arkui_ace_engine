@@ -25,7 +25,7 @@
 #include "core/components_ng/pattern/stack/stack_layout_property.h"
 
 namespace OHOS::Ace::NG {
-class NodeContainerPattern : virtual public Pattern {
+class NodeContainerPattern : public Pattern {
     DECLARE_ACE_TYPE(NodeContainerPattern, Pattern);
 
 public:

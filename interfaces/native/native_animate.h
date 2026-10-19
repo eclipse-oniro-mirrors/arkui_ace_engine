@@ -2282,52 +2282,6 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_PathAnimation_SetDelay(OH_ArkUI_PathAnimat
 ArkUI_ErrorCode OH_ArkUI_NativeModule_PathAnimation_GetDelay(OH_ArkUI_PathAnimationHandle animation, int32_t *delay);
 
 /**
- * @brief Sets the animation curve for a path animation.
- *
- * @param animation [in] Indicates the path animation handle.
- * @param curve [in] Indicates the animation curve that controls the rate of motion along the path.
- *     <b>NULL</b> means inheriting the group's curve set by {@link OH_ArkUI_NativeModule_AnimationGroup_SetCurve}.
- *     This API does not take ownership of the curve handle; the caller must ensure the curve remains
- *     valid when using this handle.
- *     The <b>springMotion</b>, <b>responsiveSpringMotion</b>, and <b>interpolatingSpring</b> curves are not
- *     supported because they do not have effective duration settings.
- *     The actual effective animation curve is determined by priority: if the curve is set via this API, that
- *     value is used; otherwise, the curve set on the animation group via
- *     {@link OH_ArkUI_NativeModule_AnimationGroup_SetCurve} is used; if neither is set,
- *     {@link ARKUI_CURVE_LINEAR} is used.
- * @return <ul>
- *         <li>{@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.</li>
- *         <li>{@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter exception occurs.</li>
- *         </ul>
- * @since 26.0.1
- */
-ArkUI_ErrorCode OH_ArkUI_NativeModule_PathAnimation_SetCurve(
-    OH_ArkUI_PathAnimationHandle animation, ArkUI_CurveHandle curve);
-
-/**
- * @brief Obtains the animation curve of a path animation.
- *
- * This API returns only the curve explicitly set on this animation; the value inherited from the
- * animation group or the default is resolved at runtime and is not stored on this object. If the curve
- * has not been set on this animation, <b>NULL</b> is written to <b>outBorrowedCurve</b>. The actual
- * effective animation curve used at runtime is determined by priority: if set via
- * {@link OH_ArkUI_NativeModule_PathAnimation_SetCurve}, that value is used; otherwise, the group's
- * curve via {@link OH_ArkUI_NativeModule_AnimationGroup_SetCurve} is used; if neither is set,
- * {@link ARKUI_CURVE_LINEAR} is used.
- * @param animation [in] Indicates the path animation handle.
- * @param outBorrowedCurve [out] Receives a borrowed curve handle; the caller must not destroy it.
- *     <b>NULL</b> means the curve has not been set on this animation and will inherit the group's curve
- *     at runtime.
- * @return <ul>
- *         <li>{@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.</li>
- *         <li>{@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter exception occurs.</li>
- *         </ul>
- * @since 26.0.1
- */
-ArkUI_ErrorCode OH_ArkUI_NativeModule_PathAnimation_GetCurve(
-    OH_ArkUI_PathAnimationHandle animation, ArkUI_CurveHandle *outBorrowedCurve);
-
-/**
  * @brief Sets the tempo for a path animation.
  *
  * @param animation [in] Indicates the path animation handle.
@@ -2583,8 +2537,7 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_AnimationGroup_GetDelay(OH_ArkUI_Animation
  *
  * The group's curve serves as the default curve for child animations that do not set their own curve
  * via {@link OH_ArkUI_NativeModule_PropertyAnimation_SetCurve},
- * {@link OH_ArkUI_NativeModule_KeyframeAnimation_SetCurve}, or
- * {@link OH_ArkUI_NativeModule_PathAnimation_SetCurve}.
+ * {@link OH_ArkUI_NativeModule_KeyframeAnimation_SetCurve}.
  * The <b>springMotion</b>, <b>responsiveSpringMotion</b>, and <b>interpolatingSpring</b> curves are not
  * supported because they do not have effective duration settings.
  * @param group [in] Indicates the animation group handle.

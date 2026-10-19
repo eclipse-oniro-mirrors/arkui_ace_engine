@@ -64,7 +64,7 @@ struct OH_NativeXComponent_ExtraMouseEventInfo {
 using OnTouchIntercept_Callback = HitTestMode (*)(OH_NativeXComponent*, ArkUI_UIInputEvent*);
 
 namespace OHOS::Ace {
-class NativeXComponentImpl : public virtual AceType {
+class NativeXComponentImpl : public AceType {
     DECLARE_ACE_TYPE(NativeXComponentImpl, AceType);
     using NativeXComponent_Callback = void (*)(OH_NativeXComponent*, void*);
     using NativeXComponent_CallbackWithResult = bool (*)(OH_NativeXComponent*, void*);

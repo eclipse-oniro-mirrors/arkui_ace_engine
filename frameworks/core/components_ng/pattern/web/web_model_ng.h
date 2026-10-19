@@ -131,6 +131,7 @@ public:
     void SetPermissionRequestEventId(std::function<void(const BaseEventInfo* info)>&& jsCallback) override;
     void SetScreenCaptureRequestEventId(std::function<void(const BaseEventInfo* info)>&& jsCallback) override;
     void SetBackgroundColor(Color backgroundColor) override;
+    void SetCaretColor(const Color& caretColor) override;
     void SetDefaultBackgroundColor() override;
     void InitialScale(float scale) override;
     void SetSearchResultReceiveEventId(std::function<void(const BaseEventInfo* info)>&& jsCallback) override;
@@ -465,6 +466,7 @@ public:
     static void SetInputMethodAttachedId(
         FrameNode* frameNode, std::function<void()>&& jsCallback);
     static void SetEnableFullscreenVideoOverlay(FrameNode* frameNode, bool enable);
+    static void SetCaretColor(FrameNode* frameNode, const Color& caretColor);
 #if defined(ANDROID_PLATFORM) || defined(IOS_PLATFORM)
     using PopupResultCallback = std::function<void(int32_t, bool)>;
     static void SetPopupResultCallback(PopupResultCallback&& callback);

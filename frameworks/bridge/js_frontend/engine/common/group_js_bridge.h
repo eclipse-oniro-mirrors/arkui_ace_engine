@@ -26,7 +26,7 @@
 
 namespace OHOS::Ace {
 
-class GroupJsBridge : public virtual AceType {
+class GroupJsBridge : public AceType {
     DECLARE_ACE_TYPE(GroupJsBridge, AceType);
 public:
     virtual void TriggerModuleJsCallback(int32_t callbackId, int32_t code,

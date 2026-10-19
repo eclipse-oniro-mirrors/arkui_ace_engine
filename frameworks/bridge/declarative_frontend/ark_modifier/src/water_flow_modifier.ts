@@ -237,6 +237,11 @@ class LazyArkWaterFlowComponent extends ArkScrollable {
     this.lazyComponent.onDidScroll(value);
     return this;
   }
+
+  scrollSnapStrategy(strategy?: ScrollSnapAlign | ScrollSnapOffsetProvider): this {
+    this.lazyComponent.scrollSnapStrategy(strategy);
+    return this;
+  }
 }class WaterFlowModifier extends LazyArkWaterFlowComponent implements AttributeModifier<WaterFlowAttribute> {
 
   constructor(nativePtr: KNode, classType: ModifierType) {

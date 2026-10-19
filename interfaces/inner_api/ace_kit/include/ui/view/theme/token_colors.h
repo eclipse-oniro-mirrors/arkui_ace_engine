@@ -26,7 +26,7 @@ struct TokenColorData {
     const char* colorName { nullptr };
     const int32_t systemResourceId {0};
 };
-class ACE_FORCE_EXPORT TokenColors : public virtual AceType {
+class ACE_FORCE_EXPORT TokenColors : public AceType {
     DECLARE_ACE_TYPE(TokenColors, AceType);
 
 public:

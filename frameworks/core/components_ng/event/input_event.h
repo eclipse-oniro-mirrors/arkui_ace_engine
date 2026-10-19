@@ -24,7 +24,7 @@ namespace OHOS::Ace::NG {
 class InputEventHub;
 class FrameNode;
 
-class InputEvent : public virtual AceType {
+class InputEvent : public AceType {
     DECLARE_ACE_TYPE(InputEvent, AceType);
 public:
     explicit InputEvent(OnMouseEventFunc&& callback) : onMouseCallback_(std::move(callback)) {}
@@ -152,7 +152,7 @@ private:
     bool followCursor_ = false;
 };
 
-class ACE_FORCE_EXPORT InputEventActuator : public virtual AceType {
+class ACE_FORCE_EXPORT InputEventActuator : public AceType {
     DECLARE_ACE_TYPE(InputEventActuator, AceType);
 public:
     ACE_FORCE_EXPORT explicit InputEventActuator(const WeakPtr<InputEventHub>& inputEventHub);

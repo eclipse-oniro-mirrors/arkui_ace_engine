@@ -81,6 +81,8 @@ public:
      * @brief Start the scroll animation if possible with the given velocity and offset_.
      */
     void Fling(const OffsetF& velocity);
+
+    void ScrollWithAnimation2D(const OffsetF& delta);
 private:
     void InitializePanRecognizer();
     void InitializeTouchEvent();
@@ -116,15 +118,14 @@ private:
     void FireOnScrollEnd() const;
     void FireOnScrollEdge(const std::vector<ScrollEdge>& edges) const;
 
-    void AnimateOnMouseScroll(const OffsetF& delta);
-    void HandleAxisAnimationFrame(float newOffset);
+    void InitAxisAnimator();
 
     ScrollPattern& pattern_;
     RefPtr<NodeAnimatablePropertyOffsetF> offset_;
     OffsetF actualOffset_; // actual displayed offset, adjusted by LayoutAlgorithm
     RefPtr<PanRecognizer> freePanGesture_;
     RefPtr<TouchEventImpl> freeTouch_;
-    RefPtr<AxisAnimator> axisAnimator_; // to smooth out mouse wheel scrolls
+    RefPtr<AxisAnimator> axisAnimator_; // shared for mouse wheel and keyboard 2D scroll
 
 public:
     enum class State {
@@ -138,7 +139,6 @@ public:
 private:
     State state_ = State::IDLE;
     bool enableScroll_ = true;
-    bool mouseWheelScrollIsVertical_ = true;
 };
 
 } // namespace OHOS::Ace::NG

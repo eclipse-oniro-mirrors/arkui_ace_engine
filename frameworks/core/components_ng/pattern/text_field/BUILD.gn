@@ -20,6 +20,7 @@ build_component_ng("text_field_pattern_ng") {
   sources = [
     "content_controller.cpp",
     "error_decorator.cpp",
+    "password_icon_host_base.cpp",
     "text_field_accessibility_property.cpp",
     "text_field_content_modifier.cpp",
     "text_field_controller.cpp",
@@ -39,6 +40,7 @@ build_component_ng("text_field_pattern_ng") {
     "text_field_free_scroller.cpp",
     "text_field_gesture_event_hub.cpp",
     "text_field_layout_algorithm.cpp",
+    "../../../common/ime/text_input_obscure_utils.cpp",
   ]
 
   component_ng_deps = [

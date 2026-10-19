@@ -71,8 +71,10 @@ constexpr int32_t GET_STATE_MGMT_INFO_PARAMS = 4;
 constexpr int32_t GET_SPECIFIED_CONTENT_OFFSETS_PARAMS = 3;
 constexpr int32_t HIGHLIGHT_SPECIFIED_CONTENT_PARAMS = 3;
 constexpr int32_t GET_NAVIGATION_CONTENT_PARAMS = 4;
+constexpr int32_t GET_LAZY_FOREACH_DATA_PARAMS = 3;
 constexpr int32_t PAGE_TRANSLATE_REQUEST_PARAMS = 2;
 constexpr int32_t PAGE_TRANSLATE_RESET_PARAMS = 2;
+constexpr int32_t PARAM_TWO = 2;
 constexpr size_t PAGE_TRANSLATE_EXTRA_DATA_INDEX = 2;
 constexpr int32_t DEFAULT_APP_USER_ID = 100;
 constexpr char DEFAULT_PAGE_TRANSLATE_REQUEST[] = R"({"scope":3})";
@@ -557,6 +559,7 @@ const std::map<std::string, UiSaService::DumpHandler> UiSaService::DUMP_MAP = {
     { "GetSpecifiedContentOffsets", &UiSaService::HandleGetSpecifiedContentOffsets },
     { "HighlightSpecifiedContent", &UiSaService::HandleHighlightSpecifiedContent },
     { "GetNavigationContent", &UiSaService::HandleGetNavigationContent },
+    { "GetLazyForEachData", &UiSaService::HandleGetLazyForEachData },
 };
 
 UiSaService::UiSaService() : SystemAbility(UI_SA_ID, true) {}
@@ -1278,6 +1281,42 @@ void UiSaService::HandleGetNavigationContent(
         service->GetNavigationContentByPoint(x, y, pattern, navigationContentCallback);
         LOGI("[GetNavigationContent] call GetNavigationContentByPoint x=%{public}f, y=%{public}f, pattern=%{public}s",
             x, y, pattern.c_str());
+    }
+}
+
+void UiSaService::HandleGetLazyForEachData(
+    sptr<IUiContentService> service, std::vector<std::string> params)
+{
+    if (params.size() >= GET_LAZY_FOREACH_DATA_PARAMS) {
+        errno = 0;
+        char* endPtr = nullptr;
+        float x = std::strtof(params[1].c_str(), &endPtr);
+        if (endPtr == params[1].c_str() || errno == ERANGE || *endPtr != '\0') {
+            LOGW("[GetLazyForEachData] invalid x coordinate: %{public}s", params[1].c_str());
+            return;
+        }
+        float y = std::strtof(params[PARAM_TWO].c_str(), &endPtr);
+        if (endPtr == params[PARAM_TWO].c_str() || errno == ERANGE || *endPtr != '\0') {
+            LOGW("[GetLazyForEachData] invalid y coordinate: %{public}s", params[PARAM_TWO].c_str());
+            return;
+        }
+        bool toFile = params.size() > GET_LAZY_FOREACH_DATA_PARAMS && params.back() == "-tofile";
+        auto lazyForEachDataCallback = [toFile](const std::string& data) {
+            LOGI("[GetLazyForEachData] data = %{public}s", data.substr(0, 200).c_str());
+            if (toFile) {
+                auto filePath = UI_SA_PATH + "lazy_foreach_data_" + GetCurrentTimestampStr() + ".json";
+                std::unique_ptr<std::ofstream> ostream = std::make_unique<std::ofstream>(filePath);
+                CHECK_NULL_VOID(ostream);
+                if (!ostream->is_open()) {
+                    LOGW("[GetLazyForEachData] filePath is invalid");
+                    return;
+                }
+                ostream->write(data.c_str(), data.length());
+                LOGI("[GetLazyForEachData] result is saved to %{public}s", filePath.c_str());
+            }
+        };
+        service->GetLazyForEachDataByPoint(x, y, lazyForEachDataCallback);
+        LOGI("[GetLazyForEachData] call GetLazyForEachDataByPoint x=%{public}f, y=%{public}f", x, y);
     }
 }
 } // namespace OHOS::Ace

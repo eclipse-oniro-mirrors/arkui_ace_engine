@@ -298,7 +298,10 @@ int32_t UIContentServiceProxy::SendComponentTreeQueryRequest(uint32_t code, cons
         LOGW("%{public}s write parcel failed", caller);
         return FAILED;
     }
-    bool registerSuccess = report_->RegisterComponentTreeQueryCallback(eventCallback);
+    bool isLazyForEach = code == IUiContentService::GET_LAZY_FOREACH_DATA_BY_POINT;
+    bool registerSuccess = isLazyForEach
+        ? report_->RegisterLazyForEachQueryCallback(eventCallback)
+        : report_->RegisterNavigationQueryCallback(eventCallback);
     if (!registerSuccess) {
         LOGW("%{public}s register callback failed, previous request unfinished", caller);
         return LAST_UNFINISH;
@@ -308,10 +311,17 @@ int32_t UIContentServiceProxy::SendComponentTreeQueryRequest(uint32_t code, cons
     int32_t sendRequestErrorCode = Remote()->SendRequest(code, data, reply, option);
     if (sendRequestErrorCode != ERR_NONE) {
         LOGW("%{public}s send request failed, errorCode is %{public}d", caller, sendRequestErrorCode);
-        report_->UnregisterComponentTreeQueryCallback();
+        if (isLazyForEach) {
+            report_->UnregisterLazyForEachQueryCallback();
+        } else {
+            report_->UnregisterNavigationQueryCallback();
+        }
         return REPLY_ERROR;
     }
-    if (!report_->PostComponentTreeQueryCallbackRemoveTask(timeout)) {
+    bool postSuccess = isLazyForEach
+        ? report_->PostLazyForEachQueryCallbackRemoveTask(timeout)
+        : report_->PostNavigationQueryCallbackRemoveTask(timeout);
+    if (!postSuccess) {
         return FAILED;
     }
     return reply.ReadInt32();
@@ -324,6 +334,16 @@ int32_t UIContentServiceProxy::GetNavigationContentByPoint(float x, float y, con
     return SendComponentTreeQueryRequest(GET_NAVIGATION_CONTENT_BY_POINT, "GetNavigationContentByPoint",
         eventCallback, [x, y, pattern](MessageParcel& data) {
             return data.WriteFloat(x) && data.WriteFloat(y) && data.WriteString(pattern);
+        }, timeout);
+}
+
+int32_t UIContentServiceProxy::GetLazyForEachDataByPoint(float x, float y,
+    const std::function<void(const std::string&)>& eventCallback,
+    int32_t timeout)
+{
+    return SendComponentTreeQueryRequest(GET_LAZY_FOREACH_DATA_BY_POINT, "GetLazyForEachDataByPoint",
+        eventCallback, [x, y](MessageParcel& data) {
+            return data.WriteFloat(x) && data.WriteFloat(y);
         }, timeout);
 }
 

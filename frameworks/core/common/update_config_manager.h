@@ -27,7 +27,7 @@
 
 namespace OHOS::Ace {
 template<class T>
-class UpdateConfigManager : public virtual AceType {
+class UpdateConfigManager : public AceType {
     DECLARE_ACE_TYPE(UpdateConfigManager<T>, AceType);
 public:
     struct UpdateTask {

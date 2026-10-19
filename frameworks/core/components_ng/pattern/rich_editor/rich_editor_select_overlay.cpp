@@ -15,9 +15,16 @@
 
 #include "core/components_ng/pattern/rich_editor/rich_editor_select_overlay.h"
 
+#include "core/components_ng/manager/select_content_overlay/select_content_overlay_manager.h"
 #include "core/components_ng/pattern/rich_editor/rich_editor_pattern.h"
 #include "core/components/text_overlay/text_overlay_theme.h"
 #include "core/components_ng/pattern/select_overlay/select_overlay_property.h"
+
+#ifndef ACE_UNITTEST
+#ifdef ENABLE_STANDARD_INPUT
+#include "input_method_controller.h"
+#endif
+#endif
 
 namespace OHOS::Ace::NG {
 namespace {
@@ -120,9 +127,14 @@ RectF RichEditorSelectOverlay::GetVisibleRect()
     CHECK_NULL_RETURN(host, visibleRect);
     auto geometryNode = host->GetGeometryNode();
     CHECK_NULL_RETURN(geometryNode, visibleRect);
-    OffsetF paddingOffset = geometryNode->GetPaddingOffset() - geometryNode->GetFrameOffset();
     auto paintOffset = host->GetPaintRectWithTransform().GetOffset();
-    visibleRect = RectF(paddingOffset + paintOffset, geometryNode->GetPaddingSize());
+    auto richEditorPattern = AceType::DynamicCast<RichEditorPattern>(pattern);
+    if (richEditorPattern && richEditorPattern->IsInPlainTextInputMode()) {
+        visibleRect = RectF(geometryNode->GetContentOffset() + paintOffset, geometryNode->GetContentSize());
+    } else {
+        OffsetF paddingOffset = geometryNode->GetPaddingOffset() - geometryNode->GetFrameOffset();
+        visibleRect = RectF(paddingOffset + paintOffset, geometryNode->GetPaddingSize());
+    }
     CalculateClippedRect(visibleRect);
     return visibleRect;
 }
@@ -329,10 +341,15 @@ void RichEditorSelectOverlay::OnUpdateMenuInfo(SelectMenuInfo& menuInfo, SelectO
         auto info = overlayManager->GetSelectOverlayInfo();
         IF_TRUE(info.has_value(), menuInfo.menuBuilder = info->menuInfo.menuBuilder);
     }
+    if (pattern->IsInPlainTextInputMode()) {
+        UpdateMenuInfoForPlainTextInput(menuInfo, dirtyFlag, pattern);
+        return;
+    }
     if (dirtyFlag == DIRTY_COPY_ALL_ITEM) {
         return;
     }
-    bool isShowItem = pattern->copyOption_ != CopyOptions::None;
+    bool isShowItem = pattern->copyOption_ != CopyOptions::None &&
+        pattern->IsCapabilityAllowed(RichEditorCapability::COPY);
     bool selectionMenuHidden = pattern->GetSelectionMenuHidden();
     menuInfo.showCopy = isShowItem && hasValue && !pattern->textSelector_.SelectNothing();
     menuInfo.showCut = isShowItem && hasValue && !pattern->textSelector_.SelectNothing();
@@ -344,13 +361,16 @@ void RichEditorSelectOverlay::OnUpdateMenuInfo(SelectMenuInfo& menuInfo, SelectO
     menuInfo.showAIWrite = pattern->IsShowAIWrite();
     menuInfo.showAutoFill = pattern->IsShowAutoFill();
     menuInfo.menuType = IsUsingMouse() ? OptionMenuType::MOUSE_MENU : OptionMenuType::TOUCH_MENU;
-    menuInfo.isAskCeliaEnabled = pattern->IsAskCeliaEnabled();
-    menuInfo.isShowAskCeliaInRightClick = pattern->IsShowAskCeliaInRightClick();
+    menuInfo.isAskCeliaEnabled = pattern->IsAskCeliaEnabled() &&
+        pattern->IsCapabilityAllowed(RichEditorCapability::ASK_CELIA);
+    menuInfo.isShowAskCeliaInRightClick = pattern->IsShowAskCeliaInRightClick() &&
+        pattern->IsCapabilityAllowed(RichEditorCapability::ASK_CELIA);
     pattern->UpdateSelectMenuInfo(menuInfo);
     TAG_LOGD(AceLogTag::ACE_RICH_TEXT,
         "OnUpdateMenuInfo, IsShowAIMenuOption=%{public}d, AIItemOptionEmpty=%{public}d, SelectionMenuHidden=%{public}d",
         pattern->IsShowAIMenuOption(), pattern->GetAIItemOption().empty(), selectionMenuHidden);
-    if (pattern->IsShowAIMenuOption() && !pattern->GetAIItemOption().empty()) {
+    if (pattern->IsShowAIMenuOption() && !pattern->GetAIItemOption().empty() &&
+        pattern->IsCapabilityAllowed(RichEditorCapability::AI_MENU)) {
         // do not support two selected ai entity, hence it's enough to pick first item to determine type
         auto firstSpanItem = pattern->GetAIItemOption().begin()->second;
         menuInfo.aiMenuOptionType = firstSpanItem.type;
@@ -934,5 +954,50 @@ bool RichEditorSelectOverlay::IsSingleHandleMoving()
 bool RichEditorSelectOverlay::NeedRefreshMenu()
 {
     return needRefreshMenu_;
+}
+
+void RichEditorSelectOverlay::UpdateMenuInfoForPlainTextInput(SelectMenuInfo& menuInfo,
+    SelectOverlayDirtyFlag dirtyFlag, const RefPtr<RichEditorPattern>& pattern)
+{
+    if (pattern->textResponseType_.has_value()) {
+        menuInfo.responseType = static_cast<int32_t>(pattern->textResponseType_.value());
+    }
+    FillMenuHasOnPrepareMenuCallback(menuInfo);
+    bool hasText = pattern->GetTextContentLength() > 0;
+    bool isSelectAll = pattern->IsSelectAll();
+    if (IsDirtyCopyAllItem(dirtyFlag)) {
+        FillMenuShowCopyAll(menuInfo, hasText, isSelectAll);
+        return;
+    }
+    bool isSelected = !pattern->textSelector_.SelectNothing();
+    bool isContentRestricted = pattern->IsCapabilityDisabled(RichEditorCapability::COPY);
+    bool hasCustomKeyboard = pattern->customKeyboardBuilder_ || pattern->customKeyboardNode_;
+    bool isSelectionMenuHidden = false;
+    auto layoutProperty = pattern->GetLayoutProperty<RichEditorLayoutProperty>();
+    if (layoutProperty) {
+        isSelectionMenuHidden = layoutProperty->GetSelectionMenuHiddenValue(false);
+    }
+    bool isCameraSupported = false;
+#if defined(ENABLE_STANDARD_INPUT)
+    auto inputMethod = MiscServices::InputMethodController::GetInstance();
+    isCameraSupported = inputMethod && inputMethod->IsInputTypeSupported(MiscServices::InputType::CAMERA_INPUT);
+#endif
+    FillMenuShowCameraInput(menuInfo, isSelected, isCameraSupported, isContentRestricted, hasCustomKeyboard);
+    FillMenuVisibility(menuInfo, hasText, menuInfo.showCameraInput, pattern->IsShowAutoFill(),
+        isSelectionMenuHidden, dirtyFlag);
+    FillMenuShowPaste(menuInfo);
+    FillMenuMenuType(menuInfo);
+    FillMenuShowCopyAndCut(menuInfo, hasText,
+        pattern->copyOption_ != CopyOptions::None && !isContentRestricted, isSelected);
+    FillMenuShowCopyAll(menuInfo, hasText, isSelectAll);
+    FillMenuShowAutoFill(menuInfo, pattern->IsShowAutoFill());
+    FillMenuShowTranslate(menuInfo, menuInfo.showCopy, pattern->IsShowTranslate());
+    FillMenuShowSearch(menuInfo, menuInfo.showCopy, pattern->IsShowSearch());
+    FillMenuShowShare(menuInfo, menuInfo.showCopy);
+    FillMenuShowAIWrite(menuInfo, pattern->IsShowAIWrite());
+    const auto& aiItems = pattern->GetAIItemOption();
+    bool hasAiItem = !aiItems.empty();
+    TextDataDetectType aiType = hasAiItem ? aiItems.begin()->second.type : TextDataDetectType::INVALID;
+    FillMenuAIMenuOptionType(menuInfo, isContentRestricted, pattern->IsShowAIMenuOption(), hasAiItem, aiType);
 }
 } // namespace OHOS::Ace::NG

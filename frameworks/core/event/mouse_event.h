@@ -284,7 +284,7 @@ public:
     }
 
     MouseEvent ConvertToMouseEvent() const;
-    MouseEvent ConvertToMouseEventForStatic() const;
+    MouseEvent ConvertToMouseEventForStatic(float density = 1.0f) const;
     void SetIsRightButtonEventFromDoulbeTap(bool isRightButtonEventFromDoulbeTap)
     {
         isRightButtonEventFromDoulbeTap_ = isRightButtonEventFromDoulbeTap;
@@ -474,7 +474,7 @@ using OnHoverEventFunc = std::function<void(bool)>;
 
 using OnAccessibilityHoverFunc = std::function<void(bool, AccessibilityHoverInfo& info)>;
 
-class MouseEventTarget : public virtual TouchEventTarget {
+class MouseEventTarget : public TouchEventTarget {
     DECLARE_ACE_TYPE(MouseEventTarget, TouchEventTarget);
 
 public:
@@ -503,7 +503,7 @@ private:
     OnMouseEventFunc onMouseCallback_;
 };
 
-class HoverEventTarget : public virtual TouchEventTarget {
+class HoverEventTarget : public TouchEventTarget {
     DECLARE_ACE_TYPE(HoverEventTarget, TouchEventTarget);
 
 public:
@@ -596,7 +596,7 @@ private:
     OnHoverMoveFunc onPenHoverMoveEventCallback_;
 };
 
-class HoverEffectTarget : public virtual TouchEventTarget {
+class HoverEffectTarget : public TouchEventTarget {
     DECLARE_ACE_TYPE(HoverEffectTarget, TouchEventTarget);
 
 public:

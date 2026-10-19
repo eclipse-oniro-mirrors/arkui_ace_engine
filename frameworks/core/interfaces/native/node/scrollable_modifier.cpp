@@ -299,6 +299,27 @@ int32_t GetEnableScrollWithMouse(ArkUINodeHandle node)
     return ScrollableModelNG::GetEnableScrollWithMouse(frameNode);
 }
 
+void SetEnableScrollWithKeyboard(ArkUINodeHandle node, ArkUI_Bool value)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    ScrollableModelNG::SetEnableScrollWithKeyboard(frameNode, value);
+}
+
+void ResetEnableScrollWithKeyboard(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    ScrollableModelNG::ResetEnableScrollWithKeyboard(frameNode);
+}
+
+int32_t GetEnableScrollWithKeyboard(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_RETURN(frameNode, 1);
+    return ScrollableModelNG::GetEnableScrollWithKeyboard(frameNode);
+}
+
 void SetScrollBarMargin(ArkUINodeHandle node, ArkUI_Float32 marginStart, ArkUI_Int32 marginStartLengthUnit,
     ArkUI_Float32 marginEnd, ArkUI_Int32 marginEndLengthUnit)
 {
@@ -557,6 +578,9 @@ const ArkUIScrollableModifier* GetScrollableModifier()
         .setEnableScrollWithMouse = SetEnableScrollWithMouse,
         .resetEnableScrollWithMouse = ResetEnableScrollWithMouse,
         .getEnableScrollWithMouse = GetEnableScrollWithMouse,
+        .setEnableScrollWithKeyboard = SetEnableScrollWithKeyboard,
+        .resetEnableScrollWithKeyboard = ResetEnableScrollWithKeyboard,
+        .getEnableScrollWithKeyboard = GetEnableScrollWithKeyboard,
         .setScrollBarMargin = SetScrollBarMargin,
         .resetScrollBarMargin = ResetScrollBarMargin,
         .getScrollBarMargin = GetScrollBarMargin,

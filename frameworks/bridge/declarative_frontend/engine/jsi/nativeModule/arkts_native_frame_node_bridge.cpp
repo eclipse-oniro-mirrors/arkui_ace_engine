@@ -31,7 +31,14 @@
 #include "bridge/declarative_frontend/jsview/js_view_context.h"
 #include "core/components_ng/base/view_abstract.h"
 #include "core/components_ng/base/view_stack_processor.h"
+#include "core/components_ng/event/focus_hub.h"
+#include "core/components_ng/manager/post_event/post_event_manager.h"
+#include "core/event/axis_event.h"
 #include "core/event/focus_axis_event.h"
+#include "core/event/key_event.h"
+#include "core/event/mouse_event.h"
+#include "core/event/touch_event.h"
+#include "core/pipeline_ng/pipeline_context.h"
 #include "core/components_ng/pattern/custom_frame_node/custom_frame_node.h"
 #include "core/components_ng/pattern/custom_frame_node/custom_frame_node_pattern.h"
 #include "core/components_ng/pattern/toggle/toggle_model_ng.h"
@@ -41,6 +48,7 @@
 #include "core/interfaces/native/node/node_xcomponent_modifier.h"
 #include "frameworks/bridge/declarative_frontend/engine/js_types.h"
 #include "frameworks/bridge/declarative_frontend/engine/jsi/nativeModule/arkts_utils.h"
+#include "interfaces/native/ui_input_event.h"
 #include "core/components_ng/pattern/xcomponent/xcomponent_model_ng.h"
 #include "frameworks/core/components_ng/pattern/xcomponent/bridge/arkts_native_xcomponent_bridge.h"
 
@@ -3597,5 +3605,286 @@ ArkUINativeModuleValue FrameNodeBridge::CreateTypedFrameNodeFormFullSet(ArkUIRun
         { "Rating", ARKUI_RATING}, { "Radio", ARKUI_RADIO }, { "Slider", ARKUI_SLIDER }, { "Toggle", ARKUI_TOGGLE }};
     auto reslut = CreateTypedFrameNodeImpl(runtimeCallInfo, typeMapFull);
     return reslut;
+}
+
+namespace {
+int32_t GetIntProperty(EcmaVM* vm, const Local<panda::ObjectRef>& obj, const char* name)
+{
+    auto value = obj->Get(vm, name);
+    if (value->IsNumber()) {
+        return static_cast<int32_t>(value->ToNumber(vm)->Value());
+    }
+    return 0;
+}
+
+float GetFloatProperty(EcmaVM* vm, const Local<panda::ObjectRef>& obj, const char* name)
+{
+    auto value = obj->Get(vm, panda::StringRef::NewFromUtf8(vm, name));
+    if (value->IsNumber()) {
+        return static_cast<float>(value->ToNumber(vm)->Value());
+    }
+    return 0.0f;
+}
+
+double GetDoubleProperty(EcmaVM* vm, const Local<panda::ObjectRef>& obj, const char* name)
+{
+    auto value = obj->Get(vm, panda::StringRef::NewFromUtf8(vm, name));
+    if (value->IsNumber()) {
+        return static_cast<double>(value->ToNumber(vm)->Value());
+    }
+    return 0.0;
+}
+
+bool GetBoolProperty(EcmaVM* vm, const Local<panda::ObjectRef>& obj, const char* name)
+{
+    auto value = obj->Get(vm, panda::StringRef::NewFromUtf8(vm, name));
+    return value->IsBoolean() ? value->ToBoolean(vm)->Value() : false;
+}
+
+void InitBaseEventFields(EcmaVM* vm, const Local<panda::ObjectRef>& obj, SourceType& sourceType,
+    SourceTool& sourceTool, TimeStamp& time, int64_t& deviceId, int32_t& targetDisplayId)
+{
+    auto sourceVal = obj->Get(vm, panda::StringRef::NewFromUtf8(vm, "source"));
+    if (sourceVal->IsNumber()) {
+        sourceType = static_cast<SourceType>(static_cast<int32_t>(sourceVal->ToNumber(vm)->Value()));
+    }
+    auto sourceToolVal = obj->Get(vm, panda::StringRef::NewFromUtf8(vm, "sourceTool"));
+    if (sourceToolVal->IsNumber()) {
+        sourceTool = static_cast<SourceTool>(static_cast<int32_t>(sourceToolVal->ToNumber(vm)->Value()));
+    }
+    auto timestampVal = obj->Get(vm, panda::StringRef::NewFromUtf8(vm, "timestamp"));
+    if (timestampVal->IsNumber()) {
+        std::chrono::nanoseconds nanoseconds(static_cast<int64_t>(timestampVal->ToNumber(vm)->Value()));
+        time = TimeStamp(nanoseconds);
+    }
+    deviceId = GetIntProperty(vm, obj, "deviceId");
+    targetDisplayId = GetIntProperty(vm, obj, "targetDisplayId");
+}
+
+void InitTouchEventFromObj(EcmaVM* vm, const Local<panda::ObjectRef>& eventObj, TouchEvent& touchEvent)
+{
+    touchEvent.type = static_cast<TouchType>(GetIntProperty(vm, eventObj, "type"));
+    touchEvent.sourceType = static_cast<SourceType>(GetIntProperty(vm, eventObj, "source"));
+    touchEvent.sourceTool = static_cast<SourceTool>(GetIntProperty(vm, eventObj, "sourceTool"));
+    touchEvent.force = GetFloatProperty(vm, eventObj, "pressure");
+    auto timestampVal = eventObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "timestamp"));
+    if (timestampVal->IsNumber()) {
+        touchEvent.time =
+            TimeStamp(std::chrono::nanoseconds(static_cast<int64_t>(timestampVal->ToNumber(vm)->Value())));
+    }
+    touchEvent.deviceId = GetIntProperty(vm, eventObj, "deviceId");
+    touchEvent.targetDisplayId = GetIntProperty(vm, eventObj, "targetDisplayId");
+    touchEvent.eventHandleId = GetIntProperty(vm, eventObj, "eventHandleId");
+    touchEvent.tiltX = GetFloatProperty(vm, eventObj, "tiltX");
+    touchEvent.tiltY = GetFloatProperty(vm, eventObj, "tiltY");
+    touchEvent.rollAngle = GetFloatProperty(vm, eventObj, "rollAngle");
+
+    auto touchesVal = eventObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "touches"));
+    if (!touchesVal->IsArray(vm)) {
+        return;
+    }
+    Local<panda::ArrayRef> touchesArray(touchesVal);
+    auto touchLen = ArkTSUtils::GetArrayLength(vm, touchesArray);
+    for (size_t i = 0; i < touchLen; ++i) {
+        auto touchObj = Local<JSValueRef>(panda::ArrayRef::GetValueAt(vm, touchesArray, i))->ToObject(vm);
+        TouchPoint touchPoint;
+        touchPoint.id = GetIntProperty(vm, touchObj, "id");
+        touchPoint.x = GetFloatProperty(vm, touchObj, "windowX");
+        touchPoint.y = GetFloatProperty(vm, touchObj, "windowY");
+        touchPoint.screenX = GetFloatProperty(vm, touchObj, "displayX");
+        touchPoint.screenY = GetFloatProperty(vm, touchObj, "displayY");
+        touchPoint.originalId = touchPoint.id;
+        touchPoint.force = GetFloatProperty(vm, touchObj, "pressure");
+        touchPoint.width = static_cast<int32_t>(GetFloatProperty(vm, touchObj, "width"));
+        touchPoint.height = static_cast<int32_t>(GetFloatProperty(vm, touchObj, "height"));
+        touchPoint.globalDisplayX = GetDoubleProperty(vm, touchObj, "globalDisplayX");
+        touchPoint.globalDisplayY = GetDoubleProperty(vm, touchObj, "globalDisplayY");
+        touchPoint.operatingHand = GetIntProperty(vm, touchObj, "hand");
+        auto pressedTimeVal = touchObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "pressedTime"));
+        if (pressedTimeVal->IsNumber()) {
+            touchPoint.downTime =
+                TimeStamp(std::chrono::nanoseconds(static_cast<int64_t>(pressedTimeVal->ToNumber(vm)->Value())));
+        }
+        touchEvent.pointers.emplace_back(touchPoint);
+    }
+    auto changedTouchesVal = eventObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "changedTouches"));
+    if (changedTouchesVal->IsArray(vm)) {
+        Local<panda::ArrayRef> changedArray(changedTouchesVal);
+        if (ArkTSUtils::GetArrayLength(vm, changedArray) > 0) {
+            auto changedObj = Local<JSValueRef>(panda::ArrayRef::GetValueAt(vm, changedArray, 0))->ToObject(vm);
+            touchEvent.id = GetIntProperty(vm, changedObj, "id");
+            touchEvent.x = GetFloatProperty(vm, changedObj, "windowX");
+            touchEvent.y = GetFloatProperty(vm, changedObj, "windowY");
+            touchEvent.screenX = GetFloatProperty(vm, changedObj, "displayX");
+            touchEvent.screenY = GetFloatProperty(vm, changedObj, "displayY");
+            touchEvent.originalId = touchEvent.id;
+        }
+    }
+}
+
+void InitAxisEventFromObj(EcmaVM* vm, const Local<panda::ObjectRef>& eventObj, AxisEvent& axisEvent)
+{
+    InitBaseEventFields(vm, eventObj, axisEvent.sourceType, axisEvent.sourceTool, axisEvent.time,
+        axisEvent.deviceId, axisEvent.targetDisplayId);
+    auto actionVal = eventObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "action"));
+    if (actionVal->IsNumber()) {
+        axisEvent.action = static_cast<AxisAction>(static_cast<int32_t>(actionVal->ToNumber(vm)->Value()));
+    }
+    axisEvent.x = GetFloatProperty(vm, eventObj, "windowX");
+    axisEvent.y = GetFloatProperty(vm, eventObj, "windowY");
+    axisEvent.screenX = GetFloatProperty(vm, eventObj, "displayX");
+    axisEvent.screenY = GetFloatProperty(vm, eventObj, "displayY");
+    axisEvent.globalDisplayX = GetDoubleProperty(vm, eventObj, "globalDisplayX");
+    axisEvent.globalDisplayY = GetDoubleProperty(vm, eventObj, "globalDisplayY");
+    axisEvent.eventHandleId = GetIntProperty(vm, eventObj, "eventHandleId");
+    auto scrollStepVal = eventObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "scrollStep"));
+    if (scrollStepVal->IsNumber()) {
+        axisEvent.scrollStep = static_cast<int32_t>(scrollStepVal->ToNumber(vm)->Value());
+    }
+    axisEvent.horizontalAxis = GetDoubleProperty(vm, eventObj, "axisHorizontal");
+    axisEvent.verticalAxis = GetDoubleProperty(vm, eventObj, "axisVertical");
+    auto pinchVal = eventObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "axisPinch"));
+    if (pinchVal->IsNumber()) {
+        axisEvent.pinchAxisScale = static_cast<float>(pinchVal->ToNumber(vm)->Value());
+    }
+    auto rotateVal = eventObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "rotateAxisAngle"));
+    if (rotateVal->IsNumber()) {
+        axisEvent.rotateAxisAngle = static_cast<float>(rotateVal->ToNumber(vm)->Value());
+    }
+}
+
+void InitMouseEventFromObj(EcmaVM* vm, const Local<panda::ObjectRef>& eventObj, MouseEvent& mouseEvent)
+{
+    InitBaseEventFields(vm, eventObj, mouseEvent.sourceType, mouseEvent.sourceTool, mouseEvent.time,
+        mouseEvent.deviceId, mouseEvent.targetDisplayId);
+    auto buttonVal = eventObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "button"));
+    if (buttonVal->IsNumber()) {
+        mouseEvent.button = static_cast<MouseButton>(static_cast<int32_t>(buttonVal->ToNumber(vm)->Value()));
+    }
+    auto actionVal = eventObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "action"));
+    if (actionVal->IsNumber()) {
+        mouseEvent.action = static_cast<MouseAction>(static_cast<int32_t>(actionVal->ToNumber(vm)->Value()));
+    }
+    mouseEvent.x = GetFloatProperty(vm, eventObj, "windowX");
+    mouseEvent.y = GetFloatProperty(vm, eventObj, "windowY");
+    mouseEvent.screenX = GetFloatProperty(vm, eventObj, "displayX");
+    mouseEvent.screenY = GetFloatProperty(vm, eventObj, "displayY");
+    mouseEvent.globalDisplayX = GetDoubleProperty(vm, eventObj, "globalDisplayX");
+    mouseEvent.globalDisplayY = GetDoubleProperty(vm, eventObj, "globalDisplayY");
+    mouseEvent.eventHandleId = GetIntProperty(vm, eventObj, "eventHandleId");
+    mouseEvent.rawDeltaX = GetFloatProperty(vm, eventObj, "rawDeltaX");
+    mouseEvent.rawDeltaY = GetFloatProperty(vm, eventObj, "rawDeltaY");
+    auto pressedButtonsVal = eventObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "pressedButtons"));
+    if (pressedButtonsVal->IsArray(vm)) {
+        Local<panda::ArrayRef> pressedArray(pressedButtonsVal);
+        auto pressedLen = ArkTSUtils::GetArrayLength(vm, pressedArray);
+        for (size_t i = 0; i < pressedLen; ++i) {
+            auto item = panda::ArrayRef::GetValueAt(vm, pressedArray, i);
+            if (item->IsNumber()) {
+                mouseEvent.pressedButtonsArray.push_back(
+                    static_cast<MouseButton>(static_cast<int32_t>(item->ToNumber(vm)->Value())));
+            }
+        }
+    }
+}
+} // namespace
+
+ArkUINativeModuleValue FrameNodeBridge::DispatchInputEvent(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    auto* nativeNode = GetFrameNode(runtimeCallInfo);
+    CHECK_NULL_RETURN(nativeNode, panda::JSValueRef::Undefined(vm));
+    auto* frameNode = reinterpret_cast<NG::FrameNode*>(nativeNode);
+    CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
+
+    Local<JSValueRef> eventArg = runtimeCallInfo->GetCallArgRef(1);
+    if (!eventArg->IsObject(vm)) {
+        return panda::JSValueRef::Undefined(vm);
+    }
+    auto eventObj = eventArg->ToObject(vm);
+
+    int32_t competitionStrategy = ARKUI_COMPETITION_STRATEGY_DEFAULT;
+    Local<JSValueRef> strategyArg = runtimeCallInfo->GetCallArgRef(2); // 2: index of the competition strategy argument
+    if (strategyArg->IsNumber()) {
+        competitionStrategy = static_cast<int32_t>(strategyArg->ToNumber(vm)->Value());
+    }
+
+    auto pipelineContext = frameNode->GetContext();
+    CHECK_NULL_RETURN(pipelineContext, panda::JSValueRef::Undefined(vm));
+    auto postEventManager = pipelineContext->GetPostEventManager();
+    CHECK_NULL_RETURN(postEventManager, panda::JSValueRef::Undefined(vm));
+
+    auto node = AceType::Claim(frameNode);
+    bool result = false;
+    // ARKUI_COMPETITION_STRATEGY_COMPETITION routes the event to the competition gesture recognizer.
+    const bool useCompetition = competitionStrategy == ARKUI_COMPETITION_STRATEGY_COMPETITION;
+
+    auto touchesVal = eventObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "touches"));
+    if (touchesVal->IsArray(vm)) {
+        TouchEvent touchEvent;
+        InitTouchEventFromObj(vm, eventObj, touchEvent);
+        result = useCompetition ? postEventManager->PostTouchEventWithStrategy(node, std::move(touchEvent))
+                                : postEventManager->PostTouchEvent(node, std::move(touchEvent));
+    } else {
+        auto scrollStepVal = eventObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "scrollStep"));
+        if (scrollStepVal->IsNumber()) {
+            AxisEvent axisEvent;
+            InitAxisEventFromObj(vm, eventObj, axisEvent);
+            result = useCompetition ? postEventManager->PostAxisEventWithStrategy(node, std::move(axisEvent))
+                                    : postEventManager->PostAxisEvent(node, std::move(axisEvent));
+        } else {
+            MouseEvent mouseEvent;
+            InitMouseEventFromObj(vm, eventObj, mouseEvent);
+            result = useCompetition ? postEventManager->PostMouseEventWithStrategy(node, std::move(mouseEvent))
+                                    : postEventManager->PostMouseEvent(node, std::move(mouseEvent));
+        }
+    }
+
+    return panda::BooleanRef::New(vm, result);
+}
+
+ArkUINativeModuleValue FrameNodeBridge::DispatchKeyEvent(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    auto* nativeNode = GetFrameNode(runtimeCallInfo);
+    CHECK_NULL_RETURN(nativeNode, panda::JSValueRef::Undefined(vm));
+    auto* frameNode = reinterpret_cast<NG::FrameNode*>(nativeNode);
+    CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
+
+    Local<JSValueRef> eventArg = runtimeCallInfo->GetCallArgRef(1);
+    if (!eventArg->IsObject(vm)) {
+        return panda::JSValueRef::Undefined(vm);
+    }
+    auto eventObj = eventArg->ToObject(vm);
+
+    KeyEvent keyEvent;
+    keyEvent.code = static_cast<KeyCode>(GetIntProperty(vm, eventObj, "keyCode"));
+    auto keyTextVal = eventObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "keyText"));
+    if (keyTextVal->IsString(vm)) {
+        keyEvent.key = keyTextVal->ToString(vm)->ToString(vm);
+    }
+    keyEvent.action = static_cast<KeyAction>(GetIntProperty(vm, eventObj, "type"));
+    keyEvent.sourceType = static_cast<SourceType>(GetIntProperty(vm, eventObj, "keySource"));
+    keyEvent.deviceId = GetIntProperty(vm, eventObj, "deviceId");
+    keyEvent.unicode = static_cast<uint32_t>(GetIntProperty(vm, eventObj, "unicode"));
+    keyEvent.metaKey = GetIntProperty(vm, eventObj, "metaKey");
+    keyEvent.keyIntention = static_cast<KeyIntention>(GetIntProperty(vm, eventObj, "intentionCode"));
+    keyEvent.numLock = GetBoolProperty(vm, eventObj, "isNumLockOn");
+    keyEvent.enableCapsLock = GetBoolProperty(vm, eventObj, "isCapsLockOn");
+    keyEvent.scrollLock = GetBoolProperty(vm, eventObj, "isScrollLockOn");
+    keyEvent.SetTimeStamp(GetIntProperty(vm, eventObj, "timestamp"));
+
+    auto pipelineContext = frameNode->GetContext();
+    CHECK_NULL_RETURN(pipelineContext, panda::JSValueRef::Undefined(vm));
+
+    auto focusHub = frameNode->GetOrCreateFocusHub();
+    CHECK_NULL_RETURN(focusHub, panda::BooleanRef::New(vm, false));
+    if (!focusHub->IsCurrentFocus()) {
+        return panda::BooleanRef::New(vm, false);
+    }
+
+    return panda::BooleanRef::New(vm, focusHub->HandleEvent(keyEvent));
 }
 } // namespace OHOS::Ace::NG

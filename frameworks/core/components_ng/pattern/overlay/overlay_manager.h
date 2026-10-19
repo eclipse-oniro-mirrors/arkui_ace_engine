@@ -182,6 +182,10 @@ public:
 
     PopupInfo GetPopupInfo(int32_t targetId) const;
 
+    // Read pattern state without exposing concrete Menu/Bubble pattern headers to callers.
+    static bool GetMenuWrapperState(const RefPtr<FrameNode>& node, int32_t& targetId, bool& isShown);
+    static bool GetPopupTargetId(const RefPtr<FrameNode>& node, int32_t& targetId);
+
     bool HasPopupInfo(int32_t targetId) const;
 
     void ErasePopupInfo(int32_t targetId);

@@ -165,6 +165,7 @@ public:
     void OnResetTextSelection() override {}
     void AfterCloseOverlay() override;
     bool AllowTranslate() override { return true; }
+    std::optional<Color> GetHandleColor() override;
     // override BaseTextSelectOverlay end
 
     // override SelectOverlayHolder

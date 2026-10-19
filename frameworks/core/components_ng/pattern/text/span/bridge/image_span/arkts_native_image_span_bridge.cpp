@@ -671,8 +671,8 @@ ArkUINativeModuleValue ImageSpanBridge::ResetResizableSlice(ArkUIRuntimeCallInfo
     EcmaVM* vm = runtimeCallInfo->GetVM();
     CHECK_NULL_RETURN(vm, panda::NativePointerRef::New(vm, nullptr));
     Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(0);
-    CHECK_NULL_RETURN(firstArg->IsNativePointer(vm), panda::JSValueRef::Undefined(vm));
-    auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
+    ArkUINodeHandle nativeNode = nullptr;
+    CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
     GetArkUINodeModifiers()->getImageSpanModifier()->resetImageSpanResizableSlice(nativeNode);
     return panda::JSValueRef::Undefined(vm);
 }
@@ -683,8 +683,8 @@ ArkUINativeModuleValue ImageSpanBridge::SetResizableLattice(ArkUIRuntimeCallInfo
     CHECK_NULL_RETURN(vm, panda::NativePointerRef::New(vm, nullptr));
 #ifndef CROSS_PLATFORM
     Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(0);
-    CHECK_NULL_RETURN(firstArg->IsNativePointer(vm), panda::JSValueRef::Undefined(vm));
-    auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
+    ArkUINodeHandle nativeNode = nullptr;
+    CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
     Local<JSValueRef> latticeArg = runtimeCallInfo->GetCallArgRef(NUM_1);
     if (latticeArg->IsUndefined() || latticeArg->IsNull() || !latticeArg->IsObject(vm)) {
         GetArkUINodeModifiers()->getImageSpanModifier()->resetImageSpanResizableLattice(nativeNode);
@@ -709,8 +709,8 @@ ArkUINativeModuleValue ImageSpanBridge::ResetResizableLattice(ArkUIRuntimeCallIn
     EcmaVM* vm = runtimeCallInfo->GetVM();
     CHECK_NULL_RETURN(vm, panda::NativePointerRef::New(vm, nullptr));
     Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(0);
-    CHECK_NULL_RETURN(firstArg->IsNativePointer(vm), panda::JSValueRef::Undefined(vm));
-    auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
+    ArkUINodeHandle nativeNode = nullptr;
+    CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
     GetArkUINodeModifiers()->getImageSpanModifier()->resetImageSpanResizableLattice(nativeNode);
     return panda::JSValueRef::Undefined(vm);
 }

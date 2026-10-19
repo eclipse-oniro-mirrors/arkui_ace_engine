@@ -161,6 +161,9 @@ void RenderWeb::Update(const RefPtr<Component>& component)
         if (web->GetBackgroundColorEnabled()) {
             delegate_->UpdateBackgroundColor(web->GetBackgroundColor());
         }
+        if (web->HasCaretColor()) {
+            delegate_->UpdateCaretColor(web->GetCaretColor());
+        }
         if (web->GetIsInitialScaleSet()) {
             delegate_->UpdateInitialScale(web->GetInitialScale());
         }

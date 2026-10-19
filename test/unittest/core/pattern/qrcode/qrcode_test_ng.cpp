@@ -163,6 +163,10 @@ HWTEST_F(QRCodeTestNg, QRCodePaintPropertyTest002, TestSize.Level0)
  */
 HWTEST_F(QRCodeTestNg, QRCodePatternTest002, TestSize.Level0)
 {
+    /**
+     * @tc.steps: step1. create qrcode, set color and background color, then get frameNode.
+     * @tc.expected: step1. frameNode is not null.
+     */
     QRCodeModelNG qrCodeModelNG;
     qrCodeModelNG.Create(CREATE_VALUE);
     qrCodeModelNG.SetQRCodeColor(QR_CODE_COLOR_VALUE);
@@ -170,6 +174,11 @@ HWTEST_F(QRCodeTestNg, QRCodePatternTest002, TestSize.Level0)
     auto frameNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
     EXPECT_FALSE(frameNode == nullptr);
 
+    /**
+     * @tc.steps: step2. get qrcodePattern and create its paintProperty/layoutAlgorithm/paintMethod.
+     * @tc.expected: step2. qrcodePattern, paintProperty, layoutAlgorithm, paintMethod and
+     *               qrcodePaintProperty are all not null.
+     */
     auto qrcodePattern = frameNode->GetPattern<QRCodePattern>();
     EXPECT_FALSE(qrcodePattern == nullptr);
     auto paintProperty = qrcodePattern->CreatePaintProperty();
@@ -181,6 +190,10 @@ HWTEST_F(QRCodeTestNg, QRCodePatternTest002, TestSize.Level0)
     auto qrcodePaintProperty = frameNode->GetPaintProperty<QRCodePaintProperty>();
     EXPECT_FALSE(qrcodePaintProperty == nullptr);
 
+    /**
+     * @tc.steps: step3. build layoutWrapper with layoutAlgorithm, then get qrcodeLayoutAlgorithm.
+     * @tc.expected: step3. layoutAlgorithmWrapper and qrcodeLayoutAlgorithm are not null.
+     */
     RefPtr<GeometryNode> geometryNode = AceType::MakeRefPtr<GeometryNode>();
     EXPECT_FALSE(geometryNode == nullptr);
     RefPtr<LayoutWrapperNode> layoutWrapper =

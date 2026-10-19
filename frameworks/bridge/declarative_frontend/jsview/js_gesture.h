@@ -23,7 +23,7 @@
 #include "frameworks/bridge/declarative_frontend/jsview/js_view_abstract.h"
 
 namespace OHOS::Ace::Framework {
-class JSGesture : public virtual AceType {
+class JSGesture : public AceType {
     DECLARE_ACE_TYPE(JSGesture, AceType);
 
 public:

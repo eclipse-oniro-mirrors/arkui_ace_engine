@@ -5535,6 +5535,9 @@ struct ArkUIScrollableModifier {
     ArkUI_Float32 (*getContentEndOffset)(ArkUINodeHandle node);
     void (*createWithResourceObjContentStartOffset)(ArkUINodeHandle node, void* resObj);
     void (*createWithResourceObjContentEndOffset)(ArkUINodeHandle node, void* resObj);
+    void (*setEnableScrollWithKeyboard)(ArkUINodeHandle node, ArkUI_Bool value);
+    void (*resetEnableScrollWithKeyboard)(ArkUINodeHandle node);
+    ArkUI_Int32 (*getEnableScrollWithKeyboard)(ArkUINodeHandle node);
 };
 
 struct ArkUIScrollModifier {
@@ -7259,6 +7262,8 @@ struct ArkUIWebModifier {
     void (*resetEnableFullscreenVideoOverlay)(ArkUINodeHandle node);
     void (*setOnZoomChangeCallBack)(ArkUINodeHandle node, void* callback);
     void (*resetOnZoomChangeCallBack)(ArkUINodeHandle node);
+    void (*setCaretColor)(ArkUINodeHandle node, ArkUI_Uint32 color, void* colorRawPtr);
+    void (*resetCaretColor)(ArkUINodeHandle node);
 };
 
 struct ArkUIBlankModifier {
@@ -9514,6 +9519,14 @@ struct ArkUIRichEditorModifier {
     void (*setRichEditorInputFilter)(ArkUINodeHandle node, ArkUI_CharPtr value);
     ArkUI_CharPtr (*getRichEditorInputFilter)(ArkUINodeHandle node);
     void (*resetRichEditorInputFilter)(ArkUINodeHandle node);
+    void (*setRichEditorInputType)(ArkUINodeHandle node, ArkUI_Int32 value);
+    void (*resetRichEditorInputType)(ArkUINodeHandle node);
+    ArkUI_Int32 (*getRichEditorInputType)(ArkUINodeHandle node);
+    void (*setRichEditorShowPasswordIcon)(ArkUINodeHandle node, ArkUI_Uint32 showPasswordIcon);
+    void (*resetRichEditorShowPasswordIcon)(ArkUINodeHandle node);
+    ArkUI_Bool (*getRichEditorShowPasswordIcon)(ArkUINodeHandle node);
+    void (*setRichEditorPasswordIcon)(ArkUINodeHandle node, const struct ArkUIPasswordIconType* passwordIcon);
+    void (*resetRichEditorPasswordIcon)(ArkUINodeHandle node);
     void (*setRichEditorCaretStyle)(ArkUINodeHandle node, ArkUI_Float32 value, ArkUI_Int32 unit);
     ArkUI_Float32 (*getRichEditorCaretStyle)(ArkUINodeHandle node, ArkUI_Int32 unit);
     void (*resetRichEditorCaretStyle)(ArkUINodeHandle node);
@@ -10917,6 +10930,10 @@ typedef struct {
         ArkUISnapshotOptions* snapshotOptions, ArkUI_Int32 dynamicRangeMode, bool isAuto);
     ArkUI_Int32 (*getSyncSnapshot)(ArkUINodeHandle node, ArkUISnapshotOptions* snapshotOptions, void* mediaPixel);
     ArkUI_Int32 (*getSizeLimitation)(ArkUI_Int32* maxWidth, ArkUI_Int32* maxHeight);
+    // Collection tasks always run on the Context UI thread, including invalidation callbacks.
+    ArkUI_Int32 (*postImageCollectionTask)(ArkUI_Int32 contextId, void* data,
+        void (*task)(void* data, ArkUI_Int32 error));
+    ArkUI_Int32 (*getImageByNodeId)(ArkUI_Int32 nodeId, void* mediaPixel);
 } ArkUISnapshotAPI;
 
 typedef struct {

@@ -16,6 +16,7 @@
 #include "test/unittest/core/base/view_abstract_test_ng.h"
 
 #include "base/subwindow/subwindow_manager.h"
+#include "core/components_ng/event/event_hub_callback_sets.h"
 #include "core/components_ng/event/focus_hub.h"
 #include "core/event/key_event.h"
 #include "test/mock/adapter/ohos/osal/mock_system_properties.h"
@@ -215,7 +216,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractDisableOnAppearByFrameNodeTest, TestSiz
     std::function<void()> onAppearCallback = []() {};
     ViewAbstract::SetOnAppear(AceType::RawPtr(node), std::move(onAppearCallback));
     auto eventHub = node->GetEventHub<EventHub>();
-    auto& callback = eventHub->onAppear_;
+    auto& callback = eventHub->GetOrCreateAppearCallbackSet()->onAppear;
     EXPECT_NE(callback, nullptr);
 
     /**
@@ -249,7 +250,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractDisableOnDisAppearByFrameNodeTest, Test
     std::function<void()> onDiaAppearCallback = []() {};
     ViewAbstract::SetOnDisappear(AceType::RawPtr(node), std::move(onDiaAppearCallback));
     auto eventHub = node->GetEventHub<EventHub>();
-    auto& callback = eventHub->onDisappear_;
+    auto& callback = eventHub->GetOrCreateAppearCallbackSet()->onDisappear;
     EXPECT_NE(callback, nullptr);
 
     /**
@@ -285,7 +286,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractDisableOnAreaChangeByFrameNodeTest, Tes
             [](const RectF& oldRect, const OffsetF& oldOrigin, const RectF& rect, const OffsetF& origin) {};
     ViewAbstract::SetOnAreaChanged(AceType::RawPtr(node), std::move(onAreaChangeCallback));
     auto eventHub = node->GetEventHub<EventHub>();
-    auto& callback = eventHub->onAreaChanged_;
+    auto& callback = eventHub->GetOrCreateAreaCallbackSet()->onAreaChanged;
     EXPECT_NE(callback, nullptr);
 
     /**
@@ -381,7 +382,7 @@ HWTEST_F(ViewAbstractTestNg, ViewAbstractSetOnSizeChangeByFrameNodeTest, TestSiz
                                                                                             const RectF& rect) {};
     ViewAbstract::SetOnSizeChanged(AceType::RawPtr(node), std::move(onSizeChangeCallback));
     auto eventHub = node->GetEventHub<EventHub>();
-    auto& callback = eventHub->onSizeChanged_;
+    auto& callback = eventHub->GetOrCreateSizeCallbackSet()->onSizeChanged;
     EXPECT_NE(callback, nullptr);
 }
 

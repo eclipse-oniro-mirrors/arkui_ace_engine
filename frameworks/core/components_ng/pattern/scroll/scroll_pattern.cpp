@@ -120,6 +120,7 @@ void ScrollPattern::OnModifyDone()
         SetScrollBar(paintProperty->GetScrollBarProperty());
     }
     SetAccessibilityAction();
+    InitOnKeyEvent();
     if (scrollSnapUpdate_) {
         host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
     }
@@ -2099,4 +2100,45 @@ RefPtr<ScrollableController> ScrollPattern::GetScrollPositionController() const
 {
     return positionController_;
 }
+
+bool ScrollPattern::ScrollByArrowKey(KeyCode code, float delta)
+{
+    if (GetAxis() != Axis::FREE) {
+        return ScrollablePattern::ScrollByArrowKey(code, delta);
+    }
+    float xDelta = 0.0f;
+    float yDelta = 0.0f;
+    if (code == KeyCode::KEY_DPAD_UP) {
+        yDelta = delta;
+    } else if (code == KeyCode::KEY_DPAD_DOWN) {
+        yDelta = -delta;
+    } else if (code == KeyCode::KEY_DPAD_LEFT) {
+        xDelta = delta;
+    } else if (code == KeyCode::KEY_DPAD_RIGHT) {
+        xDelta = -delta;
+    }
+    CHECK_NULL_RETURN(freeScroll_, false);
+    freeScroll_->ScrollWithAnimation2D(OffsetF(xDelta, yDelta));
+    return true;
+}
+
+void ScrollPattern::InitOnKeyEvent()
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto focusHub = host->GetOrCreateFocusHub();
+    CHECK_NULL_VOID(focusHub);
+    auto onKeyEvent = [wp = WeakClaim(this)](const KeyEvent& event) -> bool {
+        auto pattern = wp.Upgrade();
+        CHECK_NULL_RETURN(pattern, false);
+        return pattern->OnKeyEvent(event);
+    };
+    focusHub->SetOnKeyEventInternal(std::move(onKeyEvent));
+}
+
+bool ScrollPattern::OnKeyEvent(const KeyEvent& event)
+{
+    return HandleArrowKeyScroll(event);
+}
+
 } // namespace OHOS::Ace::NG

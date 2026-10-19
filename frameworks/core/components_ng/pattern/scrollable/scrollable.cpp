@@ -878,9 +878,7 @@ void Scrollable::ProcessAxisUpdateEvent(float mainDelta, bool fromScrollBar)
         return;
     }
     lastAxisVsyncTime_ = currentVsyncTime;
-    if (!axisAnimator_) {
-        InitAxisAnimator();
-    }
+    InitAxisAnimator();
     ACE_SCOPED_TRACE(
         "ProcessAxisUpdateEvent onAxis, IsAxisAnimationRunning:%u, mainDelta:%f, currentPos_:%f, id:%d, tag:%s",
         IsAxisAnimationRunning(), mainDelta, currentPos_, nodeId_, nodeTag_.c_str());
@@ -1049,6 +1047,44 @@ void Scrollable::FinishDragEnd(const GestureEvent& info)
     }
     SetDragStartPosition(0.0);
     SetDragEndPosition(0.0);
+}
+
+void Scrollable::ProcessAxisScroll(float mainDelta)
+{
+    TAG_LOGD(AceLogTag::ACE_SCROLLABLE,
+        "ProcessAxisScroll mainDelta:%{public}f, state:%{public}d, canStay:%{public}d, axisAnim:%{public}d, "
+        "snapAnim:%{public}d, snapType:%{public}d, id:%{public}d",
+        mainDelta, static_cast<int32_t>(state_), CanStayOverScroll(), IsAxisAnimationRunning(),
+        IsSnapAnimationRunning(), static_cast<int32_t>(GetSnapType()), nodeId_);
+    if (!CanStayOverScroll()) {
+        if (!IsAxisAnimationRunning() && !IsSnapAnimationRunning()) {
+            axisSnapDistance_ = currentPos_;
+            snapDirection_ = SnapDirection::NONE;
+        }
+    } else if (IsAxisAnimationRunning()) {
+        StopAxisAnimation();
+    }
+    if (state_ != AnimationState::IDLE) {
+        isDragUpdateStop_ = true;
+        StopFrictionAnimation();
+        StopSpringAnimation();
+        if (GetSnapType() == SnapType::NONE_SNAP) {
+            StopSnapAnimation();
+            currentPos_ = 0.0;
+        }
+    }
+    lastMainDelta_ = mainDelta;
+    mainDelta = lastMainDelta_ + prevRemainDelta_;
+    auto prevMainDelta = isReverseCallback_ && isReverseCallback_() ? -mainDelta : mainDelta;
+    mainDelta = Round(prevMainDelta);
+    prevRemainDelta_ = prevMainDelta - mainDelta;
+
+    if (CanStayOverScroll()) {
+        HandleOverScroll(0);
+        SetCanStayOverScroll(false);
+    } else {
+        ProcessAxisUpdateEvent(mainDelta);
+    }
 }
 
 void Scrollable::ProcessAxisEndEvent()
@@ -1409,15 +1445,14 @@ void Scrollable::StartListSnapAnimation(float predictSnapOffset, float scrollSna
     CHECK_NULL_VOID(context);
     lastVsyncTime_ = context->GetVsyncTime();
     MarkNeedFlushAnimationStartTime();
+    context->RequestFrame();
 }
 
 void Scrollable::StartScrollSnapAnimation(
     float scrollSnapDelta, float scrollSnapVelocity, bool fromScrollBar, int32_t source, bool useSlowSpring)
 {
-    TAG_LOGD(AceLogTag::ACE_SCROLLABLE,
-        "The snap delta of scroll motion is %{public}f, "
-        "The snap velocity of scroll motion is %{public}f",
-        scrollSnapDelta, scrollSnapVelocity);
+    TAG_LOGD(AceLogTag::ACE_SCROLLABLE, "The snap delta of scroll motion is %{public}f, "
+        "The snap velocity of scroll motion is %{public}f", scrollSnapDelta, scrollSnapVelocity);
     if (NearZero(scrollSnapDelta)) {
         return;
     }
@@ -1457,6 +1492,8 @@ void Scrollable::StartScrollSnapAnimation(
     auto context = context_.Upgrade();
     CHECK_NULL_VOID(context);
     lastVsyncTime_ = context->GetVsyncTime();
+    MarkNeedFlushAnimationStartTime();
+    context->RequestFrame();
 }
 
 void Scrollable::UpdateScrollSnapStartOffset(double offset)

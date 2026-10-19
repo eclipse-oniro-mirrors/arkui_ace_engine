@@ -1976,7 +1976,7 @@ HWTEST_F(RichEditorBaseTestNg, ResetKeyboardIfNeed001, TestSize.Level0)
     /**
      * @tc.steps: step2. Call ResetKeyboardIfNeed
      */
-    richEditorPattern->ResetKeyboardIfNeed();
+    richEditorPattern->CheckIfNeedToResetKeyboard();
     EXPECT_TRUE(richEditorPattern->isEditing_);
 }
 

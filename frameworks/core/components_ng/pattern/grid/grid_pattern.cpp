@@ -1098,11 +1098,12 @@ bool GridPattern::OnKeyEvent(const KeyEvent& event)
         ScrollPage(event.code == KeyCode::KEY_PAGE_UP);
     }
 
-    if (FocusHub::IsFocusStepKey(event.code)) {
-        if (focusHandler_.ScrollToLastFocusIndex(event.code)) {
-            keyEvent_ = event;
-            return true;
-        }
+    if (FocusHub::IsFocusStepKey(event.code) && focusHandler_.ScrollToLastFocusIndex(event.code)) {
+        keyEvent_ = event;
+        return true;
+    }
+    if (HandleArrowKeyScroll(event)) {
+        return true;
     }
     return false;
 }

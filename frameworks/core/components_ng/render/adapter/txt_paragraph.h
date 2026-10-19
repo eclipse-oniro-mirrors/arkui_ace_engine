@@ -17,6 +17,9 @@
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_RENDER_ADAPTER_TXT_PARAGRAPH_H
 
 #include "core/components_ng/render/drawing.h"
+#ifndef ACE_UNITTEST
+#include "rosen_text/ref_count_holder.h"
+#endif
 
 #include "base/utils/noncopyable.h"
 #include "core/components/common/properties/text_layout_info.h"
@@ -37,7 +40,12 @@ public:
     TxtParagraph(void* paragraph)
     {
         hasExternalParagraph_ = true;
+#ifndef ACE_UNITTEST
+        auto* holder = reinterpret_cast<Rosen::RefCountedHolder<RSParagraph>*>(paragraph);
+        externalParagraph_ = Rosen::RefCountedPtr<RSParagraph>(holder);
+#else
         externalParagraph_ = reinterpret_cast<RSParagraph*>(paragraph);
+#endif
     }
 
     void SetParagraphSymbolAnimation(const RefPtr<FrameNode>& frameNode) override;
@@ -133,6 +141,14 @@ public:
         std::vector<RectF>& selectedRects, std::vector<TextDirection>& textDirections) override;
     std::shared_ptr<RSParagraph> GetSharedParagraph()
     {
+        if (hasExternalParagraph_) {
+#ifndef ACE_UNITTEST
+            RSParagraph* ptr = externalParagraph_.Get();
+#else
+            RSParagraph* ptr = externalParagraph_;
+#endif
+            return std::shared_ptr<RSParagraph>(ptr, [](RSParagraph*) {});
+        }
         std::shared_ptr<RSParagraph> paragraphSharedPtr(paragraph_.get(), [](RSParagraph *) {});
         return paragraphSharedPtr;
     }
@@ -156,7 +172,11 @@ protected:
     RSParagraph* GetParagraph();
     Rosen::RSSymbolAnimation rsSymbolAnimation_;
     std::unique_ptr<RSParagraph> paragraph_;
+#ifndef ACE_UNITTEST
+    Rosen::RefCountedPtr<RSParagraph> externalParagraph_;
+#else
     RSParagraph* externalParagraph_ = nullptr;
+#endif
     std::unique_ptr<RSParagraphBuilder> builder_;
     std::shared_ptr<RSFontCollection> fontCollection_;
 

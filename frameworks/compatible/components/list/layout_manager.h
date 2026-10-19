@@ -41,7 +41,7 @@ const double INFINITE_POSITION = 0.0;
 // This map will adapter the Grid FlexDirection with Key Direction.
 extern const std::map<bool, std::map<FlexDirection, std::map<bool, std::map<bool, KeyDirection>>>> DIRECTION_MAP;
 
-class LayoutManager : public virtual AceType {
+class LayoutManager : public AceType {
     DECLARE_ACE_TYPE(LayoutManager, AceType);
 
 public:

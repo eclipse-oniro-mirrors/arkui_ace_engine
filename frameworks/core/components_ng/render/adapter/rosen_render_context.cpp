@@ -5309,6 +5309,13 @@ std::vector<std::shared_ptr<Rosen::RSNode>> RosenRenderContext::BuildMixedTarget
         }
     }
     CHECK_NULL_RETURN(frameNode, targetRSNodes);
+    auto safeAreaInsetNode = frameNode->GetSafeAreaInsetNode();
+    if (safeAreaInsetNode) {
+        auto property = safeAreaInsetNode->GetLayoutProperty();
+        if (property && property->GetVisibilityValue(VisibleType::VISIBLE) == VisibleType::VISIBLE) {
+            addRSNodeIfAbsent(targetRSNodes, targetNodeMap, GetRsNodeByFrame(safeAreaInsetNode));
+        }
+    }
     auto overlayNode = frameNode->GetOverlayNode();
     if (overlayNode) {
         auto property = overlayNode->GetLayoutProperty();
@@ -5433,6 +5440,21 @@ void RosenRenderContext::GetLiveChildren(const RefPtr<FrameNode>& node, std::vec
         } else {
             child->SetDeleteRsNode(true);
             GetLiveChildren(child, childNodes);
+        }
+    }
+    auto safeAreaInsetNode = node->GetSafeAreaInsetNode();
+    if (safeAreaInsetNode) {
+        auto property = safeAreaInsetNode->GetLayoutProperty();
+        if (property && property->GetVisibilityValue(VisibleType::VISIBLE) == VisibleType::VISIBLE) {
+            if (!CanNodeBeDeleted(safeAreaInsetNode)) {
+                childNodes.emplace_back(safeAreaInsetNode);
+                if (pipeline && safeAreaInsetNode->HasPositionZ()) {
+                    pipeline->AddPositionZNode(safeAreaInsetNode->GetId());
+                }
+            } else {
+                safeAreaInsetNode->SetDeleteRsNode(true);
+                GetLiveChildren(safeAreaInsetNode, childNodes);
+            }
         }
     }
     auto accessibilityFocusPaintNode = node->GetFocusPaintNode();

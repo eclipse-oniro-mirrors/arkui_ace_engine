@@ -1652,14 +1652,12 @@ bool ListPattern::OnKeyEvent(const KeyEvent& event)
         ScrollPage(true);
         return true;
     }
-    if (FocusHub::IsFocusStepKey(event.code)) {
-        return ScrollToLastFocusIndex(event);
+    if (FocusHub::IsFocusStepKey(event.code) && ScrollToLastFocusIndex(event)) {
+        return true;
     }
-    return HandleDirectionKey(event);
-}
-
-bool ListPattern::HandleDirectionKey(const KeyEvent& event)
-{
+    if (HandleArrowKeyScroll(event)) {
+        return true;
+    }
     return false;
 }
 

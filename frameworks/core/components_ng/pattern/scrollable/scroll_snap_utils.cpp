@@ -182,10 +182,26 @@ SnapSelectResult ScrollSnapUtils::SelectSnapTarget(const std::vector<SnapCandida
     // zero-velocity behavior (direction from predictDelta, threshold selection) instead of
     // landing in a random comparison branch (NaN compares false everywhere).
     const bool velocityValid = std::isfinite(velocity) && !NearZero(velocity);
-    bool forward = velocityValid ? velocity > 0.0f : predictDelta >= 0.0f;
+    const bool deltaValid = std::isfinite(predictDelta) && !NearZero(predictDelta);
+    if (!velocityValid && !deltaValid) {
+        // With no effective direction, the threshold's current/neighbor ordering is
+        // undefined. Select the nearest anchor, breaking equal distances by item index.
+        auto best = candidates.begin();
+        float bestDistance = std::abs(best->offset - currentOffset);
+        for (auto candidate = best + 1; candidate != candidates.end(); ++candidate) {
+            const float distance = std::abs(candidate->offset - currentOffset);
+            const bool equal = NearEqual(distance, bestDistance, SNAP_OFFSET_EPSILON);
+            if ((!equal && distance < bestDistance) || (equal && candidate->index < best->index)) {
+                best = candidate;
+                bestDistance = distance;
+            }
+        }
+        return MakeResult(*best);
+    }
+    bool forward = velocityValid ? velocity > 0.0f : predictDelta > 0.0f;
     float safeScale = (std::isfinite(velocityScale) && GreatNotEqual(velocityScale, 0.0f)) ? velocityScale : 1.0f;
     float speedThreshold = SNAP_VELOCITY_THRESHOLD * safeScale;
-    if (velocityValid && std::abs(velocity) >= speedThreshold && !NearZero(predictDelta)) {
+    if (velocityValid && std::abs(velocity) >= speedThreshold && deltaValid) {
         float predictedOffset = currentOffset + predictDelta;
         return SelectByPredictedLanding(candidates, currentOffset, predictedOffset, forward, threshold);
     }

@@ -76,7 +76,7 @@ struct ImageLoadResultInfo {
 class ImageObject;
 
 // load & decode images
-class ImageProvider : public virtual AceType {
+class ImageProvider : public AceType {
     DECLARE_ACE_TYPE(ImageProvider, AceType);
 
 public:

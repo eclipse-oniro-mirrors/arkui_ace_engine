@@ -536,6 +536,8 @@ RefPtr<LayoutWrapper> FrameNode::GetOrCreateChildByIndex(uint32_t, bool, bool)
 }
 void FrameNode::Measure(const std::optional<LayoutConstraintF>&) {}
 void FrameNode::Layout() {}
+void FrameNode::MeasureSafeAreaInset() {}
+void FrameNode::LayoutSafeAreaInset() {}
 bool FrameNode::SkipMeasureContent() const
 {
     return false;

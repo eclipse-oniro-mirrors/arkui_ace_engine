@@ -21,7 +21,7 @@
 
 namespace OHOS::Ace {
 
-class FlutterRenderFactory final : public virtual RenderFactory {
+class FlutterRenderFactory final : public RenderFactory {
     DECLARE_ACE_TYPE(FlutterRenderFactory, RenderFactory);
 
 public:

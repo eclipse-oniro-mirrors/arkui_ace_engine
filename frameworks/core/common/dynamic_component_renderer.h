@@ -44,7 +44,7 @@ struct IsolatedInfo {
     std::vector<std::string> registerComponents;
 };
 
-class DynamicComponentRenderer : public virtual AceType {
+class DynamicComponentRenderer : public AceType {
     DECLARE_ACE_TYPE(DynamicComponentRenderer, AceType);
 
 public:

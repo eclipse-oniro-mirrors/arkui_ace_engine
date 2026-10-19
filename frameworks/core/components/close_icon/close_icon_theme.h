@@ -28,7 +28,7 @@ constexpr Dimension PANEL_CLOSE_ICON_MARGIN_TOP = 20.0_vp;
 constexpr Dimension PANEL_CLOSE_ICON_MARGIN_RIGHT = 24.0_vp;
 constexpr Dimension PANEL_CLOSE_ICON_RADIUS = 12.0_vp;
 } // namespace
-class CloseIconTheme : public virtual Theme {
+class CloseIconTheme : public Theme {
     DECLARE_ACE_TYPE(CloseIconTheme, Theme);
 
 public:

@@ -58,7 +58,7 @@ struct TouchPointInfo {
     }
 };
 
-struct OverlayInfo : public virtual AceType {
+struct OverlayInfo : public AceType {
     DECLARE_ACE_TYPE(OverlayInfo, AceType);
 
 public:

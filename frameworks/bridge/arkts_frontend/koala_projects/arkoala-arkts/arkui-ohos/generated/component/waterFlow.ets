@@ -20,6 +20,8 @@ import { ArkThemeScopeManager } from '#arktheme'
 import { SerializerBase, DeserializerBase, nullptr, KPointer, KInt, KBoolean, KStringPtr, RuntimeType, MaterializedBase, toPeerPtr, NativeBuffer, CallbackResource, InteropNativeModule, Tags, KSerializerBuffer, KUint8ArrayPtr, resourceFinalizerRegister, Finalizable, MaterializedBaseTag } from '@koalaui/interop'
 import { ItemFillPolicy_serializer, ConstraintSizeOptions_serializer, ItemFillPolicy, ConstraintSizeOptions, Length, Resource as arkui_component_units_Resource, Dimension, Margin, Padding } from './units'
 import { global_resource_Resource_serializer } from './../framework/resource'
+import { ScrollSnapOffsetProviderProxy, ScrollSnapOffsetProviderProxy_serializer } from './scrollCommon'
+import { extractors, ScrollSnapOffsetProvider, AttributeModifier, hookWaterFlowOptionsImpl, initializers, WaterFlowSections, hookWaterFlowAttributeModifier, AttributeUpdater } from '#handwritten'
 import { int32, int64, float32, unsafeCast } from '@koalaui/common'
 import { ComponentBase } from './../ComponentBase'
 import { PeerNode } from './../PeerNode'
@@ -27,12 +29,9 @@ import { ArkUIGeneratedNativeModule } from '#components'
 import { ArkScrollableCommonMethodPeer, ScrollableCommonMethod, OnWillScrollCallback, OnScrollCallback, CommonMethod, ArkScrollableCommonMethodComponent, ArkCommonMethodComponent, UIScrollableCommonEvent, UIScrollableCommonEventInternal } from './common'
 import { Resource as global_resource_Resource } from 'global.resource'
 import { FlexDirection, ScrollSource } from './enums'
+import { ScrollSnapAlign, ScrollState } from './list'
 import { OnScrollFrameBeginCallback, Scroller, Scroller_serializer } from './scroll'
-import { ScrollState } from './list'
 import { PlaceholderProvider } from '@ohos.arkui.placeholderRegister'
-// instructive change start
-import { AttributeModifier, initializers, extractors, WaterFlowSections, hookWaterFlowAttributeModifier, AttributeUpdater, hookWaterFlowOptionsImpl } from '#handwritten'
-// instructive change end
 import { CustomBuilder } from './builder'
 import { CallbackKind } from './../framework/peers/CallbackKind'
 import { CallbackTransformer } from './../CallbackTransformer'
@@ -171,6 +170,27 @@ export class ArkWaterFlowPeer extends ArkScrollableCommonMethodPeer {
             thisSerializer.writeInt8(RuntimeType.UNDEFINED)
         }
         ArkUIGeneratedNativeModule._WaterFlowAttribute_setLayoutDirection(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
+    setScrollSnapStrategyAttribute(value: ScrollSnapAlign | ScrollSnapOffsetProvider | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (value !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueTmpValue = value!
+            if (valueTmpValue instanceof ScrollSnapAlign) {
+                thisSerializer.writeInt8((0).toByte())
+                const valueTmpValueForIdx0 = valueTmpValue as ScrollSnapAlign
+                thisSerializer.writeInt32(valueTmpValueForIdx0.valueOf())
+            } else if (valueTmpValue instanceof ScrollSnapOffsetProvider) {
+                thisSerializer.writeInt8((1).toByte())
+                const valueTmpValueForIdx1 = valueTmpValue as ScrollSnapOffsetProvider
+                const valueTmpValueForIdx1Transformed: ScrollSnapOffsetProviderProxy = extractors.transform_Ark_ScrollSnapOffsetProvider_to_Ark_ScrollSnapOffsetProviderProxy(valueTmpValueForIdx1)
+                ScrollSnapOffsetProviderProxy_serializer.write(thisSerializer, valueTmpValueForIdx1Transformed)
+            }
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._WaterFlowAttribute_setScrollSnapStrategy(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
     setCachedCount0Attribute(value: int32 | undefined): void {
@@ -332,6 +352,9 @@ export interface WaterFlowAttribute extends ScrollableCommonMethod {
     layoutDirection(value: FlexDirection | undefined): this {
         throw new Error('Unimplemented method layoutDirection')
     }
+    scrollSnapStrategy(value: ScrollSnapAlign | ScrollSnapOffsetProvider | undefined): this {
+        throw new Error('Unimplemented method scrollSnapStrategy')
+    }
     cachedCount(value: int32 | undefined): this {
         throw new Error('Unimplemented method cachedCount')
     }
@@ -369,11 +392,7 @@ export class ArkWaterFlowComponent extends ArkScrollableCommonMethodComponent im
         return (this.peer as ArkWaterFlowPeer)
     }
     public setWaterFlowOptions(options?: WaterFlowOptions): this {
-        const options_casted = options as (WaterFlowOptions | undefined)
-        // instructive change start
-        hookWaterFlowOptionsImpl(this, options);
-        // instructive change end
-        this.applyOptionsFinish('WaterFlowAttribute');
+        hookWaterFlowOptionsImpl(this, options)
         return this
     }
     public columnsTemplate(value: string | ItemFillPolicy | undefined): this {
@@ -404,6 +423,11 @@ export class ArkWaterFlowComponent extends ArkScrollableCommonMethodComponent im
     public layoutDirection(value: FlexDirection | undefined): this {
         const value_casted = value as (FlexDirection | undefined)
         this.getPeer()?.setLayoutDirectionAttribute(value_casted)
+        return this
+    }
+    public scrollSnapStrategy(value: ScrollSnapAlign | ScrollSnapOffsetProvider | undefined): this {
+        const value_casted = value as (ScrollSnapAlign | ScrollSnapOffsetProvider | undefined)
+        this.getPeer()?.setScrollSnapStrategyAttribute(value_casted)
         return this
     }
     public cachedCount(value: int32 | undefined): this {

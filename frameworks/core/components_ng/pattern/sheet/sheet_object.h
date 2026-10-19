@@ -30,7 +30,7 @@ namespace OHOS::Ace::NG {
 class SheetPresentationPattern;
 enum class BindSheetDismissReason;
 
-class SheetObject : public virtual AceType {
+class SheetObject : public AceType {
     DECLARE_ACE_TYPE(SheetObject, AceType);
 
 public:

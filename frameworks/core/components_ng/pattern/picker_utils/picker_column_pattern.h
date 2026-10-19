@@ -50,7 +50,7 @@ struct PickerOptionProperty {
     float nextDistance = 0.0f; // between the next item and itself when scroll down
 };
 
-class PickerEventParam : public virtual AceType {
+class PickerEventParam : public AceType {
     DECLARE_ACE_TYPE(PickerEventParam, AceType);
 
 public:
