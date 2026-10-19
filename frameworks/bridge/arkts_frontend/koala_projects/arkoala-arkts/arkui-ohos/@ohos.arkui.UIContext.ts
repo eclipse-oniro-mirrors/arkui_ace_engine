@@ -721,6 +721,7 @@ export enum KeyboardAvoidMode {
 export enum ImmersiveStrategy {
     AVOID_CUTOUT = 0,
     AVOID_FLOAT_NAV = 1,
+    NAVIGATION_EXPAND_SAFE_AREA = 8,
 }
 
 export class ResolvedUIContext extends UIContext {

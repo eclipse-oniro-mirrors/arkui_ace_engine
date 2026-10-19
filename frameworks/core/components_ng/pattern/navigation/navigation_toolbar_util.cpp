@@ -720,6 +720,7 @@ void NavigationToolbarUtil::SetToolbarOptions(
     CHECK_NULL_VOID(nodeBase);
     auto navDestinationPatternBase = nodeBase->GetPattern<NavDestinationPatternBase>();
     CHECK_NULL_VOID(navDestinationPatternBase);
+    opt.brOptions.barStyle = GetDefaultBarStyleFromStrategy(AceType::RawPtr(nodeBase), opt.brOptions.barStyle);
     navDestinationPatternBase->SetToolBarStyle(opt.brOptions.barStyle);
     auto toolBarNode = AceType::DynamicCast<NavToolbarNode>(nodeBase->GetToolBarNode());
     CHECK_NULL_VOID(toolBarNode);
