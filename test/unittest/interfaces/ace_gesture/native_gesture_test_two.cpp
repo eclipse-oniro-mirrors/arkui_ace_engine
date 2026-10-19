@@ -30,6 +30,11 @@
 #include "frameworks/core/interfaces/arkoala/arkoala_api.h"
 
 
+namespace OHOS::Ace::NodeModel {
+extern void (*g_eventReceiver)(ArkUI_NodeEvent* event);
+extern void (*g_customEventReceiver)(ArkUI_NodeCustomEvent* event);
+} // namespace OHOS::Ace::NodeModel
+
 using namespace testing;
 using namespace testing::ext;
 class NativeGestureTestTwo : public testing::Test {
@@ -179,8 +184,11 @@ HWTEST_F(NativeGestureTestTwo, NodeEventReceiverRegistrationEntries, TestSize.Le
     ASSERT_NE(api, nullptr);
     ASSERT_NE(api->registerNodeEventReceiver, nullptr);
     ASSERT_NE(api->unregisterNodeEventReceiver, nullptr);
-    api->registerNodeEventReceiver([](ArkUI_NodeEvent*) {});
+    auto receiver = +[](ArkUI_NodeEvent*) {};
+    api->registerNodeEventReceiver(receiver);
+    EXPECT_EQ(OHOS::Ace::NodeModel::g_eventReceiver, receiver);
     api->unregisterNodeEventReceiver();
+    EXPECT_EQ(OHOS::Ace::NodeModel::g_eventReceiver, nullptr);
 }
 
 /**
@@ -195,8 +203,11 @@ HWTEST_F(NativeGestureTestTwo, NodeCustomEventReceiverRegistrationEntries, TestS
     ASSERT_NE(api, nullptr);
     ASSERT_NE(api->registerNodeCustomEventReceiver, nullptr);
     ASSERT_NE(api->unregisterNodeCustomEventReceiver, nullptr);
-    api->registerNodeCustomEventReceiver([](ArkUI_NodeCustomEvent*) {});
+    auto receiver = +[](ArkUI_NodeCustomEvent*) {};
+    api->registerNodeCustomEventReceiver(receiver);
+    EXPECT_EQ(OHOS::Ace::NodeModel::g_customEventReceiver, receiver);
     api->unregisterNodeCustomEventReceiver();
+    EXPECT_EQ(OHOS::Ace::NodeModel::g_customEventReceiver, nullptr);
 }
 
 /**
