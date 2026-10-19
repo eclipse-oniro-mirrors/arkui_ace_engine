@@ -22,6 +22,8 @@
 #include "bridge/declarative_frontend/ng/page_router_manager.h"
 
 namespace OHOS::Ace::NG {
+class ForceSplitManager;
+
 class ParallelPageRouterManager : public PageRouterManager {
     DECLARE_ACE_TYPE(ParallelPageRouterManager, PageRouterManager);
 public:
@@ -50,6 +52,9 @@ private:
         const std::string& curTopPageName, const RefPtr<PipelineContext>& context) override;
     std::vector<std::string> CollectPageStackNames(const std::string& curTopPageName);
     void TryEstablishPageLevelSplitHome(const std::string& pageUrl, const RefPtr<FrameNode>& pageNode,
+        const RefPtr<PipelineContext>& context);
+    void UpdatePageLevelSplitHome(const RefPtr<FrameNode>& pageNode, const RefPtr<FrameNode>& belowTopPage,
+        const std::vector<RefPtr<FrameNode>>& effectivePages, const RefPtr<ForceSplitManager>& forceSplitMgr,
         const RefPtr<PipelineContext>& context);
     void LoadPlaceholderOrRelatedPageIfNeeded(
         const RefPtr<PipelineContext>& context, const RefPtr<ParallelStageManager>& manager);

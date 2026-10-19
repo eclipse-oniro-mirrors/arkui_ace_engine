@@ -803,7 +803,9 @@ HWTEST_F(ParallelStageTestFourNg, OnHomePageDetectedVirtualStack001, TestSize.Le
     EXPECT_TRUE(result);
     EXPECT_EQ(homePattern->GetPageType(), RouterPageType::HOME_PAGE);
     EXPECT_EQ(homePattern->GetColumnType(), ForceSplitPageColumnType::PRIMARY);
-=======
+    EXPECT_EQ(stagePattern->GetHomePage(), homePage);
+}
+
 /**
  * @tc.name: ParallelStagePattern_HandleTouchEvent_EmptyTouchesNoCrash001
  * @tc.desc: Test HandleTouchEvent with an empty touches list (e.g. a postTouchEvent-injected
@@ -877,7 +879,123 @@ HWTEST_F(ParallelStageTestFourNg, ParallelStagePattern_HandleTouchEvent_DownTouc
 
     // The DOWN branch executed and created the drag bar node.
     EXPECT_NE(stagePattern->GetDragBarNode(), nullptr);
->>>>>>> master
+}
+
+/**
+ * @tc.name: OnHomePageDetectedVirtualStack002
+ * @tc.desc: Changing the home instance invalidates populated column caches before rebuilding visible pages.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ParallelStageTestFourNg, OnHomePageDetectedVirtualStack002, TestSize.Level1)
+{
+    RefPtr<FrameNode> stageNode;
+    RefPtr<ParallelStagePattern> stagePattern;
+    auto stageManager = CreateParallelStageManager(stageNode, stagePattern);
+    auto manager = GetPageLevelForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    manager->SetEnablePageLevelSplit(true);
+    manager->UpdateIsTopPageSplitDisabled(false);
+    manager->SetBehaviorMode(ForceSplitBehaviorMode::DISPLACE);
+    stagePattern->mode_ = PageMode::SPLIT;
+    auto oldHome = CreateRouterPage("detail1", RouterPageType::HOME_PAGE, ForceSplitPageColumnType::PRIMARY);
+    auto newHome = CreateRouterPage("detail2", RouterPageType::DETAIL_PAGE, ForceSplitPageColumnType::SECONDARY);
+    auto detail = CreateRouterPage("detail1", RouterPageType::DETAIL_PAGE, ForceSplitPageColumnType::SECONDARY);
+    MountRouterPage(stageNode, oldHome);
+    MountRouterPage(stageNode, newHome);
+    MountRouterPage(stageNode, detail);
+    stagePattern->SetHomePage(oldHome);
+    stageManager->InvalidateRouterColumnNodes();
+    auto before = stageManager->GetRouterVisiblePages();
+    ASSERT_EQ(before.primary, oldHome);
+    ASSERT_EQ(before.detail, detail);
+    ASSERT_FALSE(stageManager->routerColumnNodesDirty_);
+    std::list<WeakPtr<FrameNode>> pages = { WeakPtr(oldHome), WeakPtr(newHome), WeakPtr(detail) };
+    ASSERT_TRUE(stageManager->OnHomePageDetected(newHome, pages));
+    auto after = stageManager->GetRouterVisiblePages();
+    EXPECT_EQ(stagePattern->GetHomePage(), newHome);
+    EXPECT_EQ(after.primary, newHome);
+    EXPECT_EQ(after.detail, detail);
+    EXPECT_EQ(GetRouterPagePattern(newHome)->GetColumnType(), ForceSplitPageColumnType::PRIMARY);
+    EXPECT_EQ(GetRouterPagePattern(detail)->GetColumnType(), ForceSplitPageColumnType::SECONDARY);
+}
+
+/**
+ * @tc.name: OnHomePageDetectedVirtualStack003
+ * @tc.desc: A home recognized in portrait updates column ownership before a later split layout.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ParallelStageTestFourNg, OnHomePageDetectedVirtualStack003, TestSize.Level1)
+{
+    RefPtr<FrameNode> stageNode;
+    RefPtr<ParallelStagePattern> stagePattern;
+    auto stageManager = CreateParallelStageManager(stageNode, stagePattern);
+    auto manager = GetPageLevelForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    manager->SetBehaviorMode(ForceSplitBehaviorMode::DISPLACE);
+    stagePattern->mode_ = PageMode::STACK;
+    auto first = CreateRouterPage("same", RouterPageType::DETAIL_PAGE, ForceSplitPageColumnType::SECONDARY);
+    auto second = CreateRouterPage("same", RouterPageType::DETAIL_PAGE, ForceSplitPageColumnType::SECONDARY);
+    MountRouterPage(stageNode, first);
+    MountRouterPage(stageNode, second);
+    stageManager->GetTopPrimaryColumnPage();
+    std::list<WeakPtr<FrameNode>> pages = { WeakPtr(first), WeakPtr(second) };
+    ASSERT_TRUE(stageManager->OnHomePageDetected(first, pages));
+    EXPECT_EQ(stagePattern->GetHomePage(), first);
+    EXPECT_EQ(stageManager->GetTopPrimaryColumnPage(), first);
+    EXPECT_EQ(stageManager->GetTopSecondaryColumnPage(), second);
+}
+
+/**
+ * @tc.name: PushPagePageLevelPair001
+ * @tc.desc: A repeated split URL follows the NAVIGATION page pair and retains the original home instance.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ParallelStageTestFourNg, PushPagePageLevelPair001, TestSize.Level1)
+{
+    RefPtr<FrameNode> stageNode;
+    RefPtr<ParallelStagePattern> stagePattern;
+    auto stageManager = CreateParallelStageManager(stageNode, stagePattern);
+    auto manager = GetPageLevelForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    manager->SetEnablePageLevelSplit(true);
+    manager->UpdateIsTopPageSplitDisabled(false);
+    manager->SetBehaviorMode(ForceSplitBehaviorMode::NAVIGATION);
+    manager->SetPagePairs({ { "detail1", { "detail2" } } });
+    stagePattern->mode_ = PageMode::SPLIT;
+    auto oldHome = CreateRouterPage("detail2", RouterPageType::HOME_PAGE, ForceSplitPageColumnType::PRIMARY);
+    auto from = CreateRouterPage("detail1", RouterPageType::DETAIL_PAGE, ForceSplitPageColumnType::SECONDARY);
+    auto to = CreateRouterPage("detail2", RouterPageType::DETAIL_PAGE, ForceSplitPageColumnType::SECONDARY);
+    MountRouterPage(stageNode, oldHome);
+    MountRouterPage(stageNode, from);
+    stagePattern->SetHomePage(oldHome);
+    stageManager->InvalidateRouterColumnNodes();
+    ASSERT_TRUE(stageManager->PushPage(to, true, false));
+    auto visible = stageManager->GetRouterVisiblePages();
+    EXPECT_EQ(visible.primary, from);
+    EXPECT_EQ(visible.detail, to);
+    EXPECT_EQ(stagePattern->GetHomePage(), oldHome);
+    EXPECT_EQ(GetRouterPagePattern(to)->GetPageType(), RouterPageType::DETAIL_PAGE);
+}
+
+/**
+ * @tc.name: PushPageNeedOperationInSplitMode004
+ * @tc.desc: The pending split-operation flag is consumed even when the stage is already split.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ParallelStageTestFourNg, PushPageNeedOperationInSplitMode004, TestSize.Level1)
+{
+    RefPtr<FrameNode> stageNode;
+    RefPtr<ParallelStagePattern> stagePattern;
+    auto stageManager = CreateParallelStageManager(stageNode, stagePattern);
+    auto manager = GetPageLevelForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    manager->SetBehaviorMode(ForceSplitBehaviorMode::DISPLACE);
+    stagePattern->mode_ = PageMode::SPLIT;
+    stageManager->needOperationInSplitModeWithFullScreen_ = true;
+    auto detail = CreateRouterPage("detail");
+    ASSERT_TRUE(stageManager->PushPage(detail, true, false));
+    EXPECT_FALSE(stageManager->needOperationInSplitModeWithFullScreen_);
+    EXPECT_EQ(stageNode->GetChildIndex(detail), 0);
 }
 
 } // namespace OHOS::Ace::NG

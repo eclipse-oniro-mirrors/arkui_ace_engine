@@ -524,6 +524,11 @@ bool ForceSplitUtils::ParsePageSplitOptions(const std::unique_ptr<JsonValue>& pa
             continue;
         }
         config.pageSplitOptions[page] = splitJson->GetBool();
+        if (config.enablePageLevelSplit) {
+            TAG_LOGI(AceLogTag::ACE_NAVIGATION,
+                "pageLevelSplit config option index:%{public}d, page:%{public}s, split:%{public}d",
+                idx, page.c_str(), splitJson->GetBool());
+        }
     }
     return true;
 }
@@ -571,6 +576,15 @@ bool ForceSplitUtils::ParseCommonConfig(const std::unique_ptr<JsonValue>& config
         config.behaviorMode = modeValue == DISPLACE_BEHAVIOR_MODE ?
             ForceSplitBehaviorMode::DISPLACE : ForceSplitBehaviorMode::NAVIGATION;
     }
+    if (!ParsePageLevelSplitConfig(configJson, config)) {
+        return false;
+    }
+    return ParseBehaviorModeConfig(configJson, config);
+}
+
+bool ForceSplitUtils::ParsePageLevelSplitConfig(
+    const std::unique_ptr<JsonValue>& configJson, ForceSplitParam& config)
+{
     if (configJson->Contains(PAGE_SPLIT_OPTIONS_KEY)) {
         if (!ParsePageSplitOptions(configJson->GetValue(PAGE_SPLIT_OPTIONS_KEY), config)) {
             return false;
@@ -584,7 +598,7 @@ bool ForceSplitUtils::ParseCommonConfig(const std::unique_ptr<JsonValue>& config
         }
         config.enableInheritSplitStrategy = inheritJson->GetBool();
     }
-    return ParseBehaviorModeConfig(configJson, config);
+    return true;
 }
 
 bool ForceSplitUtils::ParseBehaviorModeConfig(

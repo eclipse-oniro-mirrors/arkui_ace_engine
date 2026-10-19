@@ -913,4 +913,107 @@ HWTEST_F(ForceSplitUtilsTest, LogForceSplitParam001, TestSize.Level1)
     EXPECT_TRUE(config.enablePageLevelSplit);
     EXPECT_EQ(config.pageSplitOptions.size(), 2);
 }
+/**
+ * @tc.name: ParseForceSplitParam038
+ * @tc.desc: Page-level control ignores malformed legacy home, related and fullscreen fields for both routing types.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitUtilsTest, ParseForceSplitParam038, TestSize.Level1)
+{
+    const std::string configStr =
+        R"({"enablePageLevelSplit":true,"homePage":1,"relatedPage":false,"fullScreenPages":{}})";
+    for (bool isRouter : { ROUTER_SPLIT, NAVIGATION_SPLIT }) {
+        NG::ForceSplitParam config;
+        ASSERT_TRUE(NG::ForceSplitUtils::ParseForceSplitParam(isRouter, configStr, config));
+        EXPECT_TRUE(config.enablePageLevelSplit);
+        EXPECT_FALSE(config.enableInheritSplitStrategy);
+        EXPECT_TRUE(config.homePage.empty());
+        EXPECT_TRUE(config.relatedPage.empty());
+        EXPECT_TRUE(config.fullScreenPages.empty());
+    }
+}
+
+/**
+ * @tc.name: ParseForceSplitParam039
+ * @tc.desc: An explicit false inherit flag and enabled split options are parsed in both modes.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitUtilsTest, ParseForceSplitParam039, TestSize.Level1)
+{
+    for (int32_t mode : { 0, 1 }) {
+        const std::string configStr =
+            std::string(R"({"enablePageLevelSplit":true,"enableInheritSplitStrategy":false,"mode":)") +
+            std::to_string(mode) +
+            R"(,"pageSplitOptions":[{"page":"PageA","split":true},{"page":"PageB","split":false}]})";
+        NG::ForceSplitParam config;
+        ASSERT_TRUE(NG::ForceSplitUtils::ParseForceSplitParam(ROUTER_SPLIT, configStr, config));
+        EXPECT_FALSE(config.enableInheritSplitStrategy);
+        ASSERT_EQ(config.pageSplitOptions.size(), 2);
+        EXPECT_TRUE(config.pageSplitOptions.at("PageA"));
+        EXPECT_FALSE(config.pageSplitOptions.at("PageB"));
+        EXPECT_EQ(config.behaviorMode,
+            mode == 0 ? NG::ForceSplitBehaviorMode::DISPLACE : NG::ForceSplitBehaviorMode::NAVIGATION);
+    }
+}
+
+/**
+ * @tc.name: ParseForceSplitParam040
+ * @tc.desc: Null and wrong-type page-level booleans are rejected rather than treated as defaults.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitUtilsTest, ParseForceSplitParam040, TestSize.Level1)
+{
+    const char* configs[] = {
+        R"({"enablePageLevelSplit":null})",
+        R"({"enablePageLevelSplit":"true"})",
+        R"({"enableInheritSplitStrategy":null})",
+        R"({"enableInheritSplitStrategy":0})",
+        R"({"pageSplitOptions":null})",
+    };
+    for (const auto* configStr : configs) {
+        SCOPED_TRACE(configStr);
+        NG::ForceSplitParam config;
+        EXPECT_FALSE(NG::ForceSplitUtils::ParseForceSplitParam(NAVIGATION_SPLIT, configStr, config));
+    }
+}
+
+/**
+ * @tc.name: ParsePageSplitOptions003
+ * @tc.desc: An empty array clears previous options and duplicate entries use the last explicit boolean.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitUtilsTest, ParsePageSplitOptions003, TestSize.Level1)
+{
+    NG::ForceSplitParam config;
+    config.enablePageLevelSplit = true;
+    config.pageSplitOptions = { { "stale", true } };
+    auto empty = JsonUtil::ParseJsonData("[]");
+    ASSERT_TRUE(NG::ForceSplitUtils::ParsePageSplitOptions(empty, config));
+    EXPECT_TRUE(config.pageSplitOptions.empty());
+    auto options = JsonUtil::ParseJsonData(
+        R"([{"page":"PageA","split":false},{"page":"PageA","split":true},{"page":"PageB","split":false}])");
+    ASSERT_TRUE(NG::ForceSplitUtils::ParsePageSplitOptions(options, config));
+    ASSERT_EQ(config.pageSplitOptions.size(), 2);
+    EXPECT_TRUE(config.pageSplitOptions.at("PageA"));
+    EXPECT_FALSE(config.pageSplitOptions.at("PageB"));
+    EXPECT_EQ(config.pageSplitOptions.count("stale"), 0);
+}
+
+/**
+ * @tc.name: ParsePageSplitOptions004
+ * @tc.desc: Malformed items are skipped independently while later valid entries remain usable.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitUtilsTest, ParsePageSplitOptions004, TestSize.Level1)
+{
+    auto options = JsonUtil::ParseJsonData(
+        R"([null,[],{},{"page":null,"split":true},{"page":"A","split":null},)"
+        R"({"page":"","split":false},{"page":"Valid","split":true}])");
+    NG::ForceSplitParam config;
+    config.enablePageLevelSplit = true;
+    ASSERT_TRUE(NG::ForceSplitUtils::ParsePageSplitOptions(options, config));
+    ASSERT_EQ(config.pageSplitOptions.size(), 1);
+    EXPECT_TRUE(config.pageSplitOptions.at("Valid"));
+}
+
 } // namespace OHOS::Ace

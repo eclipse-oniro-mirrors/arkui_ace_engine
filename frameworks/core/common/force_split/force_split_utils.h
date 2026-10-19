@@ -69,6 +69,7 @@ public:
     static void LogForceSplitParam(bool isRouter, const ForceSplitParam& config);
 private:
     static bool ParseCommonConfig(const std::unique_ptr<JsonValue>& configJson, ForceSplitParam& config);
+    static bool ParsePageLevelSplitConfig(const std::unique_ptr<JsonValue>& configJson, ForceSplitParam& config);
     static bool ParseBehaviorModeConfig(const std::unique_ptr<JsonValue>& configJson, ForceSplitParam& config);
     static bool ParseFullScreenPages(const std::unique_ptr<JsonValue>& fullScreenPages, ForceSplitParam& config);
     static bool ParseSplitDividerColor(const std::unique_ptr<JsonValue>& splitDividerColor, ForceSplitParam& config);

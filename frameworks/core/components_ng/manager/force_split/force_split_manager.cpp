@@ -438,10 +438,15 @@ bool ForceSplitManager::IsPageSplitDisabled(const std::string& pageName) const
     auto it = pageSplitOptions_.find(pageName);
     if (it != pageSplitOptions_.end()) {
         // explicit option: split(true) keeps split layout, split(false) means no split
+        TAG_LOGI(AceLogTag::ACE_NAVIGATION,
+            "pageLevelSplit policy page:%{public}s, source:explicit, split:%{public}d, inherit:%{public}d",
+            pageName.c_str(), it->second, enableInheritSplitStrategy_);
         return !it->second;
     }
     if (!enableInheritSplitStrategy_) {
         // no explicit option and inherit off: default no split when page-level control is on
+        TAG_LOGI(AceLogTag::ACE_NAVIGATION,
+            "pageLevelSplit policy page:%{public}s, source:default, split:0, inherit:0", pageName.c_str());
         return true;
     }
     // no explicit option and inherit on: follow the upstream page's split state
@@ -469,8 +474,19 @@ bool ForceSplitManager::IsUpstreamPageSplitDisabled(const std::string& pageName)
     for (int32_t upstream = index - 1; upstream >= 0; --upstream) {
         auto it = pageSplitOptions_.find(pageStack_[upstream]);
         if (it != pageSplitOptions_.end()) {
+            if (enablePageLevelSplit_) {
+                TAG_LOGI(AceLogTag::ACE_NAVIGATION,
+                    "pageLevelSplit policy page:%{public}s, source:upstream, index:%{public}d, "
+                    "upstream:%{public}s, upstreamIndex:%{public}d, split:%{public}d", pageName.c_str(), index,
+                    pageStack_[upstream].c_str(), upstream, it->second);
+            }
             return !it->second;
         }
+    }
+    if (enablePageLevelSplit_) {
+        TAG_LOGI(AceLogTag::ACE_NAVIGATION,
+            "pageLevelSplit policy page:%{public}s, source:noUpstreamOption, index:%{public}d, "
+            "stackSize:%{public}zu, split:0", pageName.c_str(), index, pageStack_.size());
     }
     return true;
 }
@@ -483,7 +499,18 @@ bool ForceSplitManager::IsTransitionShouldMovePageToPrimary(const std::string& f
     if (behaviorMode_ == ForceSplitBehaviorMode::DISPLACE) {
         // In displace mode, except for the fromPage or toPage that belong to transPages,
         // all transitions will trigger secondary push to primary by default
+        if (enablePageLevelSplit_) {
+            TAG_LOGI(AceLogTag::ACE_NAVIGATION,
+                "pageLevelSplit movePolicy mode:displace, from:%{public}s, to:%{public}s, "
+                "fromTrans:%{public}d, toTrans:%{public}d",
+                from.c_str(), to.c_str(), IsTransPage(from), IsTransPage(to));
+        }
         return !IsTransPage(from) && !IsTransPage(to);
+    }
+    if (enablePageLevelSplit_) {
+        TAG_LOGI(AceLogTag::ACE_NAVIGATION,
+            "pageLevelSplit movePolicy mode:navigation, from:%{public}s, to:%{public}s, pagePair:%{public}d",
+            from.c_str(), to.c_str(), IsPagePair(from, to));
     }
     return IsPagePair(from, to);
 }
