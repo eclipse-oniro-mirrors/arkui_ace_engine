@@ -2028,4 +2028,885 @@ HWTEST_F(NavigationPatternTestFiveNg, IsHomeDestinationOrNavBarVisible, TestSize
     ret = pattern->IsHomeDestinationOrNavBarVisible();
     EXPECT_TRUE(ret);
 }
+
+/**
+ * @tc.name: RecognizeHomePageIfNeeded008
+ * @tc.desc: Branch: if (forceSplitMgr && forceSplitMgr->IsPageLevelSplitEnabled()) { => true
+ *           page-level split control skips legacy home recognition
+ * @tc.type: FUNC
+ */
+HWTEST_F(NavigationPatternTestFiveNg, RecognizeHomePageIfNeeded008, TestSize.Level1)
+{
+    NavigationPatternTestFiveNg::SetUpTestSuite();
+    MockPipelineContextGetTheme();
+    NavigationModelNG navigationModel;
+    navigationModel.Create();
+    navigationModel.SetNavigationStack();
+    navigationModel.SetUsrNavigationMode(NavigationMode::SPLIT);
+    auto navNode = AceType::DynamicCast<NavigationGroupNode>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    ASSERT_NE(navNode, nullptr);
+    auto pattern = navNode->GetPattern<NavigationPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto& stack = pattern->navigationStack_;
+    ASSERT_NE(stack, nullptr);
+    auto context = PipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    auto manager = context->GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    manager->isRouter_ = false;
+    manager->isForceSplitSupported_ = true;
+    manager->enablePageLevelSplit_ = true;
+    manager->SetHomePageName("");
+
+    auto dest = NavDestinationGroupNode::GetOrCreateGroupNode(
+        V2::NAVDESTINATION_VIEW_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
+    ASSERT_NE(dest, nullptr);
+    auto destPattern = dest->GetPattern<NavDestinationPattern>();
+    ASSERT_NE(destPattern, nullptr);
+    destPattern->SetName("two");
+    stack->navPathList_.clear();
+    stack->navPathList_.push_back({ "two", dest });
+    pattern->forceSplitHomeDest_ = nullptr;
+
+    pattern->RecognizeHomePageIfNeeded();
+    EXPECT_EQ(pattern->forceSplitHomeDest_.Upgrade(), nullptr);
+    EXPECT_TRUE(manager->GetHomePageName().empty());
+}
+
+/**
+ * @tc.name: TryEstablishPageLevelSplitHome001
+ * @tc.desc: Branch: if (!forceSplitMgr->IsPageLevelSplitEnabled()) { => true
+ * @tc.type: FUNC
+ */
+HWTEST_F(NavigationPatternTestFiveNg, TryEstablishPageLevelSplitHome001, TestSize.Level1)
+{
+    NavigationPatternTestFiveNg::SetUpTestSuite();
+    MockPipelineContextGetTheme();
+    NavigationModelNG navigationModel;
+    navigationModel.Create();
+    navigationModel.SetNavigationStack();
+    navigationModel.SetUsrNavigationMode(NavigationMode::SPLIT);
+    auto navNode = AceType::DynamicCast<NavigationGroupNode>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    ASSERT_NE(navNode, nullptr);
+    auto pattern = navNode->GetPattern<NavigationPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto context = PipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    auto manager = context->GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    manager->enablePageLevelSplit_ = false;
+    manager->SetHomePageName("");
+    pattern->forceSplitHomeDest_ = nullptr;
+
+    pattern->TryEstablishPageLevelSplitHome();
+    EXPECT_EQ(pattern->forceSplitHomeDest_.Upgrade(), nullptr);
+    EXPECT_TRUE(manager->GetHomePageName().empty());
+}
+
+/**
+ * @tc.name: TryEstablishPageLevelSplitHome002
+ * @tc.desc: Branch: if (!topNavPath.has_value()) { => true
+ * @tc.type: FUNC
+ */
+HWTEST_F(NavigationPatternTestFiveNg, TryEstablishPageLevelSplitHome002, TestSize.Level1)
+{
+    NavigationPatternTestFiveNg::SetUpTestSuite();
+    MockPipelineContextGetTheme();
+    NavigationModelNG navigationModel;
+    navigationModel.Create();
+    navigationModel.SetNavigationStack();
+    navigationModel.SetUsrNavigationMode(NavigationMode::SPLIT);
+    auto navNode = AceType::DynamicCast<NavigationGroupNode>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    ASSERT_NE(navNode, nullptr);
+    auto pattern = navNode->GetPattern<NavigationPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto& stack = pattern->navigationStack_;
+    ASSERT_NE(stack, nullptr);
+    auto context = PipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    auto manager = context->GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    manager->enablePageLevelSplit_ = true;
+    manager->SetHomePageName("");
+    stack->navPathList_.clear();
+    pattern->forceSplitHomeDest_ = nullptr;
+
+    pattern->TryEstablishPageLevelSplitHome();
+    EXPECT_EQ(pattern->forceSplitHomeDest_.Upgrade(), nullptr);
+    EXPECT_TRUE(manager->GetHomePageName().empty());
+}
+
+/**
+ * @tc.name: TryEstablishPageLevelSplitHome003
+ * @tc.desc: Branch: top path node is not a NavDestination => topPattern null, early return
+ * @tc.type: FUNC
+ */
+HWTEST_F(NavigationPatternTestFiveNg, TryEstablishPageLevelSplitHome003, TestSize.Level1)
+{
+    NavigationPatternTestFiveNg::SetUpTestSuite();
+    MockPipelineContextGetTheme();
+    NavigationModelNG navigationModel;
+    navigationModel.Create();
+    navigationModel.SetNavigationStack();
+    navigationModel.SetUsrNavigationMode(NavigationMode::SPLIT);
+    auto navNode = AceType::DynamicCast<NavigationGroupNode>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    ASSERT_NE(navNode, nullptr);
+    auto pattern = navNode->GetPattern<NavigationPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto& stack = pattern->navigationStack_;
+    ASSERT_NE(stack, nullptr);
+    auto context = PipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    auto manager = context->GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    manager->enablePageLevelSplit_ = true;
+    manager->SetHomePageName("");
+    stack->navPathList_.clear();
+    stack->navPathList_.push_back({ "PageA", nullptr });
+    pattern->forceSplitHomeDest_ = nullptr;
+
+    pattern->TryEstablishPageLevelSplitHome();
+    EXPECT_EQ(pattern->forceSplitHomeDest_.Upgrade(), nullptr);
+    EXPECT_TRUE(manager->GetHomePageName().empty());
+}
+
+/**
+ * @tc.name: TryEstablishPageLevelSplitHome004
+ * @tc.desc: Branch: if (forceSplitMgr->IsPageSplitDisabled(topPattern->GetName())) { => true
+ * @tc.type: FUNC
+ */
+HWTEST_F(NavigationPatternTestFiveNg, TryEstablishPageLevelSplitHome004, TestSize.Level1)
+{
+    NavigationPatternTestFiveNg::SetUpTestSuite();
+    MockPipelineContextGetTheme();
+    NavigationModelNG navigationModel;
+    navigationModel.Create();
+    navigationModel.SetNavigationStack();
+    navigationModel.SetUsrNavigationMode(NavigationMode::SPLIT);
+    auto navNode = AceType::DynamicCast<NavigationGroupNode>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    ASSERT_NE(navNode, nullptr);
+    auto pattern = navNode->GetPattern<NavigationPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto& stack = pattern->navigationStack_;
+    ASSERT_NE(stack, nullptr);
+    auto context = PipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    auto manager = context->GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    manager->enablePageLevelSplit_ = true;
+    manager->pageSplitOptions_ = { { "PageA", false } };
+    manager->SetHomePageName("");
+
+    auto dest = NavDestinationGroupNode::GetOrCreateGroupNode(
+        V2::NAVDESTINATION_VIEW_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
+    ASSERT_NE(dest, nullptr);
+    dest->GetPattern<NavDestinationPattern>()->SetName("PageA");
+    stack->navPathList_.clear();
+    stack->navPathList_.push_back({ "PageA", dest });
+    pattern->forceSplitHomeDest_ = nullptr;
+
+    pattern->TryEstablishPageLevelSplitHome();
+    EXPECT_EQ(pattern->forceSplitHomeDest_.Upgrade(), nullptr);
+    EXPECT_TRUE(manager->GetHomePageName().empty());
+}
+
+/**
+ * @tc.name: TryEstablishPageLevelSplitHome005
+ * @tc.desc: Branch: no home established, NAVIGATION mode => current top split page becomes home
+ * @tc.type: FUNC
+ */
+HWTEST_F(NavigationPatternTestFiveNg, TryEstablishPageLevelSplitHome005, TestSize.Level1)
+{
+    NavigationPatternTestFiveNg::SetUpTestSuite();
+    MockPipelineContextGetTheme();
+    NavigationModelNG navigationModel;
+    navigationModel.Create();
+    navigationModel.SetNavigationStack();
+    navigationModel.SetUsrNavigationMode(NavigationMode::SPLIT);
+    auto navNode = AceType::DynamicCast<NavigationGroupNode>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    ASSERT_NE(navNode, nullptr);
+    auto pattern = navNode->GetPattern<NavigationPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto& stack = pattern->navigationStack_;
+    ASSERT_NE(stack, nullptr);
+    auto context = PipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    auto manager = context->GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    manager->enablePageLevelSplit_ = true;
+    manager->pageSplitOptions_ = { { "PageA", true } };
+    manager->SetHomePageName("");
+
+    auto dest = NavDestinationGroupNode::GetOrCreateGroupNode(
+        V2::NAVDESTINATION_VIEW_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
+    ASSERT_NE(dest, nullptr);
+    dest->GetPattern<NavDestinationPattern>()->SetName("PageA");
+    stack->navPathList_.clear();
+    stack->navPathList_.push_back({ "PageA", dest });
+    pattern->forceSplitHomeDest_ = nullptr;
+    pattern->navBarIsHome_ = false;
+
+    pattern->TryEstablishPageLevelSplitHome();
+    EXPECT_EQ(pattern->forceSplitHomeDest_.Upgrade(), dest);
+    EXPECT_EQ(manager->GetHomePageName(), "PageA");
+    EXPECT_EQ(dest->GetNavDestinationType(), NavDestinationType::HOME);
+    EXPECT_FALSE(pattern->navBarIsHome_);
+}
+
+/**
+ * @tc.name: TryEstablishPageLevelSplitHome006
+ * @tc.desc: Branch: if (!forceSplitMgr->GetHomePageName().empty()) { => true
+ *                   if (homeInStack && belowTopIsSplit) { => true, keep established home
+ * @tc.type: FUNC
+ */
+HWTEST_F(NavigationPatternTestFiveNg, TryEstablishPageLevelSplitHome006, TestSize.Level1)
+{
+    NavigationPatternTestFiveNg::SetUpTestSuite();
+    MockPipelineContextGetTheme();
+    NavigationModelNG navigationModel;
+    navigationModel.Create();
+    navigationModel.SetNavigationStack();
+    navigationModel.SetUsrNavigationMode(NavigationMode::SPLIT);
+    auto navNode = AceType::DynamicCast<NavigationGroupNode>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    ASSERT_NE(navNode, nullptr);
+    auto pattern = navNode->GetPattern<NavigationPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto& stack = pattern->navigationStack_;
+    ASSERT_NE(stack, nullptr);
+    auto context = PipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    auto manager = context->GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    manager->enablePageLevelSplit_ = true;
+    manager->pageSplitOptions_ = { { "PageA", true }, { "PageB", true } };
+
+    auto destA = NavDestinationGroupNode::GetOrCreateGroupNode(
+        V2::NAVDESTINATION_VIEW_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
+    ASSERT_NE(destA, nullptr);
+    destA->GetPattern<NavDestinationPattern>()->SetName("PageA");
+    auto destB = NavDestinationGroupNode::GetOrCreateGroupNode(
+        V2::NAVDESTINATION_VIEW_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
+    ASSERT_NE(destB, nullptr);
+    destB->GetPattern<NavDestinationPattern>()->SetName("PageB");
+    stack->navPathList_.clear();
+    stack->navPathList_.push_back({ "PageA", destA });
+    stack->navPathList_.push_back({ "PageB", destB });
+    manager->SetHomePageName("PageA");
+    pattern->forceSplitHomeDest_ = WeakPtr(destA);
+
+    pattern->TryEstablishPageLevelSplitHome();
+    EXPECT_EQ(pattern->forceSplitHomeDest_.Upgrade(), destA);
+    EXPECT_EQ(manager->GetHomePageName(), "PageA");
+    EXPECT_NE(destB->GetNavDestinationType(), NavDestinationType::HOME);
+}
+
+/**
+ * @tc.name: TryEstablishPageLevelSplitHome007
+ * @tc.desc: Branch: home in stack but below-top is non-split => re-anchor home to top
+ * @tc.type: FUNC
+ */
+HWTEST_F(NavigationPatternTestFiveNg, TryEstablishPageLevelSplitHome007, TestSize.Level1)
+{
+    NavigationPatternTestFiveNg::SetUpTestSuite();
+    MockPipelineContextGetTheme();
+    NavigationModelNG navigationModel;
+    navigationModel.Create();
+    navigationModel.SetNavigationStack();
+    navigationModel.SetUsrNavigationMode(NavigationMode::SPLIT);
+    auto navNode = AceType::DynamicCast<NavigationGroupNode>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    ASSERT_NE(navNode, nullptr);
+    auto pattern = navNode->GetPattern<NavigationPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto& stack = pattern->navigationStack_;
+    ASSERT_NE(stack, nullptr);
+    auto context = PipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    auto manager = context->GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    manager->enablePageLevelSplit_ = true;
+    manager->pageSplitOptions_ = { { "PageA", true }, { "PageB", false }, { "PageC", true } };
+
+    auto destA = NavDestinationGroupNode::GetOrCreateGroupNode(
+        V2::NAVDESTINATION_VIEW_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
+    ASSERT_NE(destA, nullptr);
+    destA->GetPattern<NavDestinationPattern>()->SetName("PageA");
+    auto destB = NavDestinationGroupNode::GetOrCreateGroupNode(
+        V2::NAVDESTINATION_VIEW_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
+    ASSERT_NE(destB, nullptr);
+    destB->GetPattern<NavDestinationPattern>()->SetName("PageB");
+    auto destC = NavDestinationGroupNode::GetOrCreateGroupNode(
+        V2::NAVDESTINATION_VIEW_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
+    ASSERT_NE(destC, nullptr);
+    destC->GetPattern<NavDestinationPattern>()->SetName("PageC");
+    stack->navPathList_.clear();
+    stack->navPathList_.push_back({ "PageA", destA });
+    stack->navPathList_.push_back({ "PageB", destB });
+    stack->navPathList_.push_back({ "PageC", destC });
+    manager->SetHomePageName("PageA");
+    pattern->forceSplitHomeDest_ = WeakPtr(destA);
+
+    pattern->TryEstablishPageLevelSplitHome();
+    EXPECT_EQ(pattern->forceSplitHomeDest_.Upgrade(), destC);
+    EXPECT_EQ(manager->GetHomePageName(), "PageC");
+    EXPECT_EQ(destC->GetNavDestinationType(), NavDestinationType::HOME);
+}
+
+/**
+ * @tc.name: TryEstablishPageLevelSplitHome008
+ * @tc.desc: Branch: established home popped out of stack => re-anchor home to top
+ * @tc.type: FUNC
+ */
+HWTEST_F(NavigationPatternTestFiveNg, TryEstablishPageLevelSplitHome008, TestSize.Level1)
+{
+    NavigationPatternTestFiveNg::SetUpTestSuite();
+    MockPipelineContextGetTheme();
+    NavigationModelNG navigationModel;
+    navigationModel.Create();
+    navigationModel.SetNavigationStack();
+    navigationModel.SetUsrNavigationMode(NavigationMode::SPLIT);
+    auto navNode = AceType::DynamicCast<NavigationGroupNode>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    ASSERT_NE(navNode, nullptr);
+    auto pattern = navNode->GetPattern<NavigationPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto& stack = pattern->navigationStack_;
+    ASSERT_NE(stack, nullptr);
+    auto context = PipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    auto manager = context->GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    manager->enablePageLevelSplit_ = true;
+    manager->pageSplitOptions_ = { { "PageA", true }, { "PageB", true } };
+
+    auto destA = NavDestinationGroupNode::GetOrCreateGroupNode(
+        V2::NAVDESTINATION_VIEW_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
+    ASSERT_NE(destA, nullptr);
+    destA->GetPattern<NavDestinationPattern>()->SetName("PageA");
+    auto destB = NavDestinationGroupNode::GetOrCreateGroupNode(
+        V2::NAVDESTINATION_VIEW_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
+    ASSERT_NE(destB, nullptr);
+    destB->GetPattern<NavDestinationPattern>()->SetName("PageB");
+    stack->navPathList_.clear();
+    stack->navPathList_.push_back({ "PageA", destA });
+    stack->navPathList_.push_back({ "PageB", destB });
+    // home "PageX" no longer in stack
+    manager->SetHomePageName("PageX");
+    pattern->forceSplitHomeDest_ = nullptr;
+
+    pattern->TryEstablishPageLevelSplitHome();
+    EXPECT_EQ(pattern->forceSplitHomeDest_.Upgrade(), destB);
+    EXPECT_EQ(manager->GetHomePageName(), "PageB");
+    EXPECT_EQ(destB->GetNavDestinationType(), NavDestinationType::HOME);
+}
+
+/**
+ * @tc.name: TryEstablishPageLevelSplitHome009
+ * @tc.desc: Branch: if (allDestNodes.size() >= SECOND_ZINDEX_VALUE) { => false
+ *           single destination stack has no below-top page, re-anchor home to the top itself
+ * @tc.type: FUNC
+ */
+HWTEST_F(NavigationPatternTestFiveNg, TryEstablishPageLevelSplitHome009, TestSize.Level1)
+{
+    NavigationPatternTestFiveNg::SetUpTestSuite();
+    MockPipelineContextGetTheme();
+    NavigationModelNG navigationModel;
+    navigationModel.Create();
+    navigationModel.SetNavigationStack();
+    navigationModel.SetUsrNavigationMode(NavigationMode::SPLIT);
+    auto navNode = AceType::DynamicCast<NavigationGroupNode>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    ASSERT_NE(navNode, nullptr);
+    auto pattern = navNode->GetPattern<NavigationPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto& stack = pattern->navigationStack_;
+    ASSERT_NE(stack, nullptr);
+    auto context = PipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    auto manager = context->GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    manager->enablePageLevelSplit_ = true;
+    manager->pageSplitOptions_ = { { "PageA", true } };
+
+    auto dest = NavDestinationGroupNode::GetOrCreateGroupNode(
+        V2::NAVDESTINATION_VIEW_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
+    ASSERT_NE(dest, nullptr);
+    dest->GetPattern<NavDestinationPattern>()->SetName("PageA");
+    stack->navPathList_.clear();
+    stack->navPathList_.push_back({ "PageA", dest });
+    // stale home from previous session, not in current stack
+    manager->SetHomePageName("PageX");
+    pattern->forceSplitHomeDest_ = nullptr;
+
+    pattern->TryEstablishPageLevelSplitHome();
+    EXPECT_EQ(pattern->forceSplitHomeDest_.Upgrade(), dest);
+    EXPECT_EQ(manager->GetHomePageName(), "PageA");
+}
+
+/**
+ * @tc.name: TryEstablishPageLevelSplitHome010
+ * @tc.desc: Branch: if (GetBehaviorMode() == DISPLACE && allDestNodes.size() >= 2) { => true
+ *           displace mode anchors the page below top as home
+ * @tc.type: FUNC
+ */
+HWTEST_F(NavigationPatternTestFiveNg, TryEstablishPageLevelSplitHome010, TestSize.Level1)
+{
+    NavigationPatternTestFiveNg::SetUpTestSuite();
+    MockPipelineContextGetTheme();
+    NavigationModelNG navigationModel;
+    navigationModel.Create();
+    navigationModel.SetNavigationStack();
+    navigationModel.SetUsrNavigationMode(NavigationMode::SPLIT);
+    auto navNode = AceType::DynamicCast<NavigationGroupNode>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    ASSERT_NE(navNode, nullptr);
+    auto pattern = navNode->GetPattern<NavigationPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto& stack = pattern->navigationStack_;
+    ASSERT_NE(stack, nullptr);
+    auto context = PipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    auto manager = context->GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    manager->enablePageLevelSplit_ = true;
+    manager->SetBehaviorMode(ForceSplitBehaviorMode::DISPLACE);
+    manager->pageSplitOptions_ = { { "PageA", true }, { "PageB", true } };
+    manager->SetHomePageName("");
+
+    auto destA = NavDestinationGroupNode::GetOrCreateGroupNode(
+        V2::NAVDESTINATION_VIEW_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
+    ASSERT_NE(destA, nullptr);
+    destA->GetPattern<NavDestinationPattern>()->SetName("PageA");
+    auto destB = NavDestinationGroupNode::GetOrCreateGroupNode(
+        V2::NAVDESTINATION_VIEW_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
+    ASSERT_NE(destB, nullptr);
+    destB->GetPattern<NavDestinationPattern>()->SetName("PageB");
+    stack->navPathList_.clear();
+    stack->navPathList_.push_back({ "PageA", destA });
+    stack->navPathList_.push_back({ "PageB", destB });
+    pattern->forceSplitHomeDest_ = nullptr;
+
+    pattern->TryEstablishPageLevelSplitHome();
+    EXPECT_EQ(pattern->forceSplitHomeDest_.Upgrade(), destA);
+    EXPECT_EQ(manager->GetHomePageName(), "PageA");
+    EXPECT_EQ(destA->GetNavDestinationType(), NavDestinationType::HOME);
+}
+
+/**
+ * @tc.name: TryEstablishPageLevelSplitHome011
+ * @tc.desc: Branch: if (GetBehaviorMode() == DISPLACE && allDestNodes.size() >= 2) { => false
+ *           displace mode with single destination anchors top itself as home
+ * @tc.type: FUNC
+ */
+HWTEST_F(NavigationPatternTestFiveNg, TryEstablishPageLevelSplitHome011, TestSize.Level1)
+{
+    NavigationPatternTestFiveNg::SetUpTestSuite();
+    MockPipelineContextGetTheme();
+    NavigationModelNG navigationModel;
+    navigationModel.Create();
+    navigationModel.SetNavigationStack();
+    navigationModel.SetUsrNavigationMode(NavigationMode::SPLIT);
+    auto navNode = AceType::DynamicCast<NavigationGroupNode>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    ASSERT_NE(navNode, nullptr);
+    auto pattern = navNode->GetPattern<NavigationPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto& stack = pattern->navigationStack_;
+    ASSERT_NE(stack, nullptr);
+    auto context = PipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    auto manager = context->GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    manager->enablePageLevelSplit_ = true;
+    manager->SetBehaviorMode(ForceSplitBehaviorMode::DISPLACE);
+    manager->pageSplitOptions_ = { { "PageA", true } };
+    manager->SetHomePageName("");
+
+    auto dest = NavDestinationGroupNode::GetOrCreateGroupNode(
+        V2::NAVDESTINATION_VIEW_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
+    ASSERT_NE(dest, nullptr);
+    dest->GetPattern<NavDestinationPattern>()->SetName("PageA");
+    stack->navPathList_.clear();
+    stack->navPathList_.push_back({ "PageA", dest });
+    pattern->forceSplitHomeDest_ = nullptr;
+
+    pattern->TryEstablishPageLevelSplitHome();
+    EXPECT_EQ(pattern->forceSplitHomeDest_.Upgrade(), dest);
+    EXPECT_EQ(manager->GetHomePageName(), "PageA");
+}
+
+/**
+ * @tc.name: IsTopNavDestinationSplitDisabled001
+ * @tc.desc: Branch: if (pathNames.empty()) { => true
+ *                   return forceSplitMgr->IsPageLevelSplitEnabled()
+ * @tc.type: FUNC
+ */
+HWTEST_F(NavigationPatternTestFiveNg, IsTopNavDestinationSplitDisabled001, TestSize.Level1)
+{
+    NavigationPatternTestFiveNg::SetUpTestSuite();
+    MockPipelineContextGetTheme();
+    NavigationModelNG navigationModel;
+    navigationModel.Create();
+    navigationModel.SetNavigationStack();
+    navigationModel.SetUsrNavigationMode(NavigationMode::SPLIT);
+    auto navNode = AceType::DynamicCast<NavigationGroupNode>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    ASSERT_NE(navNode, nullptr);
+    auto pattern = navNode->GetPattern<NavigationPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto& stack = pattern->navigationStack_;
+    ASSERT_NE(stack, nullptr);
+    auto context = PipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    auto manager = context->GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    stack->navPathList_.clear();
+
+    manager->enablePageLevelSplit_ = true;
+    EXPECT_TRUE(pattern->IsTopNavDestinationSplitDisabled());
+    manager->enablePageLevelSplit_ = false;
+    EXPECT_FALSE(pattern->IsTopNavDestinationSplitDisabled());
+}
+
+/**
+ * @tc.name: IsTopNavDestinationSplitDisabled002
+ * @tc.desc: Branch: if (pathNames.empty()) { => false
+ *                   page stack synced and top disabled by explicit option
+ * @tc.type: FUNC
+ */
+HWTEST_F(NavigationPatternTestFiveNg, IsTopNavDestinationSplitDisabled002, TestSize.Level1)
+{
+    NavigationPatternTestFiveNg::SetUpTestSuite();
+    MockPipelineContextGetTheme();
+    NavigationModelNG navigationModel;
+    navigationModel.Create();
+    navigationModel.SetNavigationStack();
+    navigationModel.SetUsrNavigationMode(NavigationMode::SPLIT);
+    auto navNode = AceType::DynamicCast<NavigationGroupNode>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    ASSERT_NE(navNode, nullptr);
+    auto pattern = navNode->GetPattern<NavigationPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto& stack = pattern->navigationStack_;
+    ASSERT_NE(stack, nullptr);
+    auto context = PipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    auto manager = context->GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    manager->enablePageLevelSplit_ = true;
+    manager->pageSplitOptions_ = { { "PageB", false } };
+    manager->pageStack_.clear();
+
+    auto destA = NavDestinationGroupNode::GetOrCreateGroupNode(
+        V2::NAVDESTINATION_VIEW_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
+    ASSERT_NE(destA, nullptr);
+    destA->GetPattern<NavDestinationPattern>()->SetName("PageA");
+    auto destB = NavDestinationGroupNode::GetOrCreateGroupNode(
+        V2::NAVDESTINATION_VIEW_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
+    ASSERT_NE(destB, nullptr);
+    destB->GetPattern<NavDestinationPattern>()->SetName("PageB");
+    stack->navPathList_.clear();
+    stack->navPathList_.push_back({ "PageA", destA });
+    stack->navPathList_.push_back({ "PageB", destB });
+
+    EXPECT_TRUE(pattern->IsTopNavDestinationSplitDisabled());
+    EXPECT_EQ(manager->pageStack_, (std::vector<std::string> { "PageA", "PageB" }));
+}
+
+/**
+ * @tc.name: IsTopNavDestinationSplitDisabled003
+ * @tc.desc: Branch: top destination split enabled by explicit option => false
+ * @tc.type: FUNC
+ */
+HWTEST_F(NavigationPatternTestFiveNg, IsTopNavDestinationSplitDisabled003, TestSize.Level1)
+{
+    NavigationPatternTestFiveNg::SetUpTestSuite();
+    MockPipelineContextGetTheme();
+    NavigationModelNG navigationModel;
+    navigationModel.Create();
+    navigationModel.SetNavigationStack();
+    navigationModel.SetUsrNavigationMode(NavigationMode::SPLIT);
+    auto navNode = AceType::DynamicCast<NavigationGroupNode>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    ASSERT_NE(navNode, nullptr);
+    auto pattern = navNode->GetPattern<NavigationPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto& stack = pattern->navigationStack_;
+    ASSERT_NE(stack, nullptr);
+    auto context = PipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    auto manager = context->GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    manager->enablePageLevelSplit_ = true;
+    manager->pageSplitOptions_ = { { "PageB", true } };
+
+    auto destA = NavDestinationGroupNode::GetOrCreateGroupNode(
+        V2::NAVDESTINATION_VIEW_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
+    ASSERT_NE(destA, nullptr);
+    destA->GetPattern<NavDestinationPattern>()->SetName("PageA");
+    auto destB = NavDestinationGroupNode::GetOrCreateGroupNode(
+        V2::NAVDESTINATION_VIEW_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
+    ASSERT_NE(destB, nullptr);
+    destB->GetPattern<NavDestinationPattern>()->SetName("PageB");
+    stack->navPathList_.clear();
+    stack->navPathList_.push_back({ "PageA", destA });
+    stack->navPathList_.push_back({ "PageB", destB });
+
+    EXPECT_FALSE(pattern->IsTopNavDestinationSplitDisabled());
+}
+
+/**
+ * @tc.name: NotifyForceFullScreenChangeIfNeededPageLevel001
+ * @tc.desc: Branch: if (forceSplitMgr->IsPageLevelSplitEnabled()) { => true
+ *                   fullScreenPages takes no effect, page stack synced, state unchanged
+ * @tc.type: FUNC
+ */
+HWTEST_F(NavigationPatternTestFiveNg, NotifyForceFullScreenChangeIfNeededPageLevel001, TestSize.Level1)
+{
+    NavigationPatternTestFiveNg::SetUpTestSuite();
+    MockPipelineContextGetTheme();
+    NavigationModelNG navigationModel;
+    navigationModel.Create();
+    navigationModel.SetNavigationStack();
+    navigationModel.SetUsrNavigationMode(NavigationMode::SPLIT);
+    auto navNode = AceType::DynamicCast<NavigationGroupNode>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    ASSERT_NE(navNode, nullptr);
+    auto pattern = navNode->GetPattern<NavigationPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto context = PipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    auto manager = context->GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    manager->isRouter_ = false;
+    manager->isForceSplitSupported_ = true;
+    manager->enablePageLevelSplit_ = true;
+    manager->fullScreenPages_ = { "FullScreen" };
+    manager->pageStack_.clear();
+    pattern->isTopFullScreenPage_ = false;
+
+    pattern->NotifyForceFullScreenChangeIfNeeded({ "FullScreen" });
+    EXPECT_FALSE(pattern->isTopFullScreenPage_);
+    EXPECT_FALSE(pattern->isTopFullScreenChanged_);
+    EXPECT_EQ(manager->pageStack_, (std::vector<std::string> { "FullScreen" }));
+}
+
+/**
+ * @tc.name: NotifyForceFullScreenChangeIfNeededPageLevel002
+ * @tc.desc: Branch: if (forceSplitMgr->IsPageLevelSplitEnabled()) { => false
+ *                   if (isTopFullScreenPage_ != isCurTopFullScreenPage) { => false
+ *           page-level off: fullScreen top keeps fullscreen state
+ * @tc.type: FUNC
+ */
+HWTEST_F(NavigationPatternTestFiveNg, NotifyForceFullScreenChangeIfNeededPageLevel002, TestSize.Level1)
+{
+    NavigationPatternTestFiveNg::SetUpTestSuite();
+    MockPipelineContextGetTheme();
+    NavigationModelNG navigationModel;
+    navigationModel.Create();
+    navigationModel.SetNavigationStack();
+    navigationModel.SetUsrNavigationMode(NavigationMode::SPLIT);
+    auto navNode = AceType::DynamicCast<NavigationGroupNode>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    ASSERT_NE(navNode, nullptr);
+    auto pattern = navNode->GetPattern<NavigationPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto context = PipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    auto manager = context->GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    manager->isRouter_ = false;
+    manager->isForceSplitSupported_ = true;
+    manager->enablePageLevelSplit_ = false;
+    manager->fullScreenPages_ = { "FullScreen" };
+    pattern->isTopFullScreenPage_ = true;
+
+    pattern->NotifyForceFullScreenChangeIfNeeded({ "FullScreen" });
+    EXPECT_TRUE(pattern->isTopFullScreenPage_);
+    EXPECT_FALSE(pattern->isTopFullScreenChanged_);
+}
+
+/**
+ * @tc.name: NotifyForceFullScreenChangeIfNeededPageLevel003
+ * @tc.desc: Branch: if (isTopFullScreenPage_ != isCurTopFullScreenPage) { => true
+ *           page-level on clears a legacy fullscreen state
+ * @tc.type: FUNC
+ */
+HWTEST_F(NavigationPatternTestFiveNg, NotifyForceFullScreenChangeIfNeededPageLevel003, TestSize.Level1)
+{
+    NavigationPatternTestFiveNg::SetUpTestSuite();
+    MockPipelineContextGetTheme();
+    NavigationModelNG navigationModel;
+    navigationModel.Create();
+    navigationModel.SetNavigationStack();
+    navigationModel.SetUsrNavigationMode(NavigationMode::SPLIT);
+    auto navNode = AceType::DynamicCast<NavigationGroupNode>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    ASSERT_NE(navNode, nullptr);
+    auto pattern = navNode->GetPattern<NavigationPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto context = PipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    auto manager = context->GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    manager->isRouter_ = false;
+    manager->isForceSplitSupported_ = true;
+    manager->enablePageLevelSplit_ = true;
+    manager->fullScreenPages_ = { "FullScreen" };
+    pattern->isTopFullScreenPage_ = true;
+
+    pattern->NotifyForceFullScreenChangeIfNeeded({ "FullScreen" });
+    EXPECT_FALSE(pattern->isTopFullScreenPage_);
+    EXPECT_TRUE(pattern->isTopFullScreenChanged_);
+}
+
+/**
+ * @tc.name: NotifyForceFullScreenChangeIfNeededPageLevel004
+ * @tc.desc: Branch: if (!allNames.empty()) { => false
+ * @tc.type: FUNC
+ */
+HWTEST_F(NavigationPatternTestFiveNg, NotifyForceFullScreenChangeIfNeededPageLevel004, TestSize.Level1)
+{
+    NavigationPatternTestFiveNg::SetUpTestSuite();
+    MockPipelineContextGetTheme();
+    NavigationModelNG navigationModel;
+    navigationModel.Create();
+    navigationModel.SetNavigationStack();
+    navigationModel.SetUsrNavigationMode(NavigationMode::SPLIT);
+    auto navNode = AceType::DynamicCast<NavigationGroupNode>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    ASSERT_NE(navNode, nullptr);
+    auto pattern = navNode->GetPattern<NavigationPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto context = PipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    auto manager = context->GetForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    manager->isRouter_ = false;
+    manager->isForceSplitSupported_ = true;
+    manager->enablePageLevelSplit_ = true;
+    pattern->isTopFullScreenPage_ = false;
+
+    pattern->NotifyForceFullScreenChangeIfNeeded({});
+    EXPECT_FALSE(pattern->isTopFullScreenPage_);
+    EXPECT_FALSE(pattern->isTopFullScreenChanged_);
+}
+
+/**
+ * @tc.name: UpdateNavContentAndChildVisibility001
+ * @tc.desc: Branch: if (!isVisible || !forceSplitSuccess_) { => true
+ *           force split off: children below home are not hidden
+ * @tc.type: FUNC
+ */
+HWTEST_F(NavigationPatternTestFiveNg, UpdateNavContentAndChildVisibility001, TestSize.Level1)
+{
+    NavigationPatternTestFiveNg::SetUpTestSuite();
+    MockPipelineContextGetTheme();
+    NavigationModelNG navigationModel;
+    navigationModel.Create();
+    navigationModel.SetNavigationStack();
+    navigationModel.SetUsrNavigationMode(NavigationMode::SPLIT);
+    auto navNode = AceType::DynamicCast<NavigationGroupNode>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    ASSERT_NE(navNode, nullptr);
+    auto pattern = navNode->GetPattern<NavigationPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    auto navContentNode = FrameNode::CreateFrameNode(V2::NAVIGATION_CONTENT_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(navContentNode, nullptr);
+
+    // isVisible=false breaks immediately
+    pattern->forceSplitSuccess_ = true;
+    pattern->UpdateNavContentAndChildVisibility(navContentNode, false);
+    EXPECT_EQ(navContentNode->GetLayoutProperty()->GetVisibilityValue(VisibleType::VISIBLE), VisibleType::INVISIBLE);
+
+    // force split failed: children below home are skipped even when visible
+    pattern->forceSplitSuccess_ = false;
+    pattern->UpdateNavContentAndChildVisibility(navContentNode, true);
+    EXPECT_EQ(navContentNode->GetLayoutProperty()->GetVisibilityValue(VisibleType::VISIBLE), VisibleType::VISIBLE);
+}
+
+/**
+ * @tc.name: UpdateNavContentAndChildVisibility002
+ * @tc.desc: Branch: if (!isVisible || !forceSplitSuccess_) { => false
+ *                   if (destNode->GetIndex() >= homeIndex) { => true
+ *           force split on: destinations below home become invisible
+ * @tc.type: FUNC
+ */
+HWTEST_F(NavigationPatternTestFiveNg, UpdateNavContentAndChildVisibility002, TestSize.Level1)
+{
+    NavigationPatternTestFiveNg::SetUpTestSuite();
+    MockPipelineContextGetTheme();
+    NavigationModelNG navigationModel;
+    navigationModel.Create();
+    navigationModel.SetNavigationStack();
+    navigationModel.SetUsrNavigationMode(NavigationMode::SPLIT);
+    auto navNode = AceType::DynamicCast<NavigationGroupNode>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    ASSERT_NE(navNode, nullptr);
+    auto pattern = navNode->GetPattern<NavigationPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    auto navContentNode = FrameNode::CreateFrameNode(V2::NAVIGATION_CONTENT_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(navContentNode, nullptr);
+
+    auto belowHomeDest = NavDestinationGroupNode::GetOrCreateGroupNode(
+        V2::NAVDESTINATION_VIEW_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
+    ASSERT_NE(belowHomeDest, nullptr);
+    belowHomeDest->SetIndex(0);
+    auto homeDest = NavDestinationGroupNode::GetOrCreateGroupNode(
+        V2::NAVDESTINATION_VIEW_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
+    ASSERT_NE(homeDest, nullptr);
+    homeDest->SetIndex(1);
+    belowHomeDest->MountToParent(navContentNode);
+    homeDest->MountToParent(navContentNode);
+
+    pattern->forceSplitSuccess_ = true;
+    pattern->forceSplitHomeDest_ = WeakPtr(homeDest);
+    pattern->UpdateNavContentAndChildVisibility(navContentNode, true);
+    EXPECT_EQ(belowHomeDest->GetLayoutProperty()->GetVisibilityValue(VisibleType::VISIBLE), VisibleType::INVISIBLE);
+}
+
+/**
+ * @tc.name: UpdateNavContentAndChildVisibility003
+ * @tc.desc: Branch: auto homeNode = forceSplitHomeDest_.Upgrade(); CHECK_NULL_BREAK(homeNode)
+ *           force split on without home: loop breaks, no child is hidden
+ * @tc.type: FUNC
+ */
+HWTEST_F(NavigationPatternTestFiveNg, UpdateNavContentAndChildVisibility003, TestSize.Level1)
+{
+    NavigationPatternTestFiveNg::SetUpTestSuite();
+    MockPipelineContextGetTheme();
+    NavigationModelNG navigationModel;
+    navigationModel.Create();
+    navigationModel.SetNavigationStack();
+    navigationModel.SetUsrNavigationMode(NavigationMode::SPLIT);
+    auto navNode = AceType::DynamicCast<NavigationGroupNode>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    ASSERT_NE(navNode, nullptr);
+    auto pattern = navNode->GetPattern<NavigationPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    auto navContentNode = FrameNode::CreateFrameNode(V2::NAVIGATION_CONTENT_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(navContentNode, nullptr);
+    auto belowHomeDest = NavDestinationGroupNode::GetOrCreateGroupNode(
+        V2::NAVDESTINATION_VIEW_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
+    ASSERT_NE(belowHomeDest, nullptr);
+    belowHomeDest->SetIndex(0);
+    belowHomeDest->MountToParent(navContentNode);
+
+    pattern->forceSplitSuccess_ = true;
+    pattern->forceSplitHomeDest_ = nullptr;
+    pattern->UpdateNavContentAndChildVisibility(navContentNode, true);
+    EXPECT_EQ(belowHomeDest->GetLayoutProperty()->GetVisibilityValue(VisibleType::VISIBLE), VisibleType::VISIBLE);
+}
 } // namespace OHOS::Ace::NG

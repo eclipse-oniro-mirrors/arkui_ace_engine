@@ -73,6 +73,11 @@ constexpr char IS_DRAGGABLE_KEY[] = "isDraggable";
 constexpr char BEHAVIOR_MODE_KEY[] = "mode";
 constexpr char PAGE_PAIRS_KEY[] = "pagePairs";
 constexpr char TRANS_PAGES_KEY[] = "transPages";
+constexpr char PAGE_SPLIT_OPTIONS_KEY[] = "pageSplitOptions";
+constexpr char ENABLE_PAGE_LEVEL_SPLIT_KEY[] = "enablePageLevelSplit";
+constexpr char ENABLE_INHERIT_SPLIT_STRATEGY_KEY[] = "enableInheritSplitStrategy";
+constexpr char PAGE_KEY[] = "page";
+constexpr char SPLIT_KEY[] = "split";
 constexpr int DISPLACE_BEHAVIOR_MODE = 0;
 constexpr int NAVIGATION_BEHAVIOR_MODE = 1;
 
@@ -491,13 +496,46 @@ bool ForceSplitUtils::ParseTransPages(const std::unique_ptr<JsonValue>& transPag
     return true;
 }
 
+bool ForceSplitUtils::ParsePageSplitOptions(const std::unique_ptr<JsonValue>& pageSplitOptions,
+    ForceSplitParam& config)
+{
+    if (!pageSplitOptions || !pageSplitOptions->IsArray()) {
+        TAG_LOGW(AceLogTag::ACE_NAVIGATION, "Error, pageSplitOptions is an invalid json array!");
+        return false;
+    }
+    config.pageSplitOptions.clear();
+    int32_t itemSize = pageSplitOptions->GetArraySize();
+    for (int32_t idx = 0; idx < itemSize; ++idx) {
+        auto item = pageSplitOptions->GetArrayItem(idx);
+        if (!item || !item->IsObject() || !item->Contains(PAGE_KEY) || !item->Contains(SPLIT_KEY)) {
+            TAG_LOGW(AceLogTag::ACE_NAVIGATION, "Error, pageSplitOptions's item must contain page & split!");
+            continue;
+        }
+        auto pageJson = item->GetValue(PAGE_KEY);
+        auto splitJson = item->GetValue(SPLIT_KEY);
+        if (!pageJson || !pageJson->IsString() || !splitJson || !splitJson->IsBool()) {
+            TAG_LOGW(AceLogTag::ACE_NAVIGATION,
+                "Error, pageSplitOptions's page must be string and split must be bool!");
+            continue;
+        }
+        auto page = pageJson->GetString();
+        if (page.empty()) {
+            TAG_LOGW(AceLogTag::ACE_NAVIGATION, "Error, pageSplitOptions's page can not be empty!");
+            continue;
+        }
+        config.pageSplitOptions[page] = splitJson->GetBool();
+    }
+    return true;
+}
+
 bool ForceSplitUtils::ParseCommonConfig(const std::unique_ptr<JsonValue>& configJson, ForceSplitParam& config)
 {
     if (!configJson) {
         return false;
     }
     config.dialogSupportSplit = configJson->GetBool(DIALOG_SUPPORT_SPLIT_KEY, true);
-    if (configJson->Contains(FULL_SCREEN_PAGES_KEY)) {
+    // fullScreenPages takes no effect when page-level split control is on
+    if (!config.enablePageLevelSplit && configJson->Contains(FULL_SCREEN_PAGES_KEY)) {
         if (!ParseFullScreenPages(configJson->GetValue(FULL_SCREEN_PAGES_KEY), config)) {
             return false;
         }
@@ -532,6 +570,19 @@ bool ForceSplitUtils::ParseCommonConfig(const std::unique_ptr<JsonValue>& config
         }
         config.behaviorMode = modeValue == DISPLACE_BEHAVIOR_MODE ?
             ForceSplitBehaviorMode::DISPLACE : ForceSplitBehaviorMode::NAVIGATION;
+    }
+    if (configJson->Contains(PAGE_SPLIT_OPTIONS_KEY)) {
+        if (!ParsePageSplitOptions(configJson->GetValue(PAGE_SPLIT_OPTIONS_KEY), config)) {
+            return false;
+        }
+    }
+    if (configJson->Contains(ENABLE_INHERIT_SPLIT_STRATEGY_KEY)) {
+        auto inheritJson = configJson->GetValue(ENABLE_INHERIT_SPLIT_STRATEGY_KEY);
+        if (!inheritJson || !inheritJson->IsBool()) {
+            TAG_LOGW(AceLogTag::ACE_NAVIGATION, "Error, %{public}s is not bool!", ENABLE_INHERIT_SPLIT_STRATEGY_KEY);
+            return false;
+        }
+        config.enableInheritSplitStrategy = inheritJson->GetBool();
     }
     return ParseBehaviorModeConfig(configJson, config);
 }
@@ -571,26 +622,37 @@ bool ForceSplitUtils::ParseForceSplitParam(
         return false;
     }
     config.isArkUIHookEnabled = configJson->GetBool(ENABLE_HOOK_KEY, true);
-    if (configJson->Contains(HOME_PAGE_KEY)) {
-        auto homePageJson = configJson->GetValue(HOME_PAGE_KEY);
-        if (!homePageJson->IsString()) {
-            TAG_LOGW(AceLogTag::ACE_NAVIGATION, "Error, %{public}s is not string!", HOME_PAGE_KEY);
+    if (configJson->Contains(ENABLE_PAGE_LEVEL_SPLIT_KEY)) {
+        auto enableJson = configJson->GetValue(ENABLE_PAGE_LEVEL_SPLIT_KEY);
+        if (!enableJson || !enableJson->IsBool()) {
+            TAG_LOGW(AceLogTag::ACE_NAVIGATION, "Error, %{public}s is not bool!", ENABLE_PAGE_LEVEL_SPLIT_KEY);
             return false;
         }
-        auto homePageStr = homePageJson->GetString();
-        if (!homePageStr.empty()) {
-            config.homePage = homePageStr;
-        }
+        config.enablePageLevelSplit = enableJson->GetBool();
     }
-    if (configJson->Contains(RELATED_PAGE_KEY)) {
-        auto relatedPageJson = configJson->GetValue(RELATED_PAGE_KEY);
-        if (!relatedPageJson->IsString()) {
-            TAG_LOGW(AceLogTag::ACE_NAVIGATION, "Error, %{public}s is not string!", RELATED_PAGE_KEY);
-            return false;
+    if (!config.enablePageLevelSplit) {
+        // homePage/relatedPage take no effect when page-level split control is on
+        if (configJson->Contains(HOME_PAGE_KEY)) {
+            auto homePageJson = configJson->GetValue(HOME_PAGE_KEY);
+            if (!homePageJson->IsString()) {
+                TAG_LOGW(AceLogTag::ACE_NAVIGATION, "Error, %{public}s is not string!", HOME_PAGE_KEY);
+                return false;
+            }
+            auto homePageStr = homePageJson->GetString();
+            if (!homePageStr.empty()) {
+                config.homePage = homePageStr;
+            }
         }
-        auto relatedPageStr = relatedPageJson->GetString();
-        if (!relatedPageStr.empty()) {
-            config.relatedPage = relatedPageStr;
+        if (configJson->Contains(RELATED_PAGE_KEY)) {
+            auto relatedPageJson = configJson->GetValue(RELATED_PAGE_KEY);
+            if (!relatedPageJson->IsString()) {
+                TAG_LOGW(AceLogTag::ACE_NAVIGATION, "Error, %{public}s is not string!", RELATED_PAGE_KEY);
+                return false;
+            }
+            auto relatedPageStr = relatedPageJson->GetString();
+            if (!relatedPageStr.empty()) {
+                config.relatedPage = relatedPageStr;
+            }
         }
     }
     if (!ParseCommonConfig(configJson, config)) {
@@ -656,7 +718,8 @@ void ForceSplitUtils::LogForceSplitParam(bool isRouterSplit, const ForceSplitPar
         "navDepth:%{public}s, disablePlaceholder:%{public}d, disableDivider:%{public}d, "
         "dividerColorLight:%{public}s, dividerColorDark:%{public}s, "
         "wideSplit[ratio:%{public}s, isDraggable:%{public}d], squareSplit[ratio:%{public}s, isDraggable:%{public}d], "
-        "behaviorMode:%{public}d, transPages:%{public}s",
+        "behaviorMode:%{public}d, transPages:%{public}s, enablePageLevelSplit:%{public}d, "
+        "pageSplitOptionsCount:%{public}zu, enableInheritSplitStrategy:%{public}d",
         isRouterSplit, config.homePage.c_str(), config.relatedPage.c_str(),
         JoinStringSet(config.fullScreenPages).c_str(), config.isArkUIHookEnabled,
         (config.navigationId.has_value() ? config.navigationId.value().c_str() : "NA"),
@@ -668,7 +731,8 @@ void ForceSplitUtils::LogForceSplitParam(bool isRouterSplit, const ForceSplitPar
         config.wideSplitIsDraggable,
         (config.squareSplitRatio.has_value() ? std::to_string(config.squareSplitRatio.value()).c_str() : "NA"),
         config.squareSplitIsDraggable,
-        static_cast<int32_t>(config.behaviorMode), JoinStringSet(config.transPages).c_str());
+        static_cast<int32_t>(config.behaviorMode), JoinStringSet(config.transPages).c_str(),
+        config.enablePageLevelSplit, config.pageSplitOptions.size(), config.enableInheritSplitStrategy);
 }
 } // namespace OHOS::Ace::NG
 

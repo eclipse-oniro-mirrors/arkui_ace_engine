@@ -727,4 +727,190 @@ HWTEST_F(ForceSplitUtilsTest, ParseCommonConfig_IsDraggable001, TestSize.Level1)
     ASSERT_TRUE(config.squareSplitRatio.has_value());
     EXPECT_FLOAT_EQ(config.squareSplitRatio.value(), EXPECTED_HALF_RATIO);
 }
+
+/**
+ * @tc.name: ParseForceSplitParam031
+ * @tc.desc: Branch: if (configJson->Contains(ENABLE_PAGE_LEVEL_SPLIT_KEY)) { => true
+ *                   if (!enableJson || !enableJson->IsBool()) { => true
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitUtilsTest, ParseForceSplitParam031, TestSize.Level1)
+{
+    std::string configStr = "{ \"enablePageLevelSplit\": 1 }";
+    bool isRouterSplit = NAVIGATION_SPLIT;
+    NG::ForceSplitParam config;
+    auto ret = NG::ForceSplitUtils::ParseForceSplitParam(isRouterSplit, configStr, config);
+    EXPECT_FALSE(ret);
+}
+
+/**
+ * @tc.name: ParseForceSplitParam032
+ * @tc.desc: Branch: if (configJson->Contains(ENABLE_PAGE_LEVEL_SPLIT_KEY)) { => true
+ *                   config.enablePageLevelSplit = true
+ *                   if (!config.enablePageLevelSplit) { => false
+ *           homePage/relatedPage/fullScreenPages take no effect when page-level split is on
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitUtilsTest, ParseForceSplitParam032, TestSize.Level1)
+{
+    std::string configStr =
+        "{ \"enablePageLevelSplit\": true, \"homePage\": \"HomePage\", \"relatedPage\": \"RelatedPage\", "
+        "\"fullScreenPages\": [\"DetailPage\"] }";
+    bool isRouterSplit = NAVIGATION_SPLIT;
+    NG::ForceSplitParam config;
+    auto ret = NG::ForceSplitUtils::ParseForceSplitParam(isRouterSplit, configStr, config);
+    EXPECT_TRUE(ret);
+    EXPECT_TRUE(config.enablePageLevelSplit);
+    EXPECT_TRUE(config.homePage.empty());
+    EXPECT_TRUE(config.relatedPage.empty());
+    EXPECT_TRUE(config.fullScreenPages.empty());
+}
+
+/**
+ * @tc.name: ParseForceSplitParam033
+ * @tc.desc: Branch: if (configJson->Contains(ENABLE_PAGE_LEVEL_SPLIT_KEY)) { => true
+ *                   config.enablePageLevelSplit = false
+ *                   if (!config.enablePageLevelSplit) { => true
+ *                   homePage/relatedPage still parsed when page-level split is off
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitUtilsTest, ParseForceSplitParam033, TestSize.Level1)
+{
+    std::string configStr =
+        "{ \"enablePageLevelSplit\": false, \"homePage\": \"HomePage\", \"relatedPage\": \"RelatedPage\" }";
+    bool isRouterSplit = NAVIGATION_SPLIT;
+    NG::ForceSplitParam config;
+    auto ret = NG::ForceSplitUtils::ParseForceSplitParam(isRouterSplit, configStr, config);
+    EXPECT_TRUE(ret);
+    EXPECT_FALSE(config.enablePageLevelSplit);
+    EXPECT_EQ(config.homePage, "HomePage");
+    EXPECT_EQ(config.relatedPage, "RelatedPage");
+}
+
+/**
+ * @tc.name: ParseForceSplitParam034
+ * @tc.desc: Branch: if (configJson->Contains(ENABLE_INHERIT_SPLIT_STRATEGY_KEY)) { => true
+ *                   if (!inheritJson || !inheritJson->IsBool()) { => true
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitUtilsTest, ParseForceSplitParam034, TestSize.Level1)
+{
+    std::string configStr = "{ \"enableInheritSplitStrategy\": \"true\" }";
+    bool isRouterSplit = NAVIGATION_SPLIT;
+    NG::ForceSplitParam config;
+    auto ret = NG::ForceSplitUtils::ParseForceSplitParam(isRouterSplit, configStr, config);
+    EXPECT_FALSE(ret);
+}
+
+/**
+ * @tc.name: ParseForceSplitParam035
+ * @tc.desc: Branch: if (configJson->Contains(ENABLE_INHERIT_SPLIT_STRATEGY_KEY)) { => true
+ *                   config.enableInheritSplitStrategy = true
+ *           default enableInheritSplitStrategy is false when key absent (covered by 032)
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitUtilsTest, ParseForceSplitParam035, TestSize.Level1)
+{
+    std::string configStr = "{ \"enableInheritSplitStrategy\": true }";
+    bool isRouterSplit = NAVIGATION_SPLIT;
+    NG::ForceSplitParam config;
+    auto ret = NG::ForceSplitUtils::ParseForceSplitParam(isRouterSplit, configStr, config);
+    EXPECT_TRUE(ret);
+    EXPECT_TRUE(config.enableInheritSplitStrategy);
+}
+
+/**
+ * @tc.name: ParseForceSplitParam036
+ * @tc.desc: Branch: if (configJson->Contains(PAGE_SPLIT_OPTIONS_KEY)) { => true
+ *                   ParsePageSplitOptions fills pageSplitOptions
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitUtilsTest, ParseForceSplitParam036, TestSize.Level1)
+{
+    std::string configStr =
+        "{ \"pageSplitOptions\": ["
+        "{ \"page\": \"PageA\", \"split\": true },"
+        "{ \"page\": \"PageB\", \"split\": false } ] }";
+    bool isRouterSplit = NAVIGATION_SPLIT;
+    NG::ForceSplitParam config;
+    auto ret = NG::ForceSplitUtils::ParseForceSplitParam(isRouterSplit, configStr, config);
+    EXPECT_TRUE(ret);
+    EXPECT_EQ(config.pageSplitOptions.size(), 2);
+    EXPECT_TRUE(config.pageSplitOptions["PageA"]);
+    EXPECT_FALSE(config.pageSplitOptions["PageB"]);
+}
+
+/**
+ * @tc.name: ParseForceSplitParam037
+ * @tc.desc: Branch: if (configJson->Contains(PAGE_SPLIT_OPTIONS_KEY)) { => true
+ *                   if (!pageSplitOptions || !pageSplitOptions->IsArray()) { => true
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitUtilsTest, ParseForceSplitParam037, TestSize.Level1)
+{
+    std::string configStr = "{ \"pageSplitOptions\": {} }";
+    bool isRouterSplit = NAVIGATION_SPLIT;
+    NG::ForceSplitParam config;
+    auto ret = NG::ForceSplitUtils::ParseForceSplitParam(isRouterSplit, configStr, config);
+    EXPECT_FALSE(ret);
+}
+
+/**
+ * @tc.name: ParsePageSplitOptions001
+ * @tc.desc: Branch: if (!pageSplitOptions || !pageSplitOptions->IsArray()) { => true
+ *           ParsePageSplitOptions with null json returns false
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitUtilsTest, ParsePageSplitOptions001, TestSize.Level1)
+{
+    std::unique_ptr<JsonValue> pageSplitOptions = nullptr;
+    NG::ForceSplitParam config;
+    auto ret = NG::ForceSplitUtils::ParsePageSplitOptions(pageSplitOptions, config);
+    EXPECT_FALSE(ret);
+    EXPECT_TRUE(config.pageSplitOptions.empty());
+}
+
+/**
+ * @tc.name: ParsePageSplitOptions002
+ * @tc.desc: Branch: ParsePageSplitOptions ignores invalid items and keeps valid ones
+ *           item not object / missing page / missing split / wrong types / empty page => continue
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitUtilsTest, ParsePageSplitOptions002, TestSize.Level1)
+{
+    auto pageSplitOptions = JsonUtil::ParseJsonData(
+        "["
+        "1,"
+        "{ \"page\": \"NoSplitKey\" },"
+        "{ \"split\": true },"
+        "{ \"page\": 1, \"split\": true },"
+        "{ \"page\": \"PageA\", \"split\": 1 },"
+        "{ \"page\": \"\", \"split\": true },"
+        "{ \"page\": \"PageA\", \"split\": true },"
+        "{ \"page\": \"PageB\", \"split\": false },"
+        "{ \"page\": \"PageA\", \"split\": false } ]");
+    ASSERT_NE(pageSplitOptions, nullptr);
+    NG::ForceSplitParam config;
+    auto ret = NG::ForceSplitUtils::ParsePageSplitOptions(pageSplitOptions, config);
+    EXPECT_TRUE(ret);
+    EXPECT_EQ(config.pageSplitOptions.size(), 2);
+    EXPECT_FALSE(config.pageSplitOptions["PageA"]);
+    EXPECT_FALSE(config.pageSplitOptions["PageB"]);
+}
+
+/**
+ * @tc.name: LogForceSplitParam001
+ * @tc.desc: Branch: LogForceSplitParam prints page-level split fields
+ * @tc.type: FUNC
+ */
+HWTEST_F(ForceSplitUtilsTest, LogForceSplitParam001, TestSize.Level1)
+{
+    NG::ForceSplitParam config;
+    config.enablePageLevelSplit = true;
+    config.enableInheritSplitStrategy = true;
+    config.pageSplitOptions = { { "PageA", true }, { "PageB", false } };
+    NG::ForceSplitUtils::LogForceSplitParam(NAVIGATION_SPLIT, config);
+    EXPECT_TRUE(config.enablePageLevelSplit);
+    EXPECT_EQ(config.pageSplitOptions.size(), 2);
+}
 } // namespace OHOS::Ace

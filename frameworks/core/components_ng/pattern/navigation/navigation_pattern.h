@@ -631,6 +631,8 @@ public:
     }
     void RecognizeHomePageIfNeeded();
     void TryForceSplitIfNeeded();
+    bool IsTopNavDestinationSplitDisabled();
+    void TryEstablishPageLevelSplitHome();
     void SwapNavDestinationAndProxyNode(bool needFireLifecycle);
     bool IsPrimaryNode(const RefPtr<NavDestinationGroupNode>& destNode) const;
     // Only used for the toolbar in 'container_modal' component

@@ -48,6 +48,9 @@ private:
     bool CheckStackSize(const RouterPageInfo& target, bool needClearSecondaryPage);
     void NotifyForceFullScreenChangeIfNeeded(
         const std::string& curTopPageName, const RefPtr<PipelineContext>& context) override;
+    std::vector<std::string> CollectPageStackNames(const std::string& curTopPageName);
+    void TryEstablishPageLevelSplitHome(const std::string& pageUrl, const RefPtr<FrameNode>& pageNode,
+        const RefPtr<PipelineContext>& context);
     void LoadPlaceholderOrRelatedPageIfNeeded(
         const RefPtr<PipelineContext>& context, const RefPtr<ParallelStageManager>& manager);
     bool LoadRelatedPage(const std::string& url, const RefPtr<ParallelStageManager>& manager);

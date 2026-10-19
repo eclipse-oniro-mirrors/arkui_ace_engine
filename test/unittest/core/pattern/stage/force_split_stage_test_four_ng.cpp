@@ -60,6 +60,13 @@ void ResetForceSplitBehaviorConfig(const RefPtr<ForceSplitManager>& manager)
     manager->pagePairs_.clear();
     manager->transPages_.clear();
     manager->fullScreenPages_.clear();
+    manager->enablePageLevelSplit_ = false;
+    manager->pageSplitOptions_.clear();
+    manager->pageStack_.clear();
+    manager->enableInheritSplitStrategy_ = false;
+    manager->isTopPageSplitDisabled_ = true;
+    manager->isRouter_ = false;
+    manager->isForceSplitEnable_ = false;
 }
 }
 
@@ -500,6 +507,303 @@ HWTEST_F(ParallelStageTestFourNg, UpdateSecondaryPageNeedRemoved_FalseWithNullop
     auto count = stageManager->UpdateSecondaryPageNeedRemoved(false);
     EXPECT_EQ(count, 0);
     EXPECT_FALSE(stageManager->GetHomePageTouched().has_value());
+}
+
+namespace {
+RefPtr<ForceSplitManager> GetPageLevelForceSplitManager()
+{
+    auto pipeline = MockPipelineContext::GetCurrent();
+    return pipeline ? pipeline->GetForceSplitManager() : nullptr;
+}
+} // namespace
+
+/**
+ * @tc.name: IsSplitModePageLevel001
+ * @tc.desc: Branch: if (!stagePattern->GetIsSplit()) { => true
+ * @tc.type: FUNC
+ */
+HWTEST_F(ParallelStageTestFourNg, IsSplitModePageLevel001, TestSize.Level1)
+{
+    RefPtr<FrameNode> stageNode;
+    RefPtr<ParallelStagePattern> stagePattern;
+    auto stageManager = CreateParallelStageManager(stageNode, stagePattern);
+    ASSERT_NE(stageManager, nullptr);
+
+    stagePattern->mode_ = PageMode::STACK;
+    EXPECT_FALSE(stageManager->IsSplitMode());
+}
+
+/**
+ * @tc.name: IsSplitModePageLevel002
+ * @tc.desc: Branch: if (!stagePattern->GetIsSplit()) { => false
+ *                   if (!context) { => false
+ *                   if (!forceSplitMgr) { => false
+ *                   return !forceSplitMgr->IsTopPageSplitDisabled()
+ *           page-level split off: split mode kept
+ * @tc.type: FUNC
+ */
+HWTEST_F(ParallelStageTestFourNg, IsSplitModePageLevel002, TestSize.Level1)
+{
+    RefPtr<FrameNode> stageNode;
+    RefPtr<ParallelStagePattern> stagePattern;
+    auto stageManager = CreateParallelStageManager(stageNode, stagePattern);
+    ASSERT_NE(stageManager, nullptr);
+    auto manager = GetPageLevelForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+
+    stagePattern->mode_ = PageMode::SPLIT;
+    manager->enablePageLevelSplit_ = false;
+    manager->isTopPageSplitDisabled_ = true;
+    EXPECT_TRUE(stageManager->IsSplitMode());
+}
+
+/**
+ * @tc.name: IsSplitModePageLevel003
+ * @tc.desc: Branch: page-level split on and top page split disabled => false
+ * @tc.type: FUNC
+ */
+HWTEST_F(ParallelStageTestFourNg, IsSplitModePageLevel003, TestSize.Level1)
+{
+    RefPtr<FrameNode> stageNode;
+    RefPtr<ParallelStagePattern> stagePattern;
+    auto stageManager = CreateParallelStageManager(stageNode, stagePattern);
+    ASSERT_NE(stageManager, nullptr);
+    auto manager = GetPageLevelForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+
+    stagePattern->mode_ = PageMode::SPLIT;
+    manager->enablePageLevelSplit_ = true;
+    manager->isTopPageSplitDisabled_ = true;
+    EXPECT_FALSE(stageManager->IsSplitMode());
+}
+
+/**
+ * @tc.name: IsSplitModePageLevel004
+ * @tc.desc: Branch: page-level split on and top page split enabled => true
+ * @tc.type: FUNC
+ */
+HWTEST_F(ParallelStageTestFourNg, IsSplitModePageLevel004, TestSize.Level1)
+{
+    RefPtr<FrameNode> stageNode;
+    RefPtr<ParallelStagePattern> stagePattern;
+    auto stageManager = CreateParallelStageManager(stageNode, stagePattern);
+    ASSERT_NE(stageManager, nullptr);
+    auto manager = GetPageLevelForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+
+    stagePattern->mode_ = PageMode::SPLIT;
+    manager->enablePageLevelSplit_ = true;
+    manager->isTopPageSplitDisabled_ = false;
+    EXPECT_TRUE(stageManager->IsSplitMode());
+}
+
+/**
+ * @tc.name: CalculateModePageLevel001
+ * @tc.desc: Branch: if (forceSplitMgr->IsForceSplitEnable(true) && !stageManager->IsTopFullScreenPage()) { => false
+ * @tc.type: FUNC
+ */
+HWTEST_F(ParallelStageTestFourNg, CalculateModePageLevel001, TestSize.Level1)
+{
+    RefPtr<FrameNode> stageNode;
+    RefPtr<ParallelStagePattern> stagePattern;
+    auto stageManager = CreateParallelStageManager(stageNode, stagePattern);
+    ASSERT_NE(stageManager, nullptr);
+    auto manager = GetPageLevelForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+
+    manager->isRouter_ = true;
+    manager->isForceSplitEnable_ = false;
+    stagePattern->mode_ = PageMode::STACK;
+    EXPECT_FALSE(stagePattern->CalculateMode());
+    EXPECT_EQ(stagePattern->mode_, PageMode::STACK);
+
+    // top fullscreen page also skips split calculation
+    manager->isForceSplitEnable_ = true;
+    stageManager->isTopFullScreenPage_ = true;
+    EXPECT_FALSE(stagePattern->CalculateMode());
+    EXPECT_EQ(stagePattern->mode_, PageMode::STACK);
+}
+
+/**
+ * @tc.name: CalculateModePageLevel002
+ * @tc.desc: Branch: splitMode = isMainWindow && !IsTopPageSplitDisabled() ? SPLIT : STACK
+ *                   isMainWindow false => STACK
+ * @tc.type: FUNC
+ */
+HWTEST_F(ParallelStageTestFourNg, CalculateModePageLevel002, TestSize.Level1)
+{
+    RefPtr<FrameNode> stageNode;
+    RefPtr<ParallelStagePattern> stagePattern;
+    auto stageManager = CreateParallelStageManager(stageNode, stagePattern);
+    ASSERT_NE(stageManager, nullptr);
+    auto manager = GetPageLevelForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    // MockContainer::IsMainWindow returns false by default, isMainWindow branch => STACK
+
+    manager->isRouter_ = true;
+    manager->isForceSplitEnable_ = true;
+    manager->enablePageLevelSplit_ = false;
+    stagePattern->mode_ = PageMode::STACK;
+    EXPECT_FALSE(stagePattern->CalculateMode());
+    EXPECT_EQ(stagePattern->mode_, PageMode::STACK);
+}
+
+/**
+ * @tc.name: CalculateModePageLevel003
+ * @tc.desc: Branch: splitMode = isMainWindow && !IsTopPageSplitDisabled() ? SPLIT : STACK
+ *                   page-level on and top split disabled => STACK
+ * @tc.type: FUNC
+ */
+HWTEST_F(ParallelStageTestFourNg, CalculateModePageLevel003, TestSize.Level1)
+{
+    RefPtr<FrameNode> stageNode;
+    RefPtr<ParallelStagePattern> stagePattern;
+    auto stageManager = CreateParallelStageManager(stageNode, stagePattern);
+    ASSERT_NE(stageManager, nullptr);
+    auto manager = GetPageLevelForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    auto container = AceType::DynamicCast<MockContainer>(Container::Current());
+    ASSERT_NE(container, nullptr);
+    EXPECT_CALL(*container, IsMainWindow).WillRepeatedly(Return(true));
+
+    manager->isRouter_ = true;
+    manager->isForceSplitEnable_ = true;
+    manager->enablePageLevelSplit_ = true;
+    manager->isTopPageSplitDisabled_ = true;
+    stagePattern->mode_ = PageMode::STACK;
+    EXPECT_FALSE(stagePattern->CalculateMode());
+    EXPECT_EQ(stagePattern->mode_, PageMode::STACK);
+}
+
+/**
+ * @tc.name: CalculateModePageLevel004
+ * @tc.desc: Branch: splitMode = isMainWindow && !IsTopPageSplitDisabled() ? SPLIT : STACK
+ *                   main window and top split enabled => SPLIT (mode unchanged, early return)
+ * @tc.type: FUNC
+ */
+HWTEST_F(ParallelStageTestFourNg, CalculateModePageLevel004, TestSize.Level1)
+{
+    RefPtr<FrameNode> stageNode;
+    RefPtr<ParallelStagePattern> stagePattern;
+    auto stageManager = CreateParallelStageManager(stageNode, stagePattern);
+    ASSERT_NE(stageManager, nullptr);
+    auto manager = GetPageLevelForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    auto container = AceType::DynamicCast<MockContainer>(Container::Current());
+    ASSERT_NE(container, nullptr);
+    EXPECT_CALL(*container, IsMainWindow).WillRepeatedly(Return(true));
+
+    manager->isRouter_ = true;
+    manager->isForceSplitEnable_ = true;
+    manager->enablePageLevelSplit_ = true;
+    manager->isTopPageSplitDisabled_ = false;
+    // pre-set SPLIT so mode_ == splitMode returns early without side effects
+    stagePattern->mode_ = PageMode::SPLIT;
+    EXPECT_FALSE(stagePattern->CalculateMode());
+    EXPECT_EQ(stagePattern->mode_, PageMode::SPLIT);
+
+    // page-level split off also keeps split when top is enabled
+    manager->enablePageLevelSplit_ = false;
+    EXPECT_FALSE(stagePattern->CalculateMode());
+    EXPECT_EQ(stagePattern->mode_, PageMode::SPLIT);
+}
+
+/**
+ * @tc.name: PushPageNeedOperationInSplitMode001
+ * @tc.desc: Branch: if (!stagePattern->GetIsSplit() && !needOperationInSplitMode) { => false
+ *                   push a non-detail page in split operation => false, page not mounted
+ * @tc.type: FUNC
+ */
+HWTEST_F(ParallelStageTestFourNg, PushPageNeedOperationInSplitMode001, TestSize.Level1)
+{
+    RefPtr<FrameNode> stageNode;
+    RefPtr<ParallelStagePattern> stagePattern;
+    auto stageManager = CreateParallelStageManager(stageNode, stagePattern);
+    ASSERT_NE(stageManager, nullptr);
+
+    stagePattern->mode_ = PageMode::STACK;
+    stageManager->needOperationInSplitModeWithFullScreen_ = true;
+    auto homePage = CreateRouterPage("home", RouterPageType::HOME_PAGE);
+    auto result = stageManager->PushPage(homePage);
+    EXPECT_FALSE(result);
+    EXPECT_EQ(stageNode->GetChildren().size(), 0);
+    EXPECT_FALSE(stageManager->needOperationInSplitModeWithFullScreen_);
+}
+
+/**
+ * @tc.name: PushPageNeedOperationInSplitMode002
+ * @tc.desc: Branch: if (!stagePattern->GetIsSplit() && !needOperationInSplitMode) { => false
+ *                   push a detail page in split operation succeeds and consumes the flag
+ * @tc.type: FUNC
+ */
+HWTEST_F(ParallelStageTestFourNg, PushPageNeedOperationInSplitMode002, TestSize.Level1)
+{
+    RefPtr<FrameNode> stageNode;
+    RefPtr<ParallelStagePattern> stagePattern;
+    auto stageManager = CreateParallelStageManager(stageNode, stagePattern);
+    ASSERT_NE(stageManager, nullptr);
+    auto manager = GetPageLevelForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+
+    manager->SetBehaviorMode(ForceSplitBehaviorMode::NAVIGATION);
+    stagePattern->mode_ = PageMode::STACK;
+    stageManager->needOperationInSplitModeWithFullScreen_ = true;
+    auto detailPage = CreateRouterPage("detail", RouterPageType::DETAIL_PAGE);
+    auto result = stageManager->PushPage(detailPage);
+    EXPECT_TRUE(result);
+    EXPECT_FALSE(stageManager->needOperationInSplitModeWithFullScreen_);
+}
+
+/**
+ * @tc.name: PushPageNeedOperationInSplitMode003
+ * @tc.desc: Branch: if (!stagePattern->GetIsSplit() && !needOperationInSplitMode) { => true
+ *                   flag off falls back to stack push (regression of legacy behavior)
+ * @tc.type: FUNC
+ */
+HWTEST_F(ParallelStageTestFourNg, PushPageNeedOperationInSplitMode003, TestSize.Level1)
+{
+    RefPtr<FrameNode> stageNode;
+    RefPtr<ParallelStagePattern> stagePattern;
+    auto stageManager = CreateParallelStageManager(stageNode, stagePattern);
+    ASSERT_NE(stageManager, nullptr);
+
+    stagePattern->mode_ = PageMode::STACK;
+    stageManager->needOperationInSplitModeWithFullScreen_ = false;
+    auto detailPage = CreateRouterPage("detail", RouterPageType::DETAIL_PAGE);
+    auto result = stageManager->PushPage(detailPage);
+    EXPECT_TRUE(result);
+    EXPECT_EQ(stageNode->GetChildren().size(), 1);
+    EXPECT_FALSE(stageManager->needOperationInSplitModeWithFullScreen_);
+}
+
+/**
+ * @tc.name: OnHomePageDetectedVirtualStack001
+ * @tc.desc: Branch: if (isVirtualStackBasedSplit) { => true
+ *                   preVisiblePages saved before SetPageType/SetColumnType in virtual stack mode
+ * @tc.type: FUNC
+ */
+HWTEST_F(ParallelStageTestFourNg, OnHomePageDetectedVirtualStack001, TestSize.Level1)
+{
+    RefPtr<FrameNode> stageNode;
+    RefPtr<ParallelStagePattern> stagePattern;
+    auto stageManager = CreateParallelStageManager(stageNode, stagePattern);
+    ASSERT_NE(stageManager, nullptr);
+    auto manager = GetPageLevelForceSplitManager();
+    ASSERT_NE(manager, nullptr);
+    manager->SetBehaviorMode(ForceSplitBehaviorMode::DISPLACE);
+
+    stagePattern->mode_ = PageMode::SPLIT;
+    auto homePage = CreateRouterPage("home", RouterPageType::DETAIL_PAGE);
+    MountRouterPage(stageNode, homePage);
+    auto homePattern = GetRouterPagePattern(homePage);
+    ASSERT_NE(homePattern, nullptr);
+    std::list<WeakPtr<FrameNode>> pageStack;
+    pageStack.emplace_back(homePage);
+
+    auto result = stageManager->OnHomePageDetected(homePage, pageStack);
+    EXPECT_TRUE(result);
+    EXPECT_EQ(homePattern->GetPageType(), RouterPageType::HOME_PAGE);
+    EXPECT_EQ(homePattern->GetColumnType(), ForceSplitPageColumnType::PRIMARY);
 }
 
 } // namespace OHOS::Ace::NG

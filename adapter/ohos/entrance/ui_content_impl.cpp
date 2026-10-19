@@ -6226,10 +6226,15 @@ void UIContentImpl::SetForceSplitConfig(const std::optional<ForceSplitConfig>& s
     forceSplitMgr->SetBehaviorMode(config.behaviorMode);
     forceSplitMgr->SetPagePairs(std::move(config.pagePairs));
     forceSplitMgr->SetTransPages(std::move(config.transPages));
+    forceSplitMgr->SetEnablePageLevelSplit(config.enablePageLevelSplit);
+    forceSplitMgr->SetPageSplitOptions(std::move(config.pageSplitOptions));
+    forceSplitMgr->SetEnableInheritSplitStrategy(config.enableInheritSplitStrategy);
     if (!(splitConfig->isRouter)) {
         navManager->SetForceSplitNavigationId(config.navigationId);
         navManager->SetForceSplitNavigationDepth(config.navigationDepth);
-        navManager->SetPlaceholderDisabled(config.navigationDisablePlaceholder);
+        // page-level split: no placeholder, keep the right column empty
+        navManager->SetPlaceholderDisabled(config.navigationDisablePlaceholder ||
+            config.enablePageLevelSplit);
         navManager->SetDividerDisabled(config.navigationDisableDivider);
     }
 }

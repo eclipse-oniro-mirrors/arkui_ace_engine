@@ -97,6 +97,11 @@ public:
         return isTopFullScreenPageChanged_;
     }
 
+    void SetNeedOperationInSplitModeWithFullScreen(bool needOperationInSplitMode)
+    {
+        needOperationInSplitMode_ = needOperationInSplitMode;
+    }
+
     bool IsTopFullScreenPage() const override
     {
         return isTopFullScreenPage_;
@@ -280,6 +285,7 @@ private:
     bool needClearSecondaryPage_ = false;
     bool isTopFullScreenPage_ = false;
     bool isTopFullScreenPageChanged_ = false;
+    bool needOperationInSplitModeWithFullScreen_ = false;
     mutable std::vector<WeakPtr<FrameNode>> primaryNodes_;
     mutable std::vector<WeakPtr<FrameNode>> secondaryNodes_;
     mutable bool routerColumnNodesDirty_ = true;

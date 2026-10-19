@@ -19,6 +19,7 @@
 
 #include <vector>
 #include <sstream>
+#include <algorithm>
 
 #include "bridge/common/utils/utils.h"
 #include "bridge/common/utils/engine_helper.h"
@@ -41,6 +42,40 @@ constexpr int32_t MAX_ROUTER_STACK_SIZE = 32;
 const std::vector<std::string> HOME_PAGE_PREFIX = {"main", "home", "index", "root"};
 }
 
+std::vector<std::string> ParallelPageRouterManager::CollectPageStackNames(const std::string& curTopPageName)
+{
+    std::vector<std::string> pageStack;
+    for (const auto& weakNode : pageRouterStack_) {
+        auto pageNode = weakNode.Upgrade();
+        if (!pageNode) {
+            continue;
+        }
+        auto pagePattern = pageNode->GetPattern<PagePattern>();
+        if (!pagePattern) {
+            continue;
+        }
+        auto pageUrl = pagePattern->GetPageUrl();
+        if (!pageUrl.empty()) {
+            pageStack.emplace_back(std::move(pageUrl));
+        }
+    }
+    // This notification happens before the router stack is updated, so reconcile the
+    // incoming top page name: append it for push, or drop pages above it for pop.
+    if (!curTopPageName.empty()) {
+        if (pageStack.empty()) {
+            pageStack.emplace_back(curTopPageName);
+        } else if (pageStack.back() != curTopPageName) {
+            auto it = std::find(pageStack.begin(), pageStack.end(), curTopPageName);
+            if (it != pageStack.end()) {
+                pageStack.erase(it + 1, pageStack.end());
+            } else {
+                pageStack.emplace_back(curTopPageName);
+            }
+        }
+    }
+    return pageStack;
+}
+
 void ParallelPageRouterManager::NotifyForceFullScreenChangeIfNeeded(
     const std::string& curTopPageName, const RefPtr<PipelineContext>& context)
 {
@@ -50,14 +85,100 @@ void ParallelPageRouterManager::NotifyForceFullScreenChangeIfNeeded(
     if (!forceSplitMgr->IsForceSplitSupported(true)) {
         return;
     }
+    bool isTopPageSplitDisabledChanged = false;
+    if (forceSplitMgr->IsPageLevelSplitEnabled()) {
+        // Sync the page stack first: page-level split inheritance is resolved from it.
+        forceSplitMgr->SetPageStack(CollectPageStackNames(curTopPageName));
+        bool isPageSplitDisabled = forceSplitMgr->IsPageSplitDisabled(curTopPageName);
+        isTopPageSplitDisabledChanged = forceSplitMgr->UpdateIsTopPageSplitDisabled(isPageSplitDisabled);
+        TAG_LOGI(AceLogTag::ACE_ROUTER, "PLSplit notify: page=%{public}s, disabled=%{public}d, changed=%{public}d",
+            curTopPageName.c_str(), isPageSplitDisabled, isTopPageSplitDisabledChanged);
+    }
     auto stageManager = AceType::DynamicCast<ParallelStageManager>(context->GetStageManager());
     CHECK_NULL_VOID(stageManager);
-    stageManager->UpdateIsTopFullScreenPage(forceSplitMgr->IsFullScreenPage(curTopPageName));
-    if (stageManager->IsTopFullScreenPageChanged()) {
+    // when page-level split control is on, fullScreenPages takes no effect
+    bool isCurFullScreen = forceSplitMgr->IsFullScreenPage(curTopPageName) &&
+        !forceSplitMgr->IsPageLevelSplitEnabled();
+    if (stageManager->IsTopFullScreenPage() != isCurFullScreen) {
+        stageManager->UpdateIsTopFullScreenPage(isCurFullScreen);
         forceSplitMgr->NotifyForceFullScreenChange(stageManager->IsTopFullScreenPage());
+        bool isPreInSplitMode = stageManager->IsSplitMode();
         // try to update mode immediately
         forceSplitMgr->NotifyForceSplitStateChange();
+        bool isCurInSplitMode = stageManager->IsSplitMode();
+        stageManager->SetNeedOperationInSplitModeWithFullScreen(isPreInSplitMode || isCurInSplitMode);
+        return;
     }
+    if (isTopPageSplitDisabledChanged) {
+        // page-level split switch state changed, try to update mode immediately
+        forceSplitMgr->NotifyForceSplitStateChange();
+    }
+}
+
+void ParallelPageRouterManager::TryEstablishPageLevelSplitHome(
+    const std::string& pageUrl, const RefPtr<FrameNode>& pageNode, const RefPtr<PipelineContext>& context)
+{
+    CHECK_NULL_VOID(context);
+    auto forceSplitMgr = context->GetForceSplitManager();
+    CHECK_NULL_VOID(forceSplitMgr);
+    if (!forceSplitMgr->IsPageLevelSplitEnabled() || forceSplitMgr->IsPageSplitDisabled(pageUrl)) {
+        return;
+    }
+
+    // pageRouterStack_: bottom -> top
+    // Find the page directly below the current top page.
+    RefPtr<FrameNode> belowTopPage;
+    auto currentIt = std::find_if(
+        pageRouterStack_.rbegin(), pageRouterStack_.rend(),
+        [&pageNode](const WeakPtr<FrameNode>& weakNode) {
+            return weakNode.Upgrade() == pageNode;
+        });
+    if (currentIt != pageRouterStack_.rend()) {
+        auto belowIt = std::next(currentIt);
+        if (belowIt != pageRouterStack_.rend()) {
+            belowTopPage = belowIt->Upgrade();
+        }
+    }
+
+    if (!forceSplitMgr->GetHomePageName().empty()) {
+        bool homeInStack = false;
+        for (const auto& weakNode : pageRouterStack_) {
+            auto node = weakNode.Upgrade();
+            auto pattern = node ? node->GetPattern<PagePattern>() : nullptr;
+            if (pattern && pattern->GetPageUrl() == forceSplitMgr->GetHomePageName()) {
+                homeInStack = true;
+                break;
+            }
+        }
+
+        bool belowTopIsSplit = false;
+        auto belowTopPattern = belowTopPage ? belowTopPage->GetPattern<PagePattern>() : nullptr;
+        if (belowTopPattern) {
+            belowTopIsSplit = !forceSplitMgr->IsPageSplitDisabled(belowTopPattern->GetPageUrl());
+        }
+
+        if (homeInStack && belowTopIsSplit) {
+            return;
+        }
+    }
+
+    // NAVIGATION: current split page B is the new home -> [B | empty].
+    // DISPLACE: the page below B, namely A, is the new home -> [A | B].
+    auto homePageNode = pageNode;
+    if (forceSplitMgr->GetBehaviorMode() == ForceSplitBehaviorMode::DISPLACE && belowTopPage) {
+        homePageNode = belowTopPage;
+    }
+
+    auto homePattern = homePageNode->GetPattern<PagePattern>();
+    CHECK_NULL_VOID(homePattern);
+    forceSplitMgr->SetHomePageName(homePattern->GetPageUrl());
+    auto stageManager = AceType::DynamicCast<ParallelStageManager>(context->GetStageManager());
+    CHECK_NULL_VOID(stageManager);
+    stageManager->OnHomePageDetected(homePageNode, pageRouterStack_);
+
+    auto stageNode = stageManager->GetStageNode();
+    CHECK_NULL_VOID(stageNode);
+    stageNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
 }
 
 void ParallelPageRouterManager::LoadPage(
@@ -112,6 +233,8 @@ void ParallelPageRouterManager::LoadPage(
         TAG_LOGI(AceLogTag::ACE_ROUTER, "url: %{public}s was recognised as home page", target.url.c_str());
         stageManager->OnHomePageDetected(pageNode, pageRouterStack_);
     }
+    // page-level split: the first split page acts as home page
+    TryEstablishPageLevelSplitHome(target.url, pageNode, context);
 
     pageNode->OnAccessibilityEvent(AccessibilityEventType::CHANGE);
 
@@ -173,6 +296,8 @@ void ParallelPageRouterManager::LoadPageExtender(
         TAG_LOGI(AceLogTag::ACE_ROUTER, "url: %{public}s was recognised as home page", target.url.c_str());
         stageManager->OnHomePageDetected(pageNode, pageRouterStack_);
     }
+    // page-level split: the first split page acts as home page
+    TryEstablishPageLevelSplitHome(target.url, pageNode, context);
 
     pageNode->OnAccessibilityEvent(AccessibilityEventType::CHANGE);
 
@@ -194,6 +319,10 @@ void ParallelPageRouterManager::LoadPlaceholderOrRelatedPageIfNeeded(
     auto forceSplitMgr = context->GetForceSplitManager();
     CHECK_NULL_VOID(forceSplitMgr);
     if (!forceSplitMgr->IsForceSplitSupported(true)) {
+        return;
+    }
+    // page-level split: no placeholder, keep the right column empty
+    if (forceSplitMgr->IsPageLevelSplitEnabled()) {
         return;
     }
     do {
@@ -233,6 +362,12 @@ bool ParallelPageRouterManager::DetectHomePage(const RouterPageInfo& target, con
     CHECK_NULL_RETURN(context, false);
     auto forceSplitMgr = context->GetForceSplitManager();
     CHECK_NULL_RETURN(forceSplitMgr, false);
+
+    // Page-level split established its runtime anchor from page stack.
+    if (forceSplitMgr->IsPageLevelSplitEnabled()) {
+        TAG_LOGI(AceLogTag::ACE_ROUTER, "Skip home page detection in page-level split");
+        return false;
+    }
 
     if (!forceSplitMgr->IsForceSplitSupported(true)) {
         TAG_LOGI(AceLogTag::ACE_ROUTER, "No need for home page recognition");
@@ -515,8 +650,10 @@ bool ParallelPageRouterManager::StartPop()
         if (penultimatePageNode) {
             auto pattern = penultimatePageNode->GetPattern<PagePattern>();
             if (pattern) {
-                NotifyForceFullScreenChangeIfNeeded(
-                    pattern->GetPageUrl(), penultimatePageNode->GetContextRefPtr());
+                auto pageContext = penultimatePageNode->GetContextRefPtr();
+                NotifyForceFullScreenChangeIfNeeded(pattern->GetPageUrl(), pageContext);
+                // page-level split: re-establish home when popping back into a split page
+                TryEstablishPageLevelSplitHome(pattern->GetPageUrl(), penultimatePageNode, pageContext);
             }
         }
     }

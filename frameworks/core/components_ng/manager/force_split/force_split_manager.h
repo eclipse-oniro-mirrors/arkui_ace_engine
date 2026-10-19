@@ -19,6 +19,7 @@
 #include <cstdint>
 #include <optional>
 #include <unordered_map>
+#include <vector>
 
 #include "base/memory/ace_type.h"
 #include "core/common/force_split/force_split_constants.h"
@@ -95,6 +96,43 @@ public:
     bool IsFullScreenPage(const std::string& name) const
     {
         return fullScreenPages_.find(name) != fullScreenPages_.end();
+    }
+
+    void SetEnablePageLevelSplit(bool enablePageLevelSplit)
+    {
+        enablePageLevelSplit_ = enablePageLevelSplit;
+    }
+    bool IsPageLevelSplitEnabled() const
+    {
+        return enablePageLevelSplit_;
+    }
+    void SetPageSplitOptions(std::unordered_map<std::string, bool>&& pageSplitOptions)
+    {
+        pageSplitOptions_ = std::move(pageSplitOptions);
+    }
+    void SetEnableInheritSplitStrategy(bool enableInheritSplitStrategy)
+    {
+        enableInheritSplitStrategy_ = enableInheritSplitStrategy;
+    }
+    void SetPageStack(std::vector<std::string>&& pageStack)
+    {
+        pageStack_ = std::move(pageStack);
+    }
+    bool IsPageSplitDisabled(const std::string& pageName) const;
+    bool IsUpstreamPageSplitDisabled(const std::string& pageName) const;
+    bool UpdateIsTopPageSplitDisabled(bool isTopPageSplitDisabled)
+    {
+        if (isTopPageSplitDisabled_ == isTopPageSplitDisabled) {
+            return false;
+        }
+        isTopPageSplitDisabled_ = isTopPageSplitDisabled;
+        return true;
+    }
+    bool IsTopPageSplitDisabled() const
+    {
+        // no effect unless page-level split control is on; default disabled before
+        // the first top page notification so startup stays in stack layout
+        return enablePageLevelSplit_ && isTopPageSplitDisabled_;
     }
 
     void SetSplitDividerColor(std::optional<Color> light, std::optional<Color> dark)
@@ -218,6 +256,7 @@ private:
     bool IsTopFullScreenPage();
     bool IsWindowConditionMatched();
     bool HasForceSplitTargetNavigation();
+    int32_t GetLastPageStackIndex(const std::string& pageName) const;
     void FlushArkUIHook();
     void NotifyMediaQueryUpdate();
     float CalcCurrentSplitRatio();
@@ -257,6 +296,17 @@ private:
     bool disableNavForceSplitInternal_ = false;
     std::optional<Color> splitDividerColorLight_;
     std::optional<Color> splitDividerColorDark_;
+    // master switch of page-level split control
+    bool enablePageLevelSplit_ = false;
+    // page name -> split(true means the page uses split layout)
+    std::unordered_map<std::string, bool> pageSplitOptions_;
+    // whether pages without an explicit option follow the upstream page's split state
+    bool enableInheritSplitStrategy_ = false;
+    // current page navigation stack(from bottom to top), used for upstream queries
+    std::vector<std::string> pageStack_;
+    // cached state: whether the current top page has split disabled(default true
+    // until the first top page notification, only meaningful when feature is on)
+    bool isTopPageSplitDisabled_ = true;
 };
 } // namespace OHOS::Ace::NG
 
