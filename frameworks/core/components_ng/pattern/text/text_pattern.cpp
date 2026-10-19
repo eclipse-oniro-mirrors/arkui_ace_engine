@@ -4615,10 +4615,9 @@ ResultObject TextPattern::GetImageResultObject(RefPtr<UINode> uinode, int32_t in
 {
     int32_t itemLength = 1;
     ResultObject resultObject;
-    if (!DynamicCast<FrameNode>(uinode) || !GetSpanItemByIndex(index)) {
-        return resultObject;
-    }
-    int32_t endPosition = std::min(GetTextContentLength(), GetSpanItemByIndex(index)->position);
+    auto spanItem = GetSpanItemByIndex(index);
+    CHECK_NULL_RETURN(DynamicCast<FrameNode>(uinode) && spanItem, resultObject);
+    int32_t endPosition = std::min(GetTextContentLength(), spanItem->position);
     int32_t startPosition = endPosition - itemLength;
     if ((start <= startPosition) && (end >= endPosition)) {
         auto imageNode = DynamicCast<FrameNode>(uinode);
@@ -4658,6 +4657,9 @@ ResultObject TextPattern::GetImageResultObject(RefPtr<UINode> uinode, int32_t in
             resultObject.imageStyle.borderRadius = jsonObject->GetValue("borderRadius")->IsObject()
                                                        ? jsonObject->GetValue("borderRadius")->ToString()
                                                        : jsonObject->GetString("borderRadius");
+        }
+        if (auto imageSpanItem = DynamicCast<ImageSpanItem>(spanItem)) {
+            resultObject.imageTag = imageSpanItem->options.imageTag;
         }
     }
     return resultObject;

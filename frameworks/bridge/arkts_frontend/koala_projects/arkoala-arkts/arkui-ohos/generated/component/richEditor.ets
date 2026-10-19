@@ -1169,6 +1169,7 @@ export interface RichEditorImageSpanResult {
     valueResourceStr?: ResourceStr;
     imageStyle: RichEditorImageSpanStyleResult;
     offsetInSpan: [ int32, int32 ];
+    imageTag?: string;
 }
 export interface RichEditorImageSpan {
     spanPosition: RichEditorSpanPosition;
@@ -1199,6 +1200,7 @@ export interface RichEditorImageSpanOptions {
     imageStyle?: RichEditorImageSpanStyle;
     gesture?: RichEditorGesture;
     onHover?: OnHoverCallback;
+    imageTag?: string;
 }
 export interface RichEditorBuilderSpanOptions {
     offset?: int32;
@@ -4228,6 +4230,14 @@ export class RichEditorImageSpanOptions_serializer {
         } else {
             valueSerializer.writeInt8(RuntimeType.UNDEFINED)
         }
+        const valueHolderForImageTag = value.imageTag
+        if (valueHolderForImageTag !== undefined) {
+            valueSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueHolderForImageTagTmpValue = valueHolderForImageTag!
+            valueSerializer.writeString(valueHolderForImageTagTmpValue)
+        } else {
+            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
     }
     public static read(buffer: DeserializerBase): RichEditorImageSpanOptions {
         let valueDeserializer: DeserializerBase = buffer
@@ -4270,7 +4280,13 @@ export class RichEditorImageSpanOptions_serializer {
             onHoverTmpBuf = onHoverTmpBufOptClosure
         }
         const onHoverTmpResult: OnHoverCallback | undefined = onHoverTmpBuf
-        let value: RichEditorImageSpanOptions = ({offset: offsetTmpResult, imageStyle: imageStyleTmpResult, gesture: gestureTmpResult, onHover: onHoverTmpResult} as RichEditorImageSpanOptions)
+        const imageTagTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
+        let imageTagTmpBuf: string | undefined = undefined
+        if ((imageTagTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
+            imageTagTmpBuf = (valueDeserializer.readString() as string)
+        }
+        const imageTagTmpResult: string | undefined = imageTagTmpBuf
+        let value: RichEditorImageSpanOptions = ({offset: offsetTmpResult, imageStyle: imageStyleTmpResult, gesture: gestureTmpResult, onHover: onHoverTmpResult, imageTag: imageTagTmpResult} as RichEditorImageSpanOptions)
         return value
     }
 }
@@ -4310,6 +4326,14 @@ export class RichEditorImageSpanResult_serializer {
         valueSerializer.writeInt32(valueHolderForOffsetInSpan_0)
         const valueHolderForOffsetInSpan_1 = valueHolderForOffsetInSpan[1]
         valueSerializer.writeInt32(valueHolderForOffsetInSpan_1)
+        const valueHolderForImageTag = value.imageTag
+        if (valueHolderForImageTag !== undefined) {
+            valueSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueHolderForImageTagTmpValue = valueHolderForImageTag!
+            valueSerializer.writeString(valueHolderForImageTagTmpValue)
+        } else {
+            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
     }
     public static read(buffer: DeserializerBase): RichEditorImageSpanResult {
         let valueDeserializer: DeserializerBase = buffer
@@ -4339,7 +4363,13 @@ export class RichEditorImageSpanResult_serializer {
         const offsetInSpanTmpBufValue0: int32 = valueDeserializer.readInt32()
         const offsetInSpanTmpBufValue1: int32 = valueDeserializer.readInt32()
         const offsetInSpanTmpResult: [ int32, int32 ] = ([offsetInSpanTmpBufValue0, offsetInSpanTmpBufValue1] as [ int32, int32 ])
-        let value: RichEditorImageSpanResult = ({spanPosition: spanPositionTmpResult, valuePixelMap: valuePixelMapTmpResult, valueResourceStr: valueResourceStrTmpResult, imageStyle: imageStyleTmpResult, offsetInSpan: offsetInSpanTmpResult} as RichEditorImageSpanResult)
+        const imageTagTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
+        let imageTagTmpBuf: string | undefined = undefined
+        if ((imageTagTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
+            imageTagTmpBuf = (valueDeserializer.readString() as string)
+        }
+        const imageTagTmpResult: string | undefined = imageTagTmpBuf
+        let value: RichEditorImageSpanResult = ({spanPosition: spanPositionTmpResult, valuePixelMap: valuePixelMapTmpResult, valueResourceStr: valueResourceStrTmpResult, imageStyle: imageStyleTmpResult, offsetInSpan: offsetInSpanTmpResult, imageTag: imageTagTmpResult} as RichEditorImageSpanResult)
         return value
     }
 }

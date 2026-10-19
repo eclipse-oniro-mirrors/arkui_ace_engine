@@ -2045,6 +2045,7 @@ ResultObject ImageSpanItem::GetSpanResultObject(int32_t start, int32_t end)
         if (options.imagePixelMap.has_value()) {
             resultObject.valuePixelMap = options.imagePixelMap.value();
         }
+        resultObject.imageTag = options.imageTag;
         resultObject.isInit = true;
     }
     return resultObject;

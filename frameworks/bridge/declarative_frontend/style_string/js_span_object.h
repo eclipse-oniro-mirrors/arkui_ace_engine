@@ -359,6 +359,8 @@ public:
     void SetImageColorFilter(const JSCallbackInfo& info) {}
     void GetSupportSvg2(const JSCallbackInfo& info);
     void SetSupportSvg2(const JSCallbackInfo& info) {}
+    void GetImageTag(const JSCallbackInfo& info);
+    void SetImageTag(const JSCallbackInfo& info) {}
     void GetResizable(const JSCallbackInfo& info);
     void SetResizable(const JSCallbackInfo& info) {}
 
