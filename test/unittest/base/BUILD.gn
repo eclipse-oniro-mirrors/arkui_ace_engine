@@ -66,6 +66,8 @@ ace_unittest("util_test") {
     "json_util_test.cpp",
     "measure_util_test.cpp",
     "node_object_test.cpp",
+    "sparse_fields_test.cpp",
+    "sparse_ref_ptr_late_type.cpp",
     "unique_valued_map_test.cpp",
     "uobject_test.cpp",
     "utf_helper_test_ng.cpp",
@@ -87,6 +89,14 @@ ace_unittest("util_test") {
   ]
 }
 
+# The sparse storage in its diagnostic build: access counters on, the macros compiled in that configuration.
+ace_unittest("sparse_field_stats_test") {
+  module_name = "CommonEvent-Input"
+  type = "new"
+  sources = [ "sparse_field_stats_test.cpp" ]
+  defines = [ "ACE_SPARSE_FIELDS_STATS" ]
+}
+
 ace_unittest("shared_image_manager_test") {
   module_name = "Resource"
   type = "new"
@@ -101,6 +111,7 @@ group("base_unittest") {
   deps = [
     ":geometry_test",
     ":shared_image_manager_test",
+    ":sparse_field_stats_test",
     ":util_test",
   ]
 }
