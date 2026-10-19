@@ -859,6 +859,7 @@ int32_t OH_ArkUI_NodeUtils_GetPositionToParent(ArkUI_NodeHandle node, ArkUI_IntO
 ArkUI_ErrorCode OH_ArkUI_AddSupportedUIStates(ArkUI_NodeHandle node, int32_t uiStates,
     void (statesChangeHandler)(int32_t currentStates, void* userData), bool excludeInner, void* userData)
 {
+    CHECK_UI_THREAD("OH_ArkUI_AddSupportedUIStates");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID,
         "OH_ArkUI_AddSupportedUIStates", "Node parameter is null");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
@@ -870,6 +871,7 @@ ArkUI_ErrorCode OH_ArkUI_AddSupportedUIStates(ArkUI_NodeHandle node, int32_t uiS
 
 ArkUI_ErrorCode OH_ArkUI_RemoveSupportedUIStates(ArkUI_NodeHandle node, int32_t uiStates)
 {
+    CHECK_UI_THREAD("OH_ArkUI_RemoveSupportedUIStates");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID,
         "OH_ArkUI_RemoveSupportedUIStates", "Node parameter is null");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();

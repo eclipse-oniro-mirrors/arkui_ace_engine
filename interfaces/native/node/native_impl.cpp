@@ -94,10 +94,22 @@ ArkUI_NativeNodeAPI_1 nodeImpl_1 = {
         CHECK_UI_THREAD("ArkUI_NativeNodeAPI_1.resetAttribute");
         return OHOS::Ace::NodeModel::ResetAttribute(node, attribute);
     },
-    OHOS::Ace::NodeModel::RegisterNodeEvent,
-    OHOS::Ace::NodeModel::UnregisterNodeEvent,
-    OHOS::Ace::NodeModel::RegisterOnEvent,
-    OHOS::Ace::NodeModel::UnregisterOnEvent,
+    [](ArkUI_NodeHandle nodePtr, ArkUI_NodeEventType eventType, int32_t targetId, void* userData) -> int32_t {
+        CHECK_UI_THREAD("ArkUI_NativeNodeAPI_1.registerNodeEvent");
+        return OHOS::Ace::NodeModel::RegisterNodeEvent(nodePtr, eventType, targetId, userData);
+    },
+    [](ArkUI_NodeHandle nodePtr, ArkUI_NodeEventType eventType) -> void {
+        CHECK_UI_THREAD("ArkUI_NativeNodeAPI_1.unregisterNodeEvent");
+        OHOS::Ace::NodeModel::UnregisterNodeEvent(nodePtr, eventType);
+    },
+    [](void (*eventReceiver)(ArkUI_NodeEvent* event)) -> void {
+        CHECK_UI_THREAD("ArkUI_NativeNodeAPI_1.registerNodeEventReceiver");
+        OHOS::Ace::NodeModel::RegisterOnEvent(eventReceiver);
+    },
+    []() -> void {
+        CHECK_UI_THREAD("ArkUI_NativeNodeAPI_1.unregisterNodeEventReceiver");
+        OHOS::Ace::NodeModel::UnregisterOnEvent();
+    },
     [](ArkUI_NodeHandle node, ArkUI_NodeDirtyFlag dirtyFlag) -> void {
         CHECK_UI_THREAD("ArkUI_NativeNodeAPI_1.markDirty");
         OHOS::Ace::NodeModel::MarkDirty(node, dirtyFlag);
@@ -126,10 +138,22 @@ ArkUI_NativeNodeAPI_1 nodeImpl_1 = {
         CHECK_UI_THREAD("ArkUI_NativeNodeAPI_1.getNextSibling");
         return OHOS::Ace::NodeModel::GetNextSibling(node);
     },
-    OHOS::Ace::NodeModel::RegisterNodeCustomEvent,
-    OHOS::Ace::NodeModel::UnregisterNodeCustomEvent,
-    OHOS::Ace::NodeModel::RegisterNodeCustomReceiver,
-    OHOS::Ace::NodeModel::UnregisterNodeCustomEventReceiver,
+    [](ArkUI_NodeHandle node, ArkUI_NodeCustomEventType eventType, int32_t targetId, void* userData) -> int32_t {
+        CHECK_UI_THREAD("ArkUI_NativeNodeAPI_1.registerNodeCustomEvent");
+        return OHOS::Ace::NodeModel::RegisterNodeCustomEvent(node, eventType, targetId, userData);
+    },
+    [](ArkUI_NodeHandle node, ArkUI_NodeCustomEventType eventType) -> void {
+        CHECK_UI_THREAD("ArkUI_NativeNodeAPI_1.unregisterNodeCustomEvent");
+        OHOS::Ace::NodeModel::UnregisterNodeCustomEvent(node, eventType);
+    },
+    [](void (*eventReceiver)(ArkUI_NodeCustomEvent* event)) -> void {
+        CHECK_UI_THREAD("ArkUI_NativeNodeAPI_1.registerNodeCustomEventReceiver");
+        OHOS::Ace::NodeModel::RegisterNodeCustomReceiver(eventReceiver);
+    },
+    []() -> void {
+        CHECK_UI_THREAD("ArkUI_NativeNodeAPI_1.unregisterNodeCustomEventReceiver");
+        OHOS::Ace::NodeModel::UnregisterNodeCustomEventReceiver();
+    },
     OHOS::Ace::NodeModel::SetMeasuredSize,
     OHOS::Ace::NodeModel::SetLayoutPosition,
     OHOS::Ace::NodeModel::GetMeasuredSize,
@@ -256,33 +280,92 @@ ArkUI_NativeDialogAPI_3 dialogImpl_3 = {
 constexpr int32_t CURRENT_NATIVE_GESTURE_API_VERSION = 1;
 ArkUI_NativeGestureAPI_1 gestureImpl_1 = {
     CURRENT_NATIVE_GESTURE_API_VERSION,
-    OHOS::Ace::GestureModel::CreateTapGesture,
-    OHOS::Ace::GestureModel::CreateLongPressGesture,
-    OHOS::Ace::GestureModel::CreatePanGesture,
-    OHOS::Ace::GestureModel::CreatePinchGesture,
-    OHOS::Ace::GestureModel::CreateRotationGesture,
-    OHOS::Ace::GestureModel::CreateSwipeGesture,
-    OHOS::Ace::GestureModel::CreateGroupGesture,
-    OHOS::Ace::GestureModel::DisposeGesture,
-    OHOS::Ace::GestureModel::AddChildGesture,
-    OHOS::Ace::GestureModel::RemoveChildGesture,
-    OHOS::Ace::GestureModel::SetGestureEventTarget,
-    OHOS::Ace::GestureModel::AddGestureToNode,
-    OHOS::Ace::GestureModel::RemoveGestureFromNode,
-    OHOS::Ace::GestureModel::SetGestureInterrupterToNode,
+    [](int32_t count, int32_t fingers) -> ArkUI_GestureRecognizer* {
+        CHECK_UI_THREAD("ArkUI_NativeGestureAPI_1.createTapGesture");
+        return OHOS::Ace::GestureModel::CreateTapGesture(count, fingers);
+    },
+    [](int32_t fingers, bool repeatResult, int32_t duration) -> ArkUI_GestureRecognizer* {
+        CHECK_UI_THREAD("ArkUI_NativeGestureAPI_1.createLongPressGesture");
+        return OHOS::Ace::GestureModel::CreateLongPressGesture(fingers, repeatResult, duration);
+    },
+    [](int32_t fingersNum, ArkUI_GestureDirectionMask mask, double distanceNum) -> ArkUI_GestureRecognizer* {
+        CHECK_UI_THREAD("ArkUI_NativeGestureAPI_1.createPanGesture");
+        return OHOS::Ace::GestureModel::CreatePanGesture(fingersNum, mask, distanceNum);
+    },
+    [](int32_t fingers, double distance) -> ArkUI_GestureRecognizer* {
+        CHECK_UI_THREAD("ArkUI_NativeGestureAPI_1.createPinchGesture");
+        return OHOS::Ace::GestureModel::CreatePinchGesture(fingers, distance);
+    },
+    [](int32_t fingers, double angle) -> ArkUI_GestureRecognizer* {
+        CHECK_UI_THREAD("ArkUI_NativeGestureAPI_1.createRotationGesture");
+        return OHOS::Ace::GestureModel::CreateRotationGesture(fingers, angle);
+    },
+    [](int32_t fingers, ArkUI_GestureDirectionMask directions, double speed) -> ArkUI_GestureRecognizer* {
+        CHECK_UI_THREAD("ArkUI_NativeGestureAPI_1.createSwipeGesture");
+        return OHOS::Ace::GestureModel::CreateSwipeGesture(fingers, directions, speed);
+    },
+    [](ArkUI_GroupGestureMode gestureMode) -> ArkUI_GestureRecognizer* {
+        CHECK_UI_THREAD("ArkUI_NativeGestureAPI_1.createGroupGesture");
+        return OHOS::Ace::GestureModel::CreateGroupGesture(gestureMode);
+    },
+    [](ArkUI_GestureRecognizer* recognizer) -> void {
+        CHECK_UI_THREAD("ArkUI_NativeGestureAPI_1.dispose");
+        OHOS::Ace::GestureModel::DisposeGesture(recognizer);
+    },
+    [](ArkUI_GestureRecognizer* group, ArkUI_GestureRecognizer* child) -> int32_t {
+        CHECK_UI_THREAD("ArkUI_NativeGestureAPI_1.addChildGesture");
+        return OHOS::Ace::GestureModel::AddChildGesture(group, child);
+    },
+    [](ArkUI_GestureRecognizer* group, ArkUI_GestureRecognizer* child) -> int32_t {
+        CHECK_UI_THREAD("ArkUI_NativeGestureAPI_1.removeChildGesture");
+        return OHOS::Ace::GestureModel::RemoveChildGesture(group, child);
+    },
+    [](ArkUI_GestureRecognizer* recognizer, ArkUI_GestureEventActionTypeMask mask, void* extraParam,
+        void (*targetReceiver)(ArkUI_GestureEvent* event, void* extraParam)) -> int32_t {
+        CHECK_UI_THREAD("ArkUI_NativeGestureAPI_1.setGestureEventTarget");
+        return OHOS::Ace::GestureModel::SetGestureEventTarget(recognizer, mask, extraParam, targetReceiver);
+    },
+    [](ArkUI_NodeHandle node, ArkUI_GestureRecognizer* recognizer, ArkUI_GesturePriority priorityNum,
+        ArkUI_GestureMask mask) -> int32_t {
+        CHECK_UI_THREAD("ArkUI_NativeGestureAPI_1.addGestureToNode");
+        return OHOS::Ace::GestureModel::AddGestureToNode(node, recognizer, priorityNum, mask);
+    },
+    [](ArkUI_NodeHandle node, ArkUI_GestureRecognizer* recognizer) -> int32_t {
+        CHECK_UI_THREAD("ArkUI_NativeGestureAPI_1.removeGestureFromNode");
+        return OHOS::Ace::GestureModel::RemoveGestureFromNode(node, recognizer);
+    },
+    [](ArkUI_NodeHandle node, ArkUI_GestureInterruptResult (*interrupter)(ArkUI_GestureInterruptInfo* info)) -> int32_t {
+        CHECK_UI_THREAD("ArkUI_NativeGestureAPI_1.setGestureInterrupterToNode");
+        return OHOS::Ace::GestureModel::SetGestureInterrupterToNode(node, interrupter);
+    },
     OHOS::Ace::GestureModel::GetGestureType,
-    OHOS::Ace::GestureModel::SetInnerGestureParallelTo,
-    OHOS::Ace::GestureModel::CreateTapGestureWithDistanceThreshold,
+    [](ArkUI_NodeHandle node, void* userData,
+        ArkUI_GestureRecognizer* (*parallelInnerGesture)(ArkUI_ParallelInnerGestureEvent* event)) -> int32_t {
+        CHECK_UI_THREAD("ArkUI_NativeGestureAPI_1.setInnerGestureParallelTo");
+        return OHOS::Ace::GestureModel::SetInnerGestureParallelTo(node, userData, parallelInnerGesture);
+    },
+    [](int32_t count, int32_t fingers, double distanceThreshold) -> ArkUI_GestureRecognizer* {
+        CHECK_UI_THREAD("ArkUI_NativeGestureAPI_1.createTapGestureWithDistanceThreshold");
+        return OHOS::Ace::GestureModel::CreateTapGestureWithDistanceThreshold(count, fingers, distanceThreshold);
+    },
 };
 
 ArkUI_NativeGestureAPI_2 gestureImpl_2 = {
     &gestureImpl_1,
-    OHOS::Ace::GestureModel::SetGestureInterrupterToNodeWithUserData,  
+    [](ArkUI_NodeHandle node, void* userData,
+        ArkUI_GestureInterruptResult (*interrupter)(ArkUI_GestureInterruptInfo* info)) -> int32_t {
+        CHECK_UI_THREAD("ArkUI_NativeGestureAPI_2.setGestureInterrupterToNode");
+        return OHOS::Ace::GestureModel::SetGestureInterrupterToNodeWithUserData(node, userData, interrupter);
+    },
 };
 
 ArkUI_NativeGestureAPI_3 gestureImpl_3 = {
     &gestureImpl_2,
-    OHOS::Ace::GestureModel::SetGestureParallelTo,
+    [](ArkUI_NodeHandle node, void* userData,
+        ArkUI_GestureRecognizer* (*parallelGesture)(ArkUI_ParallelGestureEvent* event)) -> ArkUI_ErrorCode {
+        CHECK_UI_THREAD("ArkUI_NativeGestureAPI_3.setGestureParallelTo");
+        return OHOS::Ace::GestureModel::SetGestureParallelTo(node, userData, parallelGesture);
+    },
 };
 
 ArkUI_NativeAnimateAPI_1 animateImpl_1 = {

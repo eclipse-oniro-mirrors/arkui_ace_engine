@@ -24,6 +24,7 @@ extern "C" {
 
 ArkUI_ErrorCode OH_ArkUI_FocusRequest(ArkUI_NodeHandle node)
 {
+    CHECK_UI_THREAD("OH_ArkUI_FocusRequest");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     CHECK_NULL_RETURN_WITH_MESSAGE(impl, ARKUI_ERROR_CODE_FOCUS_NON_EXISTENT,
         "OH_ArkUI_FocusRequest", "Native module not initialized");
@@ -36,6 +37,7 @@ ArkUI_ErrorCode OH_ArkUI_FocusRequest(ArkUI_NodeHandle node)
 
 void OH_ArkUI_FocusClear(ArkUI_ContextHandle uiContext)
 {
+    CHECK_UI_THREAD("OH_ArkUI_FocusClear");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_FocusClear", "Native module not initialized");
@@ -51,6 +53,7 @@ void OH_ArkUI_FocusClear(ArkUI_ContextHandle uiContext)
 
 void OH_ArkUI_FocusActivate(ArkUI_ContextHandle uiContext, bool isActive, bool isAutoInactive)
 {
+    CHECK_UI_THREAD("OH_ArkUI_FocusActivate");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_FocusActivate", "Native module not initialized");
@@ -66,6 +69,7 @@ void OH_ArkUI_FocusActivate(ArkUI_ContextHandle uiContext, bool isActive, bool i
 
 void OH_ArkUI_FocusSetAutoTransfer(ArkUI_ContextHandle uiContext, bool autoTransfer)
 {
+    CHECK_UI_THREAD("OH_ArkUI_FocusSetAutoTransfer");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID,
@@ -83,6 +87,7 @@ void OH_ArkUI_FocusSetAutoTransfer(ArkUI_ContextHandle uiContext, bool autoTrans
 
 void OH_ArkUI_FocusSetKeyProcessingMode(ArkUI_ContextHandle uiContext, ArkUI_KeyProcessingMode mode)
 {
+    CHECK_UI_THREAD("OH_ArkUI_FocusSetKeyProcessingMode");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID,
