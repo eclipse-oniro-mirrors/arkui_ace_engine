@@ -1233,14 +1233,6 @@ void ViewAbstractModelNG::ApplySheetImmersiveStrategyDefaults(
     if (!sheetStyle.titleBarHoverMode.has_value()) {
         sheetStyle.titleBarHoverMode = SheetTitleBarHoverMode::SAFE_AREA_PADDING;
     }
-    const auto hoverMode = sheetStyle.titleBarHoverMode.value();
-    if (!sheetStyle.titleBarBackgroundBlur.has_value() &&
-        hoverMode == SheetTitleBarHoverMode::SAFE_AREA_PADDING &&
-        context->GetImmersiveEffectMode() == ImmersiveEffectMode::ENABLED) {
-        sheetStyle.titleBarBackgroundBlur = NG::SheetTitleBarBackgroundBlurOptions {
-            .blurStyle = NG::SheetTitleBarBackgroundBlur::GRADIENT,
-        };
-    }
 }
 
 void ViewAbstractModelNG::BindSheet(bool isShow, std::function<void(const std::string&)>&& callback,
