@@ -15574,8 +15574,7 @@ HWTEST_F(NativeNodeTest, VisibleAreaEventOptions_GetMeasureFromViewport_NullOpti
 HWTEST_F(NativeNodeTest, CreateSnapshotOptions_Normal, TestSize.Level1)
 {
     auto result = OH_ArkUI_CreateSnapshotOptions();
-    ASSERT_NE(result, nullptr);
-    OH_ArkUI_DestroySnapshotOptions(result);
+    EXPECT_NE(result, nullptr);
 }
 
 HWTEST_F(NativeNodeTest, DragPreviewOption_CreateAndDispose_Normal, TestSize.Level1)

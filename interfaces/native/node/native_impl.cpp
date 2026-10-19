@@ -277,7 +277,7 @@ ArkUI_NativeGestureAPI_1 gestureImpl_1 = {
 
 ArkUI_NativeGestureAPI_2 gestureImpl_2 = {
     &gestureImpl_1,
-    OHOS::Ace::GestureModel::SetGestureInterrupterToNodeWithUserData,
+    OHOS::Ace::GestureModel::SetGestureInterrupterToNodeWithUserData,  
 };
 
 ArkUI_NativeGestureAPI_3 gestureImpl_3 = {
