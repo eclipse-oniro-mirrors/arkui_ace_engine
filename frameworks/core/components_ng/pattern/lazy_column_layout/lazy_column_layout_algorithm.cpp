@@ -24,6 +24,7 @@
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/pattern/lazy_layout/lazy_layout_pattern.h"
 #include "core/components_ng/pattern/lazy_layout/lazy_layout_utils.h"
+#include "core/components_ng/pattern/lazy_layout/prepared_layout_geometry.h"
 #include "core/components_ng/pattern/lazy_layout/header_footer_utils.h"
 #include "core/components_ng/pattern/lazy_column_layout/lazy_column_layout_pattern.h"
 #include "core/components_ng/property/measure_utils.h"
@@ -41,6 +42,237 @@ float GetVerticalMargin(const RefPtr<LayoutWrapper>& wrapper, bool isStart)
     return isStart ? margin->top.value_or(0.0f) : margin->bottom.value_or(0.0f);
 }
 } // namespace
+
+std::optional<LazyPremeasureResult> LazyColumnLayoutAlgorithm::Premeasure(LayoutWrapper* layoutWrapper)
+{
+    LazyColumnLayoutAlgorithm measure(layoutInfo_);
+    measure.header_ = header_;
+    measure.footer_ = footer_;
+    return measure.MeasureBoundaryRange(layoutWrapper);
+}
+
+std::optional<LazyPremeasureResult> LazyColumnLayoutAlgorithm::MeasureBoundaryRange(LayoutWrapper* layoutWrapper)
+{
+    OptionalSizeF ideal;
+    CHECK_NULL_RETURN(PrepareBoundaryMeasure(layoutWrapper, ideal), std::nullopt);
+    const float oldTotal = layoutInfo_->totalMainSize_;
+    const float oldHeader = layoutInfo_->headerMainSize_;
+    prevBodyMainSize_ = std::max(0.0f, oldTotal - oldHeader - layoutInfo_->footerMainSize_);
+    const auto oldAdjust = layoutInfo_->adjustOffset_;
+    const auto anchor = layoutInfo_->posMap_.find(layoutInfo_->startIndex_);
+    const std::optional<float> oldAnchor = anchor == layoutInfo_->posMap_.end()
+        ? std::nullopt : std::optional<float>(anchor->second.startPos + oldHeader);
+    MeasureHeader(layoutWrapper);
+    MeasureFooter(layoutWrapper);
+    layoutInfo_->SetSpace(space_);
+    layoutInfo_->SetTotalItemCount(totalItemCount_);
+    const auto& reference = layoutWrapper->GetLayoutProperty()->GetContentLayoutConstraint()->viewPosRef.value();
+    const auto range = LazyLayoutUtils::CalculateViewRange(reference,
+        prevBodyMainSize_ + layoutInfo_->headerMainSize_ + layoutInfo_->footerMainSize_);
+    startPos_ = range.start - layoutInfo_->headerMainSize_;
+    endPos_ = range.end - layoutInfo_->headerMainSize_;
+    auto result = MeasureBoundaryItems(layoutWrapper, reference.referenceEdge == ReferenceEdge::START);
+    const bool accepted = FinishBoundaryMeasure(result, oldTotal, oldHeader, oldAnchor);
+    CapturePreparedGeometry(*result.geometry);
+    result.unsupported = result.unsupported || !accepted;
+    layoutInfo_->adjustOffset_ = oldAdjust;
+    result.complete = result.complete && !result.unsupported;
+    result.reachedOppositeEdge = result.reachedOppositeEdge && result.complete;
+    SetFrameSize(layoutWrapper, ideal);
+    result.marginMainSize = layoutWrapper->GetGeometryNode()->GetMarginFrameSize().Height();
+    return result;
+}
+
+bool LazyColumnLayoutAlgorithm::PrepareBoundaryMeasure(LayoutWrapper* layoutWrapper, OptionalSizeF& ideal)
+{
+    CHECK_NULL_RETURN(layoutWrapper, false);
+    auto property = AceType::DynamicCast<LazyColumnLayoutProperty>(layoutWrapper->GetLayoutProperty());
+    CHECK_NULL_RETURN(property && layoutInfo_ && property->GetContentLayoutConstraint(), false);
+    const auto& constraint = property->GetContentLayoutConstraint().value();
+    CHECK_NULL_RETURN(constraint.viewPosRef, false);
+    knownMainSize_ = constraint.viewPosRef->knownMainSize;
+    if (constraint.selfIdealSize.Height() || Positive(constraint.minSize.Height()) ||
+        !GreaterOrEqualToInfinity(constraint.maxSize.Height())) {
+        return false;
+    }
+    UpdateHeaderFooterIndexes(layoutWrapper);
+    totalItemCount_ = CalculateItemCount(layoutWrapper);
+    ideal = ResolveContentIdealSize(constraint, property);
+    UpdateAttribute(property, constraint);
+    UpdateChildConstraint(property, ideal);
+    return true;
+}
+
+LazyPremeasureResult LazyColumnLayoutAlgorithm::MeasureBoundaryItems(
+    LayoutWrapper* layoutWrapper, bool forward)
+{
+    LazyPremeasureResult result;
+    result.geometry = std::make_shared<PreparedLayoutGeometry>();
+    result.geometry->fromEnd = !forward;
+    const float limit = forward ? endPos_ : startPos_;
+    float cursor = forward ? 0.0f : prevBodyMainSize_;
+    int32_t index = forward ? 0 : totalItemCount_ - 1;
+    bool crossedChildren = true;
+    result.complete = true;
+    while (index >= 0 && index < totalItemCount_ &&
+        (forward ? LessNotEqual(cursor, limit) : GreatNotEqual(cursor, limit))) {
+        const bool displayed = (index >= layoutInfo_->startIndex_ && index <= layoutInfo_->endIndex_) ||
+            (index >= layoutInfo_->cachedStartIndex_ && index <= layoutInfo_->cachedEndIndex_);
+        auto child = layoutWrapper->GetOrCreateChildByIndex(GetRawIndexForItem(index), false, !displayed);
+        if (!child) {
+            result.complete = false;
+            break;
+        }
+        auto item = MeasureBoundaryItem(child, cursor, forward);
+        const bool nested = NeedLazyLayout(child);
+        if (!item) {
+            result.unsupported = true;
+            result.complete = false;
+            break;
+        }
+        result.unsupported = item->unsupported;
+        if ((!item->complete && !nested) ||
+            !std::isfinite(item->marginMainSize) || Negative(item->marginMainSize)) {
+            result.complete = false;
+            break;
+        }
+        // An incomplete nested pass still returns its committed children and their compensation.
+        result.complete = item->complete && !result.unsupported;
+        crossedChildren = crossedChildren && item->reachedOppositeEdge;
+        if (index == layoutInfo_->startIndex_) {
+            result.adjust.start = item->adjust.start;
+        }
+        cursor = CommitBoundaryItem(index, cursor, forward, item.value());
+        RecordBoundaryItemGeometry(index, item.value(), result);
+        index += forward ? 1 : -1;
+        if (!result.complete) {
+            break;
+        }
+    }
+    result.reachedOppositeEdge = result.complete && crossedChildren && (index < 0 || index >= totalItemCount_);
+    return result;
+}
+
+void LazyColumnLayoutAlgorithm::RecordBoundaryItemGeometry(
+    int32_t index, const LazyPremeasureResult& item, LazyPremeasureResult& result)
+{
+    result.geometry->positions.try_emplace(index);
+    if (item.geometry) {
+        result.geometry->children[index] = item.geometry;
+    }
+}
+
+float LazyColumnLayoutAlgorithm::CommitBoundaryItem(
+    int32_t index, float cursor, bool forward, const LazyPremeasureResult& item)
+{
+    // Nested compensation belongs to the displayed anchor, not the requested measurement boundary.
+    const float start = forward ? cursor : cursor - item.marginMainSize;
+    layoutInfo_->SetPosMap(index, { start, start + item.marginMainSize });
+    return forward ? start + item.marginMainSize + space_ : start - space_;
+}
+
+std::optional<LazyPremeasureResult> LazyColumnLayoutAlgorithm::MeasureBoundaryItem(
+    const RefPtr<LayoutWrapper>& child, float cursor, bool forward)
+{
+    if (NeedLazyLayout(child)) {
+        auto constraint = childLayoutConstraint_;
+        constraint.viewPosRef = ViewPosReference {
+            .viewPosStart = startPos_, .viewPosEnd = endPos_, .referencePos = cursor,
+            .referenceEdge = forward ? ReferenceEdge::START : ReferenceEdge::END, .axis = Axis::VERTICAL,
+        };
+        if (totalItemCount_ == 1) {
+            constraint.viewPosRef->knownMainSize = GetKnownBodySize();
+        }
+        return LazyLayoutUtils::Premeasure(child, constraint);
+    }
+    child->Measure(childLayoutConstraint_);
+    CHECK_NULL_RETURN(LazyLayoutUtils::IsChildMeasureComplete(child), LazyPremeasureResult());
+    return LazyPremeasureResult { true, true, child->GetGeometryNode()->GetMarginFrameSize().Height(), {} };
+}
+
+void LazyColumnLayoutAlgorithm::CapturePreparedGeometry(PreparedLayoutGeometry& geometry) const
+{
+    geometry.type = PreparedLayoutType::COLUMN;
+    geometry.itemCount = totalItemCount_;
+    geometry.bodyMainSize = layoutInfo_->totalMainSize_ - layoutInfo_->headerMainSize_ - layoutInfo_->footerMainSize_;
+    geometry.headerMainSize = layoutInfo_->headerMainSize_;
+    geometry.footerMainSize = layoutInfo_->footerMainSize_;
+    geometry.space = space_;
+    geometry.estimatedItemSize = layoutInfo_->estimateItemSize_;
+    const float origin = geometry.fromEnd ? geometry.bodyMainSize : 0.0f;
+    for (auto& [index, item] : geometry.positions) {
+        const auto& position = layoutInfo_->posMap_.at(index);
+        item = { position.startPos - origin, position.endPos - origin };
+    }
+}
+
+bool LazyColumnLayoutAlgorithm::FinishBoundaryMeasure(LazyPremeasureResult& result, float oldTotal, float oldHeader,
+    const std::optional<float>& oldAnchor)
+{
+    layoutInfo_->totalMainSize_ = prevBodyMainSize_;
+    bool accepted = true;
+    if (totalItemCount_ > 0 || knownMainSize_) {
+        accepted = layoutInfo_->UpdatePosMap(prevBodyMainSize_, GetKnownBodySize());
+    } else {
+        layoutInfo_->totalMainSize_ = 0.0f;
+    }
+    totalMainSize_ = layoutInfo_->totalMainSize_ + layoutInfo_->headerMainSize_ + layoutInfo_->footerMainSize_;
+    layoutInfo_->totalMainSize_ = totalMainSize_;
+    layoutInfo_->premeasuredMainSize_ = totalMainSize_;
+    const float nestedAnchorAdjust = result.adjust.start;
+    result.adjust.start = 0.0f;
+    const auto anchor = layoutInfo_->posMap_.find(layoutInfo_->startIndex_);
+    if (oldAnchor && anchor != layoutInfo_->posMap_.end()) {
+        result.adjust.start = anchor->second.startPos + layoutInfo_->headerMainSize_ - oldAnchor.value() +
+            nestedAnchorAdjust;
+    }
+    RebasePremeasureWindow(oldAnchor ? result.adjust.start - layoutInfo_->headerMainSize_ + oldHeader : 0.0f);
+    result.adjust.end = totalMainSize_ - oldTotal - result.adjust.start;
+    return accepted;
+}
+
+std::optional<float> LazyColumnLayoutAlgorithm::GetKnownBodySize() const
+{
+    if (!knownMainSize_) {
+        return std::nullopt;
+    }
+    return knownMainSize_.value() - layoutInfo_->headerMainSize_ - layoutInfo_->footerMainSize_;
+}
+
+AdjustOffset LazyColumnLayoutAlgorithm::PrepareKnownBodyMeasure()
+{
+    const auto knownBody = GetKnownBodySize();
+    CHECK_NULL_RETURN(knownBody, AdjustOffset());
+    layoutInfo_->SetSpace(space_);
+    layoutInfo_->SetTotalItemCount(totalItemCount_);
+    CHECK_NULL_RETURN(layoutInfo_->ApplyKnownBodySize(prevBodyMainSize_, knownBody.value()), AdjustOffset());
+    const auto adjust = layoutInfo_->adjustOffset_;
+    prevBodyMainSize_ = layoutInfo_->totalMainSize_;
+    totalMainSize_ = prevBodyMainSize_ + layoutInfo_->headerMainSize_ + layoutInfo_->footerMainSize_;
+    RebasePremeasureWindow(adjust.start);
+    layoutInfo_->adjustOffset_ = {};
+    return hadMeasuredItems_ ? adjust : AdjustOffset();
+}
+
+void LazyColumnLayoutAlgorithm::RebasePremeasureWindow(float bodyAnchorAdjust)
+{
+    // Retain the same displayed/cached indexes; only their body-coordinate bookkeeping changes.
+    const float bodyEnd = totalMainSize_ - layoutInfo_->headerMainSize_ - layoutInfo_->footerMainSize_;
+    auto first = layoutInfo_->posMap_.find(layoutInfo_->layoutedStartIndex_);
+    if (layoutInfo_->layoutedStartIndex_ >= totalItemCount_) {
+        layoutInfo_->layoutedStart_ = bodyEnd;
+    } else if (first != layoutInfo_->posMap_.end()) {
+        layoutInfo_->layoutedStart_ = first->first == 0 ? 0.0f : first->second.startPos - space_;
+    }
+    auto last = layoutInfo_->posMap_.find(layoutInfo_->layoutedEndIndex_);
+    if (layoutInfo_->layoutedEndIndex_ >= totalItemCount_ - 1) {
+        layoutInfo_->layoutedEnd_ = bodyEnd;
+    } else if (last != layoutInfo_->posMap_.end()) {
+        layoutInfo_->layoutedEnd_ = last->second.endPos + space_;
+    }
+    layoutInfo_->cacheStartPos_ += bodyAnchorAdjust;
+    layoutInfo_->cacheEndPos_ += bodyAnchorAdjust;
+}
 
 void LazyColumnLayoutAlgorithm::ShiftLayoutWindow(float delta)
 {
@@ -60,10 +292,14 @@ void LazyColumnLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
     CHECK_NULL_VOID(layoutProperty);
     auto hostNode = layoutWrapper->GetHostNode();
     auto pattern = hostNode ? hostNode->GetPattern<LazyLayoutPattern>() : nullptr;
+    if (LazyLayoutUtils::MeasurePreparedBoundary(AceType::RawPtr(pattern))) {
+        return;
+    }
     if (pattern) {
         pattern->NotifyParentOnStickyHeaderChange();
     }
     auto contentConstraint = layoutProperty->GetContentLayoutConstraint().value_or(LayoutConstraintF());
+    knownMainSize_ = contentConstraint.viewPosRef ? contentConstraint.viewPosRef->knownMainSize : std::nullopt;
     auto contentIdealSize = ResolveContentIdealSize(contentConstraint, layoutProperty);
     UpdateHeaderFooterIndexes(layoutWrapper);
     totalItemCount_ = CalculateItemCount(layoutWrapper);
@@ -73,8 +309,14 @@ void LazyColumnLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
 
     // Header first: UpdatePosReference needs this frame's header to convert the viewport to body coords.
     MeasureHeader(layoutWrapper);
+    if (knownMainSize_) {
+        MeasureFooter(layoutWrapper);
+    }
+    const auto knownAdjust = PrepareKnownBodyMeasure();
     UpdatePosReference(layoutWrapper, contentConstraint.viewPosRef);
-    MeasureFooter(layoutWrapper);
+    if (!knownMainSize_) {
+        MeasureFooter(layoutWrapper);
+    }
 
     ComposeChildStickyInsets(layoutWrapper);
 
@@ -86,6 +328,8 @@ void LazyColumnLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
     // Body-local: totalMainSize_ holds the body extent here; fold the edge slots into the section total.
     totalMainSize_ += layoutInfo_->headerMainSize_ + layoutInfo_->footerMainSize_;
     layoutInfo_->totalMainSize_ = totalMainSize_;
+    layoutInfo_->adjustOffset_.start += knownAdjust.start;
+    layoutInfo_->adjustOffset_.end += knownAdjust.end;
 
     SetFrameSize(layoutWrapper, contentIdealSize);
 }
@@ -93,6 +337,8 @@ void LazyColumnLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
 void LazyColumnLayoutAlgorithm::MeasureItemsByMode(LayoutWrapper* layoutWrapper,
     const RefPtr<LazyColumnLayoutProperty>& layoutProperty, const OptionalSizeF& contentIdealSize)
 {
+    const bool updateKnownSize = knownMainSize_ && (totalItemCount_ == 0 || isEstimatePass_ ||
+        (!layoutInfo_->deadline_ && (needAllLayout_ || needSkipLayout_)));
     if (totalItemCount_ == 0) {
         layoutInfo_->SetTotalItemCount(0);
         totalMainSize_ = 0.0f;
@@ -104,6 +350,10 @@ void LazyColumnLayoutAlgorithm::MeasureItemsByMode(LayoutWrapper* layoutWrapper,
         MeasureAllItems(layoutWrapper);
     } else if (!needSkipLayout_) {
         MeasureItemsLazy(layoutWrapper);
+    }
+    if (updateKnownSize) {
+        layoutInfo_->UpdatePosMap(prevBodyMainSize_, GetKnownBodySize());
+        totalMainSize_ = layoutInfo_->totalMainSize_;
     }
 }
 
@@ -124,6 +374,9 @@ OptionalSizeF LazyColumnLayoutAlgorithm::ResolveContentIdealSize(const LayoutCon
 
 void LazyColumnLayoutAlgorithm::CaptureFrameBaseline()
 {
+    // Preparation commits info without geometry. Consume that baseline before this frame changes it.
+    premeasuredMainSize_ = layoutInfo_->premeasuredMainSize_;
+    layoutInfo_->premeasuredMainSize_.reset();
     totalMainSize_ = layoutInfo_->totalMainSize_;
     // Edge sizes still hold last frame's values here.
     prevBodyMainSize_ = std::max(0.0f, totalMainSize_ - layoutInfo_->headerMainSize_ - layoutInfo_->footerMainSize_);
@@ -237,10 +490,13 @@ bool LazyColumnLayoutAlgorithm::UpdateViewRange(LayoutWrapper* layoutWrapper, co
         startPos_ = posRef.viewPosStart - viewExtStart_ - referencePos_;
         endPos_ = posRef.viewPosEnd + viewExtEnd_ - referencePos_;
     } else {
-        auto geometryNode = layoutWrapper->GetGeometryNode();
-        CHECK_NULL_RETURN(geometryNode, false);
-        auto realMainSize = geometryNode->GetPaddingSize().Height();
-        referencePos_ += totalMainSize_ - realMainSize;
+        auto mainSize = premeasuredMainSize_;
+        if (!mainSize) {
+            auto geometryNode = layoutWrapper->GetGeometryNode();
+            CHECK_NULL_RETURN(geometryNode, false);
+            mainSize = geometryNode->GetPaddingSize().Height();
+        }
+        referencePos_ += totalMainSize_ - mainSize.value();
         startPos_ = posRef.viewPosStart - viewExtStart_ - (referencePos_ - totalMainSize_);
         endPos_ = posRef.viewPosEnd + viewExtEnd_ - (referencePos_ - totalMainSize_);
     }
@@ -467,9 +723,12 @@ void LazyColumnLayoutAlgorithm::GetEndIndexInfo(int32_t& index, float& pos)
     }
     auto it = layoutInfo_->posMap_.find(layoutInfo_->endIndex_);
     if (it == layoutInfo_->posMap_.end()) {
-        pos = prevBodyMainSize_;
-        index = layoutInfo_->totalItemCount_ - 1;
-        return;
+        if (!layoutInfo_->premeasuredMainSize_ || layoutInfo_->posMap_.empty()) {
+            pos = prevBodyMainSize_;
+            index = layoutInfo_->totalItemCount_ - 1;
+            return;
+        }
+        it = std::prev(layoutInfo_->posMap_.end());
     }
     std::reverse_iterator<std::map<int32_t, ColumnItemMainPos>::iterator> rit(++it);
     auto nextIt = rit;
@@ -509,6 +768,9 @@ LayoutConstraintF LazyColumnLayoutAlgorithm::GetLazyLayoutConstraint(float refer
         .axis = Axis::VERTICAL,
         .deadline = layoutInfo_->deadline_,
     };
+    if (totalItemCount_ == 1) {
+        ref.knownMainSize = GetKnownBodySize();
+    }
     auto constraint = childLayoutConstraint_;
     constraint.viewPosRef = ref;
     LazyLayoutUtils::SetStickyInsets(constraint, childStickyTopInset_, childStickyBottomInset_);
@@ -589,6 +851,16 @@ bool LazyColumnLayoutAlgorithm::MeasureItem(
         return false;
     }
     if (NeedLazyLayout(wrapper)) {
+        auto host = layoutWrapper->GetHostNode();
+        auto pattern = host ? host->GetPattern<LazyLayoutPattern>() : nullptr;
+        auto geometry = pattern ? pattern->GetPreparedGeometry() : nullptr;
+        if (geometry) {
+            auto child = geometry->children.find(curIndex);
+            auto lazy = LazyLayoutUtils::GetLazyLayoutPattern(wrapper->GetHostNode());
+            if (child != geometry->children.end() && lazy) {
+                lazy->RestorePreparedGeometry(child->second);
+            }
+        }
         wrapper->Measure(GetLazyLayoutConstraint(currentPos, forward));
         ApplyLazyNodeAdjustOffset(wrapper, currentPos, forward);
     } else if (CheckNeedMeasure(wrapper)) {
@@ -805,7 +1077,7 @@ void LazyColumnLayoutAlgorithm::MeasureItemsLazy(LayoutWrapper* layoutWrapper)
         }
     }
     CheckRecycle();
-    layoutInfo_->UpdatePosMap(prevBodyMainSize_);
+    layoutInfo_->UpdatePosMap(prevBodyMainSize_, GetKnownBodySize());
     ShiftLayoutWindow(layoutInfo_->adjustOffset_.start);
     if (!hadMeasuredItems_) {
         // First layout: no parent anchor to preserve.
@@ -1065,12 +1337,12 @@ void LazyColumnLayoutAlgorithm::SyncPredictLayoutInfo(LayoutWrapper* layoutWrapp
     // Skip posMap update if only self measure changed, as child positions remain valid.
     auto layoutProperty = layoutWrapper->GetLayoutProperty();
     CHECK_NULL_VOID(layoutProperty);
-    if (layoutProperty->GetPropertyChangeFlag() == PROPERTY_UPDATE_MEASURE_SELF) {
+    if (!knownMainSize_ && layoutProperty->GetPropertyChangeFlag() == PROPERTY_UPDATE_MEASURE_SELF) {
         // Reuse last frame's body; old section minus CURRENT edges would lock the total across an edge resize.
         totalMainSize_ = prevBodyMainSize_;
         return;
     }
-    layoutInfo_->UpdatePosMap(prevBodyMainSize_);
+    layoutInfo_->UpdatePosMap(prevBodyMainSize_, GetKnownBodySize());
     totalMainSize_ = layoutInfo_->totalMainSize_;
 }
 

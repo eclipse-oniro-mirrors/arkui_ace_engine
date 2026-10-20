@@ -66,6 +66,9 @@ void LazyWaterFlowLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
     CHECK_NULL_VOID(layoutProperty);
     auto hostNode = layoutWrapper->GetHostNode();
     auto pattern = hostNode ? hostNode->GetPattern<LazyLayoutPattern>() : nullptr;
+    if (LazyLayoutUtils::MeasurePreparedBoundary(AceType::RawPtr(pattern))) {
+        return;
+    }
     if (pattern) {
         pattern->NotifyParentOnStickyHeaderChange();
     }
