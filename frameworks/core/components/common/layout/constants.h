@@ -894,6 +894,7 @@ enum class ImmersiveStrategy : int32_t {
     AVOID_CUTOUT = 0,
     AVOID_FLOAT_NAV = 1,
     BIND_SHEET_EXPAND_SAFE_AREA = 7,
+    NAVIGATION_EXPAND_SAFE_AREA = 8,
 };
 
 enum class SwipeActionState : uint32_t {
