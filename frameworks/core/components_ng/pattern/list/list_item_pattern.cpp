@@ -1165,6 +1165,7 @@ void ListItemPattern::MarkIsSelected(bool isSelected)
     if (isSelected_ != isSelected) {
         isSelected_ = isSelected;
         auto eventHub = GetEventHub<ListItemEventHub>();
+        CHECK_NULL_VOID(eventHub);
         eventHub->FireSelectChangeEvent(isSelected);
         auto host = GetHost();
         CHECK_NULL_VOID(host);

@@ -1585,6 +1585,7 @@ void ListPattern::SetEdgeEffectCallback(const RefPtr<ScrollEdgeEffect>& scrollEf
     });
     scrollEffect->SetLeadingCallback([weak = AceType::WeakClaim(this)]() -> double {
         auto list = weak.Upgrade();
+        CHECK_NULL_RETURN(list, 0.0);
         auto endPos = list->endMainPos_;
         auto startPos = list->startMainPos_;
         float leading = list->contentMainSize_ - (endPos - startPos) - list->contentEndOffset_;
@@ -1607,6 +1608,7 @@ void ListPattern::SetEdgeEffectCallback(const RefPtr<ScrollEdgeEffect>& scrollEf
     });
     scrollEffect->SetInitLeadingCallback([weak = AceType::WeakClaim(this)]() -> double {
         auto list = weak.Upgrade();
+        CHECK_NULL_RETURN(list, 0.0);
         auto endPos = list->endMainPos_;
         auto startPos = list->startMainPos_;
         float leading = list->contentMainSize_ - (endPos - startPos) - list->contentEndOffset_;
