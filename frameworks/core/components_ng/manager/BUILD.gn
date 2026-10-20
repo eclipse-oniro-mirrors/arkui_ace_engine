@@ -51,6 +51,8 @@ build_component_ng("manager_ng") {
     "frame_rate/frame_rate_manager.cpp",
     "full_screen/full_screen_manager.cpp",
     "gesture/active_recognizer_manager.cpp",
+    "interaction_observer/ui_info_collection_manager.cpp",
+    "interaction_observer/ui_interaction_json_builder.cpp",
     "memory/memory_manager.cpp",
     "navigation/navigation_manager.cpp",
     "material/material_processor.cpp",

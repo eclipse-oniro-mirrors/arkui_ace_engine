@@ -28,6 +28,7 @@
 #include "core/components_ng/gestures/recognizers/recognizer_group.h"
 #include "core/components_ng/manager/smart_gesture/smart_gesture_manager.h"
 #include "core/components_ng/manager/gesture_debug/gesture_debug_boundary_manager.h"
+#include "core/components_ng/manager/interaction_observer/ui_info_collection_manager.h"
 #include "core/components_ng/manager/select_overlay/select_overlay_manager.h"
 #include "core/components_ng/manager/gesture/active_recognizer_manager.h"
 #include "core/components_ng/pattern/window_scene/helper/window_scene_helper.h"
@@ -1210,6 +1211,68 @@ void EventManager::ProcessTouchEventDownPhase(const TouchEvent& point, const Tou
 #endif
 }
 
+bool EventManager::DispatchTouchEventToPipelines(TouchEvent& point, bool sendOnTouch)
+{
+    bool dispatchSuccess = DispatchMultiContainerEvent(point);
+    // If one gesture recognizer has already been won, other gesture recognizers will still be affected by
+    // the event, each recognizer needs to filter the extra events by itself.
+    if (dispatchSuccess && Container::IsCurrentUseNewPipeline()) {
+        if (point.type == TouchType::CANCEL && point.pullType == TouchType::PULL_MOVE) {
+            CleanRecognizersForDragBegin(point);
+            lastEventTime_ = point.time;
+            lastTouchEventEndTimestamp_ = GetSysTimestamp();
+            // Short-circuit: the drag-begin cancel path skips the remaining dispatch steps.
+            return false;
+        }
+        // Need update here: onTouch/Recognizer need update
+        DispatchTouchEventAndCheck(point, sendOnTouch);
+    }
+    DispatchTouchEventInOldPipeline(point, dispatchSuccess);
+    return true;
+}
+
+namespace {
+// First frame node attached to the touch test result list, used as the hit
+// node id for interaction observer touch-down notifications.
+int32_t GetFirstHitNodeId(const TouchTestResult& hitTestResult)
+{
+    for (const auto& target : hitTestResult) {
+        if (!target) {
+            continue;
+        }
+        auto hitNode = target->GetAttachedNode().Upgrade();
+        if (hitNode) {
+            return hitNode->GetId();
+        }
+    }
+    return -1;
+}
+
+// Always-on delivery for NDK interaction observers: raw touch down/up. Down
+// carries the first hit node id when a touch test result exists; up never
+// carries one.
+void NotifyTouchToInteractionObserver(
+    int32_t instanceId, const TouchEvent& point, const TouchTestResult* hitTestResult)
+{
+    if ((point.type != TouchType::DOWN && point.type != TouchType::UP && point.type != TouchType::CANCEL) ||
+        !NG::UIInfoCollectionManager::GetInstance().HasAnyObserver()) {
+        return;
+    }
+    if (point.type == TouchType::CANCEL) {
+        // Cancel never reaches observers (the public TOUCH surface is down
+        // and up only); it only ends the drag-start timing record.
+        NG::UIInfoCollectionManager::GetInstance().NotifyTouchCancelled(instanceId, point.id);
+        return;
+    }
+    int32_t hitNodeId = -1;
+    if (point.type == TouchType::DOWN && hitTestResult != nullptr) {
+        hitNodeId = GetFirstHitNodeId(*hitTestResult);
+    }
+    NG::UIInfoCollectionManager::GetInstance().NotifyTouch(
+        instanceId, point.type == TouchType::DOWN, point, hitNodeId);
+}
+} // namespace
+
 bool EventManager::DispatchTouchEvent(const TouchEvent& event, bool sendOnTouch)
 {
 #ifdef ENABLE_INSPECTOR_EVENT_REPORTING
@@ -1222,6 +1285,8 @@ bool EventManager::DispatchTouchEvent(const TouchEvent& event, bool sendOnTouch)
     TouchEvent point = event;
     UpdateDragInfo(point);
     const auto iter = touchTestResults_.find(point.id);
+    NotifyTouchToInteractionObserver(
+        instanceId_, point, iter != touchTestResults_.end() ? &iter->second : nullptr);
     if (iter == touchTestResults_.end()) {
         CheckUpEvent(event);
         lastDownFingerNumber_ = static_cast<int32_t>(downFingerIds_.size());
@@ -1242,21 +1307,9 @@ bool EventManager::DispatchTouchEvent(const TouchEvent& event, bool sendOnTouch)
 #ifdef ENABLE_INSPECTOR_EVENT_REPORTING
     NG::Reporter::GetInstance().HandleInputEventInspectorReporting(point);
 #endif
-    bool dispatchSuccess = true;
-    dispatchSuccess = DispatchMultiContainerEvent(point);
-    // If one gesture recognizer has already been won, other gesture recognizers will still be affected by
-    // the event, each recognizer needs to filter the extra events by itself.
-    if (dispatchSuccess && Container::IsCurrentUseNewPipeline()) {
-        if (point.type == TouchType::CANCEL && point.pullType == TouchType::PULL_MOVE) {
-            CleanRecognizersForDragBegin(point);
-            lastEventTime_ = point.time;
-            lastTouchEventEndTimestamp_ = GetSysTimestamp();
-            return true;
-        }
-        // Need update here: onTouch/Recognizer need update
-        DispatchTouchEventAndCheck(point, sendOnTouch);
+    if (!DispatchTouchEventToPipelines(point, sendOnTouch)) {
+        return true;
     }
-    DispatchTouchEventInOldPipeline(point, dispatchSuccess);
     NotifyDragTouchEventListener(point);
     CheckUpEvent(event);
     auto item = touchTestResults_.find(event.id);

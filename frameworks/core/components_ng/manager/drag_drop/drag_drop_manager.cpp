@@ -41,6 +41,7 @@
 #include "core/components_ng/manager/drag_drop/drag_drop_global_controller.h"
 #include "core/components_ng/manager/drag_drop/drag_drop_spring_loading/drag_drop_spring_loading_detector.h"
 #include "core/components_ng/manager/drag_drop/utils/drag_animation_helper.h"
+#include "core/components_ng/manager/interaction_observer/ui_info_collection_manager.h"
 #include "core/components_ng/pattern/grid/grid_event_hub.h"
 #include "core/components_ng/pattern/list/list_event_hub.h"
 #include "core/components_ng/pattern/menu/wrapper/menu_wrapper_pattern.h"
@@ -100,6 +101,20 @@ DragAnimationType ParseDragAnimationType(int32_t dragAnimationTypeValue)
     return dragAnimationTypeValue == static_cast<int32_t>(DragAnimationType::FOLLOW_HAND_MORPH)
         ? DragAnimationType::FOLLOW_HAND_MORPH
         : DragAnimationType::DEFAULT;
+}
+
+// Instance id used for interaction observer drag notifications; falls back to
+// the current container when no node is available.
+int32_t GetInteractionObserverInstanceId(const RefPtr<FrameNode>& node)
+{
+    if (node) {
+        auto context = node->GetContext();
+        if (context) {
+            return context->GetInstanceId();
+        }
+    }
+    auto container = Container::Current();
+    return container ? container->GetInstanceId() : -1;
 }
 } // namespace
 
@@ -748,6 +763,10 @@ void DragDropManager::OnDragStart(const Point& point, const RefPtr<FrameNode>& f
     draggedFrameNode_ = preTargetFrameNode_;
     preMovePoint_ = point;
     parentHitNodes_.emplace(frameNode->GetId());
+    // Always-on delivery for NDK interaction observers; screen coordinates
+    // come from the point built in DragDropProxy with the gesture screen
+    // location.
+    UIInfoCollectionManager::GetInstance().NotifyDragStart(frameNode, point.GetScreenX(), point.GetScreenY());
 #ifdef ENABLE_INSPECTOR_EVENT_REPORTING
     DragDropBehaviorReporter::GetInstance().UpdateFrameNodeStartId(frameNode->GetId());
     DragDropBehaviorReporter::GetInstance().UpdateStartPoint(point);
@@ -1268,6 +1287,9 @@ void DragDropManager::HandleOnDragEnd(const DragPointerEvent& pointerEvent, cons
         DragDropBehaviorReporter::GetInstance().UpdateDragStopResult(DragStopResult::APP_REFUSE_DATA);
 #endif
         ACE_SCOPED_TRACE("drag: stop drag, not allowed to drop");
+        // Always-on delivery for NDK interaction observers: drop refused.
+        UIInfoCollectionManager::GetInstance().NotifyDragEnd(
+            container->GetInstanceId(), pointerEvent.displayX, pointerEvent.displayY, false, -1);
         ResetDragDrop(container->GetWindowId(), point);
         return;
     }
@@ -1308,6 +1330,10 @@ void DragDropManager::HandleDragCancel(const Point& point, const DragPointerEven
         "pointerEventId is %{public}d.",
         windowId, pointerEvent.pointerEventId);
     ACE_SCOPED_TRACE("drag: drag cancelled");
+    // Always-on delivery for NDK interaction observers: drag cancelled.
+    UIInfoCollectionManager::GetInstance().NotifyDragEnd(
+        GetInteractionObserverInstanceId(preTargetFrameNode), pointerEvent.displayX, pointerEvent.displayY, false,
+        -1);
     DragDropRet dragDropRet { DragRet::DRAG_CANCEL, false, windowId, DragBehavior::UNKNOWN };
     ResetDragDropStatus(point, dragDropRet, windowId);
     FireOnDragEvent(preTargetFrameNode, pointerEvent, DragEventType::LEAVE, extraInfo);
@@ -1359,6 +1385,9 @@ void DragDropManager::OnDragEnd(const DragPointerEvent& pointerEvent, const std:
             "pointerEventId is %{public}d.",
             container->GetWindowId(), pointerEvent.pointerEventId);
         ACE_SCOPED_TRACE("drag: drag stop, not find drop target");
+        // Always-on delivery for NDK interaction observers: no drop target.
+        UIInfoCollectionManager::GetInstance().NotifyDragEnd(
+            containerId, pointerEvent.displayX, pointerEvent.displayY, false, -1);
         ResetDragDrop(container->GetWindowId(), point);
         return;
     }
@@ -1539,6 +1568,10 @@ void DragDropManager::OnDragDrop(RefPtr<OHOS::Ace::DragEvent>& event, const RefP
     DragDropBehaviorReporter::GetInstance().UpdateFrameNodeDropId(dragFrameNode->GetId());
     DragDropBehaviorReporter::GetInstance().UpdateDropResult(DropResult::DROP_SUCCESS);
 #endif
+    // The NDK interaction-observer drag-end notification is deferred to
+    // HandleStopDrag: the customer onDrop below (and the pending stop-drag
+    // callback) can still turn the result into DRAG_FAIL or DRAG_CANCEL, so
+    // the final result must be settled before success is reported.
     eventHub->FireCustomerOnDragFunc(DragFuncType::DRAG_DROP, event, extraParams);
     if (event->IsDragEndPending() && event->GetRequestIdentify() != -1) {
         if (PostStopDrag(dragFrameNode, pointerEvent, event, extraParams)) {
@@ -1569,6 +1602,21 @@ void DragDropManager::HandleStopDrag(const RefPtr<FrameNode>& dragFrameNode, con
         DragDropBehaviorReporter::GetInstance().UpdateDragStopResult(DragStopResult::USER_STOP_DRAG);
     }
 #endif
+    // Always-on delivery for NDK interaction observers: the final drop result
+    // is only settled here — the customer onDrop and the internal drop
+    // handling have run, and the pending path re-enters through the stop-drag
+    // callback after the result is resolved. Success mirrors the platform
+    // stop-drag result: adapter TranslateDragResult maps every DragRet other
+    // than DRAG_FAIL and DRAG_CANCEL to a platform success, including the
+    // DRAG_DEFAULT an onDrop leaves behind when it only consumes the data, so
+    // a plain default drop is reported as successful and keeps its target id.
+    // The refusal, cancel and no-target paths notify in their own terminal
+    // branches and never reach this point, so each drag end is reported
+    // exactly once.
+    const bool dropSucceeded = dragResult != DragRet::DRAG_FAIL && dragResult != DragRet::DRAG_CANCEL;
+    UIInfoCollectionManager::GetInstance().NotifyDragEnd(
+        GetInteractionObserverInstanceId(dragFrameNode), pointerEvent.displayX, pointerEvent.displayY,
+        dropSucceeded, dropSucceeded ? dragFrameNode->GetId() : -1);
     auto useCustomAnimation = event->IsUseCustomAnimation();
     if (event->GetNeedDoInternalDropAnimation() && useCustomAnimation) {
         TAG_LOGI(AceLogTag::ACE_DRAG, "Need do internal drop animation, set useCustomAnimation to false.");

@@ -248,6 +248,169 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_ImageCollectionTakeItemByNodeId(
  */
 void OH_ArkUI_NativeModule_ImageCollectionDestroy(OH_ArkUI_NativeModule_ImageCollection* collection);
 
+/**
+ * @brief Enumerates the observable UI interaction event types.
+ *
+ * The values are bit flags. They are used to build the eventMask passed to
+ * {@link OH_ArkUI_NativeModule_UIInfoCollectionRegisterInteractionObserver}.
+ *
+ * @since 26.2.0
+ */
+typedef enum {
+    /**
+     * @brief No event.
+     *
+     * @since 26.2.0
+     */
+    OH_ARKUI_NATIVEMODULE_UIINFOCOLLECTION_INTERACTION_EVENT_NONE = 0,
+    /**
+     * @brief Tap gesture.
+     *
+     * @since 26.2.0
+     */
+    OH_ARKUI_NATIVEMODULE_UIINFOCOLLECTION_INTERACTION_EVENT_TAP = 1 << 0,
+    /**
+     * @brief Click.
+     *
+     * @since 26.2.0
+     */
+    OH_ARKUI_NATIVEMODULE_UIINFOCOLLECTION_INTERACTION_EVENT_CLICK = 1 << 1,
+    /**
+     * @brief Long press gesture.
+     *
+     * @since 26.2.0
+     */
+    OH_ARKUI_NATIVEMODULE_UIINFOCOLLECTION_INTERACTION_EVENT_LONG_PRESS = 1 << 2,
+    /**
+     * @brief Pan gesture.
+     *
+     * @since 26.2.0
+     */
+    OH_ARKUI_NATIVEMODULE_UIINFOCOLLECTION_INTERACTION_EVENT_PAN = 1 << 3,
+    /**
+     * @brief Pinch gesture.
+     *
+     * @since 26.2.0
+     */
+    OH_ARKUI_NATIVEMODULE_UIINFOCOLLECTION_INTERACTION_EVENT_PINCH = 1 << 4,
+    /**
+     * @brief Rotation gesture.
+     *
+     * @since 26.2.0
+     */
+    OH_ARKUI_NATIVEMODULE_UIINFOCOLLECTION_INTERACTION_EVENT_ROTATION = 1 << 5,
+    /**
+     * @brief Swipe gesture.
+     *
+     * @since 26.2.0
+     */
+    OH_ARKUI_NATIVEMODULE_UIINFOCOLLECTION_INTERACTION_EVENT_SWIPE = 1 << 6,
+    /**
+     * @brief Unified drag and drop.
+     *
+     * @since 26.2.0
+     */
+    OH_ARKUI_NATIVEMODULE_UIINFOCOLLECTION_INTERACTION_EVENT_DRAG = 1 << 7,
+    /**
+     * @brief Raw touch down or up.
+     *
+     * @since 26.2.0
+     */
+    OH_ARKUI_NATIVEMODULE_UIINFOCOLLECTION_INTERACTION_EVENT_TOUCH = 1 << 8
+} OH_ArkUI_NativeModule_UIInfoCollection_InteractionEventType;
+
+/**
+ * @brief Callback type for receiving a sensed interaction event.
+ *
+ * The callback carries a borrowed {@link OH_ArkUI_NativeModule_UIJsonWrapper} object that holds the
+ * event payload. The object is valid only within the callback invocation; the callback must not
+ * retain or destroy it. All positional coordinates in the payload are relative to the screen
+ * (display), in physical pixels (px). The payload's top-level structure is:
+ *
+ * { "schemaVersion": 1, "type": "<event type>", ... }
+ *
+ * The event-specific fields are as follows:
+ * - Tap or click: id, point, count, fingers.
+ * - Long press: id, point, actualDuration (milliseconds), action ("end").
+ * - Pan: id, point, direction, action ("start" | "end" | "cancel").
+ * - Pinch: id, point (array of [x, y]), fingers, action ("start" | "end" | "cancel"); scale is
+ * present only on "end".
+ * - Rotation: id, point (array of [x, y]), fingers, action ("start" | "end" | "cancel"); angle
+ * (degrees) is present only on "end".
+ * - Swipe: id, downPoint (array of [x, y]), upPoint (array of [x, y]), direction, speed,
+ * actualSpeed.
+ * - Drag: action ("start" | "end"); "start" carries id, point, hostName, actualDuration; "end"
+ * carries point, dropResult ("success" | "fail"), id (target, present only on success), hostName.
+ * - Touch: action ("down" | "up"), fingerId, point; "down" also carries id (hit node ID).
+ *
+ * @param json [in] Borrowed JSON object. Valid only during the callback invocation.
+ * @param userData [in] Custom user data passed during registration. It can be NULL. The framework
+ *     does not own, dereference, or free it.
+ * @since 26.2.0
+ */
+typedef void (*OH_ArkUI_NativeModule_UIInfoCollectionInteractionJsonCallback)(
+    const OH_ArkUI_NativeModule_UIJsonWrapper *json, void *userData);
+
+/**
+ * @brief Registers an observer for UI interaction events.
+ *
+ * The observer receives callbacks only for the event types included in eventMask. Multiple
+ * observers can be registered for the same UI instance. Registering the same callback and userData
+ * pair again creates an additional independent observer with a new registration ID.
+ *
+ * Remember to unregister the callback by {@link OH_ArkUI_NativeModule_UIInfoCollectionUnregisterInteractionObserver}
+ * when it's not used anymore.
+ *
+ * This function must be called on the UI main thread of the UI instance. Calling it from any other
+ * thread is not supported.
+ *
+ * @param uiContext [in] Pointer to a UI instance. It must not be NULL.
+ * @param eventMask [in] Bitmask of {@link OH_ArkUI_NativeModule_UIInfoCollection_InteractionEventType}
+ *     values to observe, combined with the bitwise OR operator. The supported bits are
+ *     OH_ARKUI_NATIVEMODULE_UIINFOCOLLECTION_INTERACTION_EVENT_TAP through
+ *     OH_ARKUI_NATIVEMODULE_UIINFOCOLLECTION_INTERACTION_EVENT_TOUCH. Bits outside this range are
+ *     ignored. If no supported bit is set, {@link ARKUI_ERROR_CODE_PARAM_INVALID} is returned.
+ * @param registerID [out] Receives the observer registration ID on success. It must not be NULL,
+ *     requires no initialization, and on failure is set to 0.
+ * @param callback [in] Callback invoked when a matching event occurs. It must not be NULL.
+ * @param userData [in] Custom user data passed to the callback. It can be NULL. The framework does
+ *     not take ownership of it; the caller must keep it valid until the observer is unregistered.
+ * @return <ul>
+ *         <li>{@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.</li>
+ *         <li>{@link ARKUI_ERROR_CODE_PARAM_INVALID} if a required pointer is NULL or eventMask
+ *             contains no supported bit.</li>
+ *         <li>{@link ARKUI_ERROR_CODE_UI_CONTEXT_INVALID} if the UI context is invalid.</li>
+ *         </ul>
+ * @since 26.2.0
+ */
+ArkUI_ErrorCode OH_ArkUI_NativeModule_UIInfoCollectionRegisterInteractionObserver(
+    ArkUI_ContextHandle uiContext,
+    uint32_t eventMask,
+    uint32_t *registerID,
+    OH_ArkUI_NativeModule_UIInfoCollectionInteractionJsonCallback callback,
+    void *userData);
+
+/**
+ * @brief Unregisters an interaction observer.
+ *
+ * After this call returns, no new callback is started for the registration: callbacks whose
+ * dispatch had not yet begun are skipped, including observers unregistered from inside another
+ * callback of the same dispatch batch. When this function is called from inside the observer's
+ * own callback, the running invocation completes normally afterwards; in that case keep userData
+ * valid until the callback returns.
+ *
+ * This function must be called on the UI main thread of the UI instance. Calling it from any
+ * other thread is not supported. This function does not block, and is not async-signal-safe.
+ *
+ * @param registerID [in] Registration ID returned by a successful registration.
+ * @return <ul>
+ *         <li>{@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.</li>
+ *         <li>{@link ARKUI_ERROR_CODE_PARAM_INVALID} if the registration ID is invalid.</li>
+ *         </ul>
+ * @since 26.2.0
+ */
+ArkUI_ErrorCode OH_ArkUI_NativeModule_UIInfoCollectionUnregisterInteractionObserver(uint32_t registerID);
+
 #ifdef __cplusplus
 }
 #endif
