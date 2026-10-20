@@ -375,7 +375,7 @@ public:
     void UpdateZIndexAndTitleEffectNode();
     void OnContentScrollUpdate(double currentOffset, double frameOffset, bool isFling);
     void OnFlingEnd(double currentOffset);
-    void UpdateStackModeZIndex();
+    void UpdateTitleBarZIndex();
     RefPtr<FrameNode> GetTitleBarEffectNode() const
     {
         return titleBarEffectNode_;
