@@ -461,7 +461,7 @@ private:
     ImageType imageType_ = ImageType::BASE;
     ContentTransitionType contentTransitionType_ = ContentTransitionType::IDENTITY;
     std::shared_ptr<CancelableCallback<void()>> navDestRecycleCallback_;
-    static constexpr uint32_t NAV_DEST_RECYCLE_DELAY_MS = 500;
+    static constexpr uint32_t NAV_DEST_RECYCLE_DELAY_MS = 1000;
     int64_t lastDrawTime_ = 0;
 
     ACE_DISALLOW_COPY_AND_MOVE(ImagePattern);
