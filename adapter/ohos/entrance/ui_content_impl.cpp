@@ -215,6 +215,8 @@ static bool g_isDragging = false;
 constexpr char SCENE_COMMON_CHAR = '0';
 constexpr char SCENE_START_CHAR = '1';
 constexpr uint32_t VSYNC_FIRST_WITHOUT_DEFAULT_BARRIER = 2;
+// Delay search click flushing to batch rapid clicks.
+constexpr uint32_t SEARCH_CLICK_FLUSH_DELAY_MS = 250;
 static const uint64_t VSYNC_FIRST_FORCE_ENABLE_TIME_NS =
     system::GetIntParameter("const.sys.param_vsync_first_force_enable_time_ms", 5000) * 1000000ULL;
 
@@ -6719,7 +6721,7 @@ void UIContentImpl::InitUISessionManagerCallbacks(const WeakPtr<TaskExecutor>& t
                 const auto pageName = !page.navDestinationName.empty() ? page.navDestinationName
                     : (!page.pageUrl.empty() ? page.pageUrl : pipeline->GetCurrentPageName());
                 ReportSearchClickEvents(results, pageName, executor);
-            }, TaskExecutor::TaskType::UI, 250, "ArkUISearchClickFlushIfStable");
+            }, TaskExecutor::TaskType::UI, SEARCH_CLICK_FLUSH_DELAY_MS, "ArkUISearchClickFlushIfStable");
             if (!posted) {
                 flushScheduled->store(false);
             }
