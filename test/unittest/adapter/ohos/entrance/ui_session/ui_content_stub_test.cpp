@@ -2155,4 +2155,27 @@ HWTEST_F(UIContentStubTest, UIContentStubTestQueryReport004, TestSize.Level1)
     EXPECT_FALSE(report->lazyForEachQueryCallback_);
 }
 
+HWTEST_F(UIContentStubTest, SearchReview_ClickFlushDoesNotDetectPages, TestSize.Level1)
+{
+    class SearchClickSession : public UiSessionManager {
+    public:
+        void NotifyPageSceneContentChanged() override { ++detectCount; }
+        void FlushPageSceneNodeChanged() override { ++detectCount; }
+        int detectCount = 0;
+    };
+    SearchClickSession manager;
+    int flushCount = 0;
+    // No callback is a safe no-op, including during UIContent teardown.
+    manager.FlushPendingSearchClicksIfStable();
+    manager.SaveSearchClickFlushFunction([&manager, &flushCount] {
+        ++flushCount;
+        // Replacement must be safe: the dispatcher cannot hold its mutex here.
+        manager.SaveSearchClickFlushFunction({});
+    });
+    manager.FlushPendingSearchClicksIfStable();
+    manager.FlushPendingSearchClicksIfStable();
+    EXPECT_EQ(flushCount, 1);
+    EXPECT_EQ(manager.detectCount, 0);
+}
+
 }

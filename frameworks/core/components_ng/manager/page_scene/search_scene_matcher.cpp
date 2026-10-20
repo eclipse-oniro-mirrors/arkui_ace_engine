@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <cctype>
 
+#include "base/log/log_wrapper.h"
 #include "core/components_ng/manager/page_scene/page_scene_rule_manager.h"
 
 namespace OHOS::Ace::NG {
@@ -26,6 +27,31 @@ constexpr float ZERO_RECT_SIZE = 0.0f;
 const char KEYWORD_EVIDENCE[] = "keyword";
 const char COMPONENT_EVIDENCE[] = "component";
 const char INSPECTOR_ID_SOURCE[] = "inspectorId";
+
+// Matches when rule.pageName equals base or base+"+Dialog"/"+Sheet"
+bool IsPageTargetMatched(const std::string& basePageName, const std::string& rulePageName)
+{
+    if (basePageName.empty() || rulePageName.empty()) {
+        return false;
+    }
+    return rulePageName == basePageName ||
+        rulePageName == basePageName + SUBWINDOW_DIALOG_SUFFIX ||
+        rulePageName == basePageName + SUBWINDOW_SHEET_SUFFIX;
+}
+
+// Resolve the suffix relative to the actual page identity. A main page whose
+// name contains (or ends in) +Dialog/+Sheet is still a main-window target.
+std::string ExtractSubwindowSuffix(const SearchSceneSnapshot& snapshot, const SearchSceneRule& rule)
+{
+    const auto& base = rule.pageType == "Navigation" ? snapshot.navDestinationName : snapshot.pageUrl;
+    if (rule.pageName == base + SUBWINDOW_DIALOG_SUFFIX) {
+        return SUBWINDOW_DIALOG_SUFFIX;
+    }
+    if (rule.pageName == base + SUBWINDOW_SHEET_SUFFIX) {
+        return SUBWINDOW_SHEET_SUFFIX;
+    }
+    return "";
+}
 } // namespace
 
 bool SearchSnapshotMatcher::IsPointInRegion(const PageSceneRectInfo& region, const RectF& rect)
@@ -52,11 +78,14 @@ bool SearchSnapshotMatcher::ContainsIgnoreCase(const std::string& text, const st
 
 bool SearchSnapshotMatcher::IsRulePageMatched(const SearchSceneSnapshot& snapshot, const SearchSceneRule& rule)
 {
+    // Support +Dialog/+Sheet subwindow pageName matching
     if (rule.pageType == "Navigation") {
-        return !snapshot.navDestinationName.empty() && rule.pageName == snapshot.navDestinationName;
+        return !snapshot.navDestinationName.empty() &&
+            IsPageTargetMatched(snapshot.navDestinationName, rule.pageName);
     }
     if (rule.pageType == "Router") {
-        return !snapshot.pageUrl.empty() && rule.pageName == snapshot.pageUrl;
+        return !snapshot.pageUrl.empty() &&
+            IsPageTargetMatched(snapshot.pageUrl, rule.pageName);
     }
     return false;
 }
@@ -96,7 +125,13 @@ std::optional<SearchMatchEvidence> SearchSnapshotMatcher::FindKeywordHit(
     if (rule.keywords.empty()) {
         return std::nullopt;
     }
+    // Subwindow rules only match isSubwindow nodes; normal rules only match main-window nodes
+    const auto suffix = ExtractSubwindowSuffix(snapshot, rule);
+    bool requireSubwindow = !suffix.empty();
     for (const auto& node : snapshot.nodes) {
+        if (requireSubwindow != node.isSubwindow) {
+            continue;
+        }
         if (node.visibleRect.Height() <= ZERO_RECT_SIZE || node.visibleRect.Width() <= ZERO_RECT_SIZE) {
             continue;
         }
@@ -105,7 +140,7 @@ std::optional<SearchMatchEvidence> SearchSnapshotMatcher::FindKeywordHit(
         if (!inAnyRegion) {
             continue;
         }
-        auto evidence = FindKeywordHitInNode(node, ruleSet, rule);
+        auto evidence = FindKeywordHitInNode(node, ruleSet, rule, suffix);
         if (evidence.has_value()) {
             return evidence;
         }
@@ -114,7 +149,8 @@ std::optional<SearchMatchEvidence> SearchSnapshotMatcher::FindKeywordHit(
 }
 
 std::optional<SearchMatchEvidence> SearchSnapshotMatcher::FindKeywordHitInNode(
-    const SearchSceneNodeFeature& node, const SearchRuleSet& ruleSet, const SearchSceneRule& rule) const
+    const SearchSceneNodeFeature& node, const SearchRuleSet& ruleSet, const SearchSceneRule& rule,
+    const std::string& suffix) const
 {
     // inspectorId participates as a keyword source via substring fuzzy match.
     for (const auto& keyword : rule.keywords) {
@@ -130,6 +166,7 @@ std::optional<SearchMatchEvidence> SearchSnapshotMatcher::FindKeywordHitInNode(
                 evidence.nodeType = node.nodeType;
                 evidence.rect = node.visibleRect;
                 evidence.isSubwindow = node.isSubwindow;
+                evidence.subwindowSuffix = suffix;
                 return evidence;
             }
         }
@@ -144,6 +181,7 @@ std::optional<SearchMatchEvidence> SearchSnapshotMatcher::FindKeywordHitInNode(
             evidence.nodeType = node.nodeType;
             evidence.rect = node.visibleRect;
             evidence.isSubwindow = node.isSubwindow;
+            evidence.subwindowSuffix = suffix;
             return evidence;
         }
     }
@@ -156,7 +194,13 @@ std::optional<SearchMatchEvidence> SearchSnapshotMatcher::FindComponentHit(
     if (rule.components.empty()) {
         return std::nullopt;
     }
+    // Subwindow rules only match isSubwindow nodes; normal rules only match main-window nodes
+    const auto suffix = ExtractSubwindowSuffix(snapshot, rule);
+    bool requireSubwindow = !suffix.empty();
     for (const auto& node : snapshot.nodes) {
+        if (requireSubwindow != node.isSubwindow) {
+            continue;
+        }
         if (node.visibleRect.Height() <= ZERO_RECT_SIZE || node.visibleRect.Width() <= ZERO_RECT_SIZE) {
             continue;
         }
@@ -176,6 +220,7 @@ std::optional<SearchMatchEvidence> SearchSnapshotMatcher::FindComponentHit(
                 evidence.nodeType = node.nodeType;
                 evidence.rect = node.visibleRect;
                 evidence.isSubwindow = node.isSubwindow;
+                evidence.subwindowSuffix = suffix;
                 return evidence;
             }
         }
@@ -222,6 +267,9 @@ SearchPresenceStateMachine::PresenceEvent SearchPresenceStateMachine::MakeEvent(
         event.ruleIds.emplace_back(hit.ruleSetId, hit.ruleId);
         if (hit.isSubwindow) {
             event.anySubwindow = true;
+            if (event.subwindowSuffix.empty()) {
+                event.subwindowSuffix = hit.subwindowSuffix;
+            }
         }
     }
     return event;
@@ -292,6 +340,28 @@ std::vector<SearchPresenceStateMachine::PresenceEvent> SearchPresenceStateMachin
             ++iter;
         } else {
             ++iter;
+        }
+    }
+    return events;
+}
+
+std::vector<SearchPresenceStateMachine::PresenceEvent> SearchPresenceStateMachine::ExitOtherPages(
+    const std::string& prefix, const std::string& pageName)
+{
+    std::vector<PresenceEvent> events;
+    if (prefix.empty() || pageName.empty()) {
+        return events;
+    }
+    const auto mainKey = prefix + pageName;
+    const auto dialogKey = prefix + BuildSearchSubwindowPageName(pageName, SUBWINDOW_DIALOG_SUFFIX);
+    const auto sheetKey = prefix + BuildSearchSubwindowPageName(pageName, SUBWINDOW_SHEET_SUFFIX);
+    for (const auto& [key, state] : pageStates_) {
+        if (key.compare(0, prefix.size(), prefix) != 0 || key == mainKey || key == dialogKey || key == sheetKey) {
+            continue;
+        }
+        auto event = Exit(key, ExtractPageName(key));
+        if (event) {
+            events.emplace_back(std::move(*event));
         }
     }
     return events;
