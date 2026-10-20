@@ -57,6 +57,7 @@
 #include "arkweb_utils.h"
 #include "bridge/common/utils/engine_helper.h"
 #include "core/accessibility/accessibility_manager.h"
+#include "core/components_ng/base/cmp_accessibility_registry.h"
 #include "core/common/ace_engine_ext.h"
 #include "core/common/ai/image_analyzer_manager.h"
 #include "core/common/container.h"
@@ -10022,7 +10023,15 @@ void WebPattern::InitializeAccessibility()
     int64_t accessibilityId = frameNode->GetAccessibilityId();
     auto pipeline = PipelineContext::GetCurrentContext();
     CHECK_NULL_VOID(pipeline);
-    auto accessibilityManager = pipeline->GetAccessibilityManager();
+    auto mainAccessibilityManager = pipeline->GetAccessibilityManager();
+    CHECK_NULL_VOID(mainAccessibilityManager);
+    auto accessibilityManager = mainAccessibilityManager;
+    if (CmpAccessibility::CmpAccessibilityRegistry::HasAnySubAM()) {
+        accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(frameNode);
+        if (!accessibilityManager) {
+            accessibilityManager = mainAccessibilityManager;
+        }
+    }
     CHECK_NULL_VOID(accessibilityManager);
     accessibilityChildTreeCallback_[instanceId_] = std::make_shared<WebAccessibilityChildTreeCallback>(
         WeakClaim(this), frameNode->GetAccessibilityId());
@@ -10046,7 +10055,15 @@ void WebPattern::UninitializeAccessibility()
         pipeline = pipeline_.Upgrade();
     }
     CHECK_NULL_VOID(pipeline);
-    auto accessibilityManager = pipeline->GetAccessibilityManager();
+    auto mainAccessibilityManager = pipeline->GetAccessibilityManager();
+    CHECK_NULL_VOID(mainAccessibilityManager);
+    auto accessibilityManager = mainAccessibilityManager;
+    if (CmpAccessibility::CmpAccessibilityRegistry::HasAnySubAM()) {
+        accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(frameNode);
+        if (!accessibilityManager) {
+            accessibilityManager = mainAccessibilityManager;
+        }
+    }
     CHECK_NULL_VOID(accessibilityManager);
     if (accessibilityManager->IsRegister()) {
         if (accessibilityChildTreeCallback_.find(instanceId_) == accessibilityChildTreeCallback_.end() ||
@@ -10074,15 +10091,23 @@ void WebPattern::OnSetAccessibilityChildTree(int32_t childWindowId, int32_t chil
 bool WebPattern::OnAccessibilityChildTreeRegister()
 {
     ContainerScope scope(instanceId_);
+    auto frameNode = frameNode_.Upgrade();
+    CHECK_NULL_RETURN(frameNode, false);
     auto pipeline = PipelineContext::GetCurrentContext();
     CHECK_NULL_RETURN(pipeline, false);
-    auto accessibilityManager = pipeline->GetAccessibilityManager();
+    auto mainAccessibilityManager = pipeline->GetAccessibilityManager();
+    CHECK_NULL_RETURN(mainAccessibilityManager, false);
+    auto accessibilityManager = mainAccessibilityManager;
+    if (CmpAccessibility::CmpAccessibilityRegistry::HasAnySubAM()) {
+        accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(frameNode);
+        if (!accessibilityManager) {
+            accessibilityManager = mainAccessibilityManager;
+        }
+    }
     CHECK_NULL_RETURN(accessibilityManager, false);
     if (accessibilitySessionAdapter_ == nullptr) {
         accessibilitySessionAdapter_ = AceType::MakeRefPtr<WebAccessibilitySessionAdapter>(WeakClaim(this));
     }
-    auto frameNode = frameNode_.Upgrade();
-    CHECK_NULL_RETURN(frameNode, false);
     int64_t accessibilityId = frameNode->GetAccessibilityId();
     return accessibilityManager->RegisterWebInteractionOperationAsChildTree(accessibilityId, WeakClaim(this));
 }
@@ -10090,12 +10115,21 @@ bool WebPattern::OnAccessibilityChildTreeRegister()
 bool WebPattern::OnAccessibilityChildTreeDeregister()
 {
     ContainerScope scope(instanceId_);
+    auto frameNode = frameNode_.Upgrade();
     auto pipeline = PipelineContext::GetCurrentContext();
     if (!pipeline) {
         pipeline = pipeline_.Upgrade();
     }
     CHECK_NULL_RETURN(pipeline, false);
-    auto accessibilityManager = pipeline->GetAccessibilityManager();
+    auto mainAccessibilityManager = pipeline->GetAccessibilityManager();
+    CHECK_NULL_RETURN(mainAccessibilityManager, false);
+    auto accessibilityManager = mainAccessibilityManager;
+    if (CmpAccessibility::CmpAccessibilityRegistry::HasAnySubAM()) {
+        accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(frameNode);
+        if (!accessibilityManager) {
+            accessibilityManager = mainAccessibilityManager;
+        }
+    }
     CHECK_NULL_RETURN(accessibilityManager, false);
     if (treeId_ == 0) {
         TAG_LOGD(AceLogTag::ACE_WEB, "OnAccessibilityChildTreeDeregister: treeId is 0.");

@@ -168,11 +168,15 @@ UIExtensionPattern::~UIExtensionPattern()
 
     auto instanceId = GetInstanceIdFromHost();
     ContainerScope scope(instanceId);
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
     auto ngPipeline = NG::PipelineContext::GetCurrentContext();
     CHECK_NULL_VOID(ngPipeline);
     auto frontend = ngPipeline->GetFrontend();
     CHECK_NULL_VOID(frontend);
-    auto accessibilityManager = frontend->GetAccessibilityManager();
+    auto mainAccessibilityManager = frontend->GetAccessibilityManager();
+    CHECK_NULL_VOID(mainAccessibilityManager);
+    auto accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(host);
     CHECK_NULL_VOID(accessibilityManager);
     accessibilityManager->DeregisterAccessibilityChildTreeCallback(
         accessibilityChildTreeCallback_->GetAccessibilityId());
@@ -1813,10 +1817,12 @@ void UIExtensionPattern::InitializeAccessibility()
     CHECK_NULL_VOID(ngPipeline);
     auto frontend = ngPipeline->GetFrontend();
     CHECK_NULL_VOID(frontend);
-    auto accessibilityManager = frontend->GetAccessibilityManager();
-    CHECK_NULL_VOID(accessibilityManager);
     auto frameNode = frameNode_.Upgrade();
     CHECK_NULL_VOID(frameNode);
+    auto mainAccessibilityManager = frontend->GetAccessibilityManager();
+    CHECK_NULL_VOID(mainAccessibilityManager);
+    auto accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(frameNode);
+    CHECK_NULL_VOID(accessibilityManager);
     int64_t accessibilityId = frameNode->GetAccessibilityId();
     accessibilityChildTreeCallback_ = std::make_shared<UIExtensionAccessibilityChildTreeCallback>(
         WeakClaim(this), accessibilityId);

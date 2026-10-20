@@ -10038,6 +10038,9 @@ struct ArkUIFrameNodeModifier {
     ArkUI_AccessibilityProvider* (*getAccessibilityProvider)(ArkUINodeHandle node);
     ArkUINodeHandle (*getPageRootNode)(ArkUI_Int32 instanceId);
     ArkUI_Int32 (*getCommonViewParentId)(ArkUINodeHandle node);
+    ArkUI_Int32 (*bindAccessibilityExportTree)(ArkUINodeHandle owner, ArkUI_Int64 bindId,
+        ArkUINodeHandle exportedRoot);
+    ArkUI_Int32 (*unbindAccessibilityExportTree)(ArkUINodeHandle owner, ArkUI_Int64 bindId);
     ArkUI_Int32 (*injectCompositeCommand)(const ArkUIInjectCommandParams* params);
 };
 

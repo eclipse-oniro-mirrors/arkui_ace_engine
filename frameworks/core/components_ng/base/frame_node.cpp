@@ -5461,7 +5461,12 @@ void FrameNode::OnAccessibilityEvent(
         event.windowContentChangeTypes = windowsContentChangeType;
         event.nodeId = accessibilityId_;
         auto pipeline = GetContext();
-        CHECK_NULL_VOID(pipeline);
+        if (pipeline == nullptr) {
+            TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY,
+                "OnA11yEvent drop: no context, node=%{public}d type=%{public}d",
+                GetId(), static_cast<int32_t>(eventType));
+            return;
+        }
         if (sendByNode) {
             pipeline->SendEventToAccessibilityWithNode(event, Claim(this));
         } else {

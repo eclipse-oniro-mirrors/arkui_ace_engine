@@ -97,16 +97,35 @@ public:
 private:
     void HandleAccessibilityHoverForThirdInner(
         const AccessibilityHoverForThirdConfig& config);
+    // CMP mixed-rendering: if hit node is a bindId mount node within an exported subtree, transfer hover to native.
+    void TransferHoverToExportedSubtreeIfNeeded(
+        int64_t hitElementId,
+        const AccessibilityHoverForThirdConfig& config);
+    // Coordinate geometry of one hover transfer (provider-space point → exportedRoot's ArkUI-parent space), per the.
+    struct HoverTransferGeometry {
+        float rootWinX = 0.0f;
+        float rootWinY = 0.0f;
+        float hostOffsetX = 0.0f;
+        float hostOffsetY = 0.0f;
+        float paintOriginX = 0.0f;
+        float paintOriginY = 0.0f;
+    };
+    // Compute the transfer offsets for the exported root's window position per mounting form.
+    bool ComputeHoverTransferOffsets(const RefPtr<NG::FrameNode>& exportedRoot, bool adoptedMount,
+        int64_t splitHitId, const AccessibilityHoverForThirdConfig& config,
+        HoverTransferGeometry& geometry);
     void ResetHoverForThirdState();
     AccessibilityHoverTestPathForThird HoverPathForThird(
         const int64_t hostElementId,
         const NG::PointF& point,
-        AccessibilityElementInfo& rootInfo);
+        AccessibilityElementInfo& rootInfo,
+        const std::vector<int64_t>& mountBindIds);
     bool HoverPathForThirdRecursive(
         const int64_t hostElementId,
         const NG::PointF& hoverPoint,
         const AccessibilityElementInfo& nodeInfo,
-        AccessibilityHoverTestPathForThird& path);
+        AccessibilityHoverTestPathForThird& path,
+        const std::vector<int64_t>& mountBindIds);
     std::pair<bool, bool> GetSearchStrategyForThird(
         const AccessibilityElementInfo& nodeInfo);
     bool IsAccessibilityFocusable(const AccessibilityElementInfo& nodeInfo);
