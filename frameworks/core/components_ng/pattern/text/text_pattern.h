@@ -117,6 +117,15 @@ public:
     RefPtr<LayoutProperty> CreateLayoutProperty() override;
     RefPtr<LayoutAlgorithm> CreateLayoutAlgorithm() override;
     RefPtr<AccessibilityProperty> CreateAccessibilityProperty() override;
+
+    // Restricted scroll-placeholder whitelist clone: text content lives in the
+    // layout property, which the copy protocol clones wholesale, so a fresh
+    // pattern restores the self-measure algorithm without dragging any
+    // callbacks along.
+    RefPtr<Pattern> CloneForPlaceholder() override
+    {
+        return MakeRefPtr<TextPattern>();
+    }
     RefPtr<EventHub> CreateEventHub() override;
     RefPtr<VerticalOverflowHandler> GetOrCreateVerticalOverflowHandler(const WeakPtr<FrameNode>& host) override
     {

@@ -16,9 +16,12 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_LIST_LIST_PATTERN_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_LIST_LIST_PATTERN_H
 
+#include <list>
+#include <map>
 #include <tuple>
 #include "core/animation/chain_animation.h"
 #include "core/components/common/layout/constants.h"
+#include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_types.h"
 #include "core/components_ng/pattern/list/list_children_main_size.h"
 #include "core/components_ng/pattern/list/list_content_modifier.h"
 #include "core/components_ng/pattern/list/list_layout_algorithm.h"
@@ -30,6 +33,7 @@
 #include "core/components/scroll/scroll_controller_base.h"
 
 namespace OHOS::Ace::NG {
+class ScrollPlaceholderManager;
 class InspectorFilter;
 class ListAccessibilityProperty;
 class ListEventHub;
@@ -62,6 +66,55 @@ public:
         SetEdgeEffect(EdgeEffect::SPRING, false);
     }
     ~ListPattern() override;
+
+    // FEAT scroll placeholder: the per-item provider, enable flag and host
+    // generation are owned by the pattern (never written into the clonable
+    // layout property); a null provider resets the capability.
+    void SetScrollPlaceholder(ScrollPlaceholderProvider&& provider);
+    bool IsScrollPlaceholderEnabled() const
+    {
+        return scrollPlaceholderProvider_ != nullptr;
+    }
+    const ScrollPlaceholderProvider& GetScrollPlaceholderProvider() const
+    {
+        return scrollPlaceholderProvider_;
+    }
+    void ResetScrollPlaceholder();
+
+    // ---- Component call-site placeholder replacement (ADR-2/ADR-7, 2026-10-12) ----
+    // An item whose real build got deferred shows a placeholder shell mounted as a
+    // direct child of the List host — never inside any LazyForEach/Repeat cache
+    // (syntax layer untouched). All methods run on the UI thread only.
+    struct ScrollPlaceholderItemInfo {
+        RefPtr<FrameNode> shell;
+        std::string templateId;
+        uint64_t templateGen = 0;
+    };
+    // Decision + acquire + mount + framed enqueue at the child build call point.
+    // Returns the mounted shell when this index is deferred to a placeholder,
+    // null when the caller should keep the existing (build-real) acquisition.
+    // A deferred index is also recorded in the manager's deferral table, so the
+    // acquisition itself (FrameProxy::GetFrameNodeByIndex) substitutes the shell.
+    RefPtr<FrameNode> CreateScrollPlaceholderShell(int32_t index);
+    // Decision-side entry invoked from the layout fill loop right before the normal
+    // child acquisition: predicts with the remaining frame budget and, on defer,
+    // mounts the shell and records the deferral. The wrapper substitution itself is
+    // NOT done here — the acquisition below flows through FrameProxy, which resolves
+    // the recorded deferral, so skip-flag inheritance and activation match real items.
+    void PrepareScrollPlaceholderForAcquisition(int32_t index);
+    bool HasScrollPlaceholderItem(int32_t index) const;
+    // Real-build closure executed by the pipeline framed flush: builds the real
+    // item through the existing build-style acquisition (syntax path as-is),
+    // then requests the local remeasure that completes the replacement.
+    bool CommitScrollPlaceholderRealBuild(int32_t index);
+    // Layout-round reconcile: drops placeholders whose index already holds a real
+    // child or fell out of range, and retires shells whose real item was committed
+    // (removed from the host and the template content returned to the pool).
+    void ReconcileScrollPlaceholderItems();
+    // Defensive sweep: retires mounted shells that neither placeholder table tracks
+    // anymore, so a bookkeeping miss can never leave a shell on the tree (index-based
+    // cleanup can not see shells by design — zero frame count).
+    void SweepOrphanPlaceholderShells();
 
     RefPtr<NodePaintMethod> CreateNodePaintMethod() override;
 
@@ -702,6 +755,23 @@ private:
     float prevEndOffset_ = 0.f;
     double currentOffset_ = 0.0f;
     bool maintainVisibleContentPosition_ = false;
+    ScrollPlaceholderProvider scrollPlaceholderProvider_;
+    std::map<int32_t, ScrollPlaceholderItemInfo> scrollPlaceholderItems_;
+    std::list<std::pair<RefPtr<FrameNode>, std::string>> retiringPlaceholderShells_;
+    // Every shell this pattern mounted on the host (shell -> its template id), the
+    // single source of truth for the orphan sweep: shells are invisible to index-based
+    // cleanup (zero frame count by design), so retirement bookkeeping misses are
+    // caught here rather than leaking a mounted shell onto the tree.
+    std::map<RefPtr<FrameNode>, std::string> mountedPlaceholderShells_;
+    // Two-stage budget gate (aggregate estimate first, provider only under pressure);
+    // returns the provider options when the index should defer to a placeholder.
+    std::optional<ScrollPlaceholderOptions> PredictScrollPlaceholderDefer(
+        const RefPtr<ScrollPlaceholderManager>& manager, const RefPtr<FrameNode>& host, int32_t index);
+    void RetireScrollPlaceholderShell(const RefPtr<FrameNode>& shell, const std::string& templateId);
+    // Submits the deferred real-build closure for a placeholder item into the
+    // framed UI-thread queue (flushed by the pipeline).
+    void EnqueueScrollPlaceholderRealBuild(const RefPtr<ScrollPlaceholderManager>& manager,
+        const ScrollPlaceholderPredictParams& params, uint64_t templateGen);
     std::optional<int32_t> lastSnapTargetIndex_;
 
     bool crossMatchChild_ = false;

@@ -564,8 +564,10 @@ RefPtr<UINode> FrameNode::GetCurrentPageRootNode()
     return {};
 }
 
-RefPtr<LayoutWrapper> FrameNode::GetOrCreateChildByIndex(uint32_t index, bool addToRenderTree, bool isCache)
+RefPtr<LayoutWrapper> FrameNode::GetOrCreateChildByIndex(
+    uint32_t index, bool addToRenderTree, bool isCache, bool allowPlaceholderSubstitution)
 {
+    (void)allowPlaceholderSubstitution;
     return {};
 }
 

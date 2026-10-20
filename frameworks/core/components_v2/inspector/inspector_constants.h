@@ -340,6 +340,9 @@ ACE_EXPORT extern const char TOGGLE_ETS_TAG[];
 // scroll
 ACE_EXPORT extern const char SCROLL_COMPONENT_TAG[];
 ACE_FORCE_EXPORT extern const char SCROLL_ETS_TAG[];
+// scroll placeholder shell (framework-internal: mounted by the scroll container
+// placeholder runtime, never created by application code)
+ACE_EXPORT extern const char SCROLL_PLACEHOLDER_SHELL_ETS_TAG[];
 
 // calendar
 ACE_EXPORT extern const char CALENDAR_COMPONENT_TAG[];

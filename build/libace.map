@@ -1484,6 +1484,7 @@
       "OHOS::Ace::NG::FrameNode::GetOffsetRelativeToWindow() const";
       "OHOS::Ace::NG::FrameNode::GetOrCreateAccessibilityProperty()";
       "OHOS::Ace::NG::FrameNode::GetOrCreateChildByIndex(unsigned int, bool, bool)";
+      "OHOS::Ace::NG::FrameNode::GetOrCreateChildByIndex(unsigned int, bool, bool, bool)";
       "OHOS::Ace::NG::FrameNode::GetOrCreateDragDropRelatedConfigurations()";
       "OHOS::Ace::NG::FrameNode::GetOrCreateFocusHub()";
       "OHOS::Ace::NG::FrameNode::GetOrCreateFrameNode(std::__h::basic_string_view<char, std::__h::char_traits<char>>, int, std::__h::function<OHOS::Ace::RefPtr<OHOS::Ace::NG::Pattern> ()> const&)";

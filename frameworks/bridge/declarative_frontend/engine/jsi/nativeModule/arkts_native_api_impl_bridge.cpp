@@ -54,6 +54,7 @@
 #include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_list_item_group_bridge.h"
 #include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_frame_node_bridge.h"
 #include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_container_span_bridge.h"
+#include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_scroll_placeholder_bridge.h"
 #include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_linear_indicator.h"
 #include "bridge/declarative_frontend/engine/js_converter.h"
 #include "bridge/declarative_frontend/jsview/js_navigation_stack.h"
@@ -879,7 +880,26 @@ ArkUINativeModuleValue ArkUINativeModule::GetArkUINativeModule(ArkUIRuntimeCallI
     RegisterEmbeddedComponentAttributes(object, vm);
 #endif
     RegisterContainerPickerAttributes(object, vm);
+    RegisterScrollPlaceholderRegisterModule(object, vm);
     return object;
+}
+
+void ArkUINativeModule::RegisterScrollPlaceholderRegisterModule(Local<panda::ObjectRef> object, EcmaVM* vm)
+{
+    auto placeholderRegister = panda::ObjectRef::New(vm);
+    placeholderRegister->Set(vm, panda::StringRef::NewFromUtf8(vm, "register"),
+        panda::FunctionRef::New(
+            const_cast<panda::EcmaVM*>(vm), ScrollPlaceholderRegisterBridge::Register));
+    placeholderRegister->Set(vm, panda::StringRef::NewFromUtf8(vm, "unregister"),
+        panda::FunctionRef::New(
+            const_cast<panda::EcmaVM*>(vm), ScrollPlaceholderRegisterBridge::Unregister));
+    placeholderRegister->Set(vm, panda::StringRef::NewFromUtf8(vm, "isRegistered"),
+        panda::FunctionRef::New(
+            const_cast<panda::EcmaVM*>(vm), ScrollPlaceholderRegisterBridge::IsRegistered));
+    // The restricted-builder instrumentation entries (__aceBegin/EndScrollPlaceholder__)
+    // are NOT members of this surface: they are mounted on globalThis directly by
+    // JsRegisterViews so @Builder({ isPlaceholder: true }) products can call them bare.
+    object->Set(vm, panda::StringRef::NewFromUtf8(vm, "scrollPlaceholderRegister"), placeholderRegister);
 }
 
 void ArkUINativeModule::RegisterThemeAttributes(Local<panda::ObjectRef> object, EcmaVM *vm)

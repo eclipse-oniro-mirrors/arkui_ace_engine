@@ -40,6 +40,7 @@
 #include "core/components_ng/property/layout_constraint.h"
 #include "core/components_ng/property/measure_property.h"
 #include "core/components_ng/property/measure_utils.h"
+#include "core/components_ng/layout/layout_wrapper_node.h"
 #include "core/components_ng/pattern/list/list_properties.h"
 #include "core/pipeline_ng/pipeline_context.h"
 
@@ -61,7 +62,8 @@ RefPtr<LayoutWrapper> CreateDummyListItemChild()
  *        LazyForEach/RepeatVirtualScroll, try to create empty branch LayoutWrapper for the index.
  */
 static RefPtr<LayoutWrapper> GetListItemWithEmptyBranch(
-    LayoutWrapper* layoutWrapper, int32_t index, bool addToRenderTree, bool isCache)
+    LayoutWrapper* layoutWrapper, int32_t index, bool addToRenderTree, bool isCache,
+    bool allowPlaceholderSubstitution = false)
 {
     const auto& layoutProperty = AceType::DynamicCast<ListLayoutProperty>(layoutWrapper->GetLayoutProperty());
     // Scroll placeholder load observation at the List child build call point: predict before
@@ -71,16 +73,31 @@ static RefPtr<LayoutWrapper> GetListItemWithEmptyBranch(
     ScrollPlaceholderItemBuildScope buildScope(
         ScrollPlaceholderComponentType::LIST, layoutWrapper, index, isCache);
     if (layoutProperty->GetSupportLazyLoadingEmptyBranch().value_or(false)) {
-        auto wrapper = layoutWrapper->GetOrCreateChildByIndex(index, addToRenderTree, isCache);
+        auto wrapper = layoutWrapper->GetOrCreateChildByIndex(index, addToRenderTree, isCache,
+            allowPlaceholderSubstitution);
         buildScope.SetAcquiredWrapper(wrapper);
         if (!wrapper) {
             wrapper = CreateDummyListItemChild();
         }
         return wrapper;
     }
-    auto wrapper = layoutWrapper->GetOrCreateChildByIndex(index, addToRenderTree, isCache);
+    auto wrapper = layoutWrapper->GetOrCreateChildByIndex(
+        index, addToRenderTree, isCache, allowPlaceholderSubstitution);
     buildScope.SetAcquiredWrapper(wrapper);
     return wrapper;
+}
+
+// Fast flag check on the List host pattern: with the scroll placeholder provider
+// set, the layout loops keep filling the viewport past the response deadline with
+// cheap placeholder items (deferred real builds) instead of stopping early.
+bool IsScrollPlaceholderEnabled(const LayoutWrapper* layoutWrapper)
+{
+    CHECK_NULL_RETURN(layoutWrapper, false);
+    const auto& host = layoutWrapper->GetHostNode();
+    CHECK_NULL_RETURN(host, false);
+    const auto& pattern = host->GetPattern<ListPattern>();
+    CHECK_NULL_RETURN(pattern, false);
+    return pattern->IsScrollPlaceholderEnabled();
 }
 } // namespace
 
@@ -1481,7 +1498,10 @@ void ListLayoutAlgorithm::LayoutForward(LayoutWrapper* layoutWrapper, int32_t st
     auto chainOffset = 0.0f;
     do {
         if ((static_cast<int32_t>(itemPosition_.size()) > prevItemPosCount_) && !syncLoad_ &&
-            layoutWrapper->ReachResponseDeadline()) {
+            layoutWrapper->ReachResponseDeadline() && !IsScrollPlaceholderEnabled(layoutWrapper)) {
+            // With scroll placeholder enabled the loop keeps filling the viewport
+            // with cheap placeholder items instead of deferring the whole tail to
+            // the next frame (which would show a blank area while scrolling).
             measureInNextFrame_ = true;
             return;
         }
@@ -1572,7 +1592,10 @@ void ListLayoutAlgorithm::LayoutBackward(LayoutWrapper* layoutWrapper, int32_t e
     auto chainOffset = 0.0f;
     do {
         if ((static_cast<int32_t>(itemPosition_.size()) > prevItemPosCount_) && !syncLoad_ &&
-            layoutWrapper->ReachResponseDeadline()) {
+            layoutWrapper->ReachResponseDeadline() && !IsScrollPlaceholderEnabled(layoutWrapper)) {
+            // With scroll placeholder enabled the loop keeps filling the viewport
+            // with cheap placeholder items instead of deferring the whole tail to
+            // the next frame (which would show a blank area while scrolling).
             measureInNextFrame_ = true;
             return;
         }
@@ -3351,6 +3374,22 @@ RefPtr<LayoutWrapper> ListLayoutAlgorithm::GetListItem(
 {
     index = (!isStackFromEnd_ ? index : totalItemCount_ - index - 1) + itemStartIndex_;
 
+    // Scroll placeholder acquisition pre-check: the
+    // budget decision and shell mounting stay with the pattern (it owns the frame
+    // context); the index->wrapper substitution itself executes in
+    // FrameProxy::GetFrameNodeByIndex, gated by an explicit per-acquisition
+    // declaration. Only a fill loop with the capability verified passes the
+    // declaration down, so every other caller of the host acquisition keeps the
+    // unmodified semantics. Cache/preload paths never substitute.
+    if (!isCache && layoutWrapper) {
+        const auto& host = layoutWrapper->GetHostNode();
+        const auto& pattern = host ? host->GetPattern<ListPattern>() : nullptr;
+        if (pattern && pattern->IsScrollPlaceholderEnabled()) {
+            pattern->PrepareScrollPlaceholderForAcquisition(index);
+            return GetListItemWithEmptyBranch(
+                layoutWrapper, index, addToRenderTree, isCache, /*allowPlaceholderSubstitution=*/true);
+        }
+    }
     return GetListItemWithEmptyBranch(layoutWrapper, index, addToRenderTree, isCache);
 }
 } // namespace OHOS::Ace::NG

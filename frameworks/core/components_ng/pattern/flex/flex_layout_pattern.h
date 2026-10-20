@@ -49,6 +49,12 @@ public:
         return MakeRefPtr<FlexLayoutAlgorithm>();
     }
 
+    // Restricted scroll-placeholder whitelist clone: plain layout-only container.
+    RefPtr<Pattern> CloneForPlaceholder() override
+    {
+        return MakeRefPtr<FlexLayoutPattern>(isWrap_);
+    }
+
     bool IsAtomicNode() const override
     {
         return false;
