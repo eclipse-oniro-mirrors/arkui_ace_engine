@@ -327,6 +327,7 @@ public:
     void SetContainerModalTitleVisible(bool customTitleSettedShow, bool floatingTitleSettedShow) override;
     bool GetContainerModalTitleVisible(bool isImmersive) override;
     void SetContainerModalTitleHeight(int32_t height) override;
+    void SetContainerModalTitleHeightWithVp(double heightVp) override;
     void SetContainerButtonStyle(const Rosen::DecorButtonStyle& buttonStyle) override;
     int32_t GetContainerModalTitleHeight() override;
     void SetFrameMetricsCallBack(std::function<void(FrameMetrics info)>&& callback) override;

@@ -2176,4 +2176,56 @@ HWTEST_F(PipelineContextFourTestNg, PipelineContextSevenTest088, TestSize.Level1
     context_->windowModal_ = originalWindowModal;
 }
 
+/**
+ * @tc.name: PipelineContextSevenTest089
+ * @tc.desc: Test SetContainerModalTitleHeightWithVp passes the vp value to ContainerModalPattern
+ *           unchanged and marks the height as user set.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextFourTestNg, PipelineContextSevenTest089, TestSize.Level1)
+{
+    AssertValidContext();
+    auto originalWindowModal = context_->windowModal_;
+    auto originalRootNode = context_->rootNode_;
+    context_->windowModal_ = WindowModal::CONTAINER_MODAL;
+
+    auto containerNode = FrameNode::CreateFrameNode("containerModal",
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<ContainerModalPattern>());
+    ASSERT_NE(containerNode, nullptr);
+    auto columnNode = FrameNode::CreateFrameNode("containerModalColumn",
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(columnNode, nullptr);
+    columnNode->AddChild(FrameNode::CreateFrameNode("customTitleRow",
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>()));
+    columnNode->AddChild(FrameNode::CreateFrameNode("containerModalStack",
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>()));
+    columnNode->AddChild(FrameNode::CreateFrameNode("gestureRow",
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>()));
+    containerNode->AddChild(FrameNode::CreateFrameNode("floatingTitleRow",
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>()));
+    containerNode->AddChild(columnNode);
+    containerNode->AddChild(FrameNode::CreateFrameNode("controlButtonsRow",
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>()));
+    auto rootNode = FrameNode::CreateFrameNode("rootNode",
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    rootNode->AddChild(containerNode);
+    context_->rootNode_ = rootNode;
+
+    auto containerPattern = containerNode->GetPattern<ContainerModalPattern>();
+    ASSERT_NE(containerPattern, nullptr);
+    EXPECT_FALSE(containerPattern->GetIsSetContainerModalTitleHeight());
+
+    /**
+     * @tc.steps: call SetContainerModalTitleHeightWithVp on pipeline.
+     * @tc.expected: the pattern stores the vp value unchanged, and the user set flag is on.
+     */
+    context_->SetContainerModalTitleHeightWithVp(56.5);
+    EXPECT_DOUBLE_EQ(containerPattern->titleHeight_.Value(), 56.5);
+    EXPECT_TRUE(containerPattern->titleHeight_ == Dimension(56.5, DimensionUnit::VP));
+    EXPECT_TRUE(containerPattern->GetIsSetContainerModalTitleHeight());
+
+    context_->rootNode_ = originalRootNode;
+    context_->windowModal_ = originalWindowModal;
+}
+
 } // namespace OHOS::Ace::NG

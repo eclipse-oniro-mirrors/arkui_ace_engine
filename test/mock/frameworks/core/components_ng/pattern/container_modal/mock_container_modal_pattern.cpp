@@ -100,6 +100,11 @@ void ContainerModalPattern::SetContainerModalTitleHeight(int32_t height)
     titleHeight_ = Dimension(static_cast<double>(height));
 }
 
+void ContainerModalPattern::SetContainerModalTitleHeightWithVp(double heightVp)
+{
+    titleHeight_ = Dimension(heightVp, DimensionUnit::VP);
+}
+
 bool ContainerModalPattern::GetContainerModalButtonsRect(RectF& containerModal, RectF& buttons)
 {
     containerModal = RectF();

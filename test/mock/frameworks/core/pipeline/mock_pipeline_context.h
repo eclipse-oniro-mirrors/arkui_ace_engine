@@ -56,6 +56,7 @@ public:
     void SetContainerControlButtonVisible(bool visible);
     void SetContainerModalButtonsRect(RectF buttons);
     void SetContainerModalTitleHeight(int32_t height);
+    void SetContainerModalTitleHeightWithVp(double heightVp);
 
     MOCK_CONST_METHOD0(GetSafeAreaWithoutProcess, SafeAreaInsets());
     MOCK_CONST_METHOD0(GetSelectOverlayManager, SafeAreaInsets());
