@@ -1309,6 +1309,16 @@ public:
         return halfLeading_;
     }
 
+    void SetConfigTextStyleOptimizeFlag(bool flag)
+    {
+        configTextStyleOptimizeFlag_ = flag;
+    }
+
+    bool GetConfigTextStyleOptimizeFlag() const
+    {
+        return configTextStyleOptimizeFlag_;
+    }
+
     void SetHasPreviewTextOption(bool hasOption)
     {
         hasPreviewTextOption_ = hasOption;
@@ -1850,6 +1860,7 @@ private:
     int64_t formAnimationStartTime_ = 0;
     bool isFormAnimation_ = false;
     bool halfLeading_ = false;
+    bool configTextStyleOptimizeFlag_ = false;
     bool hasSupportedPreviewText_ = true;
     bool hasPreviewTextOption_ = false;
     // whether visible area need to be calculate at each vsync after approximate timeout.
