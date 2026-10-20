@@ -1301,6 +1301,8 @@
       "OHOS::Ace::NG::Converter::ResourceConverter::ToString()";
       "OHOS::Ace::NG::Converter::ResourceConverter::ToInt()";
       "OHOS::Ace::NG::Converter::ResourceConverter::ToSymbol()";
+      "OHOS::Ace::NG::Converter::ConverterState::defDimensionUnit";
+      "OHOS::Ace::NG::Converter::ConverterState::defShadowBlurRadius";
       "OHOS::Ace::NG::Converter::TextDecorationOptions OHOS::Ace::NG::Converter::Convert<OHOS::Ace::NG::Converter::TextDecorationOptions, Ark_TextDecorationOptions>(Ark_TextDecorationOptions const&)";
       "OHOS::Ace::NG::Converter::OptConvertFromArkNumResStr(Ark_Union_F64_ResourceStr const&, OHOS::Ace::DimensionUnit)";
       "OHOS::Ace::NG::ConvertToLinearGradientDirection(std::__h::shared_ptr<OHOS::Ace::NG::LinearGradient>)";
