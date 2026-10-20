@@ -148,6 +148,9 @@ constexpr uint32_t RICH_EDITOR_TWINKLING_INTERVAL_MS_DEBUG = 3000;
 constexpr double DEFAULT_STROKE_WIDTH = 0.0;
 constexpr uint32_t RECORD_MAX_LENGTH = 20;
 constexpr float DOUBLE_CLICK_INTERVAL_MS = 300.0f;
+constexpr Dimension UNDERLINE_WIDTH = 1.0_px;
+constexpr Dimension TYPING_UNDERLINE_WIDTH = 2.0_px;
+constexpr Dimension ERROR_UNDERLINE_WIDTH = 2.0_px;
 
 constexpr float DEFAILT_OPACITY = 0.2f;
 constexpr int64_t COLOR_OPAQUE = 255;
@@ -780,6 +783,64 @@ void RichEditorPattern::AddPlaceholderSpan(const BuilderSpanOptions& options, bo
     AddPlaceholderSpan(options.customNode, baseOption, reason);
 }
 
+bool RichEditorPattern::IsUnderlineMode() const
+{
+    auto layoutProperty = GetLayoutProperty<RichEditorLayoutProperty>();
+    CHECK_NULL_RETURN(layoutProperty, false);
+    return layoutProperty->GetShowUnderlineValue(false);
+}
+
+bool RichEditorPattern::IsUnderlineAndButtonMode() const
+{
+    return IsUnderlineMode() && IsShowCancelButtonMode();
+}
+
+void RichEditorPattern::UpdateUnderlineStyle()
+{
+    if (!IsUnderlineMode()) {
+        return;
+    }
+    auto theme = GetTheme<TextFieldTheme>();
+    CHECK_NULL_VOID(theme);
+    auto layoutProperty = GetLayoutProperty<RichEditorLayoutProperty>();
+    CHECK_NULL_VOID(layoutProperty);
+    auto userColor = layoutProperty->GetUnderlineColorValue(UserUnderlineColor());
+    // RichEditor has no error state; error color stored but not applied
+    Color underlineColor = HasFocus()
+        ? userColor.typing.value_or(theme->GetUnderlineTypingColor())
+        : userColor.normal.value_or(theme->GetUnderlineColor());
+    if (userColor.disable.has_value()) {
+        underlineColor_ = IsDisabled() ? userColor.disable.value() : underlineColor;
+    } else {
+        underlineColor_ = IsDisabled() ? theme->GetDisableUnderlineColor() : underlineColor;
+    }
+    underlineWidth_ = HasFocus() ? TYPING_UNDERLINE_WIDTH : UNDERLINE_WIDTH;
+}
+
+void RichEditorPattern::UpdateUnderlineErrorStyle()
+{
+    if (!IsUnderlineMode()) {
+        return;
+    }
+    auto theme = GetTheme<TextFieldTheme>();
+    CHECK_NULL_VOID(theme);
+    auto layoutProperty = GetLayoutProperty<RichEditorLayoutProperty>();
+    CHECK_NULL_VOID(layoutProperty);
+    auto userColor = layoutProperty->GetUnderlineColorValue(UserUnderlineColor());
+    underlineWidth_ = ERROR_UNDERLINE_WIDTH;
+    underlineColor_ = userColor.error.value_or(theme->GetErrorUnderlineColor());
+}
+
+Color RichEditorPattern::GetUnderlineColor() const
+{
+    return underlineColor_;
+}
+
+Dimension RichEditorPattern::GetUnderlineWidth() const
+{
+    return underlineWidth_;
+}
+
 void RichEditorPattern::OnModifyDone()
 {
     Pattern::CheckLocalized();
@@ -836,6 +897,7 @@ void RichEditorPattern::OnModifyDone()
     RegisterTranslateListener();
     InitMargin();
     ProcessCounter();
+    UpdateUnderlineStyle();
     InitPasswordMode();
 }
 
@@ -889,6 +951,7 @@ void RichEditorPattern::HandleEnabled()
         auto opacity = renderContext->GetOpacity().value_or(1.0);
         renderContext->OnOpacityUpdate(opacity);
     }
+    UpdateUnderlineStyle();
 }
 
 void RichEditorPattern::RemovePlaceholderImageNodes()
@@ -1099,6 +1162,18 @@ void RichEditorPattern::ClearOnFocusTextField(FrameNode* node)
     textFieldManager->ClearOnFocusTextField(node->GetId());
 }
 
+void RichEditorPattern::AdjustBoundsRect(RectF& bounds)
+{
+    if (IsShowCounterEnabled()) {
+        auto size = bounds.GetSize();
+        auto countHeight = counterDecorator_ ? counterDecorator_->GetBoundHeight() : 0.0f;
+        bounds.SetHeight(size.Height() + countHeight);
+    } else if (IsUnderlineMode()) {
+        auto size = bounds.GetSize();
+        bounds.SetHeight(size.Height() + underlineWidth_.ConvertToPx());
+    }
+}
+
 bool RichEditorPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, const DirtySwapConfig& config)
 {
     CHECK_NULL_RETURN(!config.skipMeasure && !dirty->SkipMeasureContent(), false);
@@ -1113,6 +1188,31 @@ bool RichEditorPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& di
     UpdateRichTextRect(richTextRectOpt);
     UpdateTextFieldManager(Offset(parentGlobalOffset_.GetX(), parentGlobalOffset_.GetY()), frameRect_.Height());
     bool ret = TextPattern::OnDirtyLayoutWrapperSwap(dirty, config);
+    ProcessOnLayoutSwap(originalFrameRect, config);
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, ret);
+    auto context = host->GetRenderContext();
+    CHECK_NULL_RETURN(context, ret);
+    if (context->GetClipEdge().has_value()) {
+        auto geometryNode = host->GetGeometryNode();
+        auto frameOffset = geometryNode->GetFrameOffset();
+        auto frameSize = geometryNode->GetFrameSize();
+        auto height = static_cast<float>(paragraphs_.GetHeight() + std::fabs(baselineOffset_));
+        if (!context->GetClipEdge().value() && LessNotEqual(frameSize.Height(), height)) {
+            RectF boundsRect(frameOffset.GetX(), frameOffset.GetY(), frameSize.Width(), height);
+            AdjustBoundsRect(boundsRect);
+            CHECK_NULL_RETURN(overlayMod_ && hostOverlayMod_, ret);
+            overlayMod_->SetBoundsRect(boundsRect);
+            hostOverlayMod_->SetBoundsRect(boundsRect);
+        }
+    }
+    caretUpdateType_ = CaretUpdateType::NONE;
+    HandleDragDropOnSwap();
+    return ret;
+}
+
+void RichEditorPattern::ProcessOnLayoutSwap(const RectF& originalFrameRect, const DirtySwapConfig& config)
+{
     UpdateScrollStateAfterLayout(config.frameSizeChange);
     UpdateMagnifierStateAfterLayout(config.frameSizeChange);
     IF_TRUE(!isRichEditorInit_, FireOnReady());
@@ -1125,30 +1225,16 @@ bool RichEditorPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& di
         TriggerAvoidOnCaretChangeNextFrame();
     });
     IF_TRUE(!isModifyingContent_, UpdateCaretInfoToController());
-    auto host = GetHost();
-    CHECK_NULL_RETURN(host, ret);
-    auto context = host->GetRenderContext();
-    CHECK_NULL_RETURN(context, ret);
-    if (context->GetClipEdge().has_value()) {
-        auto geometryNode = host->GetGeometryNode();
-        auto frameOffset = geometryNode->GetFrameOffset();
-        auto frameSize = geometryNode->GetFrameSize();
-        auto height = static_cast<float>(paragraphs_.GetHeight() + std::fabs(baselineOffset_));
-        if (!context->GetClipEdge().value() && LessNotEqual(frameSize.Height(), height)) {
-            RectF boundsRect(frameOffset.GetX(), frameOffset.GetY(), frameSize.Width(), height);
-            CHECK_NULL_RETURN(overlayMod_ && hostOverlayMod_, ret);
-            overlayMod_->SetBoundsRect(boundsRect);
-            hostOverlayMod_->SetBoundsRect(boundsRect);
-        }
-    }
-    caretUpdateType_ = CaretUpdateType::NONE;
+}
+
+void RichEditorPattern::HandleDragDropOnSwap()
+{
     IF_PRESENT(oneStepDragController_, HandleDirtyNodes());
     if (afterDragSelect_) {
         UpdateSelectionAndHandleVisibility();
         afterDragSelect_ = false;
     }
     releaseInDrop_ = false;
-    return ret;
 }
 
 void RichEditorPattern::HandleContentScroll(const OffsetF& preTextOffset, const OffsetF& curTextOffset) const
@@ -4641,6 +4727,7 @@ void RichEditorPattern::HandleBlurEvent()
     CreateMultipleClickRecognizer();
     IF_PRESENT(multipleClickRecognizer_, Stop());
     ProcBorderInBlurEvent();
+    UpdateUnderlineStyle();
     CHECK_NULL_VOID(showSelect_ || !IsSelected());
     HandleBlurEventReset();
 
@@ -4690,6 +4777,7 @@ void RichEditorPattern::HandleFocusEvent(FocusReason focusReason)
     UseHostToUpdateTextFieldManager();
     ReportEditorEvent(std::string(EDITOR_FOCUS_EVENT));
     needSelectAll_ = ShouldSelectAllOnInit(focusReason);
+    UpdateUnderlineStyle();
     if (previewLongPress_ || isOnlyRequestFocus_) {
         TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "HandleFocusEvent, previewLongPress=%{public}d,"
             "OnlyRequestFocus=%{public}d", previewLongPress_, isOnlyRequestFocus_);
@@ -16561,6 +16649,13 @@ void RichEditorPattern::UpdateShowCountBorderStyle()
 
 void RichEditorPattern::HandleCountStyle()
 {
+    if (IsUnderlineMode() && !IsShowCounterEnabled()) {
+        if (showCountBorderStyle_) {
+            UpdateUnderlineErrorStyle();
+        } else {
+            UpdateUnderlineStyle();
+        }
+    }
     if (!IsShowCounterEnabled()) {
         return;
     }
@@ -16589,9 +16684,19 @@ void RichEditorPattern::HandleCounterBorder()
 {
     CHECK_EQUAL_VOID(IsNapiRichEditorPattern(), false);
     if (showCountBorderStyle_) {
-        ApplyInnerBorderColor();
+        if (IsUnderlineMode()) {
+            UpdateUnderlineErrorStyle();
+        } else {
+            ApplyInnerBorderColor();
+        }
     } else {
-        SetThemeBorderAttr();
+        if (IsUnderlineMode()) {
+            UpdateUnderlineStyle();
+            CHECK_NULL_VOID(counterDecorator_);
+            counterDecorator_->UpdateTextFieldMargin();
+        } else {
+            SetThemeBorderAttr();
+        }
     }
 }
 

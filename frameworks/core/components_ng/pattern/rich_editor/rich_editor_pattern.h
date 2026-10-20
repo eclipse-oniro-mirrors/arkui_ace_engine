@@ -439,8 +439,11 @@ public:
     void ResetAfterPaste();
     void OnModifyDone() override;
     void BeforeCreateLayoutWrapper() override;
+    void AdjustBoundsRect(RectF& bounds);
     bool OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, const DirtySwapConfig& config) override;
     void HandleSelectOverlayOnLayoutSwap();
+    void ProcessOnLayoutSwap(const RectF& originalFrameRect, const DirtySwapConfig& config);
+    void HandleDragDropOnSwap();
     void FireOnReady();
     void MoveCaretOnLayoutSwap();
     void MoveTextRectOnLayoutSwap();
@@ -1119,6 +1122,8 @@ public:
     bool HasCounterTextOverflowColor() const override;
     Color GetCounterTextOverflowColor() const override;
     float GetFontScaleFromEnv(const RefPtr<FrameNode>& host) const override;
+    bool IsUnderlineMode() const override;
+    bool IsUnderlineAndButtonMode() const override;
     TextDirection GetLayoutDirection() const override;
     TextDirection GetNonAutoLayoutDirection() const override;
     std::optional<MarginProperty> GetMarginProperty() const override;
@@ -1154,6 +1159,14 @@ public:
     bool RequestKeyboard(bool isFocusViewChanged, bool needStartTwinkling, bool needShowSoftKeyboard,
         SourceType sourceType = SourceType::NONE);
 
+    Color GetUnderlineColor() const;
+    Dimension GetUnderlineWidth() const;
+    void UpdateUnderlineStyle();
+    void UpdateUnderlineErrorStyle();
+    const RectF& GetFrameRect() const
+    {
+        return frameRect_;
+    }
 protected:
     RefPtr<TextSelectOverlay> GetOrCreateSelectOverlay() override;
     RefPtr<TextSelectOverlay> GetSelectOverlay() const override;
@@ -1751,6 +1764,9 @@ private:
     // ===== counter members =====
     RefPtr<CounterDecorator> counterDecorator_;
     bool showCountBorderStyle_ = false;
+
+    Color underlineColor_ = Color::TRANSPARENT;
+    Dimension underlineWidth_ = 0.0_vp;
 
 #if defined(CROSS_PLATFORM)
     std::shared_ptr<TextEditingValue> editingValue_;

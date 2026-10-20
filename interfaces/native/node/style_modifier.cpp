@@ -5597,6 +5597,86 @@ void ResetRichEditorEnableSkipPreviewLongPress(ArkUI_NodeHandle node)
     }
 }
 
+int32_t SetRichEditorShowUnderline(ArkUI_NodeHandle node, const ArkUI_AttributeItem* item)
+{
+    if (item == nullptr || item->size != 1 || !InRegion(DEFAULT_FALSE, DEFAULT_TRUE, item->value[0].i32)) {
+        return ERROR_CODE_PARAM_INVALID;
+    }
+    if (node->type != ARKUI_NODE_TEXT_EDITOR) {
+        return ERROR_CODE_PARAM_INVALID;
+    }
+    GetFullImpl()->getNodeModifiers()->getRichEditorModifier()->setRichEditorShowUnderline(
+        node->uiNodeHandle, item->value[0].i32);
+    return ERROR_CODE_NO_ERROR;
+}
+
+const ArkUI_AttributeItem* GetRichEditorShowUnderline(ArkUI_NodeHandle node)
+{
+    if (node->type != ARKUI_NODE_TEXT_EDITOR) {
+        return nullptr;
+    }
+    g_numberValues[0].i32 = GetFullImpl()->getNodeModifiers()->getRichEditorModifier()->
+        getRichEditorShowUnderline(node->uiNodeHandle);
+    g_attributeItem.size = REQUIRED_ONE_PARAM;
+    return &g_attributeItem;
+}
+
+void ResetRichEditorShowUnderline(ArkUI_NodeHandle node)
+{
+    if (node->type != ARKUI_NODE_TEXT_EDITOR) {
+        return;
+    }
+    GetFullImpl()->getNodeModifiers()->getRichEditorModifier()->
+        resetRichEditorShowUnderline(node->uiNodeHandle);
+}
+
+int32_t SetRichEditorUnderlineColor(ArkUI_NodeHandle node, const ArkUI_AttributeItem* item)
+{
+    auto actualSize = CheckAttributeItemArray(item, REQUIRED_FOUR_PARAM);
+    if (actualSize < 0) {
+        return ERROR_CODE_PARAM_INVALID;
+    }
+    if (node->type != ARKUI_NODE_TEXT_EDITOR) {
+        return ERROR_CODE_PARAM_INVALID;
+    }
+    ArkUI_Uint32 values[NUM_4];
+    values[NUM_0] = item->value[NUM_0].u32;
+    values[NUM_1] = item->value[NUM_1].u32;
+    values[NUM_2] = item->value[NUM_2].u32;
+    values[NUM_3] = item->value[NUM_3].u32;
+    GetFullImpl()->getNodeModifiers()->getRichEditorModifier()->setRichEditorUnderlineColor(
+        node->uiNodeHandle, values, NUM_4);
+    return ERROR_CODE_NO_ERROR;
+}
+
+const ArkUI_AttributeItem* GetRichEditorUnderlineColor(ArkUI_NodeHandle node)
+{
+    if (node->type != ARKUI_NODE_TEXT_EDITOR) {
+        return nullptr;
+    }
+    ArkUI_Uint32 size = 0;
+    const ArkUI_Uint32* values = GetFullImpl()->getNodeModifiers()->getRichEditorModifier()->
+        getRichEditorUnderlineColor(node->uiNodeHandle, &size);
+    if (values == nullptr || size != NUM_4) {
+        return nullptr;
+    }
+    g_numberValues[NUM_0].u32 = values[NUM_0];
+    g_numberValues[NUM_1].u32 = values[NUM_1];
+    g_numberValues[NUM_2].u32 = values[NUM_2];
+    g_numberValues[NUM_3].u32 = values[NUM_3];
+    g_attributeItem.size = REQUIRED_FOUR_PARAM;
+    return &g_attributeItem;
+}
+
+void ResetRichEditorUnderlineColor(ArkUI_NodeHandle node)
+{
+    if (node->type != ARKUI_NODE_TEXT_EDITOR) {
+        return;
+    }
+    GetFullImpl()->getNodeModifiers()->getRichEditorModifier()->
+        resetRichEditorUnderlineColor(node->uiNodeHandle);
+}
+
 int32_t SetFontColor(ArkUI_NodeHandle node, const ArkUI_AttributeItem* item)
 {
     if (item->size == NUM_0) {

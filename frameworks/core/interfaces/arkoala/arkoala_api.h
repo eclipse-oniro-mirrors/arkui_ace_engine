@@ -9579,6 +9579,12 @@ struct ArkUIRichEditorModifier {
     void (*resetRichEditorMargin)(ArkUINodeHandle node);
     void (*getRichEditorMargin)(ArkUINodeHandle node, ArkUI_Float32 (*values)[4],
         ArkUI_Int32 length, ArkUI_Int32 unit);
+    void (*setRichEditorShowUnderline)(ArkUINodeHandle node, ArkUI_Int32 showUnderline);
+    ArkUI_Int32 (*getRichEditorShowUnderline)(ArkUINodeHandle node);
+    void (*resetRichEditorShowUnderline)(ArkUINodeHandle node);
+    void (*setRichEditorUnderlineColor)(ArkUINodeHandle node, const ArkUI_Uint32* colors, ArkUI_Uint32 size);
+    const ArkUI_Uint32* (*getRichEditorUnderlineColor)(ArkUINodeHandle node, ArkUI_Uint32* size);
+    void (*resetRichEditorUnderlineColor)(ArkUINodeHandle node);
 };
 
 struct ArkUIRichEditorControllerModifier {

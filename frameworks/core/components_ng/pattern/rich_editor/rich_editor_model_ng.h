@@ -129,6 +129,12 @@ public:
     static void SetOnSelectionChange(FrameNode* frameNode, std::function<void(const BaseEventInfo*)>&& callback);
     static void SetCaretColor(FrameNode* frameNode, const Color& color);
     static Color GetCaretColor(FrameNode* frameNode);
+    static void SetShowUnderline(FrameNode* frameNode, bool showUnderline);
+    static bool GetShowUnderline(FrameNode* frameNode);
+    static void ResetShowUnderline(FrameNode* frameNode);
+    static void SetUnderlineColor(FrameNode* frameNode, const UserUnderlineColor& userColor);
+    static UserUnderlineColor GetUnderlineColor(FrameNode* frameNode);
+    static void ResetUnderlineColor(FrameNode* frameNode);
     static void SetOnSelect(
         FrameNode* frameNode, std::function<void(const BaseEventInfo*)>&& callback, bool isJsView = false);
     static void SetOnReady(FrameNode* frameNode, std::function<void()>&& callback);

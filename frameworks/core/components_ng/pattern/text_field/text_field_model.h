@@ -179,6 +179,10 @@ struct UserUnderlineColor {
     std::optional<Color> normal = std::nullopt;
     std::optional<Color> error = std::nullopt;
     std::optional<Color> disable = std::nullopt;
+    bool operator==(const UserUnderlineColor& other) const
+    {
+        return typing == other.typing && normal == other.normal && error == other.error && disable == other.disable;
+    }
 };
 
 enum class InputStyle {
