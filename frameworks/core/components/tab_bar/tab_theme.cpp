@@ -144,6 +144,8 @@ void TabTheme::Builder::ParsePattern2(const RefPtr<TabTheme>& theme, const RefPt
         pattern->GetAttr<Color>("interactive_focus", Color::BLACK);
     theme->outlineExtraLarger_ =
         pattern->GetAttr<Dimension>("outline_extra_larger", 2.0_vp);
+    theme->borderExtraLarger_ =
+        pattern->GetAttr<Dimension>("border_extra_larger", 2.0_vp);
     theme->iconEmphasize_ =
         pattern->GetAttr<Color>("icon_emphasize", Color::BLACK);
     theme->iconPrimary_ =
@@ -184,6 +186,8 @@ void TabTheme::Builder::ParsePattern2(const RefPtr<TabTheme>& theme, const RefPt
         pattern->GetAttr<Color>("sidebar_divider_color", Color(0x33182431));
     theme->sideBarBackgroundColor_ =
         pattern->GetAttr<Color>("sidebar_background_color", Color(0xfff1f3f5));
+    theme->topTabTextSize_ =
+        pattern->GetAttr<Dimension>("top_tab_text_size", 16.0_fp);
 }
 
 } // namespace OHOS::Ace

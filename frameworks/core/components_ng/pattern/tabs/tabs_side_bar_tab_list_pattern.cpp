@@ -731,9 +731,9 @@ void TabsSideBarTabListPattern::ApplyDefaultVisibility()
     CHECK_NULL_VOID(tabsNode);
     auto tabsProperty = tabsNode->GetLayoutProperty<TabsLayoutProperty>();
     CHECK_NULL_VOID(tabsProperty);
-    // The sidebar does not display in Bottom style, so there is no need to update the visibility of the internal tab.
+    // The sidebar does not display in Bottom/Top style, so there is no need to update the visibility of the internal tab.
     auto barLayoutStyle = tabsProperty->GetBarLayoutStyleValue(TabBarLayoutStyle::BOTTOM);
-    if (barLayoutStyle == TabBarLayoutStyle::BOTTOM) {
+    if (barLayoutStyle == TabBarLayoutStyle::BOTTOM || barLayoutStyle == TabBarLayoutStyle::TOP) {
         return;
     }
 

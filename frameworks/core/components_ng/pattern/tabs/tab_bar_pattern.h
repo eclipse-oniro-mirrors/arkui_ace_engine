@@ -193,6 +193,7 @@ public:
         layoutAlgorithm->SetVisibleItemPosition(visibleItemPosition_);
         layoutAlgorithm->SetCanOverScroll(canOverScroll_);
         layoutAlgorithm->SetIsFloatingBar(isFloatingBar_);
+        layoutAlgorithm->SetIsFloatingTopBar(isFloatingTopBar_);
         return layoutAlgorithm;
     }
 
@@ -692,6 +693,26 @@ public:
     {
         isFloatingBar_ = isFloatingBar;
     }
+    bool IsFloatingBar() const
+    {
+        return isFloatingBar_;
+    }
+    void SetIsFloatingTopBar(bool isFloatingTopBar)
+    {
+        isFloatingTopBar_ = isFloatingTopBar;
+    }
+    void SetTopFloatingContentWidth(float width)
+    {
+        topFloatingContentWidth_ = width;
+    }
+    float GetTopFloatingContentWidth() const
+    {
+        return topFloatingContentWidth_;
+    }
+    bool IsFloatingTopBar() const
+    {
+        return isFloatingTopBar_;
+    }
 
     void SetColorInvertColorMode(ColorMode colorMode)
     {
@@ -839,6 +860,7 @@ private:
     const Color& GetSubTabBarHoverColor(int32_t index) const;
     void UpdateFocusToSelectedNode(bool isFocusActive);
     void UpdateFocusTabBarPageState();
+    void UpdateTopFloatingFocusBorder(bool isFocused, int32_t index);
     void UpdateSubTabBarItemStyles(const RefPtr<FrameNode>& columnNode, int32_t focusedColumnId,
         int32_t selectedColumnId, OHOS::Ace::Axis axis, int32_t index);
     void UpdateSelectedTextColor(const RefPtr<TabTheme>& tabTheme, OHOS::Ace::Axis axis,
@@ -940,6 +962,7 @@ private:
     float currentDelta_ = 0.0f;
     float currentOffset_ = 0.0f;
     float barGridMargin_ = 0.0f;
+    float topFloatingContentWidth_ = 0.0f;
     std::map<int32_t, ItemInfo> visibleItemPosition_;
     bool canOverScroll_ = false;
     bool isTabBarFocusActive_ = false;
@@ -951,6 +974,7 @@ private:
     bool shouldPlayMaskAnimation_ = true;
     bool useNewMaterial_ = false;
     bool isFloatingBar_ = false;
+    bool isFloatingTopBar_ = false;
     ColorMode colorInvertColorMode_ = ColorMode::COLOR_MODE_UNDEFINED;
 
     ACE_DISALLOW_COPY_AND_MOVE(TabBarPattern);

@@ -87,6 +87,8 @@ public:
     void CreateWithResourceObj(TabJsResType colorType, const RefPtr<ResourceObject>& resObj) override;
     void SetBarFloatingStyle(const BarFloatingStyleParameters& parameters) override;
     void ResetBarFloatingStyle() override;
+    void SetBarTopFloatingStyle(const BarTopFloatingStyleParameters& parameters) override;
+    void ResetBarTopFloatingStyle() override;
     void SetSidebarDisplayStyle(SidebarDisplayStyle sidebarDisplayStyle) override;
     void SetBarLayoutStyle(TabBarLayoutStyle barLayoutStyle) override;
     void SetSidebarPosition(BarPosition position) override;
@@ -98,6 +100,10 @@ public:
     static void ProcessDimensionWithResourceObj(
         FrameNode* frameNode, const std::string& name, const RefPtr<ResourceObject>& resObj);
     static void ProcessColorWithResourceObj(
+        FrameNode* frameNode, const std::string& name, const RefPtr<ResourceObject>& resObj);
+    static void ProcessTopDimensionWithResourceObj(
+        FrameNode* frameNode, const std::string& name, const RefPtr<ResourceObject>& resObj);
+    static void ProcessTopColorWithResourceObj(
         FrameNode* frameNode, const std::string& name, const RefPtr<ResourceObject>& resObj);
 
     static RefPtr<TabsNode> GetOrCreateTabsNode(
@@ -198,6 +204,8 @@ public:
 
     static void SetBarFloatingStyle(FrameNode* frameNode, const BarFloatingStyleParameters& parameters);
     static void ResetBarFloatingStyle(FrameNode* frameNode);
+    static void SetBarTopFloatingStyle(FrameNode* frameNode, const BarTopFloatingStyleParameters& parameters);
+    static void ResetBarTopFloatingStyle(FrameNode* frameNode);
     static void SetSidebarDisplayStyle(FrameNode* frameNode, SidebarDisplayStyle sidebarDisplayStyle);
     static void SetBarLayoutStyle(FrameNode* frameNode, TabBarLayoutStyle barLayoutStyle);
     static void SetSidebarPosition(FrameNode* frameNode, BarPosition position);
