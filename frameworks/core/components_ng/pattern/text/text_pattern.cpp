@@ -5864,8 +5864,12 @@ void TextPattern::OnVisibleChange(bool isVisible)
             GetDataDetectorAdapter()->aiDetectDelayTask_.Cancel();
         }
     } else {
-        if (CanStartAITask()) {
-            GetDataDetectorAdapter()->StartAITask();
+        if (CanStartAITask() && !GetDataDetectorAdapter()->aiDetectInitialized_) {
+            ParseOriText(textForDisplay_);
+            if (!GetDataDetectorAdapter()->aiDetectInitialized_) {
+                GetDataDetectorAdapter()->textForAI_ = textForDisplay_;
+                GetDataDetectorAdapter()->StartAITask();
+            }
         }
     }
 }
