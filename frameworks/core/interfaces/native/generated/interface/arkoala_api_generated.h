@@ -5176,6 +5176,15 @@ typedef struct Opt_EventQueryType {
     Ark_Tag tag;
     Ark_EventQueryType value;
 } Opt_EventQueryType;
+typedef enum Ark_FastScrollMode {
+    ARK_FAST_SCROLL_MODE_NONE = 0,
+    ARK_FAST_SCROLL_MODE_SKIP_MEASURE = 1,
+    ARK_FAST_SCROLL_MODE_SKIP_CREATE_AND_MEASURE = 2,
+} Ark_FastScrollMode;
+typedef struct Opt_FastScrollMode {
+    Ark_Tag tag;
+    Ark_FastScrollMode value;
+} Opt_FastScrollMode;
 typedef enum Ark_FileSelectorMode {
     ARK_FILE_SELECTOR_MODE_FILE_OPEN_MODE = 0,
     ARK_FILE_SELECTOR_MODE_FILE_OPEN_MULTIPLE_MODE = 1,
@@ -20989,6 +20998,7 @@ typedef struct Opt_ScrollOptions {
 typedef struct Ark_ScrollToIndexOptions {
     /* kind: Interface */
     Opt_LengthMetricsProxy extraOffset;
+    Opt_FastScrollMode fastScroll;
 } Ark_ScrollToIndexOptions;
 typedef struct Opt_ScrollToIndexOptions {
     Ark_Tag tag;

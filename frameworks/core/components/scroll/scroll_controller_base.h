@@ -59,6 +59,17 @@ enum class ScrollAlign {
     NONE,
 };
 
+enum class FastScrollMode {
+    NONE = 0,
+    SKIP_MEASURE,
+    SKIP_CREATE_AND_MEASURE,
+};
+
+constexpr bool IsFastScrollEnabled(FastScrollMode mode)
+{
+    return mode == FastScrollMode::SKIP_MEASURE || mode == FastScrollMode::SKIP_CREATE_AND_MEASURE;
+}
+
 struct ListItemGroupIndex {
     int32_t index = -1;
     int32_t area = -1;
@@ -168,6 +179,12 @@ public:
     }
 
     virtual void StopAnimate() {}
+
+    virtual void ScrollToIndexWithOptions(int32_t index, bool smooth, ScrollAlign align,
+        std::optional<float> extraOffset, FastScrollMode mode)
+    {
+        ScrollToIndex(index, smooth, align, extraOffset);
+    }
 
 protected:
     RefPtr<ScrollerObserverManager> observerMgr_ = nullptr;

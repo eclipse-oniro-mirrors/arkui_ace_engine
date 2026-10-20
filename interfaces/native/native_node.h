@@ -8391,8 +8391,8 @@ typedef enum {
     /**
      * @brief Scroll to the specified index.
      * 
-     * When activating the smooth animation, all items passed through will be loaded and layout calculated, which can
-     * lead to performance issues when loading a large number of items.\n
+     * When smooth animation is enabled without fast scrolling, all items passed through will be loaded and laid out,
+     * which can lead to performance issues when loading a large number of items.\n
      * \n
      * Format of the {@link ArkUI_AttributeItem} parameter for setting the attribute:\n
      * .value[0].i32：The index value of the target element to be slid to in the current container.\n
@@ -8402,6 +8402,11 @@ typedef enum {
      * {@link ArkUI_ScrollAlignment}, default value is ARKUI_SCROLL_ALIGNMENT_START. \n
      * .value[3]?.f32: extra offset, in vp. The default value is <b>0</b>.
      * This parameter is supported since API version 15. \n
+     * .value[4]?.i32: fast scroll mode for List. The value <b>0</b> disables optimization, <b>1</b> skips
+     * intermediate item measurement, and <b>2</b> skips intermediate item creation and measurement.
+     * Other values disable optimization. The default value is <b>0</b>. This option takes effect only when
+     * .value[1] is <b>1</b>. When enabled, intermediate items may be skipped using estimated positions.
+     * This parameter is supported since API version 26.2.0. \n
      *
      */
     NODE_LIST_SCROLL_TO_INDEX,

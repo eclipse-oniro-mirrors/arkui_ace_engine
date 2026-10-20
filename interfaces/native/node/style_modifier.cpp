@@ -23,6 +23,7 @@
 #include "base/geometry/shape.h"
 #include "frame_information.h"
 #include "grid_layout_option.h"
+#include "list_option.h"
 #include "animate_impl.h"
 #include "native_material_impl.h"
 #include "native_type.h"
@@ -9078,13 +9079,25 @@ int32_t SetListScrollToIndex(ArkUI_NodeHandle node, const ArkUI_AttributeItem* i
     if (values[NUM_2] == ArkUI_ScrollAlignment::ARKUI_SCROLL_ALIGNMENT_NONE) {
         values[NUM_2] = ArkUI_ScrollAlignment::ARKUI_SCROLL_ALIGNMENT_START;
     }
-    ArkUI_Float32 options = 0.0f;
+    ArkUI_Float32 extraOffset = 0.0f;
     if (item->size > NUM_3) {
-        options = item->value[NUM_3].f32;
+        extraOffset = item->value[NUM_3].f32;
     }
     auto* fullImpl = GetFullImpl();
-    fullImpl->getNodeModifiers()->getListModifier()->setScrollToIndex(
-        node->uiNodeHandle, values[NUM_0], values[NUM_1], values[NUM_2], options);
+    if (item->size > NUM_4 && InRegion(NUM_1, NUM_2, item->value[NUM_4].i32)) {
+        ArkUIScrollToIndexOptions options {
+            values[NUM_1] != DEFAULT_FALSE, values[NUM_2], extraOffset, item->value[NUM_4].i32
+        };
+        const int32_t unit = GetDefaultUnit(node, UNIT_VP);
+        if (options.smooth && unit != UNIT_PX) {
+            options.extraOffset = fullImpl->getBasicAPI()->convertLengthMetricsUnit(extraOffset, unit, UNIT_PX);
+        }
+        fullImpl->getNodeModifiers()->getListModifier()->setScrollToIndexWithOptions(
+            node->uiNodeHandle, values[NUM_0], &options);
+    } else {
+        fullImpl->getNodeModifiers()->getListModifier()->setScrollToIndex(
+            node->uiNodeHandle, values[NUM_0], values[NUM_1], values[NUM_2], extraOffset);
+    }
     return ERROR_CODE_NO_ERROR;
 }
 

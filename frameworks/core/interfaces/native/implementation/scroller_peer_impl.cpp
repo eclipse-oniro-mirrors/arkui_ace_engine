@@ -61,6 +61,7 @@ struct ScrollEdgeOptions {
 
 struct ScrollToIndexOptions {
     std::optional<float> extraOffset;
+    OHOS::Ace::FastScrollMode fastScroll = OHOS::Ace::FastScrollMode::NONE;
 };
 
 struct ScrollAnimationOptions {
@@ -102,11 +103,23 @@ inline ScrollEdgeOptions Convert(const Ark_ScrollEdgeOptions& src)
 }
 
 template<>
+inline void AssignCast(std::optional<FastScrollMode>& dst, const Ark_FastScrollMode& src)
+{
+    switch (src) {
+        case ARK_FAST_SCROLL_MODE_NONE: dst = FastScrollMode::NONE; break;
+        case ARK_FAST_SCROLL_MODE_SKIP_MEASURE: dst = FastScrollMode::SKIP_MEASURE; break;
+        case ARK_FAST_SCROLL_MODE_SKIP_CREATE_AND_MEASURE: dst = FastScrollMode::SKIP_CREATE_AND_MEASURE; break;
+        default: LOGE("Unexpected enum value in Ark_FastScrollMode: %{public}d", src);
+    }
+}
+
+template<>
 inline ScrollToIndexOptions Convert(const Ark_ScrollToIndexOptions& src)
 {
     auto offset = Converter::OptConvert<Dimension>(src.extraOffset);
     ScrollToIndexOptions scrollToIndexOptions = {
-        .extraOffset = offset ? std::optional<float>(offset.value().ConvertToPx()) : std::nullopt
+        .extraOffset = offset ? std::optional<float>(offset.value().ConvertToPx()) : std::nullopt,
+        .fastScroll = Converter::OptConvert<FastScrollMode>(src.fastScroll).value_or(FastScrollMode::NONE),
     };
     return scrollToIndexOptions;
 }
@@ -322,7 +335,12 @@ void ScrollerPeerImpl::TriggerScrollToIndex(Ark_VMContext vmContext, const Ark_I
     auto extraOffset = scrollToIndexOptions ? scrollToIndexOptions->extraOffset : std::nullopt;
 
     ContainerScope scope(instanceId_);
-    scrollController->ScrollToIndex(index, smooth, align, extraOffset);
+    const auto mode = scrollToIndexOptions ? scrollToIndexOptions->fastScroll : FastScrollMode::NONE;
+    if (smooth && IsFastScrollEnabled(mode)) {
+        scrollController->ScrollToIndexWithOptions(index, smooth, align, extraOffset, mode);
+    } else {
+        scrollController->ScrollToIndex(index, smooth, align, extraOffset);
+    }
 }
 
 void ScrollerPeerImpl::TriggerScrollBy(Ark_VMContext vmContext, const Dimension& xOffset, const Dimension& yOffset)

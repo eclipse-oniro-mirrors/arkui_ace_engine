@@ -48,6 +48,12 @@ enum class ListPosMapUpdate {
 class ACE_FORCE_EXPORT ListPositionMap : public AceType {
     DECLARE_ACE_TYPE(ListPositionMap, AceType);
 public:
+    struct EstimateRange {
+        int32_t startIndex;
+        int32_t endIndex;
+    };
+    using ItemGroupFlags = std::vector<std::pair<int32_t, bool>>;
+
     ListPositionMap() = default;
     ~ListPositionMap() override = default;
 
@@ -92,6 +98,12 @@ public:
 
     void UpdatePosMapEnd(int32_t prevEndIndex, float space, bool groupAtEnd);
 
+    void UpdateFastScrollPosMapStart(float delta, double& listCurrentPos, float space,
+        int32_t startIndex, float startPos, bool groupAtStart);
+    void UpdateFastScrollPosMapEnd(int32_t prevEndIndex, float space, bool groupAtEnd);
+    // Discard FastScroll metadata without geometry before resuming legacy position updates.
+    void RemoveUnpositionedEntries();
+
     void CalculateUINode(RefPtr<UINode> node);
 
     std::optional<bool> GetLazyForEachChildIsGroup(RefPtr<UINode> node);
@@ -128,6 +140,23 @@ public:
 
     ListPositionInfo GetPositionInfo(int32_t index) const;
 
+    ItemGroupFlags GetItemGroupFlags() const;
+    void UpdateItemGroupFlags(const ItemGroupFlags& flags);
+
+    // Size-only entries are standalone samples; adjacent positioned items share a row up to lanes.
+    std::optional<float> GetAverageRowHeight(int32_t lanes) const;
+
+    // Connect the requested range to a valid position; the caller compensates coordinate changes.
+    bool EstimatePositions(const EstimateRange& range, float estimatedSize, int32_t lanes, float space,
+        const std::map<int32_t, int32_t>& itemRanges = {}, bool stackFromEnd = false);
+
+    // itemRanges uses layout indices; the returned row uses physical indices when stackFromEnd is true.
+    std::optional<EstimateRange> GetLanesRow(int32_t index, int32_t lanes,
+        const std::map<int32_t, int32_t>& itemRanges, bool stackFromEnd = false) const;
+
+    // Returns the first item in the row and the offset from its start; gaps belong to the next row.
+    std::pair<int32_t, float> FindRowAtPosition(float position, int32_t lanes) const;
+
     std::pair<int32_t, float> GetStartIndexAndPos() const;
 
     std::pair<int32_t, float> GetEndIndexAndPos() const;
@@ -152,6 +181,8 @@ public:
     std::pair<int32_t, float> GetRowEndIndexAndHeight(const int32_t input);
 
     void ReversePosMap();
+    // Create a layout-local mirrored view; the shared physical position table is not modified.
+    RefPtr<ListPositionMap> CreateFastScrollMirroredPosMap() const;
 protected:
     RefPtr<ListChildrenMainSize> childrenSize_;
     ListChangeFlag dirty_ = LIST_NO_CHANGE;
@@ -160,7 +191,28 @@ protected:
     int32_t lanes_ = -1;
 
 private:
-    std::map<int32_t, ListPositionInfo> posMap_;
+    using PositionMap = std::map<int32_t, ListPositionInfo>;
+
+    PositionMap::iterator FindEstimatedAnchor(const EstimateRange& range);
+    std::optional<double> CheckEstimatedPositions(
+        const EstimateRange& range, PositionMap::const_iterator anchor, float estimatedSize, float space) const;
+    void FillEstimatedPositions(const EstimateRange& range, PositionMap::iterator anchor,
+        double anchorPos, float estimatedSize, float space);
+    bool EstimateSingleLanePositions(EstimateRange range, float estimatedSize, float space);
+    struct LanesEstimate {
+        int32_t lanes;
+        bool stackFromEnd;
+        const std::map<int32_t, int32_t>& itemRanges;
+    };
+
+    bool EstimateConfirmedRows(EstimateRange range, float estimatedSize, float space, const LanesEstimate& layout);
+    std::optional<double> CollectEstimatedRows(const EstimateRange& range, int32_t anchorIndex,
+        float estimatedSize, float space, const LanesEstimate& layout,
+        std::vector<std::pair<int32_t, float>>& heights) const;
+    void FillConfirmedRows(int32_t startIndex,
+        const std::vector<std::pair<int32_t, float>>& heights, double position, float space);
+
+    PositionMap posMap_;
     std::function<float(int32_t)> chainOffsetFunc_;
     int32_t curLine_ = 0;
     int32_t curIndex_ = 0;
