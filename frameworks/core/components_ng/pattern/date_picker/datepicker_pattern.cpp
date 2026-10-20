@@ -628,6 +628,30 @@ void DatePickerPattern::UpdateLunarSwitch()
     lunarSwitchCheckbox->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
 }
 
+bool DatePickerPattern::IsAtStartYear() const
+{
+    auto currentDate = GetCurrentDate();
+    return currentDate.GetYear() == startDateSolar_.GetYear();
+}
+
+bool DatePickerPattern::IsAtEndYear() const
+{
+    auto currentDate = GetCurrentDate();
+    return currentDate.GetYear() == endDateSolar_.GetYear();
+}
+
+bool DatePickerPattern::IsAtStartMonth() const
+{
+    auto currentDate = GetCurrentDate();
+    return IsAtStartYear() && currentDate.GetMonth() == startDateSolar_.GetMonth();
+}
+
+bool DatePickerPattern::IsAtEndMonth() const
+{
+    auto currentDate = GetCurrentDate();
+    return IsAtEndYear() && currentDate.GetMonth() == endDateSolar_.GetMonth();
+}
+
 void DatePickerPattern::UpdateDateOrder()
 {
     auto language = AceApplicationInfo::GetInstance().GetLanguage();
@@ -1070,7 +1094,7 @@ bool DatePickerPattern::HandleDirectionKey(KeyCode code)
     return ParseDirectionKey(pattern, code, totalOptionCount, static_cast<int32_t>(childSize));
 }
 
-std::unordered_map<std::string, RefPtr<FrameNode>> DatePickerPattern::GetAllChildNode()
+std::unordered_map<std::string, RefPtr<FrameNode>> DatePickerPattern::GetAllChildNode() const
 {
     std::unordered_map<std::string, RefPtr<FrameNode>> allChildNode;
     RefPtr<FrameNode> stackYear;
@@ -1099,7 +1123,7 @@ std::unordered_map<std::string, RefPtr<FrameNode>> DatePickerPattern::GetAllChil
 }
 
 void DatePickerPattern::OrderAllChildNode(
-    RefPtr<FrameNode>& stackYear, RefPtr<FrameNode>& stackMonth, RefPtr<FrameNode>& stackDay)
+    RefPtr<FrameNode>& stackYear, RefPtr<FrameNode>& stackMonth, RefPtr<FrameNode>& stackDay) const
 {
     auto host = GetHost();
     CHECK_NULL_VOID(host);

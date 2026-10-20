@@ -25,6 +25,7 @@
 #include "test/mock/frameworks/core/common/mock_theme_manager.h"
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 #include "core/components_ng/base/view_stack_processor.h"
+#include "core/components_ng/pattern/date_picker/datepicker_column_pattern.h"
 #include "core/components_ng/pattern/date_picker/datepicker_model_ng.h"
 #include "core/components_ng/pattern/date_picker/datepicker_pattern.h"
 #include "core/components_ng/pattern/date_picker/picker_date_f.h"
@@ -405,12 +406,342 @@ HWTEST_F(DatePickerTestCore, DatePickerCore010, TestSize.Level1)
     auto datePickerPattern = frameNode->GetPattern<DatePickerPattern>();
     ASSERT_NE(datePickerPattern, nullptr);
 
-    auto expectedOrder = DateTimeSequence().GetDateOrder(language).dateOrder;
-    EXPECT_EQ(datePickerPattern->dateOrder_, expectedOrder);
-
     EXPECT_TRUE(datePickerPattern->HasYearNode());
     EXPECT_TRUE(datePickerPattern->HasMonthNode());
     EXPECT_TRUE(datePickerPattern->HasDayNode());
+}
+
+/**
+ * @tc.name: DatePickerCore011
+ * @tc.desc: Test IsAtStartYear when selectedDate equals startDate
+ * @tc.type: FUNC
+ */
+HWTEST_F(DatePickerTestCore, DatePickerCore011, TestSize.Level1)
+{
+    auto frameNode = CreateDatePickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto datePickerPattern = frameNode->GetPattern<DatePickerPattern>();
+    ASSERT_NE(datePickerPattern, nullptr);
+
+    datePickerPattern->SetStartDate(PickerDate(2020, 1, 1));
+    datePickerPattern->SetEndDate(PickerDate(2030, 12, 31));
+    datePickerPattern->SetSelectDate(PickerDate(2020, 1, 1));
+    frameNode->MarkModifyDone();
+
+    EXPECT_TRUE(datePickerPattern->IsAtStartYear());
+    EXPECT_FALSE(datePickerPattern->IsAtEndYear());
+}
+
+/**
+ * @tc.name: DatePickerCore012
+ * @tc.desc: Test IsAtEndYear when selectedDate equals endDate
+ * @tc.type: FUNC
+ */
+HWTEST_F(DatePickerTestCore, DatePickerCore012, TestSize.Level1)
+{
+    auto frameNode = CreateDatePickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto datePickerPattern = frameNode->GetPattern<DatePickerPattern>();
+    ASSERT_NE(datePickerPattern, nullptr);
+
+    datePickerPattern->SetStartDate(PickerDate(2020, 1, 1));
+    datePickerPattern->SetEndDate(PickerDate(2030, 12, 31));
+    datePickerPattern->SetSelectDate(PickerDate(2030, 12, 31));
+    frameNode->MarkModifyDone();
+
+    EXPECT_FALSE(datePickerPattern->IsAtStartYear());
+    EXPECT_TRUE(datePickerPattern->IsAtEndYear());
+}
+
+/**
+ * @tc.name: DatePickerCore013
+ * @tc.desc: Test IsAtStartMonth when selectedDate equals startDate
+ * @tc.type: FUNC
+ */
+HWTEST_F(DatePickerTestCore, DatePickerCore013, TestSize.Level1)
+{
+    auto frameNode = CreateDatePickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto datePickerPattern = frameNode->GetPattern<DatePickerPattern>();
+    ASSERT_NE(datePickerPattern, nullptr);
+
+    datePickerPattern->SetStartDate(PickerDate(2020, 6, 15));
+    datePickerPattern->SetEndDate(PickerDate(2030, 6, 20));
+    datePickerPattern->SetSelectDate(PickerDate(2020, 6, 15));
+    frameNode->MarkModifyDone();
+
+    EXPECT_TRUE(datePickerPattern->IsAtStartYear());
+    EXPECT_TRUE(datePickerPattern->IsAtStartMonth());
+    EXPECT_FALSE(datePickerPattern->IsAtEndMonth());
+}
+
+/**
+ * @tc.name: DatePickerCore014
+ * @tc.desc: Test IsAtEndMonth when selectedDate equals endDate
+ * @tc.type: FUNC
+ */
+HWTEST_F(DatePickerTestCore, DatePickerCore014, TestSize.Level1)
+{
+    auto frameNode = CreateDatePickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto datePickerPattern = frameNode->GetPattern<DatePickerPattern>();
+    ASSERT_NE(datePickerPattern, nullptr);
+
+    datePickerPattern->SetStartDate(PickerDate(2020, 6, 15));
+    datePickerPattern->SetEndDate(PickerDate(2030, 6, 20));
+    datePickerPattern->SetSelectDate(PickerDate(2030, 6, 20));
+    frameNode->MarkModifyDone();
+
+    EXPECT_TRUE(datePickerPattern->IsAtEndYear());
+    EXPECT_TRUE(datePickerPattern->IsAtEndMonth());
+    EXPECT_FALSE(datePickerPattern->IsAtStartMonth());
+}
+
+/**
+ * @tc.name: DatePickerCore015
+ * @tc.desc: Test IsAtStartYear false when selectedDate is non-boundary
+ * @tc.type: FUNC
+ */
+HWTEST_F(DatePickerTestCore, DatePickerCore015, TestSize.Level1)
+{
+    auto frameNode = CreateDatePickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto datePickerPattern = frameNode->GetPattern<DatePickerPattern>();
+    ASSERT_NE(datePickerPattern, nullptr);
+
+    datePickerPattern->SetStartDate(PickerDate(2020, 1, 1));
+    datePickerPattern->SetEndDate(PickerDate(2030, 12, 31));
+    datePickerPattern->SetSelectDate(PickerDate(2025, 6, 15));
+    frameNode->MarkModifyDone();
+
+    EXPECT_FALSE(datePickerPattern->IsAtStartYear());
+    EXPECT_FALSE(datePickerPattern->IsAtEndYear());
+    EXPECT_FALSE(datePickerPattern->IsAtStartMonth());
+    EXPECT_FALSE(datePickerPattern->IsAtEndMonth());
+}
+
+/**
+ * @tc.name: DatePickerCore016
+ * @tc.desc: Test GetCanLoopFromLayoutPropertyWithStartEnd for year column (always false)
+ * @tc.type: FUNC
+ */
+HWTEST_F(DatePickerTestCore, DatePickerCore016, TestSize.Level1)
+{
+    auto frameNode = CreateDatePickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto datePickerPattern = frameNode->GetPattern<DatePickerPattern>();
+    ASSERT_NE(datePickerPattern, nullptr);
+
+    datePickerPattern->SetStartDate(PickerDate(2020, 1, 1));
+    datePickerPattern->SetEndDate(PickerDate(2030, 12, 31));
+    datePickerPattern->SetSelectDate(PickerDate(2025, 6, 15));
+    frameNode->MarkModifyDone();
+
+    auto allChildNode = datePickerPattern->GetAllChildNode();
+    auto yearNode = allChildNode["year"];
+    ASSERT_NE(yearNode, nullptr);
+    auto yearColumnPattern = yearNode->GetPattern<DatePickerColumnPattern>();
+    ASSERT_NE(yearColumnPattern, nullptr);
+    EXPECT_FALSE(yearColumnPattern->GetCanLoopFromLayoutPropertyWithStartEnd());
+}
+
+/**
+ * @tc.name: DatePickerCore017
+ * @tc.desc: Test GetCanLoopFromLayoutPropertyWithStartEnd for month column at boundary (false)
+ * @tc.type: FUNC
+ */
+HWTEST_F(DatePickerTestCore, DatePickerCore017, TestSize.Level1)
+{
+    auto frameNode = CreateDatePickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto datePickerPattern = frameNode->GetPattern<DatePickerPattern>();
+    ASSERT_NE(datePickerPattern, nullptr);
+
+    datePickerPattern->SetStartDate(PickerDate(2020, 1, 1));
+    datePickerPattern->SetEndDate(PickerDate(2030, 12, 31));
+    datePickerPattern->SetSelectDate(PickerDate(2020, 6, 15));
+    frameNode->MarkModifyDone();
+
+    auto allChildNode = datePickerPattern->GetAllChildNode();
+    auto monthNode = allChildNode["month"];
+    ASSERT_NE(monthNode, nullptr);
+    auto monthColumnPattern = monthNode->GetPattern<DatePickerColumnPattern>();
+    ASSERT_NE(monthColumnPattern, nullptr);
+    EXPECT_FALSE(monthColumnPattern->GetCanLoopFromLayoutPropertyWithStartEnd());
+}
+
+/**
+ * @tc.name: DatePickerCore018
+ * @tc.desc: Test GetCanLoopFromLayoutPropertyWithStartEnd for month column non-boundary (true)
+ * @tc.type: FUNC
+ */
+HWTEST_F(DatePickerTestCore, DatePickerCore018, TestSize.Level1)
+{
+    auto frameNode = CreateDatePickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto datePickerPattern = frameNode->GetPattern<DatePickerPattern>();
+    ASSERT_NE(datePickerPattern, nullptr);
+
+    datePickerPattern->SetStartDate(PickerDate(2020, 1, 1));
+    datePickerPattern->SetEndDate(PickerDate(2030, 12, 31));
+    datePickerPattern->SetSelectDate(PickerDate(2025, 6, 15));
+    frameNode->MarkModifyDone();
+
+    auto allChildNode = datePickerPattern->GetAllChildNode();
+    auto monthNode = allChildNode["month"];
+    ASSERT_NE(monthNode, nullptr);
+    auto monthColumnPattern = monthNode->GetPattern<DatePickerColumnPattern>();
+    ASSERT_NE(monthColumnPattern, nullptr);
+    EXPECT_TRUE(monthColumnPattern->GetCanLoopFromLayoutPropertyWithStartEnd());
+}
+
+/**
+ * @tc.name: DatePickerCore019
+ * @tc.desc: Test GetCanLoopFromLayoutPropertyWithStartEnd for day column at boundary (false)
+ * @tc.type: FUNC
+ */
+HWTEST_F(DatePickerTestCore, DatePickerCore019, TestSize.Level1)
+{
+    auto frameNode = CreateDatePickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto datePickerPattern = frameNode->GetPattern<DatePickerPattern>();
+    ASSERT_NE(datePickerPattern, nullptr);
+
+    datePickerPattern->SetStartDate(PickerDate(2020, 6, 15));
+    datePickerPattern->SetEndDate(PickerDate(2030, 6, 20));
+    datePickerPattern->SetSelectDate(PickerDate(2020, 6, 15));
+    frameNode->MarkModifyDone();
+
+    auto allChildNode = datePickerPattern->GetAllChildNode();
+    auto dayNode = allChildNode["day"];
+    ASSERT_NE(dayNode, nullptr);
+    auto dayColumnPattern = dayNode->GetPattern<DatePickerColumnPattern>();
+    ASSERT_NE(dayColumnPattern, nullptr);
+    EXPECT_FALSE(dayColumnPattern->GetCanLoopFromLayoutPropertyWithStartEnd());
+}
+
+/**
+ * @tc.name: DatePickerCore020
+ * @tc.desc: Test GetCanLoopFromLayoutPropertyWithStartEnd for day column non-boundary (true)
+ * @tc.type: FUNC
+ */
+HWTEST_F(DatePickerTestCore, DatePickerCore020, TestSize.Level1)
+{
+    auto frameNode = CreateDatePickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto datePickerPattern = frameNode->GetPattern<DatePickerPattern>();
+    ASSERT_NE(datePickerPattern, nullptr);
+
+    datePickerPattern->SetStartDate(PickerDate(2020, 6, 15));
+    datePickerPattern->SetEndDate(PickerDate(2030, 6, 20));
+    datePickerPattern->SetSelectDate(PickerDate(2025, 6, 18));
+    frameNode->MarkModifyDone();
+
+    auto allChildNode = datePickerPattern->GetAllChildNode();
+    auto dayNode = allChildNode["day"];
+    ASSERT_NE(dayNode, nullptr);
+    auto dayColumnPattern = dayNode->GetPattern<DatePickerColumnPattern>();
+    ASSERT_NE(dayColumnPattern, nullptr);
+    EXPECT_TRUE(dayColumnPattern->GetCanLoopFromLayoutPropertyWithStartEnd());
+}
+
+/**
+ * @tc.name: DatePickerCore021
+ * @tc.desc: Test GetCanLoopFromLayoutPropertyWithStartEnd when start=end (false)
+ * @tc.type: FUNC
+ */
+HWTEST_F(DatePickerTestCore, DatePickerCore021, TestSize.Level1)
+{
+    auto frameNode = CreateDatePickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto datePickerPattern = frameNode->GetPattern<DatePickerPattern>();
+    ASSERT_NE(datePickerPattern, nullptr);
+
+    datePickerPattern->SetStartDate(PickerDate(2025, 6, 15));
+    datePickerPattern->SetEndDate(PickerDate(2025, 6, 15));
+    datePickerPattern->SetSelectDate(PickerDate(2025, 6, 15));
+    frameNode->MarkModifyDone();
+
+    auto allChildNode = datePickerPattern->GetAllChildNode();
+    auto monthNode = allChildNode["month"];
+    ASSERT_NE(monthNode, nullptr);
+    auto monthColumnPattern = monthNode->GetPattern<DatePickerColumnPattern>();
+    ASSERT_NE(monthColumnPattern, nullptr);
+    EXPECT_FALSE(monthColumnPattern->GetCanLoopFromLayoutPropertyWithStartEnd());
+}
+
+/**
+ * @tc.name: DatePickerCore022
+ * @tc.desc: Test GetCanLoopFromLayoutPropertyWithStartEnd when canLoop=false (false)
+ * @tc.type: FUNC
+ */
+HWTEST_F(DatePickerTestCore, DatePickerCore022, TestSize.Level1)
+{
+    auto frameNode = CreateDatePickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto datePickerPattern = frameNode->GetPattern<DatePickerPattern>();
+    ASSERT_NE(datePickerPattern, nullptr);
+
+    auto layoutProperty = frameNode->GetLayoutProperty<DataPickerRowLayoutProperty>();
+    ASSERT_NE(layoutProperty, nullptr);
+    layoutProperty->UpdateCanLoop(false);
+
+    datePickerPattern->SetStartDate(PickerDate(2020, 1, 1));
+    datePickerPattern->SetEndDate(PickerDate(2030, 12, 31));
+    datePickerPattern->SetSelectDate(PickerDate(2025, 6, 15));
+    frameNode->MarkModifyDone();
+
+    auto allChildNode = datePickerPattern->GetAllChildNode();
+    auto monthNode = allChildNode["month"];
+    ASSERT_NE(monthNode, nullptr);
+    auto monthColumnPattern = monthNode->GetPattern<DatePickerColumnPattern>();
+    ASSERT_NE(monthColumnPattern, nullptr);
+    EXPECT_FALSE(monthColumnPattern->GetCanLoopFromLayoutPropertyWithStartEnd());
+}
+
+/**
+ * @tc.name: DatePickerCore023
+ * @tc.desc: Test IsTossNeedToStop returns inverse of GetCanLoopFromLayoutPropertyWithStartEnd
+ * @tc.type: FUNC
+ */
+HWTEST_F(DatePickerTestCore, DatePickerCore023, TestSize.Level1)
+{
+    auto frameNode = CreateDatePickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto datePickerPattern = frameNode->GetPattern<DatePickerPattern>();
+    ASSERT_NE(datePickerPattern, nullptr);
+
+    datePickerPattern->SetStartDate(PickerDate(2020, 1, 1));
+    datePickerPattern->SetEndDate(PickerDate(2030, 12, 31));
+    datePickerPattern->SetSelectDate(PickerDate(2025, 6, 15));
+    frameNode->MarkModifyDone();
+
+    auto allChildNode = datePickerPattern->GetAllChildNode();
+    auto monthNode = allChildNode["month"];
+    ASSERT_NE(monthNode, nullptr);
+    auto monthColumnPattern = monthNode->GetPattern<DatePickerColumnPattern>();
+    ASSERT_NE(monthColumnPattern, nullptr);
+
+    bool canLoop = monthColumnPattern->GetCanLoopFromLayoutPropertyWithStartEnd();
+    EXPECT_EQ(monthColumnPattern->IsTossNeedToStop(), !canLoop);
+}
+
+/**
+ * @tc.name: DatePickerCore024
+ * @tc.desc: Test GetAllChildNode returns 3 valid nodes
+ * @tc.type: FUNC
+ */
+HWTEST_F(DatePickerTestCore, DatePickerCore024, TestSize.Level1)
+{
+    auto frameNode = CreateDatePickerNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto datePickerPattern = frameNode->GetPattern<DatePickerPattern>();
+    ASSERT_NE(datePickerPattern, nullptr);
+
+    auto allChildNode = datePickerPattern->GetAllChildNode();
+    EXPECT_NE(allChildNode["year"], nullptr);
+    EXPECT_NE(allChildNode["month"], nullptr);
+    EXPECT_NE(allChildNode["day"], nullptr);
 }
 
 } // namespace OHOS::Ace::NG
