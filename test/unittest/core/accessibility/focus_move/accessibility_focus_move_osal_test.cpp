@@ -830,6 +830,35 @@ HWTEST_F(AccessibilityFocusMoveTest, FocusStrategyOsalHandleFocusMoveSearchResul
 }
 
 /**
+ * @tc.name: FocusStrategyOsalHandleFocusMoveSearchResultTest006
+ * @tc.desc: HandleFocusMoveSearchResult FIND_FAIL_IN_SCROLL with FOCUS_BY_TITLE/FOCUS_BY_LINK
+ * @tc.type: FUNC
+ */
+HWTEST_F(AccessibilityFocusMoveTest, FocusStrategyOsalHandleFocusMoveSearchResultTest006, TestSize.Level1)
+{
+    auto jsAccessibilityManager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
+    ASSERT_NE(jsAccessibilityManager, nullptr);
+    auto frameNode = NG::FrameNode::CreateFrameNode("framenode", ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<NG::Pattern>(), false);
+    ASSERT_NE(frameNode, nullptr);
+
+    MockFocusStrategyOsal strategy(jsAccessibilityManager);
+    Accessibility::AccessibilityFocusMoveParam param;
+    Accessibility::AccessibilityElementInfo info;
+    auto targetNode = std::make_shared<FrameNodeRulesCheckNode>(frameNode, frameNode->GetAccessibilityId());
+    AceFocusMoveResult aceResult = AceFocusMoveResult::FIND_FAIL_IN_SCROLL;
+    // aceResult FIND_FAIL_IN_SCROLL, type FOCUS_BY_TITLE
+    param.type = Accessibility::FocusRuleType::FOCUS_BY_TITLE;
+    auto finalResult = strategy.HandleFocusMoveSearchResult(param, targetNode, aceResult, info);
+    ASSERT_EQ(finalResult, FocusMoveResultType::SEARCH_FAIL_IN_SCROLL);
+
+    // aceResult FIND_FAIL_IN_SCROLL, type FOCUS_BY_LINK
+    param.type = Accessibility::FocusRuleType::FOCUS_BY_LINK;
+    finalResult = strategy.HandleFocusMoveSearchResult(param, targetNode, aceResult, info);
+    ASSERT_EQ(finalResult, FocusMoveResultType::SEARCH_FAIL_IN_SCROLL);
+}
+
+/**
  * @tc.name: FocusStrategyOsalTest004
  * @tc.desc: ExecuteFocusMoveSearch
  * @tc.type: FUNC
