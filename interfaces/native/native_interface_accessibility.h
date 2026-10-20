@@ -1165,6 +1165,50 @@ int32_t OH_ArkUI_NativeModule_GetNativeAccessibilityProvider(
  */
 int32_t OH_ArkUI_AccessibilityElementInfoSetComponentIdentifier(
     ArkUI_AccessibilityElementInfo *elementInfo, const char *identifier);
+
+/**
+ * @brief Binds an exported ArkUI subtree to a specified placeholder node in the accessibility tree
+ * of a third-party framework (e.g. CMP), creating a sub accessibility manager and registering
+ * the subtree to AAMS (Accessibility Ability Manager Service).
+ *
+ * The binding is identified by {@code bindId}, which is also the accessibility ID of the
+ * mount node in the third-party framework's accessibility tree (the node is reported by the
+ * third-party framework). Multiple bindings can coexist on the same owner with different bindIds.
+ *
+ * @param owner Indicates the ArkUI node handle of the placeholder node (ArkUIView) in the
+ *              third-party framework's accessibility tree. Must be an ARKUI_NODE_CUSTOM,
+ *              ARKUI_NODE_XCOMPONENT or ARKUI_NODE_XCOMPONENT_TEXTURE node.
+ * @param bindId Indicates the binding identifier. Also serves as the accessibility ID of the
+ *               mount node in the third-party framework's tree. Must be unique within the
+ *               same owner node.
+ * @param exportedRoot Indicates the ArkUI node handle of the exported subtree root.
+ *                     Adoption via {@code AdoptChild} is NOT required.
+ * @return Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.
+ *         Returns {@link ARKUI_ERROR_CODE_PARAM_INVALID} if the owner or exportedRoot handle
+ *         is invalid, or the owner node type is not ARKUI_NODE_CUSTOM,
+ *         ARKUI_NODE_XCOMPONENT or ARKUI_NODE_XCOMPONENT_TEXTURE.
+ * @since 26
+ */
+int32_t OH_ArkUI_Accessibility_BindExportTree(
+    ArkUI_NodeHandle owner, int64_t bindId, ArkUI_NodeHandle exportedRoot);
+
+/**
+ * @brief Unbinds a previously bound exported ArkUI subtree from the third-party framework's
+ * accessibility tree: deregisters grandchild trees, deregisters the subtree from AAMS, and
+ * releases the sub accessibility manager with the binding (binding lifecycle: created on
+ * Bind, released on Unbind — independent of {@code AdoptChild}/{@code RemoveAdoptedChild}
+ * calls, which only manage render-tree placement).
+ *
+ * @param owner Indicates the ArkUI node handle of the placeholder node (ArkUIView).
+ * @param bindId Indicates the binding identifier to unbind.
+ * @return Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.
+ *         Returns {@link ARKUI_ERROR_CODE_PARAM_INVALID} if the owner handle is invalid.
+ *         Unbinding an unknown or already-unbound bindId is a no-op (idempotent, returns NO_ERROR).
+ * @since 26
+ */
+int32_t OH_ArkUI_Accessibility_UnbindExportTree(
+    ArkUI_NodeHandle owner, int64_t bindId);
+
 #ifdef __cplusplus
 };
 #endif

@@ -1779,7 +1779,9 @@ int32_t GetNodeTypeByTag(ArkUI_NodeHandle node)
         { OHOS::Ace::V2::CUSTOM_ETS_TAG, ArkUI_NodeType::ARKUI_NODE_CUSTOM },
     };
 
-    const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
+    // GetOrCreateFullImpl (NOT GetFullImpl): this resolution may be the caller's FIRST access to the NDK-side NodeModel bundle (e.g.
+    const auto* impl = OHOS::Ace::NodeModel::GetOrCreateFullImpl();
+    CHECK_NULL_RETURN(impl, -1);
     auto value = impl->getNodeModifiers()->getFrameNodeModifier()->getNodeType(node->uiNodeHandle);
     auto iter = nodeTypeMap.find(value);
     if (iter != nodeTypeMap.end()) {

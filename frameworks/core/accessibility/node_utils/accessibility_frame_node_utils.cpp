@@ -15,6 +15,7 @@
 #include "accessibility_frame_node_utils.h"
 
 #include "base/log/log_wrapper.h"
+#include "core/components_ng/base/cmp_accessibility_registry.h"
 #include "core/components_ng/event/focus_hub.h"
 #include "core/components_ng/pattern/list/list_pattern.h"
 #include "core/components_ng/pattern/scrollable/scrollable_pattern.h"
@@ -121,6 +122,11 @@ void GetFrameNodeChildren(
 {
     CHECK_NULL_VOID(uiNode);
     auto frameNode = AceType::DynamicCast<FrameNode>(uiNode);
+    // Exported-subtree roots are owned by their CMP binding's operator (T_sub path): cut them from the focus-strategy traversal too.
+    if (OHOS::Ace::CmpAccessibility::CmpAccessibilityRegistry::IsRegisteredExportedRoot(
+        frameNode.GetRawPtr())) {
+        return;
+    }
     if (AccessibilityFrameNodeUtils::IsValidEmbedTarget(frameNode, accessibilityManager)) {
         return;
     }

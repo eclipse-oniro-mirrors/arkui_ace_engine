@@ -6636,6 +6636,14 @@
         "name": "OH_ArkUI_AccessibilityElementInfoSetComponentIdentifier"
     },
     {
+        "first_introduced": "26",
+        "name": "OH_ArkUI_Accessibility_BindExportTree"
+    },
+    {
+        "first_introduced": "26",
+        "name": "OH_ArkUI_Accessibility_UnbindExportTree"
+    },
+    {
         "first_introduced": "24",
         "name": "OH_ArkUI_TextEditorSelectionMenuOptions_Create"
     },

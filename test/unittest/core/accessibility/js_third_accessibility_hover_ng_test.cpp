@@ -349,7 +349,7 @@ HWTEST_F(JsThirdAccessibilityHoverNgTest, JsThirdAccessibilityHoverNgTest005, Te
 
     auto ret = jsAccessibilityManager->GetElementInfoForThird(-1, rootInfo, hostElementId);
     EXPECT_EQ(ret, true);
-    auto path = jsAccessibilityManager->HoverPathForThird(hostElementId, point, rootInfo);
+    auto path = jsAccessibilityManager->HoverPathForThird(hostElementId, point, rootInfo, {});
     EXPECT_EQ(path.size(), elementInfoListSize);
 }
 

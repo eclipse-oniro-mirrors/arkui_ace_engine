@@ -25,6 +25,7 @@
 #include "core/common/color_inverter.h"
 #include "core/components_ng/base/inspector.h"
 #include "core/components_ng/base/view_abstract.h"
+#include "core/components_ng/base/cmp_accessibility_registry.h"
 #include "core/components_ng/pattern/custom_frame_node/custom_frame_node.h"
 #include "core/components_ng/pattern/custom_frame_node/custom_pattern.h"
 #include "core/components_ng/pattern/custom/custom_measure_layout_node.h"
@@ -1298,6 +1299,43 @@ ArkUI_AccessibilityProvider* GetAccessibilityProvider(ArkUINodeHandle node)
     return pattern->GetNativeAccessibilityProvider();
 }
 
+// CMP mixed-rendering: frame node modifier route for OH_ArkUI_Accessibility_BindExportTree / OH_ArkUI_Accessibility_UnbindExportTree.
+ArkUI_Int32 BindAccessibilityExportTree(ArkUINodeHandle owner, ArkUI_Int64 bindId, ArkUINodeHandle exportedRoot)
+{
+    // Adoption of exportedRoot is NOT required.
+    auto* ownerNode = reinterpret_cast<FrameNode*>(owner);
+    auto* exportedRootNode = reinterpret_cast<FrameNode*>(exportedRoot);
+    if (ownerNode == nullptr || exportedRootNode == nullptr) {
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+#ifdef OHOS_PLATFORM
+    if (!OHOS::Ace::CmpAccessibility::CmpAccessibilityRegistry::BindExportTree(
+        ownerNode, static_cast<int64_t>(bindId), exportedRootNode)) {
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    return ARKUI_ERROR_CODE_NO_ERROR;
+#else
+    // CMP mixed-rendering depends on the OHOS accessibility (AAMS) stack.
+    return ARKUI_ERROR_CODE_INTERNAL_ERROR;
+#endif
+}
+
+// Unbind is idempotent for unknown bindIds: NO_ERROR, no side effects.
+ArkUI_Int32 UnbindAccessibilityExportTree(ArkUINodeHandle owner, ArkUI_Int64 bindId)
+{
+    auto* ownerNode = reinterpret_cast<FrameNode*>(owner);
+    if (ownerNode == nullptr) {
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+#ifdef OHOS_PLATFORM
+    OHOS::Ace::CmpAccessibility::CmpAccessibilityRegistry::UnbindExportTree(
+        ownerNode, static_cast<int64_t>(bindId));
+    return ARKUI_ERROR_CODE_NO_ERROR;
+#else
+    return ARKUI_ERROR_CODE_INTERNAL_ERROR;
+#endif
+}
+
 ArkUINodeHandle GetPageRootNode(int32_t instanceId)
 {
     ContainerScope scope(instanceId);
@@ -1426,6 +1464,8 @@ const ArkUIFrameNodeModifier* GetFrameNodeModifier()
         .getAccessibilityProvider = GetAccessibilityProvider,
         .getPageRootNode = GetPageRootNode,
         .getCommonViewParentId = GetCommonViewParentId,
+        .bindAccessibilityExportTree = BindAccessibilityExportTree,
+        .unbindAccessibilityExportTree = UnbindAccessibilityExportTree,
         .injectCompositeCommand = InjectCompositeCommandImpl,
     };
     CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line

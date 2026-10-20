@@ -144,12 +144,10 @@ public:
     MOCK_METHOD(void, SendExtensionAccessibilityEvent,
         (const Accessibility::AccessibilityEventInfo& eventInfo, int64_t uiExtensionOffset), (override));
 #endif
-#ifdef WEB_SUPPORTED
     MOCK_METHOD(bool, RegisterWebInteractionOperationAsChildTree,
         (int64_t accessibilityId, const WeakPtr<NG::WebPattern>& webPattern), (override));
     MOCK_METHOD(bool, DeregisterWebInteractionOperationAsChildTree,
         (int32_t treeId, const WeakPtr<NG::WebPattern>& webPattern), (override));
-#endif
     void RegisterAccessibilityChildTreeCallback(
         int64_t elementId, const std::shared_ptr<AccessibilityChildTreeCallback>& callback) override
     {}
@@ -811,6 +809,16 @@ const RefPtr<SelectOverlayManager>& PipelineContext::GetSelectOverlayManager()
     return selectOverlayManager_;
 }
 
+namespace {
+// Mock-only toggle (MockPipelineContext::SetNullOverlayManagerForTest).
+bool g_useNullOverlayManagerForTest = false;
+}
+
+void MockPipelineContext::SetNullOverlayManagerForTest(bool useNull)
+{
+    g_useNullOverlayManagerForTest = useNull;
+}
+
 const RefPtr<DragDropManager>& PipelineContext::GetDragDropManager()
 {
     return dragDropManager_;
@@ -846,6 +854,14 @@ const RefPtr<FullScreenManager>& PipelineContext::GetFullScreenManager()
 
 const RefPtr<OverlayManager>& PipelineContext::GetOverlayManager()
 {
+    // Mock-only toggle (MockPipelineContext::SetNullOverlayManagerForTest): when on,
+    // yield a null ref so overlay-gated paths bail at their null checks instead of
+    // building real overlay/menu UI in the mock environment (e.g. the WebDataDetector
+    // AI-entity-menu tests).
+    static const RefPtr<OverlayManager> nullOverlayManager;
+    if (g_useNullOverlayManagerForTest) {
+        return nullOverlayManager;
+    }
     return overlayManager_;
 }
 

@@ -719,7 +719,9 @@ void XComponentPatternV2::ResetAndInitializeNodeHandleAccessibility()
     CHECK_NULL_VOID(host);
     auto pipeline = host->GetContextRefPtr();
     CHECK_NULL_VOID(pipeline);
-    auto accessibilityManager = pipeline->GetAccessibilityManager();
+    auto mainAccessibilityManager = pipeline->GetAccessibilityManager();
+    CHECK_NULL_VOID(mainAccessibilityManager);
+    auto accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(host);
     CHECK_NULL_VOID(accessibilityManager);
     if (accessibilityChildTreeCallback_) {
         accessibilityManager->DeregisterAccessibilityChildTreeCallback(
