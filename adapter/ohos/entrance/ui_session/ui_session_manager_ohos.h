@@ -170,6 +170,10 @@ public:
     void SavePageSceneDetectFunction(PageSceneDetectFunction&& function) override;
     void SaveWebPageSceneFunction(WebPageSceneFunction&& function) override;
     bool IsWebSourceEnabled(const std::string& ruleJson);
+    void SaveComponentTreeQueryFunction(ComponentTreeQueryFunction&& function) override;
+    void ComponentTreeQuery(const ComponentTreeQueryRequest& request) override;
+    void ReportNavigationQueryResult(const std::string& data) override;
+    void ReportLazyForEachQueryResult(const std::string& data) override;
 
     void SaveReportProxy(sptr<IRemoteObject> reportProxy, int32_t processId);
     // UI-thread validation of an internal detection request; does not change IPC.

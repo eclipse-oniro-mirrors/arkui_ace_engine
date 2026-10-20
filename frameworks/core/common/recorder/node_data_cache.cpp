@@ -83,6 +83,7 @@ void NodeDataCache::OnPageShow(const std::string& pageUrl)
 
 void NodeDataCache::OnBeforePagePop(bool destroy)
 {
+    std::unique_lock<std::shared_mutex> configLock(configMutex_);
     if (destroy) {
         Clear(prePageUrl_);
     } else {
@@ -103,7 +104,7 @@ bool NodeDataCache::PutString(const RefPtr<NG::FrameNode>& node, const std::stri
     if (id.empty() || value.empty() || value.length() > MAX_DATA_LENGTH) {
         return false;
     }
-    if (mergedConfig_->shareNodes.empty()) {
+    if (IsShareNodeEmpty()) {
         return false;
     }
     auto pageUrl = GetPageUrlByNode(node);

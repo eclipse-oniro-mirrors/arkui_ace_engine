@@ -13,16 +13,13 @@
  * limitations under the License.
  */
 
-#include "core/components/common/properties/ui_material.h"
+#ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_INTERFACES_NATIVE_ANI_SAFE_AREA_INSET_ANI_MODIFIER_H
+#define FOUNDATION_ACE_FRAMEWORKS_CORE_INTERFACES_NATIVE_ANI_SAFE_AREA_INSET_ANI_MODIFIER_H
 
-namespace OHOS::Ace {
-bool MaterialUtils::GetGlobalMaterialLevel(UiMaterialLevel& result)
-{
-    return false;
-}
+#include "core/interfaces/ani/ani_api.h"
 
-bool MaterialUtils::GetDeviceUiMaterialEnabled(bool& result)
-{
-    return false;
-}
-} // namespace OHOS::Ace
+namespace OHOS::Ace::NG {
+void SetSafeAreaInsetStatic(ArkUINodeHandle node, const ArkUIAniSafeAreaInsetEdge* edges, int32_t count);
+} // namespace OHOS::Ace::NG
+
+#endif

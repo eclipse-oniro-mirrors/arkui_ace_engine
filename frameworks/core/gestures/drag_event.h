@@ -292,6 +292,9 @@ public:
     void SetSummary(const std::map<std::string, int64_t>& summary);
     const std::map<std::string, int64_t>& GetSummary() const;
 
+    void SetSummaryInfo(const DragSummaryInfo& summaryInfo);
+    const DragSummaryInfo& GetSummaryInfo() const;
+
     void SetSpringLoadingAborted();
     bool IsSpringLoadingAborted() const;
 
@@ -303,7 +306,7 @@ private:
     DragSpringLoadingState state_;
     int32_t currentNotifySequence_ = 0;
     std::string extraInfos_;
-    std::map<std::string, int64_t> summary_;
+    DragSummaryInfo summaryInfo_;
     bool isSpringLoadingAborted_ = false;
     RefPtr<NG::DragSpringLoadingConfiguration> DragSpringLoadingConfiguration_;
 };

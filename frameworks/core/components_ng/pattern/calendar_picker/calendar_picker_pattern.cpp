@@ -15,11 +15,14 @@
 
 #include "core/components_ng/pattern/calendar_picker/calendar_picker_pattern.h"
 
+#include "core/components_ng/pattern/calendar_picker/calendar_picker_model_ng.h"
+#include "core/components_ng/pattern/calendar_picker/calendar_picker_i18n.h"
 #include "core/components_ng/pattern/calendar_picker/calendar_picker_event_hub.h"
 
 #include <algorithm>
 
 #include "base/i18n/localization.h"
+#include "base/log/log_wrapper.h"
 #include "base/utils/utf_helper.h"
 #include "core/components/calendar/calendar_theme.h"
 #include "core/components_ng/pattern/calendar_picker/calendar_dialog_view.h"
@@ -45,6 +48,7 @@ constexpr int32_t MONTH_INDEX = 2;
 constexpr int32_t SECOND_SLASH = 3;
 constexpr int32_t DAY_INDEX = 4;
 constexpr int32_t YEAR_LENTH = 4;
+constexpr int32_t MONTH_DAY_DIGITS = 2;
 constexpr int32_t ADD_BUTTON_INDEX = 0;
 constexpr int32_t SUB_BUTTON_INDEX = 1;
 constexpr int32_t DATE_NODE_COUNT = 3;
@@ -52,6 +56,8 @@ constexpr uint32_t MIN_YEAR = 1;
 constexpr uint32_t MAX_YEAR = 5000;
 constexpr uint32_t DELAY_TIME = 2000;
 constexpr uint32_t MAX_MONTH = 12;
+constexpr int32_t MAX_FIRST_DAY_OF_WEEK = 7;
+constexpr int32_t FIRST_DAY_OF_WEEK_LOCAL = 0;
 constexpr Dimension DIALOG_HEIGHT = 348.0_vp;
 constexpr Dimension DIALOG_WIDTH = 336.0_vp;
 constexpr double DISABLE_ALPHA = 0.4;
@@ -543,6 +549,9 @@ void CalendarPickerPattern::ShowDialog()
     auto pipeline = host->GetContext();
     CHECK_NULL_VOID(pipeline);
     auto overlayManager = pipeline->GetOverlayManager();
+    if (!overlayManager) {
+        return;
+    }
 
     std::map<std::string, NG::DialogEvent> dialogEvent;
     auto changeId = [weak = WeakClaim(this)](const std::string& info) {
@@ -1341,6 +1350,44 @@ void CalendarPickerPattern::OnColorConfigurationUpdate()
     ResetTextState();
 }
 
+void CalendarPickerPattern::OnLanguageConfigurationUpdate()
+{
+    InitDateIndex();
+    FlushTextStyle();
+    if (HasContentNode()) {
+        auto host = GetHost();
+        CHECK_NULL_VOID(host);
+        auto contentNode = AceType::DynamicCast<FrameNode>(host->GetFirstChild());
+        CHECK_NULL_VOID(contentNode);
+        auto locale = Localization::GetInstance()->GetLanguage();
+        auto separators = CalendarPickerI18n::GetDateSeparators(locale);
+        std::string sep1 = separators.size() > 0 ? separators[0] : "/";
+        std::string sep2 = separators.size() > 1 ? separators[1] : "/";
+        auto updateNodeText = [&contentNode](int32_t index, const std::string& text) {
+            auto node = AceType::DynamicCast<FrameNode>(contentNode->GetChildAtIndex(index));
+            CHECK_NULL_VOID(node);
+            auto prop = node->GetLayoutProperty<TextLayoutProperty>();
+            CHECK_NULL_VOID(prop);
+            prop->UpdateContent(text);
+            node->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
+        };
+        updateNodeText(FIRST_SLASH, sep1);
+        updateNodeText(SECOND_SLASH, sep2);
+        uint32_t year = calendarData_.selectedDate.GetYear();
+        uint32_t month = calendarData_.selectedDate.GetMonth();
+        uint32_t day = calendarData_.selectedDate.GetDay();
+        updateNodeText(yearIndex_,
+            CalendarPickerI18n::LocalizeDateNumber(year, YEAR_LENTH, locale));
+        updateNodeText(monthIndex_,
+            CalendarPickerI18n::LocalizeDateNumber(month, MONTH_DAY_DIGITS, locale));
+        updateNodeText(dayIndex_,
+            CalendarPickerI18n::LocalizeDateNumber(day, MONTH_DAY_DIGITS, locale));
+    }
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+}
+
 bool CalendarPickerPattern::OnThemeScopeUpdate(int32_t themeScopeId)
 {
     auto host = GetHost();
@@ -1416,27 +1463,25 @@ void CalendarPickerPattern::SetDate(const std::string& info)
     auto textLayoutProperty = yearNode->GetLayoutProperty<TextLayoutProperty>();
     CHECK_NULL_VOID(textLayoutProperty);
     auto yearNum = json->GetUInt("year");
-    auto yearStr = std::to_string(yearNum);
-    yearStr = (yearNum < 1000 ? "0" : "") + yearStr;
-    yearStr = (yearNum < 100 ? "0" : "") + yearStr;
-    yearStr = (yearNum < 10 ? "0" : "") + yearStr;
-    textLayoutProperty->UpdateContent(yearStr);
+    auto locale = Localization::GetInstance()->GetLanguage();
+    textLayoutProperty->UpdateContent(
+        CalendarPickerI18n::LocalizeDateNumber(yearNum, YEAR_LENTH, locale));
     yearNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
 
     auto monthNode = AceType::DynamicCast<FrameNode>(contentNode->GetChildAtIndex(monthIndex_));
     CHECK_NULL_VOID(monthNode);
     textLayoutProperty = monthNode->GetLayoutProperty<TextLayoutProperty>();
     CHECK_NULL_VOID(textLayoutProperty);
-    auto monthString = (json->GetUInt("month") < 10 ? "0" : "") + std::to_string(json->GetUInt("month"));
-    textLayoutProperty->UpdateContent(monthString);
+    textLayoutProperty->UpdateContent(
+        CalendarPickerI18n::LocalizeDateNumber(json->GetUInt("month"), MONTH_DAY_DIGITS, locale));
     monthNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
 
     auto dayNode = AceType::DynamicCast<FrameNode>(contentNode->GetChildAtIndex(dayIndex_));
     CHECK_NULL_VOID(dayNode);
     textLayoutProperty = dayNode->GetLayoutProperty<TextLayoutProperty>();
     CHECK_NULL_VOID(textLayoutProperty);
-    auto dayString = (json->GetUInt("day") < 10 ? "0" : "") + std::to_string(json->GetUInt("day"));
-    textLayoutProperty->UpdateContent(dayString);
+    textLayoutProperty->UpdateContent(
+        CalendarPickerI18n::LocalizeDateNumber(json->GetUInt("day"), MONTH_DAY_DIGITS, locale));
     dayNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
     SetSelectedType(selected_);
     UpdateAccessibilityText();
@@ -1533,6 +1578,21 @@ void CalendarPickerPattern::ToJsonValue(std::unique_ptr<JsonValue>& json, const 
     if (calendarData_.endDate.ToDays() != PickerDate().ToDays()) {
         json->PutExtAttr("end", calendarData_.endDate.ToString(false).c_str(), filter);
     }
+    auto GetFirstDayOfWeekString = [](int32_t firstDayOfWeek) {
+        std::string ret;
+        switch (firstDayOfWeek) {
+            case 1: ret = "CalendarFirstDayOfWeek.MON"; break;
+            case 2: ret = "CalendarFirstDayOfWeek.TUE"; break;
+            case 3: ret = "CalendarFirstDayOfWeek.WED"; break;
+            case 4: ret = "CalendarFirstDayOfWeek.THU"; break;
+            case 5: ret = "CalendarFirstDayOfWeek.FRI"; break;
+            case 6: ret = "CalendarFirstDayOfWeek.SAT"; break;
+            case 7: ret = "CalendarFirstDayOfWeek.SUN"; break;
+            default: ret = "CalendarFirstDayOfWeek.LOCAL"; break;
+        }
+        return ret;
+    };
+    json->PutExtAttr("firstDayOfWeek", GetFirstDayOfWeekString(calendarData_.firstDayOfWeek).c_str(), filter);
 }
 
 void CalendarPickerPattern::SetMarkToday(bool isMarkToday)
@@ -1544,6 +1604,19 @@ void CalendarPickerPattern::SetMarkToday(bool isMarkToday)
 bool CalendarPickerPattern::GetMarkToday()
 {
     return isMarkToday_;
+}
+
+void CalendarPickerPattern::SetFirstDayOfWeek(int32_t firstDayOfWeek)
+{
+    if (firstDayOfWeek < FIRST_DAY_OF_WEEK_LOCAL || firstDayOfWeek > MAX_FIRST_DAY_OF_WEEK) {
+        firstDayOfWeek = FIRST_DAY_OF_WEEK_LOCAL;
+    }
+    calendarData_.firstDayOfWeek = firstDayOfWeek;
+}
+
+int32_t CalendarPickerPattern::GetFirstDayOfWeek()
+{
+    return calendarData_.firstDayOfWeek;
 }
 
 void CalendarPickerPattern::SetDisabledDateRange(

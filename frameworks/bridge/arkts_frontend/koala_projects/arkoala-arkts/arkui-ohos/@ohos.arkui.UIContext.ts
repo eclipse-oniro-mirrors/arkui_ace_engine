@@ -741,6 +741,13 @@ export enum ResolveStrategy {
     UNDEFINED = 5
 }
 
+class InputEventMonitorHandle implements InputEventMonitor {
+    handle?: KPointer;
+    constructor(handle: KPointer) {
+        this.handle = handle;
+    }
+}
+
 export class UIContext {
     instanceId_: int32 = -1;
     observer_ :UIObserver |null = null;
@@ -895,14 +902,17 @@ export class UIContext {
     }
     public addLocalInputEventMonitor(eventMask: int32, listener: InputEventListener): InputEventMonitor {
         ArkUIAniModule._Common_Sync_InstanceId(this.instanceId_);
-        const monitor = IUIContext.addLocalInputEventMonitor(eventMask as int32, listener);
+        const monitorHandle = IUIContext.addLocalInputEventMonitor(eventMask as int32, listener);
         ArkUIAniModule._Common_Restore_InstanceId();
-        return monitor;
+        return new InputEventMonitorHandle(monitorHandle);
     }
-
     public removeLocalInputEventMonitor(monitor: InputEventMonitor): void {
         ArkUIAniModule._Common_Sync_InstanceId(this.instanceId_);
-        IUIContext.removeLocalInputEventMonitor(monitor);
+        const handle = (monitor as InputEventMonitorHandle).handle;
+        if (handle !== undefined) {
+            IUIContext.removeLocalInputEventMonitor(handle);
+            (monitor as InputEventMonitorHandle).handle = undefined;
+        }
         ArkUIAniModule._Common_Restore_InstanceId();
     }
     public setTextSelectionClearPolicy(policy: TextSelectionClearPolicy): void {
@@ -1265,6 +1275,9 @@ export class UIContext {
         }
         ArkUIAniModule._Common_Restore_InstanceId();
         return HeightBreakpoint.fromValue(ret);
+    }
+    public isWindowInfoInitialized(): boolean {
+        return ArkUIAniModule._Common_isWindowInfoInitialized(this.instanceId_);
     }
     public vp2px(value: double): double {
         return ArkUIAniModule._Common_vp2px(value, this.instanceId_);

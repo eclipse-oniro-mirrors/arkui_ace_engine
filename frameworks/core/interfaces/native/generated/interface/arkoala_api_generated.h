@@ -574,8 +574,6 @@ typedef struct Ark_InnerGestureTriggerInfo Ark_InnerGestureTriggerInfo;
 typedef struct Opt_InnerGestureTriggerInfo Opt_InnerGestureTriggerInfo;
 typedef struct Ark_InputEventInterceptResult Ark_InputEventInterceptResult;
 typedef struct Opt_InputEventInterceptResult Opt_InputEventInterceptResult;
-typedef struct Ark_InputEventMonitor Ark_InputEventMonitor;
-typedef struct Opt_InputEventMonitor Opt_InputEventMonitor;
 typedef struct InputMethodExtraConfigPeer InputMethodExtraConfigPeer;
 typedef struct InputMethodExtraConfigPeer* Ark_InputMethodExtraConfig;
 typedef struct Opt_InputMethodExtraConfig Opt_InputMethodExtraConfig;
@@ -1925,6 +1923,8 @@ typedef struct OnDestroyAISession OnDestroyAISession;
 typedef struct Opt_OnDestroyAISession Opt_OnDestroyAISession;
 typedef struct OnDetectBlankScreenCallback OnDetectBlankScreenCallback;
 typedef struct Opt_OnDetectBlankScreenCallback Opt_OnDetectBlankScreenCallback;
+typedef struct OnMonitorBlankScreenCallback OnMonitorBlankScreenCallback;
+typedef struct Opt_OnMonitorBlankScreenCallback Opt_OnMonitorBlankScreenCallback;
 typedef struct OnDidChangeCallback OnDidChangeCallback;
 typedef struct Opt_OnDidChangeCallback Opt_OnDidChangeCallback;
 typedef struct OnDidStopDraggingCallback OnDidStopDraggingCallback;
@@ -2097,6 +2097,10 @@ typedef struct ScrollOnScrollCallback ScrollOnScrollCallback;
 typedef struct Opt_ScrollOnScrollCallback Opt_ScrollOnScrollCallback;
 typedef struct ScrollOnWillScrollCallback ScrollOnWillScrollCallback;
 typedef struct Opt_ScrollOnWillScrollCallback Opt_ScrollOnWillScrollCallback;
+typedef struct ScrollSnapApproachCallback ScrollSnapApproachCallback;
+typedef struct Opt_ScrollSnapApproachCallback Opt_ScrollSnapApproachCallback;
+typedef struct ScrollSnapTargetCallback ScrollSnapTargetCallback;
+typedef struct Opt_ScrollSnapTargetCallback Opt_ScrollSnapTargetCallback;
 typedef struct SearchSubmitCallback SearchSubmitCallback;
 typedef struct Opt_SearchSubmitCallback Opt_SearchSubmitCallback;
 typedef struct SearchValueCallback SearchValueCallback;
@@ -2725,6 +2729,8 @@ typedef struct Ark_ScrollEdgeOptions Ark_ScrollEdgeOptions;
 typedef struct Opt_ScrollEdgeOptions Opt_ScrollEdgeOptions;
 typedef struct Ark_ScrollPageOptions Ark_ScrollPageOptions;
 typedef struct Opt_ScrollPageOptions Opt_ScrollPageOptions;
+typedef struct Ark_ScrollSnapOffsetProviderProxy Ark_ScrollSnapOffsetProviderProxy;
+typedef struct Opt_ScrollSnapOffsetProviderProxy Opt_ScrollSnapOffsetProviderProxy;
 typedef struct Ark_SelectionContainerEditMenuOptions Ark_SelectionContainerEditMenuOptions;
 typedef struct Opt_SelectionContainerEditMenuOptions Opt_SelectionContainerEditMenuOptions;
 typedef struct Ark_SelectionContainerMenuOptions Ark_SelectionContainerMenuOptions;
@@ -2959,6 +2965,8 @@ typedef struct Ark_Union_RotateOptions_RotateAngleOptions Ark_Union_RotateOption
 typedef struct Opt_Union_RotateOptions_RotateAngleOptions Opt_Union_RotateOptions_RotateAngleOptions;
 typedef struct Ark_Union_ScrollAnimationOptions_Boolean Ark_Union_ScrollAnimationOptions_Boolean;
 typedef struct Opt_Union_ScrollAnimationOptions_Boolean Opt_Union_ScrollAnimationOptions_Boolean;
+typedef struct Ark_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy Ark_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy;
+typedef struct Opt_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy Opt_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy;
 typedef struct Ark_Union_SpatialPosition_F64 Ark_Union_SpatialPosition_F64;
 typedef struct Opt_Union_SpatialPosition_F64 Opt_Union_SpatialPosition_F64;
 typedef struct Ark_Union_String_Array_String Ark_Union_String_Array_String;
@@ -3055,6 +3063,8 @@ typedef struct Ark_BindableResourceStr Ark_BindableResourceStr;
 typedef struct Opt_BindableResourceStr Opt_BindableResourceStr;
 typedef struct Ark_BlankScreenDetectionEventInfo Ark_BlankScreenDetectionEventInfo;
 typedef struct Opt_BlankScreenDetectionEventInfo Opt_BlankScreenDetectionEventInfo;
+typedef struct Ark_MonitoredBlankScreenEventInfo Ark_MonitoredBlankScreenEventInfo;
+typedef struct Opt_MonitoredBlankScreenEventInfo Opt_MonitoredBlankScreenEventInfo;
 typedef struct Ark_ButtonIconOptions Ark_ButtonIconOptions;
 typedef struct Opt_ButtonIconOptions Opt_ButtonIconOptions;
 typedef struct Ark_cacheDownload_DownloadInfo Ark_cacheDownload_DownloadInfo;
@@ -4310,6 +4320,38 @@ typedef struct Opt_BlankScreenDetectionMethod {
     Ark_Tag tag;
     Ark_BlankScreenDetectionMethod value;
 } Opt_BlankScreenDetectionMethod;
+typedef enum Ark_BlankScreenReason {
+    ARK_BLANK_SCREEN_REASON_DNS_RESOLVE_FAILED = 101,
+    ARK_BLANK_SCREEN_REASON_REQUEST_TIMED_OUT = 102,
+    ARK_BLANK_SCREEN_REASON_CONNECTION_REFUSED = 103,
+    ARK_BLANK_SCREEN_REASON_CONNECTION_RESET = 104,
+    ARK_BLANK_SCREEN_REASON_SSL_ERROR = 105,
+    ARK_BLANK_SCREEN_REASON_CERT_ERROR = 106,
+    ARK_BLANK_SCREEN_REASON_INTERNET_DISCONNECTED = 107,
+    ARK_BLANK_SCREEN_REASON_REDIRECT_LOOP = 108,
+    ARK_BLANK_SCREEN_REASON_PROXY_ERROR = 109,
+    ARK_BLANK_SCREEN_REASON_OTHER_NETWORK_ERROR = 199,
+    ARK_BLANK_SCREEN_REASON_MAIN_DOC_EMPTY = 201,
+    ARK_BLANK_SCREEN_REASON_HTTP_4XX_ERROR = 202,
+    ARK_BLANK_SCREEN_REASON_HTTP_5XX_ERROR = 203,
+    ARK_BLANK_SCREEN_REASON_JS_GLOBAL_BUNDLE_LOAD_FAILED = 210,
+    ARK_BLANK_SCREEN_REASON_CSS_LOAD_FAILED = 211,
+    ARK_BLANK_SCREEN_REASON_MULTI_RESOURCE_LOAD_FAILED = 212,
+    ARK_BLANK_SCREEN_REASON_CORS_BLOCKED = 213,
+    ARK_BLANK_SCREEN_REASON_CSP_BLOCKED = 214,
+    ARK_BLANK_SCREEN_REASON_MIXED_CONTENT_BLOCKED = 215,
+    ARK_BLANK_SCREEN_REASON_JS_RUNTIME_ERROR = 301,
+    ARK_BLANK_SCREEN_REASON_NO_FIRST_CONTENTFUL_PAINT = 312,
+    ARK_BLANK_SCREEN_REASON_RENDERER_CRASHED = 401,
+    ARK_BLANK_SCREEN_REASON_RENDERER_KILLED = 402,
+    ARK_BLANK_SCREEN_REASON_GPU_PROCESS_CRASHED = 403,
+    ARK_BLANK_SCREEN_REASON_GPU_PROCESS_WATCHDOG_TIMEOUT = 404,
+    ARK_BLANK_SCREEN_REASON_WEB_VIEW_ZERO_SIZE = 501,
+} Ark_BlankScreenReason;
+typedef struct Opt_BlankScreenReason {
+    Ark_Tag tag;
+    Ark_BlankScreenReason value;
+} Opt_BlankScreenReason;
 typedef enum Ark_BlendApplyType {
     ARK_BLEND_APPLY_TYPE_FAST = 0,
     ARK_BLEND_APPLY_TYPE_OFFSCREEN = 1,
@@ -4454,6 +4496,20 @@ typedef struct Opt_CalendarAlign {
     Ark_Tag tag;
     Ark_CalendarAlign value;
 } Opt_CalendarAlign;
+typedef enum Ark_CalendarFirstDayOfWeek {
+    ARK_CALENDAR_FIRST_DAY_OF_WEEK_LOCAL = 0,
+    ARK_CALENDAR_FIRST_DAY_OF_WEEK_MON = 1,
+    ARK_CALENDAR_FIRST_DAY_OF_WEEK_TUE = 2,
+    ARK_CALENDAR_FIRST_DAY_OF_WEEK_WED = 3,
+    ARK_CALENDAR_FIRST_DAY_OF_WEEK_THU = 4,
+    ARK_CALENDAR_FIRST_DAY_OF_WEEK_FRI = 5,
+    ARK_CALENDAR_FIRST_DAY_OF_WEEK_SAT = 6,
+    ARK_CALENDAR_FIRST_DAY_OF_WEEK_SUN = 7,
+} Ark_CalendarFirstDayOfWeek;
+typedef struct Opt_CalendarFirstDayOfWeek {
+    Ark_Tag tag;
+    Ark_CalendarFirstDayOfWeek value;
+} Opt_CalendarFirstDayOfWeek;
 typedef enum Ark_CameraCaptureState {
     ARK_CAMERA_CAPTURE_STATE_NONE = 0,
     ARK_CAMERA_CAPTURE_STATE_PAUSED = 1,
@@ -8731,14 +8787,6 @@ typedef struct Opt_InputEventInterceptResult {
     Ark_Tag tag;
     Ark_InputEventInterceptResult value;
 } Opt_InputEventInterceptResult;
-typedef struct Ark_InputEventMonitor {
-    /* kind: Interface */
-    void *handle;
-} Ark_InputEventMonitor;
-typedef struct Opt_InputEventMonitor {
-    Ark_Tag tag;
-    Ark_InputEventMonitor value;
-} Opt_InputEventMonitor;
 typedef struct Opt_InputMethodExtraConfig {
     Ark_Tag tag;
     Ark_InputMethodExtraConfig value;
@@ -14028,6 +14076,16 @@ typedef struct Opt_OnDetectBlankScreenCallback {
     Ark_Tag tag;
     OnDetectBlankScreenCallback value;
 } Opt_OnDetectBlankScreenCallback;
+typedef struct OnMonitorBlankScreenCallback {
+    /* kind: Callback */
+    Ark_CallbackResource resource;
+    void (*call)(const Ark_Int32 resourceId, const Ark_MonitoredBlankScreenEventInfo event);
+    void (*callSync)(Ark_VMContext vmContext, const Ark_Int32 resourceId, const Ark_MonitoredBlankScreenEventInfo event);
+} OnMonitorBlankScreenCallback;
+typedef struct Opt_OnMonitorBlankScreenCallback {
+    Ark_Tag tag;
+    OnMonitorBlankScreenCallback value;
+} Opt_OnMonitorBlankScreenCallback;
 typedef struct OnDidChangeCallback {
     /* kind: Callback */
     Ark_CallbackResource resource;
@@ -14886,6 +14944,26 @@ typedef struct Opt_ScrollOnWillScrollCallback {
     Ark_Tag tag;
     ScrollOnWillScrollCallback value;
 } Opt_ScrollOnWillScrollCallback;
+typedef struct ScrollSnapApproachCallback {
+    /* kind: Callback */
+    Ark_CallbackResource resource;
+    void (*call)(const Ark_Int32 resourceId, const Ark_Float64 velocity, const Ark_Float64 decayOffset, const synthetic_Callback_F64_Void continuation);
+    void (*callSync)(Ark_VMContext vmContext, const Ark_Int32 resourceId, const Ark_Float64 velocity, const Ark_Float64 decayOffset, const synthetic_Callback_F64_Void continuation);
+} ScrollSnapApproachCallback;
+typedef struct Opt_ScrollSnapApproachCallback {
+    Ark_Tag tag;
+    ScrollSnapApproachCallback value;
+} Opt_ScrollSnapApproachCallback;
+typedef struct ScrollSnapTargetCallback {
+    /* kind: Callback */
+    Ark_CallbackResource resource;
+    void (*call)(const Ark_Int32 resourceId, const Ark_Float64 velocity, const synthetic_Callback_F64_Void continuation);
+    void (*callSync)(Ark_VMContext vmContext, const Ark_Int32 resourceId, const Ark_Float64 velocity, const synthetic_Callback_F64_Void continuation);
+} ScrollSnapTargetCallback;
+typedef struct Opt_ScrollSnapTargetCallback {
+    Ark_Tag tag;
+    ScrollSnapTargetCallback value;
+} Opt_ScrollSnapTargetCallback;
 typedef struct SearchSubmitCallback {
     /* kind: Callback */
     Ark_CallbackResource resource;
@@ -18050,6 +18128,15 @@ typedef struct Opt_ScrollPageOptions {
     Ark_Tag tag;
     Ark_ScrollPageOptions value;
 } Opt_ScrollPageOptions;
+typedef struct Ark_ScrollSnapOffsetProviderProxy {
+    /* kind: Interface */
+    ScrollSnapApproachCallback calculateApproachOffset;
+    ScrollSnapTargetCallback calculateSnapOffset;
+} Ark_ScrollSnapOffsetProviderProxy;
+typedef struct Opt_ScrollSnapOffsetProviderProxy {
+    Ark_Tag tag;
+    Ark_ScrollSnapOffsetProviderProxy value;
+} Opt_ScrollSnapOffsetProviderProxy;
 typedef struct Ark_SelectionContainerEditMenuOptions {
     /* kind: Interface */
     Opt_OnCreateMenuCallback onCreateMenu;
@@ -19400,6 +19487,18 @@ typedef struct Opt_Union_ScrollAnimationOptions_Boolean {
     Ark_Tag tag;
     Ark_Union_ScrollAnimationOptions_Boolean value;
 } Opt_Union_ScrollAnimationOptions_Boolean;
+typedef struct Ark_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy {
+    /* kind: UnionType */
+    Ark_Int32 selector;
+    union {
+        Ark_ScrollSnapAlign value0;
+        Ark_ScrollSnapOffsetProviderProxy value1;
+    };
+} Ark_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy;
+typedef struct Opt_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy {
+    Ark_Tag tag;
+    Ark_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy value;
+} Opt_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy;
 typedef struct Ark_Union_SpatialPosition_F64 {
     /* kind: UnionType */
     Ark_Int32 selector;
@@ -19964,6 +20063,16 @@ typedef struct Opt_BlankScreenDetectionEventInfo {
     Ark_Tag tag;
     Ark_BlankScreenDetectionEventInfo value;
 } Opt_BlankScreenDetectionEventInfo;
+typedef struct Ark_MonitoredBlankScreenEventInfo {
+    /* kind: Interface */
+    Ark_String url;
+    Ark_BlankScreenReason reason;
+    Ark_String extraMsg;
+} Ark_MonitoredBlankScreenEventInfo;
+typedef struct Opt_MonitoredBlankScreenEventInfo {
+    Ark_Tag tag;
+    Ark_MonitoredBlankScreenEventInfo value;
+} Opt_MonitoredBlankScreenEventInfo;
 typedef struct Ark_ButtonIconOptions {
     /* kind: Interface */
     Ark_Union_String_image_PixelMap_Resource shown;
@@ -24328,6 +24437,7 @@ typedef struct Ark_CalendarDialogOptions {
     Opt_uiMaterial_Material systemMaterial;
     Opt_DistortionMode distortionMode;
     Opt_EdgeLightMode edgeLightMode;
+    Opt_CalendarFirstDayOfWeek firstDayOfWeek;
 } Ark_CalendarDialogOptions;
 typedef struct Opt_CalendarDialogOptions {
     Ark_Tag tag;
@@ -24409,6 +24519,7 @@ typedef struct Ark_ImageAttachmentInterface {
     Opt_ImageFit objectFit;
     Opt_ImageAttachmentLayoutStyle layoutStyle;
     Opt_ColorFilterType colorFilter;
+    Opt_String imageTag;
 } Ark_ImageAttachmentInterface;
 typedef struct Opt_ImageAttachmentInterface {
     Ark_Tag tag;
@@ -24538,6 +24649,7 @@ typedef struct Ark_ResourceImageAttachmentOptions {
     Opt_ColorFilterType colorFilter;
     Opt_Boolean syncLoad;
     Opt_Boolean supportSvg2;
+    Opt_String imageTag;
 } Ark_ResourceImageAttachmentOptions;
 typedef struct Opt_ResourceImageAttachmentOptions {
     Ark_Tag tag;
@@ -24835,6 +24947,7 @@ typedef struct Ark_RichEditorImageSpanOptions {
     Opt_RichEditorImageSpanStyle imageStyle;
     Opt_RichEditorGesture gesture;
     Opt_OnHoverCallback onHover;
+    Opt_String imageTag;
 } Ark_RichEditorImageSpanOptions;
 typedef struct Opt_RichEditorImageSpanOptions {
     Ark_Tag tag;
@@ -24847,6 +24960,7 @@ typedef struct Ark_RichEditorImageSpanResult {
     Opt_ResourceStr valueResourceStr;
     Ark_RichEditorImageSpanStyleResult imageStyle;
     Ark_Tuple_I32_I32 offsetInSpan;
+    Opt_String imageTag;
 } Ark_RichEditorImageSpanResult;
 typedef struct Opt_RichEditorImageSpanResult {
     Ark_Tag tag;
@@ -25060,6 +25174,8 @@ typedef struct GENERATED_ArkUICalendarPickerModifier {
                         const Opt_Callback_Date_Void* value);
     void (*setMarkToday)(Ark_NativePointer node,
                          const Opt_Boolean* value);
+    void (*setFirstDayOfWeek)(Ark_NativePointer node,
+                              const Opt_CalendarFirstDayOfWeek* value);
     void (*setEdgeAlign)(Ark_NativePointer node,
                          const Opt_CalendarAlign* alignType,
                          const Opt_Offset* offset);
@@ -26012,6 +26128,8 @@ typedef struct GENERATED_ArkUIGridModifier {
                           const Opt_Callback_ItemDragInfo_I32_I32_Boolean_Void* value);
     void (*setNestedScroll)(Ark_NativePointer node,
                             const Opt_NestedScrollOptions* value);
+    void (*setScrollSnapStrategy)(Ark_NativePointer node,
+                                  const Opt_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy* value);
     void (*setEnableScrollInteraction)(Ark_NativePointer node,
                                        const Opt_Boolean* value);
     void (*setFriction)(Ark_NativePointer node,
@@ -27150,6 +27268,8 @@ typedef struct GENERATED_ArkUIScrollableCommonMethodModifier {
                          const Opt_Boolean* value);
     void (*setScrollBarHeight)(Ark_NativePointer node,
                                const Opt_LengthMetricsProxy* value);
+    void (*setEnableScrollWithKeyboard)(Ark_NativePointer node,
+                                        const Opt_Boolean* value);
     void (*setEdgeEffect)(Ark_NativePointer node,
                           const Opt_EdgeEffect* edgeEffect,
                           const Opt_EdgeEffectOptions* options);
@@ -28701,6 +28821,8 @@ typedef struct GENERATED_ArkUIWaterFlowModifier {
                        const Opt_Length* value);
     void (*setLayoutDirection)(Ark_NativePointer node,
                                const Opt_FlexDirection* value);
+    void (*setScrollSnapStrategy)(Ark_NativePointer node,
+                                  const Opt_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy* value);
     void (*setCachedCount0)(Ark_NativePointer node,
                             const Opt_Int32* value);
     void (*setSyncLoad)(Ark_NativePointer node,
@@ -28997,8 +29119,12 @@ typedef struct GENERATED_ArkUIWebModifier {
                                  const Opt_Boolean* value);
     void (*setOnDetectedBlankScreen)(Ark_NativePointer node,
                                      const Opt_OnDetectBlankScreenCallback* value);
+    void (*setOnMonitoredBlankScreen)(Ark_NativePointer node,
+                                      const Opt_OnMonitorBlankScreenCallback* value);
     void (*setBlankScreenDetectionConfig)(Ark_NativePointer node,
                                           const Opt_BlankScreenDetectionConfig* value);
+    void (*setEnableBlankScreenMonitor)(Ark_NativePointer node,
+                                        const Opt_Boolean* value);
     void (*setBackToTop)(Ark_NativePointer node,
                          const Opt_Boolean* value);
     void (*setEnableSelectedDataDetector)(Ark_NativePointer node,
@@ -29031,8 +29157,12 @@ typedef struct GENERATED_ArkUIWebModifier {
                                             const Opt_Boolean* value);
     void (*setEnableMediaNetworkProxy)(Ark_NativePointer node,
                                        const Opt_Boolean* value);
+    void (*setCaretColor)(Ark_NativePointer node,
+                          const Opt_ResourceColor* value);
     void (*setOnZoomChange)(Ark_NativePointer node,
                             const Opt_OnZoomChangeCallback* value);
+    void (*setFlingSpeedLimit)(Ark_NativePointer node,
+                               const Opt_Float64* value);
     void (*setRegisterNativeEmbedRule)(Ark_NativePointer node,
                                        const Opt_String* tag,
                                        const Opt_String* type);
@@ -29083,6 +29213,8 @@ typedef struct GENERATED_ArkUIXComponentModifier {
                                       const Opt_Boolean* value);
     void (*setHdrBrightness0)(Ark_NativePointer node,
                               const Opt_Float64* value);
+    void (*setBufferQueueCount)(Ark_NativePointer node,
+                                Ark_Int32 value);
     void (*setHdrBrightness1)(Ark_NativePointer node,
                               const Opt_Float64* brightness,
                               const Opt_HdrType* type);
@@ -30413,6 +30545,11 @@ typedef struct GENERATED_ArkUIFrameNodeExtenderAccessor {
     Ark_NativePointer (*getDestroy)();
     void (*destroyPeer)(Ark_FrameNode peer);
     Ark_Boolean (*isModifiable)(Ark_NativePointer peer);
+    Ark_Boolean (*dispatchInputEvent)(Ark_FrameNode peer,
+                                      const Ark_InputEventType* event,
+                                      const Opt_CompetitionStrategy* competitionStrategy);
+    Ark_Boolean (*dispatchKeyEvent)(Ark_FrameNode peer,
+                                    Ark_KeyEvent event);
     Ark_Int32 (*appendChild)(Ark_FrameNode peer,
                              Ark_FrameNode child);
     Ark_Int32 (*insertChildAfter)(Ark_NativePointer peer,
@@ -30786,6 +30923,7 @@ typedef struct GENERATED_ArkUIImageAttachmentAccessor {
     Opt_ColorFilterType (*getColorFilter)(Ark_ImageAttachment peer);
     Opt_Boolean (*getSupportSvg2)(Ark_ImageAttachment peer);
     Opt_SizeOptions (*getSizeInVp)(Ark_ImageAttachment peer);
+    Opt_String (*getImageTag)(Ark_ImageAttachment peer);
 } GENERATED_ArkUIImageAttachmentAccessor;
 
 typedef struct GENERATED_ArkUIImageBitmapAccessor {
@@ -30888,9 +31026,9 @@ typedef struct GENERATED_ArkUIIUIContextAccessor {
                             const Opt_Int32* focusY);
     void (*enableEventPassthrough)(const Opt_Boolean* enabled,
                                    Ark_RawInputEventType eventType);
-    Ark_InputEventMonitor (*addLocalInputEventMonitor)(Ark_Int32 eventMask,
-                                                       const InputEventListener* listener);
-    void (*removeLocalInputEventMonitor)(const Ark_InputEventMonitor* monitor);
+    Ark_NativePointer (*addLocalInputEventMonitor)(Ark_Int32 eventMask,
+                                                   const InputEventListener* listener);
+    void (*removeLocalInputEventMonitor)(Ark_NativePointer monitor);
     void (*setTextSelectionClearPolicy)(Ark_TextSelectionClearPolicy policy);
 } GENERATED_ArkUIIUIContextAccessor;
 
@@ -32364,6 +32502,8 @@ typedef struct GENERATED_ArkUIScrollerAccessor {
     Ark_SizeResult (*contentSize)(Ark_VMContext vmContext,
                                   Ark_Scroller peer);
     Opt_FrameNode (*getFrameNode)(Ark_Scroller peer);
+    Ark_ScrollState (*getScrollState)(Ark_VMContext vmContext,
+                                       Ark_Scroller peer);
 } GENERATED_ArkUIScrollerAccessor;
 
 typedef struct GENERATED_ArkUIScrollResultAccessor {

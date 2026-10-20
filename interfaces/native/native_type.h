@@ -1675,6 +1675,11 @@ typedef enum {
      */
     ARKUI_ERROR_CODE_ANIMATION_GROUP_INVALID_STATE = 106215,
     /**
+     * @brief The resolved target node does not belong to the same UIContext as the context parameter.
+     * @since 26.0.1
+     */
+    ARKUI_ERROR_CODE_TARGET_NODE_NOT_IN_SAME_CONTEXT = 106216,
+    /**
      * @error The node type is not custom node.
      * @since 20
      */
@@ -1790,6 +1795,42 @@ typedef enum {
      * @since 26.2.0
      */
     ARKUI_ERROR_CODE_NODE_NOT_FOUND = 106410,
+    /**
+     * @brief Result too large.
+     *
+     * @since 26.2.0
+     */
+    ARKUI_ERROR_CODE_RESULT_TOO_LARGE = 106411,
+    /**
+     * @brief Resource exhausted.
+     *
+     * @since 26.2.0
+     */
+    ARKUI_ERROR_CODE_RESOURCE_EXHAUSTED = 106412,
+    /**
+     * @brief The node ID is duplicated.
+     *
+     * @since 26.2.0
+     */
+    ARKUI_ERROR_CODE_DUPLICATE_NODE_ID = 106413,
+    /**
+     * @brief Some collection items failed.
+     *
+     * @since 26.2.0
+     */
+    ARKUI_ERROR_CODE_COLLECTION_PARTIAL_FAILED = 106414,
+    /**
+     * @brief The collection item is not found.
+     *
+     * @since 26.2.0
+     */
+    ARKUI_ERROR_CODE_COLLECTION_ITEM_NOT_FOUND = 106415,
+    /**
+     * @brief The collection item has already been taken.
+     *
+     * @since 26.2.0
+     */
+    ARKUI_ERROR_CODE_COLLECTION_ITEM_ALREADY_TAKEN = 106416,
 } ArkUI_ErrorCode;
 
 /**

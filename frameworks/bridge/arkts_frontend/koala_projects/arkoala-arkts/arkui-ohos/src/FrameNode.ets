@@ -22,7 +22,7 @@ import { finalizerRegister, int32 } from "@koalaui/common"
 import { ArkUIAniModule } from "arkui.ani"
 import { RenderNode } from "./RenderNode"
 import { CommonAttribute, ArkCommonMethodPeer, CommonMethod, UIGestureEvent, UICommonEvent, UICommonEventInternal,
-    CustomProperty, AnimateParam } from './component/common';
+    CustomProperty, AnimateParam, KeyEvent } from './component/common';
 import { ArkButtonNode } from './typedNode/ArkButtonNode'
 import { ButtonOptions, ButtonAttribute, ArkButtonPeer} from './component/button'
 import { ArkCheckboxNode } from './typedNode/ArkCheckboxNode'
@@ -109,9 +109,11 @@ import { MarqueeOptions, MarqueeAttribute, ArkMarqueePeer } from './component/ma
 import { SymbolGlyphAttribute, ArkSymbolGlyphPeer } from './component/symbolglyph'
 import { XComponentParameters, XComponentOptions, NativeXComponentParameters, XComponentAttribute, TypedXComponentPeerInternal } from "./component/xcomponent"
 import { XComponentType, AnimationPropertyType, EventQueryType } from './component/enums'
+import { CompetitionStrategy } from './component/enums'
 import { ComponentContent, ReactiveComponentContent } from './ComponentContent';
 import { DrawContext } from './Graphics';
 import { JSBuilderNode } from "./BuilderNode"
+import { InputEventType } from "#generated"
 import { BusinessError } from '#external';
 import { Resource } from 'global.resource';
 import { ElementIdToCustomProperties } from "#handwritten"
@@ -327,6 +329,12 @@ export class FrameNode implements MaterializedBase {
     }
     public isModifiable(): boolean {
         return FrameNodeExtender.isModifiable(this.peer!.ptr);
+    }
+    public dispatchInputEvent(event: InputEventType, competitionStrategy?: CompetitionStrategy): boolean {
+        return FrameNodeExtender.dispatchInputEvent(this, event, competitionStrategy);
+    }
+    public dispatchKeyEvent(event: KeyEvent): boolean {
+        return FrameNodeExtender.dispatchKeyEvent(this, event);
     }
     public checkIfCanCrossLanguageTreeOperating(): boolean {
         return FrameNodeExtender.checkIfCanCrossLanguageTreeOperating(this);

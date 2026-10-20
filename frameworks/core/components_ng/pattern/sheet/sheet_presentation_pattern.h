@@ -375,7 +375,7 @@ public:
     void UpdateZIndexAndTitleEffectNode();
     void OnContentScrollUpdate(double currentOffset, double frameOffset, bool isFling);
     void OnFlingEnd(double currentOffset);
-    void UpdateStackModeZIndex();
+    void UpdateTitleBarZIndex();
     RefPtr<FrameNode> GetTitleBarEffectNode() const
     {
         return titleBarEffectNode_;
@@ -386,7 +386,7 @@ public:
     }
     void MountTitleBarEffectNode();
     void ResetTitleBarEffectNode();
-    Color GetTitleBarEffectBgColor(const NG::SheetStyle& sheetStyle, UiMaterialLevel materialLevel, bool isDarkMode);
+    Color GetTitleBarEffectBgColor(const NG::SheetStyle& sheetStyle, UiMaterialLevel materialLevel);
 
     void ClearSheetRenderMaterial();
     void SetSheetRenderMaterial();
@@ -807,6 +807,7 @@ public:
     void UpdateTitleColumnSize();
 
     float GetTitleBuilderHeightStackMode() const;
+    float GetRealPreScrollHeight(float scrollHeight, float titleHeightStackMode, bool useStackModeHeight) const;
     bool CheckSheetHaveTitle(const NG::SheetStyle& sheetStyle);
     bool CheckTitleIsStackMode(const SheetStyle& sheetStyle);
     bool CheckTitleIsHasEffectNode(const SheetStyle& sheetStyle);

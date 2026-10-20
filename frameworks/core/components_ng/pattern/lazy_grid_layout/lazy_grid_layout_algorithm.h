@@ -149,6 +149,10 @@ private:
     bool InitPredictBackwardState(int32_t& currIndex, int32_t& currLane,
         float& currPos, float& mainSize, float& layoutedStart);
     void PredictLayoutBackward(LayoutWrapper* layoutWrapper, float crossSize, const OffsetF& paddingOffset);
+    bool StartsFromTail() const;
+    float AnchorUnmeasuredTail();
+    float EstimateTailPos(float storedTail);
+    void RebaseTailWindow();
     void SyncPredictLayoutInfo(LayoutWrapper* layoutWrapper);
     void FixPosMapBackward(int32_t index);
     void FixPosMapForward(int32_t index, LayoutWrapper* layoutWrapper, float crossSize, const OffsetF& paddingOffset);
@@ -167,6 +171,8 @@ private:
     float prevBodyMainSize_ = 0.0f;
     // False only on the very first layout (previous total == 0); a recycled child re-entering still counts as laid.
     bool hadMeasuredItems_ = true;
+    // Set when a prediction without a baseline placed the tail at 0; its result is rebased by the new extent.
+    bool rebaseTail_ = false;
     float realMainSize_ = 0.0f;
     bool needAllLayout_ = true;
     bool needSkipLayout_ = false;

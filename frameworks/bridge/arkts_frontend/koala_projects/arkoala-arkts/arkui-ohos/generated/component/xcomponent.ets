@@ -138,6 +138,9 @@ export class ArkXComponentPeer extends ArkCommonMethodPeer {
         ArkUIGeneratedNativeModule._XComponentAttribute_setHdrBrightness0(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
+    setBufferQueueCountAttribute(value: int32): void {
+        ArkUIGeneratedNativeModule._XComponentAttribute_setBufferQueueCount(this.peer.ptr, value)
+    }
     setHdrBrightness1Attribute(brightness: double | undefined, type?: HdrType): void {
         const thisSerializer: SerializerBase = SerializerBase.hold()
         if (brightness !== undefined) {
@@ -207,6 +210,9 @@ export interface XComponentAttribute extends CommonMethod {
     hdrBrightness(value: double | undefined): this {
         throw new Error('Unimplemented method hdrBrightness')
     }
+    bufferQueueCount(value: int32): this {
+        throw new Error('Unimplemented method bufferQueueCount')
+    }
     hdrBrightness(brightness: double | undefined, type?: HdrType): this {
         throw new Error('Unimplemented method hdrBrightness')
     }
@@ -260,6 +266,11 @@ export class ArkXComponentComponent extends ArkCommonMethodComponent implements 
     public hdrBrightness(value: double | undefined): this {
         const value_casted = value as (double | undefined)
         this.getPeer()?.setHdrBrightness0Attribute(value_casted)
+        return this
+    }
+    public bufferQueueCount(value: int32): this {
+        const value_casted = value as (int32)
+        this.getPeer()?.setBufferQueueCountAttribute(value_casted)
         return this
     }
     public hdrBrightness(brightness: double | undefined, type?: HdrType): this {

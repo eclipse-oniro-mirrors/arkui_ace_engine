@@ -396,6 +396,16 @@ public:
         return strokeJoinStyle_;
     }
 
+    void SetImageTag(const std::optional<std::u16string>& imageTag)
+    {
+        imageTag_ = imageTag;
+    }
+
+    const std::optional<std::u16string>& GetImageTag() const
+    {
+        return imageTag_;
+    }
+
 private:
     TextStyleResult textStyle_;
     double lineHeight_ = 0.0;
@@ -434,6 +444,7 @@ private:
     SymbolSpanStyle symbolSpanStyle_;
     RefPtr<ResourceObject> valueResource_;
     StrokeJoinStyle strokeJoinStyle_;
+    std::optional<std::u16string> imageTag_ = std::nullopt;
 };
 
 }

@@ -1223,6 +1223,18 @@ RefPtr<PipelineContext> ViewAbstractModelNG::GetSheetContext(NG::SheetStyle& she
     return context;
 }
 
+void ViewAbstractModelNG::ApplySheetImmersiveStrategyDefaults(
+    const RefPtr<PipelineContext>& context, NG::SheetStyle& sheetStyle)
+{
+    CHECK_NULL_VOID(context);
+    if (!context->IsImmersiveStrategySet(ImmersiveStrategy::BIND_SHEET_EXPAND_SAFE_AREA)) {
+        return;
+    }
+    if (!sheetStyle.titleBarHoverMode.has_value()) {
+        sheetStyle.titleBarHoverMode = SheetTitleBarHoverMode::SAFE_AREA_PADDING;
+    }
+}
+
 void ViewAbstractModelNG::BindSheet(bool isShow, std::function<void(const std::string&)>&& callback,
     std::function<void()>&& buildFunc, std::function<void()>&& titleBuildFunc, NG::SheetStyle& sheetStyle,
     std::function<void()>&& onAppear, std::function<void()>&& onDisappear, std::function<void()>&& shouldDismiss,
@@ -1250,6 +1262,7 @@ void ViewAbstractModelNG::BindSheet(bool isShow, std::function<void(const std::s
     };
     auto context = GetSheetContext(sheetStyle);
     CHECK_NULL_VOID(context);
+    ApplySheetImmersiveStrategyDefaults(context, sheetStyle);
     auto overlayManager = context->GetOverlayManager();
     auto* sheetModifier = NodeModifier::GetSheetManagerInnerModifier();
     CHECK_NULL_VOID(sheetModifier);
@@ -2235,6 +2248,49 @@ void ViewAbstractModelNG::SetSafeAreaPaddings(const std::optional<CalcDimension>
 {
     NG::PaddingProperty paddings = NG::ConvertToCalcPaddingProperty(top, bottom, left, right);
     ViewAbstract::SetSafeAreaPadding(paddings);
+}
+
+void ViewAbstractModelNG::SetSafeAreaInset(
+    const SafeAreaInsetOptions& options, SafeAreaInsetBuilderArray&& builders)
+{
+    if (!ViewStackProcessor::GetInstance()->IsCurrentVisualStateProcess()) {
+        return;
+    }
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    CHECK_NULL_VOID(frameNode);
+    auto effectiveOptions = options;
+    SafeAreaInsetContentArray contents;
+    for (size_t index = 0; index < SAFE_AREA_INSET_EDGE_COUNT; ++index) {
+        if (!effectiveOptions.edges[index].has_value()) {
+            continue;
+        }
+        auto& builder = builders[index];
+        if (!builder) {
+            effectiveOptions.edges[index].reset();
+            continue;
+        }
+        ScopedViewStackProcessor builderViewStackProcessor;
+        builder();
+        contents[index] = ViewStackProcessor::GetInstance()->Finish();
+        if (!contents[index]) {
+            effectiveOptions.edges[index].reset();
+        }
+    }
+    if (effectiveOptions.Empty()) {
+        ViewAbstract::ResetSafeAreaInset(frameNode);
+        return;
+    }
+    ViewAbstract::SetSafeAreaInset(frameNode, effectiveOptions, contents);
+}
+
+void ViewAbstractModelNG::ResetSafeAreaInset()
+{
+    if (!ViewStackProcessor::GetInstance()->IsCurrentVisualStateProcess()) {
+        return;
+    }
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    CHECK_NULL_VOID(frameNode);
+    ViewAbstract::ResetSafeAreaInset(frameNode);
 }
 
 void ViewAbstractModelNG::SetAccessibilityCustomActions(

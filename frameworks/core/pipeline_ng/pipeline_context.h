@@ -664,10 +664,11 @@ public:
         return taskScheduler_->IsLayouting();
     }
 
-    bool IsFirstRootLayout() const
+    bool IsFirstFlushMessages() const
     {
-        return isFirstRootLayout_;
+        return isFirstFlushMessages_;
     }
+
     // end pipeline, exit app
     void Finish(bool autoFinish) const override;
     RectF GetRootRect();

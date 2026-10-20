@@ -324,6 +324,10 @@ RefPtr<FrameNode> SheetView::CreateScrollNode(const NG::SheetStyle& sheetStyle)
             false, static_cast<EffectEdge>(sheetStyle.sheetEffectEdge.value_or(NG::SheetEffectEdge::ALL)));
     }
     pattern->SetScrollToSafeAreaHelper(false);
+    if (sheetStyle.titleBarHoverMode.value_or(SheetTitleBarHoverMode::STANDARD) ==
+        SheetTitleBarHoverMode::SAFE_AREA_PADDING) {
+        paintProps->UpdateContentClip(ContentClip(ContentClipMode::SAFE_AREA, nullptr));
+    }
     props->UpdateAlignment(Alignment::TOP_CENTER);
     if (AceApplicationInfo::GetInstance().GreatOrEqualTargetAPIVersion(PlatformVersion::VERSION_TWELVE)) {
         NestedScrollOptions nestedOpt = {

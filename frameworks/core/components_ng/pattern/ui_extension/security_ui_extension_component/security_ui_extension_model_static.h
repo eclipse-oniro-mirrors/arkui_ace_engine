@@ -33,7 +33,7 @@ class ACE_FORCE_EXPORT SecurityUIExtensionStatic : public AceType {
 public:
     static RefPtr<FrameNode> CreateSecurityUIExtensionComponent(int32_t nodeId, NG::SessionType sessionType);
     static void UpdateSecurityUecConfig(FrameNode* frameNode, bool isTransferringCaller,
-        DpiFollowStrategy dpiFollowStrategy, bool isWindowModeFollowHost,
+        DpiFollowStrategy dpiFollowStrategy, bool isDpiFollowStrategySet, bool isWindowModeFollowHost,
         const std::map<PlaceholderType, RefPtr<NG::FrameNode>>& placeholderMap);
     static void UpdateSecurityWant(FrameNode* frameNode, const AAFwk::Want& want);
     static void SetSecurityOnError(FrameNode* frameNode,

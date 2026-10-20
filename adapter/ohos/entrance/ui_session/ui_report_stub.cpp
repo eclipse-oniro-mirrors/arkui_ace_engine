@@ -29,6 +29,8 @@
 
 namespace {
 constexpr char GET_INSPECTOR_TREE_CALLBACK_TIMEOUT[] = "GetInspectorTreeCallbackTimeout";
+constexpr char NAVIGATION_QUERY_CALLBACK_TIMEOUT[] = "NavigationQueryCallbackTimeout";
+constexpr char LAZY_FOREACH_QUERY_CALLBACK_TIMEOUT[] = "LazyForEachQueryCallbackTimeout";
 constexpr char PAGE_TRANSLATE_CALLBACK_TIMEOUT[] = "PageTranslateCallbackTimeout";
 constexpr char PAGE_TRANSLATE_RESULT_WATCHDOG_PREFIX[] = "PageTranslateResultWatchdog";
 constexpr int32_t SPECIFIED_CONTENT_OFFSETS_LOOP_UPPERBOUND = 1024000;
@@ -377,6 +379,34 @@ int32_t UiReportStub::OnRemoteRequest(uint32_t code, MessageParcel& data, Messag
             ReportPageSceneEvent(result, isGetResult);
             break;
         }
+        case REPORT_NAVIGATION_QUERY_RESULT: {
+            sptr<LargeStringAshmem> largeStringAshmem = data.ReadParcelable<LargeStringAshmem>();
+            if (!largeStringAshmem) {
+                LOGW("ReportNavigationQueryResult read LargeStringAshmem failed");
+                break;
+            }
+            std::string result;
+            if (!largeStringAshmem->ReadFromAshmem(result)) {
+                LOGW("ReportNavigationQueryResult read data failed");
+                break;
+            }
+            ReportNavigationQueryResult(result);
+            break;
+        }
+        case REPORT_LAZY_FOREACH_QUERY_RESULT: {
+            sptr<LargeStringAshmem> largeStringAshmem = data.ReadParcelable<LargeStringAshmem>();
+            if (!largeStringAshmem) {
+                LOGW("ReportLazyForEachQueryResult read LargeStringAshmem failed");
+                break;
+            }
+            std::string result;
+            if (!largeStringAshmem->ReadFromAshmem(result)) {
+                LOGW("ReportLazyForEachQueryResult read data failed");
+                break;
+            }
+            ReportLazyForEachQueryResult(result);
+            break;
+        }
 
         default: {
             LOGI("ui_session unknown transaction code %{public}d", code);
@@ -499,6 +529,202 @@ void UiReportStub::RegisterGetHitTestNodeInfoCallback(
     const std::function<void(std::string, int32_t, bool)>& eventCallback)
 {
     getHitTestNodeInfoCallback_ = std::move(eventCallback);
+}
+
+void UiReportStub::ReportNavigationQueryResult(const std::string& data)
+{
+    std::function<void(const std::string&)> callback;
+    {
+        std::lock_guard<std::mutex> lock(navigationQueryCallbackMutex_);
+        if (!navigationQueryCallback_) {
+            return;
+        }
+        callback = navigationQueryCallback_;
+        CancelNavigationQueryCallbackTimeoutTaskLocked();
+        navigationQueryCallback_ = nullptr;
+    }
+    callback(data);
+}
+
+bool UiReportStub::RegisterNavigationQueryCallback(
+    const std::function<void(const std::string&)>& eventCallback)
+{
+    std::lock_guard<std::mutex> lock(navigationQueryCallbackMutex_);
+    if (navigationQueryCallback_) {
+        return false;
+    }
+    navigationQueryCallback_ = eventCallback;
+    return true;
+}
+
+void UiReportStub::UnregisterNavigationQueryCallback()
+{
+    std::lock_guard<std::mutex> lock(navigationQueryCallbackMutex_);
+    navigationQueryCallback_ = nullptr;
+}
+
+bool UiReportStub::PostNavigationQueryCallbackRemoveTask(int32_t timeout)
+{
+    auto eventHandler = eventHandler_.lock();
+    if (eventHandler == nullptr) {
+        LOGE("PostNavigationQueryCallbackRemoveTask eventHandler is null");
+        std::function<void(const std::string&)> callback;
+        {
+            std::lock_guard<std::mutex> lock(navigationQueryCallbackMutex_);
+            callback = navigationQueryCallback_;
+            navigationQueryCallback_ = nullptr;
+        }
+        if (callback) {
+            callback("{\"errorCode\":8}");
+        }
+        return false;
+    }
+    wptr<UiReportStub> weakThis = this;
+    bool postTaskSuccess = eventHandler->PostTask([weakThis]() {
+        auto uiReportStub = weakThis.promote();
+        if (uiReportStub == nullptr) {
+            LOGE("PostNavigationQueryCallbackRemoveTask uiReportStub is null");
+            return;
+        }
+        uiReportStub->HandleNavigationQueryCallbackTimeout();
+    }, NAVIGATION_QUERY_CALLBACK_TIMEOUT,
+        NormalizeTimeout(timeout, DEFAULT_INSPECTOR_TREE_CALLBACK_TIMEOUT_MS));
+    if (!postTaskSuccess) {
+        LOGW("Post NavigationQuery timeout task failed");
+        std::function<void(const std::string&)> callback;
+        {
+            std::lock_guard<std::mutex> lock(navigationQueryCallbackMutex_);
+            callback = navigationQueryCallback_;
+            navigationQueryCallback_ = nullptr;
+        }
+        if (callback) {
+            callback("{\"errorCode\":8}");
+        }
+        return false;
+    }
+    return true;
+}
+
+void UiReportStub::HandleNavigationQueryCallbackTimeout()
+{
+    std::function<void(const std::string&)> callback;
+    {
+        std::lock_guard<std::mutex> lock(navigationQueryCallbackMutex_);
+        if (!navigationQueryCallback_) {
+            return;
+        }
+        callback = navigationQueryCallback_;
+        navigationQueryCallback_ = nullptr;
+    }
+    callback("{\"errorCode\":8}");
+}
+
+void UiReportStub::CancelNavigationQueryCallbackTimeoutTaskLocked()
+{
+    auto eventHandler = eventHandler_.lock();
+    if (eventHandler == nullptr) {
+        LOGE("CancelNavigationQueryCallbackTimeoutTaskLocked eventHandler is null");
+        return;
+    }
+    eventHandler->RemoveTask(NAVIGATION_QUERY_CALLBACK_TIMEOUT);
+}
+
+void UiReportStub::ReportLazyForEachQueryResult(const std::string& data)
+{
+    std::function<void(const std::string&)> callback;
+    {
+        std::lock_guard<std::mutex> lock(lazyForEachQueryCallbackMutex_);
+        if (!lazyForEachQueryCallback_) {
+            return;
+        }
+        callback = lazyForEachQueryCallback_;
+        CancelLazyForEachQueryCallbackTimeoutTaskLocked();
+        lazyForEachQueryCallback_ = nullptr;
+    }
+    callback(data);
+}
+
+bool UiReportStub::RegisterLazyForEachQueryCallback(
+    const std::function<void(const std::string&)>& eventCallback)
+{
+    std::lock_guard<std::mutex> lock(lazyForEachQueryCallbackMutex_);
+    if (lazyForEachQueryCallback_) {
+        return false;
+    }
+    lazyForEachQueryCallback_ = eventCallback;
+    return true;
+}
+
+void UiReportStub::UnregisterLazyForEachQueryCallback()
+{
+    std::lock_guard<std::mutex> lock(lazyForEachQueryCallbackMutex_);
+    lazyForEachQueryCallback_ = nullptr;
+}
+
+bool UiReportStub::PostLazyForEachQueryCallbackRemoveTask(int32_t timeout)
+{
+    auto eventHandler = eventHandler_.lock();
+    if (eventHandler == nullptr) {
+        LOGE("PostLazyForEachQueryCallbackRemoveTask eventHandler is null");
+        std::function<void(const std::string&)> callback;
+        {
+            std::lock_guard<std::mutex> lock(lazyForEachQueryCallbackMutex_);
+            callback = lazyForEachQueryCallback_;
+            lazyForEachQueryCallback_ = nullptr;
+        }
+        if (callback) {
+            callback("{\"errorCode\":8}");
+        }
+        return false;
+    }
+    wptr<UiReportStub> weakThis = this;
+    bool postTaskSuccess = eventHandler->PostTask([weakThis]() {
+        auto uiReportStub = weakThis.promote();
+        if (uiReportStub == nullptr) {
+            LOGE("PostLazyForEachQueryCallbackRemoveTask uiReportStub is null");
+            return;
+        }
+        uiReportStub->HandleLazyForEachQueryCallbackTimeout();
+    }, LAZY_FOREACH_QUERY_CALLBACK_TIMEOUT,
+        NormalizeTimeout(timeout, DEFAULT_INSPECTOR_TREE_CALLBACK_TIMEOUT_MS));
+    if (!postTaskSuccess) {
+        LOGW("Post LazyForEachQuery timeout task failed");
+        std::function<void(const std::string&)> callback;
+        {
+            std::lock_guard<std::mutex> lock(lazyForEachQueryCallbackMutex_);
+            callback = lazyForEachQueryCallback_;
+            lazyForEachQueryCallback_ = nullptr;
+        }
+        if (callback) {
+            callback("{\"errorCode\":8}");
+        }
+        return false;
+    }
+    return true;
+}
+
+void UiReportStub::HandleLazyForEachQueryCallbackTimeout()
+{
+    std::function<void(const std::string&)> callback;
+    {
+        std::lock_guard<std::mutex> lock(lazyForEachQueryCallbackMutex_);
+        if (!lazyForEachQueryCallback_) {
+            return;
+        }
+        callback = lazyForEachQueryCallback_;
+        lazyForEachQueryCallback_ = nullptr;
+    }
+    callback("{\"errorCode\":8}");
+}
+
+void UiReportStub::CancelLazyForEachQueryCallbackTimeoutTaskLocked()
+{
+    auto eventHandler = eventHandler_.lock();
+    if (eventHandler == nullptr) {
+        LOGE("CancelLazyForEachQueryCallbackTimeoutTaskLocked eventHandler is null");
+        return;
+    }
+    eventHandler->RemoveTask(LAZY_FOREACH_QUERY_CALLBACK_TIMEOUT);
 }
 
 void UiReportStub::ReportWebUnfocusEvent(int64_t accessibilityId, const std::string& data)

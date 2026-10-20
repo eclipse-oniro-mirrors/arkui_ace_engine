@@ -221,6 +221,20 @@ public:
     void RegisterGetHitTestNodeInfoCallback(const std::function<void(std::string, int32_t, bool)>& eventCallback);
 
     /**
+     * @description: report component tree query result
+     */
+    void ReportNavigationQueryResult(const std::string& data) override;
+    void ReportLazyForEachQueryResult(const std::string& data) override;
+
+    bool RegisterNavigationQueryCallback(const std::function<void(const std::string&)>& eventCallback);
+    void UnregisterNavigationQueryCallback();
+    bool PostNavigationQueryCallbackRemoveTask(int32_t timeout);
+
+    bool RegisterLazyForEachQueryCallback(const std::function<void(const std::string&)>& eventCallback);
+    void UnregisterLazyForEachQueryCallback();
+    bool PostLazyForEachQueryCallbackRemoveTask(int32_t timeout);
+
+    /**
      * @description: report web unfocus value for SA
      */
     void ReportWebUnfocusEvent(int64_t accessibilityId, const std::string& data) override;
@@ -292,6 +306,10 @@ public:
 private:
     void HandleInspectorTreeCallbackTimeout();
     void CancelGetInspectorTreeCallbackTimeoutTaskLocked();
+    void HandleNavigationQueryCallbackTimeout();
+    void CancelNavigationQueryCallbackTimeoutTaskLocked();
+    void HandleLazyForEachQueryCallbackTimeout();
+    void CancelLazyForEachQueryCallbackTimeoutTaskLocked();
     void OnGetWebInfoByRequestInner(MessageParcel& data);
     void OnSendPageTextInner(MessageParcel& data);
     void HandlePageTranslateCallbackTimeout(int64_t requestId);
@@ -320,6 +338,10 @@ private:
     std::mutex inspectorTreeCallbackMutex_;
     std::function<void(std::string, int32_t, bool)> inspectorTreeCallback_;
     std::function<void(std::string, int32_t, bool)> getHitTestNodeInfoCallback_;
+    std::mutex navigationQueryCallbackMutex_;
+    std::function<void(const std::string&)> navigationQueryCallback_;
+    std::mutex lazyForEachQueryCallbackMutex_;
+    std::function<void(const std::string&)> lazyForEachQueryCallback_;
     std::function<void(int64_t accessibilityId, const std::string& data)> unfocusEvent_;
     std::function<void(std::vector<std::pair<int32_t, std::shared_ptr<Media::PixelMap>>>)> getShowingImageCallback_;
     std::function<void(int32_t, const std::unordered_map<int32_t, std::shared_ptr<Media::PixelMap>>&,

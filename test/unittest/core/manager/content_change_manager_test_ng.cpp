@@ -2728,4 +2728,87 @@ HWTEST_F(ContentChangeManagerTestNg, ContentChangeManagerTest031, TestSize.Level
 
     EXPECT_FALSE(contentChangeMgr->IsContentChanging());
 }
+
+/**
+ * @tc.name: ContentChangeManagerPageLogicalIdTest001
+ * @tc.desc: An explicit logical ID closes only its START while END dumps a different node.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, ContentChangeManagerPageLogicalIdTest001, TestSize.Level1)
+{
+    auto manager = GetContentChangeManager();
+    auto mock = GetMockUiSessionManager();
+    ContentChangeConfig config;
+    config.reportStartEvent = true;
+    manager->StartContentChangeReport(config);
+    auto navigation = FrameNode::CreateFrameNode("Navigation", 450, AceType::MakeRefPtr<Pattern>(), true);
+    auto target = FrameNode::CreateFrameNode("NavDestination", 451, AceType::MakeRefPtr<Pattern>(), true);
+    EXPECT_CALL(*mock, ReportContentChangeEvent(ChangeType::PAGE_START, _)).Times(2);
+    EXPECT_CALL(*mock, ReportContentChangeEvent(ChangeType::PAGE, GetSimpleTree(target))).Times(2);
+    manager->OnTransitionAdded(navigation->GetId());
+    manager->OnContentChangeStart(navigation, ChangeType::PAGE);
+    manager->OnTransitionAdded(target->GetId());
+    manager->OnContentChangeStart(target, ChangeType::PAGE);
+    manager->OnPageTransitionEnd(target, navigation->GetId());
+    EXPECT_EQ(manager->transitioningNodes_.count(navigation->GetId()), 0);
+    EXPECT_EQ(manager->activeContentChanges_.count(navigation->GetId()), 0);
+    EXPECT_EQ(manager->transitioningNodes_.count(target->GetId()), 1);
+    EXPECT_EQ(manager->activeContentChanges_.count(target->GetId()), 1);
+    manager->OnPageTransitionEnd(target);
+    EXPECT_FALSE(manager->IsTransitioning());
+    EXPECT_TRUE(manager->activeContentChanges_.empty());
+    Mock::VerifyAndClearExpectations(mock);
+    manager->StopContentChangeReport();
+}
+
+/**
+ * @tc.name: ContentChangeManagerPageLogicalIdTest002
+ * @tc.desc: Interruption clears Navigation identity and allows a subsequent START without PAGE CANCEL.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, ContentChangeManagerPageLogicalIdTest002, TestSize.Level1)
+{
+    auto manager = GetContentChangeManager();
+    auto mock = GetMockUiSessionManager();
+    ContentChangeConfig config;
+    config.reportStartEvent = true;
+    manager->StartContentChangeReport(config);
+    auto navigation = FrameNode::CreateFrameNode("Navigation", 452, AceType::MakeRefPtr<Pattern>(), true);
+    EXPECT_CALL(*mock, ReportContentChangeEvent(ChangeType::PAGE_START, HasSubstr("\"$ID\":452"))).Times(2);
+    EXPECT_CALL(*mock, ReportContentChangeEvent(ChangeType::PAGE, HasSubstr("\"$ID\":452"))).Times(2);
+    for (int32_t i = 0; i < 2; ++i) {
+        manager->OnTransitionAdded(navigation->GetId());
+        manager->OnContentChangeStart(navigation, ChangeType::PAGE);
+        manager->OnContentChangeInterrupted(navigation, ChangeType::PAGE);
+        EXPECT_FALSE(manager->IsTransitioning());
+        EXPECT_TRUE(manager->activeContentChanges_.empty());
+    }
+    Mock::VerifyAndClearExpectations(mock);
+    manager->StopContentChangeReport();
+}
+
+/**
+ * @tc.name: ContentChangeManagerPageLogicalIdTest003
+ * @tc.desc: A missing dump node does not prevent cleanup of the explicit logical ID.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ContentChangeManagerTestNg, ContentChangeManagerPageLogicalIdTest003, TestSize.Level1)
+{
+    auto manager = GetContentChangeManager();
+    auto mock = GetMockUiSessionManager();
+    ContentChangeConfig config;
+    config.reportStartEvent = true;
+    manager->StartContentChangeReport(config);
+    auto navigation = FrameNode::CreateFrameNode("Navigation", 453, AceType::MakeRefPtr<Pattern>(), true);
+    EXPECT_CALL(*mock, ReportContentChangeEvent(ChangeType::PAGE_START, _)).Times(1);
+    EXPECT_CALL(*mock, ReportContentChangeEvent(ChangeType::PAGE, _)).Times(0);
+    manager->OnTransitionAdded(navigation->GetId());
+    manager->OnContentChangeStart(navigation, ChangeType::PAGE);
+    manager->OnPageTransitionEnd(nullptr, navigation->GetId());
+    EXPECT_FALSE(manager->IsTransitioning());
+    EXPECT_TRUE(manager->activeContentChanges_.empty());
+    Mock::VerifyAndClearExpectations(mock);
+    manager->StopContentChangeReport();
+}
+
 } // namespace OHOS::Ace::NG

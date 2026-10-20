@@ -628,7 +628,7 @@ void TabContentModelNG::AddBottomStyleTabBarItem(const RefPtr<UINode>& tabConten
     auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
     auto columnProperty = columnNode->GetLayoutProperty();
     if (tabsPattern && columnProperty) {
-        bool shouldHide = tabsPattern->IsTabShouldHideByVisibility(defaultVisibility);
+        bool shouldHide = defaultVisibility.ShouldHide(TabBarDisplayMode::BOTTOMTABBAR);
         columnProperty->UpdateVisibility(shouldHide ? VisibleType::GONE : VisibleType::VISIBLE);
     }
 

@@ -27,7 +27,7 @@
 namespace OHOS::Ace::NG {
 
 // FullScreenManager is the base class to display full screen.
-class ACE_EXPORT FullScreenManager : public virtual AceType {
+class ACE_EXPORT FullScreenManager : public AceType {
     DECLARE_ACE_TYPE(FullScreenManager, AceType);
 
 public:

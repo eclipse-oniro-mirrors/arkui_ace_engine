@@ -28,7 +28,7 @@ struct ToolbarInfo {
     float width;
 };
 
-class ToolbarManager : public virtual AceType {
+class ToolbarManager : public AceType {
     DECLARE_ACE_TYPE(ToolbarManager, AceType);
 
 public:

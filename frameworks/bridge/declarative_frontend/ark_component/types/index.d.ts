@@ -1644,6 +1644,10 @@ declare enum ScrollSnapAlign {
   CENTER = 2,
   END = 3,
 }
+declare interface ScrollSnapOffsetProvider {
+  calculateSnapOffset: (velocity: number) => number;
+  calculateApproachOffset?: (velocity: number, decayOffset: number) => number;
+}
 declare class SymbolEffect {}
 declare enum TextDataDetectorType {
   PHONE_NUMBER = 0,
@@ -2027,8 +2031,10 @@ declare interface NestedScrollOptionsExt {
 }
 declare type OnCameraCaptureStateChangeCallback = (event: any) => void;
 declare type OnContextMenuHideCallback = () => void;
+declare type OnContextMenuUpdateCallback = () => void;
 declare type OnDetectBlankScreenCallback = (event: any) => void;
 declare type OnFirstScreenPaintCallback = (firstScreenPaint: any) => void;
+declare type OnMonitorBlankScreenCallback = (event: any) => void;
 declare type OnMicrophoneCaptureStateChangeCallback = (event: any) => void;
 declare type OnNavigationEntryCommittedCallback = (loadCommittedDetails: any) => void;
 declare type OnOverrideUrlLoadingCallback = (webResourceRequest: WebResourceRequest) => boolean;
@@ -2214,6 +2220,16 @@ declare enum CalendarAlign {
   START = 0,
   CENTER = 1,
   END = 2,
+}
+declare enum CalendarFirstDayOfWeek {
+  LOCAL = 0,
+  MON = 1,
+  TUE = 2,
+  WED = 3,
+  THU = 4,
+  FRI = 5,
+  SAT = 6,
+  SUN = 7,
 }
 declare type CalendarPickerAttribute = any;
 declare type CheckboxAttribute = any;

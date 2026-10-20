@@ -27,6 +27,7 @@
 
 #include "core/components/button/button_theme.h"
 #include "core/components/theme/icon_theme.h"
+#include "base/i18n/date_time_sequence.h"
 #include "core/components_ng/pattern/button/button_pattern.h"
 #include "core/components_ng/pattern/dialog/dialog_pattern.h"
 #include "core/components_ng/pattern/dialog/dialog_view.h"
@@ -59,14 +60,9 @@ const std::string CONNECTER = "-";
 const std::vector<int> DEFAULT_MONTH_DAY = { 1, 2, 3 };
 constexpr int32_t BUFFER_NODE_NUMBER = 2;
 constexpr uint8_t PIXEL_ROUND = 18;
-const std::unordered_map<std::string, std::string> EXPECT_DATE_ORDER_MAP = {
-    { "ug", "y-d-M" },
-    { "ar", "y-M-d" },
-    { "fa", "y-M-d" },
-    { "ur", "y-M-d" },
-    { "iw", "y-M-d" },
-    { "he", "y-M-d" },
-};
+constexpr int32_t COL_YEAR = 0;
+constexpr int32_t COL_MONTH = 1;
+constexpr int32_t COL_DAY = 2;
 
 RefPtr<Theme> GetTheme(ThemeType type)
 {
@@ -807,8 +803,8 @@ HWTEST_F(DatePickerOrderTest, DatePickerOrder010, TestSize.Level1)
     yearColumnPattern->SetCurrentIndex(YEARINDEX);
     PickerDate pickerDate = datePickerPattern->startDateSolar_;
     EXPECT_EQ(datePickerPattern->GetText(), std::to_string(pickerDate.GetYear()) + CONNECTER +
-                                                    std::to_string(pickerDate.GetMonth() + YEARINDEX) + CONNECTER +
-                                                    std::to_string(pickerDate.GetDay()));
+                                                    std::to_string(pickerDate.GetMonth()) + CONNECTER +
+                                                    std::to_string(pickerDate.GetDay() + YEARINDEX));
 }
 
 /**
@@ -919,8 +915,8 @@ HWTEST_F(DatePickerOrderTest, DatePickerOrder012, TestSize.Level1)
     dayColumnPattern->SetCurrentIndex(DAYINDEX);
     PickerDate pickerDate = datePickerPattern->startDateSolar_;
     EXPECT_EQ(datePickerPattern->GetText(), std::to_string(pickerDate.GetYear()) + CONNECTER +
-                                                    std::to_string(pickerDate.GetMonth() + DAYINDEX) + CONNECTER +
-                                                    std::to_string(pickerDate.GetDay()));
+                                                    std::to_string(pickerDate.GetMonth()) + CONNECTER +
+                                                    std::to_string(pickerDate.GetDay() + DAYINDEX));
 }
 
 /**
@@ -975,8 +971,8 @@ HWTEST_F(DatePickerOrderTest, DatePickerOrder013, TestSize.Level1)
     yearColumnPattern->SetCurrentIndex(YEARINDEX);
     PickerDate pickerDate = datePickerPattern->startDateSolar_;
     EXPECT_EQ(datePickerPattern->GetText(), std::to_string(pickerDate.GetYear()) + CONNECTER +
-                                                    std::to_string(pickerDate.GetMonth()) + CONNECTER +
-                                                    std::to_string(pickerDate.GetDay() + YEARINDEX));
+                                                    std::to_string(pickerDate.GetMonth() + YEARINDEX) + CONNECTER +
+                                                    std::to_string(pickerDate.GetDay()));
 }
 
 /**
@@ -1087,8 +1083,8 @@ HWTEST_F(DatePickerOrderTest, DatePickerOrder015, TestSize.Level1)
     dayColumnPattern->SetCurrentIndex(DAYINDEX);
     PickerDate pickerDate = datePickerPattern->startDateSolar_;
     EXPECT_EQ(datePickerPattern->GetText(), std::to_string(pickerDate.GetYear()) + CONNECTER +
-                                                    std::to_string(pickerDate.GetMonth()) + CONNECTER +
-                                                    std::to_string(pickerDate.GetDay() + DAYINDEX));
+                                                    std::to_string(pickerDate.GetMonth() + DAYINDEX) + CONNECTER +
+                                                    std::to_string(pickerDate.GetDay()));
 }
 
 /**
@@ -1143,8 +1139,8 @@ HWTEST_F(DatePickerOrderTest, DatePickerOrder016, TestSize.Level1)
     yearColumnPattern->SetCurrentIndex(YEARINDEX);
     PickerDate pickerDate = datePickerPattern->startDateSolar_;
     EXPECT_EQ(datePickerPattern->GetText(), std::to_string(pickerDate.GetYear()) + CONNECTER +
-                                                    std::to_string(pickerDate.GetMonth() + YEARINDEX) + CONNECTER +
-                                                    std::to_string(pickerDate.GetDay()));
+                                                    std::to_string(pickerDate.GetMonth()) + CONNECTER +
+                                                    std::to_string(pickerDate.GetDay() + YEARINDEX));
 }
 
 /**
@@ -1199,8 +1195,8 @@ HWTEST_F(DatePickerOrderTest, DatePickerOrder017, TestSize.Level1)
     monthColumnPattern->SetCurrentIndex(MONTHINDEX);
     PickerDate pickerDate = datePickerPattern->startDateSolar_;
     EXPECT_EQ(datePickerPattern->GetText(), std::to_string(pickerDate.GetYear()) + CONNECTER +
-                                                    std::to_string(pickerDate.GetMonth()) + CONNECTER +
-                                                    std::to_string(pickerDate.GetDay() + MONTHINDEX));
+                                                    std::to_string(pickerDate.GetMonth() + MONTHINDEX) + CONNECTER +
+                                                    std::to_string(pickerDate.GetDay()));
 }
 
 /**
@@ -1311,8 +1307,8 @@ HWTEST_F(DatePickerOrderTest, DatePickerOrder019, TestSize.Level1)
     yearColumnPattern->SetCurrentIndex(YEARINDEX);
     PickerDate pickerDate = datePickerPattern->startDateSolar_;
     EXPECT_EQ(datePickerPattern->GetText(), std::to_string(pickerDate.GetYear()) + CONNECTER +
-                                                    std::to_string(pickerDate.GetMonth()) + CONNECTER +
-                                                    std::to_string(pickerDate.GetDay() + YEARINDEX));
+                                                    std::to_string(pickerDate.GetMonth() + YEARINDEX) + CONNECTER +
+                                                    std::to_string(pickerDate.GetDay()));
 }
 
 /**
@@ -1367,8 +1363,8 @@ HWTEST_F(DatePickerOrderTest, DatePickerOrder020, TestSize.Level1)
     monthColumnPattern->SetCurrentIndex(MONTHINDEX);
     PickerDate pickerDate = datePickerPattern->startDateSolar_;
     EXPECT_EQ(datePickerPattern->GetText(), std::to_string(pickerDate.GetYear()) + CONNECTER +
-                                                    std::to_string(pickerDate.GetMonth() + MONTHINDEX) + CONNECTER +
-                                                    std::to_string(pickerDate.GetDay()));
+                                                    std::to_string(pickerDate.GetMonth()) + CONNECTER +
+                                                    std::to_string(pickerDate.GetDay() + MONTHINDEX));
 }
 
 /**
@@ -1535,8 +1531,8 @@ HWTEST_F(DatePickerOrderTest, DatePickerOrder023, TestSize.Level1)
     monthColumnPattern->SetCurrentIndex(MONTHINDEX);
     PickerDate pickerDate = datePickerPattern->startDateSolar_;
     EXPECT_EQ(datePickerPattern->GetText(), std::to_string(pickerDate.GetYear()) + CONNECTER +
-                                                    std::to_string(pickerDate.GetMonth() + MONTHINDEX) + CONNECTER +
-                                                    std::to_string(pickerDate.GetDay()));
+                                                    std::to_string(pickerDate.GetMonth()) + CONNECTER +
+                                                    std::to_string(pickerDate.GetDay() + MONTHINDEX));
 }
 
 /**
@@ -1591,8 +1587,8 @@ HWTEST_F(DatePickerOrderTest, DatePickerOrder024, TestSize.Level1)
     dayColumnPattern->SetCurrentIndex(DAYINDEX);
     PickerDate pickerDate = datePickerPattern->startDateSolar_;
     EXPECT_EQ(datePickerPattern->GetText(), std::to_string(pickerDate.GetYear()) + CONNECTER +
-                                                    std::to_string(pickerDate.GetMonth()) + CONNECTER +
-                                                    std::to_string(pickerDate.GetDay() + DAYINDEX));
+                                                    std::to_string(pickerDate.GetMonth() + DAYINDEX) + CONNECTER +
+                                                    std::to_string(pickerDate.GetDay()));
 }
 
 /**
@@ -1703,8 +1699,8 @@ HWTEST_F(DatePickerOrderTest, DatePickerOrder026, TestSize.Level1)
     monthColumnPattern->SetCurrentIndex(MONTHINDEX);
     PickerDate pickerDate = datePickerPattern->startDateSolar_;
     EXPECT_EQ(datePickerPattern->GetText(), std::to_string(pickerDate.GetYear()) + CONNECTER +
-                                                    std::to_string(pickerDate.GetMonth()) + CONNECTER +
-                                                    std::to_string(pickerDate.GetDay() + MONTHINDEX));
+                                                    std::to_string(pickerDate.GetMonth() + MONTHINDEX) + CONNECTER +
+                                                    std::to_string(pickerDate.GetDay()));
 }
 
 /**
@@ -1759,8 +1755,8 @@ HWTEST_F(DatePickerOrderTest, DatePickerOrder027, TestSize.Level1)
     dayColumnPattern->SetCurrentIndex(DAYINDEX);
     PickerDate pickerDate = datePickerPattern->startDateSolar_;
     EXPECT_EQ(datePickerPattern->GetText(), std::to_string(pickerDate.GetYear()) + CONNECTER +
-                                                    std::to_string(pickerDate.GetMonth() + DAYINDEX) + CONNECTER +
-                                                    std::to_string(pickerDate.GetDay()));
+                                                    std::to_string(pickerDate.GetMonth()) + CONNECTER +
+                                                    std::to_string(pickerDate.GetDay() + DAYINDEX));
 }
 
 /**
@@ -2047,7 +2043,7 @@ HWTEST_F(DatePickerOrderTest, DatePickerOrder032, TestSize.Level1)
 
     auto datePickerPattern = datePickerNode->GetPattern<DatePickerPattern>();
     ASSERT_NE(datePickerPattern, nullptr);
-    EXPECT_EQ(datePickerPattern->dateOrder_, EXPECT_DATE_ORDER_MAP.find(language)->second);
+    EXPECT_EQ(datePickerPattern->dateOrder_, DateTimeSequence().GetDateOrder(language).dateOrder);
 
     /**
      * @tc.steps: steps3. Switch language and city.
@@ -2060,8 +2056,7 @@ HWTEST_F(DatePickerOrderTest, DatePickerOrder032, TestSize.Level1)
     AceApplicationInfo::GetInstance().SetLocale(newLanguage, newCountryOrRegion, newScript, newKeywordsAndValues);
 
     datePickerPattern->OnLanguageConfigurationUpdate();
-    EXPECT_EQ(datePickerPattern->dateOrder_, EXPECT_DATE_ORDER_MAP.find(newLanguage)->second);
-    EXPECT_EQ(datePickerPattern->isDateOrderChange_, true);
+    EXPECT_EQ(datePickerPattern->dateOrder_, DateTimeSequence().GetDateOrder(newLanguage).dateOrder);
 
     /**
      * @tc.steps: steps4. OnModifyDone update the properties and layout.
@@ -2100,7 +2095,7 @@ HWTEST_F(DatePickerOrderTest, DatePickerOrder033, TestSize.Level1)
     frameNode->MarkModifyDone();
     auto datePickerPattern = frameNode->GetPattern<DatePickerPattern>();
     ASSERT_NE(datePickerPattern, nullptr);
-    EXPECT_EQ(datePickerPattern->dateOrder_, EXPECT_DATE_ORDER_MAP.find(language)->second);
+    EXPECT_EQ(datePickerPattern->dateOrder_, DateTimeSequence().GetDateOrder(language).dateOrder);
 
     /**
      * @tc.steps: steps3. Switch language and city.
@@ -2113,8 +2108,7 @@ HWTEST_F(DatePickerOrderTest, DatePickerOrder033, TestSize.Level1)
     AceApplicationInfo::GetInstance().SetLocale(newLanguage, newCountryOrRegion, newScript, newKeywordsAndValues);
 
     datePickerPattern->OnLanguageConfigurationUpdate();
-    EXPECT_EQ(datePickerPattern->dateOrder_, EXPECT_DATE_ORDER_MAP.find(newLanguage)->second);
-    EXPECT_EQ(datePickerPattern->isDateOrderChange_, true);
+    EXPECT_EQ(datePickerPattern->dateOrder_, DateTimeSequence().GetDateOrder(newLanguage).dateOrder);
 
     /**
     * @tc.steps: steps4. OnModifyDone update the properties and layout.
@@ -2151,11 +2145,7 @@ HWTEST_F(DatePickerOrderTest, DatePickerOrder034, TestSize.Level1)
     auto datePickerPattern = frameNode->GetPattern<DatePickerPattern>();
     ASSERT_NE(datePickerPattern, nullptr);
     datePickerPattern->OnLanguageConfigurationUpdate();
-    EXPECT_EQ(datePickerPattern->dateOrder_, EXPECT_DATE_ORDER_MAP.find(language)->second);
-    auto pickerProperty = frameNode->GetLayoutProperty<DataPickerRowLayoutProperty>();
-    ASSERT_NE(pickerProperty, nullptr);
-    EXPECT_EQ(pickerProperty->GetLayoutDirection(), TextDirection::LTR);
-    EXPECT_EQ(datePickerPattern->isDirectionSetByAr, true);
+    EXPECT_EQ(datePickerPattern->dateOrder_, DateTimeSequence().GetDateOrder(language).dateOrder);
 
     /**
      * @tc.steps: steps3. Switch language and city.
@@ -2165,10 +2155,7 @@ HWTEST_F(DatePickerOrderTest, DatePickerOrder034, TestSize.Level1)
     AceApplicationInfo::GetInstance().SetLocale(newLanguage, "Kashgar", "Uyghur", "");
 
     datePickerPattern->OnLanguageConfigurationUpdate();
-    EXPECT_EQ(datePickerPattern->dateOrder_, EXPECT_DATE_ORDER_MAP.find(newLanguage)->second);
-    EXPECT_EQ(datePickerPattern->isDateOrderChange_, true);
-    EXPECT_EQ(pickerProperty->GetLayoutDirection(), TextDirection::AUTO);
-    EXPECT_EQ(datePickerPattern->isDirectionSetByAr, false);
+    EXPECT_EQ(datePickerPattern->dateOrder_, DateTimeSequence().GetDateOrder(newLanguage).dateOrder);
     AceApplicationInfo::GetInstance().language_ = oldLanguage_;
 }
 
@@ -2226,11 +2213,7 @@ HWTEST_F(DatePickerOrderTest, DatePickerOrder035, TestSize.Level1)
     auto datePickerPattern = datePickerNode->GetPattern<DatePickerPattern>();
     ASSERT_NE(datePickerPattern, nullptr);
     datePickerPattern->OnLanguageConfigurationUpdate();
-    EXPECT_EQ(datePickerPattern->dateOrder_, EXPECT_DATE_ORDER_MAP.find(language)->second);
-    auto pickerProperty = datePickerNode->GetLayoutProperty<DataPickerRowLayoutProperty>();
-    ASSERT_NE(pickerProperty, nullptr);
-    EXPECT_EQ(pickerProperty->GetLayoutDirection(), TextDirection::LTR);
-    EXPECT_EQ(datePickerPattern->isDirectionSetByAr, true);
+    EXPECT_EQ(datePickerPattern->dateOrder_, DateTimeSequence().GetDateOrder(language).dateOrder);
 
     /**
      * @tc.steps: steps3. Switch language and city.
@@ -2240,10 +2223,7 @@ HWTEST_F(DatePickerOrderTest, DatePickerOrder035, TestSize.Level1)
     AceApplicationInfo::GetInstance().SetLocale(newLanguage, "Kashgar", "Uyghur", "");
 
     datePickerPattern->OnLanguageConfigurationUpdate();
-    EXPECT_EQ(datePickerPattern->dateOrder_, EXPECT_DATE_ORDER_MAP.find(newLanguage)->second);
-    EXPECT_EQ(datePickerPattern->isDateOrderChange_, true);
-    EXPECT_EQ(pickerProperty->GetLayoutDirection(), TextDirection::AUTO);
-    EXPECT_EQ(datePickerPattern->isDirectionSetByAr, false);
+    EXPECT_EQ(datePickerPattern->dateOrder_, DateTimeSequence().GetDateOrder(newLanguage).dateOrder);
     AceApplicationInfo::GetInstance().language_ = oldLanguage_;
 }
 
@@ -2272,10 +2252,7 @@ HWTEST_F(DatePickerOrderTest, DatePickerOrder036, TestSize.Level1)
 
     auto datePickerPattern = frameNode->GetPattern<DatePickerPattern>();
     ASSERT_NE(datePickerPattern, nullptr);
-    EXPECT_EQ(datePickerPattern->dateOrder_, EXPECT_DATE_ORDER_MAP.find(language)->second);
-    auto pickerProperty = frameNode->GetLayoutProperty<DataPickerRowLayoutProperty>();
-    ASSERT_NE(pickerProperty, nullptr);
-    EXPECT_EQ(pickerProperty->GetLayoutDirection(), TextDirection::LTR);
+    EXPECT_EQ(datePickerPattern->dateOrder_, DateTimeSequence().GetDateOrder(language).dateOrder);
     AceApplicationInfo::GetInstance().language_ = oldLanguage_;
 }
 
@@ -2332,10 +2309,7 @@ HWTEST_F(DatePickerOrderTest, DatePickerOrder037, TestSize.Level1)
 
     auto datePickerPattern = datePickerNode->GetPattern<DatePickerPattern>();
     ASSERT_NE(datePickerPattern, nullptr);
-    EXPECT_EQ(datePickerPattern->dateOrder_, EXPECT_DATE_ORDER_MAP.find(language)->second);
-    auto pickerProperty = datePickerNode->GetLayoutProperty<DataPickerRowLayoutProperty>();
-    ASSERT_NE(pickerProperty, nullptr);
-    EXPECT_EQ(pickerProperty->GetLayoutDirection(), TextDirection::LTR);
+    EXPECT_EQ(datePickerPattern->dateOrder_, DateTimeSequence().GetDateOrder(language).dateOrder);
     AceApplicationInfo::GetInstance().language_ = oldLanguage_;
 }
 
@@ -2366,8 +2340,16 @@ HWTEST_F(DatePickerOrderTest, DatePickerOrder038, TestSize.Level1)
     AceApplicationInfo::GetInstance().SetLocale(language, "Egypt", "Arabic", "");
 
     auto date = PickerDateF::CreateMonthDay(4, 16, false, false);
-    EXPECT_EQ(datePickerPattern->solarDays_[15] + " " + datePickerPattern->solarMonths_[3],
-        datePickerPattern->GetFormatString(date));
+    auto arOrder = DateTimeSequence().GetDateOrder(language).dateOrder;
+    auto arMonthPos = arOrder.find('M');
+    auto arDayPos = arOrder.find('d');
+    if (arMonthPos != std::string::npos && arDayPos != std::string::npos && arDayPos < arMonthPos) {
+        EXPECT_EQ(datePickerPattern->solarDays_[15] + " " + datePickerPattern->solarMonths_[3],
+            datePickerPattern->GetFormatString(date));
+    } else {
+        EXPECT_EQ(datePickerPattern->solarMonths_[3] + " " + datePickerPattern->solarDays_[15],
+            datePickerPattern->GetFormatString(date));
+    }
 
     /**
      * @tc.steps: steps3. Switch language and city.
@@ -2375,8 +2357,238 @@ HWTEST_F(DatePickerOrderTest, DatePickerOrder038, TestSize.Level1)
     const std::string newLanguage = "en";
     AceApplicationInfo::GetInstance().SetLocale(newLanguage, "US", "Latn", "");
 
-    EXPECT_EQ(datePickerPattern->solarMonths_[3] + " " + datePickerPattern->solarDays_[15],
-        datePickerPattern->GetFormatString(date));
+    auto enOrder = DateTimeSequence().GetDateOrder(newLanguage).dateOrder;
+    auto enMonthPos = enOrder.find('M');
+    auto enDayPos = enOrder.find('d');
+    if (enMonthPos != std::string::npos && enDayPos != std::string::npos && enDayPos < enMonthPos) {
+        EXPECT_EQ(datePickerPattern->solarDays_[15] + " " + datePickerPattern->solarMonths_[3],
+            datePickerPattern->GetFormatString(date));
+    } else {
+        EXPECT_EQ(datePickerPattern->solarMonths_[3] + " " + datePickerPattern->solarDays_[15],
+            datePickerPattern->GetFormatString(date));
+    }
+}
+
+/**
+ * @tc.name: DatePickerOrder039
+ * @tc.desc: Test ug locale uses ICU date order instead of hardcoded "y-d-M"
+ * @tc.type: FUNC
+ */
+HWTEST_F(DatePickerOrderTest, DatePickerOrder039, TestSize.Level1)
+{
+    const std::string language = "ug";
+    AceApplicationInfo::GetInstance().SetLocale(language, "Kashgar", "Uyghur", "");
+
+    auto theme = MockPipelineContext::GetCurrent()->GetTheme<PickerTheme>();
+    DatePickerModel::GetInstance()->CreateDatePicker(theme);
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    ASSERT_NE(frameNode, nullptr);
+    frameNode->MarkModifyDone();
+
+    auto datePickerPattern = frameNode->GetPattern<DatePickerPattern>();
+    ASSERT_NE(datePickerPattern, nullptr);
+    auto expectedOrder = DateTimeSequence().GetDateOrder(language).dateOrder;
+    EXPECT_EQ(datePickerPattern->dateOrder_, expectedOrder);
+    EXPECT_NE(datePickerPattern->dateOrder_, "y-d-M");
+    AceApplicationInfo::GetInstance().language_ = oldLanguage_;
+}
+
+/**
+ * @tc.name: DatePickerOrder042
+ * @tc.desc: Test GetFormatString uses ICU date order for de-DE (day before month)
+ * @tc.type: FUNC
+ */
+HWTEST_F(DatePickerOrderTest, DatePickerOrder042, TestSize.Level1)
+{
+    auto theme = MockPipelineContext::GetCurrent()->GetTheme<PickerTheme>();
+    DatePickerModel::GetInstance()->CreateDatePicker(theme);
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    ASSERT_NE(frameNode, nullptr);
+    frameNode->MarkModifyDone();
+
+    auto datePickerPattern = frameNode->GetPattern<DatePickerPattern>();
+    ASSERT_NE(datePickerPattern, nullptr);
+
+    const std::string language = "de";
+    AceApplicationInfo::GetInstance().SetLocale(language, "DE", "Latn", "");
+    datePickerPattern->OnLanguageConfigurationUpdate();
+
+    auto date = PickerDateF::CreateMonthDay(4, 16, false, false);
+    auto expectedOrder = DateTimeSequence().GetDateOrder(language).dateOrder;
+    auto monthPos = expectedOrder.find('M');
+    auto dayPos = expectedOrder.find('d');
+    if (monthPos != std::string::npos && dayPos != std::string::npos && dayPos < monthPos) {
+        EXPECT_EQ(datePickerPattern->solarDays_[15] + " " + datePickerPattern->solarMonths_[3],
+            datePickerPattern->GetFormatString(date));
+    } else {
+        EXPECT_EQ(datePickerPattern->solarMonths_[3] + " " + datePickerPattern->solarDays_[15],
+            datePickerPattern->GetFormatString(date));
+    }
+    AceApplicationInfo::GetInstance().language_ = oldLanguage_;
+}
+
+/**
+ * @tc.name: DatePickerOrder043
+ * @tc.desc: Test GetFormatString uses ICU date order for zh-CN (month before day)
+ * @tc.type: FUNC
+ */
+HWTEST_F(DatePickerOrderTest, DatePickerOrder043, TestSize.Level1)
+{
+    auto theme = MockPipelineContext::GetCurrent()->GetTheme<PickerTheme>();
+    DatePickerModel::GetInstance()->CreateDatePicker(theme);
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    ASSERT_NE(frameNode, nullptr);
+    frameNode->MarkModifyDone();
+
+    auto datePickerPattern = frameNode->GetPattern<DatePickerPattern>();
+    ASSERT_NE(datePickerPattern, nullptr);
+
+    const std::string language = "zh";
+    AceApplicationInfo::GetInstance().SetLocale(language, "CN", "Hans", "");
+    datePickerPattern->OnLanguageConfigurationUpdate();
+
+    auto date = PickerDateF::CreateMonthDay(4, 16, false, false);
+    auto expectedOrder = DateTimeSequence().GetDateOrder(language).dateOrder;
+    auto monthPos = expectedOrder.find('M');
+    auto dayPos = expectedOrder.find('d');
+    if (monthPos != std::string::npos && dayPos != std::string::npos && dayPos < monthPos) {
+        EXPECT_EQ(datePickerPattern->solarDays_[15] + " " + datePickerPattern->solarMonths_[3],
+            datePickerPattern->GetFormatString(date));
+    } else {
+        EXPECT_EQ(datePickerPattern->solarMonths_[3] + " " + datePickerPattern->solarDays_[15],
+            datePickerPattern->GetFormatString(date));
+    }
+    AceApplicationInfo::GetInstance().language_ = oldLanguage_;
+}
+
+/**
+ * @tc.name: DatePickerOrder044
+ * @tc.desc: Test InitColumnsOrder for all 6 date orders
+ * @tc.type: FUNC
+ */
+HWTEST_F(DatePickerOrderTest, DatePickerOrder044, TestSize.Level1)
+{
+    auto pickerTheme = MockPipelineContext::GetCurrent()->GetTheme<PickerTheme>();
+    auto dialogTheme = MockPipelineContext::GetCurrent()->GetTheme<DialogTheme>();
+    auto pickerStack = DatePickerDialogView::CreateStackNode();
+    auto datePickerNode = FrameNode::GetOrCreateFrameNode(
+        V2::DATE_PICKER_ETS_TAG, 1, []() { return AceType::MakeRefPtr<DatePickerPattern>(); });
+    datePickerNode->MountToParent(pickerStack);
+    auto datePickerPattern = datePickerNode->GetPattern<DatePickerPattern>();
+    ASSERT_NE(datePickerPattern, nullptr);
+    uint32_t showCount = pickerTheme->GetShowOptionCount() + BUFFER_NODE_NUMBER;
+    datePickerPattern->SetShowCount(showCount);
+    RefPtr<FrameNode> yearColumnNode = CreateYearColumnNode(datePickerPattern, showCount);
+    RefPtr<FrameNode> monthColumnNode = CreateMonthColumnNode(datePickerPattern, showCount);
+    RefPtr<FrameNode> dayColumnNode = CreateDayColumnNode(datePickerPattern, showCount);
+
+    auto verifyOrder = [datePickerNode, datePickerPattern, yearColumnNode, monthColumnNode,
+        dayColumnNode](const std::string& order) {
+        while (datePickerNode->TotalChildCount() > 0) {
+            datePickerNode->RemoveChildAtIndex(0);
+        }
+        datePickerPattern->SetDateOrder(order);
+        datePickerPattern->datePickerColumns_.clear();
+        datePickerPattern->SetColumn(yearColumnNode);
+        datePickerPattern->SetColumn(monthColumnNode);
+        datePickerPattern->SetColumn(dayColumnNode);
+        CreateDateColumn(yearColumnNode, datePickerNode);
+        CreateDateColumn(monthColumnNode, datePickerNode);
+        CreateDateColumn(dayColumnNode, datePickerNode);
+        RefPtr<FrameNode> columns[COLUMNS_SIZE];
+        datePickerPattern->InitColumnsOrder(&columns);
+        EXPECT_NE(columns[COL_YEAR], nullptr);
+        EXPECT_NE(columns[COL_MONTH], nullptr);
+        EXPECT_NE(columns[COL_DAY], nullptr);
+        auto host = datePickerPattern->GetHost();
+        ASSERT_NE(host, nullptr);
+        auto children = host->GetChildren();
+        auto iter = children.begin();
+        for (int i = 0; i < COLUMNS_SIZE && iter != children.end(); ++i, ++iter) {
+            auto stackChild = *iter;
+            auto blendChild = stackChild->GetLastChild();
+            ASSERT_NE(blendChild, nullptr);
+            auto child = blendChild->GetLastChild();
+            ASSERT_NE(child, nullptr);
+            int32_t expectedIndex;
+            if (order == "M-d-y") {
+                expectedIndex = (i == 0) ? COL_MONTH : (i == 1) ? COL_DAY : COL_YEAR;
+            } else if (order == "d-M-y") {
+                expectedIndex = (i == 0) ? COL_DAY : (i == 1) ? COL_MONTH : COL_YEAR;
+            } else if (order == "y-d-M") {
+                expectedIndex = (i == 0) ? COL_YEAR : (i == 1) ? COL_DAY : COL_MONTH;
+            } else if (order == "d-y-M") {
+                expectedIndex = (i == 0) ? COL_DAY : (i == 1) ? COL_YEAR : COL_MONTH;
+            } else if (order == "M-y-d") {
+                expectedIndex = (i == 0) ? COL_MONTH : (i == 1) ? COL_YEAR : COL_DAY;
+            } else {
+                expectedIndex = (i == 0) ? COL_YEAR : (i == 1) ? COL_MONTH : COL_DAY;
+            }
+            EXPECT_EQ(columns[expectedIndex]->GetId(), child->GetId());
+        }
+    };
+
+    verifyOrder("y-M-d");
+    verifyOrder("M-d-y");
+    verifyOrder("d-M-y");
+    verifyOrder("y-d-M");
+    verifyOrder("d-y-M");
+    verifyOrder("M-y-d");
+}
+
+/**
+ * @tc.name: DatePickerOrder045
+ * @tc.desc: Test SetOnChange callback triggers MarkDirtyNode on locale change
+ * @tc.type: FUNC
+ */
+HWTEST_F(DatePickerOrderTest, DatePickerOrder045, TestSize.Level1)
+{
+    auto theme = MockPipelineContext::GetCurrent()->GetTheme<PickerTheme>();
+    DatePickerModel::GetInstance()->CreateDatePicker(theme);
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    ASSERT_NE(frameNode, nullptr);
+    frameNode->MarkModifyDone();
+
+    auto datePickerPattern = frameNode->GetPattern<DatePickerPattern>();
+    ASSERT_NE(datePickerPattern, nullptr);
+
+    auto date = PickerDate(2024, 1, 1);
+    datePickerPattern->GetYear(date.GetYear());
+    EXPECT_TRUE(DatePickerPattern::inited_);
+
+    Localization::GetInstance()->HandleOnChange();
+    EXPECT_FALSE(DatePickerPattern::inited_);
+    AceApplicationInfo::GetInstance().language_ = oldLanguage_;
+}
+
+/**
+ * @tc.name: DatePickerOrder046
+ * @tc.desc: Test column mounting order via CreateDatePicker for en-US (M-d-y)
+ * @tc.type: FUNC
+ */
+HWTEST_F(DatePickerOrderTest, DatePickerOrder046, TestSize.Level1)
+{
+    const std::string language = "en";
+    AceApplicationInfo::GetInstance().SetLocale(language, "US", "Latn", "");
+
+    auto theme = MockPipelineContext::GetCurrent()->GetTheme<PickerTheme>();
+    DatePickerModel::GetInstance()->CreateDatePicker(theme);
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    ASSERT_NE(frameNode, nullptr);
+    frameNode->MarkModifyDone();
+
+    auto datePickerPattern = frameNode->GetPattern<DatePickerPattern>();
+    ASSERT_NE(datePickerPattern, nullptr);
+
+    auto expectedOrder = DateTimeSequence().GetDateOrder(language).dateOrder;
+    EXPECT_EQ(datePickerPattern->dateOrder_, expectedOrder);
+
+    RefPtr<FrameNode> columns[COLUMNS_SIZE];
+    datePickerPattern->InitColumnsOrder(&columns);
+    EXPECT_NE(columns[COL_YEAR], nullptr);
+    EXPECT_NE(columns[COL_MONTH], nullptr);
+    EXPECT_NE(columns[COL_DAY], nullptr);
+    AceApplicationInfo::GetInstance().language_ = oldLanguage_;
 }
 
 } // namespace OHOS::Ace::NG

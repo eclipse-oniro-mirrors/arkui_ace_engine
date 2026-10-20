@@ -105,7 +105,7 @@ public:
     void DestroyUIDirector() override;
     void SetUIContentType(UIContentType uIContentType) override;
     void SetHostParams(const OHOS::AAFwk::WantParams& params) override;
-    void MarkUIExtensionDensityFollowHost() override;
+    void SetUIExtensionDensityFollowHost(OHOS::Rosen::DpiFollowStrategy dpiFollowStrategy) override;
     void UpdateFontScale(const std::shared_ptr<OHOS::AppExecFwk::Configuration>& config);
     static int32_t GetUIContentWindowID(int32_t instanceId);
     OHOS::Rosen::Window* GetUIContentWindow() override;
@@ -190,6 +190,7 @@ public:
     std::shared_ptr<Rosen::RSSurfaceNode> GetFormRootNode() override;
     void UpdateFormData(const std::string& data) override;
     void UpdateFormSharedImage(const std::map<std::string, sptr<OHOS::AppExecFwk::FormAshmem>>& imageDataMap) override;
+    void SetFormImageCacheThreshold(int32_t threshold) override;
     void ReloadForm(const std::string& url) override;
 
     void SetFormWidth(float width) override { formWidth_ = width; }
@@ -429,6 +430,7 @@ public:
     void SetTopWindowBoundaryByID(const std::string& stringId) override;
     void SetupGetPixelMapCallback(const WeakPtr<TaskExecutor>& taskExecutor);
     void SaveGetHitTestInfoCallback(const WeakPtr<TaskExecutor>& taskExecutor);
+    void SaveComponentTreeQueryFunction(const WeakPtr<TaskExecutor>& taskExecutor);
     void RelaxedCommandCallbackInner(const WeakPtr<TaskExecutor>& taskExecutor);
     void RegisterGetSpecifiedContentOffsetsCallback(const WeakPtr<TaskExecutor>& taskExecutor);
     void RegisterHighlightSpecifiedContentCallback(const WeakPtr<TaskExecutor>& taskExecutor);
@@ -510,6 +512,8 @@ protected:
     void DestroyCallback() const;
     void ProcessDestructCallbacks();
     void SetConfiguration(const std::shared_ptr<OHOS::AppExecFwk::Configuration>& config);
+    void ApplyUIExtensionDensityFollowHost(NG::DpiFollowStrategy strategy);
+    void ApplyPendingDpiFollowStrategy();
 
     void InitializeSafeArea(const RefPtr<Platform::AceContainer>& container);
     void InitializeDisplayAvailableRect(const RefPtr<Platform::AceContainer>& container);
@@ -548,6 +552,13 @@ protected:
     std::string startUrl_;
     int32_t instanceId_ = -1;
     std::shared_ptr<NG::PageSceneRuleManager> pageSceneMatcher_;
+    // The window may call SetUIExtensionDensityFollowHost before Initialize assigns
+    // instanceId_, so the latest received strategy is cached here and applied to the
+    // pipeline once the container is ready (see ApplyPendingDpiFollowStrategy).
+    bool isDpiFollowStrategyReceived_ = false;
+    // Zero-initialized to Rosen::DpiFollowStrategy::NONE (the default); meaningful only
+    // when isDpiFollowStrategyReceived_ is true.
+    OHOS::Rosen::DpiFollowStrategy pendingDpiFollowStrategy_ {};
     int32_t lastRotation = -1;
     OHOS::sptr<OHOS::Rosen::IWindowDragListener> dragWindowListener_ = nullptr;
     OHOS::sptr<OHOS::Rosen::IAvoidAreaChangedListener> avoidAreaChangedListener_ = nullptr;

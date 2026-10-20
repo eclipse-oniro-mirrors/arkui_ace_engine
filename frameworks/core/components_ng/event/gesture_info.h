@@ -31,7 +31,7 @@ inline constexpr uint32_t SourceToolToBit(SourceTool tool)
 
 inline constexpr uint32_t AllowedTypesNone = 0u;
 
-class ACE_EXPORT GestureInfo : public virtual AceType {
+class ACE_EXPORT GestureInfo : public AceType {
     DECLARE_ACE_TYPE(GestureInfo, AceType);
 
 public:

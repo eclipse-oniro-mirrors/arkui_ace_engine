@@ -211,6 +211,7 @@ struct ImageSpanOptions : SpanOptionBase {
     std::optional<RefPtr<PixelMap>> imagePixelMap;
     std::optional<ImageSpanAttribute> imageAttribute;
     std::optional<bool> isUriPureNumber;
+    std::optional<std::u16string> imageTag = std::nullopt;
 
     bool HasValue() const
     {
@@ -231,6 +232,8 @@ struct ImageSpanOptions : SpanOptionBase {
             jsonValue->Put("pixelMapSize", pixSize.c_str());
         }
         JSON_STRING_PUT_OPTIONAL_STRINGABLE(jsonValue, imageAttribute);
+        jsonValue->Put("imageTagLen",
+            imageTag.has_value() ? std::to_string(imageTag->length()).c_str() : "undefined");
 #ifndef IS_RELEASE_VERSION
         JSON_STRING_PUT_OPTIONAL_STRING(jsonValue, image);
         JSON_STRING_PUT_OPTIONAL_STRING(jsonValue, bundleName);

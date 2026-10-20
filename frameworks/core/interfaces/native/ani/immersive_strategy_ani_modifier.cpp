@@ -35,7 +35,8 @@ void ApplyDefaultImmersiveStrategy(const int32_t* types, int32_t count)
     CHECK_NULL_VOID(pipeline);
     auto ngPipeline = AceType::DynamicCast<NG::PipelineContext>(pipeline);
     // C8 gate: only effective before the first layout flow is entered.
-    if (!ngPipeline || !ngPipeline->IsFirstRootLayout()) {
+    if (!ngPipeline || !ngPipeline->IsFirstFlushMessages()) {
+        LOGW("applyDefaultImmersiveStrategy is only effective before the first layout flow is entered.");
         return;
     }
     std::unordered_set<ImmersiveStrategy> strategies;

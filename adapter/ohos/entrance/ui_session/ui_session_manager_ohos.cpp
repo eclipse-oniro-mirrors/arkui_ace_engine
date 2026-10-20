@@ -2614,4 +2614,68 @@ void UiSessionManagerOhos::SendWebInfoByRequest(uint32_t windowId, int32_t webId
     }
     processIter->second.clear();
 }
+
+void UiSessionManagerOhos::SaveComponentTreeQueryFunction(ComponentTreeQueryFunction&& function)
+{
+    std::lock_guard<std::mutex> lock(componentTreeQueryFunctionMutex_);
+    componentTreeQueryFunction_ = std::move(function);
+}
+
+void UiSessionManagerOhos::ComponentTreeQuery(const ComponentTreeQueryRequest& request)
+{
+    ComponentTreeQueryFunction componentTreeQueryFunction;
+    {
+        std::lock_guard<std::mutex> lock(componentTreeQueryFunctionMutex_);
+        componentTreeQueryFunction = componentTreeQueryFunction_;
+    }
+    if (componentTreeQueryFunction) {
+        componentTreeQueryFunction(request);
+    } else {
+        LOGW("ComponentTreeQuery function not registered");
+    }
+}
+
+void UiSessionManagerOhos::ReportNavigationQueryResult(const std::string& data)
+{
+    std::shared_lock<std::shared_mutex> reportLock(reportObjectMutex_);
+    std::unique_lock<std::shared_mutex> processMapLock(processMapMutex_);
+    auto processIter = processMap_.find("componentTreeQuery");
+    if (processIter == processMap_.end() || processIter->second.empty()) {
+        LOGW("ReportNavigationQueryResult no report proxy");
+        return;
+    }
+    for (const auto& pid : processIter->second) {
+        auto reportIter = reportObjectMap_.find(pid);
+        auto reportService =
+            (reportIter != reportObjectMap_.end()) ? iface_cast<ReportService>(reportIter->second) : nullptr;
+        if (reportService == nullptr) {
+            LOGW("Report NavigationQueryResult failed, process id:%{public}d", pid);
+            continue;
+        }
+        reportService->ReportNavigationQueryResult(data);
+    }
+    processIter->second.clear();
+}
+
+void UiSessionManagerOhos::ReportLazyForEachQueryResult(const std::string& data)
+{
+    std::shared_lock<std::shared_mutex> reportLock(reportObjectMutex_);
+    std::unique_lock<std::shared_mutex> processMapLock(processMapMutex_);
+    auto processIter = processMap_.find("lazyForEachQuery");
+    if (processIter == processMap_.end() || processIter->second.empty()) {
+        LOGW("ReportLazyForEachQueryResult no report proxy");
+        return;
+    }
+    for (const auto& pid : processIter->second) {
+        auto reportIter = reportObjectMap_.find(pid);
+        auto reportService =
+            (reportIter != reportObjectMap_.end()) ? iface_cast<ReportService>(reportIter->second) : nullptr;
+        if (reportService == nullptr) {
+            LOGW("Report LazyForEachQueryResult failed, process id:%{public}d", pid);
+            continue;
+        }
+        reportService->ReportLazyForEachQueryResult(data);
+    }
+    processIter->second.clear();
+}
 } // namespace OHOS::Ace

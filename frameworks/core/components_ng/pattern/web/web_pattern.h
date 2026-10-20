@@ -218,6 +218,8 @@ public:
     using WebNodeInfoCallback = const std::function<void(std::shared_ptr<JsonValue>& jsonNodeArray, int32_t webId)>;
     using TextBlurCallback = std::function<void(int64_t, const std::string)>;
     using OnMediaCastEnterCallback = std::function<void()>;
+    using OnContextMenuUpdateCallback =
+        std::function<void(WebContextMenuItemId menuItemId, const WebContextMenuOptions& options)>;
     using WebComponentClickCallback = std::function<void(int64_t, const std::string)>;
     using OnWebNativeMessageConnectCallback = std::function<void(const std::shared_ptr<BaseEventInfo>&)>;
     using OnFullScreenVideoOverlayEnterCallback = std::function<void(const std::shared_ptr<BaseEventInfo>&)>;
@@ -302,6 +304,8 @@ public:
 
 
     void OnModifyDone() override;
+
+    void UpdatePropertyImpl(const std::string& key, RefPtr<PropertyValueBase> value) override;
 
     void DumpViewDataPageNode(RefPtr<ViewDataWrap> viewDataWrap, bool needsRecordData = false) override;
 
@@ -418,6 +422,16 @@ public:
     OnMediaCastEnterCallback GetOnMediaCastEnterCallback()
     {
         return onMediaCastEnterCallback_;
+    }
+
+    void SetOnContextMenuUpdateCallback(OnContextMenuUpdateCallback&& callback)
+    {
+        onContextMenuUpdateCallback_ = std::move(callback);
+    }
+
+    OnContextMenuUpdateCallback GetOnContextMenuUpdateCallback()
+    {
+        return onContextMenuUpdateCallback_;
     }
 
     PermissionClipboardCallback GetPermissionClipboardCallback() const
@@ -654,6 +668,7 @@ public:
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, HorizontalScrollBarAccessEnabled, bool);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, VerticalScrollBarAccessEnabled, bool);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, ScrollBarColor, std::string);
+    ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, CaretColor, Color);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, OverScrollMode, int32_t);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, BlurOnKeyboardHideMode, int32_t);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, CopyOptionMode, int32_t);
@@ -680,10 +695,12 @@ public:
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, EnableDataDetector, bool);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, EnableFollowSystemFontWeight, bool);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, BlankScreenDetectionConfig, BlankScreenDetectionConfig);
+    ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, WebBlankScreenMonitorEnabled, bool);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, EnableImageAnalyzer, bool);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, GestureFocusMode, GestureFocusMode);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, RotateRenderEffect, WebRotateEffect);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, ForceEnableZoom, bool);
+    ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, FlingSpeedLimit, float);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, BackToTop, bool);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, EnableAutoFill, bool);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, EnableDefaultContextMenu, bool);
@@ -891,6 +908,7 @@ public:
     std::vector<int8_t> GetWordSelection(const std::string& text, int8_t offset);
     bool Backward();
     void OnBlankScreenDetectionConfigUpdate(const BlankScreenDetectionConfig &config);
+    void OnWebBlankScreenMonitorEnabledUpdate(bool enable);
     void OnEnableImageAnalyzerUpdate(bool isEnabled);
     void OnSelectionMenuOptionsUpdate(const WebMenuOptionsParam& webMenuOption);
     void UpdateEditMenuOptions(const NG::OnCreateMenuCallback&& onCreateMenuCallback,
@@ -1287,6 +1305,7 @@ private:
     void OnHorizontalScrollBarAccessEnabledUpdate(bool value);
     void OnVerticalScrollBarAccessEnabledUpdate(bool value);
     void OnScrollBarColorUpdate(const std::string& value);
+    void OnCaretColorUpdate(const Color& value);
     void OnOverScrollModeUpdate(const int32_t value);
     void OnBlurOnKeyboardHideModeUpdate(const int32_t value);
     void OnCopyOptionModeUpdate(const int32_t value);
@@ -1314,6 +1333,7 @@ private:
     void OnRotateRenderEffectUpdate(WebRotateEffect effect);
     void WebRotateRenderEffect(WindowSizeChangeReason type);
     void OnForceEnableZoomUpdate(bool value);
+    void OnFlingSpeedLimitUpdate(float value);
     void OnEnableAutoFillUpdate(bool isEnabled);
     void OnEnableDefaultContextMenuUpdate(bool isEnabled);
     void OnEnableDragUpdate(bool isEnabled);
@@ -1354,6 +1374,7 @@ private:
     void HandleBlurEvent(const BlurReason& blurReason);
     bool HandleKeyEvent(const KeyEvent& keyEvent);
     bool WebOnKeyEvent(const KeyEvent& keyEvent);
+    bool IsShouldTriggerBack(const KeyEvent& event, bool isUsed);
     bool HandleEscToBackSupport(PipelineContext* pipeline);
     void WebRequestFocus();
     void ResetDragAction();
@@ -1573,6 +1594,7 @@ private:
     SetWebIdCallback setWebIdCallback_ = nullptr;
     SetWebDetachCallback setWebDetachCallback_ = nullptr;
     OnMediaCastEnterCallback onMediaCastEnterCallback_ = nullptr;
+    OnContextMenuUpdateCallback onContextMenuUpdateCallback_ = nullptr;
     PermissionClipboardCallback permissionClipboardCallback_ = nullptr;
     OnOpenAppLinkCallback onOpenAppLinkCallback_ = nullptr;
     SetFaviconCallback setFaviconCallback_ = nullptr;
@@ -1838,6 +1860,7 @@ private:
     bool scrollbarLayoutPolicyChanged_ = false;
     bool isLanguageRtl_ = false;
     bool isEscKeyDownConsumed_ = false;
+    bool isEscKeyFromOverlayOrFullScreen_ = false;
 
 protected:
     OnCreateMenuCallback onCreateMenuCallback_;

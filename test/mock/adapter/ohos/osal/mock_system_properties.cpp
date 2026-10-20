@@ -31,7 +31,6 @@ bool g_isTransformEnabled = false;
 namespace {
 constexpr int32_t ORIENTATION_PORTRAIT = 0;
 constexpr int32_t ORIENTATION_LANDSCAPE = 1;
-constexpr int32_t DEFAULT_FORM_SHARED_IMAGE_CACHE_THRESHOLD = 30;
 constexpr char UNDEFINED_PARAM[] = "undefined parameter";
 
 void Swap(int32_t& deviceWidth, int32_t& deviceHeight)
@@ -120,7 +119,6 @@ bool SystemProperties::forcibleLandscapeEnabled_ = false;
 bool SystemProperties::softPagetransition_ = false;
 bool SystemProperties::formSkeletonBlurEnabled_ = true;
 bool SystemProperties::syncLoadEnabled_ = true;
-int32_t SystemProperties::formSharedImageCacheThreshold_ = DEFAULT_FORM_SHARED_IMAGE_CACHE_THRESHOLD;
 bool SystemProperties::debugThreadSafeNodeEnable_ = false;
 bool SystemProperties::prebuildInMultiFrameEnabled_ = false;
 bool SystemProperties::autoResizeEnabled_ = false;
@@ -415,11 +413,6 @@ bool SystemProperties::IsSoftPageTransition()
 bool SystemProperties::IsFormSkeletonBlurEnabled()
 {
     return formSkeletonBlurEnabled_;
-}
-
-int32_t SystemProperties::getFormSharedImageCacheThreshold()
-{
-    return formSharedImageCacheThreshold_;
 }
 
 bool SystemProperties::IsWhiteBlockEnabled()

@@ -8146,6 +8146,9 @@ void PipelineContext::SetDisplayWindowRectInfo(const Rect& displayWindowRectInfo
         }
     }
     displayWindowRectInfo_ = displayWindowRectInfo;
+    if (displayWindowRectInfo.Width() > 0.0f && displayWindowRectInfo.Height() > 0.0f && window_) {
+        window_->SetWindowInfoInitialized(true);
+    }
 }
 
 void PipelineContext::SetIsTransFlag(bool result)

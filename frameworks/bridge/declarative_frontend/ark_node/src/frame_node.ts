@@ -40,6 +40,7 @@ interface ArkComponentCreator {
   createTextTimerComponent?: (node: NodePtr, type: ModifierType) => ArkTextTimerComponent;
   createTextAreaComponent?: (node: NodePtr, type: ModifierType) => ArkTextAreaComponent;
   createTextInputComponent?: (node: NodePtr, type: ModifierType) => ArkTextInputComponent;
+  createSwiperComponent?: (node: NodePtr, type: ModifierType) => ArkSwiperComponent;
   createGridRowComponent?: (node: NodePtr, type: ModifierType) => ArkGridRowComponent;
   createGridColComponent?: (node: NodePtr, type: ModifierType) => ArkGridColComponent;
   createBlankComponent?: (node: NodePtr, type: ModifierType) => ArkBlankComponent;
@@ -357,6 +358,20 @@ class FrameNode {
   }
   isModifiable(): boolean {
     return this._nativeRef !== undefined && this._nativeRef !== null;
+  }
+
+  dispatchInputEvent(event: InputEventType, competitionStrategy?: CompetitionStrategy): boolean {
+    if (!this.nodePtr_ || !this.uiContext_) {
+      return false;
+    }
+    return getUINativeModule().frameNode.dispatchInputEvent(this.nodePtr_, event, competitionStrategy);
+  }
+
+  dispatchKeyEvent(event: KeyEvent): boolean {
+    if (!this.nodePtr_ || !this.uiContext_) {
+      return false;
+    }
+    return getUINativeModule().frameNode.dispatchKeyEvent(this.nodePtr_, event);
   }
 
   convertToFrameNode(nodePtr: NodePtr, nodeId: number = -1): FrameNode | null {
@@ -1381,9 +1396,12 @@ const __creatorMap__ = new Map<string, (context: UIContext, options?: object) =>
     }],
     ['Swiper', (context: UIContext): FrameNode => {
       return new TypedFrameNode(context, 'Swiper', (node: NodePtr, type: ModifierType): ArkSwiperComponent => {
-        getUINativeModule().loadNativeModule('Swiper');
-        let module = globalThis.requireNapi('arkui.components.arkswiper');
-        return module.createComponent(node, type);
+        if (__componentCreator__.createSwiperComponent === undefined) {
+          getUINativeModule().loadNativeModule('Swiper');
+          let module = globalThis.requireNapi('arkui.components.arkswiper');
+          __componentCreator__.createSwiperComponent = module.createComponent;
+        }
+        return __componentCreator__.createSwiperComponent!(node, type);
       })
     }],
     ['Progress', (context: UIContext): FrameNode => {
@@ -1623,9 +1641,12 @@ const __attributeMap__ = new Map<string, (node: FrameNode) => ArkComponent>(
       if (!node.getNodePtr()) {
         return undefined;
       }
-      getUINativeModule().loadNativeModule('Swiper');
-      let module = globalThis.requireNapi('arkui.components.arkswiper');
-      node._componentAttribute = module.createComponent(node.getNodePtr(), ModifierType.FRAME_NODE);
+      if (__componentCreator__.createSwiperComponent === undefined) {
+        getUINativeModule().loadNativeModule('Swiper');
+        let module = globalThis.requireNapi('arkui.components.arkswiper');
+        __componentCreator__.createSwiperComponent = module.createComponent;
+      }
+      node._componentAttribute = __componentCreator__.createSwiperComponent!(node.getNodePtr(), ModifierType.FRAME_NODE);
       return node._componentAttribute;
     }],
     ['Scroll', (node: FrameNode): ArkScrollComponent => {

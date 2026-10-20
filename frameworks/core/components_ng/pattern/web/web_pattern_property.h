@@ -20,6 +20,7 @@
 #include <string>
 #include <tuple>
 
+#include "core/components/common/properties/color.h"
 #include "core/components/web/web_property.h"
 #include "core/components_ng/property/property.h"
 
@@ -72,6 +73,9 @@ struct WebPatternProperty {
     ACE_DEFINE_PROPERTY_GROUP_ITEM(HorizontalScrollBarAccessEnabled, bool);
     ACE_DEFINE_PROPERTY_GROUP_ITEM(VerticalScrollBarAccessEnabled, bool);
     ACE_DEFINE_PROPERTY_GROUP_ITEM(ScrollBarColor, std::string);
+    // A value of zero is the unset sentinel. Consumers must not use HasCaretColor()
+    // alone to determine whether an API override is active.
+    ACE_DEFINE_PROPERTY_GROUP_ITEM(CaretColor, Color);
     ACE_DEFINE_PROPERTY_GROUP_ITEM(OverScrollMode, int32_t);
     ACE_DEFINE_PROPERTY_GROUP_ITEM(BlurOnKeyboardHideMode, int32_t);
     ACE_DEFINE_PROPERTY_GROUP_ITEM(CopyOptionMode, int32_t);
@@ -97,12 +101,14 @@ struct WebPatternProperty {
     ACE_DEFINE_PROPERTY_GROUP_ITEM(EnableSelectedDataDetector, bool);
     ACE_DEFINE_PROPERTY_GROUP_ITEM(EnableFollowSystemFontWeight, bool);
     ACE_DEFINE_PROPERTY_GROUP_ITEM(BlankScreenDetectionConfig, BlankScreenDetectionConfig);
+    ACE_DEFINE_PROPERTY_GROUP_ITEM(WebBlankScreenMonitorEnabled, bool);
     ACE_DEFINE_PROPERTY_GROUP_ITEM(EnableImageAnalyzer, bool);
     ACE_DEFINE_PROPERTY_GROUP_ITEM(EnableAutoFill, bool);
     ACE_DEFINE_PROPERTY_GROUP_ITEM(EnableDefaultContextMenu, bool);
     ACE_DEFINE_PROPERTY_GROUP_ITEM(GestureFocusMode, GestureFocusMode);
     ACE_DEFINE_PROPERTY_GROUP_ITEM(RotateRenderEffect, WebRotateEffect);
     ACE_DEFINE_PROPERTY_GROUP_ITEM(ForceEnableZoom, bool);
+    ACE_DEFINE_PROPERTY_GROUP_ITEM(FlingSpeedLimit, float);
     ACE_DEFINE_PROPERTY_GROUP_ITEM(BackToTop, bool);
     ACE_DEFINE_PROPERTY_GROUP_ITEM(EnableDrag, bool);
     ACE_DEFINE_PROPERTY_GROUP_ITEM(ScrollbarLayoutPolicy, ScrollbarLayoutPolicy);

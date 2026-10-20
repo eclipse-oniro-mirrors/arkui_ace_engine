@@ -31,7 +31,7 @@ class NodeAnimatableProperty;
 using NodeAnimatablePropertyFloat = NodeAnimatableProperty<float, AnimatablePropertyFloat>;
 class TextPickerColumnPattern;
 
-class TextPickerTossAnimationController : public virtual AceType {
+class TextPickerTossAnimationController : public AceType {
     DECLARE_ACE_TYPE(TextPickerTossAnimationController, AceType);
 
 public:

@@ -288,6 +288,7 @@ private:
     LogWrapper() = delete;
     ~LogWrapper() = delete;
 
+    static LogLevel level_;
     static LogLevel& GetLogLevelStorage();
 };
 

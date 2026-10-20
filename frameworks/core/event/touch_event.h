@@ -137,7 +137,7 @@ struct StateRecord {
     void Dump(std::unique_ptr<JsonValue>& json) const;
 };
 
-struct GestureSnapshot : public virtual AceType {
+struct GestureSnapshot : public AceType {
     DECLARE_ACE_TYPE(GestureSnapshot, AceType);
 
 public:

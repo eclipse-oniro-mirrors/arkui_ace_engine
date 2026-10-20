@@ -24,11 +24,11 @@ bool ValidateRSNodeInstance(
     return true;
 }
 
-std::shared_ptr<AnimationUtils::InteractiveAnimation> CreateAndStartGroupAnimation(
+AnimationGroupCreateResult CreateAndStartGroupAnimation(
     ArkUIAnimationGroupHandle group, const std::vector<Rosen::RSNode*>& childRawRSNodes,
     int32_t instanceId, const std::string& key, int64_t generation)
 {
-    return nullptr;
+    return { nullptr, ERROR_CODE_PARAM_INVALID };
 }
 
 #endif

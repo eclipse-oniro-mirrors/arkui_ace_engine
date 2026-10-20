@@ -28,7 +28,7 @@
 #include "core/components_ng/pattern/text/text_model.h"
 
 namespace OHOS::Ace::Framework {
-class JSFontSpan : public virtual AceType {
+class JSFontSpan : public AceType {
     DECLARE_ACE_TYPE(JSFontSpan, AceType);
 
 public:
@@ -155,7 +155,7 @@ private:
     JSRef<JSObject> leadingMarginSpanObj_;
 };
 
-class JSDecorationSpan : public virtual AceType {
+class JSDecorationSpan : public AceType {
     DECLARE_ACE_TYPE(JSDecorationSpan, AceType);
 
 public:
@@ -185,7 +185,7 @@ private:
     RefPtr<DecorationSpan> decorationSpan_;
 };
 
-class JSBaselineOffsetSpan : public virtual AceType {
+class JSBaselineOffsetSpan : public AceType {
     DECLARE_ACE_TYPE(JSBaselineOffsetSpan, AceType);
 
 public:
@@ -206,7 +206,7 @@ private:
     RefPtr<BaselineOffsetSpan> baselineOffsetSpan_;
 };
 
-class JSLetterSpacingSpan : public virtual AceType {
+class JSLetterSpacingSpan : public AceType {
     DECLARE_ACE_TYPE(JSLetterSpacingSpan, AceType);
 
 public:
@@ -227,7 +227,7 @@ private:
     RefPtr<LetterSpacingSpan> letterSpacingSpan_;
 };
 
-class JSGestureSpan : public virtual AceType {
+class JSGestureSpan : public AceType {
     DECLARE_ACE_TYPE(JSGestureSpan, AceType);
 
 public:
@@ -246,7 +246,7 @@ private:
     RefPtr<GestureSpan> gestureSpan_;
 };
 
-class JSTextShadowSpan : public virtual AceType {
+class JSTextShadowSpan : public AceType {
     DECLARE_ACE_TYPE(JSTextShadowSpan, AceType);
 
 public:
@@ -266,7 +266,7 @@ private:
     ACE_DISALLOW_COPY_AND_MOVE(JSTextShadowSpan);
     RefPtr<TextShadowSpan> textShadowSpan_;
 };
-class JSBackgroundColorSpan : public virtual AceType {
+class JSBackgroundColorSpan : public AceType {
     DECLARE_ACE_TYPE(JSBackgroundColorSpan, AceType);
 
 public:
@@ -286,7 +286,7 @@ private:
     ACE_DISALLOW_COPY_AND_MOVE(JSBackgroundColorSpan);
     RefPtr<BackgroundColorSpan> backgroundColorSpan_;
 };
-class JSLineHeightSpan : public virtual AceType {
+class JSLineHeightSpan : public AceType {
     DECLARE_ACE_TYPE(JSLineHeightSpan, AceType);
 
 public:
@@ -309,7 +309,7 @@ private:
     RefPtr<LineHeightSpan> lineHeightSpan_;
 };
 
-class JSLineSpacingSpan : public virtual AceType {
+class JSLineSpacingSpan : public AceType {
     DECLARE_ACE_TYPE(JSLineSpacingSpan, AceType);
 
 public:
@@ -333,7 +333,7 @@ private:
     RefPtr<LineSpacingSpan> lineSpacingSpan_;
 };
 
-class JSImageAttachment : public virtual AceType {
+class JSImageAttachment : public AceType {
     DECLARE_ACE_TYPE(JSImageAttachment, AceType);
 
 public:
@@ -359,6 +359,8 @@ public:
     void SetImageColorFilter(const JSCallbackInfo& info) {}
     void GetSupportSvg2(const JSCallbackInfo& info);
     void SetSupportSvg2(const JSCallbackInfo& info) {}
+    void GetImageTag(const JSCallbackInfo& info);
+    void SetImageTag(const JSCallbackInfo& info) {}
     void GetResizable(const JSCallbackInfo& info);
     void SetResizable(const JSCallbackInfo& info) {}
 
@@ -379,7 +381,7 @@ private:
     RefPtr<ImageSpan> imageSpan_;
 };
 
-class JSNativeCustomSpan : public virtual AceType {
+class JSNativeCustomSpan : public AceType {
     DECLARE_ACE_TYPE(JSNativeCustomSpan, AceType);
 
 public:
@@ -423,7 +425,7 @@ private:
     JSWeak<JSObject> customSpanObj_;
 };
 
-class JSNativeLeadingMarginSpan : public virtual AceType {
+class JSNativeLeadingMarginSpan : public AceType {
     DECLARE_ACE_TYPE(JSNativeLeadingMarginSpan, AceType);
 
 public:
@@ -453,7 +455,7 @@ private:
     JSRef<JSObject> extSpanObj_;
 };
 
-class JSUrlSpan : public virtual AceType {
+class JSUrlSpan : public AceType {
     DECLARE_ACE_TYPE(JSUrlSpan, AceType);
 
 public:

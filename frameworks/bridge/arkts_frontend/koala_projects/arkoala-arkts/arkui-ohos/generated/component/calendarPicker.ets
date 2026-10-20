@@ -139,6 +139,18 @@ export class ArkCalendarPickerPeer extends ArkCommonMethodPeer {
         ArkUIGeneratedNativeModule._CalendarPickerAttribute_setMarkToday(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
+    setFirstDayOfWeekAttribute(value: CalendarFirstDayOfWeek | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (value !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueTmpValue = (value as CalendarFirstDayOfWeek)
+            thisSerializer.writeInt32(valueTmpValue.valueOf())
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._CalendarPickerAttribute_setFirstDayOfWeek(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
     setEdgeAlignAttribute(alignType: CalendarAlign | undefined, offset?: Offset): void {
         const thisSerializer: SerializerBase = SerializerBase.hold()
         if (alignType !== undefined) {
@@ -164,6 +176,16 @@ export enum CalendarAlign {
     CENTER = 1,
     END = 2
 }
+export enum CalendarFirstDayOfWeek {
+    LOCAL = 0,
+    MON = 1,
+    TUE = 2,
+    WED = 3,
+    THU = 4,
+    FRI = 5,
+    SAT = 6,
+    SUN = 7
+}
 export interface CalendarOptions {
     hintRadius?: double | global_resource_Resource;
     selected?: Date;
@@ -183,6 +205,9 @@ export interface CalendarPickerAttribute extends CommonMethod {
     }
     markToday(value: boolean | undefined): this {
         throw new Error('Unimplemented method markToday')
+    }
+    firstDayOfWeek(value: CalendarFirstDayOfWeek | undefined): this {
+        throw new Error('Unimplemented method firstDayOfWeek')
     }
     edgeAlign(alignType: CalendarAlign | undefined, offset?: Offset): this {
         throw new Error('Unimplemented method edgeAlign')
@@ -212,6 +237,7 @@ export interface CalendarDialogOptions extends CalendarOptions {
     systemMaterial?: SystemUiMaterial;
     distortionMode?: DistortionMode;
     edgeLightMode?: EdgeLightMode;
+    firstDayOfWeek?: CalendarFirstDayOfWeek;
 }
 
 export class ArkCalendarPickerComponent extends ArkCommonMethodComponent implements CalendarPickerAttribute {
@@ -237,6 +263,11 @@ export class ArkCalendarPickerComponent extends ArkCommonMethodComponent impleme
     public markToday(value: boolean | undefined): this {
         const value_casted = value as (boolean | undefined)
         this.getPeer()?.setMarkTodayAttribute(value_casted)
+        return this
+    }
+    public firstDayOfWeek(value: CalendarFirstDayOfWeek | undefined): this {
+        const value_casted = value as (CalendarFirstDayOfWeek | undefined)
+        this.getPeer()?.setFirstDayOfWeekAttribute(value_casted)
         return this
     }
     public edgeAlign(alignType: CalendarAlign | undefined, offset?: Offset): this {
@@ -640,6 +671,14 @@ export class CalendarDialogOptions_serializer {
         } else {
             valueSerializer.writeInt8(RuntimeType.UNDEFINED)
         }
+        const valueHolderForFirstDayOfWeek = value.firstDayOfWeek
+        if (valueHolderForFirstDayOfWeek !== undefined) {
+            valueSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueHolderForFirstDayOfWeekTmpValue = (valueHolderForFirstDayOfWeek as CalendarFirstDayOfWeek)
+            valueSerializer.writeInt32(valueHolderForFirstDayOfWeekTmpValue.valueOf())
+        } else {
+            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
     }
     public static read(buffer: DeserializerBase): CalendarDialogOptions {
         let valueDeserializer: DeserializerBase = buffer
@@ -921,7 +960,13 @@ export class CalendarDialogOptions_serializer {
             edgeLightModeTmpBuf = EdgeLightMode.fromValue(valueDeserializer.readInt32())
         }
         const edgeLightModeTmpResult: EdgeLightMode | undefined = edgeLightModeTmpBuf
-        let value: CalendarDialogOptions = ({hintRadius: hintRadiusTmpResult, selected: selectedTmpResult, start: startTmpResult, end: endTmpResult, disabledDateRange: disabledDateRangeTmpResult, onAccept: onAcceptTmpResult, onCancel: onCancelTmpResult, onChange: onChangeTmpResult, backgroundColor: backgroundColorTmpResult, backgroundBlurStyle: backgroundBlurStyleTmpResult, backgroundBlurStyleOptions: backgroundBlurStyleOptionsTmpResult, backgroundEffect: backgroundEffectTmpResult, acceptButtonStyle: acceptButtonStyleTmpResult, cancelButtonStyle: cancelButtonStyleTmpResult, onDidAppear: onDidAppearTmpResult, onDidDisappear: onDidDisappearTmpResult, onWillAppear: onWillAppearTmpResult, onWillDisappear: onWillDisappearTmpResult, shadow: shadowTmpResult, enableHoverMode: enableHoverModeTmpResult, hoverModeArea: hoverModeAreaTmpResult, markToday: markTodayTmpResult, systemMaterial: systemMaterialTmpResult, distortionMode: distortionModeTmpResult, edgeLightMode: edgeLightModeTmpResult} as CalendarDialogOptions)
+        const firstDayOfWeekTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
+        let firstDayOfWeekTmpBuf: CalendarFirstDayOfWeek | undefined = undefined
+        if ((firstDayOfWeekTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
+            firstDayOfWeekTmpBuf = CalendarFirstDayOfWeek.fromValue(valueDeserializer.readInt32())
+        }
+        const firstDayOfWeekTmpResult: CalendarFirstDayOfWeek | undefined = firstDayOfWeekTmpBuf
+        let value: CalendarDialogOptions = ({hintRadius: hintRadiusTmpResult, selected: selectedTmpResult, start: startTmpResult, end: endTmpResult, disabledDateRange: disabledDateRangeTmpResult, onAccept: onAcceptTmpResult, onCancel: onCancelTmpResult, onChange: onChangeTmpResult, backgroundColor: backgroundColorTmpResult, backgroundBlurStyle: backgroundBlurStyleTmpResult, backgroundBlurStyleOptions: backgroundBlurStyleOptionsTmpResult, backgroundEffect: backgroundEffectTmpResult, acceptButtonStyle: acceptButtonStyleTmpResult, cancelButtonStyle: cancelButtonStyleTmpResult, onDidAppear: onDidAppearTmpResult, onDidDisappear: onDidDisappearTmpResult, onWillAppear: onWillAppearTmpResult, onWillDisappear: onWillDisappearTmpResult, shadow: shadowTmpResult, enableHoverMode: enableHoverModeTmpResult, hoverModeArea: hoverModeAreaTmpResult, markToday: markTodayTmpResult, systemMaterial: systemMaterialTmpResult, distortionMode: distortionModeTmpResult, edgeLightMode: edgeLightModeTmpResult, firstDayOfWeek: firstDayOfWeekTmpResult} as CalendarDialogOptions)
         return value
     }
 }

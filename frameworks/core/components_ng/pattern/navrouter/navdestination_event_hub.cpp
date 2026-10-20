@@ -123,8 +123,8 @@ void NavDestinationEventHub::FireOnShownEvent(
     if (navigationManager) {
         navigationManager->HandleSequentialRestoreOnShown(navDestination, name);
     }
+#ifndef CROSS_PLATFORM
     pipelineContext->GetMemoryManager()->RebuildImageByPage(navDestination);
-    // AC-6.2/AC-6.4: NavDestination became the new top page. Immediately
     // trigger a page-scene detection cycle so ExitOtherSearchPresence emits a
     // false event for the previous NavDestination (A false before B true).
     // No-op when no search ruleSet is registered.
@@ -135,6 +135,9 @@ void NavDestinationEventHub::FireOnShownEvent(
             contentChangeManager->NotifyPageSceneContentChanged(true);
         }
     }
+#else
+    pipelineContext->GetMemoryManager()->RebuildImageByPage(AceType::DynamicCast<FrameNode>(navDestination));
+#endif
 }
 
 void NavDestinationEventHub::FireOnHiddenEvent(const std::string& name, NavDestVisibilityChangeReason reason)
@@ -182,12 +185,12 @@ void NavDestinationEventHub::FireOnAppear()
         eventHub->state_ = NavDestinationState::ON_APPEAR;
         UIObserverHandler::GetInstance().NotifyNavigationStateChange(eventHub->GetNavDestinationPattern(),
             NavDestinationState::ON_APPEAR);
-        if (eventHub->onAppear_) {
-            auto onAppear = eventHub->onAppear_;
+        auto onAppear = eventHub->GetOnAppear();
+        if (onAppear) {
             onAppear();
         }
-        if (eventHub->onJSFrameNodeAppear_) {
-            auto onJSFrameNodeAppear = eventHub->onJSFrameNodeAppear_;
+        auto onJSFrameNodeAppear = eventHub->GetOnJSFrameNodeAppear();
+        if (onJSFrameNodeAppear) {
             onJSFrameNodeAppear();
         }
     };

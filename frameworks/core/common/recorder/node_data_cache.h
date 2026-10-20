@@ -18,6 +18,7 @@
 
 #include <list>
 #include <memory>
+#include <atomic>
 #include <shared_mutex>
 #include <string>
 #include <unordered_map>
@@ -87,6 +88,7 @@ public:
 
     bool IsShareNodeEmpty() const
     {
+        std::shared_lock<std::shared_mutex> configLock(configMutex_);
         return mergedConfig_->shareNodes.empty();
     }
 
@@ -100,7 +102,7 @@ private:
 
     std::shared_ptr<MergedConfig> mergedConfig_;
 
-    std::shared_mutex configMutex_;
+    mutable std::shared_mutex configMutex_;
 
     std::shared_mutex cacheMutex_;
 
@@ -108,7 +110,7 @@ private:
 
     std::string prePageUrl_;
 
-    bool shouldCollectFull_ = true;
+    std::atomic<bool> shouldCollectFull_ = true;
 
     ACE_DISALLOW_COPY_AND_MOVE(NodeDataCache);
 };

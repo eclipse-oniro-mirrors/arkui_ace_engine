@@ -659,8 +659,6 @@ ArkUINativeModuleValue GridRowBridge::SetOnBreakpointChange(ArkUIRuntimeCallInfo
         if (isJsView) {
             JAVASCRIPT_EXECUTION_SCOPE_WITH_CHECK(execCtx);
             ACE_SCORING_EVENT("GridRow.onBreakpointChange");
-            invokeCallback();
-            return;
         }
         panda::LocalScope pandaScope(vm);
         invokeCallback();

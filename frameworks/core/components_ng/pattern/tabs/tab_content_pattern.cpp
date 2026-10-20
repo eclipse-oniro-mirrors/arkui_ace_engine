@@ -54,7 +54,7 @@ void TabContentPattern::OnModifyDone()
     auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
     CHECK_NULL_VOID(tabsPattern);
     auto activeDisplayMode = tabsPattern->GetActiveBarDisplayMode();
-    bool shouldHide = tabsPattern->IsTabShouldHideByVisibility(defaultVisibility);
+    bool shouldHide = defaultVisibility.ShouldHide(activeDisplayMode);
     if (activeDisplayMode == TabBarDisplayMode::BOTTOMTABBAR) {
         // Bottom tab bar is currently visible — update this tab's columnNode directly
         if (!tabContentNode->HasTabBarItemId()) {

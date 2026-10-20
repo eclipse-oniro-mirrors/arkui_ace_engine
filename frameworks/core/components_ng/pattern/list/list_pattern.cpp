@@ -480,7 +480,7 @@ bool ListPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, c
     DrivenRender(dirty);
 
     ChangeAnimateOverScroll();
-    SetScrollSource(SCROLL_FROM_NONE);
+    SetScrollSourceLayout(SCROLL_FROM_NONE);
     ResetAccessibilityScrollSourceIfIdle();
     MarkSelectedItems();
     UpdateListDirectionInCardStyle();
@@ -1652,14 +1652,12 @@ bool ListPattern::OnKeyEvent(const KeyEvent& event)
         ScrollPage(true);
         return true;
     }
-    if (FocusHub::IsFocusStepKey(event.code)) {
-        return ScrollToLastFocusIndex(event);
+    if (FocusHub::IsFocusStepKey(event.code) && ScrollToLastFocusIndex(event)) {
+        return true;
     }
-    return HandleDirectionKey(event);
-}
-
-bool ListPattern::HandleDirectionKey(const KeyEvent& event)
-{
+    if (HandleArrowKeyScroll(event)) {
+        return true;
+    }
     return false;
 }
 
@@ -2152,6 +2150,8 @@ void ListPattern::ScrollToIndex(int32_t index, bool smooth, ScrollAlign align, s
         smooth_ = smooth;
         if (smooth_) {
             SetExtraOffset(extraOffset);
+            // Smooth animation scrolling: updates only the session-level query state (FLING semantics)
+            SetScrollSourceForQuery(SCROLL_FROM_ANIMATION_SPRING);
             if (!AnimateToTarget(index, std::nullopt, align)) {
                 targetIndex_ = index;
                 scrollAlign_ = align;

@@ -1572,39 +1572,291 @@ HWTEST_F(WebPatternWebTest, HandleKeyEvent_004, TestSize.Level1)
 #endif
 }
 
+
+#ifdef OHOS_STANDARD_SYSTEM
+namespace {
+RefPtr<FrameNode> CreateWebFrameNodeForEscBackTest()
+{
+    auto* stack = ViewStackProcessor::GetInstance();
+    if (stack == nullptr) {
+        return nullptr;
+    }
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    if (frameNode == nullptr) {
+        return nullptr;
+    }
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    if (webPattern != nullptr) {
+        webPattern->OnModifyDone();
+    }
+    return frameNode;
+}
+} // namespace
+#endif
+
+class MockFullScreenExitHandler : public FullScreenExitHandler {
+    DECLARE_ACE_TYPE(MockFullScreenExitHandler, FullScreenExitHandler);
+
+public:
+    void ExitFullScreen() override
+    {
+        isExitFullScreenCalled_ = true;
+    }
+
+    bool isExitFullScreenCalled_ = false;
+};
+
 /**
  * @tc.name: HandleEscToBackSupport_001
- * @tc.desc: HandleEscToBackSupport.
+ * @tc.desc: HandleEscToBackSupport when web is in full screen, the exit handler should be invoked.
  * @tc.type: FUNC
  */
 HWTEST_F(WebPatternWebTest, HandleEscToBackSupport_001, TestSize.Level1)
 {
 #ifdef OHOS_STANDARD_SYSTEM
-    auto* stack = ViewStackProcessor::GetInstance();
-    ASSERT_NE(stack, nullptr);
-    auto nodeId = stack->ClaimNodeId();
-    auto frameNode =
-        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    auto frameNode = CreateWebFrameNodeForEscBackTest();
     ASSERT_NE(frameNode, nullptr);
-    stack->Push(frameNode);
-    auto pipelineContext = MockPipelineContext::GetCurrent();
     auto webPattern = frameNode->GetPattern<WebPattern>();
     ASSERT_NE(webPattern, nullptr);
-    webPattern->OnModifyDone();
-    ASSERT_NE(webPattern, nullptr);
-    auto webEventhub = frameNode->GetEventHub<WebEventHub>();
-    webEventhub->SetOnPreKeyEvent([](KeyEventInfo& keyEventInfo) {
-        std::cout << "onPrekeyevent" << std::endl;
-        return false;
-    });
-    std::vector<KeyCode> code;
-    code.push_back(KeyCode::KEY_ESCAPE);
-    std::vector<uint8_t> enhanceData;
-    enhanceData.push_back(100);
-    TimeStamp timeStamp;
-    KeyEvent keuEvent(KeyCode::KEY_ESCAPE, KeyAction::UP, code, 1, timeStamp, 1, 1, SourceType::KEYBOARD, enhanceData);
+
+    auto exitHandler = AceType::MakeRefPtr<MockFullScreenExitHandler>();
+    ASSERT_NE(exitHandler, nullptr);
+    webPattern->isFullScreen_ = true;
+    webPattern->SetFullScreenExitHandler(std::make_shared<FullScreenEnterEvent>(exitHandler, 0, 0));
+
+    auto pipelineContext = MockPipelineContext::GetCurrent();
+    ASSERT_NE(pipelineContext, nullptr);
     bool flag = webPattern->HandleEscToBackSupport(Referenced::RawPtr(pipelineContext));
     EXPECT_TRUE(flag);
+    EXPECT_TRUE(exitHandler->isExitFullScreenCalled_);
+#endif
+}
+
+/**
+ * @tc.name: HandleEscToBackSupport_002
+ * @tc.desc: HandleEscToBackSupport in full screen but without exit handler, it falls through to window manager.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternWebTest, HandleEscToBackSupport_002, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto frameNode = CreateWebFrameNodeForEscBackTest();
+    ASSERT_NE(frameNode, nullptr);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+
+    // In full screen but no exit handler registered, and no delegate for backward.
+    webPattern->isFullScreen_ = true;
+    webPattern->fullScreenExitHandler_ = nullptr;
+    webPattern->delegate_ = nullptr;
+    // Keep the soft keyboard branch out of the way so the flow reaches the window manager branch.
+    webPattern->isVirtualKeyBoardShow_ = WebPattern::VkState::VK_HIDE;
+    webPattern->isImeStatus_ = WebPattern::VkState::VK_HIDE;
+
+    auto pipelineContext = MockPipelineContext::GetCurrent();
+    ASSERT_NE(pipelineContext, nullptr);
+    // Mock environment dependencies of this case:
+    // 1. PipelineContext::OnBackPressed() returns false because MockPipelineContext::SetUp() attaches no
+    //    frontend, so the flow falls through the pipeline branch.
+    // 2. MockPipelineContext::SetUp() creates a WindowManager whose WindowPerformBack() is a no-op
+    //    (no windowPerformBackCallback_ registered), so the window manager branch returns true safely.
+    ASSERT_NE(pipelineContext->GetWindowManager(), nullptr);
+    bool flag = webPattern->HandleEscToBackSupport(Referenced::RawPtr(pipelineContext));
+    // Falls through to the WindowManager branch and returns true.
+    EXPECT_TRUE(flag);
+#endif
+}
+
+/**
+ * @tc.name: IsShouldTriggerBack_001
+ * @tc.desc: IsShouldTriggerBack with ESC DOWN, the down consumed state should be recorded.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternWebTest, IsShouldTriggerBack_001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto frameNode = CreateWebFrameNodeForEscBackTest();
+    ASSERT_NE(frameNode, nullptr);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->isEscKeyDownConsumed_ = false;
+
+    // ESC DOWN consumed by the web page.
+    EXPECT_FALSE(webPattern->IsShouldTriggerBack(KeyEvent(KeyCode::KEY_ESCAPE, KeyAction::DOWN), true));
+    EXPECT_TRUE(webPattern->isEscKeyDownConsumed_);
+
+    // ESC DOWN not consumed by the web page.
+    EXPECT_FALSE(webPattern->IsShouldTriggerBack(KeyEvent(KeyCode::KEY_ESCAPE, KeyAction::DOWN), false));
+    EXPECT_FALSE(webPattern->isEscKeyDownConsumed_);
+#endif
+}
+
+/**
+ * @tc.name: IsShouldTriggerBack_002
+ * @tc.desc: IsShouldTriggerBack with ESC DOWN not consumed and ESC UP not used, back should be triggered.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternWebTest, IsShouldTriggerBack_002, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto frameNode = CreateWebFrameNodeForEscBackTest();
+    ASSERT_NE(frameNode, nullptr);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->isEscKeyDownConsumed_ = false;
+
+    EXPECT_FALSE(webPattern->IsShouldTriggerBack(KeyEvent(KeyCode::KEY_ESCAPE, KeyAction::DOWN), false));
+    EXPECT_TRUE(webPattern->IsShouldTriggerBack(KeyEvent(KeyCode::KEY_ESCAPE, KeyAction::UP), false));
+    EXPECT_TRUE(webPattern->isEscKeyDownConsumed_);
+#endif
+}
+
+/**
+ * @tc.name: IsShouldTriggerBack_003
+ * @tc.desc: IsShouldTriggerBack with ESC UP used by the web page, back should not be triggered.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternWebTest, IsShouldTriggerBack_003, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto frameNode = CreateWebFrameNodeForEscBackTest();
+    ASSERT_NE(frameNode, nullptr);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->isEscKeyDownConsumed_ = false;
+
+    EXPECT_FALSE(webPattern->IsShouldTriggerBack(KeyEvent(KeyCode::KEY_ESCAPE, KeyAction::UP), true));
+    EXPECT_TRUE(webPattern->isEscKeyDownConsumed_);
+#endif
+}
+
+/**
+ * @tc.name: IsShouldTriggerBack_004
+ * @tc.desc: IsShouldTriggerBack with ESC DOWN consumed, the following ESC UP should not trigger back.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternWebTest, IsShouldTriggerBack_004, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto frameNode = CreateWebFrameNodeForEscBackTest();
+    ASSERT_NE(frameNode, nullptr);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->isEscKeyDownConsumed_ = false;
+
+    EXPECT_FALSE(webPattern->IsShouldTriggerBack(KeyEvent(KeyCode::KEY_ESCAPE, KeyAction::DOWN), true));
+    EXPECT_TRUE(webPattern->isEscKeyDownConsumed_);
+    EXPECT_FALSE(webPattern->IsShouldTriggerBack(KeyEvent(KeyCode::KEY_ESCAPE, KeyAction::UP), false));
+#endif
+}
+
+/**
+ * @tc.name: IsShouldTriggerBack_005
+ * @tc.desc: IsShouldTriggerBack with ESC coming from the overlay layer, back should not be triggered.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternWebTest, IsShouldTriggerBack_005, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto frameNode = CreateWebFrameNodeForEscBackTest();
+    ASSERT_NE(frameNode, nullptr);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->isEscKeyDownConsumed_ = false;
+    webPattern->isEscKeyFromOverlayOrFullScreen_ = true;
+
+    EXPECT_FALSE(webPattern->IsShouldTriggerBack(KeyEvent(KeyCode::KEY_ESCAPE, KeyAction::UP), false));
+    // The overlay layer flag should be reset after the first ESC UP.
+    EXPECT_FALSE(webPattern->isEscKeyFromOverlayOrFullScreen_);
+    EXPECT_TRUE(webPattern->isEscKeyDownConsumed_);
+#endif
+}
+
+/**
+ * @tc.name: IsShouldTriggerBack_006
+ * @tc.desc: IsShouldTriggerBack with a non ESC key, back should never be triggered.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternWebTest, IsShouldTriggerBack_006, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto frameNode = CreateWebFrameNodeForEscBackTest();
+    ASSERT_NE(frameNode, nullptr);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->isEscKeyDownConsumed_ = false;
+
+    EXPECT_FALSE(webPattern->IsShouldTriggerBack(KeyEvent(KeyCode::KEY_HOME, KeyAction::DOWN), true));
+    EXPECT_FALSE(webPattern->isEscKeyDownConsumed_);
+    EXPECT_FALSE(webPattern->IsShouldTriggerBack(KeyEvent(KeyCode::KEY_HOME, KeyAction::UP), false));
+    EXPECT_FALSE(webPattern->isEscKeyDownConsumed_);
+#endif
+}
+
+/**
+ * @tc.name: IsShouldTriggerBack_007
+ * @tc.desc: IsShouldTriggerBack with consecutive ESC UP, back should be triggered only once.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternWebTest, IsShouldTriggerBack_007, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto frameNode = CreateWebFrameNodeForEscBackTest();
+    ASSERT_NE(frameNode, nullptr);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->isEscKeyDownConsumed_ = false;
+
+    EXPECT_TRUE(webPattern->IsShouldTriggerBack(KeyEvent(KeyCode::KEY_ESCAPE, KeyAction::UP), false));
+    EXPECT_TRUE(webPattern->isEscKeyDownConsumed_);
+    EXPECT_FALSE(webPattern->IsShouldTriggerBack(KeyEvent(KeyCode::KEY_ESCAPE, KeyAction::UP), false));
+#endif
+}
+
+/**
+ * @tc.name: OnShowAutofillPopupV2EscFlag_001
+ * @tc.desc: OnShowAutofillPopupV2 should mark the ESC key as coming from the overlay layer, so the following
+ *           ESC UP closes the popup instead of triggering back.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternWebTest, OnShowAutofillPopupV2EscFlag_001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto frameNode = CreateWebFrameNodeForEscBackTest();
+    ASSERT_NE(frameNode, nullptr);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->isEscKeyFromOverlayOrFullScreen_ = false;
+
+    std::vector<std::string> menuItems = { "autofill_item" };
+    webPattern->OnShowAutofillPopupV2(0.0f, 0.0f, 10.0f, 10.0f, menuItems);
+    // The popup is shown as an overlay, the next ESC key should only close it.
+    EXPECT_TRUE(webPattern->isEscKeyFromOverlayOrFullScreen_);
+#endif
+}
+
+/**
+ * @tc.name: CreateDataListFrameNodeEscFlag_001
+ * @tc.desc: CreateDataListFrameNode should not mark the ESC key as coming from the overlay layer anymore, only
+ *           OnShowAutofillPopupV2 does after the popup is actually shown.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternWebTest, CreateDataListFrameNodeEscFlag_001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto frameNode = CreateWebFrameNodeForEscBackTest();
+    ASSERT_NE(frameNode, nullptr);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->isEscKeyFromOverlayOrFullScreen_ = false;
+
+    auto dataListNode = webPattern->CreateDataListFrameNode(OffsetF(0.0f, 0.0f), 10.0f, 10.0f);
+    ASSERT_NE(dataListNode, nullptr);
+    // The flag is now set in OnShowAutofillPopupV2 instead of here.
+    EXPECT_FALSE(webPattern->isEscKeyFromOverlayOrFullScreen_);
 #endif
 }
 
@@ -1734,6 +1986,62 @@ HWTEST_F(WebPatternWebTest, OnForceEnableZoomUpdate, TestSize.Level1)
     OHOS::ArkWeb::setActiveWebEngineVersion(OHOS::ArkWeb::ArkWebEngineVersion::M132);
     webPattern->delegate_ = nullptr;
     webPattern->OnForceEnableZoomUpdate(value);
+#endif
+}
+
+/**
+ * @tc.name: OnFlingSpeedLimitUpdate
+ * @tc.desc: OnFlingSpeedLimitUpdate callback routes to delegate_->SetFlingSpeedLimit.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternWebTest, OnFlingSpeedLimitUpdate, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+    float speedLimit = 5000.0f;
+    OHOS::ArkWeb::setActiveWebEngineVersion(OHOS::ArkWeb::ArkWebEngineVersion::M132);
+    webPattern->OnFlingSpeedLimitUpdate(speedLimit);
+    OHOS::ArkWeb::setActiveWebEngineVersion(OHOS::ArkWeb::ArkWebEngineVersion::M114);
+    webPattern->OnFlingSpeedLimitUpdate(speedLimit);
+    OHOS::ArkWeb::setActiveWebEngineVersion(OHOS::ArkWeb::ArkWebEngineVersion::M132);
+    webPattern->delegate_ = nullptr;
+    webPattern->OnFlingSpeedLimitUpdate(speedLimit);
+#endif
+}
+
+/**
+ * @tc.name: OnFlingSpeedLimitUpdate002
+ * @tc.desc: OnFlingSpeedLimitUpdate with invalid values (0, negative) does not crash.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternWebTest, OnFlingSpeedLimitUpdate002, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+    OHOS::ArkWeb::setActiveWebEngineVersion(OHOS::ArkWeb::ArkWebEngineVersion::M132);
+    EXPECT_NO_FATAL_FAILURE(webPattern->OnFlingSpeedLimitUpdate(0.0f));
+    EXPECT_NO_FATAL_FAILURE(webPattern->OnFlingSpeedLimitUpdate(-1.0f));
+    EXPECT_NO_FATAL_FAILURE(webPattern->OnFlingSpeedLimitUpdate(-9999.0f));
 #endif
 }
 

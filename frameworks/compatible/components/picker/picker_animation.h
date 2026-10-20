@@ -24,7 +24,7 @@
 
 namespace OHOS::Ace {
 
-class PickerAnimation : public virtual AceType {
+class PickerAnimation : public AceType {
     DECLARE_ACE_TYPE(PickerAnimation, AceType);
 
 public:

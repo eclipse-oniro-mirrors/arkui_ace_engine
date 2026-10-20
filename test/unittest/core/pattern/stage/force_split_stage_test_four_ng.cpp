@@ -37,6 +37,7 @@
 #include "core/components_ng/manager/force_split/force_split_manager.h"
 #include "core/components_ng/pattern/stage/page_info.h"
 #include "core/components_ng/pattern/stage/page_pattern.h"
+#include "core/event/touch_event.h"
 
 #include "core/components_ng/pattern/stage/force_split/parallel_page_pattern.h"
 #include "core/components_ng/pattern/stage/force_split/parallel_stage_layout_algorithm.h"
@@ -500,6 +501,81 @@ HWTEST_F(ParallelStageTestFourNg, UpdateSecondaryPageNeedRemoved_FalseWithNullop
     auto count = stageManager->UpdateSecondaryPageNeedRemoved(false);
     EXPECT_EQ(count, 0);
     EXPECT_FALSE(stageManager->GetHomePageTouched().has_value());
+}
+
+/**
+ * @tc.name: ParallelStagePattern_HandleTouchEvent_EmptyTouchesNoCrash001
+ * @tc.desc: Test HandleTouchEvent with an empty touches list (e.g. a postTouchEvent-injected
+ *           event without the "touches" field) returns early instead of dereferencing
+ *           GetTouches().front() on an empty list.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ParallelStageTestFourNg, ParallelStagePattern_HandleTouchEvent_EmptyTouchesNoCrash001, TestSize.Level1)
+{
+    auto stagePattern = AceType::MakeRefPtr<ParallelStagePattern>();
+    auto stageNode = FrameNode::CreateFrameNode(
+        V2::STAGE_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), stagePattern);
+    ASSERT_NE(stageNode, nullptr);
+
+    TouchEventInfo info("onTouch");
+    EXPECT_TRUE(info.GetTouches().empty());
+
+    stagePattern->HandleTouchEvent(info);
+
+    EXPECT_EQ(stagePattern->GetDragBarNode(), nullptr);
+}
+
+/**
+ * @tc.name: ParallelStagePattern_HandleTouchEvent_EmptyTouchesWithChangedTouchesNoCrash001
+ * @tc.desc: Test HandleTouchEvent with empty touches but non-empty changedTouches, which is
+ *           the real shape of an injected event whose "touches" field is missing: RawRecognizer
+ *           fills touches_ only from TouchEvent::pointers, so it can stay empty while
+ *           changedTouches is not.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ParallelStageTestFourNg, ParallelStagePattern_HandleTouchEvent_EmptyTouchesWithChangedTouchesNoCrash001,
+    TestSize.Level1)
+{
+    auto stagePattern = AceType::MakeRefPtr<ParallelStagePattern>();
+    auto stageNode = FrameNode::CreateFrameNode(
+        V2::STAGE_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), stagePattern);
+    ASSERT_NE(stageNode, nullptr);
+
+    TouchEventInfo info("onTouch");
+    TouchLocationInfo changedInfo("onTouch", 0);
+    changedInfo.SetTouchType(TouchType::CANCEL);
+    info.AddChangedTouchLocationInfo(std::move(changedInfo));
+    EXPECT_TRUE(info.GetTouches().empty());
+    EXPECT_FALSE(info.GetChangedTouches().empty());
+
+    stagePattern->HandleTouchEvent(info);
+
+    EXPECT_EQ(stagePattern->GetDragBarNode(), nullptr);
+}
+
+/**
+ * @tc.name: ParallelStagePattern_HandleTouchEvent_DownTouchStillHandled001
+ * @tc.desc: Test HandleTouchEvent with a non-empty touches list still enters the DOWN branch,
+ *           the empty-touches guard must not swallow valid events.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ParallelStageTestFourNg, ParallelStagePattern_HandleTouchEvent_DownTouchStillHandled001, TestSize.Level1)
+{
+    auto stagePattern = AceType::MakeRefPtr<ParallelStagePattern>();
+    auto stageNode = FrameNode::CreateFrameNode(
+        V2::STAGE_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), stagePattern);
+    ASSERT_NE(stageNode, nullptr);
+
+    TouchEventInfo info("onTouch");
+    TouchLocationInfo touchInfo("onTouch", 0);
+    touchInfo.SetTouchType(TouchType::DOWN);
+    info.AddTouchLocationInfo(std::move(touchInfo));
+    EXPECT_FALSE(info.GetTouches().empty());
+
+    stagePattern->HandleTouchEvent(info);
+
+    // The DOWN branch executed and created the drag bar node.
+    EXPECT_NE(stagePattern->GetDragBarNode(), nullptr);
 }
 
 } // namespace OHOS::Ace::NG

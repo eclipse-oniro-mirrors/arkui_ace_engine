@@ -15,6 +15,7 @@
 
 #include "core/common/container.h"
 #include "arkoala_api_generated.h"
+#include "base/utils/string_utils.h"
 
 #include "core/components_ng/base/frame_node.h"
 #include "core/components/image/image_component.h"
@@ -97,6 +98,10 @@ RefPtr<ImageSpan> Convert(const Ark_ImageAttachmentInterface& value)
         imageStyle.drawingColorFilter = std::nullopt;
     }
     imageOptions.imageAttribute = imageStyle;
+    auto imageTagOpt = Converter::OptConvert<std::string>(value.imageTag);
+    if (imageTagOpt.has_value()) {
+        imageOptions.imageTag = StringUtils::Str8ToStr16(imageTagOpt.value());
+    }
     return AceType::MakeRefPtr<ImageSpan>(imageOptions);
 }
 
@@ -136,6 +141,10 @@ RefPtr<ImageSpan> Convert(const Ark_ResourceImageAttachmentOptions& value)
         imageStyle.drawingColorFilter = std::nullopt;
     }
     imageOptions.imageAttribute = imageStyle;
+    auto imageTagOpt = Converter::OptConvert<std::string>(value.imageTag);
+    if (imageTagOpt.has_value()) {
+        imageOptions.imageTag = StringUtils::Str8ToStr16(imageTagOpt.value());
+    }
     return AceType::MakeRefPtr<ImageSpan>(imageOptions);
 }
 
@@ -247,6 +256,15 @@ Opt_String GetResourceValueImpl(Ark_ImageAttachment peer)
     CHECK_NULL_RETURN(image, invalid);
     return Converter::ArkValue<Opt_String>(image.value());
 }
+Opt_String GetImageTagValueImpl(Ark_ImageAttachment peer)
+{
+    auto invalid = Converter::ArkValue<Opt_String>();
+    CHECK_NULL_RETURN(peer && peer->span, invalid);
+    auto imageTag = peer->span->GetImageSpanOptions().imageTag;
+    CHECK_NULL_RETURN(imageTag, invalid);
+    auto imageTagStr = StringUtils::Str16ToStr8(imageTag.value());
+    return Converter::ArkValue<Opt_String>(imageTagStr, Converter::FC);
+}
 Opt_SizeOptions GetSizeImpl(Ark_ImageAttachment peer)
 {
     auto invalid = Converter::ArkValue<Opt_SizeOptions>();
@@ -338,6 +356,7 @@ const GENERATED_ArkUIImageAttachmentAccessor* GetImageAttachmentAccessor()
         ImageAttachmentAccessor::GetColorFilterImpl,
         ImageAttachmentAccessor::GetSupportSvg2Impl,
         ImageAttachmentAccessor::GetSizeInVpImpl,
+        ImageAttachmentAccessor::GetImageTagValueImpl,
     };
     return &ImageAttachmentAccessorImpl;
 }

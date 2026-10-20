@@ -58,6 +58,9 @@ public:
     MOCK_METHOD(int, GetMediaType, (), (const, override));
     MOCK_METHOD(int, GetInputFieldType, (), (const, override));
     MOCK_METHOD(std::string, GetSelectionText, (), (const, override));
+    MOCK_METHOD(bool, ShouldOfferLinkToText, (), (const, override));
+    MOCK_METHOD(bool, IsOverTextFragment, (), (const, override));
+    MOCK_METHOD(std::string, GetTextFragmentGeneratedLink, (), (const, override));
 };
 
 class ContextMenuResultShow : public ContextMenuResult {
@@ -77,6 +80,8 @@ public:
     MOCK_METHOD(void, Redo, (), (const, override));
     MOCK_METHOD(void, PasteAndMatchStyle, (), (const, override));
     MOCK_METHOD(void, RequestPasswordAutoFill, (), (const, override));
+    MOCK_METHOD(void, CopyLinkToTextMenu, (), (const, override));
+    MOCK_METHOD(void, RemoveFragments, (), (const, override));
 };
 class WebPatternTestNgSupplement : public testing::Test {
 public:

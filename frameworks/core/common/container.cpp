@@ -27,6 +27,7 @@
 #include "core/common/ace_engine.h"
 #include "core/common/container.h"
 #include "core/common/container_handler.h"
+#include "core/common/ui_observer/ui_observer_store.h"
 #ifdef PLUGIN_COMPONENT_SUPPORTED
 #include "core/common/plugin_manager.h"
 #endif
@@ -40,6 +41,26 @@ namespace OHOS::Ace {
 Container::Container() : state_(FrontendState::UNDEFINE) {}
 
 Container::~Container() = default;
+
+std::shared_ptr<UIObserverStore> Container::GetUIObserverStore(bool create)
+{
+    if (uiObserverStoreClosed_) {
+        return nullptr;
+    }
+    if (!uiObserverStore_ && create) {
+        uiObserverStore_ = std::make_shared<UIObserverStore>();
+    }
+    return uiObserverStore_;
+}
+
+void Container::ClearUIObserverStore()
+{
+    uiObserverStoreClosed_ = true;
+    if (uiObserverStore_) {
+        uiObserverStore_->Close();
+        uiObserverStore_.reset();
+    }
+}
 
 void Container::SetAppBar(const RefPtr<NG::AppBarView>& appBar)
 {

@@ -40,6 +40,15 @@ namespace {
     constexpr uint8_t ARGC_TWO = 2;
     const CalcDimension SECURITY_UEC_MIN_WIDTH(10.0f, DimensionUnit::VP);
     const CalcDimension SECURITY_UEC_MIN_HEIGHT(10.0f, DimensionUnit::VP);
+
+    void ParseDpiFollowStrategyOption(const JSRef<JSObject>& obj, NG::UIExtensionConfig& config)
+    {
+        JSRef<JSVal> enableDensityDPI = obj->GetProperty("dpiFollowStrategy");
+        if (enableDensityDPI->IsNumber()) {
+            config.dpiFollowStrategy = NG::ParseDpiFollowStrategy(enableDensityDPI->ToNumber<int32_t>());
+            config.isDpiFollowStrategySet = true;
+        }
+    }
 }
 void JSSecurityUIExtensionProxy::JSBind(BindingTarget globalObj)
 {
@@ -431,10 +440,7 @@ void JSSecurityUIExtension::Create(const JSCallbackInfo& info)
         if (transferringCallerValue->IsBoolean()) {
             config.transferringCaller = transferringCallerValue->ToBoolean();
         }
-        JSRef<JSVal> enableDensityDPI = obj->GetProperty("dpiFollowStrategy");
-        if (enableDensityDPI->IsNumber()) {
-            config.dpiFollowStrategy = NG::ParseDpiFollowStrategy(enableDensityDPI->ToNumber<int32_t>());
-        }
+        ParseDpiFollowStrategyOption(obj, config);
         do {
             JSRef<JSVal> componentContent = obj->GetProperty("placeholder");
             if (!componentContent->IsObject()) {
@@ -658,10 +664,7 @@ void JSPreviewUIExtension::Create(const JSCallbackInfo& info)
         if (transferringCallerValue->IsBoolean()) {
             config.transferringCaller = transferringCallerValue->ToBoolean();
         }
-        JSRef<JSVal> enableDensityDPI = obj->GetProperty("dpiFollowStrategy");
-        if (enableDensityDPI->IsNumber()) {
-            config.dpiFollowStrategy = NG::ParseDpiFollowStrategy(enableDensityDPI->ToNumber<int32_t>());
-        }
+        ParseDpiFollowStrategyOption(obj, config);
         do {
             JSRef<JSVal> componentContent = obj->GetProperty("placeholder");
             if (!componentContent->IsObject()) {

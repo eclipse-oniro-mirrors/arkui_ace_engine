@@ -17,6 +17,7 @@
 #include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_utils_bridge.h"
 #include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_utils.h"
 #include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/base/view_abstract.h"
 #include "core/components_ng/base/view_stack_processor.h"
 #include "core/components_ng/pattern/checkbox/checkbox_model_ng.h"
 #include "core/pipeline_ng/pipeline_context.h"
@@ -285,6 +286,22 @@ ArkUINativeModuleValue CheckboxBridge::SetUnSelectedColor(ArkUIRuntimeCallInfo* 
     return panda::JSValueRef::Undefined(vm);
 }
 
+static bool TryApplyLayoutPolicy(
+    EcmaVM* vm, ArkUINodeHandle nativeNode, const Local<JSValueRef>& jsValue, bool isWidth)
+{
+    if (jsValue.IsEmpty() || !jsValue->IsObject(vm)) {
+        return false;
+    }
+    auto obj = jsValue->ToObject(vm);
+    auto layoutPolicy = obj->Get(vm, panda::StringRef::NewFromUtf8(vm, "id_"));
+    if (!layoutPolicy->IsString(vm)) {
+        return false;
+    }
+    auto policy = CommonBridge::ParseLayoutPolicy(layoutPolicy->ToString(vm)->ToString(vm));
+    ViewAbstract::UpdateLayoutPolicyProperty(reinterpret_cast<FrameNode*>(nativeNode), policy, isWidth);
+    return true;
+}
+
 ArkUINativeModuleValue CheckboxBridge::SetCheckboxWidth(ArkUIRuntimeCallInfo* runtimeCallInfo)
 {
     EcmaVM* vm = runtimeCallInfo->GetVM();
@@ -295,12 +312,16 @@ ArkUINativeModuleValue CheckboxBridge::SetCheckboxWidth(ArkUIRuntimeCallInfo* ru
 
     CalcDimension width;
     if (!ArkTSUtils::ParseJsDimensionVp(vm, jsValue, width)) {
-        GetArkUINodeModifiers()->getCheckboxModifier()->resetCheckboxWidth(nativeNode);
+        if (!TryApplyLayoutPolicy(vm, nativeNode, jsValue, true)) {
+            GetArkUINodeModifiers()->getCheckboxModifier()->resetCheckboxWidth(nativeNode);
+            ViewAbstract::ResetLayoutPolicyProperty(reinterpret_cast<FrameNode*>(nativeNode), true);
+        }
         return panda::JSValueRef::Undefined(vm);
     }
 
     GetArkUINodeModifiers()->getCheckboxModifier()->setCheckboxWidth(
         nativeNode, width.Value(), static_cast<int>(width.Unit()));
+    ViewAbstract::ResetLayoutPolicyProperty(reinterpret_cast<FrameNode*>(nativeNode), true);
     return panda::JSValueRef::Undefined(vm);
 }
 
@@ -314,11 +335,15 @@ ArkUINativeModuleValue CheckboxBridge::SetCheckboxHeight(ArkUIRuntimeCallInfo* r
 
     CalcDimension height;
     if (!ArkTSUtils::ParseJsDimensionVp(vm, jsValue, height)) {
-        GetArkUINodeModifiers()->getCheckboxModifier()->resetCheckboxHeight(nativeNode);
+        if (!TryApplyLayoutPolicy(vm, nativeNode, jsValue, false)) {
+            GetArkUINodeModifiers()->getCheckboxModifier()->resetCheckboxHeight(nativeNode);
+            ViewAbstract::ResetLayoutPolicyProperty(reinterpret_cast<FrameNode*>(nativeNode), false);
+        }
         return panda::JSValueRef::Undefined(vm);
     }
     GetArkUINodeModifiers()->getCheckboxModifier()->setCheckboxHeight(
         nativeNode, height.Value(), static_cast<int>(height.Unit()));
+    ViewAbstract::ResetLayoutPolicyProperty(reinterpret_cast<FrameNode*>(nativeNode), false);
     return panda::JSValueRef::Undefined(vm);
 }
 
@@ -369,6 +394,7 @@ ArkUINativeModuleValue CheckboxBridge::ResetCheckboxWidth(ArkUIRuntimeCallInfo* 
     Local<JSValueRef> nodeArg = runtimeCallInfo->GetCallArgRef(0);
     auto nativeNode = nodePtr(nodeArg->ToNativePointer(vm)->Value());
     GetArkUINodeModifiers()->getCheckboxModifier()->resetCheckboxWidth(nativeNode);
+    ViewAbstract::ResetLayoutPolicyProperty(reinterpret_cast<FrameNode*>(nativeNode), true);
     return panda::JSValueRef::Undefined(vm);
 }
 
@@ -379,6 +405,7 @@ ArkUINativeModuleValue CheckboxBridge::ResetCheckboxHeight(ArkUIRuntimeCallInfo*
     Local<JSValueRef> nodeArg = runtimeCallInfo->GetCallArgRef(0);
     auto nativeNode = nodePtr(nodeArg->ToNativePointer(vm)->Value());
     GetArkUINodeModifiers()->getCheckboxModifier()->resetCheckboxHeight(nativeNode);
+    ViewAbstract::ResetLayoutPolicyProperty(reinterpret_cast<FrameNode*>(nativeNode), false);
     return panda::JSValueRef::Undefined(vm);
 }
 

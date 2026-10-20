@@ -21,7 +21,10 @@ UIObserver（无感监听）是 ArkUI 引擎的 UI 生命周期和状态变化�
 | NodeRenderStatusMonitor | `frameworks/core/components_ng/base/node_render_status_monitor.h` | 逐节点渲染状态监听（ABOUT_TO_RENDER_IN/OUT）；最多 64 节点；PipelineContext 懒创建 |
 | ScrollerObserverManager | `frameworks/core/components_ng/pattern/scrollable/scroller_observer_manager.h` | Scroll 组件内部事件分发（touch/reach/scroll start/stop/did-scroll） |
 | NAPI 桥接 UIObserver | `interfaces/napi/kits/observer/ui_observer.h` | UIObserver 静态类；scoped 监听器存储 map；Register/UnRegister/Handle 方法 |
-| NAPI 桥接 ObserverListener | `interfaces/napi/kits/observer/ui_observer_listener.h` | UIObserverListener；封装 napi_ref；On* 回调方法 |
+| NAPI 桥接 ObserverListener | `interfaces/napi/kits/observer/ui_observer_listener.h` | 未迁移业务的 On* 方法；Render 不再由此类承载 |
+| NAPI callback 公共组件 | `interfaces/napi/kits/observer/common/napi_observer_callback.h` | 组合式引用管理、Equals、scope 内 Invoke 和幂等 Reset |
+| NAPI Render/Layout listener | `interfaces/napi/kits/observer/render/render_layout_observer_listener.h` | Draw/Layout 业务参数；组合 callback 组件，实现 core 窄接口 |
+| 实例 observer store | `frameworks/core/common/ui_observer/README.md` | Container 所有权、类型化业务桶及 Render/Layout 接入指南 |
 | NAPI 桥接 ObserverProcess | `interfaces/napi/kits/observer/js_ui_observer.h` | ObserverProcess；on/off type 字符串 → Process*Register 分发 |
 | NAPI 手势监听 | `interfaces/napi/kits/observer/gesture/gesture_observer.h` | GestureObserver；全局手势监听 AddGlobalGestureListener/RemoveGlobalGestureListener |
 | ANI 桥接 UiObserver | `interfaces/ets/ani/observer/src/observer.cpp` | UiObserver 实例（per UIContext）；ANI 路径注册/Handle/分发；ani_ref 回调 |
@@ -57,6 +60,7 @@ UIObserver（无感监听）是 ArkUI 引擎的 UI 生命周期和状态变化�
 | 类型 | 稳定路径 | 用途 |
 |------|----------|------|
 | UIObserverHandler 核心 | `test/unittest/core/base/observer_test_ng.cpp` | 31+ 测试；NavDestinationInfo/ScrollEvent/DensityChange/NavDestinationSwitch/WillClick/DidClick/PanGesture/TextChangeEvent/WindowSizeBreakpoint/GlobalGestureListener |
+| Draw/Layout 同步通知 | `test/unittest/core/base/observer_draw_callback_test.cpp` | 同步顺序、调用线程、实例作用域及空 Handler |
 | Mock ObserverHandler | `test/mock/frameworks/core/components_ng/base/mock_observer_handler.cpp` | Pipeline 测试替身 |
 | Swiper Observer | `test/unittest/core/pattern/swiper/swiper_ui_observer_test_ng.cpp` | SwiperContentInfo/GetShownItemInfo |
 | C API NavDestination | `test/unittest/capi/modifiers/nav_destination_modifier_test.cpp` | NavDestination C API modifier |
@@ -100,3 +104,17 @@ UIObserver（无感监听）是 ArkUI 引擎的 UI 生命周期和状态变化�
 - [日志](../architecture/dfx/logging.md)（HiLog 条件编译依赖）
 - [Trace 打点](../architecture/dfx/trace.md)（UIEventObserver 与 EventRecorder 交叉）
 - [UIContext 实例 ID 泄漏](../issues/lifecycle/uicontext-instance-id-leak.md) — JS 前端历史配对问题（已修复）与 UIObserver 实例路由排查
+
+## 稳定性整改核对
+
+当前 Render/Layout 样例通过 `RenderLayoutObserverListener` 组合 `NapiObserverCallback`，从 on 创建、off 比较到快照分发均需核对实际类型。不能把 store 拆分、引用基类提取或文档类图，直接当作组合式 listener 解耦已经接入的证据。其他业务仍在旧类中，须逐业务迁移参数 builder；组件 Reset 不等于 env 退出清理已经接通。
+
+Draw/Layout 的 Handler 均在 pipeline 触发点同步调用。NAPI 分发层按 instanceId 查找 Container，并保留 owner JS 线程检查和非 owner 线程投递；标准 Stage 同线程路径不再为 Draw 额外排队。Draw 的执行时机由排队任务提前到当前 VSync 调用栈，需回归与焦点、区域变化及后渲染任务的顺序；ANI 共用该 Handler，但不经过 NAPI Container Store，其隔离能力需单独评估。
+
+## 稳定性设计索引
+
+关联能力：`Func-04-11-02-Feat-02`（无感监听接口全覆盖，US-6、AC-6.1～AC-6.3 对应 `willDraw` / `didLayout`）及 `Func-04-11-02-Feat-01`（无感监听核心架构）。原则性设计按上述 FeatID 定位：
+
+- [Container 绑定与 Render/Layout 接入索引](../../ui-observer-container-bound-refactor-feasibility.md)：当前推荐设计及穿刺接入、兼容性评估。
+
+方案包含两类作用域：实例事件由 Container Store 隔离；全局监听（如 Navigation 相关事件）保持主 JS 引擎内全部实例范围，按引擎归属拒绝 DC 注册和事件。全局监听加固详见方案第 5.4 节，覆盖具有相同监听范围与线程约束的同类场景。该加固方案仍为待实施/待验证设计，不能由当前 Render/Layout 穿刺结果推定已经完成。

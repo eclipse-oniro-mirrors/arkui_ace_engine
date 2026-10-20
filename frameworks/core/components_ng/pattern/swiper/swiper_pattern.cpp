@@ -122,7 +122,9 @@ constexpr Dimension DEFAULT_INDICATOR_HEAD_DISTANCE = 14.0_vp;
 constexpr char SWIPER_SCROLL_DIRECTION_FORWARD[] = "forward";
 constexpr char SWIPER_SCROLL_DIRECTION_BACKWARD[] = "backward";
 constexpr char SWIPER_SCROLL_DIRECTION_BIDIRECTIONAL[] = "bidirectional";
-constexpr int32_t COMPONENT_SWIPER = 1;
+constexpr int32_t COMPONENT_STATE_CHANGE_IDX = 0;
+constexpr int32_t COMPONENT_STATE_SHOW = 1;
+constexpr int32_t COMPONENT_STATE_HIDDEN = 2;
 constexpr int32_t MEMORY_LEVEL_CRITICAL = 2;
 
 MoveStep GetKeyMoveStep(const KeyEvent& event, Axis axis, bool isRtl)
@@ -1783,7 +1785,7 @@ void SwiperPattern::FireIndicatorChangeAccessibilityEvent() const
     indicatorPattern->OnIndicatorChangeAccessibilityEvent();
 }
 
-void SwiperPattern::ReportSwiperChangeContent(int32_t currentIndex) const
+void SwiperPattern::ReportSwiperChangeContent(int32_t currentIndex, int32_t componentState) const
 {
     auto host = GetHost();
     CHECK_NULL_VOID(host);
@@ -1813,14 +1815,17 @@ void SwiperPattern::ReportSwiperChangeContent(int32_t currentIndex) const
     auto fullPath = pageInfo->GetFullPath();
     auto pageName = pipeline->GetNavDestinationPageName(pageInfo);
     auto jsViewName = pipeline->GetNavDestinationJSViewName(pageInfo);
-    if (pipeline->GetTaihangOptimizer()->CheckSwiperPageValid(fullPath, pageName, jsViewName) && !isInAutoPlay_) {
+    // The `isInAutoPlay_` guard only applies to `COMPONENT_STATE_CHANGE_IDX`;
+    // SHOW/HIDDEN reports bypass it.
+    if (pipeline->GetTaihangOptimizer()->CheckSwiperPageValid(fullPath, pageName, jsViewName) &&
+        (componentState != COMPONENT_STATE_CHANGE_IDX || !isInAutoPlay_)) {
         RefPtr<NG::UINode> curUINode = host;
         std::string path = curUINode->GetPath();
         std::unordered_map<std::string, std::string> payload;
         payload["window_id"] = std::to_string(pipeline->GetWindowId());
         payload["path"] = path;
         payload["currentIndex"] = std::to_string(currentIndex);
-        payload["componentType"] = std::to_string(COMPONENT_SWIPER);
+        payload["componentSwiperState"] = std::to_string(componentState);
         ResSchedReport::GetInstance().HandleSwiperChange(payload);
     }
 #endif
@@ -5738,6 +5743,10 @@ void SwiperPattern::PostTranslateTask(uint32_t delayTime)
 
 void SwiperPattern::HandleVisibleChange(bool visible)
 {
+    if (isVisibleArea_ != visible) {
+        auto currentIndex = GetLoopIndex(CurrentIndex());
+        ReportSwiperChangeContent(currentIndex, visible ? COMPONENT_STATE_SHOW : COMPONENT_STATE_HIDDEN);
+    }
     isVisibleArea_ = visible;
     if (!visible) {
         translateTask_.Cancel();

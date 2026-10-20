@@ -2610,6 +2610,31 @@ RefPtr<FrameNode> CreateGridItemContent(const OptionParam& param, int32_t themeS
     return columnNode;
 }
 
+// Apply disabled visual style to grid item, mirroring MenuItemPattern::UpdateDisabledStyle().
+// When enabled is false, set opacity to disabledFontColorAlpha on every child (icon / text) so
+// the grid item shows the same greyed-out appearance as a normal disabled MenuItem.
+void UpdateGridItemDisabledStyle(const RefPtr<FrameNode>& itemNode, const RefPtr<SelectTheme>& theme,
+    bool enabled)
+{
+    CHECK_NULL_VOID(itemNode);
+    CHECK_NULL_VOID(theme);
+    if (enabled) {
+        return;
+    }
+    auto alpha = theme->GetDisabledFontColorAlpha();
+    for (const auto& child : itemNode->GetChildren()) {
+        auto childFrame = AceType::DynamicCast<FrameNode>(child);
+        if (!childFrame) {
+            continue;
+        }
+        auto renderContext = childFrame->GetRenderContext();
+        CHECK_NULL_VOID(renderContext);
+        auto originalOpacity = renderContext->GetOpacityValue(1.0);
+        renderContext->OnOpacityUpdate(alpha * originalOpacity);
+        childFrame->MarkModifyDone();
+    }
+}
+
 void InitGridItemFeedback(const RefPtr<FrameNode>& itemNode, const RefPtr<SelectTheme>& theme)
 {
     CHECK_NULL_VOID(itemNode);
@@ -2739,6 +2764,7 @@ RefPtr<FrameNode> MenuView::CreateGridItem(const OptionParam& param, int32_t ind
     auto eventHub = contentColumn->GetEventHub<EventHub>();
     CHECK_NULL_RETURN(eventHub, nullptr);
     eventHub->SetEnabled(param.enabled);
+    UpdateGridItemDisabledStyle(contentColumn, theme, param.enabled);
     // Transfer events first, then set feedback and click. CopyEvent overwrites touch/click
     // actuators, so it must run before InitGridItemFeedback (which appends touch/hover via
     // AddTouchEvent/AddOnHoverEvent) and InitGridItemClick (which appends via AddClickEvent).

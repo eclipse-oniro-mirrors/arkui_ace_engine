@@ -42,8 +42,6 @@ RefPtr<DisplayInfo> DisplayInfoUtils::GetDisplayInfo(int32_t displayId)
     GetIsFoldable();
     GetCurrentFoldStatus();
     GetCurrentFoldCreaseRegion();
-    GetLiveFoldCreaseRegion();
-    GetFoldCreaseDirection();
     return displayInfo_;
 }
 

@@ -28,7 +28,6 @@
 #include "parameters.h"
 
 #include "adapter/ohos/osal/window_utils.h"
-#include "base/thread/background_task_executor.h"
 #include "core/common/ace_application_info.h"
 #include "core/components/common/properties/ui_material.h"
 
@@ -75,7 +74,6 @@ constexpr float DEFAULT_ANIMATION_SCALE = 1.0f;
 float animationScale_ = DEFAULT_ANIMATION_SCALE;
 constexpr int32_t DEFAULT_DRAG_START_DAMPING_RATIO = 20;
 constexpr int32_t DEFAULT_DRAG_START_PAN_DISTANCE_THRESHOLD_IN_VP = 10;
-constexpr int32_t DEFAULT_FORM_SHARED_IMAGE_CACHE_THRESHOLD = 30;
 constexpr int32_t DEFAULT_VELOCITY_TRACKER_POINT_NUMBER = 20;
 constexpr bool DEFAULT_IS_VELOCITY_WITHIN_TIME_WINDOW = true;
 constexpr bool DEFAULT_IS_VELOCITY_WITHOUT_UP_POINT = true;
@@ -596,11 +594,8 @@ int32_t ReadTouchAccelarateMode()
 UiMaterialLevel ReadUiMaterialLevel()
 {
     UiMaterialLevel result = UiMaterialLevel::DEFAULT;
-    if (MaterialUtils::GetGlobalMaterialLevel(result)) {
-        return result;
-    }
     int32_t level =
-        system::GetIntParameter("const.immersive_material_level", static_cast<int32_t>(UiMaterialLevel::DEFAULT));
+        system::GetIntParameter("const.hds.immersive_material_level", static_cast<int32_t>(UiMaterialLevel::DEFAULT));
     if (level >= static_cast<int32_t>(UiMaterialLevel::EXQUISITE) &&
         level <= static_cast<int32_t>(UiMaterialLevel::MAX)) {
         result = static_cast<UiMaterialLevel>(level);
@@ -610,12 +605,8 @@ UiMaterialLevel ReadUiMaterialLevel()
 
 bool ReadUiMaterialEnabled()
 {
-    bool result = true;
-    if (MaterialUtils::GetDeviceUiMaterialEnabled(result)) {
-        return result;
-    }
-    result = system::GetBoolParameter("const.support_immersive", true);
-    return result;
+    // rk default true, else default false
+    return system::GetBoolParameter("const.hds.support_immersive", true);
 }
 
 bool IsAscending(const std::vector<double>& nums)
@@ -865,7 +856,6 @@ bool SystemProperties::pageTransitionFrzEnabled_ = false;
 bool SystemProperties::forcibleLandscapeEnabled_ = false;
 bool SystemProperties::softPagetransition_ = false;
 bool SystemProperties::formSkeletonBlurEnabled_ = true;
-int32_t SystemProperties::formSharedImageCacheThreshold_ = DEFAULT_FORM_SHARED_IMAGE_CACHE_THRESHOLD;
 WidthLayoutBreakPoint SystemProperties::widthLayoutBreakpoints_ = WidthLayoutBreakPoint();
 HeightLayoutBreakPoint SystemProperties::heightLayoutBreakpoints_ = HeightLayoutBreakPoint();
 bool SystemProperties::syncLoadEnabled_ = true;
@@ -882,6 +872,8 @@ bool SystemProperties::autoResizeEnabled_ = false;
 int32_t SystemProperties::syntaxMemOptStrategy_ = ReadSyntaxMemOptStrategy();
 int32_t SystemProperties::bootVendorDdrSize_ = ReadBootVendorDdrSize();
 int32_t SystemProperties::sensorCorrectionEnable_ = 0;
+bool SystemProperties::isDeviceSystemMaterialSupported_ = false;
+UiMaterialLevel SystemProperties::uiMaterialLevel_ = UiMaterialLevel::DEFAULT;
 
 std::once_flag SystemProperties::getSysPropertiesFlag_;
 
@@ -1083,14 +1075,11 @@ void SystemProperties::ReadSystemParametersCallOnce()
 
         // init form sys params
         formSkeletonBlurEnabled_ = system::GetBoolParameter("const.form.skeleton_view.blur_style_enable", true);
-        formSharedImageCacheThreshold_ = system::GetIntParameter(
-            "const.form.shared_image.cache_threshold", DEFAULT_FORM_SHARED_IMAGE_CACHE_THRESHOLD);
 
         InitDeviceTypeBySystemProperty();
-        BackgroundTaskExecutor::GetInstance().PostTask([]() {
-            [[maybe_unused]] auto supported = SystemProperties::IsDeviceSystemMaterialSupported();
-            [[maybe_unused]] auto level = SystemProperties::GetUiMaterialLevel();
-        });
+
+        isDeviceSystemMaterialSupported_ = ReadUiMaterialEnabled();
+        uiMaterialLevel_ = ReadUiMaterialLevel();
     });
 }
 
@@ -1569,11 +1558,6 @@ bool SystemProperties::IsFormSkeletonBlurEnabled()
     return formSkeletonBlurEnabled_;
 }
 
-int32_t SystemProperties::getFormSharedImageCacheThreshold()
-{
-    return formSharedImageCacheThreshold_;
-}
-
 bool SystemProperties::IsFormSkeletonRSTransactionEnabled()
 {
     static bool enabled = system::GetBoolParameter("const.form.skeleton_animation.rs_transaction_enabled", true);
@@ -1605,6 +1589,16 @@ int32_t SystemProperties::GetWhiteBlockCacheCountValue()
 int32_t SystemProperties::GetPreviewStatus()
 {
     return previewStatus_;
+}
+
+UiMaterialLevel SystemProperties::GetUiMaterialLevel()
+{
+    return uiMaterialLevel_;
+}
+
+bool SystemProperties::IsDeviceSystemMaterialSupported()
+{
+    return isDeviceSystemMaterialSupported_;
 }
 
 void SystemProperties::SetDeviceType(DeviceType deviceType)
@@ -1664,18 +1658,6 @@ void SystemProperties::SetStateManagerEnabled(bool stateManagerEnable)
 void SystemProperties::SetFaultInjectEnabled(bool faultInjectEnable)
 {
     faultInjectEnabled_ = faultInjectEnable;
-}
-
-UiMaterialLevel SystemProperties::GetUiMaterialLevel()
-{
-    static auto uiMaterialLevel = ReadUiMaterialLevel();
-    return uiMaterialLevel;
-}
-
-bool SystemProperties::IsDeviceSystemMaterialSupported()
-{
-    static auto enabled = ReadUiMaterialEnabled();
-    return enabled;
 }
 
 int32_t SystemProperties::GetFormTaskPriority()

@@ -619,9 +619,11 @@ void SetBarBackgroundColorImpl(Ark_NativePointer node,
     auto convValue = Converter::OptConvertPtr<Color>(value);
     if (!convValue) {
         TabsModelStatic::SetBarBackgroundColor(frameNode, Color::TRANSPARENT);
+        TabsModelStatic::SetBarBackgroundColorByUser(frameNode, false);
         return;
     }
     TabsModelStatic::SetBarBackgroundColor(frameNode, convValue);
+    TabsModelStatic::SetBarBackgroundColorByUser(frameNode, true);
 }
 void SetBarGridAlignImpl(Ark_NativePointer node,
                          const Opt_BarGridColumnOptions* value)

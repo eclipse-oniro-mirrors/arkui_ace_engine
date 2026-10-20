@@ -69,6 +69,7 @@ public:
     }
 
     void OnPageTransitionEnd(const RefPtr<FrameNode>& keyNode);
+    void OnPageTransitionEnd(const RefPtr<FrameNode>& keyNode, int32_t transitionId);
     void OnContentChangeStart(const RefPtr<FrameNode>& keyNode, ChangeType type);
     void OnContentChangeInterrupted(const RefPtr<FrameNode>& keyNode, ChangeType type);
     void OnContentChangeNodeDestroyed(int32_t nodeId);

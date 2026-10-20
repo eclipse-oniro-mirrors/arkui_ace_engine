@@ -813,6 +813,8 @@ void WebPattern::CloseContextSelectionMenu()
 {
     if (contextSelectOverlay_ && contextSelectOverlay_->IsCurrentMenuVisibile()) {
         contextSelectOverlay_->CloseOverlay(true, CloseReason::CLOSE_REASON_NORMAL);
+        // Set isEscKeyFromOverlayOrFullScreen_ to true, so that the next ESC key event will not be sent to web.
+        isEscKeyFromOverlayOrFullScreen_ = true;
     }
 }
 
@@ -820,6 +822,8 @@ void WebPattern::CloseDefaultContextMenu()
 {
     if (contextMenuOverlay_ && contextMenuOverlay_->IsCurrentMenuVisibile()) {
         contextMenuOverlay_->CloseOverlay(true, CloseReason::CLOSE_REASON_NORMAL);
+        // Set isEscKeyFromOverlayOrFullScreen_ to true, so that the next ESC key event will not be sent to web.
+        isEscKeyFromOverlayOrFullScreen_ = true;
     }
 }
 
@@ -838,6 +842,8 @@ void WebPattern::RemovePreviewMenuNode()
     parent->RemoveChild(previewNode);
     previewImageNodeId_.reset();
     parent->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
+    // Set isEscKeyFromOverlayOrFullScreen_ to true, so that the next ESC key event will not be sent to web.
+    isEscKeyFromOverlayOrFullScreen_ = true;
 }
 
 bool WebPattern::IsPreviewMenuNotNeedShowPreview()
@@ -3665,6 +3671,27 @@ bool WebPattern::IsContextMenuShow()
            (contextMenuOverlay_ && contextMenuOverlay_->IsCurrentMenuVisibile());
 }
 
+bool WebPattern::IsShouldTriggerBack(const KeyEvent& event, bool isUsed)
+{
+    bool isEscKey = event.code == KeyCode::KEY_ESCAPE;
+    bool isKeyDown = event.action == KeyAction::DOWN;
+    bool isKeyUp = event.action == KeyAction::UP;
+    if (isEscKey && isKeyDown) {
+        isEscKeyDownConsumed_ = isUsed;
+    }
+    bool shouldTriggerBack = false;
+    if (isEscKey && isKeyUp) {
+        if (isEscKeyFromOverlayOrFullScreen_) {
+            shouldTriggerBack = false;
+        } else if (!isEscKeyDownConsumed_ && !isUsed) {
+            shouldTriggerBack = true;
+        }
+        isEscKeyDownConsumed_ = true;
+        isEscKeyFromOverlayOrFullScreen_ = false;
+    }
+    return shouldTriggerBack;
+}
+
 bool WebPattern::HandleEscToBackSupport(PipelineContext* pipeline)
 {
     // 1. FullScreen
@@ -3695,6 +3722,7 @@ bool WebPattern::HandleEscToBackSupport(PipelineContext* pipeline)
 bool WebPattern::HandleKeyEvent(const KeyEvent& keyEvent)
 {
     if (IsContextMenuShow() && keyEvent.code == KeyCode::KEY_ESCAPE && keyEvent.action == KeyAction::DOWN) {
+        isEscKeyFromOverlayOrFullScreen_ = true;
         bool isKeyNull = !(keyEvent.HasKey(KeyCode::KEY_ALT_LEFT) || keyEvent.HasKey(KeyCode::KEY_ALT_RIGHT) ||
                            keyEvent.HasKey(KeyCode::KEY_SHIFT_LEFT) || keyEvent.HasKey(KeyCode::KEY_SHIFT_RIGHT) ||
                            keyEvent.HasKey(KeyCode::KEY_CTRL_LEFT) || keyEvent.HasKey(KeyCode::KEY_CTRL_RIGHT) ||
@@ -3806,17 +3834,16 @@ void WebPattern::KeyboardReDispatch(
         TAG_LOGW(AceLogTag::ACE_WEB, "KeyEvent is not find keycode");
         return;
     }
-    if (keyEvent->code == KeyCode::KEY_ESCAPE && keyEvent->action == KeyAction::DOWN) {
-        isEscKeyDownConsumed_ = isUsed;
-    }
-    if (keyEvent->code == KeyCode::KEY_ESCAPE && keyEvent->action == KeyAction::UP) {
-        if(!isUsed && !isEscKeyDownConsumed_ && system::GetBoolParameter(std::string(ESC_TO_BACK_SUPPORT), false)) {
-            if(HandleEscToBackSupport(pipelineContext)) {
+    bool isEscKey = keyEvent->code == KeyCode::KEY_ESCAPE;
+    if (isEscKey && system::GetBoolParameter(std::string(ESC_TO_BACK_SUPPORT), false)) {
+        if (IsShouldTriggerBack(*keyEvent, isUsed)) {
+            if (HandleEscToBackSupport(pipelineContext)) {
                 webKeyEvent_.erase((++keyEvent).base());
                 return;
             }
         }
     }
+
     if (!isUsed) {
         taskExecutor->PostTask([context = AceType::WeakClaim(pipelineContext),
             event = *keyEvent] () {
@@ -4667,6 +4694,26 @@ void WebPattern::OnScrollBarColorUpdate(const std::string& value)
     }
 }
 
+void WebPattern::OnCaretColorUpdate(const Color& value)
+{
+    if (delegate_) {
+        delegate_->UpdateCaretColor(value);
+    }
+    if (webSelectOverlay_) {
+        webSelectOverlay_->UpdateHandleColor();
+    }
+}
+
+void WebPattern::UpdatePropertyImpl(const std::string& key, RefPtr<PropertyValueBase> value)
+{
+    if (key != "WebCaretColor" || !value) {
+        return;
+    }
+    if (auto color = std::get_if<Color>(&(value->GetValue()))) {
+        UpdateCaretColor(*color);
+    }
+}
+
 void WebPattern::OnDefaultTextEncodingFormatUpdate(const std::string& value)
 {
     if (delegate_) {
@@ -4688,6 +4735,17 @@ void WebPattern::OnForceEnableZoomUpdate(bool isEnabled)
     if (delegate_) {
         TAG_LOGI(AceLogTag::ACE_WEB, "SetForceEnableZoom :%{public}d", isEnabled);
         delegate_->SetForceEnableZoom(isEnabled);
+    }
+}
+
+void WebPattern::OnFlingSpeedLimitUpdate(float speedLimit)
+{
+    // M114 engine version does not support FlingSpeedLimit; skip is expected.
+    RETURN_IF_CALLING_FROM_M114();
+    TAG_LOGD(AceLogTag::ACE_WEB, "OnFlingSpeedLimitUpdate speedLimit=%{public}f", speedLimit);
+    if (delegate_) {
+        TAG_LOGD(AceLogTag::ACE_WEB, "SetFlingSpeedLimit :%{public}f", speedLimit);
+        delegate_->SetFlingSpeedLimit(speedLimit);
     }
 }
 
@@ -4906,6 +4964,9 @@ void WebPattern::OnModifyDone()
         delegate_->UpdateHorizontalScrollBarAccess(GetHorizontalScrollBarAccessEnabledValue(true));
         delegate_->UpdateVerticalScrollBarAccess(GetVerticalScrollBarAccessEnabledValue(true));
         delegate_->UpdateScrollBarColor(GetScrollBarColorValue(DEFAULT_SCROLLBAR_COLOR));
+        if (HasCaretColor()) {
+            delegate_->UpdateCaretColor(GetCaretColorValue(Color()));
+        }
         delegate_->UpdateOverlayScrollbarEnabled(GetOverlayScrollbarEnabledValue(false));
         delegate_->UpdateOverScrollMode(GetOverScrollModeValue(OverScrollMode::NEVER));
         delegate_->UpdateBlurOnKeyboardHideMode(GetBlurOnKeyboardHideModeValue(BlurOnKeyboardHideMode::SILENT));
@@ -4935,6 +4996,7 @@ void WebPattern::OnModifyDone()
             delegate_->UpdateBlankScreenDetectionConfig(
                 config.enable, config.detectionTiming, config.detectionMethods, config.contentfulNodesCountThreshold);
         }
+        delegate_->UpdateWebBlankScreenMonitorEnabled(GetWebBlankScreenMonitorEnabledValue(false));
         delegate_->UpdateEnableImageAnalyzer(GetEnableImageAnalyzerValue(true));
         isAllowWindowOpenMethod_ = SystemProperties::GetAllowWindowOpenMethodEnabled();
         delegate_->UpdateAllowWindowOpenMethod(GetAllowWindowOpenMethodValue(isAllowWindowOpenMethod_));
@@ -5756,6 +5818,7 @@ bool WebPattern::ParseTouchInfo(const TouchEventInfo& info, std::list<TouchInfo>
 void WebPattern::RequestFullScreen()
 {
     isFullScreen_ = true;
+    isEscKeyFromOverlayOrFullScreen_ = true;
 }
 
 void WebPattern::ExitFullScreen()
@@ -5896,6 +5959,14 @@ void WebPattern::OnBlankScreenDetectionConfigUpdate(const BlankScreenDetectionCo
     if (delegate_) {
         delegate_->UpdateBlankScreenDetectionConfig(
             config.enable, config.detectionTiming, config.detectionMethods, config.contentfulNodesCountThreshold);
+    }
+}
+
+void WebPattern::OnWebBlankScreenMonitorEnabledUpdate(bool enable)
+{
+    RETURN_IF_CALLING_FROM_M132();
+    if (delegate_) {
+        delegate_->UpdateWebBlankScreenMonitorEnabled(enable);
     }
 }
 
@@ -9535,6 +9606,7 @@ void WebPattern::OnShowAutofillPopupV2(
     CHECK_NULL_VOID(overlayManager);
     menu->GetOrCreateFocusHub()->SetFocusable(false);
     overlayManager->ShowMenu(dataListNode->GetId(), OffsetF(), menu);
+    isEscKeyFromOverlayOrFullScreen_ = true;
 }
 
 void WebPattern::OnHideAutofillPopup()

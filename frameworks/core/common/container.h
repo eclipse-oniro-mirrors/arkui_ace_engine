@@ -89,6 +89,7 @@ using MouseTargetHitCallback = std::function<bool(const MouseEvent&,
 
 class PipelineBase;
 class ContainerHandler;
+class UIObserverStore;
 class Frontend;
 
 class ACE_FORCE_EXPORT Container : public virtual AceType {
@@ -133,6 +134,10 @@ public:
 
     // Get task executor.
     virtual RefPtr<TaskExecutor> GetTaskExecutor() const = 0;
+
+    // Accessed only on the container's JS owner thread.
+    std::shared_ptr<UIObserverStore> GetUIObserverStore(bool create = false);
+    void ClearUIObserverStore();
 
     // Get assert manager.
     virtual RefPtr<AssetManager> GetAssetManager() const = 0;
@@ -240,6 +245,10 @@ public:
     {
         return displayManager_;
     }
+
+    virtual void RefreshLiveFoldCreaseRegion() {}
+
+    virtual void RefreshFoldCreaseDirection() {}
 
     virtual DisplaySourceMode GetDisplaySourceMode();
 
@@ -856,6 +865,8 @@ private:
     UIContentType uIContentType_ = UIContentType::UNDEFINED;
     uint64_t currentDisplayId_ = 0;
     ColorMode colorMode_ = ColorMode::LIGHT;
+    std::shared_ptr<UIObserverStore> uiObserverStore_;
+    bool uiObserverStoreClosed_ = false;
     std::string extensionHostParams_ = "";
     ACE_DISALLOW_COPY_AND_MOVE(Container);
 };

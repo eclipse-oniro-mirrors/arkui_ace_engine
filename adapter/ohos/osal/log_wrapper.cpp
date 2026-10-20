@@ -143,6 +143,7 @@ const std::unordered_map<AceLogTag, const char*> g_DOMAIN_CONTENTS_MAP = {
     { AceLogTag::ACE_LAZY_COLUMN, "AceLazyColumn" },
     { AceLogTag::ACE_LAZY_WATER_FLOW, "AceLazyWaterFlow" },
 };
+
 char LogWrapper::GetSeparatorCharacter()
 {
     return '/';

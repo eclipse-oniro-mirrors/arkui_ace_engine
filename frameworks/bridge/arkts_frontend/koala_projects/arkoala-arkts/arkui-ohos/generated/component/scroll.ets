@@ -25,13 +25,13 @@ import { Length, Resource as arkui_component_units_Resource, VoidCallback, Dimen
 import { Resource as global_resource_Resource } from 'global.resource'
 import { extractors, AttributeModifier, LengthMetrics as arkui_component_units_LengthMetrics, LengthMetrics as arkui_Graphics_LengthMetrics, hookScrollAttributeModifier, AttributeUpdater } from '#handwritten'
 import { FrameNode } from 'arkui.FrameNode'
+import { ScrollState, ScrollSnapAlign } from './list'
 import { unsafeCast, int32, int64, float32 } from '@koalaui/common'
 import { ArkUIGeneratedNativeModule } from '#components'
 import { CallbackTransformer } from './../CallbackTransformer'
 import { ArkThemeScopeManager } from '#arktheme'
 import { ComponentBase } from './../ComponentBase'
 import { PeerNode } from './../PeerNode'
-import { ScrollState, ScrollSnapAlign } from './list'
 import { CustomBuilder } from './builder'
 import { CallbackKind } from './../framework/peers/CallbackKind'
 import { memo, memo_stable, memo_skip } from 'arkui.stateManagement.runtime'
@@ -123,6 +123,9 @@ export class Scroller implements MaterializedBase {
     }
     public getFrameNode(): FrameNode | undefined {
         return this.getFrameNode_serialize()
+    }
+    public getScrollState(): ScrollState {
+        return this.getScrollState_serialize()
     }
     private scrollTo_serialize(options: ScrollOptions): void {
         const thisSerializer: SerializerBase = SerializerBase.hold()
@@ -265,6 +268,10 @@ export class Scroller implements MaterializedBase {
         const returnResult: FrameNode | undefined = buffer
         retvalDeserializer.dispose()
         return (returnResult as FrameNode | undefined)
+    }
+    private getScrollState_serialize(): ScrollState {
+        const retval = ArkUIGeneratedNativeModule._Scroller_getScrollState(this.peer!.ptr)
+        return ScrollState.fromValue(retval)
     }
 }
 export class ArkScrollPeer extends ArkScrollableCommonMethodPeer {
