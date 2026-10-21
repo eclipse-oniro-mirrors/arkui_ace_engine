@@ -39,6 +39,7 @@
 #include "core/components_ng/render/render_context.h"
 #include "core/components/common/properties/ui_material.h"
 #include "core/components_ng/layout/layout_wrapper_node.h"
+#include "json/json_util.h"
 
 using namespace OHOS::Ace::Framework;
 
@@ -2132,5 +2133,913 @@ HWTEST_F(SliderPatternMaterialTestNg, SliderPattern_UpdateMaterialNodePosition_A
     auto pointRC = pattern->dragPointNode_->GetRenderContext();
     ASSERT_NE(pointRC, nullptr);
     EXPECT_TRUE(pointRC->GetPosition().has_value());
+}
+
+/**
+ * @tc.name: SliderPattern_SetVelocityFieldEnabled_Horizontal_001
+ * @tc.desc: Test CreateParticleVelocityFields horizontal branch via SetVelocityFieldEnabled
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternMaterialTestNg, SliderPattern_SetVelocityFieldEnabled_Horizontal_001, TestSize.Level1)
+{
+    auto frameNode = CreateSliderNodeWithMaterial();
+    ASSERT_NE(frameNode, nullptr);
+
+    auto pattern = frameNode->GetPattern<SliderPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    auto layoutProperty = frameNode->GetLayoutProperty<SliderLayoutProperty>();
+    ASSERT_NE(layoutProperty, nullptr);
+    layoutProperty->UpdateDirection(Axis::HORIZONTAL);
+
+    pattern->sliderContentModifier_ = AceType::MakeRefPtr<SliderContentModifier>(
+        SliderContentModifier::Parameters {}, [](const PointF&) {});
+
+    auto particleFrameNode = FrameNode::CreateFrameNode(
+        V2::PARTICLE_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<ParticlePattern>(1));
+    ASSERT_NE(particleFrameNode, nullptr);
+    pattern->particleFrameNode_ = particleFrameNode;
+    frameNode->AddChild(particleFrameNode);
+
+    pattern->SetVelocityFieldEnabled(true);
+    SUCCEED();
+}
+
+/**
+ * @tc.name: SliderPattern_SetVelocityFieldEnabled_Vertical_001
+ * @tc.desc: Test CreateParticleVelocityFields vertical branch via SetVelocityFieldEnabled
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternMaterialTestNg, SliderPattern_SetVelocityFieldEnabled_Vertical_001, TestSize.Level1)
+{
+    auto frameNode = CreateSliderNodeWithMaterial();
+    ASSERT_NE(frameNode, nullptr);
+
+    auto pattern = frameNode->GetPattern<SliderPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    auto layoutProperty = frameNode->GetLayoutProperty<SliderLayoutProperty>();
+    ASSERT_NE(layoutProperty, nullptr);
+    layoutProperty->UpdateDirection(Axis::VERTICAL);
+
+    pattern->sliderContentModifier_ = AceType::MakeRefPtr<SliderContentModifier>(
+        SliderContentModifier::Parameters {}, [](const PointF&) {});
+
+    auto particleFrameNode = FrameNode::CreateFrameNode(
+        V2::PARTICLE_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<ParticlePattern>(1));
+    ASSERT_NE(particleFrameNode, nullptr);
+    pattern->particleFrameNode_ = particleFrameNode;
+    frameNode->AddChild(particleFrameNode);
+
+    pattern->SetVelocityFieldEnabled(true);
+    SUCCEED();
+}
+
+/**
+ * @tc.name: UpdatePrefixPosition001
+ * @tc.desc: Test UpdatePrefixPosition with reverse=false, showSteps=false
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternMaterialTestNg, UpdatePrefixPosition001, TestSize.Level1)
+{
+    auto frameNode = CreateSliderNodeWithMaterial();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SliderPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->sliderContentModifier_ = AceType::MakeRefPtr<SliderContentModifier>(
+        SliderContentModifier::Parameters {}, [](const PointF&) {});
+    pattern->prefixNodeStack_ = FrameNode::CreateFrameNode(
+        V2::COLUMN_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<LinearLayoutPattern>(true));
+    pattern->parentAccessibilityNode_ = FrameNode::CreateFrameNode(
+        V2::COLUMN_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<LinearLayoutPattern>(true));
+    auto paintProperty = frameNode->GetPaintProperty<SliderPaintProperty>();
+    ASSERT_NE(paintProperty, nullptr);
+    paintProperty->UpdateShowSteps(false);
+    pattern->UpdatePrefixPosition();
+    SUCCEED();
+}
+
+/**
+ * @tc.name: UpdatePrefixPosition002
+ * @tc.desc: Test UpdatePrefixPosition with reverse=true, showSteps=false
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternMaterialTestNg, UpdatePrefixPosition002, TestSize.Level1)
+{
+    auto frameNode = CreateSliderNodeWithMaterial();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SliderPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto layoutProperty = frameNode->GetLayoutProperty<SliderLayoutProperty>();
+    ASSERT_NE(layoutProperty, nullptr);
+    layoutProperty->UpdateReverse(true);
+    pattern->sliderContentModifier_ = AceType::MakeRefPtr<SliderContentModifier>(
+        SliderContentModifier::Parameters {}, [](const PointF&) {});
+    pattern->prefixNodeStack_ = FrameNode::CreateFrameNode(
+        V2::COLUMN_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<LinearLayoutPattern>(true));
+    pattern->parentAccessibilityNode_ = FrameNode::CreateFrameNode(
+        V2::COLUMN_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<LinearLayoutPattern>(true));
+    auto paintProperty = frameNode->GetPaintProperty<SliderPaintProperty>();
+    ASSERT_NE(paintProperty, nullptr);
+    paintProperty->UpdateShowSteps(false);
+    pattern->UpdatePrefixPosition();
+    SUCCEED();
+}
+
+/**
+ * @tc.name: UpdatePrefixPosition003
+ * @tc.desc: Test UpdatePrefixPosition with reverse=false, showSteps=true
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternMaterialTestNg, UpdatePrefixPosition003, TestSize.Level1)
+{
+    auto frameNode = CreateSliderNodeWithMaterial();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SliderPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->sliderContentModifier_ = AceType::MakeRefPtr<SliderContentModifier>(
+        SliderContentModifier::Parameters {}, [](const PointF&) {});
+    pattern->prefixNodeStack_ = FrameNode::CreateFrameNode(
+        V2::COLUMN_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<LinearLayoutPattern>(true));
+    pattern->parentAccessibilityNode_ = FrameNode::CreateFrameNode(
+        V2::COLUMN_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<LinearLayoutPattern>(true));
+    auto paintProperty = frameNode->GetPaintProperty<SliderPaintProperty>();
+    ASSERT_NE(paintProperty, nullptr);
+    paintProperty->UpdateShowSteps(true);
+    pattern->UpdatePrefixPosition();
+    SUCCEED();
+}
+
+/**
+ * @tc.name: UpdatePrefixPosition004
+ * @tc.desc: Test UpdatePrefixPosition with reverse=true, showSteps=true
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternMaterialTestNg, UpdatePrefixPosition004, TestSize.Level1)
+{
+    auto frameNode = CreateSliderNodeWithMaterial();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SliderPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto layoutProperty = frameNode->GetLayoutProperty<SliderLayoutProperty>();
+    ASSERT_NE(layoutProperty, nullptr);
+    layoutProperty->UpdateReverse(true);
+    pattern->sliderContentModifier_ = AceType::MakeRefPtr<SliderContentModifier>(
+        SliderContentModifier::Parameters {}, [](const PointF&) {});
+    pattern->prefixNodeStack_ = FrameNode::CreateFrameNode(
+        V2::COLUMN_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<LinearLayoutPattern>(true));
+    pattern->parentAccessibilityNode_ = FrameNode::CreateFrameNode(
+        V2::COLUMN_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<LinearLayoutPattern>(true));
+    auto paintProperty = frameNode->GetPaintProperty<SliderPaintProperty>();
+    ASSERT_NE(paintProperty, nullptr);
+    paintProperty->UpdateShowSteps(true);
+    pattern->UpdatePrefixPosition();
+    SUCCEED();
+}
+
+/**
+ * @tc.name: UpdateSuffixPosition001
+ * @tc.desc: Test UpdateSuffixPosition with reverse=false, showSteps=false
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternMaterialTestNg, UpdateSuffixPosition001, TestSize.Level1)
+{
+    auto frameNode = CreateSliderNodeWithMaterial();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SliderPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->sliderContentModifier_ = AceType::MakeRefPtr<SliderContentModifier>(
+        SliderContentModifier::Parameters {}, [](const PointF&) {});
+    pattern->suffixNodeStack_ = FrameNode::CreateFrameNode(
+        V2::COLUMN_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<LinearLayoutPattern>(true));
+    pattern->parentAccessibilityNode_ = FrameNode::CreateFrameNode(
+        V2::COLUMN_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<LinearLayoutPattern>(true));
+    auto paintProperty = frameNode->GetPaintProperty<SliderPaintProperty>();
+    ASSERT_NE(paintProperty, nullptr);
+    paintProperty->UpdateShowSteps(false);
+    pattern->UpdateSuffixPosition();
+    SUCCEED();
+}
+
+/**
+ * @tc.name: UpdateSuffixPosition002
+ * @tc.desc: Test UpdateSuffixPosition with reverse=true, showSteps=false
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternMaterialTestNg, UpdateSuffixPosition002, TestSize.Level1)
+{
+    auto frameNode = CreateSliderNodeWithMaterial();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SliderPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto layoutProperty = frameNode->GetLayoutProperty<SliderLayoutProperty>();
+    ASSERT_NE(layoutProperty, nullptr);
+    layoutProperty->UpdateReverse(true);
+    pattern->sliderContentModifier_ = AceType::MakeRefPtr<SliderContentModifier>(
+        SliderContentModifier::Parameters {}, [](const PointF&) {});
+    pattern->suffixNodeStack_ = FrameNode::CreateFrameNode(
+        V2::COLUMN_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<LinearLayoutPattern>(true));
+    pattern->parentAccessibilityNode_ = FrameNode::CreateFrameNode(
+        V2::COLUMN_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<LinearLayoutPattern>(true));
+    auto paintProperty = frameNode->GetPaintProperty<SliderPaintProperty>();
+    ASSERT_NE(paintProperty, nullptr);
+    paintProperty->UpdateShowSteps(false);
+    pattern->UpdateSuffixPosition();
+    SUCCEED();
+}
+
+/**
+ * @tc.name: UpdateSuffixPosition003
+ * @tc.desc: Test UpdateSuffixPosition with reverse=false, showSteps=true
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternMaterialTestNg, UpdateSuffixPosition003, TestSize.Level1)
+{
+    auto frameNode = CreateSliderNodeWithMaterial();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SliderPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->sliderContentModifier_ = AceType::MakeRefPtr<SliderContentModifier>(
+        SliderContentModifier::Parameters {}, [](const PointF&) {});
+    pattern->suffixNodeStack_ = FrameNode::CreateFrameNode(
+        V2::COLUMN_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<LinearLayoutPattern>(true));
+    pattern->parentAccessibilityNode_ = FrameNode::CreateFrameNode(
+        V2::COLUMN_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<LinearLayoutPattern>(true));
+    auto paintProperty = frameNode->GetPaintProperty<SliderPaintProperty>();
+    ASSERT_NE(paintProperty, nullptr);
+    paintProperty->UpdateShowSteps(true);
+    pattern->UpdateSuffixPosition();
+    SUCCEED();
+}
+
+/**
+ * @tc.name: UpdateSuffixPosition004
+ * @tc.desc: Test UpdateSuffixPosition with reverse=true, showSteps=true
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternMaterialTestNg, UpdateSuffixPosition004, TestSize.Level1)
+{
+    auto frameNode = CreateSliderNodeWithMaterial();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SliderPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto layoutProperty = frameNode->GetLayoutProperty<SliderLayoutProperty>();
+    ASSERT_NE(layoutProperty, nullptr);
+    layoutProperty->UpdateReverse(true);
+    pattern->sliderContentModifier_ = AceType::MakeRefPtr<SliderContentModifier>(
+        SliderContentModifier::Parameters {}, [](const PointF&) {});
+    pattern->suffixNodeStack_ = FrameNode::CreateFrameNode(
+        V2::COLUMN_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<LinearLayoutPattern>(true));
+    pattern->parentAccessibilityNode_ = FrameNode::CreateFrameNode(
+        V2::COLUMN_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<LinearLayoutPattern>(true));
+    auto paintProperty = frameNode->GetPaintProperty<SliderPaintProperty>();
+    ASSERT_NE(paintProperty, nullptr);
+    paintProperty->UpdateShowSteps(true);
+    pattern->UpdateSuffixPosition();
+    SUCCEED();
+}
+
+/**
+ * @tc.name: UpdateEndsNotShowStepsPosition001
+ * @tc.desc: Test UpdateEndsNotShowStepsPosition HORIZONTAL + OUTSET
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternMaterialTestNg, UpdateEndsNotShowStepsPosition001, TestSize.Level1)
+{
+    auto frameNode = CreateSliderNodeWithMaterial();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SliderPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto layoutProperty = frameNode->GetLayoutProperty<SliderLayoutProperty>();
+    ASSERT_NE(layoutProperty, nullptr);
+    layoutProperty->UpdateDirection(Axis::HORIZONTAL);
+    layoutProperty->UpdateSliderMode(SliderModel::SliderMode::OUTSET);
+    PointF pos(0, 0);
+    PointF block(50, 25);
+    SizeF size(20, 20);
+    pattern->UpdateEndsNotShowStepsPosition(pos, block, size, 50.0f, 10.0f);
+    SUCCEED();
+}
+
+/**
+ * @tc.name: SliderPattern_UpdateEndsNotShowStepsPosition_VerticalOutset_001
+ * @tc.desc: Test UpdateEndsNotShowStepsPosition VERTICAL + OUTSET
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternMaterialTestNg, SliderPattern_UpdateEndsNotShowStepsPosition_VerticalOutset_001, TestSize.Level1)
+{
+    auto frameNode = CreateSliderNodeWithMaterial();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SliderPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto layoutProperty = frameNode->GetLayoutProperty<SliderLayoutProperty>();
+    ASSERT_NE(layoutProperty, nullptr);
+    layoutProperty->UpdateDirection(Axis::VERTICAL);
+    layoutProperty->UpdateSliderMode(SliderModel::SliderMode::OUTSET);
+    PointF pos(0, 0);
+    PointF block(50, 25);
+    SizeF size(20, 20);
+    pattern->UpdateEndsNotShowStepsPosition(pos, block, size, 50.0f, 10.0f);
+    SUCCEED();
+}
+
+/**
+ * @tc.name: UpdateEndsNotShowStepsPosition002
+ * @tc.desc: Test UpdateEndsNotShowStepsPosition HORIZONTAL + NONE mode
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternMaterialTestNg, UpdateEndsNotShowStepsPosition002, TestSize.Level1)
+{
+    auto frameNode = CreateSliderNodeWithMaterial();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SliderPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto layoutProperty = frameNode->GetLayoutProperty<SliderLayoutProperty>();
+    ASSERT_NE(layoutProperty, nullptr);
+    layoutProperty->UpdateDirection(Axis::HORIZONTAL);
+    layoutProperty->UpdateSliderMode(SliderModel::SliderMode::NONE);
+    PointF pos(0, 0);
+    PointF block(50, 25);
+    SizeF size(20, 20);
+    pattern->UpdateEndsNotShowStepsPosition(pos, block, size, 50.0f, 10.0f);
+    SUCCEED();
+}
+
+/**
+ * @tc.name: SliderPattern_UpdateEndsNotShowStepsPosition_VerticalNone_001
+ * @tc.desc: Test UpdateEndsNotShowStepsPosition VERTICAL + NONE mode
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternMaterialTestNg, SliderPattern_UpdateEndsNotShowStepsPosition_VerticalNone_001, TestSize.Level1)
+{
+    auto frameNode = CreateSliderNodeWithMaterial();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SliderPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto layoutProperty = frameNode->GetLayoutProperty<SliderLayoutProperty>();
+    ASSERT_NE(layoutProperty, nullptr);
+    layoutProperty->UpdateDirection(Axis::VERTICAL);
+    layoutProperty->UpdateSliderMode(SliderModel::SliderMode::NONE);
+    PointF pos(0, 0);
+    PointF block(50, 25);
+    SizeF size(20, 20);
+    pattern->UpdateEndsNotShowStepsPosition(pos, block, size, 50.0f, 10.0f);
+    SUCCEED();
+}
+
+/**
+ * @tc.name: SliderPattern_DumpInfo_Json_FullProperties_001
+ * @tc.desc: Test DumpInfo(json) with all paint properties set
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternMaterialTestNg, SliderPattern_DumpInfo_Json_FullProperties_001, TestSize.Level1)
+{
+    auto frameNode = CreateSliderNodeWithMaterial();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SliderPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto paintProperty = frameNode->GetPaintProperty<SliderPaintProperty>();
+    ASSERT_NE(paintProperty, nullptr);
+    paintProperty->UpdateValue(VALUE);
+    paintProperty->UpdateMin(MIN);
+    paintProperty->UpdateMax(MAX);
+    paintProperty->UpdateStep(STEP);
+    paintProperty->UpdateSliderMode(SliderModel::SliderMode::INSET);
+    paintProperty->UpdateDirection(Axis::VERTICAL);
+    paintProperty->UpdateReverse(true);
+    paintProperty->UpdateBlockColor(TEST_COLOR);
+    paintProperty->UpdateSelectColor(TEST_COLOR);
+    paintProperty->UpdateShowSteps(true);
+    paintProperty->UpdateShowTips(true);
+    auto layoutProperty = frameNode->GetLayoutProperty<SliderLayoutProperty>();
+    ASSERT_NE(layoutProperty, nullptr);
+    std::unique_ptr<JsonValue> json = std::make_unique<JsonValue>();
+    ASSERT_NE(json, nullptr);
+    pattern->DumpInfo(json);
+    SUCCEED();
+}
+
+/**
+ * @tc.name: SliderPattern_DumpInfo_Json_MinimalProperties_001
+ * @tc.desc: Test DumpInfo(json) with minimal properties set
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternMaterialTestNg, SliderPattern_DumpInfo_Json_MinimalProperties_001, TestSize.Level1)
+{
+    auto frameNode = CreateSliderNodeWithMaterial();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SliderPattern>();
+    ASSERT_NE(pattern, nullptr);
+    std::unique_ptr<JsonValue> json = std::make_unique<JsonValue>();
+    ASSERT_NE(json, nullptr);
+    pattern->DumpInfo(json);
+    SUCCEED();
+}
+
+/**
+ * @tc.name: SliderPattern_CalculateEmitterPosition_HorizontalNotReverse_001
+ * @tc.desc: Test CalculateEmitterPosition HORIZONTAL + not reverse
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternMaterialTestNg, SliderPattern_CalculateEmitterPosition_HorizontalNotReverse_001, TestSize.Level1)
+{
+    auto frameNode = CreateSliderNodeWithMaterial();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SliderPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->sliderContentModifier_ = AceType::MakeRefPtr<SliderContentModifier>(
+        SliderContentModifier::Parameters {}, [](const PointF&) {});
+    pattern->circleCenter_ = CIRCLE_CENTER_TEST;
+    float x = 0, y = 0, len = 0;
+    pattern->CalculateEmitterPosition(x, y, len);
+    SUCCEED();
+}
+
+/**
+ * @tc.name: SliderPattern_CalculateEmitterPosition_HorizontalReverse_001
+ * @tc.desc: Test CalculateEmitterPosition HORIZONTAL + reverse
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternMaterialTestNg, SliderPattern_CalculateEmitterPosition_HorizontalReverse_001, TestSize.Level1)
+{
+    auto frameNode = CreateSliderNodeWithMaterial();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SliderPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto layoutProperty = frameNode->GetLayoutProperty<SliderLayoutProperty>();
+    ASSERT_NE(layoutProperty, nullptr);
+    layoutProperty->UpdateReverse(true);
+    pattern->sliderContentModifier_ = AceType::MakeRefPtr<SliderContentModifier>(
+        SliderContentModifier::Parameters {}, [](const PointF&) {});
+    pattern->circleCenter_ = CIRCLE_CENTER_TEST;
+    float x = 0, y = 0, len = 0;
+    pattern->CalculateEmitterPosition(x, y, len);
+    SUCCEED();
+}
+
+/**
+ * @tc.name: SliderPattern_CalculateEmitterPosition_VerticalNotReverse_001
+ * @tc.desc: Test CalculateEmitterPosition VERTICAL + not reverse
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternMaterialTestNg, SliderPattern_CalculateEmitterPosition_VerticalNotReverse_001, TestSize.Level1)
+{
+    auto frameNode = CreateSliderNodeWithMaterial();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SliderPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto layoutProperty = frameNode->GetLayoutProperty<SliderLayoutProperty>();
+    ASSERT_NE(layoutProperty, nullptr);
+    layoutProperty->UpdateDirection(Axis::VERTICAL);
+    pattern->sliderContentModifier_ = AceType::MakeRefPtr<SliderContentModifier>(
+        SliderContentModifier::Parameters {}, [](const PointF&) {});
+    pattern->circleCenter_ = CIRCLE_CENTER_TEST;
+    float x = 0, y = 0, len = 0;
+    pattern->CalculateEmitterPosition(x, y, len);
+    SUCCEED();
+}
+
+/**
+ * @tc.name: SliderPattern_CalculateEmitterPosition_VerticalReverse_001
+ * @tc.desc: Test CalculateEmitterPosition VERTICAL + reverse
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternMaterialTestNg, SliderPattern_CalculateEmitterPosition_VerticalReverse_001, TestSize.Level1)
+{
+    auto frameNode = CreateSliderNodeWithMaterial();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SliderPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto layoutProperty = frameNode->GetLayoutProperty<SliderLayoutProperty>();
+    ASSERT_NE(layoutProperty, nullptr);
+    layoutProperty->UpdateDirection(Axis::VERTICAL);
+    layoutProperty->UpdateReverse(true);
+    pattern->sliderContentModifier_ = AceType::MakeRefPtr<SliderContentModifier>(
+        SliderContentModifier::Parameters {}, [](const PointF&) {});
+    pattern->circleCenter_ = CIRCLE_CENTER_TEST;
+    float x = 0, y = 0, len = 0;
+    pattern->CalculateEmitterPosition(x, y, len);
+    SUCCEED();
+}
+
+/**
+ * @tc.name: SliderPattern_UpdateParticleFrameNode_HorizontalHighGrade_001
+ * @tc.desc: Test UpdateParticleFrameNode HORIZONTAL + high grade material
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternMaterialTestNg, SliderPattern_UpdateParticleFrameNode_HorizontalHighGrade_001, TestSize.Level1)
+{
+    g_uiMaterialLevel = UiMaterialLevel::EXQUISITE;
+    auto frameNode = CreateSliderNodeWithMaterial();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SliderPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->sliderContentModifier_ = AceType::MakeRefPtr<SliderContentModifier>(
+        SliderContentModifier::Parameters {}, [](const PointF&) {});
+    pattern->particleFrameNode_ = FrameNode::CreateFrameNode(
+        V2::PARTICLE_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<ParticlePattern>(1));
+    pattern->UpdateParticleFrameNode(50.0f, 25.0f);
+    SUCCEED();
+}
+
+/**
+ * @tc.name: SliderPattern_UpdateParticleFrameNode_VerticalHighGrade_001
+ * @tc.desc: Test UpdateParticleFrameNode VERTICAL + high grade material
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternMaterialTestNg, SliderPattern_UpdateParticleFrameNode_VerticalHighGrade_001, TestSize.Level1)
+{
+    g_uiMaterialLevel = UiMaterialLevel::EXQUISITE;
+    auto frameNode = CreateSliderNodeWithMaterial();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SliderPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto layoutProperty = frameNode->GetLayoutProperty<SliderLayoutProperty>();
+    ASSERT_NE(layoutProperty, nullptr);
+    layoutProperty->UpdateDirection(Axis::VERTICAL);
+    pattern->sliderContentModifier_ = AceType::MakeRefPtr<SliderContentModifier>(
+        SliderContentModifier::Parameters {}, [](const PointF&) {});
+    pattern->particleFrameNode_ = FrameNode::CreateFrameNode(
+        V2::PARTICLE_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<ParticlePattern>(1));
+    pattern->UpdateParticleFrameNode(50.0f, 25.0f);
+    SUCCEED();
+}
+
+/**
+ * @tc.name: SliderPattern_UpdateParticleFrameNode_NotHighGrade_001
+ * @tc.desc: Test UpdateParticleFrameNode with non-high-grade material (early return path)
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternMaterialTestNg, SliderPattern_UpdateParticleFrameNode_NotHighGrade_001, TestSize.Level1)
+{
+    auto frameNode = CreateSliderNodeWithMaterial();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SliderPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->sliderContentModifier_ = AceType::MakeRefPtr<SliderContentModifier>(
+        SliderContentModifier::Parameters {}, [](const PointF&) {});
+    pattern->particleFrameNode_ = FrameNode::CreateFrameNode(
+        V2::PARTICLE_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<ParticlePattern>(1));
+    pattern->UpdateParticleFrameNode(50.0f, 25.0f);
+    SUCCEED();
+}
+
+/**
+ * @tc.name: SliderPattern_UpdateParticleFrameOffset_HorizontalNotReverse_001
+ * @tc.desc: Test UpdateParticleFrameOffset HORIZONTAL + not reverse
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternMaterialTestNg, SliderPattern_UpdateParticleFrameOffset_HorizontalNotReverse_001, TestSize.Level1)
+{
+    auto frameNode = CreateSliderNodeWithMaterial();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SliderPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->sliderContentModifier_ = AceType::MakeRefPtr<SliderContentModifier>(
+        SliderContentModifier::Parameters {}, [](const PointF&) {});
+    pattern->particleFrameNode_ = FrameNode::CreateFrameNode(
+        V2::PARTICLE_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<ParticlePattern>(1));
+    pattern->UpdateParticleFrameOffset(Axis::HORIZONTAL, false);
+    SUCCEED();
+}
+
+/**
+ * @tc.name: SliderPattern_UpdateParticleFrameOffset_VerticalReverse_001
+ * @tc.desc: Test UpdateParticleFrameOffset VERTICAL + reverse
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternMaterialTestNg, SliderPattern_UpdateParticleFrameOffset_VerticalReverse_001, TestSize.Level1)
+{
+    auto frameNode = CreateSliderNodeWithMaterial();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SliderPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->sliderContentModifier_ = AceType::MakeRefPtr<SliderContentModifier>(
+        SliderContentModifier::Parameters {}, [](const PointF&) {});
+    pattern->particleFrameNode_ = FrameNode::CreateFrameNode(
+        V2::PARTICLE_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<ParticlePattern>(1));
+    pattern->UpdateParticleFrameOffset(Axis::VERTICAL, true);
+    SUCCEED();
+}
+
+/**
+ * @tc.name: SliderPattern_UpdateEmitterProperties_HorizontalNotReverse_001
+ * @tc.desc: Test UpdateEmitterProperties HORIZONTAL + not reverse
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternMaterialTestNg, SliderPattern_UpdateEmitterProperties_HorizontalNotReverse_001, TestSize.Level1)
+{
+    auto frameNode = CreateSliderNodeWithMaterial();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SliderPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->sliderContentModifier_ = AceType::MakeRefPtr<SliderContentModifier>(
+        SliderContentModifier::Parameters {}, [](const PointF&) {});
+    pattern->particleFrameNode_ = FrameNode::CreateFrameNode(
+        V2::PARTICLE_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<ParticlePattern>(1));
+    pattern->UpdateEmitterProperties(50.0f, 25.0f, Axis::HORIZONTAL, false);
+    SUCCEED();
+}
+
+/**
+ * @tc.name: SliderPattern_UpdateEmitterProperties_VerticalReverse_001
+ * @tc.desc: Test UpdateEmitterProperties VERTICAL + reverse
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternMaterialTestNg, SliderPattern_UpdateEmitterProperties_VerticalReverse_001, TestSize.Level1)
+{
+    auto frameNode = CreateSliderNodeWithMaterial();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SliderPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->sliderContentModifier_ = AceType::MakeRefPtr<SliderContentModifier>(
+        SliderContentModifier::Parameters {}, [](const PointF&) {});
+    pattern->particleFrameNode_ = FrameNode::CreateFrameNode(
+        V2::PARTICLE_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<ParticlePattern>(1));
+    pattern->UpdateEmitterProperties(50.0f, 25.0f, Axis::VERTICAL, true);
+    SUCCEED();
+}
+
+/**
+ * @tc.name: SliderPattern_ShowMaterialNode_HighGrade_002
+ * @tc.desc: Test ShowMaterialNode with high grade material (coverage)
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternMaterialTestNg, SliderPattern_ShowMaterialNode_HighGrade_002, TestSize.Level1)
+{
+    g_uiMaterialLevel = UiMaterialLevel::EXQUISITE;
+    auto frameNode = CreateSliderNodeWithMaterial();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SliderPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->sliderContentModifier_ = AceType::MakeRefPtr<SliderContentModifier>(
+        SliderContentModifier::Parameters {}, [](const PointF&) {});
+    pattern->CreateDragPointNode();
+    pattern->CreateBlurCoverNode();
+    pattern->ShowMaterialNode();
+    SUCCEED();
+}
+
+/**
+ * @tc.name: SliderPattern_ShowMaterialNode_MiddleGrade_002
+ * @tc.desc: Test ShowMaterialNode with middle grade material (coverage)
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternMaterialTestNg, SliderPattern_ShowMaterialNode_MiddleGrade_002, TestSize.Level1)
+{
+    g_uiMaterialLevel = UiMaterialLevel::GENTLE;
+    auto frameNode = CreateSliderNodeWithMaterial();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SliderPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->sliderContentModifier_ = AceType::MakeRefPtr<SliderContentModifier>(
+        SliderContentModifier::Parameters {}, [](const PointF&) {});
+    pattern->ShowMaterialNode();
+    SUCCEED();
+}
+
+/**
+ * @tc.name: SliderPattern_ShowMaterialNode_NotNeeded_001
+ * @tc.desc: Test ShowMaterialNode when material not needed (early return)
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternMaterialTestNg, SliderPattern_ShowMaterialNode_NotNeeded_001, TestSize.Level1)
+{
+    auto frameNode = CreateSliderNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SliderPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->ShowMaterialNode();
+    SUCCEED();
+}
+
+/**
+ * @tc.name: SliderPattern_HideMaterialNode_HighGrade_002
+ * @tc.desc: Test HideMaterialNode with high grade material (coverage)
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternMaterialTestNg, SliderPattern_HideMaterialNode_HighGrade_002, TestSize.Level1)
+{
+    g_uiMaterialLevel = UiMaterialLevel::EXQUISITE;
+    auto frameNode = CreateSliderNodeWithMaterial();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SliderPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->sliderContentModifier_ = AceType::MakeRefPtr<SliderContentModifier>(
+        SliderContentModifier::Parameters {}, [](const PointF&) {});
+    pattern->CreateDragPointNode();
+    pattern->CreateBlurCoverNode();
+    pattern->HideMaterialNode();
+    SUCCEED();
+}
+
+/**
+ * @tc.name: SliderPattern_HideMaterialNode_MiddleGrade_002
+ * @tc.desc: Test HideMaterialNode with middle grade material (coverage)
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternMaterialTestNg, SliderPattern_HideMaterialNode_MiddleGrade_002, TestSize.Level1)
+{
+    g_uiMaterialLevel = UiMaterialLevel::GENTLE;
+    auto frameNode = CreateSliderNodeWithMaterial();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SliderPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->sliderContentModifier_ = AceType::MakeRefPtr<SliderContentModifier>(
+        SliderContentModifier::Parameters {}, [](const PointF&) {});
+    pattern->HideMaterialNode();
+    SUCCEED();
+}
+
+/**
+ * @tc.name: SliderPattern_HideMaterialNode_NotNeeded_001
+ * @tc.desc: Test HideMaterialNode when material not needed (early return)
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternMaterialTestNg, SliderPattern_HideMaterialNode_NotNeeded_001, TestSize.Level1)
+{
+    auto frameNode = CreateSliderNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SliderPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->HideMaterialNode();
+    SUCCEED();
+}
+
+/**
+ * @tc.name: SliderPattern_AnimateHighGradeHide_AllNodesExist_001
+ * @tc.desc: Test AnimateHighGradeHide with all material nodes existing
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternMaterialTestNg, SliderPattern_AnimateHighGradeHide_AllNodesExist_001, TestSize.Level1)
+{
+    auto frameNode = CreateSliderNodeWithMaterial();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SliderPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->CreateDragFrameNode();
+    pattern->CreateSelectedTrackFrameNode();
+    pattern->particleFrameNode_ = FrameNode::CreateFrameNode(
+        V2::PARTICLE_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<ParticlePattern>(1));
+    auto pointRC = pattern->dragPointNode_ ? pattern->dragPointNode_->GetRenderContext() : nullptr;
+    auto blurRC = pattern->blurCoverNode_ ? pattern->blurCoverNode_->GetRenderContext() : nullptr;
+    if (!pointRC) {
+        pattern->CreateDragPointNode();
+        pointRC = pattern->dragPointNode_->GetRenderContext();
+    }
+    if (!blurRC) {
+        pattern->CreateBlurCoverNode();
+        blurRC = pattern->blurCoverNode_->GetRenderContext();
+    }
+    pattern->AnimateHighGradeHide(pointRC, blurRC);
+    SUCCEED();
+}
+
+/**
+ * @tc.name: SliderPattern_AnimateHighGradeHide_NullNodes_001
+ * @tc.desc: Test AnimateHighGradeHide with null render contexts and null nodes
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternMaterialTestNg, SliderPattern_AnimateHighGradeHide_NullNodes_001, TestSize.Level1)
+{
+    auto frameNode = CreateSliderNodeWithMaterial();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SliderPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->dragFrameNode_ = nullptr;
+    pattern->selectedTrackFrameNode_ = nullptr;
+    pattern->particleFrameNode_ = nullptr;
+    pattern->AnimateHighGradeHide(nullptr, nullptr);
+    SUCCEED();
+}
+
+/**
+ * @tc.name: SliderPattern_ResetHostMaterialEffectsInner_001
+ * @tc.desc: Test ResetHostMaterialEffectsInner
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternMaterialTestNg, SliderPattern_ResetHostMaterialEffectsInner_001, TestSize.Level1)
+{
+    auto frameNode = CreateSliderNodeWithMaterial();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SliderPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->ResetHostMaterialEffectsInner();
+    SUCCEED();
+}
+
+/**
+ * @tc.name: SliderPattern_HandleLongPress_HighGrade_001
+ * @tc.desc: Test HandleLongPress with high grade material
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternMaterialTestNg, SliderPattern_HandleLongPress_HighGrade_001, TestSize.Level1)
+{
+    g_uiMaterialLevel = UiMaterialLevel::EXQUISITE;
+    auto frameNode = CreateSliderNodeWithMaterial();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SliderPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->sliderContentModifier_ = AceType::MakeRefPtr<SliderContentModifier>(
+        SliderContentModifier::Parameters {}, [](const PointF&) {});
+    pattern->HandleLongPress();
+    SUCCEED();
+}
+
+/**
+ * @tc.name: SliderPattern_HandleLongPress_LowGrade_002
+ * @tc.desc: Test HandleLongPress with default (low) grade material (coverage)
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternMaterialTestNg, SliderPattern_HandleLongPress_LowGrade_002, TestSize.Level1)
+{
+    auto frameNode = CreateSliderNodeWithMaterial();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SliderPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->sliderContentModifier_ = AceType::MakeRefPtr<SliderContentModifier>(
+        SliderContentModifier::Parameters {}, [](const PointF&) {});
+    pattern->HandleLongPress();
+    SUCCEED();
+}
+
+/**
+ * @tc.name: SliderPattern_HandleLongPress_NotNeeded_001
+ * @tc.desc: Test HandleLongPress when material not needed (early return)
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternMaterialTestNg, SliderPattern_HandleLongPress_NotNeeded_001, TestSize.Level1)
+{
+    auto frameNode = CreateSliderNode();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SliderPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->HandleLongPress();
+    SUCCEED();
+}
+
+/**
+ * @tc.name: SliderPattern_HandleHighGradeLongPress_Outset_001
+ * @tc.desc: Test HandleHighGradeLongPress with OUTSET slider mode
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternMaterialTestNg, SliderPattern_HandleHighGradeLongPress_Outset_001, TestSize.Level1)
+{
+    g_uiMaterialLevel = UiMaterialLevel::EXQUISITE;
+    auto frameNode = CreateSliderNodeWithMaterial();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SliderPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->sliderContentModifier_ = AceType::MakeRefPtr<SliderContentModifier>(
+        SliderContentModifier::Parameters {}, [](const PointF&) {});
+    pattern->HandleHighGradeLongPress();
+    SUCCEED();
+}
+
+/**
+ * @tc.name: SliderPattern_HandleHighGradeLongPress_Inset_001
+ * @tc.desc: Test HandleHighGradeLongPress with INSET slider mode (useParticle path)
+ * @tc.type: FUNC
+ */
+HWTEST_F(SliderPatternMaterialTestNg, SliderPattern_HandleHighGradeLongPress_Inset_001, TestSize.Level1)
+{
+    g_uiMaterialLevel = UiMaterialLevel::EXQUISITE;
+    auto frameNode = CreateSliderNodeWithMaterial();
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<SliderPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto layoutProperty = frameNode->GetLayoutProperty<SliderLayoutProperty>();
+    ASSERT_NE(layoutProperty, nullptr);
+    layoutProperty->UpdateSliderMode(SliderModel::SliderMode::INSET);
+    pattern->sliderContentModifier_ = AceType::MakeRefPtr<SliderContentModifier>(
+        SliderContentModifier::Parameters {}, [](const PointF&) {});
+    pattern->HandleHighGradeLongPress();
+    SUCCEED();
 }
 } // namespace OHOS::Ace::NG
