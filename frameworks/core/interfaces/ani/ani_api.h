@@ -597,7 +597,13 @@ struct ArkUIAniParallelizeUIModifier {
     void (*registerCallback)(
         ArkUINodeHandle, std::function<int32_t()>&&, std::function<ArkUINodeHandle(int32_t, int32_t, int32_t)>&&);
 };
-
+// Complete snapshot in TOP, END, BOTTOM, START order; content is a detached static builder root.
+struct ArkUIAniSafeAreaInsetEdge {
+    ArkUINodeHandle content = nullptr;
+    double spacing = 0.0;
+    int32_t unit = 1; // DimensionUnit::VP
+    int32_t alignment = 1; // SafeAreaInsetAlignment::CENTER
+};
 namespace OHOS::AAFwk {
 class Want;
 class WantParams;

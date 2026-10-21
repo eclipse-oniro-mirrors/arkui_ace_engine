@@ -25,15 +25,21 @@
 #include "adapter/ohos/osal/want_wrap_ohos.h"
 #include "bridge/common/utils/engine_helper.h"
 #include "bridge/declarative_frontend/jsview/js_utils.h"
+#include "bridge/declarative_frontend/jsview/js_ui_extension.h"
+#include "bridge/declarative_frontend/engine/js_converter.h"
 #include "core/common/container_scope.h"
+#include "core/common/container.h"
 #include "core/components_ng/property/transition_property.h"
 #include "core/components_ng/pattern/overlay/overlay_manager.h"
+#include "core/components_ng/pattern/ui_extension/ui_extension_component/modal_ui_extension_proxy_impl.h"
 #include "core/pipeline_ng/pipeline_context.h"
 #include "core/animation/animation_pub.h"
 #include "core/animation/curve.h"
 #include "ui/animation/animation_option.h"
 #include "bridge/common/utils/utils.h"
 #include "native_engine/impl/ark/ark_native_engine.h"
+#include "base/error/error_code.h"
+#include "base/log/ace_scoring_log.h"
 #endif
 
 namespace OHOS::Ace::NG {
@@ -41,13 +47,52 @@ namespace OHOS::Ace::NG {
 namespace {
 constexpr int32_t MODAL_PROXY_FIELD_COUNT = 1;
 
+enum class ModalRegisterType {
+    UNKNOWN = 0,
+    SYNC,
+    ASYNC,
+};
+
+ModalRegisterType GetModalRegisterType(const std::string& strType)
+{
+    static constexpr char syncType[] = "syncReceiverRegister";
+    static constexpr char asyncType[] = "asyncReceiverRegister";
+    if (strType.compare(syncType) == 0) {
+        return ModalRegisterType::SYNC;
+    }
+    if (strType.compare(asyncType) == 0) {
+        return ModalRegisterType::ASYNC;
+    }
+    return ModalRegisterType::UNKNOWN;
+}
+
+using ModalProxyCallbackList =
+    std::list<std::pair<napi_ref, std::function<void(const RefPtr<UIExtensionProxy>&)>>>;
+
 struct ModalUIExtensionProxyHolder {
     std::shared_ptr<ModalUIExtensionProxy> proxy;
+    int32_t instanceId = 0;
+    ModalProxyCallbackList onAsyncCallbackList;
+    ModalProxyCallbackList onSyncCallbackList;
+    std::mutex callbackLock;
 };
 
 void DestroyModalUIExtensionProxy(void* data, void* env, void* hint)
 {
-    delete static_cast<ModalUIExtensionProxyHolder*>(data);
+    auto* holder = static_cast<ModalUIExtensionProxyHolder*>(data);
+    CHECK_NULL_VOID(holder);
+    auto engine = EngineHelper::GetCurrentEngine();
+    NativeEngine* nativeEngine = engine ? engine->GetNativeEngine() : nullptr;
+    auto napiEnv = nativeEngine ? reinterpret_cast<napi_env>(nativeEngine) : nullptr;
+    if (napiEnv) {
+        for (const auto& item : holder->onAsyncCallbackList) {
+            napi_delete_reference(napiEnv, item.first);
+        }
+        for (const auto& item : holder->onSyncCallbackList) {
+            napi_delete_reference(napiEnv, item.first);
+        }
+    }
+    delete holder;
 }
 
 Local<JSValueRef> ModalUIExtensionProxySend(panda::JsiRuntimeCallInfo* info)
@@ -80,15 +125,257 @@ Local<JSValueRef> ModalUIExtensionProxySend(panda::JsiRuntimeCallInfo* info)
     return panda::JSValueRef::Undefined(vm);
 }
 
+std::string GetModalSendSyncErrMsg(int32_t sendCode)
+{
+    if (sendCode == ERROR_CODE_UIEXTENSION_NOT_REGISTER_SYNC_CALLBACK) {
+        return "no callback has been registered to process synchronous data transferring.";
+    }
+    if (sendCode == ERROR_CODE_UIEXTENSION_TRANSFER_DATA_FAILED) {
+        return "Transferring data failed.";
+    }
+    return "Unknown error.";
+}
+
+Local<JSValueRef> ModalUIExtensionProxySendSync(panda::JsiRuntimeCallInfo* info)
+{
+    EcmaVM* vm = info->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> thisObj = info->GetThisRef();
+    if (!thisObj->IsObject(vm)) {
+        return panda::JSValueRef::Undefined(vm);
+    }
+    auto* holder = static_cast<ModalUIExtensionProxyHolder*>(
+        Local<ObjectRef>(thisObj)->GetNativePointerField(vm, 0));
+    CHECK_NULL_RETURN(holder && holder->proxy, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> dataArg = info->GetCallArgRef(0);
+    if (!dataArg->IsObject(vm)) {
+        return panda::JSValueRef::Undefined(vm);
+    }
+    auto engine = EngineHelper::GetCurrentEngine();
+    CHECK_NULL_RETURN(engine, panda::JSValueRef::Undefined(vm));
+    auto nativeEngine = engine->GetNativeEngine();
+    CHECK_NULL_RETURN(nativeEngine, panda::JSValueRef::Undefined(vm));
+    auto napiEnv = reinterpret_cast<napi_env>(nativeEngine);
+    JSValueWrapper valueWrapper = dataArg;
+    Framework::ScopeRAII scopeNapi(napiEnv);
+    napi_value nativeValue = nativeEngine->ValueToNapiValue(valueWrapper);
+    auto wantParamsWrap = WantParamsWrap::CreateWantWrap(napiEnv, nativeValue);
+    CHECK_NULL_RETURN(wantParamsWrap, panda::JSValueRef::Undefined(vm));
+    auto wantParamsWrapOhos = AceType::DynamicCast<WantParamsWrapOhos>(wantParamsWrap);
+    CHECK_NULL_RETURN(wantParamsWrapOhos, panda::JSValueRef::Undefined(vm));
+    auto* modalProxy = static_cast<ModalUIExtensionProxyImpl*>(holder->proxy.get());
+    CHECK_NULL_RETURN(modalProxy, panda::JSValueRef::Undefined(vm));
+    AAFwk::WantParams replyParams;
+    int32_t sendCode = modalProxy->SendDataSync(wantParamsWrapOhos->GetWantParams(), replyParams);
+    if (sendCode != 0) {
+        auto errMsg = GetModalSendSyncErrMsg(sendCode);
+        using namespace OHOS::Ace::Framework;
+        auto execCtx = JsiExecutionContext(vm);
+        JAVASCRIPT_EXECUTION_SCOPE_WITH_CHECK(execCtx, panda::JSValueRef::Undefined(vm));
+        Framework::JSException::Throw(sendCode, errMsg.c_str());
+        return panda::JSValueRef::Undefined(vm);
+    }
+    auto nativeReply = WantWrap::ConvertParamsToNativeValue(replyParams, napiEnv);
+    using namespace OHOS::Ace::Framework;
+    auto execCtx = JsiExecutionContext(vm);
+    JAVASCRIPT_EXECUTION_SCOPE_WITH_CHECK(execCtx, panda::JSValueRef::Undefined(vm));
+    auto replyJsVal = Framework::JsConverter::ConvertNapiValueToJsVal(nativeReply);
+    return replyJsVal->GetLocalHandle();
+}
+
+std::list<std::function<void(const RefPtr<UIExtensionProxy>&)>> GetModalOnFuncList(
+    ModalUIExtensionProxyHolder* holder, ModalRegisterType type)
+{
+    std::list<std::function<void(const RefPtr<UIExtensionProxy>&)>> reList;
+    if (type == ModalRegisterType::SYNC) {
+        for (const auto& item : holder->onSyncCallbackList) {
+            reList.emplace_back(item.second);
+        }
+    } else if (type == ModalRegisterType::ASYNC) {
+        for (const auto& item : holder->onAsyncCallbackList) {
+            reList.emplace_back(item.second);
+        }
+    }
+    return reList;
+}
+
+void PostModalUpdateCallbacksTask(ModalUIExtensionProxyHolder* holder, ModalRegisterType type)
+{
+    CHECK_NULL_VOID(holder);
+    auto* modalProxy = static_cast<ModalUIExtensionProxyImpl*>(holder->proxy.get());
+    CHECK_NULL_VOID(modalProxy);
+    auto innerProxy = modalProxy->GetInnerProxy();
+    CHECK_NULL_VOID(innerProxy);
+    auto pattern = innerProxy->GetPattern();
+    CHECK_NULL_VOID(pattern);
+    auto onFuncList = GetModalOnFuncList(holder, type);
+    auto instanceId = holder->instanceId;
+    auto container = Container::GetContainer(instanceId);
+    CHECK_NULL_VOID(container);
+    auto taskExecutor = container->GetTaskExecutor();
+    CHECK_NULL_VOID(taskExecutor);
+    taskExecutor->PostTask([pattern, onFuncList = std::move(onFuncList), type]() {
+        if (type == ModalRegisterType::SYNC) {
+            pattern->SetSyncCallbacks(std::move(onFuncList));
+        } else if (type == ModalRegisterType::ASYNC) {
+            pattern->SetAsyncCallbacks(std::move(onFuncList));
+        }
+        }, TaskExecutor::TaskType::UI, "ArkUIModalUIExtensionProxyUpdateCallbacks");
+}
+
+std::function<void(const RefPtr<UIExtensionProxy>&)> CreateModalReceiverCallback(
+    EcmaVM* vm, panda::CopyableGlobal<panda::FunctionRef> func,
+    Framework::JsiExecutionContext execCtx, int32_t instanceId)
+{
+    return [vm, func = std::move(func), execCtx, instanceId](
+            const RefPtr<UIExtensionProxy>& session) {
+        using namespace OHOS::Ace::Framework;
+        panda::LocalScope pandaScope(vm);
+        panda::TryCatch trycatch(vm);
+        ContainerScope scope(instanceId);
+        JAVASCRIPT_EXECUTION_SCOPE_WITH_CHECK(execCtx);
+        JSRef<JSObject> contextObj = JSClass<JSUIExtensionProxy>::NewInstance();
+        auto proxy = Referenced::Claim(contextObj->Unwrap<Framework::JSUIExtensionProxy>());
+        CHECK_NULL_VOID(proxy);
+        proxy->SetInstanceId(instanceId);
+        proxy->SetProxy(session);
+        Local<JSValueRef> param = JSRef<JSVal>::Cast(contextObj)->GetLocalHandle();
+        func->Call(vm, func.ToLocal(), &param, 1);
+    };
+}
+
+Local<JSValueRef> ModalUIExtensionProxyOn(panda::JsiRuntimeCallInfo* info)
+{
+    EcmaVM* vm = info->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> thisObj = info->GetThisRef();
+    if (!thisObj->IsObject(vm)) {
+        return panda::JSValueRef::Undefined(vm);
+    }
+    auto* holder = static_cast<ModalUIExtensionProxyHolder*>(
+        Local<ObjectRef>(thisObj)->GetNativePointerField(vm, 0));
+    CHECK_NULL_RETURN(holder && holder->proxy, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> typeArg = info->GetCallArgRef(0);
+    Local<JSValueRef> cbArg = info->GetCallArgRef(1);
+    if (!typeArg->IsString(vm) || !cbArg->IsFunction(vm)) {
+        return panda::JSValueRef::Undefined(vm);
+    }
+    std::string strType = typeArg->ToString(vm)->ToString(vm);
+    ModalRegisterType registerType = GetModalRegisterType(strType);
+    if (registerType == ModalRegisterType::UNKNOWN) {
+        return panda::JSValueRef::Undefined(vm);
+    }
+
+    auto execCtx = Framework::JsiExecutionContext(vm);
+    auto instanceId = holder->instanceId;
+    panda::Local<panda::FunctionRef> funcRef = cbArg->ToObject(vm);
+    auto func = panda::CopyableGlobal(vm, funcRef);
+    auto jsFunc = CreateModalReceiverCallback(vm, std::move(func), execCtx, instanceId);
+
+    auto engine = EngineHelper::GetCurrentEngine();
+    CHECK_NULL_RETURN(engine, panda::JSValueRef::Undefined(vm));
+    auto nativeEngine = engine->GetNativeEngine();
+    CHECK_NULL_RETURN(nativeEngine, panda::JSValueRef::Undefined(vm));
+    auto napiEnv = reinterpret_cast<napi_env>(nativeEngine);
+    Framework::ScopeRAII scopeNapi(napiEnv);
+    JSValueWrapper cbWrapper = cbArg;
+    napi_value cbNapi = nativeEngine->ValueToNapiValue(cbWrapper);
+    napi_ref ref = nullptr;
+    napi_create_reference(napiEnv, cbNapi, 1, &ref);
+    {
+        std::lock_guard<std::mutex> lock(holder->callbackLock);
+        if (registerType == ModalRegisterType::SYNC) {
+            holder->onSyncCallbackList.emplace_back(ref, jsFunc);
+        } else {
+            holder->onAsyncCallbackList.emplace_back(ref, jsFunc);
+        }
+    }
+    PostModalUpdateCallbacksTask(holder, registerType);
+    return panda::JSValueRef::Undefined(vm);
+}
+
+void RemoveModalCallbacks(napi_env napiEnv, napi_value cb, ModalProxyCallbackList& list)
+{
+    if (cb == nullptr) {
+        for (const auto& item : list) {
+            napi_delete_reference(napiEnv, item.first);
+        }
+        list.clear();
+        return;
+    }
+    for (auto iter = list.begin(); iter != list.end();) {
+        napi_value refItem = nullptr;
+        napi_get_reference_value(napiEnv, iter->first, &refItem);
+        bool equals = false;
+        napi_strict_equals(napiEnv, refItem, cb, &equals);
+        if (equals) {
+            napi_delete_reference(napiEnv, iter->first);
+            iter = list.erase(iter);
+        } else {
+            ++iter;
+        }
+    }
+}
+
+Local<JSValueRef> ModalUIExtensionProxyOff(panda::JsiRuntimeCallInfo* info)
+{
+    EcmaVM* vm = info->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> thisObj = info->GetThisRef();
+    if (!thisObj->IsObject(vm)) {
+        return panda::JSValueRef::Undefined(vm);
+    }
+    auto* holder = static_cast<ModalUIExtensionProxyHolder*>(
+        Local<ObjectRef>(thisObj)->GetNativePointerField(vm, 0));
+    CHECK_NULL_RETURN(holder && holder->proxy, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> typeArg = info->GetCallArgRef(0);
+    if (!typeArg->IsString(vm)) {
+        return panda::JSValueRef::Undefined(vm);
+    }
+    std::string strType = typeArg->ToString(vm)->ToString(vm);
+    ModalRegisterType registerType = GetModalRegisterType(strType);
+    if (registerType == ModalRegisterType::UNKNOWN) {
+        return panda::JSValueRef::Undefined(vm);
+    }
+    Local<JSValueRef> cbArg = info->GetCallArgRef(1);
+    auto engine = EngineHelper::GetCurrentEngine();
+    CHECK_NULL_RETURN(engine, panda::JSValueRef::Undefined(vm));
+    auto nativeEngine = engine->GetNativeEngine();
+    CHECK_NULL_RETURN(nativeEngine, panda::JSValueRef::Undefined(vm));
+    auto napiEnv = reinterpret_cast<napi_env>(nativeEngine);
+    Framework::ScopeRAII scopeNapi(napiEnv);
+    napi_value cb = nullptr;
+    if (cbArg->IsFunction(vm)) {
+        JSValueWrapper cbWrapper = cbArg;
+        cb = nativeEngine->ValueToNapiValue(cbWrapper);
+    }
+    {
+        std::lock_guard<std::mutex> lock(holder->callbackLock);
+        if (registerType == ModalRegisterType::SYNC) {
+            RemoveModalCallbacks(napiEnv, cb, holder->onSyncCallbackList);
+        } else {
+            RemoveModalCallbacks(napiEnv, cb, holder->onAsyncCallbackList);
+        }
+    }
+    PostModalUpdateCallbacksTask(holder, registerType);
+    return panda::JSValueRef::Undefined(vm);
+}
+
 Local<JSValueRef> CreateModalUIExtensionProxyObject(EcmaVM* vm,
-    const std::shared_ptr<ModalUIExtensionProxy>& proxy)
+    const std::shared_ptr<ModalUIExtensionProxy>& proxy, int32_t instanceId)
 {
     auto proxyObj = panda::ObjectRef::New(vm);
-    auto* holder = new ModalUIExtensionProxyHolder { .proxy = proxy };
+    auto* holder = new ModalUIExtensionProxyHolder { .proxy = proxy, .instanceId = instanceId };
     proxyObj->SetNativePointerFieldCount(vm, MODAL_PROXY_FIELD_COUNT);
     proxyObj->SetNativePointerField(vm, 0, holder, DestroyModalUIExtensionProxy);
     proxyObj->Set(vm, panda::StringRef::NewFromUtf8(vm, "send"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), ModalUIExtensionProxySend));
+    proxyObj->Set(vm, panda::StringRef::NewFromUtf8(vm, "sendSync"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), ModalUIExtensionProxySendSync));
+    proxyObj->Set(vm, panda::StringRef::NewFromUtf8(vm, "on"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), ModalUIExtensionProxyOn));
+    proxyObj->Set(vm, panda::StringRef::NewFromUtf8(vm, "off"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), ModalUIExtensionProxyOff));
     return proxyObj;
 }
 
@@ -105,7 +392,7 @@ std::function<void(const std::shared_ptr<ModalUIExtensionProxy>&)> CreateOnRemot
         panda::LocalScope pandaScope(vm);
         panda::TryCatch trycatch(vm);
         ContainerScope scope(instanceId);
-        auto proxyObj = CreateModalUIExtensionProxyObject(vm, proxy);
+        auto proxyObj = CreateModalUIExtensionProxyObject(vm, proxy, instanceId);
         panda::Local<panda::JSValueRef> params[1] = { proxyObj };
         func->Call(vm, func.ToLocal(), params, 1);
     };
@@ -440,7 +727,7 @@ void ParseOptionsFromArg(EcmaVM* vm, const Local<JSValueRef>& optionsArg,
     if (transitionVal->IsObject(vm)) {
             auto effect = ParseChainedTransitionEffectWithChain(vm, transitionVal);
         if (effect) {
-            extraConfig.transition = new RefPtr<NG::ChainedTransitionEffect>(effect);
+            extraConfig.transition = effect;
         }
     }
 }

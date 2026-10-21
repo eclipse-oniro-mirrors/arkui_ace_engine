@@ -747,6 +747,13 @@ export enum ResolveStrategy {
     UNDEFINED = 5
 }
 
+class InputEventMonitorHandle implements InputEventMonitor {
+    handle?: KPointer;
+    constructor(handle: KPointer) {
+        this.handle = handle;
+    }
+}
+
 export interface ModalUIExtensionOptions {
     dpiFollowStrategy?: DpiFollowStrategy;
     windowModeFollowStrategy?: WindowModeFollowStrategy;
@@ -789,7 +796,7 @@ export class ModalUIExtensionProxy implements UIExtensionProxy {
     }
     public sendSync(data: Record<string, RecordData>): Record<string, RecordData> {
         if (this.proxyPtr_ === 0) {
-            return new Record<String, RecordData>();
+            return new Record<string, RecordData>();
         }
         return ArkUIAniModule._ModalUIExtensionProxySendSync(this.proxyPtr_, data);
     }

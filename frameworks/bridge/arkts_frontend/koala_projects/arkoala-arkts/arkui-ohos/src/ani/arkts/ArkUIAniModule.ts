@@ -51,7 +51,8 @@ import { DrawModifier } from "#handwritten"
 import { JavaScriptProxy } from '#generated';
 import { ErrorCallback } from '@ohos.base';
 import { int32 } from '@koalaui/compat';
-import { SaveButtonCallback, PasteButtonCallback, uiextensionProxy } from '#generated';
+import { SaveButtonCallback, PasteButtonCallback } from '#generated';
+import { UIExtensionProxy } from 'arkui/component/uiExtensionComponent';
 import { InputMethodExtraConfig } from '@ohos.inputMethod.ExtraConfig'
 import { default as text } from '@ohos.graphics.text'
 import { StackLayoutAlgorithm } from "arkui/LayoutAlgorithm"
@@ -577,7 +578,7 @@ export class ArkUIAniModule {
     native static _CreateModalUIExtension(want: Want, options?: Object, callback?: Object): KInt
     native static _CloseModalUIExtension(sessionId: KInt, instanceId: KInt): void
     native static _ModalUIExtensionProxySend(proxyPtr: KPointer, data: Object): void
-    native static _ModalUIExtensionProxySendSync(proxyPtr: KPointer, data: Object): Object
+    native static _ModalUIExtensionProxySendSync(proxyPtr: KPointer, data: Object): Record<string, RecordData>
     native static _ModalUIExtensionProxyDestroy(proxyPtr: KPointer): void
     native static _ModalUIExtensionProxyOnAsyncReceiverRegister(proxyPtr: KPointer, callback: Callback<UIExtensionProxy>): void
     native static _ModalUIExtensionProxyOnSyncReceiverRegister(proxyPtr: KPointer, callback: Callback<UIExtensionProxy>): void

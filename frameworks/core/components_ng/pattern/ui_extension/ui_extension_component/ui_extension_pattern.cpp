@@ -1563,7 +1563,8 @@ void UIExtensionPattern::FireOnRemoteReadyCallback()
         onRemoteReadyCallback_(MakeRefPtr<UIExtensionProxy>(sessionWrapper_, Claim(this)));
     }
     if (onModalRemoteReadyCallback_) {
-        onModalRemoteReadyCallback_(std::make_shared<ModalUIExtensionProxyImpl>(sessionWrapper_));
+        auto innerProxy = MakeRefPtr<UIExtensionProxy>(sessionWrapper_, Claim(this));
+        onModalRemoteReadyCallback_(std::make_shared<ModalUIExtensionProxyImpl>(innerProxy));
     }
 }
 

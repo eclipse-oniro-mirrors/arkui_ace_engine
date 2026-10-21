@@ -54,10 +54,9 @@ ohos_shared_library("arkoala_native_ani") {
   ]
   if (!build_ohos_sdk && !(defined(is_arkui_x) && is_arkui_x)) {
     deps += [
-      "$ace_root/frameworks/bridge/arkts_frontend:ArkoalaNative_ark",
       "$ace_root/build:libace_compatible",
+      "$ace_root/frameworks/bridge/arkts_frontend:ArkoalaNative_ark",
       "$ace_root/frameworks/core:ace_container_scope",
-      "$ace_root/frameworks/core/components_ng/pattern/uiextension:ace_core_components_ui_extension_pattern_ng_ohos",
     ]
   }
 

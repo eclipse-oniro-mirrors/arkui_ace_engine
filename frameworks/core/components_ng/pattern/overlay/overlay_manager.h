@@ -51,11 +51,11 @@ class FrameNode;
 class UINode;
 class PipelineContext;
 class OverlayManager;
-struct InnerExtraConfig {
-    void* transition = nullptr;
-};
-class ModalPresentationPattern;
 class ChainedTransitionEffect;
+class ModalPresentationPattern;
+struct InnerExtraConfig {
+    RefPtr<ChainedTransitionEffect> transition;
+};
 struct CalendarSettingData;
 struct ContentCoverParam;
 struct DatePickerSettingData;
@@ -754,7 +754,6 @@ private:
     void ExecuteModalTransitionOut(const RefPtr<FrameNode>& topModalNode,
         const RefPtr<ModalPresentationPattern>& pattern, ModalTransition modalTransition,
         const RefPtr<FrameNode>& builder, const RefPtr<UINode>& rootNode);
-    RefPtr<NG::ChainedTransitionEffect> ExtractTransitionEffect(void* transitionRaw);
     void BindModalUIExtensionContentCover(const ModalUIExtensionConfig& config,
         int32_t sessionId, std::function<RefPtr<UINode>()>&& buildNodeFunc,
         const RefPtr<NG::ChainedTransitionEffect>& transitionEffect,

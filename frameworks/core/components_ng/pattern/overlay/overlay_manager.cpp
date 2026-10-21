@@ -5864,6 +5864,7 @@ int32_t OverlayManager::CreateModalUIExtension(
         .isModalRequestFocus = config.isModalRequestFocus, .isModalFixFocus = config.isModalFixFocus };
     innerModalUIExtensionConfig.transition = extraConfig.transition;
     auto uiExtNode = ModalUIExtension::Create(want, callbacks, innerModalUIExtensionConfig);
+    CHECK_NULL_RETURN(uiExtNode, 0);
     if (!HandleUIExtNodeTransform(want, uiExtNode)) {
         return 0;
     }
@@ -5872,20 +5873,8 @@ int32_t OverlayManager::CreateModalUIExtension(
         return uiExtNode;
     };
     auto sessionId = ModalUIExtension::GetSessionId(uiExtNode);
-    auto transitionEffect = ExtractTransitionEffect(extraConfig.transition);
-    BindModalUIExtensionContentCover(config, sessionId, std::move(buildNodeFunc), transitionEffect, uiExtNode);
+    BindModalUIExtensionContentCover(config, sessionId, std::move(buildNodeFunc), extraConfig.transition, uiExtNode);
     return sessionId;
-}
-
-RefPtr<NG::ChainedTransitionEffect> OverlayManager::ExtractTransitionEffect(void* transitionRaw)
-{
-    if (transitionRaw == nullptr) {
-        return nullptr;
-    }
-    auto* transitionPtr = static_cast<RefPtr<NG::ChainedTransitionEffect>*>(transitionRaw);
-    auto effect = *transitionPtr;
-    delete transitionPtr;
-    return effect;
 }
 
 void OverlayManager::BindModalUIExtensionContentCover(const ModalUIExtensionConfig& config,

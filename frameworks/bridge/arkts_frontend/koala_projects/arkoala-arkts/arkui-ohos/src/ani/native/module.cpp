@@ -2104,6 +2104,36 @@ ANI_EXPORT ani_status ANI_Constructor(ani_vm* vm, uint32_t* result)
             "_ModalUIExtensionProxySend",
             nullptr,
             reinterpret_cast<void*>(OHOS::Ace::Ani::ModalUIExtensionProxySend)
+        },
+        ani_native_function {
+            "_ModalUIExtensionProxySendSync",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::ModalUIExtensionProxySendSync)
+        },
+        ani_native_function {
+            "_ModalUIExtensionProxyDestroy",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::ModalUIExtensionProxyDestroy)
+        },
+        ani_native_function {
+            "_ModalUIExtensionProxyOnAsyncReceiverRegister",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::ModalUIExtensionProxyOnAsyncReceiverRegister)
+        },
+        ani_native_function {
+            "_ModalUIExtensionProxyOnSyncReceiverRegister",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::ModalUIExtensionProxyOnSyncReceiverRegister)
+        },
+        ani_native_function {
+            "_ModalUIExtensionProxyOffAsyncReceiverRegister",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::ModalUIExtensionProxyOffAsyncReceiverRegister)
+        },
+        ani_native_function {
+            "_ModalUIExtensionProxyOffSyncReceiverRegister",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::ModalUIExtensionProxyOffSyncReceiverRegister)
         }
 #endif
     };

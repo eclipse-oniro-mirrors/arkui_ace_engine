@@ -21,15 +21,15 @@
 #include "ani_common_want.h"
 #include "core/common/container.h"
 #include "core/common/container_scope.h"
-#include "core/components_ng/pattern/overlay/overlay_manager.h"
-#include "core/components_ng/pattern/ui_extension/ui_extension_component/modal_ui_extension_proxy_impl.h"
-#include "core/components_ng/pattern/ui_extension/ui_extension_component/ui_extension_proxy.h"
-#include "core/components_ng/pattern/ui_extension/ui_extension_component/ui_extension_pattern.h"
 #include "core/interfaces/ani/ani_api.h"
 #include "core/interfaces/native/implementation/transition_effect_peer_impl.h"
 #include "interfaces/inner_api/ace/ui_content.h"
 #include "interfaces/inner_api/ace/modal_ui_extension_config.h"
 #include "interfaces/inner_api/ace/modal_ui_extension_proxy.h"
+#include "core/components_ng/pattern/ui_extension/ui_extension_component/modal_ui_extension_proxy_impl.h"
+#include "core/components_ng/pattern/ui_extension/ui_extension_component/ui_extension_proxy.h"
+#include "core/components_ng/pattern/ui_extension/ui_extension_component/ui_extension_pattern.h"
+#include "core/components_ng/pattern/overlay/overlay_manager.h"
 
 namespace OHOS::Ace::Ani {
 namespace {
@@ -41,11 +41,11 @@ enum class ModalRegisterType {
 };
 
 using ModalAniCallbackList =
-    std::list<std::pair<ani_ref, std::function<void(const Refptr<NG::UIExtensionProxy>&)>>>;
+    std::list<std::pair<ani_ref, std::function<void(const RefPtr<NG::UIExtensionProxy>&)>>>;
 
-struct ModalUiExtensionProxyAniHolder {
+struct ModalUIExtensionProxyAniHolder {
     std::shared_ptr<ModalUIExtensionProxy> proxy;
-    int32_t sessionId = 0;
+    int32_t instanceId = 0;
     ani_env* callbackEnv = nullptr;
     ModalAniCallbackList onAsyncCallbackList;
     ModalAniCallbackList onSyncCallbackList;
@@ -105,14 +105,12 @@ std::function<void(const std::shared_ptr<ModalUIExtensionProxy>&)> CreateAniOnRe
         ScopedAniEnv scopedEnv(vm);
         ani_env* callbackEnv = scopedEnv.Get();
         CHECK_NULL_VOID(callbackEnv);
-        auto* holder = new ModalUiExtensionProxyAniHolder {
+        auto* holder = new ModalUIExtensionProxyAniHolder {
             .proxy = proxy,
-            .sessionId = instanceId,
+            .instanceId = instanceId,
             .callbackEnv = callbackEnv,
-        }
+        };
         ani_long proxyPtr = reinterpret_cast<ani_long>(holder);
-        auto proxyStorage = std::make_shared<std::shared_ptr<ModalUIExtensionProxy>>(proxy);
-        ani_long proxyPtr = reinterpret_cast<ani_long>(proxyStorage.get());
         ani_ref arg = AniUtils::CreateLong(callbackEnv, proxyPtr);
         CHECK_NULL_VOID(arg);
         AniLocalRefGuard argGuard(callbackEnv, arg);
@@ -260,7 +258,7 @@ void ParseDpiFollowStrategy(ani_env* env, ani_object options, ModalUIExtensionCo
     config.isDensityFollowHost = (static_cast<int32_t>(dpiStrategy) == FOLLOW_HOST_STRATEGY);
 }
 
-void ParseWindowModeFollowHost(ani_env* env, ani_object options, ModalUIExtensionConfig& config)
+void ParseWindowModeFollowStrategy(ani_env* env, ani_object options, ModalUIExtensionConfig& config)
 {
     ani_ref windowModeRef = nullptr;
     if (ANI_OK != env->Object_GetPropertyByName_Ref(options, "isWindowModeFollowHost", &windowModeRef)
@@ -290,7 +288,7 @@ ModalUIExtensionConfig ParseConfigFromAniOptions(ani_env* env, ani_object option
     config.isWindowModeFollowHost = true;
     config.isModalFixFocus = true;
     ParseDpiFollowStrategy(env, options, config);
-    ParseWindowModeFollowHost(env, options, config);
+    ParseWindowModeFollowStrategy(env, options, config);
     ParseTransitionFromAniOptions(env, options, extraConfig);
     return config;
 }
@@ -299,7 +297,7 @@ ModalUIExtensionConfig ParseConfigFromAniOptions(ani_env* env, ani_object option
 void ModalUIExtensionProxySend(ani_env* env, [[maybe_unused]] ani_object obj, ani_long proxyPtr, ani_object data)
 {
     CHECK_NULL_VOID(env);
-    auto* holder = reinterpret_cast<ModalUiExtensionProxyAniHolder*>(proxyPtr);
+    auto* holder = reinterpret_cast<ModalUIExtensionProxyAniHolder*>(proxyPtr);
     CHECK_NULL_VOID(holder);
     CHECK_NULL_VOID(holder->proxy);
     OHOS::AAFwk::WantParams requestParams;
@@ -314,7 +312,7 @@ ani_object ModalUIExtensionProxySendSync(
 {
     ani_object resultObj = {};
     CHECK_NULL_RETURN(env, resultObj);
-    auto* holder = reinterpret_cast<ModalUiExtensionProxyAniHolder*>(proxyPtr);
+    auto* holder = reinterpret_cast<ModalUIExtensionProxyAniHolder*>(proxyPtr);
     CHECK_NULL_RETURN(holder, resultObj);
     CHECK_NULL_RETURN(holder->proxy, resultObj);
     OHOS::AAFwk::WantParams requestParams;
@@ -322,7 +320,7 @@ ani_object ModalUIExtensionProxySendSync(
         return resultObj;
     }
     OHOS::AAFwk::WantParams replyParams;
-    auto* modalProxy = static_cast<OHOS::ACE::NG::ModalUIExtensionProxyImpl*>(holder->proxy.get());
+    auto* modalProxy = static_cast<OHOS::Ace::NG::ModalUIExtensionProxyImpl*>(holder->proxy.get());
     CHECK_NULL_RETURN(modalProxy, resultObj);
     modalProxy->SendDataSync(requestParams, replyParams);
     ani_ref wantParamsObj = OHOS::AppExecFwk::WrapWantParams(env, replyParams);
@@ -330,10 +328,10 @@ ani_object ModalUIExtensionProxySendSync(
     return static_cast<ani_object>(wantParamsObj);
 }
 
-std::list<std::function<void(const Refptr<NG::UIExtensionProxy>&)>> GetModalOnFuncList(
+std::list<std::function<void(const RefPtr<NG::UIExtensionProxy>&)>> GetModalOnFuncList(
     ModalUIExtensionProxyAniHolder* holder, ModalRegisterType type)
 {
-    std::list<std::function<void(const Refptr<NG::UIExtensionProxy>&)>> reList;
+    std::list<std::function<void(const RefPtr<NG::UIExtensionProxy>&)>> reList;
     if (type == ModalRegisterType::SYNC) {
         for (const auto& item : holder->onSyncCallbackList) {
             reList.emplace_back(item.second);
@@ -346,10 +344,10 @@ std::list<std::function<void(const Refptr<NG::UIExtensionProxy>&)>> GetModalOnFu
     return reList;
 }
 
-void PostModalUpdateCallbacksTask(ModalUiExtensionProxyAniHolder* holder, ModalRegisterType type)
+void PostModalUpdateCallbacksTask(ModalUIExtensionProxyAniHolder* holder, ModalRegisterType type)
 {
     CHECK_NULL_VOID(holder);
-    auto* modalProxy = static_cast<OHOS::ACE::NG::ModalUIExtensionProxyImpl*>(holder->proxy.get());
+    auto* modalProxy = static_cast<OHOS::Ace::NG::ModalUIExtensionProxyImpl*>(holder->proxy.get());
     CHECK_NULL_VOID(modalProxy);
     auto innerProxy = modalProxy->GetInnerProxy();
     CHECK_NULL_VOID(innerProxy);
@@ -367,16 +365,16 @@ void PostModalUpdateCallbacksTask(ModalUiExtensionProxyAniHolder* holder, ModalR
         } else if (type == ModalRegisterType::ASYNC) {
             pattern->SetAsyncCallbacks(std::move(onFuncList));
         }
-    }, TaskExecutor::TaskType::UI, "ArkUIModalUIExtensionProxyUpdateCallbacks");
+        }, TaskExecutor::TaskType::UI, "ArkUIModalUIExtensionProxyUpdateCallbacks");
 }
 
-std::function<void(const Refptr<NG::UIExtensionProxy>&)> CreateAniReceiverCallback(
-    ModalUiExtensionProxyAniHolder* holder, ani_ref cbRef)
+std::function<void(const RefPtr<NG::UIExtensionProxy>&)> CreateAniReceiverCallback(
+    ModalUIExtensionProxyAniHolder* holder, ani_ref cbRef)
 {
     ani_env* callbackEnv = holder->callbackEnv;
     int32_t instanceId = holder->instanceId;
     auto cb = std::make_shared<CommonModuleCallbackAni>(callbackEnv, cbRef);
-    return [callbackEnv, func = cb, instanceId](const Refptr<NG::UIExtensionProxy>& session) {
+    return [callbackEnv, cb, instanceId](const RefPtr<NG::UIExtensionProxy>& session) {
         ani_vm* vm = nullptr;
         callbackEnv->GetVM(&vm);
         CHECK_NULL_VOID(vm);
@@ -384,17 +382,17 @@ std::function<void(const Refptr<NG::UIExtensionProxy>&)> CreateAniReceiverCallba
         ani_env* env = scopedEnv.Get();
         CHECK_NULL_VOID(env);
         ContainerScope scope(instanceId);
-        auto modalProxy = std::make_shared<OHOS::ACE::NG::ModalUIExtensionProxyImpl>(session);
-        auto* receiverHolder = new ModalUiExtensionProxyAniHolder {
+        auto modalProxy = std::make_shared<OHOS::Ace::NG::ModalUIExtensionProxyImpl>(session);
+        auto* receiverHolder = new ModalUIExtensionProxyAniHolder {
             .proxy = modalProxy,
-            .sessionId = instanceId,
+            .instanceId = instanceId,
             .callbackEnv = env,
         };
         ani_long proxyPtr = reinterpret_cast<ani_long>(receiverHolder);
         ani_ref arg = AniUtils::CreateLong(env, proxyPtr);
         CHECK_NULL_VOID(arg);
         AniLocalRefGuard argGuard(env, arg);
-        CallAniCallback(func.get(), env, 1, &arg);
+        CallAniCallback(cb.get(), env, 1, &arg);
     };
 }
 
@@ -402,7 +400,7 @@ void ModalUIExtensionProxyOnAsyncReceiverRegister(
     ani_env* env, [[maybe_unused]] ani_object obj, ani_long proxyPtr, ani_object callback)
 {
     CHECK_NULL_VOID(env);
-    auto* holder = reinterpret_cast<ModalUiExtensionProxyAniHolder*>(proxyPtr);
+    auto* holder = reinterpret_cast<ModalUIExtensionProxyAniHolder*>(proxyPtr);
     CHECK_NULL_VOID(holder);
     CHECK_NULL_VOID(holder->proxy);
     if (!callback || AniUtils::IsUndefined(env, callback)) {
@@ -424,7 +422,7 @@ void ModalUIExtensionProxyOnSyncReceiverRegister(
     ani_env* env, [[maybe_unused]] ani_object obj, ani_long proxyPtr, ani_object callback)
 {
     CHECK_NULL_VOID(env);
-    auto* holder = reinterpret_cast<ModalUiExtensionProxyAniHolder*>(proxyPtr);
+    auto* holder = reinterpret_cast<ModalUIExtensionProxyAniHolder*>(proxyPtr);
     CHECK_NULL_VOID(holder);
     CHECK_NULL_VOID(holder->proxy);
     if (!callback || AniUtils::IsUndefined(env, callback)) {
@@ -472,7 +470,7 @@ void ModalUIExtensionProxyOffAsyncReceiverRegister(
     ani_env* env, [[maybe_unused]] ani_object obj, ani_long proxyPtr, ani_object callback)
 {
     CHECK_NULL_VOID(env);
-    auto* holder = reinterpret_cast<ModalUiExtensionProxyAniHolder*>(proxyPtr);
+    auto* holder = reinterpret_cast<ModalUIExtensionProxyAniHolder*>(proxyPtr);
     CHECK_NULL_VOID(holder);
     CHECK_NULL_VOID(holder->proxy);
     ani_env* callbackEnv = holder->callbackEnv;
@@ -487,7 +485,7 @@ void ModalUIExtensionProxyOffSyncReceiverRegister(
     ani_env* env, [[maybe_unused]] ani_object obj, ani_long proxyPtr, ani_object callback)
 {
     CHECK_NULL_VOID(env);
-    auto* holder = reinterpret_cast<ModalUiExtensionProxyAniHolder*>(proxyPtr);
+    auto* holder = reinterpret_cast<ModalUIExtensionProxyAniHolder*>(proxyPtr);
     CHECK_NULL_VOID(holder);
     CHECK_NULL_VOID(holder->proxy);
     ani_env* callbackEnv = holder->callbackEnv;
@@ -501,9 +499,8 @@ void ModalUIExtensionProxyOffSyncReceiverRegister(
 void ModalUIExtensionProxyDestroy(ani_env* env, [[maybe_unused]] ani_object obj, ani_long proxyPtr)
 {
     CHECK_NULL_VOID(env);
-    auto* holder = reinterpret_cast<ModalUiExtensionProxyAniHolder*>(proxyPtr);
+    auto* holder = reinterpret_cast<ModalUIExtensionProxyAniHolder*>(proxyPtr);
     CHECK_NULL_VOID(holder);
-    CHECK_NULL_VOID(holder->proxy);
     ani_env* callbackEnv = holder->callbackEnv;
     if (callbackEnv) {
         for (const auto& item : holder->onAsyncCallbackList) {

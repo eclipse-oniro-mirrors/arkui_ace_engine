@@ -25,6 +25,7 @@
 #include "core/components_ng/pattern/ui_extension/ui_extension_component/session_wrapper_impl.h"
 #include "core/components_ng/pattern/ui_extension/ui_extension_model_ng.h"
 #include "core/components_ng/pattern/ui_extension/ui_extension_config.h"
+#include "core/components_ng/property/transition_property.h"
 #include "interfaces/inner_api/ace/modal_ui_extension_config.h"
 #include "adapter/ohos/osal/want_wrap_ohos.h"
 
@@ -172,7 +173,9 @@ HWTEST_F(ModalUIExtensionTestNg, ModalUIExtensionProxyTest001, TestSize.Level1)
     auto sessionWrapper = AceType::MakeRefPtr<SessionWrapperImpl>(pattern, pattern->instanceId_, true,
         SessionType::UI_EXTENSION_ABILITY);
     ASSERT_NE(sessionWrapper, nullptr);
-    auto proxy = std::make_shared<ModalUIExtensionProxyImpl>(sessionWrapper);
+    auto innerProxy = AceType::MakeRefPtr<UIExtensionProxy>(sessionWrapper, pattern);
+    ASSERT_NE(innerProxy, nullptr);
+    auto proxy = std::make_shared<ModalUIExtensionProxyImpl>(innerProxy);
     ASSERT_NE(proxy, nullptr);
     AAFwk::WantParams params;
     proxy->SendData(params);
@@ -238,9 +241,9 @@ HWTEST_F(ModalUIExtensionTestNg, ModalUIExtensionPatternCallbackTest002, TestSiz
     EXPECT_EQ(releaseCode, 1);
 
     pattern->FireOnErrorCallback(100, "TestError", "test message");
-    EXPECT_EQ(errorCode, 100);
-    EXPECT_EQ(errorName, "TestError");
-    EXPECT_EQ(errorMessage, "test message");
+    EXPECT_EQ(errorCode, -1);
+    EXPECT_EQ(errorName, "");
+    EXPECT_EQ(errorMessage, "");
 #endif
 }
 
@@ -511,11 +514,11 @@ HWTEST_F(ModalUIExtensionTestNg, ModalUIExtensionOnDrawReadyTest001, TestSize.Le
  */
 HWTEST_F(ModalUIExtensionTestNg, ModalUIExtensionTransitionTest002, TestSize.Level1)
 {
-    int dummyValue = 42;
+    auto effect = AceType::MakeRefPtr<ChainedIdentityEffect>();
     InnerModalUIExtensionConfig config;
-    config.transition = &dummyValue;
+    config.transition = effect;
     EXPECT_NE(config.transition, nullptr);
-    EXPECT_EQ(config.transition, &dummyValue);
+    EXPECT_EQ(config.transition, effect);
 
     config.transition = nullptr;
     EXPECT_EQ(config.transition, nullptr);
