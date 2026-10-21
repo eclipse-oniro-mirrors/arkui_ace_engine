@@ -6,6 +6,8 @@
       OHOS::Ace::NG::FrameNode::GetPositionToWindowWithTransform*;
       "OHOS::Ace::JsonValue::Replace(char const*, bool)";
       OHOS::Ace::NG::TextPattern::IsSetObscured*;
+      OHOS::Ace::NG::TextPattern::HasInspectorResponseRegion*;
+      virtual?thunk?to?OHOS::Ace::NG::TextPattern::HasInspectorResponseRegion*;
       "OHOS::Ace::JsonValue::Put(double)";
       OHOS::Ace::NG::TextPattern::CollectVisualTreeProperties*;
       OHOS::Ace::NG::TextPattern::CollectFunctionalTreeProperties*;
