@@ -2255,3 +2255,23 @@ HWTEST_F(NativeGestureTest, GestureImplTest0087, TestSize.Level1)
     EXPECT_NE(std::string(errorMsg).find(errorCodeStr), std::string::npos);
     EXPECT_NE(std::string(errorMsg).find("SetInnerGestureParallelTo"), std::string::npos);
 }
+/**
+ * @tc.name: GestureRecognizerObserverFollowsDisposal
+ * @tc.desc: An interrupt info stops exposing a gesture recognizer after it is disposed.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeGestureTest, GestureRecognizerObserverFollowsDisposal, TestSize.Level1)
+{
+    auto* gestureApi = static_cast<ArkUI_NativeGestureAPI_1*>(
+        OH_ArkUI_QueryModuleInterfaceByName(ARKUI_NATIVE_GESTURE, "ArkUI_NativeGestureAPI_1"));
+    ASSERT_NE(gestureApi, nullptr);
+    auto* recognizer = gestureApi->createTapGesture(1, 1);
+    ASSERT_NE(recognizer, nullptr);
+
+    ArkUI_GestureInterruptInfo interruptInfo {};
+    interruptInfo.interruptData.userData = std::make_unique<OHOS::Ace::LifeCycleObserver>(recognizer);
+    EXPECT_EQ(OH_ArkUI_GestureInterruptInfo_GetRecognizer(&interruptInfo), recognizer);
+
+    gestureApi->dispose(recognizer);
+    EXPECT_EQ(OH_ArkUI_GestureInterruptInfo_GetRecognizer(&interruptInfo), nullptr);
+}
