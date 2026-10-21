@@ -594,6 +594,35 @@ HWTEST_F(WaterFlowScrollSnapTestNg, SameLayoutModePreservesSnapCandidates, TestS
 }
 
 /**
+ * @tc.name: SameLayoutModePreservesRetainedHeight
+ * @tc.desc: An unsynchronized sliding window keeps its sampled height and legal bound after same-mode replay.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollSnapTestNg, SameLayoutModePreservesRetainedHeight, TestSize.Level1)
+{
+    CreateDirectionalItems(FlexDirection::COLUMN);
+    if (pattern_->GetLayoutMode() != WaterFlowLayoutMode::SLIDING_WINDOW) {
+        EXPECT_FALSE(pattern_->snapTotalHeight_.has_value());
+        return;
+    }
+    ASSERT_TRUE(pattern_->snapTotalHeight_.has_value());
+    const float retainedHeight = pattern_->snapTotalHeight_.value();
+    const float maxOffset = pattern_->GetItemSnapMaxOffset();
+    ASSERT_FALSE(pattern_->layoutInfo_->itemEnd_);
+    ASSERT_GT(maxOffset, pattern_->GetItemSnapCurrentOffset());
+
+    pattern_->layoutInfo_->UpdateOffset(0.0f);
+    ASSERT_FLOAT_EQ(pattern_->layoutInfo_->EstimateTotalHeight(), 0.0f);
+    ASSERT_FLOAT_EQ(pattern_->GetItemSnapMaxOffset(), maxOffset);
+
+    pattern_->SetLayoutMode(pattern_->GetLayoutMode());
+
+    ASSERT_TRUE(pattern_->snapTotalHeight_.has_value());
+    EXPECT_FLOAT_EQ(pattern_->snapTotalHeight_.value(), retainedHeight);
+    EXPECT_FLOAT_EQ(pattern_->GetItemSnapMaxOffset(), maxOffset);
+}
+
+/**
  * @tc.name: SameLayoutModeKeepsNextDragSnap
  * @tc.desc: A drag after a redundant mode update still settles on the same anchor as an unchanged component.
  * @tc.type: FUNC

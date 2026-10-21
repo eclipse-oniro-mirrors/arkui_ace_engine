@@ -68,6 +68,8 @@ public:
     float GetItemSnapCalibrationMargin() const override;
 
     using LayoutMode = WaterFlowLayoutMode;
+    // Replaying the active mode preserves snap geometry and retained height, including modifier/C API
+    // reset to an already active TOP_DOWN. Discarding them requires data, section or layout invalidation.
     void SetLayoutMode(LayoutMode mode);
     LayoutMode GetLayoutMode() const
     {

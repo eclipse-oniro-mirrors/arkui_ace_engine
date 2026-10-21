@@ -1111,6 +1111,8 @@ void WaterFlowPattern::AddFooter(const RefPtr<NG::UINode>& footer)
 
 void WaterFlowPattern::SetLayoutMode(LayoutMode mode)
 {
+    // Same-mode property replay must keep sampled snap geometry. Data, section and layout resets,
+    // as well as actual mode switches, remain responsible for invalidation.
     if (!layoutInfo_ || mode != layoutInfo_->Mode()) {
         snapItemGeometryCache_.clear();
         snapTotalHeight_.reset();
