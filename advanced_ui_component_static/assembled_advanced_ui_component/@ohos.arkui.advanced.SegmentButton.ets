@@ -1871,7 +1871,6 @@ export struct SegmentButton {
           }
           .id("SegmentButton_ItemStack")
           .direction(this.options.direction)
-          .animation({ duration: 0 })
           .borderRadius(this.getBackgroundBorderRadius())
           .translate({ x: this.selectedItemOffsetX })
           .visibility((this.componentSize.height as double) > 0 ? Visibility.Visible : Visibility.None)
