@@ -2883,10 +2883,14 @@ NG::DragDropInfo WebPattern::HandleOnDragStart(const RefPtr<OHOS::Ace::DragEvent
         std::string htmlContent = delegate_->dragData_->GetFragmentHtml();
         std::string linkUrl = delegate_->dragData_->GetLinkURL();
         std::string linkTitle = delegate_->dragData_->GetLinkTitle();
+        std::string fileUri;
         if (!fileName.empty()) {
-            OnDragFileNameStart(aceUnifiedData, fileName);
+            fileUri = OnDragFileNameStart(aceUnifiedData, fileName);
         } else {
             TAG_LOGW(AceLogTag::ACE_WEB, "DragDrop event start, dragdata has no image file uri, just pass");
+        }
+        if (!fileUri.empty() && !htmlContent.empty()) {
+            RewriteHtmlImgSrc(htmlContent, fileUri);
         }
         if (!plainContent.empty()) {
             isDragEndMenuShow_ = true;
@@ -2909,7 +2913,28 @@ NG::DragDropInfo WebPattern::HandleOnDragStart(const RefPtr<OHOS::Ace::DragEvent
     return dragDropInfo;
 }
 
-void WebPattern::OnDragFileNameStart(const RefPtr<UnifiedData>& aceUnifiedData, const std::string& fileName)
+void WebPattern::RewriteHtmlImgSrc(std::string& htmlContent, const std::string& fileUri)
+{
+    // HTML from Blink CreateMarkup is lowercase double-quoted: <img src="..." style="...">
+    // Match " src=\"" (space-prefixed) to avoid matching data-src or other attributes containing "src"
+    auto imgPos = htmlContent.find("<img");
+    if (imgPos == std::string::npos) {
+        return;
+    }
+    auto srcPos = htmlContent.find(" src=\"", imgPos);
+    if (srcPos == std::string::npos) {
+        return;
+    }
+    srcPos += sizeof(" src=\"") - 1;
+    auto srcEnd = htmlContent.find("\"", srcPos);
+    if (srcEnd == std::string::npos) {
+        return;
+    }
+    htmlContent.replace(srcPos, srcEnd - srcPos, fileUri);
+    TAG_LOGD(AceLogTag::ACE_WEB, "RewriteHtmlImgSrc rewrote html img src");
+}
+
+std::string WebPattern::OnDragFileNameStart(const RefPtr<UnifiedData>& aceUnifiedData, const std::string& fileName)
 {
     isDragEndMenuShow_ = false;
     std::string fullName;
@@ -2924,7 +2949,11 @@ void WebPattern::OnDragFileNameStart(const RefPtr<UnifiedData>& aceUnifiedData, 
     std::vector<std::string> urlVec;
     std::string udmfUri = fileUri.ToString();
     urlVec.emplace_back(udmfUri);
-    UdmfClient::GetInstance()->AddFileUriRecord(aceUnifiedData, urlVec);
+    if (!UdmfClient::GetInstance()->AddFileUriRecord(aceUnifiedData, urlVec)) {
+        TAG_LOGW(AceLogTag::ACE_WEB, "DragDrop event AddFileUriRecord failed, skip html img src rewrite");
+        return "";
+    }
+    return udmfUri;
 }
 
 void WebPattern::HandleOnDropMove(const RefPtr<OHOS::Ace::DragEvent>& info)
