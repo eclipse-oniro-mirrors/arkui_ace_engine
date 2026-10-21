@@ -705,6 +705,7 @@ public:
     void ReportTextChange();
     void ReportEditorEvent(const std::string& eventType);
     void DeleteToMaxLength(std::optional<int32_t> length);
+    bool IsUnspecifiedOrTextType() const;
     void DeleteContent(int32_t length);
     void ClearTextForDisplayIfEmpty();
     void ResetIsMousePressed();
@@ -1122,13 +1123,15 @@ public:
     bool HasCounterTextOverflowColor() const override;
     Color GetCounterTextOverflowColor() const override;
     float GetFontScaleFromEnv(const RefPtr<FrameNode>& host) const override;
+    bool IsUnspecifiedOrTextType() const;
     bool IsUnderlineMode() const override;
     bool IsUnderlineAndButtonMode() const override;
     TextDirection GetLayoutDirection() const override;
     TextDirection GetNonAutoLayoutDirection() const override;
     std::optional<MarginProperty> GetMarginProperty() const override;
     bool NeedRestoreMeasureConstraint() const override;
-
+    float GetPaddingLeft() const override;
+    float GetPaddingRight() const override;
     // ===== counter behavior logic (RichEditor-specific) =====
     void ProcessCounter();
     void AddCounterNode();
@@ -1152,7 +1155,7 @@ public:
     RefPtr<TextComponentDecorator> GetCounterDecorator() const override;
     std::vector<RefPtr<TextInputResponseArea>> GetAllResponseArea() const override
     {
-        return { cleanNodeResponseArea_ };
+        return { cleanNodeResponseArea_, passwordResponseArea_ };
     }
 
     void MarkCancelButtonDirty() { cancelButtonDirty_ = true; }

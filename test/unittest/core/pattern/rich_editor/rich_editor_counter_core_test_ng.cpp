@@ -105,12 +105,12 @@ HWTEST_F(RichEditorCounterCoreTestNg, GetAllResponseArea001, TestSize.Level0)
     ASSERT_NE(richEditorPattern, nullptr);
     // Branch: cleanNodeResponseArea_ not initialized -> size 1, element null
     auto areas = richEditorPattern->GetAllResponseArea();
-    EXPECT_EQ(areas.size(), 1);
+    EXPECT_EQ(areas.size(), 2);
     // Branch: cleanNodeResponseArea_ set -> size 1, element non-null
     richEditorPattern->cleanNodeResponseArea_ =
         AceType::MakeRefPtr<CleanNodeResponseArea>(AceType::WeakClaim(AceType::RawPtr(richEditorPattern)));
     areas = richEditorPattern->GetAllResponseArea();
-    EXPECT_EQ(areas.size(), 1);
+    EXPECT_EQ(areas.size(), 2);
     EXPECT_NE(areas[0], nullptr);
     richEditorPattern->cleanNodeResponseArea_.Reset();
 }

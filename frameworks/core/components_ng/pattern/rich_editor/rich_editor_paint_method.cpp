@@ -59,6 +59,7 @@ void RichEditorPaintMethod::UpdateOverlayModifier(PaintWrapper* paintWrapper)
             overlayMod->UpdateScrollBar(paintWrapper);
             overlayMod->SetIsClip(false);
         }
+        SetShowUnderlineWidth(paintWrapper);
         return;
     }
     UpdateContentOverlayModifier(paintWrapper);
@@ -78,7 +79,6 @@ void RichEditorPaintMethod::UpdateContentOverlayModifier(PaintWrapper* paintWrap
     overlayMod->SetSingleLine(richEditorPattern->isSingleLineMode_);
     overlayMod->SetHorizontalScrolling(richEditorPattern->isHorizontalScrolling_);
     SetPreviewTextDecoration(paintWrapper);
-    SetShowUnderlineWidth(paintWrapper);
     const auto& selection = richEditorPattern->GetTextSelector();
     auto selectedRects = richEditorPattern->CalculateSelectedRect(selection.GetTextStart(), selection.GetTextEnd());
     auto frameSize = paintWrapper->GetGeometryNode()->GetFrameSize();
@@ -136,9 +136,7 @@ void RichEditorPaintMethod::SetPreviewTextDecoration(PaintWrapper* paintWrapper)
 
 void RichEditorPaintMethod::SetShowUnderlineWidth(PaintWrapper* paintWrapper)
 {
-    auto contentPattern = DynamicCast<RichEditorContentPattern>(GetPattern().Upgrade());
-    CHECK_NULL_VOID(contentPattern);
-    auto richEditorPattern = contentPattern->GetParentPattern();
+    auto richEditorPattern = DynamicCast<RichEditorPattern>(GetPattern().Upgrade());
     CHECK_NULL_VOID(richEditorPattern);
     auto overlayMod = DynamicCast<RichEditorOverlayModifier>(GetOverlayModifier(paintWrapper));
     CHECK_NULL_VOID(overlayMod);
