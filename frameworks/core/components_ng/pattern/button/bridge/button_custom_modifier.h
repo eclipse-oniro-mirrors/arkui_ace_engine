@@ -22,6 +22,7 @@
 
 #include "base/geometry/dimension.h"
 #include "base/geometry/offset.h"
+#include "base/memory/referenced.h"
 #include "core/components/common/layout/constants.h"
 #include "core/components/common/properties/color.h"
 #include "core/components/common/properties/text_style.h"
@@ -29,11 +30,12 @@
 
 namespace OHOS::Ace::NG {
 class FrameNode;
+class Pattern;
 struct ArkUIButtonCustomModifier {
     ArkUINodeHandle (*createFrameNode)(ArkUI_Int32 nodeId);
     ArkUINodeHandle (*createButtonFrameNode)(ArkUI_Int32 nodeId);
-    void* (*createButtonPattern)();
-    void* (*createToggleButtonPattern)();
+    RefPtr<Pattern> (*createButtonPattern)();
+    RefPtr<Pattern> (*createToggleButtonPattern)();
     void (*setComponentButtonType)(ArkUINodeHandle node, OHOS::Ace::ComponentButtonType buttonType);
     void (*setSkipColorConfigurationUpdate)(ArkUINodeHandle node);
     void (*setClickedColor)(ArkUINodeHandle node, const OHOS::Ace::Color& color);

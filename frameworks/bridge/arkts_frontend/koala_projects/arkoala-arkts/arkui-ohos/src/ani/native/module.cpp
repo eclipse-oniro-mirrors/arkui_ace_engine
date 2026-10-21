@@ -492,6 +492,11 @@ ANI_EXPORT ani_status ANI_Constructor(ani_vm* vm, uint32_t* result)
             reinterpret_cast<void*>(OHOS::Ace::Ani::ConvertToPixelMapAni)
         },
         ani_native_function {
+            "_Common_SetSafeAreaInset",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::SetSafeAreaInset)
+        },
+        ani_native_function {
             "_Common_GetHostContext",
             nullptr,
             reinterpret_cast<void*>(OHOS::Ace::Ani::GetHostContext)
@@ -974,12 +979,12 @@ ANI_EXPORT ani_status ANI_Constructor(ani_vm* vm, uint32_t* result)
         },
         ani_native_function {
             "_UiMaterial_ConvertToECMaterial",
-            nullptr,
+            "ll:",
             reinterpret_cast<void*>(OHOS::Ace::Ani::UiMaterialConvertToECMaterial)
         },
         ani_native_function {
             "_UiMaterial_ConvertToECSubMaterial",
-            nullptr,
+            "ll:",
             reinterpret_cast<void*>(OHOS::Ace::Ani::UiMaterialConvertToECSubMaterial)
         },
         ani_native_function {
@@ -1004,7 +1009,7 @@ ANI_EXPORT ani_status ANI_Constructor(ani_vm* vm, uint32_t* result)
         },
         ani_native_function {
             "_UiMaterial_GetEmpty",
-            nullptr,
+            "l:",
             reinterpret_cast<void*>(OHOS::Ace::Ani::UiMaterialGetEmpty)
         },
         ani_native_function {
@@ -1404,6 +1409,11 @@ ANI_EXPORT ani_status ANI_Constructor(ani_vm* vm, uint32_t* result)
             "_Common_getWindowHeightBreakpoint",
             nullptr,
             reinterpret_cast<void*>(OHOS::Ace::Ani::getWindowHeightBreakpoint)
+        },
+        ani_native_function {
+            "_Common_isWindowInfoInitialized",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::isWindowInfoInitialized)
         },
         ani_native_function {
             "_TransferKeyEventPointer",

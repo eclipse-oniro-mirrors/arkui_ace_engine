@@ -28,10 +28,11 @@ class TabBarPaintMethod : public NodePaintMethod {
 public:
     TabBarPaintMethod(const RefPtr<TabBarModifier>& tabBarModifier, const RectF& frameRect,
         const std::vector<bool>& gradientRegions, const Color& backgroundColor,
-        const IndicatorStyle& indicatorStyle, const OffsetF& indicatorOffset, bool hasIndicator)
+        const IndicatorStyle& indicatorStyle, const OffsetF& indicatorOffset, bool hasIndicator,
+        bool isTopFloating = false)
         : tabBarModifier_(tabBarModifier), frameRect_(frameRect), gradientRegions_(gradientRegions),
         backgroundColor_(backgroundColor), indicatorStyle_(indicatorStyle),
-        indicatorOffset_(indicatorOffset), hasIndicator_(hasIndicator) {}
+        indicatorOffset_(indicatorOffset), hasIndicator_(hasIndicator), isTopFloating_(isTopFloating) {}
     ~TabBarPaintMethod() override = default;
 
     CanvasDrawFunction GetForegroundDrawFunction(PaintWrapper* paintWrapper) override;
@@ -40,7 +41,8 @@ public:
 
 private:
     static void PaintGradient(RSCanvas& canvas, const RectF& barRect, const Color& backgroundColor,
-        const std::vector<bool>& gradientRegions, const MarginPropertyF& padding);
+        const std::vector<bool>& gradientRegions, const MarginPropertyF& padding,
+        bool isTopFloating = false);
     static void PaintLeftGradient(RSCanvas& context, const RectF& barRect, const Color& backgroundColor,
         float shadowMargin, float gradientWidth, float padding);
     static void PaintRightGradient(RSCanvas& context, const RectF& barRect, const Color& backgroundColor,
@@ -59,6 +61,7 @@ private:
     IndicatorStyle indicatorStyle_;
     OffsetF indicatorOffset_;
     bool hasIndicator_ = true;
+    bool isTopFloating_ = false;
     ACE_DISALLOW_COPY_AND_MOVE(TabBarPaintMethod);
 };
 } // namespace OHOS::Ace::NG

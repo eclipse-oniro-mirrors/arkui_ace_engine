@@ -89,6 +89,7 @@ class InspectorOffscreenNodesMgr;
 class OverlayManager;
 class PostEventManager;
 class PrivacySensitiveManager;
+class ContainerModalPattern;
 class SafeAreaManager;
 class SelectOverlayManager;
 class SharedOverlayManager;
@@ -229,6 +230,11 @@ public:
     std::string GetNavDestinationJSViewName(const RefPtr<PageInfo>& pageInfo) const;
 
     std::string GetCurrentPageName();
+
+    // Search scene page matching by pageType: top NavDestination name and top
+    // pageUrl fetched independently, never the concatenated string (ADR-2).
+    std::string GetCurrentNavDestinationName();
+    std::string GetCurrentPageUrl();
 
     void OnTouchEvent(const TouchEvent& point, const RefPtr<NG::FrameNode>& node, bool isSubPipe = false) override;
 
@@ -658,10 +664,11 @@ public:
         return taskScheduler_->IsLayouting();
     }
 
-    bool IsFirstRootLayout() const
+    bool IsFirstFlushMessages() const
     {
-        return isFirstRootLayout_;
+        return isFirstFlushMessages_;
     }
+
     // end pipeline, exit app
     void Finish(bool autoFinish) const override;
     RectF GetRootRect();
@@ -833,6 +840,7 @@ public:
     RefPtr<FrameNode> GetContainerModalNode() const;
     void SetContainerModalTitleVisible(bool customTitleSettedShow, bool floatingTitleSettedShow);
     void SetContainerModalTitleHeight(int32_t height);
+    void SetContainerModalTitleHeightWithVp(double heightVp);
     int32_t GetContainerModalTitleHeight();
     bool GetContainerModalButtonsRect(RectF& containerModal, RectF& buttons);
     void SubscribeContainerModalButtonsRectChange(
@@ -1376,6 +1384,8 @@ protected:
     void PostKeyboardAvoidTask();
 
 private:
+    RefPtr<ContainerModalPattern> GetContainerModalPatternForTitleHeight();
+
     void ExecuteSurfaceChangedCallbacks(int32_t newWidth, int32_t newHeight, WindowSizeChangeReason type);
 
     void FlushWindowStateChangedCallback(bool isShow);

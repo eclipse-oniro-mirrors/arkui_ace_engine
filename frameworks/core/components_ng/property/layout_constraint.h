@@ -45,6 +45,8 @@ struct ViewPosReference {
     ReferenceEdge referenceEdge;
     Axis axis;
     std::optional<int64_t> deadline;
+    // Optional parent-supplied extent in this reference's coordinate space, including the node's decorations.
+    std::optional<float> knownMainSize;
 
     bool operator==(const ViewPosReference &other) const;
 };

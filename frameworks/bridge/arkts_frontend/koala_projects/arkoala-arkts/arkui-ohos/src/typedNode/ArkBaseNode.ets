@@ -24,7 +24,7 @@ import { GeometryTransitionOptions, GestureModifier, GestureRecognizerJudgeBegin
 import { LinearGradientBlurOptions, BackgroundOptions, SmartGestureShortcutOptions } from '../component/common';
 import { LocalizedAlignRuleOptions, MenuElement, MenuOptions, ModalTransition, MotionBlurOptions, MotionPathOptions } from '../component/common';
 import { MouseEvent, OutlineStyle, OverlayOptions, PixelRoundPolicy, PixelStretchEffectOptions, PopupOptions, PreDragStatus } from '../component/common';
-import { ProgressMask, Rectangle, ResponseRegion, RotateOptions, RotateAngleOptions, SafeAreaEdge, SafeAreaType, ScaleOptions, ShadowOptions, ShadowStyle } from '../component/common';
+import { ProgressMask, Rectangle, ResponseRegion, RotateOptions, RotateAngleOptions, SafeAreaEdge, SafeAreaType, SafeAreaInsetOptions, ScaleOptions, ShadowOptions, ShadowStyle } from '../component/common';
 import { SheetOptions, ShouldBuiltInRecognizerParallelWithCallback, ShouldRecognizerParallelWithCallback, SizeChangeCallback, StateStyles, TouchEvent, TouchResult } from '../component/common';
 import { TouchTestInfo, TouchTestDoneCallback, GestureCollectInterceptCallback, TransitionEffect, TransitionFinishCallback, TranslateOptions } from '../component/common';
 import { VisibleAreaChangeCallback, sharedTransitionOptions, BackgroundImageOptions, ArkCommonMethodPeer } from '../component/common';
@@ -116,6 +116,10 @@ export class ArkBaseNode extends ComponentBase implements CommonAttribute {
     public safeAreaPadding(value: Padding | LengthMetrics | LocalizedPadding | undefined): this {
         this.getPeer().setSafeAreaPaddingAttribute(value);
         return this
+    }
+    public safeAreaInset(options?: SafeAreaInsetOptions): this {
+        this.getPeer().setSafeAreaInsetAttribute(options);
+        return this;
     }
     public margin(value: Margin | Length | LocalizedMargin | undefined): this {
         this.getPeer().setMarginAttribute(value);

@@ -63,8 +63,34 @@ protected:
     int32_t GetLanesFloor(LayoutWrapper* layoutWrapper, int32_t index) override;
     int32_t GetLanesCeil(LayoutWrapper* layoutWrapper, int32_t index) override;
     void SetCacheCount(LayoutWrapper* layoutWrapper, int32_t cacheCount) override;
+    bool BuildFastScrollLanesRange(LayoutWrapper* layoutWrapper, int32_t endIndex);
+    bool PrepareFastScrollRows(LayoutWrapper* layoutWrapper) override;
+    bool MeasureFastScrollRow(
+        LayoutWrapper* layoutWrapper, int32_t index, float extent, bool forward, float& size) override;
+    bool MeasureFastScrollNeighbors(LayoutWrapper* layoutWrapper, float size) override;
+    bool IsFastScrollForward(float size) const override;
+    std::optional<ListPositionMap::EstimateRange> GetFastScrollLanesRow(int32_t index) const override;
 
 private:
+    struct FastScrollTypeRange {
+        int32_t startIndex;
+        int32_t endIndex;
+        bool isGroup;
+    };
+    RefPtr<LayoutWrapper> GetFastScrollLanesItem(LayoutWrapper* layoutWrapper, int32_t index) const;
+    std::optional<ListPositionMap::EstimateRange> GetFastScrollLazyRange(
+        const RefPtr<FrameNode>& node, int32_t index) const;
+    std::optional<FastScrollTypeRange> GetFastScrollTypeRange(LayoutWrapper* layoutWrapper, int32_t index) const;
+    std::optional<int32_t> FindFastScrollSegmentStart(
+        LayoutWrapper* layoutWrapper, int32_t index, const FastScrollTypeRange& types);
+    bool ConfirmFastScrollLanesRange(LayoutWrapper* layoutWrapper, int32_t first, int32_t last,
+        int32_t segmentStart, FastScrollTypeRange types);
+    bool ExtendFastScrollLanesRange(LayoutWrapper* layoutWrapper, int32_t index);
+    void RecordFastScrollItemType(int32_t index, bool isGroup);
+    void RecordFastScrollItemTypes(int32_t start, int32_t end, bool isGroup);
+    void RecordFastScrollLanesRange(int32_t start, int32_t end);
+    std::map<int32_t, int32_t>::iterator ReplaceFastScrollLanesRange(int32_t start, int32_t& end);
+    float GetFastScrollRowHeight(int32_t start, int32_t end) const;
     static void ModifyLaneLength(
         std::optional<float>& minLaneLength, std::optional<float>& maxLaneLength, float crossSize);
     int32_t FindLanesStartIndex(LayoutWrapper* layoutWrapper, int32_t index);
@@ -84,6 +110,8 @@ private:
     void MeasureGroup(LayoutWrapper* listWrapper, const RefPtr<LayoutWrapper>& groupWrapper,
         int32_t index, float& pos, bool forward);
     void MeasureItem(const RefPtr<LayoutWrapper>& itemWrapper, int32_t index, bool forward);
+    float MeasureLineItem(LayoutWrapper* layoutWrapper, const RefPtr<LayoutWrapper>& wrapper,
+        int32_t index, float& referencePos, bool forward, bool isGroup);
     void SetLaneIdx4Divider(int32_t idx)
     {
         laneIdx4Divider_ = idx;

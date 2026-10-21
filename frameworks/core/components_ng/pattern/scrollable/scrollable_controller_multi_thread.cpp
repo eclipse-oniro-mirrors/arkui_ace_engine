@@ -171,6 +171,26 @@ void ScrollableController::ScrollToIndexMultiThread(
     });
 }
 
+void ScrollableController::ScrollToIndexWithOptionsMultiThread(int32_t index, bool smooth, ScrollAlign align,
+    std::optional<float> extraOffset, FastScrollMode mode)
+{
+    auto pattern = scroll_.Upgrade();
+    CHECK_NULL_VOID(pattern);
+    auto host = pattern->GetHost();
+    CHECK_NULL_VOID(host);
+    host->PostAfterAttachMainTreeTask([weak = WeakPtr<ScrollablePattern>(pattern),
+        index, smooth, align, extraOffset, mode]() {
+        auto pattern = weak.Upgrade();
+        CHECK_NULL_VOID(pattern);
+        pattern->SetAccessibilityScrollSource(AccessibilityScrollSource::API);
+        if (IsFastScrollEnabled(mode) && smooth) {
+            pattern->ScrollToIndexFastScroll(index, smooth, align, extraOffset, mode);
+        } else {
+            pattern->ScrollToIndex(index, smooth, align, extraOffset);
+        }
+    });
+}
+
 void ScrollableController::ScrollPageMultiThread(bool reverse, bool smooth)
 {
     auto pattern = scroll_.Upgrade();

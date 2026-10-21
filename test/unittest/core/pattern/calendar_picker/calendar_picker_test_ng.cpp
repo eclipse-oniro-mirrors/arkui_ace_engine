@@ -1054,7 +1054,7 @@ HWTEST_F(CalendarPickerTestNg, CalendarPickerTextDirectionTest001, TestSize.Leve
     ASSERT_NE(contentFrameNode, nullptr);
     auto contentLayoutProperty = contentFrameNode->GetLayoutProperty<LinearLayoutProperty>();
     ASSERT_NE(contentLayoutProperty, nullptr);
-    EXPECT_EQ(contentLayoutProperty->GetLayoutDirection(), TextDirection::LTR);
+    EXPECT_EQ(contentLayoutProperty->GetLayoutDirection(), TextDirection::AUTO);
 }
 
 /**

@@ -17,13 +17,14 @@
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_VIDEO_VIDEO_CONTROLLER_ASYNC_H
 
 #include <functional>
+#include <mutex>
 #include <string>
 #include "base/memory/ace_type.h"
 #include "core/components_ng/pattern/video/video_utils.h"
 
 namespace OHOS::Ace {
 
-class VideoControllerAsync : public virtual AceType {
+class VideoControllerAsync : public AceType {
     DECLARE_ACE_TYPE(VideoControllerAsync, AceType);
 
 public:
@@ -62,6 +63,9 @@ private:
     static void ReportNullPattern(const char* method, AsyncCommandCallback&& callback);
     static void ReportNullPattern(const char* method);
 
+    // Guards all impl members below. Read side (any thread) snapshots the std::function
+    // under this lock and invokes it outside the lock; write side (Set*Impl/Clear) holds it.
+    mutable std::mutex implMutex_;
     StartImpl startImpl_;
     PauseImpl pauseImpl_;
     StopImpl stopImpl_;

@@ -18,6 +18,7 @@
 
 #include <memory>
 #include <mutex>
+#include <unordered_map>
 
 #include <iremote_object.h>
 #include <iremote_stub.h>
@@ -220,6 +221,20 @@ public:
     void RegisterGetHitTestNodeInfoCallback(const std::function<void(std::string, int32_t, bool)>& eventCallback);
 
     /**
+     * @description: report component tree query result
+     */
+    void ReportNavigationQueryResult(const std::string& data) override;
+    void ReportLazyForEachQueryResult(const std::string& data) override;
+
+    bool RegisterNavigationQueryCallback(const std::function<void(const std::string&)>& eventCallback);
+    void UnregisterNavigationQueryCallback();
+    bool PostNavigationQueryCallbackRemoveTask(int32_t timeout);
+
+    bool RegisterLazyForEachQueryCallback(const std::function<void(const std::string&)>& eventCallback);
+    void UnregisterLazyForEachQueryCallback();
+    bool PostLazyForEachQueryCallbackRemoveTask(int32_t timeout);
+
+    /**
      * @description: report web unfocus value for SA
      */
     void ReportWebUnfocusEvent(int64_t accessibilityId, const std::string& data) override;
@@ -270,8 +285,12 @@ public:
     void UnregisterContentChangeCallback();
     void RegisterGetStateMgmtInfoCallback(const std::function<void(std::vector<std::string>)>& callback);
     void ReportGetStateMgmtInfo(std::vector<std::string> results) override;
-    void RegisterPageSceneEventCallback(const PageSceneEventCallback& eventCallback);
-    void UnregisterPageSceneEventCallback();
+    // Dual ruleSet routing: callback is stored per ruleSetId and dispatched only
+    // to the ruleSets present in an event's hits/exits. Each callback receives
+    // only evidence belonging to its registered ruleSetId.
+    bool RegisterPageSceneEventCallback(const std::string& ruleSetId, const PageSceneEventCallback& eventCallback);
+    bool TryRegisterPageSceneEventCallback(const std::string& ruleSetId, const PageSceneEventCallback& eventCallback);
+    void UnregisterPageSceneEventCallback(const std::string& ruleSetId);
     bool RegisterGetPageSceneCallback(const PageSceneEventCallback& eventCallback);
     void UnregisterGetPageSceneCallback();
     void ReportPageSceneEvent(const std::string& sceneJson, bool isGetResult = false) override;
@@ -287,6 +306,10 @@ public:
 private:
     void HandleInspectorTreeCallbackTimeout();
     void CancelGetInspectorTreeCallbackTimeoutTaskLocked();
+    void HandleNavigationQueryCallbackTimeout();
+    void CancelNavigationQueryCallbackTimeoutTaskLocked();
+    void HandleLazyForEachQueryCallbackTimeout();
+    void CancelLazyForEachQueryCallbackTimeoutTaskLocked();
     void OnGetWebInfoByRequestInner(MessageParcel& data);
     void OnSendPageTextInner(MessageParcel& data);
     void HandlePageTranslateCallbackTimeout(int64_t requestId);
@@ -315,6 +338,10 @@ private:
     std::mutex inspectorTreeCallbackMutex_;
     std::function<void(std::string, int32_t, bool)> inspectorTreeCallback_;
     std::function<void(std::string, int32_t, bool)> getHitTestNodeInfoCallback_;
+    std::mutex navigationQueryCallbackMutex_;
+    std::function<void(const std::string&)> navigationQueryCallback_;
+    std::mutex lazyForEachQueryCallbackMutex_;
+    std::function<void(const std::string&)> lazyForEachQueryCallback_;
     std::function<void(int64_t accessibilityId, const std::string& data)> unfocusEvent_;
     std::function<void(std::vector<std::pair<int32_t, std::shared_ptr<Media::PixelMap>>>)> getShowingImageCallback_;
     std::function<void(int32_t, const std::unordered_map<int32_t, std::shared_ptr<Media::PixelMap>>&,
@@ -325,7 +352,7 @@ private:
     std::function<void(ChangeType type, const std::string& simpleTree)> contentChangeCallback_;
     std::function<void(std::vector<std::string>)> getStateMgmtInfoCallback_;
     std::mutex pageSceneCallbackMutex_;
-    PageSceneEventCallback pageSceneEventCallback_;
+    std::unordered_map<std::string, PageSceneEventCallback> pageSceneEventCallbacks_;
     PageSceneEventCallback getPageSceneCallback_;
 
     GetWebInfoByRequestCallback getWebInfoByRequestCallback_;

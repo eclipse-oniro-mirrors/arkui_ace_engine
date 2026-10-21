@@ -46,6 +46,10 @@ void RichEditorPaintMethod::UpdateOverlayModifier(PaintWrapper* paintWrapper)
         overlayMod->SetHorizontalScrolling(richEditorPattern->isHorizontalScrolling_);
         overlayMod->ChangeOverlay();
         if (!richEditorPattern->HasFocus()) {
+            auto geometryNode = paintWrapper->GetGeometryNode();
+            CHECK_NULL_VOID(geometryNode);
+            auto frameSize = geometryNode->GetFrameSize();
+            overlayMod->SetFrameSize(frameSize);
             overlayMod->UpdateScrollBar(paintWrapper);
         } else {
             auto geometryNode = paintWrapper->GetGeometryNode();
@@ -74,8 +78,11 @@ void RichEditorPaintMethod::UpdateContentOverlayModifier(PaintWrapper* paintWrap
     overlayMod->SetSingleLine(richEditorPattern->isSingleLineMode_);
     overlayMod->SetHorizontalScrolling(richEditorPattern->isHorizontalScrolling_);
     SetPreviewTextDecoration(paintWrapper);
+    SetShowUnderlineWidth(paintWrapper);
     const auto& selection = richEditorPattern->GetTextSelector();
     auto selectedRects = richEditorPattern->CalculateSelectedRect(selection.GetTextStart(), selection.GetTextEnd());
+    auto frameSize = paintWrapper->GetGeometryNode()->GetFrameSize();
+    overlayMod->SetFrameSize(frameSize);
     if (!richEditorPattern->HasFocus()) {
         overlayMod->SetCaretVisible(false);
         overlayMod->SetFloatingCaretVisible(false);
@@ -89,8 +96,6 @@ void RichEditorPaintMethod::UpdateContentOverlayModifier(PaintWrapper* paintWrap
     auto contentRect = richEditorPattern->GetTextContentRect();
     overlayMod->SetContentRect(contentRect);
     overlayMod->SetSelectedRects(selectedRects);
-    auto frameSize = paintWrapper->GetGeometryNode()->GetFrameSize();
-    overlayMod->SetFrameSize(frameSize);
     overlayMod->SetIsClip(false);
 }
 
@@ -127,6 +132,22 @@ void RichEditorPaintMethod::SetPreviewTextDecoration(PaintWrapper* paintWrapper)
     overlayMod->SetPreviewTextUnderlineWidth(richEditorPattern->GetPreviewTextUnderlineWidth());
     overlayMod->SetShowPreviewTextDecoration(richEditorPattern->IsPreviewTextInputting());
     overlayMod->SetPreviewTextStyle(richEditorPattern->GetPreviewTextStyle());
+}
+
+void RichEditorPaintMethod::SetShowUnderlineWidth(PaintWrapper* paintWrapper)
+{
+    auto contentPattern = DynamicCast<RichEditorContentPattern>(GetPattern().Upgrade());
+    CHECK_NULL_VOID(contentPattern);
+    auto richEditorPattern = contentPattern->GetParentPattern();
+    CHECK_NULL_VOID(richEditorPattern);
+    auto overlayMod = DynamicCast<RichEditorOverlayModifier>(GetOverlayModifier(paintWrapper));
+    CHECK_NULL_VOID(overlayMod);
+    if (richEditorPattern->IsUnderlineMode()) {
+        overlayMod->SetUnderlineColor(richEditorPattern->GetUnderlineColor());
+        overlayMod->SetUnderlineWidth(static_cast<float>(richEditorPattern->GetUnderlineWidth().ConvertToPx()));
+    } else {
+        overlayMod->SetUnderlineWidth(0.0f);
+    }
 }
 
 void RichEditorPaintMethod::SetCaretState(PaintWrapper* paintWrapper)

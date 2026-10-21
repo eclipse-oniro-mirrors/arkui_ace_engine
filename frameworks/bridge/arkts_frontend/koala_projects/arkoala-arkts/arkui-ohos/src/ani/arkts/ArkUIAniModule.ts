@@ -121,6 +121,7 @@ export class ArkUIAniModule {
     native static _Image_SetOnErrorCallback(ptr: KPointer, value: ImageErrorCallback | undefined): void
     native static _ConvertUtils_ConvertFromPixelMapAni(pixelmap: image.PixelMap): KPointer
     native static _ConvertUtils_ConvertToPixelMapAni(ptr: KPointer): image.PixelMap
+    native static _Common_SetSafeAreaInset(ptr: KPointer, edges: Array<Object>): void
     native static _Common_GetHostContext(key: KInt): common.Context
     native static _Common_SetFrameRateRange(ptr: KPointer, value: ExpectedFrameRateRange, type: KInt): void
     native static _Common_Sync_InstanceId(id: KInt): void
@@ -354,13 +355,13 @@ export class ArkUIAniModule {
 
     native static _UiMaterial_ConstructMaterial(value: uiMaterial.MaterialOptions | undefined): long
     native static _UiMaterial_DestroyMaterial(value: long): void
-    native static _UiMaterial_ConvertToECMaterial(value: long): long
-    native static _UiMaterial_ConvertToECSubMaterial(value: long): long
+    native static _UiMaterial_ConvertToECMaterial(src: long, dst: long): void
+    native static _UiMaterial_ConvertToECSubMaterial(src: long, dst: long): void
     native static _UiMaterial_GetGlobalMaterialLevel(): int
     native static _UiMaterial_IsImmersiveMaterialSupported(): boolean
     native static _UiMaterial_GetMaterialState(): int
     native static _UiMaterial_GetMaterialType(): int
-    native static _UiMaterial_GetEmpty(): long
+    native static _UiMaterial_GetEmpty(dst: long): void
 
     native static _CreateViewStackProcessor(): KPointer
 
@@ -457,6 +458,7 @@ export class ArkUIAniModule {
     native static _Common_getWindowId(instanceId: KInt): int32
     native static _Common_getWindowWidthBreakpoint(): KInt
     native static _Common_getWindowHeightBreakpoint(): KInt
+    native static _Common_isWindowInfoInitialized(instanceId: KInt): boolean
 
     native static _Common_IsEasySplit(instanceId: KInt): boolean
 

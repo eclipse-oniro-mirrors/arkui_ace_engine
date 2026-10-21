@@ -68,6 +68,13 @@ class FrameNode;
 class THPExtraManager;
 struct UIExtCallbackEvent;
 enum class UIExtCallbackEventId : uint32_t;
+// Defined in core/components_ng/pattern/ui_extension/ui_extension_config.h. Opaque declaration
+// avoids including that pattern header here (pipeline_base.h is included almost everywhere);
+// the underlying type must match its definition.
+enum class DpiFollowStrategy : int32_t;
+// The enum is opaque here so its enumerators cannot be named; the default strategy is
+// FOLLOW_UI_EXTENSION_ABILITY_DPI = 1 (referenced by underlying value below).
+constexpr int32_t DEFAULT_UI_EXTENSION_DPI_FOLLOW_STRATEGY = 1;
 } // namespace NG
 
 struct KeyboardAnimationCurve {
@@ -600,6 +607,7 @@ public:
     }
 
     bool CheckThreadSafe();
+    bool IsCurrentThreadSafe() const;
 
     RefPtr<Frontend> GetFrontend() const;
 
@@ -984,6 +992,19 @@ public:
         return density_;
     }
 
+    // Default dpi follow strategy for UECs in this window instance, set by the window
+    // (whitelist). A strategy explicitly configured by the developer on a UEC takes
+    // precedence; each call replaces the saved value.
+    void SetUIExtensionDensityFollowHost(NG::DpiFollowStrategy dpiFollowStrategy)
+    {
+        uiExtensionDpiFollowStrategy_ = dpiFollowStrategy;
+    }
+
+    NG::DpiFollowStrategy GetUIExtensionDensityFollowHost() const
+    {
+        return uiExtensionDpiFollowStrategy_;
+    }
+
     RefPtr<PlatformResRegister> GetPlatformResRegister() const;
 
     void SetTouchPipeline(const WeakPtr<PipelineBase>& context);
@@ -1286,6 +1307,16 @@ public:
     bool GetHalfLeading() const
     {
         return halfLeading_;
+    }
+
+    void SetConfigTextStyleOptimizeFlag(bool flag)
+    {
+        configTextStyleOptimizeFlag_ = flag;
+    }
+
+    bool GetConfigTextStyleOptimizeFlag() const
+    {
+        return configTextStyleOptimizeFlag_;
     }
 
     void SetHasPreviewTextOption(bool hasOption)
@@ -1711,6 +1742,9 @@ protected:
     float viewScale_ = 1.0f;
     double density_ = 1.0;
     double dipScale_ = 1.0;
+    std::atomic<NG::DpiFollowStrategy> uiExtensionDpiFollowStrategy_ {
+        NG::DpiFollowStrategy(NG::DEFAULT_UI_EXTENSION_DPI_FOLLOW_STRATEGY)
+    };
     bool isCurrentInForceSplitMode_ = false;
     double rootHeight_ = 0.0;
     double rootWidth_ = 0.0;
@@ -1826,6 +1860,7 @@ private:
     int64_t formAnimationStartTime_ = 0;
     bool isFormAnimation_ = false;
     bool halfLeading_ = false;
+    bool configTextStyleOptimizeFlag_ = false;
     bool hasSupportedPreviewText_ = true;
     bool hasPreviewTextOption_ = false;
     // whether visible area need to be calculate at each vsync after approximate timeout.

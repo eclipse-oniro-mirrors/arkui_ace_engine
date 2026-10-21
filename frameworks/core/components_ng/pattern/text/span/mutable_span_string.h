@@ -24,26 +24,26 @@
 namespace OHOS::Ace {
 enum class AroundSpecialNode { AFTER = 0, BEFORE, BETWEEN, NONE };
 
-class ACE_EXPORT MutableSpanString : public SpanString {
+class ACE_FORCE_EXPORT MutableSpanString : public SpanString {
     DECLARE_ACE_TYPE(MutableSpanString, SpanString);
 
 public:
     explicit MutableSpanString(const std::u16string& text) : SpanString(text) {}
     explicit MutableSpanString(const ImageSpanOptions& options) : SpanString(options) {}
     explicit MutableSpanString(RefPtr<CustomSpan>& span) : SpanString(span) {}
-    void ReplaceString(int32_t start, int32_t length, const std::u16string& other);
+    ACE_FORCE_EXPORT virtual void ReplaceString(int32_t start, int32_t length, const std::u16string& other);
     ACE_FORCE_EXPORT void InsertString(int32_t start, const std::u16string& other);
     ACE_FORCE_EXPORT void RemoveString(int32_t start, int32_t length);
     void ReplaceSpan(int32_t start, int32_t length, const RefPtr<SpanBase>& span);
     void RemoveSpans(int32_t start, int32_t length, bool removeSpecialSpan = true);
-    void ClearAllSpans();
+    ACE_FORCE_EXPORT virtual void ClearAllSpans();
     ACE_FORCE_EXPORT void ReplaceSpanString(int32_t start, int32_t length, const RefPtr<SpanString>& spanString);
     ACE_FORCE_EXPORT void InsertSpanString(int32_t start, const RefPtr<SpanString>& spanString);
     ACE_FORCE_EXPORT void AppendSpanString(const RefPtr<SpanString>& spanString);
     bool IsSpeicalNode(int32_t location, SpanType speicalType);
     ACE_FORCE_EXPORT void SetSpanWatcher(const WeakPtr<SpanWatcher>& watcher);
     ACE_FORCE_EXPORT void SplitSpansByNewLine();
-    ACE_FORCE_EXPORT void NotifySpanWatcher();
+    ACE_FORCE_EXPORT virtual void NotifySpanWatcher();
 
 private:
     WeakPtr<SpanWatcher> watcher_;

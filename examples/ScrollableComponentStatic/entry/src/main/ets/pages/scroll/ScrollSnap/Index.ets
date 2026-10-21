@@ -46,7 +46,7 @@ class TestList {
   public description?: ResourceStr;
 }
 
-export const Scroll_ROUTE_PREFIX: string = 'scroll';
+export const scrollRoutePrefix: string = 'scroll';
 
 const routes: TestList[] = [
   {

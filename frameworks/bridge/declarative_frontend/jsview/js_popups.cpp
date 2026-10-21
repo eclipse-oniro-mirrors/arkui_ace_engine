@@ -2687,10 +2687,8 @@ void JSViewPopups::ParseSheetTitleBarHoverMode(const JSRef<JSVal>& value, NG::Sh
     if (value->IsNumber()) {
         auto modeValue = value->ToNumber<int32_t>();
         if (modeValue >= static_cast<int32_t>(NG::SheetTitleBarHoverMode::STANDARD) &&
-            modeValue <= static_cast<int32_t>(NG::SheetTitleBarHoverMode::STACK)) {
+            modeValue <= static_cast<int32_t>(NG::SheetTitleBarHoverMode::SAFE_AREA_PADDING)) {
             sheetStyle.titleBarHoverMode = static_cast<NG::SheetTitleBarHoverMode>(modeValue);
-        } else {
-            sheetStyle.titleBarHoverMode = NG::SheetTitleBarHoverMode::STANDARD;
         }
     }
 }

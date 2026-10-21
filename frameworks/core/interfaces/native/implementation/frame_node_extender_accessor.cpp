@@ -29,16 +29,27 @@
 #include "core/components_ng/base/inspector.h"
 #include "core/components_ng/base/ui_node.h"
 #include "core/components_ng/base/view_abstract_model_static.h"
+#include "core/components_ng/event/focus_hub.h"
+#include "core/components_ng/manager/post_event/post_event_manager.h"
+#include "core/event/axis_event.h"
+#include "core/event/key_event.h"
+#include "core/event/mouse_event.h"
+#include "core/event/touch_event.h"
+#include "core/pipeline_ng/pipeline_context.h"
 #include "core/components_ng/pattern/custom/custom_measure_layout_node.h"
 #include "core/components_ng/pattern/custom_frame_node/custom_frame_node.h"
 #include "core/components_ng/pattern/node_container/node_container_pattern.h"
 #include "core/components_ng/property/property.h"
 #include "core/interfaces/native/implementation/frame_node_peer_impl.h"
 #include "core/interfaces/native/implementation/ui_common_event_peer.h"
+#include "core/interfaces/native/implementation/mouse_event_peer.h"
+#include "core/interfaces/native/implementation/axis_event_peer.h"
+#include "core/interfaces/native/implementation/key_event_peer.h"
 #include "core/interfaces/native/utility/callback_helper.h"
 #include "core/interfaces/native/generated/interface/ui_node_api.h"
 #include "core/interfaces/native/node/node_api.h"
 #include "core/interfaces/arkoala/arkoala_api.h"
+#include "interfaces/native/event/ui_input_event_impl.h"
 
 namespace OHOS::Ace::NG {
 enum class ExpandMode : uint32_t {
@@ -179,6 +190,10 @@ void ParseArrayResultNumber(std::vector<float>& indexes, NG::OffsetF offset)
 }
 } // namespace
 
+namespace BuilderNodeOpsAccessor {
+void GetTouchEventFromProxy(const Ark_TouchEventProxy& proxy, TouchEvent& touchEvent, bool isPostTouchEvent);
+} // namespace BuilderNodeOpsAccessor
+
 namespace FrameNodeExtenderAccessor {
 void DestroyPeerImpl(Ark_FrameNode peer)
 {
@@ -213,6 +228,103 @@ Ark_Boolean IsModifiableImpl(Ark_NativePointer peer)
     CHECK_NULL_RETURN(peerNode, false);
     auto isModifiable = peerNode->GetTag() == "CustomFrameNode";
     return Converter::ArkValue<Ark_Boolean>(isModifiable);
+}
+Ark_Boolean DispatchInputEventImpl(Ark_FrameNode peer,
+                                   const Ark_InputEventType* event,
+                                   const Opt_CompetitionStrategy* competitionStrategy)
+{
+    CHECK_ON_UI_THREAD_RETURN(false);
+    CHECK_NULL_RETURN(event, Converter::ArkValue<Ark_Boolean>(false));
+    CHECK_NULL_RETURN(competitionStrategy, Converter::ArkValue<Ark_Boolean>(false));
+    auto frameNodePeer = reinterpret_cast<FrameNodePeer*>(peer);
+    auto peerNode = FrameNodePeer::GetFrameNodeByPeer(frameNodePeer);
+    CHECK_NULL_RETURN(peerNode, false);
+    auto currentUINodeRef = AceType::DynamicCast<NG::UINode>(peerNode);
+    CHECK_NULL_RETURN(currentUINodeRef, false);
+    CHECK_NODE_ON_VALID_THREAD_RETURN(AceType::RawPtr(currentUINodeRef), false);
+
+    const RefPtr<NG::UINode>& node = currentUINodeRef;
+    auto pipelineContext = node->GetContext();
+    CHECK_NULL_RETURN(pipelineContext, false);
+    auto postEventManager = pipelineContext->GetPostEventManager();
+    CHECK_NULL_RETURN(postEventManager, false);
+    const bool useCompetition =
+        competitionStrategy->tag != InteropTag::INTEROP_TAG_UNDEFINED &&
+        competitionStrategy->value == Ark_CompetitionStrategy::ARK_COMPETITION_STRATEGY_COMPETITION;
+    bool result = false;
+    switch (event->selector) {
+        case SELECTOR_ID_0: {
+            TouchEvent touchEvent;
+            BuilderNodeOpsAccessor::GetTouchEventFromProxy(event->value0, touchEvent, false);
+            touchEvent.isNewReferee = useCompetition ? false : true;
+            result = useCompetition ? postEventManager->PostTouchEventWithStrategy(node, std::move(touchEvent))
+                                    : postEventManager->PostTouchEvent(node, std::move(touchEvent));
+            break;
+        }
+        case SELECTOR_ID_1: {
+            CHECK_NULL_RETURN(event->value1, Converter::ArkValue<Ark_Boolean>(false));
+            auto mouseEventInfo = event->value1->GetEventInfo();
+            CHECK_NULL_RETURN(mouseEventInfo, Converter::ArkValue<Ark_Boolean>(false));
+            auto density = static_cast<float>(pipelineContext->GetDensity());
+            auto mouseEvent = mouseEventInfo->ConvertToMouseEventForStatic(density);
+            mouseEvent.time = mouseEventInfo->GetTimeStamp();
+            mouseEvent.isNewReferee = useCompetition ? false : true;
+            result = useCompetition ? postEventManager->PostMouseEventWithStrategy(node, std::move(mouseEvent))
+                                    : postEventManager->PostMouseEvent(node, std::move(mouseEvent));
+            break;
+        }
+        case SELECTOR_ID_2: {
+            CHECK_NULL_RETURN(event->value2, Converter::ArkValue<Ark_Boolean>(false));
+            auto axisEventInfo = event->value2->GetEventInfo();
+            CHECK_NULL_RETURN(axisEventInfo, Converter::ArkValue<Ark_Boolean>(false));
+            auto density = static_cast<float>(pipelineContext->GetDensity());
+            auto axisEvent = axisEventInfo->ConvertToAxisEvent(true, density);
+            axisEvent.pressedCodes = axisEventInfo->GetPressedKeyCodes();
+            axisEvent.isNewReferee = useCompetition ? false : true;
+            result = useCompetition ? postEventManager->PostAxisEventWithStrategy(node, std::move(axisEvent))
+                                    : postEventManager->PostAxisEvent(node, std::move(axisEvent));
+            break;
+        }
+        default:
+            result = false;
+            break;
+    }
+    return Converter::ArkValue<Ark_Boolean>(result);
+}
+Ark_Boolean DispatchKeyEventImpl(Ark_FrameNode peer, Ark_KeyEvent event)
+{
+    CHECK_ON_UI_THREAD_RETURN(false);
+    CHECK_NULL_RETURN(event, Converter::ArkValue<Ark_Boolean>(false));
+    auto frameNodePeer = reinterpret_cast<FrameNodePeer*>(peer);
+    auto peerNode = FrameNodePeer::GetFrameNodeByPeer(frameNodePeer);
+    CHECK_NULL_RETURN(peerNode, false);
+    auto currentUINodeRef = AceType::DynamicCast<NG::UINode>(peerNode);
+    CHECK_NULL_RETURN(currentUINodeRef, false);
+    CHECK_NODE_ON_VALID_THREAD_RETURN(AceType::RawPtr(currentUINodeRef), false);
+
+    auto focusHub = peerNode->GetOrCreateFocusHub();
+    CHECK_NULL_RETURN(focusHub, false);
+    if (!focusHub->IsCurrentFocus()) {
+        return Converter::ArkValue<Ark_Boolean>(false);
+    }
+
+    auto keyEventInfo = event->GetEventInfo();
+    CHECK_NULL_RETURN(keyEventInfo, Converter::ArkValue<Ark_Boolean>(false));
+    KeyEvent keyEvent;
+    keyEvent.action = keyEventInfo->GetKeyType();
+    keyEvent.code = keyEventInfo->GetKeyCode();
+    keyEvent.key = keyEventInfo->GetKeyText();
+    keyEvent.sourceType = keyEventInfo->GetKeySource();
+    keyEvent.deviceId = keyEventInfo->GetDeviceId();
+    keyEvent.unicode = keyEventInfo->GetUnicode();
+    keyEvent.numLock = keyEventInfo->GetNumLock();
+    keyEvent.enableCapsLock = keyEventInfo->GetCapsLock();
+    keyEvent.scrollLock = keyEventInfo->GetScrollLock();
+    keyEvent.keyIntention = keyEventInfo->GetKeyIntention();
+    keyEvent.metaKey = keyEventInfo->GetMetaKey();
+    keyEvent.timeStamp = keyEventInfo->GetTimeStamp();
+    keyEvent.pressedCodes = keyEventInfo->GetPressedKeyCodes();
+    return Converter::ArkValue<Ark_Boolean>(focusHub->HandleEvent(keyEvent));
 }
 Ark_Int32 AppendChildImpl(Ark_FrameNode peer,
                           Ark_FrameNode child)
@@ -1590,6 +1702,8 @@ const GENERATED_ArkUIFrameNodeExtenderAccessor* GetFrameNodeExtenderAccessor()
         FrameNodeExtenderAccessor::GetDestroyImpl,
         FrameNodeExtenderAccessor::DestroyPeerImpl,
         FrameNodeExtenderAccessor::IsModifiableImpl,
+        FrameNodeExtenderAccessor::DispatchInputEventImpl,
+        FrameNodeExtenderAccessor::DispatchKeyEventImpl,
         FrameNodeExtenderAccessor::AppendChildImpl,
         FrameNodeExtenderAccessor::InsertChildAfterImpl,
         FrameNodeExtenderAccessor::RemoveChildImpl,

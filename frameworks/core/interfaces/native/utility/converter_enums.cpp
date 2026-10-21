@@ -833,7 +833,7 @@ ACE_FORCE_EXPORT void AssignCast(std::optional<TextInputType>& dst, const Ark_In
         case ARK_INPUT_TYPE_NEW_PASSWORD: dst = TextInputType::NEW_PASSWORD; break;
         case ARK_INPUT_TYPE_NUMBER_DECIMAL: dst = TextInputType::NUMBER_DECIMAL; break;
         case ARK_INPUT_TYPE_URL: dst = TextInputType::URL; break;
-        case ARK_INPUT_TYPE_ONE_TIME_CODE: dst = TextInputType::JS_ONE_TIME_CODE; break;
+        case ARK_INPUT_TYPE_ONE_TIME_CODE: dst = TextInputType::ONE_TIME_CODE; break;
         default: LOGE("Unexpected enum value in Ark_InputType: %{public}d", src);
     }
 }
@@ -1429,6 +1429,28 @@ void AssignCast(std::optional<WebKeyboardAvoidMode>& dst, const Ark_WebKeyboardA
         default: LOGE("Unexpected enum value in Ark_WebKeyboardAvoidMode: %{public}d", src);
     }
 }
+
+#ifndef WINDOWS_PLATFORM
+#if defined(ARKUI_CAPI_UNITTEST) || defined(LINUX_PLATFORM) || defined(MAC_PLATFORM) || defined(CROSS_PLATFORM)
+template<>
+void AssignCast(std::optional<WebContextMenuItemId>& dst, const WebContextMenuItemId& src)
+{
+    switch (src) {
+        case WebContextMenuItemId::MENU_COPY_LINK: dst = WebContextMenuItemId::MENU_COPY_LINK; break;
+        default: LOGE("Unexpected enum value in WebContextMenuItemId: %{public}d", static_cast<int32_t>(src));
+    }
+}
+#else
+template<>
+void AssignCast(std::optional<WebContextMenuItemId>& dst, const Ark_WebContextMenuItemId& src)
+{
+    switch (src) {
+        case ARK_WEB_CONTEXT_MENU_ITEM_ID_MENU_COPY_LINK: dst = WebContextMenuItemId::MENU_COPY_LINK; break;
+        default: LOGE("Unexpected enum value in Ark_WebContextMenuItemId: %{public}d", src);
+    }
+}
+#endif
+#endif
 
 template<>
 void AssignCast(std::optional<WebKeyboardAppearanceMode>& dst, const Ark_WebKeyboardAppearanceMode& src)

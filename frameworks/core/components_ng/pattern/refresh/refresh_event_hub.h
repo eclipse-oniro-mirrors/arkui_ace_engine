@@ -41,7 +41,8 @@ public:
     void FireOnStateChange(const int32_t value) const
     {
         if (stateChange_) {
-            stateChange_(value);
+            auto stateChange = stateChange_;
+            stateChange(value);
         }
     }
     void SetOnRefreshing(RefreshingEvent&& refreshing)
@@ -52,7 +53,8 @@ public:
     void FireOnRefreshing() const
     {
         if (refreshing_) {
-            refreshing_();
+            auto refreshing = refreshing_;
+            refreshing();
         }
     }
 
@@ -64,7 +66,8 @@ public:
     void FireChangeEvent(const std::string& value) const
     {
         if (changeEvent_) {
-            changeEvent_(value);
+            auto changeEvent = changeEvent_;
+            changeEvent(value);
         }
     }
 
@@ -86,14 +89,16 @@ public:
     void FireOnOffsetChange(const float value) const
     {
         if (offsetChange_) {
-            offsetChange_(value);
+            auto offsetChange = offsetChange_;
+            offsetChange(value);
         }
     }
 
     void FireOnStepOffsetChange(const float value, const bool isDrag) const
     {
         if (stepOffsetChange_) {
-            stepOffsetChange_(value, isDrag);
+            auto stepOffsetChange = stepOffsetChange_;
+            stepOffsetChange(value, isDrag);
         }
     }
 

@@ -22,7 +22,7 @@
 #include "core/interfaces/native/utility/reverse_converter.h"
 
 namespace OHOS::Ace::NG::GeneratedModifier {
-class CustomDialogControllerPeerImpl : public virtual AceType {
+class CustomDialogControllerPeerImpl : public AceType {
     DECLARE_ACE_TYPE(CustomDialogControllerPeerImpl, AceType);
 
 public:

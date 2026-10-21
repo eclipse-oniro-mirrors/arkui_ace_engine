@@ -96,6 +96,7 @@ public:
         void(std::function<void(const std::string& code, const std::string& msg)>&& actionCallback));
     MOCK_METHOD1(ReloadForm, void(const std::string& url));
     MOCK_METHOD1(SetIsFocusActive, void(bool isFocusActive));
+    MOCK_METHOD1(SetFormImageCacheThreshold, void(int32_t threshold));
 
     MOCK_METHOD3(CreateModalUIExtension, int32_t(const AAFwk::Want& want,
         const ModalUIExtensionCallbacks& callbacks, const ModalUIExtensionConfig& config));

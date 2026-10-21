@@ -15,12 +15,14 @@
 
 #include "adapter/ohos/entrance/ui_session/ui_session_batch_command.h"
 
+#include <cctype>
 #include <charconv>
 #include <climits>
 #include <cstring>
 #include <deque>
 #include <iterator>
 #include <memory>
+#include <unordered_map>
 #include <unordered_set>
 
 #include "cJSON.h"
@@ -30,6 +32,7 @@ namespace {
 
 constexpr size_t MAX_BATCH_COMMAND_COUNT = 50;
 constexpr size_t MAX_SET_TEXT_VALUE_LENGTH = 384;
+constexpr char UNICODE_ESCAPE_PREFIX[] = "\\u";
 constexpr char ESCAPED_NULL_SEQUENCE[] = "\\u0000";
 constexpr char BATCH_COMMAND[] = "batch";
 constexpr char SET_TEXT_COMMAND[] = "setText";
@@ -43,7 +46,7 @@ class BatchJsonStrings {
 public:
     BatchJsonStrings(const cJSON* root, const std::string& source)
     {
-        if (source.find(ESCAPED_NULL_SEQUENCE) != std::string::npos) {
+        if (source.find(UNICODE_ESCAPE_PREFIX) != std::string::npos) {
             size_t position = 0;
             CollectNullStrings(root, source, position);
         }
@@ -59,42 +62,86 @@ public:
         return IsValid(value) && std::strcmp(value, expected) == 0;
     }
 
+    bool HasInvalidUnicodeEscape() const
+    {
+        return hasInvalidUnicodeEscape_;
+    }
+
+    size_t GetLength(const char* value) const
+    {
+        if (value == nullptr) {
+            return 0;
+        }
+        size_t length = 0;
+        const auto iter = nullStrings_.find(value);
+        if (iter != nullStrings_.end()) {
+            // cJSON retains every decoded byte, including the segments after embedded NULs.
+            for (size_t index = 0; index < iter->second; ++index) {
+                length += std::strlen(value + length) + 1;
+            }
+        }
+        return length + std::strlen(value + length);
+    }
+
 private:
-    bool ReadStringHasNull(const std::string& source, size_t& position) const
+    void CheckUnicodeEscape(const std::string& source, size_t position)
+    {
+        if (source.compare(position, sizeof(UNICODE_ESCAPE_PREFIX) - 1, UNICODE_ESCAPE_PREFIX) != 0) {
+            return;
+        }
+        // cJSON maps invalid hexadecimal digits to NUL instead of rejecting the escape.
+        for (size_t offset = sizeof(UNICODE_ESCAPE_PREFIX) - 1; offset < sizeof(ESCAPED_NULL_SEQUENCE) - 1; ++offset) {
+            if (position + offset >= source.size() ||
+                !std::isxdigit(static_cast<unsigned char>(source[position + offset]))) {
+                hasInvalidUnicodeEscape_ = true;
+            }
+        }
+    }
+
+    size_t ReadStringNullCount(const std::string& source, size_t& position)
     {
         position = source.find('"', position);
         if (position == std::string::npos) {
-            return false;
+            return 0;
         }
-        bool hasNull = false;
+        size_t nullCount = 0;
         for (++position; position < source.size(); ++position) {
             if (source[position] == '"') {
                 ++position;
                 break;
             }
             if (source[position] == '\\') {
-                hasNull = hasNull || source.compare(position, sizeof(ESCAPED_NULL_SEQUENCE) - 1,
-                    ESCAPED_NULL_SEQUENCE) == 0;
+                CheckUnicodeEscape(source, position);
+                if (source.compare(position, sizeof(ESCAPED_NULL_SEQUENCE) - 1, ESCAPED_NULL_SEQUENCE) == 0) {
+                    ++nullCount;
+                }
                 ++position; // Skip the escaped character, including escaped backslashes and quotes.
             }
         }
-        return hasNull;
+        return nullCount;
     }
 
     void CollectNullStrings(const cJSON* node, const std::string& source, size_t& position)
     {
         for (auto item = node; item != nullptr; item = item->next) {
-            if (item->string && ReadStringHasNull(source, position)) {
-                nullStrings_.emplace(item->string);
+            if (item->string) {
+                const auto nullCount = ReadStringNullCount(source, position);
+                if (nullCount > 0) {
+                    nullStrings_.emplace(item->string, nullCount);
+                }
             }
-            if (cJSON_IsString(item) && ReadStringHasNull(source, position)) {
-                nullStrings_.emplace(item->valuestring);
+            if (cJSON_IsString(item)) {
+                const auto nullCount = ReadStringNullCount(source, position);
+                if (nullCount > 0) {
+                    nullStrings_.emplace(item->valuestring, nullCount);
+                }
             }
             CollectNullStrings(item->child, source, position);
         }
     }
 
-    std::unordered_set<const char*> nullStrings_;
+    bool hasInvalidUnicodeEscape_ = false;
+    std::unordered_map<const char*, size_t> nullStrings_;
 };
 
 size_t CountNamedMembers(const cJSON* object, const char* name, const cJSON** first, const BatchJsonStrings& strings)
@@ -225,7 +272,7 @@ BatchParseResult ParseBatchCommands(const cJSON* commands, const BatchJsonString
             break;
         }
         int32_t nodeId = -1;
-        const auto keyLength = child->string == nullptr ? 0 : std::strlen(child->string);
+        const auto keyLength = strings.GetLength(child->string);
         if (!ParseNodeId(child->string, nodeId, strings)) {
             auto item = AnalyzeCommand(child, nodeId, result.commandCount, strings);
             result.diagnostics.emplace_back(
@@ -315,7 +362,7 @@ BatchParseResult UiSessionBatchCommand::Parse(const std::string& command)
         !strings.Equals(cmd->valuestring, BATCH_COMMAND)) {
         return {};
     }
-    if (cmdCount != 1) {
+    if (cmdCount != 1 || strings.HasInvalidUnicodeEscape()) {
         return { .status = BatchParseStatus::INVALID_BATCH,
             .batchReason = BatchDiagnosticReason::INVALID_BATCH_ENVELOPE };
     }

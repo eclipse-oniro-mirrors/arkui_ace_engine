@@ -84,7 +84,7 @@ private:
     std::vector<std::shared_ptr<WebDomNode>> children_;
 };
 
-class WebDomDocument : public virtual AceType {
+class WebDomDocument : public AceType {
     DECLARE_ACE_TYPE(WebDomDocument, AceType);
 
 public:

@@ -17,6 +17,7 @@ import { InteropNativeModule, toPeerPtr } from '@koalaui/interop';
 import { ArkBaseNode } from './ArkBaseNode';
 import { XComponentAttribute, ArkXComponentPeer, XComponentParameters, XComponentOptions, NativeXComponentParameters, SurfaceRect, XComponentOptionsInternal, HdrType } from '../component/xcomponent';
 import { VoidCallback } from '../component/units';
+import { int32 } from '@koalaui/common';
 import { ArkUIAniModule } from "arkui.ani";
 
 export class ArkXComponentNode extends ArkBaseNode implements XComponentAttribute {
@@ -77,6 +78,10 @@ export class ArkXComponentNode extends ArkBaseNode implements XComponentAttribut
     }
     hdrBrightness(brightness: number | undefined, type?: HdrType): this {
         this.getPeer()?.setHdrBrightness1Attribute(brightness, type);
+        return this;
+    }
+    bufferQueueCount(count: int32): this {
+        this.getPeer()?.setBufferQueueCountAttribute(count);
         return this;
     }
 }

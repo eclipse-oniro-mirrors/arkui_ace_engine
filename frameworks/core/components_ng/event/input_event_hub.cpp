@@ -259,4 +259,22 @@ void InputEventHub::CreateAccessibilityHoverEventActuator()
         accessibilityHoverEventActuator_->ReplaceInputEvent(std::move(userAccessibilityHoverFunc_));
     }
 }
+
+void InputEventHub::CopyEvent(const RefPtr<InputEventHub>& source)
+{
+    CHECK_NULL_VOID(source);
+    userMouseFunc_ = source->userMouseFunc_;
+    userJSFrameNodeMouseFunc_ = source->userJSFrameNodeMouseFunc_;
+    userHoverFunc_ = source->userHoverFunc_;
+    userJSFrameNodeHoverFunc_ = source->userJSFrameNodeHoverFunc_;
+    userHoverMoveFunc_ = source->userHoverMoveFunc_;
+    userJSFrameNodeHoverMoveFunc_ = source->userJSFrameNodeHoverMoveFunc_;
+    userAxisFunc_ = source->userAxisFunc_;
+    userCoastingAxisFunc_ = source->userCoastingAxisFunc_;
+    userAccessibilityHoverFunc_ = source->userAccessibilityHoverFunc_;
+    mouseInputEvents_ = source->mouseInputEvents_;
+    hoverInputEvents_ = source->hoverInputEvents_;
+    hoverMoveInputEvents_ = source->hoverMoveInputEvents_;
+    axisInputEvents_ = source->axisInputEvents_;
+}
 } // namespace OHOS::Ace::NG

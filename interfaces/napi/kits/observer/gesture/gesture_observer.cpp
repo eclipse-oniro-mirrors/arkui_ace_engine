@@ -16,8 +16,10 @@
 #include "gesture_observer.h"
 
 #include "gesture_observer_listener.h"
+#include "napi/native_common.h"
 #include "interfaces/napi/kits/observer/ui_observer_listener.h"
 
+#include "base/utils/napi_scope_raii.h"
 #include "bridge/common/utils/engine_helper.h"
 
 namespace OHOS::Ace::Napi {
@@ -183,24 +185,23 @@ napi_status GestureObserver::DefineGestureObserver(napi_env env, napi_value expo
 
 napi_value GestureObserver::AddGlobalGestureListener(napi_env env, napi_callback_info info)
 {
-    napi_handle_scope scope = nullptr;
-    NAPI_CALL(env, napi_open_handle_scope(env, &scope));
+    ScopeRAII scope(env);
+    if (!scope) {
+        return nullptr;
+    }
     size_t argc = ARG_COUNT_THREE;
     napi_value argv[ARG_COUNT_THREE] = { nullptr };
     napi_get_cb_info(env, info, &argc, argv, nullptr, nullptr);
     if (argc != ARG_COUNT_THREE) {
-        napi_close_handle_scope(env, scope);
         LOGE("Invalid arguments");
         return nullptr;
     }
     NG::GestureListenerType gestureListenerType;
     if (!ParseGestureListenerType(env, argv[PARAM_INDEX_ZERO], gestureListenerType)) {
-        napi_close_handle_scope(env, scope);
         return nullptr;
     }
     std::unordered_set<NG::GestureActionPhase> outPhases;
     if (!ParseGestureObserverConfigs(env, argv[PARAM_INDEX_ONE], outPhases, gestureListenerType)) {
-        napi_close_handle_scope(env, scope);
         return nullptr;
     }
 
@@ -211,25 +212,24 @@ napi_value GestureObserver::AddGlobalGestureListener(napi_env env, napi_callback
 
     auto listener = std::make_shared<UIObserverListener>(env, argv[PARAM_INDEX_TWO]);
     RegisterGlobalGestureListener(gestureListenerType, outPhases, listener);
-    napi_close_handle_scope(env, scope);
     return nullptr;
 }
 
 napi_value GestureObserver::RemoveGlobalGestureListener(napi_env env, napi_callback_info info)
 {
-    napi_handle_scope scope = nullptr;
-    NAPI_CALL(env, napi_open_handle_scope(env, &scope));
+    ScopeRAII scope(env);
+    if (!scope) {
+        return nullptr;
+    }
     size_t argc = ARG_COUNT_TWO;
     napi_value argv[ARG_COUNT_TWO] = { nullptr };
     napi_get_cb_info(env, info, &argc, argv, nullptr, nullptr);
     if (argc != ARG_COUNT_ONE && argc != ARG_COUNT_TWO) {
-        napi_close_handle_scope(env, scope);
         LOGE("Invalid arguments");
         return nullptr;
     }
     NG::GestureListenerType gestureListenerType;
     if (!ParseGestureListenerType(env, argv[PARAM_INDEX_ZERO], gestureListenerType)) {
-        napi_close_handle_scope(env, scope);
         return nullptr;
     }
     if (argc == ARG_COUNT_ONE) {
@@ -238,7 +238,6 @@ napi_value GestureObserver::RemoveGlobalGestureListener(napi_env env, napi_callb
     if (argc == ARG_COUNT_TWO && GestureObserverListener::MatchValueType(env, argv[PARAM_INDEX_ONE], napi_function)) {
         UnRegisterGlobalGestureListener(gestureListenerType, argv[PARAM_INDEX_ONE]);
     }
-    napi_close_handle_scope(env, scope);
     return nullptr;
 }
 
@@ -316,27 +315,23 @@ void GestureObserver::HandleGestureAccept(NG::GestureListenerType gestureListene
         return;
     }
     auto env = GetCurrentNapiEnv();
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env);
+    if (!scope) {
         return;
     }
 
     auto iter = GestureObserverListeners_.find(gestureListenerType);
     if (iter == GestureObserverListeners_.end()) {
-        napi_close_handle_scope(env, scope);
         return;
     }
     auto& holder = iter->second;
     auto phaseIter = holder.find(phase);
     if (phaseIter == holder.end()) {
-        napi_close_handle_scope(env, scope);
         return;
     }
     for (const auto& listener : phaseIter->second) {
         listener->OnGestureStateChange(gestureListenerType, gestureEventInfo, current, frameNode, phase);
     }
-    napi_close_handle_scope(env, scope);
 }
 
 napi_env GestureObserver::GetCurrentNapiEnv()

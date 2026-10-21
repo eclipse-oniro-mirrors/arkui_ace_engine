@@ -71,22 +71,24 @@ void AnimatedDrawableDescriptor::LoadAsync(const LoadCallback&& callback)
 
 void AnimatedDrawableDescriptor::ControllAnimation(int32_t nodeId, bool play)
 {
-    // first: find animator
-    auto it = animators_.find(nodeId);
-    if (it == animators_.end()) {
-        return;
+    RefPtr<ControlledAnimator> animator;
+    auto status = ControlledAnimator::ControlStatus::STOPPED;
+    {
+        std::shared_lock<std::shared_mutex> lock(callMutx_);
+        auto it = animators_.find(nodeId);
+        if (it == animators_.end()) {
+            return;
+        }
+        animator = it->second;
+        status = animator->GetControlStatus();
     }
-    auto animator = it->second;
-    // second: animator operate
-    // visible and auto play is true, start to forward.
     if (play && !autoPlay_) {
         FlushUpdateCallbacksByNodeId(0, nodeId);
+        return;
     }
     if (play && autoPlay_) {
         animator->Forward();
     }
-    // invisible, pause animation.
-    auto status = animator->GetControlStatus();
     if (!play && status == ControlledAnimator::ControlStatus::RUNNING) {
         animator->Pause();
     }
@@ -94,6 +96,7 @@ void AnimatedDrawableDescriptor::ControllAnimation(int32_t nodeId, bool play)
 
 RefPtr<ControlledAnimator> AnimatedDrawableDescriptor::GetControlledAnimator(const std::string& id)
 {
+    std::shared_lock<std::shared_mutex> lock(callMutx_);
     if (animators_.size() == 1) {
         return animators_.begin()->second;
     }
@@ -111,6 +114,7 @@ RefPtr<ControlledAnimator> AnimatedDrawableDescriptor::GetControlledAnimator(con
 
 RefPtr<ControlledAnimator> AnimatedDrawableDescriptor::GetControlledAnimator(const int32_t id)
 {
+    std::shared_lock<std::shared_mutex> lock(callMutx_);
     if (animators_.size() == 1) {
         return animators_.begin()->second;
     }
@@ -298,15 +302,20 @@ void AnimatedDrawableDescriptor::RegisterUpdateCallback(int32_t nodeId, const Up
 
 void AnimatedDrawableDescriptor::UnRegisterUpdateCallback(int32_t nodeId)
 {
-    // unregister callbacks and remove animator by node id
-    auto it = animators_.find(nodeId);
-    if (it != animators_.end()) {
-        it->second->Pause();
+    RefPtr<ControlledAnimator> animator;
+    {
+        std::unique_lock<std::shared_mutex> lock(callMutx_);
+        auto it = animators_.find(nodeId);
+        if (it != animators_.end()) {
+            animator = it->second;
+        }
+        updateCallbacks_.erase(nodeId);
+        animators_.erase(nodeId);
+        imageSources_.erase(nodeId);
     }
-    std::unique_lock<std::shared_mutex> lock(callMutx_);
-    updateCallbacks_.erase(nodeId);
-    animators_.erase(nodeId);
-    imageSources_.erase(nodeId);
+    if (animator) {
+        animator->Pause();
+    }
 }
 
 void AnimatedDrawableDescriptor::FlushUpdateCallbacksByNodeId(int32_t index, int32_t nodeId)
@@ -314,28 +323,39 @@ void AnimatedDrawableDescriptor::FlushUpdateCallbacksByNodeId(int32_t index, int
     if (index < 0 || index >= static_cast<int32_t>(GetFrameCount())) {
         return;
     }
-    std::shared_lock<std::shared_mutex> lock(callMutx_);
-    auto it = updateCallbacks_.find(nodeId);
-    if (it == updateCallbacks_.end()) {
-        return;
+    UpdateCallback callback;
+    RefPtr<PixelMap> pixelMap;
+    {
+        std::shared_lock<std::shared_mutex> lock(callMutx_);
+        auto it = updateCallbacks_.find(nodeId);
+        if (it == updateCallbacks_.end()) {
+            return;
+        }
+        callback = it->second;
+        pixelMap = GetFrameByIndexInternal(index, nodeId);
     }
-    auto pixelMap = GetFrameByIndex(index, nodeId);
     CHECK_NULL_VOID(pixelMap);
-    it->second(pixelMap);
+    callback(pixelMap);
 }
 
 RefPtr<PixelMap> AnimatedDrawableDescriptor::GetFrameByIndex(int32_t index, int32_t nodeId)
 {
+    std::shared_lock<std::shared_mutex> lock(callMutx_);
+    return GetFrameByIndexInternal(index, nodeId);
+}
+
+RefPtr<PixelMap> AnimatedDrawableDescriptor::GetFrameByIndexInternal(int32_t index, int32_t nodeId)
+{
     if (!pixelMapList_.empty()) {
         return pixelMapList_[index];
     }
-    auto imageSource = imageSources_[nodeId];
-    if (!imageSource) {
+    auto it = imageSources_.find(nodeId);
+    if (it == imageSources_.end() || !it->second) {
         LOGE("Find imageSource failed, nodeId: %{public}d", nodeId);
         return nullptr;
     }
     uint32_t errorCode = 0;
-    auto frame = imageSource->CreatePixelMap(index, { -1, -1 }, errorCode, {});
+    auto frame = it->second->CreatePixelMap(index, { -1, -1 }, errorCode, {});
     return frame;
 }
 } // namespace OHOS::Ace

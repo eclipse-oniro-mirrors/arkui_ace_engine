@@ -29,23 +29,6 @@ OrderResult DateTimeSequence::GetDateOrder(const std::string& locale)
     if (U_FAILURE(icuStatus)) {
         return orderResult;
     }
-    const char* language = localeObj.getBaseName();
-    if (language == nullptr) {
-        return orderResult;
-    }
-    const std::unordered_map<std::string, std::string> DATE_ORDER_MAP = {
-        { "ug", "M-d-y" },
-        { "ar", "y-M-d" },
-        { "fa", "y-M-d" },
-        { "ur", "y-M-d" },
-        { "iw", "y-M-d" },
-        { "he", "y-M-d" },
-    };
-    std::string languageTag = language;
-    if (DATE_ORDER_MAP.find(languageTag) != DATE_ORDER_MAP.end()) {
-        orderResult.dateOrder = DATE_ORDER_MAP.find(languageTag)->second;
-        return orderResult;
-    }
     icu::SimpleDateFormat* formatter = static_cast<icu::SimpleDateFormat*>
         (icu::DateFormat::createDateInstance(icu::DateFormat::EStyle::kDefault, localeObj));
     if (U_FAILURE(icuStatus) || formatter == nullptr) {
@@ -72,20 +55,6 @@ OrderResult DateTimeSequence::GetDateTimeOrder(const std::string& locale)
     icu::Locale localeObj = icu::Locale::forLanguageTag(locale.data(), status);
     if (U_FAILURE(status)) {
         orderResult.dateTimeOrder = "-1";
-        return orderResult;
-    }
-    const std::unordered_map<std::string, std::string> DATETIME_ORDER_MAP = {
-        { "ug", "01" },
-        { "ar", "10" },
-        { "fa", "01" },
-        { "ur", "10" },
-        { "iw", "10" },
-        { "he", "10" },
-    };
-    const char* language = localeObj.getBaseName();
-    std::string languageTag = language == nullptr ? "" : language;
-    if (DATETIME_ORDER_MAP.find(languageTag) != DATETIME_ORDER_MAP.end()) {
-        orderResult.dateTimeOrder = DATETIME_ORDER_MAP.find(languageTag)->second;
         return orderResult;
     }
     icu::SimpleDateFormat* formatter = static_cast<icu::SimpleDateFormat*>
@@ -118,24 +87,9 @@ OrderResult DateTimeSequence::GetAmPmTimeOrder(const std::string& locale)
         orderResult.amPmTimeOrder = "-1";
         return orderResult;
     }
-    const char* language = localeObj.getBaseName();
     // 0 represents am/pm position, 1 represents time position
     const std::string amPmFirst = "10";
     const std::string amPmLast = "01";
-    const std::unordered_map<std::string, std::string> AM_PM_TIME_ORDER_MAP = {
-        { "ug", amPmFirst },
-        { "ar", amPmFirst },
-        { "fa", amPmLast },
-        { "ur", amPmFirst },
-        { "iw", amPmLast },
-        { "he", amPmLast },
-        { "bo", amPmFirst },
-    };
-    std::string languageTag = language == nullptr ? "" : language;
-    if (AM_PM_TIME_ORDER_MAP.find(languageTag) != AM_PM_TIME_ORDER_MAP.end()) {
-        orderResult.amPmTimeOrder = AM_PM_TIME_ORDER_MAP.find(languageTag)->second;
-        return orderResult;
-    }
     icu::DateTimePatternGenerator* gen = icu::DateTimePatternGenerator::createInstance(localeObj, status);
     icu::UnicodeString skeleton("h");
     if (gen == nullptr) {

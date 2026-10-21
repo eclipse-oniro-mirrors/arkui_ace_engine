@@ -333,6 +333,7 @@ enum class LpxAttribute {
     LPX_STROKE_WIDTH,
     LPX_TEXT_INDENT,
     LPX_TEXT_SPAN,
+    LPX_SAFE_AREA_INSET_SPACING,
     ALWAYS
 };
 
@@ -922,6 +923,11 @@ public:
 
     void SetBackgroundFunction(std::function<RefPtr<UINode>()>&& buildFunc);
 
+    const RefPtr<FrameNode>& GetBackgroundNode() const
+    {
+        return backgroundNode_;
+    }
+
     void SetIsNeedRefreshBackgroundBuilder(bool isNeedRefreshBackgroundBuilder)
     {
         isNeedRefreshBackgroundBuilder_ = isNeedRefreshBackgroundBuilder;
@@ -998,6 +1004,13 @@ public:
     RefPtr<FrameNode> GetOverlayNode() const
     {
         return overlayNode_;
+    }
+
+    void SetSafeAreaInsetNode(const RefPtr<FrameNode>& safeAreaInsetNode);
+
+    RefPtr<FrameNode> GetSafeAreaInsetNode() const
+    {
+        return safeAreaInsetNode_;
     }
 
     RefPtr<FrameNode> FindChildByPosition(float x, float y);
@@ -1122,8 +1135,8 @@ public:
         return layoutProperty_;
     }
 
-    RefPtr<LayoutWrapper> GetOrCreateChildByIndex(
-        uint32_t index, bool addToRenderTree = true, bool isCache = false) override;
+    RefPtr<LayoutWrapper> GetOrCreateChildByIndex(uint32_t index, bool addToRenderTree = true,
+        bool isCache = false, bool allowPlaceholderSubstitution = false) override;
     RefPtr<LayoutWrapper> GetChildByIndex(uint32_t index, bool isCache = false) override;
 
     FrameNode* GetFrameNodeChildByIndex(uint32_t index, bool isCache = false, bool isExpand = true);
@@ -1667,7 +1680,10 @@ public:
     void UnRegisterLpxUpdateCallback(LpxAttribute attribute);
     void FireLpxUpdateCallbacks();
     bool IsNeedLazyLayout() const;
+    void MeasureSafeAreaInset() override;
 protected:
+    void LayoutSafeAreaInset() override;
+
     void DumpInfo() override;
     std::unordered_map<std::string, std::function<void()>> destroyCallbacksMap_;
     void DumpInfo(std::unique_ptr<JsonValue>& json) override;
@@ -1988,6 +2004,8 @@ private:
     bool hasPreMake_ = false;
 
     RefPtr<FrameNode> overlayNode_;
+
+    RefPtr<FrameNode> safeAreaInsetNode_;
 
     RefPtr<FrameNode> paintNode_;
 

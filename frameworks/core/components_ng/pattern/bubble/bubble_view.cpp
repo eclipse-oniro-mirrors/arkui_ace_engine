@@ -1234,12 +1234,12 @@ RefPtr<FrameNode> BubbleView::CreateButton(ButtonProperties& buttonParam, int32_
     auto buttonId = ElementRegister::GetInstance()->MakeUniqueId();
     auto* buttonModifier = NodeModifier::GetButtonCustomModifier();
     CHECK_NULL_RETURN(buttonModifier, nullptr);
-    auto* buttonPattern = reinterpret_cast<ButtonPattern*>(buttonModifier->createButtonPattern());
+    auto buttonPattern = AceType::DynamicCast<ButtonPattern>(buttonModifier->createButtonPattern());
     CHECK_NULL_RETURN(buttonPattern, nullptr);
     // set button focus color
     buttonPattern->setComponentButtonType(ComponentButtonType::POPUP);
     buttonPattern->SetFocusBorderColor(focusColor);
-    auto buttonNode = FrameNode::CreateFrameNode(BUTTON_ETS_TAG, buttonId, AceType::Claim(buttonPattern));
+    auto buttonNode = FrameNode::CreateFrameNode(BUTTON_ETS_TAG, buttonId, buttonPattern);
     CHECK_NULL_RETURN(buttonNode, nullptr);
     auto nodeHandle = reinterpret_cast<ArkUINodeHandle>(AceType::RawPtr(buttonNode));
     CHECK_NULL_RETURN(nodeHandle, nullptr);

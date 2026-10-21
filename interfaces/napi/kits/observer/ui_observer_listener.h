@@ -16,29 +16,50 @@
 #ifndef FOUNDATION_ACE_INTERFACES_OBSERVER_LISTENER_H
 #define FOUNDATION_ACE_INTERFACES_OBSERVER_LISTENER_H
 
-#include "napi/native_api.h"
-#include "napi/native_common.h"
-#include "napi/native_node_api.h"
+#include <cstdint>
+#include <string>
 
-#include "core/components_ng/base/observer_handler.h"
+#include "napi/native_api.h"
+
+#include "common/napi_observer_callback.h"
+
+namespace OHOS::Ace {
+class BaseEventInfo;
+class ClickInfo;
+class GestureEvent;
+struct FingerInfo;
+struct WindowSizeBreakpoint;
+enum class Axis;
+template<typename T>
+class RefPtr;
+} // namespace OHOS::Ace
 
 namespace OHOS::Ace::NG {
+class FrameNode;
+class NGGestureRecognizer;
+class PanRecognizer;
+struct NavDestinationInfo;
+struct NavDestinationSwitchInfo;
+struct RouterPageInfoNG;
+struct SwiperContentInfo;
+struct TabContentInfo;
+struct TextChangeEventInfo;
+enum class GestureActionPhase;
+enum class GestureListenerType;
 enum class NodeRenderState;
-}
+enum class ScrollEventType;
+} // namespace OHOS::Ace::NG
 
 namespace OHOS::Ace::Napi {
 class UIObserverListener {
 public:
-    UIObserverListener(napi_env env, napi_value callback) : env_(env)
+    UIObserverListener(napi_env env, napi_value callback) : env_(env), callback_(env, callback) {}
+    ~UIObserverListener() = default;
+    bool NapiEqual(napi_value callback) const
     {
-        napi_create_reference(env_, callback, 1, &callback_);
+        return callback_.Equals(callback);
     }
-    ~UIObserverListener()
-    {
-        if (callback_) {
-            napi_delete_reference(env_, callback_);
-        }
-    }
+
     void OnNavigationStateChange(const NG::NavDestinationInfo& info);
     void OnScrollEventStateChange(
         const std::string& id, int32_t uniqueId, NG::ScrollEventType eventType, float offset, Ace::Axis axis);
@@ -62,14 +83,11 @@ public:
     void OnRouterPageSizeChange(const NG::RouterPageInfoNG& info, napi_value context = nullptr);
     void OnNavDestinationSizeChange(const NG::NavDestinationInfo& info);
     void HandleSwiperContentUpdate(const NG::SwiperContentInfo& info);
-    bool NapiEqual(napi_value cb);
-    void OnDrawOrLayout();
 
 private:
     napi_value CreateNavDestinationSwitchInfoObj(const NG::NavDestinationSwitchInfo& switchInfo, napi_value context);
     napi_value CreateNavDestinationInfoObj(const NG::NavDestinationInfo& info);
     napi_value CreateRouterPageInfoObj(const NG::RouterPageInfoNG& info, napi_value context);
-    napi_value GetNapiCallback();
     napi_value GetFrameNodeObject(const RefPtr<NG::FrameNode>& frameNode);
     static napi_valuetype GetValueType(napi_env env, napi_value value);
     static napi_value GetNamedProperty(napi_env env, napi_value object, const std::string& propertyName);
@@ -85,8 +103,9 @@ private:
     void AddClickEventInfoTwo(napi_value objValueClickEvent, const ClickInfo& clickInfo);
     void AddFingerObjectInfo(napi_value napiFinger, const FingerInfo& finger);
     void AddTargetObject(napi_value objValueEvent, const BaseEventInfo& baseEventInfo);
+
     napi_env env_ = nullptr;
-    napi_ref callback_ = nullptr;
+    NapiObserverCallback callback_;
 };
 } // namespace OHOS::Ace::Napi
 

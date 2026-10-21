@@ -388,6 +388,8 @@ public:
     void SetTransparencyCallbackId(const std::optional<int32_t>& id);
     std::optional<ImmersiveMaterialConfig> GetImmersiveMaterialConfig() const;
     std::optional<int32_t> GetTransparencyCallbackId() const;
+    void SetMaterialColorModeChangeCallback(std::function<void()>&& callback);
+    void OnMaterialColorModeChange();
     RefPtr<UiMaterial> GetSystemMaterial() const;
 
     virtual void OpacityAnimation(const AnimationOption& option, double begin, double end) {}
@@ -485,6 +487,11 @@ public:
     virtual void DumpInfo() {}
     virtual void DumpInfo(std::unique_ptr<JsonValue>& json) {}
     virtual void DumpSimplifyInfo(std::shared_ptr<JsonValue>& json) {}
+    virtual void CollectVisualTreeProperties(JsonValue& json) {}
+    virtual void CollectFunctionalTreeProperties(JsonValue& json) {}
+
+    virtual bool HasRenderContent() const { return false; }
+
     virtual void DumpAdvanceInfo() {}
     virtual void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json) {}
 

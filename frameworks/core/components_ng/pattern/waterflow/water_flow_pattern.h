@@ -49,6 +49,24 @@ public:
     OverScrollOffset GetOverScrollOffset(double delta) const override;
     void UpdateScrollBarOffset() override;
 
+    // Feat-20260806915269: item scroll snap (scrollSnapStrategy) integration on the shared
+    // ScrollablePattern item snap mechanism; WaterFlow only supplies candidates and the legal range.
+    SnapType GetSnapType() override;
+    ScrollSnapStrategy GetScrollSnapStrategy() const override;
+    bool StartSnapAnimation(SnapAnimationOptions snapAnimationOptions) override;
+    std::vector<SnapCandidate> BuildItemSnapCandidates(ScrollSnapAlign align) override;
+    std::optional<float> GetItemSnapNeighborAnchor(ScrollSnapAlign align, bool towardSmaller) override;
+    float GetItemSnapMinOffset() const override;
+    float GetItemSnapMaxOffset() const override;
+    // Measured-anchor tracking during a fling (same contract as GridPattern).
+    bool SupportsTrackedItemSnap() const override
+    {
+        return true;
+    }
+    void BeginTrackedItemSnap(float coordinate) override;
+    std::vector<SnapCandidate> BuildTrackedItemSnapCandidates(ScrollSnapAlign align) override;
+    float GetItemSnapCalibrationMargin() const override;
+
     using LayoutMode = WaterFlowLayoutMode;
     void SetLayoutMode(LayoutMode mode);
     LayoutMode GetLayoutMode() const
@@ -250,6 +268,8 @@ private:
         return DisplayMode::OFF;
     }
     void OnModifyDone() override;
+    void InitOnKeyEvent();
+    bool OnKeyEvent(const KeyEvent& event);
     bool OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, const DirtySwapConfig& config) override;
     void CheckScrollable();
     bool IsOutOfBoundary(bool useCurrentDelta = true) override;
@@ -290,6 +310,27 @@ private:
     bool IsAtSectionBoundary() const;
 
     void ScrollToFocusItem(int32_t itemIdx);
+
+    // Feat-20260806915269: content-space main-axis geometry of the laid-out (visible + cached) items,
+    // captured in the layout swap so settle callbacks never read lagging frame rects (as GridPattern).
+    struct SnapItemGeometry {
+        float contentStart = 0.0f;
+        float mainSize = 0.0f;
+        int32_t index = -1;
+    };
+    void UpdateSnapItemGeometryCache();
+    void AppendSnapItemGeometry(
+        const RefPtr<LayoutWrapper>& item, int32_t index, float leadingPadding, float totalOffset);
+    void UpdateSnapGeometryAfterLayout(bool isLayoutValid);
+    void CheckSpringAfterContentShrink();
+    // Total offset including a sliding-window delta that is applied at the next layout.
+    double GetItemSnapCurrentOffset() const override;
+    std::vector<SnapItemGeometry> snapItemGeometryCache_;
+    // Coordinate origins sampled with snapItemGeometryCache_ during the last layout.
+    float snapGeometryEstimatedOffset_ = 0.0f;
+    float snapGeometryStableOffset_ = 0.0f;
+    // Last synchronized sliding-window total height; an unsynced window cannot estimate it.
+    std::optional<float> snapTotalHeight_;
 
     std::optional<int32_t> targetIndex_;
     RefPtr<WaterFlowLayoutInfoBase> layoutInfo_ = WaterFlowLayoutInfoBase::Create(LayoutMode::TOP_DOWN);

@@ -14,6 +14,7 @@
  */
 
 #include "node_model.h"
+#include "config_manager.h"
 #include "gesture_impl.h"
 #include "interfaces/native/native_error_message_macros.h"
 
@@ -305,7 +306,8 @@ ArkUI_NodeHandle OH_ArkUI_TouchRecognizer_GetNodeHandle(const ArkUI_TouchRecogni
             static_cast<void*>(recognizer));
 
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
-    ArkUI_Node* arkUINode = new ArkUI_Node({ -1, node, false });
+    ArkUI_Node* arkUINode = new ArkUI_Node({
+        .type = -1, .uiNodeHandle = node, .cNode = false, .magic = ARKUI_NODE_MAGIC_VALID });
     impl->getExtendedAPI()->setAttachNodePtr((arkUINode)->uiNodeHandle, reinterpret_cast<void*>(arkUINode));
     return reinterpret_cast<ArkUI_NodeHandle>(arkUINode);
 }
@@ -833,6 +835,7 @@ ArkUI_ErrorCode OH_ArkUI_SetTouchTestDoneCallback(ArkUI_NodeHandle node, void* u
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     CHECK_NULL_RETURN_WITH_MESSAGE(impl, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "impl is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "node is null");
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     auto callback = reinterpret_cast<void (*)(ArkUIGestureEvent* event, ArkUIGestureRecognizerHandleArray recognizers,
         int32_t count, void* userData)>(touchTestDone);
     auto result = impl->getNodeModifiers()->getCommonModifier()->setOnTouchTestDoneCallback(
@@ -1000,6 +1003,7 @@ int32_t AddGestureToNode(ArkUI_NodeHandle node, ArkUI_GestureRecognizer* recogni
 {
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "node is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(recognizer, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "recognizer is null");
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     recognizer->attachNode = node;
     recognizer->attachNodeId =
         OHOS::Ace::NodeModel::GetFullImpl()->getNodeModifiers()->getFrameNodeModifier()->getIdByNodePtr(
@@ -1014,6 +1018,7 @@ int32_t RemoveGestureFromNode(ArkUI_NodeHandle node, ArkUI_GestureRecognizer* re
 {
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "node is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(recognizer, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "recognizer is null");
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     OHOS::Ace::NodeModel::GetFullImpl()->getNodeModifiers()->getGestureModifier()->removeGestureFromNode(
         node->uiNodeHandle, recognizer->gesture);
     recognizer->attachNodeId = -1;
@@ -1109,6 +1114,7 @@ int32_t SetGestureInterrupterToNode(
 {
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "node is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(interrupter, 0, __FUNCTION__, "GestureInterrupt is null");
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     auto callback = reinterpret_cast<int32_t (*)(ArkUIGestureInterruptInfo*)>(interrupter);
     OHOS::Ace::NodeModel::GetFullImpl()->getNodeModifiers()->getGestureModifier()->setGestureInterrupterToNode(
         node->uiNodeHandle, callback);
@@ -1120,6 +1126,7 @@ int32_t SetGestureInterrupterToNodeWithUserData(ArkUI_NodeHandle node, void* use
 {
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "node is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(interrupter, 0, __FUNCTION__, "GestureInterrupt is null");
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     auto callback = reinterpret_cast<int32_t (*)(ArkUIGestureInterruptInfo*)>(interrupter);
     auto nodeModel = OHOS::Ace::NodeModel::GetFullImpl();
     if (nodeModel) {
@@ -1135,6 +1142,7 @@ int32_t SetInnerGestureParallelTo(ArkUI_NodeHandle node, void* userData,
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "node is null");
     CHECK_NULL_RETURN_WITH_MESSAGE(
         parallelInnerGesture, ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "parallelInnerGesture is null");
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     auto callback =
         reinterpret_cast<ArkUIGestureRecognizer* (*)(ArkUIParallelInnerGestureEvent * current)>(parallelInnerGesture);
     OHOS::Ace::NodeModel::GetFullImpl()->getNodeModifiers()->getGestureModifier()->setInnerGestureParallelTo(
@@ -1148,6 +1156,7 @@ ArkUI_ErrorCode SetGestureParallelTo(ArkUI_NodeHandle node, void* userData,
     if (node == nullptr) {
         return ARKUI_ERROR_CODE_PARAM_INVALID;
     }
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     auto callback = reinterpret_cast<ArkUIGestureRecognizer* (*)(ArkUIParallelGestureEvent * current)>(parallelGesture);
     OHOS::Ace::NodeModel::GetFullImpl()->getNodeModifiers()->getGestureModifier()->setGestureParallelTo(
         node->uiNodeHandle, userData, callback);

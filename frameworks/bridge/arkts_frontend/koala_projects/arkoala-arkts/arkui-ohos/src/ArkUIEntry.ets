@@ -207,7 +207,7 @@ export class Application {
     private exitApp: boolean = false
     private userView: UserView | undefined = undefined
     private entryPoint: EntryPoint | undefined = undefined
-    private moduleName: string = ""
+    private moduleSourcePath: string = ""
     private startUrl: string = ""
     private startParam: string = ""
     private startName: string = ""
@@ -218,10 +218,10 @@ export class Application {
     private rootPointer: KPointer = nullptr
     public static firstRegisterArkuiApiHandler: boolean = true
 
-    constructor(useNativeLog: boolean, moduleName: string, startUrl: string, startParam: string, name: string,
+    constructor(useNativeLog: boolean, moduleSourcePath: string, startUrl: string, startParam: string, name: string,
         userView: UserView | undefined, entryPoint: EntryPoint | undefined) {
         this.useNativeLog = useNativeLog
-        this.moduleName = moduleName
+        this.moduleSourcePath = moduleSourcePath
         this.startUrl = startUrl
         this.startParam = startParam
         this.userView = userView
@@ -233,11 +233,11 @@ export class Application {
     static createMemoRootState(manager: StateManager,
         @memo
         builder: () => void, // TODO UserViewBuilder
-        moduleName: string,
+        moduleSourcePath: string,
         initUrl: string
     ): void {
         // init router module
-        Routed(builder, moduleName, initUrl)
+        Routed(builder, moduleSourcePath, initUrl)
         let routerOption: router.RouterOptions = {url: initUrl}
         router.runPage(routerOption, builder)
     }
@@ -307,7 +307,7 @@ export class Application {
                     if (this.startName) {
                         Application.createMemoRootStateByName(this.startName, this.uiContext!)
                     } else {
-                        Application.createMemoRootState(this.manager!, builder, this.moduleName, this.startUrl)
+                        Application.createMemoRootState(this.manager!, builder, this.moduleSourcePath, this.startUrl)
                     }
                     this.rootState = this.manager!.updatableNode<PeerNode>(PeerNode.generateRootPeer(), (context: StateContext) => {})
                 }
@@ -590,7 +590,7 @@ export class Application {
         this.manager!.updateSnapshot();
     }
 
-    static createApplication(startUrl: string, startParams: string, startName: string, useNativeLog: boolean, moduleName: string, userView: UserView | undefined, entryPoint: EntryPoint | undefined): Application {
+    static createApplication(startUrl: string, startParams: string, startName: string, useNativeLog: boolean, moduleSourcePath: string, userView: UserView | undefined, entryPoint: EntryPoint | undefined): Application {
         if (!userView && !entryPoint && startUrl != "__INTEROP__" && startName === "") {
             throw new Error(`Invalid EntryPoint`)
         }
@@ -607,7 +607,7 @@ export class Application {
             });
             Application.firstRegisterArkuiApiHandler = false
         }
-        return new Application(useNativeLog, moduleName, startUrl, startParams, startName, userView, entryPoint)
+        return new Application(useNativeLog, moduleSourcePath, startUrl, startParams, startName, userView, entryPoint)
     }
 
     static createApplication(param: ApplicationConstructorParam): Application {
@@ -620,7 +620,7 @@ export class Application {
             param.startParams,
             param.startName,
             param.useNativeLog,
-            param.moduleName,
+            param.moduleSourcePath,
             param.userView,
             param.entryPoint
         );
@@ -649,7 +649,7 @@ export class ApplicationConstructorParam {
     public startParams: string;
     public startName: string;
     public useNativeLog: boolean;
-    public moduleName: string;
+    public moduleSourcePath: string;
     public userView: UserView | undefined;
     public entryPoint: EntryPoint | undefined;
     public enableDebug: boolean;
@@ -658,7 +658,7 @@ export class ApplicationConstructorParam {
         startParams: string,
         startName: string,
         useNativeLog: boolean,
-        moduleName: string,
+        moduleSourcePath: string,
         userView: UserView | undefined,
         entryPoint: EntryPoint | undefined,
         enableDebug: boolean
@@ -667,7 +667,7 @@ export class ApplicationConstructorParam {
         this.startParams = startParams;
         this.startName = startName;
         this.useNativeLog = useNativeLog;
-        this.moduleName = moduleName;
+        this.moduleSourcePath = moduleSourcePath;
         this.userView = userView;
         this.entryPoint = entryPoint;
         this.enableDebug = enableDebug;

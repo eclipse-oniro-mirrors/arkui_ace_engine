@@ -33,6 +33,7 @@
 namespace OHOS::Ace::NG {
 
 class PipelineContext;
+class FrameNode;
 
 // Prediction request for one real item about to be created inside a scroll container.
 struct ScrollPlaceholderPredictParams {
@@ -55,7 +56,7 @@ struct ScrollPlaceholderPredictResult {
     bool budgetAvailable = false;
 };
 
-// Per pipeline scroll placeholder scheduler core (design ADR-1/ADR-4/ADR-6/ADR-9):
+// Per pipeline scroll placeholder scheduler core:
 // - lazy created by PipelineContext, isolated per container instance;
 // - predicts, before the real builder runs, whether the estimated item build cost fits the
 //   remaining frame budget anchored to the current vsync period;
@@ -67,7 +68,7 @@ struct ScrollPlaceholderPredictResult {
 // ACE_FORCE_EXPORT: the List/Grid/WaterFlow split .so libraries reference
 // NotifyRealBuildStart/End through the observation scope header, so the class
 // must keep default visibility to be exportable via build/libace.map.
-class ACE_FORCE_EXPORT ScrollPlaceholderManager : public virtual AceType {
+class ACE_FORCE_EXPORT ScrollPlaceholderManager : public AceType {
     DECLARE_ACE_TYPE(ScrollPlaceholderManager, AceType);
 
 public:
@@ -82,15 +83,24 @@ public:
     uint64_t RegisterTemplate(const std::string& templateId, ScrollPlaceholderBuilder&& builder);
     bool UnregisterTemplate(const std::string& templateId);
     bool IsTemplateRegistered(const std::string& templateId) const;
+    // Registration probe: synchronously runs one restricted-protocol subtree
+    // clone of the resident source instance on the UI thread (validation is the
+    // clone itself — same path production clones take). Returns false when any node
+    // of the template is not copyable, with the offending subtree path in
+    // subtreePath for diagnostics; on success the probe product is cached into the
+    // instance pool. The template itself stays registered either way: the caller
+    // (registration bridge) unregisters and reports the rejection.
+    bool ProbeTemplateClone(const std::string& templateId, std::string& subtreePath);
     std::optional<ScrollPlaceholderTemplateSnapshot> LookupTemplateForCreate(const std::string& templateId);
     // Resident copy source of the template (built by the builder on the UI thread); never
     // handed out, only traversed and copied by background clone tasks.
     void SetTemplateSourceInstance(const std::string& templateId, const RefPtr<UINode>& instance);
     RefPtr<UINode> GetTemplateSourceInstance(const std::string& templateId) const;
     void CacheTemplateInstance(const std::string& templateId, const RefPtr<UINode>& instance);
-    // Takes a spare copy when the pool still holds one; with no spare the instance is
-    // synchronously created from the current template on the UI thread. Either way the pool
-    // is replenished by background clones of the resident source.
+    // Always executes the template builder synchronously on the UI thread and returns
+    // the product. The instance pool stays maintained (registration seeds it, retirement
+    // returns content to it) but is not consumed on acquire: pooled clones carry layout
+    // properties only (no paint properties), which visibly degrades the placeholder.
     RefPtr<UINode> AcquireTemplateInstance(const std::string& templateId);
     size_t GetCachedInstanceCount(const std::string& templateId) const;
     size_t GetHotTemplateCount() const;
@@ -117,6 +127,29 @@ public:
     // Lifecycle.
     void Destroy();
     bool IsDestroyed() const;
+
+    // ---- Acquisition deferral table (the index->wrapper substitution itself
+    // executes in FrameProxy::GetFrameNodeByIndex, one choke point above every lazy
+    // syntax node). The container pattern stays the decision side: on defer it mounts
+    // the shell and records (hostId, index) -> shell here; FrameProxy queries the table
+    // on every non-cache index acquisition and returns the shell as the index's current
+    // occupant until the real build commits and the entry is cleared. Registered shells
+    // never enter FrameProxy's partFrameNodeChildren_: the index slot stays reserved
+    // for the real item. Threading: UI thread only.
+    // Records one live deferral; replaces any previous shell for the same (hostId, index).
+    void RecordDeferral(int32_t hostNodeId, int32_t index, const RefPtr<FrameNode>& shell);
+    // Drops the deferral so the index resolves through the normal acquisition again.
+    void ClearDeferral(int32_t hostNodeId, int32_t index);
+    // Drops every deferral whose recorded shell is the given node (the retirement
+    // funnel covers paths that do not know the index, e.g. the orphan sweep).
+    void RemoveDeferralsByShell(int32_t hostNodeId, const RefPtr<FrameNode>& shell);
+    // Returns the deferred shell for the index, or null when nothing is deferred (a
+    // dead weak reference is treated as no deferral and swept).
+    RefPtr<FrameNode> QueryDeferredShell(int32_t hostNodeId, int32_t index);
+    // Process-wide fast gate for the FrameProxy hot path: false when no deferral was
+    // ever recorded and not yet cleared, letting non-placeholder acquisitions skip the
+    // context/manager lookup entirely.
+    static bool HasAnyDeferrals();
 
     // Observation hooks for scroll container item builds (no behavior impact: the real item
     // is still built synchronously; these only sample its cost and let the prediction say,
@@ -200,6 +233,18 @@ private:
     void RequestFrameIfAlive();
     void PurgeTemplateRealBuilds(const std::string& templateId, ScrollPlaceholderCancelReason reason);
 
+    // Deferral table key: host id and item index packed into one 64-bit key. Host ids
+    // and lazy-container indexes are generated positive int32s, so the packing is
+    // collision-free for every real pair.
+    static uint64_t DeferralKey(int32_t hostNodeId, int32_t index)
+    {
+        return (static_cast<uint64_t>(static_cast<uint32_t>(hostNodeId)) << 32) |
+               static_cast<uint64_t>(static_cast<uint32_t>(index));
+    }
+    // Erases one table entry and keeps the live count in step; true when an entry
+    // was actually removed.
+    bool TakeDeferralEntry(uint64_t key);
+
     int32_t instanceId_ = -1;
     WeakPtr<PipelineContext> pipeline_;
     ScrollPlaceholderCostModel costModel_;
@@ -216,6 +261,14 @@ private:
     // background clone tasks.
     mutable std::mutex cloneMutex_;
     std::unordered_map<std::string, uint32_t> pendingCloneCount_;
+
+    // (hostId, index) -> mounted shell of a deferred index. Weak so a leaked pattern
+    // bookkeeping bug can never keep a retired shell alive through this table.
+    std::unordered_map<uint64_t, WeakPtr<FrameNode>> deferrals_;
+    // Process-wide live-deferral count behind HasAnyDeferrals(): relaxed atomic, the
+    // FrameProxy fast gate reads it from the UI thread while record/clear run on the
+    // UI thread as well (the atomic only keeps the read well-defined off-contract).
+    inline static std::atomic<int32_t> liveDeferralCount_ = 0;
 
     mutable std::atomic<uint64_t> predictBuildRealNow_ = 0;
     mutable std::atomic<uint64_t> predictUsePlaceholder_ = 0;

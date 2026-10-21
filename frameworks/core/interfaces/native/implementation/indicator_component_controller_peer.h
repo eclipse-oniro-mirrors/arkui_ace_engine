@@ -23,7 +23,7 @@
 #include "core/components_ng/pattern/swiper_indicator/indicator_common/indicator_controller.h"
 #include "core/interfaces/native/utility/peer_utils.h"
 
-struct IndicatorComponentControllerPeer : public virtual OHOS::Ace::AceType {
+struct IndicatorComponentControllerPeer : public OHOS::Ace::AceType {
     DECLARE_ACE_TYPE(IndicatorComponentControllerPeer, OHOS::Ace::AceType);
 public:
     void SetController(const OHOS::Ace::RefPtr<OHOS::Ace::NG::IndicatorController>& controller,

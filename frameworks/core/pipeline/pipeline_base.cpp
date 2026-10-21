@@ -1230,12 +1230,20 @@ void PipelineBase::SetUiDvsyncSwitch(bool on, FromWhom fromWhom)
 
 bool PipelineBase::CheckThreadSafe()
 {
-    CHECK_NULL_RETURN(taskExecutor_, true);
-    if (!isFormRender_ && !taskExecutor_->WillRunOnCurrentThread(TaskExecutor::TaskType::UI)) {
+    if (!IsCurrentThreadSafe()) {
         LogBacktrace();
         return false;
     }
     return true;
+}
+
+bool PipelineBase::IsCurrentThreadSafe() const
+{
+    // Preserve the permissive behavior when no task executor is available.
+    CHECK_NULL_RETURN(taskExecutor_, true);
+    // Only non-dynamic form rendering bypasses the thread check. Dynamic rendering
+    // (including DynamicComponent and IsolatedComponent) must pass the executor's UI thread check.
+    return IsFormRenderExceptDynamicComponent() || taskExecutor_->WillRunOnCurrentThread(TaskExecutor::TaskType::UI);
 }
 
 bool PipelineBase::CheckIfGetTheme()

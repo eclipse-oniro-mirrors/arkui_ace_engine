@@ -655,6 +655,7 @@ struct ArkUIAniCommonModifier {
     ani_int (*getWindowId)(ani_int instanceId);
     ani_int (*getWindowWidthBreakpoint)();
     ani_int (*getWindowHeightBreakpoint)();
+    ani_boolean (*isWindowInfoInitialized)(ani_int instanceId);
     void* (*transferKeyEventPointer)(ani_long nativePtr);
     void* (*createKeyEventAccessorWithPointer)(ani_long nativePtr);
     void* (*createEventTargetInfoAccessor)();
@@ -716,6 +717,7 @@ struct ArkUIAniCommonModifier {
     void (*modalUIExtensionProxySend)(
         std::shared_ptr<OHOS::Ace::ModalUIExtensionProxy>& proxy, const OHOS::AAFwk::WantParams& params);
     ani_long (*interopProxyNodeConstruct)(ArkUI_Int32 id);
+    void (*setSafeAreaInset)(ArkUINodeHandle node, const ArkUIAniSafeAreaInsetEdge* edges, int32_t count);
 };
 struct  ArkUICustomNodeInfo {
     std::function<void()> onPageShowFunc;
@@ -1044,8 +1046,9 @@ struct ArkUIAniCommonNodeAniModifier {
 struct ArkUIAniVisualEffectModifier {
     OHOS::Ace::UiMaterial* (*constructMaterial)(int32_t type);
     void (*destroyMaterial)(OHOS::Ace::UiMaterial* ptr);
-    OHOS::Ace::UiMaterial* (*convertToECMaterial)(OHOS::Ace::UiMaterial* ptr);
-    OHOS::Ace::UiMaterial* (*convertToECSubMaterial)(OHOS::Ace::UiMaterial* ptr);
+    void (*convertToECMaterial)(OHOS::Ace::UiMaterial* src, OHOS::Ace::UiMaterial* dst);
+    void (*convertToECSubMaterial)(OHOS::Ace::UiMaterial* src, OHOS::Ace::UiMaterial* dst);
+    void (*getEmpty)(OHOS::Ace::UiMaterial* dst);
     int32_t (*getGlobalMaterialLevel)();
     bool (*isImmersiveMaterialSupported)();
     int32_t (*getMaterialState)();

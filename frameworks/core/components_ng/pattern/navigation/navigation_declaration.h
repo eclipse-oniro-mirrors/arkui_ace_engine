@@ -16,6 +16,7 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_DECLARATION_NAVIGATION_NAVIGATION_DECLARATION_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_DECLARATION_NAVIGATION_NAVIGATION_DECLARATION_H
 
+#include <optional>
 #include <string>
 
 #include "base/geometry/dimension.h"
@@ -238,6 +239,21 @@ enum class BarStyle {
     STACK,
     SAFE_AREA_PADDING,
 };
+
+inline std::optional<BarStyle> GetDefaultBarStyleFromStrategy(
+    FrameNode* host, const std::optional<BarStyle>& barStyle)
+{
+    CHECK_NULL_RETURN(host, std::nullopt);
+    if (barStyle.has_value()) {
+        return barStyle;
+    }
+    auto pipeline = host->GetContext();
+    CHECK_NULL_RETURN(pipeline, std::nullopt);
+    if (pipeline->IsImmersiveStrategySet(ImmersiveStrategy::NAVIGATION_EXPAND_SAFE_AREA)) {
+        return BarStyle::SAFE_AREA_PADDING;
+    }
+    return std::nullopt;
+}
 
 enum class TitleBarParentType { NAVBAR, NAV_DESTINATION };
 

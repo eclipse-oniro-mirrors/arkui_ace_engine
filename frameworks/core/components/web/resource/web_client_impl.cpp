@@ -635,6 +635,16 @@ void WebClientImpl::OnScaleChanged(float oldScaleFactor, float newScaleFactor)
     delegate->OnScaleChange(oldScaleFactor, newScaleFactor);
 }
 
+void WebClientImpl::OnZoomFactorChanged(double oldZoomFactor, double newZoomFactor)
+{
+    auto delegate = webDelegate_.Upgrade();
+    if (!delegate) {
+        return;
+    }
+    ContainerScope scope(delegate->GetInstanceId());
+    delegate->OnZoomChange(oldZoomFactor, newZoomFactor);
+}
+
 void WebClientImpl::OnScroll(double xOffset, double yOffset)
 {
     auto delegate = webDelegate_.Upgrade();
@@ -781,6 +791,23 @@ void WebClientImpl::OnContextMenuDismissed()
     CHECK_NULL_VOID(delegate);
     ContainerScope scope(delegate->GetInstanceId());
     delegate->OnContextMenuDismissed();
+}
+
+void WebClientImpl::OnContextMenuUpdate(int32_t menuItemId, std::shared_ptr<NWeb::NWebContextMenuOptions> options)
+{
+    bool enable = false;
+    if (options) {
+        enable = options->Enable();
+    }
+    TAG_LOGI(AceLogTag::ACE_WEB, "OnContextMenuUpdate menuItemId:%{public}d, enable:%{public}d",
+        menuItemId, enable);
+    auto delegate = webDelegate_.Upgrade();
+    CHECK_NULL_VOID(delegate);
+    ContainerScope scope(delegate->GetInstanceId());
+
+    WebContextMenuOptions contextMenuOptions;
+    contextMenuOptions.enable = enable;
+    delegate->OnContextMenuUpdate(static_cast<WebContextMenuItemId>(menuItemId), contextMenuOptions);
 }
 
 bool WebClientImpl::RunContextMenu(
@@ -1758,6 +1785,16 @@ void WebClientImpl::OnDetectedBlankScreen(
     CHECK_NULL_VOID(delegate);
     ContainerScope scope(delegate->GetInstanceId());
     delegate->OnDetectedBlankScreen(url, blankScreenReason, detectedContentfulNodesCount);
+}
+
+void WebClientImpl::OnMonitoredBlankScreen(
+    const std::string& url, int32_t reason,
+    const std::string& extraMsg)
+{
+    auto delegate = webDelegate_.Upgrade();
+    CHECK_NULL_VOID(delegate);
+    ContainerScope scope(delegate->GetInstanceId());
+    delegate->OnMonitoredBlankScreen(url, reason, extraMsg);
 }
 
 void WebClientImpl::OnFirstScreenPaint(

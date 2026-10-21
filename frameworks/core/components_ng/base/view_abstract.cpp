@@ -68,6 +68,7 @@
 #include "core/components_ng/pattern/overlay/overlay_manager.h"
 #include "core/components_ng/pattern/pattern.h"
 #include "core/components_ng/pattern/scroll/scroll_event_hub.h"
+#include "core/components_ng/pattern/safe_area_inset/safe_area_inset_pattern.h"
 #include "core/components_ng/pattern/scrollable/scrollable_event_hub.h"
 #include "core/components_ng/pattern/stack/stack_pattern.h"
 #include "core/components_ng/pattern/text_field/text_field_paint_property.h"
@@ -80,6 +81,7 @@
 #include "core/interfaces/native/node/dialog_modifier.h"
 #include "core/interfaces/native/node/menu_item_modifier.h"
 #include "core/interfaces/native/node/menu_modifier.h"
+#include "core/pipeline/base/element_register.h"
 
 namespace OHOS::Ace::NG {
 
@@ -1551,6 +1553,103 @@ void ViewAbstract::ResetSafeAreaPadding()
         return;
     }
     ACE_RESET_LAYOUT_PROPERTY(LayoutProperty, SafeAreaPadding);
+}
+
+void ViewAbstract::SetSafeAreaInset(
+    FrameNode* frameNode, const SafeAreaInsetOptions& options, const SafeAreaInsetContentArray& contents)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto layoutProperty = frameNode->GetLayoutProperty();
+    CHECK_NULL_VOID(layoutProperty);
+
+    SafeAreaInsetOptions effectiveOptions = options;
+    SafeAreaInsetContentArray effectiveContents = contents;
+    bool hasLpxSpacing = false;
+    for (size_t index = 0; index < SAFE_AREA_INSET_EDGE_COUNT; ++index) {
+        auto& edge = effectiveOptions.edges[index];
+        auto& content = effectiveContents[index];
+        if (!edge.has_value() || !content) {
+            edge.reset();
+            content.Reset();
+            continue;
+        }
+        for (size_t previous = 0; previous < index; ++previous) {
+            if (effectiveContents[previous] == content) {
+                edge.reset();
+                content.Reset();
+                break;
+            }
+        }
+        if (edge.has_value() && edge->spacing.GetDimension().Unit() == DimensionUnit::LPX) {
+            hasLpxSpacing = true;
+        }
+    }
+    if (effectiveOptions.Empty()) {
+        ResetSafeAreaInset(frameNode);
+        return;
+    }
+
+    if (hasLpxSpacing) {
+        frameNode->RegisterLpxAttribute(LpxAttribute::LPX_SAFE_AREA_INSET_SPACING);
+    } else {
+        frameNode->UnRegisterLpxAttribute(LpxAttribute::LPX_SAFE_AREA_INSET_SPACING);
+    }
+
+    auto insetContainer = frameNode->GetSafeAreaInsetNode();
+    auto insetPattern = insetContainer ? insetContainer->GetPattern<SafeAreaInsetPattern>() : nullptr;
+    if (!insetPattern) {
+        insetPattern = AceType::MakeRefPtr<SafeAreaInsetPattern>();
+        insetContainer = FrameNode::CreateFrameNode(SAFE_AREA_INSET_CONTAINER_TAG,
+            ElementRegister::GetInstance()->MakeUniqueId(), insetPattern);
+        CHECK_NULL_VOID(insetContainer);
+        insetContainer->SetInternal();
+        insetContainer->SetHitTestMode(HitTestMode::HTMTRANSPARENT_SELF);
+    }
+    bool contentChanged = false;
+    // Release changed slots before mounting the new snapshot, including roots moved between edges.
+    for (size_t index = 0; index < SAFE_AREA_INSET_EDGE_COUNT; ++index) {
+        auto edge = static_cast<SafeAreaInsetEdge>(index);
+        if (insetPattern->GetEdgeContent(edge) != effectiveContents[index]) {
+            contentChanged = insetPattern->SetEdgeContent(edge, nullptr) || contentChanged;
+        }
+    }
+    for (size_t index = 0; index < SAFE_AREA_INSET_EDGE_COUNT; ++index) {
+        contentChanged = insetPattern->SetEdgeContent(
+            static_cast<SafeAreaInsetEdge>(index), effectiveContents[index]) || contentChanged;
+    }
+    if (insetPattern->Empty()) {
+        ResetSafeAreaInset(frameNode);
+        return;
+    }
+
+    const bool optionsChanged = !layoutProperty->GetSafeAreaInset().has_value() ||
+        layoutProperty->GetSafeAreaInset().value() != effectiveOptions;
+    layoutProperty->UpdateSafeAreaInset(effectiveOptions);
+    if (frameNode->GetSafeAreaInsetNode() != insetContainer) {
+        frameNode->SetSafeAreaInsetNode(insetContainer);
+    } else if (contentChanged) {
+        frameNode->MarkNeedSyncRenderTree(true);
+    }
+    if (optionsChanged || contentChanged) {
+        frameNode->ResetSafeAreaPadding();
+        frameNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+    }
+}
+
+void ViewAbstract::ResetSafeAreaInset(FrameNode* frameNode)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto layoutProperty = frameNode->GetLayoutProperty();
+    CHECK_NULL_VOID(layoutProperty);
+    if (!frameNode->GetSafeAreaInsetNode() && !layoutProperty->GetSafeAreaInset().has_value() &&
+        !layoutProperty->GetSafeAreaInsetContribution().HasValue()) {
+        return;
+    }
+    frameNode->UnRegisterLpxAttribute(LpxAttribute::LPX_SAFE_AREA_INSET_SPACING);
+    layoutProperty->ResetSafeAreaInset();
+    frameNode->SetSafeAreaInsetNode(nullptr);
+    frameNode->ResetSafeAreaPadding();
+    frameNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
 }
 
 void ViewAbstract::SetSafeAreaPadding(FrameNode* frameNode, const CalcLength& value)
@@ -6743,6 +6842,7 @@ void ViewAbstract::ResetSystemMaterialEffect(FrameNode* frameNode)
     }
     auto pattern = frameNode->GetPattern();
     CHECK_NULL_VOID(pattern);
+    renderContext->SetMaterialColorModeChangeCallback(nullptr);
     pattern->RemoveResObj("viewAbstract.uiMaterial");
     UnRegisterMaterialInteractionEvent(frameNode);
     if (preMaterial->GetType() == static_cast<int32_t>(MaterialType::IMMERSIVE)) {
@@ -6896,6 +6996,19 @@ void ViewAbstract::SetSystemMaterialImmediate(FrameNode* frameNode, const UiMate
 
     if (material != nullptr) {
         updateFunc(nullptr);
+        // When frameNode == stackFrameNode, the call originates from declarative ArkTs where
+        // ConfigChangePerform is not enabled; color mode switches re-execute the ArkTs code,
+        // so no callback registration is needed. When frameNode != stackFrameNode, the call
+        // may come from C-API or imperative ArkTs, which requires a registered callback to
+        // handle color mode changes.
+        auto stackFrameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+        if (frameNode != stackFrameNode) {
+            auto renderContext = frameNode->GetRenderContext();
+            CHECK_NULL_VOID(renderContext);
+            renderContext->SetMaterialColorModeChangeCallback([updateFunc = std::move(updateFunc)]() {
+               updateFunc(nullptr); 
+            });
+        }
     } else {
         ResetSystemMaterialEffect(frameNode);
     }
@@ -10627,6 +10740,14 @@ Matrix4 ViewAbstract::GetTransform(FrameNode* frameNode)
     const auto& target = frameNode->GetRenderContext();
     CHECK_NULL_RETURN(target, value);
     return target->GetTransformMatrixValue(value);
+}
+
+Matrix4 ViewAbstract::GetTransform3D(FrameNode* frameNode)
+{
+    Matrix4 value;
+    const auto& target = frameNode->GetRenderContext();
+    CHECK_NULL_RETURN(target, value);
+    return target->GetTransform3DMatrixValue(value);
 }
 
 HitTestMode ViewAbstract::GetHitTestBehavior(FrameNode* frameNode)

@@ -81,14 +81,7 @@ void DatePickerModelNG::CreateDatePicker(RefPtr<PickerTheme> pickerTheme)
     orderResult = sequence.GetDateOrder(language);
     dateOrder = orderResult.dateOrder;
     dateTimeOrder = orderResult.dateTimeOrder;
-    if (language == "ug") {
-        datePickerPattern->SetDateOrder("y-d-M");
-    } else {
-        datePickerPattern->SetDateOrder(dateOrder);
-    }
-    if (language == "ar" && dateNode->GetLayoutProperty()) {
-        dateNode->GetLayoutProperty()->UpdateLayoutDirection(TextDirection::LTR);
-    }
+    datePickerPattern->SetDateOrder(dateOrder);
     bool hasYearNode = datePickerPattern->HasYearNode();
     bool hasMonthNode = datePickerPattern->HasMonthNode();
     bool hasDayNode = datePickerPattern->HasDayNode();
@@ -151,6 +144,46 @@ void DatePickerModelNG::CreateDatePicker(RefPtr<PickerTheme> pickerTheme)
         if (!hasYearNode) {
             CreateDateColumn(yearColumnNode, dateNode);
         }
+    } else if (dateOrder == "d-M-y") {
+        if (!hasDayNode) {
+            CreateDateColumn(dayColumnNode, dateNode);
+        }
+        if (!hasMonthNode) {
+            CreateDateColumn(monthColumnNode, dateNode);
+        }
+        if (!hasYearNode) {
+            CreateDateColumn(yearColumnNode, dateNode);
+        }
+    } else if (dateOrder == "y-d-M") {
+        if (!hasYearNode) {
+            CreateDateColumn(yearColumnNode, dateNode);
+        }
+        if (!hasDayNode) {
+            CreateDateColumn(dayColumnNode, dateNode);
+        }
+        if (!hasMonthNode) {
+            CreateDateColumn(monthColumnNode, dateNode);
+        }
+    } else if (dateOrder == "d-y-M") {
+        if (!hasDayNode) {
+            CreateDateColumn(dayColumnNode, dateNode);
+        }
+        if (!hasYearNode) {
+            CreateDateColumn(yearColumnNode, dateNode);
+        }
+        if (!hasMonthNode) {
+            CreateDateColumn(monthColumnNode, dateNode);
+        }
+    } else if (dateOrder == "M-y-d") {
+        if (!hasMonthNode) {
+            CreateDateColumn(monthColumnNode, dateNode);
+        }
+        if (!hasYearNode) {
+            CreateDateColumn(yearColumnNode, dateNode);
+        }
+        if (!hasDayNode) {
+            CreateDateColumn(dayColumnNode, dateNode);
+        }
     } else {
         if (!hasYearNode) {
             CreateDateColumn(yearColumnNode, dateNode);
@@ -204,9 +237,7 @@ RefPtr<FrameNode> DatePickerModelNG::CreateButtonNode()
     return FrameNode::GetOrCreateFrameNode(BUTTON_ETS_TAG, buttonId, []() -> RefPtr<Pattern> {
         auto* buttonModifier = NodeModifier::GetButtonCustomModifier();
         CHECK_NULL_RETURN(buttonModifier, nullptr);
-        auto* rawPattern = reinterpret_cast<Pattern*>(buttonModifier->createButtonPattern());
-        CHECK_NULL_RETURN(rawPattern, nullptr);
-        return AceType::Claim(rawPattern);
+        return buttonModifier->createButtonPattern();
     });
 }
 

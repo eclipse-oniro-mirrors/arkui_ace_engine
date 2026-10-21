@@ -723,7 +723,6 @@ void CalendarPaintMethod::ApplyCalendarThemeFlags(const RefPtr<CalendarPaintProp
     if (paintProperty->HasStartOfWeek()) {
         startOfWeek_ = static_cast<int32_t>(paintProperty->GetStartOfWeekValue());
     }
-    startOfWeek_ = static_cast<int32_t>(log2(startOfWeek_));
     if (paintProperty->HasOffDays()) {
         offDays_ = paintProperty->GetOffDaysValue();
     }

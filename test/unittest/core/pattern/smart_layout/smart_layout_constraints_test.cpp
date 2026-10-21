@@ -323,7 +323,7 @@ HWTEST_F(SmartLayoutConstraintsTest, SmartLayoutConstraintsScaleUpTest001, TestS
     rootNode->SetLayoutType(SmartLayoutType::COLUMN);
     rootNode->SetLayoutSize(400.0, 400.0);
     rootNode->SetFixedSizeConstraints(400.0, 400.0);
-    rootNode->GetContext().contentPadding = 12.0;
+    rootNode->GetContext().padding = {12.0, 12.0, 12.0, 12.0};
 
     std::vector<ChildLayoutInfo> childInfos;
     ChildLayoutInfo info1;
@@ -379,7 +379,7 @@ HWTEST_F(SmartLayoutConstraintsTest, SmartLayoutConstraintsScaleUpTest002, TestS
     rootNode->SetLayoutType(SmartLayoutType::ROW);
     rootNode->SetLayoutSize(600.0, 400.0);
     rootNode->SetFixedSizeConstraints(600.0, 400.0);
-    rootNode->GetContext().contentPadding = 12.0;
+    rootNode->GetContext().padding = {12.0, 12.0, 12.0, 12.0};
 
     std::vector<ChildLayoutInfo> childInfos;
     ChildLayoutInfo info1;
@@ -450,7 +450,7 @@ HWTEST_F(SmartLayoutConstraintsTest, SmartLayoutConstraintsScaleUpTest003, TestS
     rootNode->SetLayoutType(SmartLayoutType::COLUMN);
     rootNode->SetLayoutSize(200.0, 200.0);
     rootNode->SetFixedSizeConstraints(200.0, 200.0);
-    rootNode->GetContext().contentPadding = 12.0;
+    rootNode->GetContext().padding = {12.0, 12.0, 12.0, 12.0};
 
     std::vector<ChildLayoutInfo> childInfos;
     ChildLayoutInfo info1;
@@ -494,7 +494,7 @@ HWTEST_F(SmartLayoutConstraintsTest, SmartLayoutConstraintsScaleUpTest004, TestS
     rootNode->SetLayoutType(SmartLayoutType::ROW);
     rootNode->SetLayoutSize(400.0, 200.0);
     rootNode->SetFixedSizeConstraints(400.0, 200.0);
-    rootNode->GetContext().contentPadding = 12.0;
+    rootNode->GetContext().padding = {12.0, 12.0, 12.0, 12.0};
 
     std::vector<ChildLayoutInfo> childInfos;
     ChildLayoutInfo info1;
@@ -563,7 +563,7 @@ HWTEST_F(SmartLayoutConstraintsTest, SmartLayoutConstraintsScaleUpTest005, TestS
     rootNode->SetLayoutType(SmartLayoutType::COLUMN);
     rootNode->SetLayoutSize(20.0, 20.0);
     rootNode->SetFixedSizeConstraints(20.0, 20.0);
-    rootNode->GetContext().contentPadding = 12.0;
+    rootNode->GetContext().padding = {12.0, 12.0, 12.0, 12.0};
 
     std::vector<ChildLayoutInfo> childInfos;
     ChildLayoutInfo info1;
@@ -593,9 +593,9 @@ HWTEST_F(SmartLayoutConstraintsTest, SmartLayoutConstraintsScaleUpTest005, TestS
 
 /**
  * @tc.name: SmartLayoutConstraintsScaleUpTest006
- * @tc.desc: Test AddScaleUpConstraints - default zero content padding
+ * @tc.desc: Test AddScaleUpConstraints - default zero container padding
  *           Container: 200x200, Child at (0,0) size 100x100
- *           contentPadding defaults to 0, available area = full container
+ *           padding defaults to 0, available area = full container
  *           Expected: upScale = 200/100 = 2.0, child fills the container
  * @tc.type: FUNC
  */
@@ -634,6 +634,34 @@ HWTEST_F(SmartLayoutConstraintsTest, SmartLayoutConstraintsScaleUpTest006, TestS
     EXPECT_NEAR(children[0]->GetSize().height.value, 200.0, 0.01);
     EXPECT_NEAR(children[0]->GetPosition().offsetX.value, 0.0, 0.01);
     EXPECT_NEAR(children[0]->GetPosition().offsetY.value, 0.0, 0.01);
+}
+
+/**
+ * @tc.name: SmartLayoutConstraintsScaleUpTest007
+ * @tc.desc: 1px epsilon: BB 175.5 (within) no scale-up, BB 174 (beyond) scales up to fill 176.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SmartLayoutConstraintsTest, SmartLayoutConstraintsScaleUpTest007, TestSize.Level1)
+{
+    auto solveScaleUp = [](double bbSize) {
+        auto rootNode = SmartLayoutNode::CreateRootNode();
+        rootNode->SetLayoutType(SmartLayoutType::COLUMN);
+        rootNode->SetLayoutSize(200.0, 200.0);
+        rootNode->SetFixedSizeConstraints(200.0, 200.0);
+        rootNode->GetContext().padding = {12.0, 12.0, 12.0, 12.0};
+        ChildLayoutInfo info;
+        info.id = 1;
+        info.width = bbSize;
+        info.height = bbSize;
+        rootNode->CreateChildrenFromInfos({info});
+        rootNode->SetBoundingBox(rootNode->GetChildrenBoundingBox());
+        SmartLayoutConstraints constraints;
+        constraints.AddScaleUpConstraints(*rootNode);
+        rootNode->SolveLayout();
+        return rootNode->GetScaleInfo().sizeScale.value;
+    };
+    EXPECT_NEAR(solveScaleUp(175.5), 1.0, 0.01);           // within epsilon -> no scale-up
+    EXPECT_NEAR(solveScaleUp(174.0), 176.0 / 174.0, 0.01); // beyond epsilon -> fill available 176
 }
 
 } // namespace OHOS::Ace::NG

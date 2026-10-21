@@ -25,7 +25,7 @@ namespace OHOS::Ace {
  * ListTheme defines styles of list. ListTheme should be built
  * using ListTheme::Builder.
  */
-class ListTheme : public virtual Theme {
+class ListTheme : public Theme {
     DECLARE_ACE_TYPE(ListTheme, Theme);
 
 public:

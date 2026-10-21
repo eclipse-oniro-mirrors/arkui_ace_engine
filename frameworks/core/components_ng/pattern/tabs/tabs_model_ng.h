@@ -87,6 +87,8 @@ public:
     void CreateWithResourceObj(TabJsResType colorType, const RefPtr<ResourceObject>& resObj) override;
     void SetBarFloatingStyle(const BarFloatingStyleParameters& parameters) override;
     void ResetBarFloatingStyle() override;
+    void SetBarTopFloatingStyle(const BarTopFloatingStyleParameters& parameters) override;
+    void ResetBarTopFloatingStyle() override;
     void SetSidebarDisplayStyle(SidebarDisplayStyle sidebarDisplayStyle) override;
     void SetBarLayoutStyle(TabBarLayoutStyle barLayoutStyle) override;
     void SetSidebarPosition(BarPosition position) override;
@@ -98,6 +100,10 @@ public:
     static void ProcessDimensionWithResourceObj(
         FrameNode* frameNode, const std::string& name, const RefPtr<ResourceObject>& resObj);
     static void ProcessColorWithResourceObj(
+        FrameNode* frameNode, const std::string& name, const RefPtr<ResourceObject>& resObj);
+    static void ProcessTopDimensionWithResourceObj(
+        FrameNode* frameNode, const std::string& name, const RefPtr<ResourceObject>& resObj);
+    static void ProcessTopColorWithResourceObj(
         FrameNode* frameNode, const std::string& name, const RefPtr<ResourceObject>& resObj);
 
     static RefPtr<TabsNode> GetOrCreateTabsNode(
@@ -113,14 +119,16 @@ public:
     static void SetDividerColorByUser(FrameNode* frameNode, bool isByUser);
     static void SetEffectNodeOption(FrameNode* frameNode, const TabsEffectNodeOption& option);
     static void SetFadingEdge(FrameNode* frameNode, bool fadingEdge);
-    static void SetBarBackgroundColor(FrameNode* frameNode, const Color& backgroundColor);
+    static void SetBarBackgroundColor(FrameNode* frameNode, const Color& backgroundColor,
+        bool updateForSideBar = true);
     static void SetBarBackgroundColorByUser(FrameNode* frameNode, bool isByUser);
     static void SetSidebarSelectedIconColor(FrameNode* frameNode, const Color& color);
     static void SetSidebarSelectedTextColor(FrameNode* frameNode, const Color& color);
     static void SetSidebarUnselectedIconColor(FrameNode* frameNode, const Color& color);
     static void SetSidebarUnselectedTextColor(FrameNode* frameNode, const Color& color);
     static void SetSidebarSelectedBoardColor(FrameNode* frameNode, const Color& color);
-    static void SetBarBackgroundBlurStyle(FrameNode* frameNode, const BlurStyleOption& styleOption);
+    static void SetBarBackgroundBlurStyle(FrameNode* frameNode, const BlurStyleOption& styleOption,
+        bool updateForSideBar = true);
     static void SetBarOverlap(FrameNode* frameNode, bool barOverlap);
     static void SetIsVertical(FrameNode* frameNode, bool isVertical);
     static void SetTabBarPosition(FrameNode* frameNode, BarPosition tabBarPosition);
@@ -179,28 +187,47 @@ public:
         bool isModifier = false);
     static void HandleBackgroundBlurStyleInactiveColor(FrameNode* frameNode, const RefPtr<ResourceObject>& resObj,
         bool isModifier = false);
-    static void HandleSidebarSelectedIconColor(FrameNode* frameNode, const RefPtr<ResourceObject>& resObj,
-        bool isModifier = false);
-    static void HandleSidebarSelectedTextColor(FrameNode* frameNode, const RefPtr<ResourceObject>& resObj,
-        bool isModifier = false);
-    static void HandleSidebarUnselectedIconColor(FrameNode* frameNode, const RefPtr<ResourceObject>& resObj,
-        bool isModifier = false);
-    static void HandleSidebarUnselectedTextColor(FrameNode* frameNode, const RefPtr<ResourceObject>& resObj,
-        bool isModifier = false);
-    static void HandleSidebarSelectedBoardColor(FrameNode* frameNode, const RefPtr<ResourceObject>& resObj,
-        bool isModifier = false);
+    static void HandleSidebarSelectedIconColor(FrameNode* frameNode, const RefPtr<ResourceObject>& resObj);
+    static void HandleSidebarSelectedTextColor(FrameNode* frameNode, const RefPtr<ResourceObject>& resObj);
+    static void HandleSidebarUnselectedIconColor(FrameNode* frameNode, const RefPtr<ResourceObject>& resObj);
+    static void HandleSidebarUnselectedTextColor(FrameNode* frameNode, const RefPtr<ResourceObject>& resObj);
+    static void HandleSidebarSelectedBoardColor(FrameNode* frameNode, const RefPtr<ResourceObject>& resObj);
+    static void HandleSidebarWidth(FrameNode* frameNode, const RefPtr<ResourceObject>& resObj);
+    static void HandleMinSidebarWidth(FrameNode* frameNode, const RefPtr<ResourceObject>& resObj);
+    static void HandleMaxSidebarWidth(FrameNode* frameNode, const RefPtr<ResourceObject>& resObj);
+    static void HandleMinContentWidth(FrameNode* frameNode, const RefPtr<ResourceObject>& resObj);
+    static void HandleSidebarBackgroundColor(FrameNode* frameNode, const RefPtr<ResourceObject>& resObj);
+    static void HandleSidebarDividerStrokeWidth(FrameNode* frameNode, const RefPtr<ResourceObject>& resObj);
+    static void HandleSidebarDividerColor(FrameNode* frameNode, const RefPtr<ResourceObject>& resObj);
+    static void HandleSidebarDividerStartMargin(FrameNode* frameNode, const RefPtr<ResourceObject>& resObj);
+    static void HandleSidebarDividerEndMargin(FrameNode* frameNode, const RefPtr<ResourceObject>& resObj);
 
     static void SetBarFloatingStyle(FrameNode* frameNode, const BarFloatingStyleParameters& parameters);
     static void ResetBarFloatingStyle(FrameNode* frameNode);
+    static void SetBarTopFloatingStyle(FrameNode* frameNode, const BarTopFloatingStyleParameters& parameters);
+    static void ResetBarTopFloatingStyle(FrameNode* frameNode);
     static void SetSidebarDisplayStyle(FrameNode* frameNode, SidebarDisplayStyle sidebarDisplayStyle);
     static void SetBarLayoutStyle(FrameNode* frameNode, TabBarLayoutStyle barLayoutStyle);
     static void SetSidebarPosition(FrameNode* frameNode, BarPosition position);
     static void SetSidebarHeader(FrameNode* frameNode, const RefPtr<AceType>& header);
+    static void SetSidebarFooter(FrameNode* frameNode, const RefPtr<AceType>& footer);
+    static void SetSidebarBottomBar(FrameNode* frameNode, const RefPtr<AceType>& bottomBar);
     static void SetSidebarSearchableOptions(FrameNode* frameNode, const TabsSidebarSearchableOptions& options);
     static void SetBarDisplayModeBreakpoint(FrameNode* frameNode, const TabBarDisplayModeBreakpoint& breakpoint);
     static void SetOnBarDisplayModeChange(FrameNode* frameNode,
         std::function<void(NG::TabBarDisplayMode)>&& onBarDisplayModeChange);
+    static void SetSidebarWidth(FrameNode* frameNode, const std::optional<Dimension>& width);
+    static void SetMinSidebarWidth(FrameNode* frameNode, const std::optional<Dimension>& width);
+    static void SetMaxSidebarWidth(FrameNode* frameNode, const std::optional<Dimension>& width);
+    static void SetMinContentWidth(FrameNode* frameNode, const std::optional<Dimension>& width);
+    static void SetSidebarBackgroundColor(FrameNode* frameNode, const Color& color);
+    static void SetSidebarBackgroundColorByUser(FrameNode* frameNode, bool isByUser);
+    static void SetSidebarBackgroundBlurStyle(FrameNode* frameNode, const std::optional<BlurStyle>& blurStyle);
+    static void SetSidebarDivider(FrameNode* frameNode, const TabsItemDivider& divider);
+    static void SetSidebarDividerColorByUser(FrameNode* frameNode, bool isByUser);
     static void CreateWithResourceObj(
+        FrameNode* frameNode, TabJsResType colorType, const RefPtr<ResourceObject>& resObj);
+    static void CreateWithSidebarResourceObj(
         FrameNode* frameNode, TabJsResType colorType, const RefPtr<ResourceObject>& resObj);
     static void SetOnCustomAnimation(FrameNode* frameNode, TabsCustomAnimationEvent&& onCustomAnimation);
 

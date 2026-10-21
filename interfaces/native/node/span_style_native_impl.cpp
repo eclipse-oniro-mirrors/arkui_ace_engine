@@ -307,6 +307,7 @@ ArkUIImageAttachment ConvertToOriginImageAttachment(const OH_ArkUI_ImageAttachme
         }
     }
     imageAttachment.resource = attachment.resource;
+    imageAttachment.imageTag = attachment.imageTag;
     imageAttachment.width = attachment.width;
     imageAttachment.height = attachment.height;
     imageAttachment.verticalAlign = attachment.verticalAlign;
@@ -537,6 +538,7 @@ OH_ArkUI_ImageAttachment ConvertToCImageAttachment(const ArkUIImageAttachment& a
         imageAttachment.pixelMap = pixelmapNative.release();
     }
     imageAttachment.resource = attachment.resource;
+    imageAttachment.imageTag = attachment.imageTag;
     imageAttachment.width = attachment.width;
     imageAttachment.height = attachment.height;
     imageAttachment.verticalAlign = static_cast<ArkUI_ImageSpanAlignment>(attachment.verticalAlign);
@@ -1236,6 +1238,7 @@ ArkUI_ErrorCode OH_ArkUI_SpanStyle_SetImageAttachment(
     spanStyle->imageAttachment.resizableSliceRight = imageAttachment->resizableSliceRight;
     spanStyle->imageAttachment.resizableSliceBottom = imageAttachment->resizableSliceBottom;
     spanStyle->imageAttachment.resizableLattice = imageAttachment->resizableLattice;
+    spanStyle->imageAttachment.imageTag = imageAttachment->imageTag;
     return ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR;
 }
 
@@ -1275,6 +1278,7 @@ ArkUI_ErrorCode OH_ArkUI_SpanStyle_GetImageAttachment(
     imageAttachment->resizableSliceRight = spanStyle->imageAttachment.resizableSliceRight;
     imageAttachment->resizableSliceBottom = spanStyle->imageAttachment.resizableSliceBottom;
     imageAttachment->resizableLattice = spanStyle->imageAttachment.resizableLattice;
+    imageAttachment->imageTag = spanStyle->imageAttachment.imageTag;
     return ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR;
 }
 
@@ -2217,6 +2221,7 @@ OH_ArkUI_ImageAttachment* OH_ArkUI_ImageAttachment_Create()
 
 void OH_ArkUI_ImageAttachment_Destroy(OH_ArkUI_ImageAttachment* imageAttachment)
 {
+    CHECK_NULL_VOID(imageAttachment);
     delete imageAttachment->pixelMap;
     imageAttachment->pixelMap = nullptr;
     delete imageAttachment;
@@ -2270,6 +2275,30 @@ ArkUI_ErrorCode OH_ArkUI_ImageAttachment_GetResource(
     }
     auto size = static_cast<size_t>(bufferSize);
     if (strncpy_s(buffer, size, imageAttachment->resource.c_str(), contentLength) != 0) {
+        return ArkUI_ErrorCode::ARKUI_ERROR_CODE_BUFFER_SIZE_ERROR;
+    }
+    return ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+ArkUI_ErrorCode OH_ArkUI_ImageAttachment_SetImageTag(OH_ArkUI_ImageAttachment* imageAttachment, const char* imageTag)
+{
+    CHECK_NULL_RETURN(imageAttachment && imageTag, ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID);
+    imageAttachment->imageTag = std::string(imageTag);
+    return ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+ArkUI_ErrorCode OH_ArkUI_ImageAttachment_GetImageTag(
+    const OH_ArkUI_ImageAttachment* imageAttachment, int32_t bufferSize, char* buffer, int32_t* writeLength)
+{
+    CHECK_NULL_RETURN(imageAttachment && buffer && writeLength, ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID);
+    const auto& tag = imageAttachment->imageTag.value_or("");
+    int32_t contentLength = static_cast<int32_t>(tag.size());
+    *writeLength = contentLength;
+    if (bufferSize < contentLength + 1) {
+        return ArkUI_ErrorCode::ARKUI_ERROR_CODE_BUFFER_SIZE_ERROR;
+    }
+    auto size = static_cast<size_t>(bufferSize);
+    if (strncpy_s(buffer, size, tag.c_str(), contentLength) != 0) {
         return ArkUI_ErrorCode::ARKUI_ERROR_CODE_BUFFER_SIZE_ERROR;
     }
     return ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR;
@@ -2502,13 +2531,13 @@ ArkUI_ErrorCode OH_ArkUI_ImageAttachment_SetResizableLattice(
 }
 
 ArkUI_ErrorCode OH_ArkUI_ImageAttachment_GetResizableLattice(const OH_ArkUI_ImageAttachment* imageAttachment,
-    OH_Drawing_Lattice** lattice)
+    OH_Drawing_Lattice* lattice)
 {
     CHECK_NULL_RETURN(imageAttachment && lattice, ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID);
     if (imageAttachment->resizableLattice == nullptr) {
         return ArkUI_ErrorCode::ARKUI_ERROR_CODE_GET_INFO_FAILED;
     }
-    *lattice = imageAttachment->resizableLattice;
+    lattice = imageAttachment->resizableLattice;
     return ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR;
 }
 

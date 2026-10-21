@@ -40,10 +40,10 @@ constexpr Dimension SHEET_FLING_BLUR_CLOSE_THRESHOLD_PX = 10.0_px;
 constexpr Dimension SHEET_FLING_BLUR_REOPEN_THRESHOLD_PX = 9.0_px;
 constexpr int32_t SHEET_TITLE_EFFECT_Z_INDEX = 1;
 constexpr int32_t SHEET_TITLE_STACK_Z_INDEX = 2;
-const Color SHEET_NON_SMOOTH_GRADUAL_BLUR_LIGHT_BG_COLOR = Color::FromString("#CCF1F3F5");
-const Color SHEET_NON_SMOOTH_GRADUAL_BLUR_DARK_BG_COLOR = Color::FromString("#66202224");
-const Color SHEET_SMOOTH_GRADUAL_BLUR_LIGHT_BG_COLOR = Color::FromString("#F2F1F3F5");
-const Color SHEET_SMOOTH_GRADUAL_BLUR_DARK_BG_COLOR = Color::FromString("#E5202224");
+constexpr uint8_t SHEET_TITLE_MASK_ALPHA_SMOOTH_DARK = 0xE5;
+constexpr uint8_t SHEET_TITLE_MASK_ALPHA_SMOOTH_LIGHT = 0xF2;
+constexpr uint8_t SHEET_TITLE_MASK_ALPHA_NON_SMOOTH_DARK = 0x66;
+constexpr uint8_t SHEET_TITLE_MASK_ALPHA_NON_SMOOTH_LIGHT = 0xCC;
 const std::vector<std::pair<float, float>> SHEET_GRADIENT_BLUR_STOPS = { { 1.0f, 0.0f }, { 0.6f, 0.6f },
     { 0.0f, 1.0f } };
 const std::vector<std::pair<float, float>> SHEET_SMOOTH_GRADUAL_MASK_FRACTION_STOPS = { { 1.0f, 0.0f },
@@ -251,13 +251,12 @@ void SheetPresentationPattern::UpdateTitleEffectBlurAndMaskColorProgress(float p
     CHECK_NULL_VOID(host);
     auto pipeline = host->GetContext();
     CHECK_NULL_VOID(pipeline);
-    bool isDarkMode = pipeline->GetColorMode() == ColorMode::DARK;
     auto materialLevel = SystemProperties::GetUiMaterialLevel();
     auto layoutProperty = GetLayoutProperty<SheetPresentationProperty>();
     CHECK_NULL_VOID(layoutProperty);
     auto sheetStyle = layoutProperty->GetSheetStyleValue();
 
-    auto bgColor = GetTitleBarEffectBgColor(sheetStyle, materialLevel, isDarkMode);
+    auto bgColor = GetTitleBarEffectBgColor(sheetStyle, materialLevel);
     float currentOpacity = progress;
     auto gradient = CreateSheetFadeOutGradient(bgColor, currentOpacity, materialLevel);
     CHECK_NULL_VOID(titleBarEffectNode_);
@@ -284,7 +283,7 @@ void SheetPresentationPattern::UpdateTitleEffectBlurAndMaskColorProgress(float p
 }
 
 Color SheetPresentationPattern::GetTitleBarEffectBgColor(
-    const NG::SheetStyle& sheetStyle, UiMaterialLevel materialLevel, bool isDarkMode)
+    const NG::SheetStyle& sheetStyle, UiMaterialLevel materialLevel)
 {
     if (sheetStyle.titleBarBackgroundBlur.has_value()) {
         const auto& options = sheetStyle.titleBarBackgroundBlur.value();
@@ -292,25 +291,33 @@ Color SheetPresentationPattern::GetTitleBarEffectBgColor(
             return options.maskColor.value();
         }
     }
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, Color::TRANSPARENT);
+    auto sheetTheme = host->GetTheme<SheetTheme>(true);
+    CHECK_NULL_RETURN(sheetTheme, Color::TRANSPARENT);
+    auto bgColor = sheetTheme->GetTitleMaskColor();
+    bool isDarkMode = MaterialUtils::GetNodeColorMode(host) == ColorMode::DARK;
     if (materialLevel == UiMaterialLevel::SMOOTH) {
-        if (isDarkMode) {
-            return SHEET_SMOOTH_GRADUAL_BLUR_DARK_BG_COLOR;
-        }
-        return SHEET_SMOOTH_GRADUAL_BLUR_LIGHT_BG_COLOR;
+        return bgColor.ChangeAlpha(
+            isDarkMode ? SHEET_TITLE_MASK_ALPHA_SMOOTH_DARK : SHEET_TITLE_MASK_ALPHA_SMOOTH_LIGHT);
     }
-    return isDarkMode ? SHEET_NON_SMOOTH_GRADUAL_BLUR_DARK_BG_COLOR : SHEET_NON_SMOOTH_GRADUAL_BLUR_LIGHT_BG_COLOR;
+    return bgColor.ChangeAlpha(
+        isDarkMode ? SHEET_TITLE_MASK_ALPHA_NON_SMOOTH_DARK : SHEET_TITLE_MASK_ALPHA_NON_SMOOTH_LIGHT);
 }
 
-void SheetPresentationPattern::UpdateStackModeZIndex()
+void SheetPresentationPattern::UpdateTitleBarZIndex()
 {
     auto layoutProperty = GetLayoutProperty<SheetPresentationProperty>();
     CHECK_NULL_VOID(layoutProperty);
     auto sheetStyle = layoutProperty->GetSheetStyleValue();
     bool titleUseStackMode = CheckTitleIsStackMode(sheetStyle);
     bool hasEffectNode = CheckTitleIsHasEffectNode(sheetStyle);
-    UpdateNodeZIndex(GetTitleBuilderNode(), titleUseStackMode || hasEffectNode ? SHEET_TITLE_STACK_Z_INDEX : 0);
-    UpdateNodeZIndex(GetSheetCloseIcon(), titleUseStackMode || hasEffectNode ? SHEET_TITLE_STACK_Z_INDEX : 0);
-    UpdateNodeZIndex(GetDragBarNode(), titleUseStackMode || hasEffectNode ? SHEET_TITLE_STACK_Z_INDEX : 0);
+    bool isSafeAreaPadding = sheetStyle.titleBarHoverMode.value_or(SheetTitleBarHoverMode::STANDARD) ==
+                             SheetTitleBarHoverMode::SAFE_AREA_PADDING;
+    bool needStackZIndex = titleUseStackMode || hasEffectNode || isSafeAreaPadding;
+    UpdateNodeZIndex(GetTitleBuilderNode(), needStackZIndex ? SHEET_TITLE_STACK_Z_INDEX : 0);
+    UpdateNodeZIndex(GetSheetCloseIcon(), needStackZIndex ? SHEET_TITLE_STACK_Z_INDEX : 0);
+    UpdateNodeZIndex(GetDragBarNode(), needStackZIndex ? SHEET_TITLE_STACK_Z_INDEX : 0);
 
     if (preScrollSelfHeight_.has_value() && preTitleStackMode_ != titleUseStackMode) {
         auto scrollNode = GetSheetScrollNode();
@@ -640,6 +647,35 @@ void SheetPresentationPattern::UpdateSheetScrollBar(const NG::SheetStyle& sheetS
     scrollNode->MarkDirtyNode(PROPERTY_UPDATE_RENDER);
 }
 
+void SheetPresentationPattern::UpdateSheetScrollBarMargin()
+{
+    auto layoutProperty = GetLayoutProperty<SheetPresentationProperty>();
+    CHECK_NULL_VOID(layoutProperty);
+    auto sheetStyle = layoutProperty->GetSheetStyleValue(SheetStyle());
+    if (sheetStyle.scrollBarState.value_or(DisplayMode::OFF) != DisplayMode::OFF) {
+        auto scrollNode = GetSheetScrollNode();
+        CHECK_NULL_VOID(scrollNode);
+        auto scrollPattern = scrollNode->GetPattern<ScrollPattern>();
+        CHECK_NULL_VOID(scrollPattern);
+        ScrollBarMargin margin;
+        if (CheckTitleIsStackMode(sheetStyle)) {
+            margin.start_ = Dimension(GetTitleBuilderHeight(), DimensionUnit::PX);
+        } else {
+            margin.start_ = Dimension(0.0f, DimensionUnit::PX);
+        }
+        auto scrollBar = scrollPattern->GetScrollBar();
+        CHECK_NULL_VOID(scrollBar);
+        const auto& currentMargin = scrollBar->GetScrollBarMargin();
+        if (currentMargin.has_value() && NearEqual(currentMargin->start_, margin.start_)) {
+            return;
+        }
+        auto paintProperty = scrollPattern->GetPaintProperty<ScrollablePaintProperty>();
+        CHECK_NULL_VOID(paintProperty);
+        paintProperty->UpdateScrollBarMargin(margin);
+        scrollPattern->SetScrollBar(paintProperty->GetScrollBarProperty());
+    }
+}
+
 void SheetPresentationPattern::UpdateZIndexAndTitleEffectNode()
 {
     auto host = GetHost();
@@ -656,7 +692,7 @@ void SheetPresentationPattern::UpdateZIndexAndTitleEffectNode()
         preTitleBlurOptions_ = sheetStyle.titleBarBackgroundBlur;
     }
     if (sheetStyle.titleBarHoverMode.has_value() || currentIsTitleStackMode != preTitleStackMode_) {
-        UpdateStackModeZIndex();
+        UpdateTitleBarZIndex();
         preTitleStackMode_ = currentIsTitleStackMode;
     }
 }

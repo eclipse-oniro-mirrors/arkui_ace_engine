@@ -303,11 +303,16 @@ ArkUINativeModuleValue ImageSpanBridge::SetOnComplete(ArkUIRuntimeCallInfo *runt
             panda::NumberRef::New(vm, event.GetHeight()), panda::NumberRef::New(vm, event.GetComponentWidth()),
             panda::NumberRef::New(vm, event.GetComponentHeight()), panda::NumberRef::New(vm, event.GetLoadingStatus()),
             panda::NumberRef::New(vm, event.GetContentWidth()), panda::NumberRef::New(vm, event.GetContentHeight()),
-            panda::NumberRef::New(vm, event.GetContentOffsetX()),
-            panda::NumberRef::New(vm, event.GetContentOffsetY()) };
+            panda::NumberRef::New(vm, event.GetContentOffsetX()), panda::NumberRef::New(vm, event.GetContentOffsetY())};
+        // The eventPtr can only be bound to a JS object, and its lifetime belongs to that object.
+        // It is not allowed to hold this address elsewhere.
+        auto eventPtr = new LoadImageSuccessEvent(event);
         auto eventObject = panda::ObjectRef::NewWithNamedProperties(vm, ArraySize(keys), keys, values);
         eventObject->SetNativePointerFieldCount(vm, 1);
-        eventObject->SetNativePointerField(vm, 0, static_cast<void*>(&event));
+        eventObject->SetConcurrentNativePointerField(vm, 0, static_cast<void*>(eventPtr),
+            [](void* env, void* nativePtr, void* data) {
+                delete static_cast<LoadImageSuccessEvent*>(nativePtr);
+            }, nullptr);
         panda::Local<panda::JSValueRef> params[1] = { eventObject };
         auto result = func->Call(vm, func.ToLocal(), params, 1);
         if (isJsView) {
@@ -361,9 +366,15 @@ ArkUINativeModuleValue ImageSpanBridge::SetOnError(ArkUIRuntimeCallInfo *runtime
         Local<JSValueRef> values[] = { panda::NumberRef::New(vm, event.GetComponentWidth()),
             panda::NumberRef::New(vm, event.GetComponentHeight()),
             panda::StringRef::NewFromUtf8(vm, event.GetErrorMessage().c_str()) };
+        // The eventPtr can only be bound to a JS object, and its lifetime belongs to that object.
+        // It is not allowed to hold this address elsewhere.
+        auto eventPtr = new LoadImageFailEvent(event);
         auto eventObject = panda::ObjectRef::NewWithNamedProperties(vm, ArraySize(keys), keys, values);
         eventObject->SetNativePointerFieldCount(vm, 1);
-        eventObject->SetNativePointerField(vm, 0, static_cast<void*>(&event));
+        eventObject->SetConcurrentNativePointerField(vm, 0, static_cast<void*>(eventPtr),
+            [](void* env, void* nativePtr, void* data) {
+                delete static_cast<LoadImageFailEvent*>(nativePtr);
+            }, nullptr);
         panda::Local<panda::JSValueRef> params[1] = { eventObject };
         auto result = func->Call(vm, func.ToLocal(), params, 1);
         if (isJsView) {
@@ -660,8 +671,8 @@ ArkUINativeModuleValue ImageSpanBridge::ResetResizableSlice(ArkUIRuntimeCallInfo
     EcmaVM* vm = runtimeCallInfo->GetVM();
     CHECK_NULL_RETURN(vm, panda::NativePointerRef::New(vm, nullptr));
     Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(0);
-    CHECK_NULL_RETURN(firstArg->IsNativePointer(vm), panda::JSValueRef::Undefined(vm));
-    auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
+    ArkUINodeHandle nativeNode = nullptr;
+    CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
     GetArkUINodeModifiers()->getImageSpanModifier()->resetImageSpanResizableSlice(nativeNode);
     return panda::JSValueRef::Undefined(vm);
 }
@@ -672,8 +683,8 @@ ArkUINativeModuleValue ImageSpanBridge::SetResizableLattice(ArkUIRuntimeCallInfo
     CHECK_NULL_RETURN(vm, panda::NativePointerRef::New(vm, nullptr));
 #ifndef CROSS_PLATFORM
     Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(0);
-    CHECK_NULL_RETURN(firstArg->IsNativePointer(vm), panda::JSValueRef::Undefined(vm));
-    auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
+    ArkUINodeHandle nativeNode = nullptr;
+    CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
     Local<JSValueRef> latticeArg = runtimeCallInfo->GetCallArgRef(NUM_1);
     if (latticeArg->IsUndefined() || latticeArg->IsNull() || !latticeArg->IsObject(vm)) {
         GetArkUINodeModifiers()->getImageSpanModifier()->resetImageSpanResizableLattice(nativeNode);
@@ -698,8 +709,8 @@ ArkUINativeModuleValue ImageSpanBridge::ResetResizableLattice(ArkUIRuntimeCallIn
     EcmaVM* vm = runtimeCallInfo->GetVM();
     CHECK_NULL_RETURN(vm, panda::NativePointerRef::New(vm, nullptr));
     Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(0);
-    CHECK_NULL_RETURN(firstArg->IsNativePointer(vm), panda::JSValueRef::Undefined(vm));
-    auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
+    ArkUINodeHandle nativeNode = nullptr;
+    CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
     GetArkUINodeModifiers()->getImageSpanModifier()->resetImageSpanResizableLattice(nativeNode);
     return panda::JSValueRef::Undefined(vm);
 }

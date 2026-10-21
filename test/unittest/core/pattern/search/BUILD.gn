@@ -23,6 +23,7 @@ test_sources = [
   "search_testfour_ng.cpp",
   "search_testthree_ng.cpp",
   "search_testtwo_ng.cpp",
+  "search_text_style_optimization_test_ng.cpp",
 ]
 
 if (is_host_product) {

@@ -63,6 +63,27 @@ void AssignCast(std::optional<int32_t>& dst, const Ark_FillMode& src)
             LOGE("Unexpected enum value in Ark_FillMode: %{public}d", src);
     }
 }
+template<>
+void AssignCast(std::optional<int32_t>& dst, const Ark_ImageInterpolation& src)
+{
+    switch (src) {
+        case Ark_ImageInterpolation::ARK_IMAGE_INTERPOLATION_NONE:
+            dst = static_cast<int32_t>(src);
+            break;
+        case Ark_ImageInterpolation::ARK_IMAGE_INTERPOLATION_LOW:
+            dst = static_cast<int32_t>(src);
+            break;
+        case Ark_ImageInterpolation::ARK_IMAGE_INTERPOLATION_MEDIUM:
+            dst = static_cast<int32_t>(src);
+            break;
+        case Ark_ImageInterpolation::ARK_IMAGE_INTERPOLATION_HIGH:
+            dst = static_cast<int32_t>(src);
+            break;
+        default:
+            LOGE("Unexpected enum value in Ark_ImageInterpolation: %{public}d", src);
+    }
+}
+
 
 template<>
 ImageProperties Convert(const Ark_ImageFrameInfo& src)
@@ -191,6 +212,19 @@ void SetMonitorInvisibleAreaImpl(Ark_NativePointer node, const Opt_Boolean* valu
     }
     ImageAnimatorModelNG::SetAutoMonitorInvisibleArea(frameNode, *convValue);
 }
+void SetInterpolationImpl(Ark_NativePointer node, const Opt_ImageInterpolation* value)
+{
+    auto frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto interpolationOpt = Converter::OptConvertPtr<int32_t>(value);
+    if (!interpolationOpt || *interpolationOpt < static_cast<int32_t>(ImageInterpolation::NONE) ||
+        *interpolationOpt > static_cast<int32_t>(ImageInterpolation::HIGH)) {
+        ImageAnimatorModelNG::ResetImageInterpolation(frameNode);
+        return;
+    }
+    ImageAnimatorModelNG::SetImageInterpolation(frameNode, *interpolationOpt);
+}
+
 void SetOnStartImpl(Ark_NativePointer node, const Opt_synthetic_Callback_Void* value)
 {
     auto frameNode = reinterpret_cast<FrameNode*>(node);
@@ -265,6 +299,7 @@ const GENERATED_ArkUIImageAnimatorModifier* GetImageAnimatorStaticModifier()
         ImageAnimatorAttributeModifier::SetFillModeImpl,
         ImageAnimatorAttributeModifier::SetIterationsImpl,
         ImageAnimatorAttributeModifier::SetMonitorInvisibleAreaImpl,
+        ImageAnimatorAttributeModifier::SetInterpolationImpl,
         ImageAnimatorAttributeModifier::SetOnStartImpl,
         ImageAnimatorAttributeModifier::SetOnPauseImpl,
         ImageAnimatorAttributeModifier::SetOnRepeatImpl,

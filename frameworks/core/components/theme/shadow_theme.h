@@ -30,7 +30,7 @@ namespace OHOS::Ace {
 enum class BlurStyle;
 enum class ThemeColorMode;
 
-class ACE_FORCE_EXPORT ShadowTheme : public virtual Theme {
+class ACE_FORCE_EXPORT ShadowTheme : public Theme {
     DECLARE_ACE_TYPE(ShadowTheme, Theme);
 
 public:

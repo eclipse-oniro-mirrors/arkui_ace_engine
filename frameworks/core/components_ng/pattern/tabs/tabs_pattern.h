@@ -63,6 +63,8 @@ public:
         return true;
     }
 
+    void ClampTabBarTransformOffset();
+
     RefPtr<LayoutProperty> CreateLayoutProperty() override
     {
         ACE_UINODE_TRACE(GetHost());
@@ -177,9 +179,10 @@ public:
     }
     TabBarDisplayMode GetActiveBarDisplayMode() const;
     void SetCurrentBarDisplayMode(TabBarDisplayMode mode);
-    bool IsTabShouldHideByVisibility(const TabContentDefaultVisibility& visibility);
 
     void FireBarDisplayModeChangeEvent(TabBarDisplayMode mode);
+
+    void StartDisplayModeSwitchAnimation(TabBarDisplayMode fromMode, TabBarDisplayMode toMode);
 
     void HandleChildrenUpdated(const RefPtr<FrameNode>& swiperNode, const RefPtr<FrameNode>& tabBarNode);
 
@@ -193,6 +196,10 @@ public:
     void UpdateDividerColor()
     {
         OnUpdateShowDivider();
+    }
+    void UpdateSidebarDividerStrokeWidth()
+    {
+        UpdateSideBarDivider();
     }
     int32_t OnInjectionEvent(const std::string& command) override;
     void OnColorConfigurationUpdate() override;
@@ -209,6 +216,10 @@ public:
     {
         floatingBarMargin_ = floatingBarMargin;
     }
+    void SetFloatingTopBarMargin(std::optional<float> floatingTopBarMargin)
+    {
+        floatingTopBarMargin_ = floatingTopBarMargin;
+    }
     bool IsFloatingBar() const
     {
         return isFloatingBar_;
@@ -216,6 +227,14 @@ public:
     bool LastFloatingBar() const
     {
         return lastFloatingBar_;
+    }
+    bool IsFloatingTopBar() const
+    {
+        return isFloatingTopBar_;
+    }
+    bool LastFloatingTopBar() const
+    {
+        return lastFloatingTopBar_;
     }
     void SetFloatingScaleEnabled(bool isFloatingScaleEnabled);
 
@@ -226,6 +245,24 @@ public:
     RefPtr<NG::UINode> GetSidebarHeaderNode() const
     {
         return sidebarHeaderNode_;
+    }
+
+    void SetSidebarFooterNode(const RefPtr<NG::UINode>& footer)
+    {
+        sidebarFooterNode_ = footer;
+    }
+    const RefPtr<NG::UINode>& GetSidebarFooterNode() const
+    {
+        return sidebarFooterNode_;
+    }
+
+    void SetSidebarBottomBarNode(const RefPtr<NG::UINode>& bottomBar)
+    {
+        sidebarBottomBarNode_ = bottomBar;
+    }
+    const RefPtr<NG::UINode>& GetSidebarBottomBarNode() const
+    {
+        return sidebarBottomBarNode_;
     }
 
     TabBarDisplayMode CalculateTabBarDisplayMode(float width);
@@ -265,9 +302,36 @@ public:
         hasBarBlurStyle_ = true;
         barBlurStyleOption_ = option;
     }
-
     const BlurStyleOption& GetBarBlurStyleOption() const
     {
+        return barBlurStyleOption_;
+    }
+    void SetBarBlurStyleOptionForSideBar(const BlurStyleOption& option)
+    {
+        hasBarBlurStyleForSideBar_ = true;
+        barBlurStyleOptionForSideBar_ = option;
+    }
+    const BlurStyleOption& GetBarBlurStyleOptionForSideBar() const
+    {
+        return barBlurStyleOptionForSideBar_;
+    }
+    void SetSidebarBlurStyleOptions(const BlurStyleOption& option)
+    {
+        hasSidebarBlurStyle_ = true;
+        sidebarBlurStyleOptions_ = option;
+    }
+    const BlurStyleOption& GetSidebarBlurStyleOption() const
+    {
+        return sidebarBlurStyleOptions_;
+    }
+    const BlurStyleOption& GetEffectiveSidebarBlurStyleOptions() const
+    {
+        if (hasSidebarBlurStyle_) {
+            return sidebarBlurStyleOptions_;
+        }
+        if (hasBarBlurStyleForSideBar_) {
+            return barBlurStyleOptionForSideBar_;
+        }
         return barBlurStyleOption_;
     }
 
@@ -276,15 +340,37 @@ public:
     bool IsColorInvertEnabled();
     ColorMode GetColorInvertColorMode();
 
-    float GetRealSideBarWidthPx() const
+    const std::optional<float>& GetRealSideBarWidthPx() const
     {
         return realSideBarWidthPx_;
     }
 
+    std::optional<Dimension> GetEffectiveSidebarWidth() const;
+
+    void SetSidebarWidthCalled()
+    {
+        hasSidebarWidth_ = true;
+    }
+
     // Sync bar* attributes to the sidebar (no-op when sidebar does not exist).
     void UpdateSideBarDivider();
+    void UpdateSidebarDividerColor();
     void UpdateSideBarBackgroundColor();
     void UpdateSideBarBackgroundBlurStyle();
+
+    struct SideBarDragRange {
+        float minPx = 0.0f;
+        float maxPx = 0.0f;
+        bool draggable = false;
+        float initialWidthPx = 0.0f;
+    };
+    SideBarDragRange CalcSideBarDragRange(float tabsWidth);
+    void ClampSideBarWidthToRange();
+
+    bool IsOnDisplayModeSwitchAnimation() const
+    {
+        return isOnDisplayModeSwitchAnimation_;
+    }
 
 private:
     void OnAttachToFrameNode() override;
@@ -320,6 +406,7 @@ private:
 
     void InitFloatingBar();
     void UpdateBgMaskNode();
+    void UpdateTopBgMaskNode();
     GradientColor CreatePercentGradientColor(float percent, Color color);
     void InitTouchEvent();
     void OnTouchEvent(const TouchEventInfo& info);
@@ -347,13 +434,24 @@ private:
             }
         }
     }
+    void SetTabBarIsFloatingTopBar(bool isFloating)
+    {
+        auto tabsNode = AceType::DynamicCast<TabsNode>(GetHost());
+        CHECK_NULL_VOID(tabsNode);
+        auto tabBar = AceType::DynamicCast<FrameNode>(tabsNode->GetTabBar());
+        if (tabBar) {
+            auto tabBarPattern = tabBar->GetPattern<TabBarPattern>();
+            if (tabBarPattern) {
+                tabBarPattern->SetIsFloatingTopBar(isFloating);
+            }
+        }
+    }
 
     void UpdateSideBarIfNeeded();
     void UpdateSideBarNode();
     void UpdateSideBarAttributes();
     void SyncPropertiesToSideBar();
-    void RegisterSideBarTabItems();
-    void ResetSideBarTabListItemIds();
+    void RegisterSideBarTabItems(bool update);
     void SyncSideBarTabListIndicator(int32_t currentIndex);
     RefPtr<FrameNode> CreateSideBarNode();
     RefPtr<FrameNode> CreateSideBarDividerNode();
@@ -372,6 +470,34 @@ private:
     void SetMouseStyle(MouseFormat format);
     void AddDividerHotZoneRect();
     bool IsDividerDraggable() const;
+
+    TabsItemDivider GetEffectiveSidebarDividerConfig() const;
+    float GetEffectiveSidebarDividerWidthPx() const;
+    std::optional<Color> GetEffectiveSidebarBackgroundColor() const;
+
+    void OnDisplayModeSwitchAnimationsFinished();
+    void SetElementVisibilityForMode(TabBarDisplayMode targetMode);
+    // Compute the horizontal translate offset that places sidebar+divider just outside the
+    // tabs container (used as the sidebar enter/exit visual start position).
+    float CalcSidebarOutsideTranslateX() const;
+    // Apply initial transform state (translate for sidebar/divider, scale/opacity for tabbar)
+    // to entering elements without animation. Used on first-time animation start so that the
+    // entering element renders outside the container before the animation closure runs.
+    void ApplyEnteringElementInitialTransform(TabBarDisplayMode toMode);
+    void ApplyEnteringSidebarInitialTransform(float outsideX);
+    void ApplyEnteringBottomTabBarInitialTransform(const RefPtr<FrameNode>& tabBar,
+        const RefPtr<FrameNode>& tabBarDivider);
+    // Reset all transform/opacity previously applied by the mode-switch animation.
+    void ResetDisplayModeSwitchTransforms();
+    void StartNonFloatingTabBarAnimation(bool toSidebar, float outsideX, float tabHeight,
+        const std::function<void()>& finishCb);
+    void ApplyNonFloatingTabBarAnimClosure(bool toSidebar, float outsideX, float tabHeight);
+    void StartFloatingTabBarAnimation(bool toSidebar, float outsideX, float baseScale,
+        const std::function<void()>& finishCb);
+    void StartFloatingSidebarTranslateAnim(
+        bool toSidebar, float outsideX, const std::function<void()>& finishCb);
+    void StartFloatingTabBarExitAnim(float baseScale, const std::function<void()>& finishCb);
+    void StartFloatingTabBarEnterAnim(float baseScale, const std::function<void()>& finishCb);
 
     bool isCustomAnimation_ = false;
     bool isDisableSwipe_ = false;
@@ -401,15 +527,26 @@ private:
     std::optional<float> floatingBarMargin_ = 0.0f;
     float baseFloatingScale_ = FLOATING_BAR_SCALE;
 
+    bool isFloatingTopBar_ = false;
+    bool lastFloatingTopBar_ = false;
+    std::optional<float> floatingTopBarMargin_ = 0.0f;
+
     std::optional<TabBarDisplayMode> currentBarDisplayMode_;
     std::optional<TabBarLayoutStyle> layoutStyle_;
     RefPtr<FrameNode> sideBarNode_ = nullptr;
     RefPtr<FrameNode> sideBarDividerNode_ = nullptr;
     RefPtr<NG::UINode> sidebarHeaderNode_;
+    RefPtr<NG::UINode> sidebarFooterNode_;
+    RefPtr<NG::UINode> sidebarBottomBarNode_;
     TabsSidebarSearchableOptions searchableOptions_;
     std::function<void(WeakPtr<NG::FrameNode>)> barModifierApply_;
     bool hasBarBlurStyle_ = false;
     BlurStyleOption barBlurStyleOption_;
+    bool hasBarBlurStyleForSideBar_ = false;
+    BlurStyleOption barBlurStyleOptionForSideBar_;
+    bool hasSidebarBlurStyle_ = false;
+    BlurStyleOption sidebarBlurStyleOptions_;
+    bool hasSidebarWidth_ = false;
     std::vector<WeakPtr<TabContentNode>> tabContentNodes_;
     // Color invert state for auto-inversion
     std::optional<bool> isColorPickerDark_;
@@ -420,10 +557,21 @@ private:
     RefPtr<InputEvent> hoverEvent_;
     RefPtr<InputEvent> dividerMouseEvent_;
     bool isInDividerDrag_ = false;
-    float realSideBarWidthPx_ = 0.0f;
+    std::optional<float> realSideBarWidthPx_;
     float preSideBarWidthPx_ = 0.0f;
     float minSideBarWidth_ = -1.0f;
     float maxSideBarWidth_ = -1.0f;
+
+    // Display mode switch animation state.
+    // sidebar translate + tabbar scale/opacity run as independent animations; a counter
+    // tracks in-flight animations so the final state is applied only after all of them
+    // finish. Interrupting switches do not stop in-flight animations — they start new ones
+    // and let old ones finish naturally; the last finish callback sets the steady state.
+    bool isOnDisplayModeSwitchAnimation_ = false;
+    int32_t displayModeAnimCount_ = 0;
+    std::optional<TabBarDisplayMode> displayModeAnimTarget_;
+    std::shared_ptr<AnimationUtils::Animation> sidebarTranslateAnim_;
+    std::shared_ptr<AnimationUtils::Animation> tabBarEnterExitAnim_;
 };
 
 } // namespace OHOS::Ace::NG

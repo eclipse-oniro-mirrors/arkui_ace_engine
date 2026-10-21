@@ -147,8 +147,14 @@ public:
     virtual const RefPtr<GeometryNode>& GetGeometryNode() const = 0;
     virtual const RefPtr<LayoutProperty>& GetLayoutProperty() const = 0;
 
-    virtual RefPtr<LayoutWrapper> GetOrCreateChildByIndex(
-        uint32_t index, bool addToRenderTree = true, bool isCache = false) = 0;
+    // allowPlaceholderSubstitution declares THIS acquisition open to the scroll
+    // placeholder deferral substitution (FrameProxy answers with the mounted shell
+    // for a deferred index). Only scroll-container layout fill loops that verified
+    // the placeholder capability pass true; every other caller — focus resolution,
+    // jump-to-index, pure queries, the real-build commit — keeps the unmodified
+    // acquisition semantics whatever any container deferral table holds.
+    virtual RefPtr<LayoutWrapper> GetOrCreateChildByIndex(uint32_t index, bool addToRenderTree = true,
+        bool isCache = false, bool allowPlaceholderSubstitution = false) = 0;
     /**
      * @param isCache if false, child is added to render tree and AttachToMainTree is called.
      */
@@ -331,6 +337,10 @@ public:
 protected:
     void CreateRootConstraint();
     void ApplyConstraint(LayoutConstraintF constraint);
+    virtual void MeasureSafeAreaInset() {}
+    virtual void LayoutSafeAreaInset() {}
+    void MeasureSafeAreaInsetContainer(LayoutWrapper* insetContainer);
+    void LayoutSafeAreaInsetContainer(LayoutWrapper* insetContainer);
 
     // keyboard avoidance is done by offsetting, to expand into keyboard area, reverse the offset.
     OffsetF ExpandIntoKeyboard(RefPtr<FrameNode>& host, RefPtr<FrameNode>& parentNode);

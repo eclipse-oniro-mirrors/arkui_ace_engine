@@ -28,6 +28,7 @@
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_observer.h"
 #include "core/components_ng/pattern/lazy_layout/lazy_layout_pattern.h"
 #include "core/components_ng/pattern/lazy_layout/lazy_layout_utils.h"
+#include "core/components_ng/pattern/lazy_layout/prepared_layout_geometry.h"
 #include "core/components_ng/pattern/list/list_item_group_layout_algorithm.h"
 #include "core/components_ng/pattern/list/list_item_group_pattern.h"
 #include "core/components_ng/pattern/list/list_item_model_ng.h"
@@ -40,6 +41,7 @@
 #include "core/components_ng/property/layout_constraint.h"
 #include "core/components_ng/property/measure_property.h"
 #include "core/components_ng/property/measure_utils.h"
+#include "core/components_ng/layout/layout_wrapper_node.h"
 #include "core/components_ng/pattern/list/list_properties.h"
 #include "core/pipeline_ng/pipeline_context.h"
 
@@ -48,6 +50,34 @@ namespace OHOS::Ace::NG {
 namespace {
 constexpr Dimension RESERVE_BOTTOM_HEIGHT = 24.0_vp;
 constexpr float SCROLL_SNAP_VELOCITY_TH = 780;
+
+// Pattern must see physical coordinates even when Measure is not followed by Layout.
+class ScopedFastScrollPositionMap final {
+public:
+    ScopedFastScrollPositionMap(RefPtr<ListPositionMap>& positionMap, bool mirror) : positionMap_(positionMap)
+    {
+        if (mirror && positionMap_) {
+            original_ = positionMap_;
+            positionMap_ = original_->CreateFastScrollMirroredPosMap();
+        }
+    }
+
+    ~ScopedFastScrollPositionMap()
+    {
+        if (original_) {
+            positionMap_ = std::move(original_);
+        }
+    }
+
+    ScopedFastScrollPositionMap(const ScopedFastScrollPositionMap&) = delete;
+    ScopedFastScrollPositionMap& operator=(const ScopedFastScrollPositionMap&) = delete;
+    ScopedFastScrollPositionMap(ScopedFastScrollPositionMap&&) = delete;
+    ScopedFastScrollPositionMap& operator=(ScopedFastScrollPositionMap&&) = delete;
+
+private:
+    RefPtr<ListPositionMap>& positionMap_;
+    RefPtr<ListPositionMap> original_;
+};
 
 RefPtr<LayoutWrapper> CreateDummyListItemChild()
 {
@@ -61,7 +91,8 @@ RefPtr<LayoutWrapper> CreateDummyListItemChild()
  *        LazyForEach/RepeatVirtualScroll, try to create empty branch LayoutWrapper for the index.
  */
 static RefPtr<LayoutWrapper> GetListItemWithEmptyBranch(
-    LayoutWrapper* layoutWrapper, int32_t index, bool addToRenderTree, bool isCache)
+    LayoutWrapper* layoutWrapper, int32_t index, bool addToRenderTree, bool isCache,
+    bool allowPlaceholderSubstitution = false)
 {
     const auto& layoutProperty = AceType::DynamicCast<ListLayoutProperty>(layoutWrapper->GetLayoutProperty());
     // Scroll placeholder load observation at the List child build call point: predict before
@@ -71,16 +102,31 @@ static RefPtr<LayoutWrapper> GetListItemWithEmptyBranch(
     ScrollPlaceholderItemBuildScope buildScope(
         ScrollPlaceholderComponentType::LIST, layoutWrapper, index, isCache);
     if (layoutProperty->GetSupportLazyLoadingEmptyBranch().value_or(false)) {
-        auto wrapper = layoutWrapper->GetOrCreateChildByIndex(index, addToRenderTree, isCache);
+        auto wrapper = layoutWrapper->GetOrCreateChildByIndex(index, addToRenderTree, isCache,
+            allowPlaceholderSubstitution);
         buildScope.SetAcquiredWrapper(wrapper);
         if (!wrapper) {
             wrapper = CreateDummyListItemChild();
         }
         return wrapper;
     }
-    auto wrapper = layoutWrapper->GetOrCreateChildByIndex(index, addToRenderTree, isCache);
+    auto wrapper = layoutWrapper->GetOrCreateChildByIndex(
+        index, addToRenderTree, isCache, allowPlaceholderSubstitution);
     buildScope.SetAcquiredWrapper(wrapper);
     return wrapper;
+}
+
+// Fast flag check on the List host pattern: with the scroll placeholder provider
+// set, the layout loops keep filling the viewport past the response deadline with
+// cheap placeholder items (deferred real builds) instead of stopping early.
+bool IsScrollPlaceholderEnabled(const LayoutWrapper* layoutWrapper)
+{
+    CHECK_NULL_RETURN(layoutWrapper, false);
+    const auto& host = layoutWrapper->GetHostNode();
+    CHECK_NULL_RETURN(host, false);
+    const auto& pattern = host->GetPattern<ListPattern>();
+    CHECK_NULL_RETURN(pattern, false);
+    return pattern->IsScrollPlaceholderEnabled();
 }
 } // namespace
 
@@ -209,7 +255,10 @@ void ListLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
         if (childrenSize_ && posMap_) {
             posMap_->UpdatePosMap(layoutWrapper, GetLanes(), spaceWidth_, childrenSize_);
         }
+        PrepareFastScrollSkipStart();
         ProcessStackFromEnd();
+        ScopedFastScrollPositionMap positionMapScope(posMap_, isStackFromEnd_ && childrenSize_ &&
+            fastScrollState_ && fastScrollState_->input.useKnownMainSize);
         currentOffset_ = currentDelta_;
         OnSurfaceChanged(layoutWrapper);
         startMainPos_ = currentOffset_;
@@ -218,6 +267,9 @@ void ListLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
         listItemAlign_ = listLayoutProperty->GetListItemAlign().value_or(V2::ListItemAlign::START);
         // calculate child layout constraint.
         UpdateListItemConstraint(axis_, contentIdealSize, childLayoutConstraint_);
+        if (HasFastScrollPreparationRequest()) {
+            PrepareFastScrollTargetWindow(layoutWrapper);
+        }
         MeasureList(layoutWrapper);
         PostClipContentSafeAreaBundle(layoutWrapper);
     } else {
@@ -886,6 +938,10 @@ bool ListLayoutAlgorithm::CanUseInfoInPosMap(int32_t index, float delta) const
 
 void ListLayoutAlgorithm::CheckJumpToIndex()
 {
+    if (fastScrollState_ && fastScrollState_->input.targetIndex) {
+        // Only the actual compression skip may select an estimated anchor below.
+        return;
+    }
     if (jumpIndex_.has_value() || !isNeedCheckOffset_ || childrenSize_) {
         return;
     }
@@ -925,6 +981,542 @@ void ListLayoutAlgorithm::CheckJumpToIndex()
         }
     }
     jumpIndex_ = std::clamp(targetIndex, 0, totalItemCount_ - 1);
+}
+
+void ListLayoutAlgorithm::SetFastScrollTarget(int32_t index, ScrollAlign align)
+{
+    auto& input = GetOrCreateFastScrollState().input;
+    input.targetIndex = index;
+    input.align = align;
+    input.useKnownMainSize = true;
+}
+
+void ListLayoutAlgorithm::SetFastScrollMode(FastScrollMode mode)
+{
+    GetOrCreateFastScrollState().input.mode = mode;
+}
+
+void ListLayoutAlgorithm::SetFastScrollPreparationOffset(float extraOffset)
+{
+    GetOrCreateFastScrollState().input.preparationOffset = extraOffset;
+}
+
+void ListLayoutAlgorithm::SetFastScrollPreparedLayouts(std::shared_ptr<FastScrollPreparedLayouts> items)
+{
+    if (items || fastScrollState_) {
+        GetOrCreateFastScrollState().preparedLayouts = std::move(items);
+    }
+}
+
+bool ListLayoutAlgorithm::MatchesFastScrollTarget(int32_t index, ScrollAlign align, float extraOffset) const
+{
+    CHECK_NULL_RETURN(fastScrollState_, false);
+    const auto& input = fastScrollState_->input;
+    return input.targetIndex == index && input.align == align &&
+        (!input.preparationOffset || NearEqual(input.preparationOffset.value(), extraOffset, 0.0));
+}
+
+ListLayoutAlgorithm::FastScrollLayoutState& ListLayoutAlgorithm::GetOrCreateFastScrollState()
+{
+    if (!fastScrollState_) {
+        fastScrollState_ = std::make_unique<FastScrollLayoutState>();
+    }
+    return *fastScrollState_;
+}
+
+float ListLayoutAlgorithm::GetFastScrollWindowStart(float size) const
+{
+    float position = -(isStackFromEnd_ ? contentEndOffset_ : contentStartOffset_);
+    if (GetFastScrollState()->input.align == ScrollAlign::CENTER) {
+        position = (size - contentMainSize_) / 2.0f;
+    } else if (GetFastScrollState()->input.align == ScrollAlign::END) {
+        position = size - contentMainSize_ + (isStackFromEnd_ ? contentStartOffset_ : contentEndOffset_);
+    }
+    return position + GetFastScrollState()->input.preparationOffset.value();
+}
+
+bool ListLayoutAlgorithm::IsFastScrollForward(float size) const
+{
+    const int32_t target = GetFastScrollState()->input.targetIndex.value();
+    const auto info = posMap_->GetPositionInfo(target);
+    float position = info.mainPos;
+    if (Negative(position)) {
+        const auto [index, anchor] = posMap_->GetStartIndexAndPos();
+        const auto sample = posMap_->GetAverageRowHeight(1);
+        if (index >= 0 && NonNegative(anchor) && sample) {
+            position = anchor + (target - index) * (sample.value() + spaceWidth_);
+        } else if (!itemPosition_.empty()) {
+            return target >= itemPosition_.begin()->first;
+        }
+    }
+    const int32_t visibleIndex = itemPosition_.empty() ? target : itemPosition_.begin()->first;
+    const float targetCorrection = GetFastScrollPreparedOffsetCorrection(target);
+    const float visibleCorrection = GetFastScrollPreparedOffsetCorrection(visibleIndex);
+    return GreatOrEqual(position + targetCorrection + GetFastScrollWindowStart(size),
+        totalOffset_ + visibleCorrection);
+}
+
+float ListLayoutAlgorithm::GetFastScrollPreparedOffsetCorrection(int32_t index) const
+{
+    float correction = 0.0f;
+    std::optional<float> sample;
+    for (const auto& [measuredIndex, measured] : GetFastScrollState()->result.measuredSizes) {
+        if (measuredIndex >= index) {
+            break;
+        }
+        const auto previous = posMap_->GetPositionInfo(measuredIndex);
+        if (Negative(previous.mainSize) && !sample) {
+            sample = posMap_->GetAverageRowHeight(1);
+        }
+        const float previousSize = NonNegative(previous.mainSize) ? previous.mainSize : sample.value_or(0.0f);
+        correction += measured.mainSize - previousSize;
+    }
+    return correction;
+}
+
+std::pair<float, float> ListLayoutAlgorithm::GetFastScrollPreparationRange(float size) const
+{
+    const bool forward = IsFastScrollForward(size);
+    float alignmentLine = 0.0f;
+    if (GetFastScrollState()->input.align == ScrollAlign::END) {
+        alignmentLine = size;
+    } else if (GetFastScrollState()->input.align == ScrollAlign::CENTER) {
+        alignmentLine = size / 2.0f;
+    }
+    const float offsetLine = alignmentLine + GetFastScrollState()->input.preparationOffset.value();
+    if (forward) {
+        return { std::min(alignmentLine, offsetLine - 2.0f * contentMainSize_), std::max(alignmentLine, offsetLine) };
+    }
+    return { std::min(alignmentLine, offsetLine), std::max(alignmentLine, offsetLine + 2.0f * contentMainSize_) };
+}
+
+bool ListLayoutAlgorithm::PremeasureFastScrollGroup(
+    const RefPtr<LayoutWrapper>& wrapper, int32_t index, float extent, bool forward)
+{
+    forward = forward != isStackFromEnd_;
+    SetListItemGroupParam(wrapper, index, 0.0f, forward, listLayoutProperty_, false);
+    auto algorithm = AceType::DynamicCast<ListItemGroupLayoutAlgorithm>(
+        wrapper->GetLayoutAlgorithm()->GetLayoutAlgorithm());
+    CHECK_NULL_RETURN(algorithm, false);
+    const int32_t physicalIndex = isStackFromEnd_ ? totalItemCount_ - index - 1 : index;
+    const bool displayed = itemPosition_.count(physicalIndex) ||
+        (listLayoutProperty_->GetShowCachedItemsValue(false) && cachedItemPosition_.count(physicalIndex));
+    algorithm->SetPremeasureOnly(true, displayed);
+    algorithm->SetCacheParam(std::nullopt);
+    algorithm->SetScrollAlign(ScrollAlign::NONE);
+    algorithm->SetFixOffset(0.0f, 0.0f);
+    algorithm->SetContentOffset(0.0f, 0.0f);
+    algorithm->SetNeedSyncLoad(true);
+    algorithm->SetListMainSize(forward ? 0.0f : -extent, forward ? extent : 0.0f,
+        0.0f, contentMainSize_, forward);
+    auto constraint = GetGroupLayoutConstraint();
+    constraint.viewPosRef = ViewPosReference {
+        .viewPosStart = forward ? 0.0f : -extent,
+        .viewPosEnd = forward ? extent : 0.0f,
+        .referencePos = 0.0f,
+        .referenceEdge = forward ? ReferenceEdge::START : ReferenceEdge::END,
+        .axis = axis_,
+    };
+    wrapper->Measure(constraint);
+    auto measuredNodes = algorithm->TakePremeasuredNodes();
+    if (!measuredNodes.empty()) {
+        TrackFastScrollPremeasuredItem(wrapper, index, true);
+        auto& nodes = GetOrCreateFastScrollState().premeasuredItems.at(index).measuredNodes;
+        if (nodes.empty()) {
+            nodes = std::move(measuredNodes);
+        } else {
+            nodes.insert(nodes.end(), measuredNodes.begin(), measuredNodes.end());
+        }
+    }
+    SaveFastScrollPreparedLayout(index, algorithm->GetPreparedGeometry());
+    return algorithm->IsPremeasureComplete();
+}
+
+void ListLayoutAlgorithm::TrackFastScrollPremeasuredItem(
+    const RefPtr<LayoutWrapper>& wrapper, int32_t index, bool clearEntireTree)
+{
+    auto host = wrapper->GetHostNode();
+    CHECK_NULL_VOID(host);
+    auto [it, inserted] = GetOrCreateFastScrollState().premeasuredItems.try_emplace(
+        index, FastScrollPremeasuredItem { wrapper, clearEntireTree });
+    if (!inserted && it->second.wrapper->GetHostNode() != host) {
+        it->second = { wrapper, clearEntireTree };
+    }
+}
+
+void ListLayoutAlgorithm::SaveFastScrollPreparedLayout(
+    int32_t index, const std::shared_ptr<const PreparedLayoutGeometry>& geometry)
+{
+    if (!geometry) {
+        return;
+    }
+    if (!GetFastScrollState()->preparedLayouts) {
+        GetOrCreateFastScrollState().preparedLayouts = std::make_shared<FastScrollPreparedLayouts>();
+    }
+    (*GetFastScrollState()->preparedLayouts)[index] = geometry;
+}
+
+bool ListLayoutAlgorithm::ReuseFastScrollVisibleItem(LayoutWrapper* layoutWrapper, int32_t index, float& size) const
+{
+    auto item = itemPosition_.find(index);
+    if (expandSafeArea_ || item == itemPosition_.end() || item->second.isGroup || item->second.isLazyChild) {
+        return false;
+    }
+    auto node = AceType::DynamicCast<FrameNode>(ElementRegister::GetInstance()->GetUINodeById(item->second.id));
+    if (!node || node->GetParentFrameNode() != layoutWrapper->GetHostNode() || !node->IsLayoutComplete() ||
+        node->IsLayoutDirtyMarked() || CheckNeedMeasure(node) ||
+        (node->HasLayoutAlgorithm() && node->GetLayoutAlgorithm()->MeasureInNextFrame())) {
+        return false;
+    }
+    if (!childrenSize_) {
+        UpdateListItemEditModeCheckBoxSpace(node);
+    }
+    size = childrenSize_ ? childrenSize_->GetChildSize(index) :
+        GetMainAxisSize(node->GetGeometryNode()->GetMarginFrameSize(), axis_);
+    return std::isfinite(size) && !Negative(size);
+}
+
+bool ListLayoutAlgorithm::MeasureFastScrollRegularItem(const RefPtr<LayoutWrapper>& wrapper, int32_t index)
+{
+    UpdateListItemEditModeCheckBoxSpace(wrapper);
+    const auto& algorithm = wrapper->GetLayoutAlgorithm();
+    if (expandSafeArea_ || CheckNeedMeasure(wrapper) || (algorithm && algorithm->MeasureInNextFrame())) {
+        wrapper->Measure(childLayoutConstraint_);
+        TrackFastScrollPremeasuredItem(wrapper, index, false);
+        return LazyLayoutUtils::IsChildMeasureComplete(wrapper);
+    }
+    return true;
+}
+
+bool ListLayoutAlgorithm::MeasureFastScrollItem(
+    LayoutWrapper* layoutWrapper, int32_t index, float extent, bool forward, float& size)
+{
+    if (!std::isfinite(extent)) {
+        GetOrCreateFastScrollState().result.status = FastScrollMeasureStatus::INVALID;
+        return false;
+    }
+    const int32_t layoutIndex = isStackFromEnd_ ? totalItemCount_ - index - 1 : index;
+    if (ReuseFastScrollVisibleItem(layoutWrapper, index, size)) {
+        GetOrCreateFastScrollState().result.measuredSizes[index] = { size, false, false };
+        return true;
+    }
+    const bool visible = itemPosition_.count(index) ||
+        (listLayoutProperty_->GetShowCachedItemsValue(false) && cachedItemPosition_.count(index));
+    auto wrapper = GetListItem(layoutWrapper, layoutIndex, visible, !visible);
+    CHECK_NULL_RETURN(wrapper, false);
+    const bool isGroup = wrapper->GetHostTag() == V2::LIST_ITEM_GROUP_ETS_TAG;
+    const bool isLazy = CanSupportNestedLazy(wrapper->GetHostNode(), layoutWrapper->GetHostNode(), GetLanes());
+    if (isLazy) {
+        TrackFastScrollPremeasuredItem(wrapper, layoutIndex, true);
+        const bool complete = PremeasureFastScrollLazy(wrapper, layoutIndex, extent, forward, size,
+            &GetOrCreateFastScrollState().premeasuredItems.at(layoutIndex).measuredNodes);
+        if (!complete) {
+            return false;
+        }
+    } else if (isGroup) {
+        const bool complete = PremeasureFastScrollGroup(wrapper, layoutIndex, extent, forward);
+        TrackFastScrollPremeasuredItem(wrapper, layoutIndex, true);
+        if (!complete) {
+            return false;
+        }
+    } else if (!childrenSize_ && !MeasureFastScrollRegularItem(wrapper, layoutIndex)) {
+        return false;
+    }
+    if (!isLazy) {
+        size = childrenSize_ ? childrenSize_->GetChildSize(layoutIndex, isStackFromEnd_) :
+            GetMainAxisSize(wrapper->GetGeometryNode()->GetMarginFrameSize(), axis_);
+    }
+    if (!std::isfinite(size) || Negative(size)) {
+        GetOrCreateFastScrollState().result.status = FastScrollMeasureStatus::INVALID;
+        return false;
+    }
+    GetOrCreateFastScrollState().result.measuredSizes[index] = { size, isGroup, isLazy };
+    return true;
+}
+
+bool ListLayoutAlgorithm::PremeasureFastScrollLazy(
+    const RefPtr<LayoutWrapper>& wrapper, int32_t index, float extent, bool forward, float& size,
+    std::vector<WeakPtr<FrameNode>>* measuredNodes)
+{
+    auto constraint = childLayoutConstraint_;
+    constraint.viewPosRef = ViewPosReference {
+        .viewPosStart = forward ? 0.0f : -extent,
+        .viewPosEnd = forward ? extent : 0.0f,
+        .referencePos = 0.0f,
+        .referenceEdge = forward ? ReferenceEdge::START : ReferenceEdge::END,
+        .axis = axis_,
+    };
+    if (childrenSize_) {
+        constraint.viewPosRef->knownMainSize = childrenSize_->GetChildSize(index, isStackFromEnd_);
+    }
+    auto result = LazyLayoutUtils::Premeasure(wrapper, constraint, measuredNodes);
+    if (!result) {
+        GetOrCreateFastScrollState().result.status = FastScrollMeasureStatus::UNSUPPORTED;
+        return false;
+    }
+    auto& record = GetOrCreateFastScrollState().premeasuredItems.at(index);
+    if (record.pendingLazyAdjustment) {
+        // Internal shifts are incremental; wrapper insets and the total size delta use the original geometry.
+        const float previousAnchorShift = record.pendingLazyAdjustment->start - record.pendingLazyStartInset;
+        result->adjust.start += previousAnchorShift;
+        result->adjust.end -= previousAnchorShift;
+    }
+    record.pendingLazyAdjustment = result->adjust;
+    record.pendingLazyStartInset = result->startInsetAdjustment;
+    SaveFastScrollPreparedLayout(index, result->geometry);
+    size = result->marginMainSize;
+    if (result->unsupported) {
+        GetOrCreateFastScrollState().result.status = FastScrollMeasureStatus::UNSUPPORTED;
+    }
+    return result->complete && !result->unsupported;
+}
+
+void ListLayoutAlgorithm::PrepareFastScrollTargetWindow(LayoutWrapper* layoutWrapper)
+{
+    if (!fastScrollState_) {
+        return;
+    }
+    auto& state = *fastScrollState_;
+    state.result.measuredSizes.clear();
+    for (auto& [index, record] : state.premeasuredItems) {
+        record.pendingLazyAdjustment.reset();
+    }
+    state.result.status = FastScrollMeasureStatus::PENDING;
+    if (!state.input.targetIndex) {
+        return;
+    }
+    if (childrenSize_) {
+        state.result.status = FastScrollMeasureStatus::COMPLETE;
+        return;
+    }
+    if (!PrepareFastScrollRows(layoutWrapper)) {
+        return;
+    }
+    const int32_t target = GetFastScrollState()->input.targetIndex.value();
+    const bool forward = GetFastScrollState()->input.align != ScrollAlign::END;
+    const float estimatedSize = std::max(posMap_->GetPositionInfo(target).mainSize, 0.0f);
+    float extent = GetFastScrollTargetExtent(estimatedSize, forward);
+    if (GetFastScrollState()->input.align == ScrollAlign::CENTER) {
+        extent = std::numeric_limits<float>::max();
+    } else if (GetFastScrollState()->input.align == ScrollAlign::AUTO) {
+        extent = contentMainSize_;
+    }
+    float size = 0.0f;
+    if (!MeasureFastScrollRow(layoutWrapper, target, std::max(extent, 1.0f), forward, size) ||
+        GetFastScrollState()->input.align == ScrollAlign::AUTO) {
+        return;
+    }
+    const float actualExtent = GetFastScrollTargetExtent(size, forward);
+    if (GreatNotEqual(actualExtent, extent) &&
+        !MeasureFastScrollRow(layoutWrapper, target, actualExtent, forward, size)) {
+        return;
+    }
+    if (CompleteFastScrollPreparation(layoutWrapper, size, std::max(extent, actualExtent))) {
+        state.result.status = FastScrollMeasureStatus::COMPLETE;
+    }
+}
+
+float ListLayoutAlgorithm::GetFastScrollTargetExtent(float size, bool forward) const
+{
+    const auto range = GetFastScrollPreparationRange(size);
+    return std::max(forward ? range.second : size - range.first, 1.0f);
+}
+
+bool ListLayoutAlgorithm::CompleteFastScrollPreparation(LayoutWrapper* layoutWrapper, float size, float extent)
+{
+    const bool approach = IsFastScrollForward(size);
+    if (!MeasureFastScrollNeighbors(layoutWrapper, size)) {
+        return false;
+    }
+    if (approach == IsFastScrollForward(size)) {
+        return true;
+    }
+    // Real neighboring sizes can reverse the approach. Complete the other side before starting the animation.
+    const bool forward = GetFastScrollState()->input.align != ScrollAlign::END;
+    const float required = GetFastScrollTargetExtent(size, forward);
+    if (GreatNotEqual(required, extent) &&
+        !MeasureFastScrollRow(layoutWrapper, GetFastScrollState()->input.targetIndex.value(), required, forward,
+            size)) {
+        return false;
+    }
+    return MeasureFastScrollNeighbors(layoutWrapper, size);
+}
+
+bool ListLayoutAlgorithm::MeasureFastScrollNeighbors(LayoutWrapper* layoutWrapper, float size)
+{
+    const int32_t target = GetFastScrollState()->input.targetIndex.value();
+    const auto [start, end] = GetFastScrollPreparationRange(size);
+    if (!std::isfinite(start) || !std::isfinite(end)) {
+        GetOrCreateFastScrollState().result.status = FastScrollMeasureStatus::INVALID;
+        return false;
+    }
+    int32_t index = target;
+    float position = 0.0f;
+    while (LessNotEqual(position + size, end) && index < totalItemCount_ - 1) {
+        position += size + spaceWidth_;
+        if (GreatOrEqual(position, end)) {
+            break;
+        }
+        if (!MeasureFastScrollItem(layoutWrapper, ++index, std::max(end - position, 1.0f), true, size)) {
+            return false;
+        }
+    }
+    index = target;
+    position = 0.0f;
+    while (GreatNotEqual(position, start) && index > 0) {
+        if (LessOrEqual(position - spaceWidth_, start)) {
+            break;
+        }
+        if (!MeasureFastScrollItem(layoutWrapper, --index, std::max(position - spaceWidth_ - start, 1.0f),
+            false, size)) {
+            return false;
+        }
+        position -= size + spaceWidth_;
+    }
+    return true;
+}
+
+std::optional<ListPositionMap::EstimateRange> ListLayoutAlgorithm::GetPhysicalLanesRow(int32_t index) const
+{
+    auto row = GetFastScrollLanesRow(isStackFromEnd_ ? totalItemCount_ - index - 1 : index);
+    if (row && isStackFromEnd_) {
+        return ListPositionMap::EstimateRange {
+            totalItemCount_ - row->endIndex - 1, totalItemCount_ - row->startIndex - 1 };
+    }
+    return row;
+}
+
+void ListLayoutAlgorithm::PrepareFastScrollSkipStart()
+{
+    if (fastScrollState_) {
+        fastScrollState_->skipStart.reset();
+    }
+    if (!fastScrollState_ || !fastScrollState_->input.skip || jumpIndex_ || !posMap_ || itemPosition_.empty()) {
+        return;
+    }
+    auto [index, delta] = posMap_->FindRowAtPosition(totalOffset_ + currentDelta_, GetLanes());
+    if (index < 0 || index >= totalItemCount_) {
+        return;
+    }
+    if (!childrenSize_ && GetFastScrollState()->input.targetIndex && !HasFastScrollPreparationRequest()) {
+        int32_t target = GetFastScrollState()->input.targetIndex.value();
+        if (const auto row = GetPhysicalLanesRow(target)) {
+            target = row->startIndex;
+        }
+        const auto info = posMap_->GetPositionInfo(target);
+        const float position = info.mainPos - totalOffset_ - currentDelta_;
+        if (target > index && target < totalItemCount_ && NonNegative(position) &&
+            LessNotEqual(position, contentMainSize_)) {
+            // Preserve the prepared target position when the preceding row still has an estimated size.
+            GetOrCreateFastScrollState().skipStart = { target, info.mainPos - totalOffset_ };
+            return;
+        }
+    }
+    GetOrCreateFastScrollState().skipStart = { index, currentDelta_ - delta };
+}
+
+void ListLayoutAlgorithm::MeasureFastScrollSkipWindow(LayoutWrapper* layoutWrapper)
+{
+    const auto [index, position] = GetFastScrollState()->skipStart.value();
+    itemPosition_.clear();
+    if (isStackFromEnd_) {
+        const float endPos = index == 0 && !canOverScrollEnd_ ?
+            std::max<float>(contentMainSize_ - position, currentOffset_ + contentMainSize_ - contentEndOffset_) :
+            contentMainSize_ - position;
+        LayoutBackward(layoutWrapper, totalItemCount_ - index - 1, endPos);
+        if (GetEndIndex() < totalItemCount_ - 1 &&
+            !LayoutReachEnd(GetEndPosition(), endMainPos_, GetEndIndex())) {
+            LayoutForward(layoutWrapper, GetEndIndex() + 1, GetEndPosition());
+        }
+    } else {
+        const float startPos = index == 0 && !canOverScrollStart_ ?
+            std::min<float>(position, currentOffset_ + contentStartOffset_) : position;
+        LayoutForward(layoutWrapper, index, startPos);
+        if (GetStartIndex() > 0 &&
+            !LayoutReachStart(GetStartPositionWithChainOffset(), startMainPos_, GetStartIndex())) {
+            LayoutBackward(layoutWrapper, GetStartIndex() - 1, GetStartPosition());
+        }
+    }
+    RecycleGroupItem(layoutWrapper);
+    UpdateNoLayoutedItems();
+}
+
+void ListLayoutAlgorithm::ConfigureFastScrollGroup(
+    const RefPtr<ListItemGroupLayoutAlgorithm>& group, const RefPtr<LayoutWrapper>& wrapper, int32_t index)
+{
+    std::optional<float> mainSize;
+    const auto* state = GetFastScrollState();
+    const bool fastScroll = state && (state->input.targetIndex || state->preparedLayouts ||
+        (state->input.useKnownMainSize && childrenSize_));
+    if (fastScroll && childrenSize_) {
+        mainSize = childrenSize_->GetChildSize(index, isStackFromEnd_);
+    }
+    if (state && state->preparedLayouts) {
+        auto prepared = state->preparedLayouts->find(index);
+        if (prepared != state->preparedLayouts->end() &&
+            prepared->second->type == PreparedLayoutType::GROUP) {
+            group->SetPreparedGeometry(prepared->second);
+        }
+    }
+    group->SetFastScroll(fastScroll, mainSize);
+}
+
+void ListLayoutAlgorithm::ResetFastScrollPremeasuredItems()
+{
+    CHECK_NULL_VOID(fastScrollState_);
+    for (const auto& [index, premeasured] : fastScrollState_->premeasuredItems) {
+        ResetFastScrollPremeasuredItem(index, premeasured);
+        for (const auto& weak : premeasured.measuredNodes) {
+            auto node = weak.Upgrade();
+            if (node && node->HasLayoutAlgorithm()) {
+                node->ClearSubtreeLayoutAlgorithm(true, true);
+            }
+        }
+    }
+    fastScrollState_->premeasuredItems.clear();
+}
+
+void ListLayoutAlgorithm::ResetFastScrollPremeasuredItem(int32_t index, const FastScrollPremeasuredItem& premeasured)
+{
+    if (itemPosition_.count(index) || recycledItemPosition_.count(index)) {
+        return;
+    }
+    noLayoutedItems_.erase(index);
+    const bool cached = cachedItemPosition_.count(index);
+    auto node = AceType::DynamicCast<FrameNode>(premeasured.wrapper);
+    CHECK_NULL_VOID(node);
+    auto group = node->GetPattern<ListItemGroupPattern>();
+    if (group && !cached) {
+        group->ClearItemPosition();
+    }
+    node->ClearSubtreeLayoutAlgorithm(true, cached || premeasured.clearEntireTree);
+}
+
+bool ListLayoutAlgorithm::NeedAllListItemGroupLayout(int32_t index, bool groupNeedAllLayout) const
+{
+    const auto* state = GetFastScrollState();
+    return groupNeedAllLayout || (targetIndex_ && targetIndex_.value() == index) ||
+        (!childrenSize_ && HasFastScrollPreparationRequest() &&
+            state->input.targetIndex == (isStackFromEnd_ ? totalItemCount_ - index - 1 : index) &&
+            state->input.align == ScrollAlign::CENTER) ||
+        (scrollSnapAlign_ != ScrollSnapAlign::NONE && !childrenSize_);
+}
+
+void ListLayoutAlgorithm::ApplyFastScrollPreparedGeometry(const RefPtr<LayoutWrapper>& wrapper, int32_t index)
+{
+    const auto* state = GetFastScrollState();
+    if (!state || !state->preparedLayouts) {
+        return;
+    }
+    auto prepared = state->preparedLayouts->find(index);
+    if (prepared == state->preparedLayouts->end() ||
+        prepared->second->type == PreparedLayoutType::GROUP) {
+        return;
+    }
+    auto lazy = LazyLayoutUtils::GetLazyLayoutPattern(wrapper->GetHostNode());
+    if (lazy) {
+        lazy->RestorePreparedGeometry(prepared->second);
+    }
 }
 
 void ListLayoutAlgorithm::UpdateSnapCenterContentOffset(LayoutWrapper* layoutWrapper)
@@ -1070,6 +1662,10 @@ void ListLayoutAlgorithm::MeasureList(LayoutWrapper* layoutWrapper)
     ReverseItemPosition(cachedItemPosition_, prevTotalItemCount, prevContentMainSize_);
     preStartIndex_ = isStackFromEnd_ ? prevTotalItemCount - pattern->GetEndIndexInItemPosition() - 1:
                                        pattern->GetStartIndexInItemPosition();
+    if (fastScrollState_ && fastScrollState_->skipStart) {
+        MeasureFastScrollSkipWindow(layoutWrapper);
+        return;
+    }
     if (jumpIndex_ && scrollAlign_ == ScrollAlign::AUTO) {
         auto it = itemPosition_.find(jumpIndex_.value());
         if (it != itemPosition_.end()) {
@@ -1481,7 +2077,10 @@ void ListLayoutAlgorithm::LayoutForward(LayoutWrapper* layoutWrapper, int32_t st
     auto chainOffset = 0.0f;
     do {
         if ((static_cast<int32_t>(itemPosition_.size()) > prevItemPosCount_) && !syncLoad_ &&
-            layoutWrapper->ReachResponseDeadline()) {
+            layoutWrapper->ReachResponseDeadline() && !IsScrollPlaceholderEnabled(layoutWrapper)) {
+            // With scroll placeholder enabled the loop keeps filling the viewport
+            // with cheap placeholder items instead of deferring the whole tail to
+            // the next frame (which would show a blank area while scrolling).
             measureInNextFrame_ = true;
             return;
         }
@@ -1537,7 +2136,7 @@ void ListLayoutAlgorithm::LayoutForward(LayoutWrapper* layoutWrapper, int32_t st
         } else {
             // adjust offset. If edgeEffect is SPRING, jump adjust to allow list scroll through boundary
             if (!canOverScrollEnd_ || jumpIndex_.has_value()) {
-                currentOffset_ = currentEndPos + contentEndOffset_ - contentMainSize_;
+                currentOffset_ = static_cast<double>(currentEndPos) + contentEndOffset_ - contentMainSize_;
             }
         }
     }
@@ -1572,7 +2171,10 @@ void ListLayoutAlgorithm::LayoutBackward(LayoutWrapper* layoutWrapper, int32_t e
     auto chainOffset = 0.0f;
     do {
         if ((static_cast<int32_t>(itemPosition_.size()) > prevItemPosCount_) && !syncLoad_ &&
-            layoutWrapper->ReachResponseDeadline()) {
+            layoutWrapper->ReachResponseDeadline() && !IsScrollPlaceholderEnabled(layoutWrapper)) {
+            // With scroll placeholder enabled the loop keeps filling the viewport
+            // with cheap placeholder items instead of deferring the whole tail to
+            // the next frame (which would show a blank area while scrolling).
             measureInNextFrame_ = true;
             return;
         }
@@ -2000,6 +2602,7 @@ void ListLayoutAlgorithm::CheckGroupMeasureBreak(const RefPtr<LayoutWrapper>& wr
 void ListLayoutAlgorithm::ResetLayoutItem(LayoutWrapper* layoutWrapper)
 {
     ResetUnLayoutedItems(layoutWrapper, recycledItemPosition_);
+    ResetFastScrollPremeasuredItems();
     ResetUnLayoutedItems(layoutWrapper, noLayoutedItems_);
 }
 
@@ -2030,6 +2633,8 @@ void ListLayoutAlgorithm::ResetUnLayoutedItems(LayoutWrapper* layoutWrapper, Pos
 
 void ListLayoutAlgorithm::Layout(LayoutWrapper* layoutWrapper)
 {
+    ScopedFastScrollPositionMap positionMapScope(posMap_, isStackFromEnd_ && childrenSize_ &&
+        fastScrollState_ && fastScrollState_->input.useKnownMainSize);
     auto listProps = AceType::DynamicCast<ListLayoutProperty>(layoutWrapper->GetLayoutProperty());
     CHECK_NULL_VOID(listProps);
     auto axis_ = listProps->GetListDirection().value_or(Axis::VERTICAL);
@@ -2197,6 +2802,7 @@ void ListLayoutAlgorithm::SetListItemGroupParam(const RefPtr<LayoutWrapper>& lay
     CHECK_NULL_VOID(layoutAlgorithmWrapper);
     auto itemGroup = AceType::DynamicCast<ListItemGroupLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
     CHECK_NULL_VOID(itemGroup);
+    itemGroup->SetPremeasureOnly(false);
     if (jumpIndexInGroup_.has_value() && scrollAlign_ == ScrollAlign::CENTER) {
         referencePos = (startMainPos_ + endMainPos_) / 2; // 2:average
     }
@@ -2212,21 +2818,23 @@ void ListLayoutAlgorithm::SetListItemGroupParam(const RefPtr<LayoutWrapper>& lay
         float endPos = startPos + (contentMainSize_ + startFixOffset_ + endFixOffset_);
         itemGroup->SetListMainSize(startPos, endPos, referencePos, prevContentMainSize_, forwardLayout);
     }
-    bool needMeasureFormLastItem = index < preStartIndex_;
-    itemGroup->SetNeedMeasureFormLastItem(needMeasureFormLastItem);
+    itemGroup->SetNeedMeasureFormLastItem(index < preStartIndex_);
     itemGroup->SetNeedAdjustRefPos(needAdjustRefPos);
     itemGroup->SetListLayoutProperty(layoutProperty);
     itemGroup->SetDefaultMultiSelectStyleEnabled(defaultMultiSelectStyleEnabled_);
-    itemGroup->SetNeedCheckOffset(isNeedCheckOffset_, groupItemAverageHeight_);
+    const auto* state = GetFastScrollState();
+    itemGroup->SetNeedCheckOffset(isNeedCheckOffset_ || (state && state->input.skip), groupItemAverageHeight_);
+    ConfigureFastScrollGroup(itemGroup, layoutWrapper, index);
     itemGroup->SetFixOffset(startFixOffset_, endFixOffset_);
     itemGroup->SetNeedSyncLoad(syncLoad_);
     if (scrollSnapAlign_ != ScrollSnapAlign::CENTER) {
         itemGroup->SetContentOffset(contentStartOffset_, contentEndOffset_);
     }
     SetListItemGroupJumpIndex(itemGroup, forwardLayout, index);
-
-    if (groupNeedAllLayout || (targetIndex_ && targetIndex_.value() == index) ||
-        (scrollSnapAlign_ != ScrollSnapAlign::NONE && !childrenSize_)) {
+    if (state && (state->input.targetIndex || state->preparedLayouts)) {
+        itemGroup->SetNeedAllLayout(false);
+    }
+    if (NeedAllListItemGroupLayout(index, groupNeedAllLayout)) {
         itemGroup->SetNeedAllLayout();
     } else if (forwardFeature_ || backwardFeature_) {
         itemGroup->CheckNeedAllLayout(layoutWrapper, forwardLayout);
@@ -2274,8 +2882,21 @@ void ListLayoutAlgorithm::MeasureLazyChild(const RefPtr<LayoutWrapper>& wrapper,
     float& referencePos, bool forward)
 {
     ACE_SCOPED_TRACE("ListLayoutAlgorithm::MeasureLazyChild:%d, %f, forward:%d", index, referencePos, forward);
-    wrapper->Measure(CreateLazyChildConstraint(referencePos, forward));
-    ApplyLazyVGridAdjustOffset(wrapper, referencePos, forward);
+    ApplyFastScrollPreparedGeometry(wrapper, index);
+    if (fastScrollState_) {
+        auto record = fastScrollState_->premeasuredItems.find(index);
+        if (record != fastScrollState_->premeasuredItems.end() && record->second.pendingLazyAdjustment) {
+            ApplyLazyVGridAdjustOffset(record->second.pendingLazyAdjustment.value(), referencePos, forward);
+            record->second.pendingLazyAdjustment.reset();
+        }
+    }
+    auto constraint = CreateLazyChildConstraint(referencePos, forward);
+    if (fastScrollState_ && (fastScrollState_->input.useKnownMainSize || fastScrollState_->preparedLayouts) &&
+        childrenSize_) {
+        constraint.viewPosRef->knownMainSize = childrenSize_->GetChildSize(index, isStackFromEnd_);
+    }
+    wrapper->Measure(constraint);
+    ApplyLazyVGridAdjustOffset(GetAdjustOffset(wrapper), referencePos, forward);
     lazyChildIndex_.emplace(index);
 }
 
@@ -2303,9 +2924,8 @@ AdjustOffset ListLayoutAlgorithm::GetAdjustOffset(const RefPtr<LayoutWrapper>& i
 }
 
 void ListLayoutAlgorithm::ApplyLazyVGridAdjustOffset(
-    const RefPtr<LayoutWrapper>& wrapper, float& referencePos, bool forward)
+    const AdjustOffset& adjustOffset, float& referencePos, bool forward) const
 {
-    auto adjustOffset = GetAdjustOffset(wrapper);
     if (NearEqual(adjustOffset.start, 0.0f) && NearEqual(adjustOffset.end, 0.0f)) {
         return;
     }
@@ -3298,7 +3918,7 @@ void ListLayoutAlgorithm::ProcessStackFromEnd()
         } else if (scrollAlign_ == ScrollAlign::END) {
             scrollAlign_ = ScrollAlign::START;
         }
-        if (childrenSize_ && posMap_) {
+        if (childrenSize_ && posMap_ && (!fastScrollState_ || !fastScrollState_->input.useKnownMainSize)) {
             posMap_->ReversePosMap();
         }
     }
@@ -3351,6 +3971,22 @@ RefPtr<LayoutWrapper> ListLayoutAlgorithm::GetListItem(
 {
     index = (!isStackFromEnd_ ? index : totalItemCount_ - index - 1) + itemStartIndex_;
 
+    // Scroll placeholder acquisition pre-check: the
+    // budget decision and shell mounting stay with the pattern (it owns the frame
+    // context); the index->wrapper substitution itself executes in
+    // FrameProxy::GetFrameNodeByIndex, gated by an explicit per-acquisition
+    // declaration. Only a fill loop with the capability verified passes the
+    // declaration down, so every other caller of the host acquisition keeps the
+    // unmodified semantics. Cache/preload paths never substitute.
+    if (!isCache && layoutWrapper) {
+        const auto& host = layoutWrapper->GetHostNode();
+        const auto& pattern = host ? host->GetPattern<ListPattern>() : nullptr;
+        if (pattern && pattern->IsScrollPlaceholderEnabled()) {
+            pattern->PrepareScrollPlaceholderForAcquisition(index);
+            return GetListItemWithEmptyBranch(
+                layoutWrapper, index, addToRenderTree, isCache, /*allowPlaceholderSubstitution=*/true);
+        }
+    }
     return GetListItemWithEmptyBranch(layoutWrapper, index, addToRenderTree, isCache);
 }
 } // namespace OHOS::Ace::NG

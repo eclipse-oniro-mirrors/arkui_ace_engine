@@ -28,7 +28,7 @@ namespace NG {
 
 class PipelineContext;
 
-class FormGestureManager : public virtual AceType {
+class FormGestureManager : public AceType {
     DECLARE_ACE_TYPE(FormGestureManager, AceType);
 public:
     FormGestureManager() = default;

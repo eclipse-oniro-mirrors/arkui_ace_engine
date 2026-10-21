@@ -63,6 +63,9 @@ public:
     void SetOnFileSelectorShow(std::function<bool(const BaseEventInfo* info)>&& jsCallback) override;
     void SetOnContextMenuShow(std::function<bool(const BaseEventInfo* info)>&& jsCallback) override;
     void SetOnContextMenuHide(std::function<void(const BaseEventInfo* info)>&& jsCallback) override;
+    void SetOnContextMenuUpdate(
+        std::function<void(WebContextMenuItemId menuItemId, const WebContextMenuOptions& options)>&& jsCallback)
+        override;
     void SetJsEnabled(bool isJsEnabled) override;
     void SetFileAccessEnabled(bool isFileAccessEnabled) override;
     void SetOnLineImageAccessEnabled(bool isOnLineImageAccessEnabled) override;
@@ -86,9 +89,11 @@ public:
     void SetOnMouseEvent(std::function<void(MouseInfo& info)>&& jsCallback) override;
     void SetResourceLoadId(std::function<void(const BaseEventInfo* info)>&& jsCallback) override;
     void SetScaleChangeId(std::function<void(const BaseEventInfo* info)>&& jsCallback) override;
+    void SetZoomChangeId(std::function<void(const BaseEventInfo* info)>&& jsCallback) override;
     void SetScrollId(std::function<void(const BaseEventInfo* info)>&& jsCallback) override;
     void SetPermissionRequestEventId(std::function<void(const BaseEventInfo* info)>&& jsCallback) override;
     void SetBackgroundColor(Color backgroundColor) override;
+    void SetCaretColor(const Color& caretColor) override;
     void InitialScale(float scale) override;
     void SetSearchResultReceiveEventId(std::function<void(const BaseEventInfo* info)>&& jsCallback) override;
 
@@ -134,6 +139,7 @@ public:
     void SetOnLoadFinished(std::function<void(const BaseEventInfo* info)>&& jsCallback) override;
     void SetBypassVsyncCondition(WebBypassVsyncCondition condition) override;
     void SetForceEnableZoom(bool isForceEnableZoom) override;
+    void SetFlingSpeedLimit(float speedLimit) override;
     void SetOnVerifyPinRequest(std::function<bool(const BaseEventInfo* info)>&& jsCallback) override;
 };
 } // namespace OHOS::Ace::Framework

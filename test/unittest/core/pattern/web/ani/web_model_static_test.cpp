@@ -13,6 +13,8 @@
  * limitations under the License.
  */
 
+#include <limits>
+
 #include "gtest/gtest.h"
 #include "core/accessibility/accessibility_manager.h"
 
@@ -551,6 +553,47 @@ HWTEST_F(WebModelStaticTest, SetOnScroll001, TestSize.Level1)
     WebModelStatic::SetOnContextMenuHide(AccessibilityManager::RawPtr(frameNode), jsCallback);
     webEventHub->FireOnContextMenuHideEvent(mockEventInfo);
     EXPECT_TRUE(callbackCalled);
+#endif
+}
+
+/**
+ * @tc.name: SetOnZoomChange001
+ * @tc.desc: Test WebModelStatic zoom change callback registration and reset.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebModelStaticTest, SetOnZoomChange001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    auto frameNode = WebModelStatic::CreateFrameNode(stack->ClaimNodeId());
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto webEventHub = ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>();
+    ASSERT_NE(webEventHub, nullptr);
+
+    bool callbackCalled = false;
+    double oldZoomFactor = 0.0;
+    double newZoomFactor = 0.0;
+    auto zoomChangeCallback = [&callbackCalled, &oldZoomFactor, &newZoomFactor](const BaseEventInfo* info) {
+        callbackCalled = true;
+        auto* event = TypeInfoHelper::DynamicCast<ZoomChangeEvent>(info);
+        EXPECT_NE(event, nullptr);
+        if (!event) {
+            return;
+        }
+        oldZoomFactor = event->GetOnZoomChangeOldZoomFactor();
+        newZoomFactor = event->GetOnZoomChangeNewZoomFactor();
+    };
+    WebModelStatic::SetZoomChangeId(AccessibilityManager::RawPtr(frameNode), zoomChangeCallback);
+    webEventHub->FireOnZoomChangeEvent(std::make_shared<ZoomChangeEvent>(1.0, 1.5));
+    EXPECT_TRUE(callbackCalled);
+    EXPECT_DOUBLE_EQ(oldZoomFactor, 1.0);
+    EXPECT_DOUBLE_EQ(newZoomFactor, 1.5);
+
+    callbackCalled = false;
+    WebModelStatic::SetZoomChangeId(AccessibilityManager::RawPtr(frameNode), nullptr);
+    webEventHub->FireOnZoomChangeEvent(std::make_shared<ZoomChangeEvent>(1.5, 2.0));
+    EXPECT_FALSE(callbackCalled);
 #endif
 }
 
@@ -2472,6 +2515,33 @@ HWTEST_F(WebModelStaticTest, SetOnDetectedBlankScreen, TestSize.Level1)
 }
 
 /**
+ * @tc.name: SetOnMonitoredBlankScreen
+ * @tc.desc: Test web_model_static.cpp
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebModelStaticTest, SetOnMonitoredBlankScreen, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    int callCount = 0;
+    auto* stack = ViewStackProcessor::GetInstance();
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode = WebModelStatic::CreateFrameNode(nodeId);
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+    auto callback = [&callCount](const BaseEventInfo* info) {
+        callCount++;
+    };
+    WebModelStatic::SetOnMonitoredBlankScreen(AccessibilityManager::RawPtr(frameNode), callback);
+    auto webEventHub = ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>();
+    ASSERT_NE(webEventHub, nullptr);
+ 
+    auto mockEventInfo = std::make_shared<MockBaseEventInfo>();
+    webEventHub->FireOnMonitoredBlankScreenEvent(mockEventInfo);
+    EXPECT_NE(callCount, 0);
+#endif
+}
+
+/**
  * @tc.name: SetOnFirstScreenPaint
  * @tc.desc: Test web_model_static.cpp
  * @tc.type: FUNC
@@ -2582,6 +2652,35 @@ HWTEST_F(WebModelStaticTest, SetOnContextMenuHide001, TestSize.Level1)
     auto mockEventInfo = std::make_shared<MockBaseEventInfo>();
     webEventHub->FireOnContextMenuHideEvent(mockEventInfo);
     EXPECT_NE(callCount, 0);
+#endif
+}
+
+/**
+ * @tc.name: SetOnContextMenuUpdate001
+ * @tc.desc: Test web_model_static.cpp
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebModelStaticTest, SetOnContextMenuUpdate001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    int callCount = 0;
+    auto* stack = ViewStackProcessor::GetInstance();
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode = WebModelStatic::CreateFrameNode(nodeId);
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+
+    auto callback =
+        [&callCount](WebContextMenuItemId menuItemId, const WebContextMenuOptions& options) { callCount++; };
+
+    WebModelStatic::SetOnContextMenuUpdate(AccessibilityManager::RawPtr(frameNode), callback);
+
+    auto webPattern = AceType::DynamicCast<WebPattern>(frameNode->GetPattern());
+    ASSERT_NE(webPattern, nullptr);
+    auto updateCallback = webPattern->GetOnContextMenuUpdateCallback();
+    ASSERT_NE(updateCallback, nullptr);
+    updateCallback(WebContextMenuItemId::MENU_COPY_LINK, WebContextMenuOptions {});
+    EXPECT_EQ(callCount, 1);
 #endif
 }
 
@@ -3410,6 +3509,49 @@ HWTEST_F(WebModelStaticTest, SetInputMethodAttachedId001, TestSize.Level1)
     CHECK_NULL_VOID(webEventHub);
     webEventHub->FireOnInputMethodAttachedEvent(mockEventInfo);
     EXPECT_TRUE(callbackCalled);
+#endif
+}
+
+/**
+ * @tc.name: SetFlingSpeedLimit001
+ * @tc.desc: Test WebModelStatic::SetFlingSpeedLimit updates WebPatternStatic property.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebModelStaticTest, SetFlingSpeedLimit001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode = WebModelStatic::CreateFrameNode(nodeId);
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+
+    WebModelStatic::SetFlingSpeedLimit(AccessibilityManager::RawPtr(frameNode), 5000.0f);
+    auto webPatternStatic = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPatternStatic>();
+    ASSERT_NE(webPatternStatic, nullptr);
+    EXPECT_EQ(webPatternStatic->GetOrCreateWebProperty()->CheckFlingSpeedLimit(5000.0f), true);
+#endif
+}
+
+/**
+ * @tc.name: SetFlingSpeedLimitInvalid001
+ * @tc.desc: Invalid fling speed values are normalized to the default sentinel.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebModelStaticTest, SetFlingSpeedLimitInvalid001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode = WebModelStatic::CreateFrameNode(nodeId);
+    ASSERT_NE(frameNode, nullptr);
+    stack->Push(frameNode);
+
+    WebModelStatic::SetFlingSpeedLimit(
+        AccessibilityManager::RawPtr(frameNode), std::numeric_limits<float>::infinity());
+    auto webPatternStatic = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPatternStatic>();
+    ASSERT_NE(webPatternStatic, nullptr);
+    EXPECT_TRUE(webPatternStatic->GetOrCreateWebProperty()->CheckFlingSpeedLimit(0.0f));
 #endif
 }
 } // namespace OHOS::Ace::NG

@@ -87,14 +87,14 @@ void SetTabsBarBackgroundBlurStyle(ArkUINodeHandle node, void* styleOption)
     auto* blurStyle = reinterpret_cast<BlurStyleOption*>(styleOption);
     CHECK_NULL_VOID(frameNode);
     CHECK_NULL_VOID(blurStyle);
-    TabsModelNG::SetBarBackgroundBlurStyle(frameNode, *blurStyle);
+    TabsModelNG::SetBarBackgroundBlurStyle(frameNode, *blurStyle, false);
 }
 
 void SetTabsBarBackgroundColor(ArkUINodeHandle node, ArkUI_Uint32 color)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
     CHECK_NULL_VOID(frameNode);
-    TabsModelNG::SetBarBackgroundColor(frameNode, Color(color));
+    TabsModelNG::SetBarBackgroundColor(frameNode, Color(color), false);
 }
 
 void SetTabsBarBackgroundEffect(ArkUINodeHandle node, void* effectOption)
@@ -316,6 +316,13 @@ void SwipeToCustom(ArkUINodeHandle node, ArkUI_Int32 index)
     CHECK_NULL_VOID(tabsController);
     tabsController->SwipeTo(index);
 }
+
+int32_t GetBarDisplayMode(ArkUINodeHandle node)
+{
+    auto tabsController = GetTabsController(node);
+    CHECK_NULL_RETURN(tabsController, static_cast<int32_t>(TabBarDisplayMode::BOTTOMTABBAR));
+    return static_cast<int32_t>(tabsController->GetBarDisplayMode());
+}
 } // namespace
 
 namespace NodeModifier {
@@ -356,6 +363,7 @@ const ArkUITabsCustomModifier* GetTabsCustomModifier()
         .setTabBarTranslate = SetTabsTabBarTranslateCustom,
         .setTabBarOpacity = SetTabsTabBarOpacityCustom,
         .swipeTo = SwipeToCustom,
+        .getBarDisplayMode = GetBarDisplayMode,
     };
     CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
     return &modifier;

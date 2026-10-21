@@ -15,6 +15,7 @@
 #include "node_extened.h"
 
 #include "node_model.h"
+#include "config_manager.h"
 
 #include "base/error/error_code.h"
 #include "base/log/log_wrapper.h"
@@ -56,7 +57,12 @@ void NodeAddExtraData(ArkUI_NodeHandle node, ArkUI_NodeCustomEventType eventType
 
 int32_t RegisterNodeCustomEvent(ArkUI_NodeHandle node, ArkUI_NodeCustomEventType eventType, int32_t targetId, void* userData)
 {
-    if (!node || !CheckIsCNode(node)) {
+    if (!node) {
+        SET_ERROR_MESSAGE(ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Node is invalid");
+        return ERROR_CODE_PARAM_INVALID;
+    }
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
+    if (!CheckIsCNode(node)) {
         SET_ERROR_MESSAGE(ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Node is invalid");
         return ERROR_CODE_PARAM_INVALID;
     }
@@ -134,7 +140,11 @@ void NodeRemoveExtraData(ArkUI_NodeHandle node, ArkUI_NodeCustomEventType eventT
 
 void UnregisterNodeCustomEvent(ArkUI_NodeHandle node, ArkUI_NodeCustomEventType eventType)
 {
-    if (node == nullptr || !node->extraCustomData || !CheckIsCNode(node)) {
+    if (node == nullptr) {
+        return;
+    }
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
+    if (!node->extraCustomData || !CheckIsCNode(node)) {
         return;
     }
     const auto* impl = GetFullImpl();
@@ -231,7 +241,12 @@ void HandleCustomEvent(ArkUI_NodeCustomEvent* event)
 
 int32_t AddNodeCustomEventReceiver(ArkUI_NodeHandle nodePtr, void (*eventReceiver)(ArkUI_NodeCustomEvent* event))
 {
-    if (!nodePtr || !eventReceiver || !CheckIsCNode(nodePtr)) {
+    if (!nodePtr || !eventReceiver) {
+        SET_ERROR_MESSAGE(ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Node or event receiver is invalid");
+        return ERROR_CODE_PARAM_INVALID;
+    }
+    CHECK_NODE_DISPOSED(nodePtr, "Node has been disposed");
+    if (!CheckIsCNode(nodePtr)) {
         SET_ERROR_MESSAGE(ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Node or event receiver is invalid");
         return ERROR_CODE_PARAM_INVALID;
     }
@@ -251,7 +266,12 @@ int32_t AddNodeCustomEventReceiver(ArkUI_NodeHandle nodePtr, void (*eventReceive
 int32_t RemoveNodeCustomEventReceiver(ArkUI_NodeHandle nodePtr,
     void (*eventReceiver)(ArkUI_NodeCustomEvent* event))
 {
-    if (!nodePtr || !eventReceiver || !nodePtr->customEventListeners || !CheckIsCNode(nodePtr)) {
+    if (!nodePtr || !eventReceiver) {
+        SET_ERROR_MESSAGE(ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Node or event receiver is invalid");
+        return ERROR_CODE_PARAM_INVALID;
+    }
+    CHECK_NODE_DISPOSED(nodePtr, "Node has been disposed");
+    if (!nodePtr->customEventListeners || !CheckIsCNode(nodePtr)) {
         SET_ERROR_MESSAGE(ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Node or event receiver is invalid");
         return ERROR_CODE_PARAM_INVALID;
     }
@@ -271,11 +291,13 @@ int32_t RemoveNodeCustomEventReceiver(ArkUI_NodeHandle nodePtr,
 
 int32_t SetMeasuredSize(ArkUI_NodeHandle node, int32_t width, int32_t height)
 {
+    CHECK_UI_THREAD("SetMeasuredSize");
     if (node == nullptr || !CheckIsCNode(node)) {
         SET_ERROR_MESSAGE(ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Node is invalid");
         return ERROR_CODE_PARAM_INVALID;
     }
     const auto* impl = GetFullImpl();
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     impl->getExtendedAPI()->setMeasureWidth(node->uiNodeHandle, width > 0 ? width : 0);
     impl->getExtendedAPI()->setMeasureHeight(node->uiNodeHandle, height > 0 ? height : 0);
     return ERROR_CODE_NO_ERROR;
@@ -283,11 +305,13 @@ int32_t SetMeasuredSize(ArkUI_NodeHandle node, int32_t width, int32_t height)
 
 int32_t SetLayoutPosition(ArkUI_NodeHandle node, int32_t positionX, int32_t positionY)
 {
+    CHECK_UI_THREAD("SetLayoutPosition");
     if (node == nullptr || !CheckIsCNode(node)) {
         SET_ERROR_MESSAGE(ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Node is invalid");
         return ERROR_CODE_PARAM_INVALID;
     }
     const auto* impl = GetFullImpl();
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     impl->getExtendedAPI()->setX(node->uiNodeHandle, positionX);
     impl->getExtendedAPI()->setY(node->uiNodeHandle, positionY);
     return ERROR_CODE_NO_ERROR;
@@ -319,11 +343,13 @@ int32_t GetLayoutConstraint(ArkUI_NodeHandle node, ArkUI_LayoutConstraint* layou
 
 ArkUI_IntSize GetMeasuredSize(ArkUI_NodeHandle node)
 {
+    CHECK_UI_THREAD("GetMeasuredSize");
     ArkUI_IntSize size = {0, 0};
     if (node == nullptr) {
         return size;
     }
     const auto* impl = GetFullImpl();
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     size.width = impl->getExtendedAPI()->getMeasureWidth(node->uiNodeHandle);
     size.height = impl->getExtendedAPI()->getMeasureHeight(node->uiNodeHandle);
     return size;
@@ -331,11 +357,13 @@ ArkUI_IntSize GetMeasuredSize(ArkUI_NodeHandle node)
 
 ArkUI_IntOffset GetLayoutPosition(ArkUI_NodeHandle node)
 {
+    CHECK_UI_THREAD("GetLayoutPosition");
     ArkUI_IntOffset offset;
     if (node == nullptr) {
         return offset;
     }
     const auto* impl = GetFullImpl();
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     offset.x = impl->getExtendedAPI()->getX(node->uiNodeHandle);
     offset.y = impl->getExtendedAPI()->getY(node->uiNodeHandle);
     return offset;
@@ -343,11 +371,13 @@ ArkUI_IntOffset GetLayoutPosition(ArkUI_NodeHandle node)
 
 int32_t MeasureNode(ArkUI_NodeHandle node, ArkUI_LayoutConstraint* constraint)
 {
+    CHECK_UI_THREAD("MeasureNode");
     if (node == nullptr || constraint == nullptr || !CheckIsCNode(node)) {
         SET_ERROR_MESSAGE(ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Node or layout constraint is invalid");
         return ERROR_CODE_PARAM_INVALID;
     }
     const auto* impl = GetFullImpl();
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     // data size
     ArkUI_Float32 data[6];
     //minWidth
@@ -368,11 +398,13 @@ int32_t MeasureNode(ArkUI_NodeHandle node, ArkUI_LayoutConstraint* constraint)
 
 int32_t LayoutNode(ArkUI_NodeHandle node, int32_t positionX, int32_t positionY)
 {
+    CHECK_UI_THREAD("LayoutNode");
     if (node == nullptr || !CheckIsCNode(node)) {
         SET_ERROR_MESSAGE(ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Node is invalid");
         return ERROR_CODE_PARAM_INVALID;
     }
     const auto* impl = GetFullImpl();
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     //layout data size
     float data[2];
     //positionX
@@ -389,6 +421,7 @@ uint32_t GetTotalChildCount(ArkUI_NodeHandle node)
         return 0;
     }
     const auto* impl = GetFullImpl();
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     return impl->getNodeModifiers()->getFrameNodeModifier()->getChildrenCount(node->uiNodeHandle, ALL_EXPAND);
 }
 
@@ -398,6 +431,7 @@ ArkUI_NodeHandle GetChildAt(ArkUI_NodeHandle node, int32_t position)
         return nullptr;
     }
     const auto* impl = GetFullImpl();
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     auto* attachNode = impl->getNodeModifiers()->getFrameNodeModifier()->getChild(node->uiNodeHandle, position, true);
     return GetArkUINode(attachNode);
 }
@@ -408,6 +442,7 @@ ArkUI_NodeHandle GetFirstChild(ArkUI_NodeHandle node)
         return nullptr;
     }
     const auto* impl = GetFullImpl();
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     auto* attachNode = impl->getNodeModifiers()->getFrameNodeModifier()->getFirst(node->uiNodeHandle, true);
     return GetArkUINode(attachNode);
 }
@@ -418,6 +453,7 @@ ArkUI_NodeHandle GetLastChild(ArkUI_NodeHandle node)
         return nullptr;
     }
     const auto* impl = GetFullImpl();
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     auto* attachNode = impl->getNodeModifiers()->getFrameNodeModifier()->getLast(node->uiNodeHandle, true);
     return GetArkUINode(attachNode);
 }
@@ -428,6 +464,7 @@ ArkUI_NodeHandle GetPreviousSibling(ArkUI_NodeHandle node)
         return nullptr;
     }
     const auto* impl = GetFullImpl();
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     auto* attachNode = impl->getNodeModifiers()->getFrameNodeModifier()->getPreviousSibling(node->uiNodeHandle, true);
     return GetArkUINode(attachNode);
 }
@@ -438,6 +475,7 @@ ArkUI_NodeHandle GetNextSibling(ArkUI_NodeHandle node)
         return nullptr;
     }
     const auto* impl = GetFullImpl();
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     auto* attachNode = impl->getNodeModifiers()->getFrameNodeModifier()->getNextSibling(node->uiNodeHandle, true);
     return GetArkUINode(attachNode);
 }
@@ -448,6 +486,7 @@ ArkUI_NodeHandle GetParent(ArkUI_NodeHandle node)
         return nullptr;
     }
     const auto* impl = GetFullImpl();
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     auto* value = impl->getNodeModifiers()->getFrameNodeModifier()->getParent(node->uiNodeHandle);
     void* attachNode = impl->getExtendedAPI()->getAttachNodePtr(value);
     if (attachNode) {
@@ -463,6 +502,7 @@ int32_t RemoveAllChildren(ArkUI_NodeHandle parentNode)
         return ERROR_CODE_PARAM_INVALID;
     }
     const auto* impl = GetFullImpl();
+    CHECK_NODE_DISPOSED(parentNode, "Node has been disposed");
     impl->getNodeModifiers()->getFrameNodeModifier()->clearChildren(parentNode->uiNodeHandle);
     return ERROR_CODE_NO_ERROR;
 }

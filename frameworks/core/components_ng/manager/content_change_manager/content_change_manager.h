@@ -69,6 +69,7 @@ public:
     }
 
     void OnPageTransitionEnd(const RefPtr<FrameNode>& keyNode);
+    void OnPageTransitionEnd(const RefPtr<FrameNode>& keyNode, int32_t transitionId);
     void OnContentChangeStart(const RefPtr<FrameNode>& keyNode, ChangeType type);
     void OnContentChangeInterrupted(const RefPtr<FrameNode>& keyNode, ChangeType type);
     void OnContentChangeNodeDestroyed(int32_t nodeId);
@@ -100,6 +101,14 @@ public:
 #ifndef IS_RELEASE_VERSION
     std::string DumpInfo() const;
 #endif
+
+    // PageScene detection entry points. Exposed so route-change hook points
+    // (PagePattern::OnShow, NavDestinationEventHub::FireOnShownEvent) can
+    // trigger an immediate detection cycle for AC-6.2/AC-6.4 (route-leave
+    // false event, A-false-before-B-true ordering). No-op when no search
+    // ruleSet is registered (NeedPageSceneDetect fast-returns).
+    void NotifyPageSceneContentChanged(bool flushNow);
+    void FlushPageSceneNodeChanged();
 
 private:
     struct ActiveContentChange {
@@ -135,8 +144,6 @@ private:
     bool IsContentChanging() const;
     bool NeedPageSceneDetect() const;
     bool NeedContentChangeReportOrPageSceneDetect() const;
-    void NotifyPageSceneContentChanged(bool flushNow);
-    void FlushPageSceneNodeChanged();
     void ReportImageEvent();
     void RemoveImageReportTask();
     void PostImageReportTask(uint32_t delay);

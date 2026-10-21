@@ -21,18 +21,19 @@ ace_unittest("xcomponent_test_ng") {
   }
   sources = [
     "$ace_root/frameworks/core/components/xcomponent/native_interface_xcomponent_impl.cpp",
-    "$ace_root/frameworks/core/interfaces/native/node/node_xcomponent_modifier.cpp",
     "$ace_root/frameworks/core/components_ng/pattern/xcomponent/xcomponent_resolution_config.cpp",
+    "$ace_root/frameworks/core/interfaces/native/node/node_xcomponent_modifier.cpp",
     "xcomponent_layout_test_ng.cpp",
+    "xcomponent_pattern_branch_test.cpp",
     "xcomponent_property_test_ng.cpp",
     "xcomponent_property_test_two_ng.cpp",
     "xcomponent_static_test_ng.cpp",
+    "xcomponent_test_buffer_queue_count.cpp",
     "xcomponent_test_ng.cpp",
     "xcomponent_test_three_ng.cpp",
     "xcomponent_testtwo_ng.cpp",
     "xcomponent_utils_test_ng.cpp",
     "xcomponent_v2_test_ng.cpp",
-    "xcomponent_pattern_branch_test.cpp",
   ]
 
   if (!ace_enable_full_test_suite) {

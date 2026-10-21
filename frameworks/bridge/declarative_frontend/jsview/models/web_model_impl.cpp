@@ -284,6 +284,14 @@ void WebModelImpl::SetOnContextMenuHide(std::function<void(const BaseEventInfo* 
     webComponent->SetOnContextMenuHide(std::move(jsCallback));
 }
 
+void WebModelImpl::SetOnContextMenuUpdate(
+    std::function<void(WebContextMenuItemId menuItemId, const WebContextMenuOptions& options)>&& jsCallback)
+{
+    auto webComponent = AceType::DynamicCast<WebComponent>(ViewStackProcessor::GetInstance()->GetMainComponent());
+    CHECK_NULL_VOID(webComponent);
+    webComponent->SetOnContextMenuUpdate(std::move(jsCallback));
+}
+
 void WebModelImpl::SetJsEnabled(bool isJsEnabled)
 {
     auto webComponent = AceType::DynamicCast<WebComponent>(ViewStackProcessor::GetInstance()->GetMainComponent());
@@ -463,6 +471,15 @@ void WebModelImpl::SetScaleChangeId(std::function<void(const BaseEventInfo* info
     webComponent->SetScaleChangeId(eventMarker);
 }
 
+void WebModelImpl::SetZoomChangeId(std::function<void(const BaseEventInfo* info)>&& jsCallback)
+{
+    auto webComponent = AceType::DynamicCast<WebComponent>(ViewStackProcessor::GetInstance()->GetMainComponent());
+    CHECK_NULL_VOID(webComponent);
+    auto eventMarker = EventMarker(std::move(jsCallback));
+
+    webComponent->SetZoomChangeId(eventMarker);
+}
+
 void WebModelImpl::SetScrollId(std::function<void(const BaseEventInfo* info)>&& jsCallback)
 {
     auto webComponent = AceType::DynamicCast<WebComponent>(ViewStackProcessor::GetInstance()->GetMainComponent());
@@ -486,6 +503,13 @@ void WebModelImpl::SetBackgroundColor(Color backgroundColor)
     auto webComponent = AceType::DynamicCast<WebComponent>(ViewStackProcessor::GetInstance()->GetMainComponent());
     CHECK_NULL_VOID(webComponent);
     webComponent->SetBackgroundColor(backgroundColor.GetValue());
+}
+
+void WebModelImpl::SetCaretColor(const Color& caretColor)
+{
+    auto webComponent = AceType::DynamicCast<WebComponent>(ViewStackProcessor::GetInstance()->GetMainComponent());
+    CHECK_NULL_VOID(webComponent);
+    webComponent->SetCaretColor(caretColor);
 }
 
 void WebModelImpl::InitialScale(float scale)
@@ -778,6 +802,13 @@ void WebModelImpl::SetForceEnableZoom(bool isForceEnableZoom)
     auto webComponent = AceType::DynamicCast<WebComponent>(ViewStackProcessor::GetInstance()->GetMainComponent());
     CHECK_NULL_VOID(webComponent);
     webComponent->SetForceEnableZoom(isForceEnableZoom);
+}
+
+void WebModelImpl::SetFlingSpeedLimit(float speedLimit)
+{
+    auto webComponent = AceType::DynamicCast<WebComponent>(ViewStackProcessor::GetInstance()->GetMainComponent());
+    CHECK_NULL_VOID(webComponent);
+    webComponent->SetFlingSpeedLimit(NormalizeFlingSpeedLimit(speedLimit));
 }
 
 void WebModelImpl::SetOnVerifyPinRequest(std::function<bool(const BaseEventInfo* info)>&& jsCallback)

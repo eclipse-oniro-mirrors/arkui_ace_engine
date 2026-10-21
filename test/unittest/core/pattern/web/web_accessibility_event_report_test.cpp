@@ -97,6 +97,7 @@ public:
     MOCK_METHOD(int32_t, GetCheckboxGroupSelectedStatus, (), (override));
     MOCK_METHOD(std::string, GetExpandedState, (), (override));
     MOCK_METHOD(std::string, GetHtmlElementId, (), (override));
+    MOCK_METHOD(int32_t, GetZIndex, (), (override));
 };
 } // namespace
 

@@ -157,6 +157,7 @@ void JSScrollableBase::JSBind(BindingTarget globalObj)
     JSClass<JSScrollableBase>::StaticMethod("scrollBarMargin", &JSScrollableBase::SetScrollBarMargin);
     JSClass<JSScrollableBase>::StaticMethod("backToTop", &JSScrollableBase::JSBackToTop);
     JSClass<JSScrollableBase>::StaticMethod("enableScrollWithMouse", &JSScrollableBase::JSEnableScrollWithMouse);
+    JSClass<JSScrollableBase>::StaticMethod("enableScrollWithKeyboard", &JSScrollableBase::JSEnableScrollWithKeyboard);
     JSClass<JSScrollableBase>::StaticMethod("onWillStartDragging", &JSScrollableBase::JSOnWillStartDragging, opt);
     JSClass<JSScrollableBase>::StaticMethod("onDidStopDragging", &JSScrollableBase::JSOnDidStopDragging, opt);
     JSClass<JSScrollableBase>::StaticMethod("onWillStartFling", &JSScrollableBase::JSOnWillStartFling, opt);
@@ -243,6 +244,18 @@ void JSScrollableBase::JSEnableScrollWithMouse(const JSCallbackInfo& info)
     }
     if (info[0]->IsBoolean()) {
         NG::ScrollableModelNG::SetEnableScrollWithMouse(info[0]->ToBoolean());
+    }
+}
+
+void JSScrollableBase::JSEnableScrollWithKeyboard(const JSCallbackInfo& info)
+{
+    if (info.Length() < 1) {
+        return;
+    }
+    if (info[0]->IsBoolean()) {
+        NG::ScrollableModelNG::SetEnableScrollWithKeyboard(info[0]->ToBoolean());
+    } else {
+        NG::ScrollableModelNG::ResetEnableScrollWithKeyboard();
     }
 }
 

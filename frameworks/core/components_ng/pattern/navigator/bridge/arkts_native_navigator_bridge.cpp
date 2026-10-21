@@ -17,6 +17,7 @@
 #include "jsnapi_expo.h"
 #include "ui/base/ace_type.h"
 #include "ui/base/utils/utils.h"
+#include "base/hiviewdfx/histogram_wrapper.h"
 
 #include "core/components/navigator/navigator_component.h"
 #include "core/components_ng/base/view_stack_processor.h"
@@ -278,11 +279,13 @@ ArkUINativeModuleValue NavigatorBridge::SetSize(ArkUIRuntimeCallInfo* runtimeCal
 
 ArkUINativeModuleValue NavigatorBridge::Create(ArkUIRuntimeCallInfo* runtimeCallInfo)
 {
+    ACE_ENGINE_HISTOGRAM_BOOLEAN("Navgator.NavigatorAttribute", 1);
     EcmaVM* vm = runtimeCallInfo->GetVM();
     CHECK_NULL_RETURN(vm, panda::NativePointerRef::New(vm, nullptr));
     Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(NUM_0);
     auto* stack = ViewStackProcessor::GetInstance();
     auto nodeId = stack->ClaimNodeId();
+    ACE_LAYOUT_SCOPED_TRACE("Create[%s][self:%d]", NAVIGATOR_ETS_TAG, nodeId);
     auto frameNode = FrameNode::GetOrCreateFrameNode(
         NAVIGATOR_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<NavigatorPattern>(); });
     CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));

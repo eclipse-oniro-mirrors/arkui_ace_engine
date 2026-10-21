@@ -155,10 +155,12 @@ private:
         const MenuParam& menuParam, RefPtr<FrameNode> column, int32_t themeScopeId);
     static void MountGridSection(std::vector<OptionParam>& params, const RefPtr<FrameNode>& menuNode,
         const MenuParam& menuParam, const RefPtr<FrameNode>& outerColumn,
-        RefPtr<MenuPattern> customMenuPattern = nullptr);
+        RefPtr<MenuPattern> customMenuPattern = nullptr,
+        const std::vector<RefPtr<FrameNode>>& originalNodes = {});
     static RefPtr<FrameNode> CreateGridItem(
         const OptionParam& param, int32_t index, const WeakPtr<FrameNode>& menuWeak = nullptr,
-        int32_t themeScopeId = 0, RefPtr<MenuPattern> customMenuPattern = nullptr);
+        int32_t themeScopeId = 0, RefPtr<MenuPattern> customMenuPattern = nullptr,
+        const RefPtr<FrameNode>& srcNode = nullptr);
     static void MountGridSectionDivider(const RefPtr<FrameNode>& column);
 
     // Custom builder grid support

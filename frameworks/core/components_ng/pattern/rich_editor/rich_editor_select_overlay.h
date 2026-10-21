@@ -104,6 +104,8 @@ private:
     void OnUpdateOnCreateMenuCallback(SelectOverlayInfo& selectInfo);
     void ResumeTwinkling();
     void ChangeHandleHeight(const GestureEvent& event, bool isFirst);
+    void UpdateMenuInfoForPlainTextInput(SelectMenuInfo& menuInfo, SelectOverlayDirtyFlag dirtyFlag,
+        const RefPtr<RichEditorPattern>& pattern);
     std::shared_ptr<SelectionMenuParams> lastMenuParams_ = nullptr;
     std::pair<TextSpanType, TextResponseType> lastSelectResponseComb_;
     bool needRefreshMenu_ = false;

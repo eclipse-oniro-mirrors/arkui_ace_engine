@@ -27,6 +27,9 @@
 
 namespace OHOS::Ace::NG {
 namespace {
+constexpr int32_t ABOUT_TO_API_MAJOR = 26;
+constexpr int32_t ABOUT_TO_API_MINOR = 2;
+constexpr int32_t ABOUT_TO_API_PATCH = 0;
 std::string GetNavigationId(const RefPtr<NavDestinationPattern>& pattern)
 {
     CHECK_NULL_RETURN(pattern, "");
@@ -187,6 +190,10 @@ void UIObserverHandler::NotifyNavigationStateChange(const WeakPtr<AceType>& weak
         state == NavDestinationState::ON_ACTIVE || state == NavDestinationState::ON_INACTIVE)) {
         return;
     }
+    if (Container::LessThanAPITargetVersionFull(ABOUT_TO_API_MAJOR, ABOUT_TO_API_MINOR, ABOUT_TO_API_PATCH) &&
+        (state == NavDestinationState::ABOUT_TO_APPEAR || state == NavDestinationState::ABOUT_TO_DISAPPEAR)) {
+        return;
+    }
     std::shared_ptr<NavPathInfoScope> scope = nullptr;
     scope = pathInfo->Scope();
     NavDestinationInfo info(GetNavigationId(pattern), pattern->GetName(), state, context->GetIndex(),
@@ -206,6 +213,10 @@ void UIObserverHandler::NotifyNavigationStateChangeForAni(
     const WeakPtr<AceType>& weakPattern, NavDestinationState state)
 {
     CHECK_NULL_VOID(navigationHandleFuncForAni_);
+    if (Container::LessThanAPITargetVersionFull(ABOUT_TO_API_MAJOR, ABOUT_TO_API_MINOR, ABOUT_TO_API_PATCH) &&
+        (state == NavDestinationState::ABOUT_TO_APPEAR || state == NavDestinationState::ABOUT_TO_DISAPPEAR)) {
+        return;
+    }
     auto ref = weakPattern.Upgrade();
     CHECK_NULL_VOID(ref);
     auto pattern = AceType::DynamicCast<NavDestinationPattern>(ref);
@@ -711,13 +722,7 @@ void UIObserverHandler::HandleDrawCommandSendCallBack()
 {
     CHECK_NULL_VOID(drawCommandSendHandleFunc_);
     ACE_LAYOUT_SCOPED_TRACE("drawCommandSend");
-    auto container = Container::Current();
-    CHECK_NULL_VOID(container);
-    auto taskExecutor = container->GetTaskExecutor();
-    CHECK_NULL_VOID(taskExecutor);
-    taskExecutor->PostTask(
-        [callback = drawCommandSendHandleFunc_] { callback(); },
-        TaskExecutor::TaskType::JS, "ArkUIObserverDrawCommandSend");
+    drawCommandSendHandleFunc_();
 }
 
 void UIObserverHandler::HandleLayoutDoneCallBack()

@@ -1324,6 +1324,7 @@ public:
         JSClass<JSWebResourceResponse>::CustomMethod("getResponseCode", &JSWebResourceResponse::GetResponseCode);
         JSClass<JSWebResourceResponse>::CustomMethod("getResponseHeader", &JSWebResourceResponse::GetResponseHeader);
         JSClass<JSWebResourceResponse>::CustomMethod("setResponseData", &JSWebResourceResponse::SetResponseData);
+        JSClass<JSWebResourceResponse>::CustomMethod("setResponseBody", &JSWebResourceResponse::SetResponseBody);
         JSClass<JSWebResourceResponse>::CustomMethod(
             "setResponseEncoding", &JSWebResourceResponse::SetResponseEncoding);
         JSClass<JSWebResourceResponse>::CustomMethod(
@@ -1414,6 +1415,16 @@ public:
 
     void SetResponseData(const JSCallbackInfo& args)
     {
+        DoSetResponseData(args, false);
+    }
+
+    void SetResponseBody(const JSCallbackInfo& args)
+    {
+        DoSetResponseData(args, true);
+    }
+
+    void DoSetResponseData(const JSCallbackInfo& args, bool parseRawfile)
+    {
         if (args.Length() <= 0) {
             return;
         }
@@ -1451,7 +1462,9 @@ public:
             if (!JSViewAbstract::ParseJsMedia(args[0], resourceUrl)) {
                 return;
             }
-            JSWeb::ParseRawfileWebSrc(args[0], resourceUrl);
+            if (parseRawfile) {
+                JSWeb::ParseRawfileWebSrc(args[0], resourceUrl);
+            }
             auto np = resourceUrl.find_first_of("/");
             url = (np == std::string::npos) ? resourceUrl : resourceUrl.erase(np, 1);
             response_->SetResourceUrl(url);
@@ -1912,6 +1925,12 @@ public:
         JSClass<JSContextMenuParam>::CustomMethod("getPreviewHeight", &JSContextMenuParam::GetPreviewHeight);
         JSClass<JSContextMenuParam>::CustomMethod(
             "getContextMenuMediaType", &JSContextMenuParam::GetContextMenuMediaType);
+        JSClass<JSContextMenuParam>::CustomMethod(
+            "shouldOfferLinkToText", &JSContextMenuParam::ShouldOfferLinkToText);
+        JSClass<JSContextMenuParam>::CustomMethod(
+            "isOverTextFragment", &JSContextMenuParam::IsOverTextFragment);
+        JSClass<JSContextMenuParam>::CustomMethod(
+            "getTextFragmentGeneratedLink", &JSContextMenuParam::GetTextFragmentGeneratedLink);
         JSClass<JSContextMenuParam>::Bind(globalObj, &JSContextMenuParam::Constructor, &JSContextMenuParam::Destructor);
     }
 
@@ -2095,6 +2114,39 @@ public:
         args.SetReturnValue(descriptionRef);
     }
 
+    void ShouldOfferLinkToText(const JSCallbackInfo& args)
+    {
+        bool ret = false;
+        if (param_) {
+            ret = param_->ShouldOfferLinkToText();
+        }
+        auto jsRet = JSVal(ToJSValue(ret));
+        auto descriptionRef = JSRef<JSVal>::Make(jsRet);
+        args.SetReturnValue(descriptionRef);
+    }
+
+    void IsOverTextFragment(const JSCallbackInfo& args)
+    {
+        bool ret = false;
+        if (param_) {
+            ret = param_->IsOverTextFragment();
+        }
+        auto jsRet = JSVal(ToJSValue(ret));
+        auto descriptionRef = JSRef<JSVal>::Make(jsRet);
+        args.SetReturnValue(descriptionRef);
+    }
+
+    void GetTextFragmentGeneratedLink(const JSCallbackInfo& args)
+    {
+        std::string url;
+        if (param_) {
+            url = param_->GetTextFragmentGeneratedLink();
+        }
+        auto jsUrl = JSVal(ToJSValue(url));
+        auto descriptionRef = JSRef<JSVal>::Make(jsUrl);
+        args.SetReturnValue(descriptionRef);
+    }
+
 private:
     static void Constructor(const JSCallbackInfo& args)
     {
@@ -2134,6 +2186,9 @@ public:
         JSClass<JSContextMenuResult>::CustomMethod("requestPasswordAutoFill",
             &JSContextMenuResult::RequestPasswordAutoFill);
         JSClass<JSContextMenuResult>::CustomMethod("saveImage", &JSContextMenuResult::SaveImage);
+        JSClass<JSContextMenuResult>::CustomMethod("copyLinkToTextMenu",
+            &JSContextMenuResult::CopyLinkToTextMenu);
+        JSClass<JSContextMenuResult>::CustomMethod("removeFragments", &JSContextMenuResult::RemoveFragments);
         JSClass<JSContextMenuResult>::Bind(
             globalObj, &JSContextMenuResult::Constructor, &JSContextMenuResult::Destructor);
     }
@@ -2221,6 +2276,20 @@ public:
     {
         if (result_) {
             result_->SaveImage();
+        }
+    }
+
+    void CopyLinkToTextMenu(const JSCallbackInfo& args)
+    {
+        if (result_) {
+            result_->CopyLinkToTextMenu();
+        }
+    }
+
+    void RemoveFragments(const JSCallbackInfo& args)
+    {
+        if (result_) {
+            result_->RemoveFragments();
         }
     }
 
@@ -2529,12 +2598,15 @@ void JSWeb::JSBind(BindingTarget globalObj)
     JSClass<JSWeb>::StaticMethod("textZoomRatio", &JSWeb::TextZoomRatio);
     JSClass<JSWeb>::StaticMethod("textZoomAtio", &JSWeb::TextZoomRatio);
     JSClass<JSWeb>::StaticMethod("initialScale", &JSWeb::InitialScale);
+    JSClass<JSWeb>::StaticMethod("flingSpeedLimit", &JSWeb::FlingSpeedLimit);
     JSClass<JSWeb>::StaticMethod("backgroundColor", &JSWeb::BackgroundColor);
+    JSClass<JSWeb>::StaticMethod("caretColor", &JSWeb::CaretColor);
     JSClass<JSWeb>::StaticMethod("onKeyEvent", &JSWeb::OnKeyEvent);
     JSClass<JSWeb>::StaticMethod("onTouch", &JSInteractableView::JsOnTouch);
     JSClass<JSWeb>::StaticMethod("onMouse", &JSWeb::OnMouse);
     JSClass<JSWeb>::StaticMethod("onResourceLoad", &JSWeb::OnResourceLoad);
     JSClass<JSWeb>::StaticMethod("onScaleChange", &JSWeb::OnScaleChange);
+    JSClass<JSWeb>::StaticMethod("onZoomChange", &JSWeb::OnZoomChange);
     JSClass<JSWeb>::StaticMethod("password", &JSWeb::Password);
     JSClass<JSWeb>::StaticMethod("tableData", &JSWeb::TableData);
     JSClass<JSWeb>::StaticMethod("onFileSelectorShow", &JSWeb::OnFileSelectorShowAbandoned);
@@ -2546,6 +2618,7 @@ void JSWeb::JSBind(BindingTarget globalObj)
     JSClass<JSWeb>::StaticMethod("onPermissionRequest", &JSWeb::OnPermissionRequest);
     JSClass<JSWeb>::StaticMethod("onContextMenuShow", &JSWeb::OnContextMenuShow);
     JSClass<JSWeb>::StaticMethod("onContextMenuHide", &JSWeb::OnContextMenuHide);
+    JSClass<JSWeb>::StaticMethod("onContextMenuUpdate", &JSWeb::OnContextMenuUpdate);
     JSClass<JSWeb>::StaticMethod("onSearchResultReceive", &JSWeb::OnSearchResultReceive);
     JSClass<JSWeb>::StaticMethod("mediaPlayGestureAccess", &JSWeb::MediaPlayGestureAccess);
     JSClass<JSWeb>::StaticMethod("enableFullscreenVideoOverlay", &JSWeb::EnableFullscreenVideoOverlay);
@@ -2650,7 +2723,9 @@ void JSWeb::JSBind(BindingTarget globalObj)
     JSClass<JSWeb>::StaticMethod("onPdfLoadEvent", &JSWeb::OnPdfLoadEvent);
     JSClass<JSWeb>::StaticMethod("forceEnableZoom", &JSWeb::SetForceEnableZoom);
     JSClass<JSWeb>::StaticMethod("onDetectedBlankScreen", &JSWeb::OnDetectedBlankScreen);
+    JSClass<JSWeb>::StaticMethod("onMonitoredBlankScreen", &JSWeb::OnMonitoredBlankScreen);
     JSClass<JSWeb>::StaticMethod("blankScreenDetectionConfig", &JSWeb::BlankScreenDetectionConfig);
+    JSClass<JSWeb>::StaticMethod("enableBlankScreenMonitor", &JSWeb::EnableBlankScreenMonitor);
     JSClass<JSWeb>::StaticMethod("onFirstScreenPaint", &JSWeb::OnFirstScreenPaint);
     JSClass<JSWeb>::StaticMethod("onTextSelectionChange", &JSWeb::OnTextSelectionChange);
     JSClass<JSWeb>::StaticMethod("enableImageAnalyzer", &JSWeb::EnableImageAnalyzer);
@@ -2817,6 +2892,15 @@ JSRef<JSVal> DetectedBlankScreenEventToJSValue(const DetectedBlankScreenEvent &e
         detailsObj->SetProperty("detectedContentfulNodesCount", eventInfo.GetDetectedContentfulNodesCount());
         obj->SetPropertyObject("blankScreenDetails", detailsObj);
     }
+    return JSRef<JSVal>::Cast(obj);
+}
+
+JSRef<JSVal> MonitoredBlankScreenEventToJSValue(const MonitoredBlankScreenEvent &eventInfo)
+{
+    JSRef<JSObject> obj = JSRef<JSObject>::New();
+    obj->SetProperty("url", eventInfo.GetUrl());
+    obj->SetProperty("reason", eventInfo.GetReason());
+    obj->SetProperty("extraMsg", eventInfo.GetExtraMsg());
     return JSRef<JSVal>::Cast(obj);
 }
 
@@ -4936,6 +5020,34 @@ void JSWeb::OnContextMenuHide(const JSCallbackInfo& args)
     WebModel::GetInstance()->SetOnContextMenuHide(jsCallback);
 }
 
+void JSWeb::OnContextMenuUpdate(const JSCallbackInfo& args)
+{
+    if (!args[0]->IsFunction()) {
+        return;
+    }
+    WeakPtr<NG::FrameNode> frameNode = AceType::WeakClaim(NG::ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    auto jsFunc = AceType::MakeRefPtr<JsFunction>(JSRef<JSObject>(), JSRef<JSFunc>::Cast(args[0]));
+    
+    auto jsCallback = [execCtx = args.GetExecutionContext(), func = std::move(jsFunc), node = frameNode](
+                          WebContextMenuItemId menuItemId, const WebContextMenuOptions& options) {
+        auto webNode = node.Upgrade();
+        CHECK_NULL_VOID(webNode);
+        ContainerScope scope(webNode->GetInstanceId());
+        JAVASCRIPT_EXECUTION_SCOPE_WITH_CHECK(execCtx);
+        auto pipelineContext = PipelineContext::GetCurrentContext();
+        if (pipelineContext) {
+            pipelineContext->UpdateCurrentActiveNode(node);
+        }
+ 
+        JSRef<JSObject> optionsObj = JSRef<JSObject>::New();
+        optionsObj->SetProperty("enable", options.enable);
+        auto itemId = JSRef<JSVal>::Make(ToJSValue(static_cast<int32_t>(menuItemId)));
+        JSRef<JSVal> params[2] = { itemId, optionsObj };
+        func->ExecuteJS(2, params);
+    };
+    WebModel::GetInstance()->SetOnContextMenuUpdate(jsCallback);
+}
+
 void JSWeb::JsEnabled(bool isJsEnabled)
 {
     WebModel::GetInstance()->SetJsEnabled(isJsEnabled);
@@ -5297,6 +5409,14 @@ JSRef<JSVal> ScaleChangeEventToJSValue(const ScaleChangeEvent& eventInfo)
     return JSRef<JSVal>::Cast(obj);
 }
 
+JSRef<JSVal> ZoomChangeEventToJSValue(const ZoomChangeEvent& eventInfo)
+{
+    JSRef<JSObject> obj = JSRef<JSObject>::New();
+    obj->SetProperty("oldZoomFactor", eventInfo.GetOnZoomChangeOldZoomFactor());
+    obj->SetProperty("newZoomFactor", eventInfo.GetOnZoomChangeNewZoomFactor());
+    return JSRef<JSVal>::Cast(obj);
+}
+
 void JSWeb::OnScaleChange(const JSCallbackInfo& args)
 {
     if (args.Length() < 1 || !args[0]->IsFunction()) {
@@ -5319,6 +5439,31 @@ void JSWeb::OnScaleChange(const JSCallbackInfo& args)
         func->Execute(*eventInfo);
     };
     WebModel::GetInstance()->SetScaleChangeId(jsCallback);
+}
+
+void JSWeb::OnZoomChange(const JSCallbackInfo& args)
+{
+    if (args.Length() < 1 || !args[0]->IsFunction()) {
+        return;
+    }
+    WeakPtr<NG::FrameNode> frameNode = AceType::WeakClaim(NG::ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    auto jsFunc = AceType::MakeRefPtr<JsEventFunction<ZoomChangeEvent, 1>>(
+        JSRef<JSFunc>::Cast(args[0]), ZoomChangeEventToJSValue);
+    auto jsCallback = [execCtx = args.GetExecutionContext(), func = std::move(jsFunc), node = frameNode](
+                          const BaseEventInfo* info) {
+        auto webNode = node.Upgrade();
+        CHECK_NULL_VOID(webNode);
+        ContainerScope scope(webNode->GetInstanceId());
+        JAVASCRIPT_EXECUTION_SCOPE_WITH_CHECK(execCtx);
+        auto pipelineContext = PipelineContext::GetCurrentContext();
+        if (pipelineContext) {
+            pipelineContext->UpdateCurrentActiveNode(node);
+        }
+        auto* eventInfo = TypeInfoHelper::DynamicCast<ZoomChangeEvent>(info);
+        CHECK_NULL_VOID(eventInfo);
+        func->Execute(*eventInfo);
+    };
+    WebModel::GetInstance()->SetZoomChangeId(jsCallback);
 }
 
 JSRef<JSVal> ScrollEventToJSValue(const WebOnScrollEvent& eventInfo)
@@ -5461,9 +5606,28 @@ void JSWeb::BackgroundColor(const JSCallbackInfo& info)
     }
 }
 
+void JSWeb::CaretColor(const JSCallbackInfo& info)
+{
+    if (info.Length() < 1) {
+        WebModel::GetInstance()->SetCaretColor(Color(0));
+        return;
+    }
+    Color caretColor;
+    if (ParseJsColor(info[0], caretColor)) {
+        WebModel::GetInstance()->SetCaretColor(caretColor);
+    } else {
+        WebModel::GetInstance()->SetCaretColor(Color(0));
+    }
+}
+
 void JSWeb::InitialScale(float scale)
 {
     WebModel::GetInstance()->InitialScale(scale);
+}
+
+void JSWeb::FlingSpeedLimit(float speedLimit)
+{
+    WebModel::GetInstance()->SetFlingSpeedLimit(speedLimit);
 }
 
 void JSWeb::Password(bool password)
@@ -7971,6 +8135,39 @@ void JSWeb::OnDetectedBlankScreen(const JSCallbackInfo& args)
     WebModel::GetInstance()->SetOnDetectedBlankScreen(jsCallback);
 }
 
+void JSWeb::OnMonitoredBlankScreen(const JSCallbackInfo& args)
+{
+    RETURN_IF_CALLING_FROM_M114();
+    TAG_LOGI(AceLogTag::ACE_WEB, "JSWeb::OnMonitoredBlankScreen, callback set");
+    if (args.Length() < 1 || !args[0]->IsFunction()) {
+        return;
+    }
+#ifdef ACE_ENGINE_API_METRICS_EXT_ENABLE
+    HISTOGRAM_BOOLEAN("ArkWeb.Render.onMonitoredBlankScreen", HISTOGRAM_API_BOOL_COUNTS);
+#endif
+    auto jsFunc = AceType::MakeRefPtr<JsEventFunction<MonitoredBlankScreenEvent, 1>>(
+        JSRef<JSFunc>::Cast(args[0]), MonitoredBlankScreenEventToJSValue);
+ 
+    WeakPtr<NG::FrameNode> frameNode = AceType::WeakClaim(NG::ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    auto jsCallback = [execCtx = args.GetExecutionContext(), func = std::move(jsFunc), node = frameNode](
+                          const BaseEventInfo* info) {
+        auto webNode = node.Upgrade();
+        CHECK_NULL_VOID(webNode);
+        ContainerScope scope(webNode->GetInstanceId());
+        JAVASCRIPT_EXECUTION_SCOPE_WITH_CHECK(execCtx);
+        CHECK_NULL_VOID(func);
+        auto pipelineContext = PipelineContext::GetCurrentContext();
+ 
+        if (pipelineContext) {
+            pipelineContext->UpdateCurrentActiveNode(node);
+        }
+        auto* eventInfo = TypeInfoHelper::DynamicCast<MonitoredBlankScreenEvent>(info);
+        CHECK_NULL_VOID(eventInfo);
+        func->Execute(*eventInfo);
+    };
+    WebModel::GetInstance()->SetOnMonitoredBlankScreen(jsCallback);
+}
+
 void JSWeb::OnFirstScreenPaint(const JSCallbackInfo& args)
 {
     TAG_LOGI(AceLogTag::ACE_WEB, "JSWeb::OnFirstScreenPaint, callback set");
@@ -8077,6 +8274,15 @@ void JSWeb::BlankScreenDetectionConfig(const JSCallbackInfo& args)
     }
     WebModel::GetInstance()->SetBlankScreenDetectionConfig(
         enable, detectionTiming, detectionMethods, contentfulNodesCountThreshold);
+}
+
+void JSWeb::EnableBlankScreenMonitor(const JSCallbackInfo& args)
+{
+    if (args.Length() < 1 || !args[0]->IsBoolean()) {
+        return;
+    }
+    bool isEnabled = args[0]->ToBoolean();
+    WebModel::GetInstance()->SetWebBlankScreenMonitorEnabled(isEnabled);
 }
 
 void JSWeb::EnableImageAnalyzer(const JSCallbackInfo& args)

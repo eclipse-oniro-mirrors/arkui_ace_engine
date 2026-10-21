@@ -260,4 +260,94 @@ HWTEST_F(ResSchedReportTest, ResSchedReportTest015, TestSize.Level1)
     ResSchedReport::GetInstance().HandlePageTransition(pageTransitionInfo, 0);
     EXPECT_FALSE(pageTransitionInfo.fromPage.empty());
 }
+
+namespace {
+struct DialogShowReportRecorder {
+    uint32_t lastResType = 0;
+    int32_t reportCount = 0;
+} g_dialogShowRecorder;
+
+void DialogShowReportCapture(uint32_t resType, int64_t value,
+    const std::unordered_map<std::string, std::string>& payload)
+{
+    g_dialogShowRecorder.lastResType = resType;
+    g_dialogShowRecorder.reportCount++;
+}
+
+struct SwiperChangeReportRecorder {
+    uint32_t lastResType = 0;
+    int64_t lastValue = -1;
+    int32_t reportCount = 0;
+} g_swiperChangeRecorder;
+
+void SwiperChangeReportCapture(uint32_t resType, int64_t value,
+    const std::unordered_map<std::string, std::string>& payload)
+{
+    g_swiperChangeRecorder.lastResType = resType;
+    g_swiperChangeRecorder.lastValue = value;
+    g_swiperChangeRecorder.reportCount++;
+}
+} // namespace
+
+/**
+ * @tc.name: ResSchedReportDialogShow001
+ * @tc.desc: test ReportDialogShow reports RES_TYPE_DIALOG_EVENT
+ * @tc.type: FUNC
+ */
+HWTEST_F(ResSchedReportTest, ResSchedReportDialogShow001, TestSize.Level1)
+{
+    g_dialogShowRecorder = {};
+    ResSchedReport::GetInstance().reportDataFunc_ = &DialogShowReportCapture;
+    ResSchedReport::GetInstance().ReportDialogShow();
+    ResSchedReport::GetInstance().reportDataFunc_ = nullptr;
+    EXPECT_EQ(g_dialogShowRecorder.lastResType, 225u);
+    EXPECT_EQ(g_dialogShowRecorder.reportCount, 1);
+}
+
+/**
+ * @tc.name: ResSchedReportDialogShow002
+ * @tc.desc: test ReportDialogShow twice reports twice without miss or duplicate
+ * @tc.type: FUNC
+ */
+HWTEST_F(ResSchedReportTest, ResSchedReportDialogShow002, TestSize.Level1)
+{
+    g_dialogShowRecorder = {};
+    ResSchedReport::GetInstance().reportDataFunc_ = &DialogShowReportCapture;
+    ResSchedReport::GetInstance().ReportDialogShow();
+    ResSchedReport::GetInstance().ReportDialogShow();
+    ResSchedReport::GetInstance().reportDataFunc_ = nullptr;
+    EXPECT_EQ(g_dialogShowRecorder.lastResType, 225u);
+    EXPECT_EQ(g_dialogShowRecorder.reportCount, 2);
+}
+
+/**
+ * @tc.name: ResSchedReportDialogShow003
+ * @tc.desc: test ReportDialogShow when report channel is null, silent skip without crash
+ * @tc.type: FUNC
+ */
+HWTEST_F(ResSchedReportTest, ResSchedReportDialogShow003, TestSize.Level1)
+{
+    g_dialogShowRecorder = {};
+    ResSchedReport::GetInstance().reportDataFunc_ = nullptr;
+    ResSchedReport::GetInstance().ReportDialogShow();
+    EXPECT_EQ(g_dialogShowRecorder.reportCount, 0);
+}
+
+/**
+ * @tc.name: ResSchedReportSwiperChange001
+ * @tc.desc: test HandleSwiperChange reports RES_TYPE_COMPONENT_STATE_CHANGE with COMPONENT_TYPE_SWIPER
+ * @tc.type: FUNC
+ */
+HWTEST_F(ResSchedReportTest, ResSchedReportSwiperChange001, TestSize.Level1)
+{
+    g_swiperChangeRecorder = {};
+    ResSchedReport::GetInstance().reportDataFunc_ = &SwiperChangeReportCapture;
+    std::unordered_map<std::string, std::string> payload;
+    payload["currentIndex"] = "1";
+    ResSchedReport::GetInstance().HandleSwiperChange(payload);
+    ResSchedReport::GetInstance().reportDataFunc_ = nullptr;
+    EXPECT_EQ(g_swiperChangeRecorder.lastResType, 212u);
+    EXPECT_EQ(g_swiperChangeRecorder.lastValue, 1);
+    EXPECT_EQ(g_swiperChangeRecorder.reportCount, 1);
+}
 } // namespace OHOS::Ace

@@ -45,9 +45,9 @@ import { ScrollSnapDestination } from './ScrollSnap/Index';
 import { Route } from '../../common/Route';
 import resource from '../../common/resource';
 
-export const ScrollSnap_ROUTE_PREFIX: string = 'ScrollSnap';
-export const ScrollModifier_ROUTE_PREFIX: string = 'ScrollModifier';
-export const Scroll_ROUTE_PREFIX: string = 'scroll';
+export const scrollSnapRoutePrefix: string = 'ScrollSnap';
+export const scrollModifierRoutePrefix: string = 'ScrollModifier';
+export const scrollRoutePrefix: string = 'scroll';
 
 const routes: Route[] = [
   new Route('scroll/ScrollSnap/Index', resource.resourceToString($r('app.string.Scroll_Title'))),
@@ -56,7 +56,7 @@ const routes: Route[] = [
 
 @Builder
 export function scrollDestination(name: string): void {
-  if (name === Scroll_ROUTE_PREFIX) {
+  if (name === scrollRoutePrefix) {
     ScrollExample();
   } else if (name === routes[0].name) {
     ScrollSnapDestination();

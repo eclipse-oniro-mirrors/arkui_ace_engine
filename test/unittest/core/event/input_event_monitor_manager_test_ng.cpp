@@ -108,10 +108,13 @@ HWTEST_F(InputEventMonitorManagerTestNg, InputEventMonitorManagerTest001, TestSi
     ASSERT_NE(identity, nullptr);
     EXPECT_EQ(manager->monitors_.size(), 1);
 
-    manager->RemoveLocalInputMonitor(nullptr);
+    manager->RemoveLocalInputMonitor(static_cast<MonitorIdentity*>(nullptr));
     EXPECT_EQ(manager->monitors_.size(), 1);
 
     manager->RemoveLocalInputMonitor(identity);
+    EXPECT_TRUE(manager->monitors_.empty());
+
+    manager->RemoveLocalInputMonitor(identity.GetRawPtr());
     EXPECT_TRUE(manager->monitors_.empty());
 }
 

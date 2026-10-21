@@ -254,11 +254,15 @@ function loadComponent(): ComponentObj | undefined {
         modifierWithKey(this._modifiersWithKeys, TabBarFloatingStyleModifier.identity, TabBarFloatingStyleModifier, value);
         return this;
       }
+      topBarFloatingStyle(value: topBarFloatingStyleOptions): TabsAttribute {
+        modifierWithKey(this._modifiersWithKeys, TabTopBarFloatingStyleModifier.identity, TabTopBarFloatingStyleModifier, value);
+        return this;
+      }
       onContentWillChange(handler: (currentIndex: number, targetIndex: number) => void): TabsAttribute {
         modifierWithKey(this._modifiersWithKeys, TabsOnContentWillChange.identity, TabsOnContentWillChange, handler);
         return this;
       }
-      sidebarDisplayStyle(value: SidebarDisplayStyle): TabsAttribute {
+      sidebarDisplayStyle(value: TabsSidebarDisplayStyle): TabsAttribute {
         modifierWithKey(this._modifiersWithKeys, SidebarDisplayStyleModifier.identity, SidebarDisplayStyleModifier, value);
         return this;
       }
@@ -274,6 +278,14 @@ function loadComponent(): ComponentObj | undefined {
         modifierWithKey(this._modifiersWithKeys, TabsSidebarHeaderModifier.identity, TabsSidebarHeaderModifier, value);
         return this;
       }
+      sidebarFooter(value: ComponentContent): TabsAttribute {
+        modifierWithKey(this._modifiersWithKeys, TabsSidebarFooterModifier.identity, TabsSidebarFooterModifier, value);
+        return this;
+      }
+      sidebarBottomBar(value: ComponentContent): TabsAttribute {
+        modifierWithKey(this._modifiersWithKeys, TabsSidebarBottomBarModifier.identity, TabsSidebarBottomBarModifier, value);
+        return this;
+      }
       sidebarSearchable(value: TabsSidebarSearchableOptions): TabsAttribute {
         modifierWithKey(this._modifiersWithKeys, TabsSidebarSearchableModifier.identity, TabsSidebarSearchableModifier, value);
         return this;
@@ -284,6 +296,34 @@ function loadComponent(): ComponentObj | undefined {
       }
       onBarDisplayModeChange(event: (mode: TabBarDisplayMode) => void): TabsAttribute {
         modifierWithKey(this._modifiersWithKeys, TabsOnBarDisplayModeChangeModifier.identity, TabsOnBarDisplayModeChangeModifier, event);
+        return this;
+      }
+      sidebarWidth(value: Optional<Length>): TabsAttribute {
+        modifierWithKey(this._modifiersWithKeys, TabSidebarWidthModifier.identity, TabSidebarWidthModifier, value);
+        return this;
+      }
+      minSidebarWidth(value: Optional<Length>): TabsAttribute {
+        modifierWithKey(this._modifiersWithKeys, TabMinSidebarWidthModifier.identity, TabMinSidebarWidthModifier, value);
+        return this;
+      }
+      maxSidebarWidth(value: Optional<Length>): TabsAttribute {
+        modifierWithKey(this._modifiersWithKeys, TabMaxSidebarWidthModifier.identity, TabMaxSidebarWidthModifier, value);
+        return this;
+      }
+      minContentWidth(value: Optional<Length>): TabsAttribute {
+        modifierWithKey(this._modifiersWithKeys, TabMinContentWidthModifier.identity, TabMinContentWidthModifier, value);
+        return this;
+      }
+      sidebarBackgroundColor(value: Optional<ResourceColor>): TabsAttribute {
+        modifierWithKey(this._modifiersWithKeys, TabSidebarBackgroundColorModifier.identity, TabSidebarBackgroundColorModifier, value);
+        return this;
+      }
+      sidebarBackgroundBlurStyle(value: Optional<BlurStyle>): TabsAttribute {
+        modifierWithKey(this._modifiersWithKeys, TabSidebarBackgroundBlurStyleModifier.identity, TabSidebarBackgroundBlurStyleModifier, value);
+        return this;
+      }
+      sidebarDivider(value: Optional<DividerStyle>): TabsAttribute {
+        modifierWithKey(this._modifiersWithKeys, TabSidebarDividerModifier.identity, TabSidebarDividerModifier, value);
         return this;
       }
     }
@@ -299,6 +339,21 @@ function loadComponent(): ComponentObj | undefined {
           getUINativeModule().tabs.resetTabsBarFloatingStyle(node);
         } else {
           getUINativeModule().tabs.setTabsBarFloatingStyle(node, this.value);
+        }
+      }
+    }
+
+    class TabTopBarFloatingStyleModifier extends ModifierWithKey<topBarFloatingStyleOptions> {
+      constructor(value: topBarFloatingStyleOptions) {
+        super(value);
+      }
+      static identity: Symbol = Symbol('topBarFloatingStyle');
+
+      applyPeer(node: KNode, reset: boolean): void {
+        if (reset) {
+          getUINativeModule().tabs.resetTabsBarTopFloatingStyle(node);
+        } else {
+          getUINativeModule().tabs.setTabsBarTopFloatingStyle(node, this.value);
         }
       }
     }
@@ -1105,8 +1160,8 @@ function loadComponent(): ComponentObj | undefined {
       }
     } 
 
-    class SidebarDisplayStyleModifier extends ModifierWithKey<SidebarDisplayStyle> {
-      constructor(value: SidebarDisplayStyle) {
+    class SidebarDisplayStyleModifier extends ModifierWithKey<TabsSidebarDisplayStyle> {
+      constructor(value: TabsSidebarDisplayStyle) {
         super(value);
       }
       static identity: Symbol = Symbol('sidebarDisplayStyle');
@@ -1177,6 +1232,36 @@ function loadComponent(): ComponentObj | undefined {
       }
     }
 
+    class TabsSidebarFooterModifier extends ModifierWithKey<ComponentContent> {
+      constructor(value: ComponentContent) {
+        super(value);
+      }
+      static identity: Symbol = Symbol('tabsSidebarFooter');
+
+      applyPeer(node: KNode, reset: boolean): void {
+        if (reset) {
+          getUINativeModule().tabs.resetSidebarFooter(node);
+        } else {
+          getUINativeModule().tabs.setSidebarFooter(node, this.value);
+        }
+      }
+    }
+
+    class TabsSidebarBottomBarModifier extends ModifierWithKey<ComponentContent> {
+      constructor(value: ComponentContent) {
+        super(value);
+      }
+      static identity: Symbol = Symbol('tabsSidebarBottomBar');
+
+      applyPeer(node: KNode, reset: boolean): void {
+        if (reset) {
+          getUINativeModule().tabs.resetSidebarBottomBar(node);
+        } else {
+          getUINativeModule().tabs.setSidebarBottomBar(node, this.value);
+        }
+      }
+    }
+
     class TabsSidebarSearchableModifier extends ModifierWithKey<TabsSidebarSearchableOptions> {
       constructor(value: TabsSidebarSearchableOptions) {
         super(value);
@@ -1222,6 +1307,123 @@ function loadComponent(): ComponentObj | undefined {
       }
     }
 
+    class TabSidebarWidthModifier extends ModifierWithKey<Optional<Length>> {
+      constructor(value: Optional<Length>) {
+        super(value);
+      }
+      static identity: Symbol = Symbol('sidebarWidth');
+
+      applyPeer(node: KNode, reset: boolean): void {
+        if (reset) {
+          getUINativeModule().tabs.resetTabSidebarWidth(node);
+        }
+        else {
+          getUINativeModule().tabs.setTabSidebarWidth(node, this.value);
+        }
+      }
+    }
+
+    class TabMinSidebarWidthModifier extends ModifierWithKey<Optional<Length>> {
+      constructor(value: Optional<Length>) {
+        super(value);
+      }
+      static identity: Symbol = Symbol('minSidebarWidth');
+
+      applyPeer(node: KNode, reset: boolean): void {
+        if (reset) {
+          getUINativeModule().tabs.resetTabMinSidebarWidth(node);
+        }
+        else {
+          getUINativeModule().tabs.setTabMinSidebarWidth(node, this.value);
+        }
+      }
+    }
+
+    class TabMaxSidebarWidthModifier extends ModifierWithKey<Optional<Length>> {
+      constructor(value: Optional<Length>) {
+        super(value);
+      }
+      static identity: Symbol = Symbol('maxSidebarWidth');
+
+      applyPeer(node: KNode, reset: boolean): void {
+        if (reset) {
+          getUINativeModule().tabs.resetTabMaxSidebarWidth(node);
+        }
+        else {
+          getUINativeModule().tabs.setTabMaxSidebarWidth(node, this.value);
+        }
+      }
+    }
+
+    class TabMinContentWidthModifier extends ModifierWithKey<Optional<Length>> {
+      constructor(value: Optional<Length>) {
+        super(value);
+      }
+      static identity: Symbol = Symbol('minContentWidth');
+
+      applyPeer(node: KNode, reset: boolean): void {
+        if (reset) {
+          getUINativeModule().tabs.resetTabMinContentWidth(node);
+        }
+        else {
+          getUINativeModule().tabs.setTabMinContentWidth(node, this.value);
+        }
+      }
+    }
+
+    class TabSidebarBackgroundColorModifier extends ModifierWithKey<Optional<ResourceColor>> {
+      constructor(value: Optional<ResourceColor>) {
+        super(value);
+      }
+      static identity: Symbol = Symbol('sidebarBackgroundColor');
+
+      applyPeer(node: KNode, reset: boolean): void {
+        if (reset) {
+          getUINativeModule().tabs.resetTabSidebarBackgroundColor(node);
+        }
+        else {
+          getUINativeModule().tabs.setTabSidebarBackgroundColor(node, this.value);
+        }
+      }
+    }
+
+    class TabSidebarBackgroundBlurStyleModifier extends ModifierWithKey<Optional<BlurStyle>> {
+      constructor(value: Optional<BlurStyle>) {
+        super(value);
+      }
+      static identity: Symbol = Symbol('sidebarBackgroundBlurStyle');
+
+      applyPeer(node: KNode, reset: boolean): void {
+        if (reset) {
+          getUINativeModule().tabs.resetTabSidebarBackgroundBlurStyle(node);
+        }
+        else {
+          getUINativeModule().tabs.setTabSidebarBackgroundBlurStyle(node, this.value);
+        }
+      }
+    }
+
+    class TabSidebarDividerModifier extends ModifierWithKey<Optional<DividerStyle>> {
+      constructor(value: Optional<DividerStyle>) {
+        super(value);
+      }
+      static identity: Symbol = Symbol('sidebarDivider');
+
+      applyPeer(node: KNode, reset: boolean): void {
+        if (reset) {
+          getUINativeModule().tabs.resetTabSidebarDivider(node);
+        }
+        else {
+          getUINativeModule().tabs.setTabSidebarDivider(node, this.value);
+        }
+      }
+      checkObjectDiff() {
+        return !(this.stageValue?.strokeWidth === this.value?.strokeWidth &&
+          this.stageValue?.color === this.value?.color &&
+          this.stageValue?.startMargin === this.value?.startMargin &&
+          this.stageValue?.endMargin === this.value?.endMargin);
+      }
+    }
         loadComponent.componentObj = { 'component': ArkTabsComponent };
   }
   return loadComponent.componentObj;
@@ -1414,6 +1616,10 @@ class JSTabs extends JSContainerBase {
     getUINativeModule().tabs.setTabsBarFloatingStyle(true, value);
   }
 
+  static topBarFloatingStyle(value: any): void {
+    getUINativeModule().tabs.setTabsBarTopFloatingStyle(true, value);
+  }
+
   static sidebarDisplayStyle(value: any): void {
     getUINativeModule().tabs.setSidebarDisplayStyle(true, value);
   }
@@ -1430,6 +1636,14 @@ class JSTabs extends JSContainerBase {
     getUINativeModule().tabs.setSidebarHeader(true, value);
   }
 
+  static sidebarFooter(value: any): void {
+    getUINativeModule().tabs.setSidebarFooter(true, value);
+  }
+
+  static sidebarBottomBar(value: any): void {
+    getUINativeModule().tabs.setSidebarBottomBar(true, value);
+  }
+
   static sidebarSearchable(value: any): void {
     getUINativeModule().tabs.setSidebarSearchable(true, value);
   }
@@ -1440,6 +1654,34 @@ class JSTabs extends JSContainerBase {
 
   static onBarDisplayModeChange(value: any): void {
     getUINativeModule().tabs.setOnBarDisplayModeChange(true, value);
+  }
+
+  static sidebarWidth(value: any): void {
+    getUINativeModule().tabs.setTabSidebarWidth(true, value);
+  }
+
+  static minSidebarWidth(value: any): void {
+    getUINativeModule().tabs.setTabMinSidebarWidth(true, value);
+  }
+
+  static maxSidebarWidth(value: any): void {
+    getUINativeModule().tabs.setTabMaxSidebarWidth(true, value);
+  }
+
+  static minContentWidth(value: any): void {
+    getUINativeModule().tabs.setTabMinContentWidth(true, value);
+  }
+
+  static sidebarBackgroundColor(value: any): void {
+    getUINativeModule().tabs.setTabSidebarBackgroundColor(true, value);
+  }
+
+  static sidebarBackgroundBlurStyle(value: any): void {
+    getUINativeModule().tabs.setTabSidebarBackgroundBlurStyle(true, value);
+  }
+
+  static sidebarDivider(value: any): void {
+    getUINativeModule().tabs.setTabSidebarDivider(true, value);
   }
 
   static attributeModifier(modifier: any): void {
