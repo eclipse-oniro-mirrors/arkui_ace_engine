@@ -57,6 +57,7 @@ namespace OHOS::Ace::NG {
 class AccessibilitySessionAdapter;
 class InspectorFilter;
 class VerticalOverflowHandler;
+struct InspectorDumpOptions;
 
 class ScrollingListener : public AceType {
     DECLARE_ACE_TYPE(ScrollingListener, AceType);
@@ -319,10 +320,19 @@ public:
     virtual void DumpInfo() {}
     virtual void DumpInfo(std::unique_ptr<JsonValue>& json) {}
     virtual void DumpSimplifyInfo(std::unique_ptr<JsonValue>& json) {}
+    virtual void CollectVisualTreeProperties(JsonValue& json) {}
+    virtual void CollectFunctionalTreeProperties(JsonValue& json) {}
+
     virtual void DumpAdvanceInfo() {}
     virtual void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json) {}
     virtual void DumpViewDataPageNode(RefPtr<ViewDataWrap> viewDataWrap, bool needsRecordData = false) {}
     virtual void DumpSimplifyInfo(std::shared_ptr<JsonValue>& json) {}
+    // Components with diagnostic fields must override this overload to honor the options.
+    virtual void DumpSimplifyInfo(
+        std::shared_ptr<JsonValue>& json, const InspectorDumpOptions& /* options */)
+    {
+        DumpSimplifyInfo(json);
+    }
     virtual void DumpSimplifyInfoOnlyForParamConfig(
         std::shared_ptr<JsonValue>& json, ParamConfig config = ParamConfig())
     {}
