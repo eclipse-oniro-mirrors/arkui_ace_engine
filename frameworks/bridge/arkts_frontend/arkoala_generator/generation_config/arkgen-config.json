@@ -1289,6 +1289,10 @@
         "arkui.component.scroll.Scroller.getItemIndex",
         "arkui.component.scroll.Scroller.contentSize",
         "arkui.component.scroll.Scroller.getScrollState",
+        "arkui.component.select.SelectAttribute.arrowModifier",
+        "arkui.component.select.SelectAttribute.optionTextModifier",
+        "arkui.component.select.SelectAttribute.selectedOptionTextModifier",
+        "arkui.component.select.SelectAttribute.textModifier",
         "arkui.component.grid.GridInterface.invoke"
     ],
     "constants": {
