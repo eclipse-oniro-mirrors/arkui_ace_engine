@@ -10,6 +10,18 @@ UISession 是 ArkUI 在应用进程内提供给系统 SA、调试工具和 AI �
 
 本 KB 只提供稳定的源码、SDK、测试和 Spec 路由。具体事件传递细节、门控逻辑、翻译流程和并发保护应回到当前源码、测试与相关 Spec 核实。
 
+### Report 对象与死亡监听方向
+
+SA 侧 `UIContentServiceProxy::Connect` 创建本地 `UiReportStub`，通过 IPC 传给应用侧
+`UiContentStub::ConnectInner`。应用侧 `SaveReportProxy` 保存的是 `sptr<IRemoteObject>` 远程对象，
+上报时通过 `iface_cast<ReportService>` 使用 `UiReportProxy` 业务代理；不能将 map 中的对象
+直接等同于 `UiReportProxy` C++ 实例。
+
+应用侧在该远程对象上添加 `UiReportProxyRecipient`，感知 SA 死亡并清理本地注册。
+模拟 SA 的 `UiSaService::getArkUIService` 则在指向应用侧 `UiContentStub` 的远程对象上添加
+`UiContentProxyRecipient`，感知应用死亡并清理本地缓存。两者均在本地 proxy 上注册，
+通知对应远端的死亡；应按 IPC 接收端和对象类型判断进程方向，避免因函数名包含 Stub 而倒置两端。
+
 ## 快速路由
 
 ### 源码入口
@@ -69,6 +81,7 @@ UISession 是框架内部 IPC 通道，没有独立 SDK API。IPC 接口通过 `
 | 关注点 | 路径 | 说明 |
 |--------|------|------|
 | Mock Manager | `test/mock/interfaces/inner_api/ui_session/mock_ui_session_manager.*` | UiSessionManager mock |
+| 页面场景回调回归 | `test/unittest/adapter/ohos/entrance/ui_session/ui_content_stub_test.cpp` | `UIContentStubTestPageScene*`：规则集数据隔离、旧版事件兼容和重复注册保护 |
 | SA 验证构建 | `interfaces/inner_api/ui_session:ui_session_example` | ui_sa 构建 target |
 | 内容变化 Dump | `PipelineContext::DumpInfo -contentChange` | 非 release 版本调试入口 |
 
@@ -77,7 +90,7 @@ UISession 是框架内部 IPC 通道，没有独立 SDK API。IPC 接口通过 `
 | 关注点 | 断点位置 | 说明 |
 |--------|----------|------|
 | IPC 入口 | `ui_content_stub.cpp` OnRemoteRequest | 检查 code、SA token、interface token |
-| 连接链路 | `ui_content_stub.cpp` ConnectInner + `ui_session_manager_ohos.cpp` SaveReportStub | 连接与 Report 注册 |
+| 连接链路 | `ui_content_stub.cpp` ConnectInner + `ui_session_manager_ohos.cpp` SaveReportProxy | 连接与 Report 注册 |
 | 事件注册 | `ui_content_stub_impl.cpp` | 各类事件注册回调 |
 | 组件事件过滤 | `ui_session_manager_ohos.cpp` | mask 过滤与广播上报 |
 | InspectorTree | `ui_content_impl.cpp` + `ui_session_manager_ohos.cpp` | 查询与 Web 聚合 |
@@ -92,6 +105,7 @@ UISession 是框架内部 IPC 通道，没有独立 SDK API。IPC 接口通过 `
 | 问题 | 定位路径 | 说明 |
 |------|----------|------|
 | 事件上报 SA 未收到 | `ui_session_manager_ohos.cpp` | 检查 ReportService 非空 + 注册计数 > 0 + mask 命中 |
+| 页面场景回调串集 / 重复注册后无事件 | `ui_report_stub.cpp`、`ui_content_proxy.cpp` | 检查按 ruleSetId 过滤 hits/exits；检查失败注册是否覆盖或删除已有回调。回归用例应验证回调所属数据和原注册仍有效，不能用合并 JSON 原样分发的断言代替隔离验证 |
 | InspectorTree 无结果 | `ui_session_manager_ohos.cpp` | 检查 processMap_ / inspectorFunction_ / webTaskNums_ |
 | 翻译请求 PARAM_INVALID | `ui_session_manager_ohos.cpp` | 检查 scope 格式和 IsTranslateScopeValid |
 | 内容变化无 TEXT 上报 | `content_change_manager.cpp` | 检查 ContentChangeConfig 阈值和滚动/过渡状态 |

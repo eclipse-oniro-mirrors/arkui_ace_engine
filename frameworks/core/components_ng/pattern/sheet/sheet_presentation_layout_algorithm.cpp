@@ -23,6 +23,7 @@
 #include "base/subwindow/subwindow_manager.h"
 #include "core/common/ace_engine.h"
 #include "core/components/common/properties/placement.h"
+#include "core/components_ng/pattern/scrollable/scrollable_paint_property.h"
 
 namespace OHOS::Ace::NG {
 namespace {
@@ -530,6 +531,41 @@ void SheetPresentationLayoutAlgorithm::LayoutScrollNode(const NG::OffsetF& trans
     CHECK_NULL_VOID(geometryNode);
     geometryNode->SetMarginFrameOffset(offset);
     scrollWrapper->Layout();
+    UpdateSafeAreaPaddingClip(host, scrollNode->GetPaintProperty<ScrollablePaintProperty>(), titleBarHoverMode,
+        offset.GetY() - translate.GetY());
+}
+
+void SheetPresentationLayoutAlgorithm::UpdateSafeAreaPaddingClip(const RefPtr<FrameNode>& host,
+    const RefPtr<ScrollablePaintProperty>& scrollPaintProps, SheetTitleBarHoverMode hoverMode, float top)
+{
+    CHECK_NULL_VOID(host);
+    CHECK_NULL_VOID(scrollPaintProps);
+    auto hostLayoutProperty = host->GetLayoutProperty();
+    CHECK_NULL_VOID(hostLayoutProperty);
+    if (hoverMode == SheetTitleBarHoverMode::SAFE_AREA_PADDING) {
+        const auto& existing = hostLayoutProperty->GetSafeAreaPaddingProperty();
+        bool needUpdate =
+            !existing || !existing->top.has_value() || !NearEqual(existing->top->GetDimension().Value(), top);
+        if (needUpdate) {
+            PaddingProperty safeAreaPadding;
+            safeAreaPadding.left = CalcLength(0.0);
+            safeAreaPadding.right = CalcLength(0.0);
+            safeAreaPadding.top = CalcLength(top);
+            safeAreaPadding.bottom = std::nullopt;
+            hostLayoutProperty->UpdateSafeAreaPadding(safeAreaPadding);
+            host->ResetSafeAreaPadding();
+        }
+        const auto& clip = scrollPaintProps->GetContentClip();
+        if (!clip.has_value() || clip->first != ContentClipMode::SAFE_AREA) {
+            scrollPaintProps->UpdateContentClip(ContentClip(ContentClipMode::SAFE_AREA, nullptr));
+        }
+    } else if (hostLayoutProperty->GetSafeAreaPaddingProperty()) {
+        hostLayoutProperty->ResetSafeAreaPadding();
+        host->ResetSafeAreaPadding();
+        if (scrollPaintProps->GetContentClip().has_value()) {
+            scrollPaintProps->UpdateContentClip(ContentClip(ContentClipMode::BOUNDARY, nullptr));
+        }
+    }
 }
 
 void SheetPresentationLayoutAlgorithm::LayoutDragBar(const NG::OffsetF& translate, LayoutWrapper* layoutWrapper)

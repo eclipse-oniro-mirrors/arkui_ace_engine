@@ -20,6 +20,7 @@
 #include <string_view>
 
 #include "core/components_ng/base/view_abstract.h"
+#include "core/components/common/properties/ui_material.h"
 #include "ui/properties/ui_material_structs.h"
 #include "ui/properties/ui_material_enums.h"
 #ifndef ACE_UNITTEST
@@ -54,6 +55,17 @@
 
 namespace OHOS::Ace::NG {
 namespace {
+std::string MaterialTypeToString(int32_t type)
+{
+    static const std::string MaterialTypeStyles[] = { "MaterialType.NONE", "MaterialType.SEMI_TRANSPARENT",
+        "MaterialType.IMMERSIVE" };
+    if (type >= static_cast<int32_t>(MaterialType::NONE) &&
+        type <= static_cast<int32_t>(MaterialType::IMMERSIVE)) {
+        return MaterialTypeStyles[type];
+    }
+    return MaterialTypeStyles[0];
+}
+
 constexpr float HALF = 0.5;
 constexpr float SLIDER_MIN = .0f;
 constexpr float SLIDER_MAX = 100.0f;
@@ -328,6 +340,11 @@ std::vector<ParticleVelocityField> CreateParticleVelocityFields(
 }
 
 } // namespace
+
+std::string SliderPattern::GetPageTextForReport(bool /* includeInput */) const
+{
+    return sliderTipModifier_ ? sliderTipModifier_->GetVisibleText() : "";
+}
 
 RefPtr<NodePaintMethod> SliderPattern::CreateNodePaintMethod()
 {
@@ -3031,6 +3048,8 @@ void SliderPattern::OnDetachFromMainTree()
 {
     auto host = GetHost();
     THREAD_SAFE_NODE_CHECK(host, OnDetachFromMainTree, host);
+    CHECK_NULL_VOID(host);
+    host->ResetRenderDirtyMarked(false);
 }
 
 void SliderPattern::InitOrRefreshSlipFactor()
@@ -3069,6 +3088,14 @@ bool SliderPattern::OnThemeScopeUpdate(int32_t themeScopeId)
         !paintProperty->HasSelectColor() ||
         !paintProperty->HasStepColor();
     return result;
+}
+
+void SliderPattern::ToJsonValue(std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const
+{
+    if (filter.IsFastFilter()) {
+        return;
+    }
+    json->PutExtAttr("hasSystemMaterial", HasSystemMaterial() ? "true" : "false", filter);
 }
 
 void SliderPattern::DumpInfo()
@@ -3131,6 +3158,143 @@ void SliderPattern::DumpInfo()
     }
 
     DumpSubInfo(paintProperty);
+    DumpLog::GetInstance().AddDesc("HasSystemMaterial: " + std::string(HasSystemMaterial() ? "true" : "false"));
+    bool hasSystemMaterial = HasSystemMaterial();
+    if (hasSystemMaterial) {
+        auto host = GetHost();
+        CHECK_NULL_VOID(host);
+        auto renderContext = host->GetRenderContext();
+        CHECK_NULL_VOID(renderContext);
+        auto material = renderContext->GetSystemMaterial();
+        auto nativeMaterial = MaterialUtils::PreProcessMaterial(AceType::RawPtr(material));
+        auto materialType = MaterialUtils::GetTypeFromMaterial(nativeMaterial);
+        DumpLog::GetInstance().AddDesc("MaterialType: " +
+            (materialType.has_value() ? MaterialTypeToString(static_cast<int32_t>(materialType.value()))
+                                      : std::string("MaterialType.NONE")));
+    }
+}
+
+void SliderPattern::DumpInfo(std::unique_ptr<JsonValue>& json)
+{
+    auto paintProperty = GetPaintProperty<SliderPaintProperty>();
+    CHECK_NULL_VOID(paintProperty);
+
+    if (paintProperty->HasValue()) {
+        json->Put("Value", std::to_string(paintProperty->GetValue().value()).c_str());
+    }
+    if (paintProperty->HasMin()) {
+        json->Put("Min", std::to_string(paintProperty->GetMin().value()).c_str());
+    }
+    if (paintProperty->HasMax()) {
+        json->Put("Max", std::to_string(paintProperty->GetMax().value()).c_str());
+    }
+    if (paintProperty->HasStep()) {
+        json->Put("Step", std::to_string(paintProperty->GetStep().value()).c_str());
+    }
+    if (paintProperty->HasSliderMode()) {
+        json->Put("Style", ToString(paintProperty->GetSliderMode().value()).c_str());
+    }
+    if (paintProperty->HasDirection()) {
+        json->Put("Direction", ToString(paintProperty->GetDirection().value()).c_str());
+    }
+    if (paintProperty->HasReverse()) {
+        json->Put("Reverse", ToString(paintProperty->GetReverse().value()).c_str());
+    }
+    if (paintProperty->HasBlockColor()) {
+        json->Put("BlockColor", paintProperty->GetBlockColor().value().ToString().c_str());
+    }
+    if (paintProperty->HasBlockGradientColor()) {
+        std::vector<GradientColor> gradientColors = paintProperty->GetBlockGradientColor().value().GetColors();
+        std::ostringstream oss;
+        for (const auto& gradientColor : gradientColors) {
+            oss << gradientColor.GetLinearColor().ToColor().ToString() << " ";
+        }
+        json->Put("BlockLinearGradientColor", oss.str().c_str());
+    }
+    if (paintProperty->HasTrackBackgroundColor()) {
+        std::vector<GradientColor> gradientColors = paintProperty->GetTrackBackgroundColor().value().GetColors();
+        std::ostringstream oss;
+        for (const auto& gradientColor : gradientColors) {
+            oss << gradientColor.GetLinearColor().ToColor().ToString() << " ";
+        }
+        json->Put("TrackBackgroundColor", oss.str().c_str());
+    }
+    if (paintProperty->HasSelectColor()) {
+        json->Put("SelectColor", paintProperty->GetSelectColor().value().ToString().c_str());
+    }
+    if (paintProperty->HasMinResponsiveDistance()) {
+        json->Put("MinResponsiveDistance",
+            std::to_string(paintProperty->GetMinResponsiveDistance().value()).c_str());
+    }
+    if (paintProperty->HasShowSteps()) {
+        json->Put("ShowSteps", ToString(paintProperty->GetShowSteps().value()).c_str());
+    }
+    if (paintProperty->HasShowTips()) {
+        json->Put("ShowTips", ToString(paintProperty->GetShowTips().value()).c_str());
+    }
+
+    auto layoutProperty = GetLayoutProperty<SliderLayoutProperty>();
+    if (layoutProperty) {
+        if (layoutProperty->HasThickness()) {
+            json->Put("Thickness", layoutProperty->GetThickness().value().ToString().c_str());
+        }
+        if (layoutProperty->HasBlockSize()) {
+            SizeT<Dimension> size = layoutProperty->GetBlockSize().value();
+            std::stringstream ss;
+            ss << "[" << size.Width().ToString() << " x " << size.Height().ToString() << "]";
+            json->Put("BlockSize", ss.str().c_str());
+        }
+    }
+    if (paintProperty->HasBlockBorderColor()) {
+        json->Put("BlockBorderColor", paintProperty->GetBlockBorderColor().value().ToString().c_str());
+    }
+    if (paintProperty->HasBlockBorderWidth()) {
+        json->Put("BlockBorderWidth", paintProperty->GetBlockBorderWidth().value().ToString().c_str());
+    }
+    if (paintProperty->HasStepColor()) {
+        json->Put("StepColor", paintProperty->GetStepColor().value().ToString().c_str());
+    }
+    if (paintProperty->HasStepSize()) {
+        json->Put("StepSize", paintProperty->GetStepSize().value().ToString().c_str());
+    }
+    if (paintProperty->HasTrackBorderRadius()) {
+        json->Put("TrackBorderRadius", paintProperty->GetTrackBorderRadius().value().ToString().c_str());
+    }
+    if (paintProperty->HasSelectedBorderRadius()) {
+        json->Put("SelectedBorderRadius", paintProperty->GetSelectedBorderRadius().value().ToString().c_str());
+    }
+    if (paintProperty->HasBlockType()) {
+        json->Put("BlockType", ToString(paintProperty->GetBlockType().value()).c_str());
+    }
+    if (paintProperty->HasBlockImage()) {
+        json->Put("BlockImage", paintProperty->GetBlockImage().value().c_str());
+    }
+    if (paintProperty->HasBlockShape()) {
+        json->Put("BlockShape",
+            ToString(paintProperty->GetBlockShape().value()->GetBasicShapeType()).c_str());
+    }
+    if (paintProperty->HasSliderInteractionMode()) {
+        json->Put("SliderInteractionMode",
+            ToString(paintProperty->GetSliderInteractionMode().value()).c_str());
+    }
+    if (paintProperty->HasValidSlideRange()) {
+        json->Put("SlideRange", paintProperty->GetValidSlideRange().value()->ToString().c_str());
+    }
+
+    bool hasSystemMaterial = HasSystemMaterial();
+    json->Put("HasSystemMaterial", hasSystemMaterial ? "true" : "false");
+    if (hasSystemMaterial) {
+        auto host = GetHost();
+        CHECK_NULL_VOID(host);
+        auto renderContext = host->GetRenderContext();
+        CHECK_NULL_VOID(renderContext);
+        auto material = renderContext->GetSystemMaterial();
+        auto nativeMaterial = MaterialUtils::PreProcessMaterial(AceType::RawPtr(material));
+        auto materialType = MaterialUtils::GetTypeFromMaterial(nativeMaterial);
+        json->Put("MaterialType",
+            materialType.has_value() ? MaterialTypeToString(static_cast<int32_t>(materialType.value())).c_str()
+                                     : "MaterialType.NONE");
+    }
 }
 
 void SliderPattern::DumpSubInfo(RefPtr<SliderPaintProperty> paintProperty)
@@ -3485,6 +3649,18 @@ float SliderPattern::GetBlockRadius() const
     return std::min(blockSize_.Width(), blockSize_.Height()) * HALF;
 }
 
+OffsetF SliderPattern::GetRealPosition(float x, float y)
+{
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, OffsetF());
+    const auto& content = host->GetGeometryNode()->GetContent();
+    auto contentOffset = content ? content->GetRect().GetOffset() : OffsetF(0.0f, 0.0f);
+    auto sliderLayoutProperty = host->GetLayoutProperty<SliderLayoutProperty>();
+    auto padding = sliderLayoutProperty ? sliderLayoutProperty->CreatePaddingWithoutBorder() : PaddingPropertyF();
+    return OffsetF(x + contentOffset.GetX() - padding.left.value_or(0.0f),
+        y + contentOffset.GetY() - padding.top.value_or(0.0f));
+}
+
 float SliderPattern::GetDragFrameBaseScale() const
 {
     auto host = GetHost();
@@ -3642,7 +3818,7 @@ void SliderPattern::CreateSelectedTrackFrameNode()
         trackRC->SetClipToBounds(true);
     }
 
-    UpdateSelectedTrackFrameNode(circleCenter_.GetX(), circleCenter_.GetY());
+    UpdateSelectedTrackFrameNode();
 }
 
 void SliderPattern::CalculateEmitterPosition(float& emitterNodeX, float& emitterNodeY, float& emitterLength)
@@ -3724,7 +3900,7 @@ void SliderPattern::CreateParticleFrameNode()
     particleRC->UpdateParticleOptionArray(particleOptions);
 }
 
-void SliderPattern::UpdateSelectedTrackFrameNode(float centerX, float centerY)
+void SliderPattern::UpdateSelectedTrackFrameNode()
 {
     CHECK_NULL_VOID(selectedTrackFrameNode_);
     CHECK_NULL_VOID(sliderContentModifier_);
@@ -3735,13 +3911,13 @@ void SliderPattern::UpdateSelectedTrackFrameNode(float centerX, float centerY)
     auto rect = sliderContentModifier_->GetSelectedTrackRect();
     float borderRadiusValue = sliderContentModifier_->GetSelectedBorderRadius();
 
-    const auto& content = host->GetGeometryNode()->GetContent();
-    auto contentOffsetF = content ? content->GetRect().GetOffset() : OffsetF(0.0f, 0.0f);
+    auto sliderLayoutProperty = host->GetLayoutProperty<SliderLayoutProperty>();
+    auto padding = sliderLayoutProperty ? sliderLayoutProperty->CreatePaddingWithoutBorder() : PaddingPropertyF();
 
     float width = rect.GetWidth();
     float height = rect.GetHeight();
-    float x = rect.GetLeft() - contentOffsetF.GetX();
-    float y = rect.GetTop() - contentOffsetF.GetY();
+    float x = rect.GetLeft() - padding.left.value_or(0.0f);
+    float y = rect.GetTop() - padding.top.value_or(0.0f);
 
     selectedTrackFrameNode_->GetLayoutProperty()->UpdateUserDefinedIdealSize(
         CalcSize(CalcLength(width), CalcLength(height)));
@@ -3860,13 +4036,14 @@ void SliderPattern::UpdateMaterialNodePosition(float centerX, float centerY, flo
     
     const auto& content = host->GetGeometryNode()->GetContent();
     auto contentOffset = content ? content->GetRect().GetOffset() : OffsetF(0.0f, 0.0f);
+    float contentAreaX = isRealPosition ? centerX - contentOffset.GetX() : centerX;
+    float contentAreaY = isRealPosition ? centerY - contentOffset.GetY() : centerY;
+    auto realPosition = GetRealPosition(contentAreaX, contentAreaY);
     
     auto blockDiameter = blockRadius * NUMBER_TWO;
     auto frameSize = blockDiameter * GetDragFrameBaseScale();
-    auto realCenterX = isRealPosition ? centerX - contentOffset.GetX() : centerX;
-    auto realCenterY = isRealPosition ? centerY - contentOffset.GetY() : centerY;
-    float frameNodeX = realCenterX - frameSize / NUMBER_TWO;
-    float frameNodeY = realCenterY - frameSize / NUMBER_TWO;
+    float frameNodeX = realPosition.GetX() - frameSize / NUMBER_TWO;
+    float frameNodeY = realPosition.GetY() - frameSize / NUMBER_TWO;
     
     UpdateMaterialFrameNode(dragFrameNode_, frameSize, frameNodeX, frameNodeY, frameSize / NUMBER_TWO);
 
@@ -3876,17 +4053,18 @@ void SliderPattern::UpdateMaterialNodePosition(float centerX, float centerY, flo
             CalcSize(CalcLength(trackRect.GetWidth()), CalcLength(trackRect.GetHeight())));
         auto blurRC = blurCoverNode_->GetRenderContext();
         if (blurRC) {
+            auto blurPosition = GetRealPosition(
+                trackRect.GetLeft() - contentOffset.GetX(), trackRect.GetTop() - contentOffset.GetY());
             blurRC->UpdatePosition(OffsetT<Dimension>(
-                Dimension(trackRect.GetLeft() - contentOffset.GetX()),
-                Dimension(trackRect.GetTop() - contentOffset.GetY())));
+                Dimension(blurPosition.GetX()), Dimension(blurPosition.GetY())));
         }
     }
 
-    float pointNodeX = realCenterX - blockRadius;
-    float pointNodeY = realCenterY - blockRadius;
+    float pointNodeX = realPosition.GetX() - blockRadius;
+    float pointNodeY = realPosition.GetY() - blockRadius;
     UpdateMaterialFrameNode(dragPointNode_, blockDiameter, pointNodeX, pointNodeY, blockRadius);
     
-    UpdateSelectedTrackFrameNode(realCenterX, realCenterY);
+    UpdateSelectedTrackFrameNode();
     UpdateParticleFrameNode(centerX, centerY);
 }
 
@@ -3949,11 +4127,9 @@ void SliderPattern::ShowMaterialNode()
     auto blurRC = blurCoverNode_->GetRenderContext();
     CHECK_NULL_VOID(blurRC);
     auto blockRadius = GetBlockRadius();
-    const auto& content = host->GetGeometryNode()->GetContent();
-    auto contentOffset = content ? content->GetRect().GetOffset() : OffsetF(0.0f, 0.0f);
-    float pointNodeX = circleCenter_.GetX() - contentOffset.GetX() - blockRadius;
-    float pointNodeY = circleCenter_.GetY() - contentOffset.GetY() - blockRadius;
-    pointRC->UpdatePosition(OffsetT<Dimension>(Dimension(pointNodeX), Dimension(pointNodeY)));
+    auto realPosition = GetRealPosition(circleCenter_.GetX(), circleCenter_.GetY());
+    auto pointPosition = realPosition - OffsetF(blockRadius, blockRadius);
+    pointRC->UpdatePosition(OffsetT<Dimension>(Dimension(pointPosition.GetX()), Dimension(pointPosition.GetY())));
 
     host->AddChild(dragPointNode_);
     host->AddChild(blurCoverNode_);
@@ -4142,10 +4318,26 @@ void SliderPattern::ResetHostMaterialEffects()
     CHECK_NULL_VOID(renderContext);
     auto material = renderContext->GetSystemMaterial();
     CHECK_NULL_VOID(material);
-    
+
+    AnimationUtils::ExecuteWithoutAnimation(
+        [weak = WeakClaim(this)]() {
+            auto pattern = weak.Upgrade();
+            CHECK_NULL_VOID(pattern);
+            pattern->ResetHostMaterialEffectsInner();
+        },
+        host->GetContextRefPtr());
+}
+
+void SliderPattern::ResetHostMaterialEffectsInner()
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto renderContext = host->GetRenderContext();
+    CHECK_NULL_VOID(renderContext);
+
     MaterialUtils::CallSetMaterial(AceType::RawPtr(host), nullptr);
     renderContext->UpdateUiMaterialFilter(nullptr);
-    
+
     auto preBackgroundColor = renderContext->GetPreBackgroundColor();
     if (preBackgroundColor.has_value()) {
         renderContext->UpdateBackgroundColor(preBackgroundColor.value());
@@ -4153,7 +4345,7 @@ void SliderPattern::ResetHostMaterialEffects()
         renderContext->ResetBackgroundColor();
         renderContext->OnBackgroundColorUpdate(Color::TRANSPARENT);
     }
-    
+
     auto preBorderWidth = renderContext->GetPreBorderWidth();
     if (preBorderWidth.has_value()) {
         auto layoutProperty = host->GetLayoutProperty();

@@ -44,6 +44,7 @@ namespace {
 constexpr int32_t INSTANCEID_TWO = 2;
 constexpr int32_t INSTANCEID_THREE = 3;
 constexpr int32_t INSTANCEID_NEGATIVE_TWO = -2;
+constexpr int32_t INSTANCEID_UIEXTENSION_SUBWINDOW_HOST = 4;
 } // namespace
 
 AceContainer::AceContainer(int32_t instanceId, FrontendType type, std::shared_ptr<OHOS::AppExecFwk::Ability> aceAbility,
@@ -90,6 +91,10 @@ RefPtr<AceContainer> AceContainer::GetContainer(int32_t instanceId)
         aceContainer->SetUIContentType(UIContentType::UNDEFINED);
     } else {
         aceContainer->SetUIContentType(UIContentType::SECURITY_UI_EXTENSION);
+    }
+    if (instanceId == INSTANCEID_UIEXTENSION_SUBWINDOW_HOST) {
+        aceContainer->SetUIExtensionAbilityHost(true);
+        aceContainer->SetUIExtensionSubWindow(true);
     }
     aceContainer->pipelineContext_ = NG::MockPipelineContext::GetCurrentContext();
     return aceContainer;
@@ -169,6 +174,10 @@ bool AceContainer::IsMainWindow() const
 bool AceContainer::IsSubWindow() const
 {
     return true;
+}
+bool AceContainer::IsPipWindow() const
+{
+    return false;
 }
 bool AceContainer::IsDialogWindow() const
 {
@@ -318,5 +327,9 @@ void AceContainer::TerminateUIExtensionInner(int32_t code) {}
 
 void AceContainer::GetOriginalEventInfo(const EventPositionInfo& eventPositionInfo,
     EventPositionInfo& originalPos) {}
+
+void AceContainer::RefreshLiveFoldCreaseRegion() {}
+
+void AceContainer::RefreshFoldCreaseDirection() {}
 
 } // namespace OHOS::Ace::NG

@@ -999,7 +999,7 @@ HWTEST_F(TextFieldPatternFuncTestTwo, TextPatternFunc057, TestSize.Level1)
     ASSERT_NE(pattern, nullptr);
 
     std::u16string insertValue = u"1";
-    pattern->obscureTickCountDown_ = 10;
+    pattern->obscureHelper_.tickCountDown_ = 10;
     pattern->UpdateObscure(insertValue, false);
 }
 

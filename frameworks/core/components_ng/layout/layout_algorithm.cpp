@@ -351,19 +351,28 @@ bool LayoutAlgorithm::IsContentUnderutilizedForSmartLayout(LayoutWrapper* layout
         }
     }
 
-    double contentPadding = Dimension(SMART_LAYOUT_CONTENT_PADDING, DimensionUnit::VP).ConvertToPx();
-    double availableWidth = static_cast<double>(frameSize.Width()) - 2.0 * contentPadding;
-    double availableHeight = static_cast<double>(frameSize.Height()) - 2.0 * contentPadding;
+    auto layoutProperty = hostNode->GetLayoutProperty();
+    PaddingPropertyF padding;
+    if (layoutProperty) {
+        padding = layoutProperty->CreatePaddingWithoutBorder();
+    }
+    double horizontalPadding = static_cast<double>(padding.left.value_or(0.0f)) +
+        static_cast<double>(padding.right.value_or(0.0f));
+    double verticalPadding = static_cast<double>(padding.top.value_or(0.0f)) +
+        static_cast<double>(padding.bottom.value_or(0.0f));
+    double availableWidth = static_cast<double>(frameSize.Width()) - horizontalPadding;
+    double availableHeight = static_cast<double>(frameSize.Height()) - verticalPadding;
     if (LessOrEqual(availableWidth, 0.0) || LessOrEqual(availableHeight, 0.0)) {
         return false;
     }
-    double bbArea = static_cast<double>(childRect.Width()) * static_cast<double>(childRect.Height());
-    if (bbArea <= 0) {
+    if (static_cast<double>(childRect.Width()) * static_cast<double>(childRect.Height()) <= 0) {
         return false;
     }
 
-    return LessNotEqual(static_cast<double>(childRect.Width()), availableWidth) &&
-        LessNotEqual(static_cast<double>(childRect.Height()), availableHeight);
+    // 1px tolerance for floor-based padding sub-pixel bias; keep in sync with AddScaleUpConstraints.
+    constexpr double SPARE_SPACE_EPSILON = 1.0;
+    return LessNotEqual(static_cast<double>(childRect.Width()), availableWidth - SPARE_SPACE_EPSILON) &&
+        LessNotEqual(static_cast<double>(childRect.Height()), availableHeight - SPARE_SPACE_EPSILON);
 }
 
 void LayoutAlgorithm::TryRestoreSmartLayoutForHost(LayoutWrapper* layoutWrapper)

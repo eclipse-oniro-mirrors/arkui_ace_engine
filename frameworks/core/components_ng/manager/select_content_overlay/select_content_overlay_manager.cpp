@@ -269,7 +269,9 @@ void SelectContentOverlayManager::UpdateStatusInfos(SelectOverlayInfo& overlayIn
     // for menuInfo update, some AI update logic in BaseTextSelectOverlay::OnUpdateSelectOverlayInfo
     selectOverlayHolder_->OnUpdateMenuInfo(menuInfo, DIRTY_ALL_MENU_ITEM);
     overlayInfo.menuInfo = menuInfo;
-    overlayInfo.callerFrameNode = selectOverlayHolder_->GetOwner();
+    // The caller node must be the node the overlay is actually mounted on,
+    // which may be an ancestor of the owner (see GetSelectOverlayMountNode).
+    overlayInfo.callerFrameNode = GetSelectOverlayMountNode(selectOverlayHolder_->GetOwner());
     overlayInfo.selectText = selectOverlayHolder_->GetSelectedText();
     overlayInfo.selectArea = selectOverlayHolder_->GetSelectArea();
 }
@@ -741,7 +743,9 @@ std::list<RefPtr<UINode>>::const_iterator SelectContentOverlayManager::FindSelec
 void SelectContentOverlayManager::MountNodeToCaller(const RefPtr<FrameNode>& overlayNode, bool animation)
 {
     CHECK_NULL_VOID(selectOverlayHolder_);
-    auto ownerFrameNode = selectOverlayHolder_->GetOwner();
+    // Mount the overlay on the mount node, which may be an ancestor of the
+    // owner (see GetSelectOverlayMountNode).
+    auto ownerFrameNode = GetSelectOverlayMountNode(selectOverlayHolder_->GetOwner());
     CHECK_NULL_VOID(ownerFrameNode);
     TAG_LOGI(AceLogTag::ACE_SELECT_OVERLAY,
         "Mount SelectOverlay node: %{public}s, id: %{public}d", ownerFrameNode->GetTag().c_str(),
@@ -1293,7 +1297,9 @@ bool SelectContentOverlayManager::IsTouchAtHandle(const PointF& localPoint, cons
         return false;
     }
     CHECK_NULL_RETURN(selectOverlayHolder_, false);
-    if (selectOverlayNode->GetParent() == selectOverlayHolder_->GetOwner()) {
+    // The overlay is mounted on the mount node, so compare its parent against
+    // the mount node instead of the owner.
+    if (selectOverlayNode->GetParent() == GetSelectOverlayMountNode(selectOverlayHolder_->GetOwner())) {
         return selectOverlayNode->IsInSelectedOrSelectOverlayArea(localPoint);
     }
     return selectOverlayNode->IsInSelectedOrSelectOverlayArea(globalPoint);

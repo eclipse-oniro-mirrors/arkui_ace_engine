@@ -44,6 +44,7 @@
 #include "core/components_ng/manager/avoid_info/avoid_info_manager.h"
 #include "core/components_ng/manager/content_change_manager/content_change_manager.h"
 #include "core/components_ng/manager/focus/focus_manager.h"
+#include "core/components_ng/pattern/stage/page_info.h"
 #include "core/components_ng/manager/force_split/force_split_manager.h"
 #include "core/components_ng/manager/form_event/form_event_manager.h"
 #include "core/components_ng/manager/form_gesture/form_gesture_manager.h"
@@ -143,12 +144,10 @@ public:
     MOCK_METHOD(void, SendExtensionAccessibilityEvent,
         (const Accessibility::AccessibilityEventInfo& eventInfo, int64_t uiExtensionOffset), (override));
 #endif
-#ifdef WEB_SUPPORTED
     MOCK_METHOD(bool, RegisterWebInteractionOperationAsChildTree,
         (int64_t accessibilityId, const WeakPtr<NG::WebPattern>& webPattern), (override));
     MOCK_METHOD(bool, DeregisterWebInteractionOperationAsChildTree,
         (int32_t treeId, const WeakPtr<NG::WebPattern>& webPattern), (override));
-#endif
     void RegisterAccessibilityChildTreeCallback(
         int64_t elementId, const std::shared_ptr<AccessibilityChildTreeCallback>& callback) override
     {}
@@ -191,6 +190,7 @@ static bool g_isContainerCustomTitleVisible = false;
 static bool g_isContainerControlButtonVisible = false;
 static RectF g_buttonRect = RectF(0.0f, 0.0f, 0.0f, 0.0f);
 static int32_t g_containerModalTitleHeight = 0;
+static RefPtr<NG::PageInfo> g_lastPageInfo;
 } // namespace
 
 RefPtr<MockPipelineContext> MockPipelineContext::pipeline_;
@@ -265,7 +265,7 @@ RefPtr<MockPipelineContext> MockPipelineContext::GetCurrent()
 
 const RefPtr<NG::PageInfo> MockPipelineContext::GetLastPageInfo()
 {
-    return nullptr;
+    return PipelineContext::GetLastPageInfo();
 }
 
 
@@ -340,6 +340,17 @@ PipelineContext::PipelineContext(): safeAreaManager_(MakeRefPtr<SafeAreaManager>
     if (!recycleManager_) {
         recycleManager_ = std::make_unique<RecycleManager>();
     }
+}
+
+// Host test binary does not link the real pipeline_context.cpp; provide the same lazy
+// creation so syntax-side observation hooks resolve and exercise the real manager.
+const RefPtr<ScrollPlaceholderManager>& PipelineContext::GetOrCreateScrollPlaceholderManager()
+{
+    if (!scrollPlaceholderManager_) {
+        scrollPlaceholderManager_ = MakeRefPtr<ScrollPlaceholderManager>(instanceId_);
+        scrollPlaceholderManager_->SetPipelineContext(WeakClaim(this));
+    }
+    return scrollPlaceholderManager_;
 }
 
 float PipelineContext::GetCurrentRootWidth()
@@ -632,7 +643,7 @@ void PipelineContext::DetachNode(RefPtr<UINode>) {}
 
 void PipelineContext::Finish(bool autoFinish) const {}
 
-void PipelineContext::FlushVsync(uint64_t nanoTimestamp, uint64_t frameCount) {}
+void PipelineContext::FlushVsync(uint64_t nanoTimestamp, uint64_t frameCount, int64_t vsyncStartTime) {}
 
 void PipelineContext::FlushPipelineWithoutAnimation() {}
 
@@ -798,6 +809,16 @@ const RefPtr<SelectOverlayManager>& PipelineContext::GetSelectOverlayManager()
     return selectOverlayManager_;
 }
 
+namespace {
+// Mock-only toggle (MockPipelineContext::SetNullOverlayManagerForTest).
+bool g_useNullOverlayManagerForTest = false;
+}
+
+void MockPipelineContext::SetNullOverlayManagerForTest(bool useNull)
+{
+    g_useNullOverlayManagerForTest = useNull;
+}
+
 const RefPtr<DragDropManager>& PipelineContext::GetDragDropManager()
 {
     return dragDropManager_;
@@ -833,6 +854,14 @@ const RefPtr<FullScreenManager>& PipelineContext::GetFullScreenManager()
 
 const RefPtr<OverlayManager>& PipelineContext::GetOverlayManager()
 {
+    // Mock-only toggle (MockPipelineContext::SetNullOverlayManagerForTest): when on,
+    // yield a null ref so overlay-gated paths bail at their null checks instead of
+    // building real overlay/menu UI in the mock environment (e.g. the WebDataDetector
+    // AI-entity-menu tests).
+    static const RefPtr<OverlayManager> nullOverlayManager;
+    if (g_useNullOverlayManagerForTest) {
+        return nullOverlayManager;
+    }
     return overlayManager_;
 }
 
@@ -999,9 +1028,19 @@ void PipelineContext::AddVisibleAreaChangeNode(int32_t nodeId) {}
 void PipelineContext::AddVisibleAreaChangeNode(const RefPtr<FrameNode>& node, const std::vector<double>& ratio,
     const VisibleRatioCallback& callback, bool isUserCallback, bool isCalculateInnerClip)
 {
+    CHECK_NULL_VOID(node);
     CHECK_NULL_VOID(callback);
-    callback(false, 0.0);
-    callback(true, ratio[0]);
+    VisibleCallbackInfo addInfo;
+    addInfo.callback = callback;
+    addInfo.isCurrentVisible = false;
+    onVisibleAreaChangeNodeIds_.emplace(node->GetId());
+    node->ClearCachedIsFrameDisappear();
+    if (isUserCallback) {
+        node->SetVisibleAreaUserCallback(ratio, addInfo);
+    } else {
+        node->SetVisibleAreaInnerCallback(ratio, addInfo, isCalculateInnerClip);
+    }
+    isNeedCallbackAreaChange_ = true;
 }
 
 void PipelineContext::RemoveVisibleAreaChangeNode(int32_t nodeId) {}
@@ -1120,6 +1159,18 @@ void PipelineContext::UpdateNavSafeAreaWithoutAnimation(
 }
 
 void PipelineContext::UpdateFloatNavSafeAreaWithoutAnimation(const SafeAreaInsets& floatNavSafeArea) {}
+
+void PipelineContext::ApplyDefaultImmersiveStrategy(const std::unordered_set<ImmersiveStrategy>& types)
+{
+    CHECK_NULL_VOID(safeAreaManager_);
+    safeAreaManager_->ApplyDefaultImmersiveStrategy(types);
+}
+ 
+bool PipelineContext::IsImmersiveStrategySet(ImmersiveStrategy strategy) const
+{
+    CHECK_NULL_RETURN(safeAreaManager_, false);
+    return safeAreaManager_->IsImmersiveStrategySet(strategy);
+}
 
 KeyBoardAvoidMode PipelineContext::GetEnableKeyBoardAvoidMode()
 {
@@ -1526,7 +1577,7 @@ void PipelineBase::OnVirtualKeyboardAreaChange(Rect keyboardArea, double positio
     const std::shared_ptr<Rosen::RSTransaction>& rsTransaction, bool forceChange)
 {}
 
-void PipelineBase::OnVsyncEvent(uint64_t nanoTimestamp, uint64_t frameCount) {}
+void PipelineBase::OnVsyncEvent(uint64_t nanoTimestamp, uint64_t frameCount, int64_t vsyncStartTime) {}
 
 bool PipelineBase::ReachResponseDeadline() const
 {
@@ -1892,9 +1943,14 @@ std::string NG::PipelineContext::GetCurrentPageNameCallback()
     return "";
 }
 
+void NG::MockPipelineContext::SetLastPageInfo(const RefPtr<NG::PageInfo>& pageInfo)
+{
+    g_lastPageInfo = pageInfo;
+}
+
 const RefPtr<NG::PageInfo> NG::PipelineContext::GetLastPageInfo() const
 {
-    return nullptr;
+    return g_lastPageInfo;
 }
 
 std::string NG::PipelineContext::GetNavDestinationPageName(const RefPtr<NG::PageInfo>& pageInfo) const
@@ -2126,8 +2182,19 @@ int32_t PipelineContext::RegisterRotationEndCallback(std::function<void()>&& cal
 }
 
 void PipelineContext::OnSurfaceDensityChanged(double density) {}
-void PipelineContext::RegisterListenerForTranslate(const WeakPtr<FrameNode> node) {}
-void PipelineContext::UnRegisterListenerForTranslate(int32_t nodeId) {}
+void PipelineContext::RegisterListenerForTranslate(const WeakPtr<FrameNode> node)
+{
+    CHECK_NULL_VOID(uiTranslateManager_);
+    uiTranslateManager_->AddTranslateListener(node);
+    CHECK_NULL_VOID(contentChangeMgr_);
+    contentChangeMgr_->ReportTranslateTextFrameNode(node);
+}
+
+void PipelineContext::UnRegisterListenerForTranslate(int32_t nodeId)
+{
+    CHECK_NULL_VOID(uiTranslateManager_);
+    uiTranslateManager_->RemoveTranslateListener(nodeId);
+}
 
 void PipelineContext::RegisterMaterialNode(const RefPtr<FrameNode>& node) {}
 
@@ -2151,3 +2218,10 @@ int32_t PipelineBase::RegisterDensityChangedCallback(std::function<void(double)>
 void PipelineBase::UnregisterDensityChangedCallback(int) {}
 
 } // namespace OHOS::Ace
+
+namespace OHOS::Ace::NG {
+std::shared_ptr<UiTranslateManagerImpl> PipelineContext::GetUiTranslateManagerImpl()
+{
+    return uiTranslateManager_;
+}
+} // namespace OHOS::Ace::NG

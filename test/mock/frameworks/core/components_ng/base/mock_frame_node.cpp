@@ -454,7 +454,6 @@ RefPtr<UINode> FrameNode::GetFrameChildByIndexWithoutExpanded(uint32_t)
 {
     return nullptr;
 }
-void FrameNode::GetInspectorValue() {}
 bool FrameNode::HasVirtualNodeAccessibilityProperty()
 {
     return false;
@@ -531,12 +530,14 @@ const RefPtr<LayoutAlgorithmWrapper>& FrameNode::GetLayoutAlgorithm(bool)
 {
     return layoutAlgorithm_;
 }
-RefPtr<LayoutWrapper> FrameNode::GetOrCreateChildByIndex(uint32_t, bool, bool)
+RefPtr<LayoutWrapper> FrameNode::GetOrCreateChildByIndex(uint32_t, bool, bool, bool)
 {
     return nullptr;
 }
 void FrameNode::Measure(const std::optional<LayoutConstraintF>&) {}
 void FrameNode::Layout() {}
+void FrameNode::MeasureSafeAreaInset() {}
+void FrameNode::LayoutSafeAreaInset() {}
 bool FrameNode::SkipMeasureContent() const
 {
     return false;

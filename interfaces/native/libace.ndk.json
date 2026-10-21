@@ -2104,6 +2104,10 @@
         "name": "OH_ArkUI_DragEvent_GetDataTypes"
     },
     {
+        "first_introduced": "26",
+        "name": "OH_ArkUI_DragEvent_GetSummary"
+    },
+    {
         "first_introduced": "12",
         "name": "OH_ArkUI_DragEvent_GetDragResult"
     },
@@ -6440,6 +6444,14 @@
         "name": "OH_ArkUI_ImageAttachment_GetResource"
     },
     {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_ImageAttachment_SetImageTag"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_ImageAttachment_GetImageTag"
+    },
+    {
         "first_introduced": "24",
         "name": "OH_ArkUI_ImageAttachment_SetSizeWidth"
     },
@@ -6622,6 +6634,14 @@
     {
         "first_introduced": "24",
         "name": "OH_ArkUI_AccessibilityElementInfoSetComponentIdentifier"
+    },
+    {
+        "first_introduced": "26",
+        "name": "OH_ArkUI_Accessibility_BindExportTree"
+    },
+    {
+        "first_introduced": "26",
+        "name": "OH_ArkUI_Accessibility_UnbindExportTree"
     },
     {
         "first_introduced": "24",
@@ -7027,5 +7047,485 @@
     {
         "first_introduced": "26.0.0",
         "name": "OH_ArkUI_NativeModule_LineSpacingOptions_GetOnlyBetweenLines"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_PropertyAnimation_Create"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_PropertyAnimation_Destroy"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_PropertyAnimation_SetFromValue"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_PropertyAnimation_GetFromValue"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_PropertyAnimation_SetToValue"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_PropertyAnimation_GetToValue"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_PropertyAnimation_SetDuration"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_PropertyAnimation_GetDuration"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_PropertyAnimation_SetDelay"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_PropertyAnimation_GetDelay"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_PropertyAnimation_SetCurve"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_PropertyAnimation_GetCurve"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_PropertyAnimation_SetTempo"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_PropertyAnimation_GetTempo"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_PropertyAnimation_SetAutoReverse"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_PropertyAnimation_GetAutoReverse"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_PropertyAnimation_SetTargetNode"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_PropertyAnimation_GetTargetNode"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_PropertyAnimation_SetIterations"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_PropertyAnimation_GetIterations"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_KeyframeAnimation_Create"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_KeyframeAnimation_Destroy"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_KeyframeAnimation_SetKeyTimes"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_KeyframeAnimation_GetKeyTime"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_KeyframeAnimation_SetKeyTime"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_KeyframeAnimation_SetValue"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_KeyframeAnimation_SetValues"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_KeyframeAnimation_GetValue"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_KeyframeAnimation_SetCurves"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_KeyframeAnimation_SetCurve"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_KeyframeAnimation_GetCurve"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_KeyframeAnimation_SetDuration"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_KeyframeAnimation_GetDuration"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_KeyframeAnimation_SetDelay"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_KeyframeAnimation_GetDelay"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_KeyframeAnimation_SetTempo"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_KeyframeAnimation_GetTempo"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_KeyframeAnimation_SetAutoReverse"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_KeyframeAnimation_GetAutoReverse"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_KeyframeAnimation_SetTargetNode"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_KeyframeAnimation_GetTargetNode"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_KeyframeAnimation_SetIterations"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_KeyframeAnimation_GetIterations"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_PathAnimation_Create"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_PathAnimation_Destroy"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_PathAnimation_SetDuration"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_PathAnimation_GetDuration"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_PathAnimation_SetDelay"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_PathAnimation_GetDelay"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_PathAnimation_SetTempo"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_PathAnimation_GetTempo"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_PathAnimation_SetAutoReverse"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_PathAnimation_GetAutoReverse"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_PathAnimation_SetTargetNode"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_PathAnimation_GetTargetNode"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_PathAnimation_SetIterations"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_PathAnimation_GetIterations"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_PathAnimation_SetAutoRotation"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_PathAnimation_GetAutoRotation"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_AnimationGroup_Create"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_AnimationGroup_Destroy"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_AnimationGroup_SetDuration"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_AnimationGroup_GetDuration"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_AnimationGroup_SetDelay"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_AnimationGroup_GetDelay"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_AnimationGroup_SetCurve"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_AnimationGroup_GetCurve"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_AnimationGroup_SetTempo"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_AnimationGroup_GetTempo"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_AnimationGroup_SetAutoReverse"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_AnimationGroup_GetAutoReverse"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_AnimationGroup_SetTargetNode"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_AnimationGroup_GetTargetNode"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_AnimationGroup_SetIterations"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_AnimationGroup_GetIterations"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_AnimationGroup_SetExpectedFrameRateRange"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_AnimationGroup_GetExpectedFrameRateRange"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_AnimationGroup_RegisterOnFinishCallback"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_AnimationGroup_AddPropertyAnimation"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_AnimationGroup_AddKeyframeAnimation"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_AnimationGroup_AddPathAnimation"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_AddAnimationGroup"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_RemoveAnimationGroup"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_GetAnimationGroupState"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_HasAnimationGroup"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_PauseAnimationGroup"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_ResumeAnimationGroup"
+    },
+    {
+        "first_introduced": "26.0.1",
+        "name": "OH_ArkUI_NativeModule_FinishAnimationGroup"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_GetImagesByNodeIdAsync"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_ImageCollectionTakeItemByNodeId"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_ImageCollectionDestroy"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIAgentGetPageText"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIJsonWrapperCreate"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIJsonWrapperGetData"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIJsonWrapperGetSize"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIJsonWrapperDestroy"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_SetRuntimeCheckMode"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIEventInjectCompositeCommand"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_LinearGradientBlurOptions_Create"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_LinearGradientBlurOptions_Destroy"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_LinearGradientBlurOptions_SetBlurRadius"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_LinearGradientBlurOptions_GetBlurRadius"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_LinearGradientBlurOptions_SetFractionStops"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_LinearGradientBlurOptions_GetFractionStops"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_LinearGradientBlurOptions_SetDirection"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_LinearGradientBlurOptions_GetDirection"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyEvent_Create"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyEvent_Destroy"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyEvent_SetType"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyEvent_SetKeyCode"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyEvent_SetKeyText"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyEvent_SetKeySource"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyEvent_SetDeviceId"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyEvent_SetUnicode"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyEvent_SetEventTime"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyEvent_SetPressedKeys"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyEvent_SetKeyIntentionCode"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyEvent_SetNumLockOn"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyEvent_SetCapsLockOn"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyEvent_SetScrollLockOn"
     }
 ]

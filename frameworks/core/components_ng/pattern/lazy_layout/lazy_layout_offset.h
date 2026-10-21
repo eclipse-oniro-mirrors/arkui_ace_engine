@@ -16,10 +16,28 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_LAZY_LAYOUT_LAZY_LAYOUT_OFFSET_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_LAZY_LAYOUT_LAZY_LAYOUT_OFFSET_H
 
+#include <memory>
+
 namespace OHOS::Ace::NG {
+struct PreparedLayoutGeometry;
 struct AdjustOffset {
     float start = 0.0f; // Positive: Top edge adjust up, Negative: Top edge adjust down.
     float end = 0.0f;   // Positive: Bottom edge adjust down, Negative: Bottom edge adjust up.
+};
+
+struct LazyPremeasureResult {
+    // The requested boundary range is measured, or every item was exhausted without a measurement failure.
+    bool complete = false;
+    // True only when the opposite edge and all traversed nested sections were fully measured.
+    bool reachedOppositeEdge = false;
+    float marginMainSize = 0.0f;
+    // Relative to the previously displayed anchor, not the synthetic measurement window.
+    AdjustOffset adjust;
+    // Terminal failure after measurement began; size and adjustment still describe committed partial results.
+    bool unsupported = false;
+    // Insets are relative to published geometry; the remaining start adjustment is incremental.
+    float startInsetAdjustment = 0.0f;
+    std::shared_ptr<PreparedLayoutGeometry> geometry;
 };
 }
 

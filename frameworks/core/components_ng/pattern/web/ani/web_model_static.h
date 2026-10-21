@@ -51,6 +51,7 @@ public:
     static void SetBlockNetwork(FrameNode* frameNode, bool isNetworkBlocked);
     static void SetHorizontalScrollBarAccessEnabled(FrameNode* frameNode, bool isHorizontalScrollBarAccessEnabled);
     static void SetVerticalScrollBarAccessEnabled(FrameNode* frameNode, bool isVerticalScrollBarAccessEnabled);
+    static void SetCaretColor(FrameNode* frameNode, const std::optional<Color>& caretColor);
     static void SetPinchSmoothModeEnabled(FrameNode* frameNode, bool isPinchSmoothModeEnabled);
     static void SetNativeEmbedModeEnabled(FrameNode* frameNode, bool isEmbedModeEnabled);
     static void SetTextAutosizing(FrameNode* frameNode, bool isTextAutosizing);
@@ -71,7 +72,8 @@ public:
     static void JavaScriptOnHeadEnd(FrameNode* frameNode, const ScriptItems& scriptItems,
         const ScriptRegexItems& scriptRegexItems, const ScriptItemsByOrder& scriptItemsByOrder);
     static void SetNativeEmbedOptions(
-        FrameNode *frameNode, bool supportDefaultIntrinsicSize, bool supportCssDisplayChange);
+        FrameNode *frameNode, bool supportDefaultIntrinsicSize, bool supportCssDisplayChange,
+        bool supportTransformRotateAndSkew);
     static void SetBypassVsyncCondition(FrameNode *frameNode, const std::optional<WebBypassVsyncCondition>& condition);
     static void SetMixedMode(FrameNode* frameNode, const std::optional<MixedModeContent>& mixedMode);
     static void SetCacheMode(FrameNode* frameNode, const std::optional<WebCacheMode>& cacheMode);
@@ -139,7 +141,10 @@ public:
         FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& callback);
     static void SetOnDetectedBlankScreen(
         FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& callback);
+    static void SetOnMonitoredBlankScreen(
+        FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& callback);
     static void SetBlankScreenDetectionConfig(FrameNode* frameNode, const BlankScreenDetectionConfig& detectConfig);
+    static void SetWebBlankScreenMonitorEnabled(FrameNode *frameNode, const std::optional<bool>& enable);
     static void SetOnFirstScreenPaint(FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& callback);
     static void SetResourceLoadId(FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& callback);
     static void SetOnFullScreenExit(
@@ -147,6 +152,7 @@ public:
     static void SetOnFullScreenEnter(
         FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& callback);
     static void SetScaleChangeId(FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& callback);
+    static void SetZoomChangeId(FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& callback);
     static void SetOnHttpAuthRequest(
         FrameNode* frameNode, std::function<bool(const BaseEventInfo* info)>&& callback);
     static void SetOnInterceptRequest(
@@ -163,6 +169,8 @@ public:
         FrameNode* frameNode, std::function<bool(const BaseEventInfo* info)>&& callback);
     static void SetOnContextMenuHide(
         FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& callback);
+    static void SetOnContextMenuUpdate(FrameNode* frameNode,
+        std::function<void(WebContextMenuItemId menuItemId, const WebContextMenuOptions& options)>&& callback);
     static void SetSearchResultReceiveEventId(
         FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& callback);
     static void SetScrollId(FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& callback);
@@ -214,6 +222,7 @@ public:
     static void SetNativeEmbedObjectParamChangeId(
         FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& callback);
     static void SetForceEnableZoom(FrameNode* frameNode, bool isForceEnableZoom);
+    static void SetFlingSpeedLimit(FrameNode* frameNode, float speedLimit);
     static void SetRotateRenderEffect(FrameNode* frameNode, const std::optional<WebRotateEffect>& effect);
     static void SetNativeEmbedGestureEventId(
         FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& callback);

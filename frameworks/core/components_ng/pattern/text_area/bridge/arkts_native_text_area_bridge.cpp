@@ -19,6 +19,7 @@
 #include <regex.h>
 #endif
 #include "base/log/ace_scoring_log.h"
+#include "base/log/log.h"
 #include "base/utils/utils.h"
 #include "bridge/common/utils/utils.h"
 #include "bridge/declarative_frontend/engine/jsi/jsi_types.h"
@@ -300,24 +301,28 @@ bool CheckRegexValid(const std::string& pattern)
 #endif
 }
 
-Local<JSValueRef> JsPreventDefault(panda::JsiRuntimeCallInfo* info)
+static Local<JSValueRef> JsPreventDefault(panda::JsiRuntimeCallInfo* info)
 {
     Local<JSValueRef> thisObj = info->GetThisRef();
     auto eventInfo =
         static_cast<BaseEventInfo*>(panda::Local<panda::ObjectRef>(thisObj)->GetNativePointerField(info->GetVM(), 0));
     if (eventInfo) {
         eventInfo->SetPreventDefault(true);
+    } else {
+        LOGE("JsPreventDefault failed. eventInfo is null.");
     }
     return JSValueRef::Undefined(info->GetVM());
 }
 
-Local<JSValueRef> JsKeepEditableState(panda::JsiRuntimeCallInfo* info)
+static Local<JSValueRef> JsKeepEditableState(panda::JsiRuntimeCallInfo* info)
 {
     Local<JSValueRef> thisObj = info->GetThisRef();
     auto eventInfo = static_cast<NG::TextFieldCommonEvent*>(
         panda::Local<panda::ObjectRef>(thisObj)->GetNativePointerField(info->GetVM(), 0));
     if (eventInfo) {
         eventInfo->SetKeepEditable(true);
+    } else {
+        LOGE("JsKeepEditableState failed. eventInfo is null.");
     }
     return JSValueRef::Undefined(info->GetVM());
 }
@@ -407,6 +412,7 @@ void TextAreaBridge::RegisterTextAreaAttributes(Local<panda::ObjectRef> object, 
         "setTextAlign",
         "resetTextAlign",
         "setPlaceholderFont",
+        "setPlaceholderFontJs",
         "resetPlaceholderFont",
         "setBarState",
         "resetBarState",
@@ -603,6 +609,7 @@ void TextAreaBridge::RegisterTextAreaAttributes(Local<panda::ObjectRef> object, 
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TextAreaBridge::SetTextAreaTextAlign),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TextAreaBridge::ResetTextAreaTextAlign),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TextAreaBridge::SetPlaceholderFont),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TextInputBridge::SetPlaceholderFont),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TextAreaBridge::ResetPlaceholderFont),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TextAreaBridge::SetBarState),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TextAreaBridge::ResetBarState),
@@ -3015,6 +3022,7 @@ ArkUINativeModuleValue TextAreaBridge::SetOnPaste(ArkUIRuntimeCallInfo* runtimeC
         if (isJsView) {
             ArkTSUtils::HandleCallbackJobs(vm, trycatch, ret);
         }
+        eventObject->SetNativePointerField(vm, 0, nullptr);
     };
     GetArkUINodeModifiers()->getTextAreaModifier()->setTextAreaOnPaste(
         nativeNode, reinterpret_cast<void*>(&callback));
@@ -3257,6 +3265,7 @@ ArkUINativeModuleValue TextAreaBridge::CreateJsTextFieldCommonEvent(ArkUIRuntime
             panda::IntegerRef::New(vm, key), eventObject };
         auto ret = func->Call(vm, func.ToLocal(), params, PARAM_ARR_LENGTH_2);
         ArkTSUtils::HandleCallbackJobs(vm, trycatch, ret);
+        eventObject->SetNativePointerField(vm, 0, nullptr);
     };
     GetArkUINodeModifiers()->getTextAreaModifier()->setTextAreaOnSubmitWithEvent(
         nativeNode, reinterpret_cast<void*>(&callback));
@@ -3357,6 +3366,7 @@ ArkUINativeModuleValue TextAreaBridge::SetOnSubmit(ArkUIRuntimeCallInfo* runtime
         panda::Local<panda::JSValueRef> params[PARAM_ARR_LENGTH_2] = {
             panda::IntegerRef::New(vm, key), eventObject };
         func->Call(vm, func.ToLocal(), params, PARAM_ARR_LENGTH_2);
+        eventObject->SetNativePointerField(vm, 0, nullptr);
     };
     GetArkUINodeModifiers()->getTextAreaModifier()->setTextAreaOnSubmitWithEvent(
         nativeNode, reinterpret_cast<void*>(&callback));

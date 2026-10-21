@@ -35,6 +35,8 @@ public:
     using DefaultFileSelectorShowCallback = std::function<void(const std::shared_ptr<BaseEventInfo>&)>;
     using OnFullScreenVideoOverlayEnterCallback = std::function<void(const std::shared_ptr<BaseEventInfo>&)>;
     using PermissionClipboardCallback = std::function<void(const std::shared_ptr<BaseEventInfo>&)>;
+    using OnContextMenuUpdateCallback =
+        std::function<void(WebContextMenuItemId menuItemId, const WebContextMenuOptions& options)>;
     WebPattern();
     ~WebPattern() override;
 
@@ -101,11 +103,14 @@ public:
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, NativeEmbedRuleType, std::string);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, EnableDataDetector, bool);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, CssDisplayChangeEnabled, bool);
+    ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, TransformRotateAndSkewEnabled, bool);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, BypassVsyncCondition, WebBypassVsyncCondition);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, AudioSessionType, WebAudioSessionType);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, BlankScreenDetectionConfig, BlankScreenDetectionConfig);
+    ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, WebBlankScreenMonitorEnabled, bool);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, RotateRenderEffect, WebRotateEffect);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, ForceEnableZoom, bool);
+    ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, FlingSpeedLimit, float);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, BackToTop, bool);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, EnableSelectedDataDetector, bool);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(WebProperty, ZoomControlAccess, bool);
@@ -159,6 +164,15 @@ public:
     OnFullScreenVideoOverlayEnterCallback GetOnFullScreenVideoOverlayEnterCallback() const
     {
         return onFullScreenVideoOverlayEnterCallback_;
+    }
+
+    void SetOnContextMenuUpdateCallback(OnContextMenuUpdateCallback&& Callback)
+    {
+        onContextMenuUpdateCallback_ = std::move(Callback);
+    }
+    OnContextMenuUpdateCallback GetOnContextMenuUpdateCallback()
+    {
+        return onContextMenuUpdateCallback_;
     }
 
     void SetOnControllerAttachedCallback(OnControllerAttachedCallback&& callback);
@@ -273,11 +287,14 @@ private:
     void OnWebMediaAVSessionEnabledUpdate(bool) {}
     void OnEnableDataDetectorUpdate(bool enable) {}
     void OnCssDisplayChangeEnabledUpdate(bool value) {}
+    void OnTransformRotateAndSkewEnabledUpdate(bool value) {}
     void OnBypassVsyncConditionUpdate(WebBypassVsyncCondition condition) {}
     void OnAudioSessionTypeUpdate(WebAudioSessionType value) {}
     void OnBlankScreenDetectionConfigUpdate(const BlankScreenDetectionConfig &config) {}
+    void OnWebBlankScreenMonitorEnabledUpdate(bool enable) {}
     void OnRotateRenderEffectUpdate(WebRotateEffect effect) {}
     void OnForceEnableZoomUpdate(bool value) {}
+    void OnFlingSpeedLimitUpdate(float value) {}
     void OnBackToTopUpdate(bool isBackToTop) {}
     void OnEnableSelectedDataDetectorUpdate(bool enable) {}
     void OnZoomControlAccessUpdate(bool zoomControlAccess) {}
@@ -301,6 +318,7 @@ private:
     OnCreateMenuCallback onCreateMenuCallback_ = nullptr;
     OnMenuItemClickCallback onMenuItemClick_ = nullptr;
     OnFullScreenVideoOverlayEnterCallback onFullScreenVideoOverlayEnterCallback_ = nullptr;
+    OnContextMenuUpdateCallback onContextMenuUpdateCallback_ = nullptr;
 };
 } // namespace OHOS::Ace::NG
 #endif // CAPI_STUBS_MOCK_WEB_PATTERN_H

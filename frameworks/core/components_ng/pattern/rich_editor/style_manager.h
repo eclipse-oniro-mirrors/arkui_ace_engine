@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 Huawei Device Co., Ltd.
+ * Copyright (c) 2025-2026 Huawei Device Co., Ltd.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -19,6 +19,7 @@
 #include <string_view>
 
 #include "core/components_ng/pattern/rich_editor/rich_editor_pattern.h"
+#include "core/components_ng/pattern/rich_editor/plain_text_span_string.h"
 #include "core/components_ng/pattern/rich_editor/rich_editor_theme.h"
 #include "core/components_ng/pattern/text/span/mutable_span_string.h"
 
@@ -35,6 +36,7 @@ public:
     static constexpr std::string_view PLACEHOLDER_FONT_COLOR_KEY = "placeholderFontColor";
     static constexpr std::string_view SELECTED_DRAG_PREVIEW_COLOR_KEY = "selectedDragPreviewColor";
     static constexpr std::string_view SELECTED_BACKGROUND_COLOR_KEY = "selectedBackgroundColor";
+    static constexpr std::string_view CANCEL_BUTTON_ICON_COLOR_KEY = "cancelButtonIconColor";
 
     // color in TextStyle
     static constexpr std::string_view TEXT_COLOR_KEY = "textColor";
@@ -281,6 +283,14 @@ public:
         }
     }
 
+    static void UpdateUrlSpanColor(TextStyle& style, const Color& urlSpanColor,
+        bool useThemeDecorationColor, bool strokeColorFollowFontColor)
+    {
+        style.SetTextColor(urlSpanColor);
+        IF_TRUE(useThemeDecorationColor, style.SetTextDecorationColor(urlSpanColor));
+        IF_TRUE(strokeColorFollowFontColor, style.SetStrokeColor(urlSpanColor));
+    }
+
     void SetTypingStyle(const std::optional<struct UpdateSpanStyle>& typingStyle,
         const std::optional<TextStyle>& textStyle)
     {
@@ -442,6 +452,26 @@ public:
         auto spanNode = AceType::MakeRefPtr<SpanNode>(ElementRegister::GetInstance()->MakeUniqueId());
         spanNode->SetSpanItem(spanItem);
         UpdateTextStyleByTypingStyle(spanNode);
+    }
+
+    void ApplyTypingStyleToSpanItem(const RefPtr<PlainTextSpanString>& plainStr)
+    {
+        CHECK_NULL_VOID(plainStr && typingFontStyle_.has_value() && typingTextStyle_.has_value());
+        auto spanItems = plainStr->GetSpanItems();
+        CHECK_NULL_VOID(!spanItems.empty());
+        auto spanItem = spanItems.front();
+        CHECK_NULL_VOID(spanItem);
+        auto spanNode = AceType::MakeRefPtr<SpanNode>(ElementRegister::GetInstance()->MakeUniqueId());
+        spanNode->SetSpanItem(spanItem);
+        auto& updateSpanStyle = typingFontStyle_.value();
+        spanItem->useThemeFontColor = updateSpanStyle.useThemeFontColor;
+        spanItem->useThemeDecorationColor = updateSpanStyle.useThemeDecorationColor;
+        spanItem->strokeColorFollowFontColor = updateSpanStyle.strokeColorFollowFontColor;
+        if (updateSpanStyle.strokeColorFollowFontColor && updateSpanStyle.updateTextColor.has_value()) {
+            updateSpanStyle.updateStrokeColor = typingTextStyle_.value().GetTextColor();
+        }
+        UpdateTextStyle(spanNode, updateSpanStyle);
+        spanItem->SetTextStyle(typingTextStyle_);
     }
 
     static RefPtr<FontSpan> CreateFontSpanByTextStyle(

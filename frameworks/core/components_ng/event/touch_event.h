@@ -18,7 +18,6 @@
 
 #include <list>
 
-#include "base/memory/referenced.h"
 #include "base/utils/time_util.h"
 #include "core/components_ng/event/gesture_event_actuator.h"
 #include "core/event/touch_event.h"
@@ -162,8 +161,15 @@ public:
 private:
     bool TriggerInteractionCallBack(TouchEventInfo& event);
     bool TriggerTouchCallBack(const TouchEvent& changedPoint);
+    void UpdateFirstInputTime(const TouchEvent& point);
+    // Runs on the input/UI path; publishes only while a PageScene observer is registered.
+    // The candidate stores a weak response node and is consumed at a later stable point.
+    void PublishSearchClickCandidate(const TouchEvent& point);
     bool ShouldResponse() override;
     void TriggerCallBacks(TouchEventInfo& event);
+#ifdef ENABLE_INSPECTOR_EVENT_REPORTING
+    void ReportTouchEventToUISession(const TouchEventInfo& event);
+#endif
     TouchEventInfo CreateTouchEventInfo(const TouchEvent& lastPoint);
     TouchLocationInfo CreateChangedTouchInfo(const TouchEvent& lastPoint, const TouchEvent& event);
     TouchLocationInfo CreateTouchItemInfo(const TouchPoint& pointItem, const TouchEvent& event, TouchType type);

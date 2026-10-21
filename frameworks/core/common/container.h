@@ -89,6 +89,7 @@ using MouseTargetHitCallback = std::function<bool(const MouseEvent&,
 
 class PipelineBase;
 class ContainerHandler;
+class UIObserverStore;
 class Frontend;
 
 class ACE_FORCE_EXPORT Container : public virtual AceType {
@@ -133,6 +134,10 @@ public:
 
     // Get task executor.
     virtual RefPtr<TaskExecutor> GetTaskExecutor() const = 0;
+
+    // Accessed only on the container's JS owner thread.
+    std::shared_ptr<UIObserverStore> GetUIObserverStore(bool create = false);
+    void ClearUIObserverStore();
 
     // Get assert manager.
     virtual RefPtr<AssetManager> GetAssetManager() const = 0;
@@ -241,6 +246,10 @@ public:
         return displayManager_;
     }
 
+    virtual void RefreshLiveFoldCreaseRegion() {}
+
+    virtual void RefreshFoldCreaseDirection() {}
+
     virtual DisplaySourceMode GetDisplaySourceMode();
 
     virtual bool IsNeedModifySize(const RefPtr<Container>& subContainer = nullptr);
@@ -308,6 +317,7 @@ public:
 
     virtual bool IsMainWindow() const { return false; }
     virtual bool IsSubWindow() const { return false; }
+    virtual bool IsPipWindow() const { return false; }
     virtual bool IsDialogWindow() const { return false; }
     virtual bool IsSystemWindow() const { return false; }
     virtual bool IsHostMainWindow() const { return false; }
@@ -621,6 +631,42 @@ public:
 
     static int32_t GetCurrentApiTargetVersion();
 
+    // Compare the full SDK version (major.minor.patch) of the application.
+    // Raw version int encoding: major * 10000000 + minor * 100000 + patch * 1000 + apiLevel
+    static bool LessThanAPITargetVersionFull(int32_t targetMajor, int32_t targetMinor, int32_t targetPatch)
+    {
+        int32_t rawVersion = AceApplicationInfo::GetInstance().GetApiTargetVersion();
+        return !GreatOrEqualFullVersion(rawVersion, targetMajor, targetMinor, targetPatch);
+    }
+
+    static bool GreatOrEqualAPITargetVersionFull(int32_t targetMajor, int32_t targetMinor, int32_t targetPatch)
+    {
+        int32_t rawVersion = AceApplicationInfo::GetInstance().GetApiTargetVersion();
+        return GreatOrEqualFullVersion(rawVersion, targetMajor, targetMinor, targetPatch);
+    }
+
+private:
+    static constexpr int32_t API_LEVEL_BASE = 1000;
+    static constexpr int32_t SUB_VERSION_BASE = 100;
+    static constexpr int32_t PATCH_BASE = API_LEVEL_BASE * SUB_VERSION_BASE;
+    static constexpr int32_t MINOR_BASE = PATCH_BASE * SUB_VERSION_BASE;
+
+    static bool GreatOrEqualFullVersion(
+        int32_t rawVersion, int32_t targetMajor, int32_t targetMinor, int32_t targetPatch)
+    {
+        int32_t major = rawVersion / MINOR_BASE;
+        int32_t minor = (rawVersion / PATCH_BASE) % SUB_VERSION_BASE;
+        int32_t patch = (rawVersion / API_LEVEL_BASE) % SUB_VERSION_BASE;
+        if (major != targetMajor) {
+            return major > targetMajor;
+        }
+        if (minor != targetMinor) {
+            return minor > targetMinor;
+        }
+        return patch >= targetPatch;
+    }
+
+public:
     void SetAppBar(const RefPtr<NG::AppBarView>& appBar);
 
     RefPtr<NG::AppBarView> GetAppBar() const;
@@ -819,6 +865,8 @@ private:
     UIContentType uIContentType_ = UIContentType::UNDEFINED;
     uint64_t currentDisplayId_ = 0;
     ColorMode colorMode_ = ColorMode::LIGHT;
+    std::shared_ptr<UIObserverStore> uiObserverStore_;
+    bool uiObserverStoreClosed_ = false;
     std::string extensionHostParams_ = "";
     ACE_DISALLOW_COPY_AND_MOVE(Container);
 };

@@ -298,6 +298,8 @@ public:
     }
     void ResetFontColor();
     void DumpInfo() override;
+    void DumpInfo(std::unique_ptr<JsonValue>& json) override;
+    bool HasSystemMaterial() const;
     void SetTextModifierApply(const std::function<void(WeakPtr<NG::FrameNode>)>& textApply);
     void SetArrowModifierApply(const std::function<void(WeakPtr<NG::FrameNode>)>& arrowApply);
     void SetArrowColor(const Color& color);
@@ -432,6 +434,8 @@ private:
     void UpdateTargetSize();
     bool GetShadowFromTheme(ShadowStyle shadowStyle, Shadow& shadow);
     void ShowScrollBar();
+    void RegisterScrollToSelectedTask();
+    void ScrollToSelectedOption();
     void UpdateMenuBorderStyle(const RefPtr<FrameNode>& menu);
     std::vector<RefPtr<FrameNode>> options_;
     std::vector<RefPtr<FrameNode>> builderOptions_;

@@ -62,6 +62,7 @@
 #include "frameworks/bridge/declarative_frontend/jsview/js_if_else.h"
 #include "frameworks/bridge/declarative_frontend/jsview/js_image.h"
 #include "frameworks/bridge/declarative_frontend/jsview/js_keyboard_avoid.h"
+#include "frameworks/bridge/declarative_frontend/jsview/js_immersive_strategy.h"
 #include "frameworks/bridge/declarative_frontend/jsview/js_lazy_foreach.h"
 #include "frameworks/bridge/declarative_frontend/jsview/js_linear_gradient.h"
 #include "frameworks/bridge/declarative_frontend/jsview/js_list.h"
@@ -168,7 +169,6 @@
 #include "bridge/declarative_frontend/jsview/js_richeditor.h"
 #include "bridge/declarative_frontend/jsview/js_save_button.h"
 #include "bridge/declarative_frontend/jsview/menu/js_context_menu.h"
-#include "bridge/declarative_frontend/sharedata/js_share_data.h"
 #include "bridge/declarative_frontend/jsview/text_menu/js_text_menu.h"
 #include "core/common/plugin_manager.h"
 #ifdef EFFECT_COMPONENT_SUPPORTED
@@ -450,6 +450,7 @@ void JsBindViews(BindingTarget globalObj, void* nativeEngine, bool isCustomEnvSu
     JSDumpLog::JSBind(globalObj);
     JSDumpRegister::JSBind(globalObj);
     JSKeyboardAvoid::JSBind(globalObj);
+    JSImmersiveStrategy::JSBind(globalObj);
     JSContainerSpan::JSBind(globalObj);
     JsDragFunction::JSBind(globalObj);
 #ifdef USE_COMPONENTS_LIB
@@ -477,7 +478,6 @@ void JsBindViews(BindingTarget globalObj, void* nativeEngine, bool isCustomEnvSu
     JSPasteButton::JSBind(globalObj);
     JSProfiler::JSBind(globalObj);
     JSSaveButton::JSBind(globalObj);
-    JSShareData::JSBind(globalObj);
 #ifdef WEB_SUPPORTED
     JSWeb::JSBind(globalObj);
     JSWebController::JSBind(globalObj);

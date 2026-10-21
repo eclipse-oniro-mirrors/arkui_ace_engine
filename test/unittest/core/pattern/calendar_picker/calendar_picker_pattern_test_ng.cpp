@@ -1499,7 +1499,7 @@ HWTEST_F(CalendarPickerPatternTestNg, CalendarPickerPattern_OnModifyDone_UpdateH
 
 /**
  * @tc.name: CalendarPickerPattern_OnModifyDone_UpdateHostEntryBorderColor002
- * @tc.desc: Verify host border color uses CalendarTheme entry border color when API target is 26 or above.
+ * @tc.desc: Verify host border color uses theme default when developer did not set custom border color.
  * @tc.type: FUNC
  */
 HWTEST_F(CalendarPickerPatternTestNg, CalendarPickerPattern_OnModifyDone_UpdateHostEntryBorderColor002, TestSize.Level1)
@@ -1521,13 +1521,43 @@ HWTEST_F(CalendarPickerPatternTestNg, CalendarPickerPattern_OnModifyDone_UpdateH
     auto renderContext = frameNode->GetRenderContext();
     ASSERT_NE(renderContext, nullptr);
 
+    pickerPattern->OnModifyDone();
+    auto resultBorderColor = renderContext->GetBorderColor().value_or(BorderColorProperty());
+    EXPECT_EQ(resultBorderColor.leftColor.value_or(Color::TRANSPARENT), theme->GetEntryBorderColor());
+
+    container->SetApiTargetVersion(backupApiVersion);
+}
+
+/**
+ * @tc.name: CalendarPickerPattern_OnModifyDone_UpdateHostEntryBorderColor003
+ * @tc.desc: Verify developer-set border color is preserved when API target is 26 or above.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CalendarPickerPatternTestNg, CalendarPickerPattern_OnModifyDone_UpdateHostEntryBorderColor003, TestSize.Level1)
+{
+    auto container = MockContainer::Current();
+    ASSERT_NE(container, nullptr);
+    int32_t backupApiVersion = container->GetApiTargetVersion();
+    container->SetApiTargetVersion(static_cast<int32_t>(PlatformVersion::VERSION_TWENTY_SIX));
+
+    CreateCalendarPicker();
+    auto element = ViewStackProcessor::GetInstance()->Finish();
+    auto frameNode = AceType::DynamicCast<FrameNode>(element);
+    ASSERT_NE(frameNode, nullptr);
+    auto pickerPattern = frameNode->GetPattern<CalendarPickerPattern>();
+    ASSERT_NE(pickerPattern, nullptr);
+
+    auto renderContext = frameNode->GetRenderContext();
+    ASSERT_NE(renderContext, nullptr);
+
+    // Developer sets a custom border color:OnModifyDone should preserve it.
     BorderColorProperty borderColor;
     borderColor.SetColor(Color::RED);
     renderContext->UpdateBorderColor(borderColor);
 
     pickerPattern->OnModifyDone();
     auto resultBorderColor = renderContext->GetBorderColor().value_or(BorderColorProperty());
-    EXPECT_EQ(resultBorderColor.leftColor.value_or(Color::TRANSPARENT), theme->GetEntryBorderColor());
+    EXPECT_EQ(resultBorderColor.leftColor.value_or(Color::TRANSPARENT), Color::RED);
 
     container->SetApiTargetVersion(backupApiVersion);
 }
@@ -1829,5 +1859,113 @@ HWTEST_F(CalendarPickerPatternTestNg, CalendarPickerPattern_CreateCalendarPicker
 
     container->SetApiTargetVersion(backupContainerApi);
     pipeline->SetApiTargetVersion(backupPipelineApi);
+}
+
+/**
+ * @tc.name: SetFirstDayOfWeek001
+ * @tc.desc: Test SetFirstDayOfWeek with MON (1)
+ * @tc.type: FUNC
+ */
+HWTEST_F(CalendarPickerPatternTestNg, SetFirstDayOfWeek001, TestSize.Level1)
+{
+    CreateCalendarPicker();
+    auto element = ViewStackProcessor::GetInstance()->Finish();
+    auto frameNode = AceType::DynamicCast<FrameNode>(element);
+    ASSERT_NE(frameNode, nullptr);
+    auto pickerPattern = frameNode->GetPattern<CalendarPickerPattern>();
+    ASSERT_NE(pickerPattern, nullptr);
+
+    pickerPattern->SetFirstDayOfWeek(1);
+    EXPECT_EQ(pickerPattern->GetFirstDayOfWeek(), 1);
+}
+
+/**
+ * @tc.name: SetFirstDayOfWeek002
+ * @tc.desc: Test SetFirstDayOfWeek with all valid values (0-7)
+ * @tc.type: FUNC
+ */
+HWTEST_F(CalendarPickerPatternTestNg, SetFirstDayOfWeek002, TestSize.Level1)
+{
+    CreateCalendarPicker();
+    auto element = ViewStackProcessor::GetInstance()->Finish();
+    auto frameNode = AceType::DynamicCast<FrameNode>(element);
+    ASSERT_NE(frameNode, nullptr);
+    auto pickerPattern = frameNode->GetPattern<CalendarPickerPattern>();
+    ASSERT_NE(pickerPattern, nullptr);
+
+    for (int32_t day = 0; day <= 7; day++) {
+        pickerPattern->SetFirstDayOfWeek(day);
+        EXPECT_EQ(pickerPattern->GetFirstDayOfWeek(), day)
+            << "Failed for firstDayOfWeek value: " << day;
+    }
+}
+
+/**
+ * @tc.name: SetFirstDayOfWeek003
+ * @tc.desc: Test default firstDayOfWeek value is 0 (LOCAL)
+ * @tc.type: FUNC
+ */
+HWTEST_F(CalendarPickerPatternTestNg, SetFirstDayOfWeek003, TestSize.Level1)
+{
+    CreateCalendarPicker();
+    auto element = ViewStackProcessor::GetInstance()->Finish();
+    auto frameNode = AceType::DynamicCast<FrameNode>(element);
+    ASSERT_NE(frameNode, nullptr);
+    auto pickerPattern = frameNode->GetPattern<CalendarPickerPattern>();
+    ASSERT_NE(pickerPattern, nullptr);
+
+    EXPECT_EQ(pickerPattern->GetFirstDayOfWeek(), 0);
+}
+
+/**
+ * @tc.name: SetFirstDayOfWeek004
+ * @tc.desc: Test CalendarPickerModelNG::SetFirstDayOfWeek static method
+ * @tc.type: FUNC
+ */
+HWTEST_F(CalendarPickerPatternTestNg, SetFirstDayOfWeek004, TestSize.Level1)
+{
+    CreateCalendarPicker();
+    auto element = ViewStackProcessor::GetInstance()->Finish();
+    auto frameNode = AceType::DynamicCast<FrameNode>(element);
+    ASSERT_NE(frameNode, nullptr);
+
+    CalendarPickerModelNG::SetFirstDayOfWeek(AceType::RawPtr(frameNode), 1);
+    EXPECT_EQ(CalendarPickerModelNG::GetFirstDayOfWeek(AceType::RawPtr(frameNode)), 1);
+}
+
+/**
+ * @tc.name: SetFirstDayOfWeek005
+ * @tc.desc: Test SetFirstDayOfWeek with null frameNode does not crash
+ * @tc.type: FUNC
+ */
+HWTEST_F(CalendarPickerPatternTestNg, SetFirstDayOfWeek005, TestSize.Level1)
+{
+    FrameNode* frameNode = nullptr;
+    CalendarPickerModelNG::SetFirstDayOfWeek(frameNode, 1);
+    EXPECT_EQ(CalendarPickerModelNG::GetFirstDayOfWeek(frameNode), 0);
+}
+
+/**
+ * @tc.name: SetFirstDayOfWeek006
+ * @tc.desc: Test SetFirstDayOfWeek overrides previous value
+ * @tc.type: FUNC
+ */
+HWTEST_F(CalendarPickerPatternTestNg, SetFirstDayOfWeek006, TestSize.Level1)
+{
+    CreateCalendarPicker();
+    auto element = ViewStackProcessor::GetInstance()->Finish();
+    auto frameNode = AceType::DynamicCast<FrameNode>(element);
+    ASSERT_NE(frameNode, nullptr);
+    auto pickerPattern = frameNode->GetPattern<CalendarPickerPattern>();
+    ASSERT_NE(pickerPattern, nullptr);
+
+    pickerPattern->SetFirstDayOfWeek(3);
+    EXPECT_EQ(pickerPattern->GetFirstDayOfWeek(), 3);
+
+    pickerPattern->SetFirstDayOfWeek(1);
+    EXPECT_EQ(pickerPattern->GetFirstDayOfWeek(), 1);
+
+    pickerPattern->SetFirstDayOfWeek(7);
+    EXPECT_EQ(pickerPattern->GetFirstDayOfWeek(), 7);
 }
 } // namespace OHOS::Ace::NG

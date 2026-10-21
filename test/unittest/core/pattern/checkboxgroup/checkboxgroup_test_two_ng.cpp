@@ -29,6 +29,7 @@
 #include "core/components/checkable/checkable_component.h"
 #include "core/components/checkable/checkable_theme.h"
 #include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/base/view_abstract.h"
 #include "core/components_ng/base/view_stack_processor.h"
 #include "core/components_ng/layout/layout_wrapper_node.h"
 #include "core/components_ng/pattern/checkbox/checkbox_model.h"
@@ -71,6 +72,7 @@ const SizeF CONTENT_SIZE = SizeF(400.0, 500.0);
 const OffsetF CONTENT_OFFSET = OffsetF(50.0, 60.0);
 constexpr float COMPONENT_WIDTH = 200.0;
 constexpr float COMPONENT_HEIGHT = 210.0;
+constexpr Dimension TEST_USER_HEIGHT_DIMENSION = Dimension(COMPONENT_HEIGHT);
 constexpr float BORDER_RADIUS = 100.0;
 constexpr float CHECK_STROKE = 200.0;
 constexpr float CHECK_MARK_SIZEF = 50.0;
@@ -646,6 +648,8 @@ HWTEST_F(CheckBoxGroupTwoTestNG, CheckBoxGroupPaintPropertyTest029, TestSize.Lev
 {
     int32_t backupApiVersion = AceApplicationInfo::GetInstance().GetApiTargetVersion();
     AceApplicationInfo::GetInstance().SetApiTargetVersion(static_cast<int32_t>(PlatformVersion::VERSION_TWELVE));
+    MockContainer::SetUp();
+    MockContainer::Current()->SetApiTargetVersion(static_cast<int32_t>(PlatformVersion::VERSION_TWELVE));
     /**
      * @tc.steps: step1. Init CheckBoxGroup node
      */
@@ -668,6 +672,7 @@ HWTEST_F(CheckBoxGroupTwoTestNG, CheckBoxGroupPaintPropertyTest029, TestSize.Lev
     checkBoxPaintProperty->ToJsonValue(json, filter);
     EXPECT_EQ(json->GetString("checkboxShape"), "1");
     AceApplicationInfo::GetInstance().SetApiTargetVersion(backupApiVersion);
+    MockContainer::TearDown();
 }
 
 /**
@@ -1371,5 +1376,90 @@ HWTEST_F(CheckBoxGroupTwoTestNG, CreateCheckboxGroup, TestSize.Level1)
     ASSERT_NE(frameNode, nullptr);
     groupName = CheckBoxGroupModelNG::GetCheckboxGroupName(frameNode);
     EXPECT_EQ(groupName, "");
+}
+
+/**
+ * @tc.name: CheckBoxGroupLayoutPolicyByViewAbstractTest001
+ * @tc.desc: Test imperative LayoutPolicy semantics through ViewAbstract entry points (bridge sinks):
+ *           applying matchParent clears user-defined size, measure fills parentIdealSize,
+ *           numeric set and explicit reset clear the policy (mutual exclusion per axis).
+ * @tc.type: FUNC
+ */
+HWTEST_F(CheckBoxGroupTwoTestNG, CheckBoxGroupLayoutPolicyByViewAbstractTest001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. create checkboxgroup node and layout wrapper.
+     */
+    CheckBoxGroupModelNG checkBoxGroupModelNG;
+    checkBoxGroupModelNG.Create(GROUP_NAME);
+    auto frameNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
+    ASSERT_NE(frameNode, nullptr);
+    auto layoutProperty = frameNode->GetLayoutProperty();
+    ASSERT_NE(layoutProperty, nullptr);
+    RefPtr<GeometryNode> geometryNode = AceType::MakeRefPtr<GeometryNode>();
+    ASSERT_NE(geometryNode, nullptr);
+    LayoutWrapperNode layoutWrapper = LayoutWrapperNode(frameNode, geometryNode, layoutProperty);
+    auto checkBoxGroupLayoutAlgorithm = AceType::MakeRefPtr<CheckBoxGroupLayoutAlgorithm>();
+    ASSERT_NE(checkBoxGroupLayoutAlgorithm, nullptr);
+    layoutWrapper.SetLayoutAlgorithm(AceType::MakeRefPtr<LayoutAlgorithmWrapper>(checkBoxGroupLayoutAlgorithm));
+    LayoutConstraintF contentConstraint;
+    contentConstraint.parentIdealSize.SetSize(TEST_SIZE_100_200);
+
+    /**
+     * @tc.steps: step2. imperative numeric height set (bridge success-path sink).
+     * @tc.expected: user-defined height exists and height policy is not MATCH_PARENT.
+     */
+    ViewAbstract::SetHeight(AceType::RawPtr(frameNode), CalcLength(TEST_USER_HEIGHT_DIMENSION));
+    auto hasUserHeight = [layoutProperty]() {
+        const auto& calcConstraint = layoutProperty->GetCalcLayoutConstraint();
+        return calcConstraint != nullptr && calcConstraint->selfIdealSize.has_value() &&
+               calcConstraint->selfIdealSize->Height().has_value();
+    };
+    EXPECT_TRUE(hasUserHeight());
+    EXPECT_FALSE(layoutProperty->GetLayoutPolicyProperty().has_value() &&
+                 layoutProperty->GetLayoutPolicyProperty()->IsHeightMatch());
+
+    /**
+     * @tc.steps: step3. imperative policy apply (bridge parse-fail branch sink).
+     * @tc.expected: height policy becomes MATCH_PARENT and user-defined height is cleared.
+     */
+    ViewAbstract::UpdateLayoutPolicyProperty(
+        AceType::RawPtr(frameNode), LayoutCalPolicy::MATCH_PARENT, false);
+    auto layoutPolicy = layoutProperty->GetLayoutPolicyProperty();
+    ASSERT_TRUE(layoutPolicy.has_value());
+    EXPECT_TRUE(layoutPolicy->IsHeightMatch());
+    EXPECT_FALSE(hasUserHeight());
+
+    /**
+     * @tc.steps: step4. measure with parentIdealSize.
+     * @tc.expected: matchParent fills parent height (checkboxgroup constrains to square size).
+     */
+    auto ret = checkBoxGroupLayoutAlgorithm->MeasureContent(contentConstraint, &layoutWrapper);
+    ASSERT_TRUE(ret.has_value());
+    EXPECT_EQ(ret.value().Height(), TEST_SIZE_100_200.Height());
+
+    /**
+     * @tc.steps: step5. imperative explicit reset (bridge modifier reset sink).
+     * @tc.expected: height policy returns to NO_MATCH and measure no longer fills parent.
+     */
+    ViewAbstract::ResetLayoutPolicyProperty(AceType::RawPtr(frameNode), false);
+    EXPECT_FALSE(layoutProperty->GetLayoutPolicyProperty().has_value() &&
+                 layoutProperty->GetLayoutPolicyProperty()->IsHeightMatch());
+    ret = checkBoxGroupLayoutAlgorithm->MeasureContent(contentConstraint, &layoutWrapper);
+    ASSERT_TRUE(ret.has_value());
+    EXPECT_NE(ret.value().Height(), TEST_SIZE_100_200.Height());
+
+    /**
+     * @tc.steps: step6. mutual exclusion other direction: apply policy, then numeric set with
+     *               policy reset (bridge success path).
+     * @tc.expected: user-defined height exists again and height policy stays NO_MATCH.
+     */
+    ViewAbstract::UpdateLayoutPolicyProperty(
+        AceType::RawPtr(frameNode), LayoutCalPolicy::MATCH_PARENT, false);
+    ViewAbstract::SetHeight(AceType::RawPtr(frameNode), CalcLength(TEST_USER_HEIGHT_DIMENSION));
+    ViewAbstract::ResetLayoutPolicyProperty(AceType::RawPtr(frameNode), false);
+    EXPECT_FALSE(layoutProperty->GetLayoutPolicyProperty().has_value() &&
+                 layoutProperty->GetLayoutPolicyProperty()->IsHeightMatch());
+    EXPECT_TRUE(hasUserHeight());
 }
 } // namespace OHOS::Ace::NG

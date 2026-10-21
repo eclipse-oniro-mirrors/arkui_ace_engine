@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Huawei Device Co., Ltd.
+ * Copyright (c) 2023-2026 Huawei Device Co., Ltd.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -17,8 +17,11 @@
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_RICH_EDITOR_RICH_EDITOR_MODEL_NG_H
 
 #include "core/components_ng/pattern/rich_editor/rich_editor_model.h"
-#include "core/components_ng/pattern/text/selection_info.h"
 #include "core/components_ng/pattern/text_field/text_keyboard_common_type.h"
+
+namespace OHOS::Ace {
+class ImageSourceInfo;
+}
 
 namespace OHOS::Ace::NG {
 class ACE_EXPORT RichEditorModelNG : public OHOS::Ace::RichEditorModel {
@@ -82,6 +85,10 @@ public:
     void ResetSingleLine() override;
     void SetHorizontalScrolling(bool enabled) override;
     void ResetHorizontalScrolling() override;
+    static void SetInputFilter(FrameNode* frameNode, const std::string& value);
+    static void SetInputFilterError(FrameNode* frameNode, const std::function<void(const std::u16string&)>& onError);
+    static std::string GetInputFilter(FrameNode* frameNode);
+    static void ResetInputFilter(FrameNode* frameNode);
 
     static void SetCaretOffset(FrameNode* frameNode, int32_t caretPosition);
     static int32_t GetCaretOffset(FrameNode* frameNode);
@@ -122,6 +129,12 @@ public:
     static void SetOnSelectionChange(FrameNode* frameNode, std::function<void(const BaseEventInfo*)>&& callback);
     static void SetCaretColor(FrameNode* frameNode, const Color& color);
     static Color GetCaretColor(FrameNode* frameNode);
+    static void SetShowUnderline(FrameNode* frameNode, bool showUnderline);
+    static bool GetShowUnderline(FrameNode* frameNode);
+    static void ResetShowUnderline(FrameNode* frameNode);
+    static void SetUnderlineColor(FrameNode* frameNode, const UserUnderlineColor& userColor);
+    static UserUnderlineColor GetUnderlineColor(FrameNode* frameNode);
+    static void ResetUnderlineColor(FrameNode* frameNode);
     static void SetOnSelect(
         FrameNode* frameNode, std::function<void(const BaseEventInfo*)>&& callback, bool isJsView = false);
     static void SetOnReady(FrameNode* frameNode, std::function<void()>&& callback);
@@ -223,6 +236,14 @@ public:
     static void SetHorizontalScrolling(FrameNode* frameNode, bool enabled);
     static void ResetHorizontalScrolling(FrameNode* frameNode);
     static bool GetHorizontalScrolling(FrameNode* frameNode);
+    static void SetInputType(FrameNode* frameNode, TextInputType type);
+    static void ResetInputType(FrameNode* frameNode);
+    static TextInputType GetInputType(FrameNode* frameNode);
+    static void SetShowPasswordIcon(FrameNode* frameNode, bool show);
+    static void ResetShowPasswordIcon(FrameNode* frameNode);
+    static bool GetShowPasswordIcon(FrameNode* frameNode);
+    static void SetPasswordIcon(FrameNode* frameNode, const ImageSourceInfo& showIcon, const ImageSourceInfo& hideIcon);
+    static void ResetPasswordIcon(FrameNode* frameNode);
     static Color GetScrollBarColor(FrameNode* frameNode);
     static void BindSelectionMenu(FrameNode* frameNode, TextSpanType& spanType,
         TextResponseType& responseType, std::function<void()>& buildFunc, const SelectMenuParam& menuParam);
@@ -237,6 +258,40 @@ public:
     static void SetOnStyledStringDidChange(FrameNode* frameNode,
         std::function<void(const NG::StyledStringChangeValue&)>&& func);
     static void SetKeyboardAppearanceConfig(FrameNode* frameNode, NG::KeyboardAppearanceConfig config);
+    static void SetCancelButton(FrameNode* frameNode, int32_t style, const CalcDimension& iconSize,
+        const Color& iconColor, const std::string& iconSrc);
+    static void ResetCancelButton(FrameNode* frameNode);
+
+    // ===== counter properties (instance methods) =====
+    void SetShowCounter(bool value);
+    void SetCounter(int32_t value);
+    void SetCounterTextColor(const Color& value);
+    void SetCounterTextOverflowColor(const Color& value);
+    void SetShowHighlightBorder(bool value);
+    void ResetCounterTextColor();
+    void ResetCounterTextOverflowColor();
+
+    // ===== counter properties (static methods with FrameNode*) =====
+    static void SetShowCounter(FrameNode* frameNode, bool value);
+    static void SetCounter(FrameNode* frameNode, int32_t value);
+    static void SetCounterTextColor(FrameNode* frameNode, const Color& value);
+    static void SetCounterTextOverflowColor(FrameNode* frameNode, const Color& value);
+    static void SetShowHighlightBorder(FrameNode* frameNode, bool value);
+    static void ResetCounterTextColor(FrameNode* frameNode);
+    static void ResetCounterTextOverflowColor(FrameNode* frameNode);
+    static bool GetShowCounter(FrameNode* frameNode);
+    static int GetCounterType(FrameNode* frameNode);
+    static bool GetShowCounterBorder(FrameNode* frameNode);
+    static Color GetCounterTextColor(FrameNode* frameNode);
+    static Color GetCounterTextOverflowColor(FrameNode* frameNode);
+
+    // ===== border methods (static methods with FrameNode*) =====
+    static void SetBorderWidth(FrameNode* frameNode, const BorderWidthProperty& borderWidth);
+    static void SetBorderRadius(FrameNode* frameNode, const BorderRadiusProperty& borderRadius);
+    static void SetBorderColor(FrameNode* frameNode, const BorderColorProperty& borderColors);
+    static void SetBorderStyle(FrameNode* frameNode, const BorderStyleProperty& borderStyles);
+    static void SetMargin(FrameNode* frameNode, const MarginProperty& margin);
+    static MarginProperty GetMargin(FrameNode* frameNode);
 
 private:
     void SetDraggable(bool draggable);

@@ -35,7 +35,6 @@
 #include "core/components_ng/base/inspector.h"
 
 namespace OHOS::Ace::NG::GeneratedModifier {
-const GENERATED_ArkUIRawInputEventWrapperAccessor* GetRawInputEventWrapperAccessor();
 
 namespace {
 constexpr int32_t INVALID_ID = -1;
@@ -52,11 +51,6 @@ BindInfoMap bindInfoMap_;
 
 constexpr int32_t SHOW_TAB_BAR_DELAY = 2000;
 constexpr float SCROLL_RATIO = 2.0f;
-
-struct InputEventMonitorPeer {
-    RefPtr<InputEventMonitorHolder> holder;
-    RefPtr<CallbackHelper<InputEventListener>> listener;
-};
 
 thread_local Ark_InputEventInterceptResult* g_inputEventInterceptResult = nullptr;
 
@@ -674,23 +668,22 @@ void SetCustomKeyboardContinueFeatureImpl(Ark_CustomKeyboardContinueFeature feat
     bool value = (featureVal == NG::CustomKeyboardContinueFeature::ENABLED);
     textFieldManager->SetCustomKeyboardContinueFeature(value);
 }
-Ark_InputEventMonitor AddLocalInputEventMonitorImpl(Ark_Int32 eventMask, const InputEventListener* listener)
+Ark_NativePointer AddLocalInputEventMonitorImpl(Ark_Int32 eventMask, const InputEventListener* listener)
 {
-    Ark_InputEventMonitor invalidMonitor {};
-    CHECK_NULL_RETURN(listener, invalidMonitor);
+    CHECK_NULL_RETURN(listener, nullptr);
 
     auto listenerRef = AceType::MakeRefPtr<CallbackHelper<InputEventListener>>(*listener);
-    CHECK_NULL_RETURN(listenerRef, invalidMonitor);
-    CHECK_NULL_RETURN(listenerRef->IsValid(), invalidMonitor);
+    CHECK_NULL_RETURN(listenerRef, nullptr);
+    CHECK_NULL_RETURN(listenerRef->IsValid(), nullptr);
 
     auto container = Container::CurrentSafely();
-    CHECK_NULL_RETURN(container, invalidMonitor);
+    CHECK_NULL_RETURN(container, nullptr);
     auto pipeline = container->GetPipelineContext();
-    CHECK_NULL_RETURN(pipeline, invalidMonitor);
+    CHECK_NULL_RETURN(pipeline, nullptr);
     auto eventManager = pipeline->GetEventManager();
-    CHECK_NULL_RETURN(eventManager, invalidMonitor);
+    CHECK_NULL_RETURN(eventManager, nullptr);
     auto monitorManager = eventManager->GetInputMonitorManager();
-    CHECK_NULL_RETURN(monitorManager, invalidMonitor);
+    CHECK_NULL_RETURN(monitorManager, nullptr);
 
     auto handleFunc = [listenerRef](const RawInputEventWrapper& wrapper) -> InputEventInterceptAction {
         CHECK_NULL_RETURN(listenerRef, InputEventInterceptAction::CONTINUE);
@@ -713,30 +706,17 @@ Ark_InputEventMonitor AddLocalInputEventMonitorImpl(Ark_Int32 eventMask, const I
         listenerRef->InvokeSync(rawEvent, continuation);
         g_inputEventInterceptResult = nullptr;
 
-        auto* rawInputEventWrapperAccessor = GetRawInputEventWrapperAccessor();
-        if (rawInputEventWrapperAccessor != nullptr && rawEvent != nullptr) {
-            rawInputEventWrapperAccessor->destroyPeer(rawEvent);
-        }
-
         return result.action == ARK_INPUT_EVENT_INTERCEPT_ACTION_BLOCK ?
             InputEventInterceptAction::BLOCK : InputEventInterceptAction::CONTINUE;
     };
 
     auto identity = monitorManager->AddLocalInputMonitor(static_cast<uint32_t>(eventMask), std::move(handleFunc));
-    CHECK_NULL_RETURN(identity, invalidMonitor);
-
-    auto* monitorPeer = new InputEventMonitorPeer {
-        .holder = AceType::MakeRefPtr<InputEventMonitorHolder>(identity),
-        .listener = listenerRef,
-    };
-    CHECK_NULL_RETURN(monitorPeer, invalidMonitor);
-    return Ark_InputEventMonitor { .handle = monitorPeer };
+    CHECK_NULL_RETURN(identity, nullptr);
+    return reinterpret_cast<Ark_NativePointer>(identity.GetRawPtr());
 }
-void RemoveLocalInputEventMonitorImpl(const Ark_InputEventMonitor* monitor)
+void RemoveLocalInputEventMonitorImpl(Ark_NativePointer monitor)
 {
     CHECK_NULL_VOID(monitor);
-    auto* monitorPeer = reinterpret_cast<InputEventMonitorPeer*>(monitor->handle);
-    CHECK_NULL_VOID(monitorPeer);
 
     auto container = Container::CurrentSafely();
     CHECK_NULL_VOID(container);
@@ -746,10 +726,7 @@ void RemoveLocalInputEventMonitorImpl(const Ark_InputEventMonitor* monitor)
     CHECK_NULL_VOID(eventManager);
     auto monitorManager = eventManager->GetInputMonitorManager();
     CHECK_NULL_VOID(monitorManager);
-    CHECK_NULL_VOID(monitorPeer->holder);
-    monitorManager->RemoveLocalInputMonitor(monitorPeer->holder->GetIdentity());
-
-    delete monitorPeer;
+    monitorManager->RemoveLocalInputMonitor(reinterpret_cast<MonitorIdentity*>(monitor));
 }
 void EnableEventPassthroughImpl(const Opt_Boolean* enabled, Ark_RawInputEventType eventType)
 {

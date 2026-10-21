@@ -27,7 +27,7 @@ namespace OHOS::Ace::NG {
 
 class GestureEventHub;
 
-class LongPressEvent : public virtual AceType {
+class LongPressEvent : public AceType {
     DECLARE_ACE_TYPE(LongPressEvent, AceType);
 
 public:

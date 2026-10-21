@@ -15,6 +15,10 @@
 
 #include "core/components_ng/pattern/text/text_pattern.h"
 #include "core/components_ng/manager/safe_area/safe_area_manager.h"
+#include "core/components_ng/render/drawing.h"
+#ifndef ACE_UNITTEST
+#include "rosen_text/ref_count_holder.h"
+#endif
 
 #include <cstdint>
 #include <iterator>
@@ -111,6 +115,7 @@ TextPattern::TextPattern()
 
 TextPattern::~TextPattern()
 {
+    ReleaseExternalParagraphRef();
     // node destruct, need to stop text race animation
     CHECK_NULL_VOID(contentMod_);
     contentMod_->StopTextRace();
@@ -118,6 +123,16 @@ TextPattern::~TextPattern()
         paragraphCache_->Clear();
         paragraphCache_.Reset();
     }
+}
+
+void TextPattern::ReleaseExternalParagraphRef()
+{
+    CHECK_NULL_VOID(externalParagraph_.has_value());
+#ifndef ACE_UNITTEST
+    auto* holder = reinterpret_cast<Rosen::RefCountedHolder<RSParagraph>*>(externalParagraph_.value());
+    holder->Release();
+#endif
+    externalParagraph_ = std::nullopt;
 }
 
 void TextPattern::InitParagraphCache()
@@ -229,7 +244,7 @@ void TextPattern::OnDetachFromFrameNode(FrameNode* node)
     pipeline->RemoveVisibleAreaChangeNode(node->GetId());
     pipeline->RemoveWindowSizeChangeCallback(node->GetId());
     RemoveFormVisibleChangeCallback(node->GetId());
-    pipeline->UnRegisterListenerForTranslate(node->GetId());
+    UnRegisterTranslateListener(node->GetId());
 }
 
 void TextPattern::OnAttachToMainTree()
@@ -4600,10 +4615,9 @@ ResultObject TextPattern::GetImageResultObject(RefPtr<UINode> uinode, int32_t in
 {
     int32_t itemLength = 1;
     ResultObject resultObject;
-    if (!DynamicCast<FrameNode>(uinode) || !GetSpanItemByIndex(index)) {
-        return resultObject;
-    }
-    int32_t endPosition = std::min(GetTextContentLength(), GetSpanItemByIndex(index)->position);
+    auto spanItem = GetSpanItemByIndex(index);
+    CHECK_NULL_RETURN(DynamicCast<FrameNode>(uinode) && spanItem, resultObject);
+    int32_t endPosition = std::min(GetTextContentLength(), spanItem->position);
     int32_t startPosition = endPosition - itemLength;
     if ((start <= startPosition) && (end >= endPosition)) {
         auto imageNode = DynamicCast<FrameNode>(uinode);
@@ -4643,6 +4657,9 @@ ResultObject TextPattern::GetImageResultObject(RefPtr<UINode> uinode, int32_t in
             resultObject.imageStyle.borderRadius = jsonObject->GetValue("borderRadius")->IsObject()
                                                        ? jsonObject->GetValue("borderRadius")->ToString()
                                                        : jsonObject->GetString("borderRadius");
+        }
+        if (auto imageSpanItem = DynamicCast<ImageSpanItem>(spanItem)) {
+            resultObject.imageTag = imageSpanItem->options.imageTag;
         }
     }
     return resultObject;
@@ -4814,7 +4831,28 @@ void TextPattern::OnModifyDone()
     if (lastDrawnPageTranslateContent_.empty() && !textForDisplay_.empty()) {
         MarkPageTranslateTextDrawn();
     }
+    RegisterTranslateListener();
+}
+
+void TextPattern::RegisterTranslateListener()
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto pipeline = host->GetContext();
+    CHECK_NULL_VOID(pipeline);
+    auto previousPipeline = translatePipeline_.Upgrade();
+    if (previousPipeline && previousPipeline != pipeline) {
+        previousPipeline->UnRegisterListenerForTranslate(host->GetId());
+    }
+    translatePipeline_ = pipeline;
     pipeline->RegisterListenerForTranslate(WeakPtr<FrameNode>(host));
+}
+
+void TextPattern::UnRegisterTranslateListener(int32_t nodeId)
+{
+    auto translatePipeline = translatePipeline_.Upgrade();
+    CHECK_NULL_VOID(translatePipeline);
+    translatePipeline->UnRegisterListenerForTranslate(nodeId);
 }
 
 void TextPattern::UpdateMarqueeStartPolicy()
@@ -5500,6 +5538,10 @@ const std::optional<std::u16string>& TextPattern::GetPageTranslatedText() const
 void TextPattern::MarkPageTranslateTextDrawn()
 {
     lastDrawnPageTranslateContent_ = textForDisplay_;
+    auto property = GetLayoutProperty<TextLayoutProperty>();
+    // Internal labels may update layout content without going through OnModifyDone.
+    lastDrawnPageTextContent_ = property && !isSpanStringMode_ && spans_.empty() ?
+        property->GetContentValue(textForDisplay_) : textForDisplay_;
 }
 
 int32_t TextPattern::GetPageTranslateNodeId() const
@@ -5512,6 +5554,7 @@ int32_t TextPattern::GetPageTranslateNodeId() const
 void TextPattern::OnPageTranslateSourceTextChanged()
 {
     lastDrawnPageTranslateContent_.clear();
+    lastDrawnPageTextContent_.clear();
     // Caller (OnModifyDone/OnTextContentChanged) is already in layout queue — skip dirty marking
     pageTranslatedContent_.reset();
     pageTranslateVersion_ = 0;
@@ -5523,12 +5566,12 @@ void TextPattern::ReportPageTranslateTextDrawn()
     auto host = GetHost();
     CHECK_NULL_VOID(host);
     MarkPageTranslateTextDrawn();
-    auto text = GetPageTranslateTextForReport();
-    CHECK_NULL_VOID(!text.empty());
     auto pipeline = host->GetContext();
     CHECK_NULL_VOID(pipeline);
     auto mgr = pipeline->GetContentChangeManager();
     CHECK_NULL_VOID(mgr);
+    auto text = GetPageTranslateTextForReport();
+    CHECK_NULL_VOID(!text.empty());
     mgr->ReportTranslateTextNode(AceType::WeakClaim<PageTranslateNode>(this), text);
 #endif
 }
@@ -5570,6 +5613,24 @@ std::string TextPattern::GetPageTranslateTextForReport() const
         return "";
     }
     return UtfUtils::Str16DebugToStr8(textForDisplay_);
+}
+
+std::string TextPattern::GetPageTextForReport(bool /* includeInput */) const
+{
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, "");
+    // RichEditor and other derived patterns retain their own collection rules.
+    if (host->GetTag() != V2::TEXT_ETS_TAG) {
+        return GetPageTranslateTextForReport();
+    }
+    auto property = GetLayoutProperty<TextLayoutProperty>();
+    const auto content = property && !isSpanStringMode_ && spans_.empty() ?
+        property->GetContentValue(textForDisplay_) : textForDisplay_;
+    if (content.empty() || lastDrawnPageTextContent_ != content) {
+        return "";
+    }
+    // The collector excludes the actual placeholder node by identity, not every child of an input.
+    return UtfUtils::Str16DebugToStr8(content);
 }
 
 void TextPattern::ParseOriText(const std::u16string& currentText)
@@ -9046,6 +9107,8 @@ void TextPattern::UpdatePropertyImpl(const std::string& key, RefPtr<PropertyValu
         DEFINE_PROP_HANDLER(LetterSpacing, CalcDimension, UpdateLetterSpacing),
         DEFINE_PROP_HANDLER(AdaptMaxFontSize, CalcDimension, UpdateAdaptMaxFontSize),
         DEFINE_PROP_HANDLER(AdaptMinFontSize, CalcDimension, UpdateAdaptMinFontSize),
+        DEFINE_PROP_HANDLER(StrokeWidth, CalcDimension, UpdateStrokeWidth),
+        DEFINE_PROP_HANDLER(StrokeColor, Color, UpdateStrokeColor),
         DEFINE_PROP_HANDLER(BaselineOffset, CalcDimension, UpdateBaselineOffset),
         DEFINE_PROP_HANDLER(TextCaretColor, Color, UpdateCursorColor),
         DEFINE_PROP_HANDLER(TextDecorationColor, Color, UpdateTextDecorationColor),
@@ -9737,7 +9800,17 @@ const std::list<RefPtr<UINode>>& TextPattern::GetChildNodes() const
 void TextPattern::SetExternalParagraph(void* paragraph)
 {
     ACE_TEXT_SCOPED_TRACE("SetExternalParagraph");
-    externalParagraph_ = paragraph;
+    if (externalParagraph_.has_value() && externalParagraph_.value() == paragraph) {
+        return;
+    }
+    ReleaseExternalParagraphRef();
+    if (paragraph) {
+#ifndef ACE_UNITTEST
+        auto* holder = reinterpret_cast<Rosen::RefCountedHolder<RSParagraph>*>(paragraph);
+        holder->AddRef();
+#endif
+        externalParagraph_ = paragraph;
+    }
 }
 
 const std::optional<void*>& TextPattern::GetExternalParagraph()

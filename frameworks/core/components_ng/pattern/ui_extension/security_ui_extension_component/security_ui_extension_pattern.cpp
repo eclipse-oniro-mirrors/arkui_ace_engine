@@ -350,7 +350,7 @@ void SecurityUIExtensionPattern::OnConnect()
     bool isFocused = focusHub && focusHub->IsCurrentFocus();
     RegisterVisibleAreaChange();
     DispatchFocusState(isFocused);
-    DispatchFollowHostDensity(GetDensityDpi());
+    DispatchFollowHostDensity(GetEffectiveDpiFollowStrategy());
     auto pipeline = host->GetContextRefPtr();
     CHECK_NULL_VOID(pipeline);
     auto uiExtensionManager = pipeline->GetUIExtensionManager();
@@ -742,28 +742,43 @@ void SecurityUIExtensionPattern::FireAsyncCallbacks()
     }
 }
 
-void SecurityUIExtensionPattern::SetDensityDpi(bool densityDpi)
+void SecurityUIExtensionPattern::DispatchFollowHostDensity(DpiFollowStrategy dpiFollowStrategy)
 {
-    densityDpi_ = densityDpi;
-}
-
-void SecurityUIExtensionPattern::DispatchFollowHostDensity(bool densityDpi)
-{
-    densityDpi_ = densityDpi;
     CHECK_NULL_VOID(sessionWrapper_);
-    sessionWrapper_->SetDensityDpiImpl(densityDpi_);
+    sessionWrapper_->SetDensityDpiImpl(dpiFollowStrategy);
 }
 
 void SecurityUIExtensionPattern::OnDpiConfigurationUpdate()
 {
-    if (GetDensityDpi()) {
-        DispatchFollowHostDensity(true);
-    }
+    DispatchFollowHostDensity(GetEffectiveDpiFollowStrategy());
 }
 
-bool SecurityUIExtensionPattern::GetDensityDpi()
+void SecurityUIExtensionPattern::SetDpiFollowStrategy(DpiFollowStrategy dpiFollowStrategy, bool isDpiFollowStrategySet)
 {
-    return densityDpi_;
+    dpiFollowStrategy_ = dpiFollowStrategy;
+    isDpiFollowStrategySet_ = isDpiFollowStrategySet;
+}
+
+DpiFollowStrategy SecurityUIExtensionPattern::GetDpiFollowStrategy()
+{
+    return dpiFollowStrategy_;
+}
+
+DpiFollowStrategy SecurityUIExtensionPattern::GetEffectiveDpiFollowStrategy()
+{
+    ContainerScope scope(instanceId_);
+    auto context = PipelineBase::GetCurrentContext();
+    DpiFollowStrategy hostDpiFollowStrategy =
+        context ? context->GetUIExtensionDensityFollowHost() : DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI;
+    // Developer-configured strategy takes precedence (even when it is the default value,
+    // i.e. an explicit opt-out); when not configured at all, fall back to the strategy
+    // saved from UIContent::SetUIExtensionDensityFollowHost.
+    DpiFollowStrategy effectiveStrategy = isDpiFollowStrategySet_ ? dpiFollowStrategy_ : hostDpiFollowStrategy;
+    UIEXT_LOGI("GetEffectiveDpiFollowStrategy: dpiFollowStrategy=%{public}d, isDpiFollowStrategySet=%{public}d, "
+               "hostDpiFollowStrategy=%{public}d, effective=%{public}d, instanceId=%{public}d.",
+        static_cast<int32_t>(dpiFollowStrategy_), isDpiFollowStrategySet_, static_cast<int32_t>(hostDpiFollowStrategy),
+        static_cast<int32_t>(effectiveStrategy), instanceId_);
+    return effectiveStrategy;
 }
 
 void SecurityUIExtensionPattern::OnVisibleChange(bool visible)
@@ -887,6 +902,16 @@ void SecurityUIExtensionPattern::DumpInfo()
         eventProxyStr = platformEventProxy_->GetCurEventProxyToString();
     }
     DumpLog::GetInstance().AddDesc(std::string("eventProxy: ").append(eventProxyStr));
+    ContainerScope dpiScope(instanceId_);
+    auto dpiContext = PipelineBase::GetCurrentContext();
+    DumpLog::GetInstance().AddDesc(std::string("dpiFollowStrategy: ")
+        .append(std::to_string(static_cast<int32_t>(dpiFollowStrategy_))));
+    DumpLog::GetInstance().AddDesc(std::string("isDpiFollowStrategySet: ")
+        .append(std::to_string(isDpiFollowStrategySet_)));
+    DumpLog::GetInstance().AddDesc(std::string("uiExtensionDpiFollowHost: ")
+        .append(std::to_string(dpiContext ? static_cast<int32_t>(dpiContext->GetUIExtensionDensityFollowHost()) : -1)));
+    DumpLog::GetInstance().AddDesc(std::string("dpiFollowStrategyEffective: ")
+        .append(std::to_string(static_cast<int32_t>(GetEffectiveDpiFollowStrategy()))));
 }
 
 void SecurityUIExtensionPattern::DumpInfo(std::unique_ptr<JsonValue>& json)
@@ -899,6 +924,14 @@ void SecurityUIExtensionPattern::DumpInfo(std::unique_ptr<JsonValue>& json)
         eventProxyStr = platformEventProxy_->GetCurEventProxyToString();
     }
     json->Put("eventProxy: ", eventProxyStr.c_str());
+    ContainerScope dpiScope(instanceId_);
+    auto dpiContext = PipelineBase::GetCurrentContext();
+    json->Put("dpiFollowStrategy: ", std::to_string(static_cast<int32_t>(dpiFollowStrategy_)).c_str());
+    json->Put("isDpiFollowStrategySet: ", std::to_string(isDpiFollowStrategySet_).c_str());
+    json->Put("uiExtensionDpiFollowHost: ",
+        std::to_string(dpiContext ? static_cast<int32_t>(dpiContext->GetUIExtensionDensityFollowHost()) : -1).c_str());
+    json->Put("dpiFollowStrategyEffective: ",
+        std::to_string(static_cast<int32_t>(GetEffectiveDpiFollowStrategy())).c_str());
 }
 
 const char* SecurityUIExtensionPattern::ToString(AbilityState state)

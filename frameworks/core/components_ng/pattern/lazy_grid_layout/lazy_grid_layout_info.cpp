@@ -30,6 +30,114 @@ void LazyGridLayoutInfo::EstimateItemSize()
     }
 }
 
+void LazyGridLayoutInfo::EstimateBoundaryItemSize()
+{
+    if (posMap_.empty()) {
+        return;
+    }
+    float measuredSize = 0.0f;
+    float lineSize = 0.0f;
+    int32_t previousLine = -1;
+    int32_t lineCount = 0;
+    for (const auto& [index, item] : posMap_) {
+        const int32_t line = index / lanes_;
+        if (line != previousLine) {
+            measuredSize += lineSize;
+            lineSize = 0.0f;
+            previousLine = line;
+            ++lineCount;
+        }
+        lineSize = std::max(lineSize, item.endPos - item.startPos);
+    }
+    estimateItemSize_ = (measuredSize + lineSize) / lineCount;
+}
+
+bool LazyGridLayoutInfo::ApplyKnownBodySize(float prevBodyMainSize, float knownBodyMainSize)
+{
+    if (!std::isfinite(knownBodyMainSize) || LessNotEqualCustomPrecision(knownBodyMainSize, 0.0, 0.0) ||
+        totalItemCount_ < 0 || lanes_ <= 0) {
+        return false;
+    }
+    const auto measured = CollectMeasuredRows();
+    CHECK_NULL_RETURN(measured, false);
+    const int32_t rowCount = totalItemCount_ == 0 ? 0 : (totalItemCount_ - 1) / lanes_ + 1;
+    const int32_t unknownCount = rowCount - measured->first;
+    const double remaining = knownBodyMainSize - measured->second -
+        static_cast<double>(std::max(rowCount - 1, 0)) * spaceWidth_;
+    if (!std::isfinite(remaining) || LessNotEqualCustomPrecision(remaining, 0.0, 0.0) ||
+        (unknownCount == 0 && !NearZero(remaining))) {
+        return false;
+    }
+    auto anchor = posMap_.find(startIndex_);
+    const float oldAnchor = anchor == posMap_.end() ? 0.0f : anchor->second.startPos;
+    const double estimateSize = unknownCount > 0 ? remaining / unknownCount : 0.0;
+    if (unknownCount > 0) {
+        estimateItemSize_ = static_cast<float>(estimateSize);
+    }
+    RebaseKnownRows(estimateSize, knownBodyMainSize);
+    if (anchor != posMap_.end()) {
+        adjustOffset_.start += anchor->second.startPos - oldAnchor;
+    }
+    totalMainSize_ = knownBodyMainSize;
+    adjustOffset_.end = totalMainSize_ - prevBodyMainSize - adjustOffset_.start;
+    return true;
+}
+
+std::optional<std::pair<int32_t, double>> LazyGridLayoutInfo::CollectMeasuredRows() const
+{
+    std::pair<int32_t, double> measured { 0, 0.0 };
+    auto item = posMap_.begin();
+    while (item != posMap_.end()) {
+        const int32_t first = item->first;
+        if (first < 0 || first >= totalItemCount_ || first % lanes_ != 0) {
+            return std::nullopt;
+        }
+        const int32_t last = LanesCeil(first);
+        float rowSize = 0.0f;
+        for (int32_t index = first; index <= last; ++index) {
+            if (item == posMap_.end() || item->first != index || item->second.laneIdx != index - first) {
+                return std::nullopt;
+            }
+            const float size = item->second.endPos - item->second.startPos;
+            if (!std::isfinite(size) || LessNotEqualCustomPrecision(size, 0.0, 0.0)) {
+                return std::nullopt;
+            }
+            rowSize = std::max(rowSize, size);
+            ++item;
+        }
+        ++measured.first;
+        measured.second += rowSize;
+    }
+    return measured;
+}
+
+void LazyGridLayoutInfo::RebaseKnownRows(double estimateSize, float knownBodyMainSize)
+{
+    double measuredPrefix = 0.0;
+    int32_t measuredCount = 0;
+    auto item = posMap_.begin();
+    while (item != posMap_.end()) {
+        const int32_t row = item->first / lanes_;
+        const int32_t last = LanesCeil(item->first);
+        auto next = item;
+        float size = 0.0f;
+        while (next != posMap_.end() && next->first <= last) {
+            size = std::max(size, next->second.endPos - next->second.startPos);
+            ++next;
+        }
+        const bool atEnd = last == totalItemCount_ - 1;
+        const double cursor = atEnd ? static_cast<double>(knownBodyMainSize) - size :
+            (row - measuredCount) * estimateSize + measuredPrefix + static_cast<double>(row) * spaceWidth_;
+        while (item != next) {
+            item->second.startPos = static_cast<float>(cursor);
+            item->second.endPos = atEnd ? knownBodyMainSize : static_cast<float>(cursor + size);
+            ++item;
+        }
+        measuredPrefix += size;
+        ++measuredCount;
+    }
+}
+
 float LazyGridLayoutInfo::UpdatePosMapStart(int32_t updatedStart, int32_t updatedEnd)
 {
     auto startIter = posMap_.find(updatedStart);
@@ -95,7 +203,8 @@ void LazyGridLayoutInfo::UpdatePosMapEnd(int32_t updatedEnd)
         prevIndex = last->first;
     }
     if (prevIndex >= totalItemCount_ - 1) {
-        totalMainSize_ = prevPos - spaceWidth_;
+        // A partial last row does not advance the packing cursor.
+        totalMainSize_ = posMap_.rbegin()->second.endPos;
     } else {
         float estSize = LineCount(prevIndex, totalItemCount_ - 1) * (estimateItemSize_ + spaceWidth_);
         totalMainSize_ = prevPos + estSize - spaceWidth_;
@@ -139,7 +248,7 @@ float LazyGridLayoutInfo::UpdatePosWithIter(
     return delta;
 }
 
-void LazyGridLayoutInfo::UpdatePosMap(float prevBodyMainSize)
+bool LazyGridLayoutInfo::UpdatePosMap(float prevBodyMainSize, std::optional<float> knownBodyMainSize)
 {
     float prevTotalMainSize_ = prevBodyMainSize;
     if (!Positive(estimateItemSize_)) {
@@ -172,14 +281,16 @@ void LazyGridLayoutInfo::UpdatePosMap(float prevBodyMainSize)
     cachedUpdatedStart_ = INT_MAX;
     cachedUpdatedEnd_ = -1;
     spaceUpdated_ = false;
+    return !knownBodyMainSize || ApplyKnownBodySize(prevBodyMainSize, knownBodyMainSize.value());
 }
 
 void LazyGridLayoutInfo::SetSpace(float space)
 {
     if (!NearEqual(space, spaceWidth_)) {
         spaceWidth_ = space;
-        int32_t prevIndex = -1;
-        float prevPos = 0.0f;
+        const int32_t firstIndex = posMap_.empty() ? 0 : posMap_.begin()->first;
+        int32_t prevIndex = firstIndex - 1;
+        float prevPos = (firstIndex / lanes_) * (estimateItemSize_ + spaceWidth_);
         for (auto it = posMap_.begin(); it != posMap_.end(); it++) {
             UpdatePosWithIter(it, prevIndex, prevPos);
         }

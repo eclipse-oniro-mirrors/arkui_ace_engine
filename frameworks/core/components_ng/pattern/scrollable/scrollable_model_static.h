@@ -73,6 +73,9 @@ public:
     static void SetOnWillStartFling(FrameNode* frameNode, OnWillStartFlingEvent&& event);
     static void SetOnDidStopFling(FrameNode* frameNode, OnDidStopFlingEvent&& event);
     static void SetEnableScrollWithMouse(FrameNode* frameNode, bool enabled);
+    static void ResetEnableScrollWithMouse(FrameNode* frameNode);
+    static void SetEnableScrollWithKeyboard(FrameNode* frameNode, bool enabled);
+    static void ResetEnableScrollWithKeyboard(FrameNode* frameNode);
     static void SetAutoAdjustScrollBarMargin(FrameNode* frameNode, std::optional<bool> autoAdjust);
 
 #ifdef SUPPORT_DIGITAL_CROWN

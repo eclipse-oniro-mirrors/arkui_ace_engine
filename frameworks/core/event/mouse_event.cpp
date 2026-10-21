@@ -76,10 +76,10 @@ bool HoverEventTarget::HandlePenHoverEvent(bool isHovered, const TouchEvent& eve
         if (node) {
             TAG_LOGD(AceLogTag::ACE_MOUSE,
                 "HandlePenHoverEvent_node(%{public}s/%{public}d/%{public}s/%{public}s) isHovered:%{public}d "
-                "type:%{public}d x:%{public}f y:%{public}f",
+                "type:%{public}d x:" SEC_PLD(%{public}f) " y:" SEC_PLD(%{public}f),
                 node->GetTag().c_str(), node->GetId(), std::to_string(node->GetAccessibilityId()).c_str(),
                 node->GetInspectorId().value_or("").c_str(), isHovered, static_cast<int32_t>(event.type),
-                event.x, event.y);
+                SEC_PARAM(event.x), SEC_PARAM(event.y));
             ACE_SCOPED_TRACE("HandlePenHoverEvent_node(%s/%d/%s/%s) isHovered:%d type:%d",
                 node->GetTag().c_str(), node->GetId(), std::to_string(node->GetAccessibilityId()).c_str(),
                 node->GetInspectorId().value_or("").c_str(), isHovered, static_cast<int32_t>(event.type));
@@ -125,9 +125,10 @@ bool HoverEventTarget::HandlePenHoverMoveEvent(const TouchEvent& event)
         auto node = GetAttachedNode().Upgrade();
         if (node) {
             TAG_LOGD(AceLogTag::ACE_MOUSE,
-                "HandlePenHoverMoveEvent_node(%{public}s/%{public}d/%{public}s/%{public}s) x:%{public}f y:%{public}f",
+                "HandlePenHoverMoveEvent_node(%{public}s/%{public}d/%{public}s/%{public}s) x:" SEC_PLD(%{public}f)
+                " y:" SEC_PLD(%{public}f),
                 node->GetTag().c_str(), node->GetId(), std::to_string(node->GetAccessibilityId()).c_str(),
-                node->GetInspectorId().value_or("").c_str(), event.x, event.y);
+                node->GetInspectorId().value_or("").c_str(), SEC_PARAM(event.x), SEC_PARAM(event.y));
             ACE_SCOPED_TRACE("HandlePenHoverMoveEvent_node(%s/%d/%s/%s)",
                 node->GetTag().c_str(), node->GetId(), std::to_string(node->GetAccessibilityId()).c_str(),
                 node->GetInspectorId().value_or("").c_str());
@@ -361,22 +362,25 @@ MouseEvent MouseInfo::ConvertToMouseEvent() const
     return mouseEvent;
 }
 
-MouseEvent MouseInfo::ConvertToMouseEventForStatic() const
+MouseEvent MouseInfo::ConvertToMouseEventForStatic(float density) const
 {
+    if (NearEqual(density, 0.f)) {
+        density = 1.0f;
+    }
     MouseEvent mouseEvent;
     mouseEvent.sourceType = GetSourceDevice();
     mouseEvent.sourceTool = GetSourceTool();
     mouseEvent.time = GetTimeStamp();
     mouseEvent.deviceId = GetDeviceId();
     mouseEvent.targetDisplayId = GetTargetDisplayId();
-    mouseEvent.x = globalLocation_.GetX();
-    mouseEvent.y = globalLocation_.GetY();
-    mouseEvent.globalDisplayX = globalDisplayLocation_.GetX();
-    mouseEvent.globalDisplayY = globalDisplayLocation_.GetY();
+    mouseEvent.x = globalLocation_.GetX() / density;
+    mouseEvent.y = globalLocation_.GetY() / density;
+    mouseEvent.globalDisplayX = globalDisplayLocation_.GetX() / density;
+    mouseEvent.globalDisplayY = globalDisplayLocation_.GetY() / density;
     mouseEvent.button = button_;
     mouseEvent.action = action_;
-    mouseEvent.screenX = screenLocation_.GetX();
-    mouseEvent.screenY = screenLocation_.GetY();
+    mouseEvent.screenX = screenLocation_.GetX() / density;
+    mouseEvent.screenY = screenLocation_.GetY() / density;
     mouseEvent.rawDeltaX = rawDeltaX_;
     mouseEvent.rawDeltaY = rawDeltaY_;
     mouseEvent.pressedKeyCodes_ = GetPressedKeyCodes();

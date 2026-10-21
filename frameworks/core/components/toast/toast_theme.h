@@ -31,7 +31,7 @@ namespace OHOS::Ace {
  * ToastTheme defines color and styles of Toast. ToastTheme should be built
  * using ToastTheme::Builder.
  */
-class ToastTheme : public virtual Theme {
+class ToastTheme : public Theme {
     DECLARE_ACE_TYPE(ToastTheme, Theme);
 
 public:

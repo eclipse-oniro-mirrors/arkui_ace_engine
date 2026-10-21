@@ -27,7 +27,7 @@
 
 namespace OHOS::Ace::NG {
 
-class MagnifierController : public virtual AceType {
+class MagnifierController : public AceType {
     DECLARE_ACE_TYPE(MagnifierController, AceType);
 
 public:

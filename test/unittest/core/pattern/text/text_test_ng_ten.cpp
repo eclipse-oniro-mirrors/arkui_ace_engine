@@ -599,11 +599,8 @@ HWTEST_F(TextTestNgTen, ResetTextEffectBeforeLayout_005, TestSize.Level1)
     textLayoutProperty->UpdateTextEffectStrategy(TextEffectStrategy::FLIP);
     textLayoutProperty->UpdateTextOverflow(TextOverflow::DEFAULT);
     pattern->isSpanStringMode_ = false;
-    struct ExternalParagraph {
-        int32_t data;
-    };
-    ExternalParagraph externalPara;
-    void* paraPtr = &externalPara;
+    int32_t dummy = 0;
+    void* paraPtr = &dummy;
     pattern->SetExternalParagraph(paraPtr);
     pattern->textEffect_ = TextEffect::CreateTextEffect();
     pattern->spans_.clear();

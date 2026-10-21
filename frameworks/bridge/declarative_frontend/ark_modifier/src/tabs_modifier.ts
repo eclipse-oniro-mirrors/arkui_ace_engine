@@ -57,7 +57,7 @@ class LazyArkTabsComponent extends ArkComponent {
     return this;
   }
 
-  sidebarDisplayStyle(value: SidebarDisplayStyle): this {
+  sidebarDisplayStyle(value: TabsSidebarDisplayStyle): this {
     this.lazyComponent.sidebarDisplayStyle(value);
     return this;
   }
@@ -244,6 +244,16 @@ class LazyArkTabsComponent extends ArkComponent {
     return this;
   }
 
+  sidebarFooter(value: ComponentContent): this {
+    this.lazyComponent.sidebarFooter(value);
+    return this;
+  }
+
+  sidebarBottomBar(value: ComponentContent): this {
+    this.lazyComponent.sidebarBottomBar(value);
+    return this;
+  }
+
   sidebarSearchable(value: TabsSidebarSearchableOptions): this {
     this.lazyComponent.sidebarSearchable(value);
     return this;
@@ -256,6 +266,41 @@ class LazyArkTabsComponent extends ArkComponent {
 
   onBarDisplayModeChange(value: (mode: TabBarDisplayMode) => void): this {
     this.lazyComponent.onBarDisplayModeChange(value);
+    return this;
+  }
+
+  sidebarWidth(value: Optional<Length>): this {
+    this.lazyComponent.sidebarWidth(value);
+    return this;
+  }
+
+  minSidebarWidth(value: Optional<Length>): this {
+    this.lazyComponent.minSidebarWidth(value);
+    return this;
+  }
+
+  maxSidebarWidth(value: Optional<Length>): this {
+    this.lazyComponent.maxSidebarWidth(value);
+    return this;
+  }
+
+  minContentWidth(value: Optional<Length>): this {
+    this.lazyComponent.minContentWidth(value);
+    return this;
+  }
+
+  sidebarBackgroundColor(value: Optional<ResourceColor>): this {
+    this.lazyComponent.sidebarBackgroundColor(value);
+    return this;
+  }
+
+  sidebarBackgroundBlurStyle(value: Optional<BlurStyle>): this {
+    this.lazyComponent.sidebarBackgroundBlurStyle(value);
+    return this;
+  }
+
+  sidebarDivider(value: Optional<DividerStyle>): this {
+    this.lazyComponent.sidebarDivider(value);
     return this;
   }
 }

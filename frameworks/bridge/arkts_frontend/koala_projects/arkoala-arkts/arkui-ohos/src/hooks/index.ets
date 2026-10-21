@@ -862,6 +862,7 @@ export function hookSliderSetSuffixMethod(node: ArkSliderComponent | ArkSliderPe
 
 export function hookWaterFlowOptionsImpl(node: ArkWaterFlowComponent, options: WaterFlowOptions | undefined): void {
   WaterFlowHandWritten.hookWaterFlowOptionsImpl(node, options)
+  node.applyOptionsFinish('WaterFlowAttribute')
 }
 
 export function hookListItemGroupOptionsImpl(

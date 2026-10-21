@@ -16,9 +16,11 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_TEXT_FIELD_CLEAN_NODE_HOST_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_TEXT_FIELD_CLEAN_NODE_HOST_H
 
+#include <cstddef>
 #include <functional>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "base/geometry/calc_dimension.h"
 #include "base/memory/ace_type.h"
@@ -26,8 +28,12 @@
 #include "core/components/common/properties/color.h"
 #include "core/components_ng/pattern/text_field/text_field_model.h"
 
-namespace OHOS::Ace::NG {
+namespace OHOS::Ace {
+class HoverInfo;
+
+namespace NG {
 class FrameNode;
+class RoundRect;
 
 // Abstract host interface for CleanNodeResponseArea to decouple from concrete pattern types.
 // Enables both TextFieldPattern and RichEditorPattern to reuse CleanNodeResponseArea.
@@ -81,6 +87,25 @@ public:
     virtual std::optional<float> GetCancelMinFontScale() const = 0;
     virtual bool HasCancelMaxFontScale() const = 0;
     virtual bool HasCancelMinFontScale() const = 0;
+
+    // --- Behavioral hooks for up-lifted cancel button event handling ---
+
+    // Overlay modifier bridge: set/clear hover color and rects.
+    virtual void SetCleanHoverColorAndRect(const RoundRect& rect, uint32_t color) = 0;
+    virtual void ClearCleanHoverColorAndRects() = 0;
+
+    // Anti-flicker hooks. RichEditor overrides OnCleanNodeHoverEnter to manage currentMouseStyle_.
+    // OnCleanNodeHoverLeave is intentionally empty: do not set mouse style here.
+    // Defer to HandleMouseEvent/OnHover to avoid flicker.
+    virtual void OnCleanNodeHoverEnter() {}
+    virtual void OnCleanNodeHoverLeave() {}
+
+    // Hover callback hook. TextField overrides to call OnHover().
+    virtual void OnCleanNodeHover(bool isHover, const HoverInfo& info) {}
+
+    // cancelButtonTouched_ state access.
+    virtual bool IsCancelButtonTouched() const = 0;
+    virtual void SetCancelButtonTouched(bool touched) = 0;
 };
 
 // CRTP base providing default implementations of the layout-property bridge methods.
@@ -219,7 +244,22 @@ public:
         CHECK_NULL_RETURN(layoutProperty, false);
         return layoutProperty->HasMinFontScale();
     }
+
+    // Overlay modifier bridge: set/clear hover color and rects. Default impl delegates to
+    // Derived::SetOverlayHoverColorAndRects so clean-button and password-icon hover share
+    // one hook (see PasswordIconHostBase). The single rect is wrapped into a 1-element vector.
+    void SetCleanHoverColorAndRect(const RoundRect& rect, uint32_t color) override
+    {
+        std::vector<RoundRect> rects;
+        rects.push_back(rect);
+        static_cast<Derived*>(this)->SetOverlayHoverColorAndRects(rects, color);
+    }
+    void ClearCleanHoverColorAndRects() override
+    {
+        static_cast<Derived*>(this)->ClearOverlayHoverColorAndRects();
+    }
 };
 } // namespace OHOS::Ace::NG
+} // namespace OHOS::Ace
 
 #endif // FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_TEXT_FIELD_CLEAN_NODE_HOST_H

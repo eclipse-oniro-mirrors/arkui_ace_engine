@@ -18,6 +18,7 @@
 #include <regex.h>
 #endif
 #include "base/log/ace_scoring_log.h"
+#include "base/log/log.h"
 #include "base/utils/utils.h"
 #include "core/components/common/layout/constants.h"
 #include "core/components/text_field/textfield_theme.h"
@@ -140,24 +141,28 @@ void prepareUnderlineColorValues(
     hasValues[CALL_ARG_3] = userColor.disable.has_value();
 }
 
-Local<JSValueRef> JsPreventDefault(panda::JsiRuntimeCallInfo* info)
+static Local<JSValueRef> JsPreventDefault(panda::JsiRuntimeCallInfo* info)
 {
     Local<JSValueRef> thisObj = info->GetThisRef();
     auto eventInfo =
         static_cast<BaseEventInfo*>(panda::Local<panda::ObjectRef>(thisObj)->GetNativePointerField(info->GetVM(), 0));
     if (eventInfo) {
         eventInfo->SetPreventDefault(true);
+    } else {
+        LOGE("JsPreventDefault failed. eventInfo is null.");
     }
     return JSValueRef::Undefined(info->GetVM());
 }
 
-Local<JSValueRef> JsKeepEditableState(panda::JsiRuntimeCallInfo* info)
+static Local<JSValueRef> JsKeepEditableState(panda::JsiRuntimeCallInfo* info)
 {
     Local<JSValueRef> thisObj = info->GetThisRef();
     auto eventInfo = static_cast<NG::TextFieldCommonEvent*>(
         panda::Local<panda::ObjectRef>(thisObj)->GetNativePointerField(info->GetVM(), 0));
     if (eventInfo) {
         eventInfo->SetKeepEditable(true);
+    } else {
+        LOGE("JsKeepEditableState failed. eventInfo is null.");
     }
     return JSValueRef::Undefined(info->GetVM());
 }
@@ -1768,16 +1773,22 @@ ArkUINativeModuleValue TextInputBridge::SetMaxLength(ArkUIRuntimeCallInfo *runti
     bool isJsView = ArkTSUtils::IsJsView(firstArg, vm);
     if ((isJsView && secondArg->IsUndefined()) || !secondArg->IsNumber()) {
         GetArkUINodeModifiers()->getTextInputModifier()->resetTextInputMaxLength(nativeNode);
+        return panda::JSValueRef::Undefined(vm);
+    }
+    const bool isInfinity = std::isinf(static_cast<float>(secondArg->ToNumber(vm)->Value()));
+    uint32_t maxLength = 0;
+    bool isMaxLengthValid = true;
+    if (isJsView) {
+        const int32_t length = isInfinity ? INT32_MAX : secondArg->Int32Value(vm);
+        isMaxLengthValid = GreatOrEqual(length, 0);
+        maxLength = static_cast<uint32_t>(length);
     } else {
-        uint32_t maxLength = secondArg->Uint32Value(vm);
-        if (std::isinf(static_cast<float>(secondArg->ToNumber(vm)->Value()))) {
-            maxLength = INT32_MAX; // Infinity
-        }
-        if (GreatOrEqual(maxLength, 0)) {
-            GetArkUINodeModifiers()->getTextInputModifier()->setTextInputMaxLength(nativeNode, maxLength);
-        } else {
-            GetArkUINodeModifiers()->getTextInputModifier()->resetTextInputMaxLength(nativeNode);
-        }
+        maxLength = isInfinity ? static_cast<uint32_t>(INT32_MAX) : secondArg->Uint32Value(vm);
+    }
+    if (isMaxLengthValid) {
+        GetArkUINodeModifiers()->getTextInputModifier()->setTextInputMaxLength(nativeNode, maxLength);
+    } else {
+        GetArkUINodeModifiers()->getTextInputModifier()->resetTextInputMaxLength(nativeNode);
     }
     return panda::JSValueRef::Undefined(vm);
 }
@@ -1910,6 +1921,7 @@ ArkUINativeModuleValue TextInputBridge::SetPlaceholderFont(ArkUIRuntimeCallInfo 
     Local<JSValueRef> jsStyle = runtimeCallInfo->GetCallArgRef(4);
     ArkUINodeHandle nativeNode = nullptr;
     CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
+    bool isJsView = ArkTSUtils::IsJsView(firstArg, vm);
     ArkUILengthType length{ nullptr, DEFAULT_FONT_SIZE, static_cast<int8_t>(DimensionUnit::FP) };
     CalcDimension size(DEFAULT_FONT_SIZE, DimensionUnit::FP);
     RefPtr<ResourceObject> fontSizeObject;
@@ -1925,8 +1937,10 @@ ArkUINativeModuleValue TextInputBridge::SetPlaceholderFont(ArkUIRuntimeCallInfo 
     } else {
         length.number = size.Value();
     }
-    
-    std::string weight = DEFAULT_FONT_WEIGHT;
+    std::string weight;
+    if (!isJsView) {
+        weight = DEFAULT_FONT_WEIGHT;
+    }
     if (!jsWeight->IsNull()) {
         if (jsWeight->IsString(vm)) {
             weight = jsWeight->ToString(vm)->ToString(vm);
@@ -1961,7 +1975,7 @@ ArkUINativeModuleValue TextInputBridge::SetPlaceholderFont(ArkUIRuntimeCallInfo 
     }
     
     GetArkUINodeModifiers()->getTextInputModifier()->setTextInputPlaceholderFont(
-        nativeNode, &placeholderFont, AceType::RawPtr(fontSizeObject), AceType::RawPtr(fontFamiliesObj));
+        nativeNode, &placeholderFont, AceType::RawPtr(fontSizeObject), AceType::RawPtr(fontFamiliesObj), isJsView);
     return panda::JSValueRef::Undefined(vm);
 }
 
@@ -3106,6 +3120,7 @@ ArkUINativeModuleValue TextInputBridge::CreateJsTextFieldCommonEvent(ArkUIRuntim
             panda::IntegerRef::New(vm, key), eventObject };
         auto ret = func->Call(vm, func.ToLocal(), params, PARAM_ARR_LENGTH_2);
         ArkTSUtils::HandleCallbackJobs(vm, trycatch, ret);
+        eventObject->SetNativePointerField(vm, 0, nullptr);
     };
     GetArkUINodeModifiers()->getTextInputModifier()->setTextInputOnSubmitWithEvent(
         nativeNode, reinterpret_cast<void*>(&callback));
@@ -3177,6 +3192,7 @@ ArkUINativeModuleValue TextInputBridge::SetOnSubmit(ArkUIRuntimeCallInfo* runtim
         panda::Local<panda::JSValueRef> params[PARAM_ARR_LENGTH_2] = {
             panda::IntegerRef::New(vm, key), eventObject };
         func->Call(vm, func.ToLocal(), params, PARAM_ARR_LENGTH_2);
+        eventObject->SetNativePointerField(vm, 0, nullptr);
     };
     GetArkUINodeModifiers()->getTextInputModifier()->setTextInputOnSubmitWithEvent(
         nativeNode, reinterpret_cast<void*>(&callback));
@@ -3639,6 +3655,7 @@ ArkUINativeModuleValue TextInputBridge::SetOnPaste(ArkUIRuntimeCallInfo* runtime
         if (isJsView) {
             ArkTSUtils::HandleCallbackJobs(vm, trycatch, ret);
         }
+        eventObject->SetNativePointerField(vm, 0, nullptr);
     };
     GetArkUINodeModifiers()->getTextInputModifier()->setTextInputOnPaste(
         nativeNode, reinterpret_cast<void*>(&callback));
@@ -4427,6 +4444,7 @@ IMEAttachCallback TextInputBridge::ParseAndCreateIMEAttachCallback(
         if (isJsView) {
             ArkTSUtils::HandleCallbackJobs(vm, trycatch, result);
         }
+        imeClientObj->SetNativePointerField(vm, 0, nullptr);
     };
     return callback;
 }
@@ -4437,7 +4455,11 @@ Local<JSValueRef> TextInputBridge::JsSetIMEExtraInfo(ArkUIRuntimeCallInfo* info)
 #ifdef ENABLE_STANDARD_INPUT
     auto imeClient =
         static_cast<IMEClient*>(panda::Local<panda::ObjectRef>(info->GetThisRef())->GetNativePointerField(vm, 0));
-    if (info->GetArgsNumber() <= 0 || !imeClient) {
+    if (!imeClient) {
+        LOGE("JsSetIMEExtraInfo failed. imeClient is null.");
+        return JSValueRef::Undefined(vm);
+    }
+    if (info->GetArgsNumber() <= 0) {
         return JSValueRef::Undefined(vm);
     }
     Local<JSValueRef> arg = info->GetCallArgRef(0);

@@ -175,6 +175,7 @@ struct OH_ArkUI_ImageAttachment {
     std::optional<float> resizableSliceRight;
     std::optional<float> resizableSliceBottom;
     OH_Drawing_Lattice* resizableLattice = nullptr;
+    std::optional<std::string> imageTag = std::nullopt;
 };
 
 struct OH_ArkUI_SpanStyle {

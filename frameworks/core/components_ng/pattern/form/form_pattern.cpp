@@ -716,6 +716,7 @@ void FormPattern::OnColorConfigurationUpdate()
     if (!SystemProperties::ConfigChangePerform()) {
         return;
     }
+    UpdateSpecialStyleCfg();
     OnModifyDone();
 }
 
@@ -1090,9 +1091,11 @@ void FormPattern::UpdateFormComponentSize(const RequestFormInfo& info)
         layoutConstraint.maxSize = idealSize;
         if (imageNode != nullptr) {
             imageNode->UpdateLayoutConstraint(layoutConstraint);
+            imageNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
         }
         if (disableStyleRootNode != nullptr) {
             disableStyleRootNode->UpdateLayoutConstraint(layoutConstraint);
+            disableStyleRootNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
         }
     }
 
@@ -1883,6 +1886,13 @@ void FormPattern::FireFormSurfaceDetachCallback()
 {
     TAG_LOGI(AceLogTag::ACE_FORM, "FireFormSurfaceDetachCallback isFrsNodeDetached:%{public}d", isFrsNodeDetached_);
     isFrsNodeDetached_ = true;
+    // Remove the stale frsNode so the next rebuild re-adds it when rendering falls back to this host.
+    CHECK_NULL_VOID(formTaskExecutor_);
+    formTaskExecutor_->PostUITask([weak = WeakClaim(this)] {
+        auto formPattern = weak.Upgrade();
+        CHECK_NULL_VOID(formPattern);
+        formPattern->RemoveFrsNode();
+        }, "ArkUIFormRemoveFrsNodeOnDetach");
 }
 
 void FormPattern::CreateCardContainer()
@@ -2059,7 +2069,7 @@ void FormPattern::OnActionEvent(const std::string& action)
     }
 
     auto type = actionType->GetString();
-    if (type != "router" && type != "message" && type != "call") {
+    if (type != "router" && type != "message" && type != "call" && type != "insightIntent") {
         TAG_LOGE(AceLogTag::ACE_FORM, "action type: %{public}s is error.", type.c_str());
         return;
     }
@@ -2074,12 +2084,15 @@ void FormPattern::OnActionEvent(const std::string& action)
     if (!isManuallyClick_ && subContainer->GetUISyntaxType() == FrontendType::ETS_CARD) {
         EventReport::ReportNonManualPostCardActionInfo(cardInfo_.cardName, cardInfo_.bundleName, cardInfo_.abilityName,
             cardInfo_.moduleName, cardInfo_.dimension);
-        if ("router" == type && !AceApplicationInfo::GetInstance().IsAccessibilityEnabled()) {
+        if (("router" == type || "insightIntent" == type) &&
+            !AceApplicationInfo::GetInstance().IsAccessibilityEnabled()) {
             TAG_LOGW(AceLogTag::ACE_FORM, "postcardaction is not manually click.");
             return;
         }
     }
-
+    if ("insightIntent" == type) {
+        isManuallyClick_ = false;
+    }
     if ("router" == type) {
         isManuallyClick_ = false;
         if (formTaskExecutor_->IsRunOnUIThread()) {

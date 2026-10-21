@@ -424,12 +424,14 @@ export class ChipGroupV2 extends ViewV2 {
         this.initParam("chipGroupSpace", (params && "chipGroupSpace" in params) ? params.chipGroupSpace : defaultTheme.chipGroupSpace);
         this.initParam("chipGroupPadding", (params && "chipGroupPadding" in params) ? params.chipGroupPadding : defaultTheme.chipGroupPadding);
         this.onChange = "onChange" in params ? params.onChange : () => { };
+        this.onItemsChange = "onItemsChange" in params ? params.onItemsChange : undefined;
         this.suffix = "suffix" in params ? params.suffix : undefined;
         this.chipSize = defaultTheme.size;
         this.scroller = new Scroller();
         this.selectedIndexesInternal = [0];
         this.isReachEnd = this.scroller.isAtEnd();
         this.isRefresh = true;
+        this.closedIndexes = [];
         this.finalizeConstruction();
     }
     resetStateVarsOnReuse(params) {
@@ -442,14 +444,19 @@ export class ChipGroupV2 extends ViewV2 {
         this.resetParam("chipGroupSpace", (params && "chipGroupSpace" in params) ? params.chipGroupSpace : defaultTheme.chipGroupSpace);
         this.resetParam("chipGroupPadding", (params && "chipGroupPadding" in params) ? params.chipGroupPadding : defaultTheme.chipGroupPadding);
         this.onChange = "onChange" in params ? params.onChange : () => { };
+        this.onItemsChange = "onItemsChange" in params ? params.onItemsChange : undefined;
         this.suffix = "suffix" in params ? params.suffix : undefined;
         this.chipSize = defaultTheme.size;
         this.selectedIndexesInternal = [0];
         this.isReachEnd = this.scroller.isAtEnd();
         this.isRefresh = true;
+        this.closedIndexes = [];
         this.resetMonitorsOnReuse();
     }
-    onItemsChange() {
+    onItemsChangeInternal() {
+        if (this.closedIndexes.length > 0) {
+            this.closedIndexes = [];
+        }
         this.isRefresh = !this.isRefresh;
     }
     onMultipleChange() {
@@ -463,6 +470,13 @@ export class ChipGroupV2 extends ViewV2 {
     }
     selectedIndexesOnChange() {
         this.selectedIndexesInternal = this.selectedIndexes?.filter(() => true);
+    }
+    onItemClose(index) {
+        if (!this.onItemsChange || this.closedIndexes.includes(index)) {
+            return;
+        }
+        this.closedIndexes.push(index);
+        this.onItemsChange?.(this.items.filter((element, i) => !this.closedIndexes.includes(i)));
     }
     aboutToAppear() {
         this.itemStyleOnChange();
@@ -655,6 +669,7 @@ export class ChipGroupV2 extends ViewV2 {
                                                     this.$items?.(this.items.filter((element) => {
                                                         return element !== chipItem;
                                                     }));
+                                                    this.onItemClose(index);
                                                 }
                                             }) }, undefined, elmtId, () => { }, { page: "components/src/main/ets/components/ChipGroupV2.ets", line: 615, col: 11 });
                                         ViewV2.create(componentCall);
@@ -708,6 +723,7 @@ export class ChipGroupV2 extends ViewV2 {
                                                         this.$items?.(this.items.filter((element) => {
                                                             return element !== chipItem;
                                                         }));
+                                                        this.onItemClose(index);
                                                     }
                                                 })
                                             };
@@ -764,6 +780,7 @@ export class ChipGroupV2 extends ViewV2 {
                                                     this.$items?.(this.items.filter((element) => {
                                                         return element !== chipItem;
                                                     }));
+                                                    this.onItemClose(index);
                                                 }
                                             })
                                         });
@@ -1018,6 +1035,9 @@ __decorate([
     Event
 ], ChipGroupV2.prototype, "onChange", void 0);
 __decorate([
+    Event
+], ChipGroupV2.prototype, "onItemsChange", void 0);
+__decorate([
     Provider()
 ], ChipGroupV2.prototype, "chipSize", void 0);
 __decorate([
@@ -1031,7 +1051,7 @@ __decorate([
 ], ChipGroupV2.prototype, "isRefresh", void 0);
 __decorate([
     Monitor('items')
-], ChipGroupV2.prototype, "onItemsChange", null);
+], ChipGroupV2.prototype, "onItemsChangeInternal", null);
 __decorate([
     Monitor('multiple')
 ], ChipGroupV2.prototype, "onMultipleChange", null);

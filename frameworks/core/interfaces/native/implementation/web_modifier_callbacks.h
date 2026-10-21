@@ -70,6 +70,8 @@ void DefaultOnFullScreenVideoOverlayEnter(
     WeakPtr<FrameNode> weakNode, int32_t instanceId, const BaseEventInfo* info);
 void OnDetectedBlankScreen(const CallbackHelper<OnDetectBlankScreenCallback>& arkCallback,
     WeakPtr<FrameNode> weakNode, int32_t instanceId, const BaseEventInfo* info);
+void OnMonitoredBlankScreen(const CallbackHelper<OnMonitorBlankScreenCallback>& arkCallback,
+    WeakPtr<FrameNode> weakNode, int32_t instanceId, const BaseEventInfo* info);
 void OnTextSelectionChange(const CallbackHelper<TextSelectionChangeCallback>& arkCallback,
     WeakPtr<FrameNode> weakNode, int32_t instanceId, const BaseEventInfo* info);
 void OnFirstScreenPaint(const CallbackHelper<OnFirstScreenPaintCallback>& arkCallback,
@@ -81,6 +83,8 @@ void OnFullScreenExit(const CallbackHelper<Callback_Void>& arkCallback,
 void OnFullScreenEnter(const CallbackHelper<OnFullScreenEnterCallback>& arkCallback,
     WeakPtr<FrameNode> weakNode, int32_t instanceId, const BaseEventInfo* info);
 void OnScaleChange(const CallbackHelper<Callback_OnScaleChangeEvent_Void>& arkCallback,
+    WeakPtr<FrameNode> weakNode, int32_t instanceId, const BaseEventInfo* info);
+void OnZoomChange(const CallbackHelper<OnZoomChangeCallback>& arkCallback,
     WeakPtr<FrameNode> weakNode, int32_t instanceId, const BaseEventInfo* info);
 bool OnHttpAuthRequest(const CallbackHelper<Callback_OnHttpAuthRequestEvent_Boolean>& arkCallback,
     WeakPtr<FrameNode> weakNode, int32_t instanceId, const BaseEventInfo* info);
@@ -100,6 +104,9 @@ bool OnContextMenuShow(const CallbackHelper<Callback_OnContextMenuShowEvent_Bool
     WeakPtr<FrameNode> weakNode, int32_t instanceId, const BaseEventInfo* info);
 void OnContextMenuHide(const CallbackHelper<OnContextMenuHideCallback>& arkCallback,
     WeakPtr<FrameNode> weakNode, int32_t instanceId, const BaseEventInfo* info);
+void OnContextMenuUpdate(const CallbackHelper<OnContextMenuUpdateCallback>& arkCallback,
+    WeakPtr<FrameNode> weakNode, int32_t instanceId, WebContextMenuItemId menuItemId,
+    const WebContextMenuOptions& options);
 void OnSearchResultReceive(const CallbackHelper<Callback_OnSearchResultReceiveEvent_Void>& arkCallback,
     WeakPtr<FrameNode> weakNode, int32_t instanceId, const BaseEventInfo* info);
 void OnScroll(const CallbackHelper<Callback_OnScrollEvent_Void>& arkCallback,

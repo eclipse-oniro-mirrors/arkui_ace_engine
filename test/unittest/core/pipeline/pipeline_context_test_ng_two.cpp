@@ -13,6 +13,15 @@
  * limitations under the License.
  */
 
+#include <cstddef>
+#include <limits>
+#include <memory>
+#include <type_traits>
+#include <unistd.h>
+#include <utility>
+#include <vector>
+
+#include "test/mock/ohos_mock/rosen/render_service_client/core/ui/rs_mock.h"
 #include "test/unittest/core/pipeline/pipeline_context_test_ng.h"
 // Add the following two macro definitions to test the private and protected method.
 #define private public
@@ -42,6 +51,293 @@ using namespace testing::ext;
 
 namespace OHOS::Ace {
 namespace NG {
+
+/**
+ * @tc.name: FrameMetricsApiContract
+ * @tc.desc: Verify the type, default value, and append-only order of the new FrameMetrics fields.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextTestNg, FrameMetricsApiContract, TestSize.Level1)
+{
+    static_assert(std::is_same_v<decltype(FrameMetrics::actualStartTime), uint64_t>);
+    static_assert(std::is_same_v<decltype(FrameMetrics::totalDuration), uint64_t>);
+
+    FrameMetrics frameMetrics;
+    EXPECT_EQ(frameMetrics.actualStartTime, 0);
+    EXPECT_EQ(frameMetrics.totalDuration, 0);
+    EXPECT_LT(offsetof(FrameMetrics, layoutMeasureDuration), offsetof(FrameMetrics, actualStartTime));
+    EXPECT_LT(offsetof(FrameMetrics, actualStartTime), offsetof(FrameMetrics, totalDuration));
+}
+
+/**
+ * @tc.name: FrameMetricsFlushVsyncCallback
+ * @tc.desc: Verify a submitted frame reports the actual start time and total duration once.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextTestNg, FrameMetricsFlushVsyncCallback, TestSize.Level1)
+{
+    ASSERT_NE(context_, nullptr);
+    auto window = static_cast<MockWindow*>(context_->window_.get());
+    ASSERT_NE(window, nullptr);
+    auto director = Rosen::RSUIDirector::Create(nullptr);
+    ASSERT_NE(director, nullptr);
+    ON_CALL(*window, GetRSUIDirector()).WillByDefault(Return(director));
+
+    FrameMetrics observedMetrics;
+    int32_t callbackCount = 0;
+    const bool originalFreezeFlushMessage = context_->IsFreezeFlushMessage();
+    const bool originalOnShow = context_->onShow_;
+    const bool originalOnFocus = context_->onFocus_;
+    const bool originalBackgroundColorModeUpdated = context_->backgroundColorModeUpdated_;
+    context_->SetFrameMetricsCallBack([&observedMetrics, &callbackCount](FrameMetrics info) {
+        observedMetrics = info;
+        ++callbackCount;
+    });
+    context_->SetIsFreezeFlushMessage(false);
+    context_->backgroundColorModeUpdated_ = false;
+    context_->onShow_ = true;
+    context_->onFocus_ = false;
+    context_->FlushVsync(NANO_TIME_STAMP, FRAME_COUNT);
+
+    EXPECT_EQ(callbackCount, 1);
+    EXPECT_EQ(observedMetrics.vsyncTimestamp, NANO_TIME_STAMP);
+    EXPECT_GT(observedMetrics.actualStartTime, 0);
+    EXPECT_GT(observedMetrics.totalDuration, 0);
+    EXPECT_GE(
+        observedMetrics.totalDuration, observedMetrics.inputHandlingDuration + observedMetrics.layoutMeasureDuration);
+
+    context_->frameMetricsCallBack_ = nullptr;
+    context_->SetIsFreezeFlushMessage(originalFreezeFlushMessage);
+    context_->onShow_ = originalOnShow;
+    context_->onFocus_ = originalOnFocus;
+    context_->backgroundColorModeUpdated_ = originalBackgroundColorModeUpdated;
+    ON_CALL(*window, GetRSUIDirector()).WillByDefault(Return(nullptr));
+}
+
+/**
+ * @tc.name: FrameMetricsFreezeFrame
+ * @tc.desc: Verify a frozen submission preserves the start time and still reports total duration.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextTestNg, FrameMetricsFreezeFrame, TestSize.Level1)
+{
+    ASSERT_NE(context_, nullptr);
+    auto window = static_cast<MockWindow*>(context_->window_.get());
+    ASSERT_NE(window, nullptr);
+    int32_t flushCount = 0;
+    ON_CALL(*window, FlushTasks(_)).WillByDefault([&flushCount](std::function<void()>) { ++flushCount; });
+    FrameMetrics observedMetrics;
+    int32_t callbackCount = 0;
+    const bool originalFreezeFlushMessage = context_->IsFreezeFlushMessage();
+    const bool originalOnShow = context_->onShow_;
+    const bool originalOnFocus = context_->onFocus_;
+    const bool originalBackgroundColorModeUpdated = context_->backgroundColorModeUpdated_;
+    context_->SetFrameMetricsCallBack([&observedMetrics, &callbackCount](FrameMetrics info) {
+        observedMetrics = info;
+        ++callbackCount;
+    });
+    context_->SetIsFreezeFlushMessage(true);
+    context_->backgroundColorModeUpdated_ = false;
+    context_->onShow_ = true;
+    context_->onFocus_ = false;
+    context_->FlushVsync(NANO_TIME_STAMP, FRAME_COUNT);
+
+    EXPECT_EQ(callbackCount, 1);
+    EXPECT_GT(observedMetrics.actualStartTime, 0);
+    EXPECT_GT(observedMetrics.totalDuration, 0);
+    EXPECT_FALSE(context_->IsFreezeFlushMessage());
+    EXPECT_EQ(flushCount, 0);
+    context_->frameMetricsCallBack_ = nullptr;
+    context_->SetIsFreezeFlushMessage(originalFreezeFlushMessage);
+    context_->onShow_ = originalOnShow;
+    context_->onFocus_ = originalOnFocus;
+    context_->backgroundColorModeUpdated_ = originalBackgroundColorModeUpdated;
+    ON_CALL(*window, FlushTasks(_)).WillByDefault([](std::function<void()>) {});
+}
+
+/**
+ * @tc.name: FrameMetricsMissingDirector
+ * @tc.desc: Verify a missing RS director still reports total duration.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextTestNg, FrameMetricsMissingDirector, TestSize.Level1)
+{
+    ASSERT_NE(context_, nullptr);
+    auto window = static_cast<MockWindow*>(context_->window_.get());
+    ASSERT_NE(window, nullptr);
+    int32_t flushCount = 0;
+    ON_CALL(*window, GetRSUIDirector()).WillByDefault(Return(nullptr));
+    ON_CALL(*window, FlushTasks(_)).WillByDefault([&flushCount](std::function<void()>) { ++flushCount; });
+
+    FrameMetrics observedMetrics;
+    const bool originalFreezeFlushMessage = context_->IsFreezeFlushMessage();
+    int32_t callbackCount = 0;
+    const bool originalOnShow = context_->onShow_;
+    const bool originalOnFocus = context_->onFocus_;
+    const bool originalBackgroundColorModeUpdated = context_->backgroundColorModeUpdated_;
+    context_->SetFrameMetricsCallBack([&observedMetrics, &callbackCount](FrameMetrics info) {
+        observedMetrics = info;
+        ++callbackCount;
+    });
+    context_->SetIsFreezeFlushMessage(false);
+    context_->backgroundColorModeUpdated_ = false;
+    context_->onShow_ = true;
+    context_->onFocus_ = false;
+    context_->FlushVsync(NANO_TIME_STAMP, FRAME_COUNT);
+
+    EXPECT_EQ(flushCount, 1);
+    EXPECT_EQ(callbackCount, 1);
+    EXPECT_GT(observedMetrics.actualStartTime, 0);
+    EXPECT_GT(observedMetrics.totalDuration, 0);
+
+    context_->frameMetricsCallBack_ = nullptr;
+    context_->SetIsFreezeFlushMessage(originalFreezeFlushMessage);
+    context_->onShow_ = originalOnShow;
+    context_->onFocus_ = originalOnFocus;
+    context_->backgroundColorModeUpdated_ = originalBackgroundColorModeUpdated;
+    ON_CALL(*window, FlushTasks(_)).WillByDefault([](std::function<void()>) {});
+}
+
+/**
+ * @tc.name: FrameMetricsDvSyncTimestamp
+ * @tc.desc: Verify a future DVSync timestamp does not overwrite the actual frame start time.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextTestNg, FrameMetricsDvSyncTimestamp, TestSize.Level1)
+{
+    ASSERT_NE(context_, nullptr);
+    auto window = static_cast<MockWindow*>(context_->window_.get());
+    ASSERT_NE(window, nullptr);
+    auto director = Rosen::RSUIDirector::Create(nullptr);
+    ASSERT_NE(director, nullptr);
+    ON_CALL(*window, GetRSUIDirector()).WillByDefault(Return(director));
+    constexpr uint64_t futureOffset = 1000000000;
+    const uint64_t futureVsyncTimestamp = static_cast<uint64_t>(GetSysTimestamp()) + futureOffset;
+    EXPECT_CALL(*window, FlushAnimation(futureVsyncTimestamp)).WillOnce(Return(false));
+
+    FrameMetrics observedMetrics;
+    const bool originalFreezeFlushMessage = context_->IsFreezeFlushMessage();
+    const bool originalOnShow = context_->onShow_;
+    const bool originalOnFocus = context_->onFocus_;
+    const bool originalBackgroundColorModeUpdated = context_->backgroundColorModeUpdated_;
+    context_->SetFrameMetricsCallBack([&observedMetrics](FrameMetrics info) { observedMetrics = info; });
+    context_->SetIsFreezeFlushMessage(false);
+    context_->backgroundColorModeUpdated_ = false;
+    context_->onShow_ = true;
+    context_->onFocus_ = false;
+    context_->FlushVsync(futureVsyncTimestamp, FRAME_COUNT);
+
+    EXPECT_EQ(observedMetrics.vsyncTimestamp, futureVsyncTimestamp);
+    EXPECT_GT(observedMetrics.actualStartTime, 0);
+    EXPECT_LT(observedMetrics.actualStartTime, observedMetrics.vsyncTimestamp);
+    EXPECT_GT(observedMetrics.totalDuration, 0);
+
+    context_->frameMetricsCallBack_ = nullptr;
+    context_->SetIsFreezeFlushMessage(originalFreezeFlushMessage);
+    context_->onShow_ = originalOnShow;
+    context_->onFocus_ = originalOnFocus;
+    context_->backgroundColorModeUpdated_ = originalBackgroundColorModeUpdated;
+    ON_CALL(*window, GetRSUIDirector()).WillByDefault(Return(nullptr));
+}
+
+/**
+ * @tc.name: FrameMetricsExistingContract
+ * @tc.desc: Verify the existing fields and single callback behavior remain intact.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextTestNg, FrameMetricsExistingContract, TestSize.Level1)
+{
+    static_assert(std::is_same_v<decltype(FrameMetrics::firstDrawFrame), bool>);
+    static_assert(std::is_same_v<decltype(FrameMetrics::vsyncTimestamp), uint64_t>);
+    static_assert(std::is_same_v<decltype(FrameMetrics::inputHandlingDuration), uint64_t>);
+    static_assert(std::is_same_v<decltype(FrameMetrics::layoutMeasureDuration), uint64_t>);
+
+    ASSERT_NE(context_, nullptr);
+    auto window = static_cast<MockWindow*>(context_->window_.get());
+    ASSERT_NE(window, nullptr);
+    auto director = Rosen::RSUIDirector::Create(nullptr);
+    ASSERT_NE(director, nullptr);
+    ON_CALL(*window, GetRSUIDirector()).WillByDefault(Return(director));
+    FrameMetrics observedMetrics;
+    int32_t callbackCount = 0;
+    const bool originalFirstFlushMessages = context_->isFirstFlushMessages_;
+    const bool originalFreezeFlushMessage = context_->IsFreezeFlushMessage();
+    const bool originalOnShow = context_->onShow_;
+    const bool originalOnFocus = context_->onFocus_;
+    const bool originalBackgroundColorModeUpdated = context_->backgroundColorModeUpdated_;
+    context_->SetFrameMetricsCallBack([&observedMetrics, &callbackCount](FrameMetrics info) {
+        observedMetrics = info;
+        ++callbackCount;
+    });
+    context_->isFirstFlushMessages_ = true;
+    context_->SetIsFreezeFlushMessage(false);
+    context_->backgroundColorModeUpdated_ = true;
+    context_->onShow_ = false;
+    context_->onFocus_ = false;
+    context_->FlushVsync(NANO_TIME_STAMP, FRAME_COUNT);
+
+    EXPECT_EQ(callbackCount, 1);
+    EXPECT_TRUE(observedMetrics.firstDrawFrame);
+    EXPECT_EQ(observedMetrics.vsyncTimestamp, NANO_TIME_STAMP);
+    EXPECT_GT(observedMetrics.actualStartTime, 0);
+    EXPECT_GT(observedMetrics.totalDuration, 0);
+    EXPECT_FALSE(context_->isFirstFlushMessages_);
+    EXPECT_FALSE(context_->backgroundColorModeUpdated_);
+    context_->frameMetricsCallBack_ = nullptr;
+    context_->isFirstFlushMessages_ = originalFirstFlushMessages;
+    context_->SetIsFreezeFlushMessage(originalFreezeFlushMessage);
+    context_->onShow_ = originalOnShow;
+    context_->onFocus_ = originalOnFocus;
+    context_->backgroundColorModeUpdated_ = originalBackgroundColorModeUpdated;
+    ON_CALL(*window, GetRSUIDirector()).WillByDefault(Return(nullptr));
+}
+
+/**
+ * @tc.name: FrameMetricsCoversRSSubmission
+ * @tc.desc: Verify totalDuration covers the RS submission phase. Inject a known delay inside
+ *           window_->FlushVsync() and assert totalDuration includes it, confirming submitEndTime
+ *           is captured after (not before) the actual RS submission.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextTestNg, FrameMetricsCoversRSSubmission, TestSize.Level1)
+{
+    ASSERT_NE(context_, nullptr);
+    auto originalWindow = context_->window_;
+    ASSERT_NE(originalWindow, nullptr);
+
+    constexpr int32_t DELAY_US = 30000;
+    class FrameMetricsSubmissionWindow : public NiceMock<MockWindow> {
+    public:
+        explicit FrameMetricsSubmissionWindow(int32_t delayUs) : delayUs_(delayUs) {}
+        void FlushVsync() override
+        {
+            beforeFlushVsync = GetSysTimestamp();
+            usleep(delayUs_);
+            afterFlushVsync = GetSysTimestamp();
+        }
+        int64_t beforeFlushVsync = 0;
+        int64_t afterFlushVsync = 0;
+
+    private:
+        int32_t delayUs_;
+    };
+    auto delayWindow = std::make_shared<FrameMetricsSubmissionWindow>(DELAY_US);
+    ASSERT_NE(delayWindow, nullptr);
+    context_->window_ = delayWindow;
+
+    FrameMetrics observedMetrics;
+    context_->SetFrameMetricsCallBack([&observedMetrics](FrameMetrics info) { observedMetrics = info; });
+
+    context_->FlushVsync(NANO_TIME_STAMP, FRAME_COUNT);
+
+    EXPECT_GT(delayWindow->beforeFlushVsync, 0);
+    EXPECT_GT(delayWindow->afterFlushVsync, 0);
+    EXPECT_GE(observedMetrics.totalDuration,
+        static_cast<uint64_t>(delayWindow->afterFlushVsync - delayWindow->beforeFlushVsync));
+
+    context_->frameMetricsCallBack_ = nullptr;
+    context_->window_ = originalWindow;
+}
 
 /**
  * @tc.name: PipelineContextTestNg130
@@ -1043,6 +1339,31 @@ HWTEST_F(PipelineContextTestNg, PipelineContextTestNg156, TestSize.Level1)
     context_->displayWindowRectInfo_.SetRect(100.0, 100.0, 0.0, 0.0);
     context_->SetDisplayWindowRectInfo(displayWindowRectInfo);
     EXPECT_FALSE(context_->lastMouseEvent_);
+}
+
+/**
+ * @tc.name: PipelineContextWindowInfoTest001
+ * @tc.desc: Test window information initialization state.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextTestNg, PipelineContextWindowInfoTest001, TestSize.Level1)
+{
+    ASSERT_NE(context_, nullptr);
+    auto originalWindow = context_->window_;
+    context_->window_ = std::make_shared<Window>();
+
+    EXPECT_FALSE(context_->window_->IsWindowInfoInitialized());
+
+    context_->SetDisplayWindowRectInfo(Rect(0.0, 0.0, 0.0, 100.0));
+    EXPECT_FALSE(context_->window_->IsWindowInfoInitialized());
+
+    context_->SetDisplayWindowRectInfo(Rect(0.0, 0.0, 100.0, 0.0));
+    EXPECT_FALSE(context_->window_->IsWindowInfoInitialized());
+
+    context_->SetDisplayWindowRectInfo(Rect(0.0, 0.0, 100.0, 100.0));
+    EXPECT_TRUE(context_->window_->IsWindowInfoInitialized());
+
+    context_->window_ = originalWindow;
 }
 
 /**
@@ -2802,5 +3123,167 @@ HWTEST_F(PipelineContextTestNg, PipelineContextTestNg410, TestSize.Level1)
     }
     EXPECT_EQ(context_->compatibleManager_.GetCurrentStateType(), StateType::IDLE);
 }
+} // namespace NG
+
+namespace NG {
+namespace {
+// A fresh Window for every case. Restore the shared fixture even after ASSERT failures.
+class WindowInfoStateGuard final {
+public:
+    explicit WindowInfoStateGuard(const RefPtr<PipelineContext>& context)
+        : context_(context), oldWindow_(context->window_), oldRect_(context->displayWindowRectInfo_),
+          oldMouse_(std::move(context->lastMouseEvent_)), oldCallbacks_(std::move(context->surfaceChangedCallbackMap_)),
+          oldCallbackId_(context->callbackId_)
+    {
+        context_->window_ = std::make_shared<NiceMock<MockWindow>>();
+        context_->displayWindowRectInfo_ = Rect();
+        context_->surfaceChangedCallbackMap_.clear();
+    }
+
+    ~WindowInfoStateGuard()
+    {
+        context_->window_ = oldWindow_;
+        context_->displayWindowRectInfo_ = oldRect_;
+        context_->lastMouseEvent_ = std::move(oldMouse_);
+        context_->surfaceChangedCallbackMap_ = std::move(oldCallbacks_);
+        context_->callbackId_ = oldCallbackId_;
+    }
+
+    WindowInfoStateGuard(const WindowInfoStateGuard&) = delete;
+    WindowInfoStateGuard& operator=(const WindowInfoStateGuard&) = delete;
+
+private:
+    RefPtr<PipelineContext> context_;
+    std::shared_ptr<Window> oldWindow_;
+    Rect oldRect_;
+    decltype(PipelineContext::lastMouseEvent_) oldMouse_;
+    decltype(PipelineContext::surfaceChangedCallbackMap_) oldCallbacks_;
+    int32_t oldCallbackId_;
+};
+} // namespace
+
+#ifndef WINDOW_INFO_BASELINE
+/**
+ * @tc.name: WININFO_001
+ * @tc.desc: Requirement 1: a newly created, uninitialized Window returns false.
+ * @tc.type: FUNC
+ * Precondition: construct real OHOS::Ace::Window objects without receiving any window size information.
+ * Steps: create two independent Windows, query IsWindowInfoInitialized() on each, then query the first again.
+ * Expected: all queries return false; the getter does not change the initialization flag.
+ */
+HWTEST_F(PipelineContextTestNg, WININFO_001, TestSize.Level1)
+{
+    // Use Window's real default constructor to check the initial value of windowInfoInitialized_.
+    auto first = std::make_shared<Window>();
+    auto second = std::make_shared<Window>();
+    EXPECT_FALSE(first->IsWindowInfoInitialized());
+    EXPECT_FALSE(second->IsWindowInfoInitialized());
+    // A repeated query must still return false, confirming that the getter does not set the flag.
+    EXPECT_FALSE(first->IsWindowInfoInitialized());
+}
+
+/**
+ * @tc.name: WININFO_002
+ * @tc.desc: Requirement 2: the query returns true after SetDisplayWindowRectInfo receives positive width and height.
+ * @tc.type: FUNC
+ * Precondition: WindowInfoStateGuard replaces the pipeline's Window with a new, uninitialized instance.
+ * Steps: query false, then call the real setter with Rect(x=20, y=30, width=640, height=480).
+ * Expected: the same Window's query result changes from false to true.
+ * Additional assertion: a later zero size leaves the flag true, verifying that initialization is latched.
+ * Note: MockWindow isolates platform/rendering behavior; IsWindowInfoInitialized() uses the real base implementation.
+ */
+HWTEST_F(PipelineContextTestNg, WININFO_002, TestSize.Level1)
+{
+    ASSERT_NE(context_, nullptr);
+    WindowInfoStateGuard guard(context_);
+    auto window = context_->GetWindow();
+    ASSERT_NE(window, nullptr);
+    EXPECT_FALSE(window->IsWindowInfoInitialized());
+    // Width 640 and height 480 are both > 0; the real pipeline setter sets the initialization flag.
+    context_->SetDisplayWindowRectInfo(Rect(20.0, 30.0, 640.0, 480.0));
+    EXPECT_TRUE(window->IsWindowInfoInitialized());
+    // An initialized Window must not become uninitialized after receiving an invalid size.
+    context_->SetDisplayWindowRectInfo(Rect(0.0, 0.0, 0.0, 0.0));
+    EXPECT_TRUE(window->IsWindowInfoInitialized());
+}
+
+/**
+ * @tc.name: WININFO_003
+ * @tc.desc: Requirement 3: an uninitialized Window returns false when size is missing, zero, or invalid.
+ * @tc.type: FUNC
+ * Precondition: use a new, uninitialized Window that has not received valid positive width and height.
+ * Step 1: query without calling the setter to verify the default state before size information is applied.
+ * Step 2: pass zero, negative, and NaN sizes to the real setter, querying after each input.
+ * Expected: every query returns false; no invalid size should initially set the flag.
+ * Scope: simulate IPC not yet received by not calling the receiver setter; the real IPC transport is not tested.
+ * Scope: the maximum uint32_t dimension with a zero counterpart is tested separately in WININFO_003_02 below.
+ */
+HWTEST_F(PipelineContextTestNg, WININFO_003, TestSize.Level1)
+{
+    ASSERT_NE(context_, nullptr);
+    WindowInfoStateGuard guard(context_);
+    auto window = context_->GetWindow();
+    // Simulate IPC not yet received: SetDisplayWindowRectInfo has not been called, so size is not applied; expect
+    // false.
+    EXPECT_FALSE(window->IsWindowInfoInitialized());
+    const auto nan = std::numeric_limits<double>::quiet_NaN();
+    const std::vector<Rect> invalidRects {
+        // Both dimensions zero, width zero, or height zero.
+        Rect(0.0, 0.0, 0.0, 0.0), Rect(0.0, 0.0, 0.0, 100.0), Rect(0.0, 0.0, 100.0, 0.0),
+        // Negative width, negative height, or both dimensions negative.
+        Rect(0.0, 0.0, -1.0, 100.0), Rect(0.0, 0.0, 100.0, -1.0), Rect(0.0, 0.0, -1.0, -1.0),
+        // NaN width or height: neither is a valid window size.
+        Rect(0.0, 0.0, nan, 100.0), Rect(0.0, 0.0, 100.0, nan)
+    };
+    for (size_t i = 0; i < invalidRects.size(); ++i) {
+        // Include the input index in failure output to identify any invalid size that incorrectly sets the flag.
+        SCOPED_TRACE(i);
+        context_->SetDisplayWindowRectInfo(invalidRects[i]);
+        EXPECT_FALSE(window->IsWindowInfoInitialized());
+    }
+}
+
+/**
+ * @tc.name: WININFO_003_02
+ * @tc.desc: Additional parameter boundary for requirement 3: a uint32_t maximum dimension
+ * combined with a zero dimension must remain uninitialized.
+ * Rosen::Rect transports width and height as uint32_t values; this test uses the largest
+ * representable dimension without constructing a non-IPC floating-point value.
+ */
+HWTEST_F(PipelineContextTestNg, WININFO_003_02, TestSize.Level1)
+{
+    ASSERT_NE(context_, nullptr);
+    WindowInfoStateGuard guard(context_);
+    const double maxDimension = static_cast<double>(std::numeric_limits<uint32_t>::max());
+    context_->SetDisplayWindowRectInfo(Rect(0.0, 0.0, maxDimension, 0.0));
+    EXPECT_FALSE(context_->GetWindow()->IsWindowInfoInitialized());
+    // Use another fresh native window so the second subcase is independent.
+    context_->window_ = std::make_shared<NiceMock<MockWindow>>();
+    context_->SetDisplayWindowRectInfo(Rect(0.0, 0.0, 0.0, maxDimension));
+    EXPECT_FALSE(context_->GetWindow()->IsWindowInfoInitialized());
+}
+
+#endif // WINDOW_INFO_BASELINE
+
+#ifndef WINDOW_INFO_BASELINE
+/**
+ * @tc.name: WININFO_004
+ * @tc.desc: The actual ROOT_SCENE_CHANGE adapter branch supplies Offset(0,0), positive Size.
+ * Scope: this test validates the receiving pipeline; the real ROOT_SCENE_CHANGE trigger requires system-side
+ * validation.
+ */
+HWTEST_F(PipelineContextTestNg, WININFO_004, TestSize.Level1)
+{
+    ASSERT_NE(context_, nullptr);
+    WindowInfoStateGuard guard(context_);
+    EXPECT_FALSE(context_->GetWindow()->IsWindowInfoInitialized());
+    // Offset delta is exactly zero: size validity must still initialize the Window.
+    context_->SetDisplayWindowRectInfo(Rect(Offset(0.0, 0.0), Size(1080.0, 1920.0)));
+    EXPECT_EQ(context_->GetDisplayWindowRectInfo().Left(), 0.0);
+    EXPECT_EQ(context_->GetDisplayWindowRectInfo().Top(), 0.0);
+    EXPECT_TRUE(context_->GetWindow()->IsWindowInfoInitialized());
+}
+#endif // WINDOW_INFO_BASELINE
+
 } // namespace NG
 } // namespace OHOS::Ace

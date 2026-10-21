@@ -86,6 +86,7 @@ text_field_test_ng_sources = [
   "text_field_test_ng_one.cpp",
   "text_field_test_ng_three.cpp",
   "text_field_test_ng_two.cpp",
+  "text_field_text_style_optimization_test_ng.cpp",
   "text_input_base.cpp",
 ]
 

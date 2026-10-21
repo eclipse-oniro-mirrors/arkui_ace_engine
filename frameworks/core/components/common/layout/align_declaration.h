@@ -21,7 +21,7 @@
 
 namespace OHOS::Ace {
 
-class AlignDeclaration : public virtual AceType {
+class AlignDeclaration : public AceType {
     DECLARE_ACE_TYPE(AlignDeclaration, AceType);
 
 public:

@@ -206,9 +206,8 @@ std::pair<std::string, RefPtr<NG::UINode>> WaterFlowMockLazy::OnGetChildByIndex(
     auto node = ViewStackProcessor::GetInstance()->Finish();
     node->nodeId_ = index;
     auto frameNode = AceType::DynamicCast<FrameNode>(node);
-    frameNode->measureCallback_ = [](RefPtr<Kit::FrameNode>& node) {
-        NG::MockPipelineContext::GetCurrent()->DecResponseTime();
-    };
+    frameNode->measureCallback_ = std::make_unique<std::function<void(RefPtr<Kit::FrameNode>&)>>(
+        [](RefPtr<Kit::FrameNode>& node) { NG::MockPipelineContext::GetCurrent()->DecResponseTime(); });
     return { std::to_string(index), node };
 }
 
@@ -237,9 +236,8 @@ WaterFlowItemModelNG WaterFlowTestNg::CreateWaterFlowItem(float mainSize)
     SetSize(axis, CalcLength(FILL_LENGTH), CalcLength(mainSize));
     RefPtr<UINode> element = ViewStackProcessor::GetInstance()->GetMainElementNode();
     auto frameNode = AceType::DynamicCast<FrameNode>(element);
-    frameNode->measureCallback_ = [](RefPtr<Kit::FrameNode>& node) {
-        NG::MockPipelineContext::GetCurrent()->DecResponseTime();
-    };
+    frameNode->measureCallback_ = std::make_unique<std::function<void(RefPtr<Kit::FrameNode>&)>>(
+        [](RefPtr<Kit::FrameNode>& node) { NG::MockPipelineContext::GetCurrent()->DecResponseTime(); });
     return waterFlowItemModel;
 }
 
@@ -2647,6 +2645,24 @@ HWTEST_F(WaterFlowTestNg, SetEnableScrollWithMouse001, TestSize.Level1)
 }
 
 /**
+ * @tc.name: SetEnableScrollWithMouse002
+ * @tc.desc: Test default value (vertical → false)
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowTestNg, SetEnableScrollWithMouse002, TestSize.Level1)
+{
+    WaterFlowModelNG model = CreateWaterFlow();
+    model.SetColumnsTemplate("1fr 1fr");
+    CreateWaterFlowItems(4);
+    CreateDone();
+    EXPECT_FALSE(pattern_->GetIsAllowMouse());
+    pattern_->SetIsAllowMouse(true);
+    EXPECT_TRUE(pattern_->GetIsAllowMouse());
+    pattern_->ResetIsAllowMouse();
+    EXPECT_FALSE(pattern_->GetIsAllowMouse());
+}
+
+/**
  * @tc.name: ItemFillPolicyTestWithWidth500
  * @tc.desc: Test specify the number of columnsTemplate on waterFlow for width 500 in different responsive breakpoints
  * @tc.type: FUNC
@@ -3066,7 +3082,8 @@ HWTEST_F(WaterFlowTestNg, DirtyVisibleItemMeasuredDuringScroll001, TestSize.Leve
     ASSERT_TRUE(stack);
 
     int32_t measureCount = 0;
-    stack->measureCallback_ = [&measureCount](RefPtr<Kit::FrameNode>&) { ++measureCount; };
+    stack->measureCallback_ = std::make_unique<std::function<void(RefPtr<Kit::FrameNode>&)>>(
+        [&measureCount](RefPtr<Kit::FrameNode>&) { ++measureCount; });
     item->AddChild(stack);
     stack->SetActive(false);
     item->MarkDirtyNode(PROPERTY_UPDATE_BY_CHILD_REQUEST);
@@ -3105,7 +3122,8 @@ HWTEST_F(WaterFlowTestNg, DirtyVisibleItemMeasuredDuringScroll002, TestSize.Leve
     auto stack = FrameNode::CreateFrameNode(
         V2::STACK_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<StackPattern>());
     int32_t measureCount = 0;
-    stack->measureCallback_ = [&measureCount](RefPtr<Kit::FrameNode>&) { ++measureCount; };
+    stack->measureCallback_ = std::make_unique<std::function<void(RefPtr<Kit::FrameNode>&)>>(
+        [&measureCount](RefPtr<Kit::FrameNode>&) { ++measureCount; });
     item3->AddChild(stack);
     stack->SetActive(false);
     item3->MarkDirtyNode(PROPERTY_UPDATE_BY_CHILD_REQUEST);

@@ -56,20 +56,22 @@ void ConvertGetCountCallbackFun(
         auto attachCurrentThreadStatus = GetAniEnv(vm, &env);
         CHECK_NULL_RETURN(env, 0);
         if (ANI_OK != env->CreateLocalScope(SPECIFIED_CAPACITY)) {
+            if (attachCurrentThreadStatus == ANI_OK) {
+                vm->DetachCurrentThread();
+            }
             return 0;
         }
         std::vector<ani_ref> args = {};
         ani_ref ret = nullptr;
         callbackAni->Call(env, args.size(), args.data(), &ret);
+        ani_int aniValue = 0;
+        if (ANI_OK != env->Object_CallMethodByName_Int((ani_object)ret, "toInt", ":i", &aniValue)) {
+            aniValue = 0;
+        }
+        env->DestroyLocalScope();
         if (attachCurrentThreadStatus == ANI_OK) {
             vm->DetachCurrentThread();
         }
-        ani_int aniValue = 0;
-        if (ANI_OK != env->Object_CallMethodByName_Int((ani_object)ret, "toInt", ":i", &aniValue)) {
-            env->DestroyLocalScope();
-            return 0;
-        }
-        env->DestroyLocalScope();
         return aniValue;
     };
 }

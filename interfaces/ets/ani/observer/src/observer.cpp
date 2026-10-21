@@ -131,6 +131,7 @@ public:
         auto& holder = iter->second;
         if (cb == nullptr) {
             holder.clear();
+            TAG_LOGI(AceLogTag::ACE_OBSERVER, "SubEvent op=off_all, kit=ArkUI, event=densityUpdate");
             return;
         }
         holder.erase(std::remove_if(
@@ -476,6 +477,7 @@ public:
     {
         if (cb == nullptr) {
             unspecifiedNavigationListeners_.clear();
+            TAG_LOGI(AceLogTag::ACE_OBSERVER, "SubEvent op=off_all, kit=ArkUI, event=navDestinationUpdate");
             return;
         }
 
@@ -510,6 +512,8 @@ public:
         auto& holder = iter->second;
         if (cb == nullptr) {
             holder.clear();
+            TAG_LOGI(AceLogTag::ACE_OBSERVER,
+                "SubEvent op=off_all, kit=ArkUI, event=navDestinationUpdate, id=%{public}s", navigationId.c_str());
             return;
         }
         holder.erase(std::remove_if(
@@ -660,6 +664,7 @@ public:
                 env->GlobalReference_Delete(callback);
             }
             unspecifiedTabChangeListeners_.clear();
+            TAG_LOGI(AceLogTag::ACE_OBSERVER, "SubEvent op=off_all, kit=ArkUI, event=tabChange");
             return;
         }
 
@@ -702,6 +707,8 @@ public:
                 env->GlobalReference_Delete(callback);
             }
             holder.clear();
+            TAG_LOGI(AceLogTag::ACE_OBSERVER,
+                "SubEvent op=off_all, kit=ArkUI, event=tabChange, id=%{public}s", id.c_str());
             return;
         }
         holder.erase(std::remove_if(
@@ -742,6 +749,7 @@ public:
     {
         if (cb == nullptr) {
             unspecifiedTabContentListeners_.clear();
+            TAG_LOGI(AceLogTag::ACE_OBSERVER, "SubEvent op=off_all, kit=ArkUI, event=tabContentUpdate");
             return;
         }
         unspecifiedTabContentListeners_.erase(
@@ -759,6 +767,8 @@ public:
         auto& holder = iter->second;
         if (cb == nullptr) {
             holder.clear();
+            TAG_LOGI(AceLogTag::ACE_OBSERVER,
+                "SubEvent op=off_all, kit=ArkUI, event=tabContentUpdate, id=%{public}s", id.c_str());
             return;
         }
         holder.erase(std::remove_if(holder.begin(),
@@ -798,6 +808,7 @@ public:
         auto& holder = iter->second;
         if (cb == nullptr) {
             holder.clear();
+            TAG_LOGI(AceLogTag::ACE_OBSERVER, "SubEvent op=off_all, kit=ArkUI, event=routerPageUpdate");
             return;
         }
         holder.erase(std::remove_if(
@@ -848,6 +859,7 @@ public:
         auto& listeners = it->second;
         if (cb == nullptr) {
             listeners.clear();
+            TAG_LOGI(AceLogTag::ACE_OBSERVER, "SubEvent op=off_all, kit=ArkUI, event=navDestinationSwitch");
         } else {
             listeners.erase(std::remove_if(listeners.begin(), listeners.end(),
                                 [env, cb](ani_ref cb1) { return AniEqual(env, cb, cb1); }),
@@ -1304,8 +1316,9 @@ public:
         ani_enum_item navDesStateItem;
         ani_size enumIndex = static_cast<ani_size>(info.state);
         if (info.state == NG::NavDestinationState::ON_BACKPRESS) {
-            // value of ON_BACKPRESS is 100, but index of ON_BACKPRESS is 10
-            enumIndex = 10;
+            // value of ON_BACKPRESS is 100, but index is 12
+            // (after ABOUT_TO_APPEAR at index 10 and ABOUT_TO_DISAPPEAR at index 11)
+            enumIndex = 12;
         }
         ani_status status;
         if ((status = env->Enum_GetEnumItemByIndex(navDesState, enumIndex, &navDesStateItem)) != ANI_OK) {

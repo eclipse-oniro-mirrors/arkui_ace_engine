@@ -14,7 +14,10 @@
  */
 
 #include "ui_observer_listener.h"
+#include "core/components_ng/base/observer_handler.h"
+#include "base/utils/napi_scope_raii.h"
 #include "js_native_api.h"
+#include "napi/native_common.h"
 #include "core/common/container.h"
 #include "core/event/ace_events.h"
 #include "interfaces/napi/kits/observer/gesture/gesture_observer_listener.h"
@@ -114,9 +117,8 @@ napi_value GetNavDestinationParam(napi_env env, const NG::NavDestinationInfo& in
     if (!env) {
         return nullptr;
     }
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env);
+    if (!scope) {
         return nullptr;
     }
     napi_value globalValue;
@@ -130,10 +132,8 @@ napi_value GetNavDestinationParam(napi_env env, const NG::NavDestinationInfo& in
     napi_value interopParam = nullptr;
     if (napi_call_function(env, jsonClass, parseFunc, 1, &stringifiedParamNapi, &interopParam) != napi_ok) {
         napi_get_and_clear_last_exception(env, &interopParam);
-        napi_close_handle_scope(env, scope);
         return nullptr;
     }
-    napi_close_handle_scope(env, scope);
     return interopParam;
 }
 
@@ -155,23 +155,20 @@ static GestureEvent* GetBaseEventInfo(
 
 static napi_value GetModifierKeyState(napi_env env, napi_callback_info info)
 {
-    napi_escapable_handle_scope scope = nullptr;
-    auto status = napi_open_escapable_handle_scope(env, &scope);
-    if (status != napi_ok) {
+    EscapableScopeRAII scope(env);
+    if (!scope) {
         return nullptr;
     }
     size_t argc = PARAM_SIZE_ONE;
     napi_value argv = nullptr;
     GestureEvent* gestureEventInfo = GetBaseEventInfo(env, info, &argc, &argv);
     if (!gestureEventInfo) {
-        napi_close_escapable_handle_scope(env, scope);
         return nullptr;
     }
 
     bool ret = false;
-    status = napi_is_array(env, argv, &ret);
+    napi_status status = napi_is_array(env, argv, &ret);
     if (status != napi_ok) {
-        napi_close_escapable_handle_scope(env, scope);
         return nullptr;
     }
     auto pressedKeyCodes = gestureEventInfo->GetPressedKeyCodes();
@@ -197,8 +194,7 @@ static napi_value GetModifierKeyState(napi_env env, napi_callback_info info)
     napi_value result = nullptr;
     napi_get_boolean(env, checkRet, &result);
     napi_value newResult = nullptr;
-    napi_escape_handle(env, scope, result, &newResult);
-    napi_close_escapable_handle_scope(env, scope);
+    scope.Escape(result, &newResult);
     return newResult;
 }
 
@@ -270,14 +266,15 @@ bool SetCurrentLocalLocationForGestureEvent(napi_env env, napi_value result, con
 
 static napi_value GetCurrentLocalPositionForTapLocation(napi_env env, napi_callback_info info)
 {
-    napi_escapable_handle_scope scope = nullptr;
-    NAPI_CALL(env, napi_open_escapable_handle_scope(env, &scope));
+    EscapableScopeRAII scope(env);
+    if (!scope) {
+        return nullptr;
+    }
     napi_value thisArg;
     napi_get_cb_info(env, info, nullptr, nullptr, &thisArg, nullptr);
     GestureEvent* wrapper = nullptr;
     auto status = napi_unwrap(env, thisArg, reinterpret_cast<void**>(&wrapper));
     if (status != napi_ok || !wrapper) {
-        napi_close_escapable_handle_scope(env, scope);
         return nullptr;
     }
     Offset offset = wrapper->GetCurrentLocalLocation();
@@ -290,21 +287,21 @@ static napi_value GetCurrentLocalPositionForTapLocation(napi_env env, napi_callb
     napi_set_named_property(env, result, "x", x);
     napi_set_named_property(env, result, "y", y);
     napi_value newResult = nullptr;
-    napi_escape_handle(env, scope, result, &newResult);
-    napi_close_escapable_handle_scope(env, scope);
+    scope.Escape(result, &newResult);
     return newResult;
 }
 
 static napi_value GetCurrentLocalPositionForFingerInfo(napi_env env, napi_callback_info info)
 {
-    napi_escapable_handle_scope scope = nullptr;
-    NAPI_CALL(env, napi_open_escapable_handle_scope(env, &scope));
+    EscapableScopeRAII scope(env);
+    if (!scope) {
+        return nullptr;
+    }
     napi_value thisArg;
     napi_get_cb_info(env, info, nullptr, nullptr, &thisArg, nullptr);
     FingerInfo* wrapper = nullptr;
     auto status = napi_unwrap(env, thisArg, reinterpret_cast<void**>(&wrapper));
     if (status != napi_ok || !wrapper || !wrapper->currentLocalLocation_) {
-        napi_close_escapable_handle_scope(env, scope);
         return nullptr;
     }
     Offset offset = wrapper->currentLocalLocation_();
@@ -317,21 +314,21 @@ static napi_value GetCurrentLocalPositionForFingerInfo(napi_env env, napi_callba
     napi_set_named_property(env, result, "x", x);
     napi_set_named_property(env, result, "y", y);
     napi_value newResult = nullptr;
-    napi_escape_handle(env, scope, result, &newResult);
-    napi_close_escapable_handle_scope(env, scope);
+    scope.Escape(result, &newResult);
     return newResult;
 }
 
 static napi_value GetCurrentLocalPositionForClickEvent(napi_env env, napi_callback_info info)
 {
-    napi_escapable_handle_scope scope = nullptr;
-    NAPI_CALL(env, napi_open_escapable_handle_scope(env, &scope));
+    EscapableScopeRAII scope(env);
+    if (!scope) {
+        return nullptr;
+    }
     napi_value thisArg;
     napi_get_cb_info(env, info, nullptr, nullptr, &thisArg, nullptr);
     ClickInfo* wrapper = nullptr;
     auto status = napi_unwrap(env, thisArg, reinterpret_cast<void**>(&wrapper));
     if (status != napi_ok || !wrapper) {
-        napi_close_escapable_handle_scope(env, scope);
         return nullptr;
     }
     Offset offset = wrapper->GetCurrentLocalLocation();
@@ -344,21 +341,21 @@ static napi_value GetCurrentLocalPositionForClickEvent(napi_env env, napi_callba
     napi_set_named_property(env, result, "x", x);
     napi_set_named_property(env, result, "y", y);
     napi_value newResult = nullptr;
-    napi_escape_handle(env, scope, result, &newResult);
-    napi_close_escapable_handle_scope(env, scope);
+    scope.Escape(result, &newResult);
     return newResult;
 }
 
 static napi_value GetCurrentLocalPositionForGestureEvent(napi_env env, napi_callback_info info)
 {
-    napi_escapable_handle_scope scope = nullptr;
-    NAPI_CALL(env, napi_open_escapable_handle_scope(env, &scope));
+    EscapableScopeRAII scope(env);
+    if (!scope) {
+        return nullptr;
+    }
     napi_value thisArg;
     napi_get_cb_info(env, info, nullptr, nullptr, &thisArg, nullptr);
     GestureEvent* wrapper = nullptr;
     auto status = napi_unwrap(env, thisArg, reinterpret_cast<void**>(&wrapper));
     if (status != napi_ok || !wrapper) {
-        napi_close_escapable_handle_scope(env, scope);
         return nullptr;
     }
     Offset offset = wrapper->GetCurrentLocalLocation();
@@ -371,46 +368,40 @@ static napi_value GetCurrentLocalPositionForGestureEvent(napi_env env, napi_call
     napi_set_named_property(env, result, "x", x);
     napi_set_named_property(env, result, "y", y);
     napi_value newResult = nullptr;
-    napi_escape_handle(env, scope, result, &newResult);
-    napi_close_escapable_handle_scope(env, scope);
+    scope.Escape(result, &newResult);
     return newResult;
 }
 }
 
 void UIObserverListener::OnNavigationStateChange(const NG::NavDestinationInfo& info)
 {
-    if (!env_ || !callback_) {
+    if (!env_ || !callback_.IsValid()) {
         TAG_LOGW(AceLogTag::ACE_OBSERVER,
             "Handle navDestination state change failed, runtime or callback function invalid!");
         return;
     }
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env_, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env_);
+    if (!scope) {
         return;
     }
-    napi_value callback = nullptr;
-    napi_get_reference_value(env_, callback_, &callback);
+    napi_value callback = callback_.GetValue();
     napi_value argv[] = { CreateNavDestinationInfoObj(info) };
     napi_call_function(env_, nullptr, callback, 1, argv, nullptr);
-    napi_close_handle_scope(env_, scope);
 }
 
 void UIObserverListener::OnScrollEventStateChange(
     const std::string& id, int32_t uniqueId, NG::ScrollEventType eventType, float offset, Ace::Axis axis)
 {
-    if (!env_ || !callback_) {
+    if (!env_ || !callback_.IsValid()) {
         TAG_LOGW(AceLogTag::ACE_OBSERVER,
             "Handle scrollEvent state change failed, runtime or callback function invalid!");
         return;
     }
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env_, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env_);
+    if (!scope) {
         return;
     }
-    napi_value callback = nullptr;
-    napi_get_reference_value(env_, callback_, &callback);
+    napi_value callback = callback_.GetValue();
     napi_value objValue = nullptr;
     napi_create_object(env_, &objValue);
     napi_value scrollId = nullptr;
@@ -430,42 +421,36 @@ void UIObserverListener::OnScrollEventStateChange(
     napi_set_named_property(env_, objValue, "axis", scrollAxis);
     napi_value argv[] = { objValue };
     napi_call_function(env_, nullptr, callback, 1, argv, nullptr);
-    napi_close_handle_scope(env_, scope);
 }
 
 void UIObserverListener::OnRouterPageStateChange(const NG::RouterPageInfoNG& pageInfo, napi_value context)
 {
-    if (!env_ || !callback_) {
+    if (!env_ || !callback_.IsValid()) {
         TAG_LOGW(AceLogTag::ACE_OBSERVER,
             "Handle router page state change failed, runtime or callback function invalid!");
         return;
     }
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env_, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env_);
+    if (!scope) {
         return;
     }
-    napi_value callback = nullptr;
-    napi_get_reference_value(env_, callback_, &callback);
+    napi_value callback = callback_.GetValue();
     napi_value argv[] = { CreateRouterPageInfoObj(pageInfo, context) };
     napi_call_function(env_, nullptr, callback, 1, argv, nullptr);
-    napi_close_handle_scope(env_, scope);
 }
 
 void UIObserverListener::OnDensityChange(double density)
 {
-    if (!env_ || !callback_) {
+    if (!env_ || !callback_.IsValid()) {
         TAG_LOGW(AceLogTag::ACE_OBSERVER,
             "Handle density change failed, runtime or callback function invalid!");
         return;
     }
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env_, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env_);
+    if (!scope) {
         return;
     }
-    napi_value callback = nullptr;
-    napi_get_reference_value(env_, callback_, &callback);
+    napi_value callback = callback_.GetValue();
     napi_value objValue = nullptr;
     napi_create_object(env_, &objValue);
     napi_value napiDensity = nullptr;
@@ -473,23 +458,20 @@ void UIObserverListener::OnDensityChange(double density)
     napi_set_named_property(env_, objValue, "density", napiDensity);
     napi_value argv[] = { objValue };
     napi_call_function(env_, nullptr, callback, 1, argv, nullptr);
-    napi_close_handle_scope(env_, scope);
 }
 
 void UIObserverListener::OnWinSizeLayoutBreakpointChange(const WindowSizeBreakpoint info)
 {
-    if (!env_ || !callback_) {
+    if (!env_ || !callback_.IsValid()) {
         TAG_LOGW(AceLogTag::ACE_OBSERVER,
             "Handle winSizeLayoutBreakpoint change failed, runtime or callback function invalid!");
         return;
     }
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env_, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env_);
+    if (!scope) {
         return;
     }
-    napi_value callback = nullptr;
-    napi_get_reference_value(env_, callback_, &callback);
+    napi_value callback = callback_.GetValue();
     napi_value objValue = nullptr;
     napi_create_object(env_, &objValue);
     napi_value widthValue;
@@ -500,23 +482,20 @@ void UIObserverListener::OnWinSizeLayoutBreakpointChange(const WindowSizeBreakpo
     napi_set_named_property(env_, objValue, "heightBreakpoint", heightValue);
     napi_value argv[] = { objValue };
     napi_call_function(env_, nullptr, callback, 1, argv, nullptr);
-    napi_close_handle_scope(env_, scope);
 }
 
 void UIObserverListener::OnNodeRenderStateChange(NG::FrameNode* frameNode, NG::NodeRenderState nodeRenderState)
 {
-    if (!env_ || !callback_) {
+    if (!env_ || !callback_.IsValid()) {
         TAG_LOGW(
             AceLogTag::ACE_OBSERVER, "Handle nodeRender state change failed, runtime or callback function invalid!");
         return;
     }
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env_, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env_);
+    if (!scope) {
         return;
     }
-    napi_value callback = nullptr;
-    napi_get_reference_value(env_, callback_, &callback);
+    napi_value callback = callback_.GetValue();
 
     napi_value objValueNodeRenderState = nullptr;
     napi_create_int32(env_, static_cast<int32_t>(nodeRenderState), &objValueNodeRenderState);
@@ -526,12 +505,10 @@ void UIObserverListener::OnNodeRenderStateChange(NG::FrameNode* frameNode, NG::N
         napi_create_object(env_, &objValueFrameNode);
         auto container = Container::Current();
         if (!container) {
-            napi_close_handle_scope(env_, scope);
             return;
         }
         auto frontEnd = container->GetFrontend();
         if (!frontEnd) {
-            napi_close_handle_scope(env_, scope);
             return;
         }
         objValueFrameNode = frontEnd->GetFrameNodeValueByNodeId(frameNode->GetId());
@@ -541,62 +518,35 @@ void UIObserverListener::OnNodeRenderStateChange(NG::FrameNode* frameNode, NG::N
         napi_value argv[] = { objValueNodeRenderState };
         napi_call_function(env_, nullptr, callback, PARAM_SIZE_ONE, argv, nullptr);
     }
-
-    napi_close_handle_scope(env_, scope);
-}
-
-void UIObserverListener::OnDrawOrLayout()
-{
-    if (!env_ || !callback_) {
-        TAG_LOGW(AceLogTag::ACE_OBSERVER, "Handle draw or layout failed, runtime or callback function invalid!");
-        return;
-    }
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env_, &scope);
-    if (status != napi_ok) {
-        return;
-    }
-    napi_value callback = nullptr;
-    napi_get_reference_value(env_, callback_, &callback);
-    napi_value objValue = nullptr;
-    napi_create_object(env_, &objValue);
-    napi_value argv[] = { objValue };
-    napi_call_function(env_, nullptr, callback, 1, argv, nullptr);
-    napi_close_handle_scope(env_, scope);
 }
 
 void UIObserverListener::OnNavDestinationSwitch(const NG::NavDestinationSwitchInfo& switchInfo, napi_value context)
 {
-    if (!env_ || !callback_) {
+    if (!env_ || !callback_.IsValid()) {
         TAG_LOGW(AceLogTag::ACE_OBSERVER,
             "Handle navDestination switch failed, runtime or callback function invalid!");
         return;
     }
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env_, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env_);
+    if (!scope) {
         return;
     }
-    napi_value callback = nullptr;
-    napi_get_reference_value(env_, callback_, &callback);
+    napi_value callback = callback_.GetValue();
     napi_value argv[] = { CreateNavDestinationSwitchInfoObj(switchInfo, context) };
     napi_call_function(env_, nullptr, callback, 1, argv, nullptr);
-    napi_close_handle_scope(env_, scope);
 }
 
 void UIObserverListener::OnTextChangeEvent(const NG::TextChangeEventInfo& info)
 {
-    if (!env_ || !callback_) {
+    if (!env_ || !callback_.IsValid()) {
         TAG_LOGW(AceLogTag::ACE_OBSERVER, "Handle text change event failed, runtime or callback function invalid!");
         return;
     }
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env_, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env_);
+    if (!scope) {
         return;
     }
-    napi_value callback = nullptr;
-    napi_get_reference_value(env_, callback_, &callback);
+    napi_value callback = callback_.GetValue();
     napi_value objValue = nullptr;
     napi_value id = nullptr;
     napi_value uniqueId = nullptr;
@@ -610,61 +560,52 @@ void UIObserverListener::OnTextChangeEvent(const NG::TextChangeEventInfo& info)
     napi_set_named_property(env_, objValue, "content", content);
     napi_value argv[] = { objValue };
     napi_call_function(env_, nullptr, callback, 1, argv, nullptr);
-    napi_close_handle_scope(env_, scope);
 }
 
 void UIObserverListener::OnRouterPageSizeChange(const NG::RouterPageInfoNG& info, napi_value context)
 {
-    if (!env_ || !callback_) {
+    if (!env_ || !callback_.IsValid()) {
         TAG_LOGW(
             AceLogTag::ACE_OBSERVER, "Handle router page size change failed, runtime or callback function invalid!");
         return;
     }
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env_, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env_);
+    if (!scope) {
         return;
     }
-    napi_value callback = nullptr;
-    napi_get_reference_value(env_, callback_, &callback);
+    napi_value callback = callback_.GetValue();
     napi_value argv[] = { CreateRouterPageInfoObj(info, context) };
     napi_call_function(env_, nullptr, callback, 1, argv, nullptr);
-    napi_close_handle_scope(env_, scope);
 }
 
 void UIObserverListener::OnNavDestinationSizeChange(const NG::NavDestinationInfo& info)
 {
-    if (!env_ || !callback_) {
+    if (!env_ || !callback_.IsValid()) {
         TAG_LOGW(AceLogTag::ACE_OBSERVER,
             "Handle NavDestination size change failed, runtime or callback function invalid!");
         return;
     }
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env_, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env_);
+    if (!scope) {
         return;
     }
-    napi_value callback = nullptr;
-    napi_get_reference_value(env_, callback_, &callback);
+    napi_value callback = callback_.GetValue();
     napi_value argv[] = { CreateNavDestinationInfoObj(info) };
     napi_call_function(env_, nullptr, callback, 1, argv, nullptr);
-    napi_close_handle_scope(env_, scope);
 }
 
 void UIObserverListener::HandleSwiperContentUpdate(const NG::SwiperContentInfo& info)
 {
-    if (!env_ || !callback_) {
+    if (!env_ || !callback_.IsValid()) {
         TAG_LOGW(AceLogTag::ACE_OBSERVER,
             "Handle swiper content update failed, runtime or callback function invalid!");
         return;
     }
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env_, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env_);
+    if (!scope) {
         return;
     }
-    napi_value callback = nullptr;
-    napi_get_reference_value(env_, callback_, &callback);
+    napi_value callback = callback_.GetValue();
     napi_value objValue = nullptr;
     napi_value id = nullptr;
     napi_value uniqueId = nullptr;
@@ -693,7 +634,6 @@ void UIObserverListener::HandleSwiperContentUpdate(const NG::SwiperContentInfo& 
     // call observer callback in js side
     napi_value argv[] = { objValue };
     napi_call_function(env_, nullptr, callback, 1, argv, nullptr);
-    napi_close_handle_scope(env_, scope);
 }
 
 napi_value UIObserverListener::CreateNavDestinationSwitchInfoObj(
@@ -725,19 +665,17 @@ napi_value UIObserverListener::CreateNavDestinationSwitchInfoObj(
 void UIObserverListener::OnWillClick(
     const GestureEvent& gestureEventInfo, const ClickInfo& clickInfo, const RefPtr<NG::FrameNode> frameNode)
 {
-    if (!env_ || !callback_) {
+    if (!env_ || !callback_.IsValid()) {
         TAG_LOGW(AceLogTag::ACE_OBSERVER,
             "Handle density change failed, runtime or callback function invalid!");
         return;
     }
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env_, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env_);
+    if (!scope) {
         return;
     }
 
-    napi_value callback = nullptr;
-    napi_get_reference_value(env_, callback_, &callback);
+    napi_value callback = callback_.GetValue();
     
     napi_value objValueClickEvent = nullptr;
     napi_create_object(env_, &objValueClickEvent);
@@ -756,25 +694,22 @@ void UIObserverListener::OnWillClick(
 
     napi_value argv[] = { objValueClickEvent, objValueFrameNode };
     napi_call_function(env_, nullptr, callback, PARAM_SIZE_TWO, argv, nullptr);
-    napi_close_handle_scope(env_, scope);
 }
 
 void UIObserverListener::OnDidClick(
     const GestureEvent& gestureEventInfo, const ClickInfo& clickInfo, const RefPtr<NG::FrameNode> frameNode)
 {
-    if (!env_ || !callback_) {
+    if (!env_ || !callback_.IsValid()) {
         TAG_LOGW(AceLogTag::ACE_OBSERVER,
             "Handle density change failed, runtime or callback function invalid!");
         return;
     }
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env_, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env_);
+    if (!scope) {
         return;
     }
 
-    napi_value callback = nullptr;
-    napi_get_reference_value(env_, callback_, &callback);
+    napi_value callback = callback_.GetValue();
     
     napi_value objValueClickEvent = nullptr;
     napi_create_object(env_, &objValueClickEvent);
@@ -793,24 +728,21 @@ void UIObserverListener::OnDidClick(
 
     napi_value argv[] = { objValueClickEvent, objValueFrameNode };
     napi_call_function(env_, nullptr, callback, PARAM_SIZE_TWO, argv, nullptr);
-    napi_close_handle_scope(env_, scope);
 }
 
 void UIObserverListener::OnPanGestureStateChange(const GestureEvent& gestureEventInfo,
     const RefPtr<NG::PanRecognizer>& current, const RefPtr<NG::FrameNode> frameNode)
 {
-    if (!env_ || !callback_) {
+    if (!env_ || !callback_.IsValid()) {
         TAG_LOGW(AceLogTag::ACE_OBSERVER, "Handle pan gesture change failed, runtime or callback function invalid!");
         return;
     }
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env_, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env_);
+    if (!scope) {
         return;
     }
 
-    napi_value callback = nullptr;
-    napi_get_reference_value(env_, callback_, &callback);
+    napi_value callback = callback_.GetValue();
 
     napi_value objValueGestureEvent = nullptr;
     napi_create_object(env_, &objValueGestureEvent);
@@ -832,26 +764,23 @@ void UIObserverListener::OnPanGestureStateChange(const GestureEvent& gestureEven
 
     napi_value argv[] = { objValueGestureEvent, objValueGestureRecognizer, objValueFrameNode };
     napi_call_function(env_, nullptr, callback, PARAM_SIZE_THREE, argv, nullptr);
-    napi_close_handle_scope(env_, scope);
 }
 
 void UIObserverListener::OnGestureStateChange(NG::GestureListenerType gestureListenerType,
     const GestureEvent& gestureEventInfo, const RefPtr<NG::NGGestureRecognizer>& current,
     const RefPtr<NG::FrameNode> frameNode, NG::GestureActionPhase phase)
 {
-    if (!env_ || !callback_ || !current) {
+    if (!env_ || !callback_.IsValid() || !current) {
         TAG_LOGW(
             AceLogTag::ACE_OBSERVER, "Handle gesture change failed, runtime, recognizer or callback function invalid!");
         return;
     }
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env_, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env_);
+    if (!scope) {
         return;
     }
 
-    napi_value callback = nullptr;
-    napi_get_reference_value(env_, callback_, &callback);
+    napi_value callback = callback_.GetValue();
 
     napi_value objValueGestureTriggerInfo = nullptr;
     napi_create_object(env_, &objValueGestureTriggerInfo);
@@ -883,23 +812,20 @@ void UIObserverListener::OnGestureStateChange(NG::GestureListenerType gestureLis
     }
     napi_value argv[] = { objValueGestureTriggerInfo };
     napi_call_function(env_, nullptr, callback, PARAM_SIZE_ONE, argv, nullptr);
-    napi_close_handle_scope(env_, scope);
 }
 
 void UIObserverListener::OnTabContentStateChange(const NG::TabContentInfo& tabContentInfo)
 {
-    if (!env_ || !callback_) {
+    if (!env_ || !callback_.IsValid()) {
         TAG_LOGW(AceLogTag::ACE_OBSERVER,
             "Handle tabContent state change failed, runtime or callback function invalid!");
         return;
     }
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env_, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env_);
+    if (!scope) {
         return;
     }
-    napi_value callback = nullptr;
-    napi_get_reference_value(env_, callback_, &callback);
+    napi_value callback = callback_.GetValue();
     napi_value objValue = nullptr;
     napi_value param1 = nullptr;
     napi_value param2 = nullptr;
@@ -932,23 +858,20 @@ void UIObserverListener::OnTabContentStateChange(const NG::TabContentInfo& tabCo
     napi_create_object_with_named_properties(env_, &objValue, PARAM_SIZE_SIX, keys, values);
     napi_value argv[] = { objValue };
     napi_call_function(env_, nullptr, callback, 1, argv, nullptr);
-    napi_close_handle_scope(env_, scope);
 }
 
 void UIObserverListener::OnTabChange(const NG::TabContentInfo& tabContentInfo)
 {
-    if (!env_ || !callback_) {
+    if (!env_ || !callback_.IsValid()) {
         TAG_LOGW(AceLogTag::ACE_OBSERVER,
             "Handle tab change failed, runtime or callback function invalid!");
         return;
     }
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env_, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env_);
+    if (!scope) {
         return;
     }
-    napi_value callback = nullptr;
-    napi_get_reference_value(env_, callback_, &callback);
+    napi_value callback = callback_.GetValue();
     napi_value objValue = nullptr;
     napi_value param1 = nullptr;
     napi_value param2 = nullptr;
@@ -973,15 +896,13 @@ void UIObserverListener::OnTabChange(const NG::TabContentInfo& tabContentInfo)
         param1, param2, param3, param4, param5, param6, param7,
     };
     const int32_t paramSize = tabContentInfo.lastIndex.has_value() ? PARAM_SIZE_SEVEN : PARAM_SIZE_SIX;
-    status = napi_create_object_with_named_properties(env_, &objValue, paramSize, keys, values);
+    napi_status status = napi_create_object_with_named_properties(env_, &objValue, paramSize, keys, values);
     if (status != napi_ok) {
         TAG_LOGW(AceLogTag::ACE_OBSERVER, "Failed to create object with named properties, status: %d", status);
-        napi_close_handle_scope(env_, scope);
         return;
     }
     napi_value argv[] = { objValue };
     napi_call_function(env_, nullptr, callback, 1, argv, nullptr);
-    napi_close_handle_scope(env_, scope);
 }
 
 napi_valuetype UIObserverListener::GetValueType(napi_env env, napi_value value)
@@ -1010,9 +931,8 @@ napi_value UIObserverListener::GetNamedProperty(napi_env env, napi_value object,
 
 void UIObserverListener::AddBaseEventInfo(napi_value objValueEvent, const BaseEventInfo& baseEventInfo)
 {
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env_, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env_);
+    if (!scope) {
         return;
     }
 
@@ -1044,15 +964,12 @@ void UIObserverListener::AddBaseEventInfo(napi_value objValueEvent, const BaseEv
     napi_set_named_property(env_, objValueEvent, "tiltY", napiTiltY);
     napi_set_named_property(env_, objValueEvent, "rollAngle", napiRollAngle);
     napi_set_named_property(env_, objValueEvent, "sourceTool", napiSourceTool);
-
-    napi_close_handle_scope(env_, scope);
 }
 
 void UIObserverListener::AddGestureEventInfoOne(napi_value objValueEvent, const GestureEvent& gestureEventInfo)
 {
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env_, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env_);
+    if (!scope) {
         return;
     }
     double scale = Dimension(1.0, DimensionUnit::VP).ConvertToPx();
@@ -1097,14 +1014,12 @@ void UIObserverListener::AddGestureEventInfoOne(napi_value objValueEvent, const 
             env_, GET_CURRENT_LOCAL_POSITION, 0, GetCurrentLocalPositionForGestureEvent, nullptr, &funcValue);
         napi_set_named_property(env_, objValueEvent, GET_CURRENT_LOCAL_POSITION, funcValue);
     }
-    napi_close_handle_scope(env_, scope);
 }
 
 void UIObserverListener::AddGestureEventInfoTwo(napi_value objValueEvent, const GestureEvent& gestureEventInfo)
 {
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env_, &scope);
-    if (status != napi_ok) { return; }
+    ScopeRAII scope(env_);
+    if (!scope) { return; }
     double scale = Dimension(1.0, DimensionUnit::VP).ConvertToPx();
     if (NearZero(scale)) {
         scale = 1.0;
@@ -1149,14 +1064,12 @@ void UIObserverListener::AddGestureEventInfoTwo(napi_value objValueEvent, const 
         napi_create_double(env_, gestureEventInfo.GetPinchCenter().GetY() / scale, &napiPinchCenterY);
         napi_set_named_property(env_, objValueEvent, "pinchCenterY", napiPinchCenterY);
     }
-    napi_close_handle_scope(env_, scope);
 }
 
 void UIObserverListener::AddGestureEventInfoThree(napi_value objValueEvent, const GestureEvent& gestureEventInfo)
 {
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env_, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env_);
+    if (!scope) {
         return;
     }
     double scale = Dimension(1.0, DimensionUnit::VP).ConvertToPx();
@@ -1195,18 +1108,15 @@ void UIObserverListener::AddGestureEventInfoThree(napi_value objValueEvent, cons
     napi_set_named_property(env_, objValueEvent, "targetDisplayId", napiTargetDisplayId);
     AddFingerListInfo(objValueEvent, gestureEventInfo);
     AddFingerInfosInfo(objValueEvent, gestureEventInfo);
-    napi_close_handle_scope(env_, scope);
 }
 
 void UIObserverListener::AddTapLocationInfo(napi_value objTapGestureEventInfo, const GestureEvent& gestureEventInfo)
 {
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env_, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env_);
+    if (!scope) {
         return;
     }
     if (gestureEventInfo.GetFingerList().size() == 0) {
-        napi_close_handle_scope(env_, scope);
         return;
     }
 
@@ -1255,14 +1165,12 @@ void UIObserverListener::AddTapLocationInfo(napi_value objTapGestureEventInfo, c
         napi_set_named_property(env_, tapLocation, GET_CURRENT_LOCAL_POSITION, funcValue);
     }
     napi_set_named_property(env_, objTapGestureEventInfo, "tapLocation", tapLocation);
-    napi_close_handle_scope(env_, scope);
 }
 
 void UIObserverListener::AddFingerListInfo(napi_value objValueClickEvent, const GestureEvent& gestureEventInfo)
 {
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env_, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env_);
+    if (!scope) {
         return;
     }
 
@@ -1271,7 +1179,6 @@ void UIObserverListener::AddFingerListInfo(napi_value objValueClickEvent, const 
     napi_create_array(env_, &napiFingerList);
     bool isArray = false;
     if (napi_is_array(env_, napiFingerList, &isArray) != napi_ok || !isArray) {
-        napi_close_handle_scope(env_, scope);
         return;
     }
     if (fingerList.size() > 0) {
@@ -1283,14 +1190,12 @@ void UIObserverListener::AddFingerListInfo(napi_value objValueClickEvent, const 
         }
     }
     napi_set_named_property(env_, objValueClickEvent, "fingerList", napiFingerList);
-    napi_close_handle_scope(env_, scope);
 }
 
 void UIObserverListener::AddFingerInfosInfo(napi_value objValueClickEvent, const GestureEvent& gestureEventInfo)
 {
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env_, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env_);
+    if (!scope) {
         return;
     }
 
@@ -1298,7 +1203,6 @@ void UIObserverListener::AddFingerInfosInfo(napi_value objValueClickEvent, const
     napi_create_array(env_, &napiFingerInfos);
     bool isArray = false;
     if (napi_is_array(env_, napiFingerInfos, &isArray) != napi_ok || !isArray) {
-        napi_close_handle_scope(env_, scope);
         return;
     }
     
@@ -1312,7 +1216,6 @@ void UIObserverListener::AddFingerInfosInfo(napi_value objValueClickEvent, const
     }
     
     napi_set_named_property(env_, objValueClickEvent, "fingerInfos", napiFingerInfos);
-    napi_close_handle_scope(env_, scope);
 }
 
 void UIObserverListener::AddFingerObjectInfo(napi_value napiFinger, const FingerInfo& finger)
@@ -1365,9 +1268,8 @@ void UIObserverListener::AddFingerObjectInfo(napi_value napiFinger, const Finger
 
 void UIObserverListener::AddClickEventInfoOne(napi_value objValueClickEvent, const ClickInfo& clickInfo)
 {
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env_, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env_);
+    if (!scope) {
         return;
     }
 
@@ -1408,14 +1310,12 @@ void UIObserverListener::AddClickEventInfoOne(napi_value objValueClickEvent, con
         napi_create_double(env_, globalDisplayOffset.GetY() / scale, &napiGlobalDisplayY);
         napi_set_named_property(env_, objValueClickEvent, "globalDisplayY", napiGlobalDisplayY);
     }
-    napi_close_handle_scope(env_, scope);
 }
 
 void UIObserverListener::AddClickEventInfoTwo(napi_value objValueClickEvent, const ClickInfo& clickInfo)
 {
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env_, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env_);
+    if (!scope) {
         return;
     }
 
@@ -1454,20 +1354,18 @@ void UIObserverListener::AddClickEventInfoTwo(napi_value objValueClickEvent, con
         napi_set_named_property(env_, objValueClickEvent, GET_CURRENT_LOCAL_POSITION, funcValue);
     }
     AddTargetObject(objValueClickEvent, clickInfo);
-    napi_close_handle_scope(env_, scope);
 }
 
 void UIObserverListener::AddGestureEventInfoFour(napi_value objValueEvent, const GestureEvent& gestureEventInfo)
 {
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env_, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env_);
+    if (!scope) {
         return;
     }
 
     std::unique_ptr<GestureEvent> infoHolder = std::make_unique<GestureEvent>(gestureEventInfo);
     auto* info = infoHolder.release();
-    status = napi_wrap(
+    napi_status status = napi_wrap(
         env_, objValueEvent, info,
         [](napi_env env, void* data, void* hint) {
             GestureEvent* info = reinterpret_cast<GestureEvent*>(data);
@@ -1479,20 +1377,17 @@ void UIObserverListener::AddGestureEventInfoFour(napi_value objValueEvent, const
     if (status != napi_ok) {
         LOGE("napi_wrap failed");
         delete info;
-        napi_close_handle_scope(env_, scope);
         return;
     }
     napi_value funcValue = nullptr;
     napi_create_function(env_, GET_MODIFIER_KEY_STATE, 0, GetModifierKeyState, nullptr, &funcValue);
     napi_set_named_property(env_, objValueEvent, GET_MODIFIER_KEY_STATE, funcValue);
-    napi_close_handle_scope(env_, scope);
 }
 
 void UIObserverListener::AddTargetObject(napi_value objValueEvent, const BaseEventInfo& baseEventInfo)
 {
-    napi_handle_scope scope = nullptr;
-    auto status = napi_open_handle_scope(env_, &scope);
-    if (status != napi_ok) {
+    ScopeRAII scope(env_);
+    if (!scope) {
         return;
     }
 
@@ -1539,7 +1434,6 @@ void UIObserverListener::AddTargetObject(napi_value objValueEvent, const BaseEve
     napi_set_named_property(env_, napiTargetObject, "id", id);
 
     napi_set_named_property(env_, objValueEvent, "target", napiTargetObject);
-    napi_close_handle_scope(env_, scope);
 }
 
 napi_value UIObserverListener::CreateNavDestinationInfoObj(const NG::NavDestinationInfo& info)
@@ -1618,13 +1512,6 @@ napi_value UIObserverListener::CreateRouterPageInfoObj(const NG::RouterPageInfoN
     return objValue;
 }
 
-napi_value UIObserverListener::GetNapiCallback()
-{
-    napi_value callback = nullptr;
-    napi_get_reference_value(env_, callback_, &callback);
-    return callback;
-}
-
 napi_value UIObserverListener::GetFrameNodeObject(const RefPtr<NG::FrameNode>& frameNode)
 {
     CHECK_NULL_RETURN(frameNode, nullptr);
@@ -1637,10 +1524,4 @@ napi_value UIObserverListener::GetFrameNodeObject(const RefPtr<NG::FrameNode>& f
     return frontEnd->GetFrameNodeValueByNodeId(frameNode->GetId());
 }
 
-bool UIObserverListener::NapiEqual(napi_value cb)
-{
-    bool isEquals = false;
-    napi_strict_equals(env_, cb, GetNapiCallback(), &isEquals);
-    return isEquals;
-}
 } // namespace OHOS::Ace::Napi

@@ -333,6 +333,11 @@ public:
         return imageReleaseManageObjectEnabled_;
     }
 
+    static bool GetSvgCacheSkipEnabled()
+    {
+        return svgCacheSkipEnabled_;
+    }
+
     static bool GetImageAutoResizeEnabled()
     {
         return autoResizeEnabled_;
@@ -762,8 +767,6 @@ public:
 
     static bool IsFormSkeletonBlurEnabled();
 
-    static int32_t getFormSharedImageCacheThreshold();
-
     static bool IsFormSkeletonRSTransactionEnabled();
 
     static bool IsWhiteBlockEnabled();
@@ -886,6 +889,7 @@ private:
     static bool recycleImageEnabled_;
     static bool navigationImageRecycleEnabled_;
     static bool imageReleaseManageObjectEnabled_;
+    static bool svgCacheSkipEnabled_;
     static bool gpuUploadEnabled_;
     static bool isHookModeEnabled_;
     static bool astcEnabled_;
@@ -931,7 +935,6 @@ private:
     static bool forcibleLandscapeEnabled_;
     static bool softPagetransition_;
     static bool formSkeletonBlurEnabled_;
-    static int32_t formSharedImageCacheThreshold_;
     static WidthLayoutBreakPoint widthLayoutBreakpoints_;
     static HeightLayoutBreakPoint heightLayoutBreakpoints_;
     static bool syncLoadEnabled_;
@@ -944,9 +947,11 @@ private:
     static bool isPCMode_;
     static bool isAutoFillSupport_;
     static bool isOpenYuvDecode_;
+    static bool isDeviceSystemMaterialSupported_;
 
     static std::once_flag getSysPropertiesFlag_;
     static int32_t sensorCorrectionEnable_;
+    static UiMaterialLevel uiMaterialLevel_;
 };
 
 } // namespace OHOS::Ace

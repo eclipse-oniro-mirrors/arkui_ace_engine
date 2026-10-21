@@ -44,6 +44,8 @@
 #include "core/components_ng/pattern/symbol/constants.h"
 #include "core/components_ng/pattern/symbol/symbol_effect_options.h"
 #include "core/components_v2/inspector/inspector_constants.h"
+#include "core/components_ng/pattern/badge/badge_model_ng.h"
+#include "core/components_ng/pattern/badge/badge_pattern.h"
 
 namespace OHOS::Ace::NG {
 namespace {
@@ -60,6 +62,330 @@ constexpr std::string_view KEY_PADDING_RIGHT = "tabContent.tabBarPadding.right";
 constexpr std::string_view KEY_PADDING_TOP = "tabContent.tabBarPadding.top";
 constexpr std::string_view KEY_PADDING_BOTTOM = "tabContent.tabBarPadding.bottom";
 const char TAB_CONTENT_ITEM_ETS_TAG[] = "TabContent";
+} // namespace
+// Resolve RTL direction from the Tabs/TabBar ancestor of the badge node.
+// The badge node is mounted as: badgeNode → columnNode → tabBarNode → tabsNode.
+// Tabs resolves its RTL via tabLayoutProperty->GetNonAutoLayoutDirection(); TabBar may
+// also carry an explicit direction. This helper walks up from the badge node to find the
+// TabBar/Tabs ancestors and computes isRTL the same way as AddBottomStyleTabBarItem.
+bool TabContentModelNG::ResolveBadgeRTL(const RefPtr<FrameNode>& badgeNode)
+{
+    CHECK_NULL_RETURN(badgeNode, false);
+    auto columnNode = AceType::DynamicCast<FrameNode>(badgeNode->GetParent());
+    CHECK_NULL_RETURN(columnNode, false);
+    auto tabBarNode = AceType::DynamicCast<FrameNode>(columnNode->GetParent());
+    CHECK_NULL_RETURN(tabBarNode, false);
+    auto tabBarLayoutProperty = tabBarNode->GetLayoutProperty<TabBarLayoutProperty>();
+    CHECK_NULL_RETURN(tabBarLayoutProperty, false);
+    auto tabsNode = AceType::DynamicCast<TabsNode>(tabBarNode->GetParent());
+    CHECK_NULL_RETURN(tabsNode, false);
+    auto tabsLayoutProperty = AceType::DynamicCast<TabsLayoutProperty>(tabsNode->GetLayoutProperty());
+    CHECK_NULL_RETURN(tabsLayoutProperty, false);
+    auto tabsDirection = tabsLayoutProperty->GetNonAutoLayoutDirection();
+    auto tabBarDirection = tabBarLayoutProperty->GetLayoutDirection();
+    return tabBarDirection == TextDirection::RTL ||
+           (tabBarDirection == TextDirection::AUTO && tabsDirection == TextDirection::RTL);
+}
+// Build BadgeParameters from TabBarBadgeParam
+// - value undefined or unexpected type → 6vp dot, RIGHT_TOP enum mode
+// - value is number → ellipse with count display
+// - value is string → ellipse with text display
+BadgeParameters TabContentModelNG::BuildBadgeParameters(const TabBarBadgeParam& badgeParam, bool& isDefaultFontSize,
+    bool& isDefaultBadgeSize, bool& isEllipseMode)
+{
+    BadgeParameters badgeParams;
+    isDefaultFontSize = true;
+    isDefaultBadgeSize = true;
+    isEllipseMode = false;
+    badgeParams.badgePosition = static_cast<int>(BadgePosition::RIGHT_TOP);
+    badgeParams.isPositionXy = false;
+
+    if (!badgeParam.badgeValue.has_value() && !badgeParam.badgeCount.has_value()) {
+        // Dot mode: no text content. Set badgeCircleSize as diameter and a near-zero font size
+        // so that std::max(textSize.Height(), badgeCircleDiameter) in BadgeLayoutAlgorithm::Measure
+        // does not inflate the dot to the font height.
+        // 6.0vp circle.
+        badgeParams.badgeCircleSize = Dimension(6.0, DimensionUnit::VP);
+        badgeParams.badgeFontSize = Dimension(0.0, DimensionUnit::VP);
+        badgeParams.badgeValue = "";  // Empty string triggers badgeVisible=true in BadgePattern::OnModifyDone
+        // Mark as user-specified to prevent OnColorConfigurationUpdate from overwriting
+        // with theme defaults (10vp font, 6vp circle) on theme/color config changes.
+        badgeParams.badgeFontSizeByUser = true;
+        badgeParams.badgeCircleSizeByUser = true;
+        isDefaultBadgeSize = false;
+        isDefaultFontSize = false;
+    } else if (badgeParam.badgeCount.has_value()) {
+        badgeParams.badgeCount = badgeParam.badgeCount.value();
+        if (badgeParam.badgeMaxCount.has_value()) {
+            badgeParams.badgeMaxCount = badgeParam.badgeMaxCount.value();
+        }
+        isEllipseMode = true;
+    } else if (badgeParam.badgeValue.has_value()) {
+        badgeParams.badgeValue = badgeParam.badgeValue.value();
+        badgeParams.resourceBadgeValueObject = badgeParam.resourceBadgeValueObject;
+        isEllipseMode = true;
+    }
+    return badgeParams;
+}
+// Calculate the RTL position X for an ellipse badge.
+// In RTL the badge circle sits on the left side of the content:
+// circle right edge = content left edge + 8vp
+// → positionX = 8vp - circleWidth (circleWidth from text child geometry)
+float TabContentModelNG::CalculateEllipseRtlPositionX(const RefPtr<FrameNode>& badgeNode, float eightVpPx)
+{
+    float circleWidth = 0.0f;
+    const auto& badgeChildren = badgeNode->GetChildren();
+    if (!badgeChildren.empty()) {
+        auto textChild = AceType::DynamicCast<FrameNode>(badgeChildren.back());
+        if (textChild) {
+            auto textGeometry = textChild->GetGeometryNode();
+            CHECK_NULL_RETURN(textGeometry, eightVpPx);
+            circleWidth = textGeometry->GetFrameRect().Width();
+        }
+    }
+    return eightVpPx - circleWidth;
+}
+// Schedule a post-render task to adjust ellipse badge position.
+// The badge node wraps the contentChild (icon+text column); badge frame width = content width.
+// positionX positions the badge circle (text child) relative to the badge frame's left edge.
+// LTR: circle LEFT edge = content RIGHT edge - 8vp  →  positionX = badgeWidth - 8vp
+// RTL: circle RIGHT edge = content LEFT edge + 8vp  →  positionX = 8vp - circleWidth
+//      (circleWidth = text child frame width, NOT badgeWidth)
+void TabContentModelNG::ScheduleEllipsePositionAdjustment(const RefPtr<FrameNode>& badgeNode)
+{
+    auto pipeline = PipelineContext::GetCurrentContext();
+    CHECK_NULL_VOID(pipeline);
+    pipeline->AddAfterRenderTask([weakBadge = WeakPtr<FrameNode>(badgeNode)]() {
+        auto badgeNode = weakBadge.Upgrade();
+        CHECK_NULL_VOID(badgeNode);
+        auto badgeGeometry = badgeNode->GetGeometryNode();
+        CHECK_NULL_VOID(badgeGeometry);
+        float badgeWidth = badgeGeometry->GetFrameRect().Width();
+        if (badgeWidth <= 0.0f) {
+            return;
+        }
+        auto pipeline = PipelineContext::GetCurrentContext();
+        CHECK_NULL_VOID(pipeline);
+        float vpToPx = pipeline->GetDipScale();
+        float eightVpPx = 8.0f * vpToPx;
+        bool isRTL = ResolveBadgeRTL(badgeNode);
+        float positionXPx;
+        if (isRTL) {
+            positionXPx = CalculateEllipseRtlPositionX(badgeNode, eightVpPx);
+        } else {
+            positionXPx = badgeWidth - eightVpPx;
+        }
+        auto badgeLayoutProperty = badgeNode->GetLayoutProperty<BadgeLayoutProperty>();
+        CHECK_NULL_VOID(badgeLayoutProperty);
+        badgeLayoutProperty->UpdateIsPositionXy(true);
+        badgeLayoutProperty->UpdateBadgePositionX(Dimension(positionXPx, DimensionUnit::PX));
+        // Offset upward by -4.0vp in the y direction.
+        badgeLayoutProperty->UpdateBadgePositionY(Dimension(-4.0, DimensionUnit::VP));
+        badgeNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
+    });
+}
+
+void TabContentModelNG::UpdateBottomStyleBadge(const RefPtr<FrameNode>& columnNode,
+    const RefPtr<TabContentPattern>& tabContentPattern, bool hasBadge,
+    const RefPtr<LinearLayoutProperty>& linearLayoutProperty)
+{
+    CHECK_NULL_VOID(columnNode);
+    CHECK_NULL_VOID(tabContentPattern);
+    auto existingBadgeNode = AceType::DynamicCast<FrameNode>(columnNode->GetChildren().front());
+    bool hasExistingBadge = existingBadgeNode && existingBadgeNode->GetTag() == BADGE_ETS_TAG;
+    if (hasBadge && !hasExistingBadge) {
+        AddBadgeToColumn(columnNode, tabContentPattern, linearLayoutProperty);
+    } else if (!hasBadge && hasExistingBadge) {
+        RemoveBadgeFromColumn(columnNode, existingBadgeNode);
+    } else if (hasBadge && hasExistingBadge) {
+        UpdateExistingBadge(columnNode, existingBadgeNode, tabContentPattern);
+    }
+}
+
+void TabContentModelNG::AddBadgeToColumn(const RefPtr<FrameNode>& columnNode,
+    const RefPtr<TabContentPattern>& tabContentPattern,
+    const RefPtr<LinearLayoutProperty>& linearLayoutProperty)
+{
+    auto iconNode = TabBarPattern::GetIconNodeFromColumn(columnNode);
+    auto textNode = TabBarPattern::GetTextNodeFromColumn(columnNode);
+    if (iconNode && textNode) {
+        columnNode->Clean();
+        WrapWithBadge(
+            columnNode, iconNode, textNode, tabContentPattern->GetTabBarBadge().value(), linearLayoutProperty);
+    }
+}
+
+void TabContentModelNG::RemoveBadgeFromColumn(const RefPtr<FrameNode>& columnNode,
+    const RefPtr<FrameNode>& existingBadgeNode)
+{
+    RefPtr<FrameNode> iconNode;
+    RefPtr<FrameNode> textNode;
+    auto& badgeChildren = existingBadgeNode->GetChildren();
+    if (!badgeChildren.empty()) {
+        auto contentChild = AceType::DynamicCast<FrameNode>(badgeChildren.front());
+        // text and image node size count 2.
+        if (contentChild && contentChild->GetChildren().size() >= 2) {
+            iconNode = AceType::DynamicCast<FrameNode>(contentChild->GetChildren().front());
+            textNode = AceType::DynamicCast<FrameNode>(contentChild->GetChildren().back());
+        }
+    }
+    columnNode->Clean();
+    if (iconNode) {
+        iconNode->MountToParent(columnNode);
+    }
+    if (textNode) {
+        textNode->MountToParent(columnNode);
+    }
+}
+
+void TabContentModelNG::UpdateExistingBadge(const RefPtr<FrameNode>& columnNode,
+    const RefPtr<FrameNode>& existingBadgeNode, const RefPtr<TabContentPattern>& tabContentPattern)
+{
+    auto badgeParam = tabContentPattern->GetTabBarBadge().value();
+    bool isDefaultFontSize = true;
+    bool isDefaultBadgeSize = true;
+    bool isEllipseMode = false;
+    auto badgeParams = BuildBadgeParameters(badgeParam, isDefaultFontSize, isDefaultBadgeSize, isEllipseMode);
+
+    BadgeModelNG::SetBadgeParam(
+        AceType::RawPtr(existingBadgeNode), badgeParams, isDefaultFontSize, isDefaultBadgeSize);
+
+    auto updateBadgeLayoutProp = existingBadgeNode->GetLayoutProperty<BadgeLayoutProperty>();
+    if (updateBadgeLayoutProp) {
+        updateBadgeLayoutProp->UpdateBadgeFontSizeByuser(badgeParams.badgeFontSizeByUser);
+        updateBadgeLayoutProp->UpdateBadgeCircleSizeByuser(badgeParams.badgeCircleSizeByUser);
+        if (!badgeParams.badgeCount.has_value()) {
+            updateBadgeLayoutProp->ResetBadgeCount();
+        }
+    }
+
+    if (SystemProperties::ConfigChangePerform()) {
+        BadgeModelNG badgeModel;
+        badgeModel.CreateWithResourceObj(existingBadgeNode, badgeParams);
+    }
+
+    existingBadgeNode->MarkModifyDone();
+
+    auto colRC = columnNode->GetRenderContext();
+    if (colRC) {
+        colRC->UpdateClipEdge(false);
+    }
+    auto badgeRC = existingBadgeNode->GetRenderContext();
+    if (badgeRC) {
+        badgeRC->UpdateClipEdge(false);
+    }
+
+    // Keep RTL direction in sync when the badge is updated (e.g. direction change at runtime).
+    // Only the badge node direction is set — contentChild direction is intentionally left
+    // to system/app-level resolution for consistency with non-badge tab items.
+    auto isRTL = ResolveBadgeRTL(existingBadgeNode);
+    auto badgeLayoutProp = existingBadgeNode->GetLayoutProperty<BadgeLayoutProperty>();
+    if (badgeLayoutProp) {
+        badgeLayoutProp->UpdateLayoutDirection(isRTL ? TextDirection::RTL : TextDirection::LTR);
+    }
+
+    if (isEllipseMode) {
+        ScheduleEllipsePositionAdjustment(existingBadgeNode);
+    }
+}
+
+RefPtr<FrameNode> TabContentModelNG::CreateBadgeContentChild(const RefPtr<FrameNode>& iconNode,
+    const RefPtr<FrameNode>& textNode, const RefPtr<LinearLayoutProperty>& columnLayoutProperty)
+{
+    auto contentChildId = ElementRegister::GetInstance()->MakeUniqueId();
+    auto contentChild = FrameNode::GetOrCreateFrameNode(V2::COLUMN_ETS_TAG, contentChildId,
+        []() { return AceType::MakeRefPtr<LinearLayoutPattern>(true); });
+    CHECK_NULL_RETURN(contentChild, nullptr);
+
+    auto contentChildLayout = contentChild->GetLayoutProperty<LinearLayoutProperty>();
+    if (columnLayoutProperty && contentChildLayout) {
+        if (columnLayoutProperty->HasFlexDirection()) {
+            contentChildLayout->UpdateFlexDirection(
+                columnLayoutProperty->GetFlexDirectionValue(FlexDirection::COLUMN));
+        }
+        if (columnLayoutProperty->HasMainAxisAlign()) {
+            contentChildLayout->UpdateMainAxisAlign(
+                columnLayoutProperty->GetMainAxisAlignValue(FlexAlign::FLEX_START));
+        }
+        if (columnLayoutProperty->HasCrossAxisAlign()) {
+            contentChildLayout->UpdateCrossAxisAlign(
+                columnLayoutProperty->GetCrossAxisAlignValue(FlexAlign::CENTER));
+        }
+        if (columnLayoutProperty->HasSpace()) {
+            contentChildLayout->UpdateSpace(columnLayoutProperty->GetSpaceValue(Dimension(0.0f)));
+        }
+    }
+
+    iconNode->MountToParent(contentChild);
+    textNode->MountToParent(contentChild);
+    return contentChild;
+}
+
+RefPtr<FrameNode> TabContentModelNG::ConfigureBadgeNode(const TabBarBadgeParam& badgeParam, bool& isEllipseMode)
+{
+    auto badgeNodeId = ElementRegister::GetInstance()->MakeUniqueId();
+    auto badgeNode = BadgeModelNG::CreateFrameNode(badgeNodeId);
+    CHECK_NULL_RETURN(badgeNode, nullptr);
+
+    bool isDefaultFontSize = true;
+    bool isDefaultBadgeSize = true;
+    isEllipseMode = false;
+    auto badgeParams = BuildBadgeParameters(badgeParam, isDefaultFontSize, isDefaultBadgeSize, isEllipseMode);
+
+    BadgeModelNG::SetBadgeParam(AceType::RawPtr(badgeNode), badgeParams, isDefaultFontSize, isDefaultBadgeSize);
+
+    auto badgeLayoutProp = badgeNode->GetLayoutProperty<BadgeLayoutProperty>();
+    if (badgeLayoutProp) {
+        badgeLayoutProp->UpdateBadgeFontSizeByuser(badgeParams.badgeFontSizeByUser);
+        badgeLayoutProp->UpdateBadgeCircleSizeByuser(badgeParams.badgeCircleSizeByUser);
+    }
+
+    if (SystemProperties::ConfigChangePerform()) {
+        BadgeModelNG badgeModel;
+        badgeModel.CreateWithResourceObj(badgeNode, badgeParams);
+    }
+    return badgeNode;
+}
+
+void TabContentModelNG::WrapWithBadge(const RefPtr<FrameNode>& columnNode, const RefPtr<FrameNode>& iconNode,
+    const RefPtr<FrameNode>& textNode, const TabBarBadgeParam& badgeParam,
+    const RefPtr<LinearLayoutProperty>& columnLayoutProperty)
+{
+    auto contentChild = CreateBadgeContentChild(iconNode, textNode, columnLayoutProperty);
+    CHECK_NULL_VOID(contentChild);
+
+    bool isEllipseMode = false;
+    auto badgeNode = ConfigureBadgeNode(badgeParam, isEllipseMode);
+    CHECK_NULL_VOID(badgeNode);
+
+    contentChild->MountToParent(badgeNode);
+    badgeNode->MountToParent(columnNode);
+    badgeNode->MarkModifyDone();
+
+    auto columnRenderContext = columnNode->GetRenderContext();
+    if (columnRenderContext) {
+        columnRenderContext->UpdateClipEdge(false);
+    }
+    auto badgeRenderContext = badgeNode->GetRenderContext();
+    if (badgeRenderContext) {
+        badgeRenderContext->UpdateClipEdge(false);
+    }
+
+    // Propagate RTL direction to badge node so that the badge layout algorithm's
+    // GetNonAutoLayoutDirection() returns the correct value. Dot badge relies on this
+    // to trigger the RTL branches in GetTextDataOffset / AdjustTextOffsetForBadge /
+    // content child horizontal offset. contentChild direction is NOT set here — it
+    // mirrors the same system/app-level RTL resolution as the non-badge tab item column,
+    // keeping behavior consistent with or without badge.
+    auto isRTL = ResolveBadgeRTL(badgeNode);
+    auto badgeLayoutProp = badgeNode->GetLayoutProperty<BadgeLayoutProperty>();
+    if (badgeLayoutProp) {
+        badgeLayoutProp->UpdateLayoutDirection(isRTL ? TextDirection::RTL : TextDirection::LTR);
+    }
+
+    if (isEllipseMode) {
+        ScheduleEllipsePositionAdjustment(badgeNode);
+    }
 }
 
 void TabContentModelNG::Create(std::function<void()>&& deepRenderFunc)
@@ -254,6 +580,14 @@ void TabContentModelNG::AddBottomStyleTabBarItem(const RefPtr<UINode>& tabConten
             linearLayoutProperty->SetIsVertical(true);
         }
     }
+    bool isTopFloating = tabLayoutProperty->GetBarLayoutStyleValue(TabBarLayoutStyle::BOTTOM) ==
+        TabBarLayoutStyle::TOP;
+    if (isTopFloating) {
+        linearLayoutProperty->UpdateFlexDirection(FlexDirection::ROW);
+        linearLayoutProperty->UpdateSpace(0.0_vp);
+        linearLayoutProperty->UpdateCrossAxisAlign(FlexAlign::CENTER);
+        linearLayoutProperty->SetIsVertical(false);
+    }
 
     auto swiperNode = AceType::DynamicCast<FrameNode>(tabsNode->GetTabs());
     CHECK_NULL_VOID(swiperNode);
@@ -275,6 +609,13 @@ void TabContentModelNG::AddBottomStyleTabBarItem(const RefPtr<UINode>& tabConten
         CHECK_NULL_VOID(renderContext);
         BorderRadiusProperty borderRadiusProperty;
         borderRadiusProperty.SetRadius(boardStyle.borderRadius);
+        renderContext->UpdateBorderRadius(borderRadiusProperty);
+    }
+    if (isTopFloating) {
+        auto renderContext = columnNode->GetRenderContext();
+        CHECK_NULL_VOID(renderContext);
+        BorderRadiusProperty borderRadiusProperty;
+        borderRadiusProperty.SetRadius(Dimension(23, DimensionUnit::VP));
         renderContext->UpdateBorderRadius(borderRadiusProperty);
     }
     if (tabBarStyle != TabBarStyle::SUBTABBATSTYLE) {
@@ -302,7 +643,8 @@ void TabContentModelNG::AddBottomStyleTabBarItem(const RefPtr<UINode>& tabConten
     auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
     auto columnProperty = columnNode->GetLayoutProperty();
     if (tabsPattern && columnProperty) {
-        bool shouldHide = tabsPattern->IsTabShouldHideByVisibility(defaultVisibility);
+        auto activeDisplayMode = tabsPattern->GetActiveBarDisplayMode();
+        bool shouldHide = defaultVisibility.ShouldHide(activeDisplayMode);
         columnProperty->UpdateVisibility(shouldHide ? VisibleType::GONE : VisibleType::VISIBLE);
     }
 
@@ -370,7 +712,12 @@ void TabContentModelNG::AddBottomStyleTabBarItem(const RefPtr<UINode>& tabConten
     RefPtr<FrameNode> iconNode;
     auto layoutProperty = columnNode->GetLayoutProperty();
     CHECK_NULL_VOID(layoutProperty);
-    if (tabBarStyle == TabBarStyle::SUBTABBATSTYLE || tabBarStyle == TabBarStyle::BOTTOMTABBATSTYLE) {
+    if (isTopFloating) {
+        PaddingProperty topPadding;
+        topPadding.SetEdges(CalcLength(18, DimensionUnit::VP), CalcLength(18, DimensionUnit::VP),
+            CalcLength(0, DimensionUnit::VP), CalcLength(0, DimensionUnit::VP));
+        layoutProperty->UpdatePadding(topPadding);
+    } else if (tabBarStyle == TabBarStyle::SUBTABBATSTYLE || tabBarStyle == TabBarStyle::BOTTOMTABBATSTYLE) {
         layoutProperty->UpdatePadding(padding);
         auto accessibilityProperty = columnNode->GetAccessibilityProperty<AccessibilityProperty>();
         accessibilityProperty->SetAccessibilityGroup(true);
@@ -390,6 +737,7 @@ void TabContentModelNG::AddBottomStyleTabBarItem(const RefPtr<UINode>& tabConten
     } else {
         tabBarPattern->AddTabBarItemType(columnNode->GetId(), TabBarParamType::NORMAL);
     }
+    bool hasBadge = tabContentPattern->GetTabBarBadge().has_value() && tabBarStyle != TabBarStyle::SUBTABBATSTYLE;
     if (static_cast<int32_t>(columnNode->GetChildren().size()) == 0) {
         if (tabBarParam.GetSymbol().has_value()) {
             iconNode = FrameNode::GetOrCreateFrameNode(V2::SYMBOL_ETS_TAG,
@@ -409,14 +757,22 @@ void TabContentModelNG::AddBottomStyleTabBarItem(const RefPtr<UINode>& tabConten
         auto index = std::clamp(position, 0, static_cast<int32_t>(tabBarNode->GetChildren().size()) -
             MASK_COUNT - IMAGE_INDICATOR_COUNT);
         columnNode->MountToParent(tabBarNode, index);
-        iconNode->MountToParent(columnNode);
-        textNode->MountToParent(columnNode);
+        if (hasBadge) {
+            WrapWithBadge(
+                columnNode, iconNode, textNode, tabContentPattern->GetTabBarBadge().value(), linearLayoutProperty);
+        } else {
+            iconNode->MountToParent(columnNode);
+            textNode->MountToParent(columnNode);
+        }
     } else {
+        UpdateBottomStyleBadge(columnNode, tabContentPattern, hasBadge, linearLayoutProperty);
+
         if (isFrameNode) {
             auto builderNode = tabContentPattern->FireCustomStyleNode();
-            columnNode->ReplaceChild(AceType::DynamicCast<FrameNode>(columnNode->GetChildren().back()), builderNode);
+            auto currentTextNode = TabBarPattern::GetTextNodeFromColumn(columnNode);
+            columnNode->ReplaceChild(currentTextNode, builderNode);
         }
-        auto oldIcon = AceType::DynamicCast<FrameNode>(columnNode->GetChildren().front());
+        auto oldIcon = TabBarPattern::GetIconNodeFromColumn(columnNode);
         CHECK_NULL_VOID(oldIcon);
         if (tabBarParam.GetSymbol().has_value() && oldIcon->GetTag() != V2::SYMBOL_ETS_TAG) {
             auto icon = FrameNode::GetOrCreateFrameNode(V2::SYMBOL_ETS_TAG,
@@ -427,8 +783,8 @@ void TabContentModelNG::AddBottomStyleTabBarItem(const RefPtr<UINode>& tabConten
                 ElementRegister::GetInstance()->MakeUniqueId(), []() { return AceType::MakeRefPtr<ImagePattern>(); });
             columnNode->ReplaceChild(oldIcon, icon);
         }
-        iconNode = AceType::DynamicCast<FrameNode>(columnNode->GetChildren().front());
-        textNode = AceType::DynamicCast<FrameNode>(columnNode->GetChildren().back());
+        iconNode = TabBarPattern::GetIconNodeFromColumn(columnNode);
+        textNode = TabBarPattern::GetTextNodeFromColumn(columnNode);
     }
     CHECK_NULL_VOID(textNode);
     CHECK_NULL_VOID(iconNode);
@@ -489,7 +845,10 @@ void TabContentModelNG::AddBottomStyleTabBarItem(const RefPtr<UINode>& tabConten
     if (!tabBarParam.GetIcon().empty() || tabBarStyle == TabBarStyle::BOTTOMTABBATSTYLE) {
         textLayoutProperty->UpdateFontSize(tabTheme->GetBottomTabTextSize());
     }
-    if (tabBarStyle == TabBarStyle::BOTTOMTABBATSTYLE) {
+    if (isTopFloating) {
+        textLayoutProperty->UpdateFontSize(tabTheme->GetTopTabTextSize());
+        textLayoutProperty->UpdateFontWeight(FontWeight::MEDIUM);
+    } else if (tabBarStyle == TabBarStyle::BOTTOMTABBATSTYLE) {
         textLayoutProperty->UpdateFontWeight(FontWeight::MEDIUM);
     } else if (tabBarStyle == TabBarStyle::SUBTABBATSTYLE && !isFrameNode) {
         textLayoutProperty->UpdateFontWeight(myIndex == indicator ? FontWeight::MEDIUM : FontWeight::NORMAL);
@@ -1356,6 +1715,14 @@ void TabContentModelNG::SetIconUnselectedColorByUser(bool isByUser)
 void TabContentModelNG::SetIconSelectedColorByUser(bool isByUser)
 {
     ACE_UPDATE_LAYOUT_PROPERTY(TabContentLayoutProperty, IconSelectedColorSetByUser, isByUser);
+}
+
+void TabContentModelNG::SetTabBarBadge(FrameNode* node, const std::optional<TabBarBadgeParam>& badgeParam)
+{
+    CHECK_NULL_VOID(node);
+    auto pattern = node->GetPattern<TabContentPattern>();
+    CHECK_NULL_VOID(pattern);
+    pattern->SetTabBarBadge(badgeParam);
 }
 
 void TabContentModelNG::SetPadding(const PaddingProperty& padding)

@@ -109,7 +109,7 @@ public:
         return false;
     }
 
-    virtual void OnVsync(uint64_t nanoTimestamp, uint64_t frameCount);
+    virtual void OnVsync(uint64_t nanoTimestamp, uint64_t frameCount, int64_t vsyncStartTime = -1);
 
     virtual void SetVsyncCallback(AceVsyncCallback&& callback);
 
@@ -274,6 +274,16 @@ public:
     WidthBreakpoint GetWidthBreakpoint(const WidthLayoutBreakPoint& layoutBreakpoints) const;
     HeightBreakpoint GetHeightBreakpoint(const HeightLayoutBreakPoint& layoutBreakpoints) const;
 
+    void SetWindowInfoInitialized(bool initialized)
+    {
+        windowInfoInitialized_ = initialized;
+    }
+
+    bool IsWindowInfoInitialized() const
+    {
+        return windowInfoInitialized_;
+    }
+
     virtual void SetDVSyncUpdate(uint64_t dvsyncTime) {}
 
     virtual void FlushVsync() {}
@@ -333,6 +343,7 @@ protected:
     int64_t lastDVsyncInbihitPredictTs_ = 0;
     bool forceVsync_ = false;
     WindowSizeBreakpoint currentBreakpoint_;
+    bool windowInfoInitialized_ = false;
 
 private:
     std::function<Rect()> windowRectImpl_;

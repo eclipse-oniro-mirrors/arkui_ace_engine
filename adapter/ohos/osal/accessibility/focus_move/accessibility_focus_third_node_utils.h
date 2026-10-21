@@ -64,6 +64,8 @@ public:
 
     std::shared_ptr<FocusRulesCheckNode> GetAceParent() override;
 
+    bool IsChildTreeContainer() override;
+
     bool IsInChildTree() override
     {
         return true;

@@ -2829,6 +2829,41 @@ ArkUI_ErrorCode OH_ArkUI_ImageAttachment_GetResource(const OH_ArkUI_ImageAttachm
     char* buffer, int32_t bufferSize, int32_t* writeLength);
 
 /**
+ * @brief Set the image text tag of the image attachment.
+ *
+ * @note All input pointer parameters must be allocated, managed, and released by the caller.
+ * @param imageAttachment Pointer to the <b>OH_ArkUI_ImageAttachment</b> object.
+ * @param imageTag The image text tag string.
+ * @return Returns the result code.
+ *         Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.
+ *         Returns {@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter exception occurs.
+ * @since 26.2.0
+ */
+ArkUI_ErrorCode OH_ArkUI_ImageAttachment_SetImageTag(
+    OH_ArkUI_ImageAttachment* imageAttachment, const char* imageTag);
+
+/**
+ * @brief Get the image text tag of the image attachment.
+ *
+ * @note All input pointer parameters must be allocated, managed, and released by the caller.
+ * @param imageAttachment Pointer to the <b>OH_ArkUI_ImageAttachment</b> object.
+ * @param bufferSize The buffer size.
+ * @param buffer The buffer to which the image text tag writes to the memory,
+ *               memory space needs to be allocated by the developer.
+ * @param writeLength Indicates the string length actually written to the buffer
+ *                    when returning {@link ARKUI_ERROR_CODE_NO_ERROR}.
+ *                    Indicates the minimum buffer size that can accommodate the target
+ *                    when {@link ARKUI_ERROR_CODE_BUFFER_SIZE_ERROR} is returned.
+ * @return Returns the result code.
+ *         Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.
+ *         Returns {@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter exception occurs.
+ *         Returns {@link ARKUI_ERROR_CODE_BUFFER_SIZE_ERROR} If the buffer size is less than the minimum buffer size.
+ * @since 26.2.0
+ */
+ArkUI_ErrorCode OH_ArkUI_ImageAttachment_GetImageTag(const OH_ArkUI_ImageAttachment* imageAttachment,
+    int32_t bufferSize, char* buffer, int32_t* writeLength);
+
+/**
  * @brief Set image width of the image attachment.
  *
  * @note All input pointer parameters must be allocated, managed, and released by the caller.
@@ -3181,19 +3216,19 @@ ArkUI_ErrorCode OH_ArkUI_ImageAttachment_SetResizableLattice(
     OH_ArkUI_ImageAttachment* imageAttachment, const OH_Drawing_Lattice* lattice);
 
 /**
- * @brief Get the resizable lattice of the image attachment.
+ * @brief Obtains the resizable image lattice in the image style.
  *
- * @param imageAttachment Pointer to the <b>OH_ArkUI_ImageAttachment</b> object.
- * @param lattice Pointer to a pointer that receives the lattice handle previously set by
- *                <b>OH_ArkUI_ImageAttachment_SetResizableLattice</b>. The caller does not take
- *                ownership of the returned handle; its lifetime is bound to the source attachment.
- * @return Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if successful,
- *         {@link ARKUI_ERROR_CODE_GET_INFO_FAILED} if not set,
- *         {@link ARKUI_ERROR_CODE_PARAM_INVALID} if parameter is invalid.
- * @since 26
+ * @note All input pointer parameters must be allocated, managed, and released by the caller.
+ * @param imageAttachment [in] Pointer to the {@link OH_ArkUI_ImageAttachment} object.
+ * @param lattice [out] Output parameter. Pointer to the image resizable lattice.
+ *     The type is {@link OH_Drawing_Lattice}.
+ * @return Returns the result code.
+ *     <br>Returns {@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.
+ *     <br>Returns {@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter exception occurs.
+ * @since 26.1.0
  */
 ArkUI_ErrorCode OH_ArkUI_ImageAttachment_GetResizableLattice(const OH_ArkUI_ImageAttachment* imageAttachment,
-    OH_Drawing_Lattice** lattice);
+    OH_Drawing_Lattice* lattice);
 
 /**
  * @brief Obtains the range of content that will be replaced.

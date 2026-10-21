@@ -13,6 +13,8 @@
  * limitations under the License.
  */
 
+#include <unordered_map>
+
 #include "base/geometry/rect.h"
 #include "base/log/log_wrapper.h"
 #include "base/subwindow/subwindow_manager.h"
@@ -20,6 +22,7 @@
 namespace OHOS::Ace {
 namespace {
 static RefPtr<Subwindow> g_currentWindow;
+std::unordered_map<int32_t, int32_t> g_parentContainerMap;
 } // namespace
 
 std::shared_ptr<SubwindowManager> SubwindowManager::instance_;
@@ -62,7 +65,18 @@ Rect SubwindowManager::GetParentWindowRect()
 
 int32_t SubwindowManager::GetParentContainerId(int32_t containerId)
 {
-    return -1;
+    auto iter = g_parentContainerMap.find(containerId);
+    return iter == g_parentContainerMap.end() ? -1 : iter->second;
+}
+
+void SubwindowManager::AddParentContainerId(int32_t containerId, int32_t parentContainerId)
+{
+    g_parentContainerMap[containerId] = parentContainerId;
+}
+
+void SubwindowManager::RemoveParentContainerId(int32_t containerId)
+{
+    g_parentContainerMap.erase(containerId);
 }
 
 int32_t SubwindowManager::GetSubContainerId(int32_t parentContainerId)
@@ -74,6 +88,12 @@ const std::vector<int32_t> SubwindowManager::GetAllSubContainerId(int32_t parent
 {
     (void)parentContainerId;
     return {};
+}
+
+const RefPtr<Subwindow> SubwindowManager::GetSubwindowById(int32_t subinstanceId)
+{
+    auto iter = instanceSubwindowMap_.find(subinstanceId);
+    return iter == instanceSubwindowMap_.end() ? nullptr : iter->second;
 }
 
 const RefPtr<Subwindow> SubwindowManager::GetSubwindow(int32_t instanceId)

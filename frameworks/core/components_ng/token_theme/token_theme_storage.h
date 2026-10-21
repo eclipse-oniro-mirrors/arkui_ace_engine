@@ -36,11 +36,11 @@ public:
     // theme map (key: themeScopeId - value: ark theme instance)
     void StoreThemeScope(TokenThemeScopeId themeScopeId, int32_t themeId);
     void RemoveThemeScope(TokenThemeScopeId themeScopeId, bool removeToken = false);
-    const RefPtr<TokenTheme>& GetTheme(TokenThemeScopeId themeScopeId);
+    ACE_FORCE_EXPORT const RefPtr<TokenTheme>& GetTheme(TokenThemeScopeId themeScopeId);
 
     // default theme
     void SetDefaultTheme(const RefPtr<TokenTheme>& theme, ColorMode colorMode);
-    const RefPtr<TokenTheme>& GetDefaultTheme();
+    ACE_FORCE_EXPORT const RefPtr<TokenTheme>& GetDefaultTheme();
     void UpdateDefaultThemeBySystemTheme(ColorMode colorMode);
 
     // cache (key: theme id - value: ark theme instance)
@@ -50,7 +50,7 @@ public:
     const RefPtr<TokenTheme>& CacheGet(int32_t themeId);
     void CacheRemove(int32_t themeId);
 
-    RefPtr<TokenTheme> ObtainSystemTheme(ColorMode themeColorMode = ColorMode::COLOR_MODE_UNDEFINED);
+    ACE_FORCE_EXPORT RefPtr<TokenTheme> ObtainSystemTheme(ColorMode themeColorMode = ColorMode::COLOR_MODE_UNDEFINED);
     
     void SetIsThemeColorAvailable(bool isDark, int32_t index, bool isColorAvailable);
 

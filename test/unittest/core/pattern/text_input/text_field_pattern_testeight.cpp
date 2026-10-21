@@ -586,13 +586,16 @@ HWTEST_F(TextFieldPatternTestEight, HandleButtonMouseEvent001, TestSize.Level0)
     RefPtr<TextFieldPattern> pattern = textFieldNode->GetPattern<TextFieldPattern>();
     ASSERT_NE(pattern, nullptr);
 
-    RefPtr<TextInputResponseArea> responseArea = AceType::MakeRefPtr<CleanNodeResponseArea>(pattern);
+    RefPtr<TextInputResponseArea> responseArea = AceType::MakeRefPtr<CleanNodeResponseArea>(pattern_);
+    auto cleanNodeResponseArea = AceType::DynamicCast<CleanNodeResponseArea>(responseArea);
+    ASSERT_NE(cleanNodeResponseArea, nullptr);
+    cleanNodeResponseArea->cleanNode_ = AceType::MakeRefPtr<FrameNode>("node", -1, AceType::MakeRefPtr<Pattern>());
     bool isHover = true;
-    pattern_->HandleButtonMouseEvent(responseArea, isHover);
+    cleanNodeResponseArea->HandleButtonMouseEvent(isHover);
     EXPECT_NE(pattern_->textFieldOverlayModifier_, nullptr);
 
     isHover = false;
-    pattern_->HandleButtonMouseEvent(responseArea, isHover);
+    cleanNodeResponseArea->HandleButtonMouseEvent(isHover);
     EXPECT_NE(pattern_->textFieldOverlayModifier_, nullptr);
 }
 
@@ -1026,7 +1029,7 @@ HWTEST_F(TextFieldPatternTestEight, StopTwinkling001, TestSize.Level0)
     });
     GetFocus();
 
-    pattern_->obscureTickCountDown_ = 1;
+    pattern_->obscureHelper_.tickCountDown_ = 1;
     pattern_->cursorVisible_ = false;
     pattern_->StopTwinkling();
     EXPECT_FALSE(pattern_->isCaretTwinkling_);
@@ -1044,7 +1047,7 @@ HWTEST_F(TextFieldPatternTestEight, ShowCaretAndStopTwinkling001, TestSize.Level
     });
     GetFocus();
 
-    pattern_->obscureTickCountDown_ = 1;
+    pattern_->obscureHelper_.tickCountDown_ = 1;
     pattern_->ShowCaretAndStopTwinkling();
     EXPECT_TRUE(pattern_->cursorVisible_);
 }

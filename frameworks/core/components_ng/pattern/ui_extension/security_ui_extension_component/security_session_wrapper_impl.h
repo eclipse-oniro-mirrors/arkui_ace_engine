@@ -95,7 +95,7 @@ public:
         WindowSizeChangeReason reason) const override;
     bool NotifyOccupiedAreaChangeInfo(
         sptr<Rosen::OccupiedAreaChangeInfo> info, bool needWaitLayout) override;
-    void SetDensityDpiImpl(bool isDensityDpi) override;
+    void SetDensityDpiImpl(DpiFollowStrategy dpiFollowStrategy) override;
 
     // The interface to send the data for ArkTS
     void SendDataAsync(const AAFwk::WantParams& params) const override;
@@ -133,7 +133,7 @@ private:
     RectF displayArea_;
     uint32_t reason_ = (uint32_t)Rosen::SizeChangeReason::UNDEFINED;
     std::shared_ptr<Rosen::ILifecycleListener> lifecycleListener_;
-    std::function<void((OHOS::Rosen::WSError))> foregroundCallback_;
+    std::function<void(OHOS::Rosen::WSError, int32_t)> foregroundCallback_;
     std::function<void((OHOS::Rosen::WSError))> backgroundCallback_;
     std::function<void((OHOS::Rosen::WSError))> destructionCallback_;
     std::weak_ptr<Rosen::RSTransaction> transaction_;

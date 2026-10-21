@@ -242,9 +242,6 @@ RefPtr<UINode> FrameNode::GetFrameChildByIndexWithoutExpanded(uint32_t index)
     return {};
 }
 
-void FrameNode::GetInspectorValue()
-{}
-
 const RefPtr<LayoutAlgorithmWrapper>& FrameNode::GetLayoutAlgorithm(bool needReset)
 {
     static const RefPtr<LayoutAlgorithmWrapper> value {};
@@ -302,6 +299,10 @@ bool FrameNode::IsOutOfLayout() const
 
 void FrameNode::Layout()
 {}
+
+void FrameNode::MeasureSafeAreaInset() {}
+
+void FrameNode::LayoutSafeAreaInset() {}
 
 void FrameNode::MarkDirtyNode(PropertyChangeFlag extraFlag)
 {
@@ -563,8 +564,10 @@ RefPtr<UINode> FrameNode::GetCurrentPageRootNode()
     return {};
 }
 
-RefPtr<LayoutWrapper> FrameNode::GetOrCreateChildByIndex(uint32_t index, bool addToRenderTree, bool isCache)
+RefPtr<LayoutWrapper> FrameNode::GetOrCreateChildByIndex(
+    uint32_t index, bool addToRenderTree, bool isCache, bool allowPlaceholderSubstitution)
 {
+    (void)allowPlaceholderSubstitution;
     return {};
 }
 

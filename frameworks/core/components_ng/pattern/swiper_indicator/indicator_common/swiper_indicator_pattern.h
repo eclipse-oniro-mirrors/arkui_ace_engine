@@ -289,6 +289,7 @@ public:
     void OnModifyDone() override;
     void IndicatorOnChange();
     void InitIndicatorEvent();
+    virtual void OnIndicatorChangeAccessibilityEvent() {}
     virtual bool GetDigitFrameSize(RefPtr<GeometryNode>& geoNode, SizeF& frameSize) const;
     virtual int32_t RealTotalCount() const;
     virtual int32_t GetCurrentIndex() const;

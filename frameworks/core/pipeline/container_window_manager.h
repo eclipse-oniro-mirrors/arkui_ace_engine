@@ -68,7 +68,7 @@ struct DecorButtonStyle {
     uint32_t buttonBackgroundCornerRadius;
 };
 
-class WindowManager : public virtual AceType {
+class WindowManager : public AceType {
     DECLARE_ACE_TYPE(WindowManager, AceType);
 
 public:

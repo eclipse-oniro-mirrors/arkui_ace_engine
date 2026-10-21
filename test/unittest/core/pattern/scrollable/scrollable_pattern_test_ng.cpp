@@ -25,6 +25,7 @@
 
 #include "core/animation/bezier_variable_velocity_motion.h"
 #include "core/components/scroll/scroll_bar_theme.h"
+#include "core/animation/animator.h"
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/pattern/arc_list/arc_list_pattern.h"
 #include "core/components_ng/pattern/arc_scroll/inner/arc_scroll_bar.h"

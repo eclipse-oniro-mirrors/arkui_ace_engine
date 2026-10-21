@@ -61,6 +61,7 @@
 #include "core/event/touch_event.h"
 #include "core/pipeline/pipeline_context.h"
 #include "core/pipeline_ng/pipeline_context.h"
+#include "interfaces/inner_api/ace/modal_ui_extension_config.h"
 #include "session/host/include/extension_session.h"
 #include "session/host/include/session.h"
 #include "ui/rs_surface_node.h"
@@ -167,11 +168,15 @@ UIExtensionPattern::~UIExtensionPattern()
 
     auto instanceId = GetInstanceIdFromHost();
     ContainerScope scope(instanceId);
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
     auto ngPipeline = NG::PipelineContext::GetCurrentContext();
     CHECK_NULL_VOID(ngPipeline);
     auto frontend = ngPipeline->GetFrontend();
     CHECK_NULL_VOID(frontend);
-    auto accessibilityManager = frontend->GetAccessibilityManager();
+    auto mainAccessibilityManager = frontend->GetAccessibilityManager();
+    CHECK_NULL_VOID(mainAccessibilityManager);
+    auto accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(host);
     CHECK_NULL_VOID(accessibilityManager);
     accessibilityManager->DeregisterAccessibilityChildTreeCallback(
         accessibilityChildTreeCallback_->GetAccessibilityId());
@@ -615,7 +620,7 @@ void UIExtensionPattern::UpdateSessionViewportConfigFromContext()
     auto pipeline = PipelineContext::GetCurrentContext();
     CHECK_NULL_VOID(pipeline);
     SessionViewportConfig sessionViewportConfig;
-    sessionViewportConfig.isDensityFollowHost_ = GetDensityDpi();
+    sessionViewportConfig.dpiFollowStrategy_ = GetEffectiveDpiFollowStrategy();
     sessionViewportConfig.density_ = pipeline->GetCurrentDensity();
     sessionViewportConfig.displayId_ = container->GetCurrentDisplayId();
     sessionViewportConfig.orientation_ = static_cast<int32_t>(SystemProperties::GetDeviceOrientation());
@@ -1636,6 +1641,24 @@ void UIExtensionPattern::FireOnErrorCallback(int32_t code, const std::string& na
     lastError_ = { code, name, message };
 }
 
+void UIExtensionPattern::SetOnAbilityErrorCodeCallback(
+    const std::function<void(const UIExtensionOperationPhase&, int32_t)>&& callback)
+{
+    onAbilityErrorCodeCallback_ = std::move(callback);
+}
+
+void UIExtensionPattern::FireOnAbilityErrorCodeCallback(
+    const UIExtensionOperationPhase& operationPhase, int32_t abilityErrorCode)
+{
+    UIEXT_LOGI("OnAbilityErrorCode operationPhase is %{public}d, abilityErrorCode is %{public}d, "
+        "hasCallback is %{public}d.", static_cast<int32_t>(operationPhase), abilityErrorCode,
+        onAbilityErrorCodeCallback_ ? 1 : 0);
+    if (onAbilityErrorCodeCallback_) {
+        ContainerScope scope(instanceId_);
+        onAbilityErrorCodeCallback_(operationPhase, abilityErrorCode);
+    }
+}
+
 void UIExtensionPattern::SetOnResultCallback(const std::function<void(int32_t, const AAFwk::Want&)>&& callback)
 {
     onResultCallback_ = std::move(callback);
@@ -1739,14 +1762,32 @@ void UIExtensionPattern::FireBindModalCallback()
     }
 }
 
-void UIExtensionPattern::SetDensityDpi(bool densityDpi)
+void UIExtensionPattern::SetDpiFollowStrategy(DpiFollowStrategy dpiFollowStrategy, bool isDpiFollowStrategySet)
 {
-    densityDpi_ = densityDpi;
+    dpiFollowStrategy_ = dpiFollowStrategy;
+    isDpiFollowStrategySet_ = isDpiFollowStrategySet;
 }
 
-bool UIExtensionPattern::GetDensityDpi()
+DpiFollowStrategy UIExtensionPattern::GetDpiFollowStrategy()
 {
-    return densityDpi_;
+    return dpiFollowStrategy_;
+}
+
+DpiFollowStrategy UIExtensionPattern::GetEffectiveDpiFollowStrategy()
+{
+    ContainerScope scope(instanceId_);
+    auto context = PipelineBase::GetCurrentContext();
+    DpiFollowStrategy hostDpiFollowStrategy =
+        context ? context->GetUIExtensionDensityFollowHost() : DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI;
+    // Developer-configured strategy takes precedence (even when it is the default value,
+    // i.e. an explicit opt-out); when not configured at all, fall back to the strategy
+    // saved from UIContent::SetUIExtensionDensityFollowHost.
+    DpiFollowStrategy effectiveStrategy = isDpiFollowStrategySet_ ? dpiFollowStrategy_ : hostDpiFollowStrategy;
+    UIEXT_LOGI("GetEffectiveDpiFollowStrategy: dpiFollowStrategy=%{public}d, isDpiFollowStrategySet=%{public}d, "
+               "hostDpiFollowStrategy=%{public}d, effective=%{public}d, instanceId=%{public}d.",
+        static_cast<int32_t>(dpiFollowStrategy_), isDpiFollowStrategySet_, static_cast<int32_t>(hostDpiFollowStrategy),
+        static_cast<int32_t>(effectiveStrategy), instanceId_);
+    return effectiveStrategy;
 }
 
 void UIExtensionPattern::OnVisibleChange(bool visible)
@@ -1776,10 +1817,12 @@ void UIExtensionPattern::InitializeAccessibility()
     CHECK_NULL_VOID(ngPipeline);
     auto frontend = ngPipeline->GetFrontend();
     CHECK_NULL_VOID(frontend);
-    auto accessibilityManager = frontend->GetAccessibilityManager();
-    CHECK_NULL_VOID(accessibilityManager);
     auto frameNode = frameNode_.Upgrade();
     CHECK_NULL_VOID(frameNode);
+    auto mainAccessibilityManager = frontend->GetAccessibilityManager();
+    CHECK_NULL_VOID(mainAccessibilityManager);
+    auto accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(frameNode);
+    CHECK_NULL_VOID(accessibilityManager);
     int64_t accessibilityId = frameNode->GetAccessibilityId();
     accessibilityChildTreeCallback_ = std::make_shared<UIExtensionAccessibilityChildTreeCallback>(
         WeakClaim(this), accessibilityId);
@@ -1908,7 +1951,7 @@ void UIExtensionPattern::RegisterVisibleAreaChange()
         uiExtension->HandleVisibleAreaChange(visible, ratio);
     };
     std::vector<double> ratioList = { SHOW_START, SHOW_FULL };
-    pipeline->AddVisibleAreaChangeNode(host, ratioList, callback, false);
+    pipeline->AddVisibleAreaChangeNode(host, ratioList, callback, false, true);
 }
 
 void UIExtensionPattern::HandleVisibleAreaChange(bool visible, double ratio)
@@ -2017,6 +2060,20 @@ const char* UIExtensionPattern::ToString(AbilityState state)
     }
 }
 
+void UIExtensionPattern::DumpDpiFollowInfo()
+{
+    ContainerScope dpiScope(instanceId_);
+    auto dpiContext = PipelineBase::GetCurrentContext();
+    DumpLog::GetInstance().AddDesc(std::string("dpiFollowStrategy: ")
+        .append(std::to_string(static_cast<int32_t>(dpiFollowStrategy_))));
+    DumpLog::GetInstance().AddDesc(std::string("isDpiFollowStrategySet: ")
+        .append(std::to_string(isDpiFollowStrategySet_)));
+    DumpLog::GetInstance().AddDesc(std::string("uiExtensionDpiFollowHost: ")
+        .append(std::to_string(dpiContext ? static_cast<int32_t>(dpiContext->GetUIExtensionDensityFollowHost()) : -1)));
+    DumpLog::GetInstance().AddDesc(std::string("dpiFollowStrategyEffective: ")
+        .append(std::to_string(static_cast<int32_t>(GetEffectiveDpiFollowStrategy()))));
+}
+
 void UIExtensionPattern::DumpInfo()
 {
     CHECK_NULL_VOID(sessionWrapper_);
@@ -2028,6 +2085,7 @@ void UIExtensionPattern::DumpInfo()
     DumpLog::GetInstance().AddDesc(std::string("reason: ").append(std::to_string(sessionWrapper_->GetReasonDump())));
     DumpLog::GetInstance().AddDesc(std::string("focusStatus: ").append(std::to_string(focusState_)));
     DumpLog::GetInstance().AddDesc(std::string("abilityState: ").append(ToString(state_)));
+    DumpDpiFollowInfo();
     std::string eventProxyStr = "[]";
     if (platformEventProxy_) {
         eventProxyStr = platformEventProxy_->GetCurEventProxyToString();
@@ -2075,6 +2133,14 @@ void UIExtensionPattern::DumpInfo(std::unique_ptr<JsonValue>& json)
     json->Put("reason: ", std::to_string(sessionWrapper_->GetReasonDump()).c_str());
     json->Put("focusStatus: ", std::to_string(focusState_).c_str());
     json->Put("abilityState: ", ToString(state_));
+    ContainerScope dpiScope(instanceId_);
+    auto dpiContext = PipelineBase::GetCurrentContext();
+    json->Put("dpiFollowStrategy: ", std::to_string(static_cast<int32_t>(dpiFollowStrategy_)).c_str());
+    json->Put("isDpiFollowStrategySet: ", std::to_string(isDpiFollowStrategySet_).c_str());
+    json->Put("uiExtensionDpiFollowHost: ",
+        std::to_string(dpiContext ? static_cast<int32_t>(dpiContext->GetUIExtensionDensityFollowHost()) : -1).c_str());
+    json->Put("dpiFollowStrategyEffective: ",
+        std::to_string(static_cast<int32_t>(GetEffectiveDpiFollowStrategy())).c_str());
     std::string eventProxyStr = "[]";
     if (platformEventProxy_) {
         eventProxyStr = platformEventProxy_->GetCurEventProxyToString();

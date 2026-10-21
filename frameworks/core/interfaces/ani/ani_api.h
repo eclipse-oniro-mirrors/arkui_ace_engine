@@ -597,6 +597,14 @@ struct ArkUIAniParallelizeUIModifier {
     void (*registerCallback)(
         ArkUINodeHandle, std::function<int32_t()>&&, std::function<ArkUINodeHandle(int32_t, int32_t, int32_t)>&&);
 };
+// Complete snapshot in TOP, END, BOTTOM, START order; content is a detached static builder root.
+struct ArkUIAniSafeAreaInsetEdge {
+    ArkUINodeHandle content = nullptr;
+    double spacing = 0.0;
+    int32_t unit = 1; // DimensionUnit::VP
+    int32_t alignment = 1; // SafeAreaInsetAlignment::CENTER
+};
+
 struct ArkUIAniCommonModifier {
     ani_ref* (*getHostContext)(ArkUI_Int32 key);
     void (*setFrameRateRange)(ani_env* env, ani_long peerPtr, ani_object value, ArkUI_Int32 type);
@@ -640,6 +648,7 @@ struct ArkUIAniCommonModifier {
     ani_int (*getWindowId)(ani_int instanceId);
     ani_int (*getWindowWidthBreakpoint)();
     ani_int (*getWindowHeightBreakpoint)();
+    ani_boolean (*isWindowInfoInitialized)(ani_int instanceId);
     void* (*transferKeyEventPointer)(ani_long nativePtr);
     void* (*createKeyEventAccessorWithPointer)(ani_long nativePtr);
     void* (*createEventTargetInfoAccessor)();
@@ -694,6 +703,8 @@ struct ArkUIAniCommonModifier {
     void (*setOnNodeDestroyEvent)(ArkUINodeHandle node, std::function<void(int32_t)>&& event);
     void(*fireArkUIObjectLifecycleCallback)(ani_long nodePtr, const std::string& className, void* data);
     std::string (*GetIdString)(ArkUINodeHandle node);
+    ani_long (*interopProxyNodeConstruct)(ArkUI_Int32 id);
+    void (*setSafeAreaInset)(ArkUINodeHandle node, const ArkUIAniSafeAreaInsetEdge* edges, int32_t count);
 };
 struct  ArkUICustomNodeInfo {
     std::function<void()> onPageShowFunc;
@@ -723,6 +734,9 @@ struct ArkUIAniCustomNodeModifier {
 struct ArkUIAniKeyboardAvoidModeModifier {
     ArkUI_Int32 (*getKeyboardAvoidMode)();
     void (*setKeyboardAvoidMode)(int32_t index);
+};
+struct ArkUIAniImmersiveStrategyModifier {
+    void (*applyDefaultImmersiveStrategy)(const int32_t* types, int32_t count);
 };
 struct ArkUIAniDrawModifier {
     void (*setDrawModifier)(ani_long ptr, uint32_t flag, void* fnDrawBehindFun, void* fnDrawContentFun,
@@ -1019,8 +1033,9 @@ struct ArkUIAniCommonNodeAniModifier {
 struct ArkUIAniVisualEffectModifier {
     OHOS::Ace::UiMaterial* (*constructMaterial)(int32_t type);
     void (*destroyMaterial)(OHOS::Ace::UiMaterial* ptr);
-    OHOS::Ace::UiMaterial* (*convertToECMaterial)(OHOS::Ace::UiMaterial* ptr);
-    OHOS::Ace::UiMaterial* (*convertToECSubMaterial)(OHOS::Ace::UiMaterial* ptr);
+    void (*convertToECMaterial)(OHOS::Ace::UiMaterial* src, OHOS::Ace::UiMaterial* dst);
+    void (*convertToECSubMaterial)(OHOS::Ace::UiMaterial* src, OHOS::Ace::UiMaterial* dst);
+    void (*getEmpty)(OHOS::Ace::UiMaterial* dst);
     int32_t (*getGlobalMaterialLevel)();
     bool (*isImmersiveMaterialSupported)();
     int32_t (*getMaterialState)();
@@ -1055,6 +1070,7 @@ struct ArkUIAniModifiers {
     const ArkUIAniCommonModifier* (*getCommonAniModifier)();
     const ArkUIAniCustomNodeModifier* (*getCustomNodeAniModifier)();
     const ArkUIAniKeyboardAvoidModeModifier* (*getKeyboardAvoidModeAniModifier)();
+    const ArkUIAniImmersiveStrategyModifier* (*getImmersiveStrategyAniModifier)();
     const ArkUIAniLazyForEachNodeModifier* (*getLazyForEachNodeAniModifier)();
     const ArkUIAniContentSlotModifier* (*getContentSlotAniModifier)();
     const ArkUIAniDrawModifier* (*getArkUIAniDrawModifier)();

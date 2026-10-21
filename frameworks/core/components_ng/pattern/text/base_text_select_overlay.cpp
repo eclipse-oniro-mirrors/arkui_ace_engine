@@ -134,15 +134,6 @@ bool BaseTextSelectOverlay::IsHandleReverse()
     return overlayManager->IsHandleReverse();
 }
 
-bool BaseTextSelectOverlay::IsOwnerClipContent()
-{
-    auto owner = GetOwner();
-    CHECK_NULL_RETURN(owner, true);
-    auto renderContext = owner->GetRenderContext();
-    CHECK_NULL_RETURN(renderContext, true);
-    return renderContext->GetClipEdge().value_or(false);
-}
-
 bool BaseTextSelectOverlay::SelectOverlayIsOn()
 {
     auto manager = GetManager<SelectContentOverlayManager>();
@@ -840,9 +831,8 @@ bool BaseTextSelectOverlay::CheckHandleCanPaintInHost(const RectF& firstRect, co
 
 void BaseTextSelectOverlay::CalcHandleLevelMode(const RectF& firstLocalPaintRect, const RectF& secondLocalPaintRect)
 {
-    if ((CheckHandleCanPaintInHost(firstLocalPaintRect, secondLocalPaintRect) || HasUnsupportedTransform() ||
-        IsHandleInParentSafeAreaPadding(firstLocalPaintRect, secondLocalPaintRect)) &&
-        !IsOwnerClipContent()) {
+    if (CheckHandleCanPaintInHost(firstLocalPaintRect, secondLocalPaintRect) || HasUnsupportedTransform() ||
+        IsHandleInParentSafeAreaPadding(firstLocalPaintRect, secondLocalPaintRect)) {
         SetHandleLevelMode(HandleLevelMode::EMBED);
     } else {
         SetHandleLevelMode(HandleLevelMode::OVERLAY);
@@ -1111,7 +1101,9 @@ bool BaseTextSelectOverlay::GetFrameNodeContentRect(const RefPtr<FrameNode>& nod
 void BaseTextSelectOverlay::MarkOverlayDirty()
 {
     if (SelectOverlayIsOn()) {
-        auto host = GetOwner();
+        // The overlay node is held by the mount node, which may be an
+        // ancestor of the owner (see GetSelectOverlayMountNode).
+        auto host = GetSelectOverlayMountNode(GetOwner());
         CHECK_NULL_VOID(host);
         auto overlayNode = host->GetOverlayNode();
         CHECK_NULL_VOID(overlayNode);

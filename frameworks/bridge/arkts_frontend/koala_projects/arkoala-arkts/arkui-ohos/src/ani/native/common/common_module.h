@@ -29,6 +29,7 @@ private:
     ani_vm* vm_ = nullptr;
     ani_ref func_ = nullptr;
 };
+void SetSafeAreaInset(ani_env* env, ani_object obj, ani_long ptr, ani_array edges);
 ani_boolean IsEasySplit([[maybe_unused]] ani_env* env, ani_object obj, ani_int instaceId);
 ani_object GetHostContext([[maybe_unused]] ani_env* env, ani_object obj, ani_int key);
 void SetFrameRateRange([[maybe_unused]] ani_env* env, ani_object obj, ani_long key, ani_object value, ani_int type);
@@ -46,6 +47,7 @@ void SetCustomCallbackWithCheckForFrameNodes(ani_env* env, ani_object obj, ani_a
 void Invalidate(ani_env* env, [[maybe_unused]] ani_object aniClass, ani_long ptr);
 ani_long BuilderProxyNodeConstruct(ani_env* env, [[maybe_unused]] ani_object aniClass, ani_int id);
 ani_long BuilderProxyNodeMockConstruct(ani_env* env, [[maybe_unused]] ani_object aniClass, ani_int id);
+ani_long InteropProxyNodeConstruct(ani_env* env, [[maybe_unused]] ani_object aniClass, ani_int id);
 void SetOnNodeDestroyEvent(
     ani_env* env, [[maybe_unused]] ani_object aniClass, ani_long ptr, ani_fn_object event);
 void RemoveComponentFromFrameNode(ani_env* env, ani_object obj, ani_long node, ani_long content);
@@ -88,6 +90,7 @@ ani_string getWindowName(ani_env* env, ani_object obj, ani_int instanceId);
 ani_int getWindowId(ani_env* env, ani_object obj, ani_int instanceId);
 ani_int getWindowWidthBreakpoint(ani_env* env, ani_object obj);
 ani_int getWindowHeightBreakpoint(ani_env* env, ani_object obj);
+ani_boolean isWindowInfoInitialized(ani_env* env, ani_object obj, ani_int instanceId);
 void* TransferKeyEventPointer(ani_env* env, ani_object obj, ani_long pointer);
 void* CreateKeyEventAccessorWithPointer(ani_env* env, [[maybe_unused]] ani_object obj, ani_long pointer);
 void* CreateEventTargetInfoAccessor(ani_env* env, [[maybe_unused]] ani_object obj);

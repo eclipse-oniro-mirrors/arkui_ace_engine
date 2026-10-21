@@ -23,6 +23,7 @@ build_component_ng("swiper_pattern_ng") {
     "swiper_event_hub.cpp",
     "swiper_helper.cpp",
     "swiper_layout_algorithm.cpp",
+    "swiper_layout_property.cpp",
     "swiper_model_ng.cpp",
     "swiper_model_static.cpp",
     "swiper_paint_method.cpp",
@@ -43,12 +44,10 @@ build_component_ng("swiper_pattern_ng") {
   ]
 
   if (!is_arkui_x) {
-    if (!ace_engine_feature_wearable) {
-      ark_sources += [
-        "bridge/swiper_static_modifier.cpp",
-        "bridge/swiper_content_transition_proxy_accessor.cpp",
-        "bridge/swiper_controller_accessor.cpp",
-      ]
-    }
+    ark_sources += [
+      "bridge/swiper_static_modifier.cpp",
+      "bridge/swiper_content_transition_proxy_accessor.cpp",
+      "bridge/swiper_controller_accessor.cpp",
+    ]
   }
 }

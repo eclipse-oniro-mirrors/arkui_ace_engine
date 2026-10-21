@@ -16,6 +16,8 @@
 #include "bridge/declarative_frontend/jsview/js_view_abstract.h"
 
 #include <algorithm>
+#include <array>
+#include <cmath>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -88,6 +90,7 @@
 #include "core/common/card_scope.h"
 #include "core/common/dynamic_module_helper.h"
 #include "core/common/resource/resource_manager.h"
+#include "core/components_ng/base/view_abstract.h"
 #include "core/components/theme/resource_adapter.h"
 #include "core/common/resource/resource_parse_utils.h"
 #include "core/components/common/properties/depth_option.h"
@@ -123,6 +126,7 @@ constexpr int32_t FLOAT_PRECISION = 6;
 constexpr char JS_TEXT_MENU_ID_CLASS_NAME[] = "TextMenuItemId";
 constexpr int NUM1 = 1;
 constexpr int NUM2 = 2;
+constexpr size_t MAX_MODIFIER_KEYS = 3;
 const std::vector<HoverModeAreaType> HOVER_MODE_AREA_TYPE = { HoverModeAreaType::TOP_SCREEN,
     HoverModeAreaType::BOTTOM_SCREEN };
 constexpr std::string_view CUSTOM_SYMBOL_SUFFIX = "_CustomSymbol";
@@ -309,6 +313,7 @@ void OnPreDragTrampoline(const RefPtr<JsDragFunction>& func, const PreDragStatus
 void OnKeyboardShortcutActionTrampoline(const RefPtr<JsFunction>& func)
 {
     ACE_SCORING_EVENT("onKeyboardShortcutAction");
+    CHECK_NULL_VOID(func);
     func->ExecuteJS();
 }
 
@@ -6588,7 +6593,7 @@ bool JSViewAbstract::ParseJsDimensionNG(const JSRef<JSVal>& jsValue, CalcDimensi
     }
     if (jsValue->IsString()) {
         auto value = jsValue->ToString();
-        if (!isSupportPercent && value.back() == '%') {
+        if (!isSupportPercent && !value.empty() && value.back() == '%') {
             return false;
         }
         return StringUtils::StringToCalcDimensionNG(value, result, false, defaultUnit);
@@ -7186,10 +7191,12 @@ bool JSViewAbstract::ParseJsColorFromResourceForMaterial(
     if (ok) {
         JSRef<JSVal> jsOpacityRatio = jsObj->GetProperty("opacityRatio");
         if (jsOpacityRatio->IsNumber()) {
-            auto placeholder = result.GetPlaceholder();
             double opacityRatio = jsOpacityRatio->ToNumber<double>();
-            result = result.BlendOpacity(opacityRatio);
-            result.SetPlaceholder(placeholder);
+            if (std::isfinite(opacityRatio)) {
+                auto placeholder = result.GetPlaceholder();
+                result = result.BlendOpacity(opacityRatio);
+                result.SetPlaceholder(placeholder);
+            }
         }
     }
     return ok;
@@ -7328,8 +7335,10 @@ bool JSViewAbstract::CheckDarkResource(const RefPtr<ResourceObject>& resObj)
     if (resId == -1 && !params.empty() && params.back().value.has_value()) {
         std::vector<std::string> splitter;
         StringUtils::StringSplitter(params.back().value.value(), '.', splitter);
-        hasDarkRes = resourceAdapter->ExistDarkResByName(splitter.back(),
-            std::to_string(resObj->GetType()));
+        if (!splitter.empty()) {
+            hasDarkRes = resourceAdapter->ExistDarkResByName(splitter.back(),
+                std::to_string(resObj->GetType()));
+        }
     } else {
         hasDarkRes = resourceAdapter->ExistDarkResById(std::to_string(resId));
     }
@@ -8000,7 +8009,9 @@ bool JSViewAbstract::ParseJsBool(const JSRef<JSVal>& jsValue, bool& result,
             return false;
         }
         JSRef<JSArray> params = JSRef<JSArray>::Cast(args);
+        CHECK_EQUAL_RETURN(params->Length(), 0, false);
         auto param = params->GetValueAt(0);
+        if (!param->IsString()) return false;
         if (resType == static_cast<int32_t>(ResourceType::BOOLEAN)) {
             result = resourceAdapter->GetBooleanByName(param->ToString());
             return true;
@@ -10274,6 +10285,7 @@ void JSViewAbstract::JSBind(BindingTarget globalObj)
     JSClass<JSViewAbstract>::StaticMethod("paddingLeft", &JSViewAbstract::SetPaddingLeft, opt);
     JSClass<JSViewAbstract>::StaticMethod("paddingRight", &JSViewAbstract::SetPaddingRight, opt);
     JSClass<JSViewAbstract>::StaticMethod("safeAreaPadding", &JSViewAbstract::SetSafeAreaPadding, opt);
+    JSClass<JSViewAbstract>::StaticMethod("safeAreaInset", &JSViewAbstract::SetSafeAreaInset, opt);
 
     JSClass<JSViewAbstract>::StaticMethod("foregroundColor", &JSViewAbstract::JsForegroundColor);
     JSClass<JSViewAbstract>::StaticMethod("foregroundEffect", &JSViewAbstract::JsForegroundEffect);
@@ -10901,6 +10913,84 @@ void JSViewAbstract::SetSafeAreaPadding(const JSCallbackInfo& info)
     ParseMarginOrPadding(info, EdgeType::SAFE_AREA_PADDING);
 }
 
+void JSViewAbstract::SetSafeAreaInset(const JSCallbackInfo& info)
+{
+    if (info.Length() < 1 || info[0]->IsUndefined() || info[0]->IsNull() || !info[0]->IsObject()) {
+        NG::ViewAbstractModelNG::ResetSafeAreaInset();
+        return;
+    }
+    auto optionsObject = JSRef<JSObject>::Cast(info[0]);
+    auto targetNode = AceType::WeakClaim(NG::ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    static constexpr std::array<std::pair<const char*, NG::SafeAreaInsetEdge>, NG::SAFE_AREA_INSET_EDGE_COUNT>
+        EDGE_FIELDS = {
+        std::pair { "top", NG::SafeAreaInsetEdge::TOP },
+        std::pair { "end", NG::SafeAreaInsetEdge::END },
+        std::pair { "bottom", NG::SafeAreaInsetEdge::BOTTOM },
+        std::pair { "start", NG::SafeAreaInsetEdge::START },
+    };
+    NG::SafeAreaInsetOptions options;
+    SafeAreaInsetBuilderArray builders;
+    for (const auto& [field, edge] : EDGE_FIELDS) {
+        auto edgeValue = optionsObject->GetProperty(field);
+        if (edgeValue->IsUndefined() || edgeValue->IsNull() || !edgeValue->IsObject()) {
+            continue;
+        }
+        auto edgeObject = JSRef<JSObject>::Cast(edgeValue);
+        auto contentValue = edgeObject->GetProperty("content");
+        if (!contentValue->IsFunction()) {
+            continue;
+        }
+
+        CalcDimension spacing(0.0, DimensionUnit::VP);
+        auto spacingValue = edgeObject->GetProperty("spacing");
+        if (!spacingValue->IsUndefined() && !spacingValue->IsNull() && spacingValue->IsObject()) {
+            CalcDimension parsedSpacing;
+            auto spacingObject = JSRef<JSObject>::Cast(spacingValue);
+            auto spacingResource = spacingObject->GetProperty("res");
+            if ((spacingResource->IsUndefined() || spacingResource->IsNull()) &&
+                ParseJsLengthMetricsVp(spacingObject, parsedSpacing) && std::isfinite(parsedSpacing.Value()) &&
+                parsedSpacing.IsNonNegative() &&
+                (parsedSpacing.Unit() == DimensionUnit::VP || parsedSpacing.Unit() == DimensionUnit::PX ||
+                    parsedSpacing.Unit() == DimensionUnit::FP || parsedSpacing.Unit() == DimensionUnit::LPX)) {
+                spacing = parsedSpacing;
+            }
+        }
+
+        auto alignment = NG::SafeAreaInsetAlignment::CENTER;
+        auto alignmentValue = edgeObject->GetProperty("alignment");
+        if (alignmentValue->IsNumber()) {
+            auto alignmentNumber = alignmentValue->ToNumber<double>();
+            if (std::isfinite(alignmentNumber) && std::trunc(alignmentNumber) == alignmentNumber &&
+                alignmentNumber >= static_cast<int32_t>(NG::SafeAreaInsetAlignment::START) &&
+                alignmentNumber <= static_cast<int32_t>(NG::SafeAreaInsetAlignment::END)) {
+                alignment = static_cast<NG::SafeAreaInsetAlignment>(static_cast<int32_t>(alignmentNumber));
+            }
+        }
+
+        auto index = NG::SafeAreaInsetOptions::ToIndex(edge);
+        options.edges[index] = NG::SafeAreaInsetEdgeOptions {
+            .spacing = NG::CalcLength(spacing),
+            .alignment = alignment,
+        };
+        auto builderFunc = AceType::MakeRefPtr<JsFunction>(JSRef<JSFunc>::Cast(contentValue));
+        if (!builderFunc) {
+            options.edges[index].reset();
+            continue;
+        }
+        builders[index] = [execCtx = info.GetExecutionContext(), func = std::move(builderFunc), node = targetNode]() {
+            JAVASCRIPT_EXECUTION_SCOPE_WITH_CHECK(execCtx);
+            ACE_SCORING_EVENT("SafeAreaInsetBuilder");
+            PipelineContext::SetCallBackNode(node);
+            func->Execute();
+        };
+    }
+    if (options.Empty()) {
+        NG::ViewAbstractModelNG::ResetSafeAreaInset();
+        return;
+    }
+    NG::ViewAbstractModelNG::SetSafeAreaInset(options, std::move(builders));
+}
+
 void JSViewAbstract::SetColorBlend(Color color)
 {
     ViewAbstractModel::GetInstance()->SetColorBlend(color);
@@ -10987,8 +11077,7 @@ bool JSViewAbstract::ParseJsonDouble(const std::unique_ptr<JsonValue>& jsonValue
         return true;
     }
     if (jsonValue->IsString()) {
-        result = StringUtils::StringToDouble(jsonValue->GetString());
-        return true;
+        return StringUtils::StringToDouble(jsonValue->GetString(), result);
     }
     // parse json Resource
     auto resVal = JsonUtil::ParseJsonString(jsonValue->ToString());
@@ -11901,6 +11990,7 @@ void JSViewAbstract::JsOnGestureCollectIntercept(const JSCallbackInfo& info)
             func = panda::CopyableGlobal(vm, jsFuncLocalHandle), node = frameNode](
             const std::vector<RefPtr<NG::NGGestureRecognizer>>& recognizers,
             const std::vector<RefPtr<TouchEventTarget>>& touchRecognizers) -> NG::GestureCollectIntervention {
+        panda::TryCatch trycatch(vm);
         JAVASCRIPT_EXECUTION_SCOPE_WITH_CHECK(execCtx, NG::GestureCollectIntervention::CONTINUE);
         ACE_SCORING_EVENT("onGestureCollectIntercept");
         PipelineContext::SetCallBackNode(node);
@@ -12307,8 +12397,12 @@ void JSViewAbstract::JsKeyboardShortcut(const JSCallbackInfo& info)
 
     auto keysArray = JSRef<JSArray>::Cast(info[1]);
     size_t size = keysArray->Length();
-    std::vector<ModifierKey> keys(size);
-    keys.clear();
+    if (size > MAX_MODIFIER_KEYS) {
+        ViewAbstractModel::GetInstance()->SetKeyboardShortcut({}, {}, nullptr);
+        return;
+    }
+    std::vector<ModifierKey> keys;
+    keys.reserve(size);
     for (size_t i = 0; i < size; i++) {
         JSRef<JSVal> key = keysArray->GetValueAt(i);
         if (key->IsNumber()) {

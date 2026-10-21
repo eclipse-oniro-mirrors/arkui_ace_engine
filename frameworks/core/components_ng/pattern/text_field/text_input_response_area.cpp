@@ -23,7 +23,7 @@
 #include "core/accessibility/accessibility_manager.h"
 #include "core/common/container.h"
 #include "core/common/ime/text_input_type.h"
-#include "core/common/password_icon_host.h"
+#include "core/components_ng/pattern/text_field/password_icon_host.h"
 #include "core/components/common/layout/constants.h"
 #include "core/components/theme/icon_theme.h"
 #include "core/components_ng/layout/layout_property.h"
@@ -142,8 +142,7 @@ void TextInputResponseArea::SetHoverRect(RefPtr<FrameNode>& stackNode, RectF& re
     float hoverRectHeight, bool isFocus)
 {
     auto passwordHost = DynamicCast<IPasswordIconHost>(hostPattern_.Upgrade());
-    CHECK_NULL_VOID(passwordHost);
-    if (passwordHost->IsTV()) {
+    if (passwordHost && passwordHost->IsTV()) {
         SetHoverRectForTV(stackNode, rect, iconSize, hoverRectHeight, isFocus);
         return;
     }
@@ -215,6 +214,57 @@ void TextInputResponseArea::SetHotZoneRect(DimensionRect& hotZoneRegion, float i
 }
 // TextInputResponseArea end
 
+// ResponseAreaMeasureHelper begin
+float ResponseAreaMeasureHelper::MeasureAndDeductConstraint(
+    const RefPtr<TextInputResponseArea>& area, LayoutWrapper* layoutWrapper, LayoutConstraintF& constraint)
+{
+    CHECK_NULL_RETURN(area, 0.0f);
+    CHECK_NULL_RETURN(layoutWrapper, 0.0f);
+    auto frameNode = layoutWrapper->GetHostNode();
+    CHECK_NULL_RETURN(frameNode, 0.0f);
+    auto childIndex = frameNode->GetChildIndex(area->GetFrameNode());
+    auto iconSize = area->Measure(layoutWrapper, childIndex);
+    auto areaWidth = iconSize.Width();
+    constraint.maxSize.SetWidth(std::max(constraint.maxSize.Width() - areaWidth, 0.0f));
+    constraint.minSize.SetWidth(std::max(constraint.minSize.Width() - areaWidth, 0.0f));
+    if (constraint.selfIdealSize.Width()) {
+        constraint.selfIdealSize.SetWidth(constraint.selfIdealSize.Width().value() - areaWidth);
+    }
+    return areaWidth;
+}
+
+void ResponseAreaMeasureHelper::LayoutArea(
+    const RefPtr<TextInputResponseArea>& area, LayoutWrapper* layoutWrapper, float& nodeWidth)
+{
+    CHECK_NULL_VOID(area);
+    CHECK_NULL_VOID(layoutWrapper);
+    auto frameNode = layoutWrapper->GetHostNode();
+    CHECK_NULL_VOID(frameNode);
+    auto childIndex = frameNode->GetChildIndex(area->GetFrameNode());
+    area->Layout(layoutWrapper, childIndex, nodeWidth);
+}
+
+OffsetF ResponseAreaMeasureHelper::AdjustContentOffsetForRTL(
+    const OffsetF& contentOffset, float areaWidth, LayoutWrapper* layoutWrapper)
+{
+    auto result = contentOffset;
+    CHECK_NULL_RETURN(areaWidth > 0.0f, result);
+    CHECK_NULL_RETURN(layoutWrapper, result);
+    auto layoutProperty = layoutWrapper->GetLayoutProperty();
+    CHECK_NULL_RETURN(layoutProperty, result);
+    CHECK_NULL_RETURN(layoutProperty->GetNonAutoLayoutDirection() == TextDirection::RTL, result);
+    auto geometryNode = layoutWrapper->GetGeometryNode();
+    CHECK_NULL_RETURN(geometryNode, result);
+    const auto& content = geometryNode->GetContent();
+    if (content) {
+        auto offset = content->GetRect().GetOffset();
+        content->SetOffset(OffsetF(offset.GetX() + areaWidth, offset.GetY()));
+    }
+    result.SetX(result.GetX() + areaWidth);
+    return result;
+}
+// ResponseAreaMeasureHelper end
+
 // PasswordResponseArea begin
 void PasswordResponseArea::InitResponseArea()
 {
@@ -258,7 +308,7 @@ RefPtr<FrameNode> PasswordResponseArea::CreateNode()
     CHECK_NULL_RETURN(stackLayoutProperty, nullptr);
     stackLayoutProperty->UpdateUserDefinedIdealSize(CalcSize(CalcLength(hotZoneSize), std::nullopt));
     CHECK_NULL_RETURN(passwordHost->CheckLayoutProperty(), nullptr);
-    stackLayoutProperty->UpdateAlignment(GetStackAlignment(passwordHost->GetLayoutDirection()));
+    stackLayoutProperty->UpdateAlignment(GetStackAlignment(passwordHost->GetPasswordIconDirection()));
     AddEvent(stackNode);
     stackNode->MarkModifyDone();
 
@@ -478,7 +528,7 @@ void PasswordResponseArea::Refresh()
     if (passwordHost && stackNode_) {
         auto stackLayoutProperty = stackNode_->GetLayoutProperty<LayoutProperty>();
         if (stackLayoutProperty && passwordHost->CheckLayoutProperty()) {
-            stackLayoutProperty->UpdateAlignment(GetStackAlignment(passwordHost->GetLayoutDirection()));
+            stackLayoutProperty->UpdateAlignment(GetStackAlignment(passwordHost->GetPasswordIconDirection()));
         }
         if (stackLayoutProperty) {
             auto iconSize = GetIconSize();
@@ -1025,7 +1075,8 @@ bool CleanNodeResponseArea::IsSymbolIcon() const
 
 void CleanNodeResponseArea::Layout(LayoutWrapper *layoutWrapper, int32_t index, float &nodeWidth)
 {
-    if (!IsShowClean()) {
+    bool showClean = IsShowClean();
+    if (!showClean) {
         return;
     }
     LayoutChild(layoutWrapper, index, nodeWidth);
@@ -1343,6 +1394,28 @@ void CleanNodeResponseArea::UpdateShowState()
     }
 }
 
+void CleanNodeResponseArea::SetAccessibilityClearAction()
+{
+    auto hostInterface = DynamicCast<ICleanNodeHost>(hostPattern_.Upgrade());
+    CHECK_NULL_VOID(hostInterface);
+    CHECK_NULL_VOID(hostInterface->IsShowCancelButtonMode());
+    CHECK_NULL_VOID(cleanNode_);
+    auto accessibilityProperty = cleanNode_->GetAccessibilityProperty<AccessibilityProperty>();
+    CHECK_NULL_VOID(accessibilityProperty);
+    accessibilityProperty->SetAccessibilityLevel("yes");
+    auto cleanNodeStyle = hostInterface->GetCleanNodeStyle().value_or(CleanNodeStyle::INPUT);
+    auto hasContent = cleanNodeStyle == CleanNodeStyle::CONSTANT ||
+                      (cleanNodeStyle == CleanNodeStyle::INPUT && !hostInterface->IsContentEmpty());
+    auto host = hostInterface->GetHost();
+    CHECK_NULL_VOID(host);
+    auto pipeline = host->GetContext();
+    CHECK_NULL_VOID(pipeline);
+    auto theme = pipeline->GetTheme<TextFieldTheme>(host->GetThemeScopeId());
+    std::string cancelText = theme ? theme->GetCancelButton() : "";
+    accessibilityProperty->SetAccessibilityText(hasContent ? cancelText : "");
+    accessibilityProperty->SetAccessibilityCustomRole("button");
+}
+
 void CleanNodeResponseArea::ReplaceNode()
 {
     CHECK_NULL_VOID(cleanNode_);
@@ -1462,6 +1535,125 @@ void CleanNodeResponseArea::OnThemeScopeUpdate(const RefPtr<TextFieldTheme>& the
     if (IsShowSymbol() && SystemProperties::IsNeedSymbol()) {
         UpdateSymbolSource();
     }
+}
+
+void CleanNodeResponseArea::HandleCleanNodeHover(bool isHover, const HoverInfo& info)
+{
+    auto pattern = hostPattern_.Upgrade();
+    CHECK_NULL_VOID(pattern);
+    auto cleanHost = AceType::DynamicCast<ICleanNodeHost>(pattern);
+    CHECK_NULL_VOID(cleanHost);
+    cleanHost->OnCleanNodeHover(isHover, info);
+    HandleButtonMouseEvent(isHover);
+}
+
+void CleanNodeResponseArea::HandleButtonMouseEvent(bool isHover)
+{
+    auto pattern = hostPattern_.Upgrade();
+    CHECK_NULL_VOID(pattern);
+    auto cleanHost = AceType::DynamicCast<ICleanNodeHost>(pattern);
+    CHECK_NULL_VOID(cleanHost);
+    auto host = cleanHost->GetHost();
+    CHECK_NULL_VOID(host);
+    if (isHover) {
+        cleanHost->OnCleanNodeHoverEnter();
+        RoundRect mouseRect;
+        CreateIconRect(mouseRect, false);
+        float cornerRadius = mouseRect.GetRect().Width() / 2;
+        mouseRect.SetCornerRadius(cornerRadius);
+        auto pipeline = host->GetContext();
+        CHECK_NULL_VOID(pipeline);
+        auto textFieldTheme = pipeline->GetTheme<TextFieldTheme>(host->GetThemeScopeId());
+        CHECK_NULL_VOID(textFieldTheme);
+        auto touchColor = textFieldTheme->GetHoverColor();
+        cleanHost->SetCleanHoverColorAndRect(mouseRect, touchColor.GetValue());
+        host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
+    } else {
+        cleanHost->OnCleanNodeHoverLeave();
+        cleanHost->ClearCleanHoverColorAndRects();
+        host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
+    }
+}
+
+void CleanNodeResponseArea::HandleResponseButtonTouchDown()
+{
+    auto pattern = hostPattern_.Upgrade();
+    CHECK_NULL_VOID(pattern);
+    auto cleanHost = AceType::DynamicCast<ICleanNodeHost>(pattern);
+    CHECK_NULL_VOID(cleanHost);
+    auto host = cleanHost->GetHost();
+    CHECK_NULL_VOID(host);
+    RoundRect mouseRect;
+    CreateIconRect(mouseRect, false);
+    float cornerRadius = mouseRect.GetRect().Width() / 2;
+    mouseRect.SetCornerRadius(cornerRadius);
+    auto pipeline = host->GetContext();
+    CHECK_NULL_VOID(pipeline);
+    auto textFieldTheme = pipeline->GetTheme<TextFieldTheme>(host->GetThemeScopeId());
+    CHECK_NULL_VOID(textFieldTheme);
+    auto touchColor = textFieldTheme->GetPressColor();
+    cleanHost->SetCleanHoverColorAndRect(mouseRect, touchColor.GetValue());
+    cleanHost->SetCancelButtonTouched(true);
+    host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
+}
+
+void CleanNodeResponseArea::HandleResponseButtonTouchUp()
+{
+    auto pattern = hostPattern_.Upgrade();
+    CHECK_NULL_VOID(pattern);
+    auto cleanHost = AceType::DynamicCast<ICleanNodeHost>(pattern);
+    CHECK_NULL_VOID(cleanHost);
+    auto host = cleanHost->GetHost();
+    CHECK_NULL_VOID(host);
+    cleanHost->ClearCleanHoverColorAndRects();
+    cleanHost->SetCancelButtonTouched(false);
+    host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
+}
+
+void CleanNodeResponseArea::InitCancelButtonMouseEvent()
+{
+    auto stackNode = GetFrameNode();
+    CHECK_NULL_VOID(stackNode);
+    auto imageTouchHub = stackNode->GetOrCreateGestureEventHub();
+    CHECK_NULL_VOID(imageTouchHub);
+    auto imageInputHub = stackNode->GetOrCreateInputEventHub();
+    CHECK_NULL_VOID(imageInputHub);
+
+    auto weak = WeakClaim(this);
+    auto imageHoverTask = [weak](bool isHover, const HoverInfo& info) {
+        auto area = weak.Upgrade();
+        CHECK_NULL_VOID(area);
+        area->HandleCleanNodeHover(isHover, info);
+    };
+    imageInputHub->AddOnHoverEvent(MakeRefPtr<InputEvent>(std::move(imageHoverTask)));
+
+    auto imageTouchTask = [weak](const TouchEventInfo& info) {
+        auto area = weak.Upgrade();
+        CHECK_NULL_VOID(area);
+        auto touchType = info.GetTouches().front().GetTouchType();
+        if (touchType == TouchType::DOWN) {
+            area->HandleResponseButtonTouchDown();
+        }
+        if (touchType == TouchType::UP || touchType == TouchType::CANCEL) {
+            area->HandleResponseButtonTouchUp();
+        }
+    };
+    imageTouchHub->AddTouchEvent(MakeRefPtr<TouchEventImpl>(std::move(imageTouchTask)));
+}
+
+void CleanNodeResponseArea::AfterLayoutProcessCleanResponse()
+{
+    auto pattern = hostPattern_.Upgrade();
+    CHECK_NULL_VOID(pattern);
+    auto host = pattern->GetHost();
+    CHECK_NULL_VOID(host);
+    auto pipeline = host->GetContext();
+    CHECK_NULL_VOID(pipeline);
+    pipeline->AddAfterLayoutTask([weak = WeakClaim(this)]() {
+        auto area = weak.Upgrade();
+        CHECK_NULL_VOID(area);
+        area->UpdateCleanNode(area->IsShow());
+    });
 }
 
 void PlaceholderResponseArea::InitResponseArea()
@@ -1796,33 +1988,24 @@ void VoiceNodeResponseArea::InitButtonMouseEvent()
     CHECK_NULL_VOID(imageTouchHub);
     auto imageInputHub = stackNode->GetOrCreateInputEventHub();
     CHECK_NULL_VOID(imageInputHub);
-    auto imageHoverTask = [weak = WeakClaim(this)](bool isHover, const HoverInfo& info) {
-        auto responseArea = weak.Upgrade();
-        CHECK_NULL_VOID(responseArea);
-        auto hostPattern = responseArea->hostPattern_.Upgrade();
-        CHECK_NULL_VOID(hostPattern);
-        auto pattern = AceType::DynamicCast<TextFieldPattern>(hostPattern);
-        CHECK_NULL_VOID(pattern);
-        if (pattern) {
-            pattern->OnHover(isHover, info);
-            pattern->HandleButtonMouseEvent(responseArea, isHover);
-        }
+
+    auto weak = WeakClaim(this);
+    auto imageHoverTask = [weak](bool isHover, const HoverInfo& info) {
+        auto area = weak.Upgrade();
+        CHECK_NULL_VOID(area);
+        area->HandleCleanNodeHover(isHover, info);
     };
     imageInputHub->AddOnHoverEvent(MakeRefPtr<InputEvent>(std::move(imageHoverTask)));
 
-    auto imageTouchTask = [weak = WeakClaim(this)](const TouchEventInfo& info) {
-        auto responseArea = weak.Upgrade();
-        CHECK_NULL_VOID(responseArea);
-        auto hostPattern = responseArea->hostPattern_.Upgrade();
-        CHECK_NULL_VOID(hostPattern);
-        auto pattern = AceType::DynamicCast<TextFieldPattern>(hostPattern);
-        CHECK_NULL_VOID(pattern);
+    auto imageTouchTask = [weak](const TouchEventInfo& info) {
+        auto area = weak.Upgrade();
+        CHECK_NULL_VOID(area);
         auto touchType = info.GetTouches().front().GetTouchType();
         if (touchType == TouchType::DOWN) {
-            pattern->HandleResponseButtonTouchDown(responseArea);
+            area->HandleResponseButtonTouchDown();
         }
         if (touchType == TouchType::UP || touchType == TouchType::CANCEL) {
-            pattern->HandleResponseButtonTouchUp();
+            area->HandleResponseButtonTouchUp();
         }
     };
 

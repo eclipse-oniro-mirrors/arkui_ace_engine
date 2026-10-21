@@ -45,13 +45,16 @@ constexpr int NUM_7 = 7;
 constexpr float COLOR_COEFFICIENT = 100.0f;
 const std::vector<std::string> TEXT_DETECT_TYPES = { "phoneNum", "url", "email", "location", "datetime" };
 }
-Local<JSValueRef> JsPreventDefault(panda::JsiRuntimeCallInfo *info)
+static Local<JSValueRef> JsPreventDefault(panda::JsiRuntimeCallInfo *info)
 {
     Local<JSValueRef> thisObj = info->GetThisRef();
     auto eventInfo = static_cast<BaseEventInfo*>(panda::Local<panda::ObjectRef>(thisObj)->GetNativePointerField(
         info->GetVM(), 0));
     if (eventInfo) {
         eventInfo->SetPreventDefault(true);
+    } else {
+        // The native pointer is detached after the callback; this call happens past the event lifetime.
+        TAG_LOGE(AceLogTag::ACE_RICH_TEXT, "preventDefault invoked after event callback finished.");
     }
     return JSValueRef::Undefined(info->GetVM());
 }
@@ -64,6 +67,9 @@ Local<JSValueRef> JsKeepEditableStateInternal(panda::JsiRuntimeCallInfo* info)
             info->GetVM(), 0));
     if (eventInfo) {
         eventInfo->SetKeepEditable(true);
+    } else {
+        // The native pointer is detached after the callback; this call happens past the event lifetime.
+        TAG_LOGE(AceLogTag::ACE_RICH_TEXT, "keepEditableState invoked after event callback finished.");
     }
     return JSValueRef::Undefined(info->GetVM());
 }
@@ -885,8 +891,6 @@ ArkUINativeModuleValue RichEditorBridge::SetOnIMEInputComplete(ArkUIRuntimeCallI
         panda::TryCatch trycatch(vm);
         PipelineContext::SetCallBackNode(weakNode);
         auto onIMEInputCompleteObj = CreateAbstractSpanResult(vm, event);
-        onIMEInputCompleteObj->SetNativePointerFieldCount(vm, NUM_1);
-        onIMEInputCompleteObj->SetNativePointerField(vm, NUM_0, static_cast<void*>(&event));
         panda::Local<panda::JSValueRef> params[NUM_1] = { onIMEInputCompleteObj };
         auto result = func->Call(vm, func.ToLocal(), params, NUM_1);
         if (isJsView) {
@@ -1168,6 +1172,10 @@ Local<panda::ObjectRef> CreateSpanResultObject(EcmaVM *vm, const ResultObject& r
         }
         resultObj->Set(vm, panda::StringRef::NewFromUtf8(vm, "imageStyle"),
             CreateImageStyleResult(vm, resultObject.imageStyle));
+        if (resultObject.imageTag.has_value()) {
+            resultObj->Set(vm, panda::StringRef::NewFromUtf8(vm, "imageTag"),
+                panda::StringRef::NewFromUtf16(vm, resultObject.imageTag.value().c_str()));
+        }
     }
 
     return resultObj;
@@ -1237,6 +1245,10 @@ void SetImageChangeSpanResult(
     imageStyleResult.borderRadius = spanResult.GetBorderRadius();
     imageStyleResult.margin = spanResult.GetMargin();
     resultObj->Set(vm, panda::StringRef::NewFromUtf8(vm, "imageStyle"), CreateImageStyleResult(vm, imageStyleResult));
+    if (spanResult.GetImageTag().has_value()) {
+        resultObj->Set(vm, panda::StringRef::NewFromUtf8(vm, "imageTag"),
+            panda::StringRef::NewFromUtf16(vm, spanResult.GetImageTag().value().c_str()));
+    }
 }
 
 void SetChangeTextSpans(EcmaVM* vm, const std::vector<NG::RichEditorAbstractSpanResult>& spanList,
@@ -1466,6 +1478,10 @@ void SetDeleteSpan(EcmaVM* vm, panda::Local<panda::ObjectRef>& spanResultObj,
             auto layoutStyleObj = panda::ObjectRef::NewWithNamedProperties(vm, ArraySize(keys), keys, values);
             imageStyleObj->Set(vm, panda::StringRef::NewFromUtf8(vm, "layoutStyle"), layoutStyleObj);
             spanResultObj->Set(vm, panda::StringRef::NewFromUtf8(vm, "imageStyle"), imageStyleObj);
+            if (spanResult.GetImageTag().has_value()) {
+                spanResultObj->Set(vm, panda::StringRef::NewFromUtf8(vm, "imageTag"),
+                    panda::StringRef::NewFromUtf16(vm, spanResult.GetImageTag().value().c_str()));
+            }
             break;
         }
         case NG::SpanResultType::SYMBOL: {
@@ -1961,6 +1977,8 @@ ArkUINativeModuleValue RichEditorBridge::SetOnSubmit(ArkUIRuntimeCallInfo* runti
         if (isJsView) {
             ArkTSUtils::HandleCallbackJobs(vm, trycatch, ret);
         }
+        // Detach the borrowed pointer so any delayed JS call sees null and is detected.
+        eventObject->SetNativePointerField(vm, 0, nullptr);
     };
     nodeModifiers->getRichEditorModifier()->setRichEditorOnSubmit(
         nativeNode, reinterpret_cast<void*>(&callback));
@@ -2226,7 +2244,7 @@ ArkUINativeModuleValue RichEditorBridge::ResetSelectedBackgroundColor(ArkUIRunti
     return panda::JSValueRef::Undefined(vm);
 }
 
-void CreateCommonEvent(EcmaVM *vm, TextCommonEvent& event, panda::Local<panda::JSValueRef> params[])
+Local<panda::ObjectRef> CreateCommonEvent(EcmaVM *vm, TextCommonEvent& event, panda::Local<panda::JSValueRef> params[])
 {
     auto eventObject = panda::ObjectRef::New(vm);
     eventObject->SetNativePointerFieldCount(vm, NUM_1);
@@ -2234,6 +2252,7 @@ void CreateCommonEvent(EcmaVM *vm, TextCommonEvent& event, panda::Local<panda::J
         panda::FunctionRef::New(vm, JsPreventDefault));
     eventObject->SetNativePointerField(vm, NUM_0, static_cast<void*>(&event));
     params[NUM_0] = { eventObject };
+    return eventObject;
 }
 
 ArkUINativeModuleValue RichEditorBridge::SetOnPaste(ArkUIRuntimeCallInfo* runtimeCallInfo)
@@ -2264,7 +2283,7 @@ ArkUINativeModuleValue RichEditorBridge::SetOnPaste(ArkUIRuntimeCallInfo* runtim
         panda::TryCatch trycatch(vm);
         PipelineContext::SetCallBackNode(weakNode);
         panda::Local<panda::JSValueRef> params[NUM_1];
-        CreateCommonEvent(vm, event, params);
+        auto eventObject = CreateCommonEvent(vm, event, params);
         auto ret = func->Call(vm, func.ToLocal(), params, NUM_1);
         if (isJsView) {
 #ifndef CROSS_PLATFORM
@@ -2273,6 +2292,8 @@ ArkUINativeModuleValue RichEditorBridge::SetOnPaste(ArkUIRuntimeCallInfo* runtim
 #endif
             ArkTSUtils::HandleCallbackJobs(vm, trycatch, ret);
         }
+        // Detach the borrowed pointer so any delayed JS call sees null and is detected.
+        eventObject->SetNativePointerField(vm, NUM_0, nullptr);
     };
     nodeModifiers->getRichEditorModifier()->setRichEditorOnPaste(
         nativeNode, reinterpret_cast<void*>(&callback));
@@ -2320,11 +2341,13 @@ ArkUINativeModuleValue RichEditorBridge::SetOnCut(ArkUIRuntimeCallInfo* runtimeC
         panda::TryCatch trycatch(vm);
         PipelineContext::SetCallBackNode(weakNode);
         panda::Local<panda::JSValueRef> params[NUM_1];
-        CreateCommonEvent(vm, event, params);
+        auto eventObject = CreateCommonEvent(vm, event, params);
         auto ret = func->Call(vm, func.ToLocal(), params, NUM_1);
         if (isJsView) {
             ArkTSUtils::HandleCallbackJobs(vm, trycatch, ret);
         }
+        // Detach the borrowed pointer so any delayed JS call sees null and is detected.
+        eventObject->SetNativePointerField(vm, NUM_0, nullptr);
     };
     nodeModifiers->getRichEditorModifier()->setRichEditorOnCut(
         nativeNode, reinterpret_cast<void*>(&callback));
@@ -2372,11 +2395,13 @@ ArkUINativeModuleValue RichEditorBridge::SetOnCopy(ArkUIRuntimeCallInfo* runtime
         panda::TryCatch trycatch(vm);
         PipelineContext::SetCallBackNode(weakNode);
         panda::Local<panda::JSValueRef> params[NUM_1];
-        CreateCommonEvent(vm, event, params);
+        auto eventObject = CreateCommonEvent(vm, event, params);
         auto ret = func->Call(vm, func.ToLocal(), params, NUM_1);
         if (isJsView) {
             ArkTSUtils::HandleCallbackJobs(vm, trycatch, ret);
         }
+        // Detach the borrowed pointer so any delayed JS call sees null and is detected.
+        eventObject->SetNativePointerField(vm, NUM_0, nullptr);
     };
     nodeModifiers->getRichEditorModifier()->setRichEditorOnCopy(
         nativeNode, reinterpret_cast<void*>(&callback));

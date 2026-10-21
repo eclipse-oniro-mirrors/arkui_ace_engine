@@ -29,8 +29,8 @@ import { NestedScrollOptions_serializer, ArkCommonMethodPeer, CommonMethod, Call
 import { EditMenuOptions_serializer, TextDataDetectorConfig_serializer, EditMenuOptions, TextDataDetectorConfig, MenuType } from './textCommon'
 import { ComponentBase } from './../ComponentBase'
 import { PeerNode } from './../PeerNode'
-import { CopyOptions, NestedScrollMode } from './enums'
-import { VoidCallback, Position, Position_serializer } from './units'
+import { CopyOptions, NestedScrollMode, Color as arkui_component_enums_Color } from './enums'
+import { VoidCallback, Position, Position_serializer, ResourceColor, Resource as arkui_component_units_Resource } from './units'
 import { CustomBuilder } from './builder'
 import { PreviewMenuOptions, PreviewMenuOptions_serializer } from './richEditor'
 import { CallbackKind } from './../framework/peers/CallbackKind'
@@ -1331,6 +1331,11 @@ export class WebResourceResponse implements MaterializedBase {
         this.setResponseData_serialize(data_casted)
         return
     }
+    public setResponseBody(data: string | int32 | global_resource_Resource | ArrayBuffer): void {
+        const data_casted = data as (string | int32 | global_resource_Resource | ArrayBuffer)
+        this.setResponseBody_serialize(data_casted)
+        return
+    }
     public setResponseEncoding(encoding: string): void {
         const encoding_casted = encoding as (string)
         this.setResponseEncoding_serialize(encoding_casted)
@@ -1452,6 +1457,28 @@ export class WebResourceResponse implements MaterializedBase {
             thisSerializer.writeBuffer(dataForIdx3)
         }
         ArkUIGeneratedNativeModule._WebResourceResponse_setResponseData(this.peer!.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
+    private setResponseBody_serialize(data: string | int32 | global_resource_Resource | ArrayBuffer): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (data instanceof string) {
+            thisSerializer.writeInt8((0).toByte())
+            const dataForIdx0 = data as string
+            thisSerializer.writeString(dataForIdx0)
+        } else if (data instanceof int32) {
+            thisSerializer.writeInt8((1).toByte())
+            const dataForIdx1 = data as int32
+            thisSerializer.writeInt32(dataForIdx1)
+        } else if (data instanceof global_resource_Resource) {
+            thisSerializer.writeInt8((2).toByte())
+            const dataForIdx2 = data as global_resource_Resource
+            global_resource_Resource_serializer.write(thisSerializer, dataForIdx2)
+        } else if (data instanceof ArrayBuffer) {
+            thisSerializer.writeInt8((3).toByte())
+            const dataForIdx3 = data as ArrayBuffer
+            thisSerializer.writeBuffer(dataForIdx3)
+        }
+        ArkUIGeneratedNativeModule._WebResourceResponse_setResponseBody(this.peer!.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
     private setResponseEncoding_serialize(encoding: string): void {
@@ -3151,6 +3178,18 @@ export class ArkWebPeer extends ArkCommonMethodPeer {
         ArkUIGeneratedNativeModule._WebAttribute_setOnDetectedBlankScreen(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
+    setOnMonitoredBlankScreenAttribute(value: OnMonitorBlankScreenCallback | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (value !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueTmpValue = value!
+            thisSerializer.holdAndWriteCallback(valueTmpValue)
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._WebAttribute_setOnMonitoredBlankScreen(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
     setBlankScreenDetectionConfigAttribute(value: BlankScreenDetectionConfig | undefined): void {
         const thisSerializer: SerializerBase = SerializerBase.hold()
         if (value !== undefined) {
@@ -3161,6 +3200,18 @@ export class ArkWebPeer extends ArkCommonMethodPeer {
             thisSerializer.writeInt8(RuntimeType.UNDEFINED)
         }
         ArkUIGeneratedNativeModule._WebAttribute_setBlankScreenDetectionConfig(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
+    setEnableBlankScreenMonitorAttribute(value: boolean | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (value !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueTmpValue = value!
+            thisSerializer.writeBoolean(valueTmpValue)
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._WebAttribute_setEnableBlankScreenMonitor(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
     setBackToTopAttribute(value: boolean | undefined): void {
@@ -3357,6 +3408,58 @@ export class ArkWebPeer extends ArkCommonMethodPeer {
             thisSerializer.writeInt8(RuntimeType.UNDEFINED)
         }
         ArkUIGeneratedNativeModule._WebAttribute_setEnableMediaNetworkProxy(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
+    setCaretColorAttribute(value: ResourceColor | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (value !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueTmpValue = value!
+            if (valueTmpValue instanceof arkui_component_enums_Color) {
+                thisSerializer.writeInt8((0).toByte())
+                const valueTmpValueForIdx0 = valueTmpValue as arkui_component_enums_Color
+                thisSerializer.writeInt32((valueTmpValueForIdx0.getOrdinal()) % (12))
+            } else if (valueTmpValue instanceof int32) {
+                thisSerializer.writeInt8((1).toByte())
+                const valueTmpValueForIdx1 = valueTmpValue as int32
+                thisSerializer.writeInt32(valueTmpValueForIdx1)
+            } else if (valueTmpValue instanceof string) {
+                thisSerializer.writeInt8((2).toByte())
+                const valueTmpValueForIdx2 = valueTmpValue as string
+                thisSerializer.writeString(valueTmpValueForIdx2)
+            } else if (valueTmpValue instanceof arkui_component_units_Resource) {
+                thisSerializer.writeInt8((3).toByte())
+                const valueTmpValueForIdx3 = valueTmpValue as arkui_component_units_Resource
+                global_resource_Resource_serializer.write(thisSerializer, valueTmpValueForIdx3)
+            }
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._WebAttribute_setCaretColor(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
+    setOnZoomChangeAttribute(value: OnZoomChangeCallback | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (value !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueTmpValue = value!
+            thisSerializer.holdAndWriteCallback(valueTmpValue)
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._WebAttribute_setOnZoomChange(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
+    setFlingSpeedLimitAttribute(value: double | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (value !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueTmpValue = value!
+            thisSerializer.writeFloat64(valueTmpValue)
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._WebAttribute_setFlingSpeedLimit(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
     setRegisterNativeEmbedRuleAttribute(tag: string | undefined, type: string | undefined): void {
@@ -3973,6 +4076,40 @@ export interface BlankScreenDetectionEventInfo {
     blankScreenDetails?: BlankScreenDetails;
 }
 export type OnDetectBlankScreenCallback = (event: BlankScreenDetectionEventInfo) => void;
+export enum BlankScreenReason {
+    DNS_RESOLVE_FAILED = 101,
+    REQUEST_TIMED_OUT = 102,
+    CONNECTION_REFUSED = 103,
+    CONNECTION_RESET = 104,
+    SSL_ERROR = 105,
+    CERT_ERROR = 106,
+    INTERNET_DISCONNECTED = 107,
+    REDIRECT_LOOP = 108,
+    PROXY_ERROR = 109,
+    OTHER_NETWORK_ERROR = 199,
+    MAIN_DOC_EMPTY = 201,
+    HTTP_4XX_ERROR = 202,
+    HTTP_5XX_ERROR = 203,
+    JS_GLOBAL_BUNDLE_LOAD_FAILED = 210,
+    CSS_LOAD_FAILED = 211,
+    MULTI_RESOURCE_LOAD_FAILED = 212,
+    CORS_BLOCKED = 213,
+    CSP_BLOCKED = 214,
+    MIXED_CONTENT_BLOCKED = 215,
+    JS_RUNTIME_ERROR = 301,
+    NO_FIRST_CONTENTFUL_PAINT = 312,
+    RENDERER_CRASHED = 401,
+    RENDERER_KILLED = 402,
+    GPU_PROCESS_CRASHED = 403,
+    GPU_PROCESS_WATCHDOG_TIMEOUT = 404,
+    WEB_VIEW_ZERO_SIZE = 501,
+}
+export interface MonitoredBlankScreenEventInfo {
+    url: string;
+    reason: BlankScreenReason;
+    extraMsg: string;
+}
+export type OnMonitorBlankScreenCallback = (event: MonitoredBlankScreenEventInfo) => void;
 export type TextSelectionChangeCallback = (selectionText: string) => void;
 export enum BlankScreenDetectionMethod {
     DETECTION_CONTENTFUL_NODES_SEVENTEEN = 0
@@ -3990,6 +4127,11 @@ export interface FirstScreenPaint {
 }
 export type OnFirstScreenPaintCallback = (firstScreenPaint: FirstScreenPaint) => void;
 export type OnInputmethodAttachedCallback = () => void;
+export type OnZoomChangeCallback = (zoomChangeInfo: OnZoomChangeEvent) => void;
+export interface OnZoomChangeEvent {
+    oldZoomFactor: double;
+    newZoomFactor: double;
+}
 export interface WebAttribute extends CommonMethod {
     setWebOptions(value: WebOptions): this {
         throw new Error('Unimplemented method setWebOptions')
@@ -4399,8 +4541,14 @@ export interface WebAttribute extends CommonMethod {
     onDetectedBlankScreen(value: OnDetectBlankScreenCallback | undefined): this {
         throw new Error('Unimplemented method onDetectedBlankScreen')
     }
+    onMonitoredBlankScreen(value: OnMonitorBlankScreenCallback | undefined): this {
+        throw new Error('Unimplemented method onMonitoredBlankScreen')
+    }
     blankScreenDetectionConfig(value: BlankScreenDetectionConfig | undefined): this {
         throw new Error('Unimplemented method blankScreenDetectionConfig')
+    }
+    enableBlankScreenMonitor(value: boolean | undefined): this {
+        throw new Error('Unimplemented method enableBlankScreenMonitor')
     }
     backToTop(value: boolean | undefined): this {
         throw new Error('Unimplemented method backToTop')
@@ -4449,6 +4597,15 @@ export interface WebAttribute extends CommonMethod {
     }
     enableMediaNetworkProxy(value: boolean | undefined): this {
         throw new Error('Unimplemented method enableMediaNetworkProxy')
+    }
+    caretColor(value: ResourceColor | undefined): this {
+        throw new Error('Unimplemented method caretColor')
+    }
+    onZoomChange(value: OnZoomChangeCallback | undefined): this {
+        throw new Error('Unimplemented method onZoomChange')
+    }
+    flingSpeedLimit(value: double | undefined): this {
+        throw new Error('Unimplemented method flingSpeedLimit')
     }
     registerNativeEmbedRule(tag: string | undefined, type: string | undefined): this {
         throw new Error('Unimplemented method registerNativeEmbedRule')
@@ -5241,9 +5398,19 @@ export class ArkWebComponent extends ArkCommonMethodComponent implements WebAttr
         this.getPeer()?.setOnDetectedBlankScreenAttribute(value_casted)
         return this
     }
+    public onMonitoredBlankScreen(value: OnMonitorBlankScreenCallback | undefined): this {
+        const value_casted = value as (OnMonitorBlankScreenCallback | undefined)
+        this.getPeer()?.setOnMonitoredBlankScreenAttribute(value_casted)
+        return this
+    }
     public blankScreenDetectionConfig(value: BlankScreenDetectionConfig | undefined): this {
         const value_casted = value as (BlankScreenDetectionConfig | undefined)
         this.getPeer()?.setBlankScreenDetectionConfigAttribute(value_casted)
+        return this
+    }
+    public enableBlankScreenMonitor(value: boolean | undefined): this {
+        const value_casted = value as (boolean | undefined)
+        this.getPeer()?.setEnableBlankScreenMonitorAttribute(value_casted)
         return this
     }
     public backToTop(value: boolean | undefined): this {
@@ -5324,6 +5491,21 @@ export class ArkWebComponent extends ArkCommonMethodComponent implements WebAttr
     public enableMediaNetworkProxy(value: boolean | undefined): this {
         const value_casted = value as (boolean | undefined)
         this.getPeer()?.setEnableMediaNetworkProxyAttribute(value_casted)
+        return this
+    }
+    public caretColor(value: ResourceColor | undefined): this {
+        const value_casted = value as (ResourceColor | undefined)
+        this.getPeer()?.setCaretColorAttribute(value_casted)
+        return this
+    }
+    public onZoomChange(value: OnZoomChangeCallback | undefined): this {
+        const value_casted = value as (OnZoomChangeCallback | undefined)
+        this.getPeer()?.setOnZoomChangeAttribute(value_casted)
+        return this
+    }
+    public flingSpeedLimit(value: double | undefined): this {
+        const value_casted = value as (double | undefined)
+        this.getPeer()?.setFlingSpeedLimitAttribute(value_casted)
         return this
     }
     public registerNativeEmbedRule(tag: string | undefined, type: string | undefined): this {
@@ -5671,6 +5853,22 @@ export class OnScaleChangeEvent_serializer {
         const oldScaleTmpResult: double = valueDeserializer.readFloat64()
         const newScaleTmpResult: double = valueDeserializer.readFloat64()
         let value: OnScaleChangeEvent = ({oldScale: oldScaleTmpResult, newScale: newScaleTmpResult} as OnScaleChangeEvent)
+        return value
+    }
+}
+export class OnZoomChangeEvent_serializer {
+    public static write(buffer: SerializerBase, value: OnZoomChangeEvent): void {
+        let valueSerializer: SerializerBase = buffer
+        const valueHolderForOldZoomFactor = value.oldZoomFactor
+        valueSerializer.writeFloat64(valueHolderForOldZoomFactor)
+        const valueHolderForNewZoomFactor = value.newZoomFactor
+        valueSerializer.writeFloat64(valueHolderForNewZoomFactor)
+    }
+    public static read(buffer: DeserializerBase): OnZoomChangeEvent {
+        let valueDeserializer: DeserializerBase = buffer
+        const oldZoomFactorTmpResult: double = valueDeserializer.readFloat64()
+        const newZoomFactorTmpResult: double = valueDeserializer.readFloat64()
+        let value: OnZoomChangeEvent = ({oldZoomFactor: oldZoomFactorTmpResult, newZoomFactor: newZoomFactorTmpResult} as OnZoomChangeEvent)
         return value
     }
 }
@@ -6439,6 +6637,25 @@ export class LoadCommittedDetails_serializer {
         const navigationTypeTmpResult: WebNavigationType = WebNavigationType.fromValue(valueDeserializer.readInt32())
         const urlTmpResult: string = (valueDeserializer.readString() as string)
         let value: LoadCommittedDetails = ({isMainFrame: isMainFrameTmpResult, isSameDocument: isSameDocumentTmpResult, didReplaceEntry: didReplaceEntryTmpResult, navigationType: navigationTypeTmpResult, url: urlTmpResult} as LoadCommittedDetails)
+        return value
+    }
+}
+export class MonitoredBlankScreenEventInfo_serializer {
+    public static write(buffer: SerializerBase, value: MonitoredBlankScreenEventInfo): void {
+        let valueSerializer: SerializerBase = buffer
+        const valueHolderForUrl = value.url
+        valueSerializer.writeString(valueHolderForUrl)
+        const valueHolderForReason = value.reason
+        valueSerializer.writeInt32(valueHolderForReason.valueOf())
+        const valueHolderForExtraMsg = value.extraMsg
+        valueSerializer.writeString(valueHolderForExtraMsg)
+    }
+    public static read(buffer: DeserializerBase): MonitoredBlankScreenEventInfo {
+        let valueDeserializer: DeserializerBase = buffer
+        const urlTmpResult: string = (valueDeserializer.readString() as string)
+        const reasonTmpResult: BlankScreenReason = BlankScreenReason.fromValue(valueDeserializer.readInt32())
+        const extraMsgTmpResult: string = (valueDeserializer.readString() as string)
+        let value: MonitoredBlankScreenEventInfo = ({url: urlTmpResult, reason: reasonTmpResult, extraMsg: extraMsgTmpResult} as MonitoredBlankScreenEventInfo)
         return value
     }
 }

@@ -15,6 +15,7 @@
 
 #include "core/components_ng/pattern/rich_editor/rich_editor_paint_method.h"
 
+#include "core/components/text_field/textfield_theme.h"
 #include "core/components_ng/pattern/text/paragraph_manager.h"
 #include "core/components_ng/pattern/rich_editor/rich_editor_content_modifier.h"
 #include "core/components_ng/pattern/rich_editor/rich_editor_overlay_modifier.h"
@@ -24,9 +25,11 @@
 namespace OHOS::Ace::NG {
 RichEditorPaintMethod::RichEditorPaintMethod(const WeakPtr<Pattern>& pattern, const ParagraphManager* pManager,
     float baselineOffset, const RefPtr<TextContentModifier>& contentMod,
-    const RefPtr<TextOverlayModifier>& overlayMod)
+    const RefPtr<TextOverlayModifier>& overlayMod,
+    const RefPtr<RichEditorForegroundModifier>& foregroundModifier)
     : TextPaintMethod(pattern, baselineOffset, contentMod, overlayMod),
-      pManager_(pManager)
+      pManager_(pManager),
+      foregroundModifier_(foregroundModifier)
 {}
 
 void RichEditorPaintMethod::UpdateOverlayModifier(PaintWrapper* paintWrapper)
@@ -43,6 +46,10 @@ void RichEditorPaintMethod::UpdateOverlayModifier(PaintWrapper* paintWrapper)
         overlayMod->SetHorizontalScrolling(richEditorPattern->isHorizontalScrolling_);
         overlayMod->ChangeOverlay();
         if (!richEditorPattern->HasFocus()) {
+            auto geometryNode = paintWrapper->GetGeometryNode();
+            CHECK_NULL_VOID(geometryNode);
+            auto frameSize = geometryNode->GetFrameSize();
+            overlayMod->SetFrameSize(frameSize);
             overlayMod->UpdateScrollBar(paintWrapper);
         } else {
             auto geometryNode = paintWrapper->GetGeometryNode();
@@ -71,8 +78,11 @@ void RichEditorPaintMethod::UpdateContentOverlayModifier(PaintWrapper* paintWrap
     overlayMod->SetSingleLine(richEditorPattern->isSingleLineMode_);
     overlayMod->SetHorizontalScrolling(richEditorPattern->isHorizontalScrolling_);
     SetPreviewTextDecoration(paintWrapper);
+    SetShowUnderlineWidth(paintWrapper);
     const auto& selection = richEditorPattern->GetTextSelector();
     auto selectedRects = richEditorPattern->CalculateSelectedRect(selection.GetTextStart(), selection.GetTextEnd());
+    auto frameSize = paintWrapper->GetGeometryNode()->GetFrameSize();
+    overlayMod->SetFrameSize(frameSize);
     if (!richEditorPattern->HasFocus()) {
         overlayMod->SetCaretVisible(false);
         overlayMod->SetFloatingCaretVisible(false);
@@ -86,8 +96,6 @@ void RichEditorPaintMethod::UpdateContentOverlayModifier(PaintWrapper* paintWrap
     auto contentRect = richEditorPattern->GetTextContentRect();
     overlayMod->SetContentRect(contentRect);
     overlayMod->SetSelectedRects(selectedRects);
-    auto frameSize = paintWrapper->GetGeometryNode()->GetFrameSize();
-    overlayMod->SetFrameSize(frameSize);
     overlayMod->SetIsClip(false);
 }
 
@@ -124,6 +132,22 @@ void RichEditorPaintMethod::SetPreviewTextDecoration(PaintWrapper* paintWrapper)
     overlayMod->SetPreviewTextUnderlineWidth(richEditorPattern->GetPreviewTextUnderlineWidth());
     overlayMod->SetShowPreviewTextDecoration(richEditorPattern->IsPreviewTextInputting());
     overlayMod->SetPreviewTextStyle(richEditorPattern->GetPreviewTextStyle());
+}
+
+void RichEditorPaintMethod::SetShowUnderlineWidth(PaintWrapper* paintWrapper)
+{
+    auto contentPattern = DynamicCast<RichEditorContentPattern>(GetPattern().Upgrade());
+    CHECK_NULL_VOID(contentPattern);
+    auto richEditorPattern = contentPattern->GetParentPattern();
+    CHECK_NULL_VOID(richEditorPattern);
+    auto overlayMod = DynamicCast<RichEditorOverlayModifier>(GetOverlayModifier(paintWrapper));
+    CHECK_NULL_VOID(overlayMod);
+    if (richEditorPattern->IsUnderlineMode()) {
+        overlayMod->SetUnderlineColor(richEditorPattern->GetUnderlineColor());
+        overlayMod->SetUnderlineWidth(static_cast<float>(richEditorPattern->GetUnderlineWidth().ConvertToPx()));
+    } else {
+        overlayMod->SetUnderlineWidth(0.0f);
+    }
 }
 
 void RichEditorPaintMethod::SetCaretState(PaintWrapper* paintWrapper)
@@ -196,5 +220,22 @@ void RichEditorPaintMethod::UpdateContentModifier(PaintWrapper* paintWrapper)
     contentMod->SetClipOffset(paddingOffset);
     contentMod->SetClipSize(frameSize);
     contentMod->ContentChange();
+}
+
+RefPtr<Modifier> RichEditorPaintMethod::GetForegroundModifier(PaintWrapper* paintWrapper)
+{
+    return foregroundModifier_;
+}
+
+void RichEditorPaintMethod::UpdateForegroundModifier(PaintWrapper* paintWrapper)
+{
+    CHECK_NULL_VOID(foregroundModifier_);
+    auto richEditorPattern = DynamicCast<RichEditorPattern>(GetPattern().Upgrade());
+    CHECK_NULL_VOID(richEditorPattern);
+    foregroundModifier_->SetInnerBorderWidth(
+        static_cast<float>(richEditorPattern->GetInnerBorderWidthValue().ConvertToPx()));
+    auto textFieldTheme = richEditorPattern->GetTheme<TextFieldTheme>();
+    foregroundModifier_->SetInnerBorderColor(
+        richEditorPattern->GetInnerBorderColorValue(textFieldTheme ? textFieldTheme->GetOverCounterColor() : Color()));
 }
 } // namespace OHOS::Ace::NG

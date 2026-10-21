@@ -27,7 +27,7 @@ constexpr size_t FLEX_CACHE_SIZE = 50;
 constexpr size_t FLEX_ITEM_CACHE_SIZE = 200;
 constexpr bool USE_CACHE = false;
 class RenderNode;
-class RenderNodeFactory : public virtual AceType {
+class RenderNodeFactory : public AceType {
     DECLARE_ACE_TYPE(RenderNodeFactory, AceType);
 
 public:
@@ -46,7 +46,7 @@ protected:
     ACE_DISALLOW_COPY_AND_MOVE(RenderNodeFactory);
 };
 
-class RenderFlexFactory final : public virtual RenderNodeFactory {
+class RenderFlexFactory final : public RenderNodeFactory {
     DECLARE_ACE_TYPE(RenderFlexFactory, RenderNodeFactory);
 
 public:
@@ -55,7 +55,7 @@ public:
     ACE_DISALLOW_COPY_AND_MOVE(RenderFlexFactory);
 };
 
-class RenderWrapFactory final : public virtual RenderNodeFactory {
+class RenderWrapFactory final : public RenderNodeFactory {
     DECLARE_ACE_TYPE(RenderWrapFactory, RenderNodeFactory);
 
 public:
@@ -64,7 +64,7 @@ public:
     ACE_DISALLOW_COPY_AND_MOVE(RenderWrapFactory);
 };
 
-class RenderFlexItemFactory final : public virtual RenderNodeFactory {
+class RenderFlexItemFactory final : public RenderNodeFactory {
     DECLARE_ACE_TYPE(RenderFlexItemFactory, RenderNodeFactory);
 
 public:

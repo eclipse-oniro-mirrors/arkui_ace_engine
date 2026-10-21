@@ -91,7 +91,7 @@ const char SWIPER_LEFT_CAPTURE_ETS_TAG[] = "SwiperLeftCapture";
 const char SWIPER_RIGHT_CAPTURE_ETS_TAG[] = "SwiperRightCapture";
 const char TABS_ETS_TAG[] = "Tabs";
 const char NAVDESTINATION_VIEW_ETS_TAG[] = "NavDestination";
-const char JS_FOR_EACH_ETS_TAG[] = "JSForEach";
+const char JS_FOR_EACH_ETS_TAG[] = "ForEach";
 constexpr std::string_view SWIPER_DRAG_SCENE = "swiper_drag_scene";
 constexpr std::string_view FADE_PROPERTY_NAME = "fade";
 constexpr std::string_view SPRING_PROPERTY_NAME = "spring";
@@ -122,7 +122,9 @@ constexpr Dimension DEFAULT_INDICATOR_HEAD_DISTANCE = 14.0_vp;
 constexpr char SWIPER_SCROLL_DIRECTION_FORWARD[] = "forward";
 constexpr char SWIPER_SCROLL_DIRECTION_BACKWARD[] = "backward";
 constexpr char SWIPER_SCROLL_DIRECTION_BIDIRECTIONAL[] = "bidirectional";
-constexpr int32_t COMPONENT_SWIPER = 1;
+constexpr int32_t COMPONENT_STATE_CHANGE_IDX = 0;
+constexpr int32_t COMPONENT_STATE_SHOW = 1;
+constexpr int32_t COMPONENT_STATE_HIDDEN = 2;
 constexpr int32_t MEMORY_LEVEL_CRITICAL = 2;
 
 MoveStep GetKeyMoveStep(const KeyEvent& event, Axis axis, bool isRtl)
@@ -1757,6 +1759,7 @@ void SwiperPattern::FireChangeEvent(int32_t preIndex, int32_t currentIndex, bool
     swiperEventHub->FireChangeEvent(preIndex, currentIndex, isInLayout);
     swiperEventHub->FireIndicatorChangeEvent(currentIndex);
     swiperEventHub->FireIndicatorIndexChangeEvent(currentIndex);
+    FireIndicatorChangeAccessibilityEvent();
     swiperEventHub->FireChangeDoneEvent(moveDirection_);
     ReportSwiperChangeContent(currentIndex);
     if (swiperController_) {
@@ -1770,7 +1773,19 @@ void SwiperPattern::FireChangeEvent(int32_t preIndex, int32_t currentIndex, bool
     }
 }
 
-void SwiperPattern::ReportSwiperChangeContent(int32_t currentIndex) const
+void SwiperPattern::FireIndicatorChangeAccessibilityEvent() const
+{
+    if (!HasIndicatorNode()) {
+        return;
+    }
+    auto indicatorNode = GetCommonIndicatorNode();
+    CHECK_NULL_VOID(indicatorNode);
+    auto indicatorPattern = indicatorNode->GetPattern<SwiperIndicatorPattern>();
+    CHECK_NULL_VOID(indicatorPattern);
+    indicatorPattern->OnIndicatorChangeAccessibilityEvent();
+}
+
+void SwiperPattern::ReportSwiperChangeContent(int32_t currentIndex, int32_t componentState) const
 {
     auto host = GetHost();
     CHECK_NULL_VOID(host);
@@ -1800,14 +1815,17 @@ void SwiperPattern::ReportSwiperChangeContent(int32_t currentIndex) const
     auto fullPath = pageInfo->GetFullPath();
     auto pageName = pipeline->GetNavDestinationPageName(pageInfo);
     auto jsViewName = pipeline->GetNavDestinationJSViewName(pageInfo);
-    if (pipeline->GetTaihangOptimizer()->CheckSwiperPageValid(fullPath, pageName, jsViewName) && !isInAutoPlay_) {
+    // The `isInAutoPlay_` guard only applies to `COMPONENT_STATE_CHANGE_IDX`;
+    // SHOW/HIDDEN reports bypass it.
+    if (pipeline->GetTaihangOptimizer()->CheckSwiperPageValid(fullPath, pageName, jsViewName) &&
+        (componentState != COMPONENT_STATE_CHANGE_IDX || !isInAutoPlay_)) {
         RefPtr<NG::UINode> curUINode = host;
         std::string path = curUINode->GetPath();
         std::unordered_map<std::string, std::string> payload;
         payload["window_id"] = std::to_string(pipeline->GetWindowId());
         payload["path"] = path;
         payload["currentIndex"] = std::to_string(currentIndex);
-        payload["componentType"] = std::to_string(COMPONENT_SWIPER);
+        payload["componentSwiperState"] = std::to_string(componentState);
         ResSchedReport::GetInstance().HandleSwiperChange(payload);
     }
 #endif
@@ -1838,6 +1856,9 @@ void SwiperPattern::FireAnimationEndEvent(
     auto host = GetHost();
     CHECK_NULL_VOID(host);
     host->OnAccessibilityEvent(AccessibilityEventType::SCROLL_END);
+    if (isInterrupt) {
+        ContentChangeOnTransitionEnd(host, true);
+    }
 }
 
 void SwiperPattern::FireGestureSwipeEvent(int32_t currentIndex, const AnimationCallbackInfo& info) const
@@ -1896,7 +1917,7 @@ void SwiperPattern::NotifyScrollStateEvent(ScrollState scrollState)
     CHECK_NULL_VOID(mgr);
     auto host = GetHost();
     if (scrollState_ == ScrollState::IDLE) {
-        mgr->OnSwiperScrollStart(host);
+        mgr->OnSwiperScrollStart(host, hasTabsAncestor_);
     }
     if (scrollState == ScrollState::IDLE) {
         mgr->OnSwiperScrollEnd(host);
@@ -2143,6 +2164,15 @@ void SwiperPattern::OnSwiperCustomAnimationFinish(
 void SwiperPattern::SwipeToWithoutAnimation(int32_t index, std::optional<int32_t> rawIndex)
 {
     if (currentIndex_ != index) {
+#ifndef CROSS_PLATFORM
+        auto pipeline = GetContext();
+        if (pipeline) {
+            auto contentChangeManager = pipeline->GetContentChangeManager();
+            if (contentChangeManager) {
+                contentChangeManager->OnSwiperChangeStart(GetHost(), hasTabsAncestor_);
+            }
+        }
+#endif
         FireWillShowEvent(index);
         FireWillHideEvent(currentIndex_);
     }
@@ -2286,7 +2316,7 @@ int32_t SwiperPattern::CheckTargetIndex(int32_t targetIndex, bool isForceBackwar
             --targetIndex;
         }
         if (!IsLoop() && (targetIndex < 0 || targetIndex >= TotalCount())) {
-            if (isIgnoreHiddenItem_) {
+            if (isIgnoreHiddenItem_ && !IsAutoPlay()) {
                 return 0;
             }
             return currentIndex_;
@@ -5713,6 +5743,10 @@ void SwiperPattern::PostTranslateTask(uint32_t delayTime)
 
 void SwiperPattern::HandleVisibleChange(bool visible)
 {
+    if (isVisibleArea_ != visible) {
+        auto currentIndex = GetLoopIndex(CurrentIndex());
+        ReportSwiperChangeContent(currentIndex, visible ? COMPONENT_STATE_SHOW : COMPONENT_STATE_HIDDEN);
+    }
     isVisibleArea_ = visible;
     if (!visible) {
         translateTask_.Cancel();
@@ -6873,6 +6907,14 @@ void SwiperPattern::TriggerCustomContentTransitionEvent(int32_t fromIndex, int32
     }
     CHECK_NULL_VOID(onTabsCustomContentTransition_);
 
+#ifndef CROSS_PLATFORM
+    if (auto context = GetContext()) {
+        auto contentChangeManager = context->GetContentChangeManager();
+        if (contentChangeManager) {
+            contentChangeManager->OnSwiperChangeStart(GetHost(), hasTabsAncestor_);
+        }
+    }
+#endif
     auto tabContentAnimatedTransition = (*onTabsCustomContentTransition_)(fromIndex, toIndex);
     auto transition = tabContentAnimatedTransition.transition;
 
@@ -7827,7 +7869,12 @@ void SwiperPattern::ToJsonValue(std::unique_ptr<JsonValue>& json, const Inspecto
     auto indicatorType = GetIndicatorType();
     const char* indicator = "indicator";
     if (indicatorType == SwiperIndicatorType::DOT) {
-        json->PutExtAttr(indicator, SwiperHelper::GetDotIndicatorStyle(GetSwiperParameters()).c_str(), filter);
+        auto host = GetHost();
+        int32_t id = TokenThemeStorage::INVALID_THEME_SCOPE_ID;
+        if (host && host->GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TWENTY_SIX)) {
+            id = host->GetThemeScopeId();
+        }
+        json->PutExtAttr(indicator, SwiperHelper::GetDotIndicatorStyle(GetSwiperParameters(), id).c_str(), filter);
     } else if (indicatorType == SwiperIndicatorType::ARC_DOT) {
             json->PutExtAttr(indicator, GetArcDotIndicatorStyle().c_str(), filter);
     } else {
@@ -8177,7 +8224,7 @@ void SwiperPattern::SetPageFlipMode(int32_t pageFlipMode)
     pageFlipMode_ = static_cast<PageFlipMode>(pageFlipMode);
 }
 
-RefPtr<FrameNode> SwiperPattern::GetCommonIndicatorNode()
+RefPtr<FrameNode> SwiperPattern::GetCommonIndicatorNode() const
 {
     if (isBindIndicator_) {
         return GetIndicatorNode();
@@ -8247,14 +8294,14 @@ void SwiperPattern::UpdateDefaultColor()
         swiperParameters_->selectedColorVal = swiperIndicatorTheme->GetSelectedColor();
     }
     if (swiperArrowParameters_ && !swiperArrowParameters_->parametersByUser.count("backgroundColor")) {
-        if (props->GetIsSidebarMiddleValue()) {
+        if (props->GetIsSidebarMiddleValue(false)) {
             props->UpdateBackgroundColor(swiperIndicatorTheme->GetBigArrowBackgroundColor());
         } else {
             props->UpdateBackgroundColor(swiperIndicatorTheme->GetSmallArrowBackgroundColor());
         }
     }
     if (swiperArrowParameters_ && !swiperArrowParameters_->parametersByUser.count("arrowColor")) {
-        if (props->GetIsSidebarMiddleValue()) {
+        if (props->GetIsSidebarMiddleValue(false)) {
             props->UpdateArrowColor(swiperIndicatorTheme->GetBigArrowColor());
         } else {
             props->UpdateArrowColor(swiperIndicatorTheme->GetSmallArrowColor());
@@ -8362,6 +8409,11 @@ void SwiperPattern::ContentChangeReport(const RefPtr<FrameNode>& keyNode, bool n
         return;
     }
     if (targetIndex_.has_value() && targetIndex_.value() == currentIndex_) {
+#ifndef CROSS_PLATFORM
+        if (mgr->IsStartEventReportEnabled()) {
+            mgr->OnSwiperChangeCancel(keyNode, hasTabsAncestor_);
+        }
+#endif
         return;
     }
 #ifndef CROSS_PLATFORM
@@ -8381,7 +8433,7 @@ void SwiperPattern::ContentChangeOnTransitionStart(const RefPtr<FrameNode>& keyN
 #endif
 }
 
-void SwiperPattern::ContentChangeOnTransitionEnd(const RefPtr<FrameNode>& keyNode) const
+void SwiperPattern::ContentChangeOnTransitionEnd(const RefPtr<FrameNode>& keyNode, bool isInterrupt) const
 {
 #ifndef CROSS_PLATFORM
     auto pipeline = GetContext();
@@ -8389,7 +8441,13 @@ void SwiperPattern::ContentChangeOnTransitionEnd(const RefPtr<FrameNode>& keyNod
     auto mgr = pipeline->GetContentChangeManager();
     CHECK_NULL_VOID(mgr);
     CHECK_NULL_VOID(keyNode);
+    if (isInterrupt && (IsAutoPlay() || !mgr->IsStartEventReportEnabled())) {
+        return;
+    }
     mgr->OnTransitionRemoved(keyNode->GetId());
+    if (isInterrupt) {
+        mgr->OnSwiperChangeEnd(keyNode, hasTabsAncestor_);
+    }
 #endif
 }
 

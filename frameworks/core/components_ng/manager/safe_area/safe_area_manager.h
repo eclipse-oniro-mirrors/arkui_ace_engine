@@ -22,6 +22,10 @@
 #include "core/components_ng/property/safe_area_insets.h"
 #include "core/components_ng/property/transition_property.h"
 
+#include <functional>
+#include <optional>
+#include <unordered_set>
+
 namespace OHOS::Ace::NG {
 // SafeAreaManager stores layout information to apply SafeArea correctly.
 
@@ -35,7 +39,7 @@ struct WindowTypeConfig {
     bool isSceneBoardWindow = false;
 };
 
-class ACE_FORCE_EXPORT SafeAreaManager : public virtual AceType {
+class ACE_FORCE_EXPORT SafeAreaManager : public AceType {
     DECLARE_ACE_TYPE(SafeAreaManager, AceType);
 
 public:
@@ -291,6 +295,15 @@ public:
 
     KeyBoardAvoidMode GetKeyBoardAvoidMode();
 
+    void ApplyDefaultImmersiveStrategy(const std::unordered_set<ImmersiveStrategy>& types);
+
+    bool IsImmersiveStrategySet(ImmersiveStrategy strategy) const;
+
+    void SetFloatNavPullDelegate(std::function<void(bool)> delegate)
+    {
+        floatNavPullDelegate_ = std::move(delegate);
+    }
+
     bool IsIgnoreSafeArea()
     {
         return ignoreSafeArea_;
@@ -372,9 +385,9 @@ public:
         useCutout_ = useCutout;
     }
 
-    bool GetUseCutout()
+    bool GetUseCutout() const
     {
-        return useCutout_;
+        return IsImmersiveStrategySet(ImmersiveStrategy::AVOID_CUTOUT);
     }
 
     PaddingPropertyF SafeAreaToPadding(
@@ -389,6 +402,8 @@ public:
     {
         getKeyboardInset = method;
     }
+
+    bool IsImmersiveEffectEnabled() const;
 
 private:
     bool isAtomicService_ = false;
@@ -415,11 +430,13 @@ private:
      */
     bool keyboardSafeAreaEnabled_ = false;
 
-    bool useCutout_ = false;
+    std::optional<bool> useCutout_;
 
     KeyBoardAvoidMode keyboardAvoidMode_ = KeyBoardAvoidMode::OFFSET;
     bool IsModeResize();
     bool IsModeOffset();
+
+    std::function<void(bool)> floatNavPullDelegate_;
 
     SafeAreaInsets systemSafeArea_;
     SafeAreaInsets cutoutSafeArea_;
@@ -476,6 +493,7 @@ private:
     std::unordered_map<int32_t, std::function<void()>> keyboardChangeCbsConsideringUIExt_;
 
     std::function<SafeAreaInsets::Inset(SafeAreaManager*)> getKeyboardInset = nullptr;
+    std::unordered_set<ImmersiveStrategy> appliedStrategies_;
 
     ACE_DISALLOW_COPY_AND_MOVE(SafeAreaManager);
 };

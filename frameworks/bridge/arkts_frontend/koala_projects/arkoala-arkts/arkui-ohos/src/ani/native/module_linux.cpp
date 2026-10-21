@@ -145,6 +145,11 @@ ANI_EXPORT ani_status ANI_Constructor(ani_vm* vm, uint32_t* result)
             reinterpret_cast<void*>(OHOS::Ace::Ani::QueryRouterPageInfo)
         },
         ani_native_function {
+            "_Common_SetSafeAreaInset",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::SetSafeAreaInset)
+        },
+        ani_native_function {
             "_Common_GetHostContext",
             nullptr,
             reinterpret_cast<void*>(OHOS::Ace::Ani::GetHostContext)
@@ -218,6 +223,16 @@ ANI_EXPORT ani_status ANI_Constructor(ani_vm* vm, uint32_t* result)
             "_BuilderProxyNode_Mock_Construct",
             "i:l",
             reinterpret_cast<void*>(OHOS::Ace::Ani::BuilderProxyNodeMockConstruct)
+        },
+        ani_native_function {
+            "_InteropProxyNode_Construct",
+            "i:l",
+            reinterpret_cast<void*>(OHOS::Ace::Ani::InteropProxyNodeConstruct)
+        },
+        ani_native_function {
+            "_SetOnNodeDestroyEvent",
+            "lC{std.core.Function1}:",
+            reinterpret_cast<void*>(OHOS::Ace::Ani::SetOnNodeDestroyEvent)
         },
         ani_native_function {
             "_ContentSlot_construct",
@@ -478,6 +493,11 @@ ANI_EXPORT ani_status ANI_Constructor(ani_vm* vm, uint32_t* result)
             "_Common_getWindowHeightBreakpoint",
             nullptr,
             reinterpret_cast<void*>(OHOS::Ace::Ani::getWindowHeightBreakpoint)
+        },
+        ani_native_function {
+            "_Common_isWindowInfoInitialized",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::isWindowInfoInitialized)
         },
         ani_native_function {
             "_SyntaxItem_Construct",

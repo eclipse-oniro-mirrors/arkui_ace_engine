@@ -355,7 +355,7 @@ std::unordered_map<SheetKey, WeakPtr<FrameNode>, SheetKeyHash> OverlayManager::G
 
 void OverlayManager::SetFilterActive(bool actived)
 {
-    hasFilterActived = actived;
+    hasFilterActived_ = actived;
 }
 
 void OverlayManager::SetDismissPopupId(int32_t targetId)
@@ -5646,6 +5646,13 @@ void OverlayManager::RemoveFilterAnimation()
         return;
     }
 
+    if (hasFilterActived_) {
+        TAG_LOGI(AceLogTag::ACE_OVERLAY,
+            "filter show animation still active (hasFilterActived_=true), skip disappear for filterId=%{public}d",
+            filterNode->GetId());
+        return;
+    }
+
     ShowFilterDisappearAnimation(filterNode);
 }
 
@@ -5660,6 +5667,8 @@ void OverlayManager::RemoveFilterWithNode(const RefPtr<FrameNode>& filterNode)
     } else {
         TAG_LOGI(AceLogTag::ACE_OVERLAY, "filter has no parent, skip remove filterId: %{public}d", filterNode->GetId());
     }
+
+    RemoveFilterOnDisappear(filterNode->GetId());
 
     auto columnNode = filterColumnNodeWeak_.Upgrade();
     auto isRemoveCurrentFilter = columnNode && columnNode->GetId() == filterNode->GetId();
@@ -7078,12 +7087,35 @@ RefPtr<FrameNode> OverlayManager::GetLastChildNotRemoving(const RefPtr<UINode>& 
     const auto& children = rootNode->GetChildren();
     for (auto iter = children.rbegin(); iter != children.rend(); ++iter) {
         auto& child = *iter;
+        if (child->GetTag() == V2::SHEET_WRAPPER_TAG) {
+            auto sheetWrapper = GetLastChildNotOnDisappearingForSheet(child);
+            if (sheetWrapper) {
+                return sheetWrapper;
+            }
+            continue;
+        }
         if (child->GetTag() == V2::ATOMIC_SERVICE_ETS_TAG) {
             auto atomicNode = child;
             return GetLastChildNotRemovingForAtm(atomicNode);
         } else if (!child->IsRemoving()) {
             return DynamicCast<FrameNode>(child);
         }
+    }
+    return nullptr;
+}
+
+RefPtr<FrameNode> OverlayManager::GetLastChildNotOnDisappearingForSheet(const RefPtr<UINode>& node)
+{
+    auto sheetWrapperNode = DynamicCast<FrameNode>(node);
+    CHECK_NULL_RETURN(sheetWrapperNode, nullptr);
+    auto* sheetWrapperModifier = NG::NodeModifier::GetSheetWrapperInnerModifier();
+    CHECK_NULL_RETURN(sheetWrapperModifier, nullptr);
+    auto sheetPageNode = sheetWrapperModifier->sheetWrapperGetSheetPageNode(sheetWrapperNode);
+    CHECK_NULL_RETURN(sheetPageNode, nullptr);
+    auto* sheetPatternModifier = NG::NodeModifier::GetSheetPatternInnerModifier();
+    CHECK_NULL_RETURN(sheetPatternModifier, nullptr);
+    if (!sheetPatternModifier->sheetIsOnDisappearing(sheetPageNode)) {
+        return sheetWrapperNode;
     }
     return nullptr;
 }
@@ -7418,6 +7450,28 @@ void OverlayManager::ResetDetachedFreeRootProxy(int32_t targetId)
     if (iter != detachedProxyMap_.end()) {
         detachedProxyMap_.erase(iter);
     }
+}
+
+bool OverlayManager::GetMenuWrapperState(const RefPtr<FrameNode>& node, int32_t& targetId, bool& isShown)
+{
+    targetId = -1;
+    isShown = false;
+    CHECK_NULL_RETURN(node, false);
+    auto menu = node->GetPattern<MenuWrapperPattern>();
+    CHECK_NULL_RETURN(menu, false);
+    targetId = menu->GetTargetId();
+    isShown = menu->IsShow();
+    return true;
+}
+
+bool OverlayManager::GetPopupTargetId(const RefPtr<FrameNode>& node, int32_t& targetId)
+{
+    targetId = -1;
+    CHECK_NULL_RETURN(node, false);
+    auto bubble = node->GetPattern<BubblePattern>();
+    CHECK_NULL_RETURN(bubble, false);
+    targetId = bubble->GetPopupTargetId();
+    return true;
 }
 
 PopupInfo OverlayManager::GetPopupInfo(int32_t targetId) const

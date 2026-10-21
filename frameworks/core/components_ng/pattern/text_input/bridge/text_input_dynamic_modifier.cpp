@@ -993,8 +993,30 @@ void ResetTextInputShowError(ArkUINodeHandle node)
     }
 }
 
+void SetTextInputPlaceholderFontResource(FrameNode* frameNode, void* fontSizeRawPtr, void* fontFamilyRawPtr,
+    const CalcDimension& fontSize, const std::vector<std::string>& fontFamilies)
+{
+    if (!SystemProperties::ConfigChangePerform()) {
+        return;
+    }
+    auto pattern = frameNode->GetPattern();
+    CHECK_NULL_VOID(pattern);
+    if (fontSizeRawPtr != nullptr) {
+        auto resObj = AceType::Claim(reinterpret_cast<ResourceObject*>(fontSizeRawPtr));
+        pattern->RegisterResource<CalcDimension>("placeholderFontSize", resObj, fontSize);
+    } else {
+        pattern->UnRegisterResource("placeholderFontSize");
+    }
+    if (fontFamilyRawPtr != nullptr) {
+        auto resObj = AceType::Claim(reinterpret_cast<ResourceObject*>(fontFamilyRawPtr));
+        pattern->RegisterResource<std::vector<std::string>>("placeholderFontFamily", resObj, fontFamilies);
+    } else {
+        pattern->UnRegisterResource("placeholderFontFamily");
+    }
+}
+
 void SetTextInputPlaceholderFont(ArkUINodeHandle node, const struct ArkUIPlaceholderFontType* placeholderFont,
-                                 void* fontSizeRawPtr, void* fontfamilyRawPtr)
+                                 void* fontSizeRawPtr, void* fontfamilyRawPtr, bool isJsView)
 {
     auto *frameNode = reinterpret_cast<FrameNode *>(node);
     CHECK_NULL_VOID(frameNode);
@@ -1009,8 +1031,11 @@ void SetTextInputPlaceholderFont(ArkUINodeHandle node, const struct ArkUIPlaceho
         fontSize.SetUnit(static_cast<DimensionUnit>(placeholderFont->size->unit));
     }
     font.fontSize = fontSize;
-    if (placeholderFont->weight != nullptr && !std::string(placeholderFont->weight).empty()) {
-        font.fontWeight = Framework::ConvertStrToFontWeight(placeholderFont->weight);
+    const char* weightStr = placeholderFont->weight;
+    if (isJsView) {
+        font.fontWeight = (weightStr != nullptr) ? Framework::ConvertStrToFontWeight(weightStr) : DEFAULT_FONT_WEIGHT;
+    } else if (weightStr != nullptr && !std::string(weightStr).empty()) {
+        font.fontWeight = Framework::ConvertStrToFontWeight(weightStr);
     } else if (placeholderFont->weightEnum > -1) {
         font.fontWeight = static_cast<FontWeight>(placeholderFont->weightEnum);
     }
@@ -1026,22 +1051,7 @@ void SetTextInputPlaceholderFont(ArkUINodeHandle node, const struct ArkUIPlaceho
         font.fontStyle = static_cast<Ace::FontStyle>(placeholderFont->style);
     }
     TextFieldModelNG::SetPlaceholderFont(frameNode, font);
-    if (SystemProperties::ConfigChangePerform()) {
-        auto pattern = frameNode->GetPattern();
-        CHECK_NULL_VOID(pattern);
-        if (fontSizeRawPtr) {
-            auto resObj = AceType::Claim(reinterpret_cast<ResourceObject*>(fontSizeRawPtr));
-            pattern->RegisterResource<CalcDimension>("placeholderFontSize", resObj, fontSize);
-        } else {
-            pattern->UnRegisterResource("placeholderFontSize");
-        }
-        if (fontfamilyRawPtr) {
-            auto resObj = AceType::Claim(reinterpret_cast<ResourceObject*>(fontfamilyRawPtr));
-            pattern->RegisterResource<std::vector<std::string>>("placeholderFontFamily", resObj, font.fontFamilies);
-        } else {
-            pattern->UnRegisterResource("placeholderFontFamily");
-        }
-    }
+    SetTextInputPlaceholderFontResource(frameNode, fontSizeRawPtr, fontfamilyRawPtr, fontSize, font.fontFamilies);
 }
 
 void ResetTextInputPlaceholderFont(ArkUINodeHandle node)
@@ -3470,7 +3480,7 @@ void SetTextInputPlaceholderColorImpl(ArkUINodeHandle node, ArkUI_Uint32 color, 
 }
 
 void SetTextInputPlaceholderFontImpl(ArkUINodeHandle node, const struct ArkUIPlaceholderFontType* placeholderFont,
-    void* fontSizeRawPtr, void* fontfamilyRawPtr)
+    void* fontSizeRawPtr, void* fontfamilyRawPtr, bool isJsView)
 {
     auto *frameNode = reinterpret_cast<FrameNode *>(node);
     CHECK_NULL_VOID(frameNode);

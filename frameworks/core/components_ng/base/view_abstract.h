@@ -16,6 +16,7 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_BASE_VIEW_ABSTRACT_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_BASE_VIEW_ABSTRACT_H
 
+#include <array>
 #include <cstdint>
 #include <functional>
 
@@ -84,9 +85,12 @@ struct ImmersiveMaterialConfig;
 }
 
 namespace OHOS::Ace::NG {
+class UINode;
+
 struct AttractionEffect;
 using TransitionFinishCallback = std::function<void(bool)>;
 using OnNeedSoftkeyboardFunc = std::function<bool()>;
+using SafeAreaInsetContentArray = std::array<RefPtr<UINode>, SAFE_AREA_INSET_EDGE_COUNT>;
 struct ACE_FORCE_EXPORT OptionParam {
     std::string value;
     std::string icon;
@@ -253,6 +257,9 @@ public:
     static void SetSafeAreaPadding(FrameNode* frameNode, const PaddingProperty& value);
     static void ResetSafeAreaPadding();
     static void ResetSafeAreaPadding(FrameNode* frameNode);
+    static void SetSafeAreaInset(
+        FrameNode* frameNode, const SafeAreaInsetOptions& options, const SafeAreaInsetContentArray& contents);
+    static void ResetSafeAreaInset(FrameNode* frameNode);
     static void CheckSafeAreaPaddingLPX(const PaddingProperty& value);
     static void CheckNodeSafeAreaPaddingLPX(FrameNode* frameNode, const PaddingProperty& value);
     static void CheckNodeSafeAreaPaddingLPX(RefPtr<OHOS::Ace::NG::FrameNode> frameNode, const PaddingProperty& value);
@@ -1055,6 +1062,7 @@ public:
     static bool GetClip(FrameNode* frameNode);
     static RefPtr<BasicShape> GetClipShape(FrameNode* frameNode);
     static Matrix4 GetTransform(FrameNode* frameNode);
+    static Matrix4 GetTransform3D(FrameNode* frameNode);
     static HitTestMode GetHitTestBehavior(FrameNode* frameNode);
     static OffsetT<Dimension> GetPosition(FrameNode* frameNode);
     static std::optional<EdgesParam> GetPositionEdges(FrameNode* frameNode);

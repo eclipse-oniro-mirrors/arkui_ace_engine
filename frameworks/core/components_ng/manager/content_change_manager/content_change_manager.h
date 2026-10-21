@@ -63,9 +63,20 @@ public:
         return currentContentChangeConfig_.has_value();
     }
 
+    bool IsStartEventReportEnabled() const
+    {
+        return currentContentChangeConfig_.has_value() && currentContentChangeConfig_->reportStartEvent;
+    }
+
     void OnPageTransitionEnd(const RefPtr<FrameNode>& keyNode);
+    void OnPageTransitionEnd(const RefPtr<FrameNode>& keyNode, int32_t transitionId);
+    void OnContentChangeStart(const RefPtr<FrameNode>& keyNode, ChangeType type);
+    void OnContentChangeInterrupted(const RefPtr<FrameNode>& keyNode, ChangeType type);
+    void OnContentChangeNodeDestroyed(int32_t nodeId);
     void OnScrollChangeStart(const RefPtr<FrameNode>& keyNode);
-    void OnScrollChangeEnd(const RefPtr<FrameNode>& keyNode);
+    void OnScrollChangeEnd(const RefPtr<FrameNode>& keyNode, uint32_t type = NONE);
+    void OnSwiperChangeStart(const RefPtr<FrameNode>& keyNode, bool hasTabsAncestor);
+    void OnSwiperChangeCancel(const RefPtr<FrameNode>& keyNode, bool hasTabsAncestor);
     void OnSwiperChangeEnd(const RefPtr<FrameNode>& keyNode, bool hasTabsAncestor);
     ACE_FORCE_EXPORT void OnDialogChangeEnd(const RefPtr<FrameNode>& keyNode, bool isShow);
     void OnScrollRemoved(int32_t nodeId);
@@ -84,14 +95,44 @@ public:
     bool IsIgnoringEventType(uint32_t type) const;
 
     bool IsSwiperScrolling() const;
-    void OnSwiperScrollStart(const RefPtr<FrameNode>& keyNode);
+    void OnSwiperScrollStart(const RefPtr<FrameNode>& keyNode, bool hasTabsAncestor = false);
     void OnSwiperScrollEnd(const RefPtr<FrameNode>& keyNode);
 
 #ifndef IS_RELEASE_VERSION
     std::string DumpInfo() const;
 #endif
 
+    // PageScene detection entry points. Exposed so route-change hook points
+    // (PagePattern::OnShow, NavDestinationEventHub::FireOnShownEvent) can
+    // trigger an immediate detection cycle for AC-6.2/AC-6.4 (route-leave
+    // false event, A-false-before-B-true ordering). No-op when no search
+    // ruleSet is registered (NeedPageSceneDetect fast-returns).
+    void NotifyPageSceneContentChanged(bool flushNow);
+    void FlushPageSceneNodeChanged();
+
 private:
+    struct ActiveContentChange {
+        ChangeType endType = ChangeType::PAGE;
+        std::string tag;
+        int32_t nodeId = -1;
+        int64_t startTimestamp = 0;
+        bool normalEndPending = false;
+        int32_t pendingReportNodeId = -1;
+    };
+
+    struct PendingSwiperChange {
+        int32_t logicalNodeId = -1;
+        bool canceled = false;
+    };
+
+    std::optional<ChangeType> GetStartChangeType(ChangeType type) const;
+    void CompleteContentChange(int32_t nodeId, ChangeType type);
+    void MarkSwiperNormalEndPending(
+        const RefPtr<FrameNode>& reportNode, const RefPtr<FrameNode>& logicalNode, ChangeType type);
+    bool ConsumeCanceledSwiperEnd(int32_t reportNodeId, ChangeType type);
+    void CompleteSwiperContentChange(int32_t reportNodeId, ChangeType type);
+    void CancelPendingSwiperEnd(const ActiveContentChange& activeChange);
+    void ReportContentChangeEnd(const ActiveContentChange& activeChange, const char* endReason = nullptr);
     void SetContentChangeConfig(const ContentChangeConfig& config);
     void UpdateContentChangeParameters();
     void ResetContentChangeState();
@@ -103,8 +144,6 @@ private:
     bool IsContentChanging() const;
     bool NeedPageSceneDetect() const;
     bool NeedContentChangeReportOrPageSceneDetect() const;
-    void NotifyPageSceneContentChanged(bool flushNow);
-    void FlushPageSceneNodeChanged();
     void ReportImageEvent();
     void RemoveImageReportTask();
     void PostImageReportTask(uint32_t delay);
@@ -147,6 +186,8 @@ private:
     uint64_t lastComponentReportTime_ = 0;  // Timestamp of last component event report
     uint64_t lastTransitionReportTime_ = 0; // Timestamp of last transition event report
     bool textCollecting_ = false;
+    std::unordered_map<int32_t, std::unordered_map<ChangeType, ActiveContentChange>> activeContentChanges_;
+    std::unordered_map<int32_t, std::unordered_map<ChangeType, PendingSwiperChange>> pendingSwiperChanges_;
     std::set<std::pair<WeakPtr<FrameNode>, bool>> changedSwiperNodes_;
     std::set<int32_t> scrollingNodes_;
     std::set<int32_t> scrollingSwiperNodes_;

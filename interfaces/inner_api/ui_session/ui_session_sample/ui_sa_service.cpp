@@ -58,14 +58,23 @@ constexpr size_t SIMPLIFYTREE_WITH_PARAMCONFIG = GET_VISIBLE_WITH_UI_EXTENSION_I
 constexpr size_t SIMPLIFYTREE_WITH_EXTENDED_PARAMCONFIG = GET_VISIBLE_MIN_OPACITY_INDEX + 1;
 constexpr int32_t SEND_COMMAND_WITH_NODEID = 3;
 constexpr int32_t SEND_COMMAND_WITHOUT_NODEID = 2;
+constexpr size_t SEND_COMMAND_LOG_PREVIEW_LENGTH = 200;
+constexpr size_t MAX_BATCH_SET_TEXT_COUNT = 50;
+constexpr size_t BATCH_ARGUMENT_PAIR_SIZE = 2;
+constexpr size_t MIN_BATCH_SET_TEXT_PARAM_COUNT = 3;
+constexpr uint8_t NIBBLE_BITS = 4;
+constexpr uint8_t LOW_NIBBLE_MASK = 0x0F;
 constexpr int32_t START_WEB_VIEW_TRANSLATE = 2;
 constexpr int32_t GET_WEB_INFO_BY_REQUEST_PARAMS = 3;
 constexpr int32_t EXE_APP_AI_FUNCTION_PARAMS = 3;
 constexpr int32_t GET_STATE_MGMT_INFO_PARAMS = 4;
 constexpr int32_t GET_SPECIFIED_CONTENT_OFFSETS_PARAMS = 3;
 constexpr int32_t HIGHLIGHT_SPECIFIED_CONTENT_PARAMS = 3;
+constexpr int32_t GET_NAVIGATION_CONTENT_PARAMS = 4;
+constexpr int32_t GET_LAZY_FOREACH_DATA_PARAMS = 3;
 constexpr int32_t PAGE_TRANSLATE_REQUEST_PARAMS = 2;
 constexpr int32_t PAGE_TRANSLATE_RESET_PARAMS = 2;
+constexpr int32_t PARAM_TWO = 2;
 constexpr size_t PAGE_TRANSLATE_EXTRA_DATA_INDEX = 2;
 constexpr int32_t DEFAULT_APP_USER_ID = 100;
 constexpr char DEFAULT_PAGE_TRANSLATE_REQUEST[] = R"({"scope":3})";
@@ -73,14 +82,17 @@ constexpr size_t PAGE_SCENE_RULE_PARAM_INDEX = 1;
 constexpr size_t PAGE_SCENE_RULE_SET_ID_PARAM_INDEX = 1;
 constexpr double PERCENT_VALUE = 100.0;
 const char PAGE_SCENE_RULE_FILE[] = "page_scene_rules.json";
+const char PAGE_SCENE_RULE_FILE_B[] = "page_scene_rules_b.json";
 const char DEFAULT_PAGE_SCENE_RULE_SET_ID[] = "default_scene_rules";
 const char NULL_CALLBACK_DUMP_OPTION[] = "-nullcb";
 const char EMPTY_ID_DUMP_OPTION[] = "-emptyid";
+const char DUAL_RULE_SET_DUMP_OPTION[] = "-dual";
 const std::string REPEAT_DUMP_OPTION_PREFIX = "-repeat:";
 
 struct DumpOption {
     bool useNullCallback = false;
     bool useEmptyId = false;
+    bool dualRuleSet = false;
     int32_t repeatCount = 1;
 };
 
@@ -94,6 +106,10 @@ DumpOption ParseDumpOption(std::vector<std::string>& params)
         }
         if (param == EMPTY_ID_DUMP_OPTION) {
             option.useEmptyId = true;
+            return true;
+        }
+        if (param == DUAL_RULE_SET_DUMP_OPTION) {
+            option.dualRuleSet = true;
             return true;
         }
         if (param.rfind(REPEAT_DUMP_OPTION_PREFIX, 0) != 0) {
@@ -205,6 +221,12 @@ ContentChangeConfig ParseContentChangeConfig(
         [&config](const std::string& value) {
             config.reportDelayTime = std::atoi(value.c_str());
         },
+        [&config](const std::string& value) {
+            config.reportStartEvent = value == "1";
+            if (value != "0" && value != "1") {
+                LOGW("[ContentChangeManager] reportStartEvent only accepts 0 or 1, use false");
+            }
+        },
     };
 
     const size_t configStart = static_cast<size_t>(PARAMS_OFFSET);
@@ -219,6 +241,44 @@ ContentChangeConfig ParseContentChangeConfig(
     }
 
     return config;
+}
+
+const char* GetContentChangeTypeName(ChangeType type)
+{
+    switch (type) {
+        case ChangeType::PAGE:
+            return "PAGE";
+        case ChangeType::SCROLL:
+            return "SCROLL";
+        case ChangeType::SWIPER:
+            return "SWIPER";
+        case ChangeType::TABS:
+            return "TABS";
+        case ChangeType::TEXT:
+            return "TEXT";
+        case ChangeType::DIALOG:
+            return "DIALOG";
+        case ChangeType::ARKWEB_PAGE:
+            return "ARKWEB_PAGE";
+        case ChangeType::ARKWEB_TEXT:
+            return "ARKWEB_TEXT";
+        case ChangeType::IMAGE_LOADED:
+            return "IMAGE_LOADED";
+        case ChangeType::PAGE_START:
+            return "PAGE_START";
+        case ChangeType::SCROLL_START:
+            return "SCROLL_START";
+        case ChangeType::SWIPER_START:
+            return "SWIPER_START";
+        case ChangeType::TABS_START:
+            return "TABS_START";
+        case ChangeType::SWIPER_START_CANCEL:
+            return "SWIPER_START_CANCEL";
+        case ChangeType::TABS_START_CANCEL:
+            return "TABS_START_CANCEL";
+        default:
+            return "UNKNOWN";
+    }
 }
 
 std::string UnescapeContent(const std::string& param)
@@ -281,7 +341,11 @@ bool ReadTextFile(const std::string& filePath, std::string& content)
     std::ostringstream buffer;
     buffer << input.rdbuf();
     content = buffer.str();
-    return !content.empty();
+    if (content.empty()) {
+        LOGW("[PageScene] file content is empty, filePath=%{public}s", filePath.c_str());
+        return false;
+    }
+    return true;
 }
 
 void WriteTextFile(const std::string& tag, const std::string& fileNamePrefix, const std::string& content)
@@ -306,6 +370,159 @@ std::string ReadPageSceneRuleJson()
     }
     return ruleJson;
 }
+
+// --- Search event summary (demo logging; light-weight string parse of our own
+// fixed event contract, no JSON dependency) ---
+std::string ExtractJsonStringField(const std::string& json, const std::string& field)
+{
+    auto key = "\"" + field + "\"";
+    auto pos = json.find(key);
+    if (pos == std::string::npos) {
+        return "";
+    }
+    pos = json.find(':', pos + key.length());
+    if (pos == std::string::npos) {
+        return "";
+    }
+    auto quote = json.find('"', pos);
+    if (quote == std::string::npos) {
+        return "";
+    }
+    auto endQuote = json.find('"', quote + 1);
+    if (endQuote == std::string::npos) {
+        return "";
+    }
+    return json.substr(quote + 1, endQuote - quote - 1);
+}
+
+bool ExtractJsonBoolField(const std::string& json, const std::string& field)
+{
+    constexpr size_t TRUE_BOOL_STR_LEN = 4;
+    auto key = "\"" + field + "\"";
+    auto pos = json.find(key);
+    if (pos == std::string::npos) {
+        return false;
+    }
+    pos = json.find(':', pos + key.length());
+    if (pos == std::string::npos) {
+        return false;
+    }
+    return json.compare(pos + 1, TRUE_BOOL_STR_LEN, "true") == 0;
+}
+
+// Collects "ruleSetId:ruleId" pairs appearing in hits/exits arrays.
+bool AppendRulePair(std::ostringstream& oss, const std::string& json, const std::string& ruleSetId,
+    size_t endQuote, int32_t& count, size_t& nextSearch)
+{
+    auto ruleIdPos = json.find("\"ruleId\"", endQuote);
+    if (ruleIdPos == std::string::npos) {
+        return false;
+    }
+    auto ruleIdColon = json.find(':', ruleIdPos);
+    auto ruleIdQuote = json.find('"', ruleIdColon);
+    auto ruleIdEnd = json.find('"', ruleIdQuote + 1);
+    if (ruleIdColon == std::string::npos || ruleIdQuote == std::string::npos || ruleIdEnd == std::string::npos) {
+        return false;
+    }
+    std::string ruleId = json.substr(ruleIdQuote + 1, ruleIdEnd - ruleIdQuote - 1);
+    if (count++ > 0) {
+        oss << ",";
+    }
+    oss << ruleSetId << ":" << ruleId;
+    nextSearch = ruleIdEnd + 1;
+    return true;
+}
+
+std::string CollectSearchRulePairs(const std::string& json)
+{
+    std::ostringstream oss;
+    int32_t count = 0;
+    size_t searchFrom = 0;
+    while (searchFrom < json.size()) {
+        auto ruleSetPos = json.find("\"ruleSetId\"", searchFrom);
+        if (ruleSetPos == std::string::npos) {
+            break;
+        }
+        auto colon = json.find(':', ruleSetPos);
+        auto quote = json.find('"', colon);
+        auto endQuote = json.find('"', quote + 1);
+        if (colon == std::string::npos || quote == std::string::npos || endQuote == std::string::npos) {
+            break;
+        }
+        std::string ruleSetId = json.substr(quote + 1, endQuote - quote - 1);
+        size_t nextSearch = 0;
+        if (AppendRulePair(oss, json, ruleSetId, endQuote, count, nextSearch)) {
+            searchFrom = nextSearch;
+            continue;
+        }
+        searchFrom = endQuote + 1;
+    }
+    return oss.str();
+}
+
+std::string BuildSearchEventSummary(const std::string& json)
+{
+    std::ostringstream oss;
+    auto eventType = ExtractJsonStringField(json, "eventType");
+    oss << "eventType=" << eventType;
+    auto pageName = ExtractJsonStringField(json, "pageName");
+    oss << ",pageName=" << pageName;
+    if (eventType == "presence") {
+        oss << ",hasSearch=" << (ExtractJsonBoolField(json, "hasSearch") ? "true" : "false");
+    } else if (eventType == "click") {
+        oss << ",matchType=" << ExtractJsonStringField(json, "matchType");
+    }
+    auto rules = CollectSearchRulePairs(json);
+    if (!rules.empty()) {
+        oss << ",rules=" << rules;
+    }
+    return oss.str();
+}
+
+void AppendJsonEscaped(std::string& output, const std::string& value)
+{
+    constexpr char HEX_DIGITS[] = "0123456789abcdef";
+    for (const auto character : value) {
+        const auto byte = static_cast<uint8_t>(character);
+        if (character == '"' || character == '\\') {
+            output.push_back('\\');
+            output.push_back(character);
+        } else if (character == '\b') {
+            output += "\\b";
+        } else if (character == '\f') {
+            output += "\\f";
+        } else if (character == '\n') {
+            output += "\\n";
+        } else if (character == '\r') {
+            output += "\\r";
+        } else if (character == '\t') {
+            output += "\\t";
+        } else if (byte < 0x20) {
+            output += "\\u00";
+            output.push_back(HEX_DIGITS[byte >> NIBBLE_BITS]);
+            output.push_back(HEX_DIGITS[byte & LOW_NIBBLE_MASK]);
+        } else {
+            output.push_back(character);
+        }
+    }
+}
+
+std::string BuildBatchSetTextCommand(const std::vector<std::string>& params)
+{
+    std::string command = R"({"cmd":"batch","commands":{)";
+    for (size_t index = 1; index + 1 < params.size(); index += BATCH_ARGUMENT_PAIR_SIZE) {
+        if (index > 1) {
+            command.push_back(',');
+        }
+        command.push_back('"');
+        AppendJsonEscaped(command, params[index]);
+        command += R"(":{"cmd":"setText","params":{"value":")";
+        AppendJsonEscaped(command, params[index + 1]);
+        command += R"("}})";
+    }
+    command += "}}";
+    return command;
+}
 } // namespace
 
 const std::map<std::string, UiSaService::DumpHandler> UiSaService::DUMP_MAP = {
@@ -313,6 +530,7 @@ const std::map<std::string, UiSaService::DumpHandler> UiSaService::DUMP_MAP = {
     { "GetVisibleInspectorTree", &UiSaService::HandleGetVisibleInspectorTree },
     { "GetCurrentPageName", &UiSaService::HandleGetCurrentPageName },
     { "SendCommand", &UiSaService::HandleSendCommand },
+    { "SendBatchSetText", &UiSaService::HandleSendBatchSetText },
     { "SendCommandSync", &UiSaService::HandleSendCommandSync },
     { "RegisterContentChangeCallback", &UiSaService::HandleRegisterContentChangeCallback },
     { "UnregisterContentChangeCallback", &UiSaService::HandleUnregisterContentChangeCallback },
@@ -340,6 +558,8 @@ const std::map<std::string, UiSaService::DumpHandler> UiSaService::DUMP_MAP = {
     { "GetPageScene", &UiSaService::HandleGetPageScene },
     { "GetSpecifiedContentOffsets", &UiSaService::HandleGetSpecifiedContentOffsets },
     { "HighlightSpecifiedContent", &UiSaService::HandleHighlightSpecifiedContent },
+    { "GetNavigationContent", &UiSaService::HandleGetNavigationContent },
+    { "GetLazyForEachData", &UiSaService::HandleGetLazyForEachData },
 };
 
 UiSaService::UiSaService() : SystemAbility(UI_SA_ID, true) {}
@@ -406,6 +626,8 @@ sptr<Ace::IUiContentService> UiSaService::getArkUIService(int32_t windowId)
         LOGW("through uiSa, agent window dead, windowId:%{public}d", windowId);
         this->uiContentRemoteObjMap_.erase(windowId);
     });
+    // In this sample SA, tmpRemoteObj refers to the application-side UiContentStub.
+    // Listen for remote application death through this proxy and remove the local cached service.
     tmpRemoteObj->AddDeathRecipient(uiContentProxyRecipient);
     service = iface_cast<Ace::IUiContentService>(tmpRemoteObj);
     if (service == nullptr) {
@@ -512,11 +734,37 @@ void UiSaService::HandleSendCommand(sptr<IUiContentService> service, std::vector
     if (params.size() == SEND_COMMAND_WITH_NODEID) {
         int32_t id = std::atoi(params[1].c_str());
         std::string command = params[2];
+        // "file" is a reserved SendCommand keyword: command content is read from page_scene_rules.json.
+        if (command == "file") {
+            std::string commandFromFile = ReadPageSceneRuleJson();
+            if (commandFromFile.empty()) {
+                LOGW("[SendCommand] commandFromFile is empty");
+                return;
+            }
+            LOGI("[SendCommand] commandFromFile preview=%{private}s, length=%{public}zu",
+                commandFromFile.substr(0, SEND_COMMAND_LOG_PREVIEW_LENGTH).c_str(),
+                commandFromFile.length());
+            service->SendCommand(id, commandFromFile);
+            return;
+        }
         service->SendCommand(id, command);
     } else if (params.size() == SEND_COMMAND_WITHOUT_NODEID) {
         std::string command = params[1];
         service->SendCommand(command);
     }
+}
+
+void UiSaService::HandleSendBatchSetText(sptr<IUiContentService> service, std::vector<std::string> params)
+{
+    const auto itemCount = params.empty() ? 0 : (params.size() - 1) / BATCH_ARGUMENT_PAIR_SIZE;
+    if (params.size() < MIN_BATCH_SET_TEXT_PARAM_COUNT ||
+        (params.size() - 1) % BATCH_ARGUMENT_PAIR_SIZE != 0 || itemCount > MAX_BATCH_SET_TEXT_COUNT) {
+        LOGW("SendBatchSetText expects 1..50 nodeId/text pairs");
+        return;
+    }
+    auto command = BuildBatchSetTextCommand(params);
+    LOGI("SendBatchSetText itemCount=%{public}zu, commandLength=%{public}zu", itemCount, command.size());
+    service->SendCommand(command);
 }
 
 void UiSaService::HandleSendCommandSync(sptr<IUiContentService> service, std::vector<std::string> params)
@@ -532,8 +780,8 @@ void UiSaService::HandleRegisterContentChangeCallback(sptr<IUiContentService> se
 {
     bool toFile = params.back() == "-tofile";
     auto contentChangeCallback = [toFile](ChangeType type, const std::string& simpleTree) {
-        LOGI("[ContentChangeManager] callback type = %{public}d, tree: %{public}s", type,
-            simpleTree.substr(0, 200).c_str());
+        LOGI("[ContentChangeManager] callback type=%{public}s(%{public}d), tree: %{public}s",
+            GetContentChangeTypeName(type), static_cast<int32_t>(type), simpleTree.substr(0, 200).c_str());
         if (toFile && simpleTree.length()) {
             auto filePath = UI_SA_PATH + "arkui_simpleTree_" + GetCurrentTimestampStr() + ".json";
             std::unique_ptr<std::ofstream> ostream = std::make_unique<std::ofstream>(filePath);
@@ -666,13 +914,18 @@ void UiSaService::HandleGetWebInfoByRequest(sptr<IUiContentService> service, std
 void UiSaService::HandleRegisterComponentChangeEventCallback(
     sptr<IUiContentService> service, std::vector<std::string> params)
 {
+    bool toFile = HasToFileParam(params);
+    RemoveToFileParam(params);
     uint32_t mask = ParseComponentChangeEventMask(params);
-    auto finishCallback = [](std::string data) {
+    auto finishCallback = [toFile](std::string data) {
         LOGI("[ComponentChangeEvent] data = %{public}s", data.c_str());
+        if (toFile && !data.empty()) {
+            WriteTextFile("[ComponentChangeEvent]", "component_change_event", data);
+        }
     };
     service->RegisterComponentChangeEventCallback(finishCallback, mask);
-    LOGI("[ComponentChangeEvent] call RegisterComponentChangeEventCallback mask=%{public}s",
-        std::bitset<BITS_UINT32>(mask).to_string().c_str());
+    LOGI("[ComponentChangeEvent] call RegisterComponentChangeEventCallback mask=%{public}s, toFile=%{public}d",
+        std::bitset<BITS_UINT32>(mask).to_string().c_str(), toFile);
 }
 
 void UiSaService::HandleUnregisterComponentChangeEventCallback(
@@ -714,6 +967,35 @@ void UiSaService::HandleUnregisterSelectTextEventCallback(
     LOGI("[SelectTextEvent] call UnregisterSelectTextEventCallback");
 }
 
+static void RegisterDualRuleSets(sptr<IUiContentService> service, const std::string& ruleJson,
+    const PageSceneEventCallback& eventCallback, const DumpOption& dumpOption, bool toFile)
+{
+    std::string ruleJsonB;
+    auto filePathB = UI_SA_PATH + PAGE_SCENE_RULE_FILE_B;
+    if (!ReadTextFile(filePathB, ruleJsonB)) {
+        LOGW("[PageScene] dual ruleSet: read ruleSet-B failed, filePath=%{public}s", filePathB.c_str());
+        return;
+    }
+    int32_t resultA = FAILED;
+    int32_t resultB = FAILED;
+    for (int32_t index = 0; index < dumpOption.repeatCount; index++) {
+        resultA = service->RegisterPageSceneRules(ruleJson, eventCallback);
+        resultB = service->RegisterPageSceneRules(ruleJsonB, eventCallback);
+        LOGI("[PageScene] call RegisterPageSceneRules dual repeat=%{public}d/%{public}d, "
+             "ruleSet-A result=%{public}d, ruleSet-B result=%{public}d",
+            index + 1, dumpOption.repeatCount, resultA, resultB);
+    }
+    if (toFile) {
+        std::ostringstream resultJson;
+        resultJson << "{\"command\":\"RegisterPageSceneRules\",\"dual\":true," <<
+            "\"ruleSetA\":\"" << ExtractJsonStringField(ruleJson, "ruleSetId") <<
+            "\",\"ruleSetAResult\":" << resultA <<
+            ",\"ruleSetB\":\"" << ExtractJsonStringField(ruleJsonB, "ruleSetId") <<
+            "\",\"ruleSetBResult\":" << resultB << "}";
+        WriteTextFile("[PageSceneRegisterDual]", "page_scene_register_dual", resultJson.str());
+    }
+}
+
 void UiSaService::HandleRegisterPageSceneRules(sptr<IUiContentService> service, std::vector<std::string> params)
 {
     if (!EnsureConnected(service)) {
@@ -726,15 +1008,23 @@ void UiSaService::HandleRegisterPageSceneRules(sptr<IUiContentService> service, 
     std::string ruleJson = dumpOption.useEmptyId
                                ? ""
                                : (params.size() > PAGE_SCENE_RULE_PARAM_INDEX ? params[PAGE_SCENE_RULE_PARAM_INDEX]
-                                                                              : ReadPageSceneRuleJson());
+                                                                               : ReadPageSceneRuleJson());
     PageSceneEventCallback eventCallback = nullptr;
     if (!dumpOption.useNullCallback) {
         eventCallback = [toFile](const std::string& data) {
-            LOGI("[PageScene] event length=%{public}zu", data.length());
+            LOGI("[PageScene] event length=%{public}zu summary=%{public}s", data.length(),
+                BuildSearchEventSummary(data).c_str());
             if (toFile && !data.empty()) {
                 WriteTextFile("[PageSceneEvent]", "page_scene_event", data);
             }
         };
+    }
+    if (dumpOption.dualRuleSet) {
+        // Same SA registers two independent ruleSets (ruleSet-A + ruleSet-B),
+        // Both rule sets intentionally share the sample collector callback so the merged
+        // event stream can be inspected in one place.
+        RegisterDualRuleSets(service, ruleJson, eventCallback, dumpOption, toFile);
+        return;
     }
     for (int32_t index = 0; index < dumpOption.repeatCount; index++) {
         int32_t result = service->RegisterPageSceneRules(ruleJson, eventCallback);
@@ -785,7 +1075,8 @@ void UiSaService::HandleGetPageScene(sptr<IUiContentService> service, std::vecto
     PageSceneEventCallback eventCallback = nullptr;
     if (!dumpOption.useNullCallback) {
         eventCallback = [toFile](const std::string& data) {
-            LOGI("[PageScene] get result length=%{public}zu", data.length());
+            LOGI("[PageScene] get result length=%{public}zu summary=%{public}s", data.length(),
+                BuildSearchEventSummary(data).c_str());
             if (toFile && !data.empty()) {
                 WriteTextFile("[PageSceneGet]", "page_scene_get", data);
             }
@@ -952,6 +1243,80 @@ void UiSaService::HandleHighlightSpecifiedContent(
         service->HighlightSpecifiedContent(id, content, nodeIds, configs);
         LOGI("[HighlightSpecifiedContent] call HighlightSpecifiedContent id=%{public}d, content=%{public}s",
             id, content.c_str());
+    }
+}
+
+void UiSaService::HandleGetNavigationContent(
+    sptr<IUiContentService> service, std::vector<std::string> params)
+{
+    if (params.size() >= GET_NAVIGATION_CONTENT_PARAMS) {
+        errno = 0;
+        char* endPtr = nullptr;
+        float x = std::strtof(params[1].c_str(), &endPtr);
+        if (endPtr == params[1].c_str() || errno == ERANGE) {
+            LOGW("[GetNavigationContent] invalid x coordinate: %{public}s", params[1].c_str());
+            return;
+        }
+        float y = std::strtof(params[2].c_str(), &endPtr);
+        if (endPtr == params[2].c_str() || errno == ERANGE) {
+            LOGW("[GetNavigationContent] invalid y coordinate: %{public}s", params[2].c_str());
+            return;
+        }
+        std::string pattern = params[3];
+        bool toFile = params.size() > GET_NAVIGATION_CONTENT_PARAMS && params.back() == "-tofile";
+        auto navigationContentCallback = [toFile](const std::string& data) {
+            LOGI("[GetNavigationContent] data = %{public}s", data.substr(0, 200).c_str());
+            if (toFile) {
+                auto filePath = UI_SA_PATH + "navigation_content_" + GetCurrentTimestampStr() + ".json";
+                std::unique_ptr<std::ofstream> ostream = std::make_unique<std::ofstream>(filePath);
+                CHECK_NULL_VOID(ostream);
+                if (!ostream->is_open()) {
+                    LOGW("[GetNavigationContent] filePath is invalid");
+                    return;
+                }
+                ostream->write(data.c_str(), data.length());
+                LOGI("[GetNavigationContent] result is saved to %{public}s", filePath.c_str());
+            }
+        };
+        service->GetNavigationContentByPoint(x, y, pattern, navigationContentCallback);
+        LOGI("[GetNavigationContent] call GetNavigationContentByPoint x=%{public}f, y=%{public}f, pattern=%{public}s",
+            x, y, pattern.c_str());
+    }
+}
+
+void UiSaService::HandleGetLazyForEachData(
+    sptr<IUiContentService> service, std::vector<std::string> params)
+{
+    if (params.size() >= GET_LAZY_FOREACH_DATA_PARAMS) {
+        errno = 0;
+        char* endPtr = nullptr;
+        float x = std::strtof(params[1].c_str(), &endPtr);
+        if (endPtr == params[1].c_str() || errno == ERANGE || *endPtr != '\0') {
+            LOGW("[GetLazyForEachData] invalid x coordinate: %{public}s", params[1].c_str());
+            return;
+        }
+        float y = std::strtof(params[PARAM_TWO].c_str(), &endPtr);
+        if (endPtr == params[PARAM_TWO].c_str() || errno == ERANGE || *endPtr != '\0') {
+            LOGW("[GetLazyForEachData] invalid y coordinate: %{public}s", params[PARAM_TWO].c_str());
+            return;
+        }
+        bool toFile = params.size() > GET_LAZY_FOREACH_DATA_PARAMS && params.back() == "-tofile";
+        auto lazyForEachDataCallback = [toFile](const std::string& data) {
+            LOGI("[GetLazyForEachData] data = %{public}s", data.substr(0, 200).c_str());
+            if (toFile) {
+                auto filePath = UI_SA_PATH + "lazy_foreach_data_" + GetCurrentTimestampStr() + ".json";
+                std::unique_ptr<std::ofstream> ostream = std::make_unique<std::ofstream>(filePath);
+                CHECK_NULL_VOID(ostream);
+                if (!ostream->is_open()) {
+                    LOGW("[GetLazyForEachData] filePath is invalid");
+                    return;
+                }
+                ostream->write(data.c_str(), data.length());
+                LOGI("[GetLazyForEachData] result is saved to %{public}s", filePath.c_str());
+            }
+        };
+        service->GetLazyForEachDataByPoint(x, y, lazyForEachDataCallback);
+        LOGI("[GetLazyForEachData] call GetLazyForEachDataByPoint x=%{public}f, y=%{public}f", x, y);
     }
 }
 } // namespace OHOS::Ace

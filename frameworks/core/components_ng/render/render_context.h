@@ -388,6 +388,8 @@ public:
     void SetTransparencyCallbackId(const std::optional<int32_t>& id);
     std::optional<ImmersiveMaterialConfig> GetImmersiveMaterialConfig() const;
     std::optional<int32_t> GetTransparencyCallbackId() const;
+    void SetMaterialColorModeChangeCallback(std::function<void()>&& callback);
+    void OnMaterialColorModeChange();
     RefPtr<UiMaterial> GetSystemMaterial() const;
 
     virtual void OpacityAnimation(const AnimationOption& option, double begin, double end) {}
@@ -628,7 +630,19 @@ public:
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(BdImage, BorderImageGradient, Gradient);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(BdImage, BorderSourceFromImage, bool);
 
-    ACE_DEFINE_PROPERTY_ITEM_FUNC_WITHOUT_GROUP(BackgroundColor, Color);
+    ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP_GET(BackgroundColor, Color);
+public:
+    void UpdateBackgroundColor(const Color& value)
+    {
+        UpdatePreBackgroundColor(value);
+        if (propBackgroundColor_.has_value()) {
+            if (NearEqual(propBackgroundColor_.value(), value)) {
+                return;
+            }
+        }
+        propBackgroundColor_ = value;
+        OnBackgroundColorUpdate(value);
+    }
     ACE_DEFINE_PROPERTY_ITEM_FUNC_WITHOUT_GROUP(Opacity, double);
     ACE_DEFINE_PROPERTY_ITEM_FUNC_WITHOUT_GROUP(RenderGroup, bool);
     ACE_DEFINE_PROPERTY_ITEM_FUNC_WITHOUT_GROUP(ExcludeFromRenderGroup, bool);
@@ -665,7 +679,17 @@ public:
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Graphics, DynamicLightUpDegree, float);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Graphics, BgDynamicBrightnessOption, BrightnessOption);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Graphics, FgDynamicBrightnessOption, BrightnessOption);
-    ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Graphics, BackShadow, Shadow);
+    ACE_DEFINE_PROPERTY_ITEM_WITH_GROUP_GET(Graphics, BackShadow, Shadow);
+    void UpdateBackShadow(const Shadow& value)
+    {
+        UpdatePreBackShadow(value);
+        auto& groupProperty = GetOrCreateGraphics();
+        if (groupProperty->CheckBackShadow(value)) {
+            return;
+        }
+        groupProperty->UpdateBackShadow(value);
+        OnBackShadowUpdate(value);
+    }
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Graphics, BackBlendMode, BlendMode);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Graphics, BackBlendApplyType, BlendApplyType);
 
@@ -673,7 +697,17 @@ public:
     ACE_DEFINE_PROPERTY_GROUP(Border, BorderProperty);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Border, BorderRadius, BorderRadiusProperty);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Border, BorderWidth, BorderWidthProperty);
-    ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Border, BorderColor, BorderColorProperty);
+    ACE_DEFINE_PROPERTY_ITEM_WITH_GROUP_GET(Border, BorderColor, BorderColorProperty);
+    void UpdateBorderColor(const BorderColorProperty& value)
+    {
+        UpdatePreBorderColor(value);
+        auto& groupProperty = GetOrCreateBorder();
+        if (groupProperty->CheckBorderColor(value)) {
+            return;
+        }
+        groupProperty->UpdateBorderColor(value);
+        OnBorderColorUpdate(value);
+    }
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Border, BorderStyle, BorderStyleProperty);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Border, DashGap, BorderWidthProperty);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Border, DashWidth, BorderWidthProperty);
@@ -684,6 +718,40 @@ public:
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(MaterialPreParams, PreBorderColor, BorderColorProperty);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(MaterialPreParams, PreBackShadow, Shadow);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(MaterialPreParams, PreBackgroundColor, Color);
+
+    // MaterialBackgroundColor/MaterialBorderColor share the same property storage as
+    // BackgroundColor/BorderColor (propBackgroundColor_ / Border group's propBorderColor).
+    // The only difference from UpdateBackgroundColor/UpdateBorderColor is the OnXXUpdate
+    // callback they invoke, so the equality short-circuit stays consistent across both
+    // update paths.
+    void UpdateMaterialBackgroundColor(const Color& value)
+    {
+        if (propBackgroundColor_.has_value()) {
+            if (NearEqual(propBackgroundColor_.value(), value)) {
+                return;
+            }
+        }
+        propBackgroundColor_ = value;
+        OnBackgroundColorUpdate(value);
+    }
+    void UpdateMaterialBorderColor(const BorderColorProperty& value)
+    {
+        auto& groupProperty = GetOrCreateBorder();
+        if (groupProperty->CheckBorderColor(value)) {
+            return;
+        }
+        groupProperty->UpdateBorderColor(value);
+        OnBorderColorUpdate(value);
+    }
+    void UpdateMaterialBackShadow(const Shadow& value)
+    {
+        auto& groupProperty = GetOrCreateGraphics();
+        if (groupProperty->CheckBackShadow(value)) {
+            return;
+        }
+        groupProperty->UpdateBackShadow(value);
+        OnBackShadowUpdate(value);
+    }
 
     // Outer Border
     ACE_DEFINE_PROPERTY_GROUP(OuterBorder, OuterBorderProperty);

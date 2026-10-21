@@ -41,9 +41,8 @@ GridItemModelNG GridSyncLoadTestNg::CreateGridItemForSyncLoad(float width, float
     ViewAbstract::SetFocusable(true);
     RefPtr<UINode> element = ViewStackProcessor::GetInstance()->GetMainElementNode();
     auto frameNode = AceType::DynamicCast<FrameNode>(element);
-    frameNode->measureCallback_ = [](RefPtr<Kit::FrameNode>& node) {
-        NG::MockPipelineContext::GetCurrent()->DecResponseTime();
-    };
+    frameNode->measureCallback_ = std::make_unique<std::function<void(RefPtr<Kit::FrameNode>&)>>(
+        [](RefPtr<Kit::FrameNode>& node) { NG::MockPipelineContext::GetCurrent()->DecResponseTime(); });
     return itemModel;
 }
 
@@ -282,5 +281,30 @@ HWTEST_F(GridSyncLoadTestNg, ScrollToIndexAuto001, TestSize.Level1)
     EXPECT_EQ(pattern_->info_.endMainLineIndex_, 6);
     EXPECT_EQ(pattern_->info_.startIndex_, 9);
     EXPECT_EQ(pattern_->info_.endIndex_, 20);
+}
+
+/**
+ * @tc.name: SyncLoadScrollToIndexPartialLine001
+ * @tc.desc: WithOptions syncLoad(false) mid-line then scrollToIndex to the next item stays on that line.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridSyncLoadTestNg, SyncLoadScrollToIndexPartialLine001, TestSize.Level1)
+{
+    GridLayoutOptions options;
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr 1fr 1fr");
+    model.SetLayoutOptions(options);
+    model.SetSyncLoad(false);
+    model.SetCachedCount(0, false);
+    CreateGridItems(20);
+    MockPipelineContext::GetCurrent()->SetResponseTime(1);
+    CreateDone();
+    EXPECT_EQ(pattern_->info_.endIndex_, 0);
+    ASSERT_FALSE(pattern_->info_.gridMatrix_.empty());
+    EXPECT_EQ(static_cast<int32_t>(pattern_->info_.gridMatrix_.rbegin()->second.size()), 1);
+
+    ScrollToIndex(1, false, ScrollAlign::START);
+    EXPECT_EQ(pattern_->info_.startMainLineIndex_, 0);
+    EXPECT_EQ(pattern_->info_.startIndex_, 0);
 }
 } // namespace OHOS::Ace::NG

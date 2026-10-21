@@ -299,6 +299,7 @@ public:
     static void JsPadding(const JSCallbackInfo& info);
     static void JsMargin(const JSCallbackInfo& info);
     static void SetSafeAreaPadding(const JSCallbackInfo& info);
+    static void SetSafeAreaInset(const JSCallbackInfo& info);
     static void ParseMarginOrPadding(const JSCallbackInfo& info, EdgeType type);
     static void ParseMarginOrPaddingCorner(JSRef<JSObject> obj, std::optional<CalcDimension>& top,
         std::optional<CalcDimension>& bottom, std::optional<CalcDimension>& left, std::optional<CalcDimension>& right);
@@ -831,7 +832,9 @@ public:
                 return false;
             }
             JSRef<JSArray> params = JSRef<JSArray>::Cast(args);
+            CHECK_EQUAL_RETURN(params->Length(), 0, false);
             auto param = params->GetValueAt(0);
+            if (!param->IsString()) return false;
             if (resType == static_cast<int32_t>(ResourceType::INTEGER)) {
                 result = static_cast<T>(resourceAdapter->GetIntByName(param->ToString()));
                 return true;

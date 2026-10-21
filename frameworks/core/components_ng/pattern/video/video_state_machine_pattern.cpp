@@ -325,10 +325,10 @@ RectF AdjustPaintRect(float positionX, float positionY, float width, float heigh
     return rect;
 }
 
-void RegisterMediaPlayerEventImpl(const WeakPtr<VideoStateMachinePattern>& weak, const RefPtr<MediaPlayer>& mediaPlayer,
-    int32_t instanceId, const SingleTaskExecutor& uiTaskExecutor)
+PositionUpdatedEvent BuildPositionUpdatedEvent(const WeakPtr<VideoStateMachinePattern>& weak,
+    const SingleTaskExecutor& uiTaskExecutor, int32_t instanceId)
 {
-    auto&& positionUpdatedEvent = [weak, uiTaskExecutor, instanceId](uint32_t currentPos) {
+    return [weak, uiTaskExecutor, instanceId](uint32_t currentPos) {
         uiTaskExecutor.PostSyncTask([weak, currentPos, instanceId] {
             auto video = weak.Upgrade();
             CHECK_NULL_VOID(video);
@@ -339,8 +339,12 @@ void RegisterMediaPlayerEventImpl(const WeakPtr<VideoStateMachinePattern>& weak,
 #endif
             }, "ArkUIVideoCurrentTimeChange");
     };
+}
 
-    auto&& stateChangedEvent = [weak, uiTaskExecutor, instanceId](PlaybackStatus status) {
+StateChangedEvent BuildStateChangedEvent(const WeakPtr<VideoStateMachinePattern>& weak,
+    const SingleTaskExecutor& uiTaskExecutor, int32_t instanceId)
+{
+    return [weak, uiTaskExecutor, instanceId](PlaybackStatus status) {
         uiTaskExecutor.PostTask([weak, status, instanceId] {
             auto video = weak.Upgrade();
             CHECK_NULL_VOID(video);
@@ -348,8 +352,12 @@ void RegisterMediaPlayerEventImpl(const WeakPtr<VideoStateMachinePattern>& weak,
             video->OnPlayerStatus(status);
             }, "ArkUIVideoPlayerStatusChange");
     };
+}
 
-    auto&& errorEvent = [weak, uiTaskExecutor, instanceId]() {
+CommonEvent BuildErrorEvent(const WeakPtr<VideoStateMachinePattern>& weak,
+    const SingleTaskExecutor& uiTaskExecutor, int32_t instanceId)
+{
+    return [weak, uiTaskExecutor, instanceId]() {
         uiTaskExecutor.PostTask([weak, instanceId] {
             auto video = weak.Upgrade();
             CHECK_NULL_VOID(video);
@@ -357,8 +365,12 @@ void RegisterMediaPlayerEventImpl(const WeakPtr<VideoStateMachinePattern>& weak,
             video->OnError("");
             }, "ArkUIVideoError");
     };
+}
 
-    auto&& videoErrorEvent = [weak, uiTaskExecutor, instanceId](int32_t code, const std::string& message) {
+VideoErrorEvent BuildVideoErrorEvent(const WeakPtr<VideoStateMachinePattern>& weak,
+    const SingleTaskExecutor& uiTaskExecutor, int32_t instanceId)
+{
+    return [weak, uiTaskExecutor, instanceId](int32_t code, const std::string& message) {
         uiTaskExecutor.PostTask([weak, instanceId, code, message] {
             auto video = weak.Upgrade();
             CHECK_NULL_VOID(video);
@@ -366,8 +378,12 @@ void RegisterMediaPlayerEventImpl(const WeakPtr<VideoStateMachinePattern>& weak,
             video->OnError(code, message);
             }, "ArkUIVideoErrorWithParam");
     };
+}
 
-    auto&& resolutionChangeEvent = [weak, uiTaskExecutor, instanceId]() {
+CommonEvent BuildResolutionChangeEvent(const WeakPtr<VideoStateMachinePattern>& weak,
+    const SingleTaskExecutor& uiTaskExecutor, int32_t instanceId)
+{
+    return [weak, uiTaskExecutor, instanceId]() {
         uiTaskExecutor.PostSyncTask([weak, instanceId] {
             auto video = weak.Upgrade();
             CHECK_NULL_VOID(video);
@@ -375,8 +391,12 @@ void RegisterMediaPlayerEventImpl(const WeakPtr<VideoStateMachinePattern>& weak,
             video->OnResolutionChange();
             }, "ArkUIVideoResolutionChange");
     };
+}
 
-    auto&& startRenderFrameEvent = [weak, uiTaskExecutor, instanceId]() {
+CommonEvent BuildStartRenderFrameEvent(const WeakPtr<VideoStateMachinePattern>& weak,
+    const SingleTaskExecutor& uiTaskExecutor, int32_t instanceId)
+{
+    return [weak, uiTaskExecutor, instanceId]() {
         uiTaskExecutor.PostSyncTask([weak, instanceId] {
             auto video = weak.Upgrade();
             CHECK_NULL_VOID(video);
@@ -384,10 +404,33 @@ void RegisterMediaPlayerEventImpl(const WeakPtr<VideoStateMachinePattern>& weak,
             video->OnStartRenderFrameCb();
             }, "ArkUIVideoStartRenderFrame");
     };
+}
 
-    mediaPlayer->RegisterMediaPlayerEvent(
-        positionUpdatedEvent, stateChangedEvent, errorEvent, resolutionChangeEvent, startRenderFrameEvent);
-    mediaPlayer->RegisterMediaPlayerVideoErrorEvent(videoErrorEvent);
+SeekDoneEvent BuildSeekDoneEvent(const WeakPtr<VideoStateMachinePattern>& weak,
+    const SingleTaskExecutor& uiTaskExecutor, int32_t instanceId)
+{
+    return [weak, uiTaskExecutor, instanceId](uint32_t currentPos) {
+        uiTaskExecutor.PostSyncTask(
+            [&weak, currentPos, instanceId] {
+                auto video = weak.Upgrade();
+                CHECK_NULL_VOID(video);
+                ContainerScope scope(instanceId);
+                video->SetIsSeeking(false);
+                video->OnCurrentTimeChange(currentPos);
+            }, "ArkUIVideoSeekDone");
+    };
+}
+
+void RegisterMediaPlayerEventImpl(const WeakPtr<VideoStateMachinePattern>& weak,
+    const RefPtr<MediaPlayer>& mediaPlayer, int32_t instanceId, const SingleTaskExecutor& uiTaskExecutor)
+{
+    mediaPlayer->RegisterMediaPlayerEvent(BuildPositionUpdatedEvent(weak, uiTaskExecutor, instanceId),
+        BuildStateChangedEvent(weak, uiTaskExecutor, instanceId),
+        BuildErrorEvent(weak, uiTaskExecutor, instanceId),
+        BuildResolutionChangeEvent(weak, uiTaskExecutor, instanceId),
+        BuildStartRenderFrameEvent(weak, uiTaskExecutor, instanceId),
+        BuildVideoErrorEvent(weak, uiTaskExecutor, instanceId),
+        BuildSeekDoneEvent(weak, uiTaskExecutor, instanceId));
 }
 
 std::string StatusToString(PlaybackStatus status)
@@ -535,6 +578,14 @@ void VideoStateMachinePattern::ResetMediaPlayerOnBg(VideoControllerAsync::AsyncC
         auto currentPattern = stateMgr->GetCurrentPattern();
         CHECK_NULL_VOID(currentPattern);
         RegisterMediaPlayerEvent(WeakClaim(AceType::RawPtr(currentPattern)), mediaPlayer, videoSrc.src_, id);
+        // Move (not copy) the strong ref into a UI-queue task: a copied ref could be
+        // released when the UI task finishes before this bg task ends, making this bg
+        // local the last holder again. After std::move, this bg task never releases the
+        // pattern; the final release happens on the UI thread. Same idiom as
+        // lazy_for_each_node.cpp deferring node destruction via AddAfterLayoutTask.
+        uiTaskExecutor.PostTask(
+            [patternHolder = std::move(currentPattern)]() mutable { patternHolder = nullptr; },
+            "ArkUIVideoReleasePatternOnUI");
 
         if (!mediaPlayer->SetSource(videoSrc.src_, videoSrc.bundleName_, videoSrc.moduleName_)) {
             TAG_LOGE(AceLogTag::ACE_VIDEO, "Video[%{public}d] mediaPlayer SetSource failed", hostId);
@@ -712,8 +763,6 @@ void VideoStateMachinePattern::OnPreparedStateEntered()
                 TAG_LOGI(AceLogTag::ACE_VIDEO, "Video[%{public}d] Auto-trigger mediaPlayer play", hostId);
                 int32_t ret = mediaPlayer->Play();
 
-                auto stateMgr = stateMgrWeak.Upgrade();
-                CHECK_NULL_VOID(stateMgr);
                 if (ret != 0) {
                     TAG_LOGW(AceLogTag::ACE_VIDEO, "Video[%{public}d] Auto-play failed: ret=%{public}d", hostId, ret);
                     uiTaskExecutor.PostTask([stateMgrWeak]() {
@@ -853,18 +902,6 @@ void VideoStateMachinePattern::RegisterMediaPlayerEvent(const WeakPtr<VideoState
     CHECK_NULL_VOID(context);
     auto uiTaskExecutor = SingleTaskExecutor::Make(context->GetTaskExecutor(), TaskExecutor::TaskType::UI);
     RegisterMediaPlayerEventImpl(weak, mediaPlayer, instanceId, uiTaskExecutor);
-
-    auto&& seekDoneEvent = [weak, uiTaskExecutor, instanceId](uint32_t currentPos) {
-        uiTaskExecutor.PostSyncTask(
-            [&weak, currentPos, instanceId] {
-                auto video = weak.Upgrade();
-                CHECK_NULL_VOID(video);
-                ContainerScope scope(instanceId);
-                video->SetIsSeeking(false);
-                video->OnCurrentTimeChange(currentPos);
-            }, "ArkUIVideoSeekDone");
-    };
-    mediaPlayer->RegisterMediaPlayerSeekDoneEvent(std::move(seekDoneEvent));
 
 #ifdef RENDER_EXTRACT_SUPPORTED
     auto&& textureRefreshEvent = [weak, uiTaskExecutor](int32_t instanceId, int64_t textureId) {
@@ -1211,10 +1248,11 @@ void VideoStateMachinePattern::UpdateSpeed()
         auto context = host->GetContext();
         CHECK_NULL_VOID(context);
 
+        auto uiTaskExecutor = SingleTaskExecutor::Make(context->GetTaskExecutor(), TaskExecutor::TaskType::UI);
         PostSerialBgTask(
             [weak = WeakClaim(RawPtr(mediaPlayer_)),
             stateMgrWeak = WeakClaim(RawPtr(stateManager_)),
-            progress = progressRate_] {
+            progress = progressRate_, hostId = hostId_, uiTaskExecutor] {
             auto mediaPlayer = weak.Upgrade();
             CHECK_NULL_VOID(mediaPlayer);
             int32_t errorCode = 0;
@@ -1223,64 +1261,69 @@ void VideoStateMachinePattern::UpdateSpeed()
             if (LessNotEqual(progress, SPEED_0_125_X) || GreatNotEqual(progress, SPEED_8_00_X)) {
                 SendStatisticEvent(StatisticEventType::VIDEO_EXCEED_PROGRESS_RATE);
             }
+            // Rate fallback stays on the serial bg queue and uses the captured media player;
+            // pattern members must not be touched off the UI thread.
+            HandleSetPlaybackRateResult(mediaPlayer, hostId, progress, errorCode, errorMsg);
 
-            // Report via the currently active pattern; the posting pattern may already be
-            // destroyed after a fullscreen transition.
-            auto stateMgr = stateMgrWeak.Upgrade();
-            CHECK_NULL_VOID(stateMgr);
-            auto pattern = stateMgr->GetCurrentPattern();
-            CHECK_NULL_VOID(pattern);
-            pattern->HandleSetPlaybackRateResult(progress, errorCode, errorMsg);
-            double lastSpeed = pattern->GetLastProgressRate();
-            double lastSetSpeed = pattern->GetLastSetProgressRate();
+            // Pattern members (inject flag, progress rates, playback status/position) are
+            // UI-thread owned; resolve the currently active pattern and report on UI thread.
+            uiTaskExecutor.PostTask([stateMgrWeak, progress, ret] {
+                auto stateMgr = stateMgrWeak.Upgrade();
+                CHECK_NULL_VOID(stateMgr);
+                auto pattern = stateMgr->GetCurrentPattern();
+                CHECK_NULL_VOID(pattern);
+                double lastSpeed = pattern->GetLastProgressRate();
+                double lastSetSpeed = pattern->GetLastSetProgressRate();
 
-            if (pattern->GetsIsProgressInjectCmd()) {
-                pattern->SetIsProgressInjectCmd(false);
-                pattern->ReportCommandResultOnUIThread(
-                    "setVideoPlaybackSpeed",
-                    ret == 0 ? "success" : "fail",
-                    ret == 0 ? "" : "SetSpeed operation execution failed");
-            }
+                if (pattern->GetsIsProgressInjectCmd()) {
+                    pattern->SetIsProgressInjectCmd(false);
+                    pattern->ReportCommandResult(
+                        "setVideoPlaybackSpeed",
+                        ret == 0 ? "success" : "fail",
+                        ret == 0 ? "" : "SetSpeed operation execution failed");
+                }
 
-            auto reportProgressRate = lastSpeed;
-            if (ret == 0 || (ret != 0 && lastSpeed == 0)) {
-                reportProgressRate = progress;
-                pattern->SetLastProgressRate(progress);
-            }
-            if (NearEqual(lastSetSpeed, progress)) {
-                return;
-            }
-            pattern->SetLastSetProgressRate(progress);
-            pattern->ReportChangeEventOnUIThread(
-                pattern->GetCurrentPlaybackStatus(), reportProgressRate, pattern->GetCurrentPos());
+                auto reportProgressRate = lastSpeed;
+                if (ret == 0 || (ret != 0 && lastSpeed == 0)) {
+                    reportProgressRate = progress;
+                    pattern->SetLastProgressRate(progress);
+                }
+                if (NearEqual(lastSetSpeed, progress)) {
+                    return;
+                }
+                pattern->SetLastSetProgressRate(progress);
+                pattern->ReportChangeEvent(
+                    pattern->GetCurrentPlaybackStatus(), reportProgressRate, pattern->GetCurrentPos());
+                }, "ArkUIVideoUpdateSpeedResult");
             }, "ArkUIVideoUpdateSpeed");
     }
 }
 
-void VideoStateMachinePattern::HandleSetPlaybackRateResult(double progress, int32_t errorCode, std::string& errorMsg)
+void VideoStateMachinePattern::HandleSetPlaybackRateResult(
+    const RefPtr<MediaPlayer>& mediaPlayer, int32_t hostId, double progress, int32_t errorCode, std::string& errorMsg)
 {
     int32_t newCode = 0;
     std::string newMsg = "";
     switch (static_cast<PlayBackRate>(errorCode)) {
         case PlayBackRate::SUCCESS:
             TAG_LOGD(
-                AceLogTag::ACE_VIDEO, "Video[%{public}d] currentProgressRate is set as %{public}f", hostId_, progress);
+                AceLogTag::ACE_VIDEO, "Video[%{public}d] currentProgressRate is set as %{public}f", hostId, progress);
             break;
         case PlayBackRate::MSERR_INVALID_VAL:
-            CHECK_NULL_VOID(mediaPlayer_);
-            mediaPlayer_->SetPlaybackRate(DEFAULT_PROGRESS_RATE, newCode, newMsg);
+            CHECK_NULL_VOID(mediaPlayer);
+            mediaPlayer->SetPlaybackRate(DEFAULT_PROGRESS_RATE, newCode, newMsg);
             errorMsg.append("The parameter check failed, parameter value out of range.");
             TAG_LOGW(AceLogTag::ACE_VIDEO,
                 "Video[%{public}d] Failed to set currentProgressRate %{public}f, code is %{public}d, message is "
                 "%{public}s",
-                hostId_, progress, errorCode, errorMsg.c_str());
+                hostId, progress, errorCode, errorMsg.c_str());
             break;
         case PlayBackRate::MSERR_INVALID_OPERATION:
             break;
         default:
-            CHECK_NULL_VOID(mediaPlayer_);
-            mediaPlayer_->SetPlaybackRate(DEFAULT_PROGRESS_RATE, newCode, newMsg);
-            TAG_LOGW(AceLogTag::ACE_VIDEO, "Video[%{public}d] Failed to set currentProgressRate %{public}f", hostId_,
+            CHECK_NULL_VOID(mediaPlayer);
+            mediaPlayer->SetPlaybackRate(DEFAULT_PROGRESS_RATE, newCode, newMsg);
+            TAG_LOGW(AceLogTag::ACE_VIDEO, "Video[%{public}d] Failed to set currentProgressRate %{public}f", hostId,
                 progress);
             break;
     }
@@ -2195,9 +2238,6 @@ void VideoStateMachinePattern::Start(VideoControllerAsync::AsyncCommandCallback 
             TAG_LOGI(AceLogTag::ACE_VIDEO, "Video[%{public}d] trigger mediaPlayer play", hostId);
             int32_t ret = mediaPlayer->Play();
 
-            auto stateMgr = stateMgrWeak.Upgrade();
-            CHECK_NULL_VOID(stateMgr);
-
             if (ret != 0) {
                 TAG_LOGW(AceLogTag::ACE_VIDEO, "Video[%{public}d] Media player Play() failed: ret=%{public}d", hostId, ret);
                 uiTaskExecutor.PostTask([stateMgrWeak]() {
@@ -2209,22 +2249,26 @@ void VideoStateMachinePattern::Start(VideoControllerAsync::AsyncCommandCallback 
                 return;
             }
 
-            // Report via the currently active pattern; the posting pattern may already be
-            // destroyed after a fullscreen transition.
-            auto pattern = stateMgr->GetCurrentPattern();
-            CHECK_NULL_VOID(pattern);
-            auto currentStatus = pattern->GetCurrentPlaybackStatus();
-            if (pattern->currentInjectedStatusCmd_ == "play") {
-                pattern->currentInjectedStatusCmd_.clear();
-                pattern->ReportCommandResultOnUIThread(
-                    "setVideoPlayerStatusPlay",
-                    "success",
-                    "");
-            }
-            if (currentStatus != PlaybackStatus::STARTED) {
-                pattern->ReportChangeEventOnUIThread(
-                    currentStatus, pattern->GetLastProgressRate(), pattern->GetCurrentPos());
-            }
+            // Report via the currently active pattern on the UI thread; pattern members
+            // (currentInjectedStatusCmd_, playback status/position) are UI-thread owned.
+            uiTaskExecutor.PostTask([stateMgrWeak] {
+                auto stateMgr = stateMgrWeak.Upgrade();
+                CHECK_NULL_VOID(stateMgr);
+                auto pattern = stateMgr->GetCurrentPattern();
+                CHECK_NULL_VOID(pattern);
+                auto currentStatus = pattern->GetCurrentPlaybackStatus();
+                if (pattern->currentInjectedStatusCmd_ == "play") {
+                    pattern->currentInjectedStatusCmd_.clear();
+                    pattern->ReportCommandResult(
+                        "setVideoPlayerStatusPlay",
+                        "success",
+                        "");
+                }
+                if (currentStatus != PlaybackStatus::STARTED) {
+                    pattern->ReportChangeEvent(
+                        currentStatus, pattern->GetLastProgressRate(), pattern->GetCurrentPos());
+                }
+                }, "ArkUIVideoPlayResult");
         }, "ArkUIVideoPlay");
     TAG_LOGI(AceLogTag::ACE_VIDEO, "Video[%{public}d] Start() exit: async play task posted", hostId_);
 }
@@ -2277,9 +2321,6 @@ void VideoStateMachinePattern::Pause(VideoControllerAsync::AsyncCommandCallback 
             TAG_LOGI(AceLogTag::ACE_VIDEO, "Video[%{public}d] trigger mediaPlayer pause on bg thread", hostId);
             int32_t ret = mediaPlayer->Pause();
 
-            auto stateMgr = stateMgrWeak.Upgrade();
-            CHECK_NULL_VOID(stateMgr);
-
             if (ret != 0) {
                 TAG_LOGW(AceLogTag::ACE_VIDEO, "Video[%{public}d] Media player Pause() failed: ret=%{public}d", hostId, ret);
                 uiTaskExecutor.PostTask([stateMgrWeak]() {
@@ -2291,22 +2332,26 @@ void VideoStateMachinePattern::Pause(VideoControllerAsync::AsyncCommandCallback 
                 return;
             }
 
-            // Report via the currently active pattern; the posting pattern may already be
-            // destroyed after a fullscreen transition.
-            auto pattern = stateMgr->GetCurrentPattern();
-            CHECK_NULL_VOID(pattern);
-            auto currentStatus = pattern->GetCurrentPlaybackStatus();
-            if (pattern->currentInjectedStatusCmd_ == "pause") {
-                pattern->currentInjectedStatusCmd_.clear();
-                pattern->ReportCommandResultOnUIThread(
-                    "setVideoPlayerStatusPaused",
-                    "success",
-                    "");
-            }
-            if (currentStatus != PlaybackStatus::PAUSED) {
-                pattern->ReportChangeEventOnUIThread(
-                    currentStatus, pattern->GetLastProgressRate(), pattern->GetCurrentPos());
-            }
+            // Report via the currently active pattern on the UI thread; pattern members
+            // (currentInjectedStatusCmd_, playback status/position) are UI-thread owned.
+            uiTaskExecutor.PostTask([stateMgrWeak] {
+                auto stateMgr = stateMgrWeak.Upgrade();
+                CHECK_NULL_VOID(stateMgr);
+                auto pattern = stateMgr->GetCurrentPattern();
+                CHECK_NULL_VOID(pattern);
+                auto currentStatus = pattern->GetCurrentPlaybackStatus();
+                if (pattern->currentInjectedStatusCmd_ == "pause") {
+                    pattern->currentInjectedStatusCmd_.clear();
+                    pattern->ReportCommandResult(
+                        "setVideoPlayerStatusPaused",
+                        "success",
+                        "");
+                }
+                if (currentStatus != PlaybackStatus::PAUSED) {
+                    pattern->ReportChangeEvent(
+                        currentStatus, pattern->GetLastProgressRate(), pattern->GetCurrentPos());
+                }
+                }, "ArkUIVideoPauseResult");
         }, "ArkUIVideoPause");
     TAG_LOGI(AceLogTag::ACE_VIDEO, "Video[%{public}d] Pause() exit, %{public}s",
         hostId_, stateManager_->GetStateInfo().c_str());
@@ -2360,9 +2405,6 @@ void VideoStateMachinePattern::Stop(VideoControllerAsync::AsyncCommandCallback c
             TAG_LOGI(AceLogTag::ACE_VIDEO, "Video[%{public}d] trigger mediaPlayer stop on bg thread", hostId);
             int32_t ret = mediaPlayer->Stop();
 
-            auto stateMgr = stateMgrWeak.Upgrade();
-            CHECK_NULL_VOID(stateMgr);
-
             if (ret != 0) {
                 TAG_LOGW(AceLogTag::ACE_VIDEO, "Video[%{public}d] Media player Stop() failed: ret=%{public}d", hostId, ret);
                 uiTaskExecutor.PostTask([stateMgrWeak]() {
@@ -2374,11 +2416,15 @@ void VideoStateMachinePattern::Stop(VideoControllerAsync::AsyncCommandCallback c
                 return;
             }
 
-            // Update the currently active pattern; the posting pattern may already be
-            // destroyed after a fullscreen transition.
-            auto pattern = stateMgr->GetCurrentPattern();
-            CHECK_NULL_VOID(pattern);
-            pattern->SetIsSeeking(false);
+            // Update the currently active pattern on the UI thread; isSeeking_ is UI-thread
+            // owned (read in OnUpdateTime, written by slider drag and seek-done callback).
+            uiTaskExecutor.PostTask([stateMgrWeak] {
+                auto stateMgr = stateMgrWeak.Upgrade();
+                CHECK_NULL_VOID(stateMgr);
+                auto pattern = stateMgr->GetCurrentPattern();
+                CHECK_NULL_VOID(pattern);
+                pattern->SetIsSeeking(false);
+                }, "ArkUIVideoStopResult");
         }, "ArkUIVideoStop");
     TAG_LOGI(AceLogTag::ACE_VIDEO, "Video[%{public}d] Stop() exit, waiting for STOPPED callback", hostId_);
 }

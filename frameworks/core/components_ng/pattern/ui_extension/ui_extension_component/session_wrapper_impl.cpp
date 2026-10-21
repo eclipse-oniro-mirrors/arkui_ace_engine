@@ -22,6 +22,7 @@
 #include "extension/extension_business_info.h"
 #include "int_wrapper.h"
 #include "interfaces/include/ws_common.h"
+#include "interfaces/inner_api/ace/modal_ui_extension_config.h"
 #include "parameters.h"
 #include "refbase.h"
 #include "session_manager/include/extension_session_manager.h"
@@ -40,6 +41,7 @@
 #include "core/common/container.h"
 #include "core/common/container_scope.h"
 #include "core/components_ng/pattern/ui_extension/platform_container_handler.h"
+#include "core/components_ng/pattern/ui_extension/ui_extension_utils.h"
 #include "core/components_ng/pattern/ui_extension/session_wrapper.h"
 #include "core/components_ng/pattern/ui_extension/ui_extension_container_handler.h"
 #include "core/components_ng/pattern/window_scene/helper/window_scene_helper.h"
@@ -171,16 +173,30 @@ void SessionWrapperImpl::InitForegroundCallback()
     CHECK_NULL_VOID(taskExecutor_);
     int32_t callSessionId = GetSessionId();
     foregroundCallback_ = [weakTaskExecutor = WeakClaim(RawPtr(taskExecutor_)),
-        weak = hostPattern_, callSessionId] (OHOS::Rosen::WSError errcode) {
-            if (errcode == OHOS::Rosen::WSError::WS_OK) {
-                return;
-            }
-
+        weak = hostPattern_, callSessionId] (OHOS::Rosen::WSError errcode, int32_t abilityCode) {
             auto taskExecutor = weakTaskExecutor.Upgrade();
             if (taskExecutor == nullptr) {
                 TAG_LOGW(AceLogTag::ACE_UIEXTENSIONCOMPONENT,
                     "InitForegroundCallback: taskExecutor is nullptr");
                     return;
+            }
+
+            taskExecutor->PostTask(
+                [weak, abilityCode, callSessionId] {
+                    auto pattern = weak.Upgrade();
+                    CHECK_NULL_VOID(pattern);
+                    if (callSessionId != pattern->GetSessionId()) {
+                        TAG_LOGW(AceLogTag::ACE_UIEXTENSIONCOMPONENT,
+                            "foregroundCallback_: The callSessionId(%{public}d)"
+                                " is inconsistent with the curSession(%{public}d)",
+                            callSessionId, pattern->GetSessionId());
+                            return;
+                    }
+                    pattern->FireOnAbilityErrorCodeCallback(UIExtensionOperationPhase::FOREGROUND, abilityCode);
+                }, TaskExecutor::TaskType::UI, "ArkUIUIExtensionAbilityErrorCode");
+
+            if (errcode == OHOS::Rosen::WSError::WS_OK) {
+                return;
             }
 
             taskExecutor->PostTask(
@@ -641,7 +657,7 @@ void SessionWrapperImpl::UpdateInstanceId(int32_t instanceId)
 Rosen::SessionViewportConfig ConvertToRosenSessionViewportConfig(const SessionViewportConfig& config)
 {
     Rosen::SessionViewportConfig config_ = {
-        .isDensityFollowHost_ = config.isDensityFollowHost_,
+        .dpiFollowStrategy_ = ConvertToRosenDpiFollowStrategy(config.dpiFollowStrategy_),
         .density_ = config.density_,
         .displayId_ = config.displayId_,
         .orientation_ = config.orientation_,
@@ -707,12 +723,16 @@ void SessionWrapperImpl::CreateSession(const AAFwk::Want& want, const SessionCon
     auto pattern = hostPattern_.Upgrade();
     CHECK_NULL_VOID(pattern);
     SessionViewportConfig sessionViewportConfig;
-    sessionViewportConfig.isDensityFollowHost_ = pattern->GetDensityDpi();
+    sessionViewportConfig.dpiFollowStrategy_ = pattern->GetEffectiveDpiFollowStrategy();
     sessionViewportConfig.density_ = context->GetCurrentDensity();
     sessionViewportConfig.displayId_ = container->GetCurrentDisplayId();
     sessionViewportConfig.orientation_ = static_cast<int32_t>(SystemProperties::GetDeviceOrientation());
     sessionViewportConfig.transform_ = context->GetTransformHint();
     pattern->SetSessionViewportConfig(sessionViewportConfig);
+    UIEXT_LOGI("SessionViewportConfig compose: uiExtensionDpiFollowHost=%{public}d, "
+               "dpiFollowStrategy=%{public}d, componentId=%{public}d.",
+        static_cast<int32_t>(context->GetUIExtensionDensityFollowHost()),
+        static_cast<int32_t>(sessionViewportConfig.dpiFollowStrategy_), GetFrameNodeId());
     Rosen::SessionInfo extensionSessionInfo;
     extensionSessionInfo.bundleName_ = want.GetElement().GetBundleName();
     extensionSessionInfo.abilityName_ = want.GetElement().GetAbilityName();
@@ -1512,10 +1532,11 @@ void SessionWrapperImpl::UpdateSessionViewportConfig()
     auto pattern = hostPattern_.Upgrade();
     CHECK_NULL_VOID(pattern);
     auto config = pattern->GetSessionViewportConfig();
-    UIEXT_LOGI("SessionViewportConfig: isDensityFollowHost=%{public}d, density=%{public}f, "
-        "displayId=%{public}" PRIu64", orientation=%{public}d, transform=%{public}d, componentId=%{public}d.",
-        config.isDensityFollowHost_, config.density_, config.displayId_, config.orientation_, config.transform_,
-        GetFrameNodeId());
+    UIEXT_LOGI("SessionViewportConfig: dpiFollowStrategy=%{public}d, "
+               "density=%{public}f, displayId=%{public}" PRIu64 ", orientation=%{public}d, transform=%{public}d, "
+               "componentId=%{public}d.",
+        static_cast<int32_t>(config.dpiFollowStrategy_), config.density_, config.displayId_, config.orientation_,
+        config.transform_, GetFrameNodeId());
     session_->UpdateSessionViewportConfig(ConvertToRosenSessionViewportConfig(config));
 }
 

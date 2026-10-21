@@ -130,6 +130,7 @@ protected:
     std::string blankWindowName_ = "BlankWindow";
     const std::string newAppWindowName_ = "NewAppWindow";
     bool attachToFrameNodeFlag_ = false;
+    bool needReplaceBlankWithStarting_ = false;
     bool isBlankForSnapshot_ = false;
     bool isScaledSnapshot_ = false;
     bool syncStartingWindow_ = false;
@@ -146,6 +147,7 @@ private:
     void UpdateStartingWindowProperty(const Rosen::SessionInfo& sessionInfo,
         Color &color, ImageSourceInfo &sourceInfo);
     bool IsSnapshotSizeChanged();
+    bool CheckAndHandleStartWithSnapshot();
     bool CheckAndHandleRestartApp();
     bool CheckAndAddStartingWindowAboveLocked();
     bool CheckAndAddStartingWindowForPrelaunch();

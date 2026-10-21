@@ -21,7 +21,7 @@
 
 namespace OHOS::Ace {
 
-class ACE_FORCE_EXPORT BackgroundTaskHelper : public virtual AceType {
+class ACE_FORCE_EXPORT BackgroundTaskHelper : public AceType {
     DECLARE_ACE_TYPE(BackgroundTaskHelper, AceType);
 public:
     static BackgroundTaskHelper& GetInstance();

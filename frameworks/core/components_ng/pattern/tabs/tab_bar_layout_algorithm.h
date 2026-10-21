@@ -21,9 +21,11 @@
 
 #include "base/geometry/axis.h"
 #include "base/memory/referenced.h"
+#include "core/components/tab_bar/tab_theme.h"
 #include "core/components_ng/layout/layout_algorithm.h"
 #include "core/components_ng/layout/layout_wrapper.h"
 #include "core/components_ng/pattern/tabs/tab_bar_layout_property.h"
+#include "core/components_ng/pattern/tabs/tab_content_model.h"
 #include "core/components_ng/pattern/tabs/tabs_declaration.h"
 
 namespace OHOS::Ace::NG {
@@ -99,6 +101,11 @@ public:
         isFloatingBar_ = isFloatingBar;
     }
 
+    void SetIsFloatingTopBar(bool isFloatingTopBar)
+    {
+        isFloatingTopBar_ = isFloatingTopBar;
+    }
+
     float GetBarGridMargin()
     {
         return barGridMargin_;
@@ -147,6 +154,11 @@ private:
     void MeasureSubTabBarImageIndicator(LayoutWrapper* layoutWrapper) const;
     void LayoutSubTabBarImageIndicator(LayoutWrapper* layoutWrapper) const;
     void UpdateEffectiveChildIndices(LayoutWrapper* layoutWrapper);
+    void SyncBadgeContentChildLayout(const RefPtr<FrameNode>& childNode, bool isVertical,
+        const RefPtr<TabTheme>& tabTheme, const BottomTabBarStyle& bottomTabBarStyle);
+    void ResetBottomTabItemMargin(const RefPtr<FrameNode>& columnFrameNode);
+    void ResetIconMargin(const RefPtr<FrameNode>& iconFrameNode);
+    void ResetScrollableMarqueeOverflow(const RefPtr<FrameNode>& columnFrameNode);
 
     bool isRTL_ = false;
     Axis axis_ = Axis::NONE;
@@ -172,6 +184,7 @@ private:
     bool useItemWidth_ = true;
     bool canOverScroll_ = false;
     bool isFloatingBar_ = false;
+    bool isFloatingTopBar_ = false;
     std::vector<int32_t> effectiveChildIndices_;
     std::unordered_set<int32_t> effectiveChildIndexSet_;
     Dimension leftAndRightMargin_ = 0.0_vp;

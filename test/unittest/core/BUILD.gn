@@ -49,6 +49,7 @@ group("core_unittest") {
       "common/resource:resource_manager_test",
       "common/resource:resource_parse_utils_test_ng",
       "manager:avoid_info_manager_test_ng",
+      "manager:component_tree_query_test_ng",
       "interfaces:interfaces_test",
       "manager:navigation_manager_test_ng",
       "manager:theme_manager_test_ng",

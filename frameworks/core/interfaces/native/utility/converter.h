@@ -40,7 +40,7 @@
 #include "core/components/web/web_property.h" // Unscoped enum types
 #include "core/common/ime/text_range.h"
 #include "core/components/common/properties/text_style.h"
-#include "core/components_ng/pattern/list/list_item_group_pattern.h" // Unscoped enum types
+#include "core/components_ng/pattern/list/list_properties.h" // Unscoped enum types
 #include "core/components_ng/pattern/slider/slider_model.h" // Inner types
 #include "core/components_ng/pattern/tabs/tab_content_model.h"
 #include "core/components_ng/pattern/text/text_styles.h"
@@ -85,7 +85,9 @@ enum class LineJoinStyle;
 enum class MenuPolicy;
 enum class NavigationType;
 enum class ParticleDisturbanceShapeType : uint32_t;
+enum class ScrollAlign;
 enum class TabBarDisplayMode;
+enum class SidebarDisplayStyle;
 enum class TabsCacheMode;
 enum class TextDeleteDirection;
 enum class TextInputAction;
@@ -97,6 +99,7 @@ class PickerDate;
 class PickerTime;
 struct DateTimeType;
 struct Font;
+struct ListItemGroupIndex;
 struct PickerIndicatorStyle;
 struct PreviewText;
 struct SelectionOptions;
@@ -1074,6 +1077,8 @@ namespace Converter {
     template<> ACE_FORCE_EXPORT void AssignCast(std::optional<TabBarMode>& dst, const Ark_BarMode& src);
     template<>
     ACE_FORCE_EXPORT void AssignCast(std::optional<TabBarDisplayMode>& dst, const Ark_TabBarDisplayMode& src);
+    template<>
+    ACE_FORCE_EXPORT void AssignCast(std::optional<SidebarDisplayStyle>& dst, const Ark_TabsSidebarDisplayStyle& src);
     template<> void AssignCast(std::optional<TabsCacheMode>& dst, const Ark_TabsCacheMode& src);
     template<> ACE_FORCE_EXPORT void AssignCast(std::optional<TextAlign>& dst, const Ark_TextAlign& src);
     template<> void AssignCast(std::optional<TextVerticalAlign>& dst, const Ark_TextVerticalAlign& src);
@@ -1159,6 +1164,13 @@ namespace Converter {
     template<> void AssignCast(std::optional<ImmersiveOptions>& dst, const Ark_ImmersiveOptionsInner& src);
     template<> void AssignCast(std::optional<BlurSnapshotOptions>& dst, const Ark_BlurSnapshotOptions& src);
     template<> void AssignCast(std::optional<LightEffectOptions>& dst, const Ark_LightEffectOptionsInner& src);
+#ifndef WINDOWS_PLATFORM
+#if defined(ARKUI_CAPI_UNITTEST) || defined(LINUX_PLATFORM) || defined(MAC_PLATFORM) || defined(CROSS_PLATFORM)
+    template<> void AssignCast(std::optional<WebContextMenuItemId>& dst, const WebContextMenuItemId& src);
+#else
+    template<> void AssignCast(std::optional<WebContextMenuItemId>& dst, const Ark_WebContextMenuItemId& src);
+#endif
+#endif
     // DO NOT ADD NEW DECLARATIONS HERE!!! Add in alphabetic order above!
 
     template<typename From>

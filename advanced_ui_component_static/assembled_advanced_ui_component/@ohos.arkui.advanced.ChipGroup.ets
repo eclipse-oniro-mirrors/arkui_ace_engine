@@ -480,7 +480,7 @@ export interface ChipItemsBuilderOptions {
 
 @Component
 export struct ChipGroup {
-  @PropRef @Watch('onItemsChange') items: ChipGroupItemOptions[] = new Array<ChipGroupItemOptions>();
+  @PropRef @Watch('onItemsChangeInternal') items: ChipGroupItemOptions[] = new Array<ChipGroupItemOptions>();
   @PropRef @Watch('itemStyleOnChange') itemStyle?: ChipItemStyle = getChipItemStyle(defaultTheme.itemStyle);
   @Provide chipSize: ChipSize | SizeOptions = defaultTheme.itemStyle.size;
   @PropRef selectedIndexes?: Array<int> = [0];
@@ -490,12 +490,17 @@ export struct ChipGroup {
   @PropRef selectedBackgroundSystemMaterial?: uiMaterial.Material = undefined;
   @BuilderParam suffix?: ChipGroupSuffixBuilder;
   public onChange: InnerCallback<Array<int>> = noop;
+  public onItemsChange?: InnerCallback<ChipGroupItemOptions[]> = undefined;
   private scroller: Scroller = new Scroller();
   @State isReachEnd: boolean = false;
   @PropRef chipGroupPadding?: ChipGroupPaddingOptions = defaultTheme.chipGroupPadding;
   @State refreshCnt: int = 0;
+  private closedIndexes: Array<int> = [];
 
-  onItemsChange(value: string): void {
+  onItemsChangeInternal(value: string): void {
+    if (this.closedIndexes.length > 0) {
+      this.closedIndexes = [];
+    }
     this.refreshCnt++;
   }
 
@@ -667,6 +672,14 @@ export struct ChipGroup {
     return this.onChange ?? noop;
   }
 
+  private onItemClose(index: int): void {
+    if (!this.onItemsChange || this.closedIndexes.includes(index)) {
+      return;
+    }
+    this.closedIndexes.push(index);
+    this.onItemsChange?.(this.items.filter((_, i) => !this.closedIndexes.includes(i)));
+  }
+
   private isSelected(itemIndex: int): boolean {
     if (!this.isMultiple() && this.getSelectedIndexes().length > 0) {
       return itemIndex == this.getSelectedIndexes()[0];
@@ -788,6 +801,11 @@ export struct ChipGroup {
                 this.selectedIndexes!.push(index);
               }
               this.getOnChange()(this.getSelectedIndexes());
+            },
+            onClose: () => {
+              if (this.onItemsChange) {
+                this.onItemClose(index)
+              }
             }
           } as ChipOptions)
         }

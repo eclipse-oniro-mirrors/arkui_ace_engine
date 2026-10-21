@@ -369,6 +369,14 @@ let PixelRoundMode;
   PixelRoundMode[PixelRoundMode.PIXEL_ROUND_AFTER_MEASURE = 1] = 'PIXEL_ROUND_AFTER_MEASURE';
 })(PixelRoundMode || (PixelRoundMode = {}));
 
+let ImmersiveStrategy;
+(function (ImmersiveStrategy) {
+  ImmersiveStrategy[ImmersiveStrategy.AVOID_CUTOUT = 0] = 'AVOID_CUTOUT';
+  ImmersiveStrategy[ImmersiveStrategy.AVOID_FLOAT_NAV = 1] = 'AVOID_FLOAT_NAV';
+  ImmersiveStrategy[ImmersiveStrategy.BIND_SHEET_EXPAND_SAFE_AREA = 7] = 'BIND_SHEET_EXPAND_SAFE_AREA';
+  ImmersiveStrategy[ImmersiveStrategy.NAVIGATION_EXPAND_SAFE_AREA = 8] = 'NAVIGATION_EXPAND_SAFE_AREA';
+})(ImmersiveStrategy || (ImmersiveStrategy = {}));
+
 let VerticalAlign;
 (function (VerticalAlign) {
   VerticalAlign[VerticalAlign.Top = 1] = 'Top';
@@ -803,6 +811,18 @@ class LayoutPolicy {
 
 globalThis.LayoutPolicy = LayoutPolicy;
 
+var BlurStyle;
+(function (BlurStyle) {
+  BlurStyle[BlurStyle.SmallLight = 100] = 'SmallLight';
+  BlurStyle[BlurStyle.MediumLight = 101] = 'MediumLight';
+  BlurStyle[BlurStyle.LargeLight = 102] = 'LargeLight';
+  BlurStyle[BlurStyle.XlargeLight = 103] = 'XlargeLight';
+  BlurStyle[BlurStyle.SmallDark = 104] = 'SmallDark';
+  BlurStyle[BlurStyle.MediumDark = 105] = 'MediumDark';
+  BlurStyle[BlurStyle.LargeDark = 106] = 'LargeDark';
+  BlurStyle[BlurStyle.XlargeDark = 107] = 'XlargeDark';
+})(BlurStyle || (BlurStyle = {}));
+
 let Edge;
 (function (Edge) {
   Edge[Edge.Top = 0] = 'Top';
@@ -1072,18 +1092,20 @@ let TabBarStyle;
   TabBarStyle[TabBarStyle.BOTTOM = 0] = 'BOTTOM';
   TabBarStyle[TabBarStyle.SIDEBAR = 1] = 'SIDEBAR';
   TabBarStyle[TabBarStyle.SIDEBAR_ADAPTABLE = 2] = 'SIDEBAR_ADAPTABLE';
+  TabBarStyle[TabBarStyle.TOP = 3] = 'TOP';
 })(TabBarStyle || (TabBarStyle = {}));
 
-let SidebarDisplayStyle;
-(function (SidebarDisplayStyle) {
-  SidebarDisplayStyle[SidebarDisplayStyle.EMBED = 0] = 'EMBED';
-  SidebarDisplayStyle[SidebarDisplayStyle.DISPLACE = 1] = 'DISPLACE';
-})(SidebarDisplayStyle || (SidebarDisplayStyle = {}));
+let TabsSidebarDisplayStyle;
+(function (TabsSidebarDisplayStyle) {
+  TabsSidebarDisplayStyle[TabsSidebarDisplayStyle.EMBED = 0] = 'EMBED';
+  TabsSidebarDisplayStyle[TabsSidebarDisplayStyle.DISPLACE = 1] = 'DISPLACE';
+})(TabsSidebarDisplayStyle || (TabsSidebarDisplayStyle = {}));
 
 let TabBarDisplayMode;
 (function (TabBarDisplayMode) {
   TabBarDisplayMode[TabBarDisplayMode.BOTTOM_TABBAR = 0] = 'BOTTOM_TABBAR';
   TabBarDisplayMode[TabBarDisplayMode.SIDEBAR = 1] = 'SIDEBAR';
+  TabBarDisplayMode[TabBarDisplayMode.TOP_TABBAR = 2] = 'TOP_TABBAR';
 })(TabBarDisplayMode || (TabBarDisplayMode = {}));
 
 let TabVisibility;
@@ -1872,7 +1894,7 @@ let ListItemAlign;
   ListItemAlign[ListItemAlign.End = 2] = 'End';
 })(ListItemAlign || (ListItemAlign = {}));
 
-let BlurStyle;
+var BlurStyle;
 (function (BlurStyle) {
   BlurStyle[BlurStyle.NoMaterial = 0] = 'NoMaterial';
   BlurStyle[BlurStyle.Thin = 1] = 'Thin';
@@ -1892,14 +1914,6 @@ let BlurStyle;
   BlurStyle[BlurStyle.COMPONENT_THICK = 11] = 'COMPONENT_THICK';
   BlurStyle[BlurStyle.COMPONENT_ULTRA_THICK = 12] = 'COMPONENT_ULTRA_THICK';
   BlurStyle[BlurStyle.NONE = 0] = 'NONE';
-  BlurStyle[BlurStyle.SmallLight = 100] = 'SmallLight';
-  BlurStyle[BlurStyle.MediumLight = 101] = 'MediumLight';
-  BlurStyle[BlurStyle.LargeLight = 102] = 'LargeLight';
-  BlurStyle[BlurStyle.XlargeLight = 103] = 'XlargeLight';
-  BlurStyle[BlurStyle.SmallDark = 104] = 'SmallDark';
-  BlurStyle[BlurStyle.MediumDark = 105] = 'MediumDark';
-  BlurStyle[BlurStyle.LargeDark = 106] = 'LargeDark';
-  BlurStyle[BlurStyle.XlargeDark = 107] = 'XlargeDark';
 })(BlurStyle || (BlurStyle = {}));
 
 let BlurStyleActivePolicy;
@@ -2146,6 +2160,7 @@ let SheetTitleBarHoverMode;
 (function (SheetTitleBarHoverMode) {
   SheetTitleBarHoverMode[SheetTitleBarHoverMode.STANDARD = 0] = 'STANDARD';
   SheetTitleBarHoverMode[SheetTitleBarHoverMode.STACK = 1] = 'STACK';
+  SheetTitleBarHoverMode[SheetTitleBarHoverMode.SAFE_AREA_PADDING = 2] = 'SAFE_AREA_PADDING';
 })(SheetTitleBarHoverMode || (SheetTitleBarHoverMode = {}));
 
 let SheetTitleBarBackgroundBlur;
@@ -2358,6 +2373,10 @@ class BottomTabBarStyle {
   }
   iconStyle(arg) {
     this.iconStyle = arg;
+    return this;
+  }
+  badge(arg) {
+    this.badge = arg;
     return this;
   }
 }
@@ -2988,17 +3007,7 @@ class NavPathStack {
     if (ret) {
       return;
     }
-    // find in pop array
-    info.index = -1;
-    info.navDestinationId = undefined;
-    for (let i = this.popArray.length - 1; i >= 0; i--) {
-      if (info.name === this.popArray[i].name) {
-        let infoFind = this.popArray.splice(i, 1);
-        info.index = infoFind[0].index;
-        info.navDestinationId = infoFind[0].navDestinationId;
-        break;
-      }
-    }
+    [info.index, info.navDestinationId] = this.findInPopArray(info.name);
     if (launchMode === LaunchMode.NEW_INSTANCE) {
       info.needBuildNewInstance = true;
     }
@@ -3031,7 +3040,7 @@ class NavPathStack {
     this.preloadItem = {
       info: info,
       paramString: paramString,
-      onDestroy: options !== undefined ? options.onDestroy : undefined
+      onDestroy: options !== undefined && options !== null ? options.onDestroy : undefined
     };
     
     // Create the preloaded node via native stack
@@ -4444,6 +4453,13 @@ let ScrollAlign;
   ScrollAlign[ScrollAlign.AUTO = 3] = 'AUTO';
 })(ScrollAlign || (ScrollAlign = {}));
 
+let FastScrollMode;
+(function (FastScrollMode) {
+  FastScrollMode[FastScrollMode.NONE = 0] = 'NONE';
+  FastScrollMode[FastScrollMode.SKIP_MEASURE = 1] = 'SKIP_MEASURE';
+  FastScrollMode[FastScrollMode.SKIP_CREATE_AND_MEASURE = 2] = 'SKIP_CREATE_AND_MEASURE';
+})(FastScrollMode || (FastScrollMode = {}));
+
 let SafeAreaType;
 (function (SafeAreaType) {
   SafeAreaType[SafeAreaType.SYSTEM = 0] = 'SYSTEM';
@@ -4458,6 +4474,13 @@ let SafeAreaEdge;
   SafeAreaEdge[SafeAreaEdge.START = 2] = 'START';
   SafeAreaEdge[SafeAreaEdge.END = 3] = 'END';
 })(SafeAreaEdge || (SafeAreaEdge = {}));
+
+let SafeAreaInsetAlignment;
+(function (SafeAreaInsetAlignment) {
+  SafeAreaInsetAlignment[SafeAreaInsetAlignment.START = 0] = 'START';
+  SafeAreaInsetAlignment[SafeAreaInsetAlignment.CENTER = 1] = 'CENTER';
+  SafeAreaInsetAlignment[SafeAreaInsetAlignment.END = 2] = 'END';
+})(SafeAreaInsetAlignment || (SafeAreaInsetAlignment = {}));
 
 let LayoutSafeAreaType;
 (function (LayoutSafeAreaType) {
@@ -4508,6 +4531,18 @@ let CalendarAlign;
   CalendarAlign[CalendarAlign.CENTER = 1] = 'CENTER';
   CalendarAlign[CalendarAlign.END = 2] = 'END';
 })(CalendarAlign || (CalendarAlign = {}));
+
+let CalendarFirstDayOfWeek;
+(function (CalendarFirstDayOfWeek) {
+  CalendarFirstDayOfWeek[CalendarFirstDayOfWeek.LOCAL = 0] = 'LOCAL';
+  CalendarFirstDayOfWeek[CalendarFirstDayOfWeek.MON = 1] = 'MON';
+  CalendarFirstDayOfWeek[CalendarFirstDayOfWeek.TUE = 2] = 'TUE';
+  CalendarFirstDayOfWeek[CalendarFirstDayOfWeek.WED = 3] = 'WED';
+  CalendarFirstDayOfWeek[CalendarFirstDayOfWeek.THU = 4] = 'THU';
+  CalendarFirstDayOfWeek[CalendarFirstDayOfWeek.FRI = 5] = 'FRI';
+  CalendarFirstDayOfWeek[CalendarFirstDayOfWeek.SAT = 6] = 'SAT';
+  CalendarFirstDayOfWeek[CalendarFirstDayOfWeek.SUN = 7] = 'SUN';
+})(CalendarFirstDayOfWeek || (CalendarFirstDayOfWeek = {}));
 
 let DragBehavior;
 (function (DragBehavior) {
@@ -5339,6 +5374,11 @@ let PickerIndicatorType;
   PickerIndicatorType[PickerIndicatorType.BACKGROUND = 0] = 'BACKGROUND';
   PickerIndicatorType[PickerIndicatorType.DIVIDER = 1] = 'DIVIDER';
 })(PickerIndicatorType || (PickerIndicatorType = {}));
+
+let WebContextMenuItemId;
+(function (WebContextMenuItemId) {
+  WebContextMenuItemId[WebContextMenuItemId.MENU_COPY_LINK = 11] = 'MENU_COPY_LINK';
+})(WebContextMenuItemId || (WebContextMenuItemId = {}));
 
 let BlankScreenDetectionMethod;
 (function (BlankScreenDetectionMethod) {

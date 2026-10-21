@@ -14,6 +14,8 @@
  */
 #include "core/components_ng/pattern/xcomponent/bridge/arkts_native_xcomponent_bridge.h"
 
+#include <algorithm>
+#include <cmath>
 #include <limits>
 #include <optional>
 
@@ -451,6 +453,10 @@ void XComponentBridge::RegisterXComponentAttributes(Local<panda::ObjectRef> obje
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), XComponentBridge::SetEnableTransparentLayer));
     xComponent->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetEnableTransparentLayer"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), XComponentBridge::ResetEnableTransparentLayer));
+    xComponent->Set(vm, panda::StringRef::NewFromUtf8(vm, "setBufferQueueCount"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), XComponentBridge::SetBufferQueueCount));
+    xComponent->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetBufferQueueCount"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), XComponentBridge::ResetBufferQueueCount));
     xComponent->Set(vm, panda::StringRef::NewFromUtf8(vm, "setRenderFit"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), XComponentBridge::SetRenderFit));
     xComponent->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetRenderFit"),
@@ -776,7 +782,7 @@ void XComponentBridge::HandleDetachCallback(ArkUIRuntimeCallInfo* runtimeCallInf
     CHECK_NULL_VOID(runtimeCallInfo->GetArgsNumber() > ARG_FIRST);
     Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(ARG_FIRST);
     CHECK_NULL_VOID(firstArg->IsNativePointer(vm));
-    auto detachCallback = [](const std::string& xcomponentId) {
+    DetachCallback detachCallback = [](const std::string& xcomponentId) {
 #ifdef XCOMPONENT_SUPPORTED
         Framework::XComponentClient::GetInstance().DeleteControllerFromJSXComponentControllersMap(xcomponentId);
         Framework::XComponentClient::GetInstance().DeleteFromJsValMapById(xcomponentId);
@@ -884,9 +890,6 @@ ArkUINativeModuleValue XComponentBridge::SetOpacity(ArkUIRuntimeCallInfo* runtim
     ACE_UINODE_TRACE(reinterpret_cast<FrameNode*>(nativeNode));
     auto type =
         static_cast<XComponentType>(GetArkUINodeModifiers()->getXComponentModifier()->getXComponentType(nativeNode));
-    if (type != XComponentType::NODE) {
-        return panda::JSValueRef::Undefined(vm);
-    }
     if (ArkTSUtils::IsJsView(firstArg, vm)) {
         if (type == XComponentType::SURFACE || type == XComponentType::COMPONENT) {
             return panda::JSValueRef::Undefined(vm);
@@ -910,6 +913,9 @@ ArkUINativeModuleValue XComponentBridge::SetOpacity(ArkUIRuntimeCallInfo* runtim
             }
         }
         GetArkUINodeModifiers()->getXComponentModifier()->setXComponentOpacity(nativeNode, opacity);
+        return panda::JSValueRef::Undefined(vm);
+    }
+    if (type != XComponentType::NODE) {
         return panda::JSValueRef::Undefined(vm);
     }
     RefPtr<ResourceObject> opacityResObj;
@@ -1243,6 +1249,46 @@ ArkUINativeModuleValue XComponentBridge::ResetEnableTransparentLayer(ArkUIRuntim
     auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
     ACE_UINODE_TRACE(reinterpret_cast<FrameNode*>(nativeNode));
     GetArkUINodeModifiers()->getXComponentModifier()->resetXComponentEnableTransparentLayer(nativeNode);
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue XComponentBridge::SetBufferQueueCount(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(ARG_FIRST);
+    Local<JSValueRef> secondArg = runtimeCallInfo->GetCallArgRef(ARG_ID);
+    if (secondArg.IsNull() || secondArg->IsUndefined()) {
+        return panda::JSValueRef::Undefined(vm);
+    }
+    ArkUINodeHandle nativeNode = nullptr;
+    CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
+    ACE_UINODE_TRACE(reinterpret_cast<FrameNode*>(nativeNode));
+    if (secondArg->IsNumber()) {
+        double countValue = secondArg->ToNumber(vm)->Value();
+        bool isIntegerCount = std::isfinite(countValue) && std::floor(countValue) == countValue;
+        if (isIntegerCount) {
+            double int32RangeValue = std::clamp(countValue,
+                static_cast<double>(std::numeric_limits<int32_t>::min()),
+                static_cast<double>(std::numeric_limits<int32_t>::max()));
+            GetArkUINodeModifiers()->getXComponentModifier()->setXComponentBufferQueueCount(
+                nativeNode, static_cast<int32_t>(int32RangeValue));
+            return panda::JSValueRef::Undefined(vm);
+        }
+    }
+    GetArkUINodeModifiers()->getXComponentModifier()->resetXComponentBufferQueueCount(nativeNode);
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue XComponentBridge::ResetBufferQueueCount(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(ARG_FIRST);
+    CHECK_NULL_RETURN(firstArg->IsNativePointer(vm), panda::JSValueRef::Undefined(vm));
+    auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
+    ACE_UINODE_TRACE(reinterpret_cast<FrameNode*>(nativeNode));
+    GetArkUINodeModifiers()->getXComponentModifier()->resetXComponentBufferQueueCount(nativeNode);
     return panda::JSValueRef::Undefined(vm);
 }
 

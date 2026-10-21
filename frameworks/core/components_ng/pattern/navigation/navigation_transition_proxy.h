@@ -159,15 +159,16 @@ public:
         interactiveFinishCallback_ = finishCallback;
     }
 
-    void StartAnimation()
+    int32_t StartAnimation()
     {
         if (!interactiveAnimation_) {
-            return;
+            return -1;
         }
         // if error code is 0, start interactive success
         int32_t errorCode = AnimationUtils::StartInteractiveAnimation(interactiveAnimation_);
         TAG_LOGI(AceLogTag::ACE_NAVIGATION, "update start interactive animation code is %{public}d", errorCode);
         isStartAnimation_ = errorCode == 0;
+        return errorCode;
     }
 
     void UpdateTransition(float progress)

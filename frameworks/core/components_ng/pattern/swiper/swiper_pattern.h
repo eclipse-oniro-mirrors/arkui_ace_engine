@@ -914,7 +914,7 @@ public:
 
     void ContentChangeReport(const RefPtr<FrameNode>& keyNode, bool needSwiperChangeEnd);
     void ContentChangeOnTransitionStart(const RefPtr<FrameNode>& keyNode) const;
-    void ContentChangeOnTransitionEnd(const RefPtr<FrameNode>& keyNode) const;
+    void ContentChangeOnTransitionEnd(const RefPtr<FrameNode>& keyNode, bool isInterrupt = false) const;
 
     void SetCachedCountIndependent(bool independent)
     {
@@ -1117,7 +1117,8 @@ private:
     float MainSize() const;
     float GetMainContentSize() const;
     void FireChangeEvent(int32_t preIndex, int32_t currentIndex, bool isInLayout = false) const;
-    void ReportSwiperChangeContent(int32_t currentIndex) const;
+    void FireIndicatorChangeAccessibilityEvent() const;
+    void ReportSwiperChangeContent(int32_t currentIndex, int32_t componentState = 0) const;
     void FireAnimationEndEvent(int32_t currentIndex, const AnimationCallbackInfo& info, bool isInterrupt = false) const;
     void FireGestureSwipeEvent(int32_t currentIndex, const AnimationCallbackInfo& info) const;
     void FireUnselectedEvent(int32_t currentIndex, int32_t targetIndex);
@@ -1402,7 +1403,7 @@ private:
     void FastAnimation(int32_t targetIndex);
     void MarkDirtyBindIndicatorNode() const;
 
-    RefPtr<FrameNode> GetCommonIndicatorNode();
+    RefPtr<FrameNode> GetCommonIndicatorNode() const;
     bool IsIndicator(const std::string& tag) const
     {
         return tag == SWIPER_INDICATOR_ETS_TAG_PATTERN || tag == INDICATOR_ETS_TAG_PATTERN;

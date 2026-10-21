@@ -22,6 +22,7 @@
 #include "base/utils/string_utils.h"
 #include "base/utils/utils.h"
 #include "base/log/ace_scoring_log.h"
+#include "base/hiviewdfx/histogram_wrapper.h"
 #include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_common_bridge.h"
 #include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_utils_bridge.h"
 #include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_utils.h"
@@ -112,6 +113,7 @@ constexpr int32_t ARROW_RESOURCE_COLOR = 3;
 constexpr int32_t ARROW_RESOURCE_VECTOR_LENGTH = 4;
 constexpr float ARROW_SIZE_COEFFICIENT = 0.75f;
 constexpr char DOM_ANIMATION_TIMING_FUNCTION_CUSTOM[] = "customCallback";
+const std::vector<SwiperDisplayMode> DISPLAY_MODE = { SwiperDisplayMode::STRETCH, SwiperDisplayMode::AUTO_LINEAR };
 
 enum class DotIndicatorThemeMode {
     APPLY,
@@ -181,7 +183,8 @@ void SetSwiperIndexChangeEvent(EcmaVM* vm, ArkUINodeHandle nativeNode, const Loc
         nativeNode, reinterpret_cast<void*>(&callback));
 }
 
-std::string ParseDisplayCountObject(Local<JSValueRef> valueArg, EcmaVM* vm, std::string& type)
+std::string ParseDisplayCountObject(
+    Local<JSValueRef> valueArg, EcmaVM* vm, std::string& type, int32_t& displayCountType)
 {
     if (!valueArg->IsObject(vm)) {
         return "";
@@ -189,9 +192,11 @@ std::string ParseDisplayCountObject(Local<JSValueRef> valueArg, EcmaVM* vm, std:
     auto obj = valueArg->ToObject(vm);
     auto minSizeParam = obj->Get(vm, panda::StringRef::NewFromUtf8(vm, "minSize"));
     if (!minSizeParam->IsUndefined()) {
+        displayCountType = 2;
         type = "minSize";
         return minSizeParam->ToString(vm)->ToString(vm);
     }
+    displayCountType = 3;
     type = "fillType";
     auto fillTypeParam = obj->Get(vm, panda::StringRef::NewFromUtf8(vm, "fillType"));
     int32_t fillTypeValue = 0;
@@ -240,6 +245,7 @@ RefPtr<Curve> ParseJsViewCurveObject(ArkUIRuntimeCallInfo* runtimeCallInfo)
         panda::Local<panda::FunctionRef> func = onCallBack->ToObject(vm);
         customCallBack = [func = panda::CopyableGlobal(vm, func), id = Container::CurrentId()](float time) -> float {
             auto vm = func.GetEcmaVM();
+            CHECK_EQUAL_RETURN(ArkTSUtils::CheckJavaScriptScope(vm), false, 1.0f);
             panda::LocalScope pandaScope(vm);
             panda::TryCatch trycatch(vm);
             ContainerScope scope(id);
@@ -1241,9 +1247,11 @@ ArkUINativeModuleValue SwiperBridge::SetSwiperDisplayCount(ArkUIRuntimeCallInfo*
     Local<JSValueRef> valueArg = runtimeCallInfo->GetCallArgRef(CALL_ARG_VALUE_INDEX);
 
     if (isJsView) {
-        if (valueArg.IsNull() || valueArg->IsUndefined()) {
+        if (valueArg.IsNull()) {
             return panda::JSValueRef::Undefined(vm);
         }
+        // DisplayCount type enum: 0=string(auto), 1=number, 2=object-minSize, 3=object-fillType, 4=default
+        int32_t displayCountType = 0;
         if (argc == NUM_3) {
             Local<JSValueRef> swipeByGroupArg = runtimeCallInfo->GetCallArgRef(CALL_ARG_TYPE_INDEX);
             if (!swipeByGroupArg.IsNull() && !swipeByGroupArg->IsUndefined() && swipeByGroupArg->IsBoolean()) {
@@ -1256,29 +1264,35 @@ ArkUINativeModuleValue SwiperBridge::SetSwiperDisplayCount(ArkUIRuntimeCallInfo*
 
         if (Container::GreatOrEqualAPIVersion(PlatformVersion::VERSION_TEN)) {
             if (valueArg->IsString(vm) && valueArg->ToString(vm)->ToString(vm) == "auto") {
+                displayCountType = 0;
                 GetArkUINodeModifiers()->getSwiperModifier()->setSwiperDisplayCount(nativeNode, "auto", "string");
             } else if (valueArg->IsNumber() && valueArg->Int32Value(vm) > 0) {
+                displayCountType = 1;
                 std::string displayCountValue = std::to_string(valueArg->Int32Value(vm));
                 GetArkUINodeModifiers()->getSwiperModifier()->setSwiperDisplayCount(
                     nativeNode, displayCountValue.c_str(), "number");
             } else if (valueArg->IsObject(vm)) {
                 std::string type;
-                std::string displayCountValue = ParseDisplayCountObject(valueArg, vm, type);
+                std::string displayCountValue = ParseDisplayCountObject(valueArg, vm, type, displayCountType);
                 GetArkUINodeModifiers()->getSwiperModifier()->setSwiperDisplayCount(
                     nativeNode, displayCountValue.c_str(), type.c_str());
             } else {
+                displayCountType = 4;
                 GetArkUINodeModifiers()->getSwiperModifier()->setSwiperDisplayCount(
                     nativeNode, "DEFAULT_DISPLAY_COUNT", "DEFAULT_DISPLAY_COUNT");
             }
             return panda::JSValueRef::Undefined(vm);
         }
         if (valueArg->IsString(vm) && valueArg->ToString(vm)->ToString(vm) == "auto") {
+            displayCountType = 0;
             GetArkUINodeModifiers()->getSwiperModifier()->setSwiperDisplayCount(nativeNode, "auto", "string");
         } else if (valueArg->IsNumber()) {
+            displayCountType = 1;
             std::string displayCountValue = std::to_string(valueArg->Int32Value(vm));
             GetArkUINodeModifiers()->getSwiperModifier()->setSwiperDisplayCount(
                 nativeNode, displayCountValue.c_str(), "number");
         }
+        ACE_ENGINE_HISTOGRAM_ENUMERATION("Swiper.DisplayCount", displayCountType, 3);
         return panda::JSValueRef::Undefined(vm);
     }
 
@@ -1670,11 +1684,11 @@ ArkUINativeModuleValue SwiperBridge::SetSwiperDisplayMode(ArkUIRuntimeCallInfo* 
     ArkUINodeHandle nativeNode = nullptr;
     CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, nodeArg, vm), true, panda::JSValueRef::Undefined(vm));
     Local<JSValueRef> valueArg = runtimeCallInfo->GetCallArgRef(CALL_ARG_VALUE_INDEX);
-    bool isJsView = ArkTSUtils::IsJsView(nodeArg, vm);
     if (!valueArg.IsNull() && !valueArg->IsUndefined() && valueArg->IsNumber()) {
         int32_t index = valueArg->Int32Value(vm);
+        ACE_ENGINE_HISTOGRAM_ENUMERATION("Swiper.DisplayMode", index, static_cast<int32_t>(DISPLAY_MODE.size()) - 1);
         GetArkUINodeModifiers()->getSwiperModifier()->setSwiperDisplayMode(nativeNode, index);
-    } else if (!isJsView) {
+    } else {
         GetArkUINodeModifiers()->getSwiperModifier()->resetSwiperDisplayMode(nativeNode);
     }
     return panda::JSValueRef::Undefined(vm);
@@ -2012,7 +2026,7 @@ std::optional<Dimension> ParseJsViewIndicatorDimension(EcmaVM* vm, const Local<J
         return indicatorDimension;
     }
     CalcDimension dimPosition;
-    auto parseOk = ArkTSUtils::ParseJsDimension(vm, value, dimPosition, DimensionUnit::VP, resObj);
+    auto parseOk = ArkTSUtils::ParseJsDimension(vm, value, dimPosition, DimensionUnit::VP, resObj, true, false);
     indicatorDimension = parseOk && dimPosition.ConvertToPx() >= 0.0f ? dimPosition : 0.0_vp;
     return indicatorDimension;
 }
@@ -2323,7 +2337,7 @@ ArkUINativeModuleValue SwiperBridge::SetSwiperIndicator(ArkUIRuntimeCallInfo* ru
             return panda::JSValueRef::Undefined(vm);
         }
         Local<JSValueRef> valueArg = runtimeCallInfo->GetCallArgRef(CALL_ARG_VALUE_INDEX);
-        if (valueArg.IsEmpty() || valueArg->IsUndefined() || valueArg->IsNull()) {
+        if (valueArg.IsEmpty() || valueArg->IsNull()) {
             GetArkUINodeModifiers()->getSwiperModifier()->setSwiperShowIndicator(nativeNode, true);
             return panda::JSValueRef::Undefined(vm);
         }
@@ -2429,6 +2443,7 @@ ArkUINativeModuleValue SwiperBridge::SetSwiperIndicatorStyle(ArkUIRuntimeCallInf
     CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, nodeArg, vm), true, panda::JSValueRef::Undefined(vm));
     Local<JSValueRef> styleArg = runtimeCallInfo->GetCallArgRef(CALL_ARG_VALUE_INDEX);
     SwiperParameters swiperParameters;
+    ACE_ENGINE_HISTOGRAM_BOOLEAN("Swiper.IndicatorStyle", 1);
     if (!styleArg.IsNull() && !styleArg->IsUndefined() && styleArg->IsObject(vm)) {
         bool isCustomSize = false;
         swiperParameters = ParseJsViewIndicatorStyle(vm, nativeNode, styleArg, isCustomSize);
@@ -3003,7 +3018,11 @@ ArkUINativeModuleValue SwiperBridge::SetSwiperOnContentWillScroll(ArkUIRuntimeCa
     ArkUINodeHandle nativeNode = nullptr;
     CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
     bool isJsView = ArkTSUtils::IsJsView(firstArg, vm);
-    if (callbackArg->IsUndefined() || callbackArg->IsNull() || !callbackArg->IsFunction(vm)) {
+    if (callbackArg->IsUndefined() || callbackArg->IsNull()) {
+        GetArkUINodeModifiers()->getSwiperModifier()->resetSwiperOnContentWillScroll(nativeNode);
+        return panda::JSValueRef::Undefined(vm);
+    }
+    if (!callbackArg->IsFunction(vm)) {
         if (!isJsView) {
             GetArkUINodeModifiers()->getSwiperModifier()->resetSwiperOnContentWillScroll(nativeNode);
         }
@@ -3168,7 +3187,7 @@ ArkUINativeModuleValue SwiperBridge::SetSwiperSize(ArkUIRuntimeCallInfo* runtime
     return result;
 }
 
-Local<panda::ObjectRef> CreateClickInfo(EcmaVM* vm, const ClickInfo& info)
+Local<panda::ObjectRef> CreateClickInfo(EcmaVM* vm, ClickInfo& info)
 {
     auto obj = panda::ObjectRef::New(vm);
     Offset globalOffset = info.GetGlobalLocation();
@@ -3227,7 +3246,10 @@ Local<panda::ObjectRef> CreateClickInfo(EcmaVM* vm, const ClickInfo& info)
         panda::FunctionRef::New(vm, Framework::JsGetCurrentLocalPosition));
 #endif
     obj->SetNativePointerFieldCount(vm, 1);
-    obj->SetNativePointerField(vm, 0, static_cast<void*>(const_cast<ClickInfo*>(&info)));
+    obj->SetConcurrentNativePointerField(vm, 0, static_cast<void*>(&info),
+        [](void* env, void* nativePtr, void* data) {
+            delete static_cast<ClickInfo*>(nativePtr);
+        }, nullptr);
     return obj;
 }
 
@@ -3263,12 +3285,14 @@ ArkUINativeModuleValue SwiperBridge::SetSwiperOnClick(ArkUIRuntimeCallInfo* runt
                 TAG_LOGW(AceLogTag::ACE_SWIPER, "Swiper onClick callback execute failed.");
                 return;
             }
-            auto newInfo = *clickInfo;
+            // The newInfoPtr can only be bound to a JS object, and its lifetime belongs to that object.
+            // It is not allowed to hold this address elsewhere.
+            auto newInfoPtr = new ClickInfo(*clickInfo);
             if (impl) {
-                impl->UpdateEventInfo(newInfo);
+                impl->UpdateEventInfo(*newInfoPtr);
             }
 
-            auto obj = CreateClickInfo(vm, newInfo);
+            auto obj = CreateClickInfo(vm, *newInfoPtr);
             panda::Local<panda::JSValueRef> params[1] = { obj };
             auto result = func->Call(vm, func.ToLocal(), params, 1);
             if (isJsView) {

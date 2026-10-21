@@ -2116,5 +2116,36 @@ HWTEST_F(PipelineContextFourTestNg, OnHideTest001, TestSize.Level1)
     context_->SetIsFormRender(formBackup);
     AceApplicationInfo::GetInstance().SetAccessibilityEnabled(accessibilityEnableBackup);
 }
+
+/**
+ * @tc.name: IsFirstFlushMessages001
+ * @tc.desc: IsFirstFlushMessages() is true initially, false after first FlushVsync.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextFourTestNg, IsFirstFlushMessages001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: 1. Initialize test environment.
+     * @tc.expected: Context is not null.
+     */
+    ASSERT_NE(context_, nullptr);
+    context_->SetupRootElement();
+    context_->isFirstFlushMessages_ = true;
+    EXPECT_TRUE(context_->IsFirstFlushMessages());
+
+    /**
+     * @tc.steps: 2. Call FlushVsync to trigger first frame flush.
+     * @tc.expected: IsFirstFlushMessages() returns false after first FlushVsync.
+     */
+    context_->FlushVsync(NANO_TIME_STAMP, FRAME_COUNT);
+    EXPECT_FALSE(context_->IsFirstFlushMessages());
+
+    /**
+     * @tc.steps: 3. Call FlushVsync again to verify gate is irreversible.
+     * @tc.expected: IsFirstFlushMessages() stays false on subsequent vsync flushes.
+     */
+    context_->FlushVsync(NANO_TIME_STAMP, FRAME_COUNT);
+    EXPECT_FALSE(context_->IsFirstFlushMessages());
+}
 } // namespace NG
 } // namespace OHOS::Ace

@@ -19,7 +19,9 @@
 
 #include "core/interfaces/native/implementation/render_node_peer_impl.h"
 #include "common_ani_modifier.h"
+#include "safe_area_inset_ani_modifier.h"
 #include "securec.h"
+
 #include "ui/properties/color.h"
 #include "base/log/container_scope_wrapper.h"
 #include "base/log/log.h"
@@ -261,6 +263,18 @@ ArkUI_Int32 GetFocusedInstanceId()
         currentInstance = SubwindowManager::GetInstance()->GetParentContainerId(currentInstance);
     }
     return currentInstance;
+}
+
+ani_long InteropProxyNodeConstruct(ArkUI_Int32 id)
+{
+    auto proxyNode = NG::FrameNode::GetOrCreateFrameNode(
+        "InteropProxyNode", id, []() { return AceType::MakeRefPtr<StackPattern>(); });
+    CHECK_NULL_RETURN(proxyNode, 0);
+    auto stackLayoutAlgorithm = proxyNode->GetLayoutProperty<LayoutProperty>();
+    CHECK_NULL_RETURN(stackLayoutAlgorithm, 0);
+    stackLayoutAlgorithm->UpdateAlignment(Alignment::TOP_LEFT);
+    proxyNode->IncRefCount();
+    return reinterpret_cast<ani_long>(AceType::RawPtr(proxyNode));
 }
 
 ani_long BuilderProxyNodeConstruct(ArkUI_Int32 id)
@@ -732,6 +746,15 @@ ani_int GetWindowWidthBreakpoint()
 ani_int GetWindowHeightBreakpoint()
 {
     return ViewAbstract::GetWindowHeightBreakpoint();
+}
+
+ani_boolean IsWindowInfoInitialized(ani_int instanceId)
+{
+    auto context = NG::PipelineContext::GetContextByContainerId(instanceId);
+    CHECK_NULL_RETURN(context, false);
+    auto window = context->GetWindow();
+    CHECK_NULL_RETURN(window, false);
+    return window->IsWindowInfoInitialized();
 }
 
 void* TransferKeyEventPointer(ani_long nativePtr)
@@ -1316,6 +1339,7 @@ const ArkUIAniCommonModifier* GetCommonAniModifier()
         .getWindowId = OHOS::Ace::NG::GetWindowId,
         .getWindowHeightBreakpoint = OHOS::Ace::NG::GetWindowHeightBreakpoint,
         .getWindowWidthBreakpoint = OHOS::Ace::NG::GetWindowWidthBreakpoint,
+        .isWindowInfoInitialized = OHOS::Ace::NG::IsWindowInfoInitialized,
         .transferKeyEventPointer = OHOS::Ace::NG::TransferKeyEventPointer,
         .createKeyEventAccessorWithPointer = OHOS::Ace::NG::CreateKeyEventAccessorWithPointer,
         .createEventTargetInfoAccessor = OHOS::Ace::NG::CreateEventTargetInfoAccessor,
@@ -1369,6 +1393,8 @@ const ArkUIAniCommonModifier* GetCommonAniModifier()
         .setOnNodeDestroyEvent = OHOS::Ace::NG::SetOnNodeDestroyEvent,
         .fireArkUIObjectLifecycleCallback = OHOS::Ace::NG::FireArkUIObjectLifecycleCallbackImpl,
         .GetIdString = OHOS::Ace::NG::GetIdString,
+        .interopProxyNodeConstruct = OHOS::Ace::NG::InteropProxyNodeConstruct,
+        .setSafeAreaInset = OHOS::Ace::NG::SetSafeAreaInsetStatic,
     };
     return &impl;
 }

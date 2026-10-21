@@ -1972,6 +1972,7 @@ void TextModelNG::SetIncludeFontPadding(FrameNode* frameNode, bool enabled)
 
 bool TextModelNG::GetIncludeFontPadding(FrameNode* frameNode)
 {
+    CHECK_NULL_RETURN(frameNode, false);
     bool value = false;
     ACE_GET_NODE_LAYOUT_PROPERTY_WITH_DEFAULT_VALUE(TextLayoutProperty, IncludeFontPadding, value, frameNode, value);
     return value;
@@ -1989,6 +1990,7 @@ void TextModelNG::SetFallbackLineSpacing(FrameNode* frameNode, bool enabled)
 
 bool TextModelNG::GetFallbackLineSpacing(FrameNode* frameNode)
 {
+    CHECK_NULL_RETURN(frameNode, false);
     bool value = false;
     ACE_GET_NODE_LAYOUT_PROPERTY_WITH_DEFAULT_VALUE(TextLayoutProperty, FallbackLineSpacing, value, frameNode, value);
     return value;
@@ -2233,5 +2235,88 @@ void TextModelNG::SetTailIndents(const NG::TailIndents& value)
 void TextModelNG::SetTailIndents(FrameNode* frameNode, const NG::TailIndents& value)
 {
     ACE_UPDATE_NODE_LAYOUT_PROPERTY(TextLayoutProperty, TailIndents, value, frameNode);
+}
+
+void TextModelNG::SetStrokeWidth(const Dimension& value)
+{
+    ACE_UPDATE_LAYOUT_PROPERTY(TextLayoutProperty, StrokeWidth, value);
+    ACE_CHECK_LPX_ATTRIBUTE(value, LpxAttribute::LPX_STROKE_WIDTH);
+}
+
+void TextModelNG::ResetStrokeWidth()
+{
+    ACE_RESET_LAYOUT_PROPERTY(TextLayoutProperty, StrokeWidth);
+}
+
+void TextModelNG::SetStrokeWidth(FrameNode* frameNode, const Dimension& value)
+{
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(TextLayoutProperty, StrokeWidth, value, frameNode);
+    ACE_CHECK_NODE_LPX_ATTRIBUTE(value, LpxAttribute::LPX_STROKE_WIDTH, frameNode);
+}
+
+void TextModelNG::ResetStrokeWidth(FrameNode* frameNode)
+{
+    ACE_RESET_NODE_LAYOUT_PROPERTY(TextLayoutProperty, StrokeWidth, frameNode);
+}
+
+Dimension TextModelNG::GetStrokeWidth(FrameNode* frameNode)
+{
+    Dimension value;
+    ACE_GET_NODE_LAYOUT_PROPERTY_WITH_DEFAULT_VALUE(TextLayoutProperty, StrokeWidth, value, frameNode, value);
+    return value;
+}
+
+void TextModelNG::SetStrokeColor(const Color& value)
+{
+    ACE_UPDATE_LAYOUT_PROPERTY(TextLayoutProperty, StrokeColor, value);
+}
+
+void TextModelNG::ResetStrokeColor()
+{
+    ACE_RESET_LAYOUT_PROPERTY(TextLayoutProperty, StrokeColor);
+}
+
+void TextModelNG::SetStrokeColor(FrameNode* frameNode, const Color& value)
+{
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(TextLayoutProperty, StrokeColor, value, frameNode);
+}
+
+void TextModelNG::ResetStrokeColor(FrameNode* frameNode)
+{
+    ACE_RESET_NODE_LAYOUT_PROPERTY(TextLayoutProperty, StrokeColor, frameNode);
+}
+
+Color TextModelNG::GetStrokeColor(FrameNode* frameNode)
+{
+    Color value;
+    ACE_GET_NODE_LAYOUT_PROPERTY_WITH_DEFAULT_VALUE(TextLayoutProperty, StrokeColor, value, frameNode, value);
+    return value;
+}
+
+void TextModelNG::SetStrokeJoinStyle(StrokeJoinStyle value)
+{
+    ACE_UPDATE_LAYOUT_PROPERTY(TextLayoutProperty, StrokeJoinStyle, value);
+}
+
+void TextModelNG::ResetStrokeJoinStyle()
+{
+    ACE_RESET_LAYOUT_PROPERTY(TextLayoutProperty, StrokeJoinStyle);
+}
+
+void TextModelNG::SetStrokeJoinStyle(FrameNode* frameNode, StrokeJoinStyle value)
+{
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(TextLayoutProperty, StrokeJoinStyle, value, frameNode);
+}
+
+void TextModelNG::ResetStrokeJoinStyle(FrameNode* frameNode)
+{
+    ACE_RESET_NODE_LAYOUT_PROPERTY(TextLayoutProperty, StrokeJoinStyle, frameNode);
+}
+
+StrokeJoinStyle TextModelNG::GetStrokeJoinStyle(FrameNode* frameNode)
+{
+    StrokeJoinStyle value = StrokeJoinStyle::MITER_JOIN;
+    ACE_GET_NODE_LAYOUT_PROPERTY_WITH_DEFAULT_VALUE(TextLayoutProperty, StrokeJoinStyle, value, frameNode, value);
+    return value;
 }
 } // namespace OHOS::Ace::NG

@@ -377,7 +377,13 @@ HWTEST_F(TextFieldPatternTest, TextPattern014, TestSize.Level1)
     ASSERT_NE(textFieldNode, nullptr);
     RefPtr<TextFieldPattern> pattern = textFieldNode->GetPattern<TextFieldPattern>();
     ASSERT_NE(pattern, nullptr);
+    /**
+     * @tc.steps: step2. SetAutoFillTriggeredStateByType ACE_USER_NAME
+     */
     pattern->SetAutoFillTriggeredStateByType(AceAutoFillType::ACE_USER_NAME);
+    /**
+     * @tc.steps: step3. SetAutoFillTriggeredStateByType ACE_PASSWORD
+     */
     pattern->SetAutoFillTriggeredStateByType(AceAutoFillType::ACE_PASSWORD);
     pattern->SetAutoFillTriggeredStateByType(AceAutoFillType::ACE_NEW_PASSWORD);
 }
@@ -3451,6 +3457,54 @@ HWTEST_F(TextFieldPatternTest, TextPattern109, TestSize.Level1)
      * @tc.steps: step3. verify placeholder is dumped correctly
      */
     EXPECT_EQ(json->GetString("placeholder", DEFAULT_TEXT), DEFAULT_TEXT);
+}
+
+/**
+ * @tc.name: TextPattern118
+ * @tc.desc: Test TextFieldPattern DumpSimplifyInfo enableAutoFill field
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternTest, TextPattern118, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. create target node.
+     */
+    auto textFieldNode = FrameNode::GetOrCreateFrameNode(V2::TEXTINPUT_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), []() { return AceType::MakeRefPtr<TextFieldPattern>(); });
+    ASSERT_NE(textFieldNode, nullptr);
+    auto pattern = textFieldNode->GetPattern<TextFieldPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto textFieldLayoutProperty = pattern->GetLayoutProperty<TextFieldLayoutProperty>();
+    ASSERT_NE(textFieldLayoutProperty, nullptr);
+
+    /**
+     * @tc.steps: step2. enableAutoFill is not set, DumpSimplifyInfo does not carry the field
+     */
+    auto unsetJson = JsonUtil::CreateSharedPtrJson(true);
+    pattern->DumpSimplifyInfo(unsetJson);
+    EXPECT_TRUE(unsetJson->GetValue("enableAutoFill")->IsNull());
+
+    /**
+     * @tc.steps: step3. set enableAutoFill false, DumpSimplifyInfo carries false
+     */
+    textFieldLayoutProperty->UpdateEnableAutoFill(false);
+    auto falseJson = JsonUtil::CreateSharedPtrJson(true);
+    pattern->DumpSimplifyInfo(falseJson);
+    auto falseValue = falseJson->GetValue("enableAutoFill");
+    ASSERT_TRUE(falseValue);
+    EXPECT_TRUE(falseValue->IsBool());
+    EXPECT_FALSE(falseJson->GetBool("enableAutoFill"));
+
+    /**
+     * @tc.steps: step4. set enableAutoFill true, DumpSimplifyInfo carries true
+     */
+    textFieldLayoutProperty->UpdateEnableAutoFill(true);
+    auto trueJson = JsonUtil::CreateSharedPtrJson(true);
+    pattern->DumpSimplifyInfo(trueJson);
+    auto trueValue = trueJson->GetValue("enableAutoFill");
+    ASSERT_TRUE(trueValue);
+    EXPECT_TRUE(trueValue->IsBool());
+    EXPECT_TRUE(trueJson->GetBool("enableAutoFill"));
 }
 
 /**

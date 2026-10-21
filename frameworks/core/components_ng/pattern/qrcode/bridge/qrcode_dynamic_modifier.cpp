@@ -108,14 +108,10 @@ void ResetQRBackgroundColor(ArkUINodeHandle node, ArkUI_Bool isJsView)
 {
     FrameNode* frameNode = GetFrameNode(node);
     CHECK_NULL_VOID(frameNode);
-    if (isJsView) {
-        auto qrCodeTheme = frameNode->GetTheme<QrcodeTheme>(true);
-        CHECK_NULL_VOID(qrCodeTheme);
-        Color qrcodeBackgroundColor = qrCodeTheme->GetBackgroundColor();
-        QRCodeModelNG::SetQRBackgroundColor(frameNode, qrcodeBackgroundColor);
-    } else {
-        QRCodeModelNG::SetQRBackgroundColor(frameNode, Color(DEFAULT_BG_COLOR));
-    }
+    auto qrCodeTheme = frameNode->GetTheme<QrcodeTheme>(true);
+    CHECK_NULL_VOID(qrCodeTheme);
+    Color qrcodeBackgroundColor = qrCodeTheme->GetBackgroundColor();
+    QRCodeModelNG::SetQRBackgroundColor(frameNode, qrcodeBackgroundColor);
 
     if (SystemProperties::ConfigChangePerform()) {
         QRCodeModelNG::CreateWithResourceObj(frameNode, QRCodeResourceType::BACKGROUND_COLOR, nullptr);

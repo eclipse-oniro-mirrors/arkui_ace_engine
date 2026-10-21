@@ -813,6 +813,21 @@ class EnableScrollWithMouseModifier extends ModifierWithKey {
 }
 EnableScrollWithMouseModifier.identity = Symbol('enableScrollWithMouse');
 
+class EnableScrollWithKeyboardModifier extends ModifierWithKey {
+  constructor(value) {
+    super(value);
+  }
+  applyPeer(node, reset) {
+    if (reset) {
+      getUINativeModule().scrollable.resetEnableScrollWithKeyboard(node);
+    }
+    else {
+      getUINativeModule().scrollable.setEnableScrollWithKeyboard(node, this.value);
+    }
+  }
+}
+EnableScrollWithKeyboardModifier.identity = Symbol('enableScrollWithKeyboard');
+
 class ScrollBarMarginModifier extends ModifierWithKey {
   constructor(value) {
     super(value);
@@ -987,6 +1002,10 @@ class ArkScrollable extends ArkComponent {
   }
   enableScrollWithMouse(value) {
     modifierWithKey(this._modifiersWithKeys, EnableScrollWithMouseModifier.identity, EnableScrollWithMouseModifier, value);
+    return this;
+  }
+  enableScrollWithKeyboard(value) {
+    modifierWithKey(this._modifiersWithKeys, EnableScrollWithKeyboardModifier.identity, EnableScrollWithKeyboardModifier, value);
     return this;
   }
   scrollBarMargin(value) {
@@ -4534,6 +4553,57 @@ class TextTailIndentsModifier extends ModifierWithKey {
 }
 TextTailIndentsModifier.identity = Symbol('textTailIndents');
 
+class TextStrokeWidthModifier extends ModifierWithKey {
+  constructor(value) {
+    super(value);
+  }
+  applyPeer(node, reset) {
+    if (reset) {
+      getUINativeModule().text.resetStrokeWidth(node);
+    } else {
+      getUINativeModule().text.setStrokeWidth(node, this.value);
+    }
+  }
+  checkObjectDiff() {
+    return !isBaseOrResourceEqual(this.stageValue, this.value);
+  }
+}
+TextStrokeWidthModifier.identity = Symbol('textStrokeWidth');
+
+class TextStrokeColorModifier extends ModifierWithKey {
+  constructor(value) {
+    super(value);
+  }
+  applyPeer(node, reset) {
+    if (reset) {
+      getUINativeModule().text.resetStrokeColor(node);
+    } else {
+      getUINativeModule().text.setStrokeColor(node, this.value);
+    }
+  }
+  checkObjectDiff() {
+    return !isBaseOrResourceEqual(this.stageValue, this.value);
+  }
+}
+TextStrokeColorModifier.identity = Symbol('textStrokeColor');
+
+class TextStrokeJoinStyleModifier extends ModifierWithKey {
+  constructor(value) {
+    super(value);
+  }
+  applyPeer(node, reset) {
+    if (reset) {
+      getUINativeModule().text.resetStrokeJoinStyle(node);
+    } else {
+      getUINativeModule().text.setStrokeJoinStyle(node, this.value);
+    }
+  }
+  checkObjectDiff() {
+    return !isBaseOrResourceEqual(this.stageValue, this.value);
+  }
+}
+TextStrokeJoinStyleModifier.identity = Symbol('textStrokeJoinStyle');
+
 class ArkTextComponent extends ArkComponent {
   constructor(nativePtr, classType) {
     super(nativePtr, classType);
@@ -4861,6 +4931,18 @@ class ArkTextComponent extends ArkComponent {
   }
   tailIndents(value) {
     modifierWithKey(this._modifiersWithKeys, TextTailIndentsModifier.identity, TextTailIndentsModifier, value);
+    return this;
+  }
+  strokeWidth(value) {
+    modifierWithKey(this._modifiersWithKeys, TextStrokeWidthModifier.identity, TextStrokeWidthModifier, value);
+    return this;
+  }
+  strokeColor(value) {
+    modifierWithKey(this._modifiersWithKeys, TextStrokeColorModifier.identity, TextStrokeColorModifier, value);
+    return this;
+  }
+  strokeJoinStyle(value) {
+    modifierWithKey(this._modifiersWithKeys, TextStrokeJoinStyleModifier.identity, TextStrokeJoinStyleModifier, value);
     return this;
   }
 }
@@ -9477,6 +9559,10 @@ class ArkWebComponent extends ArkComponent {
     modifierWithKey(this._modifiersWithKeys, WebOnScaleChangeModifier.identity, WebOnScaleChangeModifier, callback);
     return this;
   }
+  onZoomChange(callback) {
+    modifierWithKey(this._modifiersWithKeys, WebOnZoomChangeModifier.identity, WebOnZoomChangeModifier, callback);
+    return this;
+  }
   onHttpAuthRequest(callback) {
     modifierWithKey(this._modifiersWithKeys, WebOnHttpAuthRequestModifier.identity, WebOnHttpAuthRequestModifier, callback);
     return this;
@@ -9500,6 +9586,10 @@ class ArkWebComponent extends ArkComponent {
     modifierWithKey(this._modifiersWithKeys, WebOnDetectedBlankScreenModifier.identity, WebOnDetectedBlankScreenModifier, callback);
     return this;
   }
+  onMonitoredBlankScreen(callback) {
+    modifierWithKey(this._modifiersWithKeys, WebOnMonitoredBlankScreenModifier.identity, WebOnMonitoredBlankScreenModifier, callback);
+    return this;
+  }
   blankScreenDetectionConfig(config) {
     if (config === undefined || config === null) {
       return this;
@@ -9510,6 +9600,10 @@ class ArkWebComponent extends ArkComponent {
     detectConfig.detectionMethods = config.detectionMethods;
     detectConfig.contentfulNodesCountThreshold = config.contentfulNodesCountThreshold;
     modifierWithKey(this._modifiersWithKeys, WebBlankScreenDetectionConfigModifier.identity, WebBlankScreenDetectionConfigModifier, detectConfig);
+    return this;
+  }
+  enableBlankScreenMonitor(enabled) {
+    modifierWithKey(this._modifiersWithKeys, WebEnableBlankScreenMonitorModifier.identity, WebEnableBlankScreenMonitorModifier, enabled);
     return this;
   }
   onFirstScreenPaint(callback) {
@@ -9598,6 +9692,10 @@ class ArkWebComponent extends ArkComponent {
   }
   defaultFontSize(size) {
     modifierWithKey(this._modifiersWithKeys, WebDefaultFontSizeModifier.identity, WebDefaultFontSizeModifier, size);
+    return this;
+  }
+  caretColor(value) {
+    modifierWithKey(this._modifiersWithKeys, WebCaretColorModifier.identity, WebCaretColorModifier, value);
     return this;
   }
   minFontSize(size) {
@@ -9794,6 +9892,10 @@ class ArkWebComponent extends ArkComponent {
     modifierWithKey(this._modifiersWithKeys, WebOnContextMenuHideModifier.identity, WebOnContextMenuHideModifier, callback);
     return this;
   }
+  onContextMenuUpdate(callback) {
+    modifierWithKey(this._modifiersWithKeys, WebOnContextMenuUpdateModifier.identity, WebOnContextMenuUpdateModifier, callback);
+    return this;
+  }
   keyboardAvoidMode(mode) {
     modifierWithKey(this._modifiersWithKeys, WebKeyboardAvoidModeModifier.identity, WebKeyboardAvoidModeModifier, mode);
     return this;
@@ -9845,6 +9947,10 @@ class ArkWebComponent extends ArkComponent {
   }
   forceEnableZoom(enabled) {
     modifierWithKey(this._modifiersWithKeys, WebForceEnableZoomModifier.identity, WebForceEnableZoomModifier, enabled);
+    return this;
+  }
+  flingSpeedLimit(value) {
+    modifierWithKey(this._modifiersWithKeys, WebFlingSpeedLimitModifier.identity, WebFlingSpeedLimitModifier, value);
     return this;
   }
   rotateRenderEffect(effect) {
@@ -10125,6 +10231,23 @@ class WebTextZoomRatioModifier extends ModifierWithKey {
 }
 WebTextZoomRatioModifier.identity = Symbol('webTextZoomRatioModifier');
 
+class WebCaretColorModifier extends ModifierWithKey {
+  constructor(value) {
+    super(value);
+  }
+  applyPeer(node, reset) {
+    if (reset) {
+      getUINativeModule().web.resetCaretColor(node);
+    } else {
+      getUINativeModule().web.setCaretColor(node, this.value);
+    }
+  }
+  checkObjectDiff() {
+    return !isBaseOrResourceEqual(this.stageValue, this.value);
+  }
+}
+WebCaretColorModifier.identity = Symbol('webCaretColor');
+
 class WebInitialScaleModifier extends ModifierWithKey {
   constructor(value) {
     super(value);
@@ -10154,6 +10277,21 @@ class WebOnScaleChangeModifier extends ModifierWithKey {
   }
 }
 WebOnScaleChangeModifier.identity = Symbol('webOnScaleChangeModifier');
+
+class WebOnZoomChangeModifier extends ModifierWithKey {
+    constructor(value) {
+        super(value);
+    }
+    applyPeer(node, reset) {
+        if (reset) {
+            getUINativeModule().web.resetOnZoomChange(node);
+        }
+        else {
+            getUINativeModule().web.setOnZoomChange(node, this.value);
+        }
+    }
+}
+WebOnZoomChangeModifier.identity = Symbol('webOnZoomChangeModifier');
 
 class WebOnRequestSelectedModifier extends ModifierWithKey {
     constructor(value) {
@@ -10214,6 +10352,22 @@ class WebOnContextMenuHideModifier extends ModifierWithKey {
   }
 }
 WebOnContextMenuHideModifier.identity = Symbol('webOnContextMenuHideModifier');
+
+class WebOnContextMenuUpdateModifier extends ModifierWithKey {
+  constructor(value) {
+    super(value);
+  }
+  applyPeer(node, reset) {
+    if (reset) {
+      getUINativeModule().web.resetOnContextMenuUpdate(node);
+    }
+    else {
+      getUINativeModule().web.setOnContextMenuUpdate(node, this.value);
+    }
+  }
+}
+WebOnContextMenuUpdateModifier.identity = Symbol('webOnContextMenuUpdateModifier');
+
 class WebGeolocationAccessModifier extends ModifierWithKey {
   constructor (value) {
     super(value);
@@ -11175,6 +11329,21 @@ class WebOnDetectedBlankScreenModifier extends ModifierWithKey {
 }
 WebOnDetectedBlankScreenModifier.identity = Symbol('webOnDetectedBlankScreenModifier');
 
+class WebOnMonitoredBlankScreenModifier extends ModifierWithKey {
+  constructor(value) {
+    super(value);
+  }
+  applyPeer(node, reset) {
+    if (reset) {
+      getUINativeModule().web.resetOnMonitoredBlankScreen(node);
+    }
+    else {
+      getUINativeModule().web.setOnMonitoredBlankScreen(node, this.value);
+    }
+  }
+}
+WebOnMonitoredBlankScreenModifier.identity = Symbol('webOnMonitoredBlankScreenModifier');
+
 class WebBlankScreenDetectionConfigModifier extends ModifierWithKey {
   constructor(value) {
     super(value);
@@ -11196,6 +11365,20 @@ class WebBlankScreenDetectionConfigModifier extends ModifierWithKey {
   }
 }
 WebBlankScreenDetectionConfigModifier.identity = Symbol('webBlankScreenDetectionConfigModifier');
+
+class WebEnableBlankScreenMonitorModifier extends ModifierWithKey {
+  constructor(value) {
+      super(value);
+  }
+  applyPeer(node, reset) {
+      if (reset) {
+          getUINativeModule().web.resetEnableBlankScreenMonitor(node);
+      } else {
+          getUINativeModule().web.setEnableBlankScreenMonitor(node, this.value);
+      }
+  }
+}
+WebEnableBlankScreenMonitorModifier.identity = Symbol('webEnableBlankScreenMonitorModifier');
 
 class WebOnFirstScreenPaintModifier extends ModifierWithKey {
   constructor(value) {
@@ -11580,6 +11763,20 @@ class WebForceEnableZoomModifier extends ModifierWithKey {
   }
 }
 WebForceEnableZoomModifier.identity = Symbol('webForceEnableZoomModifier');
+
+class WebFlingSpeedLimitModifier extends ModifierWithKey {
+  constructor(value) {
+    super(value);
+  }
+  applyPeer(node, reset) {
+    if (reset) {
+      getUINativeModule().web.resetFlingSpeedLimit(node);
+    } else {
+      getUINativeModule().web.setFlingSpeedLimit(node, this.value);
+    }
+  }
+}
+WebFlingSpeedLimitModifier.identity = Symbol('webFlingSpeedLimit');
 
 class WebBackToTopModifier extends ModifierWithKey {
   constructor(value) {
@@ -13641,7 +13838,7 @@ class LazyColumnLayoutSpaceModifier extends ModifierWithKey {
     super(value);
   }
   applyPeer(node, reset) {
-    if (reset || !isObject(this.value)) {
+    if (reset) {
       getUINativeModule().lazyColumnLayout.resetSpace(node);
     }
     else {

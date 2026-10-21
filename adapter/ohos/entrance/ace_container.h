@@ -155,6 +155,7 @@ public:
 
     int32_t GetInstanceId() const override
     {
+        std::lock_guard<std::mutex> lock(viewMutex_);
         if (aceView_) {
             return aceView_->GetInstanceId();
         }
@@ -235,21 +236,25 @@ public:
 
     int32_t GetViewWidth() const override
     {
+        std::lock_guard<std::mutex> lock(viewMutex_);
         return aceView_ ? aceView_->GetWidth() : 0;
     }
 
     int32_t GetViewHeight() const override
     {
+        std::lock_guard<std::mutex> lock(viewMutex_);
         return aceView_ ? aceView_->GetHeight() : 0;
     }
 
     int32_t GetViewPosX() const override
     {
+        std::lock_guard<std::mutex> lock(viewMutex_);
         return aceView_ ? aceView_->GetPosX() : 0;
     }
 
     int32_t GetViewPosY() const override
     {
+        std::lock_guard<std::mutex> lock(viewMutex_);
         return aceView_ ? aceView_->GetPosY() : 0;
     }
 
@@ -715,6 +720,7 @@ public:
     bool IsSceneBoardEnabled() override;
     bool IsMainWindow() const override;
     bool IsSubWindow() const override;
+    bool IsPipWindow() const override;
     bool IsDialogWindow() const override;
     bool IsSystemWindow() const override;
     bool IsHostMainWindow() const override;
@@ -923,6 +929,10 @@ public:
     {
         foldStatusFromListener_ = GetCurrentFoldStatus();
     }
+
+    void RefreshLiveFoldCreaseRegion() override;
+
+    void RefreshFoldCreaseDirection() override;
 
     void DispatchExtensionDataToHostWindow(uint32_t code, const AAFwk::Want& data, int32_t persistentId);
 

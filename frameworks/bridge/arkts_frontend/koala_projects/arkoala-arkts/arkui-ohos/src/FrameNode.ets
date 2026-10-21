@@ -22,7 +22,7 @@ import { finalizerRegister, int32 } from "@koalaui/common"
 import { ArkUIAniModule } from "arkui.ani"
 import { RenderNode } from "./RenderNode"
 import { CommonAttribute, ArkCommonMethodPeer, CommonMethod, UIGestureEvent, UICommonEvent, UICommonEventInternal,
-    CustomProperty, AnimateParam } from './component/common';
+    CustomProperty, AnimateParam, KeyEvent } from './component/common';
 import { ArkButtonNode } from './typedNode/ArkButtonNode'
 import { ButtonOptions, ButtonAttribute, ArkButtonPeer} from './component/button'
 import { ArkCheckboxNode } from './typedNode/ArkCheckboxNode'
@@ -109,9 +109,11 @@ import { MarqueeOptions, MarqueeAttribute, ArkMarqueePeer } from './component/ma
 import { SymbolGlyphAttribute, ArkSymbolGlyphPeer } from './component/symbolglyph'
 import { XComponentParameters, XComponentOptions, NativeXComponentParameters, XComponentAttribute, TypedXComponentPeerInternal } from "./component/xcomponent"
 import { XComponentType, AnimationPropertyType, EventQueryType } from './component/enums'
+import { CompetitionStrategy } from './component/enums'
 import { ComponentContent, ReactiveComponentContent } from './ComponentContent';
 import { DrawContext } from './Graphics';
 import { JSBuilderNode } from "./BuilderNode"
+import { InputEventType } from "#generated"
 import { BusinessError } from '#external';
 import { Resource } from 'global.resource';
 import { ElementIdToCustomProperties } from "#handwritten"
@@ -327,6 +329,12 @@ export class FrameNode implements MaterializedBase {
     }
     public isModifiable(): boolean {
         return FrameNodeExtender.isModifiable(this.peer!.ptr);
+    }
+    public dispatchInputEvent(event: InputEventType, competitionStrategy?: CompetitionStrategy): boolean {
+        return FrameNodeExtender.dispatchInputEvent(this, event, competitionStrategy);
+    }
+    public dispatchKeyEvent(event: KeyEvent): boolean {
+        return FrameNodeExtender.dispatchKeyEvent(this, event);
     }
     public checkIfCanCrossLanguageTreeOperating(): boolean {
         return FrameNodeExtender.checkIfCanCrossLanguageTreeOperating(this);
@@ -857,12 +865,7 @@ export class FrameNode implements MaterializedBase {
             index_casted = index;
         }
         const oldParent = this.getParent();
-        const isOldParentCrossLanguage = oldParent && (oldParent!.getType() === 'ProxyFrameNode') &&
-            (oldParent!.checkIfCanCrossLanguageTreeOperating());
-        const isTargetParentCrossLanguage = (targetParent!.getType() === 'ProxyFrameNode') &&
-            (targetParent!.checkIfCanCrossLanguageTreeOperating());
-        if ((oldParent && !(oldParent.isModifiable() || isOldParentCrossLanguage)) ||
-            !(targetParent.isModifiable() || isTargetParentCrossLanguage) || !targetParent.checkValid(this)) {
+        if (oldParent && !oldParent.isModifiable() || !targetParent.isModifiable() || !targetParent.checkValid(this)) {
             const error = Error('The FrameNode is not modifiable.');
             throw new BusinessError(100021, error);
         }
@@ -1126,42 +1129,16 @@ export class ProxyFrameNode extends ImmutableFrameNode {
         return 'ProxyFrameNode';
     }
     moveTo(targetParent: FrameNode, index?: int): void {
-        if (!this.checkIfCanCrossLanguageTreeOperating()) {
-            const error = Error('The FrameNode is not modifiable.');
-            throw new BusinessError(100021, error);
-        }
-        if (targetParent === undefined || targetParent === null) {
-            return;
-        }
-        let index_casted: int = -1;
-        if (index !== undefined && index !== null) {
-            index_casted = index;
-        }
-        const oldParent = this.getParent();
-        const isOldParentCrossLanguage = oldParent && (oldParent!.getType() === 'ProxyFrameNode') &&
-            (oldParent!.checkIfCanCrossLanguageTreeOperating());
-        const isTargetParentCrossLanguage = (targetParent!.getType() === 'ProxyFrameNode') &&
-            (targetParent!.checkIfCanCrossLanguageTreeOperating());
-        if ((oldParent && !(oldParent.isModifiable() || isOldParentCrossLanguage)) ||
-            !(targetParent.isModifiable() || isTargetParentCrossLanguage) || !targetParent.checkValid(this)) {
-            const error = Error('The FrameNode is not modifiable.');
-            throw new BusinessError(100021, error);
-        }
-        const targetParent_casted = targetParent as (FrameNode);
-        let result = FrameNodeExtender.moveTo(this, targetParent_casted, index_casted);
-        if (result === ERROR_CODE_NODE_IS_ADOPTED) {
-            const error = Error('The current node has already been adopted.');
-            throw new BusinessError(100027, error);
-        }
-        return;
+        const error = Error('The FrameNode is not modifiable.');
+        throw new BusinessError(100021, error);
     }
     public getRenderNode(): RenderNode | null {
         return null;
     }
 }
 export class BuilderRootFrameNode<T> extends ImmutableFrameNode {
-    private __BuilderNodeOpt: JSBuilderNode<T> | undefined = undefined;
-    private __disposed: boolean = false;
+    protected __BuilderNodeOpt: JSBuilderNode<T> | undefined = undefined;
+    protected __disposed: boolean = false;
     constructor(uiContext: UIContext, type: string = 'BuilderRootFrameNode', ptr?: KPointer) {
         super(uiContext, 'BuilderRootFrameNode', ptr);
         if (!ptr) {
@@ -1226,6 +1203,29 @@ export class BuilderRootWeakFrameNode<T> extends BuilderRootFrameNode<T> {
     }
     public getRenderNode(): RenderNode | null {
         return null;
+    }
+    private disposeWeakNode(needDisposeBuilderNode: boolean): void {
+        if (this.__disposed) {
+            return;
+        }
+        this.__disposed = true;
+        FrameNodeFinalizationRegisterProxy.ElementIdToOwningFrameNode_.delete(this._nodeId);
+        this.nodePtr_ = undefined;
+        if (this.peer?.ptr) {
+            this.peer!.ptr = nullptr;
+        }
+        this.renderNode_ = undefined;
+        this._nodeId = -1;
+        if (needDisposeBuilderNode) {
+            this.__BuilderNodeOpt?.disposeNode();
+        }
+        this.__BuilderNodeOpt = undefined;
+    }
+    public disposeNode(): void {
+        this.disposeWeakNode(false);
+    }
+    public dispose(): void {
+        this.disposeWeakNode(true);
     }
     public getChild(index: int32, expandMode?: ExpandMode | undefined): FrameNode | null {
         const error = Error('weak FrameNode not support getChild');

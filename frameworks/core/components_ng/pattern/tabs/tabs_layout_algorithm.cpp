@@ -25,6 +25,9 @@
 #include "core/components_ng/pattern/tabs/tabs_side_bar_tab_list_pattern.h"
 #include "core/components_ng/property/measure_utils.h"
 #include "core/pipeline_ng/pipeline_context.h"
+#include "ui/base/geometry/ng/offset_t.h"
+#include "ui/base/geometry/ng/size_t.h"
+#include "ui/properties/safe_area_insets.h"
 
 namespace OHOS::Ace::NG {
 namespace {
@@ -34,7 +37,21 @@ constexpr int32_t COUNT_4 = 4;
 
 const Dimension FLOATING_BAR_HEIGHT = Dimension(56, Ace::DimensionUnit::VP);
 const Dimension FLOATING_BAR_BOTTOM_MARGIN = Dimension(28, Ace::DimensionUnit::VP);
+const Dimension FLOATING_BAR_TOP_MARGIN = Dimension(32, Ace::DimensionUnit::VP);
 const Dimension BG_MASK_OVER_BAR = Dimension(16, Ace::DimensionUnit::VP);
+
+const Dimension FLOATING_BAR_TOP_HEIGHT = Dimension(54, Ace::DimensionUnit::VP);
+const Dimension FLOATING_BAR_TOP_BAR_MARGIN_H = Dimension(4, Ace::DimensionUnit::VP);
+
+const Dimension GRID_GUTTER_8 = Dimension(8, Ace::DimensionUnit::VP);
+const Dimension GRID_GUTTER_12 = Dimension(12, Ace::DimensionUnit::VP);
+const Dimension GRID_GUTTER_16 = Dimension(16, Ace::DimensionUnit::VP);
+constexpr int32_t GRID_COLS_4 = 4;
+constexpr int32_t GRID_COLS_8 = 8;
+constexpr int32_t GRID_COLS_12 = 12;
+constexpr int32_t GRID_OCCUPY_4 = 4;
+constexpr int32_t GRID_OCCUPY_8 = 8;
+constexpr int32_t GRID_OCCUPY_10 = 10;
 
 const Dimension FLOATING_BAR_MARGIN_16 = Dimension(16, Ace::DimensionUnit::VP);
 const Dimension FLOATING_BAR_MARGIN_24 = Dimension(24, Ace::DimensionUnit::VP);
@@ -57,7 +74,11 @@ const Dimension FLOATING_BAR_PADDING_4 = Dimension(4, Ace::DimensionUnit::VP);
 const Dimension FLOATING_BAR_PADDING_12 = Dimension(12, Ace::DimensionUnit::VP);
 
 const Dimension SIDE_BAR_DEFAULT_WIDTH = 240.0_vp;
-const Dimension SIDE_BAR_DIVIDER_DEFAULT_WIDTH = 1.0_vp;
+
+constexpr int32_t SWIPER_INDEX = 0;
+constexpr int32_t SIDEBAR_DIVIDER_INDEX = 1;
+constexpr int32_t SIDEBAR_INDEX = 2;
+constexpr int32_t EFFECT_NODE_INDEX = 3;
 } // namespace
 
 void TabsLayoutAlgorithm::UpdateSideBarAndSideBarDividerVisibility(LayoutWrapper* layoutWrapper, bool isVisible)
@@ -120,21 +141,6 @@ void TabsLayoutAlgorithm::UpdateTabBarAndDividerVisibility(LayoutWrapper* layout
     tabBarPattern->ApplyDefaultVisibility();
 }
 
-void TabsLayoutAlgorithm::UpdateEffectNodeVisibility(LayoutWrapper* layoutWrapper, bool isVisible)
-{
-    CHECK_NULL_VOID(layoutWrapper);
-    auto host = AceType::DynamicCast<TabsNode>(layoutWrapper->GetHostNode());
-    CHECK_NULL_VOID(host);
-    if (!host->HasEffectNode()) {
-        return;
-    }
-    auto effectNode = AceType::DynamicCast<FrameNode>(host->GetEffectNode());
-    CHECK_NULL_VOID(effectNode);
-    auto property = effectNode->GetLayoutProperty();
-    CHECK_NULL_VOID(property);
-    property->UpdateVisibility(isVisible ? VisibleType::VISIBLE : VisibleType::GONE);
-}
-
 void TabsLayoutAlgorithm::UpdateBgMaskNodeVisibility(LayoutWrapper* layoutWrapper, bool isVisible)
 {
     CHECK_NULL_VOID(layoutWrapper);
@@ -169,7 +175,27 @@ float TabsLayoutAlgorithm::MeasureSideBar(
     auto geometryNode = sideBarWrapper->GetGeometryNode();
     CHECK_NULL_RETURN(geometryNode, 0.0f);
     auto childLayoutConstraint = layoutProperty->CreateChildConstraint();
-    childLayoutConstraint.selfIdealSize.SetWidth(SIDE_BAR_DEFAULT_WIDTH.ConvertToPx());
+    // Calculate effective sidebar width:
+    // 1. If a drag width has been set (realSideBarWidthPx has value), use it
+    // 2. Otherwise, use effective sidebarWidth (or barWidth if sidebarWidth never called) from pattern
+    // 3. Otherwise default 240vp
+    float sideBarWidthPx = SIDE_BAR_DEFAULT_WIDTH.ConvertToPx();
+    const auto& realSideBarWidthPx = tabsPattern->GetRealSideBarWidthPx();
+    bool hasDragWidth = realSideBarWidthPx.has_value();
+    if (hasDragWidth) {
+        sideBarWidthPx = realSideBarWidthPx.value();
+    } else {
+        auto effectiveWidth = tabsPattern->GetEffectiveSidebarWidth();
+        if (effectiveWidth.has_value()) {
+            auto px = ConvertToPx(effectiveWidth.value(), childLayoutConstraint.scaleProperty, idealSize.Width());
+            if (px.has_value() && GreatOrEqual(px.value(), 0.0f)) {
+                sideBarWidthPx = px.value();
+            }
+        }
+    }
+    // Clamp to container width to prevent overflow on rotation/resize.
+    sideBarWidthPx = std::min(sideBarWidthPx, idealSize.Width());
+    childLayoutConstraint.selfIdealSize.SetWidth(sideBarWidthPx);
     childLayoutConstraint.selfIdealSize.SetHeight(idealSize.Height());
     sideBarWrapper->Measure(childLayoutConstraint);
     return geometryNode->GetFrameSize().Width();
@@ -194,8 +220,40 @@ float TabsLayoutAlgorithm::MeasureSideBarDivider(
     auto geometryNode = sideBarDividerWrapper->GetGeometryNode();
     CHECK_NULL_RETURN(geometryNode, 0.0f);
     auto childLayoutConstraint = layoutProperty->CreateChildConstraint();
-    childLayoutConstraint.selfIdealSize.SetWidth(SIDE_BAR_DIVIDER_DEFAULT_WIDTH.ConvertToPx());
-    childLayoutConstraint.selfIdealSize.SetHeight(idealSize.Height());
+    // Sidebar divider spec:
+    // - not set / undefined / null → not shown (width 0)
+    // - valid DividerStyle (strokeWidth is required) → width = strokeWidth
+    // - strokeWidth <= 0 or percent → effective width = 0
+    // startMargin maps to top margin, endMargin maps to bottom margin.
+    float dividerWidthPx = 0.0f;
+    float startMarginPx = 0.0f;
+    float endMarginPx = 0.0f;
+    do {
+        // Prefer sidebarDivider, fall back to divider (barDivider) for backward compatibility.
+        TabsItemDivider divider;
+        if (layoutProperty->HasSidebarDivider()) {
+            divider = layoutProperty->GetSidebarDividerValue();
+        } else if (layoutProperty->HasDivider()) {
+            divider = layoutProperty->GetDividerValue();
+        } else {
+            break;
+        }
+        if (divider.isNull) {
+            break;
+        }
+        if (divider.strokeWidth.Value() > 0.0f && divider.strokeWidth.Unit() != DimensionUnit::PERCENT) {
+            dividerWidthPx = divider.strokeWidth.ConvertToPx();
+        }
+        if (divider.startMargin.Value() > 0.0f && divider.startMargin.Unit() != DimensionUnit::PERCENT) {
+            startMarginPx = divider.startMargin.ConvertToPx();
+        }
+        if (divider.endMargin.Value() > 0.0f && divider.endMargin.Unit() != DimensionUnit::PERCENT) {
+            endMarginPx = divider.endMargin.ConvertToPx();
+        }
+    } while (false);
+    childLayoutConstraint.selfIdealSize.SetWidth(dividerWidthPx);
+    float dividerHeight = idealSize.Height() - startMarginPx - endMarginPx;
+    childLayoutConstraint.selfIdealSize.SetHeight(dividerHeight > 0.0f ? dividerHeight : 0.0f);
     sideBarDividerWrapper->Measure(childLayoutConstraint);
     return geometryNode->GetFrameSize().Width();
 }
@@ -249,11 +307,13 @@ SizeF TabsLayoutAlgorithm::MeasureSwiperInSideBarMode(
     return swiperWrapper->GetGeometryNode()->GetMarginFrameSize();
 }
 
-void TabsLayoutAlgorithm::MeasureInSideBarMode(
-    LayoutWrapper* layoutWrapper, const RefPtr<TabsLayoutProperty>& layoutProperty, const SizeF& idealSize)
+void TabsLayoutAlgorithm::MeasureInSideBarMode(LayoutWrapper* layoutWrapper,
+    const RefPtr<TabsLayoutProperty>& layoutProperty, const SizeF& idealSize, bool needMeasureEnterComponents)
 {
     CHECK_NULL_VOID(layoutWrapper);
     CHECK_NULL_VOID(layoutProperty);
+    auto tabsNode = AceType::DynamicCast<TabsNode>(layoutWrapper->GetHostNode());
+    CHECK_NULL_VOID(tabsNode);
     auto geometryNode = layoutWrapper->GetGeometryNode();
     CHECK_NULL_VOID(geometryNode);
 
@@ -264,12 +324,56 @@ void TabsLayoutAlgorithm::MeasureInSideBarMode(
     if (swiperWrapper) {
         swiperWrapper->GetLayoutProperty()->UpdateLayoutDirection(layoutProperty->GetNonAutoLayoutDirection());
     }
+    SizeF swiperSize;
     if (swiperWrapper && swiperWrapper->GetHostNode() && swiperWrapper->GetHostNode()->TotalChildCount() > 0) {
-        MeasureSwiperInSideBarMode(
+        swiperSize = MeasureSwiperInSideBarMode(
             layoutProperty, swiperWrapper, idealSize, sideBarWidth, dividerStrokeWidth);
     } else if (swiperWrapper && swiperWrapper->GetGeometryNode()) {
         swiperWrapper->GetGeometryNode()->SetFrameSize(SizeF());
     }
+    if (tabsNode->HasEffectNode()) {
+        auto effectWrapper = layoutWrapper->GetChildByIndex(itemIndex_.effectIndex);
+        if (effectWrapper) {
+            MeasureEffectNode(layoutProperty, effectWrapper, needMeasureEnterComponents ? idealSize : swiperSize);
+        }
+    }
+    if (!needMeasureEnterComponents) {
+        return;
+    }
+    // Animation start layout (fromMode=SIDEBAR → toMode=BOTTOM): additionally measure the
+    // entering bottom-tabbar components so they have geometry for the enter animation.
+    // Per spec the tabbar (and effectNode/bgMaskNode) width reference is the whole tabs
+    // container width, same as a normal bottom-mode layout pass.
+    // Re-entrant layout during animation (now in toMode=SIDEBAR): also measure the exiting
+    // bottom-tabbar components so they keep proper geometry while animating out.
+    auto enterConstraint = layoutProperty->CreateChildConstraint();
+    enterConstraint.parentIdealSize = OptionalSizeF(idealSize);
+    SizeF enterTabBarSize = MeasureTabBar(layoutWrapper, enterConstraint);
+    auto enterDividerWrapper = layoutWrapper->GetOrCreateChildByIndex(itemIndex_.dividerIndex);
+    if (enterDividerWrapper) {
+        MeasureDivider(layoutProperty, enterDividerWrapper, idealSize);
+    }
+    // effectNode and backgroundMask node must also be measured with the same size
+    // reference as the tabbar (the whole tabs container), so they have geometry for
+    // the enter animation.
+    MeasureBackgroundMask(layoutWrapper, idealSize, enterTabBarSize);
+}
+
+bool TabsLayoutAlgorithm::CheckIfNeedModeChangeAnimation(const RefPtr<TabsLayoutProperty>& layoutProperty,
+    const RefPtr<TabsPattern>& tabsPattern, bool displayModeChanged, bool firstLayout)
+{
+    // Determine whether to animate the display mode switch.
+    // Skip animation on first layout and when an external animation closure is active
+    // (e.g., dynamic component rotation, split-window transitions).
+    // Non-floating tabbar only animates when it's a bottom tabbar (horizontal + barPosition=END);
+    // other positions (vertical, or barPosition=START) get a one-frame switch via the non-animate path.
+    CHECK_NULL_RETURN(tabsPattern, false);
+    CHECK_NULL_RETURN(layoutProperty, false);
+    bool isHorizontal = layoutProperty->GetAxis().value_or(Axis::HORIZONTAL) == Axis::HORIZONTAL;
+    bool isBarPositionEnd = layoutProperty->GetTabBarPosition().value_or(BarPosition::START) == BarPosition::END;
+    bool isAnimatableTabBar = tabsPattern->IsFloatingBar() || (isHorizontal && isBarPositionEnd);
+    return displayModeChanged && !firstLayout
+        && !AnimationUtils::IsImplicitAnimationOpen() && isAnimatableTabBar;
 }
 
 void TabsLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
@@ -309,24 +413,75 @@ void TabsLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
     if (firstLayout) {
         displayModeChanged = tabsPattern->GetSideBarNode() != nullptr;
     }
-    bool preIsDisableSwipe = tabsPattern->GetIsRealDisableSwipe();
-    tabsPattern->SetCurrentBarDisplayMode(curDisplayMode);
-    bool curIsDisableSwipe = tabsPattern->GetIsRealDisableSwipe();
+    bool shouldAnimate = CheckIfNeedModeChangeAnimation(layoutProperty, tabsPattern, displayModeChanged, firstLayout);
+    if (shouldAnimate && preDisplayMode.has_value() &&
+        (preDisplayMode.value() == TabBarDisplayMode::TOP_TABBAR || curDisplayMode == TabBarDisplayMode::TOP_TABBAR)) {
+        shouldAnimate = false;
+    }
+    // During the animation closure's FlushUITasks re-entrant layout, the pattern flag is set,
+    // so we take the non-animate path but must NOT touch visibility (the animation owns it).
+    bool isReentrantDuringAnim = tabsPattern->IsOnDisplayModeSwitchAnimation();
+    // The animation-start pass additionally measures+layouts the entering component. The
+    // re-entrant layout inside the animation closure is NOT the start pass.
+    measuringForAnimStart_ = shouldAnimate;
 
-    if (displayModeChanged) {
-        UpdateSideBarAndSideBarDividerVisibility(layoutWrapper, curDisplayMode == TabBarDisplayMode::SIDEBAR);
-        UpdateTabBarAndDividerVisibility(layoutWrapper, curDisplayMode == TabBarDisplayMode::BOTTOMTABBAR);
-        UpdateEffectNodeVisibility(layoutWrapper, curDisplayMode == TabBarDisplayMode::BOTTOMTABBAR);
-        UpdateBgMaskNodeVisibility(layoutWrapper, curDisplayMode == TabBarDisplayMode::BOTTOMTABBAR);
+    bool preIsDisableSwipe = tabsPattern->GetIsRealDisableSwipe();
+    TabBarDisplayMode effectiveMode = curDisplayMode;
+
+    if (shouldAnimate) {
+        // Animate path: keep layout in the old mode for this pass so the "from" state is
+        // captured. The animation closure (AddAfterLayoutTask) switches the mode and calls
+        // FlushUITasks, causing a re-entrant layout in the new mode whose offset diffs are
+        // captured by the implicit animation.
+        effectiveMode = preDisplayMode.value();
+        auto fromMode = preDisplayMode.value();
+        auto toMode = curDisplayMode;
+        // Ensure ALL components (both from-mode and to-mode) are visible so the entering
+        // element can render during the animation. The entering components were previously
+        // GONE because they belonged to the non-active mode.
+        UpdateSideBarAndSideBarDividerVisibility(layoutWrapper, true);
+        UpdateTabBarAndDividerVisibility(layoutWrapper, true);
+        UpdateBgMaskNodeVisibility(layoutWrapper, true);
         auto context = tabsNode->GetContext();
         CHECK_NULL_VOID(context);
-        context->AddAfterLayoutTask([weakTabsPattern = WeakPtr<TabsPattern>(tabsPattern), curDisplayMode]() {
-            auto tabsPattern = weakTabsPattern.Upgrade();
-            CHECK_NULL_VOID(tabsPattern);
-            tabsPattern->FireBarDisplayModeChangeEvent(curDisplayMode);
-        });
+        // Mark that the next layout pass should additionally measure/layout the entering
+        // component (the one belonging to toMode) so it has geometry for the animation.
+        // The pattern resets this flag after the animation-start layout pass.
+        context->AddAfterLayoutTask(
+            [weakTabsPattern = WeakPtr<TabsPattern>(tabsPattern), fromMode, toMode]() {
+                auto tabsPattern = weakTabsPattern.Upgrade();
+                CHECK_NULL_VOID(tabsPattern);
+                TAG_LOGI(AceLogTag::ACE_TABS, "Start Tabs displayMode change animation"
+                    ", fromMode=%{public}d, toMode=%{public}d",
+                    static_cast<int32_t>(fromMode), static_cast<int32_t>(toMode));
+                tabsPattern->StartDisplayModeSwitchAnimation(fromMode, toMode);
+            });
+    } else {
+        // Non-animate path: first layout, external animation active, or re-entrant layout
+        // (isOnDisplayModeSwitchAnimation_ == true during FlushUITasks inside animation closure).
+        // In the re-entrant case, SetCurrentBarDisplayMode and FireBarDisplayModeChangeEvent
+        // are still executed so the mode is updated and the developer callback fires at
+        // animation start (matching Navigation's behavior), not at animation finish.
+        tabsPattern->SetCurrentBarDisplayMode(curDisplayMode);
+        if (displayModeChanged) {
+            if (!isReentrantDuringAnim) {
+                UpdateSideBarAndSideBarDividerVisibility(layoutWrapper, curDisplayMode == TabBarDisplayMode::SIDEBAR);
+                UpdateTabBarAndDividerVisibility(layoutWrapper,
+                    curDisplayMode == TabBarDisplayMode::BOTTOMTABBAR || curDisplayMode == TabBarDisplayMode::TOP_TABBAR);
+                UpdateBgMaskNodeVisibility(layoutWrapper,
+                    curDisplayMode == TabBarDisplayMode::BOTTOMTABBAR || curDisplayMode == TabBarDisplayMode::TOP_TABBAR);
+            }
+            auto context = tabsNode->GetContext();
+            CHECK_NULL_VOID(context);
+            context->AddAfterLayoutTask([weakTabsPattern = WeakPtr<TabsPattern>(tabsPattern), curDisplayMode]() {
+                auto tabsPattern = weakTabsPattern.Upgrade();
+                CHECK_NULL_VOID(tabsPattern);
+                tabsPattern->FireBarDisplayModeChangeEvent(curDisplayMode);
+            });
+        }
     }
 
+    bool curIsDisableSwipe = tabsPattern->GetIsRealDisableSwipe();
     if (preIsDisableSwipe != curIsDisableSwipe) {
         auto context = tabsNode->GetContext();
         CHECK_NULL_VOID(context);
@@ -338,8 +493,8 @@ void TabsLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
             tabsNode->MarkDirtyNode();
         });
     }
-    if (curDisplayMode == TabBarDisplayMode::SIDEBAR) {
-        MeasureInSideBarMode(layoutWrapper, layoutProperty, idealSize);
+    if (effectiveMode == TabBarDisplayMode::SIDEBAR) {
+        MeasureInSideBarMode(layoutWrapper, layoutProperty, idealSize, shouldAnimate || isReentrantDuringAnim);
         return;
     }
 
@@ -351,9 +506,13 @@ void TabsLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
     SizeF tabBarSize = MeasureTabBar(layoutWrapper, childLayoutConstraint);
 
     // Measure effect node.
-    auto effectWrapper = layoutWrapper->GetOrCreateChildByIndex(itemIndex_.effectIndex);
-    if (effectWrapper) {
-        MeasureEffectNode(layoutProperty, effectWrapper, idealSize);
+    // Only measure effectNode when it actually exists — otherwise
+    // GetOrCreateChildByIndex(effectIndex) may return a different child.
+    if (tabsNode->HasEffectNode()) {
+        auto effectWrapper = layoutWrapper->GetOrCreateChildByIndex(itemIndex_.effectIndex);
+        if (effectWrapper) {
+            MeasureEffectNode(layoutProperty, effectWrapper, idealSize);
+        }
     }
 
     // Measure backgroundMask node.
@@ -365,7 +524,7 @@ void TabsLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
         dividerStrokeWidth = MeasureDivider(layoutProperty, dividerWrapper, idealSize);
     }
 
-    auto barOverlap = layoutProperty->GetBarOverlap().value_or(false);
+    auto barOverlap = layoutProperty->GetBarOverlap().value_or(false) || isFloatingTopBar_;
 
     // Measure swiper.
     auto swiperWrapper = layoutWrapper->GetOrCreateChildByIndex(itemIndex_.swiperIndex);
@@ -403,6 +562,15 @@ void TabsLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
             geometryNode->SetFrameHeight(dividerStrokeWidth + swiperSize.Height() + paddingV);
         }
     }
+    // Animation start layout (fromMode=BOTTOM → toMode=SIDEBAR): additionally measure the
+    // entering sidebar + sidebarDivider with their target-mode sizes so they have geometry
+    // for the enter animation.
+    // Re-entrant layout during animation (now in toMode=BOTTOM): also measure the exiting
+    // sidebar + sidebarDivider so they keep proper geometry while animating out.
+    if (shouldAnimate || isReentrantDuringAnim) {
+        MeasureSideBar(layoutWrapper, layoutProperty, idealSize);
+        MeasureSideBarDivider(layoutWrapper, layoutProperty, idealSize);
+    }
 }
 
 void TabsLayoutAlgorithm::LayoutInSideBarMode(LayoutWrapper* layoutWrapper)
@@ -428,20 +596,18 @@ void TabsLayoutAlgorithm::LayoutInSideBarMode(LayoutWrapper* layoutWrapper)
     CHECK_NULL_VOID(geometryNode);
     auto frameSize = geometryNode->GetFrameSize();
     auto swiperWrapper = layoutWrapper->GetOrCreateChildByIndex(itemIndex_.swiperIndex);
+    auto effectWrapper = tabsNode->HasEffectNode() ? layoutWrapper->GetChildByIndex(itemIndex_.effectIndex) : nullptr;
     if (!swiperWrapper || !sideBarDividerWrapper || !sideBarWrapper) {
         return;
     }
 
     // swiper sideBarDivider sideBar
-    std::vector<OffsetF> offsetList = { OffsetF(), OffsetF(), OffsetF() };
+    std::vector<OffsetF> offsetList = { OffsetF(), OffsetF(), OffsetF(), OffsetF() };
     if (frameSize.IsPositive()) {
         MinusPaddingToSize(layoutProperty->CreatePaddingAndBorder(), frameSize);
-        offsetList = LayoutOffsetListInSideBarMode(layoutWrapper, sideBarWrapper, frameSize);
+        offsetList = LayoutOffsetListInSideBarMode(layoutWrapper, sideBarWrapper, effectWrapper, frameSize);
     }
 
-    constexpr int32_t SWIPER_INDEX = 0;
-    constexpr int32_t SIDEBAR_DIVIDER_INDEX = 1;
-    constexpr int32_t SIDEBAR_INDEX = 2;
     auto swiperGeo = swiperWrapper->GetGeometryNode();
     if (swiperGeo) {
         swiperGeo->SetMarginFrameOffset(offsetList[SWIPER_INDEX]);
@@ -456,6 +622,67 @@ void TabsLayoutAlgorithm::LayoutInSideBarMode(LayoutWrapper* layoutWrapper)
     if (sideBarGeo) {
         sideBarGeo->SetMarginFrameOffset(offsetList[SIDEBAR_INDEX]);
         sideBarWrapper->Layout();
+    }
+    if (measuringForAnimStart_ || tabsPattern->IsOnDisplayModeSwitchAnimation()) {
+        // Animation-start or re-entrant layout: also layout the bottom-mode components
+        // (tabbar + divider + effectNode + bgMaskNode) at their correct bottom-mode positions.
+        LayoutBottomComponentsForAnimation(layoutWrapper, layoutProperty, tabsNode, geometryNode);
+        LayoutBackgroundMask(layoutWrapper);
+        measuringForAnimStart_ = false;
+    } else if (effectWrapper) {
+        auto geometryNode = effectWrapper->GetGeometryNode();
+        CHECK_NULL_VOID(geometryNode);
+        geometryNode->SetMarginFrameOffset(offsetList[EFFECT_NODE_INDEX]);
+        effectWrapper->Layout();
+    }
+}
+
+void TabsLayoutAlgorithm::LayoutBottomComponentsForAnimation(LayoutWrapper* layoutWrapper,
+    const RefPtr<TabsLayoutProperty>& layoutProperty, const RefPtr<TabsNode>& tabsNode,
+    const RefPtr<GeometryNode>& geometryNode)
+{
+    auto tabBarWrapper = layoutWrapper->GetChildByIndex(itemIndex_.tabBarIndex);
+    auto tabBarDividerWrapper = layoutWrapper->GetOrCreateChildByIndex(itemIndex_.dividerIndex);
+    auto effectWrapper = tabsNode->HasEffectNode()
+        ? layoutWrapper->GetChildByIndex(itemIndex_.effectIndex) : nullptr;
+    CHECK_NULL_VOID(tabBarWrapper);
+    CHECK_NULL_VOID(tabBarDividerWrapper);
+
+    auto frameSizeForBottom = geometryNode->GetFrameSize();
+    std::vector<OffsetF> bottomOffsets = { OffsetF(), OffsetF(), OffsetF(), OffsetF() };
+    if (frameSizeForBottom.IsPositive()) {
+        MinusPaddingToSize(layoutProperty->CreatePaddingAndBorder(), frameSizeForBottom);
+        bottomOffsets = LayoutOffsetList(layoutWrapper, tabBarWrapper, effectWrapper, frameSizeForBottom);
+    }
+    if (layoutProperty->GetNonAutoLayoutDirection() == TextDirection::RTL) {
+        auto tabsWidth = geometryNode->GetFrameSize().Width();
+        auto tabBarWidth = tabBarWrapper->GetGeometryNode()->GetMarginFrameSize().Width();
+        auto& tabBarOffset = bottomOffsets[itemIndex_.tabBarIndex];
+        tabBarOffset = OffsetF((tabsWidth - tabBarOffset.GetX() - tabBarWidth), tabBarOffset.GetY());
+        auto dividerWidth = tabBarDividerWrapper->GetGeometryNode()->GetFrameSize().Width();
+        auto& dividerOffset = bottomOffsets[itemIndex_.dividerIndex];
+        dividerOffset = OffsetF((tabsWidth - dividerOffset.GetX() - dividerWidth), dividerOffset.GetY());
+        if (effectWrapper) {
+            auto effectWidth = effectWrapper->GetGeometryNode()->GetMarginFrameSize().Width();
+            auto& effectOffset = bottomOffsets[itemIndex_.effectIndex];
+            effectOffset = OffsetF((tabsWidth - effectOffset.GetX() - effectWidth), effectOffset.GetY());
+        }
+    }
+    auto tabBarGeo = tabBarWrapper->GetGeometryNode();
+    if (tabBarGeo) {
+        tabBarGeo->SetMarginFrameOffset(bottomOffsets[itemIndex_.tabBarIndex]);
+        tabBarWrapper->Layout();
+    }
+    auto tabBarDividerGeo = tabBarDividerWrapper->GetGeometryNode();
+    if (tabBarDividerGeo) {
+        tabBarDividerGeo->SetMarginFrameOffset(bottomOffsets[itemIndex_.dividerIndex]);
+        tabBarDividerWrapper->Layout();
+    }
+    CHECK_NULL_VOID(effectWrapper);
+    auto effectNodeGeo = effectWrapper->GetGeometryNode();
+    if (effectNodeGeo) {
+        effectNodeGeo->SetMarginFrameOffset(bottomOffsets[itemIndex_.effectIndex]);
+        effectWrapper->Layout();
     }
 }
 
@@ -480,7 +707,8 @@ void TabsLayoutAlgorithm::Layout(LayoutWrapper* layoutWrapper)
     CHECK_NULL_VOID(layoutProperty);
     auto tabBarWrapper = layoutWrapper->GetChildByIndex(itemIndex_.tabBarIndex);
     auto dividerWrapper = layoutWrapper->GetOrCreateChildByIndex(itemIndex_.dividerIndex);
-    auto effectWrapper = layoutWrapper->GetChildByIndex(itemIndex_.effectIndex);
+    auto effectWrapper = tabsNode->HasEffectNode()
+        ? layoutWrapper->GetChildByIndex(itemIndex_.effectIndex) : nullptr;
     auto swiperWrapper = layoutWrapper->GetOrCreateChildByIndex(itemIndex_.swiperIndex);
     if (!tabBarWrapper || !dividerWrapper || !swiperWrapper) {
         return;
@@ -523,6 +751,51 @@ void TabsLayoutAlgorithm::Layout(LayoutWrapper* layoutWrapper)
     tabBarWrapper->Layout();
 
     LayoutBackgroundMask(layoutWrapper);
+
+    tabsPattern->ClampTabBarTransformOffset();
+
+    if (measuringForAnimStart_ || tabsPattern->IsOnDisplayModeSwitchAnimation()) {
+        LayoutSidebarForAnimation(layoutWrapper, layoutProperty, geometryNode);
+        measuringForAnimStart_ = false;
+    }
+}
+
+void TabsLayoutAlgorithm::LayoutSidebarForAnimation(LayoutWrapper* layoutWrapper,
+    const RefPtr<TabsLayoutProperty>& layoutProperty,
+    const RefPtr<GeometryNode>& geometryNode)
+{
+    auto tabsNode = AceType::DynamicCast<TabsNode>(layoutWrapper->GetHostNode());
+    CHECK_NULL_VOID(tabsNode);
+    auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
+    CHECK_NULL_VOID(tabsPattern);
+    auto sideBar = tabsPattern->GetSideBarNode();
+    auto sideBarDivider = tabsPattern->GetSideBarDividerNode();
+    CHECK_NULL_VOID(sideBar);
+    CHECK_NULL_VOID(sideBarDivider);
+    auto sideBarIndex = tabsNode->GetChildIndexById(sideBar->GetId());
+    auto sideBarWrapper = layoutWrapper->GetOrCreateChildByIndex(sideBarIndex);
+    auto sideBarDividerIndex = tabsNode->GetChildIndexById(sideBarDivider->GetId());
+    auto sideBarDividerWrapper = layoutWrapper->GetOrCreateChildByIndex(sideBarDividerIndex);
+    CHECK_NULL_VOID(sideBarWrapper);
+    CHECK_NULL_VOID(sideBarDividerWrapper);
+
+    auto frameSizeForSideBar = geometryNode->GetFrameSize();
+    if (!frameSizeForSideBar.IsPositive()) {
+        return;
+    }
+    MinusPaddingToSize(layoutProperty->CreatePaddingAndBorder(), frameSizeForSideBar);
+    auto effectWrapper = tabsNode->HasEffectNode() ? layoutWrapper->GetChildByIndex(itemIndex_.effectIndex) : nullptr;
+    auto offsets = LayoutOffsetListInSideBarMode(layoutWrapper, sideBarWrapper, effectWrapper, frameSizeForSideBar);
+    auto sideBarGeo = sideBarWrapper->GetGeometryNode();
+    if (sideBarGeo) {
+        sideBarGeo->SetMarginFrameOffset(offsets[SIDEBAR_INDEX]);
+        sideBarWrapper->Layout();
+    }
+    auto sideBarDividerGeo = sideBarDividerWrapper->GetGeometryNode();
+    if (sideBarDividerGeo) {
+        sideBarDividerGeo->SetMarginFrameOffset(offsets[SIDEBAR_DIVIDER_INDEX]);
+        sideBarDividerWrapper->Layout();
+    }
 }
 
 void TabsLayoutAlgorithm::UpdateBarMargin(LayoutWrapper* layoutWrapper, OffsetF& barOffset) const
@@ -575,71 +848,208 @@ void TabsLayoutAlgorithm::UpdateBarMargin(LayoutWrapper* layoutWrapper, OffsetF&
     tabsPattern->SetFloatingScaleEnabled(floatingScaleEnabled);
 }
 
-void TabsLayoutAlgorithm::LayoutBackgroundMask(LayoutWrapper* layoutWrapper)
+void TabsLayoutAlgorithm::UpdateTopBarMargin(LayoutWrapper* layoutWrapper, OffsetF& barOffset) const
 {
-    if (!isFloatingBar_) {
-        return;
-    }
-    auto backgroundMaskWrapper = layoutWrapper->GetOrCreateChildByIndex(itemIndex_.bgMaskIndex);
-    CHECK_NULL_VOID(backgroundMaskWrapper);
     auto layoutProperty = AceType::DynamicCast<TabsLayoutProperty>(layoutWrapper->GetLayoutProperty());
     CHECK_NULL_VOID(layoutProperty);
+    auto tabGeometryNode = layoutWrapper->GetGeometryNode();
+    CHECK_NULL_VOID(tabGeometryNode);
+    float barTopMargin = FLOATING_BAR_TOP_MARGIN.ConvertToPx();
+    auto barTopFloatingStyle = layoutProperty->GetBarTopFloatingStyle();
+    if (barTopFloatingStyle.has_value() &&
+        barTopFloatingStyle->barTopMargin.has_value() &&
+        barTopFloatingStyle->barTopMargin->IsNonNegative()) {
+        auto tabHeight = tabGeometryNode->GetFrameSize().Height();
+        barTopMargin = barTopFloatingStyle->barTopMargin.value().ConvertToPxWithSize(tabHeight);
+    }
+
+    auto hostNode = layoutWrapper->GetHostNode();
+    CHECK_NULL_VOID(hostNode);
+
+    barOffset += OffsetF(0.0f, barTopMargin);
+
+    auto context = hostNode->GetContext();
+    if (context) {
+        auto tabsGeo = layoutWrapper->GetGeometryNode();
+        CHECK_NULL_VOID(tabsGeo);
+        auto tabsFrameSize = tabsGeo->GetMarginFrameSize();
+
+        auto tabBarWrapper = layoutWrapper->GetChildByIndex(itemIndex_.tabBarIndex);
+        CHECK_NULL_VOID(tabBarWrapper);
+        auto tabBarGeo = tabBarWrapper->GetGeometryNode();
+        CHECK_NULL_VOID(tabBarGeo);
+        auto tabBarSize = tabBarGeo->GetMarginFrameSize();
+
+        auto tabsFrameOffset = tabsGeo->GetFrameOffset();
+        auto safeArea = context->GetSafeArea();
+        auto titleHeight = context->GetContainerModalTitleHeight();
+        float titleAvoidance = titleHeight > 0 ? static_cast<float>(titleHeight) : 0.0f;
+        float safeTopPx = static_cast<float>(safeArea.top_.Length()) + titleAvoidance;
+        float safeBottomPx = static_cast<float>(safeArea.bottom_.Length());
+        float safeLeftPx = static_cast<float>(safeArea.left_.Length());
+        float safeRightPx = static_cast<float>(safeArea.right_.Length());
+
+        bool tabsOverlapsTopSafe = LessNotEqual(tabsFrameOffset.GetY(), safeTopPx);
+        bool tabsOverlapsBottomSafe = GreatNotEqual(tabsFrameOffset.GetY() + tabsFrameSize.Height(),
+            safeArea.bottom_.IsValid() ? safeArea.bottom_.start : std::numeric_limits<float>::max());
+        bool tabsOverlapsLeftSafe = LessNotEqual(tabsFrameOffset.GetX(), safeLeftPx);
+        bool tabsOverlapsRightSafe = GreatNotEqual(tabsFrameOffset.GetX() + tabsFrameSize.Width(),
+            safeArea.right_.IsValid() ? safeArea.right_.start : std::numeric_limits<float>::max());
+
+        float minX = tabsOverlapsLeftSafe ? std::max(0.0f, safeLeftPx - tabsFrameOffset.GetX()) : 0.0f;
+        float maxX = tabsFrameSize.Width() - tabBarSize.Width() -
+            (tabsOverlapsRightSafe ? std::max(0.0f, safeRightPx - tabsFrameOffset.GetX()) : 0.0f);
+        float minY = tabsOverlapsTopSafe ? std::max(0.0f, safeTopPx - tabsFrameOffset.GetY()) : 0.0f;
+        float maxY = tabsFrameSize.Height() - tabBarSize.Height() -
+            (tabsOverlapsBottomSafe ? std::max(0.0f, safeBottomPx -
+                (tabsFrameOffset.GetY() + tabsFrameSize.Height())) : 0.0f);
+
+        if (LessNotEqual(maxX, minX)) {
+            maxX = minX;
+        }
+        if (LessNotEqual(maxY, minY)) {
+            maxY = minY;
+        }
+        if (LessNotEqual(barOffset.GetX(), minX)) {
+            barOffset.SetX(minX);
+        }
+        if (GreatNotEqual(barOffset.GetX(), maxX)) {
+            barOffset.SetX(maxX);
+        }
+        if (LessNotEqual(barOffset.GetY(), minY)) {
+            barOffset.SetY(minY);
+        }
+        if (GreatNotEqual(barOffset.GetY(), maxY)) {
+            barOffset.SetY(maxY);
+        }
+    }
+}
+
+void TabsLayoutAlgorithm::LayoutBackgroundMask(LayoutWrapper* layoutWrapper)
+{
+    if (!isFloatingBar_ && !isFloatingTopBar_) {
+        return;
+    }
+    auto layoutProperty = AceType::DynamicCast<TabsLayoutProperty>(layoutWrapper->GetLayoutProperty());
+    CHECK_NULL_VOID(layoutProperty);
+    if (isFloatingTopBar_) {
+        auto topStyle = layoutProperty->GetBarTopFloatingStyle();
+        bool hasMask = topStyle.has_value() && topStyle->maskHeight.has_value() &&
+            topStyle->maskHeight->IsNonNegative();
+        if (!hasMask) {
+            return;
+        }
+    }
     auto geometryNode = layoutWrapper->GetGeometryNode();
     CHECK_NULL_VOID(geometryNode);
     auto frameSize = geometryNode->GetFrameSize();
     auto paddingOffset = layoutProperty->CreatePaddingAndBorder().Offset();
     auto axis = GetAxis(layoutWrapper);
-    auto backgroundMaskGeometryNode =
-        backgroundMaskWrapper ? backgroundMaskWrapper->GetGeometryNode() : RefPtr<GeometryNode>();
-    auto backgroundMaskFrameSize =
-        backgroundMaskGeometryNode ? backgroundMaskGeometryNode->GetMarginFrameSize() : SizeF();
-    auto offset =
-        OffsetF(0.0f, frameSize.CrossSize(axis) - backgroundMaskFrameSize.CrossSize(axis) + paddingOffset.GetY());
-    if (backgroundMaskGeometryNode) {
-        backgroundMaskGeometryNode->SetMarginFrameOffset(offset);
+
+    if (itemIndex_.bgMaskIndex < 0) {
+        return;
     }
-    backgroundMaskWrapper->Layout();
+    auto bgMaskWrapper = layoutWrapper->GetOrCreateChildByIndex(itemIndex_.bgMaskIndex);
+    if (!bgMaskWrapper) {
+        return;
+    }
+    auto bgMaskGeo = bgMaskWrapper->GetGeometryNode();
+    auto bgMaskSize = bgMaskGeo ? bgMaskGeo->GetMarginFrameSize() : SizeF();
+    if (bgMaskGeo) {
+        if (isFloatingTopBar_) {
+            bgMaskGeo->SetMarginFrameOffset(OffsetF(0.0f, paddingOffset.GetY()));
+        } else {
+            bgMaskGeo->SetMarginFrameOffset(OffsetF(0.0f,
+                frameSize.CrossSize(axis) - bgMaskSize.CrossSize(axis) + paddingOffset.GetY()));
+        }
+    }
+    bgMaskWrapper->Layout();
 }
 
-std::vector<OffsetF> TabsLayoutAlgorithm::LayoutOffsetListInSideBarMode(
-    LayoutWrapper* layoutWrapper, const RefPtr<LayoutWrapper>& sideBarWrapper,
+void TabsLayoutAlgorithm::CalcEffectNodeOffsetInSideBarMode(LayoutWrapper* layoutWrapper,
+    const RefPtr<LayoutWrapper>& effectNodeWrapper, const SizeF& frameSize,
+    const OffsetF& paddingOffset, std::vector<OffsetF>& offsetList) const
+{
+    CHECK_NULL_VOID(effectNodeWrapper);
+    auto effectNodeGeometryNode = effectNodeWrapper->GetGeometryNode();
+    CHECK_NULL_VOID(effectNodeGeometryNode);
+    auto effectNodeFrameSize = effectNodeGeometryNode->GetMarginFrameSize();
+    auto barPosition = GetBarPosition(layoutWrapper);
+    if (barPosition == BarPosition::START) {
+        offsetList[EFFECT_NODE_INDEX] = OffsetF(offsetList[SWIPER_INDEX].GetX(), paddingOffset.GetY());
+    } else {
+        offsetList[EFFECT_NODE_INDEX] = OffsetF(offsetList[SWIPER_INDEX].GetX(),
+            frameSize.Height() - effectNodeFrameSize.Height() + paddingOffset.GetY());
+    }
+}
+
+std::vector<OffsetF> TabsLayoutAlgorithm::LayoutOffsetListInSideBarMode(LayoutWrapper* layoutWrapper,
+    const RefPtr<LayoutWrapper>& sideBarWrapper, const RefPtr<LayoutWrapper>& effectNodeWrapper,
     const SizeF& frameSize) const
 {
-    std::vector<OffsetF> offsetList;
-    OffsetF swiperOffset;
-    OffsetF sideBarDividerOffset;
-    OffsetF sideBarOffset;
+    constexpr int32_t OFFSET_COUNT = 4;
+    std::vector<OffsetF> offsetList(OFFSET_COUNT, OffsetF());
+    CHECK_NULL_RETURN(layoutWrapper, offsetList);
+    auto tabsNode = AceType::DynamicCast<TabsNode>(layoutWrapper->GetHostNode());
+    CHECK_NULL_RETURN(tabsNode, offsetList);
+    auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
+    CHECK_NULL_RETURN(tabsPattern, offsetList);
     auto sideBarGeometryNode = sideBarWrapper->GetGeometryNode();
     CHECK_NULL_RETURN(sideBarGeometryNode, offsetList);
     auto sideBarFrameSize = sideBarGeometryNode->GetMarginFrameSize();
-    auto dividerStrokeWidth = SIDE_BAR_DIVIDER_DEFAULT_WIDTH.ConvertToPx();
     auto layoutProperty = DynamicCast<TabsLayoutProperty>(layoutWrapper->GetLayoutProperty());
     CHECK_NULL_RETURN(layoutProperty, offsetList);
+    // Use the measured side bar divider width (driven by Divider property).
+    // Default is 0: when divider is not set/undefined/null, the sidebar divider is not shown.
+    float dividerStrokeWidth = 0.0f;
+    do {
+        auto sideBarDivider = tabsPattern->GetSideBarDividerNode();
+        CHECK_NULL_BREAK(sideBarDivider);
+        auto sideBarDividerIndex = tabsNode->GetChildIndexById(sideBarDivider->GetId());
+        if (sideBarDividerIndex < 0) {
+            break;
+        }
+        auto sideBarDividerWrapper = layoutWrapper->GetOrCreateChildByIndex(sideBarDividerIndex);
+        CHECK_NULL_BREAK(sideBarDividerWrapper);
+        auto geo = sideBarDividerWrapper->GetGeometryNode();
+        CHECK_NULL_BREAK(geo);
+        dividerStrokeWidth = geo->GetMarginFrameSize().Width();
+    } while (false);
     auto sideBarPosition = layoutProperty->GetSidebarPositionValue(BarPosition::START);
     auto paddingOffset = layoutProperty->CreatePaddingAndBorder().Offset();
+    // Apply the divider startMargin (top margin) to the vertical sidebar divider's Y offset.
+    float dividerStartMarginPx = 0.0f;
+    TabsItemDivider effectiveDivider;
+    if (layoutProperty->HasSidebarDivider()) {
+        effectiveDivider = layoutProperty->GetSidebarDividerValue();
+    } else if (layoutProperty->HasDivider()) {
+        effectiveDivider = layoutProperty->GetDividerValue();
+    }
+    if (!effectiveDivider.isNull && effectiveDivider.startMargin.Value() > 0.0f &&
+        effectiveDivider.startMargin.Unit() != DimensionUnit::PERCENT) {
+        dividerStartMarginPx = effectiveDivider.startMargin.ConvertToPx();
+    }
     bool isRTL = layoutProperty->GetNonAutoLayoutDirection() == TextDirection::RTL;
     if ((!isRTL && sideBarPosition == BarPosition::START) || (isRTL && sideBarPosition == BarPosition::END)) {
-        sideBarOffset = paddingOffset;
-        sideBarDividerOffset = OffsetF(sideBarFrameSize.Width() + paddingOffset.GetX(), paddingOffset.GetY());
-        swiperOffset = OffsetF(paddingOffset.GetX() + sideBarFrameSize.Width() + dividerStrokeWidth,
+        offsetList[SIDEBAR_INDEX] = paddingOffset;
+        offsetList[SIDEBAR_DIVIDER_INDEX] = OffsetF(sideBarFrameSize.Width() + paddingOffset.GetX(),
+            paddingOffset.GetY() + dividerStartMarginPx);
+        offsetList[SWIPER_INDEX] = OffsetF(paddingOffset.GetX() + sideBarFrameSize.Width() + dividerStrokeWidth,
             paddingOffset.GetY());
     } else {
         auto style = layoutProperty->GetSidebarDisplayStyle().value_or(SidebarDisplayStyle::EMBED);
         if (style == SidebarDisplayStyle::DISPLACE) {
-            swiperOffset = OffsetF(paddingOffset.GetX() - sideBarFrameSize.Width() - dividerStrokeWidth,
+            offsetList[SWIPER_INDEX] = OffsetF(paddingOffset.GetX() - sideBarFrameSize.Width() - dividerStrokeWidth,
                 paddingOffset.GetY());
         } else {
-            swiperOffset = paddingOffset;
+            offsetList[SWIPER_INDEX] = paddingOffset;
         }
-        sideBarOffset = OffsetF(frameSize.Width() - sideBarFrameSize.Width() + paddingOffset.GetX(),
+        offsetList[SIDEBAR_INDEX] = OffsetF(frameSize.Width() - sideBarFrameSize.Width() + paddingOffset.GetX(),
             paddingOffset.GetY());
-        sideBarDividerOffset = OffsetF(frameSize.Width() - sideBarFrameSize.Width() - dividerStrokeWidth +
-            paddingOffset.GetX(), paddingOffset.GetY());
+        offsetList[SIDEBAR_DIVIDER_INDEX] = OffsetF(frameSize.Width() - sideBarFrameSize.Width() - dividerStrokeWidth +
+            paddingOffset.GetX(), paddingOffset.GetY() + dividerStartMarginPx);
     }
-
-    offsetList.emplace_back(swiperOffset);
-    offsetList.emplace_back(sideBarDividerOffset);
-    offsetList.emplace_back(sideBarOffset);
+    CalcEffectNodeOffsetInSideBarMode(layoutWrapper, effectNodeWrapper, frameSize, paddingOffset, offsetList);
     return offsetList;
 }
 
@@ -665,12 +1075,12 @@ std::vector<OffsetF> TabsLayoutAlgorithm::LayoutOffsetList(
     auto layoutProperty = DynamicCast<TabsLayoutProperty>(layoutWrapper->GetLayoutProperty());
     CHECK_NULL_RETURN(layoutProperty, offsetList);
     auto paddingOffset = layoutProperty->CreatePaddingAndBorder().Offset();
-    auto barOverlap = layoutProperty->GetBarOverlap().value_or(false);
+    auto barOverlap = layoutProperty->GetBarOverlap().value_or(false) || isFloatingTopBar_;
 
     if (axis == Axis::HORIZONTAL) {
         float barPosX = (frameSize.MainSize(axis) - tabBarFrameSize.MainSize(axis)) / 2 + paddingOffset.GetX();
         float effectPosX = (frameSize.MainSize(axis) - effectNodeFrameSize.MainSize(axis)) / 2 + paddingOffset.GetX();
-        if (barPosition == BarPosition::START) {
+        if (isFloatingTopBar_ || barPosition == BarPosition::START) {
             tabBarOffset = OffsetF(barPosX, paddingOffset.GetY());
             effectOffset = OffsetF(effectPosX, paddingOffset.GetY());
             dividerOffset = OffsetF(dividerStartMargin + paddingOffset.GetX(),
@@ -711,7 +1121,9 @@ std::vector<OffsetF> TabsLayoutAlgorithm::LayoutOffsetList(
         offsetList.emplace_back(OffsetF());
     }
     offsetList.emplace_back(dividerOffset);
-    if (isFloatingBar_) {
+    if (isFloatingTopBar_) {
+        UpdateTopBarMargin(layoutWrapper, tabBarOffset);
+    } else if (isFloatingBar_) {
         UpdateBarMargin(layoutWrapper, tabBarOffset);
     }
     offsetList.emplace_back(tabBarOffset);
@@ -745,7 +1157,6 @@ float TabsLayoutAlgorithm::MeasureDivider(const RefPtr<TabsLayoutProperty>& layo
     const RefPtr<LayoutWrapper>& dividerWrapper, const SizeF& idealSize)
 {
     auto constraint = layoutProperty->GetLayoutConstraint();
-    
     auto dividerIdealSize = CreateIdealSize(
         constraint.value(), Axis::HORIZONTAL, layoutProperty->GetMeasureType(MeasureType::MATCH_PARENT), true);
     TabsItemDivider defaultDivider;
@@ -803,7 +1214,7 @@ SizeF TabsLayoutAlgorithm::MeasureSwiper(const RefPtr<TabsLayoutProperty>& layou
     RefPtr<LayoutWrapper>& swiperWrapper, const SizeF& idealSize, const SizeF& tabBarSize, const float dividerWidth)
 {
     auto axis = layoutProperty->GetAxis().value_or(Axis::HORIZONTAL);
-    auto barOverlap = layoutProperty->GetBarOverlap().value_or(false);
+    auto barOverlap = layoutProperty->GetBarOverlap().value_or(false) || isFloatingTopBar_;
 
     /*
      * When the width or height of tabs are set to auto, WRAP_CONTENT, FIX_AT_IDEAL_SIZE,
@@ -878,12 +1289,9 @@ SizeF TabsLayoutAlgorithm::MeasureSwiper(const RefPtr<TabsLayoutProperty>& layou
 void TabsLayoutAlgorithm::MeasureBackgroundMask(
     LayoutWrapper* layoutWrapper, const SizeF& idealSize, const SizeF& tabBarSize)
 {
-    if (!isFloatingBar_) {
+    if (!isFloatingBar_ && !isFloatingTopBar_) {
         return;
     }
-    auto backgroundMaskWrapper = layoutWrapper->GetOrCreateChildByIndex(itemIndex_.bgMaskIndex);
-    CHECK_NULL_VOID(backgroundMaskWrapper);
-
     auto layoutProperty = AceType::DynamicCast<TabsLayoutProperty>(layoutWrapper->GetLayoutProperty());
     CHECK_NULL_VOID(layoutProperty);
     auto constraint = layoutProperty->GetLayoutConstraint();
@@ -899,28 +1307,59 @@ void TabsLayoutAlgorithm::MeasureBackgroundMask(
     if (GreatOrEqual(tabWidth, BREAKPOINT_1140.ConvertToPx())) {
         tabBarHeight *= FLOATING_BAR_SCALE_ENLARGED;
     }
-    float maskHeight = FLOATING_BAR_BOTTOM_MARGIN.ConvertToPx() + tabBarHeight + BG_MASK_OVER_BAR.ConvertToPx();
-    if (layoutProperty->HasBarFloatingStyle()) {
+
+    if (itemIndex_.bgMaskIndex < 0) {
+        return;
+    }
+    auto bgMaskWrapper = layoutWrapper->GetOrCreateChildByIndex(itemIndex_.bgMaskIndex);
+    if (!bgMaskWrapper) {
+        return;
+    }
+    if (isFloatingTopBar_) {
+        auto barTopFloatingStyle = layoutProperty->GetBarTopFloatingStyle();
+        bool hasMask = barTopFloatingStyle.has_value() &&
+            barTopFloatingStyle->maskHeight.has_value() &&
+            barTopFloatingStyle->maskHeight->IsNonNegative();
+        if (!hasMask) {
+            if (bgMaskWrapper) {
+                auto prop = bgMaskWrapper->GetLayoutProperty();
+                if (prop) {
+                    prop->UpdateVisibility(VisibleType::GONE);
+                }
+            }
+            return;
+        }
         auto tabGeometryNode = layoutWrapper->GetGeometryNode();
         CHECK_NULL_VOID(tabGeometryNode);
         auto tabHeight = tabGeometryNode->GetFrameSize().Height();
-        auto barFloatingStyle = layoutProperty->GetBarFloatingStyleValue();
-        if (barFloatingStyle.maskHeight.has_value() && barFloatingStyle.maskHeight->IsNonNegative()) {
-            maskHeight = barFloatingStyle.maskHeight.value().ConvertToPxWithSize(tabHeight);
-        } else {
-            if (barFloatingStyle.barBottomMargin.has_value() && barFloatingStyle.barBottomMargin->IsNonNegative()) {
-                float barbottomMargin = barFloatingStyle.barBottomMargin.value().ConvertToPxWithSize(tabHeight);
-                maskHeight = barbottomMargin + tabBarHeight + BG_MASK_OVER_BAR.ConvertToPx();
+        float maskHeight = barTopFloatingStyle->maskHeight.value().ConvertToPxWithSize(tabHeight);
+        maskHeight = std::min(maskHeight, idealSize.Height());
+        MaskNodeIdealSize.SetHeight(maskHeight);
+        auto maskConstraint = layoutProperty->CreateChildConstraint();
+        maskConstraint.selfIdealSize = OptionalSizeF(MaskNodeIdealSize);
+        bgMaskWrapper->Measure(maskConstraint);
+    } else if (isFloatingBar_) {
+        float maskHeight = FLOATING_BAR_BOTTOM_MARGIN.ConvertToPx() + tabBarHeight + BG_MASK_OVER_BAR.ConvertToPx();
+        if (layoutProperty->HasBarFloatingStyle()) {
+            auto tabGeometryNode = layoutWrapper->GetGeometryNode();
+            CHECK_NULL_VOID(tabGeometryNode);
+            auto tabHeight = tabGeometryNode->GetFrameSize().Height();
+            auto barFloatingStyle = layoutProperty->GetBarFloatingStyleValue();
+            if (barFloatingStyle.maskHeight.has_value() && barFloatingStyle.maskHeight->IsNonNegative()) {
+                maskHeight = barFloatingStyle.maskHeight.value().ConvertToPxWithSize(tabHeight);
+            } else {
+                if (barFloatingStyle.barBottomMargin.has_value() && barFloatingStyle.barBottomMargin->IsNonNegative()) {
+                    float barbottomMargin = barFloatingStyle.barBottomMargin.value().ConvertToPxWithSize(tabHeight);
+                    maskHeight = barbottomMargin + tabBarHeight + BG_MASK_OVER_BAR.ConvertToPx();
+                }
             }
         }
+        maskHeight = std::min(maskHeight, idealSize.Height());
+        MaskNodeIdealSize.SetHeight(maskHeight);
+        auto maskConstraint = layoutProperty->CreateChildConstraint();
+        maskConstraint.selfIdealSize = OptionalSizeF(MaskNodeIdealSize);
+        bgMaskWrapper->Measure(maskConstraint);
     }
-
-    maskHeight = std::min(maskHeight, idealSize.Height());
-    MaskNodeIdealSize.SetHeight(maskHeight);
-
-    auto MaskNodeIdealSizeLayoutConstraint = layoutProperty->CreateChildConstraint();
-    MaskNodeIdealSizeLayoutConstraint.selfIdealSize = OptionalSizeF(MaskNodeIdealSize);
-    backgroundMaskWrapper->Measure(MaskNodeIdealSizeLayoutConstraint);
 }
 
 SizeF TabsLayoutAlgorithm::MeasureTabBar(LayoutWrapper* layoutWrapper, LayoutConstraintF childLayoutConstraint)
@@ -935,13 +1374,13 @@ SizeF TabsLayoutAlgorithm::MeasureTabBar(LayoutWrapper* layoutWrapper, LayoutCon
     auto tabBarRenderContext = tabBarNode->GetRenderContext();
     CHECK_NULL_RETURN(tabBarRenderContext, tabBarSize);
 
-    if (!isFloatingBar_) {
+    if (!isFloatingBar_ && !isFloatingTopBar_) {
         tabBarWrapper->Measure(childLayoutConstraint);
         auto geometryNode = tabBarWrapper->GetGeometryNode();
         CHECK_NULL_RETURN(geometryNode, tabBarSize);
         tabBarSize = geometryNode->GetMarginFrameSize();
         // Clear the corresponding attributes when the floating state is disabled.
-        if (lastFloatingBar_) {
+        if (lastFloatingBar_ || lastFloatingTopBar_) {
             auto barLayoutProperty = tabBarNode->GetLayoutProperty();
             if (barLayoutProperty) {
                 PaddingProperty padding;
@@ -954,7 +1393,7 @@ SizeF TabsLayoutAlgorithm::MeasureTabBar(LayoutWrapper* layoutWrapper, LayoutCon
         }
         return tabBarSize;
     }
-    if (layoutWrapper->ConstraintChanged()) {
+    if (layoutWrapper->ConstraintChanged() && !isFloatingTopBar_) {
         auto hostNode = layoutWrapper->GetHostNode();
         CHECK_NULL_RETURN(hostNode, tabBarSize);
         auto tabsPattern = hostNode->GetPattern<TabsPattern>();
@@ -966,7 +1405,10 @@ SizeF TabsLayoutAlgorithm::MeasureTabBar(LayoutWrapper* layoutWrapper, LayoutCon
     CHECK_NULL_RETURN(barLayoutProperty, tabBarSize);
     auto constraint = barLayoutProperty->GetLayoutConstraint();
     float barHeight = FLOATING_BAR_HEIGHT.ConvertToPx();
-    if (layoutProperty->HasBarHeight()) {
+    if (isFloatingTopBar_) {
+        barHeight = FLOATING_BAR_TOP_HEIGHT.ConvertToPx();
+        childLayoutConstraint.selfIdealSize.SetHeight(barHeight);
+    } else if (layoutProperty->HasBarHeight()) {
         // User-set barHeight takes highest priority, let it flow through naturally
     } else if (!constraint || !constraint->selfIdealSize.Height().has_value()) {
         childLayoutConstraint.selfIdealSize.SetHeight(FLOATING_BAR_HEIGHT.ConvertToPx());
@@ -974,7 +1416,12 @@ SizeF TabsLayoutAlgorithm::MeasureTabBar(LayoutWrapper* layoutWrapper, LayoutCon
         barHeight = constraint->selfIdealSize.Height().value();
     }
 
-    if (barLayoutProperty && GreatNotEqual(barHeight, FLOATING_BAR_PADDING_4.ConvertToPx() * COUNT_2)) {
+    if (isFloatingTopBar_) {
+        PaddingProperty padding;
+        padding.SetEdges(CalcLength(FLOATING_BAR_TOP_BAR_MARGIN_H), CalcLength(FLOATING_BAR_TOP_BAR_MARGIN_H),
+            CalcLength(FLOATING_BAR_PADDING_4), CalcLength(FLOATING_BAR_PADDING_4));
+        barLayoutProperty->UpdatePadding(padding);
+    } else if (barLayoutProperty && GreatNotEqual(barHeight, FLOATING_BAR_PADDING_4.ConvertToPx() * COUNT_2)) {
         PaddingProperty padding;
         padding.SetEdges(CalcLength(FLOATING_BAR_PADDING_12), CalcLength(FLOATING_BAR_PADDING_12),
             CalcLength(FLOATING_BAR_PADDING_4), CalcLength(FLOATING_BAR_PADDING_4));
@@ -983,10 +1430,68 @@ SizeF TabsLayoutAlgorithm::MeasureTabBar(LayoutWrapper* layoutWrapper, LayoutCon
 
     if (layoutProperty->HasBarWidth() && layoutProperty->GetBarWidthValue().IsNonNegative()) {
         tabBarWrapper->Measure(childLayoutConstraint);
+    } else if (isFloatingTopBar_) {
+        float tabWidth = layoutWrapper->GetGeometryNode()->GetMarginFrameSize().Width();
+        auto barTopFloatingStyle = layoutProperty->GetBarTopFloatingStyle();
+        float barSideMargin = 0.0f;
+        if (barTopFloatingStyle.has_value() && barTopFloatingStyle->barSideMargin.has_value() &&
+            barTopFloatingStyle->barSideMargin->IsNonNegative()) {
+            barSideMargin = barTopFloatingStyle->barSideMargin.value().ConvertToPxWithSize(tabWidth);
+        } else {
+            float breakpoint600 = BREAKPOINT_600.ConvertToPx();
+            float breakpoint840 = BREAKPOINT_840.ConvertToPx();
+            if (LessNotEqual(tabWidth, breakpoint600)) {
+                barSideMargin = FLOATING_BAR_MARGIN_16.ConvertToPx();
+            } else if (LessNotEqual(tabWidth, breakpoint840)) {
+                barSideMargin = FLOATING_BAR_MARGIN_24.ConvertToPx();
+            } else {
+                barSideMargin = FLOATING_BAR_MARGIN_32.ConvertToPx();
+            }
+        }
+        float gridMaxWidth = CalcTopBarGridMaxWidth(tabWidth, barSideMargin);
+        auto hostNode = layoutWrapper->GetHostNode();
+        if (hostNode) {
+            auto context = hostNode->GetContext();
+            if (context) {
+                auto safeArea = context->GetSafeArea();
+                float safeMaxWidth = tabWidth - safeArea.left_.Length() - safeArea.right_.Length();
+                gridMaxWidth = std::min(gridMaxWidth, safeMaxWidth);
+            }
+        }
+        if (barTopFloatingStyle.has_value()) {
+            if (barTopFloatingStyle->maxWidth.has_value() &&
+                barTopFloatingStyle->maxWidth->IsNonNegative()) {
+                float maxWidthPx = barTopFloatingStyle->maxWidth.value().ConvertToPxWithSize(tabWidth);
+                gridMaxWidth = std::min(gridMaxWidth, maxWidthPx);
+            }
+            if (barTopFloatingStyle->barWidth.has_value() &&
+                barTopFloatingStyle->barWidth->IsNonNegative()) {
+                float barWidthPx = barTopFloatingStyle->barWidth.value().ConvertToPxWithSize(tabWidth);
+                childLayoutConstraint.selfIdealSize.SetWidth(std::min(barWidthPx, gridMaxWidth));
+                tabBarWrapper->Measure(childLayoutConstraint);
+            } else {
+                childLayoutConstraint.maxSize.SetWidth(gridMaxWidth);
+                childLayoutConstraint.selfIdealSize.SetWidth(std::nullopt);
+                tabBarWrapper->Measure(childLayoutConstraint);
+            }
+        } else {
+            childLayoutConstraint.maxSize.SetWidth(gridMaxWidth);
+            childLayoutConstraint.selfIdealSize.SetWidth(std::nullopt);
+            tabBarWrapper->Measure(childLayoutConstraint);
+        }
     } else {
         std::optional<float> calcBarWidth = CalcFloatingBarWidth(layoutWrapper, barHeight);
         if (calcBarWidth.has_value()) {
-            childLayoutConstraint.selfIdealSize.SetWidth(calcBarWidth.value());
+            float finalWidth = calcBarWidth.value();
+            if (isFloatingBar_ && layoutProperty->HasBarFloatingStyle()) {
+                auto barFloatingStyle = layoutProperty->GetBarFloatingStyleValue();
+                if (barFloatingStyle.maxWidth.has_value() && barFloatingStyle.maxWidth->IsNonNegative()) {
+                    auto tabWidth = layoutWrapper->GetGeometryNode()->GetMarginFrameSize().Width();
+                    float maxWidthPx = barFloatingStyle.maxWidth.value().ConvertToPxWithSize(tabWidth);
+                    finalWidth = std::min(finalWidth, maxWidthPx);
+                }
+            }
+            childLayoutConstraint.selfIdealSize.SetWidth(finalWidth);
         }
         tabBarWrapper->Measure(childLayoutConstraint);
     }
@@ -1104,5 +1609,35 @@ std::optional<float> TabsLayoutAlgorithm::ParseBarWidthAndMargin(
     }
 
     return std::nullopt;
+}
+
+float TabsLayoutAlgorithm::CalcTopBarGridMaxWidth(float tabWidth, float barSideMargin)
+{
+    float breakpoint600 = BREAKPOINT_600.ConvertToPx();
+    float breakpoint840 = BREAKPOINT_840.ConvertToPx();
+    float margin = barSideMargin;
+    float gutter = 0.0f;
+    int32_t cols = 0;
+    int32_t occupy = 0;
+    if (LessNotEqual(tabWidth, breakpoint600)) {
+        gutter = GRID_GUTTER_8.ConvertToPx();
+        cols = GRID_COLS_4;
+        occupy = GRID_OCCUPY_4;
+    } else if (LessNotEqual(tabWidth, breakpoint840)) {
+        gutter = GRID_GUTTER_12.ConvertToPx();
+        cols = GRID_COLS_8;
+        occupy = GRID_OCCUPY_8;
+    } else {
+        gutter = GRID_GUTTER_16.ConvertToPx();
+        cols = GRID_COLS_12;
+        occupy = GRID_OCCUPY_10;
+    }
+    float usableWidth = tabWidth - COUNT_2 * margin;
+    if (cols <= 0) {
+        return usableWidth;
+    }
+    float columnWidth = (usableWidth - (cols - 1) * gutter) / cols;
+    float maxWidth = columnWidth * occupy + (occupy - 1) * gutter;
+    return maxWidth;
 }
 } // namespace OHOS::Ace::NG

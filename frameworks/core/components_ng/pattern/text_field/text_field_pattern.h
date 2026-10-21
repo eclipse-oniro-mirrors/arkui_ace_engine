@@ -43,7 +43,7 @@
 #include "core/common/ime/text_input_formatter.h"
 #include "core/common/ime/text_input_proxy.h"
 #include "core/common/ime/text_input_type.h"
-#include "core/common/password_icon_host.h"
+#include "core/components_ng/pattern/text_field/password_icon_host.h"
 #include "core/components/text_field/textfield_theme.h"
 #include "core/components/text_overlay/text_overlay_manager.h"
 #include "core/components_ng/image_provider/image_loading_context.h"
@@ -322,13 +322,14 @@ class ACE_FORCE_EXPORT TextFieldPattern : public ScrollablePattern,
                          public TextGestureSelector,
                          public LayoutInfoInterface,
                          public ICounterHost,
-                         public IPasswordIconHost,
+                         public PasswordIconHostBase<TextFieldPattern, TextFieldLayoutProperty>,
                          public PageTranslateNode,
                          public CleanNodeHostBase<TextFieldPattern, TextFieldLayoutProperty> {
     DECLARE_ACE_TYPE(TextFieldPattern, ScrollablePattern, TextDragBase, ValueChangeObserver, TextInputClient,
         TextBase, Magnifier, TextGestureSelector, ICounterHost, IPasswordIconHost, PageTranslateNode, ICleanNodeHost);
 
 public:
+    RefPtr<NG::FrameNode> GetHost() const override { return ScrollablePattern::GetHost(); }
     TextFieldPattern();
     ~TextFieldPattern() override;
     bool ParseCommand(const std::string& command);
@@ -434,7 +435,6 @@ public:
     int32_t InsertValueByController(const std::u16string& insertValue, int32_t offset);
     void ExecuteInsertValueCommand(const InsertCommandInfo& info);
     void CalcCounterAfterFilterInsertValue(int32_t curLength, const std::u16string insertValue, int32_t maxLength);
-    void UpdateObscure(const std::u16string& insertValue, bool hasInsertValue);
     void CleanCounterNode();
     void CleanErrorNode();
     float CalcDecoratorWidth(const RefPtr<FrameNode>& decoratorNode);
@@ -453,7 +453,6 @@ public:
     void HandleOnPageUp() override;
     void HandleOnPageDown() override;
     void CreateHandles() override;
-    void OnUiMaterialParamUpdate(const UiMaterialParam& params) override;
     void GetEmojiSubStringRange(int32_t& start, int32_t& end);
     EmojiRelation GetEmojiRelation(int index);
 
@@ -833,7 +832,6 @@ public:
     void FromJson(const std::unique_ptr<JsonValue>& json) override;
     void InitEditingValueText(std::u16string content);
     bool InitValueText(std::u16string content);
-    void HandleButtonMouseEvent(const RefPtr<TextInputResponseArea>& responseArea, bool isHover);
 
     void CloseSelectOverlay() override;
     void CloseSelectOverlay(bool animation);
@@ -872,39 +870,19 @@ public:
 
     static std::string RequestKeyboardReasonToString(RequestKeyboardReason reason);
 
-    bool GetTextObscured() const
-    {
-        return textObscured_;
-    }
-
     static std::u16string CreateObscuredText(int32_t len);
     static std::u16string CreateDisplayText(
         const std::u16string& content, int32_t nakedCharPosition, bool needObscureText, bool showPasswordDirectly);
 
-    // IPasswordIconHost interface implementations
-    RefPtr<FrameNode> GetHost() const override
+    RefPtr<TextFieldTheme> GetTextFieldThemeImpl() const
     {
-        return Pattern::GetHost();
+        return GetTheme();
     }
-    TextDirection GetLayoutDirection() override
+    RefPtr<TextFieldEventHub> GetSecurityEventHubImpl() const
     {
-        auto layoutProperty = GetLayoutProperty<TextFieldLayoutProperty>();
-        CHECK_NULL_RETURN(layoutProperty, TextDirection::LTR);
-        return layoutProperty->GetNonAutoLayoutDirection();
+        auto host = GetHost();
+        return host ? host->GetEventHub<TextFieldEventHub>() : nullptr;
     }
-    bool CheckLayoutProperty() override
-    {
-        return GetLayoutProperty<TextFieldLayoutProperty>() != nullptr;
-    }
-    ImageSourceInfo GetShowPasswordSourceInfo(const ImageSourceInfo& defaultInfo) override
-    {
-        return GetShowPasswordSourceInfoImpl(GetLayoutProperty<TextFieldLayoutProperty>(), defaultInfo);
-    }
-    ImageSourceInfo GetHidePasswordSourceInfo(const ImageSourceInfo& defaultInfo) override
-    {
-        return GetHidePasswordSourceInfoImpl(GetLayoutProperty<TextFieldLayoutProperty>(), defaultInfo);
-    }
-    bool IsDisabled() override;
 
     bool IsTextArea() const override;
 
@@ -1127,7 +1105,6 @@ public:
     std::string GetBarStateString() const;
     bool GetErrorTextState() const;
     std::string GetShowPasswordIconString() const;
-    int32_t GetNakedCharPosition() const;
     void SetSelectionFlag(int32_t selectionStart, int32_t selectionEnd,
         const std::optional<SelectionOptions>& options = std::nullopt, bool isForward = false);
     void SetSelectionFlagMultiThread(int32_t selectionStart, int32_t selectionEnd,
@@ -1137,7 +1114,7 @@ public:
     void HandleBlurEvent();
     bool IsCloseKeyboard(const RefPtr<TextFieldManagerNG>& textFieldManager);
     void HandleFocusEvent();
-    void CheckAndUpdateInputTypeForOTP();
+    void UpdateBackgroundColorForMaterial(const Color& color);
     void SetFocusStyle();
     void ClearFocusStyle();
     void ProcessFocusStyle();
@@ -1224,17 +1201,8 @@ public:
     void HandleButtonFocusEvent(const RefPtr<TextInputResponseArea>& responseArea);
     std::string GetCancelButton();
     std::string GetCancelImageText();
-    std::string GetPasswordIconPromptInformation(bool show);
     bool OnKeyEvent(const KeyEvent& event);
     size_t GetLineCount() const override;
-    TextInputType GetKeyboard()
-    {
-        return keyboard_;
-    }
-    TextInputAction GetAction()
-    {
-        return action_;
-    }
 
     void SetNeedToRequestKeyboardOnFocus(bool needToRequest)
     {
@@ -1489,17 +1457,19 @@ public:
     float GetAllResponseAreaWidth() const;
 
     bool IsShowUnit() const;
-    bool IsShowPasswordIcon() const override;
     std::optional<bool> IsShowPasswordText() const;
-    bool IsInPasswordMode() const override;
-    bool IsOneTimeCodeType() const;
+    bool IsSingleLineForPassword() const override;
+    std::u16string GetObscureContent() const override;
+    int32_t GetObscureCaretPosition() const override;
+    bool HasObscureContent() const override;
     bool IsShowCancelButtonMode() const override;
     bool IsShowVoiceButtonMode() const;
-    // ICleanNodeHost implementations with pattern-specific logic.
-    // Layout-property bridge methods are provided by CleanNodeHostBase CRTP.
     void HandleCleanNodeClicked() override;
     bool IsContentEmpty() const override;
-    void CheckPasswordAreaState();
+    // ICleanNodeHost behavioral hooks
+    void OnCleanNodeHover(bool isHover, const HoverInfo& info) override;
+    bool IsCancelButtonTouched() const override;
+    void SetCancelButtonTouched(bool touched) override;
 
     bool GetShowSelect() const
     {
@@ -1622,10 +1592,11 @@ public:
     // ========== ICounterHost interface implementations end ==========
     void ResetContextAttr();
     void RestoreDefaultMouseState() override;
-    bool SetPasswordIconHoverColor(const std::vector<RoundRect>& rects, uint32_t color) override;
-    bool ClearPasswordIconHoverColor() override;
-    bool GetPasswordIconHoverColor(uint32_t& color) override;
-    bool GetPasswordIconPressColor(uint32_t& color) override;
+    // Shared overlay-modifier hover bridge for both password-icon and clean-button hover
+    // (PasswordIconHostBase::SetHoverColorAndRectsOnModifier and
+    // CleanNodeHostBase::SetCleanHoverColorAndRect delegate here).
+    bool SetOverlayHoverColorAndRects(const std::vector<RoundRect>& rects, uint32_t color);
+    bool ClearOverlayHoverColorAndRects();
     void SetResponseButtonTouched(bool isTouched) override
     {
         cancelButtonTouched_ = isTouched;
@@ -1820,17 +1791,6 @@ public:
         isTextChangedAtCreation_ = changed;
     }
 
-    void SetIsPasswordSymbol(bool isPasswordSymbol)
-    {
-        isPasswordSymbol_ = isPasswordSymbol;
-    }
-
-    bool IsShowPasswordSymbol() const override
-    {
-        return isPasswordSymbol_ &&
-            AceApplicationInfo::GetInstance().GreatOrEqualTargetAPIVersion(PlatformVersion::VERSION_THIRTEEN);
-    }
-
     bool IsResponseRegionExpandingNeededForStylus(const TouchEvent& touchEvent) const override;
 
     RectF ExpandDefaultResponseRegion(RectF& rect) override;
@@ -1914,8 +1874,6 @@ public:
 
     void StartVibratorByIndexChange(int32_t currentIndex, int32_t preIndex);
     virtual void ProcessSelection();
-    void AfterLayoutProcessCleanResponse(
-        const RefPtr<CleanNodeResponseArea>& cleanNodeResponseArea);
     void StopContentScroll();
     void UpdateContentScroller(
         const Offset& localOffset, bool hasHotArea = true, float delay = 0.0f, bool enableScrollOutside = true);
@@ -1957,7 +1915,7 @@ public:
     void FilterInitializeText();
     void SetIsFilterChanged(bool isFilterChanged)
     {
-        isFilterChanged_ = isFilterChanged;
+        SetFilterChanged(isFilterChanged);
     }
     bool GetCancelButtonTouchInfo()
     {
@@ -2057,14 +2015,6 @@ public:
     bool TryDelaySubmitAction(TextInputAction action, bool forceCloseKeyboard);
     void ProcessPendingSubmitAction();
     virtual void FireSubmitAction(TextInputAction action, bool forceCloseKeyboard);
-
-    // tv function
-    bool IsTV() const override
-    {
-        auto theme = GetTheme();
-        CHECK_NULL_RETURN(theme, false);
-        return theme->GetHoverAndPressBgColorEnabled();
-    }
 
     bool IsPreviewTextInputting() const;
     virtual void UpdateHoverStyleForTV(bool isHover);
@@ -2190,8 +2140,6 @@ private:
     void HandleTouchEvent(const TouchEventInfo& info);
     void HandleTouchDown(const Offset& offset);
     void HandleTouchUp();
-    void HandleResponseButtonTouchDown(const RefPtr<TextInputResponseArea>& responseArea);
-    void HandleResponseButtonTouchUp();
     void HandleTouchMove(const TouchLocationInfo& info);
     void UpdateCaretByTouchMove(const TouchLocationInfo& info);
     void InitDisableColor();
@@ -2207,12 +2155,14 @@ private:
     void ShowSelectAfterDragEvent();
     void ClearDragDropEvent();
     std::function<void(Offset)> GetThumbnailCallback();
-    bool HasStateStyle(UIState state) const;
+    virtual bool HasStateStyle(UIState state) const;
     bool IsStyledPlaceholder() const;
 
     // PageTranslateNode override
     int32_t GetPageTranslateNodeId() const override;
     std::string GetPageTranslateTextForReport() const override;
+    std::string GetPageTextForReport(bool includeInput = false) const override;
+    int32_t GetPageTextPlaceholderNodeId() const override;
     bool ApplyPageTranslateResult(const std::string& result, int64_t version) override;
     void ResetPageTranslate() override;
 
@@ -2227,7 +2177,6 @@ private:
     void UpdateOverlayHandleOffsetAfterScroll();
     bool CheckSelectAreaVisible();
     void InitMouseEvent();
-    void InitCancelButtonMouseEvent();
     void InitPasswordButtonMouseEvent();
     void HandleHoverEffect(MouseInfo& info, bool isHover);
     void UpdateHoverStyle(bool isHover);
@@ -2287,8 +2236,6 @@ private:
 
     void ScheduleCursorTwinkling();
     void OnCursorTwinkling();
-    void CheckIfNeedToResetKeyboard();
-
     float PreferredTextHeight(bool isPlaceholder, bool isAlgorithmMeasure = false);
 
     void SetCaretOffsetForEmptyTextOrPositionZero();
@@ -2316,7 +2263,6 @@ private:
     void SetAccessibilityMoveTextAction();
     void SetAccessibilityErrorText();
     void SetAccessibilityClearAction();
-    void SetAccessibilityPasswordIconAction();
     void SetAccessibilityUnitAction();
 
     void UpdateCopyAllStatus();
@@ -2324,7 +2270,6 @@ private:
     void ProcessRectPadding();
     void CalcScrollRect(Rect& inlineScrollRect);
 
-    bool ResetObscureTickCountDown();
     bool IsAccessibilityClick();
     bool IsOnUnitByPosition(const Offset& globalOffset);
     bool IsOnPasswordByPosition(const Offset& globalOffset);
@@ -2440,7 +2385,25 @@ private:
     bool IsContentRectNonPositive();
     void ReportEvents();
     void ReportTextChangeEvent(const std::string& eventType);
-    void ResetPreviewTextState();
+    void ResetPreviewTextState() override;
+    AceLogTag GetLogTag() const override { return AceLogTag::ACE_TEXT_FIELD; }
+    // Group 5: password area virtual hooks
+    std::optional<bool> GetObscuredState() override;
+    RefPtr<NG::PasswordResponseArea> GetPasswordResponseArea() override;
+    void SetPasswordResponseArea(const RefPtr<NG::PasswordResponseArea>& area) override
+    {
+        responseArea_ = area;
+    }
+    bool ClearNonPasswordResponseArea() override
+    {
+        CHECK_NULL_RETURN(responseArea_, false);
+        responseArea_->ClearArea();
+        responseArea_ = nullptr;
+        return true;
+    }
+    // Group 7: keyboard reset virtual hooks
+    bool IsKeyboardTypeChanged() override;
+    bool IsCustomKeyboardAttached() const override { return isCustomKeyboardAttached_; }
     void CalculateBoundsRect();
     TextFieldInfo GenerateTextFieldInfo();
     void AddTextFieldInfo();
@@ -2470,6 +2433,9 @@ private:
     void HandleOnPasteCommon(const std::string& data);
     void HandleOnAutoFillSecurePaste(const std::string& data);
     void RemoveFillContentMap();
+    void TryRecommendTypedUserName(const RefPtr<TextFieldManagerNG>& textFieldManager,
+        FillContentMap& fillContentMap);
+    void SendAccountRecommendCommand(const RefPtr<TextFieldManagerNG>& textFieldManager);
     void RemoveMSDPAutoFillType();
     bool NeedsSendFillContent();
     void UpdateSelectOverlay(const RefPtr<OHOS::Ace::TextFieldTheme>& textFieldTheme);
@@ -2481,6 +2447,9 @@ private:
     void UpdateParagraphForDragNode(bool skipUpdate);
     void UpdateMagnifierWithFloatingCaretPos();
     bool HandleEditingEventCrossPlatform(const std::shared_ptr<TextEditingValue>& value);
+#if defined(CROSS_PLATFORM)
+    bool HandleCrossPlatformDeleteEvent(const std::shared_ptr<TextEditingValue>& value);
+#endif
     void ApplyInnerBorderColor();
     void GetSelectRectWithBlank(std::vector<RectF>& selectedRects);
     void ScrollToVisible(const TextScrollOptions& options);
@@ -2517,18 +2486,12 @@ private:
 
     RefPtr<ClickEvent> clickListener_;
     RefPtr<TouchEventImpl> touchListener_;
-    RefPtr<TouchEventImpl> imageTouchEvent_;
     RefPtr<ScrollableEvent> scrollableEvent_;
     RefPtr<InputEvent> mouseEvent_;
     RefPtr<InputEvent> hoverEvent_;
-    RefPtr<InputEvent> imageHoverEvent_;
     RefPtr<LongPressEvent> longPressEvent_;
     CursorPositionType cursorPositionType_ = CursorPositionType::NORMAL;
 
-    // What the keyboard should appears.
-    TextInputType keyboard_ = TextInputType::UNSPECIFIED;
-    // Action when "enter" pressed.
-    TextInputAction action_ = TextInputAction::UNSPECIFIED;
     TextDirection textDirection_ = TextDirection::LTR;
     // Used to record original caret position for "shift + up/down"
     // Less than 0 is invalid, initialized as invalid in constructor
@@ -2546,7 +2509,6 @@ private:
     bool cursorVisible_ = false;
     bool focusEventInitialized_ = false;
     bool isMousePressed_ = false;
-    bool textObscured_ = true;
     bool enableTouchAndHoverEffect_ = true;
     bool isOnHover_ = false;
     bool needToRequestKeyboardInner_ = false;
@@ -2569,8 +2531,6 @@ private:
     std::optional<DisplayMode> barState_;
 
     uint32_t twinklingInterval_ = 0;
-    int32_t obscureTickCountDown_ = 0;
-    int32_t nakedCharPosition_ = -1;
     bool obscuredChange_ = false;
     float currentOffset_ = 0.0f;
     float countHeight_ = 0.0f;
@@ -2710,7 +2670,6 @@ private:
     bool isMoveCaretAnywhere_ = false;
     bool isTouchPreviewText_ = false;
     bool isCaretTwinkling_ = false;
-    bool isPasswordSymbol_ = true;
     bool isEnableHapticFeedback_ = true;
     RefPtr<MultipleClickRecognizer> multipleClickRecognizer_ = nullptr;
     WeakPtr<AIWriteAdapter> aiWriteAdapter_;
@@ -2731,8 +2690,6 @@ private:
     TextRange callbackRangeAfter_;
     std::u16string callbackOldContent_;
     PreviewText callbackOldPreviewText_;
-    bool isFilterChanged_ = false;
-    std::optional<bool> showPasswordState_;
     bool textFieldInitTheme_ = false;
     bool cancelButtonTouched_ = false;
     KeyboardGradientMode imeGradientMode_ = KeyboardGradientMode::NONE;

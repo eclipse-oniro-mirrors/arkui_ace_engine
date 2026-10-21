@@ -95,6 +95,17 @@ constexpr uint32_t RENDERINGSTRATEGY_MULTIPLE_COLOR = 1;
 constexpr int32_t FIRST_NODE_INDEX = 0;
 constexpr Dimension MIN_HOT_ZONE_HEIGHT = 32.0_vp;
 
+std::string MaterialTypeToString(int32_t type)
+{
+    static const std::string MaterialTypeStyles[] = { "MaterialType.NONE", "MaterialType.SEMI_TRANSPARENT",
+        "MaterialType.IMMERSIVE" };
+    if (type >= static_cast<int32_t>(MaterialType::NONE) &&
+        type <= static_cast<int32_t>(MaterialType::IMMERSIVE)) {
+        return MaterialTypeStyles[type];
+    }
+    return MaterialTypeStyles[0];
+}
+
 static std::string ConvertControlSizeToString(ControlSize controlSize)
 {
     std::string result;
@@ -383,6 +394,7 @@ void SelectPattern::ShowSelectMenu()
     TAG_LOGI(AceLogTag::ACE_SELECT_COMPONENT, "select click to show menu.");
     ConfigMenuParam();
     overlayManager->ShowMenu(host->GetId(), offset, menuWrapper_);
+    RegisterScrollToSelectedTask();
 }
 
 void SelectPattern::ConfigMenuParam()
@@ -443,6 +455,7 @@ void SelectPattern::ShowSelectMenuInSubWindow()
     menuParam.setShow = true;
     ConfigMenuParam();
     subwindowManager->ShowMenuNG(menuWrapper_, menuParam, host, offset);
+    RegisterScrollToSelectedTask();
 }
 
 void SelectPattern::UpdateOptionsWidth(float selectWidth)
@@ -1817,6 +1830,11 @@ void SelectPattern::ToJsonValue(std::unique_ptr<JsonValue>& json, const Inspecto
     json->PutExtAttr("optionHeight", optionHeight.c_str(), filter);
     ToJsonMenuBackgroundStyle(json, filter);
     ToJsonDivider(json, filter);
+    json->PutExtAttr("hasSystemMaterial", HasSystemMaterial() ? "true" : "false", filter);
+    json->PutExtAttr("distortionMode",
+        DistortionModeToString(GetMenuDistortionMode().value_or(DistortionMode::DISTORTION_AUTO)).c_str(), filter);
+    json->PutExtAttr("edgeLightMode",
+        EdgeLightModeToString(GetMenuEdgeLightMode().value_or(EdgeLightMode::EDGELIGHT_AUTO)).c_str(), filter);
 }
 
 void SelectPattern::ToJsonSelectedOptionFontAndColor(std::unique_ptr<JsonValue>& json,
@@ -2135,6 +2153,79 @@ void SelectPattern::ShowScrollBar()
     scrollPattern->TriggerScrollBarDisplay();
 }
 
+void SelectPattern::RegisterScrollToSelectedTask()
+{
+    if (selected_ < 0) {
+        return;
+    }
+    CHECK_NULL_VOID(menuWrapper_);
+    auto pipeline = menuWrapper_->GetContext();
+    CHECK_NULL_VOID(pipeline);
+    auto callback = [weak = WeakClaim(this)]() {
+        auto pattern = weak.Upgrade();
+        CHECK_NULL_VOID(pattern);
+        pattern->ScrollToSelectedOption();
+    };
+    pipeline->AddBuildFinishCallBack(std::move(callback));
+}
+
+void SelectPattern::ScrollToSelectedOption()
+{
+    auto menu = GetMenuNode();
+    CHECK_NULL_VOID(menu);
+    auto scroll = DynamicCast<FrameNode>(menu->GetFirstChild());
+    CHECK_NULL_VOID(scroll);
+    auto scrollPattern = scroll->GetPattern<ScrollPattern>();
+    CHECK_NULL_VOID(scrollPattern);
+    auto column = DynamicCast<FrameNode>(scroll->GetFirstChild());
+    CHECK_NULL_VOID(column);
+    if (selected_ >= static_cast<int32_t>(column->GetChildren().size())) {
+        return;
+    }
+    auto option = DynamicCast<FrameNode>(column->GetChildAtIndex(selected_));
+    CHECK_NULL_VOID(option);
+    auto optionGeometry = option->GetGeometryNode();
+    CHECK_NULL_VOID(optionGeometry);
+    auto optionTop = optionGeometry->GetFrameOffset().GetY();
+    bool reachedScroll = false;
+    for (auto parent = option->GetParent(); parent != nullptr; parent = parent->GetParent()) {
+        auto parentFrame = DynamicCast<FrameNode>(parent);
+        if (!parentFrame) {
+            continue;
+        }
+        if (parentFrame == scroll) {
+            reachedScroll = true;
+            break;
+        }
+        auto parentGeometry = parentFrame->GetGeometryNode();
+        CHECK_NULL_VOID(parentGeometry);
+        optionTop += parentGeometry->GetFrameOffset().GetY();
+    }
+    if (!reachedScroll) {
+        return;
+    }
+    auto scrollGeometry = scroll->GetGeometryNode();
+    CHECK_NULL_VOID(scrollGeometry);
+    auto scrollLayoutProps = scroll->GetLayoutProperty<ScrollLayoutProperty>();
+    CHECK_NULL_VOID(scrollLayoutProps);
+    auto optionHeight = optionGeometry->GetFrameSize().Height();
+    auto scrollHeight = scrollGeometry->GetFrameSize().Height();
+    auto viewport = scrollPattern->GetMainContentSize();
+    if (optionTop >= 0 && optionTop + optionHeight <= scrollHeight) {
+        return;
+    }
+    auto contentOffsetY = scrollLayoutProps->CreatePaddingAndBorder().Offset().GetY();
+    auto targetOffset = static_cast<float>(scrollPattern->GetTotalOffset()) + optionTop - contentOffsetY
+        - (viewport - optionHeight) / 2.0f;
+    auto maxScrollOffset = scrollPattern->GetScrollableDistance();
+    if (targetOffset < 0.0f) {
+        targetOffset = 0.0f;
+    } else if (targetOffset > maxScrollOffset) {
+        targetOffset = maxScrollOffset;
+    }
+    scrollPattern->ScrollTo(targetOffset);
+}
+
 void SelectPattern::SetSpace(const Dimension& value)
 {
     auto host = GetHost();
@@ -2215,6 +2306,7 @@ void SelectPattern::OnRestoreInfo(const std::string& restoreInfo)
     if (jsonIsSelect->GetBool()) {
         SetSelected(jsonIsOn->GetInt());
         UpdateText(jsonIsOn->GetInt());
+        isSelected_ = true;
     }
 }
 
@@ -3097,6 +3189,56 @@ void SelectPattern::DumpInfo()
     DumpLog::GetInstance().AddDesc("OptionFontColor: " + optionFont_.FontColor.value_or(Color()).ToString());
     DumpLog::GetInstance().AddDesc("OptionBgColor: " + optionBgColor_.value_or(Color()).ToString());
     DumpLog::GetInstance().AddDesc("ControlSize: " + ConvertControlSizeToString(controlSize_));
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto renderContext = host->GetRenderContext();
+    CHECK_NULL_VOID(renderContext);
+    auto material = renderContext->GetSystemMaterial();
+    bool hasSystemMaterial = material != nullptr;
+    DumpLog::GetInstance().AddDesc("HasSystemMaterial: " + std::string(hasSystemMaterial ? "true" : "false"));
+    if (hasSystemMaterial) {
+        auto nativeMaterial = MaterialUtils::PreProcessMaterial(AceType::RawPtr(material));
+        auto materialType = MaterialUtils::GetTypeFromMaterial(nativeMaterial);
+        DumpLog::GetInstance().AddDesc("MaterialType: " +
+            (materialType.has_value() ? MaterialTypeToString(static_cast<int32_t>(materialType.value()))
+                                       : std::string("MaterialType.NONE")));
+    }
+    DumpLog::GetInstance().AddDesc("DistortionMode: " +
+        DistortionModeToString(GetMenuDistortionMode().value_or(DistortionMode::DISTORTION_AUTO)));
+    DumpLog::GetInstance().AddDesc("EdgeLightMode: " +
+        EdgeLightModeToString(GetMenuEdgeLightMode().value_or(EdgeLightMode::EDGELIGHT_AUTO)));
+}
+
+bool SelectPattern::HasSystemMaterial() const
+{
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, false);
+    auto renderContext = host->GetRenderContext();
+    CHECK_NULL_RETURN(renderContext, false);
+    auto material = renderContext->GetSystemMaterial();
+    return material != nullptr;
+}
+
+void SelectPattern::DumpInfo(std::unique_ptr<JsonValue>& json)
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto renderContext = host->GetRenderContext();
+    CHECK_NULL_VOID(renderContext);
+    auto material = renderContext->GetSystemMaterial();
+    bool hasSystemMaterial = material != nullptr;
+    json->Put("HasSystemMaterial", hasSystemMaterial ? "true" : "false");
+    if (hasSystemMaterial) {
+        auto nativeMaterial = MaterialUtils::PreProcessMaterial(AceType::RawPtr(material));
+        auto materialType = MaterialUtils::GetTypeFromMaterial(nativeMaterial);
+        json->Put("MaterialType",
+            materialType.has_value() ? MaterialTypeToString(static_cast<int32_t>(materialType.value())).c_str()
+                                     : "MaterialType.NONE");
+    }
+    json->Put("DistortionMode",
+        DistortionModeToString(GetMenuDistortionMode().value_or(DistortionMode::DISTORTION_AUTO)).c_str());
+    json->Put("EdgeLightMode",
+        EdgeLightModeToString(GetMenuEdgeLightMode().value_or(EdgeLightMode::EDGELIGHT_AUTO)).c_str());
 }
 
 void SelectPattern::SetArrowModifierByUser(

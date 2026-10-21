@@ -68,6 +68,7 @@
 #include "bridge/declarative_frontend/jsview/js_isolated_component.h"
 #endif
 #include "bridge/declarative_frontend/jsview/js_keyboard_avoid.h"
+#include "bridge/declarative_frontend/jsview/js_immersive_strategy.h"
 #include "bridge/declarative_frontend/jsview/js_layout_manager.h"
 #include "bridge/declarative_frontend/jsview/js_lazy_foreach.h"
 #include "bridge/declarative_frontend/jsview/js_linear_gradient.h"
@@ -126,7 +127,6 @@
 #include "bridge/declarative_frontend/jsview/js_water_flow_sections_binding.h"
 #include "bridge/declarative_frontend/jsview/menu/js_context_menu.h"
 #include "bridge/declarative_frontend/jsview/scroll_bar/js_scroll_bar.h"
-#include "bridge/declarative_frontend/sharedata/js_share_data.h"
 #include "bridge/declarative_frontend/style_string/js_span_string.h"
 #include "bridge/declarative_frontend/style_string/js_text_layout.h"
 #include "core/components_ng/pattern/custom/custom_title_node.h"
@@ -526,6 +526,7 @@ static const std::unordered_map<std::string, std::function<void(BindingTarget)>>
     { "SaveButton", JSSaveButton::JSBind },
     { "WithTheme", JSWithTheme::JSBind },
     { "__KeyboardAvoid__", JSKeyboardAvoid::JSBind },
+    { "__ImmersiveStrategy__", JSImmersiveStrategy::JSBind },
     { "TextMenu", JSTextMenu::JSBind },
 #ifdef ABILITY_COMPONENT_SUPPORTED
     { "AbilityComponent", JSAbilityComponent::JSBind },
@@ -792,6 +793,22 @@ void RegisterFormModuleByName(BindingTarget globalObj, const std::string& module
         JSTextTimerController::JSBind(globalObj);
         return;
     }
+    if (module == "__Rect__") {
+        JSRect::JSBind(globalObj);
+        return;
+    }
+    if (module == "__Path__") {
+        JSPath::JSBind(globalObj);
+        return;
+    }
+    if (module == "__Circle__") {
+        JSCircle::JSBind(globalObj);
+        return;
+    }
+    if (module == "__Ellipse__") {
+        JSEllipse::JSBind(globalObj);
+        return;
+    }
 #if !defined(WEARABLE_PRODUCT) && defined(PLAYER_FRAMEWORK_EXISTS) && defined(VIDEO_SUPPORTED)
     if (module == "Video") {
         JSVideoControllerAsyncBinding::JSBind(globalObj);
@@ -799,6 +816,14 @@ void RegisterFormModuleByName(BindingTarget globalObj, const std::string& module
         return;
     }
 #endif
+    if (module == "Canvas") {
+        JSCanvasPattern::JSBind(globalObj);
+        JSCanvasGradient::JSBind(globalObj);
+        JSCanvasImageData::JSBind(globalObj);
+        JSMatrix2d::JSBind(globalObj);
+        JSRenderImage::JSBind(globalObj, nativeEngine);
+        return;
+    }
     auto func = bindFuncs.find(module);
     if (func == bindFuncs.end()) {
         RegisterExtraViewByName(globalObj, module);
@@ -808,12 +833,6 @@ void RegisterFormModuleByName(BindingTarget globalObj, const std::string& module
         JSSwiperControllerBinding::JSBind(globalObj);
     } else if ((*func).first == "Calendar") {
         JSCalendarController::JSBind(globalObj);
-    } else if ((*func).first == "Canvas") {
-        JSCanvasPattern::JSBind(globalObj);
-        JSCanvasGradient::JSBind(globalObj);
-        JSCanvasImageData::JSBind(globalObj);
-        JSMatrix2d::JSBind(globalObj);
-        JSRenderImage::JSBind(globalObj, nativeEngine);
     }
 
     (*func).second(globalObj);
@@ -929,6 +948,10 @@ void JsBindFormViews(
         JSEllipseShape::JSBind(globalObj);
         JSPathShape::JSBind(globalObj);
         JSWithEnv::JSBind(globalObj);
+        JSRect::JSBind(globalObj);
+        JSCircle::JSBind(globalObj);
+        JSEllipse::JSBind(globalObj);
+        JSPath::JSBind(globalObj);
     }
 
     if (!formModuleList.empty()) {
@@ -978,7 +1001,6 @@ void JsBindViews(BindingTarget globalObj, void* nativeEngine, bool isCustomEnvSu
     JSPanGestureOption::JSBind(globalObj);
     JsDragFunction::JSBind(globalObj);
     JSCustomDialogController::JSBind(globalObj);
-    JSShareData::JSBind(globalObj);
     JSPersistent::JSBind(globalObj);
     JSScrollerBinding::JSBind(globalObj);
     JSListScroller::JSBind(globalObj);

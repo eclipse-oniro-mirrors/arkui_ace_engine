@@ -38,6 +38,16 @@ RefPtr<NG::CustomAccessibilityProperty> ThirdRulesCheckNode::GetCustomProperty()
     return thirdManager->GetThirdCustomProperty(GetAccessibilityId());
 }
 
+bool ThirdRulesCheckNode::IsChildTreeContainer()
+{
+    // Mirror the main-tree host flow (FrameNodeRulesCheckNode::IsChildTreeContainer): a node with a child tree bound.
+    auto provider = accessibilityProvider_.Upgrade();
+    CHECK_NULL_RETURN(provider, false);
+    auto thirdManager = provider->GetThirdAccessibilityManager().lock();
+    CHECK_NULL_RETURN(thirdManager, false);
+    return thirdManager->HasChildTree(GetAccessibilityId());
+}
+
 bool ThirdRulesCheckNode::GetPropText(Accessibility::PropValue& value)
 {
     CHECK_NULL_RETURN(nodeInfo_, false);

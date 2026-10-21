@@ -33,6 +33,7 @@
 #include "core/components/common/layout/constants.h"
 #include "core/components/common/properties/depth_option.h"
 #include "core/components/common/properties/paint_state.h"
+#include "core/components/scroll/scroll_controller_base.h"
 #include "core/components/tab_bar/tab_theme.h"
 #include "core/components/theme/shadow_theme.h"
 #include "core/components_ng/pattern/container_picker/container_picker_theme.h"
@@ -4684,6 +4685,15 @@ ACE_FORCE_EXPORT void AssignCast(std::optional<TabBarDisplayMode>& dst, const Ar
         case ARK_TAB_BAR_DISPLAY_MODE_BOTTOM_TABBAR: dst = TabBarDisplayMode::BOTTOMTABBAR; break;
         case ARK_TAB_BAR_DISPLAY_MODE_SIDEBAR: dst = TabBarDisplayMode::SIDEBAR; break;
         default: LOGE("Unexpected enum value in Ark_TabBarDisplayMode: %{public}d", src);
+    }
+}
+template<>
+ACE_FORCE_EXPORT void AssignCast(std::optional<SidebarDisplayStyle>& dst, const Ark_TabsSidebarDisplayStyle& src)
+{
+    switch (src) {
+        case ARK_TABS_SIDEBAR_DISPLAY_STYLE_EMBED: dst = SidebarDisplayStyle::EMBED; break;
+        case ARK_TABS_SIDEBAR_DISPLAY_STYLE_DISPLACE: dst = SidebarDisplayStyle::DISPLACE; break;
+        default: LOGE("Unexpected enum value in Ark_TabsSidebarDisplayStyle: %{public}d", src);
     }
 }
 } // namespace OHOS::Ace::NG::Converter

@@ -559,6 +559,20 @@ void SetInitialScaleImpl(Ark_NativePointer node,
     WebModelStatic::InitialScale(frameNode, *convValue);
 #endif // WEB_SUPPORTED
 }
+void SetFlingSpeedLimitImpl(Ark_NativePointer node,
+                            const Opt_Float64* value)
+{
+#ifdef WEB_SUPPORTED
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto convValue = Converter::OptConvert<float>(*value);
+    if (!convValue) {
+        WebModelStatic::SetFlingSpeedLimit(frameNode, 0.0f);
+        return;
+    }
+    WebModelStatic::SetFlingSpeedLimit(frameNode, *convValue);
+#endif // WEB_SUPPORTED
+}
 void UserAgentImpl(Ark_NativePointer node,
                    const Opt_String* value)
 {
@@ -1065,6 +1079,26 @@ void SetOnScaleChangeImpl(Ark_NativePointer node,
     WebModelStatic::SetScaleChangeId(frameNode, onScaleChange);
 #endif // WEB_SUPPORTED
 }
+void SetOnZoomChangeImpl(Ark_NativePointer node,
+                         const Opt_OnZoomChangeCallback* value)
+{
+#ifdef WEB_SUPPORTED
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto optValue = Converter::GetOptPtr(value);
+    if (!optValue) {
+        WebModelStatic::SetZoomChangeId(frameNode, nullptr);
+        return;
+    }
+    auto instanceId = Container::CurrentId();
+    WeakPtr<FrameNode> weakNode = AceType::WeakClaim(frameNode);
+    auto onZoomChange = [callback = CallbackHelper(*optValue), weakNode, instanceId](
+        const BaseEventInfo* info) {
+        OnZoomChange(callback, weakNode, instanceId, info);
+    };
+    WebModelStatic::SetZoomChangeId(frameNode, onZoomChange);
+#endif // WEB_SUPPORTED
+}
 void SetOnHttpAuthRequestImpl(Ark_NativePointer node,
                               const Opt_Callback_OnHttpAuthRequestEvent_Boolean* value)
 {
@@ -1185,6 +1219,30 @@ void SetOnContextMenuHideImpl(Ark_NativePointer node,
     WebModelStatic::SetOnContextMenuHide(frameNode, onContextMenuHide);
 #endif // WEB_SUPPORTED
 }
+
+#if !defined(WINDOWS_PLATFORM) && !defined(LINUX_PLATFORM) && !defined(MAC_PLATFORM)
+void SetOnContextMenuUpdateImpl(Ark_NativePointer node,
+                                const Opt_OnContextMenuUpdateCallback* value)
+{
+#ifdef WEB_SUPPORTED
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto optValue = Converter::GetOptPtr(value);
+    if (!optValue) {
+        // Implement Reset value
+        return;
+    }
+    auto instanceId = Container::CurrentId();
+    WeakPtr<FrameNode> weakNode = AceType::WeakClaim(frameNode);
+    auto onContextMenuUpdate = [callback = CallbackHelper(*optValue), weakNode, instanceId](
+        WebContextMenuItemId menuItemId, const WebContextMenuOptions& options) {
+        OnContextMenuUpdate(callback, weakNode, instanceId, menuItemId, options);
+    };
+    WebModelStatic::SetOnContextMenuUpdate(frameNode, onContextMenuUpdate);
+#endif // WEB_SUPPORTED
+}
+#endif
+
 void SetMediaPlayGestureAccessImpl(Ark_NativePointer node,
                                    const Opt_Boolean* value)
 {
@@ -1621,6 +1679,16 @@ void SetVerticalScrollBarAccessImpl(Ark_NativePointer node,
         return;
     }
     WebModelStatic::SetVerticalScrollBarAccessEnabled(frameNode, *convValue);
+#endif // WEB_SUPPORTED
+}
+void SetCaretColorImpl(Ark_NativePointer node,
+                       const Opt_ResourceColor* value)
+{
+#ifdef WEB_SUPPORTED
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto convValue = Converter::OptConvertPtr<Color>(value);
+    WebModelStatic::SetCaretColor(frameNode, convValue);
 #endif // WEB_SUPPORTED
 }
 void SetOnTouchIconUrlReceivedImpl(Ark_NativePointer node,
@@ -2439,11 +2507,16 @@ void SetNativeEmbedOptionsImpl(Ark_NativePointer node,
     }
     auto supportDefaultIntrinsicSize = Converter::OptConvert<bool>(convValue.value().supportDefaultIntrinsicSize);
     auto supportCssDisplayChange = Converter::OptConvert<bool>(convValue.value().supportCssDisplayChange);
+    auto supportTransformRotateAndSkew = Converter::OptConvert<bool>(convValue.value().supportTransformRotateAndSkew);
     if (supportCssDisplayChange.has_value()) {
         RETURN_IF_CALLING_FROM_M114();
     }
+    if (supportTransformRotateAndSkew.has_value()) {
+        RETURN_IF_CALLING_FROM_M132();
+    }
 
-    WebModelStatic::SetNativeEmbedOptions(frameNode, *supportDefaultIntrinsicSize, *supportCssDisplayChange);
+    WebModelStatic::SetNativeEmbedOptions(frameNode, *supportDefaultIntrinsicSize, *supportCssDisplayChange,
+        supportTransformRotateAndSkew.value_or(false));
 #endif // WEB_SUPPORTED
 }
 void SetEnableDefaultContextMenuImpl(Ark_NativePointer node,
@@ -2990,6 +3063,27 @@ void SetOnDetectedBlankScreenImpl(Ark_NativePointer node,
 #endif // WEB_SUPPORTED
 }
 
+void SetOnMonitoredBlankScreenImpl(Ark_NativePointer node,
+                                   const Opt_OnMonitorBlankScreenCallback* value)
+{
+#ifdef WEB_SUPPORTED
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto optValue = Converter::GetOptPtr(value);
+    if (!optValue) {
+        // Implement Reset value
+        return;
+    }
+    auto instanceId = Container::CurrentId();
+    WeakPtr<FrameNode> weakNode = AceType::WeakClaim(frameNode);
+    auto onMonitoredBlankScreen = [callback = CallbackHelper(*optValue), weakNode, instanceId](
+        const BaseEventInfo* info) -> void {
+        OnMonitoredBlankScreen(callback, weakNode, instanceId, info);
+    };
+    WebModelStatic::SetOnMonitoredBlankScreen(frameNode, onMonitoredBlankScreen);
+#endif // WEB_SUPPORTED
+}
+
 void SetBlankScreenDetectionConfigImpl(Ark_NativePointer node,
                                        const Opt_BlankScreenDetectionConfig* value)
 {
@@ -3034,6 +3128,16 @@ void SetBlankScreenDetectionConfigImpl(Ark_NativePointer node,
 
     BlankScreenDetectionConfig config{enable, detectionTiming, detectionMethods, contentfulNodesCountThreshold};
     WebModelStatic::SetBlankScreenDetectionConfig(frameNode, config);
+#endif // WEB_SUPPORTED
+}
+void SetEnableBlankScreenMonitorImpl(Ark_NativePointer node,
+                                     const Opt_Boolean* value)
+{
+#ifdef WEB_SUPPORTED
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto convValue = Converter::OptConvert<bool>(*value);
+    WebModelStatic::SetWebBlankScreenMonitorEnabled(frameNode, convValue);
 #endif // WEB_SUPPORTED
 }
 
@@ -3192,6 +3296,7 @@ void SetOnInputmethodAttachedImpl(Ark_NativePointer node,
 #endif // WEB_SUPPORTED
 }
 } // WebAttributeModifier
+
 const GENERATED_ArkUIWebModifier* GetWebModifier()
 {
     static const GENERATED_ArkUIWebModifier ArkUIWebModifierImpl {
@@ -3247,6 +3352,9 @@ const GENERATED_ArkUIWebModifier* GetWebModifier()
         WebAttributeModifier::SetOnScreenCaptureRequestImpl,
         WebAttributeModifier::SetOnContextMenuShowImpl,
         WebAttributeModifier::SetOnContextMenuHideImpl,
+#if !defined(WINDOWS_PLATFORM) && !defined(LINUX_PLATFORM) && !defined(MAC_PLATFORM)
+        WebAttributeModifier::SetOnContextMenuUpdateImpl,
+#endif
         WebAttributeModifier::SetMediaPlayGestureAccessImpl,
         WebAttributeModifier::SetOnSearchResultReceiveImpl,
         WebAttributeModifier::SetOnScrollImpl,
@@ -3332,7 +3440,9 @@ const GENERATED_ArkUIWebModifier* GetWebModifier()
         WebAttributeModifier::SetRotateRenderEffectImpl,
         WebAttributeModifier::SetZoomControlAccessImpl,
         WebAttributeModifier::SetOnDetectedBlankScreenImpl,
+        WebAttributeModifier::SetOnMonitoredBlankScreenImpl,
         WebAttributeModifier::SetBlankScreenDetectionConfigImpl,
+        WebAttributeModifier::SetEnableBlankScreenMonitorImpl,
         WebAttributeModifier::SetBackToTopImpl,
         WebAttributeModifier::SetEnableSelectedDataDetectorImpl,
         WebAttributeModifier::SetOnFirstScreenPaintImpl,
@@ -3349,6 +3459,9 @@ const GENERATED_ArkUIWebModifier* GetWebModifier()
         WebAttributeModifier::SetOnInputmethodAttachedImpl,
         WebAttributeModifier::SetEnableFullscreenVideoOverlayImpl,
         WebAttributeModifier::SetEnableMediaNetworkProxyImpl,
+        WebAttributeModifier::SetCaretColorImpl,
+        WebAttributeModifier::SetOnZoomChangeImpl,
+        WebAttributeModifier::SetFlingSpeedLimitImpl,
         WebAttributeModifier::SetRegisterNativeEmbedRuleImpl,
         WebAttributeModifier::SetBindSelectionMenuImpl,
         WebAttributeModifier::SetEnableScrollDirectionalLockImpl,

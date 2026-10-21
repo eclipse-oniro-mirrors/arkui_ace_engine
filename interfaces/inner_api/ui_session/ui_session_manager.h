@@ -43,7 +43,7 @@ class PixelMap;
 } // namespace Media
 } // namespace OHOS
 namespace OHOS::Ace {
-class InspectorJsonValue;
+struct ComponentTreeQueryRequest;
 class ACE_FORCE_EXPORT UiSessionManager {
 public:
     using InspectorFunction = std::function<void(bool onlyNeedVisible, ParamConfig config)>;
@@ -68,6 +68,7 @@ public:
     using PageTranslateResetFunction = std::function<void(int32_t)>;
     using PageTranslateResultFunction = std::function<void(const std::vector<TranslateResult>&)>;
     using PageSceneDetectFunction = std::function<void(int32_t, const std::string&, bool)>;
+    using ComponentTreeQueryFunction = std::function<void(const ComponentTreeQueryRequest&)>;
 
     enum class WebPageSceneOp {
         RegisterRules,    // Register rules + match for reportOnRegister
@@ -139,8 +140,6 @@ public:
      * @description: get current page inspector tree value
      */
     virtual void GetInspectorTree(ParamConfig config = ParamConfig()) {};
-    virtual void AddValueForTree(int32_t id, const std::string& value) {};
-    virtual void WebTaskNumsChange(int32_t num) {};
     virtual void ReportInspectorTreeValue(const std::string& value) {};
     virtual void SaveForSendCommandFunction(NotifySendCommandFunction&& function) {};
     virtual void SaveForSendCommandSyncFunction(NotifySendCommandSyncFunction&& function) {};
@@ -316,12 +315,39 @@ public:
     virtual void NotifyPageSceneNodeChanged(const std::string& nodeTag, bool isAttach) {};
     virtual void NotifyPageSceneContentChanged() {};
     virtual void FlushPageSceneNodeChanged() {};
+    // Request a coalesced click-only flush. The registered UI callback checks
+    // content stability at consumption time and preserves pending input on a miss.
+    virtual void FlushPendingSearchClicksIfStable()
+    {
+        std::function<void()> flush;
+        {
+            std::lock_guard<std::mutex> lock(searchClickFlushMutex_);
+            flush = searchClickFlushFunction_;
+        }
+        if (flush) {
+            flush();
+        }
+    };
     virtual void SavePageSceneDetectFunction(PageSceneDetectFunction&& function) {};
     virtual void SaveWebPageSceneFunction(WebPageSceneFunction&& function) {};
+    virtual bool IsSearchPageSceneRuleCurrent(
+        int32_t processId, const std::string& ruleSetId, const std::string& generation) { return false; }
     // Internal PageScene scheduling hook. Keep it at the end of the virtual interface to preserve
     // the slot order of the existing UiSessionManager methods.
     virtual void NotifyPageSceneNodeStateChanged(
         const std::string& nodeTag, PageSceneNodeStateChange stateChange) {};
+
+    virtual void SaveComponentTreeQueryFunction(ComponentTreeQueryFunction&& function) {};
+    virtual void ComponentTreeQuery(const ComponentTreeQueryRequest& request) {};
+    virtual void ReportNavigationQueryResult(const std::string& data) {};
+    virtual void ReportLazyForEachQueryResult(const std::string& data) {};
+
+    // Internal callback, separate from full page-scene detection and its queues.
+    void SaveSearchClickFlushFunction(std::function<void()>&& function)
+    {
+        std::lock_guard<std::mutex> lock(searchClickFlushMutex_);
+        searchClickFlushFunction_ = std::move(function);
+    }
 
 protected:
     UiSessionManager() = default;
@@ -329,16 +355,16 @@ protected:
 
     std::map<std::string, std::set<int32_t>> processMap_;
     std::shared_mutex processMapMutex_;
-    std::atomic<int32_t> clickEventRegisterProcesses_ = 0;
-    std::atomic<int32_t> searchEventRegisterProcesses_ = 0;
-    std::atomic<int32_t> textChangeEventRegisterProcesses_ = 0;
-    std::atomic<int32_t> routerChangeEventRegisterProcesses_ = 0;
-    std::atomic<int32_t> componentChangeEventRegisterProcesses_ = 0;
-    uint32_t componentChangeEventMask_ = 0;
-    std::atomic<int32_t> scrollEventRegisterProcesses_ = 0;
-    std::atomic<int32_t> lifeCycleEventRegisterProcesses_ = 0;
-    std::atomic<int32_t> selectTextEventRegisterProcesses_ = 0;
-    std::atomic<int32_t> pageSceneRuleRegisterProcesses_ = 0;
+    std::atomic<bool> clickEventRegistered_ = false;
+    std::atomic<bool> searchEventRegistered_ = false;
+    std::atomic<bool> textChangeEventRegistered_ = false;
+    std::atomic<bool> routerChangeEventRegistered_ = false;
+    std::atomic<bool> componentChangeEventRegistered_ = false;
+    std::atomic<uint32_t> componentChangeEventMask_ { 0 };
+    std::atomic<bool> scrollEventRegistered_ = false;
+    std::atomic<bool> lifeCycleEventRegistered_ = false;
+    std::atomic<bool> selectTextEventRegistered_ = false;
+    std::atomic<bool> pageSceneRuleRegistered_ = false;
     bool webFocusEventRegistered = false;
     std::mutex webFocusEventRegisteredMutex_;
     InspectorFunction inspectorFunction_ = 0;
@@ -357,9 +383,6 @@ protected:
     std::mutex notifySendCommandSyncFunctionMutex_;
     GetStateMgmtInfoFunction getStateMgmtInfoFunction_ = 0;
     std::mutex getStateMgmtInfoFunctionMutex_;
-    std::shared_ptr<InspectorJsonValue> jsonValue_ = nullptr;
-    std::mutex jsonValueMutex_;
-    std::atomic<int32_t> webTaskNums_ = 0;
     std::string baseInfo_;
     std::mutex baseInfoMutex_;
     std::map<int32_t, std::shared_ptr<UiTranslateManager>> translateManagerMap_;
@@ -396,10 +419,15 @@ protected:
     PageTranslateResultFunction sendArkUIPageTranslateResultFunction_;
     std::mutex arkUIPageTranslateFunctionMutex_;
     RelaxedCommandFunction relaxedCommandFunction_ = nullptr;
+    std::mutex relaxedCommandFunctionMutex_;
     PageSceneDetectFunction pageSceneDetectFunction_;
     std::mutex pageSceneDetectFunctionMutex_;
     WebPageSceneFunction webPageSceneFunction_;
     std::mutex webPageSceneMutex_;
+    ComponentTreeQueryFunction componentTreeQueryFunction_;
+    std::mutex componentTreeQueryFunctionMutex_;
+    std::function<void()> searchClickFlushFunction_;
+    std::mutex searchClickFlushMutex_;
 };
 } // namespace OHOS::Ace
 #endif // FOUNDATION_ACE_INTERFACE_UI_SESSION_MANAGER_H

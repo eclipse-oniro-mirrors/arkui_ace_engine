@@ -1169,6 +1169,7 @@ export interface RichEditorImageSpanResult {
     valueResourceStr?: ResourceStr;
     imageStyle: RichEditorImageSpanStyleResult;
     offsetInSpan: [ int32, int32 ];
+    imageTag?: string;
 }
 export interface RichEditorImageSpan {
     spanPosition: RichEditorSpanPosition;
@@ -1199,11 +1200,22 @@ export interface RichEditorImageSpanOptions {
     imageStyle?: RichEditorImageSpanStyle;
     gesture?: RichEditorGesture;
     onHover?: OnHoverCallback;
+    imageTag?: string;
 }
 export interface RichEditorBuilderSpanOptions {
     offset?: int32;
     dragBackgroundColor?: arkui_Graphics_ColorMetrics;
     isDragShadowNeeded?: boolean;
+    accessibilitySpanOptions?: AccessibilitySpanOptions;
+}
+export interface BuilderSpanInfo {
+    id?: string;
+    offset?: int32;
+}
+export interface RichEditorBuilderSpan {
+    builder: CustomBuilder;
+    onAttach?: arkui_component_common_Callback<BuilderSpanInfo, void>;
+    onDetach?: arkui_component_common_Callback<BuilderSpanInfo, void>;
     accessibilitySpanOptions?: AccessibilitySpanOptions;
 }
 export interface PlaceholderStyle {
@@ -1798,6 +1810,44 @@ export class RichEditorStyledStringOptions_serializer {
         let valueDeserializer: DeserializerBase = buffer
         const controllerTmpResult: RichEditorStyledStringController = (RichEditorStyledStringController_serializer.read(valueDeserializer) as RichEditorStyledStringController)
         let value: RichEditorStyledStringOptions = ({controller: controllerTmpResult} as RichEditorStyledStringOptions)
+        return value
+    }
+}
+export class BuilderSpanInfo_serializer {
+    public static write(buffer: SerializerBase, value: BuilderSpanInfo): void {
+        let valueSerializer: SerializerBase = buffer
+        const valueHolderForId = value.id
+        if (valueHolderForId !== undefined) {
+            valueSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueHolderForIdTmpValue = valueHolderForId!
+            valueSerializer.writeString(valueHolderForIdTmpValue)
+        } else {
+            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        const valueHolderForOffset = value.offset
+        if (valueHolderForOffset !== undefined) {
+            valueSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueHolderForOffsetTmpValue = valueHolderForOffset!
+            valueSerializer.writeInt32(valueHolderForOffsetTmpValue)
+        } else {
+            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+    }
+    public static read(buffer: DeserializerBase): BuilderSpanInfo {
+        let valueDeserializer: DeserializerBase = buffer
+        const idTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
+        let idTmpBuf: string | undefined = undefined
+        if ((idTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
+            idTmpBuf = (valueDeserializer.readString() as string)
+        }
+        const idTmpResult: string | undefined = idTmpBuf
+        const offsetTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
+        let offsetTmpBuf: int32 | undefined = undefined
+        if ((offsetTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
+            offsetTmpBuf = valueDeserializer.readInt32()
+        }
+        const offsetTmpResult: int32 | undefined = offsetTmpBuf
+        let value: BuilderSpanInfo = ({id: idTmpResult, offset: offsetTmpResult} as BuilderSpanInfo)
         return value
     }
 }
@@ -2646,6 +2696,102 @@ export class LeadingMarginPlaceholder_serializer {
         const sizeTmpBufValue1: Dimension = (sizeTmpBufValue1TempBuf as string | number | global_resource_Resource)
         const sizeTmpResult: [ Dimension, Dimension ] = ([sizeTmpBufValue0, sizeTmpBufValue1] as [ Dimension, Dimension ])
         let value: LeadingMarginPlaceholder = ({pixelMap: pixelMapTmpResult, size: sizeTmpResult} as LeadingMarginPlaceholder)
+        return value
+    }
+}
+export class RichEditorBuilderSpan_serializer {
+    public static write(buffer: SerializerBase, value: RichEditorBuilderSpan): void {
+        let valueSerializer: SerializerBase = buffer
+        const valueHolderForBuilder = value.builder
+        valueSerializer.holdAndWriteCallback(CallbackTransformer.transformFromCustomBuilder(valueHolderForBuilder))
+        const valueHolderForOnAttach = value.onAttach
+        if (valueHolderForOnAttach !== undefined) {
+            valueSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueHolderForOnAttachTmpValue = valueHolderForOnAttach!
+            valueSerializer.holdAndWriteCallback(valueHolderForOnAttachTmpValue)
+        } else {
+            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        const valueHolderForOnDetach = value.onDetach
+        if (valueHolderForOnDetach !== undefined) {
+            valueSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueHolderForOnDetachTmpValue = valueHolderForOnDetach!
+            valueSerializer.holdAndWriteCallback(valueHolderForOnDetachTmpValue)
+        } else {
+            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        const valueHolderForAccessibilitySpanOptions = value.accessibilitySpanOptions
+        if (valueHolderForAccessibilitySpanOptions !== undefined) {
+            valueSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueHolderForAccessibilitySpanOptionsTmpValue = valueHolderForAccessibilitySpanOptions!
+            AccessibilitySpanOptions_serializer.write(valueSerializer, valueHolderForAccessibilitySpanOptionsTmpValue)
+        } else {
+            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+    }
+    public static read(buffer: DeserializerBase): RichEditorBuilderSpan {
+        let valueDeserializer: DeserializerBase = buffer
+        const builderTmpBufBufResource: CallbackResource = valueDeserializer.readCallbackResource()
+        const builderTmpBufBufCall: KPointer = valueDeserializer.readPointer()
+        const builderTmpBufBufCallSync: KPointer = valueDeserializer.readPointer()
+        const builderTmpBufClosure = ():void => {
+            const builderTmpBufBufArgsSerializer: SerializerBase = SerializerBase.hold();
+            builderTmpBufBufArgsSerializer.writeInt32(builderTmpBufBufResource.resourceId);
+            builderTmpBufBufArgsSerializer.writePointer(builderTmpBufBufCall);
+            builderTmpBufBufArgsSerializer.writePointer(builderTmpBufBufCallSync);
+            InteropNativeModule._CallCallbackSync(10, -1834072896, builderTmpBufBufArgsSerializer.asBuffer(), builderTmpBufBufArgsSerializer.length());
+            builderTmpBufBufArgsSerializer.release();
+            return;
+        }
+        resourceFinalizerRegister(builderTmpBufClosure, builderTmpBufBufResource)
+        const builderTmpResult: CustomBuilder = builderTmpBufClosure
+        const onAttachTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
+        let onAttachTmpBuf: arkui_component_common_Callback<BuilderSpanInfo, void> | undefined = undefined
+        if ((onAttachTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
+            const onAttachTmpBufOptBufResource: CallbackResource = valueDeserializer.readCallbackResource()
+            const onAttachTmpBufOptBufCall: KPointer = valueDeserializer.readPointer()
+            const onAttachTmpBufOptBufCallSync: KPointer = valueDeserializer.readPointer()
+            const onAttachTmpBufOptClosure = (data: BuilderSpanInfo):void => {
+                const onAttachTmpBufOptBufArgsSerializer: SerializerBase = SerializerBase.hold();
+                onAttachTmpBufOptBufArgsSerializer.writeInt32(onAttachTmpBufOptBufResource.resourceId);
+                onAttachTmpBufOptBufArgsSerializer.writePointer(onAttachTmpBufOptBufCall);
+                onAttachTmpBufOptBufArgsSerializer.writePointer(onAttachTmpBufOptBufCallSync);
+                BuilderSpanInfo_serializer.write(onAttachTmpBufOptBufArgsSerializer, data);
+                InteropNativeModule._CallCallbackSync(10, 1220489804, onAttachTmpBufOptBufArgsSerializer.asBuffer(), onAttachTmpBufOptBufArgsSerializer.length());
+                onAttachTmpBufOptBufArgsSerializer.release();
+                return;
+            }
+            resourceFinalizerRegister(onAttachTmpBufOptClosure, onAttachTmpBufOptBufResource)
+            onAttachTmpBuf = onAttachTmpBufOptClosure
+        }
+        const onAttachTmpResult: arkui_component_common_Callback<BuilderSpanInfo, void> | undefined = onAttachTmpBuf
+        const onDetachTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
+        let onDetachTmpBuf: arkui_component_common_Callback<BuilderSpanInfo, void> | undefined = undefined
+        if ((onDetachTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
+            const onDetachTmpBufOptBufResource: CallbackResource = valueDeserializer.readCallbackResource()
+            const onDetachTmpBufOptBufCall: KPointer = valueDeserializer.readPointer()
+            const onDetachTmpBufOptBufCallSync: KPointer = valueDeserializer.readPointer()
+            const onDetachTmpBufOptClosure = (data: BuilderSpanInfo):void => {
+                const onDetachTmpBufOptBufArgsSerializer: SerializerBase = SerializerBase.hold();
+                onDetachTmpBufOptBufArgsSerializer.writeInt32(onDetachTmpBufOptBufResource.resourceId);
+                onDetachTmpBufOptBufArgsSerializer.writePointer(onDetachTmpBufOptBufCall);
+                onDetachTmpBufOptBufArgsSerializer.writePointer(onDetachTmpBufOptBufCallSync);
+                BuilderSpanInfo_serializer.write(onDetachTmpBufOptBufArgsSerializer, data);
+                InteropNativeModule._CallCallbackSync(10, 1220489804, onDetachTmpBufOptBufArgsSerializer.asBuffer(), onDetachTmpBufOptBufArgsSerializer.length());
+                onDetachTmpBufOptBufArgsSerializer.release();
+                return;
+            }
+            resourceFinalizerRegister(onDetachTmpBufOptClosure, onDetachTmpBufOptBufResource)
+            onDetachTmpBuf = onDetachTmpBufOptClosure
+        }
+        const onDetachTmpResult: arkui_component_common_Callback<BuilderSpanInfo, void> | undefined = onDetachTmpBuf
+        const accessibilitySpanOptionsTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
+        let accessibilitySpanOptionsTmpBuf: AccessibilitySpanOptions | undefined = undefined
+        if ((accessibilitySpanOptionsTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
+            accessibilitySpanOptionsTmpBuf = AccessibilitySpanOptions_serializer.read(valueDeserializer)
+        }
+        const accessibilitySpanOptionsTmpResult: AccessibilitySpanOptions | undefined = accessibilitySpanOptionsTmpBuf
+        let value: RichEditorBuilderSpan = ({builder: builderTmpResult, onAttach: onAttachTmpResult, onDetach: onDetachTmpResult, accessibilitySpanOptions: accessibilitySpanOptionsTmpResult} as RichEditorBuilderSpan)
         return value
     }
 }
@@ -4084,6 +4230,14 @@ export class RichEditorImageSpanOptions_serializer {
         } else {
             valueSerializer.writeInt8(RuntimeType.UNDEFINED)
         }
+        const valueHolderForImageTag = value.imageTag
+        if (valueHolderForImageTag !== undefined) {
+            valueSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueHolderForImageTagTmpValue = valueHolderForImageTag!
+            valueSerializer.writeString(valueHolderForImageTagTmpValue)
+        } else {
+            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
     }
     public static read(buffer: DeserializerBase): RichEditorImageSpanOptions {
         let valueDeserializer: DeserializerBase = buffer
@@ -4126,7 +4280,13 @@ export class RichEditorImageSpanOptions_serializer {
             onHoverTmpBuf = onHoverTmpBufOptClosure
         }
         const onHoverTmpResult: OnHoverCallback | undefined = onHoverTmpBuf
-        let value: RichEditorImageSpanOptions = ({offset: offsetTmpResult, imageStyle: imageStyleTmpResult, gesture: gestureTmpResult, onHover: onHoverTmpResult} as RichEditorImageSpanOptions)
+        const imageTagTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
+        let imageTagTmpBuf: string | undefined = undefined
+        if ((imageTagTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
+            imageTagTmpBuf = (valueDeserializer.readString() as string)
+        }
+        const imageTagTmpResult: string | undefined = imageTagTmpBuf
+        let value: RichEditorImageSpanOptions = ({offset: offsetTmpResult, imageStyle: imageStyleTmpResult, gesture: gestureTmpResult, onHover: onHoverTmpResult, imageTag: imageTagTmpResult} as RichEditorImageSpanOptions)
         return value
     }
 }
@@ -4166,6 +4326,14 @@ export class RichEditorImageSpanResult_serializer {
         valueSerializer.writeInt32(valueHolderForOffsetInSpan_0)
         const valueHolderForOffsetInSpan_1 = valueHolderForOffsetInSpan[1]
         valueSerializer.writeInt32(valueHolderForOffsetInSpan_1)
+        const valueHolderForImageTag = value.imageTag
+        if (valueHolderForImageTag !== undefined) {
+            valueSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueHolderForImageTagTmpValue = valueHolderForImageTag!
+            valueSerializer.writeString(valueHolderForImageTagTmpValue)
+        } else {
+            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
     }
     public static read(buffer: DeserializerBase): RichEditorImageSpanResult {
         let valueDeserializer: DeserializerBase = buffer
@@ -4195,7 +4363,13 @@ export class RichEditorImageSpanResult_serializer {
         const offsetInSpanTmpBufValue0: int32 = valueDeserializer.readInt32()
         const offsetInSpanTmpBufValue1: int32 = valueDeserializer.readInt32()
         const offsetInSpanTmpResult: [ int32, int32 ] = ([offsetInSpanTmpBufValue0, offsetInSpanTmpBufValue1] as [ int32, int32 ])
-        let value: RichEditorImageSpanResult = ({spanPosition: spanPositionTmpResult, valuePixelMap: valuePixelMapTmpResult, valueResourceStr: valueResourceStrTmpResult, imageStyle: imageStyleTmpResult, offsetInSpan: offsetInSpanTmpResult} as RichEditorImageSpanResult)
+        const imageTagTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
+        let imageTagTmpBuf: string | undefined = undefined
+        if ((imageTagTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
+            imageTagTmpBuf = (valueDeserializer.readString() as string)
+        }
+        const imageTagTmpResult: string | undefined = imageTagTmpBuf
+        let value: RichEditorImageSpanResult = ({spanPosition: spanPositionTmpResult, valuePixelMap: valuePixelMapTmpResult, valueResourceStr: valueResourceStrTmpResult, imageStyle: imageStyleTmpResult, offsetInSpan: offsetInSpanTmpResult, imageTag: imageTagTmpResult} as RichEditorImageSpanResult)
         return value
     }
 }
@@ -4431,6 +4605,11 @@ export class RichEditorController extends RichEditorBaseController implements Ma
         const options_casted = options as (RichEditorBuilderSpanOptions | undefined)
         return this.addBuilderSpan_serialize(value_casted, options_casted)
     }
+    public addRichEditorBuilderSpan(builderSpan: RichEditorBuilderSpan, info?: BuilderSpanInfo): int32 | undefined {
+        const builderSpan_casted = builderSpan as (RichEditorBuilderSpan)
+        const info_casted = info as (BuilderSpanInfo | undefined)
+        return this.addRichEditorBuilderSpan_serialize(builderSpan_casted, info_casted)
+    }
     public addSymbolSpan(value: global_resource_Resource, options?: RichEditorSymbolSpanOptions): int32 | undefined {
         const value_casted = value as (global_resource_Resource)
         const options_casted = options as (RichEditorSymbolSpanOptions | undefined)
@@ -4454,6 +4633,10 @@ export class RichEditorController extends RichEditorBaseController implements Ma
     public getSpans(value?: RichEditorRange): Array<RichEditorImageSpanResult | RichEditorTextSpanResult> | undefined {
         const value_casted = value as (RichEditorRange | undefined)
         return this.getSpans_serialize(value_casted)
+    }
+    public getRichEditorBuilderSpans(range?: RichEditorRange): Array<BuilderSpanInfo> | undefined {
+        const range_casted = range as (RichEditorRange | undefined)
+        return this.getRichEditorBuilderSpans_serialize(range_casted)
     }
     public getParagraphs(value?: RichEditorRange): Array<RichEditorParagraphResult> | undefined {
         const value_casted = value as (RichEditorRange | undefined)
@@ -4560,6 +4743,28 @@ export class RichEditorController extends RichEditorBaseController implements Ma
         retvalDeserializer.dispose()
         return (returnResult as int32 | undefined)
     }
+    private addRichEditorBuilderSpan_serialize(builderSpan: RichEditorBuilderSpan, info?: BuilderSpanInfo): int32 | undefined {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        RichEditorBuilderSpan_serializer.write(thisSerializer, builderSpan)
+        if (info !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const infoTmpValue = info!
+            BuilderSpanInfo_serializer.write(thisSerializer, infoTmpValue)
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        const retval = ArkUIGeneratedNativeModule._RichEditorController_addRichEditorBuilderSpan(this.peer!.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+        let retvalDeserializer: DeserializerBase = new DeserializerBase(retval, retval.length)
+        const buffer_runtimeType = retvalDeserializer.readInt8()!.toInt()
+        let buffer: int32 | undefined = undefined
+        if ((buffer_runtimeType) != (RuntimeType.UNDEFINED)) {
+            buffer = retvalDeserializer.readInt32()
+        }
+        const returnResult: int32 | undefined = buffer
+        retvalDeserializer.dispose()
+        return (returnResult as int32 | undefined)
+    }
     private addSymbolSpan_serialize(value: global_resource_Resource, options?: RichEditorSymbolSpanOptions): int32 | undefined {
         const thisSerializer: SerializerBase = SerializerBase.hold()
         global_resource_Resource_serializer.write(thisSerializer, value)
@@ -4651,6 +4856,31 @@ export class RichEditorController extends RichEditorBaseController implements Ma
         const returnResult: Array<RichEditorImageSpanResult | RichEditorTextSpanResult> | undefined = buffer
         retvalDeserializer.dispose()
         return (returnResult as Array<RichEditorImageSpanResult | RichEditorTextSpanResult> | undefined)
+    }
+    private getRichEditorBuilderSpans_serialize(range?: RichEditorRange): Array<BuilderSpanInfo> | undefined {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (range !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const rangeTmpValue = range!
+            RichEditorRange_serializer.write(thisSerializer, rangeTmpValue)
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        const retval = ArkUIGeneratedNativeModule._RichEditorController_getRichEditorBuilderSpans(this.peer!.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+        let retvalDeserializer: DeserializerBase = new DeserializerBase(retval, retval.length)
+        const buffer_runtimeType = retvalDeserializer.readInt8()!.toInt()
+        let buffer: Array<BuilderSpanInfo> | undefined = undefined
+        if ((buffer_runtimeType) != (RuntimeType.UNDEFINED)) {
+            const bufferOptLength: int32 = retvalDeserializer.readInt32()
+            const bufferOpt: Array<BuilderSpanInfo> = new Array<BuilderSpanInfo>(bufferOptLength, (arg0: int32):BuilderSpanInfo => {
+            return BuilderSpanInfo_serializer.read(retvalDeserializer);
+        })
+            buffer = bufferOpt
+        }
+        const returnResult: Array<BuilderSpanInfo> | undefined = buffer
+        retvalDeserializer.dispose()
+        return (returnResult as Array<BuilderSpanInfo> | undefined)
     }
     private getParagraphs_serialize(value?: RichEditorRange): Array<RichEditorParagraphResult> | undefined {
         const thisSerializer: SerializerBase = SerializerBase.hold()

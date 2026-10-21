@@ -68,6 +68,7 @@
 #include "core/components_ng/pattern/overlay/overlay_manager.h"
 #include "core/components_ng/pattern/pattern.h"
 #include "core/components_ng/pattern/scroll/scroll_event_hub.h"
+#include "core/components_ng/pattern/safe_area_inset/safe_area_inset_pattern.h"
 #include "core/components_ng/pattern/scrollable/scrollable_event_hub.h"
 #include "core/components_ng/pattern/stack/stack_pattern.h"
 #include "core/components_ng/pattern/text_field/text_field_paint_property.h"
@@ -80,6 +81,7 @@
 #include "core/interfaces/native/node/dialog_modifier.h"
 #include "core/interfaces/native/node/menu_item_modifier.h"
 #include "core/interfaces/native/node/menu_modifier.h"
+#include "core/pipeline/base/element_register.h"
 
 namespace OHOS::Ace::NG {
 
@@ -754,7 +756,6 @@ void ViewAbstract::SetBackgroundColor(const Color& color)
     }
 
     ACE_UPDATE_RENDER_CONTEXT(BackgroundColor, updateColor);
-    ACE_UPDATE_RENDER_CONTEXT(PreBackgroundColor, updateColor);
     ACE_UPDATE_LAYOUT_PROPERTY(LayoutProperty, IsUserSetBackgroundColor, true);
 }
 
@@ -795,7 +796,6 @@ void ViewAbstract::SetBackgroundColorWithResourceObj(const Color& color, const R
             pipeline->CheckNeedUpdateBackgroundColor(backgroundColor);
         }
         ACE_UPDATE_NODE_RENDER_CONTEXT(BackgroundColor, backgroundColor, frameNode);
-        ACE_UPDATE_NODE_RENDER_CONTEXT(PreBackgroundColor, backgroundColor, frameNode);
     };
     pattern->AddResObj("backgroundColor", resObj, std::move(updateFunc));
 }
@@ -807,7 +807,6 @@ void ViewAbstract::SetBackgroundColor(FrameNode* frameNode, const Color& color)
     CHECK_NULL_VOID(pattern);
     pattern->RemoveResObj("backgroundColor");
     ACE_UPDATE_NODE_RENDER_CONTEXT(BackgroundColor, color, frameNode);
-    ACE_UPDATE_NODE_RENDER_CONTEXT(PreBackgroundColor, color, frameNode);
     ACE_UPDATE_NODE_LAYOUT_PROPERTY(LayoutProperty, IsUserSetBackgroundColor, true, frameNode);
 }
 
@@ -826,11 +825,9 @@ void ViewAbstract::SetBackgroundColor(FrameNode* frameNode, const Color& color, 
         Color backgroundColor;
         ResourceParseUtils::ParseResColor(resObj, backgroundColor);
         ACE_UPDATE_NODE_RENDER_CONTEXT(BackgroundColor, backgroundColor, frameNode);
-        ACE_UPDATE_NODE_RENDER_CONTEXT(PreBackgroundColor, backgroundColor, frameNode);
     };
     pattern->AddResObj("backgroundColor", resObj, std::move(updateFunc));
     ACE_UPDATE_NODE_RENDER_CONTEXT(BackgroundColor, color, frameNode);
-    ACE_UPDATE_NODE_RENDER_CONTEXT(PreBackgroundColor, color, frameNode);
     ACE_UPDATE_NODE_LAYOUT_PROPERTY(LayoutProperty, IsUserSetBackgroundColor, true, frameNode);
 }
 
@@ -1558,6 +1555,103 @@ void ViewAbstract::ResetSafeAreaPadding()
     ACE_RESET_LAYOUT_PROPERTY(LayoutProperty, SafeAreaPadding);
 }
 
+void ViewAbstract::SetSafeAreaInset(
+    FrameNode* frameNode, const SafeAreaInsetOptions& options, const SafeAreaInsetContentArray& contents)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto layoutProperty = frameNode->GetLayoutProperty();
+    CHECK_NULL_VOID(layoutProperty);
+
+    SafeAreaInsetOptions effectiveOptions = options;
+    SafeAreaInsetContentArray effectiveContents = contents;
+    bool hasLpxSpacing = false;
+    for (size_t index = 0; index < SAFE_AREA_INSET_EDGE_COUNT; ++index) {
+        auto& edge = effectiveOptions.edges[index];
+        auto& content = effectiveContents[index];
+        if (!edge.has_value() || !content) {
+            edge.reset();
+            content.Reset();
+            continue;
+        }
+        for (size_t previous = 0; previous < index; ++previous) {
+            if (effectiveContents[previous] == content) {
+                edge.reset();
+                content.Reset();
+                break;
+            }
+        }
+        if (edge.has_value() && edge->spacing.GetDimension().Unit() == DimensionUnit::LPX) {
+            hasLpxSpacing = true;
+        }
+    }
+    if (effectiveOptions.Empty()) {
+        ResetSafeAreaInset(frameNode);
+        return;
+    }
+
+    if (hasLpxSpacing) {
+        frameNode->RegisterLpxAttribute(LpxAttribute::LPX_SAFE_AREA_INSET_SPACING);
+    } else {
+        frameNode->UnRegisterLpxAttribute(LpxAttribute::LPX_SAFE_AREA_INSET_SPACING);
+    }
+
+    auto insetContainer = frameNode->GetSafeAreaInsetNode();
+    auto insetPattern = insetContainer ? insetContainer->GetPattern<SafeAreaInsetPattern>() : nullptr;
+    if (!insetPattern) {
+        insetPattern = AceType::MakeRefPtr<SafeAreaInsetPattern>();
+        insetContainer = FrameNode::CreateFrameNode(SAFE_AREA_INSET_CONTAINER_TAG,
+            ElementRegister::GetInstance()->MakeUniqueId(), insetPattern);
+        CHECK_NULL_VOID(insetContainer);
+        insetContainer->SetInternal();
+        insetContainer->SetHitTestMode(HitTestMode::HTMTRANSPARENT_SELF);
+    }
+    bool contentChanged = false;
+    // Release changed slots before mounting the new snapshot, including roots moved between edges.
+    for (size_t index = 0; index < SAFE_AREA_INSET_EDGE_COUNT; ++index) {
+        auto edge = static_cast<SafeAreaInsetEdge>(index);
+        if (insetPattern->GetEdgeContent(edge) != effectiveContents[index]) {
+            contentChanged = insetPattern->SetEdgeContent(edge, nullptr) || contentChanged;
+        }
+    }
+    for (size_t index = 0; index < SAFE_AREA_INSET_EDGE_COUNT; ++index) {
+        contentChanged = insetPattern->SetEdgeContent(
+            static_cast<SafeAreaInsetEdge>(index), effectiveContents[index]) || contentChanged;
+    }
+    if (insetPattern->Empty()) {
+        ResetSafeAreaInset(frameNode);
+        return;
+    }
+
+    const bool optionsChanged = !layoutProperty->GetSafeAreaInset().has_value() ||
+        layoutProperty->GetSafeAreaInset().value() != effectiveOptions;
+    layoutProperty->UpdateSafeAreaInset(effectiveOptions);
+    if (frameNode->GetSafeAreaInsetNode() != insetContainer) {
+        frameNode->SetSafeAreaInsetNode(insetContainer);
+    } else if (contentChanged) {
+        frameNode->MarkNeedSyncRenderTree(true);
+    }
+    if (optionsChanged || contentChanged) {
+        frameNode->ResetSafeAreaPadding();
+        frameNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+    }
+}
+
+void ViewAbstract::ResetSafeAreaInset(FrameNode* frameNode)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto layoutProperty = frameNode->GetLayoutProperty();
+    CHECK_NULL_VOID(layoutProperty);
+    if (!frameNode->GetSafeAreaInsetNode() && !layoutProperty->GetSafeAreaInset().has_value() &&
+        !layoutProperty->GetSafeAreaInsetContribution().HasValue()) {
+        return;
+    }
+    frameNode->UnRegisterLpxAttribute(LpxAttribute::LPX_SAFE_AREA_INSET_SPACING);
+    layoutProperty->ResetSafeAreaInset();
+    frameNode->SetSafeAreaInsetNode(nullptr);
+    frameNode->ResetSafeAreaPadding();
+    frameNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+}
+
 void ViewAbstract::SetSafeAreaPadding(FrameNode* frameNode, const CalcLength& value)
 {
     CHECK_NULL_VOID(frameNode);
@@ -1832,7 +1926,6 @@ void ViewAbstract::SetBorderColor(const Color& value)
     BorderColorProperty borderColor;
     borderColor.SetColor(value);
     ACE_UPDATE_RENDER_CONTEXT(BorderColor, borderColor);
-    ACE_UPDATE_RENDER_CONTEXT(PreBorderColor, borderColor);
 }
 
 void ViewAbstract::SetBorderColor(const BorderColorProperty& value)
@@ -1856,7 +1949,6 @@ void ViewAbstract::SetBorderColor(const BorderColorProperty& value)
             auto layoutDirection = layoutProperty->GetNonAutoLayoutDirection();
             CheckLocalizedBorderColor(borderColor, layoutDirection);
             ACE_UPDATE_NODE_RENDER_CONTEXT(BorderColor, borderColor, frameNode);
-            ACE_UPDATE_NODE_RENDER_CONTEXT(PreBorderColor, borderColor, frameNode);
             auto pattern = frameNode->GetPattern<Pattern>();
             CHECK_NULL_VOID(pattern);
             pattern->UpdateBorderResource();
@@ -1865,7 +1957,6 @@ void ViewAbstract::SetBorderColor(const BorderColorProperty& value)
         pattern->AddResObj("borderColor", resObj, std::move(updateFunc));
     }
     ACE_UPDATE_RENDER_CONTEXT(BorderColor, value);
-    ACE_UPDATE_RENDER_CONTEXT(PreBorderColor, value);
 }
 
 void ViewAbstract::SetBorderColor(const RefPtr<ResourceObject>& resObj)
@@ -1893,7 +1984,6 @@ void ViewAbstract::SetBorderColor(const RefPtr<ResourceObject>& resObj)
         BorderColorProperty borderColorProperty;
         borderColorProperty.SetColor(borderColor);
         ACE_UPDATE_NODE_RENDER_CONTEXT(BorderColor, borderColorProperty, frameNode);
-        ACE_UPDATE_NODE_RENDER_CONTEXT(PreBorderColor, borderColorProperty, frameNode);
         pattern->UpdateBorderResource();
     };
     updateFunc(resObj);
@@ -1914,7 +2004,6 @@ void ViewAbstract::SetBorderWidth(const Dimension& value)
     ACE_CHECK_LPX_ATTRIBUTE(value, LpxAttribute::LPX_BORDER_WIDTH);
     ACE_UPDATE_LAYOUT_PROPERTY(LayoutProperty, BorderWidth, borderWidth);
     ACE_UPDATE_RENDER_CONTEXT(BorderWidth, borderWidth);
-    ACE_UPDATE_RENDER_CONTEXT(PreBorderWidth, borderWidth);
 }
 
 void ViewAbstract::SetBorderWidth(const BorderWidthProperty& value)
@@ -1940,7 +2029,6 @@ void ViewAbstract::SetBorderWidth(const BorderWidthProperty& value)
             CheckNodeBorderWidthLPX(frameNode, borderWidth);
             ACE_UPDATE_NODE_LAYOUT_PROPERTY(LayoutProperty, BorderWidth, borderWidth, frameNode);
             ACE_UPDATE_NODE_RENDER_CONTEXT(BorderWidth, borderWidth, frameNode);
-            ACE_UPDATE_NODE_RENDER_CONTEXT(PreBorderWidth, borderWidth, frameNode);
             auto pattern = frameNode->GetPattern<Pattern>();
             CHECK_NULL_VOID(pattern);
             pattern->UpdateBorderResource();
@@ -1951,7 +2039,6 @@ void ViewAbstract::SetBorderWidth(const BorderWidthProperty& value)
     CheckBorderWidthLPX(value);
     ACE_UPDATE_LAYOUT_PROPERTY(LayoutProperty, BorderWidth, value);
     ACE_UPDATE_RENDER_CONTEXT(BorderWidth, value);
-    ACE_UPDATE_RENDER_CONTEXT(PreBorderWidth, value);
 }
 
 void ViewAbstract::SetBorderWidth(const RefPtr<ResourceObject>& resObj)
@@ -1985,7 +2072,6 @@ void ViewAbstract::SetBorderWidth(const RefPtr<ResourceObject>& resObj)
         CheckNodeBorderWidthLPX(frameNode, borderWidthProperty);
         ACE_UPDATE_NODE_LAYOUT_PROPERTY(LayoutProperty, BorderWidth, borderWidthProperty, frameNode);
         ACE_UPDATE_NODE_RENDER_CONTEXT(BorderWidth, borderWidthProperty, frameNode);
-        ACE_UPDATE_NODE_RENDER_CONTEXT(PreBorderWidth, borderWidthProperty, frameNode);
         pattern->UpdateBorderResource();
     };
     updateFunc(resObj);
@@ -2021,7 +2107,6 @@ void ViewAbstract::SetBorderWidth(FrameNode* frameNode, const RefPtr<ResourceObj
         CheckNodeBorderWidthLPX(frameNode, borderWidthProperty);
         ACE_UPDATE_NODE_LAYOUT_PROPERTY(LayoutProperty, BorderWidth, borderWidthProperty, frameNode);
         ACE_UPDATE_NODE_RENDER_CONTEXT(BorderWidth, borderWidthProperty, frameNode);
-        ACE_UPDATE_NODE_RENDER_CONTEXT(PreBorderWidth, borderWidthProperty, frameNode);
         pattern->UpdateBorderResource();
     };
     updateFunc(resObj);
@@ -6757,6 +6842,7 @@ void ViewAbstract::ResetSystemMaterialEffect(FrameNode* frameNode)
     }
     auto pattern = frameNode->GetPattern();
     CHECK_NULL_VOID(pattern);
+    renderContext->SetMaterialColorModeChangeCallback(nullptr);
     pattern->RemoveResObj("viewAbstract.uiMaterial");
     UnRegisterMaterialInteractionEvent(frameNode);
     if (preMaterial->GetType() == static_cast<int32_t>(MaterialType::IMMERSIVE)) {
@@ -6806,10 +6892,8 @@ void ViewAbstract::ResetBorderAndBackgroundEffect(
     auto preBackgroundColor = renderContext->GetPreBackgroundColor();
     auto preBorderWidth = renderContext->GetPreBorderWidth();
     auto preBorderColor = renderContext->GetPreBorderColor();
-
     if (preBackgroundColor.has_value()) {
-        ACE_UPDATE_NODE_RENDER_CONTEXT(BackgroundColor, preBackgroundColor.value(), frameNode);
-        ACE_UPDATE_NODE_LAYOUT_PROPERTY(LayoutProperty, IsUserSetBackgroundColor, true, frameNode);
+        ACE_UPDATE_NODE_RENDER_CONTEXT(MaterialBackgroundColor, preBackgroundColor.value(), frameNode);
     } else {
         renderContext->ResetBackgroundColor();
         ACE_UPDATE_NODE_LAYOUT_PROPERTY(LayoutProperty, IsUserSetBackgroundColor, false, frameNode);
@@ -6818,18 +6902,18 @@ void ViewAbstract::ResetBorderAndBackgroundEffect(
     }
 
     if (preBorderWidth.has_value()) {
-        ACE_UPDATE_NODE_LAYOUT_PROPERTY(LayoutProperty, BorderWidth, preBorderWidth.value(), frameNode);
+        ACE_UPDATE_NODE_LAYOUT_PROPERTY(LayoutProperty, MaterialBorderWidth, preBorderWidth.value(), frameNode);
         ACE_UPDATE_NODE_RENDER_CONTEXT(BorderWidth, preBorderWidth.value(), frameNode);
     } else {
         BorderWidthProperty borderWidth;
         borderWidth.SetBorderWidth(Dimension(0));
-        ACE_UPDATE_NODE_LAYOUT_PROPERTY(LayoutProperty, BorderWidth, borderWidth, frameNode);
+        ACE_UPDATE_NODE_LAYOUT_PROPERTY(LayoutProperty, MaterialBorderWidth, borderWidth, frameNode);
         ACE_UPDATE_NODE_RENDER_CONTEXT(BorderWidth, borderWidth, frameNode);
         pattern->OnBorderWidthReset();
     }
 
     if (preBorderColor.has_value()) {
-        ACE_UPDATE_NODE_RENDER_CONTEXT(BorderColor, preBorderColor.value(), frameNode);
+        ACE_UPDATE_NODE_RENDER_CONTEXT(MaterialBorderColor, preBorderColor.value(), frameNode);
     } else {
         BorderColorProperty borderColor;
         borderColor.SetColor(Color::BLACK);
@@ -6844,18 +6928,20 @@ void ViewAbstract::RemoveBorderAndBackgroundEffect(
 {
     // reset the property to no effect to avoid blocking the effect of the material
     if (renderContext->HasBackgroundColor()) {
-        renderContext->UpdateBackgroundColor(Color::TRANSPARENT);
+        renderContext->UpdateMaterialBackgroundColor(Color::TRANSPARENT);
     }
-    if (renderContext->HasBorderWidth()) {
+    const auto& layoutProperty = frameNode->GetLayoutProperty();
+    CHECK_NULL_VOID(layoutProperty);
+    if (layoutProperty->GetBorderWidthProperty()) {
         BorderWidthProperty borderWidth;
         borderWidth.SetBorderWidth(Dimension(0));
-        ACE_UPDATE_NODE_LAYOUT_PROPERTY(LayoutProperty, BorderWidth, borderWidth, frameNode);
+        ACE_UPDATE_NODE_LAYOUT_PROPERTY(LayoutProperty, MaterialBorderWidth, borderWidth, frameNode);
         ACE_UPDATE_NODE_RENDER_CONTEXT(BorderWidth, borderWidth, frameNode);
     }
     if (renderContext->HasBorderColor()) {
         BorderColorProperty borderColor;
         borderColor.SetColor(Color::BLACK);
-        renderContext->UpdateBorderColor(borderColor);
+        renderContext->UpdateMaterialBorderColor(borderColor);
     }
 }
 
@@ -6887,12 +6973,12 @@ void ViewAbstract::SetSystemMaterialImmediate(FrameNode* frameNode, const UiMate
             TAG_LOGW(AceLogTag::ACE_VISUAL_EFFECT, "GetUiMaterialParam failed, type:%{public}d", materialType);
             return;
         }
-        ACE_UPDATE_NODE_RENDER_CONTEXT(BackgroundColor, params->backgroundColor, frameNode);
-         ACE_UPDATE_NODE_LAYOUT_PROPERTY(LayoutProperty, IsUserSetBackgroundColor, true, frameNode);
-        ACE_UPDATE_NODE_LAYOUT_PROPERTY(LayoutProperty, BorderWidth, params->borderWidth, frameNode);
+        ACE_UPDATE_NODE_RENDER_CONTEXT(MaterialBackgroundColor, params->backgroundColor, frameNode);
+        ACE_UPDATE_NODE_LAYOUT_PROPERTY(LayoutProperty, IsUserSetBackgroundColor, true, frameNode);
+        ACE_UPDATE_NODE_LAYOUT_PROPERTY(LayoutProperty, MaterialBorderWidth, params->borderWidth, frameNode);
         ACE_UPDATE_NODE_RENDER_CONTEXT(BorderWidth, params->borderWidth, frameNode);
-        ACE_UPDATE_NODE_RENDER_CONTEXT(BorderColor, params->borderColor, frameNode);
-        ACE_UPDATE_NODE_RENDER_CONTEXT(BackShadow, params->shadow, frameNode);
+        ACE_UPDATE_NODE_RENDER_CONTEXT(MaterialBorderColor, params->borderColor, frameNode);
+        ACE_UPDATE_NODE_RENDER_CONTEXT(MaterialBackShadow, params->shadow, frameNode);
         pattern->OnUiMaterialParamUpdate(params.value());
     };
     if (SystemProperties::ConfigChangePerform()) {
@@ -6910,6 +6996,19 @@ void ViewAbstract::SetSystemMaterialImmediate(FrameNode* frameNode, const UiMate
 
     if (material != nullptr) {
         updateFunc(nullptr);
+        // When frameNode == stackFrameNode, the call originates from declarative ArkTs where
+        // ConfigChangePerform is not enabled; color mode switches re-execute the ArkTs code,
+        // so no callback registration is needed. When frameNode != stackFrameNode, the call
+        // may come from C-API or imperative ArkTs, which requires a registered callback to
+        // handle color mode changes.
+        auto stackFrameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+        if (frameNode != stackFrameNode) {
+            auto renderContext = frameNode->GetRenderContext();
+            CHECK_NULL_VOID(renderContext);
+            renderContext->SetMaterialColorModeChangeCallback([updateFunc = std::move(updateFunc)]() {
+               updateFunc(nullptr); 
+            });
+        }
     } else {
         ResetSystemMaterialEffect(frameNode);
     }
@@ -6955,7 +7054,7 @@ void ViewAbstract::SetSystemMaterialWithScale(FrameNode* frameNode, const UiMate
         CHECK_NULL_VOID(renderContext);
         if (config->applyShadow && !NearZero(componentScale)) {
             Shadow shadow = MaterialUtils::GetImmersiveShadow(config->dipScale / componentScale);
-            renderContext->UpdateBackShadow(shadow);
+            renderContext->UpdateMaterialBackShadow(shadow);
         }
     };
 
@@ -7125,12 +7224,12 @@ void ViewAbstract::SetImmersiveConfigs(const RefPtr<FrameNode>& frameNode, const
         if (config->materialColor.has_value()) {
             params->backgroundColor = config->materialColor.value();
         }
-        ACE_UPDATE_NODE_RENDER_CONTEXT(BackgroundColor, params->backgroundColor, frameNode);
-        ACE_UPDATE_NODE_LAYOUT_PROPERTY(LayoutProperty, BorderWidth, params->borderWidth, frameNode);
+        ACE_UPDATE_NODE_RENDER_CONTEXT(MaterialBackgroundColor, params->backgroundColor, frameNode);
+        ACE_UPDATE_NODE_LAYOUT_PROPERTY(LayoutProperty, MaterialBorderWidth, params->borderWidth, frameNode);
         ACE_UPDATE_NODE_RENDER_CONTEXT(BorderWidth, params->borderWidth, frameNode);
-        ACE_UPDATE_NODE_RENDER_CONTEXT(BorderColor, params->borderColor, frameNode);
+        ACE_UPDATE_NODE_RENDER_CONTEXT(MaterialBorderColor, params->borderColor, frameNode);
         if (config->applyShadow) {
-            ACE_UPDATE_NODE_RENDER_CONTEXT(BackShadow, params->shadow, frameNode);
+            ACE_UPDATE_NODE_RENDER_CONTEXT(MaterialBackShadow, params->shadow, frameNode);
         } else if (preConfig && preConfig->applyShadow) {
             ResetImmersiveShadowToDefault(pattern, renderContext);
         }
@@ -7147,7 +7246,7 @@ void ViewAbstract::SetImmersiveConfigs(const RefPtr<FrameNode>& frameNode, const
 
     if (config->applyShadow) {
         Shadow shadow = MaterialUtils::GetImmersiveShadow(config->dipScale);
-        renderContext->UpdateBackShadow(shadow);
+        renderContext->UpdateMaterialBackShadow(shadow);
     } else if (preConfig && preConfig->applyShadow) {
         ResetImmersiveShadowToDefault(pattern, renderContext);
     }
@@ -7159,7 +7258,7 @@ void ViewAbstract::ResetImmersiveShadowToDefault(
 {
     auto shadowProperty = renderContext->GetPreBackShadow();
     if (shadowProperty.has_value()) {
-        renderContext->UpdateBackShadow(shadowProperty.value());
+        renderContext->UpdateMaterialBackShadow(shadowProperty.value());
     } else {
         auto shadow = MaterialUtils::GetImmersiveEmptyShadow();
         renderContext->ResetBackShadow();
@@ -7820,7 +7919,6 @@ void ViewAbstract::SetBorderWidth(FrameNode* frameNode, const BorderWidthPropert
             CheckNodeBorderWidthLPX(frameNode, borderWidth);
             ACE_UPDATE_NODE_LAYOUT_PROPERTY(LayoutProperty, BorderWidth, borderWidth, frameNode);
             ACE_UPDATE_NODE_RENDER_CONTEXT(BorderWidth, borderWidth, frameNode);
-            ACE_UPDATE_NODE_RENDER_CONTEXT(PreBorderWidth, borderWidth, frameNode);
             frameNode->MarkDirtyNode(PROPERTY_UPDATE_LAYOUT | PROPERTY_UPDATE_MEASURE);
         };
         pattern->AddResObj("borderWidth", resObj, std::move(updateFunc));
@@ -7828,7 +7926,6 @@ void ViewAbstract::SetBorderWidth(FrameNode* frameNode, const BorderWidthPropert
     CheckNodeBorderWidthLPX(frameNode, value);
     ACE_UPDATE_NODE_LAYOUT_PROPERTY(LayoutProperty, BorderWidth, value, frameNode);
     ACE_UPDATE_NODE_RENDER_CONTEXT(BorderWidth, value, frameNode);
-    ACE_UPDATE_NODE_RENDER_CONTEXT(PreBorderWidth, value, frameNode);
 }
 
 void ViewAbstract::SetBorderWidth(FrameNode* frameNode, const Dimension& value)
@@ -7843,7 +7940,6 @@ void ViewAbstract::SetBorderWidth(FrameNode* frameNode, const Dimension& value)
     CheckNodeBorderWidthLPX(frameNode, borderWidth);
     ACE_UPDATE_NODE_LAYOUT_PROPERTY(LayoutProperty, BorderWidth, borderWidth, frameNode);
     ACE_UPDATE_NODE_RENDER_CONTEXT(BorderWidth, borderWidth, frameNode);
-    ACE_UPDATE_NODE_RENDER_CONTEXT(PreBorderWidth, borderWidth, frameNode);
 }
 
 void ViewAbstract::SetBorderWidth(NG::FrameNode* frameNode, const std::optional<Dimension>& left,
@@ -7876,13 +7972,11 @@ void ViewAbstract::SetBorderColor(FrameNode* frameNode, const BorderColorPropert
             auto layoutDirection = layoutProperty->GetNonAutoLayoutDirection();
             CheckLocalizedBorderColor(borderColor, layoutDirection);
             ACE_UPDATE_NODE_RENDER_CONTEXT(BorderColor, borderColor, frameNode);
-            ACE_UPDATE_NODE_RENDER_CONTEXT(PreBorderColor, borderColor, frameNode);
             frameNode->MarkModifyDone();
         };
         pattern->AddResObj("borderColor", resObj, std::move(updateFunc));
     }
     ACE_UPDATE_NODE_RENDER_CONTEXT(BorderColor, value, frameNode);
-    ACE_UPDATE_NODE_RENDER_CONTEXT(PreBorderColor, value, frameNode);
 }
 
 void ViewAbstract::SetBorderColor(FrameNode* frameNode, const Color& value)
@@ -7890,7 +7984,6 @@ void ViewAbstract::SetBorderColor(FrameNode* frameNode, const Color& value)
     BorderColorProperty borderColor;
     borderColor.SetColor(value);
     ACE_UPDATE_NODE_RENDER_CONTEXT(BorderColor, borderColor, frameNode);
-    ACE_UPDATE_NODE_RENDER_CONTEXT(PreBorderColor, borderColor, frameNode);
 }
 
 void ViewAbstract::SetBorderColor(FrameNode* frameNode, const RefPtr<ResourceObject>& resObj)
@@ -7914,7 +8007,6 @@ void ViewAbstract::SetBorderColor(FrameNode* frameNode, const RefPtr<ResourceObj
         BorderColorProperty borderColorProperty;
         borderColorProperty.SetColor(borderColor);
         ACE_UPDATE_NODE_RENDER_CONTEXT(BorderColor, borderColorProperty, frameNode);
-        ACE_UPDATE_NODE_RENDER_CONTEXT(PreBorderColor, borderColorProperty, frameNode);
         pattern->UpdateBorderResource();
     };
     updateFunc(resObj);
@@ -8687,7 +8779,7 @@ void ViewAbstract::SetMaterialShadow(FrameNode* frameNode)
     CHECK_NULL_VOID(renderContext);
 
     Shadow shadow = MaterialUtils::GetImmersiveShadow(pipeline->GetDipScale());
-    renderContext->UpdateBackShadow(shadow);
+    renderContext->UpdateMaterialBackShadow(shadow);
 }
 
 void ViewAbstract::ResetMaterialShadow(FrameNode* frameNode)
@@ -10648,6 +10740,14 @@ Matrix4 ViewAbstract::GetTransform(FrameNode* frameNode)
     const auto& target = frameNode->GetRenderContext();
     CHECK_NULL_RETURN(target, value);
     return target->GetTransformMatrixValue(value);
+}
+
+Matrix4 ViewAbstract::GetTransform3D(FrameNode* frameNode)
+{
+    Matrix4 value;
+    const auto& target = frameNode->GetRenderContext();
+    CHECK_NULL_RETURN(target, value);
+    return target->GetTransform3DMatrixValue(value);
 }
 
 HitTestMode ViewAbstract::GetHitTestBehavior(FrameNode* frameNode)

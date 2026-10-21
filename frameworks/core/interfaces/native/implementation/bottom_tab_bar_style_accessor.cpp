@@ -20,6 +20,37 @@
 #include "arkoala_api_generated.h"
 #include "core/interfaces/native/implementation/bottom_tab_bar_style_peer.h"
 
+namespace OHOS::Ace::NG {
+namespace Converter {
+template<>
+inline TabBarBadgeParam Convert(const Ark_TabBarBadgeStyle& src)
+{
+    TabBarBadgeParam param;
+    auto badgeTypeOpt = Converter::GetOptPtr(&src.value);
+    if (badgeTypeOpt) {
+        Converter::VisitUnion(
+            badgeTypeOpt.value(),
+            [&param](const Ark_Int32& num) {
+                param.badgeCount = static_cast<int32_t>(num);
+            },
+            [&param](const Ark_ResourceStr& resStr) {
+                auto optStr = Converter::OptConvert<std::string>(resStr);
+                if (optStr) {
+                    param.badgeValue = optStr.value();
+                }
+            },
+            []() {}
+        );
+    }
+    auto maxCountOpt = Converter::GetOptPtr(&src.maxCount);
+    if (maxCountOpt) {
+        param.badgeMaxCount = static_cast<int32_t>(Converter::Convert<uint32_t>(maxCountOpt.value()));
+    }
+    return param;
+}
+} // namespace Converter
+} // namespace OHOS::Ace::NG
+
 namespace OHOS::Ace::NG::GeneratedModifier {
 namespace BottomTabBarStyleAccessor {
 void DestroyPeerImpl(Ark_BottomTabBarStyle peer)
@@ -136,6 +167,14 @@ Ark_BottomTabBarStyle IconStyleImpl(Ark_BottomTabBarStyle peer,
     peer->IncRefCount();
     return peer;
 }
+Ark_BottomTabBarStyle BadgeImpl(Ark_BottomTabBarStyle peer,
+                                const Ark_TabBarBadgeStyle* badgeStyle)
+{
+    CHECK_NULL_RETURN(peer, peer);
+    peer->badge = Converter::OptConvert<TabBarBadgeParam>(*badgeStyle);
+    peer->IncRefCount();
+    return peer;
+}
 } // BottomTabBarStyleAccessor
 const GENERATED_ArkUIBottomTabBarStyleAccessor* GetBottomTabBarStyleAccessor()
 {
@@ -151,6 +190,7 @@ const GENERATED_ArkUIBottomTabBarStyleAccessor* GetBottomTabBarStyleAccessor()
         BottomTabBarStyleAccessor::SymmetricExtensibleImpl,
         BottomTabBarStyleAccessor::IdImpl,
         BottomTabBarStyleAccessor::IconStyleImpl,
+        BottomTabBarStyleAccessor::BadgeImpl,
     };
     return &BottomTabBarStyleAccessorImpl;
 }

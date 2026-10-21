@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Huawei Device Co., Ltd.
+ * Copyright (c) 2023-2026 Huawei Device Co., Ltd.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -420,4 +420,33 @@ void RichEditorChangeValue::reset()
     rangeAfter_ = TextRange();
     changeReason_ = TextChangeReason::UNKNOWN;
 }
+
+void RichEditorEventHub::SetOnInputFilterError(const std::function<void(const std::u16string&)>& onInputFilterError)
+{
+    onInputFilterError_ = onInputFilterError;
+}
+
+void RichEditorEventHub::FireOnInputFilterError(const std::u16string& value) const
+{
+    if (!onInputFilterError_) {
+        return;
+    }
+    auto callback = onInputFilterError_;
+    callback(value);
+}
+
+void RichEditorEventHub::SetOnSecurityStateChange(std::function<void(bool)>&& func)
+{
+    onSecurityStateChanged_ = std::move(func);
+}
+
+void RichEditorEventHub::FireOnSecurityStateChanged(bool isSecure)
+{
+    if (!onSecurityStateChanged_) {
+        return;
+    }
+    auto callback = onSecurityStateChanged_;
+    callback(isSecure);
+}
+
 } // namespace OHOS::Ace::NG
