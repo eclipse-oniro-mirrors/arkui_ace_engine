@@ -98,6 +98,7 @@ class ACE_FORCE_EXPORT TextPattern : public virtual Pattern,
 
 public:
     void DumpInspectorTreeInfo(std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context) override;
+    bool HasInspectorResponseRegion() const override;
 
     TextPattern();
     ~TextPattern() override;

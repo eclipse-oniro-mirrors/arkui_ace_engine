@@ -6114,6 +6114,12 @@ void TextPattern::DumpInspectorTreeInfo(
     }
 }
 
+bool TextPattern::HasInspectorResponseRegion() const
+{
+    auto host = GetHost();
+    return host && (host->GetTag() != V2::TEXT_ETS_TAG || isUserSetResponseRegion_);
+}
+
 void TextPattern::DumpSimplifyInfo(std::shared_ptr<JsonValue>& json)
 {
     auto host = GetHost();

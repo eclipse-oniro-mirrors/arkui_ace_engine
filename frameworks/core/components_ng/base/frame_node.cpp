@@ -1853,7 +1853,7 @@ void FrameNode::DumpInspectorResponseRegions(
         }
         return;
     }
-    if (!gesture->GetResponseRegion().empty()) {
+    if (!gesture->GetResponseRegion().empty() && (!pattern_ || pattern_->HasInspectorResponseRegion())) {
         json->Put("responseRegion", encode(GetResponseRegionListRaw(raw, static_cast<int32_t>(SourceType::TOUCH))));
     }
     if (!gesture->GetMouseResponseRegion().empty()) {

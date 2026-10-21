@@ -339,6 +339,11 @@ public:
     }
     virtual void AddInspectorTreeInfo(std::shared_ptr<JsonValue>& node, InspectorTreeRequestContext& context) {}
     virtual bool HasInspectorSelection() const { return false; }
+    // Components that generate default touch regions expose their configuration state here.
+    virtual bool HasInspectorResponseRegion() const
+    {
+        return true;
+    }
 
     virtual void DumpInfo() {}
     virtual void DumpInfo(std::unique_ptr<JsonValue>& json) {}
