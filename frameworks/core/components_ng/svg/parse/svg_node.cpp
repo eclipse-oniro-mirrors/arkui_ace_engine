@@ -102,9 +102,56 @@ const std::unordered_map<std::string, std::function<double(SvgBaseAttribute&)>> 
         } },
 };
 
+void SkipLeadingWhitespaceAndQuote(const std::string& url, size_t& pos, size_t end)
+{
+    while (pos < end && std::isspace(static_cast<unsigned char>(url[pos]))) {
+        ++pos;
+    }
+    if (pos < end && (url[pos] == '\'' || url[pos] == '"')) {
+        ++pos;
+    }
+    while (pos < end && std::isspace(static_cast<unsigned char>(url[pos]))) {
+        ++pos;
+    }
+}
+
+void SkipTrailingWhitespaceAndQuote(const std::string& url, size_t pos, size_t& idEnd)
+{
+    while (idEnd > pos && std::isspace(static_cast<unsigned char>(url[idEnd - 1]))) {
+        --idEnd;
+    }
+    if (idEnd > pos && (url[idEnd - 1] == '\'' || url[idEnd - 1] == '"')) {
+        --idEnd;
+    }
+    while (idEnd > pos && std::isspace(static_cast<unsigned char>(url[idEnd - 1]))) {
+        --idEnd;
+    }
+}
+
+// Extracts node ID from SVG url() reference, e.g. "url(#gradient1)" -> "gradient1"
+// Supports optional whitespace and quotes: url( '#id' ) / url( "#id" )
+// Returns original string if format doesn't match url(#...) pattern
 std::string GetNodeIdFromUrl(const std::string& url)
 {
-    return std::regex_replace(url, std::regex(R"(^url\(\s*['"]?\s*#([^()]+?)\s*['"]?\s*\)$)"), "$1");
+    constexpr std::string_view URL_PREFIX = "url(";
+    constexpr size_t URL_PREFIX_LEN = URL_PREFIX.size();
+    constexpr size_t MIN_URL_LEN = URL_PREFIX_LEN + 2;
+    if (url.size() < MIN_URL_LEN || url.compare(0, URL_PREFIX_LEN, URL_PREFIX) != 0 || url.back() != ')') {
+        return url;
+    }
+    size_t pos = URL_PREFIX_LEN;
+    size_t end = url.size() - 1;
+    SkipLeadingWhitespaceAndQuote(url, pos, end);
+    if (pos >= end || url[pos] != '#') {
+        return url;
+    }
+    ++pos;
+    size_t idEnd = end;
+    SkipTrailingWhitespaceAndQuote(url, pos, idEnd);
+    if (idEnd == pos) {
+        return url;
+    }
+    return url.substr(pos, idEnd - pos);
 }
 
 void SetCompatibleFill(const std::string& value, SvgBaseAttribute& attrs)
@@ -141,9 +188,7 @@ void SvgNode::SetAttr(const std::string& name, const std::string& value)
             [](const std::string& val, SvgBaseAttribute& attrs) {
                 auto value = StringUtils::TrimStr(val);
                 if (value.find("url(") == 0) {
-                    auto src = std::regex_replace(value,
-                        std::regex(R"(^url\(\s*['"]?\s*#([^()]+?)\s*['"]?\s*\)$)"), "$1");
-                    attrs.clipState.SetHref(src);
+                    attrs.clipState.SetHref(GetNodeIdFromUrl(value));
                 }
             } },
         { DOM_SVG_SRC_CLIP_RULE,
@@ -155,9 +200,7 @@ void SvgNode::SetAttr(const std::string& name, const std::string& value)
             [](const std::string& val, SvgBaseAttribute& attrs) {
                 auto value = StringUtils::TrimStr(val);
                 if (value.find("url(") == 0) {
-                    auto src = std::regex_replace(value,
-                        std::regex(R"(^url\(\s*['"]?\s*#([^()]+?)\s*['"]?\s*\)$)"), "$1");
-                    attrs.clipState.SetHref(src);
+                    attrs.clipState.SetHref(GetNodeIdFromUrl(value));
                 }
             } },
         { SVG_CLIP_PATH_UNITS,
@@ -184,9 +227,7 @@ void SvgNode::SetAttr(const std::string& name, const std::string& value)
                     return;
                 }
                 if (value.find("url(") == 0) {
-                    auto src = std::regex_replace(value,
-                        std::regex(R"(^url\(\s*['"]?\s*#([^()]+?)\s*['"]?\s*\)$)"), "$1");
-                    attrs.fillState.SetHref(src);
+                    attrs.fillState.SetHref(GetNodeIdFromUrl(value));
                 }
             } },
         { DOM_SVG_SRC_FILL_OPACITY,
@@ -249,9 +290,7 @@ void SvgNode::SetAttr(const std::string& name, const std::string& value)
                     return;
                 }
                 if (value.find("url(") == 0) {
-                    auto src = std::regex_replace(value,
-                        std::regex(R"(^url\(\s*['"]?\s*#([^()]+?)\s*['"]?\s*\)$)"), "$1");
-                    attrs.strokeState.SetHref(src);
+                    attrs.strokeState.SetHref(GetNodeIdFromUrl(value));
                 }
             } },
         { DOM_SVG_SRC_STROKE_DASHARRAY,
@@ -455,8 +494,16 @@ void SvgNode::Draw(RSCanvas& canvas, const Size& viewPort, const std::optional<C
             "The current node is already in the process of being drawn in the SVG rendering flow.");
         return;
     }
+    auto svgContext = svgContext_.Upgrade();
+    if (svgContext && !svgContext->IncrementDrawDepth()) {
+        TAG_LOGW(AceLogTag::ACE_IMAGE, "SvgNode::Draw depth exceeded limit");
+        return;
+    }
     if (!OnCanvas(canvas)) {
         TAG_LOGW(AceLogTag::ACE_IMAGE, "Svg Draw failed(Reason: Canvas is null).");
+        if (svgContext) {
+            svgContext->DecrementDrawDepth();
+        }
         return;
     }
     isDrawing_ = true;
@@ -482,6 +529,9 @@ void SvgNode::Draw(RSCanvas& canvas, const Size& viewPort, const std::optional<C
     OnDrawTraversed(canvas, viewPort, color);
     rsCanvas_->RestoreToCount(count);
     isDrawing_ = false; // end the drawing process.
+    if (svgContext) {
+        svgContext->DecrementDrawDepth();
+    }
 }
 
 void SvgNode::Draw(RSCanvas& canvas, const SvgLengthScaleRule& lengthRule)
@@ -491,6 +541,11 @@ void SvgNode::Draw(RSCanvas& canvas, const SvgLengthScaleRule& lengthRule)
     if (isDrawing_) {
         TAG_LOGW(AceLogTag::ACE_IMAGE,
             "The current node is already in the process of being drawn in the SVG rendering flow.");
+        return;
+    }
+    auto svgContext = svgContext_.Upgrade();
+    if (svgContext && !svgContext->IncrementDrawDepth()) {
+        TAG_LOGW(AceLogTag::ACE_IMAGE, "SvgNode::Draw depth exceeded limit");
         return;
     }
     canvas.Save();
@@ -527,6 +582,9 @@ void SvgNode::Draw(RSCanvas& canvas, const SvgLengthScaleRule& lengthRule)
     OnDrawTraversed(canvas, lengthRule);
     canvas.RestoreToCount(count);
     isDrawing_ = false;
+    if (svgContext) {
+        svgContext->DecrementDrawDepth();
+    }
 }
 
 void SvgNode::OnDrawTraversed(RSCanvas& canvas, const Size& viewPort, const std::optional<Color>& color)
@@ -571,6 +629,7 @@ void SvgNode::OnClipPath(RSCanvas& canvas, const Size& viewPort)
     CHECK_NULL_VOID(svgContext);
     auto refSvgNode = svgContext->GetSvgNodeById(hrefClipPath_);
     CHECK_NULL_VOID(refSvgNode);
+    svgContext->ResetAsPathDepth();
     auto clipPath = refSvgNode->AsPath(viewPort);
     if (!clipPath.IsValid()) {
         LOGW("OnClipPath abandon, clipPath is empty");
@@ -588,6 +647,7 @@ void SvgNode::OnClipPath(RSCanvas& canvas, const SvgCoordinateSystemContext& svg
     if (!AceType::InstanceOf<SvgClipPath>(refSvgNode)) {
         return;
     }
+    svgContext->ResetAsPathDepth();
     refSvgNode->OnClipEffect(canvas, svgCoordinateSystemContext);
 }
 
@@ -600,6 +660,7 @@ void SvgNode::OnFilter(RSCanvas& canvas, const Size& viewPort)
     CHECK_NULL_VOID(svgContext);
     auto refFilter = svgContext->GetSvgNodeById(hrefFilterId_);
     CHECK_NULL_VOID(refFilter);
+    svgContext->ResetAsPathDepth();
     auto effectPath = AsPath(viewPort);
     auto bounds = effectPath.GetBounds();
     refFilter->SetEffectFilterArea({
@@ -628,6 +689,7 @@ void SvgNode::OnMask(RSCanvas& canvas, const Size& viewPort)
     CHECK_NULL_VOID(svgContext);
     auto refMask = svgContext->GetSvgNodeById(hrefMaskId_);
     CHECK_NULL_VOID(refMask);
+    svgContext->ResetAsPathDepth();
     refMask->Draw(canvas, viewPort, std::nullopt);
     return;
 }
