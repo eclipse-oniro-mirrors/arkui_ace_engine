@@ -80,14 +80,10 @@
         "provider-first",
         "provider-second"
       ],
-      "providerOmitted": true
+      "providerEmpty": true
     },
     "provider_failure": {
-      "requiredIds": [
-        "provider-first",
-        "provider-second"
-      ],
-      "providerOmitted": true
+      "errorMessage": "provider query failed"
     },
     "provider_delay": {
       "requiredIds": [
@@ -97,18 +93,10 @@
       "providerNonempty": true
     },
     "provider_invalid": {
-      "requiredIds": [
-        "provider-first",
-        "provider-second"
-      ],
-      "providerNonempty": true
+      "errorMessage": "invalid provider data"
     },
     "provider_limits": {
-      "requiredIds": [
-        "provider-first",
-        "provider-second"
-      ],
-      "providerOmitted": true
+      "errorMessage": "node count exceeds limit"
     },
     "web_uie": {
       "requiredIds": [
@@ -116,11 +104,7 @@
       ]
     },
     "provider_large_payload": {
-      "requiredIds": [
-        "provider-first",
-        "provider-second"
-      ],
-      "providerNonempty": true
+      "errorMessage": "tree data size exceeds limit"
     }
   }
 }

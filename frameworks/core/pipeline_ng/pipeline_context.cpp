@@ -173,7 +173,7 @@ constexpr size_t DUMP_PARAM_WITH_UI_EXTENSION_OFFSET = 4;
 constexpr size_t DUMP_PARAM_RECT_CULLING_OFFSET = 5;
 constexpr size_t DUMP_PARAM_MIN_OPACITY_OFFSET = 6;
 constexpr size_t DUMP_PARAM_WITH_RESPONSE_REGION_OFFSET = 8;
-constexpr size_t DUMP_PARAM_WITH_XCOMPONENT_OFFSET = 9;
+constexpr size_t DUMP_PARAM_WITH_CUSTOM_CONTENT_OFFSET = 9;
 constexpr size_t SIMPLIFYTREE_WITH_PARAMCONFIG =
     DUMP_PARAM_DEFAULT_START_INDEX + DUMP_PARAM_WITH_WEB_OFFSET + 1;
 constexpr size_t SIMPLIFYTREE_WITH_EXTENDED_PARAMCONFIG =
@@ -296,14 +296,14 @@ ParamConfig ParseDumpParamConfig(const std::vector<std::string>& params, size_t 
     }
     // PID_FLAG terminates the configuration in UIExtension dump requests.
     const auto responseRegionIndex = startIndex + DUMP_PARAM_WITH_RESPONSE_REGION_OFFSET;
-    const auto xComponentIndex = startIndex + DUMP_PARAM_WITH_XCOMPONENT_OFFSET;
+    const auto xComponentIndex = startIndex + DUMP_PARAM_WITH_CUSTOM_CONTENT_OFFSET;
     const auto configEnd = std::find(params.begin() + startIndex, params.end(), PID_FLAG);
     const auto configSize = static_cast<size_t>(std::distance(params.begin(), configEnd));
     if (configSize > responseRegionIndex) {
         config.withResponseRegion = ParseBoolParam(params[responseRegionIndex]);
     }
     if (configSize > xComponentIndex) {
-        config.withXComponent = ParseBoolParam(params[xComponentIndex]);
+        config.withCustomContent = ParseBoolParam(params[xComponentIndex]);
     }
     return config;
 }
@@ -4752,27 +4752,40 @@ bool PipelineContext::OnDumpInfo(const std::vector<std::string>& params) const
         DumpLog::GetInstance().OutPutDefault();
 #ifndef CROSS_PLATFORM
     } else if (params[0] == "-allInfoWithParamConfigTotal" && params.size() >= SIMPLIFYTREE_WITH_PARAMCONFIG) {
-        JsonWriteErrorScope errors;
-        auto root = JsonUtil::CreateSharedPtrJson(true);
-        GetAppInfo(root);
         auto config = ParseDumpParamConfig(params);
         auto snapshot = inspectorWindowSnapshot_ ? inspectorWindowSnapshot_() :
             std::make_optional(InspectorWindowSnapshot {});
-        if (!snapshot) {
+        InspectorTreeRequestContext context(config, {}, snapshot.value_or(InspectorWindowSnapshot {}));
+        config.inspectorContext = &context;
+        std::shared_ptr<JsonValue> root;
+        {
+            JsonWriteErrorScope errors;
+            root = JsonUtil::CreateSharedPtrJson(true);
+            if (!root || !root->IsObject() || !rootNode_ || !snapshot) {
+                context.ReportError(InspectorTreeError::COLLECTION_FAILED);
+            } else {
+                GetAppInfo(root);
+                auto appInfo = root->GetObject("appInfo");
+                appInfo->Put("WindowTitle", context.window.windowTitle.c_str());
+                appInfo->Put("PID", context.window.pid);
+                rootNode_->DumpSimplifyTreeWithParamConfig(0, root, params[1] == "1", config);
+                if (!context.ShouldStop()) {
+                    context.FinalizeNativeTree(root);
+                }
+            }
+            if (errors.HasError()) {
+                context.ReportError(InspectorTreeError::COLLECTION_FAILED);
+            }
+        }
+        JsonWriteErrorScope errors;
+        root = context.FinalizeResult(std::move(root));
+        if (!root || errors.HasError()) {
             return true;
         }
-        InspectorTreeRequestContext context(config, {}, std::move(*snapshot));
-        config.inspectorContext = &context;
-        auto appInfo = root->GetObject("appInfo");
-        appInfo->Put("WindowTitle", context.window.windowTitle.c_str());
-        appInfo->Put("PID", context.window.pid);
-        rootNode_->DumpSimplifyTreeWithParamConfig(0, root, params[1] == "1", config);
-        context.FinalizeNativeTree(root);
         char* data = nullptr;
         size_t size = 0;
         constexpr size_t MAX_REPORT_BYTES = 100 * 1024 * 1024;
-        if (!errors.HasError() &&
-            WriteJsonBounded(*root, false, MAX_REPORT_BYTES, &data, &size) == JsonWriteResult::SUCCESS) {
+        if (WriteJsonBounded(*root, false, MAX_REPORT_BYTES, &data, &size) == JsonWriteResult::SUCCESS) {
             DumpLog::GetInstance().Print(std::string(data, size));
         }
         std::free(data);
@@ -7756,22 +7769,44 @@ void PipelineContext::DumpVisibleInspectorTree(std::shared_ptr<JsonValue>& rootJ
 void PipelineContext::GetInspectorTree(bool onlyNeedVisible, ParamConfig config)
 {
     CHECK_NULL_VOID(taskExecutor_);
-    CHECK_NULL_VOID(rootNode_);
+    auto reporter = std::move(config.inspectorReporter);
     auto snapshot = inspectorWindowSnapshot_ ? inspectorWindowSnapshot_() :
         std::make_optional(InspectorWindowSnapshot {});
-    if (!snapshot) {
-        return;
-    }
-    auto reporter = std::move(config.inspectorReporter);
-    InspectorTreeRequestContext context(config, config.inspectorRoute, std::move(*snapshot));
+    InspectorTreeRequestContext context(config, config.inspectorRoute, snapshot.value_or(InspectorWindowSnapshot {}));
     config.inspectorContext = &context;
-    JsonWriteErrorScope errors;
-    auto root = JsonUtil::CreateSharedPtrJson(true);
-    GetAppInfo(root);
-    auto appInfo = root->GetObject("appInfo");
-    appInfo->Put("WindowTitle", context.window.windowTitle.c_str());
-    appInfo->Put("PID", context.window.pid);
-    auto cb = [root, reporter = std::move(reporter)]() {
+    std::shared_ptr<JsonValue> root;
+    {
+        JsonWriteErrorScope errors;
+        root = JsonUtil::CreateSharedPtrJson(true);
+        if (!root || !root->IsObject() || !rootNode_ || !snapshot) {
+            context.ReportError(InspectorTreeError::COLLECTION_FAILED);
+        } else {
+            GetAppInfo(root);
+            auto appInfo = root->GetObject("appInfo");
+            appInfo->Put("WindowTitle", context.window.windowTitle.c_str());
+            appInfo->Put("PID", context.window.pid);
+            ACE_SCOPED_TRACE("GetInspectorTree[onlyNeedVisible:%d][config.interactionInfo:%d]"
+                             "[config.accessibilityInfo:%d][config.cacheNodes:%d][config.withWeb:%d]"
+                             "[config.rectCulling:%d][config.minOpacity:%f]",
+                onlyNeedVisible, config.interactionInfo, config.accessibilityInfo, config.cacheNodes, config.withWeb,
+                config.rectCulling, config.minOpacity);
+            CollectInspectorTreeInto(root, onlyNeedVisible, config);
+            if (!context.ShouldStop()) {
+                context.FinalizeNativeTree(root);
+            }
+        }
+        if (errors.HasError()) {
+            context.ReportError(InspectorTreeError::COLLECTION_FAILED);
+        }
+    }
+    {
+        JsonWriteErrorScope errors;
+        root = context.FinalizeResult(std::move(root));
+        if (!root || errors.HasError()) {
+            return;
+        }
+    }
+    auto cb = [root = std::move(root), reporter = std::move(reporter)]() {
         constexpr size_t MAX_REPORT_BYTES = 100 * 1024 * 1024;
         JsonWriteErrorScope errors;
         char* data = nullptr;
@@ -7796,16 +7831,6 @@ void PipelineContext::GetInspectorTree(bool onlyNeedVisible, ParamConfig config)
         }
 #endif
     };
-    ACE_SCOPED_TRACE("GetInspectorTree[onlyNeedVisible:%d][config.interactionInfo:%d]"
-                     "[config.accessibilityInfo:%d][config.cacheNodes:%d][config.withWeb:%d]"
-                     "[config.rectCulling:%d][config.minOpacity:%f]",
-        onlyNeedVisible, config.interactionInfo, config.accessibilityInfo, config.cacheNodes, config.withWeb,
-        config.rectCulling, config.minOpacity);
-    CollectInspectorTreeInto(root, onlyNeedVisible, config);
-    context.FinalizeNativeTree(root);
-    if (errors.HasError()) {
-        return;
-    }
     taskExecutor_->PostTask(cb, TaskExecutor::TaskType::BACKGROUND,
         onlyNeedVisible ? "ArkUIGetVisibleInspectorTree" : "ArkUIGetInspectorTree");
 }

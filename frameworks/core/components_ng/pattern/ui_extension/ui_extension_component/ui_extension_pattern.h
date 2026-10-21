@@ -273,7 +273,8 @@ public:
     void AddExtraInfoWithParamConfig(
         std::shared_ptr<JsonValue>& json, ParamConfig config = ParamConfig()) override;
     void ExecuteDumpTask(
-        std::shared_ptr<JsonValue>& json, const std::vector<std::string>& params, const RefPtr<FrameNode>& host);
+        std::shared_ptr<JsonValue>& json, const std::vector<std::string>& params, const RefPtr<FrameNode>& host,
+        InspectorTreeRequestContext* request = nullptr);
     int32_t GetInstanceIdFromHost() const;
     void DispatchDisplayArea(bool isForce = false);
     void DispatchDisplayAreaWithDelay(uint32_t delayMs);

@@ -30,6 +30,7 @@
 #include "core/common/premake_scope.h"
 #include "core/common/resource/resource_parse_utils.h"
 #include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/base/inspector_tree_request_context.h"
 #include "core/components_ng/base/ui_node_gc.h"
 #include "core/components_ng/export_texture_info/export_texture_info.h"
 #include "core/components_ng/layout/layout_wrapper_node.h"
@@ -1701,7 +1702,8 @@ void UINode::DumpSimplifyTreeWithParamConfigInner(int32_t depth, std::shared_ptr
     bool onlyNeedVisible, ParamConfig config, std::function<std::pair<bool, bool>(const RefPtr<UINode>&)> dumpChecker,
     double parentFinalOpacity, const RectCullingState& rectCullingState)
 {
-    if (config.collectionState && config.collectionState->GetError()) {
+    if ((config.collectionState && config.collectionState->GetError()) ||
+        (config.inspectorContext && config.inspectorContext->ShouldStop())) {
         return;
     }
     auto [needDump, justDumpSubTree] = dumpChecker(Claim(this));

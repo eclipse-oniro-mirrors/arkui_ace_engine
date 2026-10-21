@@ -31,12 +31,12 @@ TEST_F(InspectorTreeTask01, DefaultAndLegacyConstructorDisableNewCapabilities)
     GetInspectorTreeConfigImpl defaults;
     EXPECT_FALSE(defaults.GetConfig().withThirdProvider);
     EXPECT_FALSE(defaults.GetConfig().withResponseRegion);
-    EXPECT_FALSE(defaults.GetConfig().withXComponent);
+    EXPECT_FALSE(defaults.GetConfig().withCustomContent);
     EXPECT_TRUE(defaults.GetConfig().cacheNodes);
     GetInspectorTreeConfigImpl legacy(true, true, false, true, true, true, 0.5f);
     EXPECT_FALSE(legacy.GetConfig().withThirdProvider);
     EXPECT_FALSE(legacy.GetConfig().withResponseRegion);
-    EXPECT_FALSE(legacy.GetConfig().withXComponent);
+    EXPECT_FALSE(legacy.GetConfig().withCustomContent);
     EXPECT_FLOAT_EQ(legacy.GetConfig().minOpacity, 0.5f);
 }
 
@@ -48,7 +48,7 @@ TEST_F(InspectorTreeTask01, CopyPreservesIndependentCapabilitiesAndOriginalField
                 ParamConfig config { true, true, false, true, true, true, 0.5f };
                 config.withThirdProvider = thirdProvider;
                 config.withResponseRegion = responseRegion;
-                config.withXComponent = xComponent;
+                config.withCustomContent = xComponent;
                 GetInspectorTreeConfigImpl value(config);
                 const auto actual = value.GetConfig();
                 EXPECT_TRUE(actual.interactionInfo);
@@ -60,7 +60,7 @@ TEST_F(InspectorTreeTask01, CopyPreservesIndependentCapabilitiesAndOriginalField
                 EXPECT_FLOAT_EQ(actual.minOpacity, 0.5f);
                 EXPECT_EQ(actual.withThirdProvider, thirdProvider);
                 EXPECT_EQ(actual.withResponseRegion, responseRegion);
-                EXPECT_EQ(actual.withXComponent, xComponent);
+                EXPECT_EQ(actual.withCustomContent, xComponent);
             }
         }
     }
@@ -104,7 +104,7 @@ TEST_F(InspectorTreeTask01, RealParcelRoundTripAllCombinations)
                 ParamConfig config { true, true, false, true, true, true, 0.75f };
                 config.withThirdProvider = thirdProvider;
                 config.withResponseRegion = responseRegion;
-                config.withXComponent = xComponent;
+                config.withCustomContent = xComponent;
                 GetInspectorTreeConfigImpl original(config);
                 Parcel parcel;
                 ASSERT_TRUE(original.Marshalling(parcel));
@@ -120,7 +120,7 @@ TEST_F(InspectorTreeTask01, RealParcelRoundTripAllCombinations)
                 EXPECT_FLOAT_EQ(actual.minOpacity, 0.75f);
                 EXPECT_EQ(actual.withThirdProvider, thirdProvider);
                 EXPECT_EQ(actual.withResponseRegion, responseRegion);
-                EXPECT_EQ(actual.withXComponent, xComponent);
+                EXPECT_EQ(actual.withCustomContent, xComponent);
             }
         }
     }

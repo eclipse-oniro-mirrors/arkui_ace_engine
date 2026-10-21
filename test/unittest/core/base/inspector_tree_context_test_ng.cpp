@@ -51,4 +51,119 @@ TEST(InspectorTreeTask10, MarqueeReplicasDoNotDeduplicateIndependentLabels)
     EXPECT_FALSE(replicas->GetArrayItem(1)->GetObject("$attrs")->Contains("content"));
     EXPECT_EQ(output->GetArrayItem(1)->GetObject("$attrs")->GetString("content"), "same");
 }
+TEST(InspectorTreeTask02, RootErrorGateAndWholeRequestFailure)
+{
+    for (bool regions : { false, true }) {
+        for (bool customContent : { false, true }) {
+            ParamConfig config;
+            config.interactionInfo = true;
+            config.accessibilityInfo = true;
+            config.withResponseRegion = regions;
+            config.withCustomContent = customContent;
+            InspectorTreeRequestContext context(config, {}, {});
+            auto root = JsonUtil::CreateSharedPtrJson();
+            root->Put("appInfo", JsonUtil::Create());
+            root->Put("$children", JsonUtil::CreateArray());
+            auto success = context.FinalizeResult(root);
+            ASSERT_NE(success, nullptr);
+            EXPECT_TRUE(success->Contains("appInfo"));
+            EXPECT_EQ(success->Contains("errorMessage"), regions || customContent);
+            if (regions || customContent) {
+                EXPECT_EQ(success->GetString("errorMessage"), "no error");
+            }
+
+            context.ReportError(InspectorTreeError::PROVIDER_QUERY_FAILED);
+            context.ReportError(InspectorTreeError::INVALID_PROVIDER_DATA);
+            auto failure = context.FinalizeResult(root);
+            ASSERT_NE(failure, nullptr);
+            EXPECT_FALSE(failure->Contains("appInfo"));
+            EXPECT_FALSE(failure->Contains("$children"));
+            EXPECT_EQ(failure->Contains("errorMessage"), regions || customContent);
+            if (regions || customContent) {
+                EXPECT_EQ(failure->GetString("errorMessage"), "provider query failed");
+            } else {
+                EXPECT_EQ(failure->ToString(), "{}");
+            }
+        }
+    }
+}
+
+TEST(InspectorTreeTask02, CancelledRequestDoesNotProduceAnErrorResult)
+{
+    ParamConfig config;
+    config.withCustomContent = true;
+    InspectorTreeRequestContext context(config, {}, {});
+    context.ReportError(InspectorTreeError::COLLECTION_FAILED);
+    context.CancelResult();
+    EXPECT_TRUE(context.ShouldStop());
+    EXPECT_EQ(context.FinalizeResult(JsonUtil::CreateSharedPtrJson()), nullptr);
+}
+
+TEST(InspectorTreeTask16, DependencyReasonsAreMappedWithoutReplacingTheFirstError)
+{
+    for (const auto* reason : { "collection failed", "provider query failed", "invalid provider data",
+             "node count exceeds limit", "tree data size exceeds limit" }) {
+        InspectorTreeDependencyResult result;
+        EXPECT_FALSE(result.HasError());
+        result.ReportErrorMessage(reason);
+        result.ReportErrorMessage("collection failed");
+        EXPECT_TRUE(result.HasError());
+        EXPECT_EQ(std::string(result.GetErrorMessage()), reason);
+    }
+    InspectorTreeDependencyResult unknown;
+    unknown.ReportErrorMessage("untrusted dependency diagnostic");
+    EXPECT_EQ(std::string(unknown.GetErrorMessage()), "collection failed");
+}
+
+TEST(InspectorTreeTask06, ExtensionFailurePropagatesToTheRequestRoot)
+{
+    for (const auto* reason : { "collection failed", "provider query failed", "invalid provider data",
+             "node count exceeds limit", "tree data size exceeds limit" }) {
+        ParamConfig config;
+        config.withCustomContent = true;
+        InspectorTreeRequestContext context(config, {}, {});
+        auto extension = JsonUtil::Create();
+        extension->Put("errorMessage", reason);
+        EXPECT_FALSE(context.AcceptExtensionTree(*extension));
+        auto root = JsonUtil::CreateSharedPtrJson();
+        root->Put("appInfo", JsonUtil::Create());
+        root->Put("$child-uec", extension);
+        auto result = context.FinalizeResult(root);
+        EXPECT_EQ(result->GetString("errorMessage"), reason);
+        EXPECT_FALSE(result->Contains("appInfo"));
+        EXPECT_FALSE(result->Contains("$child-uec"));
+    }
+}
+
+TEST(InspectorTreeTask06, SuccessfulExtensionKeepsItsTreeAndConsumesRootStatus)
+{
+    ParamConfig config;
+    config.withCustomContent = true;
+    InspectorTreeRequestContext context(config, {}, {});
+    auto extension = JsonUtil::ParseJsonString(
+        R"({"errorMessage":"no error","$children":[{"$type":"Text"}]})");
+    EXPECT_TRUE(context.AcceptExtensionTree(*extension));
+    EXPECT_FALSE(extension->Contains("errorMessage"));
+    EXPECT_EQ(extension->GetValue("$children")->GetArrayItem(0)->GetString("$type"), "Text");
+    auto empty = JsonUtil::Create();
+    EXPECT_FALSE(context.AcceptExtensionTree(*empty));
+    EXPECT_EQ(std::string(context.dependencyResult.GetErrorMessage()), "collection failed");
+}
+
+TEST(InspectorTreeTask06, ExtensionProviderArraysShareTheRequestNodeLimit)
+{
+    ParamConfig config;
+    config.withCustomContent = true;
+    InspectorTreeRequestContext context(config, {}, {});
+    auto extension = JsonUtil::ParseJsonString(R"({"$children":[{"accessibilityTree":[]}]})");
+    auto array = extension->GetValue("$children")->GetArrayItem(0)->GetValue("accessibilityTree");
+    for (size_t i = 0; i < 5000; ++i) {
+        array->Put(JsonUtil::Create());
+    }
+    EXPECT_TRUE(context.AcceptExtensionTree(*extension));
+    EXPECT_TRUE(context.AcceptExtensionTree(*extension));
+    EXPECT_FALSE(context.AcceptExtensionTree(*extension));
+    EXPECT_EQ(std::string(context.dependencyResult.GetErrorMessage()), "node count exceeds limit");
+}
+
 } // namespace OHOS::Ace::NG

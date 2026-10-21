@@ -1708,8 +1708,9 @@ void FrameNode::MergeAttributesIntoJson(std::shared_ptr<JsonValue>& json, const 
 void FrameNode::DumpSimplifyInfoOnlyForParamConfig(std::shared_ptr<JsonValue>& json, ParamConfig config)
 {
     CHECK_NULL_VOID(json);
-    // Reuse the third-provider hook for both the native switch and our compatibility option.
-    config.withThirdProvider = config.withThirdProvider || config.withXComponent;
+    if (config.inspectorContext && config.withCustomContent) {
+        config.withThirdProvider = false;
+    }
     DumpSimplifyCommonInfoOnlyForParamConfig(json, config);
     if (pattern_) {
         auto child = JsonUtil::CreateSharedPtrJson();
@@ -1725,6 +1726,9 @@ void FrameNode::DumpInspectorTreeInfo(std::shared_ptr<JsonValue>& json, ParamCon
     CHECK_NULL_VOID(json);
     CHECK_NULL_VOID(config.inspectorContext);
     auto& context = *config.inspectorContext;
+    if (context.ShouldStop()) {
+        return;
+    }
     DumpSimplifyCommonInfo(json);
     if (pattern_) {
         auto attrs = JsonUtil::CreateSharedPtrJson();
@@ -1733,6 +1737,9 @@ void FrameNode::DumpInspectorTreeInfo(std::shared_ptr<JsonValue>& json, ParamCon
     }
     // Reuse the existing/ UIAgent property readers and Web/UIExtension routing.
     DumpSimplifyInfoOnlyForParamConfig(json, config);
+    if (context.ShouldStop()) {
+        return;
+    }
     auto gesture = eventHub_ ? eventHub_->GetGestureEventHub() : nullptr;
     if (config.interactionInfo) {
         json->Put("touchable", !gesture || gesture->GetTouchable());

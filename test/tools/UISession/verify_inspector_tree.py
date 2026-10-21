@@ -36,6 +36,16 @@ def validate(capture, case, regions, providers, accessibility):
         return assertions, failures
     body = outer["0"]
     tree = json.loads(body)
+    check(type(tree) is dict, "decoded tree must be an object")
+    if type(tree) is not dict:
+        return assertions, failures
+    expected_error = case.get("errorMessage") if providers else None
+    if expected_error:
+        expected = {"errorMessage": expected_error} if regions or providers else {}
+        check(tree == expected, "failed request must discard the whole tree and report its first error")
+        return assertions, failures
+    check((tree.get("errorMessage") == "no error") if regions or providers else
+          "errorMessage" not in tree, "root errorMessage gate does not match the request")
     app = tree.get("appInfo", {})
     check(type(app.get("PID")) is int and app["PID"] > 0, "app PID must identify the target process")
     check(type(app.get("WindowTitle")) is str, "WindowTitle must be a string")
@@ -83,25 +93,27 @@ def validate(capture, case, regions, providers, accessibility):
                 for rectangles in values:
                     check(type(rectangles) is list and all(type(item) is str for item in rectangles),
                           "response region must be a rectangle string array")
-        check(not any(key in node for key in
-                      ("accessibilityTree", "accessibilityTreeComplete", "errorMessage")),
-              "legacy third-provider wrapper must not be emitted")
-        if "$children-third" in node:
+        check("accessibilityTreeComplete" not in node, "obsolete host completeness field")
+        if node is not tree:
+            check("errorMessage" not in node, "errorMessage must only appear at the tree root")
+        if "accessibilityTree" in node:
             check(providers, "provider result present with collection disabled")
             hosts.append(node)
-            third = [node["$children-third"]]
-            while third:
-                item = third.pop()
+            third = node["accessibilityTree"]
+            check(type(third) is list, "provider result must be a flat array")
+            if type(third) is not list:
+                continue
+            for item in third:
                 check(type(item) is dict, "third-provider node must be an object")
                 if type(item) is not dict:
                     continue
                 check(type(item.get("$rect")) is str, "missing provider window rectangle")
-                check(item.get("type") == "third", "missing third-provider type")
-                check(type(item.get("$ID")) is int, "provider ID must follow exporter format")
-                children = item.get("$children", [])
-                check(type(children) is list, "provider children must follow exporter hierarchy")
-                if type(children) is list:
-                    third.extend(children)
+                check(type(item.get("screenRect")) is dict, "missing original provider screen rectangle")
+                check(type(item.get("childNodeIds")) is list, "missing original child IDs")
+                for key in ("elementId", "parentId"):
+                    check(type(item.get(key)) is str and re.fullmatch(r"0|-?[1-9][0-9]*", item[key]) is not None,
+                          "provider ID must be a canonical decimal string")
+                check("$children" not in item, "provider list must not become a nested tree")
     for required in case.get("requiredIds", []):
         check(required in by_id, "missing fixture node: " + required)
     for required in case.get("emptyContentIds", []):
@@ -117,8 +129,9 @@ def validate(capture, case, regions, providers, accessibility):
                       ("responseRegionMap", "responseRegion", "mouseResponseRegion")), "unconfigured region fabricated")
     if case.get("providerNonempty"):
         check(bool(hosts), "nonempty provider fixture not returned")
-    if case.get("providerOmitted"):
-        check(not hosts, "exporter must omit empty/failed/oversized provider data")
+    if case.get("providerEmpty"):
+        check(bool(hosts) and all(host["accessibilityTree"] == [] for host in hosts),
+              "successful empty providers must return empty arrays")
     return assertions, failures
 
 
@@ -127,8 +140,7 @@ def main():
     parser.add_argument("capture", type=Path)
     parser.add_argument("--case", required=True)
     parser.add_argument("--with-response-region", action="store_true")
-    parser.add_argument("--with-xcomponent", action="store_true")
-    parser.add_argument("--with-third-provider", action="store_true")
+    parser.add_argument("--with-custom-content", action="store_true")
     parser.add_argument("--accessibility-info", action="store_true")
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument("--device-build", required=True)
@@ -139,7 +151,7 @@ def main():
     start = time.time_ns() // 1000000
     try:
         count, failures = validate(args.capture.read_text(), cases[args.case], args.with_response_region,
-                                   args.with_xcomponent or args.with_third_provider, args.accessibility_info)
+                                   args.with_custom_content, args.accessibility_info)
     except (ValueError, TypeError, KeyError, IndexError, OSError, RecursionError) as error:
         count, failures = 1, ["capture parsing/validation failed: " + type(error).__name__]
     report = {"caseId": args.case, "deviceBuild": args.device_build, "capture": str(args.capture),

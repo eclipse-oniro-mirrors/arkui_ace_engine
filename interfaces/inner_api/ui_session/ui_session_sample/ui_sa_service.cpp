@@ -726,7 +726,7 @@ void UiSaService::HandleInspectorTree(
         { "--cacheNodes", &config.cacheNodes }, { "--withWeb", &config.withWeb },
         { "--withUIExtension", &config.withUIExtension }, { "--rectCulling", &config.rectCulling },
         { "--withThirdProvider", &config.withThirdProvider },
-        { "--withResponseRegion", &config.withResponseRegion }, { "--withXComponent", &config.withXComponent }
+        { "--withResponseRegion", &config.withResponseRegion }, { "--withCustomContent", &config.withCustomContent }
     };
     for (size_t i = 1; i < params.size(); ++i) {
         if (params[i] == "-tofile") {
@@ -804,7 +804,7 @@ void UiSaService::HandleInspectorTree(
         "%{public}d,%{public}d,%{public}d,%{public}f,%{public}d,%{public}d,%{public}d timeout=%{public}d",
         caseId.c_str(), api.c_str(), config.interactionInfo, config.accessibilityInfo, config.cacheNodes,
         config.withWeb, config.withUIExtension, config.rectCulling, config.minOpacity,
-        config.withThirdProvider, config.withResponseRegion, config.withXComponent, timeout);
+        config.withThirdProvider, config.withResponseRegion, config.withCustomContent, timeout);
     const auto result = visible ? service->GetVisibleInspectorTree(callback, config, timeout) :
         service->GetInspectorTree(callback, config, timeout);
     LOGI("[InspectorTree] caseId=%{public}s api=%{public}s returnCode=%{public}d startMs=%{public}" PRId64,

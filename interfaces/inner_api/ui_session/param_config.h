@@ -53,8 +53,6 @@ struct ParamConfig {
     NG::InspectorTreeRequestContext* inspectorContext = nullptr;
 
     bool withResponseRegion = false;
-    // Compatibility entry for the third-provider data returned by XComponent/Custom hooks.
-    bool withXComponent = false;
     // Internal request values are never included in the public configuration parcel.
     InspectorTreeRequestRoute inspectorRoute;
     std::function<void(const std::string&)> inspectorReporter;

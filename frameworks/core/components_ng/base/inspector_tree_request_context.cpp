@@ -18,13 +18,69 @@
 #include <vector>
 
 #include "base/log/log_wrapper.h"
+#include "base/utils/utils.h"
+#include "core/accessibility/third_provider_tree_exporter.h"
 
 namespace OHOS::Ace::NG {
+namespace {
+InspectorTreeError MapProviderError(ThirdProviderExportStatus status)
+{
+    switch (status) {
+        case ThirdProviderExportStatus::SUCCESS:
+        case ThirdProviderExportStatus::NOT_REGISTERED:
+            return InspectorTreeError::NONE;
+        case ThirdProviderExportStatus::QUERY_FAILED:
+            return InspectorTreeError::PROVIDER_QUERY_FAILED;
+        case ThirdProviderExportStatus::INVALID_DATA:
+            return InspectorTreeError::INVALID_PROVIDER_DATA;
+        case ThirdProviderExportStatus::NODE_LIMIT:
+            return InspectorTreeError::NODE_COUNT_EXCEEDS_LIMIT;
+        case ThirdProviderExportStatus::SIZE_LIMIT:
+            return InspectorTreeError::TREE_DATA_SIZE_EXCEEDS_LIMIT;
+        default:
+            return InspectorTreeError::COLLECTION_FAILED;
+    }
+}
+} // namespace
+
 InspectorTreeRequestContext::InspectorTreeRequestContext(
     ParamConfig options, InspectorTreeRequestRoute requestRoute, InspectorWindowSnapshot snapshot)
-    : config(options), route(requestRoute), window(std::move(snapshot))
+    : config(options), route(requestRoute), window(std::move(snapshot)),
+      providerBudget_(std::make_shared<ThirdProviderTreeExportBudget>())
 {
     config.inspectorContext = nullptr;
+}
+
+void InspectorTreeRequestContext::CollectCustomContent(
+    ArkUI_AccessibilityProvider* provider, const RefPtr<FrameNode>& host, std::shared_ptr<JsonValue>& node)
+{
+    if (!config.withCustomContent || ShouldStop()) {
+        return;
+    }
+    auto result = ThirdProviderTreeExporter::ExportFlatToInspectorJson(provider, host, *providerBudget_);
+    ReportError(MapProviderError(result.status));
+    if (result.status == ThirdProviderExportStatus::SUCCESS) {
+        if (!result.nodes || !node || !node->Put("accessibilityTree", result.nodes)) {
+            ReportError(InspectorTreeError::COLLECTION_FAILED);
+        }
+    }
+}
+
+bool InspectorTreeRequestContext::AcceptExtensionTree(JsonValue& tree)
+{
+    if (!tree.IsObject() || !tree.GetChild()->IsValid()) {
+        ReportError(InspectorTreeError::COLLECTION_FAILED);
+    } else if (tree.Contains("errorMessage")) {
+        dependencyResult.ReportErrorMessage(tree.GetString("errorMessage"));
+    }
+    if (ShouldStop()) {
+        return false;
+    }
+    if (config.withCustomContent) {
+        ReportError(MapProviderError(ThirdProviderTreeExporter::AccumulateInspectorTree(tree, *providerBudget_)));
+    }
+    tree.Delete("errorMessage");
+    return !ShouldStop();
 }
 
 bool InspectorTreeRequestContext::MarkPrivacyReasonOnce(PrivacyReason reason)
@@ -77,6 +133,25 @@ void InspectorTreeRequestContext::FinalizeNativeTree(const std::shared_ptr<JsonV
             pending.emplace_back(std::move(child));
         }
     }
+}
+
+std::shared_ptr<JsonValue> InspectorTreeRequestContext::FinalizeResult(std::shared_ptr<JsonValue> root)
+{
+    if (cancelled_) {
+        return nullptr;
+    }
+    if (!root || !root->IsObject()) {
+        ReportError(InspectorTreeError::COLLECTION_FAILED);
+    }
+    if (dependencyResult.HasError()) {
+        root = JsonUtil::CreateSharedPtrJson(true);
+    }
+    CHECK_NULL_RETURN(root, nullptr);
+    root->Delete("errorMessage");
+    if (config.withResponseRegion || config.withCustomContent) {
+        root->Put("errorMessage", dependencyResult.GetErrorMessage());
+    }
+    return root;
 }
 
 } // namespace OHOS::Ace::NG

@@ -81,7 +81,7 @@ TEST_F(InspectorTreeTask01UIExtension, ForwardIndependentCapabilitiesInWireOrder
             ParamConfig config { true, false, true, false, true, true, 0.25f };
             config.withThirdProvider = !xComponent;
             config.withResponseRegion = responseRegion;
-            config.withXComponent = xComponent;
+            config.withCustomContent = xComponent;
             auto json = JsonUtil::CreateSharedPtrJson();
             const auto previousCalls = session->calls;
             pattern->AddExtraInfoWithParamConfig(json, config);
@@ -111,7 +111,7 @@ TEST_F(InspectorTreeTask01UIExtension, DisabledUIExtensionDoesNotQuerySession)
     pattern->sessionWrapper_ = session;
     ParamConfig config;
     config.withResponseRegion = true;
-    config.withXComponent = true;
+    config.withCustomContent = true;
     auto json = JsonUtil::CreateSharedPtrJson();
     pattern->AddExtraInfoWithParamConfig(json, config);
     EXPECT_EQ(session->calls, 0u);

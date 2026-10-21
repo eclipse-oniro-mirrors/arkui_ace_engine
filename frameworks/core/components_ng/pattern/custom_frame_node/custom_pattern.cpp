@@ -19,6 +19,7 @@
 #include "core/components_ng/pattern/custom_frame_node/custom_accessibility_session_adapter.h"
 #include "core/components_ng/property/accessibility_property.h"
 #include "core/accessibility/accessibility_manager.h"
+#include "core/components_ng/base/inspector_tree_request_context.h"
 #include "core/accessibility/accessibility_session_adapter.h"
 #include "core/accessibility/native_interface_accessibility_provider.h"
 #include "core/common/ace_application_info.h"
@@ -245,4 +246,11 @@ void CustomPattern::DumpInfo()
         DumpLog::GetInstance().AddDesc(std::string("OverflowInfo: ").append(vOverflowHandler_->ToString().c_str()));
     }
 }
+void CustomPattern::AddInspectorTreeInfo(std::shared_ptr<JsonValue>& node, InspectorTreeRequestContext& context)
+{
+    if (context.config.withCustomContent && !context.ShouldStop()) {
+        context.CollectCustomContent(GetNativeAccessibilityProvider(), GetHost(), node);
+    }
+}
+
 } // namespace OHOS::Ace::NG
