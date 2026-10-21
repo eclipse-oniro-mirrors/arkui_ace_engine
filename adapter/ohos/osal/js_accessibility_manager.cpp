@@ -439,6 +439,7 @@ Accessibility::EventType ConvertAceEventType(AccessibilityEventType type)
             Accessibility::EventType::TYPE_VIEW_REQUEST_FOCUS_FOR_ACCESSIBILITY_NOT_INTERRUPT },
         { AccessibilityEventType::SCROLLING_EVENT, Accessibility::EventType::TYPE_VIEW_SCROLLING_EVENT },
         { AccessibilityEventType::FOCUS_INVISIBLE, Accessibility::EventType::TYPE_FOCUS_INVISIBLE },
+        { AccessibilityEventType::PAGE_PRE_CHANGE, Accessibility::EventType::TYPE_PAGE_STATE_PRE_UPDATE },
     };
     Accessibility::EventType eventType = Accessibility::EventType::TYPE_VIEW_INVALID;
     int64_t idx = BinarySearchFindIndex(eventTypeMap, ArraySize(eventTypeMap), type);
@@ -3447,7 +3448,8 @@ namespace {
         return eventType && (eventType == Accessibility::EventType::TYPE_PAGE_STATE_UPDATE
             || eventType == Accessibility::EventType::TYPE_PAGE_CONTENT_UPDATE
             || eventType == Accessibility::EventType::TYPE_PAGE_OPEN
-            || eventType == Accessibility::EventType::TYPE_PAGE_CLOSE);
+            || eventType == Accessibility::EventType::TYPE_PAGE_CLOSE
+            || eventType == Accessibility::EventType::TYPE_PAGE_STATE_PRE_UPDATE);
     }
 
     bool IsRootOrPageComponent(const std::string& componentType)
@@ -10856,6 +10858,7 @@ bool JsAccessibilityManager::IsDetachFocusCacheClearEvent(AccessibilityEventType
         case AccessibilityEventType::CHANGE:
         case AccessibilityEventType::PAGE_OPEN:
         case AccessibilityEventType::PAGE_CLOSE:
+        case AccessibilityEventType::PAGE_PRE_CHANGE:
         case AccessibilityEventType::FOCUS:
             return true;
         case AccessibilityEventType::SCROLLING_EVENT:
