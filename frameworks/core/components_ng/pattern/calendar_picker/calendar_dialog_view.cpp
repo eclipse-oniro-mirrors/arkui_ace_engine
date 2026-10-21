@@ -441,9 +441,7 @@ RefPtr<FrameNode> CalendarDialogView::CreateTitleImageNode(
         BUTTON_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), []() -> RefPtr<Pattern> {
             auto* buttonModifier = NodeModifier::GetButtonCustomModifier();
             CHECK_NULL_RETURN(buttonModifier, nullptr);
-            auto* rawPattern = reinterpret_cast<Pattern*>(buttonModifier->createButtonPattern());
-            CHECK_NULL_RETURN(rawPattern, nullptr);
-            return AceType::Claim(rawPattern);
+            return buttonModifier->createButtonPattern();
         });
     CHECK_NULL_RETURN(buttonNode, nullptr);
     auto* buttonModifier = NodeModifier::GetButtonCustomModifier();
@@ -726,9 +724,7 @@ RefPtr<FrameNode> CalendarDialogView::CreateButtonNode(bool isConfirm, const std
         ElementRegister::GetInstance()->MakeUniqueId(), []() -> RefPtr<Pattern> {
             auto* buttonModifier = NodeModifier::GetButtonCustomModifier();
             CHECK_NULL_RETURN(buttonModifier, nullptr);
-            auto* rawPattern = reinterpret_cast<Pattern*>(buttonModifier->createButtonPattern());
-            CHECK_NULL_RETURN(rawPattern, nullptr);
-            return AceType::Claim(rawPattern);
+            return buttonModifier->createButtonPattern();
         });
     CHECK_NULL_RETURN(buttonNode, nullptr);
     RefPtr<CalendarTheme> calendarTheme = buttonNode->GetTheme<CalendarTheme>(true);

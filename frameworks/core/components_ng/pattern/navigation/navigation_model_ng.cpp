@@ -876,7 +876,7 @@ bool NavigationModelNG::CreateBackButtonNode(RefPtr<FrameNode>& backButtonNode)
 {
     auto* buttonModifier = NodeModifier::GetButtonCustomModifier();
     CHECK_NULL_RETURN(buttonModifier, false);
-    auto* buttonPattern = reinterpret_cast<ButtonPattern*>(buttonModifier->createButtonPattern());
+    auto buttonPattern = AceType::DynamicCast<ButtonPattern>(buttonModifier->createButtonPattern());
     CHECK_NULL_RETURN(buttonPattern, false);
 
     auto theme = NavigationGetTheme();
@@ -889,7 +889,7 @@ bool NavigationModelNG::CreateBackButtonNode(RefPtr<FrameNode>& backButtonNode)
         buttonPattern->SetFocusBorderWidth(theme->GetBackgroundFocusOutlineWeight());
     }
     backButtonNode = FrameNode::CreateFrameNode(
-        V2::BACK_BUTTON_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::Claim(buttonPattern));
+        V2::BACK_BUTTON_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), buttonPattern);
     auto focusHub = backButtonNode->GetOrCreateFocusHub();
     CHECK_NULL_RETURN(focusHub, false);
     focusHub->SetFocusDependence(FocusDependence::SELF);

@@ -218,9 +218,7 @@ RefPtr<FrameNode> DatePickerModelStatic::CreateButtonNode()
     return FrameNode::GetOrCreateFrameNode(BUTTON_ETS_TAG, buttonId, []() -> RefPtr<Pattern> {
         auto* buttonModifier = NodeModifier::GetButtonCustomModifier();
         CHECK_NULL_RETURN(buttonModifier, nullptr);
-        auto* rawPattern = reinterpret_cast<Pattern*>(buttonModifier->createButtonPattern());
-        CHECK_NULL_RETURN(rawPattern, nullptr);
-        return AceType::Claim(rawPattern);
+        return buttonModifier->createButtonPattern();
     });
 }
 

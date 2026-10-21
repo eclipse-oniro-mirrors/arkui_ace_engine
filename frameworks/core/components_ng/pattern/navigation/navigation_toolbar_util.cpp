@@ -333,7 +333,7 @@ RefPtr<FrameNode> CreateToolbarItemInContainer(
     CHECK_NULL_RETURN(theme, nullptr);
     auto* buttonModifier = NodeModifier::GetButtonCustomModifier();
     CHECK_NULL_RETURN(buttonModifier, nullptr);
-    auto* buttonPattern = reinterpret_cast<ButtonPattern*>(buttonModifier->createButtonPattern());
+    auto buttonPattern = AceType::DynamicCast<ButtonPattern>(buttonModifier->createButtonPattern());
     CHECK_NULL_RETURN(buttonPattern, nullptr);
     buttonPattern->setComponentButtonType(ComponentButtonType::NAVIGATION);
     buttonPattern->SetFocusBorderColor(theme->GetToolBarItemFocusColor());
@@ -342,7 +342,7 @@ RefPtr<FrameNode> CreateToolbarItemInContainer(
         buttonPattern->SetBlendColor(Color::TRANSPARENT, std::nullopt);
     }
     auto toolBarItemNode = FrameNode::CreateFrameNode(
-        V2::MENU_ITEM_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::Claim(buttonPattern));
+        V2::MENU_ITEM_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), buttonPattern);
     CHECK_NULL_RETURN(toolBarItemNode, nullptr);
     auto nodeHandle = reinterpret_cast<ArkUINodeHandle>(AceType::RawPtr(toolBarItemNode));
     auto layoutProperty = toolBarItemNode->GetLayoutProperty();
@@ -408,7 +408,7 @@ RefPtr<FrameNode> CreateToolbarMoreMenuNode(const RefPtr<BarItemNode>& barItemNo
     CHECK_NULL_RETURN(theme, nullptr);
     auto* buttonModifier = NodeModifier::GetButtonCustomModifier();
     CHECK_NULL_RETURN(buttonModifier, nullptr);
-    auto* buttonPattern = reinterpret_cast<ButtonPattern*>(buttonModifier->createButtonPattern());
+    auto buttonPattern = AceType::DynamicCast<ButtonPattern>(buttonModifier->createButtonPattern());
     CHECK_NULL_RETURN(buttonPattern, nullptr);
     buttonPattern->setComponentButtonType(ComponentButtonType::NAVIGATION);
     buttonPattern->SetFocusBorderColor(theme->GetToolBarItemFocusColor());
@@ -417,7 +417,7 @@ RefPtr<FrameNode> CreateToolbarMoreMenuNode(const RefPtr<BarItemNode>& barItemNo
         buttonPattern->SetBlendColor(Color::TRANSPARENT, std::nullopt);
     }
     auto toolBarItemNode = FrameNode::CreateFrameNode(
-        V2::MENU_ITEM_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::Claim(buttonPattern));
+        V2::MENU_ITEM_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), buttonPattern);
     CHECK_NULL_RETURN(toolBarItemNode, nullptr);
     auto nodeHandle = reinterpret_cast<ArkUINodeHandle>(AceType::RawPtr(toolBarItemNode));
     auto layoutProperty = toolBarItemNode->GetLayoutProperty();

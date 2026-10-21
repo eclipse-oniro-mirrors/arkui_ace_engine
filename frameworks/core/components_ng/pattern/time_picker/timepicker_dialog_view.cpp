@@ -306,9 +306,7 @@ RefPtr<FrameNode> TimePickerDialogView::CreateNextPrevButtonNode(std::function<v
         ElementRegister::GetInstance()->MakeUniqueId(), []() -> RefPtr<Pattern> {
             auto* buttonModifier = NodeModifier::GetButtonCustomModifier();
             CHECK_NULL_RETURN(buttonModifier, nullptr);
-            auto* rawPattern = reinterpret_cast<Pattern*>(buttonModifier->createButtonPattern());
-            CHECK_NULL_RETURN(rawPattern, nullptr);
-            return AceType::Claim(rawPattern);
+            return buttonModifier->createButtonPattern();
         });
     CHECK_NULL_RETURN(nextPrevButtonNode, nullptr);
     auto textNextPrevNode = FrameNode::CreateFrameNode(TimePickerUtil::TEXT_ETS_TAG,
@@ -434,9 +432,7 @@ RefPtr<FrameNode> TimePickerDialogView::CreateButtonNode()
     return FrameNode::GetOrCreateFrameNode(TimePickerUtil::BUTTON_ETS_TAG, buttonId, []() -> RefPtr<Pattern> {
         auto* buttonModifier = NodeModifier::GetButtonCustomModifier();
         CHECK_NULL_RETURN(buttonModifier, nullptr);
-        auto* rawPattern = reinterpret_cast<Pattern*>(buttonModifier->createButtonPattern());
-        CHECK_NULL_RETURN(rawPattern, nullptr);
-        return AceType::Claim(rawPattern);
+        return buttonModifier->createButtonPattern();
     });
 }
 
@@ -503,9 +499,7 @@ RefPtr<FrameNode> TimePickerDialogView::CreateTitleButtonNode(const RefPtr<Frame
         ElementRegister::GetInstance()->MakeUniqueId(), []() -> RefPtr<Pattern> {
             auto* buttonModifier = NodeModifier::GetButtonCustomModifier();
             CHECK_NULL_RETURN(buttonModifier, nullptr);
-            auto* rawPattern = reinterpret_cast<Pattern*>(buttonModifier->createButtonPattern());
-            CHECK_NULL_RETURN(rawPattern, nullptr);
-            return AceType::Claim(rawPattern);
+            return buttonModifier->createButtonPattern();
         });
     auto textTitleNodeId = pickerPattern->GetTitleId();
     auto textTitleNode =
@@ -743,9 +737,7 @@ RefPtr<FrameNode> TimePickerDialogView::CreateConfirmNode(const RefPtr<FrameNode
         ElementRegister::GetInstance()->MakeUniqueId(), []() -> RefPtr<Pattern> {
             auto* buttonModifier = NodeModifier::GetButtonCustomModifier();
             CHECK_NULL_RETURN(buttonModifier, nullptr);
-            auto* rawPattern = reinterpret_cast<Pattern*>(buttonModifier->createButtonPattern());
-            CHECK_NULL_RETURN(rawPattern, nullptr);
-            return AceType::Claim(rawPattern);
+            return buttonModifier->createButtonPattern();
         });
     auto textConfirmNode = FrameNode::CreateFrameNode(TimePickerUtil::TEXT_ETS_TAG,
         ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<TextPattern>());
@@ -899,9 +891,7 @@ RefPtr<FrameNode> TimePickerDialogView::CreateCancelNode(NG::DialogGestureEvent&
         ElementRegister::GetInstance()->MakeUniqueId(), []() -> RefPtr<Pattern> {
             auto* buttonModifier = NodeModifier::GetButtonCustomModifier();
             CHECK_NULL_RETURN(buttonModifier, nullptr);
-            auto* rawPattern = reinterpret_cast<Pattern*>(buttonModifier->createButtonPattern());
-            CHECK_NULL_RETURN(rawPattern, nullptr);
-            return AceType::Claim(rawPattern);
+            return buttonModifier->createButtonPattern();
         });
     CHECK_NULL_RETURN(buttonCancelNode, nullptr);
     auto textCancelNode = FrameNode::CreateFrameNode(TimePickerUtil::TEXT_ETS_TAG,
