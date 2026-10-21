@@ -84,6 +84,32 @@ struct KeyComb final {
     }
 };
 
+enum class RichSpanType : uint32_t {
+    TEXT = 0,
+    IMAGE = 1,
+    SYMBOL = 2,
+    CUSTOM = 3,
+};
+
+struct RichRange {
+    int32_t start = INVALID_VALUE;
+    int32_t end = INVALID_VALUE;
+};
+
+struct RichTextSpanInfo {
+    RichSpanType type { RichSpanType::TEXT };
+    RichRange range;
+    std::string content;
+};
+
+struct RichTextDataInfo {
+    std::vector<RichTextSpanInfo> spans;
+    bool IsEmpty() const
+    {
+        return spans.empty();
+    }
+};
+
 class TextInputClient : public virtual AceType {
     DECLARE_ACE_TYPE(TextInputClient, AceType);
 
@@ -118,6 +144,16 @@ public:
     virtual int32_t GetTextIndexAtCursor()
     {
         return -1;
+    }
+
+    virtual RichTextDataInfo GetLeftRichTextOfCursor(int32_t number)
+    {
+        return {};
+    }
+
+    virtual RichTextDataInfo GetRightRichTextOfCursor(int32_t number)
+    {
+        return {};
     }
 
     virtual void HandleSetSelection(int32_t start, int32_t end, bool showHandle = true) {}

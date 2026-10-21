@@ -650,6 +650,9 @@ public:
     std::u16string GetLeftTextOfCursor(int32_t number) override;
     std::u16string GetRightTextOfCursor(int32_t number) override;
     int32_t GetTextIndexAtCursor() override;
+    RichTextDataInfo GetLeftRichTextOfCursor(int32_t number) override;
+    RichTextDataInfo GetRightRichTextOfCursor(int32_t number) override;
+    RichTextDataInfo BuildRichText(int32_t start, int32_t end);
     void ProcessOverlay(const OverlayRequest& request = OverlayRequest()) override;
     void ShowSelectOverlay(const RectF& firstHandle, const RectF& secondHandle, bool isCopyAll = false,
         TextResponseType responseType = TextResponseType::LONG_PRESS, bool handlReverse = false);
