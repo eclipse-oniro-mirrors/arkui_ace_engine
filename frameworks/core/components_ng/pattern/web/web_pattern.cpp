@@ -680,6 +680,12 @@ constexpr int32_t ZOOM_CONVERT_NUM = 10;
 constexpr int32_t POPUP_CALCULATE_RATIO = 2;
 constexpr int32_t MIN_ACCESSIBILITY_FOCUS_SIZE = 2;
 constexpr int32_t MENU_WINDOW_ENTER_LIMIT_TIME = 300;
+constexpr int32_t MAX_ACCESSIBILITY_TREE_DEPTH = 256;
+constexpr int32_t IMAGE_RENDERING_AUTO = 0;
+constexpr int32_t IMAGE_RENDERING_OPTIMIZE_SPEED = 1;
+constexpr int32_t IMAGE_RENDERING_OPTIMIZE_QUALITY = 2;
+constexpr int32_t IMAGE_RENDERING_PIXELATED = 3;
+constexpr int32_t IMAGE_RENDERING_WEBKIT_OPTIMIZE_CONTRAST = 4;
 
 constexpr int32_t PINCH_START_TYPE = 1;
 constexpr int32_t PINCH_UPDATE_TYPE = 3;
@@ -9809,14 +9815,7 @@ void WebPattern::WebNodeInfoToJsonValue(std::shared_ptr<OHOS::Ace::JsonValue>& j
     JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::ERROR, webNodeInfo->GetError());
     JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::CHILD_IDS, VectorIntToString(webNodeInfo->GetChildIds()));
     JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::PARENT_ID, webNodeInfo->GetParentId(), -1);
-    JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::GRID_ROWS, webNodeInfo->GetGridRows(), -1);
-    JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::GRID_COLS, webNodeInfo->GetGridColumns(), -1);
-    JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::GRID_SEL_MODE, webNodeInfo->GetGridSelectedMode(), -1);
-    JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::GRID_ITEM_ROW, webNodeInfo->GetGridItemRow(), -1);
-    JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::GRID_ITEM_ROW_SPAN, webNodeInfo->GetGridItemRowSpan(), -1);
-    JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::GRID_ITEM_COL, webNodeInfo->GetGridItemColumn(), -1);
-    JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::GRID_ITEM_COL_SPAN,
-        webNodeInfo->GetGridItemColumnSpan(), -1);
+    PutGridAccessibilityFields(jsonNode, webNodeInfo);
     JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::PAGE_ID, webNodeInfo->GetPageId(), -1);
 
     if (webNodeInfo->GetRectWidth() != 0 || webNodeInfo->GetRectHeight() != 0) {
@@ -9843,7 +9842,34 @@ void WebPattern::WebNodeInfoToJsonValue(std::shared_ptr<OHOS::Ace::JsonValue>& j
     JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::DELETABLE, webNodeInfo->GetIsDeletable());
     JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::FOCUS, webNodeInfo->GetIsAccessibilityFocus());
     JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::NODE_TAG, nodeTag);
+    PutCssAccessibilityFields(jsonNode, webNodeInfo);
     isArray ? jsonNodeArray->PutRef(std::move(jsonNode)) : jsonNodeArray->PutRef(nodeTag.c_str(), std::move(jsonNode));
+}
+
+void WebPattern::PutGridAccessibilityFields(
+    std::unique_ptr<OHOS::Ace::JsonValue>& jsonNode, std::shared_ptr<OHOS::NWeb::NWebAccessibilityNodeInfo> webNodeInfo)
+{
+    JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::GRID_ROWS, webNodeInfo->GetGridRows(), -1);
+    JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::GRID_COLS, webNodeInfo->GetGridColumns(), -1);
+    JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::GRID_SEL_MODE, webNodeInfo->GetGridSelectedMode(), -1);
+    JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::GRID_ITEM_ROW, webNodeInfo->GetGridItemRow(), -1);
+    JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::GRID_ITEM_ROW_SPAN, webNodeInfo->GetGridItemRowSpan(), -1);
+    JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::GRID_ITEM_COL, webNodeInfo->GetGridItemColumn(), -1);
+    JsonNodePutDefaultValue(
+        jsonNode, WebAccessibilityType::GRID_ITEM_COL_SPAN, webNodeInfo->GetGridItemColumnSpan(), -1);
+}
+
+void WebPattern::PutCssAccessibilityFields(
+    std::unique_ptr<OHOS::Ace::JsonValue>& jsonNode, std::shared_ptr<OHOS::NWeb::NWebAccessibilityNodeInfo> webNodeInfo)
+{
+    JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::ZINDEX, webNodeInfo->GetZIndex());
+    JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::FONT_SIZE, webNodeInfo->GetFontSize());
+    JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::IMAGE_RENDERING, webNodeInfo->GetImageRendering());
+    JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::BG_SIZE_TYPE, webNodeInfo->GetBgSizeType());
+    JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::BG_COLOR, CssBgColorToHexString(webNodeInfo->GetBgColor()));
+    JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::CSS_VISIBLE, webNodeInfo->GetCssVisible());
+    JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::BG_IMG, webNodeInfo->GetBgImg());
+    JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::BG_SIZE, webNodeInfo->GetBgSize());
 }
 
 void WebPattern::GetWebAllInfosImpl(WebNodeInfoCallback cb, int32_t webId, bool needFilter)
@@ -9907,6 +9933,127 @@ void WebPattern::GetAllWebAccessibilityNodeInfos(WebNodeInfoCallback cb, int32_t
         TAG_LOGD(AceLogTag::ACE_WEB, "GetAllAccessibilityInfo time cost: %{public}f", diff.count());
         },
         TaskExecutor::TaskType::UI, WEB_ACCESSIBILITY_DELAY_TIME, "GetAllWebAccessibilityNodeInfos");
+}
+
+std::string WebPattern::CssBgColorToHexString(uint32_t color)
+{
+    std::ostringstream oss;
+    oss << "0x" << std::uppercase << std::hex << std::setfill('0') << std::setw(8) << color;
+    return oss.str();
+}
+
+std::string WebPattern::CssFontSizeToString(int32_t fontSize)
+{
+    return std::to_string(fontSize) + "px";
+}
+
+std::string WebPattern::CssImageRenderingToString(int32_t imageRendering)
+{
+    switch (imageRendering) {
+        case IMAGE_RENDERING_AUTO:
+            return "auto";
+        case IMAGE_RENDERING_OPTIMIZE_SPEED:
+            return "optimizespeed";
+        case IMAGE_RENDERING_OPTIMIZE_QUALITY:
+            return "optimizequality";
+        case IMAGE_RENDERING_PIXELATED:
+            return "pixelated";
+        case IMAGE_RENDERING_WEBKIT_OPTIMIZE_CONTRAST:
+            return "webkit-optimize-contrast";
+        default:
+            TAG_LOGW(AceLogTag::ACE_WEB, "Unknown imageRendering value:%{public}d", imageRendering);
+            return "auto";
+    }
+}
+
+void WebPattern::WebNodeInfoToJsonValueAccessibility(std::shared_ptr<OHOS::Ace::JsonValue>& jsonNode,
+    std::shared_ptr<OHOS::NWeb::NWebAccessibilityNodeInfo> webNodeInfo, int32_t depth)
+{
+    CHECK_NULL_VOID(webNodeInfo);
+    CHECK_NULL_VOID(jsonNode);
+    if (depth > MAX_ACCESSIBILITY_TREE_DEPTH) {
+        TAG_LOGW(AceLogTag::ACE_WEB, "Accessibility tree depth exceeds limit:%{public}d", depth);
+        return;
+    }
+    jsonNode->Put("$type", webNodeInfo->GetComponentType().c_str());
+    jsonNode->Put("type", "build-in");
+    std::string idStr = std::to_string(webNodeInfo->GetAccessibilityId());
+    jsonNode->Put("$ID", idStr.c_str());
+
+    int32_t rectX = webNodeInfo->GetRectX();
+    int32_t rectY = webNodeInfo->GetRectY();
+    int32_t rectWidth = webNodeInfo->GetRectWidth();
+    int32_t rectHeight = webNodeInfo->GetRectHeight();
+    std::string rectStr = "[" + std::to_string(rectX) + ", " + std::to_string(rectY) + ", " +
+                          std::to_string(rectWidth) + ", " + std::to_string(rectHeight) + "]";
+    jsonNode->Put("$rect", rectStr.c_str());
+
+    auto attrsJson = JsonUtil::Create(true);
+    attrsJson->Put("text", webNodeInfo->GetContent().c_str());
+    attrsJson->Put("cssVisible", webNodeInfo->GetCssVisible());
+    std::string fontSizeStr = CssFontSizeToString(webNodeInfo->GetFontSize());
+    attrsJson->Put("fontSize", fontSizeStr.c_str());
+    std::string bgColorStr = CssBgColorToHexString(webNodeInfo->GetBgColor());
+    attrsJson->Put("backgroundColor", bgColorStr.c_str());
+    attrsJson->Put("backgroundImg", webNodeInfo->GetBgImg().c_str());
+    attrsJson->Put("backgroundSize", webNodeInfo->GetBgSize().c_str());
+    std::string imageRenderingStr = CssImageRenderingToString(webNodeInfo->GetImageRendering());
+    attrsJson->Put("imageRendering", imageRenderingStr.c_str());
+    std::string zIndexStr = std::to_string(webNodeInfo->GetZIndex());
+    attrsJson->Put("zindex", zIndexStr.c_str());
+    jsonNode->Put("$attrs", attrsJson);
+
+    auto childrenJson = JsonUtil::CreateArray(true);
+    auto childIds = webNodeInfo->GetChildIds();
+    for (auto childId : childIds) {
+        auto childNodeInfo = delegate_->GetAccessibilityNodeInfoById(childId);
+        if (childNodeInfo) {
+            std::shared_ptr<JsonValue> childJsonShared = JsonUtil::Create(true);
+            WebNodeInfoToJsonValueAccessibility(childJsonShared, childNodeInfo, depth + 1);
+            childrenJson->PutRef(std::move(childJsonShared));
+        }
+    }
+    jsonNode->Put("$children", childrenJson);
+}
+
+void WebPattern::ToJsonValueAccessibilityImpl(WebNodeInfoCallback cb, int32_t webId)
+{
+    CHECK_NULL_VOID(delegate_);
+    std::shared_ptr<OHOS::NWeb::NWebAccessibilityNodeInfo> rootWebNode = delegate_->GetAccessibilityNodeInfoById(-1);
+    CHECK_NULL_VOID(rootWebNode);
+    std::shared_ptr<JsonValue> jsonRoot = JsonUtil::Create(true);
+    WebNodeInfoToJsonValueAccessibility(jsonRoot, rootWebNode, 0);
+    int rootChildCount = static_cast<int>(rootWebNode->GetChildIds().size());
+    TAG_LOGD(AceLogTag::ACE_WEB, "ToJsonValueAccessibilityImpl root child count:%{public}d", rootChildCount);
+    cb(jsonRoot, webId);
+}
+
+void WebPattern::ToJsonValueAccessibility(WebNodeInfoCallback cb, int32_t webId)
+{
+    CHECK_NULL_VOID(cb);
+    auto pipelineContext = GetContext();
+    CHECK_NULL_VOID(pipelineContext);
+    auto taskExecutor = pipelineContext->GetTaskExecutor();
+    CHECK_NULL_VOID(taskExecutor);
+    if (taskExecutor->WillRunOnCurrentThread(TaskExecutor::TaskType::UI)) {
+        ToJsonValueAccessibilityImpl(cb, webId);
+    } else {
+        taskExecutor->PostTask(
+            [weak = WeakClaim(this), cb, webId]() {
+                auto pattern = weak.Upgrade();
+                CHECK_NULL_VOID(pattern);
+                pattern->ToJsonValueAccessibilityImpl(cb, webId);
+            },
+            TaskExecutor::TaskType::UI, "ArkUIWebToJsonValueAccessibility");
+    }
+}
+
+std::string WebPattern::GetAccessibilityJsonString(int32_t webId)
+{
+    std::string result;
+    ToJsonValueAccessibility(
+        [&result](std::shared_ptr<JsonValue>& jsonRoot, int32_t webId) { result = jsonRoot->ToString(); }, webId);
+    return result;
 }
 
 void WebPattern::RegisterWebComponentClickCallback(WebComponentClickCallback&& callback)

@@ -104,6 +104,7 @@ constexpr char WEB_ACC_FUN_NEXT[] = "next";
 constexpr char WEB_ACC_FUN_EXE_ACTION[] = "exeAction";
 constexpr char WEB_ACC_FUN_SEND_EVENT[] = "sendEvent";
 constexpr char WEB_ACC_FUN_HOVER[] = "hover";
+constexpr char WEB_ACC_FUN_ACC_JSON[] = "accJson";
 const std::string CANDIDATE_IDS = "candidateIds";
 const std::string ACTION_ARGU_SCROLL_STUB = "scrolltype"; // wait for change
 const std::string ACTION_DEFAULT_PARAM = "ACCESSIBILITY_ACTION_INVALID";
@@ -119,8 +120,7 @@ std::map<std::string, WebAccFun> webAccFunMap = { { WEB_ACC_FUN_GET_ACC, WEB_GET
     { WEB_ACC_FUN_ON_ACC, WEB_ON_ACC }, { WEB_ACC_FUN_OFF_ACC, WEB_OFF_ACC }, { WEB_ACC_FUN_TREE, WEB_TREE },
     { WEB_ACC_FUN_NODE, WEB_NODE }, { WEB_ACC_FUN_PRE, WEB_PRE }, { WEB_ACC_FUN_NEXT, WEB_NEXT },
     { WEB_ACC_FUN_EXE_ACTION, WEB_EXE_ACTION }, { WEB_ACC_FUN_SEND_EVENT, WEB_SEND_EVENT },
-    { WEB_ACC_FUN_HOVER, WEB_HOVER } };
-
+    { WEB_ACC_FUN_HOVER, WEB_HOVER }, { WEB_ACC_FUN_ACC_JSON, WEB_ACC_JSON } };
 
 FocusMoveResult BuildWebFocusMoveResult(FocusMoveResultType resultType)
 {
@@ -5836,6 +5836,14 @@ void JsAccessibilityManager::ExecuteWebDump(const DumpInfoArgument& argument,
         case WEB_NEXT:
             ExecuteWebInfoDump(fun, infos, webPattern);
             break;
+        case WEB_ACC_JSON: {
+            auto lambda = [](std::shared_ptr<JsonValue>& jsonValue, int32_t id) {
+                CHECK_NULL_VOID(jsonValue);
+                DumpLog::GetInstance().Print(0, jsonValue->ToString());
+            };
+            webPattern->ToJsonValueAccessibility(std::move(lambda), webPattern->GetTreeId());
+            break;
+        }
         case WEB_EXE_ACTION:
         case WEB_SEND_EVENT:
         case WEB_HOVER:
