@@ -271,6 +271,7 @@ int32_t OH_ArkUI_NodeAdapterEvent_SetNodeId(ArkUI_NodeAdapterEvent* event, int32
 
 ArkUI_ContextHandle OH_ArkUI_GetContextByNode(ArkUI_NodeHandle node)
 {
+    CHECK_UI_THREAD("OH_ArkUI_GetContextByNode");
     CHECK_NULL_RETURN(node, nullptr);
     CHECK_NODE_DISPOSED(node, "Node has been disposed");
     auto* fullImpl = OHOS::Ace::NodeModel::GetFullImpl();

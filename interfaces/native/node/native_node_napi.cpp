@@ -406,6 +406,7 @@ int32_t OH_ArkUI_GetDrawableDescriptorFromResourceNapiValue(
 ArkUI_ErrorCode  OH_ArkUI_GetNavigationId(
     ArkUI_NodeHandle node, char* buffer, int32_t bufferSize, int32_t* writeLength)
 {
+    CHECK_UI_THREAD("OH_ArkUI_GetNavigationId");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Node is null");
     CHECK_NODE_DISPOSED(node, "Node has been disposed");
@@ -427,6 +428,7 @@ ArkUI_ErrorCode  OH_ArkUI_GetNavigationId(
 ArkUI_ErrorCode OH_ArkUI_GetNavDestinationName(
     ArkUI_NodeHandle node, char* buffer, int32_t bufferSize, int32_t* writeLength)
 {
+    CHECK_UI_THREAD("OH_ArkUI_GetNavDestinationName");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Node is null");
     CHECK_NODE_DISPOSED(node, "Node has been disposed");
@@ -447,6 +449,7 @@ ArkUI_ErrorCode OH_ArkUI_GetNavDestinationName(
 
 ArkUI_ErrorCode OH_ArkUI_GetNavStackLength(ArkUI_NodeHandle node, int32_t* length)
 {
+    CHECK_UI_THREAD("OH_ArkUI_GetNavStackLength");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Node is null");
     CHECK_NODE_DISPOSED(node, "Node has been disposed");
@@ -471,6 +474,7 @@ ArkUI_ErrorCode OH_ArkUI_GetNavStackLength(ArkUI_NodeHandle node, int32_t* lengt
 ArkUI_ErrorCode OH_ArkUI_GetNavDestinationNameByIndex(
     ArkUI_NodeHandle node, int32_t index, char* buffer, int32_t bufferSize, int32_t* writeLength)
 {
+    CHECK_UI_THREAD("OH_ArkUI_GetNavDestinationNameByIndex");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Node is null");
     CHECK_NODE_DISPOSED(node, "Node has been disposed");
@@ -492,6 +496,7 @@ ArkUI_ErrorCode OH_ArkUI_GetNavDestinationNameByIndex(
 ArkUI_ErrorCode OH_ArkUI_GetNavDestinationId(
     ArkUI_NodeHandle node, char* buffer, int32_t bufferSize, int32_t* writeLength)
 {
+    CHECK_UI_THREAD("OH_ArkUI_GetNavDestinationId");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Node is null");
     CHECK_NODE_DISPOSED(node, "Node has been disposed");
@@ -512,6 +517,7 @@ ArkUI_ErrorCode OH_ArkUI_GetNavDestinationId(
 
 ArkUI_ErrorCode OH_ArkUI_GetNavDestinationState(ArkUI_NodeHandle node, ArkUI_NavDestinationState* state)
 {
+    CHECK_UI_THREAD("OH_ArkUI_GetNavDestinationState");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Node is null");
     CHECK_NODE_DISPOSED(node, "Node has been disposed");
@@ -536,6 +542,7 @@ ArkUI_ErrorCode OH_ArkUI_GetNavDestinationState(ArkUI_NodeHandle node, ArkUI_Nav
 
 ArkUI_ErrorCode OH_ArkUI_GetNavDestinationIndex(ArkUI_NodeHandle node, int32_t* index)
 {
+    CHECK_UI_THREAD("OH_ArkUI_GetNavDestinationIndex");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Node is null");
     CHECK_NODE_DISPOSED(node, "Node has been disposed");
@@ -560,6 +567,7 @@ ArkUI_ErrorCode OH_ArkUI_GetNavDestinationIndex(ArkUI_NodeHandle node, int32_t* 
 
 napi_value OH_ArkUI_GetNavDestinationParam(ArkUI_NodeHandle node)
 {
+    CHECK_UI_THREAD("OH_ArkUI_GetNavDestinationParam");
     if (!node) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Node is null");
         return nullptr;
@@ -582,6 +590,7 @@ napi_value OH_ArkUI_GetNavDestinationParam(ArkUI_NodeHandle node)
 
 ArkUI_ErrorCode OH_ArkUI_GetRouterPageIndex(ArkUI_NodeHandle node, int32_t* index)
 {
+    CHECK_UI_THREAD("OH_ArkUI_GetRouterPageIndex");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Node is null");
     CHECK_NODE_DISPOSED(node, "Node has been disposed");
@@ -607,6 +616,7 @@ ArkUI_ErrorCode OH_ArkUI_GetRouterPageIndex(ArkUI_NodeHandle node, int32_t* inde
 ArkUI_ErrorCode OH_ArkUI_GetRouterPageName(
     ArkUI_NodeHandle node, char* buffer, int32_t bufferSize, int32_t* writeLength)
 {
+    CHECK_UI_THREAD("OH_ArkUI_GetRouterPageName");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Node is null");
     CHECK_NODE_DISPOSED(node, "Node has been disposed");
@@ -628,6 +638,7 @@ ArkUI_ErrorCode OH_ArkUI_GetRouterPageName(
 ArkUI_ErrorCode OH_ArkUI_GetRouterPagePath(
     ArkUI_NodeHandle node, char* buffer, int32_t bufferSize, int32_t* writeLength)
 {
+    CHECK_UI_THREAD("OH_ArkUI_GetRouterPagePath");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Node is null");
     CHECK_NODE_DISPOSED(node, "Node has been disposed");
@@ -648,6 +659,7 @@ ArkUI_ErrorCode OH_ArkUI_GetRouterPagePath(
 
 ArkUI_ErrorCode OH_ArkUI_GetRouterPageState(ArkUI_NodeHandle node, ArkUI_RouterPageState* state)
 {
+    CHECK_UI_THREAD("OH_ArkUI_GetRouterPageState");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Node is null");
     CHECK_NODE_DISPOSED(node, "Node has been disposed");
@@ -673,6 +685,7 @@ ArkUI_ErrorCode OH_ArkUI_GetRouterPageState(ArkUI_NodeHandle node, ArkUI_RouterP
 ArkUI_ErrorCode OH_ArkUI_GetRouterPageId(
     ArkUI_NodeHandle node, char* buffer, int32_t bufferSize, int32_t* writeLength)
 {
+    CHECK_UI_THREAD("OH_ArkUI_GetRouterPageId");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, ARKUI_ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Node is null");
     CHECK_NODE_DISPOSED(node, "Node has been disposed");
