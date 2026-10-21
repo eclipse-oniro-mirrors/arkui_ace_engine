@@ -570,6 +570,49 @@ HWTEST_F(WaterFlowScrollSnapTestNg, LayoutModeChangeInvalidatesOldAnchors, TestS
 }
 
 /**
+ * @tc.name: SameLayoutModePreservesSnapCandidates
+ * @tc.desc: Reapplying the active layout mode must not disable snapping before another layout is scheduled.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollSnapTestNg, SameLayoutModePreservesSnapCandidates, TestSize.Level1)
+{
+    CreateDirectionalItems(FlexDirection::COLUMN);
+    const auto before = pattern_->BuildItemSnapCandidates(ScrollSnapAlign::START);
+    ASSERT_FALSE(before.empty());
+    const auto maxOffset = pattern_->GetItemSnapMaxOffset();
+
+    pattern_->SetLayoutMode(pattern_->GetLayoutMode());
+
+    EXPECT_EQ(pattern_->GetSnapType(), SnapType::LIST_SNAP);
+    const auto after = pattern_->BuildItemSnapCandidates(ScrollSnapAlign::START);
+    ASSERT_EQ(after.size(), before.size());
+    for (size_t i = 0; i < before.size(); ++i) {
+        EXPECT_FLOAT_EQ(after[i].offset, before[i].offset);
+        EXPECT_EQ(after[i].index, before[i].index);
+    }
+    EXPECT_FLOAT_EQ(pattern_->GetItemSnapMaxOffset(), maxOffset);
+}
+
+/**
+ * @tc.name: SameLayoutModeKeepsNextDragSnap
+ * @tc.desc: A drag after a redundant mode update still settles on the same anchor as an unchanged component.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollSnapTestNg, SameLayoutModeKeepsNextDragSnap, TestSize.Level1)
+{
+    CreateUnequalItems();
+    SetStrategy(MakeAlign(ScrollSnapAlign::START));
+    pattern_->SetLayoutMode(pattern_->GetLayoutMode());
+
+    DragStart(frameNode_, Offset());
+    DragUpdate(-51.0f);
+    DragEnd(-0.1f);
+    FinishSnapAnimation();
+
+    EXPECT_NEAR(pattern_->GetTotalOffset(), 100.0f, 0.5f);
+}
+
+/**
  * @tc.name: ShortContentHasOneLegalOffset
  * @tc.desc: AC-2.1: content shorter than the viewport has one legal offset and never starts a snap.
  * @tc.type: FUNC
