@@ -1165,12 +1165,12 @@ HWTEST_F(TextTimerTestNg, TextTimerPatternTest008, TestSize.Level0)
     Color testColor = theme->GetTextStyle().GetTextColor();
     EXPECT_EQ(layoutProperty->GetTextColor(), testColor);
 
-    const std::string TEXT_TIMER_COLOR_RES_NAME = "textTimerColor008";
-    const Color TEXT_TIMER_COLOR_RES_VALUE(0xFF123456);
-    ResourceObjectParams params { .value = TEXT_TIMER_COLOR_RES_NAME, .type = ResourceObjectParamType::STRING };
+    const std::string textTimerColorResName = "textTimerColor008";
+    const Color textTimerColorResValue(0xFF123456);
+    ResourceObjectParams params { .value = textTimerColorResName, .type = ResourceObjectParamType::STRING };
     std::vector<ResourceObjectParams> resObjParamsList;
     resObjParamsList.push_back(params);
-    AddMockResourceDataByName(TEXT_TIMER_COLOR_RES_NAME, TEXT_TIMER_COLOR_RES_VALUE);
+    AddMockResourceDataByName(textTimerColorResName, textTimerColorResValue);
     RefPtr<ResourceObject> resObjWithId =
         AceType::MakeRefPtr<ResourceObject>(100000, 100001, resObjParamsList, "com.example.test", "entry", 100000);
     RefPtr<ResourceObject> resObjId =
@@ -1182,7 +1182,7 @@ HWTEST_F(TextTimerTestNg, TextTimerPatternTest008, TestSize.Level0)
     jsResourceType = JsTextTimerResourceType::FONTFAMILY;
     textTimerModel.CreateWithResourceObj(jsResourceType, resObjWithId);
     pattern->OnColorModeChange(colorMode);
-    EXPECT_EQ(layoutProperty->GetTextColor(), TEXT_TIMER_COLOR_RES_VALUE);
+    EXPECT_EQ(layoutProperty->GetTextColor(), textTimerColorResValue);
 }
 
 /**
