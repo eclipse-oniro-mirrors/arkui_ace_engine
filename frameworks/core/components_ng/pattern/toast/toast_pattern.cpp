@@ -53,7 +53,7 @@ SafeAreaInsets DeriveInsetsFromHelper(
 {
     AvoidConfig config;
     config.avoidSafeArea = true;
-    config.avoidDisplayLimit = true;
+    config.avoidDisplayLimit = false;
     SubwindowType subwindowType = SubwindowType::TYPE_TOP_MOST_TOAST;
     if (showMode == ToastShowMode::SYSTEM_TOP_MOST) {
         subwindowType = SubwindowType::TYPE_SYSTEM_TOP_MOST_TOAST;
