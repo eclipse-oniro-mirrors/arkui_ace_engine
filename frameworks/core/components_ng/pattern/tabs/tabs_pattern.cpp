@@ -2256,17 +2256,9 @@ void TabsPattern::UpdateSideBarIfNeeded()
         host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
     } else {
         // Nodes already exist (kept from a previous sidebar→bottom switch).
-        // Make them visible again and sync any property changes.
-        if (sideBarNode_) {
-            auto property = sideBarNode_->GetLayoutProperty();
-            CHECK_NULL_VOID(property);
-            property->UpdateVisibility(VisibleType::VISIBLE);
-        }
-        if (sideBarDividerNode_) {
-            auto property = sideBarDividerNode_->GetLayoutProperty();
-            CHECK_NULL_VOID(property);
-            property->UpdateVisibility(VisibleType::VISIBLE);
-        }
+        // Don't set visibility here — the layout algorithm's Measure() will
+        // call UpdateSideBarAndSideBarDividerVisibility based on the resolved
+        // display mode (which depends on width for SIDEBAR_ADAPTABLE).
         host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
     }
     // Sync properties to SideBarPattern, then trigger its OnModifyDone
