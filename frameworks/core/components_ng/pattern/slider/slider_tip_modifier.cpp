@@ -23,6 +23,7 @@
 #include "core/components/slider/slider_theme.h"
 #include "core/components_ng/pattern/text/text_styles.h"
 #include "core/components_ng/render/drawing_prop_convertor.h"
+#include "base/utils/measure_util.h"
 
 namespace OHOS::Ace::NG {
 namespace {
@@ -61,6 +62,7 @@ constexpr float SUITABLEAGING_LEVEL_1_SCALE = 1.75f;
 constexpr float SUITABLEAGING_LEVEL_2_SCALE = 2.0f;
 constexpr Dimension SUITABLEAGING_LEVEL_1_TEXT_FONT_SIZE = 25.0_vp;
 constexpr Dimension SUITABLEAGING_LEVEL_2_TEXT_FONT_SIZE = 28.0_vp;
+const std::string MAX_CONTENT = "100%";
 
 } // namespace
 
@@ -516,6 +518,12 @@ void SliderTipModifier::CreateParagraphAndLayout(const TextStyle& textStyle, con
         (GreatOrEqual(fontScale, SUITABLEAGING_LEVEL_2_SCALE))) {
         width = static_cast<float>(TEXT_AGING_MAX.ConvertToPx());
     }
+    MeasureContext measureCtx;
+    measureCtx.textContent = MAX_CONTENT;
+    measureCtx.fontSize = textFontSize_;
+    auto measuredSize = MeasureUtil::MeasureTextSize(measureCtx);
+    auto measuredWidth = static_cast<float>(measuredSize.Width());
+    width = std::max(width, measuredWidth);
     paragraph_->Layout(width);
 }
 
