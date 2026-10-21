@@ -27,6 +27,10 @@ namespace OHOS::Ace::NG {
 using namespace testing;
 using namespace testing::ext;
 
+// Not exported by component_snapshot.h: internal helper of component_snapshot.cpp,
+// re-declared here only for these tests and must be kept in sync with the definition.
+extern bool CheckImageSuccessfullyLoad(const RefPtr<UINode>& node, SnapshotDFXInfo& dfxInfo);
+
 namespace {
 constexpr int32_t INACTIVE_IMAGE_SPAN_NODE_ID = 991001;
 constexpr int32_t ACTIVE_IMAGE_SPAN_NODE_ID = 991002;
