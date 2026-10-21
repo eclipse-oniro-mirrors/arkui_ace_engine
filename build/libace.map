@@ -6128,6 +6128,9 @@
       "OHOS::Ace::NG::TextFieldManagerNG::AddAvoidKeyboardCallback(int, bool, std::__h::function<void ()> const&&)";
       "OHOS::Ace::NG::TextFieldManagerNG::IsAskCeliaSupported()";
       "OHOS::Ace::NG::TextFieldManagerNG::SetIsAskCeliaSupported(bool)";
+      "OHOS::Ace::NG::TextFieldManagerNG::GetUserNameNodeInContainer(int const&, int const&)";
+      "OHOS::Ace::NG::TextFieldManagerNG::GetAccountList(int)";
+      "OHOS::Ace::NG::TextFieldManagerNG::RemoveAccountList(int)";
       "OHOS::Ace::NG::TextAdaptFontSizer::DidExceedMaxLines(OHOS::Ace::NG::SizeT<float> const&)";
       "OHOS::Ace::NG::TextAdaptFontSizer::IsAdaptExceedLimit(OHOS::Ace::NG::SizeT<float> const&)";
       "OHOS::Ace::NG::TextAdaptFontSizer::IsNeedAdaptFontSize(OHOS::Ace::TextStyle const&, OHOS::Ace::NG::LayoutConstraintT<float> const&)";
