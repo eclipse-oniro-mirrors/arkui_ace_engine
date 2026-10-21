@@ -408,6 +408,7 @@ private:
         std::function<void()>&& buildFunc, const MenuParam& menuParam, std::function<void()>&& previewBuildFunc);
     static void BindContextMenuSingleWithOptions(FrameNode* targetNode,
         std::vector<NG::OptionParam>&& param, const MenuParam& menuParam, std::function<void()>&& previewBuildFunc);
+    static void ApplySheetImmersiveStrategyDefaults(const RefPtr<PipelineContext>& context, SheetStyle& sheetStyle);
 };
 
 

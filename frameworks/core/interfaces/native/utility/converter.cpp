@@ -4696,4 +4696,15 @@ ACE_FORCE_EXPORT void AssignCast(std::optional<SidebarDisplayStyle>& dst, const 
         default: LOGE("Unexpected enum value in Ark_TabsSidebarDisplayStyle: %{public}d", src);
     }
 }
+
+template<>
+void AssignCast(std::optional<SheetTitleBarHoverMode>& dst, const Ark_SheetTitleBarHoverMode& src)
+{
+    switch (src) {
+        case ARK_SHEET_TITLE_BAR_HOVER_MODE_STANDARD: dst = SheetTitleBarHoverMode::STANDARD; break;
+        case ARK_SHEET_TITLE_BAR_HOVER_MODE_STACK: dst = SheetTitleBarHoverMode::STACK; break;
+        case ARK_SHEET_TITLE_BAR_HOVER_MODE_SAFE_AREA_PADDING: dst = SheetTitleBarHoverMode::SAFE_AREA_PADDING; break;
+        default: LOGE("Unexpected enum value in Ark_SheetTitleBarHoverMode: %{public}d", src);
+    }
+}
 } // namespace OHOS::Ace::NG::Converter

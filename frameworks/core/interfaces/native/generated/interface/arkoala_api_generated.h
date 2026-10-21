@@ -5724,6 +5724,15 @@ typedef struct Opt_ImmersiveMode {
     Ark_Tag tag;
     Ark_ImmersiveMode value;
 } Opt_ImmersiveMode;
+typedef enum Ark_ImmersiveStrategy {
+    ARK_IMMERSIVE_STRATEGY_AVOID_CUTOUT = 0,
+    ARK_IMMERSIVE_STRATEGY_AVOID_FLOAT_NAV = 1,
+    ARK_IMMERSIVE_STRATEGY_BIND_SHEET_EXPAND_SAFE_AREA = 7,
+} Ark_ImmersiveStrategy;
+typedef struct Opt_ImmersiveStrategy {
+    Ark_Tag tag;
+    Ark_ImmersiveStrategy value;
+} Opt_ImmersiveStrategy;
 typedef enum Ark_IncrementalUpdatePolicy {
     ARK_INCREMENTAL_UPDATE_POLICY_NONE = 0,
     ARK_INCREMENTAL_UPDATE_POLICY_PARAGRAPH_CACHE = 1,
@@ -7222,6 +7231,15 @@ typedef struct Opt_SheetSize {
     Ark_Tag tag;
     Ark_SheetSize value;
 } Opt_SheetSize;
+typedef enum Ark_SheetTitleBarHoverMode {
+    ARK_SHEET_TITLE_BAR_HOVER_MODE_STANDARD = 0,
+    ARK_SHEET_TITLE_BAR_HOVER_MODE_STACK = 1,
+    ARK_SHEET_TITLE_BAR_HOVER_MODE_SAFE_AREA_PADDING = 2,
+} Ark_SheetTitleBarHoverMode;
+typedef struct Opt_SheetTitleBarHoverMode {
+    Ark_Tag tag;
+    Ark_SheetTitleBarHoverMode value;
+} Opt_SheetTitleBarHoverMode;
 typedef enum Ark_SheetType {
     ARK_SHEET_TYPE_BOTTOM = 0,
     ARK_SHEET_TYPE_CENTER = 1,
@@ -24247,6 +24265,7 @@ typedef struct Ark_SheetOptions {
     Opt_Boolean placementOnTarget;
     Opt_EdgeLightMode edgeLightMode;
     Opt_BlurSnapshotOptions blurSnapshot;
+    Opt_SheetTitleBarHoverMode titleBarHoverMode;
 } Ark_SheetOptions;
 typedef struct Opt_SheetOptions {
     Ark_Tag tag;
