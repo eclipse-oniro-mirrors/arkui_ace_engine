@@ -407,12 +407,11 @@ void TabsLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
     auto preDisplayMode = tabsPattern->GetCurrentBarDisplayMode();
     auto curDisplayMode = tabsPattern->CalculateTabBarDisplayMode(idealSize.Width());
     // When first layout, if sideBar exists (using new displayMode feature), need to initialize visibility.
+    // Also fire the callback on first layout if the developer registered one, so they receive
+    // the initial displayMode (e.g. BOTTOMTABBAR when barStyle defaults to bottom).
     // Otherwise, keep original behavior to avoid affecting developers who don't use new features.
     bool firstLayout = !preDisplayMode.has_value();
     bool displayModeChanged = preDisplayMode.has_value() && preDisplayMode.value() != curDisplayMode;
-    if (firstLayout) {
-        displayModeChanged = tabsPattern->GetSideBarNode() != nullptr;
-    }
     bool shouldAnimate = CheckIfNeedModeChangeAnimation(layoutProperty, tabsPattern, displayModeChanged, firstLayout);
     if (shouldAnimate && preDisplayMode.has_value() &&
         (preDisplayMode.value() == TabBarDisplayMode::TOP_TABBAR || curDisplayMode == TabBarDisplayMode::TOP_TABBAR)) {
@@ -424,6 +423,8 @@ void TabsLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
     // The animation-start pass additionally measures+layouts the entering component. The
     // re-entrant layout inside the animation closure is NOT the start pass.
     measuringForAnimStart_ = shouldAnimate;
+    bool needUpdateVisibility = (displayModeChanged || (firstLayout && tabsPattern->GetSideBarNode() != nullptr)) &&
+        !isReentrantDuringAnim;
 
     bool preIsDisableSwipe = tabsPattern->GetIsRealDisableSwipe();
     TabBarDisplayMode effectiveMode = curDisplayMode;
@@ -463,14 +464,14 @@ void TabsLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
         // are still executed so the mode is updated and the developer callback fires at
         // animation start (matching Navigation's behavior), not at animation finish.
         tabsPattern->SetCurrentBarDisplayMode(curDisplayMode);
-        if (displayModeChanged) {
-            if (!isReentrantDuringAnim) {
-                UpdateSideBarAndSideBarDividerVisibility(layoutWrapper, curDisplayMode == TabBarDisplayMode::SIDEBAR);
-                UpdateTabBarAndDividerVisibility(layoutWrapper,
-                    curDisplayMode == TabBarDisplayMode::BOTTOMTABBAR || curDisplayMode == TabBarDisplayMode::TOP_TABBAR);
-                UpdateBgMaskNodeVisibility(layoutWrapper,
-                    curDisplayMode == TabBarDisplayMode::BOTTOMTABBAR || curDisplayMode == TabBarDisplayMode::TOP_TABBAR);
-            }
+        if (needUpdateVisibility) {
+            UpdateSideBarAndSideBarDividerVisibility(layoutWrapper, curDisplayMode == TabBarDisplayMode::SIDEBAR);
+            UpdateTabBarAndDividerVisibility(layoutWrapper,
+                curDisplayMode == TabBarDisplayMode::BOTTOMTABBAR || curDisplayMode == TabBarDisplayMode::TOP_TABBAR);
+            UpdateBgMaskNodeVisibility(layoutWrapper,
+                curDisplayMode == TabBarDisplayMode::BOTTOMTABBAR || curDisplayMode == TabBarDisplayMode::TOP_TABBAR);
+        }
+        if (firstLayout || displayModeChanged) {
             auto context = tabsNode->GetContext();
             CHECK_NULL_VOID(context);
             context->AddAfterLayoutTask([weakTabsPattern = WeakPtr<TabsPattern>(tabsPattern), curDisplayMode]() {
