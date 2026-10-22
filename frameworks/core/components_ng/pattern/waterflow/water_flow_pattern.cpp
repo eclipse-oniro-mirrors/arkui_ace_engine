@@ -247,6 +247,10 @@ float WaterFlowPattern::GetItemSnapMaxOffset() const
                                  : estimate;
         max = std::max(static_cast<float>(GetItemSnapCurrentOffset()),
             height + layoutInfo_->contentEndOffset_ - GetMainContentSize());
+        if (GetScrollSnapStrategy().hasProvider) {
+            // Keep measuring toward a distant provider target until the real end is known.
+            max = std::max(max, static_cast<float>(GetItemSnapCurrentOffset()) + GetMainContentSize());
+        }
     }
     return std::isfinite(max) ? std::max(min, max) : min;
 }

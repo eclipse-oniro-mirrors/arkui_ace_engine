@@ -129,6 +129,40 @@ protected:
         CreateDone();
     }
 
+    void CreateUnderestimatedItems()
+    {
+        auto model = CreateWaterFlow();
+        model.SetColumnsTemplate("1fr 1fr");
+        ViewAbstract::SetHeight(CalcLength(300.0f));
+        for (int32_t i = 0; i < 100; ++i) {
+            CreateItemWithHeight(i < 10 ? 100.0f : 200.0f);
+        }
+        CreateDone();
+    }
+
+    void CheckProviderBeyondInitialEstimate(double approach, double target, bool reachesEnd)
+    {
+        CreateUnderestimatedItems();
+        int32_t snapCalls = 0;
+        int32_t approachCalls = 0;
+        SetStrategy(MakeProvider([&](double) { ++snapCalls; return target; },
+            [&](double, double) { ++approachCalls; return approach; }));
+        ASSERT_LT(pattern_->GetItemSnapMaxOffset(), target);
+        ASSERT_TRUE(pattern_->StartSnapAnimation({ .snapDelta = -30.0f, .animationVelocity = -300.0f }));
+        pattern_->GetScrollable()->FlushPendingItemSnapKickoff();
+        FinishSnapAnimation();
+        EXPECT_EQ(snapCalls, 1);
+        EXPECT_EQ(approachCalls, 1);
+        EXPECT_EQ(pattern_->layoutInfo_->itemEnd_, reachesEnd);
+        EXPECT_TRUE(pattern_->GetScrollable()->IsStopped());
+        if (reachesEnd) {
+            EXPECT_EQ(pattern_->layoutInfo_->endIndex_, 99);
+            EXPECT_NEAR(GetChildRect(frameNode_, 99).Bottom(), 300.0f, 0.5f);
+        } else {
+            EXPECT_NEAR(pattern_->GetTotalOffset(), target, 0.5f);
+        }
+    }
+
     void CreateDirectionalItems(FlexDirection direction, TextDirection textDirection = TextDirection::LTR)
     {
         auto model = CreateWaterFlow();
@@ -1011,6 +1045,62 @@ HWTEST_F(WaterFlowScrollSnapTestNg, ProviderTargetClampedToRange, TestSize.Level
     FinishSnapAnimation();
     EXPECT_EQ(snapCalls, 1);
     EXPECT_NEAR(pattern_->GetTotalOffset(), pattern_->GetItemSnapMaxOffset(), 0.5f);
+}
+
+/**
+ * @tc.name: ProviderLazyEndWithoutApproach
+ * @tc.desc: A target beyond an underestimated range reaches the actual last item after layout.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollSnapTestNg, ProviderLazyEndWithoutApproach, TestSize.Level1)
+{
+    CheckProviderBeyondInitialEstimate(0.0, 1.0e6, true);
+}
+
+/**
+ * @tc.name: ProviderLazyEndAfterApproach
+ * @tc.desc: The end bound is refreshed after both the approach and final provider stages.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollSnapTestNg, ProviderLazyEndAfterApproach, TestSize.Level1)
+{
+    CheckProviderBeyondInitialEstimate(400.0, 1.0e6, true);
+}
+
+/**
+ * @tc.name: ProviderLazyInteriorTarget
+ * @tc.desc: A finite target above the initial estimate remains reachable without scrolling to the end.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollSnapTestNg, ProviderLazyInteriorTarget, TestSize.Level1)
+{
+    CheckProviderBeyondInitialEstimate(0.0, 7000.0, false);
+}
+
+/**
+ * @tc.name: ProviderLazyNewTouchCancelsContinuation
+ * @tc.desc: A queued range correction cannot resume after a new touch interrupts the snap chain.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollSnapTestNg, ProviderLazyNewTouchCancelsContinuation, TestSize.Level1)
+{
+    CreateUnderestimatedItems();
+    int32_t snapCalls = 0;
+    SetStrategy(MakeProvider([&](double) { ++snapCalls; return 1.0e6; },
+        [](double, double) { return 0.0; }));
+    MockAnimationManager::GetInstance().SetTicks(1);
+    ASSERT_TRUE(pattern_->StartSnapAnimation({ .snapDelta = -30.0f }));
+    auto scrollable = pattern_->GetScrollable();
+    scrollable->FlushPendingItemSnapKickoff();
+    MockAnimationManager::GetInstance().Tick();
+    FlushUITasks();
+    ASSERT_TRUE(snapExecutor_->HasPending());
+    const auto interrupted = pattern_->GetTotalOffset();
+    scrollable->HandleTouchDown();
+    FinishSnapAnimation();
+    EXPECT_EQ(snapCalls, 1);
+    EXPECT_NEAR(pattern_->GetTotalOffset(), interrupted, 0.5f);
+    EXPECT_TRUE(scrollable->IsStopped());
 }
 
 /**
