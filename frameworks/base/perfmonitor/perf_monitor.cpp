@@ -76,11 +76,11 @@ void PerfMonitor::Start(const std::string& sceneId, PerfActionType type, const s
     if (sceneId == PerfConstants::LV_INTO_APP_ANIM) {
         std::unordered_map<std::string, std::string> lvPayload;
         if(!note.empty()) {
-            lvPayLoad["bundleName"] = note;
+            lvPayload["bundleName"] = note;
         }
-        LOGE("PerfMonitor LV_INTO_APP_ANIM start, type=%{public}d note=%{public}s",
+        LOGD("PerfMonitor LV_INTO_APP_ANIM start, type=%{public}d note=%{public}s",
             static_cast<int>(type), note.c_str());
-        ResSchedReport::GetInstance().ResSchedDataReport("lv_into_app_anim_start",lvPayLoad);
+        ResSchedReport::GetInstance().ResSchedDataReport("lv_into_app_anim_start", lvPayload);
     }
 }
 
