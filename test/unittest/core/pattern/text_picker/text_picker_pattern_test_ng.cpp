@@ -1432,4 +1432,26 @@ HWTEST_F(TextPickerPatternTestNg, LinearFontSizeFP001, TestSize.Level1)
     auto result = textPickerColumnPattern_->LinearFontSize(startFontSize, endFontSize, 0.5);
     EXPECT_EQ(result.Unit(), DimensionUnit::PX);
 }
+
+/**
+ * @tc.name: GetShowCount001
+ * @tc.desc: Test GetShowCount returns correct value from theme
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextPickerPatternTestNg, GetShowCount001, TestSize.Level1)
+{
+    InitTextPickerPatternTestNg();
+    ASSERT_NE(textPickerPattern_, nullptr);
+
+    auto host = textPickerPattern_->GetHost();
+    ASSERT_NE(host, nullptr);
+    auto context = host->GetContext();
+    ASSERT_NE(context, nullptr);
+    auto pickerTheme = context->GetTheme<PickerTheme>(host->GetThemeScopeId());
+    ASSERT_NE(pickerTheme, nullptr);
+
+    constexpr int32_t BUFFER_NODE_NUMBER = 2;
+    uint32_t expected = BUFFER_NODE_NUMBER + pickerTheme->GetShowOptionCount();
+    EXPECT_EQ(textPickerPattern_->GetShowCount(), expected);
+}
 } // namespace OHOS::Ace::NG

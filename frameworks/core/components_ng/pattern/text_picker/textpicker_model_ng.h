@@ -17,7 +17,6 @@
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_TEXT_PICKER_TEXT_PICKER_MODEL_NG_H
 
 #include "base/geometry/dimension.h"
-#include <shared_mutex>
 
 #include "core/components/common/layout/constants.h"
 #include "core/components_ng/pattern/text_picker/textpicker_model.h"
@@ -70,23 +69,10 @@ public:
     }
 
     void SetSingleRange(bool isSingleRange) override;
-    bool GetSingleRange() override
-    {
-        std::lock_guard<std::shared_mutex> lock(isSingleMutex_);
-        return isSingleRange_;
-    }
+    bool GetSingleRange() override;
 
-    static void SetTextPickerSingeRange(bool isSingleRange)
-    {
-        std::lock_guard<std::shared_mutex> lock(isSingleMutex_);
-        isSingleRange_ = isSingleRange;
-    }
-
-    static bool GetTextPickerSingeRange()
-    {
-        std::lock_guard<std::shared_mutex> lock(isSingleMutex_);
-        return isSingleRange_;
-    }
+    static void SetTextPickerSingeRange(FrameNode* frameNode, bool isSingleRange);
+    static bool GetTextPickerSingeRange(FrameNode* frameNode);
 
     void SetHasSelectAttr(bool value) override;
     bool GetMultiOptions(std::vector<NG::TextCascadePickerOptions>& options) override;
@@ -193,11 +179,6 @@ private:
 
     uint32_t maxCount_ = 0;
     std::vector<uint32_t> kinds_;
-    static inline bool isSingleRange_ = true;
-    static inline uint32_t showCount_ = 0;
-    static inline std::shared_mutex showCountMutex_;
-    static inline std::shared_mutex isSingleMutex_;
-    static inline uint32_t columnKind_ = TEXT;
 };
 
 class ACE_EXPORT TextPickerDialogModelNG : public TextPickerDialogModel {

@@ -63,7 +63,19 @@ constexpr float PICKER_MAXFONTSCALE = 1.0f;
 constexpr uint32_t PRECISION_TWO = 2;
 constexpr float DEFAULT_SIZE_ZERO = 0.0f;
 const Dimension PICKER_BUTTON_PADDING = 6.0_vp;
+constexpr int32_t BUFFER_NODE_NUMBER = 2;
 } // namespace
+
+uint32_t TextPickerPattern::GetShowCount() const
+{
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, 0);
+    auto context = host->GetContext();
+    CHECK_NULL_RETURN(context, 0);
+    auto pickerTheme = context->GetTheme<PickerTheme>(host->GetThemeScopeId());
+    CHECK_NULL_RETURN(pickerTheme, 0);
+    return BUFFER_NODE_NUMBER + pickerTheme->GetShowOptionCount();
+}
 
 RefPtr<EventHub> TextPickerPattern::CreateEventHub()
 {

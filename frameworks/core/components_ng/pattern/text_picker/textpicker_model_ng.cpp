@@ -276,8 +276,6 @@ RefPtr<FrameNode> TextPickerModelNG::CreateFrameNode(int32_t nodeId)
     CHECK_NULL_RETURN(pipeline, textPickerNode);
     auto pickerTheme = pipeline->GetTheme<PickerTheme>(textPickerNode->GetThemeScopeId());
     CHECK_NULL_RETURN(pickerTheme, textPickerNode);
-    std::lock_guard<std::shared_mutex> lock(showCountMutex_);
-    showCount_ = BUFFER_NODE_NUMBER + pickerTheme->GetShowOptionCount();
     SetDefaultAttributes(textPickerNode, pickerTheme);
     return textPickerNode;
 }
@@ -709,11 +707,8 @@ void TextPickerModelNG::MultiInit(const RefPtr<PickerTheme> pickerTheme)
     auto nodeId = stack->ClaimNodeId();
     auto textPickerNode = FrameNode::GetOrCreateFrameNode(
         TextPickerUtil::TEXT_PICKER_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<TextPickerPattern>(); });
-    auto textPickerPattern = textPickerNode->GetPattern<TextPickerPattern>();
 
     CHECK_NULL_VOID(pickerTheme);
-    std::lock_guard<std::shared_mutex> lock(showCountMutex_);
-    showCount_ = pickerTheme->GetShowOptionCount() + BUFFER_NODE_NUMBER;
     stack->Push(textPickerNode);
 
     if (pickerTheme->IsCircleDial()) {
@@ -744,10 +739,12 @@ void TextPickerModelNG::SetUnCascadeColumns(const std::vector<NG::TextCascadePic
 {
     auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
     CHECK_NULL_VOID(frameNode);
+    auto textPickerPattern = frameNode->GetPattern<TextPickerPattern>();
+    CHECK_NULL_VOID(textPickerPattern);
     if (frameNode->GetChildren().empty()) {
-        std::lock_guard<std::shared_mutex> lock(showCountMutex_);
+        auto showCount = textPickerPattern->GetShowCount();
         for (uint32_t i = 0; i < options.size(); i++) {
-            auto columnNode = CreateColumnNode(NG::TEXT, showCount_);
+            auto columnNode = CreateColumnNode(NG::TEXT, showCount);
             auto stackNode = CreateStackNode();
             auto buttonNode = CreateButtonNode();
             auto columnBlendNode = CreateColumnNode();
@@ -762,8 +759,6 @@ void TextPickerModelNG::SetUnCascadeColumns(const std::vector<NG::TextCascadePic
         }
     }
 
-    auto textPickerPattern = frameNode->GetPattern<TextPickerPattern>();
-    CHECK_NULL_VOID(textPickerPattern);
     textPickerPattern->SetCascadeOptions(options, options);
 }
 
@@ -785,9 +780,9 @@ void TextPickerModelNG::SetCascadeColumns(const std::vector<NG::TextCascadePicke
 
     // Create Node
     if (frameNode->GetChildren().empty()) {
-        std::lock_guard<std::shared_mutex> lock(showCountMutex_);
+        auto showCount = textPickerPattern->GetShowCount();
         for (size_t i = 0; i < columnCount; i++) {
-            auto columnNode = CreateColumnNode(NG::TEXT, showCount_);
+            auto columnNode = CreateColumnNode(NG::TEXT, showCount);
             auto stackNode = CreateStackNode();
             auto buttonNode = CreateButtonNode();
             auto columnBlendNode = CreateColumnNode();
@@ -1075,7 +1070,6 @@ void TextPickerModelNG::SetColumnKind(FrameNode* frameNode, uint32_t columnKind)
     CHECK_NULL_VOID(frameNode);
     auto textPickerPattern = frameNode->GetPattern<TextPickerPattern>();
     CHECK_NULL_VOID(textPickerPattern);
-    columnKind_ = columnKind;
     textPickerPattern->SetColumnsKind(columnKind);
 }
 
@@ -1258,14 +1252,18 @@ void TextPickerModelNG::SetBackgroundColor(FrameNode* frameNode, const Color& co
 void TextPickerModelNG::SetRange(FrameNode* frameNode, const std::vector<NG::RangeContent>& value)
 {
     CHECK_NULL_VOID(frameNode);
+    auto textPickerPattern = frameNode->GetPattern<TextPickerPattern>();
+    CHECK_NULL_VOID(textPickerPattern);
     if (frameNode->GetChildren().empty()) {
-        std::lock_guard<std::shared_mutex> lock(showCountMutex_);
+        auto showCount = textPickerPattern->GetShowCount();
+        auto columnKind = textPickerPattern->GetColumnsKind();
         RefPtr<FrameNode> columnNode = nullptr;
-        if (columnKind_ == TEXT) {
-            columnNode = CreateColumnNode(TEXT, showCount_);
-        } else if (columnKind_ == MIXTURE) {
-            columnNode = CreateColumnNode(MIXTURE, showCount_);
+        if (columnKind == TEXT) {
+            columnNode = CreateColumnNode(TEXT, showCount);
+        } else if (columnKind == MIXTURE) {
+            columnNode = CreateColumnNode(MIXTURE, showCount);
         }
+        CHECK_NULL_VOID(columnNode);
         auto stackNode = CreateStackNode();
         auto buttonNode = CreateButtonNode();
         auto columnBlendNode = CreateColumnNode();
@@ -1278,7 +1276,6 @@ void TextPickerModelNG::SetRange(FrameNode* frameNode, const std::vector<NG::Ran
         layoutProperty->UpdateAlignment(Alignment::CENTER);
         stackNode->MountToParent(AceType::Claim(frameNode));
     }
-    auto textPickerPattern = frameNode->GetPattern<TextPickerPattern>();
     textPickerPattern->SetRange(value);
 }
 
@@ -1295,10 +1292,12 @@ void TextPickerModelNG::SetUnCascadeColumnsNode(FrameNode* frameNode,
     const std::vector<NG::TextCascadePickerOptions>& options)
 {
     CHECK_NULL_VOID(frameNode);
+    auto textPickerPattern = frameNode->GetPattern<TextPickerPattern>();
+    CHECK_NULL_VOID(textPickerPattern);
     if (frameNode->GetChildren().empty()) {
-        std::lock_guard<std::shared_mutex> lock(showCountMutex_);
+        auto showCount = textPickerPattern->GetShowCount();
         for (uint32_t i = 0; i < options.size(); i++) {
-            auto columnNode = CreateColumnNode(TEXT, showCount_);
+            auto columnNode = CreateColumnNode(TEXT, showCount);
             auto stackNode = CreateStackNode();
             auto buttonNode = CreateButtonNode();
             auto columnBlendNode = CreateColumnNode();
@@ -1313,8 +1312,6 @@ void TextPickerModelNG::SetUnCascadeColumnsNode(FrameNode* frameNode,
         }
     }
 
-    auto textPickerPattern = frameNode->GetPattern<TextPickerPattern>();
-    CHECK_NULL_VOID(textPickerPattern);
     textPickerPattern->SetCascadeOptions(options, options);
 }
 
@@ -1336,9 +1333,9 @@ void TextPickerModelNG::SetCascadeColumnsNode(FrameNode* frameNode,
 
     // Create Node
     if (frameNode->GetChildren().empty()) {
-        std::lock_guard<std::shared_mutex> lock(showCountMutex_);
+        auto showCount = textPickerPattern->GetShowCount();
         for (size_t i = 0; i < columnCount; i++) {
-            auto columnNode = CreateColumnNode(NG::TEXT, showCount_);
+            auto columnNode = CreateColumnNode(NG::TEXT, showCount);
             auto stackNode = CreateStackNode();
             auto buttonNode = CreateButtonNode();
             auto columnBlendNode = CreateColumnNode();
@@ -1743,13 +1740,36 @@ bool TextPickerModelNG::IsCascade()
 
 void TextPickerModelNG::SetSingleRange(bool isSingleRange)
 {
-    std::lock_guard<std::shared_mutex> lock(isSingleMutex_);
-    isSingleRange_ = isSingleRange;
     auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
     CHECK_NULL_VOID(frameNode);
     auto textPickerPattern = frameNode->GetPattern<TextPickerPattern>();
     CHECK_NULL_VOID(textPickerPattern);
     textPickerPattern->SetSingleRange(isSingleRange);
+}
+
+bool TextPickerModelNG::GetSingleRange()
+{
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    CHECK_NULL_RETURN(frameNode, true);
+    auto textPickerPattern = frameNode->GetPattern<TextPickerPattern>();
+    CHECK_NULL_RETURN(textPickerPattern, true);
+    return textPickerPattern->GetIsSingleRange();
+}
+
+void TextPickerModelNG::SetTextPickerSingeRange(FrameNode* frameNode, bool isSingleRange)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto textPickerPattern = frameNode->GetPattern<TextPickerPattern>();
+    CHECK_NULL_VOID(textPickerPattern);
+    textPickerPattern->SetSingleRange(isSingleRange);
+}
+
+bool TextPickerModelNG::GetTextPickerSingeRange(FrameNode* frameNode)
+{
+    CHECK_NULL_RETURN(frameNode, true);
+    auto textPickerPattern = frameNode->GetPattern<TextPickerPattern>();
+    CHECK_NULL_RETURN(textPickerPattern, true);
+    return textPickerPattern->GetIsSingleRange();
 }
 
 void TextPickerModelNG::UpdateUserSetSelectColor()
