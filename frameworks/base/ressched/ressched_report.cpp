@@ -333,7 +333,7 @@ void ResSchedReport::ResSchedDataReport(const char* name, const std::unordered_m
             { LV_INTO_APP_ANIM_END,
                 [this](std::unordered_map<std::string, std::string>& payload) {
                     LoadAceApplicationContext(payload);
-                    reportDataFunc_(RES_TYPE_FLOAT_START_FROM_SIDEBAR, 1, payload);
+                    reportDataFunc_(RES_TYPE_LV_INTO_APP_ANIM, 1, payload);
                 }
             },
         };
