@@ -1,7 +1,7 @@
 import { SizeOptions } from '/arkui/component/units';
 import { CustomBuilder, WrappedBuilder } from '/arkui/component/builder';
 import { BusinessError } from "@ohos.base";
-import { ArkUIAniPlaceholderRegisterModule } from "arkui.ani";
+import { ArkUIAniModule } from "arkui.ani";
 import { createUiDetachedRoot, destroyUiDetachedRoot } from '/arkui/ArkUIEntry';
 import { UIContextUtil } from '/arkui/base/UIContextUtil';
 import { PeerNode } from '/arkui/PeerNode';
@@ -88,7 +88,7 @@ export class PlaceholderRegister {
             throw new BusinessError(401, 'Parameter error.');
         }
         const result: number =
-            ArkUIAniPlaceholderRegisterModule._PlaceholderRegisterRegister(id, builder, this.makeExecution(id, builder));
+            ArkUIAniModule._PlaceholderRegisterRegister(id, builder, this.makeExecution(id, builder));
         prLog(`register: native result=${result}, id='${id}'`);
         if (result === REGISTER_RESULT_ADMITTED) {
             this.builders_.set(id, builder);
@@ -153,7 +153,7 @@ export class PlaceholderRegister {
                 const productPtr = peerNode.peer.ptr;
                 this.roots_.set(id, productPtr);
                 prLog(`execution: detached root built, productPtr=${productPtr}`);
-                ArkUIAniPlaceholderRegisterModule._PlaceholderRegisterPublishProduct(productPtr);
+                ArkUIAniModule._PlaceholderRegisterPublishProduct(productPtr);
                 prLog(`execution: product published natively, end`);
             } catch (e) {
                 // Surface the failure reason of the isolated execution; the
@@ -176,7 +176,7 @@ export class PlaceholderRegister {
     public unregister(id: string): void {
         prLog(`unregister: enter, id='${id}'`);
         this.builders_.delete(id);
-        ArkUIAniPlaceholderRegisterModule._PlaceholderRegisterUnregister(id);
+        ArkUIAniModule._PlaceholderRegisterUnregister(id);
         // Tear down the latest template source tree; roots built by earlier
         // executions were already replaced in the registry and stay hosted by
         // the DetachedRootEntryManager until the UIContext goes away.
@@ -194,7 +194,7 @@ export class PlaceholderRegister {
      * for this UI instance.
      */
     public isRegistered(id: string): boolean {
-        const registered = ArkUIAniPlaceholderRegisterModule._PlaceholderRegisterIsRegistered(id);
+        const registered = ArkUIAniModule._PlaceholderRegisterIsRegistered(id);
         prLog(`isRegistered: id='${id}', result=${registered}`);
         return registered;
     }

@@ -111,7 +111,7 @@ const ArkUIAniModifiers* GetArkUIAniModifiers()
         .getArkUIAniDetachedFreeRootModifier = OHOS::Ace::NG::GetDetachedFreeRootModifier,
         .getArkUIAniGestureEventUIObserverModifier = OHOS::Ace::NG::GetArkUIAniGestureEventUIObserverModifier,
         .getArkUIAniWithEnvModifier = OHOS::Ace::NG::GetArkUIAniWithEnvModifier,
-        .bindPlaceholderAni = OHOS::Ace::Ani::BindPlaceholderAni,
+        .getPlaceholderRegisterAniModifier = OHOS::Ace::NG::GetPlaceholderRegisterAniModifier,
     };
     return &impl;
 }

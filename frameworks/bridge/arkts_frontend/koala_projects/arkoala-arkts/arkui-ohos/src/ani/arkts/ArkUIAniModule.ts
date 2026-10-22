@@ -572,4 +572,14 @@ export class ArkUIAniModule {
     native static _GestureEventUIObserver_RemoveGlobalGestureListener(type: KInt, callback?: GestureListenerCallback): void
     native static __BuilderNode_GetParentViewId(ptr: KPointer): KInt;
     native static _ArkTSFrameNode_GetId(peer: KPointer): string
+
+    // for PlaceholderRegister (scroll placeholder template registry). The
+    // engine face is the ArkUIAniPlaceholderRegisterModifier of libace.
+    native static _PlaceholderRegisterRegister(id: string, builder: Object, execution: Object): int32;
+    native static _PlaceholderRegisterUnregister(id: string): void;
+    native static _PlaceholderRegisterIsRegistered(id: string): boolean;
+    // Product hand-off of one isolated execution: the execution closure pops
+    // the built subtree root from its isolated view stack and publishes the
+    // pointer here, so the value never depends on ani primitive return boxing.
+    native static _PlaceholderRegisterPublishProduct(ptr: KPointer): void;
 }

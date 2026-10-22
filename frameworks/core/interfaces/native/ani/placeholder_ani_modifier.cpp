@@ -13,13 +13,13 @@
  * limitations under the License.
  */
 
-#include <array>
 #include <cinttypes>
 #include <memory>
 #include <string>
-#include <vector>
 
 #include "ani.h"
+
+#include "placeholder_ani_modifier.h"
 
 #include "base/log/ace_trace.h"
 #include "base/utils/utils.h"
@@ -28,7 +28,7 @@
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_restricted_scope.h"
 #include "core/pipeline_ng/pipeline_context.h"
 
-namespace OHOS::Ace::Ani {
+namespace OHOS::Ace::NG {
 namespace {
 
 // Northbound result codes of register: 0 admitted, negative values carry the
@@ -38,22 +38,6 @@ constexpr int32_t REGISTER_FAILED = -1;
 constexpr int32_t REGISTER_PARAM_INVALID = -2;
 constexpr int32_t REGISTER_NOT_INSTRUMENTED = -3;
 constexpr int32_t REGISTER_UNSUPPORTED_COMPONENT = -4;
-
-std::string AniStringToStdString(ani_env* env, ani_string aniStr)
-{
-    CHECK_NULL_RETURN(env, "");
-    ani_size size = 0;
-    if (env->String_GetUTF8Size(aniStr, &size) != ANI_OK) {
-        return "";
-    }
-    std::vector<char> buffer(size + 1);
-    ani_size written = 0;
-    if (env->String_GetUTF8(aniStr, buffer.data(), size + 1, &written) != ANI_OK) {
-        return "";
-    }
-    buffer[written] = '\0';
-    return std::string(buffer.data());
-}
 
 bool IsFunction(ani_env* env, ani_object obj)
 {
@@ -115,19 +99,19 @@ using AniTemplateBuilderHandlePtr = std::shared_ptr<AniTemplateBuilderHandle>;
 // the declarative bridge also receives an execution closure instead of the raw
 // builder. The probe still observes the __aceBegin/EndScrollPlaceholder__
 // instrumentation of that execution natively.
-NG::ScrollPlaceholderBuilder MakeTemplateBuilder(const AniTemplateBuilderHandlePtr& handle,
-    const std::shared_ptr<NG::ScrollPlaceholderRestrictedScope::Probe>& admission)
+ScrollPlaceholderBuilder MakeTemplateBuilder(const AniTemplateBuilderHandlePtr& handle,
+    const std::shared_ptr<ScrollPlaceholderRestrictedScope::Probe>& admission)
 {
-    return [handle, admission]() -> RefPtr<NG::UINode> {
+    return [handle, admission]() -> RefPtr<UINode> {
         ACE_SCOPED_TRACE("ScrollPlaceholder.IsolatedExecution");
         TAG_LOGI(AceLogTag::ACE_SCROLL, "ScrollPlaceholder isolated execution: begin");
         ani_env* env = handle->Env();
         if (env == nullptr) {
             TAG_LOGW(AceLogTag::ACE_SCROLL, "ScrollPlaceholder builder lost the ani env");
-            NG::ScrollPlaceholderRestrictedScope::NotifyViolation();
+            ScrollPlaceholderRestrictedScope::NotifyViolation();
             return nullptr;
         }
-        NG::ScrollPlaceholderRestrictedScope::Probe probe;
+        ScrollPlaceholderRestrictedScope::Probe probe;
         g_pendingProduct = 0;
         {
             ani_ref result = nullptr;
@@ -139,7 +123,7 @@ NG::ScrollPlaceholderBuilder MakeTemplateBuilder(const AniTemplateBuilderHandleP
                 TAG_LOGW(AceLogTag::ACE_SCROLL,
                     "ScrollPlaceholder execution closure threw (ani status=%{public}d), "
                     "see the module-side 'execution: builder THREW' line for the reason", status);
-                NG::ScrollPlaceholderRestrictedScope::NotifyViolation();
+                ScrollPlaceholderRestrictedScope::NotifyViolation();
                 // The rejection is reported through the register result code.
                 // Leaving the exception pending would propagate it through
                 // Register() into the caller's build pass and abort the whole
@@ -160,9 +144,9 @@ NG::ScrollPlaceholderBuilder MakeTemplateBuilder(const AniTemplateBuilderHandleP
             static_cast<int32_t>(probe.OutOfScopeTriggered()));
         // _PopViewStackProcessor hands the root over with an acquired reference;
         // Claim adopts that reference into the registry's product.
-        RefPtr<NG::UINode> product;
+        RefPtr<UINode> product;
         if (g_pendingProduct != 0) {
-            product = AceType::Claim(reinterpret_cast<NG::UINode*>(g_pendingProduct));
+            product = AceType::Claim(reinterpret_cast<UINode*>(g_pendingProduct));
         }
         if (!product) {
             TAG_LOGW(AceLogTag::ACE_SCROLL,
@@ -175,7 +159,7 @@ NG::ScrollPlaceholderBuilder MakeTemplateBuilder(const AniTemplateBuilderHandleP
         }
         g_pendingProduct = 0;
         if (probe.Admitted() && product) {
-            NG::ScrollPlaceholderRestrictedScope::MarkProduct(product);
+            ScrollPlaceholderRestrictedScope::MarkProduct(product);
             TAG_LOGI(AceLogTag::ACE_SCROLL, "ScrollPlaceholder product marked as verified");
         } else {
             TAG_LOGW(AceLogTag::ACE_SCROLL,
@@ -188,9 +172,8 @@ NG::ScrollPlaceholderBuilder MakeTemplateBuilder(const AniTemplateBuilderHandleP
     };
 }
 
-ani_int Register(ani_env* env, ani_object object, ani_string idArg, ani_object builderArg, ani_object executionArg)
+ani_int RegisterTemplate(ani_env* env, const std::string& templateId, ani_object builderArg, ani_object executionArg)
 {
-    std::string templateId = AniStringToStdString(env, idArg);
     TAG_LOGI(AceLogTag::ACE_SCROLL,
         "PlaceholderRegister.register: enter, id=%{public}s, builderObj=%{public}p, executionObj=%{public}p",
         templateId.c_str(), builderArg, executionArg);
@@ -221,7 +204,7 @@ ani_int Register(ani_env* env, ani_object object, ani_string idArg, ani_object b
             "PlaceholderRegister.register: execution closure is not std.core.Function0; "
             "continuing and letting FunctionalObject_Call validate it");
     }
-    auto context = NG::PipelineContext::GetCurrentContext();
+    auto context = PipelineContext::GetCurrentContext();
     if (!context) {
         TAG_LOGW(AceLogTag::ACE_SCROLL,
             "PlaceholderRegister.register: no pipeline context, id=%{public}s", templateId.c_str());
@@ -246,7 +229,7 @@ ani_int Register(ani_env* env, ani_object object, ani_string idArg, ani_object b
     ani_vm* vm = nullptr;
     env->GetVM(&vm);
     auto handle = std::make_shared<AniTemplateBuilderHandle>(vm, globalRef);
-    auto admission = std::make_shared<NG::ScrollPlaceholderRestrictedScope::Probe>();
+    auto admission = std::make_shared<ScrollPlaceholderRestrictedScope::Probe>();
     auto builderClosure = MakeTemplateBuilder(handle, admission);
     TAG_LOGI(AceLogTag::ACE_SCROLL,
         "PlaceholderRegister.register: registering template, id=%{public}s "
@@ -286,22 +269,21 @@ ani_int Register(ani_env* env, ani_object object, ani_string idArg, ani_object b
     return REGISTER_OK;
 }
 
-ani_status Unregister(ani_env* env, ani_object object, ani_string idArg)
+void UnregisterTemplate(const std::string& templateId)
 {
-    std::string templateId = AniStringToStdString(env, idArg);
-    auto context = NG::PipelineContext::GetCurrentContext();
+    auto context = PipelineContext::GetCurrentContext();
     if (!context) {
         TAG_LOGW(AceLogTag::ACE_SCROLL,
             "PlaceholderRegister.unregister: no pipeline context (treated as no-op), id=%{public}s",
             templateId.c_str());
-        return ANI_OK;
+        return;
     }
     const auto& manager = context->GetOrCreateScrollPlaceholderManager();
     if (!manager) {
         TAG_LOGW(AceLogTag::ACE_SCROLL,
             "PlaceholderRegister.unregister: manager unavailable (treated as no-op), id=%{public}s",
             templateId.c_str());
-        return ANI_OK;
+        return;
     }
     // Unregistering an unknown id stays an idempotent silent no-op, matching
     // the declarative bridge.
@@ -309,16 +291,14 @@ ani_status Unregister(ani_env* env, ani_object object, ani_string idArg)
     TAG_LOGI(AceLogTag::ACE_SCROLL,
         "PlaceholderRegister.unregister: id=%{public}s, removed=%{public}d "
         "(false = was not registered)", templateId.c_str(), static_cast<int32_t>(removed));
-    return ANI_OK;
 }
 
-ani_boolean IsRegistered(ani_env* env, ani_object object, ani_string idArg)
+ani_boolean IsTemplateRegistered(const std::string& templateId)
 {
-    std::string templateId = AniStringToStdString(env, idArg);
-    auto context = NG::PipelineContext::GetCurrentContext();
+    auto context = PipelineContext::GetCurrentContext();
     if (!context) {
-        TAG_LOGW(AceLogTag::ACE_SCROLL,
-            "PlaceholderRegister.isRegistered: no pipeline context, id=%{public}s", templateId.c_str());
+        TAG_LOGW(AceLogTag::ACE_SCROLL, "PlaceholderRegister.isRegistered: no pipeline context, id=%{public}s",
+            templateId.c_str());
         return ANI_FALSE;
     }
     const auto& manager = context->GetOrCreateScrollPlaceholderManager();
@@ -333,103 +313,36 @@ ani_boolean IsRegistered(ani_env* env, ani_object object, ani_string idArg)
 }
 
 // Product hand-off of one isolated execution; see g_pendingProduct.
-void PublishProduct(ani_env* env, ani_object object, ani_long productPtr)
+void PublishProduct(ani_long productPtr)
 {
     TAG_LOGI(AceLogTag::ACE_SCROLL, "PlaceholderRegister publish product: ptr=%{public}p",
         reinterpret_cast<void*>(static_cast<intptr_t>(productPtr)));
     g_pendingProduct = static_cast<intptr_t>(productPtr);
 }
 
+void BeginScrollPlaceholder()
+{
+    ScrollPlaceholderRestrictedScope::Begin();
+}
+
+void EndScrollPlaceholder()
+{
+    ScrollPlaceholderRestrictedScope::End();
+}
+
 } // namespace
 
-// Binding of the static @Builder({ isPlaceholder: true }) instrumentation
-// hooks. They are declared on the SDK class
-// arkui.component.builder.AcePlaceholderScopeModule. The binding runs from the
-// main ANI library constructor and stays best-effort: apps that do not link
-// the placeholder module do not carry this class in their abc, and a missing
-// class must not fail the library load. Binding from ArkoalaNative_ark is not
-// an option either: its registerAllModules() aborts on a failed FindClass().
-void BeginScrollPlaceholder(ani_env* env, ani_class cls)
+const ArkUIAniPlaceholderRegisterModifier* GetPlaceholderRegisterAniModifier()
 {
-    NG::ScrollPlaceholderRestrictedScope::Begin();
-}
-
-void EndScrollPlaceholder(ani_env* env, ani_class cls)
-{
-    NG::ScrollPlaceholderRestrictedScope::End();
-}
-
-void BindPlaceholderScopeHooks(ani_env* env)
-{
-    static const char* className = "arkui.component.builder.AcePlaceholderScopeModule";
-    ani_class cls = nullptr;
-    ani_status status = env->FindClass(className, &cls);
-    if (status != ANI_OK || cls == nullptr) {
-        TAG_LOGW(AceLogTag::ACE_SCROLL,
-            "BindPlaceholderScopeHooks: builder module not in this abc (status=%{public}d), hooks stay unbound",
-            static_cast<int32_t>(status));
-        env->ResetError();
-        return;
-    }
-    std::array staticMethods = {
-        ani_native_function {
-            "_AceBeginScrollPlaceholder", nullptr, reinterpret_cast<void*>(BeginScrollPlaceholder)},
-        ani_native_function {
-            "_AceEndScrollPlaceholder", nullptr, reinterpret_cast<void*>(EndScrollPlaceholder)},
+    static const ArkUIAniPlaceholderRegisterModifier impl = {
+        .registerTemplate = RegisterTemplate,
+        .unregisterTemplate = UnregisterTemplate,
+        .isTemplateRegistered = IsTemplateRegistered,
+        .publishProduct = PublishProduct,
+        .beginScrollPlaceholder = BeginScrollPlaceholder,
+        .endScrollPlaceholder = EndScrollPlaceholder,
     };
-    status = env->Class_BindStaticNativeMethods(cls, staticMethods.data(), staticMethods.size());
-    if (status != ANI_OK) {
-        TAG_LOGW(AceLogTag::ACE_SCROLL, "BindPlaceholderScopeHooks: bind failed, status=%{public}d",
-            static_cast<int32_t>(status));
-        env->ResetError();
-        return;
-    }
-    TAG_LOGI(AceLogTag::ACE_SCROLL, "BindPlaceholderScopeHooks: bound %{public}s", className);
+    return &impl;
 }
 
-ani_status BindNativePlaceholderRegister(ani_env* env)
-{
-    ani_class cls = nullptr;
-    static const char* className =
-        "arkui.ani.arkts.placeholderRegister.ArkUIAniPlaceholderRegisterModule.ArkUIAniPlaceholderRegisterModule";
-    ani_status status = env->FindClass(className, &cls);
-    if (status != ANI_OK || cls == nullptr) {
-        // This library is loaded by every static app, while the placeholder
-        // module is only linked into apps that use the registry. A missing
-        // class must skip the binding instead of failing the whole library.
-        TAG_LOGI(AceLogTag::ACE_SCROLL,
-            "BindNativePlaceholderRegister: module not in this abc (status=%{public}d), skipped",
-            static_cast<int32_t>(status));
-        env->ResetError();
-        return ANI_OK;
-    }
-    std::array staticMethods = {
-        ani_native_function {
-            "_PlaceholderRegisterRegister",
-            nullptr, reinterpret_cast<void*>(Register)},
-        ani_native_function {
-            "_PlaceholderRegisterUnregister",
-            nullptr, reinterpret_cast<void*>(Unregister)},
-        ani_native_function {
-            "_PlaceholderRegisterIsRegistered",
-            nullptr, reinterpret_cast<void*>(IsRegistered)},
-        ani_native_function {
-            "_PlaceholderRegisterPublishProduct",
-            nullptr, reinterpret_cast<void*>(PublishProduct)},
-    };
-    status = env->Class_BindStaticNativeMethods(cls, staticMethods.data(), staticMethods.size());
-    if (status != ANI_OK) {
-        TAG_LOGE(AceLogTag::ACE_SCROLL, "BindNativePlaceholderRegister BindStaticNativeMethods failed");
-        env->ResetError();
-        return ANI_ERROR;
-    }
-    return ANI_OK;
-}
-
-void BindPlaceholderAni(ani_env* env)
-{
-    BindNativePlaceholderRegister(env);
-    BindPlaceholderScopeHooks(env);
-}
-
-} // namespace OHOS::Ace::Ani
+} // namespace OHOS::Ace::NG

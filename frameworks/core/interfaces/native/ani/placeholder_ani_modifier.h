@@ -16,15 +16,17 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_INTERFACES_NATIVE_ANI_PLACEHOLDER_ANI_MODIFIER_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_INTERFACES_NATIVE_ANI_PLACEHOLDER_ANI_MODIFIER_H
 
-#include "ani.h"
+#include "core/interfaces/ani/ani_api.h"
 
-namespace OHOS::Ace::Ani {
+namespace OHOS::Ace::NG {
 
-// Binds the static ArkTS placeholder registry and builder-scope hooks. Called
-// best-effort from the main ANI library constructor: the ArkTS classes are
-// only present in apps that link the placeholder module.
-void BindPlaceholderAni(ani_env* env);
+// Engine face of the ArkTS placeholder registry: template admission
+// (isolated execution, restricted-scope probe, clone check), the product
+// hand-off slot, and the restricted-builder scope counter. The ANI library
+// binds the ArkTS native methods itself and reaches these entries through
+// GetArkUIAniModifiers(), like every other static ANI API.
+const ArkUIAniPlaceholderRegisterModifier* GetPlaceholderRegisterAniModifier();
 
-} // namespace OHOS::Ace::Ani
+} // namespace OHOS::Ace::NG
 
 #endif // FOUNDATION_ACE_FRAMEWORKS_CORE_INTERFACES_NATIVE_ANI_PLACEHOLDER_ANI_MODIFIER_H
