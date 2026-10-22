@@ -22,7 +22,7 @@
 #include "base/utils/device_config.h"
 #include "core/components_ng/pattern/gauge/gauge_theme.h"
 #include "core/components_ng/token_theme/token_theme_storage.h"
-#include "core/components_ng/token_theme/token_theme_wrapper.h"
+#include "core/components_ng/token_theme/token_theme.h"
 
 namespace OHOS::Ace::NG {
 
@@ -31,7 +31,7 @@ namespace OHOS::Ace::NG {
  * basing on TokenTheme's data.
  * GaugeThemeWrapper should be built using GaugeThemeWrapper::WrapperBuilder.
  */
-class GaugeThemeWrapper : public GaugeTheme, public TokenThemeWrapper {
+class GaugeThemeWrapper : public GaugeTheme {
     DECLARE_ACE_TYPE(GaugeThemeWrapper, GaugeTheme);
 
 public:
@@ -40,7 +40,7 @@ public:
         WrapperBuilder() = default;
         ~WrapperBuilder() override = default;
 
-        RefPtr<TokenThemeWrapper> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
+        RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
         {
             auto wrapper = AceType::Claim(new GaugeThemeWrapper());
             ParsePattern(themeConstants, AceType::DynamicCast<GaugeTheme>(wrapper));

@@ -98,25 +98,6 @@ struct BubbleSixTestProperty {
     std::optional<bool> secondaryButtonShow = std::nullopt;
 };
 
-class MockBubbleSixTheme : public PopupTheme, public ButtonTheme {
-    DECLARE_ACE_TYPE(MockBubbleSixTheme, PopupTheme, ButtonTheme);
-
-public:
-    class Builder {
-    public:
-        Builder() = default;
-        ~Builder() = default;
-        RefPtr<MockBubbleSixTheme> Build(const RefPtr<ThemeConstants>& themeConstants) const
-        {
-            return AceType::MakeRefPtr<MockBubbleSixTheme>();
-        }
-    };
-    ~MockBubbleSixTheme() override = default;
-
-protected:
-    MockBubbleSixTheme() = default;
-};
-
 class BubbleSixTestNg : public testing::Test {
 public:
     static void SetUpTestCase();
@@ -150,8 +131,12 @@ void BubbleSixTestNg::SetThemeManager()
 {
     auto themeManager = AceType::MakeRefPtr<MockThemeManager>();
     MockPipelineContext::GetCurrent()->SetThemeManager(themeManager);
-    EXPECT_CALL(*themeManager, GetTheme(_)).WillRepeatedly(Return(AceType::MakeRefPtr<MockBubbleSixTheme>()));
-    EXPECT_CALL(*themeManager, GetTheme(_, _)).WillRepeatedly(Return(AceType::MakeRefPtr<MockBubbleSixTheme>()));
+    EXPECT_CALL(*themeManager, GetTheme(_)).WillRepeatedly(Return(AceType::MakeRefPtr<PopupTheme>()));
+    EXPECT_CALL(*themeManager, GetTheme(_, _)).WillRepeatedly(Return(AceType::MakeRefPtr<PopupTheme>()));
+    EXPECT_CALL(*themeManager, GetTheme(ButtonTheme::TypeId()))
+        .WillRepeatedly(Return(AceType::MakeRefPtr<ButtonTheme>()));
+    EXPECT_CALL(*themeManager, GetTheme(ButtonTheme::TypeId(), _))
+        .WillRepeatedly(Return(AceType::MakeRefPtr<ButtonTheme>()));
 }
 
 RefPtr<FrameNode> BubbleSixTestNg::CreateTargetNode()

@@ -33,7 +33,7 @@ namespace OHOS::Ace {
  * TextFieldTheme defines color and styles of SliderComponent. TextFieldTheme should be built
  * using TextFieldTheme::Builder.
  */
-class TextFieldTheme : public virtual Theme {
+class TextFieldTheme : public Theme {
     DECLARE_ACE_TYPE(TextFieldTheme, Theme);
 
 public:

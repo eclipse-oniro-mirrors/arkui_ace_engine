@@ -17,7 +17,7 @@
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_REFRESH_REFRESH_THEME_WRAPPER_H
 
 #include "core/components_ng/pattern/refresh/refresh_theme_ng.h"
-#include "core/components_ng/token_theme/token_theme_wrapper.h"
+#include "core/components_ng/token_theme/token_theme.h"
 
 namespace OHOS::Ace::NG {
 
@@ -25,7 +25,7 @@ namespace OHOS::Ace::NG {
  * RefreshThemeWrapper defines color and styles of Refresh basing on TokenTheme's data.
  * RefreshThemeWrapper should be built using RefreshThemeWrapper::WrapperBuilder.
  */
-class RefreshThemeWrapper : public RefreshThemeNG, public TokenThemeWrapper {
+class RefreshThemeWrapper : public RefreshThemeNG {
     DECLARE_ACE_TYPE(RefreshThemeWrapper, RefreshThemeNG);
 
 public:
@@ -34,7 +34,7 @@ public:
         WrapperBuilder() = default;
         ~WrapperBuilder() = default;
 
-        RefPtr<TokenThemeWrapper> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
+        RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
         {
             auto wrapper = AceType::MakeRefPtr<RefreshThemeWrapper>();
             auto theme = AceType::DynamicCast<RefreshThemeNG>(wrapper);

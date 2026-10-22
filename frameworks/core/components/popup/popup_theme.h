@@ -38,7 +38,7 @@ constexpr double DEFAULT_OPACITY = 0.95;
  * PopupTheme defines color and styles of PopupComponent. PopupTheme should be built
  * using PopupTheme::Builder.
  */
-class PopupTheme : public virtual Theme {
+class PopupTheme : public Theme {
     DECLARE_ACE_TYPE(PopupTheme, Theme);
 
 public:

@@ -20,7 +20,7 @@
 
 #include "base/memory/ace_type.h"
 #include "core/components/text_overlay/text_overlay_theme.h"
-#include "core/components_ng/token_theme/token_theme_wrapper.h"
+#include "core/components_ng/token_theme/token_theme.h"
 
 namespace OHOS::Ace::NG {
 
@@ -29,7 +29,7 @@ namespace OHOS::Ace::NG {
  * basing on TokenTheme's data.
  * TextOverlayThemeWrapper should be built using TextOverlayThemeWrapper::WrapperBuilder.
  */
-class TextOverlayThemeWrapper : public TextOverlayTheme, public TokenThemeWrapper {
+class TextOverlayThemeWrapper : public TextOverlayTheme {
     DECLARE_ACE_TYPE(TextOverlayThemeWrapper, TextOverlayTheme);
 
 public:
@@ -38,7 +38,7 @@ public:
         WrapperBuilder() = default;
         ~WrapperBuilder() = default;
 
-        RefPtr<TokenThemeWrapper> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
+        RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
         {
             auto wrapper = AceType::MakeRefPtr<TextOverlayThemeWrapper>();
             auto theme = AceType::DynamicCast<TextOverlayTheme>(wrapper);

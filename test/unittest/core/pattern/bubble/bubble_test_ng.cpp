@@ -130,28 +130,6 @@ struct TestProperty {
     std::optional<Dimension> arrowOffset = std::nullopt;
 };
 
-class MockBubbleTheme : public PopupTheme, public ButtonTheme {
-    DECLARE_ACE_TYPE(MockBubbleTheme, PopupTheme, ButtonTheme);
-
-public:
-    class Builder {
-    public:
-        Builder() = default;
-        ~Builder() = default;
-
-        RefPtr<MockBubbleTheme> Build(const RefPtr<ThemeConstants>& themeConstants) const
-        {
-            RefPtr<MockBubbleTheme> theme = AceType::MakeRefPtr<MockBubbleTheme>();
-            return theme;
-        }
-    };
-
-    ~MockBubbleTheme() override = default;
-
-protected:
-    MockBubbleTheme() = default;
-};
-
 class BubbleTestNg : public testing::Test {
 public:
     static void SetUpTestCase();
@@ -1106,8 +1084,12 @@ HWTEST_F(BubbleTestNg, BubblePatternTest013, TestSize.Level0)
     auto targetNode = CreateTargetNode();
     auto themeManagerOne = AceType::MakeRefPtr<MockThemeManager>();
     MockPipelineContext::GetCurrent()->SetThemeManager(themeManagerOne);
-    EXPECT_CALL(*themeManagerOne, GetTheme(_)).WillRepeatedly(Return(AceType::MakeRefPtr<MockBubbleTheme>()));
-    EXPECT_CALL(*themeManagerOne, GetTheme(_, _)).WillRepeatedly(Return(AceType::MakeRefPtr<MockBubbleTheme>()));
+    EXPECT_CALL(*themeManagerOne, GetTheme(_)).WillRepeatedly(Return(AceType::MakeRefPtr<PopupTheme>()));
+    EXPECT_CALL(*themeManagerOne, GetTheme(_, _)).WillRepeatedly(Return(AceType::MakeRefPtr<PopupTheme>()));
+    EXPECT_CALL(*themeManagerOne, GetTheme(ButtonTheme::TypeId()))
+        .WillRepeatedly(Return(AceType::MakeRefPtr<ButtonTheme>()));
+    EXPECT_CALL(*themeManagerOne, GetTheme(ButtonTheme::TypeId(), _))
+        .WillRepeatedly(Return(AceType::MakeRefPtr<ButtonTheme>()));
     auto popupNode = BubbleView::CreateBubbleNode(targetNode->GetTag(), targetNode->GetId(), popupParam);
     ASSERT_NE(popupNode, nullptr);
     auto pattern = popupNode->GetPattern<BubblePattern>();
@@ -1157,8 +1139,12 @@ HWTEST_F(BubbleTestNg, BubblePatternTest014, TestSize.Level0)
     auto targetNode = CreateTargetNode();
     auto themeManagerOne = AceType::MakeRefPtr<MockThemeManager>();
     MockPipelineContext::GetCurrent()->SetThemeManager(themeManagerOne);
-    EXPECT_CALL(*themeManagerOne, GetTheme(_)).WillRepeatedly(Return(AceType::MakeRefPtr<MockBubbleTheme>()));
-    EXPECT_CALL(*themeManagerOne, GetTheme(_, _)).WillRepeatedly(Return(AceType::MakeRefPtr<MockBubbleTheme>()));
+    EXPECT_CALL(*themeManagerOne, GetTheme(_)).WillRepeatedly(Return(AceType::MakeRefPtr<PopupTheme>()));
+    EXPECT_CALL(*themeManagerOne, GetTheme(_, _)).WillRepeatedly(Return(AceType::MakeRefPtr<PopupTheme>()));
+    EXPECT_CALL(*themeManagerOne, GetTheme(ButtonTheme::TypeId()))
+        .WillRepeatedly(Return(AceType::MakeRefPtr<ButtonTheme>()));
+    EXPECT_CALL(*themeManagerOne, GetTheme(ButtonTheme::TypeId(), _))
+        .WillRepeatedly(Return(AceType::MakeRefPtr<ButtonTheme>()));
     auto popupNode = BubbleView::CreateBubbleNode(targetNode->GetTag(), targetNode->GetId(), popupParam);
     ASSERT_NE(popupNode, nullptr);
     auto pattern = popupNode->GetPattern<BubblePattern>();
@@ -1688,8 +1674,12 @@ HWTEST_F(BubbleTestNg, CreateButton001, TestSize.Level1)
     ASSERT_NE(targetNode, nullptr);
     auto themeManager = AceType::MakeRefPtr<MockThemeManager>();
     MockPipelineContext::GetCurrent()->SetThemeManager(themeManager);
-    EXPECT_CALL(*themeManager, GetTheme(_)).WillRepeatedly(Return(AceType::MakeRefPtr<MockBubbleTheme>()));
-    EXPECT_CALL(*themeManager, GetTheme(_, _)).WillRepeatedly(Return(AceType::MakeRefPtr<MockBubbleTheme>()));
+    EXPECT_CALL(*themeManager, GetTheme(_)).WillRepeatedly(Return(AceType::MakeRefPtr<PopupTheme>()));
+    EXPECT_CALL(*themeManager, GetTheme(_, _)).WillRepeatedly(Return(AceType::MakeRefPtr<PopupTheme>()));
+    EXPECT_CALL(*themeManager, GetTheme(ButtonTheme::TypeId()))
+        .WillRepeatedly(Return(AceType::MakeRefPtr<ButtonTheme>()));
+    EXPECT_CALL(*themeManager, GetTheme(ButtonTheme::TypeId(), _))
+        .WillRepeatedly(Return(AceType::MakeRefPtr<ButtonTheme>()));
     auto popupNode = BubbleView::CreateBubbleNode(targetNode->GetTag(), targetNode->GetId(), popupParam);
     ASSERT_NE(popupNode, nullptr);
 

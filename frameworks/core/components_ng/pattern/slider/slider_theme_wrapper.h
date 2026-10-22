@@ -20,7 +20,7 @@
 
 #include "base/memory/ace_type.h"
 #include "core/components/slider/slider_theme.h"
-#include "core/components_ng/token_theme/token_theme_wrapper.h"
+#include "core/components_ng/token_theme/token_theme.h"
 
 namespace OHOS::Ace::NG {
 
@@ -29,7 +29,7 @@ namespace OHOS::Ace::NG {
  * basing on TokenTheme's data.
  * SliderThemeWrapper should be built using SliderThemeWrapper::WrapperBuilder.
  */
-class SliderThemeWrapper : public SliderTheme, public TokenThemeWrapper {
+class SliderThemeWrapper : public SliderTheme {
     DECLARE_ACE_TYPE(SliderThemeWrapper, SliderTheme);
 
 public:
@@ -38,7 +38,7 @@ public:
         WrapperBuilder() = default;
         ~WrapperBuilder() = default;
 
-        RefPtr<TokenThemeWrapper> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
+        RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
         {
             auto wrapper = AceType::MakeRefPtr<SliderThemeWrapper>();
             if (!themeConstants) {
