@@ -1199,6 +1199,8 @@ private:
     bool pageLevelSplitStackChanged_ = true;
     // Logical DISPLACE sessions survive changes between split and stack display.
     bool pageLevelDisplaceSessionActive_ = false;
+    // Logical NAVIGATION sessions with page pairs survive display changes.
+    bool pageLevelNavigationSessionActive_ = false;
     std::vector<WeakPtr<NavDestinationGroupNode>> prePrimaryNodes_;
     std::vector<WeakPtr<NavDestinationGroupNode>> primaryNodes_;
     std::vector<RefPtr<NavDestinationGroupNode>> primaryNodesToBeRemoved_;

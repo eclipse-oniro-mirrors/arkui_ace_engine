@@ -1606,12 +1606,12 @@ bool NavigationPattern::ShouldKeepPageLevelSplitSession(
         std::find(allDestNodes.begin(), allDestNodes.end(), existingHome) != allDestNodes.end();
 
     const bool keepDisplaceSession = isDisplace && pageLevelDisplaceSessionActive_;
-
+    const bool keepNavigationSession = !isDisplace && pageLevelNavigationSessionActive_;
     const bool keepNavBarHome = navBarIsHome_ && IsNavBarValid() &&
-        (forceSplitSuccess_ || !pageLevelSplitStackChanged_ || keepDisplaceSession);
+        (forceSplitSuccess_ || !pageLevelSplitStackChanged_ || keepDisplaceSession || keepNavigationSession);
 
     const bool keepDestinationHome = existingHomeInStack &&
-        (!pageLevelSplitStackChanged_ || keepDisplaceSession);
+        (!pageLevelSplitStackChanged_ || keepDisplaceSession || keepNavigationSession);
 
     if (keepNavBarHome || keepDestinationHome) {
         TAG_LOGI(AceLogTag::ACE_NAVIGATION,
@@ -1632,8 +1632,7 @@ void NavigationPattern::InitializePageLevelSplitHome(
     auto topDest = allDestNodes.back();
     auto previousHome = forceSplitHomeDest_.Upgrade();
     // Use the NavBar only when the current destination is the sole stack entry and the NavBar is valid.
-    const bool useNavBar = curList.size() == 1 &&
-        allDestNodes.size() == 1 && IsNavBarValid();
+    const bool useNavBar = isDisplace && curList.size() == 1 && allDestNodes.size() == 1 && IsNavBarValid();
     if (useNavBar) {
         if (previousHome) {
             previousHome->SetNavDestinationType(NavDestinationType::DETAIL);
@@ -8037,7 +8036,7 @@ void NavigationPattern::UpdatePageLevelDisplaceColumns(
     const std::optional<std::pair<std::string, RefPtr<UINode>>>& preTop,
     const std::optional<std::pair<std::string, RefPtr<UINode>>>& curTop)
 {
-    if (!pageLevelDisplaceSessionActive_ || !preTop || !curTop) {
+    if (!pageLevelNavigationSessionActive_ || !pageLevelDisplaceSessionActive_ || !preTop || !curTop) {
         return;
     }
     CHECK_NULL_VOID(navigationStack_);
@@ -8062,6 +8061,7 @@ void NavigationPattern::UpdatePageLevelDisplaceColumns(
     auto home = forceSplitHomeDest_.Upgrade();
     if (!navBarIsHome_ && (!home || !containsCurrent(home))) {
         pageLevelDisplaceSessionActive_ = false;
+        pageLevelNavigationSessionActive_ = false;
         return;
     }
 
@@ -8159,13 +8159,14 @@ void NavigationPattern::AdjustNodeForStackSync(
     }
     // Page-level policy takes precedence over the previous display state.
     const bool pageLevelDisplace = forceSplitMgr->IsPageLevelSplitEnabled() &&
-    forceSplitMgr->GetBehaviorMode() == ForceSplitBehaviorMode::DISPLACE;
+        forceSplitMgr->GetBehaviorMode() == ForceSplitBehaviorMode::DISPLACE;
 
     if (forceSplitMgr->IsPageLevelSplitEnabled() &&
         IsTopNavDestinationSplitDisabled()) {
         if (pageLevelDisplace) {
             pageLevelDisplaceSessionActive_ = false;
         }
+        pageLevelNavigationSessionActive_ = false;
         AdjustNodeForStackSyncWhenStackDisplay();
         return;
     }
@@ -8173,7 +8174,10 @@ void NavigationPattern::AdjustNodeForStackSync(
     if (forceSplitSuccess_) {
         AdjustNodeForStackSyncWhenSplitDisplay(preTop, curTop);
     } else {
-        if (pageLevelDisplace) {
+        const bool keepNavigationSession = forceSplitMgr->IsPageLevelSplitEnabled() &&
+            forceSplitMgr->GetBehaviorMode() == ForceSplitBehaviorMode::NAVIGATION &&
+            pageLevelNavigationSessionActive_;
+        if (pageLevelDisplace || keepNavigationSession) {
             UpdatePageLevelDisplaceColumns(preTop, curTop);
         }
         AdjustNodeForStackSyncWhenStackDisplay();
@@ -8220,6 +8224,9 @@ void NavigationPattern::TryForceSplitIfNeeded()
         pageLevelSplitStackChanged_ = false;
         if (forceSplitMgr->GetBehaviorMode() == ForceSplitBehaviorMode::DISPLACE) {
             pageLevelDisplaceSessionActive_ = true;
+        } else if (forceSplitMgr->GetBehaviorMode() == ForceSplitBehaviorMode::NAVIGATION &&
+                    forceSplitMgr->CanPushPageToPrimary()) {
+            pageLevelNavigationSessionActive_ = true;
         }
     }
     if (forceSplitSuccess == forceSplitSuccess_ && forceSplitUseNavBar_ == forceSplitUseNavBar &&

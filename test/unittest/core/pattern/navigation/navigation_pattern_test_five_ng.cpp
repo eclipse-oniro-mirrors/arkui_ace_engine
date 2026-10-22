@@ -85,7 +85,6 @@ public:
     static RefPtr<FrameNode> CreateDialogNode();
     static void RunMeasureAndLayout(RefPtr<LayoutWrapperNode>& layoutWrapper, float width = DEFAULT_ROOT_WIDTH);
     void MockPipelineContextGetTheme();
-
     static void TestNavSwitchHandleFunc(const AbilityContextInfo& ctxInfo, NavDestinationSwitchInfo& switchInfo)
     {
         if (innerHandleFunc_) {
@@ -93,7 +92,6 @@ public:
         }
     }
     static SwitchHandleFunc innerHandleFunc_;
-
 };
 
 SwitchHandleFunc NavigationPatternTestFiveNg::innerHandleFunc_;

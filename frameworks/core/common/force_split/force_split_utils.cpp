@@ -644,7 +644,7 @@ bool ForceSplitUtils::ParseForceSplitParam(
         }
         config.enablePageLevelSplit = enableJson->GetBool();
     }
-    if (!ParseHomePageConfig(configJson, config)) {
+    if (!ParseHomePageAndRelatedPageConfig(configJson, config)) {
         return false;
     }
     if (!ParseCommonConfig(configJson, config)) {

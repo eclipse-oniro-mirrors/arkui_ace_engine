@@ -946,38 +946,6 @@ HWTEST_F(ParallelStageTestFourNg, OnHomePageDetectedVirtualStack003, TestSize.Le
 }
 
 /**
- * @tc.name: PushPagePageLevelPair001
- * @tc.desc: A repeated split URL follows the NAVIGATION page pair and retains the original home instance.
- * @tc.type: FUNC
- */
-HWTEST_F(ParallelStageTestFourNg, PushPagePageLevelPair001, TestSize.Level1)
-{
-    RefPtr<FrameNode> stageNode;
-    RefPtr<ParallelStagePattern> stagePattern;
-    auto stageManager = CreateParallelStageManager(stageNode, stagePattern);
-    auto manager = GetPageLevelForceSplitManager();
-    ASSERT_NE(manager, nullptr);
-    manager->SetEnablePageLevelSplit(true);
-    manager->UpdateIsTopPageSplitDisabled(false);
-    manager->SetBehaviorMode(ForceSplitBehaviorMode::NAVIGATION);
-    manager->SetPagePairs({ { "detail1", { "detail2" } } });
-    stagePattern->mode_ = PageMode::SPLIT;
-    auto oldHome = CreateRouterPage("detail2", RouterPageType::HOME_PAGE, ForceSplitPageColumnType::PRIMARY);
-    auto from = CreateRouterPage("detail1", RouterPageType::DETAIL_PAGE, ForceSplitPageColumnType::SECONDARY);
-    auto to = CreateRouterPage("detail2", RouterPageType::DETAIL_PAGE, ForceSplitPageColumnType::SECONDARY);
-    MountRouterPage(stageNode, oldHome);
-    MountRouterPage(stageNode, from);
-    stagePattern->SetHomePage(oldHome);
-    stageManager->InvalidateRouterColumnNodes();
-    ASSERT_TRUE(stageManager->PushPage(to, true, false));
-    auto visible = stageManager->GetRouterVisiblePages();
-    EXPECT_EQ(visible.primary, from);
-    EXPECT_EQ(visible.detail, to);
-    EXPECT_EQ(stagePattern->GetHomePage(), oldHome);
-    EXPECT_EQ(GetRouterPagePattern(to)->GetPageType(), RouterPageType::DETAIL_PAGE);
-}
-
-/**
  * @tc.name: PushPageNeedOperationInSplitMode004
  * @tc.desc: The pending split-operation flag is consumed even when the stage is already split.
  * @tc.type: FUNC

@@ -65,9 +65,10 @@ std::vector<std::string> ParallelPageRouterManager::CollectPageStackNames(const 
         if (pageStack.empty()) {
             pageStack.emplace_back(curTopPageName);
         } else if (pageStack.back() != curTopPageName) {
-            auto it = std::find(pageStack.begin(), pageStack.end(), curTopPageName);
-            if (it != pageStack.end()) {
-                pageStack.erase(it + 1, pageStack.end());
+            auto it = std::find(pageStack.rbegin(), pageStack.rend(), curTopPageName);
+            if (it != pageStack.rend()) {
+                // Keep the last matching page and remove only the pages above it.
+                pageStack.erase(it.base(), pageStack.end());
             } else {
                 pageStack.emplace_back(curTopPageName);
             }
