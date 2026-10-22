@@ -36,6 +36,20 @@
 
 namespace OHOS::Ace::NG {
 
+bool GestureEventHub::HasTreeInteraction() const
+{
+    return scrollableActuator_ || touchEventActuator_ || clickEventActuator_ || userParallelClickEventActuator_ ||
+           longPressEventActuator_ || panEventActuator_ || dragEventActuator_ || !gestures_.empty() ||
+           !modifierGestures_.empty() || !gestureHierarchy_.empty() || !modifierGestureHierarchy_.empty() ||
+           hitTestMode_ != HitTestMode::HTMDEFAULT || !touchable_ || isResponseRegion_ ||
+           hasTouchResponseRegionConfig_ || !mouseResponseRegion_.empty() || !responseRegionMap_.empty() ||
+           onChildTouchTestFunc_ || responseRegionFunc_ || gestureJudgeFunc_ || gestureJudgeNativeFunc_ ||
+           gestureJudgeNativeFuncForMenu_ || touchTestDoneCallback_ || touchInterceptFunc_ ||
+           shouldBuildinRecognizerParallelWithFunc_ || shouldRecognizerParallelWithFunc_ ||
+           onGestureCollectInterceptFunc_ || gestureRecognizerJudgeFunc_ || commonClickEvent_ || showMenu_ ||
+           bindMenuTouch_ || tipsTouchEvent_ || isDragForbiddenForWholeSubTree_ || monopolizeEvents_;
+}
+
 bool BindMenuStatus::IsNotNeedShowPreview() const
 {
     return (isBindCustomMenu && isShow) || isBindLongPressMenu;

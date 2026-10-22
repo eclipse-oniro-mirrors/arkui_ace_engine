@@ -7527,5 +7527,41 @@
     {
         "first_introduced": "26.2.0",
         "name": "OH_ArkUI_KeyEvent_SetScrollLockOn"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIAgentTreeRequestCreate"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIAgentTreeRequestDestroy"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIAgentTreeRequestSetFilterPureLayoutNodes"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIAgentTreeRequestSetInteractionInfo"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIAgentTreeRequestSetAccessibilityInfo"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIAgentTreeRequestSetCollectVisualProperties"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIAgentTreeRequestSetCollectFunctionalProperties"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIAgentGetTreeJson"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIAgentGetTreeJsonAsync"
     }
 ]

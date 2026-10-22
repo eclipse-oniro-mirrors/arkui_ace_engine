@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 
+#include "core/components_ng/base/ui_tree_collector.h"
 #include "core/components_ng/base/page_text_collector.h"
 #include "core/interfaces/native/node/page_text_api.h"
 
@@ -74,6 +75,7 @@
 #include "core/interfaces/native/node/search_modifier.h"
 #include "core/interfaces/native/node/select_modifier.h"
 #include "core/interfaces/native/node/styled_string_impl.h"
+#include "core/interfaces/native/node/ui_tree_api.h"
 #include "core/interfaces/native/node/util_modifier.h"
 #include "core/interfaces/native/node/view_model.h"
 #include "core/interfaces/native/node/water_flow_modifier.h"
@@ -2860,6 +2862,13 @@ extern "C" {
 ACE_FORCE_EXPORT CJUIFullNodeAPI* GetCJUIFullNodeAPI()
 {
     return &OHOS::Ace::NG::fullCJUIApi;
+}
+
+ACE_FORCE_EXPORT const ArkUITreeAPI* GetArkUITreeAPI(int32_t version)
+{
+    static const ArkUITreeAPI api { OHOS::Ace::NG::CollectUITree, OHOS::Ace::NG::SubmitUITree,
+        [](char* data) { std::free(data); } };
+    return version == 1 ? &api : nullptr;
 }
 
 ACE_FORCE_EXPORT const ArkUIPageTextAPI* GetArkUIPageTextAPI(int32_t version)

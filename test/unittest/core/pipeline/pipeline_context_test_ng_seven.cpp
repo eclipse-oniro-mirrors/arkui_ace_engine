@@ -14,6 +14,8 @@
  */
 
 #include "test/unittest/core/pipeline/pipeline_context_test_ng.h"
+
+#include "core/components_ng/base/ui_tree_collector.h"
 // Add the following two macro definitions to test the private and protected method.
 #define private public
 #define protected public
@@ -79,6 +81,8 @@ constexpr uint8_t TEST_RENDERING_MODE_FORM = 1;
 constexpr uint8_t TEST_RENDERING_MODE_FULL = 0;
 constexpr uint64_t LARGE_TIME_THRESHOLD = static_cast<uint64_t>(INT64_MAX >> 2);
 constexpr uint64_t TEST_SMALL_TIMESTAMP = 1000;
+const RectF PUBLIC_OVERLAY_ROOT_RECT(0, 0, 100, 100);
+const RectF PUBLIC_OVERLAY_CHILD_RECT(0, 0, 50, 50);
 
 void SetInspectorNodeRect(const RefPtr<FrameNode>& node, const RectF& rect)
 {
@@ -87,6 +91,16 @@ void SetInspectorNodeRect(const RefPtr<FrameNode>& node, const RectF& rect)
     renderContext->SetPaintRectWithTransform(rect);
     node->renderContext_ = renderContext;
     node->SetActive(true);
+}
+
+void CheckCompactTreeBudget(const TreeCollectionState& state, const std::shared_ptr<JsonValue>& root)
+{
+    constexpr int32_t SCHEMA_VERSION = 1;
+    auto envelope = JsonUtil::Create();
+    ASSERT_TRUE(envelope->Put("schemaVersion", SCHEMA_VERSION));
+    ASSERT_TRUE(envelope->Put("treeInfo", root));
+    EXPECT_EQ(state.GetError(), 0);
+    EXPECT_EQ(state.compactBytes, envelope->ToString().size());
 }
 
 size_t CountOccurrences(const std::string& text, const std::string& value)
@@ -1860,6 +1874,70 @@ HWTEST_F(PipelineContextFourTestNg, PipelineContextSevenTest075, TestSize.Level1
     bool result = context_->ProcessOverlayChildrenDumpInfo(rootNode, overlayChildrenArray, subWindowOverlayArray,
         false, config, DEFAULT_NODE_OPACITY);
     EXPECT_FALSE(result);
+}
+
+HWTEST_F(PipelineContextFourTestNg, PublicVisibleBudgetIncludesOverlayAndPageBranches, TestSize.Level1)
+{
+    AssertValidContext();
+    auto startNode = FrameNode::CreateFrameNode(
+        V2::ROOT_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    SetInspectorNodeRect(startNode, PUBLIC_OVERLAY_ROOT_RECT);
+    constexpr size_t BRANCH_COUNT = 2;
+    std::vector<RefPtr<FrameNode>> pages;
+    for (size_t index = 0; index < BRANCH_COUNT; ++index) {
+        auto overlay = FrameNode::CreateFrameNode(
+            V2::TOAST_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+        auto page = FrameNode::CreateFrameNode(
+            V2::PAGE_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+        SetInspectorNodeRect(overlay, PUBLIC_OVERLAY_CHILD_RECT);
+        SetInspectorNodeRect(page, PUBLIC_OVERLAY_CHILD_RECT);
+        startNode->AddChild(overlay);
+        startNode->AddChild(page);
+        pages.push_back(page);
+    }
+    TreeCollectionState state;
+    ParamConfig config;
+    config.collectionState = &state;
+    config.dumpMode = TreeDumpMode::PUBLIC_TREE;
+    auto root = JsonUtil::CreateSharedPtrJson();
+    context_->GetComponentOverlayInspector(root, startNode, config, false);
+    CheckCompactTreeBudget(state, root);
+    context_->DumpSimplifyTreeJsonFromTopNavNode(root, pages, config);
+    CheckCompactTreeBudget(state, root);
+    constexpr size_t ROOT_AND_OVERLAY_WRAPPERS = 2;
+    EXPECT_EQ(state.nodes, ROOT_AND_OVERLAY_WRAPPERS + BRANCH_COUNT + pages.size());
+}
+
+HWTEST_F(PipelineContextFourTestNg, PublicOverlayRespectsInteractionOption, TestSize.Level1)
+{
+    AssertValidContext();
+    auto startNode = FrameNode::CreateFrameNode(
+        V2::ROOT_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    auto overlayChild = FrameNode::CreateFrameNode(
+        V2::TOAST_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    SetInspectorNodeRect(startNode, PUBLIC_OVERLAY_ROOT_RECT);
+    SetInspectorNodeRect(overlayChild, PUBLIC_OVERLAY_CHILD_RECT);
+    startNode->AddChild(overlayChild);
+    for (bool publicRequest : { false, true }) {
+        for (bool interaction : { false, true }) {
+            TreeCollectionState state;
+            ParamConfig config;
+            config.collectionState = publicRequest ? &state : nullptr;
+            config.interactionInfo = interaction;
+            auto root = JsonUtil::CreateSharedPtrJson();
+            context_->GetComponentOverlayInspector(root, startNode, config, false);
+            if (publicRequest) {
+                CheckCompactTreeBudget(state, root);
+            }
+            auto overlay = root->GetValue("$children")->GetArrayItem(0);
+            ASSERT_EQ(overlay->GetString("$type"), "overlay");
+            EXPECT_EQ(overlay->Contains("clickable"), !publicRequest || interaction);
+            EXPECT_EQ(overlay->Contains("scrollable"), !publicRequest || interaction);
+            EXPECT_EQ(overlay->Contains("longClickable"), publicRequest && interaction);
+            EXPECT_EQ(overlay->Contains("longclickable"), !publicRequest);
+            EXPECT_EQ(overlay->GetValue("$children")->GetArrayItem(0)->GetInt("$ID"), overlayChild->GetId());
+        }
+    }
 }
 
 /**

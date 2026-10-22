@@ -15,6 +15,7 @@
 
 #include "node_model.h"
 #include "core/interfaces/native/node/page_text_api.h"
+#include "core/interfaces/native/node/ui_tree_api.h"
 #include "node/config_manager.h"
 
 #include <cstring>
@@ -201,6 +202,17 @@ const ArkUIPageTextAPI* GetPageTextAPI()
         return nullptr;
     }
     auto entry = reinterpret_cast<Entry>(FindFunction(module, "GetArkUIPageTextAPI"));
+    return entry ? entry(1) : nullptr;
+}
+
+const ArkUITreeAPI* GetTreeAPI()
+{
+    using Entry = const ArkUITreeAPI* (*)(int32_t);
+    auto* module = FindModule();
+    if (!module) {
+        return nullptr;
+    }
+    auto entry = reinterpret_cast<Entry>(FindFunction(module, "GetArkUITreeAPI"));
     return entry ? entry(1) : nullptr;
 }
 

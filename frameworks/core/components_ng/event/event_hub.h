@@ -333,6 +333,10 @@ public:
 
     bool IsCompensateOnSizeChangeEvent() const;
 
+    bool HasTreeCallbacks() const;
+
+    bool HasTreeInteraction() const;
+
 protected:
     virtual void OnModifyDone() {}
     std::function<void()> GetOnAppear() const;

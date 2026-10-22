@@ -58,6 +58,7 @@ class RSUIDirector;
 namespace OHOS::Ace::NG {
     class RecycleManager;
     class RenderContext;
+    struct UITreeRequestState;
 }
 
 namespace OHOS::Ace {
@@ -1042,7 +1043,8 @@ public:
     }
 
     void GetOverlayInfo(bool hasOverlay, std::shared_ptr<JsonValue>& root, std::shared_ptr<JsonValue>& overlayContent,
-        std::unique_ptr<JsonValue>& overlayChildrenArray, std::unique_ptr<JsonValue>& overlayArray) const;
+        std::unique_ptr<JsonValue>& overlayChildrenArray, std::unique_ptr<JsonValue>& overlayArray,
+        ParamConfig config = {}) const;
 
     // Collect Inspector-style visible starting nodes. Delegates the pure
     // algorithm to DumpUtil so both Inspector dump and PageScene
@@ -1054,6 +1056,8 @@ public:
         ParamConfig config, bool isInSubWindow, double parentFinalOpacity = 1.0) const;
 
     void GetInspectorTree(bool onlyNeedVisible, ParamConfig config = ParamConfig());
+    void CollectInspectorTreeInto(std::shared_ptr<JsonValue>& root, bool onlyNeedVisible, ParamConfig config);
+    UITreeRequestState& GetUITreeRequestState();
 
     void GetHitTestInfos(InteractionParamConfig config);
 
@@ -1760,6 +1764,7 @@ private:
     RefPtr<MaterialProcessor> materialProcessor_;
     bool isRightMouseMappingActive_ = false;
     std::function<void()> onRightMouseMappingCancel_;
+    std::unique_ptr<NG::UITreeRequestState> uiTreeRequestState_;
 };
 
 /**

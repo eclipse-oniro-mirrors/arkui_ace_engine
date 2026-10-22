@@ -55,6 +55,7 @@ class RSNGShapeBase;
 } // namespace OHOS::Rosen
 
 namespace OHOS::Ace {
+struct ParamConfig;
 struct SharedTransitionOption;
 class ShapeRect;
 class UiMaterial;
@@ -487,13 +488,12 @@ public:
     virtual void DumpInfo() {}
     virtual void DumpInfo(std::unique_ptr<JsonValue>& json) {}
     virtual void DumpSimplifyInfo(std::shared_ptr<JsonValue>& json) {}
-    virtual void CollectVisualTreeProperties(JsonValue& json) {}
-    virtual void CollectFunctionalTreeProperties(JsonValue& json) {}
 
     virtual bool HasRenderContent() const { return false; }
 
     virtual void DumpAdvanceInfo() {}
     virtual void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json) {}
+    virtual void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config) {}
 
     void ObscuredToJsonValue(std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const;
 
