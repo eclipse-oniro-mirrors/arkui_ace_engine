@@ -8,6 +8,10 @@ import { PeerNode } from '/arkui/PeerNode';
 import { ArkComponentRootPeer } from '/arkui/component/staticComponents';
 import { InteropNativeModule, KPointer } from '@koalaui/interop';
 import { int32 } from '@koalaui/common';
+import { ObserveSingleton } from '/arkui/stateManagement/base/observeSingleton';
+import { ExtendableComponent } from '/arkui/component/extendableComponent';
+import { setNeedCreate } from '/arkui/ArkComponentRoot';
+import { GlobalStateManager } from '@koalaui/runtime';
 
 // Result codes of the native registration (ani_placeholder_register_module.cpp):
 // the admission protocol (isolated execution, restricted-scope probe, clone
@@ -132,6 +136,14 @@ export class PlaceholderRegister {
                 prLog(`execution: ABORT, no UIContext for instanceId=${instanceId}`);
                 return;
             }
+            const manager = GlobalStateManager.instance;
+            const savedRendering = ObserveSingleton.instance.renderingComponent;
+            ObserveSingleton.instance.renderingComponent = ObserveSingleton.RenderingComponentV1;
+            const savedExtendable = ExtendableComponent.current;
+            ExtendableComponent.current = undefined;
+            const needCreate = setNeedCreate(true);
+            const savedFrozen = manager.frozen;
+            manager.frozen = true;
             try {
                 prLog(`execution: building template on detached root (createUiDetachedRoot route)`);
                 const peerNode = createUiDetachedRoot(
@@ -148,6 +160,11 @@ export class PlaceholderRegister {
                 // native side records the violation from the ani call status.
                 prLog(`execution: builder THREW: ${e}`);
                 throw e;
+            } finally {
+                manager.frozen = savedFrozen;
+                setNeedCreate(needCreate);
+                ExtendableComponent.current = savedExtendable;
+                ObserveSingleton.instance.renderingComponent = savedRendering;
             }
         };
     }
