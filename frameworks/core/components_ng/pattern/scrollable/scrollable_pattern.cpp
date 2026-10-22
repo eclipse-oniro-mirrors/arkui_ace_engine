@@ -21,6 +21,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 #include "interfaces/inner_api/ui_session/ui_session_manager.h"
 #include <string_view>
@@ -1193,7 +1194,9 @@ float ScrollablePattern::ResolveItemSnapTarget(const ScrollSnapStrategy& strateg
         // The provider contract exposes the positive-forward velocity.
         auto resolved = strategy.calculateSnapOffset(velocityPos);
         if (std::isfinite(resolved)) {
-            return -ScrollSnapUtils::ClampSnapOffset(static_cast<float>(resolved), minOffset, maxOffset);
+            // Retain the requested target: a lazy layout's current bound may still be an estimate.
+            const double limit = std::numeric_limits<float>::max();
+            return -static_cast<float>(std::clamp(resolved, -limit, limit));
         }
     }
     // Provider fallback: the built-in alignment target when an align is also configured,
@@ -1240,12 +1243,22 @@ bool ScrollablePattern::StartItemSnapWithProvider(const ScrollSnapStrategy& stra
     float direction = !NearZero(motionVelocity) ? (motionVelocity > 0.0f ? 1.0f : -1.0f)
                                                 : (motionDelta >= 0.0f ? 1.0f : -1.0f);
     auto targetGetter = [weak = WeakClaim(this), strategy, currentOffset, minOffset, maxOffset,
-                            predictDeltaPos = motionDelta](float handoffVelocity) -> float {
+                            predictDeltaPos = motionDelta, target = std::optional<float>()](
+                            float handoffVelocity) mutable -> float {
         auto pattern = weak.Upgrade();
-        CHECK_NULL_RETURN(pattern, -currentOffset);
-        // The handoff velocity arrives in the drag frame; the selection runs positive-forward.
-        return pattern->ResolveItemSnapTarget(
-            strategy, currentOffset, minOffset, maxOffset, -handoffVelocity, predictDeltaPos);
+        // A vanished owner has no target. Abort queued stages instead of reusing a stale offset.
+        CHECK_NULL_RETURN(pattern, std::numeric_limits<float>::quiet_NaN());
+        auto scroll = pattern->GetScrollable();
+        CHECK_NULL_RETURN(scroll, std::numeric_limits<float>::quiet_NaN());
+        if (!target) {
+            // Call the provider once; subsequent stages only refresh the layout-dependent bound.
+            target = -pattern->ResolveItemSnapTarget(
+                strategy, currentOffset, minOffset, maxOffset, -handoffVelocity, predictDeltaPos);
+        }
+        const auto bounded = ScrollSnapUtils::ClampSnapOffset(
+            target.value(), pattern->GetItemSnapMinOffset(), pattern->GetItemSnapMaxOffset());
+        // Sliding-window calibration can move the content coordinate independently of the spring.
+        return scroll->GetCurrentPos() + pattern->GetItemSnapCurrentOffset() - bounded;
     };
     scrollable->StartItemSnapTwoStageAnimation(-(approachOffset * direction),
         snapAnimationOptions.animationVelocity, snapAnimationOptions.fromScrollBar, std::move(targetGetter),

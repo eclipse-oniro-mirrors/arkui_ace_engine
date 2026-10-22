@@ -147,7 +147,11 @@ void WaterFlowPattern::UpdateSnapGeometryAfterLayout(bool isLayoutValid)
 
 void WaterFlowPattern::BeginTrackedItemSnap(float coordinate)
 {
-    snapGeometryStableOffset_ = coordinate;
+    // Release can precede layout of the final drag delta. Rebase the cached geometry from
+    // its measured offset, not the newer release offset, so that the pending delta is not
+    // added to the selected anchor a second time.
+    const float pendingOffset = static_cast<float>(GetItemSnapCurrentOffset()) - snapGeometryEstimatedOffset_;
+    snapGeometryStableOffset_ = coordinate - pendingOffset;
 }
 
 std::vector<SnapCandidate> WaterFlowPattern::BuildTrackedItemSnapCandidates(ScrollSnapAlign align)
@@ -243,6 +247,10 @@ float WaterFlowPattern::GetItemSnapMaxOffset() const
                                  : estimate;
         max = std::max(static_cast<float>(GetItemSnapCurrentOffset()),
             height + layoutInfo_->contentEndOffset_ - GetMainContentSize());
+        if (GetScrollSnapStrategy().hasProvider) {
+            // Keep measuring toward a distant provider target until the real end is known.
+            max = std::max(max, static_cast<float>(GetItemSnapCurrentOffset()) + GetMainContentSize());
+        }
     }
     return std::isfinite(max) ? std::max(min, max) : min;
 }
@@ -1111,9 +1119,11 @@ void WaterFlowPattern::AddFooter(const RefPtr<NG::UINode>& footer)
 
 void WaterFlowPattern::SetLayoutMode(LayoutMode mode)
 {
-    snapItemGeometryCache_.clear();
-    snapTotalHeight_.reset();
+    // Same-mode property replay must keep sampled snap geometry. Data, section and layout resets,
+    // as well as actual mode switches, remain responsible for invalidation.
     if (!layoutInfo_ || mode != layoutInfo_->Mode()) {
+        snapItemGeometryCache_.clear();
+        snapTotalHeight_.reset();
         layoutInfo_ = WaterFlowLayoutInfoBase::Create(mode);
         isInitialized_ = false; // for contentStartOffset when mode is changed
         MarkDirtyNodeSelf();

@@ -15,6 +15,7 @@
 
 #include "water_flow_test_ng.h"
 
+#include <algorithm>
 #include <array>
 #include <deque>
 #include <limits>
@@ -33,10 +34,15 @@
 namespace OHOS::Ace::NG {
 namespace {
 constexpr int32_t SNAP_ITEM_COUNT = 30;
+constexpr int32_t UNDERESTIMATED_ITEM_COUNT = 100;
+constexpr int32_t UNDERESTIMATED_SHORT_ITEM_COUNT = 10;
+constexpr int32_t UNDERESTIMATED_LAST_ITEM_INDEX = UNDERESTIMATED_ITEM_COUNT - 1;
+constexpr int32_t PROVIDER_TARGET_ITEM_INDEX = 6;
 constexpr int32_t MAX_SNAP_ANIMATION_TICKS = 100;
 constexpr size_t MIN_SNAP_CANDIDATE_COUNT = 4;
 constexpr size_t POST_TASK_NAME_ARGUMENT = 3;
 constexpr double PROVIDER_TARGET = 320.0;
+constexpr float PROVIDER_NATURAL_OFFSET = 500.0f;
 constexpr float PROVIDER_INITIAL_VELOCITY = 1300.0f;
 constexpr std::array<float, 6> SNAP_ITEM_SIZES = { 100.0f, 170.0f, 80.0f, 120.0f, 150.0f, 90.0f };
 constexpr std::array<SnapCandidate, 3> EXPECTED_START_ANCHORS = { {
@@ -129,6 +135,46 @@ protected:
         CreateDone();
     }
 
+    void CreateUnderestimatedItems()
+    {
+        auto model = CreateWaterFlow();
+        model.SetColumnsTemplate("1fr 1fr");
+        ViewAbstract::SetHeight(CalcLength(300.0f));
+        for (int32_t i = 0; i < UNDERESTIMATED_ITEM_COUNT; ++i) {
+            CreateItemWithHeight(i < UNDERESTIMATED_SHORT_ITEM_COUNT ? 100.0f : 200.0f);
+        }
+        CreateDone();
+    }
+
+    void CheckProviderBeyondInitialEstimate(double approach, double target, bool reachesEnd)
+    {
+        CreateUnderestimatedItems();
+        int32_t snapCalls = 0;
+        int32_t approachCalls = 0;
+        SetStrategy(MakeProvider([&](double) {
+            ++snapCalls;
+            return target;
+        }, [&](double, double) {
+            ++approachCalls;
+            return approach;
+        }));
+        ASSERT_LT(pattern_->GetItemSnapMaxOffset(), target);
+        ASSERT_TRUE(pattern_->StartSnapAnimation({ .snapDelta = -30.0f, .animationVelocity = -300.0f }));
+        pattern_->GetScrollable()->FlushPendingItemSnapKickoff();
+        FinishSnapAnimation();
+        EXPECT_EQ(snapCalls, 1);
+        EXPECT_EQ(approachCalls, 1);
+        EXPECT_EQ(pattern_->layoutInfo_->itemEnd_, reachesEnd);
+        EXPECT_TRUE(pattern_->GetScrollable()->IsStopped());
+        if (reachesEnd) {
+            EXPECT_EQ(pattern_->layoutInfo_->endIndex_, UNDERESTIMATED_LAST_ITEM_INDEX);
+            EXPECT_FLOAT_EQ(GetChildRect(frameNode_, UNDERESTIMATED_LAST_ITEM_INDEX).Height(), 200.0f);
+            EXPECT_NEAR(GetChildRect(frameNode_, UNDERESTIMATED_LAST_ITEM_INDEX).Bottom(), 300.0f, 0.5f);
+        } else {
+            EXPECT_NEAR(pattern_->GetTotalOffset(), target, 0.5f);
+        }
+    }
+
     void CreateDirectionalItems(FlexDirection direction, TextDirection textDirection = TextDirection::LTR)
     {
         auto model = CreateWaterFlow();
@@ -183,6 +229,29 @@ protected:
         EXPECT_FALSE(pattern_->GetScrollable()->IsSnapAnimationRunning());
     }
 
+    void DestroyWaterFlow()
+    {
+        WeakPtr<FrameNode> weakNode = frameNode_;
+        RemoveFromStageNode();
+        ViewStackProcessor::GetInstance()->ClearStack();
+        frameNode_.Reset();
+        pattern_.Reset();
+        ClearOldNodes();
+        ASSERT_EQ(weakNode.Upgrade(), nullptr);
+    }
+
+    void FinishDetachedSnapAnimation(const RefPtr<Scrollable>& scrollable)
+    {
+        for (int32_t tick = 0; tick < MAX_SNAP_ANIMATION_TICKS &&
+            (!MockAnimationManager::GetInstance().AllFinished() || snapExecutor_->HasPending()); ++tick) {
+            MockAnimationManager::GetInstance().Tick();
+            snapExecutor_->RunPending();
+        }
+        EXPECT_FALSE(snapExecutor_->HasPending());
+        EXPECT_TRUE(MockAnimationManager::GetInstance().AllFinished());
+        EXPECT_TRUE(scrollable->IsStopped());
+    }
+
     // Low-speed forward drag release; the next START anchor after 0 is 100 (gap D = 100).
     void CheckForwardThreshold(float distance, float expected)
     {
@@ -212,27 +281,61 @@ protected:
     {
         CreateUnequalItems();
         int32_t snapCalls = 0;
+        int32_t approachCalls = 0;
         double approachVelocity = 0.0;
+        double approachNaturalOffset = 0.0;
         double snapVelocity = 0.0;
         SetStrategy(MakeProvider([&](double velocity) {
             ++snapCalls;
             snapVelocity = velocity;
             return PROVIDER_TARGET;
-        }, [&](double velocity, double) {
+        }, [&](double velocity, double naturalOffset) {
+            ++approachCalls;
             approachVelocity = velocity;
+            approachNaturalOffset = naturalOffset;
             return approach;
         }));
         UpdateCurrentOffset(-120.0f);
         ASSERT_TRUE(pattern_->UpdateCurrentOffset(-30.0f, SCROLL_FROM_UPDATE));
         ASSERT_TRUE(pattern_->StartSnapAnimation(
-            { .snapDelta = -500.0f, .animationVelocity = -PROVIDER_INITIAL_VELOCITY }));
+            { .snapDelta = -PROVIDER_NATURAL_OFFSET, .animationVelocity = -PROVIDER_INITIAL_VELOCITY }));
         pattern_->GetScrollable()->FlushPendingItemSnapKickoff();
         FlushUITasks();
         FinishSnapAnimation();
         EXPECT_EQ(snapCalls, 1);
+        EXPECT_EQ(approachCalls, 1);
+        EXPECT_DOUBLE_EQ(approachNaturalOffset, PROVIDER_NATURAL_OFFSET);
         EXPECT_DOUBLE_EQ(approachVelocity, PROVIDER_INITIAL_VELOCITY);
         EXPECT_DOUBLE_EQ(snapVelocity, approachVelocity);
         EXPECT_NEAR(pattern_->GetTotalOffset(), PROVIDER_TARGET, 0.5f);
+        EXPECT_NEAR(GetChildRect(frameNode_, PROVIDER_TARGET_ITEM_INDEX).GetY(), 10.0f, 0.5f);
+    }
+
+    void CheckTrackedReleaseBeforeLayout(
+        ScrollSnapAlign align, float pendingDelta, int32_t expectedIndex, float expectedOffset)
+    {
+        CreateUnequalItems();
+        SetStrategy(MakeAlign(align));
+        UpdateCurrentOffset(-250.0f);
+        // The final drag update and release share a frame, before the geometry cache is refreshed.
+        ASSERT_TRUE(pattern_->UpdateCurrentOffset(pendingDelta, SCROLL_FROM_UPDATE));
+        auto scroll = pattern_->GetScrollable();
+        // Use a finger coordinate unrelated to the content offset and a nonzero velocity below
+        // the friction threshold, as in a real slow release.
+        scroll->StartScrollAnimation(937.0f, pendingDelta < 0.0f ? -77.0f : 77.0f);
+        ASSERT_TRUE(scroll->IsItemSnapTracking());
+        ASSERT_TRUE(scroll->IsSnapAnimationRunning());
+        FlushUITasks();
+        FinishSnapAnimation();
+
+        // The oracle comes from the fixture dimensions, not the candidate builder under test.
+        EXPECT_NEAR(pattern_->GetTotalOffset(), expectedOffset, 0.01f);
+        const float itemHeight = SNAP_ITEM_SIZES[expectedIndex % SNAP_ITEM_SIZES.size()];
+        const float expectedTop = align == ScrollSnapAlign::START ? 0.0f :
+            (align == ScrollSnapAlign::CENTER ? (300.0f - itemHeight) / 2.0f : 300.0f - itemHeight);
+        const auto rect = GetChildRect(frameNode_, expectedIndex);
+        EXPECT_NEAR(rect.GetY(), expectedTop, 0.01f);
+        EXPECT_FLOAT_EQ(rect.Height(), itemHeight);
     }
 
     RefPtr<TaskExecutor> previousExecutor_;
@@ -310,16 +413,28 @@ HWTEST_F(WaterFlowScrollSnapTestNg, StaticEntrySetsAndResets, TestSize.Level1)
 
 /**
  * @tc.name: ProviderReplacementKeepsNewCallback
- * @tc.desc: AC-4.2: replacing a provider stores the new callbacks and drops the old approach callback.
+ * @tc.desc: AC-4.2: a real snap after provider replacement invokes only the new callback and reaches its target.
  * @tc.type: FUNC
  */
 HWTEST_F(WaterFlowScrollSnapTestNg, ProviderReplacementKeepsNewCallback, TestSize.Level1)
 {
     CreateUnequalItems();
-    SetStrategy(MakeProvider([](double) { return 100.0; }, [](double, double) { return 50.0; }));
-    SetStrategy(MakeProvider([](double) { return 170.0; }));
-    EXPECT_DOUBLE_EQ(pattern_->GetScrollSnapStrategy().calculateSnapOffset(0.0), 170.0);
+    int32_t oldSnapCalls = 0;
+    int32_t oldApproachCalls = 0;
+    int32_t newSnapCalls = 0;
+    SetStrategy(MakeProvider([&](double) { ++oldSnapCalls; return 100.0; },
+        [&](double, double) { ++oldApproachCalls; return 50.0; }));
+    SetStrategy(MakeProvider([&](double) { ++newSnapCalls; return 170.0; }));
     EXPECT_FALSE(pattern_->GetScrollSnapStrategy().calculateApproachOffset);
+    ScrollTo(60.0f);
+    ASSERT_TRUE(pattern_->StartSnapAnimation({ .snapDelta = -30.0f }));
+    pattern_->GetScrollable()->FlushPendingItemSnapKickoff();
+    FinishSnapAnimation();
+    EXPECT_EQ(oldSnapCalls, 0);
+    EXPECT_EQ(oldApproachCalls, 0);
+    EXPECT_EQ(newSnapCalls, 1);
+    EXPECT_NEAR(pattern_->GetTotalOffset(), 170.0f, 0.5f);
+    EXPECT_NEAR(GetChildRect(frameNode_, 3).GetY(), 0.0f, 0.5f);
 }
 
 /**
@@ -542,11 +657,20 @@ HWTEST_F(WaterFlowScrollSnapTestNg, DataChangeInvalidatesCandidatesUntilLayout, 
     CreateUnequalItems();
     SetStrategy(MakeAlign(ScrollSnapAlign::START));
     ASSERT_FALSE(pattern_->BuildItemSnapCandidates(ScrollSnapAlign::START).empty());
-    pattern_->NotifyDataChange(2, -1);
+    AddItemsAtSlot(1, 60.0f, 2);
+    frameNode_->ChildrenUpdatedFrom(2);
+    pattern_->NotifyDataChange(2, 1);
     EXPECT_TRUE(pattern_->BuildItemSnapCandidates(ScrollSnapAlign::START).empty());
     frameNode_->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
     FlushUITasks();
-    EXPECT_FALSE(pattern_->BuildItemSnapCandidates(ScrollSnapAlign::START).empty());
+    // The inserted item occupies [100,160], so the next item now starts at 160, not 170.
+    const auto candidates = pattern_->BuildItemSnapCandidates(ScrollSnapAlign::START);
+    const auto changed = std::find_if(candidates.begin(), candidates.end(),
+        [](const SnapCandidate& candidate) { return candidate.index == 3; });
+    ASSERT_NE(changed, candidates.end());
+    EXPECT_FLOAT_EQ(changed->offset, 160.0f);
+    EXPECT_FLOAT_EQ(GetChildRect(frameNode_, 3).GetY(), 160.0f);
+    EXPECT_EQ(frameNode_->GetTotalChildCount(), SNAP_ITEM_COUNT + 1);
 }
 
 /**
@@ -570,6 +694,88 @@ HWTEST_F(WaterFlowScrollSnapTestNg, LayoutModeChangeInvalidatesOldAnchors, TestS
 }
 
 /**
+ * @tc.name: SameLayoutModePreservesSnapCandidates
+ * @tc.desc: Reapplying the active layout mode must not disable snapping before another layout is scheduled.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollSnapTestNg, SameLayoutModePreservesSnapCandidates, TestSize.Level1)
+{
+    CreateDirectionalItems(FlexDirection::COLUMN);
+    CheckDirectionalAnchors();
+    const auto before = pattern_->BuildItemSnapCandidates(ScrollSnapAlign::START);
+    ASSERT_FALSE(before.empty());
+    const auto maxOffset = pattern_->GetItemSnapMaxOffset();
+
+    pattern_->SetLayoutMode(pattern_->GetLayoutMode());
+
+    EXPECT_EQ(pattern_->GetSnapType(), SnapType::LIST_SNAP);
+    CheckDirectionalAnchors();
+    const auto after = pattern_->BuildItemSnapCandidates(ScrollSnapAlign::START);
+    ASSERT_EQ(after.size(), before.size());
+    for (size_t i = 0; i < before.size(); ++i) {
+        EXPECT_FLOAT_EQ(after[i].offset, before[i].offset);
+        EXPECT_EQ(after[i].index, before[i].index);
+    }
+    EXPECT_FLOAT_EQ(pattern_->GetItemSnapMaxOffset(), maxOffset);
+}
+
+/**
+ * @tc.name: SameLayoutModePreservesRetainedHeight
+ * @tc.desc: An unsynchronized sliding window keeps its sampled height and legal bound after same-mode replay.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollSnapTestNg, SameLayoutModePreservesRetainedHeight, TestSize.Level1)
+{
+    CreateDirectionalItems(FlexDirection::COLUMN);
+    // Exercise the sliding-window contract in every COMMON_SRC target, after an explicit layout.
+    pattern_->SetLayoutMode(WaterFlowLayoutMode::SLIDING_WINDOW);
+    FlushUITasks();
+    ASSERT_EQ(pattern_->GetLayoutMode(), WaterFlowLayoutMode::SLIDING_WINDOW);
+    ASSERT_TRUE(pattern_->snapTotalHeight_.has_value());
+    const float retainedHeight = pattern_->snapTotalHeight_.value();
+    const float maxOffset = pattern_->GetItemSnapMaxOffset();
+    ASSERT_GT(retainedHeight, 300.0f);
+    ASSERT_FALSE(pattern_->layoutInfo_->itemEnd_);
+    ASSERT_NEAR(GetChildRect(frameNode_, 0).GetY(), 0.0f, 0.01f);
+
+    // A real pending drag invalidates the SW estimate before the next layout consumes it.
+    ASSERT_TRUE(pattern_->UpdateCurrentOffset(-37.0f, SCROLL_FROM_UPDATE));
+    ASSERT_FLOAT_EQ(pattern_->layoutInfo_->EstimateTotalHeight(), 0.0f);
+    ASSERT_NEAR(pattern_->GetItemSnapCurrentOffset(), 37.0f, 0.01f);
+    ASSERT_FLOAT_EQ(pattern_->GetItemSnapMaxOffset(), maxOffset);
+
+    pattern_->SetLayoutMode(WaterFlowLayoutMode::SLIDING_WINDOW);
+
+    ASSERT_TRUE(pattern_->snapTotalHeight_.has_value());
+    EXPECT_FLOAT_EQ(pattern_->snapTotalHeight_.value(), retainedHeight);
+    EXPECT_FLOAT_EQ(pattern_->GetItemSnapMaxOffset(), maxOffset);
+    EXPECT_NEAR(pattern_->GetItemSnapCurrentOffset(), 37.0f, 0.01f);
+    CheckDirectionalAnchors();
+    FlushUITasks();
+    EXPECT_NEAR(GetChildRect(frameNode_, 0).GetY(), -37.0f, 0.01f);
+}
+
+/**
+ * @tc.name: SameLayoutModeKeepsNextDragSnap
+ * @tc.desc: A drag after a redundant mode update still settles on the same anchor as an unchanged component.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollSnapTestNg, SameLayoutModeKeepsNextDragSnap, TestSize.Level1)
+{
+    CreateUnequalItems();
+    SetStrategy(MakeAlign(ScrollSnapAlign::START));
+    DragStart(frameNode_, Offset());
+    DragUpdate(-51.0f);
+    ASSERT_NEAR(pattern_->GetTotalOffset(), 51.0f, 0.01f);
+    // Replay after the last measured drag. No layout may repopulate the cache before release.
+    pattern_->SetLayoutMode(pattern_->GetLayoutMode());
+    DragEnd(-0.1f);
+    FinishSnapAnimation();
+    EXPECT_NEAR(pattern_->GetTotalOffset(), 100.0f, 0.5f);
+    EXPECT_NEAR(GetChildRect(frameNode_, 2).GetY(), 0.0f, 0.5f);
+}
+
+/**
  * @tc.name: ShortContentHasOneLegalOffset
  * @tc.desc: AC-2.1: content shorter than the viewport has one legal offset and never starts a snap.
  * @tc.type: FUNC
@@ -583,7 +789,10 @@ HWTEST_F(WaterFlowScrollSnapTestNg, ShortContentHasOneLegalOffset, TestSize.Leve
     CreateItemWithHeight(100.0f);
     CreateItemWithHeight(170.0f);
     CreateDone();
-    EXPECT_FLOAT_EQ(pattern_->GetItemSnapMinOffset(), pattern_->GetItemSnapMaxOffset());
+    EXPECT_FLOAT_EQ(pattern_->GetItemSnapMinOffset(), 0.0f);
+    EXPECT_FLOAT_EQ(pattern_->GetItemSnapMaxOffset(), 0.0f);
+    EXPECT_FLOAT_EQ(pattern_->GetTotalOffset(), 0.0f);
+    EXPECT_FLOAT_EQ(GetChildRect(frameNode_, 1).Bottom(), 170.0f);
     EXPECT_EQ(pattern_->GetSnapType(), SnapType::NONE_SNAP);
     EXPECT_FALSE(pattern_->StartSnapAnimation({ .snapDelta = -10.0f }));
 }
@@ -598,9 +807,13 @@ HWTEST_F(WaterFlowScrollSnapTestNg, TrailingRangeFromRealLayout, TestSize.Level1
     CreateUnequalItems();
     ScrollToIndex(29, false, ScrollAlign::END);
     ASSERT_TRUE(pattern_->layoutInfo_->itemEnd_);
-    const float finalOffset = pattern_->GetTotalOffset();
-    EXPECT_GT(finalOffset, 0.0f);
-    EXPECT_NEAR(pattern_->GetItemSnapMaxOffset(), finalOffset, 0.5f);
+    // SW can rebase its estimated total offset after an index jump. The rendered last
+    // item defines the end independently; the legal bound must match that current coordinate.
+    EXPECT_EQ(pattern_->layoutInfo_->endIndex_, 29);
+    EXPECT_FLOAT_EQ(GetChildRect(frameNode_, 29).Height(), 90.0f);
+    EXPECT_NEAR(GetChildRect(frameNode_, 29).Bottom(), 300.0f, 0.5f);
+    ASSERT_GT(pattern_->GetTotalOffset(), 300.0f);
+    EXPECT_NEAR(pattern_->GetItemSnapMaxOffset(), pattern_->GetTotalOffset(), 0.5f);
     EXPECT_NEAR(pattern_->GetItemSnapMinOffset(), 0.0f, 0.5f);
 }
 
@@ -615,11 +828,14 @@ HWTEST_F(WaterFlowScrollSnapTestNg, TrailingSnapClampedToRange, TestSize.Level1)
     CreateUnequalItems();
     SetStrategy(MakeAlign(ScrollSnapAlign::START));
     ScrollToIndex(29, false, ScrollAlign::END);
-    const float maxOffset = pattern_->GetItemSnapMaxOffset();
-    ScrollTo(maxOffset - 10.0f);
+    ASSERT_NEAR(GetChildRect(frameNode_, 29).Bottom(), 300.0f, 0.5f);
+    const float endOffset = pattern_->GetTotalOffset();
+    ScrollTo(endOffset - 10.0f);
+    ASSERT_NEAR(GetChildRect(frameNode_, 29).Bottom(), 310.0f, 0.5f);
     ASSERT_TRUE(pattern_->StartSnapAnimation({ .snapDirection = SnapDirection::BACKWARD }));
     FinishSnapAnimation();
-    EXPECT_NEAR(pattern_->GetTotalOffset(), maxOffset, 0.5f);
+    EXPECT_NEAR(pattern_->GetTotalOffset(), endOffset, 0.5f);
+    EXPECT_NEAR(GetChildRect(frameNode_, 29).Bottom(), 300.0f, 0.5f);
 }
 
 /**
@@ -680,6 +896,66 @@ HWTEST_F(WaterFlowScrollSnapTestNg, PendingLayoutThresholdEqual, TestSize.Level1
 HWTEST_F(WaterFlowScrollSnapTestNg, PendingLayoutThresholdAbove, TestSize.Level1)
 {
     CheckThresholdBeforeLayout(51.0f, 100.0f);
+}
+
+/**
+ * @tc.name: TrackedReleaseBeforeLayoutStartForward
+ * @tc.desc: A tracked slow release includes the last unlaid drag delta in START anchors.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollSnapTestNg, TrackedReleaseBeforeLayoutStartForward, TestSize.Level1)
+{
+    CheckTrackedReleaseBeforeLayout(ScrollSnapAlign::START, -7.0f, 5, 290.0f);
+}
+
+/**
+ * @tc.name: TrackedReleaseBeforeLayoutStartBackward
+ * @tc.desc: The pending backward delta settles item 5 at the viewport start.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollSnapTestNg, TrackedReleaseBeforeLayoutStartBackward, TestSize.Level1)
+{
+    CheckTrackedReleaseBeforeLayout(ScrollSnapAlign::START, 7.0f, 5, 290.0f);
+}
+
+/**
+ * @tc.name: TrackedReleaseBeforeLayoutCenterForward
+ * @tc.desc: The pending forward delta centers item 6 in the viewport.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollSnapTestNg, TrackedReleaseBeforeLayoutCenterForward, TestSize.Level1)
+{
+    CheckTrackedReleaseBeforeLayout(ScrollSnapAlign::CENTER, -7.0f, 6, 230.0f);
+}
+
+/**
+ * @tc.name: TrackedReleaseBeforeLayoutCenterBackward
+ * @tc.desc: The pending backward delta centers item 6 in the viewport.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollSnapTestNg, TrackedReleaseBeforeLayoutCenterBackward, TestSize.Level1)
+{
+    CheckTrackedReleaseBeforeLayout(ScrollSnapAlign::CENTER, 7.0f, 6, 230.0f);
+}
+
+/**
+ * @tc.name: TrackedReleaseBeforeLayoutEndForward
+ * @tc.desc: The pending forward delta aligns item 7 with the viewport end.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollSnapTestNg, TrackedReleaseBeforeLayoutEndForward, TestSize.Level1)
+{
+    CheckTrackedReleaseBeforeLayout(ScrollSnapAlign::END, -7.0f, 7, 250.0f);
+}
+
+/**
+ * @tc.name: TrackedReleaseBeforeLayoutEndBackward
+ * @tc.desc: The pending backward delta aligns item 7 with the viewport end.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollSnapTestNg, TrackedReleaseBeforeLayoutEndBackward, TestSize.Level1)
+{
+    CheckTrackedReleaseBeforeLayout(ScrollSnapAlign::END, 7.0f, 7, 250.0f);
 }
 
 /**
@@ -762,14 +1038,17 @@ HWTEST_F(WaterFlowScrollSnapTestNg, HighVelocityFlingSettlesOnLiveAnchor, TestSi
     DragUpdate(-120.0f);
     DragEnd(-350.0f);
     FinishSnapAnimation();
-    const auto finalOffset = static_cast<float>(pattern_->GetTotalOffset());
-    EXPECT_GE(finalOffset, 120.0f);
-    EXPECT_LE(finalOffset, pattern_->GetItemSnapMaxOffset() + 0.5f);
-    float nearestDistance = std::numeric_limits<float>::max();
-    for (const auto& anchor : pattern_->BuildItemSnapCandidates(ScrollSnapAlign::START)) {
-        nearestDistance = std::min(nearestDistance, std::abs(finalOffset - anchor.offset));
+    EXPECT_GT(pattern_->GetTotalOffset(), 120.0f);
+    // Verify the rendered viewport, independently of the candidate/selection helpers.
+    // Only current window members count: recycled off-screen geometry can be stale.
+    bool aligned = false;
+    for (int32_t index = pattern_->layoutInfo_->startIndex_; index <= pattern_->layoutInfo_->endIndex_; ++index) {
+        const auto rect = GetChildRect(frameNode_, index);
+        if (rect.Height() > 0.0f && std::abs(rect.GetY()) <= 0.5f) {
+            aligned = true;
+        }
     }
-    EXPECT_LE(nearestDistance, 0.5f);
+    EXPECT_TRUE(aligned);
 }
 
 /**
@@ -800,12 +1079,17 @@ HWTEST_F(WaterFlowScrollSnapTestNg, NewTouchStopsAlignSnap, TestSize.Level1)
     CreateUnequalItems();
     SetStrategy(MakeAlign(ScrollSnapAlign::START));
     ScrollTo(60.0f);
+    MockAnimationManager::GetInstance().SetTicks(4);
     ASSERT_TRUE(pattern_->StartSnapAnimation({ .snapDelta = 10.0f }));
     ASSERT_FALSE(MockAnimationManager::GetInstance().AllFinished());
-    pattern_->GetScrollable()->HandleTouchDown();
     MockAnimationManager::GetInstance().Tick();
     FlushUITasks();
-    EXPECT_NEAR(pattern_->GetTotalOffset(), 60.0f, 0.5f);
+    // The mock advances one quarter of the 60 -> 100 animation before the touch.
+    ASSERT_NEAR(pattern_->GetTotalOffset(), 70.0f, 0.5f);
+    pattern_->GetScrollable()->HandleTouchDown();
+    FinishSnapAnimation();
+    EXPECT_NEAR(pattern_->GetTotalOffset(), 70.0f, 0.5f);
+    EXPECT_NEAR(GetChildRect(frameNode_, 2).GetY(), 30.0f, 0.5f);
 }
 
 /**
@@ -817,21 +1101,28 @@ HWTEST_F(WaterFlowScrollSnapTestNg, NewDragCancelsProviderBeforeHandoff, TestSiz
 {
     CreateUnequalItems();
     int32_t snapCalls = 0;
-    SetStrategy(MakeProvider([&snapCalls](double) { ++snapCalls; return 500.0; },
-        [](double, double) { return 200.0; }));
+    int32_t approachCalls = 0;
+    SetStrategy(MakeProvider([&](double) { ++snapCalls; return 500.0; },
+        [&](double, double) { ++approachCalls; return 200.0; }));
     MockAnimationManager::GetInstance().SetTicks(4);
     ASSERT_TRUE(pattern_->StartSnapAnimation({ .snapDelta = -300.0f }));
     pattern_->GetScrollable()->FlushPendingItemSnapKickoff();
     MockAnimationManager::GetInstance().Tick();
     FlushUITasks();
+    ASSERT_NEAR(pattern_->GetTotalOffset(), 50.0f, 0.5f);
+    ASSERT_EQ(approachCalls, 1);
+    ASSERT_EQ(snapCalls, 0);
     DragStart(frameNode_, Offset());
-    const auto interruptedOffset = pattern_->GetTotalOffset();
-    WaterFlowModelNG::ResetScrollSnapStrategy(AceType::RawPtr(frameNode_));
+    // Keep the provider configured: only the new gesture may cancel the previous chain.
+    FinishSnapAnimation();
+    EXPECT_EQ(snapCalls, 0);
+    EXPECT_NEAR(pattern_->GetTotalOffset(), 50.0f, 0.5f);
     DragUpdate(-10.0f);
     DragEnd(0.0f);
     FinishSnapAnimation();
-    EXPECT_EQ(snapCalls, 0);
-    EXPECT_NEAR(pattern_->GetTotalOffset(), interruptedOffset + 10.0f, 0.5f);
+    EXPECT_EQ(approachCalls, 2);
+    EXPECT_EQ(snapCalls, 1);
+    EXPECT_NEAR(pattern_->GetTotalOffset(), 500.0f, 0.5f);
 }
 
 /**
@@ -861,6 +1152,7 @@ HWTEST_F(WaterFlowScrollSnapTestNg, ParentFirstConsumptionDoesNotStartChildProvi
     FlushUITasks();
     EXPECT_TRUE(pattern_->HandleOverScroll(-300.0f));
     pattern_->GetScrollable()->FlushPendingItemSnapKickoff();
+    FinishSnapAnimation();
     EXPECT_EQ(providerCalls, 0);
     EXPECT_FALSE(pattern_->GetScrollable()->IsSnapAnimationRunning());
     EXPECT_NEAR(pattern_->GetTotalOffset(), offset, 0.5f);
@@ -880,7 +1172,69 @@ HWTEST_F(WaterFlowScrollSnapTestNg, ProviderTargetClampedToRange, TestSize.Level
     pattern_->GetScrollable()->FlushPendingItemSnapKickoff();
     FinishSnapAnimation();
     EXPECT_EQ(snapCalls, 1);
-    EXPECT_NEAR(pattern_->GetTotalOffset(), pattern_->GetItemSnapMaxOffset(), 0.5f);
+    EXPECT_GT(pattern_->GetTotalOffset(), 300.0f);
+    EXPECT_EQ(pattern_->layoutInfo_->endIndex_, 29);
+    EXPECT_FLOAT_EQ(GetChildRect(frameNode_, 29).Height(), 90.0f);
+    EXPECT_NEAR(GetChildRect(frameNode_, 29).Bottom(), 300.0f, 0.5f);
+}
+
+/**
+ * @tc.name: ProviderLazyEndWithoutApproach
+ * @tc.desc: A target beyond an underestimated range reaches the actual last item after layout.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollSnapTestNg, ProviderLazyEndWithoutApproach, TestSize.Level1)
+{
+    CheckProviderBeyondInitialEstimate(0.0, 1.0e6, true);
+}
+
+/**
+ * @tc.name: ProviderLazyEndAfterApproach
+ * @tc.desc: The end bound is refreshed after both the approach and final provider stages.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollSnapTestNg, ProviderLazyEndAfterApproach, TestSize.Level1)
+{
+    CheckProviderBeyondInitialEstimate(400.0, 1.0e6, true);
+}
+
+/**
+ * @tc.name: ProviderLazyInteriorTarget
+ * @tc.desc: A finite target above the initial estimate remains reachable without scrolling to the end.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollSnapTestNg, ProviderLazyInteriorTarget, TestSize.Level1)
+{
+    CheckProviderBeyondInitialEstimate(0.0, 7000.0, false);
+}
+
+/**
+ * @tc.name: ProviderLazyNewTouchCancelsContinuation
+ * @tc.desc: A queued range correction cannot resume after a new touch interrupts the snap chain.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollSnapTestNg, ProviderLazyNewTouchCancelsContinuation, TestSize.Level1)
+{
+    CreateUnderestimatedItems();
+    int32_t snapCalls = 0;
+    SetStrategy(MakeProvider([&](double) { ++snapCalls; return 1.0e6; },
+        [](double, double) { return 0.0; }));
+    MockAnimationManager::GetInstance().SetTicks(1);
+    ASSERT_TRUE(pattern_->StartSnapAnimation({ .snapDelta = -30.0f }));
+    auto scrollable = pattern_->GetScrollable();
+    scrollable->FlushPendingItemSnapKickoff();
+    MockAnimationManager::GetInstance().Tick();
+    FlushUITasks();
+    ASSERT_TRUE(snapExecutor_->HasPending());
+    const auto interrupted = pattern_->GetTotalOffset();
+    ASSERT_GT(interrupted, 0.0f);
+    ASSERT_TRUE(pattern_->layoutInfo_->endIndex_ < 99 || GetChildRect(frameNode_, 99).Bottom() > 300.5f);
+    ASSERT_EQ(snapCalls, 1);
+    scrollable->HandleTouchDown();
+    FinishSnapAnimation();
+    EXPECT_EQ(snapCalls, 1);
+    EXPECT_NEAR(pattern_->GetTotalOffset(), interrupted, 0.5f);
+    EXPECT_TRUE(scrollable->IsStopped());
 }
 
 /**
@@ -891,16 +1245,32 @@ HWTEST_F(WaterFlowScrollSnapTestNg, ProviderTargetClampedToRange, TestSize.Level
 HWTEST_F(WaterFlowScrollSnapTestNg, ProviderNonFiniteTargetFallsBack, TestSize.Level1)
 {
     CreateUnequalItems();
-    SetStrategy(MakeProvider([](double) { return std::numeric_limits<double>::quiet_NaN(); }));
-    ScrollTo(60.0f);
-    ASSERT_TRUE(pattern_->StartSnapAnimation({ .snapDelta = -30.0f }));
+    const double invalidTargets[] = { std::numeric_limits<double>::quiet_NaN(),
+        std::numeric_limits<double>::infinity(), -std::numeric_limits<double>::infinity() };
+    for (const double invalid : invalidTargets) {
+        SCOPED_TRACE(invalid);
+        int32_t snapCalls = 0;
+        int32_t approachCalls = 0;
+        SetStrategy(MakeProvider([&](double) { ++snapCalls; return invalid; },
+            [&](double, double) { ++approachCalls; return 200.0; }));
+        ScrollTo(60.0f);
+        ASSERT_TRUE(pattern_->StartSnapAnimation({ .snapDelta = -30.0f }));
+        pattern_->GetScrollable()->FlushPendingItemSnapKickoff();
+        FinishSnapAnimation();
+        // Invalid final targets keep the completed approach at 60 + 200, without rewinding.
+        EXPECT_NEAR(pattern_->GetTotalOffset(), 260.0f, 0.5f);
+        EXPECT_NEAR(GetChildRect(frameNode_, 4).GetY(), -80.0f, 0.5f);
+        EXPECT_EQ(approachCalls, 1);
+        EXPECT_EQ(snapCalls, 1);
+        EXPECT_TRUE(pattern_->GetScrollable()->IsStopped());
+    }
+    int32_t recoveryCalls = 0;
+    SetStrategy(MakeProvider([&](double) { ++recoveryCalls; return PROVIDER_TARGET; }));
+    ASSERT_TRUE(pattern_->StartSnapAnimation({ .snapDelta = -10.0f }));
     pattern_->GetScrollable()->FlushPendingItemSnapKickoff();
     FinishSnapAnimation();
-    const auto settled = pattern_->GetTotalOffset();
-    EXPECT_GE(settled, pattern_->GetItemSnapMinOffset() - 0.5f);
-    EXPECT_LE(settled, pattern_->GetItemSnapMaxOffset() + 0.5f);
-    EXPECT_TRUE(pattern_->GetScrollable()->IsStopped());
-    EXPECT_TRUE(pattern_->StartSnapAnimation({ .snapDelta = -10.0f }));
+    EXPECT_EQ(recoveryCalls, 1);
+    EXPECT_NEAR(pattern_->GetTotalOffset(), PROVIDER_TARGET, 0.5f);
 }
 
 /**
@@ -920,18 +1290,34 @@ HWTEST_F(WaterFlowScrollSnapTestNg, DestroyedNodeDoesNotRunProvider, TestSize.Le
     scrollable->FlushPendingItemSnapKickoff();
     MockAnimationManager::GetInstance().Tick();
     FlushUITasks();
-    WeakPtr<FrameNode> weakNode = frameNode_;
-    RemoveFromStageNode();
-    ViewStackProcessor::GetInstance()->ClearStack();
-    frameNode_.Reset();
-    pattern_.Reset();
-    ClearOldNodes();
-    ASSERT_EQ(weakNode.Upgrade(), nullptr);
-    for (int32_t tick = 0; tick < 8; ++tick) {
-        MockAnimationManager::GetInstance().Tick();
-        snapExecutor_->RunPending();
-    }
+    // Keep Scrollable alive to exercise already queued work after its FrameNode is destroyed.
+    ASSERT_NO_FATAL_FAILURE(DestroyWaterFlow());
+    FinishDetachedSnapAnimation(scrollable);
     EXPECT_EQ(snapCalls, 0);
+}
+
+/**
+ * @tc.name: DestroyedNodeCancelsQueuedContinuation
+ * @tc.desc: Destroying the node cancels a queued provider range correction without another callback or animation.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollSnapTestNg, DestroyedNodeCancelsQueuedContinuation, TestSize.Level1)
+{
+    CreateUnderestimatedItems();
+    int32_t snapCalls = 0;
+    SetStrategy(MakeProvider([&](double) { ++snapCalls; return 1.0e6; },
+        [](double, double) { return 0.0; }));
+    auto scrollable = pattern_->GetScrollable();
+    MockAnimationManager::GetInstance().SetTicks(1);
+    ASSERT_TRUE(pattern_->StartSnapAnimation({ .snapDelta = -30.0f }));
+    scrollable->FlushPendingItemSnapKickoff();
+    MockAnimationManager::GetInstance().Tick();
+    FlushUITasks();
+    ASSERT_EQ(snapCalls, 1);
+    ASSERT_TRUE(snapExecutor_->HasPending());
+    ASSERT_NO_FATAL_FAILURE(DestroyWaterFlow());
+    FinishDetachedSnapAnimation(scrollable);
+    EXPECT_EQ(snapCalls, 1);
 }
 
 /**
