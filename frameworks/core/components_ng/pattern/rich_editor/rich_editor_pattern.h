@@ -705,7 +705,6 @@ public:
     void ReportTextChange();
     void ReportEditorEvent(const std::string& eventType);
     void DeleteToMaxLength(std::optional<int32_t> length);
-    bool IsUnspecifiedOrTextType() const;
     void DeleteContent(int32_t length);
     void ClearTextForDisplayIfEmpty();
     void ResetIsMousePressed();
