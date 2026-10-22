@@ -101,6 +101,14 @@ export class DatePickerComponent extends ViewPU {
         this.__lunar = new ObservedPropertySimplePU(false, this, "lunar");
         this.__dateCanLoop = new ObservedPropertySimplePU(true, this, "dateCanLoop");
         this.__timeCanLoop = new ObservedPropertySimplePU(true, this, "timeCanLoop");
+        this.__dateStartEndSet = new ObservedPropertySimplePU(false, this, "dateStartEndSet");
+        this.__timeStartEndSet = new ObservedPropertySimplePU(false, this, "timeStartEndSet");
+        this.__yearColumnCanLoop = new ObservedPropertySimplePU(true, this, "yearColumnCanLoop");
+        this.__monthColumnCanLoop = new ObservedPropertySimplePU(true, this, "monthColumnCanLoop");
+        this.__dayColumnCanLoop = new ObservedPropertySimplePU(true, this, "dayColumnCanLoop");
+        this.__hourColumnCanLoop = new ObservedPropertySimplePU(true, this, "hourColumnCanLoop");
+        this.__minuteColumnCanLoop = new ObservedPropertySimplePU(true, this, "minuteColumnCanLoop");
+        this.__secondColumnCanLoop = new ObservedPropertySimplePU(true, this, "secondColumnCanLoop");
         this.__dateHapticFeedback = new ObservedPropertySimplePU(true, this, "dateHapticFeedback");
         this.__timeHapticFeedback = new ObservedPropertySimplePU(true, this, "timeHapticFeedback");
         this.__yearArray = new ObservedPropertyObjectPU([], this, "yearArray");
@@ -221,6 +229,30 @@ export class DatePickerComponent extends ViewPU {
         if (params.timeCanLoop !== undefined) {
             this.timeCanLoop = params.timeCanLoop;
         }
+        if (params.dateStartEndSet !== undefined) {
+            this.dateStartEndSet = params.dateStartEndSet;
+        }
+        if (params.timeStartEndSet !== undefined) {
+            this.timeStartEndSet = params.timeStartEndSet;
+        }
+        if (params.yearColumnCanLoop !== undefined) {
+            this.yearColumnCanLoop = params.yearColumnCanLoop;
+        }
+        if (params.monthColumnCanLoop !== undefined) {
+            this.monthColumnCanLoop = params.monthColumnCanLoop;
+        }
+        if (params.dayColumnCanLoop !== undefined) {
+            this.dayColumnCanLoop = params.dayColumnCanLoop;
+        }
+        if (params.hourColumnCanLoop !== undefined) {
+            this.hourColumnCanLoop = params.hourColumnCanLoop;
+        }
+        if (params.minuteColumnCanLoop !== undefined) {
+            this.minuteColumnCanLoop = params.minuteColumnCanLoop;
+        }
+        if (params.secondColumnCanLoop !== undefined) {
+            this.secondColumnCanLoop = params.secondColumnCanLoop;
+        }
         if (params.dateHapticFeedback !== undefined) {
             this.dateHapticFeedback = params.dateHapticFeedback;
         }
@@ -337,6 +369,14 @@ export class DatePickerComponent extends ViewPU {
         this.__lunar.purgeDependencyOnElmtId(rmElmtId);
         this.__dateCanLoop.purgeDependencyOnElmtId(rmElmtId);
         this.__timeCanLoop.purgeDependencyOnElmtId(rmElmtId);
+        this.__dateStartEndSet.purgeDependencyOnElmtId(rmElmtId);
+        this.__timeStartEndSet.purgeDependencyOnElmtId(rmElmtId);
+        this.__yearColumnCanLoop.purgeDependencyOnElmtId(rmElmtId);
+        this.__monthColumnCanLoop.purgeDependencyOnElmtId(rmElmtId);
+        this.__dayColumnCanLoop.purgeDependencyOnElmtId(rmElmtId);
+        this.__hourColumnCanLoop.purgeDependencyOnElmtId(rmElmtId);
+        this.__minuteColumnCanLoop.purgeDependencyOnElmtId(rmElmtId);
+        this.__secondColumnCanLoop.purgeDependencyOnElmtId(rmElmtId);
         this.__dateHapticFeedback.purgeDependencyOnElmtId(rmElmtId);
         this.__timeHapticFeedback.purgeDependencyOnElmtId(rmElmtId);
         this.__yearArray.purgeDependencyOnElmtId(rmElmtId);
@@ -382,6 +422,14 @@ export class DatePickerComponent extends ViewPU {
         this.__lunar.aboutToBeDeleted();
         this.__dateCanLoop.aboutToBeDeleted();
         this.__timeCanLoop.aboutToBeDeleted();
+        this.__dateStartEndSet.aboutToBeDeleted();
+        this.__timeStartEndSet.aboutToBeDeleted();
+        this.__yearColumnCanLoop.aboutToBeDeleted();
+        this.__monthColumnCanLoop.aboutToBeDeleted();
+        this.__dayColumnCanLoop.aboutToBeDeleted();
+        this.__hourColumnCanLoop.aboutToBeDeleted();
+        this.__minuteColumnCanLoop.aboutToBeDeleted();
+        this.__secondColumnCanLoop.aboutToBeDeleted();
         this.__dateHapticFeedback.aboutToBeDeleted();
         this.__timeHapticFeedback.aboutToBeDeleted();
         this.__yearArray.aboutToBeDeleted();
@@ -577,6 +625,54 @@ export class DatePickerComponent extends ViewPU {
     }
     set timeCanLoop(newValue) {
         this.__timeCanLoop.set(newValue);
+    }
+    get dateStartEndSet() {
+        return this.__dateStartEndSet.get();
+    }
+    set dateStartEndSet(newValue) {
+        this.__dateStartEndSet.set(newValue);
+    }
+    get timeStartEndSet() {
+        return this.__timeStartEndSet.get();
+    }
+    set timeStartEndSet(newValue) {
+        this.__timeStartEndSet.set(newValue);
+    }
+    get yearColumnCanLoop() {
+        return this.__yearColumnCanLoop.get();
+    }
+    set yearColumnCanLoop(newValue) {
+        this.__yearColumnCanLoop.set(newValue);
+    }
+    get monthColumnCanLoop() {
+        return this.__monthColumnCanLoop.get();
+    }
+    set monthColumnCanLoop(newValue) {
+        this.__monthColumnCanLoop.set(newValue);
+    }
+    get dayColumnCanLoop() {
+        return this.__dayColumnCanLoop.get();
+    }
+    set dayColumnCanLoop(newValue) {
+        this.__dayColumnCanLoop.set(newValue);
+    }
+    get hourColumnCanLoop() {
+        return this.__hourColumnCanLoop.get();
+    }
+    set hourColumnCanLoop(newValue) {
+        this.__hourColumnCanLoop.set(newValue);
+    }
+    get minuteColumnCanLoop() {
+        return this.__minuteColumnCanLoop.get();
+    }
+    set minuteColumnCanLoop(newValue) {
+        this.__minuteColumnCanLoop.set(newValue);
+    }
+    get secondColumnCanLoop() {
+        return this.__secondColumnCanLoop.get();
+    }
+    set secondColumnCanLoop(newValue) {
+        this.__secondColumnCanLoop.set(newValue);
     }
     get dateHapticFeedback() {
         return this.__dateHapticFeedback.get();
@@ -791,6 +887,8 @@ export class DatePickerComponent extends ViewPU {
             this.initDayArray();
         }
         this.initTimeArrays();
+        this.updateDateColumnLoopState();
+        this.updateTimeColumnLoopState();
     }
     initLunarArrays() {
         this.yearArray = [];
@@ -938,9 +1036,14 @@ export class DatePickerComponent extends ViewPU {
         return lunarMonthNames[month];
     }
     formatLunarDay(day) {
-        const lunarDayNames = ['初一', '初二', '初三', '初四', '初五', '初六', '初七', '初八', '初九', '初十',
-            '十一', '十二', '十三', '十四', '十五', '十六', '十七', '十八', '十九', '二十',
-            '廿一', '廿二', '廿三', '廿四', '廿五', '廿六', '廿七', '廿八', '廿九', '三十'];
+        const lunarDayNames = [
+            '初一', '初二', '初三', '初四', '初五',
+            '初六', '初七', '初八', '初九', '初十',
+            '十一', '十二', '十三', '十四', '十五',
+            '十六', '十七', '十八', '十九', '二十',
+            '廿一', '廿二', '廿三', '廿四', '廿五',
+            '廿六', '廿七', '廿八', '廿九', '三十'
+        ];
         if (day >= 1 && day <= 30) {
             return lunarDayNames[day - 1];
         }
@@ -1281,8 +1384,14 @@ export class DatePickerComponent extends ViewPU {
             const date = new Date(2026, 0, 1, displayHour, 0, 0);
             const formatted = this.hourFormatter.format(date);
             // Remove any non-digit characters (like AM/PM, spaces, etc.)
-            // Include Unicode ranges for all localized digits: Arabic-Indic, Persian, Devanagari, Bengali, Thai, Lao, Myanmar, Khmer
-            const hourMatch = formatted.match(/[\d\u0660-\u0669\u06F0-\u06F9\u0966-\u096F\u09E6-\u09EF\u0E50-\u0E59\u0ED0-\u0ED9\u1040-\u1049\u17E0-\u17E9]+/);
+            // This gives us just the hour number in locale format
+            // Include Unicode ranges for all localized digits:
+            // Arabic-Indic, Persian, Devanagari, Bengali, Thai, Lao, Myanmar, Khmer
+            const pattern = '[\\d\\u0660-\\u0669\\u06F0-\\u06F9]' +
+                '[\\u0966-\\u096F\\u09E6-\\u09EF]' +
+                '[\\u0E50-\\u0E59\\u0ED0-\\u0ED9]' +
+                '[\\u1040-\\u1049\\u17E0-\\u17E9]+';
+            const hourMatch = formatted.match(new RegExp(pattern));
             if (hourMatch && hourMatch.length > 0) {
                 return hourMatch[0];
             }
@@ -1509,6 +1618,7 @@ export class DatePickerComponent extends ViewPU {
             this.userLunar = false;
             this.lunarCalendar = null;
             this.dateCanLoop = true;
+            this.dateStartEndSet = false;
             this.dateHapticFeedback = true;
             this.startYear = DatePickerConstant.DEFAULT_START_YEAR;
             this.endYear = DatePickerConstant.DEFAULT_END_YEAR;
@@ -1525,6 +1635,7 @@ export class DatePickerComponent extends ViewPU {
             this.timeFormat = TimeFormat.HOUR_MINUTE;
             this.useMilitaryTime = false;
             this.timeCanLoop = true;
+            this.timeStartEndSet = false;
             this.timeHapticFeedback = true;
             this.startHour = DatePickerConstant.MIN_HOUR;
             this.endHour = DatePickerConstant.MAX_HOUR;
@@ -1669,10 +1780,7 @@ export class DatePickerComponent extends ViewPU {
             this.endMonth = tempMonth;
             this.endDay = tempDay;
         }
-        // If user explicitly sets valid start or end, force loop to false
-        if (startValid || endValid) {
-            this.dateCanLoop = false;
-        }
+        this.dateStartEndSet = startValid || endValid;
         if (this.startYear < DatePickerConstant.MIN_YEAR) {
             this.startYear = DatePickerConstant.MIN_YEAR;
             this.startMonth = DatePickerConstant.MIN_MONTH;
@@ -1878,10 +1986,7 @@ export class DatePickerComponent extends ViewPU {
         this.endMinute = Math.max(DatePickerConstant.MIN_MINUTE, Math.min(DatePickerConstant.MAX_MINUTE, this.endMinute));
         this.startSecond = Math.max(DatePickerConstant.MIN_SECOND, Math.min(DatePickerConstant.MAX_SECOND, this.startSecond));
         this.endSecond = Math.max(DatePickerConstant.MIN_SECOND, Math.min(DatePickerConstant.MAX_SECOND, this.endSecond));
-        // If user explicitly sets valid start or end, force loop to false
-        if (startValid || endValid) {
-            this.timeCanLoop = false;
-        }
+        this.timeStartEndSet = startValid || endValid;
         const now = new Date();
         let selectedTime = undefined;
         let selectedValid = false;
@@ -2020,6 +2125,7 @@ export class DatePickerComponent extends ViewPU {
             this.initMonthArray();
             this.updateDaysArray();
         }
+        this.updateDateColumnLoopState();
         this.dateOnChange?.(this.getResult());
     }
     onMonthChange(selectedIndex) {
@@ -2059,6 +2165,7 @@ export class DatePickerComponent extends ViewPU {
             this.selectedMonth = startMonthIndex + selectedIndex;
             this.updateDaysArray();
         }
+        this.updateDateColumnLoopState();
         this.dateOnChange?.(this.getResult());
     }
     onDayChange(selectedIndex) {
@@ -2156,6 +2263,7 @@ export class DatePickerComponent extends ViewPU {
             }
         }
         this.updateTimeArrays();
+        this.updateTimeColumnLoopState();
         this.timeOnChange?.(this.getResult());
     }
     onPeriodChange(selectedIndex) {
@@ -2195,6 +2303,7 @@ export class DatePickerComponent extends ViewPU {
             // Update minute and second arrays
             this.updateTimeArrays();
         }
+        this.updateTimeColumnLoopState();
         this.timeOnChange?.(this.getResult());
     }
     onMinuteChange(selectedIndex) {
@@ -2204,6 +2313,7 @@ export class DatePickerComponent extends ViewPU {
         }
         this.selectedMinute = startMinuteIndex + selectedIndex;
         this.updateSecondArray();
+        this.updateTimeColumnLoopState();
         this.timeOnChange?.(this.getResult());
     }
     onSecondChange(selectedIndex) {
@@ -2419,6 +2529,38 @@ export class DatePickerComponent extends ViewPU {
         }
         return this.selectedSecond - startSecondIndex;
     }
+    updateDateColumnLoopState() {
+        if (!this.dateStartEndSet || !this.dateCanLoop) {
+            const loop = this.dateCanLoop;
+            this.yearColumnCanLoop = loop;
+            this.monthColumnCanLoop = loop;
+            this.dayColumnCanLoop = loop;
+            return;
+        }
+        this.yearColumnCanLoop = false;
+        const atStartYear = this.selectedYear === this.startYear;
+        const atEndYear = this.selectedYear === this.endYear;
+        this.monthColumnCanLoop = !atStartYear && !atEndYear;
+        const atStartMonth = atStartYear && this.selectedMonth === this.startMonth;
+        const atEndMonth = atEndYear && this.selectedMonth === this.endMonth;
+        this.dayColumnCanLoop = !atStartMonth && !atEndMonth;
+    }
+    updateTimeColumnLoopState() {
+        if (!this.timeStartEndSet || !this.timeCanLoop) {
+            const loop = this.timeCanLoop;
+            this.hourColumnCanLoop = loop;
+            this.minuteColumnCanLoop = loop;
+            this.secondColumnCanLoop = loop;
+            return;
+        }
+        this.hourColumnCanLoop = false;
+        const atStartHour = this.selectedHour === this.startHour;
+        const atEndHour = this.selectedHour === this.endHour;
+        this.minuteColumnCanLoop = !atStartHour && !atEndHour;
+        const atStartMinute = atStartHour && this.selectedMinute === this.startMinute;
+        const atEndMinute = atEndHour && this.selectedMinute === this.endMinute;
+        this.secondColumnCanLoop = !atStartMinute && !atEndMinute;
+    }
     isRTL() {
         return i18n.isRTL(this.locale.toString()) ?? false;
     }
@@ -2622,7 +2764,7 @@ export class DatePickerComponent extends ViewPU {
                                     UIPickerComponent.create({ selectedIndex: this.getYearSelectedIndex() });
                                     UIPickerComponent.width(this.getDateColumnWidth(0));
                                     UIPickerComponent.height(200);
-                                    UIPickerComponent.canLoop(this.dateCanLoop);
+                                    UIPickerComponent.canLoop(this.yearColumnCanLoop);
                                     UIPickerComponent.enableHapticFeedback(this.dateHapticFeedback);
                                     UIPickerComponent.selectionIndicator(this.getFirstPickerIndicator(this.getAdjustedRadius()));
                                     UIPickerComponent.onChange((selectedIndex) => {
@@ -2658,7 +2800,7 @@ export class DatePickerComponent extends ViewPU {
                                     UIPickerComponent.create({ selectedIndex: this.getMonthSelectedIndex() });
                                     UIPickerComponent.width(this.getDateColumnWidth(1));
                                     UIPickerComponent.height(200);
-                                    UIPickerComponent.canLoop(this.dateCanLoop);
+                                    UIPickerComponent.canLoop(this.monthColumnCanLoop);
                                     UIPickerComponent.enableHapticFeedback(this.dateHapticFeedback);
                                     UIPickerComponent.selectionIndicator(this.getMiddlePickerIndicator());
                                     UIPickerComponent.onChange((selectedIndex) => {
@@ -2688,7 +2830,7 @@ export class DatePickerComponent extends ViewPU {
                                     UIPickerComponent.create({ selectedIndex: this.getDaySelectedIndex() });
                                     UIPickerComponent.width(this.getDateColumnWidth(2));
                                     UIPickerComponent.height(200);
-                                    UIPickerComponent.canLoop(this.dateCanLoop);
+                                    UIPickerComponent.canLoop(this.dayColumnCanLoop);
                                     UIPickerComponent.enableHapticFeedback(this.dateHapticFeedback);
                                     UIPickerComponent.selectionIndicator(this.displayMode === DisplayMode.DATE_TIME ? this.getMiddlePickerIndicator() : this.getLastPickerIndicator(this.getAdjustedRadius()));
                                     UIPickerComponent.onChange((selectedIndex) => {
@@ -2730,7 +2872,7 @@ export class DatePickerComponent extends ViewPU {
                                     UIPickerComponent.create({ selectedIndex: this.getYearSelectedIndex() });
                                     UIPickerComponent.width(this.getDateColumnWidth(0));
                                     UIPickerComponent.height(200);
-                                    UIPickerComponent.canLoop(this.dateCanLoop);
+                                    UIPickerComponent.canLoop(this.yearColumnCanLoop);
                                     UIPickerComponent.enableHapticFeedback(this.dateHapticFeedback);
                                     UIPickerComponent.selectionIndicator(this.getFirstPickerIndicator(this.getAdjustedRadius()));
                                     UIPickerComponent.onChange((selectedIndex) => {
@@ -2766,7 +2908,7 @@ export class DatePickerComponent extends ViewPU {
                                     UIPickerComponent.create({ selectedIndex: this.getMonthSelectedIndex() });
                                     UIPickerComponent.width(this.getDateColumnWidth(1));
                                     UIPickerComponent.height(200);
-                                    UIPickerComponent.canLoop(this.dateCanLoop);
+                                    UIPickerComponent.canLoop(this.monthColumnCanLoop);
                                     UIPickerComponent.enableHapticFeedback(this.dateHapticFeedback);
                                     UIPickerComponent.selectionIndicator(this.displayMode === DisplayMode.DATE_TIME ? this.getMiddlePickerIndicator() : this.getLastPickerIndicator(this.getAdjustedRadius()));
                                     UIPickerComponent.onChange((selectedIndex) => {
@@ -2808,7 +2950,7 @@ export class DatePickerComponent extends ViewPU {
                                     UIPickerComponent.create({ selectedIndex: this.getMonthSelectedIndex() });
                                     UIPickerComponent.width(this.getDateColumnWidth(0));
                                     UIPickerComponent.height(200);
-                                    UIPickerComponent.canLoop(this.dateCanLoop);
+                                    UIPickerComponent.canLoop(this.monthColumnCanLoop);
                                     UIPickerComponent.enableHapticFeedback(this.dateHapticFeedback);
                                     UIPickerComponent.selectionIndicator(this.getFirstPickerIndicator(this.getAdjustedRadius()));
                                     UIPickerComponent.onChange((selectedIndex) => {
@@ -2844,7 +2986,7 @@ export class DatePickerComponent extends ViewPU {
                                     UIPickerComponent.create({ selectedIndex: this.getDaySelectedIndex() });
                                     UIPickerComponent.width(this.getDateColumnWidth(1));
                                     UIPickerComponent.height(200);
-                                    UIPickerComponent.canLoop(this.dateCanLoop);
+                                    UIPickerComponent.canLoop(this.dayColumnCanLoop);
                                     UIPickerComponent.enableHapticFeedback(this.dateHapticFeedback);
                                     UIPickerComponent.selectionIndicator(this.displayMode === DisplayMode.DATE_TIME ? this.getMiddlePickerIndicator() : this.getLastPickerIndicator(this.getAdjustedRadius()));
                                     UIPickerComponent.onChange((selectedIndex) => {
@@ -2910,7 +3052,7 @@ export class DatePickerComponent extends ViewPU {
                                                 UIPickerComponent.create({ selectedIndex: this.getHourSelectedIndex() });
                                                 UIPickerComponent.width(this.getTimeColumnWidth(0));
                                                 UIPickerComponent.height(200);
-                                                UIPickerComponent.canLoop(this.timeCanLoop);
+                                                UIPickerComponent.canLoop(this.hourColumnCanLoop);
                                                 UIPickerComponent.enableHapticFeedback(this.timeHapticFeedback);
                                                 UIPickerComponent.selectionIndicator(this.displayMode === DisplayMode.DATE_TIME ? this.getMiddlePickerIndicator() : this.getFirstPickerIndicator(this.getAdjustedRadius()));
                                                 UIPickerComponent.onChange((selectedIndex) => {
@@ -2950,7 +3092,7 @@ export class DatePickerComponent extends ViewPU {
                                                 UIPickerComponent.create({ selectedIndex: this.getMinuteSelectedIndex() });
                                                 UIPickerComponent.width(this.getTimeColumnWidth(1));
                                                 UIPickerComponent.height(200);
-                                                UIPickerComponent.canLoop(this.timeCanLoop);
+                                                UIPickerComponent.canLoop(this.minuteColumnCanLoop);
                                                 UIPickerComponent.enableHapticFeedback(this.timeHapticFeedback);
                                                 UIPickerComponent.selectionIndicator(this.getLastPickerIndicator(this.getAdjustedRadius()));
                                                 UIPickerComponent.onChange((selectedIndex) => {
@@ -3035,7 +3177,7 @@ export class DatePickerComponent extends ViewPU {
                                                 UIPickerComponent.create({ selectedIndex: this.getHourSelectedIndex() });
                                                 UIPickerComponent.width(this.getTimeColumnWidth(1));
                                                 UIPickerComponent.height(200);
-                                                UIPickerComponent.canLoop(this.timeCanLoop);
+                                                UIPickerComponent.canLoop(this.hourColumnCanLoop);
                                                 UIPickerComponent.enableHapticFeedback(this.timeHapticFeedback);
                                                 UIPickerComponent.selectionIndicator(this.getMiddlePickerIndicator());
                                                 UIPickerComponent.onChange((selectedIndex) => {
@@ -3066,7 +3208,7 @@ export class DatePickerComponent extends ViewPU {
                                                 UIPickerComponent.create({ selectedIndex: this.getMinuteSelectedIndex() });
                                                 UIPickerComponent.width(this.getTimeColumnWidth(2));
                                                 UIPickerComponent.height(200);
-                                                UIPickerComponent.canLoop(this.timeCanLoop);
+                                                UIPickerComponent.canLoop(this.minuteColumnCanLoop);
                                                 UIPickerComponent.enableHapticFeedback(this.timeHapticFeedback);
                                                 UIPickerComponent.selectionIndicator(this.getLastPickerIndicator(this.getAdjustedRadius()));
                                                 UIPickerComponent.onChange((selectedIndex) => {
@@ -3120,7 +3262,7 @@ export class DatePickerComponent extends ViewPU {
                                                 UIPickerComponent.create({ selectedIndex: this.getHourSelectedIndex() });
                                                 UIPickerComponent.width(this.getTimeColumnWidth(0));
                                                 UIPickerComponent.height(200);
-                                                UIPickerComponent.canLoop(this.timeCanLoop);
+                                                UIPickerComponent.canLoop(this.hourColumnCanLoop);
                                                 UIPickerComponent.enableHapticFeedback(this.timeHapticFeedback);
                                                 UIPickerComponent.selectionIndicator(this.displayMode === DisplayMode.DATE_TIME ? this.getMiddlePickerIndicator() : this.getFirstPickerIndicator(this.getAdjustedRadius()));
                                                 UIPickerComponent.onChange((selectedIndex) => {
@@ -3160,7 +3302,7 @@ export class DatePickerComponent extends ViewPU {
                                                 UIPickerComponent.create({ selectedIndex: this.getMinuteSelectedIndex() });
                                                 UIPickerComponent.width(this.getTimeColumnWidth(1));
                                                 UIPickerComponent.height(200);
-                                                UIPickerComponent.canLoop(this.timeCanLoop);
+                                                UIPickerComponent.canLoop(this.minuteColumnCanLoop);
                                                 UIPickerComponent.enableHapticFeedback(this.timeHapticFeedback);
                                                 UIPickerComponent.selectionIndicator(this.getMiddlePickerIndicator());
                                                 UIPickerComponent.onChange((selectedIndex) => {
@@ -3196,7 +3338,7 @@ export class DatePickerComponent extends ViewPU {
                                                 UIPickerComponent.create({ selectedIndex: this.getSecondSelectedIndex() });
                                                 UIPickerComponent.width(this.getTimeColumnWidth(2));
                                                 UIPickerComponent.height(200);
-                                                UIPickerComponent.canLoop(this.timeCanLoop);
+                                                UIPickerComponent.canLoop(this.secondColumnCanLoop);
                                                 UIPickerComponent.enableHapticFeedback(this.timeHapticFeedback);
                                                 UIPickerComponent.selectionIndicator(this.getLastPickerIndicator(this.getAdjustedRadius()));
                                                 UIPickerComponent.onChange((selectedIndex) => {
@@ -3280,7 +3422,7 @@ export class DatePickerComponent extends ViewPU {
                                                 UIPickerComponent.create({ selectedIndex: this.getHourSelectedIndex() });
                                                 UIPickerComponent.width(this.getTimeColumnWidth(1));
                                                 UIPickerComponent.height(200);
-                                                UIPickerComponent.canLoop(this.timeCanLoop);
+                                                UIPickerComponent.canLoop(this.hourColumnCanLoop);
                                                 UIPickerComponent.enableHapticFeedback(this.timeHapticFeedback);
                                                 UIPickerComponent.selectionIndicator(this.getMiddlePickerIndicator());
                                                 UIPickerComponent.onChange((selectedIndex) => {
@@ -3311,7 +3453,7 @@ export class DatePickerComponent extends ViewPU {
                                                 UIPickerComponent.create({ selectedIndex: this.getMinuteSelectedIndex() });
                                                 UIPickerComponent.width(this.getTimeColumnWidth(2));
                                                 UIPickerComponent.height(200);
-                                                UIPickerComponent.canLoop(this.timeCanLoop);
+                                                UIPickerComponent.canLoop(this.minuteColumnCanLoop);
                                                 UIPickerComponent.enableHapticFeedback(this.timeHapticFeedback);
                                                 UIPickerComponent.selectionIndicator(this.getMiddlePickerIndicator());
                                                 UIPickerComponent.onChange((selectedIndex) => {
@@ -3347,7 +3489,7 @@ export class DatePickerComponent extends ViewPU {
                                                 UIPickerComponent.create({ selectedIndex: this.getSecondSelectedIndex() });
                                                 UIPickerComponent.width(this.getTimeColumnWidth(3));
                                                 UIPickerComponent.height(200);
-                                                UIPickerComponent.canLoop(this.timeCanLoop);
+                                                UIPickerComponent.canLoop(this.secondColumnCanLoop);
                                                 UIPickerComponent.enableHapticFeedback(this.timeHapticFeedback);
                                                 UIPickerComponent.selectionIndicator(this.getLastPickerIndicator(this.getAdjustedRadius()));
                                                 UIPickerComponent.onChange((selectedIndex) => {
@@ -3408,6 +3550,8 @@ export class DatePickerComponent extends ViewPU {
     }
     rerender() {
         this.updateDirtyElements();
+    }
+    resetStateVarsOnReuse(params) {
     }
 }
 
