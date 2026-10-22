@@ -625,8 +625,8 @@ public:
     /**
      * @description: reports component tree query result to the requesting SA process.
      */
-    virtual void ReportNavigationQueryResult(const std::string& data) {}
-    virtual void ReportLazyForEachQueryResult(const std::string& data) {}
+    virtual void ReportNavigationQueryResult(const std::string& data) = 0;
+    virtual void ReportLazyForEachQueryResult(const std::string& data) = 0;
 };
 } // namespace OHOS::Ace
 #endif // FOUNDATION_ACE_INTERFACE_UI_CONTENT_SERVICE_INTERFACE_H
