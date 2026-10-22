@@ -54,6 +54,7 @@ import {
   CommonMethod,
   ButtonType,
   HoverEffect,
+  HitTestMode,
   TapGesture,
   TouchEvent,
   SourceType,
@@ -226,6 +227,7 @@ export interface CommonSegmentButtonOptions {
   borderRadiusMode?: BorderRadiusMode,
   backgroundBorderRadius?: LengthMetrics,
   itemBorderRadius?: LengthMetrics,
+  interactionMode?: SegmentButtonInteractionMode
 }
 
 export type ItemRestriction<T> = Array<T>
@@ -528,6 +530,11 @@ export class SegmentButtonItemOptionsArray extends Array<SegmentButtonItemOption
   }
 }
 
+export enum SegmentButtonInteractionMode {
+  FOLLOWING_DRAG = 0,
+  NORMAL_DRAG = 1
+}
+
 export enum BorderRadiusMode {
   /**
    * DEFAULT Mode, the framework automatically calculates the border radius
@@ -567,6 +574,7 @@ export class SegmentButtonOptions {
   public backgroundBlurStyle: BlurStyle = BlurStyle.Thick;
   public direction?: Direction;
   private _buttons: SegmentButtonItemOptionsArray | undefined = undefined;
+  public interactionMode?: SegmentButtonInteractionMode;
   public backgroundSystemMaterial?: uiMaterial.Material;
   public borderRadiusMode?: BorderRadiusMode;
   public backgroundBorderRadius?: LengthMetrics;
@@ -608,6 +616,7 @@ export class SegmentButtonOptions {
     }
     this.localizedTextPadding = options.localizedTextPadding;
     this.localizedButtonPadding = options.localizedButtonPadding;
+    this.interactionMode = options.interactionMode;
     this.direction = options.direction ?? Direction.Auto;
     this.buttons = new SegmentButtonItemOptionsArray(options instanceof TabSegmentButtonOptions ?
       (options as TabSegmentButtonOptions).buttons : (options as CapsuleSegmentButtonOptions).buttons)
@@ -665,6 +674,7 @@ export class SegmentButtonOptions {
       localizedButtonPadding: options.localizedButtonPadding,
       backgroundBlurStyle: options.backgroundBlurStyle,
       direction: options.direction,
+      interactionMode: options.interactionMode,
       backgroundSystemMaterial: options.backgroundSystemMaterial,
       borderRadiusMode: options.borderRadiusMode,
       backgroundBorderRadius: options.backgroundBorderRadius,
@@ -692,6 +702,7 @@ export class SegmentButtonOptions {
       localizedButtonPadding: options.localizedButtonPadding,
       backgroundBlurStyle: options.backgroundBlurStyle,
       direction: options.direction,
+      interactionMode: options.interactionMode,
       backgroundSystemMaterial: options.backgroundSystemMaterial,
       borderRadiusMode: options.borderRadiusMode,
       backgroundBorderRadius: options.backgroundBorderRadius,
@@ -1860,7 +1871,6 @@ export struct SegmentButton {
           }
           .id("SegmentButton_ItemStack")
           .direction(this.options.direction)
-          .animation({ duration: 0 })
           .borderRadius(this.getBackgroundBorderRadius())
           .translate({ x: this.selectedItemOffsetX })
           .visibility((this.componentSize.height as double) > 0 ? Visibility.Visible : Visibility.None)
@@ -2023,7 +2033,7 @@ export struct SegmentButton {
           }),
         LongPressGesture({ repeat: false, duration: 200 })
           .onAction((event: GestureEvent) => {
-            if (!this.isBackgroundSystemMaterialEnabled()) {
+            if (!this.isMaterialInteractionEnabled()) {
               return
             }
             if (this.options === undefined || this.options.buttons === undefined) {
@@ -2053,8 +2063,13 @@ export struct SegmentButton {
             }
           })
           .onActionCancel((event: GestureEvent) => {
-            if (!this.isBackgroundSystemMaterialEnabled()) {
-              return
+            if (!this.isMaterialInteractionEnabled()) {
+              if (this.options?.interactionMode === SegmentButtonInteractionMode.NORMAL_DRAG) {
+                this.isCurrentPositionPressed = false;
+                this.openSelectedItemSystemMaterial = false;
+                this.selectedItemScale = undefined;
+              }
+              return;
             }
             if (this.options === undefined || this.options.buttons === undefined) {
               return;
@@ -2070,8 +2085,13 @@ export struct SegmentButton {
             this.isCurrentPositionPressed = false;
           })
           .onActionEnd((event: GestureEvent) => {
-            if (!this.isBackgroundSystemMaterialEnabled()) {
-              return
+            if (!this.isMaterialInteractionEnabled()) {
+              if (this.options?.interactionMode === SegmentButtonInteractionMode.NORMAL_DRAG) {
+                this.isCurrentPositionPressed = false;
+                this.openSelectedItemSystemMaterial = false;
+                this.selectedItemScale = undefined;
+              }
+              return;
             }
             if (this.options === undefined || this.options.buttons === undefined) {
               return;
@@ -2114,7 +2134,7 @@ export struct SegmentButton {
               }
             }
 
-            if (this.isBackgroundSystemMaterialEnabled() && this.isCurrentPositionSelected) {
+            if (this.isMaterialInteractionEnabled() && this.isCurrentPositionSelected) {
               this.getUIContext().animateTo({
                 curve: curves.interpolatingSpring(0, 1, 195, 14),
               }, () => {
@@ -2142,7 +2162,9 @@ export struct SegmentButton {
               fingerInfo!.globalY ?? 0)) {
               this.isPanGestureMoved = true;
             }
-            if (this.isBackgroundSystemMaterialEnabled()) {
+            const isMaterialEnabled = this.isBackgroundSystemMaterialEnabled();
+            if ((!this.isMouseWheelScroll(event) && this.isFollowingDragEnabled(isMaterialEnabled)) ||
+              (isMaterialEnabled && this.isMouseWheelScroll(event))) {
               const alg = this.layoutAlgorithm
               let buttonLength: int = Math.min(this.options!.buttons!.length, this.buttonItemsSize!.length).toInt();
               const startX = Math.min(alg.getButtonX(0), alg.getButtonX(buttonLength - 1))
@@ -2167,6 +2189,11 @@ export struct SegmentButton {
                   break
                 }
               }
+              if (isMaterialEnabled || this.options?.interactionMode === SegmentButtonInteractionMode.NORMAL_DRAG) {
+                this.panGestureStartPoint = { x: (fingerInfo?.globalX ?? 0) as number, y: (fingerInfo?.globalY ?? 0) as number };
+              }
+            }
+            if (!isMaterialEnabled) {
               this.zoomScaleArray.forEach((_, index) => {
                 if (index === this.selectedIndexes[0]) {
                   this.getUIContext()?.animateTo({
@@ -2197,6 +2224,10 @@ export struct SegmentButton {
             }
             let fingerInfo = event.fingerList.find(f => Boolean(f))
             if (fingerInfo === undefined) {
+              if (!this.isBackgroundSystemMaterialEnabled() &&
+                this.options?.interactionMode === SegmentButtonInteractionMode.FOLLOWING_DRAG) {
+                this.selectedItemOffsetX = 0;
+              }
               return;
             }
             if (!this.isPanGestureMoved && this.isMovedFromPanGestureStartPoint(fingerInfo!.globalX ?? 0,
@@ -2204,7 +2235,9 @@ export struct SegmentButton {
               this.isPanGestureMoved = true;
             }
 
-            if (this.isBackgroundSystemMaterialEnabled()) {
+            const isMaterialEnabled = this.isBackgroundSystemMaterialEnabled();
+            if ((!this.isMouseWheelScroll(event) && this.isFollowingDragEnabled(isMaterialEnabled)) ||
+              (isMaterialEnabled && this.isMouseWheelScroll(event))) {
               let selectedInfo = fingerInfo.localX
               let buttonLength: int = Math.min(this.options!.buttons!.length, this.buttonItemsSize!.length).toInt();
               let realIndex: int = -1;
@@ -2222,7 +2255,11 @@ export struct SegmentButton {
                 this.selectedIndexes[0] = realIndex;
                 this.selectedItemOffsetX = 0
               })
-              this.finishSelectMaterialAnimation();
+              if (!isMaterialEnabled) {
+                this.getUIContext().animateTo({ curve: curves.interpolatingSpring(10, 1, 410, 38) }, () => {
+                  this.zoomScaleArray.fill(1);
+                });
+              }
 
             } else {
               if (this.isMouseWheelScroll(event)) {
@@ -2246,6 +2283,9 @@ export struct SegmentButton {
                   this.zoomScaleArray[this.selectedIndexes[0]] = 1.0;
                 });
             }
+            if (isMaterialEnabled) {
+              this.finishSelectMaterialAnimation();
+            }
             this.isCurrentPositionSelected = false;
           })
           .onActionCancel(() => {
@@ -2261,12 +2301,27 @@ export struct SegmentButton {
                 this.zoomScaleArray[this.selectedIndexes[0]] = 1.0;
               })
             this.isCurrentPositionSelected = false;
-            if (this.isBackgroundSystemMaterialEnabled()) {
+            if (!this.isBackgroundSystemMaterialEnabled() &&
+              this.options?.interactionMode === SegmentButtonInteractionMode.FOLLOWING_DRAG) {
+              this.selectedItemOffsetX = 0;
+            }
+            if (this.isMaterialInteractionEnabled()) {
               this.finishSelectMaterialAnimation();
             }
           })
       )
     )
+  }
+
+  private isFollowingDragEnabled(isMaterialEnabled: boolean): boolean {
+    return this.options?.interactionMode === SegmentButtonInteractionMode.FOLLOWING_DRAG ||
+      (isMaterialEnabled &&
+        this.options?.interactionMode !== SegmentButtonInteractionMode.NORMAL_DRAG);
+  }
+
+  private isMaterialInteractionEnabled(): boolean {
+    // Material feedback is independent of drag positioning and selection timing.
+    return this.isBackgroundSystemMaterialEnabled();
   }
 
   private isBackgroundSystemMaterialEnabled(): boolean {
@@ -2349,6 +2404,9 @@ export struct SegmentButton {
   }
 
   updateAnimatedProperty(curve: ICurve | null) {
+    // Cross-item selection must not replay material press/release while dragging.
+    const isNormalDragSelection = this.options?.interactionMode === SegmentButtonInteractionMode.NORMAL_DRAG &&
+      this.isGestureInProgress;
 
     let setAnimatedPropertyFunc = () => {
       this.selectedItemOffsetX = 0
@@ -2362,7 +2420,7 @@ export struct SegmentButton {
       })
     }
     if (curve) {
-      if (this.options.backgroundSystemMaterial) {
+      if (this.options.backgroundSystemMaterial && !isNormalDragSelection) {
         this.getUIContext().animateTo({
           curve: curves.interpolatingSpring(0, 1, 195, 14),
         }, () => {
