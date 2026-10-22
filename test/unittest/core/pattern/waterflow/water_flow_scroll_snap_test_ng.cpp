@@ -235,6 +235,29 @@ protected:
         EXPECT_NEAR(pattern_->GetTotalOffset(), PROVIDER_TARGET, 0.5f);
     }
 
+    void CheckTrackedReleaseBeforeLayout(ScrollSnapAlign align, float pendingDelta)
+    {
+        CreateUnequalItems();
+        SetStrategy(MakeAlign(align));
+        UpdateCurrentOffset(-250.0f);
+        // The final drag update and release share a frame, before the geometry cache is refreshed.
+        ASSERT_TRUE(pattern_->UpdateCurrentOffset(pendingDelta, SCROLL_FROM_UPDATE));
+        auto scroll = pattern_->GetScrollable();
+        // Use a finger coordinate unrelated to the content offset and a nonzero velocity below
+        // the friction threshold, as in a real slow release.
+        scroll->StartScrollAnimation(937.0f, pendingDelta < 0.0f ? -77.0f : 77.0f);
+        ASSERT_TRUE(scroll->IsItemSnapTracking());
+        ASSERT_TRUE(scroll->IsSnapAnimationRunning());
+        FlushUITasks();
+        FinishSnapAnimation();
+
+        float nearest = std::numeric_limits<float>::max();
+        for (const auto& anchor : pattern_->BuildItemSnapCandidates(align)) {
+            nearest = std::min(nearest, std::abs(static_cast<float>(pattern_->GetTotalOffset()) - anchor.offset));
+        }
+        EXPECT_NEAR(nearest, 0.0f, 0.01f);
+    }
+
     RefPtr<TaskExecutor> previousExecutor_;
     RefPtr<WaterFlowSnapTaskExecutor> snapExecutor_;
 };
@@ -752,6 +775,41 @@ HWTEST_F(WaterFlowScrollSnapTestNg, PendingLayoutThresholdEqual, TestSize.Level1
 HWTEST_F(WaterFlowScrollSnapTestNg, PendingLayoutThresholdAbove, TestSize.Level1)
 {
     CheckThresholdBeforeLayout(51.0f, 100.0f);
+}
+
+/**
+ * @tc.name: TrackedReleaseBeforeLayoutStartForward
+ * @tc.desc: A tracked slow release includes the last unlaid drag delta in START anchors.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollSnapTestNg, TrackedReleaseBeforeLayoutStartForward, TestSize.Level1)
+{
+    CheckTrackedReleaseBeforeLayout(ScrollSnapAlign::START, -7.0f);
+}
+
+HWTEST_F(WaterFlowScrollSnapTestNg, TrackedReleaseBeforeLayoutStartBackward, TestSize.Level1)
+{
+    CheckTrackedReleaseBeforeLayout(ScrollSnapAlign::START, 7.0f);
+}
+
+HWTEST_F(WaterFlowScrollSnapTestNg, TrackedReleaseBeforeLayoutCenterForward, TestSize.Level1)
+{
+    CheckTrackedReleaseBeforeLayout(ScrollSnapAlign::CENTER, -7.0f);
+}
+
+HWTEST_F(WaterFlowScrollSnapTestNg, TrackedReleaseBeforeLayoutCenterBackward, TestSize.Level1)
+{
+    CheckTrackedReleaseBeforeLayout(ScrollSnapAlign::CENTER, 7.0f);
+}
+
+HWTEST_F(WaterFlowScrollSnapTestNg, TrackedReleaseBeforeLayoutEndForward, TestSize.Level1)
+{
+    CheckTrackedReleaseBeforeLayout(ScrollSnapAlign::END, -7.0f);
+}
+
+HWTEST_F(WaterFlowScrollSnapTestNg, TrackedReleaseBeforeLayoutEndBackward, TestSize.Level1)
+{
+    CheckTrackedReleaseBeforeLayout(ScrollSnapAlign::END, 7.0f);
 }
 
 /**

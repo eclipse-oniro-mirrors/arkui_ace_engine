@@ -147,7 +147,11 @@ void WaterFlowPattern::UpdateSnapGeometryAfterLayout(bool isLayoutValid)
 
 void WaterFlowPattern::BeginTrackedItemSnap(float coordinate)
 {
-    snapGeometryStableOffset_ = coordinate;
+    // Release can precede layout of the final drag delta. Rebase the cached geometry from
+    // its measured offset, not the newer release offset, so that the pending delta is not
+    // added to the selected anchor a second time.
+    const float pendingOffset = static_cast<float>(GetItemSnapCurrentOffset()) - snapGeometryEstimatedOffset_;
+    snapGeometryStableOffset_ = coordinate - pendingOffset;
 }
 
 std::vector<SnapCandidate> WaterFlowPattern::BuildTrackedItemSnapCandidates(ScrollSnapAlign align)
