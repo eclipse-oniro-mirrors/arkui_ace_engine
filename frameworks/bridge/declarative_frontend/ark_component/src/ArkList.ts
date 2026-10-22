@@ -263,6 +263,20 @@ class ListSyncLoadModifier extends ModifierWithKey<boolean | undefined> {
   }
 }
 
+class ListScrollPlaceholderModifier extends ModifierWithKey<PlaceholderProvider | undefined> {
+  constructor(value: PlaceholderProvider | undefined) {
+    super(value);
+  }
+  static identity: Symbol = Symbol('listScrollPlaceholder');
+  applyPeer(node: KNode, reset: boolean): void {
+    if (reset) {
+      getUINativeModule().list.resetListScrollPlaceholder(node);
+    } else {
+      getUINativeModule().list.setListScrollPlaceholder(node, this.value);
+    }
+  }
+}
+
 class ListEditModeOptionsModifier extends ModifierWithKey<EditModeOptions | undefined> {
   constructor(options: EditModeOptions | undefined) {
     super(options);
@@ -874,6 +888,10 @@ class ArkListComponent extends ArkScrollable<ListAttribute> implements ListAttri
   }
   syncLoad(value: boolean | undefined): this {
     modifierWithKey(this._modifiersWithKeys, ListSyncLoadModifier.identity, ListSyncLoadModifier, value);
+    return this;
+  }
+  scrollPlaceholder(provider: PlaceholderProvider | undefined): this {
+    modifierWithKey(this._modifiersWithKeys, ListScrollPlaceholderModifier.identity, ListScrollPlaceholderModifier, provider);
     return this;
   }
   editModeOptions(options: EditModeOptions | undefined): this {

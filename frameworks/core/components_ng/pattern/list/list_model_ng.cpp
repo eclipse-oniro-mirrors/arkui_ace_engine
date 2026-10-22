@@ -473,6 +473,12 @@ void ListModelNG::SetScrollPlaceholder(ScrollPlaceholderProvider&& provider)
 {
     auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
     CHECK_NULL_VOID(frameNode);
+    SetScrollPlaceholder(frameNode, std::move(provider));
+}
+
+void ListModelNG::SetScrollPlaceholder(FrameNode* frameNode, ScrollPlaceholderProvider&& provider)
+{
+    CHECK_NULL_VOID(frameNode);
     auto pattern = frameNode->GetPattern<ListPattern>();
     CHECK_NULL_VOID(pattern);
     pattern->SetScrollPlaceholder(std::move(provider));

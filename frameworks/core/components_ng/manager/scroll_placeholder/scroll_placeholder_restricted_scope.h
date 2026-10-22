@@ -42,7 +42,10 @@ class UINode;
 // signal is a compiler-product convention rather than an unforgeable guarantee.
 //
 // UI thread only: builder execution never leaves the UI thread.
-class ScrollPlaceholderRestrictedScope {
+// ACE_FORCE_EXPORT: same reason as ScrollPlaceholderManager - the static-ArkTS
+// placeholderRegister ani library references the scope state and the admission
+// probe across the .so boundary.
+class ACE_FORCE_EXPORT ScrollPlaceholderRestrictedScope {
 public:
     // Paired with End. Re-entrant: nested begin/end pairs keep a stack count.
     static void Begin();

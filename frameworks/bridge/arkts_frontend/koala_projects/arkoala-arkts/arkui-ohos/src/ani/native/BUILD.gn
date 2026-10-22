@@ -18,6 +18,7 @@ import("//foundation/arkui/ace_engine/adapter/ohos/build/common.gni")
 group("ace_ani_native_package") {
   deps = [
     "custom:arkuicustomnode_group",
+    "placeholder_register:arkuiplaceholderregister_group",
     "ui_extension:arkuiuiextension_group",
   ]
 }

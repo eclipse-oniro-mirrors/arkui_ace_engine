@@ -64,6 +64,7 @@ public:
     void SetStackFromEnd(bool enabled) override;
     void SetSyncLoad(bool enabled) override;
     void SetScrollPlaceholder(NG::ScrollPlaceholderProvider&& provider) override;
+    static void SetScrollPlaceholder(FrameNode* frameNode, NG::ScrollPlaceholderProvider&& provider);
     void SetEditModeOptions(EditModeOptions& editModeOptions) override;
     void SetEnableEditMode(bool enableEditMode) override;
     void SetEnableEditModeChangeEvent(std::function<void(bool)>&& changeEvent) override;

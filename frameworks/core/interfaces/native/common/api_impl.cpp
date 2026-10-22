@@ -27,6 +27,7 @@
 #include "core/components_ng/pattern/grid/grid_model_ng.h"
 #include "core/components_ng/pattern/list/list_model_ng.h"
 #include "core/components_ng/syntax/arkoala_for_each_node.h"
+#include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_restricted_scope.h"
 #include "core/components_ng/syntax/lazy_for_each_builder.h"
 #include "core/components_ng/syntax/lazy_for_each_node.h"
 #include "core/pipeline_ng/pipeline_context.h"
@@ -40,6 +41,20 @@ namespace GeneratedApiImpl {
 void ShowCrash(Ark_CharPtr message)
 {
     TAG_LOGE(AceLogTag::ACE_NATIVE_NODE, "Arkoala crash: %{public}s", message);
+}
+
+// Backing of the static-ArkTS restricted-builder instrumentation hooks; the
+// GENERATED_AceBegin/EndScrollPlaceholder exports below forward here, keeping
+// them on the same re-entrant scope counter as the declarative
+// JsBegin/JsEndScrollPlaceholderScope entries.
+void AceBeginScrollPlaceholder()
+{
+    ScrollPlaceholderRestrictedScope::Begin();
+}
+
+void AceEndScrollPlaceholder()
+{
+    ScrollPlaceholderRestrictedScope::End();
 }
 
 ExtensionCompanionNode* GetCompanion(Ark_NodeHandle nodePtr)
@@ -584,6 +599,20 @@ void EmitOnClick(Ark_NativePointer node, Ark_ClickEvent event)
 
 extern "C" {
 IDLIZE_API_EXPORT const OH_AnyAPI* GENERATED_GetArkAnyAPI(GENERATED_Ark_APIVariantKind kind, int version);
+
+// Entry points of the static-ArkTS restricted-builder instrumentation hooks
+// (__aceBegin/EndScrollPlaceholder__ via ArkoalaNative_ark); resolved by symbol
+// from the Arkoala side and kept on the same re-entrant scope counter as the
+// declarative JsBegin/JsEndScrollPlaceholderScope entries.
+IDLIZE_API_EXPORT void GENERATED_AceBeginScrollPlaceholder()
+{
+    OHOS::Ace::NG::GeneratedApiImpl::AceBeginScrollPlaceholder();
+}
+
+IDLIZE_API_EXPORT void GENERATED_AceEndScrollPlaceholder()
+{
+    OHOS::Ace::NG::GeneratedApiImpl::AceEndScrollPlaceholder();
+}
 
 __attribute__((constructor)) static void ProvideEntryPoint(void)
 {

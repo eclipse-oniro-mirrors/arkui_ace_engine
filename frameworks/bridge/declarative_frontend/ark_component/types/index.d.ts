@@ -1391,6 +1391,15 @@ declare interface ItemDragInfo {
   y: number;
 }
 declare interface EditModeOptions {}
+declare interface PlaceholderSizeOptions {
+  width?: number;
+  height?: number;
+}
+declare interface PlaceholderOptions {
+  id?: string;
+  size?: PlaceholderSizeOptions;
+}
+declare type PlaceholderProvider = (index: number) => PlaceholderOptions | undefined;
 declare interface Scroller {}
 declare enum FocusWrapMode {
   DEFAULT = 0,

@@ -26,8 +26,13 @@
 
 #include "arkoala_api_generated.h"
 #include "DeserializerBase.h"
+#include "dynamic-loader.h"
 
 const OH_AnyAPI* GetAnyImpl(int kind, int version, std::string* result = nullptr);
+
+// Defined in library.cc (same module): dlopens the ACE library the way
+// GetAnyImpl does, so the resolved handle matches the runtime's own.
+void* FindModule(int kind);
 
 static const GENERATED_ArkUIBasicNodeAPI* GetArkUIBasicNodeAPI() {
     return reinterpret_cast<const GENERATED_ArkUIBasicNodeAPI*>(
@@ -53,6 +58,34 @@ KNativePointer impl_GetNodeFinalizer() {
 KOALA_INTEROP_DIRECT_0(GetNodeFinalizer, KNativePointer)
 
 // custom methods
+// Static-ArkTS side of the restricted-builder instrumentation contract: the
+// module-level __aceBegin/EndScrollPlaceholder__ hooks (see the builder module
+// implementation) forward here. libace exports the counterparts as
+// GENERATED_AceBegin/EndScrollPlaceholder (libace.map), resolved lazily through
+// the same ACE module handle GetAnyImpl uses, so both engine flavors drive one
+// re-entrant scope counter.
+static void (*ResolveAceEntry(const char* name))()
+{
+    void* module = FindModule(0);
+    return module ? reinterpret_cast<void (*)()>(findSymbol(module, name)) : nullptr;
+}
+
+void impl_AceBeginScrollPlaceholder() {
+    static auto aceBegin = ResolveAceEntry("GENERATED_AceBeginScrollPlaceholder");
+    if (aceBegin) {
+        aceBegin();
+    }
+}
+KOALA_INTEROP_DIRECT_V0(AceBeginScrollPlaceholder)
+
+void impl_AceEndScrollPlaceholder() {
+    static auto aceEnd = ResolveAceEntry("GENERATED_AceEndScrollPlaceholder");
+    if (aceEnd) {
+        aceEnd();
+    }
+}
+KOALA_INTEROP_DIRECT_V0(AceEndScrollPlaceholder)
+
 void impl_ShowCrash(const KStringPtr& messagePtr) {
     GetArkUIExtendedNodeAPI()->showCrash(messagePtr.c_str());
 }
