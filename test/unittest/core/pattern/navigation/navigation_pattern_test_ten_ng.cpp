@@ -1043,7 +1043,11 @@ HWTEST_F(NavigationPatternTestTenNg, StartTransitionPreChange003, TestSize.Level
     auto pattern = navNode->GetPattern<NavigationPattern>();
     ASSERT_NE(pattern, nullptr);
     pattern->forceSplitSuccess_ = false;
-    pattern->prePrimaryNodes_.push_back(WeakPtr(navNode));
+    auto tempDest = NavDestinationGroupNode::GetOrCreateGroupNode(
+        V2::NAVDESTINATION_VIEW_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
+    ASSERT_NE(tempDest, nullptr);
+    pattern->prePrimaryNodes_.push_back(WeakPtr(tempDest));
 
     // null topDestination — accessibilityId is -1, no-animation path clears prePrimaryNodes_
     pattern->StartTransition(nullptr, nullptr, false, true, false);

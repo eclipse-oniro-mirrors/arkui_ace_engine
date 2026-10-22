@@ -5047,6 +5047,16 @@ void NavigationPattern::TriggerPerformanceCheck(
     }
 }
 
+void NavigationPattern::HandlePreTransition(const RefPtr<NavigationGroupNode>& hostNode,
+    const RefPtr<NavDestinationGroupNode>& topDestination,
+    const std::string& fromPathInfo, const std::string& toPathInfo)
+{
+    auto accessibilityId = topDestination ? topDestination->GetAccessibilityId() : -1;
+    hostNode->OnAccessibilityEvent(AccessibilityEventType::PAGE_PRE_CHANGE, accessibilityId,
+        WindowsContentChangeTypes::CONTENT_CHANGE_TYPE_INVALID);
+    ACE_SCOPED_TRACE_COMMERCIAL("NavDestination Page from %s to %s", fromPathInfo.c_str(), toPathInfo.c_str());
+}
+
 void NavigationPattern::StartTransition(const RefPtr<NavDestinationGroupNode>& preDestination,
     const RefPtr<NavDestinationGroupNode>& topDestination,
     bool isAnimated, bool isPopPage, bool isNeedVisible)
@@ -5055,9 +5065,6 @@ void NavigationPattern::StartTransition(const RefPtr<NavDestinationGroupNode>& p
     std::string toPathInfo;
     auto hostNode = AceType::DynamicCast<NavigationGroupNode>(GetHost());
     CHECK_NULL_VOID(hostNode);
-    auto accessibilityId = topDestination ? topDestination->GetAccessibilityId() : -1;
-    hostNode->OnAccessibilityEvent(AccessibilityEventType::PAGE_PRE_CHANGE, accessibilityId,
-        WindowsContentChangeTypes::CONTENT_CHANGE_TYPE_INVALID);
     ACE_UINODE_TRACE(hostNode);
     const bool isPopTransition = isPopPage && !isReplace_;
     ContentChangeOnTransitionStart(topDestination, isPopTransition);
@@ -5119,7 +5126,7 @@ void NavigationPattern::StartTransition(const RefPtr<NavDestinationGroupNode>& p
         toPathInfo = hostNode->GetNavigationPathInfo();
         toNavDestinationName = "navBar";
     }
-    ACE_SCOPED_TRACE_COMMERCIAL("NavDestination Page from %s to %s", fromPathInfo.c_str(), toPathInfo.c_str());
+    HandlePreTransition(hostNode, topDestination, fromPathInfo, toPathInfo);
 #ifndef CROSS_PLATFORM
     if (PerfMonitor::GetPerfMonitor() != nullptr) {
         PerfMonitor::GetPerfMonitor()->SetPageName(toNavDestinationName);
@@ -5771,9 +5778,6 @@ void NavigationPattern::RecoveryToLastStack(
         }
     }
     hostNode->UpdateNavDestinationNodeWithoutMarkDirty(nullptr, navigationModeChange_);
-    auto id = hostNode->GetTopDestination() ? hostNode->GetTopDestination()->GetAccessibilityId() : -1;
-    hostNode->OnAccessibilityEvent(AccessibilityEventType::PAGE_PRE_CHANGE, id,
-        WindowsContentChangeTypes::CONTENT_CHANGE_TYPE_INVALID);
 
     // recover lifecycle state before transition
     NotifyDestinationLifecycle(preTopDestination, NavDestinationLifecycle::ON_INACTIVE);
@@ -5787,6 +5791,7 @@ void NavigationPattern::RecoveryToLastStack(
     // update name index
     navigationStack_->RecoveryNavigationStack();
     hostNode->SetIsOnAnimation(false);
+    auto id = hostNode->GetTopDestination() ? hostNode->GetTopDestination()->GetAccessibilityId() : -1;
     hostNode->OnAccessibilityEvent(
         AccessibilityEventType::PAGE_CHANGE, id, WindowsContentChangeTypes::CONTENT_CHANGE_TYPE_INVALID);
 #ifndef CROSS_PLATFORM
