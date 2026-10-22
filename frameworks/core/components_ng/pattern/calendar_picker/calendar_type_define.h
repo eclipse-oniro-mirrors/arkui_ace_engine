@@ -33,6 +33,8 @@ class FrameNode;
 namespace CalendarPickerConstants {
 const std::vector<HoverModeAreaType> HOVER_MODE_AREA_TYPE = { HoverModeAreaType::TOP_SCREEN,
     HoverModeAreaType::BOTTOM_SCREEN };
+constexpr int32_t FIRST_DAY_OF_WEEK_LOCAL = 0;
+constexpr int32_t MAX_FIRST_DAY_OF_WEEK = 7;
 }
 
 enum class ArkUIRuntimeCallBackInfoType { STRING, NUMBER, OBJECT, BOOLEAN, FUNCTION };

@@ -1225,7 +1225,11 @@ void CalendarDialogPattern::HandleTitleArrowsClickEvent(int32_t nodeIndex)
 void CalendarDialogPattern::ResolveFirstDayOfWeek()
 {
     int32_t raw = currentSettingData_.firstDayOfWeek;
-    if (raw == 0) {
+    if (raw < CalendarPickerConstants::FIRST_DAY_OF_WEEK_LOCAL ||
+        raw > CalendarPickerConstants::MAX_FIRST_DAY_OF_WEEK) {
+        raw = CalendarPickerConstants::FIRST_DAY_OF_WEEK_LOCAL;
+    }
+    if (raw == CalendarPickerConstants::FIRST_DAY_OF_WEEK_LOCAL) {
         auto locale = Localization::GetInstance()->GetLanguage();
         resolvedFirstDay_ = CalendarPickerI18n::GetFirstDayOfWeek(locale);
     } else {
