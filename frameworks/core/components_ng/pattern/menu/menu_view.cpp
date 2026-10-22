@@ -54,6 +54,7 @@
 #include "core/components/common/properties/placement.h"
 #include "core/components/theme/shadow_theme.h"
 #include "interfaces/inner_api/ace_kit/include/ui/view/theme/token_colors.h"
+#include "core/components_ng/token_theme/token_theme_storage.h"
 
 namespace OHOS::Ace::NG {
 /**
@@ -1222,38 +1223,37 @@ bool MenuView::ShouldHandleLowEndImmersiveMaterial(const RefPtr<UiMaterial>& sys
 bool MenuView::HandleLowEndImmersiveMaterialForMenu(const RefPtr<FrameNode>& menuNode,
     const RefPtr<UiMaterial>& systemMaterial, const RefPtr<RenderContext>& renderContext)
 {
-    auto pipelineContext = menuNode->GetContextRefPtr();
-    CHECK_NULL_RETURN(pipelineContext, false);
-    auto themeManager = pipelineContext->GetThemeManager();
-    CHECK_NULL_RETURN(themeManager, false);
-    auto themeConstants = themeManager->GetThemeConstants();
-    CHECK_NULL_RETURN(themeConstants, false);
-
-    SetLowEndImmersiveBackgroundForMenu(renderContext, themeConstants);
-    SetLowEndImmersiveShadowForMenu(menuNode, systemMaterial, renderContext, pipelineContext);
-    return true;
-}
-
-void MenuView::SetLowEndImmersiveBackgroundForMenu(
-    const RefPtr<RenderContext>& renderContext, const RefPtr<ThemeConstants>& themeConstants)
-{
-    auto resId = Ace::TokenColors::GetSystemColorResIdByIndex(Ace::TokenColors::COMP_BACKGROUND_PRIMARY);
-    auto backgroundColor = themeConstants->GetColor(resId);
-    renderContext->UpdateBackgroundColor(backgroundColor);
-}
-
-void MenuView::SetLowEndImmersiveShadowForMenu(const RefPtr<FrameNode>& menuNode,
-    const RefPtr<UiMaterial>& systemMaterial, const RefPtr<RenderContext>& renderContext,
-    const RefPtr<PipelineContext>& pipelineContext)
-{
-    auto immersiveOptions = systemMaterial->GetImmersiveOptions();
-    if (!immersiveOptions || !immersiveOptions->applyShadow) {
-        return;
+    CHECK_NULL_RETURN(systemMaterial, false);
+    auto options = systemMaterial->GetImmersiveOptions();
+    if (options && !options->materialColor.has_value() && !options->colorResObj) {
+        // Resolve COMP_BACKGROUND_PRIMARY honoring WithTheme scope on the menu node first,
+        // because ThemeConstants::GetColor only reads global resources and ignores themeScopeId.
+        auto backgroundColor = Color::TRANSPARENT;
+        auto themeScopeId = menuNode->GetThemeScopeId();
+        auto tokenTheme = TokenThemeStorage::GetInstance()->GetTheme(themeScopeId);
+        if (tokenTheme && tokenTheme->Colors()) {
+            backgroundColor = tokenTheme->Colors()->CompBackgroundPrimary();
+        } else {
+            auto pipelineContext = menuNode->GetContext();
+            CHECK_NULL_RETURN(pipelineContext, false);
+            auto themeManager = pipelineContext->GetThemeManager();
+            CHECK_NULL_RETURN(themeManager, false);
+            auto themeConstants = themeManager->GetThemeConstants();
+            CHECK_NULL_RETURN(themeConstants, false);
+            auto resId = Ace::TokenColors::GetSystemColorResIdByIndex(Ace::TokenColors::COMP_BACKGROUND_PRIMARY);
+            backgroundColor = themeConstants->GetColor(resId);
+        }
+        auto copiedMaterial = systemMaterial->Copy();
+        CHECK_NULL_RETURN(copiedMaterial, false);
+        auto copiedOptions = copiedMaterial->GetImmersiveOptions();
+        CHECK_NULL_RETURN(copiedOptions, false);
+        copiedOptions->materialColor = backgroundColor;
+        renderContext->UpdateBackgroundColor(Color::TRANSPARENT);
+        ViewAbstract::SetSystemMaterial(AceType::RawPtr(menuNode), AceType::RawPtr(copiedMaterial));
+    } else {
+        ViewAbstract::SetSystemMaterial(AceType::RawPtr(menuNode), AceType::RawPtr(systemMaterial));
     }
-
-    auto dipScale = pipelineContext->GetDipScale();
-    auto shadow = Ace::MaterialUtils::GetImmersiveShadow(dipScale);
-    renderContext->UpdateBackShadow(shadow);
+    return true;
 }
 
 bool MenuView::ApplySystemMaterialForMenu(const RefPtr<FrameNode>& menuNode, const RefPtr<UiMaterial>& systemMaterial,

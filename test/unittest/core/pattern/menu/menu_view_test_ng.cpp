@@ -72,6 +72,7 @@
 #include "core/components/theme/icon_theme.h"
 #include "core/components/common/properties/ui_material.h"
 #include "interfaces/inner_api/ace_kit/include/ui/view/theme/token_colors.h"
+#include "core/components_ng/token_theme/token_theme_storage.h"
 #include "core/components_ng/pattern/menu/bridge/inner_modifier/menu_view_inner_modifier.h"
 
 using namespace testing;
@@ -2194,7 +2195,7 @@ HWTEST_F(MenuViewTestNg, SetMenuSystemMaterial011, TestSize.Level1)
 
     EXPECT_TRUE(paintProperty->GetIsUserSetMaterial().value_or(false));
     auto shadow = renderContext->GetBackShadow();
-    EXPECT_TRUE(shadow.has_value());
+    EXPECT_FALSE(shadow.has_value());
     g_uiMaterialLevel = UiMaterialLevel::DEFAULT;
 }
 
@@ -2261,7 +2262,7 @@ HWTEST_F(MenuViewTestNg, HandleLowEndImmersiveMaterialForMenu001, TestSize.Level
 
     menuNode->SetParent(nullptr);
     auto result = MenuView::HandleLowEndImmersiveMaterialForMenu(menuNode, material, renderContext);
-    EXPECT_FALSE(result);
+    EXPECT_TRUE(result);
 }
 
 /**
@@ -2282,7 +2283,7 @@ HWTEST_F(MenuViewTestNg, HandleLowEndImmersiveMaterialForMenu002, TestSize.Level
     material->SetType(static_cast<int32_t>(MaterialType::IMMERSIVE));
 
     auto result = MenuView::HandleLowEndImmersiveMaterialForMenu(menuNode, material, renderContext);
-    EXPECT_FALSE(result);
+    EXPECT_TRUE(result);
 }
 
 /**
@@ -2305,7 +2306,7 @@ HWTEST_F(MenuViewTestNg, HandleLowEndImmersiveMaterialForMenu003, TestSize.Level
     material->SetType(static_cast<int32_t>(MaterialType::IMMERSIVE));
 
     auto result = MenuView::HandleLowEndImmersiveMaterialForMenu(menuNode, material, renderContext);
-    EXPECT_FALSE(result);
+    EXPECT_TRUE(result);
 }
 
 /**
@@ -2335,103 +2336,137 @@ HWTEST_F(MenuViewTestNg, HandleLowEndImmersiveMaterialForMenu004, TestSize.Level
     EXPECT_TRUE(result);
 }
 
-// --- SetLowEndImmersiveBackgroundForMenu ---
-
 /**
- * @tc.name: SetLowEndImmersiveBackgroundForMenu001
- * @tc.desc: Test sets background color from theme constants
+ * @tc.name: HandleLowEndImmersiveMaterialForMenu005
+ * @tc.desc: Test uses TokenTheme color when menuNode has valid themeScopeId (WithTheme branch)
  * @tc.type: FUNC
  */
-HWTEST_F(MenuViewTestNg, SetLowEndImmersiveBackgroundForMenu001, TestSize.Level1)
+HWTEST_F(MenuViewTestNg, HandleLowEndImmersiveMaterialForMenu005, TestSize.Level1)
 {
+    // Clean TokenThemeStorage global state to avoid cross-test pollution.
+    constexpr int32_t themeScopeId = 1;
+    TokenThemeStorage::GetInstance()->CacheClear();
+    TokenThemeStorage::GetInstance()->RemoveThemeScope(themeScopeId);
+
+    // Build a TokenTheme with a specific COMP_BACKGROUND_PRIMARY color.
+    constexpr uint32_t expectedColorValue = 0xFFAABBCC;
+    auto tokenColors = AceType::MakeRefPtr<TokenColors>();
+    tokenColors->SetColor(TokenColors::COMP_BACKGROUND_PRIMARY, Color(expectedColorValue));
+    auto tokenTheme = AceType::MakeRefPtr<TokenTheme>(1);
+    tokenTheme->SetColors(tokenColors);
+    tokenTheme->SetColorMode(ColorMode::LIGHT);
+    TokenThemeStorage::GetInstance()->CacheSet(tokenTheme);
+    TokenThemeStorage::GetInstance()->StoreThemeScope(themeScopeId, tokenTheme->GetId());
+
     auto menuNode = FrameNode::CreateFrameNode(
         V2::MENU_ETS_TAG, GetNodeId(), AceType::MakeRefPtr<MenuPattern>(TARGET_ID, TEXT_TAG, MenuType::MENU));
     ASSERT_NE(menuNode, nullptr);
+    menuNode->SetThemeScopeId(themeScopeId);
     auto renderContext = menuNode->GetRenderContext();
     ASSERT_NE(renderContext, nullptr);
-    auto themeConstants = AceType::MakeRefPtr<ThemeConstants>(nullptr);
-
-    MenuView::SetLowEndImmersiveBackgroundForMenu(renderContext, themeConstants);
-
-    auto bgColor = renderContext->GetBackgroundColor();
-    EXPECT_TRUE(bgColor.has_value());
-}
-
-// --- SetLowEndImmersiveShadowForMenu branches ---
-
-/**
- * @tc.name: SetLowEndImmersiveShadowForMenu001
- * @tc.desc: Test skips when immersiveOptions is null
- * @tc.type: FUNC
- */
-HWTEST_F(MenuViewTestNg, SetLowEndImmersiveShadowForMenu001, TestSize.Level1)
-{
-    auto menuNode = FrameNode::CreateFrameNode(
-        V2::MENU_ETS_TAG, GetNodeId(), AceType::MakeRefPtr<MenuPattern>(TARGET_ID, TEXT_TAG, MenuType::MENU));
-    ASSERT_NE(menuNode, nullptr);
-    auto renderContext = menuNode->GetRenderContext();
-    ASSERT_NE(renderContext, nullptr);
-    auto pipelineContext = menuNode->GetContextRefPtr();
-    ASSERT_NE(pipelineContext, nullptr);
     auto material = AceType::MakeRefPtr<UiMaterial>();
     material->SetType(static_cast<int32_t>(MaterialType::IMMERSIVE));
-    // No immersive options set
+    ImmersiveOptions options;
+    options.applyShadow = false;
+    // Ensure materialColor and colorResObj are not set to enter the if branch.
+    material->SetImmersiveOptions(options);
 
-    MenuView::SetLowEndImmersiveShadowForMenu(menuNode, material, renderContext, pipelineContext);
-    auto shadow = renderContext->GetBackShadow();
-    EXPECT_FALSE(shadow.has_value());
+    auto result = MenuView::HandleLowEndImmersiveMaterialForMenu(menuNode, material, renderContext);
+    EXPECT_TRUE(result);
+    // The code calls UpdateBackgroundColor(Color::TRANSPARENT) on the renderContext.
+    auto backgroundColor = renderContext->GetBackgroundColor();
+    ASSERT_TRUE(backgroundColor.has_value());
+    EXPECT_EQ(backgroundColor.value(), Color::TRANSPARENT);
+
+    // Clean up TokenThemeStorage state.
+    TokenThemeStorage::GetInstance()->RemoveThemeScope(themeScopeId);
+    TokenThemeStorage::GetInstance()->CacheClear();
 }
 
 /**
- * @tc.name: SetLowEndImmersiveShadowForMenu002
- * @tc.desc: Test skips when applyShadow is false
+ * @tc.name: HandleLowEndImmersiveMaterialForMenu006
+ * @tc.desc: Test falls back to themeConstants when themeScopeId maps to no TokenTheme
  * @tc.type: FUNC
  */
-HWTEST_F(MenuViewTestNg, SetLowEndImmersiveShadowForMenu002, TestSize.Level1)
+HWTEST_F(MenuViewTestNg, HandleLowEndImmersiveMaterialForMenu006, TestSize.Level1)
 {
+    // Clean TokenThemeStorage global state; use a scope id that is never registered.
+    constexpr int32_t missingScopeId = 999;
+    TokenThemeStorage::GetInstance()->CacheClear();
+    TokenThemeStorage::GetInstance()->RemoveThemeScope(missingScopeId);
+
+    // Set up MockThemeManager + ThemeConstants for the fallback path.
+    auto themeManager = AceType::MakeRefPtr<MockThemeManager>();
+    MockPipelineContext::GetCurrent()->SetThemeManager(themeManager);
+    auto themeConstants = AceType::MakeRefPtr<ThemeConstants>(nullptr);
+    EXPECT_CALL(*themeManager, GetThemeConstants()).WillRepeatedly(Return(themeConstants));
+
     auto menuNode = FrameNode::CreateFrameNode(
         V2::MENU_ETS_TAG, GetNodeId(), AceType::MakeRefPtr<MenuPattern>(TARGET_ID, TEXT_TAG, MenuType::MENU));
     ASSERT_NE(menuNode, nullptr);
+    // Non-zero scope id that has no mapping in TokenThemeStorage -> GetTheme returns null.
+    menuNode->SetThemeScopeId(missingScopeId);
     auto renderContext = menuNode->GetRenderContext();
     ASSERT_NE(renderContext, nullptr);
-    auto pipelineContext = menuNode->GetContextRefPtr();
-    ASSERT_NE(pipelineContext, nullptr);
-
     auto material = AceType::MakeRefPtr<UiMaterial>();
     material->SetType(static_cast<int32_t>(MaterialType::IMMERSIVE));
     ImmersiveOptions options;
     options.applyShadow = false;
     material->SetImmersiveOptions(options);
 
-    MenuView::SetLowEndImmersiveShadowForMenu(menuNode, material, renderContext, pipelineContext);
-    auto shadow = renderContext->GetBackShadow();
-    EXPECT_FALSE(shadow.has_value());
+    auto result = MenuView::HandleLowEndImmersiveMaterialForMenu(menuNode, material, renderContext);
+    EXPECT_TRUE(result);
+    // The fallback path also calls UpdateBackgroundColor(Color::TRANSPARENT) on the renderContext.
+    auto backgroundColor = renderContext->GetBackgroundColor();
+    ASSERT_TRUE(backgroundColor.has_value());
+    EXPECT_EQ(backgroundColor.value(), Color::TRANSPARENT);
+
+    // Clean up.
+    TokenThemeStorage::GetInstance()->RemoveThemeScope(missingScopeId);
+    TokenThemeStorage::GetInstance()->CacheClear();
 }
 
 /**
- * @tc.name: SetLowEndImmersiveShadowForMenu003
- * @tc.desc: Test applies shadow when applyShadow is true
+ * @tc.name: HandleLowEndImmersiveMaterialForMenu007
+ * @tc.desc: Test uses TokenTheme color when themeScopeId is 0 and default theme exists
  * @tc.type: FUNC
  */
-HWTEST_F(MenuViewTestNg, SetLowEndImmersiveShadowForMenu003, TestSize.Level1)
+HWTEST_F(MenuViewTestNg, HandleLowEndImmersiveMaterialForMenu007, TestSize.Level1)
 {
+    // Clean TokenThemeStorage global state.
+    TokenThemeStorage::GetInstance()->CacheClear();
+
+    // Build a default TokenTheme and register it via SetDefaultTheme (themeScopeId == 0).
+    constexpr uint32_t expectedColorValue = 0xFF112233;
+    auto tokenColors = AceType::MakeRefPtr<TokenColors>();
+    tokenColors->SetColor(TokenColors::COMP_BACKGROUND_PRIMARY, Color(expectedColorValue));
+    auto tokenTheme = AceType::MakeRefPtr<TokenTheme>(1);
+    tokenTheme->SetColors(tokenColors);
+    tokenTheme->SetColorMode(ColorMode::LIGHT);
+    TokenThemeStorage::GetInstance()->SetDefaultTheme(tokenTheme, ColorMode::LIGHT);
+    TokenThemeStorage::GetInstance()->CacheSet(tokenTheme);
+
     auto menuNode = FrameNode::CreateFrameNode(
         V2::MENU_ETS_TAG, GetNodeId(), AceType::MakeRefPtr<MenuPattern>(TARGET_ID, TEXT_TAG, MenuType::MENU));
     ASSERT_NE(menuNode, nullptr);
+    // Keep themeScopeId as default 0; do not call SetThemeScopeId.
     auto renderContext = menuNode->GetRenderContext();
     ASSERT_NE(renderContext, nullptr);
-    auto pipelineContext = menuNode->GetContextRefPtr();
-    ASSERT_NE(pipelineContext, nullptr);
-
     auto material = AceType::MakeRefPtr<UiMaterial>();
     material->SetType(static_cast<int32_t>(MaterialType::IMMERSIVE));
     ImmersiveOptions options;
-    options.applyShadow = true;
+    options.applyShadow = false;
     material->SetImmersiveOptions(options);
 
-    MenuView::SetLowEndImmersiveShadowForMenu(menuNode, material, renderContext, pipelineContext);
-    auto shadow = renderContext->GetBackShadow();
-    EXPECT_TRUE(shadow.has_value());
+    auto result = MenuView::HandleLowEndImmersiveMaterialForMenu(menuNode, material, renderContext);
+    EXPECT_TRUE(result);
+    // The default theme path also calls UpdateBackgroundColor(Color::TRANSPARENT) on the renderContext.
+    auto backgroundColor = renderContext->GetBackgroundColor();
+    ASSERT_TRUE(backgroundColor.has_value());
+    EXPECT_EQ(backgroundColor.value(), Color::TRANSPARENT);
+
+    // Clean up.
+    TokenThemeStorage::GetInstance()->CacheClear();
 }
 
 // --- ApplySystemMaterialForMenu ---

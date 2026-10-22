@@ -250,41 +250,28 @@ bool BubbleView::HandleLowEndImmersiveMaterialForBubble(
     const RefPtr<UiMaterial>& systemMaterial,
     const RefPtr<RenderContext>& renderContext)
 {
-    auto pipelineContext = bubbleNode->GetContextRefPtr();
-    CHECK_NULL_RETURN(pipelineContext, false);
-    auto themeManager = pipelineContext->GetThemeManager();
-    CHECK_NULL_RETURN(themeManager, false);
-    auto themeConstants = themeManager->GetThemeConstants();
-    CHECK_NULL_RETURN(themeConstants, false);
-
-    SetLowEndImmersiveBackgroundForBubble(renderContext, themeConstants);
-    SetLowEndImmersiveShadowForBubble(bubbleNode, systemMaterial, renderContext, pipelineContext);
-    return true;
-}
-
-void BubbleView::SetLowEndImmersiveBackgroundForBubble(
-    const RefPtr<RenderContext>& renderContext,
-    const RefPtr<ThemeConstants>& themeConstants)
-{
-    auto resId = Ace::TokenColors::GetSystemColorResIdByIndex(Ace::TokenColors::COMP_BACKGROUND_PRIMARY);
-    auto backgroundColor = themeConstants->GetColor(resId);
-    renderContext->UpdateBackgroundColor(backgroundColor);
-}
-
-void BubbleView::SetLowEndImmersiveShadowForBubble(
-    const RefPtr<FrameNode>& bubbleNode,
-    const RefPtr<UiMaterial>& systemMaterial,
-    const RefPtr<RenderContext>& renderContext,
-    const RefPtr<PipelineContext>& pipelineContext)
-{
-    auto immersiveOptions = systemMaterial->GetImmersiveOptions();
-    if (!immersiveOptions || !immersiveOptions->applyShadow) {
-        return;
+    CHECK_NULL_RETURN(systemMaterial, false);
+    auto options = systemMaterial->GetImmersiveOptions();
+    if (options && !options->materialColor.has_value() && !options->colorResObj) {
+        auto pipelineContext = bubbleNode->GetContext();
+        CHECK_NULL_RETURN(pipelineContext, false);
+        auto themeManager = pipelineContext->GetThemeManager();
+        CHECK_NULL_RETURN(themeManager, false);
+        auto themeConstants = themeManager->GetThemeConstants();
+        CHECK_NULL_RETURN(themeConstants, false);
+        auto resId = Ace::TokenColors::GetSystemColorResIdByIndex(Ace::TokenColors::COMP_BACKGROUND_PRIMARY);
+        auto backgroundColor = themeConstants->GetColor(resId);
+        auto copiedMaterial = systemMaterial->Copy();
+        CHECK_NULL_RETURN(copiedMaterial, false);
+        auto copiedOptions = copiedMaterial->GetImmersiveOptions();
+        CHECK_NULL_RETURN(copiedOptions, false);
+        copiedOptions->materialColor = backgroundColor;
+        renderContext->UpdateBackgroundColor(Color::TRANSPARENT);
+        ViewAbstract::SetSystemMaterial(AceType::RawPtr(bubbleNode), AceType::RawPtr(copiedMaterial));
+    } else {
+        ViewAbstract::SetSystemMaterial(AceType::RawPtr(bubbleNode), AceType::RawPtr(systemMaterial));
     }
-
-    auto dipScale = pipelineContext->GetDipScale();
-    auto shadow = Ace::MaterialUtils::GetImmersiveShadow(dipScale);
-    renderContext->UpdateBackShadow(shadow);
+    return true;
 }
 
 bool BubbleView::ApplySystemMaterialForBubble(

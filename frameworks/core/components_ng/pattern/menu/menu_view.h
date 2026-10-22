@@ -129,11 +129,6 @@ private:
     static bool ShouldHandleLowEndImmersiveMaterial(const RefPtr<UiMaterial>& systemMaterial);
     static bool HandleLowEndImmersiveMaterialForMenu(const RefPtr<FrameNode>& menuNode,
         const RefPtr<UiMaterial>& systemMaterial, const RefPtr<RenderContext>& renderContext);
-    static void SetLowEndImmersiveBackgroundForMenu(
-        const RefPtr<RenderContext>& renderContext, const RefPtr<ThemeConstants>& themeConstants);
-    static void SetLowEndImmersiveShadowForMenu(const RefPtr<FrameNode>& menuNode,
-        const RefPtr<UiMaterial>& systemMaterial, const RefPtr<RenderContext>& renderContext,
-        const RefPtr<PipelineContext>& pipelineContext);
     static bool ApplySystemMaterialForMenu(const RefPtr<FrameNode>& menuNode, const RefPtr<UiMaterial>& systemMaterial,
         const RefPtr<RenderContext>& renderContext);
     static void UpdateMenuBackgroundStyle(const RefPtr<FrameNode>& menuNode, const MenuParam& menuParam);
