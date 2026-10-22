@@ -1246,9 +1246,10 @@ bool ScrollablePattern::StartItemSnapWithProvider(const ScrollSnapStrategy& stra
                             predictDeltaPos = motionDelta, target = std::optional<float>()](
                             float handoffVelocity) mutable -> float {
         auto pattern = weak.Upgrade();
-        CHECK_NULL_RETURN(pattern, -currentOffset);
+        // A vanished owner has no target. Abort queued stages instead of reusing a stale offset.
+        CHECK_NULL_RETURN(pattern, std::numeric_limits<float>::quiet_NaN());
         auto scroll = pattern->GetScrollable();
-        CHECK_NULL_RETURN(scroll, -currentOffset);
+        CHECK_NULL_RETURN(scroll, std::numeric_limits<float>::quiet_NaN());
         if (!target) {
             // Call the provider once; subsequent stages only refresh the layout-dependent bound.
             target = -pattern->ResolveItemSnapTarget(
