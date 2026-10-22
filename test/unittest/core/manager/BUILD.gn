@@ -363,6 +363,7 @@ ace_unittest("component_tree_query_test_ng") {
   if (is_host_product) {
     type = "host_components"
   }
+  cflags = [ "-fno-access-control" ]
   sources = [ "component_tree_query_test_ng.cpp" ]
 }
 
