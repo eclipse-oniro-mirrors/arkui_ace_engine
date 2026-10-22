@@ -20,7 +20,15 @@
 
 namespace OHOS::Ace::NG {
 
-class ListItemGroupModelTestNg : public ListTestNg {};
+class ListItemGroupModelTestNg : public ListTestNg {
+public:
+    void SetListChildrenMainSize(int32_t itemCount, float defaultSize)
+    {
+        std::vector<float> mainSize(itemCount, defaultSize);
+        auto childrenSize = AceType::MakeRefPtr<ListChildrenMainSize>(std::move(mainSize), defaultSize);
+        ListModelNG::SetListChildrenMainSize(AceType::RawPtr(frameNode_), childrenSize);
+    }
+};
 
 /**
  * @tc.name: SetHeader_TwoParameters
@@ -509,6 +517,77 @@ HWTEST_F(ListItemGroupModelTestNg, SetFooterStyleResetToNone, TestSize.Level1)
     ListItemGroupModelNG::SetFooterStyle(listNode, V2::ListItemGroupHeaderFooterStyle::NONE);
     EXPECT_EQ(pattern->GetFooterStyle(), V2::ListItemGroupHeaderFooterStyle::NONE);
     CreateDone();
+}
+
+/**
+ * @tc.name: CAPIListItemGroupChildrenMainSizeTest001
+ * @tc.desc: Test CAPI ListItemGroupChildrenMainSize.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListItemGroupModelTestNg, CAPIListItemGroupChildrenMainSizeTest001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create ListItemGroup with ListChildrenMainSize
+     */
+    CreateList();
+    CreateListItemGroup(V2::ListItemGroupStyle::NONE);
+    auto groupNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    ASSERT_NE(groupNode, nullptr);
+    auto groupPattern = groupNode->GetPattern<ListItemGroupPattern>();
+    ASSERT_NE(groupPattern, nullptr);
+    // Set children main size: 100.0f, 200.0f, 150.0f, 250.0f, 300.0f
+    std::vector<float> sizeArr = { 100.0f, 200.0f, 150.0f, 250.0f, 300.0f };
+    float defaultSize = 100.0f;
+    ListItemGroupModelNG::SetListChildrenMainSize(groupNode, defaultSize, sizeArr);
+    CreateListItems(5);
+    ViewStackProcessor::GetInstance()->Pop();
+    CreateDone();
+
+    /**
+     * @tc.steps: step2. Check children main size
+     * @tc.expected: childrenSize_ in pattern holds the given sizes and default size.
+     */
+    ASSERT_NE(groupPattern->childrenSize_, nullptr);
+    EXPECT_EQ(groupPattern->childrenSize_->childrenSize_, sizeArr);
+    EXPECT_EQ(groupPattern->childrenSize_->childrenSize_.size(), sizeArr.size());
+    EXPECT_TRUE(NearEqual(groupPattern->childrenSize_->defaultSize_, defaultSize));
+}
+
+/**
+ * @tc.name: CAPIListItemGroupChildrenMainSizeTest002
+ * @tc.desc: Test that the childrenMainSize of ListItemGroup takes effect on the layout of its items.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListItemGroupModelTestNg, CAPIListItemGroupChildrenMainSizeTest002, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create List with childrenMainSize, and a ListItemGroup with childrenMainSize
+     */
+    CreateList();
+    SetListChildrenMainSize(1, 400.0f);
+    CreateListItemGroup(V2::ListItemGroupStyle::NONE);
+    auto groupNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    ASSERT_NE(groupNode, nullptr);
+    auto groupPattern = groupNode->GetPattern<ListItemGroupPattern>();
+    ASSERT_NE(groupPattern, nullptr);
+    // The measured main size of each item is ITEM_MAIN_SIZE(100.0f), while the specified main sizes
+    // are 50.0f, 150.0f and 200.0f, so the total main size is 400.0f instead of 300.0f.
+    std::vector<float> sizeArr = { 50.0f, 150.0f, 200.0f };
+    ListItemGroupModelNG::SetListChildrenMainSize(groupNode, ITEM_MAIN_SIZE, sizeArr);
+    CreateListItems(3);
+    ViewStackProcessor::GetInstance()->Pop();
+    CreateDone();
+
+    /**
+     * @tc.steps: step2. Check the layout result of the ListItemGroup
+     * @tc.expected: The specified main sizes of the ListItemGroup take effect.
+     */
+    EXPECT_TRUE(pattern_->ListChildrenSizeExist());
+    ASSERT_NE(groupPattern->posMap_, nullptr);
+    EXPECT_TRUE(NearEqual(groupPattern->posMap_->GetPositionInfo(0).mainSize, 50.0f));
+    EXPECT_TRUE(NearEqual(groupPattern->posMap_->GetPositionInfo(1).mainSize, 150.0f));
+    EXPECT_TRUE(NearEqual(groupPattern->posMap_->GetPositionInfo(2).mainSize, 200.0f));
+    EXPECT_TRUE(NearEqual(groupPattern->mainSize_, 400.0f));
 }
 
 } // namespace OHOS::Ace::NG
