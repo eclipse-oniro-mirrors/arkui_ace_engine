@@ -34,7 +34,7 @@ constexpr uint32_t RES_TYPE_AXIS_EVENT      = 123;
 constexpr uint32_t RES_TYPE_PAGE_TRANSITION = 140;
 constexpr uint32_t RES_TYPE_ABILITY_OR_PAGE_SWITCH = 156;
 constexpr uint32_t RES_TYPE_FLOAT_START_FROM_SIDEBAR = 216;
-constexpr uint32_t RES_TYPE_LV_INTO_APP_ANIM = 225;
+constexpr uint32_t RES_TYPE_LV_INTO_APP_ANIM = 226;
 constexpr uint32_t RES_TYPE_CHECK_APP_IS_IN_SCHEDULE_LIST = 504;
 constexpr uint32_t SYNC_RES_TYPE_APP_IS_IN_TAIHANG_LIST = 511;
 #ifdef FFRT_EXISTS
