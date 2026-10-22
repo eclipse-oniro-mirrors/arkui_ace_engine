@@ -644,6 +644,21 @@ bool ForceSplitUtils::ParseForceSplitParam(
         }
         config.enablePageLevelSplit = enableJson->GetBool();
     }
+    if (!ParseHomePageConfig(configJson, config)) {
+        return false;
+    }
+    if (!ParseCommonConfig(configJson, config)) {
+        return false;
+    }
+    if (isRouterSplit) {
+        return true;
+    }
+    return ParseNavigationOptions(configJson, config);
+}
+
+bool ForceSplitUtils::ParseHomePageAndRelatedPageConfig(
+    const std::unique_ptr<JsonValue>& configJson, ForceSplitParam& config)
+{
     if (!config.enablePageLevelSplit) {
         // homePage/relatedPage take no effect when page-level split control is on
         if (configJson->Contains(HOME_PAGE_KEY)) {
@@ -669,13 +684,7 @@ bool ForceSplitUtils::ParseForceSplitParam(
             }
         }
     }
-    if (!ParseCommonConfig(configJson, config)) {
-        return false;
-    }
-    if (isRouterSplit) {
-        return true;
-    }
-    return ParseNavigationOptions(configJson, config);
+    return true;
 }
 
 bool ForceSplitUtils::ParseNavigationOptions(
