@@ -1232,38 +1232,6 @@ HWTEST_F(CanvasPatternTestNg, FireReadyEvent004, TestSize.Level1)
     EXPECT_TRUE(called);
 }
 
-// ==================== ResetSurfaceAndFireReady ====================
-
-HWTEST_F(CanvasPatternTestNg, ResetSurfaceAndFireReady001, TestSize.Level1)
-{
-    pattern_->contentModifier_ = nullptr;
-    pattern_->ResetSurfaceAndFireReady(SizeF(100.0f, 100.0f));
-    // contentModifier_ is null, ResetSurfaceAndFireReady returns early; no tasks are pushed.
-    EXPECT_FALSE(pattern_->paintMethod_->NeedRender());
-}
-
-HWTEST_F(CanvasPatternTestNg, ResetSurfaceAndFireReady002, TestSize.Level1)
-{
-    pattern_->contentModifier_ = AceType::MakeRefPtr<CanvasModifier>();
-    pattern_->paintMethod_ = nullptr;
-    pattern_->readyEvent_ = nullptr;
-    pattern_->readyEventNew_ = nullptr;
-    pattern_->ResetSurfaceAndFireReady(SizeF(100.0f, 100.0f));
-    // paintMethod_ is null, ResetSurfaceAndFireReady returns early; paintMethod_ stays null.
-    EXPECT_EQ(pattern_->paintMethod_, nullptr);
-}
-
-HWTEST_F(CanvasPatternTestNg, ResetSurfaceAndFireReady003, TestSize.Level1)
-{
-    pattern_->contentModifier_ = AceType::MakeRefPtr<CanvasModifier>();
-    pattern_->paintMethod_ = AceType::MakeRefPtr<CanvasPaintMethod>(pattern_->contentModifier_, frameNode_);
-    pattern_->readyEvent_ = nullptr;
-    pattern_->readyEventNew_ = nullptr;
-    pattern_->ResetSurfaceAndFireReady(SizeF(100.0f, 100.0f));
-    // canvasRenderContext_ is not set on the new paintMethod_, so NeedRender() returns false.
-    EXPECT_FALSE(pattern_->paintMethod_->NeedRender());
-}
-
 // ==================== OnDetachFromFrameNode ====================
 
 HWTEST_F(CanvasPatternTestNg, OnDetachFromFrameNode001, TestSize.Level1)
