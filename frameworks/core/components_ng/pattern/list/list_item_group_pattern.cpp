@@ -306,6 +306,7 @@ float ListItemGroupPattern::GetEstimateHeight(float& averageHeight,
     }
     float totalHeight = 0.0f;
     auto host = GetHost();
+    CHECK_NULL_RETURN(host, 0.0f);
     auto totalItem = host->GetTotalChildCount();
     if (header_.Upgrade()) {
         totalItem -= 1;

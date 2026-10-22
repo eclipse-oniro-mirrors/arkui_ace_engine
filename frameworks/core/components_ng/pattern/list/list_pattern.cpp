@@ -2153,55 +2153,38 @@ void ListPattern::StartListSnapAnimation(float scrollSnapDelta, float scrollSnap
 
 void ListPattern::SetEdgeEffectCallback(const RefPtr<ScrollEdgeEffect>& scrollEffect)
 {
+    auto leadingCallback = [weak = AceType::WeakClaim(this)]() -> double {
+        auto list = weak.Upgrade();
+        CHECK_NULL_RETURN(list, 0.0);
+        auto endPos = list->endMainPos_;
+        auto startPos = list->startMainPos_;
+        float leading = list->contentMainSize_ - (endPos - startPos) - list->contentEndOffset_;
+        if (list->isStackFromEnd_) {
+            return leading;
+        }
+        return (list->startIndex_ == 0) ? std::min(leading, list->contentStartOffset_) : leading;
+    };
+    auto trailingCallback = [weak = AceType::WeakClaim(this)]() -> double {
+        auto list = weak.Upgrade();
+        CHECK_NULL_RETURN(list, 0.0);
+        auto startMainPos = list->startMainPos_;
+        auto endMainPos = list->endMainPos_;
+        auto contentMainSize = list->contentMainSize_ - list->contentEndOffset_ - list->contentStartOffset_;
+        if (list->startIndex_ == 0 && GreatNotEqual(contentMainSize, endMainPos - startMainPos) &&
+            list->isStackFromEnd_) {
+            return contentMainSize - endMainPos + startMainPos;
+        }
+        return list->contentStartOffset_;
+    };
     scrollEffect->SetCurrentPositionCallback([weak = AceType::WeakClaim(this)]() -> double {
         auto list = weak.Upgrade();
         CHECK_NULL_RETURN(list, 0.0);
         return list->startMainPos_ - list->currentDelta_;
     });
-    scrollEffect->SetLeadingCallback([weak = AceType::WeakClaim(this)]() -> double {
-        auto list = weak.Upgrade();
-        auto endPos = list->endMainPos_;
-        auto startPos = list->startMainPos_;
-        float leading = list->contentMainSize_ - (endPos - startPos) - list->contentEndOffset_;
-        if (list->isStackFromEnd_) {
-            return leading;
-        }
-        return (list->startIndex_ == 0) ? std::min(leading, list->contentStartOffset_) : leading;
-    });
-    scrollEffect->SetTrailingCallback([weak = AceType::WeakClaim(this)]() -> double {
-        auto list = weak.Upgrade();
-        CHECK_NULL_RETURN(list, 0.0);
-        auto startMainPos = list->startMainPos_;
-        auto endMainPos = list->endMainPos_;
-        auto contentMainSize = list->contentMainSize_ - list->contentEndOffset_ - list->contentStartOffset_;
-        if (list->startIndex_ == 0 && GreatNotEqual(contentMainSize, endMainPos - startMainPos) &&
-            list->isStackFromEnd_) {
-            return contentMainSize - endMainPos + startMainPos;
-        }
-        return list->contentStartOffset_;
-    });
-    scrollEffect->SetInitLeadingCallback([weak = AceType::WeakClaim(this)]() -> double {
-        auto list = weak.Upgrade();
-        auto endPos = list->endMainPos_;
-        auto startPos = list->startMainPos_;
-        float leading = list->contentMainSize_ - (endPos - startPos) - list->contentEndOffset_;
-        if (list->isStackFromEnd_) {
-            return leading;
-        }
-        return (list->startIndex_ == 0) ? std::min(leading, list->contentStartOffset_) : leading;
-    });
-    scrollEffect->SetInitTrailingCallback([weak = AceType::WeakClaim(this)]() -> double {
-        auto list = weak.Upgrade();
-        CHECK_NULL_RETURN(list, 0.0);
-        auto startMainPos = list->startMainPos_;
-        auto endMainPos = list->endMainPos_;
-        auto contentMainSize = list->contentMainSize_ - list->contentEndOffset_ - list->contentStartOffset_;
-        if (list->startIndex_ == 0 && GreatNotEqual(contentMainSize, endMainPos - startMainPos) &&
-            list->isStackFromEnd_) {
-            return contentMainSize - endMainPos + startMainPos;
-        }
-        return list->contentStartOffset_;
-    });
+    scrollEffect->SetLeadingCallback(leadingCallback);
+    scrollEffect->SetTrailingCallback(trailingCallback);
+    scrollEffect->SetInitLeadingCallback(leadingCallback);
+    scrollEffect->SetInitTrailingCallback(trailingCallback);
 }
 
 void ListPattern::InitOnKeyEvent(const RefPtr<FocusHub>& focusHub)
