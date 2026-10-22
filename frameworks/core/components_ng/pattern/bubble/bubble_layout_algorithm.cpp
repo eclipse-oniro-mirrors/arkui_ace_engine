@@ -170,9 +170,10 @@ bool IsPositionInWindowBounds(const OffsetF& position, Placement placement, cons
 // interval union inside the Helper (ADR-4), replacing the legacy
 // max(safeArea.top_, floatButtonsHeight_) self-fetch. The base rect is resolved with the same
 // window attribution the Helper uses, so the per-edge shrinks are exact. Null node or missing
-// context yields zero insets (Helper contract, no crash).
+// context yields zero insets (guarded locally, no crash).
 SafeAreaInsets DeriveInsetsFromHelper(const RefPtr<FrameNode>& frameNode)
 {
+    CHECK_NULL_RETURN(frameNode, SafeAreaInsets());
     AvoidConfig config;
     config.avoidSafeArea = true;
     config.avoidPopupFreeNav = true;
@@ -182,7 +183,8 @@ SafeAreaInsets DeriveInsetsFromHelper(const RefPtr<FrameNode>& frameNode)
     RectF displayable = OverlaySafeAreaHelper::ComputeDisplayableRect(frameNode, config,
         static_cast<int32_t>(SubwindowType::TYPE_POPUP));
     auto context = DialogManager::GetMainPipelineContext(frameNode);
-    RectF base = context ? context->GetRootRect() : RectF();
+    CHECK_NULL_RETURN(context, SafeAreaInsets());
+    RectF base = context->GetRootRect();
     float topShrink = std::max(0.0f, displayable.Top() - base.Top());
     float bottomShrink = std::max(0.0f, base.Bottom() - displayable.Bottom());
     float leftShrink = std::max(0.0f, displayable.Left() - base.Left());
