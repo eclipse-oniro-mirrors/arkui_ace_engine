@@ -75,7 +75,7 @@ void PerfMonitor::Start(const std::string& sceneId, PerfActionType type, const s
     }
     if (sceneId == PerfConstants::LV_INTO_APP_ANIM) {
         std::unordered_map<std::string, std::string> lvPayload;
-        if(!note.empty()) {
+        if (!note.empty()) {
             lvPayload["bundleName"] = note;
         }
         LOGD("PerfMonitor LV_INTO_APP_ANIM start, type=%{public}d note=%{public}s",
