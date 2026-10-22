@@ -8074,7 +8074,6 @@ void NavigationPattern::UpdatePageLevelDisplaceColumns(
         });
     const bool isNewPush = containsCurrent(preDest) &&
         !curWasInPrevious && navigationStack_->GetReplaceValue() == 0;
-
     if (isNewPush && preDest->GetNavDestinationType() == NavDestinationType::DETAIL &&
         curDest->GetNavDestinationType() == NavDestinationType::DETAIL &&
         preDest->GetColumnType() == ForceSplitPageColumnType::SECONDARY &&
