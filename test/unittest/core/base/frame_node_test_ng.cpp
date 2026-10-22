@@ -3985,4 +3985,232 @@ HWTEST_F(FrameNodeTestNg, FrameNodeIsPreMakeAndScroll001, TestSize.Level1)
     manager->scrollingNodes_.emplace(1);
     EXPECT_TRUE(frameNode->IsPreMakeAndScroll());
 }
+
+/**
+ * @tc.name: FrameNodeAdoptedCompensation001
+ * @tc.desc: Test adopted compensation transforms geometry and can be reverted.
+ * @tc.type: FUNC
+ */
+HWTEST_F(FrameNodeTestNg, FrameNodeAdoptedCompensation001, TestSize.Level1)
+{
+    auto parent = FrameNode::CreateFrameNode(
+        "adoptParent", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    auto child = FrameNode::CreateFrameNode(
+        "adoptedChild", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(parent, nullptr);
+    ASSERT_NE(child, nullptr);
+    parent->AdoptChild(child);
+    child->SetUseAdoptedCompensation(true);
+    child->SetAdoptedCompensation(OffsetF(10.0f, 20.0f), Matrix4::CreateScale(2.0, 3.0, 1.0));
+
+    EXPECT_TRUE(child->HasAdoptedCompensation());
+    EXPECT_EQ(child->GetCoordinateAncestorNodeOfFrame(), parent);
+    EXPECT_EQ(child->GetTransformedAdoptedCompensationOffset(), OffsetF(20.0f, 60.0f));
+    EXPECT_FLOAT_EQ(child->GetAdoptedCompensationScale().x, 2.0f);
+    EXPECT_FLOAT_EQ(child->GetAdoptedCompensationScale().y, 3.0f);
+
+    PointF point(1.0f, 2.0f);
+    child->ApplyAdoptedCompensationToPoint(point);
+    EXPECT_FLOAT_EQ(point.GetX(), 22.0f);
+    EXPECT_FLOAT_EQ(point.GetY(), 66.0f);
+    child->RevertAdoptedCompensationFromPoint(point);
+    EXPECT_FLOAT_EQ(point.GetX(), 1.0f);
+    EXPECT_FLOAT_EQ(point.GetY(), 2.0f);
+
+    RectF rect(1.0f, 2.0f, 3.0f, 4.0f);
+    child->ApplyAdoptedCompensationToRect(rect);
+    EXPECT_EQ(rect, RectF(22.0f, 66.0f, 6.0f, 12.0f));
+}
+
+/**
+ * @tc.name: FrameNodeAdoptedCompensation002
+ * @tc.desc: Test legacy adoption does not use compensation and removal clears policy state.
+ * @tc.type: FUNC
+ */
+HWTEST_F(FrameNodeTestNg, FrameNodeAdoptedCompensation002, TestSize.Level1)
+{
+    auto parent = FrameNode::CreateFrameNode(
+        "adoptParent", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    auto child = FrameNode::CreateFrameNode(
+        "adoptedChild", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(parent, nullptr);
+    ASSERT_NE(child, nullptr);
+    parent->AdoptChild(child);
+    child->SetAdoptedCompensation(OffsetF(10.0f, 20.0f), Matrix4::CreateScale(2.0, 3.0, 1.0));
+
+    EXPECT_FALSE(child->UseAdoptedCompensation());
+    EXPECT_FALSE(child->HasAdoptedCompensation());
+    EXPECT_EQ(child->GetCoordinateAncestorNodeOfFrame(), nullptr);
+    PointF point(1.0f, 2.0f);
+    child->ApplyAdoptedCompensationToPoint(point);
+    EXPECT_EQ(point, PointF(1.0f, 2.0f));
+
+    child->SetUseAdoptedCompensation(true);
+    ASSERT_TRUE(child->HasAdoptedCompensation());
+    ASSERT_TRUE(parent->RemoveAdoptedChild(child));
+    EXPECT_FALSE(child->IsAdopted());
+    EXPECT_FALSE(child->UseAdoptedCompensation());
+    EXPECT_FALSE(child->HasAdoptedCompensation());
+    EXPECT_EQ(child->GetAdoptedCompensationOffset(), OffsetF());
+    EXPECT_TRUE(child->GetAdoptedCompensationTransform().IsIdentityMatrix());
+}
+
+/**
+ * @tc.name: FrameNodeAdoptedCompensation003
+ * @tc.desc: Test compensation state initialization, stored values, repeated disable, and reset behavior.
+ * @tc.type: FUNC
+ */
+HWTEST_F(FrameNodeTestNg, FrameNodeAdoptedCompensation003, TestSize.Level1)
+{
+    auto child = FrameNode::CreateFrameNode(
+        "adoptedChild", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(child, nullptr);
+
+    EXPECT_FALSE(child->UseAdoptedCompensation());
+    EXPECT_FALSE(child->HasAdoptedCompensation());
+    EXPECT_EQ(child->GetAdoptedCompensationOffset(), OffsetF());
+    EXPECT_TRUE(child->GetAdoptedCompensationTransform().IsIdentityMatrix());
+    EXPECT_EQ(child->GetTransformedAdoptedCompensationOffset(), OffsetF());
+    child->SetUseAdoptedCompensation(false);
+    EXPECT_EQ(child->adoptedCompensationInfo_, nullptr);
+
+    auto transform = Matrix4::CreateTranslate(3.0, 4.0, 0.0) * Matrix4::CreateScale(2.0, 3.0, 1.0);
+    child->SetAdoptedCompensation(OffsetF(10.0f, 20.0f), transform);
+    ASSERT_NE(child->adoptedCompensationInfo_, nullptr);
+    EXPECT_FALSE(child->UseAdoptedCompensation());
+    EXPECT_EQ(child->GetAdoptedCompensationOffset(), OffsetF(10.0f, 20.0f));
+    EXPECT_EQ(child->GetAdoptedCompensationTransform(), transform);
+
+    child->SetUseAdoptedCompensation(true);
+    EXPECT_TRUE(child->UseAdoptedCompensation());
+    EXPECT_FALSE(child->HasAdoptedCompensation());
+    child->SetUseAdoptedCompensation(false);
+    EXPECT_FALSE(child->UseAdoptedCompensation());
+    EXPECT_EQ(child->adoptedCompensationInfo_, nullptr);
+    child->SetUseAdoptedCompensation(false);
+    EXPECT_EQ(child->adoptedCompensationInfo_, nullptr);
+}
+
+/**
+ * @tc.name: FrameNodeAdoptedCompensation004
+ * @tc.desc: Test Point and PointF collection overloads apply offset before transform.
+ * @tc.type: FUNC
+ */
+HWTEST_F(FrameNodeTestNg, FrameNodeAdoptedCompensation004, TestSize.Level1)
+{
+    auto parent = FrameNode::CreateFrameNode(
+        "adoptParent", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    auto child = FrameNode::CreateFrameNode(
+        "adoptedChild", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(parent, nullptr);
+    ASSERT_NE(child, nullptr);
+    parent->AdoptChild(child);
+    child->SetUseAdoptedCompensation(true);
+    child->SetAdoptedCompensation(OffsetF(10.0f, 20.0f), Matrix4::CreateScale(2.0, 3.0, 1.0));
+
+    std::vector<Point> points = { Point(1.0, 2.0), Point(-1.0, -2.0) };
+    child->ApplyAdoptedCompensationToPoints(points);
+    ASSERT_EQ(points.size(), 2);
+    EXPECT_DOUBLE_EQ(points[0].GetX(), 22.0);
+    EXPECT_DOUBLE_EQ(points[0].GetY(), 66.0);
+    EXPECT_DOUBLE_EQ(points[1].GetX(), 18.0);
+    EXPECT_DOUBLE_EQ(points[1].GetY(), 54.0);
+
+    std::vector<PointF> floatPoints = { PointF(1.0f, 2.0f), PointF(-1.0f, -2.0f) };
+    child->ApplyAdoptedCompensationToPoints(floatPoints);
+    ASSERT_EQ(floatPoints.size(), 2);
+    EXPECT_FLOAT_EQ(floatPoints[0].GetX(), 22.0f);
+    EXPECT_FLOAT_EQ(floatPoints[0].GetY(), 66.0f);
+    EXPECT_FLOAT_EQ(floatPoints[1].GetX(), 18.0f);
+    EXPECT_FLOAT_EQ(floatPoints[1].GetY(), 54.0f);
+
+    Point point(1.0, 2.0);
+    child->ApplyAdoptedCompensationToPoint(point);
+    EXPECT_DOUBLE_EQ(point.GetX(), 22.0);
+    EXPECT_DOUBLE_EQ(point.GetY(), 66.0);
+
+    std::vector<Point> emptyPoints;
+    std::vector<PointF> emptyFloatPoints;
+    child->ApplyAdoptedCompensationToPoints(emptyPoints);
+    child->ApplyAdoptedCompensationToPoints(emptyFloatPoints);
+    EXPECT_TRUE(emptyPoints.empty());
+    EXPECT_TRUE(emptyFloatPoints.empty());
+}
+
+/**
+ * @tc.name: FrameNodeAdoptedCompensation005
+ * @tc.desc: Test rectangle bounding box and center size use the same adopted transform.
+ * @tc.type: FUNC
+ */
+HWTEST_F(FrameNodeTestNg, FrameNodeAdoptedCompensation005, TestSize.Level1)
+{
+    auto parent = FrameNode::CreateFrameNode(
+        "adoptParent", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    auto child = FrameNode::CreateFrameNode(
+        "adoptedChild", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(parent, nullptr);
+    ASSERT_NE(child, nullptr);
+    parent->AdoptChild(child);
+    child->SetUseAdoptedCompensation(true);
+    child->SetAdoptedCompensation(OffsetF(10.0f, 20.0f), Matrix4::CreateScale(-2.0, 3.0, 1.0));
+
+    RectF rect(1.0f, 2.0f, 3.0f, 4.0f);
+    child->ApplyAdoptedCompensationToRect(rect);
+    EXPECT_EQ(rect, RectF(-28.0f, 66.0f, 6.0f, 12.0f));
+
+    PointF center(1.0f, 2.0f);
+    float width = 3.0f;
+    float height = 4.0f;
+    child->ApplyAdoptedCompensationToCenterAndSize(center, width, height);
+    EXPECT_FLOAT_EQ(center.GetX(), -22.0f);
+    EXPECT_FLOAT_EQ(center.GetY(), 66.0f);
+    EXPECT_FLOAT_EQ(width, 6.0f);
+    EXPECT_FLOAT_EQ(height, 12.0f);
+}
+
+/**
+ * @tc.name: FrameNodeAdoptedCompensation006
+ * @tc.desc: Test geometry helpers are no-ops without active adopted compensation and scale has a safe fallback.
+ * @tc.type: FUNC
+ */
+HWTEST_F(FrameNodeTestNg, FrameNodeAdoptedCompensation006, TestSize.Level1)
+{
+    auto child = FrameNode::CreateFrameNode(
+        "adoptedChild", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(child, nullptr);
+    child->SetAdoptedCompensation(OffsetF(10.0f, 20.0f), Matrix4::CreateScale(2.0, 3.0, 1.0));
+
+    std::vector<Point> points = { Point(1.0, 2.0) };
+    std::vector<PointF> floatPoints = { PointF(1.0f, 2.0f) };
+    Point point(1.0, 2.0);
+    PointF floatPoint(1.0f, 2.0f);
+    RectF rect(1.0f, 2.0f, 3.0f, 4.0f);
+    PointF center(1.0f, 2.0f);
+    float width = 3.0f;
+    float height = 4.0f;
+    child->ApplyAdoptedCompensationToPoints(points);
+    child->ApplyAdoptedCompensationToPoints(floatPoints);
+    child->ApplyAdoptedCompensationToPoint(point);
+    child->ApplyAdoptedCompensationToPoint(floatPoint);
+    child->RevertAdoptedCompensationFromPoint(floatPoint);
+    child->ApplyAdoptedCompensationToRect(rect);
+    child->ApplyAdoptedCompensationToCenterAndSize(center, width, height);
+
+    EXPECT_EQ(points[0], Point(1.0, 2.0));
+    EXPECT_EQ(floatPoints[0], PointF(1.0f, 2.0f));
+    EXPECT_EQ(point, Point(1.0, 2.0));
+    EXPECT_EQ(floatPoint, PointF(1.0f, 2.0f));
+    EXPECT_EQ(rect, RectF(1.0f, 2.0f, 3.0f, 4.0f));
+    EXPECT_EQ(center, PointF(1.0f, 2.0f));
+    EXPECT_FLOAT_EQ(width, 3.0f);
+    EXPECT_FLOAT_EQ(height, 4.0f);
+    EXPECT_EQ(child->GetTransformedAdoptedCompensationOffset(), OffsetF());
+
+    auto invalidTransform = Matrix4::CreateIdentity();
+    invalidTransform.Set(3, 3, 0.0);
+    child->SetAdoptedCompensation(OffsetF(), invalidTransform);
+    auto scale = child->GetAdoptedCompensationScale();
+    EXPECT_FLOAT_EQ(scale.x, 1.0f);
+    EXPECT_FLOAT_EQ(scale.y, 1.0f);
+}
 } // namespace OHOS::Ace::NG

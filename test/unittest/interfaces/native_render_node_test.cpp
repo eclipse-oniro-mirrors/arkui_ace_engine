@@ -23,6 +23,7 @@
 #include "native_node.h"
 #include "native_render.h"
 #include "native_type.h"
+#include "interfaces/native/node/animate_impl.h"
 #include "interfaces/native/node/config_manager.h"
 #include "interfaces/native/node/node_extened.h"
 #include "interfaces/native/node/node_model.h"
@@ -33,6 +34,7 @@
 #include "test/mock/frameworks/core/common/mock_theme_manager.h"
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 #include "frameworks/base/error/error_code.h"
+#include "frameworks/core/components_ng/base/frame_node.h"
 #include "frameworks/core/components_ng/base/mixed_mount_registry.h"
 
 using namespace testing;
@@ -1722,6 +1724,180 @@ HWTEST_F(NativeRenderNodeTest, NativeRenderNodeAdopterTest011, TestSize.Level1)
     ASSERT_TRUE(NodeModel::ConfigManager::SetRuntimeCheckMode(
         static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_TYPE_NODE_DISPOSED),
         static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_DISABLED)));
+}
+
+/**
+ * @tc.name: NativeRenderNodeAdopterTest012
+ * @tc.desc: Test AdoptChildWithPolicy enables adopted compensation and follows the adopt parent chain.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeRenderNodeTest, NativeRenderNodeAdopterTest012, TestSize.Level1)
+{
+    auto nodeAPI = reinterpret_cast<ArkUI_NativeNodeAPI_1*>(
+        OH_ArkUI_QueryModuleInterfaceByName(ARKUI_NATIVE_NODE, "ArkUI_NativeNodeAPI_1"));
+    ASSERT_NE(nodeAPI, nullptr);
+    auto rootNode = nodeAPI->createNode(ARKUI_NODE_CUSTOM);
+    auto parentNode = nodeAPI->createNode(ARKUI_NODE_CUSTOM);
+    auto childNode = nodeAPI->createNode(ARKUI_NODE_CUSTOM);
+    ASSERT_NE(rootNode, nullptr);
+    ASSERT_NE(parentNode, nullptr);
+    ASSERT_NE(childNode, nullptr);
+
+    ASSERT_EQ(OH_ArkUI_NativeModule_AdoptChildWithPolicy(rootNode, parentNode,
+        OH_ARKUI_NATIVE_MODULE_ADOPT_POLICY_OVERLAY_POSITION_FOLLOWS_ADOPT_PARENT_CHAIN),
+        ARKUI_ERROR_CODE_NO_ERROR);
+    ASSERT_EQ(OH_ArkUI_NativeModule_AdoptChildWithPolicy(parentNode, childNode,
+        OH_ARKUI_NATIVE_MODULE_ADOPT_POLICY_OVERLAY_POSITION_FOLLOWS_ADOPT_PARENT_CHAIN),
+        ARKUI_ERROR_CODE_NO_ERROR);
+    auto* rootFrameNode = reinterpret_cast<NG::FrameNode*>(rootNode->uiNodeHandle);
+    auto* parentFrameNode = reinterpret_cast<NG::FrameNode*>(parentNode->uiNodeHandle);
+    auto* childFrameNode = reinterpret_cast<NG::FrameNode*>(childNode->uiNodeHandle);
+    ASSERT_NE(rootFrameNode, nullptr);
+    ASSERT_NE(parentFrameNode, nullptr);
+    ASSERT_NE(childFrameNode, nullptr);
+    EXPECT_TRUE(childFrameNode->IsAdopted());
+    EXPECT_TRUE(childFrameNode->UseAdoptedCompensation());
+    EXPECT_EQ(childFrameNode->GetAdoptParent().GetRawPtr(), parentFrameNode);
+    EXPECT_EQ(childFrameNode->GetCoordinateAncestorNodeOfFrame().GetRawPtr(), parentFrameNode);
+    EXPECT_EQ(parentFrameNode->GetCoordinateAncestorNodeOfFrame().GetRawPtr(), rootFrameNode);
+
+    ASSERT_EQ(OH_ArkUI_NativeModule_RemoveAdoptedChild(parentNode, childNode), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_FALSE(childFrameNode->IsAdopted());
+    EXPECT_FALSE(childFrameNode->UseAdoptedCompensation());
+    EXPECT_EQ(childFrameNode->GetAdoptParent(), nullptr);
+    ASSERT_EQ(OH_ArkUI_NativeModule_RemoveAdoptedChild(rootNode, parentNode), ARKUI_ERROR_CODE_NO_ERROR);
+}
+
+/**
+ * @tc.name: NativeRenderNodeAdopterTest013
+ * @tc.desc: Test AdoptChildWithPolicy rejects null nodes and unsupported policies without adopting the child.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeRenderNodeTest, NativeRenderNodeAdopterTest013, TestSize.Level1)
+{
+    auto nodeAPI = reinterpret_cast<ArkUI_NativeNodeAPI_1*>(
+        OH_ArkUI_QueryModuleInterfaceByName(ARKUI_NATIVE_NODE, "ArkUI_NativeNodeAPI_1"));
+    ASSERT_NE(nodeAPI, nullptr);
+    auto parentNode = nodeAPI->createNode(ARKUI_NODE_CUSTOM);
+    auto treeParentNode = nodeAPI->createNode(ARKUI_NODE_CUSTOM);
+    auto childNode = nodeAPI->createNode(ARKUI_NODE_CUSTOM);
+    ASSERT_NE(parentNode, nullptr);
+    ASSERT_NE(treeParentNode, nullptr);
+    ASSERT_NE(childNode, nullptr);
+    auto policy = OH_ARKUI_NATIVE_MODULE_ADOPT_POLICY_OVERLAY_POSITION_FOLLOWS_ADOPT_PARENT_CHAIN;
+
+    EXPECT_EQ(OH_ArkUI_NativeModule_AdoptChildWithPolicy(nullptr, childNode, policy),
+        ARKUI_ERROR_CODE_PARAM_INVALID);
+    EXPECT_EQ(OH_ArkUI_NativeModule_AdoptChildWithPolicy(parentNode, nullptr, policy),
+        ARKUI_ERROR_CODE_PARAM_INVALID);
+    EXPECT_EQ(OH_ArkUI_NativeModule_AdoptChildWithPolicy(
+        parentNode, childNode, static_cast<OH_ArkUI_AdoptPolicy>(-1)), ARKUI_ERROR_CODE_PARAM_INVALID);
+
+    ArkUI_Node nonCNode {};
+    nonCNode.magic = ARKUI_NODE_MAGIC_VALID;
+    EXPECT_EQ(OH_ArkUI_NativeModule_AdoptChildWithPolicy(&nonCNode, childNode, policy),
+        ARKUI_ERROR_CODE_NODE_CAN_NOT_ADOPT_TO);
+    EXPECT_EQ(OH_ArkUI_NativeModule_AdoptChildWithPolicy(parentNode, &nonCNode, policy),
+        ARKUI_ERROR_CODE_NODE_CAN_NOT_BE_ADOPTED);
+
+    ASSERT_EQ(nodeAPI->addChild(treeParentNode, childNode), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(OH_ArkUI_NativeModule_AdoptChildWithPolicy(parentNode, childNode, policy),
+        ARKUI_ERROR_CODE_NODE_HAS_PARENT);
+
+    auto* childFrameNode = reinterpret_cast<NG::FrameNode*>(childNode->uiNodeHandle);
+    ASSERT_NE(childFrameNode, nullptr);
+    EXPECT_FALSE(childFrameNode->IsAdopted());
+    EXPECT_FALSE(childFrameNode->UseAdoptedCompensation());
+}
+
+/**
+ * @tc.name: NativeRenderNodeAdopterTest014
+ * @tc.desc: Test compensation can only be set for a child adopted with the overlay position policy.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeRenderNodeTest, NativeRenderNodeAdopterTest014, TestSize.Level1)
+{
+    auto nodeAPI = reinterpret_cast<ArkUI_NativeNodeAPI_1*>(
+        OH_ArkUI_QueryModuleInterfaceByName(ARKUI_NATIVE_NODE, "ArkUI_NativeNodeAPI_1"));
+    ASSERT_NE(nodeAPI, nullptr);
+    auto parentNode = nodeAPI->createNode(ARKUI_NODE_CUSTOM);
+    auto childNode = nodeAPI->createNode(ARKUI_NODE_CUSTOM);
+    auto unadoptedNode = nodeAPI->createNode(ARKUI_NODE_CUSTOM);
+    ASSERT_NE(parentNode, nullptr);
+    ASSERT_NE(childNode, nullptr);
+    ASSERT_NE(unadoptedNode, nullptr);
+    ArkUI_PointF offset = { 10.0f, 20.0f };
+    auto matrix = OH_ArkUI_Matrix4_CreateIdentity();
+    ASSERT_NE(matrix, nullptr);
+
+    EXPECT_EQ(OH_ArkUI_NativeModule_SetAdoptedChildOverlayPositionCompensation(nullptr, &offset, matrix),
+        ARKUI_ERROR_CODE_PARAM_INVALID);
+    EXPECT_EQ(OH_ArkUI_NativeModule_SetAdoptedChildOverlayPositionCompensation(childNode, nullptr, matrix),
+        ARKUI_ERROR_CODE_PARAM_INVALID);
+    EXPECT_EQ(OH_ArkUI_NativeModule_SetAdoptedChildOverlayPositionCompensation(childNode, &offset, nullptr),
+        ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_Matrix4 invalidMatrix;
+    EXPECT_EQ(OH_ArkUI_NativeModule_SetAdoptedChildOverlayPositionCompensation(
+        childNode, &offset, &invalidMatrix), ARKUI_ERROR_CODE_PARAM_INVALID);
+    EXPECT_EQ(OH_ArkUI_NativeModule_SetAdoptedChildOverlayPositionCompensation(unadoptedNode, &offset, matrix),
+        ARKUI_ERROR_CODE_NODE_IS_NOT_IN_ADOPTED_CHILDREN);
+
+    ASSERT_EQ(OH_ArkUI_NativeModule_AdoptChild(parentNode, childNode), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(OH_ArkUI_NativeModule_SetAdoptedChildOverlayPositionCompensation(childNode, &offset, matrix),
+        ARKUI_ERROR_CODE_NODE_IS_NOT_IN_ADOPTED_CHILDREN);
+    auto* childFrameNode = reinterpret_cast<NG::FrameNode*>(childNode->uiNodeHandle);
+    ASSERT_NE(childFrameNode, nullptr);
+    EXPECT_FALSE(childFrameNode->UseAdoptedCompensation());
+    OH_ArkUI_Matrix4_Dispose(matrix);
+}
+
+/**
+ * @tc.name: NativeRenderNodeAdopterTest015
+ * @tc.desc: Test overlay position compensation stores and applies the supplied offset and transform.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeRenderNodeTest, NativeRenderNodeAdopterTest015, TestSize.Level1)
+{
+    auto nodeAPI = reinterpret_cast<ArkUI_NativeNodeAPI_1*>(
+        OH_ArkUI_QueryModuleInterfaceByName(ARKUI_NATIVE_NODE, "ArkUI_NativeNodeAPI_1"));
+    ASSERT_NE(nodeAPI, nullptr);
+    auto parentNode = nodeAPI->createNode(ARKUI_NODE_CUSTOM);
+    auto childNode = nodeAPI->createNode(ARKUI_NODE_CUSTOM);
+    ASSERT_NE(parentNode, nullptr);
+    ASSERT_NE(childNode, nullptr);
+    ASSERT_EQ(OH_ArkUI_NativeModule_AdoptChildWithPolicy(parentNode, childNode,
+        OH_ARKUI_NATIVE_MODULE_ADOPT_POLICY_OVERLAY_POSITION_FOLLOWS_ADOPT_PARENT_CHAIN),
+        ARKUI_ERROR_CODE_NO_ERROR);
+
+    constexpr float scaleX = 2.0f;
+    constexpr float scaleY = 3.0f;
+    constexpr float offsetX = 10.0f;
+    constexpr float offsetY = 20.0f;
+    const float elements[] = {
+        scaleX, 0.0f, 0.0f, 0.0f,
+        0.0f, scaleY, 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f,
+    };
+    auto matrix = OH_ArkUI_Matrix4_CreateByElements(elements);
+    ASSERT_NE(matrix, nullptr);
+    ArkUI_PointF offset = { offsetX, offsetY };
+    ASSERT_EQ(OH_ArkUI_NativeModule_SetAdoptedChildOverlayPositionCompensation(childNode, &offset, matrix),
+        ARKUI_ERROR_CODE_NO_ERROR);
+
+    auto* childFrameNode = reinterpret_cast<NG::FrameNode*>(childNode->uiNodeHandle);
+    ASSERT_NE(childFrameNode, nullptr);
+    EXPECT_EQ(childFrameNode->GetAdoptedCompensationOffset(), NG::OffsetF(offsetX, offsetY));
+    EXPECT_FLOAT_EQ(childFrameNode->GetAdoptedCompensationScale().x, scaleX);
+    EXPECT_FLOAT_EQ(childFrameNode->GetAdoptedCompensationScale().y, scaleY);
+    NG::PointF point(1.0f, 2.0f);
+    childFrameNode->ApplyAdoptedCompensationToPoint(point);
+    EXPECT_FLOAT_EQ(point.GetX(), 22.0f);
+    EXPECT_FLOAT_EQ(point.GetY(), 66.0f);
+    childFrameNode->RevertAdoptedCompensationFromPoint(point);
+    EXPECT_FLOAT_EQ(point.GetX(), 1.0f);
+    EXPECT_FLOAT_EQ(point.GetY(), 2.0f);
+    OH_ArkUI_Matrix4_Dispose(matrix);
 }
 
 /**

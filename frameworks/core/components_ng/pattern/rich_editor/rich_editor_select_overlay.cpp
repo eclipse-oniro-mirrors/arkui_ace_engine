@@ -705,13 +705,13 @@ void RichEditorSelectOverlay::OnAncestorNodeChanged(FrameNodeChangeInfoFlag flag
     CHECK_NULL_VOID(host);
     FrameNodeChangeInfoFlag changeFlag = flag;
     if (IsAncestorNodeStartScroll(host->GetChangeInfoFlag()) || IsAncestorNodeEndScroll(host->GetChangeInfoFlag())) {
-        auto parent = host->GetAncestorNodeOfFrame(true);
+        auto parent = host->GetCoordinateAncestorNodeOfFrame(true);
         changeFlag = FRAME_NODE_CHANGE_INFO_NONE;
         while (parent) {
             if (parent->GetChangeInfoFlag() != FRAME_NODE_CHANGE_INFO_NONE) {
                 changeFlag = changeFlag | parent->GetChangeInfoFlag();
             }
-            parent = parent->GetAncestorNodeOfFrame(true);
+            parent = parent->GetCoordinateAncestorNodeOfFrame(true);
         }
     }
     BaseTextSelectOverlay::OnAncestorNodeChanged(changeFlag, scrollTriggersEmbed, transformTriggersEmbed);

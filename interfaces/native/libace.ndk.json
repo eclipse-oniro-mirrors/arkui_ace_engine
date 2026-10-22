@@ -4480,6 +4480,14 @@
         "name": "OH_ArkUI_NativeModule_AdoptChild"
     },
     {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_AdoptChildWithPolicy"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_SetAdoptedChildOverlayPositionCompensation"
+    },
+    {
         "first_introduced": "22",
         "name": "OH_ArkUI_NativeModule_RemoveAdoptedChild"
     },

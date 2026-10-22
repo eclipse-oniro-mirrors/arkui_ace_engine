@@ -148,7 +148,12 @@ void MagnifierController::SetLocalOffset(const OffsetF& localOffset, const TimeS
         point = point + paintOffset;
         patternOffset = patternOffset + paintOffset;
         renderContext->GetPointTransform(point);
-        node = node ->GetAncestorNodeOfFrame(true);
+        auto ancestor = node->GetCoordinateAncestorNodeOfFrame(true);
+        if (ancestor && node->HasAdoptedCompensation()) {
+            node->ApplyAdoptedCompensationToPoint(point);
+            patternOffset += node->GetAdoptedCompensationOffset();
+        }
+        node = ancestor;
     }
     patternOffset_ = patternOffset;
     globalOffset_.SetX(point.GetX());

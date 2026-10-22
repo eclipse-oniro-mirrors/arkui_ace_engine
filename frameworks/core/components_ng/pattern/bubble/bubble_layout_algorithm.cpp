@@ -2376,18 +2376,18 @@ void BubbleLayoutAlgorithm::InitCaretTargetSizeAndPosition()
 void BubbleLayoutAlgorithm::UpdateTargetVisibleRect(const RefPtr<FrameNode>& targetNode, bool showInSubWindow)
 {
     bool useVisibleRect = isTips_ && !followCursor_;
-    if (!useVisibleRect || !targetNode->GetAncestorNodeOfFrame(true)) {
+    if (!useVisibleRect || !targetNode->GetCoordinateAncestorNodeOfFrame(true)) {
         return;
     }
     auto targetRect = targetNode->GetPaintRectToWindowWithTransform();
-    auto parent = targetNode->GetAncestorNodeOfFrame(true);
+    auto parent = targetNode->GetCoordinateAncestorNodeOfFrame(true);
     while (parent) {
         auto parentRect = parent->GetPaintRectToWindowWithTransform();
         targetRect = targetRect.Constrain(parentRect);
         if (targetRect.IsEmpty()) {
             break;
         }
-        parent = parent->GetAncestorNodeOfFrame(true);
+        parent = parent->GetCoordinateAncestorNodeOfFrame(true);
     }
     if (targetRect.IsEmpty()) {
         targetFullyInvisible_ = true;

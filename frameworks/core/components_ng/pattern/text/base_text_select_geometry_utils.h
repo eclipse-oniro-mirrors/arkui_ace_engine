@@ -40,6 +40,7 @@ public:
         const RefPtr<FrameNode>& node);
 
     static bool CheckUnsupportedTransformMatrix(const RefPtr<RenderContext>& context, bool checkScale);
+    static bool CheckUnsupportedTransformMatrix(const Matrix4& matrix, bool checkScale);
 
     // Same semantics as BaseTextSelectOverlay::HasUnsupportedTransform before extraction.
     static bool HasUnsupportedTransform(const RefPtr<FrameNode>& host, bool checkScale);
