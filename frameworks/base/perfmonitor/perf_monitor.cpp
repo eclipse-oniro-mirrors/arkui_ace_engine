@@ -79,7 +79,7 @@ void PerfMonitor::Start(const std::string& sceneId, PerfActionType type, const s
             lvPayLoad["bundleName"] = note;
         }
         LOGE("PerfMonitor LV_INTO_APP_ANIM start, type=%{public}d note=%{public}s",
-            static_sast<int>(type), note.c_str());
+            static_cast<int>(type), note.c_str());
         ResSchedReport::GetInstance().ResSchedDataReport("lv_into_app_anim_start",lvPayLoad);
     }
 }
