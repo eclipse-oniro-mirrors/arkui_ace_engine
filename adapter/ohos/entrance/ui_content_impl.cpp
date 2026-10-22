@@ -6047,27 +6047,38 @@ void UIContentImpl::SetContainerModalTitleHeight(int32_t height)
     ContainerScope scope(instanceId_);
     auto taskExecutor = Container::CurrentTaskExecutor();
     CHECK_NULL_VOID(taskExecutor);
-    auto task = [height, instanceId = instanceId_]() {
-        ContainerScope scope(instanceId);
-        auto container = Platform::AceContainer::GetContainer(instanceId);
-        CHECK_NULL_VOID(container);
-        auto pipeline = AceType::DynamicCast<NG::PipelineContext>(container->GetPipelineContext());
+    auto task = [height]() {
+        auto pipeline = NG::PipelineContext::GetCurrentContext();
         CHECK_NULL_VOID(pipeline);
-        auto display = Rosen::DisplayManager::GetInstance().GetDisplayById(container->GetDisplayId());
-        float vpr = display ? display->GetVirtualPixelRatio() : 0.0f;
-        if (NearZero(static_cast<double>(vpr))) {
-            // Fallback when the display or its vpr is unavailable, so no DM-side scale can be used here.
-            pipeline->SetContainerModalTitleHeight(height);
-        } else {
-            double heightVp = height / static_cast<double>(vpr);
-            pipeline->SetContainerModalTitleHeightWithVp(heightVp);
-        }
+        pipeline->SetContainerModalTitleHeight(height);
     };
     auto uiTaskRunner = SingleTaskExecutor::Make(taskExecutor, TaskExecutor::TaskType::UI);
     if (uiTaskRunner.IsRunOnCurrentThread()) {
         task();
     } else {
         taskExecutor->PostTask(std::move(task), TaskExecutor::TaskType::UI, "ArkUISetContainerModalTitleHeight");
+    }
+}
+
+void UIContentImpl::SetContainerModalTitleHeightWithVp(double heightVp)
+{
+    ContainerScope scope(instanceId_);
+    auto taskExecutor = Container::CurrentTaskExecutor();
+    CHECK_NULL_VOID(taskExecutor);
+    auto task = [heightVp, instanceId = instanceId_]() {
+        ContainerScope scope(instanceId);
+        auto container = Platform::AceContainer::GetContainer(instanceId);
+        CHECK_NULL_VOID(container);
+        auto pipeline = AceType::DynamicCast<NG::PipelineContext>(container->GetPipelineContext());
+        CHECK_NULL_VOID(pipeline);
+        pipeline->SetContainerModalTitleHeightWithVp(heightVp);
+    };
+    auto uiTaskRunner = SingleTaskExecutor::Make(taskExecutor, TaskExecutor::TaskType::UI);
+    if (uiTaskRunner.IsRunOnCurrentThread()) {
+        task();
+    } else {
+        taskExecutor->PostTask(
+            std::move(task), TaskExecutor::TaskType::UI, "ArkUISetContainerModalTitleHeightWithVp");
     }
 }
 

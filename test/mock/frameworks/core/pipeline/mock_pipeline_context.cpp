@@ -13,6 +13,8 @@
  * limitations under the License.
  */
 
+#include <cmath>
+
 #include <gmock/gmock.h>
 
 #include "core/common/thp_extra_manager.h"
@@ -321,6 +323,17 @@ void MockPipelineContext::SetContainerModalButtonsRect(RectF buttons)
 void MockPipelineContext::SetContainerModalTitleHeight(int32_t height)
 {
     g_containerModalTitleHeight = height;
+}
+
+void MockPipelineContext::SetContainerModalTitleHeightWithVp(double heightVp)
+{
+    if (std::isfinite(heightVp) == false) {
+        return;
+    }
+    if (heightVp < 0) {
+        heightVp = 0;
+    }
+    g_containerModalTitleHeight = static_cast<int32_t>(std::ceil(heightVp * PipelineBase::dipScale_));
 }
 // mock_pipeline_context =======================================================
 
