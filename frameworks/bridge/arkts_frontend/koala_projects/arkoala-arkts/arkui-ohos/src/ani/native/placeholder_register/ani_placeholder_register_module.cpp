@@ -108,6 +108,11 @@ NG::ScrollPlaceholderBuilder MakeTemplateBuilder(const AniTemplateBuilderHandleP
                     "ScrollPlaceholder execution closure threw (ani status=%{public}d), "
                     "see the module-side 'execution: builder THREW' line for the reason", status);
                 NG::ScrollPlaceholderRestrictedScope::NotifyViolation();
+                // The rejection is reported through the register result code.
+                // Leaving the exception pending would propagate it through
+                // Register() into the caller's build pass and abort the whole
+                // page, turning a placeholder failure into a white screen.
+                env->ResetError();
             } else {
                 TAG_LOGI(AceLogTag::ACE_SCROLL, "ScrollPlaceholder execution closure returned normally");
             }
