@@ -27,6 +27,7 @@ namespace {
 const std::unordered_set<int32_t> VALID_IMMERSIVE_STRATEGY_VALUES = {
     static_cast<int32_t>(ImmersiveStrategy::AVOID_CUTOUT),
     static_cast<int32_t>(ImmersiveStrategy::AVOID_FLOAT_NAV),
+    static_cast<int32_t>(ImmersiveStrategy::AVOID_WINDOW_CONTROLS),
     static_cast<int32_t>(ImmersiveStrategy::BIND_SHEET_EXPAND_SAFE_AREA),
     static_cast<int32_t>(ImmersiveStrategy::NAVIGATION_EXPAND_SAFE_AREA),
 };

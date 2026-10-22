@@ -773,6 +773,9 @@ bool ParseAvoidAreasUpdate(const RefPtr<NG::PipelineContext>& context,
         } else if (avoidArea.first == OHOS::Rosen::AvoidAreaType::TYPE_CUTOUT) {
             safeAreaUpdated |= safeAreaManager->UpdateCutoutSafeArea(ConvertAvoidArea(avoidArea.second),
                 NG::OptionalSize<uint32_t>(config.Width(), config.Height()));
+        } else if (avoidArea.first == OHOS::Rosen::AvoidAreaType::TYPE_TITLE_BUTTON) {
+            safeAreaUpdated |= safeAreaManager->UpdateTitleButtonSafeArea(ConvertAvoidArea(avoidArea.second),
+                NG::OptionalSize<uint32_t>(config.Width(), config.Height()));
         }
     }
     if (safeAreaUpdated) {
@@ -795,6 +798,8 @@ std::map<NG::SafeAreaAvoidType, NG::SafeAreaInsets> ParseAvoidAreasToMap(
             safeAvoidAreas[NG::SafeAreaAvoidType::TYPE_FLOAT_NAVIGATION] = ConvertAvoidArea(avoidArea.second);
         } else if (avoidArea.first == OHOS::Rosen::AvoidAreaType::TYPE_CUTOUT) {
             safeAvoidAreas[NG::SafeAreaAvoidType::TYPE_CUTOUT] = ConvertAvoidArea(avoidArea.second);
+        } else if (avoidArea.first == OHOS::Rosen::AvoidAreaType::TYPE_TITLE_BUTTON) {
+            safeAvoidAreas[NG::SafeAreaAvoidType::TYPE_TITLE_BUTTON] = ConvertAvoidArea(avoidArea.second);
         }
     }
     return safeAvoidAreas;
@@ -3135,15 +3140,17 @@ void UIContentImpl::InitializeSafeArea(const RefPtr<Platform::AceContainer>& con
             auto cutoutInsets = container->GetViewSafeAreaByType(Rosen::AvoidAreaType::TYPE_CUTOUT);
             auto navInsets = container->GetViewSafeAreaByType(Rosen::AvoidAreaType::TYPE_NAVIGATION_INDICATOR);
             auto floatNavInsets = container->GetViewSafeAreaByType(Rosen::AvoidAreaType::TYPE_FLOAT_NAVIGATION);
+            auto titleButtonInsets = container->GetViewSafeAreaByType(Rosen::AvoidAreaType::TYPE_TITLE_BUTTON);
             pipeline->UpdateSystemSafeAreaWithoutAnimation(systemInsets);
             pipeline->UpdateCutoutSafeAreaWithoutAnimation(cutoutInsets);
             pipeline->UpdateNavSafeAreaWithoutAnimation(navInsets);
             pipeline->UpdateFloatNavSafeAreaWithoutAnimation(floatNavInsets);
+            pipeline->UpdateTitleButtonSafeAreaWithoutAnimation(titleButtonInsets);
             TAG_LOGI(ACE_SAFE_AREA,
                 "InitializeSafeArea systemInsets:%{public}s, cutoutInsets:%{public}s, navInsets:%{public}s, "
-                "floatNavInsets:%{public}s",
+                "floatNavInsets:%{public}s, titleButtonInsets:%{public}s",
                 systemInsets.ToString().c_str(), cutoutInsets.ToString().c_str(), navInsets.ToString().c_str(),
-                floatNavInsets.ToString().c_str());
+                floatNavInsets.ToString().c_str(), titleButtonInsets.ToString().c_str());
         }
     }
     InitWindowMode(container);

@@ -2387,6 +2387,9 @@ bool PipelineContext::FlushSafeArea(
         } else if (avoidArea.first == NG::SafeAreaAvoidType::TYPE_CUTOUT) {
             safeAreaUpdated |=
                 safeAreaManager_->UpdateCutoutSafeArea(avoidArea.second, NG::OptionalSize<uint32_t>(width, height));
+        } else if (avoidArea.first == NG::SafeAreaAvoidType::TYPE_TITLE_BUTTON) {
+            safeAreaUpdated |= safeAreaManager_->UpdateTitleButtonSafeArea(
+                avoidArea.second, NG::OptionalSize<uint32_t>(width, height));
         }
     }
     uint32_t keyboardHeight = safeAreaManager_->GetKeyboardInset().Length();
@@ -2948,6 +2951,16 @@ void PipelineContext::UpdateFloatNavSafeArea(const SafeAreaInsets& floatNavSafeA
     }
 }
 
+void PipelineContext::UpdateTitleButtonSafeArea(const SafeAreaInsets& titleButtonSafeArea)
+{
+    CHECK_NULL_VOID(minPlatformVersion_ >= PLATFORM_VERSION_TEN);
+    auto rootSize =
+        NG::OptionalSize<uint32_t>(static_cast<uint32_t>(GetRootWidth()), static_cast<uint32_t>(GetRootHeight()));
+    if (safeAreaManager_->UpdateTitleButtonSafeArea(titleButtonSafeArea, rootSize)) {
+        AnimateOnSafeAreaUpdate();
+    }
+}
+
 void PipelineContext::UpdateSystemSafeAreaWithoutAnimation(
     const SafeAreaInsets& systemSafeArea, bool checkSceneBoardWindow)
 {
@@ -2997,6 +3010,16 @@ void PipelineContext::UpdateFloatNavSafeAreaWithoutAnimation(const SafeAreaInset
     auto rootSize =
         NG::OptionalSize<uint32_t>(static_cast<uint32_t>(GetRootWidth()), static_cast<uint32_t>(GetRootHeight()));
     if (safeAreaManager_->UpdateFloatNavSafeArea(floatNavSafeArea, rootSize)) {
+        SyncSafeArea(SafeAreaSyncType::SYNC_TYPE_AVOID_AREA);
+    }
+}
+
+void PipelineContext::UpdateTitleButtonSafeAreaWithoutAnimation(const SafeAreaInsets& titleButtonSafeArea)
+{
+    CHECK_NULL_VOID(minPlatformVersion_ >= PLATFORM_VERSION_TEN);
+    auto rootSize =
+        NG::OptionalSize<uint32_t>(static_cast<uint32_t>(GetRootWidth()), static_cast<uint32_t>(GetRootHeight()));
+    if (safeAreaManager_->UpdateTitleButtonSafeArea(titleButtonSafeArea, rootSize)) {
         SyncSafeArea(SafeAreaSyncType::SYNC_TYPE_AVOID_AREA);
     }
 }
