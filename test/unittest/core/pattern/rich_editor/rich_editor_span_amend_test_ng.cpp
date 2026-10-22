@@ -643,4 +643,433 @@ HWTEST_F(RichEditorSpanAmendTestNg, PageTranslate_ClearPlaceholderImageNode, Tes
     EXPECT_TRUE(richEditorPattern->placeholderImageNodes_.empty());
     EXPECT_EQ(spans.size(), 1);
 }
+
+namespace {
+// Build a SpanItem with given type/content/position; spanRange = [position-len, position).
+RefPtr<SpanItem> MakeSpan(SpanItemType type, std::u16string content, int32_t position)
+{
+    auto span = AceType::MakeRefPtr<SpanItem>();
+    span->spanItemType = type;
+    span->content = content;
+    span->position = position;
+    span->rangeStart = position - static_cast<int32_t>(content.length());
+    return span;
+}
+
+RefPtr<ImageSpanItem> MakeImageSpan(std::optional<std::u16string> imageTag, int32_t position)
+{
+    auto span = AceType::MakeRefPtr<ImageSpanItem>();
+    span->content = u" ";
+    span->position = position;
+    span->rangeStart = position - static_cast<int32_t>(span->content.length());
+    if (imageTag.has_value()) {
+        span->options.imageTag = imageTag.value();
+    }
+    return span;
+}
+
+void ClearAndLoadSpans(RefPtr<RichEditorPattern> pattern, std::initializer_list<RefPtr<SpanItem>> spans)
+{
+    pattern->spans_.clear();
+    for (const auto& span : spans) {
+        pattern->spans_.emplace_back(span);
+    }
+}
+} // namespace
+
+/**
+ * @tc.name: BuildRichText001
+ * @tc.desc: Invalid range guards, span filtering (position==-1 / no-overlap / empty spans_).
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorSpanAmendTestNg, BuildRichText001, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto s0 = MakeSpan(SpanItemType::NORMAL, u"hello", 5);   // [0,5)
+    auto s1 = MakeImageSpan(u"[img]", 6);                    // [5,6)
+    auto s2 = MakeSpan(SpanItemType::NORMAL, u"world", 11);  // [6,11)
+    auto sInvalid = MakeSpan(SpanItemType::NORMAL, u"x", -1); // position==-1 skipped
+    ClearAndLoadSpans(pattern, { s0, s1, s2, sInvalid });
+
+    // Branch: start<0 -> return empty
+    auto result = pattern->BuildRichText(-1, 5);
+    EXPECT_TRUE(result.IsEmpty());
+
+    // Branch: end<0 -> return empty
+    result = pattern->BuildRichText(0, -1);
+    EXPECT_TRUE(result.IsEmpty());
+
+    // Branch: start>end -> return empty
+    result = pattern->BuildRichText(5, 2);
+    EXPECT_TRUE(result.IsEmpty());
+
+    // Branch: no-overlap filtering — request [5,11) skips s0 (spanEnd 5 not > start 5)
+    result = pattern->BuildRichText(5, 11);
+    EXPECT_EQ(result.spans.size(), 2u);
+    EXPECT_EQ(result.spans[0].range.start, 0); // relative range starts at 0
+    EXPECT_EQ(result.spans[0].range.end, 1);
+
+    // Branch: empty spans_ returns empty
+    ClearAndLoadSpans(pattern, {});
+    result = pattern->BuildRichText(0, 10);
+    EXPECT_TRUE(result.IsEmpty());
+}
+
+/**
+ * @tc.name: BuildRichText002
+ * @tc.desc: Type mapping + content extraction per SpanItemType, SYMBOL partial overlap, unknown type skip.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorSpanAmendTestNg, BuildRichText002, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    // NORMAL -> TEXT, content truncated on overlap
+    ClearAndLoadSpans(pattern, { MakeSpan(SpanItemType::NORMAL, u"ab", 2) });
+    auto result = pattern->BuildRichText(0, 2);
+    ASSERT_EQ(result.spans.size(), 1u);
+    EXPECT_EQ(result.spans[0].type, RichSpanType::TEXT);
+    EXPECT_EQ(result.spans[0].content, "ab");
+
+    // IMAGE -> IMAGE, nullopt imageTag fallback to single space
+    ClearAndLoadSpans(pattern, { MakeImageSpan(std::nullopt, 1) });
+    result = pattern->BuildRichText(0, 1);
+    ASSERT_EQ(result.spans.size(), 1u);
+    EXPECT_EQ(result.spans[0].type, RichSpanType::IMAGE);
+    EXPECT_EQ(result.spans[0].content, " ");
+
+    // SYMBOL -> SYMBOL; full overlap keeps 2-space content
+    ClearAndLoadSpans(pattern, { MakeSpan(SpanItemType::SYMBOL, u"  ", 2) });
+    result = pattern->BuildRichText(0, 2);
+    ASSERT_EQ(result.spans.size(), 1u);
+    EXPECT_EQ(result.spans[0].type, RichSpanType::SYMBOL);
+    EXPECT_EQ(result.spans[0].content, "  ");
+    EXPECT_EQ(result.spans[0].range.start, 0);
+    EXPECT_EQ(result.spans[0].range.end, 2);
+
+    // SYMBOL partial overlap (1 of 2 chars): content stays "  " (non-truncating)
+    result = pattern->BuildRichText(1, 3);
+    EXPECT_EQ(result.spans[0].content, "  ");
+    EXPECT_EQ(result.spans[0].range.end, 1);
+
+    // CustomSpan -> CUSTOM
+    auto custom = AceType::MakeRefPtr<CustomSpanItem>();
+    custom->content = u" ";
+    custom->position = 1;
+    custom->rangeStart = 0;
+    ClearAndLoadSpans(pattern, { custom });
+    result = pattern->BuildRichText(0, 1);
+    ASSERT_EQ(result.spans.size(), 1u);
+    EXPECT_EQ(result.spans[0].type, RichSpanType::CUSTOM);
+    EXPECT_EQ(result.spans[0].content, " ");
+
+    // PLACEHOLDER -> CUSTOM (non-truncating)
+    auto placeholder = AceType::MakeRefPtr<PlaceholderSpanItem>();
+    placeholder->content = u" ";
+    placeholder->position = 1;
+    placeholder->rangeStart = 0;
+    ClearAndLoadSpans(pattern, { placeholder });
+    result = pattern->BuildRichText(0, 1);
+    ASSERT_EQ(result.spans.size(), 1u);
+    EXPECT_EQ(result.spans[0].type, RichSpanType::CUSTOM);
+    EXPECT_EQ(result.spans[0].content, " ");
+
+    // Unknown type -> skipped (nullopt)
+    auto unknown = MakeSpan(static_cast<SpanItemType>(99), u"?", 1);
+    ClearAndLoadSpans(pattern, { unknown });
+    result = pattern->BuildRichText(0, 1);
+    EXPECT_TRUE(result.IsEmpty());
+}
+
+/**
+ * @tc.name: BuildRichText003
+ * @tc.desc: TEXT content truncation: full/left/right/both/single-char/non-ASCII overlap.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorSpanAmendTestNg, BuildRichText003, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    // TEXT "hello world" [0,11)
+    ClearAndLoadSpans(pattern, { MakeSpan(SpanItemType::NORMAL, u"hello world", 11) });
+
+    // Full overlap
+    auto result = pattern->BuildRichText(0, 11);
+    ASSERT_EQ(result.spans.size(), 1u);
+    EXPECT_EQ(result.spans[0].content, "hello world");
+    EXPECT_EQ(result.spans[0].range.start, 0);
+    EXPECT_EQ(result.spans[0].range.end, 11);
+
+    // Left partial (span starts before range)
+    result = pattern->BuildRichText(3, 11);
+    EXPECT_EQ(result.spans[0].content, "lo world");
+    EXPECT_EQ(result.spans[0].range.start, 0);
+    EXPECT_EQ(result.spans[0].range.end, 8);
+
+    // Right partial (span ends after range)
+    result = pattern->BuildRichText(0, 7);
+    EXPECT_EQ(result.spans[0].content, "hello w");
+    EXPECT_EQ(result.spans[0].range.end, 7);
+
+    // Both sides partial
+    result = pattern->BuildRichText(2, 8);
+    EXPECT_EQ(result.spans[0].content, "llo wo");
+    EXPECT_EQ(result.spans[0].range.start, 0);
+    EXPECT_EQ(result.spans[0].range.end, 6);
+
+    // Single char overlap
+    result = pattern->BuildRichText(5, 6);
+    EXPECT_EQ(result.spans[0].content, " ");
+    EXPECT_EQ(result.spans[0].range.end, 1);
+
+    // Non-ASCII: u"你好世界" (4 u16 chars) [0,4), request [1,3)
+    ClearAndLoadSpans(pattern, { MakeSpan(SpanItemType::NORMAL, u"你好世界", 4) });
+    result = pattern->BuildRichText(1, 3);
+    EXPECT_EQ(result.spans[0].content, "好世");
+    EXPECT_EQ(result.spans[0].range.start, 0);
+    EXPECT_EQ(result.spans[0].range.end, 2);
+}
+
+/**
+ * @tc.name: BuildRichText004
+ * @tc.desc: IMAGE content extraction: non-empty tag / empty string / nullopt fallback.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorSpanAmendTestNg, BuildRichText004, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    // has_value=true, non-empty tag; content length (3) != range span (1) for IMAGE
+    ClearAndLoadSpans(pattern, { MakeImageSpan(u"[图片]", 1) });
+    auto result = pattern->BuildRichText(0, 1);
+    ASSERT_EQ(result.spans.size(), 1u);
+    EXPECT_EQ(result.spans[0].content, "[图片]");
+    EXPECT_EQ(result.spans[0].range.start, 0);
+    EXPECT_EQ(result.spans[0].range.end, 1);
+
+    // has_value=true, empty string preserved (no fallback)
+    ClearAndLoadSpans(pattern, { MakeImageSpan(u"", 1) });
+    result = pattern->BuildRichText(0, 1);
+    ASSERT_EQ(result.spans.size(), 1u);
+    EXPECT_EQ(result.spans[0].content, "");
+
+    // has_value=false, fallback to single space
+    ClearAndLoadSpans(pattern, { MakeImageSpan(std::nullopt, 1) });
+    result = pattern->BuildRichText(0, 1);
+    ASSERT_EQ(result.spans.size(), 1u);
+    EXPECT_EQ(result.spans[0].content, " ");
+}
+
+/**
+ * @tc.name: BuildRichText006
+ * @tc.desc: Multi-span relative range continuity with mixed TEXT truncation and IMAGE non-truncation.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorSpanAmendTestNg, BuildRichText006, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    ClearAndLoadSpans(pattern, {
+        MakeSpan(SpanItemType::NORMAL, u"hello", 5),    // [0,5)
+        MakeImageSpan(u"[图片]", 6),                    // [5,6)
+        MakeSpan(SpanItemType::NORMAL, u"world", 11),   // [6,11)
+    });
+
+    auto result = pattern->BuildRichText(3, 8);
+    ASSERT_EQ(result.spans.size(), 3u);
+    EXPECT_EQ(result.spans[0].content, "lo");
+    EXPECT_EQ(result.spans[0].range.start, 0);
+    EXPECT_EQ(result.spans[0].range.end, 2);
+    EXPECT_EQ(result.spans[1].content, "[图片]");
+    EXPECT_EQ(result.spans[1].range.start, 2);
+    EXPECT_EQ(result.spans[1].range.end, 3);
+    EXPECT_EQ(result.spans[2].content, "wo");
+    EXPECT_EQ(result.spans[2].range.start, 3);
+    EXPECT_EQ(result.spans[2].range.end, 5);
+}
+
+/**
+ * @tc.name: BuildRichText007
+ * @tc.desc: Boundary: zero-length range skips all spans; range beyond text end clamps overlapEnd.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorSpanAmendTestNg, BuildRichText007, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    ClearAndLoadSpans(pattern, {
+        MakeSpan(SpanItemType::NORMAL, u"hello", 5),    // [0,5)
+        MakeImageSpan(u"[图片]", 6),                    // [5,6)
+        MakeSpan(SpanItemType::NORMAL, u"world", 11),   // [6,11)
+    });
+
+    // Zero-length range [5,5): all spans skipped
+    auto result = pattern->BuildRichText(5, 5);
+    EXPECT_TRUE(result.IsEmpty());
+
+    // Range beyond text end: overlapEnd clamped by min
+    result = pattern->BuildRichText(9, 20);
+    ASSERT_EQ(result.spans.size(), 1u);
+    EXPECT_EQ(result.spans[0].content, "ld");
+    EXPECT_EQ(result.spans[0].range.start, 0);
+    EXPECT_EQ(result.spans[0].range.end, 2);
+}
+
+/**
+ * @tc.name: BuildRichText008
+ * @tc.desc: Zero-length span (empty content) and zero-length overlap (start==end crossing span).
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorSpanAmendTestNg, BuildRichText008, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    // Zero-length span: content=u"", position=5 -> spanRange [5,5)
+    ClearAndLoadSpans(pattern, { MakeSpan(SpanItemType::NORMAL, u"", 5) });
+    auto result = pattern->BuildRichText(0, 10);
+    ASSERT_EQ(result.spans.size(), 1u);
+    EXPECT_EQ(result.spans[0].content, "");
+    EXPECT_EQ(result.spans[0].range.start, 5);
+    EXPECT_EQ(result.spans[0].range.end, 5);
+
+    // Zero-length overlap: TEXT "hello" [2,7), request [5,5) -> overlap [5,5)
+    ClearAndLoadSpans(pattern, { MakeSpan(SpanItemType::NORMAL, u"hello", 7) });
+    result = pattern->BuildRichText(5, 5);
+    ASSERT_EQ(result.spans.size(), 1u);
+    EXPECT_EQ(result.spans[0].content, "");
+    EXPECT_EQ(result.spans[0].range.start, 0);
+    EXPECT_EQ(result.spans[0].range.end, 0);
+}
+
+/**
+ * @tc.name: BuildRichText009
+ * @tc.desc: SYMBOL span-aligned overlap: range span equals content length, ranges stay contiguous.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorSpanAmendTestNg, BuildRichText009, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    // TEXT[0,5) + SYMBOL[5,7) + TEXT[7,12)
+    ClearAndLoadSpans(pattern, {
+        MakeSpan(SpanItemType::NORMAL, u"hello", 5),
+        MakeSpan(SpanItemType::SYMBOL, u"  ", 7),
+        MakeSpan(SpanItemType::NORMAL, u"world", 12),
+    });
+
+    auto result = pattern->BuildRichText(3, 9);
+    ASSERT_EQ(result.spans.size(), 3u);
+    EXPECT_EQ(result.spans[0].content, "lo");
+    EXPECT_EQ(result.spans[0].range.start, 0);
+    EXPECT_EQ(result.spans[0].range.end, 2);
+    EXPECT_EQ(result.spans[1].content, "  ");
+    EXPECT_EQ(result.spans[1].range.start, 2);
+    EXPECT_EQ(result.spans[1].range.end, 4);
+    EXPECT_EQ(result.spans[2].content, "wo");
+    EXPECT_EQ(result.spans[2].range.start, 4);
+    EXPECT_EQ(result.spans[2].range.end, 6);
+}
+
+/**
+ * @tc.name: GetLeftRichTextOfCursor001
+ * @tc.desc: Cursor at start/middle/end, selection, number=0, clamp-to-0, negative number entry guard.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorSpanAmendTestNg, GetLeftRichTextOfCursor001, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    ClearAndLoadSpans(pattern, {
+        MakeSpan(SpanItemType::NORMAL, u"hello", 5),
+        MakeImageSpan(u"[img]", 6),
+        MakeSpan(SpanItemType::NORMAL, u"world", 11),
+    });
+
+    // Cursor at end, number=6 -> BuildRichText(5,11)
+    pattern->caretPosition_ = 11;
+    pattern->textSelector_.Update(-1, -1);
+    auto result = pattern->GetLeftRichTextOfCursor(6);
+    ASSERT_EQ(result.spans.size(), 2u);
+    EXPECT_EQ(result.spans[0].content, "[img]");
+    EXPECT_EQ(result.spans[1].content, "world");
+
+    // Cursor at middle, number=3 -> BuildRichText(2,5)
+    pattern->caretPosition_ = 5;
+    result = pattern->GetLeftRichTextOfCursor(3);
+    ASSERT_EQ(result.spans.size(), 1u);
+    EXPECT_EQ(result.spans[0].content, "llo");
+
+    // Cursor at start, number=5 -> BuildRichText(0,0) empty
+    pattern->caretPosition_ = 0;
+    result = pattern->GetLeftRichTextOfCursor(5);
+    EXPECT_TRUE(result.IsEmpty());
+
+    // Selection [2,5): end=min(2,5)=2, number=3 -> start=max(0,-1)=0 -> BuildRichText(0,2)
+    pattern->caretPosition_ = 5;
+    pattern->textSelector_.Update(2, 5);
+    result = pattern->GetLeftRichTextOfCursor(3);
+    ASSERT_EQ(result.spans.size(), 1u);
+    EXPECT_EQ(result.spans[0].content, "he");
+
+    // number exceeds end -> start clamped to 0, no fallback to full text
+    result = pattern->GetLeftRichTextOfCursor(10);
+    ASSERT_EQ(result.spans.size(), 1u);
+    EXPECT_EQ(result.spans[0].content, "he");
+
+    // number=0 -> BuildRichText(end,end) empty
+    pattern->caretPosition_ = 5;
+    pattern->textSelector_.Update(-1, -1);
+    result = pattern->GetLeftRichTextOfCursor(0);
+    EXPECT_TRUE(result.IsEmpty());
+
+    // negative number -> entry guard returns empty
+    result = pattern->GetLeftRichTextOfCursor(-3);
+    EXPECT_TRUE(result.IsEmpty());
+}
+
+/**
+ * @tc.name: GetRightRichTextOfCursor001
+ * @tc.desc: Cursor at start/middle/end and selection; entry guards symmetric to GetLeft.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorSpanAmendTestNg, GetRightRichTextOfCursor001, TestSize.Level1)
+{
+    auto pattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(pattern, nullptr);
+    ClearAndLoadSpans(pattern, {
+        MakeSpan(SpanItemType::NORMAL, u"hello", 5),
+        MakeImageSpan(u"[img]", 6),
+        MakeSpan(SpanItemType::NORMAL, u"world", 11),
+    });
+
+    // Cursor at start, number=5 -> BuildRichText(0,5)
+    pattern->caretPosition_ = 0;
+    pattern->textSelector_.Update(-1, -1);
+    auto result = pattern->GetRightRichTextOfCursor(5);
+    ASSERT_EQ(result.spans.size(), 1u);
+    EXPECT_EQ(result.spans[0].content, "hello");
+
+    // Cursor at middle, number=3 -> BuildRichText(5,8)
+    pattern->caretPosition_ = 5;
+    result = pattern->GetRightRichTextOfCursor(3);
+    ASSERT_EQ(result.spans.size(), 2u);
+    EXPECT_EQ(result.spans[0].content, "[img]");
+    EXPECT_EQ(result.spans[1].content, "wo");
+
+    // Cursor at end, number=5 -> end clamped to textLen(11) -> BuildRichText(11,11) returns empty
+    pattern->caretPosition_ = 11;
+    result = pattern->GetRightRichTextOfCursor(5);
+    EXPECT_TRUE(result.IsEmpty());
+
+    // Selection [2,5): start=max(2,5)=5 -> BuildRichText(5,8)
+    pattern->caretPosition_ = 2;
+    pattern->textSelector_.Update(2, 5);
+    result = pattern->GetRightRichTextOfCursor(3);
+    ASSERT_EQ(result.spans.size(), 2u);
+    EXPECT_EQ(result.spans[0].content, "[img]");
+}
 } // namespace OHOS::Ace::NG

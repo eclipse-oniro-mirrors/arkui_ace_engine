@@ -2692,6 +2692,92 @@ int32_t RichEditorPattern::GetTextIndexAtCursor()
     return caretPosition_;
 }
 
+RichTextDataInfo RichEditorPattern::GetLeftRichTextOfCursor(int32_t number)
+{
+    TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "GetLeftRichTextOfCursor length: %{public}d", number);
+    if (number < 0) {
+        TAG_LOGW(AceLogTag::ACE_RICH_TEXT, "GetLeftRichTextOfCursor length is invalid.");
+        return RichTextDataInfo{};
+    }
+    auto end = IsSelected() ? std::min(textSelector_.GetStart(), textSelector_.GetEnd()) : caretPosition_;
+    return BuildRichText(std::max(0, end - number), end);
+}
+
+RichTextDataInfo RichEditorPattern::GetRightRichTextOfCursor(int32_t number)
+{
+    TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "GetRightRichTextOfCursor length: %{public}d", number);
+    if (number < 0) {
+        TAG_LOGW(AceLogTag::ACE_RICH_TEXT, "GetRightRichTextOfCursor length is invalid.");
+        return RichTextDataInfo{};
+    }
+    auto start = IsSelected() ? std::max(textSelector_.GetStart(), textSelector_.GetEnd()) : caretPosition_;
+    auto end = GetTextContentLength() - start > number ? start + number : GetTextContentLength();
+    return BuildRichText(start, end);
+}
+
+namespace {
+// SpanItemType -> RichSpanType; nullopt means the type is skipped during export.
+std::optional<RichSpanType> ToRichSpanType(SpanItemType itemType)
+{
+    static const std::unordered_map<SpanItemType, RichSpanType> spanTypeTable = {
+        { SpanItemType::NORMAL, RichSpanType::TEXT },
+        { SpanItemType::IMAGE, RichSpanType::IMAGE },
+        { SpanItemType::SYMBOL, RichSpanType::SYMBOL },
+        { SpanItemType::CustomSpan, RichSpanType::CUSTOM },
+        { SpanItemType::PLACEHOLDER, RichSpanType::CUSTOM },
+    };
+    auto it = spanTypeTable.find(itemType);
+    return it != spanTypeTable.end() ? std::optional<RichSpanType>(it->second) : std::nullopt;
+}
+
+// SYMBOL/CustomSpan/PLACEHOLDER return whole content: partial cut would break atomic span semantics.
+std::u16string GetSpanContent(
+    const RefPtr<SpanItem>& span, int32_t overlapStart, int32_t spanStart, int32_t overlapEnd)
+{
+    if (span->spanItemType == SpanItemType::IMAGE) {
+        auto imageSpanItem = AceType::DynamicCast<ImageSpanItem>(span);
+        CHECK_NULL_RETURN(imageSpanItem, u" ");
+        return imageSpanItem->options.imageTag.value_or(u" ");
+    }
+    if (span->spanItemType == SpanItemType::NORMAL) {
+        int32_t pos = overlapStart - spanStart;
+        int32_t len = overlapEnd - overlapStart;
+        int32_t contentLen = static_cast<int32_t>(span->content.length());
+        CHECK_NULL_RETURN(pos >= 0 && len >= 0 && pos <= contentLen && len <= contentLen - pos, u"");
+        return span->content.substr(pos, len);
+    }
+    return span->content;
+}
+} // namespace
+
+RichTextDataInfo RichEditorPattern::BuildRichText(int32_t start, int32_t end)
+{
+    if (start < 0 || end < 0 || start > end) {
+        TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "BuildRichText invalid range: [%{public}d-%{public}d]", start, end);
+        return RichTextDataInfo{};
+    }
+    RichTextDataInfo result;
+    for (const auto& span : spans_) {
+        CHECK_NULL_CONTINUE(span->position != -1);
+        int32_t spanStart = span->rangeStart;
+        int32_t spanEnd = span->position;
+        CHECK_NULL_CONTINUE(spanEnd > start && spanStart < end);
+        auto richType = ToRichSpanType(span->spanItemType);
+        CHECK_NULL_CONTINUE(richType);
+        int32_t overlapStart = std::max(spanStart, start);
+        int32_t overlapEnd = std::min(spanEnd, end);
+        result.spans.emplace_back(RichTextSpanInfo{
+            .type = richType.value(),
+            .range = { .start = overlapStart - start, .end = overlapEnd - start },
+            .content = StringUtils::Str16ToStr8(GetSpanContent(span, overlapStart, spanStart, overlapEnd)),
+        });
+    }
+    TAG_LOGI(AceLogTag::ACE_RICH_TEXT,
+        "BuildRichText result: range=[%{public}d-%{public}d], spanCount=%{public}zu",
+        start, end, result.spans.size());
+    return result;
+}
+
 void RichEditorPattern::ClearContent(const RefPtr<UINode>& child)
 {
     CHECK_NULL_VOID(child);
@@ -6542,9 +6628,8 @@ std::optional<MiscServices::TextConfig> RichEditorPattern::GetMiscTextConfig()
     std::u16string abilityName = TruncateText(UtfUtils::Str8ToStr16(AceApplicationInfo::GetInstance()
         .GetAbilityName()), MAX_ABILITY_NAME_SIZE);
 
-    if (auto manager = pipeline->GetSafeAreaManager(); manager) {
-        positionY -= manager->GetKeyboardOffset();
-    }
+    auto manager = pipeline->GetSafeAreaManager();
+    positionY -= manager ? manager->GetKeyboardOffset() : 0;
     OffsetF caretLeftTopPoint(caretOffset.GetX() + parentGlobalOffset.GetX(), caretTop);
     OffsetF caretRightBottomPoint(caretLeftTopPoint.GetX() + GetCaretWidth(), caretLeftTopPoint.GetY() + caretHeight);
     HandlePointWithTransform(caretLeftTopPoint);
@@ -6563,8 +6648,7 @@ std::optional<MiscServices::TextConfig> RichEditorPattern::GetMiscTextConfig()
         .enterKeyType = (int32_t)GetTextInputActionValue(GetDefaultTextInputAction()),
         .isTextPreviewSupported = isTextPreviewSupported_ && (!isSpanStringMode_ || isAPI18Plus),
         .immersiveMode = static_cast<int32_t>(keyboardAppearance_),
-        .placeholder = placeholder,
-        .abilityName = abilityName };
+        .placeholder = placeholder, .abilityName = abilityName, .isRichText = true };
     auto start = textSelector_.IsValid() ? textSelector_.GetStart() : caretPosition_;
     auto end = textSelector_.IsValid() ? textSelector_.GetEnd() : caretPosition_;
     MiscServices::TextConfig textConfig = { .inputAttribute = inputAttribute,
