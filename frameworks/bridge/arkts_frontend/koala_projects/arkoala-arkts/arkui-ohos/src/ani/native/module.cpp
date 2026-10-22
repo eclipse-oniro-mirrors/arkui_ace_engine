@@ -63,6 +63,7 @@
 #include "dynamiclayout/dynamiclayout_module.h"
 #include "lazy_dynamic_layout/lazy_dynamic_layout_module.h"
 #include "with_env/with_env_module.h"
+#include "placeholder_register/ani_placeholder_register_module.h"
 
 ANI_EXPORT ani_status ANI_Constructor(ani_vm* vm, uint32_t* result)
 {
@@ -2093,6 +2094,11 @@ ANI_EXPORT ani_status ANI_Constructor(ani_vm* vm, uint32_t* result)
         HILOGE("Bind static native methods failed, bindRst:%{public}d", bindRst);
         return bindRst;
     }
+    // The placeholder registry is part of this library, but its ArkTS class is
+    // only linked into apps that use the registry. Both bindings are
+    // best-effort and never fail the library load for everybody else.
+    OHOS::Ace::Ani::BindNativePlaceholderRegister(env);
+    OHOS::Ace::Ani::BindPlaceholderScopeHooks(env);
     *result = ANI_VERSION_1;
     return ANI_OK;
 }

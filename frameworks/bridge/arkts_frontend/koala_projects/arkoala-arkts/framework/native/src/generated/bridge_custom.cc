@@ -26,13 +26,8 @@
 
 #include "arkoala_api_generated.h"
 #include "DeserializerBase.h"
-#include "dynamic-loader.h"
 
 const OH_AnyAPI* GetAnyImpl(int kind, int version, std::string* result = nullptr);
-
-// Defined in library.cc (same module): dlopens the ACE library the way
-// GetAnyImpl does, so the resolved handle matches the runtime's own.
-void* FindModule(int kind);
 
 static const GENERATED_ArkUIBasicNodeAPI* GetArkUIBasicNodeAPI() {
     return reinterpret_cast<const GENERATED_ArkUIBasicNodeAPI*>(
@@ -58,48 +53,6 @@ KNativePointer impl_GetNodeFinalizer() {
 KOALA_INTEROP_DIRECT_0(GetNodeFinalizer, KNativePointer)
 
 // custom methods
-// Static-ArkTS side of the restricted-builder instrumentation contract: the
-// module-level __aceBegin/EndScrollPlaceholder__ hooks (see the builder module
-// implementation) forward here. libace exports the counterparts as
-// GENERATED_AceBegin/EndScrollPlaceholder (libace.map), resolved lazily through
-// the same ACE module handle GetAnyImpl uses, so both engine flavors drive one
-// re-entrant scope counter.
-static void (*ResolveAceEntry(const char* name))()
-{
-    void* module = FindModule(0);
-    return module ? reinterpret_cast<void (*)()>(findSymbol(module, name)) : nullptr;
-}
-
-void impl_AceBeginScrollPlaceholder() {
-    static auto aceBegin = ResolveAceEntry("GENERATED_AceBeginScrollPlaceholder");
-    if (aceBegin) {
-        aceBegin();
-    }
-}
-
-void impl_AceEndScrollPlaceholder() {
-    static auto aceEnd = ResolveAceEntry("GENERATED_AceEndScrollPlaceholder");
-    if (aceEnd) {
-        aceEnd();
-    }
-}
-
-// The hooks are declared on the SDK class arkui.component.builder.
-// AcePlaceholderScopeModule, which is not the class this interop module binds
-// by default (the generated ArkUINativeModule class). Binding them under
-// ArkUINativeModule makes Class_BindStaticNativeMethods() fail with
-// ANI_NOT_FOUND for the whole module - binding is all-or-nothing - and leaves
-// every ArkUI native call unresolved. Publish them under a dedicated module
-// that names their real classpath instead.
-#undef KOALA_INTEROP_MODULE
-#define KOALA_INTEROP_MODULE PlaceholderScopeModule
-KOALA_ANI_INTEROP_MODULE_CLASSPATH(PlaceholderScopeModule,
-    "arkui.component.builder.AcePlaceholderScopeModule")
-KOALA_INTEROP_DIRECT_V0(AceBeginScrollPlaceholder)
-KOALA_INTEROP_DIRECT_V0(AceEndScrollPlaceholder)
-#undef KOALA_INTEROP_MODULE
-#define KOALA_INTEROP_MODULE ArkUINativeModule
-
 void impl_ShowCrash(const KStringPtr& messagePtr) {
     GetArkUIExtendedNodeAPI()->showCrash(messagePtr.c_str());
 }

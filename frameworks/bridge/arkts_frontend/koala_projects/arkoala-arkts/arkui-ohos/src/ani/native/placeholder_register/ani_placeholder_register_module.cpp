@@ -20,6 +20,8 @@
 
 #include "ani.h"
 
+#include "ani_placeholder_register_module.h"
+
 #include "base/log/ace_trace.h"
 #include "base/log/log_wrapper.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_manager.h"
@@ -308,15 +310,68 @@ void PublishProduct(ani_env* env, ani_object object, ani_long productPtr)
     g_pendingProduct = static_cast<intptr_t>(productPtr);
 }
 
+} // namespace
+
+// Binding of the static @Builder({ isPlaceholder: true }) instrumentation
+// hooks. They are declared on the SDK class
+// arkui.component.builder.AcePlaceholderScopeModule. The binding runs from the
+// main ANI library constructor and stays best-effort: apps that do not link
+// the placeholder module do not carry this class in their abc, and a missing
+// class must not fail the library load. Binding from ArkoalaNative_ark is not
+// an option either: its registerAllModules() aborts on a failed FindClass().
+void BeginScrollPlaceholder(ani_env* env, ani_class cls)
+{
+    NG::ScrollPlaceholderRestrictedScope::Begin();
+}
+
+void EndScrollPlaceholder(ani_env* env, ani_class cls)
+{
+    NG::ScrollPlaceholderRestrictedScope::End();
+}
+
+void BindPlaceholderScopeHooks(ani_env* env)
+{
+    static const char* className = "arkui.component.builder.AcePlaceholderScopeModule";
+    ani_class cls = nullptr;
+    ani_status status = env->FindClass(className, &cls);
+    if (status != ANI_OK || cls == nullptr) {
+        TAG_LOGW(AceLogTag::ACE_SCROLL,
+            "BindPlaceholderScopeHooks: builder module not in this abc (status=%{public}d), hooks stay unbound",
+            static_cast<int32_t>(status));
+        env->ResetError();
+        return;
+    }
+    std::array staticMethods = {
+        ani_native_function {
+            "_AceBeginScrollPlaceholder", nullptr, reinterpret_cast<void*>(BeginScrollPlaceholder)},
+        ani_native_function {
+            "_AceEndScrollPlaceholder", nullptr, reinterpret_cast<void*>(EndScrollPlaceholder)},
+    };
+    status = env->Class_BindStaticNativeMethods(cls, staticMethods.data(), staticMethods.size());
+    if (status != ANI_OK) {
+        TAG_LOGW(AceLogTag::ACE_SCROLL, "BindPlaceholderScopeHooks: bind failed, status=%{public}d",
+            static_cast<int32_t>(status));
+        env->ResetError();
+        return;
+    }
+    TAG_LOGI(AceLogTag::ACE_SCROLL, "BindPlaceholderScopeHooks: bound %{public}s", className);
+}
+
 ani_status BindNativePlaceholderRegister(ani_env* env)
 {
     ani_class cls = nullptr;
     static const char* className =
         "arkui.ani.arkts.placeholderRegister.ArkUIAniPlaceholderRegisterModule.ArkUIAniPlaceholderRegisterModule";
     ani_status status = env->FindClass(className, &cls);
-    if (status != ANI_OK) {
-        TAG_LOGE(AceLogTag::ACE_SCROLL, "BindNativePlaceholderRegister FindClass failed: %{public}s", className);
-        return ANI_ERROR;
+    if (status != ANI_OK || cls == nullptr) {
+        // This library is loaded by every static app, while the placeholder
+        // module is only linked into apps that use the registry. A missing
+        // class must skip the binding instead of failing the whole library.
+        TAG_LOGI(AceLogTag::ACE_SCROLL,
+            "BindNativePlaceholderRegister: module not in this abc (status=%{public}d), skipped",
+            static_cast<int32_t>(status));
+        env->ResetError();
+        return ANI_OK;
     }
     std::array staticMethods = {
         ani_native_function {
@@ -335,24 +390,10 @@ ani_status BindNativePlaceholderRegister(ani_env* env)
     status = env->Class_BindStaticNativeMethods(cls, staticMethods.data(), staticMethods.size());
     if (status != ANI_OK) {
         TAG_LOGE(AceLogTag::ACE_SCROLL, "BindNativePlaceholderRegister BindStaticNativeMethods failed");
+        env->ResetError();
         return ANI_ERROR;
     }
     return ANI_OK;
 }
 
-} // namespace
 } // namespace OHOS::Ace::Ani
-
-ANI_EXPORT ani_status ANI_Constructor(ani_vm* vm, uint32_t* result)
-{
-    ani_env* env = nullptr;
-    if (ANI_OK != vm->GetEnv(ANI_VERSION_1, &env)) {
-        return ANI_ERROR;
-    }
-    ani_status status = OHOS::Ace::Ani::BindNativePlaceholderRegister(env);
-    if (status != ANI_OK) {
-        return status;
-    }
-    *result = ANI_VERSION_1;
-    return ANI_OK;
-}

@@ -33,7 +33,7 @@ export class ArkUIAniPlaceholderRegisterModule {
         if (ArkUIAniPlaceholderRegisterModule.hasLoadLibrary) {
             return;
         }
-        loadLibrary("arkuiplaceholderregister_ani")
+        loadLibrary("arkoala_native_ani")
         ArkUIAniPlaceholderRegisterModule.hasLoadLibrary = true;
     }
 
