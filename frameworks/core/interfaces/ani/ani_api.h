@@ -34,7 +34,7 @@
 extern "C" {
 #endif
 
-#define ARKUI_ANI_API_VERSION 100
+#define ARKUI_ANI_API_VERSION 101
 #define EXTRA_INFO_MAX_LENGTH 1024
 #define ARKUI_ANI_MODIFIER_FUNCTION_NAME "GetArkUIAniModifiers"
 const float DEFAULT_SNAPSHOT_SCALE = 1.f;
@@ -1108,6 +1108,7 @@ struct ArkUIAniModifiers {
     const ArkUIAniDetachedFreeRootModifier* (*getArkUIAniDetachedFreeRootModifier)();
     const ArkUIAniGestureEventUIObserverModifier* (*getArkUIAniGestureEventUIObserverModifier)();
     const ArkUIAniWithEnvModifier* (*getArkUIAniWithEnvModifier)();
+    void (*bindPlaceholderAni)(ani_env* env);
 };
 
 __attribute__((visibility("default"))) const ArkUIAniModifiers* GetArkUIAniModifiers(void);

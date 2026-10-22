@@ -13,16 +13,18 @@
  * limitations under the License.
  */
 
-#ifndef ARKUI_ANI_PLACEHOLDER_REGISTER_MODULE_H
-#define ARKUI_ANI_PLACEHOLDER_REGISTER_MODULE_H
+#ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_INTERFACES_NATIVE_ANI_PLACEHOLDER_ANI_MODIFIER_H
+#define FOUNDATION_ACE_FRAMEWORKS_CORE_INTERFACES_NATIVE_ANI_PLACEHOLDER_ANI_MODIFIER_H
 
 #include "ani.h"
 
 namespace OHOS::Ace::Ani {
 
-ani_status BindNativePlaceholderRegister(ani_env* env);
-void BindPlaceholderScopeHooks(ani_env* env);
+// Binds the static ArkTS placeholder registry and builder-scope hooks. Called
+// best-effort from the main ANI library constructor: the ArkTS classes are
+// only present in apps that link the placeholder module.
+void BindPlaceholderAni(ani_env* env);
 
 } // namespace OHOS::Ace::Ani
 
-#endif // ARKUI_ANI_PLACEHOLDER_REGISTER_MODULE_H
+#endif // FOUNDATION_ACE_FRAMEWORKS_CORE_INTERFACES_NATIVE_ANI_PLACEHOLDER_ANI_MODIFIER_H

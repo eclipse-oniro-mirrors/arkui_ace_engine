@@ -58,6 +58,7 @@
 #include "xbar_ani_modifier.h"
 #include "dynamiclayout_ani_modifier.h"
 #include "lazy_dynamic_layout_ani_modifier.h"
+#include "placeholder_ani_modifier.h"
 
 extern "C" {
 const ArkUIAniModifiers* GetArkUIAniModifiers()
@@ -110,6 +111,7 @@ const ArkUIAniModifiers* GetArkUIAniModifiers()
         .getArkUIAniDetachedFreeRootModifier = OHOS::Ace::NG::GetDetachedFreeRootModifier,
         .getArkUIAniGestureEventUIObserverModifier = OHOS::Ace::NG::GetArkUIAniGestureEventUIObserverModifier,
         .getArkUIAniWithEnvModifier = OHOS::Ace::NG::GetArkUIAniWithEnvModifier,
+        .bindPlaceholderAni = OHOS::Ace::Ani::BindPlaceholderAni,
     };
     return &impl;
 }

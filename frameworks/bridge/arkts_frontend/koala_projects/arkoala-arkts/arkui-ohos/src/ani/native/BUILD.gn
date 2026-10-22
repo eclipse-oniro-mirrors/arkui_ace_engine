@@ -50,7 +50,6 @@ ohos_shared_library("arkoala_native_ani") {
 
   deps = [
     ":ani_utils_common",
-    "$ace_root/build:libace_compatible",
     "$ace_root/interfaces/inner_api/drawable_descriptor",
   ]
   if (!build_ohos_sdk && !(defined(is_arkui_x) && is_arkui_x)) {
@@ -84,7 +83,6 @@ ohos_shared_library("arkoala_native_ani") {
     "list/list_item_group_module.cpp",
     "list/list_module.cpp",
     "load.cpp",
-    "placeholder_register/ani_placeholder_register_module.cpp",
     "module.cpp",
     "node_adapter/node_adapter_module.cpp",
     "security_component/paste_button_module.cpp",

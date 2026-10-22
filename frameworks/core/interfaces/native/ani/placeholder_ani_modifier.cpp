@@ -17,17 +17,16 @@
 #include <cinttypes>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "ani.h"
 
-#include "ani_placeholder_register_module.h"
-
 #include "base/log/ace_trace.h"
+#include "base/utils/utils.h"
 #include "base/log/log_wrapper.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_manager.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_restricted_scope.h"
 #include "core/pipeline_ng/pipeline_context.h"
-#include "../utils/ani_utils.h"
 
 namespace OHOS::Ace::Ani {
 namespace {
@@ -39,6 +38,37 @@ constexpr int32_t REGISTER_FAILED = -1;
 constexpr int32_t REGISTER_PARAM_INVALID = -2;
 constexpr int32_t REGISTER_NOT_INSTRUMENTED = -3;
 constexpr int32_t REGISTER_UNSUPPORTED_COMPONENT = -4;
+
+std::string AniStringToStdString(ani_env* env, ani_string aniStr)
+{
+    CHECK_NULL_RETURN(env, "");
+    ani_size size = 0;
+    if (env->String_GetUTF8Size(aniStr, &size) != ANI_OK) {
+        return "";
+    }
+    std::vector<char> buffer(size + 1);
+    ani_size written = 0;
+    if (env->String_GetUTF8(aniStr, buffer.data(), size + 1, &written) != ANI_OK) {
+        return "";
+    }
+    buffer[written] = '\0';
+    return std::string(buffer.data());
+}
+
+bool IsFunction(ani_env* env, ani_object obj)
+{
+    CHECK_NULL_RETURN(env, false);
+    ani_class funcClass = nullptr;
+    if (env->FindClass("std.core.Function0", &funcClass) != ANI_OK) {
+        env->ResetError();
+        return false;
+    }
+    ani_boolean result = ANI_FALSE;
+    if (env->Object_InstanceOf(obj, funcClass, &result) != ANI_OK) {
+        return false;
+    }
+    return static_cast<bool>(result);
+}
 
 // Product hand-off slot of one isolated execution: the ArkTS execution closure
 // swaps its own InteropViewStackProcessor in, runs the compiled builder in the
@@ -160,7 +190,7 @@ NG::ScrollPlaceholderBuilder MakeTemplateBuilder(const AniTemplateBuilderHandleP
 
 ani_int Register(ani_env* env, ani_object object, ani_string idArg, ani_object builderArg, ani_object executionArg)
 {
-    std::string templateId = AniUtils::ANIStringToStdString(env, idArg);
+    std::string templateId = AniStringToStdString(env, idArg);
     TAG_LOGI(AceLogTag::ACE_SCROLL,
         "PlaceholderRegister.register: enter, id=%{public}s, builderObj=%{public}p, executionObj=%{public}p",
         templateId.c_str(), builderArg, executionArg);
@@ -186,7 +216,7 @@ ani_int Register(ani_env* env, ani_object object, ani_string idArg, ani_object b
             "PlaceholderRegister.register: builder has no readable '.builder' (status=%{public}d); "
             "continuing with the execution closure", static_cast<int32_t>(builderPropStatus));
     }
-    if (!AniUtils::IsFunction(env, static_cast<ani_object>(executionArg))) {
+    if (!IsFunction(env, static_cast<ani_object>(executionArg))) {
         TAG_LOGW(AceLogTag::ACE_SCROLL,
             "PlaceholderRegister.register: execution closure is not std.core.Function0; "
             "continuing and letting FunctionalObject_Call validate it");
@@ -258,7 +288,7 @@ ani_int Register(ani_env* env, ani_object object, ani_string idArg, ani_object b
 
 ani_status Unregister(ani_env* env, ani_object object, ani_string idArg)
 {
-    std::string templateId = AniUtils::ANIStringToStdString(env, idArg);
+    std::string templateId = AniStringToStdString(env, idArg);
     auto context = NG::PipelineContext::GetCurrentContext();
     if (!context) {
         TAG_LOGW(AceLogTag::ACE_SCROLL,
@@ -284,7 +314,7 @@ ani_status Unregister(ani_env* env, ani_object object, ani_string idArg)
 
 ani_boolean IsRegistered(ani_env* env, ani_object object, ani_string idArg)
 {
-    std::string templateId = AniUtils::ANIStringToStdString(env, idArg);
+    std::string templateId = AniStringToStdString(env, idArg);
     auto context = NG::PipelineContext::GetCurrentContext();
     if (!context) {
         TAG_LOGW(AceLogTag::ACE_SCROLL,
@@ -394,6 +424,12 @@ ani_status BindNativePlaceholderRegister(ani_env* env)
         return ANI_ERROR;
     }
     return ANI_OK;
+}
+
+void BindPlaceholderAni(ani_env* env)
+{
+    BindNativePlaceholderRegister(env);
+    BindPlaceholderScopeHooks(env);
 }
 
 } // namespace OHOS::Ace::Ani
