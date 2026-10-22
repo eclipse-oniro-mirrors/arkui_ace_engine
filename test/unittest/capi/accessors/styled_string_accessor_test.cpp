@@ -1144,13 +1144,9 @@ HWTEST_F(StyledStringAccessorUnionStringTest, marshalling0Test, TestSize.Level1)
     EXPECT_FALSE(checkSpanString);
 
     AsyncWorkTestHelper::DoExeceute();
-#ifdef ACE_ENGINE_BUG
-    // Looks like there is bug in ace engine. Unmarshal data length is not equal to marshal data.
+    // Round-trip contract: the bytes the unmarshall callback receives must equal the
+    // bytes the marshall callback produced (no trailing TLV_END / next-record bytes).
     EXPECT_EQ(unmarshallResult, marshallResult);
-#else
-    // Temporary check for head of data
-    EXPECT_TRUE(std::equal(marshallResult.begin(), marshallResult.end(), unmarshallResult->begin()));
-#endif
     ASSERT_TRUE(checkSpanString);
     EXPECT_EQ(checkSpanString->GetString(), peer_->spanString->GetString());
     auto spans = checkSpanString->GetSpans(0, std::strlen(STRING_TEST_VALUE), SpanType::ExtSpan);
