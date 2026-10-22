@@ -101,6 +101,26 @@ int32_t UIContentServiceStubImpl::SendCommand(const std::string command)
     return NO_ERROR;
 }
 
+int32_t UIContentServiceStubImpl::SendCommand(
+    int32_t id, const std::string& command, const SendCommandFinishCallback& finishCallback)
+{
+    if (!finishCallback) {
+        return PARAM_INVALID;
+    }
+    UiSessionManager::GetInstance()->NotifySendCommandPatternWithResult(id, command, finishCallback);
+    return NO_ERROR;
+}
+
+int32_t UIContentServiceStubImpl::SendCommand(
+    const std::string command, const SendCommandFinishCallback& finishCallback)
+{
+    if (!finishCallback) {
+        return PARAM_INVALID;
+    }
+    UiSessionManager::GetInstance()->SendCommandWithResult(command, finishCallback);
+    return NO_ERROR;
+}
+
 int32_t UIContentServiceStubImpl::UnregisterClickEventCallback()
 {
     UiSessionManager::GetInstance()->SetClickEventRegistered(false);

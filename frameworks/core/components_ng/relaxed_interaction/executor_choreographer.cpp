@@ -50,6 +50,14 @@ void ExecutorChoreographer::Clear()
     currentExecutor_.reset();
 }
 
+void ExecutorChoreographer::DiscardFront(size_t count)
+{
+    while (count > 0 && !executorQueue_.empty()) {
+        executorQueue_.pop_front();
+        --count;
+    }
+}
+
 bool ExecutorChoreographer::MoveToNext()
 {
     if (executorQueue_.empty()) {

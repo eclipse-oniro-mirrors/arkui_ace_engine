@@ -54,6 +54,17 @@ using GestureEventFunc = std::function<void(GestureEvent& info)>;
 }
 
 namespace OHOS::Ace::NG {
+enum class CommandErrorType : uint8_t { NONE, NODE_NOT_FOUND, INVALID_COMMAND, INVALID_PARAM, EXECUTE_FAIL };
+
+struct ACE_FORCE_EXPORT CommandResult {
+    bool success = false;
+    CommandErrorType errorType = CommandErrorType::EXECUTE_FAIL;
+    std::string errorMessage;
+
+    static CommandResult Success();
+    static CommandResult Error(CommandErrorType type, std::string message = "");
+};
+
 struct InspectorDumpOptions;
 class AccessibilitySessionAdapter;
 class InspectorFilter;
@@ -613,6 +624,7 @@ public:
     virtual void OnFocusNodeChange(FocusReason focusReason) {}
     virtual void OnCollectRemoved() {}
     int32_t OnRecvCommand(const std::string& command);
+    CommandResult OnRecvCommandWithResult(const std::string& command);
     virtual std::vector<std::pair<float, float>> GetSpecifiedContentOffsets(const std::string& content)
     {
         return std::vector<std::pair<float, float>> {};
@@ -624,6 +636,7 @@ public:
     {
         return RET_SUCCESS;
     };
+    virtual CommandResult OnInjectionEventWithResult(const std::string& command);
 
     bool HandleTextBoxComponentCommand(const std::string& command, std::string& cmd, std::unique_ptr<JsonValue>& json,
         std::unique_ptr<JsonValue>& params);

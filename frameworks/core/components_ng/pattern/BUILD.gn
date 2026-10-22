@@ -204,6 +204,7 @@ build_component_ng("pattern_ng") {
     "overlay/popup_base_pattern.cpp",
     "particle/particle_model_ng.cpp",
     "particle/particle_pattern.cpp",
+    "command/command_result.cpp",
     "pattern.cpp",
     "picker_utils/picker_column_pattern.cpp",
     "picker_utils/picker_column_pattern_multi_thread.cpp",

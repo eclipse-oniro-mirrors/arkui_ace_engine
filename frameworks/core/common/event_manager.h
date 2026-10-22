@@ -44,6 +44,7 @@
 
 namespace OHOS::Ace {
 namespace NG {
+struct CommandResult;
 class FrameNode;
 class GestureDebugBoundaryManager;
 class SelectOverlayManager;
@@ -496,6 +497,8 @@ public:
     
     RefPtr<NG::ActiveRecognizerManager> GetOrCreateActiveRecognizerManager();
     void ProcessCommand(const std::string& command, std::function<void()> requestFrameCallback);
+    void ProcessCommandWithResult(const std::string& command, std::function<void()> requestFrameCallback,
+        const std::function<void(const NG::CommandResult&)>& finishCallback);
     void FlushRelaxedInteraction(std::function<void()> requestFrameCallback);
 
 private:

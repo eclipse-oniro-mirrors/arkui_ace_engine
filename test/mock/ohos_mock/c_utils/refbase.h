@@ -23,8 +23,11 @@ public:
     virtual ~RefBase() = default;
 };
 
+template <typename T> class wptr;
 template <typename T>
 class sptr {
+    template<class> friend class sptr;
+    template<class> friend class wptr;
 private:
     std::shared_ptr<T> ptr_;
 public:
@@ -34,6 +37,8 @@ public:
     {
         ptr_ = std::shared_ptr<T>(p);
     }
+
+    template<class U> sptr(const sptr<U>& other) : ptr_(other.ptr_) {}
 
     sptr(const sptr& other)
     {
@@ -49,7 +54,7 @@ public:
         return *ptr_;
     }
 
-    const T* operator->() const
+    T* operator->() const
     {
         return ptr_.operator->();
     }
@@ -91,9 +96,12 @@ class wptr {
 private:
     std::weak_ptr<T> ptr_;
 public:
+    wptr() = default;
     wptr(T* p)
     {
-        ptr_ = std::shared_ptr<T>(p);
+        if (p) {
+            ptr_ = std::static_pointer_cast<T>(p->weak_from_this().lock());
+        }
     }
 
     wptr(const wptr& other)
@@ -117,12 +125,12 @@ public:
 
     bool operator==(std::nullptr_t) const
     {
-        return ptr_ == nullptr;
+        return ptr_.expired();
     }
 
     bool operator!=(std::nullptr_t) const
     {
-        return ptr_ != nullptr;
+        return !ptr_.expired();
     }
 
     wptr& operator=(const wptr& other)

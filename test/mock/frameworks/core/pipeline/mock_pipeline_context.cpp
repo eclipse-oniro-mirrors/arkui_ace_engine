@@ -2157,7 +2157,10 @@ bool PipelineContext::GetIsRequestVsync()
 
 RectF PipelineContext::GetRootRect()
 {
-    return {};
+    CHECK_NULL_RETURN(rootNode_, RectF());
+    auto geometryNode = rootNode_->GetGeometryNode();
+    CHECK_NULL_RETURN(geometryNode, RectF());
+    return geometryNode->GetFrameRect();
 }
 
 void PipelineContext::SetAreaChangeNodeMinDepth(int32_t depth) {}

@@ -6556,7 +6556,7 @@ void UIContentImpl::SetTopWindowBoundaryByID(const std::string& stringId)
         TaskExecutor::TaskType::UI, "ArkUISetTopWindowBoundaryByID");
 }
 
-void sendCommandCallbackInner(const WeakPtr<TaskExecutor>& taskExecutor)
+void SendCommandCallbackInner(const WeakPtr<TaskExecutor>& taskExecutor)
 {
     auto sendCommandCallback = [weakTaskExecutor = taskExecutor](int32_t value) {
         KeyEvent keyEvent;
@@ -6729,7 +6729,7 @@ void UIContentImpl::InitUISessionManagerCallbacks(const WeakPtr<TaskExecutor>& t
     SetupGetImagesByIdCallback(taskExecutor);
     RegisterGetCurrentPageName(taskExecutor);
     InitSendCommandFunctionsCallbacks(taskExecutor);
-    sendCommandCallbackInner(taskExecutor);
+    SendCommandCallbackInner(taskExecutor);
     RelaxedCommandCallbackInner(taskExecutor);
     SaveGetCurrentInstanceId();
     RegisterExeAppAIFunction(taskExecutor);
@@ -7276,6 +7276,8 @@ void UIContentImpl::InitSendCommandFunctionsCallbacks(const WeakPtr<TaskExecutor
             TaskExecutor::TaskType::UI, "UiSessionSendCommandPattern");
     };
     UiSessionManager::GetInstance()->SaveForSendCommandFunction(sendCommand);
+    UiSessionManager::GetInstance()->RegisterNodeCommandWithResultCallback(taskExecutor);
+    UiSessionManager::GetInstance()->RegisterSendCommandWithResultCallback(taskExecutor);
 }
 
 bool UIContentImpl::SendUIExtProprty(uint32_t code, const AAFwk::Want& data,

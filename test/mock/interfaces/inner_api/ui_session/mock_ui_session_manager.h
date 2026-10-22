@@ -27,6 +27,10 @@ public:
     MockUiSessionManager() = default;
     ~MockUiSessionManager() override = default;
 
+    MOCK_METHOD3(NotifySendCommandPatternWithResult,
+        void(int32_t, const std::string&, const CommandResultCallback&));
+    MOCK_METHOD2(SendCommandWithResult, void(const std::string&, const CommandResultCallback&));
+    MOCK_METHOD2(MakeCommandResultCallback, CommandResultCallback(int32_t, uint64_t));
     MOCK_METHOD2(OnRouterChange, void(const std::string& path, const std::string& event));
     MOCK_METHOD0(GetSelectTextEventRegistered, bool());
     MOCK_METHOD2(ReportContentChangeEvent, void(ChangeType type, const std::string& simpleTree));

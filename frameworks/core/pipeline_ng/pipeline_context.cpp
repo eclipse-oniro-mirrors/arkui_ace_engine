@@ -8908,6 +8908,20 @@ void PipelineContext::ProcessCommand(const std::string& command)
 #endif
 }
 
+void PipelineContext::ProcessCommandWithResult(
+    const std::string& command, const std::function<void(const CommandResult&)>& finish)
+{
+#ifdef RELAXED_INTERACTION_SUPPORT
+    if (!eventManager_) {
+        finish(CommandResult::Error(CommandErrorType::EXECUTE_FAIL));
+        return;
+    }
+    eventManager_->ProcessCommandWithResult(command, [this]() { RequestFrame(); }, finish);
+#else
+    finish(CommandResult::Error(CommandErrorType::INVALID_COMMAND));
+#endif
+}
+
 void PipelineContext::ChangeSensitiveNodes(bool flag)
 {
     CHECK_NULL_VOID(privacySensitiveManager_);

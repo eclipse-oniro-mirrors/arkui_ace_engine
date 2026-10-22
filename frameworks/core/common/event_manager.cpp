@@ -31,6 +31,7 @@
 #include "core/components_ng/manager/interaction_observer/ui_info_collection_manager.h"
 #include "core/components_ng/manager/select_overlay/select_overlay_manager.h"
 #include "core/components_ng/manager/gesture/active_recognizer_manager.h"
+#include "core/components_ng/pattern/pattern.h"
 #include "core/components_ng/pattern/window_scene/helper/window_scene_helper.h"
 #include "core/event/focus_axis_event.h"
 #include "core/event/crown_event.h"
@@ -3678,12 +3679,39 @@ void EventManager::ProcessCommand(const std::string& command, std::function<void
 #endif
 }
 
+void EventManager::ProcessCommandWithResult(const std::string& command, std::function<void()> requestFrameCallback,
+    const std::function<void(const NG::CommandResult&)>& finishCallback)
+{
+#ifdef RELAXED_INTERACTION_SUPPORT
+    auto relaxedInteractionManager = GetOrCreateRelaxedInteractionManager();
+    if (!relaxedInteractionManager) {
+        finishCallback(NG::CommandResult::Error(NG::CommandErrorType::EXECUTE_FAIL));
+        return;
+    }
+    auto result = relaxedInteractionManager->ProcessCommand(command,
+        [finishCallback](NG::ExecutionState state) {
+            finishCallback(state == NG::ExecutionState::SUCCESS
+                ? NG::CommandResult::Success()
+                : NG::CommandResult::Error(NG::CommandErrorType::EXECUTE_FAIL));
+        });
+    if (result == NG::ProcessResult::SUCCESS) {
+        requestFrameCallback();
+        return;
+    }
+    finishCallback(NG::CommandResult::Error(result == NG::ProcessResult::NO_VALID_CMD
+        ? NG::CommandErrorType::INVALID_COMMAND
+        : NG::CommandErrorType::INVALID_PARAM));
+#else
+    finishCallback(NG::CommandResult::Error(NG::CommandErrorType::INVALID_COMMAND));
+#endif
+}
+
 void EventManager::FlushRelaxedInteraction(std::function<void()> requestFrameCallback)
 {
 #ifdef RELAXED_INTERACTION_SUPPORT
     CHECK_NULL_VOID(relaxedInteractionManager_);
     auto state = relaxedInteractionManager_->ExecuteNextStep();
-    if (state == NG::ExecutionState::RUNNING) {
+    if (state == NG::ExecutionState::RUNNING || relaxedInteractionManager_->HasPendingWorkflow()) {
         requestFrameCallback();
     }
 #endif

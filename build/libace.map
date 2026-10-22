@@ -4860,6 +4860,10 @@
       "OHOS::Ace::NG::PageRouterManagerFactory::CreateManager()";
       "OHOS::Ace::NG::PanRecognizer::GetDistance() const";
       "OHOS::Ace::NG::Pattern::CheckLocalized()";
+      OHOS::Ace::NG::CommandResult::Success*;
+      OHOS::Ace::NG::CommandResult::Error*;
+      OHOS::Ace::NG::Pattern::OnInjectionEventWithResult*;
+      OHOS::Ace::NG::Pattern::GetSpecifiedContentOffsets*;
       "OHOS::Ace::NG::Pattern::CreateAccessibilityProperty()";
       "OHOS::Ace::NG::Pattern::CreateEventHub()";
       "OHOS::Ace::NG::Pattern::CreateLayoutAlgorithm()";

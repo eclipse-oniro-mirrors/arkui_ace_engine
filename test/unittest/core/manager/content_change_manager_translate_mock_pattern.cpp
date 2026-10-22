@@ -19,6 +19,11 @@
 #include "core/components_ng/pattern/overlay/overlay_content_change_report.h"
 
 namespace OHOS::Ace::NG {
+CommandResult Pattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return { false, CommandErrorType::INVALID_COMMAND, {} };
+}
+
 // Unexpected Overlay use fails this text-only suite; the manager suite uses the real implementation.
 const char* GetOverlayContentChangeType(const RefPtr<FrameNode>&)
 {

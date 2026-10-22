@@ -181,6 +181,13 @@ public:
     // UI-thread validation of an internal detection request; does not change IPC.
     ACE_FORCE_EXPORT bool IsSearchPageSceneRuleCurrent(
         int32_t processId, const std::string& ruleSetId, const std::string& generation) override;
+    void SaveForSendCommandWithResultFunction(NotifySendCommandWithResultFunction&& function) override;
+    void NotifySendCommandPatternWithResult(
+        int32_t id, const std::string& command, const CommandResultCallback& finishCallback) override;
+    void SaveSendCommandWithResultFunction(SendCommandWithResultFunction&& function) override;
+    void SendCommandWithResult(
+        const std::string& command, const CommandResultCallback& finishCallback) override;
+    CommandResultCallback MakeCommandResultCallback(int32_t processId, uint64_t requestId) override;
 
 private:
     bool PostToCurrentTranslateManager(const char* caller,
