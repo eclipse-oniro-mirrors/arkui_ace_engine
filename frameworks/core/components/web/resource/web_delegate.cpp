@@ -6488,7 +6488,7 @@ void WebDelegate::OnAccessibilityEvent(
         eventType == AccessibilityEventType::PAGE_CLOSE) {
         auto webPatternForGate = webPattern_.Upgrade();
         auto webHost = webPatternForGate ? webPatternForGate->GetHost() : nullptr;
-        if (webHost &&
+        if (OHOS::Ace::CmpAccessibility::CmpAccessibilityRegistry::HasAnySubAM() && webHost &&
             OHOS::Ace::CmpAccessibility::CmpAccessibilityRegistry::HasSubAM(webHost.GetRawPtr())) {
             TAG_LOGI(AceLogTag::ACE_WEB,
                 "WebPageEvent suppressed (web in exported subtree): type=%{public}d, hostId=%{public}d",
@@ -6711,7 +6711,7 @@ void WebDelegate::SendAccessibilityPageChangeEvent(const RefPtr<NG::FrameNode>& 
         "WebDelegate::AccessibilitySendPageChange accessibilityId = %{public}" PRId64,
         webNode->GetAccessibilityId());
     // Page-event suppression for webs inside CMP exported subtrees: this send path bypasses OnAccessibilityEvent's suppression gate ().
-    if (webNode &&
+    if (OHOS::Ace::CmpAccessibility::CmpAccessibilityRegistry::HasAnySubAM() && webNode &&
         OHOS::Ace::CmpAccessibility::CmpAccessibilityRegistry::HasSubAM(webNode.GetRawPtr())) {
         TAG_LOGI(AceLogTag::ACE_WEB,
             "WebPageEvent suppressed (web in exported subtree): pageChange, hostId=%{public}d",

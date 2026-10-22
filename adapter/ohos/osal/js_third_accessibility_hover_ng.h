@@ -56,6 +56,8 @@ struct AccessibilityHoverForThirdConfig {
     NG::AccessibilityHoverEventType eventType = NG::AccessibilityHoverEventType::ENTER;
     TimeStamp time = std::chrono::high_resolution_clock::now();
     RefPtr<NG::PipelineContext> context;
+    std::vector<int64_t> mountBindIds {};
+    int32_t ownerNodeId = -1;
 };
 
 using AccessibilityHoverTestPathForThird = std::vector<int64_t>;
@@ -101,6 +103,10 @@ private:
     void TransferHoverToExportedSubtreeIfNeeded(
         int64_t hitElementId,
         const AccessibilityHoverForThirdConfig& config);
+    void TransferHoverToExportedSubtreeOnUI(int64_t hitElementId,
+        const AccessibilityHoverForThirdConfig& config);
+    void UpdateHoverTransferOnUI(const RefPtr<NG::FrameNode>& exportedRoot,
+        const NG::PointF& point, const AccessibilityHoverForThirdConfig& config);
     // Coordinate geometry of one hover transfer (provider-space point → exportedRoot's ArkUI-parent space), per the.
     struct HoverTransferGeometry {
         float rootWinX = 0.0f;
@@ -148,6 +154,10 @@ private:
         const std::shared_ptr<JsThirdProviderInteractionOperation>& jsThirdProviderOperator);
 
     AccessibilityHoverForThirdState hoverForThirdState_;
+    WeakPtr<NG::FrameNode> nativeHoverRoot_;
+    WeakPtr<NG::PipelineContext> nativeHoverContext_;
+    NG::PointF nativeHoverPoint_;
+    SourceType nativeHoverSource_ = SourceType::NONE;
     std::unordered_map<int64_t, std::weak_ptr<JsThirdProviderInteractionOperation>>
         jsThirdProviderOperator_;
 };

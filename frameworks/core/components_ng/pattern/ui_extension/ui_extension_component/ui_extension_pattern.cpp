@@ -166,17 +166,17 @@ UIExtensionPattern::~UIExtensionPattern()
         return;
     }
 
-    auto instanceId = GetInstanceIdFromHost();
-    ContainerScope scope(instanceId);
     auto host = GetHost();
-    CHECK_NULL_VOID(host);
+    auto instanceId = host ? host->GetInstanceId() : instanceId_;
+    ContainerScope scope(instanceId);
     auto ngPipeline = NG::PipelineContext::GetCurrentContext();
     CHECK_NULL_VOID(ngPipeline);
     auto frontend = ngPipeline->GetFrontend();
     CHECK_NULL_VOID(frontend);
     auto mainAccessibilityManager = frontend->GetAccessibilityManager();
     CHECK_NULL_VOID(mainAccessibilityManager);
-    auto accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(host);
+    auto accessibilityManager = host ? mainAccessibilityManager->GetAccessibilityManagerForNode(host)
+                                     : mainAccessibilityManager;
     CHECK_NULL_VOID(accessibilityManager);
     accessibilityManager->DeregisterAccessibilityChildTreeCallback(
         accessibilityChildTreeCallback_->GetAccessibilityId());
