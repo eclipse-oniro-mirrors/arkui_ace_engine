@@ -4432,9 +4432,7 @@ float RosenRenderContext::OnePixelValueRounding(float value, bool isRound, bool 
     } else if (forceFloor) {
         return (value - fractials);
     } else if (isRound) {
-        if (NearEqual(fractials, 0.5f) && value < 0.0f) {
-            return (value - fractials);
-        } else if (NearEqual(fractials, 1.0f) || GreatOrEqual(fractials, 0.5f)) {
+        if (NearEqual(fractials, 1.0f) || GreatOrEqual(fractials, 0.5f)) {
             return (value - fractials + 1.0f);
         } else {
             return (value - fractials);
