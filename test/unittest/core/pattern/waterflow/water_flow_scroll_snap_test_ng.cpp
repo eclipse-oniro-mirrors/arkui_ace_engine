@@ -34,10 +34,15 @@
 namespace OHOS::Ace::NG {
 namespace {
 constexpr int32_t SNAP_ITEM_COUNT = 30;
+constexpr int32_t UNDERESTIMATED_ITEM_COUNT = 100;
+constexpr int32_t UNDERESTIMATED_SHORT_ITEM_COUNT = 10;
+constexpr int32_t UNDERESTIMATED_LAST_ITEM_INDEX = UNDERESTIMATED_ITEM_COUNT - 1;
+constexpr int32_t PROVIDER_TARGET_ITEM_INDEX = 6;
 constexpr int32_t MAX_SNAP_ANIMATION_TICKS = 100;
 constexpr size_t MIN_SNAP_CANDIDATE_COUNT = 4;
 constexpr size_t POST_TASK_NAME_ARGUMENT = 3;
 constexpr double PROVIDER_TARGET = 320.0;
+constexpr float PROVIDER_NATURAL_OFFSET = 500.0f;
 constexpr float PROVIDER_INITIAL_VELOCITY = 1300.0f;
 constexpr std::array<float, 6> SNAP_ITEM_SIZES = { 100.0f, 170.0f, 80.0f, 120.0f, 150.0f, 90.0f };
 constexpr std::array<SnapCandidate, 3> EXPECTED_START_ANCHORS = { {
@@ -135,8 +140,8 @@ protected:
         auto model = CreateWaterFlow();
         model.SetColumnsTemplate("1fr 1fr");
         ViewAbstract::SetHeight(CalcLength(300.0f));
-        for (int32_t i = 0; i < 100; ++i) {
-            CreateItemWithHeight(i < 10 ? 100.0f : 200.0f);
+        for (int32_t i = 0; i < UNDERESTIMATED_ITEM_COUNT; ++i) {
+            CreateItemWithHeight(i < UNDERESTIMATED_SHORT_ITEM_COUNT ? 100.0f : 200.0f);
         }
         CreateDone();
     }
@@ -146,8 +151,13 @@ protected:
         CreateUnderestimatedItems();
         int32_t snapCalls = 0;
         int32_t approachCalls = 0;
-        SetStrategy(MakeProvider([&](double) { ++snapCalls; return target; },
-            [&](double, double) { ++approachCalls; return approach; }));
+        SetStrategy(MakeProvider([&](double) {
+            ++snapCalls;
+            return target;
+        }, [&](double, double) {
+            ++approachCalls;
+            return approach;
+        }));
         ASSERT_LT(pattern_->GetItemSnapMaxOffset(), target);
         ASSERT_TRUE(pattern_->StartSnapAnimation({ .snapDelta = -30.0f, .animationVelocity = -300.0f }));
         pattern_->GetScrollable()->FlushPendingItemSnapKickoff();
@@ -157,9 +167,9 @@ protected:
         EXPECT_EQ(pattern_->layoutInfo_->itemEnd_, reachesEnd);
         EXPECT_TRUE(pattern_->GetScrollable()->IsStopped());
         if (reachesEnd) {
-            EXPECT_EQ(pattern_->layoutInfo_->endIndex_, 99);
-            EXPECT_FLOAT_EQ(GetChildRect(frameNode_, 99).Height(), 200.0f);
-            EXPECT_NEAR(GetChildRect(frameNode_, 99).Bottom(), 300.0f, 0.5f);
+            EXPECT_EQ(pattern_->layoutInfo_->endIndex_, UNDERESTIMATED_LAST_ITEM_INDEX);
+            EXPECT_FLOAT_EQ(GetChildRect(frameNode_, UNDERESTIMATED_LAST_ITEM_INDEX).Height(), 200.0f);
+            EXPECT_NEAR(GetChildRect(frameNode_, UNDERESTIMATED_LAST_ITEM_INDEX).Bottom(), 300.0f, 0.5f);
         } else {
             EXPECT_NEAR(pattern_->GetTotalOffset(), target, 0.5f);
         }
@@ -288,17 +298,17 @@ protected:
         UpdateCurrentOffset(-120.0f);
         ASSERT_TRUE(pattern_->UpdateCurrentOffset(-30.0f, SCROLL_FROM_UPDATE));
         ASSERT_TRUE(pattern_->StartSnapAnimation(
-            { .snapDelta = -500.0f, .animationVelocity = -PROVIDER_INITIAL_VELOCITY }));
+            { .snapDelta = -PROVIDER_NATURAL_OFFSET, .animationVelocity = -PROVIDER_INITIAL_VELOCITY }));
         pattern_->GetScrollable()->FlushPendingItemSnapKickoff();
         FlushUITasks();
         FinishSnapAnimation();
         EXPECT_EQ(snapCalls, 1);
         EXPECT_EQ(approachCalls, 1);
-        EXPECT_DOUBLE_EQ(approachNaturalOffset, 500.0);
+        EXPECT_DOUBLE_EQ(approachNaturalOffset, PROVIDER_NATURAL_OFFSET);
         EXPECT_DOUBLE_EQ(approachVelocity, PROVIDER_INITIAL_VELOCITY);
         EXPECT_DOUBLE_EQ(snapVelocity, approachVelocity);
         EXPECT_NEAR(pattern_->GetTotalOffset(), PROVIDER_TARGET, 0.5f);
-        EXPECT_NEAR(GetChildRect(frameNode_, 6).GetY(), 10.0f, 0.5f);
+        EXPECT_NEAR(GetChildRect(frameNode_, PROVIDER_TARGET_ITEM_INDEX).GetY(), 10.0f, 0.5f);
     }
 
     void CheckTrackedReleaseBeforeLayout(
