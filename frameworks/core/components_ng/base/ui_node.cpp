@@ -50,6 +50,31 @@ struct UINode::RectCullingState {
 };
 
 namespace {
+struct DumpChild {
+    RefPtr<UINode> node;
+    const char* description;
+};
+
+// Preserve the ordinary/disappearing/auxiliary order shared by full dumps and
+// targeted lookup. Cache nodes, overlay and corner marks keep their existing
+// caller-specific traversal rules.
+std::vector<DumpChild> CollectDumpChildren(UINode* node,
+    const std::list<std::tuple<RefPtr<UINode>, uint32_t, int32_t>>& disappearingChildren)
+{
+    std::vector<DumpChild> children;
+    for (const auto& child : node->GetChildren()) {
+        children.push_back({ child, child->GetParent().GetRawPtr() != node ? "BrokenChildren" : "Children" });
+    }
+    for (const auto& [child, index, branch] : disappearingChildren) {
+        children.push_back({ child, "DisappearingChildren" });
+    }
+    auto frameNode = AceType::DynamicCast<FrameNode>(node);
+    if (frameNode && frameNode->GetSafeAreaInsetNode()) {
+        children.push_back({ frameNode->GetSafeAreaInsetNode(), "SafeAreaInsetNode" });
+    }
+    return children;
+}
+
 double GetNodeOpacityValue(const RefPtr<UINode>& node)
 {
     auto frameNode = AceType::DynamicCast<FrameNode>(node);
@@ -1455,11 +1480,8 @@ void UINode::DumpTree(int32_t depth, bool hasJson, const std::string& desc)
             item->DumpTree(depth + 1, hasJson, "ChildrenForInspector");
         }
     }
-    for (const auto& item : GetChildren()) {
-        item->DumpTree(depth + 1, hasJson, item->GetParent() != Claim(this) ? "BrokenChildren" : "Children");
-    }
-    for (const auto& [item, index, branch] : disappearingChildren_) {
-        item->DumpTree(depth + 1, hasJson, "DisappearingChildren");
+    for (const auto& child : CollectDumpChildren(this, disappearingChildren_)) {
+        child.node->DumpTree(depth + 1, hasJson, child.description);
     }
     auto frameNode = AceType::DynamicCast<FrameNode>(this);
     if (frameNode && frameNode->GetOverlayNode()) {
@@ -1485,13 +1507,8 @@ bool UINode::DumpTreeByComponentName(const std::string& name)
             return true;
         }
     }
-    for (const auto& item : GetChildren()) {
-        if (item->DumpTreeByComponentName(name)) {
-            return true;
-        }
-    }
-    for (const auto& [item, index, branch] : disappearingChildren_) {
-        if (item->DumpTreeByComponentName(name)) {
+    for (const auto& child : CollectDumpChildren(this, disappearingChildren_)) {
+        if (child.node->DumpTreeByComponentName(name)) {
             return true;
         }
     }
@@ -1830,13 +1847,8 @@ bool UINode::DumpTreeById(int32_t depth, const std::string& id, bool hasJson)
             return true;
         }
     }
-    for (const auto& item : GetChildren()) {
-        if (item->DumpTreeById(depth + 1, id, hasJson)) {
-            return true;
-        }
-    }
-    for (const auto& [item, index, branch] : disappearingChildren_) {
-        if (item->DumpTreeById(depth + 1, id, hasJson)) {
+    for (const auto& child : CollectDumpChildren(this, disappearingChildren_)) {
+        if (child.node->DumpTreeById(depth + 1, id, hasJson)) {
             return true;
         }
     }

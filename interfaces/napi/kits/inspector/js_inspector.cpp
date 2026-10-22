@@ -14,6 +14,7 @@
  */
 #include "js_inspector.h"
 #include "base/log/log_wrapper.h"
+#include "base/utils/napi_scope_raii.h"
 #include "core/common/ace_engine.h"
 #include "js_native_api_types.h"
 namespace OHOS::Ace::Napi {
@@ -125,9 +126,8 @@ static size_t ParseArgs(
 
 void ComponentObserver::callUserFunction(napi_env env, std::list<napi_ref>& cbList)
 {
-    napi_handle_scope scope = nullptr;
-    napi_open_handle_scope(env, &scope);
-    if (scope == nullptr) {
+    ScopeRAII scope(env);
+    if (!scope) {
         return;
     }
 
@@ -144,22 +144,19 @@ void ComponentObserver::callUserFunction(napi_env env, std::list<napi_ref>& cbLi
         napi_value result = nullptr;
         napi_call_function(env, nullptr, cb, 1, &resultArg, &result);
     }
-    napi_close_handle_scope(env, scope);
 }
 
 void ComponentObserver::callUserFunction(napi_env env, std::list<napi_ref>& cbList,
     const std::vector<int32_t>& childIds)
 {
-    napi_handle_scope scope = nullptr;
-    napi_open_handle_scope(env, &scope);
-    if (scope == nullptr) {
+    ScopeRAII scope(env);
+    if (!scope) {
         return;
     }
 
     napi_value childIdsArray = nullptr;
     napi_create_array_with_length(env, childIds.size(), &childIdsArray);
     if (childIdsArray == nullptr) {
-        napi_close_handle_scope(env, scope);
         return;
     }
     for (size_t index = 0; index < childIds.size(); ++index) {
@@ -180,7 +177,6 @@ void ComponentObserver::callUserFunction(napi_env env, std::list<napi_ref>& cbLi
         napi_value result = nullptr;
         napi_call_function(env, nullptr, cb, 1, &childIdsArray, &result);
     }
-    napi_close_handle_scope(env, scope);
 }
 
 std::list<napi_ref>::iterator ComponentObserver::FindCbList(napi_env env, napi_value cb, CalloutType calloutType)
@@ -248,17 +244,15 @@ void ComponentObserver::UpdateDrawLayoutChildObserver(bool isClearLayoutObserver
 }
 
 void ComponentObserver::AddCallbackToList(
-    napi_value cb, std::list<napi_ref>& cbList, CalloutType calloutType, napi_env env, napi_handle_scope scope)
+    napi_value cb, std::list<napi_ref>& cbList, CalloutType calloutType, napi_env env)
 {
     auto iter = FindCbList(env, cb, calloutType);
     if (iter != cbList.end()) {
-        napi_close_handle_scope(env, scope);
         return;
     }
     napi_ref ref = nullptr;
     napi_create_reference(env, cb, 1, &ref);
     cbList.emplace_back(ref);
-    napi_close_handle_scope(env, scope);
 }
 
 void ComponentObserver::DeleteCallbackFromList(
@@ -345,9 +339,10 @@ void ComponentObserver::FunctionOnLayoutChildren(napi_env& env, napi_value resul
             return nullptr;
         }
 
-        napi_handle_scope scope = nullptr;
-        napi_open_handle_scope(env, &scope);
-        CHECK_NULL_RETURN(scope, nullptr);
+        ScopeRAII scope(env);
+        if (!scope) {
+            return nullptr;
+        }
         napi_value thisVar = nullptr;
         napi_value cb = nullptr;
         size_t argc = ParseLayoutChildrenArgs(env, info, thisVar, cb);
@@ -355,12 +350,11 @@ void ComponentObserver::FunctionOnLayoutChildren(napi_env& env, napi_value resul
         TAG_LOGI(AceLogTag::ACE_KEYBOARD, "FunctionOnLayoutChildren 2");
         ComponentObserver* observer = GetObserver(env, thisVar);
         if (!observer) {
-            napi_close_handle_scope(env, scope);
             return nullptr;
         }
         TAG_LOGI(AceLogTag::ACE_KEYBOARD, "FunctionOnLayoutChildren 3");
         observer->AddCallbackToList(
-            cb, observer->cbLayoutChildrenList_, CalloutType::LAYOUTCHILDRENCALLOUT, env, scope);
+            cb, observer->cbLayoutChildrenList_, CalloutType::LAYOUTCHILDRENCALLOUT, env);
         observer->UpdateDrawLayoutChildObserver(false, false);
         return nullptr;
     };
@@ -375,13 +369,13 @@ void ComponentObserver::FunctionOffLayoutChildren(napi_env& env, napi_value resu
     auto Off = [](napi_env env, napi_callback_info info) -> napi_value {
         napi_value thisVar = nullptr;
         napi_value cb = nullptr;
-        napi_handle_scope scope = nullptr;
-        napi_open_handle_scope(env, &scope);
-        CHECK_NULL_RETURN(scope, nullptr);
+        ScopeRAII scope(env);
+        if (!scope) {
+            return nullptr;
+        }
         size_t argc = ParseLayoutChildrenArgs(env, info, thisVar, cb);
         ComponentObserver* observer = GetObserver(env, thisVar);
         if (!observer) {
-            napi_close_handle_scope(env, scope);
             return nullptr;
         }
         observer->DeleteLayoutChildrenCallbackFromList(
@@ -389,7 +383,6 @@ void ComponentObserver::FunctionOffLayoutChildren(napi_env& env, napi_value resu
         if (observer->cbLayoutChildrenList_.empty()) {
             observer->UpdateDrawLayoutChildObserver(true, false);
         }
-        napi_close_handle_scope(env, scope);
         return nullptr;
     };
 
@@ -407,21 +400,21 @@ void ComponentObserver::FunctionOnDrawChildren(napi_env& env, napi_value result)
             return nullptr;
         }
 
-        napi_handle_scope scope = nullptr;
-        napi_open_handle_scope(env, &scope);
-        CHECK_NULL_RETURN(scope, nullptr);
+        ScopeRAII scope(env);
+        if (!scope) {
+            return nullptr;
+        }
         napi_value thisVar = nullptr;
         napi_value cb = nullptr;
         size_t argc = ParseDrawChildrenArgs(env, info, thisVar, cb);
         NAPI_ASSERT_BASE(env, (argc == 1 && thisVar != nullptr && cb != nullptr), "Invalid arguments",
-            (napi_close_handle_scope(env, scope), nullptr));
+            nullptr);
         ComponentObserver* observer = GetObserver(env, thisVar);
         if (!observer) {
-            napi_close_handle_scope(env, scope);
             return nullptr;
         }
         observer->AddCallbackToList(
-            cb, observer->cbDrawChildrenWithParameterList_, CalloutType::DRAWCHILDRENWITHPARAMETERCALLOUT, env, scope);
+            cb, observer->cbDrawChildrenWithParameterList_, CalloutType::DRAWCHILDRENWITHPARAMETERCALLOUT, env);
         observer->UpdateDrawLayoutChildObserver(false, false);
         return nullptr;
     };
@@ -436,13 +429,13 @@ void ComponentObserver::FunctionOffDrawChildren(napi_env& env, napi_value result
     auto Off = [](napi_env env, napi_callback_info info) -> napi_value {
         napi_value thisVar = nullptr;
         napi_value cb = nullptr;
-        napi_handle_scope scope = nullptr;
-        napi_open_handle_scope(env, &scope);
-        CHECK_NULL_RETURN(scope, nullptr);
+        ScopeRAII scope(env);
+        if (!scope) {
+            return nullptr;
+        }
         size_t argc = ParseDrawChildrenArgs(env, info, thisVar, cb);
         ComponentObserver* observer = GetObserver(env, thisVar);
         if (!observer) {
-            napi_close_handle_scope(env, scope);
             return nullptr;
         }
         observer->DeleteOnDrawChildrenCallbackFromList(argc, observer->cbDrawChildrenWithParameterList_,
@@ -450,7 +443,6 @@ void ComponentObserver::FunctionOffDrawChildren(napi_env& env, napi_value result
         if (observer->cbDrawChildrenWithParameterList_.empty()) {
             observer->UpdateDrawLayoutChildObserver(false, true);
         }
-        napi_close_handle_scope(env, scope);
         return nullptr;
     };
 
@@ -467,9 +459,10 @@ void ComponentObserver::FunctionOn(napi_env& env, napi_value result, const char*
             return nullptr;
         }
 
-        napi_handle_scope scope = nullptr;
-        napi_open_handle_scope(env, &scope);
-        CHECK_NULL_RETURN(scope, nullptr);
+        ScopeRAII scope(env);
+        if (!scope) {
+            return nullptr;
+        }
         napi_value thisVar = nullptr;
         napi_value cb = nullptr;
         CalloutType calloutType = CalloutType::UNKNOW;
@@ -478,16 +471,15 @@ void ComponentObserver::FunctionOn(napi_env& env, napi_value result, const char*
 
         ComponentObserver* observer = GetObserver(env, thisVar);
         if (!observer) {
-            napi_close_handle_scope(env, scope);
             return nullptr;
         }
 
         if (calloutType == CalloutType::LAYOUTCALLOUT) {
-            observer->AddCallbackToList(cb, observer->cbLayoutList_, calloutType, env, scope);
+            observer->AddCallbackToList(cb, observer->cbLayoutList_, calloutType, env);
         } else if (calloutType == CalloutType::DRAWCALLOUT) {
-            observer->AddCallbackToList(cb, observer->cbDrawList_, calloutType, env, scope);
+            observer->AddCallbackToList(cb, observer->cbDrawList_, calloutType, env);
         } else if (calloutType == CalloutType::DRAWCHILDRENCALLOUT) {
-            observer->AddCallbackToList(cb, observer->cbDrawChildrenList_, calloutType, env, scope);
+            observer->AddCallbackToList(cb, observer->cbDrawChildrenList_, calloutType, env);
             observer->UpdateDrawLayoutChildObserver(false, false);
         }
         return nullptr;
@@ -503,13 +495,13 @@ void ComponentObserver::FunctionOff(napi_env& env, napi_value result, const char
         napi_value thisVar = nullptr;
         napi_value cb = nullptr;
         CalloutType calloutType = CalloutType::UNKNOW;
-        napi_handle_scope scope = nullptr;
-        napi_open_handle_scope(env, &scope);
-        CHECK_NULL_RETURN(scope, nullptr);
+        ScopeRAII scope(env);
+        if (!scope) {
+            return nullptr;
+        }
         size_t argc = ParseArgs(env, info, thisVar, cb, calloutType);
         ComponentObserver* observer = GetObserver(env, thisVar);
         if (!observer) {
-            napi_close_handle_scope(env, scope);
             return nullptr;
         }
         if (calloutType == CalloutType::LAYOUTCALLOUT) {
@@ -522,7 +514,6 @@ void ComponentObserver::FunctionOff(napi_env& env, napi_value result, const char
                 observer->UpdateDrawLayoutChildObserver(false, true);
             }
         }
-        napi_close_handle_scope(env, scope);
         return nullptr;
     };
 
@@ -533,9 +524,8 @@ void ComponentObserver::FunctionOff(napi_env& env, napi_value result, const char
 void ComponentObserver::NapiSerializer(napi_env& env, napi_value& result)
 {
     napi_create_object(env, &result);
-    napi_handle_scope scope = nullptr;
-    napi_open_handle_scope(env, &scope);
-    if (scope == nullptr) {
+    ScopeRAII scope(env);
+    if (!scope) {
         return;
     }
 
@@ -564,7 +554,6 @@ void ComponentObserver::NapiSerializer(napi_env& env, napi_value& result)
     FunctionOffDrawChildren(env, result);
     FunctionOnLayoutChildren(env, result);
     FunctionOffLayoutChildren(env, result);
-    napi_close_handle_scope(env, scope);
 }
 
 void ComponentObserver::Destroy(napi_env env)
@@ -607,12 +596,10 @@ void ComponentObserver::Destroy(napi_env env)
 
 void ComponentObserver::Initialize(napi_env env, napi_value thisVar)
 {
-    napi_handle_scope scope = nullptr;
-    napi_open_handle_scope(env, &scope);
-    if (scope == nullptr) {
+    ScopeRAII scope(env);
+    if (!scope) {
         return;
     }
-    napi_close_handle_scope(env, scope);
 }
 
 bool isInt32Range(double d)

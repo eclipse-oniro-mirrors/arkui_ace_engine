@@ -494,6 +494,24 @@ void WebModelNG::SetOnContextMenuHide(std::function<void(const BaseEventInfo* in
     webEventHub->SetOnContextMenuHideEvent(std::move(uiCallback));
 }
 
+void WebModelNG::SetOnContextMenuUpdate(
+    std::function<void(WebContextMenuItemId menuItemId, const WebContextMenuOptions& options)>&& jsCallback)
+{
+    auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
+    CHECK_NULL_VOID(webPattern);
+    webPattern->SetOnContextMenuUpdateCallback(std::move(jsCallback));
+}
+
+void WebModelNG::SetOnContextMenuUpdate(
+    FrameNode* frameNode,
+    std::function<void(WebContextMenuItemId menuItemId, const WebContextMenuOptions& options)>&& jsCallback)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    CHECK_NULL_VOID(webPattern);
+    webPattern->SetOnContextMenuUpdateCallback(std::move(jsCallback));
+}
+
 void WebModelNG::SetJsEnabled(bool isJsEnabled)
 {
     auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
@@ -548,6 +566,13 @@ void WebModelNG::SetZoomAccessEnabled(bool isZoomAccessEnabled)
     auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
     CHECK_NULL_VOID(webPattern);
     webPattern->UpdateZoomAccessEnabled(isZoomAccessEnabled);
+}
+
+void WebModelNG::SetFlingSpeedLimit(float speedLimit)
+{
+    auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
+    CHECK_NULL_VOID(webPattern);
+    webPattern->UpdateFlingSpeedLimit(NormalizeFlingSpeedLimit(speedLimit));
 }
 
 void WebModelNG::SetZoomControlAccess(bool zoomControlAccess)
@@ -778,6 +803,13 @@ void WebModelNG::SetDefaultBackgroundColor()
     auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
     CHECK_NULL_VOID(webPattern);
     webPattern->SetDefaultBackgroundColor();
+}
+
+void WebModelNG::SetCaretColor(const Color& caretColor)
+{
+    auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
+    CHECK_NULL_VOID(webPattern);
+    webPattern->UpdateCaretColor(caretColor);
 }
 
 void WebModelNG::InitialScale(float scale)
@@ -1927,6 +1959,14 @@ void WebModelNG::SetDefaultFontSize(FrameNode* frameNode, int32_t defaultFontSiz
     webPattern->UpdateDefaultFontSize(defaultFontSize);
 }
 
+void WebModelNG::SetCaretColor(FrameNode* frameNode, const Color& caretColor)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    CHECK_NULL_VOID(webPattern);
+    webPattern->UpdateCaretColor(caretColor);
+}
+
 void WebModelNG::SetDefaultFixedFontSize(FrameNode* frameNode, int32_t defaultFixedFontSize)
 {
     CHECK_NULL_VOID(frameNode);
@@ -2756,6 +2796,19 @@ void WebModelNG::SetOnDetectedBlankScreen(std::function<void(const BaseEventInfo
     webEventHub->SetOnDetectedBlankScreenEvent(std::move(uiCallback));
 }
 
+void WebModelNG::SetOnMonitoredBlankScreen(
+    FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& jsCallback)
+{
+    auto func = jsCallback;
+    auto uiCallback = [func](const std::shared_ptr<BaseEventInfo> &info) {
+        CHECK_NULL_VOID(info);
+        func(info.get());
+    };
+    auto webEventHub = ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>();
+    CHECK_NULL_VOID(webEventHub);
+    webEventHub->SetOnMonitoredBlankScreenEvent(std::move(uiCallback));
+}
+
 void WebModelNG::SetEnableAutoFill(bool isEnabled)
 {
     auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
@@ -2827,11 +2880,38 @@ void WebModelNG::SetOnDetectedBlankScreen(
     webEventHub->SetOnDetectedBlankScreenEvent(std::move(uiCallback));
 }
 
+void WebModelNG::SetOnMonitoredBlankScreen(std::function<void(const BaseEventInfo *info)> &&jsCallback)
+{
+    auto func = std::move(jsCallback);
+    auto uiCallback = [func](const std::shared_ptr<BaseEventInfo> &info) {
+        CHECK_NULL_VOID(info);
+        func(info.get());
+    };
+    auto webEventHub = ViewStackProcessor::GetInstance()->GetMainFrameNodeEventHub<WebEventHub>();
+    CHECK_NULL_VOID(webEventHub);
+    webEventHub->SetOnMonitoredBlankScreenEvent(std::move(uiCallback));
+}
+
 void WebModelNG::SetBlankScreenDetectionConfig(FrameNode* frameNode, const BlankScreenDetectionConfig& detectConfig)
 {
     auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
     CHECK_NULL_VOID(webPattern);
     webPattern->UpdateBlankScreenDetectionConfig(detectConfig);
+}
+
+void WebModelNG::SetWebBlankScreenMonitorEnabled(bool isEnabled)
+{
+    auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
+    CHECK_NULL_VOID(webPattern);
+    webPattern->UpdateWebBlankScreenMonitorEnabled(isEnabled);
+}
+
+void WebModelNG::SetWebBlankScreenMonitorEnabled(FrameNode* frameNode, bool isEnabled)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
+    CHECK_NULL_VOID(webPattern);
+    webPattern->UpdateWebBlankScreenMonitorEnabled(isEnabled);
 }
 
 void WebModelNG::SetOnFirstScreenPaint(
@@ -2892,6 +2972,14 @@ void WebModelNG::SetForceEnableZoom(FrameNode* frameNode, bool isEnabled)
     auto webPattern = ViewStackProcessor::GetInstance()->GetMainFrameNodePattern<WebPattern>();
     CHECK_NULL_VOID(webPattern);
     webPattern->UpdateForceEnableZoom(isEnabled);
+}
+
+void WebModelNG::SetFlingSpeedLimit(FrameNode* frameNode, float speedLimit)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    CHECK_NULL_VOID(webPattern);
+    webPattern->UpdateFlingSpeedLimit(NormalizeFlingSpeedLimit(speedLimit));
 }
 
 void WebModelNG::SetSafeBrowsingCheckFinishId(

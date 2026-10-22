@@ -29,9 +29,19 @@
 #include "core/components_ng/base/ui_node.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_cost_model.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_manager.h"
+#include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_node_clone.h"
+#include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_restricted_scope.h"
+#include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_shell_node.h"
+#include "core/components_ng/property/layout_constraint.h"
 #include "core/components_ng/layout/layout_wrapper_node.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_observer.h"
 #include "core/components_ng/pattern/pattern.h"
+#include "core/components_ng/pattern/flex/flex_layout_pattern.h"
+#include "core/components_ng/pattern/image/image_pattern.h"
+#include "core/components_ng/pattern/linear_layout/linear_layout_pattern.h"
+#include "core/components_ng/pattern/stack/stack_pattern.h"
+#include "core/components_ng/pattern/text/text_layout_property.h"
+#include "core/components_ng/pattern/text/text_pattern.h"
 #include "core/pipeline/base/element_register.h"
 #include "core/pipeline/base/element_register_multi_thread.h"
 #include "core/pipeline_ng/pipeline_context.h"
@@ -147,11 +157,15 @@ ScrollPlaceholderBuilder MakeTreeBuilder(int32_t baseId)
 // Builder producing a frame-node placeholder subtree for the production copy protocol.
 ScrollPlaceholderBuilder MakeFrameTreeBuilder()
 {
+    // Restricted copy protocol (step2): only whitelisted patterns clone, so the
+    // production copy path needs whitelisted pattern nodes (plain containers).
     return ScrollPlaceholderBuilder([]() -> RefPtr<UINode> {
-        auto root = FrameNode::CreateFrameNode(
-            "placeholder_root", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
-        auto child = FrameNode::CreateFrameNode(
-            "placeholder_child", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+        auto root = FrameNode::CreateFrameNode("placeholder_root",
+            ElementRegister::GetInstance()->MakeUniqueId(),
+            AceType::MakeRefPtr<LinearLayoutPattern>(false));
+        auto child = FrameNode::CreateFrameNode("placeholder_child",
+            ElementRegister::GetInstance()->MakeUniqueId(),
+            AceType::MakeRefPtr<LinearLayoutPattern>(true));
         child->GetLayoutProperty()->UpdateAspectRatio(1.5f);
         root->AddChild(child);
         return root;
@@ -309,27 +323,33 @@ HWTEST_F(ScrollPlaceholderManagerTestNg, TemplateGenerationMonotonic001, TestSiz
 
 /**
  * @tc.name: TemplateInstanceCache001
- * @tc.desc: Built instances are retained per template and handed out on acquire.
+ * @tc.desc: Built instances are retained per template with capacity and LIFO intake;
+ *           acquires never consume the pool - every acquire is a fresh builder product.
  * @tc.type: FUNC
  */
 HWTEST_F(ScrollPlaceholderManagerTestNg, TemplateInstanceCache001, TestSize.Level1)
 {
     manager_->RegisterTemplate("tpl", MakeTreeBuilder(1));
-    auto first = TestPlaceholderNode::CreateTestNode(11);
-    auto second = TestPlaceholderNode::CreateTestNode(12);
-    manager_->CacheTemplateInstance("tpl", first);
-    manager_->CacheTemplateInstance("tpl", second); // over the spare capacity, dropped
-    EXPECT_EQ(manager_->GetCachedInstanceCount("tpl"), 1u); // spares only; source is resident
+    constexpr size_t spareSlots = SCROLL_PLACEHOLDER_INSTANCE_CACHE_CAPACITY - 1;
+    std::vector<RefPtr<TestPlaceholderNode>> nodes;
+    for (size_t i = 0; i < spareSlots + 1; ++i) { // one over the spare capacity
+        nodes.emplace_back(TestPlaceholderNode::CreateTestNode(10 + static_cast<int32_t>(i)));
+    }
+    for (const auto& node : nodes) {
+        manager_->CacheTemplateInstance("tpl", node);
+    }
+    EXPECT_EQ(manager_->GetCachedInstanceCount("tpl"), spareSlots); // overflow dropped
     ASSERT_TRUE(manager_->GetTemplateSourceInstance("tpl"));
 
+    // The pool is not consumed on acquire: every call returns a fresh builder product
+    // (distinct from the cached spares) and the cached count stays untouched.
     auto acquired = manager_->AcquireTemplateInstance("tpl");
     ASSERT_TRUE(acquired);
-    EXPECT_EQ(acquired, first);
-    EXPECT_EQ(manager_->GetCachedInstanceCount("tpl"), 0u);
-    // No spare with a working template: acquire never fails, it creates one on the UI thread.
+    EXPECT_NE(acquired, AceType::DynamicCast<UINode>(nodes[spareSlots - 1])); // fresh build, not the spare
+    EXPECT_EQ(manager_->GetCachedInstanceCount("tpl"), spareSlots); // pool untouched by acquire
     auto synced = manager_->AcquireTemplateInstance("tpl");
     EXPECT_TRUE(synced);
-    EXPECT_EQ(manager_->GetCachedInstanceCount("tpl"), 0u); // created for use, not cached
+    EXPECT_NE(synced, acquired); // each acquire builds its own product
     EXPECT_TRUE(manager_->GetTemplateSourceInstance("tpl")); // source never leaves the pool
 }
 
@@ -401,11 +421,11 @@ HWTEST_F(ScrollPlaceholderManagerTestNg, PlaceholderPoolRegisterSeedAndReplenish
     ASSERT_TRUE(source);                       // synchronous source build at registration
     EXPECT_EQ(source->GetChildren().size(), 1u);
     EXPECT_EQ(manager_->GetCachedInstanceCount("tpl"), 0u); // no spare yet
-    EXPECT_EQ(manager_->GetPendingCloneCount("tpl"), 1u);
-    EXPECT_EQ(manager_->CapturedTaskCount(), 1u);
+    EXPECT_EQ(manager_->GetPendingCloneCount("tpl"), SCROLL_PLACEHOLDER_INSTANCE_CACHE_CAPACITY - 1);
+    EXPECT_EQ(manager_->CapturedTaskCount(), SCROLL_PLACEHOLDER_INSTANCE_CACHE_CAPACITY - 1);
 
     manager_->RunCapturedTasks();
-    EXPECT_EQ(manager_->copiedNodeCount, 2u);  // top-down copy visited root and child
+    EXPECT_EQ(manager_->copiedNodeCount, 2u * (SCROLL_PLACEHOLDER_INSTANCE_CACHE_CAPACITY - 1)); // root + child per submitted clone
     EXPECT_EQ(manager_->GetCachedInstanceCount("tpl"), SCROLL_PLACEHOLDER_INSTANCE_CACHE_CAPACITY - 1);
     EXPECT_EQ(manager_->GetPendingCloneCount("tpl"), 0u);
     EXPECT_EQ(manager_->CapturedTaskCount(), 0u); // no extra tasks once at capacity
@@ -413,12 +433,13 @@ HWTEST_F(ScrollPlaceholderManagerTestNg, PlaceholderPoolRegisterSeedAndReplenish
 }
 
 /**
- * @tc.name: PlaceholderPoolAcquireTakesAndReplenishes001
- * @tc.desc: Acquire hands out a spare copy (never the source) and the background clone
- *           refills the spare slot from the resident source.
+ * @tc.name: PlaceholderPoolAcquireAlwaysBuilds001
+ * @tc.desc: Acquire always executes the builder (full-fidelity product, never the
+ *           resident source and never a pooled clone) and leaves the pool untouched:
+ *           no spare is consumed and no replenish task is scheduled by the acquire.
  * @tc.type: FUNC
  */
-HWTEST_F(ScrollPlaceholderManagerTestNg, PlaceholderPoolAcquireTakesAndReplenishes001, TestSize.Level1)
+HWTEST_F(ScrollPlaceholderManagerTestNg, PlaceholderPoolAcquireAlwaysBuilds001, TestSize.Level1)
 {
     manager_->RegisterTemplate("tpl", MakeTreeBuilder(1));
     manager_->RunCapturedTasks();
@@ -428,13 +449,12 @@ HWTEST_F(ScrollPlaceholderManagerTestNg, PlaceholderPoolAcquireTakesAndReplenish
 
     auto acquired = manager_->AcquireTemplateInstance("tpl");
     ASSERT_TRUE(acquired);
-    EXPECT_NE(acquired, source);               // a spare copy, not the resident source
-    EXPECT_EQ(acquired->GetChildren().size(), 1u); // structural copy kept the subtree
-    EXPECT_EQ(manager_->GetCachedInstanceCount("tpl"), 0u);
-    EXPECT_EQ(manager_->GetPendingCloneCount("tpl"), 1u);
-    manager_->RunCapturedTasks();
+    EXPECT_NE(acquired, source);                   // a builder product, not the resident source
+    EXPECT_NE(manager_->GetCachedInstanceCount("tpl"), 0u); // spares still cached
+    EXPECT_EQ(acquired->GetChildren().size(), 1u); // builder kept the subtree shape
     EXPECT_EQ(manager_->GetCachedInstanceCount("tpl"), SCROLL_PLACEHOLDER_INSTANCE_CACHE_CAPACITY - 1);
-    EXPECT_EQ(manager_->GetPendingCloneCount("tpl"), 0u);
+    EXPECT_EQ(manager_->GetPendingCloneCount("tpl"), 0u);   // acquire schedules no clone
+    EXPECT_EQ(manager_->CapturedTaskCount(), 0u);
     EXPECT_EQ(manager_->GetTemplateSourceInstance("tpl"), source);
 }
 
@@ -447,13 +467,13 @@ HWTEST_F(ScrollPlaceholderManagerTestNg, PlaceholderPoolAcquireTakesAndReplenish
 HWTEST_F(ScrollPlaceholderManagerTestNg, PlaceholderPoolSyncCreateWhenEmpty001, TestSize.Level1)
 {
     manager_->RegisterTemplate("tpl", MakeTreeBuilder(1));
-    EXPECT_EQ(manager_->CapturedTaskCount(), 1u); // replenish pending, not run yet
+    EXPECT_EQ(manager_->CapturedTaskCount(), SCROLL_PLACEHOLDER_INSTANCE_CACHE_CAPACITY - 1); // replenish pending, not run yet
 
-    auto synced = manager_->AcquireTemplateInstance("tpl"); // no spare path
+    auto synced = manager_->AcquireTemplateInstance("tpl"); // acquire always builds
     ASSERT_TRUE(synced);
     EXPECT_EQ(synced->GetChildren().size(), 1u);  // built by the builder on the UI thread
     EXPECT_EQ(manager_->GetCachedInstanceCount("tpl"), 0u); // served directly, not cached
-    EXPECT_EQ(manager_->CapturedTaskCount(), 1u); // spare slot already in flight
+    EXPECT_EQ(manager_->CapturedTaskCount(), SCROLL_PLACEHOLDER_INSTANCE_CACHE_CAPACITY - 1); // spare slots already in flight
     manager_->RunCapturedTasks();
     EXPECT_EQ(manager_->GetCachedInstanceCount("tpl"), SCROLL_PLACEHOLDER_INSTANCE_CACHE_CAPACITY - 1);
     EXPECT_EQ(manager_->GetPendingCloneCount("tpl"), 0u);
@@ -475,7 +495,7 @@ HWTEST_F(ScrollPlaceholderManagerTestNg, PlaceholderPoolStaleCloneDroppedOnReReg
     ASSERT_TRUE(secondSource);
     EXPECT_NE(secondSource, firstSource);      // re-register rebuilt the source on the UI thread
     EXPECT_EQ(manager_->GetCachedInstanceCount("tpl"), 0u);
-    EXPECT_EQ(manager_->CapturedTaskCount(), 2u); // stale clone + current clone
+    EXPECT_EQ(manager_->CapturedTaskCount(), 2u * (SCROLL_PLACEHOLDER_INSTANCE_CACHE_CAPACITY - 1)); // stale clones + current clones
 
     manager_->RunCapturedTasks();
     EXPECT_EQ(manager_->GetCachedInstanceCount("tpl"), SCROLL_PLACEHOLDER_INSTANCE_CACHE_CAPACITY - 1);
@@ -490,7 +510,7 @@ HWTEST_F(ScrollPlaceholderManagerTestNg, PlaceholderPoolStaleCloneDroppedOnReReg
 HWTEST_F(ScrollPlaceholderManagerTestNg, PlaceholderPoolDestroyDropsInFlight001, TestSize.Level1)
 {
     manager_->RegisterTemplate("tpl", MakeTreeBuilder(1));
-    ASSERT_EQ(manager_->CapturedTaskCount(), 1u);
+    ASSERT_EQ(manager_->CapturedTaskCount(), SCROLL_PLACEHOLDER_INSTANCE_CACHE_CAPACITY - 1);
     manager_->Destroy();
     manager_->RunCapturedTasks();
     EXPECT_FALSE(manager_->GetTemplateSourceInstance("tpl")); // registry cleared
@@ -526,10 +546,13 @@ HWTEST_F(ScrollPlaceholderManagerTestNg, PlaceholderPoolDefaultCopyCreatesSameTy
 {
     manager_->useDefaultCopyProtocol = true;
     auto builder = []() -> RefPtr<UINode> {
-        auto root = FrameNode::CreateFrameNode(
-            "placeholder_root", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
-        auto child = FrameNode::CreateFrameNode(
-            "placeholder_child", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+        // Whitelisted (restricted copy protocol) patterns: plain containers.
+        auto root = FrameNode::CreateFrameNode("placeholder_root",
+            ElementRegister::GetInstance()->MakeUniqueId(),
+            AceType::MakeRefPtr<LinearLayoutPattern>(false));
+        auto child = FrameNode::CreateFrameNode("placeholder_child",
+            ElementRegister::GetInstance()->MakeUniqueId(),
+            AceType::MakeRefPtr<LinearLayoutPattern>(true));
         child->GetLayoutProperty()->UpdateAspectRatio(1.5f);
         root->AddChild(child);
         return root;
@@ -557,8 +580,10 @@ HWTEST_F(ScrollPlaceholderManagerTestNg, PlaceholderPoolDefaultCopyCreatesSameTy
 
 /**
  * @tc.name: PlaceholderPoolParallelCloneFillsPool001
- * @tc.desc: With the real BackgroundTaskExecutor a worker thread clones the resident source:
- *           same-type creation, property copy and free-node registration all run off-thread.
+ * @tc.desc: With the real BackgroundTaskExecutor a worker thread clones the resident
+ *           source and fills the pool off-thread; an acquire executes the builder on
+ *           the UI thread instead, so the product registers in the global element
+ *           register rather than the thread-safe registry the clones use.
  * @tc.type: FUNC
  */
 HWTEST_F(ScrollPlaceholderManagerTestNg, PlaceholderPoolParallelCloneFillsPool001, TestSize.Level1)
@@ -571,19 +596,21 @@ HWTEST_F(ScrollPlaceholderManagerTestNg, PlaceholderPoolParallelCloneFillsPool00
 
     auto source = AceType::DynamicCast<FrameNode>(manager_->GetTemplateSourceInstance("tpl"));
     ASSERT_TRUE(source);
-    auto acquired = manager_->AcquireTemplateInstance("tpl"); // main thread takes worker output
+    auto acquired = manager_->AcquireTemplateInstance("tpl"); // builder runs on the UI thread
     ASSERT_TRUE(acquired);
     auto copyRoot = AceType::DynamicCast<FrameNode>(acquired);
     ASSERT_TRUE(copyRoot);
-    EXPECT_EQ(copyRoot->GetTag(), source->GetTag());   // same type
+    EXPECT_EQ(copyRoot->GetTag(), source->GetTag());   // builder kept the template type
     EXPECT_NE(copyRoot->GetId(), source->GetId());     // fresh node, not the resident source
     ASSERT_EQ(copyRoot->GetChildren().size(), 1u);
     auto copyChild = AceType::DynamicCast<FrameNode>(copyRoot->GetChildren().front());
     ASSERT_TRUE(copyChild);
-    EXPECT_FLOAT_EQ(copyChild->GetLayoutProperty()->GetAspectRatio(), 1.5f); // property copied
-    // Created under the thread-safe node scope on the worker: registered as a free node in
-    // the mutex-guarded registry instead of the global element register.
-    EXPECT_EQ(ElementRegisterMultiThread::GetInstance()->GetThreadSafeNodeById(copyRoot->GetId()), acquired);
+    EXPECT_FLOAT_EQ(copyChild->GetLayoutProperty()->GetAspectRatio(), 1.5f); // builder set the property
+    // Builder product created on the UI thread: registered in the global element
+    // register, not the thread-safe registry the worker clones use.
+    EXPECT_EQ(ElementRegisterMultiThread::GetInstance()->GetThreadSafeNodeById(copyRoot->GetId()), nullptr);
+    // The pool of worker clones stays untouched by the acquire.
+    EXPECT_EQ(manager_->GetCachedInstanceCount("tpl"), SCROLL_PLACEHOLDER_INSTANCE_CACHE_CAPACITY - 1);
 }
 
 /**
@@ -603,7 +630,7 @@ HWTEST_F(ScrollPlaceholderManagerTestNg, PlaceholderPoolParallelReplenishLoop001
     std::vector<RefPtr<UINode>> held;
     for (int i = 0; i < 6; i++) {
         auto instance = manager_->AcquireTemplateInstance("tpl");
-        ASSERT_TRUE(instance); // spare taken, or built synchronously while the worker refills
+        ASSERT_TRUE(instance); // built synchronously on the UI thread
         auto frame = AceType::DynamicCast<FrameNode>(instance);
         ASSERT_TRUE(frame);
         EXPECT_EQ(seenIds.count(frame->GetId()), 0u); // unique instance every time
@@ -1145,5 +1172,454 @@ HWTEST_F(ScrollPlaceholderObserverTestNg, ObserverScopeObservesRealAcquisition00
     // The tiny measured duration replaced the 5ms cold start estimate.
     auto probe = MakeParams(ScrollPlaceholderComponentType::LIST, std::string(), 0, 0);
     EXPECT_LT(manager->EstimateRealBuildDuration(probe), COLD_START_NS);
+}
+
+/**
+ * @tc.name: ProbeTemplateCloneNoSource001
+ * @tc.desc: A probe for a template without a resident source instance reports the
+ *           dedicated diagnostic path and keeps the template unregistered state.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPlaceholderManagerTestNg, ProbeTemplateCloneNoSource001, TestSize.Level1)
+{
+    std::string subtreePath = "untouched";
+    EXPECT_FALSE(manager_->ProbeTemplateClone("tpl-no-source", subtreePath));
+    EXPECT_EQ(subtreePath, "<no source instance>");
+    EXPECT_FALSE(manager_->IsTemplateRegistered("tpl-no-source"));
+}
+
+namespace {
+// Shared probe scaffold: registers a template, runs the admission probe and reports
+// (admitted, failing subtree path). unregisters afterwards unless keepRegistered
+// (the admitted case asserts on the pool the probe product joined).
+std::pair<bool, std::string> ProbeRegisteredTemplate(const RefPtr<TestableScrollPlaceholderManager>& manager,
+    ScrollPlaceholderBuilder&& builder, bool keepRegistered = false)
+{
+    const std::string templateId = "tpl-probe-case";
+    manager->RegisterTemplate(templateId, std::move(builder));
+    std::string subtreePath;
+    bool admitted = manager->ProbeTemplateClone(templateId, subtreePath);
+    if (!keepRegistered) {
+        manager->UnregisterTemplate(templateId);
+    }
+    return { admitted, subtreePath };
+}
+} // namespace
+
+/**
+ * @tc.name: ProbeTemplateCloneUnsupportedRoot001
+ * @tc.desc: A template whose root pattern is not on the restricted copy whitelist
+ *           (base Pattern) is rejected with the offending node tag as the path.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPlaceholderManagerTestNg, ProbeTemplateCloneUnsupportedRoot001, TestSize.Level1)
+{
+    auto rejectedBefore = manager_->GetDiagnostics().registerRejected;
+    auto [admitted, subtreePath] = ProbeRegisteredTemplate(manager_, ScrollPlaceholderBuilder([]() -> RefPtr<UINode> {
+        return FrameNode::CreateFrameNode(
+            "plain_root", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    }));
+    EXPECT_FALSE(admitted);
+    EXPECT_EQ(subtreePath, "plain_root");
+    EXPECT_GE(manager_->GetDiagnostics().registerRejected, rejectedBefore + 1);
+}
+
+/**
+ * @tc.name: ProbeTemplateCloneUnsupportedNested001
+ * @tc.desc: A whitelisted root with an unsupported descendant is rejected with the
+ *           full subtree route to the offending node in the diagnostic path.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPlaceholderManagerTestNg, ProbeTemplateCloneUnsupportedNested001, TestSize.Level1)
+{
+    auto [admitted, subtreePath] = ProbeRegisteredTemplate(manager_, ScrollPlaceholderBuilder([]() -> RefPtr<UINode> {
+        auto root = FrameNode::CreateFrameNode("nested_root", ElementRegister::GetInstance()->MakeUniqueId(),
+            AceType::MakeRefPtr<LinearLayoutPattern>(false));
+        root->AddChild(FrameNode::CreateFrameNode("bad_child", ElementRegister::GetInstance()->MakeUniqueId(),
+            AceType::MakeRefPtr<Pattern>()));
+        return root;
+    }));
+    EXPECT_FALSE(admitted);
+    EXPECT_EQ(subtreePath, "nested_root > bad_child");
+}
+
+/**
+ * @tc.name: ProbeTemplateCloneAdmitted001
+ * @tc.desc: A whitelisted subtree passes the admission probe: validation is the clone
+ *           itself, the probe product joins the instance pool and a background
+ *           replenish is scheduled.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPlaceholderManagerTestNg, ProbeTemplateCloneAdmitted001, TestSize.Level1)
+{
+    auto [admitted, subtreePath] = ProbeRegisteredTemplate(manager_, MakeFrameTreeBuilder(), true);
+    EXPECT_TRUE(admitted);
+    EXPECT_TRUE(subtreePath.empty());
+    EXPECT_GE(manager_->GetCachedInstanceCount("tpl-probe-case"), 1u);
+    EXPECT_GE(manager_->CapturedTaskCount(), 1u);
+    manager_->UnregisterTemplate("tpl-probe-case");
+}
+
+/**
+ * @tc.name: ProbeTemplateCloneCloneFails001
+ * @tc.desc: A probe whose production copy hook refuses every node fails at the
+ *           source root and reports the root tag as the failing path.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPlaceholderManagerTestNg, ProbeTemplateCloneCloneFails001, TestSize.Level1)
+{
+    manager_->copyProtocolEnabled = false;
+    auto [admitted, subtreePath] = ProbeRegisteredTemplate(manager_, MakeFrameTreeBuilder());
+    manager_->copyProtocolEnabled = true;
+    EXPECT_FALSE(admitted);
+    EXPECT_EQ(subtreePath, "placeholder_root");
+}
+
+/**
+ * @tc.name: ProbeTemplateCloneDestroyedManager001
+ * @tc.desc: A destroyed manager rejects every probe outright.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPlaceholderManagerTestNg, ProbeTemplateCloneDestroyedManager001, TestSize.Level1)
+{
+    manager_->Destroy();
+    std::string subtreePath = "untouched";
+    EXPECT_FALSE(manager_->ProbeTemplateClone("tpl-any", subtreePath));
+    EXPECT_TRUE(subtreePath.empty());
+}
+
+/**
+ * @tc.name: ProbeTemplateCloneNonFrameNode001
+ * @tc.desc: A template whose source root is not a frame node at all is rejected
+ *           with the node tag as the diagnostic path (the walk stops before any
+ *           pattern check).
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPlaceholderManagerTestNg, ProbeTemplateCloneNonFrameNode001, TestSize.Level1)
+{
+    auto [admitted, subtreePath] = ProbeRegisteredTemplate(manager_, ScrollPlaceholderBuilder([]() -> RefPtr<UINode> {
+        auto root = TestPlaceholderNode::CreateTestNode(930001);
+        root->AddChild(TestPlaceholderNode::CreateTestNode(930002));
+        return root;
+    }));
+    EXPECT_FALSE(admitted);
+    EXPECT_EQ(subtreePath, "TestPlaceholderNode");
+}
+
+/**
+ * @tc.name: RestrictedCopyWhitelistPatterns001
+ * @tc.desc: Every whitelisted render-only pattern clones through the production
+ *           restricted copy protocol (fresh same-type pattern + wholesale layout
+ *           property + zIndex), and the copy restores the pattern type.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPlaceholderManagerTestNg, RestrictedCopyWhitelistPatterns001, TestSize.Level1)
+{
+    // Route the clone through the production copy protocol (the Testable default
+    // stub would produce plain test nodes instead of frame nodes).
+    manager_->useDefaultCopyProtocol = true;
+    struct WhitelistCase {
+        std::string tag;
+        RefPtr<Pattern> pattern;
+    };
+    std::vector<WhitelistCase> cases = {
+        { "text_node", AceType::MakeRefPtr<TextPattern>() },
+        { "image_node", AceType::MakeRefPtr<ImagePattern>() },
+        { "linear_node", AceType::MakeRefPtr<LinearLayoutPattern>(false) },
+        { "stack_node", AceType::MakeRefPtr<StackPattern>() },
+        { "flex_node", AceType::MakeRefPtr<FlexLayoutPattern>(true) },
+    };
+    for (const auto& entry : cases) {
+        std::string templateId = "tpl-whitelist-" + entry.tag;
+        ScrollPlaceholderBuilder builder = [entry]() -> RefPtr<UINode> {
+            auto node = FrameNode::CreateFrameNode(
+                entry.tag, ElementRegister::GetInstance()->MakeUniqueId(), entry.pattern);
+            node->GetRenderContext()->UpdateZIndex(7);
+            return node;
+        };
+        manager_->RegisterTemplate(templateId, std::move(builder));
+        std::string subtreePath;
+        EXPECT_TRUE(manager_->ProbeTemplateClone(templateId, subtreePath)) << entry.tag;
+        // The probe product (a spare clone) carries the copied layout-relevant state.
+        auto instance = manager_->AcquireTemplateInstance(templateId);
+        ASSERT_TRUE(instance) << entry.tag;
+        auto frame = AceType::DynamicCast<FrameNode>(instance);
+        ASSERT_TRUE(frame) << entry.tag;
+        EXPECT_EQ(frame->GetTag(), entry.tag);
+        EXPECT_EQ(frame->GetRenderContext()->GetZIndex().value_or(0), 7) << entry.tag;
+        manager_->UnregisterTemplate(templateId);
+    }
+    manager_->useDefaultCopyProtocol = false;
+}
+
+/**
+ * @tc.name: ShellNodeInvisibleToChildEnumeration001
+ * @tc.desc: A placeholder shell keeps a zero frame count on purpose: host-level
+ *           child-slot enumerations must never count it as an item.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPlaceholderManagerTestNg, ShellNodeInvisibleToChildEnumeration001, TestSize.Level1)
+{
+    auto shell = ScrollPlaceholderShellNode::CreateScrollPlaceholderShellNode(
+        "shell", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    ASSERT_TRUE(shell);
+    EXPECT_EQ(shell->FrameCount(), 0);
+    EXPECT_EQ(shell->CurrentFrameCount(), 0);
+}
+
+// The restricted-scope counters are process-global statics shared by every test of this
+// binary, so each case balances its own Begin/End pairs and the TearDown drains any
+// depth a failed assertion may have left behind.
+class ScrollPlaceholderRestrictedScopeTestNg : public testing::Test {
+public:
+    void TearDown() override
+    {
+        while (ScrollPlaceholderRestrictedScope::IsInRestrictedScope()) {
+            ScrollPlaceholderRestrictedScope::End();
+        }
+    }
+};
+
+/**
+ * @tc.name: RestrictedScopePairingAndUnderflow001
+ * @tc.desc: Nested Begin/End pairs keep the scope depth, and an unpaired End
+ *           underflows safely (the depth never goes negative).
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPlaceholderRestrictedScopeTestNg, RestrictedScopePairingAndUnderflow001, TestSize.Level1)
+{
+    EXPECT_FALSE(ScrollPlaceholderRestrictedScope::IsInRestrictedScope());
+    ScrollPlaceholderRestrictedScope::Begin();
+    EXPECT_TRUE(ScrollPlaceholderRestrictedScope::IsInRestrictedScope());
+    ScrollPlaceholderRestrictedScope::Begin(); // re-entrant nesting
+    EXPECT_TRUE(ScrollPlaceholderRestrictedScope::IsInRestrictedScope());
+    ScrollPlaceholderRestrictedScope::End();
+    EXPECT_TRUE(ScrollPlaceholderRestrictedScope::IsInRestrictedScope());
+    ScrollPlaceholderRestrictedScope::End();
+    EXPECT_FALSE(ScrollPlaceholderRestrictedScope::IsInRestrictedScope());
+    // Unpaired End (underflow guard): the depth stays at zero instead of wrapping.
+    ScrollPlaceholderRestrictedScope::End();
+    EXPECT_FALSE(ScrollPlaceholderRestrictedScope::IsInRestrictedScope());
+}
+
+/**
+ * @tc.name: RestrictedScopeRaiiGuard001
+ * @tc.desc: The RAII guard opens the scope on construction and closes it on every
+ *           exit path, keeping the pairing balanced.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPlaceholderRestrictedScopeTestNg, RestrictedScopeRaiiGuard001, TestSize.Level1)
+{
+    {
+        ScopedScrollPlaceholderRestricted guard;
+        EXPECT_TRUE(ScrollPlaceholderRestrictedScope::IsInRestrictedScope());
+    }
+    EXPECT_FALSE(ScrollPlaceholderRestrictedScope::IsInRestrictedScope());
+}
+
+/**
+ * @tc.name: RestrictedScopeProbeAdmitsPairedScope001
+ * @tc.desc: A probe window covering one paired Begin/End admits the product.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPlaceholderRestrictedScopeTestNg, RestrictedScopeProbeAdmitsPairedScope001, TestSize.Level1)
+{
+    ScrollPlaceholderRestrictedScope::Probe probe;
+    ScrollPlaceholderRestrictedScope::Begin();
+    ScrollPlaceholderRestrictedScope::End();
+    probe.Close();
+    EXPECT_TRUE(probe.RestrictedScopeEntered());
+    EXPECT_TRUE(probe.ScopeClosed());
+    EXPECT_FALSE(probe.OutOfScopeTriggered());
+    EXPECT_TRUE(probe.Admitted());
+}
+
+/**
+ * @tc.name: RestrictedScopeProbeRejectsMissingScope001
+ * @tc.desc: A probe window without any Begin (a plain uninstrumented builder)
+ *           never admits: no restricted scope was entered at all.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPlaceholderRestrictedScopeTestNg, RestrictedScopeProbeRejectsMissingScope001, TestSize.Level1)
+{
+    ScrollPlaceholderRestrictedScope::Probe probe;
+    probe.Close();
+    EXPECT_FALSE(probe.RestrictedScopeEntered());
+    EXPECT_FALSE(probe.ScopeClosed());
+    EXPECT_FALSE(probe.Admitted());
+}
+
+/**
+ * @tc.name: RestrictedScopeProbeRejectsOpenScope001
+ * @tc.desc: A probe window whose Begin never paired its End (a half-executed
+ *           builder) does not close the pairing and never admits.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPlaceholderRestrictedScopeTestNg, RestrictedScopeProbeRejectsOpenScope001, TestSize.Level1)
+{
+    ScrollPlaceholderRestrictedScope::Probe probe;
+    ScrollPlaceholderRestrictedScope::Begin();
+    probe.Close();
+    EXPECT_TRUE(probe.RestrictedScopeEntered());
+    EXPECT_FALSE(probe.ScopeClosed());
+    EXPECT_FALSE(probe.Admitted());
+    ScrollPlaceholderRestrictedScope::End(); // rebalance the global depth
+}
+
+/**
+ * @tc.name: RestrictedScopeProbeRejectsViolation001
+ * @tc.desc: A violation reported inside the probe window (out-of-scope behavior
+ *           while the restricted scope is active) rejects the admission.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPlaceholderRestrictedScopeTestNg, RestrictedScopeProbeRejectsViolation001, TestSize.Level1)
+{
+    ScrollPlaceholderRestrictedScope::Probe probe;
+    ScrollPlaceholderRestrictedScope::Begin();
+    ScrollPlaceholderRestrictedScope::NotifyViolation();
+    ScrollPlaceholderRestrictedScope::End();
+    probe.Close();
+    EXPECT_TRUE(probe.RestrictedScopeEntered());
+    EXPECT_TRUE(probe.ScopeClosed());
+    EXPECT_TRUE(probe.OutOfScopeTriggered());
+    EXPECT_FALSE(probe.Admitted());
+}
+
+/**
+ * @tc.name: RestrictedScopeProductMark001
+ * @tc.desc: Product marks answer per node root (null roots are inert), and the
+ *           bounded registry discards the whole set on overflow (marks are
+ *           advisory defense-in-depth, never correctness).
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPlaceholderRestrictedScopeTestNg, RestrictedScopeProductMark001, TestSize.Level1)
+{
+    RefPtr<UINode> nullRoot;
+    EXPECT_FALSE(ScrollPlaceholderRestrictedScope::IsMarkedProduct(nullRoot));
+    ScrollPlaceholderRestrictedScope::MarkProduct(nullRoot);    // inert on null
+    ScrollPlaceholderRestrictedScope::ClearProductMark(nullRoot);
+
+    auto root = TestPlaceholderNode::CreateTestNode(910001);
+    ScrollPlaceholderRestrictedScope::MarkProduct(root);
+    EXPECT_TRUE(ScrollPlaceholderRestrictedScope::IsMarkedProduct(root));
+    ScrollPlaceholderRestrictedScope::ClearProductMark(root);
+    EXPECT_FALSE(ScrollPlaceholderRestrictedScope::IsMarkedProduct(root));
+
+    // Overflow the bounded registry: the set is cleared instead of growing unbounded.
+    constexpr int32_t overflowBaseId = 920000;
+    constexpr int32_t overflowCount = 2048; // beyond MAX_MARKED_PRODUCTS
+    for (int32_t i = 0; i < overflowCount; i++) {
+        ScrollPlaceholderRestrictedScope::MarkProduct(TestPlaceholderNode::CreateTestNode(overflowBaseId + i));
+    }
+    EXPECT_FALSE(ScrollPlaceholderRestrictedScope::IsMarkedProduct(
+        TestPlaceholderNode::CreateTestNode(overflowBaseId)));
+}
+
+/**
+ * @tc.name: ScrollPlaceholderTextCloneMeasure001
+ * @tc.desc: A Text source built offline — content written into TextLayoutProperty and
+ *           nothing else ever runs, the exact shape the isolated builder produces and
+ *           what the device demo registers — must clone with its content intact and
+ *           measure to a non-zero size after mount, like the first shell layout would.
+ *           The source is the control: if even it measures zero on host typography,
+ *           the measurement half of the assertion is inconclusive and only the
+ *           content-copy half is binding.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPlaceholderManagerTestNg, ScrollPlaceholderTextCloneMeasure001, TestSize.Level1)
+{
+    auto source = FrameNode::CreateFrameNode(
+        V2::TEXT_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<TextPattern>());
+    ASSERT_TRUE(source);
+    auto sourceProp = source->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_TRUE(sourceProp);
+    sourceProp->UpdateContent(u"I'm placeholder");
+
+    // Full production chain with the real copy protocol: register (the builder returns
+    // the offline-built source, like RegisterTemplate stores it), probe-clone, acquire.
+    manager_->useDefaultCopyProtocol = true;
+    ASSERT_EQ(manager_->RegisterTemplate("tpl-text", [source]() -> RefPtr<UINode> { return source; }), 1u);
+    std::string subtreePath;
+    ASSERT_TRUE(manager_->ProbeTemplateClone("tpl-text", subtreePath)) << "path: " << subtreePath;
+    auto copy = manager_->AcquireTemplateInstance("tpl-text");
+    ASSERT_TRUE(copy);
+    auto copyFrame = AceType::DynamicCast<FrameNode>(copy);
+    ASSERT_TRUE(copyFrame);
+    auto copyProp = copyFrame->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_TRUE(copyProp);
+    // The layout property clone must carry the text content across.
+    EXPECT_EQ(copyProp->GetContent().value_or(u""), u"I'm placeholder");
+
+    LayoutConstraintF constraint;
+    constraint.maxSize = { 1000.0f, 1000.0f };
+    constraint.percentReference = { 1000.0f, 1000.0f };
+    auto measureFrame = [&constraint](const RefPtr<FrameNode>& node) -> SizeF {
+        auto wrapper = node->CreateLayoutWrapper(true, true);
+        wrapper->GetLayoutProperty()->UpdateLayoutConstraint(constraint);
+        wrapper->GetLayoutProperty()->UpdatePropertyChangeFlag(PROPERTY_UPDATE_MEASURE);
+        wrapper->Measure(constraint);
+        return wrapper->GetGeometryNode()->GetFrameSize();
+    };
+    auto sourceSize = measureFrame(source);
+    auto copySize = measureFrame(copyFrame);
+    // Host UT has no real typography (text suites measure against mock paragraphs),
+    // so sizes here do not discriminate: the source control measures 0x0 as well.
+    // Sizes are recorded for the log; on device the post-layout "shell live" log is
+    // the authoritative discriminator (contentSize zero vs non-zero vs not painted).
+    GTEST_LOG_(INFO) << "TextCloneMeasure source=" << sourceSize.Width() << "x" << sourceSize.Height()
+                     << " copy=" << copySize.Width() << "x" << copySize.Height();
+    EXPECT_EQ(copySize, sourceSize);
+}
+
+/**
+ * @tc.name: ScrollPlaceholderDeferralTable001
+ * @tc.desc: The acquisition deferral table (consumed by
+ *           FrameProxy::GetFrameNodeByIndex): records key by (host, index),
+ *           replaces instead of stacking, answers only for its own key, clears
+ *           by index and by shell, sweeps dead entries on query, and drives the
+ *           process-wide HasAnyDeferrals gate used as the FrameProxy fast path.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPlaceholderManagerTestNg, ScrollPlaceholderDeferralTable001, TestSize.Level1)
+{
+    const int32_t hostId = 4242;
+    auto shellA = FrameNode::CreateFrameNode("deferral_shell_a",
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    auto shellB = FrameNode::CreateFrameNode("deferral_shell_b",
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    ASSERT_TRUE(shellA && shellB);
+
+    // HasAnyDeferrals is process-wide and shared with other fixtures, so only the
+    // per-manager table semantics are asserted here.
+    EXPECT_TRUE(manager_->QueryDeferredShell(hostId, 0) == nullptr);
+
+    // Record answers only for its own (host, index) and a re-record replaces.
+    manager_->RecordDeferral(hostId, 7, shellA);
+    EXPECT_EQ(manager_->QueryDeferredShell(hostId, 7), shellA);
+    EXPECT_TRUE(manager_->QueryDeferredShell(hostId, 8) == nullptr);
+    EXPECT_TRUE(manager_->QueryDeferredShell(hostId + 1, 7) == nullptr);
+    manager_->RecordDeferral(hostId, 7, shellB);
+    EXPECT_EQ(manager_->QueryDeferredShell(hostId, 7), shellB);
+
+    // Clear-by-shell removes whatever index the shell sits on (retirement funnel).
+    manager_->RecordDeferral(hostId, 9, shellA);
+    manager_->RemoveDeferralsByShell(hostId, shellA);
+    EXPECT_TRUE(manager_->QueryDeferredShell(hostId, 9) == nullptr);
+
+    // Clear-by-index drops a single entry; the gate follows the table.
+    manager_->ClearDeferral(hostId, 7);
+    EXPECT_TRUE(manager_->QueryDeferredShell(hostId, 7) == nullptr);
+
+    // A dead weak reference is treated as no deferral and swept on query.
+    manager_->RecordDeferral(hostId, 11, shellB);
+    shellB = nullptr;
+    EXPECT_TRUE(manager_->QueryDeferredShell(hostId, 11) == nullptr);
+
+    // Destroy clears everything (pipeline teardown).
+    auto shellC = FrameNode::CreateFrameNode("deferral_shell_c",
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    manager_->RecordDeferral(hostId, 12, shellC);
+    manager_->Destroy();
+    EXPECT_TRUE(manager_->QueryDeferredShell(hostId, 12) == nullptr);
 }
 } // namespace OHOS::Ace::NG

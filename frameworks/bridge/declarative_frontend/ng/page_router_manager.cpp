@@ -1370,6 +1370,10 @@ void PageRouterManager::ReplaceOhmUrl(const RouterPageInfo& target)
 
     PopPage("", false, false);
     auto context = PipelineContext::GetCurrentContext();
+#ifndef CROSS_PLATFORM
+    auto mgr = context ? context->GetContentChangeManager() : nullptr;
+    RefPtr<FrameNode> startNode;
+#endif
     if (info.routerMode == RouterMode::SINGLE) {
         auto pageInfo = FindPageInStack(info.url);
         if (pageInfo.second) {
@@ -1379,7 +1383,18 @@ void PageRouterManager::ReplaceOhmUrl(const RouterPageInfo& target)
             if (pagePattern) {
                 pagePattern->FireOnNewParam(target.params);
             }
+#ifndef CROSS_PLATFORM
+            if (mgr && mgr->IsStartEventReportEnabled()) {
+                startNode = pageInfo.second;
+                mgr->OnContentChangeStart(startNode, ChangeType::PAGE);
+            }
+#endif
             MovePageToFront(pageInfo.first, pageInfo.second, info, false, true, false);
+#ifndef CROSS_PLATFORM
+            if (startNode && (pageRouterStack_.empty() || pageRouterStack_.back().Upgrade() != startNode)) {
+                mgr->OnPageTransitionEnd(nullptr, startNode->GetId());
+            }
+#endif
             if (!pageRouterStack_.empty()) {
                 NotifyPageTransitionEnd(context, pageRouterStack_.back().Upgrade());
             }
@@ -1394,7 +1409,20 @@ void PageRouterManager::ReplaceOhmUrl(const RouterPageInfo& target)
     }
 
     auto preStackSize = pageRouterStack_.size();
+#ifndef CROSS_PLATFORM
+    auto stageManager = context ? context->GetStageManager() : nullptr;
+    if (mgr && stageManager && mgr->IsStartEventReportEnabled()) {
+        startNode = stageManager->GetStageNode();
+        mgr->OnContentChangeStart(startNode, ChangeType::PAGE);
+    }
+#endif
     LoadPage(GenerateNextPageId(), info, false, false);
+#ifndef CROSS_PLATFORM
+    if (startNode) {
+        // The existing END dumps the new Page; clear the Stage START separately, including load failure.
+        mgr->OnPageTransitionEnd(nullptr, startNode->GetId());
+    }
+#endif
     if (pageRouterStack_.size() > preStackSize) {
         NotifyPageTransitionEnd(context, pageRouterStack_.back().Upgrade());
     }
@@ -2361,12 +2389,27 @@ void PageRouterManager::DealReplacePage(const RouterPageInfo& info)
         "router replace in old lifecycle(API version < 12), replace mode: %{public}d, url: %{public}s",
         static_cast<int32_t>(info.routerMode), info.url.c_str());
     auto context = PipelineContext::GetCurrentContext();
+#ifndef CROSS_PLATFORM
+    auto mgr = context ? context->GetContentChangeManager() : nullptr;
+    RefPtr<FrameNode> startNode;
+#endif
     PopPage("", false, false);
     if (info.routerMode == RouterMode::SINGLE) {
         auto pageInfo = FindPageInStack(info.url);
         if (pageInfo.second) {
             // find page in stack, move position and update params.
+#ifndef CROSS_PLATFORM
+            if (mgr && mgr->IsStartEventReportEnabled()) {
+                startNode = pageInfo.second;
+                mgr->OnContentChangeStart(startNode, ChangeType::PAGE);
+            }
+#endif
             MovePageToFront(pageInfo.first, pageInfo.second, info, false, true, false);
+#ifndef CROSS_PLATFORM
+            if (startNode && (pageRouterStack_.empty() || pageRouterStack_.back().Upgrade() != startNode)) {
+                mgr->OnPageTransitionEnd(nullptr, startNode->GetId());
+            }
+#endif
             if (!pageRouterStack_.empty()) {
                 NotifyPageTransitionEnd(context, pageRouterStack_.back().Upgrade());
             }
@@ -2380,7 +2423,20 @@ void PageRouterManager::DealReplacePage(const RouterPageInfo& info)
         }
     }
     auto preStackSize = pageRouterStack_.size();
+#ifndef CROSS_PLATFORM
+    auto stageManager = context ? context->GetStageManager() : nullptr;
+    if (mgr && stageManager && mgr->IsStartEventReportEnabled()) {
+        startNode = stageManager->GetStageNode();
+        mgr->OnContentChangeStart(startNode, ChangeType::PAGE);
+    }
+#endif
     LoadPage(GenerateNextPageId(), info, false, false);
+#ifndef CROSS_PLATFORM
+    if (startNode) {
+        // The existing END dumps the new Page; clear the Stage START separately, including load failure.
+        mgr->OnPageTransitionEnd(nullptr, startNode->GetId());
+    }
+#endif
     if (pageRouterStack_.size() > preStackSize) {
         NotifyPageTransitionEnd(context, pageRouterStack_.back().Upgrade());
     }
@@ -2454,6 +2510,10 @@ void PageRouterManager::ReplacePageInNewLifecycle(const RouterPageInfo& info)
     TAG_LOGI(AceLogTag::ACE_ROUTER,
         "router replace in new lifecycle(API version > 11), replace mode: %{public}d, url: %{public}s",
         static_cast<int32_t>(info.routerMode), info.url.c_str());
+#ifndef CROSS_PLATFORM
+    auto mgr = pipelineContext->GetContentChangeManager();
+    RefPtr<FrameNode> startNode;
+#endif
     auto popNode = GetCurrentPageNode();
     int32_t popIndex = static_cast<int32_t>(pageRouterStack_.size()) - 1;
     bool findPage = false;
@@ -2477,6 +2537,12 @@ void PageRouterManager::ReplacePageInNewLifecycle(const RouterPageInfo& info)
             // find page in stack, move position and update params.
 #if defined(ENABLE_SPLIT_MODE)
             stageManager->SetIsNewPageReplacing(true);
+#endif
+#ifndef CROSS_PLATFORM
+            if (mgr && mgr->IsStartEventReportEnabled()) {
+                startNode = pageInfo.second;
+                mgr->OnContentChangeStart(startNode, ChangeType::PAGE);
+            }
 #endif
             MovePageToFront(pageInfo.first, pageInfo.second, info, false, true, false);
 #if defined(ENABLE_SPLIT_MODE)
@@ -2503,6 +2569,12 @@ void PageRouterManager::ReplacePageInNewLifecycle(const RouterPageInfo& info)
 #if defined(ENABLE_SPLIT_MODE)
         stageManager->SetIsNewPageReplacing(true);
 #endif
+#ifndef CROSS_PLATFORM
+        if (mgr && mgr->IsStartEventReportEnabled()) {
+            startNode = stageManager->GetStageNode();
+            mgr->OnContentChangeStart(startNode, ChangeType::PAGE);
+        }
+#endif
         LoadPage(GenerateNextPageId(), info, true, false);
 #if defined(ENABLE_SPLIT_MODE)
         stageManager->SetIsNewPageReplacing(false);
@@ -2510,6 +2582,11 @@ void PageRouterManager::ReplacePageInNewLifecycle(const RouterPageInfo& info)
         isNewPageReplacing_ = false;
     }
     if (popIndex < 0 || popNode == GetCurrentPageNode() || GetPageIndex(popNode) != popIndex) {
+#ifndef CROSS_PLATFORM
+        if (startNode) {
+            mgr->OnPageTransitionEnd(nullptr, startNode->GetId());
+        }
+#endif
         return;
     }
     auto iter = pageRouterStack_.begin();
@@ -2537,6 +2614,12 @@ void PageRouterManager::ReplacePageInNewLifecycle(const RouterPageInfo& info)
     PopPage("", false, false);
 #if defined(ENABLE_SPLIT_MODE)
     stageManager->SetIsNewPageReplacing(false);
+#endif
+#ifndef CROSS_PLATFORM
+    if (startNode && (pageRouterStack_.empty() || pageRouterStack_.size() >= preStackSize ||
+        pageRouterStack_.back().Upgrade() != startNode)) {
+        mgr->OnPageTransitionEnd(nullptr, startNode->GetId());
+    }
 #endif
     if (!pageRouterStack_.empty() && pageRouterStack_.size() < preStackSize) {
         NotifyPageTransitionEnd(pipelineContext, pageRouterStack_.back().Upgrade());

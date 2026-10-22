@@ -24,6 +24,13 @@
 
 namespace OHOS::Ace::NG {
 namespace {
+struct TargetIndexBenchMark {
+    int32_t benchmarkIndex = 0;
+    int32_t mainStartIndex = 0;
+    int32_t headOfMainStartLine = 0;
+    int32_t firstLineReserve = 0;
+};
+
 void UpdateGridItemRowAndColumnInfo(const RefPtr<LayoutWrapper>& itemLayoutWrapper, GridItemIndexInfo irregualItemInfo)
 {
     auto gridItemHost = itemLayoutWrapper->GetHostNode();
@@ -31,6 +38,62 @@ void UpdateGridItemRowAndColumnInfo(const RefPtr<LayoutWrapper>& itemLayoutWrapp
     auto gridItemPattern = gridItemHost->GetPattern<GridItemPattern>();
     CHECK_NULL_VOID(gridItemPattern);
     gridItemPattern->SetIrregularItemInfo(irregualItemInfo);
+}
+
+bool TryGetLastLineResumePlaceStart(const std::map<int32_t, int32_t>& lastLine, int32_t crossCount,
+    int32_t nextCrossStart, int32_t nextCrossSpan, int32_t& placeStart)
+{
+    if (lastLine.empty() || crossCount <= 0) {
+        return false;
+    }
+    const int32_t cursor = lastLine.rbegin()->first + 1;
+    const int32_t span = nextCrossSpan < 1 ? 1 : nextCrossSpan;
+    int32_t start = nextCrossStart;
+    if (start < 0 || start >= crossCount) {
+        start = -1;
+    }
+    placeStart = start >= 0 ? start : cursor;
+    if (placeStart < cursor || placeStart + span > crossCount) {
+        return false;
+    }
+    for (int32_t col = placeStart; col < placeStart + span; ++col) {
+        if (lastLine.find(col) != lastLine.end()) {
+            return false;
+        }
+    }
+    return true;
+}
+
+void InitTargetBenchmarkFromLastLine(const std::map<int32_t, int32_t>& lastLine, int32_t lastLineIndex,
+    const std::pair<int32_t, int32_t>& nextPos, TargetIndexBenchMark& bench)
+{
+    if (lastLine.empty()) {
+        return;
+    }
+    const int32_t crossCount = bench.firstLineReserve;
+    bench.benchmarkIndex = lastLine.rbegin()->second + 1;
+    int32_t placeStart = 0;
+    if (TryGetLastLineResumePlaceStart(lastLine, crossCount, nextPos.first, nextPos.second, placeStart)) {
+        bench.mainStartIndex = lastLineIndex;
+        bench.headOfMainStartLine = lastLine.begin()->second;
+        bench.firstLineReserve = crossCount - placeStart;
+        return;
+    }
+    bench.mainStartIndex = lastLineIndex + 1;
+    bench.headOfMainStartLine = bench.benchmarkIndex;
+}
+
+void ApplyTargetIndexInfo(GridLayoutInfo& info, int32_t mainStartIndex, int32_t headOfMainStartLine)
+{
+    info.startMainLineIndex_ = mainStartIndex;
+    info.startIndex_ = headOfMainStartLine;
+    info.endIndex_ = headOfMainStartLine - 1;
+    info.prevOffset_ = 0;
+    info.currentOffset_ = 0;
+    info.ResetPositionFlags();
+    info.gridMatrix_.clear();
+    info.lineHeightMap_.clear();
+    info.irregularItemsPosition_.clear();
 }
 } // namespace
 
@@ -86,28 +149,30 @@ void GridScrollWithOptionsLayoutAlgorithm::LargeItemLineHeight(const RefPtr<Layo
 void GridScrollWithOptionsLayoutAlgorithm::GetTargetIndexInfoWithBenchMark(
     LayoutWrapper* layoutWrapper, bool isTargetBackward, int32_t targetIndex)
 {
-    int32_t benchmarkIndex = (isTargetBackward && !info_.gridMatrix_.empty())
-                                 ? info_.gridMatrix_.rbegin()->second.rbegin()->second + 1
-                                 : 0;
-    int32_t mainStartIndex = (isTargetBackward && !info_.gridMatrix_.empty())
-                                 ? info_.gridMatrix_.rbegin()->first + 1
-                                 : 0;
-    int32_t currentIndex = benchmarkIndex;
-    int32_t headOfMainStartLine = currentIndex;
     auto layoutProperty = DynamicCast<GridLayoutProperty>(layoutWrapper->GetLayoutProperty());
     CHECK_NULL_VOID(layoutProperty);
     const auto& options = *layoutProperty->GetLayoutOptions();
+    TargetIndexBenchMark bench;
+    bench.firstLineReserve = info_.crossCount_;
+    if (isTargetBackward && !info_.gridMatrix_.empty() && !info_.gridMatrix_.rbegin()->second.empty()) {
+        const auto lastLineIter = info_.gridMatrix_.rbegin();
+        const auto& lastLine = lastLineIter->second;
+        auto nextPos = GetCrossStartAndSpan(options, lastLine.rbegin()->second + 1);
+        InitTargetBenchmarkFromLastLine(lastLine, lastLineIter->first, nextPos, bench);
+    }
+    int32_t currentIndex = bench.benchmarkIndex;
+    int32_t lineReserve = bench.firstLineReserve;
     while (currentIndex < targetIndex) {
-        int32_t crossGridReserve = info_.crossCount_;
+        int32_t crossGridReserve = lineReserve;
+        lineReserve = info_.crossCount_;
         /* go through a new line */
         while ((crossGridReserve > 0) && (currentIndex <= targetIndex)) {
-            auto crossPos = GetCrossStartAndSpan(options, currentIndex);
-            auto gridSpan = crossPos.second;
+            auto gridSpan = GetCrossStartAndSpan(options, currentIndex).second;
             if (crossGridReserve >= gridSpan) {
                 crossGridReserve -= gridSpan;
             } else if (info_.crossCount_ >= gridSpan) {
-                ++mainStartIndex;
-                headOfMainStartLine = currentIndex;
+                ++bench.mainStartIndex;
+                bench.headOfMainStartLine = currentIndex;
                 crossGridReserve = info_.crossCount_ - gridSpan;
             }
             ++currentIndex;
@@ -115,18 +180,10 @@ void GridScrollWithOptionsLayoutAlgorithm::GetTargetIndexInfoWithBenchMark(
         if (currentIndex > targetIndex) {
             break;
         }
-        ++mainStartIndex;
-        headOfMainStartLine = currentIndex;
+        ++bench.mainStartIndex;
+        bench.headOfMainStartLine = currentIndex;
     }
-    info_.startMainLineIndex_ = mainStartIndex;
-    info_.startIndex_ = headOfMainStartLine;
-    info_.endIndex_ = headOfMainStartLine - 1;
-    info_.prevOffset_ = 0;
-    info_.currentOffset_ = 0;
-    info_.ResetPositionFlags();
-    info_.gridMatrix_.clear();
-    info_.lineHeightMap_.clear();
-    info_.irregularItemsPosition_.clear();
+    ApplyTargetIndexInfo(info_, bench.mainStartIndex, bench.headOfMainStartLine);
 }
 
 std::pair<int32_t, int32_t> GridScrollWithOptionsLayoutAlgorithm::GetCrossStartAndSpan(

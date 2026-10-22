@@ -32,7 +32,8 @@ bool ViewPosReference::operator==(const ViewPosReference& other) const
            NearEqual(stickyInsetEnd, other.stickyInsetEnd) &&
            NearEqual(referencePos, other.referencePos) &&
            referenceEdge == other.referenceEdge &&
-           axis == other.axis;
+           axis == other.axis && knownMainSize.has_value() == other.knownMainSize.has_value() &&
+           (!knownMainSize || NearEqual(knownMainSize.value(), other.knownMainSize.value()));
 }
 
 // Static methods for LayoutConstraintT

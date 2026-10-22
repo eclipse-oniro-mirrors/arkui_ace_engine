@@ -2106,7 +2106,7 @@ class JSTextArea extends JSViewAbstract {
     if (value === null || value === undefined) {
       return;
     }
-    getUINativeModule().textArea.setPlaceholderFont(true, value?.size, value?.weight, value?.family, value?.style);
+    getUINativeModule().textArea.setPlaceholderFontJs(true, value?.size, value?.weight, value?.family, value?.style);
   }
   static backgroundColor(value: any): void {
     getUINativeModule().textArea.setBackgroundColor(true, value);

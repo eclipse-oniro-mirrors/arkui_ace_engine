@@ -71,9 +71,9 @@ RefPtr<FrameNode> ToggleModelStatic::CreateFrameNode(int32_t nodeId, ToggleType 
         case ToggleType::BUTTON: {
             auto buttonModifier = NodeModifier::GetButtonCustomModifier();
             CHECK_NULL_RETURN(buttonModifier, nullptr);
-            auto* rawPattern = reinterpret_cast<Pattern*>(buttonModifier->createToggleButtonPattern());
-            CHECK_NULL_RETURN(rawPattern, nullptr);
-            return FrameNode::CreateFrameNode(TOGGLE_ETS_TAG, nodeId, AceType::Claim(rawPattern));
+            auto buttonPattern = buttonModifier->createToggleButtonPattern();
+            CHECK_NULL_RETURN(buttonPattern, nullptr);
+            return FrameNode::CreateFrameNode(TOGGLE_ETS_TAG, nodeId, buttonPattern);
         }
         default: {
             return FrameNode::CreateFrameNode(TOGGLE_ETS_TAG, nodeId, AceType::MakeRefPtr<SwitchPattern>());

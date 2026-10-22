@@ -84,6 +84,22 @@ RefPtr<NavDestinationGroupNode> CreateNavDestinationWithToolBar(
     navdestinationModel.SetToolBarOptions(std::move(options));
     return AceType::DynamicCast<NavDestinationGroupNode>(ViewStackProcessor::GetInstance()->Finish());
 }
+
+void ApplyNavStrategies(const std::unordered_set<ImmersiveStrategy>& strategies)
+{
+    auto safeAreaManager = MockPipelineContext::GetCurrent()->GetSafeAreaManager();
+    ASSERT_NE(safeAreaManager, nullptr);
+    safeAreaManager->ApplyDefaultImmersiveStrategy(strategies);
+}
+
+std::optional<BarStyle> GetNavDestinationTitleBarStyle(const RefPtr<NavDestinationGroupNode>& node)
+{
+    auto pattern = node->GetPattern<NavDestinationPatternBase>();
+    if (!pattern) {
+        return std::nullopt;
+    }
+    return pattern->GetTitleBarStyle();
+}
 } // namespace
 
 class BarStyleTestNg : public testing::Test {
@@ -1318,5 +1334,371 @@ HWTEST_F(BarStyleTestNg, toolBarStyleTest012, TestSize.Level1)
      * @tc.steps: step4. property 'safeAreaPadding' should be nullptr cause no SAFE_AREA_PADDING barStyle set.
      */
     ASSERT_NE(safeAreaPadding, nullptr);
+}
+
+/**
+ * @tc.name: ImmersiveStrategy_NavSafeAreaPadding_DefaultSafeAreaPadding001
+ * @tc.desc: strategy enabled + no explicit barStyle -> Navigation and NavDestination
+ *           default to SAFE_AREA_PADDING on title bar.
+ * @tc.type: FUNC
+ */
+HWTEST_F(BarStyleTestNg, ImmersiveStrategy_NavSafeAreaPadding_DefaultSafeAreaPadding001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. enable NAVIGATION_EXPAND_SAFE_AREA strategy.
+     */
+    ApplyNavStrategies({ ImmersiveStrategy::NAVIGATION_EXPAND_SAFE_AREA });
+    /**
+     * @tc.steps: step2. create Navigation with title options but no explicit barStyle.
+     */
+    auto mockNavPathStack = AceType::MakeRefPtr<MockNavigationStack>();
+    NavigationTitlebarOptions options;
+    auto navigationNode = CreateNavigationWithTitle(
+        mockNavPathStack, options, NavigationTitleMode::MINI, "navigation", std::nullopt);
+    ASSERT_NE(navigationNode, nullptr);
+    /**
+     * @tc.steps: step3. check the pattern-level barStyle is injected as SAFE_AREA_PADDING.
+     */
+    auto navBarNode = AceType::DynamicCast<NavDestinationNodeBase>(navigationNode->GetNavBarNode());
+    ASSERT_NE(navBarNode, nullptr);
+    auto navBarPattern = navBarNode->GetPattern<NavDestinationPatternBase>();
+    ASSERT_NE(navBarPattern, nullptr);
+    EXPECT_EQ(navBarPattern->GetTitleBarStyle(), BarStyle::SAFE_AREA_PADDING);
+    auto titleBarOfNavBar = AceType::DynamicCast<TitleBarNode>(navBarNode->GetTitleBarNode());
+    ASSERT_NE(titleBarOfNavBar, nullptr);
+    auto patternOfNavBarTitleBar = titleBarOfNavBar->GetPattern<TitleBarPattern>();
+    ASSERT_NE(patternOfNavBarTitleBar, nullptr);
+    EXPECT_EQ(patternOfNavBarTitleBar->GetTitleBarOptions().brOptions.barStyle, BarStyle::SAFE_AREA_PADDING);
+    /**
+     * @tc.steps: step4. check NavDestination title bar also defaults to SAFE_AREA_PADDING.
+     */
+    NavigationTitlebarOptions destOptions;
+    auto navDestination = CreateNavDestinationWithTitle(destOptions, "navDestination", std::nullopt);
+    ASSERT_NE(navDestination, nullptr);
+    EXPECT_EQ(GetNavDestinationTitleBarStyle(navDestination), BarStyle::SAFE_AREA_PADDING);
+    /**
+     * @tc.steps: step5. run layout and check content safe area padding is applied so that
+     *            content can extend into the bar area (same as explicit SAFE_AREA_PADDING).
+     */
+    auto navigationPattern = navigationNode->GetPattern<NavigationPattern>();
+    ASSERT_NE(navigationPattern, nullptr);
+    navigationPattern->OnModifyDone();
+    auto layoutWrapper = navigationNode->CreateLayoutWrapper();
+    ASSERT_NE(layoutWrapper, nullptr);
+    auto context = PipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    context->taskExecutor_ = AceType::MakeRefPtr<MockTaskExecutor>();
+    BarStyleTestNg::RunMeasureAndLayout(layoutWrapper);
+    auto navBar = AceType::DynamicCast<NavBarNode>(navigationNode->GetNavBarNode());
+    ASSERT_NE(navBar, nullptr);
+    auto navBarContent = AceType::DynamicCast<FrameNode>(navBar->GetContentNode());
+    ASSERT_NE(navBarContent, nullptr);
+    auto contentLayoutProperty = navBarContent->GetLayoutProperty();
+    ASSERT_NE(contentLayoutProperty, nullptr);
+    const auto& safeAreaPadding = contentLayoutProperty->GetSafeAreaPaddingProperty();
+    ASSERT_NE(safeAreaPadding, nullptr);
+    EXPECT_EQ(safeAreaPadding->top.value_or(CalcLength(0.0f)),
+        CalcLength(SINGLE_LINE_TITLEBAR_HEIGHT.ConvertToPx()));
+    ApplyNavStrategies({});
+}
+
+/**
+ * @tc.name: ImmersiveStrategy_Toolbar_DefaultSafeAreaPadding002
+ * @tc.desc: strategy enabled + no explicit barStyle -> toolbar defaults to
+ *           SAFE_AREA_PADDING symmetrically.
+ * @tc.type: FUNC
+ */
+HWTEST_F(BarStyleTestNg, ImmersiveStrategy_Toolbar_DefaultSafeAreaPadding002, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. enable NAVIGATION_EXPAND_SAFE_AREA strategy.
+     */
+    ApplyNavStrategies({ ImmersiveStrategy::NAVIGATION_EXPAND_SAFE_AREA });
+    /**
+     * @tc.steps: step2. create Navigation with toolbar but no explicit barStyle.
+     */
+    NavigationToolbarOptions options;
+    std::vector<BarItem> toolbarItems = { BarItem() };
+    auto navigationNode = CreateNavigationWithToolBar(
+        AceType::MakeRefPtr<MockNavigationStack>(), std::move(options), std::move(toolbarItems));
+    ASSERT_NE(navigationNode, nullptr);
+    auto navBarNode = AceType::DynamicCast<NavDestinationNodeBase>(navigationNode->GetNavBarNode());
+    ASSERT_NE(navBarNode, nullptr);
+    auto navBarPattern = navBarNode->GetPattern<NavDestinationPatternBase>();
+    ASSERT_NE(navBarPattern, nullptr);
+    EXPECT_EQ(navBarPattern->GetToolBarStyle(), BarStyle::SAFE_AREA_PADDING);
+    /**
+     * @tc.steps: step3. check NavDestination toolbar also defaults to SAFE_AREA_PADDING.
+     */
+    NavigationToolbarOptions destOptions;
+    std::vector<BarItem> destToolbarItems = { BarItem() };
+    auto navDestination = CreateNavDestinationWithToolBar(
+        std::move(destOptions), std::move(destToolbarItems));
+    ASSERT_NE(navDestination, nullptr);
+    auto destPattern = navDestination->GetPattern<NavDestinationPatternBase>();
+    ASSERT_NE(destPattern, nullptr);
+    EXPECT_EQ(destPattern->GetToolBarStyle(), BarStyle::SAFE_AREA_PADDING);
+    ApplyNavStrategies({});
+}
+
+/**
+ * @tc.name: ImmersiveStrategy_NotEnabled_DefaultStandard003
+ * @tc.desc: strategy not enabled -> barStyle stays unset (nullopt), behavior
+ *           unchanged (STANDARD fallback).
+ * @tc.type: FUNC
+ */
+HWTEST_F(BarStyleTestNg, ImmersiveStrategy_NotEnabled_DefaultStandard003, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. make sure no strategy is applied.
+     */
+    ApplyNavStrategies({});
+    /**
+     * @tc.steps: step2. create Navigation with title options but no explicit barStyle.
+     */
+    auto mockNavPathStack = AceType::MakeRefPtr<MockNavigationStack>();
+    NavigationTitlebarOptions options;
+    auto navigationNode = CreateNavigationWithTitle(
+        mockNavPathStack, options, NavigationTitleMode::FREE, "navigation", std::nullopt);
+    ASSERT_NE(navigationNode, nullptr);
+    auto navBarNode = AceType::DynamicCast<NavDestinationNodeBase>(navigationNode->GetNavBarNode());
+    ASSERT_NE(navBarNode, nullptr);
+    auto navBarPattern = navBarNode->GetPattern<NavDestinationPatternBase>();
+    ASSERT_NE(navBarPattern, nullptr);
+    EXPECT_FALSE(navBarPattern->GetTitleBarStyle().has_value());
+    EXPECT_EQ(navBarPattern->GetTitleBarStyle().value_or(BarStyle::STANDARD), BarStyle::STANDARD);
+    /**
+     * @tc.steps: step3. layout keeps original SAFE_AREA behavior: no safe area padding injected.
+     */
+    auto navigationPattern = navigationNode->GetPattern<NavigationPattern>();
+    ASSERT_NE(navigationPattern, nullptr);
+    navigationPattern->OnModifyDone();
+    auto layoutWrapper = navigationNode->CreateLayoutWrapper();
+    ASSERT_NE(layoutWrapper, nullptr);
+    auto context = PipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    context->taskExecutor_ = AceType::MakeRefPtr<MockTaskExecutor>();
+    BarStyleTestNg::RunMeasureAndLayout(layoutWrapper);
+    auto navBar = AceType::DynamicCast<NavBarNode>(navigationNode->GetNavBarNode());
+    ASSERT_NE(navBar, nullptr);
+    auto navBarContent = AceType::DynamicCast<FrameNode>(navBar->GetContentNode());
+    ASSERT_NE(navBarContent, nullptr);
+    auto contentLayoutProperty = navBarContent->GetLayoutProperty();
+    ASSERT_NE(contentLayoutProperty, nullptr);
+    EXPECT_EQ(contentLayoutProperty->GetSafeAreaPaddingProperty(), nullptr);
+}
+
+/**
+ * @tc.name: ImmersiveStrategy_ExplicitStack_OverridesStrategy004
+ * @tc.desc: strategy enabled + explicit barStyle STACK -> developer setting wins,
+ *           strategy does not inject.
+ * @tc.type: FUNC
+ */
+HWTEST_F(BarStyleTestNg, ImmersiveStrategy_ExplicitStack_OverridesStrategy004, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. enable NAVIGATION_EXPAND_SAFE_AREA strategy.
+     */
+    ApplyNavStrategies({ ImmersiveStrategy::NAVIGATION_EXPAND_SAFE_AREA });
+    /**
+     * @tc.steps: step2. create Navigation with explicit STACK barStyle.
+     */
+    auto mockNavPathStack = AceType::MakeRefPtr<MockNavigationStack>();
+    NavigationTitlebarOptions options;
+    options.brOptions.barStyle = BarStyle::STACK;
+    auto navigationNode = CreateNavigationWithTitle(
+        mockNavPathStack, options, NavigationTitleMode::FREE, "navigation", std::nullopt);
+    ASSERT_NE(navigationNode, nullptr);
+    auto navBarNode = AceType::DynamicCast<NavDestinationNodeBase>(navigationNode->GetNavBarNode());
+    ASSERT_NE(navBarNode, nullptr);
+    auto navBarPattern = navBarNode->GetPattern<NavDestinationPatternBase>();
+    ASSERT_NE(navBarPattern, nullptr);
+    EXPECT_EQ(navBarPattern->GetTitleBarStyle(), BarStyle::STACK);
+    auto titleBarOfNavBar = AceType::DynamicCast<TitleBarNode>(navBarNode->GetTitleBarNode());
+    ASSERT_NE(titleBarOfNavBar, nullptr);
+    auto patternOfNavBarTitleBar = titleBarOfNavBar->GetPattern<TitleBarPattern>();
+    ASSERT_NE(patternOfNavBarTitleBar, nullptr);
+    EXPECT_EQ(patternOfNavBarTitleBar->GetTitleBarOptions().brOptions.barStyle, BarStyle::STACK);
+    /**
+     * @tc.steps: step3. explicit SAFE_AREA_PADDING also wins (kept as developer value).
+     */
+    NavigationTitlebarOptions paddingOptions;
+    paddingOptions.brOptions.barStyle = BarStyle::SAFE_AREA_PADDING;
+    auto paddingNode = CreateNavigationWithTitle(
+        AceType::MakeRefPtr<MockNavigationStack>(), paddingOptions, NavigationTitleMode::FREE,
+        "navigationPadding", std::nullopt);
+    ASSERT_NE(paddingNode, nullptr);
+    auto paddingNavBarNode = AceType::DynamicCast<NavDestinationNodeBase>(paddingNode->GetNavBarNode());
+    ASSERT_NE(paddingNavBarNode, nullptr);
+    auto paddingNavBarPattern = paddingNavBarNode->GetPattern<NavDestinationPatternBase>();
+    ASSERT_NE(paddingNavBarPattern, nullptr);
+    EXPECT_EQ(paddingNavBarPattern->GetTitleBarStyle(), BarStyle::SAFE_AREA_PADDING);
+    ApplyNavStrategies({});
+}
+
+/**
+ * @tc.name: ImmersiveStrategy_BarStyle_DynamicChange_UsesLatest005
+ * @tc.desc: strategy injected SAFE_AREA_PADDING first, then developer sets STANDARD
+ *           -> latest setting wins.
+ * @tc.type: FUNC
+ */
+HWTEST_F(BarStyleTestNg, ImmersiveStrategy_BarStyle_DynamicChange_UsesLatest005, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. enable strategy and create Navigation without barStyle (injected).
+     */
+    ApplyNavStrategies({ ImmersiveStrategy::NAVIGATION_EXPAND_SAFE_AREA });
+    auto mockNavPathStack = AceType::MakeRefPtr<MockNavigationStack>();
+    NavigationTitlebarOptions options;
+    auto navigationNode = CreateNavigationWithTitle(
+        mockNavPathStack, options, NavigationTitleMode::FREE, "navigation", std::nullopt);
+    ASSERT_NE(navigationNode, nullptr);
+    auto navBarNode = AceType::DynamicCast<NavDestinationNodeBase>(navigationNode->GetNavBarNode());
+    ASSERT_NE(navBarNode, nullptr);
+    auto navBarPattern = navBarNode->GetPattern<NavDestinationPatternBase>();
+    ASSERT_NE(navBarPattern, nullptr);
+    EXPECT_EQ(navBarPattern->GetTitleBarStyle(), BarStyle::SAFE_AREA_PADDING);
+    /**
+     * @tc.steps: step2. developer dynamically sets barStyle to STANDARD via update path.
+     */
+    NavigationTitlebarOptions updateOptions;
+    updateOptions.brOptions.barStyle = BarStyle::STANDARD;
+    NavigationModelNG::SetTitlebarOptions(AceType::RawPtr(navigationNode), std::move(updateOptions));
+    /**
+     * @tc.steps: step3. latest developer setting wins.
+     */
+    EXPECT_EQ(navBarPattern->GetTitleBarStyle(), BarStyle::STANDARD);
+    ApplyNavStrategies({});
+}
+
+/**
+ * @tc.name: ImmersiveStrategy_BarStyleUndefined_StrategyReinject006
+ * @tc.desc: developer sets barStyle to undefined -> falls back to unset state,
+ *           strategy re-injects default.
+ * @tc.type: FUNC
+ */
+HWTEST_F(BarStyleTestNg, ImmersiveStrategy_BarStyleUndefined_StrategyReinject006, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. enable strategy and create Navigation with explicit STACK.
+     */
+    ApplyNavStrategies({ ImmersiveStrategy::NAVIGATION_EXPAND_SAFE_AREA });
+    auto mockNavPathStack = AceType::MakeRefPtr<MockNavigationStack>();
+    NavigationTitlebarOptions options;
+    options.brOptions.barStyle = BarStyle::STACK;
+    auto navigationNode = CreateNavigationWithTitle(
+        mockNavPathStack, options, NavigationTitleMode::FREE, "navigation", std::nullopt);
+    ASSERT_NE(navigationNode, nullptr);
+    auto navBarNode = AceType::DynamicCast<NavDestinationNodeBase>(navigationNode->GetNavBarNode());
+    ASSERT_NE(navBarNode, nullptr);
+    auto navBarPattern = navBarNode->GetPattern<NavDestinationPatternBase>();
+    ASSERT_NE(navBarPattern, nullptr);
+    EXPECT_EQ(navBarPattern->GetTitleBarStyle(), BarStyle::STACK);
+    /**
+     * @tc.steps: step2. developer sets barStyle to undefined (nullopt, same semantics as unset).
+     */
+    NavigationTitlebarOptions undefinedOptions;
+    NavigationModelNG::SetTitlebarOptions(AceType::RawPtr(navigationNode), std::move(undefinedOptions));
+    /**
+     * @tc.steps: step3. strategy re-injects SAFE_AREA_PADDING.
+     */
+    EXPECT_EQ(navBarPattern->GetTitleBarStyle(), BarStyle::SAFE_AREA_PADDING);
+    ApplyNavStrategies({});
+}
+
+/**
+ * @tc.name: ImmersiveStrategy_DynamicModify_AllInstancesUpdated007
+ * @tc.desc: strategy dynamically enabled/disabled -> all Navigation instances
+ *           without explicit barStyle follow the latest strategy.
+ * @tc.type: FUNC
+ */
+HWTEST_F(BarStyleTestNg, ImmersiveStrategy_DynamicModify_AllInstancesUpdated007, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. no strategy: Navigation A stays unset.
+     */
+    ApplyNavStrategies({});
+    NavigationTitlebarOptions optionsA;
+    auto navigationNodeA = CreateNavigationWithTitle(
+        AceType::MakeRefPtr<MockNavigationStack>(), optionsA, NavigationTitleMode::FREE,
+        "navigationA", std::nullopt);
+    ASSERT_NE(navigationNodeA, nullptr);
+    auto navBarNodeA = AceType::DynamicCast<NavDestinationNodeBase>(navigationNodeA->GetNavBarNode());
+    ASSERT_NE(navBarNodeA, nullptr);
+    auto navBarPatternA = navBarNodeA->GetPattern<NavDestinationPatternBase>();
+    ASSERT_NE(navBarPatternA, nullptr);
+    EXPECT_FALSE(navBarPatternA->GetTitleBarStyle().has_value());
+    /**
+     * @tc.steps: step2. enable strategy: newly created Navigation B gets the default.
+     */
+    ApplyNavStrategies({ ImmersiveStrategy::NAVIGATION_EXPAND_SAFE_AREA });
+    NavigationTitlebarOptions optionsB;
+    auto navigationNodeB = CreateNavigationWithTitle(
+        AceType::MakeRefPtr<MockNavigationStack>(), optionsB, NavigationTitleMode::FREE,
+        "navigationB", std::nullopt);
+    ASSERT_NE(navigationNodeB, nullptr);
+    auto navBarNodeB = AceType::DynamicCast<NavDestinationNodeBase>(navigationNodeB->GetNavBarNode());
+    ASSERT_NE(navBarNodeB, nullptr);
+    auto navBarPatternB = navBarNodeB->GetPattern<NavDestinationPatternBase>();
+    ASSERT_NE(navBarPatternB, nullptr);
+    EXPECT_EQ(navBarPatternB->GetTitleBarStyle(), BarStyle::SAFE_AREA_PADDING);
+    /**
+     * @tc.steps: step3. re-apply title options on A (re-render path): A follows the latest strategy.
+     */
+    NavigationTitlebarOptions refreshOptionsA;
+    NavigationModelNG::SetTitlebarOptions(AceType::RawPtr(navigationNodeA), std::move(refreshOptionsA));
+    EXPECT_EQ(navBarPatternA->GetTitleBarStyle(), BarStyle::SAFE_AREA_PADDING);
+    /**
+     * @tc.steps: step4. disable strategy: newly created Navigation C stays unset and B reverts
+     *            through the re-render path.
+     */
+    ApplyNavStrategies({});
+    NavigationTitlebarOptions optionsC;
+    auto navigationNodeC = CreateNavigationWithTitle(
+        AceType::MakeRefPtr<MockNavigationStack>(), optionsC, NavigationTitleMode::FREE,
+        "navigationC", std::nullopt);
+    ASSERT_NE(navigationNodeC, nullptr);
+    auto navBarNodeC = AceType::DynamicCast<NavDestinationNodeBase>(navigationNodeC->GetNavBarNode());
+    ASSERT_NE(navBarNodeC, nullptr);
+    auto navBarPatternC = navBarNodeC->GetPattern<NavDestinationPatternBase>();
+    ASSERT_NE(navBarPatternC, nullptr);
+    EXPECT_FALSE(navBarPatternC->GetTitleBarStyle().has_value());
+    NavigationTitlebarOptions refreshOptionsB;
+    NavigationModelNG::SetTitlebarOptions(AceType::RawPtr(navigationNodeB), std::move(refreshOptionsB));
+    EXPECT_FALSE(navBarPatternB->GetTitleBarStyle().has_value());
+}
+
+/**
+ * @tc.name: ImmersiveStrategy_WithLegacyStrategies_NoConflict008
+ * @tc.desc: NAVIGATION_EXPAND_SAFE_AREA coexists with AVOID_CUTOUT/AVOID_FLOAT_NAV
+ *           without conflict.
+ * @tc.type: FUNC
+ */
+HWTEST_F(BarStyleTestNg, ImmersiveStrategy_WithLegacyStrategies_NoConflict008, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. apply all three strategies together.
+     */
+    ApplyNavStrategies({ ImmersiveStrategy::AVOID_CUTOUT, ImmersiveStrategy::AVOID_FLOAT_NAV,
+        ImmersiveStrategy::NAVIGATION_EXPAND_SAFE_AREA });
+    auto safeAreaManager = MockPipelineContext::GetCurrent()->GetSafeAreaManager();
+    ASSERT_NE(safeAreaManager, nullptr);
+    EXPECT_TRUE(safeAreaManager->IsImmersiveStrategySet(ImmersiveStrategy::AVOID_CUTOUT));
+    EXPECT_TRUE(safeAreaManager->IsImmersiveStrategySet(ImmersiveStrategy::AVOID_FLOAT_NAV));
+    EXPECT_TRUE(safeAreaManager->IsImmersiveStrategySet(ImmersiveStrategy::NAVIGATION_EXPAND_SAFE_AREA));
+    /**
+     * @tc.steps: step2. Navigation default barStyle follows NAVIGATION_EXPAND_SAFE_AREA.
+     */
+    NavigationTitlebarOptions options;
+    auto navigationNode = CreateNavigationWithTitle(
+        AceType::MakeRefPtr<MockNavigationStack>(), options, NavigationTitleMode::FREE,
+        "navigation", std::nullopt);
+    ASSERT_NE(navigationNode, nullptr);
+    auto navBarNode = AceType::DynamicCast<NavDestinationNodeBase>(navigationNode->GetNavBarNode());
+    ASSERT_NE(navBarNode, nullptr);
+    auto navBarPattern = navBarNode->GetPattern<NavDestinationPatternBase>();
+    ASSERT_NE(navBarPattern, nullptr);
+    EXPECT_EQ(navBarPattern->GetTitleBarStyle(), BarStyle::SAFE_AREA_PADDING);
+    ApplyNavStrategies({});
 }
 } // namespace OHOS::Ace::NG

@@ -47,6 +47,9 @@ public:
     MOCK_METHOD(std::string, GetSelectionText, (), (const, override));
     MOCK_METHOD(bool, IsAILink, (), (const, override));
     MOCK_METHOD(int, GetSourceTypeV2, (), (const, override));
+    MOCK_METHOD(bool, ShouldOfferLinkToText, (), (const, override));
+    MOCK_METHOD(bool, IsOverTextFragment, (), (const, override));
+    MOCK_METHOD(std::string, GetTextFragmentGeneratedLink, (), (const, override));
 };
 
 class MockWebContextSelectOverlay : public WebContextSelectOverlay {
@@ -82,6 +85,8 @@ public:
     MOCK_METHOD(void, Redo, (), (const, override));
     MOCK_METHOD(void, PasteAndMatchStyle, (), (const, override));
     MOCK_METHOD(void, RequestPasswordAutoFill, (), (const, override));
+    MOCK_METHOD(void, CopyLinkToTextMenu, (), (const, override));
+    MOCK_METHOD(void, RemoveFragments, (), (const, override));
 };
 } // namespace
 
@@ -1632,6 +1637,31 @@ HWTEST_F(WebPatternPartOneTest, OnWebMediaNetworkProxyEnabledUpdate_001, TestSiz
     webPattern->UpdateWebMediaNetworkProxyEnabled(false);
     webPattern->OnWebMediaNetworkProxyEnabledUpdate(false);
     auto isEnabled = webPattern->GetWebMediaNetworkProxyEnabled();
+    ASSERT_EQ(isEnabled, false);
+#endif
+}
+
+/**
+ * @tc.name: OnWebBlankScreenMonitorEnabledUpdate_001
+ * @tc.desc: Test OnWebBlankScreenMonitorEnabledUpdate function.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternPartOneTest, OnWebBlankScreenMonitorEnabledUpdate_001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    stack->Push(frameNode);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->OnModifyDone();
+    ASSERT_NE(webPattern->delegate_, nullptr);
+    webPattern->UpdateWebBlankScreenMonitorEnabled(false);
+    webPattern->OnWebBlankScreenMonitorEnabledUpdate(false);
+    auto isEnabled = webPattern->GetWebBlankScreenMonitorEnabled();
     ASSERT_EQ(isEnabled, false);
 #endif
 }

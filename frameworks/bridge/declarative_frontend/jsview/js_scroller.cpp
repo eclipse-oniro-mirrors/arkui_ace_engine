@@ -83,6 +83,21 @@ constexpr ScrollAlign ALIGN_TABLE[] = {
 };
 
 const std::regex DIMENSION_REGEX(R"(^[-+]?\d+(?:\.\d+)?(?:px|vp|fp|lpx)?$)", std::regex::icase);
+FastScrollMode ParseFastScrollMode(const JSRef<JSVal>& value)
+{
+    if (!value->IsNumber()) {
+        return FastScrollMode::NONE;
+    }
+    const auto number = value->ToNumber<double>();
+    if (NearEqual(number, static_cast<int32_t>(FastScrollMode::SKIP_MEASURE), 0.0)) {
+        return FastScrollMode::SKIP_MEASURE;
+    }
+    if (NearEqual(number, static_cast<int32_t>(FastScrollMode::SKIP_CREATE_AND_MEASURE), 0.0)) {
+        return FastScrollMode::SKIP_CREATE_AND_MEASURE;
+    }
+    return FastScrollMode::NONE;
+}
+
 } // namespace
 
 void JSScrollerBinding::JSBind(BindingTarget globalObj)
@@ -101,6 +116,7 @@ void JSScrollerBinding::JSBind(BindingTarget globalObj)
     JSClass<JSScroller>::CustomMethod("getItemIndex", &JSScrollerBinding::GetItemIndex);
     JSClass<JSScroller>::CustomMethod("contentSize", &JSScrollerBinding::ContentSize);
     JSClass<JSScroller>::CustomMethod("getFrameNode", &JSScrollerBinding::GetFrameNode);
+    JSClass<JSScroller>::CustomMethod("getScrollState", &JSScrollerBinding::GetScrollState);
     JSClass<JSScroller>::Bind(globalObj, JSScrollerBinding::Constructor, JSScrollerBinding::Destructor);
 }
 
@@ -329,9 +345,11 @@ void JSScrollerBinding::ScrollToIndex(const JSCallbackInfo& args)
 
     // 4: parameters count, 3: parameter index
     std::optional<float> extraOffset = std::nullopt;
+    auto mode = FastScrollMode::NONE;
     auto optionArg = args[3];
     if (args.Length() == 4 && optionArg->IsObject()) {
         auto obj = JSRef<JSObject>::Cast(optionArg);
+        mode = ParseFastScrollMode(obj->GetProperty("fastScroll"));
         CalcDimension offset;
         if (JSViewAbstract::ParseLengthMetricsToDimension(obj->GetProperty("extraOffset"), offset)) {
             auto offsetPx = offset.ConvertToPx();
@@ -341,7 +359,11 @@ void JSScrollerBinding::ScrollToIndex(const JSCallbackInfo& args)
         }
     }
     ContainerScope scope(jsScroller->GetInstanceId());
-    scrollController->ScrollToIndex(index, smooth, align, extraOffset);
+    if (IsFastScrollEnabled(mode)) {
+        scrollController->ScrollToIndexWithOptions(index, smooth, align, extraOffset, mode);
+    } else {
+        scrollController->ScrollToIndex(index, smooth, align, extraOffset);
+    }
 }
 
 void JSScrollerBinding::ScrollPage(const JSCallbackInfo& args)
@@ -575,5 +597,22 @@ void JSScrollerBinding::GetFrameNode(const JSCallbackInfo& args)
     params[1] = JSRef<JSVal>::Make(ToJSValue(nodeId));
     auto frameNode = jsFunc->ExecuteJS(2, params);
     args.SetReturnValue(frameNode);
+}
+
+void JSScrollerBinding::GetScrollState(const JSCallbackInfo& args)
+{
+    JSScroller* jsScroller = args.This()->Unwrap<JSScroller>();
+    if (jsScroller == nullptr) {
+        return;
+    }
+    auto scrollController = jsScroller->GetController().Upgrade();
+    if (!scrollController) {
+        JSException::Throw(ERROR_CODE_NAMED_ROUTE_ERROR, "%s", "Controller not bound to component.");
+        return;
+    }
+    ContainerScope scope(jsScroller->GetInstanceId());
+    auto scrollState = scrollController->GetScrollState();
+    auto retVal = JSRef<JSVal>::Make(ToJSValue(static_cast<int32_t>(scrollState)));
+    args.SetReturnValue(retVal);
 }
 } // namespace OHOS::Ace::Framework

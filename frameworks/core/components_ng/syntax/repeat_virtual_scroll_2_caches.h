@@ -93,7 +93,7 @@ namespace OHOS::Ace::NG {
  *
  */
 
-class RepeatVirtualScroll2CacheItem : public virtual AceType {
+class RepeatVirtualScroll2CacheItem : public AceType {
     DECLARE_ACE_TYPE(RepeatVirtualScroll2CacheItem, AceType);
 
 public:

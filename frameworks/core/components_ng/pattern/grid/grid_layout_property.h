@@ -21,6 +21,10 @@
 #include "core/components_ng/pattern/grid/grid_layout_options.h"
 #include "core/components_ng/pattern/scrollable/scrollable_layout_property.h"
 
+namespace OHOS::Ace {
+struct ScrollSnapStrategy;
+}
+
 namespace OHOS::Ace::NG {
 class InspectorFilter;
 
@@ -56,6 +60,7 @@ public:
         ResetLayoutOptions();
         ResetSyncLoad();
         ResetItemFillPolicy();
+        ResetScrollSnapStrategy();
         contentClip_.reset();
     }
 
@@ -148,6 +153,10 @@ public:
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(ScrollEnabled, bool, PROPERTY_UPDATE_MEASURE);
     ACE_DEFINE_PROPERTY_ITEM_WITHOUT_GROUP(SyncLoad, bool, PROPERTY_UPDATE_NORMAL);
     ACE_DEFINE_PROPERTY_ITEM_FUNC_WITHOUT_GROUP(AlignItems, GridItemAlignment);
+    // Feat-20260806915268: item scroll snap strategy (built-in align or custom offset provider).
+    std::optional<ScrollSnapStrategy> GetScrollSnapStrategy() const;
+    void UpdateScrollSnapStrategy(const ScrollSnapStrategy& strategy);
+    void ResetScrollSnapStrategy();
     void OnAlignItemsUpdate(GridItemAlignment /* alignItems */) const
     {
         ResetGridLayoutInfoAndMeasure();
@@ -179,6 +188,12 @@ public:
     }
 
     std::optional<std::string> GetFinalColumnsTemplate(double width);
+private:
+    std::optional<ScrollSnapAlign> snapAlign_;
+    bool snapHasProvider_ = false;
+    std::function<double(double, double)> snapApproachOffset_;
+    std::function<double(double)> snapOffset_;
+
 protected:
     void Clone(RefPtr<LayoutProperty> property) const override
     {
@@ -199,6 +214,10 @@ protected:
         value->propLayoutOptions_ = CloneLayoutOptions();
         value->propSyncLoad_ = CloneSyncLoad();
         value->propItemFillPolicy_ = CloneItemFillPolicy();
+        value->snapAlign_ = snapAlign_;
+        value->snapHasProvider_ = snapHasProvider_;
+        value->snapApproachOffset_ = snapApproachOffset_;
+        value->snapOffset_ = snapOffset_;
         value->contentClip_ = contentClip_;
     }
 

@@ -374,10 +374,10 @@ void NavDestinationModelNG::CreateBackButton(const RefPtr<NavDestinationGroupNod
     int32_t backButtonNodeId = ElementRegister::GetInstance()->MakeUniqueId();
     auto* buttonModifier = NodeModifier::GetButtonCustomModifier();
     CHECK_NULL_VOID(buttonModifier);
-    auto* rawPattern = reinterpret_cast<Pattern*>(buttonModifier->createButtonPattern());
-    CHECK_NULL_VOID(rawPattern);
+    auto buttonPattern = buttonModifier->createButtonPattern();
+    CHECK_NULL_VOID(buttonPattern);
     auto backButtonNode =
-        FrameNode::CreateFrameNode(V2::BACK_BUTTON_ETS_TAG, backButtonNodeId, AceType::Claim(rawPattern));
+        FrameNode::CreateFrameNode(V2::BACK_BUTTON_ETS_TAG, backButtonNodeId, buttonPattern);
     auto focusHub = backButtonNode->GetOrCreateFocusHub();
     CHECK_NULL_VOID(focusHub);
     focusHub->SetFocusDependence(FocusDependence::SELF);
@@ -542,6 +542,7 @@ void NavDestinationModelNG::SetTitlebarOptions(NavigationTitlebarOptions&& opt)
     CHECK_NULL_VOID(navDestinationNode);
     auto navDestinationPattern = navDestinationNode->GetPattern<NavDestinationPattern>();
     CHECK_NULL_VOID(navDestinationPattern);
+    opt.brOptions.barStyle = GetDefaultBarStyleFromStrategy(frameNode, opt.brOptions.barStyle);
     navDestinationPattern->SetTitleBarStyle(opt.brOptions.barStyle);
     auto titleBarNode = AceType::DynamicCast<TitleBarNode>(navDestinationNode->GetTitleBarNode());
     CHECK_NULL_VOID(titleBarNode);
@@ -1596,6 +1597,7 @@ void NavDestinationModelNG::SetTitlebarOptions(FrameNode* frameNode, NavigationT
     CHECK_NULL_VOID(navDestinationNode);
     auto navDestinationPattern = navDestinationNode->GetPattern<NavDestinationPattern>();
     CHECK_NULL_VOID(navDestinationPattern);
+    opt.brOptions.barStyle = GetDefaultBarStyleFromStrategy(frameNode, opt.brOptions.barStyle);
     navDestinationPattern->SetTitleBarStyle(opt.brOptions.barStyle);
     auto titleBarNode = AceType::DynamicCast<TitleBarNode>(navDestinationNode->GetTitleBarNode());
     CHECK_NULL_VOID(titleBarNode);

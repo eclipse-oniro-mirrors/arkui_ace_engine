@@ -314,6 +314,9 @@ public:
     std::string GetSelectionText() const override;
     void GetImageRect(int32_t& x, int32_t& y, int32_t& width, int32_t& height) const override;
     bool IsAILink() const override;
+    bool ShouldOfferLinkToText() const override;
+    bool IsOverTextFragment() const override;
+    std::string GetTextFragmentGeneratedLink() const override;
     int GetSourceTypeV2() const override;
     int GetMediaTypeV2() const override;
     int GetContextMenuMediaType() const override;
@@ -341,6 +344,8 @@ public:
     void Redo() const override;
     void PasteAndMatchStyle() const override;
     void RequestPasswordAutoFill() const override;
+    void CopyLinkToTextMenu() const override;
+    void RemoveFragments() const override;
 
 private:
     std::shared_ptr<OHOS::NWeb::NWebContextMenuCallback> callback_;
@@ -777,7 +782,7 @@ private:
     WeakPtr<PipelineBase> context_ = nullptr;
 };
 
-class WebDelegateObserver : public virtual AceType {
+class WebDelegateObserver : public AceType {
 DECLARE_ACE_TYPE(WebDelegateObserver, AceType);
 public:
     WebDelegateObserver(const RefPtr<WebDelegate>& delegate, WeakPtr<PipelineBase> context)
@@ -1293,6 +1298,7 @@ public:
     void UpdateVerticalScrollBarAccess(bool isVerticalScrollBarAccessEnabled);
     void UpdateOverlayScrollbarEnabled(bool isEnabled);
     void UpdateScrollBarColor(const std::string& colorValue);
+    void UpdateCaretColor(const Color& caretColor);
     void UpdateOverScrollMode(const int32_t overscrollModeValue);
     void UpdateBlurOnKeyboardHideMode(const int32_t isBlurOnKeyboardHideEnable);
     void UpdateNativeEmbedModeEnabled(bool isEmbedModeEnabled);
@@ -1455,6 +1461,7 @@ public:
     void OnRefreshAccessedHistory(const std::string& url, bool isRefreshed, bool isMainFrame = false);
     bool OnFileSelectorShow(const std::shared_ptr<BaseEventInfo>& info);
     void OnContextMenuDismissed();
+    void OnContextMenuUpdate(WebContextMenuItemId menuItemId, WebContextMenuOptions options);
     bool OnContextMenuShow(const std::shared_ptr<BaseEventInfo>& info);
     void OnContextMenuHide(const std::string& info);
     bool OnHandleInterceptUrlLoading(const std::string& url);
@@ -1777,8 +1784,11 @@ public:
     std::string GetLastSelectionText() const;
     void OnTextSelectionChange(const std::string& selectionText);
     void OnDetectedBlankScreen(const std::string& url, int32_t blankScreenReason, int32_t detectedContentfulNodesCount);
+    void OnMonitoredBlankScreen(const std::string& url, int32_t reason,
+        const std::string& extraMsg);
     void UpdateBlankScreenDetectionConfig(bool enable, const std::vector<double>& detectionTiming,
         const std::vector<int32_t>& detectionMethods, int32_t contentfulNodesCountThreshold);
+    void UpdateWebBlankScreenMonitorEnabled(bool isEnabled);
     void OnFirstScreenPaint(const std::string& url, int64_t navigationStartTime, int64_t firstScreenPaintTime);
     void UpdateEnableImageAnalyzer(bool enable);
     void OnPdfScrollAtBottom(const std::string& url);
@@ -1798,6 +1808,7 @@ public:
 #endif
     }
     void SetForceEnableZoom(bool isEnabled);
+    void SetFlingSpeedLimit(float speedLimit);
     bool IsShowHandle();
     void OnSafeBrowsingCheckFinish(int threat_type);
     bool IsPcMode();

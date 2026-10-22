@@ -246,6 +246,7 @@ void XComponentPattern::InitSurface()
         renderContext->OnNodeNameUpdate(GetId());
     }
     renderSurface_->InitSurface();
+    renderSurface_->SetSurfaceQueueSize(bufferQueueCount_);
     renderSurface_->UpdateSurfaceConfig();
     if (type_ == XComponentType::TEXTURE) {
         renderSurface_->RegisterBufferCallback();
@@ -932,6 +933,7 @@ void XComponentPattern::ToJsonValue(std::unique_ptr<JsonValue>& json, const Insp
     json->PutExtAttr("enableSecure", isEnableSecure_ ? "true" : "false", filter);
     json->PutExtAttr("hdrBrightness", std::to_string(hdrBrightness_).c_str(), filter);
     json->PutExtAttr("enableTransparentLayer", isTransparentLayer_ ? "true" : "false", filter);
+    json->PutExtAttr("bufferQueueCount", std::to_string(bufferQueueCount_).c_str(), filter);
     json->PutExtAttr("screenId", screenId_.has_value() ? std::to_string(screenId_.value()).c_str() : "", filter);
     if (type_ == XComponentType::SURFACE) {
         json->PutExtAttr(
@@ -1046,6 +1048,7 @@ void XComponentPattern::DumpAdvanceInfo()
     DumpLog::GetInstance().AddDesc(
         std::string("screenId: ").append(screenId_.has_value() ? std::to_string(screenId_.value()).c_str() : ""));
     DumpLog::GetInstance().AddDesc(std::string("isOpaque: ").append(isOpaque_ ? "true" : "false"));
+    DumpLog::GetInstance().AddDesc(std::string("bufferQueueCount: ").append(std::to_string(bufferQueueCount_)));
     if (renderSurface_) {
         renderSurface_->DumpInfo();
     }
@@ -1184,7 +1187,9 @@ void XComponentPattern::InitializeAccessibility()
         "InitializeAccessibility accessibilityId: %{public}" PRId64 "", accessibilityId);
     auto pipeline = host->GetContextRefPtr();
     CHECK_NULL_VOID(pipeline);
-    auto accessibilityManager = pipeline->GetAccessibilityManager();
+    auto mainAccessibilityManager = pipeline->GetAccessibilityManager();
+    CHECK_NULL_VOID(mainAccessibilityManager);
+    auto accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(host);
     CHECK_NULL_VOID(accessibilityManager);
     accessibilityChildTreeCallback_ = std::make_shared<XComponentAccessibilityChildTreeCallback>(
         WeakClaim(this), host->GetAccessibilityId());
@@ -1203,7 +1208,10 @@ void XComponentPattern::UninitializeAccessibility(FrameNode* frameNode)
     int64_t accessibilityId = frameNode->GetAccessibilityId();
     auto pipeline = frameNode->GetContextRefPtr();
     CHECK_NULL_VOID(pipeline);
-    auto accessibilityManager = pipeline->GetAccessibilityManager();
+    auto host = GetHost();
+    auto mainAccessibilityManager = pipeline->GetAccessibilityManager();
+    CHECK_NULL_VOID(mainAccessibilityManager);
+    auto accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(host);
     CHECK_NULL_VOID(accessibilityManager);
     if (accessibilityManager->IsRegister() && accessibilityChildTreeCallback_) {
         OnAccessibilityChildTreeDeregister(frameNode);
@@ -1229,7 +1237,9 @@ bool XComponentPattern::OnAccessibilityChildTreeRegister(uint32_t windowId, int3
     CHECK_NULL_RETURN(host, false);
     auto pipeline = host->GetContextRefPtr();
     CHECK_NULL_RETURN(pipeline, false);
-    auto accessibilityManager = pipeline->GetAccessibilityManager();
+    auto mainAccessibilityManager = pipeline->GetAccessibilityManager();
+    CHECK_NULL_RETURN(mainAccessibilityManager, false);
+    auto accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(host);
     CHECK_NULL_RETURN(accessibilityManager, false);
     if (accessibilityProvider_ == nullptr) {
         accessibilityProvider_ =
@@ -1266,15 +1276,19 @@ bool XComponentPattern::OnAccessibilityChildTreeDeregister(FrameNode* frameNode)
     TAG_LOGI(AceLogTag::ACE_XCOMPONENT, "OnAccessibilityChildTreeDeregister, "
         "windowId: %{public}u, treeId: %{public}d.", windowId_, treeId_);
     RefPtr<PipelineContext> pipeline;
+    RefPtr<FrameNode> nodeForAM;
     if (!frameNode) {
-        auto host = GetHost();
-        CHECK_NULL_RETURN(host, false);
-        pipeline = host->GetContextRefPtr();
+        nodeForAM = GetHost();
+        CHECK_NULL_RETURN(nodeForAM, false);
+        pipeline = nodeForAM->GetContextRefPtr();
     } else {
+        nodeForAM = frameNode;
         pipeline = frameNode->GetContextRefPtr();
     }
     CHECK_NULL_RETURN(pipeline, false);
-    auto accessibilityManager = pipeline->GetAccessibilityManager();
+    auto mainAccessibilityManager = pipeline->GetAccessibilityManager();
+    CHECK_NULL_RETURN(mainAccessibilityManager, false);
+    auto accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(nodeForAM);
     CHECK_NULL_RETURN(accessibilityManager, false);
     auto nativeProvider = GetNativeProvider();
     CHECK_NULL_RETURN(nativeProvider, false);
@@ -1322,7 +1336,9 @@ void XComponentPattern::HandleRegisterAccessibilityEvent(bool isRegister)
     CHECK_NULL_VOID(host);
     auto pipeline = host->GetContextRefPtr();
     CHECK_NULL_VOID(pipeline);
-    auto accessibilityManager = pipeline->GetAccessibilityManager();
+    auto mainAccessibilityManager = pipeline->GetAccessibilityManager();
+    CHECK_NULL_VOID(mainAccessibilityManager);
+    auto accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(host);
     CHECK_NULL_VOID(accessibilityManager);
     if (!isRegister) {
         accessibilityChildTreeCallback_->OnDeregister();
@@ -2657,6 +2673,19 @@ void XComponentPattern::EnableTransparentLayer(bool isTransparentLayer)
     CHECK_NULL_VOID(renderContextForSurface_);
     renderContextForSurface_->SetTransparentLayer(isTransparentLayer);
     isTransparentLayer_ = isTransparentLayer;
+}
+
+void XComponentPattern::SetBufferQueueCount(int32_t bufferQueueCount)
+{
+    bufferQueueCount_ = std::clamp(bufferQueueCount, MIN_BUFFER_QUEUE_COUNT, MAX_BUFFER_QUEUE_COUNT);
+    CHECK_NULL_VOID(renderSurface_);
+    renderSurface_->SetSurfaceQueueSize(bufferQueueCount_);
+    renderSurface_->UpdateSurfaceConfig();
+}
+
+int32_t XComponentPattern::GetBufferQueueCount() const
+{
+    return bufferQueueCount_;
 }
 
 RenderFit XComponentPattern::GetSurfaceRenderFit() const

@@ -198,8 +198,10 @@ void MultipleParagraphLayoutAlgorithm::ConstructTextStyles(
     textStyle.SetMinimumLineHeight(textLayoutProperty->GetMinimumLineHeight());
     textStyle.SetMaximumLineHeight(textLayoutProperty->GetMaximumLineHeight());
     textStyle.SetOrphanCharOptimization(textLayoutProperty->GetOrphanCharOptimizationValue(false));
-    textStyle.SetIncludeFontPadding(textLayoutProperty->GetIncludeFontPaddingValue(false));
-    textStyle.SetFallbackLineSpacing(textLayoutProperty->GetFallbackLineSpacingValue(false));
+    textStyle.SetIncludeFontPadding(textLayoutProperty->GetIncludeFontPaddingValue(
+        pipeline->GetConfigTextStyleOptimizeFlag()));
+    textStyle.SetFallbackLineSpacing(textLayoutProperty->GetFallbackLineSpacingValue(
+        pipeline->GetConfigTextStyleOptimizeFlag()));
     // Determines whether a foreground color is set or inherited.
     UpdateTextColorIfForeground(frameNode, textStyle, layoutTextColor, textColor);
     // Stroke color defaults to the font color when only stroke width is set.

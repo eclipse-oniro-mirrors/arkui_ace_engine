@@ -180,10 +180,6 @@ void BindSheetUtil::ParseSheetParams(SheetStyle& sheetStyle, const Ark_SheetOpti
     sheetStyle.systemMaterial = material ? material->Copy() : nullptr;
 #endif // WRONG_GEN_v140
 
-    if (Container::GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TWENTY_SIX) &&
-        MaterialUtils::IsMaterialEnabled() && !sheetStyle.systemMaterial) {
-        sheetStyle.systemMaterial = MaterialUtils::GetInitMaterial(UiMaterialStyle::ULTRA_THICK);
-    }
     if (sheetStyle.systemMaterial &&
         !MaterialUtils::IsImmersiveMaterialSupported(sheetStyle.systemMaterial.GetRawPtr())) {
         sheetStyle.systemMaterial = nullptr;
@@ -220,6 +216,7 @@ void BindSheetUtil::ParseSheetParams(SheetStyle& sheetStyle, const Ark_SheetOpti
     sheetOffset.SetX(offsetVal.first.value().ConvertToPx());
     sheetOffset.SetY(offsetVal.second.value().ConvertToPx());
     sheetStyle.bottomOffset = sheetOffset;
+    sheetStyle.titleBarHoverMode = OptConvert<SheetTitleBarHoverMode>(sheetOptions.titleBarHoverMode);
 }
 
 void BindSheetUtil::ModifySheetStyle(

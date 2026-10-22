@@ -13,7 +13,13 @@
  * limitations under the License.
  */
 
+#include <cmath>
+#include <limits>
+
+#include "base/geometry/dimension.h"
+#include "core/common/container_scope.h"
 #include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/pattern/scrollable/scroll_snap_strategy.h"
 #include "core/components_ng/pattern/scrollable/scrollable_model_static.h"
 #include "core/components_ng/pattern/waterflow/bridge/waterflow/water_flow_sections_accessor_peer_impl.h"
 #include "core/components_ng/pattern/waterflow/water_flow_model_static.h"
@@ -22,6 +28,7 @@
 #include "core/interfaces/native/utility/converter.h"
 #include "core/interfaces/native/utility/reverse_converter.h"
 #include "core/interfaces/native/utility/validators.h"
+#include "core/pipeline_ng/pipeline_context.h"
 
 namespace OHOS::Ace::NG {
 namespace Converter {
@@ -101,6 +108,66 @@ void SetWaterFlowOptionsImpl(Ark_NativePointer node,
 }
 } // WaterFlowInterfaceModifier
 namespace WaterFlowAttributeModifier {
+template<typename Callback, typename... Args>
+double InvokeSnapProvider(const CallbackHelper<Callback>& callback, const WeakPtr<FrameNode>& weakNode,
+    int32_t instanceId, Args... args)
+{
+    constexpr auto invalid = std::numeric_limits<double>::quiet_NaN();
+    CHECK_NULL_RETURN(weakNode.Upgrade(), invalid);
+    ContainerScope scope(instanceId);
+    PipelineContext::SetCallBackNode(weakNode);
+    // Public callbacks use vp and vp/s; the shared scroll runtime uses px and px/s.
+    auto result = callback.template InvokeWithOptConvertResult<double, Ark_Float64, synthetic_Callback_F64_Void>(
+        Converter::ArkValue<Ark_Float64>(Dimension(args).ConvertToVp())...);
+    if (!result || !std::isfinite(result.value()) || !weakNode.Upgrade()) {
+        return invalid;
+    }
+    const double resultPx = Dimension(result.value(), DimensionUnit::VP).ConvertToPx();
+    // Preserve a finite overflowing target so the shared resolver can clamp it to the scroll range.
+    return std::isfinite(resultPx) ? resultPx : std::copysign(std::numeric_limits<double>::max(), resultPx);
+}
+
+void SetScrollSnapStrategyImpl(Ark_NativePointer node,
+    const Opt_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy* value)
+{
+    auto frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    Converter::VisitUnionPtr(value,
+        [frameNode](const Ark_ScrollSnapAlign& align) {
+            ScrollSnapStrategy strategy;
+            switch (align) {
+                case ARK_SCROLL_SNAP_ALIGN_START: strategy.align = ScrollSnapAlign::START; break;
+                case ARK_SCROLL_SNAP_ALIGN_CENTER: strategy.align = ScrollSnapAlign::CENTER; break;
+                case ARK_SCROLL_SNAP_ALIGN_END: strategy.align = ScrollSnapAlign::END; break;
+                default:
+                    WaterFlowModelStatic::SetScrollSnapStrategy(frameNode, std::nullopt);
+                    return;
+            }
+            WaterFlowModelStatic::SetScrollSnapStrategy(frameNode, strategy);
+        },
+        [frameNode](const Ark_ScrollSnapOffsetProviderProxy& provider) {
+            if (!provider.calculateApproachOffset.callSync || !provider.calculateSnapOffset.callSync) {
+                WaterFlowModelStatic::SetScrollSnapStrategy(frameNode, std::nullopt);
+                return;
+            }
+            const auto weakNode = AceType::WeakClaim(frameNode);
+            const auto instanceId = frameNode->GetInstanceId();
+            ScrollSnapStrategy strategy;
+            strategy.hasProvider = true;
+            strategy.calculateApproachOffset =
+                [callback = CallbackHelper(provider.calculateApproachOffset), weakNode, instanceId](
+                    double velocity, double decayOffset) {
+                    return InvokeSnapProvider(callback, weakNode, instanceId, velocity, decayOffset);
+                };
+            strategy.calculateSnapOffset =
+                [callback = CallbackHelper(provider.calculateSnapOffset), weakNode, instanceId](double velocity) {
+                    return InvokeSnapProvider(callback, weakNode, instanceId, velocity);
+                };
+            WaterFlowModelStatic::SetScrollSnapStrategy(frameNode, strategy);
+        },
+        [frameNode]() { WaterFlowModelStatic::SetScrollSnapStrategy(frameNode, std::nullopt); });
+}
+
 void SetColumnsTemplateImpl(Ark_NativePointer node,
                             const Opt_Union_String_ItemFillPolicy* value)
 {
@@ -282,6 +349,14 @@ void SetOnDidScrollImpl(Ark_NativePointer node,
     };
     ScrollableModelStatic::SetOnDidScroll(frameNode, std::move(onDidScroll));
 }
+void SetScrollPlaceholderImpl(Ark_NativePointer node,
+                              const Opt_PlaceholderProvider* value)
+{
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    //auto convValue = value ? Converter::OptConvert<type>(*value) : std::nullopt;
+    // WaterFlowModelNG::SetSetScrollPlaceholder(frameNode, convValue);
+}
 void SetCachedCount1Impl(Ark_NativePointer node,
                          const Opt_Int32* count,
                          const Opt_Boolean* show)
@@ -312,6 +387,7 @@ const GENERATED_ArkUIWaterFlowModifier* GetWaterFlowStaticModifier()
         WaterFlowAttributeModifier::SetColumnsGapImpl,
         WaterFlowAttributeModifier::SetRowsGapImpl,
         WaterFlowAttributeModifier::SetLayoutDirectionImpl,
+        WaterFlowAttributeModifier::SetScrollSnapStrategyImpl,
         WaterFlowAttributeModifier::SetCachedCount0Impl,
         WaterFlowAttributeModifier::SetSyncLoadImpl,
         WaterFlowAttributeModifier::SetSupportEmptyBranchInLazyLoadingImpl,
@@ -319,6 +395,7 @@ const GENERATED_ArkUIWaterFlowModifier* GetWaterFlowStaticModifier()
         WaterFlowAttributeModifier::SetOnScrollIndexImpl,
         WaterFlowAttributeModifier::SetOnWillScrollImpl,
         WaterFlowAttributeModifier::SetOnDidScrollImpl,
+        WaterFlowAttributeModifier::SetScrollPlaceholderImpl,
         WaterFlowAttributeModifier::SetCachedCount1Impl,
     };
     return &ArkUIWaterFlowModifierImpl;

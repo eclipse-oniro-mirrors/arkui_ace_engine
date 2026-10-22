@@ -749,6 +749,7 @@ void WebDelegate::UpdateGestureFocusMode(const GestureFocusMode& mode) {}
 void WebDelegate::UpdateNativeEmbedRuleTag(const std::string& tag) {}
 void WebDelegate::UpdateNativeEmbedRuleType(const std::string& type) {}
 void WebDelegate::UpdateScrollBarColor(const std::string& colorValue) {}
+void WebDelegate::UpdateCaretColor(const Color& caretColor) {}
 void WebDelegate::LoadUrl() {}
 void WebDelegate::OnInactive() {}
 void WebDelegate::SetOfflineWebActiveStatus(bool isActive) {}
@@ -920,6 +921,7 @@ bool WebDelegate::OnContextMenuShow(const std::shared_ptr<BaseEventInfo>& info)
 #endif
 }
 void WebDelegate::OnContextMenuHide(const std::string& info) {}
+void WebDelegate::OnContextMenuUpdate(WebContextMenuItemId menuItemId, WebContextMenuOptions options) {}
 bool WebDelegate::OnHandleInterceptUrlLoading(const std::string& data)
 {
     return false;
@@ -1585,6 +1587,7 @@ bool WebDelegate::RestoreWebState(const std::vector<uint8_t>& state)
 {
     return g_restoreWebStateResult;
 }
+void WebDelegate::SetFlingSpeedLimit(float speedLimit) {}
 void WebDelegate::SetEnableAutoFill(bool isEnabled) {}
 void WebDelegate::SetEnableDrag(bool isEnabled) {}
 void WebDelegate::UpdateWebMediaNetworkProxyEnabled(bool isEnabled) {}
@@ -1600,8 +1603,11 @@ void WebDelegate::OnTextSelectionChange(const std::string& selectionText) {}
 std::string WebDelegate::GetLastSelectionText() const { return ""; }
 void WebDelegate::OnDetectedBlankScreen(
     const std::string& url, int32_t blankScreenReason, int32_t detectedContentfulNodesCount) {}
+void WebDelegate::OnMonitoredBlankScreen(
+    const std::string& url, int32_t reason, const std::string& extraMsg) {}
 void WebDelegate::UpdateBlankScreenDetectionConfig(bool enable, const std::vector<double>& detectionTiming,
     const std::vector<int32_t>& detectionMethods, int32_t contentfulNodesCountThreshold) {}
+void WebDelegate::UpdateWebBlankScreenMonitorEnabled(bool isEnabled) {}
 void WebDelegate::OnRequestAutofill(int32_t menuType) {}
 void WebDelegate::OnSwitchFreeMultiWindow(bool enable) {}
 void WebDelegate::RegisterFreeMultiWindowListener() {}

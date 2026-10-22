@@ -27,6 +27,7 @@
 #include "core/components_ng/pattern/list/list_event_hub.h"
 #include "core/components_ng/pattern/list/list_layout_property.h"
 #include "core/components_ng/pattern/scrollable/selectable_container_pattern.h"
+#include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_types.h"
 #include "core/components_ng/pattern/list/list_properties.h"
 
 namespace OHOS::Ace {
@@ -74,6 +75,12 @@ public:
     virtual void SetMaintainVisibleContentPosition(bool enabled) = 0;
     virtual void SetStackFromEnd(bool enabled) = 0;
     virtual void SetSyncLoad(bool enabled) = 0;
+    // FEAT scroll placeholder: per-item provider held by the ListPattern (host
+    // generation, enable flag and cancellation live on the pattern; a null
+    // provider resets the capability). Default no-op: only the NG model (and the
+    // bridges above it) carries the capability; legacy compatible implementations
+    // keep their behavior.
+    virtual void SetScrollPlaceholder(NG::ScrollPlaceholderProvider&& provider) {}
     virtual void SetEditModeOptions(NG::EditModeOptions& editModeOptions) {}
     virtual void SetEnableEditMode(bool enableEditMode) {}
     virtual void SetEnableEditModeChangeEvent(std::function<void(bool)>&& changeEvent) {}

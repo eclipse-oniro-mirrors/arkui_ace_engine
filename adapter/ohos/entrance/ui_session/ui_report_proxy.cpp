@@ -608,6 +608,44 @@ void UiReportProxy::ReportPageSceneEvent(const std::string& sceneJson, bool isGe
     }
 }
 
+void UiReportProxy::SendQueryResultReport(uint32_t code, const char* caller, const std::string& data)
+{
+    MessageParcel messageData;
+    MessageParcel reply;
+    MessageOption option(MessageOption::TF_ASYNC);
+    if (!messageData.WriteInterfaceToken(GetDescriptor())) {
+        LOGW("%{public}s write interface token failed", caller);
+        return;
+    }
+    sptr<LargeStringAshmem> largeStringAshmem = new (std::nothrow) LargeStringAshmem();
+    if (largeStringAshmem == nullptr) {
+        LOGW("%{public}s alloc shmem failed", caller);
+        return;
+    }
+    if (!largeStringAshmem->WriteToAshmem(std::to_string(code), data, data.length())) {
+        LOGW("%{public}s write to shmem failed", caller);
+        return;
+    }
+    if (!messageData.WriteParcelable(largeStringAshmem)) {
+        LOGW("%{public}s write data failed", caller);
+        return;
+    }
+    int32_t sendRequestErrorCode = Remote()->SendRequest(code, messageData, reply, option);
+    if (sendRequestErrorCode != ERR_NONE) {
+        LOGW("%{public}s send request failed, errorCode is %{public}d", caller, sendRequestErrorCode);
+    }
+}
+
+void UiReportProxy::ReportNavigationQueryResult(const std::string& data)
+{
+    SendQueryResultReport(REPORT_NAVIGATION_QUERY_RESULT, "ReportNavigationQueryResult", data);
+}
+
+void UiReportProxy::ReportLazyForEachQueryResult(const std::string& data)
+{
+    SendQueryResultReport(REPORT_LAZY_FOREACH_QUERY_RESULT, "ReportLazyForEachQueryResult", data);
+}
+
 void UiReportProxy::SendWebInfoRequestResult(
     uint32_t windowId,
     int32_t webId,

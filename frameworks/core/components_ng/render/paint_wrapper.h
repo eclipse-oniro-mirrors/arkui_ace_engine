@@ -38,7 +38,7 @@ class ExtensionHandler;
 class RenderContext;
 
 // PaintWrapper are used to flush dirty render task.
-class ACE_FORCE_EXPORT PaintWrapper : public virtual AceType {
+class ACE_FORCE_EXPORT PaintWrapper : public AceType {
     DECLARE_ACE_TYPE(PaintWrapper, AceType);
 
 public:

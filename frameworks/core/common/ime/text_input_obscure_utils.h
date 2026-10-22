@@ -16,14 +16,9 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMMON_IME_TEXT_INPUT_OBSCURE_UTILS_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMMON_IME_TEXT_INPUT_OBSCURE_UTILS_H
 
-#include <algorithm>
-#include <cctype>
 #include <cstdint>
 #include <string>
 
-#include "base/i18n/localization.h"
-#include "base/utils/utils.h"
-#include "core/common/container.h"
 #include "core/common/ime/text_input_type.h"
 
 namespace OHOS::Ace {
@@ -39,15 +34,7 @@ public:
     static constexpr char16_t OBSCURING_CHARACTER_FOR_AR = u'*'; // Arabic
     static constexpr uint32_t OBSCURE_SHOW_TICKS = 1; // 500ms (one caret twinkling tick)
 
-    /**
-     * @brief Create a fully obscured string of the given length.
-     * @param len The length of the obscured string.
-     * @return Obscured string using bullet (or * for Arabic locale).
-     */
-    static inline std::u16string CreateObscuredText(int32_t len)
-    {
-        return std::u16string(len, GetObscuringCharacter());
-    }
+    static std::u16string CreateObscuredText(int32_t len);
 
     /**
      * @brief Create display text with optional obscuration and last-char reveal.
@@ -57,29 +44,14 @@ public:
      * @param showPasswordDirectly Whether to suppress last-char reveal (API >= 12).
      * @return The display text (obscured or original).
      */
-    static inline std::u16string CreateDisplayText(
-        const std::u16string& content, int32_t nakedCharPosition, bool needObscureText, bool showPasswordDirectly)
-    {
-        if (!content.empty() && needObscureText) {
-            auto text = CreateObscuredText(static_cast<int32_t>(content.length()));
-            if (nakedCharPosition >= 0 && nakedCharPosition < static_cast<int32_t>(content.length())) {
-                if (Container::LessThanAPITargetVersion(PlatformVersion::VERSION_TWELVE) || !showPasswordDirectly) {
-                    text[nakedCharPosition] = content[nakedCharPosition];
-                }
-            }
-            return text;
-        }
-        return content;
-    }
+    static std::u16string CreateDisplayText(
+        const std::u16string& content, int32_t nakedCharPosition, bool needObscureText, bool showPasswordDirectly);
 
     /**
      * @brief Get the obscuring character for the current locale.
      * @return OBSCURING_CHARACTER_FOR_AR for Arabic, OBSCURING_CHARACTER otherwise.
      */
-    static inline char16_t GetObscuringCharacter()
-    {
-        return Localization::GetInstance()->GetLanguage() == "ar" ? OBSCURING_CHARACTER_FOR_AR : OBSCURING_CHARACTER;
-    }
+    static char16_t GetObscuringCharacter();
 
     /**
      * @brief Calculate obscure reveal state after a character insertion.
@@ -93,21 +65,9 @@ public:
         int32_t nakedCharPosition = -1;
     };
 
-    static inline ObscureUpdateResult UpdateObscureState(
+    static ObscureUpdateResult UpdateObscureState(
         TextInputType inputType, const std::u16string& insertValue, bool hasInsert,
-        const std::u16string& content, int32_t caretPosition)
-    {
-        ObscureUpdateResult result;
-        if (insertValue.length() == 1 &&
-            (inputType != TextInputType::NUMBER_PASSWORD || std::isdigit(insertValue[0])) && hasInsert) {
-            auto insertIndex = std::clamp(caretPosition - 1, 0, static_cast<int32_t>(content.length()));
-            auto strBeforeCaret = content.empty() ? u"" : content.substr(insertIndex, 1);
-            bool match = (strBeforeCaret == insertValue);
-            result.tickCountDown = match ? static_cast<int32_t>(OBSCURE_SHOW_TICKS) : 0;
-            result.nakedCharPosition = match ? insertIndex : -1;
-        }
-        return result;
-    }
+        const std::u16string& content, int32_t caretPosition);
 
     /**
      * @brief Check whether the naked (briefly visible) char should be revealed.

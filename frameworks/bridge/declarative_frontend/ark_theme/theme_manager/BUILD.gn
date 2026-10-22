@@ -34,9 +34,12 @@ npm_run_op("npm_build_ark_theme") {
 }
 
 ohos_abc("ark_theme") {
-  sources = [ "$target_gen_dir/arkTheme.js" ]
+  # the host_toolchain is needed to avoid file corruption caused by parallel operations.
+  deps = [ ":npm_build_ark_theme($host_toolchain)" ]
+  basepath =
+      get_label_info(":npm_build_ark_theme($host_toolchain)", "target_gen_dir")
+  sources = [ "$basepath/arkTheme.js" ]
   output_name = "arktheme"
-  deps = [":npm_build_ark_theme"]
 
   install_images = [ "system" ]
   module_install_dir = "etc/abc/arkui"

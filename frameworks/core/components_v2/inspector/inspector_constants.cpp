@@ -332,6 +332,7 @@ const char TOGGLE_ETS_TAG[] = "Toggle";
 // scroll
 const char SCROLL_COMPONENT_TAG[] = "ScrollComponent";
 const char SCROLL_ETS_TAG[] = "Scroll";
+const char SCROLL_PLACEHOLDER_SHELL_ETS_TAG[] = "ScrollPlaceholderShell";
 
 // calendar
 const char CALENDAR_COMPONENT_TAG[] = "calendar";

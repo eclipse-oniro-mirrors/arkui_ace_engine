@@ -154,7 +154,7 @@ function loadComponent(): ComponentObj | undefined {
         super(value);
       }
       applyPeer(node: KNode, reset: boolean): void {
-        if (reset || (!isString(this.value) && !isObject(this.value))) {
+        if (reset) {
           getUINativeModule().lazyVGridLayout.resetColumnsTemplate(node);
         } else {
           getUINativeModule().lazyVGridLayout.setColumnsTemplate(node, this.value);

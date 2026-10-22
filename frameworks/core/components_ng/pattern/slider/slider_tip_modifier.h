@@ -127,6 +127,7 @@ public:
         blockSize_ = blockSize;
     }
 
+    std::string GetVisibleText() const;
     void BuildParagraph();
     void UpdateBubbleSize();
     bool UpdateOverlayRect(const SizeF& frameSize);

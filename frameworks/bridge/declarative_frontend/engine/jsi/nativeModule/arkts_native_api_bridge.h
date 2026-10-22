@@ -80,6 +80,7 @@ private:
     static void RegisterEmbeddedComponentAttributes(Local<panda::ObjectRef> object, EcmaVM* vm);
 #endif
     static void RegisterContainerPickerAttributes(Local<panda::ObjectRef> object, EcmaVM* vm);
+    static void RegisterScrollPlaceholderRegisterModule(Local<panda::ObjectRef> object, EcmaVM* vm);
     static void RegisterGlobalMethods(Local<panda::ObjectRef> object, EcmaVM* vm);
     static void RegisterNativeUtils(Local<panda::ObjectRef> object, EcmaVM* vm);
     static void RegisterCommonAttributes(Local<panda::ObjectRef> object, EcmaVM* vm);

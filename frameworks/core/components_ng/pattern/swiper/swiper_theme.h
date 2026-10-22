@@ -24,7 +24,7 @@ class ThemeConstants;
 
 namespace OHOS::Ace::NG {
 
-class SwiperTheme : public virtual Theme {
+class SwiperTheme : public Theme {
     DECLARE_ACE_TYPE(SwiperTheme, Theme);
 
 public:

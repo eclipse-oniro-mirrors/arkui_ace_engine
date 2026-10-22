@@ -341,6 +341,11 @@ std::vector<ParticleVelocityField> CreateParticleVelocityFields(
 
 } // namespace
 
+std::string SliderPattern::GetPageTextForReport(bool /* includeInput */) const
+{
+    return sliderTipModifier_ ? sliderTipModifier_->GetVisibleText() : "";
+}
+
 RefPtr<NodePaintMethod> SliderPattern::CreateNodePaintMethod()
 {
     if (!IsSliderVisible()) {
@@ -3043,6 +3048,8 @@ void SliderPattern::OnDetachFromMainTree()
 {
     auto host = GetHost();
     THREAD_SAFE_NODE_CHECK(host, OnDetachFromMainTree, host);
+    CHECK_NULL_VOID(host);
+    host->ResetRenderDirtyMarked(false);
 }
 
 void SliderPattern::InitOrRefreshSlipFactor()
@@ -4311,10 +4318,26 @@ void SliderPattern::ResetHostMaterialEffects()
     CHECK_NULL_VOID(renderContext);
     auto material = renderContext->GetSystemMaterial();
     CHECK_NULL_VOID(material);
-    
+
+    AnimationUtils::ExecuteWithoutAnimation(
+        [weak = WeakClaim(this)]() {
+            auto pattern = weak.Upgrade();
+            CHECK_NULL_VOID(pattern);
+            pattern->ResetHostMaterialEffectsInner();
+        },
+        host->GetContextRefPtr());
+}
+
+void SliderPattern::ResetHostMaterialEffectsInner()
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto renderContext = host->GetRenderContext();
+    CHECK_NULL_VOID(renderContext);
+
     MaterialUtils::CallSetMaterial(AceType::RawPtr(host), nullptr);
     renderContext->UpdateUiMaterialFilter(nullptr);
-    
+
     auto preBackgroundColor = renderContext->GetPreBackgroundColor();
     if (preBackgroundColor.has_value()) {
         renderContext->UpdateBackgroundColor(preBackgroundColor.value());
@@ -4322,7 +4345,7 @@ void SliderPattern::ResetHostMaterialEffects()
         renderContext->ResetBackgroundColor();
         renderContext->OnBackgroundColorUpdate(Color::TRANSPARENT);
     }
-    
+
     auto preBorderWidth = renderContext->GetPreBorderWidth();
     if (preBorderWidth.has_value()) {
         auto layoutProperty = host->GetLayoutProperty();

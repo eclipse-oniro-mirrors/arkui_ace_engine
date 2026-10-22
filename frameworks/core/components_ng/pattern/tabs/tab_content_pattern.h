@@ -20,6 +20,7 @@
 #include "base/memory/referenced.h"
 #include "base/utils/noncopyable.h"
 #include "core/components_ng/manager/recoverable/recoverable_view.h"
+#include "core/components_ng/pattern/tabs/tab_content_model.h"
 #include "core/components_ng/pattern/pattern.h"
 #include "core/components_ng/pattern/image/image_model.h"
 #include "core/components_ng/pattern/tabs/tabs_pattern.h"
@@ -375,6 +376,18 @@ public:
         return bottomTabBarStyle_;
     }
 
+    using TabBarBadgeParam = OHOS::Ace::TabBarBadgeParam;
+
+    void SetTabBarBadge(const std::optional<TabBarBadgeParam>& param)
+    {
+        tabBarBadgeParam_ = param;
+    }
+
+    const std::optional<TabBarBadgeParam>& GetTabBarBadge() const
+    {
+        return tabBarBadgeParam_;
+    }
+
     void DumpAdvanceInfo() override
     {
         switch (selectedMode_) {
@@ -616,6 +629,7 @@ private:
     PaddingProperty padding_;
     std::string tabBarInspectorId_;
     BottomTabBarStyle bottomTabBarStyle_;
+    std::optional<TabBarBadgeParam> tabBarBadgeParam_;
     RefPtr<FrameNode> customStyleNode_ = nullptr;
     TabBarSymbol symbol_;
     ImageInfoConfig drawableIndicatorConfig_;

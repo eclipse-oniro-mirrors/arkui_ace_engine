@@ -126,8 +126,11 @@ int32_t SheetManager::OpenBindSheetByUIContext(
 {
     CHECK_NULL_RETURN(sheetContentNode, ERROR_CODE_BIND_SHEET_CONTENT_ERROR);
     SheetContentKey sheetContentKey(currentInstanceId, sheetContentNode->GetId());
-    if (overlayManagerMap_.find(sheetContentKey) != overlayManagerMap_.end()) {
-        return ERROR_CODE_BIND_SHEET_CONTENT_ALREADY_EXIST;
+    {
+        std::lock_guard<std::mutex> lock(sheetMutex_);
+        if (overlayManagerMap_.find(sheetContentKey) != overlayManagerMap_.end()) {
+            return ERROR_CODE_BIND_SHEET_CONTENT_ALREADY_EXIST;
+        }
     }
     auto buildTitleNodeFunc = [titleBuildFunc]() -> RefPtr<UINode> {
         CHECK_NULL_RETURN(titleBuildFunc, nullptr);
@@ -155,8 +158,14 @@ int32_t SheetManager::OpenBindSheetByUIContext(
         TAG_LOGE(AceLogTag::ACE_SHEET, "GetOverlayAndTargetNode failed errCode: %{public}d", retErrorCode);
         return retErrorCode;
     }
-    overlayManagerMap_.emplace(sheetContentKey, overlayManager);
-    targetIdMap_.emplace(sheetContentKey, targetId);
+    {
+        std::lock_guard<std::mutex> lock(sheetMutex_);
+        if (overlayManagerMap_.find(sheetContentKey) != overlayManagerMap_.end()) {
+            return ERROR_CODE_BIND_SHEET_CONTENT_ALREADY_EXIST;
+        }
+        overlayManagerMap_[sheetContentKey] = overlayManager;
+        targetIdMap_[sheetContentKey] = targetId;
+    }
 
     auto cleanMapFunc = [](const int32_t instanceId, const int32_t sheetContentNodeId) {
         SheetManager::GetInstance().CleanBindSheetMap(instanceId, sheetContentNodeId);
@@ -175,14 +184,19 @@ int32_t SheetManager::UpdateBindSheetByUIContext(const RefPtr<NG::FrameNode>& sh
 {
     CHECK_NULL_RETURN(sheetContentNode, ERROR_CODE_BIND_SHEET_CONTENT_ERROR);
     SheetContentKey sheetContentKey(currentInstanceId, sheetContentNode->GetId());
-    auto iter = overlayManagerMap_.find(sheetContentKey);
-    if (iter != overlayManagerMap_.end() && targetIdMap_.find(sheetContentKey) != targetIdMap_.end()) {
-        auto overlayManager = iter->second;
-        overlayManager->UpdateBindSheetByUIContext(
-            sheetContentNode, sheetStyle, targetIdMap_[sheetContentKey], isPartialUpdate);
-        return ERROR_CODE_NO_ERROR;
+    RefPtr<OverlayManager> overlayManager;
+    int32_t targetId = 0;
+    {
+        std::lock_guard<std::mutex> lock(sheetMutex_);
+        auto iter = overlayManagerMap_.find(sheetContentKey);
+        if (iter == overlayManagerMap_.end() || targetIdMap_.find(sheetContentKey) == targetIdMap_.end()) {
+            return ERROR_CODE_BIND_SHEET_CONTENT_NOT_FOUND;
+        }
+        overlayManager = iter->second;
+        targetId = targetIdMap_[sheetContentKey];
     }
-    return ERROR_CODE_BIND_SHEET_CONTENT_NOT_FOUND;
+    overlayManager->UpdateBindSheetByUIContext(sheetContentNode, sheetStyle, targetId, isPartialUpdate);
+    return ERROR_CODE_NO_ERROR;
 }
 
 int32_t SheetManager::CloseBindSheetByUIContext(
@@ -190,13 +204,19 @@ int32_t SheetManager::CloseBindSheetByUIContext(
 {
     CHECK_NULL_RETURN(sheetContentNode, ERROR_CODE_BIND_SHEET_CONTENT_ERROR);
     SheetContentKey sheetContentKey(currentInstanceId, sheetContentNode->GetId());
-    auto iter = overlayManagerMap_.find(sheetContentKey);
-    if (iter != overlayManagerMap_.end() && targetIdMap_.find(sheetContentKey) != targetIdMap_.end()) {
-        auto overlayManager = iter->second;
-        overlayManager->CloseBindSheetByUIContext(sheetContentNode, targetIdMap_[sheetContentKey]);
-        return ERROR_CODE_NO_ERROR;
+    RefPtr<OverlayManager> overlayManager;
+    int32_t targetId = 0;
+    {
+        std::lock_guard<std::mutex> lock(sheetMutex_);
+        auto iter = overlayManagerMap_.find(sheetContentKey);
+        if (iter == overlayManagerMap_.end() || targetIdMap_.find(sheetContentKey) == targetIdMap_.end()) {
+            return ERROR_CODE_BIND_SHEET_CONTENT_NOT_FOUND;
+        }
+        overlayManager = iter->second;
+        targetId = targetIdMap_[sheetContentKey];
     }
-    return ERROR_CODE_BIND_SHEET_CONTENT_NOT_FOUND;
+    overlayManager->CloseBindSheetByUIContext(sheetContentNode, targetId);
+    return ERROR_CODE_NO_ERROR;
 }
 
 void SheetManager::DeleteOverlayForWindowScene(int32_t rootNodeId, RootNodeType rootNodeType, int32_t targetId)
@@ -299,11 +319,12 @@ RefPtr<OverlayManager> SheetManager::GetOverlayFromPage(int32_t rootNodeId, Root
 
 bool SheetManager::RemoveSheetByESC()
 {
-    if (!sheetFocusId_.has_value()) {
+    auto sheetFocusId = GetFocusSheetId();
+    if (!sheetFocusId.has_value()) {
         TAG_LOGE(AceLogTag::ACE_SHEET, "focus sheet id is null, can't respond to esc");
         return false;
     }
-    auto sheetNode = FrameNode::GetFrameNode(SHEET_PAGE_TAG, sheetFocusId_.value());
+    auto sheetNode = FrameNode::GetFrameNode(SHEET_PAGE_TAG, sheetFocusId.value());
     CHECK_NULL_RETURN(sheetNode, false);
     auto sheetPattern = sheetNode->GetPattern<SheetPresentationPattern>();
     CHECK_NULL_RETURN(sheetPattern, false);
@@ -313,7 +334,7 @@ bool SheetManager::RemoveSheetByESC()
     }
     auto overlayManager = sheetPattern->GetOverlayManager();
     CHECK_NULL_RETURN(overlayManager, false);
-    TAG_LOGI(AceLogTag::ACE_SHEET, "sheet will close by esc, id is : %{public}d", sheetFocusId_.value());
+    TAG_LOGI(AceLogTag::ACE_SHEET, "sheet will close by esc, id is : %{public}d", sheetFocusId.value());
     return overlayManager->RemoveModalInOverlay();
 }
 

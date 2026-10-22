@@ -673,6 +673,7 @@ void NavigationModelStatic::SetTitlebarOptions(FrameNode* frameNode, NavigationT
     CHECK_NULL_VOID(navBarNode);
     auto navBarPattern = navBarNode->GetPattern<NavBarPattern>();
     CHECK_NULL_VOID(navBarPattern);
+    opt.brOptions.barStyle = GetDefaultBarStyleFromStrategy(frameNode, opt.brOptions.barStyle);
     navBarPattern->SetTitleBarStyle(opt.brOptions.barStyle);
     auto titleBarNode = AceType::DynamicCast<TitleBarNode>(navBarNode->GetTitleBarNode());
     CHECK_NULL_VOID(titleBarNode);
@@ -821,7 +822,7 @@ bool NavigationModelStatic::CreateBackButtonNode(RefPtr<FrameNode>& backButtonNo
 {
     auto* buttonModifier = NodeModifier::GetButtonCustomModifier();
     CHECK_NULL_RETURN(buttonModifier, false);
-    auto* buttonPattern = reinterpret_cast<ButtonPattern*>(buttonModifier->createButtonPattern());
+    auto buttonPattern = AceType::DynamicCast<ButtonPattern>(buttonModifier->createButtonPattern());
     CHECK_NULL_RETURN(buttonPattern, false);
 
     auto theme = NavigationGetTheme();
@@ -834,7 +835,7 @@ bool NavigationModelStatic::CreateBackButtonNode(RefPtr<FrameNode>& backButtonNo
         buttonPattern->SetFocusBorderWidth(theme->GetBackgroundFocusOutlineWeight());
     }
     backButtonNode = FrameNode::CreateFrameNode(
-        V2::BACK_BUTTON_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::Claim(buttonPattern));
+        V2::BACK_BUTTON_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), buttonPattern);
     CHECK_NULL_RETURN(backButtonNode, false);
 
     auto focusHub = backButtonNode->GetOrCreateFocusHub();

@@ -27,7 +27,7 @@ namespace OHOS::Ace {
 /**
  * PieceTheme defines default style of DOMPiece,using PieceTheme::Builder to build DOMPiece.
  */
-class PieceTheme : public virtual Theme {
+class PieceTheme : public Theme {
     DECLARE_ACE_TYPE(PieceTheme, Theme);
 
 public:

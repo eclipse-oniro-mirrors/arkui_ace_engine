@@ -134,7 +134,7 @@ struct GestureStyle {
     }
 };
 
-class SpanBase : public virtual AceType {
+class SpanBase : public AceType {
     DECLARE_ACE_TYPE(SpanBase, AceType);
 public:
     SpanBase() = default;

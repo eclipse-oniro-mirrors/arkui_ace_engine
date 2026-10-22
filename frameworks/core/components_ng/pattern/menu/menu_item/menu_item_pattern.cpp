@@ -1561,23 +1561,37 @@ void CustomMenuItemPattern::OnTouch(const TouchEventInfo& info)
 
     // close menu when touch up
     // can't use onClick because that conflicts with interactions developers might set to the customNode
-    // Treat the gesture as a click iff the finger stays inside the item bounds during the whole touch
-    // sequence (down/move/up). This mirrors ClickRecognizer::IsPointInRegion so that "onClick fires" and
-    // "menu closes" share the same hit criterion, instead of the old down->up straight-line distance check
-    // which is stricter than onClick and caused the menu not to close on an in-bounds swipe before lift-up.
+    // Treat the gesture as a click iff the finger is still inside the item bounds on lift AND the touch
+    // sequence is not a predominantly-vertical swipe. Only a predominantly-vertical move beyond
+    // DEFAULT_CLICK_DISTANCE disqualifies a click, because the parent Scroll only claims vertical swipes
+    // (its PanRecognizer direction is VERTICAL). A horizontal move — even with vertical jitter beyond
+    // DEFAULT_CLICK_DISTANCE — must NOT disqualify a click: the developer's custom node (e.g. a Button
+    // inside the customMenuItem) registers its own ClickRecognizer that uses response-region hit testing
+    // and will still fire on a horizontal swipe, so OnTouch must stay aligned and close the menu.
+    // A synthesized DOWN+UP with no MOVE leaves movedOutOfRegion_ false. The straight-line distance
+    // fallback below covers the case where the UP point drifts slightly outside the item bounds
+    // (so IsOffsetInNodeBounds fails) but is still within DEFAULT_CLICK_DISTANCE of the DOWN point —
+    // a legitimate tap.
     if (touchType == TouchType::DOWN) {
         lastTouchOffset_ = std::make_unique<Offset>(touches.front().GetLocalLocation());
         movedOutOfRegion_ = false;
     } else if (touchType == TouchType::MOVE) {
-        // mirror ClickRecognizer: once the finger leaves the item bounds, it is no longer a click
-        if (!movedOutOfRegion_ &&
-            !MenuPattern::IsOffsetInNodeBounds(GetHost(), touches.front().GetLocalLocation())) {
-            movedOutOfRegion_ = true;
+        // A swipe is detected only when the vertical component dominates (offsetY > offsetX) AND exceeds
+        // DEFAULT_CLICK_DISTANCE. This distinguishes a true vertical scroll swipe from a horizontal
+        // swipe that has some vertical hand jitter.
+        if (!movedOutOfRegion_ && lastTouchOffset_) {
+            auto current = touches.front().GetLocalLocation();
+            auto offsetX = std::abs(current.GetX() - lastTouchOffset_->GetX());
+            auto offsetY = std::abs(current.GetY() - lastTouchOffset_->GetY());
+            if (offsetY > DEFAULT_CLICK_DISTANCE && offsetY > offsetX) {
+                movedOutOfRegion_ = true;
+            }
         }
     } else if (touchType == TouchType::UP) {
         auto touchUpOffset = touches.front().GetLocalLocation();
-        bool isClick = lastTouchOffset_ && !movedOutOfRegion_ &&
-            MenuPattern::IsOffsetInNodeBounds(GetHost(), touchUpOffset);
+        bool isClick =
+            (!movedOutOfRegion_ && MenuPattern::IsOffsetInNodeBounds(GetHost(), touchUpOffset)) ||
+            (lastTouchOffset_ && (touchUpOffset - *lastTouchOffset_).GetDistance() <= DEFAULT_CLICK_DISTANCE);
         if (isClick) {
             if (Container::GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TWELVE)) {
                 HandleOnChange();

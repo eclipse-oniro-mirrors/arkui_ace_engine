@@ -1327,6 +1327,170 @@ typedef enum {
 } ArkUI_AnimationDirection;
 
 /**
+ * @brief Enumerates the animatable property types for property animations and keyframe animations.
+ *
+ * @since 26.0.1
+ */
+typedef enum {
+    /**
+     * @brief Translation in both x and y directions.
+     * The value parameter requires two f32 {@link ArkUI_NumberValue} elements: [x, y], in px.
+     * @since 26.0.1
+     */
+    OH_ARKUI_ANIMATION_PROPERTY_TRANSLATION = 0,
+    /**
+     * @brief Translation in the x direction.
+     * The value parameter requires one f32 {@link ArkUI_NumberValue} element: [x], in px.
+     * @since 26.0.1
+     */
+    OH_ARKUI_ANIMATION_PROPERTY_TRANSLATION_X = 1,
+    /**
+     * @brief Translation in the y direction.
+     * The value parameter requires one f32 {@link ArkUI_NumberValue} element: [y], in px.
+     * @since 26.0.1
+     */
+    OH_ARKUI_ANIMATION_PROPERTY_TRANSLATION_Y = 2,
+    /**
+     * @brief Translation in the z direction.
+     * The value parameter requires one f32 {@link ArkUI_NumberValue} element: [z], in px.
+     * @since 26.0.1
+     */
+    OH_ARKUI_ANIMATION_PROPERTY_TRANSLATION_Z = 3,
+    /**
+     * @brief Scale in both x and y directions.
+     * The value parameter requires two f32 {@link ArkUI_NumberValue} elements: [x, y].
+     * @since 26.0.1
+     */
+    OH_ARKUI_ANIMATION_PROPERTY_SCALE = 4,
+    /**
+     * @brief Scale in the x direction.
+     * The value parameter requires one f32 {@link ArkUI_NumberValue} element: [x].
+     * @since 26.0.1
+     */
+    OH_ARKUI_ANIMATION_PROPERTY_SCALE_X = 5,
+    /**
+     * @brief Scale in the y direction.
+     * The value parameter requires one f32 {@link ArkUI_NumberValue} element: [y].
+     * @since 26.0.1
+     */
+    OH_ARKUI_ANIMATION_PROPERTY_SCALE_Y = 6,
+    /**
+     * @brief Rotation angle for all axes.
+     * The value parameter requires three f32 {@link ArkUI_NumberValue} elements: [angleX, angleY, angleZ], in degrees.
+     * @since 26.0.1
+     */
+    OH_ARKUI_ANIMATION_PROPERTY_ROTATION = 7,
+    /**
+     * @brief Rotation angle around the x-axis.
+     * The value parameter requires one f32 {@link ArkUI_NumberValue} element: [angle], in degrees.
+     * @since 26.0.1
+     */
+    OH_ARKUI_ANIMATION_PROPERTY_ROTATION_X = 8,
+    /**
+     * @brief Rotation angle around the y-axis.
+     * The value parameter requires one f32 {@link ArkUI_NumberValue} element: [angle], in degrees.
+     * @since 26.0.1
+     */
+    OH_ARKUI_ANIMATION_PROPERTY_ROTATION_Y = 9,
+    /**
+     * @brief Rotation angle around the z-axis.
+     * The value parameter requires one f32 {@link ArkUI_NumberValue} element: [angle], in degrees.
+     * @since 26.0.1
+     */
+    OH_ARKUI_ANIMATION_PROPERTY_ROTATION_Z = 10,
+    /**
+     * @brief Opacity of the component.
+     * The value parameter requires one f32 {@link ArkUI_NumberValue} element: [opacity].
+     * Value range: [0, 1].
+     * @since 26.0.1
+     */
+    OH_ARKUI_ANIMATION_PROPERTY_OPACITY = 11,
+    /**
+     * @brief Bounds (position and size).
+     * The value parameter requires four i32 {@link ArkUI_NumberValue} elements: [x, y, width, height], in px.
+     * @since 26.0.1
+     */
+    OH_ARKUI_ANIMATION_PROPERTY_BOUNDS = 12,
+    /**
+     * @brief Position x within bounds.
+     * The value parameter requires one i32 {@link ArkUI_NumberValue} element: [x], in px.
+     * @since 26.0.1
+     */
+    OH_ARKUI_ANIMATION_PROPERTY_BOUNDS_X = 13,
+    /**
+     * @brief Position y within bounds.
+     * The value parameter requires one i32 {@link ArkUI_NumberValue} element: [y], in px.
+     * @since 26.0.1
+     */
+    OH_ARKUI_ANIMATION_PROPERTY_BOUNDS_Y = 14,
+    /**
+     * @brief Width of the bounds.
+     * The value parameter requires one i32 {@link ArkUI_NumberValue} element: [width], in px.
+     * @since 26.0.1
+     */
+    OH_ARKUI_ANIMATION_PROPERTY_BOUNDS_WIDTH = 15,
+    /**
+     * @brief Height of the bounds.
+     * The value parameter requires one i32 {@link ArkUI_NumberValue} element: [height], in px.
+     * @since 26.0.1
+     */
+    OH_ARKUI_ANIMATION_PROPERTY_BOUNDS_HEIGHT = 16,
+    /**
+     * @brief Background color of the component.
+     * The value parameter requires one u32 {@link ArkUI_NumberValue} element: [color].
+     * @since 26.0.1
+     */
+    OH_ARKUI_ANIMATION_PROPERTY_BACKGROUND_COLOR = 17,
+} OH_ArkUI_AnimationPropertyType;
+
+/**
+ * @brief Enumerates the playback states of an animation group.
+ *
+ * @since 26.0.1
+ */
+typedef enum {
+    /**
+     * @brief The animation group is running.
+     * @since 26.0.1
+     */
+    OH_ARKUI_ANIMATION_GROUP_STATE_RUNNING = 0,
+    /**
+     * @brief The animation group is paused.
+     * @since 26.0.1
+     */
+    OH_ARKUI_ANIMATION_GROUP_STATE_PAUSED = 1,
+    /**
+     * @brief The animation group is inactive, for example, when the animation has finished or when the group is
+     * in an invalid state.
+     * @since 26.0.1
+     */
+    OH_ARKUI_ANIMATION_GROUP_STATE_INACTIVE = 2,
+} OH_ArkUI_AnimationGroupState;
+
+/**
+ * @brief Enumerates the finish modes of an animation group.
+ *
+ * @since 26.0.1
+ */
+typedef enum {
+    /**
+     * @brief Finishes the animation group and jumps to the start state.
+     * @since 26.0.1
+     */
+    OH_ARKUI_ANIMATION_FINISH_TO_START = 0,
+    /**
+     * @brief Finishes the animation group and stays at the current value.
+     * @since 26.0.1
+     */
+    OH_ARKUI_ANIMATION_FINISH_TO_CURRENT = 1,
+    /**
+     * @brief Finishes the animation group and jumps to the end state.
+     * @since 26.0.1
+     */
+    OH_ARKUI_ANIMATION_FINISH_TO_END = 2,
+} OH_ArkUI_AnimationFinishMode;
+
+/**
  * @brief Enumerates the effects when the component is hovered.
  *
  * @since 23
@@ -1486,6 +1650,36 @@ typedef enum {
      */
     ARKUI_ERROR_CODE_NODE_IS_NOT_IN_ADOPTED_CHILDREN = 106210,
     /**
+     * @brief Can not get attribute because it is not set before.
+     * @since 26.0.1
+     */
+    ARKUI_ERROR_CODE_NO_ATTRIBUTE_FOUND = 106211,
+    /**
+     * @brief The parameters of sub animation are invalid.
+     * @since 26.0.1
+     */
+    ARKUI_ERROR_CODE_SUB_ANIMATION_INVALID = 106212,
+    /**
+     * @brief The animation group is not found on the UIContext.
+     * @since 26.0.1
+     */
+    ARKUI_ERROR_CODE_ANIMATION_GROUP_NOT_FOUND = 106213,
+    /**
+     * @brief A re-entrant call to the animation group API is detected on the same thread.
+     * @since 26.0.1
+     */
+    ARKUI_ERROR_CODE_ANIMATION_GROUP_REENTRANT_CALL = 106214,
+    /**
+     * @brief The animation group is not in the state required by the operation.
+     * @since 26.0.1
+     */
+    ARKUI_ERROR_CODE_ANIMATION_GROUP_INVALID_STATE = 106215,
+    /**
+     * @brief The resolved target node does not belong to the same UIContext as the context parameter.
+     * @since 26.0.1
+     */
+    ARKUI_ERROR_CODE_TARGET_NODE_NOT_IN_SAME_CONTEXT = 106216,
+    /**
      * @error The node type is not custom node.
      * @since 20
      */
@@ -1591,6 +1785,52 @@ typedef enum {
      * @since 21
      */
     ARKUI_ERROR_CODE_PARAM_ERROR = 100023,
+    /**
+     * @error The previous composite command's completion callback has not yet started.
+     * @since 26.2.0
+     */
+    ARKUI_ERROR_CODE_COMMAND_UNFINISHED = 106409,
+    /**
+     * @error The node is not found, cross-instance, or destroyed before execution.
+     * @since 26.2.0
+     */
+    ARKUI_ERROR_CODE_NODE_NOT_FOUND = 106410,
+    /**
+     * @brief Result too large.
+     *
+     * @since 26.2.0
+     */
+    ARKUI_ERROR_CODE_RESULT_TOO_LARGE = 106411,
+    /**
+     * @brief Resource exhausted.
+     *
+     * @since 26.2.0
+     */
+    ARKUI_ERROR_CODE_RESOURCE_EXHAUSTED = 106412,
+    /**
+     * @brief The node ID is duplicated.
+     *
+     * @since 26.2.0
+     */
+    ARKUI_ERROR_CODE_DUPLICATE_NODE_ID = 106413,
+    /**
+     * @brief Some collection items failed.
+     *
+     * @since 26.2.0
+     */
+    ARKUI_ERROR_CODE_COLLECTION_PARTIAL_FAILED = 106414,
+    /**
+     * @brief The collection item is not found.
+     *
+     * @since 26.2.0
+     */
+    ARKUI_ERROR_CODE_COLLECTION_ITEM_NOT_FOUND = 106415,
+    /**
+     * @brief The collection item has already been taken.
+     *
+     * @since 26.2.0
+     */
+    ARKUI_ERROR_CODE_COLLECTION_ITEM_ALREADY_TAKEN = 106416,
 } ArkUI_ErrorCode;
 
 /**
@@ -6969,6 +7209,206 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_LineSpacingOptions_SetOnlyBetweenLines(
 ArkUI_ErrorCode OH_ArkUI_NativeModule_LineSpacingOptions_GetOnlyBetweenLines(
     const OH_ArkUI_NativeModule_LineSpacingOptions* options, bool* onlyBetweenLines);
 
+/**
+ * @brief Enumerates the gradient directions for linear gradient blur.
+ *
+ * @since 26.2.0
+ */
+typedef enum {
+    /**
+     * @brief Linear gradient blur from right to left.
+     *
+     * @since 26.2.0
+     */
+    OH_ARKUI_LINEAR_GRADIENT_BLUR_DIRECTION_LEFT = 0,
+    /**
+     * @brief Linear gradient blur from bottom to top.
+     *
+     * @since 26.2.0
+     */
+    OH_ARKUI_LINEAR_GRADIENT_BLUR_DIRECTION_TOP = 1,
+    /**
+     * @brief Linear gradient blur from left to right.
+     *
+     * @since 26.2.0
+     */
+    OH_ARKUI_LINEAR_GRADIENT_BLUR_DIRECTION_RIGHT = 2,
+    /**
+     * @brief Linear gradient blur from top to bottom.
+     *
+     * @since 26.2.0
+     */
+    OH_ARKUI_LINEAR_GRADIENT_BLUR_DIRECTION_BOTTOM = 3,
+    /**
+     * @brief Linear gradient blur from lower right to upper left.
+     *
+     * @since 26.2.0
+     */
+    OH_ARKUI_LINEAR_GRADIENT_BLUR_DIRECTION_LEFT_TOP = 4,
+    /**
+     * @brief Linear gradient blur from upper right to lower left.
+     *
+     * @since 26.2.0
+     */
+    OH_ARKUI_LINEAR_GRADIENT_BLUR_DIRECTION_LEFT_BOTTOM = 5,
+    /**
+     * @brief Linear gradient blur from lower left to upper right.
+     *
+     * @since 26.2.0
+     */
+    OH_ARKUI_LINEAR_GRADIENT_BLUR_DIRECTION_RIGHT_TOP = 6,
+    /**
+     * @brief Linear gradient blur from upper left to lower right.
+     *
+     * @since 26.2.0
+     */
+    OH_ARKUI_LINEAR_GRADIENT_BLUR_DIRECTION_RIGHT_BOTTOM = 7,
+} OH_ArkUI_LinearGradientBlurDirection;
+
+/**
+ * @brief Defines the options for the linear gradient blur effect.
+ *
+ * The options include the blur radius, fraction stops, and direction. When created by
+ * {@link OH_ArkUI_NativeModule_LinearGradientBlurOptions_Create}, the default values are:
+ * blurRadius = 0 (no blur), fractionStops = {0.0, 0.0, 0.0, 1.0} (two stops: blur value 0
+ * at position 0 and blur value 0 at position 1, meaning no blur across the entire gradient),
+ * direction = {@link OH_ARKUI_LINEAR_GRADIENT_BLUR_DIRECTION_BOTTOM}.
+ *
+ * @since 26.2.0
+ */
+typedef struct OH_ArkUI_LinearGradientBlurOptions OH_ArkUI_LinearGradientBlurOptions;
+
+/**
+ * @brief Creates a linear gradient blur options object.
+ *
+ * @return Returns the pointer to the {@link OH_ArkUI_LinearGradientBlurOptions} object.
+ *     The caller owns the returned object and must release it with
+ *     {@link OH_ArkUI_NativeModule_LinearGradientBlurOptions_Destroy}.
+ * @release OH_ArkUI_NativeModule_LinearGradientBlurOptions_Destroy {return}
+ * @since 26.2.0
+ */
+OH_ArkUI_LinearGradientBlurOptions* OH_ArkUI_NativeModule_LinearGradientBlurOptions_Create(void);
+
+/**
+ * @brief Destroys a linear gradient blur options object.
+ *
+ * @param options [in] Indicates the pointer to the {@link OH_ArkUI_LinearGradientBlurOptions} object
+ *     returned by {@link OH_ArkUI_NativeModule_LinearGradientBlurOptions_Create}. Passing <b>NULL</b> has no effect.
+ *     After this function returns for a non-NULL handle, the handle is invalid, is not
+ *     reference-counted, and must not be used or destroyed again.
+ * @since 26.2.0
+ */
+void OH_ArkUI_NativeModule_LinearGradientBlurOptions_Destroy(OH_ArkUI_LinearGradientBlurOptions *options);
+
+/**
+ * @brief Sets the blur radius for the linear gradient blur options.
+ *
+ * @param options [in] Indicates the pointer to the {@link OH_ArkUI_LinearGradientBlurOptions} object.
+ * @param blurRadius [in] Indicates the blur radius, in px. A larger value indicates a higher blur degree.
+ *        If the value is <b>0</b>, the content is not blurred.
+ * @return <ul>
+ *         <li>{@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.</li>
+ *         <li>{@link ARKUI_ERROR_CODE_PARAM_INVALID} if options is null, blurRadius is negative,
+ *         or blurRadius is NaN.</li>
+ *         </ul>
+ * @since 26.2.0
+ */
+ArkUI_ErrorCode OH_ArkUI_NativeModule_LinearGradientBlurOptions_SetBlurRadius(
+    OH_ArkUI_LinearGradientBlurOptions *options, float blurRadius);
+
+/**
+ * @brief Obtains the blur radius of linear gradient blur options.
+ *
+ * @param options [in] Indicates the pointer to the {@link OH_ArkUI_LinearGradientBlurOptions} object.
+ * @param blurRadius [out] Indicates the pointer to the blur radius, in px.
+ * @return <ul>
+ *         <li>{@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.</li>
+ *         <li>{@link ARKUI_ERROR_CODE_PARAM_INVALID} if options or blurRadius is null.</li>
+ *         </ul>
+ * @since 26.2.0
+ */
+ArkUI_ErrorCode OH_ArkUI_NativeModule_LinearGradientBlurOptions_GetBlurRadius(
+    const OH_ArkUI_LinearGradientBlurOptions *options, float *blurRadius);
+
+/**
+ * @brief Sets the fraction stops for the linear gradient blur options.
+ *
+ * @param options [in] Indicates the pointer to the {@link OH_ArkUI_LinearGradientBlurOptions} object.
+ * @param fractionStops [in] Indicates the flat float array of (blur value, position) pairs.
+ *         Each pair (fractionStops[i], fractionStops[i+1]) represents one fraction stop.
+ *         The blur value (fractionStops[i]) indicates the fraction of the blur radius applied
+ *         at this position, where 0.0 means no blur and 1.0 means full blur as defined by blurRadius.
+ *         The position (fractionStops[i+1]) indicates the relative position along the gradient
+ *         direction, where 0.0 is the start and 1.0 is the end. Position values must be strictly
+ *         monotonically increasing. Each element must not be NaN and must be in the range [0.0, 1.0].
+ * @param stopsLength [in] Indicates the number of float elements in the fractionStops array.
+ *         Must be even and >= 4.
+ * @return <ul>
+ *         <li>{@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.</li>
+ *         <li>{@link ARKUI_ERROR_CODE_PARAM_INVALID} if options or fractionStops is null,
+ *         stopsLength is odd, stopsLength is less than 4, positions are not strictly
+ *         monotonically increasing, or any element in fractionStops is NaN or is outside
+ *         the range [0.0, 1.0].</li>
+ *         </ul>
+ * @since 26.2.0
+ */
+ArkUI_ErrorCode OH_ArkUI_NativeModule_LinearGradientBlurOptions_SetFractionStops(
+    OH_ArkUI_LinearGradientBlurOptions *options, const float *fractionStops, int32_t stopsLength);
+
+/**
+ * @brief Obtains the fraction stops of linear gradient blur options.
+ *
+ * @param options [in] Indicates the pointer to the {@link OH_ArkUI_LinearGradientBlurOptions} object.
+ * @param fractionStops [out] Indicates the buffer pointer to the flat float array of
+ *         (blur value, position) pairs.
+ * @param stopsSize [in] Indicates the buffer size (number of float elements) allocated by the caller
+ *         for the fractionStops array. If the buffer is not large enough to hold all fraction stops data,
+ *         the operation returns {@link ARKUI_ERROR_CODE_BUFFER_SIZE_ERROR} and sets writeLength
+ *         to the required size.
+ * @param writeLength [out] Indicates the number of float elements actually written to the
+ *         fractionStops buffer when returning {@link ARKUI_ERROR_CODE_NO_ERROR}. Indicates the
+ *         minimum buffer size required to accommodate the fractionStops when returning
+ *         {@link ARKUI_ERROR_CODE_BUFFER_SIZE_ERROR}.
+ * @return <ul>
+ *         <li>{@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.</li>
+ *         <li>{@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter exception occurs.</li>
+ *         <li>{@link ARKUI_ERROR_CODE_BUFFER_SIZE_ERROR} if stopsSize is less than the
+ *         actual fractionStops count.</li>
+ *         </ul>
+ * @since 26.2.0
+ */
+ArkUI_ErrorCode OH_ArkUI_NativeModule_LinearGradientBlurOptions_GetFractionStops(
+    const OH_ArkUI_LinearGradientBlurOptions *options, float *fractionStops, int32_t stopsSize, int32_t *writeLength);
+
+/**
+ * @brief Sets the gradient blur direction for the linear gradient blur options.
+ *
+ * @param options [in] Indicates the pointer to the {@link OH_ArkUI_LinearGradientBlurOptions} object.
+ * @param direction [in] Indicates the direction of the linear gradient blur.
+ *         The parameter type is {@link OH_ArkUI_LinearGradientBlurDirection}.
+ * @return <ul>
+ *         <li>{@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.</li>
+ *         <li>{@link ARKUI_ERROR_CODE_PARAM_INVALID} if options is null or direction
+ *         is not a valid enum value.</li>
+ *         </ul>
+ * @since 26.2.0
+ */
+ArkUI_ErrorCode OH_ArkUI_NativeModule_LinearGradientBlurOptions_SetDirection(
+    OH_ArkUI_LinearGradientBlurOptions *options, OH_ArkUI_LinearGradientBlurDirection direction);
+
+/**
+ * @brief Obtains the gradient blur direction of linear gradient blur options.
+ *
+ * @param options [in] Indicates the pointer to the {@link OH_ArkUI_LinearGradientBlurOptions} object.
+ * @param direction [out] Indicates the pointer to the direction of the linear gradient blur.
+ * @return <ul>
+ *         <li>{@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.</li>
+ *         <li>{@link ARKUI_ERROR_CODE_PARAM_INVALID} if options or direction is null.</li>
+ *         </ul>
+ * @since 26.2.0
+ */
+ArkUI_ErrorCode OH_ArkUI_NativeModule_LinearGradientBlurOptions_GetDirection(
+    const OH_ArkUI_LinearGradientBlurOptions *options, OH_ArkUI_LinearGradientBlurDirection *direction);
 
 #ifdef __cplusplus
 };

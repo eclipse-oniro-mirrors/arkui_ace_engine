@@ -18,6 +18,7 @@
 #include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_utils.h"
 #include "core/components/checkable/checkable_theme.h"
 #include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/base/view_abstract.h"
 #include "core/components_ng/base/view_stack_processor.h"
 #include "core/components_ng/pattern/radio/radio_model_ng.h"
 #include "core/components_ng/pattern/radio/radio_theme.h"
@@ -450,6 +451,22 @@ ArkUINativeModuleValue RadioBridge::ResetRadioStyle(ArkUIRuntimeCallInfo* runtim
     return panda::JSValueRef::Undefined(vm);
 }
 
+static bool TryApplyLayoutPolicy(
+    EcmaVM* vm, ArkUINodeHandle nativeNode, const Local<JSValueRef>& jsValue, bool isWidth)
+{
+    if (jsValue.IsEmpty() || !jsValue->IsObject(vm)) {
+        return false;
+    }
+    auto obj = jsValue->ToObject(vm);
+    auto layoutPolicy = obj->Get(vm, panda::StringRef::NewFromUtf8(vm, "id_"));
+    if (!layoutPolicy->IsString(vm)) {
+        return false;
+    }
+    auto policy = CommonBridge::ParseLayoutPolicy(layoutPolicy->ToString(vm)->ToString(vm));
+    ViewAbstract::UpdateLayoutPolicyProperty(reinterpret_cast<FrameNode*>(nativeNode), policy, isWidth);
+    return true;
+}
+
 ArkUINativeModuleValue RadioBridge::SetRadioWidth(ArkUIRuntimeCallInfo* runtimeCallInfo)
 {
     EcmaVM* vm = runtimeCallInfo->GetVM();
@@ -459,7 +476,10 @@ ArkUINativeModuleValue RadioBridge::SetRadioWidth(ArkUIRuntimeCallInfo* runtimeC
     auto nativeNode = nodePtr(nodeArg->ToNativePointer(vm)->Value());
     CalcDimension width;
     if (!ArkTSUtils::ParseJsDimensionVpNG(vm, widthArg, width)) {
-        GetArkUINodeModifiers()->getRadioModifier()->resetRadioWidth(nativeNode);
+        if (!TryApplyLayoutPolicy(vm, nativeNode, widthArg, true)) {
+            GetArkUINodeModifiers()->getRadioModifier()->resetRadioWidth(nativeNode);
+            ViewAbstract::ResetLayoutPolicyProperty(reinterpret_cast<FrameNode*>(nativeNode), true);
+        }
         return panda::JSValueRef::Undefined(vm);
     }
     if (LessNotEqual(width.Value(), 0.0)) {
@@ -468,6 +488,7 @@ ArkUINativeModuleValue RadioBridge::SetRadioWidth(ArkUIRuntimeCallInfo* runtimeC
     std::string widthCalc = width.CalcValue();
     GetArkUINodeModifiers()->getRadioModifier()->setRadioWidth(
         nativeNode, width.Value(), static_cast<int32_t>(width.Unit()), widthCalc.c_str());
+    ViewAbstract::ResetLayoutPolicyProperty(reinterpret_cast<FrameNode*>(nativeNode), true);
     return panda::JSValueRef::Undefined(vm);
 }
 
@@ -478,6 +499,7 @@ ArkUINativeModuleValue RadioBridge::ResetRadioWidth(ArkUIRuntimeCallInfo* runtim
     Local<JSValueRef> nodeArg = runtimeCallInfo->GetCallArgRef(0); //0 is node arguments
     auto nativeNode = nodePtr(nodeArg->ToNativePointer(vm)->Value());
     GetArkUINodeModifiers()->getRadioModifier()->resetRadioWidth(nativeNode);
+    ViewAbstract::ResetLayoutPolicyProperty(reinterpret_cast<FrameNode*>(nativeNode), true);
     return panda::JSValueRef::Undefined(vm);
 }
 
@@ -490,7 +512,10 @@ ArkUINativeModuleValue RadioBridge::SetRadioHeight(ArkUIRuntimeCallInfo* runtime
     auto nativeNode = nodePtr(nodeArg->ToNativePointer(vm)->Value());
     CalcDimension height;
     if (!ArkTSUtils::ParseJsDimensionVpNG(vm, heightArg, height)) {
-        GetArkUINodeModifiers()->getRadioModifier()->resetRadioHeight(nativeNode);
+        if (!TryApplyLayoutPolicy(vm, nativeNode, heightArg, false)) {
+            GetArkUINodeModifiers()->getRadioModifier()->resetRadioHeight(nativeNode);
+            ViewAbstract::ResetLayoutPolicyProperty(reinterpret_cast<FrameNode*>(nativeNode), false);
+        }
         return panda::JSValueRef::Undefined(vm);
     }
     if (LessNotEqual(height.Value(), 0.0)) {
@@ -499,6 +524,7 @@ ArkUINativeModuleValue RadioBridge::SetRadioHeight(ArkUIRuntimeCallInfo* runtime
     std::string heightCalc = height.CalcValue();
     GetArkUINodeModifiers()->getRadioModifier()->setRadioHeight(
         nativeNode, height.Value(), static_cast<int32_t>(height.Unit()), heightCalc.c_str());
+    ViewAbstract::ResetLayoutPolicyProperty(reinterpret_cast<FrameNode*>(nativeNode), false);
     return panda::JSValueRef::Undefined(vm);
 }
 
@@ -509,6 +535,7 @@ ArkUINativeModuleValue RadioBridge::ResetRadioHeight(ArkUIRuntimeCallInfo* runti
     Local<JSValueRef> nodeArg = runtimeCallInfo->GetCallArgRef(0); //0 is node arguments
     auto nativeNode = nodePtr(nodeArg->ToNativePointer(vm)->Value());
     GetArkUINodeModifiers()->getRadioModifier()->resetRadioHeight(nativeNode);
+    ViewAbstract::ResetLayoutPolicyProperty(reinterpret_cast<FrameNode*>(nativeNode), false);
     return panda::JSValueRef::Undefined(vm);
 }
 
@@ -797,6 +824,7 @@ ArkUINativeModuleValue RadioBridge::SetContentModifierBuilder(ArkUIRuntimeCallIn
         [vm, frameNode, obj = std::move(obj), containerId = Container::CurrentId()](
             RadioConfiguration config) -> RefPtr<FrameNode> {
             ContainerScope scope(containerId);
+            panda::LocalScope pandaScope(vm);
             auto context = ArkTSUtils::GetContext(vm);
             CHECK_EQUAL_RETURN(context->IsUndefined(), true, nullptr);
             const char* keysOfRadio[] = { "value", "checked", "enabled", "triggerChange"};
@@ -809,7 +837,6 @@ ArkUINativeModuleValue RadioBridge::SetContentModifierBuilder(ArkUIRuntimeCallIn
             auto* weak = new NG::NativeWeakRef(static_cast<AceType*>(frameNode));
             radio->SetNativePointerField(vm, 0, weak, &NG::DestructorInterceptor<NG::NativeWeakRef>);
             panda::Local<panda::JSValueRef> params[NUM_2] = { context, radio };
-            panda::LocalScope pandaScope(vm);
             panda::TryCatch trycatch(vm);
             auto jsObject = obj.ToLocal();
             auto makeFunc = jsObject->Get(vm, panda::StringRef::NewFromUtf8(vm, "makeContentModifierNode"));

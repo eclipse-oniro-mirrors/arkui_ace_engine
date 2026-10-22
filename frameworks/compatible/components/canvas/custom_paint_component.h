@@ -35,7 +35,7 @@ class RenderCustomPaint;
 using TaskFunc = std::function<void(RenderCustomPaint&, const Offset&)>;
 using PushTaskFunc = std::function<void(const TaskFunc&)>;
 
-class ACE_EXPORT CanvasTaskPool : virtual public AceType {
+class ACE_EXPORT CanvasTaskPool : public AceType {
     DECLARE_ACE_TYPE(CanvasTaskPool, AceType);
 
 public:

@@ -394,6 +394,7 @@ void SelectPattern::ShowSelectMenu()
     TAG_LOGI(AceLogTag::ACE_SELECT_COMPONENT, "select click to show menu.");
     ConfigMenuParam();
     overlayManager->ShowMenu(host->GetId(), offset, menuWrapper_);
+    RegisterScrollToSelectedTask();
 }
 
 void SelectPattern::ConfigMenuParam()
@@ -454,6 +455,7 @@ void SelectPattern::ShowSelectMenuInSubWindow()
     menuParam.setShow = true;
     ConfigMenuParam();
     subwindowManager->ShowMenuNG(menuWrapper_, menuParam, host, offset);
+    RegisterScrollToSelectedTask();
 }
 
 void SelectPattern::UpdateOptionsWidth(float selectWidth)
@@ -2151,6 +2153,79 @@ void SelectPattern::ShowScrollBar()
     scrollPattern->TriggerScrollBarDisplay();
 }
 
+void SelectPattern::RegisterScrollToSelectedTask()
+{
+    if (selected_ < 0) {
+        return;
+    }
+    CHECK_NULL_VOID(menuWrapper_);
+    auto pipeline = menuWrapper_->GetContext();
+    CHECK_NULL_VOID(pipeline);
+    auto callback = [weak = WeakClaim(this)]() {
+        auto pattern = weak.Upgrade();
+        CHECK_NULL_VOID(pattern);
+        pattern->ScrollToSelectedOption();
+    };
+    pipeline->AddBuildFinishCallBack(std::move(callback));
+}
+
+void SelectPattern::ScrollToSelectedOption()
+{
+    auto menu = GetMenuNode();
+    CHECK_NULL_VOID(menu);
+    auto scroll = DynamicCast<FrameNode>(menu->GetFirstChild());
+    CHECK_NULL_VOID(scroll);
+    auto scrollPattern = scroll->GetPattern<ScrollPattern>();
+    CHECK_NULL_VOID(scrollPattern);
+    auto column = DynamicCast<FrameNode>(scroll->GetFirstChild());
+    CHECK_NULL_VOID(column);
+    if (selected_ >= static_cast<int32_t>(column->GetChildren().size())) {
+        return;
+    }
+    auto option = DynamicCast<FrameNode>(column->GetChildAtIndex(selected_));
+    CHECK_NULL_VOID(option);
+    auto optionGeometry = option->GetGeometryNode();
+    CHECK_NULL_VOID(optionGeometry);
+    auto optionTop = optionGeometry->GetFrameOffset().GetY();
+    bool reachedScroll = false;
+    for (auto parent = option->GetParent(); parent != nullptr; parent = parent->GetParent()) {
+        auto parentFrame = DynamicCast<FrameNode>(parent);
+        if (!parentFrame) {
+            continue;
+        }
+        if (parentFrame == scroll) {
+            reachedScroll = true;
+            break;
+        }
+        auto parentGeometry = parentFrame->GetGeometryNode();
+        CHECK_NULL_VOID(parentGeometry);
+        optionTop += parentGeometry->GetFrameOffset().GetY();
+    }
+    if (!reachedScroll) {
+        return;
+    }
+    auto scrollGeometry = scroll->GetGeometryNode();
+    CHECK_NULL_VOID(scrollGeometry);
+    auto scrollLayoutProps = scroll->GetLayoutProperty<ScrollLayoutProperty>();
+    CHECK_NULL_VOID(scrollLayoutProps);
+    auto optionHeight = optionGeometry->GetFrameSize().Height();
+    auto scrollHeight = scrollGeometry->GetFrameSize().Height();
+    auto viewport = scrollPattern->GetMainContentSize();
+    if (optionTop >= 0 && optionTop + optionHeight <= scrollHeight) {
+        return;
+    }
+    auto contentOffsetY = scrollLayoutProps->CreatePaddingAndBorder().Offset().GetY();
+    auto targetOffset = static_cast<float>(scrollPattern->GetTotalOffset()) + optionTop - contentOffsetY
+        - (viewport - optionHeight) / 2.0f;
+    auto maxScrollOffset = scrollPattern->GetScrollableDistance();
+    if (targetOffset < 0.0f) {
+        targetOffset = 0.0f;
+    } else if (targetOffset > maxScrollOffset) {
+        targetOffset = maxScrollOffset;
+    }
+    scrollPattern->ScrollTo(targetOffset);
+}
+
 void SelectPattern::SetSpace(const Dimension& value)
 {
     auto host = GetHost();
@@ -2318,9 +2393,6 @@ void SelectPattern::SetOptionBgColorByUser(const Color& color, const RefPtr<Sele
 
 void SelectPattern::SetColorByUser(const RefPtr<FrameNode>& host, const RefPtr<SelectTheme>& theme)
 {
-    if (!SystemProperties::ConfigChangePerform()) {
-        return;
-    }
     CHECK_NULL_VOID(host);
     CHECK_NULL_VOID(theme);
     auto props = host->GetPaintProperty<SelectPaintProperty>();
@@ -2391,7 +2463,9 @@ bool SelectPattern::OnThemeScopeUpdate(int32_t themeScopeId)
 
     if (!fontColor_.has_value()) {
         ResetFontColor();
-        text_->MarkDirtyNode();
+        if (text_) {
+            text_->MarkDirtyNode();
+        }
         result = true;
     }
 
@@ -2864,9 +2938,7 @@ bool SelectPattern::GetShadowFromTheme(ShadowStyle shadowStyle, Shadow& shadow)
 
 void SelectPattern::SetDivider(const SelectDivider& divider)
 {
-    if (SystemProperties::ConfigChangePerform()) {
-        divider_ = divider;
-    }
+    divider_ = divider;
     const auto* menuItemModifier = NG::NodeModifier::GetMenuItemInnerModifier();
     CHECK_NULL_VOID(menuItemModifier);
     for (auto&& option : options_) {

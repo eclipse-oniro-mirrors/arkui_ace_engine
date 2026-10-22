@@ -20,6 +20,7 @@
 #include "core/components_ng/manager/drag_drop/drag_drop_manager.h"
 #include "core/components_ng/manager/safe_area/safe_area_manager.h"
 #include "core/components_ng/manager/privacy_sensitive/privacy_sensitive_manager.h"
+#include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_manager.h"
 
 #include <cinttypes>
 #include <unordered_set>
@@ -424,10 +425,36 @@ public:
         return nullptr;
     }
 
-    RefPtr<LayoutWrapper> GetFrameNodeByIndex(uint32_t index, bool needBuild, bool isCache, bool addToRenderTree)
+    RefPtr<LayoutWrapper> GetFrameNodeByIndex(
+        uint32_t index, bool needBuild, bool isCache, bool addToRenderTree, bool allowPlaceholderSubstitution)
     {
         auto itor = partFrameNodeChildren_.find(index);
         if (itor == partFrameNodeChildren_.end()) {
+            // Scroll placeholder acquisition substitution: a deferral
+            // recorded by the container pattern for this (host, index) resolves to the
+            // mounted placeholder shell, one choke point above every lazy syntax node
+            // (LazyForEach/Repeat/ForEach/Arkoala). Explicit-declaration only: the
+            // caller stated this acquisition is open to substitution (a scroll
+            // container fill loop with the capability verified) — focus resolution,
+            // jump-to-index, plain queries and the real-build commit keep the
+            // unmodified semantics whatever the deferral table holds. The shell never
+            // lands in partFrameNodeChildren_: the index slot stays reserved for the
+            // real item, and a registered real child (checked above) always wins over
+            // a deferral. The process-wide gate keeps the non-placeholder path at one
+            // atomic read.
+            if (allowPlaceholderSubstitution && !isCache && ScrollPlaceholderManager::HasAnyDeferrals()) {
+                auto* context = hostNode_->GetContext();
+                if (context) {
+                    const auto& manager = context->GetOrCreateScrollPlaceholderManager();
+                    if (manager) {
+                        auto shell = manager->QueryDeferredShell(
+                            hostNode_->GetId(), static_cast<int32_t>(index));
+                        if (shell) {
+                            return shell;
+                        }
+                    }
+                }
+            }
             Build();
             auto child = FindFrameNodeByIndex(index, needBuild, isCache, addToRenderTree);
             if (child && !isCache) {
@@ -910,6 +937,9 @@ void FrameNode::SetIsFind(bool isFind)
 void FrameNode::GetOneDepthVisibleFrame(std::vector<RefPtr<FrameNode>>& children)
 {
     GenerateOneDepthVisibleFrameWithTransition(children);
+    if (safeAreaInsetNode_) {
+        children.emplace_back(safeAreaInsetNode_);
+    }
     if (overlayNode_) {
         children.emplace_back(overlayNode_);
     }
@@ -921,6 +951,9 @@ void FrameNode::GetOneDepthVisibleFrameWithOffset(std::list<RefPtr<FrameNode>>& 
     CHECK_NULL_VOID(context);
     offset += context->GetPaintRectWithoutTransform().GetOffset();
     GenerateOneDepthVisibleFrameWithOffset(children, offset);
+    if (safeAreaInsetNode_) {
+        children.emplace_back(safeAreaInsetNode_);
+    }
     if (overlayNode_) {
         children.emplace_back(overlayNode_);
     }
@@ -1345,6 +1378,9 @@ void FrameNode::DumpKeyboardShortcutInfo()
 {
     auto eventHub = GetEventHub<EventHub>();
     if (!eventHub) {
+        return;
+    }
+    if (!eventHub->HasKeyboardShortcut()) {
         return;
     }
     auto keyboardShortcuts = eventHub->GetKeyboardShortcut();
@@ -1875,6 +1911,9 @@ void FrameNode::OnAttachToMainTree(bool recursive)
         layoutProperty_->UpdatePropertyChangeFlag(PROPERTY_UPDATE_MEASURE_SELF);
     }
     UINode::OnAttachToMainTree(recursive);
+    if (safeAreaInsetNode_ && !safeAreaInsetNode_->IsOnMainTree()) {
+        safeAreaInsetNode_->AttachToMainTree(recursive, GetContext());
+    }
     auto context = GetContext();
     CHECK_NULL_VOID(context);
 
@@ -2210,6 +2249,9 @@ void FrameNode::OnDetachFromMainTree(bool recursive, PipelineContext* context)
         }
     }
 #endif
+    if (safeAreaInsetNode_ && safeAreaInsetNode_->IsOnMainTree()) {
+        safeAreaInsetNode_->DetachFromMainTree(recursive);
+    }
     for (auto [_, callback] : removeToolbarItemCallbacks_) {
         if (callback) {
             callback();
@@ -3007,6 +3049,9 @@ void FrameNode::SetActive(bool active, bool needRebuildRenderContext)
         ClearCachedGlobalOffset();
         NotifyLazyChildren();
     }
+    if (safeAreaInsetNode_) {
+        safeAreaInsetNode_->SetActive(active, needRebuildRenderContext);
+    }
     CHECK_NULL_VOID(activeChanged);
     NotifyPageSceneActiveChanged();
 
@@ -3384,6 +3429,12 @@ void FrameNode::GenerateRenderTreeFrameChildren(std::vector<RefPtr<FrameNode>>& 
 {
     // generate full children list, including disappear children.
     GenerateOneDepthVisibleFrameWithTransition(children);
+    if (safeAreaInsetNode_) {
+        auto property = safeAreaInsetNode_->GetLayoutProperty();
+        if (property && property->GetVisibilityValue(VisibleType::VISIBLE) == VisibleType::VISIBLE) {
+            children.push_back(safeAreaInsetNode_);
+        }
+    }
     if (overlayNode_) {
         auto property = overlayNode_->GetLayoutProperty();
         if (property && property->GetVisibilityValue(VisibleType::VISIBLE) == VisibleType::VISIBLE) {
@@ -3757,6 +3808,9 @@ void FrameNode::OnGenerateOneDepthVisibleFrame(std::list<RefPtr<FrameNode>>& vis
 {
     if (isLayoutNode_) {
         UINode::GenerateOneDepthVisibleFrame(visibleList);
+        if (safeAreaInsetNode_) {
+            visibleList.emplace_back(safeAreaInsetNode_);
+        }
         if (overlayNode_) {
             visibleList.emplace_back(overlayNode_);
         }
@@ -3776,6 +3830,9 @@ void FrameNode::OnGenerateOneDepthVisibleFrameWithTransition(std::vector<RefPtr<
 {
     if (isLayoutNode_) {
         UINode::GenerateOneDepthVisibleFrameWithTransition(visibleNode);
+        if (safeAreaInsetNode_) {
+            visibleNode.emplace_back(safeAreaInsetNode_);
+        }
         if (overlayNode_) {
             visibleNode.emplace_back(overlayNode_);
         }
@@ -3797,6 +3854,9 @@ void FrameNode::OnGenerateOneDepthVisibleFrameWithOffset(std::list<RefPtr<FrameN
         isFind_ = true;
         offset += GetGeometryNode()->GetFrameOffset();
         UINode::GenerateOneDepthVisibleFrameWithOffset(visibleList, offset);
+        if (safeAreaInsetNode_) {
+            visibleList.emplace_back(safeAreaInsetNode_);
+        }
         if (overlayNode_) {
             visibleList.emplace_back(overlayNode_);
         }
@@ -5461,7 +5521,12 @@ void FrameNode::OnAccessibilityEvent(
         event.windowContentChangeTypes = windowsContentChangeType;
         event.nodeId = accessibilityId_;
         auto pipeline = GetContext();
-        CHECK_NULL_VOID(pipeline);
+        if (pipeline == nullptr) {
+            TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY,
+                "OnA11yEvent drop: no context, node=%{public}d type=%{public}d",
+                GetId(), static_cast<int32_t>(eventType));
+            return;
+        }
         if (sendByNode) {
             pipeline->SendEventToAccessibilityWithNode(event, Claim(this));
         } else {
@@ -6271,6 +6336,7 @@ void FrameNode::Measure(const std::optional<LayoutConstraintF>& parentConstraint
 
     if (layoutProperty_->GetLayoutRect()) {
         layoutProperty_->UpdateLayoutConstraintWithLayoutRect();
+        MeasureSafeAreaInset();
     } else if (parentConstraint) {
         ApplyConstraint(*parentConstraint);
     } else {
@@ -6372,6 +6438,11 @@ void FrameNode::Measure(const std::optional<LayoutConstraintF>& parentConstraint
     ACE_LAYOUT_TRACE_END()
 }
 
+void FrameNode::MeasureSafeAreaInset()
+{
+    MeasureSafeAreaInsetContainer(RawPtr(safeAreaInsetNode_));
+}
+
 // Called to perform layout children.
 void FrameNode::Layout()
 {
@@ -6425,6 +6496,9 @@ void FrameNode::Layout()
             GetLayoutAlgorithm()->Layout(this);
         }
 
+        if (safeAreaInsetNode_) {
+            LayoutSafeAreaInset();
+        }
         if (overlayNode_) {
             LayoutOverlay();
         } else if (renderContext_) {
@@ -6751,9 +6825,11 @@ void FrameNode::SyncGeometryNode(bool needSyncRsNode, const DirtySwapConfig& con
     AdjustGridOffset();
 }
 
-RefPtr<LayoutWrapper> FrameNode::GetOrCreateChildByIndex(uint32_t index, bool addToRenderTree, bool isCache)
+RefPtr<LayoutWrapper> FrameNode::GetOrCreateChildByIndex(
+    uint32_t index, bool addToRenderTree, bool isCache, bool allowPlaceholderSubstitution)
 {
-    auto child = frameProxy_->GetFrameNodeByIndex(index, true, isCache, addToRenderTree);
+    auto child = frameProxy_->GetFrameNodeByIndex(index, true, isCache, addToRenderTree,
+        allowPlaceholderSubstitution);
     if (child) {
         child->SetSkipSyncGeometryNode(SkipSyncGeometryNode());
         if (addToRenderTree) {
@@ -6765,12 +6841,12 @@ RefPtr<LayoutWrapper> FrameNode::GetOrCreateChildByIndex(uint32_t index, bool ad
 
 RefPtr<LayoutWrapper> FrameNode::GetChildByIndex(uint32_t index, bool isCache)
 {
-    return frameProxy_->GetFrameNodeByIndex(index, false, isCache, false);
+    return frameProxy_->GetFrameNodeByIndex(index, false, isCache, false, false);
 }
 
 FrameNode* FrameNode::GetFrameNodeChildByIndex(uint32_t index, bool isCache, bool isExpand)
 {
-    auto frameNode = isExpand ? DynamicCast<FrameNode>(frameProxy_->GetFrameNodeByIndex(index, true, isCache, false))
+    auto frameNode = isExpand ? DynamicCast<FrameNode>(frameProxy_->GetFrameNodeByIndex(index, true, isCache, false, false))
                               : DynamicCast<FrameNode>(UINode::GetFrameChildByIndexWithoutExpanded(index));
     return RawPtr(frameNode);
 }
@@ -6960,6 +7036,11 @@ const RefPtr<LayoutAlgorithmWrapper>& FrameNode::GetLayoutAlgorithm(bool needRes
 void FrameNode::SetCacheCount(int32_t cacheCount, const std::optional<LayoutConstraintF>& itemConstraint)
 {
     frameProxy_->SetCacheCount(cacheCount, itemConstraint);
+}
+
+void FrameNode::LayoutSafeAreaInset()
+{
+    LayoutSafeAreaInsetContainer(RawPtr(safeAreaInsetNode_));
 }
 
 void FrameNode::LayoutOverlay()
@@ -8958,12 +9039,50 @@ void FrameNode::SetIsFree(bool isFree)
     }
     UINode::SetIsFree(isFree);
     SetOverlayNodeIsFree(isFree);
+    if (safeAreaInsetNode_) {
+        if (isFree) {
+            safeAreaInsetNode_->MarkNodeTreeFree();
+        } else {
+            safeAreaInsetNode_->MarkNodeTreeNotFree();
+        }
+    }
 }
 
 void FrameNode::SetOverlayNode(const RefPtr<FrameNode>& overlayNode)
 {
     overlayNode_ = overlayNode;
     SetOverlayNodeIsFree(IsFree());
+}
+
+void FrameNode::SetSafeAreaInsetNode(const RefPtr<FrameNode>& safeAreaInsetNode)
+{
+    if (safeAreaInsetNode_ == safeAreaInsetNode) {
+        return;
+    }
+    if (safeAreaInsetNode_) {
+        if (safeAreaInsetNode_->IsOnMainTree()) {
+            safeAreaInsetNode_->DetachFromMainTree(true);
+        }
+        safeAreaInsetNode_->ResetParent();
+        safeAreaInsetNode_->MarkNodeTreeFree();
+    }
+    safeAreaInsetNode_ = safeAreaInsetNode;
+    if (safeAreaInsetNode_) {
+        safeAreaInsetNode_->SetParent(WeakClaim(this));
+        safeAreaInsetNode_->SetDepth(GetDepth() + 1);
+        safeAreaInsetNode_->SetHostPageId(GetHostPageId());
+        safeAreaInsetNode_->SetActive(isActive_);
+        if (IsOnMainTree() && !safeAreaInsetNode_->IsOnMainTree()) {
+            safeAreaInsetNode_->AttachToMainTree(true, GetContext());
+        }
+        if (IsFree()) {
+            safeAreaInsetNode_->MarkNodeTreeFree();
+        } else {
+            safeAreaInsetNode_->MarkNodeTreeNotFree();
+        }
+    }
+    MarkNeedSyncRenderTree(true);
+    MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
 }
 
 void FrameNode::SetOverlayNodeIsFree(bool isFree)

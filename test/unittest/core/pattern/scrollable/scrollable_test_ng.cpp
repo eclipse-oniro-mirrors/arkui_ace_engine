@@ -23,6 +23,7 @@
 #include "test/unittest/core/pattern/scrollable/mock_scrollable.h"
 #define protected public
 #define private public
+#include "core/animation/animator.h"
 #include "core/animation/bezier_variable_velocity_motion.h"
 #include "core/components_ng/pattern/navigation/nav_bar_pattern.h"
 #include "core/components_ng/pattern/scroll/inner/scroll_bar.h"

@@ -65,6 +65,9 @@ void GroupManager::UpdateRadioGroupValue(const std::string& group, int32_t radio
         if (!node) {
             continue;
         }
+        if (!node->IsOnMainTree()) {
+            continue;
+        }
         auto modifier = GetRadioModifier();
         if (!modifier) {
             continue;
@@ -89,11 +92,17 @@ void GroupManager::AddCheckBoxGroup(const std::string& group, const WeakPtr<Fram
     CHECK_NULL_VOID(frameNode);
     auto pattern = frameNode->GetPattern<CheckBoxGroupPattern>();
     CHECK_NULL_VOID(pattern);
-    if (checkBoxGroupMap_[group].Upgrade()) {
+    auto mappedNode = checkBoxGroupMap_[group].Upgrade();
+    if (mappedNode == frameNode) {
+        return;
+    }
+    if (mappedNode) {
         pattern->SetIsAddToMap(false);
+        checkBoxGroupRepeatMap_[group] = frameNode;
     } else {
         pattern->SetIsAddToMap(true);
         checkBoxGroupMap_[group] = frameNode;
+        checkBoxGroupRepeatMap_.erase(group);
     }
 }
 
@@ -116,7 +125,28 @@ void GroupManager::RemoveCheckBoxGroup(const std::string& group, int32_t checkBo
     auto frameNode = checkBoxGroupMap_[group].Upgrade();
     if (frameNode && frameNode->GetId() == checkBoxGroupId) {
         checkBoxGroupMap_.erase(group);
+        PromoteRepeatedCheckBoxGroup(group);
+        return;
     }
+    auto repeatNode = checkBoxGroupRepeatMap_[group].Upgrade();
+    if (repeatNode && repeatNode->GetId() == checkBoxGroupId) {
+        checkBoxGroupRepeatMap_.erase(group);
+    }
+}
+
+RefPtr<FrameNode> GroupManager::PromoteRepeatedCheckBoxGroup(const std::string& group)
+{
+    auto repeatNode = checkBoxGroupRepeatMap_[group].Upgrade();
+    if (!repeatNode) {
+        checkBoxGroupRepeatMap_.erase(group);
+        return nullptr;
+    }
+    auto pattern = repeatNode->GetPattern<CheckBoxGroupPattern>();
+    CHECK_NULL_RETURN(pattern, nullptr);
+    pattern->SetIsAddToMap(true);
+    checkBoxGroupMap_[group] = repeatNode;
+    checkBoxGroupRepeatMap_.erase(group);
+    return repeatNode;
 }
 
 std::list<RefPtr<FrameNode>> GroupManager::GetCheckboxList(const std::string& group)
@@ -137,7 +167,15 @@ std::list<RefPtr<FrameNode>> GroupManager::GetCheckboxList(const std::string& gr
 
 RefPtr<FrameNode> GroupManager::GetCheckboxGroup(const std::string& group)
 {
-    return checkBoxGroupMap_[group].Upgrade();
+    auto mappedNode = checkBoxGroupMap_[group].Upgrade();
+    if (mappedNode && mappedNode->IsOnMainTree()) {
+        return mappedNode;
+    }
+    auto repeatNode = checkBoxGroupRepeatMap_[group].Upgrade();
+    if (repeatNode && repeatNode->IsOnMainTree()) {
+        return PromoteRepeatedCheckBoxGroup(group);
+    }
+    return mappedNode;
 }
 
 WeakPtr<GroupManager> GroupManager::GetGroupManager()

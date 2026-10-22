@@ -28,29 +28,12 @@ struct DragEventData {
     double coordinateY = 0.0;
 };
 
-class PropagationEventInfo : public virtual TypeInfoBase {
-    DECLARE_RELATIONSHIP_OF_CLASSES(PropagationEventInfo, TypeInfoBase);
+class JSONStringifiableEventInfo : public BaseEventInfo {
+    DECLARE_RELATIONSHIP_OF_CLASSES(JSONStringifiableEventInfo, BaseEventInfo);
 
 public:
-    bool IsStopPropagation() const
-    {
-        return stopPropagation_;
-    }
-    void SetStopPropagation(bool stopPropagation)
-    {
-        stopPropagation_ = stopPropagation;
-    }
-
-private:
-    bool stopPropagation_ = false;
-};
-
-class EventToJSONStringAdapter : public virtual TypeInfoBase {
-    DECLARE_RELATIONSHIP_OF_CLASSES(EventToJSONStringAdapter, TypeInfoBase);
-
-public:
-    EventToJSONStringAdapter() = default;
-    ~EventToJSONStringAdapter() = default;
+    explicit JSONStringifiableEventInfo(const std::string& type) : BaseEventInfo(type) {}
+    ~JSONStringifiableEventInfo() override = default;
 
     virtual std::string ToJSONString() const = 0;
 };

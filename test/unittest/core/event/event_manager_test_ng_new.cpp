@@ -1202,4 +1202,43 @@ HWTEST_F(EventManagerTestNg, EventManagerTouchTestCheckAndClean004, TestSize.Lev
 
     EXPECT_TRUE(activeManager->HasActiveRecognizers());
 }
+
+/**
+ * @tc.name: EventManagerTouchTestCheckAndClean005
+ * @tc.desc: Test TouchTest L124 branch: axisTouchTestResults_ not empty
+ *           → axisTouchTestResults_.empty() is false, CheckAndCleanBeforeNewTouch NOT called
+ * @tc.type: FUNC
+ */
+HWTEST_F(EventManagerTestNg, EventManagerTouchTestCheckAndClean005, TestSize.Level1)
+{
+    auto eventManager = AceType::MakeRefPtr<EventManager>();
+    ASSERT_NE(eventManager, nullptr);
+
+    auto recognizer = AceType::MakeRefPtr<ClickRecognizer>(1, 1);
+    recognizer->refereeState_ = RefereeState::SUCCEED;
+
+    auto activeManager = eventManager->GetOrCreateActiveRecognizerManager();
+    ASSERT_NE(activeManager, nullptr);
+    activeManager->RegisterRecognizer(recognizer, 0);
+    EXPECT_TRUE(activeManager->HasActiveRecognizers());
+
+    TouchTestResult axisResult;
+    axisResult.emplace_back(recognizer);
+    eventManager->axisTouchTestResults_[0] = std::move(axisResult);
+    EXPECT_FALSE(eventManager->axisTouchTestResults_.empty());
+
+    const int nodeId = 20005;
+    auto frameNode = FrameNode::GetOrCreateFrameNode(V2::ROW_ETS_TAG, nodeId, nullptr);
+    TouchEvent touchPoint;
+    touchPoint.id = 0;
+    touchPoint.type = TouchType::DOWN;
+
+    TouchRestrict touchRestrict;
+    Offset offset;
+    eventManager->lastDownFingerNumber_ = 0;
+
+    eventManager->TouchTest(touchPoint, frameNode, touchRestrict, offset, 0, false);
+
+    EXPECT_TRUE(activeManager->HasActiveRecognizers());
+}
 } // namespace OHOS::Ace::NG

@@ -263,6 +263,11 @@ void WebModelStatic::SetVerticalScrollBarAccessEnabled(FrameNode* frameNode, boo
     webPatternStatic->UpdateVerticalScrollBarAccessEnabled(isVerticalScrollBarAccessEnabled);
 }
 
+void WebModelStatic::SetCaretColor(FrameNode* frameNode, const std::optional<Color>& caretColor)
+{
+    WebModelNG::SetCaretColor(frameNode, caretColor.value_or(Color(0)));
+}
+
 void WebModelStatic::SetPinchSmoothModeEnabled(FrameNode* frameNode, bool isPinchSmoothModeEnabled)
 {
     CHECK_NULL_VOID(frameNode);
@@ -991,6 +996,20 @@ void WebModelStatic::SetOnDetectedBlankScreen(
     webEventHub->SetOnDetectedBlankScreenEvent(std::move(uiCallback));
 }
 
+void WebModelStatic::SetOnMonitoredBlankScreen(
+    FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& callback)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto func = callback;
+    auto uiCallback = [func](const std::shared_ptr<BaseEventInfo> &info) {
+        CHECK_NULL_VOID(info);
+        func(info.get());
+    };
+    auto webEventHub = frameNode->GetEventHub<WebEventHub>();
+    CHECK_NULL_VOID(webEventHub);
+    webEventHub->SetOnMonitoredBlankScreenEvent(std::move(uiCallback));
+}
+
 void WebModelStatic::SetOnFirstScreenPaint(
     FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& callback)
 {
@@ -1012,6 +1031,14 @@ void WebModelStatic::SetBlankScreenDetectionConfig(
     auto webPatternStatic = AceType::DynamicCast<WebPatternStatic>(frameNode->GetPattern());
     CHECK_NULL_VOID(webPatternStatic);
     webPatternStatic->UpdateBlankScreenDetectionConfig(detectConfig);
+}
+
+void WebModelStatic::SetWebBlankScreenMonitorEnabled(FrameNode *frameNode, const std::optional<bool>& enable)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto webPatternStatic = AceType::DynamicCast<WebPatternStatic>(frameNode->GetPattern());
+    CHECK_NULL_VOID(webPatternStatic);
+    webPatternStatic->UpdateWebBlankScreenMonitorEnabled(enable.value_or(false));
 }
 
 void WebModelStatic::SetResourceLoadId(FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& callback)
@@ -1151,6 +1178,15 @@ void WebModelStatic::SetOnContextMenuHide(
     auto webEventHub = frameNode->GetEventHub<WebEventHub>();
     CHECK_NULL_VOID(webEventHub);
     webEventHub->SetOnContextMenuHideEvent(std::move(uiCallback));
+}
+
+void WebModelStatic::SetOnContextMenuUpdate(FrameNode* frameNode,
+    std::function<void(WebContextMenuItemId menuItemId, const WebContextMenuOptions& options)>&& callback)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto webPatternStatic = AceType::DynamicCast<WebPatternStatic>(frameNode->GetPattern());
+    CHECK_NULL_VOID(webPatternStatic);
+    webPatternStatic->SetOnContextMenuUpdateCallback(std::move(callback));
 }
 
 void WebModelStatic::SetSearchResultReceiveEventId(
@@ -1440,6 +1476,14 @@ void WebModelStatic::SetForceEnableZoom(FrameNode* frameNode, bool isForceEnable
     auto webPatternStatic = AceType::DynamicCast<WebPatternStatic>(frameNode->GetPattern());
     CHECK_NULL_VOID(webPatternStatic);
     webPatternStatic->UpdateForceEnableZoom(isForceEnableZoom);
+}
+
+void WebModelStatic::SetFlingSpeedLimit(FrameNode* frameNode, float speedLimit)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto webPatternStatic = AceType::DynamicCast<WebPatternStatic>(frameNode->GetPattern());
+    CHECK_NULL_VOID(webPatternStatic);
+    webPatternStatic->UpdateFlingSpeedLimit(NormalizeFlingSpeedLimit(speedLimit));
 }
 
 void WebModelStatic::SetRotateRenderEffect(FrameNode* frameNode, const std::optional<WebRotateEffect>& effect)

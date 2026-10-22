@@ -1972,6 +1972,7 @@ void TextModelNG::SetIncludeFontPadding(FrameNode* frameNode, bool enabled)
 
 bool TextModelNG::GetIncludeFontPadding(FrameNode* frameNode)
 {
+    CHECK_NULL_RETURN(frameNode, false);
     bool value = false;
     ACE_GET_NODE_LAYOUT_PROPERTY_WITH_DEFAULT_VALUE(TextLayoutProperty, IncludeFontPadding, value, frameNode, value);
     return value;
@@ -1989,6 +1990,7 @@ void TextModelNG::SetFallbackLineSpacing(FrameNode* frameNode, bool enabled)
 
 bool TextModelNG::GetFallbackLineSpacing(FrameNode* frameNode)
 {
+    CHECK_NULL_RETURN(frameNode, false);
     bool value = false;
     ACE_GET_NODE_LAYOUT_PROPERTY_WITH_DEFAULT_VALUE(TextLayoutProperty, FallbackLineSpacing, value, frameNode, value);
     return value;

@@ -43,7 +43,7 @@ struct ScrollPlaceholderCostBucketKeyHash {
     }
 };
 
-// EWMA based real item build cost model (design ADR-4):
+// EWMA based real item build cost model:
 // - buckets are keyed by componentType + templateId, plus one aggregate bucket per component;
 // - estimate = EWMA mean + EWMA mean-absolute-deviation safety margin;
 // - fallback chain: template bucket -> component aggregate -> cold start constant.

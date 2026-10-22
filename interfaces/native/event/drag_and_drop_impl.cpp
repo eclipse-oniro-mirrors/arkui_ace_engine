@@ -18,6 +18,7 @@
 #include "interfaces/native/drag_and_drop.h"
 #include "interfaces/native/node/event_converter.h"
 #include "interfaces/native/node/node_model.h"
+#include "interfaces/native/node/config_manager.h"
 #include "async_task_params.h"
 #include "data_params_conversion.h"
 #include "ndk_data_conversion.h"
@@ -201,6 +202,7 @@ ArkUI_DragAction* OH_ArkUI_CreateDragActionWithNode(ArkUI_NodeHandle node)
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_CreateDragActionWithNode", "node is null");
         return nullptr;
     }
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     auto dragActions = impl->getDragAdapterAPI()->createDragActionWithNode(node->uiNodeHandle);
     return reinterpret_cast<ArkUI_DragAction*>(dragActions);
 }
@@ -479,6 +481,7 @@ int32_t OH_ArkUI_SetNodeDraggable(ArkUI_NodeHandle node, bool enabled)
     if (!impl || !node) {
         return ARKUI_ERROR_CODE_PARAM_INVALID;
     }
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     impl->getNodeModifiers()->getCommonModifier()->setDraggable(node->uiNodeHandle, enabled);
     return ARKUI_ERROR_CODE_NO_ERROR;
 }
@@ -578,6 +581,7 @@ int32_t OH_ArkUI_SetNodeDragPreviewOption(ArkUI_NodeHandle node, ArkUI_DragPrevi
     if (!impl || !node || !option) {
         return ARKUI_ERROR_CODE_PARAM_INVALID;
     }
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     auto* previewOption = reinterpret_cast<ArkUIDragPreViewAndInteractionOptions*>(option);
     ArkUIDragPreViewOptions dragPreviewOptions;
     ArkUI_Int32 modeArray[3] = { -1, -1, -1 };
@@ -623,6 +627,7 @@ int32_t OH_ArkUI_SetNodeDragPreview(ArkUI_NodeHandle node, OH_PixelmapNative* pr
     if (!impl || !node) {
         return ARKUI_ERROR_CODE_PARAM_INVALID;
     }
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     if (!preview) {
         impl->getNodeModifiers()->getCommonModifier()->resetDragPreview(node->uiNodeHandle);
         return ARKUI_ERROR_CODE_NO_ERROR;
@@ -638,6 +643,7 @@ int32_t OH_ArkUI_SetNodeAllowedDropDataTypes(ArkUI_NodeHandle node, const char* 
     if (!fullImpl || !node || !typesArray) {
         return ARKUI_ERROR_CODE_PARAM_INVALID;
     }
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     fullImpl->getNodeModifiers()->getCommonModifier()->setAllowDrop(node->uiNodeHandle, typesArray, count);
     return ARKUI_ERROR_CODE_NO_ERROR;
 }
@@ -648,6 +654,7 @@ int32_t OH_ArkUI_SetDragEventStrictReportWithNode(ArkUI_NodeHandle node, bool en
     if (!fullImpl || !node) {
         return ARKUI_ERROR_CODE_PARAM_INVALID;
     }
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     fullImpl->getDragAdapterAPI()->setDragEventStrictReportingEnabledWithNode(enabled);
     return ARKUI_ERROR_CODE_NO_ERROR;
 }
@@ -670,6 +677,7 @@ int32_t OH_ArkUI_DisallowNodeAnyDropDataTypes(ArkUI_NodeHandle node)
     if (!fullImpl || !node) {
         return ARKUI_ERROR_CODE_PARAM_INVALID;
     }
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     fullImpl->getNodeModifiers()->getCommonModifier()->setDisAllowDrop(node->uiNodeHandle);
     return ARKUI_ERROR_CODE_NO_ERROR;
 }
@@ -680,6 +688,7 @@ int32_t OH_ArkUI_AllowNodeAllDropDataTypes(ArkUI_NodeHandle node)
     if (!fullImpl || !node) {
         return ARKUI_ERROR_CODE_PARAM_INVALID;
     }
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     fullImpl->getNodeModifiers()->getCommonModifier()->resetAllowDrop(node->uiNodeHandle);
     return ARKUI_ERROR_CODE_NO_ERROR;
 }
@@ -926,6 +935,7 @@ int32_t OH_ArkUI_DisableDropDataPrefetchOnNode(ArkUI_NodeHandle node, bool disab
     if (!impl || !node) {
         return ARKUI_ERROR_CODE_PARAM_INVALID;
     }
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     impl->getNodeModifiers()->getCommonModifier()->setDisableDataPrefetch(node->uiNodeHandle, disable);
     return ARKUI_ERROR_CODE_NO_ERROR;
 }

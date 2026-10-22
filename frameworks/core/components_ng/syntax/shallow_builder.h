@@ -26,7 +26,7 @@ namespace OHOS::Ace::NG {
 
 // ShallowBuilder对象用于ListItem和GridItem内部内容懒加载能力。
 // 在最小化更新场景下，ListItem、GridItem这些组件采用懒加载方式，内部内容在js执行时不会创建仅保存创建方法。
-class ACE_EXPORT ShallowBuilder : public virtual AceType {
+class ACE_EXPORT ShallowBuilder : public AceType {
     DECLARE_ACE_TYPE(ShallowBuilder, AceType);
 
 public:

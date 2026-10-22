@@ -31,7 +31,9 @@ export @interface Component {}
 export @interface State {}
 
 @Retention({policy: "SOURCE"})
-export @interface Builder {}
+export @interface Builder {
+    isPlaceholder: boolean = false
+}
 
 @Retention({policy: "SOURCE"})
 export @interface Link {}

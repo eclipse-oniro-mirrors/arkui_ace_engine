@@ -16,6 +16,7 @@
 
 #include "core/components_ng/pattern/image/image_pattern.h"
 #include "core/components_ng/pattern/navrouter/navdestination_event_hub.h"
+#include "core/components_ng/pattern/navrouter/navdestination_group_node.h"
 #include "core/components_ng/pattern/navrouter/navdestination_pattern.h"
 #include "core/components_ng/pattern/navigation/navigation_pattern.h"
 #include "core/pipeline_ng/pipeline_context.h"
@@ -212,6 +213,12 @@ bool MemoryManager::RegisterNavDestinationHiddenChange(
                         "Skip recycle for top NavDestination. navDestId:%{public}d", navDestNode->GetId());
                     return;
                 }
+                auto navDestGroupNode = AceType::DynamicCast<NavDestinationGroupNode>(navDestNode);
+                if (navDestGroupNode && navDestGroupNode->IsHomeDestination()) {
+                    TAG_LOGD(AceLogTag::ACE_IMAGE,
+                        "Skip recycle for home destination. navDestId:%{public}d", navDestNode->GetId());
+                    return;
+                }
                 callback(isShown);
             };
             eventHub->AddOnHiddenChange(imageNodeId, std::move(wrappedCallback));
@@ -245,5 +252,28 @@ void MemoryManager::UnregisterNavDestinationHiddenChange(int32_t imageNodeId)
     }
     TAG_LOGD(AceLogTag::ACE_IMAGE, "UnregisterNavDestinationHiddenChange imageNodeId:%{public}d", imageNodeId);
     imageNavDestMap_.erase(iter);
+}
+
+bool MemoryManager::CheckNeedSkipRecycle(int32_t imageNodeId)
+{
+    auto iter = imageNavDestMap_.find(imageNodeId);
+    if (iter == imageNavDestMap_.end()) {
+        return true;
+    }
+    auto navDestNode = AceType::DynamicCast<NavDestinationGroupNode>(iter->second.Upgrade());
+    CHECK_NULL_RETURN(navDestNode, true);
+    auto navDestPattern = navDestNode->GetPattern<NavDestinationPattern>();
+    CHECK_NULL_RETURN(navDestPattern, true);
+    auto navigationNode = AceType::DynamicCast<NavigationGroupNode>(navDestPattern->GetNavigationNode());
+    CHECK_NULL_RETURN(navigationNode, true);
+    auto navigationPattern = navigationNode->GetPattern<NavigationPattern>();
+    CHECK_NULL_RETURN(navigationPattern, true);
+    auto transitionProxy = navigationPattern->GetTopNavigationProxy();
+    if (transitionProxy && transitionProxy->GetInteractive()) {
+        TAG_LOGD(AceLogTag::ACE_IMAGE, "navDestination is in interactive transition. navDestId:%{public}d",
+            navDestNode->GetId());
+        return true;
+    }
+    return false;
 }
 } // namespace OHOS::Ace::NG

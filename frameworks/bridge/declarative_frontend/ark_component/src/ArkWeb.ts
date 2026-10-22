@@ -362,6 +362,20 @@ class WebEnableFollowSystemFontWeightModifier extends ModifierWithKey<boolean> {
   }
 }
 
+class WebOnContextMenuUpdateModifier extends ModifierWithKey<OnContextMenuUpdateCallback> {
+  constructor(value: OnContextMenuUpdateCallback) {
+    super(value);
+  }
+  static identity: Symbol = Symbol('webOnContextMenuUpdateModifier');
+  applyPeer(node: KNode, reset: boolean): void {
+    if (reset) {
+      getUINativeModule().web.resetOnContextMenuUpdate(node);
+    } else {
+      getUINativeModule().web.setOnContextMenuUpdate(node, this.value);
+    }
+  }
+}
+
 class WebVerticalScrollBarAccessModifier extends ModifierWithKey<boolean> {
   constructor(value: boolean) {
     super(value);
@@ -429,6 +443,23 @@ class WebTextZoomRatioModifier extends ModifierWithKey<number> {
     } else {
       getUINativeModule().web.setTextZoomRatio(node, this.value);
     }
+  }
+}
+
+class WebCaretColorModifier extends ModifierWithKey<ResourceColor> {
+  constructor(value: ResourceColor) {
+    super(value);
+  }
+  static identity: Symbol = Symbol('webCaretColor');
+  applyPeer(node: KNode, reset: boolean): void {
+    if (reset) {
+      getUINativeModule().web.resetCaretColor(node);
+    } else {
+      getUINativeModule().web.setCaretColor(node, this.value!);
+    }
+  }
+  checkObjectDiff(): boolean {
+    return !isBaseOrResourceEqual(this.stageValue, this.value);
   }
 }
 
@@ -1227,6 +1258,20 @@ class WebOnDetectedBlankScreenModifier extends ModifierWithKey<OnDetectBlankScre
   }
 }
 
+class WebOnMonitoredBlankScreenModifier extends ModifierWithKey<OnMonitorBlankScreenCallback> {
+  constructor (value: OnMonitorBlankScreenCallback) {
+    super(value);
+  }
+  static identity: Symbol = Symbol('webOnMonitoredBlankScreenModifier');
+  applyPeer(node: KNode, reset: boolean): void {
+    if (reset) {
+      getUINativeModule().web.resetOnMonitoredBlankScreen(node);
+    } else {
+      getUINativeModule().web.setOnMonitoredBlankScreen(node, this.value);
+    }
+  }
+}
+
 class WebBlankScreenDetectionConfigModifier extends ModifierWithKey<BlankScreenDetectionConfig> {
   constructor(value: BlankScreenDetectionConfig) {
     super(value);
@@ -1243,6 +1288,20 @@ class WebBlankScreenDetectionConfigModifier extends ModifierWithKey<BlankScreenD
                                                             this.value.contentfulNodesCountThreshold);
     }
   }
+}
+
+class WebEnableBlankScreenMonitorModifier extends ModifierWithKey<boolean> {
+  constructor(value: boolean) {
+      super(value);
+  }
+  static identity: Symbol = Symbol('webEnableBlankScreenMonitorModifier');
+  applyPeer(node: KNode, reset: boolean): void {
+      if (reset) {
+          getUINativeModule().web.resetEnableBlankScreenMonitor(node);
+      } else {
+          getUINativeModule().web.setEnableBlankScreenMonitor(node, this.value);
+      }
+    }
 }
 
 class WebOnFirstScreenPaintModifier extends ModifierWithKey<OnFirstScreenPaintCallback> {
@@ -1612,6 +1671,20 @@ class WebForceEnableZoomModifier extends ModifierWithKey<boolean> {
       getUINativeModule().web.resetForceEnableZoom(node);
     } else {
       getUINativeModule().web.setForceEnableZoom(node, this.value);
+    }
+  }
+}
+
+class WebFlingSpeedLimitModifier extends ModifierWithKey<number> {
+  constructor(value: number) {
+    super(value);
+  }
+  static identity: Symbol = Symbol('webFlingSpeedLimit');
+  applyPeer(node: KNode, reset: boolean): void {
+    if (reset) {
+      getUINativeModule().web.resetFlingSpeedLimit(node);
+    } else {
+      getUINativeModule().web.setFlingSpeedLimit(node, this.value);
     }
   }
 }
@@ -2012,9 +2085,17 @@ class ArkWebComponent extends ArkComponent implements WebAttribute {
     modifierWithKey(this._modifiersWithKeys, WebOnDetectedBlankScreenModifier.identity, WebOnDetectedBlankScreenModifier, callback);
     return this;
   }
+  onMonitoredBlankScreen(callback: OnMonitorBlankScreenCallback): this {
+    modifierWithKey(this._modifiersWithKeys, WebOnMonitoredBlankScreenModifier.identity, WebOnMonitoredBlankScreenModifier, callback);
+    return this;
+  }
   blankScreenDetectionConfig(config: BlankScreenDetectionConfig): this {
     modifierWithKey(this._modifiersWithKeys, WebBlankScreenDetectionConfigModifier.identity, WebBlankScreenDetectionConfigModifier, config);
     return this;
+  }
+  enableBlankScreenMonitor(enabled: boolean): this {
+      modifierWithKey(this._modifiersWithKeys, WebEnableBlankScreenMonitorModifier.identity, WebEnableBlankScreenMonitorModifier, enabled);
+      return this;
   }
   onFirstScreenPaint(callback: OnFirstScreenPaintCallback): this {
     modifierWithKey(this._modifiersWithKeys, WebOnFirstScreenPaintModifier.identity, WebOnFirstScreenPaintModifier, callback);
@@ -2146,6 +2227,10 @@ class ArkWebComponent extends ArkComponent implements WebAttribute {
   }
   defaultFontSize(size: number): this {
     modifierWithKey(this._modifiersWithKeys, WebDefaultFontSizeModifier.identity, WebDefaultFontSizeModifier, size);
+    return this;
+  }
+  caretColor(value: ResourceColor): this {
+    modifierWithKey(this._modifiersWithKeys, WebCaretColorModifier.identity, WebCaretColorModifier, value);
     return this;
   }
   minFontSize(size: number): this {
@@ -2335,6 +2420,10 @@ class ArkWebComponent extends ArkComponent implements WebAttribute {
     modifierWithKey(this._modifiersWithKeys, WebOnContextMenuHideModifier.identity, WebOnContextMenuHideModifier, callback);
     return this;
   }
+  onContextMenuUpdate(callback: OnContextMenuUpdateCallback): this {
+    modifierWithKey(this._modifiersWithKeys, WebOnContextMenuUpdateModifier.identity, WebOnContextMenuUpdateModifier, callback);
+    return this;
+  }
   copyOptions(value: CopyOptions): this {
     modifierWithKey(this._modifiersWithKeys, WebCopyOptionsModifier.identity, WebCopyOptionsModifier, value);
     return this;
@@ -2369,6 +2458,10 @@ class ArkWebComponent extends ArkComponent implements WebAttribute {
   }
   forceEnableZoom(forceEnableZoom: boolean): this {
     modifierWithKey(this._modifiersWithKeys, WebForceEnableZoomModifier.identity, WebForceEnableZoomModifier, forceEnableZoom);
+    return this;
+  }
+  flingSpeedLimit(value: number): this {
+    modifierWithKey(this._modifiersWithKeys, WebFlingSpeedLimitModifier.identity, WebFlingSpeedLimitModifier, value);
     return this;
   }
   rotateRenderEffect(effect: WebRotateEffect): this {

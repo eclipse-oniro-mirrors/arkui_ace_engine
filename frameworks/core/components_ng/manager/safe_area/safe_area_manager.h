@@ -39,7 +39,7 @@ struct WindowTypeConfig {
     bool isSceneBoardWindow = false;
 };
 
-class ACE_FORCE_EXPORT SafeAreaManager : public virtual AceType {
+class ACE_FORCE_EXPORT SafeAreaManager : public AceType {
     DECLARE_ACE_TYPE(SafeAreaManager, AceType);
 
 public:
@@ -415,6 +415,8 @@ public:
     {
         getKeyboardInset = method;
     }
+
+    bool IsImmersiveEffectEnabled() const;
 
 private:
     bool isAtomicService_ = false;

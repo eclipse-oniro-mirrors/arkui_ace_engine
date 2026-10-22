@@ -408,6 +408,30 @@ void ScrollableModelStatic::SetEnableScrollWithMouse(FrameNode* frameNode, bool 
     pattern->SetIsAllowMouse(enabled);
 }
 
+void ScrollableModelStatic::ResetEnableScrollWithMouse(FrameNode* frameNode)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto pattern = frameNode->GetPattern<ScrollablePattern>();
+    CHECK_NULL_VOID(pattern);
+    pattern->ResetIsAllowMouse();
+}
+
+void ScrollableModelStatic::SetEnableScrollWithKeyboard(FrameNode* frameNode, bool enabled)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto pattern = frameNode->GetPattern<ScrollablePattern>();
+    CHECK_NULL_VOID(pattern);
+    pattern->SetIsAllowKeyboard(enabled);
+}
+
+void ScrollableModelStatic::ResetEnableScrollWithKeyboard(FrameNode* frameNode)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto pattern = frameNode->GetPattern<ScrollablePattern>();
+    CHECK_NULL_VOID(pattern);
+    pattern->SetIsAllowKeyboard(true);
+}
+
 void ScrollableModelStatic::SetAutoAdjustScrollBarMargin(FrameNode* frameNode, std::optional<bool> autoAdjust)
 {
     CHECK_NULL_VOID(frameNode);

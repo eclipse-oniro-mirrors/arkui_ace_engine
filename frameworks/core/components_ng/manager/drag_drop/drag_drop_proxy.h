@@ -32,7 +32,7 @@ enum class DragType {
     TEXT,
 };
 
-class ACE_EXPORT DragDropProxy : public virtual AceType {
+class ACE_EXPORT DragDropProxy : public AceType {
     DECLARE_ACE_TYPE(DragDropProxy, AceType);
 
 public:
