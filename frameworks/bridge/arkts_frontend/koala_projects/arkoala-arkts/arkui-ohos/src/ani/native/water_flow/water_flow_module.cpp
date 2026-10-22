@@ -15,6 +15,7 @@
 
 #include "water_flow_module.h"
 
+#include <limits>
 #include <optional>
 #include <vector>
 
@@ -269,83 +270,47 @@ void SetWaterFlowSection(ani_env* env, [[maybe_unused]] ani_object aniClass, ani
     if (env->FindClass("arkui.component.waterFlow.WaterFlowSections", &waterflowSections) != ANI_OK) {
         return;
     }
-    ani_boolean isSections;
+    ani_boolean isSections = ANI_FALSE;
     env->Object_InstanceOf(sections, waterflowSections, &isSections);
     if (!isSections) {
         return;
     }
 
-    ani_ref changeArray;
-    if (env->Object_GetPropertyByName_Ref(sections, "changeArray", &changeArray) != ANI_OK) {
+    // Constructor options can be replayed for the same node or rebound to a new node.
+    // Install the current snapshot; replaying the initial splice history duplicates sections.
+    ani_ref sectionOptionsArray;
+    if (env->Object_GetPropertyByName_Ref(sections, "sectionArray", &sectionOptionsArray) != ANI_OK) {
         return;
     }
-    ani_size changeArrayLength;
-    if (env->Array_GetLength(static_cast<ani_array>(changeArray), &changeArrayLength) != ANI_OK) {
+    ani_size sectionCount;
+    if (env->Array_GetLength(static_cast<ani_array>(sectionOptionsArray), &sectionCount) != ANI_OK) {
         return;
     }
-
-    ani_class sectionChangeInfo;
-    if (env->FindClass("arkui.component.waterFlow.SectionChangeInfo", &sectionChangeInfo) != ANI_OK) {
-        return;
-    }
-
     ani_class sectionOptions;
     if (env->FindClass("arkui.component.waterFlow.SectionOptions", &sectionOptions) != ANI_OK) {
         return;
     }
 
-    int32_t changeLength = static_cast<int32_t>(changeArrayLength);
-    for (int32_t i = 0; i < changeLength; i++) {
-        ani_ref change;
-        if (env->Array_Get(static_cast<ani_array>(changeArray), i, &change) != ANI_OK) {
+    std::vector<ArkUIWaterFlowSection> newSections;
+    for (ani_size i = 0; i < sectionCount; ++i) {
+        ani_ref section;
+        if (env->Array_Get(static_cast<ani_array>(sectionOptionsArray), i, &section) != ANI_OK) {
             continue;
         }
-
-        ani_boolean isSectionChangeInfo;
-        env->Object_InstanceOf(static_cast<ani_object>(change), sectionChangeInfo, &isSectionChangeInfo);
-        if (!isSectionChangeInfo) {
+        ani_boolean isSectionOptions = ANI_FALSE;
+        env->Object_InstanceOf(static_cast<ani_object>(section), sectionOptions, &isSectionOptions);
+        if (!isSectionOptions) {
             continue;
         }
-
-        ani_int start = 0;
-        if (env->Object_GetPropertyByName_Int(static_cast<ani_object>(change), "start", &start) != ANI_OK) {
+        ArkUIWaterFlowSection curSection = ParseSectionOptions(env, section);
+        if (curSection.itemsCount < 0) {
             continue;
         }
-        ani_int deleteCount = 0;
-        if (env->Object_GetPropertyByName_Int(static_cast<ani_object>(change), "deleteCount", &deleteCount) !=
-            ANI_OK) {
-            continue;
-        }
-
-        ani_ref sectionOptionsArray;
-        env->Object_GetPropertyByName_Ref(static_cast<ani_object>(change), "sections", &sectionOptionsArray);
-
-        ani_size aniLength;
-        if (env->Array_GetLength(static_cast<ani_array>(sectionOptionsArray), &aniLength) != ANI_OK) {
-            continue;
-        }
-
-        int32_t length = static_cast<int32_t>(aniLength);
-        std::vector<ArkUIWaterFlowSection> newSections;
-        for (int32_t j = 0; j < length; j++) {
-            ani_ref section;
-            if (env->Array_Get(static_cast<ani_array>(sectionOptionsArray), j, &section) != ANI_OK) {
-                continue;
-            }
-            ani_boolean isSectionOptions = ANI_FALSE;
-            env->Object_InstanceOf(static_cast<ani_object>(section), sectionOptions, &isSectionOptions);
-            if (!isSectionOptions) {
-                continue;
-            }
-            ArkUIWaterFlowSection curSection = ParseSectionOptions(env, section);
-            if (curSection.itemsCount < 0) {
-                continue;
-            }
-            newSections.emplace_back(curSection);
-        }
-        modifier->getArkUIAniWaterFlowModifier()->setWaterFlowSection(
-            arkNode, start, deleteCount, static_cast<void*>(newSections.data()), newSections.size());
+        newSections.emplace_back(curSection);
     }
+    // ChangeData clamps the delete count to the existing native section count.
+    modifier->getArkUIAniWaterFlowModifier()->setWaterFlowSection(arkNode, 0,
+        std::numeric_limits<int32_t>::max(), static_cast<void*>(newSections.data()), newSections.size());
 }
 
 void SetWaterFlowFooterContent(ani_env* env, [[maybe_unused]] ani_object aniClass, ani_long ptr, ani_long footerPtr)
