@@ -56,6 +56,7 @@ build_component("web") {
       "webview:libnweb",
       "webview:ohos_base_glue_source",
       "window_manager:libwm",
+      "samgr:samgr_proxy",
     ]
     if (defined(global_parts_info) && defined(global_parts_info.web_webview)) {
       external_deps += [ "webview:libarkweb_utils" ]
