@@ -526,6 +526,7 @@ public:
     void MarkMeasured(bool isMeasured);
     bool IsMeasured() const;
     ACE_FORCE_EXPORT int32_t OnInjectionEvent(const std::string& command) override;
+    CommandResult OnInjectionEventWithResult(const std::string& command) override;
     bool GetFallbackLineSpacingStyleOptimizeFlag();
     bool GetPunctuationOverflowStyleOptimizeFlag();
     bool SetFallbackLineSpacingAndIncludeFontPadding(bool flag);

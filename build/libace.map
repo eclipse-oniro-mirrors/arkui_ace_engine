@@ -2311,6 +2311,7 @@
       "OHOS::Ace::NG::ScrollablePattern::OnDetachFromMainTree()";
       "OHOS::Ace::NG::ScrollablePattern::OnDetachFromMainTreeMultiThread()";
       "OHOS::Ace::NG::ScrollablePattern::OnInjectionEventByRatio(std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>> const&)";
+      OHOS::Ace::NG::ScrollablePattern::OnInjectionEventByRatioWithResult*;
       "OHOS::Ace::NG::ScrollablePattern::OnScrollCallback(float, int)";
       "OHOS::Ace::NG::ScrollablePattern::OnScrollDragEndRecursive()";
       "OHOS::Ace::NG::ScrollablePattern::OnScrollEndRecursive(std::__h::optional<float> const&)";
@@ -4877,10 +4878,14 @@
       "OHOS::Ace::NG::PageRouterManagerFactory::CreateManager()";
       "OHOS::Ace::NG::PanRecognizer::GetDistance() const";
       "OHOS::Ace::NG::Pattern::CheckLocalized()";
+      OHOS::Ace::NG::ValidateCommandParameters*;
       OHOS::Ace::NG::CommandResult::Success*;
       OHOS::Ace::NG::CommandResult::Error*;
       OHOS::Ace::NG::Pattern::OnInjectionEventWithResult*;
       OHOS::Ace::NG::Pattern::GetSpecifiedContentOffsets*;
+      OHOS::Ace::NG::TextPattern::OnInjectionEventWithResult*;
+      virtual?thunk?to?OHOS::Ace::NG::TextPattern::OnInjectionEventWithResult*;
+      OHOS::Ace::NG::Pattern::ConvertLegacyInjectionEventResult*;
       "OHOS::Ace::NG::Pattern::CreateAccessibilityProperty()";
       "OHOS::Ace::NG::Pattern::CreateEventHub()";
       "OHOS::Ace::NG::Pattern::CreateLayoutAlgorithm()";

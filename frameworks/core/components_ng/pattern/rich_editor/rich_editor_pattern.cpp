@@ -2219,6 +2219,35 @@ void RichEditorPattern::RequestKeyboardForStylus()
     RequestKeyboard(false, true, true);
 }
 
+CommandResult RichEditorPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    auto json = JsonUtil::ParseJsonString(command);
+    if (json && json->IsObject() && json->GetString("cmd") == "requestKeyboard") {
+        auto host = GetHost();
+        CHECK_NULL_RETURN(host, CommandResult::Error(CommandErrorType::EXECUTE_FAIL));
+        auto hub = host->GetEventHub<EventHub>();
+        if (!hub || !hub->IsEnabled()) {
+            return CommandResult::Error(CommandErrorType::EXECUTE_FAIL);
+        }
+        RequestFocusImpl();
+        if (!RequestKeyboard(true, true, true, SourceType::MOUSE)) {
+            return CommandResult::Error(CommandErrorType::EXECUTE_FAIL);
+        }
+        ReportRichEditorRequestKeyboardEvent(host->GetId());
+        return CommandResult::Success();
+    }
+    return ConvertLegacyInjectionEventResult(command,
+        { "addText", "deleteText", "setText", "clear", "selectText", "copy", "cut",
+            "setCaretPosition", "requestKeyboard" }, CommandErrorType::INVALID_PARAM,
+        [this](const std::unique_ptr<JsonValue>& json) {
+            const auto name = json->GetString("cmd");
+            if ((name == "copy" || name == "cut") && copyOption_ == CopyOptions::None) {
+                return CommandResult::Error(CommandErrorType::EXECUTE_FAIL);
+            }
+            return CommandResult::Success();
+        });
+}
+
 bool RichEditorPattern::ParseCommand(const std::string& command)
 {
     auto host = GetHost();

@@ -202,6 +202,10 @@ public:
         UpdateSideBarDivider();
     }
     int32_t OnInjectionEvent(const std::string& command) override;
+    CommandResult OnInjectionEventWithResult(const std::string& command) override
+    {
+        return ConvertLegacyInjectionEventResult(command, { "changeIndex" }, CommandErrorType::EXECUTE_FAIL);
+    }
     void OnColorConfigurationUpdate() override;
     void OnColorModeChange(uint32_t colorMode) override;
     bool OnThemeScopeUpdate(int32_t themeScopeId) override;

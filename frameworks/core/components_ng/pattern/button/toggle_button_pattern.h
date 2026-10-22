@@ -84,6 +84,10 @@ public:
     void ToTreeJson(std::unique_ptr<JsonValue>& json, const InspectorConfig& config) const override;
     bool OnThemeScopeUpdate(int32_t themeScopeId) override;
     int32_t OnInjectionEvent(const std::string& command) override;
+    CommandResult OnInjectionEventWithResult(const std::string& command) override
+    {
+        return ConvertLegacyInjectionEventResult(command, { "onToggleChange" }, CommandErrorType::EXECUTE_FAIL);
+    }
 
 private:
     void OnAttachToFrameNode() override;

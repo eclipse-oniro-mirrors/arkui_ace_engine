@@ -555,6 +555,28 @@ void TextFieldPattern::ReportRequestKeyboardEvent(const RefPtr<FrameNode>& frame
 #endif
 }
 
+CommandResult TextFieldPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    auto json = JsonUtil::ParseJsonString(command);
+    if (json && json->IsObject() && json->GetString("cmd") == "requestKeyboard") {
+        auto host = GetHost();
+        CHECK_NULL_RETURN(host, CommandResult::Error(CommandErrorType::EXECUTE_FAIL));
+        auto hub = host->GetEventHub<EventHub>();
+        if (!hub || !hub->IsEnabled() || HasFocus()) {
+            return CommandResult::Error(CommandErrorType::EXECUTE_FAIL);
+        }
+        auto focusHub = GetFocusHub();
+        if (!focusHub || !focusHub->RequestFocusImmediately()) {
+            return CommandResult::Error(CommandErrorType::EXECUTE_FAIL);
+        }
+        ReportRequestKeyboardEvent(host);
+        return CommandResult::Success();
+    }
+    return ConvertLegacyInjectionEventResult(command,
+        { "MSDP_AutoFill", "addText", "setText", "deleteText", "selectText", "copy", "cut",
+            "clear", "requestKeyboard", "setCaretPosition" });
+}
+
 int32_t TextFieldPattern::OnInjectionEvent(const std::string& command)
 {
     auto host = GetHost();

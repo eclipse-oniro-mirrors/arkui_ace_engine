@@ -275,6 +275,7 @@ public:
     void SetCurrentVolume(float currentVolume);
     float GetCurrentVolume() const;
     int32_t OnInjectionEvent(const std::string& command) override;
+    CommandResult OnInjectionEventWithResult(const std::string& command) override;
     PlaybackStatus GetCurrentPlaybackStatus() const
     {
         return currentPlaybackStatus_;

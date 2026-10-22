@@ -809,6 +809,7 @@ public:
     void UpdateDateOrder();
     bool IsNotSetStartEndDate();
     int32_t OnInjectionEvent(const std::string& command) override;
+    CommandResult OnInjectionEventWithResult(const std::string& command) override;
     static bool ReportDateChangeEvent(int32_t nodeId, const std::string& compName,
         const std::string& eventName, const std::string& eventData);
     static bool ReportDialogDateChangeEvent(int32_t nodeId, const std::string& compName,

@@ -1,7 +1,7 @@
 # UISession Service Context
 
-> 文档版本：v1.1
-> 更新时间：2026-07-31
+> 文档版本：v1.2
+> 更新时间：2026-10-20
 > 来源：`docs/context_registry.json` 主题 `UISessionService`
 
 ## 定位
@@ -21,6 +21,26 @@ SA 侧 `UIContentServiceProxy::Connect` 创建本地 `UiReportStub`，通过 IPC
 模拟 SA 的 `UiSaService::getArkUIService` 则在指向应用侧 `UiContentStub` 的远程对象上添加
 `UiContentProxyRecipient`，感知应用死亡并清理本地缓存。两者均在本地 proxy 上注册，
 通知对应远端的死亡；应按 IPC 接收端和对象类型判断进程方向，避免因函数名包含 Stub 而倒置两端。
+
+### SendCommand 完成回调
+
+两个旧 `SendCommand` 和 `SendCommandSync` 保持原行为。新增 callback 重载分别处理节点命令和全局命令，
+接口返回值表示是否受理，最终执行结果经 `ReportService::ReportCommandResult` 反向 IPC 返回。
+
+- `UIContentServiceProxy::SendCommandWithFinishCallback` 注册 pending、发送 requestId，并安排 5000ms 超时。
+- `UiReportStub` 以 requestId 匹配结果，先清状态再锁外回调；重复、迟到结果忽略。
+- 超时、死亡、重连及销毁清理不回调。超时不取消已经开始的 UI 操作。
+- 应用侧 `UiSessionManagerOhos::MakeCommandResultCallback` 捕获原 report remote，校验其仍为当前连接，避免重连串单。
+- `UIContentImpl` 将执行投递至 UI 线程；节点经 `FrameNode/Pattern::OnRecvCommandWithResult`，
+  keycode 使用实际 handled 返回值，relaxed 等待 workflow 最终态。
+- `ui_session_command_result.h` 统一序列化；非批量成功精确为 `{"result":"SUCCESS"}`，失败为四种 errorType，
+  errorMessage 合法 UTF-8 且不超过 128 字节，消息正文不进入新诊断日志。
+- batch 保持旧请求格式及目标范围；整批一次回调，以 `results` 数组按输入顺序返回每项 nodeId 和结果。
+  无效节点标识用 nodeKey 保留；一项失败后继续处理后续节点。
+
+源码定位：`ui_content_proxy.cpp::SendCommandWithFinishCallback`、`ui_report_stub.cpp::ReportCommandResult`、
+`ui_content_stub.cpp::SendCommandWithFinishCallbackInner`、`ui_session_batch_command.cpp::ExecuteWithResult`。
+本节是路由索引；验收状态以 change 的 fresh verification evidence 为准。
 
 ## 快速路由
 
@@ -64,7 +84,7 @@ UISession 是框架内部 IPC 通道，没有独立 SDK API。IPC 接口通过 `
 
 | Spec | 路径 | 状态 |
 |------|------|------|
-| 设计文档 | `specs/03-engine-framework/09-uisession/01-uisession-service/design.md` | Baselined |
+| 设计文档 | `specs/03-engine-framework/09-uisession/01-uisession-service/design.md` | Draft；本轮仅补录Feat-11增量 |
 | Feat-01 IPC安全框架 | `specs/03-engine-framework/09-uisession/01-uisession-service/Feat-01-ipc-security-framework-spec.md` | Baselined |
 | Feat-02 InspectorTree | `specs/03-engine-framework/09-uisession/01-uisession-service/Feat-02-inspector-tree-query-and-web-aggregation-spec.md` | Baselined |
 | Feat-03 事件上报 | `specs/03-engine-framework/09-uisession/01-uisession-service/Feat-03-event-reporting-and-atomic-gating-spec.md` | Baselined |
@@ -76,12 +96,17 @@ UISession 是框架内部 IPC 通道，没有独立 SDK API。IPC 接口通过 `
 | Feat-09 页面场景规则化感知 | `specs/03-engine-framework/09-uisession/01-uisession-service/Feat-09-pagescene-rule-awareness-spec.md` | Draft |
 | Feat-10 WM验证链路 | `specs/03-engine-framework/09-uisession/01-uisession-service/Feat-10-wm-uicontent-remoteobj-verification-spec.md` | Draft |
 
+| Feat-11 SendCommand 完成回调 | `specs/03-engine-framework/09-uisession/01-uisession-service/Feat-11-send-command-finish-callback-spec.md` | Draft；设备验收未闭合 |
+
 ### 测试入口
 
 | 关注点 | 路径 | 说明 |
 |--------|------|------|
 | Mock Manager | `test/mock/interfaces/inner_api/ui_session/mock_ui_session_manager.*` | UiSessionManager mock |
 | 页面场景回调回归 | `test/unittest/adapter/ohos/entrance/ui_session/ui_content_stub_test.cpp` | `UIContentStubTestPageScene*`：规则集数据隔离、旧版事件兼容和重复注册保护 |
+| SendCommand host 协议/状态/序列化/批量 | `test/unittest/adapter/ohos/entrance/ui_session/ui_session_send_command_test.cpp` | 实际 Proxy/Report IPC 传递及可控时间、并发、重入验证 |
+| 组件结构化结果 | `test/unittest/core/base/send_command_result_test_ng.cpp` | 组件错误矩阵、单次执行、参数类型 |
+| relaxed 最终状态 | `test/unittest/core/pattern/relaxed_interaction/relaxed_interaction_manager_test_ng.cpp` | 跨帧、fallback、隔离、旧语义回归 |
 | SA 验证构建 | `interfaces/inner_api/ui_session:ui_session_example` | ui_sa 构建 target |
 | 内容变化 Dump | `PipelineContext::DumpInfo -contentChange` | 非 release 版本调试入口 |
 
@@ -110,6 +135,14 @@ UISession 是框架内部 IPC 通道，没有独立 SDK API。IPC 接口通过 `
 | 翻译请求 PARAM_INVALID | `ui_session_manager_ohos.cpp` | 检查 scope 格式和 IsTranslateScopeValid |
 | 内容变化无 TEXT 上报 | `content_change_manager.cpp` | 检查 ContentChangeConfig 阈值和滚动/过渡状态 |
 | WM remote object 为空 | `ui_sa_service.cpp` + WM 补丁 | 检查焦点窗口和 WMS GetUIContentRemoteObj 链路 |
+
+### 本地回归环境核对
+
+- relaxed/Slide测试依赖根Geometry：`test/mock/frameworks/core/pipeline/mock_pipeline_context.cpp:2097`的`GetRootRect`应读取rootNode的frame rect。空实现会让已设置根尺寸的用例进入错误分支；先核对mock与正式实现，再判断业务回归。vector结果先ASSERT长度再索引，避免断言失败后越界中止。
+- ARM用户态QEMU的动态库搜索目录不能仅按basename任选同名库。`libutils.z.so`同时存在于`commonlibrary/c_utils`和`commonlibrary/ets_utils`；Binder/RefBase所需的是前者。记录每个软链接的来源及实际loader错误，修复运行环境后再采集XML。
+- TimePicker成功测试需通过Model初始化主题和列节点。裸Pattern没有hour列，不能作为可执行成功场景。TextField/Search的requestKeyboard完成结果需检查真实焦点请求bool；无焦点能力时不能因旧parser返回成功而判定执行成功。
+
+上述核对仅服务本地测试，不替代真实Binder、ArkWeb或设备性能验收。
 
 ## 附录：验证部署步骤
 

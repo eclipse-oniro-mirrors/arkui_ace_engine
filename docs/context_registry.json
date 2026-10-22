@@ -4213,6 +4213,8 @@
         "ui_sa",
         "GetUIContentRemoteObj",
         "SyncRequestGuard",
+        "SendCommandFinishCallback",
+        "ReportCommandResult",
         "ui_content_stub",
         "ui_content_proxy",
         "ui_report_stub"
@@ -4237,6 +4239,9 @@
         "content_proxy": "adapter/ohos/entrance/ui_session/ui_content_proxy.cpp",
         "report_stub": "adapter/ohos/entrance/ui_session/ui_report_stub.cpp",
         "report_proxy": "adapter/ohos/entrance/ui_session/ui_report_proxy.cpp",
+        "command_result": "frameworks/core/components_ng/pattern/command/command_result.h",
+        "command_serializer": "adapter/ohos/entrance/ui_session/ui_session_command_result.h",
+        "batch_command": "adapter/ohos/entrance/ui_session/ui_session_batch_command.cpp",
         "json_util": "interfaces/inner_api/ui_session/ui_session_json_util.h",
         "translate_manager": "interfaces/inner_api/ui_session/ui_translate_manager.h",
         "translate_type": "interfaces/inner_api/ui_session/ui_translate_type.h",
@@ -4253,10 +4258,13 @@
       "api_paths": {},
       "test_paths": [
         "test/mock/interfaces/inner_api/ui_session/mock_ui_session_manager.h",
-        "test/mock/interfaces/inner_api/ui_session/mock_ui_session_manager.cpp"
+        "test/mock/interfaces/inner_api/ui_session/mock_ui_session_manager.cpp",
+        "test/unittest/adapter/ohos/entrance/ui_session/ui_session_send_command_test.cpp",
+        "test/unittest/core/base/send_command_result_test_ng.cpp",
+        "test/unittest/core/pattern/relaxed_interaction/relaxed_interaction_manager_test_ng.cpp"
       ],
       "status": "active",
-      "last_verified": "2026-07-31"
+      "last_verified": "2026-10-20"
     },
     {
       "id": "UIContext",

@@ -551,6 +551,9 @@ private:
     void ReportActionSheetOnInjectionEvent(bool result,
         std::string reason, int32_t sheetIndex = -1, int32_t buttonIndex = -1);
     int32_t OnInjectionEvent(const std::string& command) override;
+    CommandResult OnInjectionEventWithResult(const std::string& command) override;
+    CommandResult ResolveMenuCommandTarget(const std::unique_ptr<JsonValue>& params, RefPtr<FrameNode>& target);
+    CommandResult ResolveDialogCommandTarget(const std::unique_ptr<JsonValue>& json, RefPtr<FrameNode>& target);
     std::vector<RefPtr<FrameNode>> GetButtons();
     bool HandleAlertDialogButtonClickCmd(const std::unique_ptr<JsonValue>& json);
     void ReportAlertDialogOnInjectionEvent(bool result, std::string reason,

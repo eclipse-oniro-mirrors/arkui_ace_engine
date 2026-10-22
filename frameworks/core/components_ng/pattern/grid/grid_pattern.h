@@ -460,6 +460,10 @@ private:
     void FireOnScrollIndex(bool indexChanged, const ScrollIndexFunc& onScrollIndex);
     void ReportOnItemGridEvent(const std::string& event);
     int32_t OnInjectionEvent(const std::string& command) override;
+    CommandResult OnInjectionEventWithResult(const std::string& command) override
+    {
+        return OnInjectionEventByRatioWithResult(command);
+    }
 
     inline bool UseIrregularLayout() const;
 

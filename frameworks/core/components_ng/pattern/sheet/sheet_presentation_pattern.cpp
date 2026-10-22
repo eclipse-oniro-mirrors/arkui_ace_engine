@@ -5354,6 +5354,18 @@ int32_t SheetPresentationPattern::ParseCommand(const std::string& command, Sheet
     return RET_SUCCESS;
 }
 
+CommandResult SheetPresentationPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return ConvertLegacyInjectionEventResult(command, { "CloseSheet" },
+        CommandErrorType::EXECUTE_FAIL, [this](const std::unique_ptr<JsonValue>& /* json */) {
+        auto context = GetHost()->GetContext();
+        if (!context || !context->GetOverlayManager()) {
+            return CommandResult::Error(CommandErrorType::EXECUTE_FAIL);
+        }
+        return CommandResult::Success();
+    });
+}
+
 int32_t SheetPresentationPattern::OnInjectionEvent(const std::string& command)
 {
     SheetCmdType cmdType = SheetCmdType::CMD_UNKNOWN;

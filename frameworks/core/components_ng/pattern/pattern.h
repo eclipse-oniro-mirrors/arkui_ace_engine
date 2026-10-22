@@ -16,7 +16,9 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_PATTERN_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_PATTERN_H
 
+#include <initializer_list>
 #include <optional>
+#include <string_view>
 
 #include "ui/properties/dirty_flag.h"
 
@@ -637,6 +639,11 @@ public:
         return RET_SUCCESS;
     };
     virtual CommandResult OnInjectionEventWithResult(const std::string& command);
+
+    CommandResult ConvertLegacyInjectionEventResult(const std::string& command,
+        std::initializer_list<std::string_view> supportedCommands,
+        CommandErrorType legacyFailureType = CommandErrorType::INVALID_PARAM,
+        const std::function<CommandResult(const std::unique_ptr<JsonValue>&)>& preflight = nullptr);
 
     bool HandleTextBoxComponentCommand(const std::string& command, std::string& cmd, std::unique_ptr<JsonValue>& json,
         std::unique_ptr<JsonValue>& params);

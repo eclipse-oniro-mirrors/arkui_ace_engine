@@ -696,6 +696,7 @@ public:
     void UpdateNormalTextStyle(const PickerTextStyle& textStyle);
     void UpdateSelectedTextStyle(const PickerTextStyle& textStyle);
     int32_t OnInjectionEvent(const std::string& command) override;
+    CommandResult OnInjectionEventWithResult(const std::string& command) override;
 
 private:
     bool ReportTimeChangeEvent(int32_t nodeId, const std::string& timeStr);

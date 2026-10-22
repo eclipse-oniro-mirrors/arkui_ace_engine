@@ -14,6 +14,9 @@
  */
 
 #include "core/components_ng/pattern/pattern.h"
+#include "core/components_ng/pattern/command/command_validation.h"
+
+#include <algorithm>
 
 #include "core/common/resource/resource_parse_utils.h"
 #include "core/components_ng/base/inspector_dump_options.h"
@@ -103,6 +106,47 @@ CommandResult Pattern::OnRecvCommandWithResult(const std::string& command)
             : CommandResult::Error(CommandErrorType::INVALID_PARAM);
     }
     return OnInjectionEventWithResult(command);
+}
+
+CommandResult Pattern::ConvertLegacyInjectionEventResult(const std::string& command,
+    std::initializer_list<std::string_view> supportedCommands, CommandErrorType legacyFailureType,
+    const std::function<CommandResult(const std::unique_ptr<JsonValue>&)>& preflight)
+{
+    auto json = JsonUtil::ParseJsonString(command);
+    if (!json || !json->IsValid() || !json->IsObject()) {
+        return CommandResult::Error(CommandErrorType::INVALID_PARAM);
+    }
+    auto commandValue = json->GetValue("cmd");
+    if (!commandValue || !commandValue->IsValid() || !commandValue->IsString()) {
+        return CommandResult::Error(CommandErrorType::INVALID_PARAM);
+    }
+    const auto commandName = commandValue->GetString();
+    const auto supported = std::find(supportedCommands.begin(), supportedCommands.end(), commandName) !=
+        supportedCommands.end();
+    if (!supported) {
+        return CommandResult::Error(CommandErrorType::INVALID_COMMAND);
+    }
+    if (!ValidateCommandParameters(json, commandName)) {
+        return CommandResult::Error(CommandErrorType::INVALID_PARAM);
+    }
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, CommandResult::Error(CommandErrorType::EXECUTE_FAIL));
+    auto eventHub = host->GetEventHub<EventHub>();
+    if (!eventHub || !eventHub->IsEnabled()) {
+        return CommandResult::Error(CommandErrorType::EXECUTE_FAIL, "Component is disabled.");
+    }
+    if (preflight) {
+        auto result = preflight(json);
+        if (!result.success) {
+            return result;
+        }
+    }
+    if (commandName == "copy" || commandName == "cut" || commandName == "requestKeyboard") {
+        legacyFailureType = CommandErrorType::EXECUTE_FAIL;
+    }
+    return OnInjectionEvent(command) == RET_SUCCESS
+        ? CommandResult::Success()
+        : CommandResult::Error(legacyFailureType);
 }
 
 void Pattern::OnColorModeChange(uint32_t colorMode)

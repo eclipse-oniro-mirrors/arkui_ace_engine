@@ -26,6 +26,7 @@
 #include "interfaces/inner_api/ui_session/ui_report_proxy.h"
 #include "adapter/ohos/entrance/ui_session/ui_session_batch_command.h"
 #include "adapter/ohos/entrance/ui_session/ui_session_command_result.h"
+#include "core/components_ng/pattern/command/command_validation.h"
 #include "core/components_ng/pattern/pattern.h"
 
 namespace OHOS::Ace {
@@ -275,6 +276,84 @@ TEST_F(SendCommandTest, ConcurrentRegistrationAndDuplicateResultsAreSingleShot)
     }
     for (auto& worker : workers) { worker.join(); }
     EXPECT_EQ(completed, 1);
+}
+
+TEST(CommandResultTest, TypedParametersCannotSilentlyUseLegacyDefaultValues)
+{
+    for (const auto& command : {
+        R"({"cmd":"setText", "params":{"value":123}})",
+        R"({"cmd":"selectText", "selectionStart":"0", "selectionEnd":1})",
+        R"({"cmd":"onToggleChange", "params":{"isOn":"true"}})",
+        R"({"cmd":"setVideoPlaybackSpeed", "value":999})",
+        R"({"cmd":"changeIndex", "params":{"index":"garbage"}})",
+        R"({"cmd":"onRatingChange", "params":{"value":"5"}})",
+        R"({"cmd":"setDatePickerTime", "params":{"year":2026.5,"month":1,"day":1}})",
+        R"({"cmd":"setTimePickerTime", "params":{"hour":"1", "minute":0,"second":0}})",
+        R"({"cmd":"alertDialogButtonClick", "params":{"buttonIndex":"0"}})",
+        R"({"cmd":"actionSheetClick", "params":{"clickType":"invalid", "index":0}})",
+        R"({"cmd":"onSelect", "params":{"index":"0"}})" }) {
+        auto json = JsonUtil::ParseJsonString(command);
+        EXPECT_FALSE(NG::ValidateCommandParameters(json, json->GetString("cmd")));
+    }
+    auto json = JsonUtil::ParseJsonString(R"({"cmd":"setText", "params":{"value":""}})");
+    EXPECT_TRUE(NG::ValidateCommandParameters(json, "setText"));
+    json = JsonUtil::ParseJsonString(R"({"cmd":"setVideoPlaybackSpeed", "value":0.125})");
+    EXPECT_TRUE(NG::ValidateCommandParameters(json, "setVideoPlaybackSpeed"));
+}
+
+TEST(CommandResultTest, PickerAndOptionalParametersRetainTheirContract)
+{
+    for (const auto* command : {
+        R"({"cmd":"setDatePickerDialogTime", "params":)"
+            R"({"year":2026, "month":1, "day":1, "hour":0, "minute":0, "second":0}})",
+        R"({"cmd":"actionMenuClick", "params":{}})",
+        R"({"cmd":"checked"})",
+        R"({"cmd":"checked", "params":null})",
+        R"({"cmd":"onSelect", "params":{"value":""}})",
+        R"({"cmd":"onSelect", "params":{"index":0}})",
+        R"({"cmd":"deleteText", "params":{}})" }) {
+        SCOPED_TRACE(command);
+        auto json = JsonUtil::ParseJsonString(command);
+        EXPECT_TRUE(NG::ValidateCommandParameters(json, json->GetString("cmd")));
+    }
+    for (const auto* command : {
+        R"({"cmd":"setDatePickerDialogTime", "params":{"year":2026, "month":1, "day":1}})",
+        R"({"cmd":"setDatePickerDialogTime", "params":{"hour":0, "minute":0, "second":0}})",
+        R"({"cmd":"actionMenuClick"})",
+        R"({"cmd":"onSelect", "params":{}})",
+        R"({"cmd":"onSelect", "params":{"value":false, "index":0}})",
+        R"({"cmd":"checked", "params":{"value":0}})" }) {
+        SCOPED_TRACE(command);
+        auto json = JsonUtil::ParseJsonString(command);
+        EXPECT_FALSE(NG::ValidateCommandParameters(json, json->GetString("cmd")));
+    }
+}
+
+TEST(CommandResultTest, NumericAndIndexBoundariesRetainTheirContract)
+{
+    for (const auto* command : {
+        R"({"cmd":"setVideoPlaybackSpeed", "value":0.125})",
+        R"({"cmd":"setVideoPlaybackSpeed", "value":8.0})",
+        R"({"cmd":"changeIndex", "params":{"index":"0"}})",
+        R"({"cmd":"change", "params":{"type":"forward"}})",
+        R"({"cmd":"change", "params":{"type":"index", "index":"0"}})" }) {
+        SCOPED_TRACE(command);
+        auto json = JsonUtil::ParseJsonString(command);
+        EXPECT_TRUE(NG::ValidateCommandParameters(json, json->GetString("cmd")));
+    }
+    for (const auto* command : {
+        R"({"cmd":"setVideoPlaybackSpeed", "value":0.124})",
+        R"({"cmd":"setVideoPlaybackSpeed", "value":8.001})",
+        R"({"cmd":"changeIndex", "params":{"index":"-1"}})",
+        R"({"cmd":"changeIndex", "params":{"index":"2147483648"}})",
+        R"({"cmd":"changeIndex", "params":{"index":"1x"}})",
+        R"({"cmd":"change", "params":{"type":"index"}})",
+        R"({"cmd":"setCaretPosition", "position":2147483648})",
+        R"({"cmd":"setCaretPosition", "position":0.5})" }) {
+        SCOPED_TRACE(command);
+        auto json = JsonUtil::ParseJsonString(command);
+        EXPECT_FALSE(NG::ValidateCommandParameters(json, json->GetString("cmd")));
+    }
 }
 
 TEST(CommandResultTest, JsonContractAndUtf8Boundaries)

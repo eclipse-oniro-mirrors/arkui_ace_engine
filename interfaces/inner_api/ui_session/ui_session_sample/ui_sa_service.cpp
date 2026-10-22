@@ -36,6 +36,7 @@
 #include "string_ex.h"
 #include "ui_content_proxy.h"
 #include "ui_content_service_interface.h"
+#include "ui_session_json_util.h"
 #include "window_manager.h"
 
 #include "adapter/ohos/entrance/ui_session/include/ui_session_log.h"
@@ -538,6 +539,8 @@ const std::map<std::string, UiSaService::DumpHandler> UiSaService::DUMP_MAP = {
     { "GetCurrentPageName", &UiSaService::HandleGetCurrentPageName },
     { "SendCommand", &UiSaService::HandleSendCommand },
     { "SendBatchSetText", &UiSaService::HandleSendBatchSetText },
+    { "SendCommandWithFinishCallback", &UiSaService::HandleSendCommandWithFinishCallback },
+    { "SendBatchSetTextWithFinishCallback", &UiSaService::HandleSendBatchSetTextWithFinishCallback },
     { "SendCommandSync", &UiSaService::HandleSendCommandSync },
     { "RegisterContentChangeCallback", &UiSaService::HandleRegisterContentChangeCallback },
     { "UnregisterContentChangeCallback", &UiSaService::HandleUnregisterContentChangeCallback },
@@ -854,6 +857,46 @@ void UiSaService::HandleSendBatchSetText(sptr<IUiContentService> service, std::v
     auto command = BuildBatchSetTextCommand(params);
     LOGI("SendBatchSetText itemCount=%{public}zu, commandLength=%{public}zu", itemCount, command.size());
     service->SendCommand(command);
+}
+
+void UiSaService::HandleSendCommandWithFinishCallback(
+    sptr<IUiContentService> service, std::vector<std::string> params)
+{
+    if ((params.size() != SEND_COMMAND_WITH_NODEID && params.size() != SEND_COMMAND_WITHOUT_NODEID) ||
+        !EnsureConnected(service)) {
+        return;
+    }
+    auto finishCallback = [](const std::string& resultJson) {
+        LOGI("[SendCommandWithFinishCallback] finish result=%{public}s", resultJson.c_str());
+        auto result = InspectorJsonUtil::ParseJsonString(resultJson);
+        bool success = result && result->GetString("result") == "SUCCESS";
+        auto results = result ? result->GetValue("results") : nullptr;
+        LOGI("[SendCommandWithFinishCallback] success=%{public}d, items=%{public}d, resultSize=%{public}zu",
+            success, results && results->IsArray() ? results->GetArraySize() : 0, resultJson.size());
+    };
+    auto command = params.back();
+    if (command == "file") {
+        command = ReadPageSceneRuleJson();
+        if (command.empty()) {
+            return;
+        }
+    }
+    int32_t result = params.size() == SEND_COMMAND_WITH_NODEID
+        ? service->SendCommand(std::atoi(params[1].c_str()), command, finishCallback)
+        : service->SendCommand(command, finishCallback);
+    LOGI("[SendCommandWithFinishCallback] request result=%{public}d", result);
+}
+
+void UiSaService::HandleSendBatchSetTextWithFinishCallback(
+    sptr<IUiContentService> service, std::vector<std::string> params)
+{
+    const auto itemCount = params.empty() ? 0 : (params.size() - 1) / BATCH_ARGUMENT_PAIR_SIZE;
+    if (params.size() < MIN_BATCH_SET_TEXT_PARAM_COUNT ||
+        (params.size() - 1) % BATCH_ARGUMENT_PAIR_SIZE != 0 || itemCount > MAX_BATCH_SET_TEXT_COUNT) {
+        LOGW("SendBatchSetTextWithFinishCallback expects 1..50 nodeId/text pairs");
+        return;
+    }
+    HandleSendCommandWithFinishCallback(service, { "SendCommandWithFinishCallback", BuildBatchSetTextCommand(params) });
 }
 
 void UiSaService::HandleSendCommandSync(sptr<IUiContentService> service, std::vector<std::string> params)

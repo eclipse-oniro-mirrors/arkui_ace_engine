@@ -1743,6 +1743,11 @@ bool TextPattern::ParseCommand(const std::string& command)
     return true;
 }
 
+CommandResult TextPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return ConvertLegacyInjectionEventResult(command, { "selectText", "copy" });
+}
+
 int32_t TextPattern::OnInjectionEvent(const std::string& command)
 {
     auto host = GetHost();

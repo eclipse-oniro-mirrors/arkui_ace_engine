@@ -141,6 +141,10 @@ public:
     void ReportInjectionEvent(bool result, std::string reson);
     bool ParseCommand(const std::string& command, int32_t& selected);
     int32_t OnInjectionEvent(const std::string& command) override;
+    CommandResult OnInjectionEventWithResult(const std::string& command) override
+    {
+        return ConvertLegacyInjectionEventResult(command, { "setAlphabetIndexer" });
+    }
 
 protected:
     void SetAccessibilityAction();

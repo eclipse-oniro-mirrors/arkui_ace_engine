@@ -3081,6 +3081,82 @@ void DialogPattern::RemoveForceSplitRatioListener()
     forceSplitMgr->RemoveForceSplitRatioListener(host->GetId());
 }
 
+CommandResult DialogPattern::ResolveMenuCommandTarget(
+    const std::unique_ptr<JsonValue>& params, RefPtr<FrameNode>& target)
+{
+    if (!dialogProperties_.isMenu) {
+        return CommandResult::Error(CommandErrorType::INVALID_COMMAND);
+    }
+    auto menu = menuNode_.Upgrade();
+    CHECK_NULL_RETURN(menu, CommandResult::Error(CommandErrorType::EXECUTE_FAIL));
+    auto index = params->GetInt("buttonIndex", -1);
+    auto count = static_cast<int32_t>(menu->GetChildren().size());
+    if (index < -1 || index >= count) {
+        return CommandResult::Error(CommandErrorType::INVALID_PARAM);
+    }
+    auto row = AceType::DynamicCast<FrameNode>(menu->GetChildAtIndex(index == -1 ? count - 1 : index));
+    CHECK_NULL_RETURN(row, CommandResult::Error(CommandErrorType::EXECUTE_FAIL));
+    target = AceType::DynamicCast<FrameNode>(row->GetFirstChild());
+    CHECK_NULL_RETURN(target, CommandResult::Error(CommandErrorType::EXECUTE_FAIL));
+    auto text = AceType::DynamicCast<FrameNode>(target->GetFirstChild());
+    return text && text->GetPattern<TextPattern>()
+        ? CommandResult::Success() : CommandResult::Error(CommandErrorType::EXECUTE_FAIL);
+}
+
+CommandResult DialogPattern::ResolveDialogCommandTarget(
+    const std::unique_ptr<JsonValue>& json, RefPtr<FrameNode>& target)
+{
+    auto name = json->GetString("cmd");
+    auto params = json->GetValue("params");
+    if (name == "actionMenuClick") {
+        return ResolveMenuCommandTarget(params, target);
+    }
+    const bool sheet = name == "actionSheetClick";
+    if (dialogProperties_.type != (sheet ? DialogType::ACTION_SHEET : DialogType::ALERT_DIALOG)) {
+        return CommandResult::Error(CommandErrorType::INVALID_COMMAND);
+    }
+    const auto index = params->GetInt(sheet ? "index" : "buttonIndex");
+    if (sheet && params->GetString("clickType") == "sheet") {
+        auto iter = contentNodeMap_.find(DialogContentNode::SHEET);
+        if (iter == contentNodeMap_.end() || !iter->second) {
+            return CommandResult::Error(CommandErrorType::EXECUTE_FAIL);
+        }
+        auto container = iter->second;
+        if (index < 0 || index >= static_cast<int32_t>(container->GetChildren().size())) {
+            return CommandResult::Error(CommandErrorType::INVALID_PARAM);
+        }
+        auto row = AceType::DynamicCast<FrameNode>(container->GetChildAtIndex(index));
+        CHECK_NULL_RETURN(row, CommandResult::Error(CommandErrorType::EXECUTE_FAIL));
+        target = AceType::DynamicCast<FrameNode>(row->GetFirstChild());
+    } else {
+        CHECK_NULL_RETURN(buttonContainer_, CommandResult::Error(CommandErrorType::EXECUTE_FAIL));
+        auto buttons = GetButtons();
+        if (index < 0 || index >= static_cast<int32_t>(buttons.size())) {
+            return CommandResult::Error(CommandErrorType::INVALID_PARAM);
+        }
+        target = buttons[index];
+    }
+    return CommandResult::Success();
+}
+
+CommandResult DialogPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return ConvertLegacyInjectionEventResult(command,
+        { "alertDialogButtonClick", "actionSheetClick", "actionMenuClick" }, CommandErrorType::EXECUTE_FAIL,
+        [this](const std::unique_ptr<JsonValue>& json) {
+            RefPtr<FrameNode> target;
+            auto result = ResolveDialogCommandTarget(json, target);
+            if (!result.success) {
+                return result;
+            }
+            CHECK_NULL_RETURN(target, CommandResult::Error(CommandErrorType::EXECUTE_FAIL));
+            auto hub = target->GetEventHub<EventHub>();
+            auto gesture = target->GetOrCreateGestureEventHub();
+            return hub && hub->IsEnabled() && gesture && gesture->GetClickEvent()
+                ? CommandResult::Success() : CommandResult::Error(CommandErrorType::EXECUTE_FAIL);
+        });
+}
+
 int32_t DialogPattern::OnInjectionEvent(const std::string& command)
 {
     TAG_LOGD(AceLogTag::ACE_DIALOG, "OnInjectionEvent input:%{public}s!", command.c_str());
