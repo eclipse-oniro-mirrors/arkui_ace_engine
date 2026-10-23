@@ -15,6 +15,7 @@
 
 #include "securec.h"
 
+#include "base/log/log_wrapper.h"
 #include "base/utils/string_utils.h"
 #include "native_type.h"
 #include "core/components_ng/pattern/text/span/mutable_span_string.h"
@@ -82,6 +83,20 @@ RefPtr<SpanBase> ParseFontSpan(const ArkUISpanStyle& style, int32_t start, int32
     return fontSpan;
 }
 
+ArkUILeadingMarginSpanDrawInfo ConvertLeadingMarginDrawInfo(const NG::LeadingMarginSpanOptions& leadingMarginOptions)
+{
+    ArkUILeadingMarginSpanDrawInfo info;
+    info.x = leadingMarginOptions.x;
+    info.top = leadingMarginOptions.top;
+    info.bottom = leadingMarginOptions.bottom;
+    info.baseline = leadingMarginOptions.baseline;
+    info.direction = static_cast<int32_t>(leadingMarginOptions.direction);
+    info.start = leadingMarginOptions.start;
+    info.end = leadingMarginOptions.end;
+    info.first = leadingMarginOptions.first;
+    return info;
+}
+
 void ParseLeadingMargin(SpanParagraphStyle& spanParagraphStyle, const ArkUIParagraphStyle& paragraphStyle)
 {
     if (paragraphStyle.onDrawLeadingMargin) {
@@ -93,18 +108,11 @@ void ParseLeadingMargin(SpanParagraphStyle& spanParagraphStyle, const ArkUIParag
                 drawContext.canvas = reinterpret_cast<ArkUICanvasHandle>(&context.canvas);
                 drawContext.width = context.width;
                 drawContext.height = context.height;
-                ArkUILeadingMarginSpanDrawInfo info;
-                info.x = leadingMarginOptions.x;
-                info.top = leadingMarginOptions.top;
-                info.bottom = leadingMarginOptions.bottom;
-                info.baseline = leadingMarginOptions.baseline;
-                info.direction = static_cast<int32_t>(leadingMarginOptions.direction);
-                info.start = leadingMarginOptions.start;
-                info.end = leadingMarginOptions.end;
-                info.first = leadingMarginOptions.first;
+                auto info = ConvertLeadingMarginDrawInfo(leadingMarginOptions);
                 auto onDrawLeadingMargin =
                     reinterpret_cast<void (*)(ArkUIDrawingContext*, ArkUILeadingMarginSpanDrawInfo*)>(func);
                 if (onDrawLeadingMargin) {
+                    LOG_CALLBACK("OH_ArkUI_ParagraphStyle_RegisterOnDrawLeadingMarginCallback", onDrawLeadingMargin);
                     onDrawLeadingMargin(&drawContext, &info);
                 }
         };
@@ -112,6 +120,7 @@ void ParseLeadingMargin(SpanParagraphStyle& spanParagraphStyle, const ArkUIParag
             float disntance = 0.0f;
             auto onGetLeadingMargin = reinterpret_cast<float(*)()>(func);
             if (onGetLeadingMargin) {
+                LOG_CALLBACK("OH_ArkUI_ParagraphStyle_RegisterOnGetLeadingMarginCallback", onGetLeadingMargin);
                 disntance = onGetLeadingMargin();
             }
             return CalcDimension(disntance, DimensionUnit::VP);
@@ -388,7 +397,11 @@ RefPtr<SpanBase> ParseCustomSpan(const ArkUICustomSpan& customSpan, int32_t star
             auto metrics = CustomSpanMetrics{ .width = 0.0f, .height = std::optional<float>(0) };
             auto onMeasureFunc = reinterpret_cast<ArkUICustomSpanMetrics* (*)(float)>(onMeasure);
             CHECK_NULL_RETURN(onMeasureFunc, metrics);
-            ArkUICustomSpanMetrics* arkuiCustomSpanMetrics = onMeasureFunc(customSpanMeasureInfo.fontSize);
+            ArkUICustomSpanMetrics* arkuiCustomSpanMetrics {};
+            {
+                LOG_CALLBACK("OH_ArkUI_CustomSpan_RegisterOnMeasureCallback", onMeasureFunc);
+                arkuiCustomSpanMetrics = onMeasureFunc(customSpanMeasureInfo.fontSize);
+            }
             CHECK_NULL_RETURN(arkuiCustomSpanMetrics, metrics);
             metrics.width = arkuiCustomSpanMetrics->width;
             metrics.height = arkuiCustomSpanMetrics->height;
@@ -407,6 +420,7 @@ RefPtr<SpanBase> ParseCustomSpan(const ArkUICustomSpan& customSpan, int32_t star
         drawInfo.optionsLineTop = customSpanOptions.lineTop;
         drawInfo.optionsLineBottom = customSpanOptions.lineBottom;
         drawInfo.optionsBaseLine = customSpanOptions.baseline;
+        LOG_CALLBACK("OH_ArkUI_CustomSpan_RegisterOnDrawCallback", onDrawFunc);
         onDrawFunc(&drawContext, &drawInfo);
     };
     auto result = AceType::MakeRefPtr<NapiCustomSpan>(onMeasureCallback, onDrawCallback, start, start + length);

@@ -15,6 +15,7 @@
 #include "core/interfaces/native/node/node_content_modifier.h"
 
 #include "base/error/error_code.h"
+#include "base/log/log_wrapper.h"
 #include "core/components_ng/syntax/node_content.h"
 #include "core/interfaces/native/utility/error_message_macros.h"
 
@@ -99,10 +100,12 @@ ArkUI_Int32 RegisterEvent(
     }
     auto onAttach = [receiver, userData, content]() {
         ArkUINodeContentEvent event { 0, userData, content };
+        LOG_CALLBACK("OH_ArkUI_NodeContent_RegisterCallback", receiver);
         receiver(&event);
     };
     auto onDetach = [receiver, userData, content]() {
         ArkUINodeContentEvent event { 1, userData, content };
+        LOG_CALLBACK("OH_ArkUI_NodeContent_RegisterCallback", receiver);
         receiver(&event);
     };
     auto* nodeContent = reinterpret_cast<NodeContent*>(content);

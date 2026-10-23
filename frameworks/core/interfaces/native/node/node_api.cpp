@@ -21,6 +21,7 @@
 #include <securec.h>
 #include <vector>
 
+#include "base/log/log_wrapper.h"
 #include "interfaces/native/native_type.h"
 #include "interfaces/native/node/config_manager.h"
 
@@ -2083,6 +2084,7 @@ ArkUI_Int32 PostFrameCallback(ArkUI_Int32 instanceId, void* userData,
         return ERROR_CODE_NATIVE_IMPL_NOT_MAIN_THREAD;
     }
     auto onframeCallbackFuncFromCAPI = [userData, callback](uint64_t nanoTimestamp, uint32_t frameCount) -> void {
+        LOG_CALLBACK("OH_ArkUI_PostFrameCallback", callback);
         callback(nanoTimestamp, frameCount, userData);
     };
 
@@ -2105,6 +2107,7 @@ ArkUI_Int32 PostIdleCallback(ArkUI_Int32 instanceId, void* userData,
         return ERROR_CODE_NATIVE_IMPL_NOT_MAIN_THREAD;
     }
     auto onidleCallbackFuncFromCAPI = [userData, callback](uint64_t nanoTimeLeft, uint32_t frameCount) -> void {
+        LOG_CALLBACK("OH_ArkUI_PostIdleCallback", callback);
         callback(nanoTimeLeft, frameCount, userData);
     };
 

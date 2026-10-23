@@ -20,6 +20,7 @@
 #include "accessibility_system_ability_client.h"
 
 #include "adapter/ohos/osal/accessibility/focus_move/accessibility_focus_move_osal_third.h"
+#include "base/log/log_wrapper.h"
 #include "core/components_ng/property/accessibility_property.h"
 #include "core/pipeline_ng/pipeline_context.h"
 #include "js_third_provider_interaction_operation_utils.h"
@@ -1079,6 +1080,7 @@ int32_t JsThirdProviderInteractionOperation::SendAccessibilityAsyncEvent(
         TAG_LOGI(AceLogTag::ACE_ACCESSIBILITY, "Inner SendAccessibilityAsyncEvent");
         SendAccessibilitySyncEventToService(accessibilityEventInfo, callback);
     }
+    LOG_CALLBACK("OH_ArkUI_SendAccessibilityAsyncEvent", callback);
     callback(0);
     return 0;
 }

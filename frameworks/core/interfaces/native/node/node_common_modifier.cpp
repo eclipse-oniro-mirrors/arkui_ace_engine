@@ -13,6 +13,8 @@
  * limitations under the License.
  */
 #include "core/interfaces/native/node/node_common_modifier.h"
+
+#include "base/log/log_wrapper.h"
 #include "core/common/container.h"
 
 #include "interfaces/native/node/native_type_visual_impl.h"
@@ -11207,6 +11209,7 @@ ArkUI_Int32 SetOnTouchTestDoneCallback(ArkUINodeHandle node, void* userData,
         ArkUIGestureRecognizerHandleArray recognizerArray = nullptr;
         auto count = static_cast<int32_t>(recognizers.size());
         if (count <= 0) {
+            LOG_CALLBACK("OH_ArkUI_SetTouchTestDoneCallback", touchTestDone);
             touchTestDone(&arkUIGestureEvent, recognizerArray, count, userData);
             return;
         }
@@ -11219,7 +11222,10 @@ ArkUI_Int32 SetOnTouchTestDoneCallback(ArkUINodeHandle node, void* userData,
             recognizerArray[index] = NodeModifier::CreateGestureRecognizer(value.Upgrade());
             index++;
         }
-        touchTestDone(&arkUIGestureEvent, recognizerArray, count, userData);
+        {
+            LOG_CALLBACK("OH_ArkUI_SetTouchTestDoneCallback", touchTestDone);
+            touchTestDone(&arkUIGestureEvent, recognizerArray, count, userData);
+        }
         delete[] recognizerArray;
     };
     ViewAbstract::SetOnTouchTestDone(frameNode, callback);

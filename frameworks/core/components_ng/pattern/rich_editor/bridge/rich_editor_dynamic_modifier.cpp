@@ -13,6 +13,8 @@
  * limitations under the License.
  */
 #include "bridge/declarative_frontend/jsview/js_richeditor.h"
+
+#include "base/log/log_wrapper.h"
 #include "bridge/declarative_frontend/jsview/models/view_abstract_model_impl.h"
 #include "core/common/container.h"
 #include "core/components_ng/base/view_abstract_model_ng.h"
@@ -275,7 +277,9 @@ void SetRichEditorNapiDataDetectorConfigWithEvent(
         auto onResult = reinterpret_cast<void (*)(const char*, int32_t, void*)>(arkUITextDetectConfig->onResult);
         textDetectConfig.onResult = [onResult, arkUITextDetectConfig](const std::string& result) {
             if (onResult) {
-                onResult(result.c_str(), static_cast<int32_t>(result.size()),
+                LOG_CALLBACK("OH_ArkUI_TextDataDetectorConfig_RegisterOnDetectResultUpdateCallback", onResult);
+                onResult(
+                    result.c_str(), static_cast<int32_t>(result.size()),
                     arkUITextDetectConfig->onDetectResultUpdateUserData);
             }
         };
@@ -879,6 +883,7 @@ SelectMenuParam parseMenuParam(ArkUIRichEditorBindMenuParam* menuParam)
         selectMenuParam.onMenuShow = [onMenuShow, userData = menuParam->onMenuShowUserData](
                                          int32_t start, int32_t end) {
             if (onMenuShow) {
+                LOG_CALLBACK("OH_ArkUI_TextEditorSelectionMenuOptions_RegisterOnMenuShowCallback", onMenuShow);
                 onMenuShow(start, end, userData);
             }
         };
@@ -888,6 +893,7 @@ SelectMenuParam parseMenuParam(ArkUIRichEditorBindMenuParam* menuParam)
         selectMenuParam.onMenuHide = [onMenuHide, userData = menuParam->onMenuHideUserData](
                                          int32_t start, int32_t end) {
             if (onMenuHide) {
+                LOG_CALLBACK("OH_ArkUI_TextEditorSelectionMenuOptions_RegisterOnMenuHideCallback", onMenuHide);
                 onMenuHide(start, end, userData);
             }
         };
@@ -897,6 +903,7 @@ SelectMenuParam parseMenuParam(ArkUIRichEditorBindMenuParam* menuParam)
         selectMenuParam.onAppear = [onMenuAppear, userData = menuParam->onMenuAppearUserData](
                                          int32_t start, int32_t end) {
             if (onMenuAppear) {
+                LOG_CALLBACK("OH_ArkUI_TextEditorSelectionMenuOptions_RegisterOnMenuAppearCallback", onMenuAppear);
                 onMenuAppear(start, end, userData);
             }
         };
@@ -905,6 +912,9 @@ SelectMenuParam parseMenuParam(ArkUIRichEditorBindMenuParam* menuParam)
         auto onMenuDisappear = reinterpret_cast<void (*)(void*)>(menuParam->onMenuDisappear);
         selectMenuParam.onDisappear = [onMenuDisappear, userData = menuParam->onMenuDisappearUserData]() {
             if (onMenuDisappear) {
+                LOG_CALLBACK(
+                    "OH_ArkUI_TextEditorSelectionMenuOptions_RegisterOnMenuDisappearCallback",
+                    onMenuDisappear);
                 onMenuDisappear(userData);
             }
         };

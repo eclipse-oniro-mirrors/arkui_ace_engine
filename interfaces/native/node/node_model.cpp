@@ -942,6 +942,7 @@ void HandleNodeEvent(ArkUI_NodeEvent* event)
         TriggerNodeEvent(event, eventListenersSet);
     }
     if (g_eventReceiver) {
+        LOG_CALLBACK("ArkUI_NativeNodeAPI_1.registerNodeEventReceiver", g_eventReceiver);
         g_eventReceiver(event);
     }
 }
@@ -960,7 +961,10 @@ void TriggerNodeEvent(ArkUI_NodeEvent* event, std::set<void (*)(ArkUI_NodeEvent*
 
     // Use the copy for iteration and callbacks
     for (const auto& eventListener : listenersCopy) {
-        eventListener(event);
+        {
+            LOG_CALLBACK("ArkUI_NativeNodeAPI_1.addNodeEventReceiver", eventListener);
+            eventListener(event);
+        }
         if (!IsValidArkUINode(event->node)) {
             break;
         }
@@ -1049,6 +1053,13 @@ void TriggerNodeCommonEvent(ArkUI_NodeEvent* event, int32_t eventType,
     auto it = commonEventListenersMap->find(eventType);
     if (it != commonEventListenersMap->end()) {
         const auto& eventListener = it->second;
+        const char* source = "OH_ArkUI_NativeModule_RegisterCommonEvent";
+        if (eventType == NODE_VISIBLE_AREA_APPROXIMATE_CHANGE_EVENT) {
+            source = "OH_ArkUI_NativeModule_RegisterCommonVisibleAreaApproximateChangeEvent";
+        } else if (eventType == NODE_EVENT_ON_AREA_CHANGE) {
+            source = "OH_ArkUI_NativeModule_RegisterCommonAreaApproximateChangeEvent";
+        }
+        LOG_CALLBACK(source, eventListener);
         (*eventListener)(event);
     }
 }

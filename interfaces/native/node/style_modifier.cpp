@@ -14,6 +14,8 @@
  */
 #include "style_modifier.h"
 
+#include "base/log/log_wrapper.h"
+
 #include <algorithm>
 #include <cerrno>
 #include <cstdlib>
@@ -15263,7 +15265,13 @@ ArkUITextMenuItemArray TextMenuItemArrayAdpaterCallback(
         itemArray.items.push_back(item);
     }
     auto userCallbackImpl = reinterpret_cast<void (*)(ArkUI_TextMenuItemArray*, void*)>(userCallback);
-    userCallbackImpl(&itemArray, userData);
+    {
+        LOG_CALLBACK(
+            "OH_ArkUI_TextEditMenuOptions_RegisterOnCreateMenuCallback / "
+            "OH_ArkUI_TextEditMenuOptions_RegisterOnPrepareMenuCallback",
+            userCallbackImpl);
+        userCallbackImpl(&itemArray, userData);
+    }
     size_t len = itemArray.items.size();
     if (len == 0) {
         return { .items = nullptr, .length = 0 };
@@ -15297,6 +15305,7 @@ bool OnMenuItemClickImpl(
     menuItem.id = item->id;
     auto onMenuItemClickCallback =
         reinterpret_cast<bool (*)(const ArkUI_TextMenuItem*, int32_t, int32_t, void*)>(onMenuItemClick);
+    LOG_CALLBACK("OH_ArkUI_TextEditMenuOptions_RegisterOnMenuItemClickCallback", onMenuItemClickCallback);
     return onMenuItemClickCallback(&menuItem, start, end, userData);
 }
 
