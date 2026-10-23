@@ -1858,6 +1858,7 @@ void UINode::DumpSimplifyTreeWithParamConfig(int32_t depth, std::shared_ptr<Json
         config.collectionState->traversalRoot = previousRoot;
     }
 }
+
 #endif
 
 void UINode::DumpSimplifyTree(int32_t depth, std::shared_ptr<JsonValue>& current)

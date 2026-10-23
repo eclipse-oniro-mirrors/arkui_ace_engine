@@ -414,10 +414,10 @@ PipelineContext::PipelineContext(std::shared_ptr<Window> window, RefPtr<TaskExec
     touchOptimizer_ = std::make_unique<ResSchedTouchOptimizer>();
     clickOptimizer_ = std::make_shared<ResSchedClickOptimizer>();
     clickOptimizer_->Init();
-    contentChangeMgr_ = MakeRefPtr<ContentChangeManager>(taskExecutor_);
     taihangOptimizer_ = std::make_shared<TaihangOptimizer>();
     taihangOptimizer_->Init();
 #endif
+    contentChangeMgr_ = MakeRefPtr<ContentChangeManager>(taskExecutor_);
     dynamicComponentSafeManager_ = AceType::MakeRefPtr<DynamicComponentSafeManager>();
     // Snapshot the thread's isolated state at pipeline creation time.
     // This determines the pipeline's IsolatedThread identity for its entire lifecycle.
@@ -456,11 +456,11 @@ PipelineContext::PipelineContext(std::shared_ptr<Window> window, RefPtr<TaskExec
 #ifndef CROSS_PLATFORM
     touchOptimizer_ = std::make_unique<ResSchedTouchOptimizer>();
     clickOptimizer_ = std::make_shared<ResSchedClickOptimizer>();
-    contentChangeMgr_ = MakeRefPtr<ContentChangeManager>(taskExecutor_);
     clickOptimizer_->Init();
     taihangOptimizer_ = std::make_shared<TaihangOptimizer>();
     taihangOptimizer_->Init();
 #endif
+    contentChangeMgr_ = MakeRefPtr<ContentChangeManager>(taskExecutor_);
     dynamicComponentSafeManager_ = AceType::MakeRefPtr<DynamicComponentSafeManager>();
     // Snapshot the thread's isolated state at pipeline creation time.
     isIsolatedThread_ = ContainerScope::IsIsolatedThread();
@@ -492,11 +492,11 @@ PipelineContext::PipelineContext()
 #ifndef CROSS_PLATFORM
     touchOptimizer_ = std::make_unique<ResSchedTouchOptimizer>();
     clickOptimizer_ = std::make_shared<ResSchedClickOptimizer>();
-    contentChangeMgr_ = MakeRefPtr<ContentChangeManager>(taskExecutor_);
     clickOptimizer_->Init();
     taihangOptimizer_ = std::make_shared<TaihangOptimizer>();
     taihangOptimizer_->Init();
 #endif
+    contentChangeMgr_ = MakeRefPtr<ContentChangeManager>(taskExecutor_);
     dynamicComponentSafeManager_ = AceType::MakeRefPtr<DynamicComponentSafeManager>();
     // Snapshot the thread's isolated state at pipeline creation time.
     isIsolatedThread_ = ContainerScope::IsIsolatedThread();
@@ -1433,11 +1433,9 @@ void PipelineContext::FlushVsync(uint64_t nanoTimestamp, uint64_t frameCount, in
         frameMetrics.actualStartTime, frameMetrics.totalDuration, frameMetrics.vsyncTimestamp,
         frameMetrics.animationDuration);
     // First vsync may come before rootNode_ is created.
-#ifndef CROSS_PLATFORM
     if (contentChangeMgr_ && rootNode_) {
         contentChangeMgr_->OnVsyncEnd(rootNode_->GetRectWithRender());
     }
-#endif
 }
 
 void PipelineContext::UpdateDrawLayoutChildObserver(
@@ -6078,6 +6076,9 @@ void PipelineContext::Destroy()
     CHECK_RUN_ON(UI);
     CloseUITreeRequests(*this);
     SetDestroyed();
+    if (contentChangeMgr_) {
+        contentChangeMgr_->InvalidateCapiContentChangeSubscriptions();
+    }
     if (rootNode_) {
         rootNode_->DetachFromMainTree();
     }

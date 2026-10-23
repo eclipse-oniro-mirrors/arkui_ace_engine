@@ -2363,14 +2363,12 @@ void FrameNode::TryVisibleChangeOnDescendant(VisibleType preVisibility, VisibleT
 
 void FrameNode::OnDetachFromMainTree(bool recursive, PipelineContext* context)
 {
-#ifndef CROSS_PLATFORM
     if (context) {
         auto contentChangeMgr = context->GetContentChangeManager();
         if (contentChangeMgr) {
             contentChangeMgr->OnContentChangeNodeDestroyed(GetId());
         }
     }
-#endif
     if (safeAreaInsetNode_ && safeAreaInsetNode_->IsOnMainTree()) {
         safeAreaInsetNode_->DetachFromMainTree(recursive);
     }

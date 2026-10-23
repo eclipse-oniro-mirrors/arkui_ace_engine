@@ -4101,6 +4101,17 @@
       "OHOS::Ace::NG::ContentChangeManager::OnSwiperChangeEnd(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&, bool)";
       "OHOS::Ace::NG::ContentChangeManager::OnSwiperChangeCancel(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&, bool)";
       "OHOS::Ace::NG::ContentChangeManager::OnSwiperChangeStart(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&, bool)";
+      OHOS::Ace::NG::ContentChangeManager::OnSwiperChangeInterrupted*;
+      OHOS::Ace::NG::ContentChangeManager::CompleteCapiSwiperChangeAfterAutoPlay*;
+      OHOS::Ace::NG::ContentChangeManager::CompleteCapiSwiperChangeWithoutMove*;
+      OHOS::Ace::NG::ReportCapiSubMenuEvent*;
+      OHOS::Ace::NG::ContentChangeManager::ReportCapiScrollEndEvent*;
+      OHOS::Ace::NG::ContentChangeManager::ReportCapiSwiperStartEvent*;
+      OHOS::Ace::NG::ContentChangeManager::QueueCapiSwiperEndEvent*;
+      OHOS::Ace::NG::ContentChangeManager::ReportCapiSwiperCancelEvent*;
+      OHOS::Ace::NG::ContentChangeManager::CompleteCapiContentChangeEventsOnNodeDestroyed*;
+      OHOS::Ace::NG::ContentChangeManager::MarkCapiScrollByEventSource*;
+      OHOS::Ace::NG::ContentChangeManager::MarkCapiScrollToEventSource*;
       "OHOS::Ace::NG::ContentChangeManager::OnSwiperScrollEnd(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&)";
       "OHOS::Ace::NG::ContentChangeManager::OnSwiperScrollStart(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&, bool)";
       "OHOS::Ace::NG::ContentChangeManager::OnTransitionAdded(int)";
@@ -5438,6 +5449,7 @@
       construction?vtable?for?OHOS::Parcelable-in-OHOS::Ace::PluginComponentManager::UIServiceListener;
       GetArkUIAniModifiers;
       GetArkUIAnyFullNodeAPI;
+      GetArkUIContentChangeAPI;
       GetArkUIPageTextAPI;
       GetArkUITreeAPI;
       GetArkUIDrawableDescriptor;
