@@ -148,21 +148,6 @@ ScrollPlaceholderBuilder MakeTemplateBuilder(const AniTemplateBuilderHandlePtr& 
         if (g_pendingProduct != 0) {
             product = AceType::Claim(reinterpret_cast<UINode*>(g_pendingProduct));
         }
-        // createUiDetachedRoot builds the template under an engine root wrapper
-        // (tag __Common__) that has no CloneForPlaceholder support. The wrapper
-        // is not part of the template: publish the single builder root beneath
-        // it so the registry probes and clones the actual content.
-        while (product != nullptr && product->GetTag() == "__Common__") {
-            const auto& children = product->GetChildren();
-            if (children.size() != 1) {
-                break;
-            }
-            auto inner = children.front();
-            TAG_LOGI(AceLogTag::ACE_SCROLL,
-                "ScrollPlaceholder product unwrapped: wrapper=__Common__, root=%{public}s, id=%{public}d",
-                inner->GetTag().c_str(), inner->GetId());
-            product = inner;
-        }
         if (!product) {
             TAG_LOGW(AceLogTag::ACE_SCROLL,
                 "ScrollPlaceholder isolated execution produced no product "
