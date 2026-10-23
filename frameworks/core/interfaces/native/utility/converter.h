@@ -1192,11 +1192,10 @@ namespace Converter {
         return std::nullopt;
     }
 
-    class ConverterState {
-    public:
-        inline static DimensionUnit defDimensionUnit = DimensionUnit::VP;
-        inline static double defShadowBlurRadius = -1.0;
-    };
+    namespace ConverterState {
+        extern ACE_FORCE_EXPORT DimensionUnit defDimensionUnit;
+        extern ACE_FORCE_EXPORT double defShadowBlurRadius;
+    } // namespace OHOS::Ace::NG::Converter::ConverterState
 
     template<> inline Dimension Convert(const Ark_LengthMetricsProxy& src)
     {

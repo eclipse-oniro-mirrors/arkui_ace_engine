@@ -211,6 +211,8 @@ std::optional<double> FloatToDouble(const std::optional<float>& src)
 }
 
 namespace OHOS::Ace::NG::Converter {
+ACE_FORCE_EXPORT DimensionUnit ConverterState::defDimensionUnit = DimensionUnit::VP;
+ACE_FORCE_EXPORT double ConverterState::defShadowBlurRadius = -1.0;
 struct DecorationStyleInterface {
     std::optional<TextDecoration> type;
     std::optional<Color> color;
