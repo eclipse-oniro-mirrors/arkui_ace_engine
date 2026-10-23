@@ -17,6 +17,7 @@
 
 #include <array>
 #include <atomic>
+#include <string>
 
 #include "node_model.h"
 
@@ -27,6 +28,7 @@ namespace {
 
 constexpr char UI_THREAD_CHECK_NAME[] = "UI_THREAD";
 constexpr char UI_THREAD_CHECK_REASON[] = "C API must be called on the UI thread";
+constexpr char ATTRIBUTE_MATCH_CHECK_NAME[] = "ATTRIBUTE_MATCH";
 constexpr char NODE_DISPOSED_CHECK_NAME[] = "NODE_DISPOSED";
 constexpr char NODE_DISPOSED_DEFAULT_REASON[] = "Node has been disposed";
 constexpr const char* DEFAULT_DEBUG_CRASH_HINT =
@@ -98,7 +100,7 @@ public:
         if (effective.mode == CheckMode::DISABLED || IsCurrentThreadSafe()) {
             return;
         }
-        EmitDiagnosis(UI_THREAD_CHECK_NAME, publicApiName, UI_THREAD_CHECK_REASON, effective);
+        EmitDiagnosis(CheckType::UI_THREAD, publicApiName, UI_THREAD_CHECK_REASON, effective);
     }
 
     void CheckNodeDisposed(ArkUI_NodeHandle nodePtr, const char* apiName, const char* errorMessage) const
@@ -108,8 +110,21 @@ public:
             nodePtr == nullptr || nodePtr->magic == ARKUI_NODE_MAGIC_VALID) {
             return;
         }
-        EmitDiagnosis(NODE_DISPOSED_CHECK_NAME, apiName,
+        EmitDiagnosis(CheckType::NODE_DISPOSED, apiName,
             (errorMessage != nullptr) ? errorMessage : NODE_DISPOSED_DEFAULT_REASON, effective);
+    }
+
+    void CheckAttributeMatch(ArkUI_NodeHandle node, int32_t attribute, int32_t attributeClass,
+        const char* apiName, AttributeMatcher matcher) const
+    {
+        const auto effective = GetEffectiveMode(CheckType::ATTRIBUTE_MATCH);
+        if (effective.mode == CheckMode::DISABLED || node == nullptr ||
+            node->magic != ARKUI_NODE_MAGIC_VALID || matcher(node->type, attribute, attributeClass)) {
+            return;
+        }
+        const auto reason = "Attribute does not match node type. nodeType: " + std::to_string(node->type) +
+            ", attribute: " + std::to_string(attribute);
+        EmitDiagnosis(CheckType::ATTRIBUTE_MATCH, apiName, reason.c_str(), effective);
     }
 
     bool IsCurrentThreadSafe() const
@@ -168,21 +183,43 @@ private:
         switch (type) {
             case CheckType::UI_THREAD:
             case CheckType::NODE_DISPOSED:
+            case CheckType::ATTRIBUTE_MATCH:
                 return isDebug ? CheckMode::CRASH : CheckMode::DISABLED;
             default:
                 return CheckMode::DISABLED;
         }
     }
 
-    void EmitDiagnosis(
-        const char* checkName, const char* apiName, const char* reason, const EffectiveMode& effective) const
+    static const char* GetCheckName(CheckType type)
     {
+        switch (type) {
+            case CheckType::UI_THREAD:
+                return UI_THREAD_CHECK_NAME;
+            case CheckType::NODE_DISPOSED:
+                return NODE_DISPOSED_CHECK_NAME;
+            case CheckType::ATTRIBUTE_MATCH:
+                return ATTRIBUTE_MATCH_CHECK_NAME;
+            default:
+                return "unknown";
+        }
+    }
+
+    void EmitDiagnosis(
+        CheckType type, const char* apiName, const char* reason, const EffectiveMode& effective) const
+    {
+        const char* checkName = GetCheckName(type);
         const char* api = (apiName != nullptr) ? apiName : "unknown";
         const char* hint = (effective.isDefault && effective.mode == CheckMode::CRASH)
             ? DEFAULT_DEBUG_CRASH_HINT : "";
-        TAG_LOGE(AceLogTag::ACE_NATIVE_NODE,
-            "ArkUI runtime check hit. checkName: %{public}s, apiName: %{public}s, reason: %{public}s%{public}s",
-            checkName, api, reason, hint);
+        if (type == CheckType::ATTRIBUTE_MATCH && effective.mode == CheckMode::LOG) {
+            TAG_LOGW(AceLogTag::ACE_NATIVE_NODE,
+                "ArkUI runtime check hit. checkName: %{public}s, apiName: %{public}s, reason: %{public}s%{public}s",
+                checkName, api, reason, hint);
+        } else {
+            TAG_LOGE(AceLogTag::ACE_NATIVE_NODE,
+                "ArkUI runtime check hit. checkName: %{public}s, apiName: %{public}s, reason: %{public}s%{public}s",
+                checkName, api, reason, hint);
+        }
         LogBacktrace();
         if (effective.mode == CheckMode::CRASH) {
             LOGF_ABORT("ArkUI runtime check abort. checkName: %{public}s, apiName: %{public}s, "
@@ -218,6 +255,12 @@ void CheckUIThread(const char* publicApiName)
 void CheckNodeDisposed(ArkUI_NodeHandle nodePtr, const char* apiName, const char* errorMessage)
 {
     GetManager().CheckNodeDisposed(nodePtr, apiName, errorMessage);
+}
+
+void CheckAttributeMatch(ArkUI_NodeHandle node, int32_t attribute, int32_t attributeClass,
+    const char* apiName, AttributeMatcher matcher)
+{
+    GetManager().CheckAttributeMatch(node, attribute, attributeClass, apiName, matcher);
 }
 
 } // namespace OHOS::Ace::NodeModel::ConfigManager

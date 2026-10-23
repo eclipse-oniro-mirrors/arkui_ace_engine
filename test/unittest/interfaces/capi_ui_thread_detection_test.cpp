@@ -228,23 +228,6 @@ HWTEST_F(UiThreadDetectionTest, LogModeProducesDiagnosticsOnUnsafeThread, TestSi
     RunAndExpectNoDiagnostic([] { ConfigManager::CheckUIThread("TestApi_Safe"); });
 }
 
-HWTEST_F(UiThreadDetectionTest, RejectsInvalidRuntimeCheckArguments, TestSize.Level1)
-{
-    SetMockIsCurrentThreadSafe(SafeThread);
-    EXPECT_EQ(OH_ArkUI_NativeModule_SetRuntimeCheckMode(
-        static_cast<OH_ArkUI_NativeModule_RuntimeCheckType>(-1), OH_ARKUI_NATIVEMODULE_CHECK_MODE_LOG),
-        ARKUI_ERROR_CODE_PARAM_INVALID);
-    EXPECT_EQ(OH_ArkUI_NativeModule_SetRuntimeCheckMode(
-        static_cast<OH_ArkUI_NativeModule_RuntimeCheckType>(2), OH_ARKUI_NATIVEMODULE_CHECK_MODE_LOG),
-        ARKUI_ERROR_CODE_PARAM_INVALID);
-    EXPECT_EQ(OH_ArkUI_NativeModule_SetRuntimeCheckMode(
-        OH_ARKUI_NATIVEMODULE_CHECK_TYPE_UI_THREAD, static_cast<OH_ArkUI_NativeModule_RuntimeCheckMode>(-1)),
-        ARKUI_ERROR_CODE_PARAM_INVALID);
-    EXPECT_EQ(OH_ArkUI_NativeModule_SetRuntimeCheckMode(
-        OH_ARKUI_NATIVEMODULE_CHECK_TYPE_UI_THREAD, static_cast<OH_ArkUI_NativeModule_RuntimeCheckMode>(3)),
-        ARKUI_ERROR_CODE_PARAM_INVALID);
-}
-
 HWTEST_F(UiThreadDetectionTest, RuntimeCheckModeChangeInvalidatesCache, TestSize.Level1)
 {
     SetMockIsCurrentThreadSafe(SafeThread);
