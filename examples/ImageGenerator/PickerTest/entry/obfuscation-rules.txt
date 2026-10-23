@@ -1,0 +1,2 @@
+# obfuscation-rules.txt
+# This file is used for code obfuscation configuration.
