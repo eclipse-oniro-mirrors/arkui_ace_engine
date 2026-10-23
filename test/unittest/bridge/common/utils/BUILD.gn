@@ -39,3 +39,18 @@ ohos_unittest("bridge_utils_test") {
   ]
   external_deps = [ "cJSON:cjson" ]
 }
+
+ohos_unittest("ark_js_runtime_test") {
+  module_out_path = bridge_test_output_path
+  sources = [
+    "ark_js_runtime_test.cpp",
+  ]
+
+  configs = [ "$ace_root/test/unittest:ace_unittest_config" ]
+
+  external_deps = [
+    "ets_runtime:libark_jsruntime",
+    "googletest:gmock",
+    "googletest:gtest",
+  ]
+}
