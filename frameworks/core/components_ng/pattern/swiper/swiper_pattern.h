@@ -936,6 +936,11 @@ public:
         isRenderGroupExplicitlySet_ = isRenderGroup;
     }
 
+    void SetIsTabsSidebarDisplayMode(bool isSidebar)
+    {
+        isTabsSidebarDisplayMode_ = isSidebar;
+    }
+
 protected:
     void MarkDirtyNodeSelf();
     void OnPropertyTranslateAnimationFinish(const OffsetF& offset);
@@ -1638,6 +1643,8 @@ private:
     bool isRenderGroupExplicitlySet_ = false;
 
     bool isIgnoreHiddenItem_ = false;
+
+    bool isTabsSidebarDisplayMode_ = false;
 };
 } // namespace OHOS::Ace::NG
 
