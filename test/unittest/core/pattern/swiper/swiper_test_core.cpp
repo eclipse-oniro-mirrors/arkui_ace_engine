@@ -14,6 +14,7 @@
  */
 
 #include "gtest/gtest.h"
+#include "interfaces/native/ui_info_collection.h"
 
 #define protected public
 #define private public
@@ -446,6 +447,177 @@ HWTEST_F(SwiperTestCore, ContentChangeTabsCustomTransitionTest001, TestSize.Leve
         Mock::VerifyAndClearExpectations(mockUiSessionManager);
         manager->StopContentChangeReport();
     }
+}
+
+
+/**
+ * @tc.name: CapiFirstSwiperLayoutAndSameIndexCompletion
+ * @tc.desc: An initial layout with a normal END starts once; an unfinished same-index command closes once.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SwiperTestCore, CapiFirstSwiperLayoutAndSameIndexCompletion, TestSize.Level1)
+{
+    auto manager = MockPipelineContext::GetCurrent()->GetContentChangeManager();
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    std::vector<uint32_t> a;
+    std::vector<uint32_t> b;
+    auto sink = [](uint32_t type, uint64_t, const char*, uint32_t, void* data) {
+        static_cast<std::vector<uint32_t>*>(data)->push_back(type);
+    };
+    auto aid = manager->RegisterCapiContentChangeEvent(true, 1, 0, &a, sink, nullptr);
+    auto bid = manager->RegisterCapiContentChangeEvent(false, 1, 0, &b, sink, nullptr);
+    auto pattern = AceType::MakeRefPtr<SwiperPattern>();
+    auto node = FrameNode::CreateFrameNode(V2::SWIPER_ETS_TAG, 498, pattern, true);
+    for (int i = 0; i < 2; ++i) {
+        node->AddChild(FrameNode::CreateFrameNode("Text", 499 + i, AceType::MakeRefPtr<Pattern>(), true));
+    }
+    node->GetLayoutProperty<SwiperLayoutProperty>()->UpdateShowIndicator(false);
+    pattern->isInit_ = true;
+    pattern->jumpIndex_ = 0;
+    FinishNoAnimationLayout(node, 0);
+    EXPECT_EQ(a, (std::vector<uint32_t> {
+        OH_ARKUI_NATIVEMODULE_EVENT_SWIPER_START, OH_ARKUI_NATIVEMODULE_EVENT_SWIPER_END }));
+    EXPECT_EQ(b, (std::vector<uint32_t> { OH_ARKUI_NATIVEMODULE_EVENT_SWIPER_END }));
+    a.clear();
+    b.clear();
+    manager->OnSwiperChangeStart(node, false);
+    pattern->ContentChangeReport(node, false);
+    manager->OnVsyncEnd(RectF());
+    EXPECT_EQ(a, (std::vector<uint32_t> {
+        OH_ARKUI_NATIVEMODULE_EVENT_SWIPER_START, OH_ARKUI_NATIVEMODULE_EVENT_SWIPER_CANCEL }));
+    EXPECT_TRUE(b.empty());
+    pattern->ContentChangeReport(node, false);
+    manager->OnVsyncEnd(RectF());
+    EXPECT_EQ(a.size(), 2U);
+    manager->UnregisterCapiContentChangeEvent(aid);
+    manager->UnregisterCapiContentChangeEvent(bid);
+}
+
+/**
+ * @tc.name: CapiAutoPlayPropertyChangeDropsStartBeforeLayout
+ * @tc.desc: Enabling autoPlay clears manual START before layout or destruction can report a terminal event.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SwiperTestCore, CapiAutoPlayPropertyChangeDropsStartBeforeLayout, TestSize.Level1)
+{
+    auto manager = MockPipelineContext::GetCurrent()->GetContentChangeManager();
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    std::vector<uint32_t> events;
+    auto sink = [](uint32_t type, uint64_t, const char*, uint32_t, void* data) {
+        static_cast<std::vector<uint32_t>*>(data)->push_back(type);
+    };
+    auto id = manager->RegisterCapiContentChangeEvent(true, 1, 0, &events, sink, nullptr);
+    auto pattern = AceType::MakeRefPtr<SwiperPattern>();
+    auto node = FrameNode::CreateFrameNode(V2::SWIPER_ETS_TAG, 501, pattern, true);
+    manager->OnSwiperChangeStart(node, false);
+    node->GetPaintProperty<SwiperPaintProperty>()->UpdateAutoPlay(true);
+    pattern->OnModifyDone();
+    manager->OnContentChangeNodeDestroyed(node->GetId());
+    manager->OnVsyncEnd(RectF());
+    EXPECT_EQ(events, (std::vector<uint32_t> { OH_ARKUI_NATIVEMODULE_EVENT_SWIPER_START }));
+    manager->UnregisterCapiContentChangeEvent(id);
+}
+
+/**
+ * @tc.name: CapiNormalizedIndexReportsOnlyActualContentChange
+ * @tc.desc: An out-of-range property corrected to another item starts; correction to the same item stays silent.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SwiperTestCore, CapiNormalizedIndexReportsOnlyActualContentChange, TestSize.Level1)
+{
+    auto manager = MockPipelineContext::GetCurrent()->GetContentChangeManager();
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    std::vector<uint32_t> events;
+    auto sink = [](uint32_t type, uint64_t, const char*, uint32_t, void* data) {
+        static_cast<std::vector<uint32_t>*>(data)->push_back(type);
+    };
+    auto id = manager->RegisterCapiContentChangeEvent(true, 1, 0, &events, sink, nullptr);
+    auto pattern = AceType::MakeRefPtr<SwiperPattern>();
+    auto node = FrameNode::CreateFrameNode(V2::SWIPER_ETS_TAG, 502, pattern, true);
+    for (int i = 0; i < 3; ++i) {
+        node->AddChild(FrameNode::CreateFrameNode("Text", 503 + i, AceType::MakeRefPtr<Pattern>(), true));
+    }
+    auto layout = node->GetLayoutProperty<SwiperLayoutProperty>();
+    layout->UpdateShowIndicator(false);
+    layout->UpdateLoop(false);
+    pattern->isInit_ = false;
+    pattern->UpdateCurrentIndex(1);
+    pattern->oldIndex_ = 1;
+    layout->UpdateIndex(99);
+    pattern->BeforeCreateLayoutWrapper();
+    EXPECT_EQ(pattern->currentIndex_, 0);
+    EXPECT_EQ(events, (std::vector<uint32_t> { OH_ARKUI_NATIVEMODULE_EVENT_SWIPER_START }));
+    FinishNoAnimationLayout(node, 0);
+    EXPECT_EQ(events, (std::vector<uint32_t> {
+        OH_ARKUI_NATIVEMODULE_EVENT_SWIPER_START, OH_ARKUI_NATIVEMODULE_EVENT_SWIPER_END }));
+    events.clear();
+    layout->UpdateIndex(99);
+    pattern->BeforeCreateLayoutWrapper();
+    FinishNoAnimationLayout(node, 0);
+    EXPECT_TRUE(events.empty());
+    manager->UnregisterCapiContentChangeEvent(id);
+}
+
+/**
+ * @tc.name: EdgeAnimationCompletesWithCancel
+ * @tc.desc: Spring/fade completion at the same index cancels the active cycle once for Swiper and Tabs.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SwiperTestCore, EdgeAnimationCompletesWithCancel, TestSize.Level1)
+{
+    auto manager = MockPipelineContext::GetCurrent()->GetContentChangeManager();
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    std::vector<uint32_t> a;
+    std::vector<uint32_t> b;
+    auto sink = [](uint32_t type, uint64_t, const char*, uint32_t, void* data) {
+        static_cast<std::vector<uint32_t>*>(data)->push_back(type);
+    };
+    auto aid = manager->RegisterCapiContentChangeEvent(true, 1, 0, &a, sink, nullptr);
+    auto bid = manager->RegisterCapiContentChangeEvent(false, 1, 0, &b, sink, nullptr);
+    for (bool tabs : { false, true }) {
+        auto pattern = AceType::MakeRefPtr<SwiperPattern>();
+        auto node = FrameNode::CreateFrameNode(
+            V2::SWIPER_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), pattern);
+        auto parent = FrameNode::CreateFrameNode(
+            V2::TABS_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+        if (tabs) {
+            node->MountToParent(parent);
+        }
+        pattern->hasTabsAncestor_ = tabs;
+        node->GetLayoutProperty<SwiperLayoutProperty>()->UpdateLoop(false);
+        for (int i = 0; i < 3; ++i) {
+            node->AddChild(FrameNode::CreateFrameNode(
+                "Text", ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>()));
+        }
+        for (int index : { 0, 2 }) {
+            a.clear();
+            b.clear();
+            pattern->currentIndex_ = index;
+            pattern->nextIndex_ = index;
+            manager->OnSwiperChangeStart(node, tabs);
+            pattern->OnSpringAndFadeAnimationFinish();
+            pattern->OnSpringAndFadeAnimationFinish();
+            manager->OnVsyncEnd(RectF());
+            EXPECT_EQ(a, (std::vector<uint32_t> { tabs ? 9U : 6U, tabs ? 11U : 8U }));
+            EXPECT_TRUE(b.empty());
+        }
+        a.clear();
+        b.clear();
+        pattern->currentIndex_ = 0;
+        pattern->nextIndex_ = 1;
+        pattern->targetIndex_ = 1;
+        manager->OnSwiperChangeStart(node, tabs);
+        pattern->OnSpringAndFadeAnimationFinish();
+        manager->OnVsyncEnd(RectF());
+        EXPECT_EQ(a, (std::vector<uint32_t> { tabs ? 9U : 6U, tabs ? 10U : 7U }));
+        EXPECT_EQ(b, (std::vector<uint32_t> { tabs ? 10U : 7U }));
+    }
+    manager->UnregisterCapiContentChangeEvent(aid);
+    manager->UnregisterCapiContentChangeEvent(bid);
 }
 
 } // namespace OHOS::Ace::NG

@@ -610,7 +610,11 @@ public:
     // 4. end hide animation: overlay node lost focus, lower level node get focus.
     void FocusOverlayNode(const RefPtr<FrameNode>& overlayNode, bool isInSubWindow = false);
     void ContentChangeReport(const RefPtr<FrameNode>& keyNode, bool isShow);
+    void ContentChangeReport(const RefPtr<FrameNode>& keyNode, bool isShow, bool reportCapi);
+    void ReportCapiOverlayEvent(const RefPtr<FrameNode>& keyNode, bool isShow, const char* overlayType,
+        const RefPtr<FrameNode>& trigger = nullptr);
     void RemoveChildWithService(const RefPtr<UINode>& rootNode, const RefPtr<FrameNode>& node);
+    void ReportSubMenuEvent(const RefPtr<FrameNode>& node, bool isShow);
     const std::set<WeakPtr<UINode>>& GetwindowScenes();
     CancelableCallback<void()>& GetPreviewFilterTask();
 
@@ -862,6 +866,9 @@ private:
     // No thread safety issue due to they are all run in UI thread
     bool isAllowedBeCovered_ = true;
     // Only hasValue when isAllowedBeCovered is false
+    std::set<int32_t> capiVisibleSubMenus_;
+    std::set<int32_t> capiVisibleOverlayContents_;
+    void ScheduleOverlayContentVisibilityReport(const RefPtr<FrameNode>& node);
     std::set<int32_t> curSessionIds_;
     std::optional<OverlayManagerInfo> overlayInfo_;
     WeakPtr<FrameNode> customKeyboardNode_;

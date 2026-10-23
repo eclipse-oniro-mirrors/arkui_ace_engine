@@ -2678,6 +2678,7 @@ int32_t ListPattern::GetFirstIndex() const
 void ListPattern::ScrollTo(float position)
 {
     StopAnimate();
+    ScheduleCapiScrollCommand(true);
     jumpIndex_.reset();
     targetIndex_.reset();
     currentDelta_ = 0.0f;
@@ -2688,7 +2689,7 @@ void ListPattern::ScrollTo(float position)
     isScrollEnd_ = true;
     auto host = GetHost();
     CHECK_NULL_VOID(host);
-    ContentChangeReport(host, ContentChangeManager::SCROLL_TO);
+    ContentChangeReport(host, ContentChangeManager::SCROLL_TO, false);
 }
 
 void ListPattern::ResetScrollToIndexParams()
@@ -3066,6 +3067,9 @@ void ListPattern::ApplyFastScrollPreparationResult(const RefPtr<ListLayoutAlgori
 
 void ListPattern::ScrollToIndex(int32_t index, bool smooth, ScrollAlign align, std::optional<float> extraOffset)
 {
+    if (!smooth) {
+        ScheduleCapiScrollCommand(true);
+    }
     SetScrollSource(SCROLL_FROM_JUMP);
     // When snap align scrolling with the mouse wheel, do not interrupt the animation.
     if (!smooth && !lastSnapTargetIndex_.has_value()) {
@@ -3093,7 +3097,7 @@ void ListPattern::ScrollToIndex(int32_t index, bool smooth, ScrollAlign align, s
             jumpIndexInGroup_.reset();
             auto host = GetHost();
             CHECK_NULL_VOID(host);
-            ContentChangeReport(host, ContentChangeManager::SCROLL_TO_INDEX);
+            ContentChangeReport(host, ContentChangeManager::SCROLL_TO_INDEX, false);
         }
         MarkDirtyNodeSelf();
     }
@@ -3127,6 +3131,9 @@ bool ListPattern::CheckTargetValid(int32_t index, int32_t indexInGroup)
 
 void ListPattern::ScrollToItemInGroup(int32_t index, int32_t indexInGroup, bool smooth, ScrollAlign align)
 {
+    if (!smooth) {
+        ScheduleCapiScrollCommand(true);
+    }
     SetScrollSource(SCROLL_FROM_JUMP);
     if (!smooth) {
         StopAnimate();
@@ -3363,6 +3370,7 @@ void ListPattern::ScrollPage(bool reverse, bool smooth, AccessibilityScrollType 
         }
     } else {
         StopAnimate();
+        ScheduleCapiScrollCommand(false);
         UpdateCurrentOffset(distance, SCROLL_FROM_JUMP);
         isScrollEnd_ = true;
     }

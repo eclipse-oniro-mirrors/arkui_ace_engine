@@ -14,6 +14,8 @@
  */
 
 #include "core/components_ng/pattern/indexer/indexer_pattern.h"
+
+#include "core/components_ng/pattern/overlay/overlay_manager.h"
 #include "indexer_pattern.h"
 #include "interfaces/inner_api/ui_session/ui_session_manager.h"
 
@@ -2035,7 +2037,15 @@ void IndexerPattern::StartBubbleAppearAnimation()
             CHECK_NULL_VOID(pattern);
             pattern->UpdatePopupOpacity(1.0f);
         },
-        nullptr, nullptr, pipeline);
+        [weak = WeakClaim(this), popup = WeakPtr<FrameNode>(popupNode_)]() {
+            auto pattern = weak.Upgrade();
+            auto node = popup.Upgrade();
+            CHECK_NULL_VOID(pattern && node && node == pattern->popupNode_ && node->IsOnMainTree());
+            auto render = node->GetRenderContext();
+            if (render && NearEqual(render->GetOpacityValue(0.0f), 1.0f)) {
+                pattern->ReportCapiBubbleEvent(true);
+            }
+        }, nullptr, pipeline);
 }
 
 void IndexerPattern::StartDelayTask(uint32_t duration)
@@ -2096,6 +2106,7 @@ void IndexerPattern::StartBubbleDisappearAnimation()
             CHECK_NULL_VOID(renderContext);
             if (NearZero(renderContext->GetOpacityValue(0.0f))) {
                 pattern->UpdatePopupVisibility(VisibleType::GONE);
+                pattern->ReportCapiBubbleEvent(false);
             }
         },
         nullptr, pipeline);
@@ -2252,11 +2263,30 @@ void IndexerPattern::SetActionClearSelection(
         });
 }
 
+void IndexerPattern::ReportCapiBubbleEvent(bool isShow)
+{
+    if (!popupNode_ || capiBubbleVisible_ == isShow) {
+        return;
+    }
+    capiBubbleVisible_ = isShow;
+    auto context = GetContext();
+    auto overlay = context ? context->GetOverlayManager() : nullptr;
+    if (overlay) {
+        overlay->ReportCapiOverlayEvent(popupNode_, isShow, "popup", GetHost());
+    }
+}
+
+void IndexerPattern::OnDetachFromMainTree()
+{
+    ReportCapiBubbleEvent(false);
+}
+
 void IndexerPattern::RemoveBubble()
 {
     auto host = GetHost();
     CHECK_NULL_VOID(host);
     host->RemoveChild(popupNode_);
+    ReportCapiBubbleEvent(false);
     auto layoutProperty = host->GetLayoutProperty<IndexerLayoutProperty>();
     CHECK_NULL_VOID(layoutProperty);
     layoutProperty->UpdateIsPopup(false);

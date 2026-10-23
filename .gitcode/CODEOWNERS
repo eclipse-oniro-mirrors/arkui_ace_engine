@@ -2524,6 +2524,7 @@ frameworks/core/components_ng/pattern/overlay/modal_presentation_pattern.h @arku
 frameworks/core/components_ng/pattern/overlay/modal_style.h @arkuicodepulse
 frameworks/core/components_ng/pattern/overlay/overlay_container_pattern.cpp @arkuipopupwindow_all
 frameworks/core/components_ng/pattern/overlay/overlay_container_pattern.h @arkuipopupwindow_all
+frameworks/core/components_ng/pattern/overlay/overlay_content_change_report.h @arkuipopupwindow_all
 frameworks/core/components_ng/pattern/overlay/overlay_manager.cpp @arkuipopupwindow_all
 frameworks/core/components_ng/pattern/overlay/overlay_manager.h @arkuipopupwindow_all
 frameworks/core/components_ng/pattern/overlay/popup_base_pattern.cpp @arkuipopupwindow_all

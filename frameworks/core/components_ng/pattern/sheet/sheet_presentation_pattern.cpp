@@ -4361,13 +4361,11 @@ void SheetPresentationPattern::OnAppear()
     if (Container::GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TWELVE)) {
         SendMessagesAfterFirstTransitionIn(true);
     }
-#ifndef CROSS_PLATFORM
     auto pipeline = GetContext();
     CHECK_NULL_VOID(pipeline);
     auto mgr = pipeline->GetContentChangeManager();
     CHECK_NULL_VOID(mgr);
     mgr->OnDialogChangeEnd(GetHost(), true);
-#endif
 }
 
 bool SheetPresentationPattern::IsNeedChangeScrollHeight(float height)
@@ -4415,13 +4413,11 @@ void SheetPresentationPattern::OnDisappear()
         ComponentEventType::COMPONENT_EVENT_SHEET_PRESENTATION);
     ACE_ENGINE_HISTOGRAM_BOOLEAN("bindSheet.SheetOptions.OnDisappear", 1);
     isDismissProcess_ = false;
-#ifndef CROSS_PLATFORM
     auto pipeline = GetContext();
     CHECK_NULL_VOID(pipeline);
     auto mgr = pipeline->GetContentChangeManager();
     CHECK_NULL_VOID(mgr);
     mgr->OnDialogChangeEnd(GetHost(), false);
-#endif
 }
 
 void SheetPresentationPattern::OnFontScaleConfigurationUpdate()

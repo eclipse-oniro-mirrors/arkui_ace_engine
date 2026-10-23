@@ -1920,7 +1920,8 @@
       "OHOS::Ace::NG::OverlayManager::CloseDialog(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&)";
       "OHOS::Ace::NG::OverlayManager::CloseKeyboard(int)";
       "OHOS::Ace::NG::OverlayManager::ClearPopupMap()";
-      "OHOS::Ace::NG::OverlayManager::ContentChangeReport(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&, bool)";
+      OHOS::Ace::NG::OverlayManager::ContentChangeReport*;
+      OHOS::Ace::NG::OverlayManager::ReportCapiOverlayEvent*;
       "OHOS::Ace::NG::OverlayManager::EraseMenuInfo(int)";
       "OHOS::Ace::NG::OverlayManager::ErasePopupInfo(int)";
       "OHOS::Ace::NG::OverlayManager::EraseTipsEnterAndLeaveInfo(int, int)";
@@ -2238,7 +2239,8 @@
       "OHOS::Ace::NG::ScrollablePattern::CleanScrollingListener()";
       "OHOS::Ace::NG::ScrollablePattern::ContentChangeByDetaching(OHOS::Ace::NG::PipelineContext*)";
       "OHOS::Ace::NG::ScrollablePattern::ContentChangeOnScrollStart(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&)";
-      "OHOS::Ace::NG::ScrollablePattern::ContentChangeReport(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&, unsigned int)";
+      OHOS::Ace::NG::ScrollablePattern::ContentChangeReport*;
+      OHOS::Ace::NG::ScrollablePattern::ScheduleCapiScrollCommand*;
       "OHOS::Ace::NG::ScrollablePattern::CreateAnalyzerOverlay(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode>)";
       "OHOS::Ace::NG::ScrollablePattern::CreateOverlayModifier()";
       "OHOS::Ace::NG::ScrollablePattern::CreatePaintProperty()";
@@ -2257,6 +2259,7 @@
       "OHOS::Ace::NG::ScrollablePattern::FireObserverOnWillScroll(float)";
       "OHOS::Ace::NG::ScrollablePattern::FireOnScroll(float, std::__h::function<void (OHOS::Ace::Dimension, OHOS::Ace::ScrollState)>&) const";
       "OHOS::Ace::NG::ScrollablePattern::FireOnScrollStart(bool)";
+      "OHOS::Ace::NG::ScrollablePattern::UpdateCapiScrollEventSource(bool)";
       "OHOS::Ace::NG::ScrollablePattern::FireOnWillScroll(float) const";
       "OHOS::Ace::NG::ScrollablePattern::Fling(double)";
       "OHOS::Ace::NG::ScrollablePattern::GetDefaultFriction()";

@@ -555,6 +555,13 @@ void SwiperPattern::OnModifyDone()
     Pattern::OnModifyDone();
     auto host = GetHost();
     CHECK_NULL_VOID(host);
+    if (IsAutoPlay()) {
+        auto context = GetContext();
+        auto manager = context ? context->GetContentChangeManager() : nullptr;
+        if (manager) {
+            manager->CompleteCapiSwiperChangeAfterAutoPlay(host, hasTabsAncestor_, false);
+        }
+    }
     ACE_UINODE_TRACE(host);
     swiperId_ = host->GetId();
     auto hub = host->GetEventHub<SwiperEventHub>();
@@ -808,6 +815,13 @@ void SwiperPattern::BeforeCreateLayoutWrapper()
         FireSelectedEvent(-1, currentIndex_);
     }
     if (lastCurrentIndex != currentIndex_ && !isInit_ && !IsUseCustomAnimation()) {
+        if (GetLoopIndex(lastCurrentIndex) != GetLoopIndex(currentIndex_)) {
+            auto pipeline = GetContext();
+            auto manager = pipeline ? pipeline->GetContentChangeManager() : nullptr;
+            if (manager) {
+                manager->ReportCapiSwiperStartEvent(host, hasTabsAncestor_);
+            }
+        }
         FireWillShowEvent(currentIndex_);
         FireWillHideEvent(lastCurrentIndex);
     }
@@ -1365,6 +1379,21 @@ bool SwiperPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty,
         needUnmountIndexs_ = algo->GetNeedUnmountIndexs();
         auto currentIndex = props->GetIndexValue(0);
         HandleTabsCachedMaxCount(currentIndex, customAnimationToIndex_.value_or(currentIndex));
+        // Attribute-driven jumps do not create a transition proxy, but still change the visible tab.
+        if (!isInit && currentIndex != changeEndOldIndex && !customAnimationToIndex_ && !currentProxyInAnimation_) {
+            auto pipeline = GetContext();
+            if (pipeline) {
+                pipeline->AddAfterRenderTask([weak = WeakClaim(this), currentIndex]() {
+                    auto swiper = weak.Upgrade();
+                    auto host = swiper ? swiper->GetHost() : nullptr;
+                    if (host && host->IsOnMainTree() && swiper->CurrentIndex() == currentIndex &&
+                        !swiper->customAnimationToIndex_ &&
+                        !swiper->currentProxyInAnimation_) {
+                        swiper->ContentChangeReport(host, true);
+                    }
+                });
+            }
+        }
         return false;
     }
     if (SupportSwiperCustomAnimation()) {
@@ -1417,6 +1446,12 @@ bool SwiperPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty,
         auto pipeline = GetContext();
         if (pipeline) {
             bool needSwiperChangeEnd = isInit || jumpIndex_.value() != changeEndOldIndex;
+            if (isInit && TotalCount() > 0) {
+                auto manager = pipeline->GetContentChangeManager();
+                if (manager) {
+                    manager->ReportCapiSwiperStartEvent(GetHost(), hasTabsAncestor_);
+                }
+            }
             pipeline->AddAfterRenderTask([weak = WeakClaim(this), needSwiperChangeEnd]() {
                 auto swiper = weak.Upgrade();
                 CHECK_NULL_VOID(swiper);
@@ -1819,7 +1854,6 @@ void SwiperPattern::ReportSwiperChangeContent(int32_t currentIndex, int32_t comp
     if (half * width > swiperWidth || half * height > swiperHeight) {
         return;
     }
-
 #ifndef CROSS_PLATFORM
     CHECK_NULL_VOID(pipeline->GetTaihangOptimizer());
     auto pageInfo = pipeline->GetLastPageInfo();
@@ -1916,7 +1950,6 @@ void SwiperPattern::FireUnselectedEvent(int32_t currentIndex, int32_t targetInde
 
 void SwiperPattern::NotifyScrollStateEvent(ScrollState scrollState)
 {
-#ifndef CROSS_PLATFORM
     if (scrollState_ == scrollState) {
         return;
     }
@@ -1934,7 +1967,6 @@ void SwiperPattern::NotifyScrollStateEvent(ScrollState scrollState)
     if (scrollState == ScrollState::IDLE) {
         mgr->OnSwiperScrollEnd(host);
     }
-#endif
 }
 
 void SwiperPattern::FireScrollStateEvent(ScrollState scrollState)
@@ -2176,7 +2208,6 @@ void SwiperPattern::OnSwiperCustomAnimationFinish(
 void SwiperPattern::SwipeToWithoutAnimation(int32_t index, std::optional<int32_t> rawIndex)
 {
     if (currentIndex_ != index) {
-#ifndef CROSS_PLATFORM
         auto pipeline = GetContext();
         if (pipeline) {
             auto contentChangeManager = pipeline->GetContentChangeManager();
@@ -2184,7 +2215,6 @@ void SwiperPattern::SwipeToWithoutAnimation(int32_t index, std::optional<int32_t
                 contentChangeManager->OnSwiperChangeStart(GetHost(), hasTabsAncestor_);
             }
         }
-#endif
         FireWillShowEvent(index);
         FireWillHideEvent(currentIndex_);
     }
@@ -4971,6 +5001,7 @@ float SwiperPattern::EstimateSpringOffset(float realOffset)
 
 void SwiperPattern::OnSpringAndFadeAnimationFinish()
 {
+    const bool contentChanged = GetLoopIndex(currentIndex_) != GetLoopIndex(nextIndex_);
     auto itemInfoInVisibleArea = std::make_pair(0, SwiperItemInfo {});
     if (!itemPosition_.empty()) {
         auto item = itemPosition_.find(nextIndex_);
@@ -4979,7 +5010,8 @@ void SwiperPattern::OnSpringAndFadeAnimationFinish()
                 std::make_pair(item->first, SwiperItemInfo { item->second.startPos, item->second.endPos });
         }
     }
-    if (GetLoopIndex(currentIndex_) != GetLoopIndex(nextIndex_)) {
+    ContentChangeReport(GetHost(), contentChanged);
+    if (contentChanged) {
         UpdateCurrentIndex(nextIndex_);
         UpdateCurrentFocus();
         OnIndexChange();
@@ -7019,14 +7051,12 @@ void SwiperPattern::TriggerCustomContentTransitionEvent(int32_t fromIndex, int32
     }
     CHECK_NULL_VOID(onTabsCustomContentTransition_);
 
-#ifndef CROSS_PLATFORM
     if (auto context = GetContext()) {
         auto contentChangeManager = context->GetContentChangeManager();
         if (contentChangeManager) {
             contentChangeManager->OnSwiperChangeStart(GetHost(), hasTabsAncestor_);
         }
     }
-#endif
     auto tabContentAnimatedTransition = (*onTabsCustomContentTransition_)(fromIndex, toIndex);
     auto transition = tabContentAnimatedTransition.transition;
 
@@ -8503,65 +8533,56 @@ void SwiperPattern::ContentChangeReport(const RefPtr<FrameNode>& keyNode, bool n
     CHECK_NULL_VOID(pipeline);
     auto mgr = pipeline->GetContentChangeManager();
     CHECK_NULL_VOID(mgr);
-    if (IsAutoPlay()) {
+    if (!needSwiperChangeEnd) {
+        mgr->CompleteCapiSwiperChangeWithoutMove(keyNode, hasTabsAncestor_);
         return;
     }
-    if (!needSwiperChangeEnd) {
+    if (IsAutoPlay()) {
+        if (needSwiperChangeEnd) {
+            mgr->CompleteCapiSwiperChangeAfterAutoPlay(
+                keyNode, hasTabsAncestor_, targetIndex_.has_value() && targetIndex_.value() == currentIndex_);
+        }
         return;
     }
     if (targetIndex_.has_value() && targetIndex_.value() == currentIndex_) {
-#ifndef CROSS_PLATFORM
-        if (mgr->IsStartEventReportEnabled()) {
-            mgr->OnSwiperChangeCancel(keyNode, hasTabsAncestor_);
-        }
-#endif
+        mgr->OnSwiperChangeCancel(keyNode, hasTabsAncestor_);
         return;
     }
-#ifndef CROSS_PLATFORM
     mgr->OnSwiperChangeEnd(keyNode, hasTabsAncestor_);
-#endif
 }
 
 void SwiperPattern::ContentChangeOnTransitionStart(const RefPtr<FrameNode>& keyNode) const
 {
-#ifndef CROSS_PLATFORM
     auto pipeline = GetContext();
     CHECK_NULL_VOID(pipeline);
     auto mgr = pipeline->GetContentChangeManager();
     CHECK_NULL_VOID(mgr);
     CHECK_NULL_VOID(keyNode);
     mgr->OnTransitionAdded(keyNode->GetId());
-#endif
 }
 
 void SwiperPattern::ContentChangeOnTransitionEnd(const RefPtr<FrameNode>& keyNode, bool isInterrupt) const
 {
-#ifndef CROSS_PLATFORM
     auto pipeline = GetContext();
     CHECK_NULL_VOID(pipeline);
     auto mgr = pipeline->GetContentChangeManager();
     CHECK_NULL_VOID(mgr);
     CHECK_NULL_VOID(keyNode);
-    if (isInterrupt && (IsAutoPlay() || !mgr->IsStartEventReportEnabled())) {
+    if (isInterrupt) {
+        mgr->OnSwiperChangeInterrupted(keyNode, hasTabsAncestor_);
         return;
     }
     mgr->OnTransitionRemoved(keyNode->GetId());
-    if (isInterrupt) {
-        mgr->OnSwiperChangeEnd(keyNode, hasTabsAncestor_);
-    }
-#endif
 }
 
 void SwiperPattern::ContentChangeByDetaching(PipelineContext* pipeline)
 {
-#ifndef CROSS_PLATFORM
     CHECK_NULL_VOID(pipeline);
     auto mgr = pipeline->GetContentChangeManager();
     CHECK_NULL_VOID(mgr);
     auto host = GetHost();
     CHECK_NULL_VOID(host);
     mgr->OnTransitionRemoved(host->GetId());
-#endif
 }
 
 bool SwiperPattern::StartFakeDrag()

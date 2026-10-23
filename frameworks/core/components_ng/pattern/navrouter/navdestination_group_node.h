@@ -244,7 +244,8 @@ public:
         navDestinationTransitionDelegate_ = std::move(delegate);
     }
 
-    int32_t DoTransition(NavigationOperation operation, bool isEnter, bool reportHomeTransition = false);
+    int32_t DoTransition(NavigationOperation operation, bool isEnter,
+        bool reportHomeTransition = false, bool reportCapiHomeTransition = false);
     bool HasStandardBefore() const;
 
     void UpdateUserSetOpacity(float opacity)
@@ -315,7 +316,7 @@ private:
     int32_t DoSystemExitExplodeTransition(NavigationOperation operation);
     void DoMaskAnimation(const AnimationOption& option, Color begin, Color end);
     void StartCustomTransitionAnimation(NavDestinationTransition& transition,
-        bool isEnter, bool& hasResetProperties, int32_t longestAnimationDuration);
+        bool isEnter, bool& hasResetProperties, const std::shared_ptr<size_t>& remaining);
     int32_t MakeUniqueAnimationId();
     void ResetCustomTransitionAnimationProperties();
 
@@ -348,6 +349,7 @@ private:
     NavigationSystemTransitionType systemTransitionType_ = NavigationSystemTransitionType::DEFAULT;
     bool needForceMeasure_ = false;
     bool needReportHomeTransition_ = false;
+    bool needReportCapiHomeTransition_ = false;
     bool isPopTransition_ = false;
     float userSetOpacity_ = 1.0f;
     // This is the effective overlay state after Navigation applies inheritance rules, not just

@@ -976,15 +976,17 @@ std::string NavDestinationGroupNode::ToDumpString()
 }
 
 int32_t NavDestinationGroupNode::DoTransition(
-    NavigationOperation operation, bool isEnter, bool reportHomeTransition)
+    NavigationOperation operation, bool isEnter, bool reportHomeTransition, bool reportCapiHomeTransition)
 {
     // Set before starting animations: a zero-duration custom transition may finish synchronously.
     needReportHomeTransition_ = reportHomeTransition;
+    needReportCapiHomeTransition_ = reportCapiHomeTransition;
     isPopTransition_ = operation == NavigationOperation::POP;
     auto id = navDestinationTransitionDelegate_ ? DoCustomTransition(operation, isEnter) :
         DoSystemTransition(operation, isEnter);
     if (id == INVALID_ANIMATION_ID) {
         needReportHomeTransition_ = false;
+        needReportCapiHomeTransition_ = false;
     }
     return id;
 }
@@ -1181,31 +1183,28 @@ int32_t NavDestinationGroupNode::DoCustomTransition(NavigationOperation operatio
     if (!allTransitions.has_value()) {
         return INVALID_ANIMATION_ID;
     }
-    int32_t longestAnimationDuration = INT32_MIN;
-    for (auto transition: allTransitions.value()) {
-        if (transition.duration + transition.delay > longestAnimationDuration) {
-            longestAnimationDuration = transition.duration + transition.delay;
-        }
-    }
-    if (longestAnimationDuration != INT32_MIN) {
-        SetIsOnAnimation(true);
-    } else {
-        TAG_LOGW(AceLogTag::ACE_NAVIGATION, "navDestination custom transition array is empty!");
-    }
+    SetIsOnAnimation(!allTransitions->empty());
     auto pipeline = GetContext();
     CHECK_NULL_RETURN(pipeline, INVALID_ANIMATION_ID);
     pipeline->FlushBuild();
     pipeline->FlushUITasks();
     animationId_ = MakeUniqueAnimationId();
-    bool hasRest = false;
-    for (auto transition: allTransitions.value()) {
-        StartCustomTransitionAnimation(transition, isEnter, hasRest, longestAnimationDuration);
+    if (allTransitions->empty()) {
+        // An empty custom animation still completes the page change after the frame is rendered.
+        OnStartOneTransitionAnimation();
+        pipeline->AddAfterRenderTask(BuildTransitionFinishCallback(isEnter, false));
+        return animationId_;
+    }
+    bool hasReset = false;
+    auto remaining = std::make_shared<size_t>(allTransitions->size());
+    for (auto& transition : allTransitions.value()) {
+        StartCustomTransitionAnimation(transition, isEnter, hasReset, remaining);
     }
     return animationId_;
 }
 
 void NavDestinationGroupNode::StartCustomTransitionAnimation(NavDestinationTransition& transition,
-    bool isEnter, bool& hasResetProperties, int32_t longestAnimationDuration)
+    bool isEnter, bool& hasResetProperties, const std::shared_ptr<size_t>& remaining)
 {
     AnimationOption option;
     option.SetDuration(transition.duration);
@@ -1237,24 +1236,24 @@ void NavDestinationGroupNode::StartCustomTransitionAnimation(NavDestinationTrans
             pipeline->FlushBuild();
             pipeline->FlushUITasks();
         };
-    std::function<void()> finish;
-    // only do remove or set visibility in longest custom transition animation's finish callback.
-    if (transition.duration + transition.delay == longestAnimationDuration) {
-        finish = BuildTransitionFinishCallback(isEnter, false, std::move(transition.onTransitionEnd));
-    } else {
-        auto navigationNode = AceType::DynamicCast<NavigationGroupNode>(GetNavigationNode());
-        finish = [onTransitionEnd = std::move(transition.onTransitionEnd),
-            weakNavNode = WeakPtr<NavigationGroupNode>(navigationNode)]() {
-            if (onTransitionEnd) {
-                onTransitionEnd();
-            }
-            auto navNode = weakNavNode.Upgrade();
-            CHECK_NULL_VOID(navNode);
-            auto navPattern = navNode->GetPattern<NavigationPattern>();
-            CHECK_NULL_VOID(navPattern);
-            navPattern->OnFinishOneTransitionAnimation();
-        };
-    }
+    auto navigationNode = AceType::DynamicCast<NavigationGroupNode>(GetNavigationNode());
+    auto finishTransition = BuildTransitionFinishCallback(isEnter, false);
+    auto finish = [remaining, finishTransition = std::move(finishTransition),
+        onTransitionEnd = std::move(transition.onTransitionEnd),
+        weakNavNode = WeakPtr<NavigationGroupNode>(navigationNode)]() {
+        if (onTransitionEnd) {
+            onTransitionEnd();
+        }
+        if (--(*remaining) == 0) {
+            finishTransition();
+            return;
+        }
+        auto navNode = weakNavNode.Upgrade();
+        CHECK_NULL_VOID(navNode);
+        auto navPattern = navNode->GetPattern<NavigationPattern>();
+        CHECK_NULL_VOID(navPattern);
+        navPattern->OnFinishOneTransitionAnimation();
+    };
     OnStartOneTransitionAnimation();
     AnimationUtils::Animate(option, event, finish, nullptr /* repeatCallback */, GetContextRefPtr());
     auto pattern = GetPattern<NavDestinationPattern>();
@@ -1306,9 +1305,21 @@ std::function<void()> NavDestinationGroupNode::BuildTransitionFinishCallback(
                     navDestination->SetJSViewActive(false);
                 }
                 navDestination->SetIsOnAnimation(false);
-                if (needReport && navDestination->needReportHomeTransition_) {
+                if (needReport &&
+                    (navDestination->needReportHomeTransition_ || navDestination->needReportCapiHomeTransition_)) {
+                    const bool reportIpc = navDestination->needReportHomeTransition_;
                     navDestination->needReportHomeTransition_ = false;
-                    navDestination->ContentChangeReport(isPopPage);
+                    navDestination->needReportCapiHomeTransition_ = false;
+                    if (reportIpc) {
+                        navDestination->ContentChangeReport(isPopPage);
+                    } else {
+                        auto context = navDestination->GetContext();
+                        auto mgr = context ? context->GetContentChangeManager() : nullptr;
+                        if (mgr) {
+                            navPattern->ReportCapiPageTransitionEnd(navDestination,
+                                isPopPage ? navNode->GetId() : navDestination->GetId());
+                        }
+                    }
                 }
                 return;
             }
@@ -1629,18 +1640,10 @@ bool NavDestinationGroupNode::GetCanReused() const
 
 void NavDestinationGroupNode::ContentChangeReport(bool isPopPage)
 {
-#ifndef CROSS_PLATFORM
-    auto context = GetContext();
-    CHECK_NULL_VOID(context);
-    auto mgr = context->GetContentChangeManager();
-    CHECK_NULL_VOID(mgr);
-    if (isPopPage) {
-        auto navigation = AceType::DynamicCast<NavigationGroupNode>(GetNavigationNode());
-        CHECK_NULL_VOID(navigation);
-        mgr->OnPageTransitionEnd(WeakClaim(this).Upgrade(), navigation->GetId());
-    } else {
-        mgr->OnPageTransitionEnd(WeakClaim(this).Upgrade());
-    }
-#endif
+    auto navigation = AceType::DynamicCast<NavigationGroupNode>(GetNavigationNode());
+    CHECK_NULL_VOID(navigation);
+    auto pattern = navigation->GetPattern<NavigationPattern>();
+    CHECK_NULL_VOID(pattern);
+    pattern->ContentChangeReport(Claim(this), isPopPage);
 }
 } // namespace OHOS::Ace::NG

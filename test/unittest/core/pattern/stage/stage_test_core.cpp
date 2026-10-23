@@ -23,6 +23,9 @@
 
 #include "core/components_ng/manager/content_change_manager/content_change_manager.h"
 #include "core/components_ng/pattern/stage/page_pattern.h"
+#include "core/components_ng/pattern/stage/stage_manager.h"
+#include "core/components_ng/pattern/stage/stage_pattern.h"
+#include "interfaces/native/ui_info_collection.h"
 
 #undef private
 #undef protected
@@ -173,6 +176,47 @@ HWTEST_F(StagePatternTestCore, ContentChangePageStartTest003, TestSize.Level1)
     pattern->transitionFinish_();
     Mock::VerifyAndClearExpectations(mockUiSessionManager);
     manager->StopContentChangeReport();
+}
+
+/**
+ * @tc.name: CapiPopWithoutAnimationReportsOnlyVisibleChange
+ * @tc.desc: A visible no-animation back reports START/END; background cleanup creates no page event.
+ * @tc.type: FUNC
+ */
+HWTEST_F(StagePatternTestCore, CapiPopWithoutAnimationReportsOnlyVisibleChange, TestSize.Level1)
+{
+    auto pipeline = MockPipelineContext::GetCurrent();
+    pipeline->SetUseFlushUITasks(true);
+    auto manager = pipeline->GetContentChangeManager();
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    std::vector<uint32_t> events;
+    auto sink = [](uint32_t type, uint64_t, const char*, uint32_t, void* data) {
+        static_cast<std::vector<uint32_t>*>(data)->push_back(type);
+    };
+    auto id = manager->RegisterCapiContentChangeEvent(true, 1, 0, &events, sink, nullptr);
+    for (bool showNext : { false, true }) {
+        auto stage = FrameNode::CreateFrameNode(V2::STAGE_ETS_TAG, 8700, AceType::MakeRefPtr<StagePattern>());
+        auto in = FrameNode::CreateFrameNode(V2::PAGE_ETS_TAG, 8701,
+            AceType::MakeRefPtr<PagePattern>(AceType::MakeRefPtr<PageInfo>()));
+        auto out = FrameNode::CreateFrameNode(V2::PAGE_ETS_TAG, 8702,
+            AceType::MakeRefPtr<PagePattern>(AceType::MakeRefPtr<PageInfo>()));
+        in->MountToParent(stage);
+        out->MountToParent(stage);
+        auto stageManager = AceType::MakeRefPtr<StageManager>(stage);
+        stageManager->srcPageNode_ = out;
+        ASSERT_TRUE(stageManager->PopPage(in, showNext, false));
+        EXPECT_EQ(events.size(), showNext ? 1U : 0U);
+        pipeline->taskScheduler_->FlushAfterLayoutTask();
+        if (showNext) {
+            EXPECT_EQ(events, (std::vector<uint32_t> {
+                OH_ARKUI_NATIVEMODULE_EVENT_PAGE_CHANGE_START, OH_ARKUI_NATIVEMODULE_EVENT_PAGE_CHANGE_END }));
+        } else {
+            EXPECT_TRUE(events.empty());
+        }
+    }
+    manager->UnregisterCapiContentChangeEvent(id);
+    pipeline->SetUseFlushUITasks(false);
 }
 
 } // namespace OHOS::Ace::NG

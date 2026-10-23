@@ -486,6 +486,7 @@ void GridPattern::MarkSwipeItemSelected(int32_t index, bool isSelected)
 
 void GridPattern::FireOnScrollStart(bool withPerfMonitor)
 {
+    UpdateCapiScrollEventSource(TakeCapiScrollToEventReportRequest());
 #ifndef CROSS_PLATFORM
     ScrollablePattern::RecordScrollEvent(Recorder::EventType::SCROLL_START);
 #endif
@@ -1147,6 +1148,7 @@ void GridPattern::ScrollPage(bool reverse, bool smooth, AccessibilityScrollType 
             return;
         }
         StopAnimate();
+        ScheduleCapiScrollCommand(false);
         UpdateCurrentOffset(distance, SCROLL_FROM_JUMP);
     }
     // AccessibilityEventType::SCROLL_END
@@ -1196,11 +1198,12 @@ void GridPattern::ScrollTo(float position)
     }
 
     StopAnimate();
+    ScheduleCapiScrollCommand(true);
     SetAnimateCanOverScroll(GetCanStayOverScroll());
     UpdateCurrentOffset(GetTotalOffset() - position, SCROLL_FROM_JUMP);
     SetIsOverScroll(GetCanStayOverScroll());
     // AccessibilityEventType::SCROLL_END
-    ContentChangeReport(GetHost(), ContentChangeManager::SCROLL_TO);
+    ContentChangeReport(GetHost(), ContentChangeManager::SCROLL_TO, false);
 }
 
 float GridPattern::EstimateHeight() const
@@ -2394,6 +2397,9 @@ int32_t GridPattern::GetFirstIndex() const
 
 void GridPattern::ScrollToIndex(int32_t index, bool smooth, ScrollAlign align, std::optional<float> extraOffset)
 {
+    if (!smooth) {
+        ScheduleCapiScrollCommand(true);
+    }
     SetScrollSource(SCROLL_FROM_JUMP);
     StopAnimate();
     auto host = GetHost();
@@ -2411,7 +2417,7 @@ void GridPattern::ScrollToIndex(int32_t index, bool smooth, ScrollAlign align, s
             host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
         } else {
             UpdateStartIndex(index, align);
-            ContentChangeReport(host, ContentChangeManager::SCROLL_TO_INDEX);
+            ContentChangeReport(host, ContentChangeManager::SCROLL_TO_INDEX, false);
         }
     } else {
         TAG_LOGW(AceLogTag::ACE_GRID, "ScrollToIndex with invalid index: %{public}d, total children: %{public}d",

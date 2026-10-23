@@ -14,6 +14,8 @@
  */
 
 #include "core/components_ng/pattern/menu/menu_item/menu_item_pattern.h"
+
+#include "core/components_ng/pattern/overlay/overlay_content_change_report.h"
 #include "core/accessibility/accessibility_manager.h"
 #include "core/components_ng/pattern/menu/menu_item/menu_item_model_ng.h"
 
@@ -724,7 +726,7 @@ void MenuItemPattern::ShowSubMenu(ShowSubMenuType type)
         CHECK_NULL_VOID(pipeline);
         auto overlayManager = pipeline->GetOverlayManager();
         CHECK_NULL_VOID(overlayManager);
-        overlayManager->ContentChangeReport(GetMenuWrapper(), true);
+        overlayManager->ContentChangeReport(GetMenuWrapper(), true, false);
         SetDetachedFreeRootProxy(customNode);
         return;
     }
@@ -796,11 +798,17 @@ void MenuItemPattern::ShowSubMenuWithAnimation(const RefPtr<FrameNode>& subMenu)
                 renderContext->UpdateTransformScale(VectorF(MENU_ANIMATION_MAX_SCALE, MENU_ANIMATION_MAX_SCALE));
                 renderContext->UpdateOpacity(MENU_ANIMATION_MAX_OPACITY);
             },
-            animationOption.GetOnFinishEvent(), nullptr, subMenu->GetContextRefPtr());
+            [weak = WeakPtr<FrameNode>(subMenu)]() {
+                ReportCapiSubMenuEvent(weak.Upgrade(), true);
+            }, nullptr, subMenu->GetContextRefPtr());
+    } else {
+        pipeline->AddAfterLayoutTask([weak = WeakPtr<FrameNode>(subMenu)]() {
+            ReportCapiSubMenuEvent(weak.Upgrade(), true);
+        });
     }
     auto overlayManager = pipeline->GetOverlayManager();
     CHECK_NULL_VOID(overlayManager);
-    overlayManager->ContentChangeReport(GetMenuWrapper(), true);
+    overlayManager->ContentChangeReport(GetMenuWrapper(), true, false);
 }
 
 void MenuItemPattern::SendSubMenuOpenToAccessibility(RefPtr<FrameNode>& subMenu, ShowSubMenuType type)
@@ -1110,7 +1118,9 @@ void MenuItemPattern::ShowEmbeddedExpandMenu(const RefPtr<FrameNode>& expandable
             pattern->SetShowEmbeddedMenuParams(expandableNode);
             menuRenderContext->UpdateSubmenuDistortionParam();
         },
-        nullptr, nullptr, host->GetContextRefPtr());
+        [weak = WeakPtr<FrameNode>(expandableNode)]() {
+            ReportCapiSubMenuEvent(weak.Upgrade(), true);
+        }, nullptr, host->GetContextRefPtr());
 }
 
 void MenuItemPattern::SetShowEmbeddedMenuParams(const RefPtr<FrameNode>& expandableNode)
@@ -1206,7 +1216,9 @@ void MenuItemPattern::HideEmbeddedExpandMenu(const RefPtr<FrameNode>& expandable
         CHECK_NULL_VOID(menuItemPattern);
         menuItemPattern->UpdatePreviewPosition(oldMenuSize, menuGeometryNode->GetFrameSize());
         menuRenderContext->UpdateSubmenuDistortionParam();
-    }, nullptr, nullptr, host->GetContextRefPtr());
+    }, [weak = WeakPtr<FrameNode>(expandableNode)]() {
+        ReportCapiSubMenuEvent(weak.Upgrade(), false);
+    }, nullptr, host->GetContextRefPtr());
 }
 
 void MenuItemPattern::CloseMenu()

@@ -13,6 +13,8 @@
  * limitations under the License.
  */
 
+#include "interfaces/native/ui_info_collection.h"
+#include "core/components_ng/manager/content_change_manager/content_change_manager.h"
 #include "mock_task_executor.h"
 #include "scroll_test_ng.h"
 #include "test/mock/frameworks/core/animation/mock_animation_manager.h"
@@ -1289,4 +1291,92 @@ HWTEST_F(ScrollInnerEventTestNg, HandleDragScrollBarOverDragBoundaryNoSplit001, 
 
     scrollBar_->HandleDragEnd(info);
 }
+/**
+ * @tc.name: CapiScrollSnapEndsAfterAlignment
+ * @tc.desc: Drag-to-snap remains one cycle and completes for END-only subscriptions.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollInnerEventTestNg, CapiScrollSnapEndsAfterAlignment, TestSize.Level1)
+{
+    auto model = CreateScroll();
+    model.SetScrollSnap(ScrollSnapAlign::START, Dimension(100), {}, { true, true });
+    CreateContent();
+    CreateScrollDone();
+    auto manager = MockPipelineContext::GetCurrent()->GetContentChangeManager();
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    std::vector<uint32_t> a;
+    std::vector<uint32_t> b;
+    auto sink = [](uint32_t type, uint64_t, const char*, uint32_t, void* data) {
+        static_cast<std::vector<uint32_t>*>(data)->push_back(type);
+    };
+    auto aid = manager->RegisterCapiContentChangeEvent(
+        true, OH_ARKUI_NATIVEMODULE_EVENT_CATEGORY_SCROLL, 0, &a, sink, nullptr);
+    auto bid = manager->RegisterCapiContentChangeEvent(
+        false, OH_ARKUI_NATIVEMODULE_EVENT_CATEGORY_SCROLL, 0, &b, sink, nullptr);
+    MockAnimationManager::GetInstance().SetTicks(2);
+    DragStart(frameNode_, Offset());
+    DragUpdate(-70);
+    DragEnd(0);
+    EXPECT_EQ(a, (std::vector<uint32_t> { OH_ARKUI_NATIVEMODULE_EVENT_SCROLL_START }));
+    EXPECT_TRUE(b.empty());
+    for (int tick = 0; tick < 10 && !MockAnimationManager::GetInstance().AllFinished(); ++tick) {
+        MockAnimationManager::GetInstance().Tick();
+        FlushUITasks();
+    }
+    EXPECT_TRUE(MockAnimationManager::GetInstance().AllFinished());
+    EXPECT_TRUE(Position(-100));
+    EXPECT_EQ(a, (std::vector<uint32_t> {
+        OH_ARKUI_NATIVEMODULE_EVENT_SCROLL_START, OH_ARKUI_NATIVEMODULE_EVENT_SCROLL_END }));
+    EXPECT_EQ(b, (std::vector<uint32_t> { OH_ARKUI_NATIVEMODULE_EVENT_SCROLL_END }));
+    manager->UnregisterCapiContentChangeEvent(aid);
+    manager->UnregisterCapiContentChangeEvent(bid);
+}
+
+/**
+ * @tc.name: CapiKeyboardScrollAndDisabledControl
+ * @tc.desc: An arrow key creates a real scroll cycle, while disabled keyboard scrolling stays silent.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollInnerEventTestNg, CapiKeyboardScrollAndDisabledControl, TestSize.Level1)
+{
+    CreateScroll();
+    CreateContent();
+    CreateScrollDone();
+    auto pipeline = MockPipelineContext::GetCurrent();
+    auto manager = pipeline->GetContentChangeManager();
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    std::vector<uint32_t> events;
+    auto id = manager->RegisterCapiContentChangeEvent(
+        false, OH_ARKUI_NATIVEMODULE_EVENT_CATEGORY_SCROLL, 0, &events,
+        [](uint32_t type, uint64_t, const char*, uint32_t, void* data) {
+            static_cast<std::vector<uint32_t>*>(data)->push_back(type);
+        }, nullptr);
+    auto wasFocusActive = pipeline->GetIsFocusActive();
+    pipeline->SetIsFocusActive(false);
+    KeyEvent event;
+    event.action = KeyAction::DOWN;
+    event.code = KeyCode::KEY_DPAD_DOWN;
+    pattern_->SetIsAllowKeyboard(false);
+    EXPECT_FALSE(pattern_->HandleArrowKeyScroll(event));
+    EXPECT_TRUE(Position(0));
+    EXPECT_TRUE(events.empty());
+    pattern_->SetIsAllowKeyboard(true);
+    EXPECT_TRUE(pattern_->HandleArrowKeyScroll(event));
+    auto scrollable = pattern_->GetScrollable();
+    ASSERT_NE(scrollable, nullptr);
+    ASSERT_NE(scrollable->axisAnimator_, nullptr);
+    EXPECT_TRUE(scrollable->axisAnimator_->IsRunning());
+    EXPECT_TRUE(events.empty());
+    // Mock Animator advances the motion but does not execute its stop listener automatically.
+    scrollable->axisAnimator_->StopAxisAnimation();
+    FlushUITasks();
+    EXPECT_FALSE(scrollable->axisAnimator_->IsRunning());
+    EXPECT_LT(pattern_->currentOffset_, 0);
+    EXPECT_EQ(events, (std::vector<uint32_t> { OH_ARKUI_NATIVEMODULE_EVENT_SCROLL_END }));
+    manager->UnregisterCapiContentChangeEvent(id);
+    pipeline->SetIsFocusActive(wasFocusActive);
+}
+
 } // namespace OHOS::Ace::NG

@@ -13,17 +13,24 @@
  * limitations under the License.
  */
 
+#include <vector>
+
+#include "interfaces/native/ui_info_collection.h"
 #include "navigation_test_min.h"
 #include "mock_navigation_route.h"
 
 #define private public
 #define protected public
 
+#include "test/mock/frameworks/base/thread/mock_task_executor.h"
 #include "test/mock/frameworks/core/common/mock_container.h"
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 #include "test/mock/interfaces/inner_api/ui_session/mock_ui_session_manager.h"
 
 #include "core/components_ng/manager/content_change_manager/content_change_manager.h"
+#include "core/components_ng/manager/navigation/navigation_manager.h"
+#include "core/components_ng/pattern/navigation/nav_bar_node.h"
+#include "core/components_ng/pattern/navigation/nav_bar_pattern.h"
 #include "core/components_ng/pattern/navigation/navigation_pattern.h"
 #include "core/components_ng/pattern/navrouter/navdestination_group_node.h"
 #include "core/components_ng/pattern/navrouter/navdestination_pattern.h"
@@ -48,6 +55,9 @@ public:
     {
         MockPipelineContext::SetUp();
         MockContainer::SetUp();
+        auto pipeline = MockPipelineContext::GetCurrent();
+        pipeline->SetTaskExecutor(AceType::MakeRefPtr<MockTaskExecutor>());
+        pipeline->navigationMgr_ = AceType::MakeRefPtr<NavigationManager>();
     }
 
     static void TearDownTestCase()
@@ -249,7 +259,7 @@ HWTEST_F(NavigationPatternTestCore, ContentChangeNavigationPopDestinationFinishT
 
 /**
  * @tc.name: ContentChangeNavigationHomeFadePopTest001
- * @tc.desc: Two single-node animations hand pop completion to Home only when START is enabled.
+ * @tc.desc: Home completes CAPI independently of IPC START; the IPC completion condition remains unchanged.
  * @tc.type: FUNC
  */
 HWTEST_F(NavigationPatternTestCore, ContentChangeNavigationHomeFadePopTest001, TestSize.Level1)
@@ -264,15 +274,31 @@ HWTEST_F(NavigationPatternTestCore, ContentChangeNavigationHomeFadePopTest001, T
     auto detail = NavDestinationGroupNode::GetOrCreateGroupNode(
         V2::NAVDESTINATION_VIEW_ETS_TAG, 452, []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
     for (auto node : { home, detail }) {
+        node->MountToParent(navigation);
         node->GetPattern<NavDestinationPattern>()->SetNavigationNode(navigation);
         node->SetSystemTransitionType(NavigationSystemTransitionType::FADE);
+        node->SetOnStartTransitionAnimationCallback([weak = WeakPtr(pattern)]() {
+            auto navigationPattern = weak.Upgrade();
+            if (navigationPattern) {
+                navigationPattern->OnStartOneTransitionAnimation();
+            }
+        });
     }
+    navigation->AttachToMainTree();
     home->SetIsHomeDestination(true);
     navigation->SetUseHomeDestination(true);
     navigation->customHomeDestination_ = home;
     pattern->SetNavigationMode(NavigationMode::STACK);
     auto mock = reinterpret_cast<MockUiSessionManager*>(UiSessionManager::GetInstance());
+    std::vector<uint32_t> capiTypes;
+    manager->InvalidateCapiContentChangeSubscriptions();
+    auto id = manager->RegisterCapiContentChangeEvent(true, OH_ARKUI_NATIVEMODULE_EVENT_CATEGORY_PAGE, 0,
+        &capiTypes, [](uint32_t type, uint64_t, const char*, uint32_t, void* data) {
+            static_cast<std::vector<uint32_t>*>(data)->push_back(type);
+        }, nullptr);
+    ASSERT_NE(id, 0U);
     for (bool enabled : { false, true }) {
+        capiTypes.clear();
         ContentChangeConfig config;
         config.reportStartEvent = enabled;
         manager->StartContentChangeReport(config);
@@ -283,17 +309,23 @@ HWTEST_F(NavigationPatternTestCore, ContentChangeNavigationHomeFadePopTest001, T
         pattern->ContentChangeOnTransitionStart(nullptr, true);
         navigation->TransitionWithPop(detail, home, true);
         EXPECT_EQ(home->needReportHomeTransition_, enabled);
+        EXPECT_TRUE(home->needReportCapiHomeTransition_);
         // Mock RenderContext does not run opacity completion; invoke the same callback factory.
         auto finish = home->BuildTransitionFinishCallback(true, false);
         finish();
         detail->BuildTransitionFinishCallback(false, false)();
+        MockPipelineContext::GetCurrent()->taskScheduler_->FlushAfterRenderTask();
         EXPECT_EQ(pattern->runningTransitionCount_, 0);
         EXPECT_FALSE(home->needReportHomeTransition_);
+        EXPECT_FALSE(home->needReportCapiHomeTransition_);
+        EXPECT_EQ(capiTypes, (std::vector<uint32_t> { OH_ARKUI_NATIVEMODULE_EVENT_PAGE_CHANGE_START,
+            OH_ARKUI_NATIVEMODULE_EVENT_PAGE_CHANGE_END }));
         EXPECT_FALSE(manager->IsTransitioning());
         EXPECT_TRUE(manager->activeContentChanges_.empty());
         Mock::VerifyAndClearExpectations(mock);
         manager->StopContentChangeReport();
     }
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
 }
 
 /**
@@ -491,12 +523,22 @@ HWTEST_F(NavigationPatternTestCore, ContentChangeNavigationCustomPopInteractiveT
     auto mock = reinterpret_cast<MockUiSessionManager*>(UiSessionManager::GetInstance());
     for (bool success : { true, false }) {
         manager->StartContentChangeReport(config);
+        manager->InvalidateCapiContentChangeSubscriptions();
+        std::vector<uint32_t> types;
+        auto subscription = manager->RegisterCapiContentChangeEvent(
+            false, OH_ARKUI_NATIVEMODULE_EVENT_CATEGORY_PAGE, 0, &types,
+            [](uint32_t type, uint64_t, const char*, uint32_t, void* data) {
+                static_cast<std::vector<uint32_t>*>(data)->push_back(type);
+            }, nullptr);
         auto navigation = NavigationGroupNode::GetOrCreateGroupNode(
             V2::NAVIGATION_VIEW_ETS_TAG, 443, []() { return AceType::MakeRefPtr<NavigationPattern>(); });
         auto pattern = navigation->GetPattern<NavigationPattern>();
         pattern->SetNavigationStack(AceType::MakeRefPtr<NavigationStack>());
-        auto navBar = FrameNode::CreateFrameNode(V2::NAVBAR_ETS_TAG, 444, AceType::MakeRefPtr<Pattern>(), true);
+        auto navBar = NavBarNode::GetOrCreateNavBarNode(
+            V2::NAVBAR_ETS_TAG, 444, []() { return AceType::MakeRefPtr<NavBarPattern>(); });
         navigation->SetNavBarNode(navBar);
+        navBar->MountToParent(navigation);
+        navigation->AttachToMainTree();
         navigation->SetUseHomeDestination(false);
         auto previous = NavDestinationGroupNode::GetOrCreateGroupNode(
             V2::NAVDESTINATION_VIEW_ETS_TAG, 445, []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
@@ -521,6 +563,12 @@ HWTEST_F(NavigationPatternTestCore, ContentChangeNavigationCustomPopInteractiveT
         } else {
             proxy->CancelInteractiveAnimation();
         }
+        MockPipelineContext::GetCurrent()->taskScheduler_->FlushAfterRenderTask();
+        EXPECT_EQ(types, success ? std::vector<uint32_t> { OH_ARKUI_NATIVEMODULE_EVENT_PAGE_CHANGE_END } :
+            std::vector<uint32_t> {});
+        manager->OnContentChangeNodeDestroyed(navigation->GetId());
+        EXPECT_EQ(types.size(), success ? 1U : 0U);
+        EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(subscription));
         EXPECT_FALSE(manager->IsTransitioning());
         EXPECT_TRUE(manager->activeContentChanges_.empty());
         Mock::VerifyAndClearExpectations(mock);
@@ -560,6 +608,147 @@ HWTEST_F(NavigationPatternTestCore, ContentChangeNavigationPopStartDisabledTest0
     pattern->ContentChangeReport(nullptr, true);
     Mock::VerifyAndClearExpectations(mock);
     manager->StopContentChangeReport();
+}
+
+/**
+ * @tc.name: CapiNavigationNullPopIgnoresIpcStartSwitch
+ * @tc.desc: Pattern and group completion report CAPI with IPC absent or START disabled, without extra IPC events.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NavigationPatternTestCore, CapiNavigationNullPopIgnoresIpcStartSwitch, TestSize.Level1)
+{
+    auto manager = MockPipelineContext::GetCurrent()->GetContentChangeManager();
+    auto navigation = NavigationGroupNode::GetOrCreateGroupNode(
+        V2::NAVIGATION_VIEW_ETS_TAG, 460, []() { return AceType::MakeRefPtr<NavigationPattern>(); });
+    auto pattern = navigation->GetPattern<NavigationPattern>();
+    pattern->SetNavigationStack(AceType::MakeRefPtr<NavigationStack>());
+    auto navBar = FrameNode::CreateFrameNode(V2::NAVBAR_ETS_TAG, 461, AceType::MakeRefPtr<Pattern>());
+    navigation->SetNavBarNode(navBar);
+    navBar->MountToParent(navigation);
+    navigation->AttachToMainTree();
+    navigation->SetUseHomeDestination(false);
+    auto ipc = reinterpret_cast<MockUiSessionManager*>(UiSessionManager::GetInstance());
+    for (bool registered : { false, true }) {
+        manager->StopContentChangeReport();
+        manager->InvalidateCapiContentChangeSubscriptions();
+        if (registered) {
+            ContentChangeConfig config;
+            config.reportStartEvent = false;
+            manager->StartContentChangeReport(config);
+        }
+        std::vector<uint32_t> types;
+        auto id = manager->RegisterCapiContentChangeEvent(true, OH_ARKUI_NATIVEMODULE_EVENT_CATEGORY_PAGE, 0,
+            &types, [](uint32_t type, uint64_t, const char*, uint32_t, void* data) {
+                static_cast<std::vector<uint32_t>*>(data)->push_back(type);
+            }, nullptr);
+        ASSERT_NE(id, 0U);
+        EXPECT_CALL(*ipc, ReportContentChangeEvent(_, _)).Times(0);
+        for (bool group : { false, true }) {
+            types.clear();
+            pattern->ContentChangeOnTransitionStart(nullptr, true);
+            EXPECT_FALSE(manager->IsTransitioning());
+            if (group) {
+                navigation->ContentChangeReport(nullptr, true);
+            } else {
+                pattern->ContentChangeReport(nullptr, true);
+            }
+            EXPECT_EQ(types, (std::vector<uint32_t> { OH_ARKUI_NATIVEMODULE_EVENT_PAGE_CHANGE_START,
+                OH_ARKUI_NATIVEMODULE_EVENT_PAGE_CHANGE_END }));
+            EXPECT_TRUE(manager->activeContentChanges_.empty());
+        }
+        EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+        Mock::VerifyAndClearExpectations(ipc);
+        manager->StopContentChangeReport();
+    }
+}
+
+/**
+ * @tc.name: CapiNavigationWaitsForAllAnimations
+ * @tc.desc: Dialog and destination callbacks coalesce per transition after all animations finish.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NavigationPatternTestCore, CapiNavigationWaitsForAllAnimations, TestSize.Level1)
+{
+    auto pipeline = MockPipelineContext::GetCurrent();
+    auto manager = pipeline->GetContentChangeManager();
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    auto navigation = NavigationGroupNode::GetOrCreateGroupNode(V2::NAVIGATION_VIEW_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), []() { return AceType::MakeRefPtr<NavigationPattern>(); });
+    auto pattern = navigation->GetPattern<NavigationPattern>();
+    pattern->SetNavigationStack(AceType::MakeRefPtr<NavigationStack>());
+    auto destination = NavDestinationGroupNode::GetOrCreateGroupNode(V2::NAVDESTINATION_VIEW_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
+    destination->GetPattern<NavDestinationPattern>()->SetNavigationNode(navigation);
+    destination->MountToParent(navigation);
+    navigation->AttachToMainTree();
+    for (bool withStart : { false, true }) {
+        std::vector<uint32_t> types;
+        auto subscription = manager->RegisterCapiContentChangeEvent(
+            withStart, OH_ARKUI_NATIVEMODULE_EVENT_CATEGORY_PAGE, 0, &types,
+            [](uint32_t type, uint64_t, const char*, uint32_t, void* data) {
+                static_cast<std::vector<uint32_t>*>(data)->push_back(type);
+            }, nullptr);
+        pattern->ContentChangeOnTransitionStart(destination);
+        pattern->OnStartOneTransitionAnimation();
+        pattern->OnStartOneTransitionAnimation();
+        navigation->ContentChangeReport(destination);
+        pattern->OnFinishOneTransitionAnimation();
+        pipeline->taskScheduler_->FlushAfterRenderTask();
+        EXPECT_EQ(types.size(), withStart ? 1U : 0U);
+        destination->ContentChangeReport();
+        pattern->OnFinishOneTransitionAnimation();
+        pipeline->taskScheduler_->FlushAfterRenderTask();
+        EXPECT_EQ(types, (withStart ? std::vector<uint32_t> {
+            OH_ARKUI_NATIVEMODULE_EVENT_PAGE_CHANGE_START, OH_ARKUI_NATIVEMODULE_EVENT_PAGE_CHANGE_END } :
+            std::vector<uint32_t> { OH_ARKUI_NATIVEMODULE_EVENT_PAGE_CHANGE_END }));
+        EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(subscription));
+    }
+}
+
+/**
+ * @tc.name: CapiForceSplitPrimaryChangesAndEmptyHome
+ * @tc.desc: Primary-only changes and empty home visibility complete for END-only listeners; no change is silent.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NavigationPatternTestCore, CapiForceSplitPrimaryChangesAndEmptyHome, TestSize.Level1)
+{
+    auto pipeline = MockPipelineContext::GetCurrent();
+    auto manager = pipeline->GetContentChangeManager();
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    auto navigation = NavigationGroupNode::GetOrCreateGroupNode(V2::NAVIGATION_VIEW_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), []() { return AceType::MakeRefPtr<NavigationPattern>(); });
+    auto pattern = navigation->GetPattern<NavigationPattern>();
+    pattern->SetNavigationStack(AceType::MakeRefPtr<NavigationStack>());
+    auto home = FrameNode::CreateFrameNode(V2::NAVBAR_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    navigation->SetNavBarNode(home);
+    navigation->SetUseHomeDestination(false);
+    home->MountToParent(navigation);
+    auto destination = NavDestinationGroupNode::GetOrCreateGroupNode(V2::NAVDESTINATION_VIEW_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
+    destination->MountToParent(navigation);
+    navigation->AttachToMainTree();
+    std::vector<uint32_t> types;
+    auto subscription = manager->RegisterCapiContentChangeEvent(
+        false, OH_ARKUI_NATIVEMODULE_EVENT_CATEGORY_PAGE, 0, &types,
+        [](uint32_t type, uint64_t, const char*, uint32_t, void* data) {
+            static_cast<std::vector<uint32_t>*>(data)->push_back(type);
+        }, nullptr);
+    pattern->ReportPrimaryTopChangeIfNeeded(nullptr);
+    EXPECT_TRUE(types.empty());
+    pattern->primaryNodes_.push_back(destination);
+    pattern->ReportPrimaryTopChangeIfNeeded(nullptr);
+    EXPECT_EQ(types, (std::vector<uint32_t> { OH_ARKUI_NATIVEMODULE_EVENT_PAGE_CHANGE_END }));
+    pattern->ReportPrimaryTopChangeIfNeeded(destination);
+    EXPECT_EQ(types.size(), 1U);
+    pattern->primaryNodes_.clear();
+    pattern->ReportPrimaryTopChangeIfNeeded(destination);
+    EXPECT_EQ(types.size(), 2U);
+    pattern->ReportTopDestinationInForceSplit();
+    EXPECT_EQ(types.size(), 3U);
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(subscription));
 }
 
 } // namespace OHOS::Ace::NG

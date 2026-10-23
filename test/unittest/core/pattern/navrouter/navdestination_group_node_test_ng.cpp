@@ -14,6 +14,8 @@
  */
 
 #include "gtest/gtest.h"
+#include "interfaces/native/ui_info_collection.h"
+#include "core/components_ng/manager/content_change_manager/content_change_manager.h"
 #include "test/unittest/core/pattern/navigation/mock_navigation_stack.h"
 #include "test/unittest/core/pattern/navigation/mock_navigation_route.h"
 
@@ -1071,7 +1073,8 @@ HWTEST_F(NavDestinationGroupNodeTestNg, StartCustomTransitionAnimation001, TestS
     navDestinationTransition.curve = Curves::EASE_IN_OUT;
     bool hasResetProperties = true;
 
-    navDestinationNode->StartCustomTransitionAnimation(navDestinationTransition, false, hasResetProperties, 100.0f);
+    navDestinationNode->StartCustomTransitionAnimation(navDestinationTransition, false, hasResetProperties,
+        std::make_shared<size_t>(2));
     EXPECT_TRUE(hasResetProperties);
 }
 
@@ -1094,7 +1097,8 @@ HWTEST_F(NavDestinationGroupNodeTestNg, StartCustomTransitionAnimation002, TestS
     navDestinationTransition.curve = Curves::EASE_IN_OUT;
     bool hasResetProperties = false;
 
-    navDestinationNode->StartCustomTransitionAnimation(navDestinationTransition, false, hasResetProperties, 100.0f);
+    navDestinationNode->StartCustomTransitionAnimation(navDestinationTransition, false, hasResetProperties,
+        std::make_shared<size_t>(2));
     EXPECT_FALSE(hasResetProperties);
 }
 
@@ -1118,7 +1122,8 @@ HWTEST_F(NavDestinationGroupNodeTestNg, StartCustomTransitionAnimation003, TestS
     navDestinationTransition.curve = Curves::EASE_IN_OUT;
     bool hasResetProperties = false;
 
-    navDestinationNode->StartCustomTransitionAnimation(navDestinationTransition, true, hasResetProperties, 100.0f);
+    navDestinationNode->StartCustomTransitionAnimation(navDestinationTransition, true, hasResetProperties,
+        std::make_shared<size_t>(2));
     EXPECT_TRUE(hasResetProperties);
     auto navDestinationPattern = navDestinationNode->GetPattern<NavDestinationPattern>();
     ASSERT_NE(navDestinationPattern, nullptr);
@@ -1157,7 +1162,8 @@ HWTEST_F(NavDestinationGroupNodeTestNg, StartCustomTransitionAnimation004, TestS
     ASSERT_NE(navDestinationRenderContext, nullptr);
     navDestinationRenderContext->translateXY_ = AceType::MakeRefPtr<AnimatablePropertyOffsetF>(OffsetF(100.0f, 60.0f));
 
-    navDestinationNode->StartCustomTransitionAnimation(navDestinationTransition, true, hasResetProperties, 100.0f);
+    navDestinationNode->StartCustomTransitionAnimation(navDestinationTransition, true, hasResetProperties,
+        std::make_shared<size_t>(2));
     EXPECT_TRUE(hasResetProperties);
     EXPECT_EQ(navDestinationRenderContext->GetTranslateXYProperty().GetX(), 0.0f);
     EXPECT_EQ(navDestinationRenderContext->GetTranslateXYProperty().GetY(), 0.0f);
@@ -1843,4 +1849,109 @@ HWTEST_F(NavDestinationGroupNodeTestNg, IsNodeInvisible001, TestSize.Level1)
     bool result = navDestination->IsNodeInvisible(navigation);
     ASSERT_FALSE(result);
 }
+/**
+ * @tc.name: EmptyCustomTransitionCompletesPageChange
+ * @tc.desc: An empty custom array completes after render without leaving the page cycle active.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NavDestinationGroupNodeTestNg, EmptyCustomTransitionCompletesPageChange, TestSize.Level1)
+{
+    auto pipeline = MockPipelineContext::GetCurrent();
+    auto oldFlush = pipeline->UseFlushUITasks();
+    pipeline->SetUseFlushUITasks(true);
+    auto manager = pipeline->GetContentChangeManager();
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    auto navigation = CreateNavigationNode(AceType::MakeRefPtr<MockNavigationStack>());
+    ASSERT_NE(navigation, nullptr);
+    auto destination = NavDestinationGroupNode::GetOrCreateGroupNode(V2::NAVDESTINATION_VIEW_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
+    SetNavigationToNavDestination(destination, navigation);
+    destination->MountToParent(navigation);
+    navigation->AttachToMainTree();
+    destination->inCurrentStack_ = true;
+    destination->SetNavDestinationTransitionDelegate([](NavigationOperation, bool) {
+        return std::vector<NavDestinationTransition> {};
+    });
+    std::vector<uint32_t> events;
+    auto id = manager->RegisterCapiContentChangeEvent(
+        true, OH_ARKUI_NATIVEMODULE_EVENT_CATEGORY_PAGE, 0, &events,
+        [](uint32_t type, uint64_t, const char*, uint32_t, void* data) {
+            static_cast<std::vector<uint32_t>*>(data)->push_back(type);
+        }, nullptr);
+    auto pattern = navigation->GetPattern<NavigationPattern>();
+    destination->SetOnStartTransitionAnimationCallback([weak = WeakPtr(pattern)]() {
+        auto navigationPattern = weak.Upgrade();
+        if (navigationPattern) {
+            navigationPattern->OnStartOneTransitionAnimation();
+        }
+    });
+    pattern->ContentChangeOnTransitionStart(destination);
+    EXPECT_NE(destination->DoTransition(NavigationOperation::PUSH, true), INVALID_ANIMATION_ID);
+    EXPECT_EQ(events, (std::vector<uint32_t> { OH_ARKUI_NATIVEMODULE_EVENT_PAGE_CHANGE_START }));
+    pipeline->taskScheduler_->FlushAfterRenderTask();
+    pipeline->taskScheduler_->FlushAfterRenderTask();
+    EXPECT_EQ(events, (std::vector<uint32_t> {
+        OH_ARKUI_NATIVEMODULE_EVENT_PAGE_CHANGE_START, OH_ARKUI_NATIVEMODULE_EVENT_PAGE_CHANGE_END }));
+    EXPECT_EQ(pattern->runningTransitionCount_, 0);
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+    pipeline->SetUseFlushUITasks(oldFlush);
+}
+
+/**
+ * @tc.name: EqualCustomTransitionsCompleteOnce
+ * @tc.desc: Equal-duration custom animations run both callbacks and complete the page cycle only once.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NavDestinationGroupNodeTestNg, EqualCustomTransitionsCompleteOnce, TestSize.Level1)
+{
+    auto pipeline = MockPipelineContext::GetCurrent();
+    auto oldFlush = pipeline->UseFlushUITasks();
+    pipeline->SetUseFlushUITasks(true);
+    auto manager = pipeline->GetContentChangeManager();
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    auto navigation = CreateNavigationNode(AceType::MakeRefPtr<MockNavigationStack>());
+    ASSERT_NE(navigation, nullptr);
+    auto destination = NavDestinationGroupNode::GetOrCreateGroupNode(V2::NAVDESTINATION_VIEW_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
+    SetNavigationToNavDestination(destination, navigation);
+    destination->MountToParent(navigation);
+    navigation->AttachToMainTree();
+    destination->inCurrentStack_ = true;
+    int32_t callbacks = 0;
+    destination->SetNavDestinationTransitionDelegate([&callbacks](NavigationOperation, bool) {
+        NavDestinationTransition transition;
+        transition.duration = 0;
+        transition.delay = 0;
+        transition.curve = Curves::LINEAR;
+        transition.event = []() {};
+        transition.onTransitionEnd = [&callbacks]() { ++callbacks; };
+        return std::vector<NavDestinationTransition> { transition, transition };
+    });
+    std::vector<uint32_t> events;
+    auto id = manager->RegisterCapiContentChangeEvent(
+        true, OH_ARKUI_NATIVEMODULE_EVENT_CATEGORY_PAGE, 0, &events,
+        [](uint32_t type, uint64_t, const char*, uint32_t, void* data) {
+            static_cast<std::vector<uint32_t>*>(data)->push_back(type);
+        }, nullptr);
+    auto pattern = navigation->GetPattern<NavigationPattern>();
+    destination->SetOnStartTransitionAnimationCallback([weak = WeakPtr(pattern)]() {
+        auto navigationPattern = weak.Upgrade();
+        if (navigationPattern) {
+            navigationPattern->OnStartOneTransitionAnimation();
+        }
+    });
+    pattern->ContentChangeOnTransitionStart(destination);
+    EXPECT_NE(destination->DoTransition(NavigationOperation::PUSH, true), INVALID_ANIMATION_ID);
+    EXPECT_EQ(callbacks, 2);
+    pipeline->taskScheduler_->FlushAfterRenderTask();
+    pipeline->taskScheduler_->FlushAfterRenderTask();
+    EXPECT_EQ(events, (std::vector<uint32_t> {
+        OH_ARKUI_NATIVEMODULE_EVENT_PAGE_CHANGE_START, OH_ARKUI_NATIVEMODULE_EVENT_PAGE_CHANGE_END }));
+    EXPECT_EQ(pattern->runningTransitionCount_, 0);
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+    pipeline->SetUseFlushUITasks(oldFlush);
+}
+
 } // namespace OHOS::Ace::NG

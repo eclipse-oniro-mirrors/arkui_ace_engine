@@ -24,6 +24,7 @@
 #include "base/log/ace_trace.h"
 #include "base/utils/time_util.h"
 #include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/pattern/overlay/overlay_content_change_report.h"
 #include "core/components_ng/pattern/swiper/swiper_paint_property.h"
 #include "core/components_v2/inspector/inspector_constants.h"
 #include "interfaces/inner_api/ace_kit/include/json/json_util.h"
@@ -71,8 +72,7 @@ uint32_t CategoryForType(uint32_t type)
 
 bool IsStartType(uint32_t type)
 {
-    return type == PAGE_START || type == SCROLL_START || type == SWIPER_START || type == TABS_START ||
-        type == SWIPER_CANCEL || type == TABS_CANCEL;
+    return type == PAGE_START || type == SCROLL_START || type == SWIPER_START || type == TABS_START;
 }
 
 std::unique_ptr<JsonValue> NodeRef(const RefPtr<FrameNode>& node)
@@ -235,7 +235,7 @@ void ContentChangeManager::CapiImpl::DispatchCapiContentChangeEvent(uint32_t typ
     }
     std::vector<std::shared_ptr<CapiSubscription>> batch;
     auto category = CategoryForType(type);
-    const bool start = type == PAGE_START || type == SCROLL_START || type == SWIPER_START || type == TABS_START;
+    const bool start = IsStartType(type);
     const bool end = type == PAGE_END || type == SCROLL_END || type == SWIPER_END || type == TABS_END;
     const bool cancel = type == SWIPER_CANCEL || type == TABS_CANCEL;
     const bool isToast = overlayType && std::strcmp(overlayType, "toast") == 0;
@@ -250,10 +250,12 @@ void ContentChangeManager::CapiImpl::DispatchCapiContentChangeEvent(uint32_t typ
         if (end || cancel) {
             record->starts.erase(key);
         }
-        if (!(record->eventMask & category) || (IsStartType(type) && !record->withStart) ||
+        if (!(record->eventMask & category) || (cancel && !record->withStart) ||
             ((pairedOnly || cancel) && !paired) || (start && paired) ||
-            (!paired && (source & IGNORE_SCROLL_BY) && (record->ignoreMask & IGNORE_SCROLL_BY)) ||
-            (!paired && (source & IGNORE_SCROLL_TO) && (record->ignoreMask & IGNORE_SCROLL_TO)) ||
+            ((!paired || !record->withStart) &&
+                (source & IGNORE_SCROLL_BY) && (record->ignoreMask & IGNORE_SCROLL_BY)) ||
+            ((!paired || !record->withStart) &&
+                (source & IGNORE_SCROLL_TO) && (record->ignoreMask & IGNORE_SCROLL_TO)) ||
             (isToast && (record->ignoreMask & IGNORE_TOAST))) {
             continue;
         }
@@ -268,11 +270,16 @@ void ContentChangeManager::CapiImpl::DispatchCapiContentChangeEvent(uint32_t typ
         return;
     }
     if (start) {
-        // Cache metadata only: START must not traverse children or keep a dying node alive.
+        // Track accepted activity even for END-only listeners; never retain a dying node.
         auto endJson = std::make_shared<const std::string>(
             BuildCapiContentChangeEventJson(type + END_EVENT_OFFSET, target, nullptr, nullptr, false));
         for (const auto& record : batch) {
             record->starts.emplace(key, endJson);
+        }
+        batch.erase(std::remove_if(batch.begin(), batch.end(),
+            [](const auto& record) { return !record->withStart; }), batch.end());
+        if (batch.empty()) {
+            return;
         }
     }
     CapiDelivery delivery { type, timestamp, {} };
@@ -364,7 +371,7 @@ void ContentChangeManager::CapiImpl::ReportCapiSwiperStartEvent(const RefPtr<Fra
     auto target = GetSwiperContentChangeNode(node, hasTabsAncestor);
     auto key = std::make_pair(node->GetId(), hasTabsAncestor);
     for (const auto& [id, record] : capiSubscriptions_) {
-        if (record->withStart && (record->eventMask & PAGE_CATEGORY)) {
+        if (record->eventMask & PAGE_CATEGORY) {
             capiActiveSwipers_[key] = { target, target->GetId() };
             break;
         }
@@ -556,11 +563,21 @@ void ContentChangeManager::CapiImpl::ClearCapiScrollEventSource(int32_t nodeId)
 void ContentChangeManager::CapiImpl::ReportCapiOverlayEvent(const RefPtr<FrameNode>& target, bool isShow,
     const char* overlayType, const RefPtr<FrameNode>& trigger)
 {
-    if (!target || !overlayType || capiSubscriptions_.empty()) {
+    if (!target || capiSubscriptions_.empty()) {
         return;
     }
+    if (!overlayType) {
+        overlayType = GetOverlayContentChangeType(target);
+        if (!overlayType) {
+            return;
+        }
+    }
+    auto triggerNode = trigger;
+    if (!triggerNode && std::strcmp(overlayType, "menu") == 0) {
+        triggerNode = GetMenuContentChangeTrigger(target);
+    }
     DispatchCapiContentChangeEvent(isShow ? OVERLAY_SHOW : OVERLAY_HIDE, target, NO_SCROLL_EVENT_SOURCE,
-        overlayType, trigger);
+        overlayType, triggerNode);
 }
 
 void ContentChangeManager::OnTransitionAdded(int32_t nodeId)
@@ -609,13 +626,20 @@ void ContentChangeManager::CapiImpl::ReportCapiPageStartEvent(const RefPtr<Frame
     }
 }
 
-void ContentChangeManager::OnContentChangeInterrupted(const RefPtr<FrameNode>& node, ChangeType type)
+void ContentChangeManager::OnContentChangeInterrupted(
+    const RefPtr<FrameNode>& node, ChangeType type, bool reportCapiEnd)
 {
 #ifndef CROSS_PLATFORM
     OnContentChangeInterruptedInner(node, type);
 #endif
     if (node && type == ChangeType::PAGE) {
-        capiImpl_->DispatchCapiContentChangeEvent(PAGE_END, node, NO_SCROLL_EVENT_SOURCE, nullptr, nullptr, true);
+        if (reportCapiEnd) {
+            capiImpl_->DispatchCapiContentChangeEvent(PAGE_END, node, NO_SCROLL_EVENT_SOURCE, nullptr, nullptr, true);
+        } else {
+            for (const auto& [id, record] : capiImpl_->capiSubscriptions_) {
+                record->starts.erase({ node->GetId(), PAGE_START });
+            }
+        }
     } else if (node && type == ChangeType::SCROLL) {
         capiImpl_->ReportCapiScrollEndEvent(node, NO_SCROLL_EVENT_SOURCE, true);
     }
@@ -635,12 +659,15 @@ void ContentChangeManager::OnPageTransitionEnd(const RefPtr<FrameNode>& keyNode)
     OnPageTransitionEnd(keyNode, keyNode->GetId());
 }
 
-void ContentChangeManager::OnPageTransitionEnd(const RefPtr<FrameNode>& keyNode, int32_t transitionId)
+void ContentChangeManager::OnPageTransitionEnd(
+    const RefPtr<FrameNode>& keyNode, int32_t transitionId, bool reportCapi)
 {
 #ifndef CROSS_PLATFORM
     OnPageTransitionEndInner(keyNode, transitionId);
 #endif
-    ReportCapiPageEndEvent(keyNode, transitionId);
+    if (reportCapi) {
+        ReportCapiPageEndEvent(keyNode, transitionId);
+    }
 }
 
 void ContentChangeManager::CapiImpl::ReportCapiPageEndEvent(const RefPtr<FrameNode>& keyNode, int32_t transitionId)

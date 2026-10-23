@@ -15,8 +15,10 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "gtest/gtest.h"
+#include "interfaces/native/ui_info_collection.h"
 
 #include "core/accessibility/accessibility_manager.h"
 #define private public
@@ -83,6 +85,13 @@
 #include "core/components_ng/pattern/toast/toast_layout_property.h"
 #include "core/components_ng/pattern/toast/toast_pattern.h"
 #include "core/components_v2/inspector/inspector_constants.h"
+#include "core/components_ng/pattern/bubble/bridge/inner_modifier/bubble_inner_modifier.h"
+#include "core/components_ng/pattern/menu/menu_manager.h"
+#include "core/components_ng/pattern/menu/menu_item/menu_item_pattern.h"
+#include "core/components_ng/pattern/select_overlay/select_overlay_pattern.h"
+#include "core/components_ng/manager/content_change_manager/content_change_manager.h"
+#include "core/pipeline/base/element_register.h"
+#include "test/mock/interfaces/inner_api/ui_session/mock_ui_session_manager.h"
 #include "core/pipeline_ng/pipeline_context.h"
 
 using namespace testing;
@@ -5762,7 +5771,7 @@ HWTEST_F(OverlayManagerTestNg, RemoveOverlayOnBackPress005, TestSize.Level1)
 
 /**
  * @tc.name: RemoveOverlayOnBackPress006
- * @tc.desc: Test RemoveOverlay skips onBackPress when callback is not registered.
+ * @tc.desc: Test RemoveOverlay removes content by default when onBackPress is not registered.
  * @tc.type: FUNC
  */
 HWTEST_F(OverlayManagerTestNg, RemoveOverlayOnBackPress006, TestSize.Level1)
@@ -5793,9 +5802,887 @@ HWTEST_F(OverlayManagerTestNg, RemoveOverlayOnBackPress006, TestSize.Level1)
 
     /**
      * @tc.steps: step4. call RemoveOverlay with isBackPressed=true.
-     * @tc.expected: onBackPress branch is skipped (no callback), falls through to default logic.
+     * @tc.expected: default removal detaches the content and empty overlay, preserving the stage.
      */
-    overlayManager->RemoveOverlay(true);
-    EXPECT_NE(overlayManager->overlayNode_, nullptr);
+    ASSERT_NE(overlayManager->overlayNode_, nullptr);
+    ASSERT_EQ(contentNode->GetParent(), overlayManager->overlayNode_);
+    ASSERT_EQ(overlayManager->overlayNode_->GetParent(), rootNode);
+    EXPECT_TRUE(overlayManager->RemoveOverlay(true));
+    EXPECT_EQ(contentNode->GetParent(), nullptr);
+    EXPECT_EQ(overlayManager->overlayNode_, nullptr);
+    EXPECT_TRUE(overlayManager->frameNodeMapOnOverlay_.empty());
+    EXPECT_EQ(stageNode->GetParent(), rootNode);
+    EXPECT_EQ(rootNode->GetFirstChild(), stageNode);
+    EXPECT_EQ(rootNode->GetLastChild(), stageNode);
 }
+
+namespace {
+constexpr uint32_t OVERLAY_CATEGORY = OH_ARKUI_NATIVEMODULE_EVENT_CATEGORY_OVERLAY;
+constexpr uint32_t OVERLAY_SHOW = OH_ARKUI_NATIVEMODULE_EVENT_OVERLAY_SHOW;
+constexpr uint32_t OVERLAY_HIDE = OH_ARKUI_NATIVEMODULE_EVENT_OVERLAY_HIDE;
+constexpr uint32_t NO_IGNORED_EVENTS = 0;
+
+RefPtr<ContentChangeManager> GetContentChangeManager()
+{
+    auto pipeline = MockPipelineContext::GetCurrent();
+    return pipeline ? pipeline->GetContentChangeManager() : nullptr;
 }
+
+MockUiSessionManager* GetMockUiSessionManager()
+{
+    return reinterpret_cast<MockUiSessionManager*>(UiSessionManager::GetInstance());
+}
+
+struct CapiTestState {
+    RefPtr<ContentChangeManager> manager;
+    uint64_t removeId = 0;
+    int32_t calls = 0;
+    int32_t releases = 0;
+    std::string json;
+    std::vector<uint32_t> types;
+    std::function<void(uint32_t)> onEvent;
+};
+
+struct CapiTestCookie {
+    CapiTestState* state;
+};
+
+void CapiContentChangeTestSink(uint32_t type, uint64_t timestamp, const char* json, uint32_t size, void* cookie)
+{
+    auto* state = static_cast<CapiTestCookie*>(cookie)->state;
+    EXPECT_GT(timestamp, 0U);
+    ++state->calls;
+    state->types.emplace_back(type);
+    state->json.assign(json, size);
+    auto onEvent = state->onEvent;
+    if (onEvent) {
+        onEvent(type);
+    }
+    if (state->removeId) {
+        EXPECT_TRUE(state->manager->UnregisterCapiContentChangeEvent(state->removeId));
+        state->removeId = 0;
+    }
+}
+
+void ReleaseCapiContentChangeTestCookie(void* cookie)
+{
+    auto* record = static_cast<CapiTestCookie*>(cookie);
+    ++record->state->releases;
+    delete record;
+}
+} // namespace
+
+// Keep reporting tests isolated from OverlayManagerTestNg's theme and container setup.
+class OverlayContentChangeTestNg : public testing::Test {
+public:
+    static void SetUpTestCase()
+    {
+        MockPipelineContext::SetUp();
+    }
+
+    static void TearDownTestCase()
+    {
+        MockPipelineContext::TearDown();
+    }
+};
+
+namespace {
+void VerifyOverlayPageLifecycle(const RefPtr<FrameNode>& node, const std::function<void()>& appear,
+    const std::function<void()>& disappear, std::vector<std::string>& order)
+{
+    constexpr int32_t SHOW_HIDE_REPORT_COUNT = 2;
+    auto manager = GetContentChangeManager();
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    manager->currentContentChangeConfig_ = ContentChangeConfig {};
+    auto ipc = GetMockUiSessionManager();
+    EXPECT_CALL(*ipc, ReportContentChangeEvent(ChangeType::DIALOG, _))
+        .Times(SHOW_HIDE_REPORT_COUNT).WillRepeatedly([&](ChangeType, const std::string& data) {
+            auto json = JsonUtil::ParseJsonString(data);
+            EXPECT_EQ(json->GetString("$type"), node->GetTag());
+            order.emplace_back(json->GetBool("show") ? "ipc-show" : "ipc-hide");
+        });
+    CapiTestState state { manager };
+    auto id = manager->RegisterCapiContentChangeEvent(
+        false, OVERLAY_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &state },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    state.onEvent = [&](uint32_t type) {
+        order.emplace_back(type == OVERLAY_SHOW ? "capi-show" : "capi-hide");
+        auto json = JsonUtil::ParseJsonString(state.json);
+        EXPECT_EQ(json->GetString("category"), "overlay");
+        EXPECT_EQ(json->GetString("overlayType"), "dialog");
+        EXPECT_EQ(json->GetValue("targetNode")->GetString("id"), std::to_string(node->GetId()));
+        EXPECT_EQ(json->GetValue("targetNode")->GetString("type"), node->GetTag());
+        EXPECT_TRUE(json->GetValue("triggerNode")->IsNull());
+        EXPECT_EQ(json->GetValue("subtree")->IsNull(), type == OVERLAY_HIDE);
+    };
+    appear();
+    disappear();
+    EXPECT_EQ(state.types, (std::vector<uint32_t> { OVERLAY_SHOW, OVERLAY_HIDE }));
+    EXPECT_EQ(order, (std::vector<std::string> {
+        "appear", "ipc-show", "capi-show", "disappear", "ipc-hide", "capi-hide" }));
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+    manager->StopContentChangeReport();
+    Mock::VerifyAndClearExpectations(ipc);
+}
+} // namespace
+
+/**
+ * @tc.name: CapiSheetLifecycleMatchesIpc
+ * @tc.desc: Sheet lifecycle callbacks and event reports retain their existing IPC ordering.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OverlayContentChangeTestNg, CapiSheetLifecycleMatchesIpc, TestSize.Level1)
+{
+    constexpr int32_t NODE_NODE_ID = 551;
+    constexpr int32_t TARGET_NODE_ID = 550;
+    auto pattern = AceType::MakeRefPtr<SheetPresentationPattern>(TARGET_NODE_ID, "target", [](const std::string&) {});
+    auto node = FrameNode::CreateFrameNode(V2::SHEET_PAGE_TAG, NODE_NODE_ID, pattern);
+    std::vector<std::string> order;
+    pattern->onAppear_ = [&] { order.emplace_back("appear"); };
+    pattern->onDisappear_ = [&] { order.emplace_back("disappear"); };
+    VerifyOverlayPageLifecycle(node, [&] { pattern->OnAppear(); }, [&] { pattern->OnDisappear(); }, order);
+    EXPECT_FALSE(pattern->isOnAppearing_);
+    EXPECT_FALSE(pattern->isOnDisappearing_);
+    EXPECT_FALSE(pattern->isDismissProcess_);
+    EXPECT_TRUE(pattern->isExecuteOnDisappear_);
+    pattern->onAppear_ = nullptr;
+    pattern->onDisappear_ = nullptr;
+}
+
+/**
+ * @tc.name: CapiContentCoverLifecycleMatchesIpc
+ * @tc.desc: ContentCover lifecycle callbacks and event reports retain their existing IPC ordering.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OverlayContentChangeTestNg, CapiContentCoverLifecycleMatchesIpc, TestSize.Level1)
+{
+    constexpr int32_t NODE_NODE_ID = 553;
+    constexpr int32_t TARGET_NODE_ID = 552;
+    auto pattern = AceType::MakeRefPtr<ModalPresentationPattern>(TARGET_NODE_ID, ModalTransition::NONE,
+        [](const std::string&) {});
+    auto node = FrameNode::CreateFrameNode(V2::MODAL_PAGE_TAG, NODE_NODE_ID, pattern);
+    std::vector<std::string> order;
+    pattern->onAppear_ = [&] { order.emplace_back("appear"); };
+    pattern->onDisappear_ = [&] { order.emplace_back("disappear"); };
+    VerifyOverlayPageLifecycle(node, [&] { pattern->OnAppear(); }, [&] { pattern->OnDisappear(); }, order);
+    EXPECT_TRUE(pattern->isExecuteOnDisappear_);
+    pattern->onAppear_ = nullptr;
+    pattern->onDisappear_ = nullptr;
+}
+
+namespace {
+constexpr int32_t MENU_TARGET_NODE_ID = 601;
+
+class MenuReportEnvironment {
+public:
+    MenuReportEnvironment()
+    {
+        pipeline = MockPipelineContext::GetCurrent();
+        oldTheme = pipeline->GetThemeManager();
+        oldOverlay = pipeline->overlayManager_;
+        auto themeManager = AceType::MakeRefPtr<MockThemeManager>();
+        auto theme = AceType::MakeRefPtr<SelectTheme>();
+        ON_CALL(*themeManager, GetTheme(SelectTheme::TypeId())).WillByDefault(Return(theme));
+        ON_CALL(*themeManager, GetTheme(SelectTheme::TypeId(), _)).WillByDefault(Return(theme));
+        pipeline->SetThemeManager(themeManager);
+        constexpr int32_t ROOT_NODE_ID = 600;
+        root = FrameNode::CreateFrameNode("root", ROOT_NODE_ID, AceType::MakeRefPtr<Pattern>());
+        overlay = AceType::MakeRefPtr<OverlayManager>(root);
+        pipeline->overlayManager_ = overlay;
+        manager = GetContentChangeManager();
+        manager->StopContentChangeReport();
+        manager->InvalidateCapiContentChangeSubscriptions();
+        manager->currentContentChangeConfig_ = ContentChangeConfig {};
+    }
+
+    ~MenuReportEnvironment()
+    {
+        manager->InvalidateCapiContentChangeSubscriptions();
+        manager->StopContentChangeReport();
+        Mock::VerifyAndClearExpectations(GetMockUiSessionManager());
+        pipeline->overlayManager_ = oldOverlay;
+        pipeline->SetThemeManager(oldTheme);
+    }
+
+    RefPtr<MockPipelineContext> pipeline;
+    RefPtr<ThemeManager> oldTheme;
+    RefPtr<OverlayManager> oldOverlay;
+    RefPtr<FrameNode> root;
+    RefPtr<OverlayManager> overlay;
+    RefPtr<ContentChangeManager> manager;
+};
+
+class OverlayContentEnvironment : public MenuReportEnvironment {
+public:
+    OverlayContentEnvironment()
+    {
+        oldFlush = pipeline->UseFlushUITasks();
+        pipeline->SetUseFlushUITasks(true);
+        oldStage = pipeline->stageManager_;
+        auto stage = FrameNode::CreateFrameNode(V2::STAGE_ETS_TAG,
+            ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<StagePattern>());
+        stage->MountToParent(root);
+        pipeline->stageManager_ = AceType::MakeRefPtr<StageManager>(stage);
+        root->AttachToMainTree();
+    }
+
+    ~OverlayContentEnvironment()
+    {
+        Flush();
+        pipeline->stageManager_ = oldStage;
+        pipeline->SetUseFlushUITasks(oldFlush);
+    }
+
+    void Flush()
+    {
+        pipeline->taskScheduler_->FlushAfterRenderTask();
+    }
+
+    bool oldFlush = false;
+    RefPtr<StageManager> oldStage;
+};
+
+void VerifyMenuContentReports(bool selectionMenu)
+{
+    constexpr int32_t SELECTION_MENU_REPORT_COUNT = 2;
+    constexpr int32_t MENU_REPORT_COUNT = 5;
+    constexpr int32_t WRAPPER_NODE_ID = 602;
+    constexpr int32_t MENU_NODE_ID = 603;
+    constexpr int32_t ITEM_NODE_ID = 604;
+    constexpr int32_t SUB_MENU_NODE_ID = 605;
+    constexpr int32_t CHILD_NODE_ID = 606;
+    MenuReportEnvironment env;
+    RefPtr<Pattern> wrapperPattern;
+    if (selectionMenu) {
+        wrapperPattern = AceType::MakeRefPtr<SelectOverlayPattern>(
+            std::make_shared<SelectOverlayInfo>(), SelectOverlayMode::ALL);
+    } else {
+        wrapperPattern = AceType::MakeRefPtr<MenuWrapperPattern>(MENU_TARGET_NODE_ID);
+    }
+    auto tag = selectionMenu ? V2::SELECT_OVERLAY_ETS_TAG : V2::MENU_WRAPPER_ETS_TAG;
+    auto wrapper = FrameNode::CreateFrameNode(tag, WRAPPER_NODE_ID, wrapperPattern);
+    wrapper->AttachToMainTree();
+    auto menu = FrameNode::CreateFrameNode(V2::MENU_ETS_TAG, MENU_NODE_ID,
+        AceType::MakeRefPtr<MenuPattern>(MENU_TARGET_NODE_ID, "Button", MenuType::MENU));
+    menu->MountToParent(wrapper);
+    auto itemPattern = AceType::MakeRefPtr<MenuItemPattern>();
+    auto item = FrameNode::CreateFrameNode(V2::MENU_ITEM_ETS_TAG, ITEM_NODE_ID, itemPattern);
+    item->MountToParent(menu);
+    CapiTestState state { env.manager };
+    auto subscription = env.manager->RegisterCapiContentChangeEvent(
+        false, OVERLAY_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &state },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    EXPECT_CALL(*GetMockUiSessionManager(), ReportContentChangeEvent(ChangeType::DIALOG, _))
+        .Times(selectionMenu ? SELECTION_MENU_REPORT_COUNT : MENU_REPORT_COUNT);
+    if (!selectionMenu) {
+        env.overlay->ContentChangeReport(wrapper, true);
+    }
+    auto subMenu = FrameNode::CreateFrameNode(V2::MENU_ETS_TAG, SUB_MENU_NODE_ID,
+        AceType::MakeRefPtr<MenuPattern>(ITEM_NODE_ID, V2::MENU_ITEM_ETS_TAG, MenuType::SUB_MENU));
+    subMenu->MountToParent(wrapper);
+    itemPattern->ShowSubMenuWithAnimation(subMenu);
+    env.pipeline->taskScheduler_->FlushAfterLayoutTask();
+    auto child = FrameNode::CreateFrameNode("Text", CHILD_NODE_ID, AceType::MakeRefPtr<Pattern>());
+    child->MountToParent(subMenu);
+    itemPattern->ShowSubMenuWithAnimation(subMenu);
+    env.pipeline->taskScheduler_->FlushAfterLayoutTask();
+    EXPECT_EQ(state.types, selectionMenu ? (std::vector<uint32_t> { OVERLAY_SHOW }) :
+        (std::vector<uint32_t> { OVERLAY_SHOW, OVERLAY_SHOW }));
+    auto json = JsonUtil::ParseJsonString(state.json);
+    EXPECT_EQ(json->GetString("overlayType"), "menu");
+    EXPECT_EQ(json->GetValue("targetNode")->GetString("type"), V2::MENU_ETS_TAG);
+    EXPECT_EQ(json->GetValue("targetNode")->GetString("id"), std::to_string(SUB_MENU_NODE_ID));
+    if (!selectionMenu) {
+        env.overlay->ContentChangeReport(wrapper, false);
+        env.overlay->ContentChangeReport(wrapper, false);
+        EXPECT_EQ(state.types, (std::vector<uint32_t> {
+            OVERLAY_SHOW, OVERLAY_SHOW, OVERLAY_HIDE, OVERLAY_HIDE }));
+    }
+    EXPECT_TRUE(env.manager->UnregisterCapiContentChangeEvent(subscription));
+}
+} // namespace
+
+/**
+ * @tc.name: CapiOverlayContentVisibility
+ * @tc.desc: Generic overlay reports actual frame visibility changes, including removal after a late subscription.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OverlayContentChangeTestNg, CapiOverlayContentVisibility, TestSize.Level1)
+{
+    OverlayContentEnvironment env;
+    auto node = FrameNode::CreateFrameNode("Text", ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<Pattern>());
+    env.overlay->AddFrameNodeToOverlay(node, std::nullopt);
+    env.Flush();
+    CapiTestState state { env.manager };
+    auto subscription = env.manager->RegisterCapiContentChangeEvent(
+        false, OVERLAY_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &state },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    env.overlay->HideNodeOnOverlay(node);
+    env.Flush();
+    EXPECT_EQ(state.types, (std::vector<uint32_t> { OVERLAY_HIDE }));
+    env.overlay->HideNodeOnOverlay(node);
+    env.Flush();
+    EXPECT_EQ(state.types.size(), 1U);
+    env.overlay->ShowNodeOnOverlay(node);
+    env.Flush();
+    env.overlay->ShowNodeOnOverlay(node);
+    env.Flush();
+    EXPECT_EQ(state.types, (std::vector<uint32_t> { OVERLAY_HIDE, OVERLAY_SHOW }));
+    env.overlay->RemoveFrameNodeOnOverlay(node);
+    env.Flush();
+    EXPECT_EQ(state.types, (std::vector<uint32_t> { OVERLAY_HIDE, OVERLAY_SHOW, OVERLAY_HIDE }));
+    auto json = JsonUtil::ParseJsonString(state.json);
+    EXPECT_EQ(json->GetString("overlayType"), "overlay");
+    EXPECT_EQ(json->GetValue("targetNode")->GetString("id"), std::to_string(node->GetId()));
+    EXPECT_TRUE(env.manager->UnregisterCapiContentChangeEvent(subscription));
+}
+
+/**
+ * @tc.name: CapiOverlayTransientAndOrderedContent
+ * @tc.desc: Same-frame transient content is silent; ordered content reports one SHOW/HIDE pair.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OverlayContentChangeTestNg, CapiOverlayTransientAndOrderedContent, TestSize.Level1)
+{
+    OverlayContentEnvironment env;
+    CapiTestState state { env.manager };
+    auto subscription = env.manager->RegisterCapiContentChangeEvent(
+        true, OVERLAY_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &state },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto node = FrameNode::CreateFrameNode("Text", ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<Pattern>());
+    env.overlay->AddFrameNodeToOverlay(node, std::nullopt);
+    env.overlay->RemoveFrameNodeOnOverlay(node);
+    env.Flush();
+    EXPECT_TRUE(state.types.empty());
+    env.overlay->AddFrameNodeWithOrder(node, 1.0);
+    env.Flush();
+    EXPECT_EQ(state.types, (std::vector<uint32_t> { OVERLAY_SHOW }));
+    env.overlay->AddFrameNodeWithOrder(node, 2.0);
+    env.Flush();
+    EXPECT_EQ(state.types.size(), 1U);
+    env.overlay->RemoveFrameNodeOnOverlay(node);
+    env.Flush();
+    EXPECT_EQ(state.types, (std::vector<uint32_t> { OVERLAY_SHOW, OVERLAY_HIDE }));
+    EXPECT_TRUE(env.manager->UnregisterCapiContentChangeEvent(subscription));
+}
+
+/**
+ * @tc.name: CapiSubmenuDoesNotRepeatParentShow
+ * @tc.desc: Submenu display reports its own SHOW once and preserves legacy IPC updates.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OverlayContentChangeTestNg, CapiSubmenuDoesNotRepeatParentShow, TestSize.Level1)
+{
+    VerifyMenuContentReports(false);
+}
+
+/**
+ * @tc.name: CapiSelectionSubmenuDoesNotRepeatParentShow
+ * @tc.desc: Custom selection submenus retain menu classification and IPC notification coverage.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OverlayContentChangeTestNg, CapiSelectionSubmenuDoesNotRepeatParentShow, TestSize.Level1)
+{
+    VerifyMenuContentReports(true);
+}
+
+/**
+ * @tc.name: CapiMenuPreviewDoesNotDuplicateCapiShow
+ * @tc.desc: Preview notification remains IPC-only; actual display completion and ordinary wrapper updates remain.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OverlayContentChangeTestNg, CapiMenuPreviewDoesNotDuplicateCapiShow, TestSize.Level1)
+{
+    constexpr int32_t EXPECTED_IPC_REPORT_COUNT = 5;
+    constexpr int32_t WRAPPER_NODE_ID = 607;
+    constexpr int32_t MENU_NODE_ID = 608;
+    constexpr int32_t PREVIEW_NODE_ID = 609;
+    MenuReportEnvironment env;
+    auto menuManager = AceType::MakeRefPtr<MenuManager>(env.root);
+    auto wrapper = FrameNode::CreateFrameNode(V2::MENU_WRAPPER_ETS_TAG, WRAPPER_NODE_ID,
+        AceType::MakeRefPtr<MenuWrapperPattern>(MENU_TARGET_NODE_ID));
+    auto menu = FrameNode::CreateFrameNode(V2::MENU_ETS_TAG, MENU_NODE_ID,
+        AceType::MakeRefPtr<MenuPattern>(MENU_TARGET_NODE_ID, "Button", MenuType::MENU));
+    menu->GetLayoutProperty<MenuLayoutProperty>()->UpdateIsRectInTarget(true);
+    menu->MountToParent(wrapper);
+    auto previewPattern = AceType::MakeRefPtr<MenuPreviewPattern>();
+    auto preview = FrameNode::CreateFrameNode(V2::MENU_PREVIEW_ETS_TAG, PREVIEW_NODE_ID, previewPattern);
+    preview->MountToParent(wrapper);
+    CapiTestState state { env.manager };
+    auto subscription = env.manager->RegisterCapiContentChangeEvent(
+        false, OVERLAY_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &state },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    std::vector<uint32_t> ipcTypes;
+    EXPECT_CALL(*GetMockUiSessionManager(), ReportContentChangeEvent(ChangeType::DIALOG, _))
+        .Times(EXPECTED_IPC_REPORT_COUNT).WillRepeatedly([&](ChangeType, const std::string& data) {
+            auto json = JsonUtil::ParseJsonString(data);
+            ipcTypes.emplace_back(json->GetBool("show") ? OVERLAY_SHOW : OVERLAY_HIDE);
+        });
+    menuManager->SetPreviewFirstShow(wrapper, env.overlay);
+    EXPECT_TRUE(previewPattern->isFirstShow_);
+    EXPECT_TRUE(state.types.empty());
+    EXPECT_EQ(ipcTypes, (std::vector<uint32_t> { OVERLAY_SHOW }));
+    menuManager->OnShowMenuAnimationFinished(wrapper, env.overlay, env.pipeline->GetInstanceId());
+    EXPECT_EQ(state.types, (std::vector<uint32_t> { OVERLAY_SHOW }));
+    EXPECT_EQ(ipcTypes, (std::vector<uint32_t> { OVERLAY_SHOW, OVERLAY_SHOW }));
+    // Every completion or HIDE notification follows the IPC call, even for the same node.
+    menuManager->OnShowMenuAnimationFinished(wrapper, env.overlay, env.pipeline->GetInstanceId());
+    env.overlay->ContentChangeReport(wrapper, false);
+    env.overlay->ContentChangeReport(wrapper, false);
+    EXPECT_EQ(state.types, (std::vector<uint32_t> {
+        OVERLAY_SHOW, OVERLAY_SHOW, OVERLAY_HIDE, OVERLAY_HIDE }));
+    EXPECT_EQ(ipcTypes.size(), EXPECTED_IPC_REPORT_COUNT);
+    EXPECT_TRUE(env.manager->UnregisterCapiContentChangeEvent(subscription));
+}
+
+/**
+ * @tc.name: CapiOverlayWithoutShowMatchesEveryIpcNotification
+ * @tc.desc: Overlay HIDE does not require a preceding SHOW notification.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OverlayContentChangeTestNg, CapiOverlayWithoutShowMatchesEveryIpcNotification, TestSize.Level1)
+{
+    constexpr int32_t EXPECTED_IPC_REPORT_COUNT = 4;
+    MenuReportEnvironment env;
+    auto ipc = GetMockUiSessionManager();
+    CapiTestState state { env.manager };
+    auto subscription = env.manager->RegisterCapiContentChangeEvent(
+        false, OVERLAY_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &state },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    int32_t nodeId = 610;
+    for (auto tag : { V2::SHEET_PAGE_TAG, V2::MODAL_PAGE_TAG, V2::MENU_ETS_TAG }) {
+        auto node = FrameNode::CreateFrameNode(tag, nodeId++, AceType::MakeRefPtr<Pattern>());
+        std::vector<uint32_t> ipcTypes;
+        std::vector<std::string> order;
+        state.types.clear();
+        state.onEvent = [&](uint32_t type) {
+            order.emplace_back("capi");
+            ASSERT_FALSE(ipcTypes.empty());
+            EXPECT_EQ(type, ipcTypes.back());
+        };
+        EXPECT_CALL(*ipc, ReportContentChangeEvent(ChangeType::DIALOG, _))
+            .Times(EXPECTED_IPC_REPORT_COUNT).WillRepeatedly([&](ChangeType, const std::string& data) {
+                auto json = JsonUtil::ParseJsonString(data);
+                ipcTypes.emplace_back(json->GetBool("show") ? OVERLAY_SHOW : OVERLAY_HIDE);
+                order.emplace_back("ipc");
+            });
+        for (bool show : { false, false, true, true }) {
+            env.overlay->ContentChangeReport(node, show);
+        }
+        EXPECT_EQ(state.types, (std::vector<uint32_t> { OVERLAY_HIDE, OVERLAY_HIDE, OVERLAY_SHOW, OVERLAY_SHOW }));
+        EXPECT_EQ(state.types, ipcTypes);
+        EXPECT_EQ(order,
+            (std::vector<std::string> { "ipc", "capi", "ipc", "capi", "ipc", "capi", "ipc", "capi" }));
+        state.onEvent = nullptr;
+        Mock::VerifyAndClearExpectations(ipc);
+    }
+    EXPECT_TRUE(env.manager->UnregisterCapiContentChangeEvent(subscription));
+}
+
+/**
+ * @tc.name: CapiMenuCommonReportResolvesTrigger
+ * @tc.desc: Common menu notifications resolve the initiating node without explicit trigger metadata.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OverlayContentChangeTestNg, CapiMenuCommonReportResolvesTrigger, TestSize.Level1)
+{
+    constexpr int32_t BUTTON_NODE_ID = 436;
+    constexpr int32_t MENU_NODE_ID = 437;
+    constexpr int32_t WRAPPER_NODE_ID = 438;
+    auto manager = GetContentChangeManager();
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    CapiTestState state { manager };
+    auto id = manager->RegisterCapiContentChangeEvent(
+        false, OVERLAY_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &state },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto button = FrameNode::CreateFrameNode(V2::BUTTON_ETS_TAG, BUTTON_NODE_ID, AceType::MakeRefPtr<Pattern>());
+    auto menu = FrameNode::CreateFrameNode(V2::MENU_ETS_TAG, MENU_NODE_ID,
+        AceType::MakeRefPtr<MenuPattern>(button->GetId(), button->GetTag(), MenuType::MENU));
+    auto wrapper = FrameNode::CreateFrameNode(
+        V2::MENU_WRAPPER_ETS_TAG, WRAPPER_NODE_ID, AceType::MakeRefPtr<Pattern>());
+    wrapper->AddChild(menu);
+    for (bool show : { true, false }) {
+        manager->OnDialogChangeEnd(wrapper, show);
+        auto json = JsonUtil::ParseJsonString(state.json);
+        EXPECT_EQ(json->GetString("overlayType"), "menu");
+        auto trigger = json->GetValue("triggerNode");
+        EXPECT_EQ(trigger->GetString("id"), std::to_string(BUTTON_NODE_ID));
+        EXPECT_EQ(trigger->GetString("type"), V2::BUTTON_ETS_TAG);
+    }
+    EXPECT_EQ(state.types, (std::vector<uint32_t> { OVERLAY_SHOW, OVERLAY_HIDE }));
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+}
+
+/**
+ * @tc.name: CapiOverlayClassificationPreservesPriority
+ * @tc.desc: Overlay classification preserves dialog, menu and popup type precedence.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OverlayContentChangeTestNg, CapiOverlayClassificationPreservesPriority, TestSize.Level1)
+{
+    auto manager = GetContentChangeManager();
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    CapiTestState state { manager };
+    auto id = manager->RegisterCapiContentChangeEvent(
+        false, OVERLAY_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &state },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto content = FrameNode::CreateFrameNode(
+        V2::COLUMN_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    auto pattern = AceType::MakeRefPtr<DialogPattern>(AceType::MakeRefPtr<DialogTheme>(), content);
+    auto node = FrameNode::CreateFrameNode(
+        V2::CUSTOM_DIALOG_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), pattern);
+    pattern->dialogProperties_.type = DialogType::ACTION_SHEET;
+    manager->OnDialogChangeEnd(node, false);
+    EXPECT_EQ(JsonUtil::ParseJsonString(state.json)->GetString("overlayType"), "actionSheet");
+    pattern->dialogProperties_.type = DialogType::COMMON;
+    manager->OnDialogChangeEnd(node, false);
+    EXPECT_EQ(JsonUtil::ParseJsonString(state.json)->GetString("overlayType"), "customDialog");
+    auto plain = FrameNode::CreateFrameNode(V2::DIALOG_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<DialogPattern>(AceType::MakeRefPtr<DialogTheme>(), nullptr));
+    manager->OnDialogChangeEnd(plain, false);
+    EXPECT_EQ(JsonUtil::ParseJsonString(state.json)->GetString("overlayType"), "dialog");
+    auto tagOnly = FrameNode::CreateFrameNode(
+        V2::CUSTOM_DIALOG_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    const auto count = state.types.size();
+    manager->OnDialogChangeEnd(tagOnly, false);
+    manager->OnDialogChangeEnd(nullptr, false);
+    EXPECT_EQ(state.types.size(), count);
+    manager->ReportCapiOverlayEvent(tagOnly, false, "popup", content);
+    auto json = JsonUtil::ParseJsonString(state.json);
+    EXPECT_EQ(json->GetString("overlayType"), "popup");
+    EXPECT_EQ(json->GetValue("triggerNode")->GetString("id"), std::to_string(content->GetId()));
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+}
+
+/**
+ * @tc.name: CapiMenuExplicitTriggerOverridesLookup
+ * @tc.desc: An explicit menu trigger takes precedence over lookup-derived metadata.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OverlayContentChangeTestNg, CapiMenuExplicitTriggerOverridesLookup, TestSize.Level1)
+{
+    auto manager = GetContentChangeManager();
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    CapiTestState state { manager };
+    auto id = manager->RegisterCapiContentChangeEvent(
+        false, OVERLAY_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &state },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto original = FrameNode::CreateFrameNode(
+        V2::BUTTON_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    auto explicitTrigger = FrameNode::CreateFrameNode(
+        V2::BUTTON_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    auto menu = FrameNode::CreateFrameNode(V2::MENU_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<MenuPattern>(original->GetId(), original->GetTag(), MenuType::MENU));
+    manager->ReportCapiOverlayEvent(menu, false, nullptr, explicitTrigger);
+    auto json = JsonUtil::ParseJsonString(state.json);
+    EXPECT_EQ(json->GetString("overlayType"), "menu");
+    EXPECT_EQ(json->GetValue("triggerNode")->GetString("id"), std::to_string(explicitTrigger->GetId()));
+    manager->OnDialogChangeEnd(menu, false);
+    json = JsonUtil::ParseJsonString(state.json);
+    EXPECT_EQ(json->GetValue("triggerNode")->GetString("id"), std::to_string(original->GetId()));
+    auto empty = FrameNode::CreateFrameNode(
+        V2::MENU_WRAPPER_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    manager->OnDialogChangeEnd(empty, false);
+    json = JsonUtil::ParseJsonString(state.json);
+    EXPECT_EQ(json->GetString("overlayType"), "menu");
+    EXPECT_TRUE(json->GetValue("triggerNode")->IsNull());
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+}
+
+/**
+ * @tc.name: CapiPopupHideKeepsWeakTriggerAfterLookupRemoved
+ * @tc.desc: Popup HIDE resolves its weak trigger after the lookup entry is removed.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OverlayContentChangeTestNg, CapiPopupHideKeepsWeakTriggerAfterLookupRemoved, TestSize.Level1)
+{
+    constexpr int32_t ROOT_NODE_ID = 440;
+    constexpr int32_t TRIGGER_NODE_ID = 442;
+    constexpr int32_t POPUP_NODE_ID = 441;
+    auto manager = GetContentChangeManager();
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    CapiTestState state { manager };
+    auto id = manager->RegisterCapiContentChangeEvent(
+        false, OVERLAY_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &state },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    constexpr int32_t REPEATED_HIDE_COUNT = 2;
+    for (bool destroyTrigger : { false, true }) {
+        auto root = FrameNode::CreateFrameNode("root", ROOT_NODE_ID, AceType::MakeRefPtr<Pattern>());
+        auto overlay = AceType::MakeRefPtr<OverlayManager>(root);
+        auto trigger = FrameNode::CreateFrameNode(V2::BUTTON_ETS_TAG, TRIGGER_NODE_ID, AceType::MakeRefPtr<Pattern>());
+        auto pattern = AceType::MakeRefPtr<BubblePattern>(trigger->GetId(), trigger->GetTag());
+        auto popup = FrameNode::CreateFrameNode(V2::POPUP_ETS_TAG, POPUP_NODE_ID, pattern);
+        popup->MountToParent(root);
+        auto& info = overlay->popupMap_[trigger->GetId()];
+        info.popupNode = popup;
+        info.target = trigger;
+        info.isCurrentOnShow = false;
+        BubbleHidePopupParams params;
+        params.targetId = trigger->GetId();
+        const auto references = trigger->RefCount();
+        auto finish = InnerModifier::GetBubbleInnerModifier()->createHidePopupOnFinish(
+            pattern, AceType::RawPtr(overlay), params, popup, root);
+        EXPECT_EQ(trigger->RefCount(), references);
+        overlay->ErasePopupInfo(params.targetId);
+        WeakPtr<FrameNode> weakTrigger = trigger;
+        if (destroyTrigger) {
+            trigger.Reset();
+            EXPECT_EQ(weakTrigger.Upgrade(), nullptr);
+        }
+        // No prior SHOW is needed, and repeated invocations are not filtered by the reporting layer.
+        for (int32_t invocation = 0; invocation < REPEATED_HIDE_COUNT; ++invocation) {
+            finish();
+            auto json = JsonUtil::ParseJsonString(state.json);
+            auto reportedTrigger = json->GetValue("triggerNode");
+            if (destroyTrigger) {
+                EXPECT_TRUE(reportedTrigger->IsNull());
+            } else {
+                EXPECT_EQ(reportedTrigger->GetString("id"), std::to_string(trigger->GetId()));
+            }
+        }
+    }
+    EXPECT_EQ(state.types, (std::vector<uint32_t> { OVERLAY_HIDE, OVERLAY_HIDE, OVERLAY_HIDE, OVERLAY_HIDE }));
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+}
+
+/**
+ * @tc.name: CapiPopupFinishReportsBeforeLastReferenceIsReleased
+ * @tc.desc: Popup completion reports HIDE before releasing the final node reference.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OverlayContentChangeTestNg, CapiPopupFinishReportsBeforeLastReferenceIsReleased, TestSize.Level1)
+{
+    constexpr size_t SHOW_HIDE_EVENT_COUNT = 2;
+    constexpr int32_t ROOT_NODE_ID = 535;
+    constexpr int32_t POPUP_NODE_ID = 537;
+    constexpr int32_t TARGET_NODE_ID = 536;
+    auto manager = GetContentChangeManager();
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    CapiTestState state { manager };
+    auto id = manager->RegisterCapiContentChangeEvent(
+        false, OVERLAY_CATEGORY, NO_IGNORED_EVENTS, new CapiTestCookie { &state },
+        CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    auto root = FrameNode::CreateFrameNode("root", ROOT_NODE_ID, AceType::MakeRefPtr<Pattern>());
+    auto overlay = AceType::MakeRefPtr<OverlayManager>(root);
+    auto pattern = AceType::MakeRefPtr<BubblePattern>(TARGET_NODE_ID, V2::BUTTON_ETS_TAG);
+    auto popup = FrameNode::CreateFrameNode(V2::POPUP_ETS_TAG, POPUP_NODE_ID, pattern);
+    popup->MountToParent(root);
+    overlay->ReportCapiOverlayEvent(popup, true, "popup");
+    auto& info = overlay->popupMap_[TARGET_NODE_ID];
+    info.popupNode = popup;
+    info.isCurrentOnShow = false;
+    BubbleHidePopupParams params;
+    params.targetId = TARGET_NODE_ID;
+    auto finish = InnerModifier::GetBubbleInnerModifier()->createHidePopupOnFinish(
+        pattern, AceType::RawPtr(overlay), params, popup, root);
+    WeakPtr<FrameNode> weakPopup = popup;
+    popup.Reset();
+    finish();
+    EXPECT_EQ(weakPopup.Upgrade(), nullptr);
+    EXPECT_TRUE(overlay->popupMap_.empty());
+    EXPECT_TRUE(root->GetChildren().empty());
+    EXPECT_EQ(state.types, (std::vector<uint32_t> { OVERLAY_SHOW, OVERLAY_HIDE }));
+    auto json = JsonUtil::ParseJsonString(state.json);
+    EXPECT_EQ(json->GetValue("targetNode")->GetString("id"), std::to_string(POPUP_NODE_ID));
+    finish();
+    EXPECT_EQ(state.types.size(), SHOW_HIDE_EVENT_COUNT);
+    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+}
+
+/**
+ * @tc.name: CapiPopupFinishDoesNotRetainRemovedNode
+ * @tc.desc: The popup completion callback does not keep an already removed node alive.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OverlayContentChangeTestNg, CapiPopupFinishDoesNotRetainRemovedNode, TestSize.Level1)
+{
+    constexpr int32_t ROOT_NODE_ID = 538;
+    constexpr int32_t POPUP_NODE_ID = 540;
+    constexpr int32_t TARGET_NODE_ID = 539;
+    auto root = FrameNode::CreateFrameNode("root", ROOT_NODE_ID, AceType::MakeRefPtr<Pattern>());
+    auto overlay = AceType::MakeRefPtr<OverlayManager>(root);
+    auto pattern = AceType::MakeRefPtr<BubblePattern>(TARGET_NODE_ID, V2::BUTTON_ETS_TAG);
+    auto popup = FrameNode::CreateFrameNode(V2::POPUP_ETS_TAG, POPUP_NODE_ID, pattern);
+    BubbleHidePopupParams params;
+    params.targetId = TARGET_NODE_ID;
+    const auto references = popup->RefCount();
+    auto finish = InnerModifier::GetBubbleInnerModifier()->createHidePopupOnFinish(
+        pattern, AceType::RawPtr(overlay), params, popup, root);
+    EXPECT_EQ(popup->RefCount(), references);
+    WeakPtr<FrameNode> weakPopup = popup;
+    popup.Reset();
+    EXPECT_EQ(weakPopup.Upgrade(), nullptr);
+    finish();
+    EXPECT_TRUE(overlay->popupMap_.empty());
+}
+
+namespace {
+class DialogReportTaskExecutor : public MockTaskExecutor {
+    DECLARE_ACE_TYPE(DialogReportTaskExecutor, MockTaskExecutor);
+
+public:
+    bool OnPostTask(Task&& task, TaskType type, uint32_t delayTime, const std::string& name,
+        PriorityType priorityType = PriorityType::LOW,
+        VsyncBarrierOption barrierOption = VsyncBarrierOption::NO_BARRIER) const override
+    {
+        if (name == "ArkUIOverlayDialogCloseEvent") {
+            tasks.emplace_back(std::move(task));
+            return true;
+        }
+        return MockTaskExecutor::OnPostTask(std::move(task), type, delayTime, name, priorityType, barrierOption);
+    }
+
+    mutable std::vector<Task> tasks;
+};
+
+class DialogCloseReportRenderContext : public RenderContext {
+    DECLARE_ACE_TYPE(DialogCloseReportRenderContext, RenderContext);
+
+public:
+    void OpacityAnimation(const AnimationOption& option, double begin, double end) override
+    {
+        finish = option.GetOnFinishEvent();
+    }
+
+    bool HasDisappearTransition() const override
+    {
+        return hasTransition;
+    }
+
+    void SetTransitionOutCallback(std::function<void()>&& callback) override
+    {
+        finish = std::move(callback);
+    }
+
+    bool hasTransition = false;
+    std::function<void()> finish;
+};
+} // namespace
+
+/**
+ * @tc.name: CapiDialogCloseReportsOncePerCompletion
+ * @tc.desc: Common dialog closes match IPC once; dedicated close paths retain their CAPI-only HIDE.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OverlayContentChangeTestNg, CapiDialogCloseReportsOncePerCompletion, TestSize.Level1)
+{
+    enum class ClosePath { ANIMATION, TRANSITION, NO_TRANSITION, MASK_CONTENT, MASK_CONTENT_TRANSITION };
+    auto pipeline = MockPipelineContext::GetCurrent();
+    auto manager = GetContentChangeManager();
+    auto ipc = GetMockUiSessionManager();
+    auto previousExecutor = pipeline->GetTaskExecutor();
+    auto previousTheme = pipeline->GetThemeManager();
+    auto theme = AceType::MakeRefPtr<MockThemeManager>();
+    EXPECT_CALL(*theme, GetTheme(_)).WillRepeatedly([](ThemeType type) { return GetTheme(type); });
+    EXPECT_CALL(*theme, GetTheme(_, _)).WillRepeatedly([](ThemeType type, int32_t) { return GetTheme(type); });
+    pipeline->SetThemeManager(theme);
+    MockContainer::SetUp();
+    MockContainer::Current()->pipelineContext_ = pipeline;
+    auto executor = AceType::MakeRefPtr<DialogReportTaskExecutor>();
+    MockContainer::Current()->taskExecutor_ = executor;
+    pipeline->SetTaskExecutor(executor);
+    for (auto path : { ClosePath::ANIMATION, ClosePath::TRANSITION,
+        ClosePath::NO_TRANSITION, ClosePath::MASK_CONTENT, ClosePath::MASK_CONTENT_TRANSITION }) {
+        SCOPED_TRACE(static_cast<int>(path));
+        manager->InvalidateCapiContentChangeSubscriptions();
+        manager->currentContentChangeConfig_ = ContentChangeConfig {};
+        CapiTestState state { manager };
+        auto id = manager->RegisterCapiContentChangeEvent(false, OVERLAY_CATEGORY, NO_IGNORED_EVENTS,
+            new CapiTestCookie { &state }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+        auto root = FrameNode::CreateFrameNode(
+            V2::ROOT_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+        auto node = FrameNode::CreateFrameNode(
+            V2::DIALOG_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+            AceType::MakeRefPtr<DialogPattern>(AceType::MakeRefPtr<DialogTheme>(), nullptr));
+        auto render = AceType::MakeRefPtr<DialogCloseReportRenderContext>();
+        render->hasTransition = path == ClosePath::TRANSITION;
+        node->renderContext_ = render;
+        node->MountToParent(root);
+        auto overlay = AceType::MakeRefPtr<OverlayManager>(root);
+        auto dialogManager = AceType::MakeRefPtr<DialogInnerManager>(root);
+        std::vector<RefPtr<DialogCloseReportRenderContext>> childRenders;
+        if (path == ClosePath::MASK_CONTENT_TRANSITION) {
+            for (const auto* tag : { "DialogContent", "DialogMask" }) {
+                auto child = FrameNode::CreateFrameNode(
+                    tag, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+                auto childRender = AceType::MakeRefPtr<DialogCloseReportRenderContext>();
+                childRender->hasTransition = true;
+                child->renderContext_ = childRender;
+                child->MountToParent(node);
+                childRenders.emplace_back(childRender);
+            }
+        }
+        const bool commonReport = path == ClosePath::ANIMATION || path == ClosePath::TRANSITION;
+        EXPECT_CALL(*ipc, ReportContentChangeEvent(ChangeType::DIALOG, _)).Times(commonReport ? 1 : 0);
+        if (path == ClosePath::ANIMATION) {
+            dialogManager->CloseDialogAnimation(overlay, node);
+        } else if (path == ClosePath::MASK_CONTENT || path == ClosePath::MASK_CONTENT_TRANSITION) {
+            dialogManager->CloseMaskAndContentMatchTransition(overlay, node);
+        } else {
+            dialogManager->CloseDialogMatchTransition(overlay, node);
+        }
+        if (render->finish) {
+            render->finish();
+        }
+        for (const auto& childRender : childRenders) {
+            ASSERT_TRUE(childRender->finish);
+            childRender->finish();
+        }
+        EXPECT_EQ(state.types.size(), commonReport ? 1U : 0U);
+        auto pending = std::move(executor->tasks);
+        executor->tasks.clear();
+        EXPECT_FALSE(pending.empty());
+        for (auto& task : pending) {
+            task();
+        }
+        EXPECT_EQ(node->GetParent(), nullptr);
+        EXPECT_EQ(state.types, (std::vector<uint32_t> { OVERLAY_HIDE }));
+        EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+        manager->StopContentChangeReport();
+        Mock::VerifyAndClearExpectations(ipc);
+    }
+    pipeline->SetTaskExecutor(previousExecutor);
+    pipeline->SetThemeManager(previousTheme);
+    MockContainer::TearDown();
+}
+
+/**
+ * @tc.name: CapiSubMenuLateSubscriptionAndDistinctTargets
+ * @tc.desc: A submenu shown before subscription can close; different submenu instances remain independent.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OverlayContentChangeTestNg, CapiSubMenuLateSubscriptionAndDistinctTargets, TestSize.Level1)
+{
+    MenuReportEnvironment env;
+    auto a = FrameNode::CreateFrameNode("Menu", ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<Pattern>());
+    auto b = FrameNode::CreateFrameNode("Menu", ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<Pattern>());
+    env.overlay->ReportSubMenuEvent(a, true);
+    CapiTestState state { env.manager };
+    auto id = env.manager->RegisterCapiContentChangeEvent(false, OVERLAY_CATEGORY, 0,
+        new CapiTestCookie { &state }, CapiContentChangeTestSink, ReleaseCapiContentChangeTestCookie);
+    EXPECT_CALL(*GetMockUiSessionManager(), ReportContentChangeEvent(_, _)).Times(0);
+    env.overlay->ReportSubMenuEvent(a, false);
+    EXPECT_EQ(state.types, (std::vector<uint32_t> { OVERLAY_HIDE }));
+    EXPECT_EQ(JsonUtil::ParseJsonString(state.json)->GetValue("targetNode")->GetString("id"),
+        std::to_string(a->GetId()));
+    env.overlay->ReportSubMenuEvent(b, true);
+    env.overlay->ReportSubMenuEvent(b, true);
+    env.overlay->ReportSubMenuEvent(b, false);
+    env.overlay->ReportSubMenuEvent(b, false);
+    EXPECT_EQ(state.types, (std::vector<uint32_t> { OVERLAY_HIDE, OVERLAY_SHOW, OVERLAY_HIDE }));
+    EXPECT_EQ(JsonUtil::ParseJsonString(state.json)->GetValue("targetNode")->GetString("id"),
+        std::to_string(b->GetId()));
+    env.manager->UnregisterCapiContentChangeEvent(id);
+}
+
+} // namespace OHOS::Ace::NG

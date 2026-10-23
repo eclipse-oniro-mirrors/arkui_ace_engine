@@ -77,7 +77,7 @@ bool ScrollableController::AnimateTo(
                 "ScrollTo with animation, position:%f, duration:%f, smooth:%u, canOverScroll:%u, id:%d, tag:%s",
                 position.ConvertToPx(), duration, smooth, canOverScroll,
                 static_cast<int32_t>(host->GetAccessibilityId()), host->GetTag().c_str());
-            pattern->AnimateTo(position.ConvertToPx(), duration, curve, smooth, canOverScroll);
+            pattern->AnimateToFromController(position.ConvertToPx(), duration, curve, smooth, canOverScroll);
         } else {
             ACE_SCOPED_TRACE("ScrollTo without animation, position:%f, id:%d, tag:%s", position.ConvertToPx(),
                 static_cast<int32_t>(host->GetAccessibilityId()), host->GetTag().c_str());
@@ -143,6 +143,7 @@ void ScrollableController::ScrollBy(double pixelX, double pixelY, bool smooth)
         return;
     }
     pattern->SetIsOverScroll(false);
+    pattern->ScheduleCapiScrollCommand(false, true);
     pattern->UpdateCurrentOffset(static_cast<float>(-offset), SCROLL_FROM_JUMP);
 }
 
@@ -229,6 +230,7 @@ void ScrollableController::ScrollPage(bool reverse, bool smooth)
         pattern->StopAnimate();
         ACE_SCOPED_TRACE("ScrollPage without animation, offset:%f, id:%d, tag:%s", offset,
             static_cast<int32_t>(host->GetAccessibilityId()), host->GetTag().c_str());
+        pattern->ScheduleCapiScrollCommand(false);
         pattern->UpdateCurrentOffset(offset, SCROLL_FROM_JUMP);
     }
 }

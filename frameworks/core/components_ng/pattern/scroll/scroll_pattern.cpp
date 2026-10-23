@@ -883,6 +883,7 @@ void ScrollPattern::ScrollBy(float pixelX, float pixelY, bool smooth, const std:
         AnimateTo(-position, fabs(distance) * UNIT_CONVERT / SCROLL_BY_SPEED, Curves::EASE_OUT, true, false, false);
         return;
     }
+    ScheduleCapiScrollCommand(false);
     JumpToPosition(position);
 }
 
@@ -919,10 +920,11 @@ void ScrollPattern::JumpToPosition(float position, int32_t source)
 
 void ScrollPattern::ScrollTo(float position)
 {
+    ScheduleCapiScrollCommand(true);
     SetAnimateCanOverScroll(GetCanStayOverScroll());
     JumpToPosition(-position - contentStartOffset_, SCROLL_FROM_JUMP);
     SetIsOverScroll(GetCanStayOverScroll());
-    ContentChangeReport(GetHost(), ContentChangeManager::SCROLL_TO);
+    ContentChangeReport(GetHost(), ContentChangeManager::SCROLL_TO, false);
 }
 
 void ScrollPattern::DoJump(float position, int32_t source)

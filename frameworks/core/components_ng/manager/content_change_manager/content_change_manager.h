@@ -70,12 +70,12 @@ public:
     }
 
     void OnPageTransitionEnd(const RefPtr<FrameNode>& keyNode);
-    void OnPageTransitionEnd(const RefPtr<FrameNode>& keyNode, int32_t transitionId);
+    void OnPageTransitionEnd(const RefPtr<FrameNode>& keyNode, int32_t transitionId, bool reportCapi = true);
     void ReportCapiPageEndEvent(const RefPtr<FrameNode>& keyNode, int32_t transitionId);
     void OnContentChangeStart(const RefPtr<FrameNode>& keyNode, ChangeType type);
     void OnContentChangeStart(const RefPtr<FrameNode>& keyNode, ChangeType type, bool reportCapi);
     void ReportCapiPageStartEvent(const RefPtr<FrameNode>& node);
-    void OnContentChangeInterrupted(const RefPtr<FrameNode>& keyNode, ChangeType type);
+    void OnContentChangeInterrupted(const RefPtr<FrameNode>& keyNode, ChangeType type, bool reportCapiEnd = true);
     void OnContentChangeNodeDestroyed(int32_t nodeId);
     void OnScrollChangeStart(const RefPtr<FrameNode>& keyNode);
     void OnScrollChangeEnd(const RefPtr<FrameNode>& keyNode, uint32_t type = NONE);
