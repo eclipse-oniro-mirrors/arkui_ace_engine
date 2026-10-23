@@ -44,6 +44,8 @@
 #include "core/components_ng/pattern/ui_extension/ui_extension_utils.h"
 #include "core/components_ng/pattern/ui_extension/session_wrapper.h"
 #include "core/components_ng/pattern/ui_extension/ui_extension_container_handler.h"
+#include "interfaces/inner_api/ace_kit/include/ui/view/theme/token_colors.h"
+#include "interfaces/inner_api/ace_kit/include/ui/view/theme/token_theme.h"
 #include "core/components_ng/pattern/window_scene/helper/window_scene_helper.h"
 #include "core/components_ng/pattern/window_scene/scene/system_window_scene.h"
 #include "core/pipeline_ng/pipeline_context.h"
@@ -669,6 +671,8 @@ Rosen::SessionViewportConfig ConvertToRosenSessionViewportConfig(const SessionVi
 void SessionWrapperImpl::CreateSession(const AAFwk::Want& want, const SessionConfig& config)
 {
     ACE_UINODE_TRACE(GetFrameNodeId());
+    auto pattern = hostPattern_.Upgrade();
+    CHECK_NULL_VOID(pattern);
     ContainerScope scope(instanceId_);
     UIEXT_LOGI("The session is created with bundle=%{public}s, ability=%{public}s,"
         " componentId=%{public}d, sessionType=%{public}d.", want.GetElement().GetBundleName().c_str(),
@@ -688,8 +692,6 @@ void SessionWrapperImpl::CreateSession(const AAFwk::Want& want, const SessionCon
         }
         if ((container->IsUIExtensionAbilityHost() && container->IsUIExtensionSubWindow())) {
             UIEXT_LOGE("The UIExtensionComponent does not allow nested pulling of another.");
-            auto pattern = hostPattern_.Upgrade();
-            CHECK_NULL_VOID(pattern);
             pattern->FireOnErrorCallback(ERROR_CODE_UIEXTENSION_FORBID_CASCADE, PULL_FAIL_NAME, PULL_FAIL_MESSAGE);
             return;
         }
@@ -698,8 +700,6 @@ void SessionWrapperImpl::CreateSession(const AAFwk::Want& want, const SessionCon
         if ((container->IsUIExtensionWindow()) ||
             (container->IsUIExtensionAbilityProcess() && container->IsUIExtensionSubWindow())) {
             UIEXT_LOGE("The EmbeddedComponent does not allow nested pulling of another.");
-            auto pattern = hostPattern_.Upgrade();
-            CHECK_NULL_VOID(pattern);
             pattern->FireOnErrorCallback(ERROR_CODE_UIEXTENSION_FORBID_CASCADE, PULL_FAIL_NAME, PULL_FAIL_MESSAGE);
             return;
         }
@@ -720,19 +720,18 @@ void SessionWrapperImpl::CreateSession(const AAFwk::Want& want, const SessionCon
     auto parentToken = container->GetParentToken();
     auto context = PipelineContext::GetCurrentContext();
     CHECK_NULL_VOID(context);
-    auto pattern = hostPattern_.Upgrade();
-    CHECK_NULL_VOID(pattern);
     SessionViewportConfig sessionViewportConfig;
     sessionViewportConfig.dpiFollowStrategy_ = pattern->GetEffectiveDpiFollowStrategy();
     sessionViewportConfig.density_ = context->GetCurrentDensity();
     sessionViewportConfig.displayId_ = container->GetCurrentDisplayId();
     sessionViewportConfig.orientation_ = static_cast<int32_t>(SystemProperties::GetDeviceOrientation());
     sessionViewportConfig.transform_ = context->GetTransformHint();
+    auto brandColorStr = pattern->GetBrandColorStr();
     pattern->SetSessionViewportConfig(sessionViewportConfig);
     UIEXT_LOGI("SessionViewportConfig compose: uiExtensionDpiFollowHost=%{public}d, "
-               "dpiFollowStrategy=%{public}d, componentId=%{public}d.",
+               "dpiFollowStrategy=%{public}d, componentId=%{public}d, brandColorStr=%{public}s.",
         static_cast<int32_t>(context->GetUIExtensionDensityFollowHost()),
-        static_cast<int32_t>(sessionViewportConfig.dpiFollowStrategy_), GetFrameNodeId());
+        static_cast<int32_t>(sessionViewportConfig.dpiFollowStrategy_), GetFrameNodeId(), brandColorStr.c_str());
     Rosen::SessionInfo extensionSessionInfo;
     extensionSessionInfo.bundleName_ = want.GetElement().GetBundleName();
     extensionSessionInfo.abilityName_ = want.GetElement().GetAbilityName();
@@ -744,9 +743,12 @@ void SessionWrapperImpl::CreateSession(const AAFwk::Want& want, const SessionCon
     extensionSessionInfo.uiExtensionUsage_ = static_cast<uint32_t>(config.uiExtensionUsage);
     extensionSessionInfo.isAsyncModalBinding_ = config.isAsyncModalBinding;
     extensionSessionInfo.config_ = ConvertToRosenSessionViewportConfig(sessionViewportConfig);
+    extensionSessionInfo.brandColorStr_ = brandColorStr;
     SetConnectToRenderInner(pipeline, extensionSessionInfo);
-    session_ = Rosen::ExtensionSessionManager::GetInstance().RequestExtensionSession(extensionSessionInfo);
-    CHECK_NULL_VOID(session_);
+    auto session = Rosen::ExtensionSessionManager::GetInstance().RequestExtensionSession(extensionSessionInfo);
+    CHECK_NULL_VOID(session);
+    SetSession(session);
+    pattern->SetLastSentBrandColorStr(brandColorStr);
     UpdateSessionConfig();
     lifecycleListener_ = std::make_shared<UIExtensionLifecycleListener>(AceType::WeakClaim(this));
     session_->RegisterLifecycleListener(lifecycleListener_);

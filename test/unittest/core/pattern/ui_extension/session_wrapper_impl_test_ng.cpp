@@ -413,4 +413,38 @@ HWTEST_F(SessionWrapperImplTestNg, SessionWrapperImplTestNg011, TestSize.Level1)
     EXPECT_TRUE(sessionWrapper->NotifyFocusStateAsync(false));
 #endif
 }
+
+/**
+ * @tc.name: SessionWrapperBrandColorTest001
+ * @tc.desc: Test pattern GetBrandColorStr returns DEFAULT_BRAND_COLOR_STR by default
+ * @tc.type: FUNC
+ */
+HWTEST_F(SessionWrapperImplTestNg, SessionWrapperBrandColorTest001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto sessionWrapper = GenerateSessionWrapperImpl();
+    ASSERT_NE(sessionWrapper, nullptr);
+    auto pattern = sessionWrapper->hostPattern_.Upgrade();
+    ASSERT_NE(pattern, nullptr);
+    auto result = pattern->GetBrandColorStr();
+    EXPECT_EQ(result, "");
+#endif
+}
+
+/**
+ * @tc.name: SessionWrapperBrandColorTest002
+ * @tc.desc: Test pattern ResolveBrandColor returns DEFAULT_BRAND_COLOR_STR with invalid themeScopeId
+ * @tc.type: FUNC
+ */
+HWTEST_F(SessionWrapperImplTestNg, SessionWrapperBrandColorTest002, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto sessionWrapper = GenerateSessionWrapperImpl();
+    ASSERT_NE(sessionWrapper, nullptr);
+    auto pattern = sessionWrapper->hostPattern_.Upgrade();
+    ASSERT_NE(pattern, nullptr);
+    auto result = pattern->ResolveBrandColor(999);
+    EXPECT_EQ(result, "");
+#endif
+}
 } // namespace OHOS::Ace::NG

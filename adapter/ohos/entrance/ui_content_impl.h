@@ -42,6 +42,8 @@
 #include "core/components/common/properties/animation_option.h"
 #include "core/components/common/properties/popup_param.h"
 #include "core/components_ng/base/observer_handler.h"
+#include "core/components_ng/token_theme/brand_color_info.h"
+#include "core/components_ng/token_theme/token_theme_storage.h"
 
 namespace OHOS::Accessibility {
 class AccessibilityElementInfo;
@@ -445,6 +447,9 @@ public:
         const std::unordered_set<int32_t>& persistentIds, uint8_t subSystemId) override;
     void EnableContainerModalCustomGesture(bool enable) override;
 
+    void RegisterBrandColorChangeListener(const BrandColorChangeCallback& callback) override;
+    void UnregisterBrandColorChangeListener() override;
+
     void AddKeyFrameAnimateEndCallback(const std::function<void()>& callback) override;
     void AddKeyFrameNodeCallback(const std::function<
         void(std::shared_ptr<OHOS::Rosen::RSWindowKeyFrameNode>& keyFrameNode,
@@ -630,6 +635,13 @@ protected:
 private:
     void ProcessWindowSizeLayoutBreakPointChange(double density);
     void ApplyFloatNavigationAvoidArea(bool enable);
+    void InitBrandColor();
+    static void UpdateBrandColor(
+        const std::weak_ptr<OHOS::AbilityRuntime::Context>& weakContext, int32_t instanceId);
+    static void NotifyBrandColorChangeToUEC(int32_t instanceId, const std::optional<Color>& brandColor,
+        const std::optional<NG::BrandColorStrategy>& colorStrategy);
+    static void HandleBrandColorChanged(
+        const std::weak_ptr<OHOS::AbilityRuntime::Context>& weakContext, int32_t instanceId);
 };
 
 } // namespace OHOS::Ace

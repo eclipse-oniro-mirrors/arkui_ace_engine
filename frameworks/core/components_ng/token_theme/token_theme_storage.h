@@ -20,8 +20,10 @@
 #include <memory>
 #include <mutex>
 #include <unordered_map>
+#include <vector>
 
 #include "base/memory/referenced.h"
+#include "core/components_ng/token_theme/brand_color_info.h"
 #include "core/components_ng/token_theme/token_theme.h"
 
 namespace OHOS::Ace::NG {
@@ -41,6 +43,7 @@ public:
     // default theme
     void SetDefaultTheme(const RefPtr<TokenTheme>& theme, ColorMode colorMode);
     ACE_FORCE_EXPORT const RefPtr<TokenTheme>& GetDefaultTheme();
+    ACE_FORCE_EXPORT const RefPtr<TokenTheme>& GetDefaultThemeWithInstance(int32_t instanceId);
     void UpdateDefaultThemeBySystemTheme(ColorMode colorMode);
 
     // cache (key: theme id - value: ark theme instance)
@@ -55,9 +58,23 @@ public:
     void SetIsThemeColorAvailable(bool isDark, int32_t index, bool isColorAvailable);
 
     void SetIsThemeColorSetByUser(int32_t themeId, bool isDark, int32_t index, bool isColorSetByUser);
+    bool GetIsThemeColorSetByUser(int32_t themeId, bool isDark, int32_t index) const;
     void InitDarkThemeMapWithoutUserSet(int32_t themeId, bool isDark);
     RefPtr<TokenTheme> CreateSystemTokenTheme(
         ColorMode colorMode, const std::optional<int32_t>& specifiedThemeId = std::nullopt);
+
+    // Instance brand color storage (key: instanceId, value: brandColor + colorStrategy)
+    void StoreInstanceBrandColor(int32_t instanceId, const BrandColorInfo& info);
+    BrandColorInfo GetInstanceBrandColor(int32_t instanceId);
+    void RemoveInstanceBrandColor(int32_t instanceId);
+    void ClearAllInstanceBrandColors();
+
+    // UEC brand color change listener registration (per-instance callback queue)
+    void RegisterBrandColorChangeListener(int32_t instanceId, const BrandColorChangeCallback& callback);
+    void UnregisterBrandColorChangeListener(int32_t instanceId);
+    void NotifyBrandColorChange(int32_t instanceId, const std::optional<Color>& brandColor,
+        const std::optional<BrandColorStrategy>& colorStrategy);
+    std::optional<Color> GetThemeScopeBrandColor(int32_t themeScopeId);
 
 private:
     static constexpr int32_t SYSTEM_THEME_LIGHT_ID = -1;
@@ -84,6 +101,13 @@ private:
 
     static RefPtr<TokenTheme> defaultLightTheme_;
     static RefPtr<TokenTheme> defaultDarkTheme_;
+
+    std::unordered_map<int32_t, BrandColorInfo> instanceBrandColorMap_;
+    std::unordered_map<int32_t, RefPtr<TokenTheme>> instanceDefaultThemerMap_;
+    std::mutex instanceBrandColorMutex_;
+
+    std::unordered_map<int32_t, std::vector<BrandColorChangeCallback>> brandColorChangeListeners_;
+    std::mutex brandColorListenerMutex_;
 };
 
 } // namespace

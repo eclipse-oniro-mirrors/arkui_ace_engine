@@ -119,6 +119,7 @@ void PreviewUIExtensionPattern::OnConnect()
     host->AddChild(contentNode_, 0);
     host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
     surfaceNode->CreateNodeInRenderThread();
+    isUeaConnecting_ = true;
     FireOnRemoteReadyCallback();
     auto focusHub = host->GetFocusHub();
     bool isFocused = focusHub && focusHub->IsCurrentFocus();
@@ -213,6 +214,7 @@ void PreviewUIExtensionPattern::FireOnRemoteReadyCallback()
     auto suec = weakSecurityUIExtension.Upgrade();
     eventHub->FireOnRemoteReadyCallback(
         MakeRefPtr<NG::SecurityUIExtensionProxy>(sessionWrapper_, suec));
+    NotifyBrandColorChangeToUEA(instanceId_, brandColorStr_);
 }
 
 void PreviewUIExtensionPattern::FireOnErrorCallback(
@@ -308,7 +310,20 @@ void PreviewUIExtensionPattern::DumpInfo()
         eventProxyStr = platformEventProxy_->GetCurEventProxyToString();
     }
     DumpLog::GetInstance().AddDesc(std::string("eventProxy: ").append(eventProxyStr));
+    DumpLog::GetInstance().AddDesc(std::string("brandColorStr: ").append(brandColorStr_));
+    DumpLog::GetInstance().AddDesc(std::string("lastSentBrandColorStr: ").append(lastSentBrandColorStr_));
+    DumpLog::GetInstance().AddDesc(std::string("isUeaConnecting: ").append(std::to_string(isUeaConnecting_)));
+    DumpExtraUieInfo(
+        [](const std::string& info) {
+            DumpLog::GetInstance().AddDesc(std::string("Preview UI Extension info: ").append(info));
+        },
+        [](const std::string&, const std::string&) {});
+}
 
+void PreviewUIExtensionPattern::DumpExtraUieInfo(
+    const std::function<void(const std::string&)>& addDesc,
+    const std::function<void(const std::string&, const std::string&)>& putJson)
+{
     auto container = Platform::AceContainer::GetContainer(instanceId_);
     CHECK_NULL_VOID(container);
     std::vector<std::string> params = container->GetUieParams();
@@ -330,7 +345,8 @@ void PreviewUIExtensionPattern::DumpInfo()
     std::vector<std::string> dumpInfo;
     sessionWrapper_->NotifyUieDump(params, dumpInfo);
     for (const std::string& info : dumpInfo) {
-        DumpLog::GetInstance().AddDesc(std::string("Preview UI Extension info: ").append(info));
+        addDesc(info);
+        putJson("Preview UI Extension info: ", info);
     }
 }
 
@@ -356,29 +372,11 @@ void PreviewUIExtensionPattern::DumpInfo(std::unique_ptr<JsonValue>& json)
         eventProxyStr = platformEventProxy_->GetCurEventProxyToString();
     }
     json->Put("eventProxy: ", eventProxyStr.c_str());
-
-    auto container = Platform::AceContainer::GetContainer(instanceId_);
-    CHECK_NULL_VOID(container);
-    std::vector<std::string> params = container->GetUieParams();
-    // Use -nouie to choose not dump extra preview uie info
-    if (std::find(params.begin(), params.end(), NO_EXTRA_UIE_DUMP) != params.end()) {
-        PLATFORM_LOGI("Not Support Dump Extra Preview UIE Info");
-        return;
-    }
-    auto host = GetHost();
-    CHECK_NULL_VOID(host);
-    auto dumpNodeIter = std::find(params.begin(), params.end(), std::to_string(host->GetId()));
-    if (dumpNodeIter != params.end()) {
-        params.erase(dumpNodeIter);
-    }
-    if (!container->IsUIExtensionWindow()) {
-        params.push_back(PID_FLAG);
-    }
-    params.push_back(std::to_string(getpid()));
-    std::vector<std::string> dumpInfo;
-    sessionWrapper_->NotifyUieDump(params, dumpInfo);
-    for (const std::string& info : dumpInfo) {
-        json->Put("Preview UI Extension info: ", info.c_str());
-    }
+    json->Put("brandColorStr: ", brandColorStr_.c_str());
+    json->Put("lastSentBrandColorStr: ", lastSentBrandColorStr_.c_str());
+    json->Put("isUeaConnecting: ", std::to_string(isUeaConnecting_).c_str());
+    DumpExtraUieInfo(
+        [](const std::string&) {},
+        [&json](const std::string& key, const std::string& val) { json->Put(key.c_str(), val.c_str()); });
 }
 } // namespace OHOS::Ace::NG

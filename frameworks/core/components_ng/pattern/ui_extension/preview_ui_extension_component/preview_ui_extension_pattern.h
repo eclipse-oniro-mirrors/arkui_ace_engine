@@ -16,6 +16,8 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_UI_EXTENSION_PREVIEW_UI_EXTENSION_PATTERN_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_UI_EXTENSION_PREVIEW_UI_EXTENSION_PATTERN_H
 
+#include <functional>
+
 #include "core/components_ng/pattern/ui_extension/security_ui_extension_component/security_ui_extension_pattern.h"
 namespace OHOS::Ace::NG {
 class PreviewUIExtensionPattern : public SecurityUIExtensionPattern {
@@ -24,7 +26,7 @@ public:
     PreviewUIExtensionPattern();
     ~PreviewUIExtensionPattern() override;
     void Initialize(const NG::UIExtensionConfig& config) override;
-    void OnConnect();
+    void OnConnect() override;
     void OnAttachToFrameNode() override;
     void FireOnRemoteReadyCallback() override;
     void FireOnErrorCallback(
@@ -35,6 +37,9 @@ public:
     void DumpInfo() override;
     void DumpInfo(std::unique_ptr<JsonValue>& json) override;
 private:
+    void DumpExtraUieInfo(
+        const std::function<void(const std::string&)>& addDesc,
+        const std::function<void(const std::string&, const std::string&)>& putJson);
     // Preview UEC dump info
     uint32_t focusWindowId_ = 0;
     uint32_t realHostWindowId_ = 0;

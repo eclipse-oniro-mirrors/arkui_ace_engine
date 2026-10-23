@@ -1855,4 +1855,83 @@ HWTEST_F(SecurityUIExtensionComponentTestNg, TransferringCaller001, TestSize.Lev
 #endif
 }
 
+/**
+ * @tc.name: SecurityUIExtensionBrandColorTest001
+ * @tc.desc: Test NotifyBrandColorChangeToUEA with null sessionWrapper
+ * @tc.type: FUNC
+ */
+HWTEST_F(SecurityUIExtensionComponentTestNg, SecurityUIExtensionBrandColorTest001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = CreateSecurityUEC();
+    ASSERT_NE(pattern, nullptr);
+    pattern->sessionWrapper_ = nullptr;
+    pattern->NotifyBrandColorChangeToUEA(200, "");
+    EXPECT_EQ(pattern->sessionWrapper_, nullptr);
+#endif
+}
+
+/**
+ * @tc.name: SecurityUIExtensionBrandColorTest002
+ * @tc.desc: Test NotifyBrandColorChangeToUEA with valid sessionWrapper and brand color
+ * @tc.type: FUNC
+ */
+HWTEST_F(SecurityUIExtensionComponentTestNg, SecurityUIExtensionBrandColorTest002, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = CreateSecurityUEC();
+    ASSERT_NE(pattern, nullptr);
+    ValidSessionWrapper(pattern);
+    Color testColor(0xFF00FF00);
+    pattern->NotifyBrandColorChangeToUEA(200, testColor.ToString());
+    EXPECT_EQ(pattern->lastSentBrandColorStr_, testColor.ToString());
+#endif
+}
+
+/**
+ * @tc.name: SecurityUIExtensionBrandColorTest003
+ * @tc.desc: Test OnThemeScopeUpdate returns true even with no theme
+ * @tc.type: FUNC
+ */
+HWTEST_F(SecurityUIExtensionComponentTestNg, SecurityUIExtensionBrandColorTest003, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = CreateSecurityUEC();
+    ASSERT_NE(pattern, nullptr);
+    ValidSessionWrapper(pattern);
+    auto result = pattern->OnThemeScopeUpdate(888);
+    EXPECT_TRUE(result);
+#endif
+}
+
+/**
+ * @tc.name: SecurityUIExtensionBrandColorTest004
+ * @tc.desc: Test OnThemeScopeUpdate with null sessionWrapper still returns true
+ * @tc.type: FUNC
+ */
+HWTEST_F(SecurityUIExtensionComponentTestNg, SecurityUIExtensionBrandColorTest004, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = CreateSecurityUEC();
+    ASSERT_NE(pattern, nullptr);
+    pattern->sessionWrapper_ = nullptr;
+    auto result = pattern->OnThemeScopeUpdate(888);
+    EXPECT_TRUE(result);
+#endif
+}
+
+/**
+ * @tc.name: SecurityUIExtensionBrandColorTest005
+ * @tc.desc: Test brandColorStr_ is empty by default
+ * @tc.type: FUNC
+ */
+HWTEST_F(SecurityUIExtensionComponentTestNg, SecurityUIExtensionBrandColorTest005, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = CreateSecurityUEC();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_TRUE(pattern->brandColorStr_.empty());
+#endif
+}
+
 } //namespace OHOS::Ace::NG

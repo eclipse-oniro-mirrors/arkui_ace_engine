@@ -20,6 +20,7 @@
 #include "constants.h"
 #include "utils.h"
 #include "ace_forward_compatibility.h"
+#include "ui/properties/color.h"
 
 #ifdef UICAST_COMPONENT_SUPPORTED
 #include "interfaces/inner_api/ace/uicast/uicast_subscriber.h"
@@ -251,5 +252,14 @@ bool UIContent::SetUICorrectionConfig(const std::string& configStr)
 const std::string& UIContent::GetUICorrectionConfig()
 {
     return UIContent::uiCorrectionConfigJson_;
+}
+
+bool UIContent::IsBrandColorValid(const std::string& brandColorStr)
+{
+    if (brandColorStr.empty()) {
+        return false;
+    }
+    auto color = Color::FromString(brandColorStr);
+    return color.GetAlpha() != 0;
 }
 } // namespace OHOS::Ace

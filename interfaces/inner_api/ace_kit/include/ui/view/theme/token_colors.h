@@ -183,11 +183,21 @@ public:
     {
         colorMode_ = colorMode;
     }
+
+    void SetThemeId(int32_t themeId)
+    {
+        themeId_ = themeId;
+    }
+
 private:
     Color GetColorWithResourceObject(int32_t colorIndex) const;
+    // Returns instance brand color if strategy is FOLLOW_UEC and brand is not user-set.
+    // opacity < 0 returns full color; otherwise returns BlendOpacity(opacity).
+    std::optional<Color> GetInstanceBrandColorOverride(double opacity = -1.0) const;
     std::vector<Color> colors_ = std::vector<Color>(TokenColors::TOTAL_NUMBER);
     std::vector<RefPtr<ResourceObject>> resObjs_;
     ColorMode colorMode_ = ColorMode::COLOR_MODE_UNDEFINED;
+    int32_t themeId_ = 0;
 };
 
 } // namespace OHOS::Ace::NG
