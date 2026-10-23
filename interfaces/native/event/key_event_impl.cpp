@@ -32,6 +32,7 @@ extern "C" {
 
 ArkUI_KeyEventType OH_ArkUI_KeyEvent_GetType(const ArkUI_UIInputEvent *event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_KeyEvent_GetType");
     CheckSupportedScenarioAndResetEventStatus(S_ALL_C_KEY_EVENT, event);
     if (!event) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_GetType", "event is null");
@@ -56,6 +57,7 @@ ArkUI_KeyEventType OH_ArkUI_KeyEvent_GetType(const ArkUI_UIInputEvent *event)
 
 int32_t OH_ArkUI_KeyEvent_GetKeyCode(const ArkUI_UIInputEvent *event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_KeyEvent_GetKeyCode");
     CheckSupportedScenarioAndResetEventStatus(S_ALL_C_KEY_EVENT, event);
     if (!event) {
         RETURN_RET_WITH_STATUS_CHECK(-1, ARKUI_ERROR_CODE_PARAM_INVALID);
@@ -78,6 +80,7 @@ int32_t OH_ArkUI_KeyEvent_GetKeyCode(const ArkUI_UIInputEvent *event)
 
 const char* OH_ArkUI_KeyEvent_GetKeyText(const ArkUI_UIInputEvent *event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_KeyEvent_GetKeyText");
     CheckSupportedScenarioAndResetEventStatus(S_ALL_C_KEY_EVENT, event);
     if (!event) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_GetKeyText", "event is null");
@@ -101,6 +104,7 @@ const char* OH_ArkUI_KeyEvent_GetKeyText(const ArkUI_UIInputEvent *event)
 
 ArkUI_KeySourceType OH_ArkUI_KeyEvent_GetKeySource(const ArkUI_UIInputEvent *event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_KeyEvent_GetKeySource");
     CheckSupportedScenarioAndResetEventStatus(S_ALL_C_KEY_EVENT, event);
     if (!event) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_GetKeySource", "event is null");
@@ -125,6 +129,7 @@ ArkUI_KeySourceType OH_ArkUI_KeyEvent_GetKeySource(const ArkUI_UIInputEvent *eve
 
 void OH_ArkUI_KeyEvent_StopPropagation(const ArkUI_UIInputEvent *event, bool stopPropagation)
 {
+    CHECK_UI_THREAD("OH_ArkUI_KeyEvent_StopPropagation");
     CheckSupportedScenarioAndResetEventStatus(S_ALL_C_KEY_EVENT, event);
     if (!event) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_StopPropagation", "event is null");
@@ -150,6 +155,7 @@ void OH_ArkUI_KeyEvent_StopPropagation(const ArkUI_UIInputEvent *event, bool sto
 
 ArkUI_KeyIntension OH_ArkUI_KeyEvent_GetKeyIntensionCode(const ArkUI_UIInputEvent *event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_KeyEvent_GetKeyIntensionCode");
     CheckSupportedScenarioAndResetEventStatus(S_ALL_C_KEY_EVENT, event);
     if (!event) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_GetKeyIntensionCode", "event is null");
@@ -175,6 +181,7 @@ ArkUI_KeyIntension OH_ArkUI_KeyEvent_GetKeyIntensionCode(const ArkUI_UIInputEven
 
 uint32_t OH_ArkUI_KeyEvent_GetUnicode(const ArkUI_UIInputEvent *event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_KeyEvent_GetUnicode");
     CheckSupportedScenarioAndResetEventStatus(S_ALL_C_KEY_EVENT, event);
     if (!event) {
         RETURN_RET_WITH_STATUS_CHECK(0, ARKUI_ERROR_CODE_PARAM_INVALID);
@@ -197,6 +204,7 @@ uint32_t OH_ArkUI_KeyEvent_GetUnicode(const ArkUI_UIInputEvent *event)
 
 void OH_ArkUI_KeyEvent_SetConsumed(const ArkUI_UIInputEvent *event, bool isConsumed)
 {
+    CHECK_UI_THREAD("OH_ArkUI_KeyEvent_SetConsumed");
     CheckSupportedScenarioAndResetEventStatus(S_NODE_ON_KEY_EVENT, event);
     if (!event) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetConsumed", "event is null");
@@ -221,6 +229,7 @@ void OH_ArkUI_KeyEvent_SetConsumed(const ArkUI_UIInputEvent *event, bool isConsu
 
 void OH_ArkUI_KeyEvent_Dispatch(ArkUI_NodeHandle node, const ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_KeyEvent_Dispatch");
     CheckSupportedScenarioAndResetEventStatus(S_ALL_C_KEY_EVENT, event);
     if (!node) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_Dispatch", "node is null");
@@ -251,6 +260,7 @@ void OH_ArkUI_KeyEvent_Dispatch(ArkUI_NodeHandle node, const ArkUI_UIInputEvent*
 
 ArkUI_ErrorCode OH_ArkUI_KeyEvent_IsNumLockOn(const ArkUI_UIInputEvent* event, bool* state)
 {
+    CHECK_UI_THREAD("OH_ArkUI_KeyEvent_IsNumLockOn");
     CheckSupportedScenarioAndResetEventStatus(S_ALL_C_KEY_EVENT, event);
     if (!event) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_IsNumLockOn", "event is null");
@@ -279,6 +289,7 @@ ArkUI_ErrorCode OH_ArkUI_KeyEvent_IsNumLockOn(const ArkUI_UIInputEvent* event, b
 
 ArkUI_ErrorCode OH_ArkUI_KeyEvent_IsCapsLockOn(const ArkUI_UIInputEvent* event, bool* state)
 {
+    CHECK_UI_THREAD("OH_ArkUI_KeyEvent_IsCapsLockOn");
     CheckSupportedScenarioAndResetEventStatus(S_ALL_C_KEY_EVENT, event);
     if (!event) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_IsCapsLockOn", "event is null");
@@ -307,6 +318,7 @@ ArkUI_ErrorCode OH_ArkUI_KeyEvent_IsCapsLockOn(const ArkUI_UIInputEvent* event, 
 
 ArkUI_ErrorCode OH_ArkUI_KeyEvent_IsScrollLockOn(const ArkUI_UIInputEvent* event, bool* state)
 {
+    CHECK_UI_THREAD("OH_ArkUI_KeyEvent_IsScrollLockOn");
     CheckSupportedScenarioAndResetEventStatus(S_ALL_C_KEY_EVENT, event);
     if (!event) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_IsScrollLockOn", "event is null");

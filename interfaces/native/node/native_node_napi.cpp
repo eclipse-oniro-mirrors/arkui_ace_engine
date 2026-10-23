@@ -759,6 +759,7 @@ int32_t OH_ArkUI_PostIdleCallback(ArkUI_ContextHandle uiContext, void* userData,
 ArkUI_ErrorCode OH_ArkUI_EnableEventPassthrough(ArkUI_ContextHandle uiContext, bool enabled,
     ArkUI_RawInputEventType type)
 {
+    CHECK_UI_THREAD("OH_ArkUI_EnableEventPassthrough");
     CHECK_NULL_RETURN(uiContext, ARKUI_ERROR_CODE_PARAM_INVALID);
     auto* fullImpl = OHOS::Ace::NodeModel::GetFullImpl();
     CHECK_NULL_RETURN(fullImpl, ARKUI_ERROR_CODE_CAPI_INIT_ERROR);
