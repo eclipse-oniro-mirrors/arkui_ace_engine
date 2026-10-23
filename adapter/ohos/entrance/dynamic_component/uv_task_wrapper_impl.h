@@ -39,6 +39,8 @@ public:
     void Call(const TaskExecutor::Task& task, uint32_t delayTime,
         PriorityType priorityType = PriorityType::LOW) override;
     static void CallInWorker(const TaskExecutor::Task& task, uint32_t delayTime, napi_env env);
+    // Post the task to the thread that owns the env, since napi calls on the env must run on that thread.
+    static void PostTaskToWorker(napi_env env, const TaskExecutor::Task& task);
 
 private:
     pthread_t threadId_ = 0;
