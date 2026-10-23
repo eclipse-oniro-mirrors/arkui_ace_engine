@@ -14,6 +14,8 @@
  */
 
 #include "text_input_base.h"
+#include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
+#include "core/common/statistic_event_reporter.h"
 namespace OHOS::Ace::NG {
 
 class TextFieldPatternOnWillTest : public TextInputBases {
@@ -570,6 +572,291 @@ HWTEST_F(TextFieldPatternOnWillTest, UpdateObscure005, TestSize.Level1)
     pattern_->UpdateObscure(u"aa", true);
 
     EXPECT_EQ(pattern_->obscureHelper_.nakedCharPosition_, -1);
+}
+
+/**
+ * @tc.name: reportOnDidInsertEvent001
+ * @tc.desc: Test reportOnDidInsertEvent with null host and null statistic reporter
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternOnWillTest, reportOnDidInsertEvent001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create a standalone pattern without host node
+     */
+    auto standalone = AceType::MakeRefPtr<TextFieldPattern>();
+    ASSERT_NE(standalone, nullptr);
+    standalone->reportOnDidInsertEvent();
+
+    /**
+     * @tc.steps: step2. Create TextField and remove statistic reporter temporarily
+     */
+    CreateTextField();
+    ASSERT_NE(pattern_, nullptr);
+    auto pipeline = MockPipelineContext::GetCurrent();
+    ASSERT_NE(pipeline, nullptr);
+    auto backupReporter = pipeline->GetStatisticEventReporter();
+    pipeline->statisticEventReporter_ = nullptr;
+    pattern_->reportOnDidInsertEvent();
+    pipeline->statisticEventReporter_ = backupReporter;
+    SUCCEED();
+}
+
+/**
+ * @tc.name: reportOnDidInsertEvent002
+ * @tc.desc: Test reportOnDidInsertEvent with callback but not search field tag
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternOnWillTest, reportOnDidInsertEvent002, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create TextField with onDidInsert callback and inject a statistic reporter
+     */
+    CreateTextField("", "", [](TextFieldModelNG model) {
+        model.SetOnDidInsertValueEvent([](const InsertValueInfo& info) {});
+    });
+    ASSERT_NE(pattern_, nullptr);
+    auto pipeline = MockPipelineContext::GetCurrent();
+    ASSERT_NE(pipeline, nullptr);
+    auto backupReporter = pipeline->GetStatisticEventReporter();
+    pipeline->statisticEventReporter_ = std::make_shared<StatisticEventReporter>();
+    auto reporter = pipeline->GetStatisticEventReporter();
+    ASSERT_NE(reporter, nullptr);
+
+    /**
+     * @tc.steps: step2. Call reportOnDidInsertEvent
+     * @tc.expected: No search event should be reported for non search field tag
+     */
+    pattern_->reportOnDidInsertEvent();
+    EXPECT_TRUE(reporter->statisitcEventMap_.find(StatisticEventType::SEARCH_ONDIDINSERT) ==
+                reporter->statisitcEventMap_.end());
+    pipeline->statisticEventReporter_ = backupReporter;
+}
+
+/**
+ * @tc.name: reportOnDidInsertEvent003
+ * @tc.desc: Test reportOnDidInsertEvent with callback and search field tag
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternOnWillTest, reportOnDidInsertEvent003, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create a search field with onDidInsert callback and inject a statistic reporter
+     */
+    auto searchFieldNode = FrameNode::GetOrCreateFrameNode("SearchField",
+        ElementRegister::GetInstance()->MakeUniqueId(), []() { return AceType::MakeRefPtr<TextFieldPattern>(); });
+    ASSERT_NE(searchFieldNode, nullptr);
+    auto pattern = searchFieldNode->GetPattern<TextFieldPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto eventHub = searchFieldNode->GetEventHub<TextFieldEventHub>();
+    ASSERT_NE(eventHub, nullptr);
+    eventHub->SetOnDidInsertValueEvent([](const InsertValueInfo& info) {});
+    auto pipeline = MockPipelineContext::GetCurrent();
+    ASSERT_NE(pipeline, nullptr);
+    auto backupReporter = pipeline->GetStatisticEventReporter();
+    pipeline->statisticEventReporter_ = std::make_shared<StatisticEventReporter>();
+    auto reporter = pipeline->GetStatisticEventReporter();
+    ASSERT_NE(reporter, nullptr);
+
+    /**
+     * @tc.steps: step2. Call reportOnDidInsertEvent
+     * @tc.expected: Search onDidInsert statistic event should be reported
+     */
+    pattern->reportOnDidInsertEvent();
+    auto iter = reporter->statisitcEventMap_.find(StatisticEventType::SEARCH_ONDIDINSERT);
+    ASSERT_TRUE(iter != reporter->statisitcEventMap_.end());
+    EXPECT_EQ(iter->second.eventCount, 1);
+    pipeline->statisticEventReporter_ = backupReporter;
+}
+
+/**
+ * @tc.name: reportOnWillDeleteEvent001
+ * @tc.desc: Test reportOnWillDeleteEvent with null host and null statistic reporter
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternOnWillTest, reportOnWillDeleteEvent001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create a standalone pattern without host node
+     */
+    auto standalone = AceType::MakeRefPtr<TextFieldPattern>();
+    ASSERT_NE(standalone, nullptr);
+    standalone->reportOnWillDeleteEvent();
+
+    /**
+     * @tc.steps: step2. Create TextField and remove statistic reporter temporarily
+     */
+    CreateTextField();
+    ASSERT_NE(pattern_, nullptr);
+    auto pipeline = MockPipelineContext::GetCurrent();
+    ASSERT_NE(pipeline, nullptr);
+    auto backupReporter = pipeline->GetStatisticEventReporter();
+    pipeline->statisticEventReporter_ = nullptr;
+    pattern_->reportOnWillDeleteEvent();
+    pipeline->statisticEventReporter_ = backupReporter;
+    SUCCEED();
+}
+
+/**
+ * @tc.name: reportOnWillDeleteEvent002
+ * @tc.desc: Test reportOnWillDeleteEvent with callback but not search field tag
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternOnWillTest, reportOnWillDeleteEvent002, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create TextField with onWillDelete callback and inject a statistic reporter
+     */
+    CreateTextField("", "", [](TextFieldModelNG model) {
+        model.SetOnWillDeleteEvent([](const DeleteValueInfo& info) { return true; });
+    });
+    ASSERT_NE(pattern_, nullptr);
+    auto pipeline = MockPipelineContext::GetCurrent();
+    ASSERT_NE(pipeline, nullptr);
+    auto backupReporter = pipeline->GetStatisticEventReporter();
+    pipeline->statisticEventReporter_ = std::make_shared<StatisticEventReporter>();
+    auto reporter = pipeline->GetStatisticEventReporter();
+    ASSERT_NE(reporter, nullptr);
+
+    /**
+     * @tc.steps: step2. Call reportOnWillDeleteEvent
+     * @tc.expected: No search event should be reported for non search field tag
+     */
+    pattern_->reportOnWillDeleteEvent();
+    EXPECT_TRUE(reporter->statisitcEventMap_.find(StatisticEventType::SEARCH_ONWILLDELETE) ==
+                reporter->statisitcEventMap_.end());
+    pipeline->statisticEventReporter_ = backupReporter;
+}
+
+/**
+ * @tc.name: reportOnWillDeleteEvent003
+ * @tc.desc: Test reportOnWillDeleteEvent with callback and search field tag
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternOnWillTest, reportOnWillDeleteEvent003, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create a search field with onWillDelete callback and inject a statistic reporter
+     */
+    auto searchFieldNode = FrameNode::GetOrCreateFrameNode("SearchField",
+        ElementRegister::GetInstance()->MakeUniqueId(), []() { return AceType::MakeRefPtr<TextFieldPattern>(); });
+    ASSERT_NE(searchFieldNode, nullptr);
+    auto pattern = searchFieldNode->GetPattern<TextFieldPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto eventHub = searchFieldNode->GetEventHub<TextFieldEventHub>();
+    ASSERT_NE(eventHub, nullptr);
+    eventHub->SetOnWillDeleteEvent([](const DeleteValueInfo& info) { return true; });
+    auto pipeline = MockPipelineContext::GetCurrent();
+    ASSERT_NE(pipeline, nullptr);
+    auto backupReporter = pipeline->GetStatisticEventReporter();
+    pipeline->statisticEventReporter_ = std::make_shared<StatisticEventReporter>();
+    auto reporter = pipeline->GetStatisticEventReporter();
+    ASSERT_NE(reporter, nullptr);
+
+    /**
+     * @tc.steps: step2. Call reportOnWillDeleteEvent
+     * @tc.expected: Search onWillDelete statistic event should be reported
+     */
+    pattern->reportOnWillDeleteEvent();
+    auto iter = reporter->statisitcEventMap_.find(StatisticEventType::SEARCH_ONWILLDELETE);
+    ASSERT_TRUE(iter != reporter->statisitcEventMap_.end());
+    EXPECT_EQ(iter->second.eventCount, 1);
+    pipeline->statisticEventReporter_ = backupReporter;
+}
+
+/**
+ * @tc.name: reportOnDidDeleteEvent001
+ * @tc.desc: Test reportOnDidDeleteEvent with null host and null statistic reporter
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternOnWillTest, reportOnDidDeleteEvent001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create a standalone pattern without host node
+     */
+    auto standalone = AceType::MakeRefPtr<TextFieldPattern>();
+    ASSERT_NE(standalone, nullptr);
+    standalone->reportOnDidDeleteEvent();
+
+    /**
+     * @tc.steps: step2. Create TextField and remove statistic reporter temporarily
+     */
+    CreateTextField();
+    ASSERT_NE(pattern_, nullptr);
+    auto pipeline = MockPipelineContext::GetCurrent();
+    ASSERT_NE(pipeline, nullptr);
+    auto backupReporter = pipeline->GetStatisticEventReporter();
+    pipeline->statisticEventReporter_ = nullptr;
+    pattern_->reportOnDidDeleteEvent();
+    pipeline->statisticEventReporter_ = backupReporter;
+    SUCCEED();
+}
+
+/**
+ * @tc.name: reportOnDidDeleteEvent002
+ * @tc.desc: Test reportOnDidDeleteEvent with callback but not search field tag
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternOnWillTest, reportOnDidDeleteEvent002, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create TextField with onDidDelete callback and inject a statistic reporter
+     */
+    CreateTextField("", "", [](TextFieldModelNG model) {
+        model.SetOnDidDeleteEvent([](const DeleteValueInfo& info) {});
+    });
+    ASSERT_NE(pattern_, nullptr);
+    auto pipeline = MockPipelineContext::GetCurrent();
+    ASSERT_NE(pipeline, nullptr);
+    auto backupReporter = pipeline->GetStatisticEventReporter();
+    pipeline->statisticEventReporter_ = std::make_shared<StatisticEventReporter>();
+    auto reporter = pipeline->GetStatisticEventReporter();
+    ASSERT_NE(reporter, nullptr);
+
+    /**
+     * @tc.steps: step2. Call reportOnDidDeleteEvent
+     * @tc.expected: No search event should be reported for non search field tag
+     */
+    pattern_->reportOnDidDeleteEvent();
+    EXPECT_TRUE(reporter->statisitcEventMap_.find(StatisticEventType::SEARCH_ONDIDDELETE) ==
+                reporter->statisitcEventMap_.end());
+    pipeline->statisticEventReporter_ = backupReporter;
+}
+
+/**
+ * @tc.name: reportOnDidDeleteEvent003
+ * @tc.desc: Test reportOnDidDeleteEvent with callback and search field tag
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternOnWillTest, reportOnDidDeleteEvent003, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create a search field with onDidDelete callback and inject a statistic reporter
+     */
+    auto searchFieldNode = FrameNode::GetOrCreateFrameNode("SearchField",
+        ElementRegister::GetInstance()->MakeUniqueId(), []() { return AceType::MakeRefPtr<TextFieldPattern>(); });
+    ASSERT_NE(searchFieldNode, nullptr);
+    auto pattern = searchFieldNode->GetPattern<TextFieldPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto eventHub = searchFieldNode->GetEventHub<TextFieldEventHub>();
+    ASSERT_NE(eventHub, nullptr);
+    eventHub->SetOnDidDeleteEvent([](const DeleteValueInfo& info) {});
+    auto pipeline = MockPipelineContext::GetCurrent();
+    ASSERT_NE(pipeline, nullptr);
+    auto backupReporter = pipeline->GetStatisticEventReporter();
+    pipeline->statisticEventReporter_ = std::make_shared<StatisticEventReporter>();
+    auto reporter = pipeline->GetStatisticEventReporter();
+    ASSERT_NE(reporter, nullptr);
+
+    /**
+     * @tc.steps: step2. Call reportOnDidDeleteEvent
+     * @tc.expected: Search onDidDelete statistic event should be reported
+     */
+    pattern->reportOnDidDeleteEvent();
+    auto iter = reporter->statisitcEventMap_.find(StatisticEventType::SEARCH_ONDIDDELETE);
+    ASSERT_TRUE(iter != reporter->statisitcEventMap_.end());
+    EXPECT_EQ(iter->second.eventCount, 1);
+    pipeline->statisticEventReporter_ = backupReporter;
 }
 
 } // namespace OHOS::Ace::NG
