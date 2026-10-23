@@ -1881,7 +1881,6 @@ private:
     bool scrollbarLayoutPolicyChanged_ = false;
     bool isLanguageRtl_ = false;
     bool isEscKeyDownConsumed_ = false;
-    bool isEscKeyFromOverlayOrFullScreen_ = false;
 
 protected:
     OnCreateMenuCallback onCreateMenuCallback_;
