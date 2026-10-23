@@ -303,6 +303,8 @@ public:
 
     void DumpInfo() override;
     void DumpInfo(std::unique_ptr<JsonValue>& json) override;
+
+    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config) override;
     void DumpAdvanceInfo() override;
     void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json) override;
     void GetEventDumpInfo() override;
@@ -316,10 +318,10 @@ public:
     void PrintGridMatrix();
     void PrintLineHeightMap();
     void PrintIrregularItemsPosition();
-    void BuildGridStateInfo(std::unique_ptr<JsonValue>& json);
-    void BuildGridOffsetInfo(std::unique_ptr<JsonValue>& json);
-    void BuildGridIndexInfo(std::unique_ptr<JsonValue>& json);
-    void BuildGridLayoutPropertyInfo(std::unique_ptr<JsonValue>& json);
+    void BuildGridStateInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config = ParamConfig());
+    void BuildGridOffsetInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config = ParamConfig());
+    void BuildGridIndexInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config = ParamConfig());
+    void BuildGridLayoutPropertyInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config = ParamConfig());
     void BuildGridLayoutInfo(std::unique_ptr<JsonValue>& json);
     void BuildScrollAlignInfo(std::unique_ptr<JsonValue>& json);
     void DumpSimplifyInfo(std::shared_ptr<JsonValue>& json) override;
@@ -402,6 +404,12 @@ public:
         int32_t endLine) const;
 
 private:
+    void DumpAdvanceGridInteractionInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
+    void DumpAdvanceGridSizeInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
+    void DumpAdvanceGridTemplateInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
     // Coordinate origins sampled with snapItemGeometryCache_ during the last layout.
     float snapGeometryEstimatedOffset_ = 0.0f;
     float snapGeometryStableOffset_ = 0.0f;
@@ -456,6 +464,7 @@ private:
     inline bool UseIrregularLayout() const;
 
     std::string GetIrregularIndexesString() const;
+    std::string GetIrregularIndexesString(const ParamConfig& config) const;
     float GetOffsetWithLimit(float offset) const override;
 
     std::string GetLayoutMode() const;

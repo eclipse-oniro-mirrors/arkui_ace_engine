@@ -19,6 +19,7 @@
 
 #include "base/log/dump_log.h"
 #include "base/utils/utils.h"
+#include "interfaces/inner_api/ui_session/param_config.h"
 
 namespace OHOS::Ace::NG {
 void LazyGridLayoutInfo::EstimateItemSize()
@@ -376,6 +377,23 @@ bool LazyGridLayoutInfo::NeedPredict() const
         (LessNotEqual(layoutedEnd_, cacheEndPos_) && layoutedEndIndex_ < totalItemCount_ - 1));
 }
 
+void LazyGridLayoutInfo::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if (!config.IsPublicTree()) {
+        json->Put("itemStartIndex", startIndex_);
+        json->Put("itemEndIndex", endIndex_);
+        json->Put("itemTotalCount", totalItemCount_);
+    }
+    if (!config.IsPublicTree() || config.visualProperties) {
+        json->Put("headerMainSize", headerMainSize_);
+        json->Put("footerMainSize", footerMainSize_);
+        json->Put("spaceWidth", spaceWidth_);
+    }
+    if (!config.IsPublicTree()) {
+        json->Put("totalMainSize", totalMainSize_);
+    }
+}
+
 void LazyGridLayoutInfo::DumpAdvanceInfo()
 {
     DumpLog::GetInstance().AddDesc("itemStartIndex:" + std::to_string(startIndex_));
@@ -389,12 +407,6 @@ void LazyGridLayoutInfo::DumpAdvanceInfo()
 
 void LazyGridLayoutInfo::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json)
 {
-    json->Put("itemStartIndex", startIndex_);
-    json->Put("itemEndIndex", endIndex_);
-    json->Put("itemTotalCount", totalItemCount_);
-    json->Put("headerMainSize", headerMainSize_);
-    json->Put("footerMainSize", footerMainSize_);
-    json->Put("spaceWidth", spaceWidth_);
-    json->Put("totalMainSize", totalMainSize_);
+    LazyGridLayoutInfo::DumpAdvanceInfo(json, ParamConfig());
 }
 } // namespace OHOS::Ace::NG

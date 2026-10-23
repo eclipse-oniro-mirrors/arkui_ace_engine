@@ -367,6 +367,8 @@ public:
 
     void GetScrollPagingStatusDumpInfo();
     void GetScrollPagingStatusDumpInfo(std::unique_ptr<JsonValue>& json);
+
+    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config) override;
     void DumpAdvanceInfo() override;
     void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json) override;
     void DumpSimplifyInfo(std::shared_ptr<JsonValue>& json) override;
@@ -421,6 +423,9 @@ protected:
     bool OnKeyEvent(const KeyEvent& event);
 
 private:
+    void DumpAdvanceSnapInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+    void DumpAdvanceHistoryInfo(std::unique_ptr<JsonValue>& json);
+
     void OnModifyDone() override;
     bool OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, const DirtySwapConfig& config) override;
 

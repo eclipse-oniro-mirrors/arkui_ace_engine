@@ -914,6 +914,8 @@ public:
     RefPtr<FrameNode> GetFirstFrameNodeOfBuilder() const;
     void GetBuilderInitHeight();
     void ChangeSheetPage(float height);
+
+    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config) override;
     void DumpAdvanceInfo() override;
     void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json) override;
 
@@ -1216,6 +1218,9 @@ protected:
     void OnDetachFromFrameNode(FrameNode* sheetNode) override;
 
 private:
+    void DumpAdvanceGeometryInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+    void DumpAdvanceStyleInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
     enum class SheetCmdType { CMD_UNKNOWN, CMD_SLIDE, CMD_CLOSE };
     int32_t ParseCommand(const std::string& command, SheetCmdType& cmdType);
     void HandleBindSheetEvent(SheetCmdType& cmdType);

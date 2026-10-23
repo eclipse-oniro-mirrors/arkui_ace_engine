@@ -410,6 +410,8 @@ public:
     std::string ProvideRestoreInfo() override;
     void OnRestoreInfo(const std::string& restoreInfo) override;
     void DumpInfo() override;
+
+    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config) override;
     void DumpAdvanceInfo() override;
     void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json) override;
     void GetEventDumpInfo() override;
@@ -655,6 +657,12 @@ protected:
     bool isStackFromEnd_ = true;
     FocusWrapMode focusWrapMode_ = FocusWrapMode::DEFAULT;
 private:
+    void DumpAdvanceListConfiguration(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
+    void DumpAdvanceDiagnostics(std::unique_ptr<JsonValue>& json);
+    void DumpAdvanceVisualProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+    void DumpAdvanceFunctionalProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
     const ListFastScrollPreparation* GetFastScrollPreparation() const
     {
         return fastScrollPreparation_.get();

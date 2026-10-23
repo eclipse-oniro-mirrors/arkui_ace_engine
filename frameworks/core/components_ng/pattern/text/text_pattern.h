@@ -151,6 +151,8 @@ public:
     void SetSpanItemEvent(const RefPtr<SpanItem>& spanItem, RefPtr<FocusHub>& focusHub);
     void AddImageToSpanItem(const RefPtr<UINode>& child);
     FocusPattern GetFocusPattern() const override;
+
+    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config) override;
     void DumpAdvanceInfo() override;
     void DumpInfo() override;
     void DumpSimplifyInfo(std::shared_ptr<JsonValue>& json) override;
@@ -730,6 +732,9 @@ protected:
     void ClearSelectionChild();
 
 private:
+    void DumpAdvanceParagraphInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+    void DumpAdvanceFontInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
     void ReportSelectionChangeEvent(int32_t nodeId, const std::string& dataStr,
         const std::string& value, int32_t start, int32_t end);
     bool ReportCommandResult(int32_t nodeId, const std::string& event);

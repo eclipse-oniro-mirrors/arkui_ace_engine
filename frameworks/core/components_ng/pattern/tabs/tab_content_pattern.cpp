@@ -84,4 +84,28 @@ void TabContentPattern::OnModifyDone()
     tabItemNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
 }
 
+void TabContentPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json)
+{
+    TabContentPattern::DumpAdvanceInfo(json, ParamConfig());
+}
+
+void TabContentPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if (!config.IsPublicTree() || config.visualProperties) {
+        switch (selectedMode_) {
+            case SelectedMode::INDICATOR: {
+                json->Put("SelectedMode", "INDICATOR");
+                break;
+            }
+            case SelectedMode::BOARD: {
+                json->Put("SelectedMode", "BOARD");
+                break;
+            }
+            default: {
+                break;
+            }
+        }
+    }
+}
+
 } // namespace OHOS::Ace::NG

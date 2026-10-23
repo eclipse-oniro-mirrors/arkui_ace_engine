@@ -180,6 +180,8 @@ public:
     void OnSectionChanged(int32_t start);
 
     void DumpInfo() override;
+
+    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config) override;
     void DumpAdvanceInfo() override;
     void GetEventDumpInfo() override;
     void GetEventDumpInfo(std::unique_ptr<JsonValue>& json) override;
@@ -265,6 +267,11 @@ public:
 
     int32_t GetFirstIndex() const override;
 private:
+    void DumpAdvanceVisualProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+    void DumpAdvanceFunctionalProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
+    void DumpAdvanceLayoutProperties(JsonValue& json);
+
     DisplayMode GetDefaultScrollBarDisplayMode() const override
     {
         return DisplayMode::OFF;

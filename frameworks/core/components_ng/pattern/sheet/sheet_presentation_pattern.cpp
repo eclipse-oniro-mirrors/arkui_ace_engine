@@ -3267,6 +3267,67 @@ float SheetPresentationPattern::GetRootOffsetYToWindow()
     return parertOffset.GetY();
 }
 
+void SheetPresentationPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if (!config.IsPublicTree()) {
+        json->Put("TargetId", static_cast<int32_t>(targetId_));
+        json->Put("TargetTag", targetTag_.c_str());
+    }
+    if (!config.IsPublicTree() || config.visualProperties) {
+        auto children = JsonUtil::Create(true);
+        DumpAdvanceGeometryInfo(children, config);
+        json->Put("SheetPage Pattern", children);
+    }
+    if (!config.IsPublicTree()) {
+        json->Put("Height ScrollTo [KeyboardHeight > 0, and is scrolling]", -scrollHeight_);
+        json->Put("KeyboardHeight", static_cast<int32_t>(keyboardHeight_));
+        json->Put("is scrolling", isScrolling_);
+        json->Put("SheetHeightUp[sheet offset to move up when avoiding keyboard]", sheetHeightUp_);
+    }
+    DumpAdvanceStyleInfo(json, config);
+}
+
+void SheetPresentationPattern::DumpAdvanceGeometryInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    json->Put("SheetType", static_cast<int32_t>(GetSheetTypeNoProcess()));
+    json->Put("SheetPage Node Height", centerHeight_);
+    json->Put("Sheet Height [start from the bottom, KeyboardHeight = 0]", height_);
+    json->Put("SheetMaxHeight [start from the bottom, pageHeight - sheetTopSafeArea]", sheetMaxHeight_);
+    if (!config.IsPublicTree()) {
+        json->Put("Page Height", pageHeight_);
+        json->Put("StatusBar Height [current sheetType needed]", sheetTopSafeArea_);
+    }
+    json->Put("PopupSheet OffsetX", sheetOffsetX_);
+    json->Put(config.IsPublicTree() ? "PopupSheet OffsetY" : "PopupSheet OffsetX", sheetOffsetY_);
+    json->Put("SheetMaxWidth", sheetMaxWidth_);
+    json->Put("FitContent Height", sheetFitContentHeight_);
+    json->Put("SheetThemeType", sheetThemeType_.c_str());
+    json->Put("currentOffset", currentOffset_);
+}
+
+void SheetPresentationPattern::DumpAdvanceStyleInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    auto layoutProperty = GetLayoutProperty<SheetPresentationProperty>();
+    CHECK_NULL_VOID(layoutProperty);
+    auto sheetStyle = layoutProperty->GetSheetStyleValue(SheetStyle());
+    if (!config.IsPublicTree() || config.visualProperties) {
+        if (!config.IsPublicTree() || sheetStyle.sheetHeight.height.has_value()) {
+            json->Put("height",
+                sheetStyle.sheetHeight.height.has_value() ? sheetStyle.sheetHeight.height->ToString().c_str() : "None");
+        }
+        if (!config.IsPublicTree() || sheetStyle.sheetHeight.sheetMode.has_value()) {
+            json->Put("sheetMode",
+                sheetStyle.sheetHeight.sheetMode.has_value()
+                    ? std::to_string(static_cast<int32_t>(sheetStyle.sheetHeight.sheetMode.value())).c_str()
+                    : "None");
+        }
+    }
+    if (!config.IsPublicTree() || config.functionalProperties) {
+        json->Put("detents Size", static_cast<int32_t>(sheetStyle.detents.size()));
+        json->Put("IsShouldDismiss", shouldDismiss_ ? "true" : "false");
+    }
+}
+
 void SheetPresentationPattern::DumpAdvanceInfo()
 {
     DumpLog::GetInstance().AddDesc("------------------------------------------");
@@ -3587,38 +3648,7 @@ void SheetPresentationPattern::SetSheetOuterBorderWidth(
 
 void SheetPresentationPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json)
 {
-    json->Put("TargetId", static_cast<int32_t>(targetId_));
-    json->Put("TargetTag", targetTag_.c_str());
-    std::unique_ptr<JsonValue> children = JsonUtil::Create(true);
-    children->Put("SheetType", static_cast<int32_t>(GetSheetTypeNoProcess()));
-    children->Put("SheetPage Node Height", centerHeight_);
-    children->Put("Sheet Height [start from the bottom, KeyboardHeight = 0]", height_);
-    children->Put("SheetMaxHeight [start from the bottom, pageHeight - sheetTopSafeArea]", sheetMaxHeight_);
-    children->Put("Page Height", pageHeight_);
-    children->Put("StatusBar Height [current sheetType needed]", sheetTopSafeArea_);
-    children->Put("PopupSheet OffsetX", sheetOffsetX_);
-    children->Put("PopupSheet OffsetX", sheetOffsetY_);
-    children->Put("SheetMaxWidth", sheetMaxWidth_);
-    children->Put("FitContent Height", sheetFitContentHeight_);
-    children->Put("SheetThemeType", sheetThemeType_.c_str());
-    children->Put("currentOffset", currentOffset_);
-    json->Put("SheetPage Pattern", children);
-
-    json->Put("Height ScrollTo [KeyboardHeight > 0, and is scrolling]", -scrollHeight_);
-    json->Put("KeyboardHeight", static_cast<int32_t>(keyboardHeight_));
-    json->Put("is scrolling", isScrolling_);
-    json->Put("SheetHeightUp[sheet offset to move up when avoiding keyboard]", sheetHeightUp_);
-
-    auto layoutProperty = GetLayoutProperty<SheetPresentationProperty>();
-    CHECK_NULL_VOID(layoutProperty);
-    auto sheetStyle = layoutProperty->GetSheetStyleValue(SheetStyle());
-    json->Put("height", sheetStyle.sheetHeight.height.has_value() ?
-        sheetStyle.sheetHeight.height->ToString().c_str() : "None");
-    json->Put("sheetMode", sheetStyle.sheetHeight.sheetMode.has_value()
-                               ? std::to_string(static_cast<int32_t>(sheetStyle.sheetHeight.sheetMode.value())).c_str()
-                               : "None");
-    json->Put("detents Size", static_cast<int32_t>(sheetStyle.detents.size()));
-    json->Put("IsShouldDismiss", shouldDismiss_ ? "true" : "false");
+    SheetPresentationPattern::DumpAdvanceInfo(json, ParamConfig());
 }
 
 void SheetPresentationPattern::StopModifySheetTransition()

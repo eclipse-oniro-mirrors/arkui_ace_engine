@@ -1990,6 +1990,7 @@
       "OHOS::Ace::NG::Pattern::GetFocusPattern() const";
       "OHOS::Ace::NG::Pattern::GetResCacheMapByKey(std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>> const&)";
       "OHOS::Ace::NG::Pattern::GetScopeFocusAlgorithm()";
+      "OHOS::Ace::NG::Pattern::ShouldIncludeDiagnostic(OHOS::Ace::NG::InspectorDumpOptions const&)";
       "OHOS::Ace::NG::Pattern::OnColorModeChange(unsigned int)";
       "OHOS::Ace::NG::Pattern::RemoveResObj(std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>> const&)";
       "OHOS::Ace::NG::Pattern::UnRegisterResource(std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>> const&)";

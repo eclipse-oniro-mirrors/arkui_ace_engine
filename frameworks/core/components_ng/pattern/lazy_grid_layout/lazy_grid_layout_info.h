@@ -27,6 +27,10 @@
 
 #include "core/components_ng/pattern/lazy_layout/lazy_layout_offset.h"
 
+namespace OHOS::Ace {
+struct ParamConfig;
+}
+
 namespace OHOS::Ace::NG {
 
 class LazyGridLayoutAlgorithm;
@@ -49,6 +53,8 @@ public:
     void SetSpace(float space);
     void SetLanes(int32_t lanes);
     void SetTotalItemCount(int32_t count);
+
+    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
     void DumpAdvanceInfo();
     void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json);
 

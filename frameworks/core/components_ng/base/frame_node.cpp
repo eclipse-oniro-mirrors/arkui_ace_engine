@@ -1538,6 +1538,7 @@ void FrameNode::DumpSimplifyCommonInfoOnlyForParamConfig(std::shared_ptr<JsonVal
 {
     RefPtr<GestureEventHub> eventHub;
     if (eventHub_) {
+        // Legacy dumping creates the hub when absent; public collection only reads an existing hub.
         eventHub = config.collectionState ? eventHub_->GetGestureEventHub() : eventHub_->GetOrCreateGestureEventHub();
     }
     if (config.interactionInfo) {

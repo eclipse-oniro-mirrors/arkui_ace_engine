@@ -105,6 +105,8 @@ public:
      * @brief Forward gap between min(lane.endPos) and cacheEndPos_; signals Pattern to post a predict task.
      */
     bool NeedPredict() const;
+
+    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
     void DumpAdvanceInfo();
     void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json);
     void ResetLanes(int32_t laneCount, std::optional<float> laneBasePos);
