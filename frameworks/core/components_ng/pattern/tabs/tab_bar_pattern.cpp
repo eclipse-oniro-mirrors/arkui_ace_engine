@@ -18,6 +18,7 @@
 
 #include <optional>
 #include <string_view>
+#include "ui/base/utils/utils.h"
 
 #include "base/geometry/axis.h"
 #include "base/geometry/dimension.h"
@@ -1634,9 +1635,8 @@ void TabBarPattern::CloseDialog()
     dialogNode_.Reset();
 }
 
-void TabBarPattern::HandleClick(SourceType type, int32_t index)
+void TabBarPattern::DoHandleClick(const RefPtr<FrameNode>& host, int32_t index)
 {
-    auto host = GetHost();
     CHECK_NULL_VOID(host);
     auto layoutProperty = host->GetLayoutProperty<TabBarLayoutProperty>();
     CHECK_NULL_VOID(layoutProperty);
@@ -1674,6 +1674,36 @@ void TabBarPattern::HandleClick(SourceType type, int32_t index)
         return;
     }
     ClickTo(host, index);
+}
+
+bool TabBarPattern::IsTabBarClickIntercepted(const RefPtr<FrameNode>& host) const
+{
+    CHECK_NULL_RETURN(host, false);
+    auto tabsNode = AceType::DynamicCast<TabsNode>(host->GetParent());
+    CHECK_NULL_RETURN(tabsNode, false);
+    auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
+    CHECK_NULL_RETURN(tabsPattern, false);
+    return tabsPattern->GetTabBarClickIntercept();
+}
+
+void TabBarPattern::HandleClick(SourceType type, int32_t index)
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    if (IsTabBarClickIntercepted(host)) {
+        return;
+    }
+    DoHandleClick(host, index);
+}
+
+void TabBarPattern::TapToHandle(int32_t index, bool skipInterceptGuard)
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    if (!skipInterceptGuard && IsTabBarClickIntercepted(host)) {
+        return;
+    }
+    DoHandleClick(host, index);
 }
 
 void TabBarPattern::ClickTo(const RefPtr<FrameNode>& host, int32_t index)

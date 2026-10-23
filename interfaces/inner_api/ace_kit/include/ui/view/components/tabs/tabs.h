@@ -102,6 +102,8 @@ public:
     void SetBarBackgroundColor(const Color& backgroundColor, const RefPtr<ResourceObject>& resObj);
     void SetBarBackgroundEffect(const EffectOption& effectOption, const RefPtr<ResourceObject>& resObj);
     NG::TabBarDisplayMode GetBarDisplayMode() const;
+    void SetTabBarClickIntercept(bool active);
+    void TabBarClick(const int32_t index);
 };
 
 } // namespace OHOS::Ace::Kit
