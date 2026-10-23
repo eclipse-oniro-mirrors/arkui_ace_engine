@@ -204,8 +204,7 @@ void DynamicComponentRendererImpl::CreateIsolatedContent()
     CHECK_NULL_VOID(runtime_);
     auto napiEnv = reinterpret_cast<napi_env>(runtime_);
     CHECK_NULL_VOID(napiEnv);
-    auto uvTaskWrapper = std::make_shared<UVTaskWrapperImpl>(napiEnv);
-    uvTaskWrapper->Call([weak = WeakClaim(this)]() {
+    UVTaskWrapperImpl::PostTaskToWorker(napiEnv, [weak = WeakClaim(this)]() {
         auto renderer = weak.Upgrade();
         CHECK_NULL_VOID(renderer);
         renderer->InitUiContent(nullptr);
@@ -222,12 +221,12 @@ void DynamicComponentRendererImpl::CreateDynamicContent()
     CHECK_NULL_VOID(runtime_);
     auto napiEnv = reinterpret_cast<napi_env>(runtime_);
     CHECK_NULL_VOID(napiEnv);
-    auto uvTaskWrapper = std::make_shared<UVTaskWrapperImpl>(napiEnv);
-    uvTaskWrapper->Call([weak = WeakClaim(this), hostAbilityContext]() {
-        auto renderer = weak.Upgrade();
-        CHECK_NULL_VOID(renderer);
-        renderer->InitUiContent(hostAbilityContext.get());
-    });
+    UVTaskWrapperImpl::PostTaskToWorker(napiEnv,
+        [weak = WeakClaim(this), hostAbilityContext]() {
+            auto renderer = weak.Upgrade();
+            CHECK_NULL_VOID(renderer);
+            renderer->InitUiContent(hostAbilityContext.get());
+        });
 }
 
 RefPtr<SystemWindowScene> DynamicComponentRendererImpl::GetWindowScene()
