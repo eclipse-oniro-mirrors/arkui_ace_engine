@@ -2125,6 +2125,7 @@
       "OHOS::Ace::NG::SafeAreaManager::GetSafeAreaWithoutProcess() const";
       "OHOS::Ace::NG::SafeAreaManager::GetSystemSafeArea() const";
       "OHOS::Ace::NG::SafeAreaManager::GetWindowWrapperOffset()";
+      "OHOS::Ace::NG::SafeAreaManager::IsImmersiveStrategySet(OHOS::Ace::ImmersiveStrategy) const";
       "OHOS::Ace::NG::SafeAreaInsets::Inset::Combine(OHOS::Ace::NG::SafeAreaInsets::Inset const&) const";
       "OHOS::Ace::NG::ScaleProperty::CreateScaleProperty(OHOS::Ace::PipelineBase*)";
       "OHOS::Ace::NG::ScopedLayout::~ScopedLayout()";
