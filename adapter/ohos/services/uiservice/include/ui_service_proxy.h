@@ -30,7 +30,10 @@ public:
     void OnReturnRequest(const AAFwk::Want& want, const std::string& source, const std::string& data,
         const std::string& extraData) override;
 private:
-    static inline BrokerDelegator<UIServiceProxy> delegator_;
+    // Defined in ui_service_proxy.cpp. Do NOT make it `static inline`:
+    // an inline definition gets compiled into every .so that includes this
+    // header, causing duplicate BrokerDelegator registrations (ODR risk).
+    static BrokerDelegator<UIServiceProxy> delegator_;
 };
 }  // namespace Ace
 }  // namespace OHOS
