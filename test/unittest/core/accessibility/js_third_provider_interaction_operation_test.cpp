@@ -1523,4 +1523,35 @@ HWTEST_F(JsThirdProviderInteractionOperationTest, JsThirdProviderInteractionOper
         Accessibility::AccessibilityElementInfo::UNDEFINED_TREE_ID);
 }
 
+HWTEST_F(JsThirdProviderInteractionOperationTest, RemovedMountNoLongerHandsFocusToChildTree, TestSize.Level1)
+{
+    auto provider = AceType::MakeRefPtr<MockOhAccessibilityProvider>();
+    auto host = FrameNode::CreateFrameNode("host", 2081, AceType::MakeRefPtr<Pattern>(), true);
+    auto manager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
+    manager->SetPipelineContext(PipelineContext::GetCurrentContext());
+    auto operation = std::make_shared<Framework::JsThirdProviderInteractionOperation>(provider, manager, host);
+    operation->SetBelongTreeId(0);
+    provider->SendThirdAccessibilityProvider(operation);
+    const int64_t mountId = MAX_TEST_ELEMENT_COUNT - 1;
+    operation->SetChildTreeIdAndWinId(mountId, 5, 100);
+    Accessibility::AccessibilityElementInfo origin;
+    origin.SetAccessibilityId(0);
+    Accessibility::AccessibilityFocusMoveParam param;
+    param.direction = Accessibility::FocusMoveDirection::FIND_LAST;
+    MockAccessibilityElementOperatorCallback before;
+    operation->FocusMoveSearchWithCondition(origin, param, 1, before);
+    ASSERT_EQ(before.mockResult_.resultType,
+        Accessibility::FocusMoveResultType::DOUBLE_CHECK_CHILD_PROPERTY_AND_GET_LAST);
+    operation->RemoveChildTreeIdAndWinId(mountId);
+    MockAccessibilityElementOperatorCallback after;
+    operation->FocusMoveSearchWithCondition(origin, param, 2, after);
+    EXPECT_FALSE(operation->HasChildTree(mountId));
+    EXPECT_EQ(after.mockResult_.resultType, Accessibility::FocusMoveResultType::SEARCH_SUCCESS);
+    ASSERT_EQ(after.mockInfos_.size(), 1u);
+    EXPECT_LE(after.mockInfos_.front().GetChildTreeId(), 0);
+    operation->SetChildTreeIdAndWinId(mountId, 6, 101);
+    operation->SetChildTreeIdAndWinId(mountId, -1, 0);
+    EXPECT_FALSE(operation->HasChildTree(mountId));
+}
+
 } // namespace OHOS::Ace::NG

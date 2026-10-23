@@ -157,6 +157,9 @@ class JsAccessibilityManager : public AccessibilityNodeManager,
     public AccessibilityHoverManagerForThirdNG {
     DECLARE_ACE_TYPE(JsAccessibilityManager, AccessibilityNodeManager);
 
+private:
+    struct CmpRegistration;
+
 public:
     JsAccessibilityManager() = default;
     ~JsAccessibilityManager() override;
@@ -190,12 +193,14 @@ public:
     void UnbindExportTree(NG::FrameNode* owner, int64_t bindId);
     // Three-parameter convergence: CMP subtree registered (treeId obtained).
     void OnCmpTreeRegistered(NG::FrameNode* owner, int32_t treeId);
+    void OnCmpTreeDeregistered(NG::FrameNode* owner, int32_t treeId);
     // Register one converged binding to AAMS (parentTreeId=CMP treeId, parentElementId=bindId): migrate four-type.
     void RegisterCmpSubtreeToAams(const std::pair<int32_t, int64_t>& key);
     // Whole-subtree detach for one binding (Unbind semantics): deregister grandchild trees, deregister the exported.
     void DetachCmpBinding(const std::pair<int32_t, int64_t>& key);
     // Binding state transition: T_sub assigned (SetBelongTreeId continuation, UI thread).
-    void MarkCmpBindingRegistered(int32_t ownerId, int64_t bindId);
+    void MarkCmpBindingRegistered(const std::pair<int32_t, int64_t>& key,
+        const RefPtr<JsAccessibilityManager>& subAM, const std::shared_ptr<CmpRegistration>& registration);
     // CMP tree treeId query through the third-provider operator registered for this host.
     int32_t GetThirdProviderTreeIdForHost(NG::FrameNode* owner);
     // Migrate four-type child-tree callbacks that landed on the main AM before Bind.
@@ -249,7 +254,7 @@ public:
         WeakPtr<NG::FrameNode> exportedRoot;
         RefPtr<JsAccessibilityManager> subAM;
     };
-    std::optional<CmpBindingQueryResult> GetCmpBindingForHover(int64_t bindId);
+    std::optional<CmpBindingQueryResult> GetCmpBindingForHover(int32_t ownerNodeId, int64_t bindId);
     // Result layer of FocusMoveSearchWithConditionFromRoot: grandchild-tree drill-down / DOUBLE_CHECK handoff for a selected child-tree host.
     bool TryReplyChildTreeHandoffFromRoot(const AccessibilityElementInfo& nodeInfo,
         const Accessibility::AccessibilityFocusMoveParam& param, const RefPtr<PipelineBase>& context,
@@ -282,12 +287,13 @@ public:
     bool SnapshotRegisteringCmpBinding(const std::pair<int32_t, int64_t>& key,
         RefPtr<JsAccessibilityManager>& subAM, WeakPtr<NG::FrameNode>& exportedRootWeak,
         WeakPtr<NG::FrameNode>& ownerWeak, int32_t& cmpTreeId);
-    void UpdateCmpBindingWindowId(const std::pair<int32_t, int64_t>& key, uint32_t windowId);
+    bool CompleteCmpRegistration(const std::pair<int32_t, int64_t>& key,
+        const RefPtr<JsAccessibilityManager>& subAM, const std::shared_ptr<CmpRegistration>& registration, bool success);
     void WireSubAmAnchors(const RefPtr<JsAccessibilityManager>& subAM,
         const WeakPtr<NG::FrameNode>& exportedRootWeak, NG::FrameNode* owner,
         int32_t cmpTreeId, int64_t elementId, uint32_t windowId);
     // Diagnostic: ids of all REGISTERED bindId mounts (hover hit-test probe).
-    std::vector<int64_t> GetCmpBindingBindIdsForHover();
+    std::vector<int64_t> GetCmpBindingBindIdsForHover(int32_t ownerNodeId);
 
     // The exported root's window position (used to complete subtree-local rects).
     bool GetExportedRootWindowOffset(float& offsetX, float& offsetY);
@@ -388,6 +394,7 @@ public:
         pageMode_ = std::make_optional(pageMode);
     }
 
+    void CompensateCmpEventRect(AccessibilityEventInfo& eventInfo);
     bool SendAccessibilitySyncEvent(
         const AccessibilityEvent& accessibilityEvent, Accessibility::AccessibilityEventInfo eventInfo);
     bool TransferAccessibilityAsyncEvent(
@@ -596,6 +603,8 @@ public:
     void NotifyAccessibilityFocusDetachOrInvisible(const RefPtr<NG::FrameNode>& focusNode);
     bool SendRequestFocusToCandidate(const RefPtr<NG::FrameNode>& candidateNode);
     RefPtr<NG::FrameNode> FindCandidateByFocusMove(const RefPtr<NG::FrameNode>& focusNode, int32_t direction);
+    RefPtr<NG::FrameNode> FindDetachFocusCandidateFromRoot(
+        const RefPtr<NG::FrameNode>& focusNode, int32_t direction);
     bool IsDetachFocusCacheClearEvent(AccessibilityEventType eventType) const;
     void ClearDetachFocusFallbackCache(int32_t instanceId);
     void CacheDetachFocusFallbackCandidates(
@@ -603,11 +612,13 @@ public:
     struct DetachFocusFallbackData {
         int64_t focusNodeId = -1;
         std::vector<int64_t> candidateIds;
+        int32_t treeId = -1;
     };
     DetachFocusFallbackData GetAndClearDetachFocusFallbackCandidates(int32_t instanceId);
     std::vector<int64_t> QueryDetachFocusFallbackCandidates(
         const RefPtr<NG::FrameNode>& focusNode, const RefPtr<NG::PipelineContext>& context, size_t maxCount);
     void HandleDetachFocusFallbackCallback(int32_t instanceId);
+    AccessibilityEventInfo BuildDetachFocusFallbackEvent(const DetachFocusFallbackData& data, int32_t windowId);
     void SetFocusMoveResultWithNode(
         const WeakPtr<NG::FrameNode>& hostNode,
         AccessibilityElementOperatorCallback& callback,
@@ -1218,6 +1229,7 @@ private:
     NG::SizeF oldGeometrySize_;
     mutable std::mutex childTreeCallbackMapMutex_;
     std::unordered_map<int64_t, std::shared_ptr<AccessibilityChildTreeCallback>> childTreeCallbackMap_;
+    std::unordered_map<int64_t, std::weak_ptr<AccessibilityChildTreeCallback>> detachedCmpChildTreeCallbacks_;
     mutable std::mutex componentSACallbackMutex_;
     std::unordered_map<int64_t, std::shared_ptr<AccessibilitySAObserverCallback>> componentSACallbackMap_;
     mutable std::mutex componentScreenReaderCallbackMutex_;
@@ -1251,11 +1263,29 @@ private:
 
     NG::AccessibilityEventBlockerInAction blockerInAction_;
 
+    struct CmpRegistration {
+        explicit CmpRegistration(uint32_t windowId) : windowId(windowId) {}
+        void SetTreeId(int32_t id);
+        void Complete(bool accepted);
+        void Cancel();
+        int32_t GetAcceptedTreeId();
+        bool IsCanceled();
+        void CleanupIfCanceled();
+
+        std::mutex mutex;
+        const uint32_t windowId;
+        int32_t treeId = -1;
+        bool finished = false;
+        bool canceled = false;
+        bool cleaned = false;
+    };
+
     // CMP mixed-rendering: binding state for exported subtree binding.
     struct CmpBindingState {
         WeakPtr<NG::FrameNode> owner;
         WeakPtr<NG::FrameNode> exportedRoot;
         RefPtr<JsAccessibilityManager> subAM; // strong ref: subAM lifecycle = binding lifecycle
+        std::shared_ptr<CmpRegistration> registration;
         int32_t cmpTreeId = -1; // CMP (parent) tree treeId — set at convergence
         uint32_t windowId = 0; // host window id — set at registration, used by detach
         // WAIT_TREE_ID: waiting for the CMP treeId.
@@ -1275,9 +1305,11 @@ private:
     public:
         CmpInteractionOperation(int32_t parentTreeId, int64_t hostElementId,
             const WeakPtr<NG::FrameNode>& exportedRoot, int32_t ownerNodeId,
-            const WeakPtr<JsAccessibilityManager>& bindingOwner)
+            const WeakPtr<JsAccessibilityManager>& bindingOwner,
+            const std::shared_ptr<CmpRegistration>& registration = nullptr)
             : js_(), bindingOwner_(bindingOwner), exportedRoot_(exportedRoot),
-              parentTreeId_(parentTreeId), hostElementId_(hostElementId), ownerNodeId_(ownerNodeId) {}
+              parentTreeId_(parentTreeId), hostElementId_(hostElementId), ownerNodeId_(ownerNodeId),
+              registration_(registration) {}
         ~CmpInteractionOperation() override = default;
 
         void SetHandler(const WeakPtr<JsAccessibilityManager>& js)
@@ -1352,6 +1384,7 @@ private:
         int32_t parentTreeId_ = -1; // CMP tree treeId (host tree)
         int64_t hostElementId_ = -1; // bindId (mount node accessibility ID in CMP tree)
         int32_t ownerNodeId_ = -1; // binding owner node id (MarkCmpBindingRegistered key part)
+        std::shared_ptr<CmpRegistration> registration_;
     };
 };
 

@@ -4002,7 +4002,7 @@ bool JsAccessibilityManager::SendAccessibilitySyncEvent(
         AccessibilitySystemAbilityClient::SetSplicElementIdTreeId(info.GetBelongTreeId(), elementId);
     }
     eventInfo.SetSource(elementId);
-    UpdateElementInfoTreeId(info);
+    UpdateElementInfoTreeId(info, false);
     eventInfo.SetElementInfo(info);
     eventInfo.SetPageId(info.GetPageId());
     TAG_LOGI(AceLogTag::ACE_ACCESSIBILITY,
@@ -4013,7 +4013,7 @@ bool JsAccessibilityManager::SendAccessibilitySyncEvent(
         TAG_LOGI(AceLogTag::ACE_WEB, "dont hover on embeddedObject without same layer rendering");
         return false;
     }
-    return client->SendEvent(eventInfo);
+    return client->SendEvent(eventInfo) == Accessibility::RET_OK;
 }
 
 bool JsAccessibilityManager::TransferAccessibilityAsyncEvent(
@@ -4237,6 +4237,7 @@ void JsAccessibilityManager::SendEventToAccessibilityWithNodeInner(
         eventInfo.SetWindowId(static_cast<int32_t>(GetWindowId()));
     }
     GenerateAccessibilityEventInfo(accessibilityEvent, eventInfo);
+    CompensateCmpEventRect(eventInfo);
 
     context->GetTaskExecutor()->PostTask(
         [weak = WeakClaim(this), accessibilityEvent, eventInfo] {
@@ -4437,6 +4438,7 @@ void JsAccessibilityManager::SendAccessibilityAsyncEventInner(const Accessibilit
         }
     }
     GenerateAccessibilityEventInfo(accessibilityEvent, eventInfo);
+    CompensateCmpEventRect(eventInfo);
 
     context->GetTaskExecutor()->PostTask(
         [weak = WeakClaim(this), accessibilityEvent, eventInfo] {
@@ -4495,6 +4497,7 @@ void JsAccessibilityManager::SendWebAccessibilityAsyncEvent(
     }
 
     GenerateAccessibilityEventInfo(accessibilityEvent, eventInfo);
+    CompensateCmpEventRect(eventInfo);
 
     context->GetTaskExecutor()->PostTask(
         [weak = WeakClaim(this), accessibilityEvent, eventInfo] {
@@ -7983,6 +7986,9 @@ bool JsAccessibilityManager::ConvertActionTypeToBoolen(ActionType action, RefPtr
             result = ActAccessibilityFocus(elementId, frameNode, context, focusInfo, false);
             currentFocusNodeId_ = focusInfo.currentFocusNodeId;
             currentFocusVirtualNodeParentId_ = focusInfo.currentFocusVirtualNodeParentId;
+            if (result) {
+                ClearDetachFocusFallbackCache(context->GetInstanceId());
+            }
             break;
         }
         case ActionType::ACCESSIBILITY_ACTION_CLEAR_ACCESSIBILITY_FOCUS: {
@@ -8990,12 +8996,14 @@ void JsAccessibilityManager::RegisterAccessibilityChildTreeCallback(
 {
     std::lock_guard<std::mutex> lock(childTreeCallbackMapMutex_);
     childTreeCallbackMap_[elementId] = callback;
+    detachedCmpChildTreeCallbacks_.erase(elementId);
 }
 
 void JsAccessibilityManager::DeregisterAccessibilityChildTreeCallback(int64_t elementId)
 {
     std::lock_guard<std::mutex> lock(childTreeCallbackMapMutex_);
     childTreeCallbackMap_.erase(elementId);
+    detachedCmpChildTreeCallbacks_.erase(elementId);
 }
 
 void JsAccessibilityManager::RegisterAccessibilitySAObserverCallback(
@@ -9037,54 +9045,67 @@ void JsAccessibilityManager::NotifyAccessibilitySAStateChange(bool state)
 
 void JsAccessibilityManager::NotifyChildTreeOnRegister(int32_t treeId)
 {
-    TAG_LOGD(AceLogTag::ACE_ACCESSIBILITY, "NotifyChildTreeOnRegister size: %{public}zu", childTreeCallbackMap_.size());
-    std::lock_guard<std::mutex> lock(childTreeCallbackMapMutex_);
-    for (auto &item : childTreeCallbackMap_) {
-        if (item.second == nullptr) {
-            continue;
+    std::unordered_map<int64_t, std::shared_ptr<AccessibilityChildTreeCallback>> callbacks;
+    {
+        std::lock_guard<std::mutex> lock(childTreeCallbackMapMutex_);
+        callbacks = childTreeCallbackMap_;
+    }
+    for (const auto& [elementId, callback] : callbacks) {
+        if (callback) {
+            callback->OnRegister(GetWindowId(), treeId);
         }
-        item.second->OnRegister(GetWindowId(), treeId);
     }
 }
 
 void JsAccessibilityManager::NotifyChildTreeOnDeregister()
 {
-    TAG_LOGD(AceLogTag::ACE_ACCESSIBILITY, "NotifyChildTreeOnDeregister size: %{public}zu",
-        childTreeCallbackMap_.size());
-    std::lock_guard<std::mutex> lock(childTreeCallbackMapMutex_);
-    for (auto &item : childTreeCallbackMap_) {
-        if (item.second == nullptr) {
-            continue;
+    std::unordered_map<int64_t, std::shared_ptr<AccessibilityChildTreeCallback>> callbacks;
+    {
+        std::lock_guard<std::mutex> lock(childTreeCallbackMapMutex_);
+        callbacks = childTreeCallbackMap_;
+    }
+    for (const auto& [elementId, callback] : callbacks) {
+        if (callback) {
+            callback->OnDeregister();
         }
-        item.second->OnDeregister();
     }
 }
 
 void JsAccessibilityManager::NotifySetChildTreeIdAndWinId(
     int64_t elementId, const int32_t treeId, const int32_t childWindowId)
 {
-    std::lock_guard<std::mutex> lock(childTreeCallbackMapMutex_);
-    auto findResult = childTreeCallbackMap_.find(elementId);
-    if (findResult == childTreeCallbackMap_.end()) {
-        TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY, "node: %{public}" PRId64 " not found, treeId: %{public}d", elementId,
-            treeId);
-        // Orphaned child-tree sync: the callback was migrated away (CMP Bind migration) or removed BEFORE the async AAMS treeId assignment arrived.
-        if (treeId > 0) {
-            auto instance = AccessibilitySystemAbilityClient::GetInstance();
-            if (instance) {
-                instance->DeregisterElementOperator(GetWindowId(), treeId);
-                TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY,
-                    "NotifySetChildTreeIdAndWinId orphan sync: deregister leaked treeId=%{public}d"
-                    ", elementId=%{public}" PRId64 ", windowId=%{public}d",
-                    treeId, elementId, GetWindowId());
-            }
+    std::shared_ptr<AccessibilityChildTreeCallback> callback;
+    {
+        std::lock_guard<std::mutex> lock(childTreeCallbackMapMutex_);
+        auto it = childTreeCallbackMap_.find(elementId);
+        if (it != childTreeCallbackMap_.end()) {
+            callback = it->second;
         }
+    }
+    if (callback) {
+        callback->SetChildTreeId(treeId);
+        callback->OnSetChildTree(childWindowId, treeId);
         return;
     }
-    auto callback = findResult->second;
-    CHECK_NULL_VOID(callback);
-    callback->SetChildTreeId(treeId);
-    callback->OnSetChildTree(childWindowId, treeId);
+    if (CmpAccessibility::CmpAccessibilityRegistry::HasAnySubAM()) {
+        RefPtr<NG::FrameNode> node;
+        auto subAM = AceType::DynamicCast<JsAccessibilityManager>(
+            CmpAccessibility::CmpAccessibilityRegistry::FindSubAMAndNodeInExportedSubtrees(elementId, node));
+        if (subAM && subAM.GetRawPtr() != this) {
+            std::lock_guard<std::mutex> lock(subAM->childTreeCallbackMapMutex_);
+            auto it = subAM->childTreeCallbackMap_.find(elementId);
+            if (it != subAM->childTreeCallbackMap_.end() && it->second &&
+                it->second->GetChildTreeId() == treeId) {
+                return;
+            }
+        }
+    }
+    if (treeId > 0) {
+        auto instance = AccessibilitySystemAbilityClient::GetInstance();
+        if (instance) {
+            instance->DeregisterElementOperator(childWindowId, treeId);
+        }
+    }
 }
 
 void JsAccessibilityManager::NotifyScreenReaderObserverStateChange(bool state)
@@ -9485,6 +9506,20 @@ void OffsetRectInScreenToWindow(Accessibility::AccessibilityElementInfo& info, f
     info.SetRectInScreen(bounds);
 }
 } // namespace
+
+void JsAccessibilityManager::CompensateCmpEventRect(AccessibilityEventInfo& eventInfo)
+{
+    auto info = eventInfo.GetElementInfo();
+    if (!IsCmpSubAM() || info.GetBelongTreeId() <= 0 || info.GetBelongTreeId() != treeId_) {
+        return;
+    }
+    float offsetX = 0.0f;
+    float offsetY = 0.0f;
+    if (GetExportedRootWindowOffset(offsetX, offsetY)) {
+        OffsetRectInScreenToWindow(info, offsetX, offsetY);
+        eventInfo.SetElementInfo(info);
+    }
+}
 
 // CMP mixed-rendering: adoption-mounted detection for an exported subtree.
 bool JsAccessibilityManager::IsUnderAdoptedMount(const RefPtr<NG::FrameNode>& node)
@@ -10121,14 +10156,13 @@ void FindExtensionNodeInRelativeDirection(const AccessibilityElementInfo& focusE
 }
 
 void FilterAccessibilityElementByFocusable(std::list<AccessibilityElementInfo>& elementList,
-    AccessibilityElementInfo& focusElement, int64_t elementId)
+    AccessibilityElementInfo& focusElement, int64_t elementId, bool preserveChildTreeHosts = false)
 {
     auto input = elementList;
     elementList.clear();
     std::set<int64_t> filterIds;
     for (auto& element : input) {
-        // Child-tree container hosts are exempt from BOTH the parent cascade and the zero-size drop: their focusable.
-        if (element.GetChildTreeId() > 0) {
+        if (preserveChildTreeHosts && element.GetChildTreeId() > 0) {
             elementList.emplace_back(element);
             if (element.GetAccessibilityId() == elementId) {
                 focusElement = element;
@@ -10555,7 +10589,7 @@ void JsAccessibilityManager::GenerateCommonPropertyForWeb(const RefPtr<PipelineB
     output.windowLeft = parentRectInfo.left;
     output.windowTop = parentRectInfo.top;
     // Adopted-mount bridge for a Web host inside an adoption-mounted exported subtree.
-    if (IsUnderAdoptedMount(node)) {
+    if (CmpAccessibility::CmpAccessibilityRegistry::HasAnySubAM() && IsUnderAdoptedMount(node)) {
         float offsetX = 0.0f;
         float offsetY = 0.0f;
         if (GetExportedRootWindowOffset(offsetX, offsetY)) {
@@ -10718,6 +10752,9 @@ void JsAccessibilityManager::FireAccessibilityEventCallback(uint32_t eventId, in
             event.type = AccessibilityEventType::ELEMENT_INFO_CHANGE;
             event.nodeId = parameter;
             SendAccessibilityAsyncEvent(event);
+            break;
+        case AccessibilityCallbackEventId::ON_SEND_DETACH_FOCUS_FALLBACK:
+            HandleDetachFocusFallbackCallback(static_cast<int32_t>(parameter));
             break;
         default:
             break;
@@ -10894,6 +10931,7 @@ void JsAccessibilityManager::CacheDetachFocusFallbackCandidates(
     DetachFocusFallbackData data;
     data.focusNodeId = focusNodeId;
     data.candidateIds = candidateIds;
+    data.treeId = treeId_;
     detachFocusFallbackCache_[instanceId] = std::move(data);
 }
 
@@ -10914,6 +10952,9 @@ RefPtr<NG::FrameNode> JsAccessibilityManager::FindCandidateByFocusMove(
     const RefPtr<NG::FrameNode>& focusNode, int32_t direction)
 {
     CHECK_NULL_RETURN(focusNode, nullptr);
+    if (IsCmpSubAM()) {
+        return FindDetachFocusCandidateFromRoot(focusNode, direction);
+    }
     auto context = focusNode->GetContextRefPtr();
     CHECK_NULL_RETURN(context, nullptr);
     AccessibilityElementInfo nodeInfo;
@@ -10952,7 +10993,7 @@ std::vector<int64_t> JsAccessibilityManager::QueryDetachFocusFallbackCandidates(
     std::vector<int64_t> candidateIds;
     CHECK_NULL_RETURN(focusNode, candidateIds);
     CHECK_NULL_RETURN(context, candidateIds);
-    auto rootNode = context->GetRootElement();
+    auto rootNode = IsCmpSubAM() ? cmpExportedRoot_.Upgrade() : context->GetRootElement();
     CHECK_NULL_RETURN(rootNode, candidateIds);
     std::unordered_set<int64_t> dedup;
 
@@ -10970,7 +11011,11 @@ std::vector<int64_t> JsAccessibilityManager::QueryDetachFocusFallbackCandidates(
     };
 
     appendCandidate(GetNextFocusNodeByManager(focusNode, rootNode));
-    appendCandidate(GetPrevFocusNodeByManager(focusNode, rootNode, context));
+    auto relationManager = IsCmpSubAM()
+        ? AceType::DynamicCast<JsAccessibilityManager>(context->GetAccessibilityManager()) : Claim(this);
+    if (relationManager) {
+        appendCandidate(relationManager->GetPrevFocusNodeByManager(focusNode, rootNode, context));
+    }
 
     auto cursor = focusNode;
     while (candidateIds.size() < maxCount && cursor) {
@@ -10990,6 +11035,18 @@ std::vector<int64_t> JsAccessibilityManager::QueryDetachFocusFallbackCandidates(
 
 void JsAccessibilityManager::HandleDetachFocusFallbackCallback(int32_t instanceId)
 {
+    std::vector<RefPtr<JsAccessibilityManager>> subManagers;
+    {
+        std::lock_guard<std::mutex> lock(cmpBindingMapMutex_);
+        for (const auto& [key, binding] : cmpBindingMap_) {
+            if (binding.state == CmpBindingState::State::REGISTERED && binding.subAM) {
+                subManagers.emplace_back(binding.subAM);
+            }
+        }
+    }
+    for (const auto& subAM : subManagers) {
+        subAM->HandleDetachFocusFallbackCallback(instanceId);
+    }
     auto fallbackData = GetAndClearDetachFocusFallbackCandidates(instanceId);
     if (fallbackData.focusNodeId == INVALID_NODE_ID) {
         TAG_LOGD(AceLogTag::ACE_ACCESSIBILITY,
@@ -10997,23 +11054,55 @@ void JsAccessibilityManager::HandleDetachFocusFallbackCallback(int32_t instanceI
             DETACH_FOCUS_LOG_PREFIX, instanceId);
         return;
     }
+    if (IsCmpSubAM() && (!IsRegister() || fallbackData.treeId != treeId_ || cmpExportedRoot_.Invalid())) {
+        TAG_LOGI(AceLogTag::ACE_ACCESSIBILITY,
+            "%{public}s Drop stale fallback: instanceId=%{public}d, cachedTreeId=%{public}d, "
+            "treeId=%{public}d, registered=%{public}d, rootExpired=%{public}d",
+            DETACH_FOCUS_LOG_PREFIX, instanceId, fallbackData.treeId, treeId_, IsRegister(), cmpExportedRoot_.Invalid());
+        return;
+    }
     auto context = GetPipelineContext().Upgrade();
     CHECK_NULL_VOID(context);
     auto ngPipeline = AceType::DynamicCast<NG::PipelineContext>(context);
     CHECK_NULL_VOID(ngPipeline);
 
-    int32_t windowId = static_cast<int32_t>(ngPipeline->GetRealHostWindowId());
+    int32_t windowId = IsCmpSubAM() ? static_cast<int32_t>(GetWindowId())
+        : static_cast<int32_t>(ngPipeline->GetRealHostWindowId());
+    auto eventInfo = BuildDetachFocusFallbackEvent(fallbackData, windowId);
+    AccessibilityEvent accessibilityEvent;
+    accessibilityEvent.type = AccessibilityEventType::FOCUS_INVISIBLE;
+    accessibilityEvent.nodeId = fallbackData.focusNodeId;
+    auto executor = context->GetTaskExecutor();
+    CHECK_NULL_VOID(executor);
+    executor->PostTask(
+        [weak = WeakClaim(this), accessibilityEvent, eventInfo] {
+            auto jsAccessibilityManager = weak.Upgrade();
+            CHECK_NULL_VOID(jsAccessibilityManager);
+            if (!jsAccessibilityManager->SendAccessibilitySyncEvent(accessibilityEvent, eventInfo)) {
+                TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY,
+                    "%{public}s FOCUS_INVISIBLE not sent, source:%{public}" PRId64,
+                    DETACH_FOCUS_LOG_PREFIX, eventInfo.GetAccessibilityId());
+            }
+        },
+        TaskExecutor::TaskType::BACKGROUND, "ArkUIA11yFocusInvisible");
+}
+
+AccessibilityEventInfo JsAccessibilityManager::BuildDetachFocusFallbackEvent(
+    const DetachFocusFallbackData& fallbackData, int32_t windowId)
+{
     AccessibilityEventInfo eventInfo;
     eventInfo.SetWindowId(windowId);
-    AccessibilityEventType eventType = AccessibilityEventType::FOCUS_INVISIBLE;
-    auto type = ConvertAceEventType(eventType);
-    if (type == Accessibility::EventType::TYPE_VIEW_INVALID) {
-        TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY,
-            "%{public}s FOCUS_INVISIBLE maps to TYPE_VIEW_INVALID, abort.", DETACH_FOCUS_LOG_PREFIX);
-        return;
+    eventInfo.SetEventType(ConvertAceEventType(AccessibilityEventType::FOCUS_INVISIBLE));
+    auto sourceId = fallbackData.focusNodeId;
+    if (fallbackData.treeId > 0) {
+        AccessibilitySystemAbilityClient::SetSplicElementIdTreeId(fallbackData.treeId, sourceId);
     }
-    eventInfo.SetEventType(type);
-    eventInfo.SetSource(fallbackData.focusNodeId);
+    eventInfo.SetSource(sourceId);
+    AccessibilityElementInfo elementInfo;
+    elementInfo.SetAccessibilityId(sourceId);
+    elementInfo.SetBelongTreeId(fallbackData.treeId);
+    elementInfo.SetWindowId(windowId);
+    eventInfo.SetElementInfo(elementInfo);
     eventInfo.SetTimeStamp(GetMicroTickCount());
     eventInfo.SetBundleName(AceApplicationInfo::GetInstance().GetPackageName());
 
@@ -11023,65 +11112,83 @@ void JsAccessibilityManager::HandleDetachFocusFallbackCallback(int32_t instanceI
         if (i > 0) {
             candidateIdStr << ", ";
         }
-        candidateIdStr << fallbackData.candidateIds[i];
+        auto candidateId = fallbackData.candidateIds[i];
+        if (fallbackData.treeId > 0) {
+            AccessibilitySystemAbilityClient::SetSplicElementIdTreeId(fallbackData.treeId, candidateId);
+        }
+        candidateIdStr << candidateId;
     }
     extraEventInfo.SetExtraEventInfo(CANDIDATE_IDS, candidateIdStr.str());
     eventInfo.SetExtraEvent(extraEventInfo);
     TAG_LOGD(AceLogTag::ACE_ACCESSIBILITY,
-        "%{public}s Send FOCUS_INVISIBLE event, instanceId:%{public}d, focusNodeId:%{public}" PRId64
-        ", candidateCount:%{public}zu",
-        DETACH_FOCUS_LOG_PREFIX, instanceId, fallbackData.focusNodeId, fallbackData.candidateIds.size());
-
-    AccessibilityEvent accessibilityEvent;
-    accessibilityEvent.type = eventType;
-    accessibilityEvent.nodeId = fallbackData.focusNodeId;
-    context->GetTaskExecutor()->PostTask(
-        [weak = WeakClaim(this), accessibilityEvent, eventInfo] {
-            auto jsAccessibilityManager = weak.Upgrade();
-            CHECK_NULL_VOID(jsAccessibilityManager);
-            jsAccessibilityManager->SendAccessibilitySyncEvent(accessibilityEvent, eventInfo);
-        },
-        TaskExecutor::TaskType::BACKGROUND, "ArkUIA11yFocusInvisible");
+        "%{public}s Prepare FOCUS_INVISIBLE event, treeId:%{public}d, focusNodeId:%{public}" PRId64
+        ", candidateIds:[%{public}s]",
+        DETACH_FOCUS_LOG_PREFIX, fallbackData.treeId, sourceId, candidateIdStr.str().c_str());
+    return eventInfo;
 }
 
 void JsAccessibilityManager::NotifyAccessibilityFocusDetachOrInvisible(const RefPtr<NG::FrameNode>& focusNode)
 {
     CHECK_NULL_VOID(focusNode);
-    auto context = AceType::DynamicCast<NG::PipelineContext>(focusNode->GetContextRefPtr());
+    auto context = IsCmpSubAM() ? AceType::DynamicCast<NG::PipelineContext>(GetPipelineContext().Upgrade())
+        : focusNode->GetContextRefPtr();
     CHECK_NULL_VOID(context);
     auto instanceId = context->GetInstanceId();
     auto candidateIds = QueryDetachFocusFallbackCandidates(focusNode, context, MAX_CANDIDATE_ID_NUMBER);
     CacheDetachFocusFallbackCandidates(instanceId, focusNode->GetAccessibilityId(), candidateIds);
-    context->AddAccessibilityCallbackEvent(
-        AccessibilityCallbackEventId::ON_SEND_DETACH_FOCUS_FALLBACK, static_cast<int64_t>(instanceId));
     TAG_LOGD(AceLogTag::ACE_ACCESSIBILITY,
-        "%{public}s Fallback candidates cached, instanceId:%{public}d, ids:[%{public}" PRId64 ", %{public}" PRId64
+        "%{public}s Fallback candidates cached, instanceId:%{public}d, treeId:%{public}d, "
+        "focusNodeId:%{public}" PRId64 ", subAM:%{public}d, ids:[%{public}" PRId64 ", %{public}" PRId64
         ", %{public}" PRId64 "]",
-        DETACH_FOCUS_LOG_PREFIX, instanceId,
+        DETACH_FOCUS_LOG_PREFIX, instanceId, treeId_, focusNode->GetAccessibilityId(), IsCmpSubAM(),
         candidateIds.size() > 0 ? candidateIds[0] : static_cast<int64_t>(-1),
         candidateIds.size() > 1 ? candidateIds[1] : static_cast<int64_t>(-1),
         candidateIds.size() > 2 ? candidateIds[2] : static_cast<int64_t>(-1));
+    if (IsCmpSubAM()) {
+        auto executor = context->GetTaskExecutor();
+        CHECK_NULL_VOID(executor);
+        executor->PostTask(
+            [weak = WeakClaim(this), instanceId] {
+                auto manager = weak.Upgrade();
+                CHECK_NULL_VOID(manager);
+                ContainerScope scope(instanceId);
+                manager->HandleDetachFocusFallbackCallback(instanceId);
+            },
+            TaskExecutor::TaskType::UI, "ArkUIA11yDetachFocusFallback");
+        return;
+    }
+    context->AddAccessibilityCallbackEvent(
+        AccessibilityCallbackEventId::ON_SEND_DETACH_FOCUS_FALLBACK, static_cast<int64_t>(instanceId));
 }
 
 void JsAccessibilityManager::OnAccessbibilityDetachFromMainTree(const RefPtr<NG::FrameNode>& focusNode)
 {
     CHECK_NULL_VOID(focusNode);
+    if (CmpAccessibility::CmpAccessibilityRegistry::HasAnySubAM()) {
+        auto ownerAM = GetAccessibilityManagerForNode(focusNode);
+        if (ownerAM && ownerAM.GetRawPtr() != this) {
+            ownerAM->OnAccessbibilityDetachFromMainTree(focusNode);
+            return;
+        }
+    }
     if (currentFocusNodeId_ != focusNode->GetAccessibilityId()) {
         return;
     }
-
-
-    auto paintNode = focusNode->GetPaintNode();
-    CHECK_NULL_VOID(paintNode);
-    auto paintNodePattern = AceType::DynamicCast<NG::AccessibilityFocusPaintNodePattern>(paintNode->GetPattern());
-    CHECK_NULL_VOID(paintNodePattern);
-    auto currentFocusNode = paintNodePattern->GetFocusNode().Upgrade();
-    CHECK_NULL_VOID(currentFocusNode);
-    if (currentFocusNode->GetId() == focusNode->GetId()) {
-        paintNodePattern->OnDetachFromFocusNode();
-        RemoveAccessibilityFocusPaint(focusNode);
-    }
     NotifyAccessibilityFocusDetachOrInvisible(focusNode);
+    auto paintNode = focusNode->GetPaintNode();
+    if (paintNode) {
+        auto pattern = paintNode->GetPattern<NG::AccessibilityFocusPaintNodePattern>();
+        if (pattern && pattern->GetFocusNode().Upgrade() == focusNode) {
+            pattern->OnDetachFromFocusNode();
+            RemoveAccessibilityFocusPaint(focusNode);
+        }
+    }
+    ClearAccessibilityFocusState();
+    currentFocusVirtualNodeParentId_ = INVALID_NODE_ID;
+    auto property = focusNode->GetAccessibilityProperty<NG::AccessibilityProperty>();
+    if (property) {
+        property->SetAccessibilityFocusState(false);
+    }
 }
 
 bool JsAccessibilityManager::CheckAccessibilityVisible(const RefPtr<NG::FrameNode>& node)
@@ -12059,6 +12166,7 @@ void JsAccessibilityManager::SendEventToAccessibilityWithVirtualNode(const Acces
     }
 
     GenerateAccessibilityEventInfo(accessibilityEvent, eventInfo);
+    CompensateCmpEventRect(eventInfo);
 
     context->GetTaskExecutor()->PostTask(
         [weak = WeakClaim(this), accessibilityEvent, eventInfo] {
@@ -12105,12 +12213,25 @@ namespace OHOS::Ace::Framework {
 void JsAccessibilityManager::OnCmpTreeRegistered(NG::FrameNode* owner, int32_t treeId)
 {
     CHECK_NULL_VOID(owner);
+    CHECK_EQUAL_VOID(treeId <= 0, true);
+    std::set<int32_t> staleTreeIds;
+    {
+        std::lock_guard<std::mutex> lock(cmpBindingMapMutex_);
+        for (const auto& [key, state] : cmpBindingMap_) {
+            if (key.first == owner->GetId() && state.cmpTreeId > 0 && state.cmpTreeId != treeId) {
+                staleTreeIds.insert(state.cmpTreeId);
+            }
+        }
+    }
+    for (auto staleTreeId : staleTreeIds) {
+        OnCmpTreeDeregistered(owner, staleTreeId);
+    }
     std::vector<std::pair<int32_t, int64_t>> readyKeys;
     {
         std::lock_guard<std::mutex> lock(cmpBindingMapMutex_);
         for (auto& [key, state] : cmpBindingMap_) {
             if (state.state != CmpBindingState::State::WAIT_TREE_ID) {
-                continue; // INV-4: only WAIT_TREE_ID transitions; later states idempotent-guarded
+                continue;
             }
             auto stateOwner = state.owner.Upgrade();
             if (!stateOwner || stateOwner->GetId() != owner->GetId()) {
@@ -12128,6 +12249,60 @@ void JsAccessibilityManager::OnCmpTreeRegistered(NG::FrameNode* owner, int32_t t
     TAG_LOGI(AceLogTag::ACE_ACCESSIBILITY,
         "OnCmpTreeRegistered: owner=%{public}d, treeId=%{public}d, converged=%{public}zu",
         owner->GetId(), treeId, readyKeys.size());
+}
+
+void JsAccessibilityManager::OnCmpTreeDeregistered(NG::FrameNode* owner, int32_t treeId)
+{
+    CHECK_NULL_VOID(owner);
+    CHECK_EQUAL_VOID(treeId <= 0, true);
+    std::vector<std::pair<int64_t, CmpBindingState>> suspended;
+    {
+        std::lock_guard<std::mutex> lock(cmpBindingMapMutex_);
+        for (auto& [key, state] : cmpBindingMap_) {
+            if (key.first != owner->GetId() || state.cmpTreeId != treeId) {
+                continue;
+            }
+            suspended.emplace_back(key.second, state);
+            state.state = CmpBindingState::State::WAIT_TREE_ID;
+            state.registration.reset();
+            state.cmpTreeId = -1;
+            state.windowId = 0;
+        }
+    }
+    for (const auto& [bindId, state] : suspended) {
+        auto subAM = state.subAM;
+        if (subAM) {
+            subAM->Register(false);
+            auto provider = subAM->cmpProviderOperation_.lock();
+            if (provider) {
+                provider->RemoveChildTreeIdAndWinId(bindId);
+            }
+            subAM->cmpProviderOperation_.reset();
+            subAM->treeId_ = 0;
+            subAM->parentTreeId_ = 0;
+            subAM->parentElementId_ = INVALID_PARENT_ID;
+            subAM->parentWindowId_ = 0;
+            std::unordered_map<int64_t, std::shared_ptr<AccessibilityChildTreeCallback>> callbacks;
+            {
+                std::lock_guard<std::mutex> lock(subAM->childTreeCallbackMapMutex_);
+                callbacks = subAM->childTreeCallbackMap_;
+            }
+            for (const auto& [elementId, callback] : callbacks) {
+                if (callback) {
+                    callback->OnDeregister();
+                    callback->OnClearRegisterFlag();
+                    callback->SetChildTreeId(0);
+                    callback->OnSetChildTree(0, 0);
+                }
+            }
+        }
+        if (state.registration) {
+            state.registration->Cancel();
+        }
+    }
+    TAG_LOGI(AceLogTag::ACE_ACCESSIBILITY,
+        "OnCmpTreeDeregistered: owner=%{public}d, treeId=%{public}d, suspended=%{public}zu",
+        owner->GetId(), treeId, suspended.size());
 }
 
 // Query the CMP treeId through the third-provider operator registered for this host.
@@ -12150,6 +12325,15 @@ void JsAccessibilityManager::MigrateChildTreeCallbacksToSubAM(
     {
         std::lock_guard<std::mutex> lock(childTreeCallbackMapMutex_);
         snapshot = childTreeCallbackMap_;
+        for (auto it = detachedCmpChildTreeCallbacks_.begin(); it != detachedCmpChildTreeCallbacks_.end();) {
+            auto callback = it->second.lock();
+            if (!callback) {
+                it = detachedCmpChildTreeCallbacks_.erase(it);
+            } else {
+                snapshot.emplace(it->first, std::move(callback));
+                ++it;
+            }
+        }
     }
     for (const auto& [elementId, callback] : snapshot) {
         if (!callback) {
@@ -12162,6 +12346,7 @@ void JsAccessibilityManager::MigrateChildTreeCallbacksToSubAM(
         }
         // Deregister the grandchild tree if it was already registered (idempotent per callback).
         callback->OnDeregister();
+        callback->SetChildTreeId(0);
         DeregisterAccessibilityChildTreeCallback(elementId);
         subAM->RegisterAccessibilityChildTreeCallback(elementId, callback);
         TAG_LOGI(AceLogTag::ACE_ACCESSIBILITY,
@@ -12186,14 +12371,80 @@ bool JsAccessibilityManager::SnapshotRegisteringCmpBinding(const std::pair<int32
     return true;
 }
 
-// Persist the registration window id for one binding (whole-detach anchor, DetachCmpBinding).
-void JsAccessibilityManager::UpdateCmpBindingWindowId(const std::pair<int32_t, int64_t>& key, uint32_t windowId)
+void JsAccessibilityManager::CmpRegistration::SetTreeId(int32_t id)
+{
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        treeId = id;
+    }
+    CleanupIfCanceled();
+}
+
+void JsAccessibilityManager::CmpRegistration::Complete(bool accepted)
+{
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        finished = true;
+        canceled = canceled || !accepted;
+    }
+    CleanupIfCanceled();
+}
+
+void JsAccessibilityManager::CmpRegistration::Cancel()
+{
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        canceled = true;
+    }
+    CleanupIfCanceled();
+}
+
+int32_t JsAccessibilityManager::CmpRegistration::GetAcceptedTreeId()
+{
+    std::lock_guard<std::mutex> lock(mutex);
+    return finished && !canceled ? treeId : -1;
+}
+
+bool JsAccessibilityManager::CmpRegistration::IsCanceled()
+{
+    std::lock_guard<std::mutex> lock(mutex);
+    return canceled;
+}
+
+void JsAccessibilityManager::CmpRegistration::CleanupIfCanceled()
+{
+    int32_t orphanTreeId = -1;
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        if (!finished || !canceled || cleaned || treeId <= 0) {
+            return;
+        }
+        cleaned = true;
+        orphanTreeId = treeId;
+    }
+    auto instance = AccessibilitySystemAbilityClient::GetInstance();
+    if (instance) {
+        instance->DeregisterElementOperator(windowId, orphanTreeId);
+    }
+}
+
+bool JsAccessibilityManager::CompleteCmpRegistration(const std::pair<int32_t, int64_t>& key,
+    const RefPtr<JsAccessibilityManager>& subAM, const std::shared_ptr<CmpRegistration>& registration, bool success)
 {
     std::lock_guard<std::mutex> lock(cmpBindingMapMutex_);
     auto it = cmpBindingMap_.find(key);
-    if (it != cmpBindingMap_.end()) {
-        it->second.windowId = windowId;
+    if (it == cmpBindingMap_.end() || it->second.subAM != subAM ||
+        it->second.registration != registration || it->second.state != CmpBindingState::State::REGISTERING) {
+        return false;
     }
+    if (!success || (registration && registration->IsCanceled())) {
+        it->second.state = CmpBindingState::State::WAIT_TREE_ID;
+        it->second.registration.reset();
+        it->second.windowId = 0;
+        return false;
+    }
+    it->second.windowId = registration->windowId;
+    return true;
 }
 
 // Wire the subAM's parent/escalation anchors after a successful AAMS registration: parent triple (CMP tree).
@@ -12223,54 +12474,89 @@ void JsAccessibilityManager::RegisterCmpSubtreeToAams(const std::pair<int32_t, i
     }
     auto owner = ownerWeak.Upgrade();
     auto exportedRoot = exportedRootWeak.Upgrade();
-    if (!owner || !exportedRoot || !subAM) {
-        return;
-    }
-    auto context = owner->GetContext();
-    if (context == nullptr) {
+    auto context = owner ? owner->GetContext() : nullptr;
+    if (!owner || !exportedRoot || !subAM || !context) {
+        CompleteCmpRegistration(key, subAM, nullptr, false);
         return;
     }
     uint32_t windowId = static_cast<uint32_t>(context->GetRealHostWindowId());
-    UpdateCmpBindingWindowId(key, windowId);
-
-    // Migrate four-type callbacks that landed on the main AM before Bind.
-    MigrateChildTreeCallbacksToSubAM(exportedRoot, subAM);
-
-    // Standard child-tree registration (RegisterInteractionOperationAsChildTree pattern).
+    auto registration = std::make_shared<CmpRegistration>(windowId);
+    {
+        std::lock_guard<std::mutex> lock(cmpBindingMapMutex_);
+        auto it = cmpBindingMap_.find(key);
+        if (it == cmpBindingMap_.end() || it->second.subAM != subAM || it->second.registration ||
+            it->second.state != CmpBindingState::State::REGISTERING) {
+            return;
+        }
+        it->second.registration = registration;
+    }
     int64_t elementId = key.second;
     AccessibilitySystemAbilityClient::SetSplicElementIdTreeId(cmpTreeId, elementId);
-    // The operator keeps the RAW bindId (hostElementId_): it is the binding state machine key.
     auto operation = std::make_shared<CmpInteractionOperation>(cmpTreeId, key.second, exportedRootWeak,
-        owner->GetId(), Referenced::WeakClaim(this));
+        owner->GetId(), Referenced::WeakClaim(this), registration);
     operation->SetHandler(Referenced::WeakClaim(subAM.GetRawPtr()));
-    std::shared_ptr<AccessibilitySystemAbilityClient> instance =
-        AccessibilitySystemAbilityClient::GetInstance();
-    CHECK_NULL_VOID(instance);
-    Accessibility::Registration registration {
+    auto instance = AccessibilitySystemAbilityClient::GetInstance();
+    Accessibility::Registration request {
         .windowId = static_cast<int32_t>(windowId),
         .parentWindowId = static_cast<int32_t>(windowId),
         .parentTreeId = cmpTreeId,
         .elementId = elementId,
     };
-    Accessibility::RetError retReg = instance->RegisterElementOperator(registration, operation);
-    WireSubAmAnchors(subAM, exportedRootWeak, owner.GetRawPtr(), cmpTreeId, elementId, windowId);
-    // subAM isRegister state is set only after T_sub is assigned (CmpInteractionOperation:: SetBelongTreeId) so that.
+    auto result = instance ? instance->RegisterElementOperator(request, operation) : Accessibility::RET_ERR_NULLPTR;
+    bool accepted = CompleteCmpRegistration(key, subAM, registration, result == RET_OK);
     TAG_LOGI(AceLogTag::ACE_ACCESSIBILITY,
         "RegisterCmpSubtreeToAams: bindId=%{public}" PRId64 ", windowId=%{public}u, "
-        "cmpTreeId=%{public}d, ret=%{public}d, elementId=%{public}" PRId64
-        " (AAMS-facing mount id — must match the mount node's provider-tree id and the"
-        " SetChildTreeIdAndWinId notification, else the childTreeId drill never applies)",
-        key.second, windowId, cmpTreeId, static_cast<int32_t>(retReg), elementId);
+        "cmpTreeId=%{public}d, ret=%{public}d, accepted=%{public}d",
+        key.second, windowId, cmpTreeId, static_cast<int32_t>(result), accepted);
+    registration->Complete(accepted);
+    if (accepted && registration->IsCanceled()) {
+        CompleteCmpRegistration(key, subAM, registration, false);
+        return;
+    }
+    if (!accepted) {
+        return;
+    }
+    WireSubAmAnchors(subAM, exportedRootWeak, owner.GetRawPtr(), cmpTreeId, elementId, windowId);
+    MarkCmpBindingRegistered(key, subAM, registration);
 }
 
 // Binding state transition: T_sub assigned (CmpInteractionOperation::SetBelongTreeId continuation).
-void JsAccessibilityManager::MarkCmpBindingRegistered(int32_t ownerId, int64_t bindId)
+void JsAccessibilityManager::MarkCmpBindingRegistered(const std::pair<int32_t, int64_t>& key,
+    const RefPtr<JsAccessibilityManager>& subAM, const std::shared_ptr<CmpRegistration>& registration)
 {
-    std::lock_guard<std::mutex> lock(cmpBindingMapMutex_);
-    auto it = cmpBindingMap_.find(std::make_pair(ownerId, bindId));
-    if (it != cmpBindingMap_.end() && it->second.state == CmpBindingState::State::REGISTERING) {
-        it->second.state = CmpBindingState::State::REGISTERED;
+    CHECK_NULL_VOID(registration);
+    auto treeId = registration->GetAcceptedTreeId();
+    if (treeId <= 0) {
+        return;
     }
+    WeakPtr<NG::FrameNode> rootWeak;
+    bool current = false;
+    {
+        std::lock_guard<std::mutex> lock(cmpBindingMapMutex_);
+        auto it = cmpBindingMap_.find(key);
+        current = it != cmpBindingMap_.end() && it->second.subAM == subAM &&
+            it->second.registration == registration;
+        if (current) {
+            if (it->second.state != CmpBindingState::State::REGISTERING) {
+                return;
+            }
+            it->second.state = CmpBindingState::State::REGISTERED;
+            rootWeak = it->second.exportedRoot;
+        }
+    }
+    if (!current) {
+        registration->Cancel();
+        return;
+    }
+    auto root = rootWeak.Upgrade();
+    if (!root) {
+        DetachCmpBinding(key);
+        return;
+    }
+    subAM->treeId_ = treeId;
+    subAM->Register(true);
+    MigrateChildTreeCallbacksToSubAM(root, subAM);
+    subAM->NotifyChildTreeOnRegister(treeId);
 }
 
 // Whole-subtree detach for one binding (Unbind semantics): deregister grandchild trees first, then deregister the.
@@ -12278,7 +12564,8 @@ void JsAccessibilityManager::DetachCmpBinding(const std::pair<int32_t, int64_t>&
 {
     RefPtr<JsAccessibilityManager> subAM;
     WeakPtr<NG::FrameNode> exportedRootWeak;
-    uint32_t windowId = 0;
+    WeakPtr<NG::FrameNode> ownerWeak;
+    std::shared_ptr<CmpRegistration> registration;
     {
         std::lock_guard<std::mutex> lock(cmpBindingMapMutex_);
         auto it = cmpBindingMap_.find(key);
@@ -12287,19 +12574,40 @@ void JsAccessibilityManager::DetachCmpBinding(const std::pair<int32_t, int64_t>&
         }
         subAM = it->second.subAM;
         exportedRootWeak = it->second.exportedRoot;
-        windowId = it->second.windowId;
+        ownerWeak = it->second.owner;
+        registration = it->second.registration;
         cmpBindingMap_.erase(it);
     }
     if (subAM) {
-        // 1. Grandchild trees (Web/XComponent/Custom/UEC content) deregister.
-        subAM->NotifyChildTreeOnDeregister();
-        // 2. Deregister the exported subtree itself (only if registration reached AAMS).
-        if (windowId != 0) {
-            std::shared_ptr<AccessibilitySystemAbilityClient> instance =
-                AccessibilitySystemAbilityClient::GetInstance();
-            if (instance) {
-                instance->DeregisterElementOperator(windowId, subAM->treeId_);
+        subAM->Register(false);
+        std::unordered_map<int64_t, std::shared_ptr<AccessibilityChildTreeCallback>> callbacks;
+        {
+            std::lock_guard<std::mutex> lock(subAM->childTreeCallbackMapMutex_);
+            callbacks.swap(subAM->childTreeCallbackMap_);
+        }
+        for (const auto& [elementId, callback] : callbacks) {
+            if (callback) {
+                callback->OnDeregister();
+                callback->SetChildTreeId(0);
             }
+        }
+        {
+            std::lock_guard<std::mutex> lock(childTreeCallbackMapMutex_);
+            for (const auto& [elementId, callback] : callbacks) {
+                if (callback) {
+                    detachedCmpChildTreeCallbacks_[elementId] = callback;
+                }
+            }
+        }
+    }
+    if (registration) {
+        registration->Cancel();
+    }
+    auto owner = ownerWeak.Upgrade();
+    if (owner) {
+        auto provider = GetJsThirdProviderInteractionOperation(owner->GetAccessibilityId()).lock();
+        if (provider) {
+            provider->RemoveChildTreeIdAndWinId(key.second);
         }
     }
     // 3. Drop the node-registry entry for this exported subtree (subAM releases with the binding).
@@ -12388,7 +12696,7 @@ void JsAccessibilityManager::FocusMoveSearchFromRoot(int64_t elementId, int32_t 
         return;
     }
     AccessibilityElementInfo focusElement;
-    FilterAccessibilityElementByFocusable(nodeList, focusElement, elementId);
+    FilterAccessibilityElementByFocusable(nodeList, focusElement, elementId, true);
     switch (direction) {
         case FocusMoveDirection::FORWARD:
         case FocusMoveDirection::BACKWARD:
@@ -12828,6 +13136,31 @@ void ReplyDirectionNotSupport(const Accessibility::AccessibilityFocusMoveParam& 
         static_cast<int32_t>(param.direction), requestId);
 }
 
+void NormalizeSubtreeSearchIds(std::list<AccessibilityElementInfo>& nodeList, int32_t treeId)
+{
+    if (treeId <= 0) {
+        return;
+    }
+    auto toLocalId = [treeId](int64_t elementId) {
+        if (elementId < 0) {
+            return elementId;
+        }
+        int64_t rawId = AccessibilityElementInfo::UNDEFINED_ACCESSIBILITY_ID;
+        int32_t belongTreeId = AccessibilityElementInfo::UNDEFINED_TREE_ID;
+        AccessibilitySystemAbilityClient::GetTreeIdAndElementIdBySplitElementId(elementId, rawId, belongTreeId);
+        return belongTreeId == treeId ? rawId : elementId;
+    };
+    for (auto& element : nodeList) {
+        element.SetAccessibilityId(toLocalId(element.GetAccessibilityId()));
+        element.SetParent(toLocalId(element.GetParentNodeId()));
+        auto children = element.GetChildIds();
+        for (auto childId : children) {
+            element.RemoveChild(childId);
+            element.AddChild(toLocalId(childId));
+        }
+    }
+}
+
 // Reading-order rebuild: the recursive prefetch collects breadth-first; rebuild DFS pre-order from child links.
 void RebuildReadingOrderList(std::list<AccessibilityElementInfo>& nodeList,
     const RefPtr<NG::FrameNode>& exportedRoot)
@@ -12896,8 +13229,104 @@ bool TryAcceptOriginAsCandidate(const RefPtr<NG::FrameNode>& exportedRoot,
     return false;
 }
 
+bool TryExplicitFocusRelationJump(const RefPtr<NG::FrameNode>& exportedRoot,
+    const Accessibility::AccessibilityFocusMoveParam& param, int64_t splitElementId,
+    const std::list<AccessibilityElementInfo>& nodeList, bool bypassDescendants,
+    AccessibilityElementInfo& nodeInfo)
+{
+    if (splitElementId < 0) {
+        return false;
+    }
+    auto originNode = NG::AccessibilityFrameNodeUtils::GetFramenodeByAccessibilityId(exportedRoot, splitElementId);
+    CHECK_NULL_RETURN(originNode, false);
+    RefPtr<NG::FrameNode> targetNode;
+    if (param.direction == Accessibility::FocusMoveDirection::FORWARD) {
+        targetNode = GetAccessibilityNextFocusNode(originNode, exportedRoot);
+    } else {
+        auto context = originNode->GetContextRefPtr();
+        CHECK_NULL_RETURN(context, false);
+        auto mainAM = AceType::DynamicCast<JsAccessibilityManager>(context->GetAccessibilityManager());
+        CHECK_NULL_RETURN(mainAM, false);
+        targetNode = mainAM->GetPrevFocusNodeByManager(originNode, exportedRoot, context);
+    }
+    CHECK_NULL_RETURN(targetNode, false);
+    auto targetId = targetNode->GetAccessibilityId();
+    if (targetId == splitElementId) {
+        return false;
+    }
+    for (const auto& candidate : nodeList) {
+        if (candidate.GetAccessibilityId() == targetId
+            && IsSubtreeCandidateFocusable(exportedRoot, candidate, param.type, bypassDescendants)) {
+            nodeInfo = candidate;
+            TAG_LOGI(AceLogTag::ACE_ACCESSIBILITY,
+                "FocusMoveSearchWithConditionFromRoot explicit jump: originId=%{public}" PRId64
+                ", targetId=%{public}" PRId64 ", direction=%{public}d",
+                splitElementId, targetId, static_cast<int32_t>(param.direction));
+            return true;
+        }
+    }
+    return false;
+}
+
+class SubtreeClippedCheckNode : public FrameNodeRulesCheckNode {
+public:
+    SubtreeClippedCheckNode(const RefPtr<NG::FrameNode>& node, int64_t accessibilityId,
+        const RefPtr<NG::FrameNode>& boundary)
+        : FrameNodeRulesCheckNode(node, accessibilityId), boundary_(boundary) {}
+
+    std::shared_ptr<FocusRulesCheckNode> GetAceParent() override
+    {
+        auto node = GetFrameNode();
+        if (node && node == boundary_) {
+            return nullptr;
+        }
+        auto parent = FrameNodeRulesCheckNode::GetAceParent();
+        CHECK_NULL_RETURN(parent, nullptr);
+        auto parentNode = std::static_pointer_cast<FrameNodeRulesCheckNode>(parent)->GetFrameNode();
+        CHECK_NULL_RETURN(parentNode, nullptr);
+        return std::make_shared<SubtreeClippedCheckNode>(
+            parentNode, parentNode->GetAccessibilityId(), boundary_);
+    }
+
+private:
+    RefPtr<NG::FrameNode> boundary_;
+};
+
+std::shared_ptr<FocusRulesCheckNode> FindScrollBoundaryFromRoot(const RefPtr<NG::FrameNode>& exportedRoot,
+    int64_t originId, bool forward)
+{
+    auto origin = NG::AccessibilityFrameNodeUtils::GetFramenodeByAccessibilityId(exportedRoot, originId);
+    CHECK_NULL_RETURN(origin, nullptr);
+    auto checkNode = std::make_shared<SubtreeClippedCheckNode>(origin, originId, exportedRoot);
+    AceFocusMoveDetailCondition condition = {.bypassSelf = true, .bypassDescendants = false};
+    std::list<std::shared_ptr<FocusRulesCheckNode>> ancestors;
+    AccessibilityFocusStrategy strategy;
+    if (forward) {
+        strategy.FindForwardScrollAncestor(condition, checkNode, ancestors);
+    } else {
+        strategy.FindBackwardScrollAncestor(condition, checkNode, ancestors);
+    }
+    return ancestors.empty() ? nullptr : ancestors.front();
+}
+
+bool IsWithinScrollBoundary(const RefPtr<NG::FrameNode>& exportedRoot, int64_t candidateId,
+    const std::shared_ptr<FocusRulesCheckNode>& boundary)
+{
+    auto node = NG::AccessibilityFrameNodeUtils::GetFramenodeByAccessibilityId(exportedRoot, candidateId);
+    CHECK_NULL_RETURN(node, false);
+    auto checkNode = std::make_shared<SubtreeClippedCheckNode>(node, candidateId, exportedRoot);
+    auto parent = checkNode->GetAceParent();
+    while (parent) {
+        if (parent->GetAccessibilityId() == boundary->GetAccessibilityId()) {
+            return true;
+        }
+        parent = parent->GetAceParent();
+    }
+    return false;
+}
+
 // FORWARD/BACKWARD candidate search over the ordered list with the main-tree candidate check.
-void SearchForwardBackwardCandidate(const RefPtr<NG::FrameNode>& exportedRoot,
+std::shared_ptr<FocusRulesCheckNode> SearchForwardBackwardCandidate(const RefPtr<NG::FrameNode>& exportedRoot,
     const Accessibility::AccessibilityFocusMoveParam& param,
     const AccessibilityElementInfo& focusElement, int64_t splitElementId,
     const std::list<AccessibilityElementInfo>& nodeList, AccessibilityElementInfo& nodeInfo)
@@ -12907,9 +13336,13 @@ void SearchForwardBackwardCandidate(const RefPtr<NG::FrameNode>& exportedRoot,
         || param.condition == Accessibility::DetailCondition::CHECK_SELF_BYPASS_DESCENDANTS;
     if (TryAcceptOriginAsCandidate(
         exportedRoot, param, focusElement, splitElementId, bypassDescendants, nodeInfo)) {
-        return;
+        return nullptr;
+    }
+    if (TryExplicitFocusRelationJump(exportedRoot, param, splitElementId, nodeList, bypassDescendants, nodeInfo)) {
+        return nullptr;
     }
     bool forward = param.direction == Accessibility::FocusMoveDirection::FORWARD;
+    auto scrollBoundary = FindScrollBoundaryFromRoot(exportedRoot, splitElementId, forward);
     auto originIt = nodeList.end();
     for (auto it = nodeList.begin(); it != nodeList.end(); ++it) {
         if (it->GetAccessibilityId() == focusElement.GetAccessibilityId()) {
@@ -12924,9 +13357,12 @@ void SearchForwardBackwardCandidate(const RefPtr<NG::FrameNode>& exportedRoot,
             ++cur;
         }
         for (; cur != nodeList.end(); ++cur) {
+            if (scrollBoundary && !IsWithinScrollBoundary(exportedRoot, cur->GetAccessibilityId(), scrollBoundary)) {
+                return scrollBoundary;
+            }
             if (IsSubtreeCandidateFocusable(exportedRoot, *cur, param.type, bypassDescendants)) {
                 nodeInfo = *cur;
-                return;
+                return nullptr;
             }
         }
     } else {
@@ -12936,12 +13372,16 @@ void SearchForwardBackwardCandidate(const RefPtr<NG::FrameNode>& exportedRoot,
         }
         while (cur != nodeList.begin()) {
             --cur;
+            if (scrollBoundary && !IsWithinScrollBoundary(exportedRoot, cur->GetAccessibilityId(), scrollBoundary)) {
+                return scrollBoundary;
+            }
             if (IsSubtreeCandidateFocusable(exportedRoot, *cur, param.type, bypassDescendants)) {
                 nodeInfo = *cur;
-                return;
+                return nullptr;
             }
         }
     }
+    return scrollBoundary;
 }
 
 // Post-search diagnostics: selected id, grandchild-host presence in the surviving list.
@@ -12964,6 +13404,34 @@ void LogFocusMoveSearchPostSearch(const AccessibilityElementInfo& nodeInfo,
         }());
 }
 } // namespace
+
+RefPtr<NG::FrameNode> JsAccessibilityManager::FindDetachFocusCandidateFromRoot(
+    const RefPtr<NG::FrameNode>& focusNode, int32_t direction)
+{
+    CHECK_NULL_RETURN(focusNode, nullptr);
+    auto root = cmpExportedRoot_.Upgrade();
+    CHECK_NULL_RETURN(root, nullptr);
+    auto context = GetPipelineContext().Upgrade();
+    CHECK_NULL_RETURN(context, nullptr);
+    std::list<AccessibilityElementInfo> nodeList;
+    SearchElementInfoByAccessibilityIdFromRoot(-1, PREFETCH_RECURSIVE_CHILDREN, nodeList, context, root);
+    NormalizeSubtreeSearchIds(nodeList, treeId_);
+    AccessibilityElementInfo origin;
+    auto originId = focusNode->GetAccessibilityId();
+    FilterAccessibilityElementByFocusable(nodeList, origin, originId, true);
+    RebuildReadingOrderList(nodeList, root);
+    AccessibilityFocusMoveParam param {
+        .direction = static_cast<Accessibility::FocusMoveDirection>(direction),
+        .condition = DetailCondition::BYPASS_SELF,
+    };
+    AccessibilityElementInfo candidate;
+    candidate.SetValidElement(false);
+    auto scrollBoundary = SearchForwardBackwardCandidate(root, param, origin, originId, nodeList, candidate);
+    if (scrollBoundary || !candidate.IsValidElement()) {
+        return nullptr;
+    }
+    return NG::AccessibilityFrameNodeUtils::GetFramenodeByAccessibilityId(root, candidate.GetAccessibilityId());
+}
 
 // Grandchild-tree drill-down at the result layer for a selected child-tree host.
 bool JsAccessibilityManager::TryReplyChildTreeHandoffFromRoot(const AccessibilityElementInfo& nodeInfo,
@@ -13085,8 +13553,9 @@ void JsAccessibilityManager::FocusMoveSearchWithConditionFromRoot(const Accessib
 #endif // WEB_SUPPORTED
     std::list<AccessibilityElementInfo> nodeList;
     SearchElementInfoByAccessibilityIdFromRoot(-1, PREFETCH_RECURSIVE_CHILDREN, nodeList, context, exportedRoot);
+    NormalizeSubtreeSearchIds(nodeList, treeId_);
     AccessibilityElementInfo focusElement;
-    FilterAccessibilityElementByFocusable(nodeList, focusElement, splitElementId);
+    FilterAccessibilityElementByFocusable(nodeList, focusElement, splitElementId, true);
     // Reading-order rebuild before the FORWARD/BACKWARD iteration (rationale in RebuildReadingOrderList).
     RebuildReadingOrderList(nodeList, exportedRoot);
     TAG_LOGI(AceLogTag::ACE_ACCESSIBILITY,
@@ -13099,11 +13568,12 @@ void JsAccessibilityManager::FocusMoveSearchWithConditionFromRoot(const Accessib
         nodeList.size(),
         splitElementId >= 0 && focusElement.GetAccessibilityId() == splitElementId,
         focusElement.GetChildTreeId());
+    std::shared_ptr<FocusRulesCheckNode> scrollBoundary;
     switch (param.direction) {
         case Accessibility::FocusMoveDirection::FORWARD:
         case Accessibility::FocusMoveDirection::BACKWARD:
             // Origin-level acceptance + candidate iteration with the main-tree candidate check.
-            SearchForwardBackwardCandidate(
+            scrollBoundary = SearchForwardBackwardCandidate(
                 exportedRoot, param, focusElement, splitElementId, nodeList, nodeInfo);
             break;
         case Accessibility::FocusMoveDirection::UP:
@@ -13116,7 +13586,16 @@ void JsAccessibilityManager::FocusMoveSearchWithConditionFromRoot(const Accessib
             break;
     }
     LogFocusMoveSearchPostSearch(nodeInfo, nodeList);
-    if (nodeInfo.IsValidElement()) {
+    if (scrollBoundary) {
+        if (param.type == Accessibility::FocusRuleType::FOCUS_BY_TITLE
+            || param.type == Accessibility::FocusRuleType::FOCUS_BY_LINK) {
+            infos.emplace_back(nodeInfo);
+        } else {
+            FillScrollAncestorInfosFromRoot(AceType::DynamicCast<NG::PipelineContext>(context),
+                { scrollBoundary }, infos);
+            result.resultType = Accessibility::FocusMoveResultType::SEARCH_FAIL_IN_SCROLL;
+        }
+    } else if (nodeInfo.IsValidElement()) {
         if (TryReplyChildTreeHandoffFromRoot(
             nodeInfo, param, context, exportedRoot, infos, result, requestId, callback)) {
             return;
@@ -13145,31 +13624,6 @@ void JsAccessibilityManager::FocusMoveSearchWithConditionFromRoot(const Accessib
 }
 
 namespace {
-// Ancestor-walk check node clipped at the exported-subtree boundary: exportedRoot itself is the topmost candidate.
-class SubtreeClippedCheckNode : public FrameNodeRulesCheckNode {
-public:
-    SubtreeClippedCheckNode(const RefPtr<NG::FrameNode>& node, int64_t accessibilityId,
-        const RefPtr<NG::FrameNode>& boundary)
-        : FrameNodeRulesCheckNode(node, accessibilityId), boundary_(boundary) {}
-
-    std::shared_ptr<FocusRulesCheckNode> GetAceParent() override
-    {
-        auto node = GetFrameNode();
-        if (node && node == boundary_) {
-            return nullptr;
-        }
-        auto parent = FrameNodeRulesCheckNode::GetAceParent();
-        CHECK_NULL_RETURN(parent, nullptr);
-        auto parentNode = std::static_pointer_cast<FrameNodeRulesCheckNode>(parent)->GetFrameNode();
-        CHECK_NULL_RETURN(parentNode, nullptr);
-        return std::make_shared<SubtreeClippedCheckNode>(
-            parentNode, parentNode->GetAccessibilityId(), boundary_);
-    }
-
-private:
-    RefPtr<NG::FrameNode> boundary_;
-};
-
 // Detect-round check node with the same exportedRoot boundary clipping.
 class SubtreeClippedDetectParentCheckNode : public DetectParentRulesCheckNode {
 public:
@@ -13706,27 +14160,22 @@ void JsAccessibilityManager::SearchDefaultFocusFromRoot(std::list<Accessibility:
 }
 
 std::optional<JsAccessibilityManager::CmpBindingQueryResult> JsAccessibilityManager::GetCmpBindingForHover(
-    int64_t bindId)
+    int32_t ownerNodeId, int64_t bindId)
 {
     std::lock_guard<std::mutex> lock(cmpBindingMapMutex_);
-    for (const auto& [key, state] : cmpBindingMap_) {
-        if (key.second != bindId || state.state != CmpBindingState::State::REGISTERED) {
-            continue;
-        }
-        CmpBindingQueryResult result;
-        result.exportedRoot = state.exportedRoot;
-        result.subAM = state.subAM;
-        return result;
+    auto it = cmpBindingMap_.find({ ownerNodeId, bindId });
+    if (it == cmpBindingMap_.end() || it->second.state != CmpBindingState::State::REGISTERED) {
+        return std::nullopt;
     }
-    return std::nullopt;
+    return CmpBindingQueryResult { it->second.exportedRoot, it->second.subAM };
 }
 
-std::vector<int64_t> JsAccessibilityManager::GetCmpBindingBindIdsForHover()
+std::vector<int64_t> JsAccessibilityManager::GetCmpBindingBindIdsForHover(int32_t ownerNodeId)
 {
     std::vector<int64_t> bindIds;
     std::lock_guard<std::mutex> lock(cmpBindingMapMutex_);
     for (const auto& [key, state] : cmpBindingMap_) {
-        if (state.state == CmpBindingState::State::REGISTERED) {
+        if (key.first == ownerNodeId && state.state == CmpBindingState::State::REGISTERED) {
             bindIds.push_back(key.second);
         }
     }
@@ -13766,6 +14215,30 @@ bool JsAccessibilityManager::BindExportTree(NG::FrameNode* owner, int64_t bindId
 {
     CHECK_NULL_RETURN(owner, false);
     CHECK_NULL_RETURN(exportedRoot, false);
+    bool retry = false;
+    {
+        std::lock_guard<std::mutex> lock(cmpBindingMapMutex_);
+        auto it = cmpBindingMap_.find(std::make_pair(owner->GetId(), bindId));
+        if (it != cmpBindingMap_.end() && it->second.state != CmpBindingState::State::UNBOUND) {
+            if (it->second.state == CmpBindingState::State::REGISTERING &&
+                it->second.registration && it->second.registration->IsCanceled()) {
+                it->second.state = CmpBindingState::State::WAIT_TREE_ID;
+                it->second.registration.reset();
+                it->second.windowId = 0;
+            }
+            if (it->second.state != CmpBindingState::State::WAIT_TREE_ID) {
+                return true;
+            }
+            retry = true;
+        }
+    }
+    if (retry) {
+        int32_t cmpTreeId = GetThirdProviderTreeIdForHost(owner);
+        if (cmpTreeId != AccessibilityElementInfo::UNDEFINED_TREE_ID) {
+            OnCmpTreeRegistered(owner, cmpTreeId);
+        }
+        return true;
+    }
     // Adoption of exportedRoot is NOT a precondition (CAPI contract): Bind works on any subtree root.
     WarnBindOwnerLevelIfNeeded(owner);
     auto subAM = CreateCmpSubAM(owner);
@@ -14063,27 +14536,33 @@ void JsAccessibilityManager::CmpInteractionOperation::FocusMoveSearch(
     int32_t splitTreeId = AccessibilityElementInfo::UNDEFINED_TREE_ID;
     AccessibilitySystemAbilityClient::GetTreeIdAndElementIdBySplitElementId(elementId, splitElementId, splitTreeId);
     auto subAM = js_.Upgrade();
-    auto exportedRoot = exportedRoot_.Upgrade();
-    if (!subAM || !exportedRoot) {
+    auto context = subAM ? subAM->GetPipelineContext().Upgrade() : nullptr;
+    if (!context || !context->GetTaskExecutor()) {
         ReturnFocusFallback(callback, requestId);
         return;
     }
-    // Delegate focus search to subAM with exportedRoot as root (Owner rule).
-    auto context = subAM->GetPipelineContext().Upgrade();
-    if (!context) {
-        ReturnFocusFallback(callback, requestId);
-        return;
-    }
-    AccessibilityElementInfo info;
-    subAM->FocusMoveSearchFromRoot(splitElementId, direction, info, context, exportedRoot);
-    if (info.IsValidElement()) {
-        // Splice T_sub into the outbound ids so AAMS can route follow-up queries back here.
-        subAM->UpdateElementInfoTreeId(info);
-        callback.SetFocusMoveSearchResult(info, requestId);
-    } else {
-        // No next focus in subtree → cross-tree fallback to CMP tree.
-        ReturnFocusFallback(callback, requestId);
-    }
+    context->GetTaskExecutor()->PostTask(
+        [weak = GetHandler(), root = exportedRoot_, splitElementId, direction, requestId, &callback,
+        parentTreeId = parentTreeId_, hostElementId = hostElementId_] {
+            auto subAM = weak.Upgrade();
+            auto exportedRoot = root.Upgrade();
+            AccessibilityElementInfo info;
+            info.SetValidElement(false);
+            if (subAM && exportedRoot && subAM->IsRegister()) {
+                subAM->FocusMoveSearchFromRoot(splitElementId, direction, info,
+                    subAM->GetPipelineContext().Upgrade(), exportedRoot);
+            }
+            if (info.IsValidElement()) {
+                subAM->UpdateElementInfoTreeId(info);
+            } else {
+                int64_t splicedHostId = hostElementId;
+                AccessibilitySystemAbilityClient::SetSplicElementIdTreeId(parentTreeId, splicedHostId);
+                info.SetAccessibilityId(splicedHostId);
+                info.SetBelongTreeId(parentTreeId);
+                info.SetValidElement(true);
+            }
+            callback.SetFocusMoveSearchResult(info, requestId);
+        }, TaskExecutor::TaskType::UI, "ArkUICmpFocusMoveSearch");
 }
 
 void JsAccessibilityManager::CmpInteractionOperation::ExecuteAction(
@@ -14129,13 +14608,13 @@ void JsAccessibilityManager::CmpInteractionOperation::ClearFocus()
     auto taskExecutor = context->GetTaskExecutor();
     CHECK_NULL_VOID(taskExecutor);
     // Clear the accessibility focus currently held within the exported subtree only: the subAM tracks its own.
-    int64_t focusNodeId = subAM->currentFocusNodeId_;
     taskExecutor->PostTask(
-        [weak = GetHandler(), root = exportedRoot_, focusNodeId] {
+        [weak = GetHandler(), root = exportedRoot_] {
             auto subAM = weak.Upgrade();
             auto exportedRoot = root.Upgrade();
             CHECK_NULL_VOID(subAM);
             CHECK_NULL_VOID(exportedRoot);
+            int64_t focusNodeId = subAM->currentFocusNodeId_;
             if (focusNodeId == -1) {
                 return;
             }
@@ -14174,7 +14653,14 @@ void JsAccessibilityManager::CmpInteractionOperation::SetChildTreeIdAndWinId(
     auto taskExecutor = context->GetTaskExecutor();
     CHECK_NULL_VOID(taskExecutor);
     taskExecutor->PostTask(
-        [weak = GetHandler(), splitElementId, treeId, childWindowId] {
+        [weak = GetHandler(), registration = registration_, splitElementId, treeId, childWindowId] {
+            if (registration && registration->IsCanceled()) {
+                auto instance = AccessibilitySystemAbilityClient::GetInstance();
+                if (instance && treeId > 0) {
+                    instance->DeregisterElementOperator(childWindowId, treeId);
+                }
+                return;
+            }
             auto subAM = weak.Upgrade();
             CHECK_NULL_VOID(subAM);
             subAM->NotifySetChildTreeIdAndWinId(splitElementId, treeId, childWindowId);
@@ -14183,28 +14669,35 @@ void JsAccessibilityManager::CmpInteractionOperation::SetChildTreeIdAndWinId(
 
 void JsAccessibilityManager::CmpInteractionOperation::SetBelongTreeId(const int32_t treeId)
 {
-    // T_sub assigned by AAMS: the exported subtree's own treeId.
-    TAG_LOGI(AceLogTag::ACE_ACCESSIBILITY, "CmpOp SetBelongTreeId: treeId=%{public}d", treeId);
+    CHECK_NULL_VOID(registration_);
+    registration_->SetTreeId(treeId);
+    if (registration_->IsCanceled()) {
+        return;
+    }
     auto subAM = js_.Upgrade();
-    CHECK_NULL_VOID(subAM);
-    subAM->treeId_ = treeId;
-    subAM->Register(true);
+    if (!subAM) {
+        registration_->Cancel();
+        return;
+    }
     auto context = subAM->GetPipelineContext().Upgrade();
-    CHECK_NULL_VOID(context);
-    auto taskExecutor = context->GetTaskExecutor();
-    CHECK_NULL_VOID(taskExecutor);
-    taskExecutor->PostTask(
-        [bindingOwner = bindingOwner_, weak = GetHandler(), treeId, bindId = hostElementId_,
-        ownerId = ownerNodeId_] {
-            // Binding state -> REGISTERED (T_sub arrived).
+    auto executor = context ? context->GetTaskExecutor() : nullptr;
+    if (!executor) {
+        registration_->Cancel();
+        return;
+    }
+    if (!executor->PostTask(
+        [bindingOwner = bindingOwner_, weak = GetHandler(), registration = registration_,
+        key = std::make_pair(ownerNodeId_, hostElementId_)] {
             auto mainAM = bindingOwner.Upgrade();
-            if (mainAM) {
-                mainAM->MarkCmpBindingRegistered(ownerId, bindId);
-            }
             auto subAM = weak.Upgrade();
-            CHECK_NULL_VOID(subAM);
-            subAM->NotifyChildTreeOnRegister(treeId);
-        }, TaskExecutor::TaskType::UI, "ArkUICmpSubTreeIdAssigned");
+            if (!mainAM || !subAM) {
+                registration->Cancel();
+                return;
+            }
+            mainAM->MarkCmpBindingRegistered(key, subAM, registration);
+        }, TaskExecutor::TaskType::UI, "ArkUICmpSubTreeIdAssigned")) {
+        registration_->Cancel();
+    }
 }
 
 void JsAccessibilityManager::CmpInteractionOperation::FocusMoveSearchWithCondition(

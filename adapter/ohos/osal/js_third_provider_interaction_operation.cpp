@@ -295,6 +295,7 @@ JsThirdProviderInteractionOperation::JsThirdProviderInteractionOperation(
 
 JsThirdProviderInteractionOperation::~JsThirdProviderInteractionOperation()
 {
+    NotifyCmpTreeDeregistered(GetBelongTreeId());
     ClearAllThirdCustomProperties();
     TAG_LOGI(AceLogTag::ACE_ACCESSIBILITY, "JsThirdProviderInteractionOperation Destory");
 }
@@ -884,7 +885,17 @@ void JsThirdProviderInteractionOperation::SetChildTreeIdAndWinId(
     TAG_LOGI(AceLogTag::ACE_ACCESSIBILITY, "SetChildTreeIdAndWinId, node: %{public}" PRId64 ","
         "treeId: %{public}d, childWindowId: %{public}d", splitElementId, treeId, childWindowId);
     std::lock_guard<std::mutex> lock(childTreeIdWinIdMapMutex_);
-    childTreeIdWinIdMap_[splitElementId] = std::make_pair(treeId, childWindowId);
+    if (treeId <= 0) {
+        childTreeIdWinIdMap_.erase(splitElementId);
+    } else {
+        childTreeIdWinIdMap_[splitElementId] = std::make_pair(treeId, childWindowId);
+    }
+}
+
+void JsThirdProviderInteractionOperation::RemoveChildTreeIdAndWinId(int64_t rawElementId)
+{
+    std::lock_guard<std::mutex> lock(childTreeIdWinIdMapMutex_);
+    childTreeIdWinIdMap_.erase(rawElementId);
 }
 
 void JsThirdProviderInteractionOperation::ApplyChildTreeIdAndWinId(
@@ -919,9 +930,30 @@ void JsThirdProviderInteractionOperation::ApplyChildTreeIdAndWinId(
     }
 }
 
+void JsThirdProviderInteractionOperation::NotifyCmpTreeDeregistered(int32_t treeId)
+{
+    CHECK_EQUAL_VOID(treeId <= 0, true);
+    auto manager = jsAccessibilityManager_.Upgrade();
+    auto context = manager ? manager->GetPipelineContext().Upgrade() : nullptr;
+    auto executor = context ? context->GetTaskExecutor() : nullptr;
+    CHECK_NULL_VOID(executor);
+    executor->PostTask(
+        [weak = jsAccessibilityManager_, host = host_, treeId] {
+            auto manager = weak.Upgrade();
+            auto owner = host.Upgrade();
+            if (manager && owner) {
+                manager->OnCmpTreeDeregistered(owner.GetRawPtr(), treeId);
+            }
+        }, TaskExecutor::TaskType::UI, "ArkUICmpTreeDeregistered");
+}
+
 void JsThirdProviderInteractionOperation::SetBelongTreeId(const int32_t treeId)
 {
-    belongTreeId_ = treeId;
+    auto oldTreeId = belongTreeId_.exchange(treeId);
+    if (treeId <= 0) {
+        NotifyCmpTreeDeregistered(oldTreeId);
+        return;
+    }
     // CMP mixed-rendering convergence: the CMP tree's own treeId just arrived.
     auto jsAccessibilityManager = jsAccessibilityManager_.Upgrade();
     auto hostNode = host_.Upgrade();
@@ -937,6 +969,9 @@ void JsThirdProviderInteractionOperation::SetBelongTreeId(const int32_t treeId)
             auto jsAccessibilityManager = weak.Upgrade();
             auto hostNode = host.Upgrade();
             if (!jsAccessibilityManager || !hostNode) {
+                return;
+            }
+            if (jsAccessibilityManager->GetThirdProviderTreeIdForHost(hostNode.GetRawPtr()) != treeId) {
                 return;
             }
             jsAccessibilityManager->OnCmpTreeRegistered(hostNode.GetRawPtr(), treeId);
@@ -980,6 +1015,7 @@ void RunCmpDetectFocusableOnUI(const WeakPtr<JsAccessibilityManager>& weakSubAM,
 
 // Detect-focusable branch of FocusMoveSearchWithCondition.
 void DelegateDetectFocusableToSubtree(const RefPtr<JsAccessibilityManager>& jsAccessibilityManager,
+    int32_t ownerNodeId,
     const AccessibilityElementInfo& info, const AccessibilityFocusMoveParam& param,
     const int32_t requestId, AccessibilityElementOperatorCallback& callback)
 {
@@ -987,7 +1023,7 @@ void DelegateDetectFocusableToSubtree(const RefPtr<JsAccessibilityManager>& jsAc
     int32_t splitParentTreeId = AccessibilityElementInfo::UNDEFINED_TREE_ID;
     AccessibilitySystemAbilityClient::GetTreeIdAndElementIdBySplitElementId(
         param.parentId, splitParentId, splitParentTreeId);
-    auto binding = jsAccessibilityManager->GetCmpBindingForHover(splitParentId);
+    auto binding = jsAccessibilityManager->GetCmpBindingForHover(ownerNodeId, splitParentId);
     if (binding.has_value()) {
         auto subAM = binding->subAM;
         auto context = subAM->GetPipelineContext().Upgrade();
@@ -1038,7 +1074,21 @@ void JsThirdProviderInteractionOperation::FocusMoveSearchWithCondition(
         return;
     }
     if (FocusStrategyOsal::IsProcessDetectFocusable(param)) {
-        DelegateDetectFocusableToSubtree(jsAccessibilityManager, info, param, requestId, callback);
+        auto context = jsAccessibilityManager->GetPipelineContext().Upgrade();
+        auto executor = context ? context->GetTaskExecutor() : nullptr;
+        if (!executor) {
+            ReplyFocusMoveNotSupport(callback, requestId);
+            return;
+        }
+        executor->PostTask([weak = jsAccessibilityManager_, host = host_, info, param, requestId, &callback] {
+            auto manager = weak.Upgrade();
+            auto owner = host.Upgrade();
+            if (!manager || !owner) {
+                ReplyFocusMoveNotSupport(callback, requestId);
+                return;
+            }
+            DelegateDetectFocusableToSubtree(manager, owner->GetId(), info, param, requestId, callback);
+        }, TaskExecutor::TaskType::UI, "ArkUICmpResolveFocusableOwner");
         return;
     }
     auto result = strategy.ExecuteFocusMoveSearch(splitElementId, param, nodeInfo);

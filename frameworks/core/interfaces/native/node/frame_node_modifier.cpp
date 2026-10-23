@@ -1309,11 +1309,31 @@ ArkUI_Int32 BindAccessibilityExportTree(ArkUINodeHandle owner, ArkUI_Int64 bindI
         return ARKUI_ERROR_CODE_PARAM_INVALID;
     }
 #ifdef OHOS_PLATFORM
-    if (!OHOS::Ace::CmpAccessibility::CmpAccessibilityRegistry::BindExportTree(
-        ownerNode, static_cast<int64_t>(bindId), exportedRootNode)) {
-        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    auto container = Container::GetContainer(ownerNode->GetInstanceId());
+    auto executor = container ? container->GetTaskExecutor() : nullptr;
+    CHECK_NULL_RETURN(executor, ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_Int32 result = ARKUI_ERROR_CODE_PARAM_INVALID;
+    auto task = [ownerWeak = Referenced::WeakClaim(ownerNode),
+        rootWeak = Referenced::WeakClaim(exportedRootNode), bindId, &result] {
+        auto owner = ownerWeak.Upgrade();
+        auto root = rootWeak.Upgrade();
+        CHECK_NULL_VOID(owner);
+        if (owner->GetTag() != V2::CUSTOM_ETS_TAG && owner->GetTag() != V2::XCOMPONENT_ETS_TAG) {
+            return;
+        }
+        CHECK_NULL_VOID(root);
+        ContainerScope scope(owner->GetInstanceId());
+        if (OHOS::Ace::CmpAccessibility::CmpAccessibilityRegistry::BindExportTree(
+            owner.GetRawPtr(), bindId, root.GetRawPtr())) {
+            result = ARKUI_ERROR_CODE_NO_ERROR;
+        }
+    };
+    if (executor->WillRunOnCurrentThread(TaskExecutor::TaskType::UI)) {
+        task();
+    } else {
+        executor->PostSyncTask(task, TaskExecutor::TaskType::UI, "ArkUIBindAccessibilityExportTree");
     }
-    return ARKUI_ERROR_CODE_NO_ERROR;
+    return result;
 #else
     // CMP mixed-rendering depends on the OHOS accessibility (AAMS) stack.
     return ARKUI_ERROR_CODE_INTERNAL_ERROR;
@@ -1328,9 +1348,26 @@ ArkUI_Int32 UnbindAccessibilityExportTree(ArkUINodeHandle owner, ArkUI_Int64 bin
         return ARKUI_ERROR_CODE_PARAM_INVALID;
     }
 #ifdef OHOS_PLATFORM
-    OHOS::Ace::CmpAccessibility::CmpAccessibilityRegistry::UnbindExportTree(
-        ownerNode, static_cast<int64_t>(bindId));
-    return ARKUI_ERROR_CODE_NO_ERROR;
+    auto container = Container::GetContainer(ownerNode->GetInstanceId());
+    auto executor = container ? container->GetTaskExecutor() : nullptr;
+    CHECK_NULL_RETURN(executor, ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_Int32 result = ARKUI_ERROR_CODE_PARAM_INVALID;
+    auto task = [ownerWeak = Referenced::WeakClaim(ownerNode), bindId, &result] {
+        auto owner = ownerWeak.Upgrade();
+        CHECK_NULL_VOID(owner);
+        if (owner->GetTag() != V2::CUSTOM_ETS_TAG && owner->GetTag() != V2::XCOMPONENT_ETS_TAG) {
+            return;
+        }
+        ContainerScope scope(owner->GetInstanceId());
+        OHOS::Ace::CmpAccessibility::CmpAccessibilityRegistry::UnbindExportTree(owner.GetRawPtr(), bindId);
+        result = ARKUI_ERROR_CODE_NO_ERROR;
+    };
+    if (executor->WillRunOnCurrentThread(TaskExecutor::TaskType::UI)) {
+        task();
+    } else if (!executor->PostSyncTask(task, TaskExecutor::TaskType::UI, "ArkUIUnbindAccessibilityExportTree")) {
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    return result;
 #else
     return ARKUI_ERROR_CODE_INTERNAL_ERROR;
 #endif

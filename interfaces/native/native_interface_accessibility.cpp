@@ -845,13 +845,8 @@ bool IsSupportedOwnerNodeType(const ArkUI_NodeHandle node)
     if (node == nullptr) {
         return false;
     }
-    int32_t nodeType = -1;
-    if (node->type != -1) {
-        nodeType = node->type;
-    } else {
-        nodeType = OHOS::Ace::NodeModel::GetNodeTypeByTag(node);
-    }
-    return nodeType == ARKUI_NODE_CUSTOM || nodeType == ARKUI_NODE_XCOMPONENT ||
+    int32_t nodeType = node->type;
+    return nodeType == -1 || nodeType == ARKUI_NODE_CUSTOM || nodeType == ARKUI_NODE_XCOMPONENT ||
         nodeType == ARKUI_NODE_XCOMPONENT_TEXTURE;
 }
 } // namespace

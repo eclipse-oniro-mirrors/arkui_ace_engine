@@ -34,6 +34,10 @@ using namespace testing;
 using namespace testing::ext;
 
 namespace OHOS::Ace {
+using Framework::CommonProperty;
+using NG::MockPipelineContext;
+using NG::VirtualNodeContainerIdManager;
+
 namespace {
 
 const char* const TEST_TAG_CONTAINER = "virtualNodeContainer";
@@ -164,7 +168,7 @@ HWTEST_F(JsAccessibilityManagerVirtualNodeTest, UpdateAccessibilityElementInfoFo
      */
     auto manager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
     auto hostNode = NG::FrameNode::CreateFrameNode(TEST_TAG_CONTAINER,
-        NG::ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<NG::Pattern>(), true);
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<NG::Pattern>(), true);
     Accessibility::AccessibilityElementInfo nodeInfo;
     CommonProperty commonProperty;
     manager->UpdateAccessibilityElementInfoForVirtualNode(
@@ -186,7 +190,7 @@ HWTEST_F(JsAccessibilityManagerVirtualNodeTest, UpdateAccessibilityElementInfoFo
     auto& mgr = NG::VirtualNodeContainerIdManager::GetInstance();
     auto manager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
     auto hostNode = NG::FrameNode::CreateFrameNode(TEST_TAG_CONTAINER,
-        NG::ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<NG::Pattern>(), true);
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<NG::Pattern>(), true);
     auto containerId = mgr.AllocateContainerId(hostNode);
     ASSERT_NE(containerId, 0);
 
@@ -220,14 +224,14 @@ HWTEST_F(JsAccessibilityManagerVirtualNodeTest, UpdateAccessibilityElementInfoFo
     EXPECT_EQ(nodeInfo.GetContent(), "testText");
     EXPECT_EQ(nodeInfo.GetAccessibilityLevel(), "yes");
     EXPECT_EQ(nodeInfo.GetAccessibilityGroup(), true);
-    EXPECT_EQ(nodeInfo.GetCheckable(), true);
-    EXPECT_EQ(nodeInfo.GetChecked(), true);
-    EXPECT_EQ(nodeInfo.GetEnabled(), true);
-    EXPECT_EQ(nodeInfo.GetSelected(), true);
-    EXPECT_EQ(nodeInfo.GetAccessibilityFocus(), true);
-    EXPECT_EQ(nodeInfo.GetParent(), TEST_PARENT_ACCESSIBILITY_ID);
+    EXPECT_EQ(nodeInfo.IsCheckable(), true);
+    EXPECT_EQ(nodeInfo.IsChecked(), true);
+    EXPECT_EQ(nodeInfo.IsEnabled(), true);
+    EXPECT_EQ(nodeInfo.IsSelected(), true);
+    EXPECT_EQ(nodeInfo.HasAccessibilityFocus(), true);
+    EXPECT_EQ(nodeInfo.GetParentNodeId(), TEST_PARENT_ACCESSIBILITY_ID);
     EXPECT_EQ(nodeInfo.GetWindowId(), TEST_WINDOW_ID);
-    EXPECT_EQ(nodeInfo.GetVisible(), true);
+    EXPECT_EQ(nodeInfo.IsVisible(), true);
 }
 
 /**
@@ -244,7 +248,7 @@ HWTEST_F(JsAccessibilityManagerVirtualNodeTest, UpdateAccessibilityElementInfoFo
     auto& mgr = NG::VirtualNodeContainerIdManager::GetInstance();
     auto manager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
     auto hostNode = NG::FrameNode::CreateFrameNode(TEST_TAG_CONTAINER,
-        NG::ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<NG::Pattern>(), true);
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<NG::Pattern>(), true);
     mgr.AllocateContainerId(hostNode);
 
     auto virtualNode = AceType::MakeRefPtr<NG::VirtualAccessibilityNode>();
@@ -264,13 +268,13 @@ HWTEST_F(JsAccessibilityManagerVirtualNodeTest, UpdateAccessibilityElementInfoFo
 
     manager->UpdateAccessibilityElementInfoForVirtualNode(hostNode, virtualNode, commonProperty, nodeInfo, 0);
 
-    auto bounds = nodeInfo.GetBoundsInScreen();
+    auto bounds = nodeInfo.GetRectInScreen();
     int32_t hostLeft = static_cast<int32_t>(hostNode->GetTransformRectRelativeToWindow().Left());
     int32_t hostTop = static_cast<int32_t>(hostNode->GetTransformRectRelativeToWindow().Top());
-    EXPECT_EQ(bounds.GetLeftTopXScreenPos(), hostLeft + 10 + 5);
-    EXPECT_EQ(bounds.GetLeftTopYScreenPos(), hostTop + 20 + 5);
-    EXPECT_EQ(bounds.GetRightBottomXScreenPos(), hostLeft + 10 + 5 + 100);
-    EXPECT_EQ(bounds.GetRightBottomYScreenPos(), hostTop + 20 + 5 + 50);
+    EXPECT_EQ(bounds.GetLeftTopXScreenPostion(), hostLeft + 10 + 5);
+    EXPECT_EQ(bounds.GetLeftTopYScreenPostion(), hostTop + 20 + 5);
+    EXPECT_EQ(bounds.GetRightBottomXScreenPostion(), hostLeft + 10 + 5 + 100);
+    EXPECT_EQ(bounds.GetRightBottomYScreenPostion(), hostTop + 20 + 5 + 50);
 }
 
 /**
@@ -287,7 +291,7 @@ HWTEST_F(JsAccessibilityManagerVirtualNodeTest, UpdateAccessibilityElementInfoFo
     auto& mgr = NG::VirtualNodeContainerIdManager::GetInstance();
     auto manager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
     auto hostNode = NG::FrameNode::CreateFrameNode(TEST_TAG_CONTAINER,
-        NG::ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<NG::Pattern>(), true);
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<NG::Pattern>(), true);
     auto containerId = mgr.AllocateContainerId(hostNode);
 
     auto root = CreateVirtualNodeTree();
@@ -342,7 +346,7 @@ HWTEST_F(JsAccessibilityManagerVirtualNodeTest, AddVirtualNodeChildrenToInfos002
      */
     auto manager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
     auto hostNode = NG::FrameNode::CreateFrameNode(TEST_TAG_CONTAINER,
-        NG::ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<NG::Pattern>(), true);
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<NG::Pattern>(), true);
     std::list<Accessibility::AccessibilityElementInfo> infos;
     CommonProperty commonProperty;
 
@@ -365,7 +369,7 @@ HWTEST_F(JsAccessibilityManagerVirtualNodeTest, AddVirtualNodeChildrenToInfos003
     auto& mgr = NG::VirtualNodeContainerIdManager::GetInstance();
     auto manager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
     auto hostNode = NG::FrameNode::CreateFrameNode(TEST_TAG_CONTAINER,
-        NG::ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<NG::Pattern>(), true);
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<NG::Pattern>(), true);
     mgr.AllocateContainerId(hostNode);
 
     auto virtualNode = AceType::MakeRefPtr<NG::VirtualAccessibilityNode>();
@@ -396,7 +400,7 @@ HWTEST_F(JsAccessibilityManagerVirtualNodeTest, AddVirtualNodeChildrenToInfos004
     auto& mgr = NG::VirtualNodeContainerIdManager::GetInstance();
     auto manager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
     auto hostNode = NG::FrameNode::CreateFrameNode(TEST_TAG_CONTAINER,
-        NG::ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<NG::Pattern>(), true);
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<NG::Pattern>(), true);
     mgr.AllocateContainerId(hostNode);
 
     auto root = CreateVirtualNodeTree();
@@ -412,7 +416,7 @@ HWTEST_F(JsAccessibilityManagerVirtualNodeTest, AddVirtualNodeChildrenToInfos004
     ASSERT_EQ(infos.size(), 2U);
     auto it = infos.begin();
     EXPECT_EQ(it->GetContent(), "child1");
-    EXPECT_EQ(it->GetParent(), 100);
+    EXPECT_EQ(it->GetParentNodeId(), 100);
     ++it;
     EXPECT_EQ(it->GetContent(), "child2");
 }
@@ -431,7 +435,7 @@ HWTEST_F(JsAccessibilityManagerVirtualNodeTest, AddVirtualNodeChildrenToInfos005
     auto& mgr = NG::VirtualNodeContainerIdManager::GetInstance();
     auto manager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
     auto hostNode = NG::FrameNode::CreateFrameNode(TEST_TAG_CONTAINER,
-        NG::ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<NG::Pattern>(), true);
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<NG::Pattern>(), true);
     mgr.AllocateContainerId(hostNode);
 
     auto root = AceType::MakeRefPtr<NG::VirtualAccessibilityNode>();
@@ -482,7 +486,7 @@ HWTEST_F(JsAccessibilityManagerVirtualNodeTest, GetAllVirtualNodeElementId001, T
      */
     auto manager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
     auto hostNode = NG::FrameNode::CreateFrameNode(TEST_TAG_CONTAINER,
-        NG::ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<NG::Pattern>(), true);
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<NG::Pattern>(), true);
 
     std::list<Accessibility::AccessibilityElementInfo> infos;
     CommonProperty commonProperty;
@@ -505,7 +509,7 @@ HWTEST_F(JsAccessibilityManagerVirtualNodeTest, GetAllVirtualNodeElementId002, T
     auto& mgr = NG::VirtualNodeContainerIdManager::GetInstance();
     auto manager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
     auto hostNode = NG::FrameNode::CreateFrameNode(TEST_TAG_CONTAINER,
-        NG::ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<NG::Pattern>(), true);
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<NG::Pattern>(), true);
     mgr.AllocateContainerId(hostNode);
 
     auto root = CreateVirtualNodeTree();
@@ -540,7 +544,7 @@ HWTEST_F(JsAccessibilityManagerVirtualNodeTest, GetAllVirtualNodeElementId003, T
     auto& mgr = NG::VirtualNodeContainerIdManager::GetInstance();
     auto manager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
     auto hostNode = NG::FrameNode::CreateFrameNode(TEST_TAG_CONTAINER,
-        NG::ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<NG::Pattern>(), true);
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<NG::Pattern>(), true);
     auto containerId = mgr.AllocateContainerId(hostNode);
     auto virtualRoot = AceType::MakeRefPtr<NG::VirtualAccessibilityNode>();
     virtualRoot->SetNodeId(5);
@@ -605,7 +609,7 @@ HWTEST_F(JsAccessibilityManagerVirtualNodeTest, SearchAccessibilityVirtualNode00
     auto& mgr = NG::VirtualNodeContainerIdManager::GetInstance();
     auto manager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
     auto hostNode = NG::FrameNode::CreateFrameNode(TEST_TAG_CONTAINER,
-        NG::ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<NG::Pattern>(), true);
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<NG::Pattern>(), true);
     auto containerId = mgr.AllocateContainerId(hostNode);
     auto virtualRoot = AceType::MakeRefPtr<NG::VirtualAccessibilityNode>();
     virtualRoot->SetNodeId(TEST_ROOT_NODE_ID);
@@ -637,7 +641,7 @@ HWTEST_F(JsAccessibilityManagerVirtualNodeTest, SearchAccessibilityVirtualNode00
     auto& mgr = NG::VirtualNodeContainerIdManager::GetInstance();
     auto manager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
     auto hostNode = NG::FrameNode::CreateFrameNode(TEST_TAG_CONTAINER,
-        NG::ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<NG::Pattern>(), true);
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<NG::Pattern>(), true);
     auto containerId = mgr.AllocateContainerId(hostNode);
 
     auto root = CreateVirtualNodeTree();
@@ -697,7 +701,7 @@ HWTEST_F(JsAccessibilityManagerVirtualNodeTest, CheckAndGetVirtualNode002, TestS
     auto& mgr = NG::VirtualNodeContainerIdManager::GetInstance();
     auto manager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
     auto hostNode = NG::FrameNode::CreateFrameNode(TEST_TAG_CONTAINER,
-        NG::ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<NG::Pattern>(), true);
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<NG::Pattern>(), true);
     auto containerId = mgr.AllocateContainerId(hostNode);
 
     int64_t elementId = NG::VirtualNodeContainerIdManager::EncodeVirtualNodeAccessibilityId(containerId, 1);
@@ -722,7 +726,7 @@ HWTEST_F(JsAccessibilityManagerVirtualNodeTest, CheckAndGetVirtualNode003, TestS
     auto& mgr = NG::VirtualNodeContainerIdManager::GetInstance();
     auto manager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
     auto hostNode = NG::FrameNode::CreateFrameNode(TEST_TAG_CONTAINER,
-        NG::ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<NG::Pattern>(), true);
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<NG::Pattern>(), true);
     auto containerId = mgr.AllocateContainerId(hostNode);
 
     auto root = AceType::MakeRefPtr<NG::VirtualAccessibilityNode>();
@@ -746,7 +750,7 @@ HWTEST_F(JsAccessibilityManagerVirtualNodeTest, CheckAndGetVirtualNode003, TestS
     ASSERT_EQ(infos.size(), 1U);
     EXPECT_EQ(infos.front().GetContent(), "foundMe");
     EXPECT_EQ(infos.front().GetComponentType(), "button");
-    EXPECT_EQ(infos.front().GetAccessibilityFocus(), true);
+    EXPECT_EQ(infos.front().HasAccessibilityFocus(), true);
 }
 
 // ================= AccessibilityFocused propagation in UpdateAccessibilityElementInfoForVirtualNode =================
@@ -765,7 +769,7 @@ HWTEST_F(JsAccessibilityManagerVirtualNodeTest, UpdateAccessibilityElementInfoFo
     auto& mgr = NG::VirtualNodeContainerIdManager::GetInstance();
     auto manager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
     auto hostNode = NG::FrameNode::CreateFrameNode(TEST_TAG_CONTAINER,
-        NG::ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<NG::Pattern>(), true);
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<NG::Pattern>(), true);
     mgr.AllocateContainerId(hostNode);
 
     auto virtualNode = AceType::MakeRefPtr<NG::VirtualAccessibilityNode>();
@@ -784,7 +788,7 @@ HWTEST_F(JsAccessibilityManagerVirtualNodeTest, UpdateAccessibilityElementInfoFo
 
     manager->UpdateAccessibilityElementInfoForVirtualNode(hostNode, virtualNode, commonProperty, nodeInfo, 0);
 
-    EXPECT_EQ(nodeInfo.GetAccessibilityFocus(), false);
+    EXPECT_EQ(nodeInfo.HasAccessibilityFocus(), false);
 }
 
 // ==================== VirtualAccessibilityNode OnAccessibilityHover ====================
