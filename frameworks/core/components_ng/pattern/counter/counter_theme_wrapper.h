@@ -21,7 +21,7 @@
 #include "base/memory/ace_type.h"
 #include "base/utils/device_config.h"
 #include "core/components/counter/counter_theme.h"
-#include "core/components_ng/token_theme/token_theme_wrapper.h"
+#include "core/components_ng/token_theme/token_theme.h"
 
 namespace OHOS::Ace::NG {
 
@@ -30,7 +30,7 @@ namespace OHOS::Ace::NG {
  * basing on TokenTheme's data.
  * CounterThemeWrapper should be built using CounterThemeWrapper::WrapperBuilder.
  */
-class CounterThemeWrapper : public CounterTheme, public TokenThemeWrapper {
+class CounterThemeWrapper : public CounterTheme {
     DECLARE_ACE_TYPE(CounterThemeWrapper, CounterTheme);
 
 public:
@@ -39,7 +39,7 @@ public:
         WrapperBuilder() = default;
         ~WrapperBuilder() override = default;
 
-        RefPtr<TokenThemeWrapper> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
+        RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
         {
             auto wrapper = AceType::MakeRefPtr<CounterThemeWrapper>();
             ParsePattern(themeConstants, AceType::DynamicCast<CounterTheme>(wrapper));

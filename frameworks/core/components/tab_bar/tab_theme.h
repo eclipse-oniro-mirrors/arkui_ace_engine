@@ -24,7 +24,7 @@ namespace OHOS::Ace {
 class ThemeConstants;
 class ThemeStyle;
 
-class TabTheme : public virtual Theme {
+class TabTheme : public Theme {
     DECLARE_ACE_TYPE(TabTheme, Theme);
 
 public:

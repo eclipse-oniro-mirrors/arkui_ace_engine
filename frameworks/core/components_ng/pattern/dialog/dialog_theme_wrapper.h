@@ -20,7 +20,7 @@
 
 #include "base/memory/ace_type.h"
 #include "core/components/dialog/dialog_theme.h"
-#include "core/components_ng/token_theme/token_theme_wrapper.h"
+#include "core/components_ng/token_theme/token_theme.h"
 
 namespace OHOS::Ace::NG {
 
@@ -28,7 +28,7 @@ namespace OHOS::Ace::NG {
  * DialogThemeWrapper defines color and styles of DialogComponent basing on TokenTheme's data.
  * DialogThemeWrapper should be built using DialogThemeWrapper::Builder.
  */
-class DialogThemeWrapper : public DialogTheme, public TokenThemeWrapper {
+class DialogThemeWrapper : public DialogTheme {
     DECLARE_ACE_TYPE(DialogThemeWrapper, DialogTheme);
 
 public:
@@ -37,7 +37,7 @@ public:
         WrapperBuilder() = default;
         ~WrapperBuilder() override = default;
 
-        RefPtr<TokenThemeWrapper> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
+        RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
         {
             auto wrapper = AceType::MakeRefPtr<DialogThemeWrapper>();
             auto theme = AceType::DynamicCast<DialogTheme>(wrapper);

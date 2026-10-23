@@ -65,28 +65,6 @@ constexpr float FIRST_ITEM_HEIGHT = 50.0f;
 const SizeF FIRST_ITEM_SIZE(FIRST_ITEM_WIDTH, FIRST_ITEM_HEIGHT);
 } // namespace
 
-class MockDialogTheme : public DialogTheme, public ButtonTheme {
-    DECLARE_ACE_TYPE(MockDialogTheme, DialogTheme, ButtonTheme);
-
-public:
-    class Builder {
-    public:
-        Builder() = default;
-        ~Builder() = default;
-
-        RefPtr<MockDialogTheme> Build(const RefPtr<ThemeConstants>& themeConstants) const
-        {
-            RefPtr<MockDialogTheme> theme = AceType::MakeRefPtr<MockDialogTheme>();
-            return theme;
-        }
-    };
-
-    ~MockDialogTheme() override = default;
-
-protected:
-    MockDialogTheme() = default;
-};
-
 class DialogLayoutTestNg : public testing::Test {
 public:
     static void SetUpTestCase();
@@ -165,8 +143,12 @@ void DialogLayoutTestNg::TearDownTestCase()
 void DialogLayoutTestNg::SetDialogTheme()
 {
     auto themeManager = AceType::DynamicCast<MockThemeManager>(MockPipelineContext::GetCurrent()->GetThemeManager());
-    EXPECT_CALL(*themeManager, GetTheme(_)).WillRepeatedly(Return(AceType::MakeRefPtr<MockDialogTheme>()));
-    EXPECT_CALL(*themeManager, GetTheme(_, _)).WillRepeatedly(Return(AceType::MakeRefPtr<MockDialogTheme>()));
+    EXPECT_CALL(*themeManager, GetTheme(_)).WillRepeatedly(Return(AceType::MakeRefPtr<DialogTheme>()));
+    EXPECT_CALL(*themeManager, GetTheme(_, _)).WillRepeatedly(Return(AceType::MakeRefPtr<DialogTheme>()));
+    EXPECT_CALL(*themeManager, GetTheme(ButtonTheme::TypeId()))
+        .WillRepeatedly(Return(AceType::MakeRefPtr<ButtonTheme>()));
+    EXPECT_CALL(*themeManager, GetTheme(ButtonTheme::TypeId(), _))
+        .WillRepeatedly(Return(AceType::MakeRefPtr<ButtonTheme>()));
 }
 
 RefPtr<LayoutWrapperNode> CreatlayoutWrapper()

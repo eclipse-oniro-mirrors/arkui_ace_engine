@@ -20,14 +20,19 @@
 
 namespace OHOS::Ace {
 
+class TokenTheme;
+
 using ThemeType = AceType::IdType;
 
-class ACE_FORCE_EXPORT Theme : public virtual AceType {
+class ACE_FORCE_EXPORT Theme : public AceType {
     DECLARE_ACE_TYPE(Theme, AceType);
 
 public:
     Theme() = default;
     ~Theme() override = default;
+
+    // Themes without token customization keep their existing values.
+    virtual void ApplyTokenTheme(const TokenTheme&) {}
 };
 
 } // namespace OHOS::Ace

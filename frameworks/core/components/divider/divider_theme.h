@@ -22,7 +22,7 @@
 
 namespace OHOS::Ace {
 
-class DividerTheme : public virtual Theme {
+class DividerTheme : public Theme {
     DECLARE_ACE_TYPE(DividerTheme, Theme);
 
 public:

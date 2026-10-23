@@ -5452,11 +5452,10 @@
         "theme_attributes": "frameworks/core/components/theme/theme_attributes.h",
         "theme_style": "frameworks/core/components/theme/theme_style.h",
         "token_theme_storage": "frameworks/core/components_ng/token_theme/token_theme_storage.cpp",
-        "token_theme_wrapper": "frameworks/core/components_ng/token_theme/token_theme_wrapper.h",
         "token_theme": "frameworks/core/components_ng/token_theme/token_theme.h",
         "token_colors": "frameworks/core/components_ng/token_theme/token_colors.h",
         "inner_api_token_theme": "interfaces/inner_api/ace_kit/include/ui/view/theme/token_theme.h",
-        "inner_api_token_theme_wrapper": "interfaces/inner_api/ace_kit/include/ui/view/theme/token_theme_wrapper.h"
+        "inner_api_theme": "interfaces/inner_api/ace_kit/include/ui/view/theme/theme.h"
       },
       "api_paths": {
         "resource_manager": "<OH_ROOT>/interface/sdk-js/api/@ohos.resourceManager.d.ts"

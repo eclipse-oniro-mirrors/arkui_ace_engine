@@ -23,7 +23,7 @@
 #include "base/memory/ace_type.h"
 #include "core/components/badge/badge_theme.h"
 #include "core/components/declaration/common/declaration.h"
-#include "core/components_ng/token_theme/token_theme_wrapper.h"
+#include "core/components_ng/token_theme/token_theme.h"
 
 namespace OHOS::Ace::NG {
 
@@ -31,7 +31,7 @@ namespace OHOS::Ace::NG {
  * BadgeThemeWrapper defines color and styles of BadgeComponent basing on TokenTheme's data.
  * BadgeThemeWrapper should be built using BadgeThemeWrapper::Builder.
  */
-class BadgeThemeWrapper : public BadgeTheme, public TokenThemeWrapper {
+class BadgeThemeWrapper : public BadgeTheme {
     DECLARE_ACE_TYPE(BadgeThemeWrapper, BadgeTheme);
 
 public:
@@ -40,7 +40,7 @@ public:
         WrapperBuilder() = default;
         ~WrapperBuilder() override = default;
 
-        RefPtr<TokenThemeWrapper> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
+        RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
         {
             auto wrapper = AceType::MakeRefPtr<BadgeThemeWrapper>();
             auto theme = AceType::DynamicCast<BadgeTheme>(wrapper);

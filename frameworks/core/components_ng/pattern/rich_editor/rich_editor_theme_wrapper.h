@@ -18,11 +18,11 @@
 
 #include "base/memory/ace_type.h"
 #include "core/components_ng/pattern/rich_editor/rich_editor_theme.h"
-#include "core/components_ng/token_theme/token_theme_wrapper.h"
+#include "core/components_ng/token_theme/token_theme.h"
 
 namespace OHOS::Ace::NG {
 
-class RichEditorThemeWrapper : public RichEditorTheme, public TokenThemeWrapper {
+class RichEditorThemeWrapper : public RichEditorTheme {
     DECLARE_ACE_TYPE(RichEditorThemeWrapper, RichEditorTheme);
 
 public:
@@ -31,7 +31,7 @@ public:
         WrapperBuilder() = default;
         ~WrapperBuilder() = default;
 
-        RefPtr<TokenThemeWrapper> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
+        RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
         {
             auto wrapper = AceType::MakeRefPtr<RichEditorThemeWrapper>();
             auto theme = AceType::DynamicCast<RichEditorTheme>(wrapper);

@@ -17,12 +17,12 @@
 #define FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_TABS_TAB_THEME_WRAPPER_H
 
 #include "core/components/tab_bar/tab_theme.h"
-#include "core/components_ng/token_theme/token_theme_wrapper.h"
+#include "core/components_ng/token_theme/token_theme.h"
 
 namespace OHOS::Ace::NG {
 
-class TabThemeWrapper : public TabTheme, public TokenThemeWrapper {
-    DECLARE_ACE_TYPE(TabThemeWrapper, TabTheme, TokenThemeWrapper);
+class TabThemeWrapper : public TabTheme {
+    DECLARE_ACE_TYPE(TabThemeWrapper, TabTheme);
 
 public:
     class WrapperBuilder : public Builder {
@@ -30,7 +30,7 @@ public:
         WrapperBuilder() = default;
         ~WrapperBuilder() = default;
 
-        RefPtr<TokenThemeWrapper> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
+        RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
         {
             auto themeWrapper = AceType::MakeRefPtr<TabThemeWrapper>();
             auto theme = AceType::DynamicCast<TabTheme>(themeWrapper);

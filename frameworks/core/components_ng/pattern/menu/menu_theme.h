@@ -47,7 +47,7 @@ constexpr uint32_t MENU_OUTLINE_COLOR = 0x19FFFFFF;
  * MenuTheme defines styles of menu item. MenuTheme should be built
  * using MenuTheme::Builder.
  */
-class MenuTheme : public virtual Theme {
+class MenuTheme : public Theme {
     DECLARE_ACE_TYPE(MenuTheme, Theme);
 
 public:
