@@ -892,6 +892,10 @@ public:
     std::list<RefPtr<SpanItem>>::iterator GetSpanIter(int32_t index);
     SpanItemType GetSpanType(int32_t index);
 
+    // RichEditor has no approved fields from TextPattern's advanced entry.
+    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config) override
+    {}
+
     void DumpAdvanceInfo() override {}
     void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json) override  {}
 

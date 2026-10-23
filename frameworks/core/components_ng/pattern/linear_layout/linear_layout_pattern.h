@@ -126,6 +126,15 @@ public:
         json->Put("FlexBetweenSpace", static_cast<double>(layoutResult_.betweenSpace));
     }
 
+    void DumpSimplifyInfo(std::shared_ptr<JsonValue>& json, const InspectorDumpOptions& options) override
+    {
+        // Keep derived overrides, including components with intentionally empty output.
+        DumpSimplifyInfo(json);
+        if (!ShouldIncludeDiagnostic(options)) {
+            json->Delete("FlexMeasureLayoutPaired");
+        }
+    }
+
     bool IsVerticalReverseLayout() const override
     {
         if (!isVertical_) {

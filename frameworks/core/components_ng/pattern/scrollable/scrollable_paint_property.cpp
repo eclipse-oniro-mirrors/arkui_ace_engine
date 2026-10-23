@@ -18,6 +18,7 @@
 #include "core/components/scroll/scroll_bar_theme.h"
 #include "core/pipeline_ng/pipeline_context.h"
 #include "base/log/dump_log.h"
+#include "interfaces/inner_api/ui_session/param_config.h"
 
 namespace OHOS::Ace::NG {
 std::string ScrollablePaintProperty::ContentClipToStr() const
@@ -83,30 +84,38 @@ void ScrollablePaintProperty::DumpInfo()
         : DumpLog::GetInstance().AddDesc("clipContent: None");
 }
 
-void ScrollablePaintProperty::DumpInfo(std::unique_ptr<JsonValue>& json)
+void ScrollablePaintProperty::DumpScrollBarProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
 {
-    auto scrollBarMode = GetScrollBarMode().value_or(DisplayMode::OFF);
-    if (scrollBarMode == DisplayMode::OFF) {
-        json->Put("innerScrollBarState", "OFF");
-    } else if (scrollBarMode == DisplayMode::AUTO) {
-        json->Put("innerScrollBarState", "AUTO");
-    } else if (scrollBarMode == DisplayMode::ON) {
-        json->Put("innerScrollBarState", "ON");
-    }
     auto scrollBarHeight = GetScrollBarHeight();
-    json->Put("scrollBarHeight",
-        scrollBarHeight.has_value() ? scrollBarHeight.value().ToString().c_str() : "None");
+    if (!config.IsPublicTree() || scrollBarHeight.has_value()) {
+        json->Put("scrollBarHeight", scrollBarHeight.has_value() ? scrollBarHeight.value().ToString().c_str() : "None");
+    }
     auto scrollBarWidth = GetScrollBarWidth();
-    json->Put("scrollBarWidth", scrollBarWidth.has_value() ? scrollBarWidth.value().ToString().c_str() : "None");
+    if (!config.IsPublicTree() || scrollBarWidth.has_value()) {
+        json->Put("scrollBarWidth", scrollBarWidth.has_value() ? scrollBarWidth.value().ToString().c_str() : "None");
+    }
     auto scrollBarColor = GetScrollBarColor();
-    json->Put("scrollBarColor", scrollBarColor.has_value() ? scrollBarColor.value().ColorToString().c_str() : "None");
+    if (!config.IsPublicTree() || scrollBarColor.has_value()) {
+        json->Put(
+            "scrollBarColor", scrollBarColor.has_value() ? scrollBarColor.value().ColorToString().c_str() : "None");
+    }
     auto scrollBarMargin = GetScrollBarMargin();
-    json->Put("scrollBarMargin",
-        scrollBarMargin.has_value() ? scrollBarMargin.value().ToString().c_str() : "None");
+    if (!config.IsPublicTree() || scrollBarMargin.has_value()) {
+        json->Put("scrollBarMargin", scrollBarMargin.has_value() ? scrollBarMargin.value().ToString().c_str() : "None");
+    }
     auto fadingEdge = GetFadingEdge();
-    json->Put("fadingEdge", fadingEdge.has_value() ? (fadingEdge.value() ? "true" : "false") : "None");
+    if (!config.IsPublicTree() || fadingEdge.has_value()) {
+        json->Put("fadingEdge", fadingEdge.has_value() ? (fadingEdge.value() ? "true" : "false") : "None");
+    }
     auto fadingEdgeLength = GetFadingEdgeLength();
-    json->Put("fadingEdgeLength", fadingEdgeLength.has_value() ? fadingEdgeLength.value().ToString().c_str() : "None");
+    if (!config.IsPublicTree() || fadingEdgeLength.has_value()) {
+        json->Put(
+            "fadingEdgeLength", fadingEdgeLength.has_value() ? fadingEdgeLength.value().ToString().c_str() : "None");
+    }
+}
+
+void ScrollablePaintProperty::DumpContentClipInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
     auto clipContent = GetContentClip();
     if (clipContent.has_value()) {
         const char* clipMode = "DEFAULT";
@@ -128,9 +137,29 @@ void ScrollablePaintProperty::DumpInfo(std::unique_ptr<JsonValue>& json)
                 break;
         }
         json->Put("clipContent", clipMode);
-    } else {
+    } else if (!config.IsPublicTree()) {
         json->Put("clipContent", "None");
     }
+}
+
+void ScrollablePaintProperty::DumpInfo(std::unique_ptr<JsonValue>& json)
+{
+    DumpInfo(json, ParamConfig(), DisplayMode::OFF);
+}
+
+void ScrollablePaintProperty::DumpInfo(
+    std::unique_ptr<JsonValue>& json, const ParamConfig& config, DisplayMode defaultMode)
+{
+    auto scrollBarMode = GetScrollBarMode().value_or(defaultMode);
+    if (scrollBarMode == DisplayMode::OFF) {
+        json->Put("innerScrollBarState", "OFF");
+    } else if (scrollBarMode == DisplayMode::AUTO) {
+        json->Put("innerScrollBarState", "AUTO");
+    } else if (scrollBarMode == DisplayMode::ON) {
+        json->Put("innerScrollBarState", "ON");
+    }
+    DumpScrollBarProperties(json, config);
+    DumpContentClipInfo(json, config);
 }
 
 void ScrollablePaintProperty::ToJsonValue(std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const

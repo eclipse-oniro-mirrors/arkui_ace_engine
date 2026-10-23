@@ -79,6 +79,7 @@ public:
     {}
     ~ListItemGroupPattern() override = default;
 
+    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config) override;
     void DumpAdvanceInfo() override;
     void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json) override;
     bool IsAtomicNode() const override
@@ -496,6 +497,8 @@ public:
     }
 
 private:
+    void DumpAdvanceVisualProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
     bool OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, const DirtySwapConfig& config) override;
     void OnAttachToMainTree() override;
     void OnAttachToMainTreeMultiThread();

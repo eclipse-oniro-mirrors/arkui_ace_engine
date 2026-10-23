@@ -429,6 +429,21 @@ void LazyGridLayoutPattern::OnAttachToMainTree()
     }
 }
 
+void LazyGridLayoutPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    CHECK_NULL_VOID(layoutInfo_);
+    if (!config.IsPublicTree()) {
+        layoutInfo_->DumpAdvanceInfo(json, config);
+        DumpStickyHeaderHandoffInfo(json);
+        return;
+    }
+    if (config.visualProperties) {
+        auto layout = JsonUtil::Create();
+        layoutInfo_->DumpAdvanceInfo(layout, config);
+        json->PutRef("layoutInfo", std::move(layout));
+    }
+}
+
 void LazyGridLayoutPattern::DumpAdvanceInfo()
 {
     CHECK_NULL_VOID(layoutInfo_);
@@ -438,8 +453,6 @@ void LazyGridLayoutPattern::DumpAdvanceInfo()
 
 void LazyGridLayoutPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json)
 {
-    CHECK_NULL_VOID(layoutInfo_);
-    layoutInfo_->DumpAdvanceInfo(json);
-    DumpStickyHeaderHandoffInfo(json);
+    LazyGridLayoutPattern::DumpAdvanceInfo(json, ParamConfig());
 }
 } // namespace OHOS::Ace::NG

@@ -9970,6 +9970,53 @@ void TextFieldPattern::DumpTextEngineInfo()
         .append(std::to_string(paragraph_->GetLongestLineWithIndent())));
 }
 
+void TextFieldPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if (!config.IsPublicTree()) {
+        Pattern::DumpAdvanceInfo(json);
+        return;
+    }
+    if (config.visualProperties) {
+        DumpAdvanceVisualProperties(json, config);
+    }
+    if (config.functionalProperties) {
+        DumpAdvanceFunctionalProperties(json, config);
+    }
+}
+
+void TextFieldPattern::DumpAdvanceVisualProperties(
+    std::unique_ptr<JsonValue>& json, const ParamConfig& /* config */)
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto pipeline = host->GetContext();
+    CHECK_NULL_VOID(pipeline);
+    auto theme = GetTheme();
+    CHECK_NULL_VOID(theme);
+    CHECK_NULL_VOID(selectController_);
+    auto property = GetLayoutProperty<TextFieldLayoutProperty>();
+    CHECK_NULL_VOID(property);
+    json->Put("FontColor", property->GetTextColorValue(theme->GetTextColor()).ColorToString().c_str());
+    // textRect and contentRect are local layout rectangles; cursorInfo is in screen pixels.
+    json->Put("textRect", textRect_.ToString().c_str());
+    json->Put("contentRect", contentRect_.ToString().c_str());
+    const auto caret = GetCaretRect(false);
+    const auto window = pipeline->GetCurrentWindowRect();
+    const auto paintOffset = GetPaintRectGlobalOffset();
+    auto cursor = JsonUtil::Create();
+    cursor->Put("left", caret.Left() + window.Left() + paintOffset.GetX());
+    cursor->Put("top", caret.Top() + window.Top() + paintOffset.GetY());
+    cursor->Put("width", theme->GetCursorWidth().ConvertToPx());
+    cursor->Put("height", caret.Height());
+    json->PutRef("cursorInfo", std::move(cursor));
+}
+
+void TextFieldPattern::DumpAdvanceFunctionalProperties(
+    std::unique_ptr<JsonValue>& json, const ParamConfig& /* config */)
+{
+    json->Put("CustomKeyboard", (customKeyboard_ || customKeyboardBuilder_) ? "true" : "false");
+}
+
 void TextFieldPattern::DumpAdvanceInfo()
 {
     if (customKeyboard_ || customKeyboardBuilder_) {

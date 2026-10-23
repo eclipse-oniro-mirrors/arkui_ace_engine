@@ -47,6 +47,8 @@ public:
     void SetCachedPosMap(int32_t index, const ColumnItemMainPos& pos);
     void SetSpace(float space);
     void SetTotalItemCount(int32_t count);
+
+    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
     void DumpAdvanceInfo();
     void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json);
 

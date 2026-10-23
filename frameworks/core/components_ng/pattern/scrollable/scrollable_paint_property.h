@@ -23,6 +23,7 @@
 
 namespace OHOS::Ace {
 class ShapeRect;
+struct ParamConfig;
 }
 
 namespace OHOS::Ace::NG {
@@ -67,6 +68,7 @@ public:
     void DumpInfo();
 
     void DumpInfo(std::unique_ptr<JsonValue>& json);
+    void DumpInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config, DisplayMode defaultMode);
 
     void ToJsonValue(std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const override;
 
@@ -95,6 +97,10 @@ public:
     }
 
 private:
+    void DumpContentClipInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
+    void DumpScrollBarProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
     std::string ContentClipToStr() const;
     std::string GetBarStateString() const;
 };

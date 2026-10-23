@@ -1277,6 +1277,82 @@ void WaterFlowPattern::DumpAdvanceLayoutInfo() const
     DumpLog::GetInstance().AddDesc("jumpIndex:" + std::to_string(layoutInfo_->jumpIndex_));
 }
 
+void WaterFlowPattern::DumpAdvanceLayoutProperties(JsonValue& json)
+{
+    auto property = GetLayoutProperty<WaterFlowLayoutProperty>();
+    CHECK_NULL_VOID(property);
+    if (const auto& value = property->GetRowsTemplate(); value.has_value()) {
+        json.Put("RowsTemplate", value->c_str());
+    }
+    if (const auto& value = property->GetColumnsTemplate(); value.has_value()) {
+        json.Put("ColumnsTemplate", value->c_str());
+    }
+    const auto minSize = property->GetItemMinSize();
+    if (minSize) {
+        auto size = JsonUtil::Create();
+        if (minSize->Width()) {
+            size->Put("width", minSize->Width()->ToString().c_str());
+        }
+        if (minSize->Height()) {
+            size->Put("height", minSize->Height()->ToString().c_str());
+        }
+        json.PutRef("ItemMinSize", std::move(size));
+    }
+    const auto maxSize = property->GetItemMaxSize();
+    if (maxSize) {
+        auto size = JsonUtil::Create();
+        if (maxSize->Width()) {
+            size->Put("width", maxSize->Width()->ToString().c_str());
+        }
+        if (maxSize->Height()) {
+            size->Put("height", maxSize->Height()->ToString().c_str());
+        }
+        json.PutRef("ItemMaxSize", std::move(size));
+    }
+}
+
+void WaterFlowPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if (!config.IsPublicTree()) {
+        ScrollablePattern::DumpAdvanceInfo(json);
+        return;
+    }
+    ScrollablePattern::DumpAdvanceInfo(json, config);
+    if (config.visualProperties) {
+        DumpAdvanceVisualProperties(json, config);
+    }
+    if (config.functionalProperties) {
+        DumpAdvanceFunctionalProperties(json, config);
+    }
+}
+
+void WaterFlowPattern::DumpAdvanceVisualProperties(
+    std::unique_ptr<JsonValue>& json, const ParamConfig& /* config */)
+{
+    if (auto info = AceType::DynamicCast<WaterFlowLayoutInfoSW>(layoutInfo_)) {
+        json->Put("footerHeight", info->footerHeight_);
+    }
+    DumpAdvanceLayoutProperties(*json);
+}
+
+void WaterFlowPattern::DumpAdvanceFunctionalProperties(
+    std::unique_ptr<JsonValue>& json, const ParamConfig& /* config */)
+{
+    auto property = GetLayoutProperty<WaterFlowLayoutProperty>();
+    if (property) {
+        if (layoutInfo_) {
+            json->Put("CachedCount", property->GetCachedCount().value_or(layoutInfo_->defCachedCount_));
+        }
+        json->Put("isReverse", property->IsReverse());
+    }
+    json->Put("footer", static_cast<bool>(footer_.Upgrade()));
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto hub = host->GetEventHub<WaterFlowEventHub>();
+    CHECK_NULL_VOID(hub);
+    json->Put("hasOnScrollIndex", static_cast<bool>(hub->GetOnScrollIndex()));
+}
+
 void WaterFlowPattern::DumpAdvanceInfo()
 {
     auto property = GetLayoutProperty<WaterFlowLayoutProperty>();

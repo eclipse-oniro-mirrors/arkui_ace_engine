@@ -1160,6 +1160,64 @@ void ScrollBar::GetPanDirectionDumpInfo()
     }
 }
 
+void ScrollBar::DumpAdvanceHistoryInfo(std::unique_ptr<JsonValue>& json)
+{
+    std::unique_ptr<JsonValue> children = JsonUtil::CreateArray(true);
+    for (const auto& info : innerScrollBarLayoutInfos_) {
+        std::unique_ptr<JsonValue> child = JsonUtil::Create(true);
+        info.ToJson(child);
+        children->Put(child);
+    }
+    json->Put("innerScrollBarLayoutInfos", children);
+}
+
+void ScrollBar::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if (!config.IsPublicTree() || config.visualProperties) {
+        json->Put("activeRect", activeRect_.ToString().c_str());
+        json->Put("trackRect", trackRect_.ToString().c_str());
+    }
+    if (!config.IsPublicTree()) {
+        json->Put("touchRegion", touchRegion_.ToString().c_str());
+        json->Put("hoverRegion", hoverRegion_.ToString().c_str());
+    }
+    if (!config.IsPublicTree() || config.visualProperties) {
+        json->Put("normalWidth", normalWidth_.ToString().c_str());
+        json->Put("activeWidth", activeWidth_.ToString().c_str());
+    }
+    if (!config.IsPublicTree()) {
+        json->Put("touchWidth", touchWidth_.ToString().c_str());
+        json->Put("hoverWidth", hoverWidth_.ToString().c_str());
+    }
+    if (!config.IsPublicTree() || config.visualProperties) {
+        GetShapeModeDumpInfo(json);
+        GetPositionModeDumpInfo(json);
+        GetAxisDumpInfo(json);
+    }
+    if (!config.IsPublicTree()) {
+        GetPanDirectionDumpInfo(json);
+    }
+    if (!config.IsPublicTree() || config.visualProperties) {
+        json->Put("hostBorderRadius", hostBorderRadius_.ToString().c_str());
+        json->Put("startReservedHeight", startReservedHeight_.ToString().c_str());
+        json->Put("endReservedHeight", endReservedHeight_.ToString().c_str());
+        json->Put("scrollBarHeight", scrollBarHeight_.ToString().c_str());
+        json->Put("scrollBarStartMargin", scrollBarStartMargin_.ToString().c_str());
+    }
+    if ((!config.IsPublicTree() || config.visualProperties) &&
+        (!config.IsPublicTree() || scrollBarMargin_.has_value())) {
+        json->Put("scrollBarMargin", scrollBarMargin_.value_or(ScrollBarMargin()).ToString().c_str());
+    }
+    if (!config.IsPublicTree() || config.functionalProperties) {
+        json->Put("autoAdjustScrollBarMargin", autoAdjustScrollBarMargin_.value_or(false) ? "true" : "false");
+        json->Put("isScrollable", std::to_string(isScrollable_).c_str());
+        json->Put("isReverse", std::to_string(isReverse_).c_str());
+    }
+    if (!config.IsPublicTree()) {
+        DumpAdvanceHistoryInfo(json);
+    }
+}
+
 void ScrollBar::DumpAdvanceInfo()
 {
     DumpLog::GetInstance().AddDesc(std::string("activeRect: ").append(activeRect_.ToString()));
@@ -1421,34 +1479,6 @@ void ScrollBar::GetPanDirectionDumpInfo(std::unique_ptr<JsonValue>& json)
 
 void ScrollBar::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json)
 {
-    json->Put("activeRect", activeRect_.ToString().c_str());
-    json->Put("trackRect", trackRect_.ToString().c_str());
-    json->Put("touchRegion", touchRegion_.ToString().c_str());
-    json->Put("hoverRegion", hoverRegion_.ToString().c_str());
-    json->Put("normalWidth", normalWidth_.ToString().c_str());
-    json->Put("activeWidth", activeWidth_.ToString().c_str());
-    json->Put("touchWidth", touchWidth_.ToString().c_str());
-    json->Put("hoverWidth", hoverWidth_.ToString().c_str());
-    GetShapeModeDumpInfo(json);
-    GetPositionModeDumpInfo(json);
-    GetAxisDumpInfo(json);
-    GetPanDirectionDumpInfo(json);
-    json->Put("hostBorderRadius", hostBorderRadius_.ToString().c_str());
-    json->Put("startReservedHeight", startReservedHeight_.ToString().c_str());
-    json->Put("endReservedHeight", endReservedHeight_.ToString().c_str());
-    json->Put("scrollBarHeight", scrollBarHeight_.ToString().c_str());
-    json->Put("scrollBarStartMargin", scrollBarStartMargin_.ToString().c_str());
-    json->Put("scrollBarMargin", scrollBarMargin_.value_or(ScrollBarMargin()).ToString().c_str());
-    json->Put("autoAdjustScrollBarMargin", autoAdjustScrollBarMargin_.value_or(false) ? "true" : "false");
-    json->Put("isScrollable", std::to_string(isScrollable_).c_str());
-    json->Put("isReverse", std::to_string(isReverse_).c_str());
-
-    std::unique_ptr<JsonValue> children = JsonUtil::CreateArray(true);
-    for (const auto& info : innerScrollBarLayoutInfos_) {
-        std::unique_ptr<JsonValue> child = JsonUtil::Create(true);
-        info.ToJson(child);
-        children->Put(child);
-    }
-    json->Put("innerScrollBarLayoutInfos", children);
+    ScrollBar::DumpAdvanceInfo(json, ParamConfig());
 }
 } // namespace OHOS::Ace::NG

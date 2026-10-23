@@ -64,6 +64,11 @@ bool AccessibilityProperty::HasSemanticContent() const
         isUserCheckable_.has_value() || HasAccessibilityStateDescription()) {
         return true;
     }
+    if (!GetAccessibilityCustomRole().empty() || textValue_.has_value() ||
+        rangeMinValue_.has_value() || rangeMaxValue_.has_value() || rangeCurrentValue_.has_value() ||
+        minValue_.has_value() || maxValue_.has_value() || currentValue_.has_value()) {
+        return true;
+    }
     return !GetAccessibilityText().empty() || !GetAccessibilityDescription().empty() ||
            GetAccessibilityLevel() != Level::AUTO || HasAccessibilityVirtualNode() || IsAccessibilityGroup() ||
            !GetAccessibilityRole().empty();

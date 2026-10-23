@@ -16,6 +16,7 @@
 #include "core/components_ng/pattern/pattern.h"
 
 #include "core/common/resource/resource_parse_utils.h"
+#include "core/components_ng/base/inspector_dump_options.h"
 #include "core/components_ng/event/focus_hub.h"
 #include "core/components_ng/event/gesture_event_hub.h"
 #include "core/components_ng/layout/box_layout_algorithm.h"
@@ -25,6 +26,11 @@
 #include "core/pipeline_ng/pipeline_context.h"
 
 namespace OHOS::Ace::NG {
+bool Pattern::ShouldIncludeDiagnostic(const InspectorDumpOptions& options)
+{
+    return options.includeDiagnostic;
+}
+
 int32_t Pattern::OnRecvCommand(const std::string& command)
 {
     auto json = JsonUtil::ParseJsonString(command);

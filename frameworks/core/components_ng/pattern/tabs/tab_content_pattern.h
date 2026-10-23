@@ -388,6 +388,7 @@ public:
         return tabBarBadgeParam_;
     }
 
+    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config) override;
     void DumpAdvanceInfo() override
     {
         switch (selectedMode_) {
@@ -440,22 +441,7 @@ public:
         return customStyleNode_;
     }
 
-    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json) override
-    {
-        switch (selectedMode_) {
-            case SelectedMode::INDICATOR: {
-                json->Put("SelectedMode", "INDICATOR");
-                break;
-            }
-            case SelectedMode::BOARD: {
-                json->Put("SelectedMode", "BOARD");
-                break;
-            }
-            default: {
-                break;
-            }
-        }
-    }
+    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json) override;
 
     void OnColorConfigurationUpdate() override
     {

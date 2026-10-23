@@ -16,12 +16,18 @@
 #include "core/components_ng/pattern/pattern.h"
 
 #include "core/common/container_consts.h"
+#include "core/components_ng/base/inspector_dump_options.h"
 #include "core/components_ng/event/event_hub.h"
 #include "core/components_ng/event/focus_hub.h"
 #include "core/components_ng/event/gesture_event_hub.h"
 #include "core/components_ng/layout/box_layout_algorithm.h"
 
 namespace OHOS::Ace::NG {
+bool Pattern::ShouldIncludeDiagnostic(const InspectorDumpOptions& options)
+{
+    return options.includeDiagnostic;
+}
+
 int32_t Pattern::OnRecvCommand(const std::string& command)
 {
     return 0;

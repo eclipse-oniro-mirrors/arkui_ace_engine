@@ -18,6 +18,7 @@
 #include "interfaces/inner_api/ace/ai/image_analyzer.h"
 
 #include "base/log/dump_log.h"
+#include "core/components_ng/base/inspector_dump_options.h"
 #include "base/utils/utils.h"
 #include "core/common/ace_application_info.h"
 #include "core/common/ai/image_analyzer_manager.h"
@@ -1074,6 +1075,14 @@ void CanvasPattern::DumpSimplifyInfo(std::shared_ptr<JsonValue>& json)
     auto arrayModifier = JsonUtil::Create();
     contentModifier_->GetSimplifyDumpInfo(arrayModifier);
     json->PutRef("CanvasModifier", std::move(arrayModifier));
+}
+
+void CanvasPattern::DumpSimplifyInfo(std::shared_ptr<JsonValue>& json, const InspectorDumpOptions& options)
+{
+    // Canvas mode, drawing matrices and command history are outside the public tree schema.
+    if (options.includeDiagnostic) {
+        DumpSimplifyInfo(json);
+    }
 }
 
 void CanvasPattern::SetUpdateContextCallback(std::function<void(CanvasUnit)>&& updateContextCB)

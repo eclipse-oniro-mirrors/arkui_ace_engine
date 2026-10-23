@@ -1600,6 +1600,88 @@ OverScrollOffset GridPattern::GetOverScrollOffset(double delta) const
     return offset;
 }
 
+void GridPattern::DumpAdvanceGridTemplateInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    auto property = GetLayoutProperty<GridLayoutProperty>();
+    CHECK_NULL_VOID(property);
+    if (!config.IsPublicTree() || (config.visualProperties)) {
+        json->Put("RowsTemplate", property->GetRowsTemplate().value_or("").c_str());
+    }
+    if (!config.IsPublicTree() || (config.visualProperties)) {
+        json->Put("ColumnsTemplate", property->GetColumnsTemplate().value_or("").c_str());
+    }
+    if (!config.IsPublicTree() || (config.visualProperties && property->GetRowsGap().has_value())) {
+        json->Put("RowsGap", property->GetRowsGap().has_value()
+                                 ? std::to_string(property->GetRowsGap().value().Value()).c_str()
+                                 : "null");
+    }
+    if (!config.IsPublicTree() || (config.visualProperties && property->GetColumnsGap().has_value())) {
+        json->Put("ColumnsGap", property->GetColumnsGap().has_value()
+                                    ? std::to_string(property->GetColumnsGap().value().Value()).c_str()
+                                    : "null");
+    }
+}
+
+void GridPattern::DumpAdvanceGridSizeInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    auto property = GetLayoutProperty<GridLayoutProperty>();
+    CHECK_NULL_VOID(property);
+    if (!config.IsPublicTree() || (config.visualProperties && property->GetMaxCount().has_value())) {
+        json->Put("MaxCount",
+            property->GetMaxCount().has_value() ? std::to_string(property->GetMaxCount().value()).c_str() : "null");
+    }
+    if (!config.IsPublicTree() || (config.visualProperties && property->GetMinCount().has_value())) {
+        json->Put("MinCount",
+            property->GetMinCount().has_value() ? std::to_string(property->GetMinCount().value()).c_str() : "null");
+    }
+    if (!config.IsPublicTree() || (config.visualProperties && property->GetCellLength().has_value())) {
+        json->Put("CellLength",
+            property->GetCellLength().has_value() ? std::to_string(property->GetCellLength().value()).c_str() : "null");
+    }
+}
+
+void GridPattern::DumpAdvanceGridInteractionInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    auto property = GetLayoutProperty<GridLayoutProperty>();
+    CHECK_NULL_VOID(property);
+    if (!config.IsPublicTree() || (config.functionalProperties && property->GetEditable().has_value())) {
+        json->Put("Editable",
+            property->GetEditable().has_value() ? std::to_string(property->GetEditable().value()).c_str() : "null");
+    }
+    if (!config.IsPublicTree() || (config.functionalProperties && property->GetScrollEnabled().has_value())) {
+        json->Put("ScrollEnabled", property->GetScrollEnabled().has_value()
+                                       ? std::to_string(property->GetScrollEnabled().value()).c_str()
+                                       : "null");
+    }
+    if (!config.IsPublicTree() || (config.visualProperties)) {
+        json->Put("AlignItems", property->GetAlignItems() ? "GridItemAlignment.STRETCH" : "GridItemAlignment.DEFAULT");
+    }
+}
+
+void GridPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    auto property = GetLayoutProperty<GridLayoutProperty>();
+    CHECK_NULL_VOID(property);
+    ScrollablePattern::DumpAdvanceInfo(json, config);
+    if (!config.IsPublicTree()) {
+        BuildGridStateInfo(json, config);
+    }
+    if (!config.IsPublicTree() || config.visualProperties) {
+        BuildGridOffsetInfo(json, config);
+        BuildGridIndexInfo(json, config);
+    }
+    if (!config.IsPublicTree()) {
+        BuildGridLayoutPropertyInfo(json, config);
+        BuildScrollAlignInfo(json);
+        BuildGridLayoutInfo(json);
+        return;
+    }
+    if (config.functionalProperties) {
+        BuildGridStateInfo(json, config);
+    }
+    BuildGridLayoutPropertyInfo(json, config);
+}
+
 void GridPattern::DumpAdvanceInfo()
 {
     auto property = GetLayoutProperty<GridLayoutProperty>();
@@ -1852,6 +1934,11 @@ void GridPattern::DumpSimplifyInfo(std::shared_ptr<JsonValue>& json)
 
 std::string GridPattern::GetIrregularIndexesString() const
 {
+    return GetIrregularIndexesString(ParamConfig());
+}
+
+std::string GridPattern::GetIrregularIndexesString(const ParamConfig& config) const
+{
     auto property = GetLayoutProperty<GridLayoutProperty>();
     if (!property || !property->HasLayoutOptions()) {
         return std::string("");
@@ -1868,7 +1955,7 @@ std::string GridPattern::GetIrregularIndexesString() const
         }
         irregularIndexes.append(std::to_string(index));
         count++;
-        if (count == MAX_NUM_SIZE) {
+        if (!config.IsPublicTree() && count == MAX_NUM_SIZE) {
             irregularIndexes.append("...");
             break;
         }
@@ -2496,22 +2583,20 @@ void GridPattern::BuildGridLayoutInfo(std::unique_ptr<JsonValue>& json)
 
 void GridPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json)
 {
-    auto property = GetLayoutProperty<GridLayoutProperty>();
-    CHECK_NULL_VOID(property);
-    ScrollablePattern::DumpAdvanceInfo(json);
-    BuildGridStateInfo(json);
-    BuildGridOffsetInfo(json);
-    BuildGridIndexInfo(json);
-    BuildGridLayoutPropertyInfo(json);
-    BuildScrollAlignInfo(json);
-    BuildGridLayoutInfo(json);
+    GridPattern::DumpAdvanceInfo(json, ParamConfig());
 }
 
-void GridPattern::BuildGridStateInfo(std::unique_ptr<JsonValue>& json)
+void GridPattern::BuildGridStateInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
 {
     auto property = GetLayoutProperty<GridLayoutProperty>();
     CHECK_NULL_VOID(property);
-    json->Put("GridLayoutOptions", property->HasLayoutOptions() ? GetIrregularIndexesString().c_str() : "null");
+    if (!config.IsPublicTree() || property->HasLayoutOptions()) {
+        json->Put(
+            "GridLayoutOptions", property->HasLayoutOptions() ? GetIrregularIndexesString(config).c_str() : "null");
+    }
+    if (config.IsPublicTree()) {
+        return;
+    }
     json->Put("supportAnimation", supportAnimation_);
     json->Put("isConfigScrollable", isConfigScrollable_);
     json->Put("lastCrossCount",
@@ -2524,57 +2609,54 @@ void GridPattern::BuildGridStateInfo(std::unique_ptr<JsonValue>& json)
     json->Put("scrollStop", std::to_string(scrollStop_).c_str());
 }
 
-void GridPattern::BuildGridOffsetInfo(std::unique_ptr<JsonValue>& json)
+void GridPattern::BuildGridOffsetInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
 {
-    json->Put("prevHeight", info_.prevHeight_);
-    json->Put("currentHeight", info_.currentHeight_);
-    json->Put("endHeight", endHeight_);
+    if (!config.IsPublicTree()) {
+        json->Put("prevHeight", info_.prevHeight_);
+        json->Put("currentHeight", info_.currentHeight_);
+        json->Put("endHeight", endHeight_);
+    }
     json->Put("currentOffset", std::to_string(info_.currentOffset_).c_str());
-    json->Put("prevOffset", std::to_string(info_.prevOffset_).c_str());
-    json->Put("lastMainSize", std::to_string(info_.lastMainSize_).c_str());
-    json->Put("totalHeightOfItemsInView", std::to_string(info_.totalHeightOfItemsInView_).c_str());
-    json->Put("startFixOffset", std::to_string(info_.startFixOffset_).c_str());
-    json->Put("endFixOffset", std::to_string(info_.endFixOffset_).c_str());
+    if (!config.IsPublicTree()) {
+        json->Put("prevOffset", std::to_string(info_.prevOffset_).c_str());
+        json->Put("lastMainSize", std::to_string(info_.lastMainSize_).c_str());
+        json->Put("totalHeightOfItemsInView", std::to_string(info_.totalHeightOfItemsInView_).c_str());
+        json->Put("startFixOffset", std::to_string(info_.startFixOffset_).c_str());
+        json->Put("endFixOffset", std::to_string(info_.endFixOffset_).c_str());
+    }
     json->Put("contentEndPadding", std::to_string(info_.contentEndPadding_).c_str());
 }
 
-void GridPattern::BuildGridIndexInfo(std::unique_ptr<JsonValue>& json)
+void GridPattern::BuildGridIndexInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
 {
     json->Put("startIndex", info_.startIndex_);
     json->Put("endIndex", info_.endIndex_);
-    json->Put("reportStartIndex", info_.ReportStartIndex());
-    json->Put("reportEndIndex", info_.ReportEndIndex());
-    json->Put("jumpIndex", info_.jumpIndex_);
+    if (!config.IsPublicTree()) {
+        json->Put("reportStartIndex", info_.ReportStartIndex());
+        json->Put("reportEndIndex", info_.ReportEndIndex());
+        json->Put("jumpIndex", info_.jumpIndex_);
+    }
     json->Put("crossCount", info_.crossCount_);
-    json->Put("childrenCount", info_.childrenCount_);
+    if (!config.IsPublicTree()) {
+        json->Put("childrenCount", info_.childrenCount_);
+    }
 }
 
-void GridPattern::BuildGridLayoutPropertyInfo(std::unique_ptr<JsonValue>& json)
+void GridPattern::BuildGridLayoutPropertyInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
 {
     auto property = GetLayoutProperty<GridLayoutProperty>();
     CHECK_NULL_VOID(property);
-    json->Put("RowsTemplate", property->GetRowsTemplate().value_or("").c_str());
-    json->Put("ColumnsTemplate", property->GetColumnsTemplate().value_or("").c_str());
-    json->Put("RowsGap",
-        property->GetRowsGap().has_value() ? std::to_string(property->GetRowsGap().value().Value()).c_str() : "null");
-    json->Put("ColumnsGap",
-        property->GetColumnsGap().has_value() ? std::to_string(property->GetColumnsGap().value().Value()).c_str()
-                                              : "null");
-    json->Put("CachedCount",
-        property->GetCachedCount().has_value() ? std::to_string(property->GetCachedCount().value()).c_str() : "null");
-    json->Put("ShowCache", std::to_string(property->GetShowCachedItemsValue(false)).c_str());
-    json->Put("MaxCount",
-        property->GetMaxCount().has_value() ? std::to_string(property->GetMaxCount().value()).c_str() : "null");
-    json->Put("MinCount",
-        property->GetMinCount().has_value() ? std::to_string(property->GetMinCount().value()).c_str() : "null");
-    json->Put("CellLength",
-        property->GetCellLength().has_value() ? std::to_string(property->GetCellLength().value()).c_str() : "null");
-    json->Put("Editable",
-        property->GetEditable().has_value() ? std::to_string(property->GetEditable().value()).c_str() : "null");
-    json->Put("ScrollEnabled", property->GetScrollEnabled().has_value()
-                                   ? std::to_string(property->GetScrollEnabled().value()).c_str()
-                                   : "null");
-    json->Put("AlignItems", property->GetAlignItems() ? "GridItemAlignment.STRETCH" : "GridItemAlignment.DEFAULT");
+    DumpAdvanceGridTemplateInfo(json, config);
+    if (!config.IsPublicTree() || (config.functionalProperties && property->GetCachedCount().has_value())) {
+        json->Put("CachedCount", property->GetCachedCount().has_value()
+                                     ? std::to_string(property->GetCachedCount().value()).c_str()
+                                     : "null");
+    }
+    if (!config.IsPublicTree() || (config.functionalProperties)) {
+        json->Put("ShowCache", std::to_string(property->GetShowCachedItemsValue(false)).c_str());
+    }
+    DumpAdvanceGridSizeInfo(json, config);
+    DumpAdvanceGridInteractionInfo(json, config);
 }
 
 SizeF GridPattern::GetChildrenExpandedSize()
