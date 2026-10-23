@@ -26,7 +26,7 @@
 #include "core/components_ng/pattern/date_picker/picker_theme.h"
 #include "core/components_ng/pattern/text_picker/textpicker_event_types.h"
 #include "core/components_ng/pattern/text_picker/textpicker_model.h"
-#include "core/components_ng/pattern/text_picker/bridge/textpicker_parser.h"
+#include "core/components_ng/pattern/text_picker/bridge/textpicker_options.h"
 #include "core/interfaces/native/utility/callback_helper.h"
 #include "core/interfaces/native/utility/converter.h"
 #include "core/interfaces/native/utility/reverse_converter.h"
