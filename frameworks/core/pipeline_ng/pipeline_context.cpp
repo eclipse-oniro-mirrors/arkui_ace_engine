@@ -1249,12 +1249,22 @@ void PipelineContext::FlushVsync(uint64_t nanoTimestamp, uint64_t frameCount, in
 #endif
     ProcessDelayTasks();
     if (frameCount != UINT64_MAX) {
+        const int64_t displaySyncStartTime = GetSysTimestamp();
         DispatchDisplaySync(nanoTimestamp);
+        const int64_t displaySyncEndTime = GetSysTimestamp();
+        if (displaySyncEndTime > displaySyncStartTime) {
+            frameMetrics.animationDuration += static_cast<uint64_t>(displaySyncEndTime - displaySyncStartTime);
+        }
     }
     FlushRebuildRenderTree();
     FlushAnimation(nanoTimestamp);
     FlushFrameCallback(nanoTimestamp, frameCount);
+    const int64_t modifierAnimationStartTime = GetSysTimestamp();
     auto hasRunningAnimation = FlushModifierAnimation(nanoTimestamp);
+    const int64_t modifierAnimationEndTime = GetSysTimestamp();
+    if (modifierAnimationEndTime > modifierAnimationStartTime) {
+        frameMetrics.animationDuration += static_cast<uint64_t>(modifierAnimationEndTime - modifierAnimationStartTime);
+    }
 #ifdef RELAXED_INTERACTION_SUPPORT
     FlushRelaxedInteraction();
 #endif
@@ -1419,8 +1429,9 @@ void PipelineContext::FlushVsync(uint64_t nanoTimestamp, uint64_t frameCount, in
     FireFrameMetricsCallBack(frameMetrics);
     TAG_LOGD(AceLogTag::ACE_WINDOW_PIPELINE,
         "FrameMetrics actualStartTime=%{public}" PRIu64 ", totalDuration=%{public}" PRIu64
-        ", vsyncTimestamp=%{public}" PRIu64,
-        frameMetrics.actualStartTime, frameMetrics.totalDuration, frameMetrics.vsyncTimestamp);
+        ", vsyncTimestamp=%{public}" PRIu64 ", animationDuration=%{public}" PRIu64,
+        frameMetrics.actualStartTime, frameMetrics.totalDuration, frameMetrics.vsyncTimestamp,
+        frameMetrics.animationDuration);
     // First vsync may come before rootNode_ is created.
 #ifndef CROSS_PLATFORM
     if (contentChangeMgr_ && rootNode_) {
