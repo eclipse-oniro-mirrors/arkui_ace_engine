@@ -74,7 +74,7 @@ RefPtr<AccessibilityManagerNG> PipelineContext::GetAccessibilityManagerNG()
     return nullptr;
 }
 
-#ifdef WINDOW_SCENE_SUPPORTED
+#ifndef WINDOW_SCENE_SUPPORTED
 const RefPtr<UIExtensionManager>& PipelineContext::GetUIExtensionManager()
 {
     static RefPtr<UIExtensionManager> manager = AceType::MakeRefPtr<UIExtensionManager>();
