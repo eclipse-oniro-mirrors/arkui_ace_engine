@@ -63,6 +63,8 @@ DatePickerConstant.MIN_SECOND = 0;
 DatePickerConstant.MAX_SECOND = 59;
 DatePickerConstant.MONTHS_IN_YEAR = 12;
 DatePickerConstant.DEFAULT_STEP = 1;
+DatePickerConstant.HIDE_YEAR_SENTINEL = -1;
+DatePickerConstant.HIDE_YEAR_TEXT = '----';
 DatePickerConstant.SYSTEM_MIN_DATE = new Date(1970, 0, 1);
 DatePickerConstant.SYSTEM_MAX_DATE = new Date(2100, 11, 31);
 export class DatePickerComponent extends ViewPU {
@@ -99,6 +101,7 @@ export class DatePickerComponent extends ViewPU {
         this.__timeFormat = new ObservedPropertySimplePU(TimeFormat.HOUR_MINUTE, this, "timeFormat");
         this.__useMilitaryTime = new ObservedPropertySimplePU(false, this, "useMilitaryTime");
         this.__lunar = new ObservedPropertySimplePU(false, this, "lunar");
+        this.__hideYear = new ObservedPropertySimplePU(false, this, "hideYear");
         this.__dateCanLoop = new ObservedPropertySimplePU(true, this, "dateCanLoop");
         this.__timeCanLoop = new ObservedPropertySimplePU(true, this, "timeCanLoop");
         this.__dateStartEndSet = new ObservedPropertySimplePU(false, this, "dateStartEndSet");
@@ -138,6 +141,7 @@ export class DatePickerComponent extends ViewPU {
         this.secondFormatter = null;
         this.setInitiallyProvidedValue(params);
         this.declareWatch("options", this.onOptionsChange);
+        this.declareWatch("hideYear", this.onHideYearChange);
         this.declareWatch("currentLocale", this.onLocaleChange);
         this.finalizeConstruction();
     }
@@ -222,6 +226,9 @@ export class DatePickerComponent extends ViewPU {
         }
         if (params.lunar !== undefined) {
             this.lunar = params.lunar;
+        }
+        if (params.hideYear !== undefined) {
+            this.hideYear = params.hideYear;
         }
         if (params.dateCanLoop !== undefined) {
             this.dateCanLoop = params.dateCanLoop;
@@ -367,6 +374,7 @@ export class DatePickerComponent extends ViewPU {
         this.__timeFormat.purgeDependencyOnElmtId(rmElmtId);
         this.__useMilitaryTime.purgeDependencyOnElmtId(rmElmtId);
         this.__lunar.purgeDependencyOnElmtId(rmElmtId);
+        this.__hideYear.purgeDependencyOnElmtId(rmElmtId);
         this.__dateCanLoop.purgeDependencyOnElmtId(rmElmtId);
         this.__timeCanLoop.purgeDependencyOnElmtId(rmElmtId);
         this.__dateStartEndSet.purgeDependencyOnElmtId(rmElmtId);
@@ -420,6 +428,7 @@ export class DatePickerComponent extends ViewPU {
         this.__timeFormat.aboutToBeDeleted();
         this.__useMilitaryTime.aboutToBeDeleted();
         this.__lunar.aboutToBeDeleted();
+        this.__hideYear.aboutToBeDeleted();
         this.__dateCanLoop.aboutToBeDeleted();
         this.__timeCanLoop.aboutToBeDeleted();
         this.__dateStartEndSet.aboutToBeDeleted();
@@ -613,6 +622,12 @@ export class DatePickerComponent extends ViewPU {
     }
     set lunar(newValue) {
         this.__lunar.set(newValue);
+    }
+    get hideYear() {
+        return this.__hideYear.get();
+    }
+    set hideYear(newValue) {
+        this.__hideYear.set(newValue);
     }
     get dateCanLoop() {
         return this.__dateCanLoop.get();
@@ -895,6 +910,9 @@ export class DatePickerComponent extends ViewPU {
         for (let i = this.startYear; i <= this.endYear; i++) {
             this.yearArray.push(this.formatLunarYear(i));
         }
+        if (this.hideYear) {
+            this.yearArray.push(DatePickerConstant.HIDE_YEAR_TEXT);
+        }
         this.monthArray = [];
         let startLunarMonthIndex = DatePickerConstant.MIN_MONTH;
         let endLunarMonthIndex = DatePickerConstant.MAX_MONTH;
@@ -925,6 +943,9 @@ export class DatePickerComponent extends ViewPU {
         }
     }
     getLunarDaysInMonth(gregorianYear, lunarMonth) {
+        if (gregorianYear === DatePickerConstant.HIDE_YEAR_SENTINEL) {
+            return 30;
+        }
         if (this.lunarCalendar === null) {
             return 30;
         }
@@ -1053,6 +1074,9 @@ export class DatePickerComponent extends ViewPU {
         this.yearArray = [];
         for (let i = this.startYear; i <= this.endYear; i++) {
             this.yearArray.push(this.formatYear(i));
+        }
+        if (this.hideYear) {
+            this.yearArray.push(DatePickerConstant.HIDE_YEAR_TEXT);
         }
     }
     initMonthArray() {
@@ -1494,6 +1518,20 @@ export class DatePickerComponent extends ViewPU {
         }
     }
     getDaysInMonth(year, month) {
+        if (year === DatePickerConstant.HIDE_YEAR_SENTINEL) {
+            if (month === 1) {
+                return 29;
+            }
+            const monthsWith31Days = [0, 2, 4, 6, 7, 9, 11];
+            const monthsWith30Days = [3, 5, 8, 10];
+            if (monthsWith31Days.includes(month)) {
+                return 31;
+            }
+            if (monthsWith30Days.includes(month)) {
+                return 30;
+            }
+            return 30;
+        }
         const monthsWith31Days = [0, 2, 4, 6, 7, 9, 11];
         const monthsWith30Days = [3, 5, 8, 10];
         if (month === 1) {
@@ -1619,6 +1657,7 @@ export class DatePickerComponent extends ViewPU {
             this.lunarCalendar = null;
             this.dateCanLoop = true;
             this.dateStartEndSet = false;
+            this.hideYear = false;
             this.dateHapticFeedback = true;
             this.startYear = DatePickerConstant.DEFAULT_START_YEAR;
             this.endYear = DatePickerConstant.DEFAULT_END_YEAR;
@@ -1690,6 +1729,12 @@ export class DatePickerComponent extends ViewPU {
         }
         else {
             this.dateHapticFeedback = true;
+        }
+        if (dateOptions.hideYear !== undefined && dateOptions.hideYear !== null) {
+            this.hideYear = dateOptions.hideYear;
+        }
+        else {
+            this.hideYear = false;
         }
         let startValid = false;
         let endValid = false;
@@ -1827,10 +1872,45 @@ export class DatePickerComponent extends ViewPU {
         const now = new Date();
         let selectedDate = undefined;
         let selectedValid = false;
-        if (dateOptions.selected !== undefined) {
-            selectedDate = this.validateDate(dateOptions.selected);
-            if (selectedDate !== undefined) {
-                selectedValid = true;
+        let selectedIsResult = false;
+        if (dateOptions.selected !== undefined && dateOptions.selected !== null) {
+            if (dateOptions.selected instanceof Date) {
+                selectedDate = this.validateDate(dateOptions.selected);
+                if (selectedDate !== undefined) {
+                    selectedValid = true;
+                }
+            }
+            else {
+                // selected is a DatePickerComponentResult: restore a prior selection result.
+                const result = dateOptions.selected;
+                // Each set field takes effect; each omitted field uses the corresponding
+                // part of the system date.
+                const m = result.month ?? now.getMonth();
+                const d = result.day ?? now.getDate();
+                if (this.hideYear && result.year === undefined) {
+                    // hideYear is enabled and year is omitted: select the hidden year column
+                    // ("----") only when (month, day) form a valid sentinel date; otherwise
+                    // (e.g. Feb 30) fall back to the system default date.
+                    if (m >= DatePickerConstant.MIN_MONTH && m <= DatePickerConstant.MAX_MONTH &&
+                        d >= DatePickerConstant.MIN_DAY &&
+                        d <= this.getDaysInMonth(DatePickerConstant.HIDE_YEAR_SENTINEL, m)) {
+                        selectedIsResult = true;
+                        this.selectedYear = DatePickerConstant.HIDE_YEAR_SENTINEL;
+                        this.selectedMonth = m;
+                        this.selectedDay = d;
+                    }
+                }
+                else {
+                    // Real year: use the provided year, or the system year when omitted
+                    // (and hideYear is off). Rebuild a Date and reuse the normal flow
+                    // (range clamping + lunar conversion); invalid (e.g. Feb 30) falls back
+                    // to the system default date.
+                    const y = result.year ?? now.getFullYear();
+                    selectedDate = this.validateDate(this.createDateFromParams(y, m, d));
+                    if (selectedDate !== undefined) {
+                        selectedValid = true;
+                    }
+                }
             }
         }
         // Create Date objects for start and end
@@ -1844,47 +1924,49 @@ export class DatePickerComponent extends ViewPU {
         else {
             targetDate = now;
         }
-        // Adjust selected date to be within range
-        if (targetDate < startDateObj) {
-            targetDate = startDateObj;
-        }
-        else if (targetDate > endDateObj) {
-            targetDate = endDateObj;
-        }
-        // Extract year, month, day from adjusted date
-        if (this.lunar && this.lunarCalendar !== null) {
-            this.lunarCalendar.setTime(targetDate);
-            this.selectedYear = targetDate.getFullYear();
-            this.selectedMonth = this.lunarCalendar.get('month');
-            this.selectedDay = this.lunarCalendar.get('date');
-            // Ensure selected date is within lunar range based on gregorian year
-            if (this.selectedYear === this.startYear) {
-                if (this.selectedMonth < this.lunarStartMonth) {
-                    this.selectedMonth = this.lunarStartMonth;
-                    this.selectedDay = this.lunarStartDay;
+        if (!selectedIsResult) {
+            // Adjust selected date to be within range
+            if (targetDate < startDateObj) {
+                targetDate = startDateObj;
+            }
+            else if (targetDate > endDateObj) {
+                targetDate = endDateObj;
+            }
+            // Extract year, month, day from adjusted date
+            if (this.lunar && this.lunarCalendar !== null) {
+                this.lunarCalendar.setTime(targetDate);
+                this.selectedYear = targetDate.getFullYear();
+                this.selectedMonth = this.lunarCalendar.get('month');
+                this.selectedDay = this.lunarCalendar.get('date');
+                // Ensure selected date is within lunar range based on gregorian year
+                if (this.selectedYear === this.startYear) {
+                    if (this.selectedMonth < this.lunarStartMonth) {
+                        this.selectedMonth = this.lunarStartMonth;
+                        this.selectedDay = this.lunarStartDay;
+                    }
+                    else if (this.selectedMonth === this.lunarStartMonth && this.selectedDay < this.lunarStartDay) {
+                        this.selectedDay = this.lunarStartDay;
+                    }
                 }
-                else if (this.selectedMonth === this.lunarStartMonth && this.selectedDay < this.lunarStartDay) {
-                    this.selectedDay = this.lunarStartDay;
+                if (this.selectedYear === this.endYear) {
+                    if (this.selectedMonth > this.lunarEndMonth) {
+                        this.selectedMonth = this.lunarEndMonth;
+                        this.selectedDay = this.lunarEndDay;
+                    }
+                    else if (this.selectedMonth === this.lunarEndMonth && this.selectedDay > this.lunarEndDay) {
+                        this.selectedDay = this.lunarEndDay;
+                    }
                 }
             }
-            if (this.selectedYear === this.endYear) {
-                if (this.selectedMonth > this.lunarEndMonth) {
-                    this.selectedMonth = this.lunarEndMonth;
-                    this.selectedDay = this.lunarEndDay;
+            else {
+                this.selectedYear = targetDate.getFullYear();
+                this.selectedMonth = targetDate.getMonth();
+                this.selectedDay = targetDate.getDate();
+                // Ensure day doesn't exceed days in month (gregorian)
+                const daysInMonth = this.getDaysInMonth(this.selectedYear, this.selectedMonth);
+                if (this.selectedDay > daysInMonth) {
+                    this.selectedDay = daysInMonth;
                 }
-                else if (this.selectedMonth === this.lunarEndMonth && this.selectedDay > this.lunarEndDay) {
-                    this.selectedDay = this.lunarEndDay;
-                }
-            }
-        }
-        else {
-            this.selectedYear = targetDate.getFullYear();
-            this.selectedMonth = targetDate.getMonth();
-            this.selectedDay = targetDate.getDate();
-            // Ensure day doesn't exceed days in month (gregorian)
-            const daysInMonth = this.getDaysInMonth(this.selectedYear, this.selectedMonth);
-            if (this.selectedDay > daysInMonth) {
-                this.selectedDay = daysInMonth;
             }
         }
         if (dateOptions.onChange !== undefined) {
@@ -1990,10 +2072,25 @@ export class DatePickerComponent extends ViewPU {
         const now = new Date();
         let selectedTime = undefined;
         let selectedValid = false;
-        if (timeOptions.selected !== undefined) {
-            selectedTime = this.validateTime(timeOptions.selected);
-            if (selectedTime !== undefined) {
-                selectedValid = true;
+        if (timeOptions.selected !== undefined && timeOptions.selected !== null) {
+            if (timeOptions.selected instanceof Date) {
+                selectedTime = this.validateTime(timeOptions.selected);
+                if (selectedTime !== undefined) {
+                    selectedValid = true;
+                }
+            }
+            else {
+                // selected is a DatePickerComponentResult: restore a prior selection result.
+                const result = timeOptions.selected;
+                // Each set field takes effect; each omitted field uses the corresponding
+                // part of the system time.
+                const h = result.hour ?? now.getHours();
+                const min = result.minute ?? now.getMinutes();
+                const sec = result.second ?? now.getSeconds();
+                selectedTime = this.validateTime(new Date(2026, 0, 1, h, min, sec));
+                if (selectedTime !== undefined) {
+                    selectedValid = true;
+                }
             }
         }
         // Determine the initial selected time
@@ -2032,8 +2129,12 @@ export class DatePickerComponent extends ViewPU {
     }
     getResult() {
         const result = new DatePickerComponentResult();
-        if (this.lunar && this.lunarCalendar !== null) {
-            // Convert lunar date to gregorian date for return value
+        if (this.selectedYear === DatePickerConstant.HIDE_YEAR_SENTINEL) {
+            result.year = undefined;
+            result.month = this.selectedMonth;
+            result.day = this.selectedDay;
+        }
+        else if (this.lunar && this.lunarCalendar !== null) {
             const gregorianDate = this.convertLunarToGregorian(this.selectedYear, this.selectedMonth, this.selectedDay);
             if (gregorianDate !== null) {
                 result.year = gregorianDate.getFullYear();
@@ -2041,7 +2142,6 @@ export class DatePickerComponent extends ViewPU {
                 result.day = gregorianDate.getDate();
             }
             else {
-                // Fallback if conversion fails
                 result.year = this.selectedYear;
                 result.month = this.selectedMonth;
                 result.day = this.selectedDay;
@@ -2052,14 +2152,18 @@ export class DatePickerComponent extends ViewPU {
             result.month = this.selectedMonth;
             result.day = this.selectedDay;
         }
-        // Always return 24-hour format (selectedHour is always 0-23)
         result.hour = this.selectedHour;
         result.minute = this.selectedMinute;
         result.second = this.selectedSecond;
         return result;
     }
     onYearChange(selectedIndex) {
-        this.selectedYear = this.startYear + selectedIndex;
+        if (this.hideYear && selectedIndex === this.yearArray.length - 1) {
+            this.selectedYear = DatePickerConstant.HIDE_YEAR_SENTINEL;
+        }
+        else {
+            this.selectedYear = this.startYear + selectedIndex;
+        }
         if (this.lunar) {
             // Calculate valid month range first
             let startLunarMonthIndex = DatePickerConstant.MIN_MONTH;
@@ -2412,6 +2516,9 @@ export class DatePickerComponent extends ViewPU {
         }
     }
     getYearSelectedIndex() {
+        if (this.selectedYear === DatePickerConstant.HIDE_YEAR_SENTINEL) {
+            return this.yearArray.length - 1;
+        }
         return this.selectedYear - this.startYear;
     }
     getMonthSelectedIndex() {
@@ -2528,6 +2635,17 @@ export class DatePickerComponent extends ViewPU {
             startSecondIndex = this.startSecond;
         }
         return this.selectedSecond - startSecondIndex;
+    }
+    onHideYearChange() {
+        if (this.lunar) {
+            this.initLunarArrays();
+        }
+        else {
+            this.initYearArray();
+            this.initMonthArray();
+            this.updateDaysArray();
+        }
+        this.updateDateColumnLoopState();
     }
     updateDateColumnLoopState() {
         if (!this.dateStartEndSet || !this.dateCanLoop) {
@@ -3551,7 +3669,7 @@ export class DatePickerComponent extends ViewPU {
     rerender() {
         this.updateDirtyElements();
     }
-    resetStateVarsOnReuse(params) {
+    __resetStateVarsOnReuse__Internal(params) {
     }
 }
 
