@@ -26,6 +26,48 @@
 #include "interfaces/native/native_type.h"
 
 namespace OHOS::Ace::NG {
+
+bool AccessibilityProperty::IsEditable() const
+{
+    return false;
+}
+
+bool AccessibilityProperty::IsScrollable() const
+{
+    return false;
+}
+
+std::string AccessibilityProperty::GetAccessibilityText() const
+{
+    return accessibilityText_.value_or("");
+}
+
+std::string AccessibilityProperty::GetAccessibilityNextFocusInspectorKey() const
+{
+    return accessibilityNextFocusParams_.has_value()
+        ? accessibilityNextFocusParams_->nextFocusInspectorKey : "";
+}
+
+std::string AccessibilityProperty::GetAccessibilityLevel() const
+{
+    if (!accessibilityLevel_.has_value()) {
+        return Level::AUTO;
+    }
+    return accessibilityLevel_.value();
+}
+
+bool AccessibilityProperty::HasSemanticContent() const
+{
+    // Explicit false states still carry semantics; an empty custom action list does not.
+    if ((accessibilityCustomActions_ && !accessibilityCustomActions_->empty()) ||
+        isDisabled_.has_value() || isSelected_.has_value() || checkedType_.has_value() ||
+        isUserCheckable_.has_value() || HasAccessibilityStateDescription()) {
+        return true;
+    }
+    return !GetAccessibilityText().empty() || !GetAccessibilityDescription().empty() ||
+           GetAccessibilityLevel() != Level::AUTO || HasAccessibilityVirtualNode() || IsAccessibilityGroup() ||
+           !GetAccessibilityRole().empty();
+}
 namespace {
 constexpr uint64_t ACTIONS = std::numeric_limits<uint64_t>::max();
 constexpr double PRECISION_RESPONSEREGION_COMP = -1.0001f;

@@ -896,6 +896,11 @@
       "OHOS::Ace::MutableSpanString::SplitSpansByNewLine()";
       "vtable for OHOS::Ace::MutableSpanString";
       "VTT for OHOS::Ace::MutableSpanString";
+      "OHOS::Ace::NG::AccessibilityProperty::GetAccessibilityText() const";
+      "OHOS::Ace::NG::AccessibilityProperty::GetAccessibilityNextFocusInspectorKey() const";
+      "OHOS::Ace::NG::AccessibilityProperty::GetAccessibilityLevel() const";
+      "OHOS::Ace::NG::AccessibilityProperty::IsEditable() const";
+      "OHOS::Ace::NG::AccessibilityProperty::IsScrollable() const";
       "OHOS::Ace::NG::AccessibilityProperty::GetAccessibilityActionOptions()";
       "OHOS::Ace::NG::AccessibilityProperty::GetAccessibilityFocusState() const";
       "OHOS::Ace::NG::AccessibilityProperty::GetAccessibilityVirtualNode() const";
@@ -1461,6 +1466,7 @@
       "OHOS::Ace::NG::FrameNode::DumpInfo(std::__h::unique_ptr<OHOS::Ace::JsonValue, std::__h::default_delete<OHOS::Ace::JsonValue>>&)";
       "OHOS::Ace::NG::FrameNode::DumpSimplifyInfo(std::__h::shared_ptr<OHOS::Ace::JsonValue>&)";
       "OHOS::Ace::NG::FrameNode::DumpSimplifyInfoOnlyForParamConfig(std::__h::shared_ptr<OHOS::Ace::JsonValue>&, OHOS::Ace::ParamConfig)";
+      "OHOS::Ace::NG::FrameNode::DumpSimplifyInfoWithParamConfig(std::__h::shared_ptr<OHOS::Ace::JsonValue>&, OHOS::Ace::ParamConfig)";
       "OHOS::Ace::NG::FrameNode::DumpViewDataPageNode(OHOS::Ace::RefPtr<OHOS::Ace::ViewDataWrap>, bool)";
       "OHOS::Ace::NG::FrameNode::FlushUpdateAndMarkDirty()";
       "OHOS::Ace::NG::FrameNode::ForceSyncGeometryNode()";
@@ -2220,6 +2226,7 @@
       "OHOS::Ace::NG::ScrollablePattern::CustomizeSafeAreaPadding(OHOS::Ace::NG::PaddingPropertyF, bool)";
       "OHOS::Ace::NG::ScrollablePattern::DumpAdvanceInfo()";
       "OHOS::Ace::NG::ScrollablePattern::DumpAdvanceInfo(std::__h::unique_ptr<OHOS::Ace::JsonValue, std::__h::default_delete<OHOS::Ace::JsonValue>>&)";
+      "OHOS::Ace::NG::ScrollablePattern::DumpAdvanceInfo(std::__h::unique_ptr<OHOS::Ace::JsonValue, std::__h::default_delete<OHOS::Ace::JsonValue>>&, OHOS::Ace::ParamConfig const&)";
       "OHOS::Ace::NG::ScrollablePattern::FillReportOnItemStopParams(std::__h::unique_ptr<OHOS::Ace::JsonValue, std::__h::default_delete<OHOS::Ace::JsonValue>>&)";
       "OHOS::Ace::NG::ScrollablePattern::FireAndCleanScrollingListener()";
       "OHOS::Ace::NG::ScrollablePattern::FireObserverOnDidScroll(float)";
@@ -2557,6 +2564,7 @@
       "OHOS::Ace::NG::TextPattern::EmplaceSymbolColorIndex(int)";
       "OHOS::Ace::NG::TextPattern::DumpAdvanceInfo()";
       "OHOS::Ace::NG::TextPattern::DumpAdvanceInfo(std::__h::unique_ptr<OHOS::Ace::JsonValue, std::__h::default_delete<OHOS::Ace::JsonValue>>&)";
+      "OHOS::Ace::NG::TextPattern::DumpAdvanceInfo(std::__h::unique_ptr<OHOS::Ace::JsonValue, std::__h::default_delete<OHOS::Ace::JsonValue>>&, OHOS::Ace::ParamConfig const&)";
       "OHOS::Ace::NG::TextPattern::DumpInfo()";
       "OHOS::Ace::NG::TextPattern::DumpInfo(std::__h::unique_ptr<OHOS::Ace::JsonValue, std::__h::default_delete<OHOS::Ace::JsonValue>>&)";
       "OHOS::Ace::NG::TextPattern::DumpSimplifyInfo(std::__h::shared_ptr<OHOS::Ace::JsonValue>&)";
@@ -5396,6 +5404,7 @@
       GetArkUIAniModifiers;
       GetArkUIAnyFullNodeAPI;
       GetArkUIPageTextAPI;
+      GetArkUITreeAPI;
       GetArkUIDrawableDescriptor;
       GetArkUIFullNodeAPI;
       GetArkUINodeAPI;

@@ -1681,6 +1681,8 @@ public:
     void FireLpxUpdateCallbacks();
     bool IsNeedLazyLayout() const;
     void MeasureSafeAreaInset() override;
+    void DumpSimplifyInfoWithParamConfig(std::shared_ptr<JsonValue>& json, ParamConfig config = ParamConfig()) override;
+
 protected:
     void LayoutSafeAreaInset() override;
 
@@ -1751,6 +1753,7 @@ private:
     void DumpCommonInfo();
     void DumpCommonInfo(std::unique_ptr<JsonValue>& json);
     void DumpSimplifyCommonInfo(std::shared_ptr<JsonValue>& json);
+    void DumpSimplifyCommonInfo(std::shared_ptr<JsonValue>& json, const TreeCollectionState* state);
     void DumpSimplifyCommonInfoOnlyForParamConfig(std::shared_ptr<JsonValue>& json, ParamConfig config = ParamConfig());
     void DumpSimplifySafeAreaInfo(std::unique_ptr<JsonValue>& json);
     void DumpSimplifyOverlayInfo(std::unique_ptr<JsonValue>& json);

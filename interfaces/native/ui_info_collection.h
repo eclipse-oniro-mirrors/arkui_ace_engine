@@ -43,6 +43,46 @@ typedef struct OH_PixelmapNative OH_PixelmapNative;
 extern "C" {
 #endif
 
+/** Opaque configuration; the caller owns and destroys the request. */
+typedef struct OH_ArkUI_NativeModule_UIAgentTreeRequest OH_ArkUI_NativeModule_UIAgentTreeRequest;
+
+typedef enum {
+    OH_ARKUI_NATIVE_MODULE_UI_AGENT_TREE_FULL = 0,
+    OH_ARKUI_NATIVE_MODULE_UI_AGENT_TREE_VISIBLE = 1,
+} OH_ArkUI_NativeModule_UIAgentTreeType;
+
+typedef enum {
+    OH_ARKUI_NATIVE_MODULE_UI_JSON_COMPACT = 0,
+    OH_ARKUI_NATIVE_MODULE_UI_JSON_PRETTY = 1,
+} OH_ArkUI_NativeModule_UIJsonFormat;
+
+/** Accepted requests complete exactly once on UI. A successful json is owned by the caller. */
+typedef void (*OH_ArkUI_NativeModule_UIAgentJsonCallback)(ArkUI_ContextHandle context, uint64_t requestId,
+    ArkUI_ErrorCode errorCode, OH_ArkUI_NativeModule_UIJsonWrapper* json, void* userData);
+
+ArkUI_ErrorCode OH_ArkUI_NativeModule_UIAgentTreeRequestCreate(
+    OH_ArkUI_NativeModule_UIAgentTreeType treeType, OH_ArkUI_NativeModule_UIAgentTreeRequest** request);
+void OH_ArkUI_NativeModule_UIAgentTreeRequestDestroy(OH_ArkUI_NativeModule_UIAgentTreeRequest* request);
+ArkUI_ErrorCode OH_ArkUI_NativeModule_UIAgentTreeRequestSetFilterPureLayoutNodes(
+    OH_ArkUI_NativeModule_UIAgentTreeRequest* request, bool enabled);
+ArkUI_ErrorCode OH_ArkUI_NativeModule_UIAgentTreeRequestSetInteractionInfo(
+    OH_ArkUI_NativeModule_UIAgentTreeRequest* request, bool enabled);
+ArkUI_ErrorCode OH_ArkUI_NativeModule_UIAgentTreeRequestSetAccessibilityInfo(
+    OH_ArkUI_NativeModule_UIAgentTreeRequest* request, bool enabled);
+ArkUI_ErrorCode OH_ArkUI_NativeModule_UIAgentTreeRequestSetCollectVisualProperties(
+    OH_ArkUI_NativeModule_UIAgentTreeRequest* request, bool enabled);
+ArkUI_ErrorCode OH_ArkUI_NativeModule_UIAgentTreeRequestSetCollectFunctionalProperties(
+    OH_ArkUI_NativeModule_UIAgentTreeRequest* request, bool enabled);
+
+/** UI thread only. Failure clears a valid output slot; no partial tree is returned. */
+ArkUI_ErrorCode OH_ArkUI_NativeModule_UIAgentGetTreeJson(ArkUI_ContextHandle context,
+    const OH_ArkUI_NativeModule_UIAgentTreeRequest* request, OH_ArkUI_NativeModule_UIJsonFormat format,
+    OH_ArkUI_NativeModule_UIJsonWrapper** json);
+/** Copies configuration before returning. userData is borrowed through callback completion. */
+ArkUI_ErrorCode OH_ArkUI_NativeModule_UIAgentGetTreeJsonAsync(ArkUI_ContextHandle context,
+    const OH_ArkUI_NativeModule_UIAgentTreeRequest* request, OH_ArkUI_NativeModule_UIJsonFormat format,
+    OH_ArkUI_NativeModule_UIAgentJsonCallback callback, void* userData, uint64_t* requestId);
+
 /**
  * @brief Collects texts from the current ArkUI page synchronously as JSON.
  * The returned JSON contains a "schemaVersion" field fixed at 1 and a "texts" array, for example:

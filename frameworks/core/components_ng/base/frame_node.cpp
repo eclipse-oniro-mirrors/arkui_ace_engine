@@ -21,6 +21,8 @@
 #include "core/components_ng/manager/safe_area/safe_area_manager.h"
 #include "core/components_ng/manager/privacy_sensitive/privacy_sensitive_manager.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_manager.h"
+#include "core/components_ng/base/inspector_dump_options.h"
+#include "core/components_ng/base/ui_tree_collector.h"
 
 #include <cinttypes>
 #include <unordered_set>
@@ -1409,6 +1411,11 @@ void FrameNode::DumpOverlayInfo()
 
 void FrameNode::DumpSimplifyCommonInfo(std::shared_ptr<JsonValue>& json)
 {
+    DumpSimplifyCommonInfo(json, nullptr);
+}
+
+void FrameNode::DumpSimplifyCommonInfo(std::shared_ptr<JsonValue>& json, const TreeCollectionState* state)
+{
     json->Put("$rect", GetTransformRectRelativeToWindow().ToBounds().c_str());
     if (!propInspectorId_->empty()) {
         json->Put("compid", propInspectorId_.value_or("").c_str());
@@ -1420,7 +1427,14 @@ void FrameNode::DumpSimplifyCommonInfo(std::shared_ptr<JsonValue>& json)
         json->Put("visible", "false");
     }
     CHECK_NULL_VOID(renderContext_);
-    auto& opacity = renderContext_->GetOpacity();
+    const std::optional<double>* cachedOpacity = nullptr;
+    if (state) {
+        auto found = state->visibility.find(this);
+        if (found != state->visibility.end()) {
+            cachedOpacity = &found->second.opacity;
+        }
+    }
+    const auto& opacity = cachedOpacity ? *cachedOpacity : renderContext_->GetOpacity();
     if (opacity.has_value() && !NearEqual(opacity.value(), 1.0f)) {
         json->Put("opacity", opacity.value());
     }
@@ -1430,26 +1444,111 @@ void FrameNode::DumpSimplifyCommonInfo(std::shared_ptr<JsonValue>& json)
     }
 }
 
+namespace {
+void CollectInteractionInfo(std::shared_ptr<JsonValue>& json, const RefPtr<GestureEventHub>& eventHub,
+    const RefPtr<FocusHub>& focusHub)
+{
+    if (eventHub) {
+        json->Put("clickable", eventHub->IsAccessibilityClickable());
+        json->Put("longClickable", eventHub->IsAccessibilityLongClickable());
+    }
+    if (focusHub) {
+        json->Put("focusable", focusHub->IsFocusable());
+    }
+}
+
+void CollectAccessibilityInfo(std::shared_ptr<JsonValue>& json, const RefPtr<AccessibilityProperty>& accessibility)
+{
+    if (!accessibility) {
+        return;
+    }
+    const auto& text = accessibility->GetAccessibilityText();
+    if (!text.empty()) {
+        json->Put("accessibilityContent", text.c_str());
+    }
+}
+
+void DumpAdvancedVisualProperties(
+    FrameNode& node, std::unique_ptr<JsonValue>& visual, const ParamConfig& config)
+{
+    if (auto geometry = node.GetGeometryNode()) {
+        visual->Put("FrameRect", geometry->GetFrameRect().ToString().c_str());
+    }
+    if (auto render = node.GetRenderContext()) {
+        visual->Put("PaintRectWithoutTransform", render->GetPaintRectWithoutTransform().ToString().c_str());
+    }
+    if (auto render = node.GetRenderContext()) {
+        render->DumpAdvanceInfo(visual, config);
+    }
+    if (auto pattern = node.GetPattern()) {
+        pattern->DumpAdvanceInfo(visual, config);
+    }
+}
+
+void DumpAdvancedFunctionalProperties(
+    FrameNode& node, std::unique_ptr<JsonValue>& functional, const ParamConfig& config)
+{
+    if (auto render = node.GetRenderContext()) {
+        render->DumpAdvanceInfo(functional, config);
+    }
+    if (auto pattern = node.GetPattern()) {
+        pattern->DumpAdvanceInfo(functional, config);
+    }
+}
+
+void DumpAdvancedProperties(FrameNode& node, std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if (config.visualProperties) {
+        auto visual = JsonUtil::Create();
+        auto visualConfig = config;
+        visualConfig.functionalProperties = false;
+        DumpAdvancedVisualProperties(node, visual, visualConfig);
+        json->Put("visual", visual);
+    }
+    if (config.functionalProperties) {
+        auto functional = JsonUtil::Create();
+        auto functionalConfig = config;
+        functionalConfig.visualProperties = false;
+        DumpAdvancedFunctionalProperties(node, functional, functionalConfig);
+        json->Put("functional", functional);
+    }
+}
+
+void DumpAdvancedNodeProperties(FrameNode& node, std::shared_ptr<JsonValue>& json, ParamConfig config)
+{
+    CHECK_NULL_VOID(json);
+    if (!config.collectionState) {
+        return;
+    }
+    if (IsHostOnlyNode(node, config)) {
+        return;
+    }
+    if (!config.visualProperties && !config.functionalProperties) {
+        return;
+    }
+    config.dumpMode = TreeDumpMode::PUBLIC_TREE;
+    auto advanced = JsonUtil::Create();
+    DumpAdvancedProperties(node, advanced, config);
+    json->Put("advanced", advanced);
+}
+} // namespace
+
+// Preserve legacy field order: gesture/focus, accessibility text, scrollable/editable.
 void FrameNode::DumpSimplifyCommonInfoOnlyForParamConfig(std::shared_ptr<JsonValue>& json, ParamConfig config)
 {
-    auto eventHub = eventHub_ ? eventHub_->GetOrCreateGestureEventHub() : nullptr;
-    if (config.interactionInfo) {
-        if (eventHub) {
-            json->Put("clickable", eventHub->IsAccessibilityClickable());
-            json->Put("longClickable", eventHub->IsAccessibilityLongClickable());
-        }
-        if (focusHub_) {
-            json->Put("focusable", focusHub_->IsFocusable());
-        }
+    RefPtr<GestureEventHub> eventHub;
+    if (eventHub_) {
+        eventHub = config.collectionState ? eventHub_->GetGestureEventHub() : eventHub_->GetOrCreateGestureEventHub();
     }
-    if (accessibilityProperty_) {
-        if (!accessibilityProperty_->GetAccessibilityText().empty() && config.accessibilityInfo) {
-            json->Put("accessibilityContent", accessibilityProperty_->GetAccessibilityText().c_str());
-        }
-        if (config.interactionInfo) {
-            json->Put("scrollable", accessibilityProperty_->IsScrollable());
-            json->Put("editable", accessibilityProperty_->IsEditable());
-        }
+    if (config.interactionInfo) {
+        CollectInteractionInfo(json, eventHub, focusHub_);
+    }
+    if (config.accessibilityInfo) {
+        CollectAccessibilityInfo(json, accessibilityProperty_);
+    }
+    if (config.interactionInfo && accessibilityProperty_) {
+        json->Put("scrollable", accessibilityProperty_->IsScrollable());
+        json->Put("editable", accessibilityProperty_->IsEditable());
     }
 }
 
@@ -1562,6 +1661,25 @@ void FrameNode::DumpSimplifyInfo(std::shared_ptr<JsonValue>& json)
     }
 }
 
+void FrameNode::DumpSimplifyInfoWithParamConfig(std::shared_ptr<JsonValue>& json, ParamConfig config)
+{
+    if (!config.collectionState) {
+        UINode::DumpSimplifyInfoWithParamConfig(json, config);
+        return;
+    }
+
+    CHECK_NULL_VOID(json);
+    DumpSimplifyCommonInfo(json, config.collectionState);
+    if (pattern_) {
+        auto child = JsonUtil::CreateSharedPtrJson();
+        InspectorDumpOptions options;
+        options.includeDiagnostic = false;
+        pattern_->DumpSimplifyInfo(child, options);
+        json->Put("$attrs", std::move(child));
+    }
+    DumpSimplifyInfoOnlyForParamConfig(json, config);
+}
+
 void FrameNode::MergeAttributesIntoJson(std::shared_ptr<JsonValue>& json, const std::shared_ptr<JsonValue>& child)
 {
     if (json->Contains("$attrs") && json->GetValue("$attrs")->IsObject()) {
@@ -1588,6 +1706,7 @@ void FrameNode::DumpSimplifyInfoOnlyForParamConfig(std::shared_ptr<JsonValue>& j
         pattern_->AddExtraInfoWithParamConfig(json, config);
         MergeAttributesIntoJson(json, child);
     }
+    DumpAdvancedNodeProperties(*this, json, config);
 }
 
 void FrameNode::DumpInfo()

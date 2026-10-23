@@ -61,6 +61,7 @@ void UINodeTestNgTwo::SetUpTestSuite()
 
 void UINodeTestNgTwo::TearDownTestSuite()
 {
+    DetachGlobalTestNodes();
     MockPipelineContext::TearDown();
 }
 

@@ -20,6 +20,14 @@
 #include <string>
 
 namespace OHOS::Ace {
+
+struct TreeCollectionState;
+
+enum class TreeDumpMode {
+    LEGACY,
+    PUBLIC_TREE,
+};
+
 struct ParamConfig {
     bool interactionInfo = false;
     bool accessibilityInfo = false;
@@ -28,6 +36,16 @@ struct ParamConfig {
     bool withUIExtension = false;
     bool rectCulling = false;
     float minOpacity = 0.0f; // ignore nodes whose final opacity are less than minOpacity
+    bool filterPureLayout = false;
+    bool visualProperties = false;
+    bool functionalProperties = false;
+    TreeCollectionState* collectionState = nullptr;
+    TreeDumpMode dumpMode = TreeDumpMode::LEGACY;
+
+    bool IsPublicTree() const
+    {
+        return dumpMode == TreeDumpMode::PUBLIC_TREE;
+    }
 };
 
 struct InteractionParamConfig {

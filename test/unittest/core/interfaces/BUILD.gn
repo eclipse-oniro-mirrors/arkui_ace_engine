@@ -80,12 +80,22 @@ ace_unittest("ui_event_command_test") {
   ]
 }
 
+ace_unittest("ui_tree_api_test") {
+  module_name = "UIEngine-Mainprocess"
+  type = "new"
+  if (defined(is_host_product) && is_host_product) {
+    type = "host_components"
+  }
+  sources = [ "native/node/ui_tree_api_test.cpp" ]
+}
+
 group("core_interfaces_unittest") {
   testonly = true
   deps = [
     ":immersive_strategy_ani_modifier_test",
     ":interfaces_test",
     ":ui_event_command_test",
+    ":ui_tree_api_test",
     ":visual_effect_ani_modifier_test",
   ]
 }

@@ -344,6 +344,8 @@ public:
     // Used when transferring events from a builder-created MenuItem to a rebuilt grid item.
     ACE_FORCE_EXPORT void CopyEvent(const RefPtr<InputEventHub>& source);
 
+    bool HasTreeInteraction() const;
+
 private:
     WeakPtr<EventHub> eventHub_;
 

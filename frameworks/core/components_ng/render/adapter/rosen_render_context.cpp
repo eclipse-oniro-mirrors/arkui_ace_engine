@@ -9612,4 +9612,12 @@ void RosenRenderContext::ResetRadiusGradientBlur()
     rsNode_->SetUICompositingFilter(&compositingFilter);
     RequestNextFrame();
 }
+bool RosenRenderContext::HasRenderContent() const
+{
+    if (!rsNode_) {
+        return false;
+    }
+    return rsNode_->GetIsDrawn() || rsNode_->GetType() != Rosen::RSUINodeType::CANVAS_NODE;
+}
+
 } // namespace OHOS::Ace::NG

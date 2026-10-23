@@ -499,6 +499,10 @@ void FrameNode::DumpInfo(std::unique_ptr<JsonValue>&) {}
 void FrameNode::DumpAdvanceInfo() {}
 void FrameNode::DumpAdvanceInfo(std::unique_ptr<JsonValue>&) {}
 void FrameNode::DumpSimplifyInfo(std::shared_ptr<JsonValue>&) {}
+void FrameNode::DumpSimplifyInfoWithParamConfig(std::shared_ptr<JsonValue>& json, ParamConfig config)
+{
+    UINode::DumpSimplifyInfoWithParamConfig(json, config);
+}
 void FrameNode::DumpSimplifyInfoOnlyForParamConfig(std::shared_ptr<JsonValue>&, ParamConfig) {}
 void FrameNode::DumpViewDataPageNode(RefPtr<ViewDataWrap>, bool) {}
 bool FrameNode::CheckAutoSave()

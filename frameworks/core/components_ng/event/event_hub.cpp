@@ -1512,4 +1512,27 @@ bool EventHub::IsCompensateOnSizeChangeEvent() const
     return compensateOnSizeChangeEvent_;
 }
 
+bool EventHub::HasTreeCallbacks() const
+{
+    return (appearCallbackSet_ && (appearCallbackSet_->onAppear || appearCallbackSet_->onJSFrameNodeAppear ||
+                                      appearCallbackSet_->onDisappear || appearCallbackSet_->onJSFrameNodeDisappear)) ||
+           (attachDetachCallbackSet_ && (attachDetachCallbackSet_->onAttach || attachDetachCallbackSet_->onDetach)) ||
+           HasOnAreaChanged() || HasInnerOnAreaChanged() || HasOnSizeChanged() || HasInnerOnSizeChanged() ||
+           (sizeCallbackSet_ && sizeCallbackSet_->onJsFrameNodeSizeChanged) ||
+           (enabledNdkCallbackSet_ &&
+               (enabledNdkCallbackSet_->ndkDrawCompletedCallback || enabledNdkCallbackSet_->ndkLayoutCallback)) ||
+           dragDropCallbackSet_ || visibleAreaChangeCallbackSet_ || stateStyleMgr_;
+}
+
+bool EventHub::HasTreeInteraction() const
+{
+    auto gesture = GetGestureEventHub();
+    auto input = GetInputEventHub();
+    auto focus = GetFocusHub();
+    return (gesture && gesture->HasTreeInteraction()) || (input && input->HasTreeInteraction()) ||
+           (focus && focus->HasTreeInteraction()) || HasTreeCallbacks() || !IsEnabled() || HasOnAreaChanged() ||
+           HasOnSizeChanged() || HasOnDragStart() || HasOnDragMove() || HasOnDragEnter() || HasOnDragLeave() ||
+           HasOnDragEnd() || HasOnDrop() || HasKeyboardShortcut();
+}
+
 } // namespace OHOS::Ace::NG
