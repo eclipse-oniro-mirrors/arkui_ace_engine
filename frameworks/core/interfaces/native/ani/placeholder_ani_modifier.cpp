@@ -62,11 +62,37 @@ intptr_t g_pendingProduct = 0;
 
 // Persistent handle of the ArkTS execution closure: the manager may execute it
 // at any later frame (source rebuilds, clone probes), so the function reference
-// must outlive the register call. Released only when the whole module goes
-// away; unregistering keeps the handle alive harmlessly.
+// must outlive the register call. The destructor releases the global reference
+// wherever the registry drops the last builder copy (register failure,
+// unregister, re-register overwrite, manager teardown), following the same
+// pattern as the save/paste button ani callbacks.
+ani_status GetAniEnv(ani_vm* vm, ani_env** env)
+{
+    CHECK_NULL_RETURN(vm, ANI_ERROR);
+    ani_options aniOpt { 0, nullptr };
+    auto status = vm->AttachCurrentThread(&aniOpt, ANI_VERSION_1, env);
+    if (status != ANI_OK) {
+        vm->GetEnv(ANI_VERSION_1, env);
+    }
+    return status;
+}
+
 class AniTemplateBuilderHandle {
 public:
     AniTemplateBuilderHandle(ani_vm* vm, ani_ref globalRef) : vm_(vm), globalRef_(globalRef) {}
+
+    ~AniTemplateBuilderHandle()
+    {
+        CHECK_NULL_VOID(vm_);
+        CHECK_NULL_VOID(globalRef_);
+        ani_env* env = nullptr;
+        auto attachCurrentThreadStatus = GetAniEnv(vm_, &env);
+        CHECK_NULL_VOID(env);
+        env->GlobalReference_Delete(globalRef_);
+        if (attachCurrentThreadStatus == ANI_OK) {
+            vm_->DetachCurrentThread();
+        }
+    }
 
     ani_fn_object Fn() const
     {
