@@ -6844,6 +6844,17 @@ void RosenRenderContext::SetHDRBrightness(float hdrBrightness, uint32_t type)
     rsSurfaceNode->SetHDRBrightnessWithType(hdrBrightness, type);
 }
 
+void RosenRenderContext::SetSolidLayerEnabled(bool enabled)
+{
+    FREE_RS_CONTEXT_CHECK(SetSolidLayerEnabled, enabled);
+    CHECK_NULL_VOID(rsNode_);
+    auto rsSurfaceNode = rsNode_->ReinterpretCastTo<Rosen::RSSurfaceNode>();
+    CHECK_NULL_VOID(rsSurfaceNode);
+    TAG_LOGI(AceLogTag::ACE_XCOMPONENT,
+        "SetSolidLayerEnabled reach end of ArkUI chain, forward to RS, enableSolidLayer: %{public}d", enabled);
+    rsSurfaceNode->SetSolidLayerEnabled(enabled);
+}
+
 void RosenRenderContext::SetImageHDRPresent(bool hdrPresent)
 {
     FREE_RS_CONTEXT_CHECK(SetImageHDRPresent, hdrPresent);

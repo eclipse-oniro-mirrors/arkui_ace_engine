@@ -88,6 +88,7 @@ std::mutex XComponentPattern::angleMtx_;
 std::string XComponentPattern::compensationAngleFromFeatureManager_ = "";
 namespace {
 
+constexpr uint32_t XCOMPONENT_EXTRA_FLAG_ENABLE_SOLID_COLOR = 0x01;
 constexpr std::string_view BUFFER_USAGE_XCOMPONENT = "xcomponent";
 #ifdef ENABLE_ROSEN_BACKEND
 constexpr char X_COMPONENT_COMPENSATION_ANGLE[] = "xcomponentCompensationAngle";
@@ -730,7 +731,7 @@ void XComponentPattern::applyBackGroundColor()
     CHECK_NULL_VOID(handlingSurfaceRenderContext_);
     auto bkColor = renderContext->GetBackgroundColor().value_or(Color::BLACK);
     handlingSurfaceRenderContext_->UpdateBackgroundColor(
-        (bkColor.GetAlpha() < UINT8_MAX) ? Color::TRANSPARENT : bkColor);
+        (!IsSolidColorEnabled() && bkColor.GetAlpha() < UINT8_MAX) ? Color::TRANSPARENT : bkColor);
 }
 
 void XComponentPattern::OnAreaChangedInner()
@@ -932,6 +933,7 @@ void XComponentPattern::ToJsonValue(std::unique_ptr<JsonValue>& json, const Insp
     json->PutExtAttr("enableAnalyzer", isEnableAnalyzer_ ? "true" : "false", filter);
     json->PutExtAttr("enableSecure", isEnableSecure_ ? "true" : "false", filter);
     json->PutExtAttr("hdrBrightness", std::to_string(hdrBrightness_).c_str(), filter);
+    json->PutExtAttr("extraFlag", IsSolidColorEnabled() ? "ENABLE_SOLID_COLOR" : "", filter);
     json->PutExtAttr("enableTransparentLayer", isTransparentLayer_ ? "true" : "false", filter);
     json->PutExtAttr("bufferQueueCount", std::to_string(bufferQueueCount_).c_str(), filter);
     json->PutExtAttr("screenId", screenId_.has_value() ? std::to_string(screenId_.value()).c_str() : "", filter);
@@ -2663,6 +2665,27 @@ void XComponentPattern::HdrBrightness(float hdrBrightness, HdrType hdrType)
     renderContextForSurface_->SetHDRBrightness(std::clamp(hdrBrightness, 0.0f, 1.0f), static_cast<uint32_t>(hdrType));
     hdrBrightness_ = std::clamp(hdrBrightness, 0.0f, 1.0f);
     hdrType_ = hdrType;
+}
+
+void XComponentPattern::SetExtraFlag(uint32_t flag)
+{
+    TAG_LOGI(AceLogTag::ACE_XCOMPONENT,
+        "XComponent[%{public}s] SetExtraFlag (pattern) entry, flag: 0x%{public}x, type: %{public}d",
+        GetId().c_str(), flag, static_cast<int32_t>(type_));
+    extraFlag_ = flag;
+    if (type_ == XComponentType::SURFACE) {
+        bool isSolidColorEnabled = IsSolidColorEnabled();
+        CHECK_NULL_VOID(renderContextForSurface_);
+        renderContextForSurface_->SetSolidLayerEnabled(isSolidColorEnabled);
+        if (handlingSurfaceRenderContext_ == renderContextForSurface_) {
+            applyBackGroundColor();
+        }
+    }
+}
+
+bool XComponentPattern::IsSolidColorEnabled() const
+{
+    return (extraFlag_ & XCOMPONENT_EXTRA_FLAG_ENABLE_SOLID_COLOR) == XCOMPONENT_EXTRA_FLAG_ENABLE_SOLID_COLOR;
 }
 
 void XComponentPattern::EnableTransparentLayer(bool isTransparentLayer)

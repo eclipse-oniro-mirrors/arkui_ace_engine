@@ -9827,6 +9827,7 @@ struct ArkUIXComponentModifier {
     void (*setXComponentHdrBrightness)(
         ArkUINodeHandle node, ArkUI_Float32 hdrBrightness, ArkUI_Int32 hdrType);
     void (*resetXComponentHdrBrightness)(ArkUINodeHandle node);
+    void (*setXComponentExtraFlag)(ArkUINodeHandle node, ArkUI_Uint32 flag);
     void (*setXComponentEnableTransparentLayer)(ArkUINodeHandle node, ArkUI_Bool enable);
     void (*resetXComponentEnableTransparentLayer)(ArkUINodeHandle node);
     void (*setXComponentBufferQueueCount)(ArkUINodeHandle node, ArkUI_Int32 bufferQueueCount);

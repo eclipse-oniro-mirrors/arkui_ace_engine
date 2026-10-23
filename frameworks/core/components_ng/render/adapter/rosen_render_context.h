@@ -369,6 +369,7 @@ public:
     void SetIsBackground(bool isBackground) override;
     void SetHDRBrightness(float hdrBrightness) override;
     void SetHDRBrightness(float hdrBrightness, uint32_t type) override;
+    void SetSolidLayerEnabled(bool enabled) override;
     void SetImageHDRBrightness(float hdrBrightness) override;
     void SetImageHDRPresent(bool hdrPresent) override;
     void SetTransparentLayer(bool isTransparentLayer) override;
