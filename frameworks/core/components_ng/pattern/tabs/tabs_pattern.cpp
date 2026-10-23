@@ -664,6 +664,12 @@ void TabsPattern::SetCurrentBarDisplayMode(TabBarDisplayMode mode)
     CHECK_NULL_VOID(swiperNode);
     auto swiperPattern = swiperNode->GetPattern<SwiperPattern>();
     CHECK_NULL_VOID(swiperPattern);
+    // In sidebar mode the sidebar occupies the swiper's main axis (width). When sidebar width
+    // >= container width, contentMainSize_ becomes 0 and itemPosition_ is empty, which would
+    // cause SwipeTo/SwipeToWithoutAnimation to early-return and BeforeCreateLayoutWrapper to
+    // discard a pending targetIndex_. This flag bypasses those checks so tab switch requests
+    // are preserved. Only enabled for SIDEBAR mode to avoid affecting other swiper scenarios.
+    swiperPattern->SetIsTabsSidebarDisplayMode(mode == TabBarDisplayMode::SIDEBAR);
     auto controller = AceType::DynamicCast<TabsControllerNG>(swiperPattern->GetSwiperController());
     if (controller) {
         controller->SetBarDisplayMode(mode);

@@ -769,7 +769,16 @@ void SwiperPattern::BeforeCreateLayoutWrapper()
         needAdjustIndex_ = false;
     }
 
-    if (lastCurrentIndex != currentIndex_ || (itemPosition_.empty() && !isVoluntarilyClear_)
+    // When contentMainSize_ is zero (e.g. Tabs sidebar occupies the full main axis),
+    // itemPosition_ will be empty because no items can be laid out. In this case, if a
+    // SwipeTo has set targetIndex_, we must NOT reset it via jumpIndex_ — otherwise the
+    // pending tab switch is lost. The isTabsSidebarDisplayMode_ flag is set by Tabs
+    // when operating in sidebar display mode (TabBarDisplayMode::SIDEBAR), so this guard
+    // only affects that mode and leaves all other swiper scenarios unchanged.
+    bool isSidebarContentEmptyWithPendingTarget =
+        isTabsSidebarDisplayMode_ && NearZero(contentMainSize_) && targetIndex_.has_value();
+    if (lastCurrentIndex != currentIndex_ ||
+        (itemPosition_.empty() && !isVoluntarilyClear_ && !isSidebarContentEmptyWithPendingTarget)
         || hadCachedCapture != hasCachedCapture_) {
         jumpIndex_ = (!isInit_ && GetMaintainVisibleContentPosition())
                          ? jumpIndex_.value_or(GetLoopIndex(currentIndex_))
@@ -1336,6 +1345,9 @@ bool SwiperPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty,
     isInit_ = false;
 
     if (!IsAutoPlay() && config.skipMeasure && config.skipLayout) {
+        if (isTabsSidebarDisplayMode_ && NearZero(contentMainSize_) && jumpIndex_) {
+            jumpIndex_.reset();
+        }
         return false;
     }
 
@@ -2176,7 +2188,13 @@ void SwiperPattern::SwipeToWithoutAnimation(int32_t index, std::optional<int32_t
         FireWillShowEvent(index);
         FireWillHideEvent(currentIndex_);
     }
-    if (IsVisibleChildrenSizeLessThanSwiper()) {
+    // In Tabs sidebar mode, when sidebar width >= container width, contentMainSize_ is 0
+    // and itemPosition_ is empty, causing IsVisibleChildrenSizeLessThanSwiper() to return
+    // true. The bypass condition (isTabsSidebarDisplayMode_ && NearZero(contentMainSize_))
+    // matches the guard in BeforeCreateLayoutWrapper so that the tab switch request can be
+    // recorded via jumpIndex_ consistently across all three sites.
+    if (IsVisibleChildrenSizeLessThanSwiper() &&
+        !(isTabsSidebarDisplayMode_ && NearZero(contentMainSize_))) {
         return;
     }
 
@@ -2242,7 +2260,13 @@ void SwiperPattern::SwipeTo(int32_t index)
         return;
     }
 
-    if (IsVisibleChildrenSizeLessThanSwiper()) {
+    // In Tabs sidebar mode, when sidebar width >= container width, contentMainSize_ is 0
+    // and itemPosition_ is empty, causing IsVisibleChildrenSizeLessThanSwiper() to return
+    // true. The bypass condition (isTabsSidebarDisplayMode_ && NearZero(contentMainSize_))
+    // matches the guard in BeforeCreateLayoutWrapper so that the tab switch request can be
+    // recorded via targetIndex_ consistently across all three sites.
+    if (IsVisibleChildrenSizeLessThanSwiper() &&
+        !(isTabsSidebarDisplayMode_ && NearZero(contentMainSize_))) {
         return;
     }
 

@@ -128,8 +128,15 @@ void TabsSideBarTabListPattern::SetCurrentIndex(int32_t index)
     // Set new selected item highlight
     UpdateTabItemStyle(index, true);
 
-    // Notify Swiper to switch page
+    // Notify Swiper to switch page.
+    // Update the animation curve before SwipeTo, same as TabsController.changeIndex
+    // (see tabs_controller_modifier.cpp ChangeIndex), so that sidebar tab switching
+    // uses the same TabBar animation curve as the JS changeIndex API.
     if (swiperController_) {
+        const auto& updateCubicCurveCallback = swiperController_->GetUpdateCubicCurveCallback();
+        if (updateCubicCurveCallback) {
+            updateCubicCurveCallback();
+        }
         swiperController_->SwipeTo(index);
     }
 
