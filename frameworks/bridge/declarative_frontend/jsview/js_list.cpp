@@ -20,6 +20,7 @@
 #include "interfaces/inner_api/ui_session/ui_session_manager.h"
 
 #include "base/geometry/axis.h"
+#include "base/utils/string_utils.h"
 #include "base/hiviewdfx/histogram_wrapper.h"
 #include "base/log/ace_scoring_log.h"
 #include "bridge/declarative_frontend/engine/functions/js_drag_function.h"
@@ -695,11 +696,16 @@ void JSList::SetScrollPlaceholder(const JSCallbackInfo& args)
             NG::ScrollPlaceholderSizeOption sizeOption;
             auto width = sizeObj->GetProperty("width");
             if (width->IsNumber()) {
-                sizeOption.width = width->ToNumber<float>();
+                sizeOption.width = Dimension(width->ToNumber<float>(), DimensionUnit::VP);
+            } else if (width->IsString()) {
+                // Bare numbers mean vp; suffixed strings ("100%", "10px") keep their unit.
+                sizeOption.width = StringUtils::StringToDimension(width->ToString(), true);
             }
             auto height = sizeObj->GetProperty("height");
             if (height->IsNumber()) {
-                sizeOption.height = height->ToNumber<float>();
+                sizeOption.height = Dimension(height->ToNumber<float>(), DimensionUnit::VP);
+            } else if (height->IsString()) {
+                sizeOption.height = StringUtils::StringToDimension(height->ToString(), true);
             }
             options.size = sizeOption;
         }

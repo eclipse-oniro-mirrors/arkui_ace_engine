@@ -21,6 +21,7 @@
 #include <optional>
 #include <string>
 
+#include "base/geometry/dimension.h"
 #include "base/memory/ace_type.h"
 
 namespace OHOS::Ace::NG {
@@ -81,8 +82,10 @@ using ScrollPlaceholderBuilder = std::function<RefPtr<UINode>()>;
 // measurement, never the real item layout; invalid dimensions are ignored in favor
 // of the component's own estimate. Added by the component adapter steps (step2/3).
 struct ScrollPlaceholderSizeOption {
-    std::optional<float> width;
-    std::optional<float> height;
+    // Unit-preserving: "100%" arrives as Dimension(1.0, PERCENT); collapsing to the
+    // raw Value() turns it into 1.0vp at shell mount (bug: 3.5px-wide placeholders).
+    std::optional<Dimension> width;
+    std::optional<Dimension> height;
 };
 
 struct ScrollPlaceholderOptions {

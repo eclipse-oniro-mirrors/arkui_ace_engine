@@ -210,6 +210,9 @@ private:
         uint64_t sequence = 0;
         ScrollPlaceholderRealBuildPriority priority = ScrollPlaceholderRealBuildPriority::VISIBLE;
         RealBuildTaskFunc task;
+        // Flush rounds this task survived without a commit; caps the budget requeue
+        // loop, because the cost estimate only calibrates after a successful commit.
+        int32_t requeueCount = 0;
     };
 
     ScrollPlaceholderPredictResult PredictCore(const ScrollPlaceholderPredictParams& params, int64_t frameDeadlineNs) const;

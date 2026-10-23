@@ -755,6 +755,8 @@ private:
     float prevEndOffset_ = 0.f;
     double currentOffset_ = 0.0f;
     bool maintainVisibleContentPosition_ = false;
+    // Timestamp of the last scroll callback; 0 = no scroll happened yet.
+    int64_t lastScrollCallbackNs_ = 0;
     ScrollPlaceholderProvider scrollPlaceholderProvider_;
     std::map<int32_t, ScrollPlaceholderItemInfo> scrollPlaceholderItems_;
     std::list<std::pair<RefPtr<FrameNode>, std::string>> retiringPlaceholderShells_;

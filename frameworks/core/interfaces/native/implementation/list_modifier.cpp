@@ -156,8 +156,8 @@ namespace OHOS::Ace::NG::Converter {
         dst = ret;
     }
 
-    // The provider size follows the ArkTS Length number convention (vp value),
-    // matching the plain-number handling of the northbound provider path.
+    // The provider size follows the ArkTS Length convention; the unit must survive
+    // the conversion into the layout-side option.
     template<>
     ScrollPlaceholderOptions Convert(const Ark_PlaceholderOptions& src)
     {
@@ -165,14 +165,10 @@ namespace OHOS::Ace::NG::Converter {
         options.id = Converter::OptConvert<std::string>(src.id).value_or("");
         if (src.size.tag != INTEROP_TAG_UNDEFINED) {
             ScrollPlaceholderSizeOption sizeOption;
-            auto width = Converter::OptConvert<Dimension>(src.size.value.width);
-            if (width.has_value()) {
-                sizeOption.width = width->Value();
-            }
-            auto height = Converter::OptConvert<Dimension>(src.size.value.height);
-            if (height.has_value()) {
-                sizeOption.height = height->Value();
-            }
+            // Keep the converted Dimension with its unit: "100%" maps to
+            // Dimension(1.0, PERCENT), and Value() would collapse it to 1.0.
+            sizeOption.width = Converter::OptConvert<Dimension>(src.size.value.width);
+            sizeOption.height = Converter::OptConvert<Dimension>(src.size.value.height);
             options.size = sizeOption;
         }
         return options;
@@ -770,10 +766,12 @@ void SetScrollPlaceholderImpl(Ark_NativePointer node,
         if (result.has_value()) {
             TAG_LOGI(AceLogTag::ACE_SCROLL,
                 "List scrollPlaceholder: provider hit, index=%{public}d, id='%{public}s', "
-                "hasSize=%{public}d, w=%{public}.2f, h=%{public}.2f",
+                "hasSize=%{public}d, w=%{public}s, h=%{public}s",
                 index, result->id.c_str(), result->size.has_value(),
-                result->size.has_value() ? result->size->width.value_or(0.0f) : 0.0f,
-                result->size.has_value() ? result->size->height.value_or(0.0f) : 0.0f);
+                (result->size.has_value() && result->size->width.has_value())
+                    ? result->size->width->ToString().c_str() : "unset",
+                (result->size.has_value() && result->size->height.has_value())
+                    ? result->size->height->ToString().c_str() : "unset");
         } else {
             TAG_LOGI(AceLogTag::ACE_SCROLL,
                 "List scrollPlaceholder: provider returned undefined (no placeholder for index=%{public}d)", index);

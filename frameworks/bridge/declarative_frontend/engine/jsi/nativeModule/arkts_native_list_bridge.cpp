@@ -654,11 +654,20 @@ ArkUINativeModuleValue ListBridge::SetListScrollPlaceholder(ArkUIRuntimeCallInfo
             ScrollPlaceholderSizeOption sizeOption;
             auto width = sizeObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "width"));
             if (width->IsNumber()) {
-                sizeOption.width = static_cast<float>(width->ToNumber(vm)->Value());
+                sizeOption.width =
+                    Dimension(static_cast<float>(width->ToNumber(vm)->Value()), DimensionUnit::VP);
+            } else if (width->IsString(vm)) {
+                // Bare numbers mean vp; suffixed strings ("100%", "10px") keep their unit.
+                sizeOption.width =
+                    StringUtils::StringToDimension(width->ToString(vm)->ToString(vm), true);
             }
             auto height = sizeObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "height"));
             if (height->IsNumber()) {
-                sizeOption.height = static_cast<float>(height->ToNumber(vm)->Value());
+                sizeOption.height =
+                    Dimension(static_cast<float>(height->ToNumber(vm)->Value()), DimensionUnit::VP);
+            } else if (height->IsString(vm)) {
+                sizeOption.height =
+                    StringUtils::StringToDimension(height->ToString(vm)->ToString(vm), true);
             }
             options.size = sizeOption;
         }
