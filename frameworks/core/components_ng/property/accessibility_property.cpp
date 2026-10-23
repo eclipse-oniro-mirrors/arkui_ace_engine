@@ -58,6 +58,12 @@ std::string AccessibilityProperty::GetAccessibilityLevel() const
 
 bool AccessibilityProperty::HasSemanticContent() const
 {
+    // Explicit false states still carry semantics; an empty custom action list does not.
+    if ((accessibilityCustomActions_ && !accessibilityCustomActions_->empty()) ||
+        isDisabled_.has_value() || isSelected_.has_value() || checkedType_.has_value() ||
+        isUserCheckable_.has_value() || HasAccessibilityStateDescription()) {
+        return true;
+    }
     return !GetAccessibilityText().empty() || !GetAccessibilityDescription().empty() ||
            GetAccessibilityLevel() != Level::AUTO || HasAccessibilityVirtualNode() || IsAccessibilityGroup() ||
            !GetAccessibilityRole().empty();

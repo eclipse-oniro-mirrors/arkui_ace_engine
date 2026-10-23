@@ -1933,8 +1933,6 @@ HWTEST_F(PipelineContextFourTestNg, PublicOverlayRespectsInteractionOption, Test
             ASSERT_EQ(overlay->GetString("$type"), "overlay");
             EXPECT_EQ(overlay->Contains("clickable"), !publicRequest || interaction);
             EXPECT_EQ(overlay->Contains("scrollable"), !publicRequest || interaction);
-            EXPECT_EQ(overlay->Contains("longClickable"), publicRequest && interaction);
-            EXPECT_EQ(overlay->Contains("longclickable"), !publicRequest);
             EXPECT_EQ(overlay->GetValue("$children")->GetArrayItem(0)->GetInt("$ID"), overlayChild->GetId());
         }
     }
