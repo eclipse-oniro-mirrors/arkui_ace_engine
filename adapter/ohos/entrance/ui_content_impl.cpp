@@ -6705,7 +6705,8 @@ std::function<void(bool, ParamConfig)> UIContentImpl::InitInspectorTreeCallback(
             TaskExecutor::TaskType::UI, GET_INSPECTOR_TREE_TIMEOUT_TIME, "UiSessionGetInspectorTree");
     };
     if (instance_) {
-        instance_->SetInspectorFunction(callback);
+        auto* stub = static_cast<UIContentServiceStubImpl*>(instance_.GetRefPtr());
+        stub->SetInspectorFunction(callback);
     }
     return callback;
 }

@@ -383,7 +383,7 @@ public:
 
     sptr<IRemoteObject> GetRemoteObj() override
     {
-        return instance_ ? instance_->AsObject() : nullptr;
+        return instance_;
     }
 
     void SetStatusBarItemColor(uint32_t color) override;
@@ -599,7 +599,7 @@ protected:
     std::vector<std::string> registerComponents_;
 
     sptr<IRemoteObject> parentToken_ = nullptr;
-    sptr<UIContentServiceStubImpl> instance_ = new (std::nothrow) UIContentServiceStubImpl();
+    sptr<IRemoteObject> instance_ = new (std::nothrow) UIContentServiceStubImpl();
     bool isUIExtensionSubWindow_ = false;
     bool isUIExtensionAbilityProcess_ = false;
     bool isUIExtensionAbilityHost_ = false;
