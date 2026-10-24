@@ -42,8 +42,12 @@ constexpr size_t MAX_PROVIDER_DEPTH = 64;
 constexpr size_t MAX_PROVIDER_JSON_DEPTH = 64;
 constexpr size_t MAX_PROVIDER_BYTES = 10 * 1024 * 1024;
 constexpr int64_t PROVIDER_ROOT_ELEMENT_ID = -1;
+// ParentId value a provider uses to mark a root node.
+constexpr int64_t PROVIDER_ROOT_PARENT_ID = -1;
 constexpr int32_t PROVIDER_REQUEST_ID = 0;
 constexpr float OPACITY_TOLERANCE = 0.001f;
+// Capacity for the formatted "[left, top],[right,bottom]" rect text.
+constexpr size_t RECT_TEXT_BUFFER_SIZE = 256;
 using ProviderElementInfo = ArkUI_AccessibilityElementInfo;
 using NodeIndex = std::unordered_map<int64_t, size_t>;
 
@@ -168,7 +172,7 @@ std::string FormatRect(const ArkUI_AccessibleRect& rect, const RectTransform& tr
         right = std::max(right, point.GetX());
         bottom = std::max(bottom, point.GetY());
     }
-    char buffer[256];
+    char buffer[RECT_TEXT_BUFFER_SIZE];
     auto length = std::snprintf(buffer, sizeof(buffer), "[%.2f, %.2f],[%.2f,%.2f]",
         left, top, right, bottom);
     return length > 0 && static_cast<size_t>(length) < sizeof(buffer) ? std::string(buffer) : std::string();
@@ -371,7 +375,7 @@ size_t SelectRoot(const std::vector<ProviderElementInfo>& infos, const NodeIndex
         if (fallback == infos.size()) {
             fallback = i;
         }
-        if (parent == -1) {
+        if (parent == PROVIDER_ROOT_PARENT_ID) {
             return i;
         }
         if (orphan == infos.size() && index.count(parent) == 0) {

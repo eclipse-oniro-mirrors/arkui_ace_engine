@@ -280,6 +280,8 @@ const GENERATED_ArkUIXComponentModifier* GetXComponentStaticModifier()
         modifier.setHdrBrightness0 = XComponentAttributeModifier::SetHdrBrightness0Impl;
         modifier.setBufferQueueCount = XComponentAttributeModifier::SetBufferQueueCountImpl;
         modifier.setHdrBrightness1 = XComponentAttributeModifier::SetHdrBrightness1Impl;
+        // The int literal 0 prefers the SFINAE overload when the SDK table has the
+        // field; if that overload is removed, 0 converts to the long no-op instead.
         SetExtraFlagIfSupported(modifier, 0);
         return modifier;
     }();
