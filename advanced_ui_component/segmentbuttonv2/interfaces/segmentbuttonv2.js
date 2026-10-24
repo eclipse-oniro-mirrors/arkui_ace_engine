@@ -1553,7 +1553,7 @@ class SimpleSegmentButtonV2 extends ViewV2 {
                 realIndex = this.isRTL() ? 0 : this.items.length - 1;
               }
               if (!isMaterialEnabled) {
-                realIndex = this.getIndexByPosition(finger.localX, finger.localY);
+                realIndex = this.getIndexByHorizontalPosition(finger.localX);
               }
               const shouldUpdateSelectedIndex = isMaterialEnabled ||
                 (this.isItemEnabled(realIndex) && realIndex !== this.selectedIndex);
@@ -2342,6 +2342,39 @@ class SimpleSegmentButtonV2 extends ViewV2 {
     }
     return -1;
   }
+  getIndexByHorizontalPosition(localX) {
+    let leftIndex = -1;
+    let rightIndex = -1;
+    let minX = 0;
+    let maxX = 0;
+    for (let index = 0; index < this.items.length; index++) {
+      const rect = this.itemRects[index];
+      if (!rect) {
+        continue;
+      }
+      const left = rect.position.x;
+      const right = left + rect.size.width;
+      if (localX >= left && localX <= right) {
+        return index;
+      }
+      if (leftIndex === -1 || left < minX) {
+        leftIndex = index;
+        minX = left;
+      }
+      if (rightIndex === -1 || right > maxX) {
+        rightIndex = index;
+        maxX = right;
+      }
+    }
+    if (localX < minX) {
+      return leftIndex;
+    }
+    if (localX > maxX) {
+      return rightIndex;
+    }
+    return -1;
+  }
+
   isPointOnRect(localX, localY, rect) {
     return (
       localX >= rect.position.x &&
