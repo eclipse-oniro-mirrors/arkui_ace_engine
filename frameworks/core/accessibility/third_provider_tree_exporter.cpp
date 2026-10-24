@@ -314,7 +314,7 @@ std::unique_ptr<ProviderJson> ElementToTreeJson(const ProviderElementInfo& info,
     node->Put("$type", type.empty() ? "third" : type.c_str());
     node->Put("type", "third");
     PutRect(*node, info.GetScreenRect(), transform);
-    PutText(*node, "contents", info.GetContents());
+    PutText(*node, "contents", info.IsPassword() ? "" : info.GetContents());
     PutText(*node, "hintText", info.GetHintText());
     PutText(*node, "accessibilityText", info.GetAccessibilityText());
     PutText(*node, "accessibilityDescription", info.GetAccessibilityDescription());
@@ -659,7 +659,7 @@ std::unique_ptr<ProviderJson> ElementToFlatJson(const ProviderElementInfo& info,
     }
     node->PutRef("childNodeIds", std::move(ids));
     node->Put("componentType", info.GetComponentType().c_str());
-    node->Put("contents", info.GetContents().c_str());
+    node->Put("contents", info.IsPassword() ? "" : info.GetContents().c_str());
     node->Put("hintText", info.GetHintText().c_str());
     node->Put("accessibilityText", info.GetAccessibilityText().c_str());
     node->Put("accessibilityDescription", info.GetAccessibilityDescription().c_str());
