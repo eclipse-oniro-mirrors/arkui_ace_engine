@@ -122,6 +122,33 @@ TEST_F(InspectorTreeTask03, WindowPrivacyFiltersBothEditorsAndRestoresTheCaller)
     EXPECT_EQ(rich->GetInspectorText(), u"rich-private-value");
 }
 
+TEST_F(InspectorTreeTask03, RichEditorMultiLineFollowsCurrentMode)
+{
+    auto pattern = AceType::MakeRefPtr<InspectorRichEditorPattern>();
+    auto frame = FrameNode::CreateFrameNode("RichEditor", 13, pattern);
+    frame->SetActive(true);
+    for (bool singleLine : { false, true, false }) {
+        pattern->isSingleLineMode_ = singleLine;
+        for (bool visible : { false, true }) {
+            for (bool accessibility : { false, true }) {
+                ParamConfig config;
+                config.accessibilityInfo = accessibility;
+                InspectorTreeRequestContext context(config, {}, {});
+                config.inspectorContext = &context;
+                auto tree = JsonUtil::CreateSharedPtrJson();
+                frame->DumpSimplifyTreeWithParamConfig(0, tree, visible, config);
+                auto attrs = tree->GetObject("$attrs");
+                if (accessibility) {
+                    EXPECT_TRUE(attrs->GetValue("multiLine")->IsBool());
+                    EXPECT_EQ(attrs->GetBool("multiLine"), !singleLine);
+                } else {
+                    EXPECT_FALSE(attrs->Contains("multiLine"));
+                }
+            }
+        }
+    }
+}
+
 TEST_F(InspectorTreeTask03, RichEditorPasswordIsProtectedWhenShownOrHidden)
 {
     auto pattern = AceType::MakeRefPtr<InspectorRichEditorPattern>();
@@ -153,8 +180,11 @@ TEST_F(InspectorTreeTask03, RichEditorPasswordIsProtectedWhenShownOrHidden)
                     if (accessibility) {
                         EXPECT_TRUE(attrs->GetValue("password")->IsBool());
                         EXPECT_EQ(attrs->GetBool("password"), password);
+                        EXPECT_TRUE(attrs->GetValue("multiLine")->IsBool());
+                        EXPECT_FALSE(attrs->GetBool("multiLine"));
                     } else {
                         EXPECT_FALSE(attrs->Contains("password"));
+                        EXPECT_FALSE(attrs->Contains("multiLine"));
                     }
                     if (password) {
                         EXPECT_EQ(tree->ToString().find("inspector-password-value"), std::string::npos);

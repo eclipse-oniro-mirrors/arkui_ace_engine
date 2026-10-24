@@ -1722,7 +1722,7 @@ void RichEditorPattern::DumpInspectorTreeInfo(
         return;
     }
     attrs->Put("password", password);
-    attrs->Put("multiLine", true);
+    attrs->Put("multiLine", !isSingleLineMode_);
     const auto property = host->GetAccessibilityProperty<AccessibilityProperty>();
     CHECK_NULL_VOID(property);
     attrs->Put("selectionStart", property->GetTextSelectionStart());
