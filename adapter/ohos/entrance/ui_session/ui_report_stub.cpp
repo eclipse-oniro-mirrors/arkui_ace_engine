@@ -31,6 +31,7 @@ namespace {
 constexpr char GET_INSPECTOR_TREE_CALLBACK_TIMEOUT[] = "GetInspectorTreeCallbackTimeout";
 constexpr char NAVIGATION_QUERY_CALLBACK_TIMEOUT[] = "NavigationQueryCallbackTimeout";
 constexpr char LAZY_FOREACH_QUERY_CALLBACK_TIMEOUT[] = "LazyForEachQueryCallbackTimeout";
+constexpr char NODES_IN_RECT_QUERY_CALLBACK_TIMEOUT[] = "NodesInRectQueryCallbackTimeout";
 constexpr char PAGE_TRANSLATE_CALLBACK_TIMEOUT[] = "PageTranslateCallbackTimeout";
 constexpr char PAGE_TRANSLATE_RESULT_WATCHDOG_PREFIX[] = "PageTranslateResultWatchdog";
 constexpr int32_t SPECIFIED_CONTENT_OFFSETS_LOOP_UPPERBOUND = 1024000;
@@ -407,6 +408,20 @@ int32_t UiReportStub::OnRemoteRequest(uint32_t code, MessageParcel& data, Messag
             ReportLazyForEachQueryResult(result);
             break;
         }
+        case REPORT_NODES_IN_RECT_QUERY_RESULT: {
+            sptr<LargeStringAshmem> largeStringAshmem = data.ReadParcelable<LargeStringAshmem>();
+            if (!largeStringAshmem) {
+                LOGW("ReportNodesInRectQueryResult read LargeStringAshmem failed");
+                break;
+            }
+            std::string result;
+            if (!largeStringAshmem->ReadFromAshmem(result)) {
+                LOGW("ReportNodesInRectQueryResult read data failed");
+                break;
+            }
+            ReportNodesInRectQueryResult(result);
+            break;
+        }
 
         default: {
             LOGI("ui_session unknown transaction code %{public}d", code);
@@ -725,6 +740,104 @@ void UiReportStub::CancelLazyForEachQueryCallbackTimeoutTaskLocked()
         return;
     }
     eventHandler->RemoveTask(LAZY_FOREACH_QUERY_CALLBACK_TIMEOUT);
+}
+
+void UiReportStub::ReportNodesInRectQueryResult(const std::string& data)
+{
+    std::function<void(const std::string&)> callback;
+    {
+        std::lock_guard<std::mutex> lock(nodesInRectQueryCallbackMutex_);
+        if (!nodesInRectQueryCallback_) {
+            return;
+        }
+        callback = nodesInRectQueryCallback_;
+        CancelNodesInRectQueryCallbackTimeoutTaskLocked();
+        nodesInRectQueryCallback_ = nullptr;
+    }
+    callback(data);
+}
+
+bool UiReportStub::RegisterNodesInRectQueryCallback(
+    const std::function<void(const std::string&)>& eventCallback)
+{
+    std::lock_guard<std::mutex> lock(nodesInRectQueryCallbackMutex_);
+    if (nodesInRectQueryCallback_) {
+        return false;
+    }
+    nodesInRectQueryCallback_ = eventCallback;
+    return true;
+}
+
+void UiReportStub::UnregisterNodesInRectQueryCallback()
+{
+    std::lock_guard<std::mutex> lock(nodesInRectQueryCallbackMutex_);
+    nodesInRectQueryCallback_ = nullptr;
+}
+
+bool UiReportStub::PostNodesInRectQueryCallbackRemoveTask(int32_t timeout)
+{
+    auto eventHandler = eventHandler_.lock();
+    if (eventHandler == nullptr) {
+        LOGE("PostNodesInRectQueryCallbackRemoveTask eventHandler is null");
+        std::function<void(const std::string&)> callback;
+        {
+            std::lock_guard<std::mutex> lock(nodesInRectQueryCallbackMutex_);
+            callback = nodesInRectQueryCallback_;
+            nodesInRectQueryCallback_ = nullptr;
+        }
+        if (callback) {
+            callback("{\"errorCode\":8}");
+        }
+        return false;
+    }
+    wptr<UiReportStub> weakThis = this;
+    bool postTaskSuccess = eventHandler->PostTask([weakThis]() {
+        auto uiReportStub = weakThis.promote();
+        if (uiReportStub == nullptr) {
+            LOGE("PostNodesInRectQueryCallbackRemoveTask uiReportStub is null");
+            return;
+        }
+        uiReportStub->HandleNodesInRectQueryCallbackTimeout();
+    }, NODES_IN_RECT_QUERY_CALLBACK_TIMEOUT,
+        NormalizeTimeout(timeout, DEFAULT_INSPECTOR_TREE_CALLBACK_TIMEOUT_MS));
+    if (!postTaskSuccess) {
+        LOGW("Post NodesInRectQuery timeout task failed");
+        std::function<void(const std::string&)> callback;
+        {
+            std::lock_guard<std::mutex> lock(nodesInRectQueryCallbackMutex_);
+            callback = nodesInRectQueryCallback_;
+            nodesInRectQueryCallback_ = nullptr;
+        }
+        if (callback) {
+            callback("{\"errorCode\":8}");
+        }
+        return false;
+    }
+    return true;
+}
+
+void UiReportStub::HandleNodesInRectQueryCallbackTimeout()
+{
+    std::function<void(const std::string&)> callback;
+    {
+        std::lock_guard<std::mutex> lock(nodesInRectQueryCallbackMutex_);
+        if (!nodesInRectQueryCallback_) {
+            return;
+        }
+        callback = nodesInRectQueryCallback_;
+        nodesInRectQueryCallback_ = nullptr;
+    }
+    callback("{\"errorCode\":8}");
+}
+
+void UiReportStub::CancelNodesInRectQueryCallbackTimeoutTaskLocked()
+{
+    auto eventHandler = eventHandler_.lock();
+    if (eventHandler == nullptr) {
+        LOGE("CancelNodesInRectQueryCallbackTimeoutTaskLocked eventHandler is null");
+        return;
+    }
+    eventHandler->RemoveTask(NODES_IN_RECT_QUERY_CALLBACK_TIMEOUT);
 }
 
 void UiReportStub::ReportWebUnfocusEvent(int64_t accessibilityId, const std::string& data)

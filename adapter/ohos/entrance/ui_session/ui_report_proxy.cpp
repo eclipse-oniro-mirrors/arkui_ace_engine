@@ -646,6 +646,11 @@ void UiReportProxy::ReportLazyForEachQueryResult(const std::string& data)
     SendQueryResultReport(REPORT_LAZY_FOREACH_QUERY_RESULT, "ReportLazyForEachQueryResult", data);
 }
 
+void UiReportProxy::ReportNodesInRectQueryResult(const std::string& data)
+{
+    SendQueryResultReport(REPORT_NODES_IN_RECT_QUERY_RESULT, "ReportNodesInRectQueryResult", data);
+}
+
 void UiReportProxy::SendWebInfoRequestResult(
     uint32_t windowId,
     int32_t webId,

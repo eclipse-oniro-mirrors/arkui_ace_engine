@@ -104,6 +104,7 @@ public:
         GET_PAGE_SCENE,
         GET_NAVIGATION_CONTENT_BY_POINT,
         GET_LAZY_FOREACH_DATA_BY_POINT,
+        GET_NODES_IN_RECT,
     };
 
     /**
@@ -446,10 +447,7 @@ public:
      */
     virtual int32_t GetNavigationContentByPoint(float x, float y, const std::string& pattern,
         const std::function<void(const std::string&)>& eventCallback,
-        int32_t timeout = DEFAULT_INSPECTOR_TREE_CALLBACK_TIMEOUT_MS)
-    {
-        return FAILED;
-    }
+        int32_t timeout = DEFAULT_INSPECTOR_TREE_CALLBACK_TIMEOUT_MS) = 0;
 
     /**
      * @description: extract LazyForEach current data of the
@@ -460,10 +458,18 @@ public:
      */
     virtual int32_t GetLazyForEachDataByPoint(float x, float y,
         const std::function<void(const std::string&)>& eventCallback,
-        int32_t timeout = DEFAULT_INSPECTOR_TREE_CALLBACK_TIMEOUT_MS)
-    {
-        return FAILED;
-    }
+        int32_t timeout = DEFAULT_INSPECTOR_TREE_CALLBACK_TIMEOUT_MS) = 0;
+
+    /**
+     * @description: collect visible nodes whose transform rect intersects the
+     * normalized rect (x1, y1)-(x2, y2) with positive area. Tangent /
+     * edge-touching does not count as a hit. Result JSON is reported through
+     * eventCallback.
+     * @return result number of the IPC request itself.
+     */
+    virtual int32_t GetNodesInRect(float x1, float y1, float x2, float y2,
+        const std::function<void(const std::string&)>& eventCallback,
+        int32_t timeout = DEFAULT_INSPECTOR_TREE_CALLBACK_TIMEOUT_MS) = 0;
 };
 class ACE_FORCE_EXPORT ReportService : public OHOS::IRemoteBroker {
 public:
@@ -499,6 +505,7 @@ public:
         REPORT_PAGE_SCENE_EVENT,
         REPORT_NAVIGATION_QUERY_RESULT,
         REPORT_LAZY_FOREACH_QUERY_RESULT,
+        REPORT_NODES_IN_RECT_QUERY_RESULT,
     };
 
     /**
@@ -627,6 +634,7 @@ public:
      */
     virtual void ReportNavigationQueryResult(const std::string& data) = 0;
     virtual void ReportLazyForEachQueryResult(const std::string& data) = 0;
+    virtual void ReportNodesInRectQueryResult(const std::string& data) = 0;
 };
 } // namespace OHOS::Ace
 #endif // FOUNDATION_ACE_INTERFACE_UI_CONTENT_SERVICE_INTERFACE_H

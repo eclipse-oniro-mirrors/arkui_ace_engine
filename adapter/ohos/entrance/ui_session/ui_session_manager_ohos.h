@@ -175,6 +175,7 @@ public:
     void ComponentTreeQuery(const ComponentTreeQueryRequest& request) override;
     void ReportNavigationQueryResult(const std::string& data) override;
     void ReportLazyForEachQueryResult(const std::string& data) override;
+    void ReportNodesInRectQueryResult(const std::string& data) override;
 
     void SaveReportProxy(sptr<IRemoteObject> reportProxy, int32_t processId);
     // UI-thread validation of an internal detection request; does not change IPC.

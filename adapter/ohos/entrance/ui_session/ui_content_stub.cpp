@@ -262,6 +262,10 @@ int32_t UiContentStub::OnRemoteRequest(uint32_t code, MessageParcel& data, Messa
             GetLazyForEachDataByPointInner(data, reply, option);
             break;
         }
+        case GET_NODES_IN_RECT: {
+            GetNodesInRectInner(data, reply, option);
+            break;
+        }
         default: {
             LOGI("ui_session unknown transaction code %{public}d", code);
             return IPCObjectStub::OnRemoteRequest(code, data, reply, option);
@@ -339,6 +343,18 @@ int32_t UiContentStub::GetLazyForEachDataByPointInner(
     int32_t processId = IPCSkeleton::GetCallingRealPid();
     UiSessionManager::GetInstance()->SaveProcessId("lazyForEachQuery", processId);
     reply.WriteInt32(GetLazyForEachDataByPoint(x, y, nullptr));
+    return NO_ERROR;
+}
+
+int32_t UiContentStub::GetNodesInRectInner(MessageParcel& data, MessageParcel& reply, MessageOption& option)
+{
+    float x1 = data.ReadFloat();
+    float y1 = data.ReadFloat();
+    float x2 = data.ReadFloat();
+    float y2 = data.ReadFloat();
+    int32_t processId = IPCSkeleton::GetCallingRealPid();
+    UiSessionManager::GetInstance()->SaveProcessId("nodesInRectQuery", processId);
+    reply.WriteInt32(GetNodesInRect(x1, y1, x2, y2, nullptr));
     return NO_ERROR;
 }
 

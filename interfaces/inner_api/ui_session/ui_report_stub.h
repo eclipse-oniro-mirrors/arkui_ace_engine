@@ -225,6 +225,7 @@ public:
      */
     void ReportNavigationQueryResult(const std::string& data) override;
     void ReportLazyForEachQueryResult(const std::string& data) override;
+    void ReportNodesInRectQueryResult(const std::string& data) override;
 
     bool RegisterNavigationQueryCallback(const std::function<void(const std::string&)>& eventCallback);
     void UnregisterNavigationQueryCallback();
@@ -233,6 +234,10 @@ public:
     bool RegisterLazyForEachQueryCallback(const std::function<void(const std::string&)>& eventCallback);
     void UnregisterLazyForEachQueryCallback();
     bool PostLazyForEachQueryCallbackRemoveTask(int32_t timeout);
+
+    bool RegisterNodesInRectQueryCallback(const std::function<void(const std::string&)>& eventCallback);
+    void UnregisterNodesInRectQueryCallback();
+    bool PostNodesInRectQueryCallbackRemoveTask(int32_t timeout);
 
     /**
      * @description: report web unfocus value for SA
@@ -310,6 +315,8 @@ private:
     void CancelNavigationQueryCallbackTimeoutTaskLocked();
     void HandleLazyForEachQueryCallbackTimeout();
     void CancelLazyForEachQueryCallbackTimeoutTaskLocked();
+    void HandleNodesInRectQueryCallbackTimeout();
+    void CancelNodesInRectQueryCallbackTimeoutTaskLocked();
     void OnGetWebInfoByRequestInner(MessageParcel& data);
     void OnSendPageTextInner(MessageParcel& data);
     void HandlePageTranslateCallbackTimeout(int64_t requestId);
@@ -342,6 +349,8 @@ private:
     std::function<void(const std::string&)> navigationQueryCallback_;
     std::mutex lazyForEachQueryCallbackMutex_;
     std::function<void(const std::string&)> lazyForEachQueryCallback_;
+    std::mutex nodesInRectQueryCallbackMutex_;
+    std::function<void(const std::string&)> nodesInRectQueryCallback_;
     std::function<void(int64_t accessibilityId, const std::string& data)> unfocusEvent_;
     std::function<void(std::vector<std::pair<int32_t, std::shared_ptr<Media::PixelMap>>>)> getShowingImageCallback_;
     std::function<void(int32_t, const std::unordered_map<int32_t, std::shared_ptr<Media::PixelMap>>&,

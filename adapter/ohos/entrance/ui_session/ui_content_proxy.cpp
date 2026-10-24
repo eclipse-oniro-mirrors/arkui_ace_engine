@@ -298,11 +298,7 @@ int32_t UIContentServiceProxy::SendComponentTreeQueryRequest(uint32_t code, cons
         LOGW("%{public}s write parcel failed", caller);
         return FAILED;
     }
-    bool isLazyForEach = code == IUiContentService::GET_LAZY_FOREACH_DATA_BY_POINT;
-    bool registerSuccess = isLazyForEach
-        ? report_->RegisterLazyForEachQueryCallback(eventCallback)
-        : report_->RegisterNavigationQueryCallback(eventCallback);
-    if (!registerSuccess) {
+    if (!RegisterQueryCallback(code, eventCallback)) {
         LOGW("%{public}s register callback failed, previous request unfinished", caller);
         return LAST_UNFINISH;
     }
@@ -311,20 +307,47 @@ int32_t UIContentServiceProxy::SendComponentTreeQueryRequest(uint32_t code, cons
     int32_t sendRequestErrorCode = Remote()->SendRequest(code, data, reply, option);
     if (sendRequestErrorCode != ERR_NONE) {
         LOGW("%{public}s send request failed, errorCode is %{public}d", caller, sendRequestErrorCode);
-        if (isLazyForEach) {
-            report_->UnregisterLazyForEachQueryCallback();
-        } else {
-            report_->UnregisterNavigationQueryCallback();
-        }
+        UnregisterQueryCallback(code);
         return REPLY_ERROR;
     }
-    bool postSuccess = isLazyForEach
-        ? report_->PostLazyForEachQueryCallbackRemoveTask(timeout)
-        : report_->PostNavigationQueryCallbackRemoveTask(timeout);
-    if (!postSuccess) {
+    if (!PostQueryTimeoutTask(code, timeout)) {
         return FAILED;
     }
     return reply.ReadInt32();
+}
+
+bool UIContentServiceProxy::RegisterQueryCallback(uint32_t code,
+    const std::function<void(const std::string&)>& eventCallback)
+{
+    if (code == IUiContentService::GET_LAZY_FOREACH_DATA_BY_POINT) {
+        return report_->RegisterLazyForEachQueryCallback(eventCallback);
+    }
+    if (code == IUiContentService::GET_NODES_IN_RECT) {
+        return report_->RegisterNodesInRectQueryCallback(eventCallback);
+    }
+    return report_->RegisterNavigationQueryCallback(eventCallback);
+}
+
+void UIContentServiceProxy::UnregisterQueryCallback(uint32_t code)
+{
+    if (code == IUiContentService::GET_LAZY_FOREACH_DATA_BY_POINT) {
+        report_->UnregisterLazyForEachQueryCallback();
+    } else if (code == IUiContentService::GET_NODES_IN_RECT) {
+        report_->UnregisterNodesInRectQueryCallback();
+    } else {
+        report_->UnregisterNavigationQueryCallback();
+    }
+}
+
+bool UIContentServiceProxy::PostQueryTimeoutTask(uint32_t code, int32_t timeout)
+{
+    if (code == IUiContentService::GET_LAZY_FOREACH_DATA_BY_POINT) {
+        return report_->PostLazyForEachQueryCallbackRemoveTask(timeout);
+    }
+    if (code == IUiContentService::GET_NODES_IN_RECT) {
+        return report_->PostNodesInRectQueryCallbackRemoveTask(timeout);
+    }
+    return report_->PostNavigationQueryCallbackRemoveTask(timeout);
 }
 
 int32_t UIContentServiceProxy::GetNavigationContentByPoint(float x, float y, const std::string& pattern,
@@ -344,6 +367,17 @@ int32_t UIContentServiceProxy::GetLazyForEachDataByPoint(float x, float y,
     return SendComponentTreeQueryRequest(GET_LAZY_FOREACH_DATA_BY_POINT, "GetLazyForEachDataByPoint",
         eventCallback, [x, y](MessageParcel& data) {
             return data.WriteFloat(x) && data.WriteFloat(y);
+        }, timeout);
+}
+
+int32_t UIContentServiceProxy::GetNodesInRect(float x1, float y1, float x2, float y2,
+    const std::function<void(const std::string&)>& eventCallback,
+    int32_t timeout)
+{
+    return SendComponentTreeQueryRequest(GET_NODES_IN_RECT, "GetNodesInRect",
+        eventCallback, [x1, y1, x2, y2](MessageParcel& data) {
+            return data.WriteFloat(x1) && data.WriteFloat(y1) &&
+                data.WriteFloat(x2) && data.WriteFloat(y2);
         }, timeout);
 }
 

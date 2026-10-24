@@ -72,6 +72,7 @@ public:
     void HandleHighlightSpecifiedContent(sptr<IUiContentService> service, std::vector<std::string> params);
     void HandleGetNavigationContent(sptr<IUiContentService> service, std::vector<std::string> params);
     void HandleGetLazyForEachData(sptr<IUiContentService> service, std::vector<std::string> params);
+    void HandleGetNodesInRect(sptr<IUiContentService> service, std::vector<std::string> params);
 private:
     DECLEAR_SYSTEM_ABILITY(UiSaService);
 

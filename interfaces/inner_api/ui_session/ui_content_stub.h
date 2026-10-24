@@ -83,6 +83,7 @@ private:
     int32_t GetPageSceneInner(MessageParcel& data, MessageParcel& reply, MessageOption& option);
     int32_t GetNavigationContentByPointInner(MessageParcel& data, MessageParcel& reply, MessageOption& option);
     int32_t GetLazyForEachDataByPointInner(MessageParcel& data, MessageParcel& reply, MessageOption& option);
+    int32_t GetNodesInRectInner(MessageParcel& data, MessageParcel& reply, MessageOption& option);
 
     bool IsSACalling() const;
 };
