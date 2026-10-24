@@ -39,6 +39,7 @@ using namespace OHOS::Ace;
 namespace {
 constexpr size_t MAX_PROVIDER_NODES = 10000;
 constexpr size_t MAX_PROVIDER_DEPTH = 64;
+constexpr size_t MAX_PROVIDER_JSON_DEPTH = 64;
 constexpr size_t MAX_PROVIDER_BYTES = 10 * 1024 * 1024;
 constexpr int64_t PROVIDER_ROOT_ELEMENT_ID = -1;
 constexpr int32_t PROVIDER_REQUEST_ID = 0;
@@ -175,6 +176,7 @@ std::string FormatRect(const ArkUI_AccessibleRect& rect, const RectTransform& tr
 
 bool GetTransform(const RefPtr<NG::FrameNode>& host, RectTransform& transform)
 {
+    CHECK_NULL_RETURN(host, false);
     // Provider rectangles are host-local, despite the GetScreenRect accessor name.
     // Both export formats report window-relative coordinates like the host node.
     for (auto node = host; node; node = node->GetAncestorNodeOfFrame(true)) {
@@ -445,16 +447,17 @@ public:
     explicit ProviderJsonCounter(size_t limit) : limit_(limit)
     {}
 
-    ProviderJsonSizeResult Count(const cJSON* value)
+    ProviderJsonSizeResult Count(const cJSON* value, size_t depth = 0)
     {
-        if (!value) {
+        // Extension JSON is external input and may be much deeper than provider output.
+        if (!value || depth > MAX_PROVIDER_JSON_DEPTH) {
             return ProviderJsonSizeResult::INVALID_VALUE;
         }
         if (cJSON_IsObject(value)) {
-            return CountObject(value);
+            return CountObject(value, depth);
         }
         if (cJSON_IsArray(value)) {
-            return CountArray(value);
+            return CountArray(value, depth);
         }
         if (cJSON_IsString(value)) {
             return value->valuestring ? CountString(value->valuestring) : ProviderJsonSizeResult::INVALID_VALUE;
@@ -513,7 +516,7 @@ private:
         return Add(std::strlen(buffer));
     }
 
-    ProviderJsonSizeResult CountArray(const cJSON* value)
+    ProviderJsonSizeResult CountArray(const cJSON* value, size_t depth)
     {
         auto result = Add(sizeof("[]") - 1);
         for (auto* child = value->child; child && result == ProviderJsonSizeResult::SUCCESS; child = child->next) {
@@ -521,13 +524,13 @@ private:
                 result = Add(sizeof(",") - 1);
             }
             if (result == ProviderJsonSizeResult::SUCCESS) {
-                result = Count(child);
+                result = Count(child, depth + 1);
             }
         }
         return result;
     }
 
-    ProviderJsonSizeResult CountObject(const cJSON* value)
+    ProviderJsonSizeResult CountObject(const cJSON* value, size_t depth)
     {
         auto result = Add(sizeof("{}") - 1);
         for (auto* child = value->child; child && result == ProviderJsonSizeResult::SUCCESS; child = child->next) {
@@ -541,7 +544,7 @@ private:
                 result = Add(sizeof(":") - 1);
             }
             if (result == ProviderJsonSizeResult::SUCCESS) {
-                result = Count(child);
+                result = Count(child, depth + 1);
             }
         }
         return result;
@@ -754,6 +757,7 @@ ThirdProviderExportStatus ChargeArray(const JsonValue& array, ThirdProviderTreeE
 std::shared_ptr<JsonValue> ThirdProviderTreeExporter::ExportToInspectorJson(
     ArkUI_AccessibilityProvider* provider, const RefPtr<NG::FrameNode>& host)
 {
+    CHECK_NULL_RETURN(host, nullptr);
     std::vector<ProviderElementInfo> infos;
     if (QueryProvider(provider, infos) != ThirdProviderExportStatus::SUCCESS) {
         return nullptr;
@@ -795,6 +799,9 @@ std::shared_ptr<JsonValue> ThirdProviderTreeExporter::ExportToInspectorJson(
 ThirdProviderTreeExportResult ThirdProviderTreeExporter::ExportFlatToInspectorJson(
     ArkUI_AccessibilityProvider* provider, const RefPtr<NG::FrameNode>& host, ThirdProviderTreeExportBudget& budget)
 {
+    if (!host) {
+        return { ThirdProviderExportStatus::COLLECTION_FAILED, nullptr };
+    }
     std::vector<ProviderElementInfo> infos;
     auto status = QueryProvider(provider, infos);
     if (status != ThirdProviderExportStatus::SUCCESS) {
@@ -861,6 +868,9 @@ ThirdProviderTreeExportResult ThirdProviderTreeExporter::ExportFlatToInspectorJs
 ThirdProviderExportStatus ThirdProviderTreeExporter::AccumulateInspectorTree(
     const JsonValue& tree, ThirdProviderTreeExportBudget& budget)
 {
+    if (!tree.IsValid()) {
+        return ThirdProviderExportStatus::INVALID_DATA;
+    }
     // Walk the JSON tree once; only accessibilityTree arrays consume the shared
     // request budget. Commit the budget only after the entire extension succeeds.
     auto next = budget;

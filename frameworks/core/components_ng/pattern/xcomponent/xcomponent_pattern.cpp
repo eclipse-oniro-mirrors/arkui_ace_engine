@@ -2806,8 +2806,10 @@ void XComponentPattern::AddExtraInfoWithParamConfig(
         return;
     }
     CHECK_NULL_VOID(json);
-    auto* provider = GetNativeProvider();
     auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto* provider = GetNativeProvider();
+    CHECK_NULL_VOID(provider);
     auto providerTree = ThirdProviderTreeExporter::ExportToInspectorJson(provider, host);
     if (providerTree) {
         json->Put(THIRD_PROVIDER_JSON_CHILDREN, providerTree);

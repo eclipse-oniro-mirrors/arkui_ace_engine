@@ -254,8 +254,10 @@ void CustomPattern::AddExtraInfoWithParamConfig(
         return;
     }
     CHECK_NULL_VOID(json);
-    auto* provider = GetNativeAccessibilityProvider();
     auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto* provider = GetNativeAccessibilityProvider();
+    CHECK_NULL_VOID(provider);
     auto providerTree = ThirdProviderTreeExporter::ExportToInspectorJson(provider, host);
     if (providerTree) {
         json->Put(THIRD_PROVIDER_JSON_CHILDREN, providerTree);
