@@ -30,6 +30,7 @@
 namespace OHOS::Ace {
 class ScrollControllerBase;
 class ScrollProxy;
+struct ScrollSnapStrategy;
 }
 
 namespace OHOS::Ace::NG {
@@ -67,6 +68,9 @@ public:
     virtual void SetLayoutDirection(FlexDirection value) = 0;
     virtual void SetNestedScroll(const NestedScrollOptions& nestedOpt) = 0;
     virtual void SetScrollEnabled(bool scrollEnabled) = 0;
+    // Feat-20260806915269: item scroll snap strategy (built-in align or custom offset provider).
+    virtual void SetScrollSnapStrategy(const ScrollSnapStrategy& /* strategy */) {}
+    virtual void ResetScrollSnapStrategy() {}
 
     virtual void SetOnReachStart(OnReachEvent&& onReachStart) = 0;
     virtual void SetOnReachEnd(OnReachEvent&& onReachEnd) = 0;

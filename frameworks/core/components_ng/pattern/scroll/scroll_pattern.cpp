@@ -120,6 +120,7 @@ void ScrollPattern::OnModifyDone()
         SetScrollBar(paintProperty->GetScrollBarProperty());
     }
     SetAccessibilityAction();
+    InitOnKeyEvent();
     if (scrollSnapUpdate_) {
         host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
     }
@@ -208,7 +209,7 @@ bool ScrollPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty,
     host->SetViewPort(globalViewPort);
     isInitialized_ = true;
     ChangeAnimateOverScroll();
-    SetScrollSource(SCROLL_FROM_NONE);
+    SetScrollSourceLayout(SCROLL_FROM_NONE);
     SetAccessibilityFocusScroll(false);
     ResetAccessibilityScrollSourceIfIdle();
     auto paintProperty = GetPaintProperty<ScrollablePaintProperty>();
@@ -1570,6 +1571,64 @@ void ScrollPattern::GetScrollPagingStatusDumpInfo()
     }
 }
 
+void ScrollPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto hub = host->GetEventHub<ScrollEventHub>();
+    CHECK_NULL_VOID(hub);
+    ScrollablePattern::DumpAdvanceInfo(json, config);
+    if (!config.IsPublicTree() || config.visualProperties) {
+        json->Put("currentOffset", std::to_string(currentOffset_).c_str());
+    }
+    if (!config.IsPublicTree() || config.functionalProperties) {
+        DumpAdvanceSnapInfo(json, config);
+        auto onScrollEdge = hub->GetScrollEdgeEvent();
+        json->Put("hasOnScrollEdge", onScrollEdge ? "true" : "false");
+    }
+    if (!config.IsPublicTree()) {
+        DumpAdvanceHistoryInfo(json);
+    }
+}
+
+void ScrollPattern::DumpAdvanceSnapInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    GetScrollSnapAlignDumpInfo(json);
+    json->Put("snapPagination", GetScrollSnapPagination().c_str());
+    json->Put("enableSnapToStart", enableSnapToSide_.first ? "true" : "false");
+    json->Put("enableSnapToEnd", enableSnapToSide_.second ? "true" : "false");
+    GetScrollPagingStatusDumpInfo(json);
+    if (!config.IsPublicTree()) {
+        std::string snapOffsetsStr = "";
+        for (const auto& iter : snapPaginations_) {
+            snapOffsetsStr = snapOffsetsStr.append(iter.ToString()).append(" ");
+        }
+        json->Put("snapOffsets", snapOffsetsStr.c_str());
+    }
+    if (!config.IsPublicTree() || initialOffset_.has_value()) {
+        json->Put("initialOffset",
+            initialOffset_.has_value() ? initialOffset_->GetMainOffset(GetAxis()).ToString().c_str() : "None");
+    }
+}
+
+void ScrollPattern::DumpAdvanceHistoryInfo(std::unique_ptr<JsonValue>& json)
+{
+    std::unique_ptr<JsonValue> children = JsonUtil::CreateArray(true);
+    for (const auto& info : scrollLayoutInfos_) {
+        std::unique_ptr<JsonValue> child = JsonUtil::Create(true);
+        info.ToJson(child);
+        children->Put(child);
+    }
+    json->Put("scrollLayoutInfos", children);
+    std::unique_ptr<JsonValue> infochildren = JsonUtil::CreateArray(true);
+    for (const auto& info : scrollMeasureInfos_) {
+        std::unique_ptr<JsonValue> child = JsonUtil::Create(true);
+        info.ToJson(child);
+        infochildren->Put(child);
+    }
+    json->Put("scrollMeasureInfos", infochildren);
+}
+
 void ScrollPattern::DumpAdvanceInfo()
 {
     auto host = GetHost();
@@ -1764,44 +1823,7 @@ void ScrollPattern::GetScrollSnapAlignDumpInfo(std::unique_ptr<JsonValue>& json)
 
 void ScrollPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json)
 {
-    auto host = GetHost();
-    CHECK_NULL_VOID(host);
-    auto hub = host->GetEventHub<ScrollEventHub>();
-    CHECK_NULL_VOID(hub);
-    ScrollablePattern::DumpAdvanceInfo(json);
-    json->Put("currentOffset", std::to_string(currentOffset_).c_str());
-
-    GetScrollSnapAlignDumpInfo(json);
-    auto snapPaginationStr = std::string("snapPagination: ");
-    json->Put("snapPagination", GetScrollSnapPagination().c_str());
-    json->Put("enableSnapToStart", enableSnapToSide_.first ? "true" : "false");
-    json->Put("enableSnapToEnd", enableSnapToSide_.second ? "true" : "false");
-
-    GetScrollPagingStatusDumpInfo(json);
-    std::string snapOffsetsStr = "";
-    for (const auto& iter : snapPaginations_) {
-        snapOffsetsStr = snapOffsetsStr.append(iter.ToString()).append(" ");
-    }
-    json->Put("snapOffsets", snapOffsetsStr.c_str());
-    json->Put("initialOffset",
-        initialOffset_.has_value() ? initialOffset_->GetMainOffset(GetAxis()).ToString().c_str() : "None");
-    auto onScrollEdge = hub->GetScrollEdgeEvent();
-    json->Put("hasOnScrollEdge", onScrollEdge ? "true" : "false");
-
-    std::unique_ptr<JsonValue> children = JsonUtil::CreateArray(true);
-    for (const auto& info : scrollLayoutInfos_) {
-        std::unique_ptr<JsonValue> child = JsonUtil::Create(true);
-        info.ToJson(child);
-        children->Put(child);
-    }
-    json->Put("scrollLayoutInfos", children);
-    std::unique_ptr<JsonValue> infochildren = JsonUtil::CreateArray(true);
-    for (const auto& info : scrollMeasureInfos_) {
-        std::unique_ptr<JsonValue> child = JsonUtil::Create(true);
-        info.ToJson(child);
-        infochildren->Put(child);
-    }
-    json->Put("scrollMeasureInfos", infochildren);
+    ScrollPattern::DumpAdvanceInfo(json, ParamConfig());
 }
 
 void ScrollPattern::DumpSimplifyInfo(std::shared_ptr<JsonValue>& json)
@@ -2099,4 +2121,45 @@ RefPtr<ScrollableController> ScrollPattern::GetScrollPositionController() const
 {
     return positionController_;
 }
+
+bool ScrollPattern::ScrollByArrowKey(KeyCode code, float delta)
+{
+    if (GetAxis() != Axis::FREE) {
+        return ScrollablePattern::ScrollByArrowKey(code, delta);
+    }
+    float xDelta = 0.0f;
+    float yDelta = 0.0f;
+    if (code == KeyCode::KEY_DPAD_UP) {
+        yDelta = delta;
+    } else if (code == KeyCode::KEY_DPAD_DOWN) {
+        yDelta = -delta;
+    } else if (code == KeyCode::KEY_DPAD_LEFT) {
+        xDelta = delta;
+    } else if (code == KeyCode::KEY_DPAD_RIGHT) {
+        xDelta = -delta;
+    }
+    CHECK_NULL_RETURN(freeScroll_, false);
+    freeScroll_->ScrollWithAnimation2D(OffsetF(xDelta, yDelta));
+    return true;
+}
+
+void ScrollPattern::InitOnKeyEvent()
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto focusHub = host->GetOrCreateFocusHub();
+    CHECK_NULL_VOID(focusHub);
+    auto onKeyEvent = [wp = WeakClaim(this)](const KeyEvent& event) -> bool {
+        auto pattern = wp.Upgrade();
+        CHECK_NULL_RETURN(pattern, false);
+        return pattern->OnKeyEvent(event);
+    };
+    focusHub->SetOnKeyEventInternal(std::move(onKeyEvent));
+}
+
+bool ScrollPattern::OnKeyEvent(const KeyEvent& event)
+{
+    return HandleArrowKeyScroll(event);
+}
+
 } // namespace OHOS::Ace::NG

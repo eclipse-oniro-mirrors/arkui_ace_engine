@@ -15,6 +15,10 @@
 
 #include "common_module.h"
 
+#include <array>
+
+#include "core/components_ng/property/measure_property.h"
+
 #if !defined(PREVIEW)
 #define OHOS_AAFWK_HILOG_TAG_WRAPPER_H
 #include "ani_base_context.h"
@@ -86,6 +90,33 @@ void CommonModuleCallbackAni::Call(ani_env* env, ani_size argc, ani_ref* argv, a
 {
     CHECK_NULL_VOID(env);
     env->FunctionalObject_Call(static_cast<ani_fn_object>(func_), argc, argv, result);
+}
+
+void SetSafeAreaInset(ani_env* env, [[maybe_unused]] ani_object obj, ani_long ptr, ani_array edges)
+{
+    CHECK_NULL_VOID(env);
+    const auto* modifier = GetNodeAniModifier();
+    CHECK_NULL_VOID(modifier);
+    auto common = modifier->getCommonAniModifier();
+    CHECK_NULL_VOID(common);
+    std::array<ArkUIAniSafeAreaInsetEdge, NG::SAFE_AREA_INSET_EDGE_COUNT> snapshot;
+    ani_size count = 0;
+    ANI_CALL(env, Array_GetLength(edges, &count), return);
+    if (count != snapshot.size()) {
+        return;
+    }
+    for (ani_size i = 0; i < count; ++i) {
+        ani_ref item;
+        ANI_CALL(env, Array_Get(edges, i, &item), return);
+        auto edge = static_cast<ani_object>(item);
+        ani_long contentPtr = 0;
+        ANI_CALL(env, Object_GetPropertyByName_Long(edge, "content", &contentPtr), return);
+        snapshot[i].content = reinterpret_cast<ArkUINodeHandle>(contentPtr);
+        ANI_CALL(env, Object_GetPropertyByName_Double(edge, "spacing", &snapshot[i].spacing), return);
+        ANI_CALL(env, Object_GetPropertyByName_Int(edge, "unit", &snapshot[i].unit), return);
+        ANI_CALL(env, Object_GetPropertyByName_Int(edge, "alignment", &snapshot[i].alignment), return);
+    }
+    common->setSafeAreaInset(reinterpret_cast<ArkUINodeHandle>(ptr), snapshot.data(), snapshot.size());
 }
 
 ani_boolean IsEasySplit([[maybe_unused]] ani_env* env, ani_object obj, ani_int instanceId)
@@ -1391,6 +1422,15 @@ ani_int getWindowHeightBreakpoint(ani_env* env, ani_object obj)
         return -1;
     }
     return modifier->getCommonAniModifier()->getWindowHeightBreakpoint();
+}
+
+ani_boolean isWindowInfoInitialized(ani_env* env, ani_object obj, ani_int instanceId)
+{
+    const auto* modifier = GetNodeAniModifier();
+    if (!modifier || !modifier->getCommonAniModifier() || !env) {
+        return false;
+    }
+    return modifier->getCommonAniModifier()->isWindowInfoInitialized(instanceId);
 }
 
 void* TransferKeyEventPointer(ani_env* env, ani_object obj, ani_long pointer)

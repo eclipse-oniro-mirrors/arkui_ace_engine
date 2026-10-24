@@ -15,6 +15,7 @@
 
 #include "node_model.h"
 #include "core/interfaces/native/node/page_text_api.h"
+#include "core/interfaces/native/node/ui_tree_api.h"
 #include "node/config_manager.h"
 
 #include <cstring>
@@ -201,6 +202,17 @@ const ArkUIPageTextAPI* GetPageTextAPI()
         return nullptr;
     }
     auto entry = reinterpret_cast<Entry>(FindFunction(module, "GetArkUIPageTextAPI"));
+    return entry ? entry(1) : nullptr;
+}
+
+const ArkUITreeAPI* GetTreeAPI()
+{
+    using Entry = const ArkUITreeAPI* (*)(int32_t);
+    auto* module = FindModule();
+    if (!module) {
+        return nullptr;
+    }
+    auto entry = reinterpret_cast<Entry>(FindFunction(module, "GetArkUITreeAPI"));
     return entry ? entry(1) : nullptr;
 }
 
@@ -581,7 +593,12 @@ int32_t RegisterNodeEvent(ArkUI_NodeHandle nodePtr, ArkUI_NodeEventType eventTyp
 
 int32_t RegisterNodeEvent(ArkUI_NodeHandle nodePtr, ArkUI_NodeEventType eventType, int32_t targetId, void* userData)
 {
-    if (nodePtr == nullptr || !CheckIsCNode(nodePtr)) {
+    CHECK_UI_THREAD("ArkUI_NativeNodeAPI_1.registerNodeEvent");
+    if (nodePtr == nullptr) {
+        return ERROR_CODE_PARAM_INVALID;
+    }
+    CHECK_NODE_DISPOSED(nodePtr, "Node has been disposed");
+    if (!CheckIsCNode(nodePtr)) {
         return ERROR_CODE_PARAM_INVALID;
     }
     auto originEventType = ConvertOriginEventType(eventType, nodePtr->type);
@@ -665,10 +682,12 @@ int32_t RegisterNodeEvent(ArkUI_NodeHandle nodePtr, ArkUI_NodeEventType eventTyp
 
 void UnregisterNodeEvent(ArkUI_NodeHandle nodePtr, ArkUI_NodeEventType eventType)
 {
-    if (nodePtr == nullptr || !CheckIsCNode(nodePtr)) {
+    CHECK_UI_THREAD("ArkUI_NativeNodeAPI_1.unregisterNodeEvent");
+    if (nodePtr == nullptr) {
         return;
     }
-    if (!nodePtr->extraData) {
+    CHECK_NODE_DISPOSED(nodePtr, "Node has been disposed");
+    if (!CheckIsCNode(nodePtr) || !nodePtr->extraData) {
         return;
     }
     if (nodePtr->type == -1 && !nodePtr->isBindNative) {
@@ -710,11 +729,13 @@ void RegisterOnEvent(void (*eventReceiver)(ArkUI_CompatibleNodeEvent* event))
 void (*g_eventReceiver)(ArkUI_NodeEvent* event) = nullptr;
 void RegisterOnEvent(void (*eventReceiver)(ArkUI_NodeEvent* event))
 {
+    CHECK_UI_THREAD("ArkUI_NativeNodeAPI_1.registerNodeEventReceiver");
     g_eventReceiver = eventReceiver;
 }
 
 void UnregisterOnEvent()
 {
+    CHECK_UI_THREAD("ArkUI_NativeNodeAPI_1.unregisterNodeEventReceiver");
     g_eventReceiver = nullptr;
 }
 
@@ -1143,7 +1164,11 @@ void MarkDirty(ArkUI_NodeHandle nodePtr, ArkUI_NodeDirtyFlag dirtyFlag)
 
 int32_t AddNodeEventReceiver(ArkUI_NodeHandle nodePtr, void (*eventReceiver)(ArkUI_NodeEvent* event))
 {
-    if (!nodePtr || !eventReceiver || !CheckIsCNode(nodePtr)) {
+    if (!nodePtr || !eventReceiver) {
+        return ERROR_CODE_PARAM_INVALID;
+    }
+    CHECK_NODE_DISPOSED(nodePtr, "Node has been disposed");
+    if (!CheckIsCNode(nodePtr)) {
         return ERROR_CODE_PARAM_INVALID;
     }
     if (!nodePtr->eventListeners) {
@@ -1159,7 +1184,11 @@ int32_t AddNodeEventReceiver(ArkUI_NodeHandle nodePtr, void (*eventReceiver)(Ark
 
 int32_t RemoveNodeEventReceiver(ArkUI_NodeHandle nodePtr, void (*eventReceiver)(ArkUI_NodeEvent* event))
 {
-    if (!nodePtr || !eventReceiver || !nodePtr->eventListeners || !CheckIsCNode(nodePtr)) {
+    if (!nodePtr || !eventReceiver) {
+        return ERROR_CODE_PARAM_INVALID;
+    }
+    CHECK_NODE_DISPOSED(nodePtr, "Node has been disposed");
+    if (!nodePtr->eventListeners || !CheckIsCNode(nodePtr)) {
         return ERROR_CODE_PARAM_INVALID;
     }
     auto eventListenersSet = reinterpret_cast<std::set<void (*)(ArkUI_NodeEvent*)>*>(nodePtr->eventListeners);
@@ -1766,7 +1795,9 @@ int32_t GetNodeTypeByTag(ArkUI_NodeHandle node)
         { OHOS::Ace::V2::CUSTOM_ETS_TAG, ArkUI_NodeType::ARKUI_NODE_CUSTOM },
     };
 
-    const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
+    // GetOrCreateFullImpl (NOT GetFullImpl): this resolution may be the caller's FIRST access to the NDK-side NodeModel bundle (e.g.
+    const auto* impl = OHOS::Ace::NodeModel::GetOrCreateFullImpl();
+    CHECK_NULL_RETURN(impl, -1);
     auto value = impl->getNodeModifiers()->getFrameNodeModifier()->getNodeType(node->uiNodeHandle);
     auto iter = nodeTypeMap.find(value);
     if (iter != nodeTypeMap.end()) {

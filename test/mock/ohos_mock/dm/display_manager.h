@@ -63,7 +63,7 @@ public:
 
 class DisplayManager {
 public:
-    class IDisplayListener : public virtual RefBase {
+class IDisplayListener : public RefBase {
     public:
         virtual ~IDisplayListener() = default;
         virtual void OnCreate(DisplayId displayId) = 0;
@@ -71,7 +71,7 @@ public:
         virtual void OnChange(DisplayId displayId) = 0;
     };
 
-    class IDisplayAttributeListener : public virtual RefBase {
+class IDisplayAttributeListener : public RefBase {
     public:
         virtual ~IDisplayAttributeListener() = default;
         virtual void OnAttributeChange(DisplayId displayId, const std::vector<std::string>& attributes) = 0;

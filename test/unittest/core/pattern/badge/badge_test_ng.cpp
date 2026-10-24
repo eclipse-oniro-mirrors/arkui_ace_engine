@@ -14,10 +14,13 @@
  */
 
 #include <optional>
+#include <type_traits>
 #include "core/accessibility/accessibility_manager.h"
 #include <utility>
 
 #include "gtest/gtest.h"
+
+#include "core/interfaces/arkoala/arkoala_api.h"
 
 #define private public
 #define protected public
@@ -226,6 +229,20 @@ HWTEST_F(BadgeTestNg, BadgeFrameNodeCreator002, TestSize.Level0)
     EXPECT_EQ(layoutProperty_->GetBadgeTextColor(), Color::GREEN);
     EXPECT_EQ(layoutProperty_->GetBadgeFontSize(), BADGE_FONT_SIZE);
     EXPECT_EQ(layoutProperty_->GetBadgeCircleSize(), BADGE_CIRCLE_SIZE);
+}
+
+/**
+ * @tc.name: BadgeArkoalaParamSignedType001
+ * @tc.desc: Test assigning the signed result of Int32Value(vm) does not trigger signed/unsigned mixing.
+ * @tc.type: FUNC
+ * @tc.author:
+ */
+HWTEST_F(BadgeTestNg, BadgeArkoalaParamSignedType001, TestSize.Level1)
+{
+    EXPECT_TRUE((std::is_same<decltype(ArkUIBadgeJSParam {}.badgeCount), ArkUI_Int32>::value));
+    EXPECT_TRUE((std::is_same<decltype(ArkUIBadgeJSParam {}.badgeMaxCount), ArkUI_Int32>::value));
+    EXPECT_TRUE(std::is_signed<decltype(ArkUIBadgeJSParam {}.badgeCount)>::value);
+    EXPECT_TRUE(std::is_signed<decltype(ArkUIBadgeJSParam {}.badgeMaxCount)>::value);
 }
 
 /**

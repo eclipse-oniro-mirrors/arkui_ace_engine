@@ -816,6 +816,100 @@ HWTEST_F(ScrollPatternThreeTestNg, SetEnableScrollWithMouse001, TestSize.Level1)
 }
 
 /**
+ * @tc.name: SetEnableScrollWithMouse002
+ * @tc.desc: Test default value and Reset behavior (vertical → false)
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPatternThreeTestNg, SetEnableScrollWithMouse002, TestSize.Level1)
+{
+    ScrollModelNG model = CreateScroll();
+    CreateContent();
+    CreateScrollDone();
+    EXPECT_FALSE(pattern_->GetIsAllowMouse());
+    pattern_->SetIsAllowMouse(true);
+    EXPECT_TRUE(pattern_->GetIsAllowMouse());
+    pattern_->ResetIsAllowMouse();
+    EXPECT_FALSE(pattern_->GetIsAllowMouse());
+}
+
+/**
+ * @tc.name: SetEnableScrollWithMouse003
+ * @tc.desc: Test default value for horizontal layout (horizontal → true)
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPatternThreeTestNg, SetEnableScrollWithMouse003, TestSize.Level1)
+{
+    ScrollModelNG model = CreateScroll();
+    model.SetAxis(Axis::HORIZONTAL);
+    CreateContent();
+    CreateScrollDone();
+    EXPECT_TRUE(pattern_->GetIsAllowMouse());
+    auto scrollable = pattern_->GetScrollableEvent()->GetScrollable();
+    EXPECT_TRUE(scrollable->panRecognizerNG_->isAllowMouse_);
+}
+
+/**
+ * @tc.name: SetEnableScrollWithMouse004
+ * @tc.desc: Test imperative Set/Reset take effect on GetIsAllowMouse (horizontal);
+ *           the recognizer syncs on the next OnModifyDone
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPatternThreeTestNg, SetEnableScrollWithMouse004, TestSize.Level1)
+{
+    ScrollModelNG model = CreateScroll();
+    model.SetAxis(Axis::HORIZONTAL);
+    CreateContent();
+    CreateScrollDone();
+    auto scrollable = pattern_->GetScrollableEvent()->GetScrollable();
+    EXPECT_TRUE(scrollable->panRecognizerNG_->isAllowMouse_);
+    pattern_->SetIsAllowMouse(false);
+    EXPECT_FALSE(pattern_->GetIsAllowMouse());
+    pattern_->SetIsAllowMouse(true);
+    EXPECT_TRUE(pattern_->GetIsAllowMouse());
+    pattern_->ResetIsAllowMouse();
+    EXPECT_TRUE(pattern_->GetIsAllowMouse());
+}
+
+/**
+ * @tc.name: SetEnableScrollWithMouse005
+ * @tc.desc: Test imperative Set/Reset take effect on GetIsAllowMouse (vertical);
+ *           the recognizer syncs on the next OnModifyDone
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPatternThreeTestNg, SetEnableScrollWithMouse005, TestSize.Level1)
+{
+    ScrollModelNG model = CreateScroll();
+    CreateContent();
+    CreateScrollDone();
+    auto scrollable = pattern_->GetScrollableEvent()->GetScrollable();
+    EXPECT_FALSE(scrollable->panRecognizerNG_->isAllowMouse_);
+    pattern_->SetIsAllowMouse(true);
+    EXPECT_TRUE(pattern_->GetIsAllowMouse());
+    pattern_->ResetIsAllowMouse();
+    EXPECT_FALSE(pattern_->GetIsAllowMouse());
+}
+
+/**
+ * @tc.name: SetEnableScrollWithMouse006
+ * @tc.desc: Test default value for free scroll mode (free -> false)
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollPatternThreeTestNg, SetEnableScrollWithMouse006, TestSize.Level1)
+{
+    ScrollModelNG model = CreateScroll();
+    model.SetAxis(Axis::FREE);
+    CreateContent();
+    CreateScrollDone();
+    EXPECT_FALSE(pattern_->GetIsAllowMouse());
+    auto scrollable = pattern_->GetScrollableEvent()->GetScrollable();
+    EXPECT_FALSE(scrollable->panRecognizerNG_->isAllowMouse_);
+    pattern_->SetIsAllowMouse(true);
+    EXPECT_TRUE(pattern_->GetIsAllowMouse());
+    pattern_->ResetIsAllowMouse();
+    EXPECT_FALSE(pattern_->GetIsAllowMouse());
+}
+
+/**
  * @tc.name: GetScrollSnap001
  * @tc.desc: Test Snap with contentOffset
  * @tc.type: FUNC

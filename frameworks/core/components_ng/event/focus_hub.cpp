@@ -893,6 +893,33 @@ bool FocusHub::IsChildFocusableNode()
     return !frameNode || frameNode->IsVisible();
 }
 
+bool FocusHub::HasTreeInteraction() const
+{
+    // Layout patterns create a SCOPE by default; only configured focus behavior makes it interactive.
+    if (focusType_ == FocusType::NODE || isFocusableExplicit_ || implicitFocusable_ || tabStop_ || !nextStep_.empty() ||
+        !focusScopeId_.empty() || isGroup_ || focusPriority_ != FocusPriority::AUTO ||
+        focusDepend_ != FocusDependence::CHILD || isNodeNeedKey_ || onFocusInternal_ || onBlurInternal_ ||
+        onBlurReasonInternal_ || onPreFocusCallback_ || onGetNextFocusNodeFunc_) {
+        return true;
+    }
+    for (const auto& entry : onKeyEventsInternal_) {
+        if (entry.second) {
+            return true;
+        }
+    }
+    if (!focusCallbackEvents_) {
+        return false;
+    }
+    const auto& callbacks = *focusCallbackEvents_;
+    return callbacks.onFocusCallback_ || callbacks.onJSFrameNodeFocusCallback_ || callbacks.onBlurCallback_ ||
+           callbacks.onJSFrameNodeBlurCallback_ || callbacks.onKeyEventCallback_ ||
+           callbacks.onJSFrameNodeKeyEventCallback_ || callbacks.onKeyPreImeCallback_ ||
+           callbacks.onClickEventCallback_ || callbacks.onSpanLongPressEventCallback_ ||
+           callbacks.onFocusAxisEventCallback_ || callbacks.onKeyEventDispatchCallback_ ||
+           callbacks.onCrownEventCallback_ || callbacks.onCrownEventsInternal_ || callbacks.tabIndex_ != 0 ||
+           callbacks.isDefaultFocus_ || callbacks.isDefaultGroupFocus_ || callbacks.isFocusOnTouch_.has_value();
+}
+
 void FocusHub::SetFocusable(bool focusable, bool isExplicit)
 {
     bool previousFocusable = IsFocusable();
@@ -3443,5 +3470,34 @@ bool FocusHub::IsFocusStepForward(FocusStep step, bool isRtl)
         isForward = !isForward;
     }
     return isForward;
+}
+
+void FocusHub::CopyEvent(const RefPtr<FocusHub>& source)
+{
+    CHECK_NULL_VOID(source);
+    auto onKey = source->GetOnKeyCallback();
+    if (onKey) {
+        SetOnKeyCallback(std::move(onKey));
+    }
+    auto onClick = source->GetOnClickCallback();
+    if (onClick) {
+        SetOnClickCallback(std::move(onClick));
+    }
+    auto onFocus = source->GetOnFocusCallback();
+    if (onFocus) {
+        SetOnFocusCallback(std::move(onFocus));
+    }
+    auto onBlur = source->GetOnBlurCallback();
+    if (onBlur) {
+        SetOnBlurCallback(std::move(onBlur));
+    }
+    auto onKeyPreIme = source->GetOnKeyPreIme();
+    if (onKeyPreIme) {
+        SetOnKeyPreIme(std::move(onKeyPreIme));
+    }
+    auto onFocusAxis = source->GetOnFocusAxisCallback();
+    if (onFocusAxis) {
+        SetOnFocusAxisCallback(std::move(onFocusAxis));
+    }
 }
 } // namespace OHOS::Ace::NG

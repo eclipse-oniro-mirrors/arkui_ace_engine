@@ -250,6 +250,23 @@ class CalendarPickerMarkTodayModifier extends ModifierWithKey<boolean> {
   }
 }
 
+class CalendarPickerFirstDayOfWeekModifier extends ModifierWithKey<CalendarFirstDayOfWeek> {
+  constructor(value: CalendarFirstDayOfWeek) {
+    super(value);
+  }
+  static identity: Symbol = Symbol('calendarPickerFirstDayOfWeek');
+  applyPeer(node: KNode, reset: boolean): void {
+    if (reset) {
+      getUINativeModule().calendarPicker.resetCalendarPickerFirstDayOfWeek(node);
+    } else {
+      getUINativeModule().calendarPicker.setCalendarPickerFirstDayOfWeek(node, this.value);
+    }
+  }
+  checkObjectDiff(): boolean {
+    return !isBaseOrResourceEqual(this.stageValue, this.value);
+  }
+}
+
 class CalendarPickerOnChangeModifier extends ModifierWithKey<Callback<Date>>{
   constructor(value: Callback<Date>) {
     super(value);
@@ -383,6 +400,10 @@ class ArkCalendarPickerComponent extends ArkComponent implements CalendarPickerA
   }
   markToday(value: boolean): this {
     modifierWithKey(this._modifiersWithKeys, CalendarPickerMarkTodayModifier.identity, CalendarPickerMarkTodayModifier, value);
+    return this;
+  }
+  firstDayOfWeek(value: CalendarFirstDayOfWeek): this {
+    modifierWithKey(this._modifiersWithKeys, CalendarPickerFirstDayOfWeekModifier.identity, CalendarPickerFirstDayOfWeekModifier, value);
     return this;
   }
 }

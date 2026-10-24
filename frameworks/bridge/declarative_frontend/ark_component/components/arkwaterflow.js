@@ -14,6 +14,21 @@
  */
 
 /// <reference path='./import.ts' />
+class WaterFlowScrollSnapStrategyModifier extends ModifierWithKey {
+  applyPeer(node, reset) {
+    if (reset) {
+      getUINativeModule().waterFlow.resetScrollSnapStrategy(node);
+    } else {
+      getUINativeModule().waterFlow.setScrollSnapStrategy(node, this.value);
+    }
+  }
+  checkObjectDiff() {
+    // Provider methods can change while the object identity remains the same.
+    return typeof this.value === 'object' || this.stageValue !== this.value;
+  }
+}
+WaterFlowScrollSnapStrategyModifier.identity = Symbol('waterFlowScrollSnapStrategy');
+
 class ItemConstraintSizeModifier extends ModifierWithKey {
   constructor(value) {
     super(value);
@@ -391,6 +406,11 @@ class ArkWaterFlowComponent extends ArkScrollable {
   constructor(nativePtr, classType) {
     super(nativePtr, classType);
   }
+  scrollSnapStrategy(value) {
+    modifierWithKey(this._modifiersWithKeys, WaterFlowScrollSnapStrategyModifier.identity,
+      WaterFlowScrollSnapStrategyModifier, value);
+    return this;
+  }
   columnsTemplate(value) {
     modifierWithKey(this._modifiersWithKeys, ColumnsTemplateModifier.identity, ColumnsTemplateModifier, value);
     return this;
@@ -526,6 +546,9 @@ class ArkWaterFlowComponent extends ArkScrollable {
 class JSWaterFlow extends JSContainerBase {
   static create(params) {
     getUINativeModule().waterFlow.create(params);
+  }
+  static scrollSnapStrategy(value) {
+    getUINativeModule().waterFlow.setScrollSnapStrategy(true, value);
   }
   static columnsGap(value) {
     getUINativeModule().waterFlow.setJSColumnsGap(true, value);

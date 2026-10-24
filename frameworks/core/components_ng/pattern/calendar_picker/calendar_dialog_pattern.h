@@ -97,10 +97,17 @@ public:
     void SetCurrentSettingData(const CalendarSettingData& settingData)
     {
         currentSettingData_ = settingData;
+        ResolveFirstDayOfWeek();
+    }
+
+    int32_t GetResolvedFirstDay() const
+    {
+        return resolvedFirstDay_;
     }
 
     void OnColorConfigurationUpdate() override;
     void OnLanguageConfigurationUpdate() override;
+    void UpdateFirstDayOfWeek(const RefPtr<FrameNode>& calendarNode);
     void OnFontScaleConfigurationUpdate() override;
 
     void UpdateCaretInfoToController();
@@ -181,6 +188,7 @@ private:
 
     bool IsJsonValid(const std::unique_ptr<JsonValue>& json);
     bool IsJsonObject(const std::unique_ptr<JsonValue>& json);
+    void ResolveFirstDayOfWeek();
     bool ReportCommandResultEvent(int32_t nodeId, const std::string& event,
         bool isSuccess, const std::string& reason);
     bool ReportChangeEvent(const std::string& compName,
@@ -210,6 +218,7 @@ private:
     WeakPtr<FrameNode> titleNode_;
     bool hasInitTitleArrowsColor_ = false;
     bool hasScopedExplicitColorMode_ = false;
+    int32_t resolvedFirstDay_ = 0;
 };
 } // namespace OHOS::Ace::NG
 

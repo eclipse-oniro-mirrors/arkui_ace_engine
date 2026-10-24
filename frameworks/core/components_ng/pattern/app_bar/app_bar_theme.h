@@ -31,7 +31,7 @@
 
 namespace OHOS::Ace::NG {
 
-class AppBarTheme : public virtual Theme {
+class AppBarTheme : public Theme {
     DECLARE_ACE_TYPE(AppBarTheme, Theme);
 
 public:

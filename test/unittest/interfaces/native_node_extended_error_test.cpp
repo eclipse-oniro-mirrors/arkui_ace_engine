@@ -13,8 +13,10 @@
  * limitations under the License.
  */
 
+#include "config_manager.h"
 #include "drawing_text_typography.h"
 #include "gtest/gtest.h"
+#include "native_interface.h"
 #include "native_styled_string.h"
 #include "node_extened.h"
 #include "node_model.h"
@@ -798,5 +800,174 @@ HWTEST_F(NativeNodeExtendedErrorTest, NodeCustomEvent_GetCustomSpanDrawInfo_Null
     ArkUI_CustomSpanDrawInfo info;
     int32_t result = OH_ArkUI_NodeCustomEvent_GetCustomSpanDrawInfo(&event, &info);
     EXPECT_EQ(result, ARKUI_ERROR_CODE_PARAM_INVALID);
+}
+
+namespace {
+constexpr int32_t RUNTIME_CHECK_TYPE_NODE_DISPOSED_VALUE = 1;
+
+// RAII guard: saves the tracked mode, sets the test mode, and restores on destruction.
+// ConfigManager exposes no getter, so the tracked mode starts at DISABLED (release default).
+class RuntimeCheckModeGuard {
+public:
+    explicit RuntimeCheckModeGuard(int32_t testMode)
+    {
+        savedMode_ = currentMode_;
+        ConfigManager::SetRuntimeCheckMode(RUNTIME_CHECK_TYPE_NODE_DISPOSED_VALUE, testMode);
+        currentMode_ = testMode;
+    }
+    ~RuntimeCheckModeGuard()
+    {
+        ConfigManager::SetRuntimeCheckMode(RUNTIME_CHECK_TYPE_NODE_DISPOSED_VALUE, savedMode_);
+        currentMode_ = savedMode_;
+    }
+
+private:
+    int32_t savedMode_ = static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_DISABLED);
+    static int32_t currentMode_;
+};
+
+int32_t RuntimeCheckModeGuard::currentMode_ =
+    static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_DISABLED);
+} // namespace
+
+/**
+ * @tc.name: NativeNodeExtendedErrorTest_TextEditorSelectionMenuOptions_Disposed_LogMode_001
+ * @tc.desc: AC-1.1: LOG mode + disposed handle → print log, interface continues (no short-circuit).
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeNodeExtendedErrorTest, TextEditorSelectionMenuOptions_Disposed_LogMode_001, TestSize.Level1)
+{
+    RuntimeCheckModeGuard guard(static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_LOG));
+
+    ArkUI_Node node;
+    node.magic = ARKUI_NODE_MAGIC_INVALID;
+    node.cNode = true;
+
+    auto* options = OH_ArkUI_TextEditorSelectionMenuOptions_Create();
+    ASSERT_NE(options, nullptr);
+
+    // SetContentNode with disposed handle: LOG mode only diagnoses, does not short-circuit
+    auto setResult = OH_ArkUI_TextEditorSelectionMenuOptions_SetContentNode(options, &node);
+    EXPECT_EQ(setResult, ARKUI_ERROR_CODE_NO_ERROR);
+
+    // GetContentNode with disposed contentNode: LOG mode only diagnoses, does not short-circuit
+    options->contentNode = &node;
+    ArkUI_NodeHandle outNode = nullptr;
+    auto getResult = OH_ArkUI_TextEditorSelectionMenuOptions_GetContentNode(options, &outNode);
+    EXPECT_EQ(getResult, ARKUI_ERROR_CODE_NO_ERROR);
+
+    OH_ArkUI_TextEditorSelectionMenuOptions_Destroy(options);
+}
+
+/**
+ * @tc.name: NativeNodeExtendedErrorTest_TextEditorSelectionMenuOptions_ValidHandle_CrashMode_002
+ * @tc.desc: AC-1.2: CRASH mode + valid handle → no check fires, normal return.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeNodeExtendedErrorTest, TextEditorSelectionMenuOptions_ValidHandle_CrashMode_002, TestSize.Level1)
+{
+    RuntimeCheckModeGuard guard(static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_CRASH));
+
+    ArkUI_Node node;
+    node.magic = ARKUI_NODE_MAGIC_VALID;
+    node.cNode = true;
+
+    auto* options = OH_ArkUI_TextEditorSelectionMenuOptions_Create();
+    ASSERT_NE(options, nullptr);
+
+    // Valid handle does not trigger the check in CRASH mode
+    auto setResult = OH_ArkUI_TextEditorSelectionMenuOptions_SetContentNode(options, &node);
+    EXPECT_EQ(setResult, ARKUI_ERROR_CODE_NO_ERROR);
+
+    options->contentNode = &node;
+    ArkUI_NodeHandle outNode = nullptr;
+    auto getResult = OH_ArkUI_TextEditorSelectionMenuOptions_GetContentNode(options, &outNode);
+    EXPECT_EQ(getResult, ARKUI_ERROR_CODE_NO_ERROR);
+
+    OH_ArkUI_TextEditorSelectionMenuOptions_Destroy(options);
+}
+
+/**
+ * @tc.name: NativeNodeExtendedErrorTest_TextEditorSelectionMenuOptions_ValidHandle_DefaultMode_003
+ * @tc.desc: AC-1.3: CRASH mode (simulating debug default) + valid handle → no check fires.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeNodeExtendedErrorTest, TextEditorSelectionMenuOptions_ValidHandle_DefaultMode_003, TestSize.Level1)
+{
+    // Explicitly set CRASH to simulate the debug default mode.
+    RuntimeCheckModeGuard guard(static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_CRASH));
+
+    ArkUI_Node node;
+    node.magic = ARKUI_NODE_MAGIC_VALID;
+    node.cNode = true;
+
+    auto* options = OH_ArkUI_TextEditorSelectionMenuOptions_Create();
+    ASSERT_NE(options, nullptr);
+
+    auto setResult = OH_ArkUI_TextEditorSelectionMenuOptions_SetContentNode(options, &node);
+    EXPECT_EQ(setResult, ARKUI_ERROR_CODE_NO_ERROR);
+
+    options->contentNode = &node;
+    ArkUI_NodeHandle outNode = nullptr;
+    auto getResult = OH_ArkUI_TextEditorSelectionMenuOptions_GetContentNode(options, &outNode);
+    EXPECT_EQ(getResult, ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(outNode, &node);
+
+    OH_ArkUI_TextEditorSelectionMenuOptions_Destroy(options);
+}
+
+/**
+ * @tc.name: NativeNodeExtendedErrorTest_TextEditorSelectionMenuOptions_Disposed_DisabledMode_004
+ * @tc.desc: AC-1.4: DISABLED mode + disposed handle → no detection, normal return.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeNodeExtendedErrorTest, TextEditorSelectionMenuOptions_Disposed_DisabledMode_004, TestSize.Level1)
+{
+    RuntimeCheckModeGuard guard(static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_DISABLED));
+
+    ArkUI_Node node;
+    node.magic = ARKUI_NODE_MAGIC_INVALID;
+    node.cNode = true;
+
+    auto* options = OH_ArkUI_TextEditorSelectionMenuOptions_Create();
+    ASSERT_NE(options, nullptr);
+
+    // DISABLED mode: disposed handle does not trigger detection
+    auto setResult = OH_ArkUI_TextEditorSelectionMenuOptions_SetContentNode(options, &node);
+    EXPECT_EQ(setResult, ARKUI_ERROR_CODE_NO_ERROR);
+
+    options->contentNode = &node;
+    ArkUI_NodeHandle outNode = nullptr;
+    auto getResult = OH_ArkUI_TextEditorSelectionMenuOptions_GetContentNode(options, &outNode);
+    EXPECT_EQ(getResult, ARKUI_ERROR_CODE_NO_ERROR);
+
+    OH_ArkUI_TextEditorSelectionMenuOptions_Destroy(options);
+}
+
+/**
+ * @tc.name: NativeNodeExtendedErrorTest_TextEditorSelectionMenuOptions_ValidHandle_Roundtrip_005
+ * @tc.desc: AC-1.5: Valid handle → SetContentNode + GetContentNode roundtrip works correctly.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeNodeExtendedErrorTest, TextEditorSelectionMenuOptions_ValidHandle_Roundtrip_005, TestSize.Level1)
+{
+    ArkUI_Node node;
+    node.magic = ARKUI_NODE_MAGIC_VALID;
+    node.cNode = true;
+
+    auto* options = OH_ArkUI_TextEditorSelectionMenuOptions_Create();
+    ASSERT_NE(options, nullptr);
+
+    // Set contentNode
+    auto setResult = OH_ArkUI_TextEditorSelectionMenuOptions_SetContentNode(options, &node);
+    EXPECT_EQ(setResult, ARKUI_ERROR_CODE_NO_ERROR);
+
+    // Get contentNode and verify roundtrip
+    ArkUI_NodeHandle outNode = nullptr;
+    auto getResult = OH_ArkUI_TextEditorSelectionMenuOptions_GetContentNode(options, &outNode);
+    EXPECT_EQ(getResult, ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(outNode, &node);
+
+    OH_ArkUI_TextEditorSelectionMenuOptions_Destroy(options);
 }
 

@@ -1970,4 +1970,23 @@ HWTEST_F(ListScrollerTestNg, GetBindingFrameNodeId001, TestSize.Level1)
     auto nodeId = positionController_->GetBindingFrameNodeId();
     EXPECT_EQ(nodeId, frameNode_->GetId());
 }
+
+/**
+ * @tc.name: ScrollToIndexJumpSourceKept
+ * @tc.desc: Test non-smooth ScrollToIndex keeps JUMP scroll source for jump semantics.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListScrollerTestNg, ScrollToIndexJumpSourceKept, TestSize.Level1)
+{
+    CreateList();
+    CreateListItems(5);
+    CreateDone();
+
+    /**
+     * @tc.steps: step1. ScrollToIndex without smooth animation.
+     * @tc.expected: The scroll source is SCROLL_FROM_JUMP.
+     */
+    pattern_->ScrollToIndex(3, false, ScrollAlign::START);
+    EXPECT_EQ(pattern_->GetScrollSource(), SCROLL_FROM_JUMP);
+}
 } // namespace OHOS::Ace::NG

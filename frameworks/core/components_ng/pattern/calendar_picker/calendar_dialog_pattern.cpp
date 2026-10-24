@@ -16,8 +16,10 @@
 #include "core/components_ng/pattern/calendar_picker/calendar_dialog_pattern.h"
 
 #include "core/components/calendar/calendar_theme.h"
+#include "core/components_ng/pattern/calendar_picker/calendar_picker_i18n.h"
 #include "core/components_ng/pattern/date_picker/picker_theme.h"
 #include "base/i18n/localization.h"
+#include "base/log/log_wrapper.h"
 #include "base/utils/date_util.h"
 #include "core/components/dialog/dialog_theme.h"
 #include "core/components_ng/pattern/calendar/calendar_event_hub.h"
@@ -36,6 +38,19 @@
 
 namespace OHOS::Ace::NG {
 namespace {
+void SetStartOfWeekInline(FrameNode* frameNode, int32_t startOfWeek)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto swiperNode = frameNode->GetChildren().front();
+    CHECK_NULL_VOID(swiperNode);
+    for (const auto& calNode : swiperNode->GetChildren()) {
+        auto calFn = AceType::DynamicCast<FrameNode>(calNode);
+        CHECK_NULL_VOID(calFn);
+        auto prop = calFn->GetPaintProperty<CalendarPaintProperty>();
+        CHECK_NULL_VOID(prop);
+        prop->UpdateStartOfWeek(NG::Week(startOfWeek));
+    }
+}
 constexpr int32_t TITLE_NODE_INDEX = 0;
 constexpr int32_t CALENDAR_NODE_INDEX = 2;
 constexpr int32_t OPTIONS_NODE_INDEX = 3;
@@ -1207,6 +1222,21 @@ void CalendarDialogPattern::HandleTitleArrowsClickEvent(int32_t nodeIndex)
     }
 }
 
+void CalendarDialogPattern::ResolveFirstDayOfWeek()
+{
+    int32_t raw = currentSettingData_.firstDayOfWeek;
+    if (raw < CalendarPickerConstants::FIRST_DAY_OF_WEEK_LOCAL ||
+        raw > CalendarPickerConstants::MAX_FIRST_DAY_OF_WEEK) {
+        raw = CalendarPickerConstants::FIRST_DAY_OF_WEEK_LOCAL;
+    }
+    if (raw == CalendarPickerConstants::FIRST_DAY_OF_WEEK_LOCAL) {
+        auto locale = Localization::GetInstance()->GetLanguage();
+        resolvedFirstDay_ = CalendarPickerI18n::GetFirstDayOfWeek(locale);
+    } else {
+        resolvedFirstDay_ = raw % WEEK_DAYS;
+    }
+}
+
 void CalendarDialogPattern::GetCalendarMonthData(int32_t year, int32_t month, ObtainedMonth& calendarMonthData)
 {
     calendarMonthData.year = year;
@@ -1218,8 +1248,11 @@ void CalendarDialogPattern::GetCalendarMonthData(int32_t year, int32_t month, Ob
     int32_t currentMonthMaxDay = static_cast<int32_t>(PickerDate::GetMaxDay(year, month));
     int32_t preMonthMaxDay =
         static_cast<int32_t>(PickerDate::GetMaxDay(GetLastMonth(currentMonth).year, GetLastMonth(currentMonth).month));
-    int32_t preMonthDaysCount = (Date::CalculateWeekDay(year, month, 1) + 1) % WEEK_DAYS;
-    int32_t nextMonthDaysCount = 6 - ((Date::CalculateWeekDay(year, month, currentMonthMaxDay) + 1) % WEEK_DAYS);
+    int32_t firstDayWeekday = Date::CalculateWeekDay(year, month, 1);
+    int32_t preMonthDaysCount = (firstDayWeekday + 1 - resolvedFirstDay_ + WEEK_DAYS) % WEEK_DAYS;
+    int32_t lastDayWeekday = Date::CalculateWeekDay(year, month, currentMonthMaxDay);
+    int32_t nextMonthDaysCount =
+        (WEEK_DAYS - 1) - ((lastDayWeekday + 1 - resolvedFirstDay_ + WEEK_DAYS) % WEEK_DAYS);
 
     int32_t index = 0;
     for (int32_t i = 0; i < preMonthDaysCount; i++, index++) {
@@ -1453,6 +1486,26 @@ void CalendarDialogPattern::OnEnterKeyEvent(const KeyEvent& event)
     }
 }
 
+void CalendarDialogPattern::UpdateFirstDayOfWeek(const RefPtr<FrameNode>& calendarNode)
+{
+    ResolveFirstDayOfWeek();
+    int32_t weekEnumValue = (resolvedFirstDay_ + 6) % 7;
+    SetStartOfWeekInline(AceType::RawPtr(calendarNode), weekEnumValue);
+    auto calendarPattern = calendarNode->GetPattern<CalendarPattern>();
+    CHECK_NULL_VOID(calendarPattern);
+    ObtainedMonth currentMonthData = calendarPattern->GetCurrentMonthData();
+    CalendarMonth currentMonth { .year = currentMonthData.year, .month = currentMonthData.month };
+    CalendarData calendarData;
+    GetCalendarMonthData(currentMonth.year, currentMonth.month, calendarData.currentData);
+    calendarPattern->SetCurrentMonthData(calendarData.currentData);
+    auto lastMonth = GetLastMonth(currentMonth);
+    GetCalendarMonthData(lastMonth.year, lastMonth.month, calendarData.preData);
+    calendarPattern->SetPreMonthData(calendarData.preData);
+    auto nextMonth = GetNextMonth(currentMonth);
+    GetCalendarMonthData(nextMonth.year, nextMonth.month, calendarData.nextData);
+    calendarPattern->SetNextMonthData(calendarData.nextData);
+}
+
 void CalendarDialogPattern::OnLanguageConfigurationUpdate()
 {
     auto host = GetHost();
@@ -1463,6 +1516,10 @@ void CalendarDialogPattern::OnLanguageConfigurationUpdate()
     CHECK_NULL_VOID(calendarNode);
     auto swiperNode = AceType::DynamicCast<FrameNode>(calendarNode->GetFirstChild());
     CHECK_NULL_VOID(swiperNode);
+
+    if (currentSettingData_.firstDayOfWeek == 0) {
+        UpdateFirstDayOfWeek(calendarNode);
+    }
 
     for (auto&& child : swiperNode->GetChildren()) {
         auto monthFrameNode = AceType::DynamicCast<FrameNode>(child);
@@ -1670,6 +1727,21 @@ void CalendarDialogPattern::ToJsonValue(std::unique_ptr<JsonValue>& json, const 
     if (currentSettingData_.endDate.ToDays() != PickerDate().ToDays()) {
         json->PutExtAttr("end", currentSettingData_.endDate.ToString(false).c_str(), filter);
     }
+    auto GetFirstDayOfWeekString = [](int32_t firstDayOfWeek) {
+        std::string ret;
+        switch (firstDayOfWeek) {
+            case 1: ret = "CalendarFirstDayOfWeek.MON"; break;
+            case 2: ret = "CalendarFirstDayOfWeek.TUE"; break;
+            case 3: ret = "CalendarFirstDayOfWeek.WED"; break;
+            case 4: ret = "CalendarFirstDayOfWeek.THU"; break;
+            case 5: ret = "CalendarFirstDayOfWeek.FRI"; break;
+            case 6: ret = "CalendarFirstDayOfWeek.SAT"; break;
+            case 7: ret = "CalendarFirstDayOfWeek.SUN"; break;
+            default: ret = "CalendarFirstDayOfWeek.LOCAL"; break;
+        }
+        return ret;
+    };
+    json->PutExtAttr("firstDayOfWeek", GetFirstDayOfWeekString(currentSettingData_.firstDayOfWeek).c_str(), filter);
 }
 
 void CalendarDialogPattern::MarkMonthNodeDirty()

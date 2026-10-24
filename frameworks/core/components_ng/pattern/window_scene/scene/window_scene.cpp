@@ -258,6 +258,7 @@ void WindowScene::OnDetachFromFrameNode(FrameNode* frameNode)
     CHECK_NULL_VOID(session_);
     session_->SetUINodeId(0);
     session_->SetAttachState(false, initWindowMode_);
+    session_->SetStartWithSnapshot(false);
     auto surfaceNode = session_->GetSurfaceNode();
     if (surfaceNode) {
         surfaceNode->SetVisible(true);
@@ -274,6 +275,12 @@ void WindowScene::OnDetachFromFrameNode(FrameNode* frameNode)
     TAG_LOGW(AceLogTag::ACE_WINDOW_SCENE,
         "OnDetachFromFrameNode id: %{public}d, node id: %{public}d, type: %{public}d, name: %{public}s",
         session_->GetPersistentId(), frameNode->GetId(), session_->GetWindowType(), windowName.c_str());
+    CHECK_EQUAL_VOID(session_->GetHidingStartingWindow(), false);
+    session_->SetHidingStartingWindow(false);
+    session_->SetLeashWindowAlpha(false);
+    TAG_LOGW(AceLogTag::ACE_WINDOW_SCENE,
+        "OnDetachFromFrameNode id: %{public}d, node id: %{public}d, reset hiding starting window",
+        session_->GetPersistentId(), frameNode->GetId());
 }
 
 void WindowScene::OnMountToParentDone()
@@ -1133,7 +1140,7 @@ bool WindowScene::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, c
     if (surfaceNode) {
         surfaceNode->SetBufferAvailableCallback(callback_);
     }
-    CHECK_EQUAL_RETURN(session_->GetSystemConfig().IsPcWindow(), true, false);
+    CHECK_EQUAL_RETURN(session_->GetSystemConfig().IsDisplayInFreeMultiWindow(session_->GetScreenId()), true, false);
     CHECK_EQUAL_RETURN(session_->GetSystemConfig().freeMultiWindowEnable_, true, false);
     CHECK_NULL_RETURN(dirty, false);
     auto geometryNode = dirty->GetGeometryNode();

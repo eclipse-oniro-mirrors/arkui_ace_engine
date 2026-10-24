@@ -49,9 +49,12 @@ ohos_shared_library("ui_service_mgr") {
     sanitize = {
       integer_overflow = true
       boundary_sanitize = true
+      cfi = true
+      cfi_cross_dso = true
       debug = ace_sanitize_debug
     }
   }
+  branch_protector_ret = "pac_ret"
 
   sources = [
     "$ace_root/adapter/ohos/services/uiservice/src/ui_service_mgr_client.cpp",
@@ -100,7 +103,6 @@ ohos_shared_library("ui_service_mgr") {
   subsystem_name = ace_engine_subsystem
   innerapi_tags = [ "platformsdk_indirect" ]
   part_name = ace_engine_part
-  branch_protector_ret = "pac_ret"
 }
 
 ohos_shared_library("uiservice_manager_interface_set") {
@@ -109,6 +111,7 @@ ohos_shared_library("uiservice_manager_interface_set") {
     cfi_cross_dso = true
     debug = false
   }
+  branch_protector_ret = "pac_ret"
   public_configs = [ ":uiservice_manager_public_config" ]
   output_values = get_target_outputs(":uiservice_manager_interface")
   sources = filter_include(output_values, [ "*_proxy.cpp" ])
@@ -126,5 +129,4 @@ ohos_shared_library("uiservice_manager_interface_set") {
   ]
   subsystem_name = ace_engine_subsystem
   part_name = ace_engine_part
-  branch_protector_ret = "pac_ret"
 }

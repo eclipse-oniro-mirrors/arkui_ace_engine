@@ -604,6 +604,7 @@ HWTEST_F(SelectControlSizeNg, OnColorConfigurationUpdateTest001, TestSize.Level1
     auto selectTheme = AceType::MakeRefPtr<SelectTheme>();
     const Color themeBgColor = Color::BLUE;
     selectTheme->backgroundColor_ = themeBgColor;
+    selectTheme->menuBlendBgColor_ = true;
     EXPECT_CALL(*themeManager, GetTheme(_))
         .WillRepeatedly(Return(selectTheme));
     EXPECT_CALL(*themeManager, GetTheme(_, _))

@@ -138,6 +138,10 @@ class ArkCalendarPickerComponent extends ArkComponent {
     modifierWithKey(this._modifiersWithKeys, CalendarPickerMarkTodayModifier.identity, CalendarPickerMarkTodayModifier, value);
     return this;
   }
+  firstDayOfWeek(value) {
+    modifierWithKey(this._modifiersWithKeys, CalendarPickerFirstDayOfWeekModifier.identity, CalendarPickerFirstDayOfWeekModifier, value);
+    return this;
+  }
 }
 
 class TextStyleModifier extends ModifierWithKey {
@@ -376,6 +380,24 @@ class CalendarPickerMarkTodayModifier extends ModifierWithKey {
 }
 CalendarPickerMarkTodayModifier.identity = Symbol('calendarPickerMarkToday');
 
+class CalendarPickerFirstDayOfWeekModifier extends ModifierWithKey {
+  constructor(value) {
+    super(value);
+  }
+  applyPeer(node, reset) {
+    if (reset) {
+      getUINativeModule().calendarPicker.resetCalendarPickerFirstDayOfWeek(node);
+    }
+    else {
+      getUINativeModule().calendarPicker.setCalendarPickerFirstDayOfWeek(node, this.value);
+    }
+  }
+  checkObjectDiff() {
+    return !isBaseOrResourceEqual(this.stageValue, this.value);
+  }
+}
+CalendarPickerFirstDayOfWeekModifier.identity = Symbol('calendarPickerFirstDayOfWeek');
+
 class CalendarPickerOnChangeModifier extends ModifierWithKey {
   constructor(value) {
     super(value);
@@ -428,6 +450,10 @@ class JSCalendarPicker extends JSViewAbstract {
 
   static markToday(value) {
     getUINativeModule().calendarPicker.setCalendarPickerMarkToday(true, value);
+  }
+
+  static firstDayOfWeek(value) {
+    getUINativeModule().calendarPicker.setCalendarPickerFirstDayOfWeek(true, value);
   }
 
   static attributeModifier(modifier) {

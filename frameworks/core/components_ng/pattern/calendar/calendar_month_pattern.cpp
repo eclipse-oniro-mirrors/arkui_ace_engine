@@ -414,9 +414,17 @@ void CalendarMonthPattern::OnLanguageConfigurationUpdate()
     CHECK_NULL_VOID(rowNode);
     auto textNodes = rowNode->GetChildren();
     std::vector<std::string> weekNumbers = Localization::GetInstance()->GetWeekdays(true);
+    if (weekNumbers.size() < static_cast<size_t>(CALENDAR_WEEK_DAYS)) {
+        return;
+    }
+    auto paintProp = host->GetPaintProperty<CalendarPaintProperty>();
+    int32_t startOfWeek = static_cast<int32_t>(Week::Sun);
+    if (paintProp) {
+        startOfWeek = static_cast<int32_t>(paintProp->GetStartOfWeek().value_or(Week::Sun));
+    }
     int32_t column = 0;
     for (auto textNode : textNodes) {
-        std::string weekContent { weekNumbers[column % CALENDAR_WEEK_DAYS] };
+        std::string weekContent { weekNumbers[(startOfWeek + column + 1) % CALENDAR_WEEK_DAYS] };
         auto textFrameNode = AceType::DynamicCast<NG::FrameNode>(textNode);
         CHECK_NULL_VOID(textFrameNode);
         auto calendarPaintProperty = host->GetPaintProperty<CalendarPaintProperty>();

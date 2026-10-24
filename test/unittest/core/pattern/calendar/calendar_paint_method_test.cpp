@@ -1291,7 +1291,7 @@ HWTEST_F(CalendarPaintMethTest, IsOffDayTest001, TestSize.Level1)
     CalendarDay calendarDay;
     PickerDate defaultDate;
     auto paintMethod = AceType::MakeRefPtr<CalendarPaintMethod>(obtainedMonth, calendarDay, defaultDate, defaultDate);
-    calendarDay.index = -10;
+    calendarDay.index = 6;
     EXPECT_TRUE(paintMethod->IsOffDay(calendarDay));
 }
 

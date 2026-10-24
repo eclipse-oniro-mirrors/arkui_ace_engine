@@ -70,7 +70,7 @@ struct ScaleDataInfo {
     float shortSide = 0.0f;
 };
 
-class ACE_EXPORT DragDropManager : public virtual AceType {
+class ACE_EXPORT DragDropManager : public AceType {
     DECLARE_ACE_TYPE(DragDropManager, AceType);
 
 public:
@@ -219,6 +219,10 @@ public:
     const std::map<std::string, int64_t>& GetSummaryMap()
     {
         return summaryMap_;
+    }
+    const DragSummaryInfo& GetSummaryInfo()
+    {
+        return dragSummaryInfo_;
     }
     void ResetRecordSize(uint32_t recordSize = 0);
     uint32_t GetRecordSize() const;

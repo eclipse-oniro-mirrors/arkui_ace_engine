@@ -151,6 +151,7 @@ public:
     void ParseJsSymbolSpanStyle(
         const JSRef<JSObject>& styleObject, TextStyle& style, struct UpdateSpanStyle& updateSpanStyle);
     ImageSpanOptions CreateJsImageOptions(const JSCallbackInfo& args);
+    void ParseImageSpanOptions(const JSCallbackInfo& args, ImageSpanOptions& options);
     void UpdateSpanStyle(const JSCallbackInfo& info);
     void UpdateParagraphStyle(const JSCallbackInfo& info);
     void GetSpansInfo(const JSCallbackInfo& args);

@@ -30,7 +30,7 @@ class ExecutorGenerator;
 class ExecutorChoreographer;
 class PipelineContext;
 
-class RelaxedInteractionManager : public virtual AceType {
+class RelaxedInteractionManager : public AceType {
     DECLARE_ACE_TYPE(RelaxedInteractionManager, AceType);
 
 public:

@@ -366,6 +366,14 @@ void IndicatorPattern::OnIndexChangeInSingleMode(int32_t index)
     SwiperIndicatorPattern::IndicatorOnChange();
 }
 
+void IndicatorPattern::OnIndicatorChangeAccessibilityEvent()
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    TAG_LOGD(AceLogTag::ACE_SWIPER, "IndicatorPattern::OnIndicatorChangeAccessibilityEvent");
+    host->OnAccessibilityEvent(AccessibilityEventType::COMPONENT_CHANGE);
+}
+
 void IndicatorPattern::ShowPrevious()
 {
     if (GetBindSwiperNode()) {

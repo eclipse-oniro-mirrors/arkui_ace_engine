@@ -23,7 +23,7 @@
 #include "core/accessibility/accessibility_manager.h"
 #include "core/common/container.h"
 #include "core/common/ime/text_input_type.h"
-#include "core/common/password_icon_host.h"
+#include "core/components_ng/pattern/text_field/password_icon_host.h"
 #include "core/components/common/layout/constants.h"
 #include "core/components/theme/icon_theme.h"
 #include "core/components_ng/layout/layout_property.h"
@@ -214,6 +214,57 @@ void TextInputResponseArea::SetHotZoneRect(DimensionRect& hotZoneRegion, float i
 }
 // TextInputResponseArea end
 
+// ResponseAreaMeasureHelper begin
+float ResponseAreaMeasureHelper::MeasureAndDeductConstraint(
+    const RefPtr<TextInputResponseArea>& area, LayoutWrapper* layoutWrapper, LayoutConstraintF& constraint)
+{
+    CHECK_NULL_RETURN(area, 0.0f);
+    CHECK_NULL_RETURN(layoutWrapper, 0.0f);
+    auto frameNode = layoutWrapper->GetHostNode();
+    CHECK_NULL_RETURN(frameNode, 0.0f);
+    auto childIndex = frameNode->GetChildIndex(area->GetFrameNode());
+    auto iconSize = area->Measure(layoutWrapper, childIndex);
+    auto areaWidth = iconSize.Width();
+    constraint.maxSize.SetWidth(std::max(constraint.maxSize.Width() - areaWidth, 0.0f));
+    constraint.minSize.SetWidth(std::max(constraint.minSize.Width() - areaWidth, 0.0f));
+    if (constraint.selfIdealSize.Width()) {
+        constraint.selfIdealSize.SetWidth(constraint.selfIdealSize.Width().value() - areaWidth);
+    }
+    return areaWidth;
+}
+
+void ResponseAreaMeasureHelper::LayoutArea(
+    const RefPtr<TextInputResponseArea>& area, LayoutWrapper* layoutWrapper, float& nodeWidth)
+{
+    CHECK_NULL_VOID(area);
+    CHECK_NULL_VOID(layoutWrapper);
+    auto frameNode = layoutWrapper->GetHostNode();
+    CHECK_NULL_VOID(frameNode);
+    auto childIndex = frameNode->GetChildIndex(area->GetFrameNode());
+    area->Layout(layoutWrapper, childIndex, nodeWidth);
+}
+
+OffsetF ResponseAreaMeasureHelper::AdjustContentOffsetForRTL(
+    const OffsetF& contentOffset, float areaWidth, LayoutWrapper* layoutWrapper)
+{
+    auto result = contentOffset;
+    CHECK_NULL_RETURN(areaWidth > 0.0f, result);
+    CHECK_NULL_RETURN(layoutWrapper, result);
+    auto layoutProperty = layoutWrapper->GetLayoutProperty();
+    CHECK_NULL_RETURN(layoutProperty, result);
+    CHECK_NULL_RETURN(layoutProperty->GetNonAutoLayoutDirection() == TextDirection::RTL, result);
+    auto geometryNode = layoutWrapper->GetGeometryNode();
+    CHECK_NULL_RETURN(geometryNode, result);
+    const auto& content = geometryNode->GetContent();
+    if (content) {
+        auto offset = content->GetRect().GetOffset();
+        content->SetOffset(OffsetF(offset.GetX() + areaWidth, offset.GetY()));
+    }
+    result.SetX(result.GetX() + areaWidth);
+    return result;
+}
+// ResponseAreaMeasureHelper end
+
 // PasswordResponseArea begin
 void PasswordResponseArea::InitResponseArea()
 {
@@ -257,7 +308,7 @@ RefPtr<FrameNode> PasswordResponseArea::CreateNode()
     CHECK_NULL_RETURN(stackLayoutProperty, nullptr);
     stackLayoutProperty->UpdateUserDefinedIdealSize(CalcSize(CalcLength(hotZoneSize), std::nullopt));
     CHECK_NULL_RETURN(passwordHost->CheckLayoutProperty(), nullptr);
-    stackLayoutProperty->UpdateAlignment(GetStackAlignment(passwordHost->GetLayoutDirection()));
+    stackLayoutProperty->UpdateAlignment(GetStackAlignment(passwordHost->GetPasswordIconDirection()));
     AddEvent(stackNode);
     stackNode->MarkModifyDone();
 
@@ -477,7 +528,7 @@ void PasswordResponseArea::Refresh()
     if (passwordHost && stackNode_) {
         auto stackLayoutProperty = stackNode_->GetLayoutProperty<LayoutProperty>();
         if (stackLayoutProperty && passwordHost->CheckLayoutProperty()) {
-            stackLayoutProperty->UpdateAlignment(GetStackAlignment(passwordHost->GetLayoutDirection()));
+            stackLayoutProperty->UpdateAlignment(GetStackAlignment(passwordHost->GetPasswordIconDirection()));
         }
         if (stackLayoutProperty) {
             auto iconSize = GetIconSize();

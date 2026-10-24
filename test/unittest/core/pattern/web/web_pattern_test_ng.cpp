@@ -22,6 +22,7 @@
 #define protected public
 #include "core/components/web/resource/web_delegate.h"
 #include "core/components_ng/pattern/web/web_pattern.h"
+#include "core/components_ng/pattern/web/web_model_ng.h"
 #include "core/components_ng/manager/recoverable/recoverable_view.h"
 #include "core/components_ng/pattern/stage/page_pattern.h"
 #include "core/components_ng/pattern/stage/page_info.h"
@@ -513,6 +514,33 @@ HWTEST_F(WebPatternTestNg, OnScrollBarColorUpdate005, TestSize.Level1)
     SystemProperties::SetExtSurfaceEnabled(false);
     webPattern->InitEnhanceSurfaceFlag();
 #endif
+}
+
+/**
+ * @tc.name: CaretResourceColorUpdate006
+ * @tc.desc: Verify a resource update changes the Web caret color and reset clears it.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternTestNg, CaretResourceColorUpdate006, TestSize.Level1)
+{
+    auto* stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto nodeId = stack->ClaimNodeId();
+    auto frameNode =
+        FrameNode::GetOrCreateFrameNode(V2::WEB_ETS_TAG, nodeId, []() { return AceType::MakeRefPtr<WebPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+
+    auto value = AceType::MakeRefPtr<PropertyValueBase>();
+    value->SetValue(Color::RED);
+    webPattern->UpdatePropertyImpl("WebCaretColor", value);
+    ASSERT_TRUE(webPattern->GetCaretColor().has_value());
+    EXPECT_EQ(webPattern->GetCaretColor().value(), Color::RED);
+
+    WebModelNG::SetCaretColor(AceType::RawPtr(frameNode), Color(0));
+    ASSERT_TRUE(webPattern->GetCaretColor().has_value());
+    EXPECT_EQ(webPattern->GetCaretColor().value().GetValue(), 0u);
 }
 
 /**

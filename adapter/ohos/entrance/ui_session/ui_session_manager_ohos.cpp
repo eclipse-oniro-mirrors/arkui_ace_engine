@@ -14,6 +14,7 @@
  */
 
 #include "adapter/ohos/entrance/ui_session/ui_session_manager_ohos.h"
+#include "adapter/ohos/entrance/ui_session/include/ui_session_log.h"
 #include "adapter/ohos/entrance/ui_session/include/ui_session_trace.h"
 #include "core/components/web/resource/web_page_scene_manager.h"
 #include "adapter/ohos/entrance/ui_session/ui_translate_request_util.h"
@@ -21,6 +22,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 
 #include "cJSON.h"
 
@@ -194,6 +196,23 @@ std::string BuildPageSceneRuleJson(const JsonObject* root, const JsonObject* rul
     return result;
 }
 
+std::string BuildPageSceneRuleRemoval(
+    const std::string& ruleSetId, bool isSearchRule, const std::string& generation = "")
+{
+    // Internal UI-thread cache notification, never sent over IPC.
+    // The '_' prefix marks registration-generation metadata outside the public rule schema.
+    auto removal = InspectorJsonUtil::Create();
+    removal->Put(PAGE_SCENE_RULE_SET_ID, ruleSetId.c_str());
+    if (!isSearchRule) {
+        removal->Put(PAGE_SCENE_VERSION, PAGE_SCENE_RULE_VERSION);
+    } else {
+        removal->Put("_pageSceneGeneration", generation.c_str());
+    }
+    auto rules = InspectorJsonUtil::CreateArray();
+    removal->Put(PAGE_SCENE_RULES, rules);
+    return removal->ToString();
+}
+
 void LogPageSceneRuleParseFailed(const std::string& ruleJson, const char* parseEnd)
 {
     size_t offset = 0;
@@ -201,6 +220,207 @@ void LogPageSceneRuleParseFailed(const std::string& ruleJson, const char* parseE
         offset = static_cast<size_t>(parseEnd - ruleJson.c_str());
     }
     LOGW("Parse page scene rule failed, length:%{public}zu, offset:%{public}zu", ruleJson.length(), offset);
+}
+
+// Search scene capacity limits for rule registration.
+constexpr int32_t MAX_SEARCH_RULE_SETS_PER_PROCESS = 2;
+constexpr int32_t MAX_SEARCH_RULES_PER_RULE_SET = 10;
+constexpr int32_t MAX_SEARCH_REGIONS_PER_RULE = 5;
+constexpr int32_t MAX_SEARCH_KEYWORDS_PER_RULE = 5;
+constexpr int32_t MAX_SEARCH_KEYWORD_UTF8_BYTES = 20;
+constexpr int32_t MAX_SEARCH_COMPONENT_TYPES = 5;
+constexpr int32_t MAX_SEARCH_INSPECTOR_IDS = 10;
+constexpr char PAGE_SCENE_PAGE_TYPE[] = "pageType";
+constexpr char PAGE_SCENE_PAGE_NAME[] = "pageName";
+constexpr char PAGE_SCENE_REGIONS[] = "regions";
+constexpr char PAGE_SCENE_KEYWORDS[] = "keywords";
+constexpr char PAGE_SCENE_COMPONENTS[] = "components";
+constexpr char PAGE_SCENE_INSPECTOR_IDS[] = "inspectorIds";
+constexpr char PAGE_SCENE_POS_X[] = "x";
+constexpr char PAGE_SCENE_POS_Y[] = "y";
+constexpr char PAGE_SCENE_RECT_WIDTH[] = "width";
+constexpr char PAGE_SCENE_RECT_HEIGHT[] = "height";
+constexpr char PAGE_SCENE_TYPE[] = "type";
+constexpr char PAGE_SCENE_MAX_SIZE[] = "maxSize";
+constexpr char PAGE_SCENE_MAX_RATIO[] = "maxRatio";
+constexpr char PAGE_SCENE_AUTO_PLAY[] = "autoPlay";
+constexpr char PAGE_TYPE_NAVIGATION[] = "Navigation";
+constexpr char PAGE_TYPE_ROUTER[] = "Router";
+constexpr char SEARCH_COMPONENT_IMAGE[] = "Image";
+constexpr char SEARCH_COMPONENT_SWIPER[] = "Swiper";
+constexpr char SEARCH_COMPONENT_SEARCH[] = "Search";
+constexpr char SEARCH_COMPONENT_BUTTON[] = "Button";
+constexpr char SEARCH_COMPONENT_TEXT_INPUT[] = "TextInput";
+
+bool IsValidSearchComponentTypeName(const std::string& type)
+{
+    return type == SEARCH_COMPONENT_IMAGE || type == SEARCH_COMPONENT_SWIPER ||
+           type == SEARCH_COMPONENT_SEARCH || type == SEARCH_COMPONENT_BUTTON ||
+           type == SEARCH_COMPONENT_TEXT_INPUT;
+}
+
+bool IsPositiveFiniteNumber(double value)
+{
+    return value > 0.0 && std::isfinite(value);
+}
+
+struct SearchRegionRect {
+    double x = 0.0;
+    double y = 0.0;
+    double width = 0.0;
+    double height = 0.0;
+};
+
+bool HasPositiveAreaOverlap(const SearchRegionRect& left, const SearchRegionRect& right)
+{
+    double overlapWidth = std::min(left.x + left.width, right.x + right.width) - std::max(left.x, right.x);
+    double overlapHeight = std::min(left.y + left.height, right.y + right.height) - std::max(left.y, right.y);
+    return overlapWidth > 0.0 && overlapHeight > 0.0;
+}
+
+bool IsValidSearchRegions(cJSON* ruleJsonValue)
+{
+    auto regions = cJSON_GetObjectItem(ruleJsonValue, PAGE_SCENE_REGIONS);
+    if (!cJSON_IsArray(regions) || cJSON_GetArraySize(regions) <= 0 ||
+        cJSON_GetArraySize(regions) > MAX_SEARCH_REGIONS_PER_RULE) {
+        return false;
+    }
+    std::vector<SearchRegionRect> parsedRegions;
+    auto regionSize = cJSON_GetArraySize(regions);
+    for (int32_t regionIndex = 0; regionIndex < regionSize; ++regionIndex) {
+        auto region = cJSON_GetArrayItem(regions, regionIndex);
+        if (!cJSON_IsObject(region)) {
+            return false;
+        }
+        auto x = cJSON_GetObjectItem(region, PAGE_SCENE_POS_X);
+        auto y = cJSON_GetObjectItem(region, PAGE_SCENE_POS_Y);
+        auto width = cJSON_GetObjectItem(region, PAGE_SCENE_RECT_WIDTH);
+        auto height = cJSON_GetObjectItem(region, PAGE_SCENE_RECT_HEIGHT);
+        if (!cJSON_IsNumber(x) || !cJSON_IsNumber(y) || !cJSON_IsNumber(width) || !cJSON_IsNumber(height) ||
+            !IsPositiveFiniteNumber(width->valuedouble) || !IsPositiveFiniteNumber(height->valuedouble)) {
+            return false;
+        }
+        SearchRegionRect rect { x->valuedouble, y->valuedouble, width->valuedouble, height->valuedouble };
+        for (const auto& existing : parsedRegions) {
+            if (HasPositiveAreaOverlap(existing, rect)) {
+                return false;
+            }
+        }
+        parsedRegions.emplace_back(rect);
+    }
+    return true;
+}
+
+bool IsValidSearchKeywords(cJSON* ruleJsonValue)
+{
+    auto keywords = cJSON_GetObjectItem(ruleJsonValue, PAGE_SCENE_KEYWORDS);
+    if (!cJSON_IsArray(keywords)) {
+        return true;
+    }
+    if (cJSON_GetArraySize(keywords) > MAX_SEARCH_KEYWORDS_PER_RULE) {
+        return false;
+    }
+    auto keywordSize = cJSON_GetArraySize(keywords);
+    for (int32_t keywordIndex = 0; keywordIndex < keywordSize; ++keywordIndex) {
+        auto item = cJSON_GetArrayItem(keywords, keywordIndex);
+        if (!cJSON_IsString(item) || item->valuestring == nullptr) {
+            return false;
+        }
+        std::string keyword(item->valuestring);
+        if (keyword.empty() || keyword.size() > MAX_SEARCH_KEYWORD_UTF8_BYTES) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool IsValidSearchComponentFeature(cJSON* component)
+{
+    auto maxSize = cJSON_GetObjectItem(component, PAGE_SCENE_MAX_SIZE);
+    if (cJSON_IsObject(maxSize)) {
+        auto maxWidth = cJSON_GetObjectItem(maxSize, PAGE_SCENE_RECT_WIDTH);
+        auto maxHeight = cJSON_GetObjectItem(maxSize, PAGE_SCENE_RECT_HEIGHT);
+        if (!cJSON_IsNumber(maxWidth) || !cJSON_IsNumber(maxHeight) ||
+            !IsPositiveFiniteNumber(maxWidth->valuedouble) || !IsPositiveFiniteNumber(maxHeight->valuedouble)) {
+            return false;
+        }
+    }
+    auto maxRatio = cJSON_GetObjectItem(component, PAGE_SCENE_MAX_RATIO);
+    if (maxRatio != nullptr && !cJSON_IsNull(maxRatio)) {
+        if (!cJSON_IsNumber(maxRatio) || !IsPositiveFiniteNumber(maxRatio->valuedouble)) {
+            return false;
+        }
+    }
+    auto autoPlay = cJSON_GetObjectItem(component, PAGE_SCENE_AUTO_PLAY);
+    if (autoPlay != nullptr && !cJSON_IsNull(autoPlay) && !cJSON_IsBool(autoPlay)) {
+        return false;
+    }
+    return true;
+}
+
+bool IsValidSearchComponents(cJSON* ruleJsonValue)
+{
+    auto components = cJSON_GetObjectItem(ruleJsonValue, PAGE_SCENE_COMPONENTS);
+    if (!cJSON_IsArray(components)) {
+        return true;
+    }
+    if (cJSON_GetArraySize(components) > MAX_SEARCH_COMPONENT_TYPES) {
+        return false;
+    }
+    std::set<std::string> componentTypes;
+    auto componentSize = cJSON_GetArraySize(components);
+    for (int32_t componentIndex = 0; componentIndex < componentSize; ++componentIndex) {
+        auto component = cJSON_GetArrayItem(components, componentIndex);
+        if (!cJSON_IsObject(component)) {
+            return false;
+        }
+        auto type = GetJsonString(component, PAGE_SCENE_TYPE);
+        if (!IsValidSearchComponentTypeName(type) || componentTypes.find(type) != componentTypes.end()) {
+            return false;
+        }
+        componentTypes.insert(type);
+        if (!IsValidSearchComponentFeature(component)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool IsValidSearchInspectorIds(cJSON* ruleJsonValue)
+{
+    auto inspectorIds = cJSON_GetObjectItem(ruleJsonValue, PAGE_SCENE_INSPECTOR_IDS);
+    if (!cJSON_IsArray(inspectorIds)) {
+        return true;
+    }
+    auto idSize = cJSON_GetArraySize(inspectorIds);
+    if (idSize > MAX_SEARCH_INSPECTOR_IDS) {
+        return false;
+    }
+    for (int32_t idIndex = 0; idIndex < idSize; ++idIndex) {
+        auto item = cJSON_GetArrayItem(inspectorIds, idIndex);
+        if (!cJSON_IsString(item) || item->valuestring == nullptr ||
+            std::string(item->valuestring).empty()) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool IsValidSearchRuleJson(cJSON* ruleJsonValue)
+{
+    if (!cJSON_IsObject(ruleJsonValue)) {
+        return false;
+    }
+    auto pageType = GetJsonString(ruleJsonValue, PAGE_SCENE_PAGE_TYPE);
+    if (pageType != PAGE_TYPE_NAVIGATION && pageType != PAGE_TYPE_ROUTER) {
+        return false;
+    }
+    auto pageName = GetJsonString(ruleJsonValue, PAGE_SCENE_PAGE_NAME);
+    if (pageName.empty()) {
+        return false;
+    }
+    return IsValidSearchRegions(ruleJsonValue) && IsValidSearchKeywords(ruleJsonValue) &&
+        IsValidSearchComponents(ruleJsonValue) && IsValidSearchInspectorIds(ruleJsonValue);
 }
 } // namespace
 
@@ -458,18 +678,26 @@ void UiSessionManagerOhos::SaveReportProxy(sptr<IRemoteObject> reportProxy, int3
         if (shouldResetPageTranslate) {
             ResetPageTranslate(-1);
         }
+        std::vector<std::string> searchRemovals;
         {
             std::lock_guard<std::mutex> lock(pageSceneMutex_);
-            if (pageSceneRuleSets_.erase(processId) > 0) {
-                ErasePendingPageSceneRulesLocked(processId);
-                pageSceneRuleRegistered_.store(
-                    HasRegisteredPageSceneRuleLocked(PAGE_SCENE_TEXT_EDITOR_SCENE));
-                if (!pageSceneRuleRegistered_.load()) {
-                    pendingPageSceneDetectRules_.clear();
+            pageSceneRuleSets_.erase(processId);
+            auto searchIter = searchPageSceneRuleSets_.find(processId);
+            if (searchIter != searchPageSceneRuleSets_.end()) {
+                for (const auto& [id, ruleSet] : searchIter->second) {
+                    searchRemovals.emplace_back(BuildPageSceneRuleRemoval(id, true, ruleSet.generation));
                 }
             }
+            searchPageSceneRuleSets_.erase(processId);
+            ErasePendingPageSceneRulesLocked(processId);
+            pageSceneRuleRegistered_.store(!searchPageSceneRuleSets_.empty() ||
+                HasRegisteredPageSceneRuleLocked(PAGE_SCENE_TEXT_EDITOR_SCENE));
             pendingPageSceneGets_.erase(processId);
         }
+        for (const auto& removal : searchRemovals) {
+            TriggerPageSceneDetect(processId, removal, false);
+        }
+        TriggerPageSceneDetect(processId, "", false);
         // Clean up Web-side PageScene rules for this process
         WebPageSceneFunction webPageSceneFunc;
         {
@@ -501,19 +729,28 @@ int32_t UiSessionManagerOhos::RegisterWebPageSceneRules(int32_t processId, const
     if (webRet != NO_ERROR) {
         LOGW("RegisterPageSceneRules web-side failed ret=%{public}d, rollback processId=%{public}d",
             webRet, processId);
+        bool hasSearchRules = false;
         {
             std::lock_guard<std::mutex> lock(pageSceneMutex_);
             pageSceneRuleSets_.erase(processId);
             pageSceneRuleRegistered_.store(
-                HasRegisteredPageSceneRuleLocked(PAGE_SCENE_TEXT_EDITOR_SCENE));
+                !searchPageSceneRuleSets_.empty() || HasRegisteredPageSceneRuleLocked(PAGE_SCENE_TEXT_EDITOR_SCENE));
+            hasSearchRules = searchPageSceneRuleSets_.find(processId) != searchPageSceneRuleSets_.end();
         }
-        EraseProcessId("pageScene", processId);
+        if (!hasSearchRules) {
+            EraseProcessId("pageScene", processId);
+        }
     }
     return webRet;
 }
 
 int32_t UiSessionManagerOhos::RegisterPageSceneRules(int32_t processId, const std::string& ruleJson)
 {
+    // Search scene ruleJson (frozen schema) carries no "version" field; the legacy
+    // TEXT_EDITOR ruleJson requires version == 1. Route by presence of "version".
+    if (IsSearchPageSceneRuleJson(ruleJson)) {
+        return RegisterSearchPageSceneRules(processId, ruleJson);
+    }
     sptr<IRemoteObject> reportObject;
     {
         std::shared_lock<std::shared_mutex> reportLock(reportObjectMutex_);
@@ -552,11 +789,210 @@ int32_t UiSessionManagerOhos::RegisterPageSceneRules(int32_t processId, const st
     return NO_ERROR;
 }
 
+bool UiSessionManagerOhos::IsSearchPageSceneRuleJson(const std::string& ruleJson) const
+{
+    const char* parseEnd = nullptr;
+    auto root = cJSON_ParseWithOpts(ruleJson.c_str(), &parseEnd, true);
+    if (!cJSON_IsObject(root)) {
+        cJSON_Delete(root);
+        return false;
+    }
+    auto version = cJSON_GetObjectItem(root, PAGE_SCENE_VERSION);
+    bool isSearch = version == nullptr || cJSON_IsNull(version);
+    cJSON_Delete(root);
+    return isSearch;
+}
+
+std::string UiSessionManagerOhos::ExtractSearchPageSceneRuleSetId(const std::string& ruleJson) const
+{
+    // Full search ruleJson validation per the frozen schema; empty on any violation.
+    const char* parseEnd = nullptr;
+    auto root = cJSON_ParseWithOpts(ruleJson.c_str(), &parseEnd, true);
+    if (!cJSON_IsObject(root)) {
+        cJSON_Delete(root);
+        return "";
+    }
+    auto ruleSetId = GetJsonString(root, PAGE_SCENE_RULE_SET_ID);
+    if (!IsValidPageSceneId(ruleSetId)) {
+        cJSON_Delete(root);
+        return "";
+    }
+    auto rules = cJSON_GetObjectItem(root, PAGE_SCENE_RULES);
+    if (!cJSON_IsArray(rules) || cJSON_GetArraySize(rules) <= 0 ||
+        cJSON_GetArraySize(rules) > MAX_SEARCH_RULES_PER_RULE_SET) {
+        cJSON_Delete(root);
+        return "";
+    }
+    std::set<std::string> ruleIds;
+    auto ruleSize = cJSON_GetArraySize(rules);
+    for (int32_t index = 0; index < ruleSize; ++index) {
+        auto ruleJsonValue = cJSON_GetArrayItem(rules, index);
+        if (!cJSON_IsObject(ruleJsonValue)) {
+            cJSON_Delete(root);
+            return "";
+        }
+        auto ruleId = GetJsonString(ruleJsonValue, PAGE_SCENE_RULE_ID);
+        if (ruleId.empty() || !IsValidPageSceneId(ruleId) || ruleIds.find(ruleId) != ruleIds.end()) {
+            cJSON_Delete(root);
+            return "";
+        }
+        ruleIds.insert(ruleId);
+        if (!IsValidSearchRuleJson(ruleJsonValue)) {
+            cJSON_Delete(root);
+            return "";
+        }
+    }
+    cJSON_Delete(root);
+    return ruleSetId;
+}
+
+int32_t UiSessionManagerOhos::RegisterSearchPageSceneRules(int32_t processId, const std::string& ruleJson)
+{
+    LOGI("RegisterSearchPageSceneRules enter, processId=%{public}d, ruleJson len=%{public}zu", processId,
+        ruleJson.size());
+    sptr<IRemoteObject> reportObject;
+    {
+        std::shared_lock<std::shared_mutex> reportLock(reportObjectMutex_);
+        auto reportIter = reportObjectMap_.find(processId);
+        if (reportIter != reportObjectMap_.end()) {
+            reportObject = reportIter->second;
+        }
+    }
+    if (reportObject == nullptr) {
+        LOGW("RegisterSearchPageSceneRules report object is null, process id:%{public}d", processId);
+        return NOT_CONNECTED;
+    }
+    auto ruleSetId = ExtractSearchPageSceneRuleSetId(ruleJson);
+    if (ruleSetId.empty()) {
+        LOGW("RegisterSearchPageSceneRules invalid rule json, process id:%{public}d", processId);
+        return PARAM_INVALID;
+    }
+    LOGI("RegisterSearchPageSceneRules ruleSetId=%{public}s", ruleSetId.c_str());
+    SearchPageSceneRuleSetInfo ruleSetInfo { ruleSetId, ruleJson, "" };
+    auto result = StoreSearchPageSceneRules(processId, reportObject, ruleSetInfo);
+    if (result != NO_ERROR) {
+        return result;
+    }
+    SaveProcessId("pageScene", processId);
+    LOGI("RegisterSearchPageSceneRules success, ruleSetId=%{public}s, calling TriggerPageSceneDetect",
+        ruleSetId.c_str());
+    TriggerPageSceneDetect(processId, ruleSetInfo.ruleJson, false);
+    return NO_ERROR;
+}
+
+int32_t UiSessionManagerOhos::StoreSearchPageSceneRules(
+    int32_t processId, const sptr<IRemoteObject>& reportObject, SearchPageSceneRuleSetInfo& ruleSetInfo)
+{
+    auto request = InspectorJsonUtil::ParseJsonString(ruleSetInfo.ruleJson);
+    if (!request || !request->IsObject()) {
+        return PARAM_INVALID;
+    }
+    // Do not publish a registration after its report connection has died.
+    std::shared_lock<std::shared_mutex> reportLock(reportObjectMutex_);
+    auto reportIter = reportObjectMap_.find(processId);
+    if (reportIter == reportObjectMap_.end() || reportIter->second != reportObject) {
+        return NOT_CONNECTED;
+    }
+    std::lock_guard<std::mutex> lock(pageSceneMutex_);
+    auto processIter = searchPageSceneRuleSets_.find(processId);
+    if (processIter != searchPageSceneRuleSets_.end()) {
+        if (processIter->second.find(ruleSetInfo.ruleSetId) != processIter->second.end()) {
+            LOGW("RegisterSearchPageSceneRules duplicated ruleSetId=%{public}s, processId=%{public}d",
+                ruleSetInfo.ruleSetId.c_str(), processId);
+            return PARAM_INVALID;
+        }
+        if (static_cast<int32_t>(processIter->second.size()) >= MAX_SEARCH_RULE_SETS_PER_PROCESS) {
+            LOGW("RegisterSearchPageSceneRules exceed max ruleSets, processId=%{public}d", processId);
+            return PARAM_INVALID;
+        }
+    }
+    // Keep the generation with the queued JSON, so a copied detection batch
+    // cannot acquire a newer registration's identity after unregister/register.
+    ruleSetInfo.generation = std::to_string(++nextSearchRuleGeneration_);
+    if (request->Contains("_pageSceneGeneration")) {
+        request->Replace("_pageSceneGeneration", ruleSetInfo.generation.c_str());
+    } else {
+        request->Put("_pageSceneGeneration", ruleSetInfo.generation.c_str());
+    }
+    ruleSetInfo.ruleJson = request->ToString();
+    searchPageSceneRuleSets_[processId][ruleSetInfo.ruleSetId] = ruleSetInfo;
+    pageSceneRuleRegistered_.store(true);
+    return NO_ERROR;
+}
+
+bool UiSessionManagerOhos::IsSearchPageSceneRuleCurrent(
+    int32_t processId, const std::string& ruleSetId, const std::string& generation)
+{
+    if (generation.empty()) {
+        return false;
+    }
+    std::lock_guard<std::mutex> lock(pageSceneMutex_);
+    auto processIter = searchPageSceneRuleSets_.find(processId);
+    if (processIter == searchPageSceneRuleSets_.end()) {
+        return false;
+    }
+    auto ruleIter = processIter->second.find(ruleSetId);
+    return ruleIter != processIter->second.end() && ruleIter->second.generation == generation;
+}
+
+int32_t UiSessionManagerOhos::UnregisterSearchPageSceneRules(int32_t processId, const std::string& ruleSetId)
+{
+    if (ruleSetId.empty()) {
+        return PARAM_INVALID;
+    }
+    bool removed = false;
+    bool hasRemainingRules = false;
+    std::string generation;
+    {
+        std::lock_guard<std::mutex> lock(pageSceneMutex_);
+        auto processIter = searchPageSceneRuleSets_.find(processId);
+        if (processIter != searchPageSceneRuleSets_.end()) {
+            auto setIter = processIter->second.find(ruleSetId);
+            if (setIter != processIter->second.end()) {
+                generation = setIter->second.generation;
+                processIter->second.erase(setIter);
+                if (processIter->second.empty()) {
+                    searchPageSceneRuleSets_.erase(processIter);
+                }
+                removed = true;
+            }
+        }
+        if (removed) {
+            ErasePendingSearchPageSceneRulesLocked(processId, ruleSetId);
+            pageSceneRuleRegistered_.store(!searchPageSceneRuleSets_.empty() ||
+                HasRegisteredPageSceneRuleLocked(PAGE_SCENE_TEXT_EDITOR_SCENE));
+            hasRemainingRules = pageSceneRuleSets_.find(processId) != pageSceneRuleSets_.end() ||
+                searchPageSceneRuleSets_.find(processId) != searchPageSceneRuleSets_.end();
+        }
+    }
+    if (!removed) {
+        return PARAM_INVALID;
+    }
+    if (!hasRemainingRules) {
+        EraseProcessId("pageScene", processId);
+    }
+    // Only remove this registration. A delayed cleanup must not clear a newer
+    // registration of the same id, even when this was the last ruleSet.
+    TriggerPageSceneDetect(processId, BuildPageSceneRuleRemoval(ruleSetId, true, generation), false);
+    return NO_ERROR;
+}
+
 int32_t UiSessionManagerOhos::UnregisterPageSceneRules(int32_t processId, const std::string& ruleSetId)
 {
     if (ruleSetId.empty()) {
         return PARAM_INVALID;
     }
+    bool isSearchRuleSet = false;
+    {
+        std::lock_guard<std::mutex> lock(pageSceneMutex_);
+        auto processIter = searchPageSceneRuleSets_.find(processId);
+        isSearchRuleSet = processIter != searchPageSceneRuleSets_.end() &&
+            processIter->second.find(ruleSetId) != processIter->second.end();
+    }
+    if (isSearchRuleSet) {
+        return UnregisterSearchPageSceneRules(processId, ruleSetId);
+    }
+    bool hasSearchRules = false;
     {
         std::lock_guard<std::mutex> lock(pageSceneMutex_);
         auto iter = pageSceneRuleSets_.find(processId);
@@ -564,16 +1000,21 @@ int32_t UiSessionManagerOhos::UnregisterPageSceneRules(int32_t processId, const 
             return PARAM_INVALID;
         }
         pageSceneRuleSets_.erase(iter);
-        ErasePendingPageSceneRulesLocked(processId);
+        ErasePendingLegacyPageSceneRulesLocked(processId);
         pageSceneRuleRegistered_.store(
-            HasRegisteredPageSceneRuleLocked(PAGE_SCENE_TEXT_EDITOR_SCENE));
+            !searchPageSceneRuleSets_.empty() || HasRegisteredPageSceneRuleLocked(PAGE_SCENE_TEXT_EDITOR_SCENE));
         if (!pageSceneRuleRegistered_.load()) {
             pendingPageSceneDetectRules_.clear();
         }
         pendingPageSceneGets_.erase(processId);
+        hasSearchRules = searchPageSceneRuleSets_.find(processId) != searchPageSceneRuleSets_.end();
     }
-    EraseProcessId("pageScene", processId);
-    TriggerPageSceneDetect(processId, "", false);
+    if (hasSearchRules) {
+        TriggerPageSceneDetect(processId, BuildPageSceneRuleRemoval(ruleSetId, false), false);
+    } else {
+        EraseProcessId("pageScene", processId);
+        TriggerPageSceneDetect(processId, "", false);
+    }
     // Web side: unregister rules via callback (decoupled from singleton)
     WebPageSceneFunction webPageSceneFunc;
     {
@@ -602,6 +1043,19 @@ int32_t UiSessionManagerOhos::ExtractRuleJsonAndWebEnabled(int32_t processId,
             ruleJson = ruleJsons.front();
         }
     } else {
+        // Look up search rule sets by ruleSetId (searchPageSceneRuleSets_:
+        // pid -> ruleSetId -> SearchPageSceneRuleSetInfo)
+        auto searchIter = searchPageSceneRuleSets_.find(processId);
+        if (searchIter != searchPageSceneRuleSets_.end()) {
+            auto setIter = searchIter->second.find(ruleJsonOrRuleSetId);
+            if (setIter != searchIter->second.end()) {
+                // Search rules use ArkUI detection and do not use the legacy Web rule schema.
+                webEnabled = false;
+                ruleJson = setIter->second.ruleJson;
+                pendingPageSceneGets_.insert(processId);
+                return NO_ERROR;
+            }
+        }
         auto ruleSetInfo = ExtractPageSceneRuleSetInfo(ruleJsonOrRuleSetId);
         webEnabled = ruleSetInfo.webEnabled;
         auto ruleJsons = GetPageSceneRuleJsons(ruleSetInfo, PAGE_SCENE_TEXT_EDITOR_SCENE, false, "");
@@ -661,6 +1115,8 @@ bool UiSessionManagerOhos::GetPageSceneRulesRegistered()
 
 void UiSessionManagerOhos::ReportPageSceneEvent(int32_t processId, const std::string& sceneJson, bool isGetResult)
 {
+    LOGI("ReportPageSceneEvent enter, processId=%{public}d, sceneJson len=%{public}zu, isGetResult=%{public}d",
+        processId, sceneJson.size(), isGetResult);
     sptr<IRemoteObject> reportObject;
     {
         std::shared_lock<std::shared_mutex> reportLock(reportObjectMutex_);
@@ -672,6 +1128,7 @@ void UiSessionManagerOhos::ReportPageSceneEvent(int32_t processId, const std::st
     auto reportService = iface_cast<ReportService>(reportObject);
     if (reportService != nullptr) {
         reportService->ReportPageSceneEvent(sceneJson, isGetResult);
+        LOGI("ReportPageSceneEvent sent success, processId=%{public}d", processId);
     } else {
         LOGW("ReportPageSceneEvent failed, process id:%{public}d", processId);
     }
@@ -735,6 +1192,11 @@ void UiSessionManagerOhos::NotifyPageSceneContentChanged()
             pendingPageSceneDetectRules_.emplace(pid, ruleJson);
         }
     }
+    for (const auto& [pid, ruleSets] : searchPageSceneRuleSets_) {
+        for (const auto& [ruleSetId, ruleSetInfo] : ruleSets) {
+            pendingSearchPageSceneDetectRules_.emplace(pid, ruleSetInfo.ruleJson);
+        }
+    }
 }
 
 void UiSessionManagerOhos::FlushPageSceneNodeChanged()
@@ -742,15 +1204,23 @@ void UiSessionManagerOhos::FlushPageSceneNodeChanged()
     std::vector<std::pair<int32_t, std::string>> ruleJsons;
     {
         std::lock_guard<std::mutex> lock(pageSceneMutex_);
-        if (pendingPageSceneDetectRules_.empty()) {
+        if (pendingPageSceneDetectRules_.empty() && pendingSearchPageSceneDetectRules_.empty()) {
             return;
         }
         ruleJsons.assign(pendingPageSceneDetectRules_.begin(), pendingPageSceneDetectRules_.end());
         pendingPageSceneDetectRules_.clear();
+        ruleJsons.insert(ruleJsons.end(),
+            pendingSearchPageSceneDetectRules_.begin(), pendingSearchPageSceneDetectRules_.end());
+        pendingSearchPageSceneDetectRules_.clear();
     }
     for (const auto& [pid, ruleJson] : ruleJsons) {
         TriggerPageSceneDetect(pid, ruleJson, false);
     }
+}
+
+void UiSessionManagerOhos::FlushPendingSearchClicksIfStable()
+{
+    UiSessionManager::FlushPendingSearchClicksIfStable();
 }
 
 void UiSessionManagerOhos::SavePageSceneDetectFunction(PageSceneDetectFunction&& function)
@@ -764,6 +1234,37 @@ void UiSessionManagerOhos::ErasePendingPageSceneRulesLocked(int32_t processId)
     for (auto iter = pendingPageSceneDetectRules_.begin(); iter != pendingPageSceneDetectRules_.end();) {
         if (iter->first == processId) {
             iter = pendingPageSceneDetectRules_.erase(iter);
+        } else {
+            ++iter;
+        }
+    }
+    for (auto iter = pendingSearchPageSceneDetectRules_.begin(); iter != pendingSearchPageSceneDetectRules_.end();) {
+        if (iter->first == processId) {
+            iter = pendingSearchPageSceneDetectRules_.erase(iter);
+        } else {
+            ++iter;
+        }
+    }
+}
+
+void UiSessionManagerOhos::ErasePendingLegacyPageSceneRulesLocked(int32_t processId)
+{
+    for (auto iter = pendingPageSceneDetectRules_.begin(); iter != pendingPageSceneDetectRules_.end();) {
+        if (iter->first == processId) {
+            iter = pendingPageSceneDetectRules_.erase(iter);
+        } else {
+            ++iter;
+        }
+    }
+}
+
+void UiSessionManagerOhos::ErasePendingSearchPageSceneRulesLocked(
+    int32_t processId, const std::string& ruleSetId)
+{
+    for (auto iter = pendingSearchPageSceneDetectRules_.begin();
+         iter != pendingSearchPageSceneDetectRules_.end();) {
+        if (iter->first == processId && ExtractSearchPageSceneRuleSetId(iter->second) == ruleSetId) {
+            iter = pendingSearchPageSceneDetectRules_.erase(iter);
         } else {
             ++iter;
         }
@@ -784,6 +1285,8 @@ void UiSessionManagerOhos::TriggerPageSceneDetect(int32_t processId, const std::
         }
         return;
     }
+    LOGD("TriggerPageSceneDetect calling function, processId=%{public}d, ruleJson len=%{public}zu, "
+         "isGetResult=%{public}d", processId, ruleJson.size(), isGetResult);
     pageSceneDetectFunction(processId, ruleJson, isGetResult);
 }
 
@@ -2126,6 +2629,70 @@ void UiSessionManagerOhos::SendWebInfoByRequest(uint32_t windowId, int32_t webId
         } else {
             LOGW("Send WebInfo By Request failed, process id:%{public}d", pid);
         }
+    }
+    processIter->second.clear();
+}
+
+void UiSessionManagerOhos::SaveComponentTreeQueryFunction(ComponentTreeQueryFunction&& function)
+{
+    std::lock_guard<std::mutex> lock(componentTreeQueryFunctionMutex_);
+    componentTreeQueryFunction_ = std::move(function);
+}
+
+void UiSessionManagerOhos::ComponentTreeQuery(const ComponentTreeQueryRequest& request)
+{
+    ComponentTreeQueryFunction componentTreeQueryFunction;
+    {
+        std::lock_guard<std::mutex> lock(componentTreeQueryFunctionMutex_);
+        componentTreeQueryFunction = componentTreeQueryFunction_;
+    }
+    if (componentTreeQueryFunction) {
+        componentTreeQueryFunction(request);
+    } else {
+        LOGW("ComponentTreeQuery function not registered");
+    }
+}
+
+void UiSessionManagerOhos::ReportNavigationQueryResult(const std::string& data)
+{
+    std::shared_lock<std::shared_mutex> reportLock(reportObjectMutex_);
+    std::unique_lock<std::shared_mutex> processMapLock(processMapMutex_);
+    auto processIter = processMap_.find("componentTreeQuery");
+    if (processIter == processMap_.end() || processIter->second.empty()) {
+        LOGW("ReportNavigationQueryResult no report proxy");
+        return;
+    }
+    for (const auto& pid : processIter->second) {
+        auto reportIter = reportObjectMap_.find(pid);
+        auto reportService =
+            (reportIter != reportObjectMap_.end()) ? iface_cast<ReportService>(reportIter->second) : nullptr;
+        if (reportService == nullptr) {
+            LOGW("Report NavigationQueryResult failed, process id:%{public}d", pid);
+            continue;
+        }
+        reportService->ReportNavigationQueryResult(data);
+    }
+    processIter->second.clear();
+}
+
+void UiSessionManagerOhos::ReportLazyForEachQueryResult(const std::string& data)
+{
+    std::shared_lock<std::shared_mutex> reportLock(reportObjectMutex_);
+    std::unique_lock<std::shared_mutex> processMapLock(processMapMutex_);
+    auto processIter = processMap_.find("lazyForEachQuery");
+    if (processIter == processMap_.end() || processIter->second.empty()) {
+        LOGW("ReportLazyForEachQueryResult no report proxy");
+        return;
+    }
+    for (const auto& pid : processIter->second) {
+        auto reportIter = reportObjectMap_.find(pid);
+        auto reportService =
+            (reportIter != reportObjectMap_.end()) ? iface_cast<ReportService>(reportIter->second) : nullptr;
+        if (reportService == nullptr) {
+            LOGW("Report LazyForEachQueryResult failed, process id:%{public}d", pid);
+            continue;
+        }
+        reportService->ReportLazyForEachQueryResult(data);
     }
     processIter->second.clear();
 }

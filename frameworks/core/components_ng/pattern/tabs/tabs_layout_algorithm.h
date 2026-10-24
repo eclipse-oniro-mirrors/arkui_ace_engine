@@ -95,6 +95,16 @@ public:
         lastFloatingBar_ = lastFloatingBar;
     }
 
+    void SetIsFloatingTopBar(bool isFloatingTopBar)
+    {
+        isFloatingTopBar_ = isFloatingTopBar;
+    }
+
+    void SetLastFloatingTopBar(bool lastFloatingTopBar)
+    {
+        lastFloatingTopBar_ = lastFloatingTopBar;
+    }
+
     void SetBarDisplayMode(std::optional<TabBarDisplayMode> mode)
     {
         currentBarDisplayMode_ = mode;
@@ -116,8 +126,10 @@ private:
     void MeasureBackgroundMask(LayoutWrapper* layoutWrapper, const SizeF& idealSize, const SizeF& tabBarSize);
     SizeF MeasureTabBar(LayoutWrapper* layoutWrapper, LayoutConstraintF childLayoutConstraint);
     std::optional<float> CalcFloatingBarWidth(LayoutWrapper* layoutWrapper, float barHeight);
+    float CalcTopBarGridMaxWidth(float tabWidth, float barSideMargin);
     std::optional<float> ParseBarWidthAndMargin(LayoutWrapper* layoutWrapper, float tabsWidth, float tabsHeight);
     void UpdateBarMargin(LayoutWrapper* layoutWrapper, OffsetF& barOffset) const;
+    void UpdateTopBarMargin(LayoutWrapper* layoutWrapper, OffsetF& barOffset) const;
     void LayoutBackgroundMask(LayoutWrapper* layoutWrapper);
 
     void UpdateSideBarAndSideBarDividerVisibility(LayoutWrapper* layoutWrapper, bool isVisible);
@@ -156,7 +168,10 @@ private:
     ItemIndex itemIndex_;
     bool isFloatingBar_ = false;
     bool lastFloatingBar_ = false;
+    bool isFloatingTopBar_ = false;
+    bool lastFloatingTopBar_ = false;
     std::optional<float> floatingBarMargin_;
+    std::optional<float> floatingTopBarMargin_;
     std::optional<TabBarDisplayMode> currentBarDisplayMode_;
     // True only during the animation-start Measure/Layout pass (fromMode layout that also
     // measures+layouts the entering component). Reset after Layout; the re-entrant layout

@@ -12,10 +12,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include "core/components_ng/base/ui_tree_collector.h"
 #include "core/components_ng/base/ui_node.h"
 
 #include <optional>
 #include <queue>
+#include <vector>
 
 #include "base/log/ace_performance_check.h"
 #include "base/log/ace_checker.h"
@@ -41,6 +43,21 @@
 #include "interfaces/inner_api/ace_kit/include/json/json_util.h"
 #include "ui/base/versions.h"
 
+#include <algorithm>
+#include <atomic>
+#include <cstdlib>
+#include <cstring>
+#include <new>
+#include "base/json/json_util_internal.h"
+#include "core/common/container.h"
+#include "core/common/container_scope.h"
+#include "core/components_ng/event/event_hub.h"
+#include "core/components_ng/event/gesture_event_hub.h"
+#include "core/components_ng/event/input_event_hub.h"
+#include "core/components_ng/property/accessibility_property.h"
+#include "core/components_v2/inspector/inspector_constants.h"
+#include "core/interfaces/native/node/ui_tree_api.h"
+
 namespace OHOS::Ace::NG {
 
 struct UINode::RectCullingState {
@@ -50,6 +67,31 @@ struct UINode::RectCullingState {
 };
 
 namespace {
+struct DumpChild {
+    RefPtr<UINode> node;
+    const char* description;
+};
+
+// Preserve the ordinary/disappearing/auxiliary order shared by full dumps and
+// targeted lookup. Cache nodes, overlay and corner marks keep their existing
+// caller-specific traversal rules.
+std::vector<DumpChild> CollectDumpChildren(UINode* node,
+    const std::list<std::tuple<RefPtr<UINode>, uint32_t, int32_t>>& disappearingChildren)
+{
+    std::vector<DumpChild> children;
+    for (const auto& child : node->GetChildren()) {
+        children.push_back({ child, child->GetParent().GetRawPtr() != node ? "BrokenChildren" : "Children" });
+    }
+    for (const auto& [child, index, branch] : disappearingChildren) {
+        children.push_back({ child, "DisappearingChildren" });
+    }
+    auto frameNode = AceType::DynamicCast<FrameNode>(node);
+    if (frameNode && frameNode->GetSafeAreaInsetNode()) {
+        children.push_back({ frameNode->GetSafeAreaInsetNode(), "SafeAreaInsetNode" });
+    }
+    return children;
+}
+
 double GetNodeOpacityValue(const RefPtr<UINode>& node)
 {
     auto frameNode = AceType::DynamicCast<FrameNode>(node);
@@ -1455,11 +1497,8 @@ void UINode::DumpTree(int32_t depth, bool hasJson, const std::string& desc)
             item->DumpTree(depth + 1, hasJson, "ChildrenForInspector");
         }
     }
-    for (const auto& item : GetChildren()) {
-        item->DumpTree(depth + 1, hasJson, item->GetParent() != Claim(this) ? "BrokenChildren" : "Children");
-    }
-    for (const auto& [item, index, branch] : disappearingChildren_) {
-        item->DumpTree(depth + 1, hasJson, "DisappearingChildren");
+    for (const auto& child : CollectDumpChildren(this, disappearingChildren_)) {
+        child.node->DumpTree(depth + 1, hasJson, child.description);
     }
     auto frameNode = AceType::DynamicCast<FrameNode>(this);
     if (frameNode && frameNode->GetOverlayNode()) {
@@ -1485,13 +1524,8 @@ bool UINode::DumpTreeByComponentName(const std::string& name)
             return true;
         }
     }
-    for (const auto& item : GetChildren()) {
-        if (item->DumpTreeByComponentName(name)) {
-            return true;
-        }
-    }
-    for (const auto& [item, index, branch] : disappearingChildren_) {
-        if (item->DumpTreeByComponentName(name)) {
+    for (const auto& child : CollectDumpChildren(this, disappearingChildren_)) {
+        if (child.node->DumpTreeByComponentName(name)) {
             return true;
         }
     }
@@ -1537,11 +1571,21 @@ void UINode::DumpSimplifyTreeBase(std::shared_ptr<JsonValue>& current)
     }
 }
 
+bool IsHostOnlyNode(const UINode& node, const ParamConfig& config)
+{
+    if (!config.collectionState) {
+        return false;
+    }
+    const auto& tag = node.GetTag();
+    return tag == V2::WEB_ETS_TAG || tag == V2::UI_EXTENSION_COMPONENT_ETS_TAG ||
+           tag == V2::UI_EXTENSION_COMPONENT_TAG || tag == V2::UI_EXTENSION_SURFACE_TAG ||
+           tag == V2::XCOMPONENT_ETS_TAG || tag == V2::XCOMPONENT_TAG;
+}
+
 void UINode::DumpSimplifyTreeNode(std::shared_ptr<JsonValue>& current, ParamConfig config)
 {
     DumpSimplifyTreeBase(current);
-    DumpSimplifyInfo(current);
-    DumpSimplifyInfoOnlyForParamConfig(current, config);
+    DumpSimplifyInfoWithParamConfig(current, config);
 }
 
 void UINode::DumpSimplifyInfoWithParamConfig(std::shared_ptr<JsonValue>& current, ParamConfig config)
@@ -1646,10 +1690,14 @@ void UINode::DumpSimplifyTreeWithParamConfigInner(int32_t depth, std::shared_ptr
     bool onlyNeedVisible, ParamConfig config, std::function<std::pair<bool, bool>(const RefPtr<UINode>&)> dumpChecker,
     double parentFinalOpacity, const RectCullingState& rectCullingState)
 {
+    if (config.collectionState && config.collectionState->GetError()) {
+        return;
+    }
     auto [needDump, justDumpSubTree] = dumpChecker(Claim(this));
     CHECK_EQUAL_VOID(needDump, false);
 
-    if (onlyNeedVisible && !IsVisibleAndActive()) {
+    if (ShouldPruneNode(Claim(this), onlyNeedVisible, config) ||
+        (!config.IsPublicTree() && onlyNeedVisible && !IsVisibleAndActive())) {
         return;
     }
     auto currentFinalOpacity = parentFinalOpacity;
@@ -1669,8 +1717,8 @@ void UINode::DumpSimplifyTreeWithParamConfigInner(int32_t depth, std::shared_ptr
     if (GetTag() == V2::JS_LAZY_FOR_EACH_ETS_TAG || GetTag() == V2::JS_REPEAT_ETS_TAG) {
         cacheChildren = GetChildrenForInspector(true);
     }
-    bool hasChildren =
-        !nodeChildren.empty() || !disappearingChildren_.empty() || (config.cacheNodes && !cacheChildren.empty());
+    bool hasChildren = !IsHostOnlyNode(*this, config) &&
+        (!nodeChildren.empty() || !disappearingChildren_.empty() || (config.cacheNodes && !cacheChildren.empty()));
     if (IsCulledByRect(rectCullingState, hasChildren)) {
         return;
     }
@@ -1697,11 +1745,16 @@ void UINode::DumpSimplifyTreeWithParamConfigInner(int32_t depth, std::shared_ptr
                 auto child = JsonUtil::CreateSharedPtrJson();
                 item->DumpSimplifyTreeWithParamConfigInner(
                     childDepth, child, false, config, dumpChecker, currentFinalOpacity, childRectCullingState);
+                if (config.collectionState && config.collectionState->GetError()) {
+                    return;
+                }
                 if (!child->Contains("$type")) {
                     continue;
                 }
-                array->PutRef(std::move(child));
-                hasDumpedChildren = true;
+                hasDumpedChildren = AppendTreeChild(*array, std::move(child), item, config) || hasDumpedChildren;
+                if (config.collectionState && config.collectionState->GetError()) {
+                    return;
+                }
             }
         } else {
             for (const auto& item : nodeChildren) {
@@ -1718,11 +1771,16 @@ void UINode::DumpSimplifyTreeWithParamConfigInner(int32_t depth, std::shared_ptr
                 auto child = JsonUtil::CreateSharedPtrJson();
                 item->DumpSimplifyTreeWithParamConfigInner(childDepth, child, onlyNeedVisible, config, dumpChecker,
                     currentFinalOpacity, childRectCullingState);
+                if (config.collectionState && config.collectionState->GetError()) {
+                    return;
+                }
                 if (!child->Contains("$type")) {
                     continue;
                 }
-                array->PutRef(std::move(child));
-                hasDumpedChildren = true;
+                hasDumpedChildren = AppendTreeChild(*array, std::move(child), item, config) || hasDumpedChildren;
+                if (config.collectionState && config.collectionState->GetError()) {
+                    return;
+                }
             }
         }
         for (const auto& [item, index, branch] : disappearingChildren_) {
@@ -1739,21 +1797,34 @@ void UINode::DumpSimplifyTreeWithParamConfigInner(int32_t depth, std::shared_ptr
             auto child = JsonUtil::CreateSharedPtrJson();
             item->DumpSimplifyTreeWithParamConfigInner(childDepth, child, onlyNeedVisible, config, dumpChecker,
                 currentFinalOpacity, childRectCullingState);
+            if (config.collectionState && config.collectionState->GetError()) {
+                return;
+            }
             if (!child->Contains("$type")) {
                 continue;
             }
-            array->PutRef(std::move(child));
-            hasDumpedChildren = true;
+            hasDumpedChildren = AppendTreeChild(*array, std::move(child), item, config) || hasDumpedChildren;
+            if (config.collectionState && config.collectionState->GetError()) {
+                return;
+            }
         }
     }
     if (IsCulledByRect(rectCullingState, hasDumpedChildren)) {
         return;
     }
 
+    RecordTreeNode(Claim(this), config);
+    if (config.collectionState && config.collectionState->GetError()) {
+        return;
+    }
     DumpSimplifyTreeBase(current);
     DumpSimplifyInfoWithParamConfig(current, config);
     if (hasChildren) {
-        current->PutRef("$children", std::move(array));
+        TreeCheck(current->PutRef("$children", std::move(array)), config.collectionState);
+    }
+    if (config.collectionState &&
+        (config.collectionState->traversalRoot == this || !IsPureLayoutNode(Claim(this), config))) {
+        RecordTreeNodeBytes(*current, config);
     }
 }
 
@@ -1761,6 +1832,12 @@ void UINode::DumpSimplifyTreeWithParamConfig(int32_t depth, std::shared_ptr<Json
     ParamConfig config, std::function<std::pair<bool, bool>(const RefPtr<UINode>&)> dumpChecker,
     double parentFinalOpacity)
 {
+    if (config.collectionState && config.collectionState->GetError()) {
+        return;
+    }
+    if (config.collectionState) {
+        config.dumpMode = TreeDumpMode::PUBLIC_TREE;
+    }
     if (!dumpChecker) {
         dumpChecker = [](const RefPtr<UINode>&) { return std::make_pair(true, false); };
     }
@@ -1770,8 +1847,15 @@ void UINode::DumpSimplifyTreeWithParamConfig(int32_t depth, std::shared_ptr<Json
         config.rectCulling = false;
     }
     auto rectCullingState = CreateRectCullingState(onlyNeedVisible, config);
+    auto* previousRoot = config.collectionState ? config.collectionState->traversalRoot : nullptr;
+    if (config.collectionState) {
+        config.collectionState->traversalRoot = this;
+    }
     DumpSimplifyTreeWithParamConfigInner(
         depth, current, onlyNeedVisible, config, dumpChecker, parentFinalOpacity, rectCullingState);
+    if (config.collectionState) {
+        config.collectionState->traversalRoot = previousRoot;
+    }
 }
 #endif
 
@@ -1830,13 +1914,8 @@ bool UINode::DumpTreeById(int32_t depth, const std::string& id, bool hasJson)
             return true;
         }
     }
-    for (const auto& item : GetChildren()) {
-        if (item->DumpTreeById(depth + 1, id, hasJson)) {
-            return true;
-        }
-    }
-    for (const auto& [item, index, branch] : disappearingChildren_) {
-        if (item->DumpTreeById(depth + 1, id, hasJson)) {
+    for (const auto& child : CollectDumpChildren(this, disappearingChildren_)) {
+        if (child.node->DumpTreeById(depth + 1, id, hasJson)) {
             return true;
         }
     }
@@ -3351,4 +3430,473 @@ RefPtr<UINode> UINode::GetFirstChild() const
     }
     return children_.front();
 }
+namespace {
+constexpr uint32_t MAX_TREE_BYTES = 5 * 1024 * 1024;
+constexpr uint32_t MAX_TREE_NODES = 5000;
+constexpr int32_t TREE_SCHEMA_VERSION = 1;
+std::atomic<uint64_t> nextRequestId { 0 };
+
+bool ValidOptions(const ArkUITreeOptions& options)
+{
+    return (options.treeType == OH_ARKUI_NATIVE_MODULE_UI_AGENT_TREE_FULL ||
+               options.treeType == OH_ARKUI_NATIVE_MODULE_UI_AGENT_TREE_VISIBLE) &&
+           (options.format == OH_ARKUI_NATIVE_MODULE_UI_JSON_COMPACT ||
+               options.format == OH_ARKUI_NATIVE_MODULE_UI_JSON_PRETTY);
+}
+
+int32_t ResolvePipeline(int32_t instanceId, RefPtr<PipelineContext>& pipeline)
+{
+    auto container = Container::GetContainer(instanceId);
+    if (!container || container->GetInstanceId() != instanceId) {
+        return ARKUI_ERROR_CODE_UI_CONTEXT_INVALID;
+    }
+    pipeline = AceType::DynamicCast<PipelineContext>(container->GetPipelineContext());
+    if (!pipeline) {
+        return ARKUI_ERROR_CODE_UI_CONTEXT_INVALID;
+    }
+    auto executor = pipeline->GetTaskExecutor();
+    if (!executor) {
+        return ARKUI_ERROR_CODE_UI_CONTEXT_INVALID;
+    }
+    if (!executor->WillRunOnCurrentThread(TaskExecutor::TaskType::UI)) {
+        return ARKUI_ERROR_CODE_NODE_ON_INVALID_THREAD;
+    }
+    return (pipeline->IsDestroyed() || pipeline->GetUITreeRequestState().closing) ? ARKUI_ERROR_CODE_UI_CONTEXT_INVALID
+                                                                                  : ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+int32_t CheckTreeNodeCount(const JsonValue& root)
+{
+    // Keep nothrow allocation to report array allocation failure as ARKUI_ERROR_CODE_RESOURCE_EXHAUSTED.
+    // std::make_unique throws instead of returning null, and exception handling is disabled in this build.
+    auto stack =
+        std::unique_ptr<std::unique_ptr<JsonValue>[]>(new (std::nothrow) std::unique_ptr<JsonValue>[MAX_TREE_NODES]);
+    if (!stack) {
+        return ARKUI_ERROR_CODE_RESOURCE_EXHAUSTED;
+    }
+    if (!root.Contains("$type")) {
+        return ARKUI_ERROR_CODE_NO_ERROR;
+    }
+    uint32_t count = 1;
+    uint32_t depth = 0;
+    auto children = root.GetValue("$children");
+    if (children && children->IsArray()) {
+        stack[depth++] = children->GetChild();
+    }
+    while (depth) {
+        auto& next = stack[depth - 1];
+        if (!next || !next->IsValid()) {
+            --depth;
+            continue;
+        }
+        auto node = std::move(next);
+        next = node->GetNext();
+        if (!node->Contains("$type")) {
+            continue;
+        }
+        if (++count > MAX_TREE_NODES) {
+            return ARKUI_ERROR_CODE_RESULT_TOO_LARGE;
+        }
+        auto descendants = node->GetValue("$children");
+        if (descendants && descendants->IsArray()) {
+            stack[depth++] = descendants->GetChild();
+        }
+    }
+    return ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+void CompleteTreeRequest(const RefPtr<PipelineContext>& pipeline, uint64_t sequence, int32_t code,
+    const char* data = nullptr, uint32_t size = 0)
+{
+    auto& state = pipeline->GetUITreeRequestState();
+    if (!state.pending || state.sequence != sequence) {
+        return;
+    }
+    auto deliver = std::move(state.deliver);
+    auto requestId = state.requestId;
+    state.pending = false;
+    state.deliver = nullptr;
+    deliver(requestId, code, data, size);
+}
+void InitializeTreeRequest(
+    UITreeRequestState& state, const ArkUITreeOptions& options, const ArkUITreeCompletion& completion)
+{
+    state.treeType = options.treeType;
+    state.format = options.format;
+    state.filterPureLayout = options.filterPureLayout;
+    state.interaction = options.interaction;
+    state.accessibility = options.accessibility;
+    state.visual = options.visual;
+    state.functional = options.functional;
+    state.deliver = [completion](uint64_t requestId, int32_t result, const char* data, uint32_t size) {
+        ArkUITreeCompletion copy = completion;
+        copy.deliver(copy, requestId, result, data, size);
+    };
+    state.requestId = ++nextRequestId;
+    ++state.sequence;
+    state.pending = true;
+}
+
+ArkUITreeOptions GetPendingTreeOptions(const UITreeRequestState& pending)
+{
+    ArkUITreeOptions options;
+    options.treeType = pending.treeType;
+    options.format = pending.format;
+    options.filterPureLayout = pending.filterPureLayout;
+    options.interaction = pending.interaction;
+    options.accessibility = pending.accessibility;
+    options.visual = pending.visual;
+    options.functional = pending.functional;
+    return options;
+}
+
+void ExecuteTreeRequest(const WeakPtr<PipelineContext>& weak, int32_t instanceId, uint64_t sequence)
+{
+    auto owner = weak.Upgrade();
+    if (!owner) {
+        return;
+    }
+    ContainerScope containerScope(instanceId);
+    auto& pending = owner->GetUITreeRequestState();
+    if (!pending.pending || pending.sequence != sequence) {
+        return;
+    }
+    auto container = Container::GetContainer(instanceId);
+    auto current = container ? AceType::DynamicCast<PipelineContext>(container->GetPipelineContext()) : nullptr;
+    if (current != owner || owner->IsDestroyed() || pending.closing) {
+        CompleteTreeRequest(owner, sequence, ARKUI_ERROR_CODE_UI_CONTEXT_INVALID);
+        return;
+    }
+    auto options = GetPendingTreeOptions(pending);
+    char* data = nullptr;
+    uint32_t size = 0;
+    auto result = CollectUITree(instanceId, &options, &data, &size);
+    CompleteTreeRequest(owner, sequence, result, data, size);
+    std::free(data);
+}
+
+ParamConfig CreateTreeConfig(const ArkUITreeOptions& options, TreeCollectionState& state)
+{
+    ParamConfig config;
+    config.interactionInfo = options.interaction;
+    config.accessibilityInfo = options.accessibility;
+    // FULL includes cached children; VISIBLE only traverses children in the current tree.
+    config.cacheNodes = options.treeType == OH_ARKUI_NATIVE_MODULE_UI_AGENT_TREE_FULL;
+    // Cull nodes outside the viewport/ancestor clip only for VISIBLE; FULL retains offscreen nodes.
+    config.rectCulling = !config.cacheNodes;
+    config.withWeb = false;
+    config.withUIExtension = false;
+    config.filterPureLayout = options.filterPureLayout;
+    config.visualProperties = options.visual;
+    config.functionalProperties = options.functional;
+    config.collectionState = &state;
+    config.dumpMode = TreeDumpMode::PUBLIC_TREE;
+    return config;
+}
+
+} // namespace
+
+void TreeCheck(bool success, TreeCollectionState* state)
+{
+    if (!success && state) {
+        state->Fail(ARKUI_ERROR_CODE_RESOURCE_EXHAUSTED);
+    }
+}
+
+bool ShouldPruneNode(
+    const RefPtr<UINode>& node, bool visible, const ParamConfig& config, const TreeNodeVisibility* parent)
+{
+    if (!config.collectionState || !visible || !node) {
+        return false;
+    }
+    auto& snapshots = config.collectionState->visibility;
+    if (auto found = snapshots.find(AceType::RawPtr(node)); found != snapshots.end()) {
+        return found->second.pruned;
+    }
+    auto collect = [&snapshots](const RefPtr<UINode>& current, bool ancestorPruned) {
+        TreeNodeVisibility snapshot;
+        snapshot.pruned = ancestorPruned || !current->IsVisibleAndActive();
+        if (!snapshot.pruned) {
+            auto frame = AceType::DynamicCast<FrameNode>(current);
+            auto render = frame ? frame->GetRenderContext() : nullptr;
+            if (render) {
+                snapshot.opacity = render->GetOpacity();
+                // Preserve actual zero values without underflow from multiplying positive opacities.
+                snapshot.pruned = snapshot.opacity.value_or(1.0) == 0.0;
+            }
+        }
+        return snapshots.emplace(AceType::RawPtr(current), snapshot).first->second.pruned;
+    };
+    if (parent) {
+        return collect(node, parent->pruned);
+    }
+
+    // Special starting points share the already resolved ancestor path within this request.
+    std::vector<RefPtr<UINode>> path;
+    bool ancestorPruned = false;
+    for (auto ancestor = node; ancestor; ancestor = ancestor->GetParent()) {
+        auto found = snapshots.find(AceType::RawPtr(ancestor));
+        if (found != snapshots.end()) {
+            ancestorPruned = found->second.pruned;
+            break;
+        }
+        path.push_back(ancestor);
+    }
+    for (auto it = path.rbegin(); it != path.rend(); ++it) {
+        ancestorPruned = collect(*it, ancestorPruned);
+    }
+    return ancestorPruned;
+}
+
+void RecordTreeNode(const RefPtr<UINode>& node, const ParamConfig& config)
+{
+    auto* state = config.collectionState;
+    if (!state) {
+        return;
+    }
+    if ((state->traversalRoot == node.GetRawPtr() || !IsPureLayoutNode(node, config)) &&
+        ++state->nodes > MAX_TREE_NODES) {
+        state->Fail(ARKUI_ERROR_CODE_RESULT_TOO_LARGE);
+    }
+}
+
+namespace {
+size_t RemainingTreeBytes(TreeCollectionState& state)
+{
+    // The envelope's treeInfo value is counted separately. Keep this literal in sync with its version.
+    static_assert(TREE_SCHEMA_VERSION == 1);
+    constexpr size_t ENVELOPE_BYTES = sizeof("{\"schemaVersion\":1,\"treeInfo\":}") - 1;
+    if (state.compactBytes == 0) {
+        state.compactBytes = ENVELOPE_BYTES;
+    }
+    return MAX_TREE_BYTES - state.compactBytes;
+}
+} // namespace
+
+void RecordTreeNodeBytes(const JsonValue& value, const ParamConfig& config, bool countNode)
+{
+    auto* state = config.collectionState;
+    if (!state || state->GetError()) {
+        return;
+    }
+    if (countNode && ++state->nodes > MAX_TREE_NODES) {
+        state->Fail(ARKUI_ERROR_CODE_RESULT_TOO_LARGE);
+        return;
+    }
+    size_t bytes = 0;
+    // Descendant values were counted when dumped; only their array separators belong to this node.
+    auto result = MeasureCompactJson(value, RemainingTreeBytes(*state), bytes, "$children");
+    if (result == JsonWriteResult::SUCCESS) {
+        state->compactBytes += bytes;
+    } else {
+        state->Fail(result == JsonWriteResult::TOO_LARGE ?
+            ARKUI_ERROR_CODE_RESULT_TOO_LARGE : ARKUI_ERROR_CODE_INTERNAL_ERROR);
+    }
+}
+
+void RecordTreeChildInsertion(const JsonValue& parent, const ParamConfig& config)
+{
+    auto* state = config.collectionState;
+    if (!state || state->GetError()) {
+        return;
+    }
+    constexpr size_t CHILDREN_FIELD_BYTES = sizeof(",\"$children\":[]") - 1;
+    size_t bytes = CHILDREN_FIELD_BYTES;
+    if (parent.Contains("$children")) {
+        auto children = parent.GetValue("$children");
+        auto first = children->GetChild();
+        bytes = first && first->IsValid() ? sizeof(",") - 1 : 0;
+    }
+    if (bytes > RemainingTreeBytes(*state)) {
+        state->Fail(ARKUI_ERROR_CODE_RESULT_TOO_LARGE);
+        return;
+    }
+    state->compactBytes += bytes;
+}
+
+bool IsPureLayoutNode(const RefPtr<UINode>& node, const ParamConfig& config)
+{
+    if (!config.collectionState || !config.filterPureLayout) {
+        return false;
+    }
+    auto frame = AceType::DynamicCast<FrameNode>(node);
+    if (!frame) {
+        return false;
+    }
+    const auto& tag = frame->GetTag();
+    if (tag != V2::ROW_ETS_TAG && tag != V2::COLUMN_ETS_TAG && tag != V2::STACK_ETS_TAG && tag != V2::FLEX_ETS_TAG &&
+        tag != V2::RELATIVE_CONTAINER_ETS_TAG) {
+        return false;
+    }
+    if (!frame->GetInspectorId().value_or("").empty()) {
+        return false;
+    }
+    auto accessibility = frame->GetAccessibilityProperty<AccessibilityProperty>();
+    if (accessibility && accessibility->HasSemanticContent()) {
+        return false;
+    }
+    auto hub = frame->GetEventHub<EventHub>();
+    if (hub && hub->HasTreeInteraction()) {
+        return false;
+    }
+    auto render = frame->GetRenderContext();
+    if (!render) {
+        return false;
+    }
+    return !render->HasRenderContent();
+}
+
+bool AppendTreeChild(
+    JsonValue& array, std::shared_ptr<JsonValue>&& child, const RefPtr<UINode>& node, const ParamConfig& config)
+{
+    if (!config.collectionState) {
+        array.PutRef(std::move(child));
+        return true;
+    }
+    if (!IsPureLayoutNode(node, config)) {
+        bool written = array.PutRef(std::move(child));
+        TreeCheck(written, config.collectionState);
+        return written;
+    }
+    auto children = child->GetValue("$children");
+    if (!children || !children->IsArray()) {
+        return false;
+    }
+    bool hasOutput = false;
+    for (auto item = children->GetChild(); item && item->IsValid(); item = item->GetNext()) {
+        bool written = array.Put(item);
+        TreeCheck(written, config.collectionState);
+        if (!written) {
+            return false;
+        }
+        hasOutput = true;
+    }
+    return hasOutput;
+}
+
+int32_t SerializeUITree(const std::shared_ptr<JsonValue>& tree, bool pretty, char** data, uint32_t* size)
+{
+    if (!data || !size || !tree) {
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    *data = nullptr;
+    *size = 0;
+    auto countResult = CheckTreeNodeCount(*tree);
+    if (countResult != ARKUI_ERROR_CODE_NO_ERROR) {
+        return countResult;
+    }
+    JsonWriteErrorScope writeScope;
+    auto envelope = JsonUtil::Create();
+    if (!envelope || !envelope->IsValid()) {
+        return ARKUI_ERROR_CODE_RESOURCE_EXHAUSTED;
+    }
+    bool written = envelope->Put("schemaVersion", TREE_SCHEMA_VERSION);
+    if (tree->Contains("$type")) {
+        // Borrow the live tree for this call instead of recursively duplicating its entire DOM.
+        written = PutJsonObjectReference(*envelope, "treeInfo", *tree) && written;
+    } else {
+        auto nullValue = JsonUtil::ParseJsonString("null");
+        if (!nullValue || !nullValue->IsValid()) {
+            return ARKUI_ERROR_CODE_RESOURCE_EXHAUSTED;
+        }
+        written = envelope->PutRef("treeInfo", std::move(nullValue)) && written;
+    }
+    if (!written || writeScope.HasError()) {
+        return ARKUI_ERROR_CODE_RESOURCE_EXHAUSTED;
+    }
+    size_t bytes = 0;
+    auto result = WriteJsonBounded(*envelope, pretty, MAX_TREE_BYTES, data, &bytes);
+    switch (result) {
+        case JsonWriteResult::SUCCESS:
+            *size = static_cast<uint32_t>(bytes);
+            return ARKUI_ERROR_CODE_NO_ERROR;
+        case JsonWriteResult::TOO_LARGE:
+            return ARKUI_ERROR_CODE_RESULT_TOO_LARGE;
+        case JsonWriteResult::NO_MEMORY:
+            return ARKUI_ERROR_CODE_RESOURCE_EXHAUSTED;
+        default:
+            return ARKUI_ERROR_CODE_INTERNAL_ERROR;
+    }
+}
+
+int32_t CollectUITree(int32_t instanceId, const ArkUITreeOptions* options, char** data, uint32_t* size)
+{
+    if (data) {
+        *data = nullptr;
+    }
+    if (size) {
+        *size = 0;
+    }
+    if (!options || !data || !size || !ValidOptions(*options)) {
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    RefPtr<PipelineContext> pipeline;
+    auto code = ResolvePipeline(instanceId, pipeline);
+    if (code != ARKUI_ERROR_CODE_NO_ERROR) {
+        return code;
+    }
+    ContainerScope containerScope(instanceId);
+    TreeCollectionState state;
+    auto config = CreateTreeConfig(*options, state);
+    JsonWriteErrorScope writeScope;
+    auto tree = JsonUtil::CreateSharedPtrJson();
+    if (!tree || !tree->IsValid()) {
+        return ARKUI_ERROR_CODE_RESOURCE_EXHAUSTED;
+    }
+#ifdef CROSS_PLATFORM
+    return ARKUI_ERROR_CODE_INTERNAL_ERROR;
+#else
+    pipeline->CollectInspectorTreeInto(tree, !config.cacheNodes, config);
+#endif
+    if (state.GetError()) {
+        return state.GetError();
+    }
+    if (writeScope.HasError()) {
+        return ARKUI_ERROR_CODE_RESOURCE_EXHAUSTED;
+    }
+    return SerializeUITree(tree, options->format == OH_ARKUI_NATIVE_MODULE_UI_JSON_PRETTY, data, size);
+}
+
+int32_t SubmitUITree(
+    int32_t instanceId, const ArkUITreeOptions* options, const ArkUITreeCompletion* completion, uint64_t* requestId)
+{
+    if (!options || !completion || !completion->callback || !completion->deliver || !requestId ||
+        !ValidOptions(*options)) {
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    RefPtr<PipelineContext> pipeline;
+    auto code = ResolvePipeline(instanceId, pipeline);
+    if (code != ARKUI_ERROR_CODE_NO_ERROR) {
+        return code;
+    }
+    auto& state = pipeline->GetUITreeRequestState();
+    if (state.pending) {
+        return ARKUI_ERROR_CODE_COMMAND_UNFINISHED;
+    }
+    InitializeTreeRequest(state, *options, *completion);
+    auto sequence = state.sequence;
+    *requestId = state.requestId;
+    auto weak = AceType::WeakClaim(AceType::RawPtr(pipeline));
+    bool posted = pipeline->GetTaskExecutor()->PostTask(
+        [weak, instanceId, sequence]() { ExecuteTreeRequest(weak, instanceId, sequence); }, TaskExecutor::TaskType::UI,
+        "ArkUICollectTreeJson");
+    if (!posted) {
+        CompleteTreeRequest(pipeline, sequence, ARKUI_ERROR_CODE_INTERNAL_ERROR);
+    }
+    return ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+void CloseUITreeRequests(PipelineContext& pipeline)
+{
+    ContainerScope containerScope(pipeline.GetInstanceId());
+    auto& state = pipeline.GetUITreeRequestState();
+    if (state.closing) {
+        return;
+    }
+    state.closing = true;
+    if (state.pending) {
+        CompleteTreeRequest(AceType::Claim(&pipeline), state.sequence, ARKUI_ERROR_CODE_UI_CONTEXT_INVALID);
+    }
+}
+
 } // namespace OHOS::Ace::NG

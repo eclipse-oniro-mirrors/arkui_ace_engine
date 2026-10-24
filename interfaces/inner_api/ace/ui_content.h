@@ -57,6 +57,7 @@ struct Rect;
 enum class WindowSizeChangeReason : uint32_t;
 enum class WindowMode : uint32_t;
 enum class MaximizeMode : uint32_t;
+enum class DpiFollowStrategy : uint32_t;
 class RSNode;
 class RSWindowKeyFrameNode;
 class RSSurfaceNode;
@@ -256,6 +257,7 @@ public:
 
     virtual void UpdateFormData(const std::string& data) = 0;
     virtual void UpdateFormSharedImage(const std::map<std::string, sptr<OHOS::AppExecFwk::FormAshmem>>& imageDataMap) {}
+    virtual void SetFormImageCacheThreshold(int32_t threshold) {}
 
     virtual void SetFormWidth(const float width) = 0;
     virtual void SetFormHeight(const float height) = 0;
@@ -391,6 +393,8 @@ public:
     virtual bool GetContainerModalTitleVisible(bool isImmersive) { return false; }
 
     virtual void SetContainerModalTitleHeight(int height) {}
+
+    virtual void SetContainerModalTitleHeightWithVp(double heightVp) {}
 
     virtual int32_t GetContainerModalTitleHeight()
     {
@@ -680,10 +684,11 @@ public:
     virtual void SetFormDisplayId(const uint64_t displayId) {}
 
     /**
-     * @description: Mark the UEC (UIExtension component) dpi follow host feature as enabled
-     * for current window instance (whitelist mark, once set it cannot be revoked).
+     * @description: Set the dpi follow strategy for UEC (UIExtension component) of current window
+     * instance (whitelist mark). The passed strategy replaces the internally saved default strategy;
+     * a strategy explicitly configured by the developer on the UEC takes precedence over it.
      */
-    virtual void MarkUIExtensionDensityFollowHost() {};
+    virtual void SetUIExtensionDensityFollowHost(Rosen::DpiFollowStrategy dpiFollowStrategy) {};
 
 private:
     static std::atomic<bool> successFlag_;

@@ -660,6 +660,64 @@ void ScrollBarPattern::GetPanDirectionDumpInfo()
     }
 }
 
+void ScrollBarPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if (!config.IsPublicTree() || config.visualProperties) {
+        GetAxisDumpInfo(json);
+        GetDisplayModeDumpInfo(json);
+    }
+    if (!config.IsPublicTree()) {
+        GetPanDirectionDumpInfo(json);
+        json->Put("hasChild", hasChild_);
+        json->Put("preFrameChildState", preFrameChildState_);
+        json->Put("enableNestedSorll", enableNestedSorll_);
+        if (!hasChild_ && scrollBar_) {
+            scrollBar_->DumpAdvanceInfo(json);
+        }
+    }
+    if (!config.IsPublicTree() || config.visualProperties) {
+        json->Put("childRect", childRect_.ToString().c_str());
+    }
+    if (!config.IsPublicTree()) {
+        json->Put("scrollableDistance", std::to_string(scrollableDistance_).c_str());
+        json->Put("controlDistance_", std::to_string(controlDistance_).c_str());
+        std::unique_ptr<JsonValue> children = JsonUtil::CreateArray(true);
+        for (const auto& info : outerScrollBarLayoutInfos_) {
+            std::unique_ptr<JsonValue> child = JsonUtil::Create(true);
+            info.ToJson(child);
+            children->Put(child);
+        }
+        json->Put("outerScrollBarLayoutInfos", children);
+    }
+    if (!config.IsPublicTree()) {
+        return;
+    }
+    if (config.visualProperties) {
+        DumpAdvanceVisualProperties(json, config);
+    }
+    if (config.functionalProperties) {
+        DumpAdvanceFunctionalProperties(json, config);
+    }
+}
+
+void ScrollBarPattern::DumpAdvanceVisualProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if (!hasChild_ && scrollBar_) {
+        auto bar = JsonUtil::Create();
+        scrollBar_->DumpAdvanceInfo(bar, config);
+        json->PutRef("scrollBar", std::move(bar));
+    }
+}
+
+void ScrollBarPattern::DumpAdvanceFunctionalProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if (!hasChild_ && scrollBar_) {
+        auto bar = JsonUtil::Create();
+        scrollBar_->DumpAdvanceInfo(bar, config);
+        json->PutRef("scrollBar", std::move(bar));
+    }
+}
+
 void ScrollBarPattern::DumpAdvanceInfo()
 {
     GetAxisDumpInfo();
@@ -1020,26 +1078,7 @@ void ScrollBarPattern::OnCollectClickTarget(const OffsetF& coordinateOffset,
 
 void ScrollBarPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json)
 {
-    GetAxisDumpInfo(json);
-    GetDisplayModeDumpInfo(json);
-    GetPanDirectionDumpInfo(json);
-    json->Put("hasChild", hasChild_);
-    json->Put("preFrameChildState", preFrameChildState_);
-    json->Put("enableNestedSorll", enableNestedSorll_);
-    if (!hasChild_ && scrollBar_) {
-        scrollBar_->DumpAdvanceInfo(json);
-    }
-    json->Put("childRect", childRect_.ToString().c_str());
-    json->Put("scrollableDistance", std::to_string(scrollableDistance_).c_str());
-    json->Put("controlDistance_", std::to_string(controlDistance_).c_str());
-
-    std::unique_ptr<JsonValue> children = JsonUtil::CreateArray(true);
-    for (const auto& info : outerScrollBarLayoutInfos_) {
-        std::unique_ptr<JsonValue> child = JsonUtil::Create(true);
-        info.ToJson(child);
-        children->Put(child);
-    }
-    json->Put("outerScrollBarLayoutInfos", children);
+    ScrollBarPattern::DumpAdvanceInfo(json, ParamConfig());
 }
 
 void ScrollBarPattern::GetDisplayModeDumpInfo(std::unique_ptr<JsonValue>& json)

@@ -16,6 +16,7 @@
 #include "core/components_ng/render/adapter/rosen_render_context.h"
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/base/modifier.h"
+#include "core/components_v2/inspector/inspector_constants.h"
 #include "core/components_ng/pattern/render_node/render_node_properties.h"
 #include "core/components_ng/property/particle_property.h"
 
@@ -5309,6 +5310,13 @@ std::vector<std::shared_ptr<Rosen::RSNode>> RosenRenderContext::BuildMixedTarget
         }
     }
     CHECK_NULL_RETURN(frameNode, targetRSNodes);
+    auto safeAreaInsetNode = frameNode->GetSafeAreaInsetNode();
+    if (safeAreaInsetNode) {
+        auto property = safeAreaInsetNode->GetLayoutProperty();
+        if (property && property->GetVisibilityValue(VisibleType::VISIBLE) == VisibleType::VISIBLE) {
+            addRSNodeIfAbsent(targetRSNodes, targetNodeMap, GetRsNodeByFrame(safeAreaInsetNode));
+        }
+    }
     auto overlayNode = frameNode->GetOverlayNode();
     if (overlayNode) {
         auto property = overlayNode->GetLayoutProperty();
@@ -5433,6 +5441,21 @@ void RosenRenderContext::GetLiveChildren(const RefPtr<FrameNode>& node, std::vec
         } else {
             child->SetDeleteRsNode(true);
             GetLiveChildren(child, childNodes);
+        }
+    }
+    auto safeAreaInsetNode = node->GetSafeAreaInsetNode();
+    if (safeAreaInsetNode) {
+        auto property = safeAreaInsetNode->GetLayoutProperty();
+        if (property && property->GetVisibilityValue(VisibleType::VISIBLE) == VisibleType::VISIBLE) {
+            if (!CanNodeBeDeleted(safeAreaInsetNode)) {
+                childNodes.emplace_back(safeAreaInsetNode);
+                if (pipeline && safeAreaInsetNode->HasPositionZ()) {
+                    pipeline->AddPositionZNode(safeAreaInsetNode->GetId());
+                }
+            } else {
+                safeAreaInsetNode->SetDeleteRsNode(true);
+                GetLiveChildren(safeAreaInsetNode, childNodes);
+            }
         }
     }
     auto accessibilityFocusPaintNode = node->GetFocusPaintNode();
@@ -6819,6 +6842,17 @@ void RosenRenderContext::SetHDRBrightness(float hdrBrightness, uint32_t type)
     auto rsSurfaceNode = rsNode_->ReinterpretCastTo<Rosen::RSSurfaceNode>();
     CHECK_NULL_VOID(rsSurfaceNode);
     rsSurfaceNode->SetHDRBrightnessWithType(hdrBrightness, type);
+}
+
+void RosenRenderContext::SetSolidLayerEnabled(bool enabled)
+{
+    FREE_RS_CONTEXT_CHECK(SetSolidLayerEnabled, enabled);
+    CHECK_NULL_VOID(rsNode_);
+    auto rsSurfaceNode = rsNode_->ReinterpretCastTo<Rosen::RSSurfaceNode>();
+    CHECK_NULL_VOID(rsSurfaceNode);
+    TAG_LOGI(AceLogTag::ACE_XCOMPONENT,
+        "SetSolidLayerEnabled reach end of ArkUI chain, forward to RS, enableSolidLayer: %{public}d", enabled);
+    rsSurfaceNode->SetSolidLayerEnabled(enabled);
 }
 
 void RosenRenderContext::SetImageHDRPresent(bool hdrPresent)
@@ -8695,12 +8729,21 @@ void RosenRenderContext::DumpInfo(std::unique_ptr<JsonValue>& json)
 
 void RosenRenderContext::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json)
 {
-    if (GetBackgroundAlign().has_value()) {
-        json->Put("BackgroundAlign", GetBackgroundAlign().value().ToString().c_str());
+    DumpAdvanceInfo(json, ParamConfig());
+}
+
+void RosenRenderContext::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    const bool visual = !config.IsPublicTree() || config.visualProperties;
+    DumpAdvanceBackgroundInfo(json, config);
+    if (visual) {
+        DumpAdvanceVisualInfo(json);
     }
-    if (GetBackgroundImage().has_value()) {
-        json->Put("BackgroundImage", GetBackgroundImage().value().ToString().c_str());
-    }
+    SetAdvanceInfo(json, config);
+}
+
+void RosenRenderContext::DumpAdvanceVisualInfo(std::unique_ptr<JsonValue>& json)
+{
     if (GetSphericalEffect().has_value()) {
         json->Put("SphericalEffect", std::to_string(GetSphericalEffect().value()).c_str());
     }
@@ -8740,44 +8783,72 @@ void RosenRenderContext::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json)
     if (GetSweepGradient().has_value()) {
         json->Put("SweepGradient", GetSweepGradient().value().ToString().c_str());
     }
-    SetAdvanceInfo(json);
+}
+
+void RosenRenderContext::DumpAdvanceBackgroundInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if ((!config.IsPublicTree() || config.visualProperties) && GetBackgroundAlign().has_value()) {
+        json->Put("BackgroundAlign", GetBackgroundAlign().value().ToString().c_str());
+    }
+    if ((!config.IsPublicTree() || config.functionalProperties) && GetBackgroundImage().has_value()) {
+        DumpAdvanceSourceInfo(json, "BackgroundImage", GetBackgroundImage().value(), config);
+    }
 }
 
 void RosenRenderContext::SetAdvanceInfo(std::unique_ptr<JsonValue>& json)
 {
-    if (GetRadialGradient().has_value()) {
+    SetAdvanceInfo(json, ParamConfig());
+}
+
+void RosenRenderContext::SetAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    const bool visual = !config.IsPublicTree() || config.visualProperties;
+    if (visual && GetRadialGradient().has_value()) {
         json->Put("RadialGradient", GetRadialGradient().value().ToString().c_str());
     }
-    if (GetFrontBrightness().has_value()) {
+    if (visual && GetFrontBrightness().has_value()) {
         json->Put("FrontBrightness", GetFrontBrightness().value().ToString().c_str());
     }
-    if (GetFrontGrayScale().has_value()) {
+    if (visual && GetFrontGrayScale().has_value()) {
         json->Put("FrontGrayScale", GetFrontGrayScale().value().ToString().c_str());
     }
-    if (GetFrontContrast().has_value()) {
+    if (visual && GetFrontContrast().has_value()) {
         json->Put("FrontContrast", GetFrontContrast().value().ToString().c_str());
     }
-    if (GetFrontSaturate().has_value()) {
+    if (visual && GetFrontSaturate().has_value()) {
         json->Put("FrontSaturate", GetFrontSaturate().value().ToString().c_str());
     }
-    if (GetFrontSepia().has_value()) {
+    if (visual && GetFrontSepia().has_value()) {
         json->Put("FrontSepia", GetFrontSepia().value().ToString().c_str());
     }
-    if (GetFrontHueRotate().has_value()) {
+    if (visual && GetFrontHueRotate().has_value()) {
         json->Put("FrontHueRotate", std::to_string(GetFrontHueRotate().value()).c_str());
     }
-    if (GetFrontColorBlend().has_value()) {
+    if (visual && GetFrontColorBlend().has_value()) {
         json->Put("FrontColorBlend", GetFrontColorBlend().value().ColorToString().c_str());
     }
-    if (GetBorderImageSource().has_value()) {
-        json->Put("BorderImageSource", GetBorderImageSource().value().ToString().c_str());
+    DumpAdvanceImageAndLightInfo(json, config);
+}
+
+void RosenRenderContext::DumpAdvanceImageAndLightInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    const bool visual = !config.IsPublicTree() || config.visualProperties;
+    if ((!config.IsPublicTree() || config.functionalProperties) && GetBorderImageSource().has_value()) {
+        DumpAdvanceSourceInfo(json, "BorderImageSource", GetBorderImageSource().value(), config);
     }
-    if (GetBorderImageGradient().has_value()) {
+    if (visual && GetBorderImageGradient().has_value()) {
         json->Put("BorderImageGradient", GetBorderImageGradient().value().ToString().c_str());
     }
-    if (GetForegroundColor().has_value()) {
+    if (visual && GetForegroundColor().has_value()) {
         json->Put("ForegroundColor", GetForegroundColor().value().ColorToString().c_str());
     }
+    if (visual) {
+        DumpAdvanceLightInfo(json);
+    }
+}
+
+void RosenRenderContext::DumpAdvanceLightInfo(std::unique_ptr<JsonValue>& json)
+{
     if (GetLightIntensity().has_value()) {
         json->Put("LightIntensity", std::to_string(GetLightIntensity().value()).c_str());
     }
@@ -8789,6 +8860,36 @@ void RosenRenderContext::SetAdvanceInfo(std::unique_ptr<JsonValue>& json)
     }
     if (GetBloom().has_value()) {
         json->Put("Bloom", std::to_string(GetBloom().value()).c_str());
+    }
+}
+
+void RosenRenderContext::DumpAdvanceSourceInfo(std::unique_ptr<JsonValue>& json, const char* key,
+    const ImageSourceInfo& source, const ParamConfig& config)
+{
+    if (!config.IsPublicTree()) {
+        json->Put(key, source.ToString().c_str());
+        return;
+    }
+    // Match ImagePattern resource references; never expose pixel maps or embedded image bytes.
+    switch (source.GetSrcType()) {
+        case SrcType::FILE:
+        case SrcType::ASSET:
+        case SrcType::NETWORK:
+        case SrcType::RESOURCE:
+        case SrcType::DATA_ABILITY:
+        case SrcType::DATA_ABILITY_DECODED:
+            if (!source.GetSrc().empty()) {
+                json->Put(key, source.GetSrc().c_str());
+            }
+            break;
+        case SrcType::RESOURCE_ID: {
+            auto resource = JsonUtil::Create();
+            resource->Put("id", static_cast<int32_t>(source.GetResourceId()));
+            json->PutRef(key, std::move(resource));
+            break;
+        }
+        default:
+            break;
     }
 }
 
@@ -9590,4 +9691,13 @@ void RosenRenderContext::ResetRadiusGradientBlur()
     rsNode_->SetUICompositingFilter(&compositingFilter);
     RequestNextFrame();
 }
+
+bool RosenRenderContext::HasRenderContent() const
+{
+    if (!rsNode_) {
+        return false;
+    }
+    return rsNode_->GetIsDrawn() || rsNode_->GetType() != Rosen::RSUINodeType::CANVAS_NODE;
+}
+
 } // namespace OHOS::Ace::NG

@@ -55,6 +55,10 @@ build_component_ng("manager_ng") {
     "navigation/navigation_manager.cpp",
     "material/material_processor.cpp",
     "page_scene/page_scene_rule_manager.cpp",
+    "page_scene/search_scene_click_matcher.cpp",
+    "page_scene/search_scene_context_collector.cpp",
+    "page_scene/search_scene_matcher.cpp",
+    "page_scene/search_scene_snapshot.cpp",
     "post_event/post_event_manager.cpp",
     "recoverable/recoverable_manager.cpp",
     "recoverable/recoverable_view.cpp",
@@ -62,6 +66,7 @@ build_component_ng("manager_ng") {
     "scroll_adjust/scroll_adjust_manager.cpp",
     "scroll_placeholder/scroll_placeholder_cost_model.cpp",
     "scroll_placeholder/scroll_placeholder_manager.cpp",
+    "scroll_placeholder/scroll_placeholder_restricted_scope.cpp",
     "scroll_placeholder/scroll_placeholder_template_registry.cpp",
     "select_content_overlay/select_content_overlay_manager.cpp",
     "select_content_overlay/selection_container.cpp",
@@ -73,8 +78,8 @@ build_component_ng("manager_ng") {
     "shared_overlay/shared_overlay_manager.cpp",
     "shared_overlay/shared_transition_effect.cpp",
     "toolbar/toolbar_manager.cpp",
+    "uisession_query/component_tree_query.cpp",
   ]
-
   inspector_event_reporting_sources = [
     "event/json_child_report.cpp",
     "drag_drop/drag_drop_behavior_reporter/drag_drop_behavior_reporter.cpp",

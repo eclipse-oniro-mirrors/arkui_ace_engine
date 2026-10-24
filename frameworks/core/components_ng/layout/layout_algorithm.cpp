@@ -365,13 +365,14 @@ bool LayoutAlgorithm::IsContentUnderutilizedForSmartLayout(LayoutWrapper* layout
     if (LessOrEqual(availableWidth, 0.0) || LessOrEqual(availableHeight, 0.0)) {
         return false;
     }
-    double bbArea = static_cast<double>(childRect.Width()) * static_cast<double>(childRect.Height());
-    if (bbArea <= 0) {
+    if (static_cast<double>(childRect.Width()) * static_cast<double>(childRect.Height()) <= 0) {
         return false;
     }
 
-    return LessNotEqual(static_cast<double>(childRect.Width()), availableWidth) &&
-        LessNotEqual(static_cast<double>(childRect.Height()), availableHeight);
+    // 1px tolerance for floor-based padding sub-pixel bias; keep in sync with AddScaleUpConstraints.
+    constexpr double SPARE_SPACE_EPSILON = 1.0;
+    return LessNotEqual(static_cast<double>(childRect.Width()), availableWidth - SPARE_SPACE_EPSILON) &&
+        LessNotEqual(static_cast<double>(childRect.Height()), availableHeight - SPARE_SPACE_EPSILON);
 }
 
 void LayoutAlgorithm::TryRestoreSmartLayoutForHost(LayoutWrapper* layoutWrapper)

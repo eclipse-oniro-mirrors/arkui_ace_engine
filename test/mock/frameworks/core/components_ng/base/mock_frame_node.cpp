@@ -499,6 +499,10 @@ void FrameNode::DumpInfo(std::unique_ptr<JsonValue>&) {}
 void FrameNode::DumpAdvanceInfo() {}
 void FrameNode::DumpAdvanceInfo(std::unique_ptr<JsonValue>&) {}
 void FrameNode::DumpSimplifyInfo(std::shared_ptr<JsonValue>&) {}
+void FrameNode::DumpSimplifyInfoWithParamConfig(std::shared_ptr<JsonValue>& json, ParamConfig config)
+{
+    UINode::DumpSimplifyInfoWithParamConfig(json, config);
+}
 void FrameNode::DumpSimplifyInfoOnlyForParamConfig(std::shared_ptr<JsonValue>&, ParamConfig) {}
 void FrameNode::DumpViewDataPageNode(RefPtr<ViewDataWrap>, bool) {}
 bool FrameNode::CheckAutoSave()
@@ -530,12 +534,14 @@ const RefPtr<LayoutAlgorithmWrapper>& FrameNode::GetLayoutAlgorithm(bool)
 {
     return layoutAlgorithm_;
 }
-RefPtr<LayoutWrapper> FrameNode::GetOrCreateChildByIndex(uint32_t, bool, bool)
+RefPtr<LayoutWrapper> FrameNode::GetOrCreateChildByIndex(uint32_t, bool, bool, bool)
 {
     return nullptr;
 }
 void FrameNode::Measure(const std::optional<LayoutConstraintF>&) {}
 void FrameNode::Layout() {}
+void FrameNode::MeasureSafeAreaInset() {}
+void FrameNode::LayoutSafeAreaInset() {}
 bool FrameNode::SkipMeasureContent() const
 {
     return false;

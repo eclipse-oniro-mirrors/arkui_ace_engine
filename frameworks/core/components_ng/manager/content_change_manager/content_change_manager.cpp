@@ -850,6 +850,8 @@ void ContentChangeManager::ResetTranslateTextNode(int32_t nodeId)
     ResetTranslateNodes(translateTextNodes_, nodeId);
     ResetTranslateNodes(translateTextSnapshotNodes_, nodeId);
     if (nodeId < 0) {
+        // Reset-all keeps the live-node tracking set but clears the snapshot cache.
+        translateTextSnapshotNodes_.clear();
         translateTextVersions_.clear();
         translateTextSnapshotVersions_.clear();
         return;
@@ -861,7 +863,17 @@ void ContentChangeManager::ResetTranslateTextNode(int32_t nodeId)
 void ContentChangeManager::OnPageTransitionEnd(const RefPtr<FrameNode>& keyNode)
 {
     CHECK_NULL_VOID(keyNode);
-    OnTransitionRemoved(keyNode->GetId());
+    OnPageTransitionEnd(keyNode, keyNode->GetId());
+}
+
+void ContentChangeManager::OnPageTransitionEnd(const RefPtr<FrameNode>& keyNode, int32_t transitionId)
+{
+    // The saved transition ID also permits cleanup when the report node has expired.
+    OnTransitionRemoved(transitionId);
+    if (!keyNode) {
+        CompleteContentChange(transitionId, ChangeType::PAGE);
+        return;
+    }
     bool contentChangeEnabled = IsContentChangeDetectEnable();
     bool pageSceneEnabled = NeedPageSceneDetect();
     if (!contentChangeEnabled && !pageSceneEnabled) {
@@ -872,7 +884,7 @@ void ContentChangeManager::OnPageTransitionEnd(const RefPtr<FrameNode>& keyNode)
         auto simpleTree = JsonUtil::CreateSharedPtrJson(true);
         keyNode->DumpSimplifyTreeWithParamConfig(0, simpleTree, false, { false, false, false });
         UiSessionManager::GetInstance()->ReportContentChangeEvent(ChangeType::PAGE, simpleTree->ToString());
-        CompleteContentChange(keyNode->GetId(), ChangeType::PAGE);
+        CompleteContentChange(transitionId, ChangeType::PAGE);
         lastTransitionReportTime_ = static_cast<uint64_t>(GetSysTimestamp());
 #ifndef IS_RELEASE_VERSION
         dumpMgr_->AddReportRecord(std::make_tuple(ChangeType::PAGE, keyNode->GetId(), keyNode->GetTag()));

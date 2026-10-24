@@ -17,12 +17,12 @@
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_SCROLL_SCROLLABLE_NG_H
 
 #include <functional>
+#include <optional>
 #include <unordered_set>
 
 #include "base/geometry/dimension.h"
 #include "base/thread/cancelable_callback.h"
 #include "base/utils/system_properties.h"
-#include "core/animation/animator.h"
 #include "core/components_ng/base/frame_scene_status.h"
 #include "core/components_ng/gestures/recognizers/pan_recognizer.h"
 #include "core/components_ng/pattern/scrollable/axis/axis_animator.h"
@@ -222,6 +222,7 @@ public:
     ScrollResult HandleScroll(double offset, int32_t source, NestedState state);
     void ProcessAxisUpdateEvent(float mainDelta, bool fromScrollBar = false);
     void ProcessAxisEndEvent();
+    void ProcessAxisScroll(float mainDelta);
     void LayoutDirectionEst(double correctVelocity, double velocityScale, bool isScrollFromTouchPad);
     void ReportToDragFRCScene(double velocity, NG::SceneStatus sceneStatus);
 
@@ -536,7 +537,34 @@ public:
     }
 
     void StartScrollSnapAnimation(
-        float scrollSnapDelta, float scrollSnapVelocity, bool fromScrollBar, int32_t source = SCROLL_FROM_NONE);
+        float scrollSnapDelta, float scrollSnapVelocity, bool fromScrollBar, int32_t source = SCROLL_FROM_NONE,
+        bool useSlowSpring = false);
+
+    // Feat-20260806915268: two-stage item snap for a custom ScrollSnapOffsetProvider — approach spring by
+    // [approachDelta], then a [targetGetter]-resolved final spring (stage contract in
+    // scrollable_item_snap.cpp; approach is skipped when [approachDelta] is near zero).
+    void StartItemSnapTwoStageAnimation(float approachDelta, float scrollSnapVelocity, bool fromScrollBar,
+        std::function<float(float handoffVelocity)>&& targetGetter, int32_t source = SCROLL_FROM_NONE);
+
+    // Runs one spring stage of the two-stage item snap; invoked with finalStage=true by the handoff of
+    // the approach stage. Not intended for external use.
+    void RunItemSnapStage(float endPos, float velocity, bool finalStage, std::function<void(float, float)>&& onHandoff);
+
+private:
+    bool TryItemSnapTakeover();
+    void ProcessItemSnapFrictionFrame(float position);
+    void CompleteItemSnapTakeover(uint32_t generation, float remaining, float velocity);
+
+    // Invalidates any in-flight two-stage item snap chain (generation bump) and resets the
+    // axis-snap steering state; called from gesture takeover and programmatic stop paths.
+    void CancelItemSnapChain();
+
+    void OnItemSnapStageFinished(uint32_t generation, bool finalStage, int32_t source, float startVelocity,
+        std::function<void(float, float)>&& onHandoff);
+    void PostItemSnapHandoff(uint32_t generation, float providerVelocity, float motionVelocity,
+        std::function<void(float, float)>&& onHandoff);
+
+public:
 
     void StopSnapController()
     {
@@ -566,6 +594,30 @@ public:
     {
         currentPos_ = currentPos;
     }
+
+    void ProcessDragUpdateScroll(const GestureEvent& info);
+    bool HandleAxisSnapUpdate(float mainDelta, bool fromScrollBar);
+    float PrepareFlingParams(float mainPosition, float& correctVelocity, bool isScrollFromTouchPad);
+    bool HandleSlowReleaseOrFling(float mainPosition, float friction, float correctVelocity);
+    std::optional<bool> ResolveDragEndFling(const GestureEvent& info, bool isAxisEvent);
+    void DispatchDragEndLifecycle(bool isWillFling);
+    void FinishDragEnd(const GestureEvent& info);
+    void SetNeedItemSnapSettle(bool need);
+    void SetItemSnapTakeoverDistance(float distance);
+    void SetItemSnapFlingRate(float rate);
+    void SetItemSnapTrackingCallback(std::function<void()>&& callback);
+    bool IsItemSnapTracking() const;
+    float GetItemSnapFlingRate() const;
+    void SetItemSnapTargetReady(bool ready);
+    void SetItemSnapLookaheadDistance(float distance);
+    void MarkItemSnapChainActive();
+    void SetPendingItemSnapKickoff(std::function<void()>&& kickoff);
+    void FlushPendingItemSnapKickoff();
+    void SetDeferItemSnapKickoff(bool defer);
+    // Returns whether the snap callback took over the motion (a settle spring is now in
+    // flight): the caller must then NOT dispatch the fling-stop/scroll-stop events for the
+    // friction that just ended — the spring's own completion delivers them exactly once.
+    bool SettleSnapOnFrictionStop(bool itemSnapSettle);
 
     bool GetNeedScrollSnapChange() const
     {
@@ -884,6 +936,26 @@ private:
     bool snapAnimationFromScrollBar_ = false;
     int32_t snapAnimationSource_ = 0;
     float snapVelocity_ = 0.0f;
+    // Generation token of the two-stage item snap chain: bumped on every stage start and on
+    // interruption so completion callbacks of superseded/interrupted stages are ignored.
+    uint32_t itemSnapGeneration_ = 0;
+    // Feat-20260806915268: a friction fling is running whose stop must trigger the item snap settle
+    // (built-in align). Cleared by the settle itself and by CancelItemSnapChain.
+    bool needItemSnapSettle_ = false;
+    float itemSnapTakeoverDistance_ = 0.0f;
+    float itemSnapFlingRate_ = 0.0f;
+    bool itemSnapMonotonicSpring_ = false;
+    std::function<void()> itemSnapTrackingCallback_;
+    bool itemSnapTargetReady_ = false;
+    float itemSnapLookaheadDistance_ = 0.0f;
+    bool itemSnapTakeoverPending_ = false;
+    uint32_t frictionGeneration_ = 0;
+    // True between an item-snap stage/spring start and its finish/cancel; gates the steering
+    // reset in CancelItemSnapChain (see MarkItemSnapChainActive).
+    bool itemSnapChainActive_ = false;
+    // Parked provider kickoff (see SetPendingItemSnapKickoff) and the gesture-path defer flag.
+    std::function<void()> pendingItemSnapKickoff_;
+    bool deferItemSnapKickoff_ = false;
     float endPos_ = 0.0;
     bool nestedScrolling_ = false;
     float axisSnapDistance_ = 0.f;

@@ -33,7 +33,7 @@ enum class VisualState {
 };
 
 template<class AttributeID>
-class StateAttributeBase : public virtual AceType {
+class StateAttributeBase : public AceType {
     DECLARE_ACE_TYPE(StateAttributeBase<AttributeID>, AceType);
 public:
     explicit StateAttributeBase(AttributeID id) : id_(id) {}

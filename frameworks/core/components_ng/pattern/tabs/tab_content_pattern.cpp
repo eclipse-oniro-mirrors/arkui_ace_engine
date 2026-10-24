@@ -54,8 +54,8 @@ void TabContentPattern::OnModifyDone()
     auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
     CHECK_NULL_VOID(tabsPattern);
     auto activeDisplayMode = tabsPattern->GetActiveBarDisplayMode();
-    bool shouldHide = tabsPattern->IsTabShouldHideByVisibility(defaultVisibility);
-    if (activeDisplayMode == TabBarDisplayMode::BOTTOMTABBAR) {
+    bool shouldHide = defaultVisibility.ShouldHide(activeDisplayMode);
+    if (activeDisplayMode == TabBarDisplayMode::BOTTOMTABBAR || activeDisplayMode == TabBarDisplayMode::TOP_TABBAR) {
         // Bottom tab bar is currently visible — update this tab's columnNode directly
         if (!tabContentNode->HasTabBarItemId()) {
             return;
@@ -82,6 +82,30 @@ void TabContentPattern::OnModifyDone()
     property->UpdateVisibility(shouldHide ? VisibleType::GONE : VisibleType::VISIBLE);
     tabItemNode->MarkNeedSyncRenderTree();
     tabItemNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+}
+
+void TabContentPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json)
+{
+    TabContentPattern::DumpAdvanceInfo(json, ParamConfig());
+}
+
+void TabContentPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if (!config.IsPublicTree() || config.visualProperties) {
+        switch (selectedMode_) {
+            case SelectedMode::INDICATOR: {
+                json->Put("SelectedMode", "INDICATOR");
+                break;
+            }
+            case SelectedMode::BOARD: {
+                json->Put("SelectedMode", "BOARD");
+                break;
+            }
+            default: {
+                break;
+            }
+        }
+    }
 }
 
 } // namespace OHOS::Ace::NG

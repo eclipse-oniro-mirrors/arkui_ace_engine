@@ -15,6 +15,7 @@
 
 #include "core/components_ng/pattern/ui_extension/ui_extension_config.h"
 #include "core/pipeline_ng/pipeline_context.h"
+#include "core/components_ng/base/ui_tree_collector.h"
 #include "core/accessibility/accessibility_manager.h"
 #include "core/accessibility/accessibility_manager_ng.h"
 
@@ -310,9 +311,14 @@ bool HasDumpedJsonContent(const std::shared_ptr<JsonValue>& json)
     return children && children->IsArray() && children->GetArraySize() > 0;
 }
 
-void AddJsonChild(std::shared_ptr<JsonValue> parentJson, std::shared_ptr<JsonValue> childJson)
+void AddJsonChild(
+    std::shared_ptr<JsonValue> parentJson, std::shared_ptr<JsonValue> childJson, const ParamConfig& config)
 {
     CHECK_NULL_VOID(parentJson && childJson);
+    RecordTreeChildInsertion(*parentJson, config);
+    if (config.collectionState && config.collectionState->GetError()) {
+        return;
+    }
     if (!parentJson->Contains("$children")) {
         auto array = JsonUtil::CreateArray();
         parentJson->PutRef("$children", std::move(array));
@@ -379,7 +385,7 @@ PipelineContext::PipelineContext(std::shared_ptr<Window> window, RefPtr<TaskExec
     RefPtr<AssetManager> assetManager, RefPtr<PlatformResRegister> platformResRegister,
     const RefPtr<Frontend>& frontend, int32_t instanceId)
     : PipelineBase(window, std::move(taskExecutor), std::move(assetManager), frontend, instanceId, platformResRegister),
-      safeAreaManager_(MakeRefPtr<SafeAreaManager>())
+      safeAreaManager_(MakeRefPtr<SafeAreaManager>()), uiTreeRequestState_(std::make_unique<NG::UITreeRequestState>())
 {
     window_->OnHide();
     InitManagers();
@@ -421,7 +427,7 @@ PipelineContext::PipelineContext(std::shared_ptr<Window> window, RefPtr<TaskExec
 PipelineContext::PipelineContext(std::shared_ptr<Window> window, RefPtr<TaskExecutor> taskExecutor,
     RefPtr<AssetManager> assetManager, const RefPtr<Frontend>& frontend, int32_t instanceId)
     : PipelineBase(window, std::move(taskExecutor), std::move(assetManager), frontend, instanceId),
-      safeAreaManager_(MakeRefPtr<SafeAreaManager>())
+      safeAreaManager_(MakeRefPtr<SafeAreaManager>()), uiTreeRequestState_(std::make_unique<NG::UITreeRequestState>())
 {
     window_->OnHide();
     InitManagers();
@@ -461,7 +467,7 @@ PipelineContext::PipelineContext(std::shared_ptr<Window> window, RefPtr<TaskExec
 }
 
 PipelineContext::PipelineContext()
-    : safeAreaManager_(MakeRefPtr<SafeAreaManager>())
+    : safeAreaManager_(MakeRefPtr<SafeAreaManager>()), uiTreeRequestState_(std::make_unique<NG::UITreeRequestState>())
 {
     InitManagers();
     if (navigationMgr_) {
@@ -598,6 +604,20 @@ std::string PipelineContext::GetCurrentPageName()
         url += "," + pageName;
     }
     return url;
+}
+
+std::string PipelineContext::GetCurrentNavDestinationName()
+{
+    auto pageInfo = GetLastPageInfo();
+    CHECK_NULL_RETURN(pageInfo, "");
+    return GetNavDestinationPageName(pageInfo);
+}
+
+std::string PipelineContext::GetCurrentPageUrl()
+{
+    auto pageInfo = GetLastPageInfo();
+    CHECK_NULL_RETURN(pageInfo, "");
+    return pageInfo->GetPageUrl();
 }
 
 void PipelineContext::ReportSelectedText()
@@ -1229,12 +1249,22 @@ void PipelineContext::FlushVsync(uint64_t nanoTimestamp, uint64_t frameCount, in
 #endif
     ProcessDelayTasks();
     if (frameCount != UINT64_MAX) {
+        const int64_t displaySyncStartTime = GetSysTimestamp();
         DispatchDisplaySync(nanoTimestamp);
+        const int64_t displaySyncEndTime = GetSysTimestamp();
+        if (displaySyncEndTime > displaySyncStartTime) {
+            frameMetrics.animationDuration += static_cast<uint64_t>(displaySyncEndTime - displaySyncStartTime);
+        }
     }
     FlushRebuildRenderTree();
     FlushAnimation(nanoTimestamp);
     FlushFrameCallback(nanoTimestamp, frameCount);
+    const int64_t modifierAnimationStartTime = GetSysTimestamp();
     auto hasRunningAnimation = FlushModifierAnimation(nanoTimestamp);
+    const int64_t modifierAnimationEndTime = GetSysTimestamp();
+    if (modifierAnimationEndTime > modifierAnimationStartTime) {
+        frameMetrics.animationDuration += static_cast<uint64_t>(modifierAnimationEndTime - modifierAnimationStartTime);
+    }
 #ifdef RELAXED_INTERACTION_SUPPORT
     FlushRelaxedInteraction();
 #endif
@@ -1399,8 +1429,9 @@ void PipelineContext::FlushVsync(uint64_t nanoTimestamp, uint64_t frameCount, in
     FireFrameMetricsCallBack(frameMetrics);
     TAG_LOGD(AceLogTag::ACE_WINDOW_PIPELINE,
         "FrameMetrics actualStartTime=%{public}" PRIu64 ", totalDuration=%{public}" PRIu64
-        ", vsyncTimestamp=%{public}" PRIu64,
-        frameMetrics.actualStartTime, frameMetrics.totalDuration, frameMetrics.vsyncTimestamp);
+        ", vsyncTimestamp=%{public}" PRIu64 ", animationDuration=%{public}" PRIu64,
+        frameMetrics.actualStartTime, frameMetrics.totalDuration, frameMetrics.vsyncTimestamp,
+        frameMetrics.animationDuration);
     // First vsync may come before rootNode_ is created.
 #ifndef CROSS_PLATFORM
     if (contentChangeMgr_ && rootNode_) {
@@ -2373,6 +2404,9 @@ bool PipelineContext::FlushSafeArea(
         } else if (avoidArea.first == NG::SafeAreaAvoidType::TYPE_CUTOUT) {
             safeAreaUpdated |=
                 safeAreaManager_->UpdateCutoutSafeArea(avoidArea.second, NG::OptionalSize<uint32_t>(width, height));
+        } else if (avoidArea.first == NG::SafeAreaAvoidType::TYPE_TITLE_BUTTON) {
+            safeAreaUpdated |= safeAreaManager_->UpdateTitleButtonSafeArea(
+                avoidArea.second, NG::OptionalSize<uint32_t>(width, height));
         }
     }
     uint32_t keyboardHeight = safeAreaManager_->GetKeyboardInset().Length();
@@ -2934,6 +2968,16 @@ void PipelineContext::UpdateFloatNavSafeArea(const SafeAreaInsets& floatNavSafeA
     }
 }
 
+void PipelineContext::UpdateTitleButtonSafeArea(const SafeAreaInsets& titleButtonSafeArea)
+{
+    CHECK_NULL_VOID(minPlatformVersion_ >= PLATFORM_VERSION_TEN);
+    auto rootSize =
+        NG::OptionalSize<uint32_t>(static_cast<uint32_t>(GetRootWidth()), static_cast<uint32_t>(GetRootHeight()));
+    if (safeAreaManager_->UpdateTitleButtonSafeArea(titleButtonSafeArea, rootSize)) {
+        AnimateOnSafeAreaUpdate();
+    }
+}
+
 void PipelineContext::UpdateSystemSafeAreaWithoutAnimation(
     const SafeAreaInsets& systemSafeArea, bool checkSceneBoardWindow)
 {
@@ -2983,6 +3027,16 @@ void PipelineContext::UpdateFloatNavSafeAreaWithoutAnimation(const SafeAreaInset
     auto rootSize =
         NG::OptionalSize<uint32_t>(static_cast<uint32_t>(GetRootWidth()), static_cast<uint32_t>(GetRootHeight()));
     if (safeAreaManager_->UpdateFloatNavSafeArea(floatNavSafeArea, rootSize)) {
+        SyncSafeArea(SafeAreaSyncType::SYNC_TYPE_AVOID_AREA);
+    }
+}
+
+void PipelineContext::UpdateTitleButtonSafeAreaWithoutAnimation(const SafeAreaInsets& titleButtonSafeArea)
+{
+    CHECK_NULL_VOID(minPlatformVersion_ >= PLATFORM_VERSION_TEN);
+    auto rootSize =
+        NG::OptionalSize<uint32_t>(static_cast<uint32_t>(GetRootWidth()), static_cast<uint32_t>(GetRootHeight()));
+    if (safeAreaManager_->UpdateTitleButtonSafeArea(titleButtonSafeArea, rootSize)) {
         SyncSafeArea(SafeAreaSyncType::SYNC_TYPE_AVOID_AREA);
     }
 }
@@ -6022,6 +6076,7 @@ void PipelineContext::FlushReload(const ConfigurationChange& configurationChange
 void PipelineContext::Destroy()
 {
     CHECK_RUN_ON(UI);
+    CloseUITreeRequests(*this);
     SetDestroyed();
     if (rootNode_) {
         rootNode_->DetachFromMainTree();
@@ -7364,18 +7419,28 @@ void PipelineContext::RegisterFocusCallback()
 
 void PipelineContext::GetOverlayInfo(bool hasOverlay, std::shared_ptr<JsonValue>& root,
     std::shared_ptr<JsonValue>& overlayContent, std::unique_ptr<JsonValue>& overlayChildrenArray,
-    std::unique_ptr<JsonValue>& overlayArray) const
+    std::unique_ptr<JsonValue>& overlayArray, ParamConfig config) const
 {
+    if (config.collectionState && config.collectionState->GetError()) {
+        return;
+    }
     if (hasOverlay && !root->Contains("$children")) {
         overlayContent->Put("$type", "overlay");
         overlayContent->Put("$ID", OVERLAY_ID);
         overlayContent->Put("$rect", root->GetValue("$rect"));
         overlayContent->Put("$debugLine", "");
         overlayContent->PutRef("$attrs", {});
-        overlayContent->Put("clickable", false);
-        overlayContent->Put("longclickable", false);
-        overlayContent->Put("scrollable", false);
+        if (!config.collectionState || config.interactionInfo) {
+            overlayContent->Put("clickable", false);
+            overlayContent->Put(config.collectionState ? "longClickable" : "longclickable", false);
+            overlayContent->Put("scrollable", false);
+        }
         overlayContent->PutRef("$children", std::move(overlayChildrenArray));
+        RecordTreeNodeBytes(*overlayContent, config, true);
+        RecordTreeChildInsertion(*root, config);
+        if (config.collectionState && config.collectionState->GetError()) {
+            return;
+        }
         overlayArray->Put(overlayContent);
         root->PutRef("$children", std::move(overlayArray));
     }
@@ -7394,6 +7459,9 @@ bool PipelineContext::ProcessOverlayChildrenDumpInfo(const RefPtr<FrameNode>& ro
     auto childNodes = rootNode->GetChildren();
     bool hasOverlay = false;
     for (const auto& child : childNodes) {
+        if (config.collectionState && config.collectionState->GetError()) {
+            break;
+        }
         auto tag = child->GetTag();
         if (DumpUtil::IsTagInOverlay(tag)) {
             if (!NearZero(config.minOpacity) &&
@@ -7404,6 +7472,9 @@ bool PipelineContext::ProcessOverlayChildrenDumpInfo(const RefPtr<FrameNode>& ro
 #ifndef CROSS_PLATFORM
             child->DumpSimplifyTreeWithParamConfig(0, eachOverlayContent, true, config, nullptr, rootNodeFinalOpacity);
 #endif
+            if (config.collectionState && config.collectionState->GetError()) {
+                return hasOverlay;
+            }
             if (!eachOverlayContent->Contains("$type")) {
                 continue;
             }
@@ -7421,7 +7492,13 @@ bool PipelineContext::ProcessOverlayChildrenDumpInfo(const RefPtr<FrameNode>& ro
 void PipelineContext::GetComponentOverlayInspector(std::shared_ptr<JsonValue>& root,
     RefPtr<NG::FrameNode> startNode, ParamConfig config, bool isInSubWindow, double parentFinalOpacity) const
 {
+    if (config.collectionState && config.collectionState->GetError()) {
+        return;
+    }
     CHECK_NULL_VOID(startNode);
+    if (ShouldPruneNode(startNode, true, config)) {
+        return;
+    }
     auto startNodeFinalOpacity = parentFinalOpacity;
     if (!NearZero(config.minOpacity)) {
         startNodeFinalOpacity *= GetNodeOpacityValue(startNode);
@@ -7436,6 +7513,10 @@ void PipelineContext::GetComponentOverlayInspector(std::shared_ptr<JsonValue>& r
     } else {
         startNode->DumpSimplifyTreeBase(root);
         startNode->DumpSimplifyInfoWithParamConfig(root, config);
+    }
+    RecordTreeNodeBytes(isInSubWindow ? *subRoot : *root, config, true);
+    if (config.collectionState && config.collectionState->GetError()) {
+        return;
     }
     // children in the value
     auto overlayArray = JsonUtil::CreateArray();
@@ -7462,7 +7543,7 @@ void PipelineContext::GetComponentOverlayInspector(std::shared_ptr<JsonValue>& r
         }
     }
 
-    GetOverlayInfo(hasOverlay, root, overlayContent, overlayChildrenArray, overlayArray);
+    GetOverlayInfo(hasOverlay, root, overlayContent, overlayChildrenArray, overlayArray, config);
 }
 
 void PipelineContext::GetOverlayInspector(std::shared_ptr<JsonValue>& root, RefPtr<NG::FrameNode> startNode,
@@ -7470,6 +7551,10 @@ void PipelineContext::GetOverlayInspector(std::shared_ptr<JsonValue>& root, RefP
 {
     // component overlay
     GetComponentOverlayInspector(root, startNode, config, false, parentFinalOpacity);
+    // Public requests are scoped to this Context; other containers have their own requests.
+    if (config.collectionState) {
+        return;
+    }
     // sub-window overlay
     auto subContainerIds = SubwindowManager::GetInstance()->GetAllSubContainerId(Container::CurrentId());
     for (auto& containerId : subContainerIds) {
@@ -7484,12 +7569,22 @@ void PipelineContext::GetOverlayInspector(std::shared_ptr<JsonValue>& root, RefP
 void PipelineContext::DumpSimplifyTreeJsonFromTopNavNode(std::shared_ptr<JsonValue>& root,
     const std::vector<RefPtr<NG::FrameNode>>& navNodeList, const ParamConfig& config) const
 {
+    if (config.collectionState && config.collectionState->GetError()) {
+        return;
+    }
     if (!root->Contains("$children")) {
+        RecordTreeChildInsertion(*root, config);
+        if (config.collectionState && config.collectionState->GetError()) {
+            return;
+        }
         auto array = JsonUtil::CreateArray();
         root->PutRef("$children", std::move(array));
     }
     auto childrenJson = root->GetValue("$children");
     for (const auto& navNode : navNodeList) {
+        if (config.collectionState && config.collectionState->GetError()) {
+            return;
+        }
         if (navNode == nullptr) {
             continue;
         }
@@ -7506,6 +7601,10 @@ void PipelineContext::DumpSimplifyTreeJsonFromTopNavNode(std::shared_ptr<JsonVal
 #endif
         if (!navNodeJson->Contains("$type")) {
             continue;
+        }
+        RecordTreeChildInsertion(*root, config);
+        if (config.collectionState && config.collectionState->GetError()) {
+            return;
         }
         childrenJson->Put(navNodeJson);
     }
@@ -7528,6 +7627,9 @@ void PipelineContext::DumpVisibleInspectorTree(std::shared_ptr<JsonValue>& rootJ
 {
     config.minOpacity = NormalizeMinOpacity(config.minOpacity);
     CHECK_NULL_VOID(rootNode_);
+    if (ShouldPruneNode(rootNode_, true, config)) {
+        return;
+    }
     if (!NearZero(config.minOpacity) && LessNotEqual(GetNodeOpacityValue(rootNode_), config.minOpacity)) {
         return;
     }
@@ -7595,11 +7697,11 @@ void PipelineContext::DumpVisibleInspectorTree(std::shared_ptr<JsonValue>& rootJ
                     0, atomicMenuBarJson, true, config, nullptr, menuBarParentFinalOpacity);
 #endif
                 if (HasDumpedJsonContent(atomicMenuBarJson)) {
-                    AddJsonChild(atomicRootJson, atomicMenuBarJson);
+                    AddJsonChild(atomicRootJson, atomicMenuBarJson, config);
                 }
             }
             if (!config.rectCulling || HasDumpedJsonContent(atomicRootJson)) {
-                AddJsonChild(pseudoRootJson, atomicRootJson);
+                AddJsonChild(pseudoRootJson, atomicRootJson, config);
             }
         }
     } else {
@@ -7607,10 +7709,10 @@ void PipelineContext::DumpVisibleInspectorTree(std::shared_ptr<JsonValue>& rootJ
     }
     if (pseudoRootJson != rootJson) {
         if (HasDumpedJsonContent(containerModalTitleJson)) {
-            AddJsonChild(rootJson, containerModalTitleJson);
+            AddJsonChild(rootJson, containerModalTitleJson, config);
         }
         if (!config.rectCulling || HasDumpedJsonContent(pseudoRootJson)) {
-            AddJsonChild(rootJson, pseudoRootJson);
+            AddJsonChild(rootJson, pseudoRootJson, config);
         }
     }
 }
@@ -7634,14 +7736,28 @@ void PipelineContext::GetInspectorTree(bool onlyNeedVisible, ParamConfig config)
                      "[config.rectCulling:%d][config.minOpacity:%f]",
         onlyNeedVisible, config.interactionInfo, config.accessibilityInfo, config.cacheNodes, config.withWeb,
         config.rectCulling, config.minOpacity);
+    CollectInspectorTreeInto(root, onlyNeedVisible, config);
+    taskExecutor_->PostTask(cb, TaskExecutor::TaskType::BACKGROUND,
+        onlyNeedVisible ? "ArkUIGetVisibleInspectorTree" : "ArkUIGetInspectorTree");
+}
+
+UITreeRequestState& PipelineContext::GetUITreeRequestState()
+{
+    return *uiTreeRequestState_;
+}
+
+void PipelineContext::CollectInspectorTreeInto(
+    std::shared_ptr<JsonValue>& root, bool onlyNeedVisible, ParamConfig config)
+{
+    if (!rootNode_) {
+        return;
+    }
     if (onlyNeedVisible) {
         DumpVisibleInspectorTree(root, config);
-        taskExecutor_->PostTask(cb, TaskExecutor::TaskType::BACKGROUND, "ArkUIGetVisibleInspectorTree");
     } else {
 #ifndef CROSS_PLATFORM
         rootNode_->DumpSimplifyTreeWithParamConfig(0, root, false, config);
 #endif
-        taskExecutor_->PostTask(cb, TaskExecutor::TaskType::BACKGROUND, "ArkUIGetInspectorTree");
     }
 }
 
@@ -8132,6 +8248,9 @@ void PipelineContext::SetDisplayWindowRectInfo(const Rect& displayWindowRectInfo
         }
     }
     displayWindowRectInfo_ = displayWindowRectInfo;
+    if (displayWindowRectInfo.Width() > 0.0f && displayWindowRectInfo.Height() > 0.0f && window_) {
+        window_->SetWindowInfoInitialized(true);
+    }
 }
 
 void PipelineContext::SetIsTransFlag(bool result)

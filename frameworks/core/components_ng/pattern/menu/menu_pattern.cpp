@@ -719,22 +719,12 @@ void MenuPattern::OnTouchEvent(const TouchEventInfo& info)
         return;
     }
     auto touchType = info.GetTouches().front().GetTouchType();
-    // Treat the gesture as a click iff the finger stays inside the menu bounds during the whole touch
-    // sequence (down/move/up), mirroring ClickRecognizer::IsPointInRegion instead of the old down->up
-    // straight-line distance check which is stricter than onClick.
     if (touchType == TouchType::DOWN) {
         lastTouchOffset_ = info.GetTouches().front().GetLocalLocation();
-        movedOutOfRegion_ = false;
-    } else if (touchType == TouchType::MOVE) {
-        // mirror ClickRecognizer: once the finger leaves the menu bounds, it is no longer a click
-        if (!movedOutOfRegion_ && !IsOffsetInNodeBounds(GetHost(), info.GetTouches().front().GetLocalLocation())) {
-            movedOutOfRegion_ = true;
-        }
     } else if (touchType == TouchType::UP) {
         auto touchUpOffset = info.GetTouches().front().GetLocalLocation();
-        bool isClick = lastTouchOffset_.has_value() && !movedOutOfRegion_ &&
-            IsOffsetInNodeBounds(GetHost(), touchUpOffset);
-        if (isClick) {
+        if (lastTouchOffset_.has_value() &&
+            (touchUpOffset - lastTouchOffset_.value()).GetDistance() <= DEFAULT_CLICK_DISTANCE) {
             auto touchGlobalLocation = info.GetTouches().front().GetGlobalLocation();
             auto position = OffsetF(static_cast<float>(touchGlobalLocation.GetX()),
                 static_cast<float>(touchGlobalLocation.GetY()));
@@ -742,7 +732,6 @@ void MenuPattern::OnTouchEvent(const TouchEventInfo& info)
             HideMenu(true, position, HideMenuType::MENU_TOUCH_UP);
         }
         lastTouchOffset_.reset();
-        movedOutOfRegion_ = false;
     }
 }
 

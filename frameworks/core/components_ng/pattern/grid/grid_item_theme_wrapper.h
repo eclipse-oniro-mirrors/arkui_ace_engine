@@ -20,7 +20,7 @@
 
 #include "core/components/common/properties/color.h"
 #include "core/components_ng/pattern/grid/grid_item_theme.h"
-#include "core/components_ng/token_theme/token_theme_wrapper.h"
+#include "core/components_ng/token_theme/token_theme.h"
 
 namespace OHOS::Ace::NG {
 
@@ -28,7 +28,7 @@ namespace OHOS::Ace::NG {
  * GridItemThemeWrapper defines color and styles of GridItem basing on TokenTheme's data.
  * GridItemThemeWrapper should be built using GridItemThemeWrapper::WrapperBuilder.
  */
-class GridItemThemeWrapper : public GridItemTheme, public TokenThemeWrapper {
+class GridItemThemeWrapper : public GridItemTheme {
     DECLARE_ACE_TYPE(GridItemThemeWrapper, GridItemTheme);
 
 public:
@@ -37,7 +37,7 @@ public:
         WrapperBuilder() = default;
         ~WrapperBuilder() = default;
 
-        RefPtr<TokenThemeWrapper> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
+        RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
         {
             auto wrapper = AceType::MakeRefPtr<GridItemThemeWrapper>();
             auto theme = AceType::DynamicCast<GridItemTheme>(wrapper);

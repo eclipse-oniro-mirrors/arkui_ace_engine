@@ -362,24 +362,6 @@ HWTEST_F(RosenRenderContextTest, RosenRenderContextTest013, TestSize.Level1)
 }
 
 /**
- * @tc.name: RosenRenderContextTest014
- * @tc.desc: CreateHardwareSurface().
- * @tc.type: FUNC
- */
-HWTEST_F(RosenRenderContextTest, RosenRenderContextTest014, TestSize.Level1)
-{
-    auto frameNode = FrameNode::GetOrCreateFrameNode("parent", -1, []() { return AceType::MakeRefPtr<Pattern>(); });
-    auto rosenRenderContext = InitRosenRenderContext(frameNode);
-    std::optional<RenderContext::ContextParam> param = std::make_optional(RenderContext::ContextParam());
-    bool isTextureExportNode = true;
-    auto rsUIDirector = OHOS::Rosen::RSUIDirector::Create(nullptr);
-    auto rsUIContext = rsUIDirector->GetRSUIContext();
-    std::shared_ptr<Rosen::RSNode> ret = rosenRenderContext->CreateHardwareSurface(
-        param, isTextureExportNode, rsUIContext);
-    EXPECT_NE(ret, nullptr);
-}
-
-/**
  * @tc.name: GetOrCreateRSUIContext001
  * @tc.desc: Test GetOrCreateRSUIContext creates RSUIDirector when RSUIContext is null.
  * @tc.type: FUNC

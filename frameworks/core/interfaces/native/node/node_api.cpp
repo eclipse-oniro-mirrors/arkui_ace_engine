@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 
+#include "core/components_ng/base/ui_tree_collector.h"
 #include "core/components_ng/base/page_text_collector.h"
 #include "core/interfaces/native/node/page_text_api.h"
 
@@ -27,6 +28,7 @@
 #include "core/common/ace_application_info.h"
 #include "core/common/ace_engine.h"
 #include "core/common/container.h"
+#include "core/components/common/properties/ui_material.h"
 #include "core/components_ng/base/observer_handler.h"
 #include "core/components_ng/base/view_stack_model.h"
 #include "core/components_ng/manager/navigation/navigation_manager.h"
@@ -53,6 +55,7 @@
 #include "core/interfaces/native/node/node_date_picker_modifier.h"
 #include "core/interfaces/native/node/node_drag_modifier.h"
 #include "core/interfaces/native/node/node_image_modifier.h"
+#include "core/interfaces/native/node/node_image_collection.h"
 #include "core/interfaces/native/node/node_image_span_modifier.h"
 #include "core/interfaces/native/node/node_list_item_modifier.h"
 #include "core/interfaces/native/node/node_list_modifier.h"
@@ -72,6 +75,7 @@
 #include "core/interfaces/native/node/search_modifier.h"
 #include "core/interfaces/native/node/select_modifier.h"
 #include "core/interfaces/native/node/styled_string_impl.h"
+#include "core/interfaces/native/node/ui_tree_api.h"
 #include "core/interfaces/native/node/util_modifier.h"
 #include "core/interfaces/native/node/view_model.h"
 #include "core/interfaces/native/node/water_flow_modifier.h"
@@ -334,6 +338,16 @@ void RegisterOEMVisualEffect(ArkUIOEMVisualEffectFuncHandle func)
 {
     OEMVisualEffectFunc oemFunc = reinterpret_cast<OEMVisualEffectFunc>(func);
     ViewAbstract::RegisterOEMVisualEffect(oemFunc);
+}
+
+void RegisterOEMMaterialFunc(ArkUIMaterialFuncHandle handle)
+{
+    MaterialUtils::RegisterMaterialFunc(handle);
+}
+
+void RegisterOEMMaterialFilterFunc(ArkUIMaterialFilterFuncHandle handle)
+{
+    MaterialUtils::RegisterMaterialFilterFunc(handle);
 }
 
 void SetOnNodeDestroyCallback(ArkUINodeHandle node, void (*onDestroy)(ArkUINodeHandle node))
@@ -2349,6 +2363,8 @@ ArkUIExtendedNodeAPI impl_extended = {
     .setOnNodeDestroyCallback = SetOnNodeDestroyCallback,
     .createCustomNodeByNodeId = CreateCustomNodeByNodeId,
     .createCustomNodeWithParam = CreateCustomNodeWithParam,
+    .registerOEMMaterialFunc = RegisterOEMMaterialFunc,
+    .registerOEMMaterialFilterFunc = RegisterOEMMaterialFilterFunc,
 };
 /* clang-format on */
 
@@ -2683,7 +2699,9 @@ const ArkUISnapshotAPI* GetComponentSnapshotAPI()
         .snapshotOptionsSetColorMode = SnapshotOptionsSetColorMode,
         .snapshotOptionsSetDynamicRangeMode = SnapshotOptionsSetDynamicRangeMode,
         .getSyncSnapshot = GetNodeSnapshot,
-        .getSizeLimitation = GetSnapshotSizeLimitation
+        .getSizeLimitation = GetSnapshotSizeLimitation,
+        .postImageCollectionTask = PostImageCollectionTask,
+        .getImageByNodeId = GetImageByNodeId
     };
     CHECK_INITIALIZED_FIELDS_END(impl, 0, 0, 0); // don't move this line
     return &impl;
@@ -2844,6 +2862,13 @@ extern "C" {
 ACE_FORCE_EXPORT CJUIFullNodeAPI* GetCJUIFullNodeAPI()
 {
     return &OHOS::Ace::NG::fullCJUIApi;
+}
+
+ACE_FORCE_EXPORT const ArkUITreeAPI* GetArkUITreeAPI(int32_t version)
+{
+    static const ArkUITreeAPI api { OHOS::Ace::NG::CollectUITree, OHOS::Ace::NG::SubmitUITree,
+        [](char* data) { std::free(data); } };
+    return version == 1 ? &api : nullptr;
 }
 
 ACE_FORCE_EXPORT const ArkUIPageTextAPI* GetArkUIPageTextAPI(int32_t version)

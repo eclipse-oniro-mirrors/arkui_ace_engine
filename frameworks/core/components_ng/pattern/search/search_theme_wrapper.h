@@ -17,11 +17,11 @@
 #define FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_SEARCH_SEARCH_THEME_WRAPPER_H
 
 #include "core/components/search/search_theme.h"
-#include "core/components_ng/token_theme/token_theme_wrapper.h"
+#include "core/components_ng/token_theme/token_theme.h"
 
 namespace OHOS::Ace::NG {
 
-class SearchThemeWrapper : public SearchTheme, public TokenThemeWrapper {
+class SearchThemeWrapper : public SearchTheme {
     DECLARE_ACE_TYPE(SearchThemeWrapper, SearchTheme);
 
 public:
@@ -30,7 +30,7 @@ public:
         WrapperBuilder() = default;
         ~WrapperBuilder() = default;
 
-        RefPtr<TokenThemeWrapper> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
+        RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
         {
             auto themeWrapper = AceType::MakeRefPtr<SearchThemeWrapper>();
             auto theme = AceType::DynamicCast<SearchTheme>(themeWrapper);

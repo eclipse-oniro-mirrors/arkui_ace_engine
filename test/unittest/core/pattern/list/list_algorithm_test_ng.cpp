@@ -1965,4 +1965,110 @@ HWTEST_F(ListAlgorithmTestNg, ListLayoutAlgorithmCanUseInfoInPosMapWithLazyChild
     EXPECT_FALSE(listLayoutAlgorithm->CanUseInfoInPosMap(1, 0.0f));
     EXPECT_FALSE(listLayoutAlgorithm->CanUseInfoInPosMap(2, 0.0f));
 }
+
+namespace {
+constexpr float END_ADJUST_VIEWPORT = 400.0f;
+constexpr int32_t END_ADJUST_ITEM_COUNT = 1;
+// 2^23 px: from this content end on the float ULP is already 1.0px, so a sub-pixel contentEndOffset is
+// rounded away when the end-of-content offset adjustment is evaluated in float instead of double.
+constexpr float END_ADJUST_HUGE_END_POS = 8388608.0f;
+constexpr float END_ADJUST_HUGE_END_OFFSET = 0.5f;
+constexpr double END_ADJUST_HUGE_CURRENT_OFFSET = 8388700.0;
+constexpr double END_ADJUST_HUGE_EXPECTED = 8388208.5;
+// What the same expression yields once hugeEndPos + hugeEndOffset collapses back to hugeEndPos in float.
+constexpr double END_ADJUST_HUGE_ROUNDED = 8388208.0;
+constexpr float END_ADJUST_SMALL_END_POS = 1000.0f;
+constexpr float END_ADJUST_SMALL_END_OFFSET = 50.0f;
+constexpr double END_ADJUST_SMALL_CURRENT_OFFSET = 700.0;
+constexpr double END_ADJUST_SMALL_EXPECTED = 650.0;
+} // namespace
+
+class ListForwardEndOffsetTestNg : public TestNG {
+public:
+    void PrepareForwardEndOffset(float contentEndPos, float contentEndOffset, double currentOffset,
+        bool canOverScrollEnd, bool hasJumpIndex);
+    void RunForwardEndOffsetAdjust();
+
+protected:
+    RefPtr<ListLayoutAlgorithm> algorithm_;
+    RefPtr<LayoutWrapperNode> wrapper_;
+    std::vector<RefPtr<FrameNode>> nodes_;
+    float contentEndPos_ = 0.0f;
+};
+
+void ListForwardEndOffsetTestNg::PrepareForwardEndOffset(float contentEndPos, float contentEndOffset,
+    double currentOffset, bool canOverScrollEnd, bool hasJumpIndex)
+{
+    contentEndPos_ = contentEndPos;
+    algorithm_ = AceType::MakeRefPtr<ListLayoutAlgorithm>();
+    auto list = FrameNode::CreateFrameNode(V2::LIST_ETS_TAG, GetElmtId(), AceType::MakeRefPtr<ListPattern>());
+    ASSERT_NE(list, nullptr);
+    nodes_.push_back(list);
+    wrapper_ = AceType::MakeRefPtr<LayoutWrapperNode>(list, list->GetGeometryNode(), list->GetLayoutProperty());
+    wrapper_->currentChildCount_ = 0;
+    algorithm_->totalItemCount_ = END_ADJUST_ITEM_COUNT;
+    algorithm_->contentMainSize_ = END_ADJUST_VIEWPORT;
+    algorithm_->contentEndOffset_ = contentEndOffset;
+    algorithm_->contentStartOffset_ = 0.0f;
+    algorithm_->canOverScrollEnd_ = canOverScrollEnd;
+    algorithm_->overScrollFeature_ = canOverScrollEnd;
+    algorithm_->prevItemPosCount_ = END_ADJUST_ITEM_COUNT;
+    algorithm_->currentOffset_ = currentOffset;
+    algorithm_->startMainPos_ = static_cast<float>(currentOffset);
+    algorithm_->endMainPos_ = static_cast<float>(currentOffset) + END_ADJUST_VIEWPORT;
+    if (hasJumpIndex) {
+        algorithm_->jumpIndex_ = 0;
+    }
+    algorithm_->itemPosition_[0] = { 0, 0.0f, contentEndPos, false };
+}
+
+void ListForwardEndOffsetTestNg::RunForwardEndOffsetAdjust()
+{
+    ASSERT_NE(algorithm_, nullptr);
+    ASSERT_NE(wrapper_, nullptr);
+    // startIndex == totalItemCount_ makes LayoutALineForward lay out nothing, so the do-while exits with
+    // currentEndPos still at the prepared content end and the tail "adjust offset" branch is reached.
+    algorithm_->LayoutForward(AceType::RawPtr(wrapper_), END_ADJUST_ITEM_COUNT, contentEndPos_);
+}
+
+/**
+ * @tc.name: LayoutForwardEndOffsetAdjustKeepsDoublePrecision001
+ * @tc.desc: End-of-content offset adjustment keeps double precision for a huge content end
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListForwardEndOffsetTestNg, LayoutForwardEndOffsetAdjustKeepsDoublePrecision001, TestSize.Level1)
+{
+    PrepareForwardEndOffset(END_ADJUST_HUGE_END_POS, END_ADJUST_HUGE_END_OFFSET,
+        END_ADJUST_HUGE_CURRENT_OFFSET, false, false);
+    RunForwardEndOffsetAdjust();
+    EXPECT_NE(algorithm_->currentOffset_, END_ADJUST_HUGE_ROUNDED);
+    EXPECT_DOUBLE_EQ(algorithm_->currentOffset_, END_ADJUST_HUGE_EXPECTED);
+}
+
+/**
+ * @tc.name: LayoutForwardEndOffsetAdjustKeepsDoublePrecision002
+ * @tc.desc: End-of-content offset adjustment is unchanged for an ordinary content end
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListForwardEndOffsetTestNg, LayoutForwardEndOffsetAdjustKeepsDoublePrecision002, TestSize.Level1)
+{
+    PrepareForwardEndOffset(END_ADJUST_SMALL_END_POS, END_ADJUST_SMALL_END_OFFSET,
+        END_ADJUST_SMALL_CURRENT_OFFSET, false, false);
+    RunForwardEndOffsetAdjust();
+    EXPECT_DOUBLE_EQ(algorithm_->currentOffset_, END_ADJUST_SMALL_EXPECTED);
+}
+
+/**
+ * @tc.name: LayoutForwardEndOffsetAdjustKeepsDoublePrecision003
+ * @tc.desc: End-of-content offset adjustment keeps double precision on a spring jump to the last item
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListForwardEndOffsetTestNg, LayoutForwardEndOffsetAdjustKeepsDoublePrecision003, TestSize.Level1)
+{
+    PrepareForwardEndOffset(END_ADJUST_HUGE_END_POS, END_ADJUST_HUGE_END_OFFSET,
+        END_ADJUST_HUGE_CURRENT_OFFSET, true, true);
+    RunForwardEndOffsetAdjust();
+    EXPECT_NE(algorithm_->currentOffset_, END_ADJUST_HUGE_ROUNDED);
+    EXPECT_DOUBLE_EQ(algorithm_->currentOffset_, END_ADJUST_HUGE_EXPECTED);
+}
 } // namespace OHOS::Ace::NG

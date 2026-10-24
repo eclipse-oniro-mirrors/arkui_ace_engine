@@ -57,7 +57,13 @@ void NodeAddExtraData(ArkUI_NodeHandle node, ArkUI_NodeCustomEventType eventType
 
 int32_t RegisterNodeCustomEvent(ArkUI_NodeHandle node, ArkUI_NodeCustomEventType eventType, int32_t targetId, void* userData)
 {
-    if (!node || !CheckIsCNode(node)) {
+    CHECK_UI_THREAD("ArkUI_NativeNodeAPI_1.registerNodeCustomEvent");
+    if (!node) {
+        SET_ERROR_MESSAGE(ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Node is invalid");
+        return ERROR_CODE_PARAM_INVALID;
+    }
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
+    if (!CheckIsCNode(node)) {
         SET_ERROR_MESSAGE(ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Node is invalid");
         return ERROR_CODE_PARAM_INVALID;
     }
@@ -135,7 +141,12 @@ void NodeRemoveExtraData(ArkUI_NodeHandle node, ArkUI_NodeCustomEventType eventT
 
 void UnregisterNodeCustomEvent(ArkUI_NodeHandle node, ArkUI_NodeCustomEventType eventType)
 {
-    if (node == nullptr || !node->extraCustomData || !CheckIsCNode(node)) {
+    CHECK_UI_THREAD("ArkUI_NativeNodeAPI_1.unregisterNodeCustomEvent");
+    if (node == nullptr) {
+        return;
+    }
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
+    if (!node->extraCustomData || !CheckIsCNode(node)) {
         return;
     }
     const auto* impl = GetFullImpl();
@@ -178,11 +189,13 @@ void UnregisterNodeCustomEvent(ArkUI_NodeHandle node, ArkUI_NodeCustomEventType 
 void (*g_customEventReceiver)(ArkUI_NodeCustomEvent* event) = nullptr;
 void RegisterNodeCustomReceiver(void (*eventReceiver)(ArkUI_NodeCustomEvent* event))
 {
+    CHECK_UI_THREAD("ArkUI_NativeNodeAPI_1.registerNodeCustomEventReceiver");
     g_customEventReceiver = eventReceiver;
 }
 
 void UnregisterNodeCustomEventReceiver()
 {
+    CHECK_UI_THREAD("ArkUI_NativeNodeAPI_1.unregisterNodeCustomEventReceiver");
     g_customEventReceiver = nullptr;
 }
 
@@ -232,7 +245,12 @@ void HandleCustomEvent(ArkUI_NodeCustomEvent* event)
 
 int32_t AddNodeCustomEventReceiver(ArkUI_NodeHandle nodePtr, void (*eventReceiver)(ArkUI_NodeCustomEvent* event))
 {
-    if (!nodePtr || !eventReceiver || !CheckIsCNode(nodePtr)) {
+    if (!nodePtr || !eventReceiver) {
+        SET_ERROR_MESSAGE(ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Node or event receiver is invalid");
+        return ERROR_CODE_PARAM_INVALID;
+    }
+    CHECK_NODE_DISPOSED(nodePtr, "Node has been disposed");
+    if (!CheckIsCNode(nodePtr)) {
         SET_ERROR_MESSAGE(ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Node or event receiver is invalid");
         return ERROR_CODE_PARAM_INVALID;
     }
@@ -252,7 +270,12 @@ int32_t AddNodeCustomEventReceiver(ArkUI_NodeHandle nodePtr, void (*eventReceive
 int32_t RemoveNodeCustomEventReceiver(ArkUI_NodeHandle nodePtr,
     void (*eventReceiver)(ArkUI_NodeCustomEvent* event))
 {
-    if (!nodePtr || !eventReceiver || !nodePtr->customEventListeners || !CheckIsCNode(nodePtr)) {
+    if (!nodePtr || !eventReceiver) {
+        SET_ERROR_MESSAGE(ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Node or event receiver is invalid");
+        return ERROR_CODE_PARAM_INVALID;
+    }
+    CHECK_NODE_DISPOSED(nodePtr, "Node has been disposed");
+    if (!nodePtr->customEventListeners || !CheckIsCNode(nodePtr)) {
         SET_ERROR_MESSAGE(ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Node or event receiver is invalid");
         return ERROR_CODE_PARAM_INVALID;
     }

@@ -627,7 +627,7 @@ void ScrollableModelNG::ResetEnableScrollWithMouse(FrameNode* frameNode)
     CHECK_NULL_VOID(frameNode);
     auto pattern = frameNode->GetPattern<ScrollablePattern>();
     CHECK_NULL_VOID(pattern);
-    pattern->SetIsAllowMouse(false);
+    pattern->ResetIsAllowMouse();
 }
 
 bool ScrollableModelNG::GetEnableScrollWithMouse(FrameNode* frameNode)
@@ -636,6 +636,46 @@ bool ScrollableModelNG::GetEnableScrollWithMouse(FrameNode* frameNode)
     auto pattern = frameNode->GetPattern<ScrollablePattern>();
     CHECK_NULL_RETURN(pattern, false);
     return pattern->GetIsAllowMouse();
+}
+
+void ScrollableModelNG::SetEnableScrollWithKeyboard(bool enableScrollWithKeyboard)
+{
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    CHECK_NULL_VOID(frameNode);
+    auto pattern = frameNode->GetPattern<ScrollablePattern>();
+    CHECK_NULL_VOID(pattern);
+    pattern->SetIsAllowKeyboard(enableScrollWithKeyboard);
+}
+
+void ScrollableModelNG::ResetEnableScrollWithKeyboard()
+{
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    CHECK_NULL_VOID(frameNode);
+    ResetEnableScrollWithKeyboard(frameNode);
+}
+
+void ScrollableModelNG::SetEnableScrollWithKeyboard(FrameNode* frameNode, bool enableScrollWithKeyboard)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto pattern = frameNode->GetPattern<ScrollablePattern>();
+    CHECK_NULL_VOID(pattern);
+    pattern->SetIsAllowKeyboard(enableScrollWithKeyboard);
+}
+
+void ScrollableModelNG::ResetEnableScrollWithKeyboard(FrameNode* frameNode)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto pattern = frameNode->GetPattern<ScrollablePattern>();
+    CHECK_NULL_VOID(pattern);
+    pattern->SetIsAllowKeyboard(true);
+}
+
+bool ScrollableModelNG::GetEnableScrollWithKeyboard(FrameNode* frameNode)
+{
+    CHECK_NULL_RETURN(frameNode, true);
+    auto pattern = frameNode->GetPattern<ScrollablePattern>();
+    CHECK_NULL_RETURN(pattern, true);
+    return pattern->GetIsAllowKeyboard();
 }
 
 void ScrollableModelNG::SetScrollBarMargin(const ScrollBarMargin& scrollBarMargin)

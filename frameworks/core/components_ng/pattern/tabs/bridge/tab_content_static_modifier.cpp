@@ -30,6 +30,7 @@ namespace {
     struct TabBarOptions {
         std::optional<std::string> text;
         std::optional<std::string> icon;
+        std::optional<TabBarBadgeParam> badge;
     };
 
     using TabBarOptionsVariant = std::variant<
@@ -98,16 +99,53 @@ auto g_setBottomTabBarStyle = [](FrameNode* frameNode, const Ark_BottomTabBarSty
     TabContentModelStatic::SetId(frameNode, style->id);
     TabContentModelStatic::SetTabBarStyle(frameNode, TabBarStyle::BOTTOMTABBATSTYLE);
     TabContentModelStatic::SetTabBar(frameNode, style->text, style->icon, nullptr);
+    TabContentModelNG::SetTabBarBadge(frameNode, style->badge);
     TabbarAddTabBarItem(AceType::WeakClaim(frameNode));
 };
 
 namespace Converter {
+template<>
+inline TabBarBadgeParam Convert(const Ark_TabBarBadgeStyle& src)
+{
+    TabBarBadgeParam param;
+    auto badgeTypeOpt = Converter::GetOptPtr(&src.value);
+    if (badgeTypeOpt) {
+        Converter::VisitUnion(
+            badgeTypeOpt.value(),
+            [&param](const Ark_Int32& num) {
+                param.badgeCount = static_cast<int32_t>(num);
+            },
+            [&param](const Ark_ResourceStr& resStr) {
+                auto optStr = Converter::OptConvert<std::string>(resStr);
+                if (optStr) {
+                    param.badgeValue = optStr.value();
+                }
+            },
+            []() {}
+        );
+    }
+    auto maxCountOpt = Converter::GetOptPtr(&src.maxCount);
+    if (maxCountOpt) {
+        param.badgeMaxCount = static_cast<int32_t>(Converter::Convert<uint32_t>(maxCountOpt.value()));
+    }
+    return param;
+}
+
+template<>
+inline void AssignTo(std::optional<TabBarBadgeParam>& dst, const Opt_TabBarBadgeStyle& src)
+{
+    if (src.tag != INTEROP_TAG_UNDEFINED) {
+        dst = Converter::Convert<TabBarBadgeParam>(src.value);
+    }
+}
+
 template<>
 inline TabBarOptions Convert(const Ark_TabBarOptions& src)
 {
     TabBarOptions options;
     options.text = OptConvert<std::string>(src.text);
     options.icon = OptConvert<std::string>(src.icon);
+    options.badge = OptConvertPtr<TabBarBadgeParam>(&src.badge);
     return options;
 }
 
@@ -288,12 +326,15 @@ void SetTabBarImpl(Ark_NativePointer node,
         [frameNode](const Ark_TabBarOptions& arkTabBarOptions) {
             std::optional<std::string> label;
             std::optional<std::string> icon;
+            std::optional<TabBarBadgeParam> badge;
             if (auto tabBarOptions = Converter::OptConvert<TabBarOptions>(arkTabBarOptions)) {
                 label = tabBarOptions->text;
                 icon = tabBarOptions->icon;
+                badge = tabBarOptions->badge;
             }
             TabContentModelStatic::SetTabBarStyle(frameNode, TabBarStyle::NOSTYLE);
             TabContentModelStatic::SetTabBar(frameNode, label, icon, nullptr);
+            TabContentModelNG::SetTabBarBadge(frameNode, badge);
             TabbarAddTabBarItem(AceType::WeakClaim(frameNode));
         },
         [frameNode]() {

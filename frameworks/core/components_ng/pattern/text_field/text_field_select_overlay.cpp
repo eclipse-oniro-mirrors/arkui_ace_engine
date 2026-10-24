@@ -248,6 +248,16 @@ std::optional<SelectHandleInfo> TextFieldSelectOverlay::GetHandleInfo(const Rect
     auto handleRect = handlePaintRect;
     SelectHandleInfo handleInfo;
     handleInfo.localPaintRect = handlePaintRect;
+    // When the overlay is mounted on an ancestor of the owner (for example,
+    // on the Search node instead of the SearchField, because the SearchField
+    // clips its children and would trim the handles), convert the handle rect
+    // from the owner coordinate space to the mount node coordinate space.
+    auto owner = GetOwner();
+    auto mountNode = GetSelectOverlayMountNode(owner);
+    if (mountNode != owner) {
+        handleInfo.localPaintRect.SetOffset(handleInfo.localPaintRect.GetOffset() +
+            owner->GetTransformRelativeOffset() - mountNode->GetTransformRelativeOffset());
+    }
     handleRect.SetOffset(handleRect.GetOffset() + GetPaintOffsetWithoutTransform());
     handleInfo.paintRect = handleRect;
     handleInfo.isShow = CheckHandleVisible(handleRect);

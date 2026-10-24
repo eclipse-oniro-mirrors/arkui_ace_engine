@@ -23,6 +23,7 @@
 #include "core/common/event_manager.h"
 #include "core/components_ng/event/drag_event.h"
 #include "core/components_ng/gestures/recognizers/pan_recognizer.h"
+#include "core/components_ng/manager/focus/focus_manager.h"
 #include "core/components_ng/pattern/list/list_item_drag_manager.h"
 #include "core/components_ng/pattern/list/list_item_event_hub.h"
 #include "core/components_ng/pattern/list/list_item_pattern.h"
@@ -1252,6 +1253,36 @@ HWTEST_F(ListEventTestNg, ScrollSnapAlignWhenHeightEqual, TestSize.Level1)
 }
 
 /**
+ * @tc.name: ListFocusScrollOnMouseWheel001
+ * @tc.desc: Focus auto-scroll is disabled while List is scrolling.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListEventTestNg, ListFocusScrollOnMouseWheel001, TestSize.Level1)
+{
+    CreateList();
+    CreateListItems();
+    CreateDone();
+    auto pipeline = frameNode_->GetContext();
+    ASSERT_NE(pipeline, nullptr);
+    auto focusManager = pipeline->GetFocusManager();
+    ASSERT_NE(focusManager, nullptr);
+    auto focusHub = GetChildFocusHub(frameNode_, 0);
+    ASSERT_NE(focusHub, nullptr);
+
+    focusManager->SetNeedTriggerScroll(true);
+    focusManager->SetLastFocusStateNode(focusHub);
+    pattern_->scrollSource_ = SCROLL_FROM_AXIS;
+    pattern_->FireOnScrollStart();
+    focusManager->SetLastFocusStateNode(focusHub);
+    EXPECT_FALSE(focusManager->GetNeedTriggerScroll());
+
+    pattern_->scrollStop_ = true;
+    pattern_->OnScrollStop(nullptr, nullptr);
+    focusManager->SetLastFocusStateNode(focusHub);
+    EXPECT_TRUE(focusManager->GetNeedTriggerScroll());
+}
+
+/**
  * @tc.name: StartSnapAnimation001
  * @tc.desc: Test start snap align by mouse wheel.
  * @tc.type: FUNC
@@ -2032,5 +2063,47 @@ HWTEST_F(ListEventTestNg, ScrollSnapAlignStartAtBottom001, TestSize.Level1)
      */
     FlushUITasks();
     EXPECT_FLOAT_EQ(pattern_->GetTotalOffset(), offsetAfterScroll);
+}
+
+/**
+ * @tc.name: StartSnapAnimation003
+ * @tc.desc: Test snap align scrolling by mouse wheel does not pollute the scroll source with JUMP,
+ *           so getScrollState keeps animation semantics during axis-driven snap animation.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListEventTestNg, StartSnapAnimation003, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create List.
+     */
+    ListModelNG model = CreateList();
+    model.SetScrollSnapAlign(ScrollSnapAlign::START);
+    // Make ListHeight not an integer multiple of ListItems
+    ViewAbstract::SetHeight(CalcLength(HEIGHT - DEVIATION_HEIGHT));
+    CreateListItems(TOTAL_ITEM_NUMBER);
+    CreateDone();
+
+    /**
+     * @tc.steps: step2. Trigger the snapAnimation by mouse wheel with axis source.
+     * @tc.expected: The scroll source keeps animation semantics instead of JUMP.
+     */
+    EXPECT_FALSE(pattern_->lastSnapTargetIndex_.has_value());
+    SnapAnimationOptions snapAnimationOptions = {
+        .snapDelta = -50.f,
+        .animationVelocity = -500.f,
+        .snapDirection = SnapDirection::BACKWARD,
+        .source = SCROLL_FROM_AXIS,
+    };
+    pattern_->StartSnapAnimation(snapAnimationOptions);
+    EXPECT_TRUE(pattern_->lastSnapTargetIndex_.has_value());
+    EXPECT_NE(pattern_->GetScrollStateForQuery(), ScrollState::IDLE);
+
+    /**
+     * @tc.steps: step3. Run the snap animation frames.
+     * @tc.expected: The scroll source keeps animation semantics instead of JUMP.
+     */
+    MockAnimationManager::GetInstance().Tick();
+    FlushUITasks();
+    EXPECT_NE(pattern_->GetScrollStateForQuery(), ScrollState::IDLE);
 }
 } // namespace OHOS::Ace::NG

@@ -23,12 +23,17 @@
 #include "test/mock/interfaces/inner_api/ui_session/mock_ui_session_manager.h"
 
 #include "core/components_ng/base/view_stack_processor.h"
+#include "core/components_ng/layout/layout_wrapper_node.h"
 #include "core/components_ng/manager/content_change_manager/content_change_manager.h"
+#include "core/components_ng/pattern/swiper/swiper_layout_algorithm.h"
 #include "core/components_ng/pattern/swiper/swiper_layout_property.h"
 #include "core/components_ng/pattern/swiper/swiper_model_ng.h"
 #include "core/components_ng/pattern/swiper/swiper_paint_property.h"
 #include "core/components_ng/pattern/swiper/swiper_pattern.h"
 #include "core/components_ng/pattern/root/root_pattern.h"
+#include "core/components_ng/pattern/tabs/tab_bar_pattern.h"
+#include "core/components_ng/pattern/tabs/tabs_layout_property.h"
+#include "core/components_ng/pattern/tabs/tabs_pattern.h"
 
 using namespace testing;
 using namespace testing::ext;
@@ -49,6 +54,20 @@ public:
     static void TearDownTestCase()
     {
         MockPipelineContext::TearDown();
+    }
+
+    static void FinishNoAnimationLayout(const RefPtr<FrameNode>& swiperNode, int32_t index)
+    {
+        auto layoutProperty = swiperNode->GetLayoutProperty<SwiperLayoutProperty>();
+        auto dirty = AceType::MakeRefPtr<LayoutWrapperNode>(
+            swiperNode, swiperNode->GetGeometryNode(), layoutProperty);
+        auto algorithm = AceType::MakeRefPtr<SwiperLayoutAlgorithm>();
+        algorithm->SetCurrentIndex(index);
+        dirty->SetLayoutAlgorithm(AceType::MakeRefPtr<LayoutAlgorithmWrapper>(algorithm));
+        swiperNode->GetPattern<SwiperPattern>()->OnDirtyLayoutWrapperSwap(dirty, DirtySwapConfig());
+        auto pipeline = MockPipelineContext::GetCurrent();
+        pipeline->taskScheduler_->FlushAfterRenderTask();
+        pipeline->GetContentChangeManager()->OnVsyncEnd(RectF());
     }
 };
 
@@ -148,6 +167,121 @@ HWTEST_F(SwiperTestCore, ContentChangeTabsStartTest001, TestSize.Level1)
     EXPECT_TRUE(manager->activeContentChanges_.empty());
     Mock::VerifyAndClearExpectations(mockUiSessionManager);
 
+    manager->StopContentChangeReport();
+}
+
+/**
+ * @tc.name: ContentChangeTabsPropertyIndexTest001
+ * @tc.desc: Tabs index changes report START before updating the index and preserve END with START disabled.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SwiperTestCore, ContentChangeTabsPropertyIndexTest001, TestSize.Level1)
+{
+    auto manager = MockPipelineContext::GetCurrent()->GetContentChangeManager();
+    ASSERT_NE(manager, nullptr);
+    auto mock = reinterpret_cast<MockUiSessionManager*>(UiSessionManager::GetInstance());
+    ASSERT_NE(mock, nullptr);
+    for (bool reportStartEvent : { false, true }) {
+        ContentChangeConfig config;
+        config.reportStartEvent = reportStartEvent;
+        manager->StartContentChangeReport(config);
+        auto tabsPattern = AceType::MakeRefPtr<TabsPattern>();
+        auto tabs = FrameNode::CreateFrameNode(V2::TABS_ETS_TAG, 445, tabsPattern, true);
+        auto tabBar = FrameNode::CreateFrameNode(
+            V2::TAB_BAR_ETS_TAG, 446, AceType::MakeRefPtr<TabBarPattern>(), true);
+        auto pattern = AceType::MakeRefPtr<SwiperPattern>();
+        auto swiper = FrameNode::CreateFrameNode(V2::SWIPER_ETS_TAG, 447, pattern, true);
+        swiper->MountToParent(tabs);
+        for (int32_t index = 0; index < 2; ++index) {
+            swiper->AddChild(FrameNode::CreateFrameNode(V2::TAB_CONTENT_ITEM_ETS_TAG, 448 + index,
+                AceType::MakeRefPtr<Pattern>(), true));
+        }
+        auto tabsProperty = tabs->GetLayoutProperty<TabsLayoutProperty>();
+        auto swiperProperty = swiper->GetLayoutProperty<SwiperLayoutProperty>();
+        tabsProperty->UpdateIndex(0);
+        tabsProperty->UpdateIndexSetByUser(1);
+        swiperProperty->UpdateIndex(0);
+        pattern->isInit_ = false;
+        pattern->SetHasTabsAncestor(true);
+        if (reportStartEvent) {
+            EXPECT_CALL(*mock, ReportContentChangeEvent(ChangeType::TABS_START, HasSubstr("\"$ID\":445")))
+                .WillOnce(Invoke([&](ChangeType, const std::string&) {
+                    EXPECT_EQ(tabsProperty->GetIndexValue(0), 0);
+                    EXPECT_EQ(swiperProperty->GetIndexValue(0), 0);
+                }));
+        } else {
+            EXPECT_CALL(*mock, ReportContentChangeEvent(ChangeType::TABS_START, _)).Times(0);
+        }
+        tabsPattern->UpdateIndex(tabs, tabBar, swiper, tabsProperty);
+        EXPECT_EQ(tabsProperty->GetIndexValue(0), 1);
+        EXPECT_EQ(swiperProperty->GetIndexValue(0), 1);
+        EXPECT_EQ(manager->activeContentChanges_.count(445), reportStartEvent ? 1u : 0u);
+        Mock::VerifyAndClearExpectations(mock);
+
+        EXPECT_CALL(*mock, ReportContentChangeEvent(ChangeType::TABS_START, _)).Times(0);
+        tabsProperty->UpdateIndexSetByUser(1);
+        tabsPattern->UpdateIndex(tabs, tabBar, swiper, tabsProperty);
+        pattern->BeforeCreateLayoutWrapper();
+        pattern->BeforeCreateLayoutWrapper();
+        EXPECT_CALL(*mock, ReportContentChangeEvent(ChangeType::TABS, _)).Times(1);
+        FinishNoAnimationLayout(swiper, 1);
+        EXPECT_TRUE(manager->activeContentChanges_.empty());
+        Mock::VerifyAndClearExpectations(mock);
+        manager->StopContentChangeReport();
+    }
+}
+
+/**
+ * @tc.name: ContentChangeTabsPropertyIndexTest002
+ * @tc.desc: Unchanged, invalid and intercepted Tabs property indices do not report START or change the index.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SwiperTestCore, ContentChangeTabsPropertyIndexTest002, TestSize.Level1)
+{
+    auto manager = MockPipelineContext::GetCurrent()->GetContentChangeManager();
+    ASSERT_NE(manager, nullptr);
+    ContentChangeConfig config;
+    config.reportStartEvent = true;
+    manager->StartContentChangeReport(config);
+    auto tabsPattern = AceType::MakeRefPtr<TabsPattern>();
+    auto tabs = FrameNode::CreateFrameNode(V2::TABS_ETS_TAG, 452, tabsPattern, true);
+    auto tabBar = FrameNode::CreateFrameNode(
+        V2::TAB_BAR_ETS_TAG, 453, AceType::MakeRefPtr<TabBarPattern>(), true);
+    auto swiper = FrameNode::CreateFrameNode(V2::SWIPER_ETS_TAG, 454, AceType::MakeRefPtr<SwiperPattern>(), true);
+    swiper->MountToParent(tabs);
+    for (int32_t index = 0; index < 2; ++index) {
+        swiper->AddChild(FrameNode::CreateFrameNode(V2::TAB_CONTENT_ITEM_ETS_TAG, 455 + index,
+            AceType::MakeRefPtr<Pattern>(), true));
+    }
+    auto tabsProperty = tabs->GetLayoutProperty<TabsLayoutProperty>();
+    auto swiperProperty = swiper->GetLayoutProperty<SwiperLayoutProperty>();
+    tabsProperty->UpdateIndex(0);
+    swiperProperty->UpdateIndex(0);
+    auto mock = reinterpret_cast<MockUiSessionManager*>(UiSessionManager::GetInstance());
+    ASSERT_NE(mock, nullptr);
+    EXPECT_CALL(*mock, ReportContentChangeEvent(_, _)).Times(0);
+    for (int32_t index : { 0, -1, 2 }) {
+        tabsProperty->UpdateIndexSetByUser(index);
+        tabsPattern->UpdateIndex(tabs, tabBar, swiper, tabsProperty);
+        EXPECT_EQ(tabsProperty->GetIndexValue(0), 0);
+        EXPECT_EQ(swiperProperty->GetIndexValue(0), 0);
+        EXPECT_TRUE(manager->activeContentChanges_.empty());
+    }
+    bool intercepted = false;
+    tabsPattern->SetInterceptStatus(true);
+    tabsPattern->SetOnContentWillChange([&](int32_t from, int32_t to) {
+        EXPECT_EQ(from, 0);
+        EXPECT_EQ(to, 1);
+        intercepted = true;
+        return false;
+    });
+    tabsProperty->UpdateIndexSetByUser(1);
+    tabsPattern->UpdateIndex(tabs, tabBar, swiper, tabsProperty);
+    EXPECT_TRUE(intercepted);
+    EXPECT_EQ(tabsProperty->GetIndexValue(0), 0);
+    EXPECT_EQ(swiperProperty->GetIndexValue(0), 0);
+    EXPECT_TRUE(manager->activeContentChanges_.empty());
+    Mock::VerifyAndClearExpectations(mock);
     manager->StopContentChangeReport();
 }
 

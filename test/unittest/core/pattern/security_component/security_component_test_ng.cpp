@@ -32,6 +32,7 @@
 #include "core/components/common/properties/color.h"
 #include "core/components/common/properties/text_style.h"
 #include "core/components_ng/base/view_stack_processor.h"
+#include "core/components_ng/event/event_hub_callback_sets.h"
 #include "core/components_ng/layout/layout_wrapper_node.h"
 #include "core/components_ng/pattern/button/button_layout_property.h"
 #include "core/components_ng/pattern/button/button_pattern.h"
@@ -754,10 +755,10 @@ HWTEST_F(SecurityComponentModelTestNg, SecurityComponentLocationPatternTest002, 
 
     auto eventHub = frameNode->GetEventHub<EventHub>();
     ASSERT_NE(eventHub, nullptr);
-    ASSERT_NE(eventHub->onAppear_, nullptr);
-    ASSERT_NE(eventHub->onDisappear_, nullptr);
-    eventHub->onAppear_();
-    eventHub->onDisappear_();
+    ASSERT_NE(eventHub->GetOrCreateAppearCallbackSet()->onAppear, nullptr);
+    ASSERT_NE(eventHub->GetOrCreateAppearCallbackSet()->onDisappear, nullptr);
+    eventHub->GetOrCreateAppearCallbackSet()->onAppear();
+    eventHub->GetOrCreateAppearCallbackSet()->onDisappear();
     ASSERT_EQ(pattern->scId_, -1);
 }
 
@@ -1351,10 +1352,10 @@ HWTEST_F(SecurityComponentModelTestNg, SecurityComponentSavePatternTest002, Test
 
     auto eventHub = frameNode->GetEventHub<EventHub>();
     ASSERT_NE(eventHub, nullptr);
-    ASSERT_NE(eventHub->onAppear_, nullptr);
-    ASSERT_NE(eventHub->onDisappear_, nullptr);
-    eventHub->onAppear_();
-    eventHub->onDisappear_();
+    ASSERT_NE(eventHub->GetOrCreateAppearCallbackSet()->onAppear, nullptr);
+    ASSERT_NE(eventHub->GetOrCreateAppearCallbackSet()->onDisappear, nullptr);
+    eventHub->GetOrCreateAppearCallbackSet()->onAppear();
+    eventHub->GetOrCreateAppearCallbackSet()->onDisappear();
     ASSERT_EQ(pattern->scId_, -1);
 }
 
@@ -1778,10 +1779,10 @@ HWTEST_F(SecurityComponentModelTestNg, SecurityComponentPastePatternTest002, Tes
 
     auto eventHub = frameNode->GetEventHub<EventHub>();
     ASSERT_NE(eventHub, nullptr);
-    ASSERT_NE(eventHub->onAppear_, nullptr);
-    ASSERT_NE(eventHub->onDisappear_, nullptr);
-    eventHub->onAppear_();
-    eventHub->onDisappear_();
+    ASSERT_NE(eventHub->GetOrCreateAppearCallbackSet()->onAppear, nullptr);
+    ASSERT_NE(eventHub->GetOrCreateAppearCallbackSet()->onDisappear, nullptr);
+    eventHub->GetOrCreateAppearCallbackSet()->onAppear();
+    eventHub->GetOrCreateAppearCallbackSet()->onDisappear();
     ASSERT_EQ(pattern->scId_, -1);
 }
 

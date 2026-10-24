@@ -63,6 +63,7 @@ public:
     void SetMaintainVisibleContentPosition(bool enabled) override;
     void SetStackFromEnd(bool enabled) override;
     void SetSyncLoad(bool enabled) override;
+    void SetScrollPlaceholder(NG::ScrollPlaceholderProvider&& provider) override;
     void SetEditModeOptions(EditModeOptions& editModeOptions) override;
     void SetEnableEditMode(bool enableEditMode) override;
     void SetEnableEditModeChangeEvent(std::function<void(bool)>&& changeEvent) override;
@@ -193,6 +194,10 @@ public:
         std::optional<float> extraOffset = std::nullopt);
     static void SetScrollToIndexMultiThread(FrameNode* frameNode, int32_t index, int32_t animation, int32_t alignment,
         std::optional<float> extraOffset = std::nullopt);
+    static void SetScrollToIndexWithOptions(FrameNode* frameNode, int32_t index, bool smooth, ScrollAlign align,
+        std::optional<float> extraOffset, FastScrollMode mode);
+    static void SetScrollToIndexWithOptionsMultiThread(FrameNode* frameNode, int32_t index, bool smooth,
+        ScrollAlign align, std::optional<float> extraOffset, FastScrollMode mode);
     static void SetScrollBy(FrameNode* frameNode, double x, double y);
     static void SetOnReachStart(FrameNode* frameNode, OnReachEvent&& onReachStart);
     static void SetOnReachEnd(FrameNode* frameNode, OnReachEvent&& onReachEnd);

@@ -27,7 +27,7 @@ namespace OHOS::Ace {
 using BuildPanelImpl = std::function<void()>;
 
 // PanelController is used in PanelElement to build a panel
-class PanelController : public virtual AceType {
+class PanelController : public AceType {
     DECLARE_ACE_TYPE(PanelController, AceType);
 
 public:

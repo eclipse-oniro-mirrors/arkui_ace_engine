@@ -28,7 +28,7 @@ namespace OHOS::Ace {
 using BuildDialogImpl = std::function<void()>;
 
 // CustomDialogController is used in CustomDialogElement to build a dialog
-class CustomDialogController : public virtual AceType {
+class CustomDialogController : public AceType {
     DECLARE_ACE_TYPE(CustomDialogController, AceType);
 
 public:

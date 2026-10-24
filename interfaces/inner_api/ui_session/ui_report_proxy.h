@@ -111,8 +111,11 @@ public:
         const std::string& request,
         const std::string& result, WebRequestErrorCode errorCode) override;
     void SendPageText(int32_t nodeId, const std::string& text, int64_t version) override;
+    void ReportNavigationQueryResult(const std::string& data) override;
+    void ReportLazyForEachQueryResult(const std::string& data) override;
 
 private:
+    void SendQueryResultReport(uint32_t code, const char* caller, const std::string& data);
     static inline BrokerDelegator<UiReportProxy> delegator_;
 };
 

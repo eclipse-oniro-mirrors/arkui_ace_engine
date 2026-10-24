@@ -482,15 +482,20 @@ export struct ChipGroupV2 {
   @Param chipGroupSpace?: ChipGroupV2Space = new ChipGroupV2Space(defaultTheme.chipGroupSpace);
   @Param chipGroupPadding?: ChipGroupV2Padding = new ChipGroupV2Padding(defaultTheme.chipGroupPadding);
   @Event onChange?: Callback<Array<int>>;
+  @Event onItemsChange?: Callback<ChipGroupV2Items> = undefined;
   @BuilderParam suffix?: ChipGroupV2SuffixBuilder;
   @Provider chipSize: ChipV2Size | SizeT<LengthMetrics> = defaultTheme.size;
   private scroller: Scroller = new Scroller();
   @Local selectedIndexesInternal?: Array<int> = [0];
   @Local isReachEnd: boolean = this.scroller.isAtEnd();
   @Local isRefresh: boolean = true;
+  private closedIndexes: Array<int> = [];
 
   @Monitor(['items'])
-  onItemsChange() {
+  onItemsChangeInternal() {
+    if (this.closedIndexes.length > 0) {
+      this.closedIndexes = [];
+    }
     this.isRefresh = !this.isRefresh;
   }
 
@@ -510,6 +515,20 @@ export struct ChipGroupV2 {
   @Monitor(['selectedIndexes'])
   selectedIndexesOnChange() {
     this.selectedIndexesInternal = this.selectedIndexes?.filter(()=>true);
+  }
+
+  private onItemClose(index: int): void {
+    if (!this.onItemsChange || this.closedIndexes.includes(index)) {
+      return;
+    }
+    this.closedIndexes.push(index);
+    let newItems = new ChipGroupV2Items([]);
+    (this.items as Array<ChipGroupV2Item>).forEach((element, i) => {
+      if (!this.closedIndexes.includes(i)) {
+        newItems.push(element);
+      }
+    })
+    this.onItemsChange?.(newItems);
   }
 
   aboutToAppear() {
@@ -768,6 +787,7 @@ export struct ChipGroupV2 {
                 })
                 this.$items?.(newItems);
               }
+              this.onItemClose(index);
             }
           } as IChipV2OptionsConfig)})
         }

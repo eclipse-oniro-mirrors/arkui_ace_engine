@@ -23,7 +23,7 @@
 
 namespace OHOS::Ace::Framework {
 
-class JsTouchFunction : public virtual JsFunction {
+class JsTouchFunction : public JsFunction {
     DECLARE_ACE_TYPE(JsTouchFunction, JsFunction);
 
 public:

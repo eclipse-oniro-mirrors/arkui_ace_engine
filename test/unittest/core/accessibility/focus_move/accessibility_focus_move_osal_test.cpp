@@ -59,7 +59,13 @@ public:
         }
         return nullptr;
     }
+    bool HasChildTree(int64_t elementId) override
+    {
+        return hasChildTree_ && (elementId == childTreeElementId_);
+    }
     RefPtr<NG::CustomAccessibilityProperty> mockProperty;
+    bool hasChildTree_ = false;
+    int64_t childTreeElementId_ = -1;
 };
 
 class MockRenderContextTest : public NG::RenderContext {
@@ -500,6 +506,92 @@ HWTEST_F(AccessibilityFocusMoveTest, FocusStrategyOsalThirdTest002, TestSize.Lev
 }
 
 /**
+ * @tc.name: ThirdRulesCheckNodeIsChildTreeContainerTest001
+ * @tc.desc: IsChildTreeContainer
+ * @tc.type: FUNC
+ */
+HWTEST_F(AccessibilityFocusMoveTest, ThirdRulesCheckNodeIsChildTreeContainerTest001, TestSize.Level1)
+{
+    auto ohAccessibilityProvider
+        = AceType::MakeRefPtr<MockOhAccessibilityProvider>();
+    ASSERT_NE(ohAccessibilityProvider, nullptr);
+    // std::make_shared (not AceType::MakeRefPtr): SendThirdAccessibilityProvider takes
+    // std::weak_ptr<ThirdAccessibilityManager>, RefPtr cannot convert to it implicitly.
+    auto thirdManager = std::make_shared<MockThirdAccessibilityManagerForCheckNode>();
+    ASSERT_NE(thirdManager, nullptr);
+    int64_t bindId = MAX_TEST_ELEMENT_COUNT - 1;
+    thirdManager->hasChildTree_ = true;
+    thirdManager->childTreeElementId_ = bindId;
+
+    // 1 no manager registered on provider
+    auto nodeInfo = std::make_shared<ArkUI_AccessibilityElementInfo>();
+    nodeInfo->SetElementId(bindId);
+    auto checkNode = std::make_shared<ThirdRulesCheckNode>(nodeInfo, bindId, ohAccessibilityProvider);
+    ASSERT_NE(checkNode, nullptr);
+    EXPECT_FALSE(checkNode->IsChildTreeContainer());
+
+    // 2 manager registered and node id is the bindId mount node
+    ohAccessibilityProvider->SendThirdAccessibilityProvider(thirdManager);
+    EXPECT_TRUE(checkNode->IsChildTreeContainer());
+
+    // 3 node id is not the bindId mount node
+    auto nodeInfo2 = std::make_shared<ArkUI_AccessibilityElementInfo>();
+    nodeInfo2->SetElementId(bindId - 1);
+    auto checkNode2 = std::make_shared<ThirdRulesCheckNode>(nodeInfo2, bindId - 1, ohAccessibilityProvider);
+    ASSERT_NE(checkNode2, nullptr);
+    EXPECT_FALSE(checkNode2->IsChildTreeContainer());
+
+    // 4 manager registered but no child tree bound
+    thirdManager->hasChildTree_ = false;
+    EXPECT_FALSE(checkNode->IsChildTreeContainer());
+}
+
+/**
+ * @tc.name: ThirdFocusMoveChildTreeContainerTest001
+ * @tc.desc: shared strategy emits FIND_CHILDTREE when last node search hits the bindId mount node
+ * @tc.type: FUNC
+ */
+HWTEST_F(AccessibilityFocusMoveTest, ThirdFocusMoveChildTreeContainerTest001, TestSize.Level1)
+{
+    auto ohAccessibilityProvider
+        = AceType::MakeRefPtr<MockOhAccessibilityProvider>();
+    ASSERT_NE(ohAccessibilityProvider, nullptr);
+    auto thirdManager = std::make_shared<MockThirdAccessibilityManagerForCheckNode>();
+    ASSERT_NE(thirdManager, nullptr);
+    thirdManager->hasChildTree_ = true;
+    thirdManager->childTreeElementId_ = MAX_TEST_ELEMENT_COUNT - 1;
+    ohAccessibilityProvider->SendThirdAccessibilityProvider(thirdManager);
+
+    // Start from the provider's LINKED chain element (the mock links 0→1→…→9 via
+    // child/parent ids): a bare info with only SetElementId(0) carries no child ids,
+    // so the last-child descent would stop at the start node itself. Fetch element 0
+    // through the same native-info channel ThirdRulesCheckNode::GetAceChildren uses.
+    auto nodeInfo = std::make_shared<ArkUI_AccessibilityElementInfo>();
+    ASSERT_TRUE(JsThirdProviderInteractionOperation::FindNativeInfoById(
+        ohAccessibilityProvider, 0, nodeInfo));
+    auto checkNode = std::make_shared<ThirdRulesCheckNode>(nodeInfo, 0, ohAccessibilityProvider);
+    ASSERT_NE(checkNode, nullptr);
+
+    AccessibilityFocusStrategy strategy;
+    AceFocusMoveDetailCondition condition = {.bypassSelf = true, .bypassDescendants = false};
+    std::shared_ptr<FocusRulesCheckNode> targetNode;
+
+    // 1 last node of the provider chain is the bindId mount node
+    auto result = strategy.FindLastNodeWithoutCheck(condition, checkNode, targetNode);
+    EXPECT_EQ(result, AceFocusMoveResult::FIND_CHILDTREE);
+    ASSERT_NE(targetNode, nullptr);
+    EXPECT_EQ(targetNode->GetAccessibilityId(), MAX_TEST_ELEMENT_COUNT - 1);
+
+    // 2 no child tree bound, last node is found directly
+    thirdManager->hasChildTree_ = false;
+    targetNode = nullptr;
+    result = strategy.FindLastNodeWithoutCheck(condition, checkNode, targetNode);
+    EXPECT_EQ(result, AceFocusMoveResult::FIND_SUCCESS);
+    ASSERT_NE(targetNode, nullptr);
+    EXPECT_EQ(targetNode->GetAccessibilityId(), MAX_TEST_ELEMENT_COUNT - 1);
+}
+
+/**
  * @tc.name: ThirdRulesCheckNodeTest001
  * @tc.desc: GetPropActionNames
  * @tc.type: FUNC
@@ -826,6 +918,35 @@ HWTEST_F(AccessibilityFocusMoveTest, FocusStrategyOsalHandleFocusMoveSearchResul
     auto targetNode = std::make_shared<FrameNodeRulesCheckNode>(frameNode, frameNode->GetAccessibilityId());
     AceFocusMoveResult aceResult = AceFocusMoveResult::FIND_FAIL_IN_SCROLL;
     auto finalResult = strategy.HandleFocusMoveSearchResult(param, targetNode, aceResult, info);
+    ASSERT_EQ(finalResult, FocusMoveResultType::SEARCH_FAIL_IN_SCROLL);
+}
+
+/**
+ * @tc.name: FocusStrategyOsalHandleFocusMoveSearchResultTest006
+ * @tc.desc: HandleFocusMoveSearchResult FIND_FAIL_IN_SCROLL with FOCUS_BY_TITLE/FOCUS_BY_LINK
+ * @tc.type: FUNC
+ */
+HWTEST_F(AccessibilityFocusMoveTest, FocusStrategyOsalHandleFocusMoveSearchResultTest006, TestSize.Level1)
+{
+    auto jsAccessibilityManager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
+    ASSERT_NE(jsAccessibilityManager, nullptr);
+    auto frameNode = NG::FrameNode::CreateFrameNode("framenode", ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<NG::Pattern>(), false);
+    ASSERT_NE(frameNode, nullptr);
+
+    MockFocusStrategyOsal strategy(jsAccessibilityManager);
+    Accessibility::AccessibilityFocusMoveParam param;
+    Accessibility::AccessibilityElementInfo info;
+    auto targetNode = std::make_shared<FrameNodeRulesCheckNode>(frameNode, frameNode->GetAccessibilityId());
+    AceFocusMoveResult aceResult = AceFocusMoveResult::FIND_FAIL_IN_SCROLL;
+    // aceResult FIND_FAIL_IN_SCROLL, type FOCUS_BY_TITLE
+    param.type = Accessibility::FocusRuleType::FOCUS_BY_TITLE;
+    auto finalResult = strategy.HandleFocusMoveSearchResult(param, targetNode, aceResult, info);
+    ASSERT_EQ(finalResult, FocusMoveResultType::SEARCH_FAIL_IN_SCROLL);
+
+    // aceResult FIND_FAIL_IN_SCROLL, type FOCUS_BY_LINK
+    param.type = Accessibility::FocusRuleType::FOCUS_BY_LINK;
+    finalResult = strategy.HandleFocusMoveSearchResult(param, targetNode, aceResult, info);
     ASSERT_EQ(finalResult, FocusMoveResultType::SEARCH_FAIL_IN_SCROLL);
 }
 

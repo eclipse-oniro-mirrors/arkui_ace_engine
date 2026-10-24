@@ -738,6 +738,66 @@ HWTEST_F(RichEditorAddSpanTestNg, AddSpans003, TestSize.Level0)
 }
 
 /**
+ * @tc.name: AddImageSpan005
+ * @tc.desc: test imageTag property of ImageSpan
+ * @tc.type: FUNC
+ */
+HWTEST_F(RichEditorAddSpanTestNg, AddImageSpan005, TestSize.Level0)
+{
+    ASSERT_NE(richEditorNode_, nullptr);
+    auto richEditorPattern = richEditorNode_->GetPattern<RichEditorPattern>();
+    ASSERT_NE(richEditorPattern, nullptr);
+    auto richEditorController = richEditorPattern->GetRichEditorController();
+    ASSERT_NE(richEditorController, nullptr);
+
+    // Branch: imageTag set
+    ImageSpanOptions optionsWithTag;
+    optionsWithTag.image = IMAGE_VALUE;
+    optionsWithTag.imageTag = u"testTag";
+    richEditorController->AddImageSpan(optionsWithTag);
+    auto spanItemWithTag = AceType::DynamicCast<ImageSpanItem>(richEditorPattern->spans_.front());
+    ASSERT_NE(spanItemWithTag, nullptr);
+    ASSERT_TRUE(spanItemWithTag->options.imageTag.has_value());
+    EXPECT_EQ(spanItemWithTag->options.imageTag.value(), u"testTag");
+    auto resultWithTag = spanItemWithTag->GetSpanResultObject(0, 1);
+    ASSERT_TRUE(resultWithTag.imageTag.has_value());
+    EXPECT_EQ(resultWithTag.imageTag.value(), u"testTag");
+    auto retInfoWithTag = richEditorPattern->GetResultByImageSpanOptions(optionsWithTag, 0);
+    ASSERT_TRUE(retInfoWithTag.GetImageTag().has_value());
+    EXPECT_EQ(retInfoWithTag.GetImageTag().value(), u"testTag");
+
+    // Branch: imageTag not set
+    ImageSpanOptions optionsNoTag;
+    optionsNoTag.image = IMAGE_VALUE;
+    richEditorController->AddImageSpan(optionsNoTag);
+    auto spanItemNoTag = AceType::DynamicCast<ImageSpanItem>(richEditorPattern->spans_.back());
+    ASSERT_NE(spanItemNoTag, nullptr);
+    EXPECT_FALSE(spanItemNoTag->options.imageTag.has_value());
+    auto resultNoTag = spanItemNoTag->GetSpanResultObject(0, 1);
+    EXPECT_FALSE(resultNoTag.imageTag.has_value());
+    auto retInfoNoTag = richEditorPattern->GetResultByImageSpanOptions(optionsNoTag, 1);
+    EXPECT_FALSE(retInfoNoTag.GetImageTag().has_value());
+
+    // Branch: GetImageResultObject via GetSpansInfo
+    auto spansInfo = richEditorController->GetSpansInfo(0, 2);
+    auto& resultObjs = spansInfo.selection_.resultObjects;
+    ASSERT_EQ(resultObjs.size(), 2);
+    EXPECT_EQ(resultObjs.front().imageTag.value_or(u""), u"testTag");
+    EXPECT_FALSE(resultObjs.back().imageTag.has_value());
+
+    // Branch: DeleteValueSetImageSpan (aboutToDelete path)
+    RichEditorAbstractSpanResult deleteResultWithTag;
+    deleteResultWithTag.SetSpanIndex(0);
+    richEditorPattern->DeleteValueSetImageSpan(spanItemWithTag, deleteResultWithTag);
+    ASSERT_TRUE(deleteResultWithTag.GetImageTag().has_value());
+    EXPECT_EQ(deleteResultWithTag.GetImageTag().value(), u"testTag");
+    RichEditorAbstractSpanResult deleteResultNoTag;
+    deleteResultNoTag.SetSpanIndex(1);
+    richEditorPattern->DeleteValueSetImageSpan(spanItemNoTag, deleteResultNoTag);
+    EXPECT_FALSE(deleteResultNoTag.GetImageTag().has_value());
+}
+
+/**
  * @tc.name: AddSpanByPasteData001
  * @tc.desc: Test add span by pasteData.
  * @tc.type: FUNC

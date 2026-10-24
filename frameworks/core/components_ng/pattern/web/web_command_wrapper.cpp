@@ -15,28 +15,62 @@
 
 #include "core/components_ng/pattern/web/web_command_wrapper.h"
 
+#include <limits>
+
 #include "base/log/log_wrapper.h"
+#include "base/utils/utils.h"
 
 namespace OHOS {
 namespace Ace {
+namespace {
+constexpr int32_t DECIMAL_BASE = 10;
+
+int32_t ParseAutoFillNodeId(const std::unique_ptr<JsonValue>& itemValue)
+{
+    CHECK_NULL_RETURN(itemValue, 0);
+    auto nodeIdValue = itemValue->GetValue("nodeId");
+    if (!nodeIdValue || !nodeIdValue->IsString()) {
+        return 0;
+    }
+    int32_t nodeId = 0;
+    const std::string value = nodeIdValue->GetString();
+    if (value.empty()) {
+        return 0;
+    }
+    for (char digitChar : value) {
+        if (digitChar < '0' || digitChar > '9') {
+            return 0;
+        }
+        int32_t digit = digitChar - '0';
+        if (nodeId > (std::numeric_limits<int32_t>::max() - digit) / DECIMAL_BASE) {
+            return 0;
+        }
+        nodeId = nodeId * DECIMAL_BASE + digit;
+    }
+    return nodeId;
+}
+} // namespace
 
 // Concrete implementation of AutoFillItem for ace_engine internal use.
 class AutoFillItemImpl : public OHOS::NWeb::AutoFillItem {
 public:
-    AutoFillItemImpl(const std::string& xpath, const std::string& content,
-                     int32_t index, OHOS::NWeb::AutoFillMode mode)
-        : xpath_(xpath), content_(content), index_(index), mode_(mode) {}
+    AutoFillItemImpl(const std::string& xpath, int32_t nodeId, const std::string& content, int32_t index,
+        OHOS::NWeb::AutoFillMode mode)
+        : xpath_(xpath), content_(content), index_(index), mode_(mode), nodeId_(nodeId)
+    {}
 
     std::string GetXPath() const override { return xpath_; }
     std::string GetContent() const override { return content_; }
     int32_t GetIndex() const override { return index_; }
     OHOS::NWeb::AutoFillMode GetMode() const override { return mode_; }
+    int32_t GetNodeId() const override { return nodeId_; }
 
 private:
     std::string xpath_;
     std::string content_;
     int32_t index_ = 0;
     OHOS::NWeb::AutoFillMode mode_ = OHOS::NWeb::AutoFillMode::Overwrite;
+    int32_t nodeId_ = 0;
 };
 
 // Initialize static constants
@@ -722,9 +756,10 @@ int WebCommandWrapper::BuildAutoFillActionInfo(
         }
 
         OHOS::NWeb::AutoFillMode mode = ParseAutoFillItemMode(itemValue);
+        int32_t nodeId = ParseAutoFillNodeId(itemValue);
         // Pass all items (including invalid ones) to Chromium layer for per-item validation.
         // Chromium will continue processing remaining items on error and return the first error code.
-        items.push_back(std::make_shared<AutoFillItemImpl>(xpath, content, index, mode));
+        items.push_back(std::make_shared<AutoFillItemImpl>(xpath, nodeId, content, index, mode));
     }
 
     if (items.empty()) {

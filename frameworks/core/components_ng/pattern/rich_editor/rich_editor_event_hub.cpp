@@ -434,4 +434,19 @@ void RichEditorEventHub::FireOnInputFilterError(const std::u16string& value) con
     auto callback = onInputFilterError_;
     callback(value);
 }
+
+void RichEditorEventHub::SetOnSecurityStateChange(std::function<void(bool)>&& func)
+{
+    onSecurityStateChanged_ = std::move(func);
+}
+
+void RichEditorEventHub::FireOnSecurityStateChanged(bool isSecure)
+{
+    if (!onSecurityStateChanged_) {
+        return;
+    }
+    auto callback = onSecurityStateChanged_;
+    callback(isSecure);
+}
+
 } // namespace OHOS::Ace::NG

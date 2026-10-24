@@ -42,7 +42,8 @@
             "ace_engine_feature_enable_upgrade_skia",
             "ace_engine_feature_enable_preload_dynamic_module",
             "ace_engine_feature_enable_default_click_sound",
-            "ace_engine_feature_enable_material_customized"
+            "ace_engine_feature_enable_material_customized",
+            "ace_engine_feature_enable_material_tv"
         ],
         "adapted_system_type": [
             "standard"

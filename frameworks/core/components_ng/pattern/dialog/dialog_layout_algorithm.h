@@ -26,6 +26,7 @@
 #include "core/components/common/properties/placement.h"
 #include "core/components/dialog/dialog_theme.h"
 #include "core/components_ng/layout/layout_algorithm.h"
+#include "core/components_ng/layout/overlay_safe_area_helper.h"
 #include "core/components_ng/pattern/dialog/dialog_layout_property.h"
 
 namespace OHOS::Ace::NG {
@@ -99,6 +100,10 @@ private:
 
     SizeF UpdateHeightWithSafeArea(SizeF size);
     void UpdateSafeArea(const RefPtr<FrameNode>& frameNode);
+    // Returns the global avoid-cutout switch resolved from the main pipeline's SafeAreaManager,
+    // the same data source OverlaySafeAreaHelper uses. When off, Dialog keeps the legacy
+    // non-avoiding behavior (no display-limit clipping).
+    bool IsGlobalAvoidEnabled(const RefPtr<FrameNode>& frameNode) const;
     void UpdateChildLayoutConstraint(const RefPtr<DialogLayoutProperty>& dialogProp,
         LayoutConstraintF& childLayoutConstraint, RefPtr<LayoutWrapper>& childLayoutWrapper);
     void AdjustHeightForKeyboard(LayoutWrapper* layoutWrapper, const RefPtr<LayoutWrapper>& child);

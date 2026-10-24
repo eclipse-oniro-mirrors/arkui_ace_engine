@@ -22,6 +22,7 @@
 #include "core/components_ng/pattern/xcomponent/inner_xcomponent_controller.h"
 #include "core/components_ng/pattern/xcomponent/xcomponent_model_ng.h"
 #include "core/components_ng/pattern/xcomponent/xcomponent_model_static.h"
+#include "core/components_ng/pattern/xcomponent/xcomponent_pattern.h"
 #include "core/components_ng/pattern/xcomponent/bridge/xcomponent_controller_peer_impl.h"
 #include "core/interfaces/native/utility/callback_helper.h"
 
@@ -218,6 +219,17 @@ void SetHdrBrightness1Impl(Ark_NativePointer node, const Opt_Float64* brightness
     }
 #endif // XCOMPONENT_SUPPORTED
 }
+void SetExtraFlagImpl(Ark_NativePointer node, Ark_Int32 value)
+{
+    TAG_LOGI(AceLogTag::ACE_XCOMPONENT, "XComponent SetExtraFlag (static modifier) entry, flag: 0x%{public}x",
+        static_cast<int32_t>(value));
+    auto frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    ACE_UINODE_TRACE(frameNode);
+#ifdef XCOMPONENT_SUPPORTED
+    XComponentModelNG::SetExtraFlag(frameNode, static_cast<uint32_t>(value));
+#endif // XCOMPONENT_SUPPORTED
+}
 void SetEnableTransparentLayerImpl(Ark_NativePointer node,
                                    const Opt_Boolean* value)
 {
@@ -227,6 +239,16 @@ void SetEnableTransparentLayerImpl(Ark_NativePointer node,
     #ifdef XCOMPONENT_SUPPORTED
     auto convValue = Converter::OptConvertPtr<bool>(value);
     XComponentModelNG::EnableTransparentLayer(frameNode, convValue.value_or(false));
+    #endif // XCOMPONENT_SUPPORTED
+}
+void SetBufferQueueCountImpl(Ark_NativePointer node,
+                             Ark_Int32 value)
+{
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    ACE_UINODE_TRACE(frameNode);
+    #ifdef XCOMPONENT_SUPPORTED
+    XComponentModelNG::SetBufferQueueCount(frameNode, value);
     #endif // XCOMPONENT_SUPPORTED
 }
 } // XComponentAttributeModifier
@@ -241,6 +263,8 @@ const GENERATED_ArkUIXComponentModifier* GetXComponentStaticModifier()
         XComponentAttributeModifier::SetEnableSecureImpl,
         XComponentAttributeModifier::SetEnableTransparentLayerImpl,
         XComponentAttributeModifier::SetHdrBrightness0Impl,
+        XComponentAttributeModifier::SetExtraFlagImpl,
+        XComponentAttributeModifier::SetBufferQueueCountImpl,
         XComponentAttributeModifier::SetHdrBrightness1Impl,
     };
     return &ArkUIXComponentModifierImpl;

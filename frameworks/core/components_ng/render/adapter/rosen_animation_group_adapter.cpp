@@ -289,20 +289,22 @@ bool ValidateRSNodeInstance(
     return true;
 }
 
-std::shared_ptr<AnimationUtils::InteractiveAnimation> CreateAndStartGroupAnimation(
+AnimationGroupCreateResult CreateAndStartGroupAnimation(
     ArkUIAnimationGroupHandle group, const std::vector<Rosen::RSNode*>& childRawRSNodes,
     int32_t instanceId, const std::string& key, int64_t generation)
 {
-    CHECK_NULL_RETURN(group, nullptr);
+    if (!group) {
+        return { nullptr, ERROR_CODE_PARAM_INVALID };
+    }
     if (childRawRSNodes.empty()) {
-        return nullptr;
+        return { nullptr, ERROR_CODE_SUB_ANIMATION_INVALID };
     }
 
     std::vector<std::shared_ptr<Rosen::RSNode>> childRSNodes;
     childRSNodes.reserve(childRawRSNodes.size());
     for (auto* rawRSNode : childRawRSNodes) {
         if (!rawRSNode) {
-            return nullptr;
+            return { nullptr, ERROR_CODE_SUB_ANIMATION_INVALID };
         }
         childRSNodes.push_back(rawRSNode->shared_from_this());
     }
@@ -310,7 +312,7 @@ std::shared_ptr<AnimationUtils::InteractiveAnimation> CreateAndStartGroupAnimati
     AnimationGroupView view;
     auto result = BuildAnimationGroupView(group, view);
     if (result != ARKUI_ERROR_CODE_NO_ERROR) {
-        return nullptr;
+        return { nullptr, result };
     }
 
     RefPtr<Curve> groupCurve = view.curve;
@@ -345,13 +347,16 @@ std::shared_ptr<AnimationUtils::InteractiveAnimation> CreateAndStartGroupAnimati
 
     auto interactiveAnimation = AnimationUtils::CreateGroupInteractiveAnimation(
         addCallback, groupOption, groupCurve, onFinishWrapper);
-    CHECK_NULL_RETURN(interactiveAnimation, nullptr);
+    if (!interactiveAnimation) {
+        TAG_LOGW(AceLogTag::ACE_ANIMATION, "Create animation group failed");
+        return { nullptr, ERROR_CODE_SUB_ANIMATION_INVALID };
+    }
 
     if (AnimationUtils::StartInteractiveAnimation(interactiveAnimation) != 0) {
-        TAG_LOGE(AceLogTag::ACE_ANIMATION, "StartInteractiveAnimation failed");
-        return nullptr;
+        TAG_LOGW(AceLogTag::ACE_ANIMATION, "Start animation group failed");
+        return { nullptr, ERROR_CODE_SUB_ANIMATION_INVALID };
     }
-    return interactiveAnimation;
+    return { std::move(interactiveAnimation), ERROR_CODE_NO_ERROR };
 }
 
 } // namespace OHOS::Ace::NG

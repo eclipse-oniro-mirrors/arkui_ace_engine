@@ -348,6 +348,9 @@ public:
     void SetSafeAreaPaddings(const std::optional<CalcDimension>& top, const std::optional<CalcDimension>& bottom,
         const std::optional<CalcDimension>& left, const std::optional<CalcDimension>& right) override;
 
+    static void SetSafeAreaInset(const SafeAreaInsetOptions& options, SafeAreaInsetBuilderArray&& builders);
+    static void ResetSafeAreaInset();
+
     void SetMargin(const CalcDimension& value) override
     {
         if (value.Unit() == DimensionUnit::CALC) {
@@ -1678,6 +1681,7 @@ public:
         std::function<void(const float)>&& onWidthDidChange,
         std::function<void(const float)>&& onTypeDidChange, std::function<void()>&& sheetSpringBack) override;
     RefPtr<PipelineContext> GetSheetContext(NG::SheetStyle& sheetStyle);
+    void ApplySheetImmersiveStrategyDefaults(const RefPtr<PipelineContext>& context, NG::SheetStyle& sheetStyle);
     void DismissSheet() override;
     void DismissContentCover() override;
     void SheetSpringBack() override;

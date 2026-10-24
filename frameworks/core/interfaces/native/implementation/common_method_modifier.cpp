@@ -2756,7 +2756,7 @@ void SetSafeAreaPaddingImpl(Ark_NativePointer node,
             auto convValue = Converter::Convert<CalcLength>(value);
             ViewAbstract::SetSafeAreaPadding(frameNode, convValue);
         },
-        []() {}
+        [frameNode]() { ViewAbstract::ResetSafeAreaPadding(frameNode); }
     );
 }
 void SetMarginImpl(Ark_NativePointer node,
@@ -4438,6 +4438,8 @@ void SetLayoutGravityImpl(Ark_NativePointer node,
     if (result) {
         // Implement Reset value
         ViewAbstractModelStatic::SetLayoutGravity(frameNode, result.value());
+    } else {
+        ViewAbstract::SetLayoutGravity(frameNode, Alignment::CENTER);
     }
 }
 void SetDisplayPriorityImpl(Ark_NativePointer node,
@@ -4483,6 +4485,7 @@ void SetAlignImpl(Ark_NativePointer node,
     CHECK_NULL_VOID(frameNode);
     auto optValue = Converter::GetOptPtr(value);
     if (!optValue) {
+        ViewAbstract::SetAlign(frameNode, Alignment::CENTER);
         return;
     }
     switch (optValue->selector) {

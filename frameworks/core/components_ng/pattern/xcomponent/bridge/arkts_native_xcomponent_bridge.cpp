@@ -14,6 +14,8 @@
  */
 #include "core/components_ng/pattern/xcomponent/bridge/arkts_native_xcomponent_bridge.h"
 
+#include <algorithm>
+#include <cmath>
 #include <limits>
 #include <optional>
 
@@ -447,10 +449,16 @@ void XComponentBridge::RegisterXComponentAttributes(Local<panda::ObjectRef> obje
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), XComponentBridge::SetHdrBrightness));
     xComponent->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetHdrBrightness"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), XComponentBridge::ResetHdrBrightness));
+    xComponent->Set(vm, panda::StringRef::NewFromUtf8(vm, "setExtraFlag"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), XComponentBridge::SetExtraFlag));
     xComponent->Set(vm, panda::StringRef::NewFromUtf8(vm, "setEnableTransparentLayer"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), XComponentBridge::SetEnableTransparentLayer));
     xComponent->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetEnableTransparentLayer"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), XComponentBridge::ResetEnableTransparentLayer));
+    xComponent->Set(vm, panda::StringRef::NewFromUtf8(vm, "setBufferQueueCount"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), XComponentBridge::SetBufferQueueCount));
+    xComponent->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetBufferQueueCount"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), XComponentBridge::ResetBufferQueueCount));
     xComponent->Set(vm, panda::StringRef::NewFromUtf8(vm, "setRenderFit"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), XComponentBridge::SetRenderFit));
     xComponent->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetRenderFit"),
@@ -1204,6 +1212,31 @@ ArkUINativeModuleValue XComponentBridge::ResetHdrBrightness(ArkUIRuntimeCallInfo
     return panda::JSValueRef::Undefined(vm);
 }
 
+ArkUINativeModuleValue XComponentBridge::SetExtraFlag(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    TAG_LOGI(AceLogTag::ACE_XCOMPONENT, "XComponent SetExtraFlag (bridge) entry");
+    Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(ARG_FIRST);
+    Local<JSValueRef> secondArg = runtimeCallInfo->GetCallArgRef(ARG_ID);
+    if (secondArg.IsNull() || secondArg->IsUndefined()) {
+        TAG_LOGI(AceLogTag::ACE_XCOMPONENT, "XComponent SetExtraFlag (bridge) arg is null or undefined, ignore");
+        return panda::JSValueRef::Undefined(vm);
+    }
+    ArkUINodeHandle nativeNode = nullptr;
+    CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(vm, firstArg, nativeNode), true, panda::JSValueRef::Undefined(vm));
+    ACE_UINODE_TRACE(reinterpret_cast<FrameNode*>(nativeNode));
+    if (secondArg->IsNumber()) {
+        auto extraFlag = static_cast<ArkUI_Uint32>(secondArg->Uint32Value(vm));
+        TAG_LOGI(AceLogTag::ACE_XCOMPONENT, "XComponent SetExtraFlag (bridge) forward to modifier, flag: 0x%{public}x",
+            extraFlag);
+        GetArkUINodeModifiers()->getXComponentModifier()->setXComponentExtraFlag(nativeNode, extraFlag);
+    } else {
+        TAG_LOGI(AceLogTag::ACE_XCOMPONENT, "XComponent SetExtraFlag (bridge) arg is not a number, ignore");
+    }
+    return panda::JSValueRef::Undefined(vm);
+}
+
 ArkUINativeModuleValue XComponentBridge::SetEnableTransparentLayer(ArkUIRuntimeCallInfo* runtimeCallInfo)
 {
     EcmaVM* vm = runtimeCallInfo->GetVM();
@@ -1243,6 +1276,46 @@ ArkUINativeModuleValue XComponentBridge::ResetEnableTransparentLayer(ArkUIRuntim
     auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
     ACE_UINODE_TRACE(reinterpret_cast<FrameNode*>(nativeNode));
     GetArkUINodeModifiers()->getXComponentModifier()->resetXComponentEnableTransparentLayer(nativeNode);
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue XComponentBridge::SetBufferQueueCount(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(ARG_FIRST);
+    Local<JSValueRef> secondArg = runtimeCallInfo->GetCallArgRef(ARG_ID);
+    if (secondArg.IsNull() || secondArg->IsUndefined()) {
+        return panda::JSValueRef::Undefined(vm);
+    }
+    ArkUINodeHandle nativeNode = nullptr;
+    CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
+    ACE_UINODE_TRACE(reinterpret_cast<FrameNode*>(nativeNode));
+    if (secondArg->IsNumber()) {
+        double countValue = secondArg->ToNumber(vm)->Value();
+        bool isIntegerCount = std::isfinite(countValue) && std::floor(countValue) == countValue;
+        if (isIntegerCount) {
+            double int32RangeValue = std::clamp(countValue,
+                static_cast<double>(std::numeric_limits<int32_t>::min()),
+                static_cast<double>(std::numeric_limits<int32_t>::max()));
+            GetArkUINodeModifiers()->getXComponentModifier()->setXComponentBufferQueueCount(
+                nativeNode, static_cast<int32_t>(int32RangeValue));
+            return panda::JSValueRef::Undefined(vm);
+        }
+    }
+    GetArkUINodeModifiers()->getXComponentModifier()->resetXComponentBufferQueueCount(nativeNode);
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue XComponentBridge::ResetBufferQueueCount(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(ARG_FIRST);
+    CHECK_NULL_RETURN(firstArg->IsNativePointer(vm), panda::JSValueRef::Undefined(vm));
+    auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
+    ACE_UINODE_TRACE(reinterpret_cast<FrameNode*>(nativeNode));
+    GetArkUINodeModifiers()->getXComponentModifier()->resetXComponentBufferQueueCount(nativeNode);
     return panda::JSValueRef::Undefined(vm);
 }
 

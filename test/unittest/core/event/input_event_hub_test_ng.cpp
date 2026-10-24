@@ -416,6 +416,7 @@ HWTEST_F(InputEventHubTestNg, HandleMouseEvent001, TestSize.Level1)
      */
     OnMouseEventFunc onMouse2 = onMouse;
     inputEventHub->SetMouseEvent(std::move(onMouse2));
+    inputEventHub->CreateMouseEventActuator();
     EXPECT_NE(inputEventHub->mouseEventActuator_->userCallback_, nullptr);
 
     /**
@@ -424,6 +425,7 @@ HWTEST_F(InputEventHubTestNg, HandleMouseEvent001, TestSize.Level1)
     const OnHoverFunc onHover = [](bool, HoverInfo) {};
     OnHoverFunc onHover1 = onHover;
     inputEventHub->SetHoverEvent(std::move(onHover1));
+    inputEventHub->CreateHoverEventActuator();
     EXPECT_NE(inputEventHub->hoverEventActuator_->userCallback_, nullptr);
 
     /**
@@ -1457,5 +1459,134 @@ HWTEST_F(InputEventHubTestNg, GetFrameNode002, TestSize.Level1)
     auto inputEventHub = AceType::MakeRefPtr<InputEventHub>(AceType::WeakClaim(AceType::RawPtr(eventHub)));
     EXPECT_NE(inputEventHub->GetFrameNode(), nullptr);
     EXPECT_EQ(inputEventHub->GetFrameNode()->GetTag(), V2::TEXT_ETS_TAG);
+}
+
+/**
+ * @tc.name: AddOnHoverEventAfterRemoveWithActuator001
+ * @tc.desc: When hoverEventActuator_ exists, re-adding tips hover event after
+ *           RemoveAllTipsHoverEvents must register directly to actuator instead
+ *           of being stranded in the staging cache, otherwise hoverTask(false)
+ *           (tips hide on hover-leave) is lost.
+ * @tc.type: FUNC
+ */
+HWTEST_F(InputEventHubTestNg, AddOnHoverEventAfterRemoveWithActuator001, TestSize.Level1)
+{
+    auto eventHub = AceType::MakeRefPtr<EventHub>();
+    auto frameNode = AceType::MakeRefPtr<FrameNode>(V2::TEXT_ETS_TAG, -1, AceType::MakeRefPtr<Pattern>());
+    eventHub->AttachHost(frameNode);
+    auto inputEventHub = AceType::MakeRefPtr<InputEventHub>(AceType::WeakClaim(AceType::RawPtr(eventHub)));
+    ASSERT_NE(inputEventHub, nullptr);
+
+    inputEventHub->hoverEventActuator_ =
+        AceType::MakeRefPtr<InputEventActuator>(AceType::WeakClaim(AceType::RawPtr(inputEventHub)));
+
+    bool hoverFalseCalled = false;
+    auto hoverTask = [&hoverFalseCalled](bool isHover) {
+        if (!isHover) {
+            hoverFalseCalled = true;
+        }
+    };
+    auto hoverEvent = AceType::MakeRefPtr<InputEvent>(std::move(hoverTask));
+    hoverEvent->SetIstips(true);
+
+    inputEventHub->RemoveAllTipsHoverEvents();
+    inputEventHub->AddOnHoverEvent(hoverEvent);
+
+    EXPECT_EQ(inputEventHub->hoverInputEvents_.size(), INPUT_EVENTS_SIZE_0);
+    ASSERT_NE(inputEventHub->hoverEventActuator_, nullptr);
+    EXPECT_EQ(inputEventHub->hoverEventActuator_->inputEvents_.size(), INPUT_EVENTS_SIZE);
+
+    for (const auto& callback : inputEventHub->hoverEventActuator_->inputEvents_) {
+        (*callback)(false);
+    }
+    EXPECT_TRUE(hoverFalseCalled);
+}
+
+/**
+ * @tc.name: AddOnMouseEventAfterRemoveWithActuator001
+ * @tc.desc: When mouseEventActuator_ exists, re-adding tips mouse event after
+ *           RemoveAllTipsMouseEvents must register directly to actuator instead
+ *           of being stranded in the staging cache (follow-cursor callback lost).
+ * @tc.type: FUNC
+ */
+HWTEST_F(InputEventHubTestNg, AddOnMouseEventAfterRemoveWithActuator001, TestSize.Level1)
+{
+    auto eventHub = AceType::MakeRefPtr<EventHub>();
+    auto frameNode = AceType::MakeRefPtr<FrameNode>(V2::TEXT_ETS_TAG, -1, AceType::MakeRefPtr<Pattern>());
+    eventHub->AttachHost(frameNode);
+    auto inputEventHub = AceType::MakeRefPtr<InputEventHub>(AceType::WeakClaim(AceType::RawPtr(eventHub)));
+    ASSERT_NE(inputEventHub, nullptr);
+
+    inputEventHub->mouseEventActuator_ =
+        AceType::MakeRefPtr<InputEventActuator>(AceType::WeakClaim(AceType::RawPtr(inputEventHub)));
+
+    bool mouseCalled = false;
+    auto mouseTask = [&mouseCalled](MouseInfo& info) { mouseCalled = true; };
+    auto mouseEvent = AceType::MakeRefPtr<InputEvent>(std::move(mouseTask));
+    mouseEvent->SetIstips(true);
+    mouseEvent->SetTipsFollowCursor(true);
+
+    inputEventHub->RemoveAllTipsMouseEvents();
+    inputEventHub->AddOnMouseEvent(mouseEvent);
+
+    EXPECT_EQ(inputEventHub->mouseInputEvents_.size(), INPUT_EVENTS_SIZE_0);
+    ASSERT_NE(inputEventHub->mouseEventActuator_, nullptr);
+    EXPECT_EQ(inputEventHub->mouseEventActuator_->inputEvents_.size(), INPUT_EVENTS_SIZE);
+}
+
+/**
+ * @tc.name: AddOnHoverMoveEventWithActuator001
+ * @tc.desc: When hoverMoveEventActuator_ exists, AddOnHoverMoveEvent must register
+ *           directly to actuator instead of being stranded in the staging cache.
+ * @tc.type: FUNC
+ */
+HWTEST_F(InputEventHubTestNg, AddOnHoverMoveEventWithActuator001, TestSize.Level1)
+{
+    auto eventHub = AceType::MakeRefPtr<EventHub>();
+    auto frameNode = AceType::MakeRefPtr<FrameNode>(V2::TEXT_ETS_TAG, -1, AceType::MakeRefPtr<Pattern>());
+    eventHub->AttachHost(frameNode);
+    auto inputEventHub = AceType::MakeRefPtr<InputEventHub>(AceType::WeakClaim(AceType::RawPtr(eventHub)));
+    ASSERT_NE(inputEventHub, nullptr);
+
+    inputEventHub->hoverMoveEventActuator_ =
+        AceType::MakeRefPtr<InputEventActuator>(AceType::WeakClaim(AceType::RawPtr(inputEventHub)));
+
+    bool hoverMoveCalled = false;
+    auto hoverMoveTask = [&hoverMoveCalled](HoverInfo& info) { hoverMoveCalled = true; };
+    auto hoverMoveEvent = AceType::MakeRefPtr<InputEvent>(std::move(hoverMoveTask));
+
+    inputEventHub->AddOnHoverMoveEvent(hoverMoveEvent);
+
+    EXPECT_EQ(inputEventHub->hoverMoveInputEvents_.size(), INPUT_EVENTS_SIZE_0);
+    ASSERT_NE(inputEventHub->hoverMoveEventActuator_, nullptr);
+    EXPECT_EQ(inputEventHub->hoverMoveEventActuator_->inputEvents_.size(), INPUT_EVENTS_SIZE);
+}
+
+/**
+ * @tc.name: AddOnAxisEventWithActuator001
+ * @tc.desc: When axisEventActuator_ exists, AddOnAxisEvent must register directly
+ *           to actuator instead of being stranded in the staging cache.
+ * @tc.type: FUNC
+ */
+HWTEST_F(InputEventHubTestNg, AddOnAxisEventWithActuator001, TestSize.Level1)
+{
+    auto eventHub = AceType::MakeRefPtr<EventHub>();
+    auto frameNode = AceType::MakeRefPtr<FrameNode>(V2::TEXT_ETS_TAG, -1, AceType::MakeRefPtr<Pattern>());
+    eventHub->AttachHost(frameNode);
+    auto inputEventHub = AceType::MakeRefPtr<InputEventHub>(AceType::WeakClaim(AceType::RawPtr(eventHub)));
+    ASSERT_NE(inputEventHub, nullptr);
+
+    inputEventHub->axisEventActuator_ =
+        AceType::MakeRefPtr<InputEventActuator>(AceType::WeakClaim(AceType::RawPtr(inputEventHub)));
+
+    bool axisCalled = false;
+    auto axisTask = [&axisCalled](AxisInfo& info) { axisCalled = true; };
+    auto axisEvent = AceType::MakeRefPtr<InputEvent>(std::move(axisTask));
+
+    inputEventHub->AddOnAxisEvent(axisEvent);
+
+    EXPECT_EQ(inputEventHub->axisInputEvents_.size(), INPUT_EVENTS_SIZE_0);
+    ASSERT_NE(inputEventHub->axisEventActuator_, nullptr);
+    EXPECT_EQ(inputEventHub->axisEventActuator_->inputEvents_.size(), INPUT_EVENTS_SIZE);
 }
 } // namespace OHOS::Ace::NG

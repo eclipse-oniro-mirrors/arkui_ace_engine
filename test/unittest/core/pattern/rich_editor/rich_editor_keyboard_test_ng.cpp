@@ -441,7 +441,7 @@ HWTEST_F(RichEditorKeyboardTestNg, ResetKeyboardIfNeed001, TestSize.Level0)
 
     focusHub->currentFocus_ = true;
     richEditorPattern->action_ = TextInputAction::UNSPECIFIED;
-    richEditorPattern->ResetKeyboardIfNeed();
+    richEditorPattern->CheckIfNeedToResetKeyboard();
     EXPECT_NE(richEditorPattern->action_, TextInputAction::UNSPECIFIED);
 }
 
@@ -465,7 +465,7 @@ HWTEST_F(RichEditorKeyboardTestNg, ResetKeyboardIfNeed002, TestSize.Level0)
     richEditorPattern->isCustomKeyboardAttached_ = true;
     focusHub->currentFocus_ = false;
     richEditorPattern->action_ = TextInputAction::SEARCH;
-    richEditorPattern->ResetKeyboardIfNeed();
+    richEditorPattern->CheckIfNeedToResetKeyboard();
     EXPECT_NE(richEditorPattern->action_, TextInputAction::SEARCH);
 }
 
@@ -489,7 +489,7 @@ HWTEST_F(RichEditorKeyboardTestNg, ResetKeyboardIfNeed003, TestSize.Level0)
     richEditorPattern->isCustomKeyboardAttached_ = false;
     focusHub->currentFocus_ = true;
     richEditorPattern->action_ = TextInputAction::SEARCH;
-    richEditorPattern->ResetKeyboardIfNeed();
+    richEditorPattern->CheckIfNeedToResetKeyboard();
     EXPECT_NE(richEditorPattern->action_, TextInputAction::SEARCH);
 }
 
@@ -516,7 +516,7 @@ HWTEST_F(RichEditorKeyboardTestNg, ResetKeyboardIfNeed004, TestSize.Level0)
     richEditorPattern->isCustomKeyboardAttached_ = true;
     focusHub->currentFocus_ = true;
     richEditorPattern->action_ = TextInputAction::SEARCH;
-    richEditorPattern->ResetKeyboardIfNeed();
+    richEditorPattern->CheckIfNeedToResetKeyboard();
     EXPECT_NE(richEditorPattern->action_, TextInputAction::SEARCH);
 }
 

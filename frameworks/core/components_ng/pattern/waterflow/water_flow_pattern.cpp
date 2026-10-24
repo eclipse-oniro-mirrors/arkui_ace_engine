@@ -15,6 +15,8 @@
 
 #include "core/components_ng/pattern/waterflow/water_flow_pattern.h"
 
+#include <cmath>
+
 #include "base/log/dump_log.h"
 #include "base/utils/utils.h"
 #include "base/utils/system_properties.h"
@@ -26,6 +28,8 @@
 #include "core/components_ng/pattern/scroll/inner/scroll_bar_overlay_modifier.h"
 #include "core/components_ng/pattern/scroll/scroll_edge_effect.h"
 #include "core/components_ng/pattern/scrollable/scrollable_paint_property.h"
+#include "core/components_ng/pattern/scrollable/scroll_snap_strategy.h"
+#include "core/components_ng/pattern/scrollable/scroll_snap_utils.h"
 #include "core/components_ng/pattern/waterflow/layout/sliding_window/water_flow_layout_sw.h"
 #include "core/components_ng/pattern/waterflow/layout/top_down/water_flow_layout_algorithm.h"
 #include "core/components_ng/pattern/waterflow/layout/top_down/water_flow_layout_info.h"
@@ -47,6 +51,209 @@
 namespace OHOS::Ace::NG {
 
 WaterFlowPattern::~WaterFlowPattern() = default;
+
+ScrollSnapStrategy WaterFlowPattern::GetScrollSnapStrategy() const
+{
+    auto property = GetLayoutProperty<WaterFlowLayoutProperty>();
+    CHECK_NULL_RETURN(property, ScrollSnapStrategy());
+    return property->GetScrollSnapStrategy().value_or(ScrollSnapStrategy());
+}
+
+SnapType WaterFlowPattern::GetSnapType()
+{
+    // Without a valid layout there are no real item anchors: this round does not snap and the
+    // scroll ends like an unconfigured WaterFlow (AC-4.3).
+    if (!GetScrollSnapStrategy().IsEnabled() || !isInitialized_ || !layoutInfo_ || !layoutInfo_->isDataValid_ ||
+        GetAxis() == Axis::NONE || LessOrEqual(GetItemSnapMaxOffset(), GetItemSnapMinOffset())) {
+        return SnapType::NONE_SNAP;
+    }
+    return SnapType::LIST_SNAP;
+}
+
+bool WaterFlowPattern::StartSnapAnimation(SnapAnimationOptions snapAnimationOptions)
+{
+    return GetSnapType() != SnapType::NONE_SNAP && StartItemSnapAnimation(snapAnimationOptions);
+}
+
+void WaterFlowPattern::UpdateSnapItemGeometryCache()
+{
+    snapItemGeometryCache_.clear();
+    snapGeometryEstimatedOffset_ = static_cast<float>(GetTotalOffset());
+    auto trackingScroll = GetScrollable();
+    snapGeometryStableOffset_ = trackingScroll && trackingScroll->IsItemSnapTracking()
+                                    ? -trackingScroll->GetCurrentPos()
+                                    : snapGeometryEstimatedOffset_;
+    auto host = GetHost();
+    auto property = GetLayoutProperty<WaterFlowLayoutProperty>();
+    if (!host || !property || !layoutInfo_ || !GetScrollSnapStrategy().IsEnabled() ||
+        layoutInfo_->endIndex_ < layoutInfo_->startIndex_) {
+        return;
+    }
+    const auto axis = GetAxis();
+    const auto viewport = GetMainContentSize();
+    if (axis == Axis::NONE || !std::isfinite(viewport) || LessOrEqual(viewport, 0.0f)) {
+        return;
+    }
+    const auto padding = property->CreatePaddingAndBorder();
+    const float leadingPadding = axis == Axis::VERTICAL ? padding.top.value_or(0.0f) : padding.left.value_or(0.0f);
+    const auto totalOffset = static_cast<float>(GetTotalOffset());
+    const int32_t cacheCount = std::max(0, property->GetCachedCountValue(layoutInfo_->defCachedCount_));
+    const int32_t itemCount = host->GetTotalChildCount() - layoutInfo_->footerIndex_ - 1;
+    const int32_t start = std::max(0, layoutInfo_->startIndex_ - cacheCount);
+    const int32_t end = std::min(itemCount - 1, layoutInfo_->endIndex_ + cacheCount);
+    for (int32_t index = start; index <= end; ++index) {
+        // Sliding-window prediction caches hold sizes of unlaid items; only lane members are real geometry.
+        if (layoutInfo_->Mode() == LayoutMode::SLIDING_WINDOW && layoutInfo_->GetCrossIndex(index) < 0) {
+            continue;
+        }
+        // Cached items are read without building or adding them to the render tree.
+        const bool cached = index < layoutInfo_->startIndex_ || index > layoutInfo_->endIndex_;
+        AppendSnapItemGeometry(host->GetChildByIndex(layoutInfo_->NodeIdx(index), cached),
+            index, leadingPadding, totalOffset);
+    }
+}
+
+void WaterFlowPattern::AppendSnapItemGeometry(
+    const RefPtr<LayoutWrapper>& item, int32_t index, float leadingPadding, float totalOffset)
+{
+    if (!item || !item->GetGeometryNode()) {
+        return;
+    }
+    const auto rect = item->GetGeometryNode()->GetMarginFrameRect();
+    const auto axis = GetAxis();
+    const float size = axis == Axis::VERTICAL ? rect.Height() : rect.Width();
+    float startPos = (axis == Axis::VERTICAL ? rect.GetY() : rect.GetX()) - leadingPadding;
+    if (!std::isfinite(startPos) || !std::isfinite(size) || LessOrEqual(size, 0.0f)) {
+        return;
+    }
+    if (IsReverse()) {
+        startPos = GetMainContentSize() - startPos - size;
+    }
+    snapItemGeometryCache_.push_back({ startPos + totalOffset, size, index });
+}
+
+void WaterFlowPattern::UpdateSnapGeometryAfterLayout(bool isLayoutValid)
+{
+    if (!isLayoutValid) {
+        snapItemGeometryCache_.clear();
+        return;
+    }
+    UpdateSnapItemGeometryCache();
+    const float height = layoutInfo_->EstimateTotalHeight();
+    if (layoutInfo_->Mode() == LayoutMode::SLIDING_WINDOW && std::isfinite(height)) {
+        snapTotalHeight_ = height;
+    }
+}
+
+void WaterFlowPattern::BeginTrackedItemSnap(float coordinate)
+{
+    // Release can precede layout of the final drag delta. Rebase the cached geometry from
+    // its measured offset, not the newer release offset, so that the pending delta is not
+    // added to the selected anchor a second time.
+    const float pendingOffset = static_cast<float>(GetItemSnapCurrentOffset()) - snapGeometryEstimatedOffset_;
+    snapGeometryStableOffset_ = coordinate - pendingOffset;
+}
+
+std::vector<SnapCandidate> WaterFlowPattern::BuildTrackedItemSnapCandidates(ScrollSnapAlign align)
+{
+    // Rebase the cached content positions onto the fling's stable coordinate.
+    auto candidates = BuildItemSnapCandidates(align);
+    for (auto& candidate : candidates) {
+        candidate.offset += snapGeometryStableOffset_ - snapGeometryEstimatedOffset_;
+    }
+    return candidates;
+}
+
+float WaterFlowPattern::GetItemSnapCalibrationMargin() const
+{
+    double total = 0.0;
+    int32_t count = 0;
+    for (const auto& geometry : snapItemGeometryCache_) {
+        if (std::isfinite(geometry.mainSize) && GreatNotEqual(geometry.mainSize, 0.0f)) {
+            total += geometry.mainSize;
+            ++count;
+        }
+    }
+    return count > 0 ? static_cast<float>(total / count) : 0.0f;
+}
+
+std::vector<SnapCandidate> WaterFlowPattern::BuildItemSnapCandidates(ScrollSnapAlign align)
+{
+    std::vector<SnapCandidate> candidates;
+    if (align != ScrollSnapAlign::START && align != ScrollSnapAlign::CENTER && align != ScrollSnapAlign::END) {
+        return candidates;
+    }
+    const auto viewport = GetMainContentSize();
+    for (const auto& geometry : snapItemGeometryCache_) {
+        float offset = geometry.contentStart;
+        if (align == ScrollSnapAlign::CENTER) {
+            offset += (geometry.mainSize - viewport) / 2.0f;
+        } else if (align == ScrollSnapAlign::END) {
+            offset += geometry.mainSize - viewport;
+        }
+        candidates.push_back({ offset, geometry.index });
+    }
+    ScrollSnapUtils::NormalizeCandidates(candidates);
+    return candidates;
+}
+
+std::optional<float> WaterFlowPattern::GetItemSnapNeighborAnchor(ScrollSnapAlign align, bool towardSmaller)
+{
+    const auto current = static_cast<float>(GetItemSnapCurrentOffset());
+    std::optional<float> result;
+    for (const auto& candidate : BuildItemSnapCandidates(align)) {
+        const bool beyond =
+            towardSmaller ? LessNotEqual(candidate.offset, current) : GreatNotEqual(candidate.offset, current);
+        if (beyond && (!result || (towardSmaller ? candidate.offset > *result : candidate.offset < *result))) {
+            result = candidate.offset;
+        }
+    }
+    return result;
+}
+
+double WaterFlowPattern::GetItemSnapCurrentOffset() const
+{
+    // Sliding-window layout applies the last motion delta at the next layout; include it.
+    const double offset = GetTotalOffset();
+    auto swInfo = DynamicCast<WaterFlowLayoutInfoSW>(layoutInfo_);
+    return swInfo && std::isfinite(swInfo->delta_) ? offset - swInfo->delta_ : offset;
+}
+
+float WaterFlowPattern::GetItemSnapMinOffset() const
+{
+    CHECK_NULL_RETURN(layoutInfo_, 0.0f);
+    // TopFinalPos is expressed in each layout mode's spring coordinate, not always the total offset.
+    const float min = layoutInfo_->Mode() != LayoutMode::SLIDING_WINDOW || layoutInfo_->startIndex_ == 0
+                          ? GetItemSnapCurrentOffset() + layoutInfo_->CurrentPos() - layoutInfo_->TopFinalPos()
+                          : -layoutInfo_->contentStartOffset_;
+    return std::isfinite(min) ? min : 0.0f;
+}
+
+float WaterFlowPattern::GetItemSnapMaxOffset() const
+{
+    CHECK_NULL_RETURN(layoutInfo_, 0.0f);
+    const float min = GetItemSnapMinOffset();
+    float max = min;
+    if (layoutInfo_->itemEnd_) {
+        max = GetItemSnapCurrentOffset() + layoutInfo_->CurrentPos() -
+            layoutInfo_->BottomFinalPos(GetMainContentSize());
+    } else {
+        // Lazy content height can be underestimated before the end is laid out; never clamp below
+        // the current position so that snap targets stay reachable.
+        // An unsynchronized sliding window reports no height; keep the last synchronized one.
+        const float estimate = layoutInfo_->EstimateTotalHeight();
+        const float height = layoutInfo_->Mode() == LayoutMode::SLIDING_WINDOW && LessOrEqual(estimate, 0.0f)
+                                 ? snapTotalHeight_.value_or(estimate)
+                                 : estimate;
+        max = std::max(static_cast<float>(GetItemSnapCurrentOffset()),
+            height + layoutInfo_->contentEndOffset_ - GetMainContentSize());
+        if (GetScrollSnapStrategy().hasProvider) {
+            // Keep measuring toward a distant provider target until the real end is known.
+            max = std::max(max, static_cast<float>(GetItemSnapCurrentOffset()) + GetMainContentSize());
+        }
+    }
+    return std::isfinite(max) ? std::max(min, max) : min;
+}
 
 RefPtr<LayoutProperty> WaterFlowPattern::CreateLayoutProperty()
 {
@@ -325,6 +532,7 @@ void WaterFlowPattern::OnModifyDone()
         SetScrollBar(paintProperty->GetScrollBarProperty());
     }
     SetAccessibilityAction();
+    InitOnKeyEvent();
     Register2DragDropManager();
     auto host = GetHost();
     CHECK_NULL_VOID(host);
@@ -444,12 +652,25 @@ void WaterFlowPattern::FireOnScrollIndex(bool indexChanged, const ScrollIndexFun
     onScrollIndex(layoutInfo_->reportStartIndex_, endIndex);
 }
 
+void WaterFlowPattern::CheckSpringAfterContentShrink()
+{
+    auto swInfo = DynamicCast<WaterFlowLayoutInfoSW>(layoutInfo_);
+    if (!swInfo || !swInfo->contentSizeDiminished_) {
+        return;
+    }
+    if (!GetCanStayOverScroll() && IsOutOfBoundary(false)) {
+        CheckRestartSpring(true);
+    }
+    swInfo->contentSizeDiminished_ = false;
+}
+
 bool WaterFlowPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, const DirtySwapConfig& config)
 {
     if (config.skipMeasure && config.skipLayout) {
         return false;
     }
 
+    const bool snapLayoutValid = layoutInfo_->isDataValid_ && !layoutInfo_->measureInNextFrame_;
     auto scrollable = GetScrollable();
     if (scrollable) {
         scrollable->ResetDragUpdateDelta();
@@ -480,13 +701,7 @@ bool WaterFlowPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dir
     UpdateScrollBarOffset();
     CheckScrollable();
 
-    auto swInfo = DynamicCast<WaterFlowLayoutInfoSW>(layoutInfo_);
-    if (swInfo && swInfo->contentSizeDiminished_) {
-        if (!GetCanStayOverScroll() && IsOutOfBoundary(false)) {
-            CheckRestartSpring(true);
-        }
-        swInfo->contentSizeDiminished_ = false;
-    }
+    CheckSpringAfterContentShrink();
 
     if (layoutInfo_->measureInNextFrame_) {
         ACE_SCOPED_TRACE("WaterFlow MeasureInNextFrame");
@@ -494,6 +709,8 @@ bool WaterFlowPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dir
     } else {
         isInitialized_ = true;
     }
+
+    UpdateSnapGeometryAfterLayout(snapLayoutValid);
 
 	// Check if we need to mark node dirty when at section boundary with misalignment
     if (IsAtSectionBoundary() && CheckMisalignment(layoutInfo_)) {
@@ -691,6 +908,8 @@ RefPtr<WaterFlowSections> WaterFlowPattern::GetOrCreateWaterFlowSections()
 
 void WaterFlowPattern::OnSectionChanged(int32_t start)
 {
+    snapItemGeometryCache_.clear();
+    snapTotalHeight_.reset();
     if (!sections_) {
         return;
     }
@@ -709,6 +928,8 @@ int32_t WaterFlowPattern::GetFirstIndex() const
 
 void WaterFlowPattern::ResetSections()
 {
+    snapItemGeometryCache_.clear();
+    snapTotalHeight_.reset();
     if (!sections_) {
         return;
     }
@@ -865,6 +1086,8 @@ bool WaterFlowPattern::NeedRender()
 
 void WaterFlowPattern::ResetLayoutInfo()
 {
+    snapItemGeometryCache_.clear();
+    snapTotalHeight_.reset();
     layoutInfo_->Reset();
     if (sections_) {
         layoutInfo_->InitSegments(sections_->GetSectionInfo(), 0);
@@ -896,7 +1119,11 @@ void WaterFlowPattern::AddFooter(const RefPtr<NG::UINode>& footer)
 
 void WaterFlowPattern::SetLayoutMode(LayoutMode mode)
 {
+    // Same-mode property replay must keep sampled snap geometry. Data, section and layout resets,
+    // as well as actual mode switches, remain responsible for invalidation.
     if (!layoutInfo_ || mode != layoutInfo_->Mode()) {
+        snapItemGeometryCache_.clear();
+        snapTotalHeight_.reset();
         layoutInfo_ = WaterFlowLayoutInfoBase::Create(mode);
         isInitialized_ = false; // for contentStartOffset when mode is changed
         MarkDirtyNodeSelf();
@@ -914,6 +1141,8 @@ int32_t WaterFlowPattern::GetChildrenCount() const
 
 void WaterFlowPattern::NotifyDataChange(int32_t index, int32_t count)
 {
+    snapItemGeometryCache_.clear();
+    snapTotalHeight_.reset();
     if (layoutInfo_->Mode() == LayoutMode::SLIDING_WINDOW && keepContentPosition_) {
         auto footer = footer_.Upgrade();
         if (footer && footer->FrameCount() > 0) {
@@ -1046,6 +1275,82 @@ void WaterFlowPattern::DumpAdvanceLayoutInfo() const
     DumpLog::GetInstance().AddDesc("endFixOffset:" + std::to_string(layoutInfo_->endFixOffset_));
     DumpLog::GetInstance().AddDesc("expandHeight:" + std::to_string(layoutInfo_->expandHeight_));
     DumpLog::GetInstance().AddDesc("jumpIndex:" + std::to_string(layoutInfo_->jumpIndex_));
+}
+
+void WaterFlowPattern::DumpAdvanceLayoutProperties(JsonValue& json)
+{
+    auto property = GetLayoutProperty<WaterFlowLayoutProperty>();
+    CHECK_NULL_VOID(property);
+    if (const auto& value = property->GetRowsTemplate(); value.has_value()) {
+        json.Put("RowsTemplate", value->c_str());
+    }
+    if (const auto& value = property->GetColumnsTemplate(); value.has_value()) {
+        json.Put("ColumnsTemplate", value->c_str());
+    }
+    const auto minSize = property->GetItemMinSize();
+    if (minSize) {
+        auto size = JsonUtil::Create();
+        if (minSize->Width()) {
+            size->Put("width", minSize->Width()->ToString().c_str());
+        }
+        if (minSize->Height()) {
+            size->Put("height", minSize->Height()->ToString().c_str());
+        }
+        json.PutRef("ItemMinSize", std::move(size));
+    }
+    const auto maxSize = property->GetItemMaxSize();
+    if (maxSize) {
+        auto size = JsonUtil::Create();
+        if (maxSize->Width()) {
+            size->Put("width", maxSize->Width()->ToString().c_str());
+        }
+        if (maxSize->Height()) {
+            size->Put("height", maxSize->Height()->ToString().c_str());
+        }
+        json.PutRef("ItemMaxSize", std::move(size));
+    }
+}
+
+void WaterFlowPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if (!config.IsPublicTree()) {
+        ScrollablePattern::DumpAdvanceInfo(json);
+        return;
+    }
+    ScrollablePattern::DumpAdvanceInfo(json, config);
+    if (config.visualProperties) {
+        DumpAdvanceVisualProperties(json, config);
+    }
+    if (config.functionalProperties) {
+        DumpAdvanceFunctionalProperties(json, config);
+    }
+}
+
+void WaterFlowPattern::DumpAdvanceVisualProperties(
+    std::unique_ptr<JsonValue>& json, const ParamConfig& /* config */)
+{
+    if (auto info = AceType::DynamicCast<WaterFlowLayoutInfoSW>(layoutInfo_)) {
+        json->Put("footerHeight", info->footerHeight_);
+    }
+    DumpAdvanceLayoutProperties(*json);
+}
+
+void WaterFlowPattern::DumpAdvanceFunctionalProperties(
+    std::unique_ptr<JsonValue>& json, const ParamConfig& /* config */)
+{
+    auto property = GetLayoutProperty<WaterFlowLayoutProperty>();
+    if (property) {
+        if (layoutInfo_) {
+            json->Put("CachedCount", property->GetCachedCount().value_or(layoutInfo_->defCachedCount_));
+        }
+        json->Put("isReverse", property->IsReverse());
+    }
+    json->Put("footer", static_cast<bool>(footer_.Upgrade()));
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto hub = host->GetEventHub<WaterFlowEventHub>();
+    CHECK_NULL_VOID(hub);
+    json->Put("hasOnScrollIndex", static_cast<bool>(hub->GetOnScrollIndex()));
 }
 
 void WaterFlowPattern::DumpAdvanceInfo()
@@ -1291,4 +1596,24 @@ void WaterFlowPattern::PostAsyncLoadTask()
         }
     });
 }
+
+void WaterFlowPattern::InitOnKeyEvent()
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto focusHub = host->GetOrCreateFocusHub();
+    CHECK_NULL_VOID(focusHub);
+    auto onKeyEvent = [wp = WeakClaim(this)](const KeyEvent& event) -> bool {
+        auto pattern = wp.Upgrade();
+        CHECK_NULL_RETURN(pattern, false);
+        return pattern->OnKeyEvent(event);
+    };
+    focusHub->SetOnKeyEventInternal(std::move(onKeyEvent));
+}
+
+bool WaterFlowPattern::OnKeyEvent(const KeyEvent& event)
+{
+    return HandleArrowKeyScroll(event);
+}
+
 } // namespace OHOS::Ace::NG

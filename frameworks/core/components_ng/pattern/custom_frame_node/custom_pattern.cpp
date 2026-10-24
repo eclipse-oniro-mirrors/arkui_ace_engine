@@ -72,7 +72,9 @@ void CustomPattern::InitializeAccessibility(PipelineContext* context)
     CHECK_NULL_VOID(host);
     int64_t accessibilityId = host->GetAccessibilityId();
     CHECK_NULL_VOID(context);
-    auto accessibilityManager = context->GetAccessibilityManager();
+    auto mainAccessibilityManager = context->GetAccessibilityManager();
+    CHECK_NULL_VOID(mainAccessibilityManager);
+    auto accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(host);
     CHECK_NULL_VOID(accessibilityManager);
 
     accessibilityChildTreeCallback_ =
@@ -89,7 +91,12 @@ void CustomPattern::InitializeAccessibility(PipelineContext* context)
 void CustomPattern::UninitializeAccessibility(FrameNode* frameNode, PipelineContext* context)
 {
     CHECK_NULL_VOID(frameNode);
-    auto accessibilityManager = context->GetAccessibilityManager();
+    // Route via GetHost() (XComponent idiom): the callback was registered under the host's AM.
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto mainAccessibilityManager = context->GetAccessibilityManager();
+    CHECK_NULL_VOID(mainAccessibilityManager);
+    auto accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(host);
     CHECK_NULL_VOID(accessibilityManager);
     int64_t accessibilityId = frameNode->GetAccessibilityId();
 
@@ -106,7 +113,9 @@ bool CustomPattern::OnAccessibilityChildTreeRegister(uint32_t windowId, int32_t 
     CHECK_NULL_RETURN(host, false);
     auto pipeline = host->GetContext();
     CHECK_NULL_RETURN(pipeline, false);
-    auto accessibilityManager = pipeline->GetAccessibilityManager();
+    auto mainAccessibilityManager = pipeline->GetAccessibilityManager();
+    CHECK_NULL_RETURN(mainAccessibilityManager, false);
+    auto accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(host);
     CHECK_NULL_RETURN(accessibilityManager, false);
     if (pipeline->IsSubPipeline()) {
         windowId = pipeline->GetRealHostWindowId();
@@ -149,7 +158,17 @@ bool CustomPattern::OnAccessibilityChildTreeDeregister(FrameNode* frameNode)
         pipeline = host->GetContext();
     }
     CHECK_NULL_RETURN(pipeline, false);
-    auto accessibilityManager = pipeline->GetAccessibilityManager();
+    // XComponent idiom: RefPtr nodeForAM (raw FrameNode* converts via RefPtr::operator=).
+    RefPtr<FrameNode> nodeForAM;
+    if (frameNode) {
+        nodeForAM = frameNode;
+    } else {
+        nodeForAM = GetHost();
+        CHECK_NULL_RETURN(nodeForAM, false);
+    }
+    auto mainAccessibilityManager = pipeline->GetAccessibilityManager();
+    CHECK_NULL_RETURN(mainAccessibilityManager, false);
+    auto accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(nodeForAM);
     CHECK_NULL_RETURN(accessibilityManager, false);
 
     auto nativeProvider = GetNativeAccessibilityProvider();

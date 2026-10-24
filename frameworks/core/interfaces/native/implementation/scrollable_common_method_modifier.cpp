@@ -273,7 +273,21 @@ void SetEnableScrollWithMouse(Ark_NativePointer node, const Opt_Boolean* value)
     auto frameNode = reinterpret_cast<FrameNode *>(node);
     CHECK_NULL_VOID(frameNode);
     auto convValue = Converter::GetOptPtr(value);
-    ScrollableModelStatic::SetEnableScrollWithMouse(frameNode, convValue.value_or(false));
+    if (convValue) {
+        ScrollableModelStatic::SetEnableScrollWithMouse(frameNode, convValue.value());
+    } else {
+        ScrollableModelStatic::ResetEnableScrollWithMouse(frameNode);
+    }
+}
+void SetEnableScrollWithKeyboardImpl(Ark_NativePointer node, const Opt_Boolean* value)
+{
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto convValue = Converter::GetOptPtr(value);
+    // Missing/unset option resets to the default: keyboard scrolling enabled.
+    // Deliberately the opposite of SetEnableScrollWithMouse (default off),
+    // matching NODE_SCROLL_ENABLE_SCROLL_WITH_KEYBOARD's documented default of 1.
+    ScrollableModelStatic::SetEnableScrollWithKeyboard(frameNode, convValue.value_or(true));
 }
 void SetOnReachStartImpl(Ark_NativePointer node,
                          const Opt_synthetic_Callback_Void* value)
@@ -459,6 +473,7 @@ const GENERATED_ArkUIScrollableCommonMethodModifier* GetScrollableCommonMethodMo
         ScrollableCommonMethodModifier::SetDigitalCrownSensitivityImpl,
         ScrollableCommonMethodModifier::SetBackToTopImpl,
         ScrollableCommonMethodModifier::SetScrollBarHeightImpl,
+        ScrollableCommonMethodModifier::SetEnableScrollWithKeyboardImpl,
         ScrollableCommonMethodModifier::SetEdgeEffectImpl,
         ScrollableCommonMethodModifier::SetFadingEdgeImpl,
     };

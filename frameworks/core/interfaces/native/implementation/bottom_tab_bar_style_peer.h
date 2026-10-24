@@ -33,6 +33,7 @@ struct BottomTabBarStylePeer final : public OHOS::Ace::Referenced {
     std::optional<bool> symmetricExtensible = std::nullopt;
     std::optional<std::string> id = std::nullopt;
     std::optional<OHOS::Ace::IconStyle> iconStyle = std::nullopt;
+    std::optional<OHOS::Ace::TabBarBadgeParam> badge = std::nullopt;
     BottomTabBarStylePeer() = default;
     ~BottomTabBarStylePeer() override = default;
     friend OHOS::Ace::NG::PeerUtils;

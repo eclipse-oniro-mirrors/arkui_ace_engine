@@ -161,6 +161,10 @@ public:
 private:
     bool TriggerInteractionCallBack(TouchEventInfo& event);
     bool TriggerTouchCallBack(const TouchEvent& changedPoint);
+    void UpdateFirstInputTime(const TouchEvent& point);
+    // Runs on the input/UI path; publishes only while a PageScene observer is registered.
+    // The candidate stores a weak response node and is consumed at a later stable point.
+    void PublishSearchClickCandidate(const TouchEvent& point);
     bool ShouldResponse() override;
     void TriggerCallBacks(TouchEventInfo& event);
 #ifdef ENABLE_INSPECTOR_EVENT_REPORTING

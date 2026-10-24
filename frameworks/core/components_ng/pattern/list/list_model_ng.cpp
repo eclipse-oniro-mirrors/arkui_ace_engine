@@ -469,6 +469,15 @@ void ListModelNG::SetSyncLoad(bool enabled)
     ACE_UPDATE_LAYOUT_PROPERTY(ListLayoutProperty, SyncLoad, enabled);
 }
 
+void ListModelNG::SetScrollPlaceholder(ScrollPlaceholderProvider&& provider)
+{
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    CHECK_NULL_VOID(frameNode);
+    auto pattern = frameNode->GetPattern<ListPattern>();
+    CHECK_NULL_VOID(pattern);
+    pattern->SetScrollPlaceholder(std::move(provider));
+}
+
 void ListModelNG::SetOnScroll(OnScrollEvent&& onScroll)
 {
     ACE_ENGINE_HISTOGRAM_BOOLEAN(SCROLLABLE_LIST_ATTRIBUTE "SetOnScroll", onScroll ? 1 : 0);
@@ -1379,6 +1388,22 @@ void ListModelNG::SetScrollToIndex(
     CHECK_NULL_VOID(pattern);
     pattern->SetAccessibilityScrollSource(AccessibilityScrollSource::API);
     pattern->ScrollToIndex(index, animation, static_cast<ScrollAlign>(alignment), extraOffset);
+}
+
+void ListModelNG::SetScrollToIndexWithOptions(FrameNode* frameNode, int32_t index, bool smooth, ScrollAlign align,
+    std::optional<float> extraOffset, FastScrollMode mode)
+{
+    if (!IsFastScrollEnabled(mode) || !smooth) {
+        SetScrollToIndex(frameNode, index, smooth, static_cast<int32_t>(align), extraOffset);
+        return;
+    }
+    CHECK_NULL_VOID(frameNode);
+    FREE_NODE_CHECK(frameNode, SetScrollToIndexWithOptions,
+        frameNode, index, smooth, align, extraOffset, mode);
+    auto pattern = frameNode->GetPattern<ListPattern>();
+    CHECK_NULL_VOID(pattern);
+    pattern->SetAccessibilityScrollSource(AccessibilityScrollSource::API);
+    pattern->ScrollToIndexFastScroll(index, smooth, align, extraOffset, mode);
 }
 
 void ListModelNG::SetScrollBy(FrameNode* frameNode, double x, double y)

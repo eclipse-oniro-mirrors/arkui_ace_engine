@@ -355,7 +355,7 @@ std::unordered_map<SheetKey, WeakPtr<FrameNode>, SheetKeyHash> OverlayManager::G
 
 void OverlayManager::SetFilterActive(bool actived)
 {
-    hasFilterActived = actived;
+    hasFilterActived_ = actived;
 }
 
 void OverlayManager::SetDismissPopupId(int32_t targetId)
@@ -5646,6 +5646,13 @@ void OverlayManager::RemoveFilterAnimation()
         return;
     }
 
+    if (hasFilterActived_) {
+        TAG_LOGI(AceLogTag::ACE_OVERLAY,
+            "filter show animation still active (hasFilterActived_=true), skip disappear for filterId=%{public}d",
+            filterNode->GetId());
+        return;
+    }
+
     ShowFilterDisappearAnimation(filterNode);
 }
 
@@ -7443,6 +7450,28 @@ void OverlayManager::ResetDetachedFreeRootProxy(int32_t targetId)
     if (iter != detachedProxyMap_.end()) {
         detachedProxyMap_.erase(iter);
     }
+}
+
+bool OverlayManager::GetMenuWrapperState(const RefPtr<FrameNode>& node, int32_t& targetId, bool& isShown)
+{
+    targetId = -1;
+    isShown = false;
+    CHECK_NULL_RETURN(node, false);
+    auto menu = node->GetPattern<MenuWrapperPattern>();
+    CHECK_NULL_RETURN(menu, false);
+    targetId = menu->GetTargetId();
+    isShown = menu->IsShow();
+    return true;
+}
+
+bool OverlayManager::GetPopupTargetId(const RefPtr<FrameNode>& node, int32_t& targetId)
+{
+    targetId = -1;
+    CHECK_NULL_RETURN(node, false);
+    auto bubble = node->GetPattern<BubblePattern>();
+    CHECK_NULL_RETURN(bubble, false);
+    targetId = bubble->GetPopupTargetId();
+    return true;
 }
 
 PopupInfo OverlayManager::GetPopupInfo(int32_t targetId) const

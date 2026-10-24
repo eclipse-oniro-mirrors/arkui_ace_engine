@@ -19,6 +19,7 @@
 
 #include "base/log/dump_log.h"
 #include "base/utils/utils.h"
+#include "interfaces/inner_api/ui_session/param_config.h"
 
 namespace OHOS::Ace::NG {
 void LazyGridLayoutInfo::EstimateItemSize()
@@ -27,6 +28,114 @@ void LazyGridLayoutInfo::EstimateItemSize()
         float totalSize = posMap_.rbegin()->second.endPos + spaceWidth_ - posMap_.begin()->second.startPos;
         int32_t totalCount = (static_cast<int32_t>(posMap_.size()) + lanes_ - 1) / lanes_;
         estimateItemSize_ = totalSize / totalCount - spaceWidth_;
+    }
+}
+
+void LazyGridLayoutInfo::EstimateBoundaryItemSize()
+{
+    if (posMap_.empty()) {
+        return;
+    }
+    float measuredSize = 0.0f;
+    float lineSize = 0.0f;
+    int32_t previousLine = -1;
+    int32_t lineCount = 0;
+    for (const auto& [index, item] : posMap_) {
+        const int32_t line = index / lanes_;
+        if (line != previousLine) {
+            measuredSize += lineSize;
+            lineSize = 0.0f;
+            previousLine = line;
+            ++lineCount;
+        }
+        lineSize = std::max(lineSize, item.endPos - item.startPos);
+    }
+    estimateItemSize_ = (measuredSize + lineSize) / lineCount;
+}
+
+bool LazyGridLayoutInfo::ApplyKnownBodySize(float prevBodyMainSize, float knownBodyMainSize)
+{
+    if (!std::isfinite(knownBodyMainSize) || LessNotEqualCustomPrecision(knownBodyMainSize, 0.0, 0.0) ||
+        totalItemCount_ < 0 || lanes_ <= 0) {
+        return false;
+    }
+    const auto measured = CollectMeasuredRows();
+    CHECK_NULL_RETURN(measured, false);
+    const int32_t rowCount = totalItemCount_ == 0 ? 0 : (totalItemCount_ - 1) / lanes_ + 1;
+    const int32_t unknownCount = rowCount - measured->first;
+    const double remaining = knownBodyMainSize - measured->second -
+        static_cast<double>(std::max(rowCount - 1, 0)) * spaceWidth_;
+    if (!std::isfinite(remaining) || LessNotEqualCustomPrecision(remaining, 0.0, 0.0) ||
+        (unknownCount == 0 && !NearZero(remaining))) {
+        return false;
+    }
+    auto anchor = posMap_.find(startIndex_);
+    const float oldAnchor = anchor == posMap_.end() ? 0.0f : anchor->second.startPos;
+    const double estimateSize = unknownCount > 0 ? remaining / unknownCount : 0.0;
+    if (unknownCount > 0) {
+        estimateItemSize_ = static_cast<float>(estimateSize);
+    }
+    RebaseKnownRows(estimateSize, knownBodyMainSize);
+    if (anchor != posMap_.end()) {
+        adjustOffset_.start += anchor->second.startPos - oldAnchor;
+    }
+    totalMainSize_ = knownBodyMainSize;
+    adjustOffset_.end = totalMainSize_ - prevBodyMainSize - adjustOffset_.start;
+    return true;
+}
+
+std::optional<std::pair<int32_t, double>> LazyGridLayoutInfo::CollectMeasuredRows() const
+{
+    std::pair<int32_t, double> measured { 0, 0.0 };
+    auto item = posMap_.begin();
+    while (item != posMap_.end()) {
+        const int32_t first = item->first;
+        if (first < 0 || first >= totalItemCount_ || first % lanes_ != 0) {
+            return std::nullopt;
+        }
+        const int32_t last = LanesCeil(first);
+        float rowSize = 0.0f;
+        for (int32_t index = first; index <= last; ++index) {
+            if (item == posMap_.end() || item->first != index || item->second.laneIdx != index - first) {
+                return std::nullopt;
+            }
+            const float size = item->second.endPos - item->second.startPos;
+            if (!std::isfinite(size) || LessNotEqualCustomPrecision(size, 0.0, 0.0)) {
+                return std::nullopt;
+            }
+            rowSize = std::max(rowSize, size);
+            ++item;
+        }
+        ++measured.first;
+        measured.second += rowSize;
+    }
+    return measured;
+}
+
+void LazyGridLayoutInfo::RebaseKnownRows(double estimateSize, float knownBodyMainSize)
+{
+    double measuredPrefix = 0.0;
+    int32_t measuredCount = 0;
+    auto item = posMap_.begin();
+    while (item != posMap_.end()) {
+        const int32_t row = item->first / lanes_;
+        const int32_t last = LanesCeil(item->first);
+        auto next = item;
+        float size = 0.0f;
+        while (next != posMap_.end() && next->first <= last) {
+            size = std::max(size, next->second.endPos - next->second.startPos);
+            ++next;
+        }
+        const bool atEnd = last == totalItemCount_ - 1;
+        const double cursor = atEnd ? static_cast<double>(knownBodyMainSize) - size :
+            (row - measuredCount) * estimateSize + measuredPrefix + static_cast<double>(row) * spaceWidth_;
+        while (item != next) {
+            item->second.startPos = static_cast<float>(cursor);
+            item->second.endPos = atEnd ? knownBodyMainSize : static_cast<float>(cursor + size);
+            ++item;
+        }
+        measuredPrefix += size;
+        ++measuredCount;
     }
 }
 
@@ -140,7 +249,7 @@ float LazyGridLayoutInfo::UpdatePosWithIter(
     return delta;
 }
 
-void LazyGridLayoutInfo::UpdatePosMap(float prevBodyMainSize)
+bool LazyGridLayoutInfo::UpdatePosMap(float prevBodyMainSize, std::optional<float> knownBodyMainSize)
 {
     float prevTotalMainSize_ = prevBodyMainSize;
     if (!Positive(estimateItemSize_)) {
@@ -173,6 +282,7 @@ void LazyGridLayoutInfo::UpdatePosMap(float prevBodyMainSize)
     cachedUpdatedStart_ = INT_MAX;
     cachedUpdatedEnd_ = -1;
     spaceUpdated_ = false;
+    return !knownBodyMainSize || ApplyKnownBodySize(prevBodyMainSize, knownBodyMainSize.value());
 }
 
 void LazyGridLayoutInfo::SetSpace(float space)
@@ -267,6 +377,23 @@ bool LazyGridLayoutInfo::NeedPredict() const
         (LessNotEqual(layoutedEnd_, cacheEndPos_) && layoutedEndIndex_ < totalItemCount_ - 1));
 }
 
+void LazyGridLayoutInfo::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if (!config.IsPublicTree()) {
+        json->Put("itemStartIndex", startIndex_);
+        json->Put("itemEndIndex", endIndex_);
+        json->Put("itemTotalCount", totalItemCount_);
+    }
+    if (!config.IsPublicTree() || config.visualProperties) {
+        json->Put("headerMainSize", headerMainSize_);
+        json->Put("footerMainSize", footerMainSize_);
+        json->Put("spaceWidth", spaceWidth_);
+    }
+    if (!config.IsPublicTree()) {
+        json->Put("totalMainSize", totalMainSize_);
+    }
+}
+
 void LazyGridLayoutInfo::DumpAdvanceInfo()
 {
     DumpLog::GetInstance().AddDesc("itemStartIndex:" + std::to_string(startIndex_));
@@ -280,12 +407,6 @@ void LazyGridLayoutInfo::DumpAdvanceInfo()
 
 void LazyGridLayoutInfo::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json)
 {
-    json->Put("itemStartIndex", startIndex_);
-    json->Put("itemEndIndex", endIndex_);
-    json->Put("itemTotalCount", totalItemCount_);
-    json->Put("headerMainSize", headerMainSize_);
-    json->Put("footerMainSize", footerMainSize_);
-    json->Put("spaceWidth", spaceWidth_);
-    json->Put("totalMainSize", totalMainSize_);
+    LazyGridLayoutInfo::DumpAdvanceInfo(json, ParamConfig());
 }
 } // namespace OHOS::Ace::NG

@@ -20,6 +20,7 @@
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 
 #include "core/components_ng/pattern/loading_progress/loading_progress_paint_property.h"
+#include "core/components_ng/pattern/refresh/refresh_event_hub.h"
 
 namespace OHOS::Ace::NG {
 class RefreshEventTestNg : public RefreshTestNg {
@@ -1431,5 +1432,179 @@ HWTEST_F(RefreshEventTestNg, CreateWithResourceObjTest001, TestSize.Level1)
     pattern_->OnColorModeChange(colorMode);
     EXPECT_TRUE(layoutProperty->GetLoadingText().has_value());
     CreateDone();
+}
+
+/**
+ * @tc.name: FireOnRefreshingReplaceDuringExecution001
+ * @tc.desc: Verify FireOnRefreshing completes safely when the callback replaces refreshing_
+ *           during its own execution (onRefreshing attribute re-applied on re-render).
+ * @tc.type: FUNC
+ */
+HWTEST_F(RefreshEventTestNg, FireOnRefreshingReplaceDuringExecution001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Register a callback which re-registers refreshing_ during execution.
+     * @tc.expected: The old callback finishes and the new callback takes effect on next fire.
+     */
+    auto eventHub = AceType::MakeRefPtr<RefreshEventHub>();
+    ASSERT_NE(eventHub, nullptr);
+    bool oldCallbackFinished = false;
+    bool newCallbackCalled = false;
+    auto newCallback = [&newCallbackCalled]() { newCallbackCalled = true; };
+    auto oldCallback = [eventHub, &oldCallbackFinished, newCallback = std::move(newCallback)]() mutable {
+        eventHub->SetOnRefreshing(std::move(newCallback));
+        oldCallbackFinished = true;
+    };
+    eventHub->SetOnRefreshing(std::move(oldCallback));
+    eventHub->FireOnRefreshing();
+    EXPECT_TRUE(oldCallbackFinished);
+    EXPECT_FALSE(newCallbackCalled);
+    eventHub->FireOnRefreshing();
+    EXPECT_TRUE(newCallbackCalled);
+}
+
+/**
+ * @tc.name: FireOnRefreshingResetDuringExecution001
+ * @tc.desc: Verify FireOnRefreshing completes safely when the callback clears refreshing_
+ *           during its own execution (resetOnRefreshing re-applied on re-render).
+ * @tc.type: FUNC
+ */
+HWTEST_F(RefreshEventTestNg, FireOnRefreshingResetDuringExecution001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Register a callback which resets refreshing_ during execution.
+     * @tc.expected: The old callback finishes and the next fire is a no-op.
+     */
+    auto eventHub = AceType::MakeRefPtr<RefreshEventHub>();
+    ASSERT_NE(eventHub, nullptr);
+    bool oldCallbackFinished = false;
+    auto oldCallback = [eventHub, &oldCallbackFinished]() {
+        eventHub->SetOnRefreshing(nullptr);
+        oldCallbackFinished = true;
+    };
+    eventHub->SetOnRefreshing(std::move(oldCallback));
+    eventHub->FireOnRefreshing();
+    EXPECT_TRUE(oldCallbackFinished);
+    eventHub->FireOnRefreshing();
+}
+
+/**
+ * @tc.name: FireChangeEventReplaceDuringExecution001
+ * @tc.desc: Verify FireChangeEvent completes safely when the callback replaces changeEvent_
+ *           during its own execution (refreshing attribute re-applied on re-render).
+ * @tc.type: FUNC
+ */
+HWTEST_F(RefreshEventTestNg, FireChangeEventReplaceDuringExecution001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Register a callback which re-registers changeEvent_ during execution.
+     * @tc.expected: The old callback finishes and the new callback takes effect on next fire.
+     */
+    auto eventHub = AceType::MakeRefPtr<RefreshEventHub>();
+    ASSERT_NE(eventHub, nullptr);
+    bool oldCallbackFinished = false;
+    bool newCallbackCalled = false;
+    auto newCallback = [&newCallbackCalled](const std::string& value) { newCallbackCalled = true; };
+    auto oldCallback = [eventHub, &oldCallbackFinished,
+                           newCallback = std::move(newCallback)](const std::string& value) mutable {
+        eventHub->SetChangeEvent(std::move(newCallback));
+        oldCallbackFinished = true;
+    };
+    eventHub->SetChangeEvent(std::move(oldCallback));
+    eventHub->FireChangeEvent("true");
+    EXPECT_TRUE(oldCallbackFinished);
+    EXPECT_FALSE(newCallbackCalled);
+    eventHub->FireChangeEvent("true");
+    EXPECT_TRUE(newCallbackCalled);
+}
+
+/**
+ * @tc.name: FireOnStateChangeReplaceDuringExecution001
+ * @tc.desc: Verify FireOnStateChange completes safely when the callback replaces stateChange_
+ *           during its own execution (onStateChange attribute re-applied on re-render).
+ * @tc.type: FUNC
+ */
+HWTEST_F(RefreshEventTestNg, FireOnStateChangeReplaceDuringExecution001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Register a callback which re-registers stateChange_ during execution.
+     * @tc.expected: The old callback finishes and the new callback takes effect on next fire.
+     */
+    auto eventHub = AceType::MakeRefPtr<RefreshEventHub>();
+    ASSERT_NE(eventHub, nullptr);
+    bool oldCallbackFinished = false;
+    bool newCallbackCalled = false;
+    auto newCallback = [&newCallbackCalled](const int32_t value) { newCallbackCalled = true; };
+    auto oldCallback = [eventHub, &oldCallbackFinished,
+                           newCallback = std::move(newCallback)](const int32_t value) mutable {
+        eventHub->SetOnStateChange(std::move(newCallback));
+        oldCallbackFinished = true;
+    };
+    eventHub->SetOnStateChange(std::move(oldCallback));
+    eventHub->FireOnStateChange(0);
+    EXPECT_TRUE(oldCallbackFinished);
+    EXPECT_FALSE(newCallbackCalled);
+    eventHub->FireOnStateChange(0);
+    EXPECT_TRUE(newCallbackCalled);
+}
+
+/**
+ * @tc.name: FireOnOffsetChangeReplaceDuringExecution001
+ * @tc.desc: Verify FireOnOffsetChange completes safely when the callback replaces offsetChange_
+ *           during its own execution (onOffsetChange attribute re-applied on re-render).
+ * @tc.type: FUNC
+ */
+HWTEST_F(RefreshEventTestNg, FireOnOffsetChangeReplaceDuringExecution001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Register a callback which re-registers offsetChange_ during execution.
+     * @tc.expected: The old callback finishes and the new callback takes effect on next fire.
+     */
+    auto eventHub = AceType::MakeRefPtr<RefreshEventHub>();
+    ASSERT_NE(eventHub, nullptr);
+    bool oldCallbackFinished = false;
+    bool newCallbackCalled = false;
+    auto newCallback = [&newCallbackCalled](const float value) { newCallbackCalled = true; };
+    auto oldCallback = [eventHub, &oldCallbackFinished,
+                           newCallback = std::move(newCallback)](const float value) mutable {
+        eventHub->SetOnOffsetChange(std::move(newCallback));
+        oldCallbackFinished = true;
+    };
+    eventHub->SetOnOffsetChange(std::move(oldCallback));
+    eventHub->FireOnOffsetChange(0.0f);
+    EXPECT_TRUE(oldCallbackFinished);
+    EXPECT_FALSE(newCallbackCalled);
+    eventHub->FireOnOffsetChange(0.0f);
+    EXPECT_TRUE(newCallbackCalled);
+}
+
+/**
+ * @tc.name: FireOnStepOffsetChangeReplaceDuringExecution001
+ * @tc.desc: Verify FireOnStepOffsetChange completes safely when the callback replaces
+ *           stepOffsetChange_ during its own execution.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RefreshEventTestNg, FireOnStepOffsetChangeReplaceDuringExecution001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Register a callback which re-registers stepOffsetChange_ during execution.
+     * @tc.expected: The old callback finishes and the new callback takes effect on next fire.
+     */
+    auto eventHub = AceType::MakeRefPtr<RefreshEventHub>();
+    ASSERT_NE(eventHub, nullptr);
+    bool oldCallbackFinished = false;
+    bool newCallbackCalled = false;
+    auto newCallback = [&newCallbackCalled](const float value, const bool isDrag) { newCallbackCalled = true; };
+    auto oldCallback = [eventHub, &oldCallbackFinished,
+                           newCallback = std::move(newCallback)](const float value, const bool isDrag) mutable {
+        eventHub->SetOnStepOffsetChange(std::move(newCallback));
+        oldCallbackFinished = true;
+    };
+    eventHub->SetOnStepOffsetChange(std::move(oldCallback));
+    eventHub->FireOnStepOffsetChange(0.0f, false);
+    EXPECT_TRUE(oldCallbackFinished);
+    EXPECT_FALSE(newCallbackCalled);
+    eventHub->FireOnStepOffsetChange(0.0f, false);
+    EXPECT_TRUE(newCallbackCalled);
 }
 } // namespace OHOS::Ace::NG

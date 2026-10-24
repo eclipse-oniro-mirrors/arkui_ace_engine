@@ -117,7 +117,7 @@ class UINode;
 class FrameNode;
 using AccessibilityHoverTestPath = std::vector<RefPtr<FrameNode>>;
 
-class CustomAccessibilityProperty : public virtual AceType {
+class CustomAccessibilityProperty : public AceType {
     DECLARE_ACE_TYPE(CustomAccessibilityProperty, AceType);
 
 public:
@@ -175,7 +175,7 @@ private:
     std::string text_;
 };
 
-class ACE_FORCE_EXPORT AccessibilityProperty : public virtual AceType,
+class ACE_FORCE_EXPORT AccessibilityProperty : public AceType,
                                                public AccessibilityPropertyInnerFunction,
                                                public AccessibilityPropertyInterfaceFunction {
     DECLARE_ACE_TYPE(AccessibilityProperty, AceType);
@@ -216,10 +216,7 @@ public:
         return false;
     }
 
-    virtual bool IsEditable() const
-    {
-        return false;
-    }
+    virtual bool IsEditable() const;
 
     virtual bool IsMultiLine() const
     {
@@ -236,10 +233,7 @@ public:
         return false;
     }
 
-    virtual bool IsScrollable() const
-    {
-        return false;
-    }
+    virtual bool IsScrollable() const;
 
     virtual int32_t GetCurrentIndex() const
     {
@@ -466,16 +460,9 @@ public:
 
     bool HasAccessibilityVirtualNode() const;
 
-    virtual std::string GetAccessibilityText() const
-    {
-        return accessibilityText_.value_or("");
-    }
+    virtual std::string GetAccessibilityText() const;
 
-    virtual std::string GetAccessibilityNextFocusInspectorKey() const
-    {
-        return accessibilityNextFocusParams_.has_value()
-            ? accessibilityNextFocusParams_->nextFocusInspectorKey : "";
-    }
+    virtual std::string GetAccessibilityNextFocusInspectorKey() const;
 
     void SetAccessibilityNextFocusParams(const AccessibilityNextFocusParams& params);
     AccessibilityNextFocusParams GetAccessibilityNextFocusParams() const;
@@ -500,13 +487,7 @@ public:
         inline static const std::string NO_HIDE_DESCENDANTS = "no-hide-descendants";
     };
 
-    virtual std::string GetAccessibilityLevel() const
-    {
-        if (!accessibilityLevel_.has_value()) {
-            return Level::AUTO;
-        }
-        return accessibilityLevel_.value();
-    }
+    virtual std::string GetAccessibilityLevel() const;
 
     void SetAccessibilityLevel(const std::string& accessibilityLevel);
 
@@ -561,6 +542,7 @@ public:
     void ResetAccessibilityRole();
     bool HasAccessibilityRole();
     std::string GetAccessibilityRole() const;
+    bool HasSemanticContent() const;
     void SetAccessibilityCustomRole(const std::string& role);
     void ResetAccessibilityCustomRole();
     bool HasAccessibilityCustomRole();

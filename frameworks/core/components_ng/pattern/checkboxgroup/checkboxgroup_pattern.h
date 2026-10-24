@@ -147,21 +147,6 @@ public:
         skipFlag_ = skipFlag;
     }
 
-    bool GetSkipFlag() const
-    {
-        return skipFlag_;
-    }
-
-    void SetColorConfigSkip(bool skip)
-    {
-        colorConfigSkip_ = skip;
-    }
-
-    bool GetColorConfigSkip() const
-    {
-        return colorConfigSkip_;
-    }
-
     void ToJsonValue(std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const override
     {
         Pattern::ToJsonValue(json, filter);
@@ -282,7 +267,6 @@ private:
     TouchHoverAnimationType touchHoverType_ = TouchHoverAnimationType::NONE;
     bool updateFlag_ = false;
     bool skipFlag_ = false;
-    bool colorConfigSkip_ = false;
     bool isFirstCreated_ = true;
     bool isUserSetResponseRegion_ = false;
     UIStatus uiStatus_ = UIStatus::UNSELECTED;

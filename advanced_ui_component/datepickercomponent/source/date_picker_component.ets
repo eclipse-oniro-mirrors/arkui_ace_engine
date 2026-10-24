@@ -127,6 +127,14 @@ export struct DatePickerComponent {
   @State lunar: boolean = false;
   @State dateCanLoop: boolean = true;
   @State timeCanLoop: boolean = true;
+  @State dateStartEndSet: boolean = false;
+  @State timeStartEndSet: boolean = false;
+  @State yearColumnCanLoop: boolean = true;
+  @State monthColumnCanLoop: boolean = true;
+  @State dayColumnCanLoop: boolean = true;
+  @State hourColumnCanLoop: boolean = true;
+  @State minuteColumnCanLoop: boolean = true;
+  @State secondColumnCanLoop: boolean = true;
   @State dateHapticFeedback: boolean = true;
   @State timeHapticFeedback: boolean = true;
   @State yearArray: string[] = [];
@@ -301,6 +309,8 @@ export struct DatePickerComponent {
       this.initDayArray();
     }
     this.initTimeArrays();
+    this.updateDateColumnLoopState();
+    this.updateTimeColumnLoopState();
   }
   
   private initLunarArrays(): void {
@@ -1124,6 +1134,7 @@ private formatHour(hour24: number): string {
       this.userLunar = false;
       this.lunarCalendar = null;
       this.dateCanLoop = true;
+      this.dateStartEndSet = false;
       this.dateHapticFeedback = true;
       this.startYear = DatePickerConstant.DEFAULT_START_YEAR;
       this.endYear = DatePickerConstant.DEFAULT_END_YEAR;
@@ -1140,6 +1151,7 @@ private formatHour(hour24: number): string {
       this.timeFormat = TimeFormat.HOUR_MINUTE;
       this.useMilitaryTime = false;
       this.timeCanLoop = true;
+      this.timeStartEndSet = false;
       this.timeHapticFeedback = true;
       this.startHour = DatePickerConstant.MIN_HOUR;
       this.endHour = DatePickerConstant.MAX_HOUR;
@@ -1285,10 +1297,7 @@ private formatHour(hour24: number): string {
       this.endDay = tempDay;
     }
     
-    // If user explicitly sets valid start or end, force loop to false
-    if (startValid || endValid) {
-      this.dateCanLoop = false;
-    }
+    this.dateStartEndSet = startValid || endValid;
     
     if (this.startYear < DatePickerConstant.MIN_YEAR) {
       this.startYear = DatePickerConstant.MIN_YEAR;
@@ -1503,10 +1512,7 @@ private formatHour(hour24: number): string {
     this.startSecond = Math.max(DatePickerConstant.MIN_SECOND, Math.min(DatePickerConstant.MAX_SECOND, this.startSecond));
     this.endSecond = Math.max(DatePickerConstant.MIN_SECOND, Math.min(DatePickerConstant.MAX_SECOND, this.endSecond));
     
-    // If user explicitly sets valid start or end, force loop to false
-    if (startValid || endValid) {
-      this.timeCanLoop = false;
-    }
+    this.timeStartEndSet = startValid || endValid;
     
     const now = new Date();
     let selectedTime: Date | undefined = undefined;
@@ -1665,6 +1671,7 @@ private formatHour(hour24: number): string {
       this.updateDaysArray();
     }
     
+    this.updateDateColumnLoopState();
     this.dateOnChange?.(this.getResult());
   }
   
@@ -1708,6 +1715,7 @@ private formatHour(hour24: number): string {
       this.selectedMonth = startMonthIndex + selectedIndex;
       this.updateDaysArray();
     }
+    this.updateDateColumnLoopState();
     this.dateOnChange?.(this.getResult());
   }
   
@@ -1807,6 +1815,7 @@ private formatHour(hour24: number): string {
       }
     }
     this.updateTimeArrays();
+    this.updateTimeColumnLoopState();
     this.timeOnChange?.(this.getResult());
   }
   
@@ -1852,6 +1861,7 @@ private formatHour(hour24: number): string {
       this.updateTimeArrays();
     }
     
+    this.updateTimeColumnLoopState();
     this.timeOnChange?.(this.getResult());
   }
   
@@ -1862,6 +1872,7 @@ private formatHour(hour24: number): string {
     }
     this.selectedMinute = startMinuteIndex + selectedIndex;
     this.updateSecondArray();
+    this.updateTimeColumnLoopState();
     this.timeOnChange?.(this.getResult());
   }
   
@@ -2104,6 +2115,42 @@ private formatHour(hour24: number): string {
     return this.selectedSecond - startSecondIndex;
   }
   
+  private updateDateColumnLoopState(): void {
+    if (!this.dateStartEndSet || !this.dateCanLoop) {
+      const loop = this.dateCanLoop;
+      this.yearColumnCanLoop = loop;
+      this.monthColumnCanLoop = loop;
+      this.dayColumnCanLoop = loop;
+      return;
+    }
+
+    this.yearColumnCanLoop = false;
+    const atStartYear = this.selectedYear === this.startYear;
+    const atEndYear = this.selectedYear === this.endYear;
+    this.monthColumnCanLoop = !atStartYear && !atEndYear;
+    const atStartMonth = atStartYear && this.selectedMonth === this.startMonth;
+    const atEndMonth = atEndYear && this.selectedMonth === this.endMonth;
+    this.dayColumnCanLoop = !atStartMonth && !atEndMonth;
+  }
+
+  private updateTimeColumnLoopState(): void {
+    if (!this.timeStartEndSet || !this.timeCanLoop) {
+      const loop = this.timeCanLoop;
+      this.hourColumnCanLoop = loop;
+      this.minuteColumnCanLoop = loop;
+      this.secondColumnCanLoop = loop;
+      return;
+    }
+
+    this.hourColumnCanLoop = false;
+    const atStartHour = this.selectedHour === this.startHour;
+    const atEndHour = this.selectedHour === this.endHour;
+    this.minuteColumnCanLoop = !atStartHour && !atEndHour;
+    const atStartMinute = atStartHour && this.selectedMinute === this.startMinute;
+    const atEndMinute = atEndHour && this.selectedMinute === this.endMinute;
+    this.secondColumnCanLoop = !atStartMinute && !atEndMinute;
+  }
+
   private isRTL(): boolean {
     return i18n.isRTL(this.locale.toString()) ?? false;
   }
@@ -2307,7 +2354,7 @@ private formatHour(hour24: number): string {
           }
           .width(this.getDateColumnWidth(0))
           .height(200)
-          .canLoop(this.dateCanLoop)
+          .canLoop(this.yearColumnCanLoop)
           .enableHapticFeedback(this.dateHapticFeedback)
           .selectionIndicator(this.getFirstPickerIndicator(this.getAdjustedRadius()))
           .onChange((selectedIndex: number) => {
@@ -2333,7 +2380,7 @@ private formatHour(hour24: number): string {
           }
           .width(this.getDateColumnWidth(1))
           .height(200)
-          .canLoop(this.dateCanLoop)
+          .canLoop(this.monthColumnCanLoop)
           .enableHapticFeedback(this.dateHapticFeedback)
           .selectionIndicator(this.getMiddlePickerIndicator())
           .onChange((selectedIndex: number) => {
@@ -2353,7 +2400,7 @@ private formatHour(hour24: number): string {
           }
           .width(this.getDateColumnWidth(2))
           .height(200)
-          .canLoop(this.dateCanLoop)
+          .canLoop(this.dayColumnCanLoop)
           .enableHapticFeedback(this.dateHapticFeedback)
           .selectionIndicator(this.displayMode === DisplayMode.DATE_TIME ? this.getMiddlePickerIndicator() : this.getLastPickerIndicator(this.getAdjustedRadius()))
           .onChange((selectedIndex: number) => {
@@ -2381,7 +2428,7 @@ private formatHour(hour24: number): string {
           }
           .width(this.getDateColumnWidth(0))
           .height(200)
-          .canLoop(this.dateCanLoop)
+          .canLoop(this.yearColumnCanLoop)
           .enableHapticFeedback(this.dateHapticFeedback)
           .selectionIndicator(this.getFirstPickerIndicator(this.getAdjustedRadius()))
           .onChange((selectedIndex: number) => {
@@ -2407,7 +2454,7 @@ private formatHour(hour24: number): string {
           }
           .width(this.getDateColumnWidth(1))
           .height(200)
-          .canLoop(this.dateCanLoop)
+          .canLoop(this.monthColumnCanLoop)
           .enableHapticFeedback(this.dateHapticFeedback)
           .selectionIndicator(this.displayMode === DisplayMode.DATE_TIME ? this.getMiddlePickerIndicator() : this.getLastPickerIndicator(this.getAdjustedRadius()))
           .onChange((selectedIndex: number) => {
@@ -2436,7 +2483,7 @@ private formatHour(hour24: number): string {
           }
           .width(this.getDateColumnWidth(0))
           .height(200)
-          .canLoop(this.dateCanLoop)
+          .canLoop(this.monthColumnCanLoop)
           .enableHapticFeedback(this.dateHapticFeedback)
           .selectionIndicator(this.getFirstPickerIndicator(this.getAdjustedRadius()))
           .onChange((selectedIndex: number) => {
@@ -2461,7 +2508,7 @@ private formatHour(hour24: number): string {
           }
           .width(this.getDateColumnWidth(1))
           .height(200)
-          .canLoop(this.dateCanLoop)
+          .canLoop(this.dayColumnCanLoop)
           .enableHapticFeedback(this.dateHapticFeedback)
           .selectionIndicator(this.displayMode === DisplayMode.DATE_TIME ? this.getMiddlePickerIndicator() : this.getLastPickerIndicator(this.getAdjustedRadius()))
           .onChange((selectedIndex: number) => {
@@ -2495,7 +2542,7 @@ private formatHour(hour24: number): string {
             }
             .width(this.getTimeColumnWidth(0))
             .height(200)
-            .canLoop(this.timeCanLoop)
+            .canLoop(this.hourColumnCanLoop)
             .enableHapticFeedback(this.timeHapticFeedback)
             .selectionIndicator(this.displayMode === DisplayMode.DATE_TIME ? this.getMiddlePickerIndicator() : this.getFirstPickerIndicator(this.getAdjustedRadius()))
             .onChange((selectedIndex: number) => {
@@ -2525,7 +2572,7 @@ private formatHour(hour24: number): string {
             }
             .width(this.getTimeColumnWidth(1))
             .height(200)
-            .canLoop(this.timeCanLoop)
+            .canLoop(this.minuteColumnCanLoop)
             .enableHapticFeedback(this.timeHapticFeedback)
             .selectionIndicator(this.getLastPickerIndicator(this.getAdjustedRadius()))
             .onChange((selectedIndex: number) => {
@@ -2586,7 +2633,7 @@ private formatHour(hour24: number): string {
             }
             .width(this.getTimeColumnWidth(1))
             .height(200)
-            .canLoop(this.timeCanLoop)
+            .canLoop(this.hourColumnCanLoop)
             .enableHapticFeedback(this.timeHapticFeedback)
             .selectionIndicator(this.getMiddlePickerIndicator())
             .onChange((selectedIndex: number) => {
@@ -2607,7 +2654,7 @@ private formatHour(hour24: number): string {
             }
             .width(this.getTimeColumnWidth(2))
             .height(200)
-            .canLoop(this.timeCanLoop)
+            .canLoop(this.minuteColumnCanLoop)
             .enableHapticFeedback(this.timeHapticFeedback)
             .selectionIndicator(this.getLastPickerIndicator(this.getAdjustedRadius()))
             .onChange((selectedIndex: number) => {
@@ -2641,7 +2688,7 @@ private formatHour(hour24: number): string {
             }
             .width(this.getTimeColumnWidth(0))
             .height(200)
-            .canLoop(this.timeCanLoop)
+            .canLoop(this.hourColumnCanLoop)
             .enableHapticFeedback(this.timeHapticFeedback)
             .selectionIndicator(this.displayMode === DisplayMode.DATE_TIME ? this.getMiddlePickerIndicator() : this.getFirstPickerIndicator(this.getAdjustedRadius()))
             .onChange((selectedIndex: number) => {
@@ -2671,7 +2718,7 @@ private formatHour(hour24: number): string {
             }
             .width(this.getTimeColumnWidth(1))
             .height(200)
-            .canLoop(this.timeCanLoop)
+            .canLoop(this.minuteColumnCanLoop)
             .enableHapticFeedback(this.timeHapticFeedback)
             .selectionIndicator(this.getMiddlePickerIndicator())
             .onChange((selectedIndex: number) => {
@@ -2697,7 +2744,7 @@ private formatHour(hour24: number): string {
             }
             .width(this.getTimeColumnWidth(2))
             .height(200)
-            .canLoop(this.timeCanLoop)
+            .canLoop(this.secondColumnCanLoop)
             .enableHapticFeedback(this.timeHapticFeedback)
             .selectionIndicator(this.getLastPickerIndicator(this.getAdjustedRadius()))
             .onChange((selectedIndex: number) => {
@@ -2757,7 +2804,7 @@ private formatHour(hour24: number): string {
             }
             .width(this.getTimeColumnWidth(1))
             .height(200)
-            .canLoop(this.timeCanLoop)
+            .canLoop(this.hourColumnCanLoop)
             .enableHapticFeedback(this.timeHapticFeedback)
             .selectionIndicator(this.getMiddlePickerIndicator())
             .onChange((selectedIndex: number) => {
@@ -2778,7 +2825,7 @@ private formatHour(hour24: number): string {
             }
             .width(this.getTimeColumnWidth(2))
             .height(200)
-            .canLoop(this.timeCanLoop)
+            .canLoop(this.minuteColumnCanLoop)
             .enableHapticFeedback(this.timeHapticFeedback)
             .selectionIndicator(this.getMiddlePickerIndicator())
             .onChange((selectedIndex: number) => {
@@ -2804,7 +2851,7 @@ private formatHour(hour24: number): string {
             }
             .width(this.getTimeColumnWidth(3))
             .height(200)
-            .canLoop(this.timeCanLoop)
+            .canLoop(this.secondColumnCanLoop)
             .enableHapticFeedback(this.timeHapticFeedback)
             .selectionIndicator(this.getLastPickerIndicator(this.getAdjustedRadius()))
             .onChange((selectedIndex: number) => {

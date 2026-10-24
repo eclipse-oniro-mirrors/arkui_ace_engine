@@ -1,0 +1,220 @@
+diff --git a/genui/src/main/ets/core/components/extended/ExtendedCommonStyleModifier.ets b/genui/src/main/ets/core/components/extended/ExtendedCommonStyleModifier.ets
+index b6d99f6c8170501a468a4ef14f26fb684eb88702..5526d2fdb4cd09c5baada9f85e74385d830efb07 100644
+--- a/genui/src/main/ets/core/components/extended/ExtendedCommonStyleModifier.ets
++++ b/genui/src/main/ets/core/components/extended/ExtendedCommonStyleModifier.ets
+@@ -28,6 +28,31 @@ type ExtendedLengthValue = Length | LayoutPolicy;
+ type ExtendedBackgroundImageSizeValue = SizeOptions | ImageSize;
+ type ExtendedShadowValue = ShadowOptions | ShadowStyle;
+ 
++interface RotateTransformValue {
++  angleX?: number;
++  angleY?: number;
++  angleZ?: number;
++  centerX?: number | string;
++  centerY?: number | string;
++  centerZ?: number;
++  perspective?: number;
++}
++
++interface ScaleTransformValue {
++  x?: number;
++  y?: number;
++}
++
++interface TranslateTransformValue {
++  x?: number;
++  y?: number;
++}
++
++interface BackdropBlurValue {
++  radius: number;
++  grayscale?: [number, number];
++}
++
+ export interface ExtendedCommonStyleOptions {
+   width?: ExtendedLengthValue;
+   height?: ExtendedLengthValue;
+@@ -47,6 +72,11 @@ export interface ExtendedCommonStyleOptions {
+   aspectRatio?: number;
+   shadow?: ExtendedShadowValue;
+   linearGradient?: LinearGradientOptions;
++  opacity?: number;
++  backdropBlur?: BackdropBlurValue;
++  rotate?: RotateTransformValue;
++  scale?: ScaleTransformValue;
++  translate?: TranslateTransformValue;
+ }
+ 
+ export interface ExtendedCommonStyleState {
+@@ -213,6 +243,21 @@ export function applyExtendedCommonStyleOptions<T extends CommonMethod<T>>(
+   if (options.linearGradient !== undefined) {
+     instance.linearGradient(options.linearGradient);
+   }
++  if (options.opacity !== undefined) {
++    instance.opacity(options.opacity);
++  }
++  if (options.backdropBlur !== undefined) {
++    instance.backdropBlur(options.backdropBlur.radius, options.backdropBlur.grayscale ? { grayscale: options.backdropBlur.grayscale } : undefined);
++  }
++  if (options.rotate !== undefined) {
++    instance.rotate(options.rotate as RotateOptions);
++  }
++  if (options.scale !== undefined) {
++    instance.scale(options.scale as ScaleOptions);
++  }
++  if (options.translate !== undefined) {
++    instance.translate(options.translate as TranslateOptions);
++  }
+ }
+ 
+ function resolveStyles(customProps: Record<string, Object> | undefined): Record<string, Object> | undefined {
+@@ -282,6 +327,11 @@ class ExtendedCommonStyleResolver {
+     this.resolveAspectRatio(options);
+     this.resolveShadow(options);
+     this.resolveLinearGradient(options);
++    this.resolveOpacity(options);
++    this.resolveBackdropBlur(options);
++    this.resolveRotate(options);
++    this.resolveScale(options);
++    this.resolveTranslate(options);
+     this.normalizeZeroConstraintBounds(options);
+ 
+     return options;
+@@ -547,6 +597,137 @@ class ExtendedCommonStyleResolver {
+     options.linearGradient = this.createDefaultLinearGradientValue();
+   }
+ 
++  private resolveOpacity(options: ExtendedCommonStyleOptions): void {
++    let raw = this.readStyle('opacity');
++    if (raw === undefined) {
++      return;
++    }
++    if (typeof raw === 'number' && Number.isFinite(raw)) {
++      let val = raw as number;
++      if (val < 0) {
++        val = 0;
++      } else if (val > 1) {
++        val = 1;
++      }
++      options.opacity = val;
++      return;
++    }
++    this.reportInvalidStyleWarning('opacity');
++  }
++
++  private resolveBackdropBlur(options: ExtendedCommonStyleOptions): void {
++    let raw = this.readStyle('backdropBlur');
++    if (raw === undefined) {
++      return;
++    }
++    if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
++      this.reportInvalidStyleWarning('backdropBlur');
++      return;
++    }
++    let obj = raw as Record<string, Object>;
++    let radiusVal = obj['radius'];
++    if (typeof radiusVal !== 'number' || !Number.isFinite(radiusVal)) {
++      this.reportInvalidStyleWarning('backdropBlur');
++      return;
++    }
++    let radius = radiusVal as number;
++    if (radius < 0) {
++      radius = 0;
++    }
++    let result: BackdropBlurValue = { radius: radius };
++    let grayscaleVal = obj['grayscale'];
++    if (Array.isArray(grayscaleVal) && (grayscaleVal as Object[]).length === 2) {
++      let arr = grayscaleVal as Object[];
++      if (typeof arr[0] === 'number' && typeof arr[1] === 'number') {
++        let g0 = arr[0] as number;
++        let g1 = arr[1] as number;
++        if (g0 < 0) { g0 = 0; } else if (g0 > 127) { g0 = 127; }
++        if (g1 < 0) { g1 = 0; } else if (g1 > 127) { g1 = 127; }
++        result.grayscale = [g0, g1];
++      }
++    }
++    options.backdropBlur = result;
++  }
++
++  private resolveRotate(options: ExtendedCommonStyleOptions): void {
++    let raw = this.readStyle('rotate');
++    if (raw === undefined) {
++      return;
++    }
++    if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
++      this.reportInvalidStyleWarning('rotate');
++      return;
++    }
++    let obj = raw as Record<string, Object>;
++    let result: RotateTransformValue = {};
++    if (typeof obj['angleX'] === 'number' && Number.isFinite(obj['angleX'] as number)) {
++      result.angleX = obj['angleX'] as number;
++    }
++    if (typeof obj['angleY'] === 'number' && Number.isFinite(obj['angleY'] as number)) {
++      result.angleY = obj['angleY'] as number;
++    }
++    if (typeof obj['angleZ'] === 'number' && Number.isFinite(obj['angleZ'] as number)) {
++      result.angleZ = obj['angleZ'] as number;
++    }
++    if (typeof obj['centerX'] === 'number' && Number.isFinite(obj['centerX'] as number)) {
++      result.centerX = obj['centerX'] as number;
++    } else if (typeof obj['centerX'] === 'string') {
++      result.centerX = obj['centerX'] as string;
++    }
++    if (typeof obj['centerY'] === 'number' && Number.isFinite(obj['centerY'] as number)) {
++      result.centerY = obj['centerY'] as number;
++    } else if (typeof obj['centerY'] === 'string') {
++      result.centerY = obj['centerY'] as string;
++    }
++    if (typeof obj['centerZ'] === 'number' && Number.isFinite(obj['centerZ'] as number)) {
++      result.centerZ = obj['centerZ'] as number;
++    }
++    if (typeof obj['perspective'] === 'number' && Number.isFinite(obj['perspective'] as number)) {
++      result.perspective = obj['perspective'] as number;
++    }
++    options.rotate = result;
++  }
++
++  private resolveScale(options: ExtendedCommonStyleOptions): void {
++    let raw = this.readStyle('scale');
++    if (raw === undefined) {
++      return;
++    }
++    if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
++      this.reportInvalidStyleWarning('scale');
++      return;
++    }
++    let obj = raw as Record<string, Object>;
++    let result: ScaleTransformValue = {};
++    if (typeof obj['x'] === 'number' && Number.isFinite(obj['x'] as number)) {
++      result.x = obj['x'] as number;
++    }
++    if (typeof obj['y'] === 'number' && Number.isFinite(obj['y'] as number)) {
++      result.y = obj['y'] as number;
++    }
++    options.scale = result;
++  }
++
++  private resolveTranslate(options: ExtendedCommonStyleOptions): void {
++    let raw = this.readStyle('translate');
++    if (raw === undefined) {
++      return;
++    }
++    if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
++      this.reportInvalidStyleWarning('translate');
++      return;
++    }
++    let obj = raw as Record<string, Object>;
++    let result: TranslateTransformValue = {};
++    if (typeof obj['x'] === 'number' && Number.isFinite(obj['x'] as number)) {
++      result.x = obj['x'] as number;
++    }
++    if (typeof obj['y'] === 'number' && Number.isFinite(obj['y'] as number)) {
++      result.y = obj['y'] as number;
++    }
++    options.translate = result;
++  }
++
+   private normalizeZeroConstraintBounds(options: ExtendedCommonStyleOptions): void {
+     let constraintSize = options.constraintSize as Record<string, Object> | undefined;
+     if (constraintSize === undefined) {

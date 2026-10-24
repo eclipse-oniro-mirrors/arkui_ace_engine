@@ -27,7 +27,7 @@
 
 namespace OHOS::Ace::NG {
 
-using ChangeEvent = std::function<void(const bool)>;
+using ToggleChangeEvent = std::function<void(const bool)>;
 
 class ToggleButtonEventHub : public ButtonEventHub {
     DECLARE_ACE_TYPE(ToggleButtonEventHub, ButtonEventHub);
@@ -36,7 +36,7 @@ public:
     ToggleButtonEventHub() = default;
     ~ToggleButtonEventHub() override = default;
 
-    void SetOnChange(ChangeEvent&& changeEvent)
+    void SetOnChange(ToggleChangeEvent&& changeEvent)
     {
         changeEvent_ = std::move(changeEvent);
     }
@@ -69,14 +69,14 @@ public:
 #endif
     }
 
-    void SetOnChangeEvent(ChangeEvent&& onChangeEvent)
+    void SetOnChangeEvent(ToggleChangeEvent&& onChangeEvent)
     {
         onChangeEvent_ = std::move(onChangeEvent);
     }
 
 private:
-    ChangeEvent changeEvent_;
-    ChangeEvent onChangeEvent_;
+    ToggleChangeEvent changeEvent_;
+    ToggleChangeEvent onChangeEvent_;
 
     ACE_DISALLOW_COPY_AND_MOVE(ToggleButtonEventHub);
 };

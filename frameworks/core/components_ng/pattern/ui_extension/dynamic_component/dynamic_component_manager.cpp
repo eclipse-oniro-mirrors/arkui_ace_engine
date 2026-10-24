@@ -192,9 +192,14 @@ OHOS::Rosen::Rect IntersectRect(const OHOS::Rosen::Rect& rect, const OHOS::Ace::
     int32_t bottom = std::min(static_cast<int32_t>(rect.posY_ + rect.height_), static_cast<int32_t>(
         config.Top() + config.Height()));
     if (left < right && top < bottom) {
-        return { left, top, static_cast<uint32_t>(right - left), static_cast<uint32_t>(bottom - top) };
+        return {
+            left - static_cast<int32_t>(config.Left()),
+            top - static_cast<int32_t>(config.Top()),
+            static_cast<uint32_t>(right - left),
+            static_cast<uint32_t>(bottom - top)
+        };
     }
-    return { 0, 0, 0, 0 };
+    return {};
 }
 
 std::map<OHOS::Rosen::AvoidAreaType, OHOS::Rosen::AvoidArea> DynamicComponentSafeManager::GetAvoidAreaIntersection(
@@ -208,13 +213,7 @@ std::map<OHOS::Rosen::AvoidAreaType, OHOS::Rosen::AvoidArea> DynamicComponentSaf
         avoidArea.leftRect_ = IntersectRect(pair.second.leftRect_, viewportConfig);
         avoidArea.rightRect_ = IntersectRect(pair.second.rightRect_, viewportConfig);
         avoidArea.bottomRect_ = IntersectRect(pair.second.bottomRect_, viewportConfig);
-        bool hasIntersection = (avoidArea.topRect_.width_ > 0 && avoidArea.topRect_.height_ > 0) ||
-                               (avoidArea.leftRect_.width_ > 0 && avoidArea.leftRect_.height_ > 0) ||
-                               (avoidArea.rightRect_.width_ > 0 && avoidArea.rightRect_.height_ > 0) ||
-                               (avoidArea.bottomRect_.width_ > 0 && avoidArea.bottomRect_.height_ > 0);
-        if (hasIntersection) {
-            res.emplace(pair.first, avoidArea);
-        }
+        res.emplace(pair.first, avoidArea);
     }
     return res;
 }

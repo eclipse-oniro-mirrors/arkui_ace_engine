@@ -15,6 +15,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cmath>
 #include "gtest/gtest.h"
 #define private public
 #define protected public
@@ -23,6 +24,7 @@
 #include "native_render.h"
 #include "native_type.h"
 #include "core/interfaces/arkoala/arkoala_api.h"
+#include "interfaces/native/node/native_type_visual_impl.h"
 #include "interfaces/native/node/node_extened.h"
 #include "interfaces/native/node/node_model.h"
 #include "interfaces/native/node/render_node.h"
@@ -1323,5 +1325,547 @@ HWTEST_F(NodeVisualEffectTest, Matrix4_GetElements_NullResult_001, TestSize.Leve
     EXPECT_NE(errorMessageStr.find("functionName: OH_ArkUI_Matrix4_GetElements"), std::string::npos);
     EXPECT_NE(errorMessageStr.find("errorMessage: matrix or result is null"), std::string::npos);
     OH_ArkUI_Matrix4_Dispose(matrix);
+}
+
+/**
+ * @tc.name: LinearGradientBlurOptions_CreateTestNormal
+ * @tc.desc: Test creating linear gradient blur options and verify default values.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeVisualEffectTest, LinearGradientBlurOptions_CreateTestNormal, TestSize.Level1)
+{
+    OH_ArkUI_LinearGradientBlurOptions* options = OH_ArkUI_NativeModule_LinearGradientBlurOptions_Create();
+    ASSERT_NE(options, nullptr);
+    EXPECT_FLOAT_EQ(options->blurRadius, 0.0f);
+    EXPECT_EQ(static_cast<int32_t>(options->fractionStops.size()), 4);
+    EXPECT_FLOAT_EQ(options->fractionStops[0], 0.0f);
+    EXPECT_FLOAT_EQ(options->fractionStops[1], 0.0f);
+    EXPECT_FLOAT_EQ(options->fractionStops[2], 0.0f);
+    EXPECT_FLOAT_EQ(options->fractionStops[3], 1.0f);
+    EXPECT_EQ(options->direction, OH_ARKUI_LINEAR_GRADIENT_BLUR_DIRECTION_BOTTOM);
+    OH_ArkUI_NativeModule_LinearGradientBlurOptions_Destroy(options);
+}
+
+/**
+ * @tc.name: LinearGradientBlurOptions_CreateGetDefaults
+ * @tc.desc: Test getting default values after create without setting.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeVisualEffectTest, LinearGradientBlurOptions_CreateGetDefaults, TestSize.Level1)
+{
+    OH_ArkUI_LinearGradientBlurOptions* options = OH_ArkUI_NativeModule_LinearGradientBlurOptions_Create();
+    ASSERT_NE(options, nullptr);
+    float blurRadius = -1.0f;
+    EXPECT_EQ(
+        OH_ArkUI_NativeModule_LinearGradientBlurOptions_GetBlurRadius(options, &blurRadius), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_FLOAT_EQ(blurRadius, 0.0f);
+    float stops[4] = { 0 };
+    int32_t writeLength = 0;
+    EXPECT_EQ(OH_ArkUI_NativeModule_LinearGradientBlurOptions_GetFractionStops(options, stops, 4, &writeLength),
+        ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(writeLength, 4);
+    EXPECT_FLOAT_EQ(stops[0], 0.0f);
+    EXPECT_FLOAT_EQ(stops[1], 0.0f);
+    EXPECT_FLOAT_EQ(stops[2], 0.0f);
+    EXPECT_FLOAT_EQ(stops[3], 1.0f);
+    OH_ArkUI_LinearGradientBlurDirection direction = OH_ARKUI_LINEAR_GRADIENT_BLUR_DIRECTION_LEFT;
+    EXPECT_EQ(
+        OH_ArkUI_NativeModule_LinearGradientBlurOptions_GetDirection(options, &direction), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(direction, OH_ARKUI_LINEAR_GRADIENT_BLUR_DIRECTION_BOTTOM);
+    OH_ArkUI_NativeModule_LinearGradientBlurOptions_Destroy(options);
+}
+
+/**
+ * @tc.name: LinearGradientBlurOptions_DisposeNormal
+ * @tc.desc: Test destroying a valid options object.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeVisualEffectTest, LinearGradientBlurOptions_DisposeNormal, TestSize.Level1)
+{
+    OH_ArkUI_LinearGradientBlurOptions* options = OH_ArkUI_NativeModule_LinearGradientBlurOptions_Create();
+    ASSERT_NE(options, nullptr);
+    OH_ArkUI_NativeModule_LinearGradientBlurOptions_Destroy(options);
+}
+
+/**
+ * @tc.name: LinearGradientBlurOptions_DisposeNull
+ * @tc.desc: Test destroying null options.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeVisualEffectTest, LinearGradientBlurOptions_DisposeNull, TestSize.Level1)
+{
+    OH_ArkUI_NativeModule_LinearGradientBlurOptions_Destroy(nullptr);
+}
+
+/**
+ * @tc.name: LinearGradientBlurOptions_SetBlurRadiusNullOptions
+ * @tc.desc: Test setting blur radius with null options.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeVisualEffectTest, LinearGradientBlurOptions_SetBlurRadiusNullOptions, TestSize.Level1)
+{
+    EXPECT_EQ(
+        OH_ArkUI_NativeModule_LinearGradientBlurOptions_SetBlurRadius(nullptr, 10.0f), ARKUI_ERROR_CODE_PARAM_INVALID);
+}
+
+/**
+ * @tc.name: LinearGradientBlurOptions_SetBlurRadiusNegative
+ * @tc.desc: Test setting negative blur radius.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeVisualEffectTest, LinearGradientBlurOptions_SetBlurRadiusNegative, TestSize.Level1)
+{
+    OH_ArkUI_LinearGradientBlurOptions* options = OH_ArkUI_NativeModule_LinearGradientBlurOptions_Create();
+    ASSERT_NE(options, nullptr);
+    EXPECT_EQ(
+        OH_ArkUI_NativeModule_LinearGradientBlurOptions_SetBlurRadius(options, -1.0f), ARKUI_ERROR_CODE_PARAM_INVALID);
+    OH_ArkUI_NativeModule_LinearGradientBlurOptions_Destroy(options);
+}
+
+/**
+ * @tc.name: LinearGradientBlurOptions_SetBlurRadiusNaN
+ * @tc.desc: Test setting NaN blur radius.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeVisualEffectTest, LinearGradientBlurOptions_SetBlurRadiusNaN, TestSize.Level1)
+{
+    OH_ArkUI_LinearGradientBlurOptions* options = OH_ArkUI_NativeModule_LinearGradientBlurOptions_Create();
+    ASSERT_NE(options, nullptr);
+    EXPECT_EQ(
+        OH_ArkUI_NativeModule_LinearGradientBlurOptions_SetBlurRadius(options, std::numeric_limits<float>::quiet_NaN()),
+        ARKUI_ERROR_CODE_PARAM_INVALID);
+    OH_ArkUI_NativeModule_LinearGradientBlurOptions_Destroy(options);
+}
+
+/**
+ * @tc.name: LinearGradientBlurOptions_SetBlurRadiusNormal
+ * @tc.desc: Test setting valid blur radius.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeVisualEffectTest, LinearGradientBlurOptions_SetBlurRadiusNormal, TestSize.Level1)
+{
+    OH_ArkUI_LinearGradientBlurOptions* options = OH_ArkUI_NativeModule_LinearGradientBlurOptions_Create();
+    ASSERT_NE(options, nullptr);
+    EXPECT_EQ(OH_ArkUI_NativeModule_LinearGradientBlurOptions_SetBlurRadius(options, 10.0f), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_FLOAT_EQ(options->blurRadius, 10.0f);
+    OH_ArkUI_NativeModule_LinearGradientBlurOptions_Destroy(options);
+}
+
+/**
+ * @tc.name: LinearGradientBlurOptions_SetFractionStopsNullOptions
+ * @tc.desc: Test setting fraction stops with null options.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeVisualEffectTest, LinearGradientBlurOptions_SetFractionStopsNullOptions, TestSize.Level1)
+{
+    float stops[] = { 0.0f, 0.0f, 1.0f, 1.0f };
+    EXPECT_EQ(OH_ArkUI_NativeModule_LinearGradientBlurOptions_SetFractionStops(nullptr, stops, 4),
+        ARKUI_ERROR_CODE_PARAM_INVALID);
+}
+
+/**
+ * @tc.name: LinearGradientBlurOptions_SetFractionStopsNullStops
+ * @tc.desc: Test setting fraction stops with null stops array.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeVisualEffectTest, LinearGradientBlurOptions_SetFractionStopsNullStops, TestSize.Level1)
+{
+    OH_ArkUI_LinearGradientBlurOptions* options = OH_ArkUI_NativeModule_LinearGradientBlurOptions_Create();
+    ASSERT_NE(options, nullptr);
+    EXPECT_EQ(OH_ArkUI_NativeModule_LinearGradientBlurOptions_SetFractionStops(options, nullptr, 4),
+        ARKUI_ERROR_CODE_PARAM_INVALID);
+    OH_ArkUI_NativeModule_LinearGradientBlurOptions_Destroy(options);
+}
+
+/**
+ * @tc.name: LinearGradientBlurOptions_SetFractionStopsZeroLength
+ * @tc.desc: Test setting fraction stops with zero length.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeVisualEffectTest, LinearGradientBlurOptions_SetFractionStopsZeroLength, TestSize.Level1)
+{
+    OH_ArkUI_LinearGradientBlurOptions* options = OH_ArkUI_NativeModule_LinearGradientBlurOptions_Create();
+    ASSERT_NE(options, nullptr);
+    float stops[] = { 0.0f, 0.0f, 1.0f, 1.0f };
+    EXPECT_EQ(OH_ArkUI_NativeModule_LinearGradientBlurOptions_SetFractionStops(options, stops, 0),
+        ARKUI_ERROR_CODE_PARAM_INVALID);
+    OH_ArkUI_NativeModule_LinearGradientBlurOptions_Destroy(options);
+}
+
+/**
+ * @tc.name: LinearGradientBlurOptions_SetFractionStopsOddLength
+ * @tc.desc: Test setting fraction stops with odd length.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeVisualEffectTest, LinearGradientBlurOptions_SetFractionStopsOddLength, TestSize.Level1)
+{
+    OH_ArkUI_LinearGradientBlurOptions* options = OH_ArkUI_NativeModule_LinearGradientBlurOptions_Create();
+    ASSERT_NE(options, nullptr);
+    float stops[] = { 0.0f, 0.5f, 0.3f };
+    EXPECT_EQ(OH_ArkUI_NativeModule_LinearGradientBlurOptions_SetFractionStops(options, stops, 3),
+        ARKUI_ERROR_CODE_PARAM_INVALID);
+    OH_ArkUI_NativeModule_LinearGradientBlurOptions_Destroy(options);
+}
+
+/**
+ * @tc.name: LinearGradientBlurOptions_SetFractionStopsLessThanTwoPairs
+ * @tc.desc: Test setting fraction stops with less than two pairs.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeVisualEffectTest, LinearGradientBlurOptions_SetFractionStopsLessThanTwoPairs, TestSize.Level1)
+{
+    OH_ArkUI_LinearGradientBlurOptions* options = OH_ArkUI_NativeModule_LinearGradientBlurOptions_Create();
+    ASSERT_NE(options, nullptr);
+    float stops[] = { 0.0f, 0.5f };
+    EXPECT_EQ(OH_ArkUI_NativeModule_LinearGradientBlurOptions_SetFractionStops(options, stops, 2),
+        ARKUI_ERROR_CODE_PARAM_INVALID);
+    OH_ArkUI_NativeModule_LinearGradientBlurOptions_Destroy(options);
+}
+
+/**
+ * @tc.name: LinearGradientBlurOptions_SetFractionStopsOutOfRangeBelow
+ * @tc.desc: Test setting fraction stops with value below 0.0.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeVisualEffectTest, LinearGradientBlurOptions_SetFractionStopsOutOfRangeBelow, TestSize.Level1)
+{
+    OH_ArkUI_LinearGradientBlurOptions* options = OH_ArkUI_NativeModule_LinearGradientBlurOptions_Create();
+    ASSERT_NE(options, nullptr);
+    float stops[] = { -0.1f, 0.0f, 0.5f, 1.0f };
+    EXPECT_EQ(OH_ArkUI_NativeModule_LinearGradientBlurOptions_SetFractionStops(options, stops, 4),
+        ARKUI_ERROR_CODE_PARAM_INVALID);
+    OH_ArkUI_NativeModule_LinearGradientBlurOptions_Destroy(options);
+}
+
+/**
+ * @tc.name: LinearGradientBlurOptions_SetFractionStopsOutOfRangeAbove
+ * @tc.desc: Test setting fraction stops with value above 1.0.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeVisualEffectTest, LinearGradientBlurOptions_SetFractionStopsOutOfRangeAbove, TestSize.Level1)
+{
+    OH_ArkUI_LinearGradientBlurOptions* options = OH_ArkUI_NativeModule_LinearGradientBlurOptions_Create();
+    ASSERT_NE(options, nullptr);
+    float stops[] = { 0.0f, 0.0f, 1.1f, 1.0f };
+    EXPECT_EQ(OH_ArkUI_NativeModule_LinearGradientBlurOptions_SetFractionStops(options, stops, 4),
+        ARKUI_ERROR_CODE_PARAM_INVALID);
+    OH_ArkUI_NativeModule_LinearGradientBlurOptions_Destroy(options);
+}
+
+/**
+ * @tc.name: LinearGradientBlurOptions_SetFractionStopsNaN
+ * @tc.desc: Test setting fraction stops with NaN value.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeVisualEffectTest, LinearGradientBlurOptions_SetFractionStopsNaN, TestSize.Level1)
+{
+    OH_ArkUI_LinearGradientBlurOptions* options = OH_ArkUI_NativeModule_LinearGradientBlurOptions_Create();
+    ASSERT_NE(options, nullptr);
+    float stops[] = { std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.5f, 1.0f };
+    EXPECT_EQ(OH_ArkUI_NativeModule_LinearGradientBlurOptions_SetFractionStops(options, stops, 4),
+        ARKUI_ERROR_CODE_PARAM_INVALID);
+    OH_ArkUI_NativeModule_LinearGradientBlurOptions_Destroy(options);
+}
+
+/**
+ * @tc.name: LinearGradientBlurOptions_SetFractionStopsNonMonotonicPosition
+ * @tc.desc: Test setting fraction stops with non-monotonic positions.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeVisualEffectTest, LinearGradientBlurOptions_SetFractionStopsNonMonotonicPosition, TestSize.Level1)
+{
+    OH_ArkUI_LinearGradientBlurOptions* options = OH_ArkUI_NativeModule_LinearGradientBlurOptions_Create();
+    ASSERT_NE(options, nullptr);
+    float stops[] = { 0.0f, 0.8f, 0.0f, 0.5f, 0.0f, 1.0f };
+    EXPECT_EQ(OH_ArkUI_NativeModule_LinearGradientBlurOptions_SetFractionStops(options, stops, 6),
+        ARKUI_ERROR_CODE_PARAM_INVALID);
+    OH_ArkUI_NativeModule_LinearGradientBlurOptions_Destroy(options);
+}
+
+/**
+ * @tc.name: LinearGradientBlurOptions_SetFractionStopsEqualPosition
+ * @tc.desc: Test setting fraction stops with equal positions.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeVisualEffectTest, LinearGradientBlurOptions_SetFractionStopsEqualPosition, TestSize.Level1)
+{
+    OH_ArkUI_LinearGradientBlurOptions* options = OH_ArkUI_NativeModule_LinearGradientBlurOptions_Create();
+    ASSERT_NE(options, nullptr);
+    float stops[] = { 0.0f, 0.5f, 0.0f, 0.5f };
+    EXPECT_EQ(OH_ArkUI_NativeModule_LinearGradientBlurOptions_SetFractionStops(options, stops, 4),
+        ARKUI_ERROR_CODE_PARAM_INVALID);
+    OH_ArkUI_NativeModule_LinearGradientBlurOptions_Destroy(options);
+}
+
+/**
+ * @tc.name: LinearGradientBlurOptions_SetFractionStopsNormal
+ * @tc.desc: Test setting valid fraction stops.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeVisualEffectTest, LinearGradientBlurOptions_SetFractionStopsNormal, TestSize.Level1)
+{
+    OH_ArkUI_LinearGradientBlurOptions* options = OH_ArkUI_NativeModule_LinearGradientBlurOptions_Create();
+    ASSERT_NE(options, nullptr);
+    float stops[] = { 0.0f, 0.0f, 0.5f, 0.8f, 1.0f, 1.0f };
+    EXPECT_EQ(
+        OH_ArkUI_NativeModule_LinearGradientBlurOptions_SetFractionStops(options, stops, 6), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(static_cast<int32_t>(options->fractionStops.size()), 6);
+    EXPECT_FLOAT_EQ(options->fractionStops[0], 0.0f);
+    EXPECT_FLOAT_EQ(options->fractionStops[1], 0.0f);
+    EXPECT_FLOAT_EQ(options->fractionStops[2], 0.5f);
+    EXPECT_FLOAT_EQ(options->fractionStops[3], 0.8f);
+    EXPECT_FLOAT_EQ(options->fractionStops[4], 1.0f);
+    EXPECT_FLOAT_EQ(options->fractionStops[5], 1.0f);
+    OH_ArkUI_NativeModule_LinearGradientBlurOptions_Destroy(options);
+}
+
+/**
+ * @tc.name: LinearGradientBlurOptions_SetDirectionNullOptions
+ * @tc.desc: Test setting direction with null options.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeVisualEffectTest, LinearGradientBlurOptions_SetDirectionNullOptions, TestSize.Level1)
+{
+    EXPECT_EQ(OH_ArkUI_NativeModule_LinearGradientBlurOptions_SetDirection(
+                  nullptr, OH_ARKUI_LINEAR_GRADIENT_BLUR_DIRECTION_RIGHT),
+        ARKUI_ERROR_CODE_PARAM_INVALID);
+}
+
+/**
+ * @tc.name: LinearGradientBlurOptions_SetDirectionOutOfRangeNegative
+ * @tc.desc: Test setting direction with negative value.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeVisualEffectTest, LinearGradientBlurOptions_SetDirectionOutOfRangeNegative, TestSize.Level1)
+{
+    OH_ArkUI_LinearGradientBlurOptions* options = OH_ArkUI_NativeModule_LinearGradientBlurOptions_Create();
+    ASSERT_NE(options, nullptr);
+    EXPECT_EQ(OH_ArkUI_NativeModule_LinearGradientBlurOptions_SetDirection(
+                  options, static_cast<OH_ArkUI_LinearGradientBlurDirection>(-1)),
+        ARKUI_ERROR_CODE_PARAM_INVALID);
+    OH_ArkUI_NativeModule_LinearGradientBlurOptions_Destroy(options);
+}
+
+/**
+ * @tc.name: LinearGradientBlurOptions_SetDirectionOutOfRange8
+ * @tc.desc: Test setting direction with value 8 (out of range).
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeVisualEffectTest, LinearGradientBlurOptions_SetDirectionOutOfRange8, TestSize.Level1)
+{
+    OH_ArkUI_LinearGradientBlurOptions* options = OH_ArkUI_NativeModule_LinearGradientBlurOptions_Create();
+    ASSERT_NE(options, nullptr);
+    EXPECT_EQ(OH_ArkUI_NativeModule_LinearGradientBlurOptions_SetDirection(
+                  options, static_cast<OH_ArkUI_LinearGradientBlurDirection>(8)),
+        ARKUI_ERROR_CODE_PARAM_INVALID);
+    OH_ArkUI_NativeModule_LinearGradientBlurOptions_Destroy(options);
+}
+
+/**
+ * @tc.name: LinearGradientBlurOptions_SetDirectionNormal
+ * @tc.desc: Test setting all valid directions.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeVisualEffectTest, LinearGradientBlurOptions_SetDirectionNormal, TestSize.Level1)
+{
+    OH_ArkUI_LinearGradientBlurOptions* options = OH_ArkUI_NativeModule_LinearGradientBlurOptions_Create();
+    ASSERT_NE(options, nullptr);
+    OH_ArkUI_LinearGradientBlurDirection directions[] = {
+        OH_ARKUI_LINEAR_GRADIENT_BLUR_DIRECTION_LEFT,
+        OH_ARKUI_LINEAR_GRADIENT_BLUR_DIRECTION_TOP,
+        OH_ARKUI_LINEAR_GRADIENT_BLUR_DIRECTION_RIGHT,
+        OH_ARKUI_LINEAR_GRADIENT_BLUR_DIRECTION_BOTTOM,
+        OH_ARKUI_LINEAR_GRADIENT_BLUR_DIRECTION_LEFT_TOP,
+        OH_ARKUI_LINEAR_GRADIENT_BLUR_DIRECTION_LEFT_BOTTOM,
+        OH_ARKUI_LINEAR_GRADIENT_BLUR_DIRECTION_RIGHT_TOP,
+        OH_ARKUI_LINEAR_GRADIENT_BLUR_DIRECTION_RIGHT_BOTTOM,
+    };
+    for (auto direction : directions) {
+        EXPECT_EQ(OH_ArkUI_NativeModule_LinearGradientBlurOptions_SetDirection(options, direction),
+            ARKUI_ERROR_CODE_NO_ERROR);
+        EXPECT_EQ(options->direction, direction);
+    }
+    OH_ArkUI_NativeModule_LinearGradientBlurOptions_Destroy(options);
+}
+
+/**
+ * @tc.name: LinearGradientBlurOptions_GetBlurRadiusNormal
+ * @tc.desc: Test getting blur radius after setting.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeVisualEffectTest, LinearGradientBlurOptions_GetBlurRadiusNormal, TestSize.Level1)
+{
+    OH_ArkUI_LinearGradientBlurOptions* options = OH_ArkUI_NativeModule_LinearGradientBlurOptions_Create();
+    ASSERT_NE(options, nullptr);
+    OH_ArkUI_NativeModule_LinearGradientBlurOptions_SetBlurRadius(options, 15.0f);
+    float blurRadius = 0.0f;
+    EXPECT_EQ(
+        OH_ArkUI_NativeModule_LinearGradientBlurOptions_GetBlurRadius(options, &blurRadius), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_FLOAT_EQ(blurRadius, 15.0f);
+    OH_ArkUI_NativeModule_LinearGradientBlurOptions_Destroy(options);
+}
+
+/**
+ * @tc.name: LinearGradientBlurOptions_GetBlurRadiusNullOptions
+ * @tc.desc: Test getting blur radius with null options.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeVisualEffectTest, LinearGradientBlurOptions_GetBlurRadiusNullOptions, TestSize.Level1)
+{
+    float blurRadius = 0.0f;
+    EXPECT_EQ(OH_ArkUI_NativeModule_LinearGradientBlurOptions_GetBlurRadius(nullptr, &blurRadius),
+        ARKUI_ERROR_CODE_PARAM_INVALID);
+}
+
+/**
+ * @tc.name: LinearGradientBlurOptions_GetBlurRadiusNullOutput
+ * @tc.desc: Test getting blur radius with null output pointer.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeVisualEffectTest, LinearGradientBlurOptions_GetBlurRadiusNullOutput, TestSize.Level1)
+{
+    OH_ArkUI_LinearGradientBlurOptions* options = OH_ArkUI_NativeModule_LinearGradientBlurOptions_Create();
+    ASSERT_NE(options, nullptr);
+    EXPECT_EQ(OH_ArkUI_NativeModule_LinearGradientBlurOptions_GetBlurRadius(options, nullptr),
+        ARKUI_ERROR_CODE_PARAM_INVALID);
+    OH_ArkUI_NativeModule_LinearGradientBlurOptions_Destroy(options);
+}
+
+/**
+ * @tc.name: LinearGradientBlurOptions_GetFractionStopsNormal
+ * @tc.desc: Test getting fraction stops after setting.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeVisualEffectTest, LinearGradientBlurOptions_GetFractionStopsNormal, TestSize.Level1)
+{
+    OH_ArkUI_LinearGradientBlurOptions* options = OH_ArkUI_NativeModule_LinearGradientBlurOptions_Create();
+    ASSERT_NE(options, nullptr);
+    float setStops[] = { 0.0f, 0.0f, 0.5f, 0.8f, 1.0f, 1.0f };
+    OH_ArkUI_NativeModule_LinearGradientBlurOptions_SetFractionStops(options, setStops, 6);
+    float getStops[6] = { 0 };
+    int32_t writeLength = 0;
+    EXPECT_EQ(OH_ArkUI_NativeModule_LinearGradientBlurOptions_GetFractionStops(options, getStops, 6, &writeLength),
+        ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(writeLength, 6);
+    for (int32_t i = 0; i < writeLength; i++) {
+        EXPECT_FLOAT_EQ(getStops[i], setStops[i]);
+    }
+    OH_ArkUI_NativeModule_LinearGradientBlurOptions_Destroy(options);
+}
+
+/**
+ * @tc.name: LinearGradientBlurOptions_GetFractionStopsQuerySize
+ * @tc.desc: Test querying fraction stops size with null buffer.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeVisualEffectTest, LinearGradientBlurOptions_GetFractionStopsQuerySize, TestSize.Level1)
+{
+    OH_ArkUI_LinearGradientBlurOptions* options = OH_ArkUI_NativeModule_LinearGradientBlurOptions_Create();
+    ASSERT_NE(options, nullptr);
+    float setStops[] = { 0.0f, 0.0f, 1.0f, 1.0f };
+    OH_ArkUI_NativeModule_LinearGradientBlurOptions_SetFractionStops(options, setStops, 4);
+    int32_t writeLength = 0;
+    EXPECT_EQ(OH_ArkUI_NativeModule_LinearGradientBlurOptions_GetFractionStops(options, nullptr, 0, &writeLength),
+        ARKUI_ERROR_CODE_BUFFER_SIZE_ERROR);
+    EXPECT_EQ(writeLength, 4);
+    float getStops[4] = { 0 };
+    EXPECT_EQ(OH_ArkUI_NativeModule_LinearGradientBlurOptions_GetFractionStops(options, getStops, 4, &writeLength),
+        ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(writeLength, 4);
+    for (int32_t i = 0; i < writeLength; i++) {
+        EXPECT_FLOAT_EQ(getStops[i], setStops[i]);
+    }
+    OH_ArkUI_NativeModule_LinearGradientBlurOptions_Destroy(options);
+}
+
+/**
+ * @tc.name: LinearGradientBlurOptions_GetFractionStopsBufferTooSmall
+ * @tc.desc: Test getting fraction stops with insufficient buffer size.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeVisualEffectTest, LinearGradientBlurOptions_GetFractionStopsBufferTooSmall, TestSize.Level1)
+{
+    OH_ArkUI_LinearGradientBlurOptions* options = OH_ArkUI_NativeModule_LinearGradientBlurOptions_Create();
+    ASSERT_NE(options, nullptr);
+    float setStops[] = { 0.0f, 0.0f, 1.0f, 1.0f };
+    OH_ArkUI_NativeModule_LinearGradientBlurOptions_SetFractionStops(options, setStops, 4);
+    float getStops[2] = { 0 };
+    int32_t writeLength = 0;
+    EXPECT_EQ(OH_ArkUI_NativeModule_LinearGradientBlurOptions_GetFractionStops(options, getStops, 2, &writeLength),
+        ARKUI_ERROR_CODE_BUFFER_SIZE_ERROR);
+    EXPECT_EQ(writeLength, 4);
+    OH_ArkUI_NativeModule_LinearGradientBlurOptions_Destroy(options);
+}
+
+/**
+ * @tc.name: LinearGradientBlurOptions_GetFractionStopsNullOptions
+ * @tc.desc: Test getting fraction stops with null options.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeVisualEffectTest, LinearGradientBlurOptions_GetFractionStopsNullOptions, TestSize.Level1)
+{
+    float getStops[4] = { 0 };
+    int32_t writeLength = 0;
+    EXPECT_EQ(OH_ArkUI_NativeModule_LinearGradientBlurOptions_GetFractionStops(nullptr, getStops, 4, &writeLength),
+        ARKUI_ERROR_CODE_PARAM_INVALID);
+}
+
+/**
+ * @tc.name: LinearGradientBlurOptions_GetFractionStopsNullWriteLength
+ * @tc.desc: Test getting fraction stops with null writeLength.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeVisualEffectTest, LinearGradientBlurOptions_GetFractionStopsNullWriteLength, TestSize.Level1)
+{
+    OH_ArkUI_LinearGradientBlurOptions* options = OH_ArkUI_NativeModule_LinearGradientBlurOptions_Create();
+    ASSERT_NE(options, nullptr);
+    float getStops[4] = { 0 };
+    EXPECT_EQ(OH_ArkUI_NativeModule_LinearGradientBlurOptions_GetFractionStops(options, getStops, 4, nullptr),
+        ARKUI_ERROR_CODE_PARAM_INVALID);
+    OH_ArkUI_NativeModule_LinearGradientBlurOptions_Destroy(options);
+}
+
+/**
+ * @tc.name: LinearGradientBlurOptions_GetDirectionNormal
+ * @tc.desc: Test getting direction after setting.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeVisualEffectTest, LinearGradientBlurOptions_GetDirectionNormal, TestSize.Level1)
+{
+    OH_ArkUI_LinearGradientBlurOptions* options = OH_ArkUI_NativeModule_LinearGradientBlurOptions_Create();
+    ASSERT_NE(options, nullptr);
+    OH_ArkUI_NativeModule_LinearGradientBlurOptions_SetDirection(
+        options, OH_ARKUI_LINEAR_GRADIENT_BLUR_DIRECTION_RIGHT_BOTTOM);
+    OH_ArkUI_LinearGradientBlurDirection direction = OH_ARKUI_LINEAR_GRADIENT_BLUR_DIRECTION_LEFT;
+    EXPECT_EQ(
+        OH_ArkUI_NativeModule_LinearGradientBlurOptions_GetDirection(options, &direction), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(direction, OH_ARKUI_LINEAR_GRADIENT_BLUR_DIRECTION_RIGHT_BOTTOM);
+    OH_ArkUI_NativeModule_LinearGradientBlurOptions_Destroy(options);
+}
+
+/**
+ * @tc.name: LinearGradientBlurOptions_GetDirectionNullOptions
+ * @tc.desc: Test getting direction with null options.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeVisualEffectTest, LinearGradientBlurOptions_GetDirectionNullOptions, TestSize.Level1)
+{
+    OH_ArkUI_LinearGradientBlurDirection direction = OH_ARKUI_LINEAR_GRADIENT_BLUR_DIRECTION_LEFT;
+    EXPECT_EQ(OH_ArkUI_NativeModule_LinearGradientBlurOptions_GetDirection(nullptr, &direction),
+        ARKUI_ERROR_CODE_PARAM_INVALID);
+}
+
+/**
+ * @tc.name: LinearGradientBlurOptions_GetDirectionNullOutput
+ * @tc.desc: Test getting direction with null output pointer.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NodeVisualEffectTest, LinearGradientBlurOptions_GetDirectionNullOutput, TestSize.Level1)
+{
+    OH_ArkUI_LinearGradientBlurOptions* options = OH_ArkUI_NativeModule_LinearGradientBlurOptions_Create();
+    ASSERT_NE(options, nullptr);
+    EXPECT_EQ(
+        OH_ArkUI_NativeModule_LinearGradientBlurOptions_GetDirection(options, nullptr), ARKUI_ERROR_CODE_PARAM_INVALID);
+    OH_ArkUI_NativeModule_LinearGradientBlurOptions_Destroy(options);
 }
 } // namespace OHOS::Ace

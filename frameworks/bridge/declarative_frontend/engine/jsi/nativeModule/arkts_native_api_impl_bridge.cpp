@@ -54,6 +54,7 @@
 #include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_list_item_group_bridge.h"
 #include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_frame_node_bridge.h"
 #include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_container_span_bridge.h"
+#include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_scroll_placeholder_bridge.h"
 #include "bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_linear_indicator.h"
 #include "bridge/declarative_frontend/engine/js_converter.h"
 #include "bridge/declarative_frontend/jsview/js_navigation_stack.h"
@@ -190,6 +191,7 @@ ArkUINativeModuleValue ArkUINativeModule::PreviewMockComponent(ArkUIRuntimeCallI
     return panda::JSValueRef::Undefined(vm);
 }
 
+#ifdef PREVIEW
 ArkUINativeModuleValue ArkUINativeModule::CreatePreviewMock(ArkUIRuntimeCallInfo* runtimeCallInfo)
 {
     EcmaVM* vm = runtimeCallInfo->GetVM();
@@ -203,6 +205,7 @@ ArkUINativeModuleValue ArkUINativeModule::CreatePreviewMock(ArkUIRuntimeCallInfo
     PreviewMockModel::GetInstance()->Create(tag);
     return panda::JSValueRef::Undefined(vm);
 }
+#endif
 
 ArkUINativeModuleValue ArkUINativeModule::GetFrameNodeById(ArkUIRuntimeCallInfo* runtimeCallInfo)
 {
@@ -877,7 +880,26 @@ ArkUINativeModuleValue ArkUINativeModule::GetArkUINativeModule(ArkUIRuntimeCallI
     RegisterEmbeddedComponentAttributes(object, vm);
 #endif
     RegisterContainerPickerAttributes(object, vm);
+    RegisterScrollPlaceholderRegisterModule(object, vm);
     return object;
+}
+
+void ArkUINativeModule::RegisterScrollPlaceholderRegisterModule(Local<panda::ObjectRef> object, EcmaVM* vm)
+{
+    auto placeholderRegister = panda::ObjectRef::New(vm);
+    placeholderRegister->Set(vm, panda::StringRef::NewFromUtf8(vm, "register"),
+        panda::FunctionRef::New(
+            const_cast<panda::EcmaVM*>(vm), ScrollPlaceholderRegisterBridge::Register));
+    placeholderRegister->Set(vm, panda::StringRef::NewFromUtf8(vm, "unregister"),
+        panda::FunctionRef::New(
+            const_cast<panda::EcmaVM*>(vm), ScrollPlaceholderRegisterBridge::Unregister));
+    placeholderRegister->Set(vm, panda::StringRef::NewFromUtf8(vm, "isRegistered"),
+        panda::FunctionRef::New(
+            const_cast<panda::EcmaVM*>(vm), ScrollPlaceholderRegisterBridge::IsRegistered));
+    // The restricted-builder instrumentation entries (__aceBegin/EndScrollPlaceholder__)
+    // are NOT members of this surface: they are mounted on globalThis directly by
+    // JsRegisterViews so @Builder({ isPlaceholder: true }) products can call them bare.
+    object->Set(vm, panda::StringRef::NewFromUtf8(vm, "scrollPlaceholderRegister"), placeholderRegister);
 }
 
 void ArkUINativeModule::RegisterThemeAttributes(Local<panda::ObjectRef> object, EcmaVM *vm)
@@ -1335,6 +1357,10 @@ void ArkUINativeModule::RegisterFrameNodeAttributes(Local<panda::ObjectRef> obje
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), FrameNodeBridge::SetOnDetach));
     frameNode->Set(vm, panda::StringRef::NewFromUtf8(vm, "setOnKeyEvent"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), FrameNodeBridge::SetOnKeyEvent));
+    frameNode->Set(vm, panda::StringRef::NewFromUtf8(vm, "dispatchInputEvent"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), FrameNodeBridge::DispatchInputEvent));
+    frameNode->Set(vm, panda::StringRef::NewFromUtf8(vm, "dispatchKeyEvent"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), FrameNodeBridge::DispatchKeyEvent));
     frameNode->Set(vm, panda::StringRef::NewFromUtf8(vm, "setOnFocus"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), FrameNodeBridge::SetOnFocus));
     frameNode->Set(vm, panda::StringRef::NewFromUtf8(vm, "setOnBlur"),
@@ -1622,6 +1648,10 @@ void ArkUINativeModule::RegisterScrollableAttributes(Local<panda::ObjectRef> obj
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), ScrollableBridge::SetEnableScrollWithMouse));
     scrollable->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetEnableScrollWithMouse"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), ScrollableBridge::ResetEnableScrollWithMouse));
+    scrollable->Set(vm, panda::StringRef::NewFromUtf8(vm, "setEnableScrollWithKeyboard"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), ScrollableBridge::SetEnableScrollWithKeyboard));
+    scrollable->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetEnableScrollWithKeyboard"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), ScrollableBridge::ResetEnableScrollWithKeyboard));
     scrollable->Set(vm, panda::StringRef::NewFromUtf8(vm, "setScrollBarMargin"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), ScrollableBridge::SetScrollBarMargin));
     scrollable->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetScrollBarMargin"),
@@ -2201,6 +2231,10 @@ void ArkUINativeModule::RegisterWebAttributes(Local<panda::ObjectRef> object, Ec
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::SetOnContextMenuHide));
     web->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetOnContextMenuHide"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::ResetOnContextMenuHide));
+    web->Set(vm, panda::StringRef::NewFromUtf8(vm, "setOnContextMenuUpdate"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::SetOnContextMenuUpdate));
+    web->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetOnContextMenuUpdate"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::ResetOnContextMenuUpdate));
     web->Set(vm, panda::StringRef::NewFromUtf8(vm, "setGeolocationAccess"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::SetGeolocationAccess));
     web->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetGeolocationAccess"),
@@ -2241,6 +2275,10 @@ void ArkUINativeModule::RegisterWebAttributes(Local<panda::ObjectRef> object, Ec
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::SetDefaultFontSize));
     web->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetDefaultFontSize"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::ResetDefaultFontSize));
+    web->Set(vm, panda::StringRef::NewFromUtf8(vm, "setCaretColor"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::SetCaretColor));
+    web->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetCaretColor"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::ResetCaretColor));
     web->Set(vm, panda::StringRef::NewFromUtf8(vm, "setDefaultFixedFontSize"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::SetDefaultFixedFontSize));
     web->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetDefaultFixedFontSize"),
@@ -2457,10 +2495,18 @@ void ArkUINativeModule::RegisterWebAttributes(Local<panda::ObjectRef> object, Ec
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::SetOnDetectedBlankScreen));
     web->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetOnDetectedBlankScreen"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::ResetOnDetectedBlankScreen));
+    web->Set(vm, panda::StringRef::NewFromUtf8(vm, "setOnMonitoredBlankScreen"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::SetOnMonitoredBlankScreen));
+    web->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetOnMonitoredBlankScreen"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::ResetOnMonitoredBlankScreen));
     web->Set(vm, panda::StringRef::NewFromUtf8(vm, "setBlankScreenDetectionConfig"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::SetBlankScreenDetectionConfig));
     web->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetBlankScreenDetectionConfig"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::ResetBlankScreenDetectionConfig));
+    web->Set(vm, panda::StringRef::NewFromUtf8(vm, "setEnableBlankScreenMonitor"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::SetEnableBlankScreenMonitor));
+    web->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetEnableBlankScreenMonitor"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::ResetEnableBlankScreenMonitor));
     web->Set(vm, panda::StringRef::NewFromUtf8(vm, "setOnFirstScreenPaint"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::SetOnFirstScreenPaint));
     web->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetOnFirstScreenPaint"),
@@ -2565,6 +2611,10 @@ void ArkUINativeModule::RegisterWebAttributes(Local<panda::ObjectRef> object, Ec
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::SetForceEnableZoom));
     web->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetForceEnableZoom"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::ResetForceEnableZoom));
+    web->Set(vm, panda::StringRef::NewFromUtf8(vm, "setFlingSpeedLimit"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::SetFlingSpeedLimit));
+    web->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetFlingSpeedLimit"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::ResetFlingSpeedLimit));
     web->Set(vm, panda::StringRef::NewFromUtf8(vm, "setBackToTop"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), WebBridge::SetBackToTop));
     web->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetBackToTop"),
@@ -3503,6 +3553,8 @@ void ArkUINativeModule::RegisterCommonAttributes(Local<panda::ObjectRef> object,
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CommonBridge::GetWindowWidthBreakpoint));
     common->Set(vm, panda::StringRef::NewFromUtf8(vm, "getWindowHeightBreakpoint"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CommonBridge::GetWindowHeightBreakpoint));
+    common->Set(vm, panda::StringRef::NewFromUtf8(vm, "isWindowInfoInitialized"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CommonBridge::IsWindowInfoInitialized));
     common->Set(vm, panda::StringRef::NewFromUtf8(vm, "freezeUINodeById"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CommonBridge::FreezeUINodeById));
     common->Set(vm, panda::StringRef::NewFromUtf8(vm, "freezeUINodeByUniqueId"),

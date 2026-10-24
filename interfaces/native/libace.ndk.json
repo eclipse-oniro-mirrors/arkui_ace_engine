@@ -6444,6 +6444,14 @@
         "name": "OH_ArkUI_ImageAttachment_GetResource"
     },
     {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_ImageAttachment_SetImageTag"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_ImageAttachment_GetImageTag"
+    },
+    {
         "first_introduced": "24",
         "name": "OH_ArkUI_ImageAttachment_SetSizeWidth"
     },
@@ -6626,6 +6634,14 @@
     {
         "first_introduced": "24",
         "name": "OH_ArkUI_AccessibilityElementInfoSetComponentIdentifier"
+    },
+    {
+        "first_introduced": "26",
+        "name": "OH_ArkUI_Accessibility_BindExportTree"
+    },
+    {
+        "first_introduced": "26",
+        "name": "OH_ArkUI_Accessibility_UnbindExportTree"
     },
     {
         "first_introduced": "24",
@@ -7230,14 +7246,6 @@
     },
     {
         "first_introduced": "26.0.1",
-        "name": "OH_ArkUI_NativeModule_PathAnimation_SetCurve"
-    },
-    {
-        "first_introduced": "26.0.1",
-        "name": "OH_ArkUI_NativeModule_PathAnimation_GetCurve"
-    },
-    {
-        "first_introduced": "26.0.1",
         "name": "OH_ArkUI_NativeModule_PathAnimation_SetTempo"
     },
     {
@@ -7394,6 +7402,18 @@
     },
     {
         "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_GetImagesByNodeIdAsync"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_ImageCollectionTakeItemByNodeId"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_ImageCollectionDestroy"
+    },
+    {
+        "first_introduced": "26.2.0",
         "name": "OH_ArkUI_NativeModule_UIAgentGetPageText"
     },
     {
@@ -7415,5 +7435,133 @@
     {
         "first_introduced": "26.2.0",
         "name": "OH_ArkUI_NativeModule_SetRuntimeCheckMode"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIEventInjectCompositeCommand"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_LinearGradientBlurOptions_Create"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_LinearGradientBlurOptions_Destroy"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_LinearGradientBlurOptions_SetBlurRadius"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_LinearGradientBlurOptions_GetBlurRadius"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_LinearGradientBlurOptions_SetFractionStops"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_LinearGradientBlurOptions_GetFractionStops"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_LinearGradientBlurOptions_SetDirection"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_LinearGradientBlurOptions_GetDirection"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyEvent_Create"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyEvent_Destroy"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyEvent_SetType"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyEvent_SetKeyCode"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyEvent_SetKeyText"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyEvent_SetKeySource"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyEvent_SetDeviceId"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyEvent_SetUnicode"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyEvent_SetEventTime"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyEvent_SetPressedKeys"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyEvent_SetKeyIntentionCode"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyEvent_SetNumLockOn"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyEvent_SetCapsLockOn"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_KeyEvent_SetScrollLockOn"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIAgentTreeRequestCreate"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIAgentTreeRequestDestroy"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIAgentTreeRequestSetFilterPureLayoutNodes"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIAgentTreeRequestSetInteractionInfo"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIAgentTreeRequestSetAccessibilityInfo"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIAgentTreeRequestSetCollectVisualProperties"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIAgentTreeRequestSetCollectFunctionalProperties"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIAgentGetTreeJson"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIAgentGetTreeJsonAsync"
     }
 ]

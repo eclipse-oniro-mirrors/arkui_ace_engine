@@ -160,6 +160,10 @@ export class BottomTabBarStyle implements MaterializedBase {
         const style_casted = style as (TabBarIconStyle)
         return this.iconStyle_serialize(style_casted)
     }
+    public badge(badgeStyle: TabBarBadgeStyle): BottomTabBarStyle {
+        const badgeStyle_casted = badgeStyle as (TabBarBadgeStyle)
+        return this.badge_serialize(badgeStyle_casted)
+    }
     private labelStyle_serialize(style: TabBarLabelStyle): BottomTabBarStyle {
         const thisSerializer: SerializerBase = SerializerBase.hold()
         TabBarLabelStyle_serializer.write(thisSerializer, style)
@@ -224,6 +228,14 @@ export class BottomTabBarStyle implements MaterializedBase {
         const thisSerializer: SerializerBase = SerializerBase.hold()
         TabBarIconStyle_serializer.write(thisSerializer, style)
         const retval = ArkUIGeneratedNativeModule._BottomTabBarStyle_iconStyle(this.peer!.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+        const obj: BottomTabBarStyle = BottomTabBarStyleInternal.fromPtr(retval)
+        return obj
+    }
+    private badge_serialize(badgeStyle: TabBarBadgeStyle): BottomTabBarStyle {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        TabBarBadgeStyle_serializer.write(thisSerializer, badgeStyle)
+        const retval = ArkUIGeneratedNativeModule._BottomTabBarStyle_badge(this.peer!.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
         const obj: BottomTabBarStyle = BottomTabBarStyleInternal.fromPtr(retval)
         return obj
@@ -604,6 +616,10 @@ export enum LayoutMode {
     VERTICAL = 1,
     HORIZONTAL = 2
 }
+export enum TabVisibility {
+    VISIBLE = 0,
+    HIDDEN = 1
+}
 export interface SubTabBarIndicatorStyle {
     color?: ResourceColor;
     height?: Length;
@@ -635,13 +651,15 @@ export interface TabBarIconStyle {
     selectedColor?: ResourceColor;
     unselectedColor?: ResourceColor;
 }
+export type TabBarBadgeType = int32 | ResourceStr;
+export interface TabBarBadgeStyle {
+    value?: TabBarBadgeType;
+    maxCount?: int32;
+}
 export interface TabBarOptions {
     icon?: string | arkui_component_units_Resource;
     text?: string | arkui_component_units_Resource;
-}
-export enum TabVisibility {
-    VISIBLE = 0,
-    HIDDEN = 1
+    badge?: TabBarBadgeStyle;
 }
 export interface TabContentAttribute extends CommonMethod {
     setTabContentOptions(): this {
@@ -741,6 +759,78 @@ export class TabBarSymbol_serializer {
         return TabBarSymbolInternal.fromPtr(ptr)
     }
 }
+export class TabBarBadgeStyle_serializer {
+    public static write(buffer: SerializerBase, value: TabBarBadgeStyle): void {
+        let valueSerializer: SerializerBase = buffer
+        const valueHolderForValue = value.value
+        if (valueHolderForValue !== undefined) {
+            valueSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueHolderForValueTmpValue = valueHolderForValue!
+            if (valueHolderForValueTmpValue instanceof int32) {
+                valueSerializer.writeInt8((0).toByte())
+                const valueHolderForValueTmpValueForIdx0 = valueHolderForValueTmpValue as int32
+                valueSerializer.writeInt32(valueHolderForValueTmpValueForIdx0)
+            } else if (valueHolderForValueTmpValue instanceof ResourceStr) {
+                valueSerializer.writeInt8((1).toByte())
+                const valueHolderForValueTmpValueForIdx1 = valueHolderForValueTmpValue as ResourceStr
+                if (valueHolderForValueTmpValueForIdx1 instanceof string) {
+                    valueSerializer.writeInt8((0).toByte())
+                    const valueHolderForValueTmpValueForIdx1ForIdx0 = valueHolderForValueTmpValueForIdx1 as string
+                    valueSerializer.writeString(valueHolderForValueTmpValueForIdx1ForIdx0)
+                } else if (valueHolderForValueTmpValueForIdx1 instanceof arkui_component_units_Resource) {
+                    valueSerializer.writeInt8((1).toByte())
+                    const valueHolderForValueTmpValueForIdx1ForIdx1 = valueHolderForValueTmpValueForIdx1 as arkui_component_units_Resource
+                    global_resource_Resource_serializer.write(valueSerializer, valueHolderForValueTmpValueForIdx1ForIdx1)
+                }
+            }
+        } else {
+            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        const valueHolderForMaxCount = value.maxCount
+        if (valueHolderForMaxCount !== undefined) {
+            valueSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueHolderForMaxCountTmpValue = valueHolderForMaxCount!
+            valueSerializer.writeInt32(valueHolderForMaxCountTmpValue)
+        } else {
+            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+    }
+    public static read(buffer: DeserializerBase): TabBarBadgeStyle {
+        let valueDeserializer: DeserializerBase = buffer
+        const valueTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
+        let valueTmpBuf: TabBarBadgeType | undefined = undefined
+        if ((valueTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
+            const valueTmpBufOptUnionSelector: int32 = valueDeserializer.readInt8()
+            let valueTmpBufOpt: int32 | ResourceStr | undefined
+            if (valueTmpBufOptUnionSelector == (0).toByte()) {
+                valueTmpBufOpt = valueDeserializer.readInt32()
+            } else if (valueTmpBufOptUnionSelector == (1).toByte()) {
+                const valueTmpBufOptBufUUnionSelector: int32 = valueDeserializer.readInt8()
+                let valueTmpBufOptBufU: string | arkui_component_units_Resource | undefined
+                if (valueTmpBufOptBufUUnionSelector == (0).toByte()) {
+                    valueTmpBufOptBufU = (valueDeserializer.readString() as string)
+                } else if (valueTmpBufOptBufUUnionSelector == (1).toByte()) {
+                    valueTmpBufOptBufU = global_resource_Resource_serializer.read(valueDeserializer)
+                } else {
+                    throw new Error('One of the branches for valueTmpBufOptBufU has to be chosen through deserialisation.')
+                }
+                valueTmpBufOpt = (valueTmpBufOptBufU as string | arkui_component_units_Resource)
+            } else {
+                throw new Error('One of the branches for valueTmpBufOpt has to be chosen through deserialisation.')
+            }
+            valueTmpBuf = (valueTmpBufOpt as int32 | ResourceStr)
+        }
+        const valueTmpResult: TabBarBadgeType | undefined = valueTmpBuf
+        const maxCountTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
+        let maxCountTmpBuf: int32 | undefined = undefined
+        if ((maxCountTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
+            maxCountTmpBuf = valueDeserializer.readInt32()
+        }
+        const maxCountTmpResult: int32 | undefined = maxCountTmpBuf
+        let value: TabBarBadgeStyle = ({value: valueTmpResult, maxCount: maxCountTmpResult} as TabBarBadgeStyle)
+        return value
+    }
+}
 export class TabBarIconStyle_serializer {
     public static write(buffer: SerializerBase, value: TabBarIconStyle): void {
         let valueSerializer: SerializerBase = buffer
@@ -834,78 +924,6 @@ export class TabBarIconStyle_serializer {
         }
         const unselectedColorTmpResult: ResourceColor | undefined = unselectedColorTmpBuf
         let value: TabBarIconStyle = ({selectedColor: selectedColorTmpResult, unselectedColor: unselectedColorTmpResult} as TabBarIconStyle)
-        return value
-    }
-}
-export class TabBarOptions_serializer {
-    public static write(buffer: SerializerBase, value: TabBarOptions): void {
-        let valueSerializer: SerializerBase = buffer
-        const valueHolderForIcon = value.icon
-        if (valueHolderForIcon !== undefined) {
-            valueSerializer.writeInt8(RuntimeType.OBJECT)
-            const valueHolderForIconTmpValue = valueHolderForIcon!
-            if (valueHolderForIconTmpValue instanceof string) {
-                valueSerializer.writeInt8((0).toByte())
-                const valueHolderForIconTmpValueForIdx0 = valueHolderForIconTmpValue as string
-                valueSerializer.writeString(valueHolderForIconTmpValueForIdx0)
-            } else if (valueHolderForIconTmpValue instanceof arkui_component_units_Resource) {
-                valueSerializer.writeInt8((1).toByte())
-                const valueHolderForIconTmpValueForIdx1 = valueHolderForIconTmpValue as arkui_component_units_Resource
-                global_resource_Resource_serializer.write(valueSerializer, valueHolderForIconTmpValueForIdx1)
-            }
-        } else {
-            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
-        }
-        const valueHolderForText = value.text
-        if (valueHolderForText !== undefined) {
-            valueSerializer.writeInt8(RuntimeType.OBJECT)
-            const valueHolderForTextTmpValue = valueHolderForText!
-            if (valueHolderForTextTmpValue instanceof string) {
-                valueSerializer.writeInt8((0).toByte())
-                const valueHolderForTextTmpValueForIdx0 = valueHolderForTextTmpValue as string
-                valueSerializer.writeString(valueHolderForTextTmpValueForIdx0)
-            } else if (valueHolderForTextTmpValue instanceof arkui_component_units_Resource) {
-                valueSerializer.writeInt8((1).toByte())
-                const valueHolderForTextTmpValueForIdx1 = valueHolderForTextTmpValue as arkui_component_units_Resource
-                global_resource_Resource_serializer.write(valueSerializer, valueHolderForTextTmpValueForIdx1)
-            }
-        } else {
-            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
-        }
-    }
-    public static read(buffer: DeserializerBase): TabBarOptions {
-        let valueDeserializer: DeserializerBase = buffer
-        const iconTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
-        let iconTmpBuf: string | arkui_component_units_Resource | undefined = undefined
-        if ((iconTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
-            const iconTmpBufOptUnionSelector: int32 = valueDeserializer.readInt8()
-            let iconTmpBufOpt: string | arkui_component_units_Resource | undefined
-            if (iconTmpBufOptUnionSelector == (0).toByte()) {
-                iconTmpBufOpt = (valueDeserializer.readString() as string)
-            } else if (iconTmpBufOptUnionSelector == (1).toByte()) {
-                iconTmpBufOpt = global_resource_Resource_serializer.read(valueDeserializer)
-            } else {
-                throw new Error('One of the branches for iconTmpBufOpt has to be chosen through deserialisation.')
-            }
-            iconTmpBuf = (iconTmpBufOpt as string | arkui_component_units_Resource)
-        }
-        const iconTmpResult: string | arkui_component_units_Resource | undefined = iconTmpBuf
-        const textTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
-        let textTmpBuf: string | arkui_component_units_Resource | undefined = undefined
-        if ((textTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
-            const textTmpBufOptUnionSelector: int32 = valueDeserializer.readInt8()
-            let textTmpBufOpt: string | arkui_component_units_Resource | undefined
-            if (textTmpBufOptUnionSelector == (0).toByte()) {
-                textTmpBufOpt = (valueDeserializer.readString() as string)
-            } else if (textTmpBufOptUnionSelector == (1).toByte()) {
-                textTmpBufOpt = global_resource_Resource_serializer.read(valueDeserializer)
-            } else {
-                throw new Error('One of the branches for textTmpBufOpt has to be chosen through deserialisation.')
-            }
-            textTmpBuf = (textTmpBufOpt as string | arkui_component_units_Resource)
-        }
-        const textTmpResult: string | arkui_component_units_Resource | undefined = textTmpBuf
-        let value: TabBarOptions = ({icon: iconTmpResult, text: textTmpResult} as TabBarOptions)
         return value
     }
 }
@@ -1326,6 +1344,92 @@ export class SubTabBarIndicatorStyle_serializer {
         }
         const marginTopTmpResult: Length | undefined = marginTopTmpBuf
         let value: SubTabBarIndicatorStyle = ({color: colorTmpResult, height: heightTmpResult, width: widthTmpResult, borderRadius: borderRadiusTmpResult, marginTop: marginTopTmpResult} as SubTabBarIndicatorStyle)
+        return value
+    }
+}
+export class TabBarOptions_serializer {
+    public static write(buffer: SerializerBase, value: TabBarOptions): void {
+        let valueSerializer: SerializerBase = buffer
+        const valueHolderForIcon = value.icon
+        if (valueHolderForIcon !== undefined) {
+            valueSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueHolderForIconTmpValue = valueHolderForIcon!
+            if (valueHolderForIconTmpValue instanceof string) {
+                valueSerializer.writeInt8((0).toByte())
+                const valueHolderForIconTmpValueForIdx0 = valueHolderForIconTmpValue as string
+                valueSerializer.writeString(valueHolderForIconTmpValueForIdx0)
+            } else if (valueHolderForIconTmpValue instanceof arkui_component_units_Resource) {
+                valueSerializer.writeInt8((1).toByte())
+                const valueHolderForIconTmpValueForIdx1 = valueHolderForIconTmpValue as arkui_component_units_Resource
+                global_resource_Resource_serializer.write(valueSerializer, valueHolderForIconTmpValueForIdx1)
+            }
+        } else {
+            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        const valueHolderForText = value.text
+        if (valueHolderForText !== undefined) {
+            valueSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueHolderForTextTmpValue = valueHolderForText!
+            if (valueHolderForTextTmpValue instanceof string) {
+                valueSerializer.writeInt8((0).toByte())
+                const valueHolderForTextTmpValueForIdx0 = valueHolderForTextTmpValue as string
+                valueSerializer.writeString(valueHolderForTextTmpValueForIdx0)
+            } else if (valueHolderForTextTmpValue instanceof arkui_component_units_Resource) {
+                valueSerializer.writeInt8((1).toByte())
+                const valueHolderForTextTmpValueForIdx1 = valueHolderForTextTmpValue as arkui_component_units_Resource
+                global_resource_Resource_serializer.write(valueSerializer, valueHolderForTextTmpValueForIdx1)
+            }
+        } else {
+            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        const valueHolderForBadge = value.badge
+        if (valueHolderForBadge !== undefined) {
+            valueSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueHolderForBadgeTmpValue = valueHolderForBadge!
+            TabBarBadgeStyle_serializer.write(valueSerializer, valueHolderForBadgeTmpValue)
+        } else {
+            valueSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+    }
+    public static read(buffer: DeserializerBase): TabBarOptions {
+        let valueDeserializer: DeserializerBase = buffer
+        const iconTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
+        let iconTmpBuf: string | arkui_component_units_Resource | undefined = undefined
+        if ((iconTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
+            const iconTmpBufOptUnionSelector: int32 = valueDeserializer.readInt8()
+            let iconTmpBufOpt: string | arkui_component_units_Resource | undefined
+            if (iconTmpBufOptUnionSelector == (0).toByte()) {
+                iconTmpBufOpt = (valueDeserializer.readString() as string)
+            } else if (iconTmpBufOptUnionSelector == (1).toByte()) {
+                iconTmpBufOpt = global_resource_Resource_serializer.read(valueDeserializer)
+            } else {
+                throw new Error('One of the branches for iconTmpBufOpt has to be chosen through deserialisation.')
+            }
+            iconTmpBuf = (iconTmpBufOpt as string | arkui_component_units_Resource)
+        }
+        const iconTmpResult: string | arkui_component_units_Resource | undefined = iconTmpBuf
+        const textTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
+        let textTmpBuf: string | arkui_component_units_Resource | undefined = undefined
+        if ((textTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
+            const textTmpBufOptUnionSelector: int32 = valueDeserializer.readInt8()
+            let textTmpBufOpt: string | arkui_component_units_Resource | undefined
+            if (textTmpBufOptUnionSelector == (0).toByte()) {
+                textTmpBufOpt = (valueDeserializer.readString() as string)
+            } else if (textTmpBufOptUnionSelector == (1).toByte()) {
+                textTmpBufOpt = global_resource_Resource_serializer.read(valueDeserializer)
+            } else {
+                throw new Error('One of the branches for textTmpBufOpt has to be chosen through deserialisation.')
+            }
+            textTmpBuf = (textTmpBufOpt as string | arkui_component_units_Resource)
+        }
+        const textTmpResult: string | arkui_component_units_Resource | undefined = textTmpBuf
+        const badgeTmpBuf_runtimeType = valueDeserializer.readInt8()!.toInt()
+        let badgeTmpBuf: TabBarBadgeStyle | undefined = undefined
+        if ((badgeTmpBuf_runtimeType) != (RuntimeType.UNDEFINED)) {
+            badgeTmpBuf = TabBarBadgeStyle_serializer.read(valueDeserializer)
+        }
+        const badgeTmpResult: TabBarBadgeStyle | undefined = badgeTmpBuf
+        let value: TabBarOptions = ({icon: iconTmpResult, text: textTmpResult, badge: badgeTmpResult} as TabBarOptions)
         return value
     }
 }

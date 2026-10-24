@@ -200,6 +200,11 @@ void FrameNode::DumpInfo(std::unique_ptr<JsonValue>& json)
 void FrameNode::DumpSimplifyInfo(std::shared_ptr<JsonValue>& json)
 {}
 
+void FrameNode::DumpSimplifyInfoWithParamConfig(std::shared_ptr<JsonValue>& json, ParamConfig config)
+{
+    UINode::DumpSimplifyInfoWithParamConfig(json, config);
+}
+
 void FrameNode::DumpSimplifyInfoOnlyForParamConfig(std::shared_ptr<JsonValue>& json, ParamConfig config)
 {}
 
@@ -299,6 +304,10 @@ bool FrameNode::IsOutOfLayout() const
 
 void FrameNode::Layout()
 {}
+
+void FrameNode::MeasureSafeAreaInset() {}
+
+void FrameNode::LayoutSafeAreaInset() {}
 
 void FrameNode::MarkDirtyNode(PropertyChangeFlag extraFlag)
 {
@@ -560,8 +569,10 @@ RefPtr<UINode> FrameNode::GetCurrentPageRootNode()
     return {};
 }
 
-RefPtr<LayoutWrapper> FrameNode::GetOrCreateChildByIndex(uint32_t index, bool addToRenderTree, bool isCache)
+RefPtr<LayoutWrapper> FrameNode::GetOrCreateChildByIndex(
+    uint32_t index, bool addToRenderTree, bool isCache, bool allowPlaceholderSubstitution)
 {
+    (void)allowPlaceholderSubstitution;
     return {};
 }
 

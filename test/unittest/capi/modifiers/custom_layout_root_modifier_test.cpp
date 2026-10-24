@@ -58,8 +58,8 @@ public:
     {
         return layoutProperty_;
     }
-    MOCK_METHOD(RefPtr<LayoutWrapper>, GetOrCreateChildByIndex, (uint32_t index, bool addToRenderTree, bool isCache),
-        (override));
+    MOCK_METHOD(RefPtr<LayoutWrapper>, GetOrCreateChildByIndex,
+        (uint32_t index, bool addToRenderTree, bool isCache, bool allowPlaceholderSubstitution), (override));
     MOCK_METHOD(RefPtr<LayoutWrapper>, GetChildByIndex, (uint32_t index, bool isCache), (override));
     MOCK_METHOD(ChildrenListWithGuard, GetAllChildrenWithBuild, (bool addToRenderTree), (override));
     MOCK_METHOD(void, RemoveChildInRenderTree, (uint32_t index), (override));

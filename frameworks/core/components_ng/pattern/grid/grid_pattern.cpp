@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 
+#include "core/components_ng/pattern/scrollable/scroll_snap_strategy.h"
 #include "core/components_ng/pattern/grid/grid_pattern.h"
 
 #include <cmath>
@@ -33,6 +34,7 @@
 #include "core/components_ng/pattern/grid/grid_content_modifier.h"
 #include "core/components_ng/pattern/grid/grid_custom/grid_custom_layout_algorithm.h"
 #include "core/components_ng/pattern/grid/grid_event_hub.h"
+#include "core/components_ng/syntax/lazy_for_each_node.h"
 #include "core/components_ng/pattern/grid/grid_item_event_hub.h"
 #include "core/components_ng/pattern/grid/grid_item_layout_property.h"
 #include "core/components_ng/pattern/grid/grid_item_pattern.h"
@@ -45,6 +47,7 @@
 #include "core/components_ng/pattern/grid/irregular/grid_layout_utils.h"
 #include "core/components_ng/pattern/scrollable/scrollable_animation_consts.h"
 #include "core/components_ng/pattern/scrollable/scrollable_pattern.h"
+#include "core/components_ng/pattern/scrollable/scroll_snap_utils.h"
 #include "core/components_ng/syntax/repeat_virtual_scroll_2_node.h"
 #include "interfaces/inner_api/ui_session/ui_session_manager.h"
 
@@ -326,10 +329,10 @@ void GridPattern::OnModifyDone()
 bool GridPattern::GetIsAllowMouse() const
 {
     auto host = GetHost();
-    CHECK_NULL_RETURN(host, isAllowMouse_);
+    CHECK_NULL_RETURN(host, ScrollablePattern::GetIsAllowMouse());
     auto gridEventHub = host->GetEventHub<GridEventHub>();
-    CHECK_NULL_RETURN(gridEventHub, isAllowMouse_);
-    return gridEventHub->GetOnItemDragStart() ? false : isAllowMouse_;
+    CHECK_NULL_RETURN(gridEventHub, ScrollablePattern::GetIsAllowMouse());
+    return gridEventHub->GetOnItemDragStart() ? false : ScrollablePattern::GetIsAllowMouse();
 }
 
 void GridPattern::MultiSelectWithoutKeyboard(const RectF& selectedZone)
@@ -764,6 +767,77 @@ void GridPattern::UpdateEndHeightOnOffsetEnd(bool prevOffsetEnd)
     endHeight_ = info_.currentHeight_ + overScroll;
 }
 
+// Feat-20260806915268 cmetrics helper: the scrollbar/index event dispatch block of
+// OnDirtyLayoutWrapperSwap, extracted verbatim (zero behavior change). Returns false
+// where the original returned false early (null event hub).
+bool GridPattern::UpdateScrollBarAndIndexEventsOnLayout(const GridLayoutInfo& gridLayoutInfo)
+{
+    auto eventhub = GetEventHub<GridEventHub>();
+    CHECK_NULL_RETURN(eventhub, false);
+    // Keep the offset argument consistent with the index argument (single
+    // source of truth for reporting semantics, AC-4.1/R-10): the index uses
+    // the content-area report range, so the offset must use the content-area
+    // first-row anchor. The raw currentOffset_ includes the start-extension
+    // row offset when the extension is active (including rows backfilled after
+    // a jump), which would make the offset argument drift with the extension
+    // state. With fix = 0 the anchor always equals currentOffset_, preserving
+    // the original behavior (four-state zero-change).
+    // The handed-out Dimension must stay VP-unit with the px->vp-converted
+    // value: the ArkTS bridges run ConvertToVp() on it, so a PX-unit
+    // dimension would divide the value by dipScale a second time.
+    Dimension offsetPx(gridLayoutInfo.GetContentAnchorOffset(GetMainGap()), DimensionUnit::PX);
+    Dimension offset(0, DimensionUnit::VP);
+    offset.SetValue(offsetPx.ConvertToVp());
+    scrollbarInfo_ = eventhub->FireOnScrollBarUpdate(gridLayoutInfo.ReportStartIndex(), offset);
+    if (!isInitialized_ || startIndex_ != gridLayoutInfo.ReportStartIndex()) {
+        eventhub->FireOnScrollToIndex(gridLayoutInfo.ReportStartIndex());
+    }
+    return true;
+}
+
+// Feat-20260806915268 cmetrics helper: the index-sync / ProcessEvent block of
+// OnDirtyLayoutWrapperSwap, extracted verbatim (zero behavior change).
+void GridPattern::SyncIndexesAndProcessEvents(
+    const RefPtr<GridLayoutBaseAlgorithm>& gridLayoutAlgorithm, bool safeAreaIntermediatePass)
+{
+    if (!gridLayoutAlgorithm->MeasureInNextFrame() && !safeAreaIntermediatePass) {
+        bool indexChanged = (startIndex_ != info_.ReportStartIndex()) || (endIndex_ != info_.ReportEndIndex());
+        ProcessEvent(indexChanged, info_.currentHeight_ - info_.prevHeight_);
+        info_.prevHeight_ = info_.currentHeight_;
+        startIndex_ = info_.ReportStartIndex();
+        endIndex_ = info_.ReportEndIndex();
+        if (isConfigScrollable_) {
+            focusHandler_.ProcessFocusEvent(keyEvent_, indexChanged);
+        }
+    }
+}
+
+// Feat-20260806915268 cmetrics helper: the post-layout bookkeeping tail of
+// OnDirtyLayoutWrapperSwap, extracted verbatim (zero behavior change).
+void GridPattern::FinalizeLayoutSwap(bool sizeDiminished, bool frameSizeChange)
+{
+    info_.extraOffset_.reset();
+    UpdateScrollBarOffset();
+    ChangeAnimateOverScroll();
+    SetScrollSourceLayout(SCROLL_FROM_NONE);
+    ResetAccessibilityScrollSourceIfIdle();
+    if (frameSizeChange) {
+        if (GetScrollBar() != nullptr) {
+            GetScrollBar()->ScheduleDisappearDelayTask();
+        }
+    }
+    if (!preSpring_ && !GetCanStayOverScroll()) {
+        CheckRestartSpring(sizeDiminished);
+    }
+    CheckScrollable();
+    MarkSelectedItems();
+    ChangeCanStayOverScroll();
+    info_.currentDelta_ = 0;
+    // Feat-20260806915268: refresh the snap geometry cache while this layout pass's geometry and
+    // info_ window are both current — the settle callbacks consume it later.
+    UpdateSnapItemGeometryCache();
+}
+
 bool GridPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, const DirtySwapConfig& config)
 {
     if (config.skipMeasure && config.skipLayout) {
@@ -785,27 +859,8 @@ bool GridPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, c
     const bool safeAreaIntermediatePass = IsSafeAreaIntermediatePass(gridLayoutAlgorithm);
     const bool shouldDispatchLayoutEvents =
         !gridLayoutAlgorithm->MeasureInNextFrame() && !safeAreaIntermediatePass;
-    if (shouldDispatchLayoutEvents) {
-        auto eventhub = GetEventHub<GridEventHub>();
-        CHECK_NULL_RETURN(eventhub, false);
-        // Keep the offset argument consistent with the index argument (single
-        // source of truth for reporting semantics, AC-4.1/R-10): the index uses
-        // the content-area report range, so the offset must use the content-area
-        // first-row anchor. The raw currentOffset_ includes the start-extension
-        // row offset when the extension is active (including rows backfilled after
-        // a jump), which would make the offset argument drift with the extension
-        // state. With fix = 0 the anchor always equals currentOffset_, preserving
-        // the original behavior (four-state zero-change).
-        // The handed-out Dimension must stay VP-unit with the px->vp-converted
-        // value: the ArkTS bridges run ConvertToVp() on it, so a PX-unit
-        // dimension would divide the value by dipScale a second time.
-        Dimension offsetPx(gridLayoutInfo.GetContentAnchorOffset(GetMainGap()), DimensionUnit::PX);
-        Dimension offset(0, DimensionUnit::VP);
-        offset.SetValue(offsetPx.ConvertToVp());
-        scrollbarInfo_ = eventhub->FireOnScrollBarUpdate(gridLayoutInfo.ReportStartIndex(), offset);
-        if (!isInitialized_ || startIndex_ != gridLayoutInfo.ReportStartIndex()) {
-            eventhub->FireOnScrollToIndex(gridLayoutInfo.ReportStartIndex());
-        }
+    if (shouldDispatchLayoutEvents && !UpdateScrollBarAndIndexEventsOnLayout(gridLayoutInfo)) {
+        return false;
     }
 
     bool offsetEnd = info_.offsetEnd_;
@@ -822,37 +877,12 @@ bool GridPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, c
         IsOutOfBoundary(true) && !NearZero(curDelta) && (info_.prevHeight_ - info_.currentHeight_ - curDelta > 0.1f);
 
     UpdateEndHeightOnOffsetEnd(offsetEnd);
-    if (!gridLayoutAlgorithm->MeasureInNextFrame() && !safeAreaIntermediatePass) {
-        bool indexChanged = (startIndex_ != info_.ReportStartIndex()) || (endIndex_ != info_.ReportEndIndex());
-        ProcessEvent(indexChanged, info_.currentHeight_ - info_.prevHeight_);
-        info_.prevHeight_ = info_.currentHeight_;
-        startIndex_ = info_.ReportStartIndex();
-        endIndex_ = info_.ReportEndIndex();
-        if (isConfigScrollable_) {
-            focusHandler_.ProcessFocusEvent(keyEvent_, indexChanged);
-        }
-    }
+    SyncIndexesAndProcessEvents(gridLayoutAlgorithm, safeAreaIntermediatePass);
     if (isSmoothScrolling_ && scrollStop_) {
         isSmoothScrolling_ = false;
     }
 
-    info_.extraOffset_.reset();
-    UpdateScrollBarOffset();
-    ChangeAnimateOverScroll();
-    SetScrollSource(SCROLL_FROM_NONE);
-    ResetAccessibilityScrollSourceIfIdle();
-    if (config.frameSizeChange) {
-        if (GetScrollBar() != nullptr) {
-            GetScrollBar()->ScheduleDisappearDelayTask();
-        }
-    }
-    if (!preSpring_ && !GetCanStayOverScroll()) {
-        CheckRestartSpring(sizeDiminished);
-    }
-    CheckScrollable();
-    MarkSelectedItems();
-    ChangeCanStayOverScroll();
-    info_.currentDelta_ = 0;
+    FinalizeLayoutSwap(sizeDiminished, config.frameSizeChange);
 
     prevMeasureBreak_ = gridLayoutAlgorithm->MeasureInNextFrame();
     if (prevMeasureBreak_) {
@@ -1068,11 +1098,12 @@ bool GridPattern::OnKeyEvent(const KeyEvent& event)
         ScrollPage(event.code == KeyCode::KEY_PAGE_UP);
     }
 
-    if (FocusHub::IsFocusStepKey(event.code)) {
-        if (focusHandler_.ScrollToLastFocusIndex(event.code)) {
-            keyEvent_ = event;
-            return true;
-        }
+    if (FocusHub::IsFocusStepKey(event.code) && focusHandler_.ScrollToLastFocusIndex(event.code)) {
+        keyEvent_ = event;
+        return true;
+    }
+    if (HandleArrowKeyScroll(event)) {
+        return true;
     }
     return false;
 }
@@ -1569,6 +1600,88 @@ OverScrollOffset GridPattern::GetOverScrollOffset(double delta) const
     return offset;
 }
 
+void GridPattern::DumpAdvanceGridTemplateInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    auto property = GetLayoutProperty<GridLayoutProperty>();
+    CHECK_NULL_VOID(property);
+    if (!config.IsPublicTree() || (config.visualProperties)) {
+        json->Put("RowsTemplate", property->GetRowsTemplate().value_or("").c_str());
+    }
+    if (!config.IsPublicTree() || (config.visualProperties)) {
+        json->Put("ColumnsTemplate", property->GetColumnsTemplate().value_or("").c_str());
+    }
+    if (!config.IsPublicTree() || (config.visualProperties && property->GetRowsGap().has_value())) {
+        json->Put("RowsGap", property->GetRowsGap().has_value()
+                                 ? std::to_string(property->GetRowsGap().value().Value()).c_str()
+                                 : "null");
+    }
+    if (!config.IsPublicTree() || (config.visualProperties && property->GetColumnsGap().has_value())) {
+        json->Put("ColumnsGap", property->GetColumnsGap().has_value()
+                                    ? std::to_string(property->GetColumnsGap().value().Value()).c_str()
+                                    : "null");
+    }
+}
+
+void GridPattern::DumpAdvanceGridSizeInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    auto property = GetLayoutProperty<GridLayoutProperty>();
+    CHECK_NULL_VOID(property);
+    if (!config.IsPublicTree() || (config.visualProperties && property->GetMaxCount().has_value())) {
+        json->Put("MaxCount",
+            property->GetMaxCount().has_value() ? std::to_string(property->GetMaxCount().value()).c_str() : "null");
+    }
+    if (!config.IsPublicTree() || (config.visualProperties && property->GetMinCount().has_value())) {
+        json->Put("MinCount",
+            property->GetMinCount().has_value() ? std::to_string(property->GetMinCount().value()).c_str() : "null");
+    }
+    if (!config.IsPublicTree() || (config.visualProperties && property->GetCellLength().has_value())) {
+        json->Put("CellLength",
+            property->GetCellLength().has_value() ? std::to_string(property->GetCellLength().value()).c_str() : "null");
+    }
+}
+
+void GridPattern::DumpAdvanceGridInteractionInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    auto property = GetLayoutProperty<GridLayoutProperty>();
+    CHECK_NULL_VOID(property);
+    if (!config.IsPublicTree() || (config.functionalProperties && property->GetEditable().has_value())) {
+        json->Put("Editable",
+            property->GetEditable().has_value() ? std::to_string(property->GetEditable().value()).c_str() : "null");
+    }
+    if (!config.IsPublicTree() || (config.functionalProperties && property->GetScrollEnabled().has_value())) {
+        json->Put("ScrollEnabled", property->GetScrollEnabled().has_value()
+                                       ? std::to_string(property->GetScrollEnabled().value()).c_str()
+                                       : "null");
+    }
+    if (!config.IsPublicTree() || (config.visualProperties)) {
+        json->Put("AlignItems", property->GetAlignItems() ? "GridItemAlignment.STRETCH" : "GridItemAlignment.DEFAULT");
+    }
+}
+
+void GridPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    auto property = GetLayoutProperty<GridLayoutProperty>();
+    CHECK_NULL_VOID(property);
+    ScrollablePattern::DumpAdvanceInfo(json, config);
+    if (!config.IsPublicTree()) {
+        BuildGridStateInfo(json, config);
+    }
+    if (!config.IsPublicTree() || config.visualProperties) {
+        BuildGridOffsetInfo(json, config);
+        BuildGridIndexInfo(json, config);
+    }
+    if (!config.IsPublicTree()) {
+        BuildGridLayoutPropertyInfo(json, config);
+        BuildScrollAlignInfo(json);
+        BuildGridLayoutInfo(json);
+        return;
+    }
+    if (config.functionalProperties) {
+        BuildGridStateInfo(json, config);
+    }
+    BuildGridLayoutPropertyInfo(json, config);
+}
+
 void GridPattern::DumpAdvanceInfo()
 {
     auto property = GetLayoutProperty<GridLayoutProperty>();
@@ -1821,6 +1934,11 @@ void GridPattern::DumpSimplifyInfo(std::shared_ptr<JsonValue>& json)
 
 std::string GridPattern::GetIrregularIndexesString() const
 {
+    return GetIrregularIndexesString(ParamConfig());
+}
+
+std::string GridPattern::GetIrregularIndexesString(const ParamConfig& config) const
+{
     auto property = GetLayoutProperty<GridLayoutProperty>();
     if (!property || !property->HasLayoutOptions()) {
         return std::string("");
@@ -1837,7 +1955,7 @@ std::string GridPattern::GetIrregularIndexesString() const
         }
         irregularIndexes.append(std::to_string(index));
         count++;
-        if (count == MAX_NUM_SIZE) {
+        if (!config.IsPublicTree() && count == MAX_NUM_SIZE) {
             irregularIndexes.append("...");
             break;
         }
@@ -1855,6 +1973,360 @@ void GridPattern::OnRestoreInfo(const std::string& restoreInfo)
 {
     info_.jumpIndex_ = StringUtils::StringToInt(restoreInfo);
     info_.scrollAlign_ = ScrollAlign::START;
+}
+
+SnapType GridPattern::GetSnapType()
+{
+    auto strategy = GetScrollSnapStrategy();
+    if (!strategy.IsEnabled()) {
+        return SnapType::NONE_SNAP;
+    }
+    // Cross-row items are out of scope (requirement decision 2026-09-15): the capability
+    // stays inactive and behaves exactly like an unconfigured grid.
+    return HasCrossRowItem() ? SnapType::NONE_SNAP : SnapType::LIST_SNAP;
+}
+
+bool GridPattern::HasCrossRowItem() const
+{
+    // The scroll layout algorithm tracks items spanning multiple main-axis lines in the layout
+    // info (set while measuring, reset on children update); new-style irregular layouts do not
+    // set the flag and are covered by UseIrregularLayout. User-defined custom layouts
+    // (getRectByIndex may return rowSpan > 1) are conservatively excluded as well.
+    return info_.hasMultiLineItem_ || UseIrregularLayout() || userDefined_;
+}
+
+ScrollSnapStrategy GridPattern::GetScrollSnapStrategy() const
+{
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, ScrollSnapStrategy());
+    auto layoutProperty = host->GetLayoutProperty<GridLayoutProperty>();
+    CHECK_NULL_RETURN(layoutProperty, ScrollSnapStrategy());
+    return layoutProperty->GetScrollSnapStrategy().value_or(ScrollSnapStrategy());
+}
+
+bool GridPattern::StartSnapAnimation(SnapAnimationOptions snapAnimationOptions)
+{
+    if (HasCrossRowItem()) {
+        return false;
+    }
+    return StartItemSnapAnimation(snapAnimationOptions);
+}
+
+void GridPattern::BeginTrackedItemSnap(float coordinate)
+{
+    snapGeometryStableOffset_ = coordinate;
+}
+
+std::vector<SnapCandidate> GridPattern::BuildTrackedItemSnapCandidates(ScrollSnapAlign align)
+{
+    std::vector<SnapCandidate> candidates;
+    if (align == ScrollSnapAlign::NONE || HasCrossRowItem()) {
+        return candidates;
+    }
+    const float viewport = GetMainContentSize();
+    for (const auto& geom : snapItemGeometryCache_) {
+        const float start = geom.contentStart - snapGeometryEstimatedOffset_ + snapGeometryStableOffset_;
+        candidates.push_back({ GetSnapAnchor(align, start, geom.mainSize, viewport), geom.index });
+    }
+    return candidates;
+}
+
+std::vector<SnapCandidate> GridPattern::BuildItemSnapCandidates(ScrollSnapAlign align)
+{
+    std::vector<SnapCandidate> candidates;
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, candidates);
+    if (align == ScrollSnapAlign::NONE || !isConfigScrollable_ || HasCrossRowItem()) {
+        return candidates;
+    }
+    auto viewportMainSize = GetMainContentSize();
+    // Preferred source: the layout-time geometry cache. Content-space positions are
+    // scroll-invariant, so anchors derived from them stay exact even when the settle
+    // callback runs before the final scroll delta has been laid out (interrupted fling).
+    if (!snapItemGeometryCache_.empty()) {
+        for (const auto& geom : snapItemGeometryCache_) {
+            candidates.push_back(
+                { GetSnapAnchor(align, geom.contentStart, geom.mainSize, viewportMainSize), geom.index });
+        }
+        ScrollSnapUtils::NormalizeCandidates(candidates);
+        return candidates;
+    }
+    // Cold start only (strategy set before the first layout swap): no scroll has happened,
+    // so the live geometry read below is exactly fresh by construction.
+    auto axis = GetAxis();
+    auto currentOffset = static_cast<float>(GetTotalOffset());
+    auto toLogicalStart = [this, axis, viewportMainSize](float physical, float itemMainSize) -> float {
+        return ToLogicalMainStart(physical, itemMainSize, axis, viewportMainSize);
+    };
+    auto pushCandidate = [&](int32_t index) {
+        auto item = host->GetChildByIndex(index);
+        CHECK_NULL_VOID(item);
+        auto itemGeometry = item->GetGeometryNode();
+        CHECK_NULL_VOID(itemGeometry);
+        const auto& rect = itemGeometry->GetFrameRect();
+        auto physicalStart = axis == Axis::VERTICAL ? rect.GetY() : rect.GetX();
+        auto itemMainSize = axis == Axis::VERTICAL ? rect.Height() : rect.Width();
+        if (LessOrEqual(itemMainSize, 0.0f)) {
+            return;
+        }
+        // Content coordinate: logical viewport-relative start; add back the scroll.
+        auto itemStartContent = toLogicalStart(physicalStart, itemMainSize) + currentOffset;
+        candidates.push_back({ GetSnapAnchor(align, itemStartContent, itemMainSize, viewportMainSize), index });
+    };
+    // Only the VISIBLE items are read through their children: their geometry is guaranteed
+    // fresh from the current layout, and reading an on-screen child never activates anything.
+    // Data deletions can leave a stale endIndex_ until the next layout pass; clamp to the live
+    // child count so the anchor scan never chases a removed item (List lesson fde27169fc4).
+    int32_t endBound = std::min(info_.endIndex_, host->GetTotalChildCount() - 1);
+    for (int32_t index = info_.startIndex_; index <= endBound; ++index) {
+        pushCandidate(index);
+    }
+    ScrollSnapUtils::NormalizeCandidates(candidates);
+    return candidates;
+}
+
+// Feat-20260806915268 fix: capture the visible items' content-space geometry right after a layout pass
+// (OnDirtyLayoutWrapperSwap), where physical frame rects and the offset used by that pass are
+// from the SAME frame. contentStart = physical-in-viewport + offset-at-layout is invariant
+// under further scrolling, unlike a settle-time read that mixes a stale rect with the final
+// offset (the one-frame lag that shifted every anchor on interrupted flings).
+void GridPattern::UpdateSnapItemGeometryCache()
+{
+    snapItemGeometryCache_.clear();
+    snapGeometryEstimatedOffset_ = static_cast<float>(GetTotalOffset());
+    auto trackingScroll = GetScrollable();
+    snapGeometryStableOffset_ = trackingScroll && trackingScroll->IsItemSnapTracking()
+        ? -trackingScroll->GetCurrentPos() : snapGeometryEstimatedOffset_;
+    auto strategy = GetScrollSnapStrategy();
+    if (!strategy.IsEnabled() || !isConfigScrollable_ || HasCrossRowItem()) {
+        return;
+    }
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto axis = GetAxis();
+    auto currentOffset = static_cast<float>(GetTotalOffset());
+    auto viewportMainSize = GetMainContentSize();
+    int32_t endBound = std::min(info_.endIndex_, host->GetTotalChildCount() - 1);
+    for (int32_t index = info_.startIndex_; index <= endBound; ++index) {
+        auto item = host->GetChildByIndex(index);
+        if (!item) {
+            continue;
+        }
+        auto itemGeometry = item->GetGeometryNode();
+        if (!itemGeometry) {
+            continue;
+        }
+        const auto& rect = itemGeometry->GetFrameRect();
+        auto physicalStart = axis == Axis::VERTICAL ? rect.GetY() : rect.GetX();
+        auto itemMainSize = axis == Axis::VERTICAL ? rect.Height() : rect.Width();
+        if (LessOrEqual(itemMainSize, 0.0f)) {
+            continue;
+        }
+        snapItemGeometryCache_.push_back({ ToLogicalMainStart(physicalStart, itemMainSize, axis, viewportMainSize) +
+                currentOffset,
+            itemMainSize, index });
+    }
+}
+
+float GridPattern::GetItemSnapCalibrationMargin() const
+{
+    if (HasCrossRowItem() || snapItemGeometryCache_.empty()) {
+        return 0.0f;
+    }
+    double total = 0.0;
+    int32_t count = 0;
+    for (const auto& item : snapItemGeometryCache_) {
+        if (std::isfinite(item.mainSize) && GreatNotEqual(item.mainSize, 0.0f)) {
+            total += item.mainSize;
+            ++count;
+        }
+    }
+    return count > 0 ? static_cast<float>(total / count) : 0.0f;
+}
+
+// Feat-20260806915268 shared snap anchor math: the alignment formula turning a logical content-frame
+// item start into the scroll offset that aligns it (START edge / center / end edge).
+float GridPattern::GetSnapAnchor(ScrollSnapAlign align, float itemStartContent, float itemMainSize,
+    float viewportMainSize) const
+{
+    if (align == ScrollSnapAlign::CENTER) {
+        return itemStartContent + itemMainSize / 2.0f - viewportMainSize / 2.0f;
+    }
+    if (align == ScrollSnapAlign::END) {
+        return itemStartContent + itemMainSize - viewportMainSize;
+    }
+    return itemStartContent;
+}
+
+// Main-axis geometry of one materialized child; false when the child or its measurement is
+// not usable (null node, no geometry, non-positive main size).
+bool GridPattern::GetItemMainGeometry(
+    const RefPtr<LayoutWrapper>& item, Axis axis, float& physicalStart, float& itemMainSize) const
+{
+    CHECK_NULL_RETURN(item, false);
+    auto itemGeometry = item->GetGeometryNode();
+    CHECK_NULL_RETURN(itemGeometry, false);
+    const auto& rect = itemGeometry->GetFrameRect();
+    physicalStart = axis == Axis::VERTICAL ? rect.GetY() : rect.GetX();
+    itemMainSize = axis == Axis::VERTICAL ? rect.Height() : rect.Width();
+    return GreatNotEqual(itemMainSize, 0.0f);
+}
+
+// Virtual child sources (LazyForEach / Repeat-V2) require cache-mode reads for offscreen
+// items (the default read activates / migrates a cached node); regular grids only resolve
+// through the normal index path (cache mode returns null there).
+bool GridPattern::HasVirtualChildSource() const
+{
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, false);
+    for (const auto& child : host->GetChildren()) {
+        if (child && (AceType::DynamicCast<LazyForEachNode>(child) ||
+                        AceType::DynamicCast<RepeatVirtualScroll2Node>(child))) {
+            return true;
+        }
+    }
+    return false;
+}
+
+std::optional<float> GridPattern::GetItemSnapNeighborAnchor(ScrollSnapAlign align, bool towardSmaller)
+{
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, std::nullopt);
+    if (towardSmaller && info_.startMainLineIndex_ - 1 < 0) {
+        return std::nullopt;
+    }
+    auto axis = GetAxis();
+    auto viewportMainSize = GetMainContentSize();
+    auto currentOffset = static_cast<float>(GetTotalOffset());
+    auto anchorOfItem = [this, align, axis, viewportMainSize, currentOffset](
+                            float physicalStart, float itemMainSize) -> float {
+        return GetSnapAnchor(align,
+            ToLogicalMainStart(physicalStart, itemMainSize, axis, viewportMainSize) + currentOffset,
+            itemMainSize, viewportMainSize);
+    };
+    auto best = ProbeNeighborItemAnchors(anchorOfItem, axis, currentOffset, towardSmaller);
+    if (best.has_value()) {
+        return best;
+    }
+    return EstimateNeighborAnchorFromBoundary(align, axis, viewportMainSize, towardSmaller);
+}
+
+// Per-item probe of the materialized neighbor line. gridMatrix_ only records the visible
+// window's placement, so the neighbor line's items are enumerated by index arithmetic
+// (cross-row layouts are gated out: one line spans exactly [lane count] consecutive indexes).
+// Unmaterialized lazy items simply resolve to null and are skipped.
+std::optional<float> GridPattern::ProbeNeighborItemAnchors(const std::function<float(float, float)>& anchorOfItem,
+    Axis axis, float currentOffset, bool towardSmaller)
+{
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, std::nullopt);
+    auto laneCount = [this]() -> int32_t {
+        auto visible = info_.gridMatrix_.find(info_.startMainLineIndex_);
+        if (visible != info_.gridMatrix_.end() && !visible->second.empty()) {
+            return static_cast<int32_t>(visible->second.size());
+        }
+        auto span = info_.endMainLineIndex_ - info_.startMainLineIndex_ + 1;
+        return span > 0 ? (info_.endIndex_ - info_.startIndex_ + 1) / span : 1;
+    }();
+    laneCount = std::max(laneCount, 1);
+    const int32_t totalChildren = host->GetTotalChildCount();
+    int32_t firstIndex = towardSmaller ? std::max(0, info_.startIndex_ - laneCount)
+                                       : std::min(totalChildren, info_.endIndex_ + 1);
+    int32_t lastIndex = towardSmaller ? std::max(-1, info_.startIndex_ - 1)
+                                      : std::min(totalChildren - 1, info_.endIndex_ + laneCount);
+    const bool cacheMode = HasVirtualChildSource();
+    std::optional<float> best;
+    for (int32_t index = firstIndex; index <= lastIndex; ++index) {
+        float physicalStart = 0.0f;
+        float itemMainSize = 0.0f;
+        if (!GetItemMainGeometry(host->GetChildByIndex(index, cacheMode), axis, physicalStart, itemMainSize)) {
+            continue;
+        }
+        float anchor = anchorOfItem(physicalStart, itemMainSize);
+        bool inDirection =
+            towardSmaller ? LessNotEqual(anchor, currentOffset) : GreatNotEqual(anchor, currentOffset);
+        if (!inDirection) {
+            continue;
+        }
+        if (!best.has_value() || std::abs(anchor - currentOffset) < std::abs(best.value() - currentOffset)) {
+            best = anchor;
+        }
+    }
+    return best;
+}
+
+// Unmeasured neighbor (cachedCount(0), lazy data not prefetched): no per-item geometry
+// exists without a layout pass. Degradation: estimate the step from the visible boundary
+// item — exact for uniform grids, and the only honest estimate available at this point.
+std::optional<float> GridPattern::EstimateNeighborAnchorFromBoundary(
+    ScrollSnapAlign align, Axis axis, float viewportMainSize, bool towardSmaller)
+{
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, std::nullopt);
+    const int32_t boundaryIndex = towardSmaller
+        ? info_.startIndex_
+        : std::min(info_.endIndex_, host->GetTotalChildCount() - 1);
+    float physicalStart = 0.0f;
+    float itemMainSize = 0.0f;
+    if (!GetItemMainGeometry(host->GetChildByIndex(boundaryIndex), axis, physicalStart, itemMainSize)) {
+        return std::nullopt;
+    }
+    // The align formula applies to the NEIGHBOR's estimated start with the neighbor's
+    // estimated height (the boundary item's own alignment must not carry over).
+    auto boundaryStart =
+        ToLogicalMainStart(physicalStart, itemMainSize, axis, viewportMainSize) +
+        static_cast<float>(GetTotalOffset());
+    auto lineHeight = [this](int32_t line, float fallback) {
+        auto it = info_.lineHeightMap_.find(line);
+        return it != info_.lineHeightMap_.end() ? it->second : fallback;
+    };
+    const int32_t boundaryLine = towardSmaller ? info_.startMainLineIndex_ : info_.endMainLineIndex_;
+    const float mainGap = GetMainGap();
+    if (towardSmaller) {
+        const float prevHeight = lineHeight(boundaryLine - 1, itemMainSize);
+        return GetSnapAnchor(align, boundaryStart - mainGap - prevHeight, prevHeight, viewportMainSize);
+    }
+    const float boundaryHeight = lineHeight(boundaryLine, itemMainSize);
+    return GetSnapAnchor(
+        align, boundaryStart + boundaryHeight + mainGap, itemMainSize, viewportMainSize);
+}
+// Single F004 conversion shared by the candidate scan and the neighbor fallback: frame rects
+// are PHYSICAL viewport positions (leading main-axis padding included, horizontal RTL mirrored
+// from the content-view right edge), while the scroll offset and the padding-stripped viewport
+// size live in the logical frame.
+float GridPattern::ToLogicalMainStart(float physicalStart, float itemMainSize, Axis axis,
+    float viewportMainSize) const
+{
+    auto host = GetHost();
+    float padMain = 0.0f;
+    if (host) {
+        const auto& padding = host->GetGeometryNode()->GetPadding();
+        if (padding) {
+            padMain = axis == Axis::VERTICAL ? padding->top.value_or(0.0f) : padding->left.value_or(0.0f);
+        }
+    }
+    float start = physicalStart - padMain;
+    bool isRtl = axis == Axis::HORIZONTAL && host &&
+        host->GetLayoutProperty()->GetNonAutoLayoutDirection() == TextDirection::RTL;
+    if (isRtl) {
+        start = viewportMainSize - start - itemMainSize;
+    }
+    return start;
+}
+
+float GridPattern::GetItemSnapMinOffset() const
+{
+    // With contentStartOffset the snap lower bound is the first-item alignment position: the
+    // snap never rests inside the leading gap (AC-2.4, aligned with the List snap spec).
+    return info_.contentStartOffset_;
+}
+
+float GridPattern::GetItemSnapMaxOffset() const
+{
+    auto maxOffset = GetTotalHeight() - GetMainContentSize();
+    // Lazy content height can be underestimated before the end is reached; never clamp below the
+    // current position so that snap targets stay reachable.
+    return std::max(maxOffset, static_cast<float>(GetTotalOffset()));
 }
 
 Rect GridPattern::GetItemRect(int32_t index) const
@@ -2111,22 +2583,20 @@ void GridPattern::BuildGridLayoutInfo(std::unique_ptr<JsonValue>& json)
 
 void GridPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json)
 {
-    auto property = GetLayoutProperty<GridLayoutProperty>();
-    CHECK_NULL_VOID(property);
-    ScrollablePattern::DumpAdvanceInfo(json);
-    BuildGridStateInfo(json);
-    BuildGridOffsetInfo(json);
-    BuildGridIndexInfo(json);
-    BuildGridLayoutPropertyInfo(json);
-    BuildScrollAlignInfo(json);
-    BuildGridLayoutInfo(json);
+    GridPattern::DumpAdvanceInfo(json, ParamConfig());
 }
 
-void GridPattern::BuildGridStateInfo(std::unique_ptr<JsonValue>& json)
+void GridPattern::BuildGridStateInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
 {
     auto property = GetLayoutProperty<GridLayoutProperty>();
     CHECK_NULL_VOID(property);
-    json->Put("GridLayoutOptions", property->HasLayoutOptions() ? GetIrregularIndexesString().c_str() : "null");
+    if (!config.IsPublicTree() || property->HasLayoutOptions()) {
+        json->Put(
+            "GridLayoutOptions", property->HasLayoutOptions() ? GetIrregularIndexesString(config).c_str() : "null");
+    }
+    if (config.IsPublicTree()) {
+        return;
+    }
     json->Put("supportAnimation", supportAnimation_);
     json->Put("isConfigScrollable", isConfigScrollable_);
     json->Put("lastCrossCount",
@@ -2139,57 +2609,54 @@ void GridPattern::BuildGridStateInfo(std::unique_ptr<JsonValue>& json)
     json->Put("scrollStop", std::to_string(scrollStop_).c_str());
 }
 
-void GridPattern::BuildGridOffsetInfo(std::unique_ptr<JsonValue>& json)
+void GridPattern::BuildGridOffsetInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
 {
-    json->Put("prevHeight", info_.prevHeight_);
-    json->Put("currentHeight", info_.currentHeight_);
-    json->Put("endHeight", endHeight_);
+    if (!config.IsPublicTree()) {
+        json->Put("prevHeight", info_.prevHeight_);
+        json->Put("currentHeight", info_.currentHeight_);
+        json->Put("endHeight", endHeight_);
+    }
     json->Put("currentOffset", std::to_string(info_.currentOffset_).c_str());
-    json->Put("prevOffset", std::to_string(info_.prevOffset_).c_str());
-    json->Put("lastMainSize", std::to_string(info_.lastMainSize_).c_str());
-    json->Put("totalHeightOfItemsInView", std::to_string(info_.totalHeightOfItemsInView_).c_str());
-    json->Put("startFixOffset", std::to_string(info_.startFixOffset_).c_str());
-    json->Put("endFixOffset", std::to_string(info_.endFixOffset_).c_str());
+    if (!config.IsPublicTree()) {
+        json->Put("prevOffset", std::to_string(info_.prevOffset_).c_str());
+        json->Put("lastMainSize", std::to_string(info_.lastMainSize_).c_str());
+        json->Put("totalHeightOfItemsInView", std::to_string(info_.totalHeightOfItemsInView_).c_str());
+        json->Put("startFixOffset", std::to_string(info_.startFixOffset_).c_str());
+        json->Put("endFixOffset", std::to_string(info_.endFixOffset_).c_str());
+    }
     json->Put("contentEndPadding", std::to_string(info_.contentEndPadding_).c_str());
 }
 
-void GridPattern::BuildGridIndexInfo(std::unique_ptr<JsonValue>& json)
+void GridPattern::BuildGridIndexInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
 {
     json->Put("startIndex", info_.startIndex_);
     json->Put("endIndex", info_.endIndex_);
-    json->Put("reportStartIndex", info_.ReportStartIndex());
-    json->Put("reportEndIndex", info_.ReportEndIndex());
-    json->Put("jumpIndex", info_.jumpIndex_);
+    if (!config.IsPublicTree()) {
+        json->Put("reportStartIndex", info_.ReportStartIndex());
+        json->Put("reportEndIndex", info_.ReportEndIndex());
+        json->Put("jumpIndex", info_.jumpIndex_);
+    }
     json->Put("crossCount", info_.crossCount_);
-    json->Put("childrenCount", info_.childrenCount_);
+    if (!config.IsPublicTree()) {
+        json->Put("childrenCount", info_.childrenCount_);
+    }
 }
 
-void GridPattern::BuildGridLayoutPropertyInfo(std::unique_ptr<JsonValue>& json)
+void GridPattern::BuildGridLayoutPropertyInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
 {
     auto property = GetLayoutProperty<GridLayoutProperty>();
     CHECK_NULL_VOID(property);
-    json->Put("RowsTemplate", property->GetRowsTemplate().value_or("").c_str());
-    json->Put("ColumnsTemplate", property->GetColumnsTemplate().value_or("").c_str());
-    json->Put("RowsGap",
-        property->GetRowsGap().has_value() ? std::to_string(property->GetRowsGap().value().Value()).c_str() : "null");
-    json->Put("ColumnsGap",
-        property->GetColumnsGap().has_value() ? std::to_string(property->GetColumnsGap().value().Value()).c_str()
-                                              : "null");
-    json->Put("CachedCount",
-        property->GetCachedCount().has_value() ? std::to_string(property->GetCachedCount().value()).c_str() : "null");
-    json->Put("ShowCache", std::to_string(property->GetShowCachedItemsValue(false)).c_str());
-    json->Put("MaxCount",
-        property->GetMaxCount().has_value() ? std::to_string(property->GetMaxCount().value()).c_str() : "null");
-    json->Put("MinCount",
-        property->GetMinCount().has_value() ? std::to_string(property->GetMinCount().value()).c_str() : "null");
-    json->Put("CellLength",
-        property->GetCellLength().has_value() ? std::to_string(property->GetCellLength().value()).c_str() : "null");
-    json->Put("Editable",
-        property->GetEditable().has_value() ? std::to_string(property->GetEditable().value()).c_str() : "null");
-    json->Put("ScrollEnabled", property->GetScrollEnabled().has_value()
-                                   ? std::to_string(property->GetScrollEnabled().value()).c_str()
-                                   : "null");
-    json->Put("AlignItems", property->GetAlignItems() ? "GridItemAlignment.STRETCH" : "GridItemAlignment.DEFAULT");
+    DumpAdvanceGridTemplateInfo(json, config);
+    if (!config.IsPublicTree() || (config.functionalProperties && property->GetCachedCount().has_value())) {
+        json->Put("CachedCount", property->GetCachedCount().has_value()
+                                     ? std::to_string(property->GetCachedCount().value()).c_str()
+                                     : "null");
+    }
+    if (!config.IsPublicTree() || (config.functionalProperties)) {
+        json->Put("ShowCache", std::to_string(property->GetShowCachedItemsValue(false)).c_str());
+    }
+    DumpAdvanceGridSizeInfo(json, config);
+    DumpAdvanceGridInteractionInfo(json, config);
 }
 
 SizeF GridPattern::GetChildrenExpandedSize()

@@ -57,6 +57,7 @@
 #include "arkweb_utils.h"
 #include "bridge/common/utils/engine_helper.h"
 #include "core/accessibility/accessibility_manager.h"
+#include "core/components_ng/base/cmp_accessibility_registry.h"
 #include "core/common/ace_engine_ext.h"
 #include "core/common/ai/image_analyzer_manager.h"
 #include "core/common/container.h"
@@ -679,6 +680,12 @@ constexpr int32_t ZOOM_CONVERT_NUM = 10;
 constexpr int32_t POPUP_CALCULATE_RATIO = 2;
 constexpr int32_t MIN_ACCESSIBILITY_FOCUS_SIZE = 2;
 constexpr int32_t MENU_WINDOW_ENTER_LIMIT_TIME = 300;
+constexpr int32_t MAX_ACCESSIBILITY_TREE_DEPTH = 256;
+constexpr int32_t IMAGE_RENDERING_AUTO = 0;
+constexpr int32_t IMAGE_RENDERING_OPTIMIZE_SPEED = 1;
+constexpr int32_t IMAGE_RENDERING_OPTIMIZE_QUALITY = 2;
+constexpr int32_t IMAGE_RENDERING_PIXELATED = 3;
+constexpr int32_t IMAGE_RENDERING_WEBKIT_OPTIMIZE_CONTRAST = 4;
 
 constexpr int32_t PINCH_START_TYPE = 1;
 constexpr int32_t PINCH_UPDATE_TYPE = 3;
@@ -2876,10 +2883,14 @@ NG::DragDropInfo WebPattern::HandleOnDragStart(const RefPtr<OHOS::Ace::DragEvent
         std::string htmlContent = delegate_->dragData_->GetFragmentHtml();
         std::string linkUrl = delegate_->dragData_->GetLinkURL();
         std::string linkTitle = delegate_->dragData_->GetLinkTitle();
+        std::string fileUri;
         if (!fileName.empty()) {
-            OnDragFileNameStart(aceUnifiedData, fileName);
+            fileUri = OnDragFileNameStart(aceUnifiedData, fileName);
         } else {
             TAG_LOGW(AceLogTag::ACE_WEB, "DragDrop event start, dragdata has no image file uri, just pass");
+        }
+        if (!fileUri.empty() && !htmlContent.empty()) {
+            RewriteHtmlImgSrc(htmlContent, fileUri);
         }
         if (!plainContent.empty()) {
             isDragEndMenuShow_ = true;
@@ -2902,7 +2913,28 @@ NG::DragDropInfo WebPattern::HandleOnDragStart(const RefPtr<OHOS::Ace::DragEvent
     return dragDropInfo;
 }
 
-void WebPattern::OnDragFileNameStart(const RefPtr<UnifiedData>& aceUnifiedData, const std::string& fileName)
+void WebPattern::RewriteHtmlImgSrc(std::string& htmlContent, const std::string& fileUri)
+{
+    // HTML from Blink CreateMarkup is lowercase double-quoted: <img src="..." style="...">
+    // Match " src=\"" (space-prefixed) to avoid matching data-src or other attributes containing "src"
+    auto imgPos = htmlContent.find("<img");
+    if (imgPos == std::string::npos) {
+        return;
+    }
+    auto srcPos = htmlContent.find(" src=\"", imgPos);
+    if (srcPos == std::string::npos) {
+        return;
+    }
+    srcPos += sizeof(" src=\"") - 1;
+    auto srcEnd = htmlContent.find("\"", srcPos);
+    if (srcEnd == std::string::npos) {
+        return;
+    }
+    htmlContent.replace(srcPos, srcEnd - srcPos, fileUri);
+    TAG_LOGD(AceLogTag::ACE_WEB, "RewriteHtmlImgSrc rewrote html img src");
+}
+
+std::string WebPattern::OnDragFileNameStart(const RefPtr<UnifiedData>& aceUnifiedData, const std::string& fileName)
 {
     isDragEndMenuShow_ = false;
     std::string fullName;
@@ -2917,7 +2949,11 @@ void WebPattern::OnDragFileNameStart(const RefPtr<UnifiedData>& aceUnifiedData, 
     std::vector<std::string> urlVec;
     std::string udmfUri = fileUri.ToString();
     urlVec.emplace_back(udmfUri);
-    UdmfClient::GetInstance()->AddFileUriRecord(aceUnifiedData, urlVec);
+    if (!UdmfClient::GetInstance()->AddFileUriRecord(aceUnifiedData, urlVec)) {
+        TAG_LOGW(AceLogTag::ACE_WEB, "DragDrop event AddFileUriRecord failed, skip html img src rewrite");
+        return "";
+    }
+    return udmfUri;
 }
 
 void WebPattern::HandleOnDropMove(const RefPtr<OHOS::Ace::DragEvent>& info)
@@ -3665,6 +3701,24 @@ bool WebPattern::IsContextMenuShow()
            (contextMenuOverlay_ && contextMenuOverlay_->IsCurrentMenuVisibile());
 }
 
+bool WebPattern::IsShouldTriggerBack(const KeyEvent& event, bool isUsed)
+{
+    bool isEscKey = event.code == KeyCode::KEY_ESCAPE;
+    bool isKeyDown = event.action == KeyAction::DOWN;
+    bool isKeyUp = event.action == KeyAction::UP;
+    if (isEscKey && isKeyDown) {
+        isEscKeyDownConsumed_ = isUsed;
+    }
+    bool shouldTriggerBack = false;
+    if (isEscKey && isKeyUp) {
+        if (!isEscKeyDownConsumed_ && !isUsed) {
+            shouldTriggerBack = true;
+        }
+        isEscKeyDownConsumed_ = true;
+    }
+    return shouldTriggerBack;
+}
+
 bool WebPattern::HandleEscToBackSupport(PipelineContext* pipeline)
 {
     // 1. FullScreen
@@ -3707,6 +3761,14 @@ bool WebPattern::HandleKeyEvent(const KeyEvent& keyEvent)
     }
     if (keyEvent.code == KeyCode::KEY_ESCAPE && keyEvent.action == KeyAction::DOWN) {
         isEscKeyDownConsumed_ = false;
+        auto host = GetHost();
+        CHECK_NULL_RETURN(host, false);
+        auto pipelineContext = host->GetContext();
+        if (pipelineContext) {
+            auto overlayManager = pipelineContext->GetOverlayManager();
+            isEscKeyDownConsumed_ = overlayManager && dataListNodeId_.has_value() &&
+                                    overlayManager->GetMenuNode(dataListNodeId_.value()) != nullptr;
+        }
     }
     bool ret = false;
     auto host = GetHost();
@@ -3806,17 +3868,16 @@ void WebPattern::KeyboardReDispatch(
         TAG_LOGW(AceLogTag::ACE_WEB, "KeyEvent is not find keycode");
         return;
     }
-    if (keyEvent->code == KeyCode::KEY_ESCAPE && keyEvent->action == KeyAction::DOWN) {
-        isEscKeyDownConsumed_ = isUsed;
-    }
-    if (keyEvent->code == KeyCode::KEY_ESCAPE && keyEvent->action == KeyAction::UP) {
-        if(!isUsed && !isEscKeyDownConsumed_ && system::GetBoolParameter(std::string(ESC_TO_BACK_SUPPORT), false)) {
-            if(HandleEscToBackSupport(pipelineContext)) {
+    bool isEscKey = keyEvent->code == KeyCode::KEY_ESCAPE;
+    if (isEscKey && system::GetBoolParameter(std::string(ESC_TO_BACK_SUPPORT), false)) {
+        if (IsShouldTriggerBack(*keyEvent, isUsed)) {
+            if (HandleEscToBackSupport(pipelineContext)) {
                 webKeyEvent_.erase((++keyEvent).base());
                 return;
             }
         }
     }
+
     if (!isUsed) {
         taskExecutor->PostTask([context = AceType::WeakClaim(pipelineContext),
             event = *keyEvent] () {
@@ -4667,6 +4728,26 @@ void WebPattern::OnScrollBarColorUpdate(const std::string& value)
     }
 }
 
+void WebPattern::OnCaretColorUpdate(const Color& value)
+{
+    if (delegate_) {
+        delegate_->UpdateCaretColor(value);
+    }
+    if (webSelectOverlay_) {
+        webSelectOverlay_->UpdateHandleColor();
+    }
+}
+
+void WebPattern::UpdatePropertyImpl(const std::string& key, RefPtr<PropertyValueBase> value)
+{
+    if (key != "WebCaretColor" || !value) {
+        return;
+    }
+    if (auto color = std::get_if<Color>(&(value->GetValue()))) {
+        UpdateCaretColor(*color);
+    }
+}
+
 void WebPattern::OnDefaultTextEncodingFormatUpdate(const std::string& value)
 {
     if (delegate_) {
@@ -4688,6 +4769,17 @@ void WebPattern::OnForceEnableZoomUpdate(bool isEnabled)
     if (delegate_) {
         TAG_LOGI(AceLogTag::ACE_WEB, "SetForceEnableZoom :%{public}d", isEnabled);
         delegate_->SetForceEnableZoom(isEnabled);
+    }
+}
+
+void WebPattern::OnFlingSpeedLimitUpdate(float speedLimit)
+{
+    // M114 engine version does not support FlingSpeedLimit; skip is expected.
+    RETURN_IF_CALLING_FROM_M114();
+    TAG_LOGD(AceLogTag::ACE_WEB, "OnFlingSpeedLimitUpdate speedLimit=%{public}f", speedLimit);
+    if (delegate_) {
+        TAG_LOGD(AceLogTag::ACE_WEB, "SetFlingSpeedLimit :%{public}f", speedLimit);
+        delegate_->SetFlingSpeedLimit(speedLimit);
     }
 }
 
@@ -4906,6 +4998,9 @@ void WebPattern::OnModifyDone()
         delegate_->UpdateHorizontalScrollBarAccess(GetHorizontalScrollBarAccessEnabledValue(true));
         delegate_->UpdateVerticalScrollBarAccess(GetVerticalScrollBarAccessEnabledValue(true));
         delegate_->UpdateScrollBarColor(GetScrollBarColorValue(DEFAULT_SCROLLBAR_COLOR));
+        if (HasCaretColor()) {
+            delegate_->UpdateCaretColor(GetCaretColorValue(Color()));
+        }
         delegate_->UpdateOverlayScrollbarEnabled(GetOverlayScrollbarEnabledValue(false));
         delegate_->UpdateOverScrollMode(GetOverScrollModeValue(OverScrollMode::NEVER));
         delegate_->UpdateBlurOnKeyboardHideMode(GetBlurOnKeyboardHideModeValue(BlurOnKeyboardHideMode::SILENT));
@@ -4935,6 +5030,7 @@ void WebPattern::OnModifyDone()
             delegate_->UpdateBlankScreenDetectionConfig(
                 config.enable, config.detectionTiming, config.detectionMethods, config.contentfulNodesCountThreshold);
         }
+        delegate_->UpdateWebBlankScreenMonitorEnabled(GetWebBlankScreenMonitorEnabledValue(false));
         delegate_->UpdateEnableImageAnalyzer(GetEnableImageAnalyzerValue(true));
         isAllowWindowOpenMethod_ = SystemProperties::GetAllowWindowOpenMethodEnabled();
         delegate_->UpdateAllowWindowOpenMethod(GetAllowWindowOpenMethodValue(isAllowWindowOpenMethod_));
@@ -5896,6 +5992,14 @@ void WebPattern::OnBlankScreenDetectionConfigUpdate(const BlankScreenDetectionCo
     if (delegate_) {
         delegate_->UpdateBlankScreenDetectionConfig(
             config.enable, config.detectionTiming, config.detectionMethods, config.contentfulNodesCountThreshold);
+    }
+}
+
+void WebPattern::OnWebBlankScreenMonitorEnabledUpdate(bool enable)
+{
+    RETURN_IF_CALLING_FROM_M132();
+    if (delegate_) {
+        delegate_->UpdateWebBlankScreenMonitorEnabled(enable);
     }
 }
 
@@ -9707,14 +9811,7 @@ void WebPattern::WebNodeInfoToJsonValue(std::shared_ptr<OHOS::Ace::JsonValue>& j
     JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::ERROR, webNodeInfo->GetError());
     JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::CHILD_IDS, VectorIntToString(webNodeInfo->GetChildIds()));
     JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::PARENT_ID, webNodeInfo->GetParentId(), -1);
-    JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::GRID_ROWS, webNodeInfo->GetGridRows(), -1);
-    JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::GRID_COLS, webNodeInfo->GetGridColumns(), -1);
-    JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::GRID_SEL_MODE, webNodeInfo->GetGridSelectedMode(), -1);
-    JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::GRID_ITEM_ROW, webNodeInfo->GetGridItemRow(), -1);
-    JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::GRID_ITEM_ROW_SPAN, webNodeInfo->GetGridItemRowSpan(), -1);
-    JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::GRID_ITEM_COL, webNodeInfo->GetGridItemColumn(), -1);
-    JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::GRID_ITEM_COL_SPAN,
-        webNodeInfo->GetGridItemColumnSpan(), -1);
+    PutGridAccessibilityFields(jsonNode, webNodeInfo);
     JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::PAGE_ID, webNodeInfo->GetPageId(), -1);
 
     if (webNodeInfo->GetRectWidth() != 0 || webNodeInfo->GetRectHeight() != 0) {
@@ -9741,7 +9838,34 @@ void WebPattern::WebNodeInfoToJsonValue(std::shared_ptr<OHOS::Ace::JsonValue>& j
     JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::DELETABLE, webNodeInfo->GetIsDeletable());
     JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::FOCUS, webNodeInfo->GetIsAccessibilityFocus());
     JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::NODE_TAG, nodeTag);
+    PutCssAccessibilityFields(jsonNode, webNodeInfo);
     isArray ? jsonNodeArray->PutRef(std::move(jsonNode)) : jsonNodeArray->PutRef(nodeTag.c_str(), std::move(jsonNode));
+}
+
+void WebPattern::PutGridAccessibilityFields(
+    std::unique_ptr<OHOS::Ace::JsonValue>& jsonNode, std::shared_ptr<OHOS::NWeb::NWebAccessibilityNodeInfo> webNodeInfo)
+{
+    JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::GRID_ROWS, webNodeInfo->GetGridRows(), -1);
+    JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::GRID_COLS, webNodeInfo->GetGridColumns(), -1);
+    JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::GRID_SEL_MODE, webNodeInfo->GetGridSelectedMode(), -1);
+    JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::GRID_ITEM_ROW, webNodeInfo->GetGridItemRow(), -1);
+    JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::GRID_ITEM_ROW_SPAN, webNodeInfo->GetGridItemRowSpan(), -1);
+    JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::GRID_ITEM_COL, webNodeInfo->GetGridItemColumn(), -1);
+    JsonNodePutDefaultValue(
+        jsonNode, WebAccessibilityType::GRID_ITEM_COL_SPAN, webNodeInfo->GetGridItemColumnSpan(), -1);
+}
+
+void WebPattern::PutCssAccessibilityFields(
+    std::unique_ptr<OHOS::Ace::JsonValue>& jsonNode, std::shared_ptr<OHOS::NWeb::NWebAccessibilityNodeInfo> webNodeInfo)
+{
+    JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::ZINDEX, webNodeInfo->GetZIndex());
+    JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::FONT_SIZE, webNodeInfo->GetFontSize());
+    JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::IMAGE_RENDERING, webNodeInfo->GetImageRendering());
+    JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::BG_SIZE_TYPE, webNodeInfo->GetBgSizeType());
+    JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::BG_COLOR, CssBgColorToHexString(webNodeInfo->GetBgColor()));
+    JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::CSS_VISIBLE, webNodeInfo->GetCssVisible());
+    JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::BG_IMG, webNodeInfo->GetBgImg());
+    JsonNodePutDefaultValue(jsonNode, WebAccessibilityType::BG_SIZE, webNodeInfo->GetBgSize());
 }
 
 void WebPattern::GetWebAllInfosImpl(WebNodeInfoCallback cb, int32_t webId, bool needFilter)
@@ -9805,6 +9929,127 @@ void WebPattern::GetAllWebAccessibilityNodeInfos(WebNodeInfoCallback cb, int32_t
         TAG_LOGD(AceLogTag::ACE_WEB, "GetAllAccessibilityInfo time cost: %{public}f", diff.count());
         },
         TaskExecutor::TaskType::UI, WEB_ACCESSIBILITY_DELAY_TIME, "GetAllWebAccessibilityNodeInfos");
+}
+
+std::string WebPattern::CssBgColorToHexString(uint32_t color)
+{
+    std::ostringstream oss;
+    oss << "0x" << std::uppercase << std::hex << std::setfill('0') << std::setw(8) << color;
+    return oss.str();
+}
+
+std::string WebPattern::CssFontSizeToString(int32_t fontSize)
+{
+    return std::to_string(fontSize) + "px";
+}
+
+std::string WebPattern::CssImageRenderingToString(int32_t imageRendering)
+{
+    switch (imageRendering) {
+        case IMAGE_RENDERING_AUTO:
+            return "auto";
+        case IMAGE_RENDERING_OPTIMIZE_SPEED:
+            return "optimizespeed";
+        case IMAGE_RENDERING_OPTIMIZE_QUALITY:
+            return "optimizequality";
+        case IMAGE_RENDERING_PIXELATED:
+            return "pixelated";
+        case IMAGE_RENDERING_WEBKIT_OPTIMIZE_CONTRAST:
+            return "webkit-optimize-contrast";
+        default:
+            TAG_LOGW(AceLogTag::ACE_WEB, "Unknown imageRendering value:%{public}d", imageRendering);
+            return "auto";
+    }
+}
+
+void WebPattern::WebNodeInfoToJsonValueAccessibility(std::shared_ptr<OHOS::Ace::JsonValue>& jsonNode,
+    std::shared_ptr<OHOS::NWeb::NWebAccessibilityNodeInfo> webNodeInfo, int32_t depth)
+{
+    CHECK_NULL_VOID(webNodeInfo);
+    CHECK_NULL_VOID(jsonNode);
+    if (depth > MAX_ACCESSIBILITY_TREE_DEPTH) {
+        TAG_LOGW(AceLogTag::ACE_WEB, "Accessibility tree depth exceeds limit:%{public}d", depth);
+        return;
+    }
+    jsonNode->Put("$type", webNodeInfo->GetComponentType().c_str());
+    jsonNode->Put("type", "build-in");
+    std::string idStr = std::to_string(webNodeInfo->GetAccessibilityId());
+    jsonNode->Put("$ID", idStr.c_str());
+
+    int32_t rectX = webNodeInfo->GetRectX();
+    int32_t rectY = webNodeInfo->GetRectY();
+    int32_t rectWidth = webNodeInfo->GetRectWidth();
+    int32_t rectHeight = webNodeInfo->GetRectHeight();
+    std::string rectStr = "[" + std::to_string(rectX) + ", " + std::to_string(rectY) + ", " +
+                          std::to_string(rectWidth) + ", " + std::to_string(rectHeight) + "]";
+    jsonNode->Put("$rect", rectStr.c_str());
+
+    auto attrsJson = JsonUtil::Create(true);
+    attrsJson->Put("text", webNodeInfo->GetContent().c_str());
+    attrsJson->Put("cssVisible", webNodeInfo->GetCssVisible());
+    std::string fontSizeStr = CssFontSizeToString(webNodeInfo->GetFontSize());
+    attrsJson->Put("fontSize", fontSizeStr.c_str());
+    std::string bgColorStr = CssBgColorToHexString(webNodeInfo->GetBgColor());
+    attrsJson->Put("backgroundColor", bgColorStr.c_str());
+    attrsJson->Put("backgroundImg", webNodeInfo->GetBgImg().c_str());
+    attrsJson->Put("backgroundSize", webNodeInfo->GetBgSize().c_str());
+    std::string imageRenderingStr = CssImageRenderingToString(webNodeInfo->GetImageRendering());
+    attrsJson->Put("imageRendering", imageRenderingStr.c_str());
+    std::string zIndexStr = std::to_string(webNodeInfo->GetZIndex());
+    attrsJson->Put("zindex", zIndexStr.c_str());
+    jsonNode->Put("$attrs", attrsJson);
+
+    auto childrenJson = JsonUtil::CreateArray(true);
+    auto childIds = webNodeInfo->GetChildIds();
+    for (auto childId : childIds) {
+        auto childNodeInfo = delegate_->GetAccessibilityNodeInfoById(childId);
+        if (childNodeInfo) {
+            std::shared_ptr<JsonValue> childJsonShared = JsonUtil::Create(true);
+            WebNodeInfoToJsonValueAccessibility(childJsonShared, childNodeInfo, depth + 1);
+            childrenJson->PutRef(std::move(childJsonShared));
+        }
+    }
+    jsonNode->Put("$children", childrenJson);
+}
+
+void WebPattern::ToJsonValueAccessibilityImpl(WebNodeInfoCallback cb, int32_t webId)
+{
+    CHECK_NULL_VOID(delegate_);
+    std::shared_ptr<OHOS::NWeb::NWebAccessibilityNodeInfo> rootWebNode = delegate_->GetAccessibilityNodeInfoById(-1);
+    CHECK_NULL_VOID(rootWebNode);
+    std::shared_ptr<JsonValue> jsonRoot = JsonUtil::Create(true);
+    WebNodeInfoToJsonValueAccessibility(jsonRoot, rootWebNode, 0);
+    int rootChildCount = static_cast<int>(rootWebNode->GetChildIds().size());
+    TAG_LOGD(AceLogTag::ACE_WEB, "ToJsonValueAccessibilityImpl root child count:%{public}d", rootChildCount);
+    cb(jsonRoot, webId);
+}
+
+void WebPattern::ToJsonValueAccessibility(WebNodeInfoCallback cb, int32_t webId)
+{
+    CHECK_NULL_VOID(cb);
+    auto pipelineContext = GetContext();
+    CHECK_NULL_VOID(pipelineContext);
+    auto taskExecutor = pipelineContext->GetTaskExecutor();
+    CHECK_NULL_VOID(taskExecutor);
+    if (taskExecutor->WillRunOnCurrentThread(TaskExecutor::TaskType::UI)) {
+        ToJsonValueAccessibilityImpl(cb, webId);
+    } else {
+        taskExecutor->PostTask(
+            [weak = WeakClaim(this), cb, webId]() {
+                auto pattern = weak.Upgrade();
+                CHECK_NULL_VOID(pattern);
+                pattern->ToJsonValueAccessibilityImpl(cb, webId);
+            },
+            TaskExecutor::TaskType::UI, "ArkUIWebToJsonValueAccessibility");
+    }
+}
+
+std::string WebPattern::GetAccessibilityJsonString(int32_t webId)
+{
+    std::string result;
+    ToJsonValueAccessibility(
+        [&result](std::shared_ptr<JsonValue>& jsonRoot, int32_t webId) { result = jsonRoot->ToString(); }, webId);
+    return result;
 }
 
 void WebPattern::RegisterWebComponentClickCallback(WebComponentClickCallback&& callback)
@@ -10011,7 +10256,15 @@ void WebPattern::InitializeAccessibility()
     int64_t accessibilityId = frameNode->GetAccessibilityId();
     auto pipeline = PipelineContext::GetCurrentContext();
     CHECK_NULL_VOID(pipeline);
-    auto accessibilityManager = pipeline->GetAccessibilityManager();
+    auto mainAccessibilityManager = pipeline->GetAccessibilityManager();
+    CHECK_NULL_VOID(mainAccessibilityManager);
+    auto accessibilityManager = mainAccessibilityManager;
+    if (CmpAccessibility::CmpAccessibilityRegistry::HasAnySubAM()) {
+        accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(frameNode);
+        if (!accessibilityManager) {
+            accessibilityManager = mainAccessibilityManager;
+        }
+    }
     CHECK_NULL_VOID(accessibilityManager);
     accessibilityChildTreeCallback_[instanceId_] = std::make_shared<WebAccessibilityChildTreeCallback>(
         WeakClaim(this), frameNode->GetAccessibilityId());
@@ -10035,7 +10288,15 @@ void WebPattern::UninitializeAccessibility()
         pipeline = pipeline_.Upgrade();
     }
     CHECK_NULL_VOID(pipeline);
-    auto accessibilityManager = pipeline->GetAccessibilityManager();
+    auto mainAccessibilityManager = pipeline->GetAccessibilityManager();
+    CHECK_NULL_VOID(mainAccessibilityManager);
+    auto accessibilityManager = mainAccessibilityManager;
+    if (CmpAccessibility::CmpAccessibilityRegistry::HasAnySubAM()) {
+        accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(frameNode);
+        if (!accessibilityManager) {
+            accessibilityManager = mainAccessibilityManager;
+        }
+    }
     CHECK_NULL_VOID(accessibilityManager);
     if (accessibilityManager->IsRegister()) {
         if (accessibilityChildTreeCallback_.find(instanceId_) == accessibilityChildTreeCallback_.end() ||
@@ -10063,15 +10324,23 @@ void WebPattern::OnSetAccessibilityChildTree(int32_t childWindowId, int32_t chil
 bool WebPattern::OnAccessibilityChildTreeRegister()
 {
     ContainerScope scope(instanceId_);
+    auto frameNode = frameNode_.Upgrade();
+    CHECK_NULL_RETURN(frameNode, false);
     auto pipeline = PipelineContext::GetCurrentContext();
     CHECK_NULL_RETURN(pipeline, false);
-    auto accessibilityManager = pipeline->GetAccessibilityManager();
+    auto mainAccessibilityManager = pipeline->GetAccessibilityManager();
+    CHECK_NULL_RETURN(mainAccessibilityManager, false);
+    auto accessibilityManager = mainAccessibilityManager;
+    if (CmpAccessibility::CmpAccessibilityRegistry::HasAnySubAM()) {
+        accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(frameNode);
+        if (!accessibilityManager) {
+            accessibilityManager = mainAccessibilityManager;
+        }
+    }
     CHECK_NULL_RETURN(accessibilityManager, false);
     if (accessibilitySessionAdapter_ == nullptr) {
         accessibilitySessionAdapter_ = AceType::MakeRefPtr<WebAccessibilitySessionAdapter>(WeakClaim(this));
     }
-    auto frameNode = frameNode_.Upgrade();
-    CHECK_NULL_RETURN(frameNode, false);
     int64_t accessibilityId = frameNode->GetAccessibilityId();
     return accessibilityManager->RegisterWebInteractionOperationAsChildTree(accessibilityId, WeakClaim(this));
 }
@@ -10079,12 +10348,21 @@ bool WebPattern::OnAccessibilityChildTreeRegister()
 bool WebPattern::OnAccessibilityChildTreeDeregister()
 {
     ContainerScope scope(instanceId_);
+    auto frameNode = frameNode_.Upgrade();
     auto pipeline = PipelineContext::GetCurrentContext();
     if (!pipeline) {
         pipeline = pipeline_.Upgrade();
     }
     CHECK_NULL_RETURN(pipeline, false);
-    auto accessibilityManager = pipeline->GetAccessibilityManager();
+    auto mainAccessibilityManager = pipeline->GetAccessibilityManager();
+    CHECK_NULL_RETURN(mainAccessibilityManager, false);
+    auto accessibilityManager = mainAccessibilityManager;
+    if (CmpAccessibility::CmpAccessibilityRegistry::HasAnySubAM()) {
+        accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(frameNode);
+        if (!accessibilityManager) {
+            accessibilityManager = mainAccessibilityManager;
+        }
+    }
     CHECK_NULL_RETURN(accessibilityManager, false);
     if (treeId_ == 0) {
         TAG_LOGD(AceLogTag::ACE_WEB, "OnAccessibilityChildTreeDeregister: treeId is 0.");

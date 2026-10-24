@@ -254,6 +254,14 @@ int32_t UiContentStub::OnRemoteRequest(uint32_t code, MessageParcel& data, Messa
             GetPageSceneInner(data, reply, option);
             break;
         }
+        case GET_NAVIGATION_CONTENT_BY_POINT: {
+            GetNavigationContentByPointInner(data, reply, option);
+            break;
+        }
+        case GET_LAZY_FOREACH_DATA_BY_POINT: {
+            GetLazyForEachDataByPointInner(data, reply, option);
+            break;
+        }
         default: {
             LOGI("ui_session unknown transaction code %{public}d", code);
             return IPCObjectStub::OnRemoteRequest(code, data, reply, option);
@@ -308,6 +316,29 @@ int32_t UiContentStub::GetPageSceneInner(MessageParcel& data, MessageParcel& rep
 {
     std::string ruleJsonOrRuleSetId = data.ReadString();
     reply.WriteInt32(GetPageScene(ruleJsonOrRuleSetId, nullptr));
+    return NO_ERROR;
+}
+
+int32_t UiContentStub::GetNavigationContentByPointInner(
+    MessageParcel& data, MessageParcel& reply, MessageOption& option)
+{
+    float x = data.ReadFloat();
+    float y = data.ReadFloat();
+    std::string pattern = data.ReadString();
+    int32_t processId = IPCSkeleton::GetCallingRealPid();
+    UiSessionManager::GetInstance()->SaveProcessId("componentTreeQuery", processId);
+    reply.WriteInt32(GetNavigationContentByPoint(x, y, pattern, nullptr));
+    return NO_ERROR;
+}
+
+int32_t UiContentStub::GetLazyForEachDataByPointInner(
+    MessageParcel& data, MessageParcel& reply, MessageOption& option)
+{
+    float x = data.ReadFloat();
+    float y = data.ReadFloat();
+    int32_t processId = IPCSkeleton::GetCallingRealPid();
+    UiSessionManager::GetInstance()->SaveProcessId("lazyForEachQuery", processId);
+    reply.WriteInt32(GetLazyForEachDataByPoint(x, y, nullptr));
     return NO_ERROR;
 }
 

@@ -434,6 +434,8 @@ private:
     void UpdateTargetSize();
     bool GetShadowFromTheme(ShadowStyle shadowStyle, Shadow& shadow);
     void ShowScrollBar();
+    void RegisterScrollToSelectedTask();
+    void ScrollToSelectedOption();
     void UpdateMenuBorderStyle(const RefPtr<FrameNode>& menu);
     std::vector<RefPtr<FrameNode>> options_;
     std::vector<RefPtr<FrameNode>> builderOptions_;

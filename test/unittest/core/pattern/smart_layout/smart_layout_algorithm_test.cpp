@@ -94,7 +94,8 @@ public:
         return layoutProperty_;
     }
 
-    RefPtr<LayoutWrapper> GetOrCreateChildByIndex(uint32_t index, bool addToRenderTree, bool isCache) override
+    RefPtr<LayoutWrapper> GetOrCreateChildByIndex(
+        uint32_t index, bool addToRenderTree, bool isCache, bool allowPlaceholderSubstitution) override
     {
         return nullptr;
     }

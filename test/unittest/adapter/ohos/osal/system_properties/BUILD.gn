@@ -29,7 +29,6 @@ ohos_unittest("system_properties_unittest") {
     "system_properties_test.cpp",
 
     # mock
-    "mock_material_utils.cpp",
     "mock_window_utils.cpp",
   ]
 

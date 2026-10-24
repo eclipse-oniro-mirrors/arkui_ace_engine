@@ -60,7 +60,7 @@ static constexpr uint32_t POPUP_UNCLICKED_BG_AREA_COLOR = 0x00000000;
 static constexpr uint32_t POPUP_BACKGROUND_COLOR_API_TWELVE = 0x66808080;
 static constexpr float HOVER_TEXT_SIZE_API_TWELVE = 10.0f;
 } // namespace
-class IndexerTheme : public virtual Theme {
+class IndexerTheme : public Theme {
     DECLARE_ACE_TYPE(IndexerTheme, Theme);
 
 public:

@@ -1997,8 +1997,7 @@ void SubwindowOhos::ResizeWindowForToast(const NG::ToastInfo& toastInfo)
     // for float window in landscape mode.
     auto needFollowParentWindowLayout = toastInfo.showMode == NG::ToastShowMode::TOP_MOST &&
                                         !parentContainer->IsSceneBoardWindow() &&
-                                        !(theme->GetExpandDisplay() || parentContainer->IsFreeMultiWindow()) &&
-                                        SystemProperties::GetDeviceOrientation() == DeviceOrientation::LANDSCAPE;
+                                        !(theme->GetExpandDisplay() || parentContainer->IsFreeMultiWindow());
     if (needFollowParentWindowLayout) {
         Rect rect;
         if (parentContainer->IsUIExtensionWindow()) {

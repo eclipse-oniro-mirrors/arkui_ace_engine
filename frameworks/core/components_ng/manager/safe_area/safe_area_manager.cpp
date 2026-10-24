@@ -116,6 +116,24 @@ bool SafeAreaManager::UpdateFloatNavSafeArea(const SafeAreaInsets& safeArea, NG:
     return true;
 }
 
+bool SafeAreaManager::UpdateTitleButtonSafeArea(
+    const SafeAreaInsets& safeArea, NG::OptionalSize<uint32_t> rootSize)
+{
+    auto safeAreaWithRoot = GenerateEdgeSafeAreaWithRoot(safeArea, rootSize);
+    if (titleButtonSafeArea_ == safeAreaWithRoot) {
+        return false;
+    }
+    ACE_SCOPED_TRACE("SafeAreaManager::UpdateTitleButtonSafeArea %s", safeAreaWithRoot.ToString().c_str());
+    titleButtonSafeArea_ = safeAreaWithRoot;
+    return true;
+}
+
+bool SafeAreaManager::CheckTitleButtonSafeArea(
+    const SafeAreaInsets& safeArea, NG::OptionalSize<uint32_t> rootSize)
+{
+    return titleButtonSafeArea_ != GenerateEdgeSafeAreaWithRoot(safeArea, rootSize);
+}
+
 bool SafeAreaManager::UpdateKeyboardSafeArea(float keyboardHeight, std::optional<uint32_t> rootHeight)
 {
     uint32_t bottom;
@@ -165,6 +183,9 @@ SafeAreaInsets SafeAreaManager::GetCombinedSafeArea(const SafeAreaExpandOpts& op
     }
     if (opts.type & SAFE_AREA_TYPE_SYSTEM) {
         res = res.Combine(systemSafeArea_).Combine(navSafeArea_).Combine(floatNavSafeArea_);
+        if (IsImmersiveStrategySet(ImmersiveStrategy::AVOID_WINDOW_CONTROLS)) {
+            res = res.Combine(titleButtonSafeArea_);
+        }
     }
     if (keyboardAvoidMode_ == KeyBoardAvoidMode::NONE) {
         return res;
@@ -333,13 +354,24 @@ SafeAreaInsets SafeAreaManager::GetFloatNavSafeArea() const
     return {};
 }
 
+SafeAreaInsets SafeAreaManager::GetTitleButtonSafeArea() const
+{
+    if (IsSafeAreaValid()) {
+        return titleButtonSafeArea_;
+    }
+    return {};
+}
+
 SafeAreaInsets SafeAreaManager::GetSafeArea() const
 {
     if (!IsSafeAreaValid()) {
         return {};
     }
     auto cutoutSafeArea = GetUseCutout() ? cutoutSafeArea_ : SafeAreaInsets();
-    return systemSafeArea_.Combine(cutoutSafeArea).Combine(navSafeArea_).Combine(floatNavSafeArea_);
+    auto titleButtonSafeArea = IsImmersiveStrategySet(ImmersiveStrategy::AVOID_WINDOW_CONTROLS)
+        ? titleButtonSafeArea_ : SafeAreaInsets();
+    return systemSafeArea_.Combine(cutoutSafeArea).Combine(navSafeArea_).Combine(floatNavSafeArea_)
+        .Combine(titleButtonSafeArea);
 }
 
 SafeAreaInsets SafeAreaManager::GetSafeAreaWithoutCutout() const
@@ -347,14 +379,19 @@ SafeAreaInsets SafeAreaManager::GetSafeAreaWithoutCutout() const
     if (!IsSafeAreaValid()) {
         return {};
     }
-    return systemSafeArea_.Combine(navSafeArea_).Combine(floatNavSafeArea_);
+    auto titleButtonSafeArea = IsImmersiveStrategySet(ImmersiveStrategy::AVOID_WINDOW_CONTROLS)
+        ? titleButtonSafeArea_ : SafeAreaInsets();
+    return systemSafeArea_.Combine(navSafeArea_).Combine(floatNavSafeArea_).Combine(titleButtonSafeArea);
 }
 
 SafeAreaInsets SafeAreaManager::GetSafeAreaWithoutProcess() const
 {
     auto cutoutSafeArea = GetUseCutout() ? cutoutSafeArea_ : SafeAreaInsets();
+    auto titleButtonSafeArea = IsImmersiveStrategySet(ImmersiveStrategy::AVOID_WINDOW_CONTROLS)
+        ? titleButtonSafeArea_ : SafeAreaInsets();
     if (!windowTypeConfig_.isSceneBoardWindow) {
-        return systemSafeArea_.Combine(cutoutSafeArea).Combine(navSafeArea_).Combine(floatNavSafeArea_);
+        return systemSafeArea_.Combine(cutoutSafeArea).Combine(navSafeArea_).Combine(floatNavSafeArea_)
+            .Combine(titleButtonSafeArea);
     }
     SafeAreaInsets scbSafeArea;
     if (scbSystemSafeArea_.has_value()) {
@@ -389,6 +426,9 @@ PaddingPropertyF SafeAreaManager::SafeAreaToPadding(bool withoutProcess, LayoutS
     bool includeKeyboard = ignoreType & LAYOUT_SAFE_AREA_TYPE_KEYBOARD;
     if (includeSystem) {
         combinedSafeArea = systemSafeArea_.Combine(cutoutSafeArea).Combine(navSafeArea_).Combine(floatNavSafeArea_);
+        if (IsImmersiveStrategySet(ImmersiveStrategy::AVOID_WINDOW_CONTROLS)) {
+            combinedSafeArea = combinedSafeArea.Combine(titleButtonSafeArea_);
+        }
     }
     if (includeKeyboard) {
         if (IsModeResize()) {
@@ -518,5 +558,10 @@ bool SafeAreaManager::CheckPageNeedAvoidKeyboard(const RefPtr<FrameNode>& frameN
     }
     CHECK_NULL_RETURN(overlay, true);
     return overlay->CheckPageNeedAvoidKeyboard();
+}
+
+bool SafeAreaManager::IsImmersiveEffectEnabled() const
+{
+    return false;
 }
 } // namespace OHOS::Ace::NG

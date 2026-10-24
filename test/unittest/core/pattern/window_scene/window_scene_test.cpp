@@ -39,6 +39,10 @@
 #include "core/components_ng/pattern/window_scene/scene/window_scene.h"
 #include "core/components_ng/pattern/window_scene/scene/window_scene_model.h"
 
+#ifdef USE_HILOG
+#include "hilog/log.h"
+#endif
+
 #undef private
 #undef protected
 
@@ -51,6 +55,15 @@ const std::string ABILITY_NAME = "MainAbility";
 const std::string BUNDLE_NAME = "com.example.helloworld";
 const std::string MODULE_NAME = "entry";
 const uint32_t WAIT_SYNC_IN_NS = 200000;
+
+#ifdef USE_HILOG
+std::string g_logMsg;
+void MyLogCallback(const LogType type, const LogLevel level, const unsigned int domain, const char* tag,
+    const char* msg)
+{
+    g_logMsg = msg;
+}
+#endif
 } // namespace
 
 class WindowSceneTest : public testing::Test {
@@ -898,6 +911,62 @@ HWTEST_F(WindowSceneTest, HideStartingWindowDefault02, TestSize.Level1)
      * @tc.steps: step3. Test and check
      */
     EXPECT_EQ(windowScene->session_->GetHidingStartingWindow(), true);
+}
+
+/**
+ * @tc.name: HideStartingWindowTimeout
+ * @tc.desc: Test HideStartingWindow timeout log format
+ * @tc.type: FUNC
+ */
+HWTEST_F(WindowSceneTest, HideStartingWindowTimeout, TestSize.Level2)
+{
+    /**
+     * @tc.steps: step1. Create windowScene with starting window.
+     */
+    Rosen::SessionInfo sessionInfo = {
+        .abilityName_ = ABILITY_NAME,
+        .bundleName_ = BUNDLE_NAME,
+        .moduleName_ = MODULE_NAME,
+        .startWindowType_ = Rosen::StartWindowType::DEFAULT,
+    };
+    auto windowScene = CreateWindowSceneForStartingWindowTest(sessionInfo);
+    ASSERT_NE(windowScene, nullptr);
+    ASSERT_NE(windowScene->startingWindow_, nullptr);
+
+#ifdef USE_HILOG
+    /**
+     * @tc.steps: step2. Setup HiLog callback and clear buffer.
+     */
+    g_logMsg.clear();
+    OH_LOG_SetCallback(MyLogCallback);
+
+    /**
+     * @tc.steps: step3. Call HideStartingWindow to trigger timeout task.
+     */
+    windowScene->HideStartingWindow();
+    EXPECT_EQ(windowScene->session_->GetHidingStartingWindow(), true);
+    usleep(WAIT_SYNC_IN_NS);
+
+    /**
+     * @tc.steps: step4. Get captured log and verify content.
+     */
+    if (g_logMsg.find("HideStartingWindow time out") != std::string::npos) {
+        EXPECT_TRUE(g_logMsg.find("timeout:") != std::string::npos)
+            << "Log should contain timeout field. Actual log: " << g_logMsg;
+    }
+
+    /**
+     * @tc.steps: step5. Cleanup HiLog callback.
+     */
+    OH_LOG_SetCallback(nullptr);
+    g_logMsg.clear();
+#else
+    /**
+     * @tc.steps: step2-3. Call HideStartingWindow (HiLog not available).
+     */
+    windowScene->HideStartingWindow();
+    EXPECT_EQ(windowScene->session_->GetHidingStartingWindow(), true);
+#endif
 }
 
 /**

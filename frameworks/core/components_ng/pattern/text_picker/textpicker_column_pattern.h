@@ -66,7 +66,7 @@ struct TextPickerOptionProperty {
     float nextDistance = 0.0f; // between the next item and itself when scroll down
 };
 
-class EventParam : public virtual AceType {
+class EventParam : public AceType {
     DECLARE_ACE_TYPE(EventParam, AceType);
 
 public:

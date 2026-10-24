@@ -10848,6 +10848,17 @@ ArkUINativeModuleValue CommonBridge::GetWindowHeightBreakpoint(ArkUIRuntimeCallI
     return panda::IntegerRef::NewFromUnsigned(vm, static_cast<uint32_t>(breakpoint));
 }
 
+ArkUINativeModuleValue CommonBridge::IsWindowInfoInitialized(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    auto context = PipelineBase::GetCurrentContext();
+    CHECK_NULL_RETURN(context, panda::BooleanRef::New(vm, false));
+    auto window = context->GetWindow();
+    CHECK_NULL_RETURN(window, panda::BooleanRef::New(vm, false));
+    return panda::BooleanRef::New(vm, window->IsWindowInfoInitialized());
+}
+
 ArkUINativeModuleValue CommonBridge::FreezeUINodeById(ArkUIRuntimeCallInfo* runtimeCallInfo)
 {
     EcmaVM* vm = runtimeCallInfo->GetVM();

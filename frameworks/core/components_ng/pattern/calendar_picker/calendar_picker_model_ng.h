@@ -44,6 +44,7 @@ public:
     void ClearBorderWidth() override;
     void ClearPadding() override;
     void SetMarkToday(bool isMarkToday) override;
+    void SetFirstDayOfWeek(int32_t firstDayOfWeek) override;
     void CalendarPickerRemoveResObj(const std::string& key) override;
 
     static void CreateCalendarPicker(const CalendarSettingData& settingData);
@@ -86,15 +87,19 @@ public:
     static std::map<std::size_t, std::string> GetDateNodeOrder(const CalendarSettingData& settingData);
     static void SetMarkToday(FrameNode* frameNode, bool isMarkToday);
     static bool GetMarkToday(FrameNode* frameNode);
+    static void SetFirstDayOfWeek(FrameNode* frameNode, int32_t firstDayOfWeek);
+    static int32_t GetFirstDayOfWeek(FrameNode* frameNode);
     static void SetDisabledDateRange(
         FrameNode* frameNode, const std::vector<std::pair<PickerDate, PickerDate>>& disabledDateRange);
     static std::string GetDisabledDateRange(FrameNode* frameNode);
     static void ParseEdgeAlignResObj(FrameNode* frameNode, const std::vector<RefPtr<ResourceObject>>& resArray);
     static void CalendarPickerRemoveResObj(FrameNode* frameNode, const std::string& key);
 
+    static std::string AddLeadingZeroToYear(uint32_t year);
+    static std::string AddLeadingZeroToDate(uint32_t value, int32_t minDigits);
+
 private:
     static void UpdateSelectedDateContent(FrameNode* frameNode, const PickerDate& selectedDate);
-    static std::string AddLeadingZeroToYear(uint32_t year);
     static void ParseNormalTextStyleResObj(FrameNode* frameNode, const PickerTextStyle& textStyleOpt);
 };
 } // namespace OHOS::Ace::NG

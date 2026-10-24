@@ -82,10 +82,10 @@ struct AnimationGroupView {
 
 // Builds an AnimationGroupView from an opaque C-API group handle.
 // Resolves duration/curve inheritance, precomputes keyframe segment
-// durations, and validates that no child uses a duration-independent curve.
+// durations, and validates that keyframe keyTimes are non-decreasing.
 // Returns ARKUI_ERROR_CODE_NO_ERROR on success, ARKUI_ERROR_CODE_PARAM_INVALID
-// if the handle is null, or ARKUI_ERROR_CODE_SUB_ANIMATION_INVALID if a child
-// uses a duration-independent curve.
+// if the handle is null, or ARKUI_ERROR_CODE_SUB_ANIMATION_INVALID if a
+// keyframe child has non-decreasing keyTimes violated.
 ArkUI_ErrorCode BuildAnimationGroupView(ArkUIAnimationGroupHandle group, AnimationGroupView& out);
 
 } // namespace OHOS::Ace::NG

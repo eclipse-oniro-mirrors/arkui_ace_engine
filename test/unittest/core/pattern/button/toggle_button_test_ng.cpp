@@ -33,6 +33,7 @@
 #include "core/components_ng/pattern/button/toggle_button_model_ng.h"
 #include "core/components_ng/pattern/button/toggle_button_paint_property.h"
 #include "core/components_ng/pattern/button/toggle_button_pattern.h"
+#include "core/interfaces/native/node/node_button_modifier.h"
 #include "core/components_ng/pattern/text/text_pattern.h"
 #include "core/components_ng/property/position_property.h"
 #include "core/components_v2/inspector/inspector_constants.h"
@@ -1491,5 +1492,59 @@ HWTEST_F(ToggleButtonTestNg, OnColorConfigurationUpdate001, TestSize.Level1)
     auto pattern = frameNode->GetPattern<ToggleButtonPattern>();
     ASSERT_NE(pattern, nullptr);
     EXPECT_NO_FATAL_FAILURE(pattern->OnColorConfigurationUpdate());
+}
+
+/**
+ * @tc.name: CreateButtonPatternRefCount001
+ * @tc.desc: Test the refcount contract after createButtonPattern returns RefPtr:
+ *           count starts at 1, copy increments, release decrements, and the object is destroyed after the last release.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ToggleButtonTestNg, CreateButtonPatternRefCount001, TestSize.Level1)
+{
+    auto* buttonModifier = NodeModifier::GetButtonCustomModifier();
+    ASSERT_NE(buttonModifier, nullptr);
+    ASSERT_NE(buttonModifier->createButtonPattern, nullptr);
+
+    auto pattern = buttonModifier->createButtonPattern();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_EQ(pattern->RefCount(), 1);
+
+    auto patternCopy = pattern;
+    EXPECT_EQ(pattern->RefCount(), 2);
+
+    patternCopy = nullptr;
+    EXPECT_EQ(pattern->RefCount(), 1);
+    ASSERT_NE(pattern, nullptr);
+
+    pattern = nullptr;
+}
+
+/**
+ * @tc.name: CreateToggleButtonPatternType002
+ * @tc.desc: Test that the two factory functions return their own types:
+ *           createToggleButtonPattern can be upcast to ButtonPattern,
+ *           the result of createButtonPattern cannot be downcast to ToggleButtonPattern;
+ *           two calls return independent new instances.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ToggleButtonTestNg, CreateToggleButtonPatternType002, TestSize.Level1)
+{
+    auto* buttonModifier = NodeModifier::GetButtonCustomModifier();
+    ASSERT_NE(buttonModifier, nullptr);
+
+    auto togglePattern = buttonModifier->createToggleButtonPattern();
+    ASSERT_NE(togglePattern, nullptr);
+    EXPECT_EQ(togglePattern->RefCount(), 1);
+
+    auto toggleAsButton = AceType::DynamicCast<ButtonPattern>(togglePattern);
+    EXPECT_NE(AceType::RawPtr(toggleAsButton), nullptr);
+
+    auto buttonPattern = buttonModifier->createButtonPattern();
+    ASSERT_NE(buttonPattern, nullptr);
+    auto buttonAsToggle = AceType::DynamicCast<ToggleButtonPattern>(buttonPattern);
+    EXPECT_EQ(AceType::RawPtr(buttonAsToggle), nullptr);
+
+    EXPECT_NE(AceType::RawPtr(buttonPattern), AceType::RawPtr(togglePattern));
 }
 } // namespace OHOS::Ace::NG

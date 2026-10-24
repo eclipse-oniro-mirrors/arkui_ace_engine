@@ -845,6 +845,28 @@ HWTEST_F(TextFieldPatternTestSeven, GetInspectorId003, TestSize.Level0)
 }
 
 /**
+ * @tc.name: GetInspectorId004
+ * @tc.desc: Test GetInspectorId with a parent and an unset inspector id
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldPatternTestSeven, GetInspectorId004, TestSize.Level0)
+{
+    auto parentNode = FrameNode::CreateFrameNode("parent", ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(parentNode, nullptr);
+
+    CreateTextField(DEFAULT_TEXT);
+    ASSERT_NE(pattern_, nullptr);
+    ASSERT_NE(frameNode_, nullptr);
+    frameNode_->SetParent(parentNode);
+    frameNode_->ResetInspectorId();
+    ASSERT_NE(frameNode_->GetParent(), nullptr);
+    ASSERT_FALSE(frameNode_->GetInspectorId().has_value());
+
+    EXPECT_EQ(pattern_->GetInspectorId(), "");
+}
+
+/**
  * @tc.name: GetUnderlinePadding001
  * @tc.desc: Test GetUnderlinePadding in underline mode with RTL direction
  * @tc.type: FUNC

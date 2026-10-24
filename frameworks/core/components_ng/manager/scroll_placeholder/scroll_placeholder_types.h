@@ -18,6 +18,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <string>
 
 #include "base/memory/ace_type.h"
@@ -36,8 +37,11 @@ enum class ScrollPlaceholderComponentType : int32_t {
 // Placeholder instance pool policy: per template id the pool totals at most this many
 // instances — one resident, immutable copy source built by the builder on the UI thread at
 // registration, plus capacity - 1 spare copies handed out on acquire and refilled by
-// background traversal clones of the source.
-inline constexpr size_t SCROLL_PLACEHOLDER_INSTANCE_CACHE_CAPACITY = 2;
+// background traversal clones of the source. A fast fling keeps dozens of shells alive at
+// once; with a single spare the pool empties after the first acquire and every further
+// acquire degrades to a synchronous UI-thread builder run — the cost the feature exists
+// to avoid — so the spares must cover the concurrent-shell order of magnitude.
+inline constexpr size_t SCROLL_PLACEHOLDER_INSTANCE_CACHE_CAPACITY = 8;
 
 // Prediction result decided before the real item builder runs:
 // - BUILD_REAL_NOW: estimated cost fits the remaining frame budget, caller builds synchronously.
@@ -71,6 +75,25 @@ enum class ScrollPlaceholderCancelReason : int32_t {
 // capability check are delivered by the compiler-contract step; until then the handle stays an
 // internal registration entry keyed for cost prediction.
 using ScrollPlaceholderBuilder = std::function<RefPtr<UINode>()>;
+
+// Per-item placeholder description returned by the scrollPlaceholder provider
+// (List/Grid/WaterFlow attribute). Suggested size only influences the placeholder
+// measurement, never the real item layout; invalid dimensions are ignored in favor
+// of the component's own estimate. Added by the component adapter steps (step2/3).
+struct ScrollPlaceholderSizeOption {
+    std::optional<float> width;
+    std::optional<float> height;
+};
+
+struct ScrollPlaceholderOptions {
+    // Registered placeholder template id; empty means the system default placeholder.
+    std::string id;
+    std::optional<ScrollPlaceholderSizeOption> size;
+};
+
+// Northbound provider: called synchronously on the UI thread while scrolling; a pure
+// calculation that must not trigger builds. nullopt means the item needs no placeholder.
+using ScrollPlaceholderProvider = std::function<std::optional<ScrollPlaceholderOptions>(int32_t index)>;
 
 } // namespace OHOS::Ace::NG
 

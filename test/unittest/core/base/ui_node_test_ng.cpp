@@ -123,6 +123,7 @@ void UINodeTestNg::SetUpTestSuite()
 
 void UINodeTestNg::TearDownTestSuite()
 {
+    DetachGlobalTestNodes();
     MockPipelineContext::TearDown();
 }
 

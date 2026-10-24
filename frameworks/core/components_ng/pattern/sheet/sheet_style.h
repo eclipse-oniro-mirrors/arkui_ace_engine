@@ -69,6 +69,7 @@ enum SheetType {
 enum class SheetTitleBarHoverMode {
     STANDARD = 0,
     STACK = 1,
+    SAFE_AREA_PADDING = 2,
 };
 
 enum class SheetAccessibilityDetents {

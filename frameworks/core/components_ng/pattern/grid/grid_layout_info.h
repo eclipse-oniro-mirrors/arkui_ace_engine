@@ -543,10 +543,11 @@ struct GridLayoutInfo {
 
     bool offsetEnd_ = false; // true if content bottom is truly reached
 
-    // Grid has GridItem whose columnEnd - columnStart > 0
+    // Grid has GridItem whose span is greater than 1 in either axis (rowSpan or colSpan)
     bool hasBigItem_ = false;
 
-    // Grid has GridItem whose rowEnd - rowStart > 0
+    // Grid has GridItem spanning more than one main-axis line: rowSpan > 1 when vertical,
+    // colSpan > 1 when horizontal (see GridScrollLayoutAlgorithm::AdjustRowColSpan)
     bool hasMultiLineItem_ = false;
     // false when offset is updated but layout hasn't happened, so data is out of sync
     bool synced_ = false;

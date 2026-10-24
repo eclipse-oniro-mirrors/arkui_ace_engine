@@ -556,14 +556,16 @@ public:
     void StopSpringAnimationImmediately();
     void StopSpringAnimation();
     void DumpInfo() override;
+
+    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config) override;
     void DumpAdvanceInfo() override;
     void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json) override;
     void DumpSimplifyInfoOnlyForParamConfig(std::shared_ptr<JsonValue>& json,
         ParamConfig config = ParamConfig()) override;
-    void BuildOffsetInfo(std::unique_ptr<JsonValue>& json);
+    void BuildOffsetInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config = ParamConfig());
     void BuildAxisInfo(std::unique_ptr<JsonValue>& json);
     void BuildItemPositionInfo(std::unique_ptr<JsonValue>& json);
-    void BuildIndicatorTypeInfo(std::unique_ptr<JsonValue>& json);
+    void BuildIndicatorTypeInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config = ParamConfig());
     void BuildPanDirectionInfo(std::unique_ptr<JsonValue>& json);
     int32_t GetLoopIndex(int32_t originalIndex) const;
     virtual int32_t GetDuration() const;
@@ -936,6 +938,11 @@ public:
         isRenderGroupExplicitlySet_ = isRenderGroup;
     }
 
+    void SetIsTabsSidebarDisplayMode(bool isSidebar)
+    {
+        isTabsSidebarDisplayMode_ = isSidebar;
+    }
+
 protected:
     void MarkDirtyNodeSelf();
     void OnPropertyTranslateAnimationFinish(const OffsetF& offset);
@@ -1027,6 +1034,10 @@ protected:
     Axis direction_ = Axis::HORIZONTAL;
 
 private:
+    void DumpAdvanceCurveInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
+    void DumpAdvanceDiagnostics(std::unique_ptr<JsonValue>& json, const ParamConfig& config = ParamConfig());
+
     void OnModifyDone() override;
     void OnHostChildUpdateDone() override;
     void OnAfterModifyDone() override;
@@ -1117,7 +1128,8 @@ private:
     float MainSize() const;
     float GetMainContentSize() const;
     void FireChangeEvent(int32_t preIndex, int32_t currentIndex, bool isInLayout = false) const;
-    void ReportSwiperChangeContent(int32_t currentIndex) const;
+    void FireIndicatorChangeAccessibilityEvent() const;
+    void ReportSwiperChangeContent(int32_t currentIndex, int32_t componentState = 0) const;
     void FireAnimationEndEvent(int32_t currentIndex, const AnimationCallbackInfo& info, bool isInterrupt = false) const;
     void FireGestureSwipeEvent(int32_t currentIndex, const AnimationCallbackInfo& info) const;
     void FireUnselectedEvent(int32_t currentIndex, int32_t targetIndex);
@@ -1402,7 +1414,7 @@ private:
     void FastAnimation(int32_t targetIndex);
     void MarkDirtyBindIndicatorNode() const;
 
-    RefPtr<FrameNode> GetCommonIndicatorNode();
+    RefPtr<FrameNode> GetCommonIndicatorNode() const;
     bool IsIndicator(const std::string& tag) const
     {
         return tag == SWIPER_INDICATOR_ETS_TAG_PATTERN || tag == INDICATOR_ETS_TAG_PATTERN;
@@ -1637,6 +1649,8 @@ private:
     bool isRenderGroupExplicitlySet_ = false;
 
     bool isIgnoreHiddenItem_ = false;
+
+    bool isTabsSidebarDisplayMode_ = false;
 };
 } // namespace OHOS::Ace::NG
 

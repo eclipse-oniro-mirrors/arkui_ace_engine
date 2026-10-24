@@ -17,6 +17,7 @@
 #include "core/components_ng/manager/safe_area/safe_area_manager.h"
 #include "core/components_ng/syntax/with_theme_node.h"
 
+#include "base/display_manager/display_manager.h"
 #include "base/geometry/dimension.h"
 #include "base/hiviewdfx/histogram_wrapper.h"
 #include "base/json/json_util.h"
@@ -203,6 +204,23 @@ bool SheetPresentationPattern::IsPhoneInLandScape()
     return false;
 }
 
+double SheetPresentationPattern::GetScreenHeight()
+{
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, 0.0);
+    auto pipelineContext = host->GetContext();
+    CHECK_NULL_RETURN(pipelineContext, 0.0);
+    double deviceHeight = 0.0;
+    auto container = Container::GetContainer(pipelineContext->GetInstanceId());
+    if (container) {
+        auto displayId = container->GetCurrentDisplayId();
+        auto info = DisplayManager::GetInstance().GetCachedDisplayInfo(displayId);
+        CHECK_NULL_RETURN(info, 0.0);
+        deviceHeight = info->GetHeight();
+    }
+    return deviceHeight;
+}
+
 float SheetPresentationPattern::GetSheetTopSafeArea()
 {
     auto host = GetHost();
@@ -214,7 +232,7 @@ float SheetPresentationPattern::GetSheetTopSafeArea()
     auto windowManager = pipelineContext->GetWindowManager();
     auto sheetType = sheetType_;
     auto windowGlobalRect = pipelineContext->GetDisplayWindowRectInfo();
-    double deviceHeight = static_cast<double>(SystemProperties::GetDeviceHeight());
+    auto deviceHeight = GetScreenHeight();
 
     // full screen subwindow sheet is also WINDOW_MODE_FLOATING, can not enter
     if (windowManager && windowManager->GetWindowMode() == WindowMode::WINDOW_MODE_FLOATING &&
@@ -765,7 +783,10 @@ void SheetPresentationPattern::InitPanEvent()
         return;
     }
 
-    auto actionStartTask = [weak = WeakClaim(this)](const GestureEvent& event) {
+    auto actionStartTask = [weak = WeakClaim(this)](const GestureEvent& info) {
+        if (info.GetInputEventType() == InputEventType::AXIS && info.GetSourceTool() == SourceTool::MOUSE) {
+            return;
+        }
         auto pattern = weak.Upgrade();
         if (pattern && pattern->enableDragControl_) {
             pattern->HandleDragStart();
@@ -773,6 +794,9 @@ void SheetPresentationPattern::InitPanEvent()
     };
 
     auto actionUpdateTask = [weak = WeakClaim(this)](const GestureEvent& info) {
+        if (info.GetInputEventType() == InputEventType::AXIS && info.GetSourceTool() == SourceTool::MOUSE) {
+            return;
+        }
         auto pattern = weak.Upgrade();
         if (pattern && pattern->enableDragControl_) {
             pattern->HandleDragUpdate(info);
@@ -780,6 +804,9 @@ void SheetPresentationPattern::InitPanEvent()
     };
 
     auto actionEndTask = [weak = WeakClaim(this)](const GestureEvent& info) {
+        if (info.GetInputEventType() == InputEventType::AXIS && info.GetSourceTool() == SourceTool::MOUSE) {
+            return;
+        }
         auto pattern = weak.Upgrade();
         if (pattern && pattern->enableDragControl_) {
             pattern->HandleDragEnd(info.GetMainVelocity());
@@ -1507,18 +1534,21 @@ void SheetPresentationPattern::ChangeScrollHeight(float height)
     CHECK_NULL_VOID(scrollNode);
     auto scrollProps = scrollNode->GetLayoutProperty<ScrollLayoutProperty>();
     CHECK_NULL_VOID(scrollProps);
-    auto scrollHeight = height - GetTitleBuilderHeightStackMode() - resizeDecreasedHeight_;
+    float titleHeightStackMode = GetTitleBuilderHeightStackMode();
+    bool useTitleHeightStackMode = true;
+    auto scrollHeight = height - titleHeightStackMode - resizeDecreasedHeight_;
     auto sheetType = GetSheetTypeNoProcess();
     if (sheetType == SheetType::SHEET_POPUP || sheetType == SheetType::SHEET_CENTER ||
         sheetType == SheetType::SHEET_BOTTOM_OFFSET) {
         auto sheetHeight = geometryNode->GetFrameSize().Height();
-        scrollHeight = sheetHeight - GetTitleBuilderHeightStackMode() - resizeDecreasedHeight_;
+        scrollHeight = sheetHeight - titleHeightStackMode - resizeDecreasedHeight_;
     }
     if (sheetType == SheetType::SHEET_MINIMIZE) {
         scrollHeight = geometryNode->GetFrameSize().Height();
+        useTitleHeightStackMode = false;
     }
     scrollProps->UpdateUserDefinedIdealSize(CalcSize(std::nullopt, CalcLength(scrollHeight)));
-    preScrollSelfHeight_ = scrollHeight;
+    preScrollSelfHeight_ = GetRealPreScrollHeight(scrollHeight, titleHeightStackMode, useTitleHeightStackMode);
     scrollNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
 }
 
@@ -2911,9 +2941,8 @@ void SheetPresentationPattern::ScrollTo(float height)
             maxScrollDecreaseHeight = maxAvoidSize - sheetHeightUp_;
         }
         auto scrollSelfHeight = GetScrollHeight() - maxScrollDecreaseHeight;
-        layoutProp->UpdateUserDefinedIdealSize(CalcSize(std::nullopt,
-            CalcLength(scrollSelfHeight)));
-        preScrollSelfHeight_ = scrollSelfHeight;
+        layoutProp->UpdateUserDefinedIdealSize(CalcSize(std::nullopt, CalcLength(scrollSelfHeight)));
+        preScrollSelfHeight_ = GetRealPreScrollHeight(scrollSelfHeight, GetTitleBuilderHeightStackMode(), true);
         auto curScrollOffset = (useCaretAvoidMode && Positive(height)) ? scrollPattern->GetTotalOffset() : 0.f;
         // ScrollTo is only invoked from keyboard-avoid / rotation paths (user-triggered), classify as USER
         scrollPattern->SetAccessibilityScrollSource(AccessibilityScrollSource::USER);
@@ -2955,7 +2984,7 @@ bool SheetPresentationPattern::AdditionalScrollTo(const RefPtr<FrameNode>& scrol
     scrollHeight_ = scrollHeight - childHeight + height;
     auto scrollSelfHeight = GetScrollHeight() - (scrollHeight - childHeight + height);
     layoutProp->UpdateUserDefinedIdealSize(CalcSize(std::nullopt, CalcLength(scrollSelfHeight)));
-    preScrollSelfHeight_ = scrollSelfHeight;
+    preScrollSelfHeight_ = GetRealPreScrollHeight(scrollSelfHeight, GetTitleBuilderHeightStackMode(), true);
     // And then scroll move the content with '-height' offset
     auto curScrollOffset = (useCaretAvoidMode && Positive(height)) ? scrollPattern->GetTotalOffset() : 0.f;
     // Same passive keyboard-avoid pan as ScrollTo — only reached from internal ScrollTo call, classify as USER
@@ -3104,7 +3133,7 @@ float SheetPresentationPattern::GetFitContentHeight()
     auto builderNode = GetFirstFrameNodeOfBuilder();
     CHECK_NULL_RETURN(builderNode, 0.0f);
     auto builderGeometryNode = builderNode->GetGeometryNode();
-    return builderGeometryNode->GetMarginFrameSize().Height() + GetTitleBuilderHeight();
+    return builderGeometryNode->GetMarginFrameSize().Height() + GetTitleBuilderHeightStackMode();
 }
 
 float SheetPresentationPattern::GetTitleBuilderHeightStackMode() const
@@ -3119,6 +3148,15 @@ float SheetPresentationPattern::GetTitleBuilderHeightStackMode() const
         result = 0.0f;
     }
     return result;
+}
+
+float SheetPresentationPattern::GetRealPreScrollHeight(
+    float scrollHeight, float titleHeightStackMode, bool useStackModeHeight) const
+{
+    if (useStackModeHeight && NearZero(titleHeightStackMode)) {
+        return scrollHeight - GetTitleBuilderHeight();
+    }
+    return scrollHeight;
 }
 
 float SheetPresentationPattern::GetTitleBuilderHeight() const
@@ -3227,6 +3265,67 @@ float SheetPresentationPattern::GetRootOffsetYToWindow()
     auto parertOffset = overlayNode->GetOffsetRelativeToWindow();
     TAG_LOGD(AceLogTag::ACE_OVERLAY, "PageLevel Node's offset to window: %{public}s", parertOffset.ToString().c_str());
     return parertOffset.GetY();
+}
+
+void SheetPresentationPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if (!config.IsPublicTree()) {
+        json->Put("TargetId", static_cast<int32_t>(targetId_));
+        json->Put("TargetTag", targetTag_.c_str());
+    }
+    if (!config.IsPublicTree() || config.visualProperties) {
+        auto children = JsonUtil::Create(true);
+        DumpAdvanceGeometryInfo(children, config);
+        json->Put("SheetPage Pattern", children);
+    }
+    if (!config.IsPublicTree()) {
+        json->Put("Height ScrollTo [KeyboardHeight > 0, and is scrolling]", -scrollHeight_);
+        json->Put("KeyboardHeight", static_cast<int32_t>(keyboardHeight_));
+        json->Put("is scrolling", isScrolling_);
+        json->Put("SheetHeightUp[sheet offset to move up when avoiding keyboard]", sheetHeightUp_);
+    }
+    DumpAdvanceStyleInfo(json, config);
+}
+
+void SheetPresentationPattern::DumpAdvanceGeometryInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    json->Put("SheetType", static_cast<int32_t>(GetSheetTypeNoProcess()));
+    json->Put("SheetPage Node Height", centerHeight_);
+    json->Put("Sheet Height [start from the bottom, KeyboardHeight = 0]", height_);
+    json->Put("SheetMaxHeight [start from the bottom, pageHeight - sheetTopSafeArea]", sheetMaxHeight_);
+    if (!config.IsPublicTree()) {
+        json->Put("Page Height", pageHeight_);
+        json->Put("StatusBar Height [current sheetType needed]", sheetTopSafeArea_);
+    }
+    json->Put("PopupSheet OffsetX", sheetOffsetX_);
+    json->Put(config.IsPublicTree() ? "PopupSheet OffsetY" : "PopupSheet OffsetX", sheetOffsetY_);
+    json->Put("SheetMaxWidth", sheetMaxWidth_);
+    json->Put("FitContent Height", sheetFitContentHeight_);
+    json->Put("SheetThemeType", sheetThemeType_.c_str());
+    json->Put("currentOffset", currentOffset_);
+}
+
+void SheetPresentationPattern::DumpAdvanceStyleInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    auto layoutProperty = GetLayoutProperty<SheetPresentationProperty>();
+    CHECK_NULL_VOID(layoutProperty);
+    auto sheetStyle = layoutProperty->GetSheetStyleValue(SheetStyle());
+    if (!config.IsPublicTree() || config.visualProperties) {
+        if (!config.IsPublicTree() || sheetStyle.sheetHeight.height.has_value()) {
+            json->Put("height",
+                sheetStyle.sheetHeight.height.has_value() ? sheetStyle.sheetHeight.height->ToString().c_str() : "None");
+        }
+        if (!config.IsPublicTree() || sheetStyle.sheetHeight.sheetMode.has_value()) {
+            json->Put("sheetMode",
+                sheetStyle.sheetHeight.sheetMode.has_value()
+                    ? std::to_string(static_cast<int32_t>(sheetStyle.sheetHeight.sheetMode.value())).c_str()
+                    : "None");
+        }
+    }
+    if (!config.IsPublicTree() || config.functionalProperties) {
+        json->Put("detents Size", static_cast<int32_t>(sheetStyle.detents.size()));
+        json->Put("IsShouldDismiss", shouldDismiss_ ? "true" : "false");
+    }
 }
 
 void SheetPresentationPattern::DumpAdvanceInfo()
@@ -3549,38 +3648,7 @@ void SheetPresentationPattern::SetSheetOuterBorderWidth(
 
 void SheetPresentationPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json)
 {
-    json->Put("TargetId", static_cast<int32_t>(targetId_));
-    json->Put("TargetTag", targetTag_.c_str());
-    std::unique_ptr<JsonValue> children = JsonUtil::Create(true);
-    children->Put("SheetType", static_cast<int32_t>(GetSheetTypeNoProcess()));
-    children->Put("SheetPage Node Height", centerHeight_);
-    children->Put("Sheet Height [start from the bottom, KeyboardHeight = 0]", height_);
-    children->Put("SheetMaxHeight [start from the bottom, pageHeight - sheetTopSafeArea]", sheetMaxHeight_);
-    children->Put("Page Height", pageHeight_);
-    children->Put("StatusBar Height [current sheetType needed]", sheetTopSafeArea_);
-    children->Put("PopupSheet OffsetX", sheetOffsetX_);
-    children->Put("PopupSheet OffsetX", sheetOffsetY_);
-    children->Put("SheetMaxWidth", sheetMaxWidth_);
-    children->Put("FitContent Height", sheetFitContentHeight_);
-    children->Put("SheetThemeType", sheetThemeType_.c_str());
-    children->Put("currentOffset", currentOffset_);
-    json->Put("SheetPage Pattern", children);
-
-    json->Put("Height ScrollTo [KeyboardHeight > 0, and is scrolling]", -scrollHeight_);
-    json->Put("KeyboardHeight", static_cast<int32_t>(keyboardHeight_));
-    json->Put("is scrolling", isScrolling_);
-    json->Put("SheetHeightUp[sheet offset to move up when avoiding keyboard]", sheetHeightUp_);
-
-    auto layoutProperty = GetLayoutProperty<SheetPresentationProperty>();
-    CHECK_NULL_VOID(layoutProperty);
-    auto sheetStyle = layoutProperty->GetSheetStyleValue(SheetStyle());
-    json->Put("height", sheetStyle.sheetHeight.height.has_value() ?
-        sheetStyle.sheetHeight.height->ToString().c_str() : "None");
-    json->Put("sheetMode", sheetStyle.sheetHeight.sheetMode.has_value()
-                               ? std::to_string(static_cast<int32_t>(sheetStyle.sheetHeight.sheetMode.value())).c_str()
-                               : "None");
-    json->Put("detents Size", static_cast<int32_t>(sheetStyle.detents.size()));
-    json->Put("IsShouldDismiss", shouldDismiss_ ? "true" : "false");
+    SheetPresentationPattern::DumpAdvanceInfo(json, ParamConfig());
 }
 
 void SheetPresentationPattern::StopModifySheetTransition()
@@ -3719,7 +3787,7 @@ void SheetPresentationPattern::DecreaseScrollHeightInSheet(float decreaseHeight)
     TAG_LOGD(AceLogTag::ACE_SHEET, "To avoid Keyboard, Scroll Height reduces by height %{public}f.", decreaseHeight);
     auto scrollSelfHeight = GetScrollHeight() - decreaseHeight;
     layoutProp->UpdateUserDefinedIdealSize(CalcSize(std::nullopt, CalcLength(scrollSelfHeight)));
-    preScrollSelfHeight_ = scrollSelfHeight;
+    preScrollSelfHeight_ = GetRealPreScrollHeight(scrollSelfHeight, GetTitleBuilderHeightStackMode(), true);
     resizeDecreasedHeight_ = decreaseHeight;
     scroll->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
 }
@@ -4253,7 +4321,7 @@ void SheetPresentationPattern::RecoverScrollOrResizeAvoidStatus()
     CHECK_NULL_VOID(layoutProp);
     auto scrollSelfHeight = GetScrollHeight();
     layoutProp->UpdateUserDefinedIdealSize(CalcSize(std::nullopt, CalcLength(scrollSelfHeight)));
-    preScrollSelfHeight_ = scrollSelfHeight;
+    preScrollSelfHeight_ = GetRealPreScrollHeight(scrollSelfHeight, GetTitleBuilderHeightStackMode(), true);
     resizeDecreasedHeight_ = 0.f;
     scrollHeight_ = 0.f;
     ScrollTo(0.f);

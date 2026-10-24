@@ -20,6 +20,9 @@
 #include "core/components_ng/manager/drag_drop/drag_drop_manager.h"
 #include "core/components_ng/manager/safe_area/safe_area_manager.h"
 #include "core/components_ng/manager/privacy_sensitive/privacy_sensitive_manager.h"
+#include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_manager.h"
+#include "core/components_ng/base/inspector_dump_options.h"
+#include "core/components_ng/base/ui_tree_collector.h"
 
 #include <cinttypes>
 #include <unordered_set>
@@ -424,10 +427,36 @@ public:
         return nullptr;
     }
 
-    RefPtr<LayoutWrapper> GetFrameNodeByIndex(uint32_t index, bool needBuild, bool isCache, bool addToRenderTree)
+    RefPtr<LayoutWrapper> GetFrameNodeByIndex(
+        uint32_t index, bool needBuild, bool isCache, bool addToRenderTree, bool allowPlaceholderSubstitution)
     {
         auto itor = partFrameNodeChildren_.find(index);
         if (itor == partFrameNodeChildren_.end()) {
+            // Scroll placeholder acquisition substitution: a deferral
+            // recorded by the container pattern for this (host, index) resolves to the
+            // mounted placeholder shell, one choke point above every lazy syntax node
+            // (LazyForEach/Repeat/ForEach/Arkoala). Explicit-declaration only: the
+            // caller stated this acquisition is open to substitution (a scroll
+            // container fill loop with the capability verified) — focus resolution,
+            // jump-to-index, plain queries and the real-build commit keep the
+            // unmodified semantics whatever the deferral table holds. The shell never
+            // lands in partFrameNodeChildren_: the index slot stays reserved for the
+            // real item, and a registered real child (checked above) always wins over
+            // a deferral. The process-wide gate keeps the non-placeholder path at one
+            // atomic read.
+            if (allowPlaceholderSubstitution && !isCache && ScrollPlaceholderManager::HasAnyDeferrals()) {
+                auto* context = hostNode_->GetContext();
+                if (context) {
+                    const auto& manager = context->GetOrCreateScrollPlaceholderManager();
+                    if (manager) {
+                        auto shell = manager->QueryDeferredShell(
+                            hostNode_->GetId(), static_cast<int32_t>(index));
+                        if (shell) {
+                            return shell;
+                        }
+                    }
+                }
+            }
             Build();
             auto child = FindFrameNodeByIndex(index, needBuild, isCache, addToRenderTree);
             if (child && !isCache) {
@@ -910,6 +939,9 @@ void FrameNode::SetIsFind(bool isFind)
 void FrameNode::GetOneDepthVisibleFrame(std::vector<RefPtr<FrameNode>>& children)
 {
     GenerateOneDepthVisibleFrameWithTransition(children);
+    if (safeAreaInsetNode_) {
+        children.emplace_back(safeAreaInsetNode_);
+    }
     if (overlayNode_) {
         children.emplace_back(overlayNode_);
     }
@@ -921,6 +953,9 @@ void FrameNode::GetOneDepthVisibleFrameWithOffset(std::list<RefPtr<FrameNode>>& 
     CHECK_NULL_VOID(context);
     offset += context->GetPaintRectWithoutTransform().GetOffset();
     GenerateOneDepthVisibleFrameWithOffset(children, offset);
+    if (safeAreaInsetNode_) {
+        children.emplace_back(safeAreaInsetNode_);
+    }
     if (overlayNode_) {
         children.emplace_back(overlayNode_);
     }
@@ -1347,6 +1382,9 @@ void FrameNode::DumpKeyboardShortcutInfo()
     if (!eventHub) {
         return;
     }
+    if (!eventHub->HasKeyboardShortcut()) {
+        return;
+    }
     auto keyboardShortcuts = eventHub->GetKeyboardShortcut();
     std::string result;
     for (auto& keyboardShortcut : keyboardShortcuts) {
@@ -1373,6 +1411,11 @@ void FrameNode::DumpOverlayInfo()
 
 void FrameNode::DumpSimplifyCommonInfo(std::shared_ptr<JsonValue>& json)
 {
+    DumpSimplifyCommonInfo(json, nullptr);
+}
+
+void FrameNode::DumpSimplifyCommonInfo(std::shared_ptr<JsonValue>& json, const TreeCollectionState* state)
+{
     json->Put("$rect", GetTransformRectRelativeToWindow().ToBounds().c_str());
     if (!propInspectorId_->empty()) {
         json->Put("compid", propInspectorId_.value_or("").c_str());
@@ -1384,7 +1427,14 @@ void FrameNode::DumpSimplifyCommonInfo(std::shared_ptr<JsonValue>& json)
         json->Put("visible", "false");
     }
     CHECK_NULL_VOID(renderContext_);
-    auto& opacity = renderContext_->GetOpacity();
+    const std::optional<double>* cachedOpacity = nullptr;
+    if (state) {
+        auto found = state->visibility.find(this);
+        if (found != state->visibility.end()) {
+            cachedOpacity = &found->second.opacity;
+        }
+    }
+    const auto& opacity = cachedOpacity ? *cachedOpacity : renderContext_->GetOpacity();
     if (opacity.has_value() && !NearEqual(opacity.value(), 1.0f)) {
         json->Put("opacity", opacity.value());
     }
@@ -1394,26 +1444,112 @@ void FrameNode::DumpSimplifyCommonInfo(std::shared_ptr<JsonValue>& json)
     }
 }
 
+namespace {
+void CollectInteractionInfo(std::shared_ptr<JsonValue>& json, const RefPtr<GestureEventHub>& eventHub,
+    const RefPtr<FocusHub>& focusHub)
+{
+    if (eventHub) {
+        json->Put("clickable", eventHub->IsAccessibilityClickable());
+        json->Put("longClickable", eventHub->IsAccessibilityLongClickable());
+    }
+    if (focusHub) {
+        json->Put("focusable", focusHub->IsFocusable());
+    }
+}
+
+void CollectAccessibilityInfo(std::shared_ptr<JsonValue>& json, const RefPtr<AccessibilityProperty>& accessibility)
+{
+    if (!accessibility) {
+        return;
+    }
+    const auto& text = accessibility->GetAccessibilityText();
+    if (!text.empty()) {
+        json->Put("accessibilityContent", text.c_str());
+    }
+}
+
+void DumpAdvancedVisualProperties(
+    FrameNode& node, std::unique_ptr<JsonValue>& visual, const ParamConfig& config)
+{
+    if (auto geometry = node.GetGeometryNode()) {
+        visual->Put("FrameRect", geometry->GetFrameRect().ToString().c_str());
+    }
+    if (auto render = node.GetRenderContext()) {
+        visual->Put("PaintRectWithoutTransform", render->GetPaintRectWithoutTransform().ToString().c_str());
+    }
+    if (auto render = node.GetRenderContext()) {
+        render->DumpAdvanceInfo(visual, config);
+    }
+    if (auto pattern = node.GetPattern()) {
+        pattern->DumpAdvanceInfo(visual, config);
+    }
+}
+
+void DumpAdvancedFunctionalProperties(
+    FrameNode& node, std::unique_ptr<JsonValue>& functional, const ParamConfig& config)
+{
+    if (auto render = node.GetRenderContext()) {
+        render->DumpAdvanceInfo(functional, config);
+    }
+    if (auto pattern = node.GetPattern()) {
+        pattern->DumpAdvanceInfo(functional, config);
+    }
+}
+
+void DumpAdvancedProperties(FrameNode& node, std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if (config.visualProperties) {
+        auto visual = JsonUtil::Create();
+        auto visualConfig = config;
+        visualConfig.functionalProperties = false;
+        DumpAdvancedVisualProperties(node, visual, visualConfig);
+        json->Put("visual", visual);
+    }
+    if (config.functionalProperties) {
+        auto functional = JsonUtil::Create();
+        auto functionalConfig = config;
+        functionalConfig.visualProperties = false;
+        DumpAdvancedFunctionalProperties(node, functional, functionalConfig);
+        json->Put("functional", functional);
+    }
+}
+
+void DumpAdvancedNodeProperties(FrameNode& node, std::shared_ptr<JsonValue>& json, ParamConfig config)
+{
+    CHECK_NULL_VOID(json);
+    if (!config.collectionState) {
+        return;
+    }
+    if (IsHostOnlyNode(node, config)) {
+        return;
+    }
+    if (!config.visualProperties && !config.functionalProperties) {
+        return;
+    }
+    config.dumpMode = TreeDumpMode::PUBLIC_TREE;
+    auto advanced = JsonUtil::Create();
+    DumpAdvancedProperties(node, advanced, config);
+    json->Put("advanced", advanced);
+}
+} // namespace
+
+// Preserve legacy field order: gesture/focus, accessibility text, scrollable/editable.
 void FrameNode::DumpSimplifyCommonInfoOnlyForParamConfig(std::shared_ptr<JsonValue>& json, ParamConfig config)
 {
-    auto eventHub = eventHub_ ? eventHub_->GetOrCreateGestureEventHub() : nullptr;
-    if (config.interactionInfo) {
-        if (eventHub) {
-            json->Put("clickable", eventHub->IsAccessibilityClickable());
-            json->Put("longClickable", eventHub->IsAccessibilityLongClickable());
-        }
-        if (focusHub_) {
-            json->Put("focusable", focusHub_->IsFocusable());
-        }
+    RefPtr<GestureEventHub> eventHub;
+    if (eventHub_) {
+        // Legacy dumping creates the hub when absent; public collection only reads an existing hub.
+        eventHub = config.collectionState ? eventHub_->GetGestureEventHub() : eventHub_->GetOrCreateGestureEventHub();
     }
-    if (accessibilityProperty_) {
-        if (!accessibilityProperty_->GetAccessibilityText().empty() && config.accessibilityInfo) {
-            json->Put("accessibilityContent", accessibilityProperty_->GetAccessibilityText().c_str());
-        }
-        if (config.interactionInfo) {
-            json->Put("scrollable", accessibilityProperty_->IsScrollable());
-            json->Put("editable", accessibilityProperty_->IsEditable());
-        }
+    if (config.interactionInfo) {
+        CollectInteractionInfo(json, eventHub, focusHub_);
+    }
+    if (config.accessibilityInfo) {
+        CollectAccessibilityInfo(json, accessibilityProperty_);
+    }
+    if (config.interactionInfo && accessibilityProperty_) {
+        json->Put("scrollable", accessibilityProperty_->IsScrollable());
+        json->Put("editable", accessibilityProperty_->IsEditable());
     }
 }
 
@@ -1526,6 +1662,25 @@ void FrameNode::DumpSimplifyInfo(std::shared_ptr<JsonValue>& json)
     }
 }
 
+void FrameNode::DumpSimplifyInfoWithParamConfig(std::shared_ptr<JsonValue>& json, ParamConfig config)
+{
+    if (!config.collectionState) {
+        UINode::DumpSimplifyInfoWithParamConfig(json, config);
+        return;
+    }
+
+    CHECK_NULL_VOID(json);
+    DumpSimplifyCommonInfo(json, config.collectionState);
+    if (pattern_) {
+        auto child = JsonUtil::CreateSharedPtrJson();
+        InspectorDumpOptions options;
+        options.includeDiagnostic = false;
+        pattern_->DumpSimplifyInfo(child, options);
+        json->Put("$attrs", std::move(child));
+    }
+    DumpSimplifyInfoOnlyForParamConfig(json, config);
+}
+
 void FrameNode::MergeAttributesIntoJson(std::shared_ptr<JsonValue>& json, const std::shared_ptr<JsonValue>& child)
 {
     if (json->Contains("$attrs") && json->GetValue("$attrs")->IsObject()) {
@@ -1552,6 +1707,7 @@ void FrameNode::DumpSimplifyInfoOnlyForParamConfig(std::shared_ptr<JsonValue>& j
         pattern_->AddExtraInfoWithParamConfig(json, config);
         MergeAttributesIntoJson(json, child);
     }
+    DumpAdvancedNodeProperties(*this, json, config);
 }
 
 void FrameNode::DumpInfo()
@@ -1875,6 +2031,9 @@ void FrameNode::OnAttachToMainTree(bool recursive)
         layoutProperty_->UpdatePropertyChangeFlag(PROPERTY_UPDATE_MEASURE_SELF);
     }
     UINode::OnAttachToMainTree(recursive);
+    if (safeAreaInsetNode_ && !safeAreaInsetNode_->IsOnMainTree()) {
+        safeAreaInsetNode_->AttachToMainTree(recursive, GetContext());
+    }
     auto context = GetContext();
     CHECK_NULL_VOID(context);
 
@@ -2210,6 +2369,9 @@ void FrameNode::OnDetachFromMainTree(bool recursive, PipelineContext* context)
         }
     }
 #endif
+    if (safeAreaInsetNode_ && safeAreaInsetNode_->IsOnMainTree()) {
+        safeAreaInsetNode_->DetachFromMainTree(recursive);
+    }
     for (auto [_, callback] : removeToolbarItemCallbacks_) {
         if (callback) {
             callback();
@@ -3007,6 +3169,9 @@ void FrameNode::SetActive(bool active, bool needRebuildRenderContext)
         ClearCachedGlobalOffset();
         NotifyLazyChildren();
     }
+    if (safeAreaInsetNode_) {
+        safeAreaInsetNode_->SetActive(active, needRebuildRenderContext);
+    }
     CHECK_NULL_VOID(activeChanged);
     NotifyPageSceneActiveChanged();
 
@@ -3384,6 +3549,12 @@ void FrameNode::GenerateRenderTreeFrameChildren(std::vector<RefPtr<FrameNode>>& 
 {
     // generate full children list, including disappear children.
     GenerateOneDepthVisibleFrameWithTransition(children);
+    if (safeAreaInsetNode_) {
+        auto property = safeAreaInsetNode_->GetLayoutProperty();
+        if (property && property->GetVisibilityValue(VisibleType::VISIBLE) == VisibleType::VISIBLE) {
+            children.push_back(safeAreaInsetNode_);
+        }
+    }
     if (overlayNode_) {
         auto property = overlayNode_->GetLayoutProperty();
         if (property && property->GetVisibilityValue(VisibleType::VISIBLE) == VisibleType::VISIBLE) {
@@ -3757,6 +3928,9 @@ void FrameNode::OnGenerateOneDepthVisibleFrame(std::list<RefPtr<FrameNode>>& vis
 {
     if (isLayoutNode_) {
         UINode::GenerateOneDepthVisibleFrame(visibleList);
+        if (safeAreaInsetNode_) {
+            visibleList.emplace_back(safeAreaInsetNode_);
+        }
         if (overlayNode_) {
             visibleList.emplace_back(overlayNode_);
         }
@@ -3776,6 +3950,9 @@ void FrameNode::OnGenerateOneDepthVisibleFrameWithTransition(std::vector<RefPtr<
 {
     if (isLayoutNode_) {
         UINode::GenerateOneDepthVisibleFrameWithTransition(visibleNode);
+        if (safeAreaInsetNode_) {
+            visibleNode.emplace_back(safeAreaInsetNode_);
+        }
         if (overlayNode_) {
             visibleNode.emplace_back(overlayNode_);
         }
@@ -3797,6 +3974,9 @@ void FrameNode::OnGenerateOneDepthVisibleFrameWithOffset(std::list<RefPtr<FrameN
         isFind_ = true;
         offset += GetGeometryNode()->GetFrameOffset();
         UINode::GenerateOneDepthVisibleFrameWithOffset(visibleList, offset);
+        if (safeAreaInsetNode_) {
+            visibleList.emplace_back(safeAreaInsetNode_);
+        }
         if (overlayNode_) {
             visibleList.emplace_back(overlayNode_);
         }
@@ -5461,7 +5641,12 @@ void FrameNode::OnAccessibilityEvent(
         event.windowContentChangeTypes = windowsContentChangeType;
         event.nodeId = accessibilityId_;
         auto pipeline = GetContext();
-        CHECK_NULL_VOID(pipeline);
+        if (pipeline == nullptr) {
+            TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY,
+                "OnA11yEvent drop: no context, node=%{public}d type=%{public}d",
+                GetId(), static_cast<int32_t>(eventType));
+            return;
+        }
         if (sendByNode) {
             pipeline->SendEventToAccessibilityWithNode(event, Claim(this));
         } else {
@@ -6271,6 +6456,7 @@ void FrameNode::Measure(const std::optional<LayoutConstraintF>& parentConstraint
 
     if (layoutProperty_->GetLayoutRect()) {
         layoutProperty_->UpdateLayoutConstraintWithLayoutRect();
+        MeasureSafeAreaInset();
     } else if (parentConstraint) {
         ApplyConstraint(*parentConstraint);
     } else {
@@ -6372,6 +6558,11 @@ void FrameNode::Measure(const std::optional<LayoutConstraintF>& parentConstraint
     ACE_LAYOUT_TRACE_END()
 }
 
+void FrameNode::MeasureSafeAreaInset()
+{
+    MeasureSafeAreaInsetContainer(RawPtr(safeAreaInsetNode_));
+}
+
 // Called to perform layout children.
 void FrameNode::Layout()
 {
@@ -6425,6 +6616,9 @@ void FrameNode::Layout()
             GetLayoutAlgorithm()->Layout(this);
         }
 
+        if (safeAreaInsetNode_) {
+            LayoutSafeAreaInset();
+        }
         if (overlayNode_) {
             LayoutOverlay();
         } else if (renderContext_) {
@@ -6751,9 +6945,11 @@ void FrameNode::SyncGeometryNode(bool needSyncRsNode, const DirtySwapConfig& con
     AdjustGridOffset();
 }
 
-RefPtr<LayoutWrapper> FrameNode::GetOrCreateChildByIndex(uint32_t index, bool addToRenderTree, bool isCache)
+RefPtr<LayoutWrapper> FrameNode::GetOrCreateChildByIndex(
+    uint32_t index, bool addToRenderTree, bool isCache, bool allowPlaceholderSubstitution)
 {
-    auto child = frameProxy_->GetFrameNodeByIndex(index, true, isCache, addToRenderTree);
+    auto child = frameProxy_->GetFrameNodeByIndex(index, true, isCache, addToRenderTree,
+        allowPlaceholderSubstitution);
     if (child) {
         child->SetSkipSyncGeometryNode(SkipSyncGeometryNode());
         if (addToRenderTree) {
@@ -6765,12 +6961,12 @@ RefPtr<LayoutWrapper> FrameNode::GetOrCreateChildByIndex(uint32_t index, bool ad
 
 RefPtr<LayoutWrapper> FrameNode::GetChildByIndex(uint32_t index, bool isCache)
 {
-    return frameProxy_->GetFrameNodeByIndex(index, false, isCache, false);
+    return frameProxy_->GetFrameNodeByIndex(index, false, isCache, false, false);
 }
 
 FrameNode* FrameNode::GetFrameNodeChildByIndex(uint32_t index, bool isCache, bool isExpand)
 {
-    auto frameNode = isExpand ? DynamicCast<FrameNode>(frameProxy_->GetFrameNodeByIndex(index, true, isCache, false))
+    auto frameNode = isExpand ? DynamicCast<FrameNode>(frameProxy_->GetFrameNodeByIndex(index, true, isCache, false, false))
                               : DynamicCast<FrameNode>(UINode::GetFrameChildByIndexWithoutExpanded(index));
     return RawPtr(frameNode);
 }
@@ -6960,6 +7156,11 @@ const RefPtr<LayoutAlgorithmWrapper>& FrameNode::GetLayoutAlgorithm(bool needRes
 void FrameNode::SetCacheCount(int32_t cacheCount, const std::optional<LayoutConstraintF>& itemConstraint)
 {
     frameProxy_->SetCacheCount(cacheCount, itemConstraint);
+}
+
+void FrameNode::LayoutSafeAreaInset()
+{
+    LayoutSafeAreaInsetContainer(RawPtr(safeAreaInsetNode_));
 }
 
 void FrameNode::LayoutOverlay()
@@ -8958,12 +9159,50 @@ void FrameNode::SetIsFree(bool isFree)
     }
     UINode::SetIsFree(isFree);
     SetOverlayNodeIsFree(isFree);
+    if (safeAreaInsetNode_) {
+        if (isFree) {
+            safeAreaInsetNode_->MarkNodeTreeFree();
+        } else {
+            safeAreaInsetNode_->MarkNodeTreeNotFree();
+        }
+    }
 }
 
 void FrameNode::SetOverlayNode(const RefPtr<FrameNode>& overlayNode)
 {
     overlayNode_ = overlayNode;
     SetOverlayNodeIsFree(IsFree());
+}
+
+void FrameNode::SetSafeAreaInsetNode(const RefPtr<FrameNode>& safeAreaInsetNode)
+{
+    if (safeAreaInsetNode_ == safeAreaInsetNode) {
+        return;
+    }
+    if (safeAreaInsetNode_) {
+        if (safeAreaInsetNode_->IsOnMainTree()) {
+            safeAreaInsetNode_->DetachFromMainTree(true);
+        }
+        safeAreaInsetNode_->ResetParent();
+        safeAreaInsetNode_->MarkNodeTreeFree();
+    }
+    safeAreaInsetNode_ = safeAreaInsetNode;
+    if (safeAreaInsetNode_) {
+        safeAreaInsetNode_->SetParent(WeakClaim(this));
+        safeAreaInsetNode_->SetDepth(GetDepth() + 1);
+        safeAreaInsetNode_->SetHostPageId(GetHostPageId());
+        safeAreaInsetNode_->SetActive(isActive_);
+        if (IsOnMainTree() && !safeAreaInsetNode_->IsOnMainTree()) {
+            safeAreaInsetNode_->AttachToMainTree(true, GetContext());
+        }
+        if (IsFree()) {
+            safeAreaInsetNode_->MarkNodeTreeFree();
+        } else {
+            safeAreaInsetNode_->MarkNodeTreeNotFree();
+        }
+    }
+    MarkNeedSyncRenderTree(true);
+    MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
 }
 
 void FrameNode::SetOverlayNodeIsFree(bool isFree)

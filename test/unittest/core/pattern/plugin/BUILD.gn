@@ -58,6 +58,7 @@ if (defined(enable_plugin_pattern_test_ng)) {
       "$ace_root/frameworks/base/utils/time_util.cpp",
       "$ace_root/frameworks/core/common/ace_engine.cpp",
       "$ace_root/frameworks/core/common/container.cpp",
+      "$ace_root/frameworks/core/common/ui_observer/ui_observer_store.cpp",
       "$ace_root/frameworks/core/common/container_scope.cpp",
       "$ace_root/frameworks/core/common/event_dump.cpp",
       "$ace_root/frameworks/core/common/frontend.cpp",

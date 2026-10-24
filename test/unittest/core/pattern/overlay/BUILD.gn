@@ -48,6 +48,7 @@ test_sources = [
   "sheet_presentation_test_five_ng.cpp",
   "sheet_presentation_test_four_ng.cpp",
   "sheet_presentation_test_ng.cpp",
+  "sheet_presentation_test_nine_ng.cpp",
   "sheet_presentation_test_seven_ng.cpp",
   "sheet_presentation_test_six_ng.cpp",
   "sheet_presentation_test_three_ng.cpp",
@@ -60,6 +61,7 @@ test_sources = [
   "sheet_wrapper_layout_test_one_ng.cpp",
   "sheet_wrapper_layout_test_two_ng.cpp",
   "sheet_ec_test_ng.cpp",
+  "sheet_title_bar_test_ng.cpp",
   "overlay_manager_test_core.cpp",
 ]
 

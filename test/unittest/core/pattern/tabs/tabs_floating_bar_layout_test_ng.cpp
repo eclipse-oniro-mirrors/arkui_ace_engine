@@ -957,6 +957,144 @@ HWTEST_F(TabsFloatingBarLayoutTestNg, TabBarPatternSetIsFloatingBar002, TestSize
 }
 
 /**
+ * @tc.name: TabsLayoutAlgorithmSetIsFloatingTopBar001
+ * @tc.desc: Test TabsLayoutAlgorithm SetIsFloatingTopBar/GetIsFloatingTopBar state
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsFloatingBarLayoutTestNg, TabsLayoutAlgorithmSetIsFloatingTopBar001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create TabsLayoutAlgorithm
+     * @tc.expected: step1. Algorithm is created
+     */
+    auto layoutAlgorithm = AceType::MakeRefPtr<TabsLayoutAlgorithm>();
+    ASSERT_NE(layoutAlgorithm, nullptr);
+
+    /**
+     * @tc.steps: step2. Set isFloatingTopBar to true then false, verify CreateLayoutAlgorithm
+     *             passes the flag. Also verify SetLastFloatingTopBar.
+     * @tc.expected: step2. No crash; algorithm remains valid
+     */
+    layoutAlgorithm->SetIsFloatingTopBar(true);
+    layoutAlgorithm->SetLastFloatingTopBar(true);
+    layoutAlgorithm->SetIsFloatingTopBar(false);
+    layoutAlgorithm->SetLastFloatingTopBar(false);
+
+    EXPECT_NE(layoutAlgorithm, nullptr);
+}
+
+/**
+ * @tc.name: CalculateTabBarDisplayModeTop001
+ * @tc.desc: Test CalculateTabBarDisplayMode returns TOP_TABBAR when barLayoutStyle=TOP
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsFloatingBarLayoutTestNg, CalculateTabBarDisplayModeTop001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create Tabs with barLayoutStyle=TOP
+     * @tc.expected: step1. Tabs instance is created
+     */
+    TabsModelNG model = CreateTabs();
+    model.SetIsVertical(false);
+    model.SetBarLayoutStyle(TabBarLayoutStyle::TOP);
+    CreateTabContents();
+    GetTabs();
+    CreateTabsDone(model);
+
+    ASSERT_NE(pattern_, nullptr);
+    ASSERT_NE(layoutProperty_, nullptr);
+
+    /**
+     * @tc.steps: step2. Call CalculateTabBarDisplayMode with any width
+     * @tc.expected: step2. Returns TabBarDisplayMode::TOP_TABBAR
+     */
+    auto mode = pattern_->CalculateTabBarDisplayMode(TABS_WIDTH_600);
+    EXPECT_EQ(mode, TabBarDisplayMode::TOP_TABBAR);
+}
+
+/**
+ * @tc.name: CalculateTabBarDisplayModeTop002
+ * @tc.desc: Test GetActiveBarDisplayMode returns TOP when barLayoutStyle=TOP
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsFloatingBarLayoutTestNg, CalculateTabBarDisplayModeTop002, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create Tabs with barLayoutStyle=TOP
+     * @tc.expected: step1. Tabs instance is created
+     */
+    TabsModelNG model = CreateTabs();
+    model.SetIsVertical(false);
+    model.SetBarLayoutStyle(TabBarLayoutStyle::TOP);
+    CreateTabContents();
+    GetTabs();
+    CreateTabsDone(model);
+
+    ASSERT_NE(pattern_, nullptr);
+
+    /**
+     * @tc.steps: step2. Call GetActiveBarDisplayMode
+     * @tc.expected: step2. Returns TabBarDisplayMode::TOP_TABBAR
+     */
+    auto mode = pattern_->GetActiveBarDisplayMode();
+    EXPECT_EQ(mode, TabBarDisplayMode::TOP_TABBAR);
+}
+
+/**
+ * @tc.name: CalculateTabBarDisplayModeBottom001
+ * @tc.desc: Test CalculateTabBarDisplayMode returns BOTTOMTABBAR for default barLayoutStyle
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsFloatingBarLayoutTestNg, CalculateTabBarDisplayModeBottom001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create Tabs with default barLayoutStyle (BOTTOM)
+     * @tc.expected: step1. Tabs instance is created
+     */
+    TabsModelNG model = CreateTabs();
+    model.SetIsVertical(false);
+    CreateTabContents();
+    GetTabs();
+    CreateTabsDone(model);
+
+    ASSERT_NE(pattern_, nullptr);
+
+    /**
+     * @tc.steps: step2. Call CalculateTabBarDisplayMode
+     * @tc.expected: step2. Returns TabBarDisplayMode::BOTTOMTABBAR
+     */
+    auto mode = pattern_->CalculateTabBarDisplayMode(TABS_WIDTH_600);
+    EXPECT_EQ(mode, TabBarDisplayMode::BOTTOMTABBAR);
+}
+
+/**
+ * @tc.name: ClampTabBarTransformOffset001
+ * @tc.desc: Test ClampTabBarTransformOffset does not crash when not floating
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsFloatingBarLayoutTestNg, ClampTabBarTransformOffset001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create Tabs without floating bar
+     * @tc.expected: step1. Tabs instance is created, not floating
+     */
+    TabsModelNG model = CreateTabs();
+    CreateTabContents();
+    GetTabs();
+    CreateTabsDone(model);
+
+    ASSERT_NE(pattern_, nullptr);
+
+    /**
+     * @tc.steps: step2. Call ClampTabBarTransformOffset
+     * @tc.expected: step2. No crash, returns early (not floating)
+     */
+    pattern_->ClampTabBarTransformOffset();
+    EXPECT_FALSE(pattern_->IsFloatingBar());
+    EXPECT_FALSE(pattern_->IsFloatingTopBar());
+}
+
+/**
  * @tc.name: TabBarPatternColorInvertColorMode001
  * @tc.desc: Test TabBarPattern SetColorInvertColorMode and GetColorInvertColorMode
  * @tc.type: FUNC

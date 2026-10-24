@@ -731,6 +731,19 @@ void ParseMarkToday(EcmaVM* vm, const panda::Local<panda::ObjectRef>& paramObj, 
     settingData.markToday = isMarkToday;
 }
 
+void ParseFirstDayOfWeek(EcmaVM* vm, const panda::Local<panda::ObjectRef>& paramObj,
+    NG::CalendarSettingData& settingData)
+{
+    auto firstDayOfWeek = paramObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "firstDayOfWeek"));
+    if (firstDayOfWeek->IsInt()) {
+        int32_t value = firstDayOfWeek->Int32Value(vm);
+        if (value < FIRST_DAY_OF_WEEK_LOCAL || value > MAX_FIRST_DAY_OF_WEEK) {
+            value = FIRST_DAY_OF_WEEK_LOCAL;
+        }
+        settingData.firstDayOfWeek = value;
+    }
+}
+
 DialogProperties CalendarPickerDialogBridge::BuildDialogProperties(EcmaVM* vm,
     const panda::Local<panda::ObjectRef>& paramObj)
 {
@@ -817,6 +830,7 @@ void CalendarPickerDialogBridge::CalendarPickerDialogShow(EcmaVM* vm, const pand
 
     NG::CalendarSettingData settingData;
     ParseMarkToday(vm, paramObj, settingData);
+    ParseFirstDayOfWeek(vm, paramObj, settingData);
     ParseSelectedStartEndDate(vm, paramObj, settingData);
     CalcDimension radius;
     auto hintRadiusValue = paramObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "hintRadius"));

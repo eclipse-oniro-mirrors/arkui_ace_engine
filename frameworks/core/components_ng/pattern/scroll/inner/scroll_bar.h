@@ -36,6 +36,10 @@
 #include "core/components_ng/gestures/recognizers/long_press_recognizer.h"
 #include "core/pipeline_ng/pipeline_context.h"
 
+namespace OHOS::Ace {
+struct ParamConfig;
+}
+
 namespace OHOS::Ace::NG {
 
 constexpr double FACTOR_HALF = 0.5;
@@ -473,6 +477,8 @@ public:
     void GetAxisDumpInfo(std::unique_ptr<JsonValue>& json);
     void GetPanDirectionDumpInfo();
     void GetPanDirectionDumpInfo(std::unique_ptr<JsonValue>& json);
+
+    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
     void DumpAdvanceInfo();
     void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json);
     void StopFlingAnimation();
@@ -725,6 +731,8 @@ protected:
     }
 
 private:
+    void DumpAdvanceHistoryInfo(std::unique_ptr<JsonValue>& json);
+
     void SetRectTrickRegion(const Offset& offset, const Size& size, const Offset& lastOffset, double mainScrollExtent,
         int32_t scrollSource, const RefPtr<PipelineContext>& context = nullptr);
 

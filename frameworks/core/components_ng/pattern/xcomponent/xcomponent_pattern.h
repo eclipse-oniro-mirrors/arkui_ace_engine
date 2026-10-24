@@ -51,7 +51,11 @@ class AccessibilityChildTreeCallback;
 enum class StatisticEventType;
 }
 namespace OHOS::Ace::NG {
+constexpr int32_t MIN_BUFFER_QUEUE_COUNT = 2;
+constexpr int32_t MAX_BUFFER_QUEUE_COUNT = 5;
+constexpr int32_t DEFAULT_BUFFER_QUEUE_COUNT = 5;
 class XComponentExtSurfaceCallbackClient;
+
 class XComponentPattern : public Pattern {
     DECLARE_ACE_TYPE(XComponentPattern, Pattern);
 
@@ -367,6 +371,8 @@ public:
     void EnableSecure(bool isSecure);
     void HdrBrightness(float hdrBrightness);
     void HdrBrightness(float hdrBrightness, HdrType hdrType);
+    void SetExtraFlag(uint32_t flag);
+    bool IsSolidColorEnabled() const;
     void EnableTransparentLayer(bool isTransparentLayer);
     RenderFit GetSurfaceRenderFit() const;
     bool GetEnableAnalyzer();
@@ -374,6 +380,8 @@ public:
     RSCanvas* LockCanvas();
     void UnlockCanvasAndPost(RSCanvas* canvas);
     void SetSurfaceIsOpaque(bool isOpaque);
+    void SetBufferQueueCount(int32_t bufferQueueCount);
+    int32_t GetBufferQueueCount() const;
     ArkUI_AccessibilityProvider* GetNativeProvider();
     void PushType(StatisticEventType type);
     void OnFrameNodeChanged(FrameNodeChangeInfoFlag flag) override;
@@ -425,11 +433,13 @@ protected:
     bool isOnTree_ = false;
     float hdrBrightness_ = 1.0f;
     HdrType hdrType_ = HdrType::DEFAULT;
+    uint32_t extraFlag_ = 0;
     bool isTransparentLayer_ = false;
     bool isEnableSecure_ = false;
     bool isSurfaceLock_ = false;
     bool isOpaque_ = false;
     RenderFit renderFit_ = RenderFit::RESIZE_FILL;
+    int32_t bufferQueueCount_ = DEFAULT_BUFFER_QUEUE_COUNT;
     RefPtr<UIXComponentDisplaySync> displaySync_ = AceType::MakeRefPtr<UIXComponentDisplaySync>();
     bool needRecoverDisplaySync_ = false;
     std::shared_ptr<AccessibilityChildTreeCallback> accessibilityChildTreeCallback_;

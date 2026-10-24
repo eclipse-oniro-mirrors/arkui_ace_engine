@@ -21,8 +21,20 @@
 #include "adapter/ohos/entrance/ui_session/get_inspector_tree_config_impl.h"
 #include "adapter/ohos/entrance/ui_session/include/ui_session_log.h"
 #include "adapter/ohos/entrance/ui_session/ui_translate_request_util.h"
+#include "interfaces/inner_api/ui_session/ui_session_json_util.h"
 
 namespace OHOS::Ace {
+namespace {
+// Extract the ruleSetId used to register and route the event callback.
+std::string ExtractPageSceneRuleSetId(const std::string& ruleJson)
+{
+    auto root = InspectorJsonUtil::ParseJsonString(ruleJson);
+    if (!root || !root->IsObject()) {
+        return "";
+    }
+    return root->GetString("ruleSetId", "");
+}
+} // namespace
 int32_t UIContentServiceProxy::GetInspectorTree(
     const std::function<void(std::string, int32_t, bool)>& eventCallback, ParamConfig config, int32_t timeout)
 {
@@ -179,16 +191,24 @@ int32_t UIContentServiceProxy::RegisterPageSceneRules(
         LOGW("RegisterPageSceneRules write parcel failed");
         return FAILED;
     }
-    report_->RegisterPageSceneEventCallback(eventCallback);
+    auto ruleSetId = ExtractPageSceneRuleSetId(ruleJson);
+    if (ruleSetId.empty()) {
+        LOGW("RegisterPageSceneRules ruleSetId is empty or invalid");
+        return PARAM_INVALID;
+    }
+    if (!report_->TryRegisterPageSceneEventCallback(ruleSetId, eventCallback)) {
+        LOGW("RegisterPageSceneRules callback already registered");
+        return PARAM_INVALID;
+    }
     int32_t sendRequestErrorCode = Remote()->SendRequest(REGISTER_PAGE_SCENE_RULES, data, reply, option);
     if (sendRequestErrorCode != ERR_NONE) {
         LOGW("RegisterPageSceneRules send request failed, errorCode is %{public}d", sendRequestErrorCode);
-        report_->UnregisterPageSceneEventCallback();
+        report_->UnregisterPageSceneEventCallback(ruleSetId);
         return REPLY_ERROR;
     }
     int32_t result = reply.ReadInt32();
     if (result != NO_ERROR) {
-        report_->UnregisterPageSceneEventCallback();
+        report_->UnregisterPageSceneEventCallback(ruleSetId);
     }
     return result;
 }
@@ -212,7 +232,7 @@ int32_t UIContentServiceProxy::UnregisterPageSceneRules(const std::string& ruleS
         return REPLY_ERROR;
     }
     if (report_ != nullptr) {
-        report_->UnregisterPageSceneEventCallback();
+        report_->UnregisterPageSceneEventCallback(ruleSetId);
     }
     return reply.ReadInt32();
 }
@@ -250,6 +270,81 @@ int32_t UIContentServiceProxy::GetPageScene(
         report_->UnregisterGetPageSceneCallback();
     }
     return result;
+}
+
+int32_t UIContentServiceProxy::SendComponentTreeQueryRequest(uint32_t code, const char* caller,
+    const std::function<void(const std::string&)>& eventCallback,
+    const std::function<bool(MessageParcel&)>& writeParams,
+    int32_t timeout)
+{
+    if (eventCallback == nullptr) {
+        LOGW("%{public}s invalid callback", caller);
+        return PARAM_INVALID;
+    }
+    if (writeParams == nullptr) {
+        LOGW("%{public}s invalid writeParams", caller);
+        return PARAM_INVALID;
+    }
+    if (report_ == nullptr) {
+        LOGW("%{public}s reportStub is nullptr", caller);
+        return FAILED;
+    }
+    MessageParcel data;
+    if (!data.WriteInterfaceToken(GetDescriptor())) {
+        LOGW("%{public}s write interface token failed", caller);
+        return FAILED;
+    }
+    if (!writeParams(data)) {
+        LOGW("%{public}s write parcel failed", caller);
+        return FAILED;
+    }
+    bool isLazyForEach = code == IUiContentService::GET_LAZY_FOREACH_DATA_BY_POINT;
+    bool registerSuccess = isLazyForEach
+        ? report_->RegisterLazyForEachQueryCallback(eventCallback)
+        : report_->RegisterNavigationQueryCallback(eventCallback);
+    if (!registerSuccess) {
+        LOGW("%{public}s register callback failed, previous request unfinished", caller);
+        return LAST_UNFINISH;
+    }
+    MessageParcel reply;
+    MessageOption option;
+    int32_t sendRequestErrorCode = Remote()->SendRequest(code, data, reply, option);
+    if (sendRequestErrorCode != ERR_NONE) {
+        LOGW("%{public}s send request failed, errorCode is %{public}d", caller, sendRequestErrorCode);
+        if (isLazyForEach) {
+            report_->UnregisterLazyForEachQueryCallback();
+        } else {
+            report_->UnregisterNavigationQueryCallback();
+        }
+        return REPLY_ERROR;
+    }
+    bool postSuccess = isLazyForEach
+        ? report_->PostLazyForEachQueryCallbackRemoveTask(timeout)
+        : report_->PostNavigationQueryCallbackRemoveTask(timeout);
+    if (!postSuccess) {
+        return FAILED;
+    }
+    return reply.ReadInt32();
+}
+
+int32_t UIContentServiceProxy::GetNavigationContentByPoint(float x, float y, const std::string& pattern,
+    const std::function<void(const std::string&)>& eventCallback,
+    int32_t timeout)
+{
+    return SendComponentTreeQueryRequest(GET_NAVIGATION_CONTENT_BY_POINT, "GetNavigationContentByPoint",
+        eventCallback, [x, y, pattern](MessageParcel& data) {
+            return data.WriteFloat(x) && data.WriteFloat(y) && data.WriteString(pattern);
+        }, timeout);
+}
+
+int32_t UIContentServiceProxy::GetLazyForEachDataByPoint(float x, float y,
+    const std::function<void(const std::string&)>& eventCallback,
+    int32_t timeout)
+{
+    return SendComponentTreeQueryRequest(GET_LAZY_FOREACH_DATA_BY_POINT, "GetLazyForEachDataByPoint",
+        eventCallback, [x, y](MessageParcel& data) {
+            return data.WriteFloat(x) && data.WriteFloat(y);
+        }, timeout);
 }
 
 int32_t UIContentServiceProxy::RegisterClickEventCallback(const EventCallback& eventCallback)

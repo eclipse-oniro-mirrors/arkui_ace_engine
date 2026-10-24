@@ -17,6 +17,7 @@
 #include "core/common/container.h"
 
 #include <string_view>
+#include <unordered_map>
 
 #include "base/input_manager/input_manager.h"
 #include "base/log/ace_trace.h"
@@ -135,6 +136,55 @@ int32_t OnTextChangedListenerImpl::GetTextIndexAtCursor()
     };
     PostSyncTaskToUI(task, "ArkUITextFieldGetTextIndexAtCursor");
     return index;
+}
+
+MiscServices::RichTextData OnTextChangedListenerImpl::ConvertRichTextDataInfoToImfData(const RichTextDataInfo& info)
+{
+    static const std::unordered_map<RichSpanType, MiscServices::SpanType> spanTypeMap {
+        { RichSpanType::TEXT, MiscServices::SpanType::TEXT },
+        { RichSpanType::IMAGE, MiscServices::SpanType::IMAGE },
+        { RichSpanType::SYMBOL, MiscServices::SpanType::SYMBOL },
+        { RichSpanType::CUSTOM, MiscServices::SpanType::CUSTOM },
+    };
+    MiscServices::RichTextData result;
+    for (const auto& spanInfo : info.spans) {
+        auto it = spanTypeMap.find(spanInfo.type);
+        CHECK_NULL_CONTINUE(it != spanTypeMap.end());
+        result.spans.emplace_back(decltype(result.spans)::value_type{
+            .type = it->second,
+            .range = { spanInfo.range.start, spanInfo.range.end },
+            .content = spanInfo.content,
+        });
+    }
+    return result;
+}
+
+MiscServices::RichTextData OnTextChangedListenerImpl::GetLeftRichTextOfCursor(int32_t number)
+{
+    ACE_SCOPED_TRACE("GetLeftRichTextOfCursor[%d]", number);
+    RichTextDataInfo localResult;
+    auto task = [textField = pattern_, &localResult, number] {
+        auto client = textField.Upgrade();
+        CHECK_NULL_VOID(client);
+        ContainerScope scope(client->GetInstanceId());
+        localResult = client->GetLeftRichTextOfCursor(number);
+    };
+    PostSyncTaskToUI(task, "ArkUITextFieldGetLeftRichTextOfCursor");
+    return ConvertRichTextDataInfoToImfData(localResult);
+}
+
+MiscServices::RichTextData OnTextChangedListenerImpl::GetRightRichTextOfCursor(int32_t number)
+{
+    ACE_SCOPED_TRACE("GetRightRichTextOfCursor[%d]", number);
+    RichTextDataInfo localResult;
+    auto task = [textField = pattern_, &localResult, number] {
+        auto client = textField.Upgrade();
+        CHECK_NULL_VOID(client);
+        ContainerScope scope(client->GetInstanceId());
+        localResult = client->GetRightRichTextOfCursor(number);
+    };
+    PostSyncTaskToUI(task, "ArkUITextFieldGetRightRichTextOfCursor");
+    return ConvertRichTextDataInfoToImfData(localResult);
 }
 
 void OnTextChangedListenerImpl::SendKeyEventFromInputMethod(const MiscServices::KeyEvent& event) {}

@@ -195,6 +195,7 @@ private:
     void RemoveBackgroundImageNode();
     bool IsCameraChange();
     void OnPaint3D();
+    void FinishBackgroundSwitch();
 
 #if defined(ENABLE_ROSEN_BACKEND) && !defined(ACE_UNITTEST)
     void LoadDepthMap();
@@ -217,10 +218,10 @@ private:
     void InitGltfAdapter();
     void UpdateGltfScene();
     std::function<void(bool)> CreateGltfLoadCallback();
+    void FireGltfLoadCallback();
     void UpdateGltfCamera();
     void UpdateGltfWindowChange(const RefPtr<LayoutWrapper>& dirty, const DirtySwapConfig& config);
     void CleanupGltfResources(bool clearAdapter = false);
-    void DoCleanupGltfResources(bool clearAdapter);
     void CreateNativeSurfaces(float width, float height);
     void ClearNativeSurfaceNodeBuffer();
     Render3D::WindowChangeInfo GetWindowChangeInfos(float width, float height) const;
@@ -268,9 +269,6 @@ private:
     float lastHeight3d_ = 0.0;
     bool isGltfLoaded_ = false;
     std::optional<bool> pendingGltfLoadSuccess_;
-    bool isDisappearing_ = false;
-    bool isAppearing_ = false;
-    bool isGltfReady_ = false;
 #endif
 
     RefPtr<ImageLoadingContext> depthMapLoadingCtx_;

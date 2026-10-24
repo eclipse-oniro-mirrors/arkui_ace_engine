@@ -723,4 +723,334 @@ HWTEST_F(NativeKeyEventTest, NativeKeyEventTest0018, TestSize.Level1)
     ret = OH_ArkUI_KeyEvent_IsScrollLockOn(inputEvent, &flag);
     EXPECT_EQ(ret, ARKUI_ERROR_CODE_PARAM_INVALID);
 }
+
+/**
+ * @tc.name: NativeKeyEventTest0019
+ * @tc.desc: Test OH_ArkUI_KeyEvent_Create null param and valid lifecycle (AC-05).
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeKeyEventTest, NativeKeyEventTest0019, TestSize.Level1)
+{
+    EXPECT_EQ(OH_ArkUI_KeyEvent_Create(nullptr), ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_UIInputEvent* event = nullptr;
+    EXPECT_EQ(OH_ArkUI_KeyEvent_Create(&event), ARKUI_ERROR_CODE_NO_ERROR);
+    ASSERT_NE(event, nullptr);
+    EXPECT_EQ(OH_ArkUI_KeyEvent_Destroy(&event), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(event, nullptr);
+}
+
+/**
+ * @tc.name: NativeKeyEventTest0020
+ * @tc.desc: Test OH_ArkUI_KeyEvent_Destroy null event null/non-Create/valid (AC-05).
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeKeyEventTest, NativeKeyEventTest0020, TestSize.Level1)
+{
+    EXPECT_EQ(OH_ArkUI_KeyEvent_Destroy(nullptr), ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_UIInputEvent* nullEvent = nullptr;
+    EXPECT_EQ(OH_ArkUI_KeyEvent_Destroy(&nullEvent), ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_UIInputEvent nonCreate {};
+    nonCreate.eventTypeId = C_KEY_EVENT_ID;
+    ArkUI_UIInputEvent* nonCreatePtr = &nonCreate;
+    EXPECT_EQ(OH_ArkUI_KeyEvent_Destroy(&nonCreatePtr), ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_UIInputEvent* event = nullptr;
+    ASSERT_EQ(OH_ArkUI_KeyEvent_Create(&event), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(OH_ArkUI_KeyEvent_Destroy(&event), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(event, nullptr);
+}
+
+/**
+ * @tc.name: NativeKeyEventTest0021
+ * @tc.desc: Test OH_ArkUI_KeyEvent_SetType null/non-key/non-Create/round-trip (AC-05/AC-06).
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeKeyEventTest, NativeKeyEventTest0021, TestSize.Level1)
+{
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetType(nullptr, ARKUI_KEY_EVENT_UP), ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_UIInputEvent nonKey {};
+    nonKey.eventTypeId = C_TOUCH_EVENT_ID;
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetType(&nonKey, ARKUI_KEY_EVENT_UP), ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_UIInputEvent nonCreate {};
+    nonCreate.eventTypeId = C_KEY_EVENT_ID;
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetType(&nonCreate, ARKUI_KEY_EVENT_UP), ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_UIInputEvent* event = nullptr;
+    ASSERT_EQ(OH_ArkUI_KeyEvent_Create(&event), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetType(event, ARKUI_KEY_EVENT_UP), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(OH_ArkUI_KeyEvent_GetType(event), ARKUI_KEY_EVENT_UP);
+    EXPECT_EQ(OH_ArkUI_KeyEvent_Destroy(&event), ARKUI_ERROR_CODE_NO_ERROR);
+}
+
+/**
+ * @tc.name: NativeKeyEventTest0022
+ * @tc.desc: Test OH_ArkUI_KeyEvent_SetKeyCode null/non-key/non-Create/round-trip (AC-05/AC-06).
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeKeyEventTest, NativeKeyEventTest0022, TestSize.Level1)
+{
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetKeyCode(nullptr, ARKUI_KEYCODE_A), ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_UIInputEvent nonKey {};
+    nonKey.eventTypeId = C_TOUCH_EVENT_ID;
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetKeyCode(&nonKey, ARKUI_KEYCODE_A), ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_UIInputEvent nonCreate {};
+    nonCreate.eventTypeId = C_KEY_EVENT_ID;
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetKeyCode(&nonCreate, ARKUI_KEYCODE_A), ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_UIInputEvent* event = nullptr;
+    ASSERT_EQ(OH_ArkUI_KeyEvent_Create(&event), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetKeyCode(event, ARKUI_KEYCODE_A), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(OH_ArkUI_KeyEvent_GetKeyCode(event), ARKUI_KEYCODE_A);
+    EXPECT_EQ(OH_ArkUI_KeyEvent_Destroy(&event), ARKUI_ERROR_CODE_NO_ERROR);
+}
+
+/**
+ * @tc.name: NativeKeyEventTest0023
+ * @tc.desc: Test OH_ArkUI_KeyEvent_SetKeyText null/non-key/non-Create/copy and clear (AC-05/AC-06).
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeKeyEventTest, NativeKeyEventTest0023, TestSize.Level1)
+{
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetKeyText(nullptr, "a"), ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_UIInputEvent nonKey {};
+    nonKey.eventTypeId = C_TOUCH_EVENT_ID;
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetKeyText(&nonKey, "a"), ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_UIInputEvent nonCreate {};
+    nonCreate.eventTypeId = C_KEY_EVENT_ID;
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetKeyText(&nonCreate, "a"), ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_UIInputEvent* event = nullptr;
+    ASSERT_EQ(OH_ArkUI_KeyEvent_Create(&event), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetKeyText(event, "Enter"), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_STREQ(OH_ArkUI_KeyEvent_GetKeyText(event), "Enter");
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetKeyText(event, nullptr), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_STREQ(OH_ArkUI_KeyEvent_GetKeyText(event), "");
+    EXPECT_EQ(OH_ArkUI_KeyEvent_Destroy(&event), ARKUI_ERROR_CODE_NO_ERROR);
+}
+
+/**
+ * @tc.name: NativeKeyEventTest0024
+ * @tc.desc: Test OH_ArkUI_KeyEvent_SetKeySource null/non-key/non-Create/round-trip (AC-05/AC-06).
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeKeyEventTest, NativeKeyEventTest0024, TestSize.Level1)
+{
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetKeySource(nullptr, ARKUI_KEY_SOURCE_TYPE_KEYBOARD),
+        ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_UIInputEvent nonKey {};
+    nonKey.eventTypeId = C_TOUCH_EVENT_ID;
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetKeySource(&nonKey, ARKUI_KEY_SOURCE_TYPE_KEYBOARD),
+        ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_UIInputEvent nonCreate {};
+    nonCreate.eventTypeId = C_KEY_EVENT_ID;
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetKeySource(&nonCreate, ARKUI_KEY_SOURCE_TYPE_KEYBOARD),
+        ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_UIInputEvent* event = nullptr;
+    ASSERT_EQ(OH_ArkUI_KeyEvent_Create(&event), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetKeySource(event, ARKUI_KEY_SOURCE_TYPE_KEYBOARD),
+        ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(OH_ArkUI_KeyEvent_GetKeySource(event), ARKUI_KEY_SOURCE_TYPE_KEYBOARD);
+    EXPECT_EQ(OH_ArkUI_KeyEvent_Destroy(&event), ARKUI_ERROR_CODE_NO_ERROR);
+}
+
+/**
+ * @tc.name: NativeKeyEventTest0025
+ * @tc.desc: Test OH_ArkUI_KeyEvent_SetDeviceId null/non-key/non-Create/round-trip (AC-05/AC-06).
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeKeyEventTest, NativeKeyEventTest0025, TestSize.Level1)
+{
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetDeviceId(nullptr, 100), ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_UIInputEvent nonKey {};
+    nonKey.eventTypeId = C_TOUCH_EVENT_ID;
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetDeviceId(&nonKey, 100), ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_UIInputEvent nonCreate {};
+    nonCreate.eventTypeId = C_KEY_EVENT_ID;
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetDeviceId(&nonCreate, 100), ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_UIInputEvent* event = nullptr;
+    ASSERT_EQ(OH_ArkUI_KeyEvent_Create(&event), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetDeviceId(event, 100), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(OH_ArkUI_UIInputEvent_GetDeviceId(event), 100);
+    EXPECT_EQ(OH_ArkUI_KeyEvent_Destroy(&event), ARKUI_ERROR_CODE_NO_ERROR);
+}
+
+/**
+ * @tc.name: NativeKeyEventTest0026
+ * @tc.desc: Test OH_ArkUI_KeyEvent_SetUnicode null/non-key/non-Create/round-trip (AC-05/AC-06).
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeKeyEventTest, NativeKeyEventTest0026, TestSize.Level1)
+{
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetUnicode(nullptr, 0x42), ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_UIInputEvent nonKey {};
+    nonKey.eventTypeId = C_TOUCH_EVENT_ID;
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetUnicode(&nonKey, 0x42), ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_UIInputEvent nonCreate {};
+    nonCreate.eventTypeId = C_KEY_EVENT_ID;
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetUnicode(&nonCreate, 0x42), ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_UIInputEvent* event = nullptr;
+    ASSERT_EQ(OH_ArkUI_KeyEvent_Create(&event), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetUnicode(event, 0x42), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(OH_ArkUI_KeyEvent_GetUnicode(event), 0x42u);
+    EXPECT_EQ(OH_ArkUI_KeyEvent_Destroy(&event), ARKUI_ERROR_CODE_NO_ERROR);
+}
+
+/**
+ * @tc.name: NativeKeyEventTest0027
+ * @tc.desc: Test OH_ArkUI_KeyEvent_SetEventTime null/non-key/non-Create/round-trip (AC-05/AC-06).
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeKeyEventTest, NativeKeyEventTest0027, TestSize.Level1)
+{
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetEventTime(nullptr, 123456789), ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_UIInputEvent nonKey {};
+    nonKey.eventTypeId = C_TOUCH_EVENT_ID;
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetEventTime(&nonKey, 123456789), ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_UIInputEvent nonCreate {};
+    nonCreate.eventTypeId = C_KEY_EVENT_ID;
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetEventTime(&nonCreate, 123456789), ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_UIInputEvent* event = nullptr;
+    ASSERT_EQ(OH_ArkUI_KeyEvent_Create(&event), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetEventTime(event, 123456789), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(OH_ArkUI_UIInputEvent_GetEventTime(event), 123456789);
+    EXPECT_EQ(OH_ArkUI_KeyEvent_Destroy(&event), ARKUI_ERROR_CODE_NO_ERROR);
+}
+
+/**
+ * @tc.name: NativeKeyEventTest0028
+ * @tc.desc: Test OH_ArkUI_KeyEvent_SetPressedKeys null/non-key/non-Create/copy and clear (AC-05/AC-06).
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeKeyEventTest, NativeKeyEventTest0028, TestSize.Level1)
+{
+    int32_t keys[] = { 2017, 2018, 2019 };
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetPressedKeys(nullptr, keys, 3), ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_UIInputEvent nonKey {};
+    nonKey.eventTypeId = C_TOUCH_EVENT_ID;
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetPressedKeys(&nonKey, keys, 3), ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_UIInputEvent nonCreate {};
+    nonCreate.eventTypeId = C_KEY_EVENT_ID;
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetPressedKeys(&nonCreate, keys, 3), ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_UIInputEvent* event = nullptr;
+    ASSERT_EQ(OH_ArkUI_KeyEvent_Create(&event), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetPressedKeys(event, keys, 3), ARKUI_ERROR_CODE_NO_ERROR);
+    int32_t buf[4] = { 0 };
+    int32_t len = 4;
+    EXPECT_EQ(OH_ArkUI_UIInputEvent_GetPressedKeys(event, buf, &len), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(len, 3);
+    EXPECT_EQ(buf[0], 2017);
+    EXPECT_EQ(buf[1], 2018);
+    EXPECT_EQ(buf[2], 2019);
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetPressedKeys(event, nullptr, 0), ARKUI_ERROR_CODE_NO_ERROR);
+    len = 4;
+    EXPECT_EQ(OH_ArkUI_UIInputEvent_GetPressedKeys(event, buf, &len), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(len, 0);
+    EXPECT_EQ(OH_ArkUI_KeyEvent_Destroy(&event), ARKUI_ERROR_CODE_NO_ERROR);
+}
+
+/**
+ * @tc.name: NativeKeyEventTest0029
+ * @tc.desc: Test OH_ArkUI_KeyEvent_SetKeyIntentionCode null/non-key/non-Create/round-trip (AC-05/AC-06).
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeKeyEventTest, NativeKeyEventTest0029, TestSize.Level1)
+{
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetKeyIntentionCode(nullptr, ARKUI_KEY_INTENSION_UP),
+        ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_UIInputEvent nonKey {};
+    nonKey.eventTypeId = C_TOUCH_EVENT_ID;
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetKeyIntentionCode(&nonKey, ARKUI_KEY_INTENSION_UP),
+        ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_UIInputEvent nonCreate {};
+    nonCreate.eventTypeId = C_KEY_EVENT_ID;
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetKeyIntentionCode(&nonCreate, ARKUI_KEY_INTENSION_UP),
+        ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_UIInputEvent* event = nullptr;
+    ASSERT_EQ(OH_ArkUI_KeyEvent_Create(&event), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetKeyIntentionCode(event, ARKUI_KEY_INTENSION_UP),
+        ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(OH_ArkUI_KeyEvent_GetKeyIntensionCode(event), ARKUI_KEY_INTENSION_UP);
+    EXPECT_EQ(OH_ArkUI_KeyEvent_Destroy(&event), ARKUI_ERROR_CODE_NO_ERROR);
+}
+
+/**
+ * @tc.name: NativeKeyEventTest0030
+ * @tc.desc: Test OH_ArkUI_KeyEvent_SetNumLockOn null/non-key/non-Create/round-trip (AC-05/AC-06).
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeKeyEventTest, NativeKeyEventTest0030, TestSize.Level1)
+{
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetNumLockOn(nullptr, true), ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_UIInputEvent nonKey {};
+    nonKey.eventTypeId = C_TOUCH_EVENT_ID;
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetNumLockOn(&nonKey, true), ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_UIInputEvent nonCreate {};
+    nonCreate.eventTypeId = C_KEY_EVENT_ID;
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetNumLockOn(&nonCreate, true), ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_UIInputEvent* event = nullptr;
+    ASSERT_EQ(OH_ArkUI_KeyEvent_Create(&event), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetNumLockOn(event, true), ARKUI_ERROR_CODE_NO_ERROR);
+    bool flag = false;
+    EXPECT_EQ(OH_ArkUI_KeyEvent_IsNumLockOn(event, &flag), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_TRUE(flag);
+    EXPECT_EQ(OH_ArkUI_KeyEvent_Destroy(&event), ARKUI_ERROR_CODE_NO_ERROR);
+}
+
+/**
+ * @tc.name: NativeKeyEventTest0031
+ * @tc.desc: Test OH_ArkUI_KeyEvent_SetCapsLockOn null/non-key/non-Create/round-trip (AC-05/AC-06).
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeKeyEventTest, NativeKeyEventTest0031, TestSize.Level1)
+{
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetCapsLockOn(nullptr, true), ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_UIInputEvent nonKey {};
+    nonKey.eventTypeId = C_TOUCH_EVENT_ID;
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetCapsLockOn(&nonKey, true), ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_UIInputEvent nonCreate {};
+    nonCreate.eventTypeId = C_KEY_EVENT_ID;
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetCapsLockOn(&nonCreate, true), ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_UIInputEvent* event = nullptr;
+    ASSERT_EQ(OH_ArkUI_KeyEvent_Create(&event), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetCapsLockOn(event, true), ARKUI_ERROR_CODE_NO_ERROR);
+    bool flag = false;
+    EXPECT_EQ(OH_ArkUI_KeyEvent_IsCapsLockOn(event, &flag), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_TRUE(flag);
+    EXPECT_EQ(OH_ArkUI_KeyEvent_Destroy(&event), ARKUI_ERROR_CODE_NO_ERROR);
+}
+
+/**
+ * @tc.name: NativeKeyEventTest0032
+ * @tc.desc: Test OH_ArkUI_KeyEvent_SetScrollLockOn null/non-key/non-Create/round-trip (AC-05/AC-06).
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeKeyEventTest, NativeKeyEventTest0032, TestSize.Level1)
+{
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetScrollLockOn(nullptr, true), ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_UIInputEvent nonKey {};
+    nonKey.eventTypeId = C_TOUCH_EVENT_ID;
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetScrollLockOn(&nonKey, true), ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_UIInputEvent nonCreate {};
+    nonCreate.eventTypeId = C_KEY_EVENT_ID;
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetScrollLockOn(&nonCreate, true), ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_UIInputEvent* event = nullptr;
+    ASSERT_EQ(OH_ArkUI_KeyEvent_Create(&event), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(OH_ArkUI_KeyEvent_SetScrollLockOn(event, true), ARKUI_ERROR_CODE_NO_ERROR);
+    bool flag = false;
+    EXPECT_EQ(OH_ArkUI_KeyEvent_IsScrollLockOn(event, &flag), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_TRUE(flag);
+    EXPECT_EQ(OH_ArkUI_KeyEvent_Destroy(&event), ARKUI_ERROR_CODE_NO_ERROR);
+}
+
+/**
+ * @tc.name: NativeKeyEventTest0033
+ * @tc.desc: Test OH_ArkUI_KeyEvent_Create inits inputType/apiVersion so GetType returns KEY (AC-05).
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeKeyEventTest, NativeKeyEventTest0033, TestSize.Level1)
+{
+    ArkUI_UIInputEvent* event = nullptr;
+    ASSERT_EQ(OH_ArkUI_KeyEvent_Create(&event), ARKUI_ERROR_CODE_NO_ERROR);
+    ASSERT_NE(event, nullptr);
+    EXPECT_EQ(OH_ArkUI_UIInputEvent_GetType(event), ARKUI_UIINPUTEVENT_TYPE_KEY);
+    EXPECT_EQ(OH_ArkUI_UIInputEvent_GetLatestStatus(), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(OH_ArkUI_KeyEvent_Destroy(&event), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(event, nullptr);
+}
 } // namespace OHOS::Ace

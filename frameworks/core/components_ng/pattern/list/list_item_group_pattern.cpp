@@ -149,6 +149,47 @@ bool ListItemGroupPattern::OnThemeScopeUpdate(int32_t themeScopeId)
     return false;
 }
 
+void ListItemGroupPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if (!config.IsPublicTree()) {
+        json->Put("itemStartIndex", itemStartIndex_);
+        json->Put("itemTotalCount", itemTotalCount_);
+    }
+    if (!config.IsPublicTree() || config.visualProperties) {
+        json->Put("itemDisplayEndIndex", itemDisplayEndIndex_);
+        json->Put("itemDisplayStartIndex", itemDisplayStartIndex_);
+        json->Put("headerMainSize", headerMainSize_);
+        json->Put("footerMainSize", footerMainSize_);
+        json->Put("spaceWidth", spaceWidth_);
+        json->Put("lanes", lanes_);
+        json->Put("laneGutter", laneGutter_);
+        json->Put("startHeaderPos", startHeaderPos_);
+        json->Put("endFooterPos", endFooterPos_);
+    }
+    if (!config.IsPublicTree()) {
+        auto layoutProperty = GetLayoutProperty<ListItemGroupLayoutProperty>();
+        if (layoutProperty) {
+            layoutProperty->DumpInfo(json);
+        }
+    }
+    if (!config.IsPublicTree()) {
+        return;
+    }
+    if (config.visualProperties) {
+        DumpAdvanceVisualProperties(json, config);
+    }
+}
+
+void ListItemGroupPattern::DumpAdvanceVisualProperties(
+    std::unique_ptr<JsonValue>& json, const ParamConfig& /* config */)
+{
+    auto property = GetLayoutProperty<ListItemGroupLayoutProperty>();
+    CHECK_NULL_VOID(property);
+    if (property->GetDivider().has_value()) {
+        property->DumpInfo(json);
+    }
+}
+
 void ListItemGroupPattern::DumpAdvanceInfo()
 {
     DumpLog::GetInstance().AddDesc("itemStartIndex:" + std::to_string(itemStartIndex_));
@@ -306,6 +347,7 @@ float ListItemGroupPattern::GetEstimateHeight(float& averageHeight,
     }
     float totalHeight = 0.0f;
     auto host = GetHost();
+    CHECK_NULL_RETURN(host, 0.0f);
     auto totalItem = host->GetTotalChildCount();
     if (header_.Upgrade()) {
         totalItem -= 1;
@@ -1048,21 +1090,7 @@ void ListItemGroupPattern::OnColorModeChange(uint32_t colorMode)
 
 void ListItemGroupPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json)
 {
-    json->Put("itemStartIndex", itemStartIndex_);
-    json->Put("itemTotalCount", itemTotalCount_);
-    json->Put("itemDisplayEndIndex", itemDisplayEndIndex_);
-    json->Put("itemDisplayStartIndex", itemDisplayStartIndex_);
-    json->Put("headerMainSize", headerMainSize_);
-    json->Put("footerMainSize", footerMainSize_);
-    json->Put("spaceWidth", spaceWidth_);
-    json->Put("lanes", lanes_);
-    json->Put("laneGutter", laneGutter_);
-    json->Put("startHeaderPos", startHeaderPos_);
-    json->Put("endFooterPos", endFooterPos_);
-    auto layoutProperty = GetLayoutProperty<ListItemGroupLayoutProperty>();
-    if (layoutProperty) {
-        layoutProperty->DumpInfo(json);
-    }
+    ListItemGroupPattern::DumpAdvanceInfo(json, ParamConfig());
 }
 
 ScopeFocusAlgorithm ListItemGroupPattern::GetScopeFocusAlgorithm()

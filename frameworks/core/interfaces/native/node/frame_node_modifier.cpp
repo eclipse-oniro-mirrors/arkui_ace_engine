@@ -25,11 +25,13 @@
 #include "core/common/color_inverter.h"
 #include "core/components_ng/base/inspector.h"
 #include "core/components_ng/base/view_abstract.h"
+#include "core/components_ng/base/cmp_accessibility_registry.h"
 #include "core/components_ng/pattern/custom_frame_node/custom_frame_node.h"
 #include "core/components_ng/pattern/custom_frame_node/custom_pattern.h"
 #include "core/components_ng/pattern/custom/custom_measure_layout_node.h"
 #include "core/interfaces/arkoala/arkoala_api.h"
 #include "core/interfaces/native/node/frame_node_modifier_multi_thread.h"
+#include "core/interfaces/native/node/ui_event_command_processor.h"
 #include "core/pipeline_ng/pipeline_context.h"
 #include "core/interfaces/native/utility/error_message_macros.h"
 #include "interfaces/native/native_type.h"
@@ -1297,6 +1299,80 @@ ArkUI_AccessibilityProvider* GetAccessibilityProvider(ArkUINodeHandle node)
     return pattern->GetNativeAccessibilityProvider();
 }
 
+// CMP mixed-rendering: frame node modifier route for OH_ArkUI_Accessibility_BindExportTree / OH_ArkUI_Accessibility_UnbindExportTree.
+ArkUI_Int32 BindAccessibilityExportTree(ArkUINodeHandle owner, ArkUI_Int64 bindId, ArkUINodeHandle exportedRoot)
+{
+    // Adoption of exportedRoot is NOT required.
+    auto* ownerNode = reinterpret_cast<FrameNode*>(owner);
+    auto* exportedRootNode = reinterpret_cast<FrameNode*>(exportedRoot);
+    if (ownerNode == nullptr || exportedRootNode == nullptr) {
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+#ifdef OHOS_PLATFORM
+    auto container = Container::GetContainer(ownerNode->GetInstanceId());
+    auto executor = container ? container->GetTaskExecutor() : nullptr;
+    CHECK_NULL_RETURN(executor, ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_Int32 result = ARKUI_ERROR_CODE_PARAM_INVALID;
+    auto task = [ownerWeak = Referenced::WeakClaim(ownerNode),
+        rootWeak = Referenced::WeakClaim(exportedRootNode), bindId, &result] {
+        auto owner = ownerWeak.Upgrade();
+        auto root = rootWeak.Upgrade();
+        CHECK_NULL_VOID(owner);
+        if (owner->GetTag() != V2::CUSTOM_ETS_TAG && owner->GetTag() != V2::XCOMPONENT_ETS_TAG) {
+            return;
+        }
+        CHECK_NULL_VOID(root);
+        ContainerScope scope(owner->GetInstanceId());
+        if (OHOS::Ace::CmpAccessibility::CmpAccessibilityRegistry::BindExportTree(
+            owner.GetRawPtr(), bindId, root.GetRawPtr())) {
+            result = ARKUI_ERROR_CODE_NO_ERROR;
+        }
+    };
+    if (executor->WillRunOnCurrentThread(TaskExecutor::TaskType::UI)) {
+        task();
+    } else {
+        executor->PostSyncTask(task, TaskExecutor::TaskType::UI, "ArkUIBindAccessibilityExportTree");
+    }
+    return result;
+#else
+    // CMP mixed-rendering depends on the OHOS accessibility (AAMS) stack.
+    return ARKUI_ERROR_CODE_INTERNAL_ERROR;
+#endif
+}
+
+// Unbind is idempotent for unknown bindIds: NO_ERROR, no side effects.
+ArkUI_Int32 UnbindAccessibilityExportTree(ArkUINodeHandle owner, ArkUI_Int64 bindId)
+{
+    auto* ownerNode = reinterpret_cast<FrameNode*>(owner);
+    if (ownerNode == nullptr) {
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+#ifdef OHOS_PLATFORM
+    auto container = Container::GetContainer(ownerNode->GetInstanceId());
+    auto executor = container ? container->GetTaskExecutor() : nullptr;
+    CHECK_NULL_RETURN(executor, ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_Int32 result = ARKUI_ERROR_CODE_PARAM_INVALID;
+    auto task = [ownerWeak = Referenced::WeakClaim(ownerNode), bindId, &result] {
+        auto owner = ownerWeak.Upgrade();
+        CHECK_NULL_VOID(owner);
+        if (owner->GetTag() != V2::CUSTOM_ETS_TAG && owner->GetTag() != V2::XCOMPONENT_ETS_TAG) {
+            return;
+        }
+        ContainerScope scope(owner->GetInstanceId());
+        OHOS::Ace::CmpAccessibility::CmpAccessibilityRegistry::UnbindExportTree(owner.GetRawPtr(), bindId);
+        result = ARKUI_ERROR_CODE_NO_ERROR;
+    };
+    if (executor->WillRunOnCurrentThread(TaskExecutor::TaskType::UI)) {
+        task();
+    } else if (!executor->PostSyncTask(task, TaskExecutor::TaskType::UI, "ArkUIUnbindAccessibilityExportTree")) {
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    return result;
+#else
+    return ARKUI_ERROR_CODE_INTERNAL_ERROR;
+#endif
+}
+
 ArkUINodeHandle GetPageRootNode(int32_t instanceId)
 {
     ContainerScope scope(instanceId);
@@ -1324,6 +1400,7 @@ ArkUI_Int32 SetUiDvsyncSwitch(ArkUIContext* context, bool enable)
     pipelineContext->SetUiDvsyncSwitch(enable, FromWhom::API);
     return ERROR_CODE_NO_ERROR;
 }
+
 
 namespace NodeModifier {
 const ArkUIFrameNodeModifier* GetFrameNodeModifier()
@@ -1424,6 +1501,9 @@ const ArkUIFrameNodeModifier* GetFrameNodeModifier()
         .getAccessibilityProvider = GetAccessibilityProvider,
         .getPageRootNode = GetPageRootNode,
         .getCommonViewParentId = GetCommonViewParentId,
+        .bindAccessibilityExportTree = BindAccessibilityExportTree,
+        .unbindAccessibilityExportTree = UnbindAccessibilityExportTree,
+        .injectCompositeCommand = InjectCompositeCommandImpl,
     };
     CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
     return &modifier;

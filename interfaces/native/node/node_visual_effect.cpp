@@ -13,10 +13,12 @@
  * limitations under the License.
  */
 
+#include <cmath>
 #include <securec.h>
 
 #include "animate_impl.h"
 #include "node/node_model.h"
+#include "native_type_visual_impl.h"
 
 #include "base/error/error_code.h"
 #include "base/utils/utils.h"
@@ -27,6 +29,7 @@ extern "C" {
 
 namespace {
 constexpr int NUM_4 = 4;
+constexpr int NUM_2 = 2;
 }
 
 ArkUI_Matrix4ScaleOptions* OH_ArkUI_Matrix4ScaleOptions_Create()
@@ -554,6 +557,133 @@ ArkUI_ErrorCode OH_ArkUI_Matrix4_GetElements(const ArkUI_Matrix4* matrix, float*
     }
     impl->getNodeModifiers()->getMatrix4Modifier()->getElements(matrix->matrix, result);
     return ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+OH_ArkUI_LinearGradientBlurOptions* OH_ArkUI_NativeModule_LinearGradientBlurOptions_Create()
+{
+    auto* options = new OH_ArkUI_LinearGradientBlurOptions();
+    return options;
+}
+
+void OH_ArkUI_NativeModule_LinearGradientBlurOptions_Destroy(OH_ArkUI_LinearGradientBlurOptions* options)
+{
+    CHECK_NULL_VOID(options);
+    delete options;
+}
+
+ArkUI_ErrorCode OH_ArkUI_NativeModule_LinearGradientBlurOptions_SetBlurRadius(
+    OH_ArkUI_LinearGradientBlurOptions* options, float blurRadius)
+{
+    if (options == nullptr) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "options is null");
+        return ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    if (std::isnan(blurRadius) || blurRadius < 0.0f) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "blurRadius is negative or NaN");
+        return ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    options->blurRadius = blurRadius;
+    return ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+ArkUI_ErrorCode OH_ArkUI_NativeModule_LinearGradientBlurOptions_GetBlurRadius(
+    const OH_ArkUI_LinearGradientBlurOptions* options, float* blurRadius)
+{
+    if (options == nullptr || blurRadius == nullptr) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "options or blurRadius is null");
+        return ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    *blurRadius = options->blurRadius;
+    return ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+ArkUI_ErrorCode OH_ArkUI_NativeModule_LinearGradientBlurOptions_SetFractionStops(
+    OH_ArkUI_LinearGradientBlurOptions* options, const float* fractionStops, int32_t stopsLength)
+{
+    if (options == nullptr) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "options is null");
+        return ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    if (fractionStops == nullptr) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "fractionStops is null");
+        return ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    if (stopsLength % NUM_2 != 0) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "stopsLength is odd");
+        return ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    if (stopsLength < NUM_4) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "stopsLength is less than 4");
+        return ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    for (uint32_t i = 0; i < stopsLength; i++) {
+        if (std::isnan(fractionStops[i]) || fractionStops[i] < 0.0f || fractionStops[i] > 1.0f) {
+            SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__,
+                "fractionStops element is NaN or outside the range [0.0, 1.0]");
+            return ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID;
+        }
+    }
+    for (uint32_t i = NUM_2 + 1; i < stopsLength; i += NUM_2) {
+        if (fractionStops[i] <= fractionStops[i - NUM_2]) {
+            SET_ERROR_MESSAGE(
+                ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "positions are not strictly monotonically increasing");
+            return ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID;
+        }
+    }
+    options->fractionStops.assign(fractionStops, fractionStops + stopsLength);
+    return ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+ArkUI_ErrorCode OH_ArkUI_NativeModule_LinearGradientBlurOptions_GetFractionStops(
+    const OH_ArkUI_LinearGradientBlurOptions* options, float* fractionStops, int32_t stopsSize, int32_t* writeLength)
+{
+    if (options == nullptr || writeLength == nullptr) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "options or writeLength is null");
+        return ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    auto size = static_cast<int32_t>(options->fractionStops.size());
+    *writeLength = size;
+    if (stopsSize < size) {
+        SET_ERROR_MESSAGE(
+            ARKUI_ERROR_CODE_BUFFER_SIZE_ERROR, __FUNCTION__, "stopsSize is less than the actual fractionStops count");
+        return ArkUI_ErrorCode::ARKUI_ERROR_CODE_BUFFER_SIZE_ERROR;
+    }
+    if (fractionStops == nullptr) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "fractionStops is null");
+        return ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    for (int32_t i = 0; i < size; i++) {
+        fractionStops[i] = options->fractionStops[i];
+    }
+    return ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+ArkUI_ErrorCode OH_ArkUI_NativeModule_LinearGradientBlurOptions_SetDirection(
+    OH_ArkUI_LinearGradientBlurOptions* options, OH_ArkUI_LinearGradientBlurDirection direction)
+{
+    if (options == nullptr) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "options is null");
+        return ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    const int32_t directionValue = static_cast<int32_t>(direction);
+    if (directionValue < 0 ||
+        directionValue > static_cast<int32_t>(OH_ARKUI_LINEAR_GRADIENT_BLUR_DIRECTION_RIGHT_BOTTOM)) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "direction is not a valid enum value");
+        return ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    options->direction = direction;
+    return ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+ArkUI_ErrorCode OH_ArkUI_NativeModule_LinearGradientBlurOptions_GetDirection(
+    const OH_ArkUI_LinearGradientBlurOptions* options, OH_ArkUI_LinearGradientBlurDirection* direction)
+{
+    if (options == nullptr || direction == nullptr) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "options or direction is null");
+        return ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    *direction = options->direction;
+    return ArkUI_ErrorCode::ARKUI_ERROR_CODE_NO_ERROR;
 }
 #ifdef __cplusplus
 };

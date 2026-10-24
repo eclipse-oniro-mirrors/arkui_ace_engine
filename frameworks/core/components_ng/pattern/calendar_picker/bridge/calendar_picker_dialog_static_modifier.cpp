@@ -105,6 +105,15 @@ CalendarSettingData BuildSettingData(const Ark_CalendarDialogOptions options)
     if (markToday.has_value()) {
         settingData.markToday = markToday.value();
     }
+    auto firstDayOfWeekOpt = Converter::GetOptPtr(&options.firstDayOfWeek);
+    if (firstDayOfWeekOpt) {
+        int32_t value = static_cast<int32_t>(*firstDayOfWeekOpt);
+        if (value < CalendarPickerConstants::FIRST_DAY_OF_WEEK_LOCAL ||
+            value > CalendarPickerConstants::MAX_FIRST_DAY_OF_WEEK) {
+            value = CalendarPickerConstants::FIRST_DAY_OF_WEEK_LOCAL;
+        }
+        settingData.firstDayOfWeek = value;
+    }
     return settingData;
 }
 

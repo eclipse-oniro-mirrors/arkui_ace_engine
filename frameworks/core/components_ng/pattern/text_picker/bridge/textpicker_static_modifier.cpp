@@ -17,7 +17,7 @@
 #include "compatible/components/picker/picker_text_component.h"
 
 #include "core/components_ng/base/frame_node.h"
-#include "core/components_ng/pattern/text_picker/bridge/textpicker_parser.h"
+#include "core/components_ng/pattern/text_picker/bridge/textpicker_options.h"
 #include "core/components_ng/pattern/text_picker/textpicker_event_hub.h"
 #include "core/components_ng/pattern/text_picker/textpicker_model_ng.h"
 #include "core/components_ng/pattern/text_picker/textpicker_model_static.h"

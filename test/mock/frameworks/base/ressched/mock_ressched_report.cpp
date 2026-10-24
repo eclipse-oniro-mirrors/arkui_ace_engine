@@ -26,6 +26,12 @@ namespace {
     constexpr char ABILITY_OR_PAGE_SWITCH_START[] = "ability_or_page_switch_start";
     constexpr char ABILITY_OR_PAGE_SWITCH_END[] = "ability_or_page_switch_end";
     constexpr uint64_t RES_TYPE_ABILITY_OR_PAGE_SWITCH = 156;
+    std::unordered_map<std::string, std::string> g_lastSwiperChangePayload;
+}
+
+const std::unordered_map<std::string, std::string>& GetLastSwiperChangePayload()
+{
+    return g_lastSwiperChangePayload;
 }
 
 ResSchedReport::ResSchedReport()
@@ -104,7 +110,9 @@ bool ResSchedReport::AppRVSEnableCheck(const std::unordered_map<std::string, std
 }
 
 void ResSchedReport::HandleSwiperChange(std::unordered_map<std::string, std::string>& payload)
-{}
+{
+    g_lastSwiperChangePayload = payload;
+}
 
 namespace {
 // Keep in sync with RES_TYPE_DIALOG_EVENT in frameworks/base/ressched/ressched_report.cpp.
@@ -118,4 +126,5 @@ void ResSchedReport::ReportDialogShow()
         reportDataFunc_(RES_TYPE_DIALOG_EVENT, 0, payload);
     }
 }
+
 } // namespace OHOS::Ace

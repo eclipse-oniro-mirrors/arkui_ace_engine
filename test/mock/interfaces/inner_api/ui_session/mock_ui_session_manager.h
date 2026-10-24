@@ -17,6 +17,7 @@
 #define TEST_MOCK_ADAPTER_MOCK_UI_SESSION_MANAGER_H
 
 #include "interfaces/inner_api/ui_session/ui_session_manager.h"
+#include "interfaces/inner_api/ui_session/component_tree_query_type.h"
 
 #include "gmock/gmock.h"
 
@@ -32,6 +33,7 @@ public:
     MOCK_METHOD0(GetPageSceneRulesRegistered, bool());
     MOCK_METHOD0(NotifyPageSceneContentChanged, void());
     MOCK_METHOD0(FlushPageSceneNodeChanged, void());
+    MOCK_METHOD0(FlushPendingSearchClicksIfStable, void());
     MOCK_METHOD0(GetComponentChangeEventRegistered, bool());
     MOCK_METHOD3(SendPageTextToAI, void(int32_t nodeId, const std::string& text, int64_t version));
     MOCK_METHOD1(GetPageTranslateText, int32_t(const std::string& request));
@@ -40,6 +42,8 @@ public:
     MOCK_METHOD1(ResetPageTranslate, void(int32_t nodeId));
     MOCK_METHOD1(SendPageTranslateResult, void(const std::string& result));
     MOCK_METHOD2(GetCurrentAbilityLanguageInfo, int32_t(std::string&, std::string&));
+    MOCK_METHOD2(SaveProcessId, void(std::string key, int32_t id));
+    MOCK_METHOD1(ComponentTreeQuery, void(const ComponentTreeQueryRequest& request));
 };
 }
 #endif

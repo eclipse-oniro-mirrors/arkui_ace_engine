@@ -28,7 +28,7 @@ namespace OHOS::Ace {
 
 using PopupImpl = std::function<void()>;
 
-class PopupController : public virtual AceType {
+class PopupController : public AceType {
     DECLARE_ACE_TYPE(PopupController, AceType);
 
 public:

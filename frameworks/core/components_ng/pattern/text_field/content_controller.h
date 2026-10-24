@@ -28,7 +28,7 @@
 #include "core/components_ng/pattern/pattern.h"
 
 namespace OHOS::Ace::NG {
-class ContentController : public virtual AceType {
+class ContentController : public AceType {
     DECLARE_ACE_TYPE(ContentController, AceType);
 
 public:

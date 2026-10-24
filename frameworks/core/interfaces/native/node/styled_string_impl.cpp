@@ -15,6 +15,7 @@
 
 #include "securec.h"
 
+#include "base/utils/string_utils.h"
 #include "native_type.h"
 #include "core/components_ng/pattern/text/span/mutable_span_string.h"
 #include "core/interfaces/arkoala/arkoala_api.h"
@@ -515,6 +516,9 @@ ImageSpanOptions CreateImageSpanOptions(const ArkUIImageAttachment& imageAttachm
     ImageSpanAttribute imageStyle;
     ConvertToImageSpanAttribute(imageStyle, imageAttachment);
     options.imageAttribute = imageStyle;
+    if (imageAttachment.imageTag.has_value()) {
+        options.imageTag = StringUtils::Str8ToStr16(imageAttachment.imageTag.value());
+    }
     return options;
 }
 
@@ -862,6 +866,9 @@ void ApplyImageSpan(ArkUISpanStyle& style, const RefPtr<SpanBase>& span)
         imageAttachment.isPixelMap = true;
     }
     ParseImageSpanAttribute(imageAttachment, options.imageAttribute);
+    if (options.imageTag.has_value()) {
+        imageAttachment.imageTag = StringUtils::Str16ToStr8(options.imageTag.value());
+    }
     style.imageAttachment = imageAttachment;
 }
 

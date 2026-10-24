@@ -13,6 +13,8 @@
  * limitations under the License.
  */
 
+#include <algorithm>
+
 #include "core/components_ng/pattern/xcomponent/xcomponent_model_ng.h"
 
 #include "base/display_manager/display_manager.h"
@@ -331,6 +333,16 @@ void XComponentModelNG::HdrBrightness(float hdrBrightness, HdrType hdrType)
     xcPattern->HdrBrightness(hdrBrightness, hdrType);
 }
 
+void XComponentModelNG::SetExtraFlag(uint32_t flag)
+{
+    TAG_LOGI(AceLogTag::ACE_XCOMPONENT, "XComponent SetExtraFlag (model instance) entry, flag: %{public}u", flag);
+    auto frameNode = AceType::Claim(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    CHECK_NULL_VOID(frameNode);
+    auto xcPattern = AceType::DynamicCast<XComponentPattern>(frameNode->GetPattern());
+    CHECK_NULL_VOID(xcPattern);
+    xcPattern->SetExtraFlag(flag);
+}
+
 void XComponentModelNG::EnableTransparentLayer(bool isTransparentLayer)
 {
     auto frameNode = AceType::Claim(ViewStackProcessor::GetInstance()->GetMainFrameNode());
@@ -338,6 +350,15 @@ void XComponentModelNG::EnableTransparentLayer(bool isTransparentLayer)
     auto xcPattern = AceType::DynamicCast<XComponentPattern>(frameNode->GetPattern());
     CHECK_NULL_VOID(xcPattern);
     xcPattern->EnableTransparentLayer(isTransparentLayer);
+}
+
+void XComponentModelNG::SetBufferQueueCount(int32_t bufferQueueCount)
+{
+    auto frameNode = AceType::Claim(ViewStackProcessor::GetInstance()->GetMainFrameNode());
+    CHECK_NULL_VOID(frameNode);
+    auto xcPattern = AceType::DynamicCast<XComponentPattern>(frameNode->GetPattern());
+    CHECK_NULL_VOID(xcPattern);
+    xcPattern->SetBufferQueueCount(std::clamp(bufferQueueCount, MIN_BUFFER_QUEUE_COUNT, MAX_BUFFER_QUEUE_COUNT));
 }
 
 void XComponentModelNG::SetScreenId(uint64_t screenId)
@@ -617,12 +638,37 @@ void XComponentModelNG::HdrBrightness(FrameNode* frameNode, float hdrBrightness,
     xcPattern->HdrBrightness(hdrBrightness, hdrType);
 }
 
+void XComponentModelNG::SetExtraFlag(FrameNode* frameNode, uint32_t flag)
+{
+    TAG_LOGI(AceLogTag::ACE_XCOMPONENT, "XComponent SetExtraFlag (model static) entry, flag: %{public}u", flag);
+    CHECK_NULL_VOID(frameNode);
+    auto xcPattern = AceType::DynamicCast<XComponentPattern>(frameNode->GetPattern());
+    CHECK_NULL_VOID(xcPattern);
+    xcPattern->SetExtraFlag(flag);
+}
+
 void XComponentModelNG::EnableTransparentLayer(FrameNode* frameNode, bool enable)
 {
     CHECK_NULL_VOID(frameNode);
     auto xcPattern = AceType::DynamicCast<XComponentPattern>(frameNode->GetPattern());
     CHECK_NULL_VOID(xcPattern);
     xcPattern->EnableTransparentLayer(enable);
+}
+
+void XComponentModelNG::SetBufferQueueCount(FrameNode* frameNode, int32_t bufferQueueCount)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto xcPattern = AceType::DynamicCast<XComponentPattern>(frameNode->GetPattern());
+    CHECK_NULL_VOID(xcPattern);
+    xcPattern->SetBufferQueueCount(std::clamp(bufferQueueCount, MIN_BUFFER_QUEUE_COUNT, MAX_BUFFER_QUEUE_COUNT));
+}
+
+int32_t XComponentModelNG::GetBufferQueueCount(FrameNode* frameNode)
+{
+    CHECK_NULL_RETURN(frameNode, DEFAULT_BUFFER_QUEUE_COUNT);
+    auto xcPattern = AceType::DynamicCast<XComponentPattern>(frameNode->GetPattern());
+    CHECK_NULL_RETURN(xcPattern, DEFAULT_BUFFER_QUEUE_COUNT);
+    return xcPattern->GetBufferQueueCount();
 }
 
 void XComponentModelNG::SetRenderFit(FrameNode* frameNode, RenderFit renderFit)

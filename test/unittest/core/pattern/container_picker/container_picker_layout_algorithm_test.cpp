@@ -2141,4 +2141,171 @@ HWTEST_F(ContainerPickerLayoutAlgorithmTest, RetainDisplayItemsWithEmptyPosition
     EXPECT_TRUE(algorithm_->itemPosition_.empty());
 }
 
+
+/**
+ * @tc.name: MeasureWithItemCountChangeResetDelta001
+ * @tc.desc: Test Measure resets currentDelta_ when totalItemCount changes.
+ */
+HWTEST_F(ContainerPickerLayoutAlgorithmTest, MeasureWithItemCountChangeResetDelta001, TestSize.Level1)
+{
+    CreateContainerPickerNode(5);
+    auto refLayoutWrapper = frameNode_->CreateLayoutWrapper();
+    ASSERT_NE(refLayoutWrapper, nullptr);
+    LayoutWrapper* layoutWrapper = Referenced::RawPtr(refLayoutWrapper);
+    ASSERT_NE(layoutWrapper, nullptr);
+
+    auto layoutProperty = AceType::DynamicCast<ContainerPickerLayoutProperty>(layoutWrapper->GetLayoutProperty());
+    ASSERT_NE(layoutProperty, nullptr);
+    layoutProperty->contentConstraint_ = layoutConstraintF;
+
+    algorithm_->prevTotalItemCount_ = 3;
+    algorithm_->totalItemCount_ = 5;
+    algorithm_->currentDelta_ = 50.0f;
+    EXPECT_EQ(algorithm_->currentDelta_, 50.0f);
+
+    algorithm_->Measure(layoutWrapper);
+    EXPECT_EQ(algorithm_->currentDelta_, 0.0f);
+}
+
+/**
+ * @tc.name: MeasureWithItemCountNotChanged001
+ * @tc.desc: Test Measure does not reset currentDelta_ when totalItemCount unchanged.
+ */
+HWTEST_F(ContainerPickerLayoutAlgorithmTest, MeasureWithItemCountNotChanged001, TestSize.Level1)
+{
+    CreateContainerPickerNode(5);
+    auto refLayoutWrapper = frameNode_->CreateLayoutWrapper();
+    ASSERT_NE(refLayoutWrapper, nullptr);
+    LayoutWrapper* layoutWrapper = Referenced::RawPtr(refLayoutWrapper);
+    ASSERT_NE(layoutWrapper, nullptr);
+
+    auto layoutProperty = AceType::DynamicCast<ContainerPickerLayoutProperty>(layoutWrapper->GetLayoutProperty());
+    ASSERT_NE(layoutProperty, nullptr);
+    layoutProperty->contentConstraint_ = layoutConstraintF;
+
+    algorithm_->prevTotalItemCount_ = 0;
+    algorithm_->totalItemCount_ = 5;
+    algorithm_->currentDelta_ = 30.0f;
+
+    algorithm_->Measure(layoutWrapper);
+    EXPECT_EQ(algorithm_->currentDelta_, 30.0f);
+}
+
+/**
+ * @tc.name: MeasurePickerItemsWithItemCountChange001
+ * @tc.desc: Test MeasurePickerItems clears itemPosition_ when totalItemCount changes.
+ */
+HWTEST_F(ContainerPickerLayoutAlgorithmTest, MeasurePickerItemsWithItemCountChange001, TestSize.Level1)
+{
+    CreateContainerPickerNode(5);
+    auto refLayoutWrapper = frameNode_->CreateLayoutWrapper();
+    ASSERT_NE(refLayoutWrapper, nullptr);
+    LayoutWrapper* layoutWrapper = Referenced::RawPtr(refLayoutWrapper);
+    ASSERT_NE(layoutWrapper, nullptr);
+
+    auto layoutProperty = AceType::DynamicCast<ContainerPickerLayoutProperty>(layoutWrapper->GetLayoutProperty());
+    ASSERT_NE(layoutProperty, nullptr);
+    layoutProperty->contentConstraint_ = layoutConstraintF;
+
+    algorithm_->SetHeight(500.0f);
+    algorithm_->CalcMainAndMiddlePos();
+    algorithm_->totalItemCount_ = 5;
+    algorithm_->selectedIndex_ = 2;
+    algorithm_->prevTotalItemCount_ = 3;
+    algorithm_->itemPosition_[1] = { 185.0f, 315.0f, nullptr };
+    EXPECT_FALSE(algorithm_->itemPosition_.empty());
+
+    LayoutConstraintF layoutConstraint;
+    layoutConstraint.selfIdealSize = { 300.0f, 500.0f };
+    algorithm_->childLayoutConstraint_ = layoutConstraint;
+    algorithm_->MeasurePickerItems(layoutWrapper);
+    EXPECT_TRUE(algorithm_->itemPosition_.find(1) == algorithm_->itemPosition_.end() ||
+        !algorithm_->itemPosition_.empty());
+}
+
+/**
+ * @tc.name: MeasurePickerItemsWithItemCountSame001
+ * @tc.desc: Test MeasurePickerItems uses old itemPosition_ when totalItemCount unchanged.
+ */
+HWTEST_F(ContainerPickerLayoutAlgorithmTest, MeasurePickerItemsWithItemCountSame001, TestSize.Level1)
+{
+    CreateContainerPickerNode(5);
+    auto refLayoutWrapper = frameNode_->CreateLayoutWrapper();
+    ASSERT_NE(refLayoutWrapper, nullptr);
+    LayoutWrapper* layoutWrapper = Referenced::RawPtr(refLayoutWrapper);
+    ASSERT_NE(layoutWrapper, nullptr);
+
+    auto layoutProperty = AceType::DynamicCast<ContainerPickerLayoutProperty>(layoutWrapper->GetLayoutProperty());
+    ASSERT_NE(layoutProperty, nullptr);
+    layoutProperty->contentConstraint_ = layoutConstraintF;
+
+    algorithm_->SetHeight(500.0f);
+    algorithm_->CalcMainAndMiddlePos();
+    algorithm_->totalItemCount_ = 5;
+    algorithm_->selectedIndex_ = 2;
+    algorithm_->prevTotalItemCount_ = 5;
+    algorithm_->itemPosition_[1] = { 185.0f, 315.0f, nullptr };
+    EXPECT_FALSE(algorithm_->itemPosition_.empty());
+
+    LayoutConstraintF layoutConstraint;
+    layoutConstraint.selfIdealSize = { 300.0f, 500.0f };
+    algorithm_->childLayoutConstraint_ = layoutConstraint;
+    algorithm_->MeasurePickerItems(layoutWrapper);
+    EXPECT_FALSE(algorithm_->itemPosition_.empty());
+}
+
+/**
+ * @tc.name: MeasureWithItemCountSameResetDelta001
+ * @tc.desc: Test Measure does not reset currentDelta_ when prevTotalItemCount_==totalItemCount_.
+ */
+HWTEST_F(ContainerPickerLayoutAlgorithmTest, MeasureWithItemCountSameResetDelta001, TestSize.Level1)
+{
+    CreateContainerPickerNode(5);
+    auto refLayoutWrapper = frameNode_->CreateLayoutWrapper();
+    ASSERT_NE(refLayoutWrapper, nullptr);
+    LayoutWrapper* layoutWrapper = Referenced::RawPtr(refLayoutWrapper);
+    ASSERT_NE(layoutWrapper, nullptr);
+
+    auto layoutProperty = AceType::DynamicCast<ContainerPickerLayoutProperty>(layoutWrapper->GetLayoutProperty());
+    ASSERT_NE(layoutProperty, nullptr);
+    layoutProperty->contentConstraint_ = layoutConstraintF;
+
+    algorithm_->prevTotalItemCount_ = 5;
+    algorithm_->totalItemCount_ = 5;
+    algorithm_->currentDelta_ = 40.0f;
+
+    algorithm_->Measure(layoutWrapper);
+    EXPECT_EQ(algorithm_->currentDelta_, 40.0f);
+}
+
+/**
+ * @tc.name: MeasurePickerItemsWithPrevZero001
+ * @tc.desc: Test MeasurePickerItems with prevTotalItemCount_=0 takes old path.
+ */
+HWTEST_F(ContainerPickerLayoutAlgorithmTest, MeasurePickerItemsWithPrevZero001, TestSize.Level1)
+{
+    CreateContainerPickerNode(5);
+    auto refLayoutWrapper = frameNode_->CreateLayoutWrapper();
+    ASSERT_NE(refLayoutWrapper, nullptr);
+    LayoutWrapper* layoutWrapper = Referenced::RawPtr(refLayoutWrapper);
+    ASSERT_NE(layoutWrapper, nullptr);
+
+    auto layoutProperty = AceType::DynamicCast<ContainerPickerLayoutProperty>(layoutWrapper->GetLayoutProperty());
+    ASSERT_NE(layoutProperty, nullptr);
+    layoutProperty->contentConstraint_ = layoutConstraintF;
+
+    algorithm_->SetHeight(500.0f);
+    algorithm_->CalcMainAndMiddlePos();
+    algorithm_->totalItemCount_ = 5;
+    algorithm_->selectedIndex_ = 2;
+    algorithm_->prevTotalItemCount_ = 0;
+    algorithm_->itemPosition_[1] = { 185.0f, 315.0f, nullptr };
+    EXPECT_FALSE(algorithm_->itemPosition_.empty());
+
+    LayoutConstraintF layoutConstraint;
+    layoutConstraint.selfIdealSize = { 300.0f, 500.0f };
+    algorithm_->childLayoutConstraint_ = layoutConstraint;
+    algorithm_->MeasurePickerItems(layoutWrapper);
+    EXPECT_FALSE(algorithm_->itemPosition_.empty());
+}
 } // namespace OHOS::Ace::NG

@@ -88,7 +88,7 @@ enum class FocusPriority : int32_t {
     PREVIOUS = 3000,
 };
 
-class ACE_EXPORT FocusPaintParam : public virtual AceType {
+class ACE_EXPORT FocusPaintParam : public AceType {
     DECLARE_ACE_TYPE(FocusPaintParam, AceType);
 
 public:
@@ -154,7 +154,7 @@ private:
     std::optional<Dimension> focusPadding;
 };
 
-class ACE_FORCE_EXPORT FocusPattern : public virtual AceType {
+class ACE_FORCE_EXPORT FocusPattern : public AceType {
     DECLARE_ACE_TYPE(FocusPattern, AceType);
 
 public:
@@ -451,6 +451,8 @@ public:
 
     void SetFocusable(bool focusable, bool isExplicit = true);
 
+    bool HasTreeInteraction() const;
+
     bool GetFocusable() const
     {
         return focusable_;
@@ -458,6 +460,7 @@ public:
 
     void SetShow(bool show);
     void SetEnabled(bool enabled);
+    void CopyEvent(const RefPtr<FocusHub>& source);
 
     bool IsShow() const;
 

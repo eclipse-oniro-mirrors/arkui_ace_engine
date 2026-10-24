@@ -319,6 +319,7 @@ public:
     bool AdditionalScrollTo(const RefPtr<FrameNode>& scroll, float height);
     void SetColumnMinSize(bool reset = false);
     float InitialSingleGearHeight(NG::SheetStyle& sheetStyle);
+    double GetScreenHeight();
     float GetSheetTopSafeArea();
     float UpdateSheetTransitionOffset();
 
@@ -374,7 +375,7 @@ public:
     void UpdateZIndexAndTitleEffectNode();
     void OnContentScrollUpdate(double currentOffset, double frameOffset, bool isFling);
     void OnFlingEnd(double currentOffset);
-    void UpdateStackModeZIndex();
+    void UpdateTitleBarZIndex();
     RefPtr<FrameNode> GetTitleBarEffectNode() const
     {
         return titleBarEffectNode_;
@@ -385,7 +386,7 @@ public:
     }
     void MountTitleBarEffectNode();
     void ResetTitleBarEffectNode();
-    Color GetTitleBarEffectBgColor(const NG::SheetStyle& sheetStyle, UiMaterialLevel materialLevel, bool isDarkMode);
+    Color GetTitleBarEffectBgColor(const NG::SheetStyle& sheetStyle, UiMaterialLevel materialLevel);
 
     void ClearSheetRenderMaterial();
     void SetSheetRenderMaterial();
@@ -806,6 +807,7 @@ public:
     void UpdateTitleColumnSize();
 
     float GetTitleBuilderHeightStackMode() const;
+    float GetRealPreScrollHeight(float scrollHeight, float titleHeightStackMode, bool useStackModeHeight) const;
     bool CheckSheetHaveTitle(const NG::SheetStyle& sheetStyle);
     bool CheckTitleIsStackMode(const SheetStyle& sheetStyle);
     bool CheckTitleIsHasEffectNode(const SheetStyle& sheetStyle);
@@ -912,6 +914,8 @@ public:
     RefPtr<FrameNode> GetFirstFrameNodeOfBuilder() const;
     void GetBuilderInitHeight();
     void ChangeSheetPage(float height);
+
+    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config) override;
     void DumpAdvanceInfo() override;
     void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json) override;
 
@@ -1214,6 +1218,9 @@ protected:
     void OnDetachFromFrameNode(FrameNode* sheetNode) override;
 
 private:
+    void DumpAdvanceGeometryInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+    void DumpAdvanceStyleInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
     enum class SheetCmdType { CMD_UNKNOWN, CMD_SLIDE, CMD_CLOSE };
     int32_t ParseCommand(const std::string& command, SheetCmdType& cmdType);
     void HandleBindSheetEvent(SheetCmdType& cmdType);

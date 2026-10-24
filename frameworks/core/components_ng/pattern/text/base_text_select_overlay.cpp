@@ -1101,7 +1101,9 @@ bool BaseTextSelectOverlay::GetFrameNodeContentRect(const RefPtr<FrameNode>& nod
 void BaseTextSelectOverlay::MarkOverlayDirty()
 {
     if (SelectOverlayIsOn()) {
-        auto host = GetOwner();
+        // The overlay node is held by the mount node, which may be an
+        // ancestor of the owner (see GetSelectOverlayMountNode).
+        auto host = GetSelectOverlayMountNode(GetOwner());
         CHECK_NULL_VOID(host);
         auto overlayNode = host->GetOverlayNode();
         CHECK_NULL_VOID(overlayNode);

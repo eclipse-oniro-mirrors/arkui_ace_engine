@@ -43,6 +43,7 @@
 #include "core/common/card_scope.h"
 #include "core/components/container_modal/container_modal_constants.h"
 #include "core/components_ng/base/inspector.h"
+#include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_restricted_scope.h"
 #include "core/components_ng/pattern/image/image_pattern.h"
 #include "core/components_ng/pattern/canvas/canvas_pattern.h"
 #include "core/components_ng/pattern/date_picker/picker_types.h"
@@ -2238,6 +2239,26 @@ void JsRegisterFormJsXNodeFull(BindingTarget globalObj, bool isLiteSetRegistered
 }
 #endif
 
+// Scroll placeholder restricted-builder instrumentation entries. The native
+// implementations live on the internal scrollPlaceholderRegister native module
+// surface (ArkUIRuntimeCallInfo style); these thin adapters expose them on
+// globalThis for bare calls from @Builder({ isPlaceholder: true }) conversion
+// products. No-op when called outside a restricted-scope probe - Begin/End only
+// drive the re-entrant scope counter (see ScrollPlaceholderRestrictedScope).
+panda::Local<panda::JSValueRef> JsBeginScrollPlaceholderScope(panda::JsiRuntimeCallInfo* runtimeCallInfo)
+{
+    auto* vm = runtimeCallInfo->GetVM();
+    NG::ScrollPlaceholderRestrictedScope::Begin();
+    return panda::JSValueRef::Undefined(vm);
+}
+
+panda::Local<panda::JSValueRef> JsEndScrollPlaceholderScope(panda::JsiRuntimeCallInfo* runtimeCallInfo)
+{
+    auto* vm = runtimeCallInfo->GetVM();
+    NG::ScrollPlaceholderRestrictedScope::End();
+    return panda::JSValueRef::Undefined(vm);
+}
+
 void JsRegisterViews(BindingTarget globalObj, void* nativeEngine, bool isCustomEnvSupported)
 {
     auto runtime = std::static_pointer_cast<ArkJSRuntime>(JsiDeclarativeEngineInstance::GetCurrentRuntime());
@@ -2378,6 +2399,11 @@ void JsRegisterViews(BindingTarget globalObj, void* nativeEngine, bool isCustomE
     // __setArkUIStageRenderGroup__ global function for StageNode render group control
     globalObj->Set(vm, panda::StringRef::NewFromUtf8(vm, "__setArkUIStageRenderGroup__"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), JsSetStageRenderGroup));
+    // Scroll placeholder instrumentation entries, same globalThis mount form as above.
+    globalObj->Set(vm, panda::StringRef::NewFromUtf8(vm, "__aceBeginScrollPlaceholder__"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), JsBeginScrollPlaceholderScope));
+    globalObj->Set(vm, panda::StringRef::NewFromUtf8(vm, "__aceEndScrollPlaceholder__"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), JsEndScrollPlaceholderScope));
     // need to delete this.
     globalObj->Set(vm, panda::StringRef::NewFromUtf8(vm, "onXIconClicked"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), JsOnXIconClicked));

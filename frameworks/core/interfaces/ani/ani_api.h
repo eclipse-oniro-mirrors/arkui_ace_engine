@@ -597,6 +597,14 @@ struct ArkUIAniParallelizeUIModifier {
     void (*registerCallback)(
         ArkUINodeHandle, std::function<int32_t()>&&, std::function<ArkUINodeHandle(int32_t, int32_t, int32_t)>&&);
 };
+// Complete snapshot in TOP, END, BOTTOM, START order; content is a detached static builder root.
+struct ArkUIAniSafeAreaInsetEdge {
+    ArkUINodeHandle content = nullptr;
+    double spacing = 0.0;
+    int32_t unit = 1; // DimensionUnit::VP
+    int32_t alignment = 1; // SafeAreaInsetAlignment::CENTER
+};
+
 struct ArkUIAniCommonModifier {
     ani_ref* (*getHostContext)(ArkUI_Int32 key);
     void (*setFrameRateRange)(ani_env* env, ani_long peerPtr, ani_object value, ArkUI_Int32 type);
@@ -640,6 +648,7 @@ struct ArkUIAniCommonModifier {
     ani_int (*getWindowId)(ani_int instanceId);
     ani_int (*getWindowWidthBreakpoint)();
     ani_int (*getWindowHeightBreakpoint)();
+    ani_boolean (*isWindowInfoInitialized)(ani_int instanceId);
     void* (*transferKeyEventPointer)(ani_long nativePtr);
     void* (*createKeyEventAccessorWithPointer)(ani_long nativePtr);
     void* (*createEventTargetInfoAccessor)();
@@ -695,6 +704,7 @@ struct ArkUIAniCommonModifier {
     void(*fireArkUIObjectLifecycleCallback)(ani_long nodePtr, const std::string& className, void* data);
     std::string (*GetIdString)(ArkUINodeHandle node);
     ani_long (*interopProxyNodeConstruct)(ArkUI_Int32 id);
+    void (*setSafeAreaInset)(ArkUINodeHandle node, const ArkUIAniSafeAreaInsetEdge* edges, int32_t count);
 };
 struct  ArkUICustomNodeInfo {
     std::function<void()> onPageShowFunc;

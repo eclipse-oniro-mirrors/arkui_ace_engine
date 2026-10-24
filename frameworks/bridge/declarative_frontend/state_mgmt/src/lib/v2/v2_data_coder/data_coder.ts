@@ -58,6 +58,10 @@ class DataCoder {
   }
 
   static isReadOnlyGetter(target: object, prop: string): boolean {
+    if (Object.getPrototypeOf(target)?.[ObserveV2.V2_DECO_METHOD_META]?.[prop]?.deco === '@Computed') {
+      return true;
+    }
+
     let hasGetter = false;
     let hasSetter = false;
     let current: object | null = target;

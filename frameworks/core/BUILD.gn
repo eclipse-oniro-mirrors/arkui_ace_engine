@@ -157,6 +157,7 @@ template("ace_core_source_set") {
       "common/clipboard/clipboard_proxy.cpp",
       "common/color_inverter.cpp",
       "common/container.cpp",
+      "common/ui_observer/ui_observer_store.cpp",
       "common/container_scope.cpp",
       "common/environment/environment_proxy.cpp",
       "common/event_manager.cpp",
@@ -176,7 +177,6 @@ template("ace_core_source_set") {
       "common/resource/pattern_resource_manager.cpp",
       "common/resource/resource_manager.cpp",
       "common/resource/resource_parse_utils.cpp",
-      "common/sharedata/share_data.cpp",
       "common/statistic_event_reporter.cpp",
       "components_ng/pattern/text_field/text_field_type_utils.cpp",
       "common/storage/storage_proxy.cpp",
@@ -275,6 +275,8 @@ template("ace_core_source_set") {
       "common/ime/text_input_configuration.cpp",
       "common/ime/text_input_connection.cpp",
       "common/ime/text_input_formatter.cpp",
+      "common/ime/text_input_keyboard_utils.cpp",
+      "common/ime/text_input_obscure_utils.cpp",
       "common/ime/text_input_proxy.cpp",
       "common/ime/text_input_type.cpp",
 
@@ -388,6 +390,10 @@ template("ace_core_source_set") {
       deps += [ "//third_party/cJSON:cjson_static" ]
     } else {
       external_deps += [ "cJSON:cjson" ]
+    }
+    if (defined(config.enable_standard_input) && config.enable_standard_input) {
+      external_deps += [ "imf:inputmethod_client" ]
+      external_deps += [ "input:libmmi-client" ]
     }
     if (!ace_engine_feature_enable_event_extra_handling) {
       sources += [ "event/event_info_convertor.cpp" ]
@@ -712,6 +718,9 @@ template("ace_core_source_set") {
     if (ace_engine_feature_enable_material_customized) {
       defines += [ "ACE_ENGINE_IMMERSIVE_MATERIAL_CUSTOMIZED" ]
     }
+    if (ace_engine_feature_enable_material_tv) {
+      defines += [ "ACE_ENGINE_IMMERSIVE_MATERIAL_TV" ]
+    }
 
     # arkoala C interface
     deps += [ "$ace_root/frameworks/core/interfaces/native:ace_core_interfaces_native_node_$platform" ]
@@ -790,6 +799,7 @@ template("ace_core_ng_source_set") {
       "common/clipboard/clipboard_proxy.cpp",
       "common/color_inverter.cpp",
       "common/container.cpp",
+      "common/ui_observer/ui_observer_store.cpp",
       "common/container_scope.cpp",
       "common/environment/environment_proxy.cpp",
       "common/event_manager.cpp",
@@ -809,7 +819,6 @@ template("ace_core_ng_source_set") {
       "common/resource/pattern_resource_manager.cpp",
       "common/resource/resource_manager.cpp",
       "common/resource/resource_parse_utils.cpp",
-      "common/sharedata/share_data.cpp",
       "common/statistic_event_reporter.cpp",
       "components_ng/pattern/text_field/text_field_type_utils.cpp",
       "common/storage/storage_proxy.cpp",
@@ -899,6 +908,8 @@ template("ace_core_ng_source_set") {
       "common/ime/text_input_configuration.cpp",
       "common/ime/text_input_connection.cpp",
       "common/ime/text_input_formatter.cpp",
+      "common/ime/text_input_keyboard_utils.cpp",
+      "common/ime/text_input_obscure_utils.cpp",
       "common/ime/text_input_proxy.cpp",
       "common/ime/text_input_type.cpp",
 
@@ -1073,6 +1084,10 @@ template("ace_core_ng_source_set") {
       deps += [ "//third_party/cJSON:cjson_static" ]
     } else {
       external_deps += [ "cJSON:cjson" ]
+    }
+    if (defined(config.enable_standard_input) && config.enable_standard_input) {
+      external_deps += [ "imf:inputmethod_client" ]
+      external_deps += [ "input:libmmi-client" ]
     }
     if (defined(ffrt_support) && ffrt_support) {
       defines += [ "FFRT_SUPPORT" ]
@@ -1266,6 +1281,9 @@ template("ace_core_ng_source_set") {
 
     if (ace_engine_feature_enable_material_customized) {
       defines += [ "ACE_ENGINE_IMMERSIVE_MATERIAL_CUSTOMIZED" ]
+    }
+    if (ace_engine_feature_enable_material_tv) {
+      defines += [ "ACE_ENGINE_IMMERSIVE_MATERIAL_TV" ]
     }
 
     cflags_cc = []

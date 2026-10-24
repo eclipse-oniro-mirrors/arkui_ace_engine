@@ -27,7 +27,7 @@
 namespace OHOS::Ace::NG {
 using LoadFontCallback = std::function<void(const std::string&, uint64_t)>;
 
-class ACE_EXPORT FontCollection : public virtual AceType {
+class ACE_EXPORT FontCollection : public AceType {
     DECLARE_ACE_TYPE(FontCollection, AceType);
 public:
     ACE_FORCE_EXPORT static RefPtr<FontCollection> Current();

@@ -89,7 +89,7 @@ public:
         multiSelectable_ = multiSelectable;
     }
 
-    bool MultiSelectable() const
+    bool MultiSelectable() const override
     {
         return multiSelectable_;
     }
@@ -179,6 +179,63 @@ public:
         return info_.reachStart_;
     }
 
+    // Feat-20260806915268: item scroll snap (scrollSnapStrategy) integration.
+    SnapType GetSnapType() override;
+    // Reflects the ACTUAL capability, not the property presence: cross-row and other gated
+    // layouts keep the grid fully snap-inactive, and the inherited property-only answer would
+    // wrongly bypass PARENT_FIRST nested-scroll forwarding for those grids.
+    bool IsScrollSnap() override
+    {
+        return GetSnapType() == SnapType::LIST_SNAP;
+    }
+    bool StartSnapAnimation(SnapAnimationOptions snapAnimationOptions) override;
+    ScrollSnapStrategy GetScrollSnapStrategy() const override;
+    std::vector<SnapCandidate> BuildItemSnapCandidates(ScrollSnapAlign align) override;
+    std::optional<float> GetItemSnapNeighborAnchor(ScrollSnapAlign align, bool towardSmaller) override;
+    // Feat-20260806915268 fix: snap anchors must not read live geometry at the settle callback — after an
+    // early-stopped friction (interrupted fling, residual velocity) child frame rects lag the
+    // final offset by one frame and every anchor shifts by that lag. Instead the visible items'
+    // CONTENT-space geometry is captured in OnDirtyLayoutWrapperSwap (same-frame fresh layout)
+    // and consumed later; content positions are scroll-invariant, so the capture frame's offset
+    // cancels out and the anchors stay exact whenever they are read.
+    struct SnapItemGeometry {
+        float contentStart = 0.0f;
+        float mainSize = 0.0f;
+        int32_t index = -1;
+    };
+    void UpdateSnapItemGeometryCache();
+    // Feat-20260806915268 cmetrics helpers: verbatim extractions from OnDirtyLayoutWrapperSwap
+    // (zero behavior change) to keep it under the 50-nbnc gate.
+    bool UpdateScrollBarAndIndexEventsOnLayout(const GridLayoutInfo& gridLayoutInfo);
+    void FinalizeLayoutSwap(bool sizeDiminished, bool frameSizeChange);
+    void SyncIndexesAndProcessEvents(
+        const RefPtr<GridLayoutBaseAlgorithm>& gridLayoutAlgorithm, bool safeAreaIntermediatePass);
+    std::vector<SnapItemGeometry> snapItemGeometryCache_;
+    bool SupportsTrackedItemSnap() const override
+    {
+        return !HasCrossRowItem();
+    }
+    void BeginTrackedItemSnap(float coordinate) override;
+    std::vector<SnapCandidate> BuildTrackedItemSnapCandidates(ScrollSnapAlign align) override;
+    float ToLogicalMainStart(float physicalStart, float itemMainSize, Axis axis, float viewportMainSize) const;
+    float GetSnapAnchor(
+        ScrollSnapAlign align, float itemStartContent, float itemMainSize, float viewportMainSize) const;
+    bool GetItemMainGeometry(
+        const RefPtr<LayoutWrapper>& item, Axis axis, float& physicalStart, float& itemMainSize) const;
+    bool HasVirtualChildSource() const;
+    std::optional<float> ProbeNeighborItemAnchors(
+        const std::function<float(float, float)>& anchorOfItem, Axis axis, float currentOffset,
+        bool towardSmaller);
+    std::optional<float> EstimateNeighborAnchorFromBoundary(
+        ScrollSnapAlign align, Axis axis, float viewportMainSize, bool towardSmaller);
+    float GetItemSnapCalibrationMargin() const override;
+    float GetItemSnapMaxOffset() const override;
+    float GetItemSnapMinOffset() const override;
+
+    // Feat-20260806915268 (2026-09-15 scope): cross-row items are not supported — true when any item
+    // spans multiple main-axis lines (info_.hasMultiLineItem_) or the irregular layout is on.
+    bool HasCrossRowItem() const;
+
     bool IsAtBottom(bool considerRepeat = false) const override
     {
         return considerRepeat ? (info_.offsetEnd_ && info_.repeatDifference_ == 0) : info_.offsetEnd_;
@@ -246,6 +303,8 @@ public:
 
     void DumpInfo() override;
     void DumpInfo(std::unique_ptr<JsonValue>& json) override;
+
+    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config) override;
     void DumpAdvanceInfo() override;
     void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json) override;
     void GetEventDumpInfo() override;
@@ -259,10 +318,10 @@ public:
     void PrintGridMatrix();
     void PrintLineHeightMap();
     void PrintIrregularItemsPosition();
-    void BuildGridStateInfo(std::unique_ptr<JsonValue>& json);
-    void BuildGridOffsetInfo(std::unique_ptr<JsonValue>& json);
-    void BuildGridIndexInfo(std::unique_ptr<JsonValue>& json);
-    void BuildGridLayoutPropertyInfo(std::unique_ptr<JsonValue>& json);
+    void BuildGridStateInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config = ParamConfig());
+    void BuildGridOffsetInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config = ParamConfig());
+    void BuildGridIndexInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config = ParamConfig());
+    void BuildGridLayoutPropertyInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config = ParamConfig());
     void BuildGridLayoutInfo(std::unique_ptr<JsonValue>& json);
     void BuildScrollAlignInfo(std::unique_ptr<JsonValue>& json);
     void DumpSimplifyInfo(std::shared_ptr<JsonValue>& json) override;
@@ -345,6 +404,16 @@ public:
         int32_t endLine) const;
 
 private:
+    void DumpAdvanceGridInteractionInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
+    void DumpAdvanceGridSizeInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
+    void DumpAdvanceGridTemplateInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
+    // Coordinate origins sampled with snapItemGeometryCache_ during the last layout.
+    float snapGeometryEstimatedOffset_ = 0.0f;
+    float snapGeometryStableOffset_ = 0.0f;
+
     /**
      * @brief calculate where startMainLine_ should be after spring animation.
      * @return main axis position relative to viewport, positive when below viewport.
@@ -395,6 +464,7 @@ private:
     inline bool UseIrregularLayout() const;
 
     std::string GetIrregularIndexesString() const;
+    std::string GetIrregularIndexesString(const ParamConfig& config) const;
     float GetOffsetWithLimit(float offset) const override;
 
     std::string GetLayoutMode() const;

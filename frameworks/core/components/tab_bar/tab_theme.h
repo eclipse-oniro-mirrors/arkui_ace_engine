@@ -24,7 +24,7 @@ namespace OHOS::Ace {
 class ThemeConstants;
 class ThemeStyle;
 
-class TabTheme : public virtual Theme {
+class TabTheme : public Theme {
     DECLARE_ACE_TYPE(TabTheme, Theme);
 
 public:
@@ -236,6 +236,16 @@ public:
         return bottomTabHorizontalTextSize_;
     }
 
+    const Dimension& GetTopTabTextSize() const
+    {
+        return topTabTextSize_;
+    }
+
+    const Color& GetTopTabBarBackgroundColor() const
+    {
+        return topTabBarBackgroundColor_;
+    }
+
     const int& GetBottomTabBackgroundBlurStyle() const
     {
         return bottomTabBackgroundBlurStyle_;
@@ -415,6 +425,11 @@ public:
         return outlineExtraLarger_;
     }
 
+    const Dimension& GetBorderExtraLarger() const
+    {
+        return borderExtraLarger_;
+    }
+
     const Color& GetIconEmphasize() const
     {
         return iconEmphasize_;
@@ -581,6 +596,7 @@ protected:
     bool isChangeFocusTextStyle_;
     Color interactiveFocusColor_;
     Dimension outlineExtraLarger_;
+    Dimension borderExtraLarger_ = 2.0_vp;
     Color iconEmphasize_;
     Color iconPrimary_;
     Color fontEmphasize_;
@@ -603,6 +619,8 @@ protected:
     Dimension sideBarTextFontSize_ = 16.0_fp;
     Color sideBarDividerColor_;
     Color sideBarBackgroundColor_;
+    Dimension topTabTextSize_ = 16.0_fp;
+    Color topTabBarBackgroundColor_ = Color::WHITE;
 };
 
 } // namespace OHOS::Ace

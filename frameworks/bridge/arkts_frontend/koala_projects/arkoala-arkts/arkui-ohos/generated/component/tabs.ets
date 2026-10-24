@@ -995,6 +995,30 @@ export class ArkTabsPeer extends ArkCommonMethodPeer {
         ArkUIGeneratedNativeModule._TabsAttribute_setSidebarDivider(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
+    setSidebarFooterAttribute(value: ComponentContentBase | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (value !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueTmpValue = value!
+            ComponentContentBase_serializer.write(thisSerializer, valueTmpValue)
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._TabsAttribute_setSidebarFooter(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
+    setSidebarBottomBarAttribute(value: ComponentContentBase | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (value !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueTmpValue = value!
+            ComponentContentBase_serializer.write(thisSerializer, valueTmpValue)
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._TabsAttribute_setSidebarBottomBar(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
     setBarModeAttribute(value: BarMode | undefined, options?: ScrollableBarModeOptions): void {
         const thisSerializer: SerializerBase = SerializerBase.hold()
         if (value !== undefined) {
@@ -1327,6 +1351,12 @@ export interface TabsAttribute extends CommonMethod {
     sidebarDivider(value: DividerStyle | undefined): this {
         throw new Error('Unimplemented method sidebarDivider')
     }
+    sidebarFooter(value: ComponentContentBase | undefined): this {
+        throw new Error('Unimplemented method sidebarFooter')
+    }
+    sidebarBottomBar(value: ComponentContentBase | undefined): this {
+        throw new Error('Unimplemented method sidebarBottomBar')
+    }
     barMode(value: BarMode | undefined, options?: ScrollableBarModeOptions): this {
         throw new Error('Unimplemented method barMode')
     }
@@ -1596,6 +1626,16 @@ export class ArkTabsComponent extends ArkCommonMethodComponent implements TabsAt
     public sidebarDivider(value: DividerStyle | undefined): this {
         const value_casted = value as (DividerStyle | undefined)
         this.getPeer()?.setSidebarDividerAttribute(value_casted)
+        return this
+    }
+    public sidebarFooter(value: ComponentContentBase | undefined): this {
+        const value_casted = value as (ComponentContentBase | undefined)
+        this.getPeer()?.setSidebarFooterAttribute(value_casted)
+        return this
+    }
+    public sidebarBottomBar(value: ComponentContentBase | undefined): this {
+        const value_casted = value as (ComponentContentBase | undefined)
+        this.getPeer()?.setSidebarBottomBarAttribute(value_casted)
         return this
     }
     public barMode(value: BarMode | undefined, options?: ScrollableBarModeOptions): this {

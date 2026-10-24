@@ -304,6 +304,8 @@ public:
 
     void GetPanDirectionDumpInfo();
     void GetPanDirectionDumpInfo(std::unique_ptr<JsonValue>& json);
+
+    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config) override;
     void DumpAdvanceInfo() override;
     void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json) override;
 
@@ -371,6 +373,9 @@ public:
     bool Idle();
 
 private:
+    void DumpAdvanceVisualProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+    void DumpAdvanceFunctionalProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
     bool ScrollPositionCallback(double offset, int32_t source, bool isMouseWheelScroll = false);
     void InitScrollEndCallback();
     void AddScrollableEvent();

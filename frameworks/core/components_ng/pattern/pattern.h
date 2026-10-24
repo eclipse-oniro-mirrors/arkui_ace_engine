@@ -54,9 +54,11 @@ using GestureEventFunc = std::function<void(GestureEvent& info)>;
 }
 
 namespace OHOS::Ace::NG {
+struct InspectorDumpOptions;
 class AccessibilitySessionAdapter;
 class InspectorFilter;
 class VerticalOverflowHandler;
+struct InspectorDumpOptions;
 
 class ScrollingListener : public AceType {
     DECLARE_ACE_TYPE(ScrollingListener, AceType);
@@ -193,6 +195,19 @@ public:
 
     virtual RefPtr<LayoutAlgorithm> CreateLayoutAlgorithm();
 
+    // Restricted scroll-placeholder copy protocol: clones an offline-renderable
+    // placeholder counterpart of this pattern for the template instance pool
+    // (background traversal clones copy the node's layout property wholesale —
+    // text content / image src ride along — plus the layout-relevant render
+    // geometry). The base returns nullptr = the component does not support
+    // placeholder templates; only restricted render-only components override it.
+    // Implementations must not copy callbacks, closures, cross-thread handles
+    // or weak pointers to other nodes.
+    virtual RefPtr<Pattern> CloneForPlaceholder()
+    {
+        return nullptr;
+    }
+
     virtual RefPtr<NodePaintMethod> CreateNodePaintMethod()
     {
         return nullptr;
@@ -319,10 +334,17 @@ public:
     virtual void DumpInfo() {}
     virtual void DumpInfo(std::unique_ptr<JsonValue>& json) {}
     virtual void DumpSimplifyInfo(std::unique_ptr<JsonValue>& json) {}
+
     virtual void DumpAdvanceInfo() {}
     virtual void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json) {}
+    virtual void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config) {}
     virtual void DumpViewDataPageNode(RefPtr<ViewDataWrap> viewDataWrap, bool needsRecordData = false) {}
     virtual void DumpSimplifyInfo(std::shared_ptr<JsonValue>& json) {}
+    // Preserve existing component output until component-specific options are implemented.
+    virtual void DumpSimplifyInfo(std::shared_ptr<JsonValue>& json, const InspectorDumpOptions& /* options */)
+    {
+        DumpSimplifyInfo(json);
+    }
     virtual void DumpSimplifyInfoOnlyForParamConfig(
         std::shared_ptr<JsonValue>& json, ParamConfig config = ParamConfig())
     {}
@@ -722,6 +744,8 @@ public:
     }
 
 protected:
+    static bool ShouldIncludeDiagnostic(const InspectorDumpOptions& options);
+
     virtual void OnAttachToFrameNode() {}
     virtual void OnDetachFromFrameNode(FrameNode* frameNode) {}
 

@@ -767,8 +767,6 @@ public:
 
     static bool IsFormSkeletonBlurEnabled();
 
-    static int32_t getFormSharedImageCacheThreshold();
-
     static bool IsFormSkeletonRSTransactionEnabled();
 
     static bool IsWhiteBlockEnabled();
@@ -937,7 +935,6 @@ private:
     static bool forcibleLandscapeEnabled_;
     static bool softPagetransition_;
     static bool formSkeletonBlurEnabled_;
-    static int32_t formSharedImageCacheThreshold_;
     static WidthLayoutBreakPoint widthLayoutBreakpoints_;
     static HeightLayoutBreakPoint heightLayoutBreakpoints_;
     static bool syncLoadEnabled_;
@@ -950,9 +947,11 @@ private:
     static bool isPCMode_;
     static bool isAutoFillSupport_;
     static bool isOpenYuvDecode_;
+    static bool isDeviceSystemMaterialSupported_;
 
     static std::once_flag getSysPropertiesFlag_;
     static int32_t sensorCorrectionEnable_;
+    static UiMaterialLevel uiMaterialLevel_;
 };
 
 } // namespace OHOS::Ace

@@ -15,6 +15,8 @@
 
 #include "js_ui_observer.h"
 #include "ui_observer.h"
+#include "ui_observer_listener.h"
+#include "render/render_layout_observer_listener.h"
 
 #include "core/common/ace_engine.h"
 #include "core/components_ng/base/inspector.h"
@@ -808,7 +810,7 @@ napi_value ObserverProcess::ProcessDrawCommandSendRegister(napi_env env, napi_ca
     }
 
     if (argc == 2 && MatchValueType(env, argv[1], napi_function)) { // 2: Param Size Two
-        auto listener = std::make_shared<UIObserverListener>(env, argv[1]);
+        auto listener = std::make_shared<RenderLayoutObserverListener>(env, argv[1]);
         int32_t instanceId = ContainerScope::CurrentId();
         UIObserver::RegisterDrawCallback(instanceId, listener);
     }
@@ -816,7 +818,7 @@ napi_value ObserverProcess::ProcessDrawCommandSendRegister(napi_env env, napi_ca
         MatchValueType(env, argv[2], napi_function)) { // 2: Param Index Two
         auto context = argv[1];
         if (context) {
-            auto listener = std::make_shared<UIObserverListener>(env, argv[2]); // 2: Param Index Two
+            auto listener = std::make_shared<RenderLayoutObserverListener>(env, argv[2]); // 2: Param Index Two
             auto uiContextInstanceId = GetUIContextInstanceId(env, context);
             UIObserver::RegisterDrawCallback(uiContextInstanceId, listener);
         }
@@ -870,7 +872,7 @@ napi_value ObserverProcess::ProcessLayoutDoneRegister(napi_env env, napi_callbac
     }
 
     if (argc == 2 && MatchValueType(env, argv[1], napi_function)) { // 2: Param Size Two
-        auto listener = std::make_shared<UIObserverListener>(env, argv[1]);
+        auto listener = std::make_shared<RenderLayoutObserverListener>(env, argv[1]);
         int32_t instanceId = ContainerScope::CurrentId();
         UIObserver::RegisterLayoutCallback(instanceId, listener);
     }
@@ -878,7 +880,7 @@ napi_value ObserverProcess::ProcessLayoutDoneRegister(napi_env env, napi_callbac
         MatchValueType(env, argv[2], napi_function)) { // 2: Param Index Two
         auto context = argv[1];
         if (context) {
-            auto listener = std::make_shared<UIObserverListener>(env, argv[2]); // 2: Param Index Two
+            auto listener = std::make_shared<RenderLayoutObserverListener>(env, argv[2]); // 2: Param Index Two
             auto uiContextInstanceId = GetUIContextInstanceId(env, context);
             UIObserver::RegisterLayoutCallback(uiContextInstanceId, listener);
         }

@@ -17,11 +17,11 @@
 #define FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_QRCODE_QRCODE_THEME_WRAPPER_H
 
 #include "core/components/qrcode/qrcode_theme.h"
-#include "core/components_ng/token_theme/token_theme_wrapper.h"
+#include "core/components_ng/token_theme/token_theme.h"
 
 namespace OHOS::Ace::NG {
 
-class QRCodeThemeWrapper : public QrcodeTheme, public TokenThemeWrapper {
+class QRCodeThemeWrapper : public QrcodeTheme {
     DECLARE_ACE_TYPE(QRCodeThemeWrapper, QrcodeTheme);
 
 public:
@@ -30,7 +30,7 @@ public:
         WrapperBuilder() = default;
         ~WrapperBuilder() override = default;
 
-        RefPtr<TokenThemeWrapper> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
+        RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
         {
             auto themeWrapper = AceType::MakeRefPtr<QRCodeThemeWrapper>();
             auto theme = AceType::DynamicCast<QrcodeTheme>(themeWrapper);

@@ -21,7 +21,7 @@
 
 namespace OHOS::Ace::NG {
 
-class CornerMarkTheme : public virtual Theme {
+class CornerMarkTheme : public Theme {
     DECLARE_ACE_TYPE(CornerMarkTheme, Theme);
 
 public:

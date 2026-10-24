@@ -34,11 +34,6 @@ public:
 
     virtual void Create() {}
     virtual void SetDistortion(const NG::DistortionParam& distortion) {}
-
-private:
-    static std::unique_ptr<DistortionComponentModel> instance_;
-    static std::mutex mutex_;
 };
-
 } // namespace OHOS::Ace
 #endif // FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_DISTORTION_COMPONENT_DISTORTION_COMPONENT_MODEL_H

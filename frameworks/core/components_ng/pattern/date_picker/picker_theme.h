@@ -41,7 +41,7 @@ constexpr double PICKER_SPRING_MASS = 1.0;
 constexpr int32_t PICKER_MAX_SLIDING_DISTANCE = 30;
 } // namespace
 
-class PickerTheme : public virtual Theme {
+class PickerTheme : public Theme {
     DECLARE_ACE_TYPE(PickerTheme, Theme);
 
 public:

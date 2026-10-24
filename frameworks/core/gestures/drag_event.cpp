@@ -519,12 +519,22 @@ const std::string& DragSpringLoadingContext::GetExtraInfos() const
 
 void DragSpringLoadingContext::SetSummary(const std::map<std::string, int64_t>& summary)
 {
-    summary_ = summary;
+    summaryInfo_.summary = summary;
 }
 
 const std::map<std::string, int64_t>& DragSpringLoadingContext::GetSummary() const
 {
-    return summary_;
+    return summaryInfo_.summary;
+}
+
+void DragSpringLoadingContext::SetSummaryInfo(const DragSummaryInfo& summaryInfo)
+{
+    summaryInfo_ = summaryInfo;
+}
+
+const DragSummaryInfo& DragSpringLoadingContext::GetSummaryInfo() const
+{
+    return summaryInfo_;
 }
 
 void DragSpringLoadingContext::SetSpringLoadingAborted()

@@ -17,11 +17,11 @@
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_SIDE_BAR_THEME_WRAPPER_H
 
 #include "core/components_ng/pattern/side_bar/side_bar_theme.h"
-#include "core/components_ng/token_theme/token_theme_wrapper.h"
+#include "core/components_ng/token_theme/token_theme.h"
 
 namespace OHOS::Ace::NG {
 
-class SideBarThemeWrapper : public SideBarTheme, public TokenThemeWrapper {
+class SideBarThemeWrapper : public SideBarTheme {
     DECLARE_ACE_TYPE(SideBarThemeWrapper, SideBarTheme);
 
 public:
@@ -30,7 +30,7 @@ public:
         WrapperBuilder() = default;
         ~WrapperBuilder() = default;
 
-        RefPtr<TokenThemeWrapper> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
+        RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
         {
             auto theme = AceType::MakeRefPtr<SideBarThemeWrapper>();
             InitTheme(theme, themeConstants);

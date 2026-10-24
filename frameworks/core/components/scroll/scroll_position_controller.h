@@ -30,8 +30,8 @@ using ComposeId = std::string;
 
 using OnScrollFunc = std::function<void(const std::string&)>;
 
-class ScrollEventInfo : public BaseEventInfo, public EventToJSONStringAdapter {
-    DECLARE_RELATIONSHIP_OF_CLASSES(ScrollEventInfo, BaseEventInfo, EventToJSONStringAdapter);
+class ScrollEventInfo : public JSONStringifiableEventInfo {
+    DECLARE_RELATIONSHIP_OF_CLASSES(ScrollEventInfo, JSONStringifiableEventInfo);
 public:
     ScrollEventInfo(ScrollEvent type, double scrollX, double scrollY, int32_t scrollState);
 

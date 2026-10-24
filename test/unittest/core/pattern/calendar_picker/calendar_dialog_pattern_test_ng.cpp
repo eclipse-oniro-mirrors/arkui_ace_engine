@@ -2583,4 +2583,145 @@ HWTEST_F(CalendarDialogPatternTestNg, CalendarDialogPatternTest040, TestSize.Lev
     EXPECT_FALSE(result);
 }
 
+/**
+ * @tc.name: CalendarDialogPatternTestToJsonFirstDayOfWeekLocal
+ * @tc.desc: Test CalendarDialogPattern ToJsonValue firstDayOfWeek default LOCAL.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CalendarDialogPatternTestNg, CalendarDialogPatternTestToJsonFirstDayOfWeekLocal, TestSize.Level1)
+{
+    RefPtr<CalendarDialogPattern> pattern;
+    auto dialogNode = CreateMountedCalendarDialogHost(
+        static_cast<int32_t>(PlatformVersion::VERSION_TWENTY_SIX), pattern);
+    ASSERT_NE(dialogNode, nullptr);
+    ASSERT_NE(pattern, nullptr);
+
+    CalendarSettingData settingData;
+    pattern->SetCurrentSettingData(settingData);
+
+    InspectorFilter filter;
+    auto json = JsonUtil::Create(true);
+    pattern->ToJsonValue(json, filter);
+
+    EXPECT_EQ(json->GetString("firstDayOfWeek"), "CalendarFirstDayOfWeek.LOCAL");
+}
+
+/**
+ * @tc.name: CalendarDialogPatternTestToJsonFirstDayOfWeekMon
+ * @tc.desc: Test CalendarDialogPattern ToJsonValue firstDayOfWeek MON.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CalendarDialogPatternTestNg, CalendarDialogPatternTestToJsonFirstDayOfWeekMon, TestSize.Level1)
+{
+    RefPtr<CalendarDialogPattern> pattern;
+    auto dialogNode = CreateMountedCalendarDialogHost(
+        static_cast<int32_t>(PlatformVersion::VERSION_TWENTY_SIX), pattern);
+    ASSERT_NE(dialogNode, nullptr);
+    ASSERT_NE(pattern, nullptr);
+
+    CalendarSettingData settingData;
+    settingData.firstDayOfWeek = 1;
+    pattern->SetCurrentSettingData(settingData);
+
+    InspectorFilter filter;
+    auto json = JsonUtil::Create(true);
+    pattern->ToJsonValue(json, filter);
+
+    EXPECT_EQ(json->GetString("firstDayOfWeek"), "CalendarFirstDayOfWeek.MON");
+}
+
+/**
+ * @tc.name: CalendarDialogPatternTestToJsonFirstDayOfWeekSun
+ * @tc.desc: Test CalendarDialogPattern ToJsonValue firstDayOfWeek SUN.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CalendarDialogPatternTestNg, CalendarDialogPatternTestToJsonFirstDayOfWeekSun, TestSize.Level1)
+{
+    RefPtr<CalendarDialogPattern> pattern;
+    auto dialogNode = CreateMountedCalendarDialogHost(
+        static_cast<int32_t>(PlatformVersion::VERSION_TWENTY_SIX), pattern);
+    ASSERT_NE(dialogNode, nullptr);
+    ASSERT_NE(pattern, nullptr);
+
+    CalendarSettingData settingData;
+    settingData.firstDayOfWeek = 7;
+    pattern->SetCurrentSettingData(settingData);
+
+    InspectorFilter filter;
+    auto json = JsonUtil::Create(true);
+    pattern->ToJsonValue(json, filter);
+
+    EXPECT_EQ(json->GetString("firstDayOfWeek"), "CalendarFirstDayOfWeek.SUN");
+}
+
+/**
+ * @tc.name: ResolveFirstDayOfWeek001
+ * @tc.desc: Test ResolveFirstDayOfWeek clamps out-of-range value 8 to LOCAL
+ * @tc.type: FUNC
+ */
+HWTEST_F(CalendarDialogPatternTestNg, ResolveFirstDayOfWeek001, TestSize.Level1)
+{
+    RefPtr<CalendarDialogPattern> pattern;
+    auto dialogNode = CreateMountedCalendarDialogHost(
+        static_cast<int32_t>(PlatformVersion::VERSION_TWENTY_SIX), pattern);
+    ASSERT_NE(dialogNode, nullptr);
+    ASSERT_NE(pattern, nullptr);
+
+    CalendarSettingData data;
+    data.firstDayOfWeek = 0;
+    pattern->SetCurrentSettingData(data);
+    int32_t localResolved = pattern->GetResolvedFirstDay();
+
+    data.firstDayOfWeek = 8;
+    pattern->SetCurrentSettingData(data);
+    EXPECT_EQ(pattern->GetResolvedFirstDay(), localResolved);
+}
+
+/**
+ * @tc.name: ResolveFirstDayOfWeek002
+ * @tc.desc: Test ResolveFirstDayOfWeek clamps negative value -1 to LOCAL (never negative)
+ * @tc.type: FUNC
+ */
+HWTEST_F(CalendarDialogPatternTestNg, ResolveFirstDayOfWeek002, TestSize.Level1)
+{
+    RefPtr<CalendarDialogPattern> pattern;
+    auto dialogNode = CreateMountedCalendarDialogHost(
+        static_cast<int32_t>(PlatformVersion::VERSION_TWENTY_SIX), pattern);
+    ASSERT_NE(dialogNode, nullptr);
+    ASSERT_NE(pattern, nullptr);
+
+    CalendarSettingData data;
+    data.firstDayOfWeek = 0;
+    pattern->SetCurrentSettingData(data);
+    int32_t localResolved = pattern->GetResolvedFirstDay();
+
+    data.firstDayOfWeek = -1;
+    pattern->SetCurrentSettingData(data);
+    EXPECT_EQ(pattern->GetResolvedFirstDay(), localResolved);
+    EXPECT_GE(pattern->GetResolvedFirstDay(), 0);
+    EXPECT_LT(pattern->GetResolvedFirstDay(), 7);
+}
+
+/**
+ * @tc.name: ResolveFirstDayOfWeek003
+ * @tc.desc: Test ResolveFirstDayOfWeek with valid values 1-7
+ * @tc.type: FUNC
+ */
+HWTEST_F(CalendarDialogPatternTestNg, ResolveFirstDayOfWeek003, TestSize.Level1)
+{
+    RefPtr<CalendarDialogPattern> pattern;
+    auto dialogNode = CreateMountedCalendarDialogHost(
+        static_cast<int32_t>(PlatformVersion::VERSION_TWENTY_SIX), pattern);
+    ASSERT_NE(dialogNode, nullptr);
+    ASSERT_NE(pattern, nullptr);
+
+    CalendarSettingData data;
+    for (int32_t day = 1; day <= 7; day++) {
+        data.firstDayOfWeek = day;
+        pattern->SetCurrentSettingData(data);
+        EXPECT_EQ(pattern->GetResolvedFirstDay(), day % 7)
+            << "Failed for firstDayOfWeek value: " << day;
+    }
+}
+
 } // namespace OHOS::Ace::NG

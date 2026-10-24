@@ -729,10 +729,10 @@ void SessionWrapperImpl::CreateSession(const AAFwk::Want& want, const SessionCon
     sessionViewportConfig.orientation_ = static_cast<int32_t>(SystemProperties::GetDeviceOrientation());
     sessionViewportConfig.transform_ = context->GetTransformHint();
     pattern->SetSessionViewportConfig(sessionViewportConfig);
-    UIEXT_LOGI("SessionViewportConfig compose: uiExtensionDensityFollowHost=%{public}d, "
+    UIEXT_LOGI("SessionViewportConfig compose: uiExtensionDpiFollowHost=%{public}d, "
                "dpiFollowStrategy=%{public}d, componentId=%{public}d.",
-        context->IsUIExtensionDensityFollowHost(), static_cast<int32_t>(sessionViewportConfig.dpiFollowStrategy_),
-        GetFrameNodeId());
+        static_cast<int32_t>(context->GetUIExtensionDensityFollowHost()),
+        static_cast<int32_t>(sessionViewportConfig.dpiFollowStrategy_), GetFrameNodeId());
     Rosen::SessionInfo extensionSessionInfo;
     extensionSessionInfo.bundleName_ = want.GetElement().GetBundleName();
     extensionSessionInfo.abilityName_ = want.GetElement().GetAbilityName();
@@ -745,11 +745,12 @@ void SessionWrapperImpl::CreateSession(const AAFwk::Want& want, const SessionCon
     extensionSessionInfo.isAsyncModalBinding_ = config.isAsyncModalBinding;
     extensionSessionInfo.config_ = ConvertToRosenSessionViewportConfig(sessionViewportConfig);
     SetConnectToRenderInner(pipeline, extensionSessionInfo);
-    session_ = Rosen::ExtensionSessionManager::GetInstance().RequestExtensionSession(extensionSessionInfo);
-    CHECK_NULL_VOID(session_);
+    auto session = Rosen::ExtensionSessionManager::GetInstance().RequestExtensionSession(extensionSessionInfo);
+    CHECK_NULL_VOID(session);
+    SetSession(session);
     UpdateSessionConfig();
     lifecycleListener_ = std::make_shared<UIExtensionLifecycleListener>(AceType::WeakClaim(this));
-    session_->RegisterLifecycleListener(lifecycleListener_);
+    session->RegisterLifecycleListener(lifecycleListener_);
     InitAllCallback();
     RegisterDataConsumer();
 }
@@ -779,6 +780,13 @@ void SessionWrapperImpl::UpdateSessionConfig()
     session_->SetSystemConfig(extConfig);
 }
 
+void SessionWrapperImpl::SetSession(sptr<Rosen::ExtensionSession> session)
+{
+    std::lock_guard<std::mutex> lock(sessionMutex_);
+    session_ = session;
+    persistentId_ = session ? session->GetPersistentId() : 0;
+}
+
 void SessionWrapperImpl::DestroySession()
 {
     CHECK_NULL_VOID(session_);
@@ -790,7 +798,7 @@ void SessionWrapperImpl::DestroySession()
         dataHandler->UnregisterDataConsumer(subSystemId_);
     }
     customWant_ = nullptr;
-    session_ = nullptr;
+    SetSession(nullptr);
 }
 
 void SessionWrapperImpl::UpdateWantPtr(std::shared_ptr<AAFwk::Want>& wantPtr)
@@ -882,7 +890,8 @@ bool SessionWrapperImpl::IsSessionValid()
 
 int32_t SessionWrapperImpl::GetSessionId() const
 {
-    return session_ ? session_->GetPersistentId() : 0;
+    std::lock_guard<std::mutex> lock(sessionMutex_);
+    return persistentId_;
 }
 
 int32_t SessionWrapperImpl::GetInstanceId() const
@@ -1120,7 +1129,7 @@ void SessionWrapperImpl::OnReleaseDone()
         session_->GetPersistentId(), GetFrameNodeId());
     session_->UnregisterLifecycleListener(lifecycleListener_);
     Rosen::ExtensionSessionManager::GetInstance().RequestExtensionSessionDestructionDone(session_);
-    session_ = nullptr;
+    SetSession(nullptr);
 }
 
 void SessionWrapperImpl::NotifyDestroy(bool isHandleError)

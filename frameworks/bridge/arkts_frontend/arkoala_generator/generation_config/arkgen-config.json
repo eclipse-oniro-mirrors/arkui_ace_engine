@@ -8,6 +8,7 @@
     "ApiVersion": 9999,
     "dumpSerialized": false,
     "ignoreMaterialized": [
+        "ScrollSnapOffsetProvider",
         "AnimatableArithmetic",
         "CrownEvent",
         "CustomLayoutRoot",
@@ -51,6 +52,10 @@
         "arkui.component.ContentModifier"
     ],
     "transformOnSerialize": [
+        {
+            "from": "arkui.component.scrollCommon.ScrollSnapOffsetProvider",
+            "to": "arkui.component.scrollCommon.ScrollSnapOffsetProviderProxy"
+        },
         {
             "from": "ohos.base.BusinessError",
             "to": "arkui.component.idlize.BusinessErrorInterface"
@@ -664,6 +669,7 @@
             "CustomNode"
         ],
         "handWritten": [
+            "ScrollSnapOffsetProvider",
             "CustomDialogControllerOptions",
             "CustomDialogControllerExternalOptions",
             "CustomDialogController",
@@ -1077,7 +1083,7 @@
                 "replaceImplementation": false
             }
         },
-        "waterFlowAttribute": {
+        "WaterFlowAttribute": {
             "setWaterFlowOptions": {
                 "hookName": "hookWaterFlowOptionsImpl",
                 "replaceImplementation": true
@@ -1282,6 +1288,11 @@
         "arkui.component.scroll.Scroller.getItemRect",
         "arkui.component.scroll.Scroller.getItemIndex",
         "arkui.component.scroll.Scroller.contentSize",
+        "arkui.component.scroll.Scroller.getScrollState",
+        "arkui.component.select.SelectAttribute.arrowModifier",
+        "arkui.component.select.SelectAttribute.optionTextModifier",
+        "arkui.component.select.SelectAttribute.selectedOptionTextModifier",
+        "arkui.component.select.SelectAttribute.textModifier",
         "arkui.component.grid.GridInterface.invoke"
     ],
     "constants": {

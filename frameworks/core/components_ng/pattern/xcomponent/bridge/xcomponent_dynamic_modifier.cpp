@@ -25,6 +25,7 @@
 #include "core/common/container.h"
 #include "core/components/xcomponent/xcomponent_component.h"
 #include "core/components_ng/base/view_abstract.h"
+#include "base/log/log_wrapper.h"
 #include "core/components_ng/base/view_abstract_model.h"
 #include "core/components_ng/base/view_stack_processor.h"
 #include "core/components_ng/pattern/xcomponent/xcomponent_controller_ng.h"
@@ -501,6 +502,13 @@ void ResetXComponentHdrBrightnessImpl(ArkUINodeHandle /*node*/)
     GetModelImpl()->HdrBrightness(1.0f);
 }
 
+void SetXComponentExtraFlagImpl(ArkUINodeHandle /*node*/, ArkUI_Uint32 flag)
+{
+    TAG_LOGI(AceLogTag::ACE_XCOMPONENT, "XComponent SetExtraFlag (dynamic modifier impl) entry, flag: 0x%{public}x",
+        flag);
+    GetModelImpl()->SetExtraFlag(flag);
+}
+
 void SetXComponentEnableTransparentLayerImpl(ArkUINodeHandle /*node*/, ArkUI_Bool enable)
 {
     GetModelImpl()->EnableTransparentLayer(enable);
@@ -509,6 +517,16 @@ void SetXComponentEnableTransparentLayerImpl(ArkUINodeHandle /*node*/, ArkUI_Boo
 void ResetXComponentEnableTransparentLayerImpl(ArkUINodeHandle /*node*/)
 {
     GetModelImpl()->EnableTransparentLayer(false);
+}
+
+void SetXComponentBufferQueueCountImpl(ArkUINodeHandle /*node*/, ArkUI_Int32 bufferQueueCount)
+{
+    GetModelImpl()->SetBufferQueueCount(bufferQueueCount);
+}
+
+void ResetXComponentBufferQueueCountImpl(ArkUINodeHandle /*node*/)
+{
+    GetModelImpl()->SetBufferQueueCount(DEFAULT_BUFFER_QUEUE_COUNT);
 }
 
 void SetXComponentRenderFitImpl(ArkUINodeHandle /*node*/, ArkUI_Int32 renderFitNumber)
@@ -1397,6 +1415,14 @@ void SetXComponentHdrBrightness(ArkUINodeHandle node, ArkUI_Float32 hdrBrightnes
     XComponentModelNG::HdrBrightness(frameNode, hdrBrightness, static_cast<HdrType>(hdrType));
 }
 
+void SetXComponentExtraFlag(ArkUINodeHandle node, ArkUI_Uint32 flag)
+{
+    TAG_LOGI(AceLogTag::ACE_XCOMPONENT, "XComponent SetExtraFlag (dynamic modifier) entry, flag: 0x%{public}x", flag);
+    auto* frameNode = GetFrameNode(node);
+    CHECK_NULL_VOID(frameNode);
+    XComponentModelNG::SetExtraFlag(frameNode, flag);
+}
+
 void ResetXComponentHdrBrightness(ArkUINodeHandle node)
 {
     auto* frameNode = GetFrameNode(node);
@@ -1416,6 +1442,27 @@ void ResetXComponentEnableTransparentLayer(ArkUINodeHandle node)
     auto* frameNode = GetFrameNode(node);
     CHECK_NULL_VOID(frameNode);
     XComponentModelNG::EnableTransparentLayer(frameNode, false);
+}
+
+void SetXComponentBufferQueueCount(ArkUINodeHandle node, ArkUI_Int32 bufferQueueCount)
+{
+    auto* frameNode = GetFrameNode(node);
+    CHECK_NULL_VOID(frameNode);
+    XComponentModelNG::SetBufferQueueCount(frameNode, bufferQueueCount);
+}
+
+void ResetXComponentBufferQueueCount(ArkUINodeHandle node)
+{
+    auto* frameNode = GetFrameNode(node);
+    CHECK_NULL_VOID(frameNode);
+    XComponentModelNG::SetBufferQueueCount(frameNode, DEFAULT_BUFFER_QUEUE_COUNT);
+}
+
+ArkUI_Int32 GetXComponentBufferQueueCount(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_RETURN(frameNode, DEFAULT_BUFFER_QUEUE_COUNT);
+    return XComponentModelNG::GetBufferQueueCount(frameNode);
 }
 
 void SetXComponentRenderFit(ArkUINodeHandle node, ArkUI_Int32 renderFitNumber)
@@ -2068,8 +2115,12 @@ const ArkUIXComponentModifier* GetXComponentDynamicModifier()
             .resetXComponentEnableSecure = ResetXComponentEnableSecureImpl,
             .setXComponentHdrBrightness = SetXComponentHdrBrightnessImpl,
             .resetXComponentHdrBrightness = ResetXComponentHdrBrightnessImpl,
+            .setXComponentExtraFlag = SetXComponentExtraFlagImpl,
             .setXComponentEnableTransparentLayer = SetXComponentEnableTransparentLayerImpl,
             .resetXComponentEnableTransparentLayer = ResetXComponentEnableTransparentLayerImpl,
+            .setXComponentBufferQueueCount = SetXComponentBufferQueueCountImpl,
+            .resetXComponentBufferQueueCount = ResetXComponentBufferQueueCountImpl,
+            .getXComponentBufferQueueCount = nullptr,
             .setXComponentRenderFit = SetXComponentRenderFitImpl,
             .resetXComponentRenderFit = ResetXComponentRenderFitImpl,
             .getXComponentRenderFit = nullptr,
@@ -2185,8 +2236,12 @@ const ArkUIXComponentModifier* GetXComponentDynamicModifier()
         .resetXComponentEnableSecure = ResetXComponentEnableSecure,
         .setXComponentHdrBrightness = SetXComponentHdrBrightness,
         .resetXComponentHdrBrightness = ResetXComponentHdrBrightness,
+        .setXComponentExtraFlag = SetXComponentExtraFlag,
         .setXComponentEnableTransparentLayer = SetXComponentEnableTransparentLayer,
         .resetXComponentEnableTransparentLayer = ResetXComponentEnableTransparentLayer,
+        .setXComponentBufferQueueCount = SetXComponentBufferQueueCount,
+        .resetXComponentBufferQueueCount = ResetXComponentBufferQueueCount,
+        .getXComponentBufferQueueCount = GetXComponentBufferQueueCount,
         .setXComponentRenderFit = SetXComponentRenderFit,
         .resetXComponentRenderFit = ResetXComponentRenderFit,
         .getXComponentRenderFit = GetXComponentRenderFit,

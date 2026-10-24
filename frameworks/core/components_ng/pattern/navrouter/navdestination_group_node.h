@@ -244,7 +244,7 @@ public:
         navDestinationTransitionDelegate_ = std::move(delegate);
     }
 
-    int32_t DoTransition(NavigationOperation operation, bool isEnter);
+    int32_t DoTransition(NavigationOperation operation, bool isEnter, bool reportHomeTransition = false);
     bool HasStandardBefore() const;
 
     void UpdateUserSetOpacity(float opacity)
@@ -294,7 +294,7 @@ public:
     {
         return isTitleConsumedElapsedTime_;
     }
-    void ContentChangeReport();
+    void ContentChangeReport(bool isPopPage = false);
 
     //-------for force split------- begin------
     void SplitTransitionPushStart(ForceSplitTransitionType type) override;
@@ -347,6 +347,8 @@ private:
     std::list<WeakPtr<UINode>> textNodeList_;
     NavigationSystemTransitionType systemTransitionType_ = NavigationSystemTransitionType::DEFAULT;
     bool needForceMeasure_ = false;
+    bool needReportHomeTransition_ = false;
+    bool isPopTransition_ = false;
     float userSetOpacity_ = 1.0f;
     // This is the effective overlay state after Navigation applies inheritance rules, not just
     // the raw request coming from the destination's own property/path info.

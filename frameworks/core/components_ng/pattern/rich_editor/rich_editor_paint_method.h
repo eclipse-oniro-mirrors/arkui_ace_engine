@@ -37,6 +37,7 @@ public:
     void UpdateContentOverlayModifier(PaintWrapper* paintWrapper);
     void SetCaretState(PaintWrapper* paintWrapper);
     void SetPreviewTextDecoration(PaintWrapper* paintWrapper);
+    void SetShowUnderlineWidth(PaintWrapper* paintWrapper);
     void SetCaretOffsetAndHeight(PaintWrapper* paintWrapper);
     static std::vector<RectF> CalculateSelectedRect(
         const std::vector<std::pair<std::vector<RectF>, ParagraphStyle>>& selectedRects, float contentWidth);

@@ -14,6 +14,7 @@
  */
 
 #include "node_model.h"
+#include "node/config_manager.h"
 
 #include "base/error/error_code.h"
 #include "native_error_message_macros.h"
@@ -24,8 +25,10 @@ extern "C" {
 
 int32_t OH_ArkUI_Swiper_FinishAnimation(ArkUI_NodeHandle node)
 {
+    CHECK_UI_THREAD("OH_ArkUI_Swiper_FinishAnimation");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, OHOS::Ace::ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Swiper node is null");
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     if (node->type != ARKUI_NODE_SWIPER) {
         SET_ERROR_MESSAGE(OHOS::Ace::ERROR_CODE_PARAM_INVALID,
             __FUNCTION__, "Node type is not ARKUI_NODE_SWIPER");
@@ -46,8 +49,10 @@ int32_t OH_ArkUI_Swiper_FinishAnimation(ArkUI_NodeHandle node)
 
 int32_t OH_ArkUI_Swiper_StartFakeDrag(ArkUI_NodeHandle node, bool* isSuccessful)
 {
+    CHECK_UI_THREAD("OH_ArkUI_Swiper_StartFakeDrag");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, OHOS::Ace::ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Swiper node is null");
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     if (node->type != ARKUI_NODE_SWIPER) {
         SET_ERROR_MESSAGE(OHOS::Ace::ERROR_CODE_PARAM_INVALID,
             __FUNCTION__, "Node type is not ARKUI_NODE_SWIPER");
@@ -68,8 +73,10 @@ int32_t OH_ArkUI_Swiper_StartFakeDrag(ArkUI_NodeHandle node, bool* isSuccessful)
 
 int32_t OH_ArkUI_Swiper_FakeDragBy(ArkUI_NodeHandle node, float offset, bool* isConsumedOffset)
 {
+    CHECK_UI_THREAD("OH_ArkUI_Swiper_FakeDragBy");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, OHOS::Ace::ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Swiper node is null");
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     if (node->type != ARKUI_NODE_SWIPER) {
         SET_ERROR_MESSAGE(OHOS::Ace::ERROR_CODE_PARAM_INVALID,
             __FUNCTION__, "Node type is not ARKUI_NODE_SWIPER");
@@ -90,8 +97,10 @@ int32_t OH_ArkUI_Swiper_FakeDragBy(ArkUI_NodeHandle node, float offset, bool* is
 
 int32_t OH_ArkUI_Swiper_StopFakeDrag(ArkUI_NodeHandle node, bool* isSuccessful)
 {
+    CHECK_UI_THREAD("OH_ArkUI_Swiper_StopFakeDrag");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, OHOS::Ace::ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Swiper node is null");
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     if (node->type != ARKUI_NODE_SWIPER) {
         SET_ERROR_MESSAGE(OHOS::Ace::ERROR_CODE_PARAM_INVALID,
             __FUNCTION__, "Node type is not ARKUI_NODE_SWIPER");
@@ -112,8 +121,10 @@ int32_t OH_ArkUI_Swiper_StopFakeDrag(ArkUI_NodeHandle node, bool* isSuccessful)
 
 int32_t OH_ArkUI_Swiper_IsFakeDragging(ArkUI_NodeHandle node, bool* isFakeDragging)
 {
+    CHECK_UI_THREAD("OH_ArkUI_Swiper_IsFakeDragging");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, OHOS::Ace::ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "current node is null");
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     if (node->type != ARKUI_NODE_SWIPER) {
         SET_ERROR_MESSAGE(OHOS::Ace::ERROR_CODE_PARAM_INVALID,
             __FUNCTION__, "Node type is not ARKUI_NODE_SWIPER");
@@ -134,8 +145,10 @@ int32_t OH_ArkUI_Swiper_IsFakeDragging(ArkUI_NodeHandle node, bool* isFakeDraggi
 
 int32_t OH_ArkUI_Swiper_ShowPrevious(ArkUI_NodeHandle node)
 {
+    CHECK_UI_THREAD("OH_ArkUI_Swiper_ShowPrevious");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, OHOS::Ace::ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Swiper node is null");
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     if (node->type != ARKUI_NODE_SWIPER) {
         SET_ERROR_MESSAGE(OHOS::Ace::ERROR_CODE_PARAM_INVALID,
             __FUNCTION__, "Node type is not ARKUI_NODE_SWIPER");
@@ -156,8 +169,10 @@ int32_t OH_ArkUI_Swiper_ShowPrevious(ArkUI_NodeHandle node)
 
 int32_t OH_ArkUI_Swiper_ShowNext(ArkUI_NodeHandle node)
 {
+    CHECK_UI_THREAD("OH_ArkUI_Swiper_ShowNext");
     CHECK_NULL_RETURN_WITH_MESSAGE(node, OHOS::Ace::ERROR_CODE_PARAM_INVALID,
         __FUNCTION__, "Swiper node is null");
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     if (node->type != ARKUI_NODE_SWIPER) {
         SET_ERROR_MESSAGE(OHOS::Ace::ERROR_CODE_PARAM_INVALID,
             __FUNCTION__, "Node type is not ARKUI_NODE_SWIPER");
@@ -178,7 +193,9 @@ int32_t OH_ArkUI_Swiper_ShowNext(ArkUI_NodeHandle node)
 
 int32_t OH_ArkUI_ArcSwiper_ShowNext(ArkUI_NodeHandle node)
 {
+    CHECK_UI_THREAD("OH_ArkUI_ArcSwiper_ShowNext");
     CHECK_NULL_RETURN(node, OHOS::Ace::ERROR_CODE_PARAM_INVALID);
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     CHECK_NE_RETURN(node->type, ARKUI_NODE_ARC_SWIPER, OHOS::Ace::ERROR_CODE_PARAM_INVALID);
     CHECK_NULL_RETURN(node->uiNodeHandle, OHOS::Ace::ERROR_CODE_PARAM_INVALID);
     auto* fullImpl = OHOS::Ace::NodeModel::GetFullImpl();
@@ -193,7 +210,9 @@ int32_t OH_ArkUI_ArcSwiper_ShowNext(ArkUI_NodeHandle node)
 
 int32_t OH_ArkUI_ArcSwiper_ShowPrevious(ArkUI_NodeHandle node)
 {
+    CHECK_UI_THREAD("OH_ArkUI_ArcSwiper_ShowPrevious");
     CHECK_NULL_RETURN(node, OHOS::Ace::ERROR_CODE_PARAM_INVALID);
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     CHECK_NE_RETURN(node->type, ARKUI_NODE_ARC_SWIPER, OHOS::Ace::ERROR_CODE_PARAM_INVALID);
     CHECK_NULL_RETURN(node->uiNodeHandle, OHOS::Ace::ERROR_CODE_PARAM_INVALID);
     auto* fullImpl = OHOS::Ace::NodeModel::GetFullImpl();
@@ -208,7 +227,9 @@ int32_t OH_ArkUI_ArcSwiper_ShowPrevious(ArkUI_NodeHandle node)
 
 int32_t OH_ArkUI_ArcSwiper_FinishAnimation(ArkUI_NodeHandle node)
 {
+    CHECK_UI_THREAD("OH_ArkUI_ArcSwiper_FinishAnimation");
     CHECK_NULL_RETURN(node, OHOS::Ace::ERROR_CODE_PARAM_INVALID);
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     CHECK_NE_RETURN(node->type, ARKUI_NODE_ARC_SWIPER, OHOS::Ace::ERROR_CODE_PARAM_INVALID);
     CHECK_NULL_RETURN(node->uiNodeHandle, OHOS::Ace::ERROR_CODE_PARAM_INVALID);
     auto* fullImpl = OHOS::Ace::NodeModel::GetFullImpl();

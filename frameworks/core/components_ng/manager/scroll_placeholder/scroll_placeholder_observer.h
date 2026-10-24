@@ -22,6 +22,7 @@
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/layout/layout_wrapper.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_manager.h"
+#include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_shell_node.h"
 #include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_types.h"
 #include "core/pipeline_ng/pipeline_context.h"
 #include "ui/base/utils/utils.h"
@@ -89,15 +90,18 @@ public:
     }
 
     // Report the acquisition result. A null wrapper means no real build happened (empty lazy
-    // branch / out of range): the observation is closed without feeding a zero-cost sample
-    // into the cost model. Sites that forget to report keep the fail-safe sampling behavior.
+    // branch / out of range) and a placeholder shell means the acquisition was substituted by
+    // the FrameProxy deferral hook: both close the observation without feeding a sample into
+    // the cost model — a substituted shell is not a real build and its (tiny) acquisition cost
+    // must not drag the per-template estimate down. Sites that forget to report keep the
+    // fail-safe sampling behavior.
     void SetAcquiredWrapper(const RefPtr<LayoutWrapper>& wrapper)
     {
         if (!observing_ || acquiredReported_) {
             return;
         }
         acquiredReported_ = true;
-        if (wrapper) {
+        if (wrapper && !AceType::DynamicCast<ScrollPlaceholderShellNode>(wrapper)) {
             return;
         }
         if (traceEnabled_) {

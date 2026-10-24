@@ -20,7 +20,7 @@
 
 #include "core/components/list/arc_list_item_theme.h"
 #include "core/components/common/properties/color.h"
-#include "core/components_ng/token_theme/token_theme_wrapper.h"
+#include "core/components_ng/token_theme/token_theme.h"
 
 namespace OHOS::Ace::NG {
 
@@ -28,7 +28,7 @@ namespace OHOS::Ace::NG {
  * ArcListItemThemeWrapper defines color and styles of ArcListItem basing on TokenTheme's data.
  * ArcListItemThemeWrapper should be built using ArcListItemThemeWrapper::WrapperBuilder.
  */
-class ArcListItemThemeWrapper : public ArcListItemTheme, public TokenThemeWrapper {
+class ArcListItemThemeWrapper : public ArcListItemTheme {
     DECLARE_ACE_TYPE(ArcListItemThemeWrapper, ArcListItemTheme);
 
 public:
@@ -37,7 +37,7 @@ public:
         WrapperBuilder() = default;
         ~WrapperBuilder() = default;
 
-        RefPtr<TokenThemeWrapper> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
+        RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
         {
             auto wrapper = AceType::MakeRefPtr<ArcListItemThemeWrapper>();
             auto theme = AceType::DynamicCast<ArcListItemTheme>(wrapper);

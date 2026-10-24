@@ -701,7 +701,18 @@ HWTEST_F(DepthComponentPatternTestNg, ApplyOnErrorCallback002, TestSize.Level1)
     EXPECT_FALSE(pattern->pendingCleanupGltf_); // reset by the bridge
 }
 
-// ===================== OnPaint3D =====================
+// ===================== FinishBackgroundSwitch / OnPaint3D =====================
+
+/**
+ * @tc.name: FinishBackgroundSwitch001
+ * @tc.desc: FinishBackgroundSwitch is a safe no-op under ACE_UNITTEST (KIT_3D compiled out).
+ * @tc.type: FUNC
+ */
+HWTEST_F(DepthComponentPatternTestNg, FinishBackgroundSwitch001, TestSize.Level1)
+{
+    auto pattern = AceType::MakeRefPtr<DepthComponentPattern>();
+    pattern->FinishBackgroundSwitch(); // no crash
+}
 
 /**
  * @tc.name: OnPaint3D001

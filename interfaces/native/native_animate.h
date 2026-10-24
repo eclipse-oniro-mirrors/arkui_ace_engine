@@ -1434,10 +1434,17 @@ void OH_ArkUI_NativeModule_PropertyAnimation_Destroy(OH_ArkUI_PropertyAnimationH
 /**
  * @brief Sets the start value of a property animation.
  *
+ * It is recommended to set the start value. If not set, the animation starts from the current property
+ * value by default. If the property animation does not set the start value of the property and the
+ * corresponding property has never been assigned, the property animation cannot be produced due to the
+ * lack of a valid start state.
+ *
  * @param animation [in] Indicates the property animation handle.
- * @param value [in] Indicates the start value. The number and type of elements depend on
- *     {@link OH_ArkUI_AnimationPropertyType}. For example, OPACITY requires 1 f32 value,
- *     and TRANSLATION requires 2 f32 values (x, y).
+ * @param value [in] Indicates the start value. The number and type of elements depend on the
+ *     <b>propertyType</b> specified when creating the property animation via
+ *     {@link OH_ArkUI_NativeModule_PropertyAnimation_Create}. For details, see
+ *     {@link OH_ArkUI_AnimationPropertyType}. For example, {@link OH_ARKUI_ANIMATION_PROPERTY_OPACITY}
+ *     requires 1 f32 value.
  * @param size [in] Indicates the number of elements in the value array.
  * @return <ul>
  *         <li>{@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.</li>
@@ -1452,10 +1459,11 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_PropertyAnimation_SetFromValue(
  * @brief Obtains the start value of a property animation.
  *
  * @param animation [in] Indicates the property animation handle.
- * @param value [out] Indicates the pointer to receive the start value array of {@link ArkUI_NumberValue}. The number
- *     and type of elements depend on {@link OH_ArkUI_AnimationPropertyType}. For example, OPACITY requires
- *     1 f32 value, and TRANSLATION requires 2 f32 values (x, y). The values are written into the memory
- *     pointed to by this pointer.
+ * @param value [out] Indicates the pointer to receive the start value array of {@link ArkUI_NumberValue}.
+ *     The number and type of elements depend on the <b>propertyType</b> specified when creating the property
+ *     animation via {@link OH_ArkUI_NativeModule_PropertyAnimation_Create}. For details, see
+ *     {@link OH_ArkUI_AnimationPropertyType}. For example, {@link OH_ARKUI_ANIMATION_PROPERTY_OPACITY}
+ *     requires 1 f32 value. The values are written into the memory pointed to by this pointer.
  *     <br>This pointer must not be **NULL**. If **value** is set to **NULL**, the error code
  *     {@link ARKUI_ERROR_CODE_PARAM_INVALID} is returned.
  * @param size [in] Indicates the size of the output array. It must equal the number of elements required by
@@ -1477,9 +1485,11 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_PropertyAnimation_GetFromValue(
  * @brief Sets the end value of a property animation.
  *
  * @param animation [in] Indicates the property animation handle.
- * @param value [in] Indicates the end value. The number and type of elements depend on
- *     {@link OH_ArkUI_AnimationPropertyType}. For example, OPACITY requires 1 f32 value,
- *     and TRANSLATION requires 2 f32 values (x, y).
+ * @param value [in] Indicates the end value. The number and type of elements depend on the
+ *     <b>propertyType</b> specified when creating the property animation via
+ *     {@link OH_ArkUI_NativeModule_PropertyAnimation_Create}. For details, see
+ *     {@link OH_ArkUI_AnimationPropertyType}. For example, {@link OH_ARKUI_ANIMATION_PROPERTY_OPACITY}
+ *     requires 1 f32 value.
  * @param size [in] Indicates the number of elements in the value array.
  * @return <ul>
  *         <li>{@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.</li>
@@ -1494,10 +1504,11 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_PropertyAnimation_SetToValue(
  * @brief Obtains the end value of a property animation.
  *
  * @param animation [in] Indicates the property animation handle.
- * @param value [out] Indicates the pointer to receive the end value array of {@link ArkUI_NumberValue}. The number
- *     and type of elements depend on {@link OH_ArkUI_AnimationPropertyType}. For example, OPACITY requires
- *     1 f32 value, and TRANSLATION requires 2 f32 values (x, y). The values are written into the memory
- *     pointed to by this pointer.
+ * @param value [out] Indicates the pointer to receive the end value array of {@link ArkUI_NumberValue}.
+ *     The number and type of elements depend on the <b>propertyType</b> specified when creating the property
+ *     animation via {@link OH_ArkUI_NativeModule_PropertyAnimation_Create}. For details, see
+ *     {@link OH_ArkUI_AnimationPropertyType}. For example, {@link OH_ARKUI_ANIMATION_PROPERTY_OPACITY}
+ *     requires 1 f32 value. The values are written into the memory pointed to by this pointer.
  *     <br>This pointer must not be **NULL**. If **value** is set to **NULL**, the error code
  *     {@link ARKUI_ERROR_CODE_PARAM_INVALID} is returned.
  * @param size [in] Indicates the size of the output array. It must equal the number of elements required by
@@ -1594,7 +1605,8 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_PropertyAnimation_GetDelay(
  * {@link OH_ArkUI_NativeModule_PropertyAnimation_SetDuration} does not take effect; the animation
  * duration is determined by the spring curve.
  * @param animation [in] Indicates the property animation handle.
- * @param curve [in] Indicates the animation curve. This API does not take ownership of
+ * @param curve [in] Indicates the animation curve. <b>NULL</b> means inheriting the group's curve
+ *     set by {@link OH_ArkUI_NativeModule_AnimationGroup_SetCurve}. This API does not take ownership of
  *     the curve handle; the caller must ensure the curve remains valid when using this handle.
  * @return <ul>
  *         <li>{@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.</li>
@@ -1610,16 +1622,17 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_PropertyAnimation_SetCurve(
  *
  * This API returns only the curve explicitly set on this animation; the value inherited from the
  * animation group or the default is resolved at runtime and is not stored on this object. If the curve
- * has not been set on this animation, {@link ARKUI_ERROR_CODE_NO_ATTRIBUTE_FOUND} is returned. The actual
+ * has not been set on this animation, <b>NULL</b> is written to <b>outBorrowedCurve</b>. The actual
  * effective animation curve used at runtime is determined by priority: if set via
  * {@link OH_ArkUI_NativeModule_PropertyAnimation_SetCurve}, that value is used; otherwise, the group's
  * curve via {@link OH_ArkUI_NativeModule_AnimationGroup_SetCurve} is used; if neither is set,
  * {@link ARKUI_CURVE_LINEAR} is used.
  * @param animation [in] Indicates the property animation handle.
  * @param outBorrowedCurve [out] Receives a borrowed curve handle; the caller must not destroy it.
+ *     <b>NULL</b> means the curve has not been set on this animation and will inherit the group's curve
+ *     at runtime.
  * @return <ul>
  *         <li>{@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.</li>
- *         <li>{@link ARKUI_ERROR_CODE_NO_ATTRIBUTE_FOUND} if the curve has not been set.</li>
  *         <li>{@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter exception occurs.</li>
  *         </ul>
  * @since 26.0.1
@@ -1662,7 +1675,9 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_PropertyAnimation_GetTempo(
  * across iterations. The default value is <b>false</b>.
  *
  * @param animation [in] Indicates the property animation handle.
- * @param autoReverse [in] Indicates whether to enable auto-reverse. The default value is <b>false</b>.
+ * @param autoReverse [in] Indicates whether to enable auto-reverse. <b>true</b> means enabling auto-reverse,
+ *     where the animation alternates between forward and backward playback across iterations; <b>false</b>
+ *     means disabling it, where the animation plays forward only. The default value is <b>false</b>.
  * @return <ul>
  *         <li>{@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.</li>
  *         <li>{@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter exception occurs.</li>
@@ -1756,11 +1771,11 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_PropertyAnimation_GetTargetNode(
 /**
  * @brief Creates a keyframe animation for a specific animatable property.
  *
- * The key time of each keyframe defaults to being evenly distributed in [0, 1] by index (for example,
+ * The keyframe time point of each keyframe defaults to being evenly distributed in [0, 1] by index (for example,
  * when there are 3 keyframes, <b>0.0</b> for the first frame, <b>0.5</b> for the second frame, and
  * <b>1.0</b> for the third frame).
  * Use {@link OH_ArkUI_NativeModule_KeyframeAnimation_SetKeyTimes} or
- * {@link OH_ArkUI_NativeModule_KeyframeAnimation_SetKeyTime} to customize the key time points.
+ * {@link OH_ArkUI_NativeModule_KeyframeAnimation_SetKeyTime} to customize the keyframe time points.
  *
  * <b>propertyType</b> must be a valid {@link OH_ArkUI_AnimationPropertyType}, and <b>size</b> must be at least 2;
  * otherwise, this API returns <b>NULL</b>.
@@ -1786,9 +1801,9 @@ OH_ArkUI_KeyframeAnimationHandle OH_ArkUI_NativeModule_KeyframeAnimation_Create(
 void OH_ArkUI_NativeModule_KeyframeAnimation_Destroy(OH_ArkUI_KeyframeAnimationHandle animation);
 
 /**
- * @brief Sets the keyframe key time points.
+ * @brief Sets the keyframe time points.
  *
- * If this API is not called, the key time of each keyframe defaults to being evenly distributed in [0, 1]
+ * If this API is not called, the keyframe time point of each keyframe defaults to being evenly distributed in [0, 1]
  * by index (for example, when there are 3 keyframes, <b>0.0</b> for the first frame, <b>0.5</b> for the
  * second frame, and <b>1.0</b> for the third frame).
  *
@@ -1796,8 +1811,9 @@ void OH_ArkUI_NativeModule_KeyframeAnimation_Destroy(OH_ArkUI_KeyframeAnimationH
  * of the keyframe animation (the <b>size</b> value specified when the animation was created via
  * {@link OH_ArkUI_NativeModule_KeyframeAnimation_Create}).
  * @param animation [in] Indicates the keyframe animation handle.
- * @param keyTimes [in] Indicates the array of key time points. Value range of each element: [0, 1].
- * @param size [in] Indicates the number of key time points.
+ * @param keyTimes [in] Indicates the array of keyframe time points, as a normalized time ratio. Value range of
+ *     each element: [0, 1].
+ * @param size [in] Indicates the number of keyframe time points.
  * @return <ul>
  *         <li>{@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.</li>
  *         <li>{@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter exception occurs.</li>
@@ -1808,11 +1824,12 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_KeyframeAnimation_SetKeyTimes(
     OH_ArkUI_KeyframeAnimationHandle animation, const float *keyTimes, int32_t size);
 
 /**
- * @brief Obtains the key time point of a keyframe at the specified index.
+ * @brief Obtains the keyframe time point of a keyframe at the specified index.
  *
  * @param animation [in] Indicates the keyframe animation handle.
  * @param index [in] Indicates the keyframe index.
- * @param keyTime [out] Indicates the pointer to receive the key time point.
+ * @param keyTime [out] Indicates the pointer to receive the keyframe time point, as a normalized time ratio,
+ *     with a value range of [0, 1].
  * @return <ul>
  *         <li>{@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.</li>
  *         <li>{@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter exception occurs.</li>
@@ -1823,15 +1840,15 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_KeyframeAnimation_GetKeyTime(
     OH_ArkUI_KeyframeAnimationHandle animation, int32_t index, float *keyTime);
 
 /**
- * @brief Sets the key time point of a keyframe at the specified index.
+ * @brief Sets the keyframe time point of a keyframe at the specified index.
  *
- * If this API is not called for a keyframe, its key time defaults to being evenly distributed in [0, 1]
+ * If this API is not called for a keyframe, its keyframe time point defaults to being evenly distributed in [0, 1]
  * by index (for example, when there are 3 keyframes, <b>0.0</b> for the first frame, <b>0.5</b> for the
  * second frame, and <b>1.0</b> for the third frame).
  *
  * @param animation [in] Indicates the keyframe animation handle.
  * @param index [in] Indicates the keyframe index.
- * @param keyTime [in] Indicates the key time point. Value range: [0, 1].
+ * @param keyTime [in] Indicates the keyframe time point, as a normalized time ratio. Value range: [0, 1].
  * @return <ul>
  *         <li>{@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.</li>
  *         <li>{@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter exception occurs.</li>
@@ -1847,8 +1864,10 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_KeyframeAnimation_SetKeyTime(
  * @param animation [in] Indicates the keyframe animation handle.
  * @param index [in] Indicates the keyframe index.
  * @param value [in] Indicates the array of {@link ArkUI_NumberValue}. The number and type of elements depend on
- *     {@link OH_ArkUI_AnimationPropertyType}. For example, OPACITY requires 1 f32 value,
- *     and TRANSLATION requires 2 f32 values (x, y).
+ *     the <b>propertyType</b> specified when creating the keyframe animation via
+ *     {@link OH_ArkUI_NativeModule_KeyframeAnimation_Create}. For details, see
+ *     {@link OH_ArkUI_AnimationPropertyType}. For example, {@link OH_ARKUI_ANIMATION_PROPERTY_OPACITY}
+ *     requires 1 f32 value.
  * @param size [in] Indicates the number of elements in the value array.
  * @return <ul>
  *         <li>{@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.</li>
@@ -1862,13 +1881,15 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_KeyframeAnimation_SetValue(
 /**
  * @brief Sets the values for all keyframes at once.
  *
- * The values are provided as a flat array. The number of elements per keyframe depends on
- * {@link OH_ArkUI_AnimationPropertyType}. For example, OPACITY requires 1 value per keyframe,
- * and TRANSLATION requires 2 values per keyframe. The total number of elements must equal
- * the number of keyframes multiplied by the number of values per keyframe.
+ * The values are provided as a flat array.
  *
  * @param animation [in] Indicates the keyframe animation handle.
- * @param values [in] Indicates the flat array of {@link ArkUI_NumberValue} for all keyframes.
+ * @param values [in] Indicates the flat array of {@link ArkUI_NumberValue} for all keyframes. The number
+ *     and type of elements per keyframe depend on the <b>propertyType</b> specified when creating the
+ *     keyframe animation via {@link OH_ArkUI_NativeModule_KeyframeAnimation_Create}. For details, see
+ *     {@link OH_ArkUI_AnimationPropertyType}. For example, {@link OH_ARKUI_ANIMATION_PROPERTY_OPACITY}
+ *     requires 1 value per keyframe. The total number of elements must equal the number of keyframes
+ *     multiplied by the number of values per keyframe.
  * @param size [in] Indicates the total number of elements in the values array.
  * @return <ul>
  *         <li>{@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.</li>
@@ -1885,9 +1906,10 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_KeyframeAnimation_SetValues(
  * @param animation [in] Indicates the keyframe animation handle.
  * @param index [in] Indicates the keyframe index.
  * @param value [out] Indicates the pointer to receive the value array of {@link ArkUI_NumberValue}. The number and
- *     type of elements depend on {@link OH_ArkUI_AnimationPropertyType}. For example, OPACITY requires 1 f32
- *     value, and TRANSLATION requires 2 f32 values (x, y). The values are written into the memory pointed
- *     to by this pointer.
+ *     type of elements depend on the <b>propertyType</b> specified when creating the keyframe animation via
+ *     {@link OH_ArkUI_NativeModule_KeyframeAnimation_Create}. For details, see
+ *     {@link OH_ArkUI_AnimationPropertyType}. For example, {@link OH_ARKUI_ANIMATION_PROPERTY_OPACITY}
+ *     requires 1 f32 value. The values are written into the memory pointed to by this pointer.
  *     <br>This pointer must not be **NULL**. If **value** is set to **NULL**, the error code
  *     {@link ARKUI_ERROR_CODE_PARAM_INVALID} is returned.
  * @param size [in] Indicates the size of the output array. It must equal the number of elements required by
@@ -1928,7 +1950,8 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_KeyframeAnimation_SetCurves(
  *
  * @param animation [in] Indicates the keyframe animation handle.
  * @param index [in] Indicates the keyframe index.
- * @param curve [in] Indicates the animation curve. This API does not take ownership of
+ * @param curve [in] Indicates the animation curve. <b>NULL</b> means inheriting the group's curve
+ *     set by {@link OH_ArkUI_NativeModule_AnimationGroup_SetCurve}. This API does not take ownership of
  *     the curve handle; the caller must ensure the curve remains valid when using this handle.
  *     The <b>springMotion</b>, <b>responsiveSpringMotion</b>, and <b>interpolatingSpring</b> curves are not
  *     supported because they do not have effective duration settings.
@@ -1951,7 +1974,7 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_KeyframeAnimation_SetCurve(
  *
  * This API returns only the curve explicitly set for the keyframe; the value inherited from the
  * animation group or the default is resolved at runtime and is not stored on this object. If the curve
- * has not been set for the keyframe, {@link ARKUI_ERROR_CODE_NO_ATTRIBUTE_FOUND} is returned. The actual
+ * has not been set for the keyframe, <b>NULL</b> is written to <b>outBorrowedCurve</b>. The actual
  * effective animation curve used at runtime is determined by priority: if set for the keyframe via
  * {@link OH_ArkUI_NativeModule_KeyframeAnimation_SetCurve} or
  * {@link OH_ArkUI_NativeModule_KeyframeAnimation_SetCurves}, that value is used; otherwise, the group's
@@ -1960,9 +1983,10 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_KeyframeAnimation_SetCurve(
  * @param animation [in] Indicates the keyframe animation handle.
  * @param index [in] Indicates the keyframe index.
  * @param outBorrowedCurve [out] Receives a borrowed curve handle; the caller must not destroy it.
+ *     <b>NULL</b> means the curve has not been set for the keyframe and will inherit the group's curve
+ *     at runtime.
  * @return <ul>
  *         <li>{@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.</li>
- *         <li>{@link ARKUI_ERROR_CODE_NO_ATTRIBUTE_FOUND} if the curve has not been set.</li>
  *         <li>{@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter exception occurs.</li>
  *         </ul>
  * @since 26.0.1
@@ -2072,7 +2096,9 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_KeyframeAnimation_GetTempo(
  * across iterations. The default value is <b>false</b>.
  *
  * @param animation [in] Indicates the keyframe animation handle.
- * @param autoReverse [in] Indicates whether to enable auto-reverse. The default value is <b>false</b>.
+ * @param autoReverse [in] Indicates whether to enable auto-reverse. <b>true</b> means enabling auto-reverse,
+ *     where the animation alternates between forward and backward playback across iterations; <b>false</b>
+ *     means disabling it, where the animation plays forward only. The default value is <b>false</b>.
  * @return <ul>
  *         <li>{@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.</li>
  *         <li>{@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter exception occurs.</li>
@@ -2256,50 +2282,6 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_PathAnimation_SetDelay(OH_ArkUI_PathAnimat
 ArkUI_ErrorCode OH_ArkUI_NativeModule_PathAnimation_GetDelay(OH_ArkUI_PathAnimationHandle animation, int32_t *delay);
 
 /**
- * @brief Sets the animation curve for a path animation.
- *
- * @param animation [in] Indicates the path animation handle.
- * @param curve [in] Indicates the animation curve that controls the rate of motion along the path.
- *     This API does not take ownership of the curve handle; the caller must ensure the curve remains
- *     valid when using this handle.
- *     The <b>springMotion</b>, <b>responsiveSpringMotion</b>, and <b>interpolatingSpring</b> curves are not
- *     supported because they do not have effective duration settings.
- *     The actual effective animation curve is determined by priority: if the curve is set via this API, that
- *     value is used; otherwise, the curve set on the animation group via
- *     {@link OH_ArkUI_NativeModule_AnimationGroup_SetCurve} is used; if neither is set,
- *     {@link ARKUI_CURVE_LINEAR} is used.
- * @return <ul>
- *         <li>{@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.</li>
- *         <li>{@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter exception occurs.</li>
- *         </ul>
- * @since 26.0.1
- */
-ArkUI_ErrorCode OH_ArkUI_NativeModule_PathAnimation_SetCurve(
-    OH_ArkUI_PathAnimationHandle animation, ArkUI_CurveHandle curve);
-
-/**
- * @brief Obtains the animation curve of a path animation.
- *
- * This API returns only the curve explicitly set on this animation; the value inherited from the
- * animation group or the default is resolved at runtime and is not stored on this object. If the curve
- * has not been set on this animation, {@link ARKUI_ERROR_CODE_NO_ATTRIBUTE_FOUND} is returned. The actual
- * effective animation curve used at runtime is determined by priority: if set via
- * {@link OH_ArkUI_NativeModule_PathAnimation_SetCurve}, that value is used; otherwise, the group's
- * curve via {@link OH_ArkUI_NativeModule_AnimationGroup_SetCurve} is used; if neither is set,
- * {@link ARKUI_CURVE_LINEAR} is used.
- * @param animation [in] Indicates the path animation handle.
- * @param outBorrowedCurve [out] Receives a borrowed curve handle; the caller must not destroy it.
- * @return <ul>
- *         <li>{@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.</li>
- *         <li>{@link ARKUI_ERROR_CODE_NO_ATTRIBUTE_FOUND} if the curve has not been set.</li>
- *         <li>{@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter exception occurs.</li>
- *         </ul>
- * @since 26.0.1
- */
-ArkUI_ErrorCode OH_ArkUI_NativeModule_PathAnimation_GetCurve(
-    OH_ArkUI_PathAnimationHandle animation, ArkUI_CurveHandle *outBorrowedCurve);
-
-/**
  * @brief Sets the tempo for a path animation.
  *
  * @param animation [in] Indicates the path animation handle.
@@ -2332,7 +2314,9 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_PathAnimation_GetTempo(OH_ArkUI_PathAnimat
  * across iterations. The default value is <b>false</b>.
  *
  * @param animation [in] Indicates the path animation handle.
- * @param autoReverse [in] Indicates whether to enable auto-reverse. The default value is <b>false</b>.
+ * @param autoReverse [in] Indicates whether to enable auto-reverse. <b>true</b> means enabling auto-reverse,
+ *     where the animation alternates between forward and backward playback across iterations; <b>false</b>
+ *     means disabling it, where the animation plays forward only. The default value is <b>false</b>.
  * @return <ul>
  *         <li>{@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.</li>
  *         <li>{@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter exception occurs.</li>
@@ -2390,11 +2374,14 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_PathAnimation_GetIterations(
 /**
  * @brief Sets whether the component auto-rotates to align with the path tangent during a path animation.
  *
- * When auto-rotation is enabled, the component rotates so that its heading direction aligns with the
+ * When auto-rotation is enabled, the component rotates so that its orientation aligns with the
  * tangent of the path at the current position. The default value is <b>false</b>.
  *
  * @param animation [in] Indicates the path animation handle.
- * @param autoRotation [in] Indicates whether to enable auto-rotation. The default value is <b>false</b>.
+ * @param autoRotation [in] Indicates whether to enable auto-rotation. <b>true</b> means enabling
+ *     auto-rotation, where the component rotates to align its orientation with the path tangent at the
+ *     current position; <b>false</b> means disabling it, where the component does not rotate with the path
+ *     tangent. The default value is <b>false</b>.
  * @return <ul>
  *         <li>{@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.</li>
  *         <li>{@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter exception occurs.</li>
@@ -2550,12 +2537,12 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_AnimationGroup_GetDelay(OH_ArkUI_Animation
  *
  * The group's curve serves as the default curve for child animations that do not set their own curve
  * via {@link OH_ArkUI_NativeModule_PropertyAnimation_SetCurve},
- * {@link OH_ArkUI_NativeModule_KeyframeAnimation_SetCurve}, or
- * {@link OH_ArkUI_NativeModule_PathAnimation_SetCurve}.
+ * {@link OH_ArkUI_NativeModule_KeyframeAnimation_SetCurve}.
  * The <b>springMotion</b>, <b>responsiveSpringMotion</b>, and <b>interpolatingSpring</b> curves are not
  * supported because they do not have effective duration settings.
  * @param group [in] Indicates the animation group handle.
- * @param curve [in] Indicates the animation curve. This API does not take ownership of
+ * @param curve [in] Indicates the animation curve. <b>NULL</b> means the group uses the default
+ *     {@link ARKUI_CURVE_LINEAR} at runtime. This API does not take ownership of
  *     the curve handle; the caller must ensure the curve remains valid when using this handle.
  * @return <ul>
  *         <li>{@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.</li>
@@ -2571,13 +2558,14 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_AnimationGroup_SetCurve(
  *
  * This API returns only the curve explicitly set on this animation group, and is not affected by
  * the curve of child animations. If the curve has not been set on this group,
- * {@link ARKUI_ERROR_CODE_NO_ATTRIBUTE_FOUND} is returned. At runtime, an unset group curve defaults
- * to {@link ARKUI_CURVE_LINEAR}.
+ * <b>NULL</b> is written to <b>outBorrowedCurve</b>.
+ * At runtime, an unset group curve defaults to {@link ARKUI_CURVE_LINEAR}.
  * @param group [in] Indicates the animation group handle.
  * @param outBorrowedCurve [out] Receives a borrowed curve handle; the caller must not destroy it.
+ *     <b>NULL</b> means the curve has not been set on this group and defaults to
+ *     {@link ARKUI_CURVE_LINEAR} at runtime.
  * @return <ul>
  *         <li>{@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.</li>
- *         <li>{@link ARKUI_ERROR_CODE_NO_ATTRIBUTE_FOUND} if the curve has not been set.</li>
  *         <li>{@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter exception occurs.</li>
  *         </ul>
  * @since 26.0.1
@@ -2618,7 +2606,10 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_AnimationGroup_GetTempo(OH_ArkUI_Animation
  * across iterations. The default value is <b>false</b>.
  *
  * @param group [in] Indicates the animation group handle.
- * @param autoReverse [in] Indicates whether to enable auto-reverse. The default value is <b>false</b>.
+ * @param autoReverse [in] Indicates whether to enable auto-reverse. <b>true</b> means enabling auto-reverse,
+ *     where the animation group alternates between forward and backward playback across iterations;
+ *     <b>false</b> means disabling it, where the animation group plays forward only. The default value is
+ *     <b>false</b>.
  * @return <ul>
  *         <li>{@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.</li>
  *         <li>{@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter exception occurs.</li>
@@ -2844,9 +2835,10 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_AnimationGroup_AddPathAnimation(
  * {@link OH_ArkUI_NativeModule_AnimationGroup_AddPathAnimation} animates the target node set by its own
  * <b>SetTargetNode</b> API; if that target is not set (or is <b>NULL</b>), it inherits the group's default
  * target set by {@link OH_ArkUI_NativeModule_AnimationGroup_SetTargetNode}. At registration, every child
- * must resolve to a non-NULL target node (its own, or the group default), and every resolved target
- * node must belong to the same UIContext as <b>context</b>; otherwise, the error code
- * {@link ARKUI_ERROR_CODE_PARAM_INVALID} is returned.
+ * must resolve to a non-NULL target node (its own, or the group default); if a child has no resolvable
+ * target node, {@link ARKUI_ERROR_CODE_SUB_ANIMATION_INVALID} is returned. Every resolved target node
+ * must belong to the same UIContext as <b>context</b>; otherwise, the error code
+ * {@link ARKUI_ERROR_CODE_TARGET_NODE_NOT_IN_SAME_CONTEXT} is returned.
  *
  * Playback control and lifecycle APIs ({@link OH_ArkUI_NativeModule_RemoveAnimationGroup},
  * {@link OH_ArkUI_NativeModule_GetAnimationGroupState}, {@link OH_ArkUI_NativeModule_HasAnimationGroup},
@@ -2867,10 +2859,13 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_AnimationGroup_AddPathAnimation(
  * @param context [in] Indicates the {@link ArkUI_ContextHandle} (UIContext) on which the animation group is
  *     registered and played.
  * @param group [in] Indicates the animation group handle.
- * @param key [in] Indicates the key used to identify the animation group on the UIContext.
+ * @param key [in] Indicates the key used to identify the animation group on the UIContext. The key is a
+ *     user-defined string that must be unique within the same UIContext. If an animation group has already
+ *     been registered with the same key, the system removes the previous one before registering the new one.
  * @return <ul>
  *         <li>{@link ARKUI_ERROR_CODE_NO_ERROR} if the operation is successful.</li>
- *         <li>{@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter exception occurs, or a resolved target node
+ *         <li>{@link ARKUI_ERROR_CODE_PARAM_INVALID} if a parameter exception occurs.</li>
+ *         <li>{@link ARKUI_ERROR_CODE_TARGET_NODE_NOT_IN_SAME_CONTEXT} if a resolved target node
  *             does not belong to the same UIContext as <b>context</b>.</li>
  *         <li>{@link ARKUI_ERROR_CODE_SUB_ANIMATION_INVALID} if a child animation has no resolvable target node.</li>
  *         <li>{@link ARKUI_ERROR_CODE_ANIMATION_GROUP_REENTRANT_CALL} if a re-entrant call is detected on
@@ -2947,8 +2942,9 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_HasAnimationGroup(ArkUI_ContextHandle cont
 /**
  * @brief Pauses the animation group identified by the specified key on the UIContext.
  *
- * The animation group must be in the RUNNING state; otherwise,
+ * The animation group must be in the {@link OH_ARKUI_ANIMATION_GROUP_STATE_RUNNING} state; otherwise,
  * {@link ARKUI_ERROR_CODE_ANIMATION_GROUP_INVALID_STATE} is returned.
+ * The playback state can be queried via {@link OH_ArkUI_NativeModule_GetAnimationGroupState}.
  *
  * @param context [in] Indicates the UIContext.
  * @param key [in] Indicates the key of the animation group.
@@ -2958,7 +2954,7 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_HasAnimationGroup(ArkUI_ContextHandle cont
  *         <li>{@link ARKUI_ERROR_CODE_ANIMATION_GROUP_NOT_FOUND} if the animation group identified by
  *             <b>key</b> is not found on the UIContext.</li>
  *         <li>{@link ARKUI_ERROR_CODE_ANIMATION_GROUP_INVALID_STATE} if the animation group is not in the
- *             RUNNING state.</li>
+ *             {@link OH_ARKUI_ANIMATION_GROUP_STATE_RUNNING} state.</li>
  *         <li>{@link ARKUI_ERROR_CODE_ANIMATION_GROUP_REENTRANT_CALL} if a re-entrant call is detected on
  *             the same thread.</li>
  *         </ul>
@@ -2969,8 +2965,9 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_PauseAnimationGroup(ArkUI_ContextHandle co
 /**
  * @brief Resumes the animation group identified by the specified key on the UIContext.
  *
- * The animation group must be in the PAUSED state; otherwise,
+ * The animation group must be in the {@link OH_ARKUI_ANIMATION_GROUP_STATE_PAUSED} state; otherwise,
  * {@link ARKUI_ERROR_CODE_ANIMATION_GROUP_INVALID_STATE} is returned.
+ * The playback state can be queried via {@link OH_ArkUI_NativeModule_GetAnimationGroupState}.
  *
  * @param context [in] Indicates the UIContext.
  * @param key [in] Indicates the key of the animation group.
@@ -2980,7 +2977,7 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_PauseAnimationGroup(ArkUI_ContextHandle co
  *         <li>{@link ARKUI_ERROR_CODE_ANIMATION_GROUP_NOT_FOUND} if the animation group identified by
  *             <b>key</b> is not found on the UIContext.</li>
  *         <li>{@link ARKUI_ERROR_CODE_ANIMATION_GROUP_INVALID_STATE} if the animation group is not in the
- *             PAUSED state.</li>
+ *             {@link OH_ARKUI_ANIMATION_GROUP_STATE_PAUSED} state.</li>
  *         <li>{@link ARKUI_ERROR_CODE_ANIMATION_GROUP_REENTRANT_CALL} if a re-entrant call is detected on
  *             the same thread.</li>
  *         </ul>
@@ -2993,8 +2990,9 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_ResumeAnimationGroup(ArkUI_ContextHandle c
  *
  * The animation group is finished according to the specified finish mode:
  * jump to the end state, jump to the start state, or stay at the current value. The animation group must
- * be in the RUNNING or PAUSED state; otherwise,
- * {@link ARKUI_ERROR_CODE_ANIMATION_GROUP_INVALID_STATE} is returned.
+ * be in the {@link OH_ARKUI_ANIMATION_GROUP_STATE_RUNNING} or {@link OH_ARKUI_ANIMATION_GROUP_STATE_PAUSED}
+ * state; otherwise, {@link ARKUI_ERROR_CODE_ANIMATION_GROUP_INVALID_STATE} is returned.
+ * The playback state can be queried via {@link OH_ArkUI_NativeModule_GetAnimationGroupState}.
  *
  * @param context [in] Indicates the UIContext.
  * @param key [in] Indicates the key of the animation group.
@@ -3007,7 +3005,8 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_ResumeAnimationGroup(ArkUI_ContextHandle c
  *         <li>{@link ARKUI_ERROR_CODE_ANIMATION_GROUP_NOT_FOUND} if the animation group identified by
  *             <b>key</b> is not found on the UIContext.</li>
  *         <li>{@link ARKUI_ERROR_CODE_ANIMATION_GROUP_INVALID_STATE} if the animation group is not in the
- *             RUNNING or PAUSED state.</li>
+ *             {@link OH_ARKUI_ANIMATION_GROUP_STATE_RUNNING} or
+ *             {@link OH_ARKUI_ANIMATION_GROUP_STATE_PAUSED} state.</li>
  *         <li>{@link ARKUI_ERROR_CODE_ANIMATION_GROUP_REENTRANT_CALL} if a re-entrant call is detected on
  *             the same thread.</li>
  *         </ul>

@@ -17,18 +17,18 @@
 
 #include "interfaces/inner_api/ace/utils.h"
 
-#include "core/common/resource/resource_parse_utils.h"
 #include "core/common/color_inverter.h"
+#include "core/common/resource/resource_parse_utils.h"
 #include "core/common/visual_effect/transparency_utils.h"
 #include "core/components/theme/resource_adapter.h"
-#include "core/pipeline_ng/pipeline_context.h"
 #include "core/components/theme/theme_constants.h"
 #include "core/components_ng/render/ui_material_filter_creator.h"
+#include "core/interfaces/arkoala/arkoala_api.h"
+#include "core/pipeline_ng/pipeline_context.h"
 
 namespace OHOS::Ace {
-const char UI_MATERIAL_EXTENSION_SO_PATH[] = "system/lib64/libhdsmaterialimpl.z.so";
-const char UI_MATERIAL_FUNC_NAME[] = "SetMaterial";
-const char UI_MATERIAL_FUNC_GET_ID[] = "GetMaterialId";
+std::atomic<const ArkUIMaterialFuncRegistry*> MaterialUtils::materialFuncRegistry_ { nullptr };
+std::atomic<const ArkUIMaterialFilterFuncRegistry*> MaterialUtils::materialFilterFuncRegistry_ { nullptr };
 
 namespace {
 std::string ColorModeToString(ColorMode colorMode)
@@ -77,14 +77,6 @@ constexpr float IMMERSIVE_SHADOW_RADIUS = 26.0f;  // in vp
 constexpr float IMMERSIVE_SHADOW_OFFSET_Y = 8.0f; // in vp
 const Color IMMERSIVE_SHADOW_COLOR(0x14050505);
 
-using SetMaterialFunc = void (*)(NG::FrameNode*, const UiMaterial*);
-using GetMaterialIdFunc = int32_t (*)(const UiMaterial*);
-using CreateMaterialFilterFunc = void* (*)(const ArkUIMaterialKeyParams*);
-using ReleaseMaterialFilterFunc = void (*)(void*);
-using CreateMaterialFilterWithSplitFunc = void* (*)(const ArkUIMaterialKeyParams*, bool);
-using GetEnableColorInvertFunc = int32_t (*)(int32_t, int32_t);
-using GetGlobalMaterialLevelFunc = int32_t (*)();
-using GetEnableMaterialFunc = bool (*)();
 struct MaterialFilterStruct {
     std::shared_ptr<Rosen::RSNGFilterBase> filter;
 };
@@ -94,57 +86,6 @@ struct MaterialFilterECStruct {
 struct MaterialShaderECSubStruct {
     std::shared_ptr<Rosen::RSNGShaderBase> shader;
 };
-
-#ifndef _WIN32
-const char UI_MATERIAL_FUNC_CREATE_UI_MATERIAL[] = "CreateUiMaterialFilter";
-const char UI_MATERIAL_FUNC_RELEASE_UI_MATERIAL[] = "ReleaseUiMaterialFilter";
-const char UI_MATERIAL_FUNC_CREATE_UI_MATERIAL_EC[] = "CreateUiMaterialFilterEC";
-const char UI_MATERIAL_FUNC_RELEASE_UI_MATERIAL_EC[] = "ReleaseUiMaterialFilterEC";
-const char UI_MATERIAL_FUNC_CREATE_UI_MATERIAL_EC_SUB[] = "CreateUiMaterialShaderECSub";
-const char UI_MATERIAL_FUNC_RELEASE_UI_MATERIAL_EC_SUB[] = "ReleaseUiMaterialShaderECSub";
-const char UI_MATERIAL_FUNC_CREATE_UI_MATERIAL_EC_SUB_OVERLAY[] = "CreateUiMaterialShaderECSubOverlay";
-const char UI_MATERIAL_FUNC_RELEASE_UI_MATERIAL_EC_SUB_OVERLAY[] = "ReleaseUiMaterialShaderECSubOverlay";
-const char UI_MATERIAL_FUNC_GET_ENABLE_COLOR_INVERT[] = "GetEnableColorInvert";
-const char UI_MATERIAL_FUNC_GET_GLOBAL_LEVEL[] = "GetGlobalMaterialLevel";
-const char UI_MATERIAL_FUNC_GET_ENABLE_MATERIAL[] = "IsSystemMaterialSupported";
-void* GetMaterialLib()
-{
-    static void* handle = nullptr;
-    static std::once_flag onceFlag;
-    std::call_once(onceFlag, []() { handle = LOADLIB(UI_MATERIAL_EXTENSION_SO_PATH); });
-    return handle;
-}
-#endif
-
-SetMaterialFunc GetOrCreateMaterialFunc()
-{
-    static SetMaterialFunc materialFunc = nullptr;
-    static std::once_flag onceFlag;
-    std::call_once(onceFlag, []() {
-#ifndef _WIN32
-        auto handle = GetMaterialLib();
-        if (handle) {
-            materialFunc = reinterpret_cast<SetMaterialFunc>(LOADSYM(handle, UI_MATERIAL_FUNC_NAME));
-        }
-#endif
-    });
-    return materialFunc;
-}
-
-GetMaterialIdFunc GetOrCreateGetMaterialIdFunc()
-{
-    static GetMaterialIdFunc getMaterialIdFunc = nullptr;
-    static std::once_flag onceFlag;
-    std::call_once(onceFlag, []() {
-#ifndef _WIN32
-        auto handle = GetMaterialLib();
-        if (handle) {
-            getMaterialIdFunc = reinterpret_cast<GetMaterialIdFunc>(LOADSYM(handle, UI_MATERIAL_FUNC_GET_ID));
-        }
-#endif
-    });
-    return getMaterialIdFunc;
-}
 
 ArkUIMaterialKeyParams ConvertToArkUIMaterialKeyParams(const ImmersiveMaterialConfig& config)
 {
@@ -197,22 +138,23 @@ ColorMode MaterialUtils::GetResourceColorMode(NG::PipelineContext* pipeline)
 }
 bool MaterialUtils::CallSetMaterial(NG::FrameNode* node, const UiMaterial* material)
 {
-    auto materialFunc = GetOrCreateMaterialFunc();
-    if (materialFunc) {
-        materialFunc(node, material);
-        return true;
+    // Do NOT cache materialFuncRegistry_ in a static local variable. The backing so is not
+    // preloaded, so registration may happen after the first call. materialFilterFuncRegistry_
+    // is preloaded, so its functions can be safely cached via std::call_once.
+    auto* registry = materialFuncRegistry_.load(std::memory_order_acquire);
+    if (!registry || !registry->setMaterial) {
+        return false;
     }
-    return false;
+    return registry->setMaterial(node, material);
 }
 int32_t MaterialUtils::CallGetMaterialId(const UiMaterial* material)
 {
     CHECK_NULL_RETURN(material, -1);
-    auto getMaterialIdFunc = GetOrCreateGetMaterialIdFunc();
-    int32_t materialId = -1;
-    if (getMaterialIdFunc) {
-        materialId = getMaterialIdFunc(material);
+    auto* registry = materialFuncRegistry_.load(std::memory_order_acquire);
+    if (!registry || !registry->getMaterialId) {
+        return -1;
     }
-    return materialId;
+    return registry->getMaterialId(material);
 }
 
 bool MaterialUtils::CheckMaterialValid(int32_t type)
@@ -436,16 +378,14 @@ bool MaterialUtils::ValidColorInvert(const std::shared_ptr<ImmersiveOptions>& op
     if (systemLevel == UiMaterialLevel::SMOOTH) {
         return false;
     }
-    static GetEnableColorInvertFunc enableFunc = nullptr;
-#ifndef _WIN32
+    static ArkUIGetEnableColorInvertFunc enableFunc = nullptr;
     static std::once_flag onceFlag;
     std::call_once(onceFlag, []() {
-        auto handle = GetMaterialLib();
-        CHECK_NULL_VOID(handle);
-        enableFunc =
-            reinterpret_cast<GetEnableColorInvertFunc>(LOADSYM(handle, UI_MATERIAL_FUNC_GET_ENABLE_COLOR_INVERT));
+        auto* registry = materialFilterFuncRegistry_.load(std::memory_order_acquire);
+        if (registry && registry->getEnableColorInvert) {
+            enableFunc = registry->getEnableColorInvert;
+        }
     });
-#endif
     if (enableFunc) {
         return enableFunc(static_cast<int32_t>(options->style), static_cast<int32_t>(systemTransparency)) != 0;
     }
@@ -468,18 +408,18 @@ bool MaterialUtils::GetUiMaterialFilter(
         return false;
     }
 #endif
-    static CreateMaterialFilterFunc createFunc = nullptr;
-    static ReleaseMaterialFilterFunc releaseFunc = nullptr;
-#ifndef _WIN32
+    static ArkUICreateMaterialFilterFunc createFunc = nullptr;
+    static ArkUIReleaseMaterialFilterFunc releaseFunc = nullptr;
     static std::once_flag onceFlag;
     std::call_once(onceFlag, []() {
-        auto handle = GetMaterialLib();
-        CHECK_NULL_VOID(handle);
-        createFunc = reinterpret_cast<CreateMaterialFilterFunc>(LOADSYM(handle, UI_MATERIAL_FUNC_CREATE_UI_MATERIAL));
-        releaseFunc =
-            reinterpret_cast<ReleaseMaterialFilterFunc>(LOADSYM(handle, UI_MATERIAL_FUNC_RELEASE_UI_MATERIAL));
+        auto* registry = materialFilterFuncRegistry_.load(std::memory_order_acquire);
+        if (registry) {
+            createFunc = registry->createUiMaterialFilter;
+            releaseFunc = registry->releaseUiMaterialFilter;
+        } else {
+            TAG_LOGW(AceLogTag::ACE_VISUAL_EFFECT, "no external CreateUiMaterialFilter func");
+        }
     });
-#endif
     if (createFunc && releaseFunc) {
         auto arkParam = ConvertToArkUIMaterialKeyParams(params);
         auto filterStructVoid = createFunc(&arkParam);
@@ -505,19 +445,16 @@ bool MaterialUtils::GetUiMaterialFilterEC(
         return false;
     }
 #endif
-    static CreateMaterialFilterFunc createFunc = nullptr;
-    static ReleaseMaterialFilterFunc releaseFunc = nullptr;
-#ifndef _WIN32
+    static ArkUICreateMaterialFilterFunc createFunc = nullptr;
+    static ArkUIReleaseMaterialFilterFunc releaseFunc = nullptr;
     static std::once_flag onceFlag;
     std::call_once(onceFlag, []() {
-        auto handle = GetMaterialLib();
-        CHECK_NULL_VOID(handle);
-        createFunc =
-            reinterpret_cast<CreateMaterialFilterFunc>(LOADSYM(handle, UI_MATERIAL_FUNC_CREATE_UI_MATERIAL_EC));
-        releaseFunc =
-            reinterpret_cast<ReleaseMaterialFilterFunc>(LOADSYM(handle, UI_MATERIAL_FUNC_RELEASE_UI_MATERIAL_EC));
+        auto* registry = materialFilterFuncRegistry_.load(std::memory_order_acquire);
+        if (registry) {
+            createFunc = registry->createUiMaterialFilterEC;
+            releaseFunc = registry->releaseUiMaterialFilterEC;
+        }
     });
-#endif
     if (createFunc && releaseFunc) {
         auto arkParam = ConvertToArkUIMaterialKeyParams(params);
         auto filterStructVoid = createFunc(&arkParam);
@@ -543,19 +480,16 @@ bool MaterialUtils::GetUiMaterialShaderECSub(
         return false;
     }
 #endif
-    static CreateMaterialFilterWithSplitFunc createFunc = nullptr;
-    static ReleaseMaterialFilterFunc releaseFunc = nullptr;
-#ifndef _WIN32
+    static ArkUICreateMaterialFilterWithSplitFunc createFunc = nullptr;
+    static ArkUIReleaseMaterialFilterFunc releaseFunc = nullptr;
     static std::once_flag onceFlag;
     std::call_once(onceFlag, []() {
-        auto handle = GetMaterialLib();
-        CHECK_NULL_VOID(handle);
-        createFunc = reinterpret_cast<CreateMaterialFilterWithSplitFunc>(
-            LOADSYM(handle, UI_MATERIAL_FUNC_CREATE_UI_MATERIAL_EC_SUB));
-        releaseFunc =
-            reinterpret_cast<ReleaseMaterialFilterFunc>(LOADSYM(handle, UI_MATERIAL_FUNC_RELEASE_UI_MATERIAL_EC_SUB));
+        auto* registry = materialFilterFuncRegistry_.load(std::memory_order_acquire);
+        if (registry) {
+            createFunc = registry->createUiMaterialShaderECSub;
+            releaseFunc = registry->releaseUiMaterialShaderECSub;
+        }
     });
-#endif
     if (createFunc && releaseFunc) {
         auto arkParam = ConvertToArkUIMaterialKeyParams(params);
         auto shaderStructVoid = createFunc(&arkParam, params.needSplitOverlayShader);
@@ -581,19 +515,16 @@ bool MaterialUtils::GetUiMaterialECSubShaderOverlay(
         return false;
     }
 #endif
-    static CreateMaterialFilterFunc createFunc = nullptr;
-    static ReleaseMaterialFilterFunc releaseFunc = nullptr;
-#ifndef _WIN32
+    static ArkUICreateMaterialFilterFunc createFunc = nullptr;
+    static ArkUIReleaseMaterialFilterFunc releaseFunc = nullptr;
     static std::once_flag onceFlag;
     std::call_once(onceFlag, []() {
-        auto handle = GetMaterialLib();
-        CHECK_NULL_VOID(handle);
-        createFunc = reinterpret_cast<CreateMaterialFilterFunc>(
-            LOADSYM(handle, UI_MATERIAL_FUNC_CREATE_UI_MATERIAL_EC_SUB_OVERLAY));
-        releaseFunc = reinterpret_cast<ReleaseMaterialFilterFunc>(
-            LOADSYM(handle, UI_MATERIAL_FUNC_RELEASE_UI_MATERIAL_EC_SUB_OVERLAY));
+        auto* registry = materialFilterFuncRegistry_.load(std::memory_order_acquire);
+        if (registry) {
+            createFunc = registry->createUiMaterialShaderECSubOverlay;
+            releaseFunc = registry->releaseUiMaterialShaderECSubOverlay;
+        }
     });
-#endif
     if (createFunc && releaseFunc) {
         auto arkParam = ConvertToArkUIMaterialKeyParams(params);
         auto overlayShaderStructVoid = createFunc(&arkParam);
@@ -605,50 +536,6 @@ bool MaterialUtils::GetUiMaterialECSubShaderOverlay(
         }
         shader = overlayShaderStruct->shader;
         releaseFunc(overlayShaderStructVoid);
-        return true;
-    }
-    return false;
-}
-
-bool MaterialUtils::GetGlobalMaterialLevel(UiMaterialLevel& result)
-{
-    static GetGlobalMaterialLevelFunc levelFunc = nullptr;
-#ifndef _WIN32
-    static std::once_flag onceFlag;
-    std::call_once(onceFlag, []() {
-        auto handle = GetMaterialLib();
-        CHECK_NULL_VOID(handle);
-        levelFunc = reinterpret_cast<GetGlobalMaterialLevelFunc>(LOADSYM(handle, UI_MATERIAL_FUNC_GET_GLOBAL_LEVEL));
-    });
-#endif
-    if (levelFunc) {
-        auto level = levelFunc();
-        if (level >= static_cast<int32_t>(UiMaterialLevel::EXQUISITE) &&
-            level <= static_cast<int32_t>(UiMaterialLevel::MAX)) {
-            result = static_cast<UiMaterialLevel>(level);
-            return true;
-        }
-    }
-    return false;
-}
-
-bool MaterialUtils::GetDeviceUiMaterialEnabled(bool& result)
-{
-    static std::optional<bool> executeResult;
-#ifndef _WIN32
-    static GetEnableMaterialFunc enableFunc = nullptr;
-    static std::once_flag onceFlag;
-    std::call_once(onceFlag, []() {
-        auto handle = GetMaterialLib();
-        CHECK_NULL_VOID(handle);
-        enableFunc = reinterpret_cast<GetEnableMaterialFunc>(LOADSYM(handle, UI_MATERIAL_FUNC_GET_ENABLE_MATERIAL));
-        if (enableFunc) {
-            executeResult = enableFunc();
-        }
-    });
-#endif
-    if (executeResult.has_value()) {
-        result = executeResult.value();
         return true;
     }
     return false;
@@ -783,5 +670,25 @@ RefPtr<UiMaterial> UiMaterial::CreateEmpty()
 std::shared_ptr<Rosen::Filter> MaterialUtils::CreateRosenFilter(const ImmersiveMaterialConfig& params)
 {
     return NG::UiMaterialFilterCreator::CreateRosenFilter(params);
+}
+
+void MaterialUtils::RegisterMaterialFunc(const ArkUIMaterialFuncRegistry* registry)
+{
+    if (registry == nullptr) {
+        return;
+    }
+    const ArkUIMaterialFuncRegistry* expected = nullptr;
+    if (materialFuncRegistry_.compare_exchange_strong(expected, registry, std::memory_order_release)) {
+        TAG_LOGI(AceLogTag::ACE_VISUAL_EFFECT, "RegisterMaterialFunc success");
+    }
+}
+
+void MaterialUtils::RegisterMaterialFilterFunc(const ArkUIMaterialFilterFuncRegistry* registry)
+{
+    if (registry == nullptr) {
+        return;
+    }
+    const ArkUIMaterialFilterFuncRegistry* expected = nullptr;
+    materialFilterFuncRegistry_.compare_exchange_strong(expected, registry, std::memory_order_release);
 }
 } // namespace OHOS::Ace

@@ -99,6 +99,7 @@ void XComponentPattern::InitSurfaceMultiThread(const RefPtr<FrameNode>& host)
         renderContext->OnNodeNameUpdate(GetId());
     }
     renderSurface_->InitSurface();
+    renderSurface_->SetSurfaceQueueSize(bufferQueueCount_);
     renderSurface_->UpdateSurfaceConfig();
     if (type_ == XComponentType::TEXTURE) {
         renderSurface_->RegisterBufferCallback();

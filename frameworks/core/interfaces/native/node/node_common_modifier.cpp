@@ -15,6 +15,7 @@
 #include "core/interfaces/native/node/node_common_modifier.h"
 #include "core/common/container.h"
 
+#include "interfaces/native/node/native_type_visual_impl.h"
 #include "interfaces/native/node/node_model.h"
 
 #include "base/log/event_report.h"
@@ -2868,6 +2869,28 @@ void ResetLinearGradientBlur(ArkUINodeHandle node)
     Dimension dimensionRadius(0.0f, DimensionUnit::PX);
     NG::LinearGradientBlurPara blurPara(dimensionRadius, fractionStops, GradientDirection::BOTTOM);
     ViewAbstract::SetLinearGradientBlur(frameNode, blurPara);
+}
+
+ArkUI_Bool GetLinearGradientBlur(ArkUINodeHandle node, OH_ArkUI_LinearGradientBlurOptions* options)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_RETURN(frameNode, false);
+    CHECK_NULL_RETURN(options, false);
+    auto renderContext = frameNode->GetRenderContext();
+    CHECK_NULL_RETURN(renderContext, false);
+    auto blurPara = renderContext->GetLinearGradientBlur();
+    if (!blurPara.has_value()) {
+        return false;
+    }
+    options->blurRadius = blurPara->blurRadius_.Value();
+    options->fractionStops.clear();
+    options->fractionStops.reserve(blurPara->fractionStops_.size() * NUM_2);
+    for (const auto& stop : blurPara->fractionStops_) {
+        options->fractionStops.push_back(stop.first);
+        options->fractionStops.push_back(stop.second);
+    }
+    options->direction = static_cast<OH_ArkUI_LinearGradientBlurDirection>(static_cast<int32_t>(blurPara->direction_));
+    return true;
 }
 
 void CheckBackgroundBlurStyleResObj(void* inactiveColorRawPtr, BlurStyleOption& bgBlurStyle)
@@ -12075,7 +12098,8 @@ const ArkUICommonModifier* GetCommonModifier()
         .setDoubleSided = SetDoubleSided,
         .resetDoubleSided = ResetDoubleSided,
         .getNextFocus = GetNextFocus,
-        .getFocusBoxStyle = GetFocusBoxStyle
+        .getFocusBoxStyle = GetFocusBoxStyle,
+        .getLinearGradientBlur = GetLinearGradientBlur
     };
     CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
 

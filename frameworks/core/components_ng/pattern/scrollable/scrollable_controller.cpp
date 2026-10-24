@@ -38,6 +38,26 @@ void ScrollableController::ScrollToIndex(
     pattern->ScrollToIndex(index, smooth, align, extraOffset);
 }
 
+void ScrollableController::ScrollToIndexWithOptions(int32_t index, bool smooth, ScrollAlign align,
+    std::optional<float> extraOffset, FastScrollMode mode)
+{
+    if (!IsFastScrollEnabled(mode) || !smooth) {
+        ScrollToIndex(index, smooth, align, extraOffset);
+        return;
+    }
+    auto pattern = scroll_.Upgrade();
+    CHECK_NULL_VOID(pattern);
+    CHECK_NULL_VOID(pattern->SupportScrollToIndex());
+    if (align == ScrollAlign::NONE) {
+        align = pattern->GetDefaultScrollAlign();
+    }
+    auto host = pattern->GetHost();
+    CHECK_NULL_VOID(host);
+    FREE_NODE_CHECK(host, ScrollToIndexWithOptions, index, smooth, align, extraOffset, mode);
+    pattern->SetAccessibilityScrollSource(AccessibilityScrollSource::API);
+    pattern->ScrollToIndexFastScroll(index, smooth, align, extraOffset, mode);
+}
+
 bool ScrollableController::AnimateTo(
     const Dimension& position, float duration, const RefPtr<Curve>& curve, bool smooth, bool canOverScroll)
 {
@@ -73,6 +93,13 @@ void ScrollableController::SetCanStayOverScroll(bool canStayOverScroll)
     auto pattern = scroll_.Upgrade();
     CHECK_NULL_VOID(pattern);
     pattern->SetCanStayOverScroll(canStayOverScroll);
+}
+
+ScrollState ScrollableController::GetScrollState() const
+{
+    auto pattern = scroll_.Upgrade();
+    CHECK_NULL_RETURN(pattern, ScrollState::IDLE);
+    return pattern->GetScrollStateForQuery();
 }
 
 Offset ScrollableController::GetCurrentOffset() const

@@ -57,6 +57,7 @@ ace_unittest("util_test") {
   type = "new"
   if (is_host_product) {
     type = "host_components"
+    include_dirs = [ "//third_party/cJSON" ]
   }
   sources = [
     "base_utils_test.cpp",

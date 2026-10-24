@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 
+#include "core/components_ng/base/ui_tree_collector.h"
 #include "adapter/ohos/entrance/ace_container.h"
 #include "core/accessibility/accessibility_manager.h"
 #include "core/accessibility/accessibility_manager_ng.h"
@@ -597,6 +598,10 @@ void AceContainer::Destroy()
 {
     LOGI("AceContainer Destroy begin");
     ContainerScope scope(instanceId_);
+    // UIObserver is Stage-thread confined. Clear the container-owned store
+    // before frontend/pipeline teardown so NAPI listeners are released on the
+    // owner thread and cannot observe a partially destroyed container.
+    ClearUIObserverStore();
     RemoveWatchSystemParameter();
     RemoveUISessionCallbacks();
     ReleaseResourceAdapter();
@@ -1683,8 +1688,17 @@ void AceContainer::DestroyContainer(int32_t instanceId, const std::function<void
     CHECK_NULL_VOID(container);
     auto taskExecutor = container->GetTaskExecutor();
     CHECK_NULL_VOID(taskExecutor);
-    taskExecutor->PostSyncTask([] { LOGI("Wait UI thread before destroy..."); },
-        TaskExecutor::TaskType::UI, "ArkUIWaitLog");
+    // Complete pending tree requests on UI before destroying the pipeline.
+    taskExecutor->PostSyncTask(
+        [weakContainer = WeakPtr<Container>(container)]() {
+            LOGI("Wait UI thread before destroy...");
+            auto owner = weakContainer.Upgrade();
+            CHECK_NULL_VOID(owner);
+            auto pipeline = AceType::DynamicCast<NG::PipelineContext>(owner->GetPipelineContext());
+            CHECK_NULL_VOID(pipeline);
+            NG::CloseUITreeRequests(*pipeline);
+        },
+        TaskExecutor::TaskType::UI, "ArkUICloseUITreeRequests");
     container->Destroy();
     // unregister watchdog before stop thread to avoid UI_BLOCK report
     AceEngine::Get().UnRegisterFromWatchDog(instanceId);
@@ -5350,5 +5364,15 @@ void AceContainer::GetOriginalEventInfo(const EventPositionInfo& eventPositionIn
     uiWindow_->GetEventOriginalPosition(winEventPositionInfo, winOriginalPos);
     originalPos.displayX = winOriginalPos.displayX;
     originalPos.displayY = winOriginalPos.displayY;
+}
+
+void AceContainer::RefreshLiveFoldCreaseRegion()
+{
+    displayManager_->GetLiveFoldCreaseRegion();
+}
+
+void AceContainer::RefreshFoldCreaseDirection()
+{
+    displayManager_->GetFoldCreaseDirection();
 }
 } // namespace OHOS::Ace::Platform

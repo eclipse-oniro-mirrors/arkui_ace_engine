@@ -109,10 +109,23 @@ public:
     SelectionInfo GetSpansInfo(int32_t start, int32_t end, GetSpansMethod method);
     std::list<ResultObject> GetSpansInfoInStyledString(int32_t start, int32_t end);
     virtual int32_t GetTextContentLength() const;
+    virtual void ApplyPasswordObscure(std::u16string& content) const {}
+    virtual void ApplyNewlineFilter(std::u16string& content) const {}
+    virtual bool IsInPasswordMode() const { return false; }
+    virtual void FilterTextStyleForPasswordMode(TextStyle& textStyle, const TextStyle& inheritedStyle) const {}
     RefPtr<NodePaintMethod> CreateNodePaintMethod() override;
     RefPtr<LayoutProperty> CreateLayoutProperty() override;
     RefPtr<LayoutAlgorithm> CreateLayoutAlgorithm() override;
     RefPtr<AccessibilityProperty> CreateAccessibilityProperty() override;
+
+    // Restricted scroll-placeholder whitelist clone: text content lives in the
+    // layout property, which the copy protocol clones wholesale, so a fresh
+    // pattern restores the self-measure algorithm without dragging any
+    // callbacks along.
+    RefPtr<Pattern> CloneForPlaceholder() override
+    {
+        return MakeRefPtr<TextPattern>();
+    }
     RefPtr<EventHub> CreateEventHub() override;
     RefPtr<VerticalOverflowHandler> GetOrCreateVerticalOverflowHandler(const WeakPtr<FrameNode>& host) override
     {
@@ -138,6 +151,8 @@ public:
     void SetSpanItemEvent(const RefPtr<SpanItem>& spanItem, RefPtr<FocusHub>& focusHub);
     void AddImageToSpanItem(const RefPtr<UINode>& child);
     FocusPattern GetFocusPattern() const override;
+
+    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config) override;
     void DumpAdvanceInfo() override;
     void DumpInfo() override;
     void DumpSimplifyInfo(std::shared_ptr<JsonValue>& json) override;
@@ -174,7 +189,7 @@ public:
     void SetSelectDetectConfig(std::vector<TextDataDetectType>& types) {}
     std::vector<TextDataDetectType> GetSelectDetectConfig();
     void ResetSelectDetectConfig() {}
-    void SelectAIDetect();
+    virtual void SelectAIDetect();
     // --------------- select AI detect end -------------------
     void SetTextDetectEnableMultiThread(bool enable);
     bool GetTextDetectEnable();
@@ -232,6 +247,7 @@ public:
     void ResetPageTranslate() override;
     void MarkPageTranslateDirty();
     std::string GetPageTranslateTextForReport() const override;
+    std::string GetPageTextForReport(bool includeInput = false) const override;
 
     void InitSurfaceChangedCallback();
     void InitSurfacePositionChangedCallback();
@@ -364,9 +380,9 @@ public:
     void HandleOnCopy();
     virtual void HandleAIMenuOption(const std::string& labelInfo = "");
     virtual void HandleOnAskCelia();
-    void SetIsAskCeliaEnabled(bool isAskCeliaEnabled);
+    ACE_FORCE_EXPORT void SetIsAskCeliaEnabled(bool isAskCeliaEnabled);
     bool IsAskCeliaEnabled() const;
-    void SetIsShowAskCeliaInRightClick(bool isShowAskCeliaInRightClick);
+    ACE_FORCE_EXPORT void SetIsShowAskCeliaInRightClick(bool isShowAskCeliaInRightClick);
     bool IsShowAskCeliaInRightClick() const;
     bool IsAskCeliaSupported();
     void HandleOnCopySpanString();
@@ -394,6 +410,7 @@ public:
     const std::list<RefPtr<UINode>>& GetChildNodes() const;
     void SetExternalParagraph(void* paragraph);
     const std::optional<void*>& GetExternalParagraph();
+    void ReleaseExternalParagraphRef();
     void SetExternalSpanItem(const std::list<RefPtr<SpanItem>>& spans);
     void SetExternalSpanItemMultiThread(const std::list<RefPtr<SpanItem>>& spans);
     void SetExternalParagraphStyle(const std::optional<ParagraphStyle>& paragraphStyle);
@@ -654,6 +671,7 @@ protected:
     RefPtr<TextOverlayModifier> overlayMod_;
     std::vector<int32_t> symbolFontColorResObjIndexArr;
     std::u16string textForDisplay_;
+    std::u16string lastDrawnPageTextContent_;
     std::string frameRecord_ = "";
     std::optional<TextStyle> textStyle_;
     std::list<RefPtr<SpanItem>> spans_;
@@ -714,6 +732,9 @@ protected:
     void ClearSelectionChild();
 
 private:
+    void DumpAdvanceParagraphInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+    void DumpAdvanceFontInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
     void ReportSelectionChangeEvent(int32_t nodeId, const std::string& dataStr,
         const std::string& value, int32_t start, int32_t end);
     bool ReportCommandResult(int32_t nodeId, const std::string& event);

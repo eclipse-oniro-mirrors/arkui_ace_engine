@@ -328,4 +328,8 @@ void AceContainer::TerminateUIExtensionInner(int32_t code) {}
 void AceContainer::GetOriginalEventInfo(const EventPositionInfo& eventPositionInfo,
     EventPositionInfo& originalPos) {}
 
+void AceContainer::RefreshLiveFoldCreaseRegion() {}
+
+void AceContainer::RefreshFoldCreaseDirection() {}
+
 } // namespace OHOS::Ace::NG

@@ -102,6 +102,8 @@ public:
         REGISTER_PAGE_SCENE_RULES,
         UNREGISTER_PAGE_SCENE_RULES,
         GET_PAGE_SCENE,
+        GET_NAVIGATION_CONTENT_BY_POINT,
+        GET_LAZY_FOREACH_DATA_BY_POINT,
     };
 
     /**
@@ -437,6 +439,31 @@ public:
     {
         return FAILED;
     }
+
+    /**
+     * @description: extract the Navigation content subtree hit
+     * by the window point (x, y) plus NavBar nodes matching pattern (regex).
+     */
+    virtual int32_t GetNavigationContentByPoint(float x, float y, const std::string& pattern,
+        const std::function<void(const std::string&)>& eventCallback,
+        int32_t timeout = DEFAULT_INSPECTOR_TREE_CALLBACK_TIMEOUT_MS)
+    {
+        return FAILED;
+    }
+
+    /**
+     * @description: extract LazyForEach current data of the
+     * item hit by the window point (x, y). Result JSON is reported through
+     * eventCallback. Only dynamic ArkTS frontend is supported; static/CJ
+     * reports UNSUPPORTED_FRONTEND.
+     * @return result number of the IPC request itself.
+     */
+    virtual int32_t GetLazyForEachDataByPoint(float x, float y,
+        const std::function<void(const std::string&)>& eventCallback,
+        int32_t timeout = DEFAULT_INSPECTOR_TREE_CALLBACK_TIMEOUT_MS)
+    {
+        return FAILED;
+    }
 };
 class ACE_FORCE_EXPORT ReportService : public OHOS::IRemoteBroker {
 public:
@@ -470,6 +497,8 @@ public:
         SEND_WEB_INFO_BY_REQUEST,
         SEND_PAGE_TEXT,
         REPORT_PAGE_SCENE_EVENT,
+        REPORT_NAVIGATION_QUERY_RESULT,
+        REPORT_LAZY_FOREACH_QUERY_RESULT,
     };
 
     /**
@@ -592,6 +621,12 @@ public:
         const std::string& result, WebRequestErrorCode errorCode) = 0;
     virtual void SendPageText(int32_t nodeId, const std::string& text, int64_t version) {}
     virtual void ReportPageSceneEvent(const std::string& sceneJson, bool isGetResult = false) {}
+
+    /**
+     * @description: reports component tree query result to the requesting SA process.
+     */
+    virtual void ReportNavigationQueryResult(const std::string& data) = 0;
+    virtual void ReportLazyForEachQueryResult(const std::string& data) = 0;
 };
 } // namespace OHOS::Ace
 #endif // FOUNDATION_ACE_INTERFACE_UI_CONTENT_SERVICE_INTERFACE_H

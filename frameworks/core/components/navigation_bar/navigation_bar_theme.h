@@ -39,7 +39,7 @@ inline Dimension MIN_ADAPT_SUBTITLE_FONT_SIZE = 10.0_fp;
 
 namespace OHOS::Ace {
 
-class NavigationBarTheme : public virtual Theme {
+class NavigationBarTheme : public Theme {
     DECLARE_ACE_TYPE(NavigationBarTheme, Theme);
 
 public:

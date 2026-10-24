@@ -68,11 +68,11 @@ constexpr int32_t MAX_TABS_CACHE_MODE = static_cast<int32_t>(TabsCacheMode::CACH
 constexpr int32_t DEFAULT_TAB_BAR_POSITION = static_cast<int32_t>(BarPosition::START);
 constexpr int32_t MAX_TAB_BAR_POSITION = static_cast<int32_t>(BarPosition::END);
 constexpr int32_t BAR_STYLE_BOTTOM = static_cast<int32_t>(TabBarLayoutStyle::BOTTOM);
-constexpr int32_t BAR_STYLE_SIDEBAR_ADAPTABLE = static_cast<int32_t>(TabBarLayoutStyle::SIDEBAR_ADAPTABLE);
+constexpr int32_t BAR_STYLE_TOP = static_cast<int32_t>(TabBarLayoutStyle::TOP);
 constexpr int32_t SIDEBAR_POSITION_START = static_cast<int32_t>(BarPosition::START);
 constexpr int32_t SIDEBAR_POSITION_END = static_cast<int32_t>(BarPosition::END);
 constexpr int32_t BAR_DISPLAY_MODE_BOTTOMTABBAR = static_cast<int32_t>(TabBarDisplayMode::BOTTOMTABBAR);
-constexpr int32_t BAR_DISPLAY_MODE_SIDEBAR = static_cast<int32_t>(TabBarDisplayMode::SIDEBAR);
+constexpr int32_t BAR_DISPLAY_MODE_TOP = static_cast<int32_t>(TabBarDisplayMode::TOP_TABBAR);
 constexpr int32_t SIDEBAR_DISPLAY_STYLE_EMBED = static_cast<int32_t>(SidebarDisplayStyle::EMBED);
 constexpr int32_t SIDEBAR_DISPLAY_STYLE_DISPLACE = static_cast<int32_t>(SidebarDisplayStyle::DISPLACE);
 namespace {
@@ -283,7 +283,8 @@ void TabsBridge::RegisterTabsAttributes(panda::Local<panda::ObjectRef> object, p
         "resetTabsOnAnimationStart", "setTabsOnAnimationEnd", "resetTabsOnAnimationEnd", "setTabsOnGestureSwipe",
         "resetTabsOnGestureSwipe", "setTabsOnContentWillChange", "resetTabsOnContentWillChange",
         "setTabsCustomContentTransition", "resetTabsCustomContentTransition", "setTabsBarFloatingStyle",
-        "resetTabsBarFloatingStyle", "setBarStyle", "resetBarStyle", "setSidebarPosition",
+        "resetTabsBarFloatingStyle", "setTabsBarTopFloatingStyle", "resetTabsBarTopFloatingStyle",
+        "setBarStyle", "resetBarStyle", "setSidebarPosition",
         "resetSidebarPosition", "setSidebarHeader", "resetSidebarHeader", "setSidebarSearchable",
         "resetSidebarSearchable", "setBarDisplayModeBreakpoint", "resetBarDisplayModeBreakpoint",
         "setOnBarDisplayModeChange", "resetOnBarDisplayModeChange", "setSidebarDisplayStyle",
@@ -389,6 +390,8 @@ void TabsBridge::RegisterTabsAttributes(panda::Local<panda::ObjectRef> object, p
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::ResetTabsCustomContentTransition),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::SetTabsBarFloatingStyle),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::ResetTabsBarFloatingStyle),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::SetTabsBarTopFloatingStyle),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::ResetTabsBarTopFloatingStyle),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::SetBarStyle),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::ResetBarStyle),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), TabsBridge::SetSidebarPosition),
@@ -1124,11 +1127,14 @@ ArkUINativeModuleValue TabsBridge::SetBarBackgroundColor(ArkUIRuntimeCallInfo* r
         Color color = Color::BLACK.BlendOpacity(0.0f);
         RefPtr<ResourceObject> backgroundColorResObj;
         uint32_t argc = runtimeCallInfo->GetArgsNumber();
+        bool parseResult = false;
         if (argc > TABS_ARG_INDEX_1) {
-            bool parseResult = ArkTSUtils::ConvertFromJSValue(vm, secondArg, color, backgroundColorResObj);
-            GetArkUINodeModifiers()->getTabsModifier()->setBarBackgroundColorByUser(nativeNode, parseResult);
+            parseResult = ArkTSUtils::ConvertFromJSValue(vm, secondArg, color, backgroundColorResObj);
         }
+        // setBarBackgroundColor internally sets SetByUser=true, so call it first
+        // and then override SetByUser with the correct parse result.
         GetArkUINodeModifiers()->getTabsModifier()->setBarBackgroundColor(nativeNode, color.GetValue());
+        GetArkUINodeModifiers()->getTabsModifier()->setBarBackgroundColorByUser(nativeNode, parseResult);
         if (SystemProperties::ConfigChangePerform()) {
             GetArkUINodeModifiers()->getTabsModifier()->createBarBackgroundColorWithResourceObj(
                 nativeNode, AceType::RawPtr(backgroundColorResObj));
@@ -3020,6 +3026,9 @@ ArkUINativeModuleValue TabsBridge::SetTabsBarFloatingStyle(ArkUIRuntimeCallInfo*
     RefPtr<ResourceObject> barBottomMarginObj;
     RefPtr<ResourceObject> maskColorObj;
     RefPtr<ResourceObject> maskHeightObj;
+    RefPtr<ResourceObject> offsetXObj;
+    RefPtr<ResourceObject> offsetYObj;
+    RefPtr<ResourceObject> maxWidthObj;
 
     auto barWidthVal = ArkTSUtils::GetProperty(vm, paramObject, "barWidth");
     if (barWidthVal->IsObject(vm)) {
@@ -3061,6 +3070,17 @@ ArkUINativeModuleValue TabsBridge::SetTabsBarFloatingStyle(ArkUIRuntimeCallInfo*
         }
     }
 
+    auto offsetVal = ArkTSUtils::GetProperty(vm, paramObject, "offset");
+    if (offsetVal->IsObject(vm)) {
+        auto offsetObject = offsetVal->ToObject(vm);
+        parameters.offsetX = ParseBarFloatingDimension(
+            vm, ArkTSUtils::GetProperty(vm, offsetObject, "x"), offsetXObj);
+        parameters.offsetY = ParseBarFloatingDimension(
+            vm, ArkTSUtils::GetProperty(vm, offsetObject, "y"), offsetYObj);
+    }
+    parameters.maxWidth =
+        ParseBarFloatingDimension(vm, ArkTSUtils::GetProperty(vm, paramObject, "maxWidth"), maxWidthObj);
+
     if (SystemProperties::ConfigChangePerform()) {
         parameters.smallBarWidthObject = smallBarWidthObj;
         parameters.mediumBarWidthObject = mediumBarWidthObj;
@@ -3069,6 +3089,9 @@ ArkUINativeModuleValue TabsBridge::SetTabsBarFloatingStyle(ArkUIRuntimeCallInfo*
         parameters.barBottomMarginObject = barBottomMarginObj;
         parameters.maskColorObject = maskColorObj;
         parameters.maskHeightObject = maskHeightObj;
+        parameters.offsetXObject = offsetXObj;
+        parameters.offsetYObject = offsetYObj;
+        parameters.maxWidthObject = maxWidthObj;
     }
     GetArkUINodeModifiers()->getTabsModifier()->setTabsBarFloatingStyle(nativeNode, &parameters);
     return panda::JSValueRef::Undefined(vm);
@@ -3082,6 +3105,88 @@ ArkUINativeModuleValue TabsBridge::ResetTabsBarFloatingStyle(ArkUIRuntimeCallInf
     CHECK_NULL_RETURN(firstArg->IsNativePointer(vm), panda::JSValueRef::Undefined(vm));
     auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
     GetArkUINodeModifiers()->getTabsModifier()->resetTabsBarFloatingStyle(nativeNode);
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue TabsBridge::SetTabsBarTopFloatingStyle(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(TABS_ARG_INDEX_0);
+    ArkUINodeHandle nativeNode = nullptr;
+    CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
+    auto* frameNode = reinterpret_cast<FrameNode*>(nativeNode);
+    using namespace OHOS::Ace::Framework;
+    CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> param = runtimeCallInfo->GetCallArgRef(TABS_ARG_INDEX_1);
+    if (!param->IsObject(vm)) {
+        GetArkUINodeModifiers()->getTabsModifier()->resetTabsBarTopFloatingStyle(nativeNode);
+        return panda::JSValueRef::Undefined(vm);
+    }
+    BarTopFloatingStyleParameters parameters;
+    auto paramObject = param->ToObject(vm);
+
+    RefPtr<ResourceObject> barWidthObj;
+    RefPtr<ResourceObject> barSideMarginObj;
+    RefPtr<ResourceObject> barTopMarginObj;
+    RefPtr<ResourceObject> maskColorObj;
+    RefPtr<ResourceObject> maskHeightObj;
+    RefPtr<ResourceObject> offsetXObj;
+    RefPtr<ResourceObject> offsetYObj;
+    RefPtr<ResourceObject> maxWidthObj;
+
+    parameters.barWidth =
+        ParseBarFloatingDimension(vm, ArkTSUtils::GetProperty(vm, paramObject, "barWidth"), barWidthObj);
+
+    parameters.barSideMargin =
+        ParseBarFloatingDimension(vm, ArkTSUtils::GetProperty(vm, paramObject, "barSideMargin"), barSideMarginObj);
+    parameters.barTopMargin =
+        ParseBarFloatingDimension(vm, ArkTSUtils::GetProperty(vm, paramObject, "barTopMargin"), barTopMarginObj);
+    Color colorVal;
+    auto nodeInfo = ArkTSUtils::MakeNativeNodeInfo(nativeNode);
+    bool parseOk = ArkTSUtils::ParseJsColorAlpha(
+        vm, ArkTSUtils::GetProperty(vm, paramObject, "maskColor"), colorVal, maskColorObj, nodeInfo);
+    if (parseOk) {
+        parameters.maskColor = colorVal;
+    } else {
+        parameters.maskColor = std::nullopt;
+    }
+    parameters.maskHeight =
+        ParseBarFloatingDimension(vm, ArkTSUtils::GetProperty(vm, paramObject, "maskHeight"), maskHeightObj);
+
+    auto offsetVal = ArkTSUtils::GetProperty(vm, paramObject, "offset");
+    if (offsetVal->IsObject(vm)) {
+        auto offsetObject = offsetVal->ToObject(vm);
+        parameters.offsetX = ParseBarFloatingDimension(
+            vm, ArkTSUtils::GetProperty(vm, offsetObject, "x"), offsetXObj);
+        parameters.offsetY = ParseBarFloatingDimension(
+            vm, ArkTSUtils::GetProperty(vm, offsetObject, "y"), offsetYObj);
+    }
+    parameters.maxWidth =
+        ParseBarFloatingDimension(vm, ArkTSUtils::GetProperty(vm, paramObject, "maxWidth"), maxWidthObj);
+
+    if (SystemProperties::ConfigChangePerform()) {
+        parameters.barWidthObject = barWidthObj;
+        parameters.barSideMarginObject = barSideMarginObj;
+        parameters.barTopMarginObject = barTopMarginObj;
+        parameters.maskColorObject = maskColorObj;
+        parameters.maskHeightObject = maskHeightObj;
+        parameters.offsetXObject = offsetXObj;
+        parameters.offsetYObject = offsetYObj;
+        parameters.maxWidthObject = maxWidthObj;
+    }
+    GetArkUINodeModifiers()->getTabsModifier()->setTabsBarTopFloatingStyle(nativeNode, &parameters);
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue TabsBridge::ResetTabsBarTopFloatingStyle(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(TABS_ARG_INDEX_0);
+    CHECK_NULL_RETURN(firstArg->IsNativePointer(vm), panda::JSValueRef::Undefined(vm));
+    auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
+    GetArkUINodeModifiers()->getTabsModifier()->resetTabsBarTopFloatingStyle(nativeNode);
     return panda::JSValueRef::Undefined(vm);
 }
 
@@ -3129,7 +3234,7 @@ ArkUINativeModuleValue TabsBridge::SetBarStyle(ArkUIRuntimeCallInfo* runtimeCall
     if (runtimeCallInfo->GetArgsNumber() > TABS_ARG_INDEX_1 && !styleArg.IsNull() && !styleArg->IsUndefined() &&
         styleArg->IsNumber()) {
         auto barStyleVal = styleArg->Int32Value(vm);
-        if (barStyleVal >= BAR_STYLE_BOTTOM && barStyleVal <= BAR_STYLE_SIDEBAR_ADAPTABLE) {
+        if (barStyleVal >= BAR_STYLE_BOTTOM && barStyleVal <= BAR_STYLE_TOP) {
             barStyle = barStyleVal;
         }
     }
@@ -3379,21 +3484,21 @@ ArkUINativeModuleValue TabsBridge::SetBarDisplayModeBreakpoint(ArkUIRuntimeCallI
     auto smVal = ArkTSUtils::GetProperty(vm, obj, "sm");
     if (smVal->IsNumber()) {
         auto smInt = smVal->Int32Value(vm);
-        if (smInt >= BAR_DISPLAY_MODE_BOTTOMTABBAR && smInt <= BAR_DISPLAY_MODE_SIDEBAR) {
+        if (smInt >= BAR_DISPLAY_MODE_BOTTOMTABBAR && smInt <= BAR_DISPLAY_MODE_TOP) {
             breakpoint.sm = smInt;
         }
     }
     auto mdVal = ArkTSUtils::GetProperty(vm, obj, "md");
     if (mdVal->IsNumber()) {
         auto mdInt = mdVal->Int32Value(vm);
-        if (mdInt >= BAR_DISPLAY_MODE_BOTTOMTABBAR && mdInt <= BAR_DISPLAY_MODE_SIDEBAR) {
+        if (mdInt >= BAR_DISPLAY_MODE_BOTTOMTABBAR && mdInt <= BAR_DISPLAY_MODE_TOP) {
             breakpoint.md = mdInt;
         }
     }
     auto lgVal = ArkTSUtils::GetProperty(vm, obj, "lg");
     if (lgVal->IsNumber()) {
         auto lgInt = lgVal->Int32Value(vm);
-        if (lgInt >= BAR_DISPLAY_MODE_BOTTOMTABBAR && lgInt <= BAR_DISPLAY_MODE_SIDEBAR) {
+        if (lgInt >= BAR_DISPLAY_MODE_BOTTOMTABBAR && lgInt <= BAR_DISPLAY_MODE_TOP) {
             breakpoint.lg = lgInt;
         }
     }

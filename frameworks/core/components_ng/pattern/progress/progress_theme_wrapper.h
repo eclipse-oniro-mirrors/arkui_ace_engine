@@ -20,7 +20,7 @@
 
 #include "base/memory/ace_type.h"
 #include "core/components/progress/progress_theme.h"
-#include "core/components_ng/token_theme/token_theme_wrapper.h"
+#include "core/components_ng/token_theme/token_theme.h"
 
 namespace OHOS::Ace::NG {
 
@@ -29,7 +29,7 @@ namespace OHOS::Ace::NG {
  * basing on TokenTheme's data.
  * ProgressThemeWrapper should be built using ProgressThemeWrapper::WrapperBuilder.
  */
-class ProgressThemeWrapper : public ProgressTheme, public TokenThemeWrapper {
+class ProgressThemeWrapper : public ProgressTheme {
     DECLARE_ACE_TYPE(ProgressThemeWrapper, ProgressTheme);
 
 public:
@@ -38,7 +38,7 @@ public:
         WrapperBuilder() = default;
         ~WrapperBuilder() override = default;
 
-        RefPtr<TokenThemeWrapper> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
+        RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
         {
             auto wrapper = AceType::MakeRefPtr<ProgressThemeWrapper>();
             ParsePattern(themeConstants, AceType::DynamicCast<ProgressTheme>(wrapper));

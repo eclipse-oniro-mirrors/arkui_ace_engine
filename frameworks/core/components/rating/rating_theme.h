@@ -29,7 +29,7 @@ class ThemeConstants;
  * RatingTheme defines color and styles of RatingComponent. RatingTheme should be built
  * using RatingTheme::Builder.
  */
-class RatingTheme : public virtual Theme {
+class RatingTheme : public Theme {
     DECLARE_ACE_TYPE(RatingTheme, Theme);
 
 public:
