@@ -48,6 +48,10 @@
 #include "core/interfaces/native/implementation/mouse_event_peer.h"
 #include "core/interfaces/native/implementation/touch_event_peer.h"
 #include "core/interfaces/native/utility/accessor_utils.h"
+#include "interfaces/inner_api/ace/ui_content.h"
+#include "interfaces/inner_api/ace/modal_ui_extension_config.h"
+#include "interfaces/inner_api/ace/modal_ui_extension_proxy.h"
+#include "core/components_ng/pattern/overlay/overlay_manager.h"
 #include "core/components_ng/token_theme/token_theme_storage.h"
 #include "core/interfaces/native/ani/ani_theme.h"
 #include "core/interfaces/native/ani/ani_theme_module.h"
@@ -1251,6 +1255,33 @@ ani_long GetPageRootNodeInStatic()
     return 0;
 }
 
+int32_t CreateModalUIExtensionInStatic(
+    const AAFwk::Want& want, const ModalUIExtensionCallbacks& callbacks, const ModalUIExtensionConfig& config,
+    const NG::InnerExtraConfig& extraConfig, ArkUI_Int32 instanceId)
+{
+    auto pipeline = NG::PipelineContext::GetContextByContainerId(instanceId);
+    CHECK_NULL_RETURN(pipeline, 0);
+    auto overlay = pipeline->GetOverlayManager();
+    CHECK_NULL_RETURN(overlay, 0);
+    return overlay->CreateModalUIExtension(want, callbacks, config, extraConfig);
+}
+
+void CloseModalUIExtensionInStatic(int32_t sessionId, ArkUI_Int32 instanceId)
+{
+    auto pipeline = NG::PipelineContext::GetContextByContainerId(instanceId);
+    CHECK_NULL_VOID(pipeline);
+    auto overlay = pipeline->GetOverlayManager();
+    CHECK_NULL_VOID(overlay);
+    overlay->CloseModalUIExtension(sessionId);
+}
+
+void ModalUIExtensionProxySendInStatic(
+    std::shared_ptr<ModalUIExtensionProxy>& proxy, const AAFwk::WantParams& params)
+{
+    CHECK_NULL_VOID(proxy);
+    proxy->SendData(params);
+}
+
 void DumpLogPrintImpl(int32_t depth, const char* content)
 {
     DumpLog::GetInstance().Print(depth, std::string(content));
@@ -1393,6 +1424,9 @@ const ArkUIAniCommonModifier* GetCommonAniModifier()
         .setOnNodeDestroyEvent = OHOS::Ace::NG::SetOnNodeDestroyEvent,
         .fireArkUIObjectLifecycleCallback = OHOS::Ace::NG::FireArkUIObjectLifecycleCallbackImpl,
         .GetIdString = OHOS::Ace::NG::GetIdString,
+        .createModalUIExtension = OHOS::Ace::NG::CreateModalUIExtensionInStatic,
+        .closeModalUIExtension = OHOS::Ace::NG::CloseModalUIExtensionInStatic,
+        .modalUIExtensionProxySend = OHOS::Ace::NG::ModalUIExtensionProxySendInStatic,
         .interopProxyNodeConstruct = OHOS::Ace::NG::InteropProxyNodeConstruct,
         .setSafeAreaInset = OHOS::Ace::NG::SetSafeAreaInsetStatic,
     };

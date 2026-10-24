@@ -71,6 +71,7 @@ RefPtr<FrameNode> UIExtensionModelNG::Create(
     pattern->SetOnReceiveCallback(std::move(callbacks.onReceive));
     pattern->SetModalOnRemoteReadyCallback(std::move(callbacks.onRemoteReady));
     pattern->SetModalOnDestroy(std::move(callbacks.onDestroy));
+    pattern->SetOnDrawReadyCallback(std::move(callbacks.onDrawReady));
     pattern->SetOnAbilityErrorCodeCallback(std::move(callbacks.onAbilityErrorCode));
     return frameNode;
 }
