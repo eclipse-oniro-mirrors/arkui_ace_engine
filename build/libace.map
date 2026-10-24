@@ -4281,6 +4281,7 @@
       "OHOS::Ace::Matrix4::Invert(OHOS::Ace::Matrix4 const&)";
       "OHOS::Ace::Matrix4::Matrix4(double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double)";
       "OHOS::Ace::Matrix4::Set(int, int, double)";
+      "OHOS::Ace::Matrix4::TransformPoint(OHOS::Ace::Point const&)";
       "OHOS::Ace::Matrix4::operator*(OHOS::Ace::Point const&)";
       "OHOS::Ace::Matrix4::operator[](int) const";
       "OHOS::Ace::MeasureUtil::MeasureText(OHOS::Ace::MeasureContext const&)";

@@ -15,6 +15,8 @@
 
 #include "core/accessibility/third_provider_tree_exporter.h"
 
+#include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -22,11 +24,14 @@
 #include <unordered_set>
 #include <vector>
 
+#include "base/geometry/matrix4.h"
+#include "base/geometry/point.h"
 #include "base/json/json_util_internal.h"
 #include "base/log/log_wrapper.h"
 #include "core/accessibility/native_interface_accessibility_impl.h"
 #include "core/accessibility/native_interface_accessibility_provider.h"
 #include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/render/render_context.h"
 
 using namespace OHOS::Ace;
 
@@ -41,35 +46,56 @@ using ProviderElementInfo = ArkUI_AccessibilityElementInfo;
 using NodeIndex = std::unordered_map<int64_t, size_t>;
 
 struct RectTransform {
-    double left = 0.0;
-    double top = 0.0;
-    double scaleX = 1.0;
-    double scaleY = 1.0;
+    Matrix4 matrix;
 };
 
 std::string FormatRect(const ArkUI_AccessibleRect& rect, const RectTransform& transform)
 {
+    std::array<Point, 4> corners = {
+        Point(rect.leftTopX, rect.leftTopY), Point(rect.rightBottomX, rect.leftTopY),
+        Point(rect.rightBottomX, rect.rightBottomY), Point(rect.leftTopX, rect.rightBottomY),
+    };
+    auto matrix = transform.matrix;
+    for (auto& point : corners) {
+        point = matrix.TransformPoint(point);
+        if (!std::isfinite(point.GetX()) || !std::isfinite(point.GetY())) {
+            JsonWriteErrorScope::RecordFailure();
+            return {};
+        }
+    }
+    auto left = corners.front().GetX();
+    auto top = corners.front().GetY();
+    auto right = left;
+    auto bottom = top;
+    for (const auto& point : corners) {
+        left = std::min(left, point.GetX());
+        top = std::min(top, point.GetY());
+        right = std::max(right, point.GetX());
+        bottom = std::max(bottom, point.GetY());
+    }
     char buffer[256];
     auto length = std::snprintf(buffer, sizeof(buffer), "[%.2f, %.2f],[%.2f,%.2f]",
-        transform.left + rect.leftTopX * transform.scaleX,
-        transform.top + rect.leftTopY * transform.scaleY,
-        transform.left + rect.rightBottomX * transform.scaleX,
-        transform.top + rect.rightBottomY * transform.scaleY);
+        left, top, right, bottom);
     return length > 0 && static_cast<size_t>(length) < sizeof(buffer) ? std::string(buffer) : std::string();
 }
 
 bool GetTransform(const RefPtr<NG::FrameNode>& host, RectTransform& transform)
 {
-    if (!host) {
-        return true;
-    }
     // Provider rectangles are host-local, despite the GetScreenRect accessor name.
     // Both export formats report window-relative coordinates like the host node.
-    const auto rect = host->GetTransformRectRelativeToWindow();
-    const auto scale = host->GetTransformScaleRelativeToWindow();
-    transform = { rect.Left(), rect.Top(), scale.x, scale.y };
-    return std::isfinite(transform.left) && std::isfinite(transform.top) &&
-        std::isfinite(transform.scaleX) && std::isfinite(transform.scaleY);
+    for (auto node = host; node; node = node->GetAncestorNodeOfFrame(true)) {
+        const auto& context = node->GetRenderContext();
+        CHECK_NULL_RETURN(context, false);
+        const auto offset = context->GetPaintRectWithoutTransform().GetOffset();
+        transform.matrix = context->GetMatrixWithTransformRotate() *
+            Matrix4::CreateTranslate(offset.GetX(), offset.GetY(), 0) * transform.matrix;
+    }
+    for (int32_t i = 0; i < Matrix4::DIMENSION * Matrix4::DIMENSION; ++i) {
+        if (!std::isfinite(transform.matrix[i])) {
+            return false;
+        }
+    }
+    return true;
 }
 
 void PutText(JsonValue& node, const char* key, const std::string& value)
@@ -310,7 +336,7 @@ ThirdProviderExportStatus ChargeJsonBytes(const JsonValue& json, size_t& bytes)
     const auto status = WriteJsonBounded(json, false, MAX_PROVIDER_BYTES - bytes, &data, &size);
     std::free(data);
     if (status != JsonWriteResult::SUCCESS) {
-        return status == JsonWriteResult::SIZE_LIMIT ? ThirdProviderExportStatus::SIZE_LIMIT :
+        return status == JsonWriteResult::TOO_LARGE ? ThirdProviderExportStatus::SIZE_LIMIT :
             ThirdProviderExportStatus::COLLECTION_FAILED;
     }
     bytes += size;
