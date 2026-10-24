@@ -1706,8 +1706,9 @@ void RichEditorPattern::DumpInspectorTreeInfo(
 {
     const auto host = GetHost();
     CHECK_NULL_VOID(host);
+    const bool password = IsInPasswordMode();
     const bool canExport = context.CanExportText(
-        InspectorTextKind::EDITABLE_TEXT, false, IsSetObscured() || IsPasswordObscured());
+        InspectorTextKind::EDITABLE_TEXT, password, IsSetObscured() || IsPasswordObscured());
     std::u16string content;
     if (canExport) {
         for (const auto& span : spans_) {
@@ -1720,7 +1721,7 @@ void RichEditorPattern::DumpInspectorTreeInfo(
     if (!context.config.accessibilityInfo) {
         return;
     }
-    attrs->Put("password", false);
+    attrs->Put("password", password);
     attrs->Put("multiLine", true);
     const auto property = host->GetAccessibilityProperty<AccessibilityProperty>();
     CHECK_NULL_VOID(property);

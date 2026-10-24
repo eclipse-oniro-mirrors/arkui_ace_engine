@@ -20,6 +20,12 @@
 #include "core/components_ng/base/inspector_tree_request_context.h"
 #include "core/components_ng/pattern/pattern.h"
 
+#define private public
+#define protected public
+#include "core/components_ng/pattern/rich_editor/rich_editor_pattern.h"
+#undef protected
+#undef private
+
 namespace OHOS::Ace::NG {
 class InspectorIdFrameNode : public FrameNode {
     DECLARE_ACE_TYPE(InspectorIdFrameNode, FrameNode);
@@ -43,6 +49,71 @@ public:
         MockPipelineContext::TearDown();
     }
 };
+
+class InspectorRichEditorPattern : public RichEditorPattern {
+    DECLARE_ACE_TYPE(InspectorRichEditorPattern, RichEditorPattern);
+
+public:
+    void SetInspectorText(const std::u16string& content)
+    {
+        auto span = AceType::MakeRefPtr<SpanItem>();
+        span->content = content;
+        spans_ = { span };
+    }
+
+    const std::u16string& GetInspectorText() const { return spans_.front()->content; }
+    void SetInspectorObscured(bool obscured) { textObscured_ = obscured; }
+
+protected:
+    void OnAttachToFrameNode() override {}
+    void OnDetachFromFrameNode(FrameNode*) override {}
+    void OnDetachFromMainTree() override {}
+};
+
+TEST_F(InspectorTreeTask03, RichEditorPasswordIsProtectedWhenShownOrHidden)
+{
+    auto pattern = AceType::MakeRefPtr<InspectorRichEditorPattern>();
+    auto frame = FrameNode::CreateFrameNode("RichEditor", 9, pattern);
+    frame->SetActive(true);
+    pattern->isSingleLineMode_ = true;
+    pattern->SetInspectorText(u"inspector-password-value");
+    auto layout = frame->GetLayoutProperty<RichEditorLayoutProperty>();
+    for (auto type : { TextInputType::TEXT, TextInputType::VISIBLE_PASSWORD,
+             TextInputType::NEW_PASSWORD, TextInputType::NUMBER_PASSWORD }) {
+        layout->UpdateTextInputType(type);
+        const bool password = type != TextInputType::TEXT;
+        ASSERT_EQ(pattern->IsInPasswordMode(), password);
+        for (bool obscured : { false, true }) {
+            pattern->SetInspectorObscured(obscured);
+            ASSERT_EQ(pattern->IsPasswordObscured(), password && obscured);
+            for (bool visible : { false, true }) {
+                for (bool accessibility : { false, true }) {
+                    SCOPED_TRACE(testing::Message() << "type=" << static_cast<int>(type) << ", obscured=" << obscured
+                        << ", visible=" << visible << ", accessibility=" << accessibility);
+                    ParamConfig config;
+                    config.accessibilityInfo = accessibility;
+                    InspectorTreeRequestContext context(config, {}, {});
+                    config.inspectorContext = &context;
+                    auto tree = JsonUtil::CreateSharedPtrJson();
+                    frame->DumpSimplifyTreeWithParamConfig(0, tree, visible, config);
+                    auto attrs = tree->GetObject("$attrs");
+                    EXPECT_EQ(attrs->GetString("content"), password ? "" : "inspector-password-value");
+                    if (accessibility) {
+                        EXPECT_TRUE(attrs->GetValue("password")->IsBool());
+                        EXPECT_EQ(attrs->GetBool("password"), password);
+                    } else {
+                        EXPECT_FALSE(attrs->Contains("password"));
+                    }
+                    if (password) {
+                        EXPECT_EQ(tree->ToString().find("inspector-password-value"), std::string::npos);
+                    }
+                    EXPECT_EQ(pattern->GetInspectorText(), u"inspector-password-value");
+                    EXPECT_EQ(pattern->GetTextObscured(), obscured);
+                }
+            }
+        }
+    }
+}
 
 TEST_F(InspectorTreeTask03, NativeIdsAreLosslessAndGated)
 {
