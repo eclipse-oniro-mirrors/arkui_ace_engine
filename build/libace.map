@@ -1494,6 +1494,7 @@
       "OHOS::Ace::NG::FrameNode::GetResponseRegionList(OHOS::Ace::NG::RectT<float> const&, int, int)";
       "OHOS::Ace::NG::FrameNode::GetResponseRegionListRaw(OHOS::Ace::NG::RectT<float> const&, int)";
       "OHOS::Ace::NG::FrameNode::GetTransformRectRelativeToWindow(bool) const";
+      "OHOS::Ace::NG::FrameNode::GetTransformScaleRelativeToWindow() const";
       "OHOS::Ace::NG::FrameNode::GetTransformRelativeOffset() const";
       "OHOS::Ace::NG::FrameNode::InitializePatternAndContext()";
       "OHOS::Ace::NG::FrameNode::InResponseRegionList(OHOS::Ace::NG::PointT<float> const&, std::__h::vector<OHOS::Ace::NG::RectT<float>, std::__h::allocator<OHOS::Ace::NG::RectT<float>>> const&, bool)";
@@ -4239,6 +4240,8 @@
       "OHOS::Ace::InteractionInterface::GetInstance()";
       "OHOS::Ace::JankFrameReport::ReportJSAnimation()";
       "OHOS::Ace::JsonUtil::CreateSharedPtrJson(bool)";
+      OHOS::Ace::JsonWriteErrorScope::*;
+      OHOS::Ace::WriteJsonBounded*;
       "OHOS::Ace::JsonValue::Delete(char const*)";
       "OHOS::Ace::JsonValue::GetChild() const";
       "OHOS::Ace::JsonValue::GetKey() const";

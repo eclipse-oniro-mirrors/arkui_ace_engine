@@ -13,11 +13,97 @@
  * limitations under the License.
  */
 
-#include "base/json/json_util.h"
+#include "base/json/json_util_internal.h"
+
+#include <algorithm>
+#include <climits>
+#include <cstdlib>
+#include <cstring>
 
 #include "cJSON.h"
 
 namespace OHOS::Ace {
+
+thread_local JsonWriteErrorScope* JsonWriteErrorScope::current_ = nullptr;
+
+JsonWriteErrorScope::JsonWriteErrorScope() : previous_(current_)
+{
+    current_ = this;
+}
+
+JsonWriteErrorScope::~JsonWriteErrorScope()
+{
+    current_ = previous_;
+}
+
+void JsonWriteErrorScope::RecordError()
+{
+    for (auto* scope = current_; scope; scope = scope->previous_) {
+        scope->error_ = true;
+    }
+}
+
+JsonWriteResult WriteJsonBounded(const JsonValue& value, bool formatted, size_t limit, char** data, size_t* size)
+{
+    if (!data || !size) {
+        return JsonWriteResult::FAILED;
+    }
+    *data = nullptr;
+    *size = 0;
+    // cJSON requires five bytes of slack for its preallocated writer.
+    constexpr size_t SLACK = 5;
+    if (!value.IsValid() || limit > INT_MAX - SLACK) {
+        return JsonWriteResult::FAILED;
+    }
+    const size_t maximum = limit + SLACK;
+    size_t capacity = std::min<size_t>(4096, maximum);
+    while (true) {
+        auto* buffer = static_cast<char*>(std::malloc(capacity));
+        if (!buffer) {
+            JsonWriteErrorScope::RecordError();
+            return JsonWriteResult::FAILED;
+        }
+        if (cJSON_PrintPreallocated(const_cast<JsonObject*>(value.GetJsonObject()), buffer,
+            static_cast<int>(capacity), formatted)) {
+            const auto length = std::strlen(buffer);
+            if (length <= limit) {
+                *data = buffer;
+                *size = length;
+                return JsonWriteResult::SUCCESS;
+            }
+            std::free(buffer);
+            return JsonWriteResult::SIZE_LIMIT;
+        }
+        std::free(buffer);
+        if (capacity == maximum) {
+            return JsonWriteResult::SIZE_LIMIT;
+        }
+        capacity = std::min(maximum, capacity * 2);
+    }
+}
+
+namespace {
+bool AddJsonItem(cJSON* object, const char* key, cJSON* child)
+{
+    if (cJSON_AddItemToObject(object, key, child)) {
+        return true;
+    }
+    cJSON_Delete(child);
+    JsonWriteErrorScope::RecordError();
+    return false;
+}
+
+bool AddJsonItem(cJSON* array, cJSON* child)
+{
+    if (cJSON_AddItemToArray(array, child)) {
+        return true;
+    }
+    cJSON_Delete(child);
+    JsonWriteErrorScope::RecordError();
+    return false;
+}
+} // namespace
+
 
 JsonValue::JsonValue(JsonObject* object) : object_(object) {}
 
@@ -164,25 +250,26 @@ std::unique_ptr<JsonValue> JsonValue::GetArrayItem(int32_t index) const
 bool JsonValue::Put(const char* key, const char* value)
 {
     if (!value || !key) {
+        JsonWriteErrorScope::RecordError();
         return false;
     }
 
     cJSON* child = cJSON_CreateString(value);
     if (child == nullptr) {
+        JsonWriteErrorScope::RecordError();
         return false;
     }
-    cJSON_AddItemToObject(object_, key, child);
-    return true;
+    return AddJsonItem(object_, key, child);
 }
 
 bool JsonValue::Put(double value)
 {
     cJSON* child = cJSON_CreateNumber(value);
     if (child == nullptr) {
+        JsonWriteErrorScope::RecordError();
         return false;
     }
-    cJSON_AddItemToArray(object_, child);
-    return true;
+    return AddJsonItem(object_, child);
 }
 
 bool JsonValue::PutFixedAttr(const char* key, const char* value,
@@ -210,29 +297,31 @@ const JsonObject* JsonValue::GetJsonObject() const
 bool JsonValue::Put(const char* key, const std::unique_ptr<JsonValue>& value)
 {
     if (!value || !key) {
+        JsonWriteErrorScope::RecordError();
         return false;
     }
     cJSON* jsonObject = cJSON_Duplicate(value->GetJsonObject(), true);
     if (jsonObject == nullptr) {
+        JsonWriteErrorScope::RecordError();
         return false;
     }
 
-    cJSON_AddItemToObject(object_, key, jsonObject);
-    return true;
+    return AddJsonItem(object_, key, jsonObject);
 }
 
 bool JsonValue::Put(const char* key, const std::shared_ptr<JsonValue>& value)
 {
     if (!value || !key) {
+        JsonWriteErrorScope::RecordError();
         return false;
     }
     cJSON* jsonObject = cJSON_Duplicate(value->GetJsonObject(), true);
     if (jsonObject == nullptr) {
+        JsonWriteErrorScope::RecordError();
         return false;
     }
 
-    cJSON_AddItemToObject(object_, key, jsonObject);
-    return true;
+    return AddJsonItem(object_, key, jsonObject);
 }
 
 bool JsonValue::PutFixedAttr(const char* key, const std::unique_ptr<JsonValue>& value,
@@ -257,43 +346,46 @@ bool JsonValue::PutExtAttr(const char* key, const std::unique_ptr<JsonValue>& va
 bool JsonValue::Put(const std::unique_ptr<JsonValue>& value)
 {
     if (!value) {
+        JsonWriteErrorScope::RecordError();
         return false;
     }
     cJSON* jsonObject = cJSON_Duplicate(value->GetJsonObject(), true);
     if (jsonObject == nullptr) {
+        JsonWriteErrorScope::RecordError();
         return false;
     }
 
-    cJSON_AddItemToArray(object_, jsonObject);
-    return true;
+    return AddJsonItem(object_, jsonObject);
 }
 
 bool JsonValue::Put(const std::shared_ptr<JsonValue>& value)
 {
     if (!value) {
+        JsonWriteErrorScope::RecordError();
         return false;
     }
     cJSON* jsonObject = cJSON_Duplicate(value->GetJsonObject(), true);
     if (jsonObject == nullptr) {
+        JsonWriteErrorScope::RecordError();
         return false;
     }
 
-    cJSON_AddItemToArray(object_, jsonObject);
-    return true;
+    return AddJsonItem(object_, jsonObject);
 }
 
 bool JsonValue::Put(const char* key, size_t value)
 {
     if (key == nullptr) {
+        JsonWriteErrorScope::RecordError();
         return false;
     }
 
     cJSON* child = cJSON_CreateNumber(static_cast<double>(value));
     if (child == nullptr) {
+        JsonWriteErrorScope::RecordError();
         return false;
     }
-    cJSON_AddItemToObject(object_, key, child);
-    return true;
+    return AddJsonItem(object_, key, child);
 }
 
 bool JsonValue::PutFixedAttr(const char* key, size_t value,
@@ -316,15 +408,16 @@ bool JsonValue::PutExtAttr(const char* key, size_t value, const NG::InspectorFil
 bool JsonValue::Put(const char* key, int32_t value)
 {
     if (key == nullptr) {
+        JsonWriteErrorScope::RecordError();
         return false;
     }
 
     cJSON* child = cJSON_CreateNumber(static_cast<double>(value));
     if (child == nullptr) {
+        JsonWriteErrorScope::RecordError();
         return false;
     }
-    cJSON_AddItemToObject(object_, key, child);
-    return true;
+    return AddJsonItem(object_, key, child);
 }
 
 bool JsonValue::PutFixedAttr(const char* key, int32_t value,
@@ -369,15 +462,16 @@ bool JsonValue::PutExtAttr(const char* key, int64_t value, const NG::InspectorFi
 bool JsonValue::Put(const char* key, double value)
 {
     if (key == nullptr) {
+        JsonWriteErrorScope::RecordError();
         return false;
     }
 
     cJSON* child = cJSON_CreateNumber(value);
     if (child == nullptr) {
+        JsonWriteErrorScope::RecordError();
         return false;
     }
-    cJSON_AddItemToObject(object_, key, child);
-    return true;
+    return AddJsonItem(object_, key, child);
 }
 
 bool JsonValue::PutFixedAttr(const char* key, double value,
@@ -410,6 +504,7 @@ JsonObject* JsonValue::ReleaseJsonObject()
 bool JsonValue::PutRef(const char* key, std::unique_ptr<JsonValue>&& value)
 {
     if (key == nullptr || value == nullptr) {
+        JsonWriteErrorScope::RecordError();
         return false;
     }
     /*
@@ -417,8 +512,7 @@ bool JsonValue::PutRef(const char* key, std::unique_ptr<JsonValue>&& value)
     * Else we need to copy the JsonObject and put the new object in current object
     */
     if (value->isRoot_) {
-        cJSON_AddItemToObject(object_, key, value->ReleaseJsonObject());
-        return true;
+        return AddJsonItem(object_, key, value->ReleaseJsonObject());
     } else {
         std::unique_ptr<JsonValue> lValue = std::move(value);
         return Put(key, lValue);
@@ -428,6 +522,7 @@ bool JsonValue::PutRef(const char* key, std::unique_ptr<JsonValue>&& value)
 bool JsonValue::PutRef(std::unique_ptr<JsonValue>&& value)
 {
     if (value == nullptr) {
+        JsonWriteErrorScope::RecordError();
         return false;
     }
     /*
@@ -435,8 +530,7 @@ bool JsonValue::PutRef(std::unique_ptr<JsonValue>&& value)
     * Else we need to copy the JsonObject and put the new object in current object
     */
     if (value->isRoot_) {
-        cJSON_AddItemToArray(object_, value->ReleaseJsonObject());
-        return true;
+        return AddJsonItem(object_, value->ReleaseJsonObject());
     } else {
         std::unique_ptr<JsonValue> lValue = std::move(value);
         return Put(lValue);
@@ -446,6 +540,7 @@ bool JsonValue::PutRef(std::unique_ptr<JsonValue>&& value)
 bool JsonValue::PutRef(std::shared_ptr<JsonValue>&& value)
 {
     if (value == nullptr) {
+        JsonWriteErrorScope::RecordError();
         return false;
     }
     /*
@@ -453,8 +548,7 @@ bool JsonValue::PutRef(std::shared_ptr<JsonValue>&& value)
     * Else we need to copy the JsonObject and put the new object in current object
     */
     if (value->isRoot_) {
-        cJSON_AddItemToArray(object_, value->ReleaseJsonObject());
-        return true;
+        return AddJsonItem(object_, value->ReleaseJsonObject());
     } else {
         std::shared_ptr<JsonValue> lValue = std::move(value);
         return Put(lValue);
@@ -464,15 +558,18 @@ bool JsonValue::PutRef(std::shared_ptr<JsonValue>&& value)
 bool JsonValue::Replace(const char* key, double value)
 {
     if (key == nullptr) {
+        JsonWriteErrorScope::RecordError();
         return false;
     }
 
     cJSON* child = cJSON_CreateNumber(value);
     if (child == nullptr) {
+        JsonWriteErrorScope::RecordError();
         return false;
     }
     if (!cJSON_ReplaceItemInObject(object_, key, child)) {
         cJSON_Delete(child);
+        JsonWriteErrorScope::RecordError();
         return false;
     }
     return true;
@@ -481,15 +578,16 @@ bool JsonValue::Replace(const char* key, double value)
 bool JsonValue::Put(const char* key, bool value)
 {
     if (key == nullptr) {
+        JsonWriteErrorScope::RecordError();
         return false;
     }
 
     cJSON* child = cJSON_CreateBool(value);
     if (child == nullptr) {
+        JsonWriteErrorScope::RecordError();
         return false;
     }
-    cJSON_AddItemToObject(object_, key, child);
-    return true;
+    return AddJsonItem(object_, key, child);
 }
 
 bool JsonValue::PutFixedAttr(const char* key, bool value,
@@ -512,15 +610,18 @@ bool JsonValue::PutExtAttr(const char* key, bool value, const NG::InspectorFilte
 bool JsonValue::Replace(const char* key, bool value)
 {
     if (key == nullptr) {
+        JsonWriteErrorScope::RecordError();
         return false;
     }
 
     cJSON* child = cJSON_CreateBool(value);
     if (child == nullptr) {
+        JsonWriteErrorScope::RecordError();
         return false;
     }
     if (!cJSON_ReplaceItemInObject(object_, key, child)) {
         cJSON_Delete(child);
+        JsonWriteErrorScope::RecordError();
         return false;
     }
     return true;
@@ -529,15 +630,18 @@ bool JsonValue::Replace(const char* key, bool value)
 bool JsonValue::Replace(const char* key, const char* value)
 {
     if ((value == nullptr) || (key == nullptr)) {
+        JsonWriteErrorScope::RecordError();
         return false;
     }
 
     cJSON* child = cJSON_CreateString(value);
     if (child == nullptr) {
+        JsonWriteErrorScope::RecordError();
         return false;
     }
     if (!cJSON_ReplaceItemInObject(object_, key, child)) {
         cJSON_Delete(child);
+        JsonWriteErrorScope::RecordError();
         return false;
     }
     return true;
@@ -546,15 +650,18 @@ bool JsonValue::Replace(const char* key, const char* value)
 bool JsonValue::Replace(const char* key, int32_t value)
 {
     if (key == nullptr) {
+        JsonWriteErrorScope::RecordError();
         return false;
     }
 
     cJSON* child = cJSON_CreateNumber(static_cast<double>(value));
     if (child == nullptr) {
+        JsonWriteErrorScope::RecordError();
         return false;
     }
     if (!cJSON_ReplaceItemInObject(object_, key, child)) {
         cJSON_Delete(child);
+        JsonWriteErrorScope::RecordError();
         return false;
     }
     return true;
@@ -563,15 +670,18 @@ bool JsonValue::Replace(const char* key, int32_t value)
 bool JsonValue::Replace(const char* key, const std::unique_ptr<JsonValue>& value)
 {
     if ((value == nullptr) || (key == nullptr)) {
+        JsonWriteErrorScope::RecordError();
         return false;
     }
     cJSON* jsonObject = cJSON_Duplicate(value->GetJsonObject(), true);
     if (jsonObject == nullptr) {
+        JsonWriteErrorScope::RecordError();
         return false;
     }
 
     if (!cJSON_ReplaceItemInObject(object_, key, jsonObject)) {
         cJSON_Delete(jsonObject);
+        JsonWriteErrorScope::RecordError();
         return false;
     }
     return true;
@@ -669,17 +779,29 @@ std::unique_ptr<JsonValue> JsonUtil::ParseJsonString(const std::string& content,
 
 std::unique_ptr<JsonValue> JsonUtil::Create(bool isRoot)
 {
-    return std::make_unique<JsonValue>(cJSON_CreateObject(), isRoot);
+    auto* object = cJSON_CreateObject();
+    if (!object) {
+        JsonWriteErrorScope::RecordError();
+    }
+    return std::make_unique<JsonValue>(object, isRoot);
 }
 
 std::shared_ptr<JsonValue> JsonUtil::CreateSharedPtrJson(bool isRoot)
 {
-    return std::make_shared<JsonValue>(cJSON_CreateObject(), isRoot);
+    auto* object = cJSON_CreateObject();
+    if (!object) {
+        JsonWriteErrorScope::RecordError();
+    }
+    return std::make_shared<JsonValue>(object, isRoot);
 }
 
 std::unique_ptr<JsonValue> JsonUtil::CreateArray(bool isRoot)
 {
-    return std::make_unique<JsonValue>(cJSON_CreateArray(), isRoot);
+    auto* object = cJSON_CreateArray();
+    if (!object) {
+        JsonWriteErrorScope::RecordError();
+    }
+    return std::make_unique<JsonValue>(object, isRoot);
 }
 
 } // namespace OHOS::Ace

@@ -15,6 +15,7 @@
 
 #include "core/components_ng/pattern/xcomponent/xcomponent_pattern.h"
 #include "core/accessibility/accessibility_manager.h"
+#include "core/accessibility/third_provider_tree_exporter.h"
 
 #include <cmath>
 #include <string_view>
@@ -2743,6 +2744,21 @@ void XComponentPattern::SetSurfaceIsOpaque(bool isOpaque)
     } else if (type_ == XComponentType::TEXTURE) {
         CHECK_NULL_VOID(renderSurface_);
         renderSurface_->SetSurfaceBufferOpaque(isOpaque);
+    }
+}
+
+void XComponentPattern::AddExtraInfoWithParamConfig(
+    std::shared_ptr<JsonValue>& json, ParamConfig config)
+{
+    if (!config.withCustomContent || config.inspectorContext) {
+        return;
+    }
+    CHECK_NULL_VOID(json);
+    auto* provider = GetNativeProvider();
+    auto host = GetHost();
+    auto providerTree = ThirdProviderTreeExporter::ExportToInspectorJson(provider, host);
+    if (providerTree) {
+        json->Put(THIRD_PROVIDER_JSON_CHILDREN, providerTree);
     }
 }
 

@@ -21,6 +21,7 @@
 #include "core/accessibility/accessibility_manager.h"
 #include "core/accessibility/accessibility_session_adapter.h"
 #include "core/accessibility/native_interface_accessibility_provider.h"
+#include "core/accessibility/third_provider_tree_exporter.h"
 #include "core/common/ace_application_info.h"
 #include "core/pipeline_ng/pipeline_context.h"
 
@@ -224,6 +225,21 @@ void CustomPattern::DumpInfo()
 {
     if (vOverflowHandler_) {
         DumpLog::GetInstance().AddDesc(std::string("OverflowInfo: ").append(vOverflowHandler_->ToString().c_str()));
+    }
+}
+
+void CustomPattern::AddExtraInfoWithParamConfig(
+    std::shared_ptr<JsonValue>& json, ParamConfig config)
+{
+    if (!config.withCustomContent || config.inspectorContext) {
+        return;
+    }
+    CHECK_NULL_VOID(json);
+    auto* provider = GetNativeAccessibilityProvider();
+    auto host = GetHost();
+    auto providerTree = ThirdProviderTreeExporter::ExportToInspectorJson(provider, host);
+    if (providerTree) {
+        json->Put(THIRD_PROVIDER_JSON_CHILDREN, providerTree);
     }
 }
 } // namespace OHOS::Ace::NG
