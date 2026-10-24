@@ -19,6 +19,10 @@
 #include <cstdint>
 #include <string>
 
+namespace OHOS::Ace::NG {
+class InspectorTreeRequestContext;
+}
+
 namespace OHOS::Ace {
 
 struct TreeCollectionState;
@@ -41,6 +45,9 @@ struct ParamConfig {
     bool functionalProperties = false;
     TreeCollectionState* collectionState = nullptr;
     TreeDumpMode dumpMode = TreeDumpMode::LEGACY;
+    bool withCustomContent = false;
+    // Borrowed request state; never serialized into the configuration parcel.
+    NG::InspectorTreeRequestContext* inspectorContext = nullptr;
 
     bool IsPublicTree() const
     {
