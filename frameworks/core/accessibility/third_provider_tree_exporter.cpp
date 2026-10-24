@@ -19,14 +19,15 @@
 #include <array>
 #include <cmath>
 #include <cstdio>
-#include <cstdlib>
+#include <cstring>
+#include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
 #include "base/geometry/matrix4.h"
 #include "base/geometry/point.h"
-#include "base/json/json_util_internal.h"
+#include "cJSON.h"
 #include "base/log/log_wrapper.h"
 #include "core/accessibility/native_interface_accessibility_impl.h"
 #include "core/accessibility/native_interface_accessibility_provider.h"
@@ -45,6 +46,100 @@ constexpr float OPACITY_TOLERANCE = 0.001f;
 using ProviderElementInfo = ArkUI_AccessibilityElementInfo;
 using NodeIndex = std::unordered_map<int64_t, size_t>;
 
+// Owns only JSON produced by the third-party exporter. Failed writes stay local
+// to this value and propagate when a child is attached; no global JSON hooks.
+class ProviderJson final {
+public:
+    explicit ProviderJson(cJSON* value) : value_(std::make_unique<JsonValue>(value, true)), failed_(!value) {}
+
+    static std::unique_ptr<ProviderJson> Create()
+    {
+        return std::make_unique<ProviderJson>(cJSON_CreateObject());
+    }
+
+    static std::unique_ptr<ProviderJson> CreateArray()
+    {
+        return std::make_unique<ProviderJson>(cJSON_CreateArray());
+    }
+
+    static std::unique_ptr<ProviderJson> CreateString(const std::string& text)
+    {
+        return std::make_unique<ProviderJson>(cJSON_CreateString(text.c_str()));
+    }
+
+    bool Put(const char* key, const char* value)
+    {
+        return Attach(key, value ? cJSON_CreateString(value) : nullptr);
+    }
+
+    bool Put(const char* key, bool value)
+    {
+        return Attach(key, cJSON_CreateBool(value));
+    }
+
+    template<typename T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
+    bool Put(const char* key, T value)
+    {
+        const auto number = static_cast<double>(value);
+        return Attach(key, std::isfinite(number) ? cJSON_CreateNumber(number) : nullptr);
+    }
+
+    bool PutRef(const char* key, std::unique_ptr<ProviderJson> value)
+    {
+        if (!value || value->HasError()) {
+            failed_ = true;
+            return false;
+        }
+        return Attach(key, value->value_->ReleaseJsonObject());
+    }
+
+    bool PutRef(std::unique_ptr<ProviderJson> value)
+    {
+        return PutRef(nullptr, std::move(value));
+    }
+
+    bool HasChildren() const
+    {
+        return value_->GetJsonObject() && value_->GetJsonObject()->child;
+    }
+
+    bool HasError() const
+    {
+        return failed_;
+    }
+
+    void RecordFailure()
+    {
+        failed_ = true;
+    }
+
+    const JsonValue& Value() const
+    {
+        return *value_;
+    }
+
+    std::unique_ptr<JsonValue> TakeValue()
+    {
+        return failed_ ? nullptr : std::move(value_);
+    }
+
+private:
+    bool Attach(const char* key, cJSON* child)
+    {
+        auto* parent = const_cast<cJSON*>(value_->GetJsonObject());
+        if (!failed_ && child && parent &&
+            (key ? cJSON_AddItemToObject(parent, key, child) : cJSON_AddItemToArray(parent, child))) {
+            return true;
+        }
+        cJSON_Delete(child);
+        failed_ = true;
+        return false;
+    }
+
+    std::unique_ptr<JsonValue> value_;
+    bool failed_ = false;
+};
+
 struct RectTransform {
     Matrix4 matrix;
 };
@@ -59,7 +154,6 @@ std::string FormatRect(const ArkUI_AccessibleRect& rect, const RectTransform& tr
     for (auto& point : corners) {
         point = matrix.TransformPoint(point);
         if (!std::isfinite(point.GetX()) || !std::isfinite(point.GetY())) {
-            JsonWriteErrorScope::RecordFailure();
             return {};
         }
     }
@@ -98,14 +192,24 @@ bool GetTransform(const RefPtr<NG::FrameNode>& host, RectTransform& transform)
     return true;
 }
 
-void PutText(JsonValue& node, const char* key, const std::string& value)
+void PutRect(ProviderJson& node, const ArkUI_AccessibleRect& rect, const RectTransform& transform)
+{
+    const auto text = FormatRect(rect, transform);
+    if (text.empty()) {
+        node.RecordFailure();
+        return;
+    }
+    node.Put("$rect", text.c_str());
+}
+
+void PutText(ProviderJson& node, const char* key, const std::string& value)
 {
     if (!value.empty()) {
         node.Put(key, value.c_str());
     }
 }
 
-void PutStates(JsonValue& node, const ProviderElementInfo& info)
+void PutStates(ProviderJson& node, const ProviderElementInfo& info)
 {
     node.Put("visible", info.IsVisible());
     node.Put("checkable", info.IsCheckable());
@@ -123,27 +227,27 @@ void PutStates(JsonValue& node, const ProviderElementInfo& info)
     node.Put("accessibilityGroup", info.GetAccessibilityGroup());
 }
 
-std::unique_ptr<JsonValue> RangeToJson(const ArkUI_AccessibleRangeInfo& range)
+std::unique_ptr<ProviderJson> RangeToJson(const ArkUI_AccessibleRangeInfo& range)
 {
-    auto json = JsonUtil::Create(true);
+    auto json = ProviderJson::Create();
     json->Put("min", range.min);
     json->Put("max", range.max);
     json->Put("current", range.current);
     return json;
 }
 
-std::unique_ptr<JsonValue> GridToJson(const ArkUI_AccessibleGridInfo& grid)
+std::unique_ptr<ProviderJson> GridToJson(const ArkUI_AccessibleGridInfo& grid)
 {
-    auto json = JsonUtil::Create(true);
+    auto json = ProviderJson::Create();
     json->Put("rowCount", grid.rowCount);
     json->Put("columnCount", grid.columnCount);
     json->Put("selectionMode", grid.selectionMode);
     return json;
 }
 
-std::unique_ptr<JsonValue> GridItemToJson(const ArkUI_AccessibleGridItemInfo& item)
+std::unique_ptr<ProviderJson> GridItemToJson(const ArkUI_AccessibleGridItemInfo& item)
 {
-    auto json = JsonUtil::Create(true);
+    auto json = ProviderJson::Create();
     json->Put("heading", item.heading);
     json->Put("selected", item.selected);
     json->Put("rowIndex", item.rowIndex);
@@ -153,11 +257,11 @@ std::unique_ptr<JsonValue> GridItemToJson(const ArkUI_AccessibleGridItemInfo& it
     return json;
 }
 
-std::unique_ptr<JsonValue> ActionsToJson(const ProviderElementInfo& info)
+std::unique_ptr<ProviderJson> ActionsToJson(const ProviderElementInfo& info)
 {
-    auto array = JsonUtil::CreateArray(true);
+    auto array = ProviderJson::CreateArray();
     for (const auto& action : info.GetOperationActions()) {
-        auto json = JsonUtil::Create(true);
+        auto json = ProviderJson::Create();
         json->Put("action", static_cast<int32_t>(action.actionType));
         if (action.description && action.description[0] != '\0') {
             json->Put("description", action.description);
@@ -167,9 +271,9 @@ std::unique_ptr<JsonValue> ActionsToJson(const ProviderElementInfo& info)
     return array;
 }
 
-void PutExtendedAttributes(JsonValue& node, const ProviderElementInfo& info)
+void PutExtendedAttributes(ProviderJson& node, const ProviderElementInfo& info)
 {
-    auto attrs = JsonUtil::Create(true);
+    auto attrs = ProviderJson::Create();
     PutText(*attrs, "backgroundColor", info.GetBackgroundColor());
     PutText(*attrs, "backgroundImage", info.GetBackgroundImage());
     PutText(*attrs, "blur", info.GetBlur());
@@ -190,20 +294,20 @@ void PutExtendedAttributes(JsonValue& node, const ProviderElementInfo& info)
     if (!info.GetOperationActions().empty()) {
         attrs->PutRef("actions", ActionsToJson(info));
     }
-    if (attrs->GetChild()->IsValid()) {
+    if (attrs->HasChildren() || attrs->HasError()) {
         node.PutRef("$attrs", std::move(attrs));
     }
 }
 
-std::unique_ptr<JsonValue> ElementToTreeJson(const ProviderElementInfo& info, const RectTransform& transform)
+std::unique_ptr<ProviderJson> ElementToTreeJson(const ProviderElementInfo& info, const RectTransform& transform)
 {
-    auto node = JsonUtil::Create(true);
+    auto node = ProviderJson::Create();
     node->Put("$ID", static_cast<int64_t>(info.GetElementId()));
     node->Put("$parentID", info.GetParentId());
     const auto type = info.GetComponentType();
     node->Put("$type", type.empty() ? "third" : type.c_str());
     node->Put("type", "third");
-    node->Put("$rect", FormatRect(info.GetScreenRect(), transform).c_str());
+    PutRect(*node, info.GetScreenRect(), transform);
     PutText(*node, "contents", info.GetContents());
     PutText(*node, "hintText", info.GetHintText());
     PutText(*node, "accessibilityText", info.GetAccessibilityText());
@@ -326,20 +430,139 @@ bool FitsElementText(const ProviderElementInfo& info, size_t remaining)
     return true;
 }
 
+enum class ProviderJsonSizeResult { SUCCESS, TOO_LARGE, INVALID_VALUE };
+
+constexpr size_t CJSON_PRINT_SAFETY_MARGIN = 5;
+// Native cJSON uses 26 bytes for number formatting, including its terminator.
+constexpr size_t CJSON_NUMBER_BUFFER_SIZE = 26;
+constexpr unsigned char JSON_CONTROL_CHARACTER_END = 0x20;
+constexpr size_t JSON_QUOTES_SIZE = sizeof("\"\"") - 1;
+constexpr size_t JSON_SHORT_ESCAPE_SIZE = sizeof("\\n") - 1;
+constexpr size_t JSON_UNICODE_ESCAPE_SIZE = sizeof("\\u0000") - 1;
+
+class ProviderJsonCounter final {
+public:
+    explicit ProviderJsonCounter(size_t limit) : limit_(limit)
+    {}
+
+    ProviderJsonSizeResult Count(const cJSON* value)
+    {
+        if (!value) {
+            return ProviderJsonSizeResult::INVALID_VALUE;
+        }
+        if (cJSON_IsObject(value)) {
+            return CountObject(value);
+        }
+        if (cJSON_IsArray(value)) {
+            return CountArray(value);
+        }
+        if (cJSON_IsString(value)) {
+            return value->valuestring ? CountString(value->valuestring) : ProviderJsonSizeResult::INVALID_VALUE;
+        }
+        return CountScalar(value);
+    }
+
+    size_t Size() const
+    {
+        return size_;
+    }
+
+private:
+    ProviderJsonSizeResult Add(size_t bytes)
+    {
+        if (bytes > limit_ - size_) {
+            return ProviderJsonSizeResult::TOO_LARGE;
+        }
+        size_ += bytes;
+        return ProviderJsonSizeResult::SUCCESS;
+    }
+
+    ProviderJsonSizeResult CountString(const char* value)
+    {
+        auto result = Add(JSON_QUOTES_SIZE);
+        // cJSON prints an absent object-member key as an empty string.
+        for (const auto* cursor = reinterpret_cast<const unsigned char*>(value);
+             result == ProviderJsonSizeResult::SUCCESS && cursor && *cursor; ++cursor) {
+            size_t bytes = sizeof(char);
+            if (*cursor == '\"' || *cursor == '\\' || *cursor == '\b' || *cursor == '\f' ||
+                *cursor == '\n' || *cursor == '\r' || *cursor == '\t') {
+                bytes = JSON_SHORT_ESCAPE_SIZE;
+            } else if (*cursor < JSON_CONTROL_CHARACTER_END) {
+                bytes = JSON_UNICODE_ESCAPE_SIZE;
+            }
+            result = Add(bytes);
+        }
+        return result;
+    }
+
+    ProviderJsonSizeResult CountScalar(const cJSON* value)
+    {
+        if (cJSON_IsBool(value)) {
+            return Add(cJSON_IsTrue(value) ? sizeof("true") - 1 : sizeof("false") - 1);
+        }
+        if (cJSON_IsNull(value)) {
+            return Add(sizeof("null") - 1);
+        }
+        if (!cJSON_IsNumber(value) || !std::isfinite(value->valuedouble)) {
+            return ProviderJsonSizeResult::INVALID_VALUE;
+        }
+        char buffer[CJSON_NUMBER_BUFFER_SIZE + CJSON_PRINT_SAFETY_MARGIN] {};
+        if (!cJSON_PrintPreallocated(const_cast<cJSON*>(value), buffer, static_cast<int>(sizeof(buffer)), false)) {
+            return ProviderJsonSizeResult::INVALID_VALUE;
+        }
+        return Add(std::strlen(buffer));
+    }
+
+    ProviderJsonSizeResult CountArray(const cJSON* value)
+    {
+        auto result = Add(sizeof("[]") - 1);
+        for (auto* child = value->child; child && result == ProviderJsonSizeResult::SUCCESS; child = child->next) {
+            if (child != value->child) {
+                result = Add(sizeof(",") - 1);
+            }
+            if (result == ProviderJsonSizeResult::SUCCESS) {
+                result = Count(child);
+            }
+        }
+        return result;
+    }
+
+    ProviderJsonSizeResult CountObject(const cJSON* value)
+    {
+        auto result = Add(sizeof("{}") - 1);
+        for (auto* child = value->child; child && result == ProviderJsonSizeResult::SUCCESS; child = child->next) {
+            if (child != value->child) {
+                result = Add(sizeof(",") - 1);
+            }
+            if (result == ProviderJsonSizeResult::SUCCESS) {
+                result = CountString(child->string);
+            }
+            if (result == ProviderJsonSizeResult::SUCCESS) {
+                result = Add(sizeof(":") - 1);
+            }
+            if (result == ProviderJsonSizeResult::SUCCESS) {
+                result = Count(child);
+            }
+        }
+        return result;
+    }
+
+    const size_t limit_;
+    size_t size_ = 0;
+};
+
 ThirdProviderExportStatus ChargeJsonBytes(const JsonValue& json, size_t& bytes)
 {
     if (bytes > MAX_PROVIDER_BYTES) {
         return ThirdProviderExportStatus::SIZE_LIMIT;
     }
-    char* data = nullptr;
-    size_t size = 0;
-    const auto status = WriteJsonBounded(json, false, MAX_PROVIDER_BYTES - bytes, &data, &size);
-    std::free(data);
-    if (status != JsonWriteResult::SUCCESS) {
-        return status == JsonWriteResult::TOO_LARGE ? ThirdProviderExportStatus::SIZE_LIMIT :
+    ProviderJsonCounter counter(MAX_PROVIDER_BYTES - bytes);
+    const auto status = counter.Count(json.GetJsonObject());
+    if (status != ProviderJsonSizeResult::SUCCESS) {
+        return status == ProviderJsonSizeResult::TOO_LARGE ? ThirdProviderExportStatus::SIZE_LIMIT :
             ThirdProviderExportStatus::COLLECTION_FAILED;
     }
-    bytes += size;
+    bytes += counter.Size();
     return ThirdProviderExportStatus::SUCCESS;
 }
 
@@ -358,9 +581,9 @@ struct TreeBuildState {
         return true;
     }
 
-    bool Charge(const JsonValue& node)
+    bool Charge(const ProviderJson& node)
     {
-        if (ChargeJsonBytes(node, bytes) != ThirdProviderExportStatus::SUCCESS) {
+        if (node.HasError() || ChargeJsonBytes(node.Value(), bytes) != ThirdProviderExportStatus::SUCCESS) {
             failed = true;
             return false;
         }
@@ -368,7 +591,7 @@ struct TreeBuildState {
     }
 };
 
-std::unique_ptr<JsonValue> BuildSubtree(size_t index, size_t depth, const std::vector<ProviderElementInfo>& infos,
+std::unique_ptr<ProviderJson> BuildSubtree(size_t index, size_t depth, const std::vector<ProviderElementInfo>& infos,
     const ChildrenIndex& children, const RectTransform& transform, TreeBuildState& state)
 {
     const auto id = infos[index].GetElementId();
@@ -388,7 +611,7 @@ std::unique_ptr<JsonValue> BuildSubtree(size_t index, size_t depth, const std::v
     if (it == children.end()) {
         return node;
     }
-    auto array = JsonUtil::CreateArray(true);
+    auto array = ProviderJson::CreateArray();
     bool hasChildren = false;
     for (const auto childIndex : it->second) {
         auto child = BuildSubtree(childIndex, depth + 1, infos, children, transform, state);
@@ -400,8 +623,7 @@ std::unique_ptr<JsonValue> BuildSubtree(size_t index, size_t depth, const std::v
             if (!state.Charge(extra)) {
                 return nullptr;
             }
-            // Transfer the complete subtree using the exported unique_ptr overload;
-            // do not copy all descendants again at each ancestor.
+            // Transfer the complete subtree without copying descendants.
             if (!array->PutRef(std::move(child))) {
                 state.failed = true;
                 return nullptr;
@@ -418,14 +640,14 @@ std::unique_ptr<JsonValue> BuildSubtree(size_t index, size_t depth, const std::v
     return node;
 }
 
-std::unique_ptr<JsonValue> ElementToFlatJson(const ProviderElementInfo& info, const RectTransform& transform)
+std::unique_ptr<ProviderJson> ElementToFlatJson(const ProviderElementInfo& info, const RectTransform& transform)
 {
-    auto node = JsonUtil::Create(true);
+    auto node = ProviderJson::Create();
     node->Put("elementId", std::to_string(info.GetElementId()).c_str());
     node->Put("parentId", std::to_string(info.GetParentId()).c_str());
-    auto ids = JsonUtil::CreateArray(true);
+    auto ids = ProviderJson::CreateArray();
     for (const auto id : info.GetChildNodeIds()) {
-        auto value = JsonUtil::ParseJsonString("\"" + std::to_string(id) + "\"");
+        auto value = ProviderJson::CreateString(std::to_string(id));
         ids->PutRef(std::move(value));
     }
     node->PutRef("childNodeIds", std::move(ids));
@@ -453,13 +675,13 @@ std::unique_ptr<JsonValue> ElementToFlatJson(const ProviderElementInfo& info, co
     node->Put("zIndex", info.GetZIndex());
     node->Put("opacity", static_cast<double>(info.GetOpacity()));
     const auto rect = info.GetScreenRect();
-    auto screen = JsonUtil::Create(true);
+    auto screen = ProviderJson::Create();
     screen->Put("leftTopX", rect.leftTopX);
     screen->Put("leftTopY", rect.leftTopY);
     screen->Put("rightBottomX", rect.rightBottomX);
     screen->Put("rightBottomY", rect.rightBottomY);
     node->PutRef("screenRect", std::move(screen));
-    node->Put("$rect", FormatRect(rect, transform).c_str());
+    PutRect(*node, rect, transform);
     node->PutRef("rangeInfo", RangeToJson(info.GetRangeInfo()));
     node->PutRef("gridInfo", GridToJson(info.GetGridInfo()));
     node->PutRef("gridItemInfo", GridItemToJson(info.GetGridItemInfo()));
@@ -556,10 +778,9 @@ std::shared_ptr<JsonValue> ThirdProviderTreeExporter::ExportToInspectorJson(
             children[infos[i].GetParentId()].push_back(i);
         }
     }
-    JsonWriteErrorScope errors;
     TreeBuildState state;
     auto tree = BuildSubtree(root, 1, infos, children, transform, state);
-    if (state.failed || errors.HasError()) {
+    if (state.failed || !tree || tree->HasError()) {
         TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY, "Third provider tree exceeded size limit or collection failed");
         return nullptr;
     }
@@ -568,7 +789,7 @@ std::shared_ptr<JsonValue> ThirdProviderTreeExporter::ExportToInspectorJson(
     if (state.visited.size() != infos.size()) {
         TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY, "Third provider omitted duplicate or unreachable nodes");
     }
-    return std::shared_ptr<JsonValue>(std::move(tree));
+    return std::shared_ptr<JsonValue>(tree->TakeValue());
 }
 
 ThirdProviderTreeExportResult ThirdProviderTreeExporter::ExportFlatToInspectorJson(
@@ -600,13 +821,12 @@ ThirdProviderTreeExportResult ThirdProviderTreeExporter::ExportFlatToInspectorJs
     if (!GetTransform(host, transform)) {
         return { ThirdProviderExportStatus::COLLECTION_FAILED, nullptr };
     }
-    JsonWriteErrorScope errors;
     // Commit the request budget only after every node succeeds. Charge each node
     // before attaching it, including array brackets and separators exactly once.
     auto next = budget;
     next.bytes += ARRAY_BYTES;
-    std::shared_ptr<JsonValue> nodes = JsonUtil::CreateArray(true);
-    if (errors.HasError()) {
+    auto nodes = ProviderJson::CreateArray();
+    if (nodes->HasError()) {
         return { ThirdProviderExportStatus::COLLECTION_FAILED, nullptr };
     }
     bool hasNodes = false;
@@ -621,10 +841,10 @@ ThirdProviderTreeExportResult ThirdProviderTreeExporter::ExportFlatToInspectorJs
             return { ThirdProviderExportStatus::SIZE_LIMIT, nullptr };
         }
         auto node = ElementToFlatJson(info, transform);
-        if (errors.HasError()) {
+        if (node->HasError()) {
             return { ThirdProviderExportStatus::COLLECTION_FAILED, nullptr };
         }
-        status = ChargeJsonBytes(*node, next.bytes);
+        status = ChargeJsonBytes(node->Value(), next.bytes);
         if (status != ThirdProviderExportStatus::SUCCESS) {
             return { status, nullptr };
         }
@@ -635,7 +855,7 @@ ThirdProviderTreeExportResult ThirdProviderTreeExporter::ExportFlatToInspectorJs
         hasNodes = true;
     }
     budget = next;
-    return { ThirdProviderExportStatus::SUCCESS, nodes };
+    return { ThirdProviderExportStatus::SUCCESS, std::shared_ptr<JsonValue>(nodes->TakeValue()) };
 }
 
 ThirdProviderExportStatus ThirdProviderTreeExporter::AccumulateInspectorTree(

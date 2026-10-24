@@ -40,7 +40,6 @@ build_component_ng("xcomponent_pattern_ng") {
     "xcomponent_pattern_v2.cpp",
     "xcomponent_resolution_config.cpp",
     "xcomponent_utils.cpp",
-    "$ace_root/frameworks/core/accessibility/third_provider_tree_exporter.cpp",
   ]
 
   ark_sources = [

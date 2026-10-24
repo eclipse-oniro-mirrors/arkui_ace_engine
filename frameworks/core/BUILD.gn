@@ -383,6 +383,12 @@ template("ace_core_source_set") {
     ]
 
     external_deps = []
+    # The third-party exporter owns its checked JSON builder.
+    if (is_arkui_x) {
+      deps += [ "//third_party/cJSON:cjson_static" ]
+    } else {
+      external_deps += [ "cJSON:cjson" ]
+    }
     if (!ace_engine_feature_enable_event_extra_handling) {
       sources += [ "event/event_info_convertor.cpp" ]
     }
@@ -1062,6 +1068,12 @@ template("ace_core_ng_source_set") {
     }
 
     external_deps = []
+    # The third-party exporter owns its checked JSON builder.
+    if (is_arkui_x) {
+      deps += [ "//third_party/cJSON:cjson_static" ]
+    } else {
+      external_deps += [ "cJSON:cjson" ]
+    }
     if (defined(ffrt_support) && ffrt_support) {
       defines += [ "FFRT_SUPPORT" ]
       external_deps += [ "ffrt:libffrt" ]
