@@ -1728,9 +1728,6 @@ void FrameNode::MergeAttributesIntoJson(std::shared_ptr<JsonValue>& json, const 
 void FrameNode::DumpSimplifyInfoOnlyForParamConfig(std::shared_ptr<JsonValue>& json, ParamConfig config)
 {
     CHECK_NULL_VOID(json);
-    if (config.inspectorContext && config.withCustomContent) {
-        config.withThirdProvider = false;
-    }
     DumpSimplifyCommonInfoOnlyForParamConfig(json, config);
     if (pattern_) {
         auto child = JsonUtil::CreateSharedPtrJson();

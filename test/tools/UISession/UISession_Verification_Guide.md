@@ -358,7 +358,7 @@ hdc shell hidumper -s 16666 -a "GetCurrentAbilityLanguageInfo"
 
 ## InspectorTree 信息扩展验证
 
-输入工程见 [inspector_tree_sample/README.md](./inspector_tree_sample/README.md)。先建立 SA 连接，再分别执行 `GetInspectorTree` 与 `GetVisibleInspectorTree`。两个入口均支持 `--interactionInfo true --accessibilityInfo true --withResponseRegion true --withThirdProvider true --caseId native_fields -tofile`；`--withXComponent true` 保留为第三方通路的兼容开关，与 withThirdProvider 取 OR。cacheNodes/withWeb/withUIExtension/rectCulling/minOpacity/timeout 命名参数及 Visible 位置参数继续支持。正文只落盘，日志仅记录配置、同步返回、耗时、字节数及回调次数。
+输入工程见 [inspector_tree_sample/README.md](./inspector_tree_sample/README.md)。先建立 SA 连接，再分别执行 `GetInspectorTree` 与 `GetVisibleInspectorTree`。两个入口均支持 `--interactionInfo true --accessibilityInfo true --withResponseRegion true --withCustomContent true --caseId native_fields -tofile`。cacheNodes/withWeb/withUIExtension/rectCulling/minOpacity/timeout 命名参数及 Visible 位置参数继续支持。正文只落盘，日志仅记录配置、同步返回、耗时、字节数及回调次数。
 
 从 `/data/service/el1/public/ui_sa/` 拉取实际回调文件后运行：
 

@@ -29,12 +29,10 @@ class InspectorTreeTask01 : public testing::Test {};
 TEST_F(InspectorTreeTask01, DefaultAndLegacyConstructorDisableNewCapabilities)
 {
     GetInspectorTreeConfigImpl defaults;
-    EXPECT_FALSE(defaults.GetConfig().withThirdProvider);
     EXPECT_FALSE(defaults.GetConfig().withResponseRegion);
     EXPECT_FALSE(defaults.GetConfig().withCustomContent);
     EXPECT_TRUE(defaults.GetConfig().cacheNodes);
     GetInspectorTreeConfigImpl legacy(true, true, false, true, true, true, 0.5f);
-    EXPECT_FALSE(legacy.GetConfig().withThirdProvider);
     EXPECT_FALSE(legacy.GetConfig().withResponseRegion);
     EXPECT_FALSE(legacy.GetConfig().withCustomContent);
     EXPECT_FLOAT_EQ(legacy.GetConfig().minOpacity, 0.5f);
@@ -42,26 +40,22 @@ TEST_F(InspectorTreeTask01, DefaultAndLegacyConstructorDisableNewCapabilities)
 
 TEST_F(InspectorTreeTask01, CopyPreservesIndependentCapabilitiesAndOriginalFields)
 {
-    for (bool thirdProvider : { false, true }) {
-        for (bool responseRegion : { false, true }) {
-            for (bool xComponent : { false, true }) {
-                ParamConfig config { true, true, false, true, true, true, 0.5f };
-                config.withThirdProvider = thirdProvider;
-                config.withResponseRegion = responseRegion;
-                config.withCustomContent = xComponent;
-                GetInspectorTreeConfigImpl value(config);
-                const auto actual = value.GetConfig();
-                EXPECT_TRUE(actual.interactionInfo);
-                EXPECT_TRUE(actual.accessibilityInfo);
-                EXPECT_FALSE(actual.cacheNodes);
-                EXPECT_TRUE(actual.withWeb);
-                EXPECT_TRUE(actual.withUIExtension);
-                EXPECT_TRUE(actual.rectCulling);
-                EXPECT_FLOAT_EQ(actual.minOpacity, 0.5f);
-                EXPECT_EQ(actual.withThirdProvider, thirdProvider);
-                EXPECT_EQ(actual.withResponseRegion, responseRegion);
-                EXPECT_EQ(actual.withCustomContent, xComponent);
-            }
+    for (bool responseRegion : { false, true }) {
+        for (bool xComponent : { false, true }) {
+            ParamConfig config { true, true, false, true, true, true, 0.5f };
+            config.withResponseRegion = responseRegion;
+            config.withCustomContent = xComponent;
+            GetInspectorTreeConfigImpl value(config);
+            const auto actual = value.GetConfig();
+            EXPECT_TRUE(actual.interactionInfo);
+            EXPECT_TRUE(actual.accessibilityInfo);
+            EXPECT_FALSE(actual.cacheNodes);
+            EXPECT_TRUE(actual.withWeb);
+            EXPECT_TRUE(actual.withUIExtension);
+            EXPECT_TRUE(actual.rectCulling);
+            EXPECT_FLOAT_EQ(actual.minOpacity, 0.5f);
+            EXPECT_EQ(actual.withResponseRegion, responseRegion);
+            EXPECT_EQ(actual.withCustomContent, xComponent);
         }
     }
 }
@@ -98,37 +92,33 @@ TEST_F(InspectorTreeTask01, BothEntrypointsRejectInvalidAccessAndInterfaceTokens
 #ifdef ACE_INSPECTOR_TREE_REAL_PARCEL_TEST
 TEST_F(InspectorTreeTask01, RealParcelRoundTripAllCombinations)
 {
-    for (bool thirdProvider : { false, true }) {
-        for (bool responseRegion : { false, true }) {
-            for (bool xComponent : { false, true }) {
-                ParamConfig config { true, true, false, true, true, true, 0.75f };
-                config.withThirdProvider = thirdProvider;
-                config.withResponseRegion = responseRegion;
-                config.withCustomContent = xComponent;
-                GetInspectorTreeConfigImpl original(config);
-                Parcel parcel;
-                ASSERT_TRUE(original.Marshalling(parcel));
-                std::unique_ptr<GetInspectorTreeConfigImpl> decoded(GetInspectorTreeConfigImpl::Unmarshalling(parcel));
-                ASSERT_NE(decoded, nullptr);
-                const auto actual = decoded->GetConfig();
-                EXPECT_TRUE(actual.interactionInfo);
-                EXPECT_TRUE(actual.accessibilityInfo);
-                EXPECT_FALSE(actual.cacheNodes);
-                EXPECT_TRUE(actual.withWeb);
-                EXPECT_TRUE(actual.withUIExtension);
-                EXPECT_TRUE(actual.rectCulling);
-                EXPECT_FLOAT_EQ(actual.minOpacity, 0.75f);
-                EXPECT_EQ(actual.withThirdProvider, thirdProvider);
-                EXPECT_EQ(actual.withResponseRegion, responseRegion);
-                EXPECT_EQ(actual.withCustomContent, xComponent);
-            }
+    for (bool responseRegion : { false, true }) {
+        for (bool xComponent : { false, true }) {
+            ParamConfig config { true, true, false, true, true, true, 0.75f };
+            config.withResponseRegion = responseRegion;
+            config.withCustomContent = xComponent;
+            GetInspectorTreeConfigImpl original(config);
+            Parcel parcel;
+            ASSERT_TRUE(original.Marshalling(parcel));
+            std::unique_ptr<GetInspectorTreeConfigImpl> decoded(GetInspectorTreeConfigImpl::Unmarshalling(parcel));
+            ASSERT_NE(decoded, nullptr);
+            const auto actual = decoded->GetConfig();
+            EXPECT_TRUE(actual.interactionInfo);
+            EXPECT_TRUE(actual.accessibilityInfo);
+            EXPECT_FALSE(actual.cacheNodes);
+            EXPECT_TRUE(actual.withWeb);
+            EXPECT_TRUE(actual.withUIExtension);
+            EXPECT_TRUE(actual.rectCulling);
+            EXPECT_FLOAT_EQ(actual.minOpacity, 0.75f);
+            EXPECT_EQ(actual.withResponseRegion, responseRegion);
+            EXPECT_EQ(actual.withCustomContent, xComponent);
         }
     }
 }
 
 TEST_F(InspectorTreeTask01, RealParcelRejectsEveryTruncatedField)
 {
-    for (size_t fields = 0; fields < 10; ++fields) {
+    for (size_t fields = 0; fields < 9; ++fields) {
         Parcel parcel;
         for (size_t i = 0; i < fields; ++i) {
             ASSERT_TRUE(i == 6 ? parcel.WriteFloat(0.5f) : parcel.WriteBool(true));
@@ -140,7 +130,7 @@ TEST_F(InspectorTreeTask01, RealParcelRejectsEveryTruncatedField)
 
 TEST_F(InspectorTreeTask01, RealParcelKeepsOriginalFieldOrder)
 {
-    GetInspectorTreeConfigImpl original(true, false, true, false, true, false, 0.25f, true, true, false);
+    GetInspectorTreeConfigImpl original(true, false, true, false, true, false, 0.25f, true, false);
     Parcel parcel;
     ASSERT_TRUE(original.Marshalling(parcel));
     for (bool expected : { true, false, true, false, true, false }) {
@@ -151,9 +141,6 @@ TEST_F(InspectorTreeTask01, RealParcelKeepsOriginalFieldOrder)
     float opacity = 0;
     ASSERT_TRUE(parcel.ReadFloat(opacity));
     EXPECT_FLOAT_EQ(opacity, 0.25f);
-    bool third = false;
-    ASSERT_TRUE(parcel.ReadBool(third));
-    EXPECT_TRUE(third);
     bool region = false;
     bool xComponent = true;
     ASSERT_TRUE(parcel.ReadBool(region));

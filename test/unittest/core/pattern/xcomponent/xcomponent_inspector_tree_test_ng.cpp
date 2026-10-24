@@ -168,6 +168,9 @@ protected:
 
 TEST_F(InspectorTreeTask05Provider, FlatOutputPreservesFieldsOrderAndLargeIds)
 {
+    input_.nodes[1].SetGridInfo({ 2, 3, 1 });
+    input_.nodes[1].AddOperationAction({ ARKUI_ACCESSIBILITY_NATIVE_ACTION_TYPE_CLICK, "" });
+    input_.nodes[1].AddOperationAction({ ARKUI_ACCESSIBILITY_NATIVE_ACTION_TYPE_LONG_CLICK, nullptr });
     auto host = Host(301);
     MockPipelineContext::SetCurrentWindowRect(Rect(100, 200, 800, 600));
     ParamConfig config;
@@ -192,11 +195,20 @@ TEST_F(InspectorTreeTask05Provider, FlatOutputPreservesFieldsOrderAndLargeIds)
     EXPECT_EQ(root->GetValue("screenRect")->GetInt("leftTopX"), 110);
     EXPECT_EQ(root->GetValue("screenRect")->GetInt("rightBottomY"), 250);
     EXPECT_FALSE(root->Contains("$children"));
+    EXPECT_EQ(root->GetObject("grid")->GetInt("rowCount"), 2);
+    EXPECT_TRUE(root->Contains("gridItem"));
+    auto actions = root->GetValue("operationActions");
+    ASSERT_EQ(actions->GetArraySize(), 2);
+    auto click = actions->GetArrayItem(0);
+    EXPECT_EQ(click->GetInt("actionType"), ARKUI_ACCESSIBILITY_NATIVE_ACTION_TYPE_CLICK);
+    EXPECT_TRUE(click->Contains("description"));
+    EXPECT_EQ(click->GetString("description"), "");
+    EXPECT_TRUE(actions->GetArrayItem(1)->GetValue("description")->IsNull());
     EXPECT_EQ(input_.calls, 1);
     EXPECT_EQ(input_.rootCalls, 1);
 }
 
-TEST_F(InspectorTreeTask05Provider, NewSwitchIsIndependentOfNativeAccessibilityAndLegacySwitch)
+TEST_F(InspectorTreeTask05Provider, CustomContentIsIndependentOfNativeAccessibility)
 {
     auto host = Host(302);
     for (bool enabled : { false, true }) {
@@ -263,6 +275,12 @@ TEST_F(InspectorTreeTask05Provider, DependencyRejectsDuplicateCycleAndMissingAnc
     EXPECT_EQ(Dump(host, config)->ToString(), R"({"errorMessage":"invalid provider data"})");
     input_.nodes = good;
     input_.nodes.front().SetParentId(9876);
+    EXPECT_EQ(Dump(host, config)->ToString(), R"({"errorMessage":"invalid provider data"})");
+    input_.nodes = good;
+    input_.nodes.back().SetParentId(PROVIDER_ROOT);
+    EXPECT_EQ(Dump(host, config)->ToString(), R"({"errorMessage":"invalid provider data"})");
+    input_.nodes = good;
+    input_.nodes.back().AddChildNodeId(9876);
     EXPECT_EQ(Dump(host, config)->ToString(), R"({"errorMessage":"invalid provider data"})");
     input_.rootFailed = true;
     EXPECT_EQ(Dump(host, config)->ToString(), R"({"errorMessage":"provider query failed"})");
@@ -381,11 +399,10 @@ TEST_F(InspectorTreeTask05Provider, NonInvertibleWindowScaleFailsTheWholeRequest
     }
 }
 
-TEST_F(InspectorTreeTask05Provider, CustomContentTakesPrecedenceOverLegacySubtreeCollection)
+TEST_F(InspectorTreeTask05Provider, CustomContentIsCollectedOncePerRequest)
 {
     auto host = Host(313);
     ParamConfig config;
-    config.withThirdProvider = true;
     config.withCustomContent = true;
     auto result = Dump(host, config);
     auto node = HostJson(result);
@@ -393,7 +410,7 @@ TEST_F(InspectorTreeTask05Provider, CustomContentTakesPrecedenceOverLegacySubtre
     EXPECT_FALSE(node->Contains(THIRD_PROVIDER_JSON_CHILDREN));
     EXPECT_EQ(input_.calls, 1);
     EXPECT_EQ(input_.rootCalls, 1);
-    EXPECT_TRUE(config.withThirdProvider);
+    EXPECT_TRUE(config.withCustomContent);
 }
 
 } // namespace OHOS::Ace::NG

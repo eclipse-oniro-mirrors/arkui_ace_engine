@@ -79,14 +79,13 @@ TEST_F(InspectorTreeTask01UIExtension, ForwardIndependentCapabilitiesInWireOrder
     for (bool responseRegion : { false, true }) {
         for (bool xComponent : { false, true }) {
             ParamConfig config { true, false, true, false, true, true, 0.25f };
-            config.withThirdProvider = !xComponent;
             config.withResponseRegion = responseRegion;
             config.withCustomContent = xComponent;
             auto json = JsonUtil::CreateSharedPtrJson();
             const auto previousCalls = session->calls;
             pattern->AddExtraInfoWithParamConfig(json, config);
             ASSERT_EQ(session->calls, previousCalls + 1);
-            ASSERT_GE(session->capturedParams.size(), 12u);
+            ASSERT_GE(session->capturedParams.size(), 11u);
             EXPECT_EQ(session->capturedParams[0], "-allInfoWithParamConfigTotal");
             EXPECT_EQ(session->capturedParams[2], "1");
             EXPECT_EQ(session->capturedParams[3], "0");
@@ -95,9 +94,8 @@ TEST_F(InspectorTreeTask01UIExtension, ForwardIndependentCapabilitiesInWireOrder
             EXPECT_EQ(session->capturedParams[6], "1");
             EXPECT_EQ(session->capturedParams[7], "1");
             EXPECT_EQ(session->capturedParams[8], std::to_string(0.25f));
-            EXPECT_EQ(session->capturedParams[9], config.withThirdProvider ? "1" : "0");
-            EXPECT_EQ(session->capturedParams[10], responseRegion ? "1" : "0");
-            EXPECT_EQ(session->capturedParams[11], xComponent ? "1" : "0");
+            EXPECT_EQ(session->capturedParams[9], responseRegion ? "1" : "0");
+            EXPECT_EQ(session->capturedParams[10], xComponent ? "1" : "0");
         }
     }
 }
