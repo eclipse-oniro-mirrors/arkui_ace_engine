@@ -48,6 +48,8 @@ constexpr int32_t PROVIDER_REQUEST_ID = 0;
 constexpr float OPACITY_TOLERANCE = 0.001f;
 // Capacity for the formatted "[left, top],[right,bottom]" rect text.
 constexpr size_t RECT_TEXT_BUFFER_SIZE = 256;
+// A rectangle is transformed through its four corners.
+constexpr size_t RECT_CORNER_COUNT = 4;
 using ProviderElementInfo = ArkUI_AccessibilityElementInfo;
 using NodeIndex = std::unordered_map<int64_t, size_t>;
 
@@ -151,7 +153,7 @@ struct RectTransform {
 
 std::string FormatRect(const ArkUI_AccessibleRect& rect, const RectTransform& transform)
 {
-    std::array<Point, 4> corners = {
+    std::array<Point, RECT_CORNER_COUNT> corners = {
         Point(rect.leftTopX, rect.leftTopY), Point(rect.rightBottomX, rect.leftTopY),
         Point(rect.rightBottomX, rect.rightBottomY), Point(rect.leftTopX, rect.rightBottomY),
     };
@@ -424,11 +426,11 @@ bool FitsElementText(const ProviderElementInfo& info, size_t remaining)
         }
     }
     for (const auto& action : info.GetOperationActions()) {
-        constexpr size_t MIN_ACTION_BYTES = sizeof("{\"action\":0}") - 1;
-        if (remaining < MIN_ACTION_BYTES) {
+        constexpr size_t minActionBytes = sizeof("{\"action\":0}") - 1;
+        if (remaining < minActionBytes) {
             return false;
         }
-        remaining -= MIN_ACTION_BYTES;
+        remaining -= minActionBytes;
         if (!FitsJsonText(action.description, remaining)) {
             return false;
         }
@@ -762,12 +764,12 @@ ThirdProviderExportStatus ChargeArray(const JsonValue& array, ThirdProviderTreeE
 ThirdProviderExportStatus AppendFlatNode(const ProviderElementInfo& info, const RectTransform& transform,
     ProviderJson& nodes, ThirdProviderTreeExportBudget& next, bool hasNodes)
 {
-    constexpr size_t SEPARATOR_BYTES = sizeof(",") - 1;
+    constexpr size_t separatorBytes = sizeof(",") - 1;
     if (hasNodes) {
-        if (next.bytes > MAX_PROVIDER_BYTES - SEPARATOR_BYTES) {
+        if (next.bytes > MAX_PROVIDER_BYTES - separatorBytes) {
             return ThirdProviderExportStatus::SIZE_LIMIT;
         }
-        next.bytes += SEPARATOR_BYTES;
+        next.bytes += separatorBytes;
     }
     if (!FitsElementText(info, MAX_PROVIDER_BYTES - next.bytes)) {
         return ThirdProviderExportStatus::SIZE_LIMIT;
@@ -858,8 +860,8 @@ ThirdProviderTreeExportResult ThirdProviderTreeExporter::ExportFlatToInspectorJs
     if (budget.nodes > MAX_PROVIDER_NODES || infos.size() > MAX_PROVIDER_NODES - budget.nodes) {
         return { ThirdProviderExportStatus::NODE_LIMIT, nullptr };
     }
-    constexpr size_t ARRAY_BYTES = sizeof("[]") - 1;
-    if (budget.bytes > MAX_PROVIDER_BYTES - ARRAY_BYTES) {
+    constexpr size_t arrayBytes = sizeof("[]") - 1;
+    if (budget.bytes > MAX_PROVIDER_BYTES - arrayBytes) {
         return { ThirdProviderExportStatus::SIZE_LIMIT, nullptr };
     }
     if (!infos.empty()) {
@@ -879,7 +881,7 @@ ThirdProviderTreeExportResult ThirdProviderTreeExporter::ExportFlatToInspectorJs
     // Commit the request budget only after every node succeeds. Charge each node
     // before attaching it, including array brackets and separators exactly once.
     auto next = budget;
-    next.bytes += ARRAY_BYTES;
+    next.bytes += arrayBytes;
     auto nodes = ProviderJson::CreateArray();
     if (nodes->HasError()) {
         return { ThirdProviderExportStatus::COLLECTION_FAILED, nullptr };
