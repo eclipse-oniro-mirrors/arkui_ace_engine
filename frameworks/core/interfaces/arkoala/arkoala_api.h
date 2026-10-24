@@ -10678,6 +10678,14 @@ struct ArkUIMultiThreadManagerAPI {
     void (*markNodeTreeNotFree)(ArkUINodeHandle node);
     ArkUI_Bool (*debugThreadSafeNodeEnabled)();
     void (*setNeedMarkNodeTreeFree)(ArkUI_Bool needMarkNodeTreeFree);
+    void* (*beginNodeTreeOperation)(ArkUINodeHandle* nodes, ArkUI_Int32 count, const char* apiName, void* snapshot);
+    void (*endNodeTreeOperation)(void* operation);
+    void (*setNodeTreeOperationCheckMode)(ArkUI_Int32 mode);
+    ArkUI_Bool (*isThreadSafeNodeScope)();
+    ArkUI_Bool (*isNeedMarkNodeTreeFree)();
+    void* (*captureNodeTreeOperationNodes)(ArkUINodeHandle* nodes, ArkUI_Int32 count);
+    ArkUI_Bool (*needsNodeTreeOperationCheck)();
+    void (*includeNodeTreeOperationResult)(void* operation, ArkUINodeHandle node);
 };
 
 struct ArkUIDialogAPI {

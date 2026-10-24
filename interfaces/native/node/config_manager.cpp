@@ -69,6 +69,13 @@ public:
         // UI-thread writes may overlap checks on worker threads. The mode publishes no other data.
         // Default resolution never overwrites the configured mode.
         configuredModes_[index].store(mode, std::memory_order_relaxed);
+        if (checkType == static_cast<int32_t>(CheckType::MULTI_THREAD)) {
+            const auto* full = GetFullImpl();
+            const auto* api = full && full->getMultiThreadManagerAPI ? full->getMultiThreadManagerAPI() : nullptr;
+            if (api && api->setNodeTreeOperationCheckMode) {
+                api->setNodeTreeOperationCheckMode(mode);
+            }
+        }
         return true;
     }
 
@@ -168,6 +175,7 @@ private:
         switch (type) {
             case CheckType::UI_THREAD:
             case CheckType::NODE_DISPOSED:
+            case CheckType::MULTI_THREAD:
                 return isDebug ? CheckMode::CRASH : CheckMode::DISABLED;
             default:
                 return CheckMode::DISABLED;

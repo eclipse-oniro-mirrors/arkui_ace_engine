@@ -158,13 +158,25 @@ typedef enum {
      * @since 26.2.0
      */
     OH_ARKUI_NATIVEMODULE_CHECK_TYPE_NODE_DISPOSED = 1,
+    /**
+     * @brief Reserved check for matching an attribute to its component type.
+     * @since 26.2.0
+     */
+    OH_ARKUI_NATIVEMODULE_CHECK_TYPE_ATTRIBUTE_MATCH = 2,
+    /**
+     * @brief Checks overlapping calls through the multi-thread node API on the same Free tree.
+     * LOG diagnoses and continues; CRASH diagnoses and terminates the application.
+     * @since 26.2.0
+     */
+    OH_ARKUI_NATIVEMODULE_CHECK_TYPE_MULTI_THREAD = 3,
 } OH_ArkUI_NativeModule_RuntimeCheckType;
 
 /**
  * @brief Defines the runtime check modes for ArkUI C APIs.
  *
  * Each check type can be independently configured to use DISABLED, LOG, or CRASH.
- * For {@link OH_ARKUI_NATIVEMODULE_CHECK_TYPE_NODE_DISPOSED}, the default mode depends on the application's
+ * For {@link OH_ARKUI_NATIVEMODULE_CHECK_TYPE_NODE_DISPOSED} and
+ * {@link OH_ARKUI_NATIVEMODULE_CHECK_TYPE_MULTI_THREAD}, the default mode depends on the application's
  * build type: debug builds default to {@link OH_ARKUI_NATIVEMODULE_CHECK_MODE_CRASH}, and release builds
  * default to {@link OH_ARKUI_NATIVEMODULE_CHECK_MODE_DISABLED}.
  * {@link OH_ARKUI_NATIVEMODULE_CHECK_TYPE_UI_THREAD} is reserved in this release and defaults to

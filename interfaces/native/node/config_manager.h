@@ -26,6 +26,8 @@ namespace OHOS::Ace::NodeModel {
 enum class CheckType : uint32_t {
     UI_THREAD = 0,
     NODE_DISPOSED = 1,
+    ATTRIBUTE_MATCH = 2,
+    MULTI_THREAD = 3,
     // Number of check types and the exclusive upper bound for configuration indices;
     // COUNT is not a configurable check type. Keep values contiguous from zero.
     // Append new types immediately before COUNT without changing existing values,

@@ -272,6 +272,9 @@ public:
         return children_;
     }
 
+    // Read-only snapshot for the Native API detector; does not invoke virtual GetChildren().
+    std::vector<RefPtr<UINode>> GetChildrenForNativeTreeCheck() const;
+
     RefPtr<UINode> GetLastChild() const;
 
     RefPtr<UINode> GetFirstChild() const;

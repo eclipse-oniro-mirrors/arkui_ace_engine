@@ -3899,4 +3899,16 @@ void CloseUITreeRequests(PipelineContext& pipeline)
     }
 }
 
+std::vector<RefPtr<UINode>> UINode::GetChildrenForNativeTreeCheck() const
+{
+    std::vector<RefPtr<UINode>> result(children_.begin(), children_.end());
+    for (const auto& entry : disappearingChildren_) {
+        result.push_back(std::get<0>(entry));
+    }
+    for (const auto& child : adoptedChildren_) {
+        result.push_back(child);
+    }
+    return result;
+}
+
 } // namespace OHOS::Ace::NG

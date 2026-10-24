@@ -15,10 +15,13 @@
 
 #include "core/interfaces/native/node/node_api_multi_thread.h"
 
+#include <vector>
+
 #include "base/error/error_code.h"
 #include "base/utils/system_properties.h"
 #include "core/common/multi_thread_build_manager.h"
 #include "core/components_ng/base/ui_node.h"
+#include "core/components_ng/base/native_node_tree_scope.h"
 
 namespace OHOS::Ace::NG {
 void SetIsThreadSafeNodeScope(ArkUI_Bool isThreadSafeNodeScope)
@@ -117,6 +120,31 @@ const ArkUIMultiThreadManagerAPI* GetMultiThreadManagerAPI()
         .markNodeTreeNotFree = MarkNodeTreeNotFree,
         .debugThreadSafeNodeEnabled = DebugThreadSafeNodeEnabled,
         .setNeedMarkNodeTreeFree = SetNeedMarkNodeTreeFree,
+        .beginNodeTreeOperation = [](
+            ArkUINodeHandle* nodes, ArkUI_Int32 count, const char* apiName, void* snapshot) -> void* {
+            const auto node = [nodes, count](int32_t index) -> UINode* {
+                return index < count ? reinterpret_cast<UINode*>(nodes[index]) : nullptr;
+            };
+            return new NativeNodeTreeScope({ node(0), node(1), node(2) }, apiName, snapshot);
+        },
+        .endNodeTreeOperation = [](void* operation) { delete static_cast<NativeNodeTreeScope*>(operation); },
+        .setNodeTreeOperationCheckMode = NativeNodeTreeScope::SetCheckMode,
+        .isThreadSafeNodeScope = []() -> ArkUI_Bool { return MultiThreadBuildManager::IsThreadSafeNodeScope(); },
+        .isNeedMarkNodeTreeFree = []() -> ArkUI_Bool { return MultiThreadBuildManager::IsNeedMarkNodeTreeFree(); },
+        .captureNodeTreeOperationNodes = [](ArkUINodeHandle* nodes, ArkUI_Int32 count) -> void* {
+            std::vector<UINode*> candidates;
+            candidates.reserve(count);
+            for (ArkUI_Int32 i = 0; i < count; ++i) {
+                candidates.push_back(reinterpret_cast<UINode*>(nodes[i]));
+            }
+            return NativeNodeTreeScope::CaptureNodes(candidates.data(), candidates.size());
+        },
+        .needsNodeTreeOperationCheck = []() -> ArkUI_Bool { return NativeNodeTreeScope::NeedsSynchronization(); },
+        .includeNodeTreeOperationResult = [](void* operation, ArkUINodeHandle node) {
+            if (operation) {
+                static_cast<NativeNodeTreeScope*>(operation)->IncludeNode(reinterpret_cast<UINode*>(node));
+            }
+        },
     };
     return &multiThreadImpl;
 }
