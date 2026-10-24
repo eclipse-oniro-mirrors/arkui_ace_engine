@@ -8148,13 +8148,9 @@ void NavigationPattern::AdjustNodeForStackSync(
             host ? host->GetId() : -1, preTop ? preTop->first.c_str() : "NA",
             curTop ? curTop->first.c_str() : "NA", forceSplitSuccess_, forceSplitUseNavBar_,
             forceSplitMgr->CanPushPageToPrimary());
-        LogPageLevelSplitStack("beforeStackSync", host, navigationStack_->GetAllNavDestinationNodes());
     }
     if (!forceSplitMgr->CanPushPageToPrimary()) {
         SwapNavDestinationAndProxyNode(false);
-        if (navigationStack_) {
-            LogPageLevelSplitStack("afterProxySwap", host, navigationStack_->GetAllNavDestinationNodes());
-        }
         return;
     }
     // Page-level policy takes precedence over the previous display state.
