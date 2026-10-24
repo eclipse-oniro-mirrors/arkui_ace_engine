@@ -375,7 +375,7 @@ HWTEST_F(TabBarTwoTestNg, SetEffectNodeOption003, TestSize.Level1)
     auto frameNodeSwipe = FrameNode::CreateFrameNode(V2::SWIPER_ETS_TAG, 1, pattern);
     auto frameNodeDivider = FrameNode::CreateFrameNode(V2::DIVIDER_ETS_TAG, 2, pattern);
     auto frameNodeTabBar = FrameNode::CreateFrameNode(V2::TAB_BAR_ETS_TAG, 3, pattern);
-    auto frameNodeEffect = FrameNode::CreateFrameNode(V2::EFFECT_COMPONENT_ETS_TAG, 4, pattern);
+    auto frameNodeEffect = FrameNode::CreateFrameNode(V2::EFFECT_COMPONENT_ETS_TAG, tabsNode->GetEffectId(), pattern);
     tabsNode->children_ = { frameNodeSwipe, frameNodeDivider, frameNodeTabBar, frameNodeEffect };
     auto effectNode = AceType::DynamicCast<FrameNode>(tabsNode->GetEffectNode());
     EXPECT_TRUE(effectNode);
