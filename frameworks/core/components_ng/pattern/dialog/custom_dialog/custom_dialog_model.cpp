@@ -14,6 +14,8 @@
  */
 #include "core/components_ng/pattern/dialog/custom_dialog/custom_dialog_model.h"
 
+#include "base/log/log_wrapper.h"
+
 #include "interfaces/native/node/dialog_model.h"
 
 #include "base/error/error_code.h"
@@ -247,7 +249,8 @@ void ParseDialogOnWillDismiss(DialogProperties& dialogProperties, ArkUIDialogHan
     dialogProperties.onWillDismiss = [controllerHandler](int32_t reason, int32_t instanceId) {
         CHECK_NULL_VOID(controllerHandler);
         CHECK_NULL_VOID(controllerHandler->onWillDismissCall);
-        (*(controllerHandler->onWillDismissCall))(reason);
+        LOG_CALLBACK("ArkUI_NativeDialogAPI_1.registerOnWillDismiss", controllerHandler->onWillDismissCall);
+        controllerHandler->onWillDismissCall(reason);
     };
 }
 
@@ -258,28 +261,41 @@ void ParseDialogLife(DialogProperties& dialogProperties, ArkUIDialogHandle contr
         dialogProperties.onWillAppear = [controllerHandler]() {
             CHECK_NULL_VOID(controllerHandler);
             CHECK_NULL_VOID(controllerHandler->onWillAppear);
-            (*(controllerHandler->onWillAppear))(controllerHandler->onWillAppearData);
+            LOG_CALLBACK(
+                "ArkUI_NativeDialogAPI_3.registerOnWillAppear / OH_ArkUI_CustomDialog_RegisterOnWillAppearCallback",
+                controllerHandler->onWillAppear);
+            controllerHandler->onWillAppear(controllerHandler->onWillAppearData);
         };
     }
     if (controllerHandler->onDidAppear) {
         dialogProperties.onDidAppear = [controllerHandler]() {
             CHECK_NULL_VOID(controllerHandler);
             CHECK_NULL_VOID(controllerHandler->onDidAppear);
-            (*(controllerHandler->onDidAppear))(controllerHandler->onDidAppearData);
+            LOG_CALLBACK(
+                "ArkUI_NativeDialogAPI_3.registerOnDidAppear / OH_ArkUI_CustomDialog_RegisterOnDidAppearCallback",
+                controllerHandler->onDidAppear);
+            controllerHandler->onDidAppear(controllerHandler->onDidAppearData);
         };
     }
     if (controllerHandler->onWillDisappear) {
         dialogProperties.onWillDisappear = [controllerHandler]() {
             CHECK_NULL_VOID(controllerHandler);
             CHECK_NULL_VOID(controllerHandler->onWillDisappear);
-            (*(controllerHandler->onWillDisappear))(controllerHandler->onWillDisappearData);
+            LOG_CALLBACK(
+                "ArkUI_NativeDialogAPI_3.registerOnWillDisappear / "
+                "OH_ArkUI_CustomDialog_RegisterOnWillDisappearCallback",
+                controllerHandler->onWillDisappear);
+            controllerHandler->onWillDisappear(controllerHandler->onWillDisappearData);
         };
     }
     if (controllerHandler->onDidDisappear) {
         dialogProperties.onDidDisappear = [controllerHandler]() {
             CHECK_NULL_VOID(controllerHandler);
             CHECK_NULL_VOID(controllerHandler->onDidDisappear);
-            (*(controllerHandler->onDidDisappear))(controllerHandler->onDidDisappearData);
+            LOG_CALLBACK(
+                "ArkUI_NativeDialogAPI_3.registerOnDidDisappear / OH_ArkUI_CustomDialog_RegisterOnDidDisappearCallback",
+                controllerHandler->onDidDisappear);
+            controllerHandler->onDidDisappear(controllerHandler->onDidDisappearData);
         };
     }
 }
@@ -446,7 +462,13 @@ void ParseDialogProperties(DialogProperties& dialogProperties, ArkUIDialogHandle
     if (controllerHandler->onWillDismissCallByNDK) {
         dialogProperties.onWillDismissCallByNDK = [controllerHandler](int32_t reason) {
             ArkUI_DialogDismissEvent event = { controllerHandler->userData, reason, false };
-            controllerHandler->onWillDismissCallByNDK(&event);
+            {
+                LOG_CALLBACK(
+                    "ArkUI_NativeDialogAPI_1.registerOnWillDismissWithUserData / "
+                    "OH_ArkUI_CustomDialog_RegisterOnWillDismissCallback",
+                    controllerHandler->onWillDismissCallByNDK);
+                controllerHandler->onWillDismissCallByNDK(&event);
+            }
             return event.BlockDismiss;
         };
     }
@@ -455,7 +477,10 @@ void ParseDialogProperties(DialogProperties& dialogProperties, ArkUIDialogHandle
         dialogProperties.onWillAppear = [controllerHandler]() {
             CHECK_NULL_VOID(controllerHandler);
             CHECK_NULL_VOID(controllerHandler->onWillAppear);
-            (*(controllerHandler->onWillAppear))(controllerHandler->userData);
+            LOG_CALLBACK(
+                "ArkUI_NativeDialogAPI_3.registerOnWillAppear / OH_ArkUI_CustomDialog_RegisterOnWillAppearCallback",
+                controllerHandler->onWillAppear);
+            controllerHandler->onWillAppear(controllerHandler->userData);
         };
     }
 
@@ -463,7 +488,10 @@ void ParseDialogProperties(DialogProperties& dialogProperties, ArkUIDialogHandle
         dialogProperties.onDidAppear = [controllerHandler]() {
             CHECK_NULL_VOID(controllerHandler);
             CHECK_NULL_VOID(controllerHandler->onDidAppear);
-            (*(controllerHandler->onDidAppear))(controllerHandler->userData);
+            LOG_CALLBACK(
+                "ArkUI_NativeDialogAPI_3.registerOnDidAppear / OH_ArkUI_CustomDialog_RegisterOnDidAppearCallback",
+                controllerHandler->onDidAppear);
+            controllerHandler->onDidAppear(controllerHandler->userData);
         };
     }
 
@@ -471,7 +499,11 @@ void ParseDialogProperties(DialogProperties& dialogProperties, ArkUIDialogHandle
         dialogProperties.onWillDisappear = [controllerHandler]() {
             CHECK_NULL_VOID(controllerHandler);
             CHECK_NULL_VOID(controllerHandler->onWillDisappear);
-            (*(controllerHandler->onWillDisappear))(controllerHandler->userData);
+            LOG_CALLBACK(
+                "ArkUI_NativeDialogAPI_3.registerOnWillDisappear / "
+                "OH_ArkUI_CustomDialog_RegisterOnWillDisappearCallback",
+                controllerHandler->onWillDisappear);
+            controllerHandler->onWillDisappear(controllerHandler->userData);
         };
     }
 
@@ -479,7 +511,10 @@ void ParseDialogProperties(DialogProperties& dialogProperties, ArkUIDialogHandle
         dialogProperties.onDidDisappear = [controllerHandler]() {
             CHECK_NULL_VOID(controllerHandler);
             CHECK_NULL_VOID(controllerHandler->onDidDisappear);
-            (*(controllerHandler->onDidDisappear))(controllerHandler->userData);
+            LOG_CALLBACK(
+                "ArkUI_NativeDialogAPI_3.registerOnDidDisappear / OH_ArkUI_CustomDialog_RegisterOnDidDisappearCallback",
+                controllerHandler->onDidDisappear);
+            controllerHandler->onDidDisappear(controllerHandler->userData);
         };
     }
 
@@ -907,6 +942,13 @@ ArkUI_Int32 RegisterOnDidDisappearDialog(
 ArkUI_Int32 OpenCustomDialog(ArkUIDialogHandle handle, void (*callback)(ArkUI_Int32 dialogId))
 {
     CHECK_NULL_RETURN_WITH_BACKEND_MESSAGE(handle, ERROR_CODE_PARAM_INVALID, "handle is null");
+    std::function<void(int32_t)> recordedCallback;
+    if (callback) {
+        recordedCallback = [callback](int32_t dialogId) {
+            LOG_CALLBACK("OH_ArkUI_CustomDialog_OpenDialog", callback);
+            callback(dialogId);
+        };
+    }
     g_dialogProperties.maskRect = std::nullopt;
     g_dialogProperties.borderRadius = std::nullopt;
     g_dialogProperties.width = std::nullopt;
@@ -916,12 +958,12 @@ ArkUI_Int32 OpenCustomDialog(ArkUIDialogHandle handle, void (*callback)(ArkUI_In
     auto promptDialogAttr = ParseDialogPropertiesFromProps(g_dialogProperties);
     if (SystemProperties::GetExtSurfaceEnabled() || !ContainerIsService()) {
         if (Container::IsCurrentUseNewPipeline()) {
-            openCustomDialogWithNewPipeline(std::move(callback));
+            openCustomDialogWithNewPipeline(std::move(recordedCallback));
         } else {
             LOGW("not support old pipeline");
         }
     } else if (SubwindowManager::GetInstance() != nullptr) {
-        SubwindowManager::GetInstance()->OpenCustomDialog(promptDialogAttr, std::move(callback));
+        SubwindowManager::GetInstance()->OpenCustomDialog(promptDialogAttr, std::move(recordedCallback));
     }
     return ERROR_CODE_NO_ERROR;
 }
@@ -972,6 +1014,13 @@ ArkUI_Int32 OpenCustomDialogWithErrorCallback(
 ArkUI_Int32 UpdateCustomDialog(ArkUIDialogHandle handle, void (*callback)(ArkUI_Int32 dialogId))
 {
     CHECK_NULL_RETURN_WITH_BACKEND_MESSAGE(handle, ERROR_CODE_PARAM_INVALID, "handle is null");
+    std::function<void(int32_t)> recordedCallback;
+    if (callback) {
+        recordedCallback = [callback](int32_t dialogId) {
+            LOG_CALLBACK("OH_ArkUI_CustomDialog_UpdateDialog", callback);
+            callback(dialogId);
+        };
+    }
     ParseDialogProperties(g_dialogProperties, handle);
     auto promptDialogAttr = ParseDialogPropertiesFromProps(g_dialogProperties);
     if (SystemProperties::GetExtSurfaceEnabled() || !ContainerIsService()) {
@@ -991,16 +1040,16 @@ ArkUI_Int32 UpdateCustomDialog(ArkUIDialogHandle handle, void (*callback)(ArkUI_
         CHECK_NULL_RETURN_WITH_BACKEND_MESSAGE(context, ERROR_CODE_PARAM_INVALID, "context is null");
         auto overlayManager = context->GetOverlayManager();
         context->GetTaskExecutor()->PostTask(
-            [node, callback, weak = WeakPtr<NG::OverlayManager>(overlayManager)]() mutable {
+            [node, recordedCallback, weak = WeakPtr<NG::OverlayManager>(overlayManager)]() mutable {
                 auto overlayManager = weak.Upgrade();
                 CHECK_NULL_VOID(overlayManager);
                 TAG_LOGI(AceLogTag::ACE_OVERLAY, "begin to update custom dialog.");
-                overlayManager->UpdateCustomDialogWithNode(node, g_dialogProperties, std::move(callback));
+                overlayManager->UpdateCustomDialogWithNode(node, g_dialogProperties, std::move(recordedCallback));
             },
             TaskExecutor::TaskType::UI, "ArkUIOverlayUpdateCustomDialog");
     } else if (SubwindowManager::GetInstance() != nullptr) {
         SubwindowManager::GetInstance()->UpdateCustomDialogNGWithNode(
-            g_dialogProperties.customCNode, promptDialogAttr, std::move(callback));
+            g_dialogProperties.customCNode, promptDialogAttr, std::move(recordedCallback));
     }
     return ERROR_CODE_NO_ERROR;
 }

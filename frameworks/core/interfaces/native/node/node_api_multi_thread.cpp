@@ -16,6 +16,7 @@
 #include "core/interfaces/native/node/node_api_multi_thread.h"
 
 #include "base/error/error_code.h"
+#include "base/log/log_wrapper.h"
 #include "base/utils/system_properties.h"
 #include "core/common/multi_thread_build_manager.h"
 #include "core/components_ng/base/ui_node.h"
@@ -62,12 +63,14 @@ int32_t PostAsyncUITask(ArkUI_Int32 contextId,
         if (asyncUITask == nullptr) {
             return;
         }
+        LOG_CALLBACK("OH_ArkUI_PostAsyncUITask:task", asyncUITask);
         asyncUITask(asyncUITaskData);
     };
     auto onFinishFunc = [asyncUITaskData, onFinish]() {
         if (onFinish == nullptr) {
             return;
         }
+        LOG_CALLBACK("OH_ArkUI_PostAsyncUITask:finish", onFinish);
         onFinish(asyncUITaskData);
     };
     if (!MultiThreadBuildManager::GetInstance().PostAsyncUITask(
@@ -83,6 +86,7 @@ int32_t PostUITask(ArkUI_Int32 contextId, void* taskData, void(*task)(void* task
         if (task == nullptr) {
             return;
         }
+        LOG_CALLBACK("OH_ArkUI_PostUITask", task);
         task(taskData);
     };
     if (!MultiThreadBuildManager::GetInstance().PostUITask(contextId, std::move(taskFunc))) {
@@ -97,6 +101,7 @@ int32_t PostUITaskAndWait(ArkUI_Int32 contextId, void* taskData, void(*task)(voi
         if (task == nullptr) {
             return;
         }
+        LOG_CALLBACK("OH_ArkUI_PostUITaskAndWait", task);
         task(taskData);
     };
     if (!MultiThreadBuildManager::GetInstance().PostUITaskAndWait(contextId, std::move(taskFunc))) {

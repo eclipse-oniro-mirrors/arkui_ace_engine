@@ -14,6 +14,8 @@
  */
 #include "core/components_ng/pattern/xcomponent/bridge/xcomponent_dynamic_modifier.h"
 
+#include "base/log/log_wrapper.h"
+
 #include "core/components_ng/pattern/xcomponent/xcomponent_model_ng.h"
 #ifdef XCOMPONENT_SUPPORTED
 #ifndef CROSS_PLATFORM
@@ -1569,6 +1571,7 @@ void StartImageAnalyzer(ArkUINodeHandle node, void* arkuiNode, void* userData, X
     CHECK_NULL_VOID(xcPattern);
     std::function<void(int32_t)> nativeAnalyzerCallback = [arkuiNode, userData, callback](int32_t statusCode) {
         if (callback) {
+            LOG_CALLBACK("OH_ArkUI_XComponent_StartImageAnalyzer", callback);
             callback(arkuiNode, statusCode, userData);
         }
     };

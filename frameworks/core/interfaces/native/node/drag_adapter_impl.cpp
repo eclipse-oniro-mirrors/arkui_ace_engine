@@ -14,6 +14,8 @@
  */
 #include "core/interfaces/native/node/drag_adapter_impl.h"
 
+#include "base/log/log_wrapper.h"
+
 #include "core/common/udmf/udmf_client.h"
 #include "core/components_ng/base/view_abstract.h"
 #include "core/components_ng/manager/drag_drop/drag_drop_func_wrapper.h"
@@ -80,6 +82,7 @@ ArkUI_Int32 StartDrag(ArkUIDragAction* dragAction)
         outInfo.status = status;
         outInfo.dragEvent = &dragEvent;
         CHECK_NULL_VOID(listener);
+        LOG_CALLBACK("OH_ArkUI_DragAction_RegisterStatusListener", listener);
         listener(&outInfo, userData);
     };
     internalDragAction->callback = callbacks;

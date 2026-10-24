@@ -14,6 +14,8 @@
  */
 #include "core/interfaces/native/node/node_list_item_modifier.h"
 
+#include "base/log/log_wrapper.h"
+
 #include "interfaces/native/node/list_option.h"
 
 #include "base/error/error_code.h"
@@ -22,6 +24,23 @@
 #include "core/components_ng/pattern/list/list_item_model_ng.h"
 
 namespace OHOS::Ace::NG {
+namespace {
+constexpr char ON_ACTION_SOURCE[] = "OH_ArkUI_ListItemSwipeActionItem_SetOnAction";
+constexpr char ON_ACTION_WITH_USER_DATA_SOURCE[] =
+    "OH_ArkUI_ListItemSwipeActionItem_SetOnActionWithUserData";
+constexpr char ON_ENTER_ACTION_AREA_SOURCE[] = "OH_ArkUI_ListItemSwipeActionItem_SetOnEnterActionArea";
+constexpr char ON_ENTER_ACTION_AREA_WITH_USER_DATA_SOURCE[] =
+    "OH_ArkUI_ListItemSwipeActionItem_SetOnEnterActionAreaWithUserData";
+constexpr char ON_EXIT_ACTION_AREA_SOURCE[] = "OH_ArkUI_ListItemSwipeActionItem_SetOnExitActionArea";
+constexpr char ON_EXIT_ACTION_AREA_WITH_USER_DATA_SOURCE[] =
+    "OH_ArkUI_ListItemSwipeActionItem_SetOnExitActionAreaWithUserData";
+constexpr char ON_STATE_CHANGE_SOURCE[] = "OH_ArkUI_ListItemSwipeActionItem_SetOnStateChange";
+constexpr char ON_STATE_CHANGE_WITH_USER_DATA_SOURCE[] =
+    "OH_ArkUI_ListItemSwipeActionItem_SetOnStateChangeWithUserData";
+constexpr char ON_OFFSET_CHANGE_SOURCE[] = "OH_ArkUI_ListItemSwipeActionOption_SetOnOffsetChange";
+constexpr char ON_OFFSET_CHANGE_WITH_USER_DATA_SOURCE[] =
+    "OH_ArkUI_ListItemSwipeActionOption_SetOnOffsetChangeWithUserData";
+} // namespace
 
 void SetOptionBuilder(FrameNode* frameNode, ArkUIListItemSwipeActionItemHandle item, bool isStart)
 {
@@ -31,6 +50,7 @@ void SetOptionBuilder(FrameNode* frameNode, ArkUIListItemSwipeActionItemHandle i
             if (item->onAction) {
                 using FuncType = void (*)(void*);
                 FuncType func = reinterpret_cast<FuncType>(item->onAction);
+                LOG_CALLBACK(item->onActionUserData ? ON_ACTION_WITH_USER_DATA_SOURCE : ON_ACTION_SOURCE, func);
                 func(item->onActionUserData);
             }
         };
@@ -38,6 +58,8 @@ void SetOptionBuilder(FrameNode* frameNode, ArkUIListItemSwipeActionItemHandle i
             if (item->onEnterActionArea) {
                 using FuncType = void (*)(void*);
                 FuncType func = reinterpret_cast<FuncType>(item->onEnterActionArea);
+                LOG_CALLBACK(item->onEnterActionAreaUserData ? ON_ENTER_ACTION_AREA_WITH_USER_DATA_SOURCE :
+                    ON_ENTER_ACTION_AREA_SOURCE, func);
                 func(item->onEnterActionAreaUserData);
             }
         };
@@ -45,6 +67,8 @@ void SetOptionBuilder(FrameNode* frameNode, ArkUIListItemSwipeActionItemHandle i
             if (item->onExitActionArea) {
                 using FuncType = void (*)(void*);
                 FuncType func = reinterpret_cast<FuncType>(item->onExitActionArea);
+                LOG_CALLBACK(item->onExitActionAreaUserData ? ON_EXIT_ACTION_AREA_WITH_USER_DATA_SOURCE :
+                    ON_EXIT_ACTION_AREA_SOURCE, func);
                 func(item->onExitActionAreaUserData);
             }
         };
@@ -52,6 +76,8 @@ void SetOptionBuilder(FrameNode* frameNode, ArkUIListItemSwipeActionItemHandle i
             if (item->onStateChange) {
                 using FuncType = float (*)(int32_t, void*);
                 FuncType func = reinterpret_cast<FuncType>(item->onStateChange);
+                LOG_CALLBACK(item->onStateChangeUserData ? ON_STATE_CHANGE_WITH_USER_DATA_SOURCE :
+                    ON_STATE_CHANGE_SOURCE, func);
                 func(static_cast<int32_t>(swipeActionState), item->onStateChangeUserData);
             }
         };
@@ -75,6 +101,7 @@ void SetListItemSwiperAction(ArkUINodeHandle node, ArkUIListItemSwipeActionOptio
         if (option->onOffsetChange) {
             using FuncType = float (*)(float, void*);
             FuncType func = reinterpret_cast<FuncType>(option->onOffsetChange);
+            LOG_CALLBACK(option->userData ? ON_OFFSET_CHANGE_WITH_USER_DATA_SOURCE : ON_OFFSET_CHANGE_SOURCE, func);
             func(static_cast<float>(offset), option->userData);
         }
     };

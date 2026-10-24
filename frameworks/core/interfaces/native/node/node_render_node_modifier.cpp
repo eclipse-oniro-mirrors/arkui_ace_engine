@@ -25,6 +25,7 @@
 #include "core/components_ng/render/adapter/rosen_render_context.h"
 
 #include "base/error/error_code.h"
+#include "base/log/log_wrapper.h"
 #include "base/memory/ace_type.h"
 #include "core/common/container.h"
 #include "core/components_ng/base/mixed_mount_registry.h"
@@ -1731,6 +1732,7 @@ ArkUI_Int32 SetModifierOnDraw(ArkUIRenderModifierHandle modifier, void* userData
         drawContext.canvas = reinterpret_cast<ArkUICanvasHandle>(&context.canvas);
         drawContext.width = context.width;
         drawContext.height = context.height;
+        LOG_CALLBACK("OH_ArkUI_RenderNodeUtils_SetContentModifierOnDraw", customRenderDrawFunc);
         customRenderDrawFunc(&drawContext, userData);
     };
     renderContentModifier->setDrawFunction(std::move(onContentDraw));
