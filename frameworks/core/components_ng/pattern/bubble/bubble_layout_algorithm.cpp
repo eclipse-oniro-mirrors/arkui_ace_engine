@@ -14,6 +14,7 @@
  */
 
 #include "core/components_ng/pattern/bubble/bubble_layout_algorithm.h"
+#include "core/components_ng/layout/overlay_safe_area_helper.h"
 #include "core/components_ng/manager/safe_area/safe_area_manager.h"
 
 #include <algorithm>
@@ -161,6 +162,43 @@ bool IsPositionInWindowBounds(const OffsetF& position, Placement placement, cons
         default:
             return true;
     }
+}
+
+// Derives per-edge safe area insets from the OverlaySafeAreaHelper result for main-window
+// bubbles (Func-04-02-01-Feat-07 ADR-1): avoidSafeArea supplies the own-window safe area and
+// avoidPopupFreeNav supplies the bindPopup free-navigation path; both are merged per edge by
+// interval union inside the Helper (ADR-4), replacing the legacy
+// max(safeArea.top_, floatButtonsHeight_) self-fetch. The base rect is resolved with the same
+// window attribution the Helper uses, so the per-edge shrinks are exact. Null node or missing
+// context yields zero insets (guarded locally, no crash).
+SafeAreaInsets DeriveInsetsFromHelper(const RefPtr<FrameNode>& frameNode)
+{
+    CHECK_NULL_RETURN(frameNode, SafeAreaInsets());
+    AvoidConfig config;
+    config.avoidSafeArea = true;
+    config.avoidPopupFreeNav = true;
+    // TYPE_POPUP is bubble's legacy subwindow type (also the ComputeDisplayableRect default);
+    // avoidDisplayLimit stays off because FitAvailableRect keeps its own display-limit
+    // pipeline (ADR-3, execution-plan deviation).
+    RectF displayable = OverlaySafeAreaHelper::ComputeDisplayableRect(frameNode, config,
+        static_cast<int32_t>(SubwindowType::TYPE_POPUP));
+    auto context = DialogManager::GetMainPipelineContext(frameNode);
+    CHECK_NULL_RETURN(context, SafeAreaInsets());
+    RectF base = context->GetRootRect();
+    float topShrink = std::max(0.0f, displayable.Top() - base.Top());
+    float bottomShrink = std::max(0.0f, base.Bottom() - displayable.Bottom());
+    float leftShrink = std::max(0.0f, displayable.Left() - base.Left());
+    float rightShrink = std::max(0.0f, base.Right() - displayable.Right());
+    SafeAreaInsets insets;
+    insets.top_ = SafeAreaInsets::Inset { .start = 0, .end = static_cast<uint32_t>(topShrink) };
+    insets.bottom_ = SafeAreaInsets::Inset {
+        .start = static_cast<uint32_t>(std::max(0.0f, base.Height() - bottomShrink)),
+        .end = static_cast<uint32_t>(base.Height()) };
+    insets.left_ = SafeAreaInsets::Inset { .start = 0, .end = static_cast<uint32_t>(leftShrink) };
+    insets.right_ = SafeAreaInsets::Inset {
+        .start = static_cast<uint32_t>(std::max(0.0f, base.Width() - rightShrink)),
+        .end = static_cast<uint32_t>(base.Width()) };
+    return insets;
 }
 } // namespace
 
@@ -313,7 +351,10 @@ void BubbleLayoutAlgorithm::UpdateBubbleMaxSize(
     auto childProp = child->GetLayoutProperty();
     CHECK_NULL_VOID(childProp);
     auto bubblePattern = bubbleNode->GetPattern<BubblePattern>();
-    if (bubblePattern) {
+    if (bubblePattern && showInSubWindow) {
+        // Free-navigation data for main-window bubbles now flows through the Helper's
+        // avoidPopupFreeNav dimension (Func-04-02-01-Feat-07 ADR-4); the subwindow branch
+        // keeps this legacy fetch as part of the preserved data source (ADR-3, OP-1).
         auto floatButtonsHeight = bubblePattern->GetWindowButtonRect(bubbleNode).Height();
         if (layoutProp->GetPositionOffset().value_or(OffsetF()).NonOffset()) {
             floatButtonsHeight_ = floatButtonsHeight;
@@ -591,10 +632,26 @@ SizeF BubbleLayoutAlgorithm::GetPopupMaxWidthAndHeight(bool showInSubWindow, con
     CHECK_NULL_RETURN(geometryNode, SizeF());
     auto width = geometryNode->GetMarginFrameSize().Width();
 
-    auto safeAreaInsets = OverlayManager::GetSafeAreaInsets(frameNode);
+    SafeAreaInsets safeAreaInsets;
+    if (showInSubWindow) {
+        // OP-1 (Func-04-02-01-Feat-07 ADR-3): subwindow bubbles keep the legacy main-window
+        // safe area source; migrate after upstream subwindow safe-area sync lands.
+        safeAreaInsets = OverlayManager::GetSafeAreaInsets(frameNode);
+    } else {
+        // Main-window bubbles source the displayable range from OverlaySafeAreaHelper
+        // (Func-04-02-01-Feat-07 ADR-1): avoidSafeArea + avoidPopupFreeNav are merged per
+        // edge by interval union inside the Helper, replacing the legacy
+        // max(safeArea.top_, floatButtonsHeight_) self-fetch (ADR-4).
+        safeAreaInsets = DeriveInsetsFromHelper(frameNode);
+    }
     // system safeArea(AvoidAreaType.TYPE_SYSTEM) only include status bar, the bottom is 0
     auto bottom = 0.0;
-    auto top = std::max(static_cast<float>(safeAreaInsets.top_.Length()), floatButtonsHeight_);
+    auto top = static_cast<float>(safeAreaInsets.top_.Length());
+    if (showInSubWindow) {
+        // Legacy free-navigation merge, subwindow branch only: the main-window branch is
+        // carried by the Helper's avoidPopupFreeNav union (ADR-4).
+        top = std::max(top, floatButtonsHeight_);
+    }
     auto maxHeight = windowGlobalRect.Height();
     if (showInSubWindow) {
         pipelineContext = frameNode->GetContextRefPtr();
@@ -898,8 +955,19 @@ void BubbleLayoutAlgorithm::InitProps(const RefPtr<BubbleLayoutProperty>& layout
     targetSecurity_ = HORIZON_SPACING_WITH_SCREEN.ConvertToPx();
     auto pipelineContext = PipelineContext::GetMainPipelineContext();
     CHECK_NULL_VOID(pipelineContext);
-    auto safeAreaInsets = OverlayManager::GetSafeAreaInsets(layoutWrapper->GetHostNode());
-    top_ = std::max(static_cast<float>(safeAreaInsets.top_.Length()), floatButtonsHeight_);
+    SafeAreaInsets safeAreaInsets;
+    if (showInSubWindow) {
+        // OP-1 (Func-04-02-01-Feat-07 ADR-3): subwindow bubbles keep the legacy main-window
+        // safe area source; migrate after upstream subwindow safe-area sync lands.
+        safeAreaInsets = OverlayManager::GetSafeAreaInsets(layoutWrapper->GetHostNode());
+        top_ = std::max(static_cast<float>(safeAreaInsets.top_.Length()), floatButtonsHeight_);
+    } else {
+        // Main-window bubbles source the displayable range from OverlaySafeAreaHelper
+        // (Func-04-02-01-Feat-07 ADR-1); the legacy max(safeArea.top_, floatButtonsHeight_)
+        // union is carried inside the Helper via avoidPopupFreeNav (ADR-4).
+        safeAreaInsets = DeriveInsetsFromHelper(layoutWrapper->GetHostNode());
+        top_ = static_cast<float>(safeAreaInsets.top_.Length());
+    }
     bottom_ = safeAreaInsets.bottom_.Length();
     UpdateDumpInfo();
     marginStart_ = (isTips_ ? TIPS_MARGIN_SPACE : MARGIN_SPACE + DRAW_EDGES_SPACE).ConvertToPx();
