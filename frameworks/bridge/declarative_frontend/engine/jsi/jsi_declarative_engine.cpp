@@ -2018,7 +2018,7 @@ bool JsiDeclarativeEngine::ExecuteCardAbc(const std::string& fileName, int64_t c
             }
         }
         {
-            if (!arkRuntime->ExecuteModuleBufferSecure(content.data(), content.size(), abcPath, true, nullptr)) {
+            if (!arkRuntime->ExecuteModuleBuffer(content.data(), content.size(), abcPath, true)) {
                 return false;
             }
         }
@@ -2223,7 +2223,7 @@ void JsiDeclarativeEngine::LoadJs(const std::string& url, const RefPtr<JsAcePage
                 LOGW("GetAssetContent \"%{public}s\" failed.", urlName.c_str());
                 return;
             }
-            if (!arkRuntime->ExecuteModuleBufferSecure(content.data(), content.size(), urlName, false, nullptr)) {
+            if (!arkRuntime->ExecuteModuleBuffer(content.data(), content.size(), urlName)) {
                 LOGW("EvaluateJsCode \"%{public}s\" failed.", urlName.c_str());
                 return;
             }
@@ -2250,7 +2250,7 @@ void JsiDeclarativeEngine::LoadPluginJsWithModule(std::string& urlName)
     if (!delegate->GetAssetContent("ets/modules.abc", content)) {
         return;
     }
-    if (!runtime->ExecuteModuleBufferSecure(content.data(), content.size(), pluginUrlName, true, nullptr)) {
+    if (!runtime->ExecuteModuleBuffer(content.data(), content.size(), pluginUrlName, true)) {
         return;
     }
 }
@@ -2326,7 +2326,7 @@ bool JsiDeclarativeEngine::LoadPageSource(
         if (!delegate->GetAssetContent("modules.abc", content)) {
             return false;
         }
-        if (!arkRuntime->ExecuteModuleBufferSecure(content.data(), content.size(), urlName.value(), false, nullptr)) {
+        if (!arkRuntime->ExecuteModuleBuffer(content.data(), content.size(), urlName.value())) {
             return false;
         }
         return true;

@@ -107,7 +107,7 @@ public:
     bool IsExecuteModuleInAbcFile(
         const std::string &bundleName, const std::string &moduleName, const std::string &ohmurl);
     bool IsStaticOrInvalidFile(const uint8_t *data, int32_t size);
-    bool ExecuteModuleBuffer(uint8_t *data, int32_t size, const std::string &filename, bool needUpdate = false);
+    bool ExecuteModuleBuffer(const uint8_t *data, int32_t size, const std::string &filename, bool needUpdate = false);
     bool ExecuteModuleBufferSecure(uint8_t *data, int32_t size, const std::string &filename,
         bool needUpdate = false, void *fileMapper = nullptr);
     void SetReleaseWorkerSafeMemFunc(ReleaseWorkerSafeMemFunc func);
