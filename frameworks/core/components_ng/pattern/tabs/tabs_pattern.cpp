@@ -132,7 +132,10 @@ void TabsPattern::OnAttachToFrameNode()
     auto tabTheme = host->GetTheme<TabTheme>(true);
     CHECK_NULL_VOID(tabTheme);
     host->GetRenderContext()->SetClipToFrame(!tabTheme->GetIsChangeFocusTextStyle());
-    // expand to navigation bar by default
+    // Expand to navigation bar by default (bottom-only, for bottom tab bar mode).
+    // SetCurrentBarDisplayMode() upgrades this to TOP + BOTTOM
+    // when the actual display mode resolves to SIDEBAR, and restores these
+    // bottom-only defaults when it resolves back to BOTTOMTABBAR.
     host->GetLayoutProperty()->UpdateSafeAreaExpandOpts(
         { .type = SAFE_AREA_TYPE_SYSTEM, .edges = SAFE_AREA_EDGE_BOTTOM });
 }
@@ -660,6 +663,22 @@ void TabsPattern::SetCurrentBarDisplayMode(TabBarDisplayMode mode)
     currentBarDisplayMode_ = mode;
     auto tabsNode = AceType::DynamicCast<TabsNode>(GetHost());
     CHECK_NULL_VOID(tabsNode);
+    // Adjust safe-area expansion on the host based on the actual
+    // display mode. Only SIDEBAR mode needs expansion into
+    // both top (status bar) and bottom (navigation bar) safe areas so that
+    // sidebar children (divider, header/bottom bar, mask nodes) can render
+    // into the safe areas — consistent with Navigation.
+    // BOTTOMTABBAR restores the bottom-only defaults from OnAttachToFrameNode.
+    auto property = tabsNode->GetLayoutProperty();
+    if (property) {
+        if (mode == TabBarDisplayMode::SIDEBAR) {
+            property->UpdateSafeAreaExpandOpts(
+                { .type = SAFE_AREA_TYPE_SYSTEM, .edges = SAFE_AREA_EDGE_TOP + SAFE_AREA_EDGE_BOTTOM });
+        } else {
+            property->UpdateSafeAreaExpandOpts(
+                { .type = SAFE_AREA_TYPE_SYSTEM, .edges = SAFE_AREA_EDGE_BOTTOM });
+        }
+    }
     auto swiperNode = AceType::DynamicCast<FrameNode>(tabsNode->GetTabs());
     CHECK_NULL_VOID(swiperNode);
     auto swiperPattern = swiperNode->GetPattern<SwiperPattern>();
@@ -2195,6 +2214,12 @@ RefPtr<FrameNode> TabsPattern::CreateSideBarNode()
     auto renderContext = sideBarNode->GetRenderContext();
     CHECK_NULL_RETURN(renderContext, nullptr);
     renderContext->UpdateClipEdge(true);
+    // Expand sidebar background/blur into status bar (top) and navigation bar (bottom).
+    auto sideBarLayoutProperty = sideBarNode->GetLayoutProperty();
+    if (sideBarLayoutProperty) {
+        sideBarLayoutProperty->UpdateSafeAreaExpandOpts(
+            { .type = SAFE_AREA_TYPE_SYSTEM, .edges = SAFE_AREA_EDGE_TOP + SAFE_AREA_EDGE_BOTTOM });
+    }
     return sideBarNode;
 }
 
@@ -2210,7 +2235,14 @@ RefPtr<FrameNode> TabsPattern::CreateSideBarDividerNode()
         static_cast<int32_t>(DEFAULT_DIVIDER_STROKE_WIDTH.Unit()));
     CHECK_NULL_RETURN(nodeModifiers->setDividerVertical, nullptr);
     nodeModifiers->setDividerVertical(arkUINodeHandle, true);
-    return Referenced::Claim<FrameNode>(reinterpret_cast<FrameNode*>(arkUINodeHandle));
+    auto dividerNode = Referenced::Claim<FrameNode>(reinterpret_cast<FrameNode*>(arkUINodeHandle));
+    CHECK_NULL_RETURN(dividerNode, nullptr);
+    auto dividerLayoutProperty = dividerNode->GetLayoutProperty();
+    CHECK_NULL_RETURN(dividerLayoutProperty, nullptr);
+    // Expand divider background/blur into status bar (top) and navigation bar (bottom).
+    dividerLayoutProperty->UpdateSafeAreaExpandOpts(
+        { .type = SAFE_AREA_TYPE_SYSTEM, .edges = SAFE_AREA_EDGE_TOP + SAFE_AREA_EDGE_BOTTOM });
+    return dividerNode;
 }
 
 void TabsPattern::UpdateSideBarIfNeeded()
@@ -2374,9 +2406,19 @@ void TabsPattern::UpdateSidebarDividerColor()
         }
     }
     if (hasColor) {
+        // The sidebar divider expands into the status bar and navigation bar via
+        // SafeAreaExpandOpts, which enlarges the RSNode Bounds but NOT the Line drawn
+        // by DividerPaintMethod (dividerLength_ stays at FrameRect height).
+        // To make the divider visually span the full expanded height, we follow the
+        // same approach as Navigation (navigation_model_ng.cpp:457-459): set the
+        // DividerColor (Line) to transparent and use BackgroundColor instead, since
+        // BackgroundColor fills the entire RSNode Bounds including the safe area.
         auto renderProp = sideBarDividerNode_->GetPaintProperty<DividerRenderProperty>();
         CHECK_NULL_VOID(renderProp);
-        renderProp->UpdateDividerColor(color);
+        renderProp->UpdateDividerColor(Color::TRANSPARENT);
+        auto renderContext = sideBarDividerNode_->GetRenderContext();
+        CHECK_NULL_VOID(renderContext);
+        renderContext->UpdateBackgroundColor(color);
     }
 }
 
@@ -2385,9 +2427,11 @@ void TabsPattern::UpdateSideBarDivider()
     CHECK_NULL_VOID(sideBarDividerNode_);
     auto divider = GetEffectiveSidebarDividerConfig();
     if (!divider.isNull) {
-        // Use DividerPattern's own properties for both line width and color,
-        // so DividerPaintMethod renders the full divider without needing RenderContext background.
-        // strokeWidth defaults to 0; only use the developer's value when it is positive and non-percent.
+        // strokeWidth controls the divider width. When strokeWidth is 0 the default
+        // DEFAULT_DIVIDER_STROKE_WIDTH set in CreateSideBarDividerNode is used.
+        // Color is handled by UpdateSidebarDividerColor() via RenderContext BackgroundColor
+        // (not DividerColor) so that it fills the entire safe-area-expanded Bounds.
+        // Only use the developer's value when it is positive and non-percent.
         auto dividerLayoutProp = sideBarDividerNode_->GetLayoutProperty<DividerLayoutProperty>();
         if (dividerLayoutProp) {
             Dimension effectiveStrokeWidth(0.0f);

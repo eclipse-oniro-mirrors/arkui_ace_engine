@@ -39,11 +39,11 @@
 
 namespace OHOS::Ace::NG {
 namespace {
-const Dimension DEFAULT_TAB_BAR_ITEM_HEIGHT = 56.0_vp;
 const Dimension SIDEBAR_TAB_ITEM_MARGIN = 8.0_vp;
 constexpr float SIDEBAR_TAB_MAX_FONT_SCALE = 2.0f;
 constexpr float SIDEBAR_TAB_FONT_SCALE_THRESHOLD_LEVEL8 = 1.75f;
 constexpr float SIDEBAR_TAB_FONT_SCALE_THRESHOLD_LEVEL10 = 2.0f;
+const Dimension SIDEBAR_TAB_ITEM_FOCUS_WIDTH = 2.0_vp;
 
 // Get vertical margin for text node based on font scale.
 // Default: padding_level4, >=1.75: padding_level8, >=2.0: padding_level10
@@ -300,14 +300,10 @@ void TabsSideBarTabListPattern::ApplySearchFilter(
     CHECK_NULL_VOID(tabsNode);
     auto swiperNode = AceType::DynamicCast<FrameNode>(tabsNode->GetTabs());
     CHECK_NULL_VOID(swiperNode);
-    auto tabContentNum = swiperNode->TotalChildCount();
     auto columnNode = GetTabItemContainerNode();
     CHECK_NULL_VOID(columnNode);
     auto children = columnNode->GetChildren();
     int32_t tabIndex = 0;
-    // Pre-compute searchText lowercase and UTF-8 conversion outside loop
-    auto searchTextLower = ToLowerU16Str(searchText);
-    auto searchText8 = UtfUtils::Str16ToStr8(searchText);
     for (auto it = children.begin(); it != children.end(); ++it, ++tabIndex) {
         auto itemNode = AceType::DynamicCast<FrameNode>(*it);
         CHECK_NULL_CONTINUE(itemNode);
@@ -318,26 +314,7 @@ void TabsSideBarTabListPattern::ApplySearchFilter(
             property->UpdateVisibility(VisibleType::GONE);
             continue;
         }
-        bool isVisible = true;
-        do {
-            if (searchText.empty()) {
-                break;
-            }
-            if (searchFilter) {
-                isVisible = searchFilter(tabIndex, searchText8);
-                break;
-            }
-            // Default: fuzzy match by tab text (Unicode-aware case-insensitive)
-            if (tabIndex >= tabContentNum) {
-                break;
-            }
-            auto tabContentNode = AceType::DynamicCast<FrameNode>(swiperNode->GetChildByIndex(tabIndex));
-            CHECK_NULL_BREAK(tabContentNode);
-            auto pattern = tabContentNode->GetPattern<TabContentPattern>();
-            CHECK_NULL_BREAK(pattern);
-            auto tabTextLower = ToLowerU16Str(UtfUtils::Str8ToStr16(pattern->GetTabBarParam().GetText()));
-            isVisible = tabTextLower.find(searchTextLower) != std::u16string::npos;
-        } while (false);
+        bool isVisible = !IsHiddenBySearchFilter(tabIndex);
         property->UpdateVisibility(isVisible ? VisibleType::VISIBLE : VisibleType::GONE);
     }
     host->MarkNeedSyncRenderTree();
@@ -701,15 +678,16 @@ RefPtr<FrameNode> TabsSideBarTabListPattern::GetOrCreateTabItemNode(int32_t id)
     buttonModifier->setBlendColor(
         nodeHandle, tabTheme->GetSideBarListItemPressedColor(), tabTheme->GetSideBarListItemHoverColor());
     buttonModifier->setFocusBorderColor(nodeHandle, tabTheme->GetSideBarListItemFocusColor());
-    buttonModifier->setFocusBorderWidth(nodeHandle, tabTheme->GetSideBarListItemFocusWidth());
+    buttonModifier->setFocusBorderWidth(nodeHandle, SIDEBAR_TAB_ITEM_FOCUS_WIDTH);
     buttonModifier->updateTypeToLayoutProp(nodeHandle, ButtonType::NORMAL);
     auto radius = tabTheme->GetSideBarListItemCornerRadius();
     buttonModifier->setButtonBorderRadius(nodeHandle, radius, radius, radius, radius);
     auto property = tabItemNode->GetLayoutProperty();
     CHECK_NULL_RETURN(property, nullptr);
-    // Width: 100% of parent; Height: match-content with minimum 56vp
+    // Width: 100% of parent; Height: match-content with minimum height
     property->UpdateUserDefinedIdealSize(CalcSize(CalcLength(1.0, DimensionUnit::PERCENT), std::nullopt));
-    property->UpdateCalcMinSize(CalcSize(std::nullopt, CalcLength(DEFAULT_TAB_BAR_ITEM_HEIGHT)));
+    auto itemHeight = tabTheme->GetSideBarListItemHeight();
+    property->UpdateCalcMinSize(CalcSize(std::nullopt, CalcLength(itemHeight)));
     property->UpdateLayoutPolicyProperty(LayoutCalPolicy::WRAP_CONTENT, false);
     return tabItemNode;
 }
@@ -728,6 +706,32 @@ bool TabsSideBarTabListPattern::IsHiddenByDefaultVisibility(int32_t tabIndex) co
     auto tabContentPattern = tabContentNode->GetPattern<TabContentPattern>();
     CHECK_NULL_RETURN(tabContentPattern, false);
     return tabContentPattern->GetDefaultVisibility().ShouldHide(TabBarDisplayMode::SIDEBAR);
+}
+
+bool TabsSideBarTabListPattern::IsHiddenBySearchFilter(int32_t tabIndex) const
+{
+    if (activeSearchText_.empty()) {
+        return false;
+    }
+    auto searchText8 = UtfUtils::Str16ToStr8(activeSearchText_);
+    if (activeSearchFilter_) {
+        return !activeSearchFilter_(tabIndex, searchText8);
+    }
+    // Default: fuzzy match by tab text (Unicode-aware case-insensitive)
+    auto tabsNode = AceType::DynamicCast<TabsNode>(tabsNode_.Upgrade());
+    CHECK_NULL_RETURN(tabsNode, false);
+    auto swiperNode = AceType::DynamicCast<FrameNode>(tabsNode->GetTabs());
+    CHECK_NULL_RETURN(swiperNode, false);
+    if (tabIndex >= swiperNode->TotalChildCount()) {
+        return false;
+    }
+    auto tabContentNode = AceType::DynamicCast<FrameNode>(swiperNode->GetChildByIndex(tabIndex));
+    CHECK_NULL_RETURN(tabContentNode, false);
+    auto tabContentPattern = tabContentNode->GetPattern<TabContentPattern>();
+    CHECK_NULL_RETURN(tabContentPattern, false);
+    auto searchTextLower = ToLowerU16Str(activeSearchText_);
+    auto tabTextLower = ToLowerU16Str(UtfUtils::Str8ToStr16(tabContentPattern->GetTabBarParam().GetText()));
+    return tabTextLower.find(searchTextLower) == std::u16string::npos;
 }
 
 void TabsSideBarTabListPattern::ApplyDefaultVisibility()
@@ -750,10 +754,6 @@ void TabsSideBarTabListPattern::ApplyDefaultVisibility()
     auto columnNode = GetTabItemContainerNode();
     CHECK_NULL_VOID(columnNode);
     auto children = columnNode->GetChildren();
-    // Pre-compute search state for cross-concern visibility coordination
-    bool hasActiveSearch = !activeSearchText_.empty();
-    auto searchTextLower = ToLowerU16Str(activeSearchText_);
-    auto searchText8 = UtfUtils::Str16ToStr8(activeSearchText_);
     int32_t tabIndex = 0;
     for (auto it = children.begin(); it != children.end(); ++it, ++tabIndex) {
         auto itemNode = AceType::DynamicCast<FrameNode>(*it);
@@ -768,26 +768,9 @@ void TabsSideBarTabListPattern::ApplyDefaultVisibility()
             property->UpdateVisibility(VisibleType::GONE);
             continue;
         }
-        // Neither defaultVisibility nor search hides this tab
-        if (!hasActiveSearch) {
-            property->UpdateVisibility(VisibleType::VISIBLE);
-            continue;
-        }
-        // defaultVisibility says visible — but check search filter too
-        bool searchVisible = true;
-        do {
-            if (activeSearchFilter_) {
-                searchVisible = activeSearchFilter_(tabIndex, searchText8);
-                break;
-            }
-            auto tabContentNode = AceType::DynamicCast<FrameNode>(swiperNode->GetChildByIndex(tabIndex));
-            CHECK_NULL_BREAK(tabContentNode);
-            auto tabContentPattern = tabContentNode->GetPattern<TabContentPattern>();
-            CHECK_NULL_BREAK(tabContentPattern);
-            auto tabTextLower = ToLowerU16Str(UtfUtils::Str8ToStr16(tabContentPattern->GetTabBarParam().GetText()));
-            searchVisible = tabTextLower.find(searchTextLower) != std::u16string::npos;
-        } while (false);
-        property->UpdateVisibility(searchVisible ? VisibleType::VISIBLE : VisibleType::GONE);
+        // defaultVisibility says visible — check search filter
+        bool isVisible = !IsHiddenBySearchFilter(tabIndex);
+        property->UpdateVisibility(isVisible ? VisibleType::VISIBLE : VisibleType::GONE);
     }
     host->MarkNeedSyncRenderTree();
     host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);

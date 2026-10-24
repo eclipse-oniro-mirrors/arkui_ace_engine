@@ -1990,10 +1990,15 @@ HWTEST_F(TabPatternTestNg, UpdateSideBarDividerTest002, TestSize.Level1)
     ASSERT_TRUE(strokeWidth.has_value());
     EXPECT_FLOAT_EQ(strokeWidth.value().Value(), 5.0f);
 
-    // Verify color is updated on DividerRenderProperty
+    // After UpdateSidebarDividerColor, DividerColor is set to TRANSPARENT and the
+    // actual color is applied via RenderContext BackgroundColor so that it fills
+    // the entire safe-area-expanded Bounds.
     auto dividerRenderProp = pattern_->sideBarDividerNode_->GetPaintProperty<DividerRenderProperty>();
     ASSERT_NE(dividerRenderProp, nullptr);
-    EXPECT_EQ(dividerRenderProp->GetDividerColor().value_or(Color::BLACK), Color::RED);
+    EXPECT_EQ(dividerRenderProp->GetDividerColor().value_or(Color::BLACK), Color::TRANSPARENT);
+    auto dividerRenderContext = pattern_->sideBarDividerNode_->GetRenderContext();
+    ASSERT_NE(dividerRenderContext, nullptr);
+    EXPECT_EQ(dividerRenderContext->GetBackgroundColor().value_or(Color::BLACK), Color::RED);
 }
 
 /**
