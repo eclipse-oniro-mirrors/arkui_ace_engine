@@ -26,15 +26,14 @@
 namespace OHOS::Ace::NG {
 class UINode;
 
-// API-entry snapshots retain all exposed members of an operated tree until the
-// outermost public call returns. No UINode mutation or lifecycle hooks are used.
+// Owner IDs live on announced roots; real parent links are walked on each lookup.
+// There is no root-address cache. UINode original methods remain unchanged.
 class ACE_FORCE_EXPORT NativeNodeTreeScope final {
 public:
-    // Takes ownership of the optional snapshot returned by CaptureNodes().
-    NativeNodeTreeScope(std::initializer_list<UINode*> nodes, const char* apiName, void* snapshot = nullptr);
+    NativeNodeTreeScope(std::initializer_list<UINode*> nodes, const char* apiName);
     ~NativeNodeTreeScope();
-    static void* CaptureNodes(UINode* const* nodes, size_t count);
     void IncludeNode(UINode* node);
+    void PrepareChildren(UINode* parent);
     static void SetCheckMode(int32_t mode);
     static bool IsCheckEnabled();
     static bool NeedsSynchronization();
@@ -42,7 +41,7 @@ public:
 private:
     struct Context;
     struct Preparation;
-    void Enter(std::initializer_list<UINode*> nodes, Preparation& preparation);
+    static void Report(Preparation& preparation);
     Context* context_ = nullptr;
     const char* apiName_ = nullptr;
     bool outermost_ = false;

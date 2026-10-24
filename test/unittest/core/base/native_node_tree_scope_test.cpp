@@ -33,32 +33,13 @@ constexpr int32_t DISABLED = 0;
 constexpr int32_t LOG = 1;
 constexpr int32_t CRASH = 2;
 constexpr auto TIMEOUT = std::chrono::seconds(3);
-std::mutex g_publishedMutex;
-std::vector<WeakPtr<UINode>> g_published;
-
-void* CapturePublishedNodes()
-{
-    if (!NativeNodeTreeScope::NeedsSynchronization()) {
-        return nullptr;
-    }
-    std::lock_guard<std::mutex> lock(g_publishedMutex);
-    std::vector<RefPtr<UINode>> pins;
-    std::vector<UINode*> nodes;
-    for (const auto& weak : g_published) {
-        if (auto node = weak.Upgrade()) {
-            nodes.push_back(node.GetRawPtr());
-            pins.push_back(std::move(node));
-        }
-    }
-    return NativeNodeTreeScope::CaptureNodes(nodes.data(), nodes.size());
-}
-
-// Models the Native bridge's already-published handle snapshot, including cached nodes.
+// Models the public API boundary: only operands and explicitly prepared roots.
 class PublicCall {
 public:
     PublicCall(std::initializer_list<UINode*> nodes, const char* apiName)
-        : scope_(nodes, apiName, CapturePublishedNodes()) {}
+        : scope_(nodes, apiName) {}
     void IncludeNode(UINode* node) { scope_.IncludeNode(node); }
+    void PrepareChildren(UINode* parent) { scope_.PrepareChildren(parent); }
 private:
     NativeNodeTreeScope scope_;
 };
@@ -88,10 +69,6 @@ RefPtr<NativeTreeTestNode> MakeNode()
     auto node = AceType::MakeRefPtr<NativeTreeTestNode>(nextId.fetch_add(1));
     node->RegisterReleaseFunc(false);
     node->SetIsFree(true);
-    {
-        std::lock_guard<std::mutex> lock(g_publishedMutex);
-        g_published.emplace_back(node);
-    }
     return node;
 }
 
@@ -206,7 +183,10 @@ TEST_F(NativeNodeTreeScopeTest, SplitChildRemainsClaimedBeforeOuterReturn)
     child->AddChild(descendant);
     EXPECT_DEATH({
         PublicCall outer({ parent.GetRawPtr() }, "outer");
-        parent->RemoveChild(child);
+        {
+            PublicCall remove({ parent.GetRawPtr(), child.GetRawPtr() }, "removeChild");
+            parent->RemoveChild(child);
+        }
         std::thread contender([&] { PublicCall call({ descendant.GetRawPtr() }, "split.before"); });
         contender.join();
     }, "MULTI_THREAD");
@@ -324,7 +304,10 @@ TEST_F(NativeNodeTreeScopeTest, DisableDrainsAnExistingScopeAndTracksItsSplits)
     {
         PublicCall outer({ parent.GetRawPtr() }, "outer");
         NativeNodeTreeScope::SetCheckMode(DISABLED);
-        parent->RemoveChild(child);
+        {
+            PublicCall remove({ parent.GetRawPtr(), child.GetRawPtr() }, "removeChild");
+            parent->RemoveChild(child);
+        }
         EXPECT_TRUE(NativeNodeTreeScope::NeedsSynchronization());
         WithOwner(child.GetRawPtr(), [&] {});
         NativeNodeTreeScope::SetCheckMode(CRASH);
@@ -355,12 +338,15 @@ TEST_F(NativeNodeTreeScopeTest, LogPrimaryMayFinishBeforeContender)
     NativeNodeTreeScope::SetCheckMode(LOG);
     Gate gate;
     auto primary = std::make_unique<PublicCall>(std::initializer_list<UINode*> { node.GetRawPtr() }, "primary");
+    const auto primaryId = node->GetNativeTreeOperationThreadId();
     std::thread contender([&] {
         PublicCall call({ node.GetRawPtr() }, "contender");
         gate.SignalAndWait();
     });
     EXPECT_TRUE(gate.Wait());
     primary.reset();
+    EXPECT_NE(node->GetNativeTreeOperationThreadId(), 0u);
+    EXPECT_NE(node->GetNativeTreeOperationThreadId(), primaryId);
     NativeNodeTreeScope::SetCheckMode(CRASH);
     EXPECT_DEATH({ PublicCall call({ node.GetRawPtr() }, "contender.still.active"); }, "MULTI_THREAD");
     NativeNodeTreeScope::SetCheckMode(DISABLED);
@@ -445,7 +431,7 @@ TEST_F(NativeNodeTreeScopeTest, ReturnedChildExtendsAnExistingSnapshot)
     }, "MULTI_THREAD");
 }
 
-TEST_F(NativeNodeTreeScopeTest, UnrelatedPublishedNodesAreNotRetainedForTheWholeCall)
+TEST_F(NativeNodeTreeScopeTest, UnrelatedNodesAreNotRetainedForTheWholeCall)
 {
     auto parent = MakeNode();
     auto unrelated = MakeNode();
@@ -474,6 +460,145 @@ TEST_F(NativeNodeTreeScopeTest, LogMergeKeepsBothInputSnapshotsAfterOneCallerRet
     EXPECT_DEATH({ PublicCall call({ parent.GetRawPtr() }, "merged.still.owned"); }, "MULTI_THREAD");
     gate.Finish();
     first.join();
+}
+
+TEST_F(NativeNodeTreeScopeTest, RemoveAllPreparesEveryDirectSubtreeBeforeDetaching)
+{
+    auto parent = MakeNode();
+    auto first = MakeNode();
+    auto second = MakeNode();
+    auto descendant = MakeNode();
+    parent->AddChild(first);
+    parent->AddChild(second);
+    second->AddChild(descendant);
+    EXPECT_DEATH({
+        PublicCall clear({ parent.GetRawPtr() }, "removeAllChildren");
+        clear.PrepareChildren(parent.GetRawPtr());
+        parent->RemoveChild(first);
+        parent->RemoveChild(second);
+        std::thread worker([&] { PublicCall call({ descendant.GetRawPtr() }, "detached.descendant"); });
+        worker.join();
+    }, "MULTI_THREAD");
+}
+
+TEST_F(NativeNodeTreeScopeTest, RemoveAllRootsCanTransferAfterOutermostReturn)
+{
+    auto parent = MakeNode();
+    auto first = MakeNode();
+    auto second = MakeNode();
+    parent->AddChild(first);
+    parent->AddChild(second);
+    {
+        PublicCall clear({ parent.GetRawPtr() }, "removeAllChildren");
+        clear.PrepareChildren(parent.GetRawPtr());
+        parent->RemoveChild(first);
+        parent->RemoveChild(second);
+    }
+    WithOwner(first.GetRawPtr(), [&] { PublicCall call({ second.GetRawPtr() }, "independent"); });
+}
+
+TEST_F(NativeNodeTreeScopeTest, RootLookupStopsBeforeAnOperandWhoseParentIsChanging)
+{
+    auto first = MakeNode();
+    auto second = MakeNode();
+    auto child = MakeNode();
+    auto descendant = MakeNode();
+    first->AddChild(child);
+    child->AddChild(descendant);
+    EXPECT_DEATH({
+        Gate gate;
+        std::atomic<bool> stop { false };
+        std::thread mover([&] {
+            PublicCall move({ first.GetRawPtr(), second.GetRawPtr(), child.GetRawPtr() }, "move");
+            {
+                std::lock_guard<std::mutex> lock(gate.mutex);
+                gate.ready = true;
+                gate.cv.notify_all();
+            }
+            while (!stop.load()) {
+                child->SetParent(AceType::WeakClaim(first.GetRawPtr()));
+                child->SetParent(AceType::WeakClaim(second.GetRawPtr()));
+            }
+        });
+        if (!gate.Wait()) { std::_Exit(2); }
+        // child.parent_ is really being rewritten; the descendant lookup must
+        // stop at the pre-announced child root before reading that link.
+        { PublicCall call({ descendant.GetRawPtr() }, "descendant.lookup"); }
+        stop.store(true);
+        mover.join();
+    }, "MULTI_THREAD");
+}
+
+TEST_F(NativeNodeTreeScopeTest, LogLookupCanRunWhileAnAnnouncedRootChangesParent)
+{
+    auto first = MakeNode();
+    auto second = MakeNode();
+    auto child = MakeNode();
+    auto descendant = MakeNode();
+    first->AddChild(child);
+    child->AddChild(descendant);
+    NativeNodeTreeScope::SetCheckMode(LOG);
+    Gate gate;
+    std::atomic<bool> stop { false };
+    std::thread mover([&] {
+        PublicCall move({ first.GetRawPtr(), second.GetRawPtr(), child.GetRawPtr() }, "move");
+        {
+            std::lock_guard<std::mutex> lock(gate.mutex);
+            gate.ready = true;
+            gate.cv.notify_all();
+        }
+        while (!stop.load()) {
+            child->SetParent(AceType::WeakClaim(first.GetRawPtr()));
+            child->SetParent(AceType::WeakClaim(second.GetRawPtr()));
+        }
+    });
+    const bool ready = gate.Wait();
+    EXPECT_TRUE(ready);
+    if (ready) {
+        for (int i = 0; i < 32; ++i) {
+            PublicCall call({ descendant.GetRawPtr() }, "lookup.while.reparenting");
+        }
+    }
+    stop.store(true);
+    mover.join();
+}
+
+TEST_F(NativeNodeTreeScopeTest, OwnerIdsLiveOnAnnouncedNodesAndClearAtOutermostExit)
+{
+    auto parent = MakeNode();
+    auto child = MakeNode();
+    auto untouched = MakeNode();
+    parent->AddChild(child);
+    EXPECT_EQ(parent->GetNativeTreeOperationThreadId(), 0u);
+    EXPECT_EQ(child->GetNativeTreeOperationThreadId(), 0u);
+    {
+        PublicCall outer({ parent.GetRawPtr() }, "outer");
+        const auto owner = parent->GetNativeTreeOperationThreadId();
+        EXPECT_NE(owner, 0u);
+        EXPECT_EQ(untouched->GetNativeTreeOperationThreadId(), 0u);
+        { PublicCall inner({ child.GetRawPtr() }, "inner"); }
+        EXPECT_EQ(child->GetNativeTreeOperationThreadId(), owner);
+    }
+    EXPECT_EQ(parent->GetNativeTreeOperationThreadId(), 0u);
+    EXPECT_EQ(child->GetNativeTreeOperationThreadId(), 0u);
+}
+
+TEST_F(NativeNodeTreeScopeTest, OwnMarkedSubtreeDoesNotReplaceWalkingTheActualParentChain)
+{
+    auto parent = MakeNode();
+    auto child = MakeNode();
+    auto descendant = MakeNode();
+    child->AddChild(descendant);
+    {
+        PublicCall outer({ child.GetRawPtr() }, "outer");
+        const auto owner = child->GetNativeTreeOperationThreadId();
+        parent->AddChild(child);
+        EXPECT_EQ(parent->GetNativeTreeOperationThreadId(), 0u);
+        { PublicCall lookup({ descendant.GetRawPtr() }, "walk.actual.parents"); }
+        // A cached child-root lookup would have stopped at child and missed parent.
+        EXPECT_EQ(parent->GetNativeTreeOperationThreadId(), owner);
+    }
+    EXPECT_EQ(parent->GetNativeTreeOperationThreadId(), 0u);
 }
 
 } // namespace OHOS::Ace::NG

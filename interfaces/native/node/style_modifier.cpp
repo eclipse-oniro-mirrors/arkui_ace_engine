@@ -297,8 +297,6 @@ constexpr float ARC_ALPHABET_DEFAULT_ITEM_SIZE = 24.0f;
 constexpr const char* ARC_ALPHABET_DEFAULT_FONT_FAMILY = "HarmonyOS Sans";
 constexpr int32_t ARC_SWIPER_MASK_COLOR_SIZE = 10;
 constexpr int32_t ARC_SWIPER_DEFAULT_DURATION = 400;
-constexpr int32_t CALENDAR_PICKER_FIRST_DAY_OF_WEEK_MIN = 0;
-constexpr int32_t CALENDAR_PICKER_FIRST_DAY_OF_WEEK_MAX = 7;
 const std::string EMPTY_STR = "";
 const std::vector<std::string> ACCESSIBILITY_LEVEL_VECTOR = { "auto", "yes", "no", "no-hide-descendants" };
 std::map<std::string, int32_t> ACCESSIBILITY_LEVEL_MAP = { { "auto", 0 }, { "yes", 1 }, { "no", 2 },
@@ -17132,9 +17130,7 @@ void ResetCalendarPickerMarkToday(ArkUI_NodeHandle node)
 
 int32_t SetCalendarPickerFirstDayOfWeek(ArkUI_NodeHandle node, const ArkUI_AttributeItem* item)
 {
-    if (item->size == 0 ||
-        item->value[0].i32 < CALENDAR_PICKER_FIRST_DAY_OF_WEEK_MIN ||
-        item->value[0].i32 > CALENDAR_PICKER_FIRST_DAY_OF_WEEK_MAX) {
+    if (item->size == 0) {
         return ERROR_CODE_PARAM_INVALID;
     }
 

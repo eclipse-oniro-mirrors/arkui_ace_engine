@@ -15,11 +15,11 @@
 
 #include "core/components_ng/base/native_node_tree_scope.h"
 
+#include <algorithm>
 #include <atomic>
 #include <memory>
 #include <mutex>
 #include <string>
-#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -76,260 +76,172 @@ void EmitConflict(const Conflict& conflict)
 } // namespace
 
 struct NativeNodeTreeScope::Preparation {
-    std::vector<RefPtr<UINode>> candidates;
-    std::vector<RefPtr<UINode>> temporaries;
     std::vector<Conflict> conflicts;
+    // Temporary references are destroyed after releasing the protocol lock.
+    std::vector<RefPtr<UINode>> nodes;
 };
 
 struct NativeNodeTreeScope::Context {
     struct State {
         uint64_t id;
-        std::vector<RefPtr<UINode>> members;
-        std::unordered_set<Context*> owners;
-    };
-    struct Registry {
-        uint64_t nextId = 1;
-        // Only members of currently claimed snapshots are indexed. There is no
-        // persistent node registration or assumption that a root stays a root.
-        std::unordered_map<const UINode*, std::shared_ptr<State>> members;
-    };
-    struct Location {
-        std::shared_ptr<State> state;
-        RefPtr<UINode> root;
-        std::vector<RefPtr<UINode>> path;
+        uint64_t threadId;
+        std::vector<RefPtr<UINode>> roots;
     };
 
-    static Registry& GetRegistry()
+    static std::vector<Context*>& ActiveContexts()
     {
-        static Registry registry;
-        return registry;
+        static std::vector<Context*> contexts;
+        return contexts;
     }
 
-    static Location Locate(UINode* node, Preparation& preparation)
+    static uint64_t NextStateId()
     {
-        Location result;
-        std::unordered_set<const UINode*> visited;
-        auto* current = node;
-        while (current && visited.insert(current).second) {
-            auto found = GetRegistry().members.find(current);
-            if (found != GetRegistry().members.end()) {
-                // Do not read a claimed node's mutable parent link. Its owner
-                // may currently be splitting or merging the business tree.
-                result.state = found->second;
-                return result;
-            }
-            if (current->RefCount() == 0) {
-                return result;
-            }
-            auto pin = AceType::Claim(current);
-            preparation.temporaries.push_back(pin);
-            result.path.push_back(pin);
-            auto parent = pin->GetParent();
-            if (!parent) {
-                parent = pin->GetAdoptParent();
-            }
-            if (!parent) {
-                result.root = pin;
-                return result;
-            }
-            preparation.temporaries.push_back(parent);
-            current = parent.GetRawPtr();
-        }
-        return result;
+        static uint64_t nextId = 1;
+        return nextId++;
     }
 
-    static void AddMember(const std::shared_ptr<State>& state, const RefPtr<UINode>& node)
+    // Ownership bookkeeping only. This is called after reading a nonzero owner
+    // from the node; it never supplies a cached parent/root for traversal.
+    static std::shared_ptr<State> FindClaim(const UINode* root)
     {
-        if (GetRegistry().members.emplace(node.GetRawPtr(), state).second) {
-            state->members.push_back(node);
-        }
-    }
-
-    static void CaptureChildren(const std::shared_ptr<State>& state, const RefPtr<UINode>& root,
-        Preparation& preparation)
-    {
-        std::vector<RefPtr<UINode>> pending { root };
-        std::unordered_set<const UINode*> visited;
-        while (!pending.empty()) {
-            auto node = pending.back();
-            pending.pop_back();
-            if (!node || !visited.insert(node.GetRawPtr()).second) {
-                continue;
-            }
-            auto found = GetRegistry().members.find(node.GetRawPtr());
-            if (found != GetRegistry().members.end() && found->second != state) {
-                continue;
-            }
-            AddMember(state, node);
-            for (auto& child : node->GetChildrenForNativeTreeCheck()) {
-                if (!child) {
+        std::unordered_set<const State*> visited;
+        for (const auto* context : ActiveContexts()) {
+            for (const auto& state : context->states) {
+                if (!visited.insert(state.get()).second) {
                     continue;
                 }
-                preparation.temporaries.push_back(child);
-                // A disappearing list can retain a child already detached from
-                // this tree. Never treat list membership alone as a parent link.
-                auto existing = GetRegistry().members.find(child.GetRawPtr());
-                if (existing != GetRegistry().members.end()) {
-                    if (existing->second == state) {
-                        pending.push_back(child);
+                for (const auto& claimed : state->roots) {
+                    if (claimed.GetRawPtr() == root) {
+                        return state;
                     }
-                    continue;
-                }
-                auto parent = child->GetParent();
-                if (!parent) {
-                    parent = child->GetAdoptParent();
-                }
-                if (parent.GetRawPtr() == node.GetRawPtr()) {
-                    pending.push_back(child);
-                }
-                if (parent) {
-                    preparation.temporaries.push_back(std::move(parent));
                 }
             }
         }
-    }
-
-    static std::shared_ptr<State> Resolve(UINode* node, Preparation& preparation)
-    {
-        auto location = Locate(node, preparation);
-        auto state = location.state;
-        const bool fresh = !state && location.root;
-        if (fresh) {
-            state = std::make_shared<State>(State { GetRegistry().nextId++, {}, {} });
-        }
-        if (!state) {
-            return nullptr;
-        }
-        for (const auto& member : location.path) {
-            AddMember(state, member);
-        }
-        if (!fresh) {
-            return state;
-        }
-        CaptureChildren(state, location.root, preparation);
-        // Published Native handles also cover cached nodes whose real parent
-        // link survives removal from the ordinary/disappearing child lists.
-        for (const auto& candidate : preparation.candidates) {
-            if (GetRegistry().members.count(candidate.GetRawPtr()) != 0) {
-                continue;
-            }
-            auto cached = Locate(candidate.GetRawPtr(), preparation);
-            if (cached.state != state) {
-                continue;
-            }
-            for (const auto& member : cached.path) {
-                AddMember(state, member);
-                CaptureChildren(state, member, preparation);
-            }
-        }
-        return state;
+        return nullptr;
     }
 
     void Claim(const std::shared_ptr<State>& state)
     {
-        if (state->owners.insert(this).second) {
+        if (std::find(states.begin(), states.end(), state) == states.end()) {
             states.push_back(state);
         }
     }
 
-    void Acquire(std::initializer_list<UINode*> nodes, const char* apiName, Preparation& preparation)
+    static void MarkRoot(const std::shared_ptr<State>& state, const RefPtr<UINode>& node)
     {
-        const auto mode = GetCheckMode();
-        std::unordered_set<const State*> checked;
-        std::vector<std::shared_ptr<State>> requested;
-        for (auto* node : nodes) {
-            auto state = Resolve(node, preparation);
-            if (!state || !checked.insert(state.get()).second) {
-                continue;
-            }
-            for (const auto* owner : state->owners) {
-                if (mode != CHECK_DISABLED && owner->threadId != threadId) {
-                    preparation.conflicts.push_back({ apiName ? apiName : "Unknown", node->GetId(), state->id,
-                        owner->threadId, mode });
-                    break;
+        if (node->GetNativeTreeOperationThreadId() == 0) {
+            state->roots.push_back(node);
+            node->SetNativeTreeOperationThreadId(state->threadId);
+        }
+    }
+
+    std::shared_ptr<State> WalkParents(UINode* node, const char* apiName, Preparation& preparation,
+        std::unordered_set<const State*>& reported)
+    {
+        if (!node || node->RefCount() == 0) {
+            return nullptr;
+        }
+        auto current = AceType::Claim(node);
+        std::unordered_set<const UINode*> visited;
+        while (visited.insert(current.GetRawPtr()).second) {
+            pins.push_back(current);
+            std::shared_ptr<State> claimed;
+            const auto primaryOwner = current->GetNativeTreeOperationThreadId();
+            if (primaryOwner != 0) {
+                claimed = FindClaim(current.GetRawPtr());
+                if (!claimed) {
+                    LOGF_ABORT("MULTI_THREAD: node owner has no active operation claim");
+                }
+                if (claimed->threadId != threadId) {
+                    if (GetCheckMode() != CHECK_DISABLED && reported.insert(claimed.get()).second) {
+                        preparation.conflicts.push_back({ apiName ? apiName : "Unknown", node->GetId(),
+                            claimed->id, claimed->threadId, GetCheckMode() });
+                    }
+                    // A foreign operation may be rewriting this exact link.
+                    // CRASH terminates before business; LOG continues business
+                    // without making an unsafe parent read just for diagnosis.
+                    return nullptr;
                 }
             }
-            requested.push_back(std::move(state));
-        }
-        // A multi-node call may join its input trees. LOG keeps every existing
-        // owner on the complete input set until that owner's outer call ends.
-        std::unordered_set<Context*> owners { this };
-        for (const auto& state : requested) {
-            owners.insert(state->owners.begin(), state->owners.end());
-        }
-        for (auto* owner : owners) {
-            for (const auto& state : requested) {
-                owner->Claim(state);
+            // Always traverse real links, including roots marked by this thread.
+            // An existing claim is not a root-finding cache or an early success.
+            auto parent = current->GetParent();
+            if (!parent) {
+                parent = current->GetAdoptParent();
             }
+            if (!parent) {
+                if (!claimed) {
+                    claimed = std::make_shared<State>(State { NextStateId(), threadId, {} });
+                    Claim(claimed);
+                    MarkRoot(claimed, current);
+                }
+                return claimed;
+            }
+            current = std::move(parent);
+        }
+        return nullptr;
+    }
+
+    void Acquire(const std::vector<UINode*>& nodes, const char* apiName, Preparation& preparation)
+    {
+        std::unordered_set<const State*> reported;
+        for (auto* node : nodes) {
+            auto state = WalkParents(node, apiName, preparation, reported);
+            if (!state) {
+                continue;
+            }
+            // A newly announced operand/detach root joins the current domain.
+            Claim(state);
+            MarkRoot(state, AceType::Claim(node));
         }
     }
 
     void Release()
     {
-        auto& members = GetRegistry().members;
         for (const auto& state : states) {
-            state->owners.erase(this);
-            if (!state->owners.empty()) {
-                continue;
-            }
-            for (const auto& node : state->members) {
-                members.erase(node.GetRawPtr());
+            for (const auto& root : state->roots) {
+                root->SetNativeTreeOperationThreadId(0);
             }
         }
+        auto& active = ActiveContexts();
+        active.erase(std::remove(active.begin(), active.end(), this), active.end());
     }
 
     static thread_local Context* current;
     const uint64_t threadId = THREAD_ID;
     std::vector<std::shared_ptr<State>> states;
+    std::vector<RefPtr<UINode>> pins;
 };
 
 thread_local NativeNodeTreeScope::Context* NativeNodeTreeScope::Context::current = nullptr;
 
-void* NativeNodeTreeScope::CaptureNodes(UINode* const* nodes, size_t count)
+NativeNodeTreeScope::NativeNodeTreeScope(std::initializer_list<UINode*> nodes, const char* apiName) : apiName_(apiName)
 {
-    auto snapshot = std::make_unique<Preparation>();
-    snapshot->candidates.reserve(count);
-    for (size_t i = 0; i < count; ++i) {
-        if (nodes[i] && nodes[i]->RefCount() != 0) {
-            snapshot->candidates.emplace_back(AceType::Claim(nodes[i]));
-        }
-    }
-    return snapshot.release();
-}
-
-NativeNodeTreeScope::NativeNodeTreeScope(
-    std::initializer_list<UINode*> nodes, const char* apiName, void* snapshot) : apiName_(apiName)
-{
-    std::unique_ptr<Preparation> preparation(static_cast<Preparation*>(snapshot));
     if (!IsCheckEnabled() && !Context::current) {
         return;
     }
-    if (!preparation) {
-        preparation = std::make_unique<Preparation>();
-    }
-    Enter(nodes, *preparation);
-    // Preparation, including unrelated candidates, is released outside all
-    // protocol/Native-handle locks. Only the claimed tree members stay pinned.
-}
-
-void NativeNodeTreeScope::Enter(std::initializer_list<UINode*> nodes, Preparation& preparation)
-{
+    Preparation preparation;
     {
         std::lock_guard<std::recursive_mutex> lock(GetTreeMutex());
+        context_ = Context::current;
         if (!context_) {
-            context_ = Context::current;
-            if (!context_) {
-                if (!IsCheckEnabled()) {
-                    return;
-                }
-                context_ = new Context;
-                Context::current = context_;
-                outermost_ = true;
-                g_activeCalls.fetch_add(1, std::memory_order_release);
+            if (!IsCheckEnabled()) {
+                return;
             }
+            context_ = new Context;
+            Context::current = context_;
+            Context::ActiveContexts().push_back(context_);
+            outermost_ = true;
+            g_activeCalls.fetch_add(1, std::memory_order_release);
         }
-        context_->Acquire(nodes, apiName_, preparation);
+        context_->Acquire({ nodes.begin(), nodes.end() }, apiName_, preparation);
     }
+    Report(preparation);
+}
+
+void NativeNodeTreeScope::Report(Preparation& preparation)
+{
+    // No metadata lock covers diagnostics, original business logic or callbacks.
     if (!g_emittingDiagnostics) {
         g_emittingDiagnostics = true;
         for (const auto& conflict : preparation.conflicts) {
@@ -341,10 +253,36 @@ void NativeNodeTreeScope::Enter(std::initializer_list<UINode*> nodes, Preparatio
 
 void NativeNodeTreeScope::IncludeNode(UINode* node)
 {
-    if (context_ && node) {
-        Preparation preparation;
-        Enter({ node }, preparation);
+    if (!context_ || !node) {
+        return;
     }
+    Preparation preparation;
+    {
+        std::lock_guard<std::recursive_mutex> lock(GetTreeMutex());
+        context_->Acquire({ node }, apiName_, preparation);
+    }
+    Report(preparation);
+}
+
+void NativeNodeTreeScope::PrepareChildren(UINode* parent)
+{
+    if (!context_ || !parent) {
+        return;
+    }
+    Preparation preparation;
+    {
+        std::lock_guard<std::recursive_mutex> lock(GetTreeMutex());
+        // Snapshot only the direct roots that clearChildren/Clean can detach.
+        // The accessor is read-only and does not invoke virtual GetChildren().
+        preparation.nodes = parent->GetChildrenForNativeTreeCheck();
+        std::vector<UINode*> roots;
+        roots.reserve(preparation.nodes.size());
+        for (const auto& child : preparation.nodes) {
+            roots.push_back(child.GetRawPtr());
+        }
+        context_->Acquire(roots, apiName_, preparation);
+    }
+    Report(preparation);
 }
 
 NativeNodeTreeScope::~NativeNodeTreeScope()

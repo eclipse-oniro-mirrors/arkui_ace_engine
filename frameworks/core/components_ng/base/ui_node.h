@@ -16,6 +16,7 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_BASE_UI_NODE_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_BASE_UI_NODE_H
 
+#include <atomic>
 #include <cstdint>
 #include <functional>
 #include <list>
@@ -274,6 +275,17 @@ public:
 
     // Read-only snapshot for the Native API detector; does not invoke virtual GetChildren().
     std::vector<RefPtr<UINode>> GetChildrenForNativeTreeCheck() const;
+
+    // Native operation occupancy, not the node's UI-thread affinity.
+    uint64_t GetNativeTreeOperationThreadId() const
+    {
+        return nativeTreeOperationThreadId_.load(std::memory_order_acquire);
+    }
+
+    void SetNativeTreeOperationThreadId(uint64_t threadId)
+    {
+        nativeTreeOperationThreadId_.store(threadId, std::memory_order_release);
+    }
 
     RefPtr<UINode> GetLastChild() const;
 
@@ -1428,6 +1440,7 @@ private:
     // Used for IsolatedThread consistency validation: node should operate on pipeline
     // with matching IsolatedThread identity to avoid cross-domain routing issues.
     bool isIsolatedThread_ = false;
+    std::atomic<uint64_t> nativeTreeOperationThreadId_ { 0 };
     bool isFree_ = false; // the thread safe node in free state can be operated by non UI threads
     bool isRunningPendingUnsafeTask_ = false;
     std::vector<std::function<void()>> afterAttachMainTreeTasks_;

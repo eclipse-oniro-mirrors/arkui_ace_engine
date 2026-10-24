@@ -16,7 +16,6 @@
 #include "node_model_safely.h"
 
 #include <initializer_list>
-#include <vector>
 #include "node/config_manager.h"
 
 #include "node_extened.h"
@@ -127,19 +126,7 @@ public:
                 handles[count++] = node->uiNodeHandle;
             }
         }
-        void* snapshot = nullptr;
-        {
-            std::lock_guard<std::mutex> lock(g_nodeSetMutex_);
-            std::vector<ArkUINodeHandle> published;
-            published.reserve(g_nodeSetSafely.size());
-            for (auto node : g_nodeSetSafely) {
-                published.push_back(node->uiNodeHandle);
-            }
-            snapshot = api->captureNodeTreeOperationNodes(published.data(), published.size());
-        }
-        // The snapshot pins only published handles. Never traverse topology or
-        // emit diagnostics while holding the Native handle-set mutex.
-        operation_ = api->beginNodeTreeOperation(handles, count, apiName, snapshot);
+        operation_ = api->beginNodeTreeOperation(handles, count, apiName);
         if (operation_) {
             ++g_checkedScopeDepth;
         }
@@ -157,6 +144,13 @@ public:
     {
         if (operation_ && node) {
             GetFullImpl()->getMultiThreadManagerAPI()->includeNodeTreeOperationResult(operation_, node->uiNodeHandle);
+        }
+    }
+
+    void PrepareChildren(ArkUI_NodeHandle parent)
+    {
+        if (operation_ && parent) {
+            GetFullImpl()->getMultiThreadManagerAPI()->prepareNodeTreeOperationChildren(operation_, parent->uiNodeHandle);
         }
     }
 
@@ -185,6 +179,7 @@ public:
     }
 
     void IncludeNode(ArkUI_NodeHandle node) { operation_.IncludeNode(node); }
+    void PrepareChildren(ArkUI_NodeHandle parent) { operation_.PrepareChildren(parent); }
 
     bool IsChecking() const { return operation_.IsChecking(); }
 
@@ -276,14 +271,10 @@ void DisposeNodeSafely(ArkUI_NodeHandle nativePtr)
         !impl->getMultiThreadManagerAPI()->checkNodeOnValidThread(nativePtr->uiNodeHandle)) {
         return;
     }
-    {
-        // Unpublish before the last engine reference can be released. A mode
-        // enabled during disposal must not snapshot a stale uiNodeHandle.
-        std::lock_guard<std::mutex> lock(g_nodeSetMutex_);
-        g_nodeSetSafely.erase(nativePtr);
-    }
     impl->getBasicAPI()->disposeNode(nativePtr->uiNodeHandle);
     DisposeNativeSource(nativePtr);
+    std::lock_guard<std::mutex> lock(g_nodeSetMutex_);
+    g_nodeSetSafely.erase(nativePtr);
     // Prevent the invalidation store from being optimized away before deallocation.
     volatile uint32_t* magic = &nativePtr->magic;
     *magic = ARKUI_NODE_MAGIC_INVALID;
@@ -867,6 +858,7 @@ int32_t RemoveAllChildrenSafely(ArkUI_NodeHandle parentNode)
         !impl->getMultiThreadManagerAPI()->checkNodeOnValidThread(parentNode->uiNodeHandle)) {
         return ERROR_CODE_NATIVE_IMPL_NODE_ON_INVALID_THREAD;
     }
+    threadSafeNodeScope.PrepareChildren(parentNode);
     MarkNodeTreeFreeScope markNodeTreeFreeScope;
     return RemoveAllChildren(parentNode);
 }

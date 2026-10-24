@@ -15,7 +15,6 @@
 
 #include "core/interfaces/native/node/node_api_multi_thread.h"
 
-#include <vector>
 
 #include "base/error/error_code.h"
 #include "base/utils/system_properties.h"
@@ -121,28 +120,25 @@ const ArkUIMultiThreadManagerAPI* GetMultiThreadManagerAPI()
         .debugThreadSafeNodeEnabled = DebugThreadSafeNodeEnabled,
         .setNeedMarkNodeTreeFree = SetNeedMarkNodeTreeFree,
         .beginNodeTreeOperation = [](
-            ArkUINodeHandle* nodes, ArkUI_Int32 count, const char* apiName, void* snapshot) -> void* {
+            ArkUINodeHandle* nodes, ArkUI_Int32 count, const char* apiName) -> void* {
             const auto node = [nodes, count](int32_t index) -> UINode* {
                 return index < count ? reinterpret_cast<UINode*>(nodes[index]) : nullptr;
             };
-            return new NativeNodeTreeScope({ node(0), node(1), node(2) }, apiName, snapshot);
+            return new NativeNodeTreeScope({ node(0), node(1), node(2) }, apiName);
         },
         .endNodeTreeOperation = [](void* operation) { delete static_cast<NativeNodeTreeScope*>(operation); },
         .setNodeTreeOperationCheckMode = NativeNodeTreeScope::SetCheckMode,
         .isThreadSafeNodeScope = []() -> ArkUI_Bool { return MultiThreadBuildManager::IsThreadSafeNodeScope(); },
         .isNeedMarkNodeTreeFree = []() -> ArkUI_Bool { return MultiThreadBuildManager::IsNeedMarkNodeTreeFree(); },
-        .captureNodeTreeOperationNodes = [](ArkUINodeHandle* nodes, ArkUI_Int32 count) -> void* {
-            std::vector<UINode*> candidates;
-            candidates.reserve(count);
-            for (ArkUI_Int32 i = 0; i < count; ++i) {
-                candidates.push_back(reinterpret_cast<UINode*>(nodes[i]));
-            }
-            return NativeNodeTreeScope::CaptureNodes(candidates.data(), candidates.size());
-        },
         .needsNodeTreeOperationCheck = []() -> ArkUI_Bool { return NativeNodeTreeScope::NeedsSynchronization(); },
         .includeNodeTreeOperationResult = [](void* operation, ArkUINodeHandle node) {
             if (operation) {
                 static_cast<NativeNodeTreeScope*>(operation)->IncludeNode(reinterpret_cast<UINode*>(node));
+            }
+        },
+        .prepareNodeTreeOperationChildren = [](void* operation, ArkUINodeHandle parent) {
+            if (operation) {
+                static_cast<NativeNodeTreeScope*>(operation)->PrepareChildren(reinterpret_cast<UINode*>(parent));
             }
         },
     };

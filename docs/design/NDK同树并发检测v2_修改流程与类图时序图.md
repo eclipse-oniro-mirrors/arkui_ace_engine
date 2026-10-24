@@ -1,102 +1,117 @@
-# NDK 同树并发检测 v2：修改流程、类图与调用时序
+# NDK 同树并发检测：树根方案、类图与调用时序
 
-> 日期：2026-10-24。代码基线：分支 `ui_tree_api_check_v2`，实现提交 `05ff0ae231385f61b803a60a775efa6e26d2c24f`。
-> 本文说明当前 `native_node_tree_scope.*` 实现。源码行号对应该提交；后续改动应重新核对。
-> 图使用 Mermaid，可在支持 Mermaid 的 Markdown 阅读器中显示。
+> 更新日期：2026-10-24。基于分支 `ui_tree_api_check_v2` 的当前树根实现；最新 master 已合入。
+> 本文的 Mermaid 图说明当前代码，不适用于已撤下的每节点 Association、全树成员快照或 UINode 父关系通知方案。
+> 源码链接相对本文路径，行号对应本次整理时的代码。
 
-## 1. 本次修改解决什么问题
+## 1. 范围和修改原则
 
-通过 `ARKUI_MULTI_THREAD_NATIVE_NODE` 获取的接口操作同一棵 Free 树时，要求应用串行调用，包括树上不同节点。检测启用后，外部接口记录本线程正在操作哪些树；另一线程重叠进入时按配置输出诊断或终止。
+本特性检测通过 `ARKUI_MULTI_THREAD_NATIVE_NODE` 获取的节点接口对同一棵 Free 树的跨线程重叠调用。入口范围以 [NDK 多线程创建组件文档](https://gitcode.com/openharmony/docs/blob/master/zh-cn/application-dev/ui/ndk-build-on-multi-thread.md) 为准。既有线程资格、参数检查、返回码继续生效。
 
-检测范围以 [NDK 多线程创建组件文档](https://gitcode.com/openharmony/docs/blob/master/zh-cn/application-dev/ui/ndk-build-on-multi-thread.md) 中的接口集合为边界。外层接口的同步回调也属于本次操作；内部布局、渲染、LazyForEach、Repeat 不独立创建检测操作域。
+当前实现遵循：
 
-当前实现保留 UINode 的业务关系写入和生命周期逻辑，增加少量关系变更通知及 Free 标志同步。构造、析构、`MaybeRelease()`、`OnDelete()` 与 master 原实现一致。
+- 只在上述外部接口建立操作域，覆盖原业务及其同步回调。
+- UINode 的构造、析构、释放、SetParent、ResetParent、Free 标志读写等原有方法保持 master 原实现。
+- UINode 只新增非虚只读方法 `GetChildrenForNativeTreeCheck()`，返回 `children_` 的直接子节点引用副本，不调用虚 GetChildren，不修改树。
+- 不遍历全局 `g_nodeSetSafely`，不抓取全部已发布句柄，不给每个树成员建立占用映射。
+- 占用索引记录实际树根、外部接口输入/返回的操作子树根，以及批量删除前预告的直接子树根。
+- 同线程嵌套共享外层 Context；活动引用与占用在最外层退出时收尾。
+- LOG 输出诊断后继续，CRASH 输出诊断后主动终止。检测器不等待业务 owner 释放。
 
-### 1.1 入口范围
+源码入口：[接口集合](../../interfaces/native/node/native_impl.cpp#L159)、[Native 包装](../../interfaces/native/node/node_model_safely.cpp#L113)、[引擎检测器](../../frameworks/core/components_ng/base/native_node_tree_scope.cpp#L84)。
 
-实际映射见 [native_impl.cpp:159](../../interfaces/native/node/native_impl.cpp#L159)，接口获取分支见 [native_impl.cpp:417](../../interfaces/native/node/native_impl.cpp#L417)。共 40 个接口项：36 个节点/创建入口接入操作域，4 个全局接收器入口没有节点，不建立树操作域。
+### 1.1 外部接口范围
 
-| 类别 | 接口 | 操作域接入 |
+`multiThreadNodeImpl_1` 有 40 个接口项。36 个涉及节点或创建节点的入口接入操作域；4 个全局接收器入口没有节点，不建立树操作域。
+
+| 类别 | 接口 | 接入方式 |
 |---|---|---|
-| 创建与销毁 | createNode、disposeNode | 是；创建开始时尚无输入节点，操作域可以为空 |
-| 属性 | setAttribute、getAttribute、resetAttribute、setLengthMetricUnit | 是 |
-| 节点事件 | registerNodeEvent、unregisterNodeEvent、addNodeEventReceiver、removeNodeEventReceiver | 是 |
-| 节点自定义事件 | registerNodeCustomEvent、unregisterNodeCustomEvent、addNodeCustomEventReceiver、removeNodeCustomEventReceiver | 是 |
-| 树修改 | addChild、removeChild、insertChildAfter、insertChildBefore、insertChildAt、removeAllChildren | 是 |
-| 树查询 | getParent、getTotalChildCount、getChildAt、getFirstChild、getLastChild、getPreviousSibling、getNextSibling | 是 |
-| 自定义数据 | setUserData、getUserData | 是；保持原来不设置 ThreadSafeNodeScope 标志的行为 |
-| 仅支持 UI 线程的节点接口 | setMeasuredSize、setLayoutPosition、getMeasuredSize、getLayoutPosition、measureNode、layoutNode、markDirty | 是；先保留原 UI 线程判断 |
-| 全局接收器 | registerNodeEventReceiver、unregisterNodeEventReceiver、registerNodeCustomEventReceiver、unregisterNodeCustomEventReceiver | 否；保留原 UI 线程约束 |
+| 创建/销毁 | createNode、disposeNode | 原包装域；创建成功后 IncludeNode 登记返回根 |
+| 属性 | setAttribute、getAttribute、resetAttribute、setLengthMetricUnit | ThreadSafeNodeScope 成员建立操作域 |
+| 节点事件 | registerNodeEvent、unregisterNodeEvent、addNodeEventReceiver、removeNodeEventReceiver | 同上 |
+| 节点自定义事件 | registerNodeCustomEvent、unregisterNodeCustomEvent、addNodeCustomEventReceiver、removeNodeCustomEventReceiver | 同上 |
+| 树修改 | addChild、removeChild、insertChildAfter、insertChildBefore、insertChildAt | 进入时登记相关输入的树根/子树根 |
+| 批量删除 | removeAllChildren | 进入后 PrepareChildren，业务前登记所有直接待拆根 |
+| 树查询 | getParent、getTotalChildCount、getChildAt、getFirstChild、getLastChild、getPreviousSibling、getNextSibling | 输入参与检测；返回节点的接口在返回前 IncludeNode |
+| 自定义数据 | setUserData、getUserData | 仅新增 NativeNodeOperationScope，保留原 TLS 行为 |
+| UI 线程限定的节点接口 | setMeasuredSize、setLayoutPosition、getMeasuredSize、getLayoutPosition、measureNode、layoutNode、markDirty | 保留原 UI 线程判断，再进入操作域 |
+| 全局接收器 | registerNodeEventReceiver、unregisterNodeEventReceiver、registerNodeCustomEventReceiver、unregisterNodeCustomEventReceiver | 不建立树域；保留原 UI 线程约束 |
 
-`OH_ArkUI_PostAsyncUITask`、`OH_ArkUI_PostUITask`、`OH_ArkUI_PostUITaskAndWait` 负责调度任务；本实现没有把整个任务作为树占用范围。任务实际调用上述节点接口时进入相应操作域。
+异步任务投递接口仍负责调度，本特性不把整个异步任务当成一个占用域；任务实际调用节点接口时才进入对应操作域。
 
-### 1.2 与旧方案的数据结构区别
+### 1.2 “只记录根”具体是什么意思
 
-| 内容 | 当前 v2 实现 |
-|---|---|
-| 每个 UINode 的 Association | 没有 |
-| 节点构造注册、析构注销 | 没有新增逻辑 |
-| 遍历子树迁移每个节点的 State | 没有；通过真实父链和新根 State 识别子树 |
-| 提前拆除存活子节点的业务父关系 | 没有 |
-| ownerThreadId / ownerDepth / additionalOwnerDepths | 使用 State.owners 中的外层 Context 集合代替 |
-| 每个 State 的拓扑锁 | 没有；当前只有一把短时全局递归互斥锁 |
-| 活动树状态 | 按需创建，最后一个持有 Context 返回后移出索引 |
-| 关闭期间创建的节点 | 无须补注册；重新启用时沿真实关系找到根 |
+不是只允许记录整棵树中“没有父节点”的节点。索引包含三类根：
 
-## 2. 总体调用流程
+| 类型 | 示例 | 为什么保留 |
+|---|---|---|
+| 实际树根 | P→C→D 中的 P | 标识当前整棵树的占用 |
+| 操作子树根 | setAttribute(D) 的 D，addChild/RemoveChild 的输入 child | 标识本次接口直接操作的子树；移动前先作为查找边界 |
+| 待拆子树根 | removeAllChildren(P) 的每个直接 child | 子树拆出后仍关联外层占用 |
+
+例如对 `P→C→D` 执行 `setAttribute(D)`，可登记 P 和 D，但不会预先登记中间 C、兄弟节点或整棵树的所有后代。查根过程中会强引用路径节点保活；**保活与占用索引登记不是同一件事**。
+
+## 2. 总体流程
 
 ```mermaid
 flowchart TD
-    A[获取 ARKUI_MULTI_THREAD_NATIVE_NODE] --> B[multiThreadNodeImpl_1]
-    B --> C[XxxSafely 参数与既有线程检查]
-    C --> D[NativeNodeOperationScope]
-    D --> E[引擎 beginNodeTreeOperation]
-    E --> F{需要同步或有存量外层调用}
-    F -->|否| G[返回空 operation]
-    F -->|是| H[NativeNodeTreeScope]
-    H --> I[复用本线程外层 Context 或新建 Context]
-    I --> J[锁内 FindRoot / GetState / 检查 owners / Claim]
-    J --> K[解锁后按 LOG 或 CRASH 诊断]
-    K --> L[原接口业务及同步回调]
-    G --> L
-    L --> M[恢复 Native TLS 标志并 endNodeTreeOperation]
-    M --> N{是否最外层引擎操作域}
-    N -->|否| O[保留外层 Context 的全部占用]
-    N -->|是| P[锁内 Release / 清除 TLS / 减少活动计数]
-    P --> Q[解锁后销毁 Context 与强引用]
+    A[多线程 Native 接口] --> B[原有参数和线程资格检查]
+    B --> C{接口表可用且 NeedsSynchronization}
+    C -->|否| D[跳过新增检测，继续原业务]
+    C -->|是| E[beginNodeTreeOperation]
+    E --> F[新建或复用本线程 Context]
+    F --> G[短锁内查找已登记根或真实树根]
+    G --> H[登记输入操作根，检查 owners，Claim]
+    H --> I[解锁后按 LOG 或 CRASH 诊断]
+    I --> J{是否 removeAllChildren}
+    J -->|是| K[短锁内登记所有直接待拆根]
+    J -->|否| L[原业务及同步回调]
+    K --> L
+    D --> L
+    L --> M[有返回节点则 IncludeNode]
+    M --> N[恢复 Native TLS，endNodeTreeOperation]
+    N --> O{最外层 Scope}
+    O -->|否| P[保留外层占用]
+    O -->|是| Q[短锁内移除 owner，清 TLS 和活动数]
+    Q --> R[解锁后销毁 Context 和强引用]
 ```
 
-图中“需要同步”的真实条件为 `IsCheckEnabled() || g_activeCalls != 0`。引擎构造函数还有本线程判断：关闭后，没有当前 Context 的新调用不会登记占用；已有 Context 的同线程嵌套仍可扩展持有集合。详见第 7 节。
+`NeedsSynchronization()` 的条件是“检查开启，或者仍有存量外层检测调用”。这不是整段业务互斥锁的开关。真实新调用是否创建 Context，还取决于本线程是否存在 current，以及当前模式。
 
-源码：[桥接入口:121](../../frameworks/core/interfaces/native/node/node_api_multi_thread.cpp#L121)、[引擎构造:183](../../frameworks/core/components_ng/base/native_node_tree_scope.cpp#L183)、[NeedsSynchronization:237](../../frameworks/core/components_ng/base/native_node_tree_scope.cpp#L237)。
-
-## 3. 类图与数据结构
+## 3. 类图和数据结构
 
 ### 3.1 类图
 
-图中的 Native 类位于 `OHOS::Ace::NodeModel`；引擎类位于 `OHOS::Ace::NG`。`Context`、`State`、`Registry`、`Data` 是 cpp 内定义的实现结构。
+Native 包装位于 `OHOS::Ace::NodeModel`；引擎 Scope、Context、State、Registry 位于 `OHOS::Ace::NG`。后三个结构定义在 cpp 中。
 
 ```mermaid
 classDiagram
-    class ThreadSafeNodeScope {
-        -NativeNodeOperationScope operation_
-        -bool previous_
-        +IsChecking() bool
-    }
     class NativeNodeOperationScope {
         -void* operation_
         +IsChecking() bool
+        +IncludeNode(node)
+        +PrepareChildren(parent)
+    }
+    class ThreadSafeNodeScope {
+        -NativeNodeOperationScope operation_
+        -bool previous_
+    }
+    class MarkNodeTreeFreeScope {
+        -bool previous_
     }
     class ArkUIMultiThreadManagerAPI {
         +beginNodeTreeOperation()
         +endNodeTreeOperation()
-        +setNodeTreeOperationCheckMode()
+        +includeNodeTreeOperationResult()
+        +prepareNodeTreeOperationChildren()
     }
     class NativeNodeTreeScope {
         -Context* context_
+        -const char* apiName_
         -bool outermost_
+        +IncludeNode(node)
+        +PrepareChildren(parent)
         +SetCheckMode(mode)
-        +IsCheckEnabled() bool
         +NeedsSynchronization() bool
     }
     class Context {
@@ -104,198 +119,406 @@ classDiagram
         +uint64_t threadId
         +vector states
         +vector pins
-        +FindRoot(node, pins)
-        +GetState(root)
-        +Enter(nodes, apiName, conflicts)
+        +Resolve(node)
+        +RegisterRoot(state, node)
+        +Acquire(nodes, apiName, preparation)
         +Claim(state)
         +Release()
     }
     class State {
         +uint64_t id
-        +RefPtr root
+        +vector roots
         +unordered_set owners
     }
     class Registry {
         +uint64_t nextId
         +unordered_map roots
     }
-    class NativeNodeTreeMutation {
-        -Data* data_
-    }
-    class Data {
-        +unique_lock lock
-        +UINode* node
-        +vector pins
-        +shared_ptr source
-    }
-    class NativeNodeTreeLock {
-        -recursive_mutex* mutex_
+    class Preparation {
+        +vector conflicts
+        +vector nodes
     }
     class UINode {
-        +GetParent()
-        +GetAdoptParent()
-        +SetParent()
-        +ResetParent()
-        +SetAdoptParent()
-        +IsFree()
-        +SetIsFree()
+        +GetChildrenForNativeTreeCheck() vector
     }
     ThreadSafeNodeScope *-- NativeNodeOperationScope : 成员
-    NativeNodeOperationScope ..> ArkUIMultiThreadManagerAPI : begin 和 end
-    ArkUIMultiThreadManagerAPI ..> NativeNodeTreeScope : 创建和销毁
+    NativeNodeOperationScope ..> ArkUIMultiThreadManagerAPI : 桥接
+    ArkUIMultiThreadManagerAPI ..> NativeNodeTreeScope : 创建与删除
     NativeNodeTreeScope *-- Context : 仅最外层拥有
     NativeNodeTreeScope o-- Context : 内层借用
-    Context o-- State : states 中 shared_ptr
-    Registry o-- State : roots 中 shared_ptr
-    State --> Context : owners 中裸指针
-    State --> UINode : root 强引用
-    Context --> UINode : pins 强引用
-    UINode ..> NativeNodeTreeMutation : 父关系写入原语
-    UINode ..> NativeNodeTreeLock : Free 标志访问
-    NativeNodeTreeMutation *-- Data : 条件创建
-    Data o-- State : source
-    Data --> UINode : 临时 pins
-    NativeNodeTreeMutation ..> Context : 将目标 State 加入原 owners
+    Context o-- State : states 中共享引用
+    Registry o-- State : 根索引共享引用
+    State --> Context : owners 裸指针
+    State --> UINode : 根节点强引用
+    Context --> UINode : 输入到根路径强引用
+    NativeNodeTreeScope ..> Preparation : 临时诊断和待拆根副本
+    NativeNodeTreeScope ..> UINode : 只读直接子根
+    MarkNodeTreeFreeScope ..> NativeNodeOperationScope : 使用线程局部检测深度
 ```
 
-源码：[Native 包装类:110](../../interfaces/native/node/node_model_safely.cpp#L110)、[引擎头文件:31](../../frameworks/core/components_ng/base/native_node_tree_scope.h#L31)、[Context/State/Registry:77](../../frameworks/core/components_ng/base/native_node_tree_scope.cpp#L77)、[Data:257](../../frameworks/core/components_ng/base/native_node_tree_scope.cpp#L257)。
+没有 NativeNodeTreeMutation、每节点 Association、全成员快照，也没有在 UINode 原方法中插入锁或通知。
 
-### 3.2 每个对象对应谁
+### 3.2 字段对应关系
 
-| 对象 | 对应关系 | 谁持有 | 何时释放 |
-|---|---|---|---|
-| NativeNodeOperationScope | 一个接入检测的 Native 包装调用 | 栈上对象，或 ThreadSafeNodeScope 的成员 | 包装调用退出 |
-| NativeNodeTreeScope | 一个引擎桥接对象 | Native 层保存其 void*，通过 end 删除 | 对应包装调用退出 |
-| Context | 一个线程当前最外层被检测调用 | 最外层引擎 Scope 使用 new/delete 管理；TLS current 只是裸指针 | 最外层 Scope 退出 |
-| State | 某次解析得到的根对应的活动占用状态 | Registry 与一个或多个 Context 通过 shared_ptr 持有 | 索引移除且最后一个共享引用释放后 |
-| Registry | 进程内活动状态索引 | 函数局部静态对象 | 进程生命周期；roots 条目只在活动期间存在 |
-| NativeNodeTreeMutation::Data | 一次需要同步的父关系原语 | Mutation 临时对象 | 原语结束后，先解锁再释放临时引用 |
-
-**不是每个 UINode 都对应 State。** 没有活动调用时，不为节点维护状态。一次外层调用可以持有多个 State；LOG 重叠时，一个 State 也可以有多个 Context owner。
-
-### 3.3 Context 字段
-
-| 字段 | 含义 |
-|---|---|
-| `current` | 当前线程最外层 Context 的 TLS 指针，不是强引用或所有者 |
-| `threadId` | 检测器分配的进程内逻辑线程编号，不是直接读取的 OS TID |
-| `states` | 当前外层调用曾经触及、必须保留至返回的 State 强引用集合；通过 Claim 去重 |
-| `pins` | FindRoot 路径上的节点强引用，防止输入节点和祖先在调用期间释放；不同 Enter 之间可能重复保存引用 |
-
-内层 Scope 的 `outermost_` 为 false，借用外层 Context。它退出时不会减少状态占用，也没有独立 ownerDepth 需要归还。
-
-### 3.4 State 和 Registry 的重要细节
-
-`State.root` 保存创建该状态时根节点的强引用。发生合树后，该节点可能已经有父节点，但旧 State 仍可被外层调用保留。因此，`Registry.roots` 不应理解为始终镜像当前树形结构的完整注册表。
-
-每次 Enter 都先沿真实父链 FindRoot，再用得到的根查询 State。拆合树后可以同时保留历史 State 与当前根 State，直到相关外层调用结束。
-
-`owners` 保存 Context 裸指针，访问受全局锁保护。Context 释放前先从它持有的全部 State 中删除自己，因此不会把一个 LOG 调用方退出误认为所有调用方都结束。
-
-源码：[FindRoot:96](../../frameworks/core/components_ng/base/native_node_tree_scope.cpp#L96)、[GetState:117](../../frameworks/core/components_ng/base/native_node_tree_scope.cpp#L117)、[Claim:127](../../frameworks/core/components_ng/base/native_node_tree_scope.cpp#L127)、[Release:163](../../frameworks/core/components_ng/base/native_node_tree_scope.cpp#L163)。
-
-### 3.5 锁和计数
-
-| 项目 | 范围/用途 | 保护内容 |
+| 数据 | 对应谁/由谁持有 | 生命周期 |
 |---|---|---|
-| GetTreeMutex 返回的 recursive_mutex | 进程内一把短时锁 | 活动状态索引、owners、Context 持有集合、检测定位与父关系原语、Free 标志读写 |
-| `g_checkMode` | 原子模式变量 | -1 跟随应用 debug 属性；0 关闭、1 LOG、2 CRASH |
-| `g_activeCalls` | 原子活动外层调用计数 | 每次新建 Context 加一，最外层退出减一；用于关闭后的存量收尾 |
-| `g_nextThreadId` / `THREAD_ID` | 全局原子编号分配器 / TLS 编号 | 区分调用线程 |
-| `g_emittingDiagnostics` | TLS bool | 避免日志重入再次递归输出冲突诊断 |
-| Native `g_checkedScopeDepth` | TLS 包装对象计数 | 辅助 Native TLS 恢复；与全局活动 Context 数量不是同一个概念 |
+| Native operation_ | 桥接返回的引擎 Scope 指针 | 本次 Native 包装调用 |
+| Scope.context_ | 当前线程外层 Context；内层借用 | 最外层 Scope 创建和删除 |
+| Context.current | TLS 裸指针，指向本线程外层 Context | 外层进入设置、退出清空；不是强引用 |
+| Context.states | 外层曾经触及的 State 共享引用 | 内层返回后继续持有，外层退出清理 |
+| Context.pins | 输入到根路径上的节点强引用 | 外层退出、解锁后释放；不为路径中间节点自动建索引 |
+| State.roots | 实际根、操作子树根、预告待拆根的强引用 | 相关 owners 全部退出后释放 |
+| State.owners | 当前持有该状态的 Context 裸指针集合 | Context 释放前删除自身 |
+| Registry.roots | 根地址到 State 的进程内临时索引 | 只覆盖活动调用；State 最后 owner 退出时移除 |
+| Preparation | 冲突值快照、批量删除的直接子根引用副本 | 单次准备阶段；锁外释放临时引用 |
 
-这把锁不覆盖整个业务调用，也没有为每棵树长期持有的业务互斥锁。LOG 继续业务后，不保证错误并发操作线程安全。
+源码：[Context/State/Registry:84](../../frameworks/core/components_ng/base/native_node_tree_scope.cpp#L84)、[根登记:102](../../frameworks/core/components_ng/base/native_node_tree_scope.cpp#L102)、[Release:183](../../frameworks/core/components_ng/base/native_node_tree_scope.cpp#L183)。
 
-## 4. 正常属性接口时序：SetAttributeSafely
+### 3.3 一个 State 可以关联多个根
 
-### 4.1 调用时序图
+拆树时不要求建立一份覆盖全部后代的新 State。可以让实际根 P 与待拆根 C 暂时关联同一 State：
 
-下图假设检测已启用、没有冲突，且本次是线程最外层调用。
+```mermaid
+flowchart LR
+    P[原树根 P] --> S[State S]
+    C[待拆子树根 C] --> S
+    S --> A[外层 Context A]
+    D[后代 D：没有预建索引] -. 沿父链到 C 后停止 .-> C
+```
+
+C 后来脱离 P，不会撤销 `C→S`；外层 A 返回前，新线程沿 D→C 即可命中占用。最后一个 owner 返回后 P/C 索引一起删除，下一次再沿真实父链判断独立树。
+
+### 3.4 锁和线程局部量
+
+| 项目 | 用途 |
+|---|---|
+| GetTreeMutex 返回的全局递归互斥锁 | 短时保护查根、根登记、owners、持有集合及待拆根准备 |
+| g_checkMode | 原子配置：-1 跟随应用 debug 属性，0 关闭、1 LOG、2 CRASH |
+| g_activeCalls | 全局原子外层 Context 数量；关闭后存量调用仍需收尾 |
+| THREAD_ID | 检测器分配的进程内逻辑线程编号，不是直接读取的 OS TID |
+| g_emittingDiagnostics | TLS 日志重入保护，避免递归输出 |
+| g_checkedScopeDepth | TLS Native 包装对象层数；不是节点数量、树 ownerDepth 或持锁深度 |
+
+锁不覆盖整段业务和回调。不能把“锁内查根”理解成原有 SetParent/ResetParent 也使用这把锁；父链安全依靠第 6 节的提前根登记协议。
+
+## 4. 正常接口时序：SetAttributeSafely
+
+### 4.1 逐步说明
+
+| 步骤 | 实现行为 | 源码位置 |
+|---|---|---|
+| 1 | 空参、disposed 检查，执行原第一次 checkNodeOnValidThread | [node_model_safely.cpp:388](../../interfaces/native/node/node_model_safely.cpp#L388) |
+| 2 | 构造 ThreadSafeNodeScope；先构造成员 NativeNodeOperationScope | [node_model_safely.cpp:164](../../interfaces/native/node/node_model_safely.cpp#L164) |
+| 3 | 判断 begin/needs 函数指针和 NeedsSynchronization，关闭且无存量域时跳过新增检测 | [node_model_safely.cpp:117](../../interfaces/native/node/node_model_safely.cpp#L117) |
+| 4 | 提取最多三个非空输入 uiNodeHandle；本接口只有 node | [node_model_safely.cpp:122](../../interfaces/native/node/node_model_safely.cpp#L122) |
+| 5 | begin 创建引擎 Scope；新建或复用线程 current Context | [node_api_multi_thread.cpp:122](../../frameworks/core/interfaces/native/node/node_api_multi_thread.cpp#L122)、[引擎:207](../../frameworks/core/components_ng/base/native_node_tree_scope.cpp#L207) |
+| 6 | 短锁内 Resolve：先查根索引，未命中才读真实 parent/adoptParent；保活访问路径 | [native_node_tree_scope.cpp:109](../../frameworks/core/components_ng/base/native_node_tree_scope.cpp#L109) |
+| 7 | 找不到父节点时创建 State，登记实际树根；随后登记本次输入操作子树根 | [native_node_tree_scope.cpp:128](../../frameworks/core/components_ng/base/native_node_tree_scope.cpp#L128)、[157](../../frameworks/core/components_ng/base/native_node_tree_scope.cpp#L157) |
+| 8 | 按 State 去重，检查其他线程 owner，收集 Conflict 值快照 | [native_node_tree_scope.cpp:145](../../frameworks/core/components_ng/base/native_node_tree_scope.cpp#L145) |
+| 9 | 在锁内 Claim，建立 Context/State 双向记账；多节点输入保留相关 owner 集合 | [native_node_tree_scope.cpp:170](../../frameworks/core/components_ng/base/native_node_tree_scope.cpp#L170) |
+| 10 | 解锁后 Report：LOG 诊断后返回，CRASH 诊断后终止 | [native_node_tree_scope.cpp:230](../../frameworks/core/components_ng/base/native_node_tree_scope.cpp#L230) |
+| 11 | Native operation 返回非空时增加 g_checkedScopeDepth | [node_model_safely.cpp:129](../../interfaces/native/node/node_model_safely.cpp#L129) |
+| 12 | ThreadSafeNodeScope 保存原 TLS 标志并设置 threadSafe=true | [node_model_safely.cpp:169](../../interfaces/native/node/node_model_safely.cpp#L169) |
+| 13 | IsChecking 时执行第二次线程资格检查，再进入原 SetAttribute | [node_model_safely.cpp:388](../../interfaces/native/node/node_model_safely.cpp#L388) |
+| 14 | 原业务及同步回调执行；内部方法不独立创建此检测域 | Native 原业务路径 |
+| 15 | ThreadSafeNodeScope 析构函数体先恢复 TLS，随后成员 operation_ 析构 | [node_model_safely.cpp:176](../../interfaces/native/node/node_model_safely.cpp#L176) |
+| 16 | Native 层减少 g_checkedScopeDepth，再 end 引擎操作域 | [node_model_safely.cpp:135](../../interfaces/native/node/node_model_safely.cpp#L135) |
+| 17 | 最外层锁内 Release，清 current、减少 g_activeCalls；锁外 delete Context，释放强引用 | [native_node_tree_scope.cpp:276](../../frameworks/core/components_ng/base/native_node_tree_scope.cpp#L276) |
+
+第一次线程检查保留原错误返回顺序。第二次检查再次确认进入操作域后的 Free/线程资格；稳定关闭状态不会新增执行第二次检查。原线程资格判定见 [multi_thread_build_manager.cpp:83](../../frameworks/core/common/multi_thread_build_manager.cpp#L83)。
+
+### 4.2 正常调用时序图
+
+下图假设检测开启、无冲突，且是本线程最外层调用。
 
 ```mermaid
 sequenceDiagram
     participant App as 应用线程
     participant API as SetAttributeSafely
-    participant Native as ThreadSafeNodeScope / NativeNodeOperationScope
+    participant Native as Native 包装 Scope
     participant Bridge as MultiThreadManagerAPI
     participant Scope as NativeNodeTreeScope
-    participant Context as Context / Registry
+    participant C as Context / Registry
     participant Node as UINode
     App->>API: setAttribute(node, attribute, value)
-    API->>API: 空参和 disposed 检查
-    API->>Bridge: 第一次 checkNodeOnValidThread
-    Bridge->>Node: IsFree + 既有 UI 线程资格判断
-    API->>Native: 构造成员 operation_
-    Native->>Bridge: beginNodeTreeOperation(handles, count, apiName)
+    API->>API: 参数、disposed、第一次线程资格检查
+    API->>Native: 构造 ThreadSafeNodeScope 成员
+    Native->>Bridge: beginNodeTreeOperation(inputs, apiName)
     Bridge->>Scope: new Scope
-    Scope->>Context: 加锁，新建 Context，设置 current，活动数加一
-    Context->>Node: FindRoot，保留输入节点和祖先引用
-    Context->>Context: GetState，按 State 去重，检查 owners
-    Context->>Context: Claim 本 Context，记录 states
-    Scope->>Scope: 解锁，处理诊断快照
-    Scope-->>Native: 返回 operation 句柄
-    Native->>Bridge: 保存原 TLS 标志并设 threadSafe=true
-    API->>Bridge: IsChecking 时第二次线程资格检查
-    API->>API: 原 SetAttribute 业务及同步回调
-    API->>Native: 退出包装作用域
-    Native->>Bridge: 恢复原 threadSafe 标志
+    Scope->>C: 加锁，复用或创建 Context
+    C->>C: 查已登记根
+    opt 未命中已登记根
+        C->>Node: 逐级读 parent，必要时读 adoptParent
+        C->>C: 实际根创建 State，登记根
+    end
+    C->>C: 登记本次操作子树根，检查 owners，Claim
+    Scope->>Scope: 解锁后 Report
+    Scope-->>Native: 返回 operation
+    Native->>Native: checkedScopeDepth 加一，保存并设置 TLS
+    API->>API: 第二次线程资格检查
+    API->>API: 原 SetAttribute 及同步回调
+    API->>Native: 析构并恢复 TLS
+    Native->>Native: checkedScopeDepth 减一
     Native->>Bridge: endNodeTreeOperation
     Bridge->>Scope: delete Scope
-    Scope->>Context: 加锁 Release，清 current，活动数减一
-    Scope->>Scope: 解锁
-    Scope->>Context: delete Context，释放 states 和 pins
+    Scope->>C: 加锁 Release，清 current，活动数减一
+    Scope->>Scope: 解锁后销毁 Context 和节点引用
     API-->>App: 原业务返回值
 ```
 
-### 4.2 每一步与代码位置
+构造函数中的 `return` 只跳过 NativeNodeOperationScope 的新增检测，不是外层 C API 返回；ThreadSafeNodeScope 原有标志设置及原业务仍继续。
 
-| 步骤 | 实际行为 | 代码 |
-|---|---|---|
-| 1 | 检查 node、disposed 状态，执行原有第一次线程资格判断 | [node_model_safely.cpp:366](../../interfaces/native/node/node_model_safely.cpp#L366) |
-| 2 | 构造 ThreadSafeNodeScope；其成员 operation_ 先于构造函数体执行 | [node_model_safely.cpp:148](../../interfaces/native/node/node_model_safely.cpp#L148) |
-| 3 | 忽略空 ArkUI_NodeHandle，提取 uiNodeHandle；最多传三个相关节点 | [node_model_safely.cpp:112](../../interfaces/native/node/node_model_safely.cpp#L112) |
-| 4 | 桥接判断 NeedsSynchronization，必要时创建引擎 Scope | [node_api_multi_thread.cpp:121](../../frameworks/core/interfaces/native/node/node_api_multi_thread.cpp#L121) |
-| 5 | 关闭且无线程当前 Context 时直接返回；否则锁内复用或新建 Context | [native_node_tree_scope.cpp:183](../../frameworks/core/components_ng/base/native_node_tree_scope.cpp#L183) |
-| 6 | Enter 对每个节点沿 GetParent、必要时 GetAdoptParent 查根；不调用虚 GetChildren | [native_node_tree_scope.cpp:96](../../frameworks/core/components_ng/base/native_node_tree_scope.cpp#L96) |
-| 7 | 获取/创建根 State，按 State 指针去重，检查是否存在其他逻辑线程 owner | [native_node_tree_scope.cpp:134](../../frameworks/core/components_ng/base/native_node_tree_scope.cpp#L134) |
-| 8 | 把 Context 加入 owners，并把 State 保存到 Context.states | [native_node_tree_scope.cpp:127](../../frameworks/core/components_ng/base/native_node_tree_scope.cpp#L127) |
-| 9 | 离开短锁后处理 Conflict 值快照；CRASH 在原业务前终止，LOG 继续 | [native_node_tree_scope.cpp:203](../../frameworks/core/components_ng/base/native_node_tree_scope.cpp#L203) |
-| 10 | Native 包装保存原 threadSafe TLS，并设置为 true | [node_model_safely.cpp:151](../../interfaces/native/node/node_model_safely.cpp#L151) |
-| 11 | 仅 IsChecking 为 true 时进行第二次线程资格检查 | [node_model_safely.cpp:375](../../interfaces/native/node/node_model_safely.cpp#L375) |
-| 12 | 调用原 SetAttribute；同步回调继续位于外层作用域中 | [node_model_safely.cpp:379](../../interfaces/native/node/node_model_safely.cpp#L379) |
-| 13 | ThreadSafeNodeScope 析构函数体先恢复 TLS；随后成员 operation_ 析构并 end | [node_model_safely.cpp:158](../../interfaces/native/node/node_model_safely.cpp#L158) |
-| 14 | 最外层锁内删除自身 owner；owner 全空的 State 从 roots 移除；清 TLS 与计数 | [native_node_tree_scope.cpp:213](../../frameworks/core/components_ng/base/native_node_tree_scope.cpp#L213) |
-| 15 | 解锁后 delete Context，释放节点/State 引用；可能触发的框架析构在锁外执行 | [native_node_tree_scope.cpp:224](../../frameworks/core/components_ng/base/native_node_tree_scope.cpp#L224) |
-
-第一次检查保留原错误返回路径，避免本应先返回线程资格错误的调用提前参与检测。第二次检查用于再次确认进入操作域后 Free/线程资格仍满足原合同；不是把 Scope 当成整个业务期间的互斥锁。
-
-现有线程资格实现见 [multi_thread_build_manager.cpp:83](../../frameworks/core/common/multi_thread_build_manager.cpp#L83)。它与同树占用检测是两个判断。
-
-## 5. 同线程嵌套与同步回调
+## 5. 同线程嵌套和同步回调
 
 ```mermaid
 sequenceDiagram
-    participant App as 线程 A
-    participant Outer as 外部接口外层 Scope
+    participant A as 线程 A
+    participant Outer as 外部最外层 Scope
     participant C as Context A
-    participant Callback as 原业务同步回调
-    participant Inner as 回调内另一个外部接口 Scope
-    App->>Outer: 第一次进入
-    Outer->>C: 创建 Context A，current 指向它，Claim 树 R
-    Outer->>Callback: 执行业务并回调应用
-    Callback->>Inner: 再次调用多线程节点接口
-    Inner->>C: 复用 current，outermost=false
-    Inner->>C: Enter，可增加其他树的 State
-    Inner-->>Callback: 内层返回，不 Release Context
-    Note over C: 内层新增的树也保留到外层返回
-    Callback-->>Outer: 同步回调完成
-    Outer->>C: Release 全部 State，清 TLS，解锁后删除 Context
-    Outer-->>App: 最外层返回
+    participant Callback as 业务同步回调
+    participant Inner as 回调内外部接口 Scope
+    A->>Outer: 进入
+    Outer->>C: 新建 Context，Claim 树状态
+    Outer->>Callback: 原业务回调
+    Callback->>Inner: 再次调用文档集合中的接口
+    Inner->>C: 复用 current，登记本次操作根
+    Note over C: 可以增加其他树和待拆根
+    Inner-->>Callback: 内层退出，不 Release 外层 Context
+    Callback-->>Outer: 回调结束
+    Outer->>C: Release 全部状态，解锁后释放引用
+    Outer-->>A: 返回
 ```
 
-同线程不会因为 owners 中已有同一 threadId 而冲突。不同 State 在 Claim 时按 Context owner 去重。
+同一 threadId 不构成冲突；同一 Context 对同一 State 只 Claim 一次。内层域仅借用 Context，退出不减少 ownerDepth；当前结构本身没有 ownerDepth 字段。
 
-内层 Scope 不独立占有 Context，也不使用引用计数延长 Context；外部接口使用正常同步栈式 RAII，外层生命周期覆盖内层。
+输入 `{ parent, child, sibling }` 表示三个相关参数，不是父、子、孙三层。三个输入各自所属树都参加占用判断；同树输入最终 State 去重。
 
-插入接口传入父节点、子节点、参照兄弟节点，是为了覆盖三个相关输入各自所属的树。`node(0/1/2)` 是参数位置，不表示父、子、孙三个层级。父子兄弟最终解析到同一 State 时只登记一次。
+## 6. 拆树、合树和父链读取协议
+
+### 6.1 单节点拆树：RemoveChild
+
+`RemoveChildSafely` 在执行原业务前，已用 parent、child 构造外部 Scope。child 会登记为操作子树根，因此不必在 UINode::ResetParent 内补协议通知。
+
+```mermaid
+sequenceDiagram
+    participant API as RemoveChildSafely / 线程 A
+    participant R as 根索引 Registry
+    participant Body as 原 RemoveChild 业务
+    participant B as 线程 B 操作后代 D
+    API->>R: 锁内 Resolve(parent, child)
+    R->>R: 登记原树根 P 和待拆根 C，关联 State S
+    R->>R: S.owners 加入 Context A
+    API->>Body: 解锁后执行删除
+    Body->>Body: 原 ResetParent，C 脱离 P
+    Note over R: C 到 S 的登记仍存在
+    B->>R: Resolve(D)
+    R->>R: 沿 D 的稳定父链到 C
+    R->>R: 命中 C，停止读取 C.parent
+    R-->>B: 发现 S 仍由线程 A 持有
+    Note over B: LOG 诊断继续，CRASH 诊断终止
+    Body-->>API: 业务和同步回调结束
+    API->>R: 最外层 Release
+    R->>R: 最后 owner 退出，移除 P/C 根登记
+    Note over B: 此后新调用按真实父链识别 C 的独立树
+```
+
+关键时间点是“**先登记 C，再修改 C 的父链接**”。登记不能推迟到删除后或同步回调返回后。
+
+### 6.2 批量拆树：RemoveAllChildren
+
+本入口只有 parent 输入，不能仅登记 parent。Native 包装在业务前调用 PrepareChildren：
+
+1. Scope 已登记 parent 所属树并完成入口冲突检查。
+2. 短锁内通过新增只读方法取得 parent 的直接 children 副本。
+3. 对每个直接 child 解析原状态、登记子树根并 Claim。
+4. 解锁后执行原 clearChildren/Clean；不递归给全部后代建立占用索引。
+5. 直接子树即使先后拆出，根登记也留到外层结束。
+
+源码：[RemoveAllChildrenSafely:848](../../interfaces/native/node/node_model_safely.cpp#L848)、[PrepareChildren:255](../../frameworks/core/components_ng/base/native_node_tree_scope.cpp#L255)。
+
+```mermaid
+sequenceDiagram
+    participant API as RemoveAllChildrenSafely
+    participant Scope as Native / Engine Scope
+    participant Node as UINode 只读辅助方法
+    participant R as Registry
+    participant Body as 原 clearChildren / Clean
+    API->>Scope: begin(parent)
+    Scope->>R: 登记 parent 操作根和实际树根
+    API->>Scope: PrepareChildren(parent)
+    Scope->>Node: 只读直接 children 副本
+    Node-->>Scope: C1、C2 等子树根
+    Scope->>R: 锁内登记 C1/C2，保留至外层结束
+    API->>Body: 执行原业务
+    Body->>Body: 原方法逐个拆卸 C1/C2
+    Note over R: 不需要登记 C1/C2 的全部后代
+    Body-->>API: 同步回调和业务结束
+    API->>Scope: 析构最外层 Scope
+    Scope->>R: 配对清理根登记和占用
+```
+
+辅助方法只返回 `children_` 副本，不执行虚 GetChildren，也不会 LoadChildren、清缓存或改 disappearingChildren。用于当前文档接口的实际原生节点树路径，不能推导为覆盖任意内部语法节点的虚遍历行为。
+
+### 6.3 合树：AddChild / InsertChild
+
+进入时登记目标父树根、待插入 child 的原树根和 child 操作根。业务改父后，child 的旧根登记继续有效，目标父树也仍被同一外层 Context 持有。无需给所有后代迁移 State。
+
+LOG 已存在其他 owner 时，当前 Acquire 将相关 owner 保留到本次多输入状态集合上，避免某一调用先结束后，另一活跃调用的合树占用被提前清除。原业务发生错误并发后的树结果仍不受安全保证。
+
+### 6.4 为什么查根时不会继续读取正在修改的根父链接
+
+外部接口进入与根登记在同一短锁内完成。每个会移动的外部输入子树根在原业务之前成为查找边界；批量拆树提前登记每个待拆根。
+
+因此对 D→C→P，如果业务正在改 C.parent，查找先走 D 的稳定父链，到 C 后先查 Registry 并停止，不再读取 C.parent。其他线程在登记前进入时，写方还未开始原业务；写方进入后又会看到先前的占用。
+
+这是一套“提前声明链接变更边界”的协议，**不是原 SetParent 使用了检测锁**。它依赖集合内树操作先登记输入/待拆根；不能在根方案中删掉 RemoveAllChildren 的预备步骤，也不能把任意未预告的内部直接改树宣称为已同步。
+
+### 6.5 返回新节点
+
+createNode 和节点查询接口在返回新句柄给应用前 IncludeNode。它登记返回节点这一操作子树根，沿用本线程 current Context。回调内创建或取得节点后，即使内层接口先返回，相关状态仍保留到最外层结束。
+
+源码：[Native IncludeNode:143](../../interfaces/native/node/node_model_safely.cpp#L143)、[引擎 IncludeNode:242](../../frameworks/core/components_ng/base/native_node_tree_scope.cpp#L242)。
+
+## 7. 冲突与释放
+
+### 7.1 LOG / CRASH
+
+Acquire 在锁内复制 API 名称、节点编号、状态编号、持有线程和模式，然后完成本 Context 的占用记账。解锁后同步输出诊断和 native 栈，CRASH 在原业务继续前主动终止。
+
+```mermaid
+sequenceDiagram
+    participant A as 线程 A
+    participant R as Registry / State
+    participant B as 线程 B
+    participant Log as 诊断输出
+    A->>R: Claim 根 P，owner 加入 Context A
+    B->>R: 进入同树操作，命中已登记根
+    R->>R: 锁内收集冲突快照，分别记录 Context B
+    R-->>B: 解锁
+    B->>Log: MULTI_THREAD、API、节点/状态、原因、双方线程、native 栈
+    alt LOG
+        B->>B: 继续原业务
+        B->>R: 退出只删除自身 owner
+        Note over R: A 尚未退出时仍保留占用
+    else CRASH
+        B->>B: 主动终止进程
+    end
+```
+
+LOG 不等待 owner、不跳过原业务，也不增加并发冲突返回码。它不保证错误并发的原业务安全；不能把诊断锁看成业务同步方案。根预告协议也不把非法 LOG 并发下原有容器读写变成线程安全。
+
+### 7.2 最外层释放顺序
+
+1. 内层 Scope 析构时 outermost_ 为 false，直接返回，继续保留外层持有集合。
+2. 最外层在短锁内遍历 Context.states，从每个 State.owners 删除自己。
+3. 某 State 还有其他 LOG owner 时，保留其所有根登记。
+4. 某 State 的 owners 全空时，逐个移除 State.roots 对应的根索引。
+5. 清除 TLS current，减少全局 g_activeCalls。
+6. 释放短锁后删除 Context。根及路径的最后强引用可能触发原框架析构，这一步在锁外执行。
+
+不能因为当前模式已关闭就跳过第 2～6 步，否则会留下 owner、引用或活动计数。
+
+## 8. 开关、默认值及实时切换
+
+配置通过 UI 线程上的 `OH_ArkUI_NativeModule_SetRuntimeCheckMode(MULTI_THREAD=3, mode)` 下发，保留原线程和参数校验。合法值 0/1/2 分别为 DISABLED/LOG/CRASH；未配置时按应用 debug 属性选择 CRASH 或 DISABLED。
+
+源码：[配置下发](../../interfaces/native/node/config_manager.cpp#L58)、[引擎 SetCheckMode](../../frameworks/core/components_ng/base/native_node_tree_scope.cpp#L290)。
+
+```mermaid
+sequenceDiagram
+    participant UI as UI 线程
+    participant Config as RuntimeCheckManager
+    participant Engine as NativeNodeTreeScope 模式
+    participant Worker as 后续节点接口
+    UI->>Config: SetRuntimeCheckMode(3, mode)
+    Config->>Config: 原线程检查、类型和模式校验
+    Config->>Engine: setNodeTreeOperationCheckMode(mode)
+    Engine->>Engine: 原子更新 g_checkMode
+    Config-->>UI: 合法配置返回 0
+    Worker->>Engine: 查询 NeedsSynchronization
+    alt 稳定关闭且无存量 Context
+        Engine-->>Worker: false，跳过新增操作域
+    else 检查开启
+        Engine-->>Worker: true，进入根检测
+    else 关闭但仍有存量 Context
+        Engine-->>Worker: true，允许存量收尾
+        Note over Engine: 同线程嵌套可沿用 current，新线程不新建占用 Context
+    end
+```
+
+| 时段 | 当前行为 |
+|---|---|
+| 稳定 DISABLED、活动数为 0 | 不建 Context/State，不查树、不登记根、不抓全局节点、不获取新增协议锁，也不额外保活节点 |
+| 关闭期间正常建树/换父 | 原 UINode 方法照常执行，无检测注册表要维护 |
+| 从关闭切到启用 | 新调用沿当前真实父链定位，按需建立根状态；无须遍历所有节点补注册 |
+| 开启切到关闭时已有外层域 | 旧域继续配对释放；PrepareChildren/同线程嵌套仍可沿用已有 Context |
+| 关闭后又开启，而旧域仍未结束 | 保留的根仍可参与后续冲突检查 |
+
+不追溯关闭期间已经开始的未检测调用，也不修复应用本身的错误并发。应用必须继续遵守同树串行规范，不能用切换开关为重叠操作建立同步关系。
+
+桥接对象非空不严格等价于已登记 State。关闭收尾窗口中，其他线程可能得到一个 context_ 为空的桥接 Scope；创建接口也可能存在尚未登记树的空 Context。
+
+## 9. Native TLS 变量的含义
+
+### 9.1 `g_checkedScopeDepth`
+
+这是 `thread_local uint32_t`，每个线程各自计数。NativeNodeOperationScope 获得非空 operation_ 时加一，析构时减一。当前读取它的地方是 MarkNodeTreeFreeScope：有检测包装域时保存并恢复原 `isNeedMarkNodeTreeFree`，支持同步嵌套。
+
+| 调用时刻 | depth | Free 标记许可 |
+|---|---:|---|
+| 外层删除入口进入 | 1 | 保存原 false，设为 true |
+| 内层删除入口进入 | 2 | 保存外层 true |
+| 内层退出 | 1 | 恢复 true，外层许可仍有效 |
+| 外层退出 | 0 | 恢复 false |
+
+它不是 State ownerDepth、节点数或持锁深度，也不负责判断树冲突。树占用由 State.owners 决定；g_activeCalls 只统计全局外层 Context 数量。
+
+### 9.2 `isNeedMarkNodeTreeFree()`
+
+查询当前线程是否允许原业务把满足条件的可转换树重新标记为 Free。它不是节点自己的 isFree_，也不是 MULTI_THREAD 开关。
+
+原 `UINode::MarkNodeTreeFree(bool)` 先检查：本次参数明确允许，或者线程许可为 true，才继续进行祖先、线程安全节点资格和子树条件检查。许可为 true 不代表无条件转换。
+
+原逻辑见 [ui_node_multi_thread.cpp](../../frameworks/core/components_ng/base/ui_node_multi_thread.cpp#L69)。当前实现不修改该方法；Native 删除包装的 MarkNodeTreeFreeScope 在业务期间设置许可。
+
+### 9.3 ThreadSafeNodeScope
+
+原本就负责设置多线程建树标志。当前在有检测包装域时保存并恢复进入前的值，支持回调嵌套；稳定关闭时 previous_ 保持 false，保留原退出行为。
+
+参数/资格检查与这两个 TLS 标志是不同机制，不能通过设置 threadSafe=true 豁免原有非 UI 操作 Attached 节点的限制。
+
+## 10. 成本和覆盖边界
+
+令 H 为父链高度、K 为批量删除的直接子根数：
+
+- 普通接口主要沿至多三个输入的父链定位，最坏 O(H) 每个输入；命中已登记操作根时可提前停止。
+- RemoveAllChildren 按 K 个直接待拆根准备，最坏 O(K×H)，不预建所有后代的占用项。
+- 根索引大小与活动调用触及的不同操作根、待拆根数量相关。回调若显式触及许多节点，根数仍会随之增加。
+- Context.pins 保留输入到根的路径引用，不是全树节点快照；不同进入路径可能重复保存引用。
+- 所有调用会短时使用同一元数据锁，但原业务、公开回调和慢速 native 栈解析不在锁内。
+- 检测只覆盖已接入外部接口及其预告的拓扑变化。内部任意未预告的父链接改写不属于“整个引擎都已检测”的承诺。
+
+这版消除了全局 `g_nodeSetSafely` 扫描和逐树成员映射，但不能描述为“启用后零开销”或“所有内部改树都安全”。
+
+## 11. 测试和验证入口
+
+| 验证内容 | 当前测试/检查 |
+|---|---|
+| 同树不同节点、兄弟参照树冲突 | SameTreeDifferentNodesConflict、SiblingReferenceTreeAlsoConflicts |
+| 异树并行与同线程重入 | IndependentTreesExecuteConcurrently、SameThreadReentryAndDuplicateInputsAreLegal |
+| 内层返回后外层仍持有 | NestedCallRetainsNewTreeUntilOuterReturn |
+| 单子树拆出前后 | SplitChildRemainsClaimedBeforeOuterReturn、SplitChildCanTransferAfterOuterReturn |
+| 批量拆树 | RemoveAllPreparesEveryDirectSubtreeBeforeDetaching、RemoveAllRootsCanTransferAfterOutermostReturn |
+| 真正重写父链接时的查根 | RootLookupStopsBeforeAnOperandWhoseParentIsChanging、LogLookupCanRunWhileAnAnnouncedRootChangesParent |
+| 关闭兼容性与重新开启 | DisabledCallsDoNotRetainNodesOrTakeProtocolLocks、DisabledParentReleasePreservesOriginalChildDepth、EnablingFindsNodesCreatedAndReparentedWhileDisabled |
+| 关闭中途的存量收尾 | DisableDrainsAnExistingScopeAndTracksItsSplits |
+| LOG 各调用方独立释放 | LogContenderContinuesAndDoesNotClearOriginalOwner、LogPrimaryMayFinishBeforeContender |
+| 缓存父链和无关节点保活 | CachedMembersOutsideOrdinaryChildrenRemainCovered、UnrelatedNodesAreNotRetainedForTheWholeCall |
+| 配置类型、非法参数、默认值 | capi_runtime_check_test.cpp |
+| UINode 原方法保持不变 | 从文件移除唯一新增辅助方法后，与 origin/master 逐字节比较 |
+
+源码：[树根协议测试](../../test/unittest/core/base/native_node_tree_scope_test.cpp)、[配置测试](../../test/unittest/capi/runtime_check/capi_runtime_check_test.cpp)。
+
+测试环境需分开理解：宿主隔离测试使用真实检测器和测试源码，UINode/平台环境使用桩；OHOS 交叉编译验证真实生产头文件与编译参数；完整 ace_engine 构建验证生产对象及动态库链接。宿主测试不替代设备上的页面、滚动和回调回归。
+
+本次最终运行结果与构建日志另记录在 `/tmp/ace_tree_roots_only/verification.md`，不把旧版本的构建结果当作当前版本通过证据。
