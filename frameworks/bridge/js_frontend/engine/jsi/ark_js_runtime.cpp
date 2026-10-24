@@ -246,12 +246,12 @@ bool ArkJSRuntime::IsStaticOrInvalidFile(const uint8_t *data, int32_t size)
     return ret;
 }
 
-bool ArkJSRuntime::ExecuteModuleBuffer(uint8_t* data, int32_t size, const std::string& filename, bool needUpdate)
+bool ArkJSRuntime::ExecuteModuleBuffer(const uint8_t* data, int32_t size, const std::string& filename, bool needUpdate)
 {
     JSExecutionScope executionScope(vm_);
     LocalScope scope(vm_);
     panda::TryCatch trycatch(vm_);
-    bool ret = JSNApi::ExecuteModuleBufferSecure(vm_, data, size, filename, needUpdate, nullptr);
+    bool ret = JSNApi::ExecuteModuleBuffer(vm_, data, size, filename, needUpdate);
     HandleUncaughtException(trycatch);
     return ret;
 }
