@@ -96,7 +96,7 @@ TEST_F(InspectorTreeTask03, WindowPrivacyFiltersBothEditorsAndRestoresTheCaller)
             for (bool accessibility : { false, true }) {
                 ParamConfig config;
                 config.accessibilityInfo = accessibility;
-                InspectorTreeRequestContext context(config, {}, { !childPrivate, "Main", 42 });
+                InspectorTreeRequestContext context(config, { !childPrivate, "Main", 42 });
                 config.inspectorContext = &context;
                 auto checkEditors = [&](bool privacy) {
                     auto inputTree = JsonUtil::CreateSharedPtrJson();
@@ -133,7 +133,7 @@ TEST_F(InspectorTreeTask03, RichEditorMultiLineFollowsCurrentMode)
             for (bool accessibility : { false, true }) {
                 ParamConfig config;
                 config.accessibilityInfo = accessibility;
-                InspectorTreeRequestContext context(config, {}, {});
+                InspectorTreeRequestContext context(config, {});
                 config.inspectorContext = &context;
                 auto tree = JsonUtil::CreateSharedPtrJson();
                 frame->DumpSimplifyTreeWithParamConfig(0, tree, visible, config);
@@ -171,7 +171,7 @@ TEST_F(InspectorTreeTask03, RichEditorPasswordIsProtectedWhenShownOrHidden)
                         << ", visible=" << visible << ", accessibility=" << accessibility);
                     ParamConfig config;
                     config.accessibilityInfo = accessibility;
-                    InspectorTreeRequestContext context(config, {}, {});
+                    InspectorTreeRequestContext context(config, {});
                     config.inspectorContext = &context;
                     auto tree = JsonUtil::CreateSharedPtrJson();
                     frame->DumpSimplifyTreeWithParamConfig(0, tree, visible, config);
@@ -203,7 +203,7 @@ TEST_F(InspectorTreeTask03, NativeIdsAreLosslessAndGated)
     frame->InitializePatternAndContext();
     ParamConfig config;
     config.accessibilityInfo = true;
-    InspectorTreeRequestContext context(config, {}, {});
+    InspectorTreeRequestContext context(config, {});
     config.inspectorContext = &context;
     for (int64_t id : { 0LL, 9007199254740991LL, 9007199254740992LL, 9007199254740993LL, 9223372036854775807LL }) {
         frame->SetInspectorAccessibilityId(id);
@@ -232,7 +232,7 @@ TEST_F(InspectorTreeTask03, FalseInteractionAndAbsentRegions)
     ParamConfig config;
     config.interactionInfo = true;
     config.withResponseRegion = true;
-    InspectorTreeRequestContext context(config, {}, {});
+    InspectorTreeRequestContext context(config, {});
     config.inspectorContext = &context;
     auto json = JsonUtil::CreateSharedPtrJson();
     frame->DumpSimplifyTreeNode(json, config);

@@ -145,7 +145,7 @@ protected:
     }
     std::shared_ptr<JsonValue> Dump(const RefPtr<FrameNode>& host, ParamConfig config)
     {
-        InspectorTreeRequestContext context(config, {}, {});
+        InspectorTreeRequestContext context(config, {});
         config.inspectorContext = &context;
         auto json = JsonUtil::CreateSharedPtrJson();
         host->DumpInspectorTreeInfo(json, config);
@@ -291,7 +291,7 @@ TEST_F(InspectorTreeTask05Provider, FailureDiscardsEarlierHostsAndStopsSubsequen
     auto host = Host(307);
     ParamConfig config;
     config.withCustomContent = true;
-    InspectorTreeRequestContext context(config, {}, {});
+    InspectorTreeRequestContext context(config, {});
     config.inspectorContext = &context;
     auto root = JsonUtil::CreateSharedPtrJson();
     root->Put("appInfo", JsonUtil::Create());
@@ -313,7 +313,7 @@ TEST_F(InspectorTreeTask05Provider, BothTraversalEntrancesUseTheFlatReturnChanne
     for (bool visible : { false, true }) {
         ParamConfig config;
         config.withCustomContent = true;
-        InspectorTreeRequestContext context(config, {}, {});
+        InspectorTreeRequestContext context(config, {});
         config.inspectorContext = &context;
         auto root = JsonUtil::CreateSharedPtrJson();
         host->DumpSimplifyTreeWithParamConfig(0, root, visible, config);

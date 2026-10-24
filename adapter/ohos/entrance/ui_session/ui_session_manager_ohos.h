@@ -80,8 +80,7 @@ public:
     void GetInspectorTree(ParamConfig config = ParamConfig()) override;
     void SaveInspectorTreeFunction(InspectorFunction&& function) override;
     void ReportInspectorTreeValue(const std::string& data) override;
-    std::function<void(const std::string&)> BindInspectorTreeReporter(
-        const InspectorTreeRequestRoute& route, const sptr<IRemoteObject>& report) override;
+    void ReportInspectorTreeValue(const std::string& data, uint64_t requestId) override;
     void SaveForSendCommandFunction(NotifySendCommandFunction&& function) override;
     void SaveForSendCommandSyncFunction(NotifySendCommandSyncFunction&& function) override;
     void NotifyAllWebPattern(bool isRegister) override;

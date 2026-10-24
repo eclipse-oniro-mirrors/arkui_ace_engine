@@ -141,8 +141,10 @@ public:
      */
     virtual void GetInspectorTree(ParamConfig config = ParamConfig()) {};
     virtual void ReportInspectorTreeValue(const std::string& value) {};
-    virtual std::function<void(const std::string&)> BindInspectorTreeReporter(
-        const InspectorTreeRequestRoute& route, const sptr<IRemoteObject>& report) { return {}; }
+    virtual void ReportInspectorTreeValue(const std::string& value, uint64_t requestId)
+    {
+        ReportInspectorTreeValue(value);
+    }
     virtual void SaveForSendCommandFunction(NotifySendCommandFunction&& function) {};
     virtual void SaveForSendCommandSyncFunction(NotifySendCommandSyncFunction&& function) {};
     virtual void SaveInspectorTreeFunction(InspectorFunction&& function) {};

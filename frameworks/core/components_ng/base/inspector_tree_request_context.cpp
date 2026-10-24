@@ -43,10 +43,8 @@ InspectorTreeError MapProviderError(ThirdProviderExportStatus status)
 }
 } // namespace
 
-InspectorTreeRequestContext::InspectorTreeRequestContext(
-    ParamConfig options, InspectorTreeRequestRoute requestRoute, InspectorWindowSnapshot snapshot)
-    : config(options), route(requestRoute), window(std::move(snapshot)),
-      providerBudget_(std::make_shared<ThirdProviderTreeExportBudget>())
+InspectorTreeRequestContext::InspectorTreeRequestContext(ParamConfig options, InspectorWindowSnapshot snapshot)
+    : config(options), window(std::move(snapshot)), providerBudget_(std::make_shared<ThirdProviderTreeExportBudget>())
 {
     config.inspectorContext = nullptr;
 }

@@ -20,14 +20,14 @@
 namespace OHOS::Ace::NG {
 TEST(InspectorTreeTask02, PrivacyMatrixAndPerRequestReasons)
 {
-    InspectorTreeRequestContext context({}, {}, { true, "Window", 42 });
+    InspectorTreeRequestContext context({}, { true, "Window", 42 });
     EXPECT_FALSE(context.CanExportText(InspectorTextKind::INPUT_VALUE, false, false));
     EXPECT_FALSE(context.CanExportText(InspectorTextKind::EDITABLE_TEXT, false, false));
     EXPECT_TRUE(context.CanExportText(InspectorTextKind::DISPLAY_TEXT, false, false));
     EXPECT_TRUE(context.CanExportText(InspectorTextKind::PLACEHOLDER, false, false));
     EXPECT_FALSE(context.CanExportText(InspectorTextKind::DISPLAY_TEXT, false, true));
     EXPECT_FALSE(context.MarkPrivacyReasonOnce(PrivacyReason::PRIVACY_WINDOW));
-    InspectorTreeRequestContext next({}, {}, {});
+    InspectorTreeRequestContext next({}, {});
     EXPECT_TRUE(next.CanExportText(InspectorTextKind::INPUT_VALUE, false, false));
     EXPECT_FALSE(next.CanExportText(InspectorTextKind::INPUT_VALUE, true, false));
     EXPECT_FALSE(next.MarkPrivacyReasonOnce(PrivacyReason::PASSWORD));
@@ -37,7 +37,7 @@ TEST(InspectorTreeTask02, PrivacyMatrixAndPerRequestReasons)
 
 TEST(InspectorTreeTask02, WindowPrivacyIsScopedAndReasonsRemainRequestWide)
 {
-    InspectorTreeRequestContext context({}, {}, { false, "Main", 42 });
+    InspectorTreeRequestContext context({}, { false, "Main", 42 });
     context.CollectWithWindowPrivacy(InspectorWindowSnapshot { true, "Child", 43 }, [&]() {
         EXPECT_FALSE(context.CanExportText(InspectorTextKind::INPUT_VALUE, false, false));
         EXPECT_FALSE(context.CanExportText(InspectorTextKind::EDITABLE_TEXT, false, false));
@@ -58,7 +58,7 @@ TEST(InspectorTreeTask02, MissingWindowSnapshotStopsBeforeCollecting)
 {
     ParamConfig config;
     config.withResponseRegion = true;
-    InspectorTreeRequestContext context(config, {}, {});
+    InspectorTreeRequestContext context(config, {});
     bool collected = false;
     context.CollectWithWindowPrivacy(std::nullopt, [&]() { collected = true; });
     EXPECT_FALSE(collected);
@@ -70,7 +70,7 @@ TEST(InspectorTreeTask02, MissingWindowSnapshotStopsBeforeCollecting)
 
 TEST(InspectorTreeTask02, WindowCollectionPreservesErrorsAndRestoresPrivacy)
 {
-    InspectorTreeRequestContext context({}, {}, { true, "Main", 42 });
+    InspectorTreeRequestContext context({}, { true, "Main", 42 });
     context.CollectWithWindowPrivacy(InspectorWindowSnapshot {}, [&]() {
         EXPECT_FALSE(context.window.privacyWindow);
         context.ReportError(InspectorTreeError::PROVIDER_QUERY_FAILED);
@@ -89,7 +89,7 @@ TEST(InspectorTreeTask10, MarqueeReplicasDoNotDeduplicateIndependentLabels)
         {"$type":"Text","$attrs":{"content":"same"}}]},
         {"$type":"Text","$attrs":{"content":"same"}}])");
     root->Put("$children", children);
-    InspectorTreeRequestContext context({}, {}, {});
+    InspectorTreeRequestContext context({}, {});
     context.FinalizeNativeTree(root);
     auto output = root->GetValue("$children");
     auto replicas = output->GetArrayItem(0)->GetValue("$children");
@@ -106,7 +106,7 @@ TEST(InspectorTreeTask02, RootErrorGateAndWholeRequestFailure)
             config.accessibilityInfo = true;
             config.withResponseRegion = regions;
             config.withCustomContent = customContent;
-            InspectorTreeRequestContext context(config, {}, {});
+            InspectorTreeRequestContext context(config, {});
             auto root = JsonUtil::CreateSharedPtrJson();
             root->Put("appInfo", JsonUtil::Create());
             root->Put("$children", JsonUtil::CreateArray());
@@ -138,7 +138,7 @@ TEST(InspectorTreeTask02, CancelledRequestDoesNotProduceAnErrorResult)
 {
     ParamConfig config;
     config.withCustomContent = true;
-    InspectorTreeRequestContext context(config, {}, {});
+    InspectorTreeRequestContext context(config, {});
     context.ReportError(InspectorTreeError::COLLECTION_FAILED);
     context.CancelResult();
     EXPECT_TRUE(context.ShouldStop());
@@ -167,7 +167,7 @@ TEST(InspectorTreeTask06, ExtensionFailurePropagatesToTheRequestRoot)
              "node count exceeds limit", "tree data size exceeds limit" }) {
         ParamConfig config;
         config.withCustomContent = true;
-        InspectorTreeRequestContext context(config, {}, {});
+        InspectorTreeRequestContext context(config, {});
         auto extension = JsonUtil::Create();
         extension->Put("errorMessage", reason);
         EXPECT_FALSE(context.AcceptExtensionTree(*extension));
@@ -185,7 +185,7 @@ TEST(InspectorTreeTask06, SuccessfulExtensionKeepsItsTreeAndConsumesRootStatus)
 {
     ParamConfig config;
     config.withCustomContent = true;
-    InspectorTreeRequestContext context(config, {}, {});
+    InspectorTreeRequestContext context(config, {});
     auto extension = JsonUtil::ParseJsonString(
         R"({"errorMessage":"no error","$children":[{"$type":"Text"}]})");
     EXPECT_TRUE(context.AcceptExtensionTree(*extension));
@@ -200,7 +200,7 @@ TEST(InspectorTreeTask06, ExtensionProviderArraysShareTheRequestNodeLimit)
 {
     ParamConfig config;
     config.withCustomContent = true;
-    InspectorTreeRequestContext context(config, {}, {});
+    InspectorTreeRequestContext context(config, {});
     auto extension = JsonUtil::ParseJsonString(R"({"$children":[{"accessibilityTree":[]}]})");
     auto array = extension->GetValue("$children")->GetArrayItem(0)->GetValue("accessibilityTree");
     for (size_t i = 0; i < 5000; ++i) {

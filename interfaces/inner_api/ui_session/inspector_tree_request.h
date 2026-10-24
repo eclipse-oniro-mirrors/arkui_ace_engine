@@ -20,22 +20,6 @@
 #include <string>
 
 namespace OHOS::Ace {
-struct InspectorTreeRequestToken {
-    uint64_t connectionEpoch = 0;
-    uint64_t generation = 0;
-
-    bool operator==(const InspectorTreeRequestToken& other) const
-    {
-        return connectionEpoch == other.connectionEpoch && generation == other.generation;
-    }
-};
-
-struct InspectorTreeRequestRoute {
-    InspectorTreeRequestToken token;
-    int32_t callerPid = -1;
-    int32_t windowId = -1;
-};
-
 struct InspectorWindowSnapshot {
     bool privacyWindow = false;
     std::string windowTitle;

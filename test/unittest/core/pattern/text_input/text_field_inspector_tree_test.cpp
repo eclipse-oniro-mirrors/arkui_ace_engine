@@ -24,14 +24,14 @@ TEST_F(InspectorTreeTask08, PrivacyDoesNotMutateInputOrPlaceholder)
 {
     CreateTextField("protected-value", "hint");
     ParamConfig config;
-    InspectorTreeRequestContext context(config, {}, { true, "", 1 });
+    InspectorTreeRequestContext context(config, { true, "", 1 });
     auto attrs = JsonUtil::CreateSharedPtrJson();
     pattern_->DumpInspectorTreeInfo(attrs, context);
     EXPECT_EQ(attrs->GetString("content"), "");
     EXPECT_EQ(attrs->GetString("placeholder"), "hint");
     EXPECT_EQ(pattern_->GetTextValue(), "protected-value");
     EXPECT_FALSE(attrs->Contains("password"));
-    InspectorTreeRequestContext ordinary(config, {}, {});
+    InspectorTreeRequestContext ordinary(config, {});
     auto visible = JsonUtil::CreateSharedPtrJson();
     pattern_->DumpInspectorTreeInfo(visible, ordinary);
     EXPECT_EQ(visible->GetString("content"), "protected-value");
@@ -42,7 +42,7 @@ TEST_F(InspectorTreeTask08, EmptyInputKeepsFalseAndZeroSemantics)
     CreateTextField("", "hint");
     ParamConfig config;
     config.accessibilityInfo = true;
-    InspectorTreeRequestContext context(config, {}, {});
+    InspectorTreeRequestContext context(config, {});
     auto attrs = JsonUtil::CreateSharedPtrJson();
     pattern_->DumpInspectorTreeInfo(attrs, context);
     EXPECT_TRUE(attrs->GetValue("content")->IsString());

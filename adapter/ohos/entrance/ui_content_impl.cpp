@@ -6700,7 +6700,6 @@ std::function<void(bool, ParamConfig)> UIContentImpl::InitInspectorTreeCallback(
                 ContainerScope scope(instanceId);
                 auto pipeline = weakPipeline.Upgrade();
                 CHECK_NULL_VOID(pipeline);
-                config.inspectorRoute.windowId = static_cast<int32_t>(pipeline->GetWindowId());
                 pipeline->GetInspectorTree(onlyNeedVisible, config);
             },
             TaskExecutor::TaskType::UI, GET_INSPECTOR_TREE_TIMEOUT_TIME, "UiSessionGetInspectorTree");

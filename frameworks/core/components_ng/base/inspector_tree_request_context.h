@@ -39,7 +39,7 @@ enum class InspectorTextKind { DISPLAY_TEXT, INPUT_VALUE, EDITABLE_TEXT, PLACEHO
 // UI-thread request state. No component retains this object or its borrowed config pointer.
 class ACE_FORCE_EXPORT InspectorTreeRequestContext {
 public:
-    InspectorTreeRequestContext(ParamConfig config, InspectorTreeRequestRoute route, InspectorWindowSnapshot window);
+    InspectorTreeRequestContext(ParamConfig config, InspectorWindowSnapshot window);
 
     bool CanExportText(InspectorTextKind kind, bool password, bool obscured);
     void CollectWithWindowPrivacy(
@@ -67,7 +67,6 @@ public:
     }
 
     ParamConfig config;
-    InspectorTreeRequestRoute route;
     InspectorWindowSnapshot window;
     InspectorTreeDependencyResult dependencyResult;
 

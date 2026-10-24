@@ -4755,7 +4755,7 @@ bool PipelineContext::OnDumpInfo(const std::vector<std::string>& params) const
         auto config = ParseDumpParamConfig(params);
         auto snapshot = inspectorWindowSnapshot_ ? inspectorWindowSnapshot_() :
             std::make_optional(InspectorWindowSnapshot {});
-        InspectorTreeRequestContext context(config, {}, snapshot.value_or(InspectorWindowSnapshot {}));
+        InspectorTreeRequestContext context(config, snapshot.value_or(InspectorWindowSnapshot {}));
         config.inspectorContext = &context;
         std::shared_ptr<JsonValue> root;
         {
@@ -7780,10 +7780,9 @@ void PipelineContext::DumpVisibleInspectorTree(std::shared_ptr<JsonValue>& rootJ
 void PipelineContext::GetInspectorTree(bool onlyNeedVisible, ParamConfig config)
 {
     CHECK_NULL_VOID(taskExecutor_);
-    auto reporter = std::move(config.inspectorReporter);
     auto snapshot = inspectorWindowSnapshot_ ? inspectorWindowSnapshot_() :
         std::make_optional(InspectorWindowSnapshot {});
-    InspectorTreeRequestContext context(config, config.inspectorRoute, snapshot.value_or(InspectorWindowSnapshot {}));
+    InspectorTreeRequestContext context(config, snapshot.value_or(InspectorWindowSnapshot {}));
     config.inspectorContext = &context;
     std::shared_ptr<JsonValue> root;
     {
@@ -7817,7 +7816,7 @@ void PipelineContext::GetInspectorTree(bool onlyNeedVisible, ParamConfig config)
             return;
         }
     }
-    auto cb = [root = std::move(root), reporter = std::move(reporter)]() {
+    auto cb = [root = std::move(root), requestId = config.inspectorRequestId]() {
         constexpr size_t MAX_REPORT_BYTES = 100 * 1024 * 1024;
         JsonWriteErrorScope errors;
         char* data = nullptr;
@@ -7835,11 +7834,7 @@ void PipelineContext::GetInspectorTree(bool onlyNeedVisible, ParamConfig config)
         std::string result(data, size);
         std::free(data);
 #ifndef CROSS_PLATFORM
-        if (reporter) {
-            reporter(result);
-        } else {
-            UiSessionManager::GetInstance()->ReportInspectorTreeValue(result);
-        }
+        UiSessionManager::GetInstance()->ReportInspectorTreeValue(result, requestId);
 #endif
     };
     taskExecutor_->PostTask(cb, TaskExecutor::TaskType::BACKGROUND,

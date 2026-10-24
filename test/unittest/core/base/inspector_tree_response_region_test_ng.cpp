@@ -57,7 +57,7 @@ public:
     {
         ParamConfig config;
         config.withResponseRegion = true;
-        InspectorTreeRequestContext context(config, {}, {});
+        InspectorTreeRequestContext context(config, {});
         config.inspectorContext = &context;
         auto json = JsonUtil::CreateSharedPtrJson();
         frame->DumpSimplifyTreeWithParamConfig(0, json, visible, config);
@@ -74,7 +74,7 @@ TEST_F(InspectorTreeTask04, ToolKeysAreConfiguredOnlyAndFeatureIsIndependent)
     gesture->SetResponseRegionMap({ { ResponseRegionSupportedTool::PEN, { region } } });
     ParamConfig config;
     config.withResponseRegion = true;
-    InspectorTreeRequestContext context(config, {}, {});
+    InspectorTreeRequestContext context(config, {});
     config.inspectorContext = &context;
     auto json = JsonUtil::CreateSharedPtrJson();
     frame->DumpSimplifyTreeNode(json, config);
@@ -107,7 +107,7 @@ TEST_F(InspectorTreeTask04, TextExportsOnlyExplicitResponseRegion)
 
     ParamConfig config;
     config.withResponseRegion = true;
-    InspectorTreeRequestContext context(config, {}, {});
+    InspectorTreeRequestContext context(config, {});
     config.inspectorContext = &context;
     auto implicit = JsonUtil::CreateSharedPtrJson();
     frame->DumpSimplifyTreeNode(implicit, config);

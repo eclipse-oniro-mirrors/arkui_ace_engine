@@ -54,13 +54,13 @@ TEST_F(InspectorTreeTask11, SelectExpandedFollowsCompletedVisibility)
         MenuStatus::SHOW, MenuStatus::ON_HIDE_ANIMATION, MenuStatus::HIDE };
     ParamConfig interaction;
     interaction.interactionInfo = true;
-    InspectorTreeRequestContext interactionContext(interaction, {}, {});
+    InspectorTreeRequestContext interactionContext(interaction, {});
     auto sparseNode = JsonUtil::CreateSharedPtrJson();
     pattern->AddInspectorTreeInfo(sparseNode, interactionContext);
     EXPECT_TRUE(sparseNode->GetValue("selected")->IsBool());
     EXPECT_FALSE(sparseNode->GetBool("selected"));
     const bool expanded[] = { false, false, false, true, true, false };
-    InspectorTreeRequestContext context({}, {}, {});
+    InspectorTreeRequestContext context({}, {});
     for (size_t i = 0; i < std::size(states); ++i) {
         wrapperPattern->ForceSetMenuStatus(states[i]);
         auto attrs = JsonUtil::CreateSharedPtrJson();
@@ -79,7 +79,7 @@ TEST_F(InspectorTreeTask11, DisappearingSubmenuRemainsExpandedUntilRemoved)
     parent->AddChild(submenu);
     pattern->inspectorSubMenu_ = submenu;
     pattern->inspectorExpanded_ = true;
-    InspectorTreeRequestContext context({}, {}, {});
+    InspectorTreeRequestContext context({}, {});
     parent->AddDisappearingChild(submenu);
     ASSERT_FALSE(submenu->IsOnMainTree());
     auto hiding = JsonUtil::CreateSharedPtrJson();
@@ -116,7 +116,7 @@ protected:
                 SCOPED_TRACE(testing::Message() << "visible=" << visible << ", interaction=" << interaction);
                 ParamConfig config;
                 config.interactionInfo = interaction;
-                InspectorTreeRequestContext context(config, {}, {});
+                InspectorTreeRequestContext context(config, {});
                 config.inspectorContext = &context;
                 auto json = JsonUtil::CreateSharedPtrJson();
                 trigger_->DumpSimplifyTreeWithParamConfig(0, json, visible, config);
@@ -195,7 +195,7 @@ TEST_F(InspectorTreeTask11BoundMenu, RegisteredOpeningMenuTakesPrecedenceOverPre
 
 TEST_F(InspectorTreeTask11, InspectorTreeTask12OnlyInlinePickersExposeExpanded)
 {
-    InspectorTreeRequestContext context({}, {}, {});
+    InspectorTreeRequestContext context({}, {});
     const auto verify = [&context](const auto& pattern) {
         pattern->SetIsShowInDialog(false);
         auto inlineAttrs = JsonUtil::CreateSharedPtrJson();

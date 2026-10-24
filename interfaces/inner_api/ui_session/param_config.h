@@ -18,7 +18,6 @@
 
 #include <cstdint>
 #include <string>
-#include <functional>
 
 #include "interfaces/inner_api/ui_session/inspector_tree_request.h"
 
@@ -54,8 +53,7 @@ struct ParamConfig {
 
     bool withResponseRegion = false;
     // Internal request values are never included in the public configuration parcel.
-    InspectorTreeRequestRoute inspectorRoute;
-    std::function<void(const std::string&)> inspectorReporter;
+    uint64_t inspectorRequestId = 0;
 
     bool IsPublicTree() const
     {

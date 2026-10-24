@@ -18,7 +18,9 @@
 
 #include "gtest/gtest.h"
 #include "interfaces/inner_api/ui_session/ui_content_stub_impl.h"
+#define private public
 #include "interfaces/inner_api/ui_session/ui_report_stub.h"
+#undef private
 #include "message_parcel.h"
 
 #include "adapter/ohos/entrance/ui_session/include/large_string_ashmem.h"
@@ -27,17 +29,17 @@ namespace OHOS::Ace {
 TEST(InspectorTreeTask06, LateReportAndCleanupCannotConsumeReplacement)
 {
     sptr<UiReportStub> stub = new UiReportStub();
-    InspectorTreeRequestToken oldToken;
-    InspectorTreeRequestToken newToken;
+    uint64_t oldToken = 0;
+    uint64_t newToken = 0;
     int oldCalls = 0;
     int newCalls = 0;
-    ASSERT_TRUE(stub->RegisterInspectorTreeRequest([&](std::string, int32_t, bool) { ++oldCalls; }, oldToken));
-    ASSERT_FALSE(stub->RegisterInspectorTreeRequest([&](std::string, int32_t, bool) { ++newCalls; }, newToken));
-    stub->UnregisterInspectorTreeRequest(oldToken);
-    ASSERT_TRUE(stub->RegisterInspectorTreeRequest([&](std::string, int32_t, bool) { ++newCalls; }, newToken));
-    EXPECT_NE(oldToken.generation, newToken.generation);
+    ASSERT_TRUE(stub->RegisterGetInspectorTreeCallback([&](std::string, int32_t, bool) { ++oldCalls; }, &oldToken));
+    ASSERT_FALSE(stub->RegisterGetInspectorTreeCallback([&](std::string, int32_t, bool) { ++newCalls; }, &newToken));
+    stub->UnregisterGetInspectorTreeCallback(oldToken);
+    ASSERT_TRUE(stub->RegisterGetInspectorTreeCallback([&](std::string, int32_t, bool) { ++newCalls; }, &newToken));
+    EXPECT_NE(oldToken, newToken);
     stub->ReportInspectorTreeForRequest("old", 1, true, oldToken);
-    stub->UnregisterInspectorTreeRequest(oldToken);
+    stub->UnregisterGetInspectorTreeCallback(oldToken);
     EXPECT_EQ(oldCalls, 0);
     EXPECT_EQ(newCalls, 0);
     stub->ReportInspectorTreeForRequest("new", 1, true, newToken);
@@ -46,131 +48,96 @@ TEST(InspectorTreeTask06, LateReportAndCleanupCannotConsumeReplacement)
     EXPECT_EQ(newCalls, 1);
 }
 
-TEST(InspectorTreeTask06, ConnectionEpochAndCallbackReentrancy)
+TEST(InspectorTreeTask06, ReconnectAndSerialCallbackReentrancy)
 {
     sptr<UiReportStub> oldStub = new UiReportStub();
     sptr<UiReportStub> newStub = new UiReportStub();
-    InspectorTreeRequestToken oldToken;
-    InspectorTreeRequestToken newToken;
-    InspectorTreeRequestToken reentrantToken;
+    uint64_t oldToken = 0;
+    uint64_t newToken = 0;
+    uint64_t reentrantToken = 0;
     bool registered = false;
-    ASSERT_TRUE(oldStub->RegisterInspectorTreeRequest([](std::string, int32_t, bool) {}, oldToken));
-    ASSERT_TRUE(newStub->RegisterInspectorTreeRequest(
+    ASSERT_TRUE(oldStub->RegisterGetInspectorTreeCallback([](std::string, int32_t, bool) {}, &oldToken));
+    ASSERT_TRUE(newStub->RegisterGetInspectorTreeCallback(
         [&](std::string, int32_t, bool) {
-            registered = newStub->RegisterInspectorTreeRequest([](std::string, int32_t, bool) {}, reentrantToken);
+            registered = newStub->RegisterGetInspectorTreeCallback([](std::string, int32_t, bool) {}, &reentrantToken);
         },
-        newToken));
-    EXPECT_NE(oldToken.connectionEpoch, newToken.connectionEpoch);
+        &newToken));
+    EXPECT_NE(oldToken, newToken);
     newStub->ReportInspectorTreeForRequest("old connection", 1, true, oldToken);
     EXPECT_FALSE(registered);
     newStub->ReportInspectorTreeForRequest("new connection", 1, true, newToken);
     EXPECT_TRUE(registered);
-    newStub->UnregisterInspectorTreeRequest(newToken);
-    InspectorTreeRequestToken overlap;
-    EXPECT_FALSE(newStub->RegisterInspectorTreeRequest([](std::string, int32_t, bool) {}, overlap));
-    newStub->UnregisterInspectorTreeRequest(reentrantToken);
+    newStub->UnregisterGetInspectorTreeCallback(newToken);
+    uint64_t overlap = 0;
+    EXPECT_FALSE(newStub->RegisterGetInspectorTreeCallback([](std::string, int32_t, bool) {}, &overlap));
+    newStub->UnregisterGetInspectorTreeCallback(reentrantToken);
 }
+
 TEST(InspectorTreeTask06, SharedMemoryRejectsOversizeAndOverread)
 {
     sptr<LargeStringAshmem> memory = new LargeStringAshmem();
     EXPECT_FALSE(memory->WriteToAshmem("inspector-test", "abc", 4));
     EXPECT_FALSE(memory->WriteToAshmem("inspector-test", "", 100 * 1024 * 1024 + 1));
 }
-namespace {
-class InspectorRemote : public IRemoteObject {
-public:
-    bool IsProxyObject() const override
-    {
-        return true;
-    }
-    bool AddDeathRecipient(const sptr<DeathRecipient>& value) override
-    {
-        recipient = value;
-        return true;
-    }
-    bool RemoveDeathRecipient(const sptr<DeathRecipient>&) override
-    {
-        recipient = nullptr;
-        return true;
-    }
-    sptr<DeathRecipient> recipient;
-};
 
-class InspectorWindowService : public UIContentServiceStubImpl {
-public:
-    using UiContentStub::GetInspectorReport;
-    using UiContentStub::SaveInspectorReport;
-};
-} // namespace
-
-TEST(InspectorTreeTask06, SameCallerKeepsSeparateWindowConnections)
+TEST(InspectorTreeTask06, WindowCallbacksHandleSerialFullAndVisibleRequests)
 {
-    InspectorWindowService firstWindow;
-    InspectorWindowService secondWindow;
-    sptr<IRemoteObject> first = new UiReportStub();
-    sptr<IRemoteObject> second = new UiReportStub();
-    sptr<IRemoteObject> replacement = new UiReportStub();
-    constexpr int32_t caller = 42;
-    ASSERT_TRUE(firstWindow.SaveInspectorReport(first, caller));
-    ASSERT_TRUE(secondWindow.SaveInspectorReport(second, caller));
-    auto pendingFirstRequest = firstWindow.GetInspectorReport(caller);
-    EXPECT_EQ(pendingFirstRequest.GetRefPtr(), first.GetRefPtr());
-    EXPECT_EQ(secondWindow.GetInspectorReport(caller).GetRefPtr(), second.GetRefPtr());
-    ASSERT_TRUE(firstWindow.SaveInspectorReport(replacement, caller));
-    EXPECT_EQ(firstWindow.GetInspectorReport(caller).GetRefPtr(), replacement.GetRefPtr());
-    EXPECT_EQ(secondWindow.GetInspectorReport(caller).GetRefPtr(), second.GetRefPtr());
-    EXPECT_EQ(pendingFirstRequest.GetRefPtr(), first.GetRefPtr());
-    EXPECT_EQ(firstWindow.GetInspectorReport(caller + 1), nullptr);
-}
-
-TEST(InspectorTreeTask06, WindowCallbacksRouteFullAndVisibleRequestsIndependently)
-{
-    InspectorWindowService mainWindow;
-    InspectorWindowService subWindow;
+    UIContentServiceStubImpl mainWindow;
+    UIContentServiceStubImpl subWindow;
     std::vector<std::pair<int32_t, bool>> requests;
-    auto bindWindow = [&](InspectorWindowService& service, int32_t windowId) {
+    auto bindWindow = [&](UIContentServiceStubImpl& service, int32_t windowId) {
         service.SetInspectorFunction([&, windowId](bool visible, ParamConfig config) {
             requests.emplace_back(windowId, visible);
-            EXPECT_EQ(config.inspectorRoute.token.connectionEpoch, 3u);
-            EXPECT_EQ(config.inspectorRoute.token.generation, 7u);
+            EXPECT_EQ(config.inspectorRequestId, requests.size());
             EXPECT_TRUE(config.withResponseRegion);
             EXPECT_TRUE(config.withCustomContent);
-            ASSERT_TRUE(config.inspectorReporter);
-            config.inspectorReporter(std::to_string(windowId));
         });
     };
     bindWindow(mainWindow, 101);
     bindWindow(subWindow, 202);
     ParamConfig config;
-    config.inspectorRoute.token = { 3, 7 };
+    config.inspectorRequestId = 1;
     config.withResponseRegion = true;
     config.withCustomContent = true;
-    std::vector<std::string> reports;
-    config.inspectorReporter = [&](const std::string& value) { reports.push_back(value); };
     EXPECT_EQ(mainWindow.GetInspectorTree(nullptr, config), NO_ERROR);
+    ++config.inspectorRequestId;
     EXPECT_EQ(subWindow.GetInspectorTree(nullptr, config), NO_ERROR);
+    ++config.inspectorRequestId;
     EXPECT_EQ(subWindow.GetVisibleInspectorTree(nullptr, config), NO_ERROR);
+    ++config.inspectorRequestId;
     EXPECT_EQ(mainWindow.GetVisibleInspectorTree(nullptr, config), NO_ERROR);
     EXPECT_EQ(requests,
         (std::vector<std::pair<int32_t, bool>> { { 101, false }, { 202, false }, { 202, true }, { 101, true } }));
-    EXPECT_EQ(reports, (std::vector<std::string> { "101", "202", "202", "101" }));
 }
 
-TEST(InspectorTreeTask06, RetiredDeathNotificationDoesNotEraseReplacement)
+TEST(InspectorTreeTask06, ExistingTimeoutOnlyClearsItsOwnRequest)
 {
-    InspectorWindowService window;
-    auto* oldObject = new InspectorRemote();
-    auto* newObject = new InspectorRemote();
-    sptr<IRemoteObject> oldReport = oldObject;
-    sptr<IRemoteObject> newReport = newObject;
-    ASSERT_TRUE(window.SaveInspectorReport(oldReport, 7));
-    auto retiredDeath = oldObject->recipient;
-    ASSERT_TRUE(window.SaveInspectorReport(newReport, 7));
-    wptr<IRemoteObject> empty(static_cast<IRemoteObject*>(nullptr));
-    retiredDeath->OnRemoteDied(empty);
-    EXPECT_EQ(window.GetInspectorReport(7).GetRefPtr(), newReport.GetRefPtr());
-    auto currentDeath = newObject->recipient;
-    currentDeath->OnRemoteDied(empty);
-    EXPECT_EQ(window.GetInspectorReport(7), nullptr);
+    sptr<UiReportStub> stub = new UiReportStub();
+    uint64_t first = 0;
+    uint64_t second = 0;
+    int calls = 0;
+    ASSERT_TRUE(stub->RegisterGetInspectorTreeCallback([](std::string, int32_t, bool) {}, &first));
+    stub->HandleInspectorTreeCallbackTimeout(first);
+    ASSERT_TRUE(stub->RegisterGetInspectorTreeCallback([&](std::string, int32_t, bool) { ++calls; }, &second));
+    stub->HandleInspectorTreeCallbackTimeout(first);
+    stub->ReportInspectorTreeForRequest("late", 1, true, first);
+    EXPECT_EQ(calls, 0);
+    stub->ReportInspectorTreeForRequest("current", 1, true, second);
+    EXPECT_EQ(calls, 1);
+}
+
+TEST(InspectorTreeTask06, ExistingRegistrationAndLegacyReportEntryRemainUsable)
+{
+    sptr<UiReportStub> stub = new UiReportStub();
+    int calls = 0;
+    auto callback = [&](std::string, int32_t, bool) { ++calls; };
+    ASSERT_TRUE(stub->RegisterGetInspectorTreeCallback(callback));
+    ASSERT_FALSE(stub->RegisterGetInspectorTreeCallback(callback));
+    stub->ReportInspectorTreeValue("first", 1, true);
+    EXPECT_EQ(calls, 1);
+    ASSERT_TRUE(stub->RegisterGetInspectorTreeCallback(callback));
+    stub->UnregisterGetInspectorTreeCallback();
+    stub->ReportInspectorTreeValue("discarded", 1, true);
+    EXPECT_EQ(calls, 1);
 }
 } // namespace OHOS::Ace

@@ -56,8 +56,8 @@ public:
      * @description: notify stub side to report inspector value
      */
     void ReportInspectorTreeValue(const std::string& data, int32_t partNum, bool isLastPart) override;
-    void ReportInspectorTreeForRequest(const std::string& data, int32_t partNum, bool isLastPart,
-        const InspectorTreeRequestToken& token) override;
+    void ReportInspectorTreeForRequest(
+        const std::string& data, int32_t partNum, bool isLastPart, uint64_t requestId) override;
 
     /**
      * @description: notify stub side to report the information of hit test node

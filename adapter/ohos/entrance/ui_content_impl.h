@@ -383,7 +383,7 @@ public:
 
     sptr<IRemoteObject> GetRemoteObj() override
     {
-        return instance_;
+        return instance_ ? instance_->AsObject() : nullptr;
     }
 
     void SetStatusBarItemColor(uint32_t color) override;

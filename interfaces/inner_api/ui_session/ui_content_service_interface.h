@@ -530,8 +530,8 @@ public:
      * @description: define reports inspector value to the proxy interface
      */
     virtual void ReportInspectorTreeValue(const std::string& data, int32_t partNum, bool isLastPart) = 0;
-    virtual void ReportInspectorTreeForRequest(const std::string& data, int32_t partNum, bool isLastPart,
-        const InspectorTreeRequestToken& token)
+    virtual void ReportInspectorTreeForRequest(
+        const std::string& data, int32_t partNum, bool isLastPart, uint64_t requestId)
     {
         ReportInspectorTreeValue(data, partNum, isLastPart);
     }
