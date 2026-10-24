@@ -76,7 +76,9 @@ bool ParseItemConstraintDimensionVp(const EcmaVM* vm, const Local<JSValueRef>& v
     if (!ArkTSUtils::ParseJsDimensionVp(vm, value, result, resourceObject, false)) {
         return false;
     }
-    // Match JSViewAbstract: reject resource types that remain unknown after completion.
+    // Parsing has already succeeded. Numeric/string dimensions have no ResourceObject.
+    // Allow those dimensions; reject Resource types that remain unknown after completion,
+    // matching the legacy JSViewAbstract behavior.
     return !resourceObject || resourceObject->GetType() != UNKNOWN_RESOURCE_TYPE;
 }
 
