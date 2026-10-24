@@ -26,6 +26,7 @@ namespace OHOS::Ace::NodeModel {
 enum class CheckType : uint32_t {
     UI_THREAD = 0,
     NODE_DISPOSED = 1,
+    ATTRIBUTE_MATCH = 2,
     // Number of check types and the exclusive upper bound for configuration indices;
     // COUNT is not a configurable check type. Keep values contiguous from zero.
     // Append new types immediately before COUNT without changing existing values,
@@ -49,6 +50,10 @@ bool SetRuntimeCheckMode(int32_t checkType, int32_t mode);
 // Diagnose misuse without short-circuiting the caller in DISABLED or LOG mode.
 void CheckUIThread(const char* publicApiName);
 void CheckNodeDisposed(ArkUI_NodeHandle nodePtr, const char* apiName, const char* errorMessage);
+// Evaluate the policy only while enabled, after validating the node's lifetime.
+using AttributeMatcher = bool (*)(int32_t nodeType, int32_t attribute, int32_t attributeClass);
+void CheckAttributeMatch(ArkUI_NodeHandle node, int32_t attribute, int32_t attributeClass,
+    const char* apiName, AttributeMatcher matcher);
 } // namespace ConfigManager
 
 } // namespace OHOS::Ace::NodeModel

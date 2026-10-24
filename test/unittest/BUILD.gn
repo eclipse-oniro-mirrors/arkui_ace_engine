@@ -46,6 +46,11 @@ group("unittest") {
 }
 
 if (!is_host_product) {
+  group("linux_unittest_runtime_check") {
+    testonly = true
+    deps = [ "capi/runtime_check:runtime_check_unittest(${host_toolchain})" ]
+  }
+
   group("linux_unittest_capi") {
     testonly = true
     deps = [ "capi:capi_unittest(${host_toolchain})" ]
