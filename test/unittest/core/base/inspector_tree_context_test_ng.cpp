@@ -35,6 +35,52 @@ TEST(InspectorTreeTask02, PrivacyMatrixAndPerRequestReasons)
     EXPECT_EQ(context.window.pid, 42);
 }
 
+TEST(InspectorTreeTask02, WindowPrivacyIsScopedAndReasonsRemainRequestWide)
+{
+    InspectorTreeRequestContext context({}, {}, { false, "Main", 42 });
+    context.CollectWithWindowPrivacy(InspectorWindowSnapshot { true, "Child", 43 }, [&]() {
+        EXPECT_FALSE(context.CanExportText(InspectorTextKind::INPUT_VALUE, false, false));
+        EXPECT_FALSE(context.CanExportText(InspectorTextKind::EDITABLE_TEXT, false, false));
+        EXPECT_TRUE(context.CanExportText(InspectorTextKind::DISPLAY_TEXT, false, false));
+        EXPECT_TRUE(context.CanExportText(InspectorTextKind::PLACEHOLDER, false, false));
+        context.CollectWithWindowPrivacy(InspectorWindowSnapshot {},
+            [&]() { EXPECT_TRUE(context.CanExportText(InspectorTextKind::INPUT_VALUE, false, false)); });
+        EXPECT_TRUE(context.window.privacyWindow);
+    });
+    EXPECT_FALSE(context.window.privacyWindow);
+    EXPECT_TRUE(context.CanExportText(InspectorTextKind::INPUT_VALUE, false, false));
+    EXPECT_FALSE(context.MarkPrivacyReasonOnce(PrivacyReason::PRIVACY_WINDOW));
+    EXPECT_EQ(context.window.windowTitle, "Main");
+    EXPECT_EQ(context.window.pid, 42);
+}
+
+TEST(InspectorTreeTask02, MissingWindowSnapshotStopsBeforeCollecting)
+{
+    ParamConfig config;
+    config.withResponseRegion = true;
+    InspectorTreeRequestContext context(config, {}, {});
+    bool collected = false;
+    context.CollectWithWindowPrivacy(std::nullopt, [&]() { collected = true; });
+    EXPECT_FALSE(collected);
+    EXPECT_TRUE(context.ShouldStop());
+    auto root = JsonUtil::CreateSharedPtrJson();
+    root->Put("content", "earlier result");
+    EXPECT_EQ(context.FinalizeResult(root)->ToString(), R"({"errorMessage":"collection failed"})");
+}
+
+TEST(InspectorTreeTask02, WindowCollectionPreservesErrorsAndRestoresPrivacy)
+{
+    InspectorTreeRequestContext context({}, {}, { true, "Main", 42 });
+    context.CollectWithWindowPrivacy(InspectorWindowSnapshot {}, [&]() {
+        EXPECT_FALSE(context.window.privacyWindow);
+        context.ReportError(InspectorTreeError::PROVIDER_QUERY_FAILED);
+    });
+    EXPECT_TRUE(context.window.privacyWindow);
+    EXPECT_TRUE(context.ShouldStop());
+    context.CollectWithWindowPrivacy(InspectorWindowSnapshot {}, []() { ADD_FAILURE(); });
+    EXPECT_STREQ(context.dependencyResult.GetErrorMessage(), "provider query failed");
+}
+
 TEST(InspectorTreeTask10, MarqueeReplicasDoNotDeduplicateIndependentLabels)
 {
     auto root = JsonUtil::CreateSharedPtrJson();

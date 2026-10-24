@@ -16,6 +16,8 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_BASE_INSPECTOR_TREE_REQUEST_CONTEXT_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_BASE_INSPECTOR_TREE_REQUEST_CONTEXT_H
 
+#include <functional>
+#include <optional>
 #include <set>
 
 #include "interfaces/inner_api/ui_session/inspector_tree_request.h"
@@ -40,6 +42,8 @@ public:
     InspectorTreeRequestContext(ParamConfig config, InspectorTreeRequestRoute route, InspectorWindowSnapshot window);
 
     bool CanExportText(InspectorTextKind kind, bool password, bool obscured);
+    void CollectWithWindowPrivacy(
+        const std::optional<InspectorWindowSnapshot>& snapshot, const std::function<void()>& collect);
     bool MarkPrivacyReasonOnce(PrivacyReason reason);
     void FinalizeNativeTree(const std::shared_ptr<JsonValue>& root);
     std::shared_ptr<JsonValue> FinalizeResult(std::shared_ptr<JsonValue> root);

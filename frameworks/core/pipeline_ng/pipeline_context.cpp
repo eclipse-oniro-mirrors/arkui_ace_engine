@@ -7610,7 +7610,18 @@ void PipelineContext::GetOverlayInspector(std::shared_ptr<JsonValue>& root, RefP
         auto container = Container::GetContainer(containerId);
         CHECK_NULL_VOID(container);
 #ifndef CROSS_PLATFORM
-        container->DumpSimplifyTreeWithParamConfig(root, config, true);
+        if (auto* context = config.inspectorContext) {
+            auto pipeline = AceType::DynamicCast<PipelineContext>(container->GetPipelineContext());
+            CHECK_NULL_CONTINUE(pipeline);
+            auto snapshot = pipeline->inspectorWindowSnapshot_ ? pipeline->inspectorWindowSnapshot_() : std::nullopt;
+            context->CollectWithWindowPrivacy(
+                snapshot, [&]() { container->DumpSimplifyTreeWithParamConfig(root, config, true); });
+            if (context->ShouldStop()) {
+                return;
+            }
+        } else {
+            container->DumpSimplifyTreeWithParamConfig(root, config, true);
+        }
 #endif
     }
 }

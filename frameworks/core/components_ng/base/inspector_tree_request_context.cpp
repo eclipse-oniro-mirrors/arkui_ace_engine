@@ -112,6 +112,23 @@ bool InspectorTreeRequestContext::CanExportText(InspectorTextKind kind, bool pas
     return allowed;
 }
 
+void InspectorTreeRequestContext::CollectWithWindowPrivacy(
+    const std::optional<InspectorWindowSnapshot>& snapshot, const std::function<void()>& collect)
+{
+    if (ShouldStop()) {
+        return;
+    }
+    if (!snapshot) {
+        ReportError(InspectorTreeError::COLLECTION_FAILED);
+        return;
+    }
+    // Cross-window collection is synchronous and shares the request's budget, errors and privacy reasons.
+    const bool previousPrivacy = window.privacyWindow;
+    window.privacyWindow = snapshot->privacyWindow;
+    collect();
+    window.privacyWindow = previousPrivacy;
+}
+
 void InspectorTreeRequestContext::FinalizeNativeTree(const std::shared_ptr<JsonValue>& root)
 {
     std::vector<std::shared_ptr<JsonValue>> pending { root };

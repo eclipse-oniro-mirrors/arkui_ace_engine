@@ -23,6 +23,7 @@
 #define private public
 #define protected public
 #include "core/components_ng/pattern/rich_editor/rich_editor_pattern.h"
+#include "core/components_ng/pattern/text_field/text_field_pattern.h"
 #undef protected
 #undef private
 
@@ -69,6 +70,57 @@ protected:
     void OnDetachFromFrameNode(FrameNode*) override {}
     void OnDetachFromMainTree() override {}
 };
+
+class InspectorTextFieldPattern : public TextFieldPattern {
+    DECLARE_ACE_TYPE(InspectorTextFieldPattern, TextFieldPattern);
+
+protected:
+    void OnAttachToFrameNode() override {}
+    void OnDetachFromFrameNode(FrameNode*) override {}
+    void OnDetachFromMainTree() override {}
+};
+
+TEST_F(InspectorTreeTask03, WindowPrivacyFiltersBothEditorsAndRestoresTheCaller)
+{
+    auto input = AceType::MakeRefPtr<InspectorTextFieldPattern>();
+    auto inputNode = FrameNode::CreateFrameNode("TextInput", 11, input);
+    inputNode->SetActive(true);
+    ASSERT_NE(input->GetTextContentController(), nullptr);
+    input->GetTextContentController()->SetTextValue(u"input-private-value");
+    auto rich = AceType::MakeRefPtr<InspectorRichEditorPattern>();
+    auto richNode = FrameNode::CreateFrameNode("RichEditor", 12, rich);
+    richNode->SetActive(true);
+    rich->SetInspectorText(u"rich-private-value");
+    for (bool childPrivate : { false, true }) {
+        for (bool visible : { false, true }) {
+            for (bool accessibility : { false, true }) {
+                ParamConfig config;
+                config.accessibilityInfo = accessibility;
+                InspectorTreeRequestContext context(config, {}, { !childPrivate, "Main", 42 });
+                config.inspectorContext = &context;
+                auto checkEditors = [&](bool privacy) {
+                    auto inputTree = JsonUtil::CreateSharedPtrJson();
+                    auto richTree = JsonUtil::CreateSharedPtrJson();
+                    inputNode->DumpSimplifyTreeWithParamConfig(0, inputTree, visible, config);
+                    richNode->DumpSimplifyTreeWithParamConfig(0, richTree, visible, config);
+                    EXPECT_EQ(
+                        inputTree->GetObject("$attrs")->GetString("content"), privacy ? "" : "input-private-value");
+                    EXPECT_EQ(richTree->GetObject("$attrs")->GetString("content"), privacy ? "" : "rich-private-value");
+                    if (privacy) {
+                        EXPECT_EQ(inputTree->ToString().find("input-private-value"), std::string::npos);
+                        EXPECT_EQ(richTree->ToString().find("rich-private-value"), std::string::npos);
+                    }
+                };
+                context.CollectWithWindowPrivacy(
+                    InspectorWindowSnapshot { childPrivate, "Child", 43 }, [&]() { checkEditors(childPrivate); });
+                checkEditors(!childPrivate);
+                EXPECT_EQ(context.window.privacyWindow, !childPrivate);
+            }
+        }
+    }
+    EXPECT_EQ(input->GetTextValue(), "input-private-value");
+    EXPECT_EQ(rich->GetInspectorText(), u"rich-private-value");
+}
 
 TEST_F(InspectorTreeTask03, RichEditorPasswordIsProtectedWhenShownOrHidden)
 {
