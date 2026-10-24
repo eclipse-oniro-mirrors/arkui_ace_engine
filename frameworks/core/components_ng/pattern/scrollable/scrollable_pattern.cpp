@@ -3564,6 +3564,7 @@ ScrollResult ScrollablePattern::HandleScroll(float offset, int32_t source, Neste
     ScrollResult result = { 0, false };
     auto host = GetHost();
     CHECK_NULL_RETURN(host, result);
+    int32_t savedQuerySource = scrollSourceForQuery_;
     auto nestedScroll = GetNestedScroll();
     auto parent = GetNestedScrollParent();
     auto initOffset = offset;
@@ -3598,6 +3599,9 @@ ScrollResult ScrollablePattern::HandleScroll(float offset, int32_t source, Neste
     }
     bool moved = HandleScrollImpl(offset, source);
     NotifyMoved(moved);
+    if (NearZero(offset) && (source == SCROLL_FROM_UPDATE || source == SCROLL_FROM_AXIS)) {
+        scrollSourceForQuery_ = savedQuerySource;
+    }
     return result;
 }
 
