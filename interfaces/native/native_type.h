@@ -7137,6 +7137,21 @@ typedef enum {
 } OH_ArkUI_NodeMountPolicy;
 
 /**
+ * @brief Enumerates the policy for adopting a child node.
+ *
+ * @since 26.2.0
+ */
+typedef enum {
+    /**
+     * The window position of the adopted node's overlays follows the FrameNode adopt-parent chain and applies the
+     * developer-provided compensation at each adoption boundary.
+     *
+     * @since 26.2.0
+     */
+    OH_ARKUI_NATIVE_MODULE_ADOPT_POLICY_OVERLAY_POSITION_FOLLOWS_ADOPT_PARENT_CHAIN = 0,
+} OH_ArkUI_AdoptPolicy;
+
+/**
  * @brief Enumerates the ArcDirection.
  *
  * @since 26.1.0

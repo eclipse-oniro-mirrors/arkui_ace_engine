@@ -29,6 +29,7 @@
 #include "interfaces/inner_api/ace_kit/include/ui/view/ai_caller_helper.h"
 #include "ui/base/modifier_property.h"
 
+#include "base/geometry/matrix4.h"
 #include "base/geometry/ng/offset_t.h"
 #include "base/geometry/ng/rect_t.h"
 #include "base/geometry/ng/vector.h"
@@ -612,6 +613,30 @@ public:
     MountPolicy GetMountPolicy();
 
     void SetMountPolicy(MountPolicy mountPolicy);
+
+    bool UseAdoptedCompensation() const
+    {
+        return adoptedCompensationInfo_ && adoptedCompensationInfo_->useAdoptedCompensation;
+    }
+
+    void SetUseAdoptedCompensation(bool useAdoptedCompensation);
+    void SetAdoptedCompensation(const OffsetF& offset, const Matrix4& transform);
+    bool HasAdoptedCompensation() const;
+
+    OffsetF GetAdoptedCompensationOffset() const;
+    Matrix4 GetAdoptedCompensationTransform() const;
+    OffsetF GetTransformedAdoptedCompensationOffset() const;
+    VectorF GetAdoptedCompensationScale() const;
+
+    void ApplyAdoptedCompensationToPoints(std::vector<Point>& points) const;
+    void ApplyAdoptedCompensationToPoints(std::vector<PointF>& points) const;
+    void ApplyAdoptedCompensationToRect(RectF& rect) const;
+    void ApplyAdoptedCompensationToPoint(Point& point) const;
+    void ApplyAdoptedCompensationToPoint(PointF& point) const;
+    void RevertAdoptedCompensationFromPoint(PointF& point) const;
+    void ApplyAdoptedCompensationToCenterAndSize(PointF& center, float& width, float& height) const;
+
+    RefPtr<FrameNode> GetCoordinateAncestorNodeOfFrame(bool checkBoundary = false) const;
 
     void OnMixedMountChildAdded(const RefPtr<UINode>& child) override;
     void OnMixedMountChildRemoved(const RefPtr<UINode>& child) override;
@@ -1889,6 +1914,12 @@ private:
     RefPtr<AccessibilityProperty>& GetOrCreateAccessibilityProperty();
     void OnHoverWithHightLight(bool isHover) const;
     bool IsPreMakeAndScroll();
+    struct AdoptedCompensationInfo {
+        bool useAdoptedCompensation = false;
+        OffsetF offset;
+        Matrix4 transform;
+    };
+
     bool isAccessibilityPropertyInitialized_ = false;
     bool isTrimMemRecycle_ = false;
     // sort in ZIndex.
@@ -1918,6 +1949,7 @@ private:
     std::shared_ptr<OffsetF> lastHostParentOffsetToWindow_;
     std::unique_ptr<RectF> lastFrameNodeRect_;
     std::unique_ptr<FrameNodeExtension> extensionData_;
+    std::unique_ptr<AdoptedCompensationInfo> adoptedCompensationInfo_;
     std::set<std::string> allowDrop_;
     std::optional<RectF> viewPort_;
     NG::DragDropInfo dragPreviewInfo_;

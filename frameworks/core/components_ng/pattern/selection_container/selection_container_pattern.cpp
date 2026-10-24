@@ -1217,7 +1217,7 @@ FrameNodeChangeInfoFlag SelectionContainerPattern::CollectFlagsFromChildToHost(
     const RefPtr<FrameNode>& childHost, int32_t containerId)
 {
     auto flag = childHost->GetChangeInfoFlag();
-    auto current = childHost->GetAncestorNodeOfFrame(true);
+    auto current = childHost->GetCoordinateAncestorNodeOfFrame(true);
     while (current) {
         if (current->GetId() == containerId) {
             break;
@@ -1226,7 +1226,7 @@ FrameNodeChangeInfoFlag SelectionContainerPattern::CollectFlagsFromChildToHost(
         if (flag == FRAME_NODE_CHANGE_ALL) {
             return flag;
         }
-        current = current->GetAncestorNodeOfFrame(true);
+        current = current->GetCoordinateAncestorNodeOfFrame(true);
     }
     return flag;
 }

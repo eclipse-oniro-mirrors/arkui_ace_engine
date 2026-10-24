@@ -208,13 +208,13 @@ std::optional<RectF> TextSelectionChild::GetAncestorNodeViewPortForChild()
         }
     }
 
-    auto parent = host->GetAncestorNodeOfFrame(true);
+    auto parent = host->GetCoordinateAncestorNodeOfFrame(true);
     while (parent) {
         auto scrollableContainer = parent->GetPattern<NestableScrollContainer>();
         if (scrollableContainer) {
             return parent->GetTransformRectRelativeToWindow();
         }
-        parent = parent->GetAncestorNodeOfFrame(true);
+        parent = parent->GetCoordinateAncestorNodeOfFrame(true);
     }
     return std::nullopt;
 }
@@ -226,7 +226,7 @@ std::vector<AncestorNodeViewPortInfo> TextSelectionChild::GetAncestorNodeViewPor
     CHECK_NULL_RETURN(pattern, infos);
     auto host = pattern->GetHost();
     CHECK_NULL_RETURN(host, infos);
-    auto parent = host->GetAncestorNodeOfFrame(true);
+    auto parent = host->GetCoordinateAncestorNodeOfFrame(true);
     while (parent) {
         auto scrollableContainer = parent->GetPattern<NestableScrollContainer>();
         if (scrollableContainer) {
@@ -246,7 +246,7 @@ std::vector<AncestorNodeViewPortInfo> TextSelectionChild::GetAncestorNodeViewPor
             info.viewPort = visibleRect;
             infos.emplace_back(info);
         }
-        parent = parent->GetAncestorNodeOfFrame(true);
+        parent = parent->GetCoordinateAncestorNodeOfFrame(true);
     }
     return infos;
 }
@@ -462,7 +462,11 @@ OffsetF TextSelectionChild::GetChildPaintOffsetWithoutTransform() const
         auto renderContext = parent->GetRenderContext();
         CHECK_NULL_RETURN(renderContext, {});
         offset += renderContext->GetPaintRectWithoutTransform().GetOffset();
-        parent = parent->GetAncestorNodeOfFrame(true);
+        auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
+        if (ancestor && parent->IsAdopted() && parent->UseAdoptedCompensation()) {
+            offset += parent->GetAdoptedCompensationOffset();
+        }
+        parent = ancestor;
     }
     return offset;
 }

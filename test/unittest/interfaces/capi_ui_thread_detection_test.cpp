@@ -236,7 +236,7 @@ HWTEST_F(UiThreadDetectionTest, RuntimeCheckModeChangeInvalidatesCache, TestSize
     EnableMode(OH_ARKUI_NATIVEMODULE_CHECK_MODE_DISABLED);
 }
 
-// === 参数化导出测试（175 × 4 模式）===
+// === 参数化导出测试（177 × 4 模式）===
 
 class UiThreadExportLogTest : public UiThreadDetectionTest, public WithParamInterface<ScopeEntry> {};
 
@@ -370,7 +370,7 @@ TEST_P(UiThreadTableLogTest, LogModeProducesDiagnostic)
     RunAndExpectDiagnostic([api, this] { GetParam().invoke(api); });
 }
 
-// === Scope entries（175 导出函数 + 17 TextEditorStyledStringController，排除 5 个范围外 + 2 个 ANI）===
+// === Scope entries（177 导出函数 + 17 TextEditorStyledStringController，排除 5 个范围外 + 2 个 ANI）===
 
 namespace {
 #define SCOPE_ENTRY(api) { #api, [] { CallWithDefaultArgs(api); } }
@@ -406,6 +406,7 @@ const ScopeEntry SCOPE_ENTRIES[] = {
     SCOPE_ENTRY(OH_ArkUI_GetNodeHandleFromNapiValue),
     SCOPE_ENTRY(OH_ArkUI_InitModuleForArkTSEnv),
     SCOPE_ENTRY(OH_ArkUI_NativeModule_AdoptChild),
+    SCOPE_ENTRY(OH_ArkUI_NativeModule_AdoptChildWithPolicy),
     SCOPE_ENTRY(OH_ArkUI_NativeModule_AtomicServiceMenuBarSetVisible),
     SCOPE_ENTRY(OH_ArkUI_NativeModule_ConvertPositionFromWindow),
     SCOPE_ENTRY(OH_ArkUI_NativeModule_ConvertPositionToWindow),
@@ -418,6 +419,7 @@ const ScopeEntry SCOPE_ENTRIES[] = {
     SCOPE_ENTRY(OH_ArkUI_NativeModule_RegisterCommonEvent),
     SCOPE_ENTRY(OH_ArkUI_NativeModule_RegisterCommonVisibleAreaApproximateChangeEvent),
     SCOPE_ENTRY(OH_ArkUI_NativeModule_RemoveAdoptedChild),
+    SCOPE_ENTRY(OH_ArkUI_NativeModule_SetAdoptedChildOverlayPositionCompensation),
     SCOPE_ENTRY(OH_ArkUI_NativeModule_SetChildMountPolicy),
     SCOPE_ENTRY(OH_ArkUI_NativeModule_UnregisterCommonAreaApproximateChangeEvent),
     SCOPE_ENTRY(OH_ArkUI_NativeModule_UnregisterCommonEvent),
