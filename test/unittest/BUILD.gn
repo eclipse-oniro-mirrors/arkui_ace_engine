@@ -733,6 +733,7 @@ ohos_static_library("ace_core_extra") {
     "$ace_root/frameworks/core/accessibility/native_interface_accessibility_provider.cpp",
     "$ace_root/frameworks/core/accessibility/node_utils/accessibility_frame_node_utils.cpp",
     "$ace_root/frameworks/core/accessibility/node_utils/cmp_accessibility_registry.cpp",
+    "$ace_root/frameworks/core/accessibility/third_provider_tree_exporter.cpp",
     "$ace_root/frameworks/core/common/agingadapation/aging_adapation_dialog_util.cpp",
     "$ace_root/frameworks/core/common/back_press_handler_manager.cpp",
     "$ace_root/frameworks/core/common/container_scope.cpp",
@@ -820,6 +821,7 @@ ohos_static_library("ace_core_extra") {
   external_deps = [
     "bounds_checking_function:libsec_static",
     "c_utils:utils",
+    "cJSON:cjson_static",
     "googletest:gmock",
     "googletest:gtest_main",
     "icu:static_icui18n",
