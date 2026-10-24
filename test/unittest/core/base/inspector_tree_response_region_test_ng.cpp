@@ -13,7 +13,10 @@
  * limitations under the License.
  */
 
+#include <tuple>
+
 #include "gtest/gtest.h"
+#include "test/mock/frameworks/core/components_ng/render/mock_render_context.h"
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 
 #include "base/geometry/calc_dimension_rect.h"
@@ -33,6 +36,32 @@ public:
     void TearDown() override
     {
         MockPipelineContext::TearDown();
+    }
+
+    RefPtr<FrameNode> CreateFrame(int32_t id, const RectF& rect)
+    {
+        auto frame = FrameNode::CreateFrameNode("test", id, AceType::MakeRefPtr<Pattern>());
+        frame->SetActive(true);
+        SetPaintRect(frame, rect);
+        return frame;
+    }
+
+    void SetPaintRect(const RefPtr<FrameNode>& frame, const RectF& rect)
+    {
+        auto render = AceType::DynamicCast<MockRenderContext>(frame->GetRenderContext());
+        ASSERT_NE(render, nullptr);
+        render->SetPaintRectWithTransform(rect);
+    }
+
+    std::shared_ptr<JsonValue> DumpRegions(const RefPtr<FrameNode>& frame, bool visible)
+    {
+        ParamConfig config;
+        config.withResponseRegion = true;
+        InspectorTreeRequestContext context(config, {}, {});
+        config.inspectorContext = &context;
+        auto json = JsonUtil::CreateSharedPtrJson();
+        frame->DumpSimplifyTreeWithParamConfig(0, json, visible, config);
+        return json;
     }
 };
 
@@ -104,5 +133,134 @@ TEST_F(InspectorTreeTask04, TextExportsOnlyExplicitResponseRegion)
     auto otherRegion = JsonUtil::CreateSharedPtrJson();
     other->DumpSimplifyTreeNode(otherRegion, config);
     EXPECT_TRUE(otherRegion->GetValue("responseRegion")->IsArray());
+}
+
+TEST_F(InspectorTreeTask04, SelfClipPreservesExplicitRegionsOutsidePaintBounds)
+{
+    auto frame = CreateFrame(23, RectF(40.0f, 50.0f, 100.0f, 100.0f));
+    auto gesture = frame->GetOrCreateGestureEventHub();
+    DimensionRect region(Dimension(140, DimensionUnit::PX), Dimension(120, DimensionUnit::PX),
+        DimensionOffset(Dimension(-20, DimensionUnit::PX), Dimension(-10, DimensionUnit::PX)));
+    gesture->SetResponseRegion({ region });
+    gesture->SetMouseResponseRegion({ region });
+    for (bool clip : { false, true }) {
+        frame->GetRenderContext()->UpdateClipEdge(clip);
+        for (bool visible : { false, true }) {
+            auto json = DumpRegions(frame, visible);
+            for (const auto* key : { "responseRegion", "mouseResponseRegion" }) {
+                auto regions = json->GetValue(key);
+                ASSERT_EQ(regions->GetArraySize(), 1);
+                EXPECT_EQ(regions->GetArrayItem(0)->GetString(), "[20.00, 40.00],[160.00,160.00]");
+            }
+        }
+        for (auto source : { SourceType::TOUCH, SourceType::MOUSE }) {
+            TouchEvent event;
+            event.sourceType = source;
+            EXPECT_FALSE(frame->IsOutOfTouchTestRegion(PointF(25.0f, 45.0f), event));
+            EXPECT_TRUE(frame->IsOutOfTouchTestRegion(PointF(15.0f, 35.0f), event));
+        }
+    }
+    const std::tuple<ResponseRegionSupportedTool, SourceTool, const char*> tools[] = {
+        { ResponseRegionSupportedTool::ALL, SourceTool::UNKNOWN, "all" },
+        { ResponseRegionSupportedTool::FINGER, SourceTool::FINGER, "finger" },
+        { ResponseRegionSupportedTool::PEN, SourceTool::PEN, "pen" },
+        { ResponseRegionSupportedTool::MOUSE, SourceTool::MOUSE, "mouse" }
+    };
+    for (const auto& [tool, source, key] : tools) {
+        gesture->SetResponseRegionMap({ { tool, { region } } });
+        TouchEvent event;
+        event.sourceType = source == SourceTool::MOUSE ? SourceType::MOUSE : SourceType::TOUCH;
+        event.sourceTool = source;
+        EXPECT_FALSE(frame->IsOutOfTouchTestRegion(PointF(25.0f, 45.0f), event));
+        for (bool visible : { false, true }) {
+            auto json = DumpRegions(frame, visible);
+            auto regions = json->GetObject("responseRegionMap")->GetValue(key);
+            ASSERT_EQ(regions->GetArraySize(), 1);
+            EXPECT_EQ(regions->GetArrayItem(0)->GetString(), "[20.00, 40.00],[160.00,160.00]");
+        }
+    }
+}
+
+TEST_F(InspectorTreeTask04, AncestorClipUsesToolResponseRegionsAndPreservesGaps)
+{
+    auto parent = CreateFrame(24, RectF(0.0f, 0.0f, 100.0f, 100.0f));
+    auto frame = CreateFrame(25, RectF(0.0f, 0.0f, 100.0f, 100.0f));
+    frame->MountToParent(parent);
+    parent->GetRenderContext()->UpdateClipEdge(true);
+    frame->GetRenderContext()->UpdateClipEdge(true);
+    DimensionRect region(Dimension(140, DimensionUnit::PX), Dimension(120, DimensionUnit::PX),
+        DimensionOffset(Dimension(-20, DimensionUnit::PX), Dimension(-10, DimensionUnit::PX)));
+    DimensionRect left(Dimension(40, DimensionUnit::PX), Dimension(120, DimensionUnit::PX),
+        DimensionOffset(Dimension(-30, DimensionUnit::PX), Dimension(-10, DimensionUnit::PX)));
+    DimensionRect right(Dimension(50, DimensionUnit::PX), Dimension(120, DimensionUnit::PX),
+        DimensionOffset(Dimension(80, DimensionUnit::PX), Dimension(-10, DimensionUnit::PX)));
+    auto gesture = frame->GetOrCreateGestureEventHub();
+    auto parentGesture = parent->GetOrCreateGestureEventHub();
+    gesture->SetResponseRegion({ region });
+    gesture->SetMouseResponseRegion({ region });
+    parentGesture->SetResponseRegion({ left, right });
+    parentGesture->SetMouseResponseRegion({ right });
+    TouchEvent event;
+    event.sourceType = SourceType::TOUCH;
+    EXPECT_FALSE(parent->IsOutOfTouchTestRegion(PointF(-15.0f, 0.0f), event));
+    EXPECT_FALSE(parent->IsOutOfTouchTestRegion(PointF(115.0f, 0.0f), event));
+    EXPECT_TRUE(parent->IsOutOfTouchTestRegion(PointF(50.0f, 50.0f), event));
+    EXPECT_FALSE(frame->IsOutOfTouchTestRegion(PointF(-15.0f, 0.0f), event));
+    for (bool visible : { false, true }) {
+        auto json = DumpRegions(frame, visible);
+        auto touch = json->GetValue("responseRegion");
+        ASSERT_EQ(touch->GetArraySize(), 2);
+        EXPECT_EQ(touch->GetArrayItem(0)->GetString(), "[-20.00, -10.00],[10.00,110.00]");
+        EXPECT_EQ(touch->GetArrayItem(1)->GetString(), "[80.00, -10.00],[120.00,110.00]");
+        auto mouse = json->GetValue("mouseResponseRegion");
+        ASSERT_EQ(mouse->GetArraySize(), 1);
+        EXPECT_EQ(mouse->GetArrayItem(0)->GetString(), "[80.00, -10.00],[120.00,110.00]");
+    }
+    gesture->SetResponseRegionMap({ { ResponseRegionSupportedTool::MOUSE, { region } } });
+    event.sourceType = SourceType::MOUSE;
+    event.sourceTool = SourceTool::MOUSE;
+    EXPECT_TRUE(parent->IsOutOfTouchTestRegion(PointF(-15.0f, 0.0f), event));
+    EXPECT_FALSE(parent->IsOutOfTouchTestRegion(PointF(115.0f, 0.0f), event));
+    for (bool visible : { false, true }) {
+        auto json = DumpRegions(frame, visible);
+        auto mouse = json->GetObject("responseRegionMap")->GetValue("mouse");
+        ASSERT_EQ(mouse->GetArraySize(), 1);
+        EXPECT_EQ(mouse->GetArrayItem(0)->GetString(), "[80.00, -10.00],[120.00,110.00]");
+    }
+    parentGesture->SetResponseRegionMap(
+        { { ResponseRegionSupportedTool::ALL, { left } }, { ResponseRegionSupportedTool::MOUSE, { right } } });
+    EXPECT_FALSE(parent->IsOutOfTouchTestRegion(PointF(-15.0f, 0.0f), event));
+    auto json = DumpRegions(frame, false);
+    auto mouse = json->GetObject("responseRegionMap")->GetValue("mouse");
+    ASSERT_EQ(mouse->GetArraySize(), 2);
+    EXPECT_EQ(mouse->GetArrayItem(0)->GetString(), "[80.00, -10.00],[120.00,110.00]");
+    EXPECT_EQ(mouse->GetArrayItem(1)->GetString(), "[-20.00, -10.00],[10.00,110.00]");
+}
+
+TEST_F(InspectorTreeTask04, AncestorClipHonorsDefaultRegionsAndEmptyIntersections)
+{
+    auto parent = CreateFrame(26, RectF(0.0f, 0.0f, 100.0f, 100.0f));
+    auto frame = CreateFrame(27, RectF(0.0f, 0.0f, 100.0f, 100.0f));
+    frame->MountToParent(parent);
+    DimensionRect region(Dimension(140, DimensionUnit::PX), Dimension(120, DimensionUnit::PX),
+        DimensionOffset(Dimension(-20, DimensionUnit::PX), Dimension(-10, DimensionUnit::PX)));
+    frame->GetOrCreateGestureEventHub()->SetResponseRegion({ region });
+    for (bool clip : { false, true }) {
+        parent->GetRenderContext()->UpdateClipEdge(clip);
+        for (bool visible : { false, true }) {
+            auto json = DumpRegions(frame, visible);
+            auto regions = json->GetValue("responseRegion");
+            ASSERT_EQ(regions->GetArraySize(), 1);
+            EXPECT_EQ(regions->GetArrayItem(0)->GetString(),
+                clip ? "[0.00, 0.00],[100.00,100.00]" : "[-20.00, -10.00],[120.00,110.00]");
+        }
+    }
+    SetPaintRect(frame, RectF(200.0f, 200.0f, 100.0f, 100.0f));
+    for (bool visible : { false, true }) {
+        auto json = DumpRegions(frame, visible);
+        auto regions = json->GetValue("responseRegion");
+        ASSERT_TRUE(regions->IsArray());
+        EXPECT_EQ(regions->GetArraySize(), 0);
+    }
 }
 } // namespace OHOS::Ace::NG

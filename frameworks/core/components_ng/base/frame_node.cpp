@@ -1820,8 +1820,8 @@ void FrameNode::DumpInspectorResponseRegions(
     auto gesture = eventHub_ ? eventHub_->GetGestureEventHub() : nullptr;
     CHECK_NULL_VOID(gesture);
     const auto raw = renderContext_->GetPaintRectWithoutTransform();
-    const auto encode = [this](const std::vector<RectF>& regions) {
-        auto array = JsonUtil::CreateArray();
+    const auto toWindow = [](const FrameNode& node, const std::vector<RectF>& regions) {
+        std::vector<RectF> result;
         for (const auto& rect : regions) {
             // Transform every corner; two opposite corners lose rotated extents.
             const OffsetF corners[] = {
@@ -1834,7 +1834,7 @@ void FrameNode::DumpInspectorResponseRegions(
             float bottom = right;
             bool finite = true;
             for (const auto& corner : corners) {
-                auto point = GetPositionToWindowWithTransform(corner);
+                auto point = node.GetPositionToWindowWithTransform(corner);
                 finite = finite && std::isfinite(point.GetX()) && std::isfinite(point.GetY());
                 left = std::min(left, point.GetX());
                 top = std::min(top, point.GetY());
@@ -1844,14 +1844,44 @@ void FrameNode::DumpInspectorResponseRegions(
             if (!finite) {
                 continue;
             }
-            RectF result(left, top, right - left, bottom - top);
-            for (auto node = Claim(this); node; node = node->GetAncestorNodeOfFrame(true)) {
-                auto render = node->GetRenderContext();
-                if (render && render->GetClipEdgeValue(false)) {
-                    result = result.IntersectRectT(node->GetTransformRectRelativeToWindow());
+            result.emplace_back(left, top, right - left, bottom - top);
+        }
+        return result;
+    };
+    const auto encode = [this, &toWindow](const std::vector<RectF>& regions, SourceType type, SourceTool tool) {
+        auto effective = toWindow(*this, regions);
+        TouchEvent event;
+        event.sourceType = type;
+        event.sourceTool = tool;
+        // Self clipping does not limit explicit regions. Ancestors gate hit testing by their response regions.
+        for (auto node = GetAncestorNodeOfFrame(true); node && !effective.empty();
+             node = node->GetAncestorNodeOfFrame(true)) {
+            auto render = node->GetRenderContext();
+            if (!render || !render->GetClipEdgeValue(false)) {
+                continue;
+            }
+            if (!node->GetTouchable()) {
+                effective.clear();
+                break;
+            }
+            auto paintRect = render->GetPaintRectWithoutTransform();
+            auto responseRect = node->CheckResponseRegionForStylus(paintRect, event);
+            auto clips = toWindow(*node,
+                node->GetResponseRegionList(responseRect, static_cast<int32_t>(type), static_cast<int32_t>(tool)));
+            std::vector<RectF> clipped;
+            for (const auto& rect : effective) {
+                for (const auto& clip : clips) {
+                    auto intersection = rect.IntersectRectT(clip);
+                    if (intersection.IsValid()) {
+                        clipped.emplace_back(intersection);
+                    }
                 }
             }
-            array->Put(std::to_string(array->GetArraySize()).c_str(), result.ToBounds().c_str());
+            effective = std::move(clipped);
+        }
+        auto array = JsonUtil::CreateArray();
+        for (const auto& rect : effective) {
+            array->Put(std::to_string(array->GetArraySize()).c_str(), rect.ToBounds().c_str());
         }
         return array;
     };
@@ -1869,9 +1899,9 @@ void FrameNode::DumpInspectorResponseRegions(
             if (found == map.end() || found->second.empty()) {
                 continue;
             }
-            auto regions = GetResponseRegionList(raw, static_cast<int32_t>(SourceType::TOUCH),
-                static_cast<int32_t>(source));
-            output->Put(name, encode(regions));
+            const auto type = source == SourceTool::MOUSE ? SourceType::MOUSE : SourceType::TOUCH;
+            auto regions = GetResponseRegionList(raw, static_cast<int32_t>(type), static_cast<int32_t>(source));
+            output->Put(name, encode(regions, type, source));
         }
         if (output->GetChild()->IsValid()) {
             json->Put("responseRegionMap", output);
@@ -1879,10 +1909,12 @@ void FrameNode::DumpInspectorResponseRegions(
         return;
     }
     if (!gesture->GetResponseRegion().empty() && (!pattern_ || pattern_->HasInspectorResponseRegion())) {
-        json->Put("responseRegion", encode(GetResponseRegionListRaw(raw, static_cast<int32_t>(SourceType::TOUCH))));
+        json->Put("responseRegion", encode(GetResponseRegionListRaw(raw, static_cast<int32_t>(SourceType::TOUCH)),
+                                        SourceType::TOUCH, SourceTool::FINGER));
     }
     if (!gesture->GetMouseResponseRegion().empty()) {
-        json->Put("mouseResponseRegion", encode(GetResponseRegionListRaw(raw, static_cast<int32_t>(SourceType::MOUSE))));
+        json->Put("mouseResponseRegion", encode(GetResponseRegionListRaw(raw, static_cast<int32_t>(SourceType::MOUSE)),
+                                             SourceType::MOUSE, SourceTool::MOUSE));
     }
 }
 
