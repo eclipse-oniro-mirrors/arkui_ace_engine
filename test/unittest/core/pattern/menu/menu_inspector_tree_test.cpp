@@ -17,13 +17,16 @@
 #define private public
 #define protected public
 #include "core/components_ng/pattern/menu/menu_item/menu_item_pattern.h"
+#include "core/components_ng/pattern/menu/menu_manager.h"
 #include "core/components_ng/pattern/menu/wrapper/menu_wrapper_pattern.h"
+#include "core/components_ng/pattern/overlay/overlay_manager.h"
 #include "core/components_ng/pattern/select/select_pattern.h"
 #undef private
 #undef protected
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 
 #include "core/components_ng/base/inspector_tree_request_context.h"
+#include "core/components_ng/event/gesture_event_hub.h"
 #include "core/components_ng/pattern/date_picker/datepicker_pattern.h"
 #include "core/components_ng/pattern/text_picker/textpicker_pattern.h"
 #include "core/components_ng/pattern/time_picker/timepicker_row_pattern.h"
@@ -87,6 +90,109 @@ TEST_F(InspectorTreeTask11, DisappearingSubmenuRemainsExpandedUntilRemoved)
     pattern->DumpInspectorTreeInfo(hidden, context);
     EXPECT_FALSE(hidden->GetBool("expanded"));
 }
+
+class InspectorTreeTask11BoundMenu : public InspectorTreeTask11 {
+protected:
+    void SetUp() override
+    {
+        InspectorTreeTask11::SetUp();
+        root_ = MockPipelineContext::GetCurrent()->GetRootElement();
+        trigger_ = FrameNode::CreateFrameNode("Button", 110, AceType::MakeRefPtr<Pattern>());
+        trigger_->SetActive(true);
+        trigger_->GetOrCreateGestureEventHub()->BindMenu([](GestureEvent&) {});
+        trigger_->MountToParent(root_);
+        wrapper_ =
+            FrameNode::CreateFrameNode("MenuWrapper", 111, AceType::MakeRefPtr<MenuWrapperPattern>(trigger_->GetId()));
+        overlay_ = MockPipelineContext::GetCurrent()->GetOverlayManager();
+        ASSERT_TRUE(overlay_->CheckMenuManager());
+        manager_ = AceType::DynamicCast<MenuManager>(overlay_->menuManager_);
+        ASSERT_NE(manager_, nullptr);
+    }
+
+    void ExpectExpanded(bool expected)
+    {
+        for (bool visible : { false, true }) {
+            for (bool interaction : { false, true }) {
+                SCOPED_TRACE(testing::Message() << "visible=" << visible << ", interaction=" << interaction);
+                ParamConfig config;
+                config.interactionInfo = interaction;
+                InspectorTreeRequestContext context(config, {}, {});
+                config.inspectorContext = &context;
+                auto json = JsonUtil::CreateSharedPtrJson();
+                trigger_->DumpSimplifyTreeWithParamConfig(0, json, visible, config);
+                auto attrs = json->GetObject("$attrs");
+                ASSERT_TRUE(attrs->GetValue("expanded")->IsBool());
+                EXPECT_EQ(attrs->GetBool("expanded"), expected);
+            }
+        }
+    }
+
+    RefPtr<FrameNode> root_;
+    RefPtr<FrameNode> trigger_;
+    RefPtr<FrameNode> wrapper_;
+    RefPtr<OverlayManager> overlay_;
+    RefPtr<MenuManager> manager_;
+};
+
+TEST_F(InspectorTreeTask11BoundMenu, ClosingRemainsExpandedAfterMenuRegistrationIsErased)
+{
+    ExpectExpanded(false);
+    wrapper_->MountToParent(root_);
+    manager_->menuMap_[trigger_->GetId()] = wrapper_;
+    auto pattern = wrapper_->GetPattern<MenuWrapperPattern>();
+    pattern->ForceSetMenuStatus(MenuStatus::ON_START_ANIMATION);
+    ExpectExpanded(false);
+    pattern->ForceSetMenuStatus(MenuStatus::SHOW);
+    ExpectExpanded(true);
+    // HideMenu erases the lookup entry while the invisible wrapper runs its exit transition.
+    pattern->ForceSetMenuStatus(MenuStatus::ON_HIDE_ANIMATION);
+    wrapper_->GetLayoutProperty()->UpdateVisibility(VisibleType::INVISIBLE, true);
+    overlay_->EraseMenuInfo(trigger_->GetId());
+    ASSERT_EQ(overlay_->GetMenuNode(trigger_->GetId()), nullptr);
+    ExpectExpanded(true);
+    ExpectExpanded(true);
+    EXPECT_EQ(pattern->GetMenuStatus(), MenuStatus::ON_HIDE_ANIMATION);
+    EXPECT_EQ(wrapper_->GetLayoutProperty()->GetVisibilityValue(VisibleType::VISIBLE), VisibleType::INVISIBLE);
+    pattern->ForceSetMenuStatus(MenuStatus::HIDE);
+    ExpectExpanded(false);
+    // A retained, detached wrapper must not make the trigger look expanded.
+    root_->RemoveChild(wrapper_);
+    pattern->ForceSetMenuStatus(MenuStatus::ON_HIDE_ANIMATION);
+    ExpectExpanded(false);
+}
+
+TEST_F(InspectorTreeTask11BoundMenu, MountedClosingMenuMustMatchTargetAndWindow)
+{
+    auto other = FrameNode::CreateFrameNode("MenuWrapper", 112, AceType::MakeRefPtr<MenuWrapperPattern>(999));
+    other->GetPattern<MenuWrapperPattern>()->ForceSetMenuStatus(MenuStatus::ON_HIDE_ANIMATION);
+    other->MountToParent(root_);
+    ExpectExpanded(false);
+    wrapper_->MountToParent(root_);
+    wrapper_->GetPattern<MenuWrapperPattern>()->ForceSetMenuStatus(MenuStatus::ON_HIDE_ANIMATION);
+    ExpectExpanded(true);
+    auto boundary = FrameNode::CreateFrameNode("WindowScene", 113, AceType::MakeRefPtr<Pattern>());
+    boundary->SetWindowBoundary();
+    boundary->MountToParent(root_);
+    root_->RemoveChild(trigger_);
+    trigger_->MountToParent(boundary);
+    ExpectExpanded(false);
+    root_->RemoveChild(wrapper_);
+    wrapper_->MountToParent(boundary);
+    ExpectExpanded(true);
+}
+
+TEST_F(InspectorTreeTask11BoundMenu, RegisteredOpeningMenuTakesPrecedenceOverPreviousClosingMenu)
+{
+    wrapper_->MountToParent(root_);
+    wrapper_->GetPattern<MenuWrapperPattern>()->ForceSetMenuStatus(MenuStatus::ON_HIDE_ANIMATION);
+    auto next =
+        FrameNode::CreateFrameNode("MenuWrapper", 114, AceType::MakeRefPtr<MenuWrapperPattern>(trigger_->GetId()));
+    next->GetPattern<MenuWrapperPattern>()->ForceSetMenuStatus(MenuStatus::ON_START_ANIMATION);
+    next->MountToParent(root_);
+    manager_->menuMap_[trigger_->GetId()] = next;
+    ExpectExpanded(false);
+}
+
 TEST_F(InspectorTreeTask11, InspectorTreeTask12OnlyInlinePickersExposeExpanded)
 {
     InspectorTreeRequestContext context({}, {}, {});

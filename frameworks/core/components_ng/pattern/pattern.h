@@ -333,9 +333,7 @@ public:
 
     virtual void DumpInspectorTreeInfo(std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context)
     {
-        InspectorDumpOptions options;
-        options.includeDiagnostic = true;
-        DumpSimplifyInfo(attrs, options);
+        DumpSimplifyInfo(attrs);
     }
     virtual void AddInspectorTreeInfo(std::shared_ptr<JsonValue>& node, InspectorTreeRequestContext& context) {}
     virtual bool HasInspectorSelection() const { return false; }

@@ -216,6 +216,26 @@ constexpr int32_t MIN_OPINC_AREA = 10000;
 } // namespace
 namespace OHOS::Ace::NG {
 namespace {
+bool HasClosingMenuForInspector(const FrameNode& target)
+{
+    // HideMenu removes the lookup entry before the mounted wrapper's exit transition finishes.
+    for (auto parent = target.GetParent(); parent; parent = parent->GetParent()) {
+        for (const auto& child : parent->GetChildren()) {
+            auto frame = AceType::DynamicCast<FrameNode>(child);
+            auto wrapper = frame ? frame->GetPattern<MenuWrapperPattern>() : nullptr;
+            if (wrapper && wrapper->GetTargetId() == target.GetId() &&
+                wrapper->GetMenuStatus() == MenuStatus::ON_HIDE_ANIMATION) {
+                return true;
+            }
+        }
+        auto frame = AceType::DynamicCast<FrameNode>(parent);
+        if (frame && frame->IsWindowBoundary()) {
+            break;
+        }
+    }
+    return false;
+}
+
 void ClearAccessibilityFocus(
     const RefPtr<AccessibilityProperty>& accessibilityProperty, const RefPtr<RenderContext>& renderContext)
 {
@@ -1786,7 +1806,8 @@ void FrameNode::DumpInspectorTreeInfo(std::shared_ptr<JsonValue>& json, ParamCon
         auto wrapper = wrapperNode ? wrapperNode->GetPattern<MenuWrapperPattern>() : nullptr;
         const auto status = wrapper ? wrapper->GetMenuStatus() : MenuStatus::INIT;
         auto attrs = json->GetObject("$attrs");
-        attrs->Put("expanded", status == MenuStatus::SHOW || status == MenuStatus::ON_HIDE_ANIMATION);
+        attrs->Put("expanded", status == MenuStatus::SHOW || status == MenuStatus::ON_HIDE_ANIMATION ||
+            (!wrapperNode && HasClosingMenuForInspector(*this)));
     }
     if (pattern_) {
         pattern_->AddInspectorTreeInfo(json, context);
