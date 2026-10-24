@@ -3100,7 +3100,18 @@ void MenuItemPattern::UpdateNextNodeDivider(bool needDivider)
     CHECK_NULL_VOID(host);
     auto parent = host->GetParent();
     CHECK_NULL_VOID(parent);
-    auto nextNode = parent->GetChildAtIndex(index_ + 1);
+    // For array grid menus, index_ is the relative index in listParams and doesn't account
+    // for the grid section and section divider nodes prepended to the column. Use the actual
+    // child index in the parent to find the correct next sibling.
+    auto menu = GetMenu();
+    int32_t nextIndex = index_ + 1;
+    if (menu) {
+        auto menuPattern = menu->GetPattern<MenuPattern>();
+        if (menuPattern && menuPattern->GetIsArrayGridMenu()) {
+            nextIndex = parent->GetChildIndex(host) + 1;
+        }
+    }
+    auto nextNode = parent->GetChildAtIndex(nextIndex);
     if (nextNode) {
         auto pattern = DynamicCast<FrameNode>(nextNode)->GetPattern<MenuItemPattern>();
         CHECK_NULL_VOID(pattern);

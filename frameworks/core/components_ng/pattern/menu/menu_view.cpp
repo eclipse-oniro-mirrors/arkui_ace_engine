@@ -31,6 +31,8 @@
 #include "core/components_ng/pattern/image/image_layout_property.h"
 #include "core/components_ng/pattern/image/image_pattern.h"
 #include "core/components_ng/pattern/linear_layout/linear_layout_pattern.h"
+#include "core/components_ng/pattern/menu/menu_item/menu_item_layout_property.h"
+#include "core/components_ng/pattern/menu/menu_item/menu_item_paint_property.h"
 #include "core/components_ng/pattern/menu/menu_item/menu_item_row_pattern.h"
 #include "core/components_ng/pattern/menu/menu_layout_property.h"
 #include "core/components_ng/pattern/menu/menu_pattern.h"
@@ -3544,6 +3546,64 @@ static OptionParam ExtractOneMenuItemParam(const RefPtr<FrameNode>& customChildN
     return param;
 }
 
+// Whether the previous list item carries a start icon/symbol. The divider is drawn at the top
+// of the current item, so its start margin follows the *previous* item: align after the icon
+// when present, otherwise use the default start margin.
+static bool PrevItemHasStartIconOrSymbol(const RefPtr<FrameNode>& prevItemFrame)
+{
+    if (!prevItemFrame) {
+        return false;
+    }
+    auto prevLayoutProp = prevItemFrame->GetLayoutProperty<MenuItemLayoutProperty>();
+    if (!prevLayoutProp) {
+        return false;
+    }
+    const auto& startIconOpt = prevLayoutProp->GetStartIcon();
+    bool hasStartIcon = startIconOpt.has_value() && !startIconOpt->GetSrc().empty();
+    bool hasStartSymbol = static_cast<bool>(prevLayoutProp->GetStartSymbol());
+    return hasStartIcon || hasStartSymbol;
+}
+
+// Set dividers on remaining MenuItems in the column. The divider is drawn at the top of each
+// item, so its alignment follows the *previous* item: if the previous item has a start
+// icon/symbol the divider starts after the icon; otherwise it aligns to the content.
+static void SetRemainingItemDividers(const RefPtr<FrameNode>& customMenuNode, const RefPtr<SelectTheme>& theme)
+{
+    CHECK_NULL_VOID(customMenuNode);
+    CHECK_NULL_VOID(theme);
+    if (theme->GetExpandDisplay() || SystemProperties::IsPCMode()) {
+        return;
+    }
+    int listIndex = 0;
+    RefPtr<FrameNode> prevItemFrame;
+    for (const auto& child : customMenuNode->GetChildren()) {
+        auto childFrame = AceType::DynamicCast<FrameNode>(child);
+        if (!childFrame || childFrame->GetTag() != MENU_ITEM_ETS_TAG) {
+            continue;
+        }
+        if (listIndex > 0) {
+            auto paintProperty = childFrame->GetPaintProperty<MenuItemPaintProperty>();
+            CHECK_NULL_VOID(paintProperty);
+            auto strokeWidth = theme->GetDefaultDividerWidth();
+            auto startMargin = theme->GetDefaultDividerStartMargin();
+            auto endMargin = theme->GetDefaultDividerEndMargin();
+            auto color = theme->GetLineColor();
+            if (PrevItemHasStartIconOrSymbol(prevItemFrame)) {
+                auto horInterval = theme->GetMenuItemHorIntervalPadding();
+                startMargin = horInterval + theme->GetIconSideLength() + theme->GetIconContentPadding();
+            }
+            paintProperty->UpdateStrokeWidth(strokeWidth);
+            paintProperty->UpdateStartMargin(startMargin);
+            paintProperty->UpdateEndMargin(endMargin);
+            paintProperty->UpdateDividerColor(color);
+            childFrame->MarkModifyDone();
+            childFrame->MarkDirtyNode(PROPERTY_UPDATE_RENDER);
+        }
+        prevItemFrame = childFrame;
+        listIndex++;
+    }
+}
+
 RefPtr<FrameNode> MenuView::BuildGridListColumn(const RefPtr<FrameNode>& customMenuNode,
     const RefPtr<FrameNode>& menuNode, const MenuParam& menuParam, int32_t themeScopeId)
 {
@@ -3607,38 +3667,9 @@ RefPtr<FrameNode> MenuView::BuildGridListColumn(const RefPtr<FrameNode>& customM
         gridContainer->MountToParent(customMenuNode);
     }
 
-    // Set dividers on remaining MenuItems
-    int listIndex = 0;
     auto theme = menuNode->GetTheme<SelectTheme>(true);
     CHECK_NULL_RETURN(theme, nullptr);
-    for (const auto& child : customMenuNode->GetChildren()) {
-        if (theme->GetExpandDisplay() || SystemProperties::IsPCMode()) {
-            break;
-        }
-        auto childFrame = AceType::DynamicCast<FrameNode>(child);
-        if (!childFrame || childFrame->GetTag() != MENU_ITEM_ETS_TAG) {
-            continue;
-        }
-        if (listIndex > 0) {
-            auto paintProperty = childFrame->GetPaintProperty<MenuItemPaintProperty>();
-            CHECK_NULL_RETURN(paintProperty, nullptr);
-            auto strokeWidth = theme->GetDefaultDividerWidth();
-            auto startMargin = theme->GetDefaultDividerStartMargin();
-            auto endMargin = theme->GetDefaultDividerEndMargin();
-            auto color = theme->GetLineColor();
-            auto iconContentPadding = theme->GetIconContentPadding();
-            auto endIconWidth = theme->GetEndIconWidth();
-            auto menuIconPadding = theme->GetMenuIconPadding();
-            auto finalStartMargin = startMargin + iconContentPadding + endIconWidth + menuIconPadding;
-            paintProperty->UpdateStrokeWidth(strokeWidth);
-            paintProperty->UpdateStartMargin(finalStartMargin);
-            paintProperty->UpdateEndMargin(endMargin);
-            paintProperty->UpdateDividerColor(color);
-            childFrame->MarkModifyDone();
-            childFrame->MarkDirtyNode(PROPERTY_UPDATE_RENDER);
-        }
-        listIndex++;
-    }
+    SetRemainingItemDividers(customMenuNode, theme);
 
     customMenuNode->MarkModifyDone();
     return customMenuNode;
