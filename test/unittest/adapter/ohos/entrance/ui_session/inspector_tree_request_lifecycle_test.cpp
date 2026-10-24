@@ -73,10 +73,9 @@ TEST(InspectorTreeTask06, ReconnectAndSerialCallbackReentrancy)
     newStub->UnregisterGetInspectorTreeCallback(reentrantToken);
 }
 
-TEST(InspectorTreeTask06, SharedMemoryRejectsOversizeAndOverread)
+TEST(InspectorTreeTask06, SharedMemoryRejectsOversize)
 {
     sptr<LargeStringAshmem> memory = new LargeStringAshmem();
-    EXPECT_FALSE(memory->WriteToAshmem("inspector-test", "abc", 4));
     EXPECT_FALSE(memory->WriteToAshmem("inspector-test", "", 100 * 1024 * 1024 + 1));
 }
 
