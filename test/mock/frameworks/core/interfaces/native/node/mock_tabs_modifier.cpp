@@ -19,6 +19,7 @@
 #include "core/components_ng/pattern/tabs/tabs_controller.h"
 #include "core/components_ng/pattern/tabs/tabs_model_ng.h"
 #include "core/components_ng/pattern/tabs/tabs_node.h"
+#include "core/components_ng/pattern/tabs/tabs_pattern.h"
 #include "core/interfaces/native/node/tabs_modifier.h"
 #include "interfaces/inner_api/ace_kit/include/ui/resource/resource_object.h"
 
@@ -331,6 +332,28 @@ int32_t GetBarDisplayModeCustom(ArkUINodeHandle node)
     return static_cast<int32_t>(tabsController->GetBarDisplayMode());
 }
 
+void SetTabsTabBarClickInterceptCustom(ArkUINodeHandle node, ArkUI_Bool active)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto pattern = frameNode->GetPattern<TabsPattern>();
+    CHECK_NULL_VOID(pattern);
+    pattern->SetTabBarClickIntercept(active);
+}
+
+void TabBarClickCustom(ArkUINodeHandle node, ArkUI_Int32 index)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto tabsNode = AceType::DynamicCast<TabsNode>(frameNode);
+    CHECK_NULL_VOID(tabsNode);
+    auto tabBarNode = AceType::DynamicCast<FrameNode>(tabsNode->GetTabBar());
+    CHECK_NULL_VOID(tabBarNode);
+    auto tabBarPattern = tabBarNode->GetPattern<TabBarPattern>();
+    CHECK_NULL_VOID(tabBarPattern);
+    tabBarPattern->TapToHandle(index, true);
+}
+
 void SetTabsIndexMock(ArkUINodeHandle node, ArkUI_Int32 indexVal)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
@@ -412,6 +435,8 @@ const ArkUITabsCustomModifier* GetTabsCustomModifier()
         .setTabBarOpacity = SetTabsTabBarOpacityCustom,
         .swipeTo = TabsSwipeToCustom,
         .getBarDisplayMode = GetBarDisplayModeCustom,
+        .setTabBarClickIntercept = SetTabsTabBarClickInterceptCustom,
+        .tabBarClick = TabBarClickCustom,
     };
     CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
     return &modifier;
