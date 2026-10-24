@@ -13,6 +13,9 @@
  * limitations under the License.
  */
 
+#include <utility>
+#include <vector>
+
 #include "gtest/gtest.h"
 #include "interfaces/inner_api/ui_session/ui_content_stub_impl.h"
 #include "interfaces/inner_api/ui_session/ui_report_stub.h"
@@ -119,6 +122,40 @@ TEST(InspectorTreeTask06, SameCallerKeepsSeparateWindowConnections)
     EXPECT_EQ(pendingFirstRequest.GetRefPtr(), first.GetRefPtr());
     EXPECT_EQ(firstWindow.GetInspectorReport(caller + 1), nullptr);
 }
+
+TEST(InspectorTreeTask06, WindowCallbacksRouteFullAndVisibleRequestsIndependently)
+{
+    InspectorWindowService mainWindow;
+    InspectorWindowService subWindow;
+    std::vector<std::pair<int32_t, bool>> requests;
+    auto bindWindow = [&](InspectorWindowService& service, int32_t windowId) {
+        service.SetInspectorFunction([&, windowId](bool visible, ParamConfig config) {
+            requests.emplace_back(windowId, visible);
+            EXPECT_EQ(config.inspectorRoute.token.connectionEpoch, 3u);
+            EXPECT_EQ(config.inspectorRoute.token.generation, 7u);
+            EXPECT_TRUE(config.withResponseRegion);
+            EXPECT_TRUE(config.withCustomContent);
+            ASSERT_TRUE(config.inspectorReporter);
+            config.inspectorReporter(std::to_string(windowId));
+        });
+    };
+    bindWindow(mainWindow, 101);
+    bindWindow(subWindow, 202);
+    ParamConfig config;
+    config.inspectorRoute.token = { 3, 7 };
+    config.withResponseRegion = true;
+    config.withCustomContent = true;
+    std::vector<std::string> reports;
+    config.inspectorReporter = [&](const std::string& value) { reports.push_back(value); };
+    EXPECT_EQ(mainWindow.GetInspectorTree(nullptr, config), NO_ERROR);
+    EXPECT_EQ(subWindow.GetInspectorTree(nullptr, config), NO_ERROR);
+    EXPECT_EQ(subWindow.GetVisibleInspectorTree(nullptr, config), NO_ERROR);
+    EXPECT_EQ(mainWindow.GetVisibleInspectorTree(nullptr, config), NO_ERROR);
+    EXPECT_EQ(requests,
+        (std::vector<std::pair<int32_t, bool>> { { 101, false }, { 202, false }, { 202, true }, { 101, true } }));
+    EXPECT_EQ(reports, (std::vector<std::string> { "101", "202", "202", "101" }));
+}
+
 TEST(InspectorTreeTask06, RetiredDeathNotificationDoesNotEraseReplacement)
 {
     InspectorWindowService window;

@@ -6660,10 +6660,11 @@ void UIContentImpl::RelaxedCommandCallbackInner(const WeakPtr<TaskExecutor>& tas
     UiSessionManager::GetInstance()->SaveRelaxedCommandFunction(relaxedCommandCallback);
 }
 
-void UIContentImpl::InitUISessionManagerCallbacks(const WeakPtr<TaskExecutor>& taskExecutor)
+std::function<void(bool, ParamConfig)> UIContentImpl::InitInspectorTreeCallback(
+    const WeakPtr<TaskExecutor>& taskExecutor)
 {
     const int32_t GET_INSPECTOR_TREE_TIMEOUT_TIME = 1500;
-    // set get inspector tree function for ui session manager
+    // Bind the inspector route and window snapshot for this UIContent.
     auto container = Platform::AceContainer::GetContainer(instanceId_);
     auto pipeline = container ? AceType::DynamicCast<NG::PipelineContext>(container->GetPipelineContext()) : nullptr;
     WeakPtr<NG::PipelineContext> weakPipeline = pipeline;
@@ -6707,7 +6708,12 @@ void UIContentImpl::InitUISessionManagerCallbacks(const WeakPtr<TaskExecutor>& t
     if (instance_) {
         instance_->SetInspectorFunction(callback);
     }
-    UiSessionManager::GetInstance()->SaveInspectorTreeFunction(callback);
+    return callback;
+}
+
+void UIContentImpl::InitUISessionManagerCallbacks(const WeakPtr<TaskExecutor>& taskExecutor)
+{
+    UiSessionManager::GetInstance()->SaveInspectorTreeFunction(InitInspectorTreeCallback(taskExecutor));
     auto webCallback = [weakTaskExecutor = taskExecutor](bool isRegister) {
         auto taskExecutor = weakTaskExecutor.Upgrade();
         CHECK_NULL_VOID(taskExecutor);
