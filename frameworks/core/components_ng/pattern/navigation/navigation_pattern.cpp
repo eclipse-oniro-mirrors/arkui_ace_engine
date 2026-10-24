@@ -619,6 +619,12 @@ bool NavigationPattern::CreateHomeDestination(RefPtr<UINode>& customNode, RefPtr
         NavigationGroupNode::GetNavDestinationNode(node));
     CHECK_NULL_RETURN(destNode, false);
     destNode->SetIsHomeDestination(true);
+    auto onStart = [weakPattern = WeakClaim(this)]() {
+        auto pattern = weakPattern.Upgrade();
+        CHECK_NULL_VOID(pattern);
+        pattern->OnStartOneTransitionAnimation();
+    };
+    destNode->SetOnStartTransitionAnimationCallback(std::move(onStart));
     // set navigation id
     auto destPattern = AceType::DynamicCast<NavDestinationPattern>(destNode->GetPattern());
     if (host && destPattern) {
