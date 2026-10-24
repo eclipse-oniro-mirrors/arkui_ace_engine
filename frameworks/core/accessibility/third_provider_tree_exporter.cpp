@@ -18,7 +18,6 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <cstdio>
 #include <cstring>
 #include <type_traits>
 #include <unordered_map>
@@ -29,6 +28,7 @@
 #include "base/geometry/point.h"
 #include "cJSON.h"
 #include "base/log/log_wrapper.h"
+#include "securec.h"
 #include "core/accessibility/native_interface_accessibility_impl.h"
 #include "core/accessibility/native_interface_accessibility_provider.h"
 #include "core/components_ng/base/frame_node.h"
@@ -173,9 +173,9 @@ std::string FormatRect(const ArkUI_AccessibleRect& rect, const RectTransform& tr
         bottom = std::max(bottom, point.GetY());
     }
     char buffer[RECT_TEXT_BUFFER_SIZE];
-    auto length = std::snprintf(buffer, sizeof(buffer), "[%.2f, %.2f],[%.2f,%.2f]",
-        left, top, right, bottom);
-    return length > 0 && static_cast<size_t>(length) < sizeof(buffer) ? std::string(buffer) : std::string();
+    const auto length = snprintf_s(buffer, sizeof(buffer), sizeof(buffer) - 1,
+        "[%.2f, %.2f],[%.2f,%.2f]", left, top, right, bottom);
+    return length > 0 ? std::string(buffer) : std::string();
 }
 
 bool GetTransform(const RefPtr<NG::FrameNode>& host, RectTransform& transform)
@@ -756,6 +756,50 @@ ThirdProviderExportStatus ChargeArray(const JsonValue& array, ThirdProviderTreeE
     budget.nodes += count;
     return ThirdProviderExportStatus::SUCCESS;
 }
+
+// Charges and appends one flat node; bumps next.nodes only after the node is
+// fully counted and attached. The caller commits next into the request budget.
+ThirdProviderExportStatus AppendFlatNode(const ProviderElementInfo& info, const RectTransform& transform,
+    ProviderJson& nodes, ThirdProviderTreeExportBudget& next, bool hasNodes)
+{
+    constexpr size_t SEPARATOR_BYTES = sizeof(",") - 1;
+    if (hasNodes) {
+        if (next.bytes > MAX_PROVIDER_BYTES - SEPARATOR_BYTES) {
+            return ThirdProviderExportStatus::SIZE_LIMIT;
+        }
+        next.bytes += SEPARATOR_BYTES;
+    }
+    if (!FitsElementText(info, MAX_PROVIDER_BYTES - next.bytes)) {
+        return ThirdProviderExportStatus::SIZE_LIMIT;
+    }
+    auto node = ElementToFlatJson(info, transform);
+    if (node->HasError()) {
+        return ThirdProviderExportStatus::COLLECTION_FAILED;
+    }
+    const auto status = ChargeJsonBytes(node->Value(), next.bytes);
+    if (status != ThirdProviderExportStatus::SUCCESS) {
+        return status;
+    }
+    if (!nodes.PutRef(std::move(node))) {
+        return ThirdProviderExportStatus::COLLECTION_FAILED;
+    }
+    ++next.nodes;
+    return ThirdProviderExportStatus::SUCCESS;
+}
+// Processes one extension node against the shared budget. Returns false (with
+// status set) when the request must stop; pushes container children to descend.
+bool AccumulateExtensionNode(const JsonValue& node, ThirdProviderTreeExportBudget& next,
+    std::vector<std::unique_ptr<JsonValue>>& pending, ThirdProviderExportStatus& status)
+{
+    if (node.GetKey() == "accessibilityTree") {
+        status = ChargeArray(node, next);
+        return status == ThirdProviderExportStatus::SUCCESS;
+    }
+    if (node.IsArray() || node.IsObject()) {
+        pending.push_back(node.GetChild());
+    }
+    return true;
+}
 } // namespace
 
 std::shared_ptr<JsonValue> ThirdProviderTreeExporter::ExportToInspectorJson(
@@ -842,27 +886,10 @@ ThirdProviderTreeExportResult ThirdProviderTreeExporter::ExportFlatToInspectorJs
     }
     bool hasNodes = false;
     for (const auto& info : infos) {
-        if (hasNodes) {
-            if (next.bytes == MAX_PROVIDER_BYTES) {
-                return { ThirdProviderExportStatus::SIZE_LIMIT, nullptr };
-            }
-            ++next.bytes;
-        }
-        if (!FitsElementText(info, MAX_PROVIDER_BYTES - next.bytes)) {
-            return { ThirdProviderExportStatus::SIZE_LIMIT, nullptr };
-        }
-        auto node = ElementToFlatJson(info, transform);
-        if (node->HasError()) {
-            return { ThirdProviderExportStatus::COLLECTION_FAILED, nullptr };
-        }
-        status = ChargeJsonBytes(node->Value(), next.bytes);
+        status = AppendFlatNode(info, transform, *nodes, next, hasNodes);
         if (status != ThirdProviderExportStatus::SUCCESS) {
             return { status, nullptr };
         }
-        if (!nodes->PutRef(std::move(node))) {
-            return { ThirdProviderExportStatus::COLLECTION_FAILED, nullptr };
-        }
-        ++next.nodes;
         hasNodes = true;
     }
     budget = next;
@@ -884,13 +911,9 @@ ThirdProviderExportStatus ThirdProviderTreeExporter::AccumulateInspectorTree(
         auto node = std::move(pending.back());
         pending.pop_back();
         for (; node->IsValid(); node = node->GetNext()) {
-            if (node->GetKey() == "accessibilityTree") {
-                const auto status = ChargeArray(*node, next);
-                if (status != ThirdProviderExportStatus::SUCCESS) {
-                    return status;
-                }
-            } else if (node->IsArray() || node->IsObject()) {
-                pending.push_back(node->GetChild());
+            ThirdProviderExportStatus status = ThirdProviderExportStatus::SUCCESS;
+            if (!AccumulateExtensionNode(*node, next, pending, status)) {
+                return status;
             }
         }
     }
