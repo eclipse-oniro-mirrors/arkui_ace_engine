@@ -5047,6 +5047,16 @@ void NavigationPattern::TriggerPerformanceCheck(
     }
 }
 
+void NavigationPattern::HandlePreTransition(const RefPtr<NavigationGroupNode>& hostNode,
+    const RefPtr<NavDestinationGroupNode>& topDestination,
+    const std::string& fromPathInfo, const std::string& toPathInfo)
+{
+    auto accessibilityId = topDestination ? topDestination->GetAccessibilityId() : -1;
+    hostNode->OnAccessibilityEvent(AccessibilityEventType::PAGE_PRE_CHANGE, accessibilityId,
+        WindowsContentChangeTypes::CONTENT_CHANGE_TYPE_INVALID);
+    ACE_SCOPED_TRACE_COMMERCIAL("NavDestination Page from %s to %s", fromPathInfo.c_str(), toPathInfo.c_str());
+}
+
 void NavigationPattern::StartTransition(const RefPtr<NavDestinationGroupNode>& preDestination,
     const RefPtr<NavDestinationGroupNode>& topDestination,
     bool isAnimated, bool isPopPage, bool isNeedVisible)
@@ -5116,7 +5126,7 @@ void NavigationPattern::StartTransition(const RefPtr<NavDestinationGroupNode>& p
         toPathInfo = hostNode->GetNavigationPathInfo();
         toNavDestinationName = "navBar";
     }
-    ACE_SCOPED_TRACE_COMMERCIAL("NavDestination Page from %s to %s", fromPathInfo.c_str(), toPathInfo.c_str());
+    HandlePreTransition(hostNode, topDestination, fromPathInfo, toPathInfo);
 #ifndef CROSS_PLATFORM
     if (PerfMonitor::GetPerfMonitor() != nullptr) {
         PerfMonitor::GetPerfMonitor()->SetPageName(toNavDestinationName);

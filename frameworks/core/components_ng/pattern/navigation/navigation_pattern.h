@@ -887,6 +887,9 @@ private:
     void StartTransition(const RefPtr<NavDestinationGroupNode>& preDestination,
     const RefPtr<NavDestinationGroupNode>& topDestination,
     bool isAnimated, bool isPopPage, bool isNeedVisible = false);
+    void HandlePreTransition(const RefPtr<NavigationGroupNode>& hostNode,
+        const RefPtr<NavDestinationGroupNode>& topDestination,
+        const std::string& fromPathInfo, const std::string& toPathInfo);
     void ProcessAutoSave(const RefPtr<FrameNode>& node);
     void InitPreloadNodeInfo(int32_t index, const RefPtr<UINode>& uiNode);
 
