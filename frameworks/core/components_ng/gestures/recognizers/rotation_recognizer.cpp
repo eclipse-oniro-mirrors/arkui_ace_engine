@@ -18,6 +18,7 @@
 #include "core/components_ng/event/event_constants.h"
 #include "core/common/reporter/reporter.h"
 #include "core/components_ng/manager/event/json_child_report.h"
+#include "core/components_ng/manager/interaction_observer/ui_info_collection_manager.h"
 #include "core/components_ng/manager/event/json_report.h"
 
 #include "core/pipeline_ng/pipeline_context.h"
@@ -384,9 +385,9 @@ void RotationRecognizer::SendCallbackMsg(const std::unique_ptr<GestureEventFunc>
     if (gestureInfo_ && gestureInfo_->GetDisposeTag()) {
         return;
     }
+    GestureEvent info;
+    GetGestureEventInfo(info);
     if (callback && *callback) {
-        GestureEvent info;
-        GetGestureEventInfo(info);
         // callback may be overwritten in its invoke so we copy it first
         auto callbackFunction = *callback;
         HandleGestureAccept(info, type, GestureListenerType::ROTATION);
@@ -396,6 +397,8 @@ void RotationRecognizer::SendCallbackMsg(const std::unique_ptr<GestureEventFunc>
         HandleReports(info, type);
 #endif
     }
+    // Always-on delivery for NDK interaction observers.
+    UIInfoCollectionManager::GetInstance().NotifyRotation(GetAttachedNode().Upgrade(), info, type);
 #ifdef GESTURE_DEBUG_BOUNDARY_SUPPORTED
     ReportToGestureDebugManager(type, GestureListenerType::ROTATION);
 #endif

@@ -19,6 +19,7 @@
 #include "core/components_ng/base/observer_handler.h"
 #include "core/components_ng/event/event_constants.h"
 #include "core/components_ng/manager/event/json_child_report.h"
+#include "core/components_ng/manager/interaction_observer/ui_info_collection_manager.h"
 #include "core/components_ng/manager/event/json_report.h"
 #include "core/pipeline_ng/pipeline_context.h"
 #include "core/pipeline/base/constants.h"
@@ -430,9 +431,9 @@ void SwipeRecognizer::SendCallbackMsg(const std::unique_ptr<GestureEventFunc>& c
     if (gestureInfo_ && gestureInfo_->GetDisposeTag()) {
         return;
     }
+    GestureEvent info;
+    GetGestureEventInfo(info);
     if (callback && *callback) {
-        GestureEvent info;
-        GetGestureEventInfo(info);
         // callback may be overwritten in its invoke so we copy it first
         auto callbackFunction = *callback;
         HandleGestureAccept(info, type, GestureListenerType::SWIPE);
@@ -442,6 +443,10 @@ void SwipeRecognizer::SendCallbackMsg(const std::unique_ptr<GestureEventFunc>& c
         HandleReports(info, type);
 #endif
     }
+    // Always-on delivery for NDK interaction observers; the configured speed
+    // threshold is reported next to the recognized speed.
+    UIInfoCollectionManager::GetInstance().NotifySwipe(
+        GetAttachedNode().Upgrade(), info, direction_.type, speed_.ConvertToPx(), downEvents_);
 #ifdef GESTURE_DEBUG_BOUNDARY_SUPPORTED
     ReportToGestureDebugManager(type, GestureListenerType::SWIPE);
 #endif

@@ -7571,5 +7571,13 @@
     {
         "first_introduced": "26.2.0",
         "name": "OH_ArkUI_NativeModule_UIAgentGetTreeJsonAsync"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIInfoCollectionRegisterInteractionObserver"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIInfoCollectionUnregisterInteractionObserver"
     }
 ]

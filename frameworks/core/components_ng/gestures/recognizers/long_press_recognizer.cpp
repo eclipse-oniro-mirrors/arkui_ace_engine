@@ -22,6 +22,7 @@
 #include "core/common/reporter/reporter.h"
 #include "core/common/statistic_event_reporter.h"
 #include "core/components_ng/manager/event/json_report.h"
+#include "core/components_ng/manager/interaction_observer/ui_info_collection_manager.h"
 #include "core/components_ng/event/event_constants.h"
 
 namespace OHOS::Ace::NG {
@@ -474,8 +475,8 @@ GestureEvent LongPressRecognizer::BuildGestureEventInfo(bool isRepeat, GestureCa
 void LongPressRecognizer::TriggerCallbackMsg(
     const std::unique_ptr<GestureEventFunc>& callback, bool isRepeat, GestureCallbackType type)
 {
+    GestureEvent info = BuildGestureEventInfo(isRepeat, type);
     if (callback && *callback) {
-        GestureEvent info = BuildGestureEventInfo(isRepeat, type);
         // callback may be overwritten in its invoke so we copy it first
         auto callbackFunction = *callback;
         HandleGestureAccept(info, type, GestureListenerType::LONG_PRESS);
@@ -487,6 +488,11 @@ void LongPressRecognizer::TriggerCallbackMsg(
         if (type == GestureCallbackType::START && longPressRecorder_ && *longPressRecorder_) {
             (*longPressRecorder_)(info);
         }
+    }
+    // The interaction observer contract reports the long press completion
+    // only, with the press duration accumulated in inputTime_.
+    if (type == GestureCallbackType::END) {
+        UIInfoCollectionManager::GetInstance().NotifyLongPress(GetAttachedNode().Upgrade(), info, inputTime_);
     }
 }
 
