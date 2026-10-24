@@ -7816,7 +7816,7 @@ void PipelineContext::GetInspectorTree(bool onlyNeedVisible, ParamConfig config)
             return;
         }
     }
-    auto cb = [root = std::move(root), requestId = config.inspectorRequestId]() {
+    auto cb = [root = std::move(root)]() {
         constexpr size_t MAX_REPORT_BYTES = 100 * 1024 * 1024;
         JsonWriteErrorScope errors;
         char* data = nullptr;
@@ -7834,7 +7834,7 @@ void PipelineContext::GetInspectorTree(bool onlyNeedVisible, ParamConfig config)
         std::string result(data, size);
         std::free(data);
 #ifndef CROSS_PLATFORM
-        UiSessionManager::GetInstance()->ReportInspectorTreeValue(result, requestId);
+        UiSessionManager::GetInstance()->ReportInspectorTreeValue(result);
 #endif
     };
     taskExecutor_->PostTask(cb, TaskExecutor::TaskType::BACKGROUND,

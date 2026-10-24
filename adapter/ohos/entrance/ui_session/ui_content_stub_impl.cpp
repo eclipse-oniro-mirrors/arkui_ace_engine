@@ -28,7 +28,7 @@ int32_t UIContentServiceStubImpl::GetInspectorTree(
     auto inspector = GetInspectorFunction();
     if (inspector) {
         inspector(false, config);
-    } else if (config.inspectorRequestId == 0) {
+    } else {
         UiSessionManager::GetInstance()->GetInspectorTree(config);
     }
     return NO_ERROR;
@@ -280,7 +280,7 @@ int32_t UIContentServiceStubImpl::GetVisibleInspectorTree(
     auto inspector = GetInspectorFunction();
     if (inspector) {
         inspector(true, config);
-    } else if (config.inspectorRequestId == 0) {
+    } else {
         UiSessionManager::GetInstance()->GetVisibleInspectorTree(config);
     }
     return NO_ERROR;

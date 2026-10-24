@@ -154,12 +154,6 @@ void UiReportProxy::ReportTextChangeEvent(const std::string& data)
 
 void UiReportProxy::ReportInspectorTreeValue(const std::string& data, int32_t partNum, bool isLastPart)
 {
-    ReportInspectorTreeForRequest(data, partNum, isLastPart, 0);
-}
-
-void UiReportProxy::ReportInspectorTreeForRequest(
-    const std::string& data, int32_t partNum, bool isLastPart, uint64_t requestId)
-{
     constexpr size_t MAX_INSPECTOR_REPORT_BYTES = 100 * 1024 * 1024;
     if (data.size() > MAX_INSPECTOR_REPORT_BYTES) {
         LOGW("InspectorTree report exceeds transport capacity");
@@ -191,9 +185,6 @@ void UiReportProxy::ReportInspectorTreeForRequest(
     }
     if (!messageData.WriteBool(isLastPart)) {
         LOGW("ReportInspectorTreeValue write data  failed");
-        return;
-    }
-    if (!messageData.WriteUint64(requestId)) {
         return;
     }
     int32_t sendRequestErrorCode = Remote()->SendRequest(REPORT_INSPECTOR_VALUE, messageData, reply, option);

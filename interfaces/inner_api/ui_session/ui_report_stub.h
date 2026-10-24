@@ -115,13 +115,12 @@ public:
      * @description: register a callback when get inspector tree
      * @param eventCallback callback to be performed
      */
-    bool RegisterGetInspectorTreeCallback(
-        const std::function<void(std::string, int32_t, bool)>& eventCallback, uint64_t* requestId = nullptr);
+    bool RegisterGetInspectorTreeCallback(const std::function<void(std::string, int32_t, bool)>& eventCallback);
 
     /**
      * @description: unregister get inspector tree callback
      */
-    void UnregisterGetInspectorTreeCallback(uint64_t requestId = 0);
+    void UnregisterGetInspectorTreeCallback();
 
     /**
      * @description: register a callback when get inspector tree
@@ -210,8 +209,6 @@ public:
      * @description: report whole inspectorTree for SA
      */
     void ReportInspectorTreeValue(const std::string& data, int32_t partNum, bool isLastPart) override;
-    void ReportInspectorTreeForRequest(
-        const std::string& data, int32_t partNum, bool isLastPart, uint64_t requestId) override;
 
     /**
      * @description: notify stub side to report the information of hit test node
@@ -301,14 +298,14 @@ public:
 
     void SetEventHandler(std::shared_ptr<AppExecFwk::EventHandler> eventHandler);
 
-    void PostGetInspectorTreeCallbackRemoveTask(int32_t timeout, uint64_t requestId = 0);
+    void PostGetInspectorTreeCallbackRemoveTask(int32_t timeout);
     void PostPageTranslateCallbackRemoveTask(int32_t timeout = DEFAULT_PAGE_TRANSLATE_CALLBACK_TIMEOUT_MS);
     void PostPageTranslateResultWatchdogTask(int32_t nodeId, int64_t version,
         int32_t timeout = DEFAULT_PAGE_TRANSLATE_CALLBACK_TIMEOUT_MS);
     void CancelPageTranslateResultWatchdogTask(int32_t nodeId, int64_t version);
 
 private:
-    void HandleInspectorTreeCallbackTimeout(uint64_t requestId = 0);
+    void HandleInspectorTreeCallbackTimeout();
     void CancelGetInspectorTreeCallbackTimeoutTaskLocked();
     void HandleNavigationQueryCallbackTimeout();
     void CancelNavigationQueryCallbackTimeoutTaskLocked();
@@ -340,7 +337,6 @@ private:
     bool pageTranslateContinuous_ = false;
     int64_t pageTranslateRequestId_ = 0;
     std::mutex inspectorTreeCallbackMutex_;
-    uint64_t inspectorRequestId_ = 0;
     std::function<void(std::string, int32_t, bool)> inspectorTreeCallback_;
     std::function<void(std::string, int32_t, bool)> getHitTestNodeInfoCallback_;
     std::mutex navigationQueryCallbackMutex_;

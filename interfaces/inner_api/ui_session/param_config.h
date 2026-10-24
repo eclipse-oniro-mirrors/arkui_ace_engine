@@ -52,8 +52,6 @@ struct ParamConfig {
     NG::InspectorTreeRequestContext* inspectorContext = nullptr;
 
     bool withResponseRegion = false;
-    // Internal request values are never included in the public configuration parcel.
-    uint64_t inspectorRequestId = 0;
 
     bool IsPublicTree() const
     {

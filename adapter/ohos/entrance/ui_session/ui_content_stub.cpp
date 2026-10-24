@@ -277,13 +277,10 @@ int32_t UiContentStub::GetInspectorTreeInner(MessageParcel& data, MessageParcel&
         LOGW("GetInspectorTreeInner read GetInspectorTreeConfigImpl failed");
         return FAILED;
     }
-    auto config = configImplPtr->GetConfig();
+    int32_t processId = IPCSkeleton::GetCallingRealPid();
+    UiSessionManager::GetInstance()->SaveProcessId("getInspectorTree", processId);
+    GetInspectorTree(nullptr, configImplPtr->GetConfig());
     delete configImplPtr;
-    if (!data.ReadUint64(config.inspectorRequestId) || config.inspectorRequestId == 0) {
-        return FAILED;
-    }
-    UiSessionManager::GetInstance()->SaveProcessId("getInspectorTree", IPCSkeleton::GetCallingRealPid());
-    GetInspectorTree(nullptr, config);
     return NO_ERROR;
 }
 
@@ -605,13 +602,10 @@ int32_t UiContentStub::GetVisibleInspectorTreeInner(MessageParcel& data, Message
         LOGW("GetVisibleInspectorTreeInner read GetInspectorTreeConfigImpl failed");
         return FAILED;
     }
-    auto config = configImplPtr->GetConfig();
+    int32_t processId = IPCSkeleton::GetCallingRealPid();
+    UiSessionManager::GetInstance()->SaveProcessId("getInspectorTree", processId);
+    GetVisibleInspectorTree(nullptr, configImplPtr->GetConfig());
     delete configImplPtr;
-    if (!data.ReadUint64(config.inspectorRequestId) || config.inspectorRequestId == 0) {
-        return FAILED;
-    }
-    UiSessionManager::GetInstance()->SaveProcessId("getInspectorTree", IPCSkeleton::GetCallingRealPid());
-    GetVisibleInspectorTree(nullptr, config);
     return NO_ERROR;
 }
 

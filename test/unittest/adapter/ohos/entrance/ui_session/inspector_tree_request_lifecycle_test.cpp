@@ -26,51 +26,40 @@
 #include "adapter/ohos/entrance/ui_session/include/large_string_ashmem.h"
 
 namespace OHOS::Ace {
-TEST(InspectorTreeTask06, LateReportAndCleanupCannotConsumeReplacement)
+TEST(InspectorTreeTask06, CallbackRemainsOccupiedUntilLastPart)
 {
     sptr<UiReportStub> stub = new UiReportStub();
-    uint64_t oldToken = 0;
-    uint64_t newToken = 0;
-    int oldCalls = 0;
-    int newCalls = 0;
-    ASSERT_TRUE(stub->RegisterGetInspectorTreeCallback([&](std::string, int32_t, bool) { ++oldCalls; }, &oldToken));
-    ASSERT_FALSE(stub->RegisterGetInspectorTreeCallback([&](std::string, int32_t, bool) { ++newCalls; }, &newToken));
-    stub->UnregisterGetInspectorTreeCallback(oldToken);
-    ASSERT_TRUE(stub->RegisterGetInspectorTreeCallback([&](std::string, int32_t, bool) { ++newCalls; }, &newToken));
-    EXPECT_NE(oldToken, newToken);
-    stub->ReportInspectorTreeForRequest("old", 1, true, oldToken);
-    stub->UnregisterGetInspectorTreeCallback(oldToken);
-    EXPECT_EQ(oldCalls, 0);
-    EXPECT_EQ(newCalls, 0);
-    stub->ReportInspectorTreeForRequest("new", 1, true, newToken);
-    EXPECT_EQ(newCalls, 1);
-    stub->ReportInspectorTreeForRequest("duplicate", 1, true, newToken);
-    EXPECT_EQ(newCalls, 1);
+    int firstCalls = 0;
+    int nextCalls = 0;
+    auto nextCallback = [&](std::string, int32_t, bool) { ++nextCalls; };
+    ASSERT_TRUE(stub->RegisterGetInspectorTreeCallback([&](std::string, int32_t, bool) { ++firstCalls; }));
+    ASSERT_FALSE(stub->RegisterGetInspectorTreeCallback(nextCallback));
+    stub->ReportInspectorTreeValue("part", 1, false);
+    EXPECT_EQ(firstCalls, 1);
+    EXPECT_EQ(nextCalls, 0);
+    ASSERT_FALSE(stub->RegisterGetInspectorTreeCallback(nextCallback));
+    stub->ReportInspectorTreeValue("last", 2, true);
+    EXPECT_EQ(firstCalls, 2);
+    stub->ReportInspectorTreeValue("duplicate", 2, true);
+    EXPECT_EQ(firstCalls, 2);
+    ASSERT_TRUE(stub->RegisterGetInspectorTreeCallback(nextCallback));
+    stub->ReportInspectorTreeValue("next", 1, true);
+    EXPECT_EQ(nextCalls, 1);
 }
 
-TEST(InspectorTreeTask06, ReconnectAndSerialCallbackReentrancy)
+TEST(InspectorTreeTask06, CompletedCallbackCanRegisterNextSerialRequest)
 {
-    sptr<UiReportStub> oldStub = new UiReportStub();
-    sptr<UiReportStub> newStub = new UiReportStub();
-    uint64_t oldToken = 0;
-    uint64_t newToken = 0;
-    uint64_t reentrantToken = 0;
+    sptr<UiReportStub> stub = new UiReportStub();
     bool registered = false;
-    ASSERT_TRUE(oldStub->RegisterGetInspectorTreeCallback([](std::string, int32_t, bool) {}, &oldToken));
-    ASSERT_TRUE(newStub->RegisterGetInspectorTreeCallback(
-        [&](std::string, int32_t, bool) {
-            registered = newStub->RegisterGetInspectorTreeCallback([](std::string, int32_t, bool) {}, &reentrantToken);
-        },
-        &newToken));
-    EXPECT_NE(oldToken, newToken);
-    newStub->ReportInspectorTreeForRequest("old connection", 1, true, oldToken);
-    EXPECT_FALSE(registered);
-    newStub->ReportInspectorTreeForRequest("new connection", 1, true, newToken);
+    int nextCalls = 0;
+    ASSERT_TRUE(stub->RegisterGetInspectorTreeCallback([&](std::string, int32_t, bool) {
+        registered = stub->RegisterGetInspectorTreeCallback([&](std::string, int32_t, bool) { ++nextCalls; });
+    }));
+    stub->ReportInspectorTreeValue("first", 1, true);
     EXPECT_TRUE(registered);
-    newStub->UnregisterGetInspectorTreeCallback(newToken);
-    uint64_t overlap = 0;
-    EXPECT_FALSE(newStub->RegisterGetInspectorTreeCallback([](std::string, int32_t, bool) {}, &overlap));
-    newStub->UnregisterGetInspectorTreeCallback(reentrantToken);
+    EXPECT_FALSE(stub->RegisterGetInspectorTreeCallback([](std::string, int32_t, bool) {}));
+    stub->ReportInspectorTreeValue("next", 1, true);
+    EXPECT_EQ(nextCalls, 1);
 }
 
 TEST(InspectorTreeTask06, SharedMemoryRejectsOversize)
@@ -87,7 +76,6 @@ TEST(InspectorTreeTask06, WindowCallbacksHandleSerialFullAndVisibleRequests)
     auto bindWindow = [&](UIContentServiceStubImpl& service, int32_t windowId) {
         service.SetInspectorFunction([&, windowId](bool visible, ParamConfig config) {
             requests.emplace_back(windowId, visible);
-            EXPECT_EQ(config.inspectorRequestId, requests.size());
             EXPECT_TRUE(config.withResponseRegion);
             EXPECT_TRUE(config.withCustomContent);
         });
@@ -95,33 +83,28 @@ TEST(InspectorTreeTask06, WindowCallbacksHandleSerialFullAndVisibleRequests)
     bindWindow(mainWindow, 101);
     bindWindow(subWindow, 202);
     ParamConfig config;
-    config.inspectorRequestId = 1;
     config.withResponseRegion = true;
     config.withCustomContent = true;
     EXPECT_EQ(mainWindow.GetInspectorTree(nullptr, config), NO_ERROR);
-    ++config.inspectorRequestId;
     EXPECT_EQ(subWindow.GetInspectorTree(nullptr, config), NO_ERROR);
-    ++config.inspectorRequestId;
     EXPECT_EQ(subWindow.GetVisibleInspectorTree(nullptr, config), NO_ERROR);
-    ++config.inspectorRequestId;
     EXPECT_EQ(mainWindow.GetVisibleInspectorTree(nullptr, config), NO_ERROR);
     EXPECT_EQ(requests,
         (std::vector<std::pair<int32_t, bool>> { { 101, false }, { 202, false }, { 202, true }, { 101, true } }));
 }
 
-TEST(InspectorTreeTask06, ExistingTimeoutOnlyClearsItsOwnRequest)
+TEST(InspectorTreeTask06, ExistingTimeoutClearsCallbackAndAllowsNextRequest)
 {
     sptr<UiReportStub> stub = new UiReportStub();
-    uint64_t first = 0;
-    uint64_t second = 0;
     int calls = 0;
-    ASSERT_TRUE(stub->RegisterGetInspectorTreeCallback([](std::string, int32_t, bool) {}, &first));
-    stub->HandleInspectorTreeCallbackTimeout(first);
-    ASSERT_TRUE(stub->RegisterGetInspectorTreeCallback([&](std::string, int32_t, bool) { ++calls; }, &second));
-    stub->HandleInspectorTreeCallbackTimeout(first);
-    stub->ReportInspectorTreeForRequest("late", 1, true, first);
+    auto callback = [&](std::string, int32_t, bool) { ++calls; };
+    ASSERT_TRUE(stub->RegisterGetInspectorTreeCallback(callback));
+    stub->HandleInspectorTreeCallbackTimeout();
     EXPECT_EQ(calls, 0);
-    stub->ReportInspectorTreeForRequest("current", 1, true, second);
+    stub->ReportInspectorTreeValue("discarded", 1, true);
+    EXPECT_EQ(calls, 0);
+    ASSERT_TRUE(stub->RegisterGetInspectorTreeCallback(callback));
+    stub->ReportInspectorTreeValue("current", 1, true);
     EXPECT_EQ(calls, 1);
 }
 

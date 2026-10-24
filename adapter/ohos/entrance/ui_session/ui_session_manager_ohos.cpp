@@ -1638,35 +1638,29 @@ void UiSessionManagerOhos::SaveInspectorTreeFunction(InspectorFunction&& functio
     std::lock_guard<std::mutex> lock(inspectorFunctionMutex_);
     inspectorFunction_ = std::move(function);
 }
+
 void UiSessionManagerOhos::ReportInspectorTreeValue(const std::string& data)
 {
-    ReportInspectorTreeValue(data, 0);
-}
-
-void UiSessionManagerOhos::ReportInspectorTreeValue(const std::string& data, uint64_t requestId)
-{
     UI_SESSION_SCOPED_TRACE("[UiSessionManagerOhos] ReportInspectorTreeValue");
-    sptr<ReportService> reportService;
-    {
-        std::shared_lock<std::shared_mutex> reportLock(reportObjectMutex_);
-        std::unique_lock<std::shared_mutex> processMapLock(processMapMutex_);
-        auto processIter = processMap_.find("getInspectorTree");
-        if (processIter == processMap_.end() || processIter->second.empty()) {
-            LOGW("ReportInspectorTreeValue no report proxy");
-            return;
-        }
-        // Inspector requests have one caller; reuse its existing report connection.
-        auto reportIter = reportObjectMap_.find(*processIter->second.begin());
-        reportService =
+    std::shared_lock<std::shared_mutex> reportLock(reportObjectMutex_);
+    std::unique_lock<std::shared_mutex> processMapLock(processMapMutex_);
+    auto processIter = processMap_.find("getInspectorTree");
+    if (processIter == processMap_.end() || processIter->second.empty()) {
+        LOGW("ReportInspectorTreeValue no report proxy");
+        return;
+    }
+    for (const auto& pid : processIter->second) {
+        auto reportIter = reportObjectMap_.find(pid);
+        auto reportService =
             (reportIter != reportObjectMap_.end()) ? iface_cast<ReportService>(reportIter->second) : nullptr;
-        // A late old result must not consume the registration for a newer request.
-        if (requestId == 0) {
-            processIter->second.clear();
+        if (reportService != nullptr) {
+            int32_t index = 1;
+            reportService->ReportInspectorTreeValue(data, index, true);
+        } else {
+            LOGW("report inspector tree value failed, process id:%{public}d", pid);
         }
     }
-    if (reportService) {
-        reportService->ReportInspectorTreeForRequest(data, 1, true, requestId);
-    }
+    processIter->second.clear();
 }
 
 void UiSessionManagerOhos::NotifyAllWebPattern(bool isRegister)
@@ -2023,7 +2017,7 @@ void UiSessionManagerOhos::SendSpecifiedContentOffsets(const std::vector<std::pa
 void UiSessionManagerOhos::SaveProcessId(std::string key, int32_t id)
 {
     std::unique_lock<std::shared_mutex> processMapLock(processMapMutex_);
-    if (key == TRANSLATE_PROCESS_KEY || key == "getInspectorTree") {
+    if (key == TRANSLATE_PROCESS_KEY) {
         processMap_[key].clear();
     }
     processMap_[key].emplace(id);

@@ -60,24 +60,20 @@ int32_t UIContentServiceProxy::GetInspectorTree(
         return FAILED;
     }
 
-    uint64_t requestId = 0;
-    bool registerSuccess = report_->RegisterGetInspectorTreeCallback(eventCallback, &requestId);
+    bool registerSuccess = report_->RegisterGetInspectorTreeCallback(eventCallback);
     if (!registerSuccess) {
         LOGW("GetInspectorTree register callback failed");
         return LAST_UNFINISH;
     }
 
-    if (!data.WriteUint64(requestId)) {
-        report_->UnregisterGetInspectorTreeCallback(requestId);
-        return FAILED;
-    }
     int32_t sendRequestErrorCode = Remote()->SendRequest(UI_CONTENT_SERVICE_GET_TREE, data, reply, option);
     if (sendRequestErrorCode != ERR_NONE) {
         LOGW("GetInspectorTree send request failed, errorCode is %{public}d", sendRequestErrorCode);
-        report_->UnregisterGetInspectorTreeCallback(requestId);
+        report_->UnregisterGetInspectorTreeCallback();
         return REPLY_ERROR;
     }
-    report_->PostGetInspectorTreeCallbackRemoveTask(timeout, requestId);
+    // Post timeoutCallbackRemove at last to avoid clear next callback register
+    report_->PostGetInspectorTreeCallbackRemoveTask(timeout);
     return NO_ERROR;
 }
 
@@ -105,23 +101,19 @@ int32_t UIContentServiceProxy::GetVisibleInspectorTree(
         LOGW("GetVisibleInspectorTree write config failed");
         return FAILED;
     }
-    uint64_t requestId = 0;
-    bool registerSuccess = report_->RegisterGetInspectorTreeCallback(eventCallback, &requestId);
+    bool registerSuccess = report_->RegisterGetInspectorTreeCallback(eventCallback);
     if (!registerSuccess) {
         LOGW("GetVisibleInspectorTree register callback failed");
         return LAST_UNFINISH;
     }
-    if (!data.WriteUint64(requestId)) {
-        report_->UnregisterGetInspectorTreeCallback(requestId);
-        return FAILED;
-    }
     int32_t sendRequestErrorCode = Remote()->SendRequest(GET_VISIBLE_TREE, data, reply, option);
     if (sendRequestErrorCode != ERR_NONE) {
         LOGW("GetVisibleInspectorTree send request failed, errorCode is %{public}d", sendRequestErrorCode);
-        report_->UnregisterGetInspectorTreeCallback(requestId);
+        report_->UnregisterGetInspectorTreeCallback();
         return REPLY_ERROR;
     }
-    report_->PostGetInspectorTreeCallbackRemoveTask(timeout, requestId);
+    // Post timeoutCallbackRemove at last to avoid clear next callback register
+    report_->PostGetInspectorTreeCallbackRemoveTask(timeout);
     return NO_ERROR;
 }
 
