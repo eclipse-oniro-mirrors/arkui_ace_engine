@@ -593,7 +593,6 @@ int32_t RegisterNodeEvent(ArkUI_NodeHandle nodePtr, ArkUI_NodeEventType eventTyp
 
 int32_t RegisterNodeEvent(ArkUI_NodeHandle nodePtr, ArkUI_NodeEventType eventType, int32_t targetId, void* userData)
 {
-    CHECK_UI_THREAD("ArkUI_NativeNodeAPI_1.registerNodeEvent");
     if (nodePtr == nullptr) {
         return ERROR_CODE_PARAM_INVALID;
     }
@@ -682,7 +681,6 @@ int32_t RegisterNodeEvent(ArkUI_NodeHandle nodePtr, ArkUI_NodeEventType eventTyp
 
 void UnregisterNodeEvent(ArkUI_NodeHandle nodePtr, ArkUI_NodeEventType eventType)
 {
-    CHECK_UI_THREAD("ArkUI_NativeNodeAPI_1.unregisterNodeEvent");
     if (nodePtr == nullptr) {
         return;
     }
@@ -729,13 +727,11 @@ void RegisterOnEvent(void (*eventReceiver)(ArkUI_CompatibleNodeEvent* event))
 void (*g_eventReceiver)(ArkUI_NodeEvent* event) = nullptr;
 void RegisterOnEvent(void (*eventReceiver)(ArkUI_NodeEvent* event))
 {
-    CHECK_UI_THREAD("ArkUI_NativeNodeAPI_1.registerNodeEventReceiver");
     g_eventReceiver = eventReceiver;
 }
 
 void UnregisterOnEvent()
 {
-    CHECK_UI_THREAD("ArkUI_NativeNodeAPI_1.unregisterNodeEventReceiver");
     g_eventReceiver = nullptr;
 }
 
