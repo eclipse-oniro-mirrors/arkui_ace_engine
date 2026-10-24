@@ -811,6 +811,7 @@ struct SimpleSegmentButtonV2 {
               const finger = event.fingerList.find((element) => Boolean(element));
               if (!finger) {
                 if (!isMaterialEnabled) {
+                  this.selectedItemOffsetX = 0;
                   this.isDragging = false;
                   this.followingDragActive = false;
                   this.dragWithPress = false;
@@ -837,7 +838,6 @@ struct SimpleSegmentButtonV2 {
               if (!shouldUpdateSelectedIndex) {
                 realIndex = this.normalizedSelectedIndex;
               }
-              this.prepareBackplateTransition(realIndex);
               this.tempDisableAnimation = true;
               this.getUIContext().animateTo({
                 curve: curves.springMotion(0.347, 0.99),
@@ -1188,8 +1188,6 @@ struct SimpleSegmentButtonV2 {
     ) {
       return;
     }
-
-    this.prepareBackplateTransition(selectedIndex);
 
     // Cross-item selection must not replay material press/release while dragging.
     const isNormalDragSelection = this.interactionMode === SegmentButtonV2InteractionMode.NORMAL_DRAG &&

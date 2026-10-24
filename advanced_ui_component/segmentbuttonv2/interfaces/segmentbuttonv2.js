@@ -1529,6 +1529,7 @@ class SimpleSegmentButtonV2 extends ViewV2 {
               const finger = event.fingerList.find(Boolean);
               if (!finger) {
                 if (!isMaterialEnabled) {
+                  this.selectedItemOffsetX = 0;
                   this.isDragging = false;
                   this.followingDragActive = false;
                   this.dragWithPress = false;
@@ -1555,7 +1556,6 @@ class SimpleSegmentButtonV2 extends ViewV2 {
               if (!shouldUpdateSelectedIndex) {
                 realIndex = this.normalizedSelectedIndex;
               }
-              this.prepareBackplateTransition(realIndex);
               this.tempDisableAnimation = true;
               this.getUIContext().animateTo({
                 curve: curves.springMotion(0.347, 0.99),
@@ -2321,7 +2321,6 @@ class SimpleSegmentButtonV2 extends ViewV2 {
       this.isTapGesture = false;
       return;
     }
-    this.prepareBackplateTransition(selectedIndex);
     // Cross-item selection must not replay material press/release while dragging.
     const isNormalDragSelection = this.interactionMode === SegmentButtonV2InteractionMode.NORMAL_DRAG &&
       this.isDragging && !this.isTapGesture;
