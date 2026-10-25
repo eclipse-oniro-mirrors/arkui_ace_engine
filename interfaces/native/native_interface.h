@@ -166,6 +166,12 @@ typedef enum {
      * @since 26.2.0
      */
     OH_ARKUI_NATIVEMODULE_CHECK_TYPE_ATTRIBUTE_MATCH = 2,
+    /**
+     * @brief Checks overlapping calls through the multi-thread node API on the same Free tree.
+     * LOG diagnoses and continues; CRASH diagnoses and terminates the application.
+     * @since 26.2.0
+     */
+    OH_ARKUI_NATIVEMODULE_CHECK_TYPE_MULTI_THREAD = 3,
 } OH_ArkUI_NativeModule_RuntimeCheckType;
 
 /**

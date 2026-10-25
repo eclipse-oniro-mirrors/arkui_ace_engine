@@ -32,7 +32,9 @@ HWTEST_F(RuntimeCheckApiTest, RuntimeCheckEnumValues, TestSize.Level1)
     EXPECT_EQ(OH_ARKUI_NATIVEMODULE_CHECK_TYPE_UI_THREAD, 0);
     EXPECT_EQ(OH_ARKUI_NATIVEMODULE_CHECK_TYPE_NODE_DISPOSED, 1);
     EXPECT_EQ(OH_ARKUI_NATIVEMODULE_CHECK_TYPE_ATTRIBUTE_MATCH, 2);
+    EXPECT_EQ(OH_ARKUI_NATIVEMODULE_CHECK_TYPE_MULTI_THREAD, 3);
     EXPECT_EQ(static_cast<uint32_t>(CheckType::ATTRIBUTE_MATCH), 2u);
+    EXPECT_EQ(static_cast<uint32_t>(CheckType::MULTI_THREAD), 3u);
     EXPECT_EQ(static_cast<uint32_t>(CheckType::UI_THREAD), OH_ARKUI_NATIVEMODULE_CHECK_TYPE_UI_THREAD);
     EXPECT_EQ(static_cast<uint32_t>(CheckType::NODE_DISPOSED), OH_ARKUI_NATIVEMODULE_CHECK_TYPE_NODE_DISPOSED);
     EXPECT_EQ(OH_ARKUI_NATIVEMODULE_CHECK_MODE_DISABLED, 0);
@@ -370,6 +372,28 @@ HWTEST_F(RuntimeCheckBehaviorTest, ExplicitDisabledSurvivesDebugInitialization, 
     EXPECT_EQ(manager_.GetEffectiveMode(CheckType::UI_THREAD).mode, CheckMode::DISABLED);
     SetThreadSafe(false);
     manager_.CheckUIThread("ExplicitDisabled");
+}
+
+HWTEST_F(RuntimeCheckBehaviorTest, MultiThreadModesAndAttributeMatchRemainIndependent, TestSize.Level1)
+{
+    for (int32_t mode = 0; mode <= 2; ++mode) {
+        ASSERT_TRUE(manager_.SetRuntimeCheckMode(3, mode));
+        ASSERT_TRUE(manager_.SetRuntimeCheckMode(2, (mode + 1) % 3));
+        EXPECT_EQ(manager_.GetEffectiveMode(CheckType::MULTI_THREAD).mode, static_cast<CheckMode>(mode));
+        EXPECT_FALSE(manager_.SetRuntimeCheckMode(4, 0));
+        EXPECT_FALSE(manager_.SetRuntimeCheckMode(3, 3));
+        EXPECT_EQ(manager_.GetEffectiveMode(CheckType::MULTI_THREAD).mode, static_cast<CheckMode>(mode));
+    }
+}
+
+HWTEST_F(RuntimeCheckBehaviorTest, MultiThreadDefaultFollowsApplicationBuildType, TestSize.Level1)
+{
+    EXPECT_EQ(manager_.GetEffectiveMode(CheckType::MULTI_THREAD).mode, CheckMode::DISABLED);
+    RuntimeCheckManager debugManager;
+    AceApplicationInfo::GetInstance().SetDebugForParallel(true);
+    EXPECT_EQ(debugManager.GetEffectiveMode(CheckType::MULTI_THREAD).mode, CheckMode::CRASH);
+    ASSERT_TRUE(debugManager.SetRuntimeCheckMode(3, 0));
+    EXPECT_EQ(debugManager.GetEffectiveMode(CheckType::MULTI_THREAD).mode, CheckMode::DISABLED);
 }
 
 HWTEST_F(RuntimeCheckBehaviorTest, InvalidConfigurationPreservesDebugDefault, TestSize.Level1)

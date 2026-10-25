@@ -103,6 +103,7 @@ ace_unittest("ui_node_test_ng") {
     type = "host_components"
   }
   sources = [
+    "native_node_tree_scope_test.cpp",
     "ui_node_multi_thread_test.cpp",
     "ui_node_test_ng.cpp",
     "ui_node_test_ng_two.cpp",
