@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024-2025 Huawei Device Co., Ltd.
+ * Copyright (c) 2024-2026 Huawei Device Co., Ltd.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -987,6 +987,7 @@ export struct ToolBarV2 {
         .accessibilityLevel(item.accessibilityLevel)
         .enabled(this.getEffectiveItemState(item) !== ToolBarV2ItemState.DISABLE)
         .opacity(this.getEffectiveItemState(item) === ToolBarV2ItemState.DISABLE ? 0.4 : 1)
+        .id(item.id)
       } else {
         Row() {
           this.itemContentBuilder();
@@ -1017,6 +1018,7 @@ export struct ToolBarV2 {
         .accessibilityLevel(item.accessibilityLevel)
         .enabled(this.getEffectiveItemState(item) !== ToolBarV2ItemState.DISABLE)
         .opacity(this.getEffectiveItemState(item) === ToolBarV2ItemState.DISABLE ? 0.4 : 1)
+        .id(item.id)
       }
     } else {
       Button({ type: ButtonType.Normal, stateEffect: false }) {
@@ -1115,6 +1117,7 @@ export struct ToolBarV2 {
       .enabled(this.getEffectiveItemState(item) !== ToolBarV2ItemState.DISABLE)
       .opacity(this.getEffectiveItemState(item) === ToolBarV2ItemState.DISABLE ? 0.4 : 1)
       .padding(0)
+      .id(item.id)
     }
   }
 

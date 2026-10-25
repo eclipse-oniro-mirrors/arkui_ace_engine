@@ -1435,105 +1435,119 @@ export class ToolBarV2 extends ViewV2 {
             If.create();
             if (this.getEffectiveDirection() === Axis.Vertical) {
               this.ifElseBranchUpdateFunction(0, () => {
-                this.observeComponentCreation2((elmtId, isInitialRender) => {
-                  Column.create();
-                  Column.width(this.getEffectiveItemWidth(item, inGroup).value);
-                  Column.height(
-                    this.getEffectiveItemHeight(item, inGroup).value
-                  );
-                  Column.justifyContent(FlexAlign.Center);
-                  Column.alignItems(HorizontalAlign.Center);
-                  Column.borderRadius(
-                    this.getEffectiveItemBorderRadius(inGroup)
-                  );
-                  Column.backgroundColor(
-                    this.getEffectiveItemDisplayBg(item, inGroup)
-                  );
-                  Column.onHover((isHover) => {
-                    this.setItemHovered(item, isHover);
-                  });
-                  ViewStackProcessor.visualState('pressed');
-                  Column.backgroundColor(
-                    this.getEffectiveItemPressedBg(item, inGroup)
-                  );
-                  ViewStackProcessor.visualState();
-                  Column.onClick(() => {
-                    if (
+                if (!If.canRetake(item.id)) {
+                  this.observeComponentCreation2((elmtId, isInitialRender) => {
+                    Column.create();
+                    Column.width(
+                      this.getEffectiveItemWidth(item, inGroup).value
+                    );
+                    Column.height(
+                      this.getEffectiveItemHeight(item, inGroup).value
+                    );
+                    Column.justifyContent(FlexAlign.Center);
+                    Column.alignItems(HorizontalAlign.Center);
+                    Column.borderRadius(
+                      this.getEffectiveItemBorderRadius(inGroup)
+                    );
+                    Column.backgroundColor(
+                      this.getEffectiveItemDisplayBg(item, inGroup)
+                    );
+                    Column.onHover((isHover) => {
+                      this.setItemHovered(item, isHover);
+                    });
+                    ViewStackProcessor.visualState('pressed');
+                    Column.backgroundColor(
+                      this.getEffectiveItemPressedBg(item, inGroup)
+                    );
+                    ViewStackProcessor.visualState();
+                    Column.onClick(() => {
+                      if (
+                        this.getEffectiveItemState(item) ===
+                        ToolBarV2ItemState.DISABLE
+                      ) {
+                        return;
+                      }
+                      this.advClickEventAction(item);
+                    });
+                    Column.accessibilityGroup(true);
+                    Column.accessibilityText(
+                      this.getAdvAccessibilityText(item)
+                    );
+                    Column.accessibilityDescription(
+                      this.getAdvAccessibilityDescription(item)
+                    );
+                    Column.accessibilityLevel(item.accessibilityLevel);
+                    Column.enabled(
+                      this.getEffectiveItemState(item) !==
+                        ToolBarV2ItemState.DISABLE
+                    );
+                    Column.opacity(
                       this.getEffectiveItemState(item) ===
-                      ToolBarV2ItemState.DISABLE
-                    ) {
-                      return;
-                    }
-                    this.advClickEventAction(item);
-                  });
-                  Column.accessibilityGroup(true);
-                  Column.accessibilityText(this.getAdvAccessibilityText(item));
-                  Column.accessibilityDescription(
-                    this.getAdvAccessibilityDescription(item)
-                  );
-                  Column.accessibilityLevel(item.accessibilityLevel);
-                  Column.enabled(
-                    this.getEffectiveItemState(item) !==
-                      ToolBarV2ItemState.DISABLE
-                  );
-                  Column.opacity(
-                    this.getEffectiveItemState(item) ===
-                      ToolBarV2ItemState.DISABLE
-                      ? 0.4
-                      : 1
-                  );
-                }, Column);
-                this.itemContentBuilder.bind(this)();
-                Column.pop();
+                        ToolBarV2ItemState.DISABLE
+                        ? 0.4
+                        : 1
+                    );
+                    Column.id(item.id);
+                  }, Column);
+                  this.itemContentBuilder.bind(this)();
+                  Column.pop();
+                }
               });
             } else {
               this.ifElseBranchUpdateFunction(1, () => {
-                this.observeComponentCreation2((elmtId, isInitialRender) => {
-                  Row.create();
-                  Row.width(this.getEffectiveItemWidth(item, inGroup).value);
-                  Row.height(this.getEffectiveItemHeight(item, inGroup).value);
-                  Row.justifyContent(FlexAlign.Center);
-                  Row.alignItems(VerticalAlign.Center);
-                  Row.borderRadius(this.getEffectiveItemBorderRadius(inGroup));
-                  Row.backgroundColor(
-                    this.getEffectiveItemDisplayBg(item, inGroup)
-                  );
-                  Row.onHover((isHover) => {
-                    this.setItemHovered(item, isHover);
-                  });
-                  ViewStackProcessor.visualState('pressed');
-                  Row.backgroundColor(
-                    this.getEffectiveItemPressedBg(item, inGroup)
-                  );
-                  ViewStackProcessor.visualState();
-                  Row.onClick(() => {
-                    if (
+                if (!If.canRetake(item.id)) {
+                  this.observeComponentCreation2((elmtId, isInitialRender) => {
+                    Row.create();
+                    Row.width(this.getEffectiveItemWidth(item, inGroup).value);
+                    Row.height(
+                      this.getEffectiveItemHeight(item, inGroup).value
+                    );
+                    Row.justifyContent(FlexAlign.Center);
+                    Row.alignItems(VerticalAlign.Center);
+                    Row.borderRadius(
+                      this.getEffectiveItemBorderRadius(inGroup)
+                    );
+                    Row.backgroundColor(
+                      this.getEffectiveItemDisplayBg(item, inGroup)
+                    );
+                    Row.onHover((isHover) => {
+                      this.setItemHovered(item, isHover);
+                    });
+                    ViewStackProcessor.visualState('pressed');
+                    Row.backgroundColor(
+                      this.getEffectiveItemPressedBg(item, inGroup)
+                    );
+                    ViewStackProcessor.visualState();
+                    Row.onClick(() => {
+                      if (
+                        this.getEffectiveItemState(item) ===
+                        ToolBarV2ItemState.DISABLE
+                      ) {
+                        return;
+                      }
+                      this.advClickEventAction(item);
+                    });
+                    Row.accessibilityGroup(true);
+                    Row.accessibilityText(this.getAdvAccessibilityText(item));
+                    Row.accessibilityDescription(
+                      this.getAdvAccessibilityDescription(item)
+                    );
+                    Row.accessibilityLevel(item.accessibilityLevel);
+                    Row.enabled(
+                      this.getEffectiveItemState(item) !==
+                        ToolBarV2ItemState.DISABLE
+                    );
+                    Row.opacity(
                       this.getEffectiveItemState(item) ===
-                      ToolBarV2ItemState.DISABLE
-                    ) {
-                      return;
-                    }
-                    this.advClickEventAction(item);
-                  });
-                  Row.accessibilityGroup(true);
-                  Row.accessibilityText(this.getAdvAccessibilityText(item));
-                  Row.accessibilityDescription(
-                    this.getAdvAccessibilityDescription(item)
-                  );
-                  Row.accessibilityLevel(item.accessibilityLevel);
-                  Row.enabled(
-                    this.getEffectiveItemState(item) !==
-                      ToolBarV2ItemState.DISABLE
-                  );
-                  Row.opacity(
-                    this.getEffectiveItemState(item) ===
-                      ToolBarV2ItemState.DISABLE
-                      ? 0.4
-                      : 1
-                  );
-                }, Row);
-                this.itemContentBuilder.bind(this)();
-                Row.pop();
+                        ToolBarV2ItemState.DISABLE
+                        ? 0.4
+                        : 1
+                    );
+                    Row.id(item.id);
+                  }, Row);
+                  this.itemContentBuilder.bind(this)();
+                  Row.pop();
+                }
               });
             }
           }, If);
@@ -1541,197 +1555,209 @@ export class ToolBarV2 extends ViewV2 {
         });
       } else {
         this.ifElseBranchUpdateFunction(1, () => {
-          this.observeComponentCreation2((elmtId, isInitialRender) => {
-            Button.createWithChild({
-              type: ButtonType.Normal,
-              stateEffect: false,
-            });
-            Button.width(this.getEffectiveItemWidth(item, inGroup).value);
-            Button.height(this.getEffectiveItemHeight(item, inGroup).value);
-            Button.hoverEffect(HoverEffect.None);
-            Button.borderRadius(this.getEffectiveItemBorderRadius(false, item));
-            Button.backgroundColor(
-              this.getEffectiveItemDisplayBg(item, inGroup)
-            );
-            Button.onHover((isHover) => {
-              this.setItemHovered(item, isHover);
-            });
-            ViewStackProcessor.visualState('pressed');
-            Button.backgroundColor(
-              this.getEffectiveItemPressedBg(item, inGroup)
-            );
-            ViewStackProcessor.visualState();
-            Button.onClick(() => {
-              if (
+          if (!If.canRetake(item.id)) {
+            this.observeComponentCreation2((elmtId, isInitialRender) => {
+              Button.createWithChild({
+                type: ButtonType.Normal,
+                stateEffect: false,
+              });
+              Button.width(this.getEffectiveItemWidth(item, inGroup).value);
+              Button.height(this.getEffectiveItemHeight(item, inGroup).value);
+              Button.hoverEffect(HoverEffect.None);
+              Button.borderRadius(
+                this.getEffectiveItemBorderRadius(false, item)
+              );
+              Button.backgroundColor(
+                this.getEffectiveItemDisplayBg(item, inGroup)
+              );
+              Button.onHover((isHover) => {
+                this.setItemHovered(item, isHover);
+              });
+              ViewStackProcessor.visualState('pressed');
+              Button.backgroundColor(
+                this.getEffectiveItemPressedBg(item, inGroup)
+              );
+              ViewStackProcessor.visualState();
+              Button.onClick(() => {
+                if (
+                  this.getEffectiveItemState(item) ===
+                  ToolBarV2ItemState.DISABLE
+                ) {
+                  return;
+                }
+                this.advClickEventAction(item);
+              });
+              Button.accessibilityGroup(true);
+              Button.accessibilityText(this.getAdvAccessibilityText(item));
+              Button.accessibilityDescription(
+                this.getAdvAccessibilityDescription(item)
+              );
+              Button.accessibilityLevel(item.accessibilityLevel);
+              Button.enabled(
+                this.getEffectiveItemState(item) !== ToolBarV2ItemState.DISABLE
+              );
+              Button.opacity(
                 this.getEffectiveItemState(item) === ToolBarV2ItemState.DISABLE
-              ) {
-                return;
+                  ? 0.4
+                  : 1
+              );
+              Button.padding(0);
+              Button.id(item.id);
+            }, Button);
+            this.observeComponentCreation2((elmtId, isInitialRender) => {
+              Button.createWithChild({
+                type: ButtonType.Normal,
+                stateEffect: false,
+              });
+              Button.width(
+                this.getEffectiveItemInnerWidth(item, inGroup).value
+              );
+              Button.height(
+                this.getEffectiveItemInnerHeight(item, inGroup).value
+              );
+              Button.padding({
+                start: LengthMetrics.vp(ITEM_PADDING),
+                end: LengthMetrics.vp(ITEM_PADDING),
+              });
+              Button.borderRadius(
+                this.getEffectiveItemBorderRadius(inGroup, item)
+              );
+              Button.backgroundColor(this.getEffectiveItemInnerDisplayBg(item));
+            }, Button);
+            this.observeComponentCreation2((elmtId, isInitialRender) => {
+              Column.create();
+              Column.justifyContent(FlexAlign.Center);
+              Column.alignItems(HorizontalAlign.Center);
+              Column.padding({
+                top: LengthMetrics.vp(ITEM_PADDING),
+                bottom: LengthMetrics.vp(ITEM_PADDING),
+              });
+            }, Column);
+            this.observeComponentCreation2((elmtId, isInitialRender) => {
+              If.create();
+              if (item.icon) {
+                this.ifElseBranchUpdateFunction(0, () => {
+                  this.observeComponentCreation2((elmtId, isInitialRender) => {
+                    If.create();
+                    if (item.icon instanceof ToolBarV2SymbolGlyph) {
+                      this.ifElseBranchUpdateFunction(0, () => {
+                        this.observeComponentCreation2(
+                          (elmtId, isInitialRender) => {
+                            SymbolGlyph.create();
+                            SymbolGlyph.fontSize(IMAGE_SIZE);
+                            SymbolGlyph.symbolEffect(new SymbolEffect(), false);
+                            SymbolGlyph.attributeModifier.bind(this)(
+                              this.isItemActivated(item)
+                                ? item.icon.activated ?? item.icon.normal
+                                : item.icon.normal
+                            );
+                            SymbolGlyph.fontColor([
+                              this.getEffectiveItemIconColor(item),
+                            ]);
+                            SymbolGlyph.margin({
+                              bottom:
+                                item.content && item.isShowText !== false
+                                  ? LengthMetrics.vp(ICON_TEXT_MARGIN)
+                                  : LengthMetrics.vp(0),
+                            });
+                          },
+                          SymbolGlyph
+                        );
+                      });
+                    } else if (Util.isSymbolResource(item.icon.src)) {
+                      this.ifElseBranchUpdateFunction(1, () => {
+                        this.observeComponentCreation2(
+                          (elmtId, isInitialRender) => {
+                            SymbolGlyph.create(item.icon.src);
+                            SymbolGlyph.fontSize(IMAGE_SIZE);
+                            SymbolGlyph.fontColor([
+                              this.getEffectiveItemIconColor(item),
+                            ]);
+                            SymbolGlyph.margin({
+                              bottom:
+                                item.content && item.isShowText !== false
+                                  ? LengthMetrics.vp(ICON_TEXT_MARGIN)
+                                  : LengthMetrics.vp(0),
+                            });
+                          },
+                          SymbolGlyph
+                        );
+                      });
+                    } else {
+                      this.ifElseBranchUpdateFunction(2, () => {
+                        this.observeComponentCreation2(
+                          (elmtId, isInitialRender) => {
+                            Image.create(item.icon.src);
+                            Image.width(IMAGE_SIZE);
+                            Image.height(IMAGE_SIZE);
+                            Image.fillColor(
+                              this.getEffectiveItemIconColor(item)
+                            );
+                            Image.objectFit(ImageFit.Contain);
+                            Image.draggable(false);
+                            Image.margin({
+                              bottom:
+                                item.content && item.isShowText !== false
+                                  ? LengthMetrics.vp(ICON_TEXT_MARGIN)
+                                  : LengthMetrics.vp(0),
+                            });
+                          },
+                          Image
+                        );
+                      });
+                    }
+                  }, If);
+                  If.pop();
+                  this.observeComponentCreation2((elmtId, isInitialRender) => {
+                    If.create();
+                    if (item.content && item.isShowText !== false) {
+                      this.ifElseBranchUpdateFunction(0, () => {
+                        this.observeComponentCreation2(
+                          (elmtId, isInitialRender) => {
+                            Text.create(item.content.text);
+                            Text.fontColor(
+                              this.getEffectiveItemTextColor(item)
+                            );
+                            Text.fontSize(this.getEffectiveItemFontSize());
+                            Text.fontWeight(FontWeight.Regular);
+                            Text.maxLines(1);
+                            Text.textOverflow({
+                              overflow: TextOverflow.Ellipsis,
+                            });
+                            Text.textAlign(TextAlign.Center);
+                          },
+                          Text
+                        );
+                        Text.pop();
+                      });
+                    } else {
+                      this.ifElseBranchUpdateFunction(1, () => {});
+                    }
+                  }, If);
+                  If.pop();
+                });
+              } else if (item.content) {
+                this.ifElseBranchUpdateFunction(1, () => {
+                  this.observeComponentCreation2((elmtId, isInitialRender) => {
+                    Text.create(item.content.text);
+                    Text.fontColor(this.getEffectiveItemTextColor(item));
+                    Text.fontSize(this.getEffectiveItemFontSize());
+                    Text.fontWeight(FontWeight.Regular);
+                    Text.maxLines(1);
+                    Text.textOverflow({ overflow: TextOverflow.Ellipsis });
+                    Text.textAlign(TextAlign.Center);
+                  }, Text);
+                  Text.pop();
+                });
+              } else {
+                this.ifElseBranchUpdateFunction(2, () => {});
               }
-              this.advClickEventAction(item);
-            });
-            Button.accessibilityGroup(true);
-            Button.accessibilityText(this.getAdvAccessibilityText(item));
-            Button.accessibilityDescription(
-              this.getAdvAccessibilityDescription(item)
-            );
-            Button.accessibilityLevel(item.accessibilityLevel);
-            Button.enabled(
-              this.getEffectiveItemState(item) !== ToolBarV2ItemState.DISABLE
-            );
-            Button.opacity(
-              this.getEffectiveItemState(item) === ToolBarV2ItemState.DISABLE
-                ? 0.4
-                : 1
-            );
-            Button.padding(0);
-          }, Button);
-          this.observeComponentCreation2((elmtId, isInitialRender) => {
-            Button.createWithChild({
-              type: ButtonType.Normal,
-              stateEffect: false,
-            });
-            Button.width(this.getEffectiveItemInnerWidth(item, inGroup).value);
-            Button.height(
-              this.getEffectiveItemInnerHeight(item, inGroup).value
-            );
-            Button.padding({
-              start: LengthMetrics.vp(ITEM_PADDING),
-              end: LengthMetrics.vp(ITEM_PADDING),
-            });
-            Button.borderRadius(
-              this.getEffectiveItemBorderRadius(inGroup, item)
-            );
-            Button.backgroundColor(this.getEffectiveItemInnerDisplayBg(item));
-          }, Button);
-          this.observeComponentCreation2((elmtId, isInitialRender) => {
-            Column.create();
-            Column.justifyContent(FlexAlign.Center);
-            Column.alignItems(HorizontalAlign.Center);
-            Column.padding({
-              top: LengthMetrics.vp(ITEM_PADDING),
-              bottom: LengthMetrics.vp(ITEM_PADDING),
-            });
-          }, Column);
-          this.observeComponentCreation2((elmtId, isInitialRender) => {
-            If.create();
-            if (item.icon) {
-              this.ifElseBranchUpdateFunction(0, () => {
-                this.observeComponentCreation2((elmtId, isInitialRender) => {
-                  If.create();
-                  if (item.icon instanceof ToolBarV2SymbolGlyph) {
-                    this.ifElseBranchUpdateFunction(0, () => {
-                      this.observeComponentCreation2(
-                        (elmtId, isInitialRender) => {
-                          SymbolGlyph.create();
-                          SymbolGlyph.fontSize(IMAGE_SIZE);
-                          SymbolGlyph.symbolEffect(new SymbolEffect(), false);
-                          SymbolGlyph.attributeModifier.bind(this)(
-                            this.isItemActivated(item)
-                              ? item.icon.activated ?? item.icon.normal
-                              : item.icon.normal
-                          );
-                          SymbolGlyph.fontColor([
-                            this.getEffectiveItemIconColor(item),
-                          ]);
-                          SymbolGlyph.margin({
-                            bottom:
-                              item.content && item.isShowText !== false
-                                ? LengthMetrics.vp(ICON_TEXT_MARGIN)
-                                : LengthMetrics.vp(0),
-                          });
-                        },
-                        SymbolGlyph
-                      );
-                    });
-                  } else if (Util.isSymbolResource(item.icon.src)) {
-                    this.ifElseBranchUpdateFunction(1, () => {
-                      this.observeComponentCreation2(
-                        (elmtId, isInitialRender) => {
-                          SymbolGlyph.create(item.icon.src);
-                          SymbolGlyph.fontSize(IMAGE_SIZE);
-                          SymbolGlyph.fontColor([
-                            this.getEffectiveItemIconColor(item),
-                          ]);
-                          SymbolGlyph.margin({
-                            bottom:
-                              item.content && item.isShowText !== false
-                                ? LengthMetrics.vp(ICON_TEXT_MARGIN)
-                                : LengthMetrics.vp(0),
-                          });
-                        },
-                        SymbolGlyph
-                      );
-                    });
-                  } else {
-                    this.ifElseBranchUpdateFunction(2, () => {
-                      this.observeComponentCreation2(
-                        (elmtId, isInitialRender) => {
-                          Image.create(item.icon.src);
-                          Image.width(IMAGE_SIZE);
-                          Image.height(IMAGE_SIZE);
-                          Image.fillColor(this.getEffectiveItemIconColor(item));
-                          Image.objectFit(ImageFit.Contain);
-                          Image.draggable(false);
-                          Image.margin({
-                            bottom:
-                              item.content && item.isShowText !== false
-                                ? LengthMetrics.vp(ICON_TEXT_MARGIN)
-                                : LengthMetrics.vp(0),
-                          });
-                        },
-                        Image
-                      );
-                    });
-                  }
-                }, If);
-                If.pop();
-                this.observeComponentCreation2((elmtId, isInitialRender) => {
-                  If.create();
-                  if (item.content && item.isShowText !== false) {
-                    this.ifElseBranchUpdateFunction(0, () => {
-                      this.observeComponentCreation2(
-                        (elmtId, isInitialRender) => {
-                          Text.create(item.content.text);
-                          Text.fontColor(this.getEffectiveItemTextColor(item));
-                          Text.fontSize(this.getEffectiveItemFontSize());
-                          Text.fontWeight(FontWeight.Regular);
-                          Text.maxLines(1);
-                          Text.textOverflow({
-                            overflow: TextOverflow.Ellipsis,
-                          });
-                          Text.textAlign(TextAlign.Center);
-                        },
-                        Text
-                      );
-                      Text.pop();
-                    });
-                  } else {
-                    this.ifElseBranchUpdateFunction(1, () => {});
-                  }
-                }, If);
-                If.pop();
-              });
-            } else if (item.content) {
-              this.ifElseBranchUpdateFunction(1, () => {
-                this.observeComponentCreation2((elmtId, isInitialRender) => {
-                  Text.create(item.content.text);
-                  Text.fontColor(this.getEffectiveItemTextColor(item));
-                  Text.fontSize(this.getEffectiveItemFontSize());
-                  Text.fontWeight(FontWeight.Regular);
-                  Text.maxLines(1);
-                  Text.textOverflow({ overflow: TextOverflow.Ellipsis });
-                  Text.textAlign(TextAlign.Center);
-                }, Text);
-                Text.pop();
-              });
-            } else {
-              this.ifElseBranchUpdateFunction(2, () => {});
-            }
-          }, If);
-          If.pop();
-          Column.pop();
-          Button.pop();
-          Button.pop();
+            }, If);
+            If.pop();
+            Column.pop();
+            Button.pop();
+            Button.pop();
+          }
         });
       }
     }, If);
