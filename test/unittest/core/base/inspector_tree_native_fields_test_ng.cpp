@@ -18,6 +18,9 @@
 
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/base/inspector_tree_request_context.h"
+#include "core/components_ng/base/view_abstract_model_ng.h"
+#include "core/components_ng/pattern/button/button_pattern.h"
+#include "core/components_ng/pattern/checkbox/checkbox_pattern.h"
 #include "core/components_ng/pattern/pattern.h"
 
 #define private public
@@ -243,5 +246,97 @@ TEST_F(InspectorTreeTask03, FalseInteractionAndAbsentRegions)
     EXPECT_FALSE(json->Contains("responseRegion"));
     EXPECT_FALSE(json->Contains("responseRegionMap"));
     EXPECT_FALSE(json->Contains("mouseResponseRegion"));
+}
+
+class InspectorTreeTask03CheckState : public InspectorTreeTask03 {
+protected:
+    void ExpectCheckState(const RefPtr<FrameNode>& frame, bool checkable, bool checked)
+    {
+        for (bool visible : { false, true }) {
+            for (bool interaction : { false, true }) {
+                for (bool accessibility : { false, true }) {
+                    SCOPED_TRACE(testing::Message() << "visible=" << visible << ", interaction=" << interaction
+                        << ", accessibility=" << accessibility << ", checkable=" << checkable
+                        << ", checked=" << checked);
+                    ParamConfig config;
+                    config.interactionInfo = interaction;
+                    config.accessibilityInfo = accessibility;
+                    InspectorTreeRequestContext context(config, {});
+                    config.inspectorContext = &context;
+                    auto json = JsonUtil::CreateSharedPtrJson();
+                    frame->DumpSimplifyTreeWithParamConfig(0, json, visible, config);
+                    if (!interaction) {
+                        EXPECT_FALSE(json->Contains("checkable"));
+                        EXPECT_FALSE(json->Contains("checked"));
+                        continue;
+                    }
+                    ASSERT_TRUE(json->GetValue("checkable")->IsBool());
+                    EXPECT_EQ(json->GetBool("checkable"), checkable);
+                    if (checkable) {
+                        ASSERT_TRUE(json->GetValue("checked")->IsBool());
+                        EXPECT_EQ(json->GetBool("checked"), checked);
+                    } else {
+                        EXPECT_FALSE(json->Contains("checked"));
+                    }
+                }
+            }
+        }
+    }
+};
+
+TEST_F(InspectorTreeTask03CheckState, ButtonUserCheckedStateAndReset)
+{
+    auto frame = FrameNode::CreateFrameNode("Button", 14, AceType::MakeRefPtr<ButtonPattern>());
+    frame->SetActive(true);
+    ExpectCheckState(frame, false, false);
+    for (bool checked : { true, false }) {
+        ViewAbstractModelNG::SetAccessibilityChecked(AceType::RawPtr(frame), checked, false);
+        ExpectCheckState(frame, true, checked);
+    }
+    ViewAbstractModelNG::SetAccessibilityChecked(AceType::RawPtr(frame), false, true);
+    ExpectCheckState(frame, false, false);
+}
+
+TEST_F(InspectorTreeTask03CheckState, UserCheckedStateOverridesCheckboxAndFallsBackAfterReset)
+{
+    auto frame = FrameNode::CreateFrameNode("Checkbox", 15, AceType::MakeRefPtr<CheckBoxPattern>());
+    frame->SetActive(true);
+    auto paint = frame->GetPaintProperty<CheckBoxPaintProperty>();
+    auto property = frame->GetAccessibilityProperty<AccessibilityProperty>();
+    ASSERT_NE(paint, nullptr);
+    ASSERT_NE(property, nullptr);
+    for (bool nativeChecked : { false, true }) {
+        paint->UpdateCheckBoxSelect(nativeChecked);
+        ExpectCheckState(frame, true, nativeChecked);
+        ViewAbstractModelNG::SetAccessibilityChecked(AceType::RawPtr(frame), !nativeChecked, false);
+        ExpectCheckState(frame, true, !nativeChecked);
+        EXPECT_EQ(property->IsChecked(), nativeChecked);
+        property->SetUserCheckable(false);
+        ExpectCheckState(frame, false, false);
+        ViewAbstractModelNG::SetAccessibilityChecked(AceType::RawPtr(frame), false, true);
+        ExpectCheckState(frame, true, nativeChecked);
+    }
+}
+
+TEST_F(InspectorTreeTask03CheckState, CustomCheckedStateTakesPrecedence)
+{
+    auto frame = FrameNode::CreateFrameNode("Button", 16, AceType::MakeRefPtr<ButtonPattern>());
+    frame->SetActive(true);
+    auto property = frame->GetAccessibilityProperty<AccessibilityProperty>();
+    ASSERT_NE(property, nullptr);
+    auto custom = AceType::MakeRefPtr<CustomAccessibilityProperty>();
+    property->SetCustomAccessibilityProperty(custom);
+    for (bool checkable : { false, true }) {
+        for (bool checked : { false, true }) {
+            ViewAbstractModelNG::SetAccessibilityChecked(AceType::RawPtr(frame), !checked, false);
+            custom->SetCheckable(checkable);
+            custom->SetChecked(checked);
+            ExpectCheckState(frame, checkable, checked);
+        }
+    }
+    property->SetCustomAccessibilityProperty(nullptr);
+    ExpectCheckState(frame, true, false);
+    ViewAbstractModelNG::SetAccessibilityChecked(AceType::RawPtr(frame), false, true);
+    ExpectCheckState(frame, false, false);
 }
 } // namespace OHOS::Ace::NG

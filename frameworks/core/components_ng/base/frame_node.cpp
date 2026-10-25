@@ -1740,10 +1740,18 @@ void FrameNode::DumpInspectorTreeInfo(std::shared_ptr<JsonValue>& json, ParamCon
     auto gesture = eventHub_ ? eventHub_->GetGestureEventHub() : nullptr;
     if (config.interactionInfo) {
         json->Put("touchable", !gesture || gesture->GetTouchable());
-        const bool checkable = accessibilityProperty_ && accessibilityProperty_->IsCheckable();
+        const auto customProperty = accessibilityProperty_ ?
+            accessibilityProperty_->GetCustomAccessibilityProperty() : nullptr;
+        const bool checkable = customProperty ? customProperty->GetCheckable() :
+            (accessibilityProperty_ && (accessibilityProperty_->HasUserCheckable() ?
+                accessibilityProperty_->IsUserCheckable() : accessibilityProperty_->IsCheckable()));
         json->Put("checkable", checkable);
         if (checkable) {
-            json->Put("checked", accessibilityProperty_->IsChecked());
+            const bool checked = customProperty ? customProperty->GetChecked() :
+                (accessibilityProperty_->HasUserCheckedType() ?
+                    static_cast<bool>(accessibilityProperty_->GetUserCheckedType()) :
+                    accessibilityProperty_->IsChecked());
+            json->Put("checked", checked);
         }
         if (accessibilityProperty_) {
             const auto actions = accessibilityProperty_->GetSupportAction();
