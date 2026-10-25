@@ -188,12 +188,6 @@ public:
         return false;
     }
 
-    bool ReadBool(bool& value)
-    {
-        value = ReadBool();
-        return true;
-    }
-
     bool needCloseFd_ = false;
     std::u16string interfaceToken_;
 };
