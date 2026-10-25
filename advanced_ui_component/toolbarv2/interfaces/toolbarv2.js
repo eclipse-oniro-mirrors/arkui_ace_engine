@@ -24,59 +24,62 @@ var __decorate =
           ? (desc = Object.getOwnPropertyDescriptor(target, key))
           : desc,
       d;
-    if (typeof Reflect === "object" && typeof Reflect.decorate === "function")
+    if (typeof Reflect === 'object' && typeof Reflect.decorate === 'function') {
       r = Reflect.decorate(decorators, target, key, desc);
-    else
-      for (var i = decorators.length - 1; i >= 0; i--)
-        if ((d = decorators[i]))
+    } else {
+      for (var i = decorators.length - 1; i >= 0; i--) {
+        if ((d = decorators[i])) {
           r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+        }
+      }
+    }
     return c > 3 && r && Object.defineProperty(target, key, r), r;
   };
-if (!("finalizeConstruction" in ViewPU.prototype)) {
-  Reflect.set(ViewPU.prototype, "finalizeConstruction", () => {});
+if (!('finalizeConstruction' in ViewPU.prototype)) {
+  Reflect.set(ViewPU.prototype, 'finalizeConstruction', () => {});
 }
-const LengthMetrics = requireNapi("arkui.node").LengthMetrics;
-const LengthUnit = requireNapi("arkui.node").LengthUnit;
-const ColorMetrics = requireNapi("arkui.node").ColorMetrics;
-const DividerModifier = requireNapi("arkui.modifier").DividerModifier;
-const hilog = requireNapi("hilog");
-const promptAction = requireNapi("promptAction");
-const uiMaterial = requireNapi("arkui.uiMaterial");
+const LengthMetrics = requireNapi('arkui.node').LengthMetrics;
+const LengthUnit = requireNapi('arkui.node').LengthUnit;
+const ColorMetrics = requireNapi('arkui.node').ColorMetrics;
+const DividerModifier = requireNapi('arkui.modifier').DividerModifier;
+const hilog = requireNapi('hilog');
+const promptAction = requireNapi('promptAction');
+const uiMaterial = requireNapi('arkui.uiMaterial');
 
 export var ToolBarV2ItemState;
 (function (ToolBarV2ItemState) {
-  ToolBarV2ItemState[(ToolBarV2ItemState["ENABLE"] = 1)] = "ENABLE";
-  ToolBarV2ItemState[(ToolBarV2ItemState["DISABLE"] = 2)] = "DISABLE";
-  ToolBarV2ItemState[(ToolBarV2ItemState["ACTIVATE"] = 3)] = "ACTIVATE";
+  ToolBarV2ItemState[(ToolBarV2ItemState['ENABLE'] = 1)] = 'ENABLE';
+  ToolBarV2ItemState[(ToolBarV2ItemState['DISABLE'] = 2)] = 'DISABLE';
+  ToolBarV2ItemState[(ToolBarV2ItemState['ACTIVATE'] = 3)] = 'ACTIVATE';
 })(ToolBarV2ItemState || (ToolBarV2ItemState = {}));
 
 export var ToolbarV2ItemPlacement;
 (function (ToolbarV2ItemPlacement) {
-  ToolbarV2ItemPlacement[(ToolbarV2ItemPlacement["MAIN"] = 0)] = "MAIN";
-  ToolbarV2ItemPlacement[(ToolbarV2ItemPlacement["LEADING"] = 1)] = "LEADING";
-  ToolbarV2ItemPlacement[(ToolbarV2ItemPlacement["TRAILING"] = 2)] = "TRAILING";
+  ToolbarV2ItemPlacement[(ToolbarV2ItemPlacement['MAIN'] = 0)] = 'MAIN';
+  ToolbarV2ItemPlacement[(ToolbarV2ItemPlacement['LEADING'] = 1)] = 'LEADING';
+  ToolbarV2ItemPlacement[(ToolbarV2ItemPlacement['TRAILING'] = 2)] = 'TRAILING';
 })(ToolbarV2ItemPlacement || (ToolbarV2ItemPlacement = {}));
 
 export var BarBackgroundVisibility;
 (function (BarBackgroundVisibility) {
-  BarBackgroundVisibility[(BarBackgroundVisibility["VISIBLE"] = 0)] = "VISIBLE";
-  BarBackgroundVisibility[(BarBackgroundVisibility["HIDDEN"] = 1)] = "HIDDEN";
+  BarBackgroundVisibility[(BarBackgroundVisibility['VISIBLE'] = 0)] = 'VISIBLE';
+  BarBackgroundVisibility[(BarBackgroundVisibility['HIDDEN'] = 1)] = 'HIDDEN';
 })(BarBackgroundVisibility || (BarBackgroundVisibility = {}));
 const PUBLIC_MORE = {
   id: 125831714,
   type: 40000,
-  params: ["sys.symbol.dot_grid_2x2"],
-  bundleName: "__harDefaultBundleName__",
-  moduleName: "__harDefaultModuleName__",
+  params: ['sys.symbol.dot_grid_2x2'],
+  bundleName: '__harDefaultBundleName__',
+  moduleName: '__harDefaultModuleName__',
 };
-const IMAGE_SIZE = "24vp";
+const IMAGE_SIZE = '24vp';
 const DEFAULT_TOOLBAR_HEIGHT = 56;
 const TOOLBAR_MAX_LENGTH = 5;
 const MAX_FONT_SIZE = 3.2;
-const DIALOG_IMAGE_SIZE = "64vp";
-const MAX_DIALOG = "256vp";
-const MIN_DIALOG = "216vp";
-const TEXT_TOOLBAR_DIALOG = "18.3fp";
+const DIALOG_IMAGE_SIZE = '64vp';
+const MAX_DIALOG = '256vp';
+const MIN_DIALOG = '216vp';
+const TEXT_TOOLBAR_DIALOG = '18.3fp';
 const SCREEN_WIDTH_BREAK_POINT = 640;
 const VERTICAL_SCREEN_TEXT_MAX_LINES = 6;
 const HORIZONTAL_SCREEN_TEXT_MAX_LINES = 1;
@@ -120,7 +123,7 @@ class Util {
     if (!resource) {
       return false;
     }
-    if (typeof resource === "string" || typeof resource === "undefined") {
+    if (typeof resource === 'string' || typeof resource === 'undefined') {
       return false;
     }
     return true;
@@ -150,8 +153,8 @@ let ToolBarV2SymbolGlyph = class ToolBarV2SymbolGlyph {
     this.activated = options.activated;
   }
 };
-__decorate([Trace], ToolBarV2SymbolGlyph.prototype, "normal", void 0);
-__decorate([Trace], ToolBarV2SymbolGlyph.prototype, "activated", void 0);
+__decorate([Trace], ToolBarV2SymbolGlyph.prototype, 'normal', void 0);
+__decorate([Trace], ToolBarV2SymbolGlyph.prototype, 'activated', void 0);
 ToolBarV2SymbolGlyph = __decorate([ObservedV2], ToolBarV2SymbolGlyph);
 
 export { ToolBarV2SymbolGlyph };
@@ -173,25 +176,25 @@ let ToolBarV2ItemText = class ToolBarV2ItemText {
     this.color = ColorMetrics.resourceColor({
       id: 125830982,
       type: 10001,
-      params: ["sys.color.font_primary"],
-      bundleName: "__harDefaultBundleName__",
-      moduleName: "__harDefaultModuleName__",
+      params: ['sys.color.font_primary'],
+      bundleName: '__harDefaultBundleName__',
+      moduleName: '__harDefaultModuleName__',
     });
     this.activatedColor = ColorMetrics.resourceColor({
       id: 125830986,
       type: 10001,
-      params: ["sys.color.font_emphasize"],
-      bundleName: "__harDefaultBundleName__",
-      moduleName: "__harDefaultModuleName__",
+      params: ['sys.color.font_emphasize'],
+      bundleName: '__harDefaultBundleName__',
+      moduleName: '__harDefaultModuleName__',
     });
     this.text = options.text;
     this.color = options.color;
     this.activatedColor = options.activatedColor;
   }
 };
-__decorate([Trace], ToolBarV2ItemText.prototype, "text", void 0);
-__decorate([Trace], ToolBarV2ItemText.prototype, "color", void 0);
-__decorate([Trace], ToolBarV2ItemText.prototype, "activatedColor", void 0);
+__decorate([Trace], ToolBarV2ItemText.prototype, 'text', void 0);
+__decorate([Trace], ToolBarV2ItemText.prototype, 'color', void 0);
+__decorate([Trace], ToolBarV2ItemText.prototype, 'activatedColor', void 0);
 ToolBarV2ItemText = __decorate([ObservedV2], ToolBarV2ItemText);
 
 export { ToolBarV2ItemText };
@@ -204,21 +207,21 @@ let ToolBarV2ItemImage = class ToolBarV2ItemImage {
     this.activatedColor = options.activatedColor;
   }
 };
-__decorate([Trace], ToolBarV2ItemImage.prototype, "src", void 0);
-__decorate([Trace], ToolBarV2ItemImage.prototype, "color", void 0);
-__decorate([Trace], ToolBarV2ItemImage.prototype, "activatedColor", void 0);
+__decorate([Trace], ToolBarV2ItemImage.prototype, 'src', void 0);
+__decorate([Trace], ToolBarV2ItemImage.prototype, 'color', void 0);
+__decorate([Trace], ToolBarV2ItemImage.prototype, 'activatedColor', void 0);
 ToolBarV2ItemImage = __decorate([ObservedV2], ToolBarV2ItemImage);
 
 export { ToolBarV2ItemImage };
 let ToolBarV2Item = class ToolBarV2Item {
   constructor(options) {
-    this.content = new ToolBarV2ItemText({ text: "" });
+    this.content = new ToolBarV2ItemText({ text: '' });
     this.action = undefined;
     this.icon = undefined;
     this.state = 1;
-    this.accessibilityText = "";
-    this.accessibilityDescription = "";
-    this.accessibilityLevel = "auto";
+    this.accessibilityText = '';
+    this.accessibilityDescription = '';
+    this.accessibilityLevel = 'auto';
     this.backgroundColor = Color.Transparent;
     this.content = options.content;
     this.action = options.action;
@@ -243,21 +246,21 @@ let ToolBarV2Item = class ToolBarV2Item {
     return undefined;
   }
 };
-__decorate([Trace], ToolBarV2Item.prototype, "content", void 0);
-__decorate([Trace], ToolBarV2Item.prototype, "action", void 0);
-__decorate([Trace], ToolBarV2Item.prototype, "icon", void 0);
-__decorate([Trace], ToolBarV2Item.prototype, "state", void 0);
-__decorate([Trace], ToolBarV2Item.prototype, "accessibilityText", void 0);
+__decorate([Trace], ToolBarV2Item.prototype, 'content', void 0);
+__decorate([Trace], ToolBarV2Item.prototype, 'action', void 0);
+__decorate([Trace], ToolBarV2Item.prototype, 'icon', void 0);
+__decorate([Trace], ToolBarV2Item.prototype, 'state', void 0);
+__decorate([Trace], ToolBarV2Item.prototype, 'accessibilityText', void 0);
 __decorate(
   [Trace],
   ToolBarV2Item.prototype,
-  "accessibilityDescription",
+  'accessibilityDescription',
   void 0
 );
-__decorate([Trace], ToolBarV2Item.prototype, "accessibilityLevel", void 0);
-__decorate([Trace], ToolBarV2Item.prototype, "backgroundColor", void 0);
-__decorate([Computed], ToolBarV2Item.prototype, "symbol", null);
-__decorate([Computed], ToolBarV2Item.prototype, "image", null);
+__decorate([Trace], ToolBarV2Item.prototype, 'accessibilityLevel', void 0);
+__decorate([Trace], ToolBarV2Item.prototype, 'backgroundColor', void 0);
+__decorate([Computed], ToolBarV2Item.prototype, 'symbol', null);
+__decorate([Computed], ToolBarV2Item.prototype, 'image', null);
 ToolBarV2Item = __decorate([ObservedV2], ToolBarV2Item);
 
 export { ToolBarV2Item };
@@ -273,19 +276,19 @@ let ToolbarV2ItemGroupStyle = class ToolbarV2ItemGroupStyle {
     this.stateEffect = init?.stateEffect;
   }
 };
-__decorate([Trace], ToolbarV2ItemGroupStyle.prototype, "placement", void 0);
-__decorate([Trace], ToolbarV2ItemGroupStyle.prototype, "space", void 0);
+__decorate([Trace], ToolbarV2ItemGroupStyle.prototype, 'placement', void 0);
+__decorate([Trace], ToolbarV2ItemGroupStyle.prototype, 'space', void 0);
 __decorate(
   [Trace],
   ToolbarV2ItemGroupStyle.prototype,
-  "backgroundColor",
+  'backgroundColor',
   void 0
 );
-__decorate([Trace], ToolbarV2ItemGroupStyle.prototype, "padding", void 0);
-__decorate([Trace], ToolbarV2ItemGroupStyle.prototype, "borderRadius", void 0);
-__decorate([Trace], ToolbarV2ItemGroupStyle.prototype, "borderWidth", void 0);
-__decorate([Trace], ToolbarV2ItemGroupStyle.prototype, "borderColor", void 0);
-__decorate([Trace], ToolbarV2ItemGroupStyle.prototype, "stateEffect", void 0);
+__decorate([Trace], ToolbarV2ItemGroupStyle.prototype, 'padding', void 0);
+__decorate([Trace], ToolbarV2ItemGroupStyle.prototype, 'borderRadius', void 0);
+__decorate([Trace], ToolbarV2ItemGroupStyle.prototype, 'borderWidth', void 0);
+__decorate([Trace], ToolbarV2ItemGroupStyle.prototype, 'borderColor', void 0);
+__decorate([Trace], ToolbarV2ItemGroupStyle.prototype, 'stateEffect', void 0);
 ToolbarV2ItemGroupStyle = __decorate([ObservedV2], ToolbarV2ItemGroupStyle);
 
 export { ToolbarV2ItemGroupStyle };
@@ -297,10 +300,10 @@ let ToolbarV2ItemGroup = class ToolbarV2ItemGroup {
     this.style = options?.style;
   }
 };
-__decorate([Trace], ToolbarV2ItemGroup.prototype, "placement", void 0);
-__decorate([Trace], ToolbarV2ItemGroup.prototype, "items", void 0);
-__decorate([Trace], ToolbarV2ItemGroup.prototype, "space", void 0);
-__decorate([Trace], ToolbarV2ItemGroup.prototype, "style", void 0);
+__decorate([Trace], ToolbarV2ItemGroup.prototype, 'placement', void 0);
+__decorate([Trace], ToolbarV2ItemGroup.prototype, 'items', void 0);
+__decorate([Trace], ToolbarV2ItemGroup.prototype, 'space', void 0);
+__decorate([Trace], ToolbarV2ItemGroup.prototype, 'style', void 0);
 ToolbarV2ItemGroup = __decorate([ObservedV2], ToolbarV2ItemGroup);
 let AdvancedToolbarV2Item = class AdvancedToolbarV2Item extends ToolBarV2Item {
   onGroupIDChange(monitor) {
@@ -340,44 +343,44 @@ let AdvancedToolbarV2Item = class AdvancedToolbarV2Item extends ToolBarV2Item {
     this.groupStyle = options.groupStyle;
   }
 };
-__decorate([Trace], AdvancedToolbarV2Item.prototype, "builder", void 0);
-__decorate([Trace], AdvancedToolbarV2Item.prototype, "titleConfigs", void 0);
-__decorate([Trace], AdvancedToolbarV2Item.prototype, "placement", void 0);
-__decorate([Trace], AdvancedToolbarV2Item.prototype, "displayPriority", void 0);
+__decorate([Trace], AdvancedToolbarV2Item.prototype, 'builder', void 0);
+__decorate([Trace], AdvancedToolbarV2Item.prototype, 'titleConfigs', void 0);
+__decorate([Trace], AdvancedToolbarV2Item.prototype, 'placement', void 0);
+__decorate([Trace], AdvancedToolbarV2Item.prototype, 'displayPriority', void 0);
 __decorate(
   [Trace],
   AdvancedToolbarV2Item.prototype,
-  "activatedBackgroundColor",
+  'activatedBackgroundColor',
   void 0
 );
-__decorate([Trace], AdvancedToolbarV2Item.prototype, "id", void 0);
-__decorate([Trace], AdvancedToolbarV2Item.prototype, "itemSize", void 0);
-__decorate([Trace], AdvancedToolbarV2Item.prototype, "isShowSeparator", void 0);
-__decorate([Trace], AdvancedToolbarV2Item.prototype, "isShowText", void 0);
+__decorate([Trace], AdvancedToolbarV2Item.prototype, 'id', void 0);
+__decorate([Trace], AdvancedToolbarV2Item.prototype, 'itemSize', void 0);
+__decorate([Trace], AdvancedToolbarV2Item.prototype, 'isShowSeparator', void 0);
+__decorate([Trace], AdvancedToolbarV2Item.prototype, 'isShowText', void 0);
 __decorate(
   [Trace],
   AdvancedToolbarV2Item.prototype,
-  "isShowOverflowMenu",
+  'isShowOverflowMenu',
   void 0
 );
-__decorate([Trace], AdvancedToolbarV2Item.prototype, "groupID", void 0);
-__decorate([Trace], AdvancedToolbarV2Item.prototype, "groupStyle", void 0);
+__decorate([Trace], AdvancedToolbarV2Item.prototype, 'groupID', void 0);
+__decorate([Trace], AdvancedToolbarV2Item.prototype, 'groupStyle', void 0);
 __decorate(
-  [Monitor("groupID")],
+  [Monitor('groupID')],
   AdvancedToolbarV2Item.prototype,
-  "onGroupIDChange",
+  'onGroupIDChange',
   null
 );
 __decorate(
-  [Monitor("groupStyle")],
+  [Monitor('groupStyle')],
   AdvancedToolbarV2Item.prototype,
-  "onGroupStyleChange",
+  'onGroupStyleChange',
   null
 );
 __decorate(
-  [Monitor("titleConfigs")],
+  [Monitor('titleConfigs')],
   AdvancedToolbarV2Item.prototype,
-  "onTitleConfigsChange",
+  'onTitleConfigsChange',
   null
 );
 AdvancedToolbarV2Item = __decorate([ObservedV2], AdvancedToolbarV2Item);
@@ -391,25 +394,25 @@ let ToolbarV2TitleStyle = class ToolbarV2TitleStyle {
     this.minLength = init?.minLength;
   }
 };
-__decorate([Trace], ToolbarV2TitleStyle.prototype, "fontSize", void 0);
-__decorate([Trace], ToolbarV2TitleStyle.prototype, "fontColor", void 0);
-__decorate([Trace], ToolbarV2TitleStyle.prototype, "fontWeight", void 0);
-__decorate([Trace], ToolbarV2TitleStyle.prototype, "minLength", void 0);
+__decorate([Trace], ToolbarV2TitleStyle.prototype, 'fontSize', void 0);
+__decorate([Trace], ToolbarV2TitleStyle.prototype, 'fontColor', void 0);
+__decorate([Trace], ToolbarV2TitleStyle.prototype, 'fontWeight', void 0);
+__decorate([Trace], ToolbarV2TitleStyle.prototype, 'minLength', void 0);
 ToolbarV2TitleStyle = __decorate([ObservedV2], ToolbarV2TitleStyle);
 
 export { ToolbarV2TitleStyle };
 let ToolbarV2TitleConfigs = class ToolbarV2TitleConfigs {
   constructor(init) {
-    this.content = init?.content ?? "";
+    this.content = init?.content ?? '';
     this.placement = init?.placement;
     this.visible = init?.visible;
     this.style = init?.style;
   }
 };
-__decorate([Trace], ToolbarV2TitleConfigs.prototype, "content", void 0);
-__decorate([Trace], ToolbarV2TitleConfigs.prototype, "placement", void 0);
-__decorate([Trace], ToolbarV2TitleConfigs.prototype, "visible", void 0);
-__decorate([Trace], ToolbarV2TitleConfigs.prototype, "style", void 0);
+__decorate([Trace], ToolbarV2TitleConfigs.prototype, 'content', void 0);
+__decorate([Trace], ToolbarV2TitleConfigs.prototype, 'placement', void 0);
+__decorate([Trace], ToolbarV2TitleConfigs.prototype, 'visible', void 0);
+__decorate([Trace], ToolbarV2TitleConfigs.prototype, 'style', void 0);
 ToolbarV2TitleConfigs = __decorate([ObservedV2], ToolbarV2TitleConfigs);
 
 export { ToolbarV2TitleConfigs };
@@ -429,33 +432,33 @@ let ToolbarV2StyleConfigs = class ToolbarV2StyleConfigs {
     this.stateEffect = init?.stateEffect;
   }
 };
-__decorate([Trace], ToolbarV2StyleConfigs.prototype, "padding", void 0);
+__decorate([Trace], ToolbarV2StyleConfigs.prototype, 'padding', void 0);
 __decorate(
   [Trace],
   ToolbarV2StyleConfigs.prototype,
-  "backgroundVisibility",
+  'backgroundVisibility',
   void 0
 );
-__decorate([Trace], ToolbarV2StyleConfigs.prototype, "backgroundColor", void 0);
+__decorate([Trace], ToolbarV2StyleConfigs.prototype, 'backgroundColor', void 0);
 __decorate(
   [Trace],
   ToolbarV2StyleConfigs.prototype,
-  "backgroundBlurStyle",
+  'backgroundBlurStyle',
   void 0
 );
 __decorate(
   [Trace],
   ToolbarV2StyleConfigs.prototype,
-  "systemBackgroundMaterial",
+  'systemBackgroundMaterial',
   void 0
 );
-__decorate([Trace], ToolbarV2StyleConfigs.prototype, "groupSpace", void 0);
-__decorate([Trace], ToolbarV2StyleConfigs.prototype, "itemSize", void 0);
-__decorate([Trace], ToolbarV2StyleConfigs.prototype, "fontSize", void 0);
-__decorate([Trace], ToolbarV2StyleConfigs.prototype, "borderWidth", void 0);
-__decorate([Trace], ToolbarV2StyleConfigs.prototype, "borderColor", void 0);
-__decorate([Trace], ToolbarV2StyleConfigs.prototype, "borderRadius", void 0);
-__decorate([Trace], ToolbarV2StyleConfigs.prototype, "stateEffect", void 0);
+__decorate([Trace], ToolbarV2StyleConfigs.prototype, 'groupSpace', void 0);
+__decorate([Trace], ToolbarV2StyleConfigs.prototype, 'itemSize', void 0);
+__decorate([Trace], ToolbarV2StyleConfigs.prototype, 'fontSize', void 0);
+__decorate([Trace], ToolbarV2StyleConfigs.prototype, 'borderWidth', void 0);
+__decorate([Trace], ToolbarV2StyleConfigs.prototype, 'borderColor', void 0);
+__decorate([Trace], ToolbarV2StyleConfigs.prototype, 'borderRadius', void 0);
+__decorate([Trace], ToolbarV2StyleConfigs.prototype, 'stateEffect', void 0);
 ToolbarV2StyleConfigs = __decorate([ObservedV2], ToolbarV2StyleConfigs);
 
 export { ToolbarV2StyleConfigs };
@@ -493,31 +496,31 @@ let AdvancedToolBarV2Modifier = class AdvancedToolBarV2Modifier {
 __decorate(
   [Trace],
   AdvancedToolBarV2Modifier.prototype,
-  "mainAxisLengthValue",
+  'mainAxisLengthValue',
   void 0
 );
 __decorate(
   [Trace],
   AdvancedToolBarV2Modifier.prototype,
-  "crossAxisLengthValue",
+  'crossAxisLengthValue',
   void 0
 );
 __decorate(
   [Trace],
   AdvancedToolBarV2Modifier.prototype,
-  "directionValue",
+  'directionValue',
   void 0
 );
 __decorate(
   [Trace],
   AdvancedToolBarV2Modifier.prototype,
-  "styleConfigsValue",
+  'styleConfigsValue',
   void 0
 );
 __decorate(
   [Trace],
   AdvancedToolBarV2Modifier.prototype,
-  "overflowMenuStyleValue",
+  'overflowMenuStyleValue',
   void 0
 );
 AdvancedToolBarV2Modifier = __decorate([ObservedV2], AdvancedToolBarV2Modifier);
@@ -528,18 +531,18 @@ let ToolBarV2Modifier = class ToolBarV2Modifier {
     this.backgroundColorValue = {
       id: 125829483,
       type: 10001,
-      params: ["sys.color.ohos_id_color_toolbar_bg"],
-      bundleName: "__harDefaultBundleName__",
-      moduleName: "__harDefaultModuleName__",
+      params: ['sys.color.ohos_id_color_toolbar_bg'],
+      bundleName: '__harDefaultBundleName__',
+      moduleName: '__harDefaultModuleName__',
     };
     this.heightValue = LengthMetrics.vp(DEFAULT_TOOLBAR_HEIGHT);
     this.stateEffectValue = true;
     this.paddingValue = LengthMetrics.resource({
       id: 125830931,
       type: 10002,
-      params: ["sys.float.padding_level12"],
-      bundleName: "__harDefaultBundleName__",
-      moduleName: "__harDefaultModuleName__",
+      params: ['sys.float.padding_level12'],
+      bundleName: '__harDefaultBundleName__',
+      moduleName: '__harDefaultModuleName__',
     });
   }
 
@@ -548,9 +551,9 @@ let ToolBarV2Modifier = class ToolBarV2Modifier {
       this.backgroundColorValue ?? {
         id: 125829483,
         type: 10001,
-        params: ["sys.color.ohos_id_color_toolbar_bg"],
-        bundleName: "__harDefaultBundleName__",
-        moduleName: "__harDefaultModuleName__",
+        params: ['sys.color.ohos_id_color_toolbar_bg'],
+        bundleName: '__harDefaultBundleName__',
+        moduleName: '__harDefaultModuleName__',
       }
     );
   }
@@ -578,12 +581,12 @@ let ToolBarV2Modifier = class ToolBarV2Modifier {
 __decorate(
   [Trace],
   ToolBarV2Modifier.prototype,
-  "backgroundColorValue",
+  'backgroundColorValue',
   void 0
 );
-__decorate([Trace], ToolBarV2Modifier.prototype, "heightValue", void 0);
-__decorate([Trace], ToolBarV2Modifier.prototype, "stateEffectValue", void 0);
-__decorate([Trace], ToolBarV2Modifier.prototype, "paddingValue", void 0);
+__decorate([Trace], ToolBarV2Modifier.prototype, 'heightValue', void 0);
+__decorate([Trace], ToolBarV2Modifier.prototype, 'stateEffectValue', void 0);
+__decorate([Trace], ToolBarV2Modifier.prototype, 'paddingValue', void 0);
 ToolBarV2Modifier = __decorate([ObservedV2], ToolBarV2Modifier);
 
 export { ToolBarV2Modifier };
@@ -592,58 +595,58 @@ let ToolBarV2Theme = class ToolBarV2Theme {
     this.iconPrimaryColor = {
       id: 125830991,
       type: 10001,
-      params: ["sys.color.icon_primary"],
-      bundleName: "__harDefaultBundleName__",
-      moduleName: "__harDefaultModuleName__",
+      params: ['sys.color.icon_primary'],
+      bundleName: '__harDefaultBundleName__',
+      moduleName: '__harDefaultModuleName__',
     };
     this.iconActivePrimaryColor = {
       id: 125830995,
       type: 10001,
-      params: ["sys.color.icon_emphasize"],
-      bundleName: "__harDefaultBundleName__",
-      moduleName: "__harDefaultModuleName__",
+      params: ['sys.color.icon_emphasize'],
+      bundleName: '__harDefaultBundleName__',
+      moduleName: '__harDefaultModuleName__',
     };
     this.iconOnPrimaryColor = {
       id: 125831057,
       type: 10001,
-      params: ["sys.color.icon_on_primary"],
-      bundleName: "__harDefaultBundleName__",
-      moduleName: "__harDefaultModuleName__",
+      params: ['sys.color.icon_on_primary'],
+      bundleName: '__harDefaultBundleName__',
+      moduleName: '__harDefaultModuleName__',
     };
     this.fontPrimaryColor = {
       id: 125830982,
       type: 10001,
-      params: ["sys.color.font_primary"],
-      bundleName: "__harDefaultBundleName__",
-      moduleName: "__harDefaultModuleName__",
+      params: ['sys.color.font_primary'],
+      bundleName: '__harDefaultBundleName__',
+      moduleName: '__harDefaultModuleName__',
     };
     this.fontActivatedPrimaryColor = {
       id: 125830986,
       type: 10001,
-      params: ["sys.color.font_emphasize"],
-      bundleName: "__harDefaultBundleName__",
-      moduleName: "__harDefaultModuleName__",
+      params: ['sys.color.font_emphasize'],
+      bundleName: '__harDefaultBundleName__',
+      moduleName: '__harDefaultModuleName__',
     };
     this.fontSecondaryColor = {
       id: 125830983,
       type: 10001,
-      params: ["sys.color.font_secondary"],
-      bundleName: "__harDefaultBundleName__",
-      moduleName: "__harDefaultModuleName__",
+      params: ['sys.color.font_secondary'],
+      bundleName: '__harDefaultBundleName__',
+      moduleName: '__harDefaultModuleName__',
     };
   }
 };
-__decorate([Trace], ToolBarV2Theme.prototype, "iconPrimaryColor", void 0);
-__decorate([Trace], ToolBarV2Theme.prototype, "iconActivePrimaryColor", void 0);
-__decorate([Trace], ToolBarV2Theme.prototype, "iconOnPrimaryColor", void 0);
-__decorate([Trace], ToolBarV2Theme.prototype, "fontPrimaryColor", void 0);
+__decorate([Trace], ToolBarV2Theme.prototype, 'iconPrimaryColor', void 0);
+__decorate([Trace], ToolBarV2Theme.prototype, 'iconActivePrimaryColor', void 0);
+__decorate([Trace], ToolBarV2Theme.prototype, 'iconOnPrimaryColor', void 0);
+__decorate([Trace], ToolBarV2Theme.prototype, 'fontPrimaryColor', void 0);
 __decorate(
   [Trace],
   ToolBarV2Theme.prototype,
-  "fontActivatedPrimaryColor",
+  'fontActivatedPrimaryColor',
   void 0
 );
-__decorate([Trace], ToolBarV2Theme.prototype, "fontSecondaryColor", void 0);
+__decorate([Trace], ToolBarV2Theme.prototype, 'fontSecondaryColor', void 0);
 ToolBarV2Theme = __decorate([ObservedV2], ToolBarV2Theme);
 
 export class ToolBarV2 extends ViewV2 {
@@ -657,39 +660,39 @@ export class ToolBarV2 extends ViewV2 {
   ) {
     super(parent, elmtId, extraInfo);
     this.initParam(
-      "toolBarList",
-      params && "toolBarList" in params ? params.toolBarList : undefined
+      'toolBarList',
+      params && 'toolBarList' in params ? params.toolBarList : undefined
     );
     this.initParam(
-      "activatedIndex",
-      params && "activatedIndex" in params ? params.activatedIndex : -1
+      'activatedIndex',
+      params && 'activatedIndex' in params ? params.activatedIndex : -1
     );
     this.initParam(
-      "dividerModifier",
-      params && "dividerModifier" in params
+      'dividerModifier',
+      params && 'dividerModifier' in params
         ? params.dividerModifier
         : new DividerModifier()
     );
     this.initParam(
-      "toolBarModifier",
-      params && "toolBarModifier" in params
+      'toolBarModifier',
+      params && 'toolBarModifier' in params
         ? params.toolBarModifier
         : new ToolBarV2Modifier()
             .padding(
               LengthMetrics.resource({
                 id: 125830931,
                 type: 10002,
-                params: ["sys.float.padding_level12"],
-                bundleName: "__harDefaultBundleName__",
-                moduleName: "__harDefaultModuleName__",
+                params: ['sys.float.padding_level12'],
+                bundleName: '__harDefaultBundleName__',
+                moduleName: '__harDefaultModuleName__',
               })
             )
             .stateEffect(true)
             .height(LengthMetrics.vp(DEFAULT_TOOLBAR_HEIGHT))
     );
     this.initParam(
-      "advancedToolBarModifier",
-      params && "advancedToolBarModifier" in params
+      'advancedToolBarModifier',
+      params && 'advancedToolBarModifier' in params
         ? params.advancedToolBarModifier
         : undefined
     );
@@ -703,7 +706,7 @@ export class ToolBarV2 extends ViewV2 {
     this.advHoveredItems = new Set();
     this.advTitleConfigs = undefined;
     this.itemContentBuilder =
-      "itemContentBuilder" in params ? params.itemContentBuilder : undefined;
+      'itemContentBuilder' in params ? params.itemContentBuilder : undefined;
     this.advEntries = [];
     this.advItemOriginalIndex = new Map();
     this.itemCardTextMaxLine = 1;
@@ -715,9 +718,9 @@ export class ToolBarV2 extends ViewV2 {
         text: {
           id: 125833704,
           type: 10003,
-          params: ["sys.string.ohos_toolbar_more"],
-          bundleName: "__harDefaultBundleName__",
-          moduleName: "__harDefaultModuleName__",
+          params: ['sys.string.ohos_toolbar_more'],
+          bundleName: '__harDefaultBundleName__',
+          moduleName: '__harDefaultModuleName__',
         },
       }),
       icon: new ToolBarV2ItemImage({
@@ -727,48 +730,48 @@ export class ToolBarV2 extends ViewV2 {
     this.moreText = {
       id: 125833704,
       type: 10003,
-      params: ["sys.string.ohos_toolbar_more"],
-      bundleName: "__harDefaultBundleName__",
-      moduleName: "__harDefaultModuleName__",
+      params: ['sys.string.ohos_toolbar_more'],
+      bundleName: '__harDefaultBundleName__',
+      moduleName: '__harDefaultModuleName__',
     };
     this.finalizeConstruction();
   }
 
   resetStateVarsOnReuse(params) {
     this.resetParam(
-      "toolBarList",
-      params && "toolBarList" in params ? params.toolBarList : undefined
+      'toolBarList',
+      params && 'toolBarList' in params ? params.toolBarList : undefined
     );
     this.resetParam(
-      "activatedIndex",
-      params && "activatedIndex" in params ? params.activatedIndex : -1
+      'activatedIndex',
+      params && 'activatedIndex' in params ? params.activatedIndex : -1
     );
     this.resetParam(
-      "dividerModifier",
-      params && "dividerModifier" in params
+      'dividerModifier',
+      params && 'dividerModifier' in params
         ? params.dividerModifier
         : new DividerModifier()
     );
     this.resetParam(
-      "toolBarModifier",
-      params && "toolBarModifier" in params
+      'toolBarModifier',
+      params && 'toolBarModifier' in params
         ? params.toolBarModifier
         : new ToolBarV2Modifier()
             .padding(
               LengthMetrics.resource({
                 id: 125830931,
                 type: 10002,
-                params: ["sys.float.padding_level12"],
-                bundleName: "__harDefaultBundleName__",
-                moduleName: "__harDefaultModuleName__",
+                params: ['sys.float.padding_level12'],
+                bundleName: '__harDefaultBundleName__',
+                moduleName: '__harDefaultModuleName__',
               })
             )
             .stateEffect(true)
             .height(LengthMetrics.vp(DEFAULT_TOOLBAR_HEIGHT))
     );
     this.resetParam(
-      "advancedToolBarModifier",
-      params && "advancedToolBarModifier" in params
+      'advancedToolBarModifier',
+      params && 'advancedToolBarModifier' in params
         ? params.advancedToolBarModifier
         : undefined
     );
@@ -782,14 +785,14 @@ export class ToolBarV2 extends ViewV2 {
     this.advHoveredItems = new Set();
     this.advTitleConfigs = undefined;
     this.itemContentBuilder =
-      "itemContentBuilder" in params ? params.itemContentBuilder : undefined;
+      'itemContentBuilder' in params ? params.itemContentBuilder : undefined;
     this.advEntries = [];
-    this.resetComputed("menus");
+    this.resetComputed('menus');
     this.resetMonitorsOnReuse();
   }
 
   onActivateIndexChange(monitor) {
-    this.localActivatedIndex = monitor.value("activatedIndex")?.now ?? -1;
+    this.localActivatedIndex = monitor.value('activatedIndex')?.now ?? -1;
   }
 
   onToolBarListChange(monitor) {
@@ -828,7 +831,7 @@ export class ToolBarV2 extends ViewV2 {
       let message = err?.message;
       hilog.error(
         0x3900,
-        "Ace",
+        'Ace',
         `Faild to toolBarV2 getMaxFontScale, code: ${code}, message: ${message}`
       );
     }
@@ -844,18 +847,6 @@ export class ToolBarV2 extends ViewV2 {
     this.theme.fontPrimaryColor = theme.colors.fontPrimary;
     this.theme.fontActivatedPrimaryColor = theme.colors.fontEmphasize;
     this.theme.fontSecondaryColor = theme.colors.fontSecondary;
-  }
-
-  getBasicItem(index) {
-    return this.toolBarList[index];
-  }
-
-  getAccessibilityText(index) {
-    return this.getBasicItem(index)?.accessibilityText;
-  }
-
-  getAccessibilityDescription(index) {
-    return this.getBasicItem(index)?.accessibilityDescription;
   }
 
   getAdvAccessibilityText(item) {
@@ -878,13 +869,13 @@ export class ToolBarV2 extends ViewV2 {
         strokeColor: ColorMetrics.resourceColor({
           id: 125829180,
           type: 10001,
-          params: ["sys.color.ohos_id_color_focused_outline"],
-          bundleName: "__harDefaultBundleName__",
-          moduleName: "__harDefaultModuleName__",
+          params: ['sys.color.ohos_id_color_focused_outline'],
+          bundleName: '__harDefaultBundleName__',
+          moduleName: '__harDefaultModuleName__',
         }),
       });
-      Button.width("100%");
-      Button.height("100%");
+      Button.width('100%');
+      Button.height('100%');
       Button.bindMenu(this.menuContent, {
         placement: Placement.TopRight,
         offset: { x: -12, y: -10 },
@@ -892,9 +883,9 @@ export class ToolBarV2 extends ViewV2 {
       Button.borderRadius({
         id: 125829706,
         type: 10002,
-        params: ["sys.float.ohos_id_corner_radius_clicked"],
-        bundleName: "__harDefaultBundleName__",
-        moduleName: "__harDefaultModuleName__",
+        params: ['sys.float.ohos_id_corner_radius_clicked'],
+        bundleName: '__harDefaultBundleName__',
+        moduleName: '__harDefaultModuleName__',
       });
       Button.backgroundColor(this.toolBarList[index].backgroundColor);
       Button.onHover((isHover) => {
@@ -902,24 +893,24 @@ export class ToolBarV2 extends ViewV2 {
           this.toolBarList[index].backgroundColor = {
             id: 125829168,
             type: 10001,
-            params: ["sys.color.ohos_id_color_hover"],
-            bundleName: "__harDefaultBundleName__",
-            moduleName: "__harDefaultModuleName__",
+            params: ['sys.color.ohos_id_color_hover'],
+            bundleName: '__harDefaultBundleName__',
+            moduleName: '__harDefaultModuleName__',
           };
         } else {
           this.toolBarList[index].backgroundColor = Color.Transparent;
         }
       });
-      ViewStackProcessor.visualState("pressed");
+      ViewStackProcessor.visualState('pressed');
       Button.backgroundColor(
         !this.toolBarModifier?.stateEffectValue
           ? this.toolBarList[index].backgroundColor
           : {
               id: 125829165,
               type: 10001,
-              params: ["sys.color.ohos_id_color_click_effect"],
-              bundleName: "__harDefaultBundleName__",
-              moduleName: "__harDefaultModuleName__",
+              params: ['sys.color.ohos_id_color_click_effect'],
+              bundleName: '__harDefaultBundleName__',
+              moduleName: '__harDefaultModuleName__',
             }
       );
       ViewStackProcessor.visualState();
@@ -927,31 +918,31 @@ export class ToolBarV2 extends ViewV2 {
     }, Button);
     this.observeComponentCreation2((elmtId, isInitialRender) => {
       Column.create();
-      Column.width("100%");
-      Column.height("100%");
+      Column.width('100%');
+      Column.height('100%');
       Column.justifyContent(FlexAlign.Center);
       Column.padding({
         start: LengthMetrics.resource({
           id: 125830921,
           type: 10002,
-          params: ["sys.float.padding_level2"],
-          bundleName: "__harDefaultBundleName__",
-          moduleName: "__harDefaultModuleName__",
+          params: ['sys.float.padding_level2'],
+          bundleName: '__harDefaultBundleName__',
+          moduleName: '__harDefaultModuleName__',
         }),
         end: LengthMetrics.resource({
           id: 125830921,
           type: 10002,
-          params: ["sys.float.padding_level2"],
-          bundleName: "__harDefaultBundleName__",
-          moduleName: "__harDefaultModuleName__",
+          params: ['sys.float.padding_level2'],
+          bundleName: '__harDefaultBundleName__',
+          moduleName: '__harDefaultModuleName__',
         }),
       });
       Column.borderRadius({
         id: 125829706,
         type: 10002,
-        params: ["sys.float.ohos_id_corner_radius_clicked"],
-        bundleName: "__harDefaultBundleName__",
-        moduleName: "__harDefaultModuleName__",
+        params: ['sys.float.ohos_id_corner_radius_clicked'],
+        bundleName: '__harDefaultBundleName__',
+        moduleName: '__harDefaultModuleName__',
       });
     }, Column);
     this.observeComponentCreation2((elmtId, isInitialRender) => {
@@ -963,9 +954,9 @@ export class ToolBarV2 extends ViewV2 {
         bottom: {
           id: 125830920,
           type: 10002,
-          params: ["sys.float.padding_level1"],
-          bundleName: "__harDefaultBundleName__",
-          moduleName: "__harDefaultModuleName__",
+          params: ['sys.float.padding_level1'],
+          bundleName: '__harDefaultBundleName__',
+          moduleName: '__harDefaultModuleName__',
         },
       });
     }, SymbolGlyph);
@@ -975,9 +966,9 @@ export class ToolBarV2 extends ViewV2 {
       Text.fontSize({
         id: 125829687,
         type: 10002,
-        params: ["sys.float.ohos_id_text_size_caption"],
-        bundleName: "__harDefaultBundleName__",
-        moduleName: "__harDefaultModuleName__",
+        params: ['sys.float.ohos_id_text_size_caption'],
+        bundleName: '__harDefaultBundleName__',
+        moduleName: '__harDefaultModuleName__',
       });
       Text.fontWeight(FontWeight.Medium);
       Text.maxLines(1);
@@ -1000,22 +991,22 @@ export class ToolBarV2 extends ViewV2 {
           this.toolBarList[index]?.content?.text
       );
       Button.accessibilityDescription(
-        this.toolBarList[index]?.accessibilityDescription ?? ""
+        this.toolBarList[index]?.accessibilityDescription ?? ''
       );
       Button.accessibilityLevel(
-        this.toolBarList[index]?.accessibilityLevel ?? "auto"
+        this.toolBarList[index]?.accessibilityLevel ?? 'auto'
       );
       Button.enabled(
         this.toolBarList[index]?.state !== ToolBarV2ItemState.DISABLE
       );
-      Button.width("100%");
-      Button.height("100%");
+      Button.width('100%');
+      Button.height('100%');
       Button.borderRadius({
         id: 125829706,
         type: 10002,
-        params: ["sys.float.ohos_id_corner_radius_clicked"],
-        bundleName: "__harDefaultBundleName__",
-        moduleName: "__harDefaultModuleName__",
+        params: ['sys.float.ohos_id_corner_radius_clicked'],
+        bundleName: '__harDefaultBundleName__',
+        moduleName: '__harDefaultModuleName__',
       });
       Button.focusable(
         !(this.toolBarList[index]?.state === ToolBarV2ItemState.DISABLE)
@@ -1029,9 +1020,9 @@ export class ToolBarV2 extends ViewV2 {
         strokeColor: ColorMetrics.resourceColor({
           id: 125829180,
           type: 10001,
-          params: ["sys.color.ohos_id_color_focused_outline"],
-          bundleName: "__harDefaultBundleName__",
-          moduleName: "__harDefaultModuleName__",
+          params: ['sys.color.ohos_id_color_focused_outline'],
+          bundleName: '__harDefaultBundleName__',
+          moduleName: '__harDefaultModuleName__',
         }),
       });
       Button.backgroundColor(this.toolBarList[index].backgroundColor);
@@ -1043,15 +1034,15 @@ export class ToolBarV2 extends ViewV2 {
           this.toolBarList[index].backgroundColor = {
             id: 125829168,
             type: 10001,
-            params: ["sys.color.ohos_id_color_hover"],
-            bundleName: "__harDefaultBundleName__",
-            moduleName: "__harDefaultModuleName__",
+            params: ['sys.color.ohos_id_color_hover'],
+            bundleName: '__harDefaultBundleName__',
+            moduleName: '__harDefaultModuleName__',
           };
         } else {
           this.toolBarList[index].backgroundColor = Color.Transparent;
         }
       });
-      ViewStackProcessor.visualState("pressed");
+      ViewStackProcessor.visualState('pressed');
       Button.backgroundColor(
         this.toolBarList[index]?.state === ToolBarV2ItemState.DISABLE ||
           !this.toolBarModifier?.stateEffectValue
@@ -1059,9 +1050,9 @@ export class ToolBarV2 extends ViewV2 {
           : {
               id: 125829165,
               type: 10001,
-              params: ["sys.color.ohos_id_color_click_effect"],
-              bundleName: "__harDefaultBundleName__",
-              moduleName: "__harDefaultModuleName__",
+              params: ['sys.color.ohos_id_color_click_effect'],
+              bundleName: '__harDefaultBundleName__',
+              moduleName: '__harDefaultModuleName__',
             }
       );
       ViewStackProcessor.visualState();
@@ -1075,29 +1066,29 @@ export class ToolBarV2 extends ViewV2 {
     this.observeComponentCreation2((elmtId, isInitialRender) => {
       Column.create();
       Column.justifyContent(FlexAlign.Center);
-      Column.width("100%");
-      Column.height("100%");
+      Column.width('100%');
+      Column.height('100%');
       Column.borderRadius({
         id: 125829706,
         type: 10002,
-        params: ["sys.float.ohos_id_corner_radius_clicked"],
-        bundleName: "__harDefaultBundleName__",
-        moduleName: "__harDefaultModuleName__",
+        params: ['sys.float.ohos_id_corner_radius_clicked'],
+        bundleName: '__harDefaultBundleName__',
+        moduleName: '__harDefaultModuleName__',
       });
       Column.padding({
         start: LengthMetrics.resource({
           id: 125830921,
           type: 10002,
-          params: ["sys.float.padding_level2"],
-          bundleName: "__harDefaultBundleName__",
-          moduleName: "__harDefaultModuleName__",
+          params: ['sys.float.padding_level2'],
+          bundleName: '__harDefaultBundleName__',
+          moduleName: '__harDefaultModuleName__',
         }),
         end: LengthMetrics.resource({
           id: 125830921,
           type: 10002,
-          params: ["sys.float.padding_level2"],
-          bundleName: "__harDefaultBundleName__",
-          moduleName: "__harDefaultModuleName__",
+          params: ['sys.float.padding_level2'],
+          bundleName: '__harDefaultBundleName__',
+          moduleName: '__harDefaultModuleName__',
         }),
       });
     }, Column);
@@ -1116,9 +1107,9 @@ export class ToolBarV2 extends ViewV2 {
               bottom: {
                 id: 125830920,
                 type: 10002,
-                params: ["sys.float.padding_level1"],
-                bundleName: "__harDefaultBundleName__",
-                moduleName: "__harDefaultModuleName__",
+                params: ['sys.float.padding_level1'],
+                bundleName: '__harDefaultBundleName__',
+                moduleName: '__harDefaultModuleName__',
               },
             });
           }, SymbolGlyph);
@@ -1133,9 +1124,9 @@ export class ToolBarV2 extends ViewV2 {
               bottom: {
                 id: 125830920,
                 type: 10002,
-                params: ["sys.float.padding_level1"],
-                bundleName: "__harDefaultBundleName__",
-                moduleName: "__harDefaultModuleName__",
+                params: ['sys.float.padding_level1'],
+                bundleName: '__harDefaultBundleName__',
+                moduleName: '__harDefaultModuleName__',
               },
             });
           }, SymbolGlyph);
@@ -1151,9 +1142,9 @@ export class ToolBarV2 extends ViewV2 {
               bottom: {
                 id: 125830920,
                 type: 10002,
-                params: ["sys.float.padding_level1"],
-                bundleName: "__harDefaultBundleName__",
-                moduleName: "__harDefaultModuleName__",
+                params: ['sys.float.padding_level1'],
+                bundleName: '__harDefaultBundleName__',
+                moduleName: '__harDefaultModuleName__',
               },
             });
             Image.objectFit(ImageFit.Contain);
@@ -1169,16 +1160,16 @@ export class ToolBarV2 extends ViewV2 {
       Text.fontSize({
         id: 125829687,
         type: 10002,
-        params: ["sys.float.ohos_id_text_size_caption"],
-        bundleName: "__harDefaultBundleName__",
-        moduleName: "__harDefaultModuleName__",
+        params: ['sys.float.ohos_id_text_size_caption'],
+        bundleName: '__harDefaultBundleName__',
+        moduleName: '__harDefaultModuleName__',
       });
       Text.maxFontSize({
         id: 125829687,
         type: 10002,
-        params: ["sys.float.ohos_id_text_size_caption"],
-        bundleName: "__harDefaultBundleName__",
-        moduleName: "__harDefaultModuleName__",
+        params: ['sys.float.ohos_id_text_size_caption'],
+        bundleName: '__harDefaultBundleName__',
+        moduleName: '__harDefaultModuleName__',
       });
       Text.minFontSize(9);
       Text.fontWeight(FontWeight.Medium);
@@ -1223,9 +1214,9 @@ export class ToolBarV2 extends ViewV2 {
                     {
                       id: 125830991,
                       type: 10001,
-                      params: ["sys.color.icon_primary"],
-                      bundleName: "__harDefaultBundleName__",
-                      moduleName: "__harDefaultModuleName__",
+                      params: ['sys.color.icon_primary'],
+                      bundleName: '__harDefaultBundleName__',
+                      moduleName: '__harDefaultModuleName__',
                     },
                   ]);
                   SymbolGlyph.fontSize(DIALOG_IMAGE_SIZE);
@@ -1233,16 +1224,16 @@ export class ToolBarV2 extends ViewV2 {
                     top: {
                       id: 125830933,
                       type: 10002,
-                      params: ["sys.float.padding_level24"],
-                      bundleName: "__harDefaultBundleName__",
-                      moduleName: "__harDefaultModuleName__",
+                      params: ['sys.float.padding_level24'],
+                      bundleName: '__harDefaultBundleName__',
+                      moduleName: '__harDefaultModuleName__',
                     },
                     bottom: {
                       id: 125830927,
                       type: 10002,
-                      params: ["sys.float.padding_level8"],
-                      bundleName: "__harDefaultBundleName__",
-                      moduleName: "__harDefaultModuleName__",
+                      params: ['sys.float.padding_level8'],
+                      bundleName: '__harDefaultBundleName__',
+                      moduleName: '__harDefaultModuleName__',
                     },
                   });
                 }, SymbolGlyph);
@@ -1255,9 +1246,9 @@ export class ToolBarV2 extends ViewV2 {
                     {
                       id: 125830991,
                       type: 10001,
-                      params: ["sys.color.icon_primary"],
-                      bundleName: "__harDefaultBundleName__",
-                      moduleName: "__harDefaultModuleName__",
+                      params: ['sys.color.icon_primary'],
+                      bundleName: '__harDefaultBundleName__',
+                      moduleName: '__harDefaultModuleName__',
                     },
                   ]);
                   SymbolGlyph.fontSize(DIALOG_IMAGE_SIZE);
@@ -1265,16 +1256,16 @@ export class ToolBarV2 extends ViewV2 {
                     top: {
                       id: 125830933,
                       type: 10002,
-                      params: ["sys.float.padding_level24"],
-                      bundleName: "__harDefaultBundleName__",
-                      moduleName: "__harDefaultModuleName__",
+                      params: ['sys.float.padding_level24'],
+                      bundleName: '__harDefaultBundleName__',
+                      moduleName: '__harDefaultModuleName__',
                     },
                     bottom: {
                       id: 125830927,
                       type: 10002,
-                      params: ["sys.float.padding_level8"],
-                      bundleName: "__harDefaultBundleName__",
-                      moduleName: "__harDefaultModuleName__",
+                      params: ['sys.float.padding_level8'],
+                      bundleName: '__harDefaultBundleName__',
+                      moduleName: '__harDefaultModuleName__',
                     },
                   });
                 }, SymbolGlyph);
@@ -1289,24 +1280,24 @@ export class ToolBarV2 extends ViewV2 {
                     top: {
                       id: 125830933,
                       type: 10002,
-                      params: ["sys.float.padding_level24"],
-                      bundleName: "__harDefaultBundleName__",
-                      moduleName: "__harDefaultModuleName__",
+                      params: ['sys.float.padding_level24'],
+                      bundleName: '__harDefaultBundleName__',
+                      moduleName: '__harDefaultModuleName__',
                     },
                     bottom: {
                       id: 125830927,
                       type: 10002,
-                      params: ["sys.float.padding_level8"],
-                      bundleName: "__harDefaultBundleName__",
-                      moduleName: "__harDefaultModuleName__",
+                      params: ['sys.float.padding_level8'],
+                      bundleName: '__harDefaultBundleName__',
+                      moduleName: '__harDefaultModuleName__',
                     },
                   });
                   Image.fillColor({
                     id: 125830991,
                     type: 10001,
-                    params: ["sys.color.icon_primary"],
-                    bundleName: "__harDefaultBundleName__",
-                    moduleName: "__harDefaultModuleName__",
+                    params: ['sys.color.icon_primary'],
+                    bundleName: '__harDefaultBundleName__',
+                    moduleName: '__harDefaultModuleName__',
                   });
                 }, Image);
               });
@@ -1315,28 +1306,28 @@ export class ToolBarV2 extends ViewV2 {
           If.pop();
           this.observeComponentCreation2((elmtId, isInitialRender) => {
             Column.create();
-            Column.width("100%");
+            Column.width('100%');
             Column.padding({
               left: {
                 id: 125830923,
                 type: 10002,
-                params: ["sys.float.padding_level4"],
-                bundleName: "__harDefaultBundleName__",
-                moduleName: "__harDefaultModuleName__",
+                params: ['sys.float.padding_level4'],
+                bundleName: '__harDefaultBundleName__',
+                moduleName: '__harDefaultModuleName__',
               },
               right: {
                 id: 125830923,
                 type: 10002,
-                params: ["sys.float.padding_level4"],
-                bundleName: "__harDefaultBundleName__",
-                moduleName: "__harDefaultModuleName__",
+                params: ['sys.float.padding_level4'],
+                bundleName: '__harDefaultBundleName__',
+                moduleName: '__harDefaultModuleName__',
               },
               bottom: {
                 id: 125830931,
                 type: 10002,
-                params: ["sys.float.padding_level12"],
-                bundleName: "__harDefaultBundleName__",
-                moduleName: "__harDefaultModuleName__",
+                params: ['sys.float.padding_level12'],
+                bundleName: '__harDefaultBundleName__',
+                moduleName: '__harDefaultModuleName__',
               },
             });
           }, Column);
@@ -1345,14 +1336,14 @@ export class ToolBarV2 extends ViewV2 {
             Text.fontSize(TEXT_TOOLBAR_DIALOG);
             Text.textOverflow({ overflow: TextOverflow.Ellipsis });
             Text.maxLines(this.itemCardTextMaxLine);
-            Text.width("100%");
+            Text.width('100%');
             Text.textAlign(TextAlign.Center);
             Text.fontColor({
               id: 125830982,
               type: 10001,
-              params: ["sys.color.font_primary"],
-              bundleName: "__harDefaultBundleName__",
-              moduleName: "__harDefaultModuleName__",
+              params: ['sys.color.font_primary'],
+              bundleName: '__harDefaultBundleName__',
+              moduleName: '__harDefaultModuleName__',
             });
           }, Text);
           Text.pop();
@@ -1383,9 +1374,9 @@ export class ToolBarV2 extends ViewV2 {
                     {
                       id: 125830991,
                       type: 10001,
-                      params: ["sys.color.icon_primary"],
-                      bundleName: "__harDefaultBundleName__",
-                      moduleName: "__harDefaultModuleName__",
+                      params: ['sys.color.icon_primary'],
+                      bundleName: '__harDefaultBundleName__',
+                      moduleName: '__harDefaultModuleName__',
                     },
                   ]);
                   SymbolGlyph.fontSize(DIALOG_IMAGE_SIZE);
@@ -1399,9 +1390,9 @@ export class ToolBarV2 extends ViewV2 {
                     {
                       id: 125830991,
                       type: 10001,
-                      params: ["sys.color.icon_primary"],
-                      bundleName: "__harDefaultBundleName__",
-                      moduleName: "__harDefaultModuleName__",
+                      params: ['sys.color.icon_primary'],
+                      bundleName: '__harDefaultBundleName__',
+                      moduleName: '__harDefaultModuleName__',
                     },
                   ]);
                   SymbolGlyph.fontSize(DIALOG_IMAGE_SIZE);
@@ -1416,9 +1407,9 @@ export class ToolBarV2 extends ViewV2 {
                   Image.fillColor({
                     id: 125830991,
                     type: 10001,
-                    params: ["sys.color.icon_primary"],
-                    bundleName: "__harDefaultBundleName__",
-                    moduleName: "__harDefaultModuleName__",
+                    params: ['sys.color.icon_primary'],
+                    bundleName: '__harDefaultBundleName__',
+                    moduleName: '__harDefaultModuleName__',
                   });
                 }, Image);
               });
@@ -1484,10 +1475,10 @@ export class ToolBarV2 extends ViewV2 {
 
   toLengthString(value) {
     if (value === undefined) {
-      return "";
+      return '';
     }
     const length = value.value;
-    let lengthString = "";
+    let lengthString = '';
     switch (value.unit) {
       case LengthUnit.PX:
         lengthString = `${length}px`;
@@ -1564,7 +1555,7 @@ export class ToolBarV2 extends ViewV2 {
                       let message = err?.message;
                       hilog.error(
                         0x3900,
-                        "Ace",
+                        'Ace',
                         `ToolBarV2 get window height failed, code: ${code}, message: ${message}`
                       );
                     }
@@ -1577,9 +1568,9 @@ export class ToolBarV2 extends ViewV2 {
                   cornerRadius: {
                     id: 125830915,
                     type: 10002,
-                    params: ["sys.float.corner_radius_level10"],
-                    bundleName: "__harDefaultBundleName__",
-                    moduleName: "__harDefaultModuleName__",
+                    params: ['sys.float.corner_radius_level10'],
+                    bundleName: '__harDefaultBundleName__',
+                    moduleName: '__harDefaultModuleName__',
                   },
                   width:
                     this.fontSize === MAX_FONT_SIZE ? MAX_DIALOG : MIN_DIALOG,
@@ -1801,9 +1792,9 @@ export class ToolBarV2 extends ViewV2 {
     return {
       id: 125831004,
       type: 10001,
-      params: ["sys.color.comp_background_primary"],
-      bundleName: "__harDefaultBundleName__",
-      moduleName: "__harDefaultModuleName__",
+      params: ['sys.color.comp_background_primary'],
+      bundleName: '__harDefaultBundleName__',
+      moduleName: '__harDefaultModuleName__',
     };
   }
 
@@ -1834,9 +1825,9 @@ export class ToolBarV2 extends ViewV2 {
     return {
       id: 125829168,
       type: 10001,
-      params: ["sys.color.ohos_id_color_hover"],
-      bundleName: "__harDefaultBundleName__",
-      moduleName: "__harDefaultModuleName__",
+      params: ['sys.color.ohos_id_color_hover'],
+      bundleName: '__harDefaultBundleName__',
+      moduleName: '__harDefaultModuleName__',
     };
   }
 
@@ -1878,9 +1869,9 @@ export class ToolBarV2 extends ViewV2 {
     return {
       id: 125829687,
       type: 10002,
-      params: ["sys.float.ohos_id_text_size_caption"],
-      bundleName: "__harDefaultBundleName__",
-      moduleName: "__harDefaultModuleName__",
+      params: ['sys.float.ohos_id_text_size_caption'],
+      bundleName: '__harDefaultBundleName__',
+      moduleName: '__harDefaultModuleName__',
     };
   }
 
@@ -1956,9 +1947,9 @@ export class ToolBarV2 extends ViewV2 {
     return {
       id: 125829165,
       type: 10001,
-      params: ["sys.color.ohos_id_color_click_effect"],
-      bundleName: "__harDefaultBundleName__",
-      moduleName: "__harDefaultModuleName__",
+      params: ['sys.color.ohos_id_color_click_effect'],
+      bundleName: '__harDefaultBundleName__',
+      moduleName: '__harDefaultModuleName__',
     };
   }
 
@@ -1993,9 +1984,9 @@ export class ToolBarV2 extends ViewV2 {
     return {
       id: 125831004,
       type: 10001,
-      params: ["sys.color.comp_background_primary"],
-      bundleName: "__harDefaultBundleName__",
-      moduleName: "__harDefaultModuleName__",
+      params: ['sys.color.comp_background_primary'],
+      bundleName: '__harDefaultBundleName__',
+      moduleName: '__harDefaultModuleName__',
     };
   }
 
@@ -2214,7 +2205,7 @@ export class ToolBarV2 extends ViewV2 {
       return `group_${index}_${group.items.length}`;
     }
     const advItem = item;
-    return `item_${index}_${advItem.id ?? ""}`;
+    return `item_${index}_${advItem.id ?? ''}`;
   }
 
   getGroupItemKey(item, index) {
@@ -2320,7 +2311,7 @@ export class ToolBarV2 extends ViewV2 {
                   Column.onHover((isHover) => {
                     this.setItemHovered(item, isHover);
                   });
-                  ViewStackProcessor.visualState("pressed");
+                  ViewStackProcessor.visualState('pressed');
                   Column.backgroundColor(
                     this.getEffectiveItemPressedBg(item, inGroup)
                   );
@@ -2369,7 +2360,7 @@ export class ToolBarV2 extends ViewV2 {
                   Row.onHover((isHover) => {
                     this.setItemHovered(item, isHover);
                   });
-                  ViewStackProcessor.visualState("pressed");
+                  ViewStackProcessor.visualState('pressed');
                   Row.backgroundColor(
                     this.getEffectiveItemPressedBg(item, inGroup)
                   );
@@ -2424,7 +2415,7 @@ export class ToolBarV2 extends ViewV2 {
             Button.onHover((isHover) => {
               this.setItemHovered(item, isHover);
             });
-            ViewStackProcessor.visualState("pressed");
+            ViewStackProcessor.visualState('pressed');
             Button.backgroundColor(
               this.getEffectiveItemPressedBg(item, inGroup)
             );
@@ -2643,9 +2634,9 @@ export class ToolBarV2 extends ViewV2 {
                         Divider.color({
                           id: 125831013,
                           type: 10001,
-                          params: ["sys.color.comp_divider"],
-                          bundleName: "__harDefaultBundleName__",
-                          moduleName: "__harDefaultModuleName__",
+                          params: ['sys.color.comp_divider'],
+                          bundleName: '__harDefaultBundleName__',
+                          moduleName: '__harDefaultModuleName__',
                         });
                       },
                       Divider
@@ -2703,9 +2694,9 @@ export class ToolBarV2 extends ViewV2 {
                         Divider.color({
                           id: 125831013,
                           type: 10001,
-                          params: ["sys.color.comp_divider"],
-                          bundleName: "__harDefaultBundleName__",
-                          moduleName: "__harDefaultModuleName__",
+                          params: ['sys.color.comp_divider'],
+                          bundleName: '__harDefaultBundleName__',
+                          moduleName: '__harDefaultModuleName__',
                         });
                       },
                       Divider
@@ -2838,8 +2829,8 @@ export class ToolBarV2 extends ViewV2 {
         this.ifElseBranchUpdateFunction(0, () => {
           this.observeComponentCreation2((elmtId, isInitialRender) => {
             Column.create({ space: this.getEffectiveSpacing().value });
-            Column.width("100%");
-            Column.height("100%");
+            Column.width('100%');
+            Column.height('100%');
             Column.justifyContent(
               placement === ToolbarV2ItemPlacement.LEADING
                 ? FlexAlign.Start
@@ -2886,8 +2877,8 @@ export class ToolBarV2 extends ViewV2 {
         this.ifElseBranchUpdateFunction(1, () => {
           this.observeComponentCreation2((elmtId, isInitialRender) => {
             Row.create({ space: this.getEffectiveSpacing().value });
-            Row.width("100%");
-            Row.height("100%");
+            Row.width('100%');
+            Row.height('100%');
             Row.justifyContent(
               placement === ToolbarV2ItemPlacement.LEADING
                 ? FlexAlign.Start
@@ -2970,7 +2961,7 @@ export class ToolBarV2 extends ViewV2 {
         this.ifElseBranchUpdateFunction(0, () => {
           this.observeComponentCreation2((elmtId, isInitialRender) => {
             Column.create();
-            Column.width("100%");
+            Column.width('100%');
           }, Column);
           this.advToolbarContent.bind(this)();
           Column.pop();
@@ -2983,7 +2974,7 @@ export class ToolBarV2 extends ViewV2 {
           }, Column);
           this.observeComponentCreation2((elmtId, isInitialRender) => {
             Divider.create();
-            Divider.width("100%");
+            Divider.width('100%');
             Divider.height(1);
             Divider.attributeModifier.bind(this)(this.dividerModifier);
           }, Divider);
@@ -2994,7 +2985,7 @@ export class ToolBarV2 extends ViewV2 {
               minHeight: this.toLengthString(this.toolBarModifier?.heightValue),
               maxHeight: this.toLengthString(this.toolBarModifier?.heightValue),
             });
-            Row.width("100%");
+            Row.width('100%');
             Row.height(this.toLengthString(this.toolBarModifier?.heightValue));
             Row.padding({
               start:
@@ -3003,9 +2994,9 @@ export class ToolBarV2 extends ViewV2 {
                   : LengthMetrics.resource({
                       id: 125830919,
                       type: 10002,
-                      params: ["sys.float.padding_level0"],
-                      bundleName: "__harDefaultBundleName__",
-                      moduleName: "__harDefaultModuleName__",
+                      params: ['sys.float.padding_level0'],
+                      bundleName: '__harDefaultBundleName__',
+                      moduleName: '__harDefaultModuleName__',
                     }),
               end:
                 this.toolBarList.length < TOOLBAR_MAX_LENGTH
@@ -3013,9 +3004,9 @@ export class ToolBarV2 extends ViewV2 {
                   : LengthMetrics.resource({
                       id: 125830919,
                       type: 10002,
-                      params: ["sys.float.padding_level0"],
-                      bundleName: "__harDefaultBundleName__",
-                      moduleName: "__harDefaultModuleName__",
+                      params: ['sys.float.padding_level0'],
+                      bundleName: '__harDefaultBundleName__',
+                      moduleName: '__harDefaultModuleName__',
                     }),
             });
           }, Row);
@@ -3033,7 +3024,7 @@ export class ToolBarV2 extends ViewV2 {
                     this.observeComponentCreation2(
                       (elmtId, isInitialRender) => {
                         Row.create();
-                        Row.height("100%");
+                        Row.height('100%');
                         Row.flexShrink(1);
                       },
                       Row
@@ -3065,7 +3056,7 @@ export class ToolBarV2 extends ViewV2 {
               this.ifElseBranchUpdateFunction(0, () => {
                 this.observeComponentCreation2((elmtId, isInitialRender) => {
                   Row.create();
-                  Row.height("100%");
+                  Row.height('100%');
                   Row.flexShrink(1);
                 }, Row);
                 this.MoreTabBuilder.bind(this)(TOOLBAR_MAX_LENGTH - 1);
@@ -3088,21 +3079,21 @@ export class ToolBarV2 extends ViewV2 {
     if (params === undefined) {
       return;
     }
-    if ("toolBarList" in params) {
-      this.updateParam("toolBarList", params.toolBarList);
+    if ('toolBarList' in params) {
+      this.updateParam('toolBarList', params.toolBarList);
     }
-    if ("activatedIndex" in params) {
-      this.updateParam("activatedIndex", params.activatedIndex);
+    if ('activatedIndex' in params) {
+      this.updateParam('activatedIndex', params.activatedIndex);
     }
-    if ("dividerModifier" in params) {
-      this.updateParam("dividerModifier", params.dividerModifier);
+    if ('dividerModifier' in params) {
+      this.updateParam('dividerModifier', params.dividerModifier);
     }
-    if ("toolBarModifier" in params) {
-      this.updateParam("toolBarModifier", params.toolBarModifier);
+    if ('toolBarModifier' in params) {
+      this.updateParam('toolBarModifier', params.toolBarModifier);
     }
-    if ("advancedToolBarModifier" in params) {
+    if ('advancedToolBarModifier' in params) {
       this.updateParam(
-        "advancedToolBarModifier",
+        'advancedToolBarModifier',
         params.advancedToolBarModifier
       );
     }
@@ -3112,34 +3103,34 @@ export class ToolBarV2 extends ViewV2 {
     this.updateDirtyElements();
   }
 }
-__decorate([Param], ToolBarV2.prototype, "toolBarList", void 0);
-__decorate([Param], ToolBarV2.prototype, "activatedIndex", void 0);
-__decorate([Param], ToolBarV2.prototype, "dividerModifier", void 0);
-__decorate([Param], ToolBarV2.prototype, "toolBarModifier", void 0);
-__decorate([Param], ToolBarV2.prototype, "advancedToolBarModifier", void 0);
-__decorate([Local], ToolBarV2.prototype, "localActivatedIndex", void 0);
-__decorate([Local], ToolBarV2.prototype, "menuContent", void 0);
-__decorate([Local], ToolBarV2.prototype, "fontSize", void 0);
-__decorate([Local], ToolBarV2.prototype, "theme", void 0);
-__decorate([Local], ToolBarV2.prototype, "isAdvancedMode", void 0);
-__decorate([Local], ToolBarV2.prototype, "advMainAxisSize", void 0);
-__decorate([Local], ToolBarV2.prototype, "advIsMeasuring", void 0);
-__decorate([Local], ToolBarV2.prototype, "advHoveredItems", void 0);
-__decorate([Local], ToolBarV2.prototype, "advTitleConfigs", void 0);
-__decorate([Local], ToolBarV2.prototype, "advEntries", void 0);
+__decorate([Param], ToolBarV2.prototype, 'toolBarList', void 0);
+__decorate([Param], ToolBarV2.prototype, 'activatedIndex', void 0);
+__decorate([Param], ToolBarV2.prototype, 'dividerModifier', void 0);
+__decorate([Param], ToolBarV2.prototype, 'toolBarModifier', void 0);
+__decorate([Param], ToolBarV2.prototype, 'advancedToolBarModifier', void 0);
+__decorate([Local], ToolBarV2.prototype, 'localActivatedIndex', void 0);
+__decorate([Local], ToolBarV2.prototype, 'menuContent', void 0);
+__decorate([Local], ToolBarV2.prototype, 'fontSize', void 0);
+__decorate([Local], ToolBarV2.prototype, 'theme', void 0);
+__decorate([Local], ToolBarV2.prototype, 'isAdvancedMode', void 0);
+__decorate([Local], ToolBarV2.prototype, 'advMainAxisSize', void 0);
+__decorate([Local], ToolBarV2.prototype, 'advIsMeasuring', void 0);
+__decorate([Local], ToolBarV2.prototype, 'advHoveredItems', void 0);
+__decorate([Local], ToolBarV2.prototype, 'advTitleConfigs', void 0);
+__decorate([Local], ToolBarV2.prototype, 'advEntries', void 0);
 __decorate(
-  [Monitor("activatedIndex")],
+  [Monitor('activatedIndex')],
   ToolBarV2.prototype,
-  "onActivateIndexChange",
+  'onActivateIndexChange',
   null
 );
 __decorate(
-  [Monitor("toolBarList")],
+  [Monitor('toolBarList')],
   ToolBarV2.prototype,
-  "onToolBarListChange",
+  'onToolBarListChange',
   null
 );
-__decorate([Computed], ToolBarV2.prototype, "menus", null);
+__decorate([Computed], ToolBarV2.prototype, 'menus', null);
 
 export default {
   ToolBarV2Item,

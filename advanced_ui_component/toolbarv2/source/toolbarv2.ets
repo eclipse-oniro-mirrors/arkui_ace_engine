@@ -732,18 +732,6 @@ export struct ToolBarV2 {
     this.theme.fontSecondaryColor = theme.colors.fontSecondary;
   }
 
-  private getBasicItem(index: number): ToolBarV2Item {
-    return this.toolBarList[index];
-  }
-
-  private getAccessibilityText(index: number): string | undefined {
-    return this.getBasicItem(index)?.accessibilityText as ESObject as string;
-  }
-
-  private getAccessibilityDescription(index: number): string | undefined {
-    return this.getBasicItem(index)?.accessibilityDescription as ESObject as string;
-  }
-
   private getAdvAccessibilityText(item: AdvancedToolbarV2Item): string | undefined {
     return item.accessibilityText as ESObject as string;
   }
