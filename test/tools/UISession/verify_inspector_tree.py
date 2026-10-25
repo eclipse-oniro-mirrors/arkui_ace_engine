@@ -122,14 +122,15 @@ def validate(capture, case, regions, providers, accessibility):
     for key, expected in case.get("text", {}).items():
         check(key in by_id and by_id[key].get("$attrs", {}).get("content") == expected,
               "ordinary label changed: " + key)
-    if "regionTools" in case:
+    if regions and "regionTools" in case:
         found = by_id.get("tool-regions", {}).get("responseRegionMap", {})
         check(set(found) == set(case["regionTools"]), "configured tool keys not retained")
         check(not any(k in by_id.get("no-region", {}) for k in
                       ("responseRegionMap", "responseRegion", "mouseResponseRegion")), "unconfigured region fabricated")
-    if case.get("providerNonempty"):
-        check(bool(hosts), "nonempty provider fixture not returned")
-    if case.get("providerEmpty"):
+    if providers and case.get("providerNonempty"):
+        check(bool(hosts) and all(host["accessibilityTree"] for host in hosts),
+              "nonempty provider fixture not returned")
+    if providers and case.get("providerEmpty"):
         check(bool(hosts) and all(host["accessibilityTree"] == [] for host in hosts),
               "successful empty providers must return empty arrays")
     return assertions, failures
