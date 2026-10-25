@@ -113,6 +113,7 @@ template("ace_core_source_set") {
       "accessibility/native_interface_accessibility_impl.cpp",
       "accessibility/native_interface_accessibility_provider.cpp",
       "accessibility/static/accessibility_static_utils.cpp",
+      "accessibility/third_provider_tree_exporter.cpp",
 
       # animation
       "animation/animatable_data.cpp",
@@ -384,6 +385,12 @@ template("ace_core_source_set") {
     ]
 
     external_deps = []
+    # The third-party exporter owns its checked JSON builder.
+    if (is_arkui_x) {
+      deps += [ "//third_party/cJSON:cjson_static" ]
+    } else {
+      external_deps += [ "cJSON:cjson" ]
+    }
     if (defined(config.enable_standard_input) && config.enable_standard_input) {
       external_deps += [ "imf:inputmethod_client" ]
       external_deps += [ "input:libmmi-client" ]
@@ -751,6 +758,7 @@ template("ace_core_ng_source_set") {
       "accessibility/native_interface_accessibility_impl.cpp",
       "accessibility/native_interface_accessibility_provider.cpp",
       "accessibility/static/accessibility_static_utils.cpp",
+      "accessibility/third_provider_tree_exporter.cpp",
 
       # animation
       "animation/animatable_data.cpp",
@@ -1071,6 +1079,12 @@ template("ace_core_ng_source_set") {
     }
 
     external_deps = []
+    # The third-party exporter owns its checked JSON builder.
+    if (is_arkui_x) {
+      deps += [ "//third_party/cJSON:cjson_static" ]
+    } else {
+      external_deps += [ "cJSON:cjson" ]
+    }
     if (defined(config.enable_standard_input) && config.enable_standard_input) {
       external_deps += [ "imf:inputmethod_client" ]
       external_deps += [ "input:libmmi-client" ]

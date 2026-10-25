@@ -466,6 +466,9 @@ protected:
     const std::string& xcomponentId);
 #endif
 
+    void AddExtraInfoWithParamConfig(
+        std::shared_ptr<JsonValue>& json, ParamConfig config = ParamConfig()) override;
+
 private:
     void OnAreaChangedInner() override;
     void DumpSimplifyInfo(std::shared_ptr<JsonValue>& json) override {}

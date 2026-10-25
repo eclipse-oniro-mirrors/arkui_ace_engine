@@ -4319,6 +4319,9 @@
       "OHOS::Ace::InteractionInterface::GetInstance()";
       "OHOS::Ace::JankFrameReport::ReportJSAnimation()";
       "OHOS::Ace::JsonUtil::CreateSharedPtrJson(bool)";
+      ThirdProviderTreeExporter::ExportToInspectorJson*;
+      ThirdProviderTreeExporter::ExportFlatToInspectorJson*;
+      ThirdProviderTreeExporter::AccumulateInspectorTree*;
       "OHOS::Ace::JsonValue::Delete(char const*)";
       "OHOS::Ace::JsonValue::GetChild() const";
       "OHOS::Ace::JsonValue::GetKey() const";

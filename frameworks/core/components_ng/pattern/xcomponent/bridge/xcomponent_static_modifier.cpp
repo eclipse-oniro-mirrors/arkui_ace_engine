@@ -252,21 +252,39 @@ void SetBufferQueueCountImpl(Ark_NativePointer node,
     #endif // XCOMPONENT_SUPPORTED
 }
 } // XComponentAttributeModifier
+namespace {
+// Older SDK-generated tables do not contain setSetExtraFlag.
+template<typename Modifier>
+constexpr auto SetExtraFlagIfSupported(Modifier& modifier, int)
+    -> decltype(modifier.setSetExtraFlag = XComponentAttributeModifier::SetExtraFlagImpl, void())
+{
+    modifier.setSetExtraFlag = XComponentAttributeModifier::SetExtraFlagImpl;
+}
+
+template<typename Modifier>
+constexpr void SetExtraFlagIfSupported(Modifier&, long)
+{}
+} // namespace
+
 const GENERATED_ArkUIXComponentModifier* GetXComponentStaticModifier()
 {
-    static const GENERATED_ArkUIXComponentModifier ArkUIXComponentModifierImpl {
-        XComponentModifier::ConstructImpl,
-        XComponentInterfaceModifier::SetXComponentOptionsImpl,
-        XComponentAttributeModifier::SetOnLoadImpl,
-        XComponentAttributeModifier::SetOnDestroyImpl,
-        XComponentAttributeModifier::SetEnableAnalyzerImpl,
-        XComponentAttributeModifier::SetEnableSecureImpl,
-        XComponentAttributeModifier::SetEnableTransparentLayerImpl,
-        XComponentAttributeModifier::SetHdrBrightness0Impl,
-        XComponentAttributeModifier::SetExtraFlagImpl,
-        XComponentAttributeModifier::SetBufferQueueCountImpl,
-        XComponentAttributeModifier::SetHdrBrightness1Impl,
-    };
+    static constexpr GENERATED_ArkUIXComponentModifier ArkUIXComponentModifierImpl = [] {
+        GENERATED_ArkUIXComponentModifier modifier {};
+        modifier.construct = XComponentModifier::ConstructImpl;
+        modifier.setXComponentOptions = XComponentInterfaceModifier::SetXComponentOptionsImpl;
+        modifier.setOnLoad = XComponentAttributeModifier::SetOnLoadImpl;
+        modifier.setOnDestroy = XComponentAttributeModifier::SetOnDestroyImpl;
+        modifier.setEnableAnalyzer = XComponentAttributeModifier::SetEnableAnalyzerImpl;
+        modifier.setEnableSecure = XComponentAttributeModifier::SetEnableSecureImpl;
+        modifier.setEnableTransparentLayer = XComponentAttributeModifier::SetEnableTransparentLayerImpl;
+        modifier.setHdrBrightness0 = XComponentAttributeModifier::SetHdrBrightness0Impl;
+        modifier.setBufferQueueCount = XComponentAttributeModifier::SetBufferQueueCountImpl;
+        modifier.setHdrBrightness1 = XComponentAttributeModifier::SetHdrBrightness1Impl;
+        // The int literal 0 prefers the SFINAE overload when the SDK table has the
+        // field; if that overload is removed, 0 converts to the long no-op instead.
+        SetExtraFlagIfSupported(modifier, 0);
+        return modifier;
+    }();
     return &ArkUIXComponentModifierImpl;
 }
 
