@@ -23,6 +23,8 @@
 
 namespace OHOS::Ace {
 
+class AceType;
+
 void PurgeMallocCache();
 
 #ifdef ACE_DEBUG
@@ -51,7 +53,7 @@ public:
     }
 
 private:
-    template<class T, bool hasTypeInfo = std::is_base_of_v<TypeInfoBase, T>>
+    template<class T, bool hasTypeInfo = std::is_base_of_v<TypeInfoBase, T> || std::is_base_of_v<AceType, T>>
     struct TypeInfo;
 
     template<class T>

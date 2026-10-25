@@ -46,6 +46,9 @@ using namespace testing::ext;
 
 namespace OHOS::Ace::NG {
 namespace {
+static_assert(!std::is_base_of_v<TypeInfoBase, AceType>);
+static_assert(std::is_same_v<FrameNode::IdType, AceType::IdType>);
+static_assert(std::is_same_v<decltype(static_cast<AceType*>(static_cast<Referenced*>(nullptr))), AceType*>);
 static_assert(!std::is_base_of_v<AceType, LayoutWrapper>);
 static_assert(std::is_base_of_v<TypeInfoBase, LayoutWrapper>);
 static_assert(sizeof(RefPtr<LayoutWrapper>) == sizeof(LayoutWrapper*));
@@ -96,6 +99,58 @@ void LayoutWrapperNodeTestNg::SetUpTestSuite()
 void LayoutWrapperNodeTestNg::TearDownTestSuite()
 {
     MockPipelineContext::TearDown();
+}
+
+/**
+ * @tc.name: AceTypeRootTypeInfo
+ * @tc.desc: AceType provides type information without a TypeInfoBase subobject.
+ * @tc.type: FUNC
+ */
+HWTEST_F(LayoutWrapperNodeTestNg, AceTypeRootTypeInfo, TestSize.Level0)
+{
+    auto root = AceType::MakeRefPtr<AceType>();
+    EXPECT_EQ(AceType::TypeId(root), AceType::TypeId<AceType>());
+    EXPECT_STREQ(AceType::TypeName(root), "AceType");
+    EXPECT_EQ(AceType::DynamicCast<AceType>(root), root);
+    EXPECT_FALSE(AceType::InstanceOf<TypeInfoBase>(root));
+    EXPECT_EQ(AceType::DynamicCast<TypeInfoBase>(root.GetRawPtr()), nullptr);
+    EXPECT_EQ(AceType::DynamicCast<FrameNode>(root), nullptr);
+    EXPECT_EQ(static_cast<void*>(root.GetRawPtr()), static_cast<void*>(static_cast<Referenced*>(root.GetRawPtr())));
+    WeakPtr<AceType> weak = root;
+    EXPECT_EQ(weak.Upgrade(), root);
+    root.Reset();
+    EXPECT_FALSE(weak.Upgrade());
+}
+
+/**
+ * @tc.name: FrameNodeOwnerLayout
+ * @tc.desc: Node and owner addresses coincide; type queries bridge both type information roots.
+ * @tc.type: FUNC
+ */
+HWTEST_F(LayoutWrapperNodeTestNg, FrameNodeOwnerLayout, TestSize.Level0)
+{
+    auto node = FrameNode::CreateFrameNode(ROW_FRAME_NODE, NODE_ID_0, AceType::MakeRefPtr<Pattern>());
+    auto* frame = node.GetRawPtr();
+    auto* uiNode = static_cast<UINode*>(frame);
+    auto* owner = static_cast<AceType*>(uiNode);
+    auto* layout = static_cast<LayoutWrapper*>(frame);
+    auto* typeInfo = static_cast<TypeInfoBase*>(layout);
+    EXPECT_EQ(static_cast<void*>(frame), static_cast<void*>(uiNode));
+    EXPECT_EQ(static_cast<void*>(frame), static_cast<void*>(owner));
+    EXPECT_EQ(static_cast<void*>(frame), static_cast<void*>(static_cast<Referenced*>(owner)));
+    EXPECT_EQ(AceType::DynamicCast<LayoutWrapper>(owner), layout);
+    EXPECT_EQ(AceType::DynamicCast<TypeInfoBase>(owner), typeInfo);
+    EXPECT_EQ(TypeInfoHelper::DynamicCast<AceType>(typeInfo), owner);
+    EXPECT_EQ(TypeInfoHelper::DynamicCast<FrameNode>(typeInfo), frame);
+    EXPECT_EQ(AceType::TypeId(owner), TypeInfoHelper::TypeId(typeInfo));
+    EXPECT_STREQ(AceType::TypeName(owner), "FrameNode");
+    EXPECT_STREQ(TypeInfoHelper::TypeName(typeInfo), "FrameNode");
+    const auto* constTypeInfo = typeInfo;
+    EXPECT_EQ(TypeInfoHelper::DynamicCast<AceType>(constTypeInfo), owner);
+#ifdef ACE_DEBUG
+    EXPECT_EQ(TypeInfoHelper::TypeSize(owner), sizeof(FrameNode));
+    EXPECT_EQ(TypeInfoHelper::TypeSize(typeInfo), sizeof(FrameNode));
+#endif
 }
 
 /**

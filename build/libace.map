@@ -4280,6 +4280,7 @@
       "OHOS::Ace::Frontend::GetTaskExecutor() const";
       "OHOS::Ace::Frontend::MaybeRelease()";
       "OHOS::Ace::Frontend::~Frontend()";
+      "vtable for OHOS::Ace::Frontend";
       "OHOS::Ace::GridColumnInfo::GetMaxWidth() const";
       "OHOS::Ace::GridContainerInfo::GetMarginLeft() const";
       "OHOS::Ace::GridContainerInfo::GetMarginRight() const";
