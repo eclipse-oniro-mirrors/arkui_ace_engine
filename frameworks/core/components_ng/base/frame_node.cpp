@@ -1879,9 +1879,9 @@ void FrameNode::DumpInspectorResponseRegions(
                 return coordinates(left) < coordinates(right);
             });
             clipped.erase(std::unique(clipped.begin(), clipped.end(),
-                              [&coordinates](const RectF& left, const RectF& right) {
-                                  return coordinates(left) == coordinates(right);
-                              }),
+                [&coordinates](const RectF& left, const RectF& right) {
+                    return coordinates(left) == coordinates(right);
+                }),
                 clipped.end());
             effective = std::move(clipped);
         }
@@ -1917,11 +1917,11 @@ void FrameNode::DumpInspectorResponseRegions(
     }
     if (!gesture->GetResponseRegion().empty() && (!pattern_ || pattern_->HasInspectorResponseRegion())) {
         json->Put("responseRegion", encode(GetResponseRegionListRaw(raw, static_cast<int32_t>(SourceType::TOUCH)),
-                                        SourceType::TOUCH, SourceTool::FINGER));
+            SourceType::TOUCH, SourceTool::FINGER));
     }
     if (!gesture->GetMouseResponseRegion().empty()) {
         json->Put("mouseResponseRegion", encode(GetResponseRegionListRaw(raw, static_cast<int32_t>(SourceType::MOUSE)),
-                                             SourceType::MOUSE, SourceTool::MOUSE));
+            SourceType::MOUSE, SourceTool::MOUSE));
     }
 }
 

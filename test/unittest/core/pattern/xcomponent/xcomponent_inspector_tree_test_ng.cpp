@@ -300,6 +300,7 @@ TEST_F(InspectorTreeTask05Provider, DependencyRejectsDuplicateCycleAndMissingAnc
 
 TEST_F(InspectorTreeTask05Provider, FailureDiscardsEarlierHostsAndStopsSubsequentQueries)
 {
+    constexpr int32_t EXPECTED_QUERY_COUNT = 2;
     auto host = Host(307);
     ParamConfig config;
     config.withCustomContent = true;
@@ -314,7 +315,7 @@ TEST_F(InspectorTreeTask05Provider, FailureDiscardsEarlierHostsAndStopsSubsequen
     auto second = JsonUtil::CreateSharedPtrJson();
     host->DumpInspectorTreeInfo(second, config);
     host->DumpInspectorTreeInfo(second, config);
-    EXPECT_EQ(input_.calls, 2);
+    EXPECT_EQ(input_.calls, EXPECTED_QUERY_COUNT);
     EXPECT_EQ(context.FinalizeResult(root)->ToString(), R"({"errorMessage":"provider query failed"})");
 }
 

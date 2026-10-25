@@ -126,7 +126,7 @@ napi_value QueryCount(napi_env env, napi_callback_info info)
 napi_value Init(napi_env env, napi_value exports)
 {
     napi_property_descriptor methods[] = { { "configure", nullptr, Configure, nullptr, nullptr, nullptr, napi_default,
-                                               nullptr },
+        nullptr },
         { "queryCount", nullptr, QueryCount, nullptr, nullptr, nullptr, napi_default, nullptr } };
     constexpr size_t METHOD_COUNT = sizeof(methods) / sizeof(methods[0]);
     napi_define_properties(env, exports, METHOD_COUNT, methods);
