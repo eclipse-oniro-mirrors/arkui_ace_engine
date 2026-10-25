@@ -16,7 +16,6 @@
 #ifndef FOUNDATION_ACE_INTERFACE_UI_CONTENT_STUB_H
 #define FOUNDATION_ACE_INTERFACE_UI_CONTENT_STUB_H
 
-
 #include "iremote_object.h"
 #include "iremote_stub.h"
 

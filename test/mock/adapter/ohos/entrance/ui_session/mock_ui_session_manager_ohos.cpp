@@ -19,5 +19,4 @@ namespace OHOS::Ace {
 void UiSessionManagerOhos::SaveReportProxy(sptr<IRemoteObject> reportProxy, int32_t processId)
 {
 }
-
 } // namespace OHOS::Ace

@@ -260,7 +260,6 @@ struct SysScale {
 
 class RichEditorScope {
 public:
-
     RichEditorScope(bool& scopeFlag);
     ~RichEditorScope();
 private:
