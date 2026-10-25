@@ -97,6 +97,63 @@ TEST(InspectorTreeTask10, MarqueeReplicasDoNotDeduplicateIndependentLabels)
     EXPECT_FALSE(replicas->GetArrayItem(1)->GetObject("$attrs")->Contains("content"));
     EXPECT_EQ(output->GetArrayItem(1)->GetObject("$attrs")->GetString("content"), "same");
 }
+
+TEST(InspectorTreeTask10, FinalizePreservesWideNativeTreeWithNewOptionsDisabled)
+{
+    auto root = JsonUtil::CreateSharedPtrJson();
+    auto children = JsonUtil::CreateArray();
+    constexpr int32_t CHILD_COUNT = 16000;
+    for (int32_t i = 0; i < CHILD_COUNT; ++i) {
+        auto child = JsonUtil::Create();
+        child->Put("$type", "Text");
+        child->Put("$ID", i);
+        auto attrs = JsonUtil::Create();
+        attrs->Put("content", "same");
+        child->PutRef("$attrs", std::move(attrs));
+        children->PutRef(std::move(child));
+    }
+    root->PutRef("$children", std::move(children));
+    auto before = root->ToString();
+    ParamConfig config;
+    config.withResponseRegion = false;
+    config.withCustomContent = false;
+    InspectorTreeRequestContext context(config, {});
+    context.FinalizeNativeTree(root);
+    EXPECT_EQ(root->ToString(), before);
+}
+
+TEST(InspectorTreeTask10, FinalizeVisitsNestedMarqueesWithoutSharingDeduplicationState)
+{
+    std::shared_ptr<JsonValue> root = JsonUtil::ParseJsonString(R"({"$children":[
+        {"$type":"Marquee","$children":[
+            {"$type":"Text","$attrs":{"content":"same"}},
+            {"$type":"Text","$attrs":{"content":"same"}},
+            {"$type":"Column","$children":[{"$type":"Marquee","$children":[
+                {"$type":"Text","$attrs":{"content":"same"}},
+                {"$type":"Text","$attrs":{"content":"same"}}]}]}]},
+        {"$type":"Text","$attrs":{"content":"same"}}]})");
+    InspectorTreeRequestContext context({}, {});
+    context.FinalizeNativeTree(root);
+    auto children = root->GetValue("$children");
+    auto outer = children->GetArrayItem(0)->GetValue("$children");
+    auto nested = outer->GetArrayItem(2)->GetValue("$children")->GetArrayItem(0)->GetValue("$children");
+    EXPECT_EQ(outer->GetArrayItem(0)->GetObject("$attrs")->GetString("content"), "same");
+    EXPECT_FALSE(outer->GetArrayItem(1)->GetObject("$attrs")->Contains("content"));
+    EXPECT_EQ(nested->GetArrayItem(0)->GetObject("$attrs")->GetString("content"), "same");
+    EXPECT_FALSE(nested->GetArrayItem(1)->GetObject("$attrs")->Contains("content"));
+    EXPECT_EQ(children->GetArrayItem(1)->GetObject("$attrs")->GetString("content"), "same");
+}
+
+TEST(InspectorTreeTask10, FinalizePreservesMissingAndEmptyChildren)
+{
+    for (const auto* data : { R"({})", R"({"$children":[]})", R"({"$children":null})" }) {
+        std::shared_ptr<JsonValue> root = JsonUtil::ParseJsonString(data);
+        InspectorTreeRequestContext context({}, {});
+        context.FinalizeNativeTree(root);
+        EXPECT_EQ(root->ToString(), data);
+    }
+}
+
 TEST(InspectorTreeTask02, RootErrorGateAndWholeRequestFailure)
 {
     for (bool regions : { false, true }) {

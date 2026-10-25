@@ -136,8 +136,8 @@ void InspectorTreeRequestContext::FinalizeNativeTree(const std::shared_ptr<JsonV
         auto children = node->GetValue("$children");
         std::set<std::string> marqueeText;
         const bool marquee = node->GetString("$type") == "Marquee";
-        for (int32_t i = 0; i < children->GetArraySize(); ++i) {
-            auto child = children->GetArrayItem(i);
+        for (auto child = children->GetChild(); child && child->IsValid();) {
+            auto next = child->GetNext();
             if (marquee && child->GetString("$type") == "Text") {
                 auto attrs = child->GetObject("$attrs");
                 auto content = attrs->GetValue("content");
@@ -146,6 +146,7 @@ void InspectorTreeRequestContext::FinalizeNativeTree(const std::shared_ptr<JsonV
                 }
             }
             pending.emplace_back(std::move(child));
+            child = std::move(next);
         }
     }
 }
