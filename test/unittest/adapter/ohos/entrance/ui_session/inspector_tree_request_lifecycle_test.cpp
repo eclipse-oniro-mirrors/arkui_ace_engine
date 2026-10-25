@@ -29,8 +29,8 @@ TEST(InspectorTreeTask06, CallbackRemainsOccupiedUntilLastPart)
     sptr<UiReportStub> stub = new UiReportStub();
     int firstCalls = 0;
     int nextCalls = 0;
-    auto nextCallback = [&](std::string, int32_t, bool) { ++nextCalls; };
-    ASSERT_TRUE(stub->RegisterGetInspectorTreeCallback([&](std::string, int32_t, bool) { ++firstCalls; }));
+    auto nextCallback = [&nextCalls](std::string, int32_t, bool) { ++nextCalls; };
+    ASSERT_TRUE(stub->RegisterGetInspectorTreeCallback([&firstCalls](std::string, int32_t, bool) { ++firstCalls; }));
     ASSERT_FALSE(stub->RegisterGetInspectorTreeCallback(nextCallback));
     stub->ReportInspectorTreeValue("part", 1, false);
     EXPECT_EQ(firstCalls, 1);
@@ -50,8 +50,8 @@ TEST(InspectorTreeTask06, CompletedCallbackCanRegisterNextSerialRequest)
     sptr<UiReportStub> stub = new UiReportStub();
     bool registered = false;
     int nextCalls = 0;
-    ASSERT_TRUE(stub->RegisterGetInspectorTreeCallback([&](std::string, int32_t, bool) {
-        registered = stub->RegisterGetInspectorTreeCallback([&](std::string, int32_t, bool) { ++nextCalls; });
+    ASSERT_TRUE(stub->RegisterGetInspectorTreeCallback([&registered, &stub, &nextCalls](std::string, int32_t, bool) {
+        registered = stub->RegisterGetInspectorTreeCallback([&nextCalls](std::string, int32_t, bool) { ++nextCalls; });
     }));
     stub->ReportInspectorTreeValue("first", 1, true);
     EXPECT_TRUE(registered);
@@ -95,7 +95,7 @@ TEST(InspectorTreeTask06, ExistingTimeoutClearsCallbackAndAllowsNextRequest)
 {
     sptr<UiReportStub> stub = new UiReportStub();
     int calls = 0;
-    auto callback = [&](std::string, int32_t, bool) { ++calls; };
+    auto callback = [&calls](std::string, int32_t, bool) { ++calls; };
     ASSERT_TRUE(stub->RegisterGetInspectorTreeCallback(callback));
     stub->HandleInspectorTreeCallbackTimeout();
     EXPECT_EQ(calls, 0);
@@ -110,7 +110,7 @@ TEST(InspectorTreeTask06, ExistingRegistrationAndLegacyReportEntryRemainUsable)
 {
     sptr<UiReportStub> stub = new UiReportStub();
     int calls = 0;
-    auto callback = [&](std::string, int32_t, bool) { ++calls; };
+    auto callback = [&calls](std::string, int32_t, bool) { ++calls; };
     ASSERT_TRUE(stub->RegisterGetInspectorTreeCallback(callback));
     ASSERT_FALSE(stub->RegisterGetInspectorTreeCallback(callback));
     stub->ReportInspectorTreeValue("first", 1, true);

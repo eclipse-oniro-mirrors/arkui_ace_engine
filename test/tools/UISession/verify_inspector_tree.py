@@ -20,6 +20,7 @@ import re
 import sys
 import time
 
+
 def validate(capture, case, regions, providers, accessibility):
     assertions = 0
     failures = []
