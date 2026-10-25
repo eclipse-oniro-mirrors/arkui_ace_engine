@@ -2275,10 +2275,10 @@ HWTEST_F(ObserverTestNg, NavDestinationStateEnum001, TestSize.Level1)
  */
 HWTEST_F(ObserverTestNg, NotifyAboutToAppear001, TestSize.Level1)
 {
-    // Raw version: major=26, minor=2, patch=0, apiLevel=26 → 26*10000000 + 2*100000 + 0*1000 + 26
-    constexpr int32_t API_26_2_0_RAW = 260200026;
-    AceApplicationInfo::GetInstance().SetApiTargetVersion(API_26_2_0_RAW);
-    Container::Current()->SetApiTargetVersion(API_26_2_0_RAW);
+    // Raw version: major=26, minor=1, patch=0, apiLevel=26 → 26*10000000 + 1*100000 + 0*1000 + 26
+    constexpr int32_t API_26_1_0_RAW = 260100026;
+    AceApplicationInfo::GetInstance().SetApiTargetVersion(API_26_1_0_RAW);
+    Container::Current()->SetApiTargetVersion(API_26_1_0_RAW);
     auto navigation = NavigationGroupNode::GetOrCreateGroupNode(
         "navigation", 11, []() { return AceType::MakeRefPtr<NavigationPattern>(); });
     navigation->GetPattern<NavigationPattern>()->navigationStack_ = AceType::MakeRefPtr<NavigationStack>();
@@ -2310,10 +2310,10 @@ HWTEST_F(ObserverTestNg, NotifyAboutToAppear001, TestSize.Level1)
  */
 HWTEST_F(ObserverTestNg, NotifyAboutToDisappear001, TestSize.Level1)
 {
-    // Raw version: major=26, minor=2, patch=0, apiLevel=26 → 26*10000000 + 2*100000 + 0*1000 + 26
-    constexpr int32_t API_26_2_0_RAW = 260200026;
-    AceApplicationInfo::GetInstance().SetApiTargetVersion(API_26_2_0_RAW);
-    Container::Current()->SetApiTargetVersion(API_26_2_0_RAW);
+    // Raw version: major=26, minor=1, patch=0, apiLevel=26 → 26*10000000 + 1*100000 + 0*1000 + 26
+    constexpr int32_t API_26_1_0_RAW = 260100026;
+    AceApplicationInfo::GetInstance().SetApiTargetVersion(API_26_1_0_RAW);
+    Container::Current()->SetApiTargetVersion(API_26_1_0_RAW);
     auto navigation = NavigationGroupNode::GetOrCreateGroupNode(
         "navigation", 11, []() { return AceType::MakeRefPtr<NavigationPattern>(); });
     navigation->GetPattern<NavigationPattern>()->navigationStack_ = AceType::MakeRefPtr<NavigationStack>();
@@ -2425,7 +2425,7 @@ HWTEST_F(ObserverTestNg, NotifyAboutToAppearVersionGate001, TestSize.Level1)
  
     UIObserverHandler::GetInstance().navigationHandleFuncForAni_ = nullptr;
 }
- 
+
 /**
  * @tc.name: FireAboutToAppearWithCustomNode001
  * @tc.desc: Test FireAboutToAppear dispatches observer notification with customNode set
@@ -2433,10 +2433,10 @@ HWTEST_F(ObserverTestNg, NotifyAboutToAppearVersionGate001, TestSize.Level1)
  */
 HWTEST_F(ObserverTestNg, FireAboutToAppearWithCustomNode001, TestSize.Level1)
 {
-    // Raw version: major=26, minor=2, patch=0, apiLevel=26 → 26*10000000 + 2*100000 + 0*1000 + 26
-    constexpr int32_t API_26_2_0_RAW = 260200026;
-    AceApplicationInfo::GetInstance().SetApiTargetVersion(API_26_2_0_RAW);
-    Container::Current()->SetApiTargetVersion(API_26_2_0_RAW);
+    // Raw version: major=26, minor=1, patch=0, apiLevel=26 → 26*10000000 + 1*100000 + 0*1000 + 26
+    constexpr int32_t API_26_1_0_RAW = 260100026;
+    AceApplicationInfo::GetInstance().SetApiTargetVersion(API_26_1_0_RAW);
+    Container::Current()->SetApiTargetVersion(API_26_1_0_RAW);
     auto navigation = NavigationGroupNode::GetOrCreateGroupNode(
         "navigation", 11, []() { return AceType::MakeRefPtr<NavigationPattern>(); });
     navigation->GetPattern<NavigationPattern>()->navigationStack_ = AceType::MakeRefPtr<NavigationStack>();
@@ -2477,10 +2477,10 @@ HWTEST_F(ObserverTestNg, FireAboutToAppearWithCustomNode001, TestSize.Level1)
  */
 HWTEST_F(ObserverTestNg, FireAboutToAppearWithoutCustomNode001, TestSize.Level1)
 {
-    // Raw version: major=26, minor=2, patch=0, apiLevel=26 → 26*10000000 + 2*100000 + 0*1000 + 26
-    constexpr int32_t API_26_2_0_RAW = 260200026;
-    AceApplicationInfo::GetInstance().SetApiTargetVersion(API_26_2_0_RAW);
-    Container::Current()->SetApiTargetVersion(API_26_2_0_RAW);
+    // Raw version: major=26, minor=1, patch=0, apiLevel=26 → 26*10000000 + 1*100000 + 0*1000 + 26
+    constexpr int32_t API_26_1_0_RAW = 260100026;
+    AceApplicationInfo::GetInstance().SetApiTargetVersion(API_26_1_0_RAW);
+    Container::Current()->SetApiTargetVersion(API_26_1_0_RAW);
     auto navigation = NavigationGroupNode::GetOrCreateGroupNode(
         "navigation", 11, []() { return AceType::MakeRefPtr<NavigationPattern>(); });
     navigation->GetPattern<NavigationPattern>()->navigationStack_ = AceType::MakeRefPtr<NavigationStack>();
