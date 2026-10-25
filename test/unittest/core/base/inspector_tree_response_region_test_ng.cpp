@@ -233,8 +233,58 @@ TEST_F(InspectorTreeTask04, AncestorClipUsesToolResponseRegionsAndPreservesGaps)
     auto json = DumpRegions(frame, false);
     auto mouse = json->GetObject("responseRegionMap")->GetValue("mouse");
     ASSERT_EQ(mouse->GetArraySize(), 2);
-    EXPECT_EQ(mouse->GetArrayItem(0)->GetString(), "[80.00, -10.00],[120.00,110.00]");
-    EXPECT_EQ(mouse->GetArrayItem(1)->GetString(), "[-20.00, -10.00],[10.00,110.00]");
+    EXPECT_EQ(mouse->GetArrayItem(0)->GetString(), "[-20.00, -10.00],[10.00,110.00]");
+    EXPECT_EQ(mouse->GetArrayItem(1)->GetString(), "[80.00, -10.00],[120.00,110.00]");
+}
+
+TEST_F(InspectorTreeTask04, OverlappingAncestorRegionsDoNotMultiply)
+{
+    auto frame = CreateFrame(100, RectF(0.0f, 0.0f, 10.0f, 10.0f));
+    auto root = frame;
+    DimensionRect region(Dimension(10, DimensionUnit::PX), Dimension(10, DimensionUnit::PX), DimensionOffset());
+    DimensionRect horizontal(Dimension(20, DimensionUnit::PX), Dimension(12, DimensionUnit::PX),
+        DimensionOffset(Dimension(-5, DimensionUnit::PX), Dimension(-1, DimensionUnit::PX)));
+    DimensionRect vertical(Dimension(12, DimensionUnit::PX), Dimension(20, DimensionUnit::PX),
+        DimensionOffset(Dimension(-1, DimensionUnit::PX), Dimension(-5, DimensionUnit::PX)));
+    std::vector<RefPtr<FrameNode>> ancestors;
+    for (int32_t depth = 0; depth < 8; ++depth) {
+        auto parent = CreateFrame(101 + depth, RectF(0.0f, 0.0f, 100.0f, 100.0f));
+        parent->GetRenderContext()->UpdateClipEdge(true);
+        auto gesture = parent->GetOrCreateGestureEventHub();
+        gesture->SetResponseRegion({ horizontal, vertical });
+        gesture->SetMouseResponseRegion({ horizontal, vertical });
+        root->MountToParent(parent);
+        ancestors.emplace_back(parent);
+        root = parent;
+    }
+    auto gesture = frame->GetOrCreateGestureEventHub();
+    gesture->SetResponseRegion({ region });
+    gesture->SetMouseResponseRegion({ region });
+    for (bool visible : { false, true }) {
+        auto json = DumpRegions(frame, visible);
+        for (const auto* key : { "responseRegion", "mouseResponseRegion" }) {
+            auto regions = json->GetValue(key);
+            ASSERT_EQ(regions->GetArraySize(), 1);
+            EXPECT_EQ(regions->GetArrayItem(0)->GetString(), "[0.00, 0.00],[10.00,10.00]");
+        }
+    }
+    gesture->SetResponseRegionMap(
+        { { ResponseRegionSupportedTool::ALL, { region } }, { ResponseRegionSupportedTool::FINGER, { region } },
+            { ResponseRegionSupportedTool::PEN, { region } }, { ResponseRegionSupportedTool::MOUSE, { region } } });
+    for (bool visible : { false, true }) {
+        auto json = DumpRegions(frame, visible);
+        auto map = json->GetObject("responseRegionMap");
+        for (const auto* key : { "all", "finger", "pen", "mouse" }) {
+            auto regions = map->GetValue(key);
+            ASSERT_EQ(regions->GetArraySize(), 1);
+            EXPECT_EQ(regions->GetArrayItem(0)->GetString(), "[0.00, 0.00],[10.00,10.00]");
+        }
+    }
+    for (const auto& ancestor : ancestors) {
+        auto parentGesture = ancestor->GetOrCreateGestureEventHub();
+        EXPECT_EQ(parentGesture->GetResponseRegion().size(), 2);
+        EXPECT_EQ(parentGesture->GetMouseResponseRegion().size(), 2);
+    }
 }
 
 TEST_F(InspectorTreeTask04, AncestorClipHonorsDefaultRegionsAndEmptyIntersections)

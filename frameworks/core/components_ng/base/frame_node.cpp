@@ -15,6 +15,7 @@
 
 #include "core/components_ng/base/frame_node.h"
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
 #include <tuple>
@@ -1852,11 +1853,24 @@ void FrameNode::DumpInspectorResponseRegions(
                     }
                 }
             }
+            // RectF equality is approximate; preserve distinct regions with close coordinates.
+            const auto coordinates = [](const RectF& rect) {
+                return std::make_tuple(rect.Left(), rect.Top(), rect.Width(), rect.Height());
+            };
+            std::sort(clipped.begin(), clipped.end(), [&coordinates](const RectF& left, const RectF& right) {
+                return coordinates(left) < coordinates(right);
+            });
+            clipped.erase(std::unique(clipped.begin(), clipped.end(),
+                              [&coordinates](const RectF& left, const RectF& right) {
+                                  return coordinates(left) == coordinates(right);
+                              }),
+                clipped.end());
             effective = std::move(clipped);
         }
         auto array = JsonUtil::CreateArray();
+        size_t index = 0;
         for (const auto& rect : effective) {
-            array->Put(std::to_string(array->GetArraySize()).c_str(), rect.ToBounds().c_str());
+            array->Put(std::to_string(index++).c_str(), rect.ToBounds().c_str());
         }
         return array;
     };
