@@ -18,7 +18,6 @@
       "aliases": [
         "CAPI runtime check"
       ],
-      "kb": "docs/kb/api/native-runtime-check.md",
       "source_paths": {
         "config": "interfaces/native/node/config_manager.cpp",
         "scope": "frameworks/core/components_ng/base/native_node_tree_scope.cpp",

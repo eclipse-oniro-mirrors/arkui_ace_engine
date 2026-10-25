@@ -13,6 +13,9 @@
  * limitations under the License.
  */
 #include "style_modifier.h"
+#include "config_manager.h"
+
+#include "base/log/log_wrapper.h"
 
 #include <algorithm>
 #include <cerrno>
@@ -15274,7 +15277,13 @@ ArkUITextMenuItemArray TextMenuItemArrayAdpaterCallback(
         itemArray.items.push_back(item);
     }
     auto userCallbackImpl = reinterpret_cast<void (*)(ArkUI_TextMenuItemArray*, void*)>(userCallback);
-    userCallbackImpl(&itemArray, userData);
+    {
+        LOG_CALLBACK(
+            "OH_ArkUI_TextEditMenuOptions_RegisterOnCreateMenuCallback / "
+            "OH_ArkUI_TextEditMenuOptions_RegisterOnPrepareMenuCallback",
+            userCallbackImpl);
+        userCallbackImpl(&itemArray, userData);
+    }
     size_t len = itemArray.items.size();
     if (len == 0) {
         return { .items = nullptr, .length = 0 };
@@ -15308,6 +15317,7 @@ bool OnMenuItemClickImpl(
     menuItem.id = item->id;
     auto onMenuItemClickCallback =
         reinterpret_cast<bool (*)(const ArkUI_TextMenuItem*, int32_t, int32_t, void*)>(onMenuItemClick);
+    LOG_CALLBACK("OH_ArkUI_TextEditMenuOptions_RegisterOnMenuItemClickCallback", onMenuItemClickCallback);
     return onMenuItemClickCallback(&menuItem, start, end, userData);
 }
 
@@ -20886,16 +20896,54 @@ const ArkUI_AttributeItem* GetGridItemSelected(ArkUI_NodeHandle node)
     return &g_attributeItem;
 }
 
-bool CheckIfAttributeLegal(ArkUI_NodeHandle node, int32_t type)
+bool CheckIfAttributeLegal(int32_t nodeType, int32_t type)
 {
-    if (node->type == ARKUI_NODE_SPAN) {
-        auto it = SPAN_ATTRIBUTES_MAP.find(type);
-        return it != SPAN_ATTRIBUTES_MAP.end();
+    if (nodeType == ARKUI_NODE_SPAN) {
+        return SPAN_ATTRIBUTES_MAP.find(type) != SPAN_ATTRIBUTES_MAP.end();
     }
-    if (node->type == ARKUI_NODE_CUSTOM_SPAN) {
-        return false;
+    return nodeType != ARKUI_NODE_CUSTOM_SPAN;
+}
+
+bool IsNodeAttributeSupported(int32_t nodeType, int32_t attribute, int32_t attributeClass)
+{
+    if (attribute < 0 || nodeType < 0 || nodeType == ARKUI_NODE_UNDEFINED) {
+        return true;
     }
-    return true;
+    if (attributeClass == 0 || attributeClass == nodeType) {
+        return true;
+    }
+    switch (attribute) {
+        case NODE_TEXT_DECORATION:
+        case NODE_FONT_COLOR:
+        case NODE_TEXT_FONT_FEATURE:
+        case NODE_FONT_SIZE:
+        case NODE_FONT_STYLE:
+        case NODE_FONT_WEIGHT:
+        case NODE_TEXT_LETTER_SPACING:
+        case NODE_TEXT_LINE_HEIGHT:
+        case NODE_LINEAR_LAYOUT_REVERSE:
+        case NODE_LINEAR_LAYOUT_SPACE:
+        case NODE_TEXT_MAX_LINES:
+        case NODE_TEXT_OPTIMIZE_TRAILING_SPACE:
+        case NODE_SCROLL_BY:
+        case NODE_SCROLL_EDGE_EFFECT:
+        case NODE_SCROLL_ENABLE_SCROLL_INTERACTION:
+        case NODE_SCROLL_FRICTION:
+        case NODE_SCROLL_NESTED_SCROLL:
+        case NODE_SCROLL_BAR_DISPLAY_MODE:
+        case NODE_SCROLL_BAR_COLOR:
+        case NODE_SCROLL_BAR_WIDTH:
+        case NODE_TEXT_ALIGN:
+        case NODE_TEXT_CASE:
+        case NODE_TEXT_COPY_OPTION:
+        case NODE_FONT_FAMILY:
+        case NODE_TEXT_MAX_FONT_SIZE:
+        case NODE_TEXT_MIN_FONT_SIZE:
+        case NODE_TEXT_TEXT_SHADOW:
+            return true;
+        default:
+            return false;
+    }
 }
 
 int32_t SetSliderPrefix(ArkUI_NodeHandle node, const ArkUI_AttributeItem* item)
@@ -25087,8 +25135,12 @@ int32_t SetNodeAttribute(ArkUI_NodeHandle node, ArkUI_NodeAttributeType type, co
     int32_t subTypeId = type % MAX_NODE_SCOPE_NUM;
     int32_t nodeSubTypeClass =
         subTypeClass < MAX_NODE_SCOPE_NUM ? subTypeClass : (subTypeClass - MAX_NODE_SCOPE_NUM + BASIC_COMPONENT_NUM);
-    if ((static_cast<uint32_t>(nodeSubTypeClass) >= sizeof(setterClasses) / sizeof(AttributeSetterClass*)) ||
-        !CheckIfAttributeLegal(node, type) || !CheckIsCNodeOrCrossLanguage(node)) {
+    const bool isAttributeClassValid =
+        static_cast<uint32_t>(nodeSubTypeClass) < sizeof(setterClasses) / sizeof(AttributeSetterClass*);
+    if (isAttributeClassValid) {
+        ConfigManager::CheckAttributeMatch(node, type, subTypeClass, "setAttribute", IsNodeAttributeSupported);
+    }
+    if (!isAttributeClassValid || !CheckIfAttributeLegal(node->type, type) || !CheckIsCNodeOrCrossLanguage(node)) {
         SET_ERROR_CODE_AND_MESSAGE(ERROR_CODE_NATIVE_IMPL_TYPE_NOT_SUPPORTED, "Node attribute is not supported");
         return ERROR_CODE_NATIVE_IMPL_TYPE_NOT_SUPPORTED;
     }
@@ -25122,8 +25174,12 @@ const ArkUI_AttributeItem* GetNodeAttribute(ArkUI_NodeHandle node, ArkUI_NodeAtt
     int32_t subTypeId = type % MAX_NODE_SCOPE_NUM;
     int32_t nodeSubTypeClass =
         subTypeClass < MAX_NODE_SCOPE_NUM ? subTypeClass : (subTypeClass - MAX_NODE_SCOPE_NUM + BASIC_COMPONENT_NUM);
-    if ((static_cast<uint32_t>(nodeSubTypeClass) >= sizeof(getterClasses) / sizeof(AttributeGetterClass*)) ||
-        !CheckIfAttributeLegal(node, type)) {
+    const bool isAttributeClassValid =
+        static_cast<uint32_t>(nodeSubTypeClass) < sizeof(getterClasses) / sizeof(AttributeGetterClass*);
+    if (isAttributeClassValid) {
+        ConfigManager::CheckAttributeMatch(node, type, subTypeClass, "getAttribute", IsNodeAttributeSupported);
+    }
+    if (!isAttributeClassValid || !CheckIfAttributeLegal(node->type, type)) {
         TAG_LOGE(AceLogTag::ACE_NATIVE_NODE, "node attribute: %{public}d NOT IMPLEMENT", type);
         return nullptr;
     }
@@ -25152,8 +25208,12 @@ int32_t ResetNodeAttribute(ArkUI_NodeHandle node, ArkUI_NodeAttributeType type)
     int32_t subTypeId = type % MAX_NODE_SCOPE_NUM;
     int32_t nodeSubTypeClass =
         subTypeClass < MAX_NODE_SCOPE_NUM ? subTypeClass : (subTypeClass - MAX_NODE_SCOPE_NUM + BASIC_COMPONENT_NUM);
-    if ((static_cast<uint32_t>(nodeSubTypeClass) >= sizeof(resetterClasses) / sizeof(AttributeResetterClass*)) ||
-        !CheckIfAttributeLegal(node, type) || !CheckIsCNodeOrCrossLanguage(node)) {
+    const bool isAttributeClassValid =
+        static_cast<uint32_t>(nodeSubTypeClass) < sizeof(resetterClasses) / sizeof(AttributeResetterClass*);
+    if (isAttributeClassValid) {
+        ConfigManager::CheckAttributeMatch(node, type, subTypeClass, "resetAttribute", IsNodeAttributeSupported);
+    }
+    if (!isAttributeClassValid || !CheckIfAttributeLegal(node->type, type) || !CheckIsCNodeOrCrossLanguage(node)) {
         TAG_LOGE(AceLogTag::ACE_NATIVE_NODE, "node attribute: %{public}d NOT IMPLEMENT", type);
         SET_ERROR_CODE_AND_MESSAGE(ERROR_CODE_NATIVE_IMPL_TYPE_NOT_SUPPORTED, "Node attribute is not supported");
         return ERROR_CODE_NATIVE_IMPL_TYPE_NOT_SUPPORTED;

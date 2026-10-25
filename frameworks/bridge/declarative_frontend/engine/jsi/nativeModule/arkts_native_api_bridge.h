@@ -49,6 +49,10 @@ public:
     static ArkUINativeModuleValue SetMarqueeFrameRateRange(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static ArkUINativeModuleValue LoadNativeModule(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static ArkUINativeModuleValue GetPageRootNode(ArkUIRuntimeCallInfo* runtimeCallInfo);
+#ifdef MODAL_UI_EXTENSION_SUPPORTED
+    static ArkUINativeModuleValue CreateModalUIExtension(ArkUIRuntimeCallInfo* runtimeCallInfo);
+    static ArkUINativeModuleValue CloseModalUIExtension(ArkUIRuntimeCallInfo* runtimeCallInfo);
+#endif
     // ArkTSCard start
     static ArkUINativeModuleValue GetArkUINativeModuleForm(ArkUIRuntimeCallInfo* runtimeCallInfo);
     static void RegisterArkUINativeModuleFormLite(Local<panda::ObjectRef> object, EcmaVM* vm);

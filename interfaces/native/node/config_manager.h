@@ -51,6 +51,10 @@ bool SetRuntimeCheckMode(int32_t checkType, int32_t mode);
 // Diagnose misuse without short-circuiting the caller in DISABLED or LOG mode.
 void CheckUIThread(const char* publicApiName);
 void CheckNodeDisposed(ArkUI_NodeHandle nodePtr, const char* apiName, const char* errorMessage);
+// Evaluate the policy only while enabled, after validating the node's lifetime.
+using AttributeMatcher = bool (*)(int32_t nodeType, int32_t attribute, int32_t attributeClass);
+void CheckAttributeMatch(ArkUI_NodeHandle node, int32_t attribute, int32_t attributeClass,
+    const char* apiName, AttributeMatcher matcher);
 } // namespace ConfigManager
 
 } // namespace OHOS::Ace::NodeModel

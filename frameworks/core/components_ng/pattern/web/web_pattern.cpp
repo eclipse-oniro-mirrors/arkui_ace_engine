@@ -5950,7 +5950,7 @@ bool WebPattern::IsSelectInfoValid()
 std::optional<RectF> WebPattern::GetViewPort() const
 {
     CHECK_NULL_RETURN(GetHost(), std::nullopt);
-    auto parentNode = GetHost()->GetAncestorNodeOfFrame(true);
+    auto parentNode = GetHost()->GetCoordinateAncestorNodeOfFrame(true);
     while (parentNode) {
         auto scrollablePattern = AceType::DynamicCast<NestableScrollContainer>(parentNode->GetPattern());
         auto geometryNode = parentNode->GetGeometryNode();
@@ -5958,7 +5958,7 @@ std::optional<RectF> WebPattern::GetViewPort() const
             auto offsetRelativeToWindow = parentNode->GetOffsetRelativeToWindow();
             return RectF(offsetRelativeToWindow, geometryNode->GetFrameRect().GetSize());
         }
-        parentNode = parentNode->GetAncestorNodeOfFrame(true);
+        parentNode = parentNode->GetCoordinateAncestorNodeOfFrame(true);
     }
     return std::nullopt;
 }
@@ -11509,7 +11509,7 @@ bool WebPattern::CheckVisible()
         return false;
     }
 
-    auto parent = host->GetAncestorNodeOfFrame(true);
+    auto parent = host->GetCoordinateAncestorNodeOfFrame(true);
     while (parent) {
         if (parent->IsWindowBoundary()) {
             TAG_LOGI(AceLogTag::ACE_WEB, "WebPattern::CheckVisible IsWindowBoundary is true");
@@ -11519,7 +11519,7 @@ bool WebPattern::CheckVisible()
             TAG_LOGI(AceLogTag::ACE_WEB, "WebPattern::CheckVisible parent is inactive or invisible");
             return false;
         }
-        parent = parent->GetAncestorNodeOfFrame(true);
+        parent = parent->GetCoordinateAncestorNodeOfFrame(true);
     }
     return true;
 }

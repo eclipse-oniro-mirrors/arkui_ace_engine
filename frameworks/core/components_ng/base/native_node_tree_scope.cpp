@@ -23,6 +23,13 @@
 #include <unordered_set>
 #include <vector>
 
+#ifdef WINDOWS_PLATFORM
+#include <windows.h>
+#else
+#include <sys/syscall.h>
+#include <unistd.h>
+#endif
+
 #include "base/log/log_wrapper.h"
 #include "core/common/ace_application_info.h"
 #include "core/components_ng/base/ui_node.h"
@@ -36,6 +43,15 @@ std::atomic<uint32_t> g_activeCalls { 0 };
 std::atomic<uint64_t> g_nextThreadId { 1 };
 thread_local const uint64_t THREAD_ID = g_nextThreadId.fetch_add(1, std::memory_order_relaxed);
 thread_local bool g_emittingDiagnostics = false;
+
+uint64_t GetOsTid()
+{
+#ifdef WINDOWS_PLATFORM
+    return static_cast<uint64_t>(GetCurrentThreadId());
+#else
+    return static_cast<uint64_t>(syscall(SYS_gettid));
+#endif
+}
 
 std::recursive_mutex& GetTreeMutex()
 {
@@ -53,24 +69,29 @@ struct Conflict {
     std::string apiName;
     int32_t nodeId;
     uint64_t stateId;
-    uint64_t owner;
+    uint64_t ownerTid;
     int32_t mode;
 };
 
 void EmitConflict(const Conflict& conflict)
 {
+    if (g_emittingDiagnostics) {
+        return;
+    }
+    g_emittingDiagnostics = true;
     TAG_LOGE(AceLogTag::ACE_NATIVE_NODE,
         "ArkUI runtime check hit. checkName: MULTI_THREAD, apiName: %{public}s, "
         "reason: Same component tree is already operated by another thread, "
         "nodeId: %{public}d, stateId: %{public}llu, currentThreadId: %{public}llu, ownerThreadId: %{public}llu",
         conflict.apiName.c_str(), conflict.nodeId, static_cast<unsigned long long>(conflict.stateId),
-        static_cast<unsigned long long>(THREAD_ID), static_cast<unsigned long long>(conflict.owner));
+        static_cast<unsigned long long>(GetOsTid()), static_cast<unsigned long long>(conflict.ownerTid));
     LogBacktrace();
+    g_emittingDiagnostics = false;
     if (conflict.mode == CHECK_CRASH) {
         LOGF_ABORT("ArkUI runtime check abort. checkName: MULTI_THREAD, apiName: %{public}s, "
                    "stateId: %{public}llu, currentThreadId: %{public}llu, ownerThreadId: %{public}llu",
             conflict.apiName.c_str(), static_cast<unsigned long long>(conflict.stateId),
-            static_cast<unsigned long long>(THREAD_ID), static_cast<unsigned long long>(conflict.owner));
+            static_cast<unsigned long long>(GetOsTid()), static_cast<unsigned long long>(conflict.ownerTid));
     }
 }
 } // namespace
@@ -85,6 +106,7 @@ struct NativeNodeTreeScope::Context {
     struct State {
         uint64_t id;
         uint64_t threadId;
+        uint64_t osTid;
         std::vector<RefPtr<UINode>> roots;
     };
 
@@ -96,12 +118,13 @@ struct NativeNodeTreeScope::Context {
 
     static uint64_t NextStateId()
     {
-        static uint64_t nextId = 1;
-        return nextId++;
+        static std::atomic<uint64_t> nextId { 1 };
+        return nextId.fetch_add(1, std::memory_order_relaxed);
     }
 
     // Ownership bookkeeping only. This is called after reading a nonzero owner
     // from the node; it never supplies a cached parent/root for traversal.
+    // Must be called with GetTreeMutex() held.
     static std::shared_ptr<State> FindClaim(const UINode* root)
     {
         std::unordered_set<const State*> visited;
@@ -131,13 +154,28 @@ struct NativeNodeTreeScope::Context {
     {
         if (node->GetNativeTreeOperationThreadId() == 0) {
             state->roots.push_back(node);
-            node->SetNativeTreeOperationThreadId(state->threadId);
+            node->SetNativeTreeOperationThreadId(state->osTid);
         }
+    }
+
+    void ReportConflict(Preparation& preparation, std::unordered_set<const State*>& reported,
+        const char* apiName, int32_t nodeId, const std::shared_ptr<State>& claimed)
+    {
+        if (GetCheckMode() == CHECK_DISABLED) {
+            return;
+        }
+        if (!reported.insert(claimed.get()).second) {
+            return;
+        }
+        preparation.conflicts.push_back({ apiName ? apiName : "Unknown", nodeId,
+            claimed->id, claimed->osTid, GetCheckMode() });
     }
 
     std::shared_ptr<State> WalkParents(UINode* node, const char* apiName, Preparation& preparation,
         std::unordered_set<const State*>& reported)
     {
+        // RefCount check is best-effort: the caller guarantees the node is alive
+        // (held by ArkUI_NodeHandle). AceType::Claim below pins it for traversal.
         if (!node || node->RefCount() == 0) {
             return nullptr;
         }
@@ -153,10 +191,7 @@ struct NativeNodeTreeScope::Context {
                     LOGF_ABORT("MULTI_THREAD: node owner has no active operation claim");
                 }
                 if (claimed->threadId != threadId) {
-                    if (GetCheckMode() != CHECK_DISABLED && reported.insert(claimed.get()).second) {
-                        preparation.conflicts.push_back({ apiName ? apiName : "Unknown", node->GetId(),
-                            claimed->id, claimed->threadId, GetCheckMode() });
-                    }
+                    ReportConflict(preparation, reported, apiName, node->GetId(), claimed);
                     // A foreign operation may be rewriting this exact link.
                     // CRASH terminates before business; LOG continues business
                     // without making an unsafe parent read just for diagnosis.
@@ -171,7 +206,7 @@ struct NativeNodeTreeScope::Context {
             }
             if (!parent) {
                 if (!claimed) {
-                    claimed = std::make_shared<State>(State { NextStateId(), threadId, {} });
+                    claimed = std::make_shared<State>(State { NextStateId(), threadId, GetOsTid(), {} });
                     Claim(claimed);
                     MarkRoot(claimed, current);
                 }
@@ -242,12 +277,9 @@ NativeNodeTreeScope::NativeNodeTreeScope(std::initializer_list<UINode*> nodes, c
 void NativeNodeTreeScope::Report(Preparation& preparation)
 {
     // No metadata lock covers diagnostics, original business logic or callbacks.
-    if (!g_emittingDiagnostics) {
-        g_emittingDiagnostics = true;
-        for (const auto& conflict : preparation.conflicts) {
-            EmitConflict(conflict);
-        }
-        g_emittingDiagnostics = false;
+    // EmitConflict has its own reentrancy guard via g_emittingDiagnostics.
+    for (const auto& conflict : preparation.conflicts) {
+        EmitConflict(conflict);
     }
 }
 
@@ -274,6 +306,9 @@ void NativeNodeTreeScope::PrepareChildren(UINode* parent)
         std::lock_guard<std::recursive_mutex> lock(GetTreeMutex());
         // Snapshot only the direct roots that clearChildren/Clean can detach.
         // The accessor is read-only and does not invoke virtual GetChildren().
+        // Note: children_ copy may race with concurrent clearChildren on another
+        // thread in LOG mode. This is an accepted trade-off: the protocol lock
+        // protects metadata, not the business tree mutation.
         preparation.nodes = parent->GetChildrenForNativeTreeCheck();
         std::vector<UINode*> roots;
         roots.reserve(preparation.nodes.size());

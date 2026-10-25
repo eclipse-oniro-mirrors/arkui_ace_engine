@@ -150,7 +150,8 @@ public:
     void PrepareChildren(ArkUI_NodeHandle parent)
     {
         if (operation_ && parent) {
-            GetFullImpl()->getMultiThreadManagerAPI()->prepareNodeTreeOperationChildren(operation_, parent->uiNodeHandle);
+            auto* api = GetFullImpl()->getMultiThreadManagerAPI();
+            api->prepareNodeTreeOperationChildren(operation_, parent->uiNodeHandle);
         }
     }
 
@@ -267,10 +268,6 @@ void DisposeNodeSafely(ArkUI_NodeHandle nativePtr)
         return;
     }
     ThreadSafeNodeScope threadSafeNodeScope({ nativePtr }, __FUNCTION__);
-    if (threadSafeNodeScope.IsChecking() &&
-        !impl->getMultiThreadManagerAPI()->checkNodeOnValidThread(nativePtr->uiNodeHandle)) {
-        return;
-    }
     impl->getBasicAPI()->disposeNode(nativePtr->uiNodeHandle);
     DisposeNativeSource(nativePtr);
     std::lock_guard<std::mutex> lock(g_nodeSetMutex_);
@@ -294,11 +291,6 @@ int32_t AddChildSafely(ArkUI_NodeHandle parentNode, ArkUI_NodeHandle childNode)
         return ERROR_CODE_NATIVE_IMPL_NODE_ON_INVALID_THREAD;
     }
     ThreadSafeNodeScope threadSafeNodeScope({ parentNode, childNode }, __FUNCTION__);
-    if (threadSafeNodeScope.IsChecking() &&
-        (!impl->getMultiThreadManagerAPI()->checkNodeOnValidThread(parentNode->uiNodeHandle) ||
-        !impl->getMultiThreadManagerAPI()->checkNodeOnValidThread(childNode->uiNodeHandle))) {
-        return ERROR_CODE_NATIVE_IMPL_NODE_ON_INVALID_THREAD;
-    }
     return AddChild(parentNode, childNode);
 }
 
@@ -314,11 +306,6 @@ int32_t RemoveChildSafely(ArkUI_NodeHandle parentNode, ArkUI_NodeHandle childNod
         return ERROR_CODE_NATIVE_IMPL_NODE_ON_INVALID_THREAD;
     }
     ThreadSafeNodeScope threadSafeNodeScope({ parentNode, childNode }, __FUNCTION__);
-    if (threadSafeNodeScope.IsChecking() &&
-        (!impl->getMultiThreadManagerAPI()->checkNodeOnValidThread(parentNode->uiNodeHandle) ||
-        !impl->getMultiThreadManagerAPI()->checkNodeOnValidThread(childNode->uiNodeHandle))) {
-        return ERROR_CODE_NATIVE_IMPL_NODE_ON_INVALID_THREAD;
-    }
     MarkNodeTreeFreeScope markNodeTreeFreeScope;
     return RemoveChild(parentNode, childNode);
 }
@@ -330,17 +317,12 @@ int32_t InsertChildAfterSafely(ArkUI_NodeHandle parentNode, ArkUI_NodeHandle chi
     auto* impl = GetFullImpl();
     CHECK_NODE_DISPOSED(parentNode, "Parent node has been disposed");
     CHECK_NODE_DISPOSED(childNode, "Child node has been disposed");
+    CHECK_NODE_DISPOSED(siblingNode, "Sibling node has been disposed");
     if (!impl->getMultiThreadManagerAPI()->checkNodeOnValidThread(parentNode->uiNodeHandle) ||
         !impl->getMultiThreadManagerAPI()->checkNodeOnValidThread(childNode->uiNodeHandle)) {
         return ERROR_CODE_NATIVE_IMPL_NODE_ON_INVALID_THREAD;
     }
-    CHECK_NODE_DISPOSED(siblingNode, "Sibling node has been disposed");
     ThreadSafeNodeScope threadSafeNodeScope({ parentNode, childNode, siblingNode }, __FUNCTION__);
-    if (threadSafeNodeScope.IsChecking() &&
-        (!impl->getMultiThreadManagerAPI()->checkNodeOnValidThread(parentNode->uiNodeHandle) ||
-        !impl->getMultiThreadManagerAPI()->checkNodeOnValidThread(childNode->uiNodeHandle))) {
-        return ERROR_CODE_NATIVE_IMPL_NODE_ON_INVALID_THREAD;
-    }
     return InsertChildAfter(parentNode, childNode, siblingNode);
 }
 
@@ -351,17 +333,12 @@ int32_t InsertChildBeforeSafely(ArkUI_NodeHandle parentNode, ArkUI_NodeHandle ch
     auto* impl = GetFullImpl();
     CHECK_NODE_DISPOSED(parentNode, "Parent node has been disposed");
     CHECK_NODE_DISPOSED(childNode, "Child node has been disposed");
+    CHECK_NODE_DISPOSED(siblingNode, "Sibling node has been disposed");
     if (!impl->getMultiThreadManagerAPI()->checkNodeOnValidThread(parentNode->uiNodeHandle) ||
         !impl->getMultiThreadManagerAPI()->checkNodeOnValidThread(childNode->uiNodeHandle)) {
         return ERROR_CODE_NATIVE_IMPL_NODE_ON_INVALID_THREAD;
     }
-    CHECK_NODE_DISPOSED(siblingNode, "Sibling node has been disposed");
     ThreadSafeNodeScope threadSafeNodeScope({ parentNode, childNode, siblingNode }, __FUNCTION__);
-    if (threadSafeNodeScope.IsChecking() &&
-        (!impl->getMultiThreadManagerAPI()->checkNodeOnValidThread(parentNode->uiNodeHandle) ||
-        !impl->getMultiThreadManagerAPI()->checkNodeOnValidThread(childNode->uiNodeHandle))) {
-        return ERROR_CODE_NATIVE_IMPL_NODE_ON_INVALID_THREAD;
-    }
     return InsertChildBefore(parentNode, childNode, siblingNode);
 }
 
@@ -377,11 +354,6 @@ int32_t InsertChildAtSafely(ArkUI_NodeHandle parentNode, ArkUI_NodeHandle childN
         return ERROR_CODE_NATIVE_IMPL_NODE_ON_INVALID_THREAD;
     }
     ThreadSafeNodeScope threadSafeNodeScope({ parentNode, childNode }, __FUNCTION__);
-    if (threadSafeNodeScope.IsChecking() &&
-        (!impl->getMultiThreadManagerAPI()->checkNodeOnValidThread(parentNode->uiNodeHandle) ||
-        !impl->getMultiThreadManagerAPI()->checkNodeOnValidThread(childNode->uiNodeHandle))) {
-        return ERROR_CODE_NATIVE_IMPL_NODE_ON_INVALID_THREAD;
-    }
     return InsertChildAt(parentNode, childNode, position);
 }
 
@@ -394,10 +366,6 @@ int32_t SetAttributeSafely(ArkUI_NodeHandle node, ArkUI_NodeAttributeType attrib
         return ERROR_CODE_NATIVE_IMPL_NODE_ON_INVALID_THREAD;
     }
     ThreadSafeNodeScope threadSafeNodeScope({ node }, __FUNCTION__);
-    if (threadSafeNodeScope.IsChecking() &&
-        !impl->getMultiThreadManagerAPI()->checkNodeOnValidThread(node->uiNodeHandle)) {
-        return ERROR_CODE_NATIVE_IMPL_NODE_ON_INVALID_THREAD;
-    }
     return SetAttribute(node, attribute, value);
 }
 
@@ -410,10 +378,6 @@ int32_t ResetAttributeSafely(ArkUI_NodeHandle node, ArkUI_NodeAttributeType attr
         return ERROR_CODE_NATIVE_IMPL_NODE_ON_INVALID_THREAD;
     }
     ThreadSafeNodeScope threadSafeNodeScope({ node }, __FUNCTION__);
-    if (threadSafeNodeScope.IsChecking() &&
-        !impl->getMultiThreadManagerAPI()->checkNodeOnValidThread(node->uiNodeHandle)) {
-        return ERROR_CODE_NATIVE_IMPL_NODE_ON_INVALID_THREAD;
-    }
     return ResetAttribute(node, attribute);
 }
 
@@ -426,10 +390,6 @@ const ArkUI_AttributeItem* GetAttributeSafely(ArkUI_NodeHandle node, ArkUI_NodeA
         return nullptr;
     }
     ThreadSafeNodeScope threadSafeNodeScope({ node }, __FUNCTION__);
-    if (threadSafeNodeScope.IsChecking() &&
-        !impl->getMultiThreadManagerAPI()->checkNodeOnValidThread(node->uiNodeHandle)) {
-        return nullptr;
-    }
     return GetAttribute(node, attribute);
 }
 
@@ -442,10 +402,6 @@ int32_t RegisterNodeEventSafely(ArkUI_NodeHandle nodePtr,
         return ERROR_CODE_NATIVE_IMPL_NODE_ON_INVALID_THREAD;
     }
     ThreadSafeNodeScope threadSafeNodeScope({ nodePtr }, __FUNCTION__);
-    if (threadSafeNodeScope.IsChecking() &&
-        !impl->getMultiThreadManagerAPI()->checkNodeOnValidThread(nodePtr->uiNodeHandle)) {
-        return ERROR_CODE_NATIVE_IMPL_NODE_ON_INVALID_THREAD;
-    }
     return RegisterNodeEvent(nodePtr, eventType, targetId, userData);
 }
 
@@ -457,10 +413,6 @@ void UnregisterNodeEventSafely(ArkUI_NodeHandle nodePtr, ArkUI_NodeEventType eve
         return;
     }
     ThreadSafeNodeScope threadSafeNodeScope({ nodePtr }, __FUNCTION__);
-    if (threadSafeNodeScope.IsChecking() &&
-        !impl->getMultiThreadManagerAPI()->checkNodeOnValidThread(nodePtr->uiNodeHandle)) {
-        return;
-    }
     UnregisterNodeEvent(nodePtr, eventType);
 }
 
@@ -485,15 +437,11 @@ int32_t SetUserDataSafely(ArkUI_NodeHandle node, void* userData)
     CHECK_NULL_RETURN(node, ERROR_CODE_PARAM_INVALID);
     auto* impl = GetFullImpl();
     CHECK_NODE_DISPOSED(node, "Node has been disposed");
-    if (impl->getMultiThreadManagerAPI()->checkNodeOnValidThread(node->uiNodeHandle)) {
-        NativeNodeOperationScope treeOperation({ node }, __FUNCTION__);
-        if (treeOperation.IsChecking() &&
-            !impl->getMultiThreadManagerAPI()->checkNodeOnValidThread(node->uiNodeHandle)) {
-            return ERROR_CODE_NATIVE_IMPL_NODE_ON_INVALID_THREAD;
-        }
-        return SetUserData(node, userData);
+    if (!impl->getMultiThreadManagerAPI()->checkNodeOnValidThread(node->uiNodeHandle)) {
+        return ERROR_CODE_NATIVE_IMPL_NODE_ON_INVALID_THREAD;
     }
-    return ERROR_CODE_NATIVE_IMPL_NODE_ON_INVALID_THREAD;
+    ThreadSafeNodeScope threadSafeNodeScope({ node }, __FUNCTION__);
+    return SetUserData(node, userData);
 }
 
 void* GetUserDataSafely(ArkUI_NodeHandle node)
@@ -501,15 +449,11 @@ void* GetUserDataSafely(ArkUI_NodeHandle node)
     CHECK_NULL_RETURN(node, nullptr);
     auto* impl = GetFullImpl();
     CHECK_NODE_DISPOSED(node, "Node has been disposed");
-    if (impl->getMultiThreadManagerAPI()->checkNodeOnValidThread(node->uiNodeHandle)) {
-        NativeNodeOperationScope treeOperation({ node }, __FUNCTION__);
-        if (treeOperation.IsChecking() &&
-            !impl->getMultiThreadManagerAPI()->checkNodeOnValidThread(node->uiNodeHandle)) {
-            return nullptr;
-        }
-        return GetUserData(node);
+    if (!impl->getMultiThreadManagerAPI()->checkNodeOnValidThread(node->uiNodeHandle)) {
+        return nullptr;
     }
-    return nullptr;
+    ThreadSafeNodeScope threadSafeNodeScope({ node }, __FUNCTION__);
+    return GetUserData(node);
 }
 
 int32_t SetLengthMetricUnitSafely(ArkUI_NodeHandle nodePtr, ArkUI_LengthMetricUnit unit)
@@ -521,10 +465,6 @@ int32_t SetLengthMetricUnitSafely(ArkUI_NodeHandle nodePtr, ArkUI_LengthMetricUn
         return ERROR_CODE_NATIVE_IMPL_NODE_ON_INVALID_THREAD;
     }
     ThreadSafeNodeScope threadSafeNodeScope({ nodePtr }, __FUNCTION__);
-    if (threadSafeNodeScope.IsChecking() &&
-        !impl->getMultiThreadManagerAPI()->checkNodeOnValidThread(nodePtr->uiNodeHandle)) {
-        return ERROR_CODE_NATIVE_IMPL_NODE_ON_INVALID_THREAD;
-    }
     return SetLengthMetricUnit(nodePtr, unit);
 }
 
@@ -549,10 +489,6 @@ int32_t AddNodeEventReceiverSafely(ArkUI_NodeHandle nodePtr, void (*eventReceive
         return ERROR_CODE_NATIVE_IMPL_NODE_ON_INVALID_THREAD;
     }
     ThreadSafeNodeScope threadSafeNodeScope({ nodePtr }, __FUNCTION__);
-    if (threadSafeNodeScope.IsChecking() &&
-        !impl->getMultiThreadManagerAPI()->checkNodeOnValidThread(nodePtr->uiNodeHandle)) {
-        return ERROR_CODE_NATIVE_IMPL_NODE_ON_INVALID_THREAD;
-    }
     return AddNodeEventReceiver(nodePtr, eventReceiver);
 }
 
@@ -564,10 +500,6 @@ int32_t RemoveNodeEventReceiverSafely(ArkUI_NodeHandle nodePtr, void (*eventRece
         return ERROR_CODE_NATIVE_IMPL_NODE_ON_INVALID_THREAD;
     }
     ThreadSafeNodeScope threadSafeNodeScope({ nodePtr }, __FUNCTION__);
-    if (threadSafeNodeScope.IsChecking() &&
-        !impl->getMultiThreadManagerAPI()->checkNodeOnValidThread(nodePtr->uiNodeHandle)) {
-        return ERROR_CODE_NATIVE_IMPL_NODE_ON_INVALID_THREAD;
-    }
     return RemoveNodeEventReceiver(nodePtr, eventReceiver);
 }
 
@@ -580,10 +512,6 @@ int32_t RegisterNodeCustomEventSafely(ArkUI_NodeHandle node,
         return ERROR_CODE_NATIVE_IMPL_NODE_ON_INVALID_THREAD;
     }
     ThreadSafeNodeScope threadSafeNodeScope({ node }, __FUNCTION__);
-    if (threadSafeNodeScope.IsChecking() &&
-        !impl->getMultiThreadManagerAPI()->checkNodeOnValidThread(node->uiNodeHandle)) {
-        return ERROR_CODE_NATIVE_IMPL_NODE_ON_INVALID_THREAD;
-    }
     return RegisterNodeCustomEvent(node, eventType, targetId, userData);
 }
 
@@ -595,10 +523,6 @@ void UnregisterNodeCustomEventSafely(ArkUI_NodeHandle node, ArkUI_NodeCustomEven
         return;
     }
     ThreadSafeNodeScope threadSafeNodeScope({ node }, __FUNCTION__);
-    if (threadSafeNodeScope.IsChecking() &&
-        !impl->getMultiThreadManagerAPI()->checkNodeOnValidThread(node->uiNodeHandle)) {
-        return;
-    }
     UnregisterNodeCustomEvent(node, eventType);
 }
 
@@ -626,10 +550,6 @@ int32_t AddNodeCustomEventReceiverSafely(ArkUI_NodeHandle nodePtr, void (*eventR
         return ERROR_CODE_NATIVE_IMPL_NODE_ON_INVALID_THREAD;
     }
     ThreadSafeNodeScope threadSafeNodeScope({ nodePtr }, __FUNCTION__);
-    if (threadSafeNodeScope.IsChecking() &&
-        !impl->getMultiThreadManagerAPI()->checkNodeOnValidThread(nodePtr->uiNodeHandle)) {
-        return ERROR_CODE_NATIVE_IMPL_NODE_ON_INVALID_THREAD;
-    }
     return AddNodeCustomEventReceiver(nodePtr, eventReceiver);
 }
 
@@ -642,10 +562,6 @@ int32_t RemoveNodeCustomEventReceiverSafely(ArkUI_NodeHandle nodePtr,
         return ERROR_CODE_NATIVE_IMPL_NODE_ON_INVALID_THREAD;
     }
     ThreadSafeNodeScope threadSafeNodeScope({ nodePtr }, __FUNCTION__);
-    if (threadSafeNodeScope.IsChecking() &&
-        !impl->getMultiThreadManagerAPI()->checkNodeOnValidThread(nodePtr->uiNodeHandle)) {
-        return ERROR_CODE_NATIVE_IMPL_NODE_ON_INVALID_THREAD;
-    }
     return RemoveNodeCustomEventReceiver(nodePtr, eventReceiver);
 }
 
@@ -730,10 +646,6 @@ uint32_t GetTotalChildCountSafely(ArkUI_NodeHandle node)
         return 0;
     }
     ThreadSafeNodeScope threadSafeNodeScope({ node }, __FUNCTION__);
-    if (threadSafeNodeScope.IsChecking() &&
-        !impl->getMultiThreadManagerAPI()->checkNodeOnValidThread(node->uiNodeHandle)) {
-        return 0;
-    }
     return GetTotalChildCount(node);
 }
 
@@ -746,10 +658,6 @@ ArkUI_NodeHandle GetChildAtSafely(ArkUI_NodeHandle node, int32_t position)
         return nullptr;
     }
     ThreadSafeNodeScope threadSafeNodeScope({ node }, __FUNCTION__);
-    if (threadSafeNodeScope.IsChecking() &&
-        !impl->getMultiThreadManagerAPI()->checkNodeOnValidThread(node->uiNodeHandle)) {
-        return nullptr;
-    }
     auto result = GetChildAt(node, position);
     threadSafeNodeScope.IncludeNode(result);
     return result;
@@ -764,10 +672,6 @@ ArkUI_NodeHandle GetFirstChildSafely(ArkUI_NodeHandle node)
         return nullptr;
     }
     ThreadSafeNodeScope threadSafeNodeScope({ node }, __FUNCTION__);
-    if (threadSafeNodeScope.IsChecking() &&
-        !impl->getMultiThreadManagerAPI()->checkNodeOnValidThread(node->uiNodeHandle)) {
-        return nullptr;
-    }
     auto result = GetFirstChild(node);
     threadSafeNodeScope.IncludeNode(result);
     return result;
@@ -782,10 +686,6 @@ ArkUI_NodeHandle GetLastChildSafely(ArkUI_NodeHandle node)
         return nullptr;
     }
     ThreadSafeNodeScope threadSafeNodeScope({ node }, __FUNCTION__);
-    if (threadSafeNodeScope.IsChecking() &&
-        !impl->getMultiThreadManagerAPI()->checkNodeOnValidThread(node->uiNodeHandle)) {
-        return nullptr;
-    }
     auto result = GetLastChild(node);
     threadSafeNodeScope.IncludeNode(result);
     return result;
@@ -800,10 +700,6 @@ ArkUI_NodeHandle GetPreviousSiblingSafely(ArkUI_NodeHandle node)
         return nullptr;
     }
     ThreadSafeNodeScope threadSafeNodeScope({ node }, __FUNCTION__);
-    if (threadSafeNodeScope.IsChecking() &&
-        !impl->getMultiThreadManagerAPI()->checkNodeOnValidThread(node->uiNodeHandle)) {
-        return nullptr;
-    }
     auto result = GetPreviousSibling(node);
     threadSafeNodeScope.IncludeNode(result);
     return result;
@@ -818,10 +714,6 @@ ArkUI_NodeHandle GetNextSiblingSafely(ArkUI_NodeHandle node)
         return nullptr;
     }
     ThreadSafeNodeScope threadSafeNodeScope({ node }, __FUNCTION__);
-    if (threadSafeNodeScope.IsChecking() &&
-        !impl->getMultiThreadManagerAPI()->checkNodeOnValidThread(node->uiNodeHandle)) {
-        return nullptr;
-    }
     auto result = GetNextSibling(node);
     threadSafeNodeScope.IncludeNode(result);
     return result;
@@ -836,10 +728,6 @@ ArkUI_NodeHandle GetParentSafely(ArkUI_NodeHandle node)
         return nullptr;
     }
     ThreadSafeNodeScope threadSafeNodeScope({ node }, __FUNCTION__);
-    if (threadSafeNodeScope.IsChecking() &&
-        !impl->getMultiThreadManagerAPI()->checkNodeOnValidThread(node->uiNodeHandle)) {
-        return nullptr;
-    }
     auto result = GetParent(node);
     threadSafeNodeScope.IncludeNode(result);
     return result;
@@ -854,10 +742,6 @@ int32_t RemoveAllChildrenSafely(ArkUI_NodeHandle parentNode)
         return ERROR_CODE_NATIVE_IMPL_NODE_ON_INVALID_THREAD;
     }
     ThreadSafeNodeScope threadSafeNodeScope({ parentNode }, __FUNCTION__);
-    if (threadSafeNodeScope.IsChecking() &&
-        !impl->getMultiThreadManagerAPI()->checkNodeOnValidThread(parentNode->uiNodeHandle)) {
-        return ERROR_CODE_NATIVE_IMPL_NODE_ON_INVALID_THREAD;
-    }
     threadSafeNodeScope.PrepareChildren(parentNode);
     MarkNodeTreeFreeScope markNodeTreeFreeScope;
     return RemoveAllChildren(parentNode);

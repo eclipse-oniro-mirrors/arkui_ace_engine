@@ -12715,7 +12715,7 @@ RectF RichEditorPattern::GetVisibleContentRect()
     contentRect.SetOffset(contentRect.GetOffset() + paintOffset);
     auto host = GetHost();
     CHECK_NULL_RETURN(host, contentRect);
-    auto parent = host->GetAncestorNodeOfFrame(false);
+    auto parent = host->GetCoordinateAncestorNodeOfFrame(false);
     return SelectOverlayClient::GetVisibleContentRect(parent, contentRect);
 }
 
@@ -12813,7 +12813,7 @@ bool RichEditorPattern::IsTouchInFrameArea(const PointF& touchPoint)
     auto host = GetHost();
     CHECK_NULL_RETURN(host, false);
     auto viewPort = RectF(parentGlobalOffset_, frameRect_.GetSize());
-    auto parent = host->GetAncestorNodeOfFrame(false);
+    auto parent = host->GetCoordinateAncestorNodeOfFrame(false);
     viewPort = SelectOverlayClient::GetVisibleContentRect(parent, viewPort);
     return viewPort.IsInRegion(touchPoint);
 }

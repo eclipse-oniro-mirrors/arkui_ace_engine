@@ -510,6 +510,7 @@ bool UINode::RemoveAdoptedChild(const RefPtr<FrameNode>& child)
         return false;
     }
     adoptedChildren_.erase(iter);
+    child->SetUseAdoptedCompensation(false);
     child->SetIsAdopted(false);
     child->SetAdoptParent(nullptr);
     return true;

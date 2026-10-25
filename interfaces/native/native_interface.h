@@ -137,29 +137,32 @@ const char* OH_ArkUI_NativeModule_GetErrorMessage();
  * @brief Defines the runtime check types for ArkUI C APIs.
  *
  * Each check type corresponds to a specific improper usage scenario of ArkUI C APIs,
- * such as cross-thread calls or accessing disposed nodes.
- * Use {@link OH_ArkUI_NativeModule_SetRuntimeCheckMode} to independently configure a runtime check mode
- * for each check type. The configured mode determines the behavior upon check failure.
- * For available modes, see {@link OH_ArkUI_NativeModule_RuntimeCheckMode}.
+ * used to detect misuse at runtime (such as cross-thread calls, accessing destroyed objects, etc.).
+ * You can use {@link OH_ArkUI_NativeModule_SetRuntimeCheckMode} to independently configure
+ * a runtime check mode for each check type. The behavior upon check failure is determined by
+ * the configured runtime check mode. For available modes, see {@link OH_ArkUI_NativeModule_RuntimeCheckMode}.
  *
  * @since 26.2.0
  */
 typedef enum {
     /**
-     * @brief Checks whether UI-thread-only C APIs are called from a non-UI thread.
-     * Reserved in this release: the configuration is accepted but no detection point consumes it.
+     * @brief UI thread check type: Some ArkUI C APIs must be called on the UI thread.
+     * This type detects whether these APIs are called from a non-UI thread.
      *
      * @since 26.2.0
      */
     OH_ARKUI_NATIVEMODULE_CHECK_TYPE_UI_THREAD = 0,
     /**
-     * @brief Checks whether the ArkUI_NodeHandle passed to a C API has already been disposed.
+     * @brief Node disposed check type: Detects whether the ArkUI_NodeHandle passed to a C API
+     * has already been disposed.
      *
      * @since 26.2.0
      */
     OH_ARKUI_NATIVEMODULE_CHECK_TYPE_NODE_DISPOSED = 1,
     /**
-     * @brief Reserved check for matching an attribute to its component type.
+     * @brief Attribute match check type: Detects whether an ArkUI_NodeAttributeType passed to
+     * SetAttribute/GetAttribute/ResetAttribute matches the node's actual component type.
+     *
      * @since 26.2.0
      */
     OH_ARKUI_NATIVEMODULE_CHECK_TYPE_ATTRIBUTE_MATCH = 2,
@@ -174,13 +177,14 @@ typedef enum {
 /**
  * @brief Defines the runtime check modes for ArkUI C APIs.
  *
- * Each check type can be independently configured to use DISABLED, LOG, or CRASH.
- * For {@link OH_ARKUI_NATIVEMODULE_CHECK_TYPE_NODE_DISPOSED} and
- * {@link OH_ARKUI_NATIVEMODULE_CHECK_TYPE_MULTI_THREAD}, the default mode depends on the application's
- * build type: debug builds default to {@link OH_ARKUI_NATIVEMODULE_CHECK_MODE_CRASH}, and release builds
- * default to {@link OH_ARKUI_NATIVEMODULE_CHECK_MODE_DISABLED}.
- * {@link OH_ARKUI_NATIVEMODULE_CHECK_TYPE_UI_THREAD} is reserved in this release and defaults to
- * {@link OH_ARKUI_NATIVEMODULE_CHECK_MODE_DISABLED}.
+ * All runtime check types use the same set of modes (DISABLED, LOG, CRASH) defined in this enum
+ * to determine the behavior upon check failure. That is, each check type can be independently
+ * set to one of the following three modes.
+ * The default mode depends on the application's build type:
+ * For applications compiled in debug mode (Debug build in DevEco Studio, used for development
+ * and debugging), the default is {@link OH_ARKUI_NATIVEMODULE_CHECK_MODE_CRASH}.
+ * For applications compiled in release mode (Release build in DevEco Studio, used for production
+ * release), the default is {@link OH_ARKUI_NATIVEMODULE_CHECK_MODE_DISABLED}.
  *
  * @since 26.2.0
  */
@@ -192,8 +196,7 @@ typedef enum {
      */
     OH_ARKUI_NATIVEMODULE_CHECK_MODE_DISABLED = 0,
     /**
-     * @brief Prints diagnostic logs, including check type, API name, cause, and native stack trace.
-     * The checked API continues to run; its return value and side effects are not changed.
+     * @brief Prints diagnostic logs (check type, API name, cause, native stack trace) and continues the C API call.
      *
      * @since 26.2.0
      */
@@ -210,14 +213,16 @@ typedef enum {
  * @brief Sets the process-level runtime check mode for ArkUI C APIs.
  *
  * This function configures the behavior of a specific runtime check type when misuse is detected.
- * The setting is process-level and remains in effect until the next successful call for the same check type.
+ * The setting is process-level and remains in effect until the next successful call for the same
+ * check type.
  *
  * <b>Thread requirement:</b> This function must be called on the UI thread.
- * Calling it from any other thread immediately terminates the application without returning.
- * The thread check is performed before parameter validation and is independent of the configured modes.
+ * Calling it from any other thread will immediately terminate the application without returning.
+ * The thread check is performed before parameter validation.
  *
- * <b>Default behavior:</b> If this function is not called for a specific check type, its default mode applies.
- * For defaults and the reserved UI thread check, see {@link OH_ArkUI_NativeModule_RuntimeCheckMode}.
+ * <b>Default behavior:</b> If this function is not called for a specific check type,
+ * debug application builds default to {@link OH_ARKUI_NATIVEMODULE_CHECK_MODE_CRASH},
+ * and release application builds default to {@link OH_ARKUI_NATIVEMODULE_CHECK_MODE_DISABLED}.
  *
  * @param checkType [in] Specifies the runtime check type to configure.
  *     The value is an enum value from {@link OH_ArkUI_NativeModule_RuntimeCheckType}.

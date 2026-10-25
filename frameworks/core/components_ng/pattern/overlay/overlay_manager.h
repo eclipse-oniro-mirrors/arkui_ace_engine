@@ -51,6 +51,11 @@ class FrameNode;
 class UINode;
 class PipelineContext;
 class OverlayManager;
+class ChainedTransitionEffect;
+class ModalPresentationPattern;
+struct InnerExtraConfig {
+    RefPtr<ChainedTransitionEffect> transition;
+};
 struct CalendarSettingData;
 struct ContentCoverParam;
 struct DatePickerSettingData;
@@ -493,9 +498,9 @@ public:
     bool HandleUIExtNodeTransform(const AAFwk::Want& want, RefPtr<FrameNode> uiExtNode);
     bool UIExtNodeAngleValid(int32_t uiExtNodeAngle);
     int32_t CreateModalUIExtension(const RefPtr<WantWrap>& want, const ModalUIExtensionCallbacks& callbacks,
-        const ModalUIExtensionConfig& config);
+        const ModalUIExtensionConfig& config, const InnerExtraConfig& extraConfig = {});
     int32_t CreateModalUIExtension(const AAFwk::Want& want, const ModalUIExtensionCallbacks& callbacks,
-        const ModalUIExtensionConfig& config);
+        const ModalUIExtensionConfig& config, const InnerExtraConfig& extraConfig = {});
     void CloseModalUIExtension(int32_t sessionId);
     void UpdateModalUIExtensionConfig(
         int32_t sessionId, const ModalUIExtensionAllowedUpdateConfig& config);
@@ -746,6 +751,13 @@ private:
         const NG::ContentCoverParam& contentCoverParam, int32_t targetId,
         std::optional<ModalTransition> modalTransition);
     void HandleModalPop(std::function<void()>&& onWillDisappear, const RefPtr<UINode> rootNode, int32_t targetId);
+    void ExecuteModalTransitionOut(const RefPtr<FrameNode>& topModalNode,
+        const RefPtr<ModalPresentationPattern>& pattern, ModalTransition modalTransition,
+        const RefPtr<FrameNode>& builder, const RefPtr<UINode>& rootNode);
+    void BindModalUIExtensionContentCover(const ModalUIExtensionConfig& config,
+        int32_t sessionId, std::function<RefPtr<UINode>()>&& buildNodeFunc,
+        const RefPtr<NG::ChainedTransitionEffect>& transitionEffect,
+        const RefPtr<FrameNode>& uiExtNode);
 
     int32_t ExceptComponent(const RefPtr<NG::UINode>& rootNode, RefPtr<NG::FrameNode>& overlay,
         bool isBackPressed, bool isPageRouter);

@@ -33,6 +33,7 @@ HWTEST_F(RuntimeCheckApiTest, RuntimeCheckEnumValues, TestSize.Level1)
     EXPECT_EQ(OH_ARKUI_NATIVEMODULE_CHECK_TYPE_NODE_DISPOSED, 1);
     EXPECT_EQ(OH_ARKUI_NATIVEMODULE_CHECK_TYPE_ATTRIBUTE_MATCH, 2);
     EXPECT_EQ(OH_ARKUI_NATIVEMODULE_CHECK_TYPE_MULTI_THREAD, 3);
+    EXPECT_EQ(static_cast<uint32_t>(CheckType::ATTRIBUTE_MATCH), 2u);
     EXPECT_EQ(static_cast<uint32_t>(CheckType::MULTI_THREAD), 3u);
     EXPECT_EQ(static_cast<uint32_t>(CheckType::UI_THREAD), OH_ARKUI_NATIVEMODULE_CHECK_TYPE_UI_THREAD);
     EXPECT_EQ(static_cast<uint32_t>(CheckType::NODE_DISPOSED), OH_ARKUI_NATIVEMODULE_CHECK_TYPE_NODE_DISPOSED);
@@ -399,7 +400,7 @@ HWTEST_F(RuntimeCheckBehaviorTest, InvalidConfigurationPreservesDebugDefault, Te
 {
     AceApplicationInfo::GetInstance().SetDebugForParallel(true);
     EXPECT_FALSE(manager_.SetRuntimeCheckMode(-1, 0));
-    EXPECT_FALSE(manager_.SetRuntimeCheckMode(4, 0));
+    EXPECT_FALSE(manager_.SetRuntimeCheckMode(static_cast<int32_t>(CheckType::COUNT), 0));
     EXPECT_FALSE(manager_.SetRuntimeCheckMode(0, -1));
     EXPECT_FALSE(manager_.SetRuntimeCheckMode(0, 3));
     EXPECT_EQ(manager_.GetEffectiveMode(CheckType::UI_THREAD).mode, CheckMode::CRASH);
@@ -608,7 +609,7 @@ HWTEST_F(RuntimeCheckBehaviorTest, ConfigurationPublishesToConcurrentReader, Tes
 HWTEST_F(RuntimeCheckBehaviorTest, CachedDefaultsRetainTheirOrigin, TestSize.Level1)
 {
     AceApplicationInfo::GetInstance().SetDebugForParallel(true);
-    for (auto type : { CheckType::UI_THREAD, CheckType::NODE_DISPOSED }) {
+    for (auto type : { CheckType::UI_THREAD, CheckType::NODE_DISPOSED, CheckType::ATTRIBUTE_MATCH }) {
         for (int i = 0; i < 3; ++i) {
             const auto effective = manager_.GetEffectiveMode(type);
             EXPECT_EQ(effective.mode, CheckMode::CRASH);
@@ -717,4 +718,38 @@ HWTEST_F(RuntimeCheckBehaviorTest, NamespaceFunctionsForwardToThePrivateManager,
 }
 
 } // namespace
+} // namespace OHOS::Ace::NodeModel
+
+namespace OHOS::Ace::NodeModel {
+HWTEST_F(RuntimeCheckBehaviorTest, AttributeDefaultsFollowBuildMode, TestSize.Level1)
+{
+    for (bool debug : { false, true }) {
+        RuntimeCheckManager manager;
+        AceApplicationInfo::GetInstance().SetDebugForParallel(debug);
+        const auto effective = manager.GetEffectiveMode(CheckType::ATTRIBUTE_MATCH);
+        EXPECT_EQ(effective.mode, debug ? CheckMode::CRASH : CheckMode::DISABLED);
+        EXPECT_TRUE(effective.isDefault);
+    }
+}
+
+HWTEST_F(RuntimeCheckBehaviorTest, AttributeConfigurationPreservesOtherChecks, TestSize.Level1)
+{
+    const auto attributeType = static_cast<int32_t>(CheckType::ATTRIBUTE_MATCH);
+    for (bool debug : { false, true }) {
+        RuntimeCheckManager manager;
+        AceApplicationInfo::GetInstance().SetDebugForParallel(debug);
+        const auto defaultMode = debug ? CheckMode::CRASH : CheckMode::DISABLED;
+        for (auto mode : { CheckMode::DISABLED, CheckMode::LOG, CheckMode::CRASH }) {
+            ASSERT_TRUE(manager.SetRuntimeCheckMode(attributeType, static_cast<int32_t>(mode)));
+            for (auto invalidMode : { -1, 3 }) {
+                EXPECT_FALSE(manager.SetRuntimeCheckMode(attributeType, invalidMode));
+                const auto effective = manager.GetEffectiveMode(CheckType::ATTRIBUTE_MATCH);
+                EXPECT_EQ(effective.mode, mode);
+                EXPECT_FALSE(effective.isDefault);
+            }
+            EXPECT_EQ(manager.GetEffectiveMode(CheckType::UI_THREAD).mode, defaultMode);
+            EXPECT_EQ(manager.GetEffectiveMode(CheckType::NODE_DISPOSED).mode, defaultMode);
+        }
+    }
+}
 } // namespace OHOS::Ace::NodeModel

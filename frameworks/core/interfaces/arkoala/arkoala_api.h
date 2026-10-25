@@ -50,7 +50,7 @@ class SymbolEffectOptions;
 extern "C" {
 #endif
 
-#define ARKUI_FULL_API_VERSION 144
+#define ARKUI_FULL_API_VERSION 145
 // When changing ARKUI_BASIC_API_VERSION, ARKUI_FULL_API_VERSION must be
 // increased as well.
 #define ARKUI_NODE_API_VERSION 145
@@ -10417,6 +10417,9 @@ struct ArkUINDKRenderNodeModifier {
     ArkUI_Int32 (*setContentBlurOption)(ArkUIRenderNodeHandle node, ArkUI_Float32 blurRadius);
     ArkUI_Int32 (*resetContentBlurOption)(ArkUIRenderNodeHandle node);
     ArkUIRSNodeHandle (*getRSNode)(ArkUIRenderNodeHandle node);
+    ArkUI_Int32 (*adoptChildWithPolicy)(ArkUINodeHandle node, ArkUINodeHandle child, ArkUI_Int32 policy);
+    ArkUI_Int32 (*setAdoptedChildOverlayPositionCompensation)(ArkUINodeHandle adoptedChild,
+        ArkUI_Float32 offsetX, ArkUI_Float32 offsetY, ArkUIMatrix4Handle transform);
 };
 
 struct ArkUIDynamicLayoutModifier {

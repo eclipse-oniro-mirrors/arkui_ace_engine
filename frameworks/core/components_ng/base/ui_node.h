@@ -274,6 +274,7 @@ public:
     }
 
     // Read-only snapshot for the Native API detector; does not invoke virtual GetChildren().
+    // Only called when multi-thread tree operation check is enabled (inside GetTreeMutex()).
     std::vector<RefPtr<UINode>> GetChildrenForNativeTreeCheck() const;
 
     // Native operation occupancy, not the node's UI-thread affinity.

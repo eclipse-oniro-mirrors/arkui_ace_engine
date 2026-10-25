@@ -8287,10 +8287,13 @@ const RefPtr<ScrollablePattern> TextPattern::FindScrollableParentWithRelativeOff
 {
     auto host = GetHost();
     CHECK_NULL_RETURN(host, nullptr);
-    auto parent = host->GetAncestorNodeOfFrame(true);
+    auto parent = host->GetCoordinateAncestorNodeOfFrame(true);
     auto renderContext = host->GetRenderContext();
     CHECK_NULL_RETURN(renderContext, nullptr);
     offset = renderContext->GetPaintRectWithTransform().GetOffset();
+    if (parent && host->HasAdoptedCompensation()) {
+        offset += host->GetTransformedAdoptedCompensationOffset();
+    }
     while (parent) {
         auto scrollablePattern = parent->GetPattern<ScrollablePattern>();
         if (scrollablePattern && scrollablePattern->IsScrollable()) {
@@ -8299,7 +8302,11 @@ const RefPtr<ScrollablePattern> TextPattern::FindScrollableParentWithRelativeOff
         auto parentRenderContext = parent->GetRenderContext();
         CHECK_NULL_RETURN(parentRenderContext, nullptr);
         offset += parentRenderContext->GetPaintRectWithTransform().GetOffset();
-        parent = parent->GetAncestorNodeOfFrame(true);
+        auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
+        if (ancestor && parent->HasAdoptedCompensation()) {
+            offset += parent->GetTransformedAdoptedCompensationOffset();
+        }
+        parent = ancestor;
     }
     return nullptr;
 }

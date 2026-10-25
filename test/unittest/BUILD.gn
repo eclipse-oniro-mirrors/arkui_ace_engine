@@ -46,6 +46,11 @@ group("unittest") {
 }
 
 if (!is_host_product) {
+  group("linux_unittest_runtime_check") {
+    testonly = true
+    deps = [ "capi/runtime_check:runtime_check_unittest(${host_toolchain})" ]
+  }
+
   group("linux_unittest_capi") {
     testonly = true
     deps = [ "capi:capi_unittest(${host_toolchain})" ]
@@ -281,12 +286,14 @@ ohos_static_library("ace_components_base") {
     "$ace_root/frameworks/core/components_ng/base/distributed_ui.cpp",
     "$ace_root/frameworks/core/components_ng/base/extension_handler.cpp",
     "$ace_root/frameworks/core/components_ng/base/frame_node.cpp",
+    "$ace_root/frameworks/core/components_ng/base/frame_node_adopted_compensation.cpp",
     "$ace_root/frameworks/core/components_ng/base/frame_node_multi_thread.cpp",
     "$ace_root/frameworks/core/components_ng/base/geometry_node.cpp",
     "$ace_root/frameworks/core/components_ng/base/inspector.cpp",
     "$ace_root/frameworks/core/components_ng/base/inspector_filter.cpp",
     "$ace_root/frameworks/core/components_ng/base/mixed_mount_registry.cpp",
     "$ace_root/frameworks/core/components_ng/base/modifier.cpp",
+    "$ace_root/frameworks/core/components_ng/base/native_node_tree_scope.cpp",
     "$ace_root/frameworks/core/components_ng/base/navigation_register.cpp",
     "$ace_root/frameworks/core/components_ng/base/node_render_status_monitor.cpp",
     "$ace_root/frameworks/core/components_ng/base/observer_handler.cpp",

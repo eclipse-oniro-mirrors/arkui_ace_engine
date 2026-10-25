@@ -14,6 +14,8 @@
  */
 #include "core/interfaces/native/node/node_text_modifier.h"
 
+#include "base/log/log_wrapper.h"
+
 #include <string_view>
 
 #include "base/utils/utf_helper.h"
@@ -2741,6 +2743,7 @@ void SetTextBindSelectionMenu(ArkUINodeHandle node, ArkUITextBindMenuParam* menu
         selectMenuParam.onMenuShow = [onMenuShow, userData = menuParam->onMenuShowUserData](
                                          int32_t start, int32_t end) {
             if (onMenuShow) {
+                LOG_CALLBACK("OH_ArkUI_TextSelectionMenuOptions_RegisterOnMenuShowCallback", onMenuShow);
                 onMenuShow(start, end, userData);
             }
         };
@@ -2750,6 +2753,7 @@ void SetTextBindSelectionMenu(ArkUINodeHandle node, ArkUITextBindMenuParam* menu
         selectMenuParam.onMenuHide = [onMenuHide, userData = menuParam->onMenuHideUserData](
                                          int32_t start, int32_t end) {
             if (onMenuHide) {
+                LOG_CALLBACK("OH_ArkUI_TextSelectionMenuOptions_RegisterOnMenuHideCallback", onMenuHide);
                 onMenuHide(start, end, userData);
             }
         };
