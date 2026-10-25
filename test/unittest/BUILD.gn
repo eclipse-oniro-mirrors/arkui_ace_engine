@@ -294,6 +294,7 @@ ohos_static_library("ace_components_base") {
     "$ace_root/frameworks/core/components_ng/base/inspector_filter.cpp",
     "$ace_root/frameworks/core/components_ng/base/mixed_mount_registry.cpp",
     "$ace_root/frameworks/core/components_ng/base/modifier.cpp",
+    "$ace_root/frameworks/core/components_ng/base/native_node_tree_scope.cpp",
     "$ace_root/frameworks/core/components_ng/base/navigation_register.cpp",
     "$ace_root/frameworks/core/components_ng/base/node_render_status_monitor.cpp",
     "$ace_root/frameworks/core/components_ng/base/observer_handler.cpp",

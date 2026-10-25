@@ -29,6 +29,7 @@ build_component_ng("base_ng") {
     "xbar_proxy_wrapper.cpp",
     "mixed_mount_registry.cpp",
     "modifier.cpp",
+    "native_node_tree_scope.cpp",
     "node_render_status_monitor.cpp",
     "observer_handler.cpp",
     "simplified_inspector.cpp",
