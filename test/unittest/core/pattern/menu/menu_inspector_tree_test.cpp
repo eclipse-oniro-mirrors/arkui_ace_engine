@@ -158,23 +158,24 @@ protected:
     RefPtr<MenuManager> manager_;
 };
 
-TEST_F(InspectorTreeTask11BoundMenu, ClosingRemainsExpandedAfterMenuRegistrationIsErased)
+TEST_F(InspectorTreeTask11BoundMenu, ExpandedFollowsExistingMenuVisibility)
 {
     ExpectExpanded(false);
     wrapper_->MountToParent(root_);
     manager_->menuMap_[trigger_->GetId()] = wrapper_;
     auto pattern = wrapper_->GetPattern<MenuWrapperPattern>();
-    pattern->ForceSetMenuStatus(MenuStatus::ON_START_ANIMATION);
-    ExpectExpanded(false);
-    pattern->ForceSetMenuStatus(MenuStatus::SHOW);
-    ExpectExpanded(true);
+    for (auto status : { MenuStatus::ON_HOVER_SCALE, MenuStatus::ON_SHOW_ANIMATION, MenuStatus::ON_START_ANIMATION,
+             MenuStatus::SHOW }) {
+        pattern->ForceSetMenuStatus(status);
+        ExpectExpanded(true);
+    }
     // HideMenu erases the lookup entry while the invisible wrapper runs its exit transition.
     pattern->ForceSetMenuStatus(MenuStatus::ON_HIDE_ANIMATION);
+    ExpectExpanded(false);
     wrapper_->GetLayoutProperty()->UpdateVisibility(VisibleType::INVISIBLE, true);
     overlay_->EraseMenuInfo(trigger_->GetId());
     ASSERT_EQ(overlay_->GetMenuNode(trigger_->GetId()), nullptr);
-    ExpectExpanded(true);
-    ExpectExpanded(true);
+    ExpectExpanded(false);
     EXPECT_EQ(pattern->GetMenuStatus(), MenuStatus::ON_HIDE_ANIMATION);
     EXPECT_EQ(wrapper_->GetLayoutProperty()->GetVisibilityValue(VisibleType::VISIBLE), VisibleType::INVISIBLE);
     pattern->ForceSetMenuStatus(MenuStatus::HIDE);
@@ -185,7 +186,7 @@ TEST_F(InspectorTreeTask11BoundMenu, ClosingRemainsExpandedAfterMenuRegistration
     ExpectExpanded(false);
 }
 
-TEST_F(InspectorTreeTask11BoundMenu, MountedClosingMenuMustMatchTargetAndWindow)
+TEST_F(InspectorTreeTask11BoundMenu, UnregisteredClosingMenuRemainsCollapsed)
 {
     auto other = FrameNode::CreateFrameNode("MenuWrapper", 112, AceType::MakeRefPtr<MenuWrapperPattern>(999));
     other->GetPattern<MenuWrapperPattern>()->ForceSetMenuStatus(MenuStatus::ON_HIDE_ANIMATION);
@@ -193,7 +194,7 @@ TEST_F(InspectorTreeTask11BoundMenu, MountedClosingMenuMustMatchTargetAndWindow)
     ExpectExpanded(false);
     wrapper_->MountToParent(root_);
     wrapper_->GetPattern<MenuWrapperPattern>()->ForceSetMenuStatus(MenuStatus::ON_HIDE_ANIMATION);
-    ExpectExpanded(true);
+    ExpectExpanded(false);
     auto boundary = FrameNode::CreateFrameNode("WindowScene", 113, AceType::MakeRefPtr<Pattern>());
     boundary->SetWindowBoundary();
     boundary->MountToParent(root_);
@@ -202,7 +203,7 @@ TEST_F(InspectorTreeTask11BoundMenu, MountedClosingMenuMustMatchTargetAndWindow)
     ExpectExpanded(false);
     root_->RemoveChild(wrapper_);
     wrapper_->MountToParent(boundary);
-    ExpectExpanded(true);
+    ExpectExpanded(false);
 }
 
 TEST_F(InspectorTreeTask11BoundMenu, RegisteredOpeningMenuTakesPrecedenceOverPreviousClosingMenu)
@@ -214,7 +215,7 @@ TEST_F(InspectorTreeTask11BoundMenu, RegisteredOpeningMenuTakesPrecedenceOverPre
     next->GetPattern<MenuWrapperPattern>()->ForceSetMenuStatus(MenuStatus::ON_START_ANIMATION);
     next->MountToParent(root_);
     manager_->menuMap_[trigger_->GetId()] = next;
-    ExpectExpanded(false);
+    ExpectExpanded(true);
 }
 
 TEST_F(InspectorTreeTask11, InspectorTreeTask12OnlyInlinePickersExposeExpanded)
