@@ -18,6 +18,7 @@
 #include "gtest/gtest.h"
 #define private public
 #define protected public
+#include "core/components/select/select_theme.h"
 #include "core/components_ng/pattern/menu/menu_item/menu_item_pattern.h"
 #include "core/components_ng/pattern/menu/menu_manager.h"
 #include "core/components_ng/pattern/menu/wrapper/menu_wrapper_pattern.h"
@@ -25,6 +26,7 @@
 #include "core/components_ng/pattern/select/select_pattern.h"
 #undef private
 #undef protected
+#include "test/mock/frameworks/core/common/mock_theme_manager.h"
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 
 #include "core/components_ng/base/inspector_tree_request_context.h"
@@ -140,7 +142,12 @@ protected:
 
     virtual void BindTriggerMenu()
     {
-        trigger_->GetOrCreateGestureEventHub()->BindMenu([](GestureEvent&) {});
+        ScopedViewStackProcessor stack;
+        ViewStackProcessor::GetInstance()->Push(trigger_);
+        MenuParam menuParam;
+        menuParam.isShowInSubWindow = false;
+        ViewAbstractModelNG model;
+        model.BindMenu({}, []() {}, menuParam);
     }
 
     void ExpectExpanded(std::optional<bool> expected)
@@ -178,20 +185,78 @@ protected:
 
     void BindExplicitMenu(bool isShow)
     {
-        ScopedViewStackProcessor stack;
-        ViewStackProcessor::GetInstance()->Push(trigger_);
         MenuParam menuParam;
         menuParam.setShow = true;
         menuParam.isShow = isShow;
         menuParam.isShowInSubWindow = false;
+        BindOrdinaryMenu(menuParam);
+        auto gesture = trigger_->GetEventHub<EventHub>()->GetGestureEventHub();
+        EXPECT_TRUE(!gesture || (!gesture->showMenu_ && !gesture->bindMenuTouch_));
+    }
+
+    void BindOrdinaryMenu(const MenuParam& menuParam, bool hasContent = true)
+    {
+        ScopedViewStackProcessor stack;
+        ViewStackProcessor::GetInstance()->Push(trigger_);
+        std::function<void()> builder;
+        if (hasContent) {
+            builder = []() {};
+        }
         if (GetParam()) {
-            ViewAbstractModelStatic::BindMenu(AceType::RawPtr(trigger_), {}, []() {}, menuParam);
+            ViewAbstractModelStatic::BindMenu(AceType::RawPtr(trigger_), {}, std::move(builder), menuParam);
         } else {
             ViewAbstractModelNG model;
-            model.BindMenu({}, []() {}, menuParam);
+            model.BindMenu({}, std::move(builder), menuParam);
         }
-        auto gesture = trigger_->GetEventHub<EventHub>()->GetGestureEventHub();
-        EXPECT_TRUE(!gesture || !gesture->HasInspectorMenu());
+    }
+
+    void BindContextMenu()
+    {
+        ScopedViewStackProcessor stack;
+        ViewStackProcessor::GetInstance()->Push(trigger_);
+        MenuParam menuParam;
+        menuParam.type = MenuType::CONTEXT_MENU;
+        menuParam.setShow = true;
+        menuParam.isShowInSubWindow = true;
+        menuParam.contextMenuRegisterType = ContextMenuRegisterType::CUSTOM_TYPE;
+        std::function<void()> builder = []() {};
+        std::function<void()> preview;
+        if (GetParam()) {
+            ViewAbstractModelStatic::BindContextMenuStatic(
+                trigger_, ResponseType::LONG_PRESS, std::move(builder), menuParam, std::move(preview));
+        } else {
+            ViewAbstractModelNG model;
+            model.BindContextMenu(ResponseType::LONG_PRESS, builder, menuParam, preview);
+        }
+    }
+
+    void SetExpandDisplay(bool expandDisplay)
+    {
+        auto theme = AceType::MakeRefPtr<SelectTheme>();
+        theme->expandDisplay_ = expandDisplay;
+        auto themes = AceType::MakeRefPtr<testing::NiceMock<MockThemeManager>>();
+        EXPECT_CALL(*themes, GetTheme(testing::_)).WillRepeatedly(testing::Return(theme));
+        MockPipelineContext::GetCurrent()->SetThemeManager(themes);
+    }
+
+    void ExpectSubwindowMenuOmitted()
+    {
+        ExpectExpanded(std::nullopt);
+        auto childRoot = FrameNode::CreateFrameNode("Root", 115, AceType::MakeRefPtr<Pattern>());
+        auto childOverlay = AceType::MakeRefPtr<OverlayManager>(childRoot);
+        ASSERT_TRUE(childOverlay->CheckMenuManager());
+        auto childManager = AceType::DynamicCast<MenuManager>(childOverlay->menuManager_);
+        ASSERT_NE(childManager, nullptr);
+        wrapper_->MountToParent(childRoot);
+        childManager->menuMap_[trigger_->GetId()] = wrapper_;
+        ASSERT_EQ(overlay_->GetMenuNode(trigger_->GetId()), nullptr);
+        for (auto status : { MenuStatus::ON_SHOW_ANIMATION, MenuStatus::SHOW,
+                 MenuStatus::ON_HIDE_ANIMATION, MenuStatus::HIDE }) {
+            wrapper_->GetPattern<MenuWrapperPattern>()->ForceSetMenuStatus(status);
+            ExpectExpanded(std::nullopt);
+        }
+        childOverlay->EraseMenuInfo(trigger_->GetId());
+        ExpectExpanded(std::nullopt);
     }
 };
 
@@ -218,6 +283,68 @@ TEST_P(InspectorTreeTask11ExplicitMenu, ExpandedFollowsMenuVisibilityWithoutMenu
     pattern->ForceSetMenuStatus(MenuStatus::HIDE);
     overlay_->EraseMenuInfo(trigger_->GetId());
     ExpectExpanded(false);
+}
+
+TEST_P(InspectorTreeTask11ExplicitMenu, ExplicitSubwindowMenuOmitsExpanded)
+{
+    SetExpandDisplay(true);
+    MenuParam menuParam;
+    menuParam.setShow = true;
+    menuParam.isShowInSubWindow = true;
+    BindOrdinaryMenu(menuParam);
+    ExpectSubwindowMenuOmitted();
+}
+
+TEST_P(InspectorTreeTask11ExplicitMenu, GestureSubwindowMenuOmitsExpanded)
+{
+    SetExpandDisplay(true);
+    MenuParam menuParam;
+    menuParam.isShowInSubWindow = true;
+    BindOrdinaryMenu(menuParam);
+    EXPECT_NE(trigger_->GetOrCreateGestureEventHub()->showMenu_, nullptr);
+    ExpectSubwindowMenuOmitted();
+}
+
+TEST_P(InspectorTreeTask11ExplicitMenu, ContextMenuOmitsExpanded)
+{
+    SetExpandDisplay(true);
+    BindContextMenu();
+    ASSERT_TRUE(trigger_->GetLayoutProperty()->GetIsBindOverlayValue(false));
+    ExpectSubwindowMenuOmitted();
+}
+
+TEST_P(InspectorTreeTask11ExplicitMenu, SubwindowPreferenceFallsBackToCurrentWindow)
+{
+    SetExpandDisplay(false);
+    MenuParam menuParam;
+    menuParam.setShow = true;
+    menuParam.isShowInSubWindow = true;
+    BindOrdinaryMenu(menuParam);
+    ExpectExpanded(false);
+    wrapper_->MountToParent(root_);
+    manager_->menuMap_[trigger_->GetId()] = wrapper_;
+    wrapper_->GetPattern<MenuWrapperPattern>()->ForceSetMenuStatus(MenuStatus::SHOW);
+    ExpectExpanded(true);
+    wrapper_->GetPattern<MenuWrapperPattern>()->ForceSetMenuStatus(MenuStatus::ON_HIDE_ANIMATION);
+    ExpectExpanded(false);
+}
+
+TEST_P(InspectorTreeTask11ExplicitMenu, BindingScopeUpdatesWithoutContextMenuOverwritingOrdinaryMenu)
+{
+    SetExpandDisplay(true);
+    MenuParam menuParam;
+    menuParam.isShowInSubWindow = false;
+    BindOrdinaryMenu(menuParam);
+    BindContextMenu();
+    ExpectExpanded(false);
+    menuParam.isShowInSubWindow = true;
+    BindOrdinaryMenu(menuParam);
+    ExpectExpanded(std::nullopt);
+    menuParam.isShowInSubWindow = false;
+    BindOrdinaryMenu(menuParam);
+    ExpectExpanded(false);
+    BindOrdinaryMenu(menuParam, false);
+    ExpectExpanded(std::nullopt);
 }
 
 INSTANTIATE_TEST_SUITE_P(DynamicAndStatic, InspectorTreeTask11ExplicitMenu, testing::Bool());

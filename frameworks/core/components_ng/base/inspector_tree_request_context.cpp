@@ -20,6 +20,10 @@
 #include "base/log/log_wrapper.h"
 #include "base/utils/utils.h"
 #include "core/accessibility/third_provider_tree_exporter.h"
+#include "core/components/select/select_theme.h"
+#include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/pattern/overlay/overlay_manager.h"
+#include "core/pipeline_ng/pipeline_context.h"
 
 namespace OHOS::Ace::NG {
 namespace {
@@ -125,6 +129,21 @@ void InspectorTreeRequestContext::CollectWithWindowPrivacy(
     window.privacyWindow = snapshot->privacyWindow;
     collect();
     window.privacyWindow = previousPrivacy;
+}
+
+std::optional<bool> InspectorTreeRequestContext::GetMenuExpanded(const FrameNode& node, bool isShowInSubWindow) const
+{
+    auto pipeline = node.GetContextRefPtr();
+    CHECK_NULL_RETURN(pipeline, std::nullopt);
+    if (isShowInSubWindow) {
+        auto theme = pipeline->GetTheme<SelectTheme>();
+        if (!theme || theme->GetExpandDisplay()) {
+            return std::nullopt;
+        }
+    }
+    auto overlay = pipeline->GetOverlayManager();
+    CHECK_NULL_RETURN(overlay, std::nullopt);
+    return overlay->IsMenuShowForTarget(node.GetId());
 }
 
 void InspectorTreeRequestContext::FinalizeNativeTree(const std::shared_ptr<JsonValue>& root)

@@ -53,6 +53,7 @@ public:
     void CollectWithWindowPrivacy(
         const std::optional<InspectorWindowSnapshot>& snapshot, const std::function<void()>& collect);
     bool MarkPrivacyReasonOnce(PrivacyReason reason);
+    std::optional<bool> GetMenuExpanded(const FrameNode& node, bool isShowInSubWindow) const;
     void FinalizeNativeTree(const std::shared_ptr<JsonValue>& root);
     std::shared_ptr<JsonValue> FinalizeResult(std::shared_ptr<JsonValue> root);
     void CollectCustomContent(ArkUI_AccessibilityProvider* provider, const RefPtr<FrameNode>& host,
