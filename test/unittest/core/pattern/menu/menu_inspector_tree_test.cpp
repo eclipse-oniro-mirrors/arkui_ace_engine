@@ -13,6 +13,8 @@
  * limitations under the License.
  */
 
+#include <optional>
+
 #include "gtest/gtest.h"
 #define private public
 #define protected public
@@ -26,6 +28,9 @@
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 
 #include "core/components_ng/base/inspector_tree_request_context.h"
+#include "core/components_ng/base/view_abstract_model_ng.h"
+#include "core/components_ng/base/view_abstract_model_static.h"
+#include "core/components_ng/base/view_stack_processor.h"
 #include "core/components_ng/event/gesture_event_hub.h"
 #include "core/components_ng/pattern/date_picker/datepicker_pattern.h"
 #include "core/components_ng/pattern/text_picker/textpicker_pattern.h"
@@ -123,7 +128,7 @@ protected:
         root_ = MockPipelineContext::GetCurrent()->GetRootElement();
         trigger_ = FrameNode::CreateFrameNode("Button", 110, AceType::MakeRefPtr<Pattern>());
         trigger_->SetActive(true);
-        trigger_->GetOrCreateGestureEventHub()->BindMenu([](GestureEvent&) {});
+        BindTriggerMenu();
         trigger_->MountToParent(root_);
         wrapper_ =
             FrameNode::CreateFrameNode("MenuWrapper", 111, AceType::MakeRefPtr<MenuWrapperPattern>(trigger_->GetId()));
@@ -133,7 +138,12 @@ protected:
         ASSERT_NE(manager_, nullptr);
     }
 
-    void ExpectExpanded(bool expected)
+    virtual void BindTriggerMenu()
+    {
+        trigger_->GetOrCreateGestureEventHub()->BindMenu([](GestureEvent&) {});
+    }
+
+    void ExpectExpanded(std::optional<bool> expected)
     {
         for (bool visible : { false, true }) {
             for (bool interaction : { false, true }) {
@@ -145,8 +155,12 @@ protected:
                 auto json = JsonUtil::CreateSharedPtrJson();
                 trigger_->DumpSimplifyTreeWithParamConfig(0, json, visible, config);
                 auto attrs = json->GetObject("$attrs");
+                if (!expected.has_value()) {
+                    EXPECT_FALSE(attrs->Contains("expanded"));
+                    continue;
+                }
                 ASSERT_TRUE(attrs->GetValue("expanded")->IsBool());
-                EXPECT_EQ(attrs->GetBool("expanded"), expected);
+                EXPECT_EQ(attrs->GetBool("expanded"), expected.value());
             }
         }
     }
@@ -157,6 +171,56 @@ protected:
     RefPtr<OverlayManager> overlay_;
     RefPtr<MenuManager> manager_;
 };
+
+class InspectorTreeTask11ExplicitMenu : public InspectorTreeTask11BoundMenu, public testing::WithParamInterface<bool> {
+protected:
+    void BindTriggerMenu() override {}
+
+    void BindExplicitMenu(bool isShow)
+    {
+        ScopedViewStackProcessor stack;
+        ViewStackProcessor::GetInstance()->Push(trigger_);
+        MenuParam menuParam;
+        menuParam.setShow = true;
+        menuParam.isShow = isShow;
+        menuParam.isShowInSubWindow = false;
+        if (GetParam()) {
+            ViewAbstractModelStatic::BindMenu(AceType::RawPtr(trigger_), {}, []() {}, menuParam);
+        } else {
+            ViewAbstractModelNG model;
+            model.BindMenu({}, []() {}, menuParam);
+        }
+        auto gesture = trigger_->GetEventHub<EventHub>()->GetGestureEventHub();
+        EXPECT_TRUE(!gesture || !gesture->HasInspectorMenu());
+    }
+};
+
+TEST_P(InspectorTreeTask11ExplicitMenu, ExpandedFollowsMenuVisibilityWithoutMenuGestures)
+{
+    ExpectExpanded(std::nullopt);
+    BindExplicitMenu(false);
+    ASSERT_TRUE(trigger_->GetLayoutProperty()->GetIsBindOverlayValue(false));
+    ExpectExpanded(false);
+
+    wrapper_->MountToParent(root_);
+    manager_->menuMap_[trigger_->GetId()] = wrapper_;
+    auto pattern = wrapper_->GetPattern<MenuWrapperPattern>();
+    pattern->ForceSetMenuStatus(MenuStatus::ON_SHOW_ANIMATION);
+    BindExplicitMenu(true);
+    ExpectExpanded(true);
+    pattern->ForceSetMenuStatus(MenuStatus::SHOW);
+    ExpectExpanded(true);
+
+    // The actual menu state can change before the bound isShow value is updated.
+    pattern->ForceSetMenuStatus(MenuStatus::ON_HIDE_ANIMATION);
+    ExpectExpanded(false);
+    BindExplicitMenu(false);
+    pattern->ForceSetMenuStatus(MenuStatus::HIDE);
+    overlay_->EraseMenuInfo(trigger_->GetId());
+    ExpectExpanded(false);
+}
+
+INSTANTIATE_TEST_SUITE_P(DynamicAndStatic, InspectorTreeTask11ExplicitMenu, testing::Bool());
 
 TEST_F(InspectorTreeTask11BoundMenu, ExpandedFollowsExistingMenuVisibility)
 {

@@ -1776,7 +1776,9 @@ void FrameNode::DumpInspectorTreeInfo(std::shared_ptr<JsonValue>& json, ParamCon
     if (config.withResponseRegion) {
         DumpInspectorResponseRegions(json, context);
     }
-    if (gesture && gesture->HasInspectorMenu()) {
+    // Explicit isShow bindings do not install menu gestures.
+    const bool hasBoundMenu = layoutProperty_ && layoutProperty_->GetIsBindOverlayValue(false);
+    if (hasBoundMenu || (gesture && gesture->HasInspectorMenu())) {
         auto pipeline = GetContextRefPtr();
         auto overlay = pipeline ? pipeline->GetOverlayManager() : nullptr;
         auto attrs = json->GetObject("$attrs");
