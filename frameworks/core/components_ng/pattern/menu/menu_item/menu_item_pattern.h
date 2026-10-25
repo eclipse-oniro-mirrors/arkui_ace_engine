@@ -181,9 +181,6 @@ public:
 
     void SetIsSubMenuShowed(bool isSubMenuShowed)
     {
-        if (isSubMenuShowed_ && !isSubMenuShowed) {
-            ++inspectorExpansionGeneration_;
-        }
         isSubMenuShowed_ = isSubMenuShowed;
     }
 
@@ -639,9 +636,6 @@ friend class ServiceCollaborationMenuAceHelper;
 
     bool isSelected_ = false;
     bool isSubMenuShowed_ = false;
-    bool inspectorExpanded_ = false;
-    uint64_t inspectorExpansionGeneration_ = 0;
-    WeakPtr<FrameNode> inspectorSubMenu_;
     bool isSubMenuHovered_ = false;
 
     bool isChanged_ = false;

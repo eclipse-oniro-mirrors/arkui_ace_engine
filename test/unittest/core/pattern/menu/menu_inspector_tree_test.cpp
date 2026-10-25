@@ -70,25 +70,49 @@ TEST_F(InspectorTreeTask11, SelectExpandedFollowsCompletedVisibility)
     }
 }
 
-TEST_F(InspectorTreeTask11, DisappearingSubmenuRemainsExpandedUntilRemoved)
+TEST_F(InspectorTreeTask11, MenuItemExpandedUsesStateForItsExpandingMode)
 {
     auto pattern = AceType::MakeRefPtr<MenuItemPattern>();
     pattern->GetSubBuilder() = []() {};
-    auto parent = FrameNode::CreateFrameNode("test", 101, AceType::MakeRefPtr<Pattern>());
-    auto submenu = FrameNode::CreateFrameNode("test", 102, AceType::MakeRefPtr<Pattern>());
-    parent->AddChild(submenu);
-    pattern->inspectorSubMenu_ = submenu;
-    pattern->inspectorExpanded_ = true;
+    struct Case {
+        SubMenuExpandingMode mode;
+        bool subMenuShowed;
+        bool embeddedExpanded;
+        bool expected;
+    };
+    const Case cases[] = {
+        { SubMenuExpandingMode::SIDE, true, false, true },
+        { SubMenuExpandingMode::SIDE, false, true, false },
+        { SubMenuExpandingMode::STACK, true, false, true },
+        { SubMenuExpandingMode::STACK, false, true, false },
+        { SubMenuExpandingMode::EMBEDDED, false, true, true },
+        { SubMenuExpandingMode::EMBEDDED, true, false, false },
+    };
+    for (bool interaction : { false, true }) {
+        ParamConfig config;
+        config.interactionInfo = interaction;
+        InspectorTreeRequestContext context(config, {});
+        for (const auto& testCase : cases) {
+            SCOPED_TRACE(testing::Message() << "mode=" << static_cast<int>(testCase.mode)
+                                            << ", interaction=" << interaction << ", expected=" << testCase.expected);
+            pattern->expandingMode_ = testCase.mode;
+            pattern->SetIsSubMenuShowed(testCase.subMenuShowed);
+            pattern->isExpanded_ = testCase.embeddedExpanded;
+            auto attrs = JsonUtil::CreateSharedPtrJson();
+            pattern->DumpInspectorTreeInfo(attrs, context);
+            ASSERT_TRUE(attrs->GetValue("expanded")->IsBool());
+            EXPECT_EQ(attrs->GetBool("expanded"), testCase.expected);
+        }
+    }
+}
+
+TEST_F(InspectorTreeTask11, MenuItemWithoutSubmenuOmitsExpanded)
+{
+    auto pattern = AceType::MakeRefPtr<MenuItemPattern>();
     InspectorTreeRequestContext context({}, {});
-    parent->AddDisappearingChild(submenu);
-    ASSERT_FALSE(submenu->IsOnMainTree());
-    auto hiding = JsonUtil::CreateSharedPtrJson();
-    pattern->DumpInspectorTreeInfo(hiding, context);
-    EXPECT_TRUE(hiding->GetBool("expanded"));
-    parent->RemoveDisappearingChild(submenu);
-    auto hidden = JsonUtil::CreateSharedPtrJson();
-    pattern->DumpInspectorTreeInfo(hidden, context);
-    EXPECT_FALSE(hidden->GetBool("expanded"));
+    auto attrs = JsonUtil::CreateSharedPtrJson();
+    pattern->DumpInspectorTreeInfo(attrs, context);
+    EXPECT_FALSE(attrs->Contains("expanded"));
 }
 
 class InspectorTreeTask11BoundMenu : public InspectorTreeTask11 {
