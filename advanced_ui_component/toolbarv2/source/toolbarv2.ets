@@ -21,11 +21,23 @@ import window from '@ohos.window';
 import common from '@ohos.app.ability.common';
 import { BusinessError } from '@ohos.base';
 import promptAction from '@ohos.promptAction';
+import uiMaterial from '@ohos.arkui.uiMaterial';
 
 export enum ToolBarV2ItemState {
   ENABLE = 1,
   DISABLE = 2,
   ACTIVATE = 3,
+}
+
+export enum ToolbarV2ItemPlacement {
+  MAIN = 0,
+  LEADING = 1,
+  TRAILING = 2,
+}
+
+export enum BarBackgroundVisibility {
+  VISIBLE = 0,
+  HIDDEN = 1,
 }
 
 // “更多”栏图标
@@ -44,6 +56,29 @@ const HORIZONTAL_SCREEN_TEXT_MAX_LINES: number = 1;
 const FOCUS_BOX_MARGIN: number = -2;
 const FOCUS_BOX_BORDER_WIDTH: number = 2;
 const RESOURCE_TYPE_SYMBOL: number = 40000;
+const DEFAULT_ITEM_MAIN_AXIS: number = 56;
+const MAX_ITEM_MAIN_AXIS: number = 76;
+const MIN_BUTTON_WIDTH: number = 36;
+const ITEM_PADDING: number = 4;
+const ICON_TEXT_MARGIN: number = 2;
+const ITEM_MARGIN: number = 0;
+const PRESSED_AREA_SIZE: number = 48;
+const PRESSED_AREA_RADIUS: number = 24;
+const HOVER_BORDER_RADIUS: number = 26;
+const DEFAULT_TITLE_FONT_SIZE: number = 20;
+const DEFAULT_TITLE_MIN_LENGTH: number = 48;
+const DEFAULT_TITLE_FONT_WEIGHT: FontWeight = FontWeight.Bold;
+const DEFAULT_ITEM_SPACE: number = 0;
+const GROUP_SPACE_MIN: number = 8;
+const GROUP_SPACE_MAX: number = 20;
+const DEFAULT_GROUP_SPACE: number = 12;
+const DISPLAY_PRIORITY_MIN: number = 0;
+const DISPLAY_PRIORITY_MAX: number = 10;
+const DEFAULT_ITEM_CROSS_AXIS: number = 48;
+const DEFAULT_MAIN_AXIS_PADDING: number = 4;
+const GROUP_MAIN_AXIS_PADDING: number = 12;
+const DEFAULT_STYLE_STATE_EFFECT: boolean = true;
+const GROUP_DIVIDER_LENGTH: number = 18;
 
 interface MenuController {
   value: ResourceStr;
@@ -68,6 +103,23 @@ class Util {
       return false;
     }
     return true;
+  }
+
+  public static lengthMetricsToVp(lengthMetrics: LengthMetrics): number {
+    switch (lengthMetrics.unit) {
+      case LengthUnit.PX:
+        return px2vp(lengthMetrics.value);
+      case LengthUnit.VP:
+        return lengthMetrics.value;
+      case LengthUnit.FP:
+        return px2vp(fp2px(lengthMetrics.value));
+      case LengthUnit.PERCENT:
+        return Number.NEGATIVE_INFINITY;
+      case LengthUnit.LPX:
+        return px2vp(lpx2px(lengthMetrics.value));
+      default:
+        return lengthMetrics.value;
+    }
   }
 }
 
@@ -204,6 +256,319 @@ export interface ToolBarV2ItemOptions {
   accessibilityLevel?: string;
 }
 
+export interface ToolbarV2PaddingOptions {
+  mainAxisStart?: LengthMetrics;
+  mainAxisEnd?: LengthMetrics;
+}
+
+@ObservedV2
+export class ToolbarV2ItemGroupStyle {
+  @Trace
+  public placement?: ToolbarV2ItemPlacement;
+  @Trace
+  public space?: LengthMetrics;
+  @Trace
+  public backgroundColor?: ColorMetrics;
+  @Trace
+  public padding?: ToolbarV2PaddingOptions;
+  @Trace
+  public borderRadius?: LengthMetrics;
+  @Trace
+  public borderWidth?: LengthMetrics;
+  @Trace
+  public borderColor?: ColorMetrics;
+  @Trace
+  public stateEffect?: boolean;
+
+  constructor(init?: ToolbarV2ItemGroupStyleOptions) {
+    this.placement = init?.placement;
+    this.space = init?.space;
+    this.backgroundColor = init?.backgroundColor;
+    this.padding = init?.padding;
+    this.borderRadius = init?.borderRadius;
+    this.borderWidth = init?.borderWidth;
+    this.borderColor = init?.borderColor;
+    this.stateEffect = init?.stateEffect;
+  }
+}
+
+export interface ToolbarV2ItemGroupStyleOptions {
+  placement?: ToolbarV2ItemPlacement;
+  space?: LengthMetrics;
+  backgroundColor?: ColorMetrics;
+  padding?: ToolbarV2PaddingOptions;
+  borderRadius?: LengthMetrics;
+  borderWidth?: LengthMetrics;
+  borderColor?: ColorMetrics;
+  stateEffect?: boolean;
+}
+
+interface ToolbarV2ItemGroupOptions {
+  placement?: ToolbarV2ItemPlacement;
+  items?: AdvancedToolbarV2Item[];
+  space?: LengthMetrics;
+  style?: ToolbarV2ItemGroupStyle;
+}
+
+@ObservedV2
+class ToolbarV2ItemGroup {
+  @Trace
+  public placement?: ToolbarV2ItemPlacement;
+  @Trace
+  public items: AdvancedToolbarV2Item[];
+  @Trace
+  public space?: LengthMetrics;
+  @Trace
+  public style?: ToolbarV2ItemGroupStyle;
+
+  constructor(options?: ToolbarV2ItemGroupOptions) {
+    this.placement = options?.placement;
+    this.items = options?.items ?? [];
+    this.space = options?.space;
+    this.style = options?.style;
+  }
+}
+
+@ObservedV2
+export class AdvancedToolbarV2Item extends ToolBarV2Item {
+  @Trace
+  public builder?: CustomBuilder;
+  @Trace
+  public titleConfigs?: ToolbarV2TitleConfigs;
+  @Trace
+  public placement?: ToolbarV2ItemPlacement;
+  @Trace
+  public displayPriority?: number;
+  @Trace
+  public activatedBackgroundColor?: ColorMetrics;
+  @Trace
+  public id?: string;
+  @Trace
+  public itemSize?: Size;
+  @Trace
+  public isShowSeparator?: boolean;
+  @Trace
+  public isShowText?: boolean;
+  @Trace
+  public isShowOverflowMenu?: boolean;
+  @Trace
+  public groupID?: string;
+  @Trace
+  public groupStyle?: ToolbarV2ItemGroupStyle;
+  public onStructureChange?: () => void = undefined;
+
+  @Monitor('groupID')
+  onGroupIDChange(monitor: IMonitor): void {
+    this.onStructureChange?.();
+  }
+
+  @Monitor('groupStyle')
+  onGroupStyleChange(monitor: IMonitor): void {
+    this.onStructureChange?.();
+  }
+
+  @Monitor('titleConfigs')
+  onTitleConfigsChange(monitor: IMonitor): void {
+    this.onStructureChange?.();
+  }
+
+  constructor(options: AdvancedToolbarV2ItemOptions) {
+    super({
+      content: options.content,
+      action: options.action,
+      icon: options.icon,
+      state: options.state,
+      accessibilityText: options.accessibilityText,
+      accessibilityDescription: options.accessibilityDescription,
+      accessibilityLevel: options.accessibilityLevel,
+    });
+    this.builder = options.builder;
+    this.titleConfigs = options.titleConfigs;
+    this.placement = options.placement;
+    this.displayPriority = options.displayPriority;
+    this.activatedBackgroundColor = options.activatedBackgroundColor;
+    this.id = options.id;
+    this.itemSize = options.itemSize;
+    this.isShowSeparator = options.isShowSeparator;
+    this.isShowText = options.isShowText;
+    this.isShowOverflowMenu = options.isShowOverflowMenu;
+    this.groupID = options.groupID;
+    this.groupStyle = options.groupStyle;
+  }
+}
+
+export interface AdvancedToolbarV2ItemOptions extends ToolBarV2ItemOptions {
+  builder?: CustomBuilder;
+  titleConfigs?: ToolbarV2TitleConfigs;
+  placement?: ToolbarV2ItemPlacement;
+  displayPriority?: number;
+  activatedBackgroundColor?: ColorMetrics;
+  id?: string;
+  itemSize?: Size;
+  isShowSeparator?: boolean;
+  isShowText?: boolean;
+  isShowOverflowMenu?: boolean;
+  groupID?: string;
+  groupStyle?: ToolbarV2ItemGroupStyle;
+}
+
+export interface ToolbarV2OverflowMenuStyle {
+  font?: Font;
+  fontColor?: ColorMetrics;
+  radius?: Dimension | BorderRadiuses;
+  menuItemDivider?: DividerStyleOptions;
+  menuItemGroupDivider?: DividerStyleOptions;
+}
+
+@ObservedV2
+export class ToolbarV2TitleStyle {
+  @Trace
+  public fontSize?: LengthMetrics;
+  @Trace
+  public fontColor?: ColorMetrics;
+  @Trace
+  public fontWeight?: FontWeight;
+  @Trace
+  public minLength?: LengthMetrics;
+
+  constructor(init?: ToolbarV2TitleStyleOptions) {
+    this.fontSize = init?.fontSize;
+    this.fontColor = init?.fontColor;
+    this.fontWeight = init?.fontWeight;
+    this.minLength = init?.minLength;
+  }
+}
+
+export interface ToolbarV2TitleStyleOptions {
+  fontSize?: LengthMetrics;
+  fontColor?: ColorMetrics;
+  fontWeight?: FontWeight;
+  minLength?: LengthMetrics;
+}
+
+@ObservedV2
+export class ToolbarV2TitleConfigs {
+  @Trace
+  public content: ResourceStr;
+  @Trace
+  public placement?: ToolbarV2ItemPlacement;
+  @Trace
+  public visible?: boolean;
+  @Trace
+  public style?: ToolbarV2TitleStyle;
+
+  constructor(init?: ToolbarV2TitleOptions) {
+    this.content = init?.content ?? '';
+    this.placement = init?.placement;
+    this.visible = init?.visible;
+    this.style = init?.style;
+  }
+}
+
+export interface ToolbarV2TitleOptions {
+  content?: ResourceStr;
+  placement?: ToolbarV2ItemPlacement;
+  visible?: boolean;
+  style?: ToolbarV2TitleStyle;
+}
+
+@ObservedV2
+export class ToolbarV2StyleConfigs {
+  @Trace
+  public padding?: ToolbarV2PaddingOptions;
+  @Trace
+  public backgroundVisibility?: BarBackgroundVisibility;
+  @Trace
+  public backgroundColor?: ColorMetrics;
+  @Trace
+  public backgroundBlurStyle?: BlurStyle;
+  @Trace
+  public systemBackgroundMaterial?: uiMaterial.Material;
+  @Trace
+  public groupSpace?: LengthMetrics;
+  @Trace
+  public itemSize?: Size;
+  @Trace
+  public fontSize?: LengthMetrics;
+  @Trace
+  public borderWidth?: LengthMetrics;
+  @Trace
+  public borderColor?: ColorMetrics;
+  @Trace
+  public borderRadius?: LengthMetrics;
+  @Trace
+  public stateEffect?: boolean;
+
+  constructor(init?: ToolbarV2StyleOptions) {
+    this.padding = init?.padding;
+    this.backgroundVisibility = init?.backgroundVisibility;
+    this.backgroundColor = init?.backgroundColor;
+    this.backgroundBlurStyle = init?.backgroundBlurStyle;
+    this.systemBackgroundMaterial = init?.systemBackgroundMaterial;
+    this.groupSpace = init?.groupSpace;
+    this.itemSize = init?.itemSize;
+    this.fontSize = init?.fontSize;
+    this.borderWidth = init?.borderWidth;
+    this.borderColor = init?.borderColor;
+    this.borderRadius = init?.borderRadius;
+    this.stateEffect = init?.stateEffect;
+  }
+}
+
+export interface ToolbarV2StyleOptions {
+  padding?: ToolbarV2PaddingOptions;
+  backgroundVisibility?: BarBackgroundVisibility;
+  backgroundColor?: ColorMetrics;
+  backgroundBlurStyle?: BlurStyle;
+  systemBackgroundMaterial?: uiMaterial.Material;
+  groupSpace?: LengthMetrics;
+  itemSize?: Size;
+  fontSize?: LengthMetrics;
+  borderWidth?: LengthMetrics;
+  borderColor?: ColorMetrics;
+  borderRadius?: LengthMetrics;
+  stateEffect?: boolean;
+}
+
+@ObservedV2
+export class AdvancedToolBarV2Modifier {
+  @Trace
+  public mainAxisLengthValue?: LengthMetrics = LengthMetrics.percent(1);
+  @Trace
+  public crossAxisLengthValue?: LengthMetrics;
+  @Trace
+  public directionValue: Axis = Axis.Horizontal;
+  @Trace
+  public styleConfigsValue?: ToolbarV2StyleConfigs;
+  @Trace
+  public overflowMenuStyleValue?: ToolbarV2OverflowMenuStyle;
+
+  mainAxisLength(value: LengthMetrics): AdvancedToolBarV2Modifier {
+    this.mainAxisLengthValue = value;
+    return this;
+  }
+
+  crossAxisLength(value: LengthMetrics): AdvancedToolBarV2Modifier {
+    this.crossAxisLengthValue = value;
+    return this;
+  }
+
+  direction(value: Axis): AdvancedToolBarV2Modifier {
+    this.directionValue = value;
+    return this;
+  }
+
+  style(styleConfigs: ToolbarV2StyleConfigs): AdvancedToolBarV2Modifier {
+    this.styleConfigsValue = styleConfigs;
+    return this;
+  }
+
+  overflowMenuStyle(menuStyle: ToolbarV2OverflowMenuStyle): AdvancedToolBarV2Modifier {
+    this.overflowMenuStyleValue = menuStyle;
+    return this;
+  }
+}
+
 @ObservedV2
 export class ToolBarV2Modifier implements AttributeModifier<ColumnAttribute> {
   @Trace
@@ -247,9 +612,13 @@ class ToolBarV2Theme {
   @Trace
   public iconActivePrimaryColor: ResourceColor = $r('sys.color.icon_emphasize');
   @Trace
+  public iconOnPrimaryColor: ResourceColor = $r('sys.color.icon_on_primary');
+  @Trace
   public fontPrimaryColor: ResourceColor = $r('sys.color.font_primary');
   @Trace
   public fontActivatedPrimaryColor: ResourceColor = $r('sys.color.font_emphasize');
+  @Trace
+  public fontSecondaryColor: ResourceColor = $r('sys.color.font_secondary');
 }
 
 @ComponentV2
@@ -266,6 +635,8 @@ export struct ToolBarV2 {
       .padding(LengthMetrics.resource($r('sys.float.padding_level12')))
       .stateEffect(true)
       .height(LengthMetrics.vp(DEFAULT_TOOLBAR_HEIGHT));
+  @Param
+  advancedToolBarModifier?: AdvancedToolBarV2Modifier = undefined;
   @Local
   localActivatedIndex: number = -1;
   @Local
@@ -274,10 +645,32 @@ export struct ToolBarV2 {
   fontSize: number = 1;
   @Local
   theme: ToolBarV2Theme = new ToolBarV2Theme();
+  @Local
+  isAdvancedMode: boolean = false;
+  @Local
+  advMainAxisSize: number = 0;
+  @Local
+  advIsMeasuring: boolean = false;
+  @Local
+  advHoveredItems: Set<AdvancedToolbarV2Item> = new Set();
+  @Local
+  advTitleConfigs: ToolbarV2TitleConfigs | undefined = undefined;
+  @BuilderParam
+  itemContentBuilder?: CustomBuilder;
+  @Local
+  advEntries: Array<AdvancedToolbarV2Item | ToolbarV2ItemGroup> = [];
+  private advItemOriginalIndex: Map<AdvancedToolbarV2Item, number> = new Map();
 
   @Monitor('activatedIndex')
   onActivateIndexChange(monitor: IMonitor) {
     this.localActivatedIndex = monitor.value<number>('activatedIndex')?.now ?? -1;
+  }
+
+  @Monitor('toolBarList')
+  onToolBarListChange(monitor: IMonitor): void {
+    if (this.isAdvancedMode) {
+      this.rebuildAdvState();
+    }
   }
 
   @Computed
@@ -316,6 +709,7 @@ export struct ToolBarV2 {
 
   aboutToAppear(): void {
     this.localActivatedIndex = this.activatedIndex ?? -1;
+    this.isAdvancedMode = this.advancedToolBarModifier !== undefined;
     try {
       this.isFollowSystem = this.getUIContext()?.isFollowingSystemFontScale();
       this.maxFontSizeScale = this.getUIContext()?.getMaxFontScale();
@@ -324,13 +718,38 @@ export struct ToolBarV2 {
       let message: string = (err as BusinessError)?.message;
       hilog.error(0x3900, 'Ace', `Faild to toolBarV2 getMaxFontScale, code: ${code}, message: ${message}`);
     }
+    if (this.isAdvancedMode) {
+      this.rebuildAdvState();
+    }
   }
 
   onWillApplyTheme(theme: Theme): void {
     this.theme.iconPrimaryColor = theme.colors.iconPrimary;
     this.theme.iconActivePrimaryColor = theme.colors.iconEmphasize;
+    this.theme.iconOnPrimaryColor = theme.colors.iconOnPrimary;
     this.theme.fontPrimaryColor = theme.colors.fontPrimary;
     this.theme.fontActivatedPrimaryColor = theme.colors.fontEmphasize;
+    this.theme.fontSecondaryColor = theme.colors.fontSecondary;
+  }
+
+  private getBasicItem(index: number): ToolBarV2Item {
+    return this.toolBarList[index];
+  }
+
+  private getAccessibilityText(index: number): string | undefined {
+    return this.getBasicItem(index)?.accessibilityText as ESObject as string;
+  }
+
+  private getAccessibilityDescription(index: number): string | undefined {
+    return this.getBasicItem(index)?.accessibilityDescription as ESObject as string;
+  }
+
+  private getAdvAccessibilityText(item: AdvancedToolbarV2Item): string | undefined {
+    return item.accessibilityText as ESObject as string;
+  }
+
+  private getAdvAccessibilityDescription(item: AdvancedToolbarV2Item): string | undefined {
+    return item.accessibilityDescription as ESObject as string;
   }
 
   @Builder
@@ -683,6 +1102,588 @@ export struct ToolBarV2 {
     return buttonGestureModifier;
   }
 
+  private isToolbarItemGroup(item: AdvancedToolbarV2Item | ToolbarV2ItemGroup): boolean {
+    return Array.isArray((item as ToolbarV2ItemGroup).items);
+  }
+
+  private buildAdvEntries(): void {
+    for (let k = 0; k < this.advEntries.length; k++) {
+      const oldEntry = this.advEntries[k];
+      if (this.isToolbarItemGroup(oldEntry)) {
+        const group = oldEntry as ToolbarV2ItemGroup;
+        for (let j = 0; j < group.items.length; j++) {
+          group.items[j].onStructureChange = undefined;
+        }
+      } else if (oldEntry instanceof AdvancedToolbarV2Item) {
+        oldEntry.onStructureChange = undefined;
+      }
+    }
+
+    const list = this.toolBarList;
+    this.advItemOriginalIndex = new Map();
+    const entries: Array<AdvancedToolbarV2Item | ToolbarV2ItemGroup> = [];
+    const groupMap: Map<string, ToolbarV2ItemGroup> = new Map();
+
+    for (let i = 0; i < list.length; i++) {
+      const item = list[i];
+      if (!(item instanceof AdvancedToolbarV2Item)) {
+        entries.push(item as AdvancedToolbarV2Item);
+        continue;
+      }
+
+      this.advItemOriginalIndex.set(item, i);
+
+      if (item.titleConfigs) {
+        this.advTitleConfigs = item.titleConfigs;
+        continue;
+      }
+
+      if (item.groupID) {
+        const existing = groupMap.get(item.groupID);
+        if (existing) {
+          existing.items.push(item);
+          if (!existing.style && item.groupStyle) {
+            existing.style = item.groupStyle;
+            existing.placement = item.groupStyle.placement;
+            existing.space = item.groupStyle.space;
+          }
+        } else {
+          const group = new ToolbarV2ItemGroup({
+            items: [item],
+            placement: item.groupStyle?.placement,
+            space: item.groupStyle?.space,
+            style: item.groupStyle,
+          });
+          groupMap.set(item.groupID, group);
+          entries.push(group);
+        }
+      } else {
+        entries.push(item);
+      }
+    }
+    this.advEntries = entries;
+
+    for (let k = 0; k < entries.length; k++) {
+      const entry = entries[k];
+      if (this.isToolbarItemGroup(entry)) {
+        const group = entry as ToolbarV2ItemGroup;
+        for (let j = 0; j < group.items.length; j++) {
+          group.items[j].onStructureChange = () => this.rebuildAdvState();
+        }
+      } else if (entry instanceof AdvancedToolbarV2Item) {
+        entry.onStructureChange = () => this.rebuildAdvState();
+      }
+    }
+  }
+
+  private rebuildAdvState(): void {
+    this.advTitleConfigs = undefined;
+    this.buildAdvEntries();
+  }
+
+  private computeFlatIndex(target: AdvancedToolbarV2Item): number {
+    return this.advItemOriginalIndex.get(target) ?? -1;
+  }
+
+  private setItemContentBuilder(item: AdvancedToolbarV2Item): boolean {
+    this.itemContentBuilder = item.builder;
+    return this.itemContentBuilder ? true : false;
+  }
+
+  private getEffectiveDirection(): Axis {
+    return this.advancedToolBarModifier?.directionValue ?? Axis.Horizontal;
+  }
+
+  private getEffectiveSpacing(): LengthMetrics {
+    const raw = this.advancedToolBarModifier?.styleConfigsValue?.groupSpace;
+    if (raw === undefined) {
+      return LengthMetrics.vp(DEFAULT_GROUP_SPACE);
+    }
+    const rawValue = Util.lengthMetricsToVp(raw);
+    if (rawValue < GROUP_SPACE_MIN) {
+      return LengthMetrics.vp(GROUP_SPACE_MIN);
+    }
+    if (rawValue > GROUP_SPACE_MAX) {
+      return LengthMetrics.vp(GROUP_SPACE_MAX);
+    }
+    return LengthMetrics.vp(rawValue);
+  }
+
+  private getEffectiveMainAxisLength(): LengthMetrics {
+    return this.advancedToolBarModifier?.mainAxisLengthValue ?? LengthMetrics.percent(1);
+  }
+
+  private getEffectiveCrossAxisLength(): LengthMetrics {
+    return this.advancedToolBarModifier?.crossAxisLengthValue ?? LengthMetrics.vp(DEFAULT_TOOLBAR_HEIGHT);
+  }
+
+  private getEffectiveToolbarCross(): number {
+    const cross = this.getEffectiveCrossAxisLength();
+    return cross ? Util.lengthMetricsToVp(cross) : DEFAULT_TOOLBAR_HEIGHT;
+  }
+
+  private getHalfCrossAxis(): string {
+    const cross = this.getEffectiveCrossAxisLength();
+    const halfValue = (cross ? Util.lengthMetricsToVp(cross) : DEFAULT_TOOLBAR_HEIGHT) / 2;
+    return `${halfValue}vp`;
+  }
+
+  private getEffectiveBorderRadius(): Length {
+    const style = this.advancedToolBarModifier?.styleConfigsValue;
+    if (style?.borderRadius) {
+      return this.toLengthString(style.borderRadius);
+    }
+    return this.getHalfCrossAxis();
+  }
+
+  private getEffectiveBorderWidth(): Length {
+    const style = this.advancedToolBarModifier?.styleConfigsValue;
+    if (style?.borderWidth) {
+      return this.toLengthString(style.borderWidth);
+    }
+    return 0;
+  }
+
+  private getEffectiveBorderColor(): ResourceColor {
+    const style = this.advancedToolBarModifier?.styleConfigsValue;
+    if (style?.borderColor) {
+      return style.borderColor.color;
+    }
+    return Color.Transparent;
+  }
+
+  private getEffectiveGroupBorderRadius(group?: ToolbarV2ItemGroup): Length {
+    if (group?.style?.borderRadius) {
+      return this.toLengthString(group.style.borderRadius);
+    }
+    const style = this.advancedToolBarModifier?.styleConfigsValue;
+    if (style?.borderRadius) {
+      return this.toLengthString(style.borderRadius);
+    }
+    return this.getHalfCrossAxis();
+  }
+
+  private getEffectiveGroupBorderWidth(group?: ToolbarV2ItemGroup): Length {
+    if (group?.style?.borderWidth) {
+      return this.toLengthString(group.style.borderWidth);
+    }
+    const style = this.advancedToolBarModifier?.styleConfigsValue;
+    if (style?.borderWidth) {
+      return this.toLengthString(style.borderWidth);
+    }
+    return 0;
+  }
+
+  private getEffectiveGroupBorderColor(group?: ToolbarV2ItemGroup): ResourceColor {
+    if (group?.style?.borderColor) {
+      return group.style.borderColor.color;
+    }
+    const style = this.advancedToolBarModifier?.styleConfigsValue;
+    if (style?.borderColor) {
+      return style.borderColor.color;
+    }
+    return Color.Transparent;
+  }
+
+  private getEffectiveGroupBg(group?: ToolbarV2ItemGroup): ResourceColor {
+    if (group?.style?.backgroundColor) {
+      return group.style.backgroundColor.color;
+    }
+    const style = this.advancedToolBarModifier?.styleConfigsValue;
+    if (style?.backgroundColor) {
+      return style.backgroundColor.color;
+    }
+    return $r('sys.color.comp_background_primary');
+  }
+
+  private getEffectiveBackgroundColor(): ResourceColor {
+    return Color.Transparent;
+  }
+
+  private getEffectiveBackgroundBlurStyle(): BlurStyle {
+    return this.advancedToolBarModifier?.styleConfigsValue?.backgroundBlurStyle ?? BlurStyle.NONE;
+  }
+
+  private getEffectiveSystemBackgroundMaterial(): uiMaterial.Material | undefined {
+    return this.advancedToolBarModifier?.styleConfigsValue?.systemBackgroundMaterial;
+  }
+
+  private getEffectiveBackgroundVisibility(): BarBackgroundVisibility {
+    return this.advancedToolBarModifier?.styleConfigsValue?.backgroundVisibility ?? BarBackgroundVisibility.VISIBLE;
+  }
+
+  private getEffectiveItemHoverBg(item: AdvancedToolbarV2Item): ResourceColor {
+    return $r('sys.color.ohos_id_color_hover');
+  }
+
+  private getEffectiveItemIconColor(item: AdvancedToolbarV2Item): ResourceColor {
+    if (this.isItemActivated(item)) {
+      const useOnPrimary = this.isItemOnlyIcon(item) && this.hasActivatedBg(item);
+      const defaultColor = useOnPrimary ? this.theme.iconOnPrimaryColor : this.theme.iconActivePrimaryColor;
+      const icon = item.icon;
+      if (icon instanceof ToolBarV2SymbolGlyph) {
+        return defaultColor;
+      }
+      return (icon as ToolBarV2ItemImage)?.activatedColor?.color ??
+        (icon as ToolBarV2ItemImage)?.color?.color ??
+        defaultColor;
+    }
+    const icon = item.icon;
+    if (icon instanceof ToolBarV2SymbolGlyph) {
+      return this.theme.iconPrimaryColor;
+    }
+    return (icon as ToolBarV2ItemImage)?.color?.color ?? this.theme.iconPrimaryColor;
+  }
+
+  private getEffectiveItemTextColor(item: AdvancedToolbarV2Item): ResourceColor {
+    if (this.isItemActivated(item)) {
+      return item.content?.activatedColor?.color ?? this.theme.fontActivatedPrimaryColor;
+    }
+    return item.content?.color?.color ?? this.theme.fontSecondaryColor;
+  }
+
+  private getEffectiveItemFontSize(): Resource | number {
+    const raw = this.advancedToolBarModifier?.styleConfigsValue?.fontSize;
+    if (raw) {
+      return raw.value;
+    }
+    return $r('sys.float.ohos_id_text_size_caption');
+  }
+
+  private getEffectiveTitleFontSize(): number {
+    const raw = this.advTitleConfigs?.style?.fontSize;
+    if (raw) {
+      return Util.lengthMetricsToVp(raw);
+    }
+    return DEFAULT_TITLE_FONT_SIZE;
+  }
+
+  private getEffectiveTitleFontWeight(): FontWeight {
+    return this.advTitleConfigs?.style?.fontWeight ?? DEFAULT_TITLE_FONT_WEIGHT;
+  }
+
+  private getEffectiveTitleMinLength(): number {
+    const raw = this.advTitleConfigs?.style?.minLength;
+    if (raw) {
+      return Util.lengthMetricsToVp(raw);
+    }
+    return DEFAULT_TITLE_MIN_LENGTH;
+  }
+
+  private getEffectiveStyleStateEffect(): boolean {
+    return this.advancedToolBarModifier?.styleConfigsValue?.stateEffect ?? DEFAULT_STYLE_STATE_EFFECT;
+  }
+
+  private getEffectiveGroupPadding(group: ToolbarV2ItemGroup | undefined): Padding {
+    const p = group?.style?.padding;
+    const sp = this.advancedToolBarModifier?.styleConfigsValue?.padding;
+    const isVertical = this.getEffectiveDirection() === Axis.Vertical;
+    const mainStart = p?.mainAxisStart ? Util.lengthMetricsToVp(p.mainAxisStart)
+      : (sp?.mainAxisStart ? Util.lengthMetricsToVp(sp.mainAxisStart) : GROUP_MAIN_AXIS_PADDING);
+    const mainEnd = p?.mainAxisEnd ? Util.lengthMetricsToVp(p.mainAxisEnd)
+      : (sp?.mainAxisEnd ? Util.lengthMetricsToVp(sp.mainAxisEnd) : GROUP_MAIN_AXIS_PADDING);
+    const result: Padding = {};
+    if (isVertical) {
+      result.top = mainStart;
+      result.bottom = mainEnd;
+      result.left = 0;
+      result.right = 0;
+    } else {
+      result.left = mainStart;
+      result.right = mainEnd;
+      result.top = 0;
+      result.bottom = 0;
+    }
+    return result;
+  }
+
+  private getEffectiveItemPressedBg(item: AdvancedToolbarV2Item, inGroup: boolean): ResourceColor {
+    if (this.getEffectiveItemState(item) === ToolBarV2ItemState.DISABLE) {
+      return Color.Transparent;
+    }
+    if (!this.getEffectiveStyleStateEffect()) {
+      return Color.Transparent;
+    }
+    if (inGroup) {
+      const groupEffect = this.getGroupStateEffectByItem(item);
+      if (groupEffect === false) {
+        return Color.Transparent;
+      }
+    }
+    return $r('sys.color.ohos_id_color_click_effect');
+  }
+
+  private getGroupStateEffectByItem(item: AdvancedToolbarV2Item): boolean | undefined {
+    for (let i = 0; i < this.advEntries.length; i++) {
+      const entry = this.advEntries[i];
+      if (this.isToolbarItemGroup(entry)) {
+        const group = entry as ToolbarV2ItemGroup;
+        for (let j = 0; j < group.items.length; j++) {
+          if (group.items[j] === item) {
+            return group.style?.stateEffect;
+          }
+        }
+      }
+    }
+    return undefined;
+  }
+
+  private hasActivatedBg(item: AdvancedToolbarV2Item): boolean {
+    if (!item.activatedBackgroundColor) {
+      return false;
+    }
+    const c = item.activatedBackgroundColor;
+    return c.alpha !== 0 || c.red !== 0 || c.green !== 0 || c.blue !== 0;
+  }
+
+  private getDefaultItemBg(): ResourceColor {
+    const style = this.advancedToolBarModifier?.styleConfigsValue;
+    if (style?.backgroundColor) {
+      return style.backgroundColor.color;
+    }
+    return $r('sys.color.comp_background_primary');
+  }
+
+  private getEffectiveItemBg(item: AdvancedToolbarV2Item, inGroup: boolean): ResourceColor {
+    return inGroup ? Color.Transparent : this.getDefaultItemBg();
+  }
+
+  private getEffectiveItemActivatedBg(item: AdvancedToolbarV2Item): ResourceColor {
+    if (this.isItemActivated(item) && this.isItemOnlyIcon(item) && this.hasActivatedBg(item)) {
+      return item.activatedBackgroundColor!.color;
+    }
+    return Color.Transparent;
+  }
+
+  private getEffectiveItemState(item: AdvancedToolbarV2Item): ToolBarV2ItemState {
+    const s = item.state;
+    if (s === ToolBarV2ItemState.ENABLE || s === ToolBarV2ItemState.DISABLE || s === ToolBarV2ItemState.ACTIVATE) {
+      return s;
+    }
+    return ToolBarV2ItemState.ENABLE;
+  }
+
+  private isItemActivated(item: AdvancedToolbarV2Item): boolean {
+    return this.getEffectiveItemState(item) === ToolBarV2ItemState.ACTIVATE;
+  }
+
+  private advClickEventAction(item: AdvancedToolbarV2Item): void {
+    if (this.getEffectiveItemState(item) === ToolBarV2ItemState.DISABLE) {
+      return;
+    }
+    const flatIndex = this.computeFlatIndex(item);
+    item.action && item.action(flatIndex);
+  }
+
+  private getEffectiveItemDisplayBg(item: AdvancedToolbarV2Item, inGroup: boolean): ResourceColor {
+    if (this.getEffectiveItemState(item) === ToolBarV2ItemState.DISABLE) {
+      return this.getEffectiveItemBg(item, inGroup);
+    }
+    if (this.advHoveredItems.has(item)) {
+      return this.getEffectiveItemHoverBg(item);
+    }
+    return this.getEffectiveItemBg(item, inGroup);
+  }
+
+  private getEffectiveItemInnerDisplayBg(item: AdvancedToolbarV2Item): ResourceColor {
+    return this.getEffectiveItemActivatedBg(item);
+  }
+
+  private setItemHovered(item: AdvancedToolbarV2Item, isHover: boolean): void {
+    if (this.getEffectiveItemState(item) === ToolBarV2ItemState.DISABLE) {
+      return;
+    }
+    if (isHover) {
+      const next = new Set(this.advHoveredItems);
+      next.add(item);
+      this.advHoveredItems = next;
+    } else {
+      const next = new Set(this.advHoveredItems);
+      next.delete(item);
+      this.advHoveredItems = next;
+    }
+  }
+
+  private getEffectivePadding(): Padding {
+    const p = this.advancedToolBarModifier?.styleConfigsValue?.padding;
+    const isVertical = this.getEffectiveDirection() === Axis.Vertical;
+    const mainStart = p?.mainAxisStart ? Util.lengthMetricsToVp(p.mainAxisStart) : DEFAULT_MAIN_AXIS_PADDING;
+    const mainEnd = p?.mainAxisEnd ? Util.lengthMetricsToVp(p.mainAxisEnd) : DEFAULT_MAIN_AXIS_PADDING;
+    const result: Padding = {};
+    if (isVertical) {
+      result.top = mainStart;
+      result.bottom = mainEnd;
+      result.left = 0;
+      result.right = 0;
+    } else {
+      result.left = mainStart;
+      result.right = mainEnd;
+      result.top = 0;
+      result.bottom = 0;
+    }
+    return result;
+  }
+
+  private findGroupByItem(item: AdvancedToolbarV2Item): ToolbarV2ItemGroup | undefined {
+    for (const entry of this.advEntries) {
+      if (this.isToolbarItemGroup(entry)) {
+        const group = entry as ToolbarV2ItemGroup;
+        if (group.items && group.items.includes(item)) {
+          return group;
+        }
+      }
+    }
+    return undefined;
+  }
+
+  private isItemWithIconAndText(item?: AdvancedToolbarV2Item): boolean {
+    if (!item) {
+      return false;
+    }
+    if (item.builder) {
+      return false;
+    }
+    if (item.titleConfigs) {
+      return false;
+    }
+    return !!item.icon && !!item.content && !!item.content.text && item.isShowText !== false;
+  }
+
+  private clampMainAxis(raw: number, item?: AdvancedToolbarV2Item): number {
+    if (this.isItemWithIconAndText(item)) {
+      return Math.max(DEFAULT_ITEM_MAIN_AXIS, Math.min(MAX_ITEM_MAIN_AXIS, raw));
+    }
+    return raw;
+  }
+
+  private clampCrossAxis(raw: number): number {
+    const max = Util.lengthMetricsToVp(this.getEffectiveCrossAxisLength());
+    return Math.min(max, Math.max(0, raw));
+  }
+
+  private getEffectiveItemWidth(item?: AdvancedToolbarV2Item, inGroup: boolean = false): LengthMetrics {
+    const isVertical = this.getEffectiveDirection() === Axis.Vertical;
+    const styleItemSize = this.advancedToolBarModifier?.styleConfigsValue?.itemSize;
+    const effectiveSize = item?.itemSize ?? styleItemSize;
+
+    if (effectiveSize) {
+      if (isVertical) {
+        return LengthMetrics.vp(this.clampCrossAxis(Math.max(0, effectiveSize.width)));
+      }
+      return LengthMetrics.vp(this.clampMainAxis(Math.max(0, effectiveSize.width), item));
+    }
+    if (isVertical) {
+      return LengthMetrics.vp(DEFAULT_ITEM_CROSS_AXIS);
+    }
+    return LengthMetrics.vp(DEFAULT_ITEM_MAIN_AXIS);
+  }
+
+  private isItemOnlyIcon(item?: AdvancedToolbarV2Item): boolean {
+    return !!item?.icon && (!item.content || !item.content.text || item.isShowText === false);
+  }
+
+  private getEffectiveItemHeight(item?: AdvancedToolbarV2Item, inGroup: boolean = false): LengthMetrics {
+    const isVertical = this.getEffectiveDirection() === Axis.Vertical;
+    const styleItemSize = this.advancedToolBarModifier?.styleConfigsValue?.itemSize;
+    const effectiveSize = item?.itemSize ?? styleItemSize;
+
+    if (effectiveSize) {
+      if (isVertical) {
+        return LengthMetrics.vp(this.clampMainAxis(Math.max(0, effectiveSize.height), item));
+      }
+      return LengthMetrics.vp(this.clampCrossAxis(Math.max(0, effectiveSize.height)));
+    }
+    if (isVertical) {
+      return LengthMetrics.vp(DEFAULT_ITEM_MAIN_AXIS);
+    }
+    return LengthMetrics.vp(DEFAULT_ITEM_CROSS_AXIS);
+  }
+
+  private getEffectivePlacement(raw: ToolbarV2ItemPlacement | undefined): ToolbarV2ItemPlacement {
+    if (raw === ToolbarV2ItemPlacement.MAIN || raw === ToolbarV2ItemPlacement.LEADING || raw === ToolbarV2ItemPlacement.TRAILING) {
+      return raw;
+    }
+    return ToolbarV2ItemPlacement.MAIN;
+  }
+
+  private getItemsByPlacement(placement: ToolbarV2ItemPlacement): Array<AdvancedToolbarV2Item | ToolbarV2ItemGroup> {
+    const result: Array<AdvancedToolbarV2Item | ToolbarV2ItemGroup> = [];
+    for (let i = 0; i < this.advEntries.length; i++) {
+      const entry = this.advEntries[i];
+      const entryPlacement = this.getEffectivePlacement((entry as ToolbarV2ItemGroup).placement);
+      if (entryPlacement === placement) {
+        result.push(entry);
+      }
+    }
+    return result;
+  }
+
+  private getEntryKey(item: AdvancedToolbarV2Item | ToolbarV2ItemGroup, index: number): string {
+    if (this.isToolbarItemGroup(item)) {
+      const group = item as ToolbarV2ItemGroup;
+      return `group_${index}_${group.items.length}`;
+    }
+    const advItem = item as AdvancedToolbarV2Item;
+    return `item_${index}_${advItem.id ?? ''}`;
+  }
+
+  private getGroupItemKey(item: AdvancedToolbarV2Item, index: number): string {
+    return item.id ?? `group_item_${index}`;
+  }
+
+  private computeAdvVisibility(): void {
+    if (this.advIsMeasuring) {
+      return;
+    }
+  }
+
+  private onAdvContentMainAxisSizeChange(newValue: SizeOptions): void {
+    if (this.getEffectiveDirection() === Axis.Vertical) {
+      this.advMainAxisSize = Number(newValue.height) || 0;
+    } else {
+      this.advMainAxisSize = Number(newValue.width) || 0;
+    }
+    this.computeAdvVisibility();
+  }
+
+  private getEffectiveItemBorderRadius(inGroup: boolean, item?: AdvancedToolbarV2Item): Length {
+    if (inGroup) {
+      if (item && this.isItemActivated(item) && this.isItemOnlyIcon(item) && this.hasActivatedBg(item)) {
+        const isVertical = this.getEffectiveDirection() === Axis.Vertical;
+        const size = isVertical
+          ? this.getEffectiveItemWidth(item, true)
+          : this.getEffectiveItemHeight(item, true);
+        return `${Util.lengthMetricsToVp(size) / 2}vp`;
+      }
+      return 0;
+    }
+    const isVertical = this.getEffectiveDirection() === Axis.Vertical;
+    const firstLayerSize = isVertical
+      ? this.getEffectiveItemWidth(undefined)
+      : this.getEffectiveItemHeight(undefined);
+    return `${Util.lengthMetricsToVp(firstLayerSize) / 2}vp`;
+  }
+
+  private getEffectiveItemInnerWidth(item: AdvancedToolbarV2Item | null, inGroup: boolean): LengthMetrics {
+    return this.getEffectiveItemWidth(item ?? undefined, inGroup);
+  }
+
+  private getEffectiveItemInnerHeight(item: AdvancedToolbarV2Item | null, inGroup: boolean): LengthMetrics {
+    return this.getEffectiveItemHeight(item ?? undefined, inGroup);
+  }
+
+  private paddingEdgeVp(edge: Length | undefined): number {
+    if (edge === undefined || edge === null) {
+      return 0;
+    }
+    return Number(edge);
+  }
+
+  private getEffectiveGroupSpace(group: ToolbarV2ItemGroup): number {
+    const raw = group.space ? Util.lengthMetricsToVp(group.space) : (group.style?.space ? Util.lengthMetricsToVp(group.style.space) : DEFAULT_ITEM_SPACE);
+    return Math.max(0, raw);
+  }
+
   onMeasureSize(selfLayoutInfo: GeometryInfo, children: Measurable[], constraint: ConstraintSizeOptions): SizeResult {
     this.fontSize = this.getFontSizeScale();
     let sizeResult: SizeResult = { height: 0, width: 0 };
@@ -694,45 +1695,378 @@ export struct ToolBarV2 {
     return sizeResult;
   }
 
-  build() {
-    Column() {
-      Divider()
-        .width('100%').height(1)
-        .attributeModifier(this.dividerModifier)
+  @Builder
+  renderAdvItem(item: AdvancedToolbarV2Item, inGroup: boolean = false): void {
+    if (this.setItemContentBuilder(item) && this.itemContentBuilder) {
+      if (this.getEffectiveDirection() === Axis.Vertical) {
+        Column() {
+          this.itemContentBuilder();
+        }
+        .width(this.getEffectiveItemWidth(item, inGroup).value)
+        .height(this.getEffectiveItemHeight(item, inGroup).value)
+        .justifyContent(FlexAlign.Center)
+        .alignItems(HorizontalAlign.Center)
+        .borderRadius(this.getEffectiveItemBorderRadius(inGroup))
+        .backgroundColor(this.getEffectiveItemDisplayBg(item, inGroup))
+        .onHover((isHover: boolean) => {
+          this.setItemHovered(item, isHover);
+        })
+        .stateStyles({
+          pressed: {
+            .backgroundColor(this.getEffectiveItemPressedBg(item, inGroup))
+          }
+        })
+        .onClick(() => {
+          if (this.getEffectiveItemState(item) === ToolBarV2ItemState.DISABLE) {
+            return;
+          }
+          this.advClickEventAction(item);
+        })
+        .accessibilityGroup(true)
+        .accessibilityText(this.getAdvAccessibilityText(item))
+        .accessibilityDescription(this.getAdvAccessibilityDescription(item))
+        .accessibilityLevel(item.accessibilityLevel)
+        .enabled(this.getEffectiveItemState(item) !== ToolBarV2ItemState.DISABLE)
+        .opacity(this.getEffectiveItemState(item) === ToolBarV2ItemState.DISABLE ? 0.4 : 1)
+      } else {
+        Row() {
+          this.itemContentBuilder();
+        }
+        .width(this.getEffectiveItemWidth(item, inGroup).value)
+        .height(this.getEffectiveItemHeight(item, inGroup).value)
+        .justifyContent(FlexAlign.Center)
+        .alignItems(VerticalAlign.Center)
+        .borderRadius(this.getEffectiveItemBorderRadius(inGroup))
+        .backgroundColor(this.getEffectiveItemDisplayBg(item, inGroup))
+        .onHover((isHover: boolean) => {
+          this.setItemHovered(item, isHover);
+        })
+        .stateStyles({
+          pressed: {
+            .backgroundColor(this.getEffectiveItemPressedBg(item, inGroup))
+          }
+        })
+        .onClick(() => {
+          if (this.getEffectiveItemState(item) === ToolBarV2ItemState.DISABLE) {
+            return;
+          }
+          this.advClickEventAction(item);
+        })
+        .accessibilityGroup(true)
+        .accessibilityText(this.getAdvAccessibilityText(item))
+        .accessibilityDescription(this.getAdvAccessibilityDescription(item))
+        .accessibilityLevel(item.accessibilityLevel)
+        .enabled(this.getEffectiveItemState(item) !== ToolBarV2ItemState.DISABLE)
+        .opacity(this.getEffectiveItemState(item) === ToolBarV2ItemState.DISABLE ? 0.4 : 1)
+      }
+    } else {
+      Button({ type: ButtonType.Normal, stateEffect: false }) {
+        Button({ type: ButtonType.Normal, stateEffect: false }) {
+          Column() {
+            if (item.icon) {
+              if (item.icon instanceof ToolBarV2SymbolGlyph) {
+                SymbolGlyph()
+                  .fontSize(IMAGE_SIZE)
+                  .symbolEffect(new SymbolEffect(), false)
+                  .attributeModifier(this.isItemActivated(item) ? item.icon.activated ?? item.icon.normal : item.icon.normal)
+                  .fontColor([this.getEffectiveItemIconColor(item)])
+                  .margin({ bottom: (item.content && item.isShowText !== false) ? LengthMetrics.vp(ICON_TEXT_MARGIN) : LengthMetrics.vp(0) });
+              } else if (Util.isSymbolResource((item.icon as ToolBarV2ItemImage).src)) {
+                SymbolGlyph((item.icon as ToolBarV2ItemImage).src as Resource)
+                  .fontSize(IMAGE_SIZE)
+                  .fontColor([this.getEffectiveItemIconColor(item)])
+                  .margin({ bottom: (item.content && item.isShowText !== false) ? LengthMetrics.vp(ICON_TEXT_MARGIN) : LengthMetrics.vp(0) });
+              } else {
+                Image((item.icon as ToolBarV2ItemImage).src)
+                  .width(IMAGE_SIZE)
+                  .height(IMAGE_SIZE)
+                  .fillColor(this.getEffectiveItemIconColor(item))
+                  .objectFit(ImageFit.Contain)
+                  .draggable(false)
+                  .margin({ bottom: (item.content && item.isShowText !== false) ? LengthMetrics.vp(ICON_TEXT_MARGIN) : LengthMetrics.vp(0) });
+              }
+              if (item.content && item.isShowText !== false) {
+                Text(item.content.text)
+                  .fontColor(this.getEffectiveItemTextColor(item))
+                  .fontSize(this.getEffectiveItemFontSize())
+                  .fontWeight(FontWeight.Regular)
+                  .maxLines(1)
+                  .textOverflow({ overflow: TextOverflow.Ellipsis })
+                  .textAlign(TextAlign.Center);
+              }
+            } else if (item.content) {
+              Text(item.content.text)
+                .fontColor(this.getEffectiveItemTextColor(item))
+                .fontSize(this.getEffectiveItemFontSize())
+                .fontWeight(FontWeight.Regular)
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
+                .textAlign(TextAlign.Center);
+            }
+          }
+          .justifyContent(FlexAlign.Center)
+          .alignItems(HorizontalAlign.Center)
+          .padding({
+            top: LengthMetrics.vp(ITEM_PADDING),
+            bottom: LengthMetrics.vp(ITEM_PADDING),
+          })
+        }
+        .width(this.getEffectiveItemInnerWidth(item, inGroup).value)
+        .height(this.getEffectiveItemInnerHeight(item, inGroup).value)
+        .padding({
+          start: LengthMetrics.vp(ITEM_PADDING),
+          end: LengthMetrics.vp(ITEM_PADDING),
+        })
+        .borderRadius(this.getEffectiveItemBorderRadius(inGroup, item))
+        .backgroundColor(this.getEffectiveItemInnerDisplayBg(item))
+      }
+      .width(this.getEffectiveItemWidth(item, inGroup).value)
+      .height(this.getEffectiveItemHeight(item, inGroup).value)
+      .hoverEffect(HoverEffect.None)
+      .borderRadius(this.getEffectiveItemBorderRadius(false, item))
+      .backgroundColor(this.getEffectiveItemDisplayBg(item, inGroup))
+      .onHover((isHover: boolean) => {
+        this.setItemHovered(item, isHover);
+      })
+      .stateStyles({
+        pressed: {
+          .backgroundColor(this.getEffectiveItemPressedBg(item, inGroup))
+        }
+      })
+      .onClick(() => {
+        if (this.getEffectiveItemState(item) === ToolBarV2ItemState.DISABLE) {
+          return;
+        }
+        this.advClickEventAction(item);
+      })
+      .accessibilityGroup(true)
+      .accessibilityText(this.getAdvAccessibilityText(item))
+      .accessibilityDescription(this.getAdvAccessibilityDescription(item))
+      .accessibilityLevel(item.accessibilityLevel)
+      .enabled(this.getEffectiveItemState(item) !== ToolBarV2ItemState.DISABLE)
+      .opacity(this.getEffectiveItemState(item) === ToolBarV2ItemState.DISABLE ? 0.4 : 1)
+      .padding(0)
+    }
+  }
+
+  @Builder
+  renderAdvItemGroup(group: ToolbarV2ItemGroup): void {
+    if (this.getEffectiveDirection() === Axis.Vertical) {
+      Column() {
+        Column({ space: this.getEffectiveGroupSpace(group) }) {
+          ForEach(group.items, (item: AdvancedToolbarV2Item, index: number) => {
+            this.renderAdvItem(item, true);
+            if (item.isShowSeparator === true) {
+              Divider()
+                .width(GROUP_DIVIDER_LENGTH)
+                .color($r('sys.color.comp_divider'))
+            }
+          }, (item: AdvancedToolbarV2Item, index: number) => this.getGroupItemKey(item, index))
+        }
+      }
+      .width(this.toLengthString(this.getEffectiveCrossAxisLength()))
+      .alignItems(HorizontalAlign.Center)
+      .backgroundColor(this.getEffectiveGroupBg(group))
+      .borderRadius(this.getEffectiveGroupBorderRadius(group))
+      .borderWidth(this.getEffectiveGroupBorderWidth(group))
+      .borderColor(this.getEffectiveGroupBorderColor(group))
+      .padding(this.getEffectiveGroupPadding(group))
+      .clip(true)
+    } else {
       Row() {
-        ForEach(this.toolBarList, (item: ToolBarV2Item, index: number) => {
-          if (this.toolBarList.length <= TOOLBAR_MAX_LENGTH || index < TOOLBAR_MAX_LENGTH - 1) {
+        Row({ space: this.getEffectiveGroupSpace(group) }) {
+          ForEach(group.items, (item: AdvancedToolbarV2Item, index: number) => {
+            this.renderAdvItem(item, true);
+            if (item.isShowSeparator === true) {
+              Divider()
+                .height(GROUP_DIVIDER_LENGTH)
+                .vertical(true)
+                .color($r('sys.color.comp_divider'))
+            }
+          }, (item: AdvancedToolbarV2Item, index: number) => this.getGroupItemKey(item, index))
+        }
+      }
+      .height(this.toLengthString(this.getEffectiveCrossAxisLength()))
+      .alignItems(VerticalAlign.Center)
+      .backgroundColor(this.getEffectiveGroupBg(group))
+      .borderRadius(this.getEffectiveGroupBorderRadius(group))
+      .borderWidth(this.getEffectiveGroupBorderWidth(group))
+      .borderColor(this.getEffectiveGroupBorderColor(group))
+      .padding(this.getEffectiveGroupPadding(group))
+      .clip(true)
+    }
+  }
+
+  @Builder
+  renderAdvSingleItem(item: AdvancedToolbarV2Item): void {
+    if (this.getEffectiveDirection() === Axis.Vertical) {
+      Column() {
+        this.renderAdvItem(item, true);
+      }
+      .width(this.toLengthString(this.getEffectiveCrossAxisLength()))
+      .alignItems(HorizontalAlign.Center)
+      .backgroundColor(this.getDefaultItemBg())
+      .borderRadius(this.getEffectiveBorderRadius())
+      .borderWidth(this.getEffectiveBorderWidth())
+      .borderColor(this.getEffectiveBorderColor())
+      .padding(this.getEffectivePadding())
+      .clip(true)
+    } else {
+      Row() {
+        this.renderAdvItem(item, true);
+      }
+      .height(this.toLengthString(this.getEffectiveCrossAxisLength()))
+      .alignItems(VerticalAlign.Center)
+      .backgroundColor(this.getDefaultItemBg())
+      .borderRadius(this.getEffectiveBorderRadius())
+      .borderWidth(this.getEffectiveBorderWidth())
+      .borderColor(this.getEffectiveBorderColor())
+      .padding(this.getEffectivePadding())
+      .clip(true)
+    }
+  }
+
+  @Builder
+  renderAdvItemOrGroup(item: AdvancedToolbarV2Item | ToolbarV2ItemGroup): void {
+    if (this.isToolbarItemGroup(item)) {
+      this.renderAdvItemGroup(item as ToolbarV2ItemGroup);
+    } else {
+      this.renderAdvSingleItem(item as AdvancedToolbarV2Item);
+    }
+  }
+
+  @Builder
+  renderAdvTitle(): void {
+    if (this.advTitleConfigs && (this.advTitleConfigs.visible ?? true)) {
+      Column() {
+        Text(this.advTitleConfigs.content)
+          .fontSize(this.getEffectiveTitleFontSize())
+          .fontColor(this.advTitleConfigs.style?.fontColor?.color ?? this.theme.fontPrimaryColor)
+          .fontWeight(this.getEffectiveTitleFontWeight())
+          .constraintSize({ minWidth: this.getEffectiveTitleMinLength() })
+      }
+      .justifyContent(FlexAlign.Center)
+      .alignItems(HorizontalAlign.Center)
+      .padding({
+        start: LengthMetrics.vp(ITEM_PADDING),
+        end: LengthMetrics.vp(ITEM_PADDING),
+        top: LengthMetrics.vp(ITEM_PADDING),
+        bottom: LengthMetrics.vp(ITEM_PADDING),
+      })
+    }
+  }
+
+  @Builder
+  advArea(placement: ToolbarV2ItemPlacement): void {
+    if (this.getEffectiveDirection() === Axis.Vertical) {
+      Column({ space: this.getEffectiveSpacing().value }) {
+        if ((this.advTitleConfigs?.placement ?? ToolbarV2ItemPlacement.LEADING) === placement) {
+          this.renderAdvTitle();
+        }
+        ForEach(this.getItemsByPlacement(placement), (item: AdvancedToolbarV2Item | ToolbarV2ItemGroup, index: number) => {
+          this.renderAdvItemOrGroup(item);
+        }, (item: AdvancedToolbarV2Item | ToolbarV2ItemGroup, index: number) =>
+        `toolbar_${placement}_${this.getEntryKey(item, index)}`)
+      }
+      .width('100%')
+      .height('100%')
+      .justifyContent(
+        placement === ToolbarV2ItemPlacement.LEADING ? FlexAlign.Start
+          : placement === ToolbarV2ItemPlacement.MAIN ? FlexAlign.Center
+          : FlexAlign.End
+      )
+      .alignItems(HorizontalAlign.Center)
+    } else {
+      Row({ space: this.getEffectiveSpacing().value }) {
+        if ((this.advTitleConfigs?.placement ?? ToolbarV2ItemPlacement.LEADING) === placement) {
+          this.renderAdvTitle();
+        }
+        ForEach(this.getItemsByPlacement(placement), (item: AdvancedToolbarV2Item | ToolbarV2ItemGroup, index: number) => {
+          this.renderAdvItemOrGroup(item);
+        }, (item: AdvancedToolbarV2Item | ToolbarV2ItemGroup, index: number) =>
+        `toolbar_${placement}_${this.getEntryKey(item, index)}`)
+      }
+      .width('100%')
+      .height('100%')
+      .justifyContent(
+        placement === ToolbarV2ItemPlacement.LEADING ? FlexAlign.Start
+          : placement === ToolbarV2ItemPlacement.MAIN ? FlexAlign.Center
+          : FlexAlign.End
+      )
+      .alignItems(VerticalAlign.Center)
+    }
+  }
+
+  @Builder
+  advToolbarContent(): void {
+    Stack() {
+      this.advArea(ToolbarV2ItemPlacement.LEADING)
+      this.advArea(ToolbarV2ItemPlacement.TRAILING)
+      this.advArea(ToolbarV2ItemPlacement.MAIN)
+    }
+    .width(this.toLengthString(
+      this.getEffectiveDirection() === Axis.Vertical
+        ? this.getEffectiveCrossAxisLength()
+        : this.getEffectiveMainAxisLength()
+    ))
+    .height(this.toLengthString(
+      this.getEffectiveDirection() === Axis.Vertical
+        ? this.getEffectiveMainAxisLength()
+        : this.getEffectiveCrossAxisLength()
+    ))
+    .clip(true)
+    .onSizeChange((_oldValue, newValue) => {
+      this.onAdvContentMainAxisSizeChange(newValue);
+    })
+  }
+
+  build() {
+    if (this.isAdvancedMode) {
+      Column() {
+        this.advToolbarContent()
+      }
+      .width('100%')
+      //.padding(this.getEffectivePadding())
+    } else {
+      Column() {
+        Divider()
+          .width('100%').height(1)
+          .attributeModifier(this.dividerModifier)
+        Row() {
+          ForEach(this.toolBarList, (item: ToolBarV2Item, index: number) => {
+            if (this.toolBarList.length <= TOOLBAR_MAX_LENGTH || index < TOOLBAR_MAX_LENGTH - 1) {
+              Row() {
+                this.TabBuilder(index);
+              }
+              .height('100%')
+              .flexShrink(1)
+            }
+          }, (item: ToolBarV2Item, index: number) => {
+            return `${this.getUniqueId}__${index}`;
+          })
+          if (this.toolBarList.length > TOOLBAR_MAX_LENGTH) {
             Row() {
-              this.TabBuilder(index);
+              this.MoreTabBuilder(TOOLBAR_MAX_LENGTH - 1);
             }
             .height('100%')
             .flexShrink(1)
           }
-        }, (item: ToolBarV2Item, index: number) => {
-          return `${this.getUniqueId}__${index}}`;
-        })
-        if (this.toolBarList.length > TOOLBAR_MAX_LENGTH) {
-          Row() {
-            this.MoreTabBuilder(TOOLBAR_MAX_LENGTH - 1);
-          }
-          .height('100%')
-          .flexShrink(1)
         }
+        .justifyContent(FlexAlign.Center)
+        .constraintSize({
+          minHeight: this.toLengthString(this.toolBarModifier?.heightValue),
+          maxHeight: this.toLengthString(this.toolBarModifier?.heightValue),
+        })
+        .width('100%')
+        .height(this.toLengthString(this.toolBarModifier?.heightValue))
+        .padding({
+          start: this.toolBarList.length < TOOLBAR_MAX_LENGTH ?
+            this.toolBarModifier?.paddingValue : LengthMetrics.resource($r('sys.float.padding_level0')),
+          end: this.toolBarList.length < TOOLBAR_MAX_LENGTH ?
+            this.toolBarModifier?.paddingValue : LengthMetrics.resource($r('sys.float.padding_level0')),
+        })
       }
-      .justifyContent(FlexAlign.Center)
-      .constraintSize({
-        minHeight: this.toLengthString(this.toolBarModifier?.heightValue),
-        maxHeight: this.toLengthString(this.toolBarModifier?.heightValue),
-      })
-      .width('100%')
-      .height(this.toLengthString(this.toolBarModifier?.heightValue))
-      .padding({
-        start: this.toolBarList.length < TOOLBAR_MAX_LENGTH ?
-          this.toolBarModifier?.paddingValue : LengthMetrics.resource($r('sys.float.padding_level0')),
-        end: this.toolBarList.length < TOOLBAR_MAX_LENGTH ?
-          this.toolBarModifier?.paddingValue : LengthMetrics.resource($r('sys.float.padding_level0')),
-      })
+      .attributeModifier(this.toolBarModifier)
     }
-    .attributeModifier(this.toolBarModifier)
   }
 }
