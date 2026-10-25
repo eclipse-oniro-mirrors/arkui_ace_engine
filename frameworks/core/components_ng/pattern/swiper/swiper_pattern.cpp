@@ -8133,12 +8133,24 @@ void SwiperPattern::DumpSimplifyInfoOnlyForParamConfig(std::shared_ptr<JsonValue
 
 void SwiperPattern::BuildOffsetInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
 {
-    json->Put("currentOffset", std::to_string(currentOffset_).c_str());
-    json->Put("fadeOffset", std::to_string(fadeOffset_).c_str());
+    if (config.IsPublicTree()) {
+        json->Put("currentOffset", currentOffset_);
+    } else {
+        json->Put("currentOffset", std::to_string(currentOffset_).c_str());
+    }
+    if (config.IsPublicTree()) {
+        json->Put("fadeOffset", fadeOffset_);
+    } else {
+        json->Put("fadeOffset", std::to_string(fadeOffset_).c_str());
+    }
     if (!config.IsPublicTree()) {
         json->Put("touchBottomRate", std::to_string(touchBottomRate_).c_str());
     }
-    json->Put("currentIndexOffset", std::to_string(currentIndexOffset_).c_str());
+    if (config.IsPublicTree()) {
+        json->Put("currentIndexOffset", currentIndexOffset_);
+    } else {
+        json->Put("currentIndexOffset", std::to_string(currentIndexOffset_).c_str());
+    }
     if (!config.IsPublicTree()) {
         json->Put("gestureSwipeIndex", gestureSwipeIndex_);
     }

@@ -376,9 +376,7 @@ void LazyColumnLayoutPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, 
         return;
     }
     if (config.visualProperties) {
-        auto layout = JsonUtil::Create();
-        layoutInfo_->DumpAdvanceInfo(layout, config);
-        json->PutRef("layoutInfo", std::move(layout));
+        layoutInfo_->DumpAdvanceInfo(json, config);
     }
 }
 

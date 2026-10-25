@@ -22,7 +22,7 @@
 #include <unordered_map>
 
 #include "base/memory/referenced.h"
-#include "core/components_ng/token_theme/token_theme.h"
+#include "ui/view/theme/token_theme.h"
 
 namespace OHOS::Ace::NG {
 

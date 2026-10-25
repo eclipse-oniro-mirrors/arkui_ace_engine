@@ -17,6 +17,7 @@
 
 #include "core/components_ng/layout/layout_wrapper_node.h"
 #include "core/components_ng/pattern/grid/grid_layout_property.h"
+#include "core/components_ng/pattern/grid/grid_model_ng.h"
 #include "core/components_ng/pattern/grid/grid_pattern.h"
 #include "core/components_ng/pattern/grid/grid_scroll/grid_scroll_layout_algorithm.h"
 #include "core/components_ng/pattern/grid/grid_scroll/grid_scroll_with_options_layout_algorithm.h"
@@ -989,5 +990,187 @@ HWTEST_F(GridTestNg, DumpAdvanceInfo015, TestSize.Level1)
     EXPECT_EQ(json->GetString("startFixOffset"), "1.500000");
     EXPECT_EQ(json->GetString("endFixOffset"), "2.500000");
     EXPECT_EQ(json->GetString("contentEndPadding"), "3.000000");
+}
+
+/**
+ * @tc.name: DumpGridGapUnits
+ * @tc.desc: Public dump preserves configured units while legacy template output stays unchanged.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridTestNg, DumpGridGapUnits, TestSize.Level1)
+{
+    auto pattern = AceType::MakeRefPtr<GridPattern>();
+    auto frameNode = FrameNode::CreateFrameNode(V2::GRID_ETS_TAG, 1, pattern);
+    ParamConfig config;
+    config.dumpMode = TreeDumpMode::PUBLIC_TREE;
+    config.visualProperties = true;
+    const struct {
+        Dimension gap;
+        const char* publicValue;
+        const char* legacyValue;
+    } cases[] = {
+        { Dimension(8.0, DimensionUnit::VP), "8.00vp", "8.000000" },
+        { Dimension(8.0, DimensionUnit::PX), "8.00px", "8.000000" },
+        { Dimension(8.0, DimensionUnit::FP), "8.00fp", "8.000000" },
+        { Dimension(8.0, DimensionUnit::LPX), "8.00lpx", "8.000000" },
+        { Dimension(0.1, DimensionUnit::PERCENT), "10.00%", "0.100000" },
+        { Dimension(0.0, DimensionUnit::VP), "0.00vp", "0.000000" },
+    };
+    for (const auto& item : cases) {
+        SCOPED_TRACE(item.publicValue);
+        GridModelNG::SetColumnsGap(AceType::RawPtr(frameNode), item.gap);
+        GridModelNG::SetRowsGap(AceType::RawPtr(frameNode), item.gap);
+        auto json = JsonUtil::Create(true);
+        pattern->DumpAdvanceGridTemplateInfo(json, config);
+        EXPECT_EQ(json->GetString("ColumnsGap"), item.publicValue);
+        EXPECT_EQ(json->GetString("RowsGap"), item.publicValue);
+        auto legacy = JsonUtil::Create(true);
+        pattern->DumpAdvanceGridTemplateInfo(legacy, ParamConfig());
+        EXPECT_EQ(legacy->ToString(), std::string("{\"RowsTemplate\":\"\",\"ColumnsTemplate\":\"\",") +
+            "\"RowsGap\":\"" + item.legacyValue + "\",\"ColumnsGap\":\"" + item.legacyValue + "\"}");
+    }
+}
+
+/**
+ * @tc.name: DumpGridGapFiltering
+ * @tc.desc: Public dump omits unset or disabled visual properties; legacy keeps its null value and order.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridTestNg, DumpGridGapFiltering, TestSize.Level1)
+{
+    auto pattern = AceType::MakeRefPtr<GridPattern>();
+    auto frameNode = FrameNode::CreateFrameNode(V2::GRID_ETS_TAG, 1, pattern);
+    ParamConfig config;
+    config.dumpMode = TreeDumpMode::PUBLIC_TREE;
+    config.visualProperties = true;
+    auto unset = JsonUtil::Create(true);
+    pattern->DumpAdvanceGridTemplateInfo(unset, config);
+    EXPECT_FALSE(unset->Contains("ColumnsGap"));
+    EXPECT_FALSE(unset->Contains("RowsGap"));
+    auto legacy = JsonUtil::Create(true);
+    pattern->DumpAdvanceGridTemplateInfo(legacy, ParamConfig());
+    EXPECT_EQ(legacy->ToString(),
+        "{\"RowsTemplate\":\"\",\"ColumnsTemplate\":\"\",\"RowsGap\":\"null\",\"ColumnsGap\":\"null\"}");
+    GridModelNG::SetColumnsGap(AceType::RawPtr(frameNode), Dimension(8.0, DimensionUnit::VP));
+    GridModelNG::SetRowsGap(AceType::RawPtr(frameNode), Dimension(8.0, DimensionUnit::VP));
+    config.visualProperties = false;
+    auto disabled = JsonUtil::Create(true);
+    pattern->DumpAdvanceGridTemplateInfo(disabled, config);
+    EXPECT_FALSE(disabled->Contains("ColumnsGap"));
+    EXPECT_FALSE(disabled->Contains("RowsGap"));
+    config.visualProperties = true;
+    auto enabled = JsonUtil::Create(true);
+    pattern->DumpAdvanceInfo(enabled, config);
+    EXPECT_EQ(enabled->GetString("ColumnsGap"), "8.00vp");
+    EXPECT_EQ(enabled->GetString("RowsGap"), "8.00vp");
+}
+
+/**
+ * @tc.name: DumpCellLengthUnits
+ * @tc.desc: CellLength retains its configured vp size in public dump and its legacy integer string.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridTestNg, DumpCellLengthUnits, TestSize.Level1)
+{
+    auto pattern = AceType::MakeRefPtr<GridPattern>();
+    auto frameNode = FrameNode::CreateFrameNode(V2::GRID_ETS_TAG, 1, pattern);
+    ParamConfig config;
+    config.dumpMode = TreeDumpMode::PUBLIC_TREE;
+    config.visualProperties = true;
+    auto unset = JsonUtil::Create(true);
+    pattern->DumpAdvanceGridSizeInfo(unset, config);
+    EXPECT_FALSE(unset->Contains("CellLength"));
+    for (int32_t value : { 0, 40 }) {
+        GridModelNG::SetCellLength(AceType::RawPtr(frameNode), value);
+        auto json = JsonUtil::Create(true);
+        pattern->DumpAdvanceGridSizeInfo(json, config);
+        EXPECT_EQ(json->GetString("CellLength"), value == 0 ? "0.00vp" : "40.00vp");
+        auto legacy = JsonUtil::Create(true);
+        pattern->DumpAdvanceGridSizeInfo(legacy, ParamConfig());
+        EXPECT_EQ(legacy->ToString(), std::string("{\"MaxCount\":\"null\",\"MinCount\":\"null\",\"CellLength\":\"") +
+            std::to_string(value) + "\"}");
+    }
+    config.visualProperties = false;
+    auto disabled = JsonUtil::Create(true);
+    pattern->DumpAdvanceGridSizeInfo(disabled, config);
+    EXPECT_FALSE(disabled->Contains("CellLength"));
+}
+
+/**
+ * @tc.name: DumpGridAlignItemsValues
+ * @tc.desc: Public output reads the enum while legacy preserves its optional-presence behavior and field order.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridTestNg, DumpGridAlignItemsValues, TestSize.Level1)
+{
+    auto pattern = AceType::MakeRefPtr<GridPattern>();
+    auto frameNode = FrameNode::CreateFrameNode(V2::GRID_ETS_TAG, 1, pattern);
+    ParamConfig config;
+    config.dumpMode = TreeDumpMode::PUBLIC_TREE;
+    config.visualProperties = true;
+    const struct {
+        std::optional<GridItemAlignment> alignment;
+        const char* publicValue;
+        const char* legacyValue;
+    } cases[] = {
+        { std::nullopt, "GridItemAlignment.DEFAULT", "GridItemAlignment.DEFAULT" },
+        { GridItemAlignment::DEFAULT, "GridItemAlignment.DEFAULT", "GridItemAlignment.STRETCH" },
+        { GridItemAlignment::STRETCH, "GridItemAlignment.STRETCH", "GridItemAlignment.STRETCH" },
+        { GridItemAlignment::DEFAULT, "GridItemAlignment.DEFAULT", "GridItemAlignment.STRETCH" },
+        { std::nullopt, "GridItemAlignment.DEFAULT", "GridItemAlignment.DEFAULT" },
+    };
+    for (const auto& item : cases) {
+        SCOPED_TRACE(item.publicValue);
+        GridModelNG::SetAlignItems(AceType::RawPtr(frameNode), item.alignment);
+        auto before = JsonUtil::Create();
+        pattern->DumpAdvanceInfo(before);
+        auto json = JsonUtil::Create();
+        pattern->DumpAdvanceInfo(json, config);
+        EXPECT_EQ(json->GetString("AlignItems"), item.publicValue);
+        auto legacy = JsonUtil::Create();
+        pattern->DumpAdvanceGridInteractionInfo(legacy, ParamConfig());
+        EXPECT_EQ(
+            legacy->ToString(), std::string("{\"Editable\":\"null\",\"ScrollEnabled\":\"null\",\"AlignItems\":\"") +
+                                    item.legacyValue + "\"}");
+        auto after = JsonUtil::Create();
+        pattern->DumpAdvanceInfo(after);
+        EXPECT_EQ(after->ToString(), before->ToString());
+    }
+}
+
+/**
+ * @tc.name: DumpGridAlignItemsFiltering
+ * @tc.desc: AlignItems follows the visual flag independently of functional configuration.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridTestNg, DumpGridAlignItemsFiltering, TestSize.Level1)
+{
+    auto pattern = AceType::MakeRefPtr<GridPattern>();
+    auto frameNode = FrameNode::CreateFrameNode(V2::GRID_ETS_TAG, 1, pattern);
+    GridModelNG::SetAlignItems(AceType::RawPtr(frameNode), GridItemAlignment::DEFAULT);
+    GridModelNG::SetEditable(AceType::RawPtr(frameNode), true);
+    GridModelNG::SetScrollEnabled(AceType::RawPtr(frameNode), false);
+    for (bool visual : { false, true }) {
+        for (bool functional : { false, true }) {
+            ParamConfig config;
+            config.dumpMode = TreeDumpMode::PUBLIC_TREE;
+            config.visualProperties = visual;
+            config.functionalProperties = functional;
+            auto json = JsonUtil::Create();
+            pattern->DumpAdvanceInfo(json, config);
+            EXPECT_EQ(json->Contains("AlignItems"), visual);
+            if (visual) {
+                EXPECT_EQ(json->GetString("AlignItems"), "GridItemAlignment.DEFAULT");
+            }
+            EXPECT_EQ(json->Contains("Editable"), functional);
+            EXPECT_EQ(json->Contains("ScrollEnabled"), functional);
+            if (functional) {
+                EXPECT_TRUE(json->GetValue("Editable")->IsBool());
+                EXPECT_TRUE(json->GetBool("Editable"));
+                EXPECT_TRUE(json->GetValue("ScrollEnabled")->IsBool());
+                EXPECT_FALSE(json->GetBool("ScrollEnabled"));
+            }
+        }
+    }
 }
 } // namespace OHOS::Ace::NG

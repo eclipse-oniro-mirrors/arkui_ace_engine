@@ -2600,8 +2600,12 @@ void ImagePattern::DumpAdvanceSourceInfo(std::unique_ptr<JsonValue>& json, const
             json->PutRef("url", std::move(resource));
             break;
         }
-        default:
+        default: {
+            auto descriptor = JsonUtil::Create();
+            descriptor->Put("sourceType", source->GetSrcTypeName());
+            json->PutRef("url", std::move(descriptor));
             break;
+        }
     }
 }
 

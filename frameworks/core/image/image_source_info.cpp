@@ -382,6 +382,41 @@ SrcType ImageSourceInfo::GetSrcType() const
     return srcType_;
 }
 
+const char* ImageSourceInfo::GetSrcTypeName() const
+{
+    switch (srcType_) {
+        case SrcType::FILE:
+            return "file";
+        case SrcType::ASSET:
+            return "asset";
+        case SrcType::NETWORK:
+            return "network";
+        case SrcType::MEMORY:
+            return "memory";
+        case SrcType::BASE64:
+            return "base64";
+        case SrcType::INTERNAL:
+            return "internal";
+        case SrcType::RESOURCE:
+            return "resource";
+        case SrcType::DATA_ABILITY:
+            return "dataAbility";
+        case SrcType::DATA_ABILITY_DECODED:
+            return "dataAbilityDecoded";
+        case SrcType::RESOURCE_ID:
+            return "resourceId";
+        case SrcType::PIXMAP:
+            return "pixmap";
+        case SrcType::ASTC:
+            return "astc";
+        case SrcType::STREAM:
+            return "stream";
+        case SrcType::UNSUPPORTED:
+        default:
+            return "unsupported";
+    }
+}
+
 std::string ImageSourceInfo::ToString(bool isNeedTruncated) const
 {
     auto& src = GetSrc();

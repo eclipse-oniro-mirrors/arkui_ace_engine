@@ -103,9 +103,18 @@ void ScrollablePaintProperty::DumpScrollBarProperties(std::unique_ptr<JsonValue>
     if (!config.IsPublicTree() || scrollBarMargin.has_value()) {
         json->Put("scrollBarMargin", scrollBarMargin.has_value() ? scrollBarMargin.value().ToString().c_str() : "None");
     }
+    DumpFadingEdgeProperties(json, config);
+}
+
+void ScrollablePaintProperty::DumpFadingEdgeProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
     auto fadingEdge = GetFadingEdge();
     if (!config.IsPublicTree() || fadingEdge.has_value()) {
-        json->Put("fadingEdge", fadingEdge.has_value() ? (fadingEdge.value() ? "true" : "false") : "None");
+        if (config.IsPublicTree()) {
+            json->Put("fadingEdge", fadingEdge.value());
+        } else {
+            json->Put("fadingEdge", fadingEdge.has_value() ? (fadingEdge.value() ? "true" : "false") : "None");
+        }
     }
     auto fadingEdgeLength = GetFadingEdgeLength();
     if (!config.IsPublicTree() || fadingEdgeLength.has_value()) {

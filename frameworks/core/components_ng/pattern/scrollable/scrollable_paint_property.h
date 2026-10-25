@@ -100,6 +100,7 @@ private:
     void DumpContentClipInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
 
     void DumpScrollBarProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+    void DumpFadingEdgeProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
 
     std::string ContentClipToStr() const;
     std::string GetBarStateString() const;

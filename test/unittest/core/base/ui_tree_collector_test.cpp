@@ -31,6 +31,19 @@
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 
 #include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/pattern/image/image_pattern.h"
+#include "core/components_ng/pattern/image/image_layout_property.h"
+#include "core/components_ng/pattern/list/list_pattern.h"
+#include "core/components_ng/pattern/grid/grid_item_pattern.h"
+#include "core/components_ng/pattern/grid/grid_item_layout_property.h"
+#include "core/components_ng/pattern/grid/grid_layout_property.h"
+#include "core/components_ng/pattern/swiper/swiper_pattern.h"
+#include "core/components_ng/pattern/grid/grid_pattern.h"
+#include "core/components_ng/pattern/scroll/scroll_pattern.h"
+#include "core/components_ng/pattern/tabs/tab_bar_pattern.h"
+#include "core/components_ng/pattern/list/list_item_pattern.h"
+#include "core/components_ng/pattern/waterflow/water_flow_pattern.h"
+#include "core/components_ng/property/gradient_property.h"
 #include "core/components_ng/base/inspector_dump_options.h"
 #include "core/components_ng/base/ui_tree_collector.h"
 #include "core/components_ng/event/event_hub.h"
@@ -42,6 +55,8 @@
 #include "core/components_ng/pattern/pattern.h"
 #include "core/components_ng/pattern/relative_container/relative_container_pattern.h"
 #include "core/components_ng/pattern/stack/stack_pattern.h"
+#include "core/components_ng/pattern/sheet/sheet_presentation_pattern.h"
+#include "core/components_ng/pattern/text/text_pattern.h"
 #include "core/components_v2/inspector/inspector_constants.h"
 #include "core/interfaces/native/node/ui_tree_api.h"
 #include "core/pipeline/base/element_register.h"
@@ -1059,4 +1074,407 @@ HWTEST_F(UITreeCollectorTest, SharedTraversalRetainsRootAndPromotesInOrder, Test
     EXPECT_EQ(state.GetError(), ARKUI_ERROR_CODE_NO_ERROR);
 }
 #endif
+
+HWTEST_F(UITreeCollectorTest, LegacyDumpCommonFieldsMatchBaselineSnapshot, TestSize.Level1)
+{
+    auto node = Frame(V2::TEXT_ETS_TAG);
+    SetTestRect(node, RectF(1.0f, 2.0f, 3.0f, 4.0f));
+    node->UpdateInspectorId("legacy-node");
+    auto focusHub = node->GetOrCreateFocusHub();
+    focusHub->SetFocusType(FocusType::NODE);
+    focusHub->SetFocusable(true);
+    auto property = node->GetAccessibilityProperty<AccessibilityProperty>();
+    ASSERT_NE(property, nullptr);
+    property->SetAccessibilityText("accessible text");
+    ParamConfig config;
+    config.interactionInfo = true;
+    config.accessibilityInfo = true;
+    auto json = JsonUtil::CreateSharedPtrJson();
+    node->DumpSimplifyInfoWithParamConfig(json, config);
+    // Frozen from fdf7d63988ed9fa338051a11c19fadf1f86653dc; compare serialized key order and types.
+    EXPECT_EQ(json->ToString(), R"({"$rect":"[1.00, 2.00],[4.00,6.00]","compid":"legacy-node","$attrs":{},)"
+        R"("clickable":false,"longClickable":false,"focusable":true,)"
+        R"("accessibilityContent":"accessible text","scrollable":false,"editable":false})");
+}
+
+HWTEST_F(UITreeCollectorTest, LegacyDumpTextMissingHostMatchesBaselineSnapshot, TestSize.Level1)
+{
+    class LegacyTextDumpPattern : public TextPattern {
+    public:
+        LegacyTextDumpPattern()
+        {
+            contentRect_ = RectF(1.0f, 2.0f, 3.0f, 4.0f);
+        }
+    };
+    ASSERT_FALSE(SystemProperties::GetDebugEnabled());
+    auto pattern = AceType::MakeRefPtr<LegacyTextDumpPattern>();
+    auto json = JsonUtil::Create();
+    pattern->DumpAdvanceInfo(json);
+    // Frozen from fdf7d63988ed9fa338051a11c19fadf1f86653dc; compare serialized key order and types.
+    EXPECT_EQ(json->ToString(),
+        R"({"contentRect":"RectT (1.00, 2.00) - [3.00 x 4.00]","BindSelectionMenu":"1"})");
+}
+
+HWTEST_F(UITreeCollectorTest, LegacyDumpSheetDuplicateOffsetsMatchBaselineSnapshot, TestSize.Level1)
+{
+    auto pattern = AceType::MakeRefPtr<SheetPresentationPattern>(77, "target", [](const std::string&) {});
+    pattern->SetCenterHeight(100.0f);
+    pattern->SetSheetMaxHeight(300.0f);
+    pattern->SetPageHeight(400.0f);
+    pattern->SetSheetOffsetX(11.0f);
+    pattern->SetSheetOffsetY(22.0f);
+    pattern->SetSheetMaxWidth(500.0f);
+    pattern->SetCurrentOffset(7.0f);
+    pattern->SetSheetHeightUp(13.0f);
+    auto json = JsonUtil::Create();
+    pattern->DumpAdvanceInfo(json);
+    // Frozen from fdf7d63988ed9fa338051a11c19fadf1f86653dc; compare serialized key order and types.
+    const std::string expected = R"({"TargetId":77,"TargetTag":"target","SheetPage Pattern":{"SheetType":0,)"
+        R"("SheetPage Node Height":100,"Sheet Height [start from the bottom, KeyboardHeight = 0]":0,)"
+        R"("SheetMaxHeight [start from the bottom, pageHeight - sheetTopSafeArea]":300,"Page Height":400,)"
+        R"("StatusBar Height [current sheetType needed]":0,"PopupSheet OffsetX":11,"PopupSheet OffsetX":22,)"
+        R"("SheetMaxWidth":500,"FitContent Height":0,"SheetThemeType":"auto","currentOffset":7},)"
+        R"("Height ScrollTo [KeyboardHeight > 0, and is scrolling]":0,"KeyboardHeight":0,)"
+        R"("is scrolling":false,"SheetHeightUp[sheet offset to move up when avoiding keyboard]":13})";
+    EXPECT_EQ(json->ToString(), expected);
+}
+
+namespace {
+ParamConfig PublicPropertyConfig(bool visual, bool functional)
+{
+    ParamConfig config;
+    config.dumpMode = TreeDumpMode::PUBLIC_TREE;
+    config.visualProperties = visual;
+    config.functionalProperties = functional;
+    return config;
+}
+
+class TreeOpacityListItem : public ListItemPattern {
+public:
+    TreeOpacityListItem() : ListItemPattern(nullptr) {}
+    void SaveOpacity(double opacity) { enableOpacity_ = opacity; }
+};
+} // namespace
+
+HWTEST_F(UITreeCollectorTest, ConfirmedTextScalarTypesAndLegacyMenuMeaning, TestSize.Level1)
+{
+    auto pattern = AceType::MakeRefPtr<TextPattern>();
+    auto host = Frame(V2::TEXT_ETS_TAG, pattern);
+    auto publicJson = JsonUtil::Create();
+    pattern->DumpAdvanceInfo(publicJson, PublicPropertyConfig(true, true));
+    ASSERT_TRUE(publicJson->GetValue("BindSelectionMenu")->IsBool());
+    EXPECT_FALSE(publicJson->GetBool("BindSelectionMenu"));
+    EXPECT_TRUE(publicJson->GetValue("fontScale")->IsNumber());
+    EXPECT_TRUE(publicJson->GetValue("fontWeightScale")->IsNumber());
+    auto legacy = JsonUtil::Create();
+    pattern->DumpAdvanceInfo(legacy, ParamConfig());
+    EXPECT_EQ(legacy->GetString("BindSelectionMenu"), "1");
+    EXPECT_TRUE(legacy->GetValue("fontScale")->IsString());
+}
+
+HWTEST_F(UITreeCollectorTest, ConfirmedScrollPaginationAndBooleanTypes, TestSize.Level1)
+{
+    auto pattern = AceType::MakeRefPtr<ScrollPattern>();
+    auto host = Frame(V2::SCROLL_ETS_TAG, pattern);
+    pattern->SetSnapPaginations({ Dimension(10, DimensionUnit::VP), Dimension(20, DimensionUnit::PX) });
+    pattern->SetEnableSnapToSide({ true, false });
+    auto json = JsonUtil::Create();
+    pattern->DumpAdvanceInfo(json, PublicPropertyConfig(false, true));
+    auto offsets = json->GetObject("snapPagination")->GetValue("offsets");
+    ASSERT_TRUE(offsets->IsArray());
+    ASSERT_EQ(offsets->GetArraySize(), 2);
+    EXPECT_EQ(offsets->GetArrayItem(0)->GetString(), "10.00vp");
+    EXPECT_EQ(offsets->GetArrayItem(1)->GetString(), "20.00px");
+    EXPECT_TRUE(json->GetValue("enableSnapToStart")->IsBool());
+    EXPECT_TRUE(json->GetBool("enableSnapToStart"));
+    EXPECT_FALSE(json->GetBool("enableSnapToEnd"));
+    EXPECT_TRUE(json->GetValue("hasOnScrollStart")->IsBool());
+    EXPECT_TRUE(json->GetValue("hasOnScrollBegin")->IsBool());
+    EXPECT_TRUE(json->GetValue("enablePaging")->IsString());
+    auto legacy = JsonUtil::Create();
+    pattern->DumpAdvanceInfo(legacy, ParamConfig());
+    EXPECT_EQ(legacy->GetString("snapPagination"), "[10.00vp 20.00px ]");
+    EXPECT_EQ(legacy->GetString("enableSnapToStart"), "true");
+    pattern->SetSnapPaginations({});
+    pattern->SetIntervalSize(Dimension(50, DimensionUnit::VP));
+    json = JsonUtil::Create();
+    pattern->DumpAdvanceInfo(json, PublicPropertyConfig(false, true));
+    EXPECT_EQ(json->GetObject("snapPagination")->GetString("interval"), "50.00vp");
+    EXPECT_FALSE(json->GetObject("snapPagination")->Contains("offsets"));
+}
+
+HWTEST_F(UITreeCollectorTest, ConfirmedGridOptionsAndScalarTypes, TestSize.Level1)
+{
+    auto pattern = AceType::MakeRefPtr<GridPattern>();
+    auto host = Frame(V2::GRID_ETS_TAG, pattern);
+    auto property = host->GetLayoutProperty<GridLayoutProperty>();
+    property->UpdateMaxCount(4);
+    property->UpdateMinCount(1);
+    property->UpdateCachedCount(2);
+    property->UpdateEditable(true);
+    GridLayoutOptions options;
+    options.irregularIndexes = { 1, 3 };
+    property->UpdateLayoutOptions(options);
+    auto json = JsonUtil::Create();
+    pattern->DumpAdvanceInfo(json, PublicPropertyConfig(true, true));
+    EXPECT_TRUE(json->GetValue("MaxCount")->IsNumber());
+    EXPECT_EQ(json->GetInt("MaxCount"), 4);
+    EXPECT_TRUE(json->GetValue("CachedCount")->IsNumber());
+    EXPECT_TRUE(json->GetValue("Editable")->IsBool());
+    auto indexes = json->GetObject("GridLayoutOptions")->GetValue("irregularIndexes");
+    ASSERT_TRUE(indexes->IsArray());
+    ASSERT_EQ(indexes->GetArraySize(), 2);
+    EXPECT_EQ(indexes->GetArrayItem(0)->GetInt(), 1);
+    EXPECT_EQ(indexes->GetArrayItem(1)->GetInt(), 3);
+    auto legacy = JsonUtil::Create();
+    pattern->DumpAdvanceInfo(legacy, ParamConfig());
+    EXPECT_EQ(legacy->GetString("MaxCount"), "4");
+    EXPECT_EQ(legacy->GetString("Editable"), "1");
+    EXPECT_EQ(legacy->GetString("GridLayoutOptions"), "IrregularIndexes: [1, 3]");
+}
+
+HWTEST_F(UITreeCollectorTest, ConfirmedTabRegionArrayAndLegacyText, TestSize.Level1)
+{
+    auto pattern = AceType::MakeRefPtr<TabBarPattern>();
+    auto host = Frame(V2::TAB_BAR_ETS_TAG, pattern);
+    pattern->SetAnimationDuration(120);
+    auto json = JsonUtil::Create();
+    pattern->DumpAdvanceInfo(json, PublicPropertyConfig(true, false));
+    EXPECT_TRUE(json->GetValue("animationDuration")->IsNumber());
+    auto region = json->GetValue("region");
+    ASSERT_TRUE(region->IsArray());
+    ASSERT_EQ(region->GetArraySize(), 4);
+    for (int i = 0; i < region->GetArraySize(); ++i) {
+        EXPECT_TRUE(region->GetArrayItem(i)->IsBool());
+        EXPECT_FALSE(region->GetArrayItem(i)->GetBool());
+    }
+    auto legacy = JsonUtil::Create();
+    pattern->DumpAdvanceInfo(legacy, ParamConfig());
+    EXPECT_EQ(legacy->GetString("region"), "false false false false ");
+    EXPECT_EQ(legacy->GetString("animationDuration"), "120");
+}
+
+HWTEST_F(UITreeCollectorTest, ConfirmedRestoredOpacityKeepsLegacyValue, TestSize.Level1)
+{
+    auto pattern = AceType::MakeRefPtr<TreeOpacityListItem>();
+    auto host = Frame(V2::LIST_ITEM_ETS_TAG, pattern);
+    pattern->SaveOpacity(0.5);
+    auto json = JsonUtil::Create();
+    pattern->DumpAdvanceInfo(json, PublicPropertyConfig(true, false));
+    EXPECT_FALSE(json->Contains("enableOpacity"));
+    EXPECT_TRUE(json->GetValue("restoredOpacity")->IsNumber());
+    EXPECT_DOUBLE_EQ(json->GetDouble("restoredOpacity"), 0.5);
+    auto legacy = JsonUtil::Create();
+    pattern->DumpAdvanceInfo(legacy, ParamConfig());
+    EXPECT_EQ(legacy->GetString("enableOpacity"), "true:");
+    EXPECT_FALSE(legacy->Contains("restoredOpacity"));
+}
+
+HWTEST_F(UITreeCollectorTest, ConfirmedGradientColorsUnitsAndTypeParameters, TestSize.Level1)
+{
+    Gradient gradient;
+    gradient.CreateGradientWithType(GradientType::LINEAR);
+    gradient.SetRepeat(true);
+    gradient.GetLinearGradient()->angle = Dimension(90, DimensionUnit::PX);
+    gradient.GetLinearGradient()->linearY = GradientDirection::BOTTOM;
+    GradientColor first;
+    first.SetColor(Color::RED);
+    first.SetDimension(Dimension(50, DimensionUnit::PERCENT));
+    gradient.AddColor(first);
+    GradientColor second;
+    second.SetColor(Color::BLUE);
+    second.SetHasValue(false);
+    gradient.AddColor(second);
+    auto json = GradientJsonUtils::ToTreeJson(gradient);
+    ASSERT_NE(json, nullptr);
+    EXPECT_EQ(json->GetString("type"), "linear");
+    EXPECT_TRUE(json->GetValue("angle")->IsNumber());
+    EXPECT_DOUBLE_EQ(json->GetDouble("angle"), 90);
+    EXPECT_EQ(json->GetString("direction"), "GradientDirection.Bottom");
+    EXPECT_TRUE(json->GetValue("repeating")->IsBool());
+    EXPECT_TRUE(json->GetBool("repeating"));
+    auto colors = json->GetValue("colors");
+    ASSERT_EQ(colors->GetArraySize(), 2);
+    EXPECT_EQ(colors->GetArrayItem(0)->GetString("color"), "#FFFF0000");
+    EXPECT_EQ(colors->GetArrayItem(0)->GetString("offset"), "50.00%");
+    EXPECT_FALSE(colors->GetArrayItem(1)->Contains("offset"));
+    auto legacy = GradientJsonUtils::LinearGradientToJson(gradient);
+    EXPECT_TRUE(legacy->GetValue("angle")->IsString());
+    EXPECT_EQ(legacy->GetString("repeating"), "true");
+    gradient.CreateGradientWithType(GradientType::SWEEP);
+    gradient.GetSweepGradient()->centerX = Dimension(0.5, DimensionUnit::PERCENT);
+    gradient.GetSweepGradient()->rotation = Dimension(45);
+    json = GradientJsonUtils::ToTreeJson(gradient);
+    EXPECT_EQ(json->GetString("centerX"), "50.00%");
+    EXPECT_DOUBLE_EQ(json->GetDouble("rotation"), 45);
+    EXPECT_FALSE(json->Contains("centerY"));
+    gradient.CreateGradientWithType(GradientType::RADIAL);
+    gradient.GetRadialGradient()->radialHorizontalSize = Dimension(12, DimensionUnit::VP);
+    json = GradientJsonUtils::ToTreeJson(gradient);
+    EXPECT_EQ(json->GetString("horizontalSize"), "12.00vp");
+    EXPECT_FALSE(json->Contains("verticalSize"));
+}
+
+HWTEST_F(UITreeCollectorTest, ConfirmedKeyboardShortcutReadsWithoutInvokingCallbacks, TestSize.Level1)
+{
+    auto host = Frame("Button");
+    int callbacks = 0;
+    host->GetEventHub<EventHub>()->SetKeyboardShortcut("K", 3, [&callbacks] { ++callbacks; });
+    TreeCollectionState state;
+    auto config = PublicPropertyConfig(false, true);
+    config.collectionState = &state;
+    auto json = JsonUtil::CreateSharedPtrJson();
+    host->DumpSimplifyInfoWithParamConfig(json, config);
+    auto shortcuts = json->GetObject("advanced")->GetObject("functional")->GetValue("keyboardShortcuts");
+    ASSERT_TRUE(shortcuts->IsArray());
+    ASSERT_EQ(shortcuts->GetArraySize(), 1);
+    EXPECT_EQ(shortcuts->GetArrayItem(0)->GetString("value"), "K");
+    EXPECT_EQ(shortcuts->GetArrayItem(0)->GetInt("keys"), 3);
+    EXPECT_FALSE(shortcuts->GetArrayItem(0)->Contains("onKeyboardShortcutAction"));
+    EXPECT_EQ(callbacks, 0);
+    config.functionalProperties = false;
+    json = JsonUtil::CreateSharedPtrJson();
+    host->DumpSimplifyInfoWithParamConfig(json, config);
+    EXPECT_FALSE(json->Contains("advanced"));
+}
+
+HWTEST_F(UITreeCollectorTest, ConfirmedWaterFlowSectionsOmitCallbacksAndAbsentValues, TestSize.Level1)
+{
+    auto pattern = AceType::MakeRefPtr<WaterFlowPattern>();
+    auto host = Frame(V2::WATERFLOW_ETS_TAG, pattern);
+    int callbacks = 0;
+    WaterFlowSections::Section section;
+    section.itemsCount = 4;
+    section.crossCount = 2;
+    section.rowsGap = Dimension(8, DimensionUnit::VP);
+    section.onGetItemMainSizeByIndex = [&callbacks](int32_t) { ++callbacks; return 20.0f; };
+    pattern->GetOrCreateWaterFlowSections()->ChangeData(0, 0, { section });
+    auto json = JsonUtil::Create();
+    pattern->DumpAdvanceInfo(json, PublicPropertyConfig(false, true));
+    auto sections = json->GetValue("sections");
+    ASSERT_TRUE(sections->IsArray());
+    ASSERT_EQ(sections->GetArraySize(), 1);
+    auto entry = sections->GetArrayItem(0);
+    EXPECT_EQ(entry->GetInt("itemsCount"), 4);
+    EXPECT_EQ(entry->GetInt("crossCount"), 2);
+    EXPECT_EQ(entry->GetString("rowsGap"), "8.00vp");
+    EXPECT_FALSE(entry->Contains("columnsGap"));
+    EXPECT_FALSE(entry->Contains("onGetItemMainSizeByIndex"));
+    EXPECT_EQ(callbacks, 0);
+    auto legacy = JsonUtil::Create();
+    pattern->DumpAdvanceInfo(legacy, ParamConfig());
+    EXPECT_FALSE(legacy->Contains("sections"));
+}
+
+HWTEST_F(UITreeCollectorTest, ConfirmedAdditionalNumericReadersPreserveLegacyTypes, TestSize.Level1)
+{
+    auto list = AceType::MakeRefPtr<ListPattern>();
+    auto listHost = Frame(V2::LIST_ETS_TAG, list);
+    auto json = JsonUtil::Create();
+    list->DumpAdvanceInfo(json, PublicPropertyConfig(true, true));
+    EXPECT_TRUE(json->GetValue("lanes")->IsNumber());
+    EXPECT_TRUE(json->GetValue("laneGutter")->IsNumber());
+    EXPECT_TRUE(json->GetValue("alignListItem")->IsNumber());
+    EXPECT_TRUE(json->GetValue("sticky")->IsNumber());
+    auto legacy = JsonUtil::Create();
+    list->DumpAdvanceInfo(legacy, ParamConfig());
+    EXPECT_TRUE(legacy->GetValue("lanes")->IsString());
+    EXPECT_TRUE(legacy->GetValue("sticky")->IsString());
+    auto item = AceType::MakeRefPtr<GridItemPattern>(nullptr);
+    auto itemHost = Frame(V2::GRID_ITEM_ETS_TAG, item);
+    itemHost->GetLayoutProperty<GridItemLayoutProperty>()->UpdateRowStart(0);
+    json = JsonUtil::Create();
+    item->DumpAdvanceInfo(json, PublicPropertyConfig(true, false));
+    EXPECT_TRUE(json->GetValue("RowStart")->IsNumber());
+    EXPECT_EQ(json->GetInt("RowStart"), 0);
+    auto swiper = AceType::MakeRefPtr<SwiperPattern>();
+    auto swiperHost = Frame(V2::SWIPER_ETS_TAG, swiper);
+    json = JsonUtil::Create();
+    swiper->DumpAdvanceInfo(json, PublicPropertyConfig(true, false));
+    EXPECT_TRUE(json->GetValue("currentOffset")->IsNumber());
+    EXPECT_TRUE(json->GetValue("fadeOffset")->IsNumber());
+}
+
+HWTEST_F(UITreeCollectorTest, ConfirmedGradientHdrAndMissingDirection, TestSize.Level1)
+{
+    Gradient gradient;
+    gradient.CreateGradientWithType(GradientType::LINEAR);
+    ColorWithHeadRoom channels;
+    channels.red = 0.25f;
+    channels.green = 0.5f;
+    channels.blue = 0.75f;
+    channels.headRoom = 2.0f;
+    Color color(channels);
+    color.SetColorSpace(ColorSpace::DISPLAY_P3);
+    GradientColor stop;
+    stop.SetColor(color);
+    stop.SetDimension(Dimension(12, DimensionUnit::VP));
+    gradient.AddColor(stop);
+    auto json = GradientJsonUtils::ToTreeJson(gradient);
+    EXPECT_FALSE(json->Contains("direction"));
+    EXPECT_FALSE(json->Contains("angle"));
+    auto entry = json->GetValue("colors")->GetArrayItem(0);
+    EXPECT_EQ(entry->GetInt("colorSpace"), 1);
+    EXPECT_EQ(entry->GetString("offset"), "12.00vp");
+    EXPECT_DOUBLE_EQ(entry->GetObject("hdr")->GetDouble("red"), 0.25);
+    EXPECT_DOUBLE_EQ(entry->GetObject("hdr")->GetDouble("headRoom"), 2.0);
+}
+
+HWTEST_F(UITreeCollectorTest, ConfirmedImageSourceReferencesAndOtherSourceTypes, TestSize.Level1)
+{
+    auto pattern = AceType::MakeRefPtr<ImagePattern>();
+    auto host = Frame(V2::IMAGE_ETS_TAG, pattern);
+    auto property = host->GetLayoutProperty<ImageLayoutProperty>();
+    auto json = JsonUtil::Create();
+    pattern->DumpAdvanceInfo(json, PublicPropertyConfig(false, true));
+    EXPECT_FALSE(json->Contains("url"));
+    ImageSourceInfo resource;
+    resource.SetResourceId(static_cast<InternalResource::ResourceId>(123));
+    property->UpdateImageSourceInfo(resource);
+    json = JsonUtil::Create();
+    pattern->DumpAdvanceInfo(json, PublicPropertyConfig(false, true));
+    ASSERT_TRUE(json->GetValue("url")->IsObject());
+    EXPECT_EQ(json->GetObject("url")->GetInt("id"), 123);
+    auto legacy = JsonUtil::Create();
+    pattern->DumpAdvanceInfo(legacy, ParamConfig());
+    EXPECT_TRUE(legacy->GetValue("url")->IsString());
+    const std::string uri = "https://example.test/image.png";
+    property->UpdateImageSourceInfo(ImageSourceInfo(uri));
+    json = JsonUtil::Create();
+    pattern->DumpAdvanceInfo(json, PublicPropertyConfig(false, true));
+    EXPECT_EQ(json->GetString("url"), uri);
+    const auto data = std::string("data:image/png;base64,") + std::string(80, 'A');
+    property->UpdateImageSourceInfo(ImageSourceInfo(data));
+    json = JsonUtil::Create();
+    pattern->DumpAdvanceInfo(json, PublicPropertyConfig(false, true));
+    ASSERT_TRUE(json->GetValue("url")->IsObject());
+    EXPECT_EQ(json->GetObject("url")->GetString("sourceType"), "base64");
+    EXPECT_EQ(json->GetObject("url")->ToString(), R"({"sourceType":"base64"})");
+    property->UpdateImageSourceInfo(ImageSourceInfo(""));
+    json = JsonUtil::Create();
+    pattern->DumpAdvanceInfo(json, PublicPropertyConfig(false, true));
+    EXPECT_EQ(json->GetObject("url")->GetString("sourceType"), "unsupported");
+    json = JsonUtil::Create();
+    pattern->DumpAdvanceInfo(json, PublicPropertyConfig(true, false));
+    EXPECT_FALSE(json->Contains("url"));
+}
+
+HWTEST_F(UITreeCollectorTest, ConfirmedOtherImageSourcesOnlyExposeType, TestSize.Level1)
+{
+    auto pattern = AceType::MakeRefPtr<ImagePattern>();
+    auto host = Frame(V2::IMAGE_ETS_TAG, pattern);
+    auto property = host->GetLayoutProperty<ImageLayoutProperty>();
+    const std::pair<const char*, const char*> cases[] = {
+        { "memory://image", "memory" }, { "internal://cached-image", "internal" },
+        { "unknown-scheme://image", "unsupported" }
+    };
+    for (const auto& [source, type] : cases) {
+        property->UpdateImageSourceInfo(ImageSourceInfo(source));
+        auto json = JsonUtil::Create();
+        pattern->DumpAdvanceInfo(json, PublicPropertyConfig(false, true));
+        auto description = json->GetObject("url");
+        EXPECT_EQ(description->ToString(), std::string("{\"sourceType\":\"") + type + "\"}");
+    }
+}
+
 } // namespace OHOS::Ace::NG

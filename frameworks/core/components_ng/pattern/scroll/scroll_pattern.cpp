@@ -1579,12 +1579,20 @@ void ScrollPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const Para
     CHECK_NULL_VOID(hub);
     ScrollablePattern::DumpAdvanceInfo(json, config);
     if (!config.IsPublicTree() || config.visualProperties) {
-        json->Put("currentOffset", std::to_string(currentOffset_).c_str());
+        if (config.IsPublicTree()) {
+            json->Put("currentOffset", currentOffset_);
+        } else {
+            json->Put("currentOffset", std::to_string(currentOffset_).c_str());
+        }
     }
     if (!config.IsPublicTree() || config.functionalProperties) {
         DumpAdvanceSnapInfo(json, config);
         auto onScrollEdge = hub->GetScrollEdgeEvent();
-        json->Put("hasOnScrollEdge", onScrollEdge ? "true" : "false");
+        if (config.IsPublicTree()) {
+            json->Put("hasOnScrollEdge", static_cast<bool>(onScrollEdge));
+        } else {
+            json->Put("hasOnScrollEdge", onScrollEdge ? "true" : "false");
+        }
     }
     if (!config.IsPublicTree()) {
         DumpAdvanceHistoryInfo(json);
@@ -1594,9 +1602,31 @@ void ScrollPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const Para
 void ScrollPattern::DumpAdvanceSnapInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
 {
     GetScrollSnapAlignDumpInfo(json);
-    json->Put("snapPagination", GetScrollSnapPagination().c_str());
-    json->Put("enableSnapToStart", enableSnapToSide_.first ? "true" : "false");
-    json->Put("enableSnapToEnd", enableSnapToSide_.second ? "true" : "false");
+    if (config.IsPublicTree()) {
+        auto pagination = JsonUtil::Create();
+        if (IsSnapToInterval()) {
+            pagination->Put("interval", intervalSize_.ToString().c_str());
+        } else {
+            auto offsets = JsonUtil::CreateArray();
+            for (size_t index = 0; index < snapPaginations_.size(); ++index) {
+                offsets->Put(std::to_string(index).c_str(), snapPaginations_[index].ToString().c_str());
+            }
+            pagination->PutRef("offsets", std::move(offsets));
+        }
+        json->PutRef("snapPagination", std::move(pagination));
+    } else {
+        json->Put("snapPagination", GetScrollSnapPagination().c_str());
+    }
+    if (config.IsPublicTree()) {
+        json->Put("enableSnapToStart", static_cast<bool>(enableSnapToSide_.first));
+    } else {
+        json->Put("enableSnapToStart", enableSnapToSide_.first ? "true" : "false");
+    }
+    if (config.IsPublicTree()) {
+        json->Put("enableSnapToEnd", static_cast<bool>(enableSnapToSide_.second));
+    } else {
+        json->Put("enableSnapToEnd", enableSnapToSide_.second ? "true" : "false");
+    }
     GetScrollPagingStatusDumpInfo(json);
     if (!config.IsPublicTree()) {
         std::string snapOffsetsStr = "";

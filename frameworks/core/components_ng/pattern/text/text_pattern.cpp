@@ -6183,7 +6183,11 @@ void TextPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamC
     if (!config.IsPublicTree() || config.functionalProperties) {
         // Legacy reports an empty map; public collection reports an installed binding.
         const bool menuState = config.IsPublicTree() ? !selectionMenuMap_.empty() : selectionMenuMap_.empty();
-        json->Put("BindSelectionMenu", std::to_string(menuState).c_str());
+        if (config.IsPublicTree()) {
+            json->Put("BindSelectionMenu", menuState);
+        } else {
+            json->Put("BindSelectionMenu", std::to_string(menuState).c_str());
+        }
     }
     if (!config.IsPublicTree() || config.visualProperties) {
         DumpAdvanceFontInfo(json, config);
@@ -6196,16 +6200,40 @@ void TextPattern::DumpAdvanceParagraphInfo(std::unique_ptr<JsonValue>& json, con
         return;
     }
     auto children = JsonUtil::Create(true);
-    children->Put("DidExceedMaxLines", std::to_string(pManager_->DidExceedMaxLines()).c_str());
-    children->Put("GetTextWidth", std::to_string(pManager_->GetTextWidth()).c_str());
-    children->Put("GetHeight", std::to_string(pManager_->GetHeight()).c_str());
+    if (config.IsPublicTree()) {
+        children->Put("DidExceedMaxLines", pManager_->DidExceedMaxLines());
+    } else {
+        children->Put("DidExceedMaxLines", std::to_string(pManager_->DidExceedMaxLines()).c_str());
+    }
+    if (config.IsPublicTree()) {
+        children->Put("GetTextWidth", pManager_->GetTextWidth());
+    } else {
+        children->Put("GetTextWidth", std::to_string(pManager_->GetTextWidth()).c_str());
+    }
+    if (config.IsPublicTree()) {
+        children->Put("GetHeight", pManager_->GetHeight());
+    } else {
+        children->Put("GetHeight", std::to_string(pManager_->GetHeight()).c_str());
+    }
     if (!config.IsPublicTree()) {
         children->Put("GetMaxWidth", std::to_string(pManager_->GetMaxWidth()).c_str());
         children->Put("GetMaxIntrinsicWidth", std::to_string(pManager_->GetMaxIntrinsicWidth()).c_str());
     }
-    children->Put("GetLineCount", std::to_string(pManager_->GetLineCount()).c_str());
-    children->Put("GetLongestLine", std::to_string(pManager_->GetLongestLine()).c_str());
-    children->Put("GetLongestLineWithIndent", std::to_string(pManager_->GetLongestLineWithIndent()).c_str());
+    if (config.IsPublicTree()) {
+        children->Put("GetLineCount", pManager_->GetLineCount());
+    } else {
+        children->Put("GetLineCount", std::to_string(pManager_->GetLineCount()).c_str());
+    }
+    if (config.IsPublicTree()) {
+        children->Put("GetLongestLine", pManager_->GetLongestLine());
+    } else {
+        children->Put("GetLongestLine", std::to_string(pManager_->GetLongestLine()).c_str());
+    }
+    if (config.IsPublicTree()) {
+        children->Put("GetLongestLineWithIndent", pManager_->GetLongestLineWithIndent());
+    } else {
+        children->Put("GetLongestLineWithIndent", std::to_string(pManager_->GetLongestLineWithIndent()).c_str());
+    }
     json->Put("from TextEngine paragraphs_ info", children);
 }
 
@@ -6217,8 +6245,16 @@ void TextPattern::DumpAdvanceFontInfo(std::unique_ptr<JsonValue>& json, const Pa
     CHECK_NULL_VOID(pipeline);
     auto fontScale = pipeline->GetFontScaleFromEnv(host);
     auto fontWeightScale = pipeline->GetFontWeightScale();
-    json->Put("fontScale", std::to_string(fontScale).c_str());
-    json->Put("fontWeightScale", std::to_string(fontWeightScale).c_str());
+    if (config.IsPublicTree()) {
+        json->Put("fontScale", fontScale);
+    } else {
+        json->Put("fontScale", std::to_string(fontScale).c_str());
+    }
+    if (config.IsPublicTree()) {
+        json->Put("fontWeightScale", fontWeightScale);
+    } else {
+        json->Put("fontWeightScale", std::to_string(fontWeightScale).c_str());
+    }
     auto renderContext = host->GetRenderContext();
     CHECK_NULL_VOID(renderContext);
     if (!config.IsPublicTree() && renderContext->HasForegroundColor()) {

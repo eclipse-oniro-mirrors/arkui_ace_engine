@@ -1516,7 +1516,7 @@ void ListItemPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const Pa
         json->Put("startDeleteAreaDistance", startDeleteAreaDistance_);
         json->Put("endDeleteAreaDistance", endDeleteAreaDistance_);
     }
-    if (!config.IsPublicTree() || config.visualProperties) {
+    if (!config.IsPublicTree()) {
         DumpAdvanceSwipeStateInfo(json);
     }
     if (!config.IsPublicTree() || config.functionalProperties) {
@@ -1534,9 +1534,9 @@ void ListItemPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const Pa
         json->Put("isSelected", isSelected_);
         json->Put("isHover", isHover_);
         json->Put("isPressed", isPressed_);
+        json->Put("isLayouted", isLayouted_);
     }
     if (!config.IsPublicTree()) {
-        json->Put("isLayouted", isLayouted_);
         json->Put("hasStartDeleteArea", hasStartDeleteArea_);
     }
     if (!config.IsPublicTree() || config.visualProperties) {
@@ -1550,7 +1550,7 @@ void ListItemPattern::DumpAdvanceVisualProperties(std::unique_ptr<JsonValue>& js
         return;
     }
     if (config.IsPublicTree()) {
-        json->Put("enableOpacity", enableOpacity_.value());
+        json->Put("restoredOpacity", enableOpacity_.value());
     } else {
         json->Put("enableOpacity", enableOpacity_.value() ? "true:" : "false");
     }

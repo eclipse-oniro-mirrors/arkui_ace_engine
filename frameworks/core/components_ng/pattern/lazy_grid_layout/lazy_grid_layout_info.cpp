@@ -388,8 +388,6 @@ void LazyGridLayoutInfo::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const
         json->Put("headerMainSize", headerMainSize_);
         json->Put("footerMainSize", footerMainSize_);
         json->Put("spaceWidth", spaceWidth_);
-    }
-    if (!config.IsPublicTree()) {
         json->Put("totalMainSize", totalMainSize_);
     }
 }

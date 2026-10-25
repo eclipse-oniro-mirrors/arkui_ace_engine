@@ -19,8 +19,10 @@
 #include "core/animation/velocity_motion.h"
 #include "core/components/common/layout/constants.h"
 #include "core/common/container.h"
+#include "core/components_ng/base/ui_tree_collector.h"
 #include "core/components_ng/pattern/scrollable/scrollable_model_ng.h"
 #include "core/components_ng/pattern/refresh/refresh_model_ng.h"
+#include "interfaces/inner_api/ui_session/param_config.h"
 
 namespace OHOS::Ace::NG {
 class WaterFlowScrollerTestNg : public WaterFlowTestNg {};
@@ -395,6 +397,43 @@ HWTEST_F(WaterFlowScrollerTestNg, onScrollIndex001, TestSize.Level1)
     UpdateCurrentOffset(-ITEM_MAIN_SIZE);
     EXPECT_EQ(firstIndex, 1);
     EXPECT_EQ(lastIndex, 6);
+}
+
+/**
+ * @tc.name: PublicReverseInFirstScrollIndex
+ * @tc.desc: Synchronous public collection in the first layout callback uses the layout direction.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowScrollerTestNg, PublicReverseInFirstScrollIndex, TestSize.Level1)
+{
+    auto model = CreateWaterFlow();
+    model.SetLayoutDirection(FlexDirection::COLUMN_REVERSE);
+    model.SetScrollBarMode(DisplayMode::ON);
+    int callbacks = 0;
+    model.SetOnScrollIndex([&](int32_t, int32_t) {
+        if (++callbacks != 1) {
+            return;
+        }
+        ASSERT_NE(pattern_->GetScrollBar(), nullptr);
+        EXPECT_FALSE(pattern_->GetScrollBar()->IsReverse());
+        TreeCollectionState state;
+        ParamConfig config;
+        config.dumpMode = TreeDumpMode::PUBLIC_TREE;
+        config.functionalProperties = true;
+        config.collectionState = &state;
+        auto json = JsonUtil::CreateSharedPtrJson();
+        // FULL collection also includes nodes whose first layout is still being finalized.
+        frameNode_->DumpSimplifyTreeWithParamConfig(0, json, false, config);
+        ASSERT_EQ(state.GetError(), 0);
+        auto functional = json->GetObject("advanced")->GetObject("functional");
+        ASSERT_TRUE(functional->GetValue("isReverse")->IsBool()) << json->ToString();
+        EXPECT_TRUE(functional->GetBool("isReverse"));
+    });
+    CreateWaterFlowItems();
+    CreateDone();
+    EXPECT_GE(callbacks, 1);
+    ASSERT_NE(pattern_->GetScrollBar(), nullptr);
+    EXPECT_TRUE(pattern_->GetScrollBar()->IsReverse());
 }
 
 /**
