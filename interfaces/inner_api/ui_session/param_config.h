@@ -19,8 +19,6 @@
 #include <cstdint>
 #include <string>
 
-#include "interfaces/inner_api/ui_session/inspector_tree_request.h"
-
 namespace OHOS::Ace::NG {
 class InspectorTreeRequestContext;
 }

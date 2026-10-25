@@ -39,7 +39,6 @@
 
 #include "core/components_ng/base/node_render_status_monitor.h"
 #include "core/components_ng/base/inspector_tree_request_context.h"
-#include "core/components_ng/pattern/menu/wrapper/menu_wrapper_pattern.h"
 #include "core/components_ng/base/ui_node.h"
 #include "core/components_ng/event/event_constants.h"
 #include "core/components_ng/layout/layout_algorithm.h"
@@ -1779,10 +1778,8 @@ void FrameNode::DumpInspectorTreeInfo(std::shared_ptr<JsonValue>& json, ParamCon
     if (gesture && gesture->HasInspectorMenu()) {
         auto pipeline = GetContextRefPtr();
         auto overlay = pipeline ? pipeline->GetOverlayManager() : nullptr;
-        auto wrapperNode = overlay ? overlay->GetMenuNode(GetId()) : nullptr;
-        auto wrapper = wrapperNode ? wrapperNode->GetPattern<MenuWrapperPattern>() : nullptr;
         auto attrs = json->GetObject("$attrs");
-        attrs->Put("expanded", wrapper && wrapper->IsShow());
+        attrs->Put("expanded", overlay && overlay->IsMenuShowForTarget(GetId()));
     }
     if (pattern_) {
         pattern_->AddInspectorTreeInfo(json, context);

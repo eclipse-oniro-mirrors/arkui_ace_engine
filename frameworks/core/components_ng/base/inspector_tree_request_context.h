@@ -19,8 +19,8 @@
 #include <functional>
 #include <optional>
 #include <set>
+#include <string>
 
-#include "interfaces/inner_api/ui_session/inspector_tree_request.h"
 #include "interfaces/inner_api/ui_session/param_config.h"
 
 #include "base/json/json_util.h"
@@ -30,6 +30,14 @@
 
 struct ArkUI_AccessibilityProvider;
 struct ThirdProviderTreeExportBudget;
+
+namespace OHOS::Ace {
+struct InspectorWindowSnapshot {
+    bool privacyWindow = false;
+    std::string windowTitle;
+    int32_t pid = 0;
+};
+} // namespace OHOS::Ace
 
 namespace OHOS::Ace::NG {
 class FrameNode;

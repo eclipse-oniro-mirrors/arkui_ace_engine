@@ -154,6 +154,7 @@
 #include "core/components/theme/shadow_theme.h"
 #include "core/components/popup/popup_theme.h"
 #include "core/components_ng/base/inspector.h"
+#include "core/components_ng/base/inspector_tree_request_context.h"
 #include "core/components_ng/base/view_abstract.h"
 #include "core/components_ng/manager/content_change_manager/content_change_manager.h"
 #include "core/components_ng/pattern/app_bar/app_bar_view.h"

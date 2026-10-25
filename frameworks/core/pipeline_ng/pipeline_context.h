@@ -62,6 +62,7 @@ namespace OHOS::Ace::NG {
 }
 
 namespace OHOS::Ace {
+struct InspectorWindowSnapshot;
 class AIWriteAdapter;
 class RRect;
 #ifndef CROSS_PLATFORM
@@ -1055,10 +1056,7 @@ public:
     void GetComponentOverlayInspector(std::shared_ptr<JsonValue>& root, RefPtr<NG::FrameNode> startNode,
         ParamConfig config, bool isInSubWindow, double parentFinalOpacity = 1.0) const;
 
-    void SetInspectorWindowSnapshotCallback(std::function<std::optional<InspectorWindowSnapshot>()>&& callback)
-    {
-        inspectorWindowSnapshot_ = std::move(callback);
-    }
+    void SetInspectorWindowSnapshotCallback(std::function<std::optional<InspectorWindowSnapshot>()>&& callback);
     const std::string& GetInspectorAppTitle() const { return inspectorAppTitle_; }
     void GetInspectorTree(bool onlyNeedVisible, ParamConfig config = ParamConfig());
     void CollectInspectorTreeInto(std::shared_ptr<JsonValue>& root, bool onlyNeedVisible, ParamConfig config);

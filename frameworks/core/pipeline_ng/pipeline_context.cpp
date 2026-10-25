@@ -7777,6 +7777,12 @@ void PipelineContext::DumpVisibleInspectorTree(std::shared_ptr<JsonValue>& rootJ
     }
 }
 
+void PipelineContext::SetInspectorWindowSnapshotCallback(
+    std::function<std::optional<InspectorWindowSnapshot>()>&& callback)
+{
+    inspectorWindowSnapshot_ = std::move(callback);
+}
+
 void PipelineContext::GetInspectorTree(bool onlyNeedVisible, ParamConfig config)
 {
     CHECK_NULL_VOID(taskExecutor_);
