@@ -774,9 +774,6 @@ void UiSaService::HandleInspectorTree(
             return;
         }
     }
-    if (!EnsureConnected(service)) {
-        return;
-    }
     auto now = []() {
         return std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::steady_clock::now().time_since_epoch()).count();
@@ -784,7 +781,7 @@ void UiSaService::HandleInspectorTree(
     const auto start = now();
     const std::string api = visible ? "GetVisibleInspectorTree" : "GetInspectorTree";
     auto count = std::make_shared<std::atomic<int32_t>>(0);
-    const auto filePath = UI_SA_PATH + "arkui_tree_" + caseId + "_" + GetCurrentTimestampStr() + ".json";
+    const auto filePath = UI_SA_PATH + "arkui_tree_" + GetCurrentTimestampStr() + ".json";
     auto callback = [toFile, filePath, start, now, api, caseId, count](std::string data, int32_t part, bool last) {
         const auto calls = ++*count;
         LOGI("[InspectorTree] caseId=%{public}s api=%{public}s bytes=%{public}zu part=%{public}d "
