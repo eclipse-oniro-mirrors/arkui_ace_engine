@@ -68,7 +68,7 @@ TEST(InspectorTreeTask06, SharedMemoryRejectsOversize)
     EXPECT_FALSE(memory->WriteToAshmem("inspector-test", "", 100 * 1024 * 1024 + 1));
 }
 
-TEST(InspectorTreeTask06, WindowCallbacksHandleSerialFullAndVisibleRequests)
+TEST(InspectorTreeTask06, FullKeepsLegacyDispatchAndVisibleUsesWindowCallbacks)
 {
     UIContentServiceStubImpl mainWindow;
     UIContentServiceStubImpl subWindow;
@@ -87,10 +87,10 @@ TEST(InspectorTreeTask06, WindowCallbacksHandleSerialFullAndVisibleRequests)
     config.withCustomContent = true;
     EXPECT_EQ(mainWindow.GetInspectorTree(nullptr, config), NO_ERROR);
     EXPECT_EQ(subWindow.GetInspectorTree(nullptr, config), NO_ERROR);
+    EXPECT_TRUE(requests.empty());
     EXPECT_EQ(subWindow.GetVisibleInspectorTree(nullptr, config), NO_ERROR);
     EXPECT_EQ(mainWindow.GetVisibleInspectorTree(nullptr, config), NO_ERROR);
-    EXPECT_EQ(requests,
-        (std::vector<std::pair<int32_t, bool>> { { 101, false }, { 202, false }, { 202, true }, { 101, true } }));
+    EXPECT_EQ(requests, (std::vector<std::pair<int32_t, bool>> { { 202, true }, { 101, true } }));
 }
 
 TEST(InspectorTreeTask06, ExistingTimeoutClearsCallbackAndAllowsNextRequest)

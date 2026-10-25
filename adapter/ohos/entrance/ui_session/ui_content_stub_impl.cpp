@@ -25,12 +25,7 @@ int32_t UIContentServiceStubImpl::GetInspectorTree(
     const std::function<void(std::string, int32_t, bool)>& eventCallback, ParamConfig config,
     [[maybe_unused]] int32_t timeout)
 {
-    auto inspector = GetInspectorFunction();
-    if (inspector) {
-        inspector(false, config);
-    } else {
-        UiSessionManager::GetInstance()->GetInspectorTree(config);
-    }
+    UiSessionManager::GetInstance()->GetInspectorTree(config);
     return NO_ERROR;
 }
 
