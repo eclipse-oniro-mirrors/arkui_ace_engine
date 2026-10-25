@@ -14,8 +14,6 @@
  */
 
 #include "core/components_ng/pattern/web/web_pattern.h"
-
-#include "core/components_ng/base/inspector_tree_request_context.h"
 #include "core/components_ng/manager/safe_area/safe_area_manager.h"
 
 #include <securec.h>
@@ -5214,12 +5212,7 @@ void WebPattern::AddExtraInfoWithParamConfig(
     if (config.withWeb && webDomDocument_->IsValid()) {
         auto offset = GetCoordinatePoint().value_or(OffsetF());
         webDomDocument_->UpdateOffset(offset);
-        auto children = webDomDocument_->ExportToJson();
-        if (!children || !children->IsArray() || !json->PutRef(WEB_DOM_JSON_CHILDREN, std::move(children))) {
-            if (config.inspectorContext) {
-                config.inspectorContext->ReportError(InspectorTreeError::COLLECTION_FAILED);
-            }
-        }
+        json->PutRef(WEB_DOM_JSON_CHILDREN, webDomDocument_->ExportToJson());
     }
 }
 
