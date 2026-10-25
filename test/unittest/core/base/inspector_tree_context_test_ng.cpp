@@ -84,10 +84,10 @@ TEST(InspectorTreeTask02, WindowCollectionPreservesErrorsAndRestoresPrivacy)
 TEST(InspectorTreeTask10, MarqueeReplicasDoNotDeduplicateIndependentLabels)
 {
     auto root = JsonUtil::CreateSharedPtrJson();
-    auto children = JsonUtil::ParseJsonString(R"([{"$type":"Marquee","$children":[
-        {"$type":"Text","$attrs":{"content":"same"}},
-        {"$type":"Text","$attrs":{"content":"same"}}]},
-        {"$type":"Text","$attrs":{"content":"same"}}])");
+    auto children = JsonUtil::ParseJsonString(R"([{"$type":"Marquee", "$children":[
+        {"$type":"Text", "$attrs":{"content":"same"}},
+        {"$type":"Text", "$attrs":{"content":"same"}}]},
+        {"$type":"Text", "$attrs":{"content":"same"}}])");
     root->Put("$children", children);
     InspectorTreeRequestContext context({}, {});
     context.FinalizeNativeTree(root);
@@ -125,13 +125,13 @@ TEST(InspectorTreeTask10, FinalizePreservesWideNativeTreeWithNewOptionsDisabled)
 TEST(InspectorTreeTask10, FinalizeVisitsNestedMarqueesWithoutSharingDeduplicationState)
 {
     std::shared_ptr<JsonValue> root = JsonUtil::ParseJsonString(R"({"$children":[
-        {"$type":"Marquee","$children":[
-            {"$type":"Text","$attrs":{"content":"same"}},
-            {"$type":"Text","$attrs":{"content":"same"}},
-            {"$type":"Column","$children":[{"$type":"Marquee","$children":[
-                {"$type":"Text","$attrs":{"content":"same"}},
-                {"$type":"Text","$attrs":{"content":"same"}}]}]}]},
-        {"$type":"Text","$attrs":{"content":"same"}}]})");
+        {"$type":"Marquee", "$children":[
+            {"$type":"Text", "$attrs":{"content":"same"}},
+            {"$type":"Text", "$attrs":{"content":"same"}},
+            {"$type":"Column", "$children":[{"$type":"Marquee", "$children":[
+                {"$type":"Text", "$attrs":{"content":"same"}},
+                {"$type":"Text", "$attrs":{"content":"same"}}]}]}]},
+        {"$type":"Text", "$attrs":{"content":"same"}}]})");
     InspectorTreeRequestContext context({}, {});
     context.FinalizeNativeTree(root);
     auto children = root->GetValue("$children");
