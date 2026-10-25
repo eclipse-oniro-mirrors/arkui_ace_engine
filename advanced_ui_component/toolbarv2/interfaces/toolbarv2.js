@@ -1,13 +1,13 @@
 /*
  * Copyright (c) 2024-2026 Huawei Device Co., Ltd.
- * Licensed under the Apache License, Version 2.0 (the 'License');
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an 'AS IS' BASIS,
+ * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
@@ -306,18 +306,6 @@ __decorate([Trace], ToolbarV2ItemGroup.prototype, 'space', void 0);
 __decorate([Trace], ToolbarV2ItemGroup.prototype, 'style', void 0);
 ToolbarV2ItemGroup = __decorate([ObservedV2], ToolbarV2ItemGroup);
 let AdvancedToolbarV2Item = class AdvancedToolbarV2Item extends ToolBarV2Item {
-  onGroupIDChange(monitor) {
-    this.onStructureChange?.();
-  }
-
-  onGroupStyleChange(monitor) {
-    this.onStructureChange?.();
-  }
-
-  onTitleConfigsChange(monitor) {
-    this.onStructureChange?.();
-  }
-
   constructor(options) {
     super({
       content: options.content,
@@ -341,6 +329,18 @@ let AdvancedToolbarV2Item = class AdvancedToolbarV2Item extends ToolBarV2Item {
     this.isShowOverflowMenu = options.isShowOverflowMenu;
     this.groupID = options.groupID;
     this.groupStyle = options.groupStyle;
+  }
+
+  onGroupIDChange(monitor) {
+    this.onStructureChange?.();
+  }
+
+  onGroupStyleChange(monitor) {
+    this.onStructureChange?.();
+  }
+
+  onTitleConfigsChange(monitor) {
+    this.onStructureChange?.();
   }
 };
 __decorate([Trace], AdvancedToolbarV2Item.prototype, 'builder', void 0);
@@ -791,16 +791,6 @@ export class ToolBarV2 extends ViewV2 {
     this.resetMonitorsOnReuse();
   }
 
-  onActivateIndexChange(monitor) {
-    this.localActivatedIndex = monitor.value('activatedIndex')?.now ?? -1;
-  }
-
-  onToolBarListChange(monitor) {
-    if (this.isAdvancedMode) {
-      this.rebuildAdvState();
-    }
-  }
-
   get menus() {
     this.menuContent = [];
     this.toolBarList.forEach((value, index) => {
@@ -818,6 +808,16 @@ export class ToolBarV2 extends ViewV2 {
       }
     });
     return this.menuContent;
+  }
+
+  onActivateIndexChange(monitor) {
+    this.localActivatedIndex = monitor.value('activatedIndex')?.now ?? -1;
+  }
+
+  onToolBarListChange(monitor) {
+    if (this.isAdvancedMode) {
+      this.rebuildAdvState();
+    }
   }
 
   aboutToAppear() {
@@ -847,14 +847,6 @@ export class ToolBarV2 extends ViewV2 {
     this.theme.fontPrimaryColor = theme.colors.fontPrimary;
     this.theme.fontActivatedPrimaryColor = theme.colors.fontEmphasize;
     this.theme.fontSecondaryColor = theme.colors.fontSecondary;
-  }
-
-  getAdvAccessibilityText(item) {
-    return item.accessibilityText;
-  }
-
-  getAdvAccessibilityDescription(item) {
-    return item.accessibilityDescription;
   }
 
   MoreTabBuilder(index, parent = null) {
@@ -1421,6 +1413,694 @@ export class ToolBarV2 extends ViewV2 {
       }
     }, If);
     If.pop();
+  }
+
+  onMeasureSize(selfLayoutInfo, children, constraint) {
+    this.fontSize = this.getFontSizeScale();
+    let sizeResult = { height: 0, width: 0 };
+    children.forEach((child) => {
+      let childMeasureResult = child.measure(constraint);
+      sizeResult.width = childMeasureResult.width;
+      sizeResult.height = childMeasureResult.height;
+    });
+    return sizeResult;
+  }
+
+  renderAdvItem(item, inGroup = false, parent = null) {
+    this.observeComponentCreation2((elmtId, isInitialRender) => {
+      If.create();
+      if (this.setItemContentBuilder(item) && this.itemContentBuilder) {
+        this.ifElseBranchUpdateFunction(0, () => {
+          this.observeComponentCreation2((elmtId, isInitialRender) => {
+            If.create();
+            if (this.getEffectiveDirection() === Axis.Vertical) {
+              this.ifElseBranchUpdateFunction(0, () => {
+                this.observeComponentCreation2((elmtId, isInitialRender) => {
+                  Column.create();
+                  Column.width(this.getEffectiveItemWidth(item, inGroup).value);
+                  Column.height(
+                    this.getEffectiveItemHeight(item, inGroup).value
+                  );
+                  Column.justifyContent(FlexAlign.Center);
+                  Column.alignItems(HorizontalAlign.Center);
+                  Column.borderRadius(
+                    this.getEffectiveItemBorderRadius(inGroup)
+                  );
+                  Column.backgroundColor(
+                    this.getEffectiveItemDisplayBg(item, inGroup)
+                  );
+                  Column.onHover((isHover) => {
+                    this.setItemHovered(item, isHover);
+                  });
+                  ViewStackProcessor.visualState('pressed');
+                  Column.backgroundColor(
+                    this.getEffectiveItemPressedBg(item, inGroup)
+                  );
+                  ViewStackProcessor.visualState();
+                  Column.onClick(() => {
+                    if (
+                      this.getEffectiveItemState(item) ===
+                      ToolBarV2ItemState.DISABLE
+                    ) {
+                      return;
+                    }
+                    this.advClickEventAction(item);
+                  });
+                  Column.accessibilityGroup(true);
+                  Column.accessibilityText(this.getAdvAccessibilityText(item));
+                  Column.accessibilityDescription(
+                    this.getAdvAccessibilityDescription(item)
+                  );
+                  Column.accessibilityLevel(item.accessibilityLevel);
+                  Column.enabled(
+                    this.getEffectiveItemState(item) !==
+                      ToolBarV2ItemState.DISABLE
+                  );
+                  Column.opacity(
+                    this.getEffectiveItemState(item) ===
+                      ToolBarV2ItemState.DISABLE
+                      ? 0.4
+                      : 1
+                  );
+                }, Column);
+                this.itemContentBuilder.bind(this)();
+                Column.pop();
+              });
+            } else {
+              this.ifElseBranchUpdateFunction(1, () => {
+                this.observeComponentCreation2((elmtId, isInitialRender) => {
+                  Row.create();
+                  Row.width(this.getEffectiveItemWidth(item, inGroup).value);
+                  Row.height(this.getEffectiveItemHeight(item, inGroup).value);
+                  Row.justifyContent(FlexAlign.Center);
+                  Row.alignItems(VerticalAlign.Center);
+                  Row.borderRadius(this.getEffectiveItemBorderRadius(inGroup));
+                  Row.backgroundColor(
+                    this.getEffectiveItemDisplayBg(item, inGroup)
+                  );
+                  Row.onHover((isHover) => {
+                    this.setItemHovered(item, isHover);
+                  });
+                  ViewStackProcessor.visualState('pressed');
+                  Row.backgroundColor(
+                    this.getEffectiveItemPressedBg(item, inGroup)
+                  );
+                  ViewStackProcessor.visualState();
+                  Row.onClick(() => {
+                    if (
+                      this.getEffectiveItemState(item) ===
+                      ToolBarV2ItemState.DISABLE
+                    ) {
+                      return;
+                    }
+                    this.advClickEventAction(item);
+                  });
+                  Row.accessibilityGroup(true);
+                  Row.accessibilityText(this.getAdvAccessibilityText(item));
+                  Row.accessibilityDescription(
+                    this.getAdvAccessibilityDescription(item)
+                  );
+                  Row.accessibilityLevel(item.accessibilityLevel);
+                  Row.enabled(
+                    this.getEffectiveItemState(item) !==
+                      ToolBarV2ItemState.DISABLE
+                  );
+                  Row.opacity(
+                    this.getEffectiveItemState(item) ===
+                      ToolBarV2ItemState.DISABLE
+                      ? 0.4
+                      : 1
+                  );
+                }, Row);
+                this.itemContentBuilder.bind(this)();
+                Row.pop();
+              });
+            }
+          }, If);
+          If.pop();
+        });
+      } else {
+        this.ifElseBranchUpdateFunction(1, () => {
+          this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Button.createWithChild({
+              type: ButtonType.Normal,
+              stateEffect: false,
+            });
+            Button.width(this.getEffectiveItemWidth(item, inGroup).value);
+            Button.height(this.getEffectiveItemHeight(item, inGroup).value);
+            Button.hoverEffect(HoverEffect.None);
+            Button.borderRadius(this.getEffectiveItemBorderRadius(false, item));
+            Button.backgroundColor(
+              this.getEffectiveItemDisplayBg(item, inGroup)
+            );
+            Button.onHover((isHover) => {
+              this.setItemHovered(item, isHover);
+            });
+            ViewStackProcessor.visualState('pressed');
+            Button.backgroundColor(
+              this.getEffectiveItemPressedBg(item, inGroup)
+            );
+            ViewStackProcessor.visualState();
+            Button.onClick(() => {
+              if (
+                this.getEffectiveItemState(item) === ToolBarV2ItemState.DISABLE
+              ) {
+                return;
+              }
+              this.advClickEventAction(item);
+            });
+            Button.accessibilityGroup(true);
+            Button.accessibilityText(this.getAdvAccessibilityText(item));
+            Button.accessibilityDescription(
+              this.getAdvAccessibilityDescription(item)
+            );
+            Button.accessibilityLevel(item.accessibilityLevel);
+            Button.enabled(
+              this.getEffectiveItemState(item) !== ToolBarV2ItemState.DISABLE
+            );
+            Button.opacity(
+              this.getEffectiveItemState(item) === ToolBarV2ItemState.DISABLE
+                ? 0.4
+                : 1
+            );
+            Button.padding(0);
+          }, Button);
+          this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Button.createWithChild({
+              type: ButtonType.Normal,
+              stateEffect: false,
+            });
+            Button.width(this.getEffectiveItemInnerWidth(item, inGroup).value);
+            Button.height(
+              this.getEffectiveItemInnerHeight(item, inGroup).value
+            );
+            Button.padding({
+              start: LengthMetrics.vp(ITEM_PADDING),
+              end: LengthMetrics.vp(ITEM_PADDING),
+            });
+            Button.borderRadius(
+              this.getEffectiveItemBorderRadius(inGroup, item)
+            );
+            Button.backgroundColor(this.getEffectiveItemInnerDisplayBg(item));
+          }, Button);
+          this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Column.create();
+            Column.justifyContent(FlexAlign.Center);
+            Column.alignItems(HorizontalAlign.Center);
+            Column.padding({
+              top: LengthMetrics.vp(ITEM_PADDING),
+              bottom: LengthMetrics.vp(ITEM_PADDING),
+            });
+          }, Column);
+          this.observeComponentCreation2((elmtId, isInitialRender) => {
+            If.create();
+            if (item.icon) {
+              this.ifElseBranchUpdateFunction(0, () => {
+                this.observeComponentCreation2((elmtId, isInitialRender) => {
+                  If.create();
+                  if (item.icon instanceof ToolBarV2SymbolGlyph) {
+                    this.ifElseBranchUpdateFunction(0, () => {
+                      this.observeComponentCreation2(
+                        (elmtId, isInitialRender) => {
+                          SymbolGlyph.create();
+                          SymbolGlyph.fontSize(IMAGE_SIZE);
+                          SymbolGlyph.symbolEffect(new SymbolEffect(), false);
+                          SymbolGlyph.attributeModifier.bind(this)(
+                            this.isItemActivated(item)
+                              ? item.icon.activated ?? item.icon.normal
+                              : item.icon.normal
+                          );
+                          SymbolGlyph.fontColor([
+                            this.getEffectiveItemIconColor(item),
+                          ]);
+                          SymbolGlyph.margin({
+                            bottom:
+                              item.content && item.isShowText !== false
+                                ? LengthMetrics.vp(ICON_TEXT_MARGIN)
+                                : LengthMetrics.vp(0),
+                          });
+                        },
+                        SymbolGlyph
+                      );
+                    });
+                  } else if (Util.isSymbolResource(item.icon.src)) {
+                    this.ifElseBranchUpdateFunction(1, () => {
+                      this.observeComponentCreation2(
+                        (elmtId, isInitialRender) => {
+                          SymbolGlyph.create(item.icon.src);
+                          SymbolGlyph.fontSize(IMAGE_SIZE);
+                          SymbolGlyph.fontColor([
+                            this.getEffectiveItemIconColor(item),
+                          ]);
+                          SymbolGlyph.margin({
+                            bottom:
+                              item.content && item.isShowText !== false
+                                ? LengthMetrics.vp(ICON_TEXT_MARGIN)
+                                : LengthMetrics.vp(0),
+                          });
+                        },
+                        SymbolGlyph
+                      );
+                    });
+                  } else {
+                    this.ifElseBranchUpdateFunction(2, () => {
+                      this.observeComponentCreation2(
+                        (elmtId, isInitialRender) => {
+                          Image.create(item.icon.src);
+                          Image.width(IMAGE_SIZE);
+                          Image.height(IMAGE_SIZE);
+                          Image.fillColor(this.getEffectiveItemIconColor(item));
+                          Image.objectFit(ImageFit.Contain);
+                          Image.draggable(false);
+                          Image.margin({
+                            bottom:
+                              item.content && item.isShowText !== false
+                                ? LengthMetrics.vp(ICON_TEXT_MARGIN)
+                                : LengthMetrics.vp(0),
+                          });
+                        },
+                        Image
+                      );
+                    });
+                  }
+                }, If);
+                If.pop();
+                this.observeComponentCreation2((elmtId, isInitialRender) => {
+                  If.create();
+                  if (item.content && item.isShowText !== false) {
+                    this.ifElseBranchUpdateFunction(0, () => {
+                      this.observeComponentCreation2(
+                        (elmtId, isInitialRender) => {
+                          Text.create(item.content.text);
+                          Text.fontColor(this.getEffectiveItemTextColor(item));
+                          Text.fontSize(this.getEffectiveItemFontSize());
+                          Text.fontWeight(FontWeight.Regular);
+                          Text.maxLines(1);
+                          Text.textOverflow({
+                            overflow: TextOverflow.Ellipsis,
+                          });
+                          Text.textAlign(TextAlign.Center);
+                        },
+                        Text
+                      );
+                      Text.pop();
+                    });
+                  } else {
+                    this.ifElseBranchUpdateFunction(1, () => {});
+                  }
+                }, If);
+                If.pop();
+              });
+            } else if (item.content) {
+              this.ifElseBranchUpdateFunction(1, () => {
+                this.observeComponentCreation2((elmtId, isInitialRender) => {
+                  Text.create(item.content.text);
+                  Text.fontColor(this.getEffectiveItemTextColor(item));
+                  Text.fontSize(this.getEffectiveItemFontSize());
+                  Text.fontWeight(FontWeight.Regular);
+                  Text.maxLines(1);
+                  Text.textOverflow({ overflow: TextOverflow.Ellipsis });
+                  Text.textAlign(TextAlign.Center);
+                }, Text);
+                Text.pop();
+              });
+            } else {
+              this.ifElseBranchUpdateFunction(2, () => {});
+            }
+          }, If);
+          If.pop();
+          Column.pop();
+          Button.pop();
+          Button.pop();
+        });
+      }
+    }, If);
+    If.pop();
+  }
+
+  renderAdvItemGroup(group, parent = null) {
+    this.observeComponentCreation2((elmtId, isInitialRender) => {
+      If.create();
+      if (this.getEffectiveDirection() === Axis.Vertical) {
+        this.ifElseBranchUpdateFunction(0, () => {
+          this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Column.create();
+            Column.width(
+              this.toLengthString(this.getEffectiveCrossAxisLength())
+            );
+            Column.alignItems(HorizontalAlign.Center);
+            Column.backgroundColor(this.getEffectiveGroupBg(group));
+            Column.borderRadius(this.getEffectiveGroupBorderRadius(group));
+            Column.borderWidth(this.getEffectiveGroupBorderWidth(group));
+            Column.borderColor(this.getEffectiveGroupBorderColor(group));
+            Column.padding(this.getEffectiveGroupPadding(group));
+            Column.clip(true);
+          }, Column);
+          this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Column.create({ space: this.getEffectiveGroupSpace(group) });
+          }, Column);
+          this.observeComponentCreation2((elmtId, isInitialRender) => {
+            ForEach.create();
+            const forEachItemGenFunction = (_item, index) => {
+              const item = _item;
+              this.renderAdvItem.bind(this)(item, true);
+              this.observeComponentCreation2((elmtId, isInitialRender) => {
+                If.create();
+                if (item.isShowSeparator === true) {
+                  this.ifElseBranchUpdateFunction(0, () => {
+                    this.observeComponentCreation2(
+                      (elmtId, isInitialRender) => {
+                        Divider.create();
+                        Divider.width(GROUP_DIVIDER_LENGTH);
+                        Divider.color({
+                          id: 125831013,
+                          type: 10001,
+                          params: ['sys.color.comp_divider'],
+                          bundleName: '__harDefaultBundleName__',
+                          moduleName: '__harDefaultModuleName__',
+                        });
+                      },
+                      Divider
+                    );
+                  });
+                } else {
+                  this.ifElseBranchUpdateFunction(1, () => {});
+                }
+              }, If);
+              If.pop();
+            };
+            this.forEachUpdateFunction(
+              elmtId,
+              group.items,
+              forEachItemGenFunction,
+              (item, index) => this.getGroupItemKey(item, index),
+              true,
+              true
+            );
+          }, ForEach);
+          ForEach.pop();
+          Column.pop();
+          Column.pop();
+        });
+      } else {
+        this.ifElseBranchUpdateFunction(1, () => {
+          this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Row.create();
+            Row.height(this.toLengthString(this.getEffectiveCrossAxisLength()));
+            Row.alignItems(VerticalAlign.Center);
+            Row.backgroundColor(this.getEffectiveGroupBg(group));
+            Row.borderRadius(this.getEffectiveGroupBorderRadius(group));
+            Row.borderWidth(this.getEffectiveGroupBorderWidth(group));
+            Row.borderColor(this.getEffectiveGroupBorderColor(group));
+            Row.padding(this.getEffectiveGroupPadding(group));
+            Row.clip(true);
+          }, Row);
+          this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Row.create({ space: this.getEffectiveGroupSpace(group) });
+          }, Row);
+          this.observeComponentCreation2((elmtId, isInitialRender) => {
+            ForEach.create();
+            const forEachItemGenFunction = (_item, index) => {
+              const item = _item;
+              this.renderAdvItem.bind(this)(item, true);
+              this.observeComponentCreation2((elmtId, isInitialRender) => {
+                If.create();
+                if (item.isShowSeparator === true) {
+                  this.ifElseBranchUpdateFunction(0, () => {
+                    this.observeComponentCreation2(
+                      (elmtId, isInitialRender) => {
+                        Divider.create();
+                        Divider.height(GROUP_DIVIDER_LENGTH);
+                        Divider.vertical(true);
+                        Divider.color({
+                          id: 125831013,
+                          type: 10001,
+                          params: ['sys.color.comp_divider'],
+                          bundleName: '__harDefaultBundleName__',
+                          moduleName: '__harDefaultModuleName__',
+                        });
+                      },
+                      Divider
+                    );
+                  });
+                } else {
+                  this.ifElseBranchUpdateFunction(1, () => {});
+                }
+              }, If);
+              If.pop();
+            };
+            this.forEachUpdateFunction(
+              elmtId,
+              group.items,
+              forEachItemGenFunction,
+              (item, index) => this.getGroupItemKey(item, index),
+              true,
+              true
+            );
+          }, ForEach);
+          ForEach.pop();
+          Row.pop();
+          Row.pop();
+        });
+      }
+    }, If);
+    If.pop();
+  }
+
+  renderAdvSingleItem(item, parent = null) {
+    this.observeComponentCreation2((elmtId, isInitialRender) => {
+      If.create();
+      if (this.getEffectiveDirection() === Axis.Vertical) {
+        this.ifElseBranchUpdateFunction(0, () => {
+          this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Column.create();
+            Column.width(
+              this.toLengthString(this.getEffectiveCrossAxisLength())
+            );
+            Column.alignItems(HorizontalAlign.Center);
+            Column.backgroundColor(this.getDefaultItemBg());
+            Column.borderRadius(this.getEffectiveBorderRadius());
+            Column.borderWidth(this.getEffectiveBorderWidth());
+            Column.borderColor(this.getEffectiveBorderColor());
+            Column.padding(this.getEffectivePadding());
+            Column.clip(true);
+          }, Column);
+          this.renderAdvItem.bind(this)(item, true);
+          Column.pop();
+        });
+      } else {
+        this.ifElseBranchUpdateFunction(1, () => {
+          this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Row.create();
+            Row.height(this.toLengthString(this.getEffectiveCrossAxisLength()));
+            Row.alignItems(VerticalAlign.Center);
+            Row.backgroundColor(this.getDefaultItemBg());
+            Row.borderRadius(this.getEffectiveBorderRadius());
+            Row.borderWidth(this.getEffectiveBorderWidth());
+            Row.borderColor(this.getEffectiveBorderColor());
+            Row.padding(this.getEffectivePadding());
+            Row.clip(true);
+          }, Row);
+          this.renderAdvItem.bind(this)(item, true);
+          Row.pop();
+        });
+      }
+    }, If);
+    If.pop();
+  }
+
+  renderAdvItemOrGroup(item, parent = null) {
+    this.observeComponentCreation2((elmtId, isInitialRender) => {
+      If.create();
+      if (this.isToolbarItemGroup(item)) {
+        this.ifElseBranchUpdateFunction(0, () => {
+          this.renderAdvItemGroup.bind(this)(item);
+        });
+      } else {
+        this.ifElseBranchUpdateFunction(1, () => {
+          this.renderAdvSingleItem.bind(this)(item);
+        });
+      }
+    }, If);
+    If.pop();
+  }
+
+  renderAdvTitle(parent = null) {
+    this.observeComponentCreation2((elmtId, isInitialRender) => {
+      If.create();
+      if (this.advTitleConfigs && (this.advTitleConfigs.visible ?? true)) {
+        this.ifElseBranchUpdateFunction(0, () => {
+          this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Column.create();
+            Column.justifyContent(FlexAlign.Center);
+            Column.alignItems(HorizontalAlign.Center);
+            Column.padding({
+              start: LengthMetrics.vp(ITEM_PADDING),
+              end: LengthMetrics.vp(ITEM_PADDING),
+              top: LengthMetrics.vp(ITEM_PADDING),
+              bottom: LengthMetrics.vp(ITEM_PADDING),
+            });
+          }, Column);
+          this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Text.create(this.advTitleConfigs.content);
+            Text.fontSize(this.getEffectiveTitleFontSize());
+            Text.fontColor(
+              this.advTitleConfigs.style?.fontColor?.color ??
+                this.theme.fontPrimaryColor
+            );
+            Text.fontWeight(this.getEffectiveTitleFontWeight());
+            Text.constraintSize({
+              minWidth: this.getEffectiveTitleMinLength(),
+            });
+          }, Text);
+          Text.pop();
+          Column.pop();
+        });
+      } else {
+        this.ifElseBranchUpdateFunction(1, () => {});
+      }
+    }, If);
+    If.pop();
+  }
+
+  advArea(placement, parent = null) {
+    this.observeComponentCreation2((elmtId, isInitialRender) => {
+      If.create();
+      if (this.getEffectiveDirection() === Axis.Vertical) {
+        this.ifElseBranchUpdateFunction(0, () => {
+          this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Column.create({ space: this.getEffectiveSpacing().value });
+            Column.width('100%');
+            Column.height('100%');
+            Column.justifyContent(
+              placement === ToolbarV2ItemPlacement.LEADING
+                ? FlexAlign.Start
+                : placement === ToolbarV2ItemPlacement.MAIN
+                ? FlexAlign.Center
+                : FlexAlign.End
+            );
+            Column.alignItems(HorizontalAlign.Center);
+          }, Column);
+          this.observeComponentCreation2((elmtId, isInitialRender) => {
+            If.create();
+            if (
+              (this.advTitleConfigs?.placement ??
+                ToolbarV2ItemPlacement.LEADING) === placement
+            ) {
+              this.ifElseBranchUpdateFunction(0, () => {
+                this.renderAdvTitle.bind(this)();
+              });
+            } else {
+              this.ifElseBranchUpdateFunction(1, () => {});
+            }
+          }, If);
+          If.pop();
+          this.observeComponentCreation2((elmtId, isInitialRender) => {
+            ForEach.create();
+            const forEachItemGenFunction = (_item, index) => {
+              const item = _item;
+              this.renderAdvItemOrGroup.bind(this)(item);
+            };
+            this.forEachUpdateFunction(
+              elmtId,
+              this.getItemsByPlacement(placement),
+              forEachItemGenFunction,
+              (item, index) =>
+                `toolbar_${placement}_${this.getEntryKey(item, index)}`,
+              true,
+              true
+            );
+          }, ForEach);
+          ForEach.pop();
+          Column.pop();
+        });
+      } else {
+        this.ifElseBranchUpdateFunction(1, () => {
+          this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Row.create({ space: this.getEffectiveSpacing().value });
+            Row.width('100%');
+            Row.height('100%');
+            Row.justifyContent(
+              placement === ToolbarV2ItemPlacement.LEADING
+                ? FlexAlign.Start
+                : placement === ToolbarV2ItemPlacement.MAIN
+                ? FlexAlign.Center
+                : FlexAlign.End
+            );
+            Row.alignItems(VerticalAlign.Center);
+          }, Row);
+          this.observeComponentCreation2((elmtId, isInitialRender) => {
+            If.create();
+            if (
+              (this.advTitleConfigs?.placement ??
+                ToolbarV2ItemPlacement.LEADING) === placement
+            ) {
+              this.ifElseBranchUpdateFunction(0, () => {
+                this.renderAdvTitle.bind(this)();
+              });
+            } else {
+              this.ifElseBranchUpdateFunction(1, () => {});
+            }
+          }, If);
+          If.pop();
+          this.observeComponentCreation2((elmtId, isInitialRender) => {
+            ForEach.create();
+            const forEachItemGenFunction = (_item, index) => {
+              const item = _item;
+              this.renderAdvItemOrGroup.bind(this)(item);
+            };
+            this.forEachUpdateFunction(
+              elmtId,
+              this.getItemsByPlacement(placement),
+              forEachItemGenFunction,
+              (item, index) =>
+                `toolbar_${placement}_${this.getEntryKey(item, index)}`,
+              true,
+              true
+            );
+          }, ForEach);
+          ForEach.pop();
+          Row.pop();
+        });
+      }
+    }, If);
+    If.pop();
+  }
+
+  advToolbarContent(parent = null) {
+    this.observeComponentCreation2((elmtId, isInitialRender) => {
+      Stack.create();
+      Stack.width(
+        this.toLengthString(
+          this.getEffectiveDirection() === Axis.Vertical
+            ? this.getEffectiveCrossAxisLength()
+            : this.getEffectiveMainAxisLength()
+        )
+      );
+      Stack.height(
+        this.toLengthString(
+          this.getEffectiveDirection() === Axis.Vertical
+            ? this.getEffectiveMainAxisLength()
+            : this.getEffectiveCrossAxisLength()
+        )
+      );
+      Stack.clip(true);
+      Stack.onSizeChange((_oldValue, newValue) => {
+        this.onAdvContentMainAxisSizeChange(newValue);
+      });
+    }, Stack);
+    this.advArea.bind(this)(ToolbarV2ItemPlacement.LEADING);
+    this.advArea.bind(this)(ToolbarV2ItemPlacement.TRAILING);
+    this.advArea.bind(this)(ToolbarV2ItemPlacement.MAIN);
+    Stack.pop();
+  }
+
+  getAdvAccessibilityText(item) {
+    return item.accessibilityText;
+  }
+
+  getAdvAccessibilityDescription(item) {
+    return item.accessibilityDescription;
   }
 
   getFontSizeScale() {
@@ -2274,686 +2954,6 @@ export class ToolBarV2 extends ViewV2 {
     return Math.max(0, raw);
   }
 
-  onMeasureSize(selfLayoutInfo, children, constraint) {
-    this.fontSize = this.getFontSizeScale();
-    let sizeResult = { height: 0, width: 0 };
-    children.forEach((child) => {
-      let childMeasureResult = child.measure(constraint);
-      sizeResult.width = childMeasureResult.width;
-      sizeResult.height = childMeasureResult.height;
-    });
-    return sizeResult;
-  }
-
-  renderAdvItem(item, inGroup = false, parent = null) {
-    this.observeComponentCreation2((elmtId, isInitialRender) => {
-      If.create();
-      if (this.setItemContentBuilder(item) && this.itemContentBuilder) {
-        this.ifElseBranchUpdateFunction(0, () => {
-          this.observeComponentCreation2((elmtId, isInitialRender) => {
-            If.create();
-            if (this.getEffectiveDirection() === Axis.Vertical) {
-              this.ifElseBranchUpdateFunction(0, () => {
-                this.observeComponentCreation2((elmtId, isInitialRender) => {
-                  Column.create();
-                  Column.width(this.getEffectiveItemWidth(item, inGroup).value);
-                  Column.height(
-                    this.getEffectiveItemHeight(item, inGroup).value
-                  );
-                  Column.justifyContent(FlexAlign.Center);
-                  Column.alignItems(HorizontalAlign.Center);
-                  Column.borderRadius(
-                    this.getEffectiveItemBorderRadius(inGroup)
-                  );
-                  Column.backgroundColor(
-                    this.getEffectiveItemDisplayBg(item, inGroup)
-                  );
-                  Column.onHover((isHover) => {
-                    this.setItemHovered(item, isHover);
-                  });
-                  ViewStackProcessor.visualState('pressed');
-                  Column.backgroundColor(
-                    this.getEffectiveItemPressedBg(item, inGroup)
-                  );
-                  ViewStackProcessor.visualState();
-                  Column.onClick(() => {
-                    if (
-                      this.getEffectiveItemState(item) ===
-                      ToolBarV2ItemState.DISABLE
-                    ) {
-                      return;
-                    }
-                    this.advClickEventAction(item);
-                  });
-                  Column.accessibilityGroup(true);
-                  Column.accessibilityText(this.getAdvAccessibilityText(item));
-                  Column.accessibilityDescription(
-                    this.getAdvAccessibilityDescription(item)
-                  );
-                  Column.accessibilityLevel(item.accessibilityLevel);
-                  Column.enabled(
-                    this.getEffectiveItemState(item) !==
-                      ToolBarV2ItemState.DISABLE
-                  );
-                  Column.opacity(
-                    this.getEffectiveItemState(item) ===
-                      ToolBarV2ItemState.DISABLE
-                      ? 0.4
-                      : 1
-                  );
-                }, Column);
-                this.itemContentBuilder.bind(this)();
-                Column.pop();
-              });
-            } else {
-              this.ifElseBranchUpdateFunction(1, () => {
-                this.observeComponentCreation2((elmtId, isInitialRender) => {
-                  Row.create();
-                  Row.width(this.getEffectiveItemWidth(item, inGroup).value);
-                  Row.height(this.getEffectiveItemHeight(item, inGroup).value);
-                  Row.justifyContent(FlexAlign.Center);
-                  Row.alignItems(VerticalAlign.Center);
-                  Row.borderRadius(this.getEffectiveItemBorderRadius(inGroup));
-                  Row.backgroundColor(
-                    this.getEffectiveItemDisplayBg(item, inGroup)
-                  );
-                  Row.onHover((isHover) => {
-                    this.setItemHovered(item, isHover);
-                  });
-                  ViewStackProcessor.visualState('pressed');
-                  Row.backgroundColor(
-                    this.getEffectiveItemPressedBg(item, inGroup)
-                  );
-                  ViewStackProcessor.visualState();
-                  Row.onClick(() => {
-                    if (
-                      this.getEffectiveItemState(item) ===
-                      ToolBarV2ItemState.DISABLE
-                    ) {
-                      return;
-                    }
-                    this.advClickEventAction(item);
-                  });
-                  Row.accessibilityGroup(true);
-                  Row.accessibilityText(this.getAdvAccessibilityText(item));
-                  Row.accessibilityDescription(
-                    this.getAdvAccessibilityDescription(item)
-                  );
-                  Row.accessibilityLevel(item.accessibilityLevel);
-                  Row.enabled(
-                    this.getEffectiveItemState(item) !==
-                      ToolBarV2ItemState.DISABLE
-                  );
-                  Row.opacity(
-                    this.getEffectiveItemState(item) ===
-                      ToolBarV2ItemState.DISABLE
-                      ? 0.4
-                      : 1
-                  );
-                }, Row);
-                this.itemContentBuilder.bind(this)();
-                Row.pop();
-              });
-            }
-          }, If);
-          If.pop();
-        });
-      } else {
-        this.ifElseBranchUpdateFunction(1, () => {
-          this.observeComponentCreation2((elmtId, isInitialRender) => {
-            Button.createWithChild({
-              type: ButtonType.Normal,
-              stateEffect: false,
-            });
-            Button.width(this.getEffectiveItemWidth(item, inGroup).value);
-            Button.height(this.getEffectiveItemHeight(item, inGroup).value);
-            Button.hoverEffect(HoverEffect.None);
-            Button.borderRadius(this.getEffectiveItemBorderRadius(false, item));
-            Button.backgroundColor(
-              this.getEffectiveItemDisplayBg(item, inGroup)
-            );
-            Button.onHover((isHover) => {
-              this.setItemHovered(item, isHover);
-            });
-            ViewStackProcessor.visualState('pressed');
-            Button.backgroundColor(
-              this.getEffectiveItemPressedBg(item, inGroup)
-            );
-            ViewStackProcessor.visualState();
-            Button.onClick(() => {
-              if (
-                this.getEffectiveItemState(item) === ToolBarV2ItemState.DISABLE
-              ) {
-                return;
-              }
-              this.advClickEventAction(item);
-            });
-            Button.accessibilityGroup(true);
-            Button.accessibilityText(this.getAdvAccessibilityText(item));
-            Button.accessibilityDescription(
-              this.getAdvAccessibilityDescription(item)
-            );
-            Button.accessibilityLevel(item.accessibilityLevel);
-            Button.enabled(
-              this.getEffectiveItemState(item) !== ToolBarV2ItemState.DISABLE
-            );
-            Button.opacity(
-              this.getEffectiveItemState(item) === ToolBarV2ItemState.DISABLE
-                ? 0.4
-                : 1
-            );
-            Button.padding(0);
-          }, Button);
-          this.observeComponentCreation2((elmtId, isInitialRender) => {
-            Button.createWithChild({
-              type: ButtonType.Normal,
-              stateEffect: false,
-            });
-            Button.width(this.getEffectiveItemInnerWidth(item, inGroup).value);
-            Button.height(
-              this.getEffectiveItemInnerHeight(item, inGroup).value
-            );
-            Button.padding({
-              start: LengthMetrics.vp(ITEM_PADDING),
-              end: LengthMetrics.vp(ITEM_PADDING),
-            });
-            Button.borderRadius(
-              this.getEffectiveItemBorderRadius(inGroup, item)
-            );
-            Button.backgroundColor(this.getEffectiveItemInnerDisplayBg(item));
-          }, Button);
-          this.observeComponentCreation2((elmtId, isInitialRender) => {
-            Column.create();
-            Column.justifyContent(FlexAlign.Center);
-            Column.alignItems(HorizontalAlign.Center);
-            Column.padding({
-              top: LengthMetrics.vp(ITEM_PADDING),
-              bottom: LengthMetrics.vp(ITEM_PADDING),
-            });
-          }, Column);
-          this.observeComponentCreation2((elmtId, isInitialRender) => {
-            If.create();
-            if (item.icon) {
-              this.ifElseBranchUpdateFunction(0, () => {
-                this.observeComponentCreation2((elmtId, isInitialRender) => {
-                  If.create();
-                  if (item.icon instanceof ToolBarV2SymbolGlyph) {
-                    this.ifElseBranchUpdateFunction(0, () => {
-                      this.observeComponentCreation2(
-                        (elmtId, isInitialRender) => {
-                          SymbolGlyph.create();
-                          SymbolGlyph.fontSize(IMAGE_SIZE);
-                          SymbolGlyph.symbolEffect(new SymbolEffect(), false);
-                          SymbolGlyph.attributeModifier.bind(this)(
-                            this.isItemActivated(item)
-                              ? item.icon.activated ?? item.icon.normal
-                              : item.icon.normal
-                          );
-                          SymbolGlyph.fontColor([
-                            this.getEffectiveItemIconColor(item),
-                          ]);
-                          SymbolGlyph.margin({
-                            bottom:
-                              item.content && item.isShowText !== false
-                                ? LengthMetrics.vp(ICON_TEXT_MARGIN)
-                                : LengthMetrics.vp(0),
-                          });
-                        },
-                        SymbolGlyph
-                      );
-                    });
-                  } else if (Util.isSymbolResource(item.icon.src)) {
-                    this.ifElseBranchUpdateFunction(1, () => {
-                      this.observeComponentCreation2(
-                        (elmtId, isInitialRender) => {
-                          SymbolGlyph.create(item.icon.src);
-                          SymbolGlyph.fontSize(IMAGE_SIZE);
-                          SymbolGlyph.fontColor([
-                            this.getEffectiveItemIconColor(item),
-                          ]);
-                          SymbolGlyph.margin({
-                            bottom:
-                              item.content && item.isShowText !== false
-                                ? LengthMetrics.vp(ICON_TEXT_MARGIN)
-                                : LengthMetrics.vp(0),
-                          });
-                        },
-                        SymbolGlyph
-                      );
-                    });
-                  } else {
-                    this.ifElseBranchUpdateFunction(2, () => {
-                      this.observeComponentCreation2(
-                        (elmtId, isInitialRender) => {
-                          Image.create(item.icon.src);
-                          Image.width(IMAGE_SIZE);
-                          Image.height(IMAGE_SIZE);
-                          Image.fillColor(this.getEffectiveItemIconColor(item));
-                          Image.objectFit(ImageFit.Contain);
-                          Image.draggable(false);
-                          Image.margin({
-                            bottom:
-                              item.content && item.isShowText !== false
-                                ? LengthMetrics.vp(ICON_TEXT_MARGIN)
-                                : LengthMetrics.vp(0),
-                          });
-                        },
-                        Image
-                      );
-                    });
-                  }
-                }, If);
-                If.pop();
-                this.observeComponentCreation2((elmtId, isInitialRender) => {
-                  If.create();
-                  if (item.content && item.isShowText !== false) {
-                    this.ifElseBranchUpdateFunction(0, () => {
-                      this.observeComponentCreation2(
-                        (elmtId, isInitialRender) => {
-                          Text.create(item.content.text);
-                          Text.fontColor(this.getEffectiveItemTextColor(item));
-                          Text.fontSize(this.getEffectiveItemFontSize());
-                          Text.fontWeight(FontWeight.Regular);
-                          Text.maxLines(1);
-                          Text.textOverflow({
-                            overflow: TextOverflow.Ellipsis,
-                          });
-                          Text.textAlign(TextAlign.Center);
-                        },
-                        Text
-                      );
-                      Text.pop();
-                    });
-                  } else {
-                    this.ifElseBranchUpdateFunction(1, () => {});
-                  }
-                }, If);
-                If.pop();
-              });
-            } else if (item.content) {
-              this.ifElseBranchUpdateFunction(1, () => {
-                this.observeComponentCreation2((elmtId, isInitialRender) => {
-                  Text.create(item.content.text);
-                  Text.fontColor(this.getEffectiveItemTextColor(item));
-                  Text.fontSize(this.getEffectiveItemFontSize());
-                  Text.fontWeight(FontWeight.Regular);
-                  Text.maxLines(1);
-                  Text.textOverflow({ overflow: TextOverflow.Ellipsis });
-                  Text.textAlign(TextAlign.Center);
-                }, Text);
-                Text.pop();
-              });
-            } else {
-              this.ifElseBranchUpdateFunction(2, () => {});
-            }
-          }, If);
-          If.pop();
-          Column.pop();
-          Button.pop();
-          Button.pop();
-        });
-      }
-    }, If);
-    If.pop();
-  }
-
-  renderAdvItemGroup(group, parent = null) {
-    this.observeComponentCreation2((elmtId, isInitialRender) => {
-      If.create();
-      if (this.getEffectiveDirection() === Axis.Vertical) {
-        this.ifElseBranchUpdateFunction(0, () => {
-          this.observeComponentCreation2((elmtId, isInitialRender) => {
-            Column.create();
-            Column.width(
-              this.toLengthString(this.getEffectiveCrossAxisLength())
-            );
-            Column.alignItems(HorizontalAlign.Center);
-            Column.backgroundColor(this.getEffectiveGroupBg(group));
-            Column.borderRadius(this.getEffectiveGroupBorderRadius(group));
-            Column.borderWidth(this.getEffectiveGroupBorderWidth(group));
-            Column.borderColor(this.getEffectiveGroupBorderColor(group));
-            Column.padding(this.getEffectiveGroupPadding(group));
-            Column.clip(true);
-          }, Column);
-          this.observeComponentCreation2((elmtId, isInitialRender) => {
-            Column.create({ space: this.getEffectiveGroupSpace(group) });
-          }, Column);
-          this.observeComponentCreation2((elmtId, isInitialRender) => {
-            ForEach.create();
-            const forEachItemGenFunction = (_item, index) => {
-              const item = _item;
-              this.renderAdvItem.bind(this)(item, true);
-              this.observeComponentCreation2((elmtId, isInitialRender) => {
-                If.create();
-                if (item.isShowSeparator === true) {
-                  this.ifElseBranchUpdateFunction(0, () => {
-                    this.observeComponentCreation2(
-                      (elmtId, isInitialRender) => {
-                        Divider.create();
-                        Divider.width(GROUP_DIVIDER_LENGTH);
-                        Divider.color({
-                          id: 125831013,
-                          type: 10001,
-                          params: ['sys.color.comp_divider'],
-                          bundleName: '__harDefaultBundleName__',
-                          moduleName: '__harDefaultModuleName__',
-                        });
-                      },
-                      Divider
-                    );
-                  });
-                } else {
-                  this.ifElseBranchUpdateFunction(1, () => {});
-                }
-              }, If);
-              If.pop();
-            };
-            this.forEachUpdateFunction(
-              elmtId,
-              group.items,
-              forEachItemGenFunction,
-              (item, index) => this.getGroupItemKey(item, index),
-              true,
-              true
-            );
-          }, ForEach);
-          ForEach.pop();
-          Column.pop();
-          Column.pop();
-        });
-      } else {
-        this.ifElseBranchUpdateFunction(1, () => {
-          this.observeComponentCreation2((elmtId, isInitialRender) => {
-            Row.create();
-            Row.height(this.toLengthString(this.getEffectiveCrossAxisLength()));
-            Row.alignItems(VerticalAlign.Center);
-            Row.backgroundColor(this.getEffectiveGroupBg(group));
-            Row.borderRadius(this.getEffectiveGroupBorderRadius(group));
-            Row.borderWidth(this.getEffectiveGroupBorderWidth(group));
-            Row.borderColor(this.getEffectiveGroupBorderColor(group));
-            Row.padding(this.getEffectiveGroupPadding(group));
-            Row.clip(true);
-          }, Row);
-          this.observeComponentCreation2((elmtId, isInitialRender) => {
-            Row.create({ space: this.getEffectiveGroupSpace(group) });
-          }, Row);
-          this.observeComponentCreation2((elmtId, isInitialRender) => {
-            ForEach.create();
-            const forEachItemGenFunction = (_item, index) => {
-              const item = _item;
-              this.renderAdvItem.bind(this)(item, true);
-              this.observeComponentCreation2((elmtId, isInitialRender) => {
-                If.create();
-                if (item.isShowSeparator === true) {
-                  this.ifElseBranchUpdateFunction(0, () => {
-                    this.observeComponentCreation2(
-                      (elmtId, isInitialRender) => {
-                        Divider.create();
-                        Divider.height(GROUP_DIVIDER_LENGTH);
-                        Divider.vertical(true);
-                        Divider.color({
-                          id: 125831013,
-                          type: 10001,
-                          params: ['sys.color.comp_divider'],
-                          bundleName: '__harDefaultBundleName__',
-                          moduleName: '__harDefaultModuleName__',
-                        });
-                      },
-                      Divider
-                    );
-                  });
-                } else {
-                  this.ifElseBranchUpdateFunction(1, () => {});
-                }
-              }, If);
-              If.pop();
-            };
-            this.forEachUpdateFunction(
-              elmtId,
-              group.items,
-              forEachItemGenFunction,
-              (item, index) => this.getGroupItemKey(item, index),
-              true,
-              true
-            );
-          }, ForEach);
-          ForEach.pop();
-          Row.pop();
-          Row.pop();
-        });
-      }
-    }, If);
-    If.pop();
-  }
-
-  renderAdvSingleItem(item, parent = null) {
-    this.observeComponentCreation2((elmtId, isInitialRender) => {
-      If.create();
-      if (this.getEffectiveDirection() === Axis.Vertical) {
-        this.ifElseBranchUpdateFunction(0, () => {
-          this.observeComponentCreation2((elmtId, isInitialRender) => {
-            Column.create();
-            Column.width(
-              this.toLengthString(this.getEffectiveCrossAxisLength())
-            );
-            Column.alignItems(HorizontalAlign.Center);
-            Column.backgroundColor(this.getDefaultItemBg());
-            Column.borderRadius(this.getEffectiveBorderRadius());
-            Column.borderWidth(this.getEffectiveBorderWidth());
-            Column.borderColor(this.getEffectiveBorderColor());
-            Column.padding(this.getEffectivePadding());
-            Column.clip(true);
-          }, Column);
-          this.renderAdvItem.bind(this)(item, true);
-          Column.pop();
-        });
-      } else {
-        this.ifElseBranchUpdateFunction(1, () => {
-          this.observeComponentCreation2((elmtId, isInitialRender) => {
-            Row.create();
-            Row.height(this.toLengthString(this.getEffectiveCrossAxisLength()));
-            Row.alignItems(VerticalAlign.Center);
-            Row.backgroundColor(this.getDefaultItemBg());
-            Row.borderRadius(this.getEffectiveBorderRadius());
-            Row.borderWidth(this.getEffectiveBorderWidth());
-            Row.borderColor(this.getEffectiveBorderColor());
-            Row.padding(this.getEffectivePadding());
-            Row.clip(true);
-          }, Row);
-          this.renderAdvItem.bind(this)(item, true);
-          Row.pop();
-        });
-      }
-    }, If);
-    If.pop();
-  }
-
-  renderAdvItemOrGroup(item, parent = null) {
-    this.observeComponentCreation2((elmtId, isInitialRender) => {
-      If.create();
-      if (this.isToolbarItemGroup(item)) {
-        this.ifElseBranchUpdateFunction(0, () => {
-          this.renderAdvItemGroup.bind(this)(item);
-        });
-      } else {
-        this.ifElseBranchUpdateFunction(1, () => {
-          this.renderAdvSingleItem.bind(this)(item);
-        });
-      }
-    }, If);
-    If.pop();
-  }
-
-  renderAdvTitle(parent = null) {
-    this.observeComponentCreation2((elmtId, isInitialRender) => {
-      If.create();
-      if (this.advTitleConfigs && (this.advTitleConfigs.visible ?? true)) {
-        this.ifElseBranchUpdateFunction(0, () => {
-          this.observeComponentCreation2((elmtId, isInitialRender) => {
-            Column.create();
-            Column.justifyContent(FlexAlign.Center);
-            Column.alignItems(HorizontalAlign.Center);
-            Column.padding({
-              start: LengthMetrics.vp(ITEM_PADDING),
-              end: LengthMetrics.vp(ITEM_PADDING),
-              top: LengthMetrics.vp(ITEM_PADDING),
-              bottom: LengthMetrics.vp(ITEM_PADDING),
-            });
-          }, Column);
-          this.observeComponentCreation2((elmtId, isInitialRender) => {
-            Text.create(this.advTitleConfigs.content);
-            Text.fontSize(this.getEffectiveTitleFontSize());
-            Text.fontColor(
-              this.advTitleConfigs.style?.fontColor?.color ??
-                this.theme.fontPrimaryColor
-            );
-            Text.fontWeight(this.getEffectiveTitleFontWeight());
-            Text.constraintSize({
-              minWidth: this.getEffectiveTitleMinLength(),
-            });
-          }, Text);
-          Text.pop();
-          Column.pop();
-        });
-      } else {
-        this.ifElseBranchUpdateFunction(1, () => {});
-      }
-    }, If);
-    If.pop();
-  }
-
-  advArea(placement, parent = null) {
-    this.observeComponentCreation2((elmtId, isInitialRender) => {
-      If.create();
-      if (this.getEffectiveDirection() === Axis.Vertical) {
-        this.ifElseBranchUpdateFunction(0, () => {
-          this.observeComponentCreation2((elmtId, isInitialRender) => {
-            Column.create({ space: this.getEffectiveSpacing().value });
-            Column.width('100%');
-            Column.height('100%');
-            Column.justifyContent(
-              placement === ToolbarV2ItemPlacement.LEADING
-                ? FlexAlign.Start
-                : placement === ToolbarV2ItemPlacement.MAIN
-                ? FlexAlign.Center
-                : FlexAlign.End
-            );
-            Column.alignItems(HorizontalAlign.Center);
-          }, Column);
-          this.observeComponentCreation2((elmtId, isInitialRender) => {
-            If.create();
-            if (
-              (this.advTitleConfigs?.placement ??
-                ToolbarV2ItemPlacement.LEADING) === placement
-            ) {
-              this.ifElseBranchUpdateFunction(0, () => {
-                this.renderAdvTitle.bind(this)();
-              });
-            } else {
-              this.ifElseBranchUpdateFunction(1, () => {});
-            }
-          }, If);
-          If.pop();
-          this.observeComponentCreation2((elmtId, isInitialRender) => {
-            ForEach.create();
-            const forEachItemGenFunction = (_item, index) => {
-              const item = _item;
-              this.renderAdvItemOrGroup.bind(this)(item);
-            };
-            this.forEachUpdateFunction(
-              elmtId,
-              this.getItemsByPlacement(placement),
-              forEachItemGenFunction,
-              (item, index) =>
-                `toolbar_${placement}_${this.getEntryKey(item, index)}`,
-              true,
-              true
-            );
-          }, ForEach);
-          ForEach.pop();
-          Column.pop();
-        });
-      } else {
-        this.ifElseBranchUpdateFunction(1, () => {
-          this.observeComponentCreation2((elmtId, isInitialRender) => {
-            Row.create({ space: this.getEffectiveSpacing().value });
-            Row.width('100%');
-            Row.height('100%');
-            Row.justifyContent(
-              placement === ToolbarV2ItemPlacement.LEADING
-                ? FlexAlign.Start
-                : placement === ToolbarV2ItemPlacement.MAIN
-                ? FlexAlign.Center
-                : FlexAlign.End
-            );
-            Row.alignItems(VerticalAlign.Center);
-          }, Row);
-          this.observeComponentCreation2((elmtId, isInitialRender) => {
-            If.create();
-            if (
-              (this.advTitleConfigs?.placement ??
-                ToolbarV2ItemPlacement.LEADING) === placement
-            ) {
-              this.ifElseBranchUpdateFunction(0, () => {
-                this.renderAdvTitle.bind(this)();
-              });
-            } else {
-              this.ifElseBranchUpdateFunction(1, () => {});
-            }
-          }, If);
-          If.pop();
-          this.observeComponentCreation2((elmtId, isInitialRender) => {
-            ForEach.create();
-            const forEachItemGenFunction = (_item, index) => {
-              const item = _item;
-              this.renderAdvItemOrGroup.bind(this)(item);
-            };
-            this.forEachUpdateFunction(
-              elmtId,
-              this.getItemsByPlacement(placement),
-              forEachItemGenFunction,
-              (item, index) =>
-                `toolbar_${placement}_${this.getEntryKey(item, index)}`,
-              true,
-              true
-            );
-          }, ForEach);
-          ForEach.pop();
-          Row.pop();
-        });
-      }
-    }, If);
-    If.pop();
-  }
-
-  advToolbarContent(parent = null) {
-    this.observeComponentCreation2((elmtId, isInitialRender) => {
-      Stack.create();
-      Stack.width(
-        this.toLengthString(
-          this.getEffectiveDirection() === Axis.Vertical
-            ? this.getEffectiveCrossAxisLength()
-            : this.getEffectiveMainAxisLength()
-        )
-      );
-      Stack.height(
-        this.toLengthString(
-          this.getEffectiveDirection() === Axis.Vertical
-            ? this.getEffectiveMainAxisLength()
-            : this.getEffectiveCrossAxisLength()
-        )
-      );
-      Stack.clip(true);
-      Stack.onSizeChange((_oldValue, newValue) => {
-        this.onAdvContentMainAxisSizeChange(newValue);
-      });
-    }, Stack);
-    this.advArea.bind(this)(ToolbarV2ItemPlacement.LEADING);
-    this.advArea.bind(this)(ToolbarV2ItemPlacement.TRAILING);
-    this.advArea.bind(this)(ToolbarV2ItemPlacement.MAIN);
-    Stack.pop();
-  }
-
   initialRender() {
     this.observeComponentCreation2((elmtId, isInitialRender) => {
       If.create();
@@ -3118,6 +3118,7 @@ __decorate([Local], ToolBarV2.prototype, 'advIsMeasuring', void 0);
 __decorate([Local], ToolBarV2.prototype, 'advHoveredItems', void 0);
 __decorate([Local], ToolBarV2.prototype, 'advTitleConfigs', void 0);
 __decorate([Local], ToolBarV2.prototype, 'advEntries', void 0);
+__decorate([Computed], ToolBarV2.prototype, 'menus', null);
 __decorate(
   [Monitor('activatedIndex')],
   ToolBarV2.prototype,
@@ -3130,7 +3131,6 @@ __decorate(
   'onToolBarListChange',
   null
 );
-__decorate([Computed], ToolBarV2.prototype, 'menus', null);
 
 export default {
   ToolBarV2Item,
