@@ -706,6 +706,12 @@ void TabsModelStatic::SetBarOverlap(FrameNode* frameNode, bool barOverlap)
     SetBarBackgroundBlurStyle(frameNode, option);
 }
 
+void TabsModelStatic::SetKeepTabBarInSideBar(FrameNode* frameNode, bool keepTabBarInSideBar)
+{
+    CHECK_NULL_VOID(frameNode);
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(TabsLayoutProperty, KeepTabBarInSideBar, keepTabBarInSideBar, frameNode);
+}
+
 void TabsModelStatic::SetBarBackgroundBlurStyle(FrameNode* frameNode, const BlurStyleOption& styleOption)
 {
     CHECK_NULL_VOID(frameNode);

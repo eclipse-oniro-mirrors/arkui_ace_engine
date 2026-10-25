@@ -233,8 +233,8 @@ float TabsLayoutAlgorithm::MeasureSideBarDivider(
         TabsItemDivider divider;
         if (layoutProperty->HasSidebarDivider()) {
             divider = layoutProperty->GetSidebarDividerValue();
-        } else if (layoutProperty->HasDivider()) {
-            divider = layoutProperty->GetDividerValue();
+        } else if (layoutProperty->HasDividerForSideBar()) {
+            divider = layoutProperty->GetDividerForSideBarValue();
         } else {
             break;
         }
@@ -324,17 +324,16 @@ void TabsLayoutAlgorithm::MeasureInSideBarMode(LayoutWrapper* layoutWrapper,
     if (swiperWrapper) {
         swiperWrapper->GetLayoutProperty()->UpdateLayoutDirection(layoutProperty->GetNonAutoLayoutDirection());
     }
-    SizeF swiperSize;
     if (swiperWrapper && swiperWrapper->GetHostNode() && swiperWrapper->GetHostNode()->TotalChildCount() > 0) {
-        swiperSize = MeasureSwiperInSideBarMode(
+        MeasureSwiperInSideBarMode(
             layoutProperty, swiperWrapper, idealSize, sideBarWidth, dividerStrokeWidth);
     } else if (swiperWrapper && swiperWrapper->GetGeometryNode()) {
         swiperWrapper->GetGeometryNode()->SetFrameSize(SizeF());
     }
     if (tabsNode->HasEffectNode()) {
-        auto effectWrapper = layoutWrapper->GetChildByIndex(itemIndex_.effectIndex);
+        auto effectWrapper = layoutWrapper->GetChildByIndex(tabsNode->GetEffectNodeIndex());
         if (effectWrapper) {
-            MeasureEffectNode(layoutProperty, effectWrapper, needMeasureEnterComponents ? idealSize : swiperSize);
+            MeasureEffectNode(layoutProperty, effectWrapper, idealSize);
         }
     }
     if (!needMeasureEnterComponents) {
@@ -510,7 +509,7 @@ void TabsLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
     // Only measure effectNode when it actually exists — otherwise
     // GetOrCreateChildByIndex(effectIndex) may return a different child.
     if (tabsNode->HasEffectNode()) {
-        auto effectWrapper = layoutWrapper->GetOrCreateChildByIndex(itemIndex_.effectIndex);
+        auto effectWrapper = layoutWrapper->GetOrCreateChildByIndex(tabsNode->GetEffectNodeIndex());
         if (effectWrapper) {
             MeasureEffectNode(layoutProperty, effectWrapper, idealSize);
         }
@@ -597,7 +596,8 @@ void TabsLayoutAlgorithm::LayoutInSideBarMode(LayoutWrapper* layoutWrapper)
     CHECK_NULL_VOID(geometryNode);
     auto frameSize = geometryNode->GetFrameSize();
     auto swiperWrapper = layoutWrapper->GetOrCreateChildByIndex(itemIndex_.swiperIndex);
-    auto effectWrapper = tabsNode->HasEffectNode() ? layoutWrapper->GetChildByIndex(itemIndex_.effectIndex) : nullptr;
+    auto effectWrapper =
+        tabsNode->HasEffectNode() ? layoutWrapper->GetChildByIndex(tabsNode->GetEffectNodeIndex()) : nullptr;
     if (!swiperWrapper || !sideBarDividerWrapper || !sideBarWrapper) {
         return;
     }
@@ -645,7 +645,7 @@ void TabsLayoutAlgorithm::LayoutBottomComponentsForAnimation(LayoutWrapper* layo
     auto tabBarWrapper = layoutWrapper->GetChildByIndex(itemIndex_.tabBarIndex);
     auto tabBarDividerWrapper = layoutWrapper->GetOrCreateChildByIndex(itemIndex_.dividerIndex);
     auto effectWrapper = tabsNode->HasEffectNode()
-        ? layoutWrapper->GetChildByIndex(itemIndex_.effectIndex) : nullptr;
+        ? layoutWrapper->GetChildByIndex(tabsNode->GetEffectNodeIndex()) : nullptr;
     CHECK_NULL_VOID(tabBarWrapper);
     CHECK_NULL_VOID(tabBarDividerWrapper);
 
@@ -709,7 +709,7 @@ void TabsLayoutAlgorithm::Layout(LayoutWrapper* layoutWrapper)
     auto tabBarWrapper = layoutWrapper->GetChildByIndex(itemIndex_.tabBarIndex);
     auto dividerWrapper = layoutWrapper->GetOrCreateChildByIndex(itemIndex_.dividerIndex);
     auto effectWrapper = tabsNode->HasEffectNode()
-        ? layoutWrapper->GetChildByIndex(itemIndex_.effectIndex) : nullptr;
+        ? layoutWrapper->GetChildByIndex(tabsNode->GetEffectNodeIndex()) : nullptr;
     auto swiperWrapper = layoutWrapper->GetOrCreateChildByIndex(itemIndex_.swiperIndex);
     if (!tabBarWrapper || !dividerWrapper || !swiperWrapper) {
         return;
@@ -785,7 +785,8 @@ void TabsLayoutAlgorithm::LayoutSidebarForAnimation(LayoutWrapper* layoutWrapper
         return;
     }
     MinusPaddingToSize(layoutProperty->CreatePaddingAndBorder(), frameSizeForSideBar);
-    auto effectWrapper = tabsNode->HasEffectNode() ? layoutWrapper->GetChildByIndex(itemIndex_.effectIndex) : nullptr;
+    auto effectWrapper =
+        tabsNode->HasEffectNode() ? layoutWrapper->GetChildByIndex(tabsNode->GetEffectNodeIndex()) : nullptr;
     auto offsets = LayoutOffsetListInSideBarMode(layoutWrapper, sideBarWrapper, effectWrapper, frameSizeForSideBar);
     auto sideBarGeo = sideBarWrapper->GetGeometryNode();
     if (sideBarGeo) {
@@ -977,9 +978,9 @@ void TabsLayoutAlgorithm::CalcEffectNodeOffsetInSideBarMode(LayoutWrapper* layou
     auto effectNodeFrameSize = effectNodeGeometryNode->GetMarginFrameSize();
     auto barPosition = GetBarPosition(layoutWrapper);
     if (barPosition == BarPosition::START) {
-        offsetList[EFFECT_NODE_INDEX] = OffsetF(offsetList[SWIPER_INDEX].GetX(), paddingOffset.GetY());
+        offsetList[EFFECT_NODE_INDEX] = OffsetF(paddingOffset.GetX(), paddingOffset.GetY());
     } else {
-        offsetList[EFFECT_NODE_INDEX] = OffsetF(offsetList[SWIPER_INDEX].GetX(),
+        offsetList[EFFECT_NODE_INDEX] = OffsetF(paddingOffset.GetX(),
             frameSize.Height() - effectNodeFrameSize.Height() + paddingOffset.GetY());
     }
 }
@@ -1023,8 +1024,8 @@ std::vector<OffsetF> TabsLayoutAlgorithm::LayoutOffsetListInSideBarMode(LayoutWr
     TabsItemDivider effectiveDivider;
     if (layoutProperty->HasSidebarDivider()) {
         effectiveDivider = layoutProperty->GetSidebarDividerValue();
-    } else if (layoutProperty->HasDivider()) {
-        effectiveDivider = layoutProperty->GetDividerValue();
+    } else if (layoutProperty->HasDividerForSideBar()) {
+        effectiveDivider = layoutProperty->GetDividerForSideBarValue();
     }
     if (!effectiveDivider.isNull && effectiveDivider.startMargin.Value() > 0.0f &&
         effectiveDivider.startMargin.Unit() != DimensionUnit::PERCENT) {

@@ -28,9 +28,9 @@ struct ArkUITabsCustomModifier {
     void (*setBarBackgroundBlurStyle)(ArkUINodeHandle node, void* styleOption);
     void (*setBarBackgroundColor)(ArkUINodeHandle node, ArkUI_Uint32 color);
     void (*setBarBackgroundEffect)(ArkUINodeHandle node, void* effectOption);
-    void (*setTabBarWidth)(ArkUINodeHandle node, void* tabBarWidth);
+    void (*setTabBarWidth)(ArkUINodeHandle node, void* tabBarWidth, bool updateForSideBar);
     void (*setTabBarHeight)(ArkUINodeHandle node, void* tabBarHeight);
-    void (*setDivider)(ArkUINodeHandle node, void* divider);
+    void (*setDivider)(ArkUINodeHandle node, void* divider, bool updateForSideBar);
     void (*setEffectNodeOption)(ArkUINodeHandle node, void* option);
     void (*setTabBarMode)(ArkUINodeHandle node, ArkUI_Int32 tabBarMode);
     void (*setScrollableBarModeOptions)(ArkUINodeHandle node, void* option);
@@ -53,6 +53,7 @@ struct ArkUITabsCustomModifier {
     void (*setTabBarOpacity)(ArkUINodeHandle node, ArkUI_Float32 opacity);
     void (*swipeTo)(ArkUINodeHandle node, ArkUI_Int32 index);
     int32_t (*getBarDisplayMode)(ArkUINodeHandle node);
+    void (*setKeepTabBarInSideBar)(ArkUINodeHandle node, ArkUI_Bool keep);
     void (*setTabBarClickIntercept)(ArkUINodeHandle node, ArkUI_Bool active);
     void (*tabBarClick)(ArkUINodeHandle node, ArkUI_Int32 index);
 };

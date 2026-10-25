@@ -2361,8 +2361,8 @@ TabsItemDivider TabsPattern::GetEffectiveSidebarDividerConfig() const
         auto divider = property->GetSidebarDividerValue();
         return divider;
     }
-    if (property->HasDivider()) {
-        auto divider = property->GetDividerValue();
+    if (property->HasDividerForSideBar()) {
+        auto divider = property->GetDividerForSideBarValue();
         return divider;
     }
     return TabsItemDivider();
@@ -2398,9 +2398,9 @@ void TabsPattern::UpdateSidebarDividerColor()
             color = currentDivider.color;
             hasColor = true;
         }
-    } else if (tabsProperty->HasDivider()) {
+    } else if (tabsProperty->HasDividerForSideBar()) {
         if (tabsProperty->HasDividerColorSetByUser() && tabsProperty->GetDividerColorSetByUserValue()) {
-            auto currentDivider = tabsProperty->GetDividerValue();
+            auto currentDivider = tabsProperty->GetDividerForSideBarValue();
             color = currentDivider.color;
             hasColor = true;
         }
@@ -2778,8 +2778,8 @@ std::optional<Dimension> TabsPattern::GetEffectiveSidebarWidth() const
         return std::nullopt;
     }
     // sidebarWidth API was never called: fall back to barWidth
-    if (property->HasBarWidth()) {
-        auto width = property->GetBarWidthValue();
+    if (property->HasBarWidthForSideBar()) {
+        auto width = property->GetBarWidthForSideBarValue();
         if (width.IsNonNegative()) {
             return width;
         }
@@ -3153,7 +3153,11 @@ void TabsPattern::ApplyEnteringElementInitialTransform(TabBarDisplayMode toMode)
     CHECK_NULL_VOID(host);
     auto tabBar = AceType::DynamicCast<FrameNode>(host->GetTabBar());
     auto tabBarDivider = AceType::DynamicCast<FrameNode>(host->GetDivider());
-    ApplyEnteringBottomTabBarInitialTransform(tabBar, tabBarDivider);
+    auto layoutProperty = host->GetLayoutProperty<TabsLayoutProperty>();
+    bool keepNode = layoutProperty && layoutProperty->GetKeepTabBarInSideBarValue(false);
+    if (!keepNode) {
+        ApplyEnteringBottomTabBarInitialTransform(tabBar, tabBarDivider);
+    }
 }
 
 void TabsPattern::ApplyEnteringSidebarInitialTransform(float outsideX)
@@ -3226,8 +3230,10 @@ void TabsPattern::ResetDisplayModeSwitchTransforms()
     auto tabBarDivider = AceType::DynamicCast<FrameNode>(host->GetDivider());
     auto bgMaskNode = host->HasBackgroundMaskNode() ?
         AceType::DynamicCast<FrameNode>(host->GetBackgroundMask()) : nullptr;
+    auto layoutProperty = host->GetLayoutProperty<TabsLayoutProperty>();
+    bool keepMode = layoutProperty && layoutProperty->GetKeepTabBarInSideBarValue(false);
 
-    if (tabBar) {
+    if (tabBar && !keepMode) {
         auto renderContext = tabBar->GetRenderContext();
         CHECK_NULL_VOID(renderContext);
         renderContext->UpdateTransformScale({ baseFloatingScale_, baseFloatingScale_ });
@@ -3241,7 +3247,7 @@ void TabsPattern::ResetDisplayModeSwitchTransforms()
         CHECK_NULL_VOID(renderContext);
         renderContext->UpdateTransformTranslate({ 0.0f, 0.0f, 0.0f });
     }
-    if (sideBarDivider) {
+    if (sideBarDivider && !keepMode) {
         auto renderContext = sideBarDivider->GetRenderContext();
         CHECK_NULL_VOID(renderContext);
         renderContext->UpdateTransformTranslate({ 0.0f, 0.0f, 0.0f });
@@ -3338,6 +3344,8 @@ void TabsPattern::ApplyNonFloatingTabBarAnimClosure(bool toSidebar, float outsid
     auto tabBarDivider = AceType::DynamicCast<FrameNode>(tabsNode->GetDivider());
     auto bgMaskNode = tabsNode->HasBackgroundMaskNode() ?
         AceType::DynamicCast<FrameNode>(tabsNode->GetBackgroundMask()) : nullptr;
+    auto layoutProperty = tabsNode->GetLayoutProperty<TabsLayoutProperty>();
+    bool keepMode = layoutProperty && layoutProperty->GetKeepTabBarInSideBarValue(false);
 
     float sideTranslateX = toSidebar ? 0.0f : outsideX;
     if (sideBar) {
@@ -3350,7 +3358,7 @@ void TabsPattern::ApplyNonFloatingTabBarAnimClosure(bool toSidebar, float outsid
         CHECK_NULL_VOID(renderContext);
         renderContext->UpdateTransformTranslate({ sideTranslateX, 0.0f, 0.0f });
     }
-    if (tabBar) {
+    if (tabBar && !keepMode) {
         auto renderContext = tabBar->GetRenderContext();
         CHECK_NULL_VOID(renderContext);
         if (toSidebar) {
@@ -3361,7 +3369,7 @@ void TabsPattern::ApplyNonFloatingTabBarAnimClosure(bool toSidebar, float outsid
             renderContext->UpdateOpacity(1.0);
         }
     }
-    if (tabBarDivider) {
+    if (tabBarDivider && !keepMode) {
         auto renderContext = tabBarDivider->GetRenderContext();
         CHECK_NULL_VOID(renderContext);
         if (toSidebar) {
