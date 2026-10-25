@@ -134,17 +134,6 @@ TEST(InspectorTreeTask02, RootErrorGateAndWholeRequestFailure)
     }
 }
 
-TEST(InspectorTreeTask02, CancelledRequestDoesNotProduceAnErrorResult)
-{
-    ParamConfig config;
-    config.withCustomContent = true;
-    InspectorTreeRequestContext context(config, {});
-    context.ReportError(InspectorTreeError::COLLECTION_FAILED);
-    context.CancelResult();
-    EXPECT_TRUE(context.ShouldStop());
-    EXPECT_EQ(context.FinalizeResult(JsonUtil::CreateSharedPtrJson()), nullptr);
-}
-
 TEST(InspectorTreeTask16, DependencyReasonsAreMappedWithoutReplacingTheFirstError)
 {
     for (const auto* reason : { "collection failed", "provider query failed", "invalid provider data",

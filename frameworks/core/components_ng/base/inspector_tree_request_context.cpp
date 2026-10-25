@@ -152,9 +152,6 @@ void InspectorTreeRequestContext::FinalizeNativeTree(const std::shared_ptr<JsonV
 
 std::shared_ptr<JsonValue> InspectorTreeRequestContext::FinalizeResult(std::shared_ptr<JsonValue> root)
 {
-    if (cancelled_) {
-        return nullptr;
-    }
     if (!root || !root->IsObject()) {
         ReportError(InspectorTreeError::COLLECTION_FAILED);
     }

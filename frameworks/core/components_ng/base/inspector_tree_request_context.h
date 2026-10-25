@@ -56,14 +56,9 @@ public:
         dependencyResult.ReportError(error);
     }
 
-    void CancelResult()
-    {
-        cancelled_ = true;
-    }
-
     bool ShouldStop() const
     {
-        return cancelled_ || dependencyResult.HasError();
+        return dependencyResult.HasError();
     }
 
     ParamConfig config;
@@ -72,7 +67,6 @@ public:
 
 private:
     std::set<PrivacyReason> loggedReasons_;
-    bool cancelled_ = false;
     std::shared_ptr<ThirdProviderTreeExportBudget> providerBudget_;
 };
 } // namespace OHOS::Ace::NG
