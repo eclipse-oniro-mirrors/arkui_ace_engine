@@ -27,6 +27,12 @@
 #include "core/components_ng/pattern/text/text_pattern.h"
 
 namespace OHOS::Ace::NG {
+namespace {
+constexpr int32_t EXTENDED_REGION_WIDTH = 140;
+constexpr int32_t EXTENDED_REGION_HEIGHT = 120;
+constexpr int32_t EXTENDED_REGION_OFFSET_X = -20;
+constexpr int32_t EXTENDED_REGION_OFFSET_Y = -10;
+} // namespace
 class InspectorTreeTask04 : public testing::Test {
 public:
     void SetUp() override
@@ -69,8 +75,13 @@ TEST_F(InspectorTreeTask04, ToolKeysAreConfiguredOnlyAndFeatureIsIndependent)
 {
     auto frame = FrameNode::CreateFrameNode("test", 20, AceType::MakeRefPtr<Pattern>());
     auto gesture = frame->GetOrCreateGestureEventHub();
-    CalcDimensionRect region(CalcDimension(40, DimensionUnit::PX), CalcDimension(20, DimensionUnit::PX),
-        CalcDimension(10, DimensionUnit::PX), CalcDimension(15, DimensionUnit::PX));
+    constexpr int32_t REGION_WIDTH = 40;
+    constexpr int32_t REGION_HEIGHT = 20;
+    constexpr int32_t REGION_OFFSET_X = 10;
+    constexpr int32_t REGION_OFFSET_Y = 15;
+    CalcDimensionRect region(CalcDimension(REGION_WIDTH, DimensionUnit::PX),
+        CalcDimension(REGION_HEIGHT, DimensionUnit::PX), CalcDimension(REGION_OFFSET_X, DimensionUnit::PX),
+        CalcDimension(REGION_OFFSET_Y, DimensionUnit::PX));
     gesture->SetResponseRegionMap({ { ResponseRegionSupportedTool::PEN, { region } } });
     ParamConfig config;
     config.withResponseRegion = true;
@@ -139,8 +150,10 @@ TEST_F(InspectorTreeTask04, SelfClipPreservesExplicitRegionsOutsidePaintBounds)
 {
     auto frame = CreateFrame(23, RectF(40.0f, 50.0f, 100.0f, 100.0f));
     auto gesture = frame->GetOrCreateGestureEventHub();
-    DimensionRect region(Dimension(140, DimensionUnit::PX), Dimension(120, DimensionUnit::PX),
-        DimensionOffset(Dimension(-20, DimensionUnit::PX), Dimension(-10, DimensionUnit::PX)));
+    DimensionRect region(Dimension(EXTENDED_REGION_WIDTH, DimensionUnit::PX),
+        Dimension(EXTENDED_REGION_HEIGHT, DimensionUnit::PX),
+        DimensionOffset(Dimension(EXTENDED_REGION_OFFSET_X, DimensionUnit::PX),
+            Dimension(EXTENDED_REGION_OFFSET_Y, DimensionUnit::PX)));
     gesture->SetResponseRegion({ region });
     gesture->SetMouseResponseRegion({ region });
     for (bool clip : { false, true }) {
@@ -188,12 +201,23 @@ TEST_F(InspectorTreeTask04, AncestorClipUsesToolResponseRegionsAndPreservesGaps)
     frame->MountToParent(parent);
     parent->GetRenderContext()->UpdateClipEdge(true);
     frame->GetRenderContext()->UpdateClipEdge(true);
-    DimensionRect region(Dimension(140, DimensionUnit::PX), Dimension(120, DimensionUnit::PX),
-        DimensionOffset(Dimension(-20, DimensionUnit::PX), Dimension(-10, DimensionUnit::PX)));
-    DimensionRect left(Dimension(40, DimensionUnit::PX), Dimension(120, DimensionUnit::PX),
-        DimensionOffset(Dimension(-30, DimensionUnit::PX), Dimension(-10, DimensionUnit::PX)));
-    DimensionRect right(Dimension(50, DimensionUnit::PX), Dimension(120, DimensionUnit::PX),
-        DimensionOffset(Dimension(80, DimensionUnit::PX), Dimension(-10, DimensionUnit::PX)));
+    DimensionRect region(Dimension(EXTENDED_REGION_WIDTH, DimensionUnit::PX),
+        Dimension(EXTENDED_REGION_HEIGHT, DimensionUnit::PX),
+        DimensionOffset(Dimension(EXTENDED_REGION_OFFSET_X, DimensionUnit::PX),
+            Dimension(EXTENDED_REGION_OFFSET_Y, DimensionUnit::PX)));
+    constexpr int32_t LEFT_REGION_WIDTH = 40;
+    constexpr int32_t LEFT_REGION_OFFSET_X = -30;
+    constexpr int32_t RIGHT_REGION_WIDTH = 50;
+    constexpr int32_t RIGHT_REGION_OFFSET_X = 80;
+    constexpr int32_t CLIPPED_REGION_COUNT = 2;
+    DimensionRect left(Dimension(LEFT_REGION_WIDTH, DimensionUnit::PX),
+        Dimension(EXTENDED_REGION_HEIGHT, DimensionUnit::PX),
+        DimensionOffset(Dimension(LEFT_REGION_OFFSET_X, DimensionUnit::PX),
+            Dimension(EXTENDED_REGION_OFFSET_Y, DimensionUnit::PX)));
+    DimensionRect right(Dimension(RIGHT_REGION_WIDTH, DimensionUnit::PX),
+        Dimension(EXTENDED_REGION_HEIGHT, DimensionUnit::PX),
+        DimensionOffset(Dimension(RIGHT_REGION_OFFSET_X, DimensionUnit::PX),
+            Dimension(EXTENDED_REGION_OFFSET_Y, DimensionUnit::PX)));
     auto gesture = frame->GetOrCreateGestureEventHub();
     auto parentGesture = parent->GetOrCreateGestureEventHub();
     gesture->SetResponseRegion({ region });
@@ -209,7 +233,7 @@ TEST_F(InspectorTreeTask04, AncestorClipUsesToolResponseRegionsAndPreservesGaps)
     for (bool visible : { false, true }) {
         auto json = DumpRegions(frame, visible);
         auto touch = json->GetValue("responseRegion");
-        ASSERT_EQ(touch->GetArraySize(), 2);
+        ASSERT_EQ(touch->GetArraySize(), CLIPPED_REGION_COUNT);
         EXPECT_EQ(touch->GetArrayItem(0)->GetString(), "[-20.00, -10.00],[10.00,110.00]");
         EXPECT_EQ(touch->GetArrayItem(1)->GetString(), "[80.00, -10.00],[120.00,110.00]");
         auto mouse = json->GetValue("mouseResponseRegion");
@@ -232,7 +256,7 @@ TEST_F(InspectorTreeTask04, AncestorClipUsesToolResponseRegionsAndPreservesGaps)
     EXPECT_FALSE(parent->IsOutOfTouchTestRegion(PointF(-15.0f, 0.0f), event));
     auto json = DumpRegions(frame, false);
     auto mouse = json->GetObject("responseRegionMap")->GetValue("mouse");
-    ASSERT_EQ(mouse->GetArraySize(), 2);
+    ASSERT_EQ(mouse->GetArraySize(), CLIPPED_REGION_COUNT);
     EXPECT_EQ(mouse->GetArrayItem(0)->GetString(), "[-20.00, -10.00],[10.00,110.00]");
     EXPECT_EQ(mouse->GetArrayItem(1)->GetString(), "[80.00, -10.00],[120.00,110.00]");
 }
@@ -241,13 +265,25 @@ TEST_F(InspectorTreeTask04, OverlappingAncestorRegionsDoNotMultiply)
 {
     auto frame = CreateFrame(100, RectF(0.0f, 0.0f, 10.0f, 10.0f));
     auto root = frame;
-    DimensionRect region(Dimension(10, DimensionUnit::PX), Dimension(10, DimensionUnit::PX), DimensionOffset());
-    DimensionRect horizontal(Dimension(20, DimensionUnit::PX), Dimension(12, DimensionUnit::PX),
-        DimensionOffset(Dimension(-5, DimensionUnit::PX), Dimension(-1, DimensionUnit::PX)));
-    DimensionRect vertical(Dimension(12, DimensionUnit::PX), Dimension(20, DimensionUnit::PX),
-        DimensionOffset(Dimension(-1, DimensionUnit::PX), Dimension(-5, DimensionUnit::PX)));
+    constexpr int32_t REGION_SIDE = 10;
+    constexpr int32_t ANCESTOR_REGION_LONG_SIDE = 20;
+    constexpr int32_t ANCESTOR_REGION_SHORT_SIDE = 12;
+    constexpr int32_t ANCESTOR_REGION_LONG_OFFSET = -5;
+    constexpr int32_t ANCESTOR_REGION_SHORT_OFFSET = -1;
+    constexpr int32_t ANCESTOR_DEPTH = 8;
+    constexpr size_t ANCESTOR_REGION_COUNT = 2;
+    DimensionRect region(Dimension(REGION_SIDE, DimensionUnit::PX),
+        Dimension(REGION_SIDE, DimensionUnit::PX), DimensionOffset());
+    DimensionRect horizontal(Dimension(ANCESTOR_REGION_LONG_SIDE, DimensionUnit::PX),
+        Dimension(ANCESTOR_REGION_SHORT_SIDE, DimensionUnit::PX),
+        DimensionOffset(Dimension(ANCESTOR_REGION_LONG_OFFSET, DimensionUnit::PX),
+            Dimension(ANCESTOR_REGION_SHORT_OFFSET, DimensionUnit::PX)));
+    DimensionRect vertical(Dimension(ANCESTOR_REGION_SHORT_SIDE, DimensionUnit::PX),
+        Dimension(ANCESTOR_REGION_LONG_SIDE, DimensionUnit::PX),
+        DimensionOffset(Dimension(ANCESTOR_REGION_SHORT_OFFSET, DimensionUnit::PX),
+            Dimension(ANCESTOR_REGION_LONG_OFFSET, DimensionUnit::PX)));
     std::vector<RefPtr<FrameNode>> ancestors;
-    for (int32_t depth = 0; depth < 8; ++depth) {
+    for (int32_t depth = 0; depth < ANCESTOR_DEPTH; ++depth) {
         auto parent = CreateFrame(101 + depth, RectF(0.0f, 0.0f, 100.0f, 100.0f));
         parent->GetRenderContext()->UpdateClipEdge(true);
         auto gesture = parent->GetOrCreateGestureEventHub();
@@ -282,8 +318,8 @@ TEST_F(InspectorTreeTask04, OverlappingAncestorRegionsDoNotMultiply)
     }
     for (const auto& ancestor : ancestors) {
         auto parentGesture = ancestor->GetOrCreateGestureEventHub();
-        EXPECT_EQ(parentGesture->GetResponseRegion().size(), 2);
-        EXPECT_EQ(parentGesture->GetMouseResponseRegion().size(), 2);
+        EXPECT_EQ(parentGesture->GetResponseRegion().size(), ANCESTOR_REGION_COUNT);
+        EXPECT_EQ(parentGesture->GetMouseResponseRegion().size(), ANCESTOR_REGION_COUNT);
     }
 }
 
@@ -292,8 +328,10 @@ TEST_F(InspectorTreeTask04, AncestorClipHonorsDefaultRegionsAndEmptyIntersection
     auto parent = CreateFrame(26, RectF(0.0f, 0.0f, 100.0f, 100.0f));
     auto frame = CreateFrame(27, RectF(0.0f, 0.0f, 100.0f, 100.0f));
     frame->MountToParent(parent);
-    DimensionRect region(Dimension(140, DimensionUnit::PX), Dimension(120, DimensionUnit::PX),
-        DimensionOffset(Dimension(-20, DimensionUnit::PX), Dimension(-10, DimensionUnit::PX)));
+    DimensionRect region(Dimension(EXTENDED_REGION_WIDTH, DimensionUnit::PX),
+        Dimension(EXTENDED_REGION_HEIGHT, DimensionUnit::PX),
+        DimensionOffset(Dimension(EXTENDED_REGION_OFFSET_X, DimensionUnit::PX),
+            Dimension(EXTENDED_REGION_OFFSET_Y, DimensionUnit::PX)));
     frame->GetOrCreateGestureEventHub()->SetResponseRegion({ region });
     for (bool clip : { false, true }) {
         parent->GetRenderContext()->UpdateClipEdge(clip);

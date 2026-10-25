@@ -70,6 +70,16 @@ protected:
 
 TEST_F(InspectorTreeTask01UIExtension, ForwardIndependentCapabilitiesInWireOrder)
 {
+    constexpr size_t INTERACTION_INFO_INDEX = 2;
+    constexpr size_t ACCESSIBILITY_INFO_INDEX = 3;
+    constexpr size_t CACHE_NODES_INDEX = 4;
+    constexpr size_t WITH_WEB_INDEX = 5;
+    constexpr size_t WITH_UI_EXTENSION_INDEX = 6;
+    constexpr size_t RECT_CULLING_INDEX = 7;
+    constexpr size_t MIN_OPACITY_INDEX = 8;
+    constexpr size_t WITH_RESPONSE_REGION_INDEX = 9;
+    constexpr size_t WITH_CUSTOM_CONTENT_INDEX = 10;
+    constexpr size_t PARAM_COUNT = 11;
     auto node = UIExtensionNode::GetOrCreateUIExtensionNode(
         V2::UI_EXTENSION_COMPONENT_ETS_TAG, 100, []() { return AceType::MakeRefPtr<UIExtensionPattern>(); });
     auto pattern = node->GetPattern<UIExtensionPattern>();
@@ -85,17 +95,17 @@ TEST_F(InspectorTreeTask01UIExtension, ForwardIndependentCapabilitiesInWireOrder
             const auto previousCalls = session->calls;
             pattern->AddExtraInfoWithParamConfig(json, config);
             ASSERT_EQ(session->calls, previousCalls + 1);
-            ASSERT_GE(session->capturedParams.size(), 11u);
+            ASSERT_GE(session->capturedParams.size(), PARAM_COUNT);
             EXPECT_EQ(session->capturedParams[0], "-allInfoWithParamConfigTotal");
-            EXPECT_EQ(session->capturedParams[2], "1");
-            EXPECT_EQ(session->capturedParams[3], "0");
-            EXPECT_EQ(session->capturedParams[4], "1");
-            EXPECT_EQ(session->capturedParams[5], "0");
-            EXPECT_EQ(session->capturedParams[6], "1");
-            EXPECT_EQ(session->capturedParams[7], "1");
-            EXPECT_EQ(session->capturedParams[8], std::to_string(0.25f));
-            EXPECT_EQ(session->capturedParams[9], responseRegion ? "1" : "0");
-            EXPECT_EQ(session->capturedParams[10], xComponent ? "1" : "0");
+            EXPECT_EQ(session->capturedParams[INTERACTION_INFO_INDEX], "1");
+            EXPECT_EQ(session->capturedParams[ACCESSIBILITY_INFO_INDEX], "0");
+            EXPECT_EQ(session->capturedParams[CACHE_NODES_INDEX], "1");
+            EXPECT_EQ(session->capturedParams[WITH_WEB_INDEX], "0");
+            EXPECT_EQ(session->capturedParams[WITH_UI_EXTENSION_INDEX], "1");
+            EXPECT_EQ(session->capturedParams[RECT_CULLING_INDEX], "1");
+            EXPECT_EQ(session->capturedParams[MIN_OPACITY_INDEX], std::to_string(0.25f));
+            EXPECT_EQ(session->capturedParams[WITH_RESPONSE_REGION_INDEX], responseRegion ? "1" : "0");
+            EXPECT_EQ(session->capturedParams[WITH_CUSTOM_CONTENT_INDEX], xComponent ? "1" : "0");
         }
     }
 }

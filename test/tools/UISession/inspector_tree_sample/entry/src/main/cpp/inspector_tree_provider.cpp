@@ -32,6 +32,10 @@ int32_t textBytes = 0;
 int32_t delayMs = 0;
 std::atomic<int32_t> calls { 0 };
 constexpr int32_t ROOT_ID = 1234;
+constexpr int32_t DEFAULT_PROVIDER_DELAY_MS = 1100;
+constexpr int32_t MAX_PROVIDER_NODE_COUNT = 10002;
+constexpr int32_t MAX_PROVIDER_TEXT_BYTES = 1024 * 1024;
+constexpr int32_t MAX_PROVIDER_DELAY_MS = 10000;
 
 int32_t Query(int64_t id, ArkUI_AccessibilitySearchMode mode, int32_t request, ArkUI_AccessibilityElementInfoList* list)
 {
@@ -52,7 +56,7 @@ int32_t Query(int64_t id, ArkUI_AccessibilitySearchMode mode, int32_t request, A
     }
     const bool tree = mode == ARKUI_ACCESSIBILITY_NATIVE_SEARCH_MODE_PREFETCH_RECURSIVE_CHILDREN;
     if (tree && current == "provider_delay") {
-        std::this_thread::sleep_for(std::chrono::milliseconds(delay > 0 ? delay : 1100));
+        std::this_thread::sleep_for(std::chrono::milliseconds(delay > 0 ? delay : DEFAULT_PROVIDER_DELAY_MS));
     }
     const int32_t size = tree ? count : 1;
     for (int32_t i = 0; i < size; ++i) {
@@ -86,10 +90,13 @@ int32_t Query(int64_t id, ArkUI_AccessibilitySearchMode mode, int32_t request, A
 
 napi_value Configure(napi_env env, napi_callback_info info)
 {
-    napi_value args[4];
-    size_t argc = 4;
+    constexpr size_t CONFIGURE_ARG_COUNT = 4;
+    constexpr size_t TEXT_BYTES_ARG_INDEX = 2;
+    constexpr size_t DELAY_MS_ARG_INDEX = 3;
+    napi_value args[CONFIGURE_ARG_COUNT];
+    size_t argc = CONFIGURE_ARG_COUNT;
     napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
-    if (argc != 4) {
+    if (argc != CONFIGURE_ARG_COUNT) {
         return nullptr;
     }
     char buffer[80] = {};
@@ -98,11 +105,11 @@ napi_value Configure(napi_env env, napi_callback_info info)
     std::lock_guard<std::mutex> lock(configMutex);
     scenario.assign(buffer, length);
     napi_get_value_int32(env, args[1], &nodeCount);
-    napi_get_value_int32(env, args[2], &textBytes);
-    napi_get_value_int32(env, args[3], &delayMs);
-    nodeCount = std::clamp(nodeCount, 0, 10002);
-    textBytes = std::clamp(textBytes, 0, 1024 * 1024);
-    delayMs = std::clamp(delayMs, 0, 10000);
+    napi_get_value_int32(env, args[TEXT_BYTES_ARG_INDEX], &textBytes);
+    napi_get_value_int32(env, args[DELAY_MS_ARG_INDEX], &delayMs);
+    nodeCount = std::clamp(nodeCount, 0, MAX_PROVIDER_NODE_COUNT);
+    textBytes = std::clamp(textBytes, 0, MAX_PROVIDER_TEXT_BYTES);
+    delayMs = std::clamp(delayMs, 0, MAX_PROVIDER_DELAY_MS);
     calls = 0;
     napi_value result;
     napi_get_undefined(env, &result);
@@ -121,7 +128,8 @@ napi_value Init(napi_env env, napi_value exports)
     napi_property_descriptor methods[] = { { "configure", nullptr, Configure, nullptr, nullptr, nullptr, napi_default,
                                                nullptr },
         { "queryCount", nullptr, QueryCount, nullptr, nullptr, nullptr, napi_default, nullptr } };
-    napi_define_properties(env, exports, 2, methods);
+    constexpr size_t METHOD_COUNT = sizeof(methods) / sizeof(methods[0]);
+    napi_define_properties(env, exports, METHOD_COUNT, methods);
     napi_value nativeObject;
     if (napi_get_named_property(env, exports, OH_NATIVE_XCOMPONENT_OBJ, &nativeObject) == napi_ok) {
         OH_NativeXComponent* component = nullptr;

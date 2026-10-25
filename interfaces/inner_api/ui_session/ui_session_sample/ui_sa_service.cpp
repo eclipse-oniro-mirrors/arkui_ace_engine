@@ -49,6 +49,7 @@ constexpr char WEB_INTERFACE_REQUEST_DOM_TREE[] = "RequestArkWebDomTree";
 constexpr char WEB_INTERFACE_REQUEST_DOM_TREE_VIEWPORT[] = "RequestArkWebDomTreeViewport";
 constexpr size_t BITS_UINT32 = sizeof(uint32_t) * 8;
 constexpr int32_t PARAMS_OFFSET = 1;
+constexpr size_t MAX_INSPECTOR_CASE_ID_LENGTH = 64;
 constexpr size_t GET_VISIBLE_INTERACTION_INFO_INDEX = 1;
 constexpr size_t GET_VISIBLE_ACCESSIBILITY_INFO_INDEX = 2;
 constexpr size_t GET_VISIBLE_CACHE_NODES_INDEX = 3;
@@ -762,9 +763,10 @@ void UiSaService::HandleInspectorTree(
             }
             timeout = static_cast<int32_t>(parsed);
         } else if (key == "--caseId") {
-            if (value.empty() || value.size() > 64 || !std::all_of(value.begin(), value.end(), [](unsigned char c) {
-                return std::isalnum(c) || c == '_' || c == '-';
-            })) {
+            if (value.empty() || value.size() > MAX_INSPECTOR_CASE_ID_LENGTH ||
+                !std::all_of(value.begin(), value.end(), [](unsigned char c) {
+                    return std::isalnum(c) || c == '_' || c == '-';
+                })) {
                 LOGW("[InspectorTree] invalid case identifier");
                 return;
             }

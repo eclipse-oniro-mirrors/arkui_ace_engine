@@ -31,11 +31,14 @@
 #undef private
 
 namespace OHOS::Ace::NG {
+namespace {
+constexpr int32_t INSPECTOR_FRAME_ID = 7;
+} // namespace
 class InspectorIdFrameNode : public FrameNode {
     DECLARE_ACE_TYPE(InspectorIdFrameNode, FrameNode);
 
 public:
-    InspectorIdFrameNode() : FrameNode("test", 7, AceType::MakeRefPtr<Pattern>()) {}
+    InspectorIdFrameNode() : FrameNode("test", INSPECTOR_FRAME_ID, AceType::MakeRefPtr<Pattern>()) {}
     void SetInspectorAccessibilityId(int64_t id)
     {
         accessibilityId_ = id;
@@ -214,7 +217,7 @@ TEST_F(InspectorTreeTask03, NativeIdsAreLosslessAndGated)
         frame->DumpSimplifyTreeNode(json, config);
         EXPECT_TRUE(json->GetValue("accessibilityId")->IsString());
         EXPECT_EQ(json->GetString("accessibilityId"), std::to_string(id));
-        EXPECT_EQ(json->GetInt("$ID"), 7);
+        EXPECT_EQ(json->GetInt("$ID"), INSPECTOR_FRAME_ID);
         EXPECT_TRUE(json->GetValue("accessibilityGroup")->IsBool());
     }
     config.accessibilityInfo = false;

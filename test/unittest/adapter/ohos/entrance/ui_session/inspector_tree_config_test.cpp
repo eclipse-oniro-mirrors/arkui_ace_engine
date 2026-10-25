@@ -118,10 +118,12 @@ TEST_F(InspectorTreeTask01, RealParcelRoundTripAllCombinations)
 
 TEST_F(InspectorTreeTask01, RealParcelRejectsEveryTruncatedField)
 {
-    for (size_t fields = 0; fields < 9; ++fields) {
+    constexpr size_t CONFIG_FIELD_COUNT = 9;
+    constexpr size_t MIN_OPACITY_FIELD_INDEX = 6;
+    for (size_t fields = 0; fields < CONFIG_FIELD_COUNT; ++fields) {
         Parcel parcel;
         for (size_t i = 0; i < fields; ++i) {
-            ASSERT_TRUE(i == 6 ? parcel.WriteFloat(0.5f) : parcel.WriteBool(true));
+            ASSERT_TRUE(i == MIN_OPACITY_FIELD_INDEX ? parcel.WriteFloat(0.5f) : parcel.WriteBool(true));
         }
         std::unique_ptr<GetInspectorTreeConfigImpl> decoded(GetInspectorTreeConfigImpl::Unmarshalling(parcel));
         EXPECT_EQ(decoded, nullptr) << "fields=" << fields;

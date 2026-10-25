@@ -30,6 +30,15 @@
 namespace OHOS::Ace::NG {
 namespace {
 constexpr int64_t PROVIDER_ROOT = (1LL << 54) + 7;
+constexpr int64_t PROVIDER_PARENT_ID = -99;
+constexpr int32_t PROVIDER_NODE_COUNT = 2;
+constexpr int32_t PROVIDER_ROOT_LEFT = 110;
+constexpr int32_t PROVIDER_ROOT_BOTTOM = 250;
+constexpr int32_t PROVIDER_CHILD_LEFT = 115;
+constexpr int32_t WINDOW_LEFT = 100;
+constexpr int32_t WINDOW_TOP = 200;
+constexpr int32_t WINDOW_WIDTH = 800;
+constexpr int32_t WINDOW_HEIGHT = 600;
 class ScaledInspectorContainer : public MockContainer {
     DECLARE_ACE_TYPE(ScaledInspectorContainer, MockContainer);
 
@@ -50,17 +59,17 @@ struct InspectorProviderInput {
     void Initialize()
     {
         root.SetElementId(PROVIDER_ROOT);
-        root.SetParentId(-99);
+        root.SetParentId(PROVIDER_PARENT_ID);
         root.AddChildNodeId(PROVIDER_ROOT + 1);
         root.SetComponentType("ProviderRoot");
         root.SetContents("provider original\n\"中文\"");
         root.SetAccessibilityDescription("provider description");
-        root.SetRect({ 110, 230, 130, 250 });
+        root.SetRect({ PROVIDER_ROOT_LEFT, 230, 130, PROVIDER_ROOT_BOTTOM });
         ArkUI_AccessibilityElementInfo child;
         child.SetElementId(PROVIDER_ROOT + 1);
         child.SetParentId(PROVIDER_ROOT);
         child.SetContents("child");
-        child.SetRect({ 115, 235, 120, 240 });
+        child.SetRect({ PROVIDER_CHILD_LEFT, 235, 120, 240 });
         // Deliberately not in tree traversal order.
         nodes = { child, root };
     }
@@ -168,11 +177,13 @@ protected:
 
 TEST_F(InspectorTreeTask05Provider, FlatOutputPreservesFieldsOrderAndLargeIds)
 {
-    input_.nodes[1].SetGridInfo({ 2, 3, 1 });
+    constexpr int32_t GRID_ROW_COUNT = 2;
+    constexpr int32_t OPERATION_ACTION_COUNT = 2;
+    input_.nodes[1].SetGridInfo({ GRID_ROW_COUNT, 3, 1 });
     input_.nodes[1].AddOperationAction({ ARKUI_ACCESSIBILITY_NATIVE_ACTION_TYPE_CLICK, "" });
     input_.nodes[1].AddOperationAction({ ARKUI_ACCESSIBILITY_NATIVE_ACTION_TYPE_LONG_CLICK, nullptr });
     auto host = Host(301);
-    MockPipelineContext::SetCurrentWindowRect(Rect(100, 200, 800, 600));
+    MockPipelineContext::SetCurrentWindowRect(Rect(WINDOW_LEFT, WINDOW_TOP, WINDOW_WIDTH, WINDOW_HEIGHT));
     ParamConfig config;
     config.withCustomContent = true;
     auto result = Dump(host, config);
@@ -183,7 +194,7 @@ TEST_F(InspectorTreeTask05Provider, FlatOutputPreservesFieldsOrderAndLargeIds)
     EXPECT_FALSE(node->Contains(THIRD_PROVIDER_JSON_CHILDREN));
     auto nodes = node->GetValue("accessibilityTree");
     ASSERT_TRUE(nodes->IsArray());
-    ASSERT_EQ(nodes->GetArraySize(), 2);
+    ASSERT_EQ(nodes->GetArraySize(), PROVIDER_NODE_COUNT);
     auto child = nodes->GetArrayItem(0);
     EXPECT_EQ(child->GetString("elementId"), std::to_string(PROVIDER_ROOT + 1));
     EXPECT_EQ(child->GetString("parentId"), std::to_string(PROVIDER_ROOT));
@@ -192,13 +203,13 @@ TEST_F(InspectorTreeTask05Provider, FlatOutputPreservesFieldsOrderAndLargeIds)
     EXPECT_EQ(root->GetString("contents"), input_.root.GetContents());
     EXPECT_EQ(root->GetString("parentId"), "-99");
     EXPECT_EQ(root->GetValue("childNodeIds")->GetArrayItem(0)->GetString(), std::to_string(PROVIDER_ROOT + 1));
-    EXPECT_EQ(root->GetValue("screenRect")->GetInt("leftTopX"), 110);
-    EXPECT_EQ(root->GetValue("screenRect")->GetInt("rightBottomY"), 250);
+    EXPECT_EQ(root->GetValue("screenRect")->GetInt("leftTopX"), PROVIDER_ROOT_LEFT);
+    EXPECT_EQ(root->GetValue("screenRect")->GetInt("rightBottomY"), PROVIDER_ROOT_BOTTOM);
     EXPECT_FALSE(root->Contains("$children"));
-    EXPECT_EQ(root->GetObject("grid")->GetInt("rowCount"), 2);
+    EXPECT_EQ(root->GetObject("grid")->GetInt("rowCount"), GRID_ROW_COUNT);
     EXPECT_TRUE(root->Contains("gridItem"));
     auto actions = root->GetValue("operationActions");
-    ASSERT_EQ(actions->GetArraySize(), 2);
+    ASSERT_EQ(actions->GetArraySize(), OPERATION_ACTION_COUNT);
     auto click = actions->GetArrayItem(0);
     EXPECT_EQ(click->GetInt("actionType"), ARKUI_ACCESSIBILITY_NATIVE_ACTION_TYPE_CLICK);
     EXPECT_TRUE(click->Contains("description"));
@@ -235,7 +246,7 @@ TEST_F(InspectorTreeTask05Provider, CustomHostUsesTheSameReturnChannel)
     ParamConfig config;
     config.withCustomContent = true;
     auto json = Dump(host, config);
-    EXPECT_EQ(HostJson(json)->GetValue("accessibilityTree")->GetArraySize(), 2);
+    EXPECT_EQ(HostJson(json)->GetValue("accessibilityTree")->GetArraySize(), PROVIDER_NODE_COUNT);
     EXPECT_EQ(input_.calls, 1);
 }
 
@@ -264,6 +275,7 @@ TEST_F(InspectorTreeTask05Provider, EmptySuccessDiffersFromUnregisteredAndQueryF
 
 TEST_F(InspectorTreeTask05Provider, DependencyRejectsDuplicateCycleAndMissingAncestor)
 {
+    constexpr int64_t MISSING_NODE_ID = 9876;
     auto host = Host(306);
     ParamConfig config;
     config.withCustomContent = true;
@@ -274,13 +286,13 @@ TEST_F(InspectorTreeTask05Provider, DependencyRejectsDuplicateCycleAndMissingAnc
     input_.nodes.front().SetParentId(PROVIDER_ROOT + 1);
     EXPECT_EQ(Dump(host, config)->ToString(), R"({"errorMessage":"invalid provider data"})");
     input_.nodes = good;
-    input_.nodes.front().SetParentId(9876);
+    input_.nodes.front().SetParentId(MISSING_NODE_ID);
     EXPECT_EQ(Dump(host, config)->ToString(), R"({"errorMessage":"invalid provider data"})");
     input_.nodes = good;
     input_.nodes.back().SetParentId(PROVIDER_ROOT);
     EXPECT_EQ(Dump(host, config)->ToString(), R"({"errorMessage":"invalid provider data"})");
     input_.nodes = good;
-    input_.nodes.back().AddChildNodeId(9876);
+    input_.nodes.back().AddChildNodeId(MISSING_NODE_ID);
     EXPECT_EQ(Dump(host, config)->ToString(), R"({"errorMessage":"invalid provider data"})");
     input_.rootFailed = true;
     EXPECT_EQ(Dump(host, config)->ToString(), R"({"errorMessage":"provider query failed"})");
@@ -308,6 +320,7 @@ TEST_F(InspectorTreeTask05Provider, FailureDiscardsEarlierHostsAndStopsSubsequen
 
 TEST_F(InspectorTreeTask05Provider, BothTraversalEntrancesUseTheFlatReturnChannel)
 {
+    constexpr int32_t TRAVERSAL_COUNT = 2;
     auto host = Host(308);
     host->SetActive(true);
     for (bool visible : { false, true }) {
@@ -319,22 +332,24 @@ TEST_F(InspectorTreeTask05Provider, BothTraversalEntrancesUseTheFlatReturnChanne
         host->DumpSimplifyTreeWithParamConfig(0, root, visible, config);
         EXPECT_NE(root->ToString().find("\"accessibilityTree\""), std::string::npos);
     }
-    EXPECT_EQ(input_.calls, 2);
+    EXPECT_EQ(input_.calls, TRAVERSAL_COUNT);
 }
 
 TEST_F(InspectorTreeTask05Provider, DependencyBudgetIsSharedAcrossHosts)
 {
+    constexpr int32_t HOST_COUNT = 2;
+    constexpr size_t NEAR_NODE_LIMIT = 9999;
     auto host = Host(309);
     ThirdProviderTreeExportBudget budget;
     auto first = ThirdProviderTreeExporter::ExportFlatToInspectorJson(&provider_, host, budget);
     ASSERT_EQ(first.status, ThirdProviderExportStatus::SUCCESS);
-    EXPECT_EQ(budget.nodes, 2);
+    EXPECT_EQ(budget.nodes, PROVIDER_NODE_COUNT);
     auto bytes = budget.bytes;
     auto second = ThirdProviderTreeExporter::ExportFlatToInspectorJson(&provider_, host, budget);
     ASSERT_EQ(second.status, ThirdProviderExportStatus::SUCCESS);
-    EXPECT_EQ(budget.nodes, 4);
-    EXPECT_EQ(budget.bytes, bytes * 2);
-    budget.nodes = 9999;
+    EXPECT_EQ(budget.nodes, PROVIDER_NODE_COUNT * HOST_COUNT);
+    EXPECT_EQ(budget.bytes, bytes * HOST_COUNT);
+    budget.nodes = NEAR_NODE_LIMIT;
     auto overflow = ThirdProviderTreeExporter::ExportFlatToInspectorJson(&provider_, host, budget);
     EXPECT_EQ(overflow.status, ThirdProviderExportStatus::NODE_LIMIT);
     EXPECT_EQ(overflow.nodes, nullptr);
@@ -342,6 +357,7 @@ TEST_F(InspectorTreeTask05Provider, DependencyBudgetIsSharedAcrossHosts)
 
 TEST_F(InspectorTreeTask05Provider, DependencyCountsFinalUtf8ArraysIncludingEscapesAndRects)
 {
+    constexpr size_t MAX_EXPORT_BYTES = 10 * 1024 * 1024;
     auto host = Host(310);
     ThirdProviderTreeExportBudget budget;
     auto result = ThirdProviderTreeExporter::ExportFlatToInspectorJson(&provider_, host, budget);
@@ -351,14 +367,14 @@ TEST_F(InspectorTreeTask05Provider, DependencyCountsFinalUtf8ArraysIncludingEsca
     envelope->Put("accessibilityTree", result.nodes);
     char* data = nullptr;
     size_t size = 0;
-    ASSERT_EQ(WriteJsonBounded(*envelope, false, 10 * 1024 * 1024, &data, &size), JsonWriteResult::SUCCESS);
+    ASSERT_EQ(WriteJsonBounded(*envelope, false, MAX_EXPORT_BYTES, &data, &size), JsonWriteResult::SUCCESS);
     std::free(data);
     EXPECT_EQ(bytes, size - std::string("{\"accessibilityTree\":}").size());
-    budget = { 0, 10 * 1024 * 1024 - bytes };
+    budget = { 0, MAX_EXPORT_BYTES - bytes };
     result = ThirdProviderTreeExporter::ExportFlatToInspectorJson(&provider_, host, budget);
     EXPECT_EQ(result.status, ThirdProviderExportStatus::SUCCESS);
-    EXPECT_EQ(budget.bytes, 10 * 1024 * 1024);
-    budget = { 0, 10 * 1024 * 1024 - bytes + 1 };
+    EXPECT_EQ(budget.bytes, MAX_EXPORT_BYTES);
+    budget = { 0, MAX_EXPORT_BYTES - bytes + 1 };
     result = ThirdProviderTreeExporter::ExportFlatToInspectorJson(&provider_, host, budget);
     EXPECT_EQ(result.status, ThirdProviderExportStatus::SIZE_LIMIT);
     EXPECT_EQ(result.nodes, nullptr);
@@ -368,7 +384,7 @@ TEST_F(InspectorTreeTask05Provider, CoordinatesFollowTheNativeFloatingWindowScal
     auto pipeline = MockPipelineContext::GetCurrentContext();
     auto container = AceType::MakeRefPtr<testing::NiceMock<ScaledInspectorContainer>>(pipeline);
     MockContainer::container_ = container;
-    MockPipelineContext::SetCurrentWindowRect(Rect(100, 200, 800, 600));
+    MockPipelineContext::SetCurrentWindowRect(Rect(WINDOW_LEFT, WINDOW_TOP, WINDOW_WIDTH, WINDOW_HEIGHT));
     auto host = Host(311);
     ParamConfig config;
     config.withCustomContent = true;
@@ -380,7 +396,7 @@ TEST_F(InspectorTreeTask05Provider, CoordinatesFollowTheNativeFloatingWindowScal
         auto child = HostJson(result)->GetValue("accessibilityTree")->GetArrayItem(0);
         EXPECT_EQ(child->GetString("$rect"), floating ? "[30.00, 70.00],[40.00,80.00]" :
             "[15.00, 35.00],[20.00,40.00]");
-        EXPECT_EQ(child->GetValue("screenRect")->GetInt("leftTopX"), 115);
+        EXPECT_EQ(child->GetValue("screenRect")->GetInt("leftTopX"), PROVIDER_CHILD_LEFT);
     }
 }
 

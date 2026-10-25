@@ -82,8 +82,9 @@ protected:
     void SetUp() override
     {
         InspectorTreeTask11::SetUp();
+        constexpr int32_t SELECT_NODE_ID = 116;
         pattern_ = AceType::MakeRefPtr<SelectPattern>();
-        frame_ = FrameNode::CreateFrameNode("Select", 116, pattern_);
+        frame_ = FrameNode::CreateFrameNode("Select", SELECT_NODE_ID, pattern_);
         frame_->SetActive(true);
     }
 
@@ -217,12 +218,14 @@ protected:
     {
         InspectorTreeTask11::SetUp();
         root_ = MockPipelineContext::GetCurrent()->GetRootElement();
-        trigger_ = FrameNode::CreateFrameNode("Button", 110, AceType::MakeRefPtr<Pattern>());
+        constexpr int32_t TRIGGER_NODE_ID = 110;
+        constexpr int32_t WRAPPER_NODE_ID = 111;
+        trigger_ = FrameNode::CreateFrameNode("Button", TRIGGER_NODE_ID, AceType::MakeRefPtr<Pattern>());
         trigger_->SetActive(true);
         BindTriggerMenu();
         trigger_->MountToParent(root_);
-        wrapper_ =
-            FrameNode::CreateFrameNode("MenuWrapper", 111, AceType::MakeRefPtr<MenuWrapperPattern>(trigger_->GetId()));
+        wrapper_ = FrameNode::CreateFrameNode(
+            "MenuWrapper", WRAPPER_NODE_ID, AceType::MakeRefPtr<MenuWrapperPattern>(trigger_->GetId()));
         overlay_ = MockPipelineContext::GetCurrent()->GetOverlayManager();
         ASSERT_TRUE(overlay_->CheckMenuManager());
         manager_ = AceType::DynamicCast<MenuManager>(overlay_->menuManager_);
