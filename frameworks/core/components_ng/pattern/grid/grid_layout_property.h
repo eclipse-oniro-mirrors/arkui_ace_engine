@@ -157,6 +157,7 @@ public:
     std::optional<ScrollSnapStrategy> GetScrollSnapStrategy() const;
     void UpdateScrollSnapStrategy(const ScrollSnapStrategy& strategy);
     void ResetScrollSnapStrategy();
+    std::string GetScrollSnapStrategyString() const;
     void OnAlignItemsUpdate(GridItemAlignment /* alignItems */) const
     {
         ResetGridLayoutInfoAndMeasure();
