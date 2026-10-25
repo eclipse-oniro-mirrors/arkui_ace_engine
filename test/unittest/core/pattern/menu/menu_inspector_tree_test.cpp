@@ -44,14 +44,14 @@ public:
     }
 };
 
-TEST_F(InspectorTreeTask11, SelectExpandedFollowsCompletedVisibility)
+TEST_F(InspectorTreeTask11, SelectExpandedFollowsExistingMenuVisibility)
 {
     auto pattern = AceType::MakeRefPtr<SelectPattern>();
     auto wrapperPattern = AceType::MakeRefPtr<MenuWrapperPattern>(100);
     auto wrapper = FrameNode::CreateFrameNode("MenuWrapper", 100, wrapperPattern);
     pattern->SetMenuNode(wrapper);
-    const MenuStatus states[] = { MenuStatus::INIT, MenuStatus::ON_SHOW_ANIMATION, MenuStatus::ON_START_ANIMATION,
-        MenuStatus::SHOW, MenuStatus::ON_HIDE_ANIMATION, MenuStatus::HIDE };
+    const MenuStatus states[] = { MenuStatus::INIT, MenuStatus::ON_HOVER_SCALE, MenuStatus::ON_SHOW_ANIMATION,
+        MenuStatus::ON_START_ANIMATION, MenuStatus::SHOW, MenuStatus::ON_HIDE_ANIMATION, MenuStatus::HIDE };
     ParamConfig interaction;
     interaction.interactionInfo = true;
     InspectorTreeRequestContext interactionContext(interaction, {});
@@ -59,7 +59,7 @@ TEST_F(InspectorTreeTask11, SelectExpandedFollowsCompletedVisibility)
     pattern->AddInspectorTreeInfo(sparseNode, interactionContext);
     EXPECT_TRUE(sparseNode->GetValue("selected")->IsBool());
     EXPECT_FALSE(sparseNode->GetBool("selected"));
-    const bool expanded[] = { false, false, false, true, true, false };
+    const bool expanded[] = { false, true, true, true, true, false, false };
     InspectorTreeRequestContext context({}, {});
     for (size_t i = 0; i < std::size(states); ++i) {
         wrapperPattern->ForceSetMenuStatus(states[i]);

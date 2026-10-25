@@ -3359,8 +3359,7 @@ void SelectPattern::DumpInspectorTreeInfo(
         return;
     }
     auto wrapper = menuWrapper_ ? menuWrapper_->GetPattern<MenuWrapperPattern>() : nullptr;
-    const auto status = wrapper ? wrapper->GetMenuStatus() : MenuStatus::INIT;
-    attrs->Put("expanded", status == MenuStatus::SHOW || status == MenuStatus::ON_HIDE_ANIMATION);
+    attrs->Put("expanded", wrapper && wrapper->IsShow());
 }
 
 void SelectPattern::AddInspectorTreeInfo(
