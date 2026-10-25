@@ -17,8 +17,6 @@
 #define FOUNDATION_ACE_INTERFACE_UI_CONTENT_STUB_IMPL_H
 
 #include "iremote_object.h"
-#include <mutex>
-
 #include "ui_content_errors.h"
 #include "ui_content_stub.h"
 
@@ -28,17 +26,6 @@ namespace OHOS::Ace {
 class ACE_FORCE_EXPORT UIContentServiceStubImpl : public UiContentStub {
 public:
     using IUiContentService::ExeAppAIFunction;
-    void SetInspectorFunction(std::function<void(bool, ParamConfig)> callback)
-    {
-        std::lock_guard<std::mutex> lock(inspectorMutex_);
-        inspectorFunction_ = std::move(callback);
-    }
-    std::function<void(bool, ParamConfig)> GetInspectorFunction()
-    {
-        std::lock_guard<std::mutex> lock(inspectorMutex_);
-        return inspectorFunction_;
-    }
-
 
     int32_t Connect(const EventCallback& eventCallback,
         std::shared_ptr<AppExecFwk::EventHandler> eventHandler = nullptr) override
@@ -134,9 +121,6 @@ public:
     int32_t GetLazyForEachDataByPoint(float x, float y,
         const std::function<void(const std::string&)>& eventCallback,
         int32_t timeout = DEFAULT_INSPECTOR_TREE_CALLBACK_TIMEOUT_MS) override;
-private:
-    std::mutex inspectorMutex_;
-    std::function<void(bool, ParamConfig)> inspectorFunction_;
 };
 } // namespace OHOS::Ace
 #endif // FOUNDATION_ACE_INTERFACE_UI_CONTENT_STUB_IMPL_H

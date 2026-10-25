@@ -13,15 +13,13 @@
  * limitations under the License.
  */
 
-#include <utility>
-#include <vector>
-
 #include "gtest/gtest.h"
 #include "interfaces/inner_api/ui_session/ui_content_stub_impl.h"
 #define private public
 #include "interfaces/inner_api/ui_session/ui_report_stub.h"
 #undef private
 #include "message_parcel.h"
+#include "test/mock/interfaces/inner_api/ui_session/mock_ui_session_manager.h"
 
 #include "adapter/ohos/entrance/ui_session/include/large_string_ashmem.h"
 
@@ -68,29 +66,29 @@ TEST(InspectorTreeTask06, SharedMemoryRejectsOversize)
     EXPECT_FALSE(memory->WriteToAshmem("inspector-test", "", 100 * 1024 * 1024 + 1));
 }
 
-TEST(InspectorTreeTask06, FullKeepsLegacyDispatchAndVisibleUsesWindowCallbacks)
+TEST(InspectorTreeTask06, FullAndVisibleForwardConfigToExistingManager)
 {
-    UIContentServiceStubImpl mainWindow;
-    UIContentServiceStubImpl subWindow;
-    std::vector<std::pair<int32_t, bool>> requests;
-    auto bindWindow = [&](UIContentServiceStubImpl& service, int32_t windowId) {
-        service.SetInspectorFunction([&, windowId](bool visible, ParamConfig config) {
-            requests.emplace_back(windowId, visible);
-            EXPECT_TRUE(config.withResponseRegion);
-            EXPECT_TRUE(config.withCustomContent);
-        });
-    };
-    bindWindow(mainWindow, 101);
-    bindWindow(subWindow, 202);
-    ParamConfig config;
+    UIContentServiceStubImpl service;
+    auto* manager = static_cast<MockUiSessionManager*>(UiSessionManager::GetInstance());
+    ParamConfig config { true, true, false, true, true, true, 0.5f };
     config.withResponseRegion = true;
     config.withCustomContent = true;
-    EXPECT_EQ(mainWindow.GetInspectorTree(nullptr, config), NO_ERROR);
-    EXPECT_EQ(subWindow.GetInspectorTree(nullptr, config), NO_ERROR);
-    EXPECT_TRUE(requests.empty());
-    EXPECT_EQ(subWindow.GetVisibleInspectorTree(nullptr, config), NO_ERROR);
-    EXPECT_EQ(mainWindow.GetVisibleInspectorTree(nullptr, config), NO_ERROR);
-    EXPECT_EQ(requests, (std::vector<std::pair<int32_t, bool>> { { 202, true }, { 101, true } }));
+    const auto matchesConfig = [&config](const ParamConfig& actual) {
+        return actual.interactionInfo == config.interactionInfo &&
+               actual.accessibilityInfo == config.accessibilityInfo && actual.cacheNodes == config.cacheNodes &&
+               actual.withWeb == config.withWeb && actual.withUIExtension == config.withUIExtension &&
+               actual.rectCulling == config.rectCulling && actual.minOpacity == config.minOpacity &&
+               actual.withResponseRegion == config.withResponseRegion &&
+               actual.withCustomContent == config.withCustomContent;
+    };
+    {
+        testing::InSequence sequence;
+        EXPECT_CALL(*manager, GetInspectorTree(testing::Truly(matchesConfig))).Times(1);
+        EXPECT_CALL(*manager, GetVisibleInspectorTree(testing::Truly(matchesConfig))).Times(1);
+    }
+    EXPECT_EQ(service.GetInspectorTree(nullptr, config), NO_ERROR);
+    EXPECT_EQ(service.GetVisibleInspectorTree(nullptr, config), NO_ERROR);
+    testing::Mock::VerifyAndClearExpectations(manager);
 }
 
 TEST(InspectorTreeTask06, ExistingTimeoutClearsCallbackAndAllowsNextRequest)

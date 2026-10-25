@@ -6660,11 +6660,8 @@ void UIContentImpl::RelaxedCommandCallbackInner(const WeakPtr<TaskExecutor>& tas
     UiSessionManager::GetInstance()->SaveRelaxedCommandFunction(relaxedCommandCallback);
 }
 
-std::function<void(bool, ParamConfig)> UIContentImpl::InitInspectorTreeCallback(
-    const WeakPtr<TaskExecutor>& taskExecutor)
+void UIContentImpl::InitInspectorWindowSnapshotCallback()
 {
-    const int32_t GET_INSPECTOR_TREE_TIMEOUT_TIME = 1500;
-    // Bind the inspector route and window snapshot for this UIContent.
     auto container = Platform::AceContainer::GetContainer(instanceId_);
     auto pipeline = container ? AceType::DynamicCast<NG::PipelineContext>(container->GetPipelineContext()) : nullptr;
     WeakPtr<NG::PipelineContext> weakPipeline = pipeline;
@@ -6691,29 +6688,29 @@ std::function<void(bool, ParamConfig)> UIContentImpl::InitInspectorTreeCallback(
     if (pipeline) {
         pipeline->SetInspectorWindowSnapshotCallback(std::move(snapshot));
     }
-    auto callback = [weakTaskExecutor = taskExecutor, weakPipeline, instanceId = instanceId_](
-        bool onlyNeedVisible, ParamConfig config) {
-        auto taskExecutor = weakTaskExecutor.Upgrade();
-        CHECK_NULL_VOID(taskExecutor);
-        taskExecutor->PostSyncTaskTimeout(
-            [onlyNeedVisible, config, weakPipeline, instanceId]() mutable {
-                ContainerScope scope(instanceId);
-                auto pipeline = weakPipeline.Upgrade();
-                CHECK_NULL_VOID(pipeline);
-                pipeline->GetInspectorTree(onlyNeedVisible, config);
-            },
-            TaskExecutor::TaskType::UI, GET_INSPECTOR_TREE_TIMEOUT_TIME, "UiSessionGetInspectorTree");
-    };
-    if (instance_) {
-        auto* stub = static_cast<UIContentServiceStubImpl*>(instance_.GetRefPtr());
-        stub->SetInspectorFunction(callback);
-    }
-    return callback;
 }
 
 void UIContentImpl::InitUISessionManagerCallbacks(const WeakPtr<TaskExecutor>& taskExecutor)
 {
-    UiSessionManager::GetInstance()->SaveInspectorTreeFunction(InitInspectorTreeCallback(taskExecutor));
+    InitInspectorWindowSnapshotCallback();
+    const int32_t GET_INSPECTOR_TREE_TIMEOUT_TIME = 1500;
+    // set get inspector tree function for ui session manager
+    auto callback = [weakTaskExecutor = taskExecutor](bool onlyNeedVisible, ParamConfig config) {
+        auto taskExecutor = weakTaskExecutor.Upgrade();
+        CHECK_NULL_VOID(taskExecutor);
+        taskExecutor->PostSyncTaskTimeout(
+            [onlyNeedVisible, config]() {
+                auto pipeline = NG::PipelineContext::GetCurrentContextSafely();
+                CHECK_NULL_VOID(pipeline);
+                if (onlyNeedVisible) {
+                    pipeline->GetInspectorTree(true, config);
+                } else {
+                    pipeline->GetInspectorTree(false, config);
+                }
+            },
+            TaskExecutor::TaskType::UI, GET_INSPECTOR_TREE_TIMEOUT_TIME, "UiSessionGetInspectorTree");
+    };
+    UiSessionManager::GetInstance()->SaveInspectorTreeFunction(callback);
     auto webCallback = [weakTaskExecutor = taskExecutor](bool isRegister) {
         auto taskExecutor = weakTaskExecutor.Upgrade();
         CHECK_NULL_VOID(taskExecutor);
