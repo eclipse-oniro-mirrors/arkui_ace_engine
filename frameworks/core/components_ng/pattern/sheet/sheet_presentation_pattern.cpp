@@ -3316,15 +3316,23 @@ void SheetPresentationPattern::DumpAdvanceStyleInfo(std::unique_ptr<JsonValue>& 
                 sheetStyle.sheetHeight.height.has_value() ? sheetStyle.sheetHeight.height->ToString().c_str() : "None");
         }
         if (!config.IsPublicTree() || sheetStyle.sheetHeight.sheetMode.has_value()) {
-            json->Put("sheetMode",
-                sheetStyle.sheetHeight.sheetMode.has_value()
-                    ? std::to_string(static_cast<int32_t>(sheetStyle.sheetHeight.sheetMode.value())).c_str()
-                    : "None");
+            if (config.IsPublicTree()) {
+                json->Put("sheetMode", static_cast<int32_t>(sheetStyle.sheetHeight.sheetMode.value()));
+            } else {
+                json->Put("sheetMode",
+                    sheetStyle.sheetHeight.sheetMode.has_value()
+                        ? std::to_string(static_cast<int32_t>(sheetStyle.sheetHeight.sheetMode.value())).c_str()
+                        : "None");
+            }
         }
     }
     if (!config.IsPublicTree() || config.functionalProperties) {
         json->Put("detents Size", static_cast<int32_t>(sheetStyle.detents.size()));
-        json->Put("IsShouldDismiss", shouldDismiss_ ? "true" : "false");
+        if (config.IsPublicTree()) {
+            json->Put("IsShouldDismiss", static_cast<bool>(shouldDismiss_));
+        } else {
+            json->Put("IsShouldDismiss", shouldDismiss_ ? "true" : "false");
+        }
     }
 }
 

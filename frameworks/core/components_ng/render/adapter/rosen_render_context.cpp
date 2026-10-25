@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 
+#include "core/components_ng/property/gradient_property.h"
 #include "core/components_ng/render/adapter/rosen_render_context.h"
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/base/modifier.h"
@@ -8737,21 +8738,29 @@ void RosenRenderContext::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const
     const bool visual = !config.IsPublicTree() || config.visualProperties;
     DumpAdvanceBackgroundInfo(json, config);
     if (visual) {
-        DumpAdvanceVisualInfo(json);
+        DumpAdvanceVisualInfo(json, config);
     }
     SetAdvanceInfo(json, config);
 }
 
-void RosenRenderContext::DumpAdvanceVisualInfo(std::unique_ptr<JsonValue>& json)
+void RosenRenderContext::DumpAdvanceVisualInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
 {
     if (GetSphericalEffect().has_value()) {
-        json->Put("SphericalEffect", std::to_string(GetSphericalEffect().value()).c_str());
+        if (config.IsPublicTree()) {
+            json->Put("SphericalEffect", GetSphericalEffect().value());
+        } else {
+            json->Put("SphericalEffect", std::to_string(GetSphericalEffect().value()).c_str());
+        }
     }
     if (GetPixelStretchEffect().has_value()) {
         json->Put("PixelStretchEffect", GetPixelStretchEffect().value().ToString().c_str());
     }
     if (GetLightUpEffect().has_value()) {
-        json->Put("LightUpEffect", std::to_string(GetLightUpEffect().value()).c_str());
+        if (config.IsPublicTree()) {
+            json->Put("LightUpEffect", GetLightUpEffect().value());
+        } else {
+            json->Put("LightUpEffect", std::to_string(GetLightUpEffect().value()).c_str());
+        }
     }
     if (GetBorderColor().has_value()) {
         json->Put("BorderColor", GetBorderColor().value().ToString().c_str());
@@ -8768,20 +8777,48 @@ void RosenRenderContext::DumpAdvanceVisualInfo(std::unique_ptr<JsonValue>& json)
     if (GetOuterBorderWidth().has_value()) {
         json->Put("OuterBorderWidth", GetOuterBorderWidth().value().ToString().c_str());
     }
+    DumpAdvanceBlendAndGradientInfo(json, config);
+}
+
+void RosenRenderContext::DumpAdvanceBlendAndGradientInfo(
+    std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
     if (GetDynamicLightUpRate().has_value()) {
-        json->Put("DynamicLightUpRate", std::to_string(GetDynamicLightUpRate().value()).c_str());
+        if (config.IsPublicTree()) {
+            json->Put("DynamicLightUpRate", GetDynamicLightUpRate().value());
+        } else {
+            json->Put("DynamicLightUpRate", std::to_string(GetDynamicLightUpRate().value()).c_str());
+        }
     }
     if (GetDynamicLightUpDegree().has_value()) {
-        json->Put("DynamicLightUpDegree", std::to_string(GetDynamicLightUpDegree().value()).c_str());
+        if (config.IsPublicTree()) {
+            json->Put("DynamicLightUpDegree", GetDynamicLightUpDegree().value());
+        } else {
+            json->Put("DynamicLightUpDegree", std::to_string(GetDynamicLightUpDegree().value()).c_str());
+        }
     }
     if (GetBackBlendMode().has_value()) {
         json->Put("BlendMode", static_cast<int>(GetBackBlendMode().value()));
     }
     if (GetLinearGradient().has_value()) {
-        json->Put("LinearGradient", GetLinearGradient().value().ToString().c_str());
+        if (config.IsPublicTree()) {
+            auto gradient = GradientJsonUtils::ToTreeJson(GetLinearGradient().value());
+            if (gradient) {
+                json->PutRef("LinearGradient", std::move(gradient));
+            }
+        } else {
+            json->Put("LinearGradient", GetLinearGradient().value().ToString().c_str());
+        }
     }
     if (GetSweepGradient().has_value()) {
-        json->Put("SweepGradient", GetSweepGradient().value().ToString().c_str());
+        if (config.IsPublicTree()) {
+            auto gradient = GradientJsonUtils::ToTreeJson(GetSweepGradient().value());
+            if (gradient) {
+                json->PutRef("SweepGradient", std::move(gradient));
+            }
+        } else {
+            json->Put("SweepGradient", GetSweepGradient().value().ToString().c_str());
+        }
     }
 }
 
@@ -8804,28 +8841,41 @@ void RosenRenderContext::SetAdvanceInfo(std::unique_ptr<JsonValue>& json, const 
 {
     const bool visual = !config.IsPublicTree() || config.visualProperties;
     if (visual && GetRadialGradient().has_value()) {
-        json->Put("RadialGradient", GetRadialGradient().value().ToString().c_str());
+        if (config.IsPublicTree()) {
+            auto gradient = GradientJsonUtils::ToTreeJson(GetRadialGradient().value());
+            if (gradient) {
+                json->PutRef("RadialGradient", std::move(gradient));
+            }
+        } else {
+            json->Put("RadialGradient", GetRadialGradient().value().ToString().c_str());
+        }
     }
-    if (visual && GetFrontBrightness().has_value()) {
-        json->Put("FrontBrightness", GetFrontBrightness().value().ToString().c_str());
-    }
-    if (visual && GetFrontGrayScale().has_value()) {
-        json->Put("FrontGrayScale", GetFrontGrayScale().value().ToString().c_str());
-    }
-    if (visual && GetFrontContrast().has_value()) {
-        json->Put("FrontContrast", GetFrontContrast().value().ToString().c_str());
-    }
-    if (visual && GetFrontSaturate().has_value()) {
-        json->Put("FrontSaturate", GetFrontSaturate().value().ToString().c_str());
-    }
-    if (visual && GetFrontSepia().has_value()) {
-        json->Put("FrontSepia", GetFrontSepia().value().ToString().c_str());
-    }
-    if (visual && GetFrontHueRotate().has_value()) {
-        json->Put("FrontHueRotate", std::to_string(GetFrontHueRotate().value()).c_str());
-    }
-    if (visual && GetFrontColorBlend().has_value()) {
-        json->Put("FrontColorBlend", GetFrontColorBlend().value().ColorToString().c_str());
+    if (visual) {
+        if (GetFrontBrightness().has_value()) {
+            json->Put("FrontBrightness", GetFrontBrightness().value().ToString().c_str());
+        }
+        if (GetFrontGrayScale().has_value()) {
+            json->Put("FrontGrayScale", GetFrontGrayScale().value().ToString().c_str());
+        }
+        if (GetFrontContrast().has_value()) {
+            json->Put("FrontContrast", GetFrontContrast().value().ToString().c_str());
+        }
+        if (GetFrontSaturate().has_value()) {
+            json->Put("FrontSaturate", GetFrontSaturate().value().ToString().c_str());
+        }
+        if (GetFrontSepia().has_value()) {
+            json->Put("FrontSepia", GetFrontSepia().value().ToString().c_str());
+        }
+        if (GetFrontHueRotate().has_value()) {
+            if (config.IsPublicTree()) {
+                json->Put("FrontHueRotate", GetFrontHueRotate().value());
+            } else {
+                json->Put("FrontHueRotate", std::to_string(GetFrontHueRotate().value()).c_str());
+            }
+        }
+        if (GetFrontColorBlend().has_value()) {
+            json->Put("FrontColorBlend", GetFrontColorBlend().value().ColorToString().c_str());
+        }
     }
     DumpAdvanceImageAndLightInfo(json, config);
 }
@@ -8837,29 +8887,48 @@ void RosenRenderContext::DumpAdvanceImageAndLightInfo(std::unique_ptr<JsonValue>
         DumpAdvanceSourceInfo(json, "BorderImageSource", GetBorderImageSource().value(), config);
     }
     if (visual && GetBorderImageGradient().has_value()) {
-        json->Put("BorderImageGradient", GetBorderImageGradient().value().ToString().c_str());
+        if (config.IsPublicTree()) {
+            auto gradient = GradientJsonUtils::ToTreeJson(GetBorderImageGradient().value());
+            if (gradient) {
+                json->PutRef("BorderImageGradient", std::move(gradient));
+            }
+        } else {
+            json->Put("BorderImageGradient", GetBorderImageGradient().value().ToString().c_str());
+        }
     }
     if (visual && GetForegroundColor().has_value()) {
         json->Put("ForegroundColor", GetForegroundColor().value().ColorToString().c_str());
     }
     if (visual) {
-        DumpAdvanceLightInfo(json);
+        DumpAdvanceLightInfo(json, config);
     }
 }
 
-void RosenRenderContext::DumpAdvanceLightInfo(std::unique_ptr<JsonValue>& json)
+void RosenRenderContext::DumpAdvanceLightInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
 {
     if (GetLightIntensity().has_value()) {
-        json->Put("LightIntensity", std::to_string(GetLightIntensity().value()).c_str());
+        if (config.IsPublicTree()) {
+            json->Put("LightIntensity", GetLightIntensity().value());
+        } else {
+            json->Put("LightIntensity", std::to_string(GetLightIntensity().value()).c_str());
+        }
     }
     if (GetLightIlluminated().has_value()) {
-        json->Put("LightIlluminated", std::to_string(GetLightIlluminated().value()).c_str());
+        if (config.IsPublicTree()) {
+            json->Put("LightIlluminated", static_cast<int64_t>(GetLightIlluminated().value()));
+        } else {
+            json->Put("LightIlluminated", std::to_string(GetLightIlluminated().value()).c_str());
+        }
     }
     if (GetIlluminatedBorderWidth().has_value()) {
         json->Put("IlluminatedBorderWidth", GetIlluminatedBorderWidth().value().ToString().c_str());
     }
     if (GetBloom().has_value()) {
-        json->Put("Bloom", std::to_string(GetBloom().value()).c_str());
+        if (config.IsPublicTree()) {
+            json->Put("Bloom", GetBloom().value());
+        } else {
+            json->Put("Bloom", std::to_string(GetBloom().value()).c_str());
+        }
     }
 }
 
@@ -8888,8 +8957,12 @@ void RosenRenderContext::DumpAdvanceSourceInfo(std::unique_ptr<JsonValue>& json,
             json->PutRef(key, std::move(resource));
             break;
         }
-        default:
+        default: {
+            auto descriptor = JsonUtil::Create();
+            descriptor->Put("sourceType", source.GetSrcTypeName());
+            json->PutRef(key, std::move(descriptor));
             break;
+        }
     }
 }
 

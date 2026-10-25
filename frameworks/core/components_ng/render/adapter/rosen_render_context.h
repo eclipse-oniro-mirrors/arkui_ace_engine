@@ -1061,10 +1061,11 @@ protected:
     ACE_DISALLOW_COPY_AND_MOVE(RosenRenderContext);
 
 private:
-    void DumpAdvanceVisualInfo(std::unique_ptr<JsonValue>& json);
+    void DumpAdvanceVisualInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+    void DumpAdvanceBlendAndGradientInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
     void DumpAdvanceBackgroundInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
     void SetAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
-    void DumpAdvanceLightInfo(std::unique_ptr<JsonValue>& json);
+    void DumpAdvanceLightInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
     void DumpAdvanceImageAndLightInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
     void DumpAdvanceSourceInfo(std::unique_ptr<JsonValue>& json, const char* key,
         const ImageSourceInfo& source, const ParamConfig& config);

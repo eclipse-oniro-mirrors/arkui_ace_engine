@@ -36,6 +36,17 @@ void ScrollableLayoutProperty::DumpInfo(std::unique_ptr<JsonValue>& json)
 
 void ScrollableLayoutProperty::DumpInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
 {
+    if (config.IsPublicTree()) {
+        if (propContentStartOffset_.has_value()) {
+            json->Put("contentStartOffset",
+                Dimension(propContentStartOffset_.value(), DimensionUnit::VP).ToString().c_str());
+        }
+        if (propContentEndOffset_.has_value()) {
+            json->Put(
+                "contentEndOffset", Dimension(propContentEndOffset_.value(), DimensionUnit::VP).ToString().c_str());
+        }
+        return;
+    }
     if (!config.IsPublicTree() || propContentStartOffset_.has_value()) {
         json->Put("contentStartOffset",
             propContentStartOffset_.has_value() ? std::to_string(propContentStartOffset_.value()).c_str() : "None");

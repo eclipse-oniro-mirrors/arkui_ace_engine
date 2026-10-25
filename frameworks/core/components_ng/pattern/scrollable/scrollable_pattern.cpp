@@ -147,6 +147,16 @@ bool UpdateCurrentOffsetByTargetId(int32_t targetId)
     ScrollablePattern::ScrollToTarget(scrollable, target, 0.0f, ScrollAlign::NONE);
     return true;
 }
+
+void PutScrollEventPresence(std::unique_ptr<JsonValue>& json, const char* key, bool hasEvent,
+    const ParamConfig& config)
+{
+    if (config.IsPublicTree()) {
+        json->Put(key, hasEvent);
+    } else {
+        json->Put(key, hasEvent ? "true" : "false");
+    }
+}
 } // namespace
 using std::chrono::high_resolution_clock;
 using std::chrono::milliseconds;
@@ -5062,7 +5072,7 @@ void ScrollablePattern::DumpAdvancePhysicsInfo(std::unique_ptr<JsonValue>& json,
     auto scrollable = scrollableEvent_->GetScrollable();
     CHECK_NULL_VOID(scrollable);
     json->Put("friction", scrollable->GetFriction());
-    json->Put("flingSpeedLimit", std::to_string(scrollable->GetMaxFlingVelocity()).c_str());
+    json->Put("flingSpeedLimit", scrollable->GetMaxFlingVelocity());
 }
 
 void ScrollablePattern::DumpAdvanceScrollEventInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
@@ -5074,28 +5084,28 @@ void ScrollablePattern::DumpAdvanceScrollEventInfo(std::unique_ptr<JsonValue>& j
     auto scrollHub = host->GetEventHub<ScrollEventHub>();
     if (scrollHub) {
         auto onWillScroll = scrollHub->GetOnWillScrollEvent();
-        json->Put("hasOnWillScroll", onWillScroll ? "true" : "false");
+        PutScrollEventPresence(json, "hasOnWillScroll", static_cast<bool>(onWillScroll), config);
         if (!config.IsPublicTree()) {
             auto onJSFrameNodeScrollWillScroll = scrollHub->GetJSFrameNodeOnScrollWillScroll();
             json->Put("nodeOnWillScroll", onJSFrameNodeScrollWillScroll ? "true" : "false");
         }
 
         auto onDidScroll = scrollHub->GetOnDidScrollEvent();
-        json->Put("hasOnDidScroll", onDidScroll ? "true" : "false");
+        PutScrollEventPresence(json, "hasOnDidScroll", static_cast<bool>(onDidScroll), config);
         if (!config.IsPublicTree()) {
             auto onJSFrameNodeScrollDidScroll = scrollHub->GetJSFrameNodeOnScrollDidScroll();
             json->Put("nodeOnDidScroll", onJSFrameNodeScrollDidScroll ? "true" : "false");
         }
     } else {
         auto onWillScroll = hub->GetOnWillScroll();
-        json->Put("hasOnWillScroll", onWillScroll ? "true" : "false");
+        PutScrollEventPresence(json, "hasOnWillScroll", static_cast<bool>(onWillScroll), config);
         if (!config.IsPublicTree()) {
             auto onJSFrameNodeWillScroll = hub->GetJSFrameNodeOnWillScroll();
             json->Put("nodeOnWillScroll", onJSFrameNodeWillScroll ? "true" : "false");
         }
 
         auto onDidScroll = hub->GetOnDidScroll();
-        json->Put("hasOnDidScroll", onDidScroll ? "true" : "false");
+        PutScrollEventPresence(json, "hasOnDidScroll", static_cast<bool>(onDidScroll), config);
         if (!config.IsPublicTree()) {
             auto onJSFrameNodeDidScroll = hub->GetJSFrameNodeOnDidScroll();
             json->Put("nodeOnDidScroll", onJSFrameNodeDidScroll ? "true" : "false");
@@ -5191,20 +5201,14 @@ void ScrollablePattern::DumpAdvanceVisualProperties(std::unique_ptr<JsonValue>& 
 {
     auto property = GetPaintProperty<ScrollablePaintProperty>();
     if (property) {
-        auto paint = JsonUtil::Create();
-        property->DumpInfo(paint, config, GetDefaultScrollBarDisplayMode());
-        if (paint->GetChild()->IsValid()) {
-            json->PutRef("paintProperty", std::move(paint));
-        }
+        property->DumpInfo(json, config, GetDefaultScrollBarDisplayMode());
     }
     auto layoutProperty = GetLayoutProperty<ScrollableLayoutProperty>();
     if (layoutProperty) {
         layoutProperty->DumpInfo(json, config);
     }
     if (scrollBar_) {
-        auto bar = JsonUtil::Create();
-        scrollBar_->DumpAdvanceInfo(bar, config);
-        json->PutRef("scrollBar", std::move(bar));
+        scrollBar_->DumpAdvanceInfo(json, config);
     }
 }
 
@@ -5213,9 +5217,7 @@ void ScrollablePattern::DumpAdvanceFunctionalProperties(std::unique_ptr<JsonValu
     GetEventDumpInfo(json, config);
     // The visual branch already includes both sets of scroll bar properties when both options are enabled.
     if (scrollBar_ && !config.visualProperties) {
-        auto bar = JsonUtil::Create();
-        scrollBar_->DumpAdvanceInfo(bar, config);
-        json->PutRef("scrollBar", std::move(bar));
+        scrollBar_->DumpAdvanceInfo(json, config);
     }
 }
 
@@ -5442,13 +5444,13 @@ void ScrollablePattern::GetEventDumpInfo(std::unique_ptr<JsonValue>& json, const
     auto hub = host->GetEventHub<ScrollableEventHub>();
     CHECK_NULL_VOID(hub);
     auto onScrollStart = hub->GetOnScrollStart();
-    json->Put("hasOnScrollStart", onScrollStart ? "true" : "false");
+    PutScrollEventPresence(json, "hasOnScrollStart", static_cast<bool>(onScrollStart), config);
     if (!config.IsPublicTree()) {
         auto onJSFrameNodeScrollStart = hub->GetJSFrameNodeOnScrollStart();
         json->Put("nodeOnScrollStart", onJSFrameNodeScrollStart ? "true" : "false");
     }
     auto onScrollStop = hub->GetOnScrollStop();
-    json->Put("hasOnScrollStop", onScrollStop ? "true" : "false");
+    PutScrollEventPresence(json, "hasOnScrollStop", static_cast<bool>(onScrollStop), config);
     if (!config.IsPublicTree()) {
         auto onJSFrameNodeScrollStop = hub->GetJSFrameNodeOnScrollStop();
         json->Put("nodeOnScrollStop", onJSFrameNodeScrollStop ? "true" : "false");
@@ -5456,21 +5458,21 @@ void ScrollablePattern::GetEventDumpInfo(std::unique_ptr<JsonValue>& json, const
 
     DumpAdvanceScrollEventInfo(json, config);
     auto onScrollFrameBegin = hub->GetOnScrollFrameBegin();
-    json->Put("hasOnScrollBegin", onScrollFrameBegin ? "true" : "false");
+    PutScrollEventPresence(json, "hasOnScrollBegin", static_cast<bool>(onScrollFrameBegin), config);
     if (!config.IsPublicTree()) {
         auto onJSFrameNodeScrollFrameBegin = hub->GetJSFrameNodeOnScrollFrameBegin();
         json->Put("nodeOnScrollBegin", onJSFrameNodeScrollFrameBegin ? "true" : "false");
     }
 
     auto onReachStart = hub->GetOnReachStart();
-    json->Put("hasOnReachStart", onReachStart ? "true" : "false");
+    PutScrollEventPresence(json, "hasOnReachStart", static_cast<bool>(onReachStart), config);
     if (!config.IsPublicTree()) {
         auto onJSFrameNodeReachStart = hub->GetJSFrameNodeOnReachStart();
         json->Put("nodeOnReachStart", onJSFrameNodeReachStart ? "true" : "false");
     }
 
     auto onReachEnd = hub->GetOnReachEnd();
-    json->Put("hasOnReachEnd", onReachEnd ? "true" : "false");
+    PutScrollEventPresence(json, "hasOnReachEnd", static_cast<bool>(onReachEnd), config);
     if (!config.IsPublicTree()) {
         auto onJSFrameNodeReachEnd = hub->GetJSFrameNodeOnReachEnd();
         json->Put("nodeOnReachEnd", onJSFrameNodeReachEnd ? "true" : "false");

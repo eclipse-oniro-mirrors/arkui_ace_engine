@@ -351,9 +351,7 @@ void LazyWaterFlowLayoutPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& jso
         return;
     }
     if (config.visualProperties) {
-        auto layout = JsonUtil::Create();
-        layoutInfo_->DumpAdvanceInfo(layout, config);
-        json->PutRef("layoutInfo", std::move(layout));
+        layoutInfo_->DumpAdvanceInfo(json, config);
     }
 }
 

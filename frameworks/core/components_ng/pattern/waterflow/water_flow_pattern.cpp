@@ -1335,15 +1335,62 @@ void WaterFlowPattern::DumpAdvanceVisualProperties(
     DumpAdvanceLayoutProperties(*json);
 }
 
+namespace {
+void PutTreeSectionMargin(JsonValue& json, const MarginProperty& margin)
+{
+    auto value = JsonUtil::Create();
+    const std::pair<const char*, std::optional<CalcLength>> edges[] = {
+        { "left", margin.left }, { "right", margin.right }, { "top", margin.top },
+        { "bottom", margin.bottom }, { "start", margin.start }, { "end", margin.end }
+    };
+    for (const auto& [key, edge] : edges) {
+        if (edge) {
+            value->Put(key, edge->ToString().c_str());
+        }
+    }
+    json.PutRef("margin", std::move(value));
+}
+
+void PutTreeSections(JsonValue& json, const RefPtr<WaterFlowSections>& sections)
+{
+    CHECK_NULL_VOID(sections);
+    auto values = JsonUtil::CreateArray();
+    for (const auto& section : sections->GetSectionInfo()) {
+        auto value = JsonUtil::Create();
+        value->Put("itemsCount", section.itemsCount);
+        if (section.crossCount) {
+            value->Put("crossCount", *section.crossCount);
+        }
+        if (section.columnsGap) {
+            value->Put("columnsGap", section.columnsGap->ToString().c_str());
+        }
+        if (section.rowsGap) {
+            value->Put("rowsGap", section.rowsGap->ToString().c_str());
+        }
+        if (section.margin) {
+            PutTreeSectionMargin(*value, *section.margin);
+        }
+        values->PutRef(std::move(value));
+    }
+    json.PutRef("sections", std::move(values));
+}
+} // namespace
+
 void WaterFlowPattern::DumpAdvanceFunctionalProperties(
     std::unique_ptr<JsonValue>& json, const ParamConfig& /* config */)
 {
+    PutTreeSections(*json, sections_);
     auto property = GetLayoutProperty<WaterFlowLayoutProperty>();
     if (property) {
         if (layoutInfo_) {
             json->Put("CachedCount", property->GetCachedCount().value_or(layoutInfo_->defCachedCount_));
         }
-        json->Put("isReverse", property->IsReverse());
+        // Layout is authoritative; the inherited scrollbar cache may not be synchronized yet.
+        if (json->Contains("isReverse")) {
+            json->Replace("isReverse", property->IsReverse());
+        } else {
+            json->Put("isReverse", property->IsReverse());
+        }
     }
     json->Put("footer", static_cast<bool>(footer_.Upgrade()));
     auto host = GetHost();

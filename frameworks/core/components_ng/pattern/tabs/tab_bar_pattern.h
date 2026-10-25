@@ -563,6 +563,7 @@ public:
     void DumpAdvanceInfo() override;
     void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json) override;
     void SetRegionInfo(std::unique_ptr<JsonValue>& json);
+    void SetRegionInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
 
     std::optional<int32_t> GetAnimationDuration()
     {

@@ -4661,36 +4661,42 @@ void ListPattern::OnRestoreInfo(const std::string& restoreInfo)
 
 void ListPattern::DumpAdvanceListConfiguration(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
 {
-    if (!config.IsPublicTree() || config.visualProperties) {
-        json->Put("lanes", std::to_string(lanes_).c_str());
-        json->Put("laneGutter", std::to_string(laneGutter_).c_str());
+    const bool isPublicTree = config.IsPublicTree();
+    const bool visual = !isPublicTree || config.visualProperties;
+    const bool functional = !isPublicTree || config.functionalProperties;
+    if (visual) {
+        if (isPublicTree) {
+            json->Put("lanes", lanes_);
+            json->Put("laneGutter", laneGutter_);
+        } else {
+            json->Put("lanes", std::to_string(lanes_).c_str());
+            json->Put("laneGutter", std::to_string(laneGutter_).c_str());
+        }
     }
-    if (!config.IsPublicTree()) {
+    if (!isPublicTree) {
         json->Put("dragFromSpring", dragFromSpring_);
         json->Put("isScrollEnd", isScrollEnd_);
     }
-    if (!config.IsPublicTree() || config.visualProperties) {
+    if (visual) {
         json->Put("IsAtTop", IsAtTop());
         json->Put("IsAtBottom", IsAtBottom());
     }
-    if (!config.IsPublicTree() || config.functionalProperties) {
+    if (functional) {
         json->Put("multiSelectable", multiSelectable_);
     }
-    if (!config.IsPublicTree() || config.visualProperties) {
+    if (visual) {
         json->Put("chainAnimation", chainAnimation_);
     }
-    if (!config.IsPublicTree() || config.functionalProperties) {
+    if (functional) {
         json->Put("maintainVisibleContentPosition", maintainVisibleContentPosition_);
     }
-    if (!config.IsPublicTree()) {
+    if (!isPublicTree) {
         auto host = GetHost();
         CHECK_NULL_VOID(host);
         auto listLayoutProperty = host->GetLayoutProperty<ListLayoutProperty>();
         if (listLayoutProperty) {
             listLayoutProperty->DumpInfo(json);
         }
-    }
-    if (!config.IsPublicTree()) {
         return;
     }
     if (config.visualProperties) {
@@ -4706,11 +4712,11 @@ void ListPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamC
     ScrollablePattern::DumpAdvanceInfo(json, config);
     if (!config.IsPublicTree()) {
         json->Put("maxListItemIndex", maxListItemIndex_);
-    }
-    if (!config.IsPublicTree() || config.visualProperties) {
         json->Put("startIndex", startIndex_);
         json->Put("endIndex", endIndex_);
         json->Put("centerIndex", centerIndex_);
+    }
+    if (!config.IsPublicTree() || config.visualProperties) {
         json->Put("startMainPos", startMainPos_);
         json->Put("endMainPos", endMainPos_);
         json->Put("currentOffset", currentOffset_);

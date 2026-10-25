@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 
+#include "interfaces/inner_api/ui_session/param_config.h"
 #include "test/unittest/core/pattern/test_ng.h"
 
 #include "core/components_ng/pattern/list/list_pattern.h"
@@ -30,6 +31,19 @@ using namespace testing::ext;
 class ScrollableTestNg : public TestNG {
 public:
 };
+
+namespace {
+void ExpectUniqueDumpProperty(const JsonValue& json, const char* key, const std::string& expected)
+{
+    SCOPED_TRACE(key);
+    EXPECT_EQ(json.GetString(key), expected);
+    int count = 0;
+    for (auto item = json.GetChild(); item && item->IsValid(); item = item->GetNext()) {
+        count += item->GetKey() == key;
+    }
+    EXPECT_EQ(count, 1);
+}
+} // namespace
 
 /**
  * @tc.name: GetEdgeEffectDumpInfo001
@@ -1173,5 +1187,154 @@ HWTEST_F(ScrollableTestNg, ScrollableLayoutPropertyClone010, TestSize.Level1)
     EXPECT_FALSE(layoutProperty->HasContentStartOffset());
     EXPECT_FALSE(layoutProperty->HasContentEndOffset());
     EXPECT_FALSE(layoutProperty->HasSupportLazyLoadingEmptyBranch());
+}
+
+/**
+ * @tc.name: PublicDumpPreservesFlatScrollProperties
+ * @tc.desc: Property and scrollbar readers keep flat values and do not duplicate host keys.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollableTestNg, PublicDumpPreservesFlatScrollProperties, TestSize.Level1)
+{
+    auto pattern = AceType::MakeRefPtr<ListPattern>();
+    auto node = FrameNode::CreateFrameNode(V2::LIST_ETS_TAG, 1, pattern);
+    auto property = node->GetPaintProperty<ScrollablePaintProperty>();
+    ASSERT_NE(property, nullptr);
+    const Dimension hostHeight(11.0, DimensionUnit::VP);
+    const ScrollBarMargin hostMargin { Dimension(2.0, DimensionUnit::VP), Dimension(3.0, DimensionUnit::VP) };
+    property->UpdateScrollBarHeight(hostHeight);
+    property->UpdateScrollBarMargin(hostMargin);
+    pattern->scrollBar_ = AceType::MakeRefPtr<ScrollBar>();
+    pattern->scrollBar_->touchRegion_ = Rect(1, 2, 30, 40);
+    pattern->scrollBar_->hoverRegion_ = Rect(3, 4, 50, 60);
+    pattern->scrollBar_->touchWidth_ = Dimension(12.0, DimensionUnit::VP);
+    pattern->scrollBar_->hoverWidth_ = Dimension(16.0, DimensionUnit::VP);
+    pattern->scrollBar_->scrollBarHeight_ = Dimension(22.0, DimensionUnit::VP);
+    pattern->scrollBar_->scrollBarMargin_ = ScrollBarMargin {};
+    auto legacy = JsonUtil::Create();
+    pattern->ScrollablePattern::DumpAdvanceInfo(legacy);
+    for (bool visual : { false, true }) {
+        for (bool functional : { false, true }) {
+            ParamConfig config;
+            config.dumpMode = TreeDumpMode::PUBLIC_TREE;
+            config.visualProperties = visual;
+            config.functionalProperties = functional;
+            auto json = JsonUtil::Create();
+            pattern->ScrollablePattern::DumpAdvanceInfo(json, config);
+            EXPECT_FALSE(json->Contains("paintProperty"));
+            EXPECT_FALSE(json->Contains("scrollBar"));
+            EXPECT_EQ(json->Contains("activeRect"), visual);
+            for (const char* key : { "touchRegion", "hoverRegion", "touchWidth", "hoverWidth" }) {
+                EXPECT_EQ(json->Contains(key), visual);
+                if (visual) {
+                    EXPECT_EQ(json->GetString(key), legacy->GetString(key));
+                }
+            }
+            EXPECT_EQ(json->Contains("autoAdjustScrollBarMargin"), functional);
+            EXPECT_FALSE(json->Contains("innerScrollBarLayoutInfos"));
+            if (visual) {
+                ExpectUniqueDumpProperty(*json, "scrollBarHeight", legacy->GetString("scrollBarHeight"));
+                ExpectUniqueDumpProperty(*json, "scrollBarMargin", legacy->GetString("scrollBarMargin"));
+            }
+        }
+    }
+    auto after = JsonUtil::Create();
+    pattern->ScrollablePattern::DumpAdvanceInfo(after);
+    EXPECT_EQ(after->ToString(), legacy->ToString());
+}
+
+
+/**
+ * @tc.name: LegacyDumpEventSlotsMatchBaselineSnapshot
+ * @tc.desc: Preserve separate ordinary and JSFrameNode event fields and their order.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollableTestNg, LegacyDumpEventSlotsMatchBaselineSnapshot, TestSize.Level1)
+{
+    auto pattern = AceType::MakeRefPtr<ListPattern>();
+    auto host = FrameNode::CreateFrameNode(V2::LIST_ETS_TAG, 1, pattern);
+    auto hub = host->GetEventHub<ScrollableEventHub>();
+    ASSERT_NE(hub, nullptr);
+    hub->SetOnScrollStart([]() {});
+    hub->SetJSFrameNodeOnScrollStop([]() {});
+    // Frozen from fdf7d63988ed9fa338051a11c19fadf1f86653dc; compare serialized key order and types.
+    const std::string expected = R"({"hasOnScrollStart":"true","nodeOnScrollStart":"false",)"
+        R"("hasOnScrollStop":"false","nodeOnScrollStop":"true","hasOnWillScroll":"false",)"
+        R"("nodeOnWillScroll":"false","hasOnDidScroll":"false","nodeOnDidScroll":"false",)"
+        R"("hasOnScrollBegin":"false","nodeOnScrollBegin":"false","hasOnReachStart":"false",)"
+        R"("nodeOnReachStart":"false","hasOnReachEnd":"false","nodeOnReachEnd":"false"})";
+    auto json = JsonUtil::Create();
+    pattern->ScrollablePattern::GetEventDumpInfo(json);
+    EXPECT_EQ(json->ToString(), expected);
+}
+
+/**
+ * @tc.name: DumpContentOffsetUnits
+ * @tc.desc: Public configured offsets retain vp units; legacy strings, missing values and order stay unchanged.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollableTestNg, DumpContentOffsetUnits, TestSize.Level1)
+{
+    auto property = AceType::MakeRefPtr<ScrollableLayoutProperty>();
+    ParamConfig config;
+    config.dumpMode = TreeDumpMode::PUBLIC_TREE;
+    auto unset = JsonUtil::Create();
+    property->DumpInfo(unset, config);
+    EXPECT_EQ(unset->ToString(), "{}");
+    auto missing = JsonUtil::Create();
+    property->DumpInfo(missing);
+    EXPECT_EQ(missing->ToString(), "{\"contentStartOffset\":\"None\",\"contentEndOffset\":\"None\"}");
+    property->UpdateContentStartOffset(10.25f);
+    property->UpdateContentEndOffset(-2.5f);
+    auto json = JsonUtil::Create();
+    property->DumpInfo(json, config);
+    EXPECT_EQ(json->ToString(), "{\"contentStartOffset\":\"10.25vp\",\"contentEndOffset\":\"-2.50vp\"}");
+    auto legacy = JsonUtil::Create();
+    property->DumpInfo(legacy);
+    EXPECT_EQ(legacy->ToString(), "{\"contentStartOffset\":\"10.250000\",\"contentEndOffset\":\"-2.500000\"}");
+    property->ResetContentStartOffset();
+    property->UpdateContentEndOffset(0.0f);
+    auto endOnly = JsonUtil::Create();
+    property->DumpInfo(endOnly, config);
+    EXPECT_EQ(endOnly->ToString(), "{\"contentEndOffset\":\"0.00vp\"}");
+}
+
+/**
+ * @tc.name: DumpContentOffsetSources
+ * @tc.desc: Scroll exposes configured vp values, while List retains resolved px numbers and visual filtering.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollableTestNg, DumpContentOffsetSources, TestSize.Level1)
+{
+    auto scroll = AceType::MakeRefPtr<ScrollPattern>();
+    auto scrollNode = FrameNode::CreateFrameNode(V2::SCROLL_ETS_TAG, 1, scroll);
+    auto list = AceType::MakeRefPtr<ListPattern>();
+    auto listNode = FrameNode::CreateFrameNode(V2::LIST_ETS_TAG, 2, list);
+    for (const auto& node : { scrollNode, listNode }) {
+        ScrollableModelNG::SetContentStartOffset(AceType::RawPtr(node), 10.0f);
+        ScrollableModelNG::SetContentEndOffset(AceType::RawPtr(node), 20.0f);
+    }
+    list->contentStartOffset_ = 20.0f;
+    list->contentEndOffset_ = 40.0f;
+    ParamConfig config;
+    config.dumpMode = TreeDumpMode::PUBLIC_TREE;
+    config.visualProperties = true;
+    auto scrollJson = JsonUtil::Create();
+    scroll->DumpAdvanceInfo(scrollJson, config);
+    ExpectUniqueDumpProperty(*scrollJson, "contentStartOffset", "10.00vp");
+    ExpectUniqueDumpProperty(*scrollJson, "contentEndOffset", "20.00vp");
+    auto listJson = JsonUtil::Create();
+    list->DumpAdvanceInfo(listJson, config);
+    EXPECT_TRUE(listJson->GetValue("contentStartOffset")->IsNumber());
+    EXPECT_TRUE(listJson->GetValue("contentEndOffset")->IsNumber());
+    EXPECT_EQ(listJson->GetDouble("contentStartOffset"), 20.0);
+    EXPECT_EQ(listJson->GetDouble("contentEndOffset"), 40.0);
+    config.visualProperties = false;
+    for (const auto& node : { scrollNode, listNode }) {
+        auto disabled = JsonUtil::Create();
+        node->GetPattern()->DumpAdvanceInfo(disabled, config);
+        EXPECT_FALSE(disabled->Contains("contentStartOffset"));
+        EXPECT_FALSE(disabled->Contains("contentEndOffset"));
+    }
 }
 } // namespace OHOS::Ace::NG

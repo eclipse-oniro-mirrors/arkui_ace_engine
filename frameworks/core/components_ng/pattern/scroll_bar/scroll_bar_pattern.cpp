@@ -703,18 +703,15 @@ void ScrollBarPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const P
 void ScrollBarPattern::DumpAdvanceVisualProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
 {
     if (!hasChild_ && scrollBar_) {
-        auto bar = JsonUtil::Create();
-        scrollBar_->DumpAdvanceInfo(bar, config);
-        json->PutRef("scrollBar", std::move(bar));
+        scrollBar_->DumpAdvanceInfo(json, config);
     }
 }
 
 void ScrollBarPattern::DumpAdvanceFunctionalProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
 {
-    if (!hasChild_ && scrollBar_) {
-        auto bar = JsonUtil::Create();
-        scrollBar_->DumpAdvanceInfo(bar, config);
-        json->PutRef("scrollBar", std::move(bar));
+    // The visual branch already writes both sets when both options are enabled.
+    if (!config.visualProperties && !hasChild_ && scrollBar_) {
+        scrollBar_->DumpAdvanceInfo(json, config);
     }
 }
 

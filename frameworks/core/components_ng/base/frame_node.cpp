@@ -1485,9 +1485,26 @@ void DumpAdvancedVisualProperties(
     }
 }
 
+void DumpAdvancedKeyboardShortcuts(FrameNode& node, JsonValue& functional)
+{
+    auto hub = node.GetEventHub<EventHub>();
+    if (!hub || !hub->HasKeyboardShortcut()) {
+        return;
+    }
+    auto shortcuts = JsonUtil::CreateArray();
+    for (const auto& shortcut : hub->GetKeyboardShortcut()) {
+        auto entry = JsonUtil::Create();
+        entry->Put("value", shortcut.value.c_str());
+        entry->Put("keys", static_cast<int32_t>(shortcut.keys));
+        shortcuts->PutRef(std::move(entry));
+    }
+    functional.PutRef("keyboardShortcuts", std::move(shortcuts));
+}
+
 void DumpAdvancedFunctionalProperties(
     FrameNode& node, std::unique_ptr<JsonValue>& functional, const ParamConfig& config)
 {
+    DumpAdvancedKeyboardShortcuts(node, *functional);
     if (auto render = node.GetRenderContext()) {
         render->DumpAdvanceInfo(functional, config);
     }

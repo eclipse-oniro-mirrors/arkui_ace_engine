@@ -3572,8 +3572,12 @@ void TabBarPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const Para
             json->Put("animationCurve", animationCurve_ ? animationCurve_->ToString().c_str() : "null");
         }
         if (!config.IsPublicTree() || animationDuration_.has_value()) {
-            json->Put("animationDuration",
-                animationDuration_.has_value() ? std::to_string(animationDuration_.value()).c_str() : "null");
+            if (config.IsPublicTree()) {
+                json->Put("animationDuration", animationDuration_.value());
+            } else {
+                json->Put("animationDuration",
+                    animationDuration_.has_value() ? std::to_string(animationDuration_.value()).c_str() : "null");
+            }
         }
     }
     if (!config.IsPublicTree()) {
@@ -3589,7 +3593,7 @@ void TabBarPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const Para
     }
     if (!config.IsPublicTree() || config.visualProperties) {
         json->Put("scrollMargin", scrollMargin_);
-        SetRegionInfo(json);
+        SetRegionInfo(json, config);
     }
 }
 
@@ -3687,11 +3691,24 @@ int32_t TabBarPattern::GetLoopIndex(int32_t originalIndex) const
 
 void TabBarPattern::SetRegionInfo(std::unique_ptr<JsonValue>& json)
 {
-    std::string regionString = "";
-    for (auto item : gradientRegions_) {
-        item ? regionString.append("true ") : regionString.append("false ");
+    SetRegionInfo(json, ParamConfig());
+}
+
+void TabBarPattern::SetRegionInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if (config.IsPublicTree()) {
+        auto regions = JsonUtil::CreateArray();
+        for (size_t index = 0; index < gradientRegions_.size(); ++index) {
+            regions->Put(std::to_string(index).c_str(), static_cast<bool>(gradientRegions_[index]));
+        }
+        json->PutRef("region", std::move(regions));
+    } else {
+        std::string regionString;
+        for (auto item : gradientRegions_) {
+            item ? regionString.append("true ") : regionString.append("false ");
+        }
+        json->Put("region", regionString.c_str());
     }
-    json->Put("region", regionString.c_str());
     switch (axis_) {
         case Axis::NONE: {
             json->Put("Axis", "NONE");

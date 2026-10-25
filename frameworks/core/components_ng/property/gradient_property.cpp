@@ -16,6 +16,7 @@
 #include "core/components_ng/property/gradient_property.h"
 #include "base/json/json_util.h"
 #include "base/log/log.h"
+#include "base/utils/string_utils.h"
 
 namespace OHOS::Ace::NG {
 
@@ -48,6 +49,122 @@ void Gradient::CreateGradientWithType(GradientType type)
 }
 
 namespace GradientJsonUtils {
+
+namespace {
+void PutTreeDimension(JsonValue& json, const char* key, const std::optional<Dimension>& value, bool angle = false)
+{
+    if (!value) {
+        return;
+    }
+    if (angle) {
+        json.Put(key, value->Value());
+    } else {
+        json.Put(key, value->ToString().c_str());
+    }
+}
+
+void PutTreeGradientColors(JsonValue& json, const Gradient& data)
+{
+    auto colors = JsonUtil::CreateArray();
+    for (const auto& stop : data.GetColors()) {
+        auto entry = JsonUtil::Create();
+        const auto& color = stop.GetColor();
+        entry->Put("color", color.ColorToString().c_str());
+        entry->Put("colorSpace", static_cast<int32_t>(color.GetColorSpace()));
+        if (const auto hdr = color.GetHeadRoomColor()) {
+            auto channels = JsonUtil::Create();
+            channels->Put("red", hdr->red);
+            channels->Put("green", hdr->green);
+            channels->Put("blue", hdr->blue);
+            channels->Put("alpha", hdr->alpha);
+            channels->Put("headRoom", hdr->headRoom);
+            entry->PutRef("hdr", std::move(channels));
+        }
+        if (stop.GetHasValue()) {
+            const auto& offset = stop.GetDimension();
+            // Gradient stops store percentages on a 0..100 scale, unlike normal Dimension values.
+            const auto value = offset.Unit() == DimensionUnit::PERCENT
+                ? StringUtils::DoubleToString(offset.Value()) + "%" : offset.ToString();
+            entry->Put("offset", value.c_str());
+        }
+        colors->PutRef(std::move(entry));
+    }
+    json.Put("repeating", data.GetRepeat());
+    json.PutRef("colors", std::move(colors));
+}
+
+void PutTreeLinearGradient(JsonValue& json, const Gradient& data)
+{
+    const auto& linear = data.GetLinearGradient();
+    CHECK_NULL_VOID(linear);
+    PutTreeDimension(json, "angle", linear->angle, true);
+    std::string direction;
+    if (linear->linearX == GradientDirection::LEFT) {
+        direction = "Left";
+    } else if (linear->linearX == GradientDirection::RIGHT) {
+        direction = "Right";
+    }
+    if (linear->linearY == GradientDirection::TOP) {
+        direction += "Top";
+    } else if (linear->linearY == GradientDirection::BOTTOM) {
+        direction += "Bottom";
+    }
+    if (!direction.empty()) {
+        json.Put("direction", ("GradientDirection." + direction).c_str());
+    }
+}
+
+void PutTreeSweepGradient(JsonValue& json, const Gradient& data)
+{
+    const auto& sweep = data.GetSweepGradient();
+    CHECK_NULL_VOID(sweep);
+    PutTreeDimension(json, "centerX", sweep->centerX);
+    PutTreeDimension(json, "centerY", sweep->centerY);
+    PutTreeDimension(json, "startAngle", sweep->startAngle, true);
+    PutTreeDimension(json, "endAngle", sweep->endAngle, true);
+    PutTreeDimension(json, "rotation", sweep->rotation, true);
+}
+
+void PutTreeRadialGradient(JsonValue& json, const Gradient& data)
+{
+    const auto& radial = data.GetRadialGradient();
+    CHECK_NULL_VOID(radial);
+    PutTreeDimension(json, "centerX", radial->radialCenterX);
+    PutTreeDimension(json, "centerY", radial->radialCenterY);
+    PutTreeDimension(json, "horizontalSize", radial->radialHorizontalSize);
+    PutTreeDimension(json, "verticalSize", radial->radialVerticalSize);
+    if (radial->radialShape) {
+        json.Put("shape", static_cast<int32_t>(*radial->radialShape));
+    }
+    if (radial->radialSizeType) {
+        json.Put("sizeType", static_cast<int32_t>(*radial->radialSizeType));
+    }
+}
+} // namespace
+
+std::unique_ptr<JsonValue> ToTreeJson(const Gradient& data)
+{
+    auto result = JsonUtil::Create();
+    switch (data.GetType()) {
+        case GradientType::LINEAR:
+            result->Put("type", "linear");
+            PutTreeLinearGradient(*result, data);
+            break;
+        case GradientType::SWEEP:
+            result->Put("type", "sweep");
+            PutTreeSweepGradient(*result, data);
+            break;
+        case GradientType::RADIAL:
+            result->Put("type", "radial");
+            PutTreeRadialGradient(*result, data);
+            break;
+        default:
+            return nullptr;
+    }
+    PutTreeGradientColors(*result, data);
+    return result;
+}
+
 
 static void GetColorsAndRepeating(std::unique_ptr<JsonValue>& resultJson, const Gradient& gradient)
 {

@@ -74,7 +74,11 @@ void ListLayoutProperty::DumpInfo(std::unique_ptr<JsonValue>& json, const ParamC
 {
     if (!config.IsPublicTree() || config.visualProperties) {
         auto listItemAlign = propListItemAlign_.value_or(V2::ListItemAlign::START);
-        json->Put("alignListItem", std::to_string(static_cast<int32_t>(listItemAlign)).c_str());
+        if (config.IsPublicTree()) {
+            json->Put("alignListItem", static_cast<int32_t>(listItemAlign));
+        } else {
+            json->Put("alignListItem", std::to_string(static_cast<int32_t>(listItemAlign)).c_str());
+        }
         if (propDivider_.has_value()) {
             auto& div = propDivider_.value();
             std::unique_ptr<JsonValue> dividerJson = JsonUtil::Create(true);
@@ -89,9 +93,17 @@ void ListLayoutProperty::DumpInfo(std::unique_ptr<JsonValue>& json, const ParamC
     }
     if (!config.IsPublicTree() || config.functionalProperties) {
         auto stickyStyle = propStickyStyle_.value_or(V2::StickyStyle::NONE);
-        json->Put("sticky", std::to_string(static_cast<uint32_t>(stickyStyle)).c_str());
+        if (config.IsPublicTree()) {
+            json->Put("sticky", static_cast<int64_t>(static_cast<uint32_t>(stickyStyle)));
+        } else {
+            json->Put("sticky", std::to_string(static_cast<uint32_t>(stickyStyle)).c_str());
+        }
         auto scrollSnapAlign = propScrollSnapAlign_.value_or(ScrollSnapAlign::NONE);
-        json->Put("scrollSnapAlign", std::to_string(static_cast<int32_t>(scrollSnapAlign)).c_str());
+        if (config.IsPublicTree()) {
+            json->Put("scrollSnapAlign", static_cast<int32_t>(scrollSnapAlign));
+        } else {
+            json->Put("scrollSnapAlign", std::to_string(static_cast<int32_t>(scrollSnapAlign)).c_str());
+        }
         json->Put("syncLoad", propSyncLoad_.value_or(false));
     }
 }

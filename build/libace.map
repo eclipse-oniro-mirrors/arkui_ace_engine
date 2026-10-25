@@ -771,6 +771,7 @@
       "OHOS::Ace::ImageSourceInfo::GetPixmap() const";
       "OHOS::Ace::ImageSourceInfo::GetResourceId() const";
       "OHOS::Ace::ImageSourceInfo::GetSrc() const";
+      "OHOS::Ace::ImageSourceInfo::GetSrcTypeName() const";
       "OHOS::Ace::ImageSourceInfo::ImageSourceInfo(std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>>, std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>>, std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>>, OHOS::Ace::Dimension, OHOS::Ace::Dimension, OHOS::Ace::InternalResource::ResourceId, OHOS::Ace::RefPtr<OHOS::Ace::PixelMap> const&)";
       "OHOS::Ace::ImageSourceInfo::IsInternalResource() const";
       "OHOS::Ace::ImageSourceInfo::IsPixmap() const";
