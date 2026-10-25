@@ -7,9 +7,9 @@
 
 Provider 默认含根及子节点，ID 从 1234 开始（当前 SDK 的节点/父 ID setter 为 int32_t；不改 SDK 签名。64 位无损编码边界由 Host 的真实 ArkUI_AccessibilityElementInfo 测试覆盖）。CURRENT(-1) 根查询和 RECURSIVE_CHILDREN(-1) 全树查询均是真实 C 回调，计数包含两种调用。提供成功空、失败保留有效前缀、1100 ms 返回、两宿主各 600 ms、重复 ID、10001 节点及字节超限输入。隐藏宿主用于 Full/Visible 对照。延迟为测试输入，框架不应强制取消同步 Provider。
 
-测试 SA 先 Connect，再调用 GetInspectorTree/GetVisibleInspectorTree，使用 --interactionInfo true --accessibilityInfo true --withResponseRegion true --withCustomContent true --caseId <场景> -tofile。观察 Provider 延迟返回时另设 --timeout 5000，测整体过期隔离时保留默认 1500。日志不打印正文；从 /data/service/el1/public/ui_sa/ 导出结果后运行 ../verify_inspector_tree.py。记录设备版本、应用版本、真实命令、回调次数及报告；窗口无 Label 分支需另用无 Label 的已安装测试应用验证。
+测试 SA 先 Connect，再调用 GetInspectorTree/GetVisibleInspectorTree，使用 --interactionInfo true --accessibilityInfo true --withResponseRegion true --withCustomContent true --caseId <场景> -tofile。只使用一个 SA 串行调用，调用方保证前次调用结束后再发起下一次请求。观察 Provider 延迟返回时另设 --timeout 5000，验证等待超时和回调清理时保留默认 1500。日志不打印正文；从 /data/service/el1/public/ui_sa/ 导出结果后运行 ../verify_inspector_tree.py。记录设备版本、应用版本、真实命令、回调次数及报告；窗口无 Label 分支需另用无 Label 的已安装测试应用验证。
 
-三方无障碍导出依赖 PR #90199 及其规格适配修复；原生采集依赖 PR #90061。`--withCustomContent true` 返回宿主直接成员 `accessibilityTree`，保持 Provider 原序扁平列表、类型化成员名、64 位 ID 的十进制字符串及原始 `screenRect`，增加窗口相对 `$rect`。成功空列表为 `[]`，未注册 Provider 省略该字段；原生 `accessibilityInfo` 独立控制原生字段。
+三方无障碍导出依赖 PR #90199 及其规格适配修复；原生采集依赖 PR #90161、#90172。编译验证时，已合入当前分支的依赖不重复应用，未合入的补丁仅临时叠加并在验证后撤回。`--withCustomContent true` 返回宿主直接成员 `accessibilityTree`，保持 Provider 原序扁平列表、类型化成员名、64 位 ID 的十进制字符串及原始 `screenRect`，增加窗口相对 `$rect`。成功空列表为 `[]`，未注册 Provider 省略该字段；原生 `accessibilityInfo` 独立控制原生字段。
 
 任一非超时采集失败清空整次树数据。`withResponseRegion` 或 `withCustomContent` 开启时，解码树根输出 `errorMessage`：成功为 `no error`，失败为首个固定错误原因；两个开关都关闭时失败结果为 `{}`。宿主不输出完整性或错误字段。结构检查、累计 10000 节点和最终 UTF-8 JSON 10 MiB 上限由依赖导出器检测，本需求承接结果。沿用原有 timeout，不增加 1 秒采集预算；超时不新增结果回调。
 

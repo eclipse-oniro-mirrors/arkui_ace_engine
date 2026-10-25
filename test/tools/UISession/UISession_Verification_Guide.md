@@ -364,16 +364,16 @@ hdc shell hidumper -s 16666 -a "GetCurrentAbilityLanguageInfo"
 
 ```bash
 python3 test/tools/UISession/verify_inspector_tree.py callback.json --case native_fields \
-  --with-response-region --with-third-provider --accessibility-info \
+  --with-response-region --with-custom-content --accessibility-info \
   --device-build '<实际系统构建号>' --report report.json
 ```
 
-验证器检查双层 JSON、原生字段类型、隐私输入和三方树通路。报告必须有实际非零断言。延迟 Provider 使用较长 timeout 观察自然返回；独立以默认 1500 ms 验证过期请求、下一请求和晚到结果隔离。未执行设备交互/窗口/跨进程场景时记录 NotRun，不以样例 JSON 或 Host 测试替代。
+验证器检查双层 JSON、原生字段类型、隐私输入和三方树通路。报告必须有实际非零断言。延迟 Provider 使用较长 timeout 观察自然返回；独立以默认 1500 ms 验证等待超时与回调清理。只使用一个 SA 串行调用，调用方保证前次调用结束后再发起下一次请求。未执行设备交互/窗口/跨进程场景时记录 NotRun，不以样例 JSON 或 Host 测试替代。
 
 ### 三方无障碍返回通路
 
-数据查询与编码复用 PR #90035 的 `ThirdProviderTreeExporter`，XComponent/Custom 的 `AddExtraInfoWithParamConfig` 将结果挂到宿主 `$children-third`。本需求透传其 JSON，保留 `$ID`、`$type`、`type=third`、`$rect`、`$attrs` 及 `$children` 层级，不再二次查询、转换为扁平数组或覆盖返回字段。
+数据查询、校验与编码复用 PR #90199 的 `ThirdProviderTreeExporter`。开启 `withCustomContent` 后，XComponent/Custom 的 `AddInspectorTreeInfo` 通过请求上下文将结果挂到宿主直接成员 `accessibilityTree`，保持 Provider 原序扁平列表、类型化成员名、64 位节点/父子 ID 的十进制字符串及原始 `screenRect`，增加窗口相对 `$rect`。
 
-当前导出器在未注册、空树、查询失败或节点数量超限时省略字段；根选择、坐标、节点/深度上限及字段类型由该 PR 定义。旧的 `accessibilityTree/accessibilityTreeComplete/errorMessage` 和本需求独立 Provider 预算已撤除。原生 `accessibilityId` 的十进制字符串协议不变；不要把原生 ID 规则套到三方 `$ID`。
+成功空列表返回 `[]`，未注册 Provider 省略该字段。依赖导出器负责结构校验及跨宿主累计 10000 节点、最终 UTF-8 JSON 10 MiB 上限；非超时采集失败清空整次树数据。任一新增开关开启时，解码树根输出 `errorMessage`，成功为 `no error`，失败为首个固定错误原因；两个开关都关闭时失败结果为 `{}`。宿主不输出 `accessibilityTreeComplete` 或 `errorMessage`。原生 `accessibilityId` 的十进制字符串协议保持。
 
-两种开关均通过 Parcel、UIExtension/Dump 参数通路传递，原生无障碍字段仍独立受 `accessibilityInfo` 控制。整包有界输出及异步回调隔离保持。编译时须临时叠加 #90061 和 #90035 的对应版本，验证后撤回；两个依赖 PR 的原始实现不进入本功能提交。
+两种开关均通过 Parcel、UIExtension/Dump 参数通路传递，原生无障碍字段仍独立受 `accessibilityInfo` 控制。保留既有 IPC 封装和回调等待机制，不增加独立采集时间预算或超时结果回调。原生采集依赖 #90161、#90172，三方导出依赖 #90199 及其规格适配修复；编译验证时使用匹配版本，已合入当前分支的依赖不重复应用，未合入的补丁仅临时叠加并在验证后撤回，依赖 PR 原始内容不进入本功能提交。
