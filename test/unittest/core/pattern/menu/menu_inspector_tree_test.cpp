@@ -77,6 +77,95 @@ TEST_F(InspectorTreeTask11, SelectExpandedFollowsExistingMenuVisibility)
     }
 }
 
+class InspectorTreeTask11SelectState : public InspectorTreeTask11 {
+protected:
+    void SetUp() override
+    {
+        InspectorTreeTask11::SetUp();
+        pattern_ = AceType::MakeRefPtr<SelectPattern>();
+        frame_ = FrameNode::CreateFrameNode("Select", 116, pattern_);
+        frame_->SetActive(true);
+    }
+
+    void ExpectSelected(const RefPtr<FrameNode>& frame, std::optional<bool> expected)
+    {
+        for (bool visible : { false, true }) {
+            for (bool interaction : { false, true }) {
+                for (bool accessibility : { false, true }) {
+                    SCOPED_TRACE(testing::Message() << "visible=" << visible << ", interaction=" << interaction
+                        << ", accessibility=" << accessibility);
+                    ParamConfig config;
+                    config.interactionInfo = interaction;
+                    config.accessibilityInfo = accessibility;
+                    InspectorTreeRequestContext context(config, {});
+                    config.inspectorContext = &context;
+                    auto json = JsonUtil::CreateSharedPtrJson();
+                    frame->DumpSimplifyTreeWithParamConfig(0, json, visible, config);
+                    const bool present = interaction && expected.has_value();
+                    size_t selectedCount = 0;
+                    for (auto field = json->GetChild(); field && field->IsValid(); field = field->GetNext()) {
+                        if (field->GetKey() == "selected") {
+                            ++selectedCount;
+                        }
+                    }
+                    EXPECT_EQ(selectedCount, present ? 1u : 0u);
+                    if (present) {
+                        ASSERT_TRUE(json->GetValue("selected")->IsBool());
+                        EXPECT_EQ(json->GetBool("selected"), expected.value());
+                    }
+                }
+            }
+        }
+    }
+
+    RefPtr<SelectPattern> pattern_;
+    RefPtr<FrameNode> frame_;
+};
+
+TEST_F(InspectorTreeTask11SelectState, UserSelectedOverridesBothNativeStatesAndResets)
+{
+    for (int32_t index : { -1, 0 }) {
+        pattern_->selected_ = index;
+        ExpectSelected(frame_, index >= 0);
+        for (bool selected : { false, true }) {
+            ViewAbstractModelNG::SetAccessibilitySelected(AceType::RawPtr(frame_), selected, false);
+            ExpectSelected(frame_, selected);
+            EXPECT_EQ(pattern_->GetSelected(), index);
+        }
+        ViewAbstractModelNG::SetAccessibilitySelected(AceType::RawPtr(frame_), false, true);
+        ExpectSelected(frame_, index >= 0);
+    }
+}
+
+TEST_F(InspectorTreeTask11SelectState, CustomSelectedKeepsSystemPriority)
+{
+    auto property = frame_->GetAccessibilityProperty<AccessibilityProperty>();
+    ASSERT_NE(property, nullptr);
+    auto custom = AceType::MakeRefPtr<CustomAccessibilityProperty>();
+    property->SetCustomAccessibilityProperty(custom);
+    for (bool selected : { false, true }) {
+        pattern_->selected_ = selected ? -1 : 0;
+        ViewAbstractModelNG::SetAccessibilitySelected(AceType::RawPtr(frame_), !selected, false);
+        custom->SetSelected(selected);
+        ExpectSelected(frame_, selected);
+    }
+    pattern_->selected_ = 0;
+    property->SetCustomAccessibilityProperty(nullptr);
+    ExpectSelected(frame_, false);
+    ViewAbstractModelNG::SetAccessibilitySelected(AceType::RawPtr(frame_), false, true);
+    ExpectSelected(frame_, true);
+}
+
+TEST_F(InspectorTreeTask11SelectState, CustomStateDoesNotAddSelectedWithoutSelectionSemantics)
+{
+    auto frame = FrameNode::CreateFrameNode("Column", 117, AceType::MakeRefPtr<Pattern>());
+    frame->SetActive(true);
+    auto custom = AceType::MakeRefPtr<CustomAccessibilityProperty>();
+    custom->SetSelected(true);
+    frame->GetAccessibilityProperty<AccessibilityProperty>()->SetCustomAccessibilityProperty(custom);
+    ExpectSelected(frame, std::nullopt);
+}
+
 TEST_F(InspectorTreeTask11, MenuItemExpandedUsesStateForItsExpandingMode)
 {
     auto pattern = AceType::MakeRefPtr<MenuItemPattern>();

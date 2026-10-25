@@ -1794,6 +1794,15 @@ void FrameNode::DumpInspectorTreeInfo(std::shared_ptr<JsonValue>& json, ParamCon
     if (pattern_) {
         pattern_->AddInspectorTreeInfo(json, context);
     }
+    // Accessibility overrides take precedence over component-derived selection state.
+    if (config.interactionInfo && accessibilityProperty_ && json->Contains("selected")) {
+        auto customProperty = accessibilityProperty_->GetCustomAccessibilityProperty();
+        if (customProperty || accessibilityProperty_->HasUserSelected()) {
+            const bool selected = customProperty ? customProperty->GetSelected() :
+                accessibilityProperty_->IsUserSelected();
+            json->Replace("selected", selected);
+        }
+    }
 }
 
 void FrameNode::DumpInspectorResponseRegions(
