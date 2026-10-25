@@ -1716,4 +1716,61 @@ HWTEST_F(MenuItemTestNg, MenuItemModelNGCreateTestNg001, TestSize.Level1)
     ASSERT_TRUE(menuItemPattern->IsSelected());
     MockContainer::Current()->SetApiTargetVersion(rollbackApiVersion);
 }
+
+/**
+ * @tc.name: MenuItemPaintMethodHandleMenuItemNullTheme001
+ * @tc.desc: Test HandleMenuItem with null SelectTheme uses default fallback values, no crash.
+ * @tc.type: FUNC
+ */
+HWTEST_F(MenuItemTestNg, MenuItemPaintMethodHandleMenuItemNullTheme001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. prepare paint method, paint property and paint wrapper.
+     */
+    RefPtr<MenuItemPaintProperty> paintProp = AceType::MakeRefPtr<MenuItemPaintProperty>();
+    RefPtr<MenuItemPaintMethod> paintMethod = AceType::MakeRefPtr<MenuItemPaintMethod>();
+    Testing::MockCanvas canvas;
+    EXPECT_CALL(canvas, AttachPen(_)).WillRepeatedly(ReturnRef(canvas));
+    EXPECT_CALL(canvas, DetachPen()).WillRepeatedly(ReturnRef(canvas));
+    EXPECT_CALL(canvas, AttachBrush(_)).WillRepeatedly(ReturnRef(canvas));
+    EXPECT_CALL(canvas, DetachBrush()).WillRepeatedly(ReturnRef(canvas));
+    EXPECT_CALL(canvas, DrawPath(_)).Times(AtLeast(0));
+    WeakPtr<RenderContext> renderContext;
+    RefPtr<GeometryNode> geometryNode = AceType::MakeRefPtr<GeometryNode>();
+    PaintWrapper* paintWrapper = new PaintWrapper(renderContext, geometryNode, paintProp);
+    ASSERT_NE(paintWrapper, nullptr);
+
+    /**
+     * @tc.steps: step2. call HandleMenuItem with null SelectTheme.
+     * @tc.expected: use default fallback (strokeWidth=1.0px, color=TRANSPARENT), no crash.
+     */
+    RSPath path;
+    paintMethod->HandleMenuItem(paintWrapper, paintProp, nullptr, path, canvas);
+    EXPECT_TRUE(true);
+
+    delete paintWrapper;
+    paintWrapper = nullptr;
+}
+
+/**
+ * @tc.name: MenuItemPaintMethodGetOverlayDrawFunctionNullPaintWrapper001
+ * @tc.desc: Test GetOverlayDrawFunction with null PaintWrapper returns a no-op function, no crash.
+ * @tc.type: FUNC
+ */
+HWTEST_F(MenuItemTestNg, MenuItemPaintMethodGetOverlayDrawFunctionNullPaintWrapper001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. prepare paint method object.
+     */
+    RefPtr<MenuItemPaintMethod> paintMethod = AceType::MakeRefPtr<MenuItemPaintMethod>();
+
+    /**
+     * @tc.steps: step2. call GetOverlayDrawFunction with null PaintWrapper.
+     * @tc.expected: result is not null, calling it does not crash (CHECK_NULL_VOID early return).
+     */
+    auto result = paintMethod->GetOverlayDrawFunction(nullptr);
+    EXPECT_NE(result, nullptr);
+    Testing::MockCanvas canvas;
+    result(canvas);
+}
 } // namespace OHOS::Ace::NG

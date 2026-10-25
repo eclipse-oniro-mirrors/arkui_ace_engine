@@ -1454,4 +1454,26 @@ HWTEST_F(MenuTestNg, MenuLayoutAlgorithmNeedArrow002, TestSize.Level1)
     result = menuAlgorithm->GetIfNeedArrow(layoutWrapper, menuSize);
     EXPECT_TRUE(result);
 }
+
+/**
+ * @tc.name: MenuPaintMethodGetContentDrawFunctionNullPaintWrapper001
+ * @tc.desc: Test GetContentDrawFunction with null PaintWrapper returns a no-op function, no crash.
+ * @tc.type: FUNC
+ */
+HWTEST_F(MenuTestNg, MenuPaintMethodGetContentDrawFunctionNullPaintWrapper001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. prepare paint method object.
+     */
+    RefPtr<MenuPaintMethod> paintMethod = AceType::MakeRefPtr<MenuPaintMethod>();
+
+    /**
+     * @tc.steps: step2. call GetContentDrawFunction with null PaintWrapper.
+     * @tc.expected: result is not null, calling it does not crash (CHECK_NULL_VOID early return).
+     */
+    auto result = paintMethod->GetContentDrawFunction(nullptr);
+    EXPECT_NE(result, nullptr);
+    Testing::MockCanvas canvas;
+    result(canvas);
+}
 } // namespace OHOS::Ace::NG

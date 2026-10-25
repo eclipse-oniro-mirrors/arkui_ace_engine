@@ -25,6 +25,7 @@
 #include "core/common/recorder/event_recorder.h"
 #include "core/components/button/button_theme.h"
 #include "core/components/dialog/dialog_properties.h"
+#include "core/components/dialog/dialog_theme.h"
 #include "core/components_ng/base/view_stack_processor.h"
 #include "core/components_ng/layout/layout_wrapper_node.h"
 #include "core/components_ng/pattern/dialog/custom_dialog/custom_dialog_controller_model_ng.h"
@@ -940,5 +941,102 @@ HWTEST_F(DialogLayoutTwoTestNg, DialogLayoutAlgorithmUpdateSafeAreaWithHelper002
     // Restore
     safeAreaManager->SetIsFullScreen(false);
     safeAreaManager->UpdateCutoutSafeArea(SafeAreaInsets {});
+}
+
+/**
+ * @tc.name: DialogLayoutAlgorithmIsDefaultPosition001
+ * @tc.desc: Test DialogLayoutAlgorithm::IsDefaultPosition function
+ * @tc.type: FUNC
+ */
+HWTEST_F(DialogLayoutTwoTestNg, DialogLayoutAlgorithmIsDefaultPosition001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. create DialogLayoutAlgorithm and DialogLayoutProperty instance.
+     */
+    DialogLayoutAlgorithm algo;
+    RefPtr<DialogLayoutProperty> prop = AceType::MakeRefPtr<DialogLayoutProperty>();
+    ASSERT_NE(prop, nullptr);
+
+    /**
+     * @tc.steps: step2. test null dialogProp.
+     * @tc.expected: return false when dialogProp is nullptr.
+     */
+    EXPECT_FALSE(algo.IsDefaultPosition(nullptr));
+
+    /**
+     * @tc.steps: step3. test default alignment with zero offset.
+     * @tc.expected: return true.
+     */
+    prop->UpdateDialogAlignment(DialogAlignment::DEFAULT);
+    prop->UpdateDialogOffset(DimensionOffset(Dimension(0.0), Dimension(0.0)));
+    EXPECT_TRUE(algo.IsDefaultPosition(prop));
+
+    /**
+     * @tc.steps: step4. test non-default alignment.
+     * @tc.expected: return false.
+     */
+    prop->UpdateDialogAlignment(DialogAlignment::TOP);
+    EXPECT_FALSE(algo.IsDefaultPosition(prop));
+
+    /**
+     * @tc.steps: step5. test default alignment with non-zero X offset.
+     * @tc.expected: return false.
+     */
+    prop->UpdateDialogAlignment(DialogAlignment::DEFAULT);
+    prop->UpdateDialogOffset(DimensionOffset(Dimension(10.0), Dimension(0.0)));
+    EXPECT_FALSE(algo.IsDefaultPosition(prop));
+
+    /**
+     * @tc.steps: step6. test default alignment with non-zero Y offset.
+     * @tc.expected: return false.
+     */
+    prop->UpdateDialogOffset(DimensionOffset(Dimension(0.0), Dimension(10.0)));
+    EXPECT_FALSE(algo.IsDefaultPosition(prop));
+}
+
+/**
+ * @tc.name: DialogLayoutAlgorithmNeedAdaptToAgingWidth001
+ * @tc.desc: Test DialogLayoutAlgorithm::NeedAdaptToAgingWidth function
+ * @tc.type: FUNC
+ */
+HWTEST_F(DialogLayoutTwoTestNg, DialogLayoutAlgorithmNeedAdaptToAgingWidth001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. create DialogLayoutAlgorithm instance.
+     * @tc.steps: step2. test null frameNode.
+     * @tc.expected: return false when frameNode is nullptr.
+     */
+    DialogLayoutAlgorithm algo;
+    EXPECT_FALSE(algo.NeedAdaptToAgingWidth(nullptr));
+}
+
+/**
+ * @tc.name: DialogLayoutAlgorithmGetPaddingBottom001
+ * @tc.desc: Test DialogLayoutAlgorithm::GetPaddingBottom function
+ * @tc.type: FUNC
+ */
+HWTEST_F(DialogLayoutTwoTestNg, DialogLayoutAlgorithmGetPaddingBottom001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. create DialogLayoutAlgorithm instance and test null dialogTheme_.
+     * @tc.expected: return 0 when dialogTheme_ is nullptr.
+     */
+    DialogLayoutAlgorithm algo;
+    algo.dialogTheme_ = nullptr;
+    EXPECT_EQ(algo.GetPaddingBottom(), 0);
+
+    /**
+     * @tc.steps: step2. test with dialogTheme_ and no keyboardAvoidDistance.
+     * @tc.expected: covers the else branch (NormalizeToPx(bottom)).
+     */
+    algo.dialogTheme_ = AceType::MakeRefPtr<DialogTheme>();
+    EXPECT_GE(algo.GetPaddingBottom(), 0);
+
+    /**
+     * @tc.steps: step3. test with keyboardAvoidDistance set.
+     * @tc.expected: covers the has_value() true branch (NormalizeToPx(keyboardAvoidDistance)).
+     */
+    algo.keyboardAvoidDistance_ = Dimension(20.0, DimensionUnit::VP);
+    EXPECT_GE(algo.GetPaddingBottom(), 0);
 }
 } // namespace OHOS::Ace::NG
