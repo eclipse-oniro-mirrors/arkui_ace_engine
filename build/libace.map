@@ -821,6 +821,7 @@
       "OHOS::Ace::JsonValue::IsObject() const";
       "OHOS::Ace::JsonValue::IsString() const";
       "OHOS::Ace::JsonValue::IsValid() const";
+      "OHOS::Ace::JsonValue::Put(double)";
       "OHOS::Ace::JsonValue::Put(std::__h::unique_ptr<OHOS::Ace::JsonValue, std::__h::default_delete<OHOS::Ace::JsonValue>> const&)";
       "OHOS::Ace::JsonValue::PutExtAttr(char const*, bool, OHOS::Ace::NG::InspectorFilter const&)";
       "OHOS::Ace::JsonValue::PutExtAttr(char const*, char const*, OHOS::Ace::NG::InspectorFilter const&)";
@@ -829,6 +830,7 @@
       "OHOS::Ace::JsonValue::PutExtAttr(char const*, long long, OHOS::Ace::NG::InspectorFilter const&)";
       "OHOS::Ace::JsonValue::PutExtAttr(char const*, long, OHOS::Ace::NG::InspectorFilter const&)";
       "OHOS::Ace::JsonValue::PutFixedAttr(char const*, char const*, OHOS::Ace::NG::InspectorFilter const&, OHOS::Ace::NG::FixedAttrBit)";
+      "OHOS::Ace::JsonValue::Replace(char const*, bool)";
       "OHOS::Ace::JsonValue::Replace(char const*, int)";
       "OHOS::Ace::KeyEvent::ConvertCodeToString() const";
       "OHOS::Ace::KeyToString(int)";
