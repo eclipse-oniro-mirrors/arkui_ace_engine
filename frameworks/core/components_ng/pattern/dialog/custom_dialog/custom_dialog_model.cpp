@@ -63,7 +63,6 @@ constexpr int NUM_7 = 7;
 constexpr int32_t DEFAULT_BORDER_WIDTH = 0;
 constexpr uint32_t DEFAULT_BORDER_COLOR = 0xff000000;
 constexpr int32_t DEFAULT_BORDER_STYLE = static_cast<int32_t>(OHOS::Ace::BorderStyle::SOLID);
-DialogProperties g_dialogProperties;
 } // namespace
 
 static void UnregisterOnWillDialogDismiss(FrameNode* dialogNode)
@@ -642,12 +641,11 @@ int32_t ConvertBlurStyle(int32_t originBlurStyle)
     return originBlurStyle;
 }
 
-void openCustomDialogWithNewPipeline(std::function<void(int32_t)>&& callback)
+void openCustomDialogWithNewPipeline(std::function<void(int32_t)>&& callback, DialogProperties dialogProperties)
 {
     TAG_LOGI(AceLogTag::ACE_OVERLAY, "Dialog IsCurrentUseNewPipeline.");
-    auto dialogProperties = g_dialogProperties;
-    dialogProperties.customCNode = g_dialogProperties.customCNode;
-    auto task = [callback, dialogProperties](const RefPtr<NG::OverlayManager>& overlayManager) mutable {
+    auto task = [callback = std::move(callback), dialogProperties](
+        const RefPtr<NG::OverlayManager>& overlayManager) mutable {
         CHECK_NULL_VOID(overlayManager);
         TAG_LOGI(AceLogTag::ACE_OVERLAY, "open custom dialog isShowInSubWindow %{public}d",
             dialogProperties.isShowInSubWindow);
@@ -949,16 +947,17 @@ ArkUI_Int32 OpenCustomDialog(ArkUIDialogHandle handle, void (*callback)(ArkUI_In
             callback(dialogId);
         };
     }
-    g_dialogProperties.maskRect = std::nullopt;
-    g_dialogProperties.borderRadius = std::nullopt;
-    g_dialogProperties.width = std::nullopt;
-    g_dialogProperties.height = std::nullopt;
-    ParseDialogProperties(g_dialogProperties, handle);
-    g_dialogProperties.customCNode = reinterpret_cast<FrameNode*>(handle->contentHandle);
-    auto promptDialogAttr = ParseDialogPropertiesFromProps(g_dialogProperties);
+    DialogProperties dialogProperties;
+    dialogProperties.maskRect = std::nullopt;
+    dialogProperties.borderRadius = std::nullopt;
+    dialogProperties.width = std::nullopt;
+    dialogProperties.height = std::nullopt;
+    ParseDialogProperties(dialogProperties, handle);
+    dialogProperties.customCNode = reinterpret_cast<FrameNode*>(handle->contentHandle);
+    auto promptDialogAttr = ParseDialogPropertiesFromProps(dialogProperties);
     if (SystemProperties::GetExtSurfaceEnabled() || !ContainerIsService()) {
         if (Container::IsCurrentUseNewPipeline()) {
-            openCustomDialogWithNewPipeline(std::move(recordedCallback));
+            openCustomDialogWithNewPipeline(std::move(callback), std::move(dialogProperties));
         } else {
             LOGW("not support old pipeline");
         }
@@ -1021,35 +1020,38 @@ ArkUI_Int32 UpdateCustomDialog(ArkUIDialogHandle handle, void (*callback)(ArkUI_
             callback(dialogId);
         };
     }
-    ParseDialogProperties(g_dialogProperties, handle);
-    auto promptDialogAttr = ParseDialogPropertiesFromProps(g_dialogProperties);
+    DialogProperties dialogProperties;
+    ParseDialogProperties(dialogProperties, handle);
+    auto promptDialogAttr = ParseDialogPropertiesFromProps(dialogProperties);
     if (SystemProperties::GetExtSurfaceEnabled() || !ContainerIsService()) {
-        g_dialogProperties.autoCancel = promptDialogAttr.autoCancel,
-        g_dialogProperties.maskColor = promptDialogAttr.maskColor, g_dialogProperties.isSysBlurStyle = false;
+        dialogProperties.autoCancel = promptDialogAttr.autoCancel;
+        dialogProperties.maskColor = promptDialogAttr.maskColor;
+        dialogProperties.isSysBlurStyle = false;
         if (promptDialogAttr.alignment.has_value()) {
-            g_dialogProperties.alignment = promptDialogAttr.alignment.value();
+            dialogProperties.alignment = promptDialogAttr.alignment.value();
         }
         if (promptDialogAttr.offset.has_value()) {
-            g_dialogProperties.offset = promptDialogAttr.offset.value();
+            dialogProperties.offset = promptDialogAttr.offset.value();
         }
-        g_dialogProperties.customCNode = reinterpret_cast<FrameNode*>(handle->contentHandle);
-        auto node = g_dialogProperties.customCNode;
+        dialogProperties.customCNode = reinterpret_cast<FrameNode*>(handle->contentHandle);
+        auto node = dialogProperties.customCNode;
         auto nodePtr = node.Upgrade();
         CHECK_NULL_RETURN_WITH_BACKEND_MESSAGE(nodePtr, ERROR_CODE_PARAM_INVALID, "nodePtr is null");
         auto context = nodePtr->GetContextWithCheck();
         CHECK_NULL_RETURN_WITH_BACKEND_MESSAGE(context, ERROR_CODE_PARAM_INVALID, "context is null");
         auto overlayManager = context->GetOverlayManager();
         context->GetTaskExecutor()->PostTask(
-            [node, recordedCallback, weak = WeakPtr<NG::OverlayManager>(overlayManager)]() mutable {
+            [node, callback, weak = WeakPtr<NG::OverlayManager>(overlayManager),
+             dialogProperties = std::move(dialogProperties)]() mutable {
                 auto overlayManager = weak.Upgrade();
                 CHECK_NULL_VOID(overlayManager);
                 TAG_LOGI(AceLogTag::ACE_OVERLAY, "begin to update custom dialog.");
-                overlayManager->UpdateCustomDialogWithNode(node, g_dialogProperties, std::move(recordedCallback));
+                overlayManager->UpdateCustomDialogWithNode(node, dialogProperties, std::move(callback));
             },
             TaskExecutor::TaskType::UI, "ArkUIOverlayUpdateCustomDialog");
     } else if (SubwindowManager::GetInstance() != nullptr) {
         SubwindowManager::GetInstance()->UpdateCustomDialogNGWithNode(
-            g_dialogProperties.customCNode, promptDialogAttr, std::move(recordedCallback));
+            dialogProperties.customCNode, promptDialogAttr, std::move(callback));
     }
     return ERROR_CODE_NO_ERROR;
 }
