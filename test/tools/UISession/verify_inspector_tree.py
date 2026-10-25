@@ -31,13 +31,13 @@ def validate(capture, case, regions, providers, accessibility):
             failures.append(message)
 
     outer = json.loads(capture)
-    check(type(outer) is dict and type(outer.get("0")) is str, "callback envelope must contain string 0")
+    check(isinstance(outer, dict) and isinstance(outer.get("0"), str), "callback envelope must contain string 0")
     if failures:
         return assertions, failures
     body = outer["0"]
     tree = json.loads(body)
-    check(type(tree) is dict, "decoded tree must be an object")
-    if type(tree) is not dict:
+    check(isinstance(tree, dict), "decoded tree must be an object")
+    if not isinstance(tree, dict):
         return assertions, failures
     expected_error = case.get("errorMessage") if providers else None
     if expected_error:
@@ -47,15 +47,17 @@ def validate(capture, case, regions, providers, accessibility):
     check((tree.get("errorMessage") == "no error") if regions or providers else
           "errorMessage" not in tree, "root errorMessage gate does not match the request")
     app = tree.get("appInfo", {})
-    check(type(app.get("PID")) is int and app["PID"] > 0, "app PID must identify the target process")
-    check(type(app.get("WindowTitle")) is str, "WindowTitle must be a string")
-    check(type(app.get("WindowID")) is int, "WindowID must remain an integer")
+    check(isinstance(app.get("PID"), int) and not isinstance(app.get("PID"), bool) and app["PID"] > 0,
+          "app PID must identify the target process")
+    check(isinstance(app.get("WindowTitle"), str), "WindowTitle must be a string")
+    check(isinstance(app.get("WindowID"), int) and not isinstance(app.get("WindowID"), bool),
+          "WindowID must remain an integer")
     nodes = []
     pending = [tree]
     while pending:
         node = pending.pop()
-        check(type(node) is dict, "native node must be an object")
-        if type(node) is not dict:
+        check(isinstance(node, dict), "native node must be an object")
+        if not isinstance(node, dict):
             continue
         nodes.append(node)
         pending.extend(node.get("$children", []))
@@ -66,32 +68,32 @@ def validate(capture, case, regions, providers, accessibility):
         if "accessibilityId" in node:
             value = node["accessibilityId"]
             check(accessibility, "accessibilityId present with accessibilityInfo disabled")
-            check(type(value) is str and re.fullmatch(r"0|[1-9][0-9]*", value) is not None,
+            check(isinstance(value, str) and re.fullmatch(r"0|[1-9][0-9]*", value) is not None,
                   "accessibilityId must be a canonical decimal string")
         for key in ("touchable", "checkable", "checked", "selected", "accessibilityGroup"):
             if key in node:
-                check(type(node[key]) is bool, key + " must preserve boolean type")
+                check(isinstance(node[key], bool), key + " must preserve boolean type")
         if node.get("checkable") is False:
             check("checked" not in node, "non-checkable node must omit checked")
         attrs = node.get("$attrs", {})
         for key in ("password", "multiLine", "expanded"):
             if key in attrs:
-                check(type(attrs[key]) is bool, key + " must be boolean")
+                check(isinstance(attrs[key], bool), key + " must be boolean")
         for key in ("selectionStart", "selectionEnd", "inputType", "textLengthLimit"):
             if key in attrs:
-                check(type(attrs[key]) is int, key + " must be integer")
+                check(isinstance(attrs[key], int) and not isinstance(attrs[key], bool), key + " must be integer")
         for key in ("responseRegionMap", "responseRegion", "mouseResponseRegion"):
             if key in node:
                 check(regions, key + " present with collection disabled")
                 values = node[key]
                 if key == "responseRegionMap":
-                    check(type(values) is dict and set(values) <= {"all", "finger", "pen", "mouse"},
+                    check(isinstance(values, dict) and set(values) <= {"all", "finger", "pen", "mouse"},
                           "invalid tool map")
-                    values = list(values.values()) if type(values) is dict else []
+                    values = list(values.values()) if isinstance(values, dict) else []
                 else:
                     values = [values]
                 for rectangles in values:
-                    check(type(rectangles) is list and all(type(item) is str for item in rectangles),
+                    check(isinstance(rectangles, list) and all(isinstance(item, str) for item in rectangles),
                           "response region must be a rectangle string array")
         check("accessibilityTreeComplete" not in node, "obsolete host completeness field")
         if node is not tree:
@@ -100,18 +102,18 @@ def validate(capture, case, regions, providers, accessibility):
             check(providers, "provider result present with collection disabled")
             hosts.append(node)
             third = node["accessibilityTree"]
-            check(type(third) is list, "provider result must be a flat array")
-            if type(third) is not list:
+            check(isinstance(third, list), "provider result must be a flat array")
+            if not isinstance(third, list):
                 continue
             for item in third:
-                check(type(item) is dict, "third-provider node must be an object")
-                if type(item) is not dict:
+                check(isinstance(item, dict), "third-provider node must be an object")
+                if not isinstance(item, dict):
                     continue
-                check(type(item.get("$rect")) is str, "missing provider window rectangle")
-                check(type(item.get("screenRect")) is dict, "missing original provider screen rectangle")
-                check(type(item.get("childNodeIds")) is list, "missing original child IDs")
+                check(isinstance(item.get("$rect"), str), "missing provider window rectangle")
+                check(isinstance(item.get("screenRect"), dict), "missing original provider screen rectangle")
+                check(isinstance(item.get("childNodeIds"), list), "missing original child IDs")
                 for key in ("elementId", "parentId"):
-                    check(type(item.get(key)) is str and re.fullmatch(r"0|-?[1-9][0-9]*", item[key]) is not None,
+                    check(isinstance(item.get(key), str) and re.fullmatch(r"0|-?[1-9][0-9]*", item[key]) is not None,
                           "provider ID must be a canonical decimal string")
                 check("$children" not in item, "provider list must not become a nested tree")
     for required in case.get("requiredIds", []):
