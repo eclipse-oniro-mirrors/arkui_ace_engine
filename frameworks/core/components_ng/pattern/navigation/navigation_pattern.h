@@ -921,6 +921,8 @@ private:
     void RegisterAvoidInfoChangeListener(const RefPtr<FrameNode>& hostNode);
     void UnregisterAvoidInfoChangeListener(const RefPtr<FrameNode>& hostNode);
     virtual void MarkAllNavDestinationDirtyIfNeeded(const RefPtr<FrameNode>& hostNode, bool skipCheck = false);
+    void MarkNavDestinationDirty(const RefPtr<NavDestinationGroupNode>& navDestination);
+    RefPtr<NavDestinationGroupNode> FindFirstNavDestination(const RefPtr<UINode>& node);
     void UpdateToobarFocusColor();
     void GenerateLastStandardPage(NavPathList& navPathList);
     RefPtr<UINode> FindNavDestinationNodeInPreList(const uint64_t navDestinationId) const;

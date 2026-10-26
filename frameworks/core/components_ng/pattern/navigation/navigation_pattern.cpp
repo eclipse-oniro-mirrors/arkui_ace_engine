@@ -6302,6 +6302,36 @@ void NavigationPattern::UnregisterAvoidInfoChangeListener(const RefPtr<FrameNode
     mgr->RemoveAvoidInfoListener(WeakClaim(this));
 }
 
+void NavigationPattern::MarkNavDestinationDirty(const RefPtr<NavDestinationGroupNode>& navDestination)
+{
+    CHECK_NULL_VOID(navDestination);
+    if (!navDestination->IsVisible()) {
+        navDestination->SetNeedForceMeasure(true);
+        return;
+    }
+    navDestination->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF_AND_CHILD);
+    auto titleBarNode = AceType::DynamicCast<TitleBarNode>(navDestination->GetTitleBarNode());
+    if (titleBarNode) {
+        titleBarNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
+    }
+}
+
+RefPtr<NavDestinationGroupNode> NavigationPattern::FindFirstNavDestination(const RefPtr<UINode>& node)
+{
+    CHECK_NULL_RETURN(node, nullptr);
+    auto navDestination = AceType::DynamicCast<NavDestinationGroupNode>(node);
+    if (navDestination) {
+        return navDestination;
+    }
+    for (const auto& child : node->GetChildren()) {
+        auto result = FindFirstNavDestination(child);
+        if (result) {
+            return result;
+        }
+    }
+    return nullptr;
+}
+
 void NavigationPattern::MarkAllNavDestinationDirtyIfNeeded(const RefPtr<FrameNode>& hostNode, bool skipCheck)
 {
     auto groupNode = AceType::DynamicCast<NavigationGroupNode>(hostNode);
@@ -6318,22 +6348,15 @@ void NavigationPattern::MarkAllNavDestinationDirtyIfNeeded(const RefPtr<FrameNod
 
     auto contentNode = AceType::DynamicCast<FrameNode>(groupNode->GetContentNode());
     CHECK_NULL_VOID(contentNode);
-    auto& childrens = contentNode->GetChildren();
-    for (auto& child : childrens) {
-        auto navDestination = AceType::DynamicCast<NavDestinationGroupNode>(child);
-        if (!navDestination) {
-            continue;
-        }
-        if (!navDestination->IsVisible()) {
-            navDestination->SetNeedForceMeasure(true);
-            continue;
-        }
-        navDestination->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF_AND_CHILD);
-        auto titleBarNode = AceType::DynamicCast<TitleBarNode>(navDestination->GetTitleBarNode());
-        if (titleBarNode) {
-            titleBarNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
-        }
+    for (const auto& child : contentNode->GetChildren()) {
+        MarkNavDestinationDirty(AceType::DynamicCast<NavDestinationGroupNode>(child));
     }
+
+    auto navBarNode = AceType::DynamicCast<NavBarNode>(groupNode->GetNavBarNode());
+    CHECK_NULL_VOID(navBarNode);
+    auto navBarContent = AceType::DynamicCast<FrameNode>(navBarNode->GetContentNode());
+    CHECK_NULL_VOID(navBarContent);
+    MarkNavDestinationDirty(FindFirstNavDestination(navBarContent));
 }
 
 void NavigationPattern::CollectActiveNodes(std::vector<RefPtr<NavDestinationGroupNode>>& destNodes)
