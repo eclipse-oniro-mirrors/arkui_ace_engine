@@ -1302,7 +1302,7 @@ HWTEST_F(UITreeCollectorTest, ConfirmedGradientColorsUnitsAndTypeParameters, Tes
     EXPECT_TRUE(legacy->GetValue("angle")->IsString());
     EXPECT_EQ(legacy->GetString("repeating"), "true");
     gradient.CreateGradientWithType(GradientType::SWEEP);
-    gradient.GetSweepGradient()->centerX = Dimension(0.5, DimensionUnit::PERCENT);
+    gradient.GetSweepGradient()->centerX = Dimension(50, DimensionUnit::PERCENT);
     gradient.GetSweepGradient()->rotation = Dimension(45);
     json = GradientJsonUtils::ToTreeJson(gradient);
     EXPECT_EQ(json->GetString("centerX"), "50.00%");
@@ -1475,6 +1475,112 @@ HWTEST_F(UITreeCollectorTest, ConfirmedOtherImageSourcesOnlyExposeType, TestSize
         auto description = json->GetObject("url");
         EXPECT_EQ(description->ToString(), std::string("{\"sourceType\":\"") + type + "\"}");
     }
+}
+
+HWTEST_F(UITreeCollectorTest, V2GradientCenterMatchesFrontendPercentageStorage, TestSize.Level1)
+{
+    // JSViewAbstract::Parse{Sweep,Radial}GradientCenter stores percentages on a 0..100 scale.
+    // Do not construct 0.5 here: that bypasses the real frontend representation of "50%".
+    for (auto type : { GradientType::SWEEP, GradientType::RADIAL }) {
+        Gradient gradient;
+        gradient.CreateGradientWithType(type);
+        if (type == GradientType::SWEEP) {
+            gradient.GetSweepGradient()->centerX = Dimension(50, DimensionUnit::PERCENT);
+            gradient.GetSweepGradient()->centerY = Dimension(25, DimensionUnit::PERCENT);
+        } else {
+            gradient.GetRadialGradient()->radialCenterX = Dimension(50, DimensionUnit::PERCENT);
+            gradient.GetRadialGradient()->radialCenterY = Dimension(25, DimensionUnit::PERCENT);
+        }
+        auto json = GradientJsonUtils::ToTreeJson(gradient);
+        EXPECT_EQ(json->GetString("centerX"), "50.00%");
+        EXPECT_EQ(json->GetString("centerY"), "25.00%");
+    }
+}
+
+HWTEST_F(UITreeCollectorTest, PublicGradientCenterUnitsAndOptionalValues, TestSize.Level1)
+{
+    const std::vector<std::pair<Dimension, const char*>> values {
+        { Dimension(0, DimensionUnit::PERCENT), "0.00%" },
+        { Dimension(0.5, DimensionUnit::PERCENT), "0.50%" },
+        { Dimension(25, DimensionUnit::PERCENT), "25.00%" },
+        { Dimension(50, DimensionUnit::PERCENT), "50.00%" },
+        { Dimension(100, DimensionUnit::PERCENT), "100.00%" },
+        { Dimension(12, DimensionUnit::VP), "12.00vp" },
+        { Dimension(18, DimensionUnit::PX), "18.00px" },
+    };
+    for (auto type : { GradientType::SWEEP, GradientType::RADIAL }) {
+        for (const auto& [value, expected] : values) {
+            SCOPED_TRACE(expected);
+            Gradient gradient;
+            gradient.CreateGradientWithType(type);
+            auto json = GradientJsonUtils::ToTreeJson(gradient);
+            ASSERT_NE(json, nullptr);
+            EXPECT_FALSE(json->Contains("centerX"));
+            EXPECT_FALSE(json->Contains("centerY"));
+            if (type == GradientType::SWEEP) {
+                gradient.GetSweepGradient()->centerX = value;
+            } else {
+                gradient.GetRadialGradient()->radialCenterX = value;
+            }
+            json = GradientJsonUtils::ToTreeJson(gradient);
+            EXPECT_TRUE(json->GetValue("centerX")->IsString());
+            EXPECT_EQ(json->GetString("centerX"), expected);
+            EXPECT_FALSE(json->Contains("centerY"));
+            if (type == GradientType::SWEEP) {
+                gradient.GetSweepGradient()->centerX.reset();
+                gradient.GetSweepGradient()->centerY = value;
+            } else {
+                gradient.GetRadialGradient()->radialCenterX.reset();
+                gradient.GetRadialGradient()->radialCenterY = value;
+            }
+            json = GradientJsonUtils::ToTreeJson(gradient);
+            EXPECT_FALSE(json->Contains("centerX"));
+            EXPECT_TRUE(json->GetValue("centerY")->IsString());
+            EXPECT_EQ(json->GetString("centerY"), expected);
+        }
+    }
+}
+
+HWTEST_F(UITreeCollectorTest, PublicGradientCenterPreservesRadiusStorageAndLegacy, TestSize.Level1)
+{
+    Gradient radial;
+    radial.CreateGradientWithType(GradientType::RADIAL);
+    auto data = radial.GetRadialGradient();
+    data->radialCenterX = Dimension(50, DimensionUnit::PERCENT);
+    data->radialCenterY = Dimension(25, DimensionUnit::PERCENT);
+    data->radialHorizontalSize = Dimension(0.5, DimensionUnit::PERCENT);
+    data->radialVerticalSize = Dimension(0.25, DimensionUnit::PERCENT);
+    const auto radialLegacyBefore = GradientJsonUtils::RadialGradientToJson(radial)->ToString();
+    auto json = GradientJsonUtils::ToTreeJson(radial);
+    EXPECT_EQ(json->GetString("centerX"), "50.00%");
+    EXPECT_EQ(json->GetString("centerY"), "25.00%");
+    EXPECT_EQ(json->GetString("horizontalSize"), "50.00%");
+    EXPECT_EQ(json->GetString("verticalSize"), "25.00%");
+    EXPECT_DOUBLE_EQ(data->radialCenterX->Value(), 50);
+    EXPECT_EQ(data->radialCenterX->Unit(), DimensionUnit::PERCENT);
+    EXPECT_DOUBLE_EQ(data->radialHorizontalSize->Value(), 0.5);
+    EXPECT_EQ(GradientJsonUtils::RadialGradientToJson(radial)->ToString(), radialLegacyBefore);
+    EXPECT_EQ(Dimension(0.5, DimensionUnit::PERCENT).ToString(), "50.00%");
+
+    Gradient sweep;
+    sweep.CreateGradientWithType(GradientType::SWEEP);
+    sweep.GetSweepGradient()->centerX = Dimension(50, DimensionUnit::PERCENT);
+    sweep.GetSweepGradient()->centerY = Dimension(25, DimensionUnit::PERCENT);
+    sweep.GetSweepGradient()->startAngle = Dimension(30);
+    sweep.GetSweepGradient()->endAngle = Dimension(270);
+    sweep.GetSweepGradient()->rotation = Dimension(45);
+    const auto sweepLegacyBefore = GradientJsonUtils::SweepGradientToJson(sweep)->ToString();
+    json = GradientJsonUtils::ToTreeJson(sweep);
+    EXPECT_EQ(json->GetString("centerX"), "50.00%");
+    EXPECT_EQ(json->GetString("centerY"), "25.00%");
+    for (const char* key : { "startAngle", "endAngle", "rotation" }) {
+        EXPECT_TRUE(json->GetValue(key)->IsNumber());
+    }
+    EXPECT_DOUBLE_EQ(json->GetDouble("startAngle"), 30);
+    EXPECT_DOUBLE_EQ(json->GetDouble("endAngle"), 270);
+    EXPECT_DOUBLE_EQ(json->GetDouble("rotation"), 45);
+    EXPECT_DOUBLE_EQ(sweep.GetSweepGradient()->centerX->Value(), 50);
+    EXPECT_EQ(GradientJsonUtils::SweepGradientToJson(sweep)->ToString(), sweepLegacyBefore);
 }
 
 } // namespace OHOS::Ace::NG
