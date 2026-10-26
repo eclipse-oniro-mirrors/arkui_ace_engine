@@ -383,6 +383,7 @@ public:
     void SetBufferQueueCount(int32_t bufferQueueCount);
     int32_t GetBufferQueueCount() const;
     ArkUI_AccessibilityProvider* GetNativeProvider();
+    void AddInspectorTreeInfo(std::shared_ptr<JsonValue>& node, InspectorTreeRequestContext& context) override;
     void PushType(StatisticEventType type);
     void OnFrameNodeChanged(FrameNodeChangeInfoFlag flag) override;
     static std::string GetCompensationAngleFromFeatureManager();

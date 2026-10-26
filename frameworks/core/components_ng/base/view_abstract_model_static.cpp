@@ -292,6 +292,8 @@ void ViewAbstractModelStatic::BindMenu(FrameNode* frameNode,
     auto targetId = targetNode->GetId();
     ACE_UPDATE_NODE_LAYOUT_PROPERTY(LayoutProperty, IsBindOverlay, true, frameNode);
     bool isBuildFuncNull = (buildFunc == nullptr && params.empty());
+    targetNode->SetInspectorMenuBinding(isBuildFuncNull ? std::nullopt :
+        std::make_optional(menuParam.isShowInSubWindow));
     if (CheckMenuIsShow(menuParam, targetId, targetNode, isBuildFuncNull)) {
         TAG_LOGI(AceLogTag::ACE_MENU, "hide menu done %{public}d %{public}d.", menuParam.isShowInSubWindow, targetId);
     } else if (menuParam.isShow) {

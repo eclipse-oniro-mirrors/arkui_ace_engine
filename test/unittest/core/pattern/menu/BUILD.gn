@@ -14,6 +14,7 @@
 import("//foundation/arkui/ace_engine/test/unittest/ace_unittest.gni")
 
 test_sources = [
+  "menu_inspector_tree_test.cpp",
   "custommenuitem_pattern_test_ng.cpp",
   "menu_accessibility_property_test_ng.cpp",
   "menu_animation_test_ng.cpp",

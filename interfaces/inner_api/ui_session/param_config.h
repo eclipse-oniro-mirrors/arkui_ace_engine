@@ -49,6 +49,8 @@ struct ParamConfig {
     // Borrowed request state; never serialized into the configuration parcel.
     NG::InspectorTreeRequestContext* inspectorContext = nullptr;
 
+    bool withResponseRegion = false;
+
     bool IsPublicTree() const
     {
         return dumpMode == TreeDumpMode::PUBLIC_TREE;

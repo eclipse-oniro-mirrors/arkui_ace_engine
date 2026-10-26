@@ -491,6 +491,7 @@ void SubwindowOhos::InitContainer()
     subPipelineContextNG->SetFontScale(parentPipeline->GetFontScale());
     SetSubWindowCutout(parentPipeline, childContainerId_);
     subPipelineContextNG->SetApiTargetVersion(parentPipeline->GetApiTargetVersion());
+    uiContentImpl->InitInspectorWindowSnapshotCallback();
 #else
     if (container->IsCurrentUseNewPipeline()) {
         auto subPipelineContextNG = AceType::DynamicCast<NG::PipelineContext>(
@@ -506,6 +507,7 @@ void SubwindowOhos::InitContainer()
         subPipelineContextNG->SetFontScale(parentPipeline->GetFontScale());
         SetSubWindowCutout(parentPipeline, childContainerId_);
         subPipelineContextNG->SetApiTargetVersion(parentPipeline->GetApiTargetVersion());
+        uiContentImpl->InitInspectorWindowSnapshotCallback();
     }
     auto subPipelineContext =
         DynamicCast<PipelineContext>(Platform::AceContainer::GetContainer(childContainerId_)->GetPipelineContext());
@@ -1873,6 +1875,10 @@ bool SubwindowOhos::InitToastDialogView(int32_t width, int32_t height, float den
     } else {
         pipelineContext->SetMinPlatformVersion(PLATFORM_VERSION_TEN);
         pipelineContext->SetApiTargetVersion(container->GetApiTargetVersion());
+    }
+    auto uiContentImpl = reinterpret_cast<UIContentImpl*>(dialogWindow_->GetUIContent());
+    if (uiContentImpl) {
+        uiContentImpl->InitInspectorWindowSnapshotCallback();
     }
     return true;
 #else

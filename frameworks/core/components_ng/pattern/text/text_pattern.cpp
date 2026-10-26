@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 
+#include "core/components_ng/base/inspector_tree_request_context.h"
 #include "core/components_ng/pattern/text/text_pattern.h"
 #include "core/components_ng/manager/safe_area/safe_area_manager.h"
 #include "core/components_ng/render/drawing.h"
@@ -6094,6 +6095,29 @@ void TextPattern::AddImageToSpanItem(const RefPtr<UINode>& child)
         gesture->SetHitTestMode(HitTestMode::HTMNONE);
         return;
     }
+}
+
+void TextPattern::DumpInspectorTreeInfo(
+    std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context)
+{
+    if (!context.CanExportText(InspectorTextKind::DISPLAY_TEXT, false, IsSetObscured())) {
+        attrs->Put("content", "");
+        return;
+    }
+    // Reuse the component-owned reader while preserving existing UISession attributes.
+    Pattern::DumpInspectorTreeInfo(attrs, context);
+    if (!attrs->Contains("content")) {
+        auto layout = GetLayoutProperty<TextLayoutProperty>();
+        auto content = spans_.empty() && layout ? layout->GetContentValue(u"") :
+            GetContentWithPlaceholderSpaceFillter();
+        attrs->Put("content", StringUtils::Str16ToStr8(content).c_str());
+    }
+}
+
+bool TextPattern::HasInspectorResponseRegion() const
+{
+    auto host = GetHost();
+    return host && (host->GetTag() != V2::TEXT_ETS_TAG || isUserSetResponseRegion_);
 }
 
 void TextPattern::DumpSimplifyInfo(std::shared_ptr<JsonValue>& json)

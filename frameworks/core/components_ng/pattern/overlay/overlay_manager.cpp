@@ -1681,6 +1681,13 @@ RefPtr<FrameNode> OverlayManager::GetMenuNode(int32_t targetId)
     return modifier->getMenuNode(menuManager_, targetId);
 }
 
+bool OverlayManager::IsMenuShowForTarget(int32_t targetId)
+{
+    auto wrapperNode = GetMenuNode(targetId);
+    auto wrapper = wrapperNode ? wrapperNode->GetPattern<MenuWrapperPattern>() : nullptr;
+    return wrapper && wrapper->IsShow();
+}
+
 void OverlayManager::HideMenu(
     const RefPtr<FrameNode>& menu, int32_t targetId, bool isMenuOnTouch, const HideMenuType& reason)
 {

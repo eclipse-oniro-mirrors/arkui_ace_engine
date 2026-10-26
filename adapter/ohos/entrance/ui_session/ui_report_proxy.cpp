@@ -154,6 +154,11 @@ void UiReportProxy::ReportTextChangeEvent(const std::string& data)
 
 void UiReportProxy::ReportInspectorTreeValue(const std::string& data, int32_t partNum, bool isLastPart)
 {
+    constexpr size_t MAX_INSPECTOR_REPORT_BYTES = 100 * 1024 * 1024;
+    if (data.size() > MAX_INSPECTOR_REPORT_BYTES) {
+        LOGW("InspectorTree report exceeds transport capacity");
+        return;
+    }
     MessageParcel messageData;
     MessageParcel reply;
     MessageOption option;

@@ -3974,4 +3974,14 @@ void MenuItemPattern::ReportEvent()
         ComponentEventType::COMPONENT_EVENT_MENU);
 #endif
 }
+void MenuItemPattern::DumpInspectorTreeInfo(
+    std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context)
+{
+    Pattern::DumpInspectorTreeInfo(attrs, context);
+    if (!subBuilderFunc_ && !subSelectMenuBuilderFunc_) {
+        return;
+    }
+    attrs->Put("expanded", expandingMode_ == SubMenuExpandingMode::EMBEDDED ? isExpanded_ : isSubMenuShowed_);
+}
+
 } // namespace OHOS::Ace::NG

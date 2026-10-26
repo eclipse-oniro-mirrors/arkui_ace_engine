@@ -49,6 +49,8 @@ class ACE_FORCE_EXPORT TimePickerRowPattern : public LinearLayoutPattern {
     DECLARE_ACE_TYPE(TimePickerRowPattern, LinearLayoutPattern);
 
 public:
+    void DumpInspectorTreeInfo(std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context) override;
+
     TimePickerRowPattern() : LinearLayoutPattern(false) {};
 
     ~TimePickerRowPattern() override = default;

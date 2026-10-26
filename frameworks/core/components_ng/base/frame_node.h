@@ -1708,6 +1708,12 @@ public:
     void UnRegisterLpxAttribute(LpxAttribute attribute);
     void RegisterLpxUpdateCallback(LpxAttribute attribute, std::function<void()>&& callback);
     void UnRegisterLpxUpdateCallback(LpxAttribute attribute);
+    void DumpInspectorTreeInfo(std::shared_ptr<JsonValue>& json, ParamConfig config) override;
+    void SetInspectorMenuBinding(std::optional<bool> showInSubWindow)
+    {
+        inspectorMenuShowInSubWindow_ = showInSubWindow;
+    }
+    void DumpInspectorResponseRegions(std::shared_ptr<JsonValue>& json, const InspectorTreeRequestContext& context);
     void FireLpxUpdateCallbacks();
     bool IsNeedLazyLayout() const;
     void MeasureSafeAreaInset() override;
@@ -1972,6 +1978,8 @@ private:
     bool isMeasureBoundary_ = false;
     bool hasPendingRequest_ = false;
     bool isPrivacySensitive_ = false;
+    // Only ordinary bindMenu sets this preference; no value means no ordinary menu binding.
+    std::optional<bool> inspectorMenuShowInSubWindow_;
 
     // for container, this flag controls only the last child in touch area is consuming event.
     bool exclusiveEventForChild_ = false;

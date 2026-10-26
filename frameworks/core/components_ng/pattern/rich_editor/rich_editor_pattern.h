@@ -276,6 +276,8 @@ class RichEditorPattern
         ICounterHost, IPasswordIconHost);
 
 public:
+    void DumpInspectorTreeInfo(std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context) override;
+
     RefPtr<NG::FrameNode> GetHost() const override { return TextPattern::GetHost(); }
     RichEditorPattern(bool isStyledStringMode = false);
     ~RichEditorPattern() override;

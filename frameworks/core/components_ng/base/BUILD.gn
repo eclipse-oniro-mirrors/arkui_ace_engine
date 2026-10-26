@@ -25,6 +25,7 @@ build_component_ng("base_ng") {
     "inspector.cpp",
     "page_text_collector.cpp",
     "inspector_filter.cpp",
+    "inspector_tree_request_context.cpp",
     "interop/view_stack_processor_interop.cpp",
     "xbar_proxy_wrapper.cpp",
     "mixed_mount_registry.cpp",

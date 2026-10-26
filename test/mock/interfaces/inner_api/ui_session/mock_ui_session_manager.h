@@ -43,6 +43,8 @@ public:
     MOCK_METHOD1(SendPageTranslateResult, void(const std::string& result));
     MOCK_METHOD2(GetCurrentAbilityLanguageInfo, int32_t(std::string&, std::string&));
     MOCK_METHOD2(SaveProcessId, void(std::string key, int32_t id));
+    MOCK_METHOD1(GetInspectorTree, void(ParamConfig config));
+    MOCK_METHOD1(GetVisibleInspectorTree, void(ParamConfig config));
     MOCK_METHOD1(ComponentTreeQuery, void(const ComponentTreeQueryRequest& request));
 };
 }

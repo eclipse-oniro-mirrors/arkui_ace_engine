@@ -18,6 +18,7 @@
 #include "base/log/log_wrapper.h"
 #include "core/accessibility/accessibility_manager.h"
 #include "core/accessibility/third_provider_tree_exporter.h"
+#include "core/components_ng/base/inspector_tree_request_context.h"
 
 #include <cmath>
 #include <string_view>
@@ -2854,6 +2855,13 @@ void XComponentPattern::UpdateSdrRatioIfNeed()
         TAG_LOGD(AceLogTag::ACE_XCOMPONENT,
             "XComponentPattern[UpdateSdrRatioIfNeed] touchSdrRatio_:%{public}f, sizeSdrRatio_:%{public}f",
             xcomponentTouchSdrRatio_, xcomponentSizeSdrRatio_);
+    }
+}
+
+void XComponentPattern::AddInspectorTreeInfo(std::shared_ptr<JsonValue>& node, InspectorTreeRequestContext& context)
+{
+    if (context.config.withCustomContent && !context.ShouldStop()) {
+        context.CollectCustomContent(GetNativeProvider(), GetHost(), node);
     }
 }
 

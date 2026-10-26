@@ -154,6 +154,7 @@
 #include "core/components/theme/shadow_theme.h"
 #include "core/components/popup/popup_theme.h"
 #include "core/components_ng/base/inspector.h"
+#include "core/components_ng/base/inspector_tree_request_context.h"
 #include "core/components_ng/base/view_abstract.h"
 #include "core/components_ng/manager/content_change_manager/content_change_manager.h"
 #include "core/components_ng/pattern/app_bar/app_bar_view.h"
@@ -6660,8 +6661,39 @@ void UIContentImpl::RelaxedCommandCallbackInner(const WeakPtr<TaskExecutor>& tas
     UiSessionManager::GetInstance()->SaveRelaxedCommandFunction(relaxedCommandCallback);
 }
 
+void UIContentImpl::InitInspectorWindowSnapshotCallback()
+{
+    auto container = Platform::AceContainer::GetContainer(instanceId_);
+    auto pipeline = container ? AceType::DynamicCast<NG::PipelineContext>(container->GetPipelineContext()) : nullptr;
+    WeakPtr<NG::PipelineContext> weakPipeline = pipeline;
+    wptr<OHOS::Rosen::Window> weakWindow = Platform::AceContainer::GetUIWindow(instanceId_);
+    auto snapshot = [weakPipeline, weakWindow]() -> std::optional<InspectorWindowSnapshot> {
+        auto window = weakWindow.promote();
+        auto pipeline = weakPipeline.Upgrade();
+        CHECK_NULL_RETURN(window, std::nullopt);
+        CHECK_NULL_RETURN(pipeline, std::nullopt);
+        if (pipeline->IsDestroyed()) {
+            return std::nullopt;
+        }
+        std::string title = pipeline->GetInspectorAppTitle();
+        if (title.empty()) {
+            auto themes = pipeline->GetThemeManager();
+            auto constants = themes ? themes->GetThemeConstants() : nullptr;
+            auto manager = pipeline->GetWindowManager();
+            if (constants && manager) {
+                title = constants->GetString(manager->GetAppLabelId());
+            }
+        }
+        return InspectorWindowSnapshot { window->IsPrivacyMode(), std::move(title), getpid() };
+    };
+    if (pipeline) {
+        pipeline->SetInspectorWindowSnapshotCallback(std::move(snapshot));
+    }
+}
+
 void UIContentImpl::InitUISessionManagerCallbacks(const WeakPtr<TaskExecutor>& taskExecutor)
 {
+    InitInspectorWindowSnapshotCallback();
     const int32_t GET_INSPECTOR_TREE_TIMEOUT_TIME = 1500;
     // set get inspector tree function for ui session manager
     auto callback = [weakTaskExecutor = taskExecutor](bool onlyNeedVisible, ParamConfig config) {

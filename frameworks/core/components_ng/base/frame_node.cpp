@@ -14,6 +14,11 @@
  */
 
 #include "core/components_ng/base/frame_node.h"
+
+#include <algorithm>
+#include <cmath>
+#include <limits>
+#include <tuple>
 #include "core/components_ng/base/modifier.h"
 #include "core/pipeline/container_window_manager.h"
 #include "core/accessibility/accessibility_manager.h"
@@ -34,6 +39,7 @@
 #endif
 
 #include "core/components_ng/base/node_render_status_monitor.h"
+#include "core/components_ng/base/inspector_tree_request_context.h"
 #include "core/components_ng/base/ui_node.h"
 #include "core/components_ng/event/event_constants.h"
 #include "core/components_ng/layout/layout_algorithm.h"
@@ -1727,6 +1733,213 @@ void FrameNode::DumpSimplifyInfoOnlyForParamConfig(std::shared_ptr<JsonValue>& j
         MergeAttributesIntoJson(json, child);
     }
     DumpAdvancedNodeProperties(*this, json, config);
+}
+
+void FrameNode::DumpInspectorTreeInfo(std::shared_ptr<JsonValue>& json, ParamConfig config)
+{
+    CHECK_NULL_VOID(json);
+    CHECK_NULL_VOID(config.inspectorContext);
+    auto& context = *config.inspectorContext;
+    if (context.ShouldStop()) {
+        return;
+    }
+    DumpSimplifyCommonInfo(json);
+    if (pattern_) {
+        auto attrs = JsonUtil::CreateSharedPtrJson();
+        pattern_->DumpInspectorTreeInfo(attrs, context);
+        json->Put("$attrs", std::move(attrs));
+    }
+    // Reuse the existing/ UIAgent property readers and Web/UIExtension routing.
+    DumpSimplifyInfoOnlyForParamConfig(json, config);
+    if (context.ShouldStop()) {
+        return;
+    }
+    auto gesture = eventHub_ ? eventHub_->GetGestureEventHub() : nullptr;
+    if (config.interactionInfo) {
+        json->Put("touchable", !gesture || gesture->GetTouchable());
+        const auto customProperty = accessibilityProperty_ ?
+            accessibilityProperty_->GetCustomAccessibilityProperty() : nullptr;
+        const bool checkable = customProperty ? customProperty->GetCheckable() :
+            (accessibilityProperty_ && (accessibilityProperty_->HasUserCheckable() ?
+                accessibilityProperty_->IsUserCheckable() : accessibilityProperty_->IsCheckable()));
+        json->Put("checkable", checkable);
+        if (checkable) {
+            const bool checked = customProperty ? customProperty->GetChecked() :
+                (accessibilityProperty_->HasUserCheckedType() ?
+                    static_cast<bool>(accessibilityProperty_->GetUserCheckedType()) :
+                    accessibilityProperty_->IsChecked());
+            json->Put("checked", checked);
+        }
+        if (accessibilityProperty_) {
+            const auto actions = accessibilityProperty_->GetSupportAction();
+            const bool hasSelection = (pattern_ && pattern_->HasInspectorSelection()) ||
+                accessibilityProperty_->IsEditable() || accessibilityProperty_->HasUserSelected() ||
+                actions.count(AceAction::ACTION_SELECT) || actions.count(AceAction::ACTION_CLEAR_SELECTION);
+            if (hasSelection) {
+                json->Put("selected", accessibilityProperty_->HasUserSelected() ?
+                    accessibilityProperty_->IsUserSelected() : accessibilityProperty_->IsSelected());
+            }
+        }
+    }
+    if (config.accessibilityInfo) {
+        const auto id = GetAccessibilityId();
+        if (id >= 0) {
+            json->Put("accessibilityId", std::to_string(id).c_str());
+        }
+        const auto putText = [&json](const char* key, const std::string& value) {
+            if (!value.empty()) {
+                json->Put(key, value.c_str());
+            }
+        };
+        if (accessibilityProperty_) {
+            putText("description", accessibilityProperty_->GetAccessibilityDescription());
+            putText("hint", accessibilityProperty_->GetHintText());
+            putText("accessibilityLevel", accessibilityProperty_->GetAccessibilityLevel());
+        }
+        json->Put("accessibilityGroup", accessibilityProperty_ && accessibilityProperty_->IsAccessibilityGroup());
+    }
+    if (config.withResponseRegion) {
+        DumpInspectorResponseRegions(json, context);
+    }
+    if (inspectorMenuShowInSubWindow_.has_value()) {
+        auto expanded = context.GetMenuExpanded(*this, inspectorMenuShowInSubWindow_.value());
+        if (expanded.has_value()) {
+            auto attrs = json->GetObject("$attrs");
+            attrs->Put("expanded", expanded.value());
+        }
+    }
+    if (pattern_) {
+        pattern_->AddInspectorTreeInfo(json, context);
+    }
+    // Accessibility overrides take precedence over component-derived selection state.
+    if (config.interactionInfo && accessibilityProperty_ && json->Contains("selected")) {
+        auto customProperty = accessibilityProperty_->GetCustomAccessibilityProperty();
+        if (customProperty || accessibilityProperty_->HasUserSelected()) {
+            const bool selected = customProperty ? customProperty->GetSelected() :
+                accessibilityProperty_->IsUserSelected();
+            json->Replace("selected", selected);
+        }
+    }
+}
+
+void FrameNode::DumpInspectorResponseRegions(
+    std::shared_ptr<JsonValue>& json, const InspectorTreeRequestContext& context)
+{
+    if (!context.config.withResponseRegion || !renderContext_) {
+        return;
+    }
+    auto gesture = eventHub_ ? eventHub_->GetGestureEventHub() : nullptr;
+    CHECK_NULL_VOID(gesture);
+    const auto raw = renderContext_->GetPaintRectWithoutTransform();
+    const auto toWindow = [](const FrameNode& node, const std::vector<RectF>& regions) {
+        std::vector<RectF> result;
+        for (const auto& rect : regions) {
+            // Transform every corner; two opposite corners lose rotated extents.
+            const OffsetF corners[] = {
+                { rect.Left(), rect.Top() }, { rect.Right(), rect.Top() },
+                { rect.Right(), rect.Bottom() }, { rect.Left(), rect.Bottom() }
+            };
+            float left = std::numeric_limits<float>::max();
+            float top = left;
+            float right = std::numeric_limits<float>::lowest();
+            float bottom = right;
+            bool finite = true;
+            for (const auto& corner : corners) {
+                auto point = node.GetPositionToWindowWithTransform(corner);
+                finite = finite && std::isfinite(point.GetX()) && std::isfinite(point.GetY());
+                left = std::min(left, point.GetX());
+                top = std::min(top, point.GetY());
+                right = std::max(right, point.GetX());
+                bottom = std::max(bottom, point.GetY());
+            }
+            if (!finite) {
+                continue;
+            }
+            result.emplace_back(left, top, right - left, bottom - top);
+        }
+        return result;
+    };
+    const auto encode = [this, &toWindow](const std::vector<RectF>& regions, SourceType type, SourceTool tool) {
+        auto effective = toWindow(*this, regions);
+        TouchEvent event;
+        event.sourceType = type;
+        event.sourceTool = tool;
+        // Self clipping does not limit explicit regions. Ancestors gate hit testing by their response regions.
+        for (auto node = GetAncestorNodeOfFrame(true); node && !effective.empty();
+             node = node->GetAncestorNodeOfFrame(true)) {
+            auto render = node->GetRenderContext();
+            if (!render || !render->GetClipEdgeValue(false)) {
+                continue;
+            }
+            if (!node->GetTouchable()) {
+                effective.clear();
+                break;
+            }
+            auto paintRect = render->GetPaintRectWithoutTransform();
+            auto responseRect = node->CheckResponseRegionForStylus(paintRect, event);
+            auto clips = toWindow(*node,
+                node->GetResponseRegionList(responseRect, static_cast<int32_t>(type), static_cast<int32_t>(tool)));
+            std::vector<RectF> clipped;
+            for (const auto& rect : effective) {
+                for (const auto& clip : clips) {
+                    auto intersection = rect.IntersectRectT(clip);
+                    if (intersection.IsValid()) {
+                        clipped.emplace_back(intersection);
+                    }
+                }
+            }
+            // RectF equality is approximate; preserve distinct regions with close coordinates.
+            const auto coordinates = [](const RectF& rect) {
+                return std::make_tuple(rect.Left(), rect.Top(), rect.Width(), rect.Height());
+            };
+            std::sort(clipped.begin(), clipped.end(), [&coordinates](const RectF& left, const RectF& right) {
+                return coordinates(left) < coordinates(right);
+            });
+            clipped.erase(std::unique(clipped.begin(), clipped.end(),
+                [&coordinates](const RectF& left, const RectF& right) {
+                    return coordinates(left) == coordinates(right);
+                }),
+                clipped.end());
+            effective = std::move(clipped);
+        }
+        auto array = JsonUtil::CreateArray();
+        size_t index = 0;
+        for (const auto& rect : effective) {
+            array->Put(std::to_string(index++).c_str(), rect.ToBounds().c_str());
+        }
+        return array;
+    };
+    const auto& map = gesture->GetResponseRegionMap();
+    if (!map.empty()) {
+        auto output = JsonUtil::Create();
+        const std::tuple<ResponseRegionSupportedTool, SourceTool, const char*> tools[] = {
+            { ResponseRegionSupportedTool::ALL, SourceTool::UNKNOWN, "all" },
+            { ResponseRegionSupportedTool::FINGER, SourceTool::FINGER, "finger" },
+            { ResponseRegionSupportedTool::PEN, SourceTool::PEN, "pen" },
+            { ResponseRegionSupportedTool::MOUSE, SourceTool::MOUSE, "mouse" }
+        };
+        for (const auto& [tool, source, name] : tools) {
+            auto found = map.find(tool);
+            if (found == map.end() || found->second.empty()) {
+                continue;
+            }
+            const auto type = source == SourceTool::MOUSE ? SourceType::MOUSE : SourceType::TOUCH;
+            auto regions = GetResponseRegionList(raw, static_cast<int32_t>(type), static_cast<int32_t>(source));
+            output->Put(name, encode(regions, type, source));
+        }
+        if (output->GetChild()->IsValid()) {
+            json->Put("responseRegionMap", output);
+        }
+        return;
+    }
+    if (!gesture->GetResponseRegion().empty() && (!pattern_ || pattern_->HasInspectorResponseRegion())) {
+        json->Put("responseRegion", encode(GetResponseRegionListRaw(raw, static_cast<int32_t>(SourceType::TOUCH)),
+            SourceType::TOUCH, SourceTool::FINGER));
+    }
+    if (!gesture->GetMouseResponseRegion().empty()) {
+        json->Put("mouseResponseRegion", encode(GetResponseRegionListRaw(raw, static_cast<int32_t>(SourceType::MOUSE)),
+            SourceType::MOUSE, SourceTool::MOUSE));
+    }
 }
 
 void FrameNode::DumpInfo()

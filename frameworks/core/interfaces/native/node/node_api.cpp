@@ -21,6 +21,7 @@
 #include "core/interfaces/native/node/content_change_api.h"
 
 #include "core/interfaces/native/node/node_api.h"
+#include "core/interfaces/native/node/ui_tree_api.h"
 
 #include <securec.h>
 #include <cstdlib>

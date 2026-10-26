@@ -2329,4 +2329,13 @@ void TextPickerPattern::OnWindowSizeChanged(int32_t width, int32_t height, Windo
     }
 }
 
+void TextPickerPattern::DumpInspectorTreeInfo(
+    std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context)
+{
+    Pattern::DumpInspectorTreeInfo(attrs, context);
+    if (!GetIsShowInDialog()) {
+        attrs->Put("expanded", true);
+    }
+}
+
 } // namespace OHOS::Ace::NG

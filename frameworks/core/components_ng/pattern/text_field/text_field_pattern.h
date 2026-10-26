@@ -329,6 +329,8 @@ class ACE_FORCE_EXPORT TextFieldPattern : public ScrollablePattern,
         TextBase, Magnifier, TextGestureSelector, ICounterHost, IPasswordIconHost, PageTranslateNode, ICleanNodeHost);
 
 public:
+    void DumpInspectorTreeInfo(std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context) override;
+
     RefPtr<NG::FrameNode> GetHost() const override { return ScrollablePattern::GetHost(); }
     TextFieldPattern();
     ~TextFieldPattern() override;

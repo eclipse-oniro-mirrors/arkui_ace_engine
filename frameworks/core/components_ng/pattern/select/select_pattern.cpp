@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 
+#include "core/components_ng/base/inspector_tree_request_context.h"
 #include "core/components_ng/pattern/select/select_pattern.h"
 #include "core/accessibility/accessibility_manager.h"
 
@@ -3348,4 +3349,29 @@ std::optional<DividerMode> SelectPattern::GetDividerMode() const
 {
     return dividerMode_;
 }
+void SelectPattern::DumpInspectorTreeInfo(
+    std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context)
+{
+    Pattern::DumpInspectorTreeInfo(attrs, context);
+    const auto menu = GetMenuNode();
+    const auto layout = menu ? menu->GetLayoutProperty<MenuLayoutProperty>() : nullptr;
+    if (layout && layout->GetShowInSubWindowValue(false)) {
+        return;
+    }
+    auto wrapper = menuWrapper_ ? menuWrapper_->GetPattern<MenuWrapperPattern>() : nullptr;
+    attrs->Put("expanded", wrapper && wrapper->IsShow());
+}
+
+void SelectPattern::AddInspectorTreeInfo(
+    std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context)
+{
+    if (context.config.interactionInfo) {
+        if (attrs->Contains("selected")) {
+            attrs->Replace("selected", selected_ >= 0);
+        } else {
+            attrs->Put("selected", selected_ >= 0);
+        }
+    }
+}
+
 } // namespace OHOS::Ace::NG

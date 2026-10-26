@@ -1,0 +1,110 @@
+{
+  "cases": {
+    "native_fields": {
+      "requiredIds": [
+        "label",
+        "button-one",
+        "button-two",
+        "search",
+        "input",
+        "area",
+        "rich",
+        "marquee",
+        "clock",
+        "timer",
+        "select",
+        "text-picker",
+        "date-picker",
+        "time-picker"
+      ]
+    },
+    "privacy_password": {
+      "emptyContentIds": [
+        "input"
+      ],
+      "text": {
+        "label": "ordinary-label"
+      }
+    },
+    "privacy_obscured": {
+      "emptyContentIds": [
+        "input",
+        "label"
+      ]
+    },
+    "privacy_window": {
+      "emptyContentIds": [
+        "input",
+        "area",
+        "rich"
+      ],
+      "text": {
+        "label": "ordinary-label"
+      }
+    },
+    "response_regions": {
+      "requiredIds": [
+        "tool-regions",
+        "traditional-regions",
+        "transformed-region",
+        "no-region"
+      ],
+      "regionTools": [
+        "all",
+        "finger",
+        "pen",
+        "mouse"
+      ]
+    },
+    "expanded_states": {
+      "requiredIds": [
+        "menu-trigger",
+        "select",
+        "text-picker",
+        "date-picker",
+        "time-picker"
+      ]
+    },
+    "window_titles": {
+      "windowMetadata": true
+    },
+    "provider_normal": {
+      "requiredIds": [
+        "provider-first",
+        "provider-second"
+      ],
+      "providerNonempty": true
+    },
+    "provider_empty": {
+      "requiredIds": [
+        "provider-first",
+        "provider-second"
+      ],
+      "providerEmpty": true
+    },
+    "provider_failure": {
+      "errorMessage": "provider query failed"
+    },
+    "provider_delay": {
+      "requiredIds": [
+        "provider-first",
+        "provider-second"
+      ],
+      "providerNonempty": true
+    },
+    "provider_invalid": {
+      "errorMessage": "invalid provider data"
+    },
+    "provider_limits": {
+      "errorMessage": "node count exceeds limit"
+    },
+    "web_uie": {
+      "requiredIds": [
+        "web-host"
+      ]
+    },
+    "provider_large_payload": {
+      "errorMessage": "tree data size exceeds limit"
+    }
+  }
+}

@@ -48,6 +48,7 @@
 #include "base/utils/utils.h"
 
 #include "core/common/window.h"
+#include "core/components_ng/base/inspector_tree_request_context.h"
 #include "core/components_ng/event/event_hub.h"
 #include "core/components_ng/manager/avoid_info/avoid_info_manager.h"
 #include "core/components_ng/pattern/pattern.h"
@@ -1735,7 +1736,7 @@ HWTEST_F(UIExtensionComponentTestTwoNg, EmbeddedComponentTest001, TestSize.Level
 
 /**
  * @tc.name: ExecuteDumpTask001
- * @tc.desc: Test Func AddExtraInfoWithParamConfig
+ * @tc.desc: UIExtension dump timeout preserves the native inspector result.
  * @tc.type: FUNC
  */
 HWTEST_F(UIExtensionComponentTestTwoNg, ExecuteDumpTask001, TestSize.Level1)
@@ -1748,12 +1749,17 @@ HWTEST_F(UIExtensionComponentTestTwoNg, ExecuteDumpTask001, TestSize.Level1)
     ASSERT_NE(uiextensionNode, nullptr);
     auto pattern = uiextensionNode->GetPattern<UIExtensionPattern>();
     ASSERT_NE(pattern, nullptr);
+    pattern->Initialize();
+    ASSERT_NE(pattern->sessionWrapper_, nullptr);
 
     /**
      * @tc.steps: step2. Test Func AddExtraInfoWithParamConfig
      */
     auto json = JsonUtil::CreateSharedPtrJson();
+    json->Put("$type", "UIExtensionComponent");
     ParamConfig config;
+    config.withResponseRegion = true;
+    InspectorTreeRequestContext request(config, {});
     std::vector<std::string> params;
     params.push_back("-allInfoWithParamConfigTotal");
     params.push_back("1");
@@ -1762,8 +1768,17 @@ HWTEST_F(UIExtensionComponentTestTwoNg, ExecuteDumpTask001, TestSize.Level1)
     params.push_back(config.cacheNodes ? "1" : "0");
     params.push_back(config.withWeb ? "1" : "0");
     params.push_back(config.withUIExtension ? "1" : "0");
-    pattern->ExecuteDumpTask(json, params, uiextensionNode);
-    EXPECT_EQ(json->GetString("$child-uec"), "");
+    auto pipeline = MockPipelineContext::GetCurrent();
+    auto savedExecutor = pipeline->GetTaskExecutor();
+    pipeline->SetTaskExecutor(AceType::MakeRefPtr<MockTaskExecutor>(true));
+    pattern->ExecuteDumpTask(json, params, uiextensionNode, &request);
+    pipeline->SetTaskExecutor(savedExecutor);
+    EXPECT_FALSE(request.ShouldStop());
+    EXPECT_FALSE(json->Contains("$child-uec"));
+    auto result = request.FinalizeResult(json);
+    ASSERT_NE(result, nullptr);
+    EXPECT_EQ(result->GetString("$type"), "UIExtensionComponent");
+    EXPECT_EQ(result->GetString("errorMessage"), "no error");
 }
 
 /**

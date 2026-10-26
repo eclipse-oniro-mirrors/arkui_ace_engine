@@ -212,6 +212,7 @@ public:
     void HideMenuInSubWindow(const RefPtr<FrameNode>& menu, int32_t targetId);
     RefPtr<FrameNode> GetMenuNodeWithExistContent(const RefPtr<UINode>& node);
     RefPtr<FrameNode> GetMenuNode(int32_t targetId);
+    bool IsMenuShowForTarget(int32_t targetId);
     void HideMenuInSubWindow(bool showPreviewAnimation = true, bool startDrag = false);
     void CleanMenuInSubWindow(int32_t targetId);
     void CleanPreviewInSubWindow();
