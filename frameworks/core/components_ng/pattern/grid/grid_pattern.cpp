@@ -47,6 +47,7 @@
 #include "core/components_ng/pattern/grid/irregular/grid_layout_utils.h"
 #include "core/components_ng/pattern/scrollable/scrollable_animation_consts.h"
 #include "core/components_ng/pattern/scrollable/scrollable_pattern.h"
+#include "core/components_ng/pattern/scrollable/scrollable_utils.h"
 #include "core/components_ng/pattern/scrollable/scroll_snap_utils.h"
 #include "core/components_ng/syntax/repeat_virtual_scroll_2_node.h"
 #include "interfaces/inner_api/ui_session/ui_session_manager.h"
@@ -156,13 +157,32 @@ void GridPattern::SetLayoutAlgorithmContentClip(const RefPtr<GridLayoutBaseAlgor
     // Gate through the LayoutProperty (ADR-1): only an explicit BOUNDARY/SAFE_AREA/
     // CUSTOM value activates the extension. Do not reuse
     // paintProperty->HasContentClip() (still true after reset with value BOUNDARY,
-    // which would wrongly activate).
+    // which would wrongly activate). An absent/DEFAULT value activates only when the
+    // unified immersive strategy promotes the effective default to SAFE_AREA.
     auto layoutProperty = GetLayoutProperty<GridLayoutProperty>();
     CHECK_NULL_VOID(layoutProperty);
     const auto& clip = layoutProperty->GetContentClip();
-    if (!clip.has_value() || clip->first == ContentClipMode::DEFAULT ||
-        clip->first == ContentClipMode::CONTENT_ONLY) {
-        safeAreaPad_.reset();
+    // explicitContentOnly and explicitActivation are mutually exclusive: CONTENT_ONLY is the only
+    // explicit value that deactivates the extension, every other explicit value activates it, and an
+    // absent or DEFAULT value falls into the strategy resolution of the !explicitActivation branch.
+    const bool explicitContentOnly = clip.has_value() && clip->first == ContentClipMode::CONTENT_ONLY;
+    const bool explicitActivation = clip.has_value() && !explicitContentOnly &&
+                                    clip->first != ContentClipMode::DEFAULT;
+    if (!explicitActivation) {
+        auto mode = ContentClipMode::CONTENT_ONLY;
+        if (!explicitContentOnly) {
+            auto paintProperty = GetPaintProperty<ScrollablePaintProperty>();
+            mode = ScrollableUtils::ResolveEffectiveDefaultContentClip(
+                GetHost(), AceType::RawPtr(paintProperty));
+        }
+        if (mode != ContentClipMode::SAFE_AREA) {
+            safeAreaPad_.reset();
+            return;
+        }
+        algorithm->SetContentClipMode(mode);
+        if (safeAreaPad_.has_value()) {
+            algorithm->SetContentClipSafeAreaPad(safeAreaPad_);
+        }
         return;
     }
     algorithm->SetContentClipMode(clip->first);

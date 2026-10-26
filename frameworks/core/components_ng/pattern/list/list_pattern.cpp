@@ -55,9 +55,9 @@
 #include "core/components_ng/pattern/scrollable/scrollable.h"
 #include "core/components_ng/pattern/scrollable/scrollable_accessibility_utils.h"
 #include "core/components_ng/pattern/scrollable/scrollable_animation_consts.h"
+#include "core/components_ng/pattern/scrollable/scrollable_utils.h"
 #include "core/components_ng/pattern/scrollable/scrollable_properties.h"
 #include "core/components_ng/pattern/scrollable/selectable_theme.h"
-#include "core/components_ng/pattern/scrollable/scrollable_utils.h"
 #include "core/components_ng/property/measure_utils.h"
 #ifndef ACE_UNITTEST
 #include "core/components_ng/render/adapter/rosen_render_context.h"
@@ -1660,20 +1660,34 @@ void ListPattern::SetLayoutAlgorithmSnapParam(const RefPtr<ListLayoutAlgorithm>&
 
 void ListPattern::SetLayoutAlgorithmClipContent(const RefPtr<ListLayoutAlgorithm>& listLayoutAlgorithm)
 {
+    CHECK_NULL_VOID(listLayoutAlgorithm);
+    // Activation gate: List reads the clip value from the paint property, while Grid gates through
+    // the layout property (ADR-1). A stored DEFAULT (written by ResetContentClip) is resolved
+    // dynamically here, so both follow a change of the immersive strategy set.
     auto paintProperty = GetPaintProperty<ScrollablePaintProperty>();
-    if (!paintProperty || !paintProperty->HasContentClip()) {
+    const bool hasClip = paintProperty && paintProperty->HasContentClip();
+    auto mode = ContentClipMode::DEFAULT;
+    RefPtr<ShapeRect> clipShape;
+    if (hasClip) {
+        const auto& clip = paintProperty->GetContentClipValue();
+        mode = clip.first;
+        clipShape = clip.second;
+    }
+    if (mode == ContentClipMode::DEFAULT) {
+        mode = ScrollableUtils::ResolveEffectiveDefaultContentClip(GetHost(), AceType::RawPtr(paintProperty));
+    }
+    if (!hasClip && mode != ContentClipMode::SAFE_AREA) {
         safeAreaPad_.reset();
         return;
     }
-    auto clip = paintProperty->GetContentClipValue();
-    listLayoutAlgorithm->SetContentClipMode(clip.first);
-    if (clip.first != ContentClipMode::SAFE_AREA) {
+    listLayoutAlgorithm->SetContentClipMode(mode);
+    if (mode != ContentClipMode::SAFE_AREA) {
         safeAreaPad_.reset();
     }
-    if (clip.first == ContentClipMode::SAFE_AREA && safeAreaPad_.has_value()) {
+    if (mode == ContentClipMode::SAFE_AREA && safeAreaPad_.has_value()) {
         listLayoutAlgorithm->SetContentClipExpend(safeAreaPad_.value());
-    } else if (clip.first == ContentClipMode::CUSTOM) {
-        listLayoutAlgorithm->SetContentClipShape(clip.second);
+    } else if (mode == ContentClipMode::CUSTOM) {
+        listLayoutAlgorithm->SetContentClipShape(clipShape);
     }
 }
 

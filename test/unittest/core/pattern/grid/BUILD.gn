@@ -80,6 +80,7 @@ CUSTOM_SRC = [
 PARITY_SRC = [
   "grid_content_clip_parity_test.cpp",
   "grid_content_clip_test.cpp",
+  "$ace_root/test/unittest/core/pattern/scrollable/scrollable_test_utils.cpp",
 ]
 
 if (is_host_product) {

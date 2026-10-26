@@ -373,6 +373,10 @@ let ImmersiveStrategy;
 (function (ImmersiveStrategy) {
   ImmersiveStrategy[ImmersiveStrategy.AVOID_CUTOUT = 0] = 'AVOID_CUTOUT';
   ImmersiveStrategy[ImmersiveStrategy.AVOID_FLOAT_NAV = 1] = 'AVOID_FLOAT_NAV';
+  ImmersiveStrategy[ImmersiveStrategy.GRID_EXPAND_SAFE_AREA = 2] = 'GRID_EXPAND_SAFE_AREA';
+  ImmersiveStrategy[ImmersiveStrategy.LIST_EXPAND_SAFE_AREA = 3] = 'LIST_EXPAND_SAFE_AREA';
+  ImmersiveStrategy[ImmersiveStrategy.SCROLL_EXPAND_SAFE_AREA = 4] = 'SCROLL_EXPAND_SAFE_AREA';
+  ImmersiveStrategy[ImmersiveStrategy.WATER_FLOW_EXPAND_SAFE_AREA = 5] = 'WATER_FLOW_EXPAND_SAFE_AREA';
   ImmersiveStrategy[ImmersiveStrategy.AVOID_WINDOW_CONTROLS = 6] = 'AVOID_WINDOW_CONTROLS';
   ImmersiveStrategy[ImmersiveStrategy.BIND_SHEET_EXPAND_SAFE_AREA = 7] = 'BIND_SHEET_EXPAND_SAFE_AREA';
   ImmersiveStrategy[ImmersiveStrategy.NAVIGATION_EXPAND_SAFE_AREA = 8] = 'NAVIGATION_EXPAND_SAFE_AREA';
