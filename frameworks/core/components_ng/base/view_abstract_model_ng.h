@@ -969,6 +969,9 @@ public:
         ViewAbstract::SetClipShape(frameNode, basicShape);
     }
 
+    void SetShadowShape(const RefPtr<BasicShape>& basicShape) override;
+    void SetShadowClipMode(ShadowClipMode clipMode) override;
+
     void SetClipEdge(bool isClip) override
     {
         ViewAbstract::SetClipEdge(isClip);

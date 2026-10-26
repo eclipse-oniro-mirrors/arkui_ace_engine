@@ -3934,6 +3934,8 @@ struct ArkUICommonModifier {
     ArkUINodeHandle (*getNextFocus)(ArkUINodeHandle node, FocusMove idx);
     ArkUI_Bool (*getFocusBoxStyle)(ArkUINodeHandle node, ArkUI_Float32* values, ArkUI_Uint32* color);
     ArkUI_Bool (*getLinearGradientBlur)(ArkUINodeHandle node, OH_ArkUI_LinearGradientBlurOptions* options);
+    void (*setShadowClipMode)(ArkUINodeHandle node, ArkUI_Int32 clipMode);
+    void (*resetShadowClipMode)(ArkUINodeHandle node);
 };
 
 struct ArkUICommonShapeModifier {

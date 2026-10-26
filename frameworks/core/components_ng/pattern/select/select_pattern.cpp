@@ -802,15 +802,12 @@ void SelectPattern::SetFocusStyle()
     CHECK_NULL_VOID(pipeline);
     auto selectTheme = pipeline->GetTheme<SelectTheme>(host->GetThemeScopeId());
     CHECK_NULL_VOID(selectTheme);
-    auto&& graphics = selectRenderContext->GetOrCreateGraphics();
-    CHECK_NULL_VOID(graphics);
     auto&& transform = selectRenderContext->GetOrCreateTransform();
     CHECK_NULL_VOID(transform);
-
     ShadowStyle shadowStyle = selectTheme->GetSelectNormalShadow();
     Shadow shadow;
     GetShadowFromTheme(shadowStyle, shadow);
-    if (!graphics->HasBackShadow() || graphics->GetBackShadowValue() == shadow) {
+    if (!selectRenderContext->HasBackShadow() || selectRenderContext->GetBackShadowValue(Shadow()) == shadow) {
         shadowModify_ = true;
         shadowStyle = selectTheme->GetSelectFocusedShadow();
         GetShadowFromTheme(shadowStyle, shadow);

@@ -1976,6 +1976,12 @@ let ShadowStyle;
   ShadowStyle[ShadowStyle.OUTER_FLOATING_MD = 5] = 'OUTER_FLOATING_MD';
 })(ShadowStyle || (ShadowStyle = {}));
 
+let ShadowClipMode;
+(function (ShadowClipMode) {
+  ShadowClipMode[ShadowClipMode.DEFAULT_SHAPE = 0] = 'DEFAULT_SHAPE';
+  ShadowClipMode[ShadowClipMode.BOUNDS_SHAPE = 1] = 'BOUNDS_SHAPE';
+})(ShadowClipMode || (ShadowClipMode = {}));
+
 let UnionMode;
 (function (UnionMode) {
   UnionMode[UnionMode.SMOOTH_UNION = 0] = 'SMOOTH_UNION';

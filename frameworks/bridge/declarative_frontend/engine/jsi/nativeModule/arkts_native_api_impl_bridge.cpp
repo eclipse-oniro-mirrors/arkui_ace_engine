@@ -2916,6 +2916,14 @@ void ArkUINativeModule::RegisterCommonAttributes(Local<panda::ObjectRef> object,
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CommonBridge::SetShadow));
     common->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetShadow"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CommonBridge::ResetShadow));
+    common->Set(vm, panda::StringRef::NewFromUtf8(vm, "setShadowShape"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CommonBridge::SetShadowShape));
+    common->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetShadowShape"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CommonBridge::ResetShadowShape));
+    common->Set(vm, panda::StringRef::NewFromUtf8(vm, "setShadowClipMode"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CommonBridge::SetShadowClipMode));
+    common->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetShadowClipMode"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CommonBridge::ResetShadowClipMode));
     common->Set(vm, panda::StringRef::NewFromUtf8(vm, "setHitTestBehavior"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), CommonBridge::SetHitTestBehavior));
     common->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetHitTestBehavior"),

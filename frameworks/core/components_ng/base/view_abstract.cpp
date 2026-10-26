@@ -6300,6 +6300,125 @@ void ViewAbstract::SetClipEdge(FrameNode* frameNode, bool isClip)
     }
 }
 
+void ViewAbstract::SetShadowShapeLpxCallback(FrameNode* frameNode, const RefPtr<BasicShape>& basicShape)
+{
+    if (CheckDimensionUseLPX(basicShape->GetWidth()) || CheckDimensionUseLPX(basicShape->GetHeight())) {
+        auto lpxUpdateFunc = [weak = AceType::WeakClaim(frameNode), shape = basicShape]() {
+            auto frameNode = weak.Upgrade();
+            CHECK_NULL_VOID(frameNode);
+            auto target = frameNode->GetRenderContext();
+            CHECK_NULL_VOID(target);
+            target->ResetShadowShape();
+            target->UpdateShadowShape(shape);
+        };
+        ACE_SET_NODE_LPX_UPDATE_CALLBACK(true, LpxAttribute::LPX_SHADOW_SHAPE, lpxUpdateFunc, frameNode);
+    } else {
+        ACE_SET_NODE_LPX_UPDATE_CALLBACK(false, LpxAttribute::LPX_SHADOW_SHAPE, EMPTY_CALLBACK, frameNode);
+    }
+}
+
+void ViewAbstract::SetShadowShape(const RefPtr<BasicShape>& basicShape)
+{
+    if (!ViewStackProcessor::GetInstance()->IsCurrentVisualStateProcess()) {
+        return;
+    }
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    ViewAbstract::SetShadowShape(frameNode, basicShape);
+}
+
+void ViewAbstract::SetShadowShape(FrameNode* frameNode, const RefPtr<BasicShape>& basicShape)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto target = frameNode->GetRenderContext();
+    CHECK_NULL_VOID(target);
+    if (!basicShape) {
+        if (SystemProperties::ConfigChangePerform()) {
+            auto pattern = frameNode->GetPattern();
+            CHECK_NULL_VOID(pattern);
+            pattern->RemoveResObj("shadowShape");
+        }
+        ACE_SET_NODE_LPX_UPDATE_CALLBACK(false, LpxAttribute::LPX_SHADOW_SHAPE, EMPTY_CALLBACK, frameNode);
+        target->ResetShadowShape();
+        target->OnShadowShapeUpdate(nullptr);
+        return;
+    }
+    if (SystemProperties::ConfigChangePerform()) {
+        auto pattern = frameNode->GetPattern();
+        CHECK_NULL_VOID(pattern);
+        if (basicShape->HasResourceObj()) {
+            RefPtr<ResourceObject> resObj = AceType::MakeRefPtr<ResourceObject>("", "", -1);
+            auto&& updateFunc = [shape = basicShape, weak = AceType::WeakClaim(frameNode)](
+                                    const RefPtr<ResourceObject>& resObj) mutable {
+                auto frameNode = weak.Upgrade();
+                CHECK_NULL_VOID(frameNode);
+                CHECK_NULL_VOID(shape);
+                shape->ReloadResources();
+                auto renderContext = frameNode->GetRenderContext();
+                CHECK_NULL_VOID(renderContext);
+                renderContext->ResetShadowShape();
+                renderContext->UpdateShadowShape(shape);
+            };
+            pattern->AddResObj("shadowShape", resObj, std::move(updateFunc));
+        } else {
+            pattern->RemoveResObj("shadowShape");
+        }
+    }
+    target->UpdateShadowShape(basicShape);
+    SetShadowShapeLpxCallback(frameNode, basicShape);
+}
+
+void ViewAbstract::ResetShadowShape()
+{
+    if (!ViewStackProcessor::GetInstance()->IsCurrentVisualStateProcess()) {
+        return;
+    }
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    ViewAbstract::ResetShadowShape(frameNode);
+}
+
+void ViewAbstract::ResetShadowShape(FrameNode* frameNode)
+{
+    CHECK_NULL_VOID(frameNode);
+    if (SystemProperties::ConfigChangePerform()) {
+        auto pattern = frameNode->GetPattern();
+        CHECK_NULL_VOID(pattern);
+        pattern->RemoveResObj("shadowShape");
+    }
+    ACE_SET_NODE_LPX_UPDATE_CALLBACK(false, LpxAttribute::LPX_SHADOW_SHAPE, EMPTY_CALLBACK, frameNode);
+    auto target = frameNode->GetRenderContext();
+    CHECK_NULL_VOID(target);
+    target->ResetShadowShape();
+    target->OnShadowShapeUpdate(nullptr);
+}
+
+void ViewAbstract::SetShadowClipMode(ShadowClipMode clipMode)
+{
+    if (!ViewStackProcessor::GetInstance()->IsCurrentVisualStateProcess()) {
+        return;
+    }
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    ViewAbstract::SetShadowClipMode(frameNode, clipMode);
+}
+
+void ViewAbstract::SetShadowClipMode(FrameNode* frameNode, ShadowClipMode clipMode)
+{
+    ACE_UPDATE_NODE_RENDER_CONTEXT(ShadowClipMode, clipMode, frameNode);
+}
+
+void ViewAbstract::ResetShadowClipMode()
+{
+    if (!ViewStackProcessor::GetInstance()->IsCurrentVisualStateProcess()) {
+        return;
+    }
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    ViewAbstract::ResetShadowClipMode(frameNode);
+}
+
+void ViewAbstract::ResetShadowClipMode(FrameNode* frameNode)
+{
+    ACE_UPDATE_NODE_RENDER_CONTEXT(ShadowClipMode, ShadowClipMode::DEFAULT_SHAPE, frameNode);
+}
+
 std::function<void()> ViewAbstract::GetMaskShapeFuncForLPX(const RefPtr<BasicShape>& basicShape)
 {
     auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();

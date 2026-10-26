@@ -602,6 +602,8 @@ public:
     static void JsMotionPath(const JSCallbackInfo& info);
     static void JsMotionBlur(const JSCallbackInfo& info);
     static void JsShadow(const JSCallbackInfo& info);
+    static void JsShadowShape(const JSCallbackInfo& info);
+    static void JsShadowClipMode(const JSCallbackInfo& info);
     static bool ParseBlendMode(const JSCallbackInfo& info, BlendMode& blendMode, BlendApplyType& blendApplyType);
     static void JsBlendMode(const JSCallbackInfo& info);
     static void JsAdvancedBlendMode(const JSCallbackInfo& info);

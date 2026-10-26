@@ -335,6 +335,7 @@ enum class LpxAttribute {
     LPX_TEXT_INDENT,
     LPX_TEXT_SPAN,
     LPX_SAFE_AREA_INSET_SPACING,
+    LPX_SHADOW_SHAPE,
     ALWAYS
 };
 

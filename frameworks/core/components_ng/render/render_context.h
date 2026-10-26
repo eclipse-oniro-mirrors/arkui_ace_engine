@@ -685,19 +685,24 @@ public:
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Graphics, DynamicLightUpDegree, float);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Graphics, BgDynamicBrightnessOption, BrightnessOption);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Graphics, FgDynamicBrightnessOption, BrightnessOption);
-    ACE_DEFINE_PROPERTY_ITEM_WITH_GROUP_GET(Graphics, BackShadow, Shadow);
+    ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Graphics, BackBlendMode, BlendMode);
+    ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Graphics, BackBlendApplyType, BlendApplyType);
+
+    // Visual
+    ACE_DEFINE_PROPERTY_GROUP(Visual, VisualProperty);
+    ACE_DEFINE_PROPERTY_ITEM_WITH_GROUP_GET(Visual, BackShadow, Shadow);
     void UpdateBackShadow(const Shadow& value)
     {
         UpdatePreBackShadow(value);
-        auto& groupProperty = GetOrCreateGraphics();
+        auto& groupProperty = GetOrCreateVisual();
         if (groupProperty->CheckBackShadow(value)) {
             return;
         }
         groupProperty->UpdateBackShadow(value);
         OnBackShadowUpdate(value);
     }
-    ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Graphics, BackBlendMode, BlendMode);
-    ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Graphics, BackBlendApplyType, BlendApplyType);
+    ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Visual, ShadowShape, RefPtr<BasicShape>);
+    ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Visual, ShadowClipMode, ShadowClipMode);
 
     // BorderRadius.
     ACE_DEFINE_PROPERTY_GROUP(Border, BorderProperty);
@@ -751,7 +756,7 @@ public:
     }
     void UpdateMaterialBackShadow(const Shadow& value)
     {
-        auto& groupProperty = GetOrCreateGraphics();
+        auto& groupProperty = GetOrCreateVisual();
         if (groupProperty->CheckBackShadow(value)) {
             return;
         }
@@ -1122,6 +1127,8 @@ protected:
     virtual void OnFgDynamicBrightnessOptionUpdate(const std::optional<BrightnessOption>& brightnessOption) {}
     virtual void OnBackShadowUpdate(const Shadow& shadow) {}
     virtual void OnPreBackShadowUpdate(const Shadow& shadow) {}
+    virtual void OnShadowShapeUpdate(const RefPtr<BasicShape>& basicShape) {}
+    virtual void OnShadowClipModeUpdate(ShadowClipMode clipMode) {}
     virtual void OnBackBlendModeUpdate(BlendMode blendMode) {}
     virtual void OnBackBlendApplyTypeUpdate(BlendApplyType blendApplyType) {}
 

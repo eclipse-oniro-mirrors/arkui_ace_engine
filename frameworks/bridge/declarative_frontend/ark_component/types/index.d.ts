@@ -145,6 +145,10 @@ declare enum ShadowStyle {
   OUTLINE_MD = 8,
   COSINE = 9,
 }
+declare enum ShadowClipMode {
+  DEFAULT_SHAPE = 0,
+  BOUNDS_SHAPE,
+}
 declare interface BlurOptions {
   low?: number;
   high?: number;

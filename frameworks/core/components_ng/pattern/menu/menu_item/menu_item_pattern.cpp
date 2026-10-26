@@ -480,14 +480,12 @@ void MenuItemPattern::SetFocusStyle()
     CHECK_NULL_VOID(host);
     auto renderContext = host->GetRenderContext();
     CHECK_NULL_VOID(renderContext);
-    auto&& graphics = renderContext->GetOrCreateGraphics();
-    CHECK_NULL_VOID(graphics);
     if (!selectTheme_->GetoptionApplyFocusedStyle()) {
         return;
     }
 
     Shadow shadow = Shadow::CreateShadow(static_cast<ShadowStyle>(NONE_SHADOW_VALUE));
-    if (!graphics->HasBackShadow() || graphics->GetBackShadowValue() == shadow) {
+    if (!renderContext->HasBackShadow() || renderContext->GetBackShadowValue(Shadow()) == shadow) {
         ShadowStyle shadowStyle = static_cast<ShadowStyle>(selectTheme_->GetOptionFocusedShadow());
         renderContext->UpdateBackShadow(Shadow::CreateShadow(shadowStyle));
         isFocusShadowSet_ = true;

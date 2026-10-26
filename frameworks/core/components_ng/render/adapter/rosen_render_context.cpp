@@ -1037,6 +1037,10 @@ void RosenRenderContext::SyncAdditionalGeometryProperties(const RectF& paintRect
         PaintClip(paintRect.GetSize());
     }
 
+    if (HasShadowShape()) {
+        PaintShadowShape(GetShadowShapeValue(nullptr), paintRect.GetSize());
+    }
+
     if (HasProgressMask() && GetProgressMaskValue()) {
         PaintProgressMask();
     }
@@ -1976,6 +1980,34 @@ void RosenRenderContext::ResetShadowPath()
 {
     CHECK_NULL_VOID(rsNode_);
     rsNode_->SetShadowPath(nullptr);
+}
+
+void RosenRenderContext::OnShadowShapeUpdate(const RefPtr<BasicShape>& basicShape)
+{
+    FREE_RS_CONTEXT_CHECK(OnShadowShapeUpdate, basicShape);
+    CHECK_NULL_VOID(rsNode_);
+    if (basicShape) {
+        if (!RectIsNull()) {
+            RectF rect = GetPaintRectWithoutTransform();
+            auto frameSize = rect.GetSize();
+            PaintShadowShape(basicShape, frameSize);
+        }
+    } else {
+        rsNode_->SetShadowPath(nullptr);
+    }
+    RequestNextFrame();
+}
+
+void RosenRenderContext::OnShadowClipModeUpdate(ShadowClipMode clipMode)
+{
+    FREE_RS_CONTEXT_CHECK(OnShadowClipModeUpdate, clipMode);
+    CHECK_NULL_VOID(rsNode_);
+    if (clipMode == ShadowClipMode::BOUNDS_SHAPE) {
+        rsNode_->SetShadowClipType(1);
+    } else {
+        rsNode_->SetShadowClipType(0);
+    }
+    RequestNextFrame();
 }
 
 void RosenRenderContext::SetOverlayNGShader(const std::shared_ptr<OHOS::Ace::RenderEdgeLightModifier>& edgeLightFilter)
@@ -6369,6 +6401,14 @@ void RosenRenderContext::PaintClip(const SizeF& frameSize)
     if (clip->HasClipMask()) {
         PaintClipMask(clip, frameSize);
     }
+}
+
+void RosenRenderContext::PaintShadowShape(const RefPtr<BasicShape>& basicShape, const SizeF& frameSize)
+{
+    CHECK_NULL_VOID(rsNode_);
+    CHECK_NULL_VOID(basicShape);
+    auto rsPath = DrawingDecorationPainter::DrawingCreatePath(basicShape, frameSize);
+    rsNode_->SetShadowPath(Rosen::RSPath::CreateRSPath(rsPath));
 }
 
 void RosenRenderContext::PaintProgressMask()
