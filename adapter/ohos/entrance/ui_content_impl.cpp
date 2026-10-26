@@ -721,6 +721,14 @@ extern "C" ACE_FORCE_EXPORT int32_t OHOS_ACE_GetUIContentWindowID(int32_t instan
     return UIContentImpl::GetUIContentWindowID(instanceId);
 }
 
+extern "C" ACE_FORCE_EXPORT bool OHOS_ACE_IsBrandColorValid(const char* brandColorStr)
+{
+    if (brandColorStr == nullptr) {
+        return false;
+    }
+    return UIContentImpl::IsBrandColorValid(brandColorStr);
+}
+
 extern "C" ACE_FORCE_EXPORT void OHOS_ACE_ScopeErrorHivewReport()
 {
     auto context = OHOS::Ace::PipelineBase::GetCurrentContextSafely();
@@ -7873,5 +7881,14 @@ void UIContentImpl::UnregisterBrandColorChangeListener()
     auto* storage = NG::TokenThemeStorage::GetInstance();
     CHECK_NULL_VOID(storage);
     storage->UnregisterBrandColorChangeListener(instanceId_);
+}
+
+bool UIContentImpl::IsBrandColorValid(const std::string& brandColorStr)
+{
+    if (brandColorStr.empty()) {
+        return false;
+    }
+    auto color = Color::FromString(brandColorStr);
+    return color.GetAlpha() != 0;
 }
 } // namespace OHOS::Ace

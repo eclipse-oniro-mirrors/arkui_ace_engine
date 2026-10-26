@@ -91,6 +91,7 @@ void UIExtensionModelNG::Create(const RefPtr<OHOS::Ace::WantWrap>& wantWrap,
     pattern->SetPlaceholderMap(placeholderMap);
     pattern->SetDpiFollowStrategy(dpiFollowStrategy, isDpiFollowStrategySet);
     pattern->SetIsWindowModeFollowHost(isWindowModeFollowHost);
+    stack->ApplyParentThemeScopeId(frameNode);
     pattern->UpdateWant(wantWrap);
     stack->Push(frameNode);
     pattern->AddWindowStateChangedCallback();
@@ -113,6 +114,7 @@ void UIExtensionModelNG::Create(const EmbeddedUIExtensionConfig& config)
     pattern->SetDpiFollowStrategy(config.dpiFollowStrategy, config.isDpiFollowStrategySet);
     pattern->SetIsWindowModeFollowHost(config.isWindowModeFollowHost);
     if (frameNode->GetNodeStatus() == NodeStatus::NORMAL_NODE) {
+        stack->ApplyParentThemeScopeId(frameNode);
         pattern->UpdateWant(config.wantWrap);
     }
     stack->Push(frameNode);
@@ -180,6 +182,7 @@ void UIExtensionModelNG::CreateSecurityUIExtension(const UIExtensionConfig& conf
     CHECK_NULL_VOID(pattern);
     pattern->Initialize(config);
     pattern->SetPlaceholderNode(config.placeholderNode);
+    stack->ApplyParentThemeScopeId(frameNode);
     pattern->UpdateWant(config.wantWrap);
     pattern->SetDpiFollowStrategy(config.dpiFollowStrategy, config.isDpiFollowStrategySet);
     stack->Push(frameNode);

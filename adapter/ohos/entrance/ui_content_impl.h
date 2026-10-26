@@ -110,6 +110,7 @@ public:
     void SetUIExtensionDensityFollowHost(OHOS::Rosen::DpiFollowStrategy dpiFollowStrategy) override;
     void UpdateFontScale(const std::shared_ptr<OHOS::AppExecFwk::Configuration>& config);
     static int32_t GetUIContentWindowID(int32_t instanceId);
+    static bool IsBrandColorValid(const std::string& brandColorStr);
     OHOS::Rosen::Window* GetUIContentWindow() override;
     void ForceRequestFrame() override;
     // UI content event process

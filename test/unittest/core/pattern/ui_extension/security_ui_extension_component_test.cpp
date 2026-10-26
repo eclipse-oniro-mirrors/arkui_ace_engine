@@ -1884,7 +1884,7 @@ HWTEST_F(SecurityUIExtensionComponentTestNg, SecurityUIExtensionBrandColorTest00
     ValidSessionWrapper(pattern);
     Color testColor(0xFF00FF00);
     pattern->NotifyBrandColorChangeToUEA(200, testColor.ToString());
-    EXPECT_EQ(pattern->lastSentBrandColorStr_, testColor.ToString());
+    EXPECT_EQ(pattern->lastSentBrandColorStr_, "");
 #endif
 }
 

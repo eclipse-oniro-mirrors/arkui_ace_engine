@@ -308,7 +308,7 @@ void UIExtensionPattern::UpdateSessionInstanceId(int32_t instanceId)
     }
 
     sessionWrapperImpl->UpdateInstanceId(instanceId);
-    CheckAndNotifyBrandColorChange(instanceId);
+    NotifyBrandColorChange(instanceId);
 }
 
 void UIExtensionPattern::RegisterEvent(int32_t instanceId)
@@ -2098,9 +2098,9 @@ void UIExtensionPattern::DumpInfo()
         eventProxyStr = platformEventProxy_->GetCurEventProxyToString();
     }
     DumpLog::GetInstance().AddDesc(std::string("eventProxy: ").append(eventProxyStr));
-    DumpLog::GetInstance().AddDesc(std::string("brandColorStr: ").append(brandColorStr_));
-    DumpLog::GetInstance().AddDesc(std::string("lastSentBrandColorStr: ").append(lastSentBrandColorStr_));
-    DumpLog::GetInstance().AddDesc(std::string("isUeaConnecting: ").append(std::to_string(isUeaConnecting_)));
+    DumpLog::GetInstance().AddDesc(std::string("brandColorStr: ").append(brandColorStr_)
+        .append(", lastSentBrandColorStr: ").append(lastSentBrandColorStr_).append(", isUeaConnecting: ")
+        .append(std::to_string(isUeaConnecting_)));
 
     auto container = Platform::AceContainer::GetContainer(instanceId_);
     CHECK_NULL_VOID(container);
@@ -2573,8 +2573,8 @@ void UIExtensionPattern::NotifyBrandColorChangeToUEA(
 {
     CHECK_NULL_VOID(sessionWrapper_);
     if (state_ != AbilityState::FOREGROUND || !isUeaConnecting_) {
-        PLATFORM_LOGW("NotifyBrandColorChangeToUEA: skip, "
-            "state=%{public}d, isUeaConnecting=%{public}s",
+        UIEXT_LOGW("NotifyBrandColorChangeToUEA: skip, "
+            "state=%{public}d, isUeaConnecting=%{public}d",
             static_cast<int32_t>(state_), isUeaConnecting_);
         return;
     }
@@ -2604,7 +2604,7 @@ void UIExtensionPattern::NotifyBrandColorChangeToUEA(
     lastSentBrandColorStr_ = brandColorStr;
 }
 
-void UIExtensionPattern::CheckAndNotifyBrandColorChange(int32_t instanceId)
+void UIExtensionPattern::NotifyBrandColorChange(int32_t instanceId)
 {
     auto brandColorStr = GetBrandColorStr();
     NotifyBrandColorChangeToUEA(instanceId, brandColorStr);
@@ -2631,7 +2631,7 @@ std::string UIExtensionPattern::ResolveBrandColor(int32_t themeScopeId) const
         UIEXT_LOGW("ResolveBrandColor: brandColor is invalid, brandColorStr=%{public}s, "
             "themeScopeId=%{public}d, instanceId=%{public}d",
             brandColor.ToString().c_str(), themeScopeId, instanceId_);
-        return brandColor.ToString();
+        return DEFAULT_BRAND_COLOR_STR;
     }
     auto container = Platform::AceContainer::GetContainer(instanceId_);
     if (container && container->IsUIExtensionWindow()) {

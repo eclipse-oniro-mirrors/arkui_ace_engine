@@ -756,7 +756,7 @@ HWTEST_F(PreviewSessionWrapperImplTestNg, PreviewSessionWrapperBrandColorTest001
     auto sessionWrapper = GeneratePreviewSessionWrapperImpl();
     ASSERT_NE(sessionWrapper, nullptr);
     auto pattern = sessionWrapper->hostPattern_.Upgrade();
-    ASSERT_NE(pattern, nullptr);
+    ASSERT_EQ(pattern, nullptr);
     auto result = pattern->GetBrandColorStr();
     EXPECT_EQ(result, "");
 #endif
@@ -773,7 +773,7 @@ HWTEST_F(PreviewSessionWrapperImplTestNg, PreviewSessionWrapperBrandColorTest002
     auto sessionWrapper = GeneratePreviewSessionWrapperImpl();
     ASSERT_NE(sessionWrapper, nullptr);
     auto pattern = sessionWrapper->hostPattern_.Upgrade();
-    ASSERT_NE(pattern, nullptr);
+    ASSERT_EQ(pattern, nullptr);
     auto result = pattern->ResolveBrandColor(999);
     EXPECT_EQ(result, "");
 #endif

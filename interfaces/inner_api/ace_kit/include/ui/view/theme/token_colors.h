@@ -191,9 +191,10 @@ public:
 
 private:
     Color GetColorWithResourceObject(int32_t colorIndex) const;
-    // Returns instance brand color if strategy is FOLLOW_UEC and brand is not user-set.
+    // Returns instance brand color if strategy is FOLLOW_UEC and the given color is not user-set.
+    // colorIndex specifies which token color to check for user-set status (defaults to BRAND).
     // opacity < 0 returns full color; otherwise returns BlendOpacity(opacity).
-    std::optional<Color> GetInstanceBrandColorOverride(double opacity = -1.0) const;
+    std::optional<Color> GetInstanceBrandColorOverride(int32_t colorIndex = BRAND, double opacity = -1.0) const;
     std::vector<Color> colors_ = std::vector<Color>(TokenColors::TOTAL_NUMBER);
     std::vector<RefPtr<ResourceObject>> resObjs_;
     ColorMode colorMode_ = ColorMode::COLOR_MODE_UNDEFINED;

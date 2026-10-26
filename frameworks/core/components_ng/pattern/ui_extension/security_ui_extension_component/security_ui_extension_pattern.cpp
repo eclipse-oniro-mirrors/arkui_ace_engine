@@ -236,7 +236,7 @@ void SecurityUIExtensionPattern::UpdateSessionInstanceId(int32_t instanceId)
     }
 
     sessionWrapper_->UpdateInstanceId(instanceId);
-    CheckAndNotifyBrandColorChange(instanceId);
+    NotifyBrandColorChange(instanceId);
 }
 
 void SecurityUIExtensionPattern::UpdateWant(const AAFwk::Want& want)
@@ -350,16 +350,18 @@ void SecurityUIExtensionPattern::OnConnect()
     surfaceNode->CreateNodeInRenderThread();
     isUeaConnecting_ = true;
     FireOnRemoteReadyCallback();
-    RegisterVisibleAreaChange();
     auto focusHub = host->GetFocusHub();
-    DispatchFocusState(focusHub && focusHub->IsCurrentFocus());
+    bool isFocused = focusHub && focusHub->IsCurrentFocus();
+    RegisterVisibleAreaChange();
+    DispatchFocusState(isFocused);
     DispatchFollowHostDensity(GetEffectiveDpiFollowStrategy());
     auto pipeline = host->GetContextRefPtr();
     CHECK_NULL_VOID(pipeline);
     auto uiExtensionManager = pipeline->GetUIExtensionManager();
     uiExtensionManager->AddAliveUIExtension(host->GetId(), WeakClaim(this));
-    if (focusHub && focusHub->IsCurrentFocus()) {
-        uiExtensionManager->RegisterSecurityUIExtensionInFocus(WeakClaim(this), sessionWrapper_);
+    if (isFocused) {
+        uiExtensionManager->RegisterSecurityUIExtensionInFocus(
+            WeakClaim(this), sessionWrapper_);
     }
     ReDispatchWantParams();
     InitializeAccessibility();
@@ -917,9 +919,9 @@ void SecurityUIExtensionPattern::DumpInfo()
         .append(std::to_string(dpiContext ? static_cast<int32_t>(dpiContext->GetUIExtensionDensityFollowHost()) : -1)));
     DumpLog::GetInstance().AddDesc(std::string("dpiFollowStrategyEffective: ")
         .append(std::to_string(static_cast<int32_t>(GetEffectiveDpiFollowStrategy()))));
-    DumpLog::GetInstance().AddDesc(std::string("brandColorStr: ").append(brandColorStr_));
-    DumpLog::GetInstance().AddDesc(std::string("lastSentBrandColorStr: ").append(lastSentBrandColorStr_));
-    DumpLog::GetInstance().AddDesc(std::string("isUeaConnecting: ").append(std::to_string(isUeaConnecting_)));
+    DumpLog::GetInstance().AddDesc(std::string("brandColorStr: ").append(brandColorStr_)
+        .append(", lastSentBrandColorStr: ").append(lastSentBrandColorStr_).append(", isUeaConnecting: ")
+        .append(std::to_string(isUeaConnecting_)));
 }
 
 void SecurityUIExtensionPattern::DumpInfo(std::unique_ptr<JsonValue>& json)
@@ -1231,7 +1233,7 @@ void SecurityUIExtensionPattern::NotifyBrandColorChangeToUEA(
     CHECK_NULL_VOID(sessionWrapper_);
     if (state_ != AbilityState::FOREGROUND || !isUeaConnecting_) {
         PLATFORM_LOGW("NotifyBrandColorChangeToUEA: skip, "
-            "state=%{public}d, isUeaConnecting=%{public}s",
+            "state=%{public}d, isUeaConnecting=%{public}d",
             static_cast<int32_t>(state_), isUeaConnecting_);
         return;
     }
@@ -1261,7 +1263,7 @@ void SecurityUIExtensionPattern::NotifyBrandColorChangeToUEA(
     lastSentBrandColorStr_ = brandColorStr;
 }
 
-void SecurityUIExtensionPattern::CheckAndNotifyBrandColorChange(int32_t instanceId)
+void SecurityUIExtensionPattern::NotifyBrandColorChange(int32_t instanceId)
 {
     auto brandColorStr = GetBrandColorStr();
     NotifyBrandColorChangeToUEA(instanceId, brandColorStr);
@@ -1288,7 +1290,7 @@ std::string SecurityUIExtensionPattern::ResolveBrandColor(int32_t themeScopeId) 
         PLATFORM_LOGW("ResolveBrandColor: brandColor is invalid, brandColorStr=%{public}s, "
             "themeScopeId=%{public}d, instanceId=%{public}d",
             brandColor.ToString().c_str(), themeScopeId, instanceId_);
-        return brandColor.ToString();
+        return DEFAULT_BRAND_COLOR_STR;
     }
     auto container = Platform::AceContainer::GetContainer(instanceId_);
     if (container && container->IsUIExtensionWindow()) {

@@ -17,6 +17,7 @@
 
 #include <vector>
 
+#include "ui/base/utils/utils.h"
 #include "base/log/log_wrapper.h"
 #include "core/common/container.h"
 #include "core/common/resource/resource_parse_utils.h"
@@ -127,7 +128,7 @@ Color TokenColors::GetColorWithResourceObject(int32_t colorIndex) const
     return colors_[colorIndex];
 }
 
-std::optional<Color> TokenColors::GetInstanceBrandColorOverride(double opacity) const
+std::optional<Color> TokenColors::GetInstanceBrandColorOverride(int32_t colorIndex, double opacity) const
 {
     auto instanceId = Container::CurrentIdSafelyWithCheck();
     if (instanceId < 0) {
@@ -139,8 +140,8 @@ std::optional<Color> TokenColors::GetInstanceBrandColorOverride(double opacity) 
         return std::nullopt;
     }
     bool isDark = colorMode_ == ColorMode::DARK;
-    bool brandSetByUser = storage->GetIsThemeColorSetByUser(themeId_, isDark, BRAND);
-    if (brandSetByUser) {
+    bool colorSetByUser = storage->GetIsThemeColorSetByUser(themeId_, isDark, colorIndex);
+    if (colorSetByUser) {
         return std::nullopt;
     }
     auto info = storage->GetInstanceBrandColor(instanceId);
@@ -151,7 +152,7 @@ std::optional<Color> TokenColors::GetInstanceBrandColorOverride(double opacity) 
     TAG_LOGD(AceLogTag::ACE_THEME,
         "instanceId: %{public}d, themeId: %{public}d, isDark: %{public}d, opacity: %{public}f, brandColor applied",
         instanceId, themeId_, isDark, opacity);
-    if (opacity < 0.0) {
+    if (LessNotEqual(opacity, 0.0)) {
         return info.brandColor.value();
     }
     return info.brandColor.value().BlendOpacity(opacity);
@@ -218,7 +219,7 @@ Color TokenColors::FontFourth() const
 
 Color TokenColors::FontEmphasize() const
 {
-    auto override = GetInstanceBrandColorOverride();
+    auto override = GetInstanceBrandColorOverride(FONT_EMPHASIZE);
     if (override.has_value()) {
         return override.value();
     }
@@ -267,7 +268,7 @@ Color TokenColors::IconFourth() const
 
 Color TokenColors::IconEmphasize() const
 {
-    auto override = GetInstanceBrandColorOverride();
+    auto override = GetInstanceBrandColorOverride(ICON_EMPHASIZE);
     if (override.has_value()) {
         return override.value();
     }
@@ -276,7 +277,7 @@ Color TokenColors::IconEmphasize() const
 
 Color TokenColors::IconSubEmphasize() const
 {
-    auto override = GetInstanceBrandColorOverride(TERTIARY);
+    auto override = GetInstanceBrandColorOverride(ICON_SUB_EMPHASIZE, TERTIARY);
     if (override.has_value()) {
         return override.value();
     }
@@ -325,7 +326,7 @@ Color TokenColors::BackgroundFourth() const
 
 Color TokenColors::BackgroundEmphasize() const
 {
-    auto override = GetInstanceBrandColorOverride();
+    auto override = GetInstanceBrandColorOverride(BACKGROUND_EMPHASIZE);
     if (override.has_value()) {
         return override.value();
     }
@@ -369,7 +370,7 @@ Color TokenColors::CompBackgroundTertiary() const
 
 Color TokenColors::CompBackgroundEmphasize() const
 {
-    auto override = GetInstanceBrandColorOverride();
+    auto override = GetInstanceBrandColorOverride(COMP_BACKGROUND_EMPHASIZE);
     if (override.has_value()) {
         return override.value();
     }
@@ -383,7 +384,7 @@ Color TokenColors::CompBackgroundNeutral() const
 
 Color TokenColors::CompEmphasizeSecondary() const
 {
-    auto override = GetInstanceBrandColorOverride(FOURTH);
+    auto override = GetInstanceBrandColorOverride(COMP_EMPHASIZE_SECONDARY, FOURTH);
     if (override.has_value()) {
         return override.value();
     }
@@ -392,7 +393,7 @@ Color TokenColors::CompEmphasizeSecondary() const
 
 Color TokenColors::CompEmphasizeTertiary() const
 {
-    auto override = GetInstanceBrandColorOverride(FIFTH);
+    auto override = GetInstanceBrandColorOverride(COMP_EMPHASIZE_TERTIARY, FIFTH);
     if (override.has_value()) {
         return override.value();
     }
@@ -441,7 +442,7 @@ Color TokenColors::InteractivePressed() const
 
 Color TokenColors::InteractiveFocus() const
 {
-    auto override = GetInstanceBrandColorOverride();
+    auto override = GetInstanceBrandColorOverride(INTERACTIVE_FOCUS);
     if (override.has_value()) {
         return override.value();
     }
@@ -450,7 +451,7 @@ Color TokenColors::InteractiveFocus() const
 
 Color TokenColors::InteractiveActive() const
 {
-    auto override = GetInstanceBrandColorOverride();
+    auto override = GetInstanceBrandColorOverride(INTERACTIVE_ACTIVE);
     if (override.has_value()) {
         return override.value();
     }

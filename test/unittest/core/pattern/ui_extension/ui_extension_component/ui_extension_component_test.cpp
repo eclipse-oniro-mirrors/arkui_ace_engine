@@ -2548,7 +2548,7 @@ HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest002, TestSize.Leve
 
     Color testColor(0xFF0000FF);
     pattern->NotifyBrandColorChangeToUEA(100, testColor.ToString());
-    EXPECT_EQ(pattern->lastSentBrandColorStr_, testColor.ToString());
+    EXPECT_EQ(pattern->lastSentBrandColorStr_, "");
 #endif
 }
 

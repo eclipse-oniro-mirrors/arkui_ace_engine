@@ -20,7 +20,6 @@
 #include "constants.h"
 #include "utils.h"
 #include "ace_forward_compatibility.h"
-#include "ui/properties/color.h"
 
 #ifdef UICAST_COMPONENT_SUPPORTED
 #include "interfaces/inner_api/ace/uicast/uicast_subscriber.h"
@@ -33,12 +32,14 @@ using CreateFunc = UIContent* (*)(void*, void*, int32_t);
 using CreateFunction = UIContent* (*)(void*);
 using GetUIContentFunc = UIContent* (*)(int32_t);
 using GetCurrentUIStackInfoFunction = char* (*)();
-using  GetWindowIdFuction = int32_t (*)(int32_t);
+using GetWindowIdFuction = int32_t (*)(int32_t);
+using IsBrandColorValidFunc = bool (*)(const char*);
 constexpr char UI_CONTENT_CREATE_FUNC[] = "OHOS_ACE_CreateUIContent";
 constexpr char Card_CREATE_FUNC[] = "OHOS_ACE_CreateFormContent";
 constexpr char SUB_WINDOW_UI_CONTENT_CREATE_FUNC[] = "OHOS_ACE_CreateSubWindowUIContent";
 constexpr char GET_UI_CONTENT_CREATE_FUNC[] = "OHOS_ACE_GetUIContent";
 constexpr char OHOS_ACE_GET_UI_CONTENT_WINDOW_ID[] = "OHOS_ACE_GetUIContentWindowID";
+constexpr char OHOS_ACE_IS_BRAND_COLOR_VALID[] = "OHOS_ACE_IsBrandColorValid";
 
 OHOS::AbilityRuntime::Context* context_ = nullptr;
 std::atomic<bool> UIContent::successFlag_{false};
@@ -256,10 +257,17 @@ const std::string& UIContent::GetUICorrectionConfig()
 
 bool UIContent::IsBrandColorValid(const std::string& brandColorStr)
 {
-    if (brandColorStr.empty()) {
+    LIBHANDLE handle = LOADLIB(AceForwardCompatibility::GetAceLibName());
+    if (handle == nullptr) {
         return false;
     }
-    auto color = Color::FromString(brandColorStr);
-    return color.GetAlpha() != 0;
+    auto entry = reinterpret_cast<IsBrandColorValidFunc>(LOADSYM(handle, OHOS_ACE_IS_BRAND_COLOR_VALID));
+    if (entry == nullptr) {
+        FREELIB(handle);
+        return false;
+    }
+    auto result = entry(brandColorStr.c_str());
+    FREELIB(handle);
+    return result;
 }
 } // namespace OHOS::Ace
