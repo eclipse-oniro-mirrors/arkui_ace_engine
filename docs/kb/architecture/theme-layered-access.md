@@ -10,6 +10,8 @@ ArkUI 主题分层访问通过 ThemeManager 单例管理四级主题解析：Tok
 
 本文档用于快速定位 Theme Layered Access 相关源码、SDK 声明、测试和规格文档。具体行为、默认值、边界条件和兼容性说明以对应 SDK 声明、源码实现、测试用例和 Spec 为准。
 
+Token 应用通过 `Theme::ApplyTokenTheme()` 虚函数分派。Theme 普通继承 AceType，各组件 Theme 普通继承 Theme，具体组件 Wrapper 仅继承对应组件 Theme；Builder 和明暗主题缓存统一使用 `RefPtr<Theme>`，专用 Wrapper 注册表继续决定哪些组件支持 Token 覆盖。
+
 ## 快速路由
 
 ### 源码入口
@@ -23,11 +25,10 @@ ArkUI 主题分层访问通过 ThemeManager 单例管理四级主题解析：Tok
 | theme_attributes | `frameworks/core/components/theme/theme_attributes.h` | |
 | theme_style | `frameworks/core/components/theme/theme_style.h` | |
 | token_theme_storage | `frameworks/core/components_ng/token_theme/token_theme_storage.cpp` | |
-| token_theme_wrapper | `frameworks/core/components_ng/token_theme/token_theme_wrapper.h` | |
 | token_theme | `frameworks/core/components_ng/token_theme/token_theme.h` | |
 | token_colors | `frameworks/core/components_ng/token_theme/token_colors.h` | |
 | inner_api_token_theme | `interfaces/inner_api/ace_kit/include/ui/view/theme/token_theme.h` | |
-| inner_api_token_theme_wrapper | `interfaces/inner_api/ace_kit/include/ui/view/theme/token_theme_wrapper.h` | |
+| inner_api_theme | `interfaces/inner_api/ace_kit/include/ui/view/theme/theme.h` | `ApplyTokenTheme()` 默认空实现，组件 Wrapper 覆盖该方法 |
 
 ### API 入口
 

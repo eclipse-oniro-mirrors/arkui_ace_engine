@@ -53,7 +53,11 @@ ohos_shared_library("arkoala_native_ani") {
     "$ace_root/interfaces/inner_api/drawable_descriptor",
   ]
   if (!build_ohos_sdk && !(defined(is_arkui_x) && is_arkui_x)) {
-    deps += [ "$ace_root/frameworks/bridge/arkts_frontend:ArkoalaNative_ark" ]
+    deps += [
+      "$ace_root/build:libace_compatible",
+      "$ace_root/frameworks/bridge/arkts_frontend:ArkoalaNative_ark",
+      "$ace_root/frameworks/core:ace_container_scope",
+    ]
   }
 
   sources = [
@@ -107,6 +111,7 @@ ohos_shared_library("arkoala_native_ani") {
   ]
 
   external_deps = [
+    "c_utils:utils",
     "graphic_2d:drawing_ani",
     "graphic_2d:text_engine_ani",
     "hilog:libhilog",
@@ -123,9 +128,11 @@ ohos_shared_library("arkoala_native_ani") {
     "udmf:udmf_taihe_native",
   ]
   if (!build_ohos_sdk) {
+    sources += [ "modal_ui_extension/modal_ui_extension_module.cpp" ]
     external_deps += [
       "ability_runtime:abilitykit_native",
       "ability_runtime:ani_base_context",
+      "ability_runtime:ani_common",
     ]
   }
   if (defined(model_component_support) && model_component_support) {
@@ -143,6 +150,9 @@ ohos_shared_library("arkoala_native_ani") {
   defines = []
   if (pixel_map_support) {
     defines += [ "PIXEL_MAP_SUPPORTED" ]
+  }
+  if (!build_ohos_sdk) {
+    defines += [ "MODAL_UI_EXTENSION_SUPPORTED" ]
   }
   if (enable_rosen_backend) {
     defines += [ "ENABLE_ROSEN_BACKEND" ]
@@ -185,14 +195,17 @@ if (use_linux) {
     ]
 
     external_deps = [
+      "c_utils:utils",
       "hilog:libhilog",
       "napi:ace_napi",
       "runtime_core:ani",
     ]
     if (!build_ohos_sdk) {
+      sources += [ "modal_ui_extension/modal_ui_extension_module.cpp" ]
       external_deps += [
         "ability_runtime:abilitykit_native",
         "ability_runtime:ani_base_context",
+        "ability_runtime:ani_common",
       ]
     }
 
@@ -203,6 +216,9 @@ if (use_linux) {
     }
     if (enable_rosen_backend) {
       defines += [ "ENABLE_ROSEN_BACKEND" ]
+    }
+    if (!build_ohos_sdk) {
+      defines += [ "MODAL_UI_EXTENSION_SUPPORTED" ]
     }
     output_name = "arkoala_native_ani"
     output_extension = "so"

@@ -664,6 +664,9 @@ public:
     std::u16string GetLeftTextOfCursor(int32_t number) override;
     std::u16string GetRightTextOfCursor(int32_t number) override;
     int32_t GetTextIndexAtCursor() override;
+    RichTextDataInfo GetLeftRichTextOfCursor(int32_t number) override;
+    RichTextDataInfo GetRightRichTextOfCursor(int32_t number) override;
+    RichTextDataInfo BuildRichText(int32_t start, int32_t end);
     void ProcessOverlay(const OverlayRequest& request = OverlayRequest()) override;
     void ShowSelectOverlay(const RectF& firstHandle, const RectF& secondHandle, bool isCopyAll = false,
         TextResponseType responseType = TextResponseType::LONG_PRESS, bool handlReverse = false);
@@ -888,6 +891,10 @@ public:
     void UpdateSelectionType(const SelectionInfo& textSelectInfo);
     std::list<RefPtr<SpanItem>>::iterator GetSpanIter(int32_t index);
     SpanItemType GetSpanType(int32_t index);
+
+    // RichEditor has no approved fields from TextPattern's advanced entry.
+    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config) override
+    {}
 
     void DumpAdvanceInfo() override {}
     void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json) override  {}
@@ -1122,13 +1129,15 @@ public:
     bool HasCounterTextOverflowColor() const override;
     Color GetCounterTextOverflowColor() const override;
     float GetFontScaleFromEnv(const RefPtr<FrameNode>& host) const override;
+    bool IsUnspecifiedOrTextType() const;
     bool IsUnderlineMode() const override;
     bool IsUnderlineAndButtonMode() const override;
     TextDirection GetLayoutDirection() const override;
     TextDirection GetNonAutoLayoutDirection() const override;
     std::optional<MarginProperty> GetMarginProperty() const override;
     bool NeedRestoreMeasureConstraint() const override;
-
+    float GetPaddingLeft() const override;
+    float GetPaddingRight() const override;
     // ===== counter behavior logic (RichEditor-specific) =====
     void ProcessCounter();
     void AddCounterNode();
@@ -1152,7 +1161,7 @@ public:
     RefPtr<TextComponentDecorator> GetCounterDecorator() const override;
     std::vector<RefPtr<TextInputResponseArea>> GetAllResponseArea() const override
     {
-        return { cleanNodeResponseArea_ };
+        return { cleanNodeResponseArea_, passwordResponseArea_ };
     }
 
     void MarkCancelButtonDirty() { cancelButtonDirty_ = true; }

@@ -21,6 +21,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 #include "interfaces/inner_api/ui_session/ui_session_manager.h"
 #include <string_view>
@@ -101,8 +102,8 @@ constexpr std::string_view SCROLL_BAR_DRAG_SCENE = "scrollBar_drag_scene";
 constexpr std::string_view SCROLLABLE_MULTI_TASK_SCENE = "scrollable_multi_task_scene";
 constexpr std::string_view SCROLL_IN_HOTZONE_SCENE = "scroll_in_hotzone_scene";
 constexpr std::string_view CUSTOM_SCROLL_BAR_SCENE = "custom_scroll_bar_scene";
-// Threshold for back to top performance optimization (5 screen sizes)
-constexpr uint32_t BACK_TO_TOP_THRESHOLD_SCREEN = 5;
+// Threshold for back to top performance optimization (4 screen sizes)
+constexpr uint32_t BACK_TO_TOP_THRESHOLD_SCREEN = 4;
 
 bool IsScrollable(const RefPtr<FrameNode>& frameNode)
 {
@@ -145,6 +146,16 @@ bool UpdateCurrentOffsetByTargetId(int32_t targetId)
 
     ScrollablePattern::ScrollToTarget(scrollable, target, 0.0f, ScrollAlign::NONE);
     return true;
+}
+
+void PutScrollEventPresence(std::unique_ptr<JsonValue>& json, const char* key, bool hasEvent,
+    const ParamConfig& config)
+{
+    if (config.IsPublicTree()) {
+        json->Put(key, hasEvent);
+    } else {
+        json->Put(key, hasEvent ? "true" : "false");
+    }
 }
 } // namespace
 using std::chrono::high_resolution_clock;
@@ -1193,7 +1204,9 @@ float ScrollablePattern::ResolveItemSnapTarget(const ScrollSnapStrategy& strateg
         // The provider contract exposes the positive-forward velocity.
         auto resolved = strategy.calculateSnapOffset(velocityPos);
         if (std::isfinite(resolved)) {
-            return -ScrollSnapUtils::ClampSnapOffset(static_cast<float>(resolved), minOffset, maxOffset);
+            // Retain the requested target: a lazy layout's current bound may still be an estimate.
+            const double limit = std::numeric_limits<float>::max();
+            return -static_cast<float>(std::clamp(resolved, -limit, limit));
         }
     }
     // Provider fallback: the built-in alignment target when an align is also configured,
@@ -1240,12 +1253,22 @@ bool ScrollablePattern::StartItemSnapWithProvider(const ScrollSnapStrategy& stra
     float direction = !NearZero(motionVelocity) ? (motionVelocity > 0.0f ? 1.0f : -1.0f)
                                                 : (motionDelta >= 0.0f ? 1.0f : -1.0f);
     auto targetGetter = [weak = WeakClaim(this), strategy, currentOffset, minOffset, maxOffset,
-                            predictDeltaPos = motionDelta](float handoffVelocity) -> float {
+                            predictDeltaPos = motionDelta, target = std::optional<float>()](
+                            float handoffVelocity) mutable -> float {
         auto pattern = weak.Upgrade();
-        CHECK_NULL_RETURN(pattern, -currentOffset);
-        // The handoff velocity arrives in the drag frame; the selection runs positive-forward.
-        return pattern->ResolveItemSnapTarget(
-            strategy, currentOffset, minOffset, maxOffset, -handoffVelocity, predictDeltaPos);
+        // A vanished owner has no target. Abort queued stages instead of reusing a stale offset.
+        CHECK_NULL_RETURN(pattern, std::numeric_limits<float>::quiet_NaN());
+        auto scroll = pattern->GetScrollable();
+        CHECK_NULL_RETURN(scroll, std::numeric_limits<float>::quiet_NaN());
+        if (!target) {
+            // Call the provider once; subsequent stages only refresh the layout-dependent bound.
+            target = -pattern->ResolveItemSnapTarget(
+                strategy, currentOffset, minOffset, maxOffset, -handoffVelocity, predictDeltaPos);
+        }
+        const auto bounded = ScrollSnapUtils::ClampSnapOffset(
+            target.value(), pattern->GetItemSnapMinOffset(), pattern->GetItemSnapMaxOffset());
+        // Sliding-window calibration can move the content coordinate independently of the spring.
+        return scroll->GetCurrentPos() + pattern->GetItemSnapCurrentOffset() - bounded;
     };
     scrollable->StartItemSnapTwoStageAnimation(-(approachOffset * direction),
         snapAnimationOptions.animationVelocity, snapAnimationOptions.fromScrollBar, std::move(targetGetter),
@@ -1750,6 +1773,9 @@ void ScrollablePattern::OnDetachFromFrameNode(FrameNode* frameNode)
 {
     // call OnDetachFromFrameNodeMultiThread() by multi thread
     THREAD_SAFE_NODE_CHECK(frameNode, OnDetachFromFrameNode, frameNode);
+    if (GetFastScrollRequest()) {
+        StopAnimate();
+    }
     activeTouchFingerIds_.clear();
     CHECK_NULL_VOID(frameNode);
     UnRegister2DragDropManager(frameNode);
@@ -1765,12 +1791,14 @@ void ScrollablePattern::OnDetachFromMainTree()
     THREAD_SAFE_NODE_CHECK(host, OnDetachFromMainTree);
     // Only notify the parent of scroll end when a scroll session is actually in progress,
     // and only when the parent is a scrollable component or a Refresh component.
-    if (!isScrolling_ || scrollStop_) {
-        return;
+    if (isScrolling_ && !scrollStop_) {
+        auto parent = GetNestedScrollParent();
+        if (parent && (AceType::InstanceOf<ScrollablePattern>(parent) || AceType::InstanceOf<RefreshPattern>(parent))) {
+            parent->OnScrollEndRecursive(GetVelocity());
+        }
     }
-    auto parent = GetNestedScrollParent();
-    if (parent && (AceType::InstanceOf<ScrollablePattern>(parent) || AceType::InstanceOf<RefreshPattern>(parent))) {
-        parent->OnScrollEndRecursive(GetVelocity());
+    if (GetFastScrollRequest()) {
+        StopAnimate();
     }
 }
 
@@ -2639,6 +2667,7 @@ void ScrollablePattern::AbortScrollAnimator()
 
 void ScrollablePattern::StopAnimate()
 {
+    CancelFastScroll();
     if (!IsScrollableStopped()) {
         StopScrollable();
     }
@@ -2723,6 +2752,7 @@ void ScrollablePattern::AnimateTo(
     float position, float duration, const RefPtr<Curve>& curve, bool smooth, bool canOverScroll, bool useTotalOffset)
 {
     StopScrollableAndAnimate();
+    startingFastScroll_ = false;
     if (NearEqual(position, GetTotalOffset())) {
         scrollAbort_ = false;
         return;
@@ -2755,6 +2785,45 @@ void ScrollablePattern::AnimateTo(
     auto pipeline = GetContext();
     CHECK_NULL_VOID(pipeline);
     pipeline->RequestFrame();
+}
+
+void ScrollablePattern::StartFastScrollAnimation(float position)
+{
+    CHECK_NULL_VOID(GetFastScrollRequest());
+    auto& request = *GetFastScrollRequest();
+    const float viewportSize = GetMainContentSize();
+    const float distance = position - GetTotalOffset();
+    float retainedDistance = viewportSize * 4.0f;
+    if (AnimateRunning() && request.skipPending && NearEqual(request.viewportSize, viewportSize) &&
+        Positive(distance) == Positive(request.skipDistance)) {
+        // Exclude the pending skip from the old segment's remaining distance; do not grant another approach interval.
+        const float remainingAnimationDistance =
+            std::abs(request.targetOffset - lastPosition_) - std::abs(request.skipDistance);
+        retainedDistance = std::clamp(remainingAnimationDistance, 2.0f * viewportSize, retainedDistance);
+    }
+    request.skipDistance = GreatNotEqual(std::abs(distance), retainedDistance) ?
+        distance - std::copysign(retainedDistance, distance) : 0.0f;
+    request.viewportSize = viewportSize;
+    request.targetOffset = position;
+    request.skipPending = !NearZero(request.skipDistance);
+    // Preserve the target across the synchronous stop of the previous animation segment.
+    startingFastScroll_ = true;
+    AnimateTo(position, -1, nullptr, true, false, false);
+}
+
+void ScrollablePattern::CancelFastScroll()
+{
+    if (GetFastScrollRequest()) {
+        scrollTarget_.reset();
+    }
+    fastScrollSkip_ = false;
+}
+
+void ScrollablePattern::OnAnimateStop()
+{
+    if (!startingFastScroll_) {
+        scrollTarget_.reset();
+    }
 }
 
 void ScrollablePattern::OnAnimateFinish()
@@ -2884,6 +2953,13 @@ float ScrollablePattern::GetScrollDelta(float offset, bool& stopAnimation)
 
 float ScrollablePattern::CalcSpringAdjustOffset(float offset) const
 {
+    if (GetFastScrollRequest() && Positive(GetFastScrollRequest()->viewportSize)) {
+        const auto& request = *GetFastScrollRequest();
+        const float skipPosition = request.targetOffset -
+            std::copysign(2.0f * request.viewportSize, request.skipDistance);
+        return ((Positive(request.skipDistance) && LessNotEqual(offset, skipPosition)) ||
+            (Negative(request.skipDistance) && GreatNotEqual(offset, skipPosition))) ? -request.skipDistance : 0.0f;
+    }
     CHECK_NULL_RETURN(isBackToTopRunning_, 0.0f);
     CHECK_NULL_RETURN(backToTopSkipDistance_, 0.0f);
     float mainContentSize = GetMainContentSize();
@@ -2904,7 +2980,13 @@ void ScrollablePattern::ProcessSpringOffsetCallback(float offset)
     bool stopAnimation = false;
     // Check if we should trigger the skip for back to top optimization
     // Add skip distance to delta when reaching animation midpoint
-    offset += CalcSpringAdjustOffset(offset);
+    const float adjustment = CalcSpringAdjustOffset(offset);
+    auto request = GetFastScrollRequest();
+    const bool skipped = request && request->skipPending && NearZero(adjustment);
+    if (skipped) {
+        request->skipPending = false;
+    }
+    offset += adjustment;
     auto delta = GetScrollDelta(offset, stopAnimation);
 
     auto source = SCROLL_FROM_ANIMATION_CONTROLLER;
@@ -2921,7 +3003,9 @@ void ScrollablePattern::ProcessSpringOffsetCallback(float offset)
             !LessNotEqual(totalOffset, finalPosition_))) {
         delta = 0;
     }
-    if (!UpdateCurrentOffset(delta, source) || stopAnimation || isAnimateOverScroll_) {
+    const bool updated = UpdateCurrentOffset(delta, source);
+    fastScrollSkip_ = fastScrollSkip_ || (skipped && updated && !NearZero(delta));
+    if (!updated || stopAnimation || isAnimateOverScroll_) {
         if (isAnimateOverScroll_ && GetCanStayOverScroll()) {
             isAnimateOverScroll_ = false;
             SetIsOverScroll(true);
@@ -4977,6 +5061,166 @@ void ScrollablePattern::GetEventDumpInfo()
                           : DumpLog::GetInstance().AddDesc("nodeOnReachEnd: false");
 }
 
+void ScrollablePattern::DumpAdvancePhysicsInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if (!config.IsPublicTree()) {
+        json->Put("friction", friction_);
+        json->Put("flingSpeedLimit", std::to_string(GetMaxFlingVelocity()).c_str());
+        return;
+    }
+    CHECK_NULL_VOID(scrollableEvent_);
+    auto scrollable = scrollableEvent_->GetScrollable();
+    CHECK_NULL_VOID(scrollable);
+    json->Put("friction", scrollable->GetFriction());
+    json->Put("flingSpeedLimit", scrollable->GetMaxFlingVelocity());
+}
+
+void ScrollablePattern::DumpAdvanceScrollEventInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto hub = host->GetEventHub<ScrollableEventHub>();
+    CHECK_NULL_VOID(hub);
+    auto scrollHub = host->GetEventHub<ScrollEventHub>();
+    if (scrollHub) {
+        auto onWillScroll = scrollHub->GetOnWillScrollEvent();
+        PutScrollEventPresence(json, "hasOnWillScroll", static_cast<bool>(onWillScroll), config);
+        if (!config.IsPublicTree()) {
+            auto onJSFrameNodeScrollWillScroll = scrollHub->GetJSFrameNodeOnScrollWillScroll();
+            json->Put("nodeOnWillScroll", onJSFrameNodeScrollWillScroll ? "true" : "false");
+        }
+
+        auto onDidScroll = scrollHub->GetOnDidScrollEvent();
+        PutScrollEventPresence(json, "hasOnDidScroll", static_cast<bool>(onDidScroll), config);
+        if (!config.IsPublicTree()) {
+            auto onJSFrameNodeScrollDidScroll = scrollHub->GetJSFrameNodeOnScrollDidScroll();
+            json->Put("nodeOnDidScroll", onJSFrameNodeScrollDidScroll ? "true" : "false");
+        }
+    } else {
+        auto onWillScroll = hub->GetOnWillScroll();
+        PutScrollEventPresence(json, "hasOnWillScroll", static_cast<bool>(onWillScroll), config);
+        if (!config.IsPublicTree()) {
+            auto onJSFrameNodeWillScroll = hub->GetJSFrameNodeOnWillScroll();
+            json->Put("nodeOnWillScroll", onJSFrameNodeWillScroll ? "true" : "false");
+        }
+
+        auto onDidScroll = hub->GetOnDidScroll();
+        PutScrollEventPresence(json, "hasOnDidScroll", static_cast<bool>(onDidScroll), config);
+        if (!config.IsPublicTree()) {
+            auto onJSFrameNodeDidScroll = hub->GetJSFrameNodeOnDidScroll();
+            json->Put("nodeOnDidScroll", onJSFrameNodeDidScroll ? "true" : "false");
+        }
+    }
+}
+
+void ScrollablePattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if (!config.IsPublicTree() || config.visualProperties) {
+        GetEdgeEffectDumpInfo(json);
+    }
+    if (!config.IsPublicTree() || config.visualProperties) {
+        json->Put("edgeEffectAlwaysEnabled", edgeEffectAlwaysEnabled_);
+    }
+    if (!config.IsPublicTree()) {
+        json->Put("isScrollable", IsScrollable());
+        GetEventDumpInfo(json);
+    }
+    if (!config.IsPublicTree() || config.functionalProperties) {
+        json->Put("NestedScroll", GetNestedScroll().ToString().c_str());
+    }
+    if (!config.IsPublicTree()) {
+        DumpAdvanceDiagnostics(json);
+    }
+    if (!config.IsPublicTree() || config.functionalProperties) {
+        json->Put("backToTop", backToTop_);
+        json->Put("enableScrollInteraction", GetScrollEnabled());
+    }
+    if (!config.IsPublicTree() || config.functionalProperties) {
+        DumpAdvancePhysicsInfo(json, config);
+    }
+    if (!config.IsPublicTree()) {
+        DumpAdvanceDiagnosticsDetails(json);
+    }
+    if (!config.IsPublicTree()) {
+        return;
+    }
+    if (config.visualProperties) {
+        DumpAdvanceVisualProperties(json, config);
+    }
+    if (config.functionalProperties) {
+        DumpAdvanceFunctionalProperties(json, config);
+    }
+}
+
+void ScrollablePattern::DumpAdvanceDiagnostics(std::unique_ptr<JsonValue>& json)
+{
+    json->Put("isSearchRefresh", GetIsSearchRefresh());
+    json->Put("isFixedNestedScrollMode", GetIsFixedNestedScrollMode());
+    auto parent = GetNestedScrollParent();
+    if (parent && parent->GetHost()) {
+        std::unique_ptr<JsonValue> children = JsonUtil::Create(true);
+        children->Put("id", parent->GetHost()->GetId());
+        children->Put("tag", parent->GetHost()->GetTag().c_str());
+        json->Put("nestedScrollParent", children);
+    } else {
+        json->Put("nestedScrollParent", "null");
+    }
+    GetAxisDumpInfo(json);
+    GetPanDirectionDumpInfo(json);
+    GetPaintPropertyDumpInfo(json);
+}
+
+void ScrollablePattern::DumpAdvanceDiagnosticsDetails(std::unique_ptr<JsonValue>& json)
+{
+    auto layoutProperty = GetLayoutProperty<ScrollableLayoutProperty>();
+    if (layoutProperty) {
+        layoutProperty->DumpInfo(json);
+    }
+    std::unique_ptr<JsonValue> children = JsonUtil::CreateArray(true);
+    for (const auto& info : eventsFiredInfos_) {
+        std::unique_ptr<JsonValue> child = JsonUtil::Create(true);
+        info.ToJson(child);
+        children->Put(child);
+    }
+    json->Put("eventsFiredInfos", children);
+    std::unique_ptr<JsonValue> childreninfo = JsonUtil::Create(true);
+    for (const auto& info : scrollableFrameInfos_) {
+        std::unique_ptr<JsonValue> child = JsonUtil::Create(true);
+        info.ToJson(child);
+        childreninfo->Put(child);
+    }
+    json->Put("scrollableFrameInfos", childreninfo);
+    if (scrollBar_) {
+        scrollBar_->DumpAdvanceInfo(json);
+    } else {
+        json->Put("inner ScrollBar", "null");
+    }
+}
+
+void ScrollablePattern::DumpAdvanceVisualProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    auto property = GetPaintProperty<ScrollablePaintProperty>();
+    if (property) {
+        property->DumpInfo(json, config, GetDefaultScrollBarDisplayMode());
+    }
+    auto layoutProperty = GetLayoutProperty<ScrollableLayoutProperty>();
+    if (layoutProperty) {
+        layoutProperty->DumpInfo(json, config);
+    }
+    if (scrollBar_) {
+        scrollBar_->DumpAdvanceInfo(json, config);
+    }
+}
+
+void ScrollablePattern::DumpAdvanceFunctionalProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    GetEventDumpInfo(json, config);
+    // The visual branch already includes both sets of scroll bar properties when both options are enabled.
+    if (scrollBar_ && !config.visualProperties) {
+        scrollBar_->DumpAdvanceInfo(json, config);
+    }
+}
+
 void ScrollablePattern::DumpAdvanceInfo()
 {
     GetEdgeEffectDumpInfo();
@@ -5190,105 +5434,54 @@ void ScrollablePattern::GetPanDirectionDumpInfo(std::unique_ptr<JsonValue>& json
 
 void ScrollablePattern::GetEventDumpInfo(std::unique_ptr<JsonValue>& json)
 {
+    ScrollablePattern::GetEventDumpInfo(json, ParamConfig());
+}
+
+void ScrollablePattern::GetEventDumpInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
     auto host = GetHost();
     CHECK_NULL_VOID(host);
     auto hub = host->GetEventHub<ScrollableEventHub>();
     CHECK_NULL_VOID(hub);
     auto onScrollStart = hub->GetOnScrollStart();
-    json->Put("hasOnScrollStart", onScrollStart ? "true" : "false");
-    auto onJSFrameNodeScrollStart = hub->GetJSFrameNodeOnScrollStart();
-    json->Put("nodeOnScrollStart", onJSFrameNodeScrollStart ? "true" : "false");
-    auto onScrollStop = hub->GetOnScrollStop();
-    json->Put("hasOnScrollStop", onScrollStop ? "true" : "false");
-    auto onJSFrameNodeScrollStop = hub->GetJSFrameNodeOnScrollStop();
-    json->Put("nodeOnScrollStop", onJSFrameNodeScrollStop ? "true" : "false");
-
-    auto scrollHub = host->GetEventHub<ScrollEventHub>();
-    if (scrollHub) {
-        auto onWillScroll = scrollHub->GetOnWillScrollEvent();
-        json->Put("hasOnWillScroll", onWillScroll ? "true" : "false");
-        auto onJSFrameNodeScrollWillScroll = scrollHub->GetJSFrameNodeOnScrollWillScroll();
-        json->Put("nodeOnWillScroll", onJSFrameNodeScrollWillScroll ? "true" : "false");
-
-        auto onDidScroll = scrollHub->GetOnDidScrollEvent();
-        json->Put("hasOnDidScroll", onDidScroll ? "true" : "false");
-        auto onJSFrameNodeScrollDidScroll = scrollHub->GetJSFrameNodeOnScrollDidScroll();
-        json->Put("nodeOnDidScroll", onJSFrameNodeScrollDidScroll ? "true" : "false");
-    } else {
-        auto onWillScroll = hub->GetOnWillScroll();
-        json->Put("hasOnWillScroll", onWillScroll ? "true" : "false");
-        auto onJSFrameNodeWillScroll = hub->GetJSFrameNodeOnWillScroll();
-        json->Put("nodeOnWillScroll", onJSFrameNodeWillScroll ? "true" : "false");
-
-        auto onDidScroll = hub->GetOnDidScroll();
-        json->Put("hasOnDidScroll", onDidScroll ? "true" : "false");
-        auto onJSFrameNodeDidScroll = hub->GetJSFrameNodeOnDidScroll();
-        json->Put("nodeOnDidScroll", onJSFrameNodeDidScroll ? "true" : "false");
+    PutScrollEventPresence(json, "hasOnScrollStart", static_cast<bool>(onScrollStart), config);
+    if (!config.IsPublicTree()) {
+        auto onJSFrameNodeScrollStart = hub->GetJSFrameNodeOnScrollStart();
+        json->Put("nodeOnScrollStart", onJSFrameNodeScrollStart ? "true" : "false");
     }
+    auto onScrollStop = hub->GetOnScrollStop();
+    PutScrollEventPresence(json, "hasOnScrollStop", static_cast<bool>(onScrollStop), config);
+    if (!config.IsPublicTree()) {
+        auto onJSFrameNodeScrollStop = hub->GetJSFrameNodeOnScrollStop();
+        json->Put("nodeOnScrollStop", onJSFrameNodeScrollStop ? "true" : "false");
+    }
+
+    DumpAdvanceScrollEventInfo(json, config);
     auto onScrollFrameBegin = hub->GetOnScrollFrameBegin();
-    json->Put("hasOnScrollBegin", onScrollFrameBegin ? "true" : "false");
-    auto onJSFrameNodeScrollFrameBegin = hub->GetJSFrameNodeOnScrollFrameBegin();
-    json->Put("nodeOnScrollBegin", onJSFrameNodeScrollFrameBegin ? "true" : "false");
+    PutScrollEventPresence(json, "hasOnScrollBegin", static_cast<bool>(onScrollFrameBegin), config);
+    if (!config.IsPublicTree()) {
+        auto onJSFrameNodeScrollFrameBegin = hub->GetJSFrameNodeOnScrollFrameBegin();
+        json->Put("nodeOnScrollBegin", onJSFrameNodeScrollFrameBegin ? "true" : "false");
+    }
 
     auto onReachStart = hub->GetOnReachStart();
-    json->Put("hasOnReachStart", onReachStart ? "true" : "false");
-    auto onJSFrameNodeReachStart = hub->GetJSFrameNodeOnReachStart();
-    json->Put("nodeOnReachStart", onJSFrameNodeReachStart ? "true" : "false");
+    PutScrollEventPresence(json, "hasOnReachStart", static_cast<bool>(onReachStart), config);
+    if (!config.IsPublicTree()) {
+        auto onJSFrameNodeReachStart = hub->GetJSFrameNodeOnReachStart();
+        json->Put("nodeOnReachStart", onJSFrameNodeReachStart ? "true" : "false");
+    }
 
     auto onReachEnd = hub->GetOnReachEnd();
-    json->Put("hasOnReachEnd", onReachEnd ? "true" : "false");
-    auto onJSFrameNodeReachEnd = hub->GetJSFrameNodeOnReachEnd();
-    json->Put("nodeOnReachEnd", onJSFrameNodeReachEnd ? "true" : "false");
+    PutScrollEventPresence(json, "hasOnReachEnd", static_cast<bool>(onReachEnd), config);
+    if (!config.IsPublicTree()) {
+        auto onJSFrameNodeReachEnd = hub->GetJSFrameNodeOnReachEnd();
+        json->Put("nodeOnReachEnd", onJSFrameNodeReachEnd ? "true" : "false");
+    }
 }
 
 void ScrollablePattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json)
 {
-    GetEdgeEffectDumpInfo(json);
-    json->Put("edgeEffectAlwaysEnabled", edgeEffectAlwaysEnabled_);
-    json->Put("isScrollable", IsScrollable());
-    GetEventDumpInfo(json);
-    json->Put("NestedScroll", GetNestedScroll().ToString().c_str());
-    json->Put("isSearchRefresh", GetIsSearchRefresh());
-    json->Put("isFixedNestedScrollMode", GetIsFixedNestedScrollMode());
-    auto parent = GetNestedScrollParent();
-    if (parent && parent->GetHost()) {
-        std::unique_ptr<JsonValue> children = JsonUtil::Create(true);
-        children->Put("id", parent->GetHost()->GetId());
-        children->Put("tag", parent->GetHost()->GetTag().c_str());
-        json->Put("nestedScrollParent", children);
-    } else {
-        json->Put("nestedScrollParent", "null");
-    }
-    GetAxisDumpInfo(json);
-    GetPanDirectionDumpInfo(json);
-    GetPaintPropertyDumpInfo(json);
-    json->Put("backToTop", backToTop_);
-    json->Put("enableScrollInteraction", GetScrollEnabled());
-    json->Put("friction", friction_);
-    json->Put("flingSpeedLimit", std::to_string(GetMaxFlingVelocity()).c_str());
-    auto layoutProperty = GetLayoutProperty<ScrollableLayoutProperty>();
-    if (layoutProperty) {
-        layoutProperty->DumpInfo(json);
-    }
-    std::unique_ptr<JsonValue> children = JsonUtil::CreateArray(true);
-    for (const auto& info : eventsFiredInfos_) {
-        std::unique_ptr<JsonValue> child = JsonUtil::Create(true);
-        info.ToJson(child);
-        children->Put(child);
-    }
-    json->Put("eventsFiredInfos", children);
-    std::unique_ptr<JsonValue> childreninfo = JsonUtil::Create(true);
-    for (const auto& info : scrollableFrameInfos_) {
-        std::unique_ptr<JsonValue> child = JsonUtil::Create(true);
-        info.ToJson(child);
-        childreninfo->Put(child);
-    }
-    json->Put("scrollableFrameInfos", childreninfo);
-    if (scrollBar_) {
-        scrollBar_->DumpAdvanceInfo(json);
-    } else {
-        json->Put("inner ScrollBar", "null");
-    }
+    ScrollablePattern::DumpAdvanceInfo(json, ParamConfig());
 }
 
 void ScrollablePattern::GetEdgeEffectDumpInfo(std::unique_ptr<JsonValue>& json)
@@ -5534,6 +5727,9 @@ void ScrollablePattern::StopScrollableAndAnimate()
     if (animator_ && !animator_->IsStopped()) {
         scrollAbort_ = true;
         animator_->Stop();
+    }
+    if (!startingFastScroll_) {
+        CancelFastScroll();
     }
 }
 

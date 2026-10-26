@@ -16,6 +16,7 @@
 #include "core/components_ng/pattern/dynamiclayout/lazy_dynamic_layout_algorithm.h"
 #include "core/components_ng/pattern/dynamiclayout/active_range_updater.h"
 #include "core/components_ng/pattern/dynamiclayout/algorithm_param_base.h"
+#include "core/components_ng/pattern/lazy_layout/lazy_layout_pattern.h"
 #include "core/components_ng/pattern/lazy_layout/lazy_layout_utils.h"
 #include "core/components_ng/layout/layout_wrapper.h"
 #include "core/components_ng/base/frame_node.h"
@@ -35,6 +36,11 @@ LazyDynamicLayoutAlgorithm::LazyDynamicLayoutAlgorithm(const RefPtr<LazyCustomLa
 void LazyDynamicLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
 {
     CHECK_NULL_VOID(layoutWrapper);
+    auto host = layoutWrapper->GetHostNode();
+    auto pattern = host ? host->GetPattern<LazyLayoutPattern>() : nullptr;
+    if (LazyLayoutUtils::MeasurePreparedBoundary(AceType::RawPtr(pattern))) {
+        return;
+    }
     needSkipLayout_ = false;
     isEstimatePass_ = false;
     if (customParams_) {

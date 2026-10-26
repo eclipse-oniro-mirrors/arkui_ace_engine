@@ -33,6 +33,7 @@
 #include "core/components/common/layout/constants.h"
 #include "core/components/common/properties/depth_option.h"
 #include "core/components/common/properties/paint_state.h"
+#include "core/components/scroll/scroll_controller_base.h"
 #include "core/components/tab_bar/tab_theme.h"
 #include "core/components/theme/shadow_theme.h"
 #include "core/components_ng/pattern/container_picker/container_picker_theme.h"
@@ -210,6 +211,8 @@ std::optional<double> FloatToDouble(const std::optional<float>& src)
 }
 
 namespace OHOS::Ace::NG::Converter {
+ACE_FORCE_EXPORT DimensionUnit ConverterState::defDimensionUnit = DimensionUnit::VP;
+ACE_FORCE_EXPORT double ConverterState::defShadowBlurRadius = -1.0;
 struct DecorationStyleInterface {
     std::optional<TextDecoration> type;
     std::optional<Color> color;
@@ -4693,6 +4696,17 @@ ACE_FORCE_EXPORT void AssignCast(std::optional<SidebarDisplayStyle>& dst, const 
         case ARK_TABS_SIDEBAR_DISPLAY_STYLE_EMBED: dst = SidebarDisplayStyle::EMBED; break;
         case ARK_TABS_SIDEBAR_DISPLAY_STYLE_DISPLACE: dst = SidebarDisplayStyle::DISPLACE; break;
         default: LOGE("Unexpected enum value in Ark_TabsSidebarDisplayStyle: %{public}d", src);
+    }
+}
+
+template<>
+void AssignCast(std::optional<SheetTitleBarHoverMode>& dst, const Ark_SheetTitleBarHoverMode& src)
+{
+    switch (src) {
+        case ARK_SHEET_TITLE_BAR_HOVER_MODE_STANDARD: dst = SheetTitleBarHoverMode::STANDARD; break;
+        case ARK_SHEET_TITLE_BAR_HOVER_MODE_STACK: dst = SheetTitleBarHoverMode::STACK; break;
+        case ARK_SHEET_TITLE_BAR_HOVER_MODE_SAFE_AREA_PADDING: dst = SheetTitleBarHoverMode::SAFE_AREA_PADDING; break;
+        default: LOGE("Unexpected enum value in Ark_SheetTitleBarHoverMode: %{public}d", src);
     }
 }
 } // namespace OHOS::Ace::NG::Converter

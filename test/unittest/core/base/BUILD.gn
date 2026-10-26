@@ -97,6 +97,7 @@ ace_unittest("ui_node_test_ng") {
     type = "host_components"
   }
   sources = [
+    "native_node_tree_scope_test.cpp",
     "ui_node_multi_thread_test.cpp",
     "ui_node_test_ng.cpp",
     "ui_node_test_ng_two.cpp",
@@ -260,6 +261,15 @@ ace_unittest("material_registry_test_ng") {
   cflags = [ "-fno-access-control" ]
 }
 
+ace_unittest("ui_tree_collector_test") {
+  module_name = "Debugger-inspector"
+  type = "new"
+  if (defined(is_host_product) && is_host_product) {
+    type = "host_components"
+  }
+  sources = [ "ui_tree_collector_test.cpp" ]
+}
+
 group("core_base_unittest") {
   testonly = true
   if (is_host_product) {
@@ -276,6 +286,7 @@ group("core_base_unittest") {
       ":simplified_inspector_test_ng",
       ":thread_safe_node_test_ng",
       ":ui_node_gc_test_ng",
+      ":ui_tree_collector_test",
       ":ui_node_test_ng",
       ":view_abstract_model_static_test_ng",
       ":view_abstract_test_ng",
@@ -297,6 +308,7 @@ group("core_base_unittest") {
       ":thread_safe_node_test_ng",
       ":transparent_node_detector_test_ng",
       ":ui_node_gc_test_ng",
+      ":ui_tree_collector_test",
       ":ui_node_test_ng",
       ":view_abstract_model_static_test_ng",
       ":view_abstract_model_test_ng",

@@ -3646,11 +3646,17 @@ void InitBaseEventFields(EcmaVM* vm, const Local<panda::ObjectRef>& obj, SourceT
 {
     auto sourceVal = obj->Get(vm, panda::StringRef::NewFromUtf8(vm, "source"));
     if (sourceVal->IsNumber()) {
-        sourceType = static_cast<SourceType>(static_cast<int32_t>(sourceVal->ToNumber(vm)->Value()));
+        int32_t source = static_cast<int32_t>(sourceVal->ToNumber(vm)->Value());
+        if (source >= 0 && source <= static_cast<int32_t>(SourceType::CROWN)) {
+            sourceType = static_cast<SourceType>(source);
+        }
     }
     auto sourceToolVal = obj->Get(vm, panda::StringRef::NewFromUtf8(vm, "sourceTool"));
     if (sourceToolVal->IsNumber()) {
-        sourceTool = static_cast<SourceTool>(static_cast<int32_t>(sourceToolVal->ToNumber(vm)->Value()));
+        int32_t tool = static_cast<int32_t>(sourceToolVal->ToNumber(vm)->Value());
+        if (tool >= 0 && tool <= static_cast<int32_t>(SourceTool::JOYSTICK)) {
+            sourceTool = static_cast<SourceTool>(tool);
+        }
     }
     auto timestampVal = obj->Get(vm, panda::StringRef::NewFromUtf8(vm, "timestamp"));
     if (timestampVal->IsNumber()) {
@@ -3663,9 +3669,18 @@ void InitBaseEventFields(EcmaVM* vm, const Local<panda::ObjectRef>& obj, SourceT
 
 void InitTouchEventFromObj(EcmaVM* vm, const Local<panda::ObjectRef>& eventObj, TouchEvent& touchEvent)
 {
-    touchEvent.type = static_cast<TouchType>(GetIntProperty(vm, eventObj, "type"));
-    touchEvent.sourceType = static_cast<SourceType>(GetIntProperty(vm, eventObj, "source"));
-    touchEvent.sourceTool = static_cast<SourceTool>(GetIntProperty(vm, eventObj, "sourceTool"));
+    auto typeVal = GetIntProperty(vm, eventObj, "type");
+    if (typeVal >= 0 && typeVal <= static_cast<int32_t>(TouchType::UNKNOWN)) {
+        touchEvent.type = static_cast<TouchType>(typeVal);
+    }
+    auto sourceVal = GetIntProperty(vm, eventObj, "source");
+    if (sourceVal >= 0 && sourceVal <= static_cast<int32_t>(SourceType::CROWN)) {
+        touchEvent.sourceType = static_cast<SourceType>(sourceVal);
+    }
+    auto sourceToolVal = GetIntProperty(vm, eventObj, "sourceTool");
+    if (sourceToolVal >= 0 && sourceToolVal <= static_cast<int32_t>(SourceTool::JOYSTICK)) {
+        touchEvent.sourceTool = static_cast<SourceTool>(sourceToolVal);
+    }
     touchEvent.force = GetFloatProperty(vm, eventObj, "pressure");
     auto timestampVal = eventObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "timestamp"));
     if (timestampVal->IsNumber()) {
@@ -3717,6 +3732,8 @@ void InitTouchEventFromObj(EcmaVM* vm, const Local<panda::ObjectRef>& eventObj, 
             touchEvent.y = GetFloatProperty(vm, changedObj, "windowY");
             touchEvent.screenX = GetFloatProperty(vm, changedObj, "displayX");
             touchEvent.screenY = GetFloatProperty(vm, changedObj, "displayY");
+            touchEvent.globalDisplayX = GetDoubleProperty(vm, changedObj, "globalDisplayX");
+            touchEvent.globalDisplayY = GetDoubleProperty(vm, changedObj, "globalDisplayY");
             touchEvent.originalId = touchEvent.id;
         }
     }
@@ -3728,7 +3745,10 @@ void InitAxisEventFromObj(EcmaVM* vm, const Local<panda::ObjectRef>& eventObj, A
         axisEvent.deviceId, axisEvent.targetDisplayId);
     auto actionVal = eventObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "action"));
     if (actionVal->IsNumber()) {
-        axisEvent.action = static_cast<AxisAction>(static_cast<int32_t>(actionVal->ToNumber(vm)->Value()));
+        int32_t action = static_cast<int32_t>(actionVal->ToNumber(vm)->Value());
+        if (action >= 0 && action <= static_cast<int32_t>(AxisAction::CANCEL)) {
+            axisEvent.action = static_cast<AxisAction>(action);
+        }
     }
     axisEvent.x = GetFloatProperty(vm, eventObj, "windowX");
     axisEvent.y = GetFloatProperty(vm, eventObj, "windowY");
@@ -3759,11 +3779,17 @@ void InitMouseEventFromObj(EcmaVM* vm, const Local<panda::ObjectRef>& eventObj, 
         mouseEvent.deviceId, mouseEvent.targetDisplayId);
     auto buttonVal = eventObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "button"));
     if (buttonVal->IsNumber()) {
-        mouseEvent.button = static_cast<MouseButton>(static_cast<int32_t>(buttonVal->ToNumber(vm)->Value()));
+        int32_t button = static_cast<int32_t>(buttonVal->ToNumber(vm)->Value());
+        if (button >= 0 && button <= static_cast<int32_t>(MouseButton::TASK_BUTTON)) {
+            mouseEvent.button = static_cast<MouseButton>(button);
+        }
     }
     auto actionVal = eventObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "action"));
     if (actionVal->IsNumber()) {
-        mouseEvent.action = static_cast<MouseAction>(static_cast<int32_t>(actionVal->ToNumber(vm)->Value()));
+        int32_t action = static_cast<int32_t>(actionVal->ToNumber(vm)->Value());
+        if (action >= 0 && action <= static_cast<int32_t>(MouseAction::CANCEL)) {
+            mouseEvent.action = static_cast<MouseAction>(action);
+        }
     }
     mouseEvent.x = GetFloatProperty(vm, eventObj, "windowX");
     mouseEvent.y = GetFloatProperty(vm, eventObj, "windowY");
@@ -3775,18 +3801,62 @@ void InitMouseEventFromObj(EcmaVM* vm, const Local<panda::ObjectRef>& eventObj, 
     mouseEvent.rawDeltaX = GetFloatProperty(vm, eventObj, "rawDeltaX");
     mouseEvent.rawDeltaY = GetFloatProperty(vm, eventObj, "rawDeltaY");
     auto pressedButtonsVal = eventObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "pressedButtons"));
-    if (pressedButtonsVal->IsArray(vm)) {
-        Local<panda::ArrayRef> pressedArray(pressedButtonsVal);
-        auto pressedLen = ArkTSUtils::GetArrayLength(vm, pressedArray);
-        for (size_t i = 0; i < pressedLen; ++i) {
-            auto item = panda::ArrayRef::GetValueAt(vm, pressedArray, i);
-            if (item->IsNumber()) {
-                mouseEvent.pressedButtonsArray.push_back(
-                    static_cast<MouseButton>(static_cast<int32_t>(item->ToNumber(vm)->Value())));
-            }
+    if (!pressedButtonsVal->IsArray(vm)) {
+        return;
+    }
+    Local<panda::ArrayRef> pressedArray(pressedButtonsVal);
+    auto pressedLen = ArkTSUtils::GetArrayLength(vm, pressedArray);
+    for (size_t i = 0; i < pressedLen; ++i) {
+        auto item = panda::ArrayRef::GetValueAt(vm, pressedArray, i);
+        if (!item->IsNumber()) {
+            continue;
         }
+        int32_t button = static_cast<int32_t>(item->ToNumber(vm)->Value());
+        if (button < 0 || button > static_cast<int32_t>(MouseButton::TASK_BUTTON)) {
+            continue;
+        }
+        mouseEvent.pressedButtonsArray.push_back(static_cast<MouseButton>(button));
     }
 }
+
+void InitKeyEventFromObj(EcmaVM* vm, const Local<panda::ObjectRef>& eventObj, KeyEvent& keyEvent)
+{
+    auto keyCodeVal = GetIntProperty(vm, eventObj, "keyCode");
+    if (keyCodeVal >= static_cast<int32_t>(KeyCode::KEY_UNKNOWN) &&
+        keyCodeVal <= static_cast<int32_t>(KeyCode::KEY_WRIST_TURN)) {
+        keyEvent.code = static_cast<KeyCode>(keyCodeVal);
+    }
+    auto keyTextVal = eventObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "keyText"));
+    if (keyTextVal->IsString(vm)) {
+        keyEvent.key = keyTextVal->ToString(vm)->ToString(vm);
+    }
+    auto keyActionVal = GetIntProperty(vm, eventObj, "type");
+    if (keyActionVal >= static_cast<int32_t>(KeyAction::UNKNOWN) &&
+        keyActionVal <= static_cast<int32_t>(KeyAction::CANCEL)) {
+        keyEvent.action = static_cast<KeyAction>(keyActionVal);
+    }
+    auto keySourceVal = GetIntProperty(vm, eventObj, "keySource");
+    if (keySourceVal >= 0 && keySourceVal <= static_cast<int32_t>(SourceType::CROWN)) {
+        keyEvent.sourceType = static_cast<SourceType>(keySourceVal);
+    }
+    keyEvent.deviceId = GetIntProperty(vm, eventObj, "deviceId");
+    keyEvent.unicode = static_cast<uint32_t>(GetIntProperty(vm, eventObj, "unicode"));
+    keyEvent.metaKey = GetIntProperty(vm, eventObj, "metaKey");
+    auto intentionVal = GetIntProperty(vm, eventObj, "intentionCode");
+    if (intentionVal >= static_cast<int32_t>(KeyIntention::INTENTION_UNKNOWN) &&
+        intentionVal <= static_cast<int32_t>(KeyIntention::INTENTION_CAMERA)) {
+        keyEvent.keyIntention = static_cast<KeyIntention>(intentionVal);
+    }
+    keyEvent.numLock = GetBoolProperty(vm, eventObj, "isNumLockOn");
+    keyEvent.enableCapsLock = GetBoolProperty(vm, eventObj, "isCapsLockOn");
+    keyEvent.scrollLock = GetBoolProperty(vm, eventObj, "isScrollLockOn");
+    auto timestampVal = eventObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "timestamp"));
+    if (timestampVal->IsNumber()) {
+        keyEvent.timeStamp =
+            TimeStamp(std::chrono::nanoseconds(static_cast<int64_t>(timestampVal->ToNumber(vm)->Value())));
+    }
+}
+
 } // namespace
 
 ArkUINativeModuleValue FrameNodeBridge::DispatchInputEvent(ArkUIRuntimeCallInfo* runtimeCallInfo)
@@ -3824,20 +3894,20 @@ ArkUINativeModuleValue FrameNodeBridge::DispatchInputEvent(ArkUIRuntimeCallInfo*
     if (touchesVal->IsArray(vm)) {
         TouchEvent touchEvent;
         InitTouchEventFromObj(vm, eventObj, touchEvent);
-        result = useCompetition ? postEventManager->PostTouchEventWithStrategy(node, std::move(touchEvent))
-                                : postEventManager->PostTouchEvent(node, std::move(touchEvent));
+        touchEvent.isNewReferee = useCompetition ? false : true;
+        result = postEventManager->PostTouchEventWithStrategy(node, std::move(touchEvent));
     } else {
         auto scrollStepVal = eventObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "scrollStep"));
         if (scrollStepVal->IsNumber()) {
             AxisEvent axisEvent;
             InitAxisEventFromObj(vm, eventObj, axisEvent);
-            result = useCompetition ? postEventManager->PostAxisEventWithStrategy(node, std::move(axisEvent))
-                                    : postEventManager->PostAxisEvent(node, std::move(axisEvent));
+            axisEvent.isNewReferee = useCompetition ? false : true;
+            result = postEventManager->PostAxisEventWithStrategy(node, std::move(axisEvent));
         } else {
             MouseEvent mouseEvent;
             InitMouseEventFromObj(vm, eventObj, mouseEvent);
-            result = useCompetition ? postEventManager->PostMouseEventWithStrategy(node, std::move(mouseEvent))
-                                    : postEventManager->PostMouseEvent(node, std::move(mouseEvent));
+            mouseEvent.isNewReferee = useCompetition ? false : true;
+            result = postEventManager->PostMouseEventWithStrategy(node, std::move(mouseEvent));
         }
     }
 
@@ -3860,21 +3930,7 @@ ArkUINativeModuleValue FrameNodeBridge::DispatchKeyEvent(ArkUIRuntimeCallInfo* r
     auto eventObj = eventArg->ToObject(vm);
 
     KeyEvent keyEvent;
-    keyEvent.code = static_cast<KeyCode>(GetIntProperty(vm, eventObj, "keyCode"));
-    auto keyTextVal = eventObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "keyText"));
-    if (keyTextVal->IsString(vm)) {
-        keyEvent.key = keyTextVal->ToString(vm)->ToString(vm);
-    }
-    keyEvent.action = static_cast<KeyAction>(GetIntProperty(vm, eventObj, "type"));
-    keyEvent.sourceType = static_cast<SourceType>(GetIntProperty(vm, eventObj, "keySource"));
-    keyEvent.deviceId = GetIntProperty(vm, eventObj, "deviceId");
-    keyEvent.unicode = static_cast<uint32_t>(GetIntProperty(vm, eventObj, "unicode"));
-    keyEvent.metaKey = GetIntProperty(vm, eventObj, "metaKey");
-    keyEvent.keyIntention = static_cast<KeyIntention>(GetIntProperty(vm, eventObj, "intentionCode"));
-    keyEvent.numLock = GetBoolProperty(vm, eventObj, "isNumLockOn");
-    keyEvent.enableCapsLock = GetBoolProperty(vm, eventObj, "isCapsLockOn");
-    keyEvent.scrollLock = GetBoolProperty(vm, eventObj, "isScrollLockOn");
-    keyEvent.SetTimeStamp(GetIntProperty(vm, eventObj, "timestamp"));
+    InitKeyEventFromObj(vm, eventObj, keyEvent);
 
     auto pipelineContext = frameNode->GetContext();
     CHECK_NULL_RETURN(pipelineContext, panda::JSValueRef::Undefined(vm));

@@ -651,4 +651,22 @@ NG::TabBarDisplayMode Tabs::GetBarDisplayMode() const
     auto mode = modifier->getBarDisplayMode(reinterpret_cast<ArkUINodeHandle>(Referenced::RawPtr(tabsNode)));
     return static_cast<NG::TabBarDisplayMode>(mode);
 }
+
+void Tabs::SetTabBarClickIntercept(bool active)
+{
+    auto tabsNode = GetTabsNode(node_);
+    CHECK_NULL_VOID(tabsNode);
+    auto modifier = NG::NodeModifier::GetTabsCustomModifier();
+    CHECK_NULL_VOID(modifier);
+    modifier->setTabBarClickIntercept(reinterpret_cast<ArkUINodeHandle>(Referenced::RawPtr(tabsNode)), active);
+}
+
+void Tabs::TabBarClick(const int32_t index)
+{
+    auto tabsNode = GetTabsNode(node_);
+    CHECK_NULL_VOID(tabsNode);
+    auto modifier = NG::NodeModifier::GetTabsCustomModifier();
+    CHECK_NULL_VOID(modifier);
+    modifier->tabBarClick(reinterpret_cast<ArkUINodeHandle>(Referenced::RawPtr(tabsNode)), index);
+}
 } // namespace OHOS::Ace::Kit

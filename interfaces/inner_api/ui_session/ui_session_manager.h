@@ -315,6 +315,19 @@ public:
     virtual void NotifyPageSceneNodeChanged(const std::string& nodeTag, bool isAttach) {};
     virtual void NotifyPageSceneContentChanged() {};
     virtual void FlushPageSceneNodeChanged() {};
+    // Request a coalesced click-only flush. The registered UI callback checks
+    // content stability at consumption time and preserves pending input on a miss.
+    virtual void FlushPendingSearchClicksIfStable()
+    {
+        std::function<void()> flush;
+        {
+            std::lock_guard<std::mutex> lock(searchClickFlushMutex_);
+            flush = searchClickFlushFunction_;
+        }
+        if (flush) {
+            flush();
+        }
+    };
     virtual void SavePageSceneDetectFunction(PageSceneDetectFunction&& function) {};
     virtual void SaveWebPageSceneFunction(WebPageSceneFunction&& function) {};
     virtual bool IsSearchPageSceneRuleCurrent(
@@ -328,6 +341,13 @@ public:
     virtual void ComponentTreeQuery(const ComponentTreeQueryRequest& request) {};
     virtual void ReportNavigationQueryResult(const std::string& data) {};
     virtual void ReportLazyForEachQueryResult(const std::string& data) {};
+
+    // Internal callback, separate from full page-scene detection and its queues.
+    void SaveSearchClickFlushFunction(std::function<void()>&& function)
+    {
+        std::lock_guard<std::mutex> lock(searchClickFlushMutex_);
+        searchClickFlushFunction_ = std::move(function);
+    }
 
 protected:
     UiSessionManager() = default;
@@ -406,6 +426,8 @@ protected:
     std::mutex webPageSceneMutex_;
     ComponentTreeQueryFunction componentTreeQueryFunction_;
     std::mutex componentTreeQueryFunctionMutex_;
+    std::function<void()> searchClickFlushFunction_;
+    std::mutex searchClickFlushMutex_;
 };
 } // namespace OHOS::Ace
 #endif // FOUNDATION_ACE_INTERFACE_UI_SESSION_MANAGER_H

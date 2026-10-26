@@ -22,6 +22,14 @@
 extern "C" {
 #endif
 
+struct ArkUIScrollToIndexOptions {
+    ArkUI_Bool smooth;
+    ArkUI_Int32 align;
+    // Pixels for animated FastScroll; preserve the legacy raw offset for non-animated calls.
+    ArkUI_Float32 extraOffset;
+    ArkUI_Int32 fastScrollMode;
+};
+
 struct ArkUI_ListItemSwipeActionItem {
     void* node;
 

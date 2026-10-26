@@ -48,6 +48,23 @@ RefPtr<ResponsiveSpringMotion> CreateItemSnapSpringCurve(float endPos, float cur
     }
     return curve;
 }
+// Re-evaluate the cached provider target after layout, without issuing another user callback.
+std::function<void(float, float)> CreateItemSnapContinuation(const WeakPtr<Scrollable>& weak, bool fromScrollBar,
+    int32_t source, std::function<float(float)>&& targetGetter, std::function<void(float)>&& onFinish)
+{
+    return [weak, fromScrollBar, source, targetGetter = std::move(targetGetter), onFinish = std::move(onFinish)](
+               float providerVelocity, float motionVelocity) mutable {
+        auto scroll = weak.Upgrade();
+        CHECK_NULL_VOID(scroll);
+        const float target = targetGetter(providerVelocity);
+        if (!std::isfinite(target) || NearEqual(target, scroll->GetCurrentPos(), 0.1f)) {
+            onFinish(motionVelocity);
+            return;
+        }
+        scroll->StartItemSnapTwoStageAnimation(
+            0.0f, motionVelocity, fromScrollBar, std::move(targetGetter), source);
+    };
+}
 } // namespace
 
 void Scrollable::SetItemSnapTakeoverDistance(float distance)
@@ -137,7 +154,7 @@ void Scrollable::OnItemSnapStageFinished(uint32_t generation, bool finalStage, i
         // Superseded by a newer stage or interrupted: this stage is fully invalidated.
         return;
     }
-    if (finalStage) {
+    if (finalStage && !onHandoff) {
         state_ = AnimationState::IDLE;
         nextStep_.reset();
         itemSnapChainActive_ = false;
@@ -259,7 +276,7 @@ void Scrollable::StartItemSnapTwoStageAnimation(float approachDelta, float scrol
     snapVelocity_ = scrollSnapVelocity;
 
     auto handoff = [weak = AceType::WeakClaim(this), targetGetter = std::move(targetGetter), fromScrollBar, source](
-                       float providerVelocity, float motionVelocity) {
+                       float providerVelocity, float motionVelocity) mutable {
         auto scroll = weak.Upgrade();
         CHECK_NULL_VOID(scroll);
         if (!targetGetter) {
@@ -279,7 +296,13 @@ void Scrollable::StartItemSnapTwoStageAnimation(float approachDelta, float scrol
         }
         scroll->snapAnimationFromScrollBar_ = fromScrollBar;
         scroll->snapAnimationSource_ = source;
-        scroll->RunItemSnapStage(resolved, motionVelocity, true, nullptr);
+        auto finish = [weak, source](float velocity) {
+            auto current = weak.Upgrade();
+            CHECK_NULL_VOID(current);
+            current->OnItemSnapStageFinished(current->itemSnapGeneration_, true, source, velocity, nullptr);
+        };
+        scroll->RunItemSnapStage(resolved, motionVelocity, true,
+            CreateItemSnapContinuation(weak, fromScrollBar, source, std::move(targetGetter), std::move(finish)));
     };
 
     if (NearZero(approachDelta)) {

@@ -63,6 +63,8 @@ public:
         return true;
     }
 
+    void ClampTabBarTransformOffset();
+
     RefPtr<LayoutProperty> CreateLayoutProperty() override
     {
         ACE_UINODE_TRACE(GetHost());
@@ -214,6 +216,10 @@ public:
     {
         floatingBarMargin_ = floatingBarMargin;
     }
+    void SetFloatingTopBarMargin(std::optional<float> floatingTopBarMargin)
+    {
+        floatingTopBarMargin_ = floatingTopBarMargin;
+    }
     bool IsFloatingBar() const
     {
         return isFloatingBar_;
@@ -221,6 +227,14 @@ public:
     bool LastFloatingBar() const
     {
         return lastFloatingBar_;
+    }
+    bool IsFloatingTopBar() const
+    {
+        return isFloatingTopBar_;
+    }
+    bool LastFloatingTopBar() const
+    {
+        return lastFloatingTopBar_;
     }
     void SetFloatingScaleEnabled(bool isFloatingScaleEnabled);
 
@@ -358,6 +372,16 @@ public:
         return isOnDisplayModeSwitchAnimation_;
     }
 
+    void SetTabBarClickIntercept(bool active)
+    {
+        tabBarClickIntercept_ = active;
+    }
+
+    bool GetTabBarClickIntercept() const
+    {
+        return tabBarClickIntercept_;
+    }
+
 private:
     void OnAttachToFrameNode() override;
     void OnAfterModifyDone() override;
@@ -392,6 +416,7 @@ private:
 
     void InitFloatingBar();
     void UpdateBgMaskNode();
+    void UpdateTopBgMaskNode();
     GradientColor CreatePercentGradientColor(float percent, Color color);
     void InitTouchEvent();
     void OnTouchEvent(const TouchEventInfo& info);
@@ -416,6 +441,18 @@ private:
             auto tabBarPattern = tabBar->GetPattern<TabBarPattern>();
             if (tabBarPattern) {
                 tabBarPattern->SetIsFloatingBar(isFloating);
+            }
+        }
+    }
+    void SetTabBarIsFloatingTopBar(bool isFloating)
+    {
+        auto tabsNode = AceType::DynamicCast<TabsNode>(GetHost());
+        CHECK_NULL_VOID(tabsNode);
+        auto tabBar = AceType::DynamicCast<FrameNode>(tabsNode->GetTabBar());
+        if (tabBar) {
+            auto tabBarPattern = tabBar->GetPattern<TabBarPattern>();
+            if (tabBarPattern) {
+                tabBarPattern->SetIsFloatingTopBar(isFloating);
             }
         }
     }
@@ -500,6 +537,10 @@ private:
     std::optional<float> floatingBarMargin_ = 0.0f;
     float baseFloatingScale_ = FLOATING_BAR_SCALE;
 
+    bool isFloatingTopBar_ = false;
+    bool lastFloatingTopBar_ = false;
+    std::optional<float> floatingTopBarMargin_ = 0.0f;
+
     std::optional<TabBarDisplayMode> currentBarDisplayMode_;
     std::optional<TabBarLayoutStyle> layoutStyle_;
     RefPtr<FrameNode> sideBarNode_ = nullptr;
@@ -541,6 +582,7 @@ private:
     std::optional<TabBarDisplayMode> displayModeAnimTarget_;
     std::shared_ptr<AnimationUtils::Animation> sidebarTranslateAnim_;
     std::shared_ptr<AnimationUtils::Animation> tabBarEnterExitAnim_;
+    bool tabBarClickIntercept_ = false;
 };
 
 } // namespace OHOS::Ace::NG

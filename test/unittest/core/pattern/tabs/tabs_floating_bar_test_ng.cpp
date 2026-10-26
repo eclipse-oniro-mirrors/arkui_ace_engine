@@ -29,6 +29,7 @@
 #include "core/components_ng/pattern/pattern.h"
 #include "core/components_ng/pattern/tabs/tabs_node.h"
 #include "core/components_ng/pattern/tabs/tabs_model.h"
+#include "core/components_ng/render/render_context.h"
 #include "core/pipeline_ng/pipeline_context.h"
 #include "interfaces/native/ui_input_event.h"
 
@@ -1246,6 +1247,179 @@ HWTEST_F(TabsFloatingBarTestNg, SetBarFloatingStyleAllUndefinedFields001, TestSi
     EXPECT_FALSE(style.maskColor.has_value());
     EXPECT_FALSE(style.maskHeight.has_value());
     EXPECT_FALSE(style.adaptToHandedness.has_value());
+}
+
+/**
+ * @tc.name: InitFloatingBarTopFloating001
+ * @tc.desc: Test InitFloatingBar enables top floating bar when barLayoutStyle=TOP + horizontal
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsFloatingBarTestNg, InitFloatingBarTopFloating001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create Tabs with horizontal + barLayoutStyle=TOP
+     * @tc.expected: step1. Tabs instance is created
+     */
+    TabsModelNG model = CreateTabs();
+    model.SetIsVertical(false);
+    model.SetBarLayoutStyle(TabBarLayoutStyle::TOP);
+    CreateTabContents();
+    GetTabs();
+    CreateTabsDone(model);
+
+    ASSERT_NE(pattern_, nullptr);
+    ASSERT_NE(layoutProperty_, nullptr);
+
+    /**
+     * @tc.steps: step2. Call InitFloatingBar
+     * @tc.expected: step2. Top floating bar is enabled, bottom floating bar is disabled
+     */
+    pattern_->InitFloatingBar();
+    EXPECT_TRUE(pattern_->IsFloatingTopBar());
+    EXPECT_FALSE(pattern_->IsFloatingBar());
+}
+
+/**
+ * @tc.name: InitFloatingBarTopFloating002
+ * @tc.desc: Test InitFloatingBar does not enable top floating bar when vertical
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsFloatingBarTestNg, InitFloatingBarTopFloating002, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create Tabs with vertical + barLayoutStyle=TOP
+     * @tc.expected: step1. Tabs instance is created
+     */
+    TabsModelNG model = CreateTabs();
+    model.SetIsVertical(true);
+    model.SetBarLayoutStyle(TabBarLayoutStyle::TOP);
+    CreateTabContents();
+    GetTabs();
+    CreateTabsDone(model);
+
+    ASSERT_NE(pattern_, nullptr);
+    ASSERT_NE(layoutProperty_, nullptr);
+
+    /**
+     * @tc.steps: step2. Call InitFloatingBar
+     * @tc.expected: step2. Neither top nor bottom floating bar is enabled (vertical blocks TOP)
+     */
+    pattern_->InitFloatingBar();
+    EXPECT_FALSE(pattern_->IsFloatingTopBar());
+    EXPECT_FALSE(pattern_->IsFloatingBar());
+}
+
+/**
+ * @tc.name: SetBarTopFloatingStyle001
+ * @tc.desc: Check BarTopFloatingStyle can be set and read back
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsFloatingBarTestNg, SetBarTopFloatingStyle001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create Tabs
+     * @tc.expected: step1. Tabs instance is created
+     */
+    TabsModelNG model = CreateTabs();
+    CreateTabContents();
+    CreateTabsDone(model);
+
+    ASSERT_NE(layoutProperty_, nullptr);
+    EXPECT_FALSE(layoutProperty_->HasBarTopFloatingStyle());
+
+    /**
+     * @tc.steps: step2. Set BarTopFloatingStyle with all fields
+     * @tc.expected: step2. Style is stored and readable
+     */
+    BarTopFloatingStyleParameters params;
+    params.barWidth = Dimension(200, DimensionUnit::PX);
+    params.barSideMargin = Dimension(12, DimensionUnit::PX);
+    params.barTopMargin = Dimension(32, DimensionUnit::PX);
+    params.maskColor = Color::WHITE;
+    params.maskHeight = Dimension(50, DimensionUnit::PX);
+    params.offsetX = Dimension(10, DimensionUnit::PX);
+    params.offsetY = Dimension(20, DimensionUnit::PX);
+    params.maxWidth = Dimension(400, DimensionUnit::PX);
+    TabsModelNG::SetBarTopFloatingStyle(AceType::RawPtr(frameNode_), params);
+
+    ASSERT_TRUE(layoutProperty_->HasBarTopFloatingStyle());
+    auto style = layoutProperty_->GetBarTopFloatingStyle().value();
+    ASSERT_TRUE(style.barWidth.has_value());
+    EXPECT_EQ(style.barWidth.value(), Dimension(200, DimensionUnit::PX));
+    ASSERT_TRUE(style.barSideMargin.has_value());
+    EXPECT_EQ(style.barSideMargin.value(), Dimension(12, DimensionUnit::PX));
+    ASSERT_TRUE(style.barTopMargin.has_value());
+    EXPECT_EQ(style.barTopMargin.value(), Dimension(32, DimensionUnit::PX));
+    ASSERT_TRUE(style.maskColor.has_value());
+    EXPECT_EQ(style.maskColor.value(), Color::WHITE);
+    ASSERT_TRUE(style.maskHeight.has_value());
+    EXPECT_EQ(style.maskHeight.value(), Dimension(50, DimensionUnit::PX));
+    ASSERT_TRUE(style.offsetX.has_value());
+    EXPECT_EQ(style.offsetX.value(), Dimension(10, DimensionUnit::PX));
+    ASSERT_TRUE(style.offsetY.has_value());
+    EXPECT_EQ(style.offsetY.value(), Dimension(20, DimensionUnit::PX));
+    ASSERT_TRUE(style.maxWidth.has_value());
+    EXPECT_EQ(style.maxWidth.value(), Dimension(400, DimensionUnit::PX));
+}
+
+/**
+ * @tc.name: SetBarTopFloatingStyleReset001
+ * @tc.desc: Check BarTopFloatingStyle reset by ResetBarTopFloatingStyle
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsFloatingBarTestNg, SetBarTopFloatingStyleReset001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create Tabs and set BarTopFloatingStyle
+     * @tc.expected: step1. Style is set
+     */
+    TabsModelNG model = CreateTabs();
+    CreateTabContents();
+    CreateTabsDone(model);
+
+    BarTopFloatingStyleParameters params;
+    params.barWidth = Dimension(200, DimensionUnit::PX);
+    params.maskHeight = Dimension(50, DimensionUnit::PX);
+    TabsModelNG::SetBarTopFloatingStyle(AceType::RawPtr(frameNode_), params);
+    ASSERT_TRUE(layoutProperty_->HasBarTopFloatingStyle());
+
+    /**
+     * @tc.steps: step2. Call ResetBarTopFloatingStyle
+     * @tc.expected: step2. Style is cleared
+     */
+    TabsModelNG::ResetBarTopFloatingStyle(AceType::RawPtr(frameNode_));
+    EXPECT_FALSE(layoutProperty_->HasBarTopFloatingStyle());
+}
+
+/**
+ * @tc.name: TabBarPatternIsFloatingTopBar001
+ * @tc.desc: Test TabBarPattern IsFloatingTopBar/SetIsFloatingTopBar state
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsFloatingBarTestNg, TabBarPatternIsFloatingTopBar001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create Tabs
+     * @tc.expected: step1. TabBarPattern is created
+     */
+    TabsModelNG model = CreateTabs();
+    CreateTabContents();
+    GetTabs();
+    CreateTabsDone(model);
+
+    ASSERT_NE(tabBarPattern_, nullptr);
+
+    /**
+     * @tc.steps: step2. Default state is false, then set to true and back to false
+     * @tc.expected: step2. State reflects SetIsFloatingTopBar calls
+     */
+    EXPECT_FALSE(tabBarPattern_->IsFloatingTopBar());
+
+    tabBarPattern_->SetIsFloatingTopBar(true);
+    EXPECT_TRUE(tabBarPattern_->IsFloatingTopBar());
+
+    tabBarPattern_->SetIsFloatingTopBar(false);
+    EXPECT_FALSE(tabBarPattern_->IsFloatingTopBar());
 }
 
 /**

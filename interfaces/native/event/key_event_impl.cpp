@@ -22,6 +22,7 @@
 #include "interfaces/native/node/node_model.h"
 #include "interfaces/native/node/config_manager.h"
 #include "interfaces/native/event/ui_input_event_impl.h"
+#include "frameworks/core/common/ace_application_info.h"
 #include "frameworks/core/interfaces/arkoala/arkoala_api.h"
 #include "interfaces/native/native_error_message_macros.h"
 
@@ -31,6 +32,7 @@ extern "C" {
 
 ArkUI_KeyEventType OH_ArkUI_KeyEvent_GetType(const ArkUI_UIInputEvent *event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_KeyEvent_GetType");
     CheckSupportedScenarioAndResetEventStatus(S_ALL_C_KEY_EVENT, event);
     if (!event) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_GetType", "event is null");
@@ -55,6 +57,7 @@ ArkUI_KeyEventType OH_ArkUI_KeyEvent_GetType(const ArkUI_UIInputEvent *event)
 
 int32_t OH_ArkUI_KeyEvent_GetKeyCode(const ArkUI_UIInputEvent *event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_KeyEvent_GetKeyCode");
     CheckSupportedScenarioAndResetEventStatus(S_ALL_C_KEY_EVENT, event);
     if (!event) {
         RETURN_RET_WITH_STATUS_CHECK(-1, ARKUI_ERROR_CODE_PARAM_INVALID);
@@ -77,6 +80,7 @@ int32_t OH_ArkUI_KeyEvent_GetKeyCode(const ArkUI_UIInputEvent *event)
 
 const char* OH_ArkUI_KeyEvent_GetKeyText(const ArkUI_UIInputEvent *event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_KeyEvent_GetKeyText");
     CheckSupportedScenarioAndResetEventStatus(S_ALL_C_KEY_EVENT, event);
     if (!event) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_GetKeyText", "event is null");
@@ -100,6 +104,7 @@ const char* OH_ArkUI_KeyEvent_GetKeyText(const ArkUI_UIInputEvent *event)
 
 ArkUI_KeySourceType OH_ArkUI_KeyEvent_GetKeySource(const ArkUI_UIInputEvent *event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_KeyEvent_GetKeySource");
     CheckSupportedScenarioAndResetEventStatus(S_ALL_C_KEY_EVENT, event);
     if (!event) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_GetKeySource", "event is null");
@@ -124,6 +129,7 @@ ArkUI_KeySourceType OH_ArkUI_KeyEvent_GetKeySource(const ArkUI_UIInputEvent *eve
 
 void OH_ArkUI_KeyEvent_StopPropagation(const ArkUI_UIInputEvent *event, bool stopPropagation)
 {
+    CHECK_UI_THREAD("OH_ArkUI_KeyEvent_StopPropagation");
     CheckSupportedScenarioAndResetEventStatus(S_ALL_C_KEY_EVENT, event);
     if (!event) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_StopPropagation", "event is null");
@@ -149,6 +155,7 @@ void OH_ArkUI_KeyEvent_StopPropagation(const ArkUI_UIInputEvent *event, bool sto
 
 ArkUI_KeyIntension OH_ArkUI_KeyEvent_GetKeyIntensionCode(const ArkUI_UIInputEvent *event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_KeyEvent_GetKeyIntensionCode");
     CheckSupportedScenarioAndResetEventStatus(S_ALL_C_KEY_EVENT, event);
     if (!event) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_GetKeyIntensionCode", "event is null");
@@ -174,6 +181,7 @@ ArkUI_KeyIntension OH_ArkUI_KeyEvent_GetKeyIntensionCode(const ArkUI_UIInputEven
 
 uint32_t OH_ArkUI_KeyEvent_GetUnicode(const ArkUI_UIInputEvent *event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_KeyEvent_GetUnicode");
     CheckSupportedScenarioAndResetEventStatus(S_ALL_C_KEY_EVENT, event);
     if (!event) {
         RETURN_RET_WITH_STATUS_CHECK(0, ARKUI_ERROR_CODE_PARAM_INVALID);
@@ -196,6 +204,7 @@ uint32_t OH_ArkUI_KeyEvent_GetUnicode(const ArkUI_UIInputEvent *event)
 
 void OH_ArkUI_KeyEvent_SetConsumed(const ArkUI_UIInputEvent *event, bool isConsumed)
 {
+    CHECK_UI_THREAD("OH_ArkUI_KeyEvent_SetConsumed");
     CheckSupportedScenarioAndResetEventStatus(S_NODE_ON_KEY_EVENT, event);
     if (!event) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetConsumed", "event is null");
@@ -220,6 +229,7 @@ void OH_ArkUI_KeyEvent_SetConsumed(const ArkUI_UIInputEvent *event, bool isConsu
 
 void OH_ArkUI_KeyEvent_Dispatch(ArkUI_NodeHandle node, const ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_KeyEvent_Dispatch");
     CheckSupportedScenarioAndResetEventStatus(S_ALL_C_KEY_EVENT, event);
     if (!node) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_Dispatch", "node is null");
@@ -250,6 +260,7 @@ void OH_ArkUI_KeyEvent_Dispatch(ArkUI_NodeHandle node, const ArkUI_UIInputEvent*
 
 ArkUI_ErrorCode OH_ArkUI_KeyEvent_IsNumLockOn(const ArkUI_UIInputEvent* event, bool* state)
 {
+    CHECK_UI_THREAD("OH_ArkUI_KeyEvent_IsNumLockOn");
     CheckSupportedScenarioAndResetEventStatus(S_ALL_C_KEY_EVENT, event);
     if (!event) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_IsNumLockOn", "event is null");
@@ -278,6 +289,7 @@ ArkUI_ErrorCode OH_ArkUI_KeyEvent_IsNumLockOn(const ArkUI_UIInputEvent* event, b
 
 ArkUI_ErrorCode OH_ArkUI_KeyEvent_IsCapsLockOn(const ArkUI_UIInputEvent* event, bool* state)
 {
+    CHECK_UI_THREAD("OH_ArkUI_KeyEvent_IsCapsLockOn");
     CheckSupportedScenarioAndResetEventStatus(S_ALL_C_KEY_EVENT, event);
     if (!event) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_IsCapsLockOn", "event is null");
@@ -306,6 +318,7 @@ ArkUI_ErrorCode OH_ArkUI_KeyEvent_IsCapsLockOn(const ArkUI_UIInputEvent* event, 
 
 ArkUI_ErrorCode OH_ArkUI_KeyEvent_IsScrollLockOn(const ArkUI_UIInputEvent* event, bool* state)
 {
+    CHECK_UI_THREAD("OH_ArkUI_KeyEvent_IsScrollLockOn");
     CheckSupportedScenarioAndResetEventStatus(S_ALL_C_KEY_EVENT, event);
     if (!event) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_IsScrollLockOn", "event is null");
@@ -352,6 +365,8 @@ ArkUI_ErrorCode OH_ArkUI_KeyEvent_Create(ArkUI_UIInputEvent** event)
     uiInputEvent->inputEvent = keyEvent;
     uiInputEvent->eventTypeId = C_KEY_EVENT_ID;
     uiInputEvent->isCreatedByUser = true;
+    uiInputEvent->inputType = ARKUI_UIINPUTEVENT_TYPE_KEY;
+    uiInputEvent->apiVersion = static_cast<int32_t>(OHOS::Ace::PlatformVersion::VERSION_TWENTY_SIX);
     *event = uiInputEvent;
     RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_NO_ERROR, ARKUI_ERROR_CODE_NO_ERROR);
 }
@@ -363,7 +378,8 @@ ArkUI_ErrorCode OH_ArkUI_KeyEvent_Destroy(ArkUI_UIInputEvent** event)
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
     }
     if (!(*event)) {
-        RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_NO_ERROR, ARKUI_ERROR_CODE_NO_ERROR);
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_Destroy", "event is null");
+        RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
     }
     auto* uiInputEvent = *event;
     if (uiInputEvent->eventTypeId != C_KEY_EVENT_ID || !uiInputEvent->isCreatedByUser) {
@@ -400,6 +416,12 @@ ArkUI_ErrorCode OH_ArkUI_KeyEvent_SetType(ArkUI_UIInputEvent* event, ArkUI_KeyEv
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetType", "keyEvent is null");
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
     }
+    int32_t typeVal = static_cast<int32_t>(type);
+    if (typeVal < static_cast<int32_t>(ArkUI_KeyEventType::ARKUI_KEY_EVENT_UNKNOWN) ||
+        typeVal > static_cast<int32_t>(ArkUI_KeyEventType::ARKUI_KEY_EVENT_CLICK)) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetType", "type is out of range");
+        RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
+    }
     keyEvent->type = static_cast<ArkUI_Int32>(type);
     RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_NO_ERROR, ARKUI_ERROR_CODE_NO_ERROR);
 }
@@ -418,6 +440,11 @@ ArkUI_ErrorCode OH_ArkUI_KeyEvent_SetKeyCode(ArkUI_UIInputEvent* event, int32_t 
     auto* keyEvent = reinterpret_cast<ArkUIKeyEvent*>(event->inputEvent);
     if (!keyEvent) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetKeyCode", "keyEvent is null");
+        RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
+    }
+    if (keyCode < static_cast<int32_t>(ArkUI_KeyCode::ARKUI_KEYCODE_UNKNOWN) ||
+        keyCode > static_cast<int32_t>(ArkUI_KeyCode::ARKUI_KEYCODE_BUTTON_THUMBR)) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetKeyCode", "keyCode is out of range");
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
     }
     keyEvent->keyCode = keyCode;
@@ -462,6 +489,13 @@ ArkUI_ErrorCode OH_ArkUI_KeyEvent_SetKeySource(ArkUI_UIInputEvent* event, ArkUI_
     auto* keyEvent = reinterpret_cast<ArkUIKeyEvent*>(event->inputEvent);
     if (!keyEvent) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetKeySource", "keyEvent is null");
+        RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
+    }
+    int32_t keySourceVal = static_cast<int32_t>(keySource);
+    if (keySourceVal < static_cast<int32_t>(ArkUI_KeySourceType::ARKUI_KEY_SOURCE_TYPE_MOUSE) ||
+        keySourceVal > static_cast<int32_t>(ArkUI_KeySourceType::ARKUI_KEY_SOURCE_TYPE_JOYSTICK)) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetKeySource",
+            "keySource is out of range");
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
     }
     keyEvent->keySource = keySource;
@@ -545,6 +579,20 @@ ArkUI_ErrorCode OH_ArkUI_KeyEvent_SetPressedKeys(
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetPressedKeys", "keyEvent is null");
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
     }
+    if (length < 0) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetPressedKeys", "length is negative");
+        RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
+    }
+    if (length > 0 && !pressedKeyCodes) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetPressedKeys",
+            "pressedKeyCodes is null when length is positive");
+        RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
+    }
+    if (length == 0 && pressedKeyCodes) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetPressedKeys",
+            "pressedKeyCodes is not null when length is 0");
+        RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
+    }
     if (keyEvent->pressedKeyCodes) {
         delete[] keyEvent->pressedKeyCodes;
         keyEvent->pressedKeyCodes = nullptr;
@@ -574,6 +622,13 @@ ArkUI_ErrorCode OH_ArkUI_KeyEvent_SetKeyIntentionCode(
     auto* keyEvent = reinterpret_cast<ArkUIKeyEvent*>(event->inputEvent);
     if (!keyEvent) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetKeyIntentionCode", "keyEvent is null");
+        RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
+    }
+    int32_t intentionVal = static_cast<int32_t>(intentionCode);
+    if (intentionVal < static_cast<int32_t>(ArkUI_KeyIntension::ARKUI_KEY_INTENSION_UNKNOWN) ||
+        intentionVal > static_cast<int32_t>(ArkUI_KeyIntension::ARKUI_KEY_INTENTION_CAMERA)) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_KeyEvent_SetKeyIntentionCode",
+            "intentionCode is out of range");
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
     }
     keyEvent->intentionCode = intentionCode;

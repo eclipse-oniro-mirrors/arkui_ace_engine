@@ -26,6 +26,7 @@
 #include "core/components_ng/pattern/list/list_item_group_layout_info.h"
 #include "core/components_ng/pattern/list/list_item_group_layout_property.h"
 #include "core/components_ng/pattern/list/list_position_map.h"
+#include "core/components_ng/pattern/list/list_properties.h"
 #include "core/components_ng/pattern/pattern.h"
 #include "core/components_ng/event/focus_hub.h"
 #include "core/components_ng/syntax/shallow_builder.h"
@@ -43,13 +44,6 @@ struct ListItemGroupPaintInfo {
     float laneGutter = 0.0f;
     int32_t totalItemCount = 0;
     float listContentSize = FLT_MAX;
-};
-
-enum ListItemGroupArea {
-    NONE_AREA,
-    IN_LIST_ITEM_AREA,
-    IN_HEADER_AREA,
-    IN_FOOTER_AREA
 };
 
 struct VisibleContentInfo {
@@ -85,6 +79,7 @@ public:
     {}
     ~ListItemGroupPattern() override = default;
 
+    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config) override;
     void DumpAdvanceInfo() override;
     void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json) override;
     bool IsAtomicNode() const override
@@ -263,6 +258,11 @@ public:
     const ListItemGroupPositionMap& GetItemPosition()
     {
         return itemPosition_;
+    }
+
+    const ListItemGroupPositionMap& GetCachedItemPosition() const
+    {
+        return cachedItemPosition_;
     }
 
     void SetIndexInList(int32_t index)
@@ -497,6 +497,8 @@ public:
     }
 
 private:
+    void DumpAdvanceVisualProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
     bool OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, const DirtySwapConfig& config) override;
     void OnAttachToMainTree() override;
     void OnAttachToMainTreeMultiThread();

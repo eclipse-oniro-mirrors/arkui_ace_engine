@@ -41,14 +41,14 @@ struct SearchSceneNodeFeature {
     std::vector<SearchKeywordSource> keywordSources;
     bool swiperAutoPlay = false;
     // True when collected from an ArkUI subwindow; its event PageName becomes
-    // `<mainPageName>+Dialog`.
+    // `<mainPageName>+Dialog` or `<mainPageName>+Sheet`.
     bool isSubwindow = false;
 };
 
 // Light-weight snapshot built once at a ContentChange stable point and reused
 // by all candidate rules (ADR-1).
 struct SearchSceneSnapshot {
-    // Event PageName: primary top page name (subwindow uses `<main>+Dialog`).
+    // Event PageName: primary top page name (subwindow uses `<main>+Dialog` or `<main>+Sheet`).
     std::string pageName;
     // Rule page matching values, fetched by pageType (ADR-2).
     std::string navDestinationName;
@@ -77,10 +77,8 @@ public:
     SearchSceneSnapshot BuildLocal(const RefPtr<FrameNode>& responseNode, int32_t maxDepth) const;
 
 private:
-    void CollectNode(const SearchWindowContext& window, const RefPtr<UINode>& node,
-        SearchSceneSnapshot& snapshot) const;
-    void CollectNodeWithDepth(const SearchWindowContext& window, const RefPtr<UINode>& node,
-        int32_t maxDepth, int32_t depth, SearchSceneSnapshot& snapshot) const;
+    std::string CollectNode(const SearchWindowContext& window, const RefPtr<UINode>& node,
+        SearchSceneSnapshot& snapshot, int32_t remainingDepth = -1) const;
     bool BuildNodeFeature(const SearchWindowContext& window, const RefPtr<FrameNode>& frameNode,
         std::vector<SearchSceneNodeFeature>& nodes) const;
 };

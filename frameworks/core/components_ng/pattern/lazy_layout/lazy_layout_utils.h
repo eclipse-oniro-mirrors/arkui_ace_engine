@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/pattern/lazy_layout/lazy_layout_offset.h"
 #include "core/components_ng/property/layout_constraint.h"
 
 namespace OHOS::Ace::NG {
@@ -74,6 +75,24 @@ struct ACE_FORCE_EXPORT LazyLayoutUtils {
     // Find the first LazyLayoutPattern through a proxy chain whose FrameNodes were explicitly marked as
     // participating in lazy layout. Ordinary wrapper/content FrameNodes are traversal boundaries.
     static RefPtr<LazyLayoutPattern> GetLazyLayoutPattern(const RefPtr<UINode>& node);
+
+    // Called after Measure: unchanged geometry and GONE are valid; deferred/pre-make measurement is not.
+    static bool IsChildMeasureComplete(const RefPtr<LayoutWrapper>& wrapper);
+    // Dispatch only the algorithm's scoped boundary work; FrameNode retains the complete Measure lifecycle.
+    static bool MeasurePreparedBoundary(LazyLayoutPattern* pattern);
+
+    // Synchronous boundary measurement. Requires an explicit viewPosRef without a deadline.
+    // Keeps active/visible ranges and offsets unchanged; commits measured sizes and internal positions only.
+    // Supports single-child allowed intermediates and nested LazyColumn. nullopt rejects preparation before
+    // committing sizes; a result with unsupported=true also carries compensation for committed partial work.
+    // Custom measure/Kit/extension callbacks and special geometry on the container itself are unsupported;
+    // ordinary descendants keep their real FrameNode measurement lifecycle.
+    // No retry is scheduled. complete is range coverage, not an assertion that the whole extent is exact.
+    // The caller consumes adjust once before laying out an already visible host, including incomplete or
+    // unsupported results, and routes unsupported containers to their existing layout behavior.
+    static std::optional<LazyPremeasureResult> Premeasure(
+        const RefPtr<LayoutWrapper>& wrapper, const LayoutConstraintF& constraint,
+        std::vector<WeakPtr<FrameNode>>* measuredNodes = nullptr);
 
     static LazyLayoutViewRange CalculateViewRange(const ViewPosReference& viewPosRef, float mainSize)
     {

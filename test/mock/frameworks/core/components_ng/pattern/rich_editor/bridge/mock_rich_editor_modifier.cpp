@@ -91,7 +91,7 @@ RefPtr<NG::RichEditorTheme> BuildRichEditorTheme(const RefPtr<ThemeConstants>& t
     return RichEditorTheme::Builder().Build(themeConstants);
 }
 
-RefPtr<TokenThemeWrapper> BuildRichEditorThemeWrapper(const RefPtr<ThemeConstants>& themeConstants)
+RefPtr<Theme> BuildRichEditorThemeWrapper(const RefPtr<ThemeConstants>& themeConstants)
 {
     CHECK_NULL_RETURN(themeConstants, nullptr);
     return RichEditorThemeWrapper::WrapperBuilder().BuildWrapper(themeConstants);

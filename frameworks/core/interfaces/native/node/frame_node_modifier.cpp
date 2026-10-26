@@ -13,11 +13,13 @@
  * limitations under the License.
  */
 #include "core/interfaces/native/node/frame_node_modifier.h"
+
 #include <cstdlib>
 #include <unistd.h>
 #include <vector>
 
 #include "base/error/error_code.h"
+#include "base/log/log_wrapper.h"
 #include "base/utils/utils.h"
 #include "base/utils/multi_thread.h"
 #include "bridge/common/utils/engine_helper.h"
@@ -25,6 +27,7 @@
 #include "core/common/color_inverter.h"
 #include "core/components_ng/base/inspector.h"
 #include "core/components_ng/base/view_abstract.h"
+#include "core/components_ng/base/cmp_accessibility_registry.h"
 #include "core/components_ng/pattern/custom_frame_node/custom_frame_node.h"
 #include "core/components_ng/pattern/custom_frame_node/custom_pattern.h"
 #include "core/components_ng/pattern/custom/custom_measure_layout_node.h"
@@ -722,6 +725,7 @@ ArkUI_Int32 SetSystemColorModeChangeEvent(ArkUINodeHandle node, void* userData, 
     auto onColorChange = [userData, onColorModeChange](int32_t colorMode) {
         using FuncType = float (*)(int32_t, void*);
         FuncType func = reinterpret_cast<FuncType>(onColorModeChange);
+        LOG_CALLBACK("OH_ArkUI_RegisterSystemColorModeChangeEvent", func);
         func(colorMode, userData);
     };
     ViewAbstract::SetSystemColorModeChangeEvent(frameNode, onColorChange);
@@ -745,6 +749,7 @@ ArkUI_Int32 SetDrawCompleteEvent(ArkUINodeHandle node, void* userData, void* onD
         if (!func) {
             return;
         }
+        LOG_CALLBACK("OH_ArkUI_RegisterDrawCallbackOnNodeHandle", func);
         func(userData);
     };
     ViewAbstract::SetDrawCompleteEvent(frameNode, std::move(onDrawCallBack));
@@ -769,6 +774,7 @@ ArkUI_Int32 SetLayoutEvent(ArkUINodeHandle node, void* userData, void* onLayout)
         if (!func) {
             return;
         }
+        LOG_CALLBACK("OH_ArkUI_RegisterLayoutCallbackOnNodeHandle", func);
         func(userData);
     };
     ViewAbstract::SetLayoutEvent(frameNode, std::move(onLayoutCallBack));
@@ -870,6 +876,7 @@ EventBindingInfo GetInteractionEventBindingInfo(ArkUINodeHandle node, int eventT
 void RunScopedTask(ArkUI_Int32 instanceId, void* userData, void (*callback)(void* userData))
 {
     ContainerScope scope(instanceId);
+    LOG_CALLBACK("OH_ArkUI_RunTaskInScope", callback);
     callback(userData);
 }
 
@@ -883,6 +890,7 @@ ArkUI_Int32 SetSystemFontStyleChangeEvent(ArkUINodeHandle node, void* userData, 
         fontStyle->fontWeight = fontWeight;
         using FuncType = float (*)(ArkUISystemFontStyleEvent, void*);
         FuncType func = reinterpret_cast<FuncType>(onFontStyleChange);
+        LOG_CALLBACK("OH_ArkUI_RegisterSystemFontStyleChangeEvent", func);
         func(fontStyle, userData);
     };
     ViewAbstract::SetSystemFontChangeEvent(frameNode, onFontChange);
@@ -1262,7 +1270,11 @@ ArkUI_Int32 SetForceDarkConfig(
     }
     if (forceDark) {
         auto invertFunc = [colorInvertFunc](uint32_t color) {
-            return colorInvertFunc ? colorInvertFunc(color) : ColorInverter::DefaultInverter(color);
+            if (colorInvertFunc) {
+                LOG_CALLBACK("OH_ArkUI_SetForceDarkConfig", colorInvertFunc);
+                return colorInvertFunc(color);
+            }
+            return ColorInverter::DefaultInverter(color);
         };
         ColorInverter::GetInstance().EnableColorInvert(instanceId, nodeTag, std::move(invertFunc));
     } else {
@@ -1296,6 +1308,80 @@ ArkUI_AccessibilityProvider* GetAccessibilityProvider(ArkUINodeHandle node)
     auto pattern = frameNode->GetPattern<CustomPattern>();
     CHECK_NULL_RETURN(pattern, nullptr);
     return pattern->GetNativeAccessibilityProvider();
+}
+
+// CMP mixed-rendering: frame node modifier route for OH_ArkUI_Accessibility_BindExportTree / OH_ArkUI_Accessibility_UnbindExportTree.
+ArkUI_Int32 BindAccessibilityExportTree(ArkUINodeHandle owner, ArkUI_Int64 bindId, ArkUINodeHandle exportedRoot)
+{
+    // Adoption of exportedRoot is NOT required.
+    auto* ownerNode = reinterpret_cast<FrameNode*>(owner);
+    auto* exportedRootNode = reinterpret_cast<FrameNode*>(exportedRoot);
+    if (ownerNode == nullptr || exportedRootNode == nullptr) {
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+#ifdef OHOS_PLATFORM
+    auto container = Container::GetContainer(ownerNode->GetInstanceId());
+    auto executor = container ? container->GetTaskExecutor() : nullptr;
+    CHECK_NULL_RETURN(executor, ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_Int32 result = ARKUI_ERROR_CODE_PARAM_INVALID;
+    auto task = [ownerWeak = Referenced::WeakClaim(ownerNode),
+        rootWeak = Referenced::WeakClaim(exportedRootNode), bindId, &result] {
+        auto owner = ownerWeak.Upgrade();
+        auto root = rootWeak.Upgrade();
+        CHECK_NULL_VOID(owner);
+        if (owner->GetTag() != V2::CUSTOM_ETS_TAG && owner->GetTag() != V2::XCOMPONENT_ETS_TAG) {
+            return;
+        }
+        CHECK_NULL_VOID(root);
+        ContainerScope scope(owner->GetInstanceId());
+        if (OHOS::Ace::CmpAccessibility::CmpAccessibilityRegistry::BindExportTree(
+            owner.GetRawPtr(), bindId, root.GetRawPtr())) {
+            result = ARKUI_ERROR_CODE_NO_ERROR;
+        }
+    };
+    if (executor->WillRunOnCurrentThread(TaskExecutor::TaskType::UI)) {
+        task();
+    } else {
+        executor->PostSyncTask(task, TaskExecutor::TaskType::UI, "ArkUIBindAccessibilityExportTree");
+    }
+    return result;
+#else
+    // CMP mixed-rendering depends on the OHOS accessibility (AAMS) stack.
+    return ARKUI_ERROR_CODE_INTERNAL_ERROR;
+#endif
+}
+
+// Unbind is idempotent for unknown bindIds: NO_ERROR, no side effects.
+ArkUI_Int32 UnbindAccessibilityExportTree(ArkUINodeHandle owner, ArkUI_Int64 bindId)
+{
+    auto* ownerNode = reinterpret_cast<FrameNode*>(owner);
+    if (ownerNode == nullptr) {
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+#ifdef OHOS_PLATFORM
+    auto container = Container::GetContainer(ownerNode->GetInstanceId());
+    auto executor = container ? container->GetTaskExecutor() : nullptr;
+    CHECK_NULL_RETURN(executor, ARKUI_ERROR_CODE_PARAM_INVALID);
+    ArkUI_Int32 result = ARKUI_ERROR_CODE_PARAM_INVALID;
+    auto task = [ownerWeak = Referenced::WeakClaim(ownerNode), bindId, &result] {
+        auto owner = ownerWeak.Upgrade();
+        CHECK_NULL_VOID(owner);
+        if (owner->GetTag() != V2::CUSTOM_ETS_TAG && owner->GetTag() != V2::XCOMPONENT_ETS_TAG) {
+            return;
+        }
+        ContainerScope scope(owner->GetInstanceId());
+        OHOS::Ace::CmpAccessibility::CmpAccessibilityRegistry::UnbindExportTree(owner.GetRawPtr(), bindId);
+        result = ARKUI_ERROR_CODE_NO_ERROR;
+    };
+    if (executor->WillRunOnCurrentThread(TaskExecutor::TaskType::UI)) {
+        task();
+    } else if (!executor->PostSyncTask(task, TaskExecutor::TaskType::UI, "ArkUIUnbindAccessibilityExportTree")) {
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    return result;
+#else
+    return ARKUI_ERROR_CODE_INTERNAL_ERROR;
+#endif
 }
 
 ArkUINodeHandle GetPageRootNode(int32_t instanceId)
@@ -1426,6 +1512,8 @@ const ArkUIFrameNodeModifier* GetFrameNodeModifier()
         .getAccessibilityProvider = GetAccessibilityProvider,
         .getPageRootNode = GetPageRootNode,
         .getCommonViewParentId = GetCommonViewParentId,
+        .bindAccessibilityExportTree = BindAccessibilityExportTree,
+        .unbindAccessibilityExportTree = UnbindAccessibilityExportTree,
         .injectCompositeCommand = InjectCompositeCommandImpl,
     };
     CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line

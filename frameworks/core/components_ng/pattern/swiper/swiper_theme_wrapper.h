@@ -17,12 +17,12 @@
 #define FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_SWIPER_SWIPER_THEME_WRAPPER_H
 
 #include "core/components/swiper/swiper_indicator_theme.h"
-#include "core/components_ng/token_theme/token_theme_wrapper.h"
+#include "core/components_ng/token_theme/token_theme.h"
 
 namespace OHOS::Ace::NG {
 
-class SwiperThemeWrapper : public SwiperIndicatorTheme, public TokenThemeWrapper {
-    DECLARE_ACE_TYPE(SwiperThemeWrapper, SwiperIndicatorTheme, TokenThemeWrapper);
+class SwiperThemeWrapper : public SwiperIndicatorTheme {
+    DECLARE_ACE_TYPE(SwiperThemeWrapper, SwiperIndicatorTheme);
 
 public:
     class WrapperBuilder : public Builder {
@@ -30,7 +30,7 @@ public:
         WrapperBuilder() = default;
         ~WrapperBuilder() = default;
 
-        RefPtr<TokenThemeWrapper> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
+        RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
         {
             auto themeWrapper = AceType::MakeRefPtr<SwiperThemeWrapper>();
             auto theme = AceType::DynamicCast<SwiperIndicatorTheme>(themeWrapper);

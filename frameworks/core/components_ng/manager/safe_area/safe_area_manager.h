@@ -84,6 +84,12 @@ public:
     bool UpdateFloatNavSafeArea(
         const SafeAreaInsets& safeArea, NG::OptionalSize<uint32_t> rootSize = NG::OptionalSize<uint32_t>());
 
+    bool UpdateTitleButtonSafeArea(
+        const SafeAreaInsets& safeArea, NG::OptionalSize<uint32_t> rootSize = NG::OptionalSize<uint32_t>());
+
+    bool CheckTitleButtonSafeArea(
+        const SafeAreaInsets& safeArea, NG::OptionalSize<uint32_t> rootSize = NG::OptionalSize<uint32_t>());
+
     /**
      * @brief Retrieves the system safe area insets.
      *
@@ -104,6 +110,13 @@ public:
     SafeAreaInsets GetFloatNavSafeAreaWithoutProcess() const
     {
         return floatNavSafeArea_;
+    }
+
+    SafeAreaInsets GetTitleButtonSafeArea() const;
+
+    SafeAreaInsets GetTitleButtonSafeAreaWithoutProcess() const
+    {
+        return titleButtonSafeArea_;
     }
 
     /**
@@ -442,6 +455,7 @@ private:
     SafeAreaInsets cutoutSafeArea_;
     SafeAreaInsets navSafeArea_;
     SafeAreaInsets floatNavSafeArea_;
+    SafeAreaInsets titleButtonSafeArea_;
     // keyboard is bottom direction only
     SafeAreaInsets::Inset keyboardInset_;
     SafeAreaInsets::Inset keyboardWebInset_;

@@ -135,6 +135,17 @@ struct ScrollOnInjectionEventInfo {
     double scrollOffset = 0.0;
 };
 
+struct ScrollToIndexTarget {
+    int32_t index = -1;
+    float extraOffset = 0.0f;
+    ScrollAlign align = ScrollAlign::START;
+    float targetOffset = 0.0f;
+    float skipDistance = 0.0f;
+    float viewportSize = 0.0f;
+    FastScrollMode fastScrollMode = FastScrollMode::NONE;
+    bool skipPending = false;
+};
+
 class ACE_FORCE_EXPORT ScrollablePattern : public NestableScrollContainer, public virtual StatusBarClickListener {
     DECLARE_ACE_TYPE(ScrollablePattern, NestableScrollContainer);
 
@@ -506,7 +517,7 @@ public:
     {
         return 0.0f;
     }
-    virtual void OnAnimateStop() {}
+    virtual void OnAnimateStop();
     virtual void ScrollTo(float position);
     void SmartGesturePerformScroll(float position);
     virtual void AnimateTo(
@@ -678,6 +689,12 @@ public:
     virtual void ScrollToIndex(int32_t index, bool smooth = false, ScrollAlign align = ScrollAlign::START,
         std::optional<float> extraOffset = std::nullopt)
     {}
+
+    virtual void ScrollToIndexFastScroll(int32_t index, bool smooth, ScrollAlign align,
+        std::optional<float> extraOffset, FastScrollMode mode)
+    {
+        ScrollToIndex(index, smooth, align, extraOffset);
+    }
 
     void SetExtraOffset(std::optional<float> extraOffset)
     {
@@ -890,6 +907,7 @@ public:
     virtual void GetEventDumpInfo();
     virtual void GetEventDumpInfo(std::unique_ptr<JsonValue>& json);
 
+    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config) override;
     void DumpAdvanceInfo() override;
     void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json) override;
 
@@ -1146,6 +1164,20 @@ public:
     ACE_FORCE_EXPORT void ContentChangeOnScrollStart(const RefPtr<FrameNode>& keyNode);
 
 protected:
+    float CalcSpringAdjustOffset(float offset) const;
+    void StartFastScrollAnimation(float position);
+    virtual void CancelFastScroll();
+    const ScrollToIndexTarget* GetFastScrollRequest() const
+    {
+        return scrollTarget_ && IsFastScrollEnabled(scrollTarget_->fastScrollMode) ? &*scrollTarget_ : nullptr;
+    }
+    ScrollToIndexTarget* GetFastScrollRequest()
+    {
+        return scrollTarget_ && IsFastScrollEnabled(scrollTarget_->fastScrollMode) ? &*scrollTarget_ : nullptr;
+    }
+    std::optional<ScrollToIndexTarget> scrollTarget_;
+    bool fastScrollSkip_ = false;
+    bool startingFastScroll_ = false;
     ACE_FORCE_EXPORT void SuggestOpIncGroup(bool flag);
     void OnAttachToFrameNode() override;
     void OnAttachToFrameNodeMultiThread();
@@ -1268,6 +1300,18 @@ protected:
     bool HandleArrowKeyScroll(const KeyEvent& keyEventInfo);
 
 private:
+    void GetEventDumpInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
+    void DumpAdvanceScrollEventInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
+    void DumpAdvancePhysicsInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
+    void DumpAdvanceDiagnostics(std::unique_ptr<JsonValue>& json);
+    void DumpAdvanceDiagnosticsDetails(std::unique_ptr<JsonValue>& json);
+    void DumpAdvanceVisualProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+    void DumpAdvanceFunctionalProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
+
     // Pattern owns target selection; Scrollable owns the animation and queued-task generation.
     std::optional<float> predictedItemSnapTarget_;
     float itemSnapReleaseMotionVelocity_ = 0.0f;
@@ -1311,7 +1355,6 @@ private:
     float GetScrollDelta(float offset, bool& stopAnimation);
     // Process spring offset animation callback
     void ProcessSpringOffsetCallback(float offset);
-    float CalcSpringAdjustOffset(float offset) const;
 
     void InitTouchEvent(const RefPtr<GestureEventHub>& gestureHub);
     void RegisterTouchpadInteractionCallback();

@@ -29,6 +29,7 @@ namespace OHOS::Ace::NG {
 class ListPositionMap;
 class ListChildrenMainSize;
 struct ListItemGroupLayoutInfo;
+struct PreparedLayoutGeometry;
 
 // TextLayoutAlgorithm acts as the underlying text layout.
 class ACE_EXPORT ListItemGroupLayoutAlgorithm : public LayoutAlgorithm {
@@ -165,6 +166,44 @@ public:
         groupItemAverageHeight_ = averageHeight;
     }
 
+    void SetFastScroll(bool fastScroll, std::optional<float> mainSize = std::nullopt)
+    {
+        if (!fastScroll) {
+            fastScrollState_.reset();
+            return;
+        }
+        auto& state = GetOrCreateFastScrollState();
+        state.mainSize = mainSize;
+        state.mainSizeProvided = mainSize.has_value();
+    }
+    void SetPreparedGeometry(const std::shared_ptr<const PreparedLayoutGeometry>& geometry);
+
+    const std::shared_ptr<const PreparedLayoutGeometry>& GetPreparedGeometry() const
+    {
+        static const std::shared_ptr<const PreparedLayoutGeometry> empty;
+        return fastScrollState_ ? fastScrollState_->preparedGeometry : empty;
+    }
+
+    void SetPremeasureOnly(bool value, bool displayed = false)
+    {
+        if (!value && !fastScrollState_) {
+            return;
+        }
+        auto& state = GetOrCreateFastScrollState();
+        state.premeasureOnly = value;
+        state.premeasureFailed = false;
+        state.premeasureExecuted = false;
+        state.premeasureDisplayed = value && displayed;
+    }
+
+    bool IsPremeasureComplete() const
+    {
+        return fastScrollState_ && fastScrollState_->premeasureExecuted &&
+            !fastScrollState_->premeasureFailed && !measureInNextFrame_;
+    }
+
+    std::vector<WeakPtr<FrameNode>> TakePremeasuredNodes();
+
     float GetRefPos() const
     {
         return refPos_;
@@ -275,9 +314,9 @@ public:
     void CheckRecycle(const RefPtr<LayoutWrapper>& layoutWrapper, float startPos, float endPos, float referencePos,
         bool forwardLayout);
 
-    void SetNeedAllLayout()
+    void SetNeedAllLayout(bool needAllLayout = true)
     {
-        needAllLayout_ = true;
+        needAllLayout_ = needAllLayout;
     }
 
     void CheckNeedAllLayout(const RefPtr<LayoutWrapper>& layoutWrapper, bool forwardLayout);
@@ -460,7 +499,17 @@ private:
         int32_t currentIndex);
     bool CheckJumpForwardForBigOffset(int32_t& startIndex, float& startPos);
     bool CheckJumpBackwardForBigOffset(int32_t& endIndex, float& endPos);
+    void FindFastScrollAnchor(int32_t& index, float& position, bool forward) const;
+    bool FindPreparedAnchor(int32_t& index, float& position, bool forward) const;
+    void MoveEstimatedAnchor(int32_t& index, float& position, float window, bool forward) const;
+    void UpdateFastScrollMainSize(const RefPtr<LayoutProperty>& layoutProperty);
+    void EstimateFastScrollMainSize(float mainMargin);
+    bool FindFastScrollEdge(int32_t& index, float& position, float window, bool forward) const;
+    int32_t FindFastScrollRow(float position) const;
+    float GetPosMapPosition(int32_t index, bool end = false) const;
     void MeasureForward(LayoutWrapper* layoutWrapper, const LayoutConstraintF& layoutConstraint,
+        int32_t startIndex, float startPos);
+    void MeasureLeadingItems(LayoutWrapper* layoutWrapper, const LayoutConstraintF& layoutConstraint,
         int32_t startIndex, float startPos);
     void MeasureBackward(LayoutWrapper* layoutWrapper, const LayoutConstraintF& layoutConstraint,
         int32_t endIndex, float endPos);
@@ -476,6 +525,10 @@ private:
     void SetActiveChildRange(LayoutWrapper* layoutWrapper, int32_t cacheCount, bool show);
     float UpdateReferencePos(RefPtr<LayoutProperty> layoutProperty, bool forwardLayout, float referencePos);
     bool NeedMeasureItem(LayoutWrapper* layoutWrapper);
+    RefPtr<LayoutWrapper> GetMeasureChild(LayoutWrapper* layoutWrapper, int32_t index) const;
+    void UpdatePremeasuredMainSize(const RefPtr<LayoutProperty>& property);
+    bool HasDisplayedTailExtent(bool mirroredSummary) const;
+    void CapturePreparedGeometry();
     static void SetListItemIndex(const LayoutWrapper* groupLayoutWrapper,
         const RefPtr<LayoutWrapper>& itemLayoutWrapper, int32_t indexInGroup);
     bool IsCardStyleForListItemGroup(const LayoutWrapper* groupLayoutWrapper);
@@ -483,6 +536,7 @@ private:
         OptionalSizeF& contentIdealSize);
     void AdjustItemPosition();
     bool CheckNeedMeasure(const RefPtr<LayoutWrapper>& layoutWrapper) const;
+    bool MeasureChild(const RefPtr<LayoutWrapper>& wrapper, const LayoutConstraintF& constraint);
     void MeasureCacheItem(LayoutWrapper* layoutWrapper);
     void MeasureCacheForward(LayoutWrapper* layoutWrapper, ListItemGroupCacheParam& param);
     void MeasureCacheBackward(LayoutWrapper* layoutWrapper, ListItemGroupCacheParam& param);
@@ -545,6 +599,30 @@ private:
     bool needAllLayout_ = false;
     bool needAdjustRefPos_ = false;
     bool isNeedCheckOffset_ = false;
+    struct FastScrollLayoutState {
+        bool premeasureOnly = false;
+        bool premeasureFailed = false;
+        bool premeasureExecuted = false;
+        bool premeasureDisplayed = false;
+        bool mainSizeProvided = false;
+        std::optional<float> mainSize;
+        std::vector<WeakPtr<FrameNode>> premeasuredNodes;
+        std::shared_ptr<const PreparedLayoutGeometry> preparedGeometry;
+    };
+
+    FastScrollLayoutState& GetOrCreateFastScrollState();
+
+    bool IsPremeasureOnly() const
+    {
+        return fastScrollState_ && fastScrollState_->premeasureOnly;
+    }
+
+    bool IsPremeasureDisplayed() const
+    {
+        return fastScrollState_ && fastScrollState_->premeasureDisplayed;
+    }
+
+    std::unique_ptr<FastScrollLayoutState> fastScrollState_;
     bool isNeedMeasureFormLastItem_ = false;
     bool isNeedSyncLoad_ = false;
     bool measureInNextFrame_ = false;

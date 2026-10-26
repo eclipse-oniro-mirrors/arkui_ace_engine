@@ -55,9 +55,6 @@ bool PostEventManager::PostEvent(const RefPtr<NG::UINode>& uiNode, TouchEvent& t
 
 bool PostEventManager::PostTouchEvent(const RefPtr<NG::UINode>& uiNode, TouchEvent&& touchEvent)
 {
-    TAG_LOGD(AceLogTag::ACE_INPUTKEYFLOW,
-        "PostTouchEvent: type=%{public}d, id=%{public}d, x=%{public}f, y=%{public}f, pointers=%{public}zu",
-        static_cast<int32_t>(touchEvent.type), touchEvent.id, touchEvent.x, touchEvent.y, touchEvent.pointers.size());
     CHECK_NULL_RETURN(uiNode, false);
     touchEvent.postEventNodeId = uiNode->GetId();
     touchEvent.id += PASS_THROUGH_EVENT_ID;
@@ -96,10 +93,6 @@ bool PostEventManager::PostTouchEvent(const RefPtr<NG::UINode>& uiNode, TouchEve
 
 bool PostEventManager::PostTouchEventWithStrategy(const RefPtr<NG::UINode>& uiNode, TouchEvent&& touchEvent)
 {
-    TAG_LOGD(AceLogTag::ACE_INPUTKEYFLOW,
-        "PostTouchEventWithStrategy: type=%{public}d, id=%{public}d, x=%{public}f, y=%{public}f, pointers=%{public}zu",
-        static_cast<int32_t>(touchEvent.type), touchEvent.id, touchEvent.x, touchEvent.y,
-        touchEvent.pointers.size());
     CHECK_NULL_RETURN(uiNode, false);
     auto it = targetNodes_.find(uiNode->GetId());
     if (it != targetNodes_.end()) {
@@ -153,10 +146,6 @@ bool PostEventManager::PostTouchEventWithStrategy(const RefPtr<NG::UINode>& uiNo
 
 bool PostEventManager::PostMouseEvent(const RefPtr<NG::UINode>& uiNode, MouseEvent&& mouseEvent)
 {
-    TAG_LOGD(AceLogTag::ACE_INPUTKEYFLOW,
-        "PostMouseEvent: action=%{public}d, button=%{public}d, x=%{public}f, y=%{public}f, id=%{public}d",
-        static_cast<int32_t>(mouseEvent.action), static_cast<int32_t>(mouseEvent.button), mouseEvent.x,
-        mouseEvent.y, mouseEvent.id);
     CHECK_NULL_RETURN(uiNode, false);
     mouseEvent.id += PASS_THROUGH_EVENT_ID;
     mouseEvent.postEventNodeId = uiNode->GetId();
@@ -195,10 +184,6 @@ bool PostEventManager::PostMouseEvent(const RefPtr<NG::UINode>& uiNode, MouseEve
 
 bool PostEventManager::PostMouseEventWithStrategy(const RefPtr<NG::UINode>& uiNode, MouseEvent&& mouseEvent)
 {
-    TAG_LOGD(AceLogTag::ACE_INPUTKEYFLOW,
-        "PostMouseEventWithStrategy: action=%{public}d, button=%{public}d, x=%{public}f, y=%{public}f, id=%{public}d",
-        static_cast<int32_t>(mouseEvent.action), static_cast<int32_t>(mouseEvent.button), mouseEvent.x,
-        mouseEvent.y, mouseEvent.id);
     CHECK_NULL_RETURN(uiNode, false);
     auto it = targetNodes_.find(uiNode->GetId());
     if (it != targetNodes_.end()) {
@@ -252,11 +237,6 @@ bool PostEventManager::PostMouseEventWithStrategy(const RefPtr<NG::UINode>& uiNo
 
 bool PostEventManager::PostAxisEvent(const RefPtr<NG::UINode>& uiNode, AxisEvent&& axisEvent)
 {
-    TAG_LOGD(AceLogTag::ACE_INPUTKEYFLOW,
-        "PostAxisEvent: action=%{public}d, scrollStep=%{public}d, x=%{public}f, y=%{public}f, "
-        "verticalAxis=%{public}f, horizontalAxis=%{public}f",
-        static_cast<int32_t>(axisEvent.action), axisEvent.scrollStep, axisEvent.x, axisEvent.y,
-        axisEvent.verticalAxis, axisEvent.horizontalAxis);
     CHECK_NULL_RETURN(uiNode, false);
     axisEvent.id += PASS_THROUGH_EVENT_ID;
     axisEvent.postEventNodeId = uiNode->GetId();
@@ -284,11 +264,6 @@ bool PostEventManager::PostAxisEvent(const RefPtr<NG::UINode>& uiNode, AxisEvent
 
 bool PostEventManager::PostAxisEventWithStrategy(const RefPtr<NG::UINode>& uiNode, AxisEvent&& axisEvent)
 {
-    TAG_LOGD(AceLogTag::ACE_INPUTKEYFLOW,
-        "PostAxisEventWithStrategy: action=%{public}d, scrollStep=%{public}d, x=%{public}f, y=%{public}f, "
-        "verticalAxis=%{public}f, horizontalAxis=%{public}f",
-        static_cast<int32_t>(axisEvent.action), axisEvent.scrollStep, axisEvent.x, axisEvent.y,
-        axisEvent.verticalAxis, axisEvent.horizontalAxis);
     CHECK_NULL_RETURN(uiNode, false);
     auto it = targetNodes_.find(uiNode->GetId());
     if (it != targetNodes_.end()) {

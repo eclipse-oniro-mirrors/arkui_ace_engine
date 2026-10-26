@@ -19,6 +19,10 @@
 #include "core/components_ng/layout/layout_property.h"
 #include "core/components_ng/pattern/scrollable/scrollable_properties.h"
 
+namespace OHOS::Ace {
+struct ParamConfig;
+}
+
 namespace OHOS::Ace::NG {
 class InspectorFilter;
 
@@ -47,6 +51,7 @@ public:
     void DumpInfo();
 
     void DumpInfo(std::unique_ptr<JsonValue>& json);
+    void DumpInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
 
     void ToJsonValue(std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const override;
 

@@ -373,7 +373,9 @@ let ImmersiveStrategy;
 (function (ImmersiveStrategy) {
   ImmersiveStrategy[ImmersiveStrategy.AVOID_CUTOUT = 0] = 'AVOID_CUTOUT';
   ImmersiveStrategy[ImmersiveStrategy.AVOID_FLOAT_NAV = 1] = 'AVOID_FLOAT_NAV';
+  ImmersiveStrategy[ImmersiveStrategy.AVOID_WINDOW_CONTROLS = 6] = 'AVOID_WINDOW_CONTROLS';
   ImmersiveStrategy[ImmersiveStrategy.BIND_SHEET_EXPAND_SAFE_AREA = 7] = 'BIND_SHEET_EXPAND_SAFE_AREA';
+  ImmersiveStrategy[ImmersiveStrategy.NAVIGATION_EXPAND_SAFE_AREA = 8] = 'NAVIGATION_EXPAND_SAFE_AREA';
 })(ImmersiveStrategy || (ImmersiveStrategy = {}));
 
 let VerticalAlign;
@@ -1091,6 +1093,7 @@ let TabBarStyle;
   TabBarStyle[TabBarStyle.BOTTOM = 0] = 'BOTTOM';
   TabBarStyle[TabBarStyle.SIDEBAR = 1] = 'SIDEBAR';
   TabBarStyle[TabBarStyle.SIDEBAR_ADAPTABLE = 2] = 'SIDEBAR_ADAPTABLE';
+  TabBarStyle[TabBarStyle.TOP = 3] = 'TOP';
 })(TabBarStyle || (TabBarStyle = {}));
 
 let TabsSidebarDisplayStyle;
@@ -1103,6 +1106,7 @@ let TabBarDisplayMode;
 (function (TabBarDisplayMode) {
   TabBarDisplayMode[TabBarDisplayMode.BOTTOM_TABBAR = 0] = 'BOTTOM_TABBAR';
   TabBarDisplayMode[TabBarDisplayMode.SIDEBAR = 1] = 'SIDEBAR';
+  TabBarDisplayMode[TabBarDisplayMode.TOP_TABBAR = 2] = 'TOP_TABBAR';
 })(TabBarDisplayMode || (TabBarDisplayMode = {}));
 
 let TabVisibility;
@@ -4424,6 +4428,12 @@ let XComponentType;
   XComponentType[XComponentType.NODE = 3] = 'NODE';
 })(XComponentType || (XComponentType = {}));
 
+let XComponentExtraFlag;
+(function (XComponentExtraFlag) {
+  XComponentExtraFlag[XComponentExtraFlag.ENABLE_SOLID_COLOR = 1] = 'ENABLE_SOLID_COLOR';
+})(XComponentExtraFlag || (XComponentExtraFlag = {}));
+
+
 let NestedScrollMode;
 (function (NestedScrollMode) {
   NestedScrollMode[NestedScrollMode.SELF_ONLY = 0] = 'SELF_ONLY';
@@ -4449,6 +4459,13 @@ let ScrollAlign;
   ScrollAlign[ScrollAlign.END = 2] = 'END';
   ScrollAlign[ScrollAlign.AUTO = 3] = 'AUTO';
 })(ScrollAlign || (ScrollAlign = {}));
+
+let FastScrollMode;
+(function (FastScrollMode) {
+  FastScrollMode[FastScrollMode.NONE = 0] = 'NONE';
+  FastScrollMode[FastScrollMode.SKIP_MEASURE = 1] = 'SKIP_MEASURE';
+  FastScrollMode[FastScrollMode.SKIP_CREATE_AND_MEASURE = 2] = 'SKIP_CREATE_AND_MEASURE';
+})(FastScrollMode || (FastScrollMode = {}));
 
 let SafeAreaType;
 (function (SafeAreaType) {

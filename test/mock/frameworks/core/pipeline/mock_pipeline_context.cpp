@@ -13,6 +13,8 @@
  * limitations under the License.
  */
 
+#include <cmath>
+
 #include <gmock/gmock.h>
 
 #include "core/common/thp_extra_manager.h"
@@ -41,6 +43,7 @@
 #include "core/components/common/layout/constants.h"
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/base/inspector.h"
+#include "core/components_ng/base/ui_tree_collector.h"
 #include "core/components_ng/manager/avoid_info/avoid_info_manager.h"
 #include "core/components_ng/manager/content_change_manager/content_change_manager.h"
 #include "core/components_ng/manager/focus/focus_manager.h"
@@ -144,12 +147,10 @@ public:
     MOCK_METHOD(void, SendExtensionAccessibilityEvent,
         (const Accessibility::AccessibilityEventInfo& eventInfo, int64_t uiExtensionOffset), (override));
 #endif
-#ifdef WEB_SUPPORTED
     MOCK_METHOD(bool, RegisterWebInteractionOperationAsChildTree,
         (int64_t accessibilityId, const WeakPtr<NG::WebPattern>& webPattern), (override));
     MOCK_METHOD(bool, DeregisterWebInteractionOperationAsChildTree,
         (int32_t treeId, const WeakPtr<NG::WebPattern>& webPattern), (override));
-#endif
     void RegisterAccessibilityChildTreeCallback(
         int64_t elementId, const std::shared_ptr<AccessibilityChildTreeCallback>& callback) override
     {}
@@ -324,10 +325,22 @@ void MockPipelineContext::SetContainerModalTitleHeight(int32_t height)
 {
     g_containerModalTitleHeight = height;
 }
+
+void MockPipelineContext::SetContainerModalTitleHeightWithVp(double heightVp)
+{
+    if (std::isfinite(heightVp) == false) {
+        return;
+    }
+    if (heightVp < 0) {
+        heightVp = 0;
+    }
+    g_containerModalTitleHeight = static_cast<int32_t>(std::ceil(heightVp * PipelineBase::dipScale_));
+}
 // mock_pipeline_context =======================================================
 
 // pipeline_context ============================================================
-PipelineContext::PipelineContext(): safeAreaManager_(MakeRefPtr<SafeAreaManager>())
+PipelineContext::PipelineContext()
+    : safeAreaManager_(MakeRefPtr<SafeAreaManager>()), uiTreeRequestState_(std::make_unique<NG::UITreeRequestState>())
 {
     InitManagers();
     if (navigationMgr_) {
@@ -421,6 +434,22 @@ RefPtr<PipelineContext> PipelineContext::GetContextByContainerId(int32_t /* cont
 void PipelineContext::AddWindowFocusChangedCallback(int32_t nodeId) {}
 
 void PipelineContext::RemoveWindowFocusChangedCallback(int32_t nodeId) {}
+
+UITreeRequestState& PipelineContext::GetUITreeRequestState()
+{
+    return *uiTreeRequestState_;
+}
+
+// TreeJson unit fixtures exercise real per-node traversal and the request lifecycle.
+// Page/navigation/overlay start selection remains a production integration test.
+void PipelineContext::CollectInspectorTreeInto(std::shared_ptr<JsonValue>& root, bool visible, ParamConfig config)
+{
+#ifndef CROSS_PLATFORM
+    if (rootNode_) {
+        rootNode_->DumpSimplifyTreeWithParamConfig(0, root, visible, config);
+    }
+#endif
+}
 
 void PipelineContext::SetupRootElement()
 {
@@ -525,6 +554,7 @@ void PipelineContext::FlushRebuildRenderTree()
 
 void PipelineContext::Destroy()
 {
+    CloseUITreeRequests(*this);
     dragDropManager_.Reset();
     rootNode_.Reset();
 }
@@ -811,6 +841,16 @@ const RefPtr<SelectOverlayManager>& PipelineContext::GetSelectOverlayManager()
     return selectOverlayManager_;
 }
 
+namespace {
+// Mock-only toggle (MockPipelineContext::SetNullOverlayManagerForTest).
+bool g_useNullOverlayManagerForTest = false;
+}
+
+void MockPipelineContext::SetNullOverlayManagerForTest(bool useNull)
+{
+    g_useNullOverlayManagerForTest = useNull;
+}
+
 const RefPtr<DragDropManager>& PipelineContext::GetDragDropManager()
 {
     return dragDropManager_;
@@ -846,6 +886,14 @@ const RefPtr<FullScreenManager>& PipelineContext::GetFullScreenManager()
 
 const RefPtr<OverlayManager>& PipelineContext::GetOverlayManager()
 {
+    // Mock-only toggle (MockPipelineContext::SetNullOverlayManagerForTest): when on,
+    // yield a null ref so overlay-gated paths bail at their null checks instead of
+    // building real overlay/menu UI in the mock environment (e.g. the WebDataDetector
+    // AI-entity-menu tests).
+    static const RefPtr<OverlayManager> nullOverlayManager;
+    if (g_useNullOverlayManagerForTest) {
+        return nullOverlayManager;
+    }
     return overlayManager_;
 }
 
@@ -1143,6 +1191,10 @@ void PipelineContext::UpdateNavSafeAreaWithoutAnimation(
 }
 
 void PipelineContext::UpdateFloatNavSafeAreaWithoutAnimation(const SafeAreaInsets& floatNavSafeArea) {}
+
+void PipelineContext::UpdateTitleButtonSafeArea(const SafeAreaInsets& titleButtonSafeArea) {}
+
+void PipelineContext::UpdateTitleButtonSafeAreaWithoutAnimation(const SafeAreaInsets& titleButtonSafeArea) {}
 
 void PipelineContext::ApplyDefaultImmersiveStrategy(const std::unordered_set<ImmersiveStrategy>& types)
 {

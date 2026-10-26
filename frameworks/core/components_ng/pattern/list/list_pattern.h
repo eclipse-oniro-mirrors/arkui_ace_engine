@@ -50,11 +50,18 @@ struct ListItemGroupPara {
     bool hasFooter = false;
 };
 
-struct ListScrollTarget {
-    int32_t index = -1;
-    float extraOffset = 0.0f;
-    ScrollAlign align = ScrollAlign::START;
-    float targetOffset;
+enum class FastScrollPreparation : uint8_t { NONE, NEED_TARGET, NEED_WINDOW, READY, UNSUPPORTED };
+
+struct ListFastScrollPreparation {
+    float estimatedSpace = 0.0f;
+    FastScrollPreparation preparation = FastScrollPreparation::NONE;
+    bool estimated = false;
+    std::shared_ptr<FastScrollPreparedLayouts> preparedLayouts;
+
+    bool NeedsPreparation() const
+    {
+        return preparation == FastScrollPreparation::NEED_TARGET || preparation == FastScrollPreparation::NEED_WINDOW;
+    }
 };
 
 class ACE_FORCE_EXPORT ListPattern : public SelectableContainerPattern {
@@ -272,6 +279,13 @@ public:
     void ScrollTo(float position) override;
     void ScrollToIndex(int32_t index, bool smooth = false, ScrollAlign align = ScrollAlign::START,
         std::optional<float> extraOffset = std::nullopt) override;
+    void ScrollToIndexFastScroll(int32_t index, bool smooth, ScrollAlign align,
+        std::optional<float> extraOffset, FastScrollMode mode) override;
+
+    bool HasFastScrollRequest() const
+    {
+        return GetFastScrollRequest() != nullptr;
+    }
     void ScrollToItemInGroup(int32_t index, int32_t indexInGroup, bool smooth = false,
         ScrollAlign align = ScrollAlign::START);
     bool CheckTargetValid(int32_t index, int32_t indexInGroup);
@@ -396,6 +410,8 @@ public:
     std::string ProvideRestoreInfo() override;
     void OnRestoreInfo(const std::string& restoreInfo) override;
     void DumpInfo() override;
+
+    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config) override;
     void DumpAdvanceInfo() override;
     void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json) override;
     void GetEventDumpInfo() override;
@@ -594,6 +610,7 @@ protected:
     virtual float GetEndOverScrollOffset(float offset, float endMainPos, float startMainPos) const;
     void SetLayoutAlgorithmParams(
         const RefPtr<ListLayoutAlgorithm>& listLayoutAlgorithm, const RefPtr<ListLayoutProperty>& listLayoutProperty);
+    void SetLayoutAlgorithmFastScrollParams(const RefPtr<ListLayoutAlgorithm>& algorithm);
     bool GetFadingEdge(RefPtr<ScrollablePaintProperty>& paintProperty);
     std::optional<ScrollingConfig> CreateScrollingConfig(
         SmartGestureDirection direction, double distance) const;
@@ -640,6 +657,34 @@ protected:
     bool isStackFromEnd_ = true;
     FocusWrapMode focusWrapMode_ = FocusWrapMode::DEFAULT;
 private:
+    void DumpAdvanceListConfiguration(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
+    void DumpAdvanceDiagnostics(std::unique_ptr<JsonValue>& json);
+    void DumpAdvanceVisualProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+    void DumpAdvanceFunctionalProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
+    const ListFastScrollPreparation* GetFastScrollPreparation() const
+    {
+        return fastScrollPreparation_.get();
+    }
+
+    ListFastScrollPreparation& GetOrCreateFastScrollPreparation();
+    void CancelFastScrollForTargetChange();
+    void CancelFastScroll() override;
+    void InitializeFastScrollRequest(int32_t index, ScrollAlign align, float extraOffset,
+        FastScrollMode mode);
+    bool MarkFastScrollVisibleTargetPrepared();
+    void UpdateFastScrollPositionMap();
+    bool FallbackFastScroll();
+    void TryStartFastScroll();
+    void UpdateFastScrollAnimation(float coordinateCorrection = 0.0f);
+    bool HasKnownFastScrollRowMismatch() const;
+    void ApplyFastScrollLayoutResult(const RefPtr<ListLayoutAlgorithm>& algorithm);
+    void ApplyFastScrollPreparationResult(const RefPtr<ListLayoutAlgorithm>& algorithm);
+    bool EstimateFastScrollPositions(int32_t firstMeasured = -1, int32_t lastMeasured = -1);
+    void ResolveFastScrollAlign();
+    bool GetFastScrollTargetPosition(float& position) const;
+    bool HandleFastScrollTargetReached(float position);
     std::optional<int32_t> GetDefaultScrollTargetIndex(
         SmartGestureDirection direction, ScrollAlign align, int32_t anchorIndex) const;
     double GetAverageScrollingDistance() const;
@@ -785,7 +830,7 @@ private:
     std::optional<int32_t> jumpIndexInGroup_;
     std::optional<int32_t> targetIndexInGroup_;
     mutable std::optional<bool> isLayoutListForFocus_; // Flag for only do Layout.
-    std::optional<ListScrollTarget> scrollTarget_;
+    std::unique_ptr<ListFastScrollPreparation> fastScrollPreparation_;
     bool paintStateFlag_ = false;
     bool isFramePaintStateValid_ = false;
 

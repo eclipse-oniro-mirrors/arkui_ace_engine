@@ -428,7 +428,7 @@ int32_t CollectPageText(int32_t instanceId, char** data, uint32_t* size, const c
     ContainerScope scope(instanceId);
     *reason = "Page text serialization, allocation or size check failed.";
     PageTextJson json;
-    bool success = json.Append("{\"texts\":[");
+    bool success = json.Append("{\"schemaVersion\":1,\"texts\":[");
 #ifndef CROSS_PLATFORM
     success = success && AppendPageText(instanceId, pipeline, json);
 #endif

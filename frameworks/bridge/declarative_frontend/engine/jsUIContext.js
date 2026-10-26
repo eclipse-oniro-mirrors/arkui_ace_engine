@@ -1262,6 +1262,18 @@ class UIContext {
         });
     }
 
+    createModalUIExtension(want, options, callback) {
+        return withInstanceId(this.instanceId_, () => {
+            return getUINativeModule().createModalUIExtension(this.instanceId_, want, options, callback);
+        });
+    }
+
+    closeModalUIExtension(sessionId) {
+        withInstanceId(this.instanceId_, () => {
+            getUINativeModule().closeModalUIExtension(this.instanceId_, sessionId);
+        });
+    }
+
     getSmartGestureController() {
         if (this.smartGestureController_ == null) {
             this.smartGestureController_ = new SmartGestureController(this.instanceId_);

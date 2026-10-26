@@ -1755,7 +1755,8 @@ HWTEST_F(WebPatternWebTest, IsShouldTriggerBack_004, TestSize.Level1)
 
 /**
  * @tc.name: IsShouldTriggerBack_005
- * @tc.desc: IsShouldTriggerBack with ESC coming from the overlay layer, back should not be triggered.
+ * @tc.desc: IsShouldTriggerBack after an ESC DOWN with no datalist popup showing, the ESC DOWN is not
+ *           consumed by the overlay layer and the following ESC UP should trigger back.
  * @tc.type: FUNC
  */
 HWTEST_F(WebPatternWebTest, IsShouldTriggerBack_005, TestSize.Level1)
@@ -1766,11 +1767,13 @@ HWTEST_F(WebPatternWebTest, IsShouldTriggerBack_005, TestSize.Level1)
     auto webPattern = frameNode->GetPattern<WebPattern>();
     ASSERT_NE(webPattern, nullptr);
     webPattern->isEscKeyDownConsumed_ = false;
-    webPattern->isEscKeyFromOverlayOrFullScreen_ = true;
 
-    EXPECT_FALSE(webPattern->IsShouldTriggerBack(KeyEvent(KeyCode::KEY_ESCAPE, KeyAction::UP), false));
-    // The overlay layer flag should be reset after the first ESC UP.
-    EXPECT_FALSE(webPattern->isEscKeyFromOverlayOrFullScreen_);
+    // No datalist popup is showing, the ESC DOWN is not consumed by the overlay layer.
+    webPattern->HandleKeyEvent(KeyEvent(KeyCode::KEY_ESCAPE, KeyAction::DOWN));
+    EXPECT_FALSE(webPattern->isEscKeyDownConsumed_);
+
+    // The following ESC UP is not blocked and back should be triggered.
+    EXPECT_TRUE(webPattern->IsShouldTriggerBack(KeyEvent(KeyCode::KEY_ESCAPE, KeyAction::UP), false));
     EXPECT_TRUE(webPattern->isEscKeyDownConsumed_);
 #endif
 }
@@ -1817,9 +1820,42 @@ HWTEST_F(WebPatternWebTest, IsShouldTriggerBack_007, TestSize.Level1)
 }
 
 /**
+ * @tc.name: HandleKeyEventEscDatalist_001
+ * @tc.desc: HandleKeyEvent with ESC DOWN, the ESC key down is consumed only when the datalist popup menu is
+ *           registered in the overlay manager, otherwise the following ESC UP can trigger back.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WebPatternWebTest, HandleKeyEventEscDatalist_001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto frameNode = CreateWebFrameNodeForEscBackTest();
+    ASSERT_NE(frameNode, nullptr);
+    auto webPattern = frameNode->GetPattern<WebPattern>();
+    ASSERT_NE(webPattern, nullptr);
+    webPattern->isEscKeyDownConsumed_ = false;
+
+    // No datalist node exists, the ESC DOWN is not consumed.
+    webPattern->HandleKeyEvent(KeyEvent(KeyCode::KEY_ESCAPE, KeyAction::DOWN));
+    EXPECT_FALSE(webPattern->isEscKeyDownConsumed_);
+
+    // The datalist node is created but its menu is not shown in the overlay manager,
+    // the ESC DOWN is still not consumed.
+    auto dataListNode = webPattern->CreateDataListFrameNode(OffsetF(0.0f, 0.0f), 10.0f, 10.0f);
+    ASSERT_NE(dataListNode, nullptr);
+    EXPECT_TRUE(webPattern->dataListNodeId_.has_value());
+    webPattern->HandleKeyEvent(KeyEvent(KeyCode::KEY_ESCAPE, KeyAction::DOWN));
+    EXPECT_FALSE(webPattern->isEscKeyDownConsumed_);
+
+    // After the datalist node is removed, the recorded node id is reset.
+    webPattern->RemoveDataListNode();
+    EXPECT_FALSE(webPattern->dataListNodeId_.has_value());
+#endif
+}
+
+/**
  * @tc.name: OnShowAutofillPopupV2EscFlag_001
- * @tc.desc: OnShowAutofillPopupV2 should mark the ESC key as coming from the overlay layer, so the following
- *           ESC UP closes the popup instead of triggering back.
+ * @tc.desc: OnShowAutofillPopupV2 shows the autofill popup and records the datalist node id, which is used by
+ *           HandleKeyEvent to check whether the popup is still showing when the ESC key is pressed.
  * @tc.type: FUNC
  */
 HWTEST_F(WebPatternWebTest, OnShowAutofillPopupV2EscFlag_001, TestSize.Level1)
@@ -1829,19 +1865,20 @@ HWTEST_F(WebPatternWebTest, OnShowAutofillPopupV2EscFlag_001, TestSize.Level1)
     ASSERT_NE(frameNode, nullptr);
     auto webPattern = frameNode->GetPattern<WebPattern>();
     ASSERT_NE(webPattern, nullptr);
-    webPattern->isEscKeyFromOverlayOrFullScreen_ = false;
 
     std::vector<std::string> menuItems = { "autofill_item" };
     webPattern->OnShowAutofillPopupV2(0.0f, 0.0f, 10.0f, 10.0f, menuItems);
-    // The popup is shown as an overlay, the next ESC key should only close it.
-    EXPECT_TRUE(webPattern->isEscKeyFromOverlayOrFullScreen_);
+    // The datalist node id used for the ESC key check should be recorded.
+    EXPECT_TRUE(webPattern->dataListNodeId_.has_value());
+
+    webPattern->RemoveDataListNode();
+    EXPECT_FALSE(webPattern->dataListNodeId_.has_value());
 #endif
 }
 
 /**
  * @tc.name: CreateDataListFrameNodeEscFlag_001
- * @tc.desc: CreateDataListFrameNode should not mark the ESC key as coming from the overlay layer anymore, only
- *           OnShowAutofillPopupV2 does after the popup is actually shown.
+ * @tc.desc: CreateDataListFrameNode creates the datalist node and records its node id for the ESC key check.
  * @tc.type: FUNC
  */
 HWTEST_F(WebPatternWebTest, CreateDataListFrameNodeEscFlag_001, TestSize.Level1)
@@ -1851,12 +1888,13 @@ HWTEST_F(WebPatternWebTest, CreateDataListFrameNodeEscFlag_001, TestSize.Level1)
     ASSERT_NE(frameNode, nullptr);
     auto webPattern = frameNode->GetPattern<WebPattern>();
     ASSERT_NE(webPattern, nullptr);
-    webPattern->isEscKeyFromOverlayOrFullScreen_ = false;
 
     auto dataListNode = webPattern->CreateDataListFrameNode(OffsetF(0.0f, 0.0f), 10.0f, 10.0f);
     ASSERT_NE(dataListNode, nullptr);
-    // The flag is now set in OnShowAutofillPopupV2 instead of here.
-    EXPECT_FALSE(webPattern->isEscKeyFromOverlayOrFullScreen_);
+    EXPECT_TRUE(webPattern->dataListNodeId_.has_value());
+
+    webPattern->RemoveDataListNode();
+    EXPECT_FALSE(webPattern->dataListNodeId_.has_value());
 #endif
 }
 

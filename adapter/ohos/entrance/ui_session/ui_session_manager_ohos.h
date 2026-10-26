@@ -167,6 +167,7 @@ public:
         const std::string& nodeTag, PageSceneNodeStateChange stateChange) override;
     void NotifyPageSceneContentChanged() override;
     void FlushPageSceneNodeChanged() override;
+    void FlushPendingSearchClicksIfStable() override;
     void SavePageSceneDetectFunction(PageSceneDetectFunction&& function) override;
     void SaveWebPageSceneFunction(WebPageSceneFunction&& function) override;
     bool IsWebSourceEnabled(const std::string& ruleJson);

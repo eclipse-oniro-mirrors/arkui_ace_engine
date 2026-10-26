@@ -120,6 +120,11 @@ public:
         return backgroundMaskId_.value();
     }
 
+    int32_t GetTopBackgroundMaskId()
+    {
+        return GetBackgroundMaskId();
+    }
+
     int32_t GetEffectId()
     {
         if (!effectId_.has_value()) {
@@ -195,6 +200,11 @@ public:
     RefPtr<UINode> GetBackgroundMask() const
     {
         return GetChildAtIndex(itemIndex_.bgMaskIndex);
+    }
+
+    RefPtr<UINode> GetTopBackgroundMask() const
+    {
+        return GetBackgroundMask();
     }
 
     RefPtr<UINode> GetEffectNode()

@@ -105,6 +105,9 @@ void TabsSideBarPattern::CreateHeaderContainerIfNeeded()
     auto property = columnNode->GetLayoutProperty<LinearLayoutProperty>();
     CHECK_NULL_VOID(property);
     property->UpdateFlexDirection(FlexDirection::COLUMN);
+    // Expand header background/blur into status bar (top) and navigation bar (bottom).
+    property->UpdateSafeAreaExpandOpts(
+        { .type = SAFE_AREA_TYPE_SYSTEM, .edges = SAFE_AREA_EDGE_TOP + SAFE_AREA_EDGE_BOTTOM });
     auto renderContext = columnNode->GetRenderContext();
     CHECK_NULL_VOID(renderContext);
     renderContext->UpdateZIndex(HEADER_CONTAINER_NODE_ZINDEX);
@@ -127,6 +130,9 @@ void TabsSideBarPattern::CreateBottomBarContainerIfNeeded()
     auto property = columnNode->GetLayoutProperty<LinearLayoutProperty>();
     CHECK_NULL_VOID(property);
     property->UpdateFlexDirection(FlexDirection::COLUMN);
+    // Expand bottom bar background/blur into status bar (top) and navigation bar (bottom).
+    property->UpdateSafeAreaExpandOpts(
+        { .type = SAFE_AREA_TYPE_SYSTEM, .edges = SAFE_AREA_EDGE_TOP + SAFE_AREA_EDGE_BOTTOM });
     auto renderContext = columnNode->GetRenderContext();
     CHECK_NULL_VOID(renderContext);
     renderContext->UpdateZIndex(BOTTOM_BAR_CONTAINER_NODE_ZINDEX);
@@ -148,6 +154,9 @@ void TabsSideBarPattern::CreateMaskNodeIfNeeded()
         auto property = maskBlurNode->GetLayoutProperty();
         CHECK_NULL_BREAK(property);
         property->UpdateVisibility(VisibleType::INVISIBLE);
+        // Expand mask blur into status bar (top) and navigation bar (bottom).
+        property->UpdateSafeAreaExpandOpts(
+            { .type = SAFE_AREA_TYPE_SYSTEM, .edges = SAFE_AREA_EDGE_TOP + SAFE_AREA_EDGE_BOTTOM });
         auto maskBlurRenderContext = maskBlurNode->GetRenderContext();
         CHECK_NULL_BREAK(maskBlurRenderContext);
         maskBlurRenderContext->UpdateZIndex(HEADER_CONTAINER_MASK_BLUR_ZINDEX);
@@ -162,6 +171,9 @@ void TabsSideBarPattern::CreateMaskNodeIfNeeded()
     auto property = maskNode->GetLayoutProperty();
     CHECK_NULL_VOID(property);
     property->UpdateVisibility(VisibleType::INVISIBLE);
+    // Expand mask into status bar (top) and navigation bar (bottom).
+    property->UpdateSafeAreaExpandOpts(
+        { .type = SAFE_AREA_TYPE_SYSTEM, .edges = SAFE_AREA_EDGE_TOP + SAFE_AREA_EDGE_BOTTOM });
     auto maskRenderContext = maskNode->GetRenderContext();
     CHECK_NULL_VOID(maskRenderContext);
     maskRenderContext->UpdateZIndex(HEADER_CONTAINER_MASK_ZINDEX);
@@ -182,6 +194,9 @@ void TabsSideBarPattern::CreateBottomBarMaskNodeIfNeeded()
         auto property = maskBlurNode->GetLayoutProperty();
         CHECK_NULL_BREAK(property);
         property->UpdateVisibility(VisibleType::INVISIBLE);
+        // Expand mask blur into status bar (top) and navigation bar (bottom).
+        property->UpdateSafeAreaExpandOpts(
+            { .type = SAFE_AREA_TYPE_SYSTEM, .edges = SAFE_AREA_EDGE_TOP + SAFE_AREA_EDGE_BOTTOM });
         auto maskBlurRenderContext = maskBlurNode->GetRenderContext();
         CHECK_NULL_BREAK(maskBlurRenderContext);
         maskBlurRenderContext->UpdateZIndex(BOTTOM_BAR_CONTAINER_MASK_BLUR_ZINDEX);
@@ -196,6 +211,9 @@ void TabsSideBarPattern::CreateBottomBarMaskNodeIfNeeded()
     auto property = maskNode->GetLayoutProperty();
     CHECK_NULL_VOID(property);
     property->UpdateVisibility(VisibleType::INVISIBLE);
+    // Expand mask into status bar (top) and navigation bar (bottom).
+    property->UpdateSafeAreaExpandOpts(
+        { .type = SAFE_AREA_TYPE_SYSTEM, .edges = SAFE_AREA_EDGE_TOP + SAFE_AREA_EDGE_BOTTOM });
     auto maskRenderContext = maskNode->GetRenderContext();
     CHECK_NULL_VOID(maskRenderContext);
     maskRenderContext->UpdateZIndex(BOTTOM_BAR_CONTAINER_MASK_ZINDEX);
@@ -425,13 +443,24 @@ void TabsSideBarPattern::UpdateSearchNodeIfNeeded()
     incommingOptions_ = std::nullopt;
 
     if (newOptions.isNull) {
+        bool needClearSearchFilter = false;
         if (searchContainerNode_) {
+            needClearSearchFilter = true;
             headerContainerNode_->RemoveChild(searchContainerNode_);
             searchContainerNode_ = nullptr;
             headerContainerNode_->MarkNeedSyncRenderTree();
             headerContainerNode_->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
         }
         searchableOptions_ = newOptions;
+        if (!needClearSearchFilter) {
+            return;
+        }
+        // Clear active search state and reset tab visibility —
+        // without this, tabs remain filtered by the previous search text.
+        CHECK_NULL_VOID(tabListNode_);
+        auto tabListPattern = tabListNode_->GetPattern<TabsSideBarTabListPattern>();
+        CHECK_NULL_VOID(tabListPattern);
+        tabListPattern->ApplySearchFilter(nullptr, u"");
         return;
     }
     bool needRecreateSearchNode = searchableOptions_ != newOptions;

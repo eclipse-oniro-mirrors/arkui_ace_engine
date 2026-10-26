@@ -19,6 +19,9 @@
 #include "animation/animation_ani_impl.h"
 #include "canvas/canvas_module.h"
 #include "common/common_module.h"
+#ifdef MODAL_UI_EXTENSION_SUPPORTED
+#include "modal_ui_extension/modal_ui_extension_module.h"
+#endif
 #include "common_node/common_node_module.h"
 #include "component3d/component3d_module_methods.h"
 #include "componentSnapshot/componentSnapshot_module.h"
@@ -2087,6 +2090,53 @@ ANI_EXPORT ani_status ANI_Constructor(ani_vm* vm, uint32_t* result)
             "l:C{std.core.String}",
             reinterpret_cast<void*>(OHOS::Ace::Ani::ArkTSFrameNodeGetId)
         },
+#ifdef MODAL_UI_EXTENSION_SUPPORTED
+        ani_native_function {
+            "_CreateModalUIExtension",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::CreateModalUIExtension)
+        },
+        ani_native_function {
+            "_CloseModalUIExtension",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::CloseModalUIExtension)
+        },
+        ani_native_function {
+            "_ModalUIExtensionProxySend",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::ModalUIExtensionProxySend)
+        },
+        ani_native_function {
+            "_ModalUIExtensionProxySendSync",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::ModalUIExtensionProxySendSync)
+        },
+        ani_native_function {
+            "_ModalUIExtensionProxyDestroy",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::ModalUIExtensionProxyDestroy)
+        },
+        ani_native_function {
+            "_ModalUIExtensionProxyOnAsyncReceiverRegister",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::ModalUIExtensionProxyOnAsyncReceiverRegister)
+        },
+        ani_native_function {
+            "_ModalUIExtensionProxyOnSyncReceiverRegister",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::ModalUIExtensionProxyOnSyncReceiverRegister)
+        },
+        ani_native_function {
+            "_ModalUIExtensionProxyOffAsyncReceiverRegister",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::ModalUIExtensionProxyOffAsyncReceiverRegister)
+        },
+        ani_native_function {
+            "_ModalUIExtensionProxyOffSyncReceiverRegister",
+            nullptr,
+            reinterpret_cast<void*>(OHOS::Ace::Ani::ModalUIExtensionProxyOffSyncReceiverRegister)
+        },
+#endif
         ani_native_function {
             "_PlaceholderRegisterRegister",
             nullptr,

@@ -254,6 +254,10 @@ function loadComponent(): ComponentObj | undefined {
         modifierWithKey(this._modifiersWithKeys, TabBarFloatingStyleModifier.identity, TabBarFloatingStyleModifier, value);
         return this;
       }
+      topBarFloatingStyle(value: topBarFloatingStyleOptions): TabsAttribute {
+        modifierWithKey(this._modifiersWithKeys, TabTopBarFloatingStyleModifier.identity, TabTopBarFloatingStyleModifier, value);
+        return this;
+      }
       onContentWillChange(handler: (currentIndex: number, targetIndex: number) => void): TabsAttribute {
         modifierWithKey(this._modifiersWithKeys, TabsOnContentWillChange.identity, TabsOnContentWillChange, handler);
         return this;
@@ -335,6 +339,21 @@ function loadComponent(): ComponentObj | undefined {
           getUINativeModule().tabs.resetTabsBarFloatingStyle(node);
         } else {
           getUINativeModule().tabs.setTabsBarFloatingStyle(node, this.value);
+        }
+      }
+    }
+
+    class TabTopBarFloatingStyleModifier extends ModifierWithKey<topBarFloatingStyleOptions> {
+      constructor(value: topBarFloatingStyleOptions) {
+        super(value);
+      }
+      static identity: Symbol = Symbol('topBarFloatingStyle');
+
+      applyPeer(node: KNode, reset: boolean): void {
+        if (reset) {
+          getUINativeModule().tabs.resetTabsBarTopFloatingStyle(node);
+        } else {
+          getUINativeModule().tabs.setTabsBarTopFloatingStyle(node, this.value);
         }
       }
     }
@@ -1595,6 +1614,10 @@ class JSTabs extends JSContainerBase {
 
   static barFloatingStyle(value: any): void {
     getUINativeModule().tabs.setTabsBarFloatingStyle(true, value);
+  }
+
+  static topBarFloatingStyle(value: any): void {
+    getUINativeModule().tabs.setTabsBarTopFloatingStyle(true, value);
   }
 
   static sidebarDisplayStyle(value: any): void {

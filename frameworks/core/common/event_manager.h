@@ -519,6 +519,7 @@ private:
     bool DispatchMultiContainerEvent(const TouchEvent& point);
     void DispatchTouchEventAndCheck(const TouchEvent& event, bool sendOnTouch = true);
     void DispatchTouchEventInOldPipeline(const TouchEvent& point, bool dispatchSuccess);
+    bool DispatchTouchEventToPipelines(TouchEvent& point, bool sendOnTouch);
     void DispatchTouchEventToTouchTestResult(const TouchEvent& touchEvent, TouchTestResult touchTestResult,
         bool sendOnTouch);
     void HandleEscapeRecognizer(const TouchEvent& touchEvent);

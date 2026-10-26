@@ -18,10 +18,12 @@ import { default as drawing } from '@ohos.graphics.drawing';
 import image from '@ohos.multimedia.image';
 import webview from '@ohos.web.webview';
 import common from '@ohos.app.ability.common';
+import Want from '@ohos.app.ability.Want';
 import unifiedDataChannel from '@ohos.data.unifiedDataChannel';
 import uniformTypeDescriptor from '@ohos.data.uniformTypeDescriptor';
 import { LocalStorage } from '@ohos.arkui.stateManagement';
 import { DrawContext } from 'arkui.Graphics';
+import { RecordData } from '@ohos.base';
 import { AnimatableArithmetic, Callback, DragItemInfo, ResourceColor, DragPreviewOptions, DragInteractionOptions, ExpectedFrameRateRange } from '#generated';
 import { AsyncCallback } from '#external'
 import { ArkCustomComponent } from 'arkui/ArkCustomComponent';
@@ -50,6 +52,7 @@ import { JavaScriptProxy } from '#generated';
 import { ErrorCallback } from '@ohos.base';
 import { int32 } from '@koalaui/compat';
 import { SaveButtonCallback, PasteButtonCallback } from '#generated';
+import { UIExtensionProxy } from 'arkui/component/uiExtensionComponent';
 import { InputMethodExtraConfig } from '@ohos.inputMethod.ExtraConfig'
 import { default as text } from '@ohos.graphics.text'
 import { StackLayoutAlgorithm } from "arkui/LayoutAlgorithm"
@@ -572,6 +575,15 @@ export class ArkUIAniModule {
     native static _GestureEventUIObserver_RemoveGlobalGestureListener(type: KInt, callback?: GestureListenerCallback): void
     native static __BuilderNode_GetParentViewId(ptr: KPointer): KInt;
     native static _ArkTSFrameNode_GetId(peer: KPointer): string
+    native static _CreateModalUIExtension(want: Want, options?: Object, callback?: Object): KInt
+    native static _CloseModalUIExtension(sessionId: KInt, instanceId: KInt): void
+    native static _ModalUIExtensionProxySend(proxyPtr: KPointer, data: Object): void
+    native static _ModalUIExtensionProxySendSync(proxyPtr: KPointer, data: Object): Record<string, RecordData>
+    native static _ModalUIExtensionProxyDestroy(proxyPtr: KPointer): void
+    native static _ModalUIExtensionProxyOnAsyncReceiverRegister(proxyPtr: KPointer, callback: Callback<UIExtensionProxy>): void
+    native static _ModalUIExtensionProxyOnSyncReceiverRegister(proxyPtr: KPointer, callback: Callback<UIExtensionProxy>): void
+    native static _ModalUIExtensionProxyOffAsyncReceiverRegister(proxyPtr: KPointer, callback?: Callback<UIExtensionProxy>): void
+    native static _ModalUIExtensionProxyOffSyncReceiverRegister(proxyPtr: KPointer, callback?: Callback<UIExtensionProxy>): void
 
     // for PlaceholderRegister (scroll placeholder template registry). The
     // engine face is the ArkUIAniPlaceholderRegisterModifier of libace.

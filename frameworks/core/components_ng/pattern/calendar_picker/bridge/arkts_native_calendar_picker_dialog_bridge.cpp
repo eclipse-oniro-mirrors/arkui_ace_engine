@@ -736,7 +736,11 @@ void ParseFirstDayOfWeek(EcmaVM* vm, const panda::Local<panda::ObjectRef>& param
 {
     auto firstDayOfWeek = paramObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "firstDayOfWeek"));
     if (firstDayOfWeek->IsInt()) {
-        settingData.firstDayOfWeek = firstDayOfWeek->Int32Value(vm);
+        int32_t value = firstDayOfWeek->Int32Value(vm);
+        if (value < FIRST_DAY_OF_WEEK_LOCAL || value > MAX_FIRST_DAY_OF_WEEK) {
+            value = FIRST_DAY_OF_WEEK_LOCAL;
+        }
+        settingData.firstDayOfWeek = value;
     }
 }
 

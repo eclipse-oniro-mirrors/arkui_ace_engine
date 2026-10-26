@@ -769,7 +769,16 @@ void SwiperPattern::BeforeCreateLayoutWrapper()
         needAdjustIndex_ = false;
     }
 
-    if (lastCurrentIndex != currentIndex_ || (itemPosition_.empty() && !isVoluntarilyClear_)
+    // When contentMainSize_ is zero (e.g. Tabs sidebar occupies the full main axis),
+    // itemPosition_ will be empty because no items can be laid out. In this case, if a
+    // SwipeTo has set targetIndex_, we must NOT reset it via jumpIndex_ — otherwise the
+    // pending tab switch is lost. The isTabsSidebarDisplayMode_ flag is set by Tabs
+    // when operating in sidebar display mode (TabBarDisplayMode::SIDEBAR), so this guard
+    // only affects that mode and leaves all other swiper scenarios unchanged.
+    bool isSidebarContentEmptyWithPendingTarget =
+        isTabsSidebarDisplayMode_ && NearZero(contentMainSize_) && targetIndex_.has_value();
+    if (lastCurrentIndex != currentIndex_ ||
+        (itemPosition_.empty() && !isVoluntarilyClear_ && !isSidebarContentEmptyWithPendingTarget)
         || hadCachedCapture != hasCachedCapture_) {
         jumpIndex_ = (!isInit_ && GetMaintainVisibleContentPosition())
                          ? jumpIndex_.value_or(GetLoopIndex(currentIndex_))
@@ -1336,6 +1345,9 @@ bool SwiperPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty,
     isInit_ = false;
 
     if (!IsAutoPlay() && config.skipMeasure && config.skipLayout) {
+        if (isTabsSidebarDisplayMode_ && NearZero(contentMainSize_) && jumpIndex_) {
+            jumpIndex_.reset();
+        }
         return false;
     }
 
@@ -2176,7 +2188,13 @@ void SwiperPattern::SwipeToWithoutAnimation(int32_t index, std::optional<int32_t
         FireWillShowEvent(index);
         FireWillHideEvent(currentIndex_);
     }
-    if (IsVisibleChildrenSizeLessThanSwiper()) {
+    // In Tabs sidebar mode, when sidebar width >= container width, contentMainSize_ is 0
+    // and itemPosition_ is empty, causing IsVisibleChildrenSizeLessThanSwiper() to return
+    // true. The bypass condition (isTabsSidebarDisplayMode_ && NearZero(contentMainSize_))
+    // matches the guard in BeforeCreateLayoutWrapper so that the tab switch request can be
+    // recorded via jumpIndex_ consistently across all three sites.
+    if (IsVisibleChildrenSizeLessThanSwiper() &&
+        !(isTabsSidebarDisplayMode_ && NearZero(contentMainSize_))) {
         return;
     }
 
@@ -2242,7 +2260,13 @@ void SwiperPattern::SwipeTo(int32_t index)
         return;
     }
 
-    if (IsVisibleChildrenSizeLessThanSwiper()) {
+    // In Tabs sidebar mode, when sidebar width >= container width, contentMainSize_ is 0
+    // and itemPosition_ is empty, causing IsVisibleChildrenSizeLessThanSwiper() to return
+    // true. The bypass condition (isTabsSidebarDisplayMode_ && NearZero(contentMainSize_))
+    // matches the guard in BeforeCreateLayoutWrapper so that the tab switch request can be
+    // recorded via targetIndex_ consistently across all three sites.
+    if (IsVisibleChildrenSizeLessThanSwiper() &&
+        !(isTabsSidebarDisplayMode_ && NearZero(contentMainSize_))) {
         return;
     }
 
@@ -6810,6 +6834,94 @@ int32_t SwiperPattern::GetLoopIndex(int32_t index, int32_t childrenSize) const
     return loopIndex;
 }
 
+void SwiperPattern::DumpAdvanceCurveInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if (!config.IsPublicTree()) {
+        json->Put("curve", GetCurveIncludeMotion() ? GetCurveIncludeMotion()->ToString().c_str() : "null");
+        return;
+    }
+    // The legacy motion getter changes animation state; public collection reads the saved curve.
+    if (auto curve = GetCurve()) {
+        json->Put("curve", curve->ToString().c_str());
+    }
+}
+
+void SwiperPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    DumpAdvanceDiagnostics(json, config);
+    if (!config.IsPublicTree() || config.visualProperties) {
+        json->Put("currentIndex", currentIndex_);
+    }
+    if (!config.IsPublicTree()) {
+        json->Put("oldIndex", oldIndex_);
+    }
+    if (!config.IsPublicTree() || config.visualProperties) {
+        BuildOffsetInfo(json, config);
+        BuildIndicatorTypeInfo(json, config);
+    }
+    if (!config.IsPublicTree()) {
+        BuildItemPositionInfo(json);
+        BuildPanDirectionInfo(json);
+        BuildAxisInfo(json);
+        return;
+    }
+    if (config.visualProperties) {
+        auto property = GetLayoutProperty<SwiperLayoutProperty>();
+        if (property) {
+            json->Put("TextDirection", static_cast<int32_t>(property->GetNonAutoLayoutDirection()));
+        }
+    }
+    if (config.functionalProperties) {
+        json->Put("disableSwipe", IsDisableSwipe());
+    }
+}
+
+void SwiperPattern::DumpAdvanceDiagnostics(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if (!config.IsPublicTree()) {
+        json->Put("isLastIndicatorFocused", isLastIndicatorFocused_);
+        json->Put("moveDirection", moveDirection_);
+        json->Put("indicatorDoingAnimation", indicatorDoingAnimation_);
+        json->Put("hasVisibleChangeRegistered", hasVisibleChangeRegistered_);
+        json->Put("isVisible", isVisible_);
+        json->Put("isVisibleArea", isVisibleArea_);
+        json->Put("isWindowShow", isWindowShow_);
+        json->Put("IsCustomSize", isCustomSize_);
+        json->Put("indicatorIsBoolean", indicatorIsBoolean_);
+        json->Put("isAtHotRegion", isAtHotRegion_);
+        json->Put("isDragging", isDragging_);
+        json->Put("isTouchDown", isTouchDown_);
+        json->Put("preLoop", preLoop_.has_value() ? std::to_string(preLoop_.value()).c_str() : "null");
+        json->Put("indicatorId", indicatorId_.has_value() ? std::to_string(indicatorId_.value()).c_str() : "null");
+        json->Put("leftButtonId", leftButtonId_.has_value() ? std::to_string(leftButtonId_.value()).c_str() : "null");
+        json->Put(
+            "rightButtonId", rightButtonId_.has_value() ? std::to_string(rightButtonId_.value()).c_str() : "null");
+        json->Put("crossMatchChild", crossMatchChild_);
+        json->Put("uiCastJumpIndex",
+            uiCastJumpIndex_.has_value() ? std::to_string(uiCastJumpIndex_.value()).c_str() : "null");
+        json->Put("jumpIndex", jumpIndex_.has_value() ? std::to_string(jumpIndex_.value()).c_str() : "null");
+        json->Put("targetIndex", targetIndex_.has_value() ? std::to_string(targetIndex_.value()).c_str() : "null");
+        json->Put("pauseTargetIndex",
+            pauseTargetIndex_.has_value() ? std::to_string(pauseTargetIndex_.value()).c_str() : "null");
+        json->Put("velocity", velocity_.has_value() ? std::to_string(velocity_.value()).c_str() : "null");
+    }
+    if (!config.IsPublicTree() || config.visualProperties) {
+        DumpAdvanceCurveInfo(json, config);
+    }
+    if (!config.IsPublicTree()) {
+        json->Put("isFinishAnimation", isFinishAnimation_);
+        json->Put("mainSizeIsMeasured", mainSizeIsMeasured_);
+        json->Put("usePropertyAnimation", propertyAnimationIsRunning_);
+        json->Put("isUserFinish", isUserFinish_);
+        json->Put("isVoluntarilyClear", isVoluntarilyClear_);
+        json->Put("isIndicatorLongPress", isIndicatorLongPress_);
+        json->Put("stopIndicatorAnimation", stopIndicatorAnimation_);
+        json->Put("isTouchPad", isTouchPad_);
+        json->Put("surfaceChangedCallbackId",
+            surfaceChangedCallbackId_.has_value() ? std::to_string(surfaceChangedCallbackId_.value()).c_str() : "null");
+    }
+}
+
 void SwiperPattern::DumpAdvanceInfo()
 {
     SwiperHelper::DumpAdvanceInfo(*this);
@@ -8003,48 +8115,7 @@ void SwiperPattern::DumpInfo()
 
 void SwiperPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json)
 {
-    json->Put("isLastIndicatorFocused", isLastIndicatorFocused_);
-    json->Put("moveDirection", moveDirection_);
-    json->Put("indicatorDoingAnimation", indicatorDoingAnimation_);
-    json->Put("hasVisibleChangeRegistered", hasVisibleChangeRegistered_);
-    json->Put("isVisible", isVisible_);
-    json->Put("isVisibleArea", isVisibleArea_);
-    json->Put("isWindowShow", isWindowShow_);
-    json->Put("IsCustomSize", isCustomSize_);
-    json->Put("indicatorIsBoolean", indicatorIsBoolean_);
-    json->Put("isAtHotRegion", isAtHotRegion_);
-    json->Put("isDragging", isDragging_);
-    json->Put("isTouchDown", isTouchDown_);
-    json->Put("preLoop", preLoop_.has_value() ? std::to_string(preLoop_.value()).c_str() : "null");
-    json->Put("indicatorId", indicatorId_.has_value() ? std::to_string(indicatorId_.value()).c_str() : "null");
-    json->Put("leftButtonId", leftButtonId_.has_value() ? std::to_string(leftButtonId_.value()).c_str() : "null");
-    json->Put("rightButtonId", rightButtonId_.has_value() ? std::to_string(rightButtonId_.value()).c_str() : "null");
-    json->Put("crossMatchChild", crossMatchChild_);
-    json->Put(
-        "uiCastJumpIndex", uiCastJumpIndex_.has_value() ? std::to_string(uiCastJumpIndex_.value()).c_str() : "null");
-    json->Put("jumpIndex", jumpIndex_.has_value() ? std::to_string(jumpIndex_.value()).c_str() : "null");
-    json->Put("targetIndex", targetIndex_.has_value() ? std::to_string(targetIndex_.value()).c_str() : "null");
-    json->Put(
-        "pauseTargetIndex", pauseTargetIndex_.has_value() ? std::to_string(pauseTargetIndex_.value()).c_str() : "null");
-    json->Put("velocity", velocity_.has_value() ? std::to_string(velocity_.value()).c_str() : "null");
-    json->Put("curve", GetCurveIncludeMotion() ? GetCurveIncludeMotion()->ToString().c_str() : "null");
-    json->Put("isFinishAnimation", isFinishAnimation_);
-    json->Put("mainSizeIsMeasured", mainSizeIsMeasured_);
-    json->Put("usePropertyAnimation", propertyAnimationIsRunning_);
-    json->Put("isUserFinish", isUserFinish_);
-    json->Put("isVoluntarilyClear", isVoluntarilyClear_);
-    json->Put("isIndicatorLongPress", isIndicatorLongPress_);
-    json->Put("stopIndicatorAnimation", stopIndicatorAnimation_);
-    json->Put("isTouchPad", isTouchPad_);
-    json->Put("surfaceChangedCallbackId",
-        surfaceChangedCallbackId_.has_value() ? std::to_string(surfaceChangedCallbackId_.value()).c_str() : "null");
-    json->Put("currentIndex", currentIndex_);
-    json->Put("oldIndex", oldIndex_);
-    BuildOffsetInfo(json);
-    BuildIndicatorTypeInfo(json);
-    BuildItemPositionInfo(json);
-    BuildPanDirectionInfo(json);
-    BuildAxisInfo(json);
+    SwiperPattern::DumpAdvanceInfo(json, ParamConfig());
 }
 
 void SwiperPattern::DumpSimplifyInfoOnlyForParamConfig(std::shared_ptr<JsonValue>& json, ParamConfig config)
@@ -8060,20 +8131,40 @@ void SwiperPattern::DumpSimplifyInfoOnlyForParamConfig(std::shared_ptr<JsonValue
     json->Put("isLoop", IsLoop());
 }
 
-void SwiperPattern::BuildOffsetInfo(std::unique_ptr<JsonValue>& json)
+void SwiperPattern::BuildOffsetInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
 {
-    json->Put("currentOffset", std::to_string(currentOffset_).c_str());
-    json->Put("fadeOffset", std::to_string(fadeOffset_).c_str());
-    json->Put("touchBottomRate", std::to_string(touchBottomRate_).c_str());
-    json->Put("currentIndexOffset", std::to_string(currentIndexOffset_).c_str());
-    json->Put("gestureSwipeIndex", gestureSwipeIndex_);
+    if (config.IsPublicTree()) {
+        json->Put("currentOffset", currentOffset_);
+    } else {
+        json->Put("currentOffset", std::to_string(currentOffset_).c_str());
+    }
+    if (config.IsPublicTree()) {
+        json->Put("fadeOffset", fadeOffset_);
+    } else {
+        json->Put("fadeOffset", std::to_string(fadeOffset_).c_str());
+    }
+    if (!config.IsPublicTree()) {
+        json->Put("touchBottomRate", std::to_string(touchBottomRate_).c_str());
+    }
+    if (config.IsPublicTree()) {
+        json->Put("currentIndexOffset", currentIndexOffset_);
+    } else {
+        json->Put("currentIndexOffset", std::to_string(currentIndexOffset_).c_str());
+    }
+    if (!config.IsPublicTree()) {
+        json->Put("gestureSwipeIndex", gestureSwipeIndex_);
+    }
     json->Put("currentFirstIndex", currentFirstIndex_);
     json->Put("startMainPos", startMainPos_);
     json->Put("endMainPos", endMainPos_);
     json->Put("contentMainSize", contentMainSize_);
     json->Put("contentCrossSize", contentCrossSize_);
-    json->Put("propertyAnimationIndex", propertyAnimationIndex_);
-    json->Put("mainDeltaSum", mainDeltaSum_);
+    if (!config.IsPublicTree()) {
+        json->Put("propertyAnimationIndex", propertyAnimationIndex_);
+    }
+    if (!config.IsPublicTree()) {
+        json->Put("mainDeltaSum", mainDeltaSum_);
+    }
 }
 
 void SwiperPattern::BuildAxisInfo(std::unique_ptr<JsonValue>& json)
@@ -8127,10 +8218,14 @@ void SwiperPattern::BuildItemPositionInfo(std::unique_ptr<JsonValue>& json)
     }
 }
 
-void SwiperPattern::BuildIndicatorTypeInfo(std::unique_ptr<JsonValue>& json)
+void SwiperPattern::BuildIndicatorTypeInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
 {
-    if (lastSwiperIndicatorType_.has_value()) {
-        switch (lastSwiperIndicatorType_.value()) {
+    auto indicatorType = lastSwiperIndicatorType_;
+    if (config.IsPublicTree()) {
+        indicatorType = GetIndicatorType();
+    }
+    if (indicatorType.has_value()) {
+        switch (indicatorType.value()) {
             case SwiperIndicatorType::DOT: {
                 json->Put("SwiperIndicatorType", "DOT");
                 break;
@@ -8139,11 +8234,17 @@ void SwiperPattern::BuildIndicatorTypeInfo(std::unique_ptr<JsonValue>& json)
                 json->Put("SwiperIndicatorType", "DIGIT");
                 break;
             }
+            case SwiperIndicatorType::ARC_DOT: {
+                if (config.IsPublicTree()) {
+                    json->Put("SwiperIndicatorType", "ARC_DOT");
+                }
+                break;
+            }
             default: {
                 break;
             }
         }
-    } else {
+    } else if (!config.IsPublicTree()) {
         json->Put("lastSwiperIndicatorType", "null");
     }
 }

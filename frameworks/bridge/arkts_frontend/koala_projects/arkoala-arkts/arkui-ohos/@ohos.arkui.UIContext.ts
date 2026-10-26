@@ -49,6 +49,11 @@ import { SheetOptions } from 'arkui/framework';
 import inspector from '@ohos/arkui/inspector';
 import router from '@ohos/router';
 import { ComponentContent, ComponentContentBase } from 'arkui/ComponentContent';
+import Want from '@ohos.app.ability.Want'
+import { DpiFollowStrategy, ReceiveCallback, UIExtensionProxy,
+    WindowModeFollowStrategy } from 'arkui/component/uiExtensionComponent';
+import { TerminationInfo, TransitionEffect } from 'arkui/component/common';
+import { VoidCallback } from 'arkui/component/units';
 import overlayManager from '@ohos/overlayManager';
 import promptAction, { LevelOrder, LevelMode } from '@ohos/promptAction';
 import { LocalStorage } from 'arkui/stateManagement/storage/localStorage';
@@ -59,13 +64,14 @@ import { PeerNode } from 'arkui/PeerNode';
 import { ArkUIAniModule } from 'arkui.ani';
 import { UIContextUtil } from 'arkui/base/UIContextUtil';
 import { int32, int64 } from "@koalaui/common";
-import { KPointer, KSerializerBuffer, KBuffer, DeserializerBase, nullptr, wrapSystemCallback } from '@koalaui/interop';
+import { KPointer, KSerializerBuffer, KBuffer, DeserializerBase,
+    nullptr, wrapSystemCallback, KLong, KInt } from '@koalaui/interop';
 import { TabsController } from 'arkui/component/tabs';
 import { Scroller } from 'arkui/component/scroll';
 import { InputEventListener, InputEventMonitor } from 'arkui/component/common';
 import { TextLayoutOptions, Paragraph, StyledString, ContextMenu, FrameNodeExtender, AnimationExtender, AlertDialog, ActionSheet, DialogExtender } from 'arkui/framework';
 import { InnerGestureObserverConfigs, InnerGestureTriggerInfo, IUIContext, UIContextGetInfo, SystemOps } from 'arkui/component/idlize';
-import { BusinessError } from "@ohos.base"
+import { BusinessError, ErrorCallback, RecordData } from '@ohos.base'
 import { ArkUIGeneratedNativeModule } from '#components';
 import { GlobalScopeUicontextFontScale, GlobalScopeUicontextTextMenu } from "#generated"
 import { deserializeAndCallCallback } from 'arkui/framework/peers/CallbackDeserializeCall';
@@ -721,6 +727,8 @@ export enum KeyboardAvoidMode {
 export enum ImmersiveStrategy {
     AVOID_CUTOUT = 0,
     AVOID_FLOAT_NAV = 1,
+    AVOID_WINDOW_CONTROLS = 6,
+    NAVIGATION_EXPAND_SAFE_AREA = 8,
 }
 
 export class ResolvedUIContext extends UIContext {
@@ -744,6 +752,78 @@ class InputEventMonitorHandle implements InputEventMonitor {
     handle?: KPointer;
     constructor(handle: KPointer) {
         this.handle = handle;
+    }
+}
+
+export interface ModalUIExtensionOptions {
+    dpiFollowStrategy?: DpiFollowStrategy;
+    windowModeFollowStrategy?: WindowModeFollowStrategy;
+    transition?: TransitionEffect;
+}
+
+interface ModalUIExtensionInnerOptions {
+    dpiFollowStrategy?: KInt;
+    isWindowModeFollowHost?: boolean;
+    transition?: TransitionEffect;
+    instanceId?: KInt;
+}
+
+interface ModalUIExtensionInnerCallback {
+    onRemoteReady?: (ptr: KLong) => void;
+    onReceive?: ReceiveCallback;
+    onError?: ErrorCallback<BusinessError>;
+    onTerminated?: (code: int32) => void;
+    onDrawReady?: VoidCallback;
+}
+
+export interface ModalUIExtensionCallback {
+    onRemoteReady?: Callback<UIExtensionProxy>;
+    onReceive?: ReceiveCallback;
+    onError?: ErrorCallback<BusinessError>;
+    onTerminated?: Callback<TerminationInfo>;
+    onDrawReady?: VoidCallback;
+}
+
+export class ModalUIExtensionProxy implements UIExtensionProxy {
+    private proxyPtr_: KLong = 0;
+    constructor(ptr: KLong) {
+        this.proxyPtr_ = ptr;
+    }
+    public send(data: Record<string, RecordData>): void {
+        if (this.proxyPtr_ === 0) {
+            return;
+        }
+        ArkUIAniModule._ModalUIExtensionProxySend(this.proxyPtr_, data);
+    }
+    public sendSync(data: Record<string, RecordData>): Record<string, RecordData> {
+        if (this.proxyPtr_ === 0) {
+            return new Record<string, RecordData>();
+        }
+        return ArkUIAniModule._ModalUIExtensionProxySendSync(this.proxyPtr_, data);
+    }
+    public onAsyncReceiverRegister(callback_: Callback<UIExtensionProxy>): void {
+        if (this.proxyPtr_ === 0) {
+            return;
+        }
+        ArkUIAniModule._ModalUIExtensionProxyOnAsyncReceiverRegister(this.proxyPtr_, callback_);
+    }
+    public onSyncReceiverRegister(callback_: Callback<UIExtensionProxy>): void {
+        if (this.proxyPtr_ === 0) {
+            return;
+        }
+        ArkUIAniModule._ModalUIExtensionProxyOnSyncReceiverRegister(this.proxyPtr_, callback_);
+    }
+    public offAsyncReceiverRegister(callback_?: Callback<UIExtensionProxy>): void {
+        if (this.proxyPtr_ === 0) {
+            return;
+        }
+        ArkUIAniModule._ModalUIExtensionProxyOffAsyncReceiverRegister(this.proxyPtr_, callback_);
+    }
+    public offSyncReceiverRegister(callback_?: Callback<UIExtensionProxy>): void {
+        if (this.proxyPtr_ === 0) {
+            return;
+        }
+        ArkUIAniModule._ModalUIExtensionProxyOffSyncReceiverRegister(this.proxyPtr_, callback_);
     }
 }
 
@@ -1530,6 +1610,69 @@ export class UIContext {
 
     public isEasySplit(): boolean {
         return ArkUIAniModule._Common_IsEasySplit(this.instanceId_);
+    }
+
+    public createModalUIExtension(want: Want, options?: ModalUIExtensionOptions, callback?: ModalUIExtensionCallback): int {
+        let innerOptions: ModalUIExtensionInnerOptions = UIContext.parseModalUIExtensionOptions(options);
+        innerOptions.instanceId = this.instanceId_;
+        let innerCallback: Object | undefined = UIContext.parseModalUIExtensionCallback(callback);
+        return ArkUIAniModule._CreateModalUIExtension(want, innerOptions, innerCallback);
+    }
+
+    private static parseModalUIExtensionOptions(options?: ModalUIExtensionOptions): ModalUIExtensionInnerOptions {
+        let dpiFollow: KInt | undefined = undefined;
+        let isWindowModeFollowHost: boolean | undefined = undefined;
+        let transition: TransitionEffect | undefined = undefined;
+        if (options !== undefined) {
+            if (options.dpiFollowStrategy !== undefined) {
+                dpiFollow = (options.dpiFollowStrategy as DpiFollowStrategy).valueOf();
+            }
+            if (options.windowModeFollowStrategy !== undefined) {
+                isWindowModeFollowHost =
+                    options.windowModeFollowStrategy === WindowModeFollowStrategy.FOLLOW_HOST_WINDOW_MODE;
+            }
+            if (options.transition !== undefined) {
+                transition = options.transition;
+            }
+        }
+        return {
+            dpiFollowStrategy: dpiFollow,
+            isWindowModeFollowHost: isWindowModeFollowHost,
+            transition: transition
+        };
+    }
+
+    private static parseModalUIExtensionCallback(callback?: ModalUIExtensionCallback): Object | undefined {
+        if (callback === undefined) {
+            return undefined;
+        }
+        let innerCb: ModalUIExtensionInnerCallback = {};
+        if (callback.onRemoteReady !== undefined) {
+        let userCallback = callback.onRemoteReady;
+        innerCb.onRemoteReady = (ptr: KLong): void => {
+            let proxy = new ModalUIExtensionProxy(ptr);
+                if (userCallback !== undefined) {
+                    userCallback(proxy as UIExtensionProxy);
+                }
+            };
+        }
+        innerCb.onReceive = callback.onReceive;
+        innerCb.onError = callback.onError;
+        if (callback.onTerminated !== undefined) {
+            let userTerminatedCallback = callback.onTerminated;
+            innerCb.onTerminated = (code: int32): void => {
+                let info: TerminationInfo = { code: code };
+                if (userTerminatedCallback !== undefined) {
+                    userTerminatedCallback(info);
+                }
+            };
+        }
+        innerCb.onDrawReady = callback.onDrawReady;
+        return innerCb;
+    }
+
+    public closeModalUIExtension(sessionId: int): void {
+        ArkUIAniModule._CloseModalUIExtension(sessionId, this.instanceId_);
     }
 }
 export abstract class FrameCallback {

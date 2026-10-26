@@ -58,6 +58,7 @@ class RSUIDirector;
 namespace OHOS::Ace::NG {
     class RecycleManager;
     class RenderContext;
+    struct UITreeRequestState;
 }
 
 namespace OHOS::Ace {
@@ -468,6 +469,7 @@ public:
     void UpdateCutoutSafeArea(const SafeAreaInsets& cutoutSafeArea, bool checkSystemWindow = false) override;
     void UpdateNavSafeArea(const SafeAreaInsets& navSafeArea, bool checkSystemWindow = false) override;
     void UpdateFloatNavSafeArea(const SafeAreaInsets& floatNavSafeArea) override;
+    void UpdateTitleButtonSafeArea(const SafeAreaInsets& titleButtonSafeArea) override;
 
     void UpdateSystemSafeAreaWithoutAnimation(
         const SafeAreaInsets& systemSafeArea, bool checkSceneBoardWindow = false) override;
@@ -479,6 +481,8 @@ public:
         const SafeAreaInsets& navSafeArea, bool checkSceneBoardWindow = false) override;
     
     void UpdateFloatNavSafeAreaWithoutAnimation(const SafeAreaInsets& floatNavSafeArea) override;
+
+    void UpdateTitleButtonSafeAreaWithoutAnimation(const SafeAreaInsets& titleButtonSafeArea) override;
 
     void UpdateOriginAvoidArea(const Rosen::AvoidArea& avoidArea, uint32_t type,
         WindowSizeChangeReason reason) override;
@@ -1039,7 +1043,8 @@ public:
     }
 
     void GetOverlayInfo(bool hasOverlay, std::shared_ptr<JsonValue>& root, std::shared_ptr<JsonValue>& overlayContent,
-        std::unique_ptr<JsonValue>& overlayChildrenArray, std::unique_ptr<JsonValue>& overlayArray) const;
+        std::unique_ptr<JsonValue>& overlayChildrenArray, std::unique_ptr<JsonValue>& overlayArray,
+        ParamConfig config = {}) const;
 
     // Collect Inspector-style visible starting nodes. Delegates the pure
     // algorithm to DumpUtil so both Inspector dump and PageScene
@@ -1051,6 +1056,8 @@ public:
         ParamConfig config, bool isInSubWindow, double parentFinalOpacity = 1.0) const;
 
     void GetInspectorTree(bool onlyNeedVisible, ParamConfig config = ParamConfig());
+    void CollectInspectorTreeInto(std::shared_ptr<JsonValue>& root, bool onlyNeedVisible, ParamConfig config);
+    UITreeRequestState& GetUITreeRequestState();
 
     void GetHitTestInfos(InteractionParamConfig config);
 
@@ -1757,6 +1764,7 @@ private:
     RefPtr<MaterialProcessor> materialProcessor_;
     bool isRightMouseMappingActive_ = false;
     std::function<void()> onRightMouseMappingCancel_;
+    std::unique_ptr<NG::UITreeRequestState> uiTreeRequestState_;
 };
 
 /**

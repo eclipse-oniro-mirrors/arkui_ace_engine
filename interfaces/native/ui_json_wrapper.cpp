@@ -34,7 +34,7 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_UIJsonWrapperCreate(const char* data, uint
         return ARKUI_ERROR_CODE_PARAM_INVALID;
     }
     *outOwned = nullptr;
-    if (!data) {
+    if (!data || size == 0) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "data parameter is invalid");
         return ARKUI_ERROR_CODE_PARAM_INVALID;
     }

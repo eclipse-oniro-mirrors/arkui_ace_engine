@@ -13,14 +13,18 @@
  * limitations under the License.
  */
 
+#include "core/components_ng/base/ui_tree_collector.h"
 #include "core/components_ng/base/page_text_collector.h"
 #include "core/interfaces/native/node/page_text_api.h"
+#include "core/components_ng/manager/interaction_observer/ui_info_collection_manager.h"
+#include "core/interfaces/native/node/interaction_observer_api.h"
 
 #include "core/interfaces/native/node/node_api.h"
 
 #include <securec.h>
 #include <vector>
 
+#include "base/log/log_wrapper.h"
 #include "interfaces/native/native_type.h"
 #include "interfaces/native/node/config_manager.h"
 
@@ -74,6 +78,7 @@
 #include "core/interfaces/native/node/search_modifier.h"
 #include "core/interfaces/native/node/select_modifier.h"
 #include "core/interfaces/native/node/styled_string_impl.h"
+#include "core/interfaces/native/node/ui_tree_api.h"
 #include "core/interfaces/native/node/util_modifier.h"
 #include "core/interfaces/native/node/view_model.h"
 #include "core/interfaces/native/node/water_flow_modifier.h"
@@ -2083,6 +2088,7 @@ ArkUI_Int32 PostFrameCallback(ArkUI_Int32 instanceId, void* userData,
         return ERROR_CODE_NATIVE_IMPL_NOT_MAIN_THREAD;
     }
     auto onframeCallbackFuncFromCAPI = [userData, callback](uint64_t nanoTimestamp, uint32_t frameCount) -> void {
+        LOG_CALLBACK("OH_ArkUI_PostFrameCallback", callback);
         callback(nanoTimestamp, frameCount, userData);
     };
 
@@ -2105,6 +2111,7 @@ ArkUI_Int32 PostIdleCallback(ArkUI_Int32 instanceId, void* userData,
         return ERROR_CODE_NATIVE_IMPL_NOT_MAIN_THREAD;
     }
     auto onidleCallbackFuncFromCAPI = [userData, callback](uint64_t nanoTimeLeft, uint32_t frameCount) -> void {
+        LOG_CALLBACK("OH_ArkUI_PostIdleCallback", callback);
         callback(nanoTimeLeft, frameCount, userData);
     };
 
@@ -2862,9 +2869,39 @@ ACE_FORCE_EXPORT CJUIFullNodeAPI* GetCJUIFullNodeAPI()
     return &OHOS::Ace::NG::fullCJUIApi;
 }
 
+ACE_FORCE_EXPORT const ArkUITreeAPI* GetArkUITreeAPI(int32_t version)
+{
+    static const ArkUITreeAPI api { OHOS::Ace::NG::CollectUITree, OHOS::Ace::NG::SubmitUITree,
+        [](char* data) { std::free(data); } };
+    return version == 1 ? &api : nullptr;
+}
+
 ACE_FORCE_EXPORT const ArkUIPageTextAPI* GetArkUIPageTextAPI(int32_t version)
 {
     static const ArkUIPageTextAPI api { OHOS::Ace::NG::CollectPageText, [](char* data) { std::free(data); } };
+    return version == 1 ? &api : nullptr;
+}
+
+ACE_FORCE_EXPORT const ArkUIInteractionObserverAPI* GetArkUIInteractionObserverAPI(int32_t version)
+{
+    static const ArkUIInteractionObserverAPI api {
+        [](int32_t instanceId, uint32_t eventMask,
+            void (*callback)(const OH_ArkUI_NativeModule_UIJsonWrapper* json, void* userData), void* userData,
+            OH_ArkUI_NativeModule_UIJsonWrapper* (*createWrapper)(const char* data, uint32_t size),
+            void (*destroyWrapper)(const OH_ArkUI_NativeModule_UIJsonWrapper* wrapper), uint32_t* registerID) {
+            OHOS::Ace::NG::UIInfoCollectionManager::RegisterParam param;
+            param.instanceId = instanceId;
+            param.eventMask = eventMask;
+            param.callback = callback;
+            param.userData = userData;
+            param.createWrapper = createWrapper;
+            param.destroyWrapper = destroyWrapper;
+            return OHOS::Ace::NG::UIInfoCollectionManager::GetInstance().RegisterObserver(param, registerID);
+        },
+        [](uint32_t registerID) {
+            return OHOS::Ace::NG::UIInfoCollectionManager::GetInstance().UnregisterObserver(registerID);
+        },
+    };
     return version == 1 ? &api : nullptr;
 }
 

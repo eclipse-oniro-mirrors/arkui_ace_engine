@@ -63,7 +63,7 @@ constexpr int SHEET_CLOSE_ICON_BUTTON_STYLE = 1;
 // sheet height mode : LARGE(1) AUTO(2)
 constexpr int SHEET_HEIGHT_DEFAULT_MODE = 1;
 } // namespace
-class SheetTheme : public virtual Theme {
+class SheetTheme : public Theme {
     DECLARE_ACE_TYPE(SheetTheme, Theme);
 
 public:

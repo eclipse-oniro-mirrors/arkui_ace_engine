@@ -233,7 +233,7 @@ void RichEditorOverlayModifier::PaintUnderline(RSCanvas& canvas) const
 {
     auto richEditorPattern = AceType::DynamicCast<RichEditorPattern>(pattern_.Upgrade());
     CHECK_NULL_VOID(richEditorPattern);
-    if (!richEditorPattern->IsUnderlineMode() || !isContentNode_) {
+    if (!richEditorPattern->IsUnderlineMode() || isContentNode_) {
         return;
     }
     auto layoutProperty = richEditorPattern->GetLayoutProperty<RichEditorLayoutProperty>();
@@ -342,6 +342,7 @@ void RichEditorOverlayModifier::onDraw(DrawingContext& drawingContext)
     if (isContentNode_) {
         DrawContent(drawingContext);
     } else {
+        PaintUnderline(drawingContext.canvas);
         DrawScrollBar(drawingContext);
         // Draw hover/press circle for cancelButton (same as TextFieldOverlayModifier)
         if (!hoverRects_.empty()) {
@@ -371,8 +372,6 @@ void RichEditorOverlayModifier::DrawContent(DrawingContext& drawingContext)
     CHECK_NULL_VOID(richEditorPattern);
     auto contentRect = richEditorPattern->GetTextContentRect();
     SetContentRect(contentRect);
-
-    PaintUnderline(drawingContext.canvas);
 
     drawingContext.canvas.ClipRect(ToRSRect(contentRect), RSClipOp::INTERSECT);
     PaintCaret(drawingContext);

@@ -14,6 +14,8 @@
  */
 
 #include "test/unittest/core/pipeline/pipeline_context_test_ng.h"
+
+#include "core/components_ng/base/ui_tree_collector.h"
 // Add the following two macro definitions to test the private and protected method.
 #define private public
 #define protected public
@@ -79,6 +81,8 @@ constexpr uint8_t TEST_RENDERING_MODE_FORM = 1;
 constexpr uint8_t TEST_RENDERING_MODE_FULL = 0;
 constexpr uint64_t LARGE_TIME_THRESHOLD = static_cast<uint64_t>(INT64_MAX >> 2);
 constexpr uint64_t TEST_SMALL_TIMESTAMP = 1000;
+const RectF PUBLIC_OVERLAY_ROOT_RECT(0, 0, 100, 100);
+const RectF PUBLIC_OVERLAY_CHILD_RECT(0, 0, 50, 50);
 
 void SetInspectorNodeRect(const RefPtr<FrameNode>& node, const RectF& rect)
 {
@@ -87,6 +91,16 @@ void SetInspectorNodeRect(const RefPtr<FrameNode>& node, const RectF& rect)
     renderContext->SetPaintRectWithTransform(rect);
     node->renderContext_ = renderContext;
     node->SetActive(true);
+}
+
+void CheckCompactTreeBudget(const TreeCollectionState& state, const std::shared_ptr<JsonValue>& root)
+{
+    constexpr int32_t SCHEMA_VERSION = 1;
+    auto envelope = JsonUtil::Create();
+    ASSERT_TRUE(envelope->Put("schemaVersion", SCHEMA_VERSION));
+    ASSERT_TRUE(envelope->Put("treeInfo", root));
+    EXPECT_EQ(state.GetError(), 0);
+    EXPECT_EQ(state.compactBytes, envelope->ToString().size());
 }
 
 size_t CountOccurrences(const std::string& text, const std::string& value)
@@ -1862,6 +1876,68 @@ HWTEST_F(PipelineContextFourTestNg, PipelineContextSevenTest075, TestSize.Level1
     EXPECT_FALSE(result);
 }
 
+HWTEST_F(PipelineContextFourTestNg, PublicVisibleBudgetIncludesOverlayAndPageBranches, TestSize.Level1)
+{
+    AssertValidContext();
+    auto startNode = FrameNode::CreateFrameNode(
+        V2::ROOT_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    SetInspectorNodeRect(startNode, PUBLIC_OVERLAY_ROOT_RECT);
+    constexpr size_t BRANCH_COUNT = 2;
+    std::vector<RefPtr<FrameNode>> pages;
+    for (size_t index = 0; index < BRANCH_COUNT; ++index) {
+        auto overlay = FrameNode::CreateFrameNode(
+            V2::TOAST_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+        auto page = FrameNode::CreateFrameNode(
+            V2::PAGE_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+        SetInspectorNodeRect(overlay, PUBLIC_OVERLAY_CHILD_RECT);
+        SetInspectorNodeRect(page, PUBLIC_OVERLAY_CHILD_RECT);
+        startNode->AddChild(overlay);
+        startNode->AddChild(page);
+        pages.push_back(page);
+    }
+    TreeCollectionState state;
+    ParamConfig config;
+    config.collectionState = &state;
+    config.dumpMode = TreeDumpMode::PUBLIC_TREE;
+    auto root = JsonUtil::CreateSharedPtrJson();
+    context_->GetComponentOverlayInspector(root, startNode, config, false);
+    CheckCompactTreeBudget(state, root);
+    context_->DumpSimplifyTreeJsonFromTopNavNode(root, pages, config);
+    CheckCompactTreeBudget(state, root);
+    constexpr size_t ROOT_AND_OVERLAY_WRAPPERS = 2;
+    EXPECT_EQ(state.nodes, ROOT_AND_OVERLAY_WRAPPERS + BRANCH_COUNT + pages.size());
+}
+
+HWTEST_F(PipelineContextFourTestNg, PublicOverlayRespectsInteractionOption, TestSize.Level1)
+{
+    AssertValidContext();
+    auto startNode = FrameNode::CreateFrameNode(
+        V2::ROOT_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    auto overlayChild = FrameNode::CreateFrameNode(
+        V2::TOAST_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    SetInspectorNodeRect(startNode, PUBLIC_OVERLAY_ROOT_RECT);
+    SetInspectorNodeRect(overlayChild, PUBLIC_OVERLAY_CHILD_RECT);
+    startNode->AddChild(overlayChild);
+    for (bool publicRequest : { false, true }) {
+        for (bool interaction : { false, true }) {
+            TreeCollectionState state;
+            ParamConfig config;
+            config.collectionState = publicRequest ? &state : nullptr;
+            config.interactionInfo = interaction;
+            auto root = JsonUtil::CreateSharedPtrJson();
+            context_->GetComponentOverlayInspector(root, startNode, config, false);
+            if (publicRequest) {
+                CheckCompactTreeBudget(state, root);
+            }
+            auto overlay = root->GetValue("$children")->GetArrayItem(0);
+            ASSERT_EQ(overlay->GetString("$type"), "overlay");
+            EXPECT_EQ(overlay->Contains("clickable"), !publicRequest || interaction);
+            EXPECT_EQ(overlay->Contains("scrollable"), !publicRequest || interaction);
+            EXPECT_EQ(overlay->GetValue("$children")->GetArrayItem(0)->GetInt("$ID"), overlayChild->GetId());
+        }
+    }
+}
+
 /**
  * @tc.name: PipelineContextSevenTest076
  * @tc.desc: Test GetComponentOverlayInspector with isInSubWindow false
@@ -2173,6 +2249,58 @@ HWTEST_F(PipelineContextFourTestNg, PipelineContextSevenTest088, TestSize.Level1
     context_->SetContainerModalTitleHeightWithVp(50.0);
     EXPECT_EQ(context_->windowModal_, WindowModal::NORMAL);
 
+    context_->windowModal_ = originalWindowModal;
+}
+
+/**
+ * @tc.name: PipelineContextSevenTest089
+ * @tc.desc: Test SetContainerModalTitleHeightWithVp passes the vp value to ContainerModalPattern
+ *           unchanged and marks the height as user set.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextFourTestNg, PipelineContextSevenTest089, TestSize.Level1)
+{
+    AssertValidContext();
+    auto originalWindowModal = context_->windowModal_;
+    auto originalRootNode = context_->rootNode_;
+    context_->windowModal_ = WindowModal::CONTAINER_MODAL;
+
+    auto containerNode = FrameNode::CreateFrameNode("containerModal",
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<ContainerModalPattern>());
+    ASSERT_NE(containerNode, nullptr);
+    auto columnNode = FrameNode::CreateFrameNode("containerModalColumn",
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(columnNode, nullptr);
+    columnNode->AddChild(FrameNode::CreateFrameNode("customTitleRow",
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>()));
+    columnNode->AddChild(FrameNode::CreateFrameNode("containerModalStack",
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>()));
+    columnNode->AddChild(FrameNode::CreateFrameNode("gestureRow",
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>()));
+    containerNode->AddChild(FrameNode::CreateFrameNode("floatingTitleRow",
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>()));
+    containerNode->AddChild(columnNode);
+    containerNode->AddChild(FrameNode::CreateFrameNode("controlButtonsRow",
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>()));
+    auto rootNode = FrameNode::CreateFrameNode("rootNode",
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+    rootNode->AddChild(containerNode);
+    context_->rootNode_ = rootNode;
+
+    auto containerPattern = containerNode->GetPattern<ContainerModalPattern>();
+    ASSERT_NE(containerPattern, nullptr);
+    EXPECT_FALSE(containerPattern->GetIsSetContainerModalTitleHeight());
+
+    /**
+     * @tc.steps: call SetContainerModalTitleHeightWithVp on pipeline.
+     * @tc.expected: the pattern stores the vp value unchanged, and the user set flag is on.
+     */
+    context_->SetContainerModalTitleHeightWithVp(56.5);
+    EXPECT_DOUBLE_EQ(containerPattern->titleHeight_.Value(), 56.5);
+    EXPECT_TRUE(containerPattern->titleHeight_ == Dimension(56.5, DimensionUnit::VP));
+    EXPECT_TRUE(containerPattern->GetIsSetContainerModalTitleHeight());
+
+    context_->rootNode_ = originalRootNode;
     context_->windowModal_ = originalWindowModal;
 }
 

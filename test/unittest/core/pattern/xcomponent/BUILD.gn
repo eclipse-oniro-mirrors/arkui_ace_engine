@@ -78,3 +78,30 @@ ace_unittest("xcomponent_test_set_rate_range") {
     }
   }
 }
+
+ace_unittest("xcomponent_test_extra_flag") {
+  module_name = "DrawingSet-Path"
+  type = "new"
+  if (is_host_product) {
+    type = "host_components"
+  }
+
+  sources = [
+    "$ace_root/frameworks/core/components/xcomponent/native_interface_xcomponent_impl.cpp",
+    "xcomponent_test_extra_flag.cpp",
+  ]
+
+  if (!ace_enable_full_test_suite) {
+    sources = []
+    sources = [ "xcomponent_test_extra_flag_core.cpp" ]
+  } else {
+    sources += [ "xcomponent_test_extra_flag_core.cpp" ]
+  }
+
+  if (!is_host_product) {
+    external_deps = [ "bounds_checking_function:libsec_shared" ]
+    if (current_os == "ohos") {
+      external_deps += [ "napi:ace_napi" ]
+    }
+  }
+}

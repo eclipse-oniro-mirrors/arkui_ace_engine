@@ -255,6 +255,7 @@ ace_unittest("safe_area_manager_test_ng") {
     "safe_area_immersive_strategy_test_ng.cpp",
     "safe_area_manager_test_ng.cpp",
     "safe_area_manager_test_ng_part_two.cpp",
+    "safe_area_title_button_test_ng.cpp",
   ]
 }
 
@@ -363,6 +364,7 @@ ace_unittest("component_tree_query_test_ng") {
   if (is_host_product) {
     type = "host_components"
   }
+  cflags = [ "-fno-access-control" ]
   sources = [ "component_tree_query_test_ng.cpp" ]
 }
 

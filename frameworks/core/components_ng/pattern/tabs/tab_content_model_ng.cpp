@@ -580,6 +580,14 @@ void TabContentModelNG::AddBottomStyleTabBarItem(const RefPtr<UINode>& tabConten
             linearLayoutProperty->SetIsVertical(true);
         }
     }
+    bool isTopFloating = tabLayoutProperty->GetBarLayoutStyleValue(TabBarLayoutStyle::BOTTOM) ==
+        TabBarLayoutStyle::TOP;
+    if (isTopFloating) {
+        linearLayoutProperty->UpdateFlexDirection(FlexDirection::ROW);
+        linearLayoutProperty->UpdateSpace(0.0_vp);
+        linearLayoutProperty->UpdateCrossAxisAlign(FlexAlign::CENTER);
+        linearLayoutProperty->SetIsVertical(false);
+    }
 
     auto swiperNode = AceType::DynamicCast<FrameNode>(tabsNode->GetTabs());
     CHECK_NULL_VOID(swiperNode);
@@ -601,6 +609,13 @@ void TabContentModelNG::AddBottomStyleTabBarItem(const RefPtr<UINode>& tabConten
         CHECK_NULL_VOID(renderContext);
         BorderRadiusProperty borderRadiusProperty;
         borderRadiusProperty.SetRadius(boardStyle.borderRadius);
+        renderContext->UpdateBorderRadius(borderRadiusProperty);
+    }
+    if (isTopFloating) {
+        auto renderContext = columnNode->GetRenderContext();
+        CHECK_NULL_VOID(renderContext);
+        BorderRadiusProperty borderRadiusProperty;
+        borderRadiusProperty.SetRadius(Dimension(23, DimensionUnit::VP));
         renderContext->UpdateBorderRadius(borderRadiusProperty);
     }
     if (tabBarStyle != TabBarStyle::SUBTABBATSTYLE) {
@@ -628,7 +643,8 @@ void TabContentModelNG::AddBottomStyleTabBarItem(const RefPtr<UINode>& tabConten
     auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
     auto columnProperty = columnNode->GetLayoutProperty();
     if (tabsPattern && columnProperty) {
-        bool shouldHide = defaultVisibility.ShouldHide(TabBarDisplayMode::BOTTOMTABBAR);
+        auto activeDisplayMode = tabsPattern->GetActiveBarDisplayMode();
+        bool shouldHide = defaultVisibility.ShouldHide(activeDisplayMode);
         columnProperty->UpdateVisibility(shouldHide ? VisibleType::GONE : VisibleType::VISIBLE);
     }
 
@@ -696,7 +712,12 @@ void TabContentModelNG::AddBottomStyleTabBarItem(const RefPtr<UINode>& tabConten
     RefPtr<FrameNode> iconNode;
     auto layoutProperty = columnNode->GetLayoutProperty();
     CHECK_NULL_VOID(layoutProperty);
-    if (tabBarStyle == TabBarStyle::SUBTABBATSTYLE || tabBarStyle == TabBarStyle::BOTTOMTABBATSTYLE) {
+    if (isTopFloating) {
+        PaddingProperty topPadding;
+        topPadding.SetEdges(CalcLength(18, DimensionUnit::VP), CalcLength(18, DimensionUnit::VP),
+            CalcLength(0, DimensionUnit::VP), CalcLength(0, DimensionUnit::VP));
+        layoutProperty->UpdatePadding(topPadding);
+    } else if (tabBarStyle == TabBarStyle::SUBTABBATSTYLE || tabBarStyle == TabBarStyle::BOTTOMTABBATSTYLE) {
         layoutProperty->UpdatePadding(padding);
         auto accessibilityProperty = columnNode->GetAccessibilityProperty<AccessibilityProperty>();
         accessibilityProperty->SetAccessibilityGroup(true);
@@ -824,7 +845,10 @@ void TabContentModelNG::AddBottomStyleTabBarItem(const RefPtr<UINode>& tabConten
     if (!tabBarParam.GetIcon().empty() || tabBarStyle == TabBarStyle::BOTTOMTABBATSTYLE) {
         textLayoutProperty->UpdateFontSize(tabTheme->GetBottomTabTextSize());
     }
-    if (tabBarStyle == TabBarStyle::BOTTOMTABBATSTYLE) {
+    if (isTopFloating) {
+        textLayoutProperty->UpdateFontSize(tabTheme->GetTopTabTextSize());
+        textLayoutProperty->UpdateFontWeight(FontWeight::MEDIUM);
+    } else if (tabBarStyle == TabBarStyle::BOTTOMTABBATSTYLE) {
         textLayoutProperty->UpdateFontWeight(FontWeight::MEDIUM);
     } else if (tabBarStyle == TabBarStyle::SUBTABBATSTYLE && !isFrameNode) {
         textLayoutProperty->UpdateFontWeight(myIndex == indicator ? FontWeight::MEDIUM : FontWeight::NORMAL);

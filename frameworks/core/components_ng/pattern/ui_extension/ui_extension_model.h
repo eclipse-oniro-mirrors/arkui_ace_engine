@@ -29,6 +29,7 @@ class WantParams;
 
 namespace OHOS::Ace {
 namespace NG {
+class ChainedTransitionEffect;
 class SecurityUIExtensionProxy;
 class UIExtensionProxy;
 
@@ -39,6 +40,7 @@ struct InnerModalUIExtensionConfig {
     bool isWindowModeFollowHost = false;
     bool isModalRequestFocus = true;
     bool isModalFixFocus = false;
+    RefPtr<ChainedTransitionEffect> transition;
 };
 
 struct EmbeddedUIExtensionConfig {

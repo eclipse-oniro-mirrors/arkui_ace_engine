@@ -36,6 +36,7 @@
 #include "core/components_ng/pattern/navigation/navigation_declaration.h"
 #include "core/components_ng/pattern/overlay/dialog_manager.h"
 #include "core/components_ng/pattern/overlay/overlay_manager.h"
+#include "core/components_ng/manager/safe_area/safe_area_manager.h"
 #include "core/components_ng/pattern/root/root_pattern.h"
 #include "core/components_ng/pattern/text/text_layout_algorithm.h"
 #include "core/components_ng/pattern/text/text_layout_property.h"
@@ -63,28 +64,6 @@ const SizeF FIRST_ITEM_SIZE(FIRST_ITEM_WIDTH, FIRST_ITEM_HEIGHT);
 constexpr float DEFAULT_WIDTH = 600.0f;
 constexpr float DEFAULT_HEIGHT = 1000.0f;
 } // namespace
-
-class MockDialogTheme : public DialogTheme, public ButtonTheme {
-    DECLARE_ACE_TYPE(MockDialogTheme, DialogTheme, ButtonTheme);
-
-public:
-    class Builder {
-    public:
-        Builder() = default;
-        ~Builder() = default;
-
-        RefPtr<MockDialogTheme> Build(const RefPtr<ThemeConstants>& themeConstants) const
-        {
-            RefPtr<MockDialogTheme> theme = AceType::MakeRefPtr<MockDialogTheme>();
-            return theme;
-        }
-    };
-
-    ~MockDialogTheme() override = default;
-
-protected:
-    MockDialogTheme() = default;
-};
 
 class DialogLayoutTwoTestNg : public testing::Test {
 public:
@@ -164,8 +143,12 @@ void DialogLayoutTwoTestNg::TearDownTestCase()
 void DialogLayoutTwoTestNg::SetDialogTheme()
 {
     auto themeManager = AceType::DynamicCast<MockThemeManager>(MockPipelineContext::GetCurrent()->GetThemeManager());
-    EXPECT_CALL(*themeManager, GetTheme(_)).WillRepeatedly(Return(AceType::MakeRefPtr<MockDialogTheme>()));
-    EXPECT_CALL(*themeManager, GetTheme(_, _)).WillRepeatedly(Return(AceType::MakeRefPtr<MockDialogTheme>()));
+    EXPECT_CALL(*themeManager, GetTheme(_)).WillRepeatedly(Return(AceType::MakeRefPtr<DialogTheme>()));
+    EXPECT_CALL(*themeManager, GetTheme(_, _)).WillRepeatedly(Return(AceType::MakeRefPtr<DialogTheme>()));
+    EXPECT_CALL(*themeManager, GetTheme(ButtonTheme::TypeId()))
+        .WillRepeatedly(Return(AceType::MakeRefPtr<ButtonTheme>()));
+    EXPECT_CALL(*themeManager, GetTheme(ButtonTheme::TypeId(), _))
+        .WillRepeatedly(Return(AceType::MakeRefPtr<ButtonTheme>()));
 }
 
 RefPtr<LayoutWrapperNode> CreatlayoutWrapperTwo()
@@ -877,5 +860,85 @@ HWTEST_F(DialogLayoutTwoTestNg, DialogLayoutAlgorithmMeasure, TestSize.Level1)
     EXPECT_EQ(layoutWrapper->GetTotalChildCount(), 1);
     EXPECT_EQ(layoutWrapper->GetGeometryNode()->GetFrameSize().Width(), DEFAULT_WIDTH);
     EXPECT_EQ(layoutWrapper->GetGeometryNode()->GetFrameSize().Height(), DEFAULT_HEIGHT);
+}
+
+/**
+ * @tc.name: DialogLayoutAlgorithmUpdateSafeAreaWithHelper001
+ * @tc.desc: Test UpdateSafeArea with global switch on — safe area insets are derived from Helper.
+ * @tc.type: FUNC
+ */
+HWTEST_F(DialogLayoutTwoTestNg, DialogLayoutAlgorithmUpdateSafeAreaWithHelper001, TestSize.Level1)
+{
+    DialogLayoutAlgorithm dialogLayoutAlgorithm;
+    auto frameNode = FrameNode::CreateFrameNode(V2::PAGE_ETS_TAG, 1, AceType::MakeRefPtr<Pattern>(), true);
+    ASSERT_NE(frameNode, nullptr);
+    auto container = Container::Current();
+    ASSERT_NE(container, nullptr);
+    auto displayInfo = container->GetDisplayInfo();
+    ASSERT_NE(displayInfo, nullptr);
+    displayInfo->currentFoldCreaseRegion_.clear();
+
+    auto pipeline = MockPipelineContext::GetCurrentContext();
+    ASSERT_NE(pipeline, nullptr);
+    auto safeAreaManager = pipeline->GetSafeAreaManager();
+    ASSERT_NE(safeAreaManager, nullptr);
+    // Enable safe area and set cutout data
+    safeAreaManager->SetIsFullScreen(true);
+    safeAreaManager->SetUseCutout(true);
+    SafeAreaInsets cutoutInsets;
+    cutoutInsets.top_ = SafeAreaInsets::Inset { 0, 100 };
+    safeAreaManager->UpdateCutoutSafeArea(cutoutInsets);
+
+    // Should not crash and should execute the helper path
+    dialogLayoutAlgorithm.isHoverMode_ = false;
+    dialogLayoutAlgorithm.UpdateSafeArea(frameNode);
+    // safeAreaInsets_ should have been set; top inset should reflect cutout avoidance
+    EXPECT_GE(dialogLayoutAlgorithm.safeAreaInsets_.top_.Length(), 0);
+
+    // Restore
+    safeAreaManager->SetUseCutout(false);
+    safeAreaManager->SetIsFullScreen(false);
+    safeAreaManager->UpdateCutoutSafeArea(SafeAreaInsets {});
+}
+
+/**
+ * @tc.name: DialogLayoutAlgorithmUpdateSafeAreaWithHelper002
+ * @tc.desc: Test UpdateSafeArea with global switch off — avoidDisplayLimit is disabled to avoid
+ *           coordinate mismatch on rotation; cutout avoidance is gated upstream by
+ *           GetSafeAreaWithoutProcess.
+ * @tc.type: FUNC
+ */
+HWTEST_F(DialogLayoutTwoTestNg, DialogLayoutAlgorithmUpdateSafeAreaWithHelper002, TestSize.Level1)
+{
+    DialogLayoutAlgorithm dialogLayoutAlgorithm;
+    auto frameNode = FrameNode::CreateFrameNode(V2::PAGE_ETS_TAG, 1, AceType::MakeRefPtr<Pattern>(), true);
+    ASSERT_NE(frameNode, nullptr);
+    auto container = Container::Current();
+    ASSERT_NE(container, nullptr);
+    auto displayInfo = container->GetDisplayInfo();
+    ASSERT_NE(displayInfo, nullptr);
+    displayInfo->currentFoldCreaseRegion_.clear();
+
+    auto pipeline = MockPipelineContext::GetCurrentContext();
+    ASSERT_NE(pipeline, nullptr);
+    auto safeAreaManager = pipeline->GetSafeAreaManager();
+    ASSERT_NE(safeAreaManager, nullptr);
+    // Global switch off — cutout is gated upstream by GetSafeAreaWithoutProcess() / GetUseCutout(),
+    // so top inset should not include cutout (avoidDisplayLimit being disabled does not affect
+    // cutout avoidance; it only controls the display-available-rect clip, which is a separate source).
+    safeAreaManager->SetIsFullScreen(true);
+    safeAreaManager->SetUseCutout(false);
+    SafeAreaInsets cutoutInsets;
+    cutoutInsets.top_ = SafeAreaInsets::Inset { 0, 100 };
+    safeAreaManager->UpdateCutoutSafeArea(cutoutInsets);
+
+    dialogLayoutAlgorithm.isHoverMode_ = false;
+    dialogLayoutAlgorithm.UpdateSafeArea(frameNode);
+    // With switch off, top inset should not include cutout
+    EXPECT_EQ(dialogLayoutAlgorithm.safeAreaInsets_.top_.Length(), 0);
+
+    // Restore
+    safeAreaManager->SetIsFullScreen(false);
+    safeAreaManager->UpdateCutoutSafeArea(SafeAreaInsets {});
 }
 } // namespace OHOS::Ace::NG

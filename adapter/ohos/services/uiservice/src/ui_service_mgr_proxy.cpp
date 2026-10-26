@@ -19,6 +19,8 @@
 #include "ui_service_mgr_errors.h"
 
 namespace OHOS::Ace {
+BrokerDelegator<UIServiceMgrProxy> UIServiceMgrProxy::delegator_;
+
 bool UIServiceMgrProxy::WriteInterfaceToken(MessageParcel& data)
 {
     if (!data.WriteInterfaceToken(UIServiceMgrProxy::GetDescriptor())) {

@@ -54,9 +54,11 @@ using GestureEventFunc = std::function<void(GestureEvent& info)>;
 }
 
 namespace OHOS::Ace::NG {
+struct InspectorDumpOptions;
 class AccessibilitySessionAdapter;
 class InspectorFilter;
 class VerticalOverflowHandler;
+struct InspectorDumpOptions;
 
 class ScrollingListener : public AceType {
     DECLARE_ACE_TYPE(ScrollingListener, AceType);
@@ -332,10 +334,17 @@ public:
     virtual void DumpInfo() {}
     virtual void DumpInfo(std::unique_ptr<JsonValue>& json) {}
     virtual void DumpSimplifyInfo(std::unique_ptr<JsonValue>& json) {}
+
     virtual void DumpAdvanceInfo() {}
     virtual void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json) {}
+    virtual void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config) {}
     virtual void DumpViewDataPageNode(RefPtr<ViewDataWrap> viewDataWrap, bool needsRecordData = false) {}
     virtual void DumpSimplifyInfo(std::shared_ptr<JsonValue>& json) {}
+    // Preserve existing component output until component-specific options are implemented.
+    virtual void DumpSimplifyInfo(std::shared_ptr<JsonValue>& json, const InspectorDumpOptions& /* options */)
+    {
+        DumpSimplifyInfo(json);
+    }
     virtual void DumpSimplifyInfoOnlyForParamConfig(
         std::shared_ptr<JsonValue>& json, ParamConfig config = ParamConfig())
     {}
@@ -735,6 +744,8 @@ public:
     }
 
 protected:
+    static bool ShouldIncludeDiagnostic(const InspectorDumpOptions& options);
+
     virtual void OnAttachToFrameNode() {}
     virtual void OnDetachFromFrameNode(FrameNode* frameNode) {}
 

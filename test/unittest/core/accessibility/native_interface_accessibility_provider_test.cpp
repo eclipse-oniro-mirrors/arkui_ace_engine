@@ -18,6 +18,10 @@
 #include "frameworks/core/accessibility/accessibility_node.h"
 #include "frameworks/core/accessibility/accessibility_utils.h"
 #include "frameworks/core/accessibility/native_interface_accessibility_provider.h"
+#include "frameworks/core/accessibility/third_provider_tree_exporter.h"
+#include "frameworks/core/components_ng/base/frame_node.h"
+#include "frameworks/core/components_ng/pattern/pattern.h"
+#include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 
 using namespace testing;
 using namespace testing::ext;
@@ -949,4 +953,80 @@ HWTEST_F(AccessibilityProviderTestNg, AccessibilityProviderTest011, TestSize.Lev
     EXPECT_EQ(g_providerMockResult.requestId_, requestId);
     EXPECT_EQ(g_providerMockResult.instanceId_, INSTANCE_ID);
 }
+
+class ThirdProviderPasswordExportTest : public testing::TestWithParam<bool> {
+public:
+    void SetUp() override
+    {
+        MockPipelineContext::SetUp();
+        host_ = FrameNode::CreateFrameNode("ProviderHost", 1, AceType::MakeRefPtr<Pattern>());
+        ArkUI_AccessibilityProviderCallbacks callbacks {};
+        BuildMockCallBack(callbacks);
+        callbacks.findAccessibilityNodeInfosById = [](int64_t, ArkUI_AccessibilitySearchMode, int32_t,
+                                                      ArkUI_AccessibilityElementInfoList* list) -> int32_t {
+            auto* info = list->AddAndGetElementInfo();
+            if (info == nullptr) {
+                return ARKUI_ACCESSIBILITY_NATIVE_RESULT_BAD_PARAMETER;
+            }
+            info->SetElementId(1);
+            info->SetParentId(-1);
+            info->SetContents("provider-test-content");
+            info->SetPassword(GetParam());
+            return ARKUI_ACCESSIBILITY_NATIVE_RESULT_SUCCESSFUL;
+        };
+        ASSERT_EQ(provider_.AccessibilityProviderRegisterCallback(&callbacks),
+            ARKUI_ACCESSIBILITY_NATIVE_RESULT_SUCCESSFUL);
+    }
+
+    void TearDown() override
+    {
+        host_.Reset();
+        MockPipelineContext::TearDown();
+    }
+
+protected:
+    ArkUI_AccessibilityProvider provider_;
+    RefPtr<FrameNode> host_;
+};
+
+/**
+ * @tc.name: TreeContents
+ * @tc.desc: Tree export hides password contents and preserves ordinary text.
+ * @tc.type: FUNC
+ */
+TEST_P(ThirdProviderPasswordExportTest, TreeContents)
+{
+    auto tree = ThirdProviderTreeExporter::ExportToInspectorJson(&provider_, host_);
+    ASSERT_NE(tree, nullptr);
+    EXPECT_EQ(tree->GetString("contents"), GetParam() ? "" : "provider-test-content");
+    EXPECT_EQ(tree->GetBool("password"), GetParam());
+    if (GetParam()) {
+        EXPECT_EQ(tree->ToString().find("provider-test-content"), std::string::npos);
+    }
+}
+
+/**
+ * @tc.name: FlatContents
+ * @tc.desc: Flat export hides password contents and preserves ordinary text and budget accounting.
+ * @tc.type: FUNC
+ */
+TEST_P(ThirdProviderPasswordExportTest, FlatContents)
+{
+    ThirdProviderTreeExportBudget budget;
+    auto result = ThirdProviderTreeExporter::ExportFlatToInspectorJson(&provider_, host_, budget);
+    ASSERT_EQ(result.status, ThirdProviderExportStatus::SUCCESS);
+    ASSERT_NE(result.nodes, nullptr);
+    ASSERT_EQ(result.nodes->GetArraySize(), 1);
+    auto node = result.nodes->GetArrayItem(0);
+    EXPECT_EQ(node->GetString("contents"), GetParam() ? "" : "provider-test-content");
+    EXPECT_EQ(node->GetBool("password"), GetParam());
+    const auto json = result.nodes->ToString();
+    EXPECT_EQ(budget.nodes, 1u);
+    EXPECT_EQ(budget.bytes, json.size());
+    if (GetParam()) {
+        EXPECT_EQ(json.find("provider-test-content"), std::string::npos);
+    }
+}
+
+INSTANTIATE_TEST_SUITE_P(PasswordAndPlainText, ThirdProviderPasswordExportTest, testing::Bool());
 } // namespace OHOS::Ace::NG

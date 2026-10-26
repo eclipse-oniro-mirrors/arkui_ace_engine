@@ -1586,6 +1586,7 @@ declare enum TabBarStyle {
   BOTTOM = 0,
   SIDEBAR = 1,
   SIDEBAR_ADAPTABLE = 2,
+  TOP = 3,
 }
 declare enum TabsSidebarDisplayStyle {
   EMBED = 0,
@@ -1601,6 +1602,7 @@ declare interface TabsSidebarSearchableOptions {
 declare enum TabBarDisplayMode {
   BOTTOM_TABBAR = 0,
   SIDEBAR = 1,
+  TOP_TABBAR = 2,
 }
 declare enum TabVisibility {
   VISIBLE = 0,

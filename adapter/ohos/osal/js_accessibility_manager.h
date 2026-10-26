@@ -16,9 +16,12 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_BRIDGE_COMMON_ACCESSIBILITY_JS_ACCESSIBILITY_MANAGER_H
 #define FOUNDATION_ACE_FRAMEWORKS_BRIDGE_COMMON_ACCESSIBILITY_JS_ACCESSIBILITY_MANAGER_H
 
+#include <optional>
+#include <map>
 #include <unordered_map>
 #include <unordered_set>
 #include <set>
+#include <mutex>
 #include <vector>
 
 #include "accessibility_config.h"
@@ -31,6 +34,7 @@
 #include "core/accessibility/hidumper/accessibility_hidumper.h"
 #include "core/accessibility/utils/accessibility_manager_utils.h"
 #include "frameworks/bridge/common/accessibility/accessibility_node_manager.h"
+#include "adapter/ohos/osal/accessibility/focus_move/accessibility_focus_strategy.h"
 
 #include "js_third_accessibility_hover_ng.h"
 
@@ -68,7 +72,8 @@ enum WebAccFun {
     WEB_NEXT,
     WEB_EXE_ACTION,
     WEB_SEND_EVENT,
-    WEB_HOVER
+    WEB_HOVER,
+    WEB_ACC_JSON
 };
 
 using CheckAndGetEmbedFunc = std::function<int64_t(const RefPtr<NG::FrameNode>& node)>;
@@ -152,6 +157,9 @@ class JsAccessibilityManager : public AccessibilityNodeManager,
     public AccessibilityHoverManagerForThirdNG {
     DECLARE_ACE_TYPE(JsAccessibilityManager, AccessibilityNodeManager);
 
+private:
+    struct CmpRegistration;
+
 public:
     JsAccessibilityManager() = default;
     ~JsAccessibilityManager() override;
@@ -166,8 +174,133 @@ public:
     void RegisterSubWindowInteractionOperation(int windowId) override;
     void SetPipelineContext(const RefPtr<PipelineBase>& context) override;
     void UpdateElementInfosTreeId(std::list<Accessibility::AccessibilityElementInfo>& infos, bool checkEmbed = false);
-    void UpdateElementInfoTreeId(Accessibility::AccessibilityElementInfo& info);
+    // compensateCmpRect=false: id splicing only, skip the CMP exported-subtree rect compensation.
+    void UpdateElementInfoTreeId(Accessibility::AccessibilityElementInfo& info,
+        bool compensateCmpRect = true);
     static bool IsTagInEmbedComponent(const std::string& tag);
+
+    // Get the subAM owning this node (nearest registered exported root).
+    static WeakPtr<JsAccessibilityManager> GetSubAccessibilityManager(const NG::FrameNode* node);
+
+    // CMP mixed-rendering: adoption-mounted detection for an exported subtree.
+    static bool IsUnderAdoptedMount(const RefPtr<NG::FrameNode>& node);
+
+    // CMP mixed-rendering: node-aware AM routing.
+    RefPtr<AccessibilityManager> GetAccessibilityManagerForNode(const RefPtr<NG::FrameNode>& node) override;
+
+    // CMP mixed-rendering: bind/unbind exported subtree (CAPI internal implementation).
+    bool BindExportTree(NG::FrameNode* owner, int64_t bindId, NG::FrameNode* exportedRoot);
+    void UnbindExportTree(NG::FrameNode* owner, int64_t bindId);
+    // Three-parameter convergence: CMP subtree registered (treeId obtained).
+    void OnCmpTreeRegistered(NG::FrameNode* owner, int32_t treeId);
+    void OnCmpTreeDeregistered(NG::FrameNode* owner, int32_t treeId);
+    // Register one converged binding to AAMS (parentTreeId=CMP treeId, parentElementId=bindId): migrate four-type.
+    void RegisterCmpSubtreeToAams(const std::pair<int32_t, int64_t>& key);
+    // Whole-subtree detach for one binding (Unbind semantics): deregister grandchild trees, deregister the exported.
+    void DetachCmpBinding(const std::pair<int32_t, int64_t>& key);
+    // Binding state transition: T_sub assigned (SetBelongTreeId continuation, UI thread).
+    void MarkCmpBindingRegistered(const std::pair<int32_t, int64_t>& key,
+        const RefPtr<JsAccessibilityManager>& subAM, const std::shared_ptr<CmpRegistration>& registration);
+    // CMP tree treeId query through the third-provider operator registered for this host.
+    int32_t GetThirdProviderTreeIdForHost(NG::FrameNode* owner);
+    // Migrate four-type child-tree callbacks that landed on the main AM before Bind.
+    void MigrateChildTreeCallbacksToSubAM(const RefPtr<NG::FrameNode>& exportedRoot,
+        const RefPtr<JsAccessibilityManager>& subAM);
+    // CMP mixed-rendering: exportedRoot-parameterized search/focus.
+    void SearchElementInfoByAccessibilityIdFromRoot(int64_t elementId, int32_t mode,
+        std::list<AccessibilityElementInfo>& infos, const RefPtr<PipelineBase>& context,
+        const RefPtr<NG::FrameNode>& exportedRoot);
+    void FocusMoveSearchFromRoot(int64_t elementId, int32_t direction,
+        Accessibility::AccessibilityElementInfo& info, const RefPtr<PipelineBase>& context,
+        const RefPtr<NG::FrameNode>& exportedRoot);
+    // Execute an accessibility action on a node within the exported subtree (root=exportedRoot).
+    bool ExecuteActionFromRoot(int64_t elementId, const std::map<std::string, std::string>& actionArguments,
+        Accessibility::ActionType action, const RefPtr<PipelineBase>& context,
+        const RefPtr<NG::FrameNode>& exportedRoot);
+    // Condition-aware focus move search scoped to the exported subtree (result envelope per AAMS).
+    void FocusMoveSearchWithConditionFromRoot(const AccessibilityElementInfo& info,
+        const Accessibility::AccessibilityFocusMoveParam& param, const int32_t requestId,
+        AccessibilityElementOperatorCallback& callback, const RefPtr<NG::FrameNode>& exportedRoot);
+    // Detect-focusable round scoped to the exported subtree.
+    void DetectElementInfoFocusableFromRoot(const AccessibilityElementInfo& info,
+        const Accessibility::AccessibilityFocusMoveParam& param, const int32_t requestId,
+        AccessibilityElementOperatorCallback& callback, const RefPtr<NG::FrameNode>& exportedRoot);
+    // Scroll-ancestor round scoped to the exported subtree: round 1 (origin = requesting node) and the AA's.
+    void ProcessGetScrollAncestorFromRoot(const AccessibilityElementInfo& info,
+        const Accessibility::AccessibilityFocusMoveParam& param, const int32_t requestId,
+        AccessibilityElementOperatorCallback& callback, const RefPtr<NG::FrameNode>& exportedRoot);
+    // FIND_LAST round scoped to the exported subtree (backward entry): last-child descent via the shared strategy walk.
+    void FindLastNodeFromRoot(const AccessibilityElementInfo& info,
+        const Accessibility::AccessibilityFocusMoveParam& param, const int32_t requestId,
+        AccessibilityElementOperatorCallback& callback, const RefPtr<NG::FrameNode>& exportedRoot);
+    // Find the currently focused node (input/accessibility focus) within the exported subtree.
+    void FindFocusedElementInfoFromRoot(int64_t elementId, int32_t focusType,
+        Accessibility::AccessibilityElementInfo& info, const RefPtr<PipelineBase>& context,
+        const RefPtr<NG::FrameNode>& exportedRoot);
+    // Search nodes matching text within the exported subtree.
+    void SearchElementInfosByTextFromRoot(int64_t elementId, const std::string& text,
+        std::list<Accessibility::AccessibilityElementInfo>& infos, const RefPtr<PipelineBase>& context,
+        const RefPtr<NG::FrameNode>& exportedRoot);
+    // Search nodes matching a specific property (customId) within the exported subtree.
+    void SearchElementInfoByCustomIdFromRoot(int64_t elementId, const std::string& customId,
+        std::list<Accessibility::AccessibilityElementInfo>& infos,
+        std::list<Accessibility::AccessibilityElementInfo>& treeInfos, const RefPtr<PipelineBase>& context,
+        const RefPtr<NG::FrameNode>& exportedRoot);
+    // Collect default-focus nodes within the exported subtree.
+    void SearchDefaultFocusFromRoot(std::list<Accessibility::AccessibilityElementInfo>& infos,
+        const RefPtr<PipelineBase>& context, const RefPtr<NG::FrameNode>& exportedRoot);
+    // Hover routing: query binding info by bindId.
+    struct CmpBindingQueryResult {
+        WeakPtr<NG::FrameNode> exportedRoot;
+        RefPtr<JsAccessibilityManager> subAM;
+    };
+    std::optional<CmpBindingQueryResult> GetCmpBindingForHover(int32_t ownerNodeId, int64_t bindId);
+    // Result layer of FocusMoveSearchWithConditionFromRoot: grandchild-tree drill-down / DOUBLE_CHECK handoff for a selected child-tree host.
+    bool TryReplyChildTreeHandoffFromRoot(const AccessibilityElementInfo& nodeInfo,
+        const Accessibility::AccessibilityFocusMoveParam& param, const RefPtr<PipelineBase>& context,
+        const RefPtr<NG::FrameNode>& exportedRoot, std::list<AccessibilityElementInfo>& infos,
+        FocusMoveResult& result, const int32_t requestId,
+        AccessibilityElementOperatorCallback& callback);
+    // SEARCH_FAIL_IN_CHILDTREE anchor fill (boundary-exhausted searches): the exhaustion reply is anchored on the subtree root's info.
+    void FillSearchFailInChildTreeRootFromRoot(const RefPtr<PipelineBase>& context,
+        const RefPtr<NG::FrameNode>& exportedRoot, const AccessibilityElementInfo& nodeInfo,
+        std::list<AccessibilityElementInfo>& infos);
+    // Hover-variant ancestor substitution for DetectElementInfoFocusableFromRoot: nearest readable ancestor within.
+    std::optional<AccessibilityElementInfo> FindReadableAncestorFromRoot(
+        const RefPtr<NG::FrameNode>& baseNode, const RefPtr<NG::FrameNode>& exportedRoot,
+        const Accessibility::AccessibilityFocusMoveParam& param, const RefPtr<PipelineBase>& context);
+    // Result completion of FindLastNodeFromRoot.
+    bool CompleteFindLastResultFromRoot(const AccessibilityElementInfo& targetInfo,
+        const Accessibility::AccessibilityFocusMoveParam& param, const RefPtr<PipelineBase>& context,
+        const RefPtr<NG::FrameNode>& exportedRoot, AceFocusMoveResult moveResult,
+        std::list<AccessibilityElementInfo>& infos, FocusMoveResult& result);
+    // Fill the scroll-ancestor reply infos from the strategy walk's collected check nodes.
+    void FillScrollAncestorInfosFromRoot(const RefPtr<NG::PipelineContext>& ngPipeline,
+        const std::list<std::shared_ptr<FocusRulesCheckNode>>& targetNodes,
+        std::list<AccessibilityElementInfo>& infos);
+    // Dissolved-embed-content origin search: the same-layer dissolution cuts the embed anchor and its content from.
+    enum class DissolvedEmbedSearch { NOT_APPLICABLE, FOUND };
+    DissolvedEmbedSearch SearchInDissolvedEmbedContent(int64_t splitElementId, int32_t direction,
+        bool checkSelf, int32_t focusRuleType, const RefPtr<PipelineBase>& context,
+        const RefPtr<NG::FrameNode>& exportedRoot, AccessibilityElementInfo& outInfo);
+    // Binding-map accessors shared by the CMP registration flow.
+    bool SnapshotRegisteringCmpBinding(const std::pair<int32_t, int64_t>& key,
+        RefPtr<JsAccessibilityManager>& subAM, WeakPtr<NG::FrameNode>& exportedRootWeak,
+        WeakPtr<NG::FrameNode>& ownerWeak, int32_t& cmpTreeId);
+    bool CompleteCmpRegistration(const std::pair<int32_t, int64_t>& key,
+        const RefPtr<JsAccessibilityManager>& subAM, const std::shared_ptr<CmpRegistration>& registration, bool success);
+    void WireSubAmAnchors(const RefPtr<JsAccessibilityManager>& subAM,
+        const WeakPtr<NG::FrameNode>& exportedRootWeak, NG::FrameNode* owner,
+        int32_t cmpTreeId, int64_t elementId, uint32_t windowId);
+    // Diagnostic: ids of all REGISTERED bindId mounts (hover hit-test probe).
+    std::vector<int64_t> GetCmpBindingBindIdsForHover(int32_t ownerNodeId);
+
+    // The exported root's window position (used to complete subtree-local rects).
+    bool GetExportedRootWindowOffset(float& offsetX, float& offsetY);
+
+    // CMP mixed-rendering: true only for subAMs created by BindExportTree.
+    void MarkCmpSubAM() { isCmpSubAM_ = true; }
+    bool IsCmpSubAM() const { return isCmpSubAM_; }
 
     void UpdateViewScale();
 
@@ -261,6 +394,7 @@ public:
         pageMode_ = std::make_optional(pageMode);
     }
 
+    void CompensateCmpEventRect(AccessibilityEventInfo& eventInfo);
     bool SendAccessibilitySyncEvent(
         const AccessibilityEvent& accessibilityEvent, Accessibility::AccessibilityEventInfo eventInfo);
     bool TransferAccessibilityAsyncEvent(
@@ -338,7 +472,8 @@ public:
     void WebFocusMoveSearchByComponent(AccessibilityElementInfo& nodeInfo, const RefPtr<NG::WebPattern>& webPattern,
         const int32_t direction, RefPtr<PipelineBase> context, FocusMoveResult& result,
         int32_t focusRuleType = static_cast<int32_t>(FocusRuleType::DEFAULT), uint32_t searchDepth = 0);
-    void WebFocusMoveSearchNG(int64_t elementId, int32_t direction,
+    // Returns true when the Web side answered with a node (focus target found).
+    bool WebFocusMoveSearchNG(int64_t elementId, int32_t direction,
         Accessibility::AccessibilityElementInfo& info, const RefPtr<PipelineBase>& context,
         const RefPtr<NG::WebPattern>& webPattern);
     void WebFocusMoveSearchWithCondition(const int64_t elementId,
@@ -347,6 +482,19 @@ public:
     FocusMoveResult WebFocusMoveSearchWithConditionNG(int64_t elementId, int32_t direction, int32_t focusRuleType,
         Accessibility::AccessibilityElementInfo& info,
         const RefPtr<PipelineBase>& context, const RefPtr<NG::WebPattern>& webPattern);
+    // In-process Web grandchild drill-down at the child-tree handoff sites.
+    bool TryFocusMoveSearchWebGrandchildFromRoot(const AccessibilityElementInfo& hostInfo,
+        const Accessibility::AccessibilityFocusMoveParam& param, const RefPtr<PipelineBase>& context,
+        const RefPtr<NG::FrameNode>& exportedRoot, std::list<AccessibilityElementInfo>& infos,
+        FocusMoveResult& result);
+    // DOM re-search fallback of WebFocusMoveSearchByComponent's embed handoff (no surfaceId / surface search miss).
+    void WebEmbedFallbackResearch(AccessibilityElementInfo& nodeInfo,
+        const RefPtr<NG::WebPattern>& webPattern, const int32_t direction, RefPtr<PipelineBase> context,
+        FocusMoveResult& result, int32_t focusRuleType, uint32_t searchDepth);
+    // Plain-API grandchild exhaustion escalation (CMP exported subtree only): the AA drives Web-tree focus moves.
+    bool TryPlainWebExhaustionEscalation(int32_t direction, int32_t requestId,
+        const RefPtr<NG::FrameNode>& hostNode, const RefPtr<PipelineBase>& context,
+        AccessibilityElementInfo& nodeInfo);
     void ExecuteWebAction(const int64_t elementId, const ActionParam& param, const int32_t requestId,
         Accessibility::AccessibilityElementOperatorCallback& callback, const int32_t windowId,
         const RefPtr<NG::WebPattern>& webPattern);
@@ -442,6 +590,8 @@ public:
     bool IsScreenReaderEnabled() override;
     bool IsSelectReaderEnabled() override;
     WeakPtr<NG::WebPattern> GetWebPatternBySurfaceId(const std::string& surfaceId) override;
+    // Own-map lookup with a main-AM fallback for subAMs.
+    WeakPtr<NG::WebPattern> GetWebPatternBySurfaceIdWithMainFallback(const std::string& surfaceId);
     void SetWebPatternBySurfaceId(const std::string& surfaceId, WeakPtr<NG::WebPattern> pattern) override;
     void RemoveWebPatternBySurfaceId(const std::string& surfaceId) override;
 
@@ -453,6 +603,8 @@ public:
     void NotifyAccessibilityFocusDetachOrInvisible(const RefPtr<NG::FrameNode>& focusNode);
     bool SendRequestFocusToCandidate(const RefPtr<NG::FrameNode>& candidateNode);
     RefPtr<NG::FrameNode> FindCandidateByFocusMove(const RefPtr<NG::FrameNode>& focusNode, int32_t direction);
+    RefPtr<NG::FrameNode> FindDetachFocusCandidateFromRoot(
+        const RefPtr<NG::FrameNode>& focusNode, int32_t direction);
     bool IsDetachFocusCacheClearEvent(AccessibilityEventType eventType) const;
     void ClearDetachFocusFallbackCache(int32_t instanceId);
     void CacheDetachFocusFallbackCandidates(
@@ -460,11 +612,13 @@ public:
     struct DetachFocusFallbackData {
         int64_t focusNodeId = -1;
         std::vector<int64_t> candidateIds;
+        int32_t treeId = -1;
     };
     DetachFocusFallbackData GetAndClearDetachFocusFallbackCandidates(int32_t instanceId);
     std::vector<int64_t> QueryDetachFocusFallbackCandidates(
         const RefPtr<NG::FrameNode>& focusNode, const RefPtr<NG::PipelineContext>& context, size_t maxCount);
     void HandleDetachFocusFallbackCallback(int32_t instanceId);
+    AccessibilityEventInfo BuildDetachFocusFallbackEvent(const DetachFocusFallbackData& data, int32_t windowId);
     void SetFocusMoveResultWithNode(
         const WeakPtr<NG::FrameNode>& hostNode,
         AccessibilityElementOperatorCallback& callback,
@@ -1075,6 +1229,7 @@ private:
     NG::SizeF oldGeometrySize_;
     mutable std::mutex childTreeCallbackMapMutex_;
     std::unordered_map<int64_t, std::shared_ptr<AccessibilityChildTreeCallback>> childTreeCallbackMap_;
+    std::unordered_map<int64_t, std::weak_ptr<AccessibilityChildTreeCallback>> detachedCmpChildTreeCallbacks_;
     mutable std::mutex componentSACallbackMutex_;
     std::unordered_map<int64_t, std::shared_ptr<AccessibilitySAObserverCallback>> componentSACallbackMap_;
     mutable std::mutex componentScreenReaderCallbackMutex_;
@@ -1107,6 +1262,130 @@ private:
     bool isIgnoreAllAction_ = false;
 
     NG::AccessibilityEventBlockerInAction blockerInAction_;
+
+    struct CmpRegistration {
+        explicit CmpRegistration(uint32_t windowId) : windowId(windowId) {}
+        void SetTreeId(int32_t id);
+        void Complete(bool accepted);
+        void Cancel();
+        int32_t GetAcceptedTreeId();
+        bool IsCanceled();
+        void CleanupIfCanceled();
+
+        std::mutex mutex;
+        const uint32_t windowId;
+        int32_t treeId = -1;
+        bool finished = false;
+        bool canceled = false;
+        bool cleaned = false;
+    };
+
+    // CMP mixed-rendering: binding state for exported subtree binding.
+    struct CmpBindingState {
+        WeakPtr<NG::FrameNode> owner;
+        WeakPtr<NG::FrameNode> exportedRoot;
+        RefPtr<JsAccessibilityManager> subAM; // strong ref: subAM lifecycle = binding lifecycle
+        std::shared_ptr<CmpRegistration> registration;
+        int32_t cmpTreeId = -1; // CMP (parent) tree treeId — set at convergence
+        uint32_t windowId = 0; // host window id — set at registration, used by detach
+        // WAIT_TREE_ID: waiting for the CMP treeId.
+        enum class State { UNBOUND, WAIT_TREE_ID, REGISTERING, REGISTERED } state = State::UNBOUND;
+    };
+    // (owner nodeId, bindId) -> binding state.
+    std::map<std::pair<int32_t, int64_t>, CmpBindingState> cmpBindingMap_;
+    std::mutex cmpBindingMapMutex_;
+    // CMP mixed-rendering: set by BindExportTree on every subAM it creates (see MarkCmpSubAM).
+    bool isCmpSubAM_ = false;
+    // CMP mixed-rendering: escalation anchors set on the subAM at RegisterCmpSubtreeToAams (used by.
+    WeakPtr<NG::FrameNode> cmpExportedRoot_;
+    std::weak_ptr<JsThirdProviderInteractionOperation> cmpProviderOperation_;
+
+    // CMP mixed-rendering: dedicated operator for the exported subtree.
+    class CmpInteractionOperation : public Accessibility::AccessibilityElementOperator {
+    public:
+        CmpInteractionOperation(int32_t parentTreeId, int64_t hostElementId,
+            const WeakPtr<NG::FrameNode>& exportedRoot, int32_t ownerNodeId,
+            const WeakPtr<JsAccessibilityManager>& bindingOwner,
+            const std::shared_ptr<CmpRegistration>& registration = nullptr)
+            : js_(), bindingOwner_(bindingOwner), exportedRoot_(exportedRoot),
+              parentTreeId_(parentTreeId), hostElementId_(hostElementId), ownerNodeId_(ownerNodeId),
+              registration_(registration) {}
+        ~CmpInteractionOperation() override = default;
+
+        void SetHandler(const WeakPtr<JsAccessibilityManager>& js)
+        {
+            js_ = js;
+        }
+        const WeakPtr<JsAccessibilityManager>& GetHandler() const
+        {
+            return js_;
+        }
+        const WeakPtr<NG::FrameNode>& GetExportedRoot() const
+        {
+            return exportedRoot_;
+        }
+        int32_t GetParentTreeId() const
+        {
+            return parentTreeId_;
+        }
+        int64_t GetHostElementId() const
+        {
+            return hostElementId_;
+        }
+
+        // AccessibilityElementOperator overrides.
+        RetError SearchElementInfoByAccessibilityId(const int64_t elementId, const int32_t requestId,
+            Accessibility::AccessibilityElementOperatorCallback& callback, const int32_t mode) override;
+        void SearchElementInfoBySpecificProperty(const int64_t elementId, const SpecificPropertyParam& param,
+            const int32_t requestId, Accessibility::AccessibilityElementOperatorCallback& callback) override;
+        void SearchElementInfosByText(const int64_t elementId, const std::string& text, const int32_t requestId,
+            Accessibility::AccessibilityElementOperatorCallback& callback) override;
+        void SearchDefaultFocusByWindowId(const int32_t windowId, const int32_t requestId,
+            Accessibility::AccessibilityElementOperatorCallback& callback, const int32_t pageId) override;
+        void FindFocusedElementInfo(const int64_t elementId, const int32_t focusType, const int32_t requestId,
+            Accessibility::AccessibilityElementOperatorCallback& callback) override;
+        void FocusMoveSearch(const int64_t elementId, const int32_t direction, const int32_t requestId,
+            Accessibility::AccessibilityElementOperatorCallback& callback) override;
+        void ExecuteAction(const int64_t elementId, const int32_t action,
+            const std::map<std::string, std::string>& actionArguments, const int32_t requestId,
+            Accessibility::AccessibilityElementOperatorCallback& callback) override;
+        void ClearFocus() override;
+        void OutsideTouch() override;
+        void GetCursorPosition(const int64_t elementId, const int32_t requestId,
+            Accessibility::AccessibilityElementOperatorCallback& callback) override;
+        void SetChildTreeIdAndWinId(const int64_t nodeId, const int32_t treeId,
+            const int32_t childWindowId) override;
+        void SetBelongTreeId(const int32_t treeId) override;
+        void FocusMoveSearchWithCondition(const AccessibilityElementInfo& info,
+            const AccessibilityFocusMoveParam param, const int32_t requestId,
+            Accessibility::AccessibilityElementOperatorCallback& callback) override;
+        void UpdateCustomAccessibilityProperty(const int64_t elementId,
+            const AccessibilityVirtualNode& accessibilityVirtualNode, const int32_t requestId,
+            Accessibility::AccessibilityElementOperatorCallback& callback) override;
+        void AddAccessibilityVirtualNode(const int64_t elementId,
+            const std::vector<AccessibilityVirtualNode>& nodes, const int32_t requestId,
+            Accessibility::AccessibilityElementOperatorCallback& callback) override;
+        void RemoveAccessibilityVirtualNode(const int64_t elementId, const int32_t requestId,
+            Accessibility::AccessibilityElementOperatorCallback& callback) override;
+
+    private:
+        // Focus fallback: when no next focus is found in the exported subtree, return ElementInfo with.
+        void ReturnFocusFallback(Accessibility::AccessibilityElementOperatorCallback& callback,
+            const int32_t requestId);
+
+        // Same F-05 host anchor through the with-condition channel: FocusMoveSearchWithCondition requests are answered.
+        static void ReturnFocusFallbackWithCondition(int32_t parentTreeId, int64_t hostElementId,
+            Accessibility::AccessibilityElementOperatorCallback& callback, const int32_t requestId);
+
+        WeakPtr<JsAccessibilityManager> js_; // SetHandler → subAM (ADR-1 operator wiring)
+        // Main AM - STATE-1 cmpBindingMap_ owner.
+        WeakPtr<JsAccessibilityManager> bindingOwner_;
+        WeakPtr<NG::FrameNode> exportedRoot_; // search root (Bind 3rd param, Owner rule)
+        int32_t parentTreeId_ = -1; // CMP tree treeId (host tree)
+        int64_t hostElementId_ = -1; // bindId (mount node accessibility ID in CMP tree)
+        int32_t ownerNodeId_ = -1; // binding owner node id (MarkCmpBindingRegistered key part)
+        std::shared_ptr<CmpRegistration> registration_;
+    };
 };
 
 } // namespace OHOS::Ace::Framework

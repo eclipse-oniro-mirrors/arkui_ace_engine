@@ -34,7 +34,7 @@ constexpr double SELECTED_ALPHA = 0.1;
  * ListItemTheme defines styles of list or grid item. ListItemTheme should be built
  * using ListItemTheme::Builder.
  */
-class ListItemTheme : public virtual Theme {
+class ListItemTheme : public Theme {
 DECLARE_ACE_TYPE(ListItemTheme, Theme);
 
 public:

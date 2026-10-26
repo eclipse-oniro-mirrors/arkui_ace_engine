@@ -32,7 +32,7 @@
 
 namespace OHOS::Ace::NG {
 
-class ContainerPickerTheme : public virtual Theme {
+class ContainerPickerTheme : public Theme {
     DECLARE_ACE_TYPE(ContainerPickerTheme, Theme);
 
 public:

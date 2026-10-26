@@ -27,6 +27,7 @@
 #include "core/components_ng/gestures/gesture_referee.h"
 #include "core/pipeline_ng/pipeline_context.h"
 #include "core/components_ng/manager/event/json_child_report.h"
+#include "core/components_ng/manager/interaction_observer/ui_info_collection_manager.h"
 #include "core/common/reporter/reporter.h"
 #include "core/components_ng/manager/event/json_report.h"
 #include "core/components_ng/pattern/scrollable/scrollable_pattern.h"
@@ -978,6 +979,10 @@ void PanRecognizer::SendCallbackMsg(const std::unique_ptr<GestureEventFunc>& cal
 #ifdef ENABLE_INSPECTOR_EVENT_REPORTING
     HandleReports(info, type);
 #endif
+    // Always-on delivery for NDK interaction observers; the manager drops
+    // notifications without a start/end/cancel semantic.
+    UIInfoCollectionManager::GetInstance().NotifyPan(
+        GetAttachedNode().Upgrade(), info, direction_.type, type);
     if (type == GestureCallbackType::END || type == GestureCallbackType::CANCEL) {
         localMatrix_.clear();
     }

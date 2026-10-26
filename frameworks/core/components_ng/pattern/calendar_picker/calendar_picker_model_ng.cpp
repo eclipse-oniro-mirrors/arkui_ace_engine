@@ -125,9 +125,7 @@ RefPtr<FrameNode> CalendarPickerModelNG::CreateButtonChild(
     auto buttonNode = FrameNode::GetOrCreateFrameNode(BUTTON_ETS_TAG, id, []() -> RefPtr<Pattern> {
         auto* buttonModifier = NodeModifier::GetButtonCustomModifier();
         CHECK_NULL_RETURN(buttonModifier, nullptr);
-        auto* rawPattern = reinterpret_cast<Pattern*>(buttonModifier->createButtonPattern());
-        CHECK_NULL_RETURN(rawPattern, nullptr);
-        return AceType::Claim(rawPattern);
+        return buttonModifier->createButtonPattern();
     });
     CHECK_NULL_RETURN(buttonNode, nullptr);
     auto* btnModifier = NodeModifier::GetButtonCustomModifier();

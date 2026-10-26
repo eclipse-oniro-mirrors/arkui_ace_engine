@@ -184,6 +184,9 @@ public:
     // sidebar float window
     static constexpr char FLOAT_START_FROM_SIDEBAR[] = "FLOAT_START_FROM_SIDEBAR";
 
+    // live view click into app anim (scene_board_ext LiveStarterVm performanceMonitor.begin)
+    static constexpr char LV_INTO_APP_ANIM[] = "LV_INTO_APP_ANIM";
+    
     // menu interactive animation
     static constexpr char MENU_LIGHT_SENSE_ANIMATION[] = "MENU_LIGHT_SENSE_ANIMATION";
 

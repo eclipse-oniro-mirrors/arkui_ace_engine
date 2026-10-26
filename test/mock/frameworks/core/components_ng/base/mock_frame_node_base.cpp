@@ -200,6 +200,11 @@ void FrameNode::DumpInfo(std::unique_ptr<JsonValue>& json)
 void FrameNode::DumpSimplifyInfo(std::shared_ptr<JsonValue>& json)
 {}
 
+void FrameNode::DumpSimplifyInfoWithParamConfig(std::shared_ptr<JsonValue>& json, ParamConfig config)
+{
+    UINode::DumpSimplifyInfoWithParamConfig(json, config);
+}
+
 void FrameNode::DumpSimplifyInfoOnlyForParamConfig(std::shared_ptr<JsonValue>& json, ParamConfig config)
 {}
 

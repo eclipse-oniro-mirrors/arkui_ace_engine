@@ -1,6 +1,7 @@
 {
   global:
     extern "C++" {
+      "OHOS::Ace::JsonValue::Put(char const*, std::__h::shared_ptr<OHOS::Ace::JsonValue> const&)";
       "bool OHOS::Ace::NG::ArkTSUtils::ConvertFromJSValue<OHOS::Ace::CalcDimension>(panda::ecmascript::EcmaVM const*, panda::Local<panda::JSValueRef> const&, OHOS::Ace::CalcDimension&, OHOS::Ace::RefPtr<OHOS::Ace::ResourceObject>&)";
       "bool OHOS::Ace::NG::ArkTSUtils::ConvertFromJSValue<OHOS::Ace::Color>(panda::ecmascript::EcmaVM const*, panda::Local<panda::JSValueRef> const&, OHOS::Ace::Color&, OHOS::Ace::RefPtr<OHOS::Ace::ResourceObject>&)";
       "bool OHOS::Ace::NG::ArkTSUtils::ConvertFromJSValueNG<OHOS::Ace::Dimension>(panda::ecmascript::EcmaVM const*, panda::Local<panda::JSValueRef> const&, OHOS::Ace::Dimension&, OHOS::Ace::RefPtr<OHOS::Ace::ResourceObject>&)";
@@ -771,6 +772,7 @@
       "OHOS::Ace::ImageSourceInfo::GetPixmap() const";
       "OHOS::Ace::ImageSourceInfo::GetResourceId() const";
       "OHOS::Ace::ImageSourceInfo::GetSrc() const";
+      "OHOS::Ace::ImageSourceInfo::GetSrcTypeName() const";
       "OHOS::Ace::ImageSourceInfo::ImageSourceInfo(std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>>, std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>>, std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>>, OHOS::Ace::Dimension, OHOS::Ace::Dimension, OHOS::Ace::InternalResource::ResourceId, OHOS::Ace::RefPtr<OHOS::Ace::PixelMap> const&)";
       "OHOS::Ace::ImageSourceInfo::IsInternalResource() const";
       "OHOS::Ace::ImageSourceInfo::IsPixmap() const";
@@ -820,6 +822,7 @@
       "OHOS::Ace::JsonValue::IsObject() const";
       "OHOS::Ace::JsonValue::IsString() const";
       "OHOS::Ace::JsonValue::IsValid() const";
+      "OHOS::Ace::JsonValue::Put(double)";
       "OHOS::Ace::JsonValue::Put(std::__h::unique_ptr<OHOS::Ace::JsonValue, std::__h::default_delete<OHOS::Ace::JsonValue>> const&)";
       "OHOS::Ace::JsonValue::PutExtAttr(char const*, bool, OHOS::Ace::NG::InspectorFilter const&)";
       "OHOS::Ace::JsonValue::PutExtAttr(char const*, char const*, OHOS::Ace::NG::InspectorFilter const&)";
@@ -828,6 +831,7 @@
       "OHOS::Ace::JsonValue::PutExtAttr(char const*, long long, OHOS::Ace::NG::InspectorFilter const&)";
       "OHOS::Ace::JsonValue::PutExtAttr(char const*, long, OHOS::Ace::NG::InspectorFilter const&)";
       "OHOS::Ace::JsonValue::PutFixedAttr(char const*, char const*, OHOS::Ace::NG::InspectorFilter const&, OHOS::Ace::NG::FixedAttrBit)";
+      "OHOS::Ace::JsonValue::Replace(char const*, bool)";
       "OHOS::Ace::JsonValue::Replace(char const*, int)";
       "OHOS::Ace::KeyEvent::ConvertCodeToString() const";
       "OHOS::Ace::KeyToString(int)";
@@ -896,6 +900,11 @@
       "OHOS::Ace::MutableSpanString::SplitSpansByNewLine()";
       "vtable for OHOS::Ace::MutableSpanString";
       "VTT for OHOS::Ace::MutableSpanString";
+      "OHOS::Ace::NG::AccessibilityProperty::GetAccessibilityText() const";
+      "OHOS::Ace::NG::AccessibilityProperty::GetAccessibilityNextFocusInspectorKey() const";
+      "OHOS::Ace::NG::AccessibilityProperty::GetAccessibilityLevel() const";
+      "OHOS::Ace::NG::AccessibilityProperty::IsEditable() const";
+      "OHOS::Ace::NG::AccessibilityProperty::IsScrollable() const";
       "OHOS::Ace::NG::AccessibilityProperty::GetAccessibilityActionOptions()";
       "OHOS::Ace::NG::AccessibilityProperty::GetAccessibilityFocusState() const";
       "OHOS::Ace::NG::AccessibilityProperty::GetAccessibilityVirtualNode() const";
@@ -1301,6 +1310,8 @@
       "OHOS::Ace::NG::Converter::ResourceConverter::ToString()";
       "OHOS::Ace::NG::Converter::ResourceConverter::ToInt()";
       "OHOS::Ace::NG::Converter::ResourceConverter::ToSymbol()";
+      "OHOS::Ace::NG::Converter::ConverterState::defDimensionUnit";
+      "OHOS::Ace::NG::Converter::ConverterState::defShadowBlurRadius";
       "OHOS::Ace::NG::Converter::TextDecorationOptions OHOS::Ace::NG::Converter::Convert<OHOS::Ace::NG::Converter::TextDecorationOptions, Ark_TextDecorationOptions>(Ark_TextDecorationOptions const&)";
       "OHOS::Ace::NG::Converter::OptConvertFromArkNumResStr(Ark_Union_F64_ResourceStr const&, OHOS::Ace::DimensionUnit)";
       "OHOS::Ace::NG::ConvertToLinearGradientDirection(std::__h::shared_ptr<OHOS::Ace::NG::LinearGradient>)";
@@ -1441,6 +1452,10 @@
       "OHOS::Ace::NG::FrameNode::AdjustLayoutWrapperTree(OHOS::Ace::RefPtr<OHOS::Ace::NG::LayoutWrapperNode> const&, bool, bool)";
       "OHOS::Ace::NG::FrameNode::AdjustParentLayoutFlag(unsigned int&)";
       "OHOS::Ace::NG::FrameNode::AfterMountToParent()";
+      "OHOS::Ace::NG::FrameNode::ApplyAdoptedCompensationToCenterAndSize*";
+      "OHOS::Ace::NG::FrameNode::ApplyAdoptedCompensationToPoint*";
+      "OHOS::Ace::NG::FrameNode::ApplyAdoptedCompensationToPoints*";
+      "OHOS::Ace::NG::FrameNode::ApplyAdoptedCompensationToRect*";
       "OHOS::Ace::NG::FrameNode::AttachContext(OHOS::Ace::NG::PipelineContext*, bool)";
       "OHOS::Ace::NG::FrameNode::AxisTest(OHOS::Ace::NG::PointT<float> const&, OHOS::Ace::NG::PointT<float> const&, OHOS::Ace::NG::PointT<float> const&, OHOS::Ace::TouchRestrict&, std::__h::list<OHOS::Ace::RefPtr<OHOS::Ace::AxisEventTarget>, std::__h::allocator<OHOS::Ace::RefPtr<OHOS::Ace::AxisEventTarget>>>&)";
       "OHOS::Ace::NG::FrameNode::CheckAutoSave()";
@@ -1459,17 +1474,22 @@
       "OHOS::Ace::NG::FrameNode::DumpInfo(std::__h::unique_ptr<OHOS::Ace::JsonValue, std::__h::default_delete<OHOS::Ace::JsonValue>>&)";
       "OHOS::Ace::NG::FrameNode::DumpSimplifyInfo(std::__h::shared_ptr<OHOS::Ace::JsonValue>&)";
       "OHOS::Ace::NG::FrameNode::DumpSimplifyInfoOnlyForParamConfig(std::__h::shared_ptr<OHOS::Ace::JsonValue>&, OHOS::Ace::ParamConfig)";
+      "OHOS::Ace::NG::FrameNode::DumpSimplifyInfoWithParamConfig(std::__h::shared_ptr<OHOS::Ace::JsonValue>&, OHOS::Ace::ParamConfig)";
       "OHOS::Ace::NG::FrameNode::DumpViewDataPageNode(OHOS::Ace::RefPtr<OHOS::Ace::ViewDataWrap>, bool)";
       "OHOS::Ace::NG::FrameNode::FlushUpdateAndMarkDirty()";
       "OHOS::Ace::NG::FrameNode::ForceSyncGeometryNode()";
       "OHOS::Ace::NG::FrameNode::ForceUpdateLayoutPropertyFlag(unsigned int)";
       "OHOS::Ace::NG::FrameNode::FrameNode(std::__h::basic_string_view<char, std::__h::char_traits<char>>, int, OHOS::Ace::RefPtr<OHOS::Ace::NG::Pattern> const&, bool, bool)";
       "OHOS::Ace::NG::FrameNode::FromJson(std::__h::unique_ptr<OHOS::Ace::JsonValue, std::__h::default_delete<OHOS::Ace::JsonValue>> const&)";
+      "OHOS::Ace::NG::FrameNode::GetAdoptedCompensationOffset*";
+      "OHOS::Ace::NG::FrameNode::GetAdoptedCompensationScale*";
+      "OHOS::Ace::NG::FrameNode::GetAdoptedCompensationTransform*";
       "OHOS::Ace::NG::FrameNode::GetAllChildrenWithBuild(bool)";
       "OHOS::Ace::NG::FrameNode::GetAncestorNodeOfFrame(bool) const";
       "OHOS::Ace::NG::FrameNode::GetBaselineDistance() const";
       "OHOS::Ace::NG::FrameNode::GetChildByIndex(unsigned int, bool)";
       "OHOS::Ace::NG::FrameNode::GetChildTrueIndex(OHOS::Ace::RefPtr<OHOS::Ace::NG::LayoutWrapper> const&) const";
+      "OHOS::Ace::NG::FrameNode::GetCoordinateAncestorNodeOfFrame(bool) const";
       "OHOS::Ace::NG::FrameNode::GetCurrentPageRootNode()";
       "OHOS::Ace::NG::FrameNode::GetDragPixelMap()";
       "OHOS::Ace::NG::FrameNode::GetFocusHub() const";
@@ -1500,8 +1520,10 @@
       "OHOS::Ace::NG::FrameNode::GetRectWithRender()";
       "OHOS::Ace::NG::FrameNode::GetResponseRegionList(OHOS::Ace::NG::RectT<float> const&, int, int)";
       "OHOS::Ace::NG::FrameNode::GetResponseRegionListRaw(OHOS::Ace::NG::RectT<float> const&, int)";
+      "OHOS::Ace::NG::FrameNode::GetTransformedAdoptedCompensationOffset*";
       "OHOS::Ace::NG::FrameNode::GetTransformRectRelativeToWindow(bool) const";
       "OHOS::Ace::NG::FrameNode::GetTransformRelativeOffset() const";
+      "OHOS::Ace::NG::FrameNode::HasAdoptedCompensation*";
       "OHOS::Ace::NG::FrameNode::InitializePatternAndContext()";
       "OHOS::Ace::NG::FrameNode::InResponseRegionList(OHOS::Ace::NG::PointT<float> const&, std::__h::vector<OHOS::Ace::NG::RectT<float>, std::__h::allocator<OHOS::Ace::NG::RectT<float>>> const&, bool)";
       "OHOS::Ace::NG::FrameNode::IsAtomicNode() const";
@@ -1573,13 +1595,16 @@
       "OHOS::Ace::NG::FrameNode::RenderCustomChild(long)";
       "OHOS::Ace::NG::FrameNode::ReplacePattern(OHOS::Ace::RefPtr<OHOS::Ace::NG::Pattern> const&)";
       "OHOS::Ace::NG::FrameNode::RequestParentDirty()";
+      "OHOS::Ace::NG::FrameNode::RevertAdoptedCompensationFromPoint*";
       "OHOS::Ace::NG::FrameNode::SetActive(bool, bool)";
       "OHOS::Ace::NG::FrameNode::SetActiveChildRange(int, int, int, int, bool)";
       "OHOS::Ace::NG::FrameNode::SetActiveChildRange(std::__h::optional<OHOS::Ace::NG::ActiveChildSets> const&, std::__h::optional<OHOS::Ace::NG::ActiveChildRange> const&)";
+      "OHOS::Ace::NG::FrameNode::SetAdoptedCompensation*";
       "OHOS::Ace::NG::FrameNode::SetCacheCount(int, std::__h::optional<OHOS::Ace::NG::LayoutConstraintT<float>> const&)";
       "OHOS::Ace::NG::FrameNode::SetHitTestMode(OHOS::Ace::NG::HitTestMode)";
       "OHOS::Ace::NG::FrameNode::SetIsFree(bool)";
       "OHOS::Ace::NG::FrameNode::SetParentLayoutConstraint(OHOS::Ace::NG::SizeT<float> const&) const";
+      "OHOS::Ace::NG::FrameNode::SetUseAdoptedCompensation*";
       "OHOS::Ace::NG::FrameNode::SkipMeasureContent() const";
       "OHOS::Ace::NG::FrameNode::ToJsonValue(std::__h::unique_ptr<OHOS::Ace::JsonValue, std::__h::default_delete<OHOS::Ace::JsonValue>>&, OHOS::Ace::NG::InspectorFilter const&) const";
       "OHOS::Ace::NG::FrameNode::ToTreeJson(std::__h::unique_ptr<OHOS::Ace::JsonValue, std::__h::default_delete<OHOS::Ace::JsonValue>>&, OHOS::Ace::NG::InspectorConfig const&) const";
@@ -1996,6 +2021,7 @@
       "OHOS::Ace::NG::Pattern::GetFocusPattern() const";
       "OHOS::Ace::NG::Pattern::GetResCacheMapByKey(std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>> const&)";
       "OHOS::Ace::NG::Pattern::GetScopeFocusAlgorithm()";
+      "OHOS::Ace::NG::Pattern::ShouldIncludeDiagnostic(OHOS::Ace::NG::InspectorDumpOptions const&)";
       "OHOS::Ace::NG::Pattern::OnColorModeChange(unsigned int)";
       "OHOS::Ace::NG::Pattern::RemoveResObj(std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>> const&)";
       "OHOS::Ace::NG::Pattern::UnRegisterResource(std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>> const&)";
@@ -2130,6 +2156,7 @@
       "OHOS::Ace::NG::SafeAreaManager::GetSafeAreaWithoutProcess() const";
       "OHOS::Ace::NG::SafeAreaManager::GetSystemSafeArea() const";
       "OHOS::Ace::NG::SafeAreaManager::GetWindowWrapperOffset()";
+      "OHOS::Ace::NG::SafeAreaManager::IsImmersiveStrategySet(OHOS::Ace::ImmersiveStrategy) const";
       "OHOS::Ace::NG::SafeAreaInsets::Inset::Combine(OHOS::Ace::NG::SafeAreaInsets::Inset const&) const";
       "OHOS::Ace::NG::ScaleProperty::CreateScaleProperty(OHOS::Ace::PipelineBase*)";
       "OHOS::Ace::NG::ScopedLayout::~ScopedLayout()";
@@ -2215,7 +2242,9 @@
       "OHOS::Ace::NG::ScrollablePattern::AddScrollableFrameInfo(int)";
       "OHOS::Ace::NG::ScrollablePattern::AddScrollEvent()";
       "OHOS::Ace::NG::ScrollablePattern::AnimateTo(float, float, OHOS::Ace::RefPtr<OHOS::Ace::Curve> const&, bool, bool, bool)";
+      "OHOS::Ace::NG::ScrollablePattern::CalcSpringAdjustOffset(float) const";
       "OHOS::Ace::NG::ScrollablePattern::CanOverScrollWithDelta(double, bool)";
+      "OHOS::Ace::NG::ScrollablePattern::CancelFastScroll()";
       "OHOS::Ace::NG::ScrollablePattern::CheckRestartSpring(bool, bool)";
       "OHOS::Ace::NG::ScrollablePattern::CalculateFriction(float)";
       "OHOS::Ace::NG::ScrollablePattern::CheckScrollBarOff()";
@@ -2230,6 +2259,7 @@
       "OHOS::Ace::NG::ScrollablePattern::CustomizeSafeAreaPadding(OHOS::Ace::NG::PaddingPropertyF, bool)";
       "OHOS::Ace::NG::ScrollablePattern::DumpAdvanceInfo()";
       "OHOS::Ace::NG::ScrollablePattern::DumpAdvanceInfo(std::__h::unique_ptr<OHOS::Ace::JsonValue, std::__h::default_delete<OHOS::Ace::JsonValue>>&)";
+      "OHOS::Ace::NG::ScrollablePattern::DumpAdvanceInfo(std::__h::unique_ptr<OHOS::Ace::JsonValue, std::__h::default_delete<OHOS::Ace::JsonValue>>&, OHOS::Ace::ParamConfig const&)";
       "OHOS::Ace::NG::ScrollablePattern::FillReportOnItemStopParams(std::__h::unique_ptr<OHOS::Ace::JsonValue, std::__h::default_delete<OHOS::Ace::JsonValue>>&)";
       "OHOS::Ace::NG::ScrollablePattern::FireAndCleanScrollingListener()";
       "OHOS::Ace::NG::ScrollablePattern::FireObserverOnDidScroll(float)";
@@ -2269,6 +2299,7 @@
       "OHOS::Ace::NG::ScrollablePattern::MarkScrollBarProxyDirty()";
       "OHOS::Ace::NG::ScrollablePattern::MultiSelectable() const";
       "OHOS::Ace::NG::ScrollablePattern::MarkUserScrollSource(int)";
+      "OHOS::Ace::NG::ScrollablePattern::OnAnimateStop()";
       "OHOS::Ace::NG::ScrollablePattern::OnAttachToFrameNode()";
       "OHOS::Ace::NG::ScrollablePattern::OnAttachToMainTree()";
       "OHOS::Ace::NG::ScrollablePattern::OnColorConfigurationUpdate()";
@@ -2566,6 +2597,7 @@
       "OHOS::Ace::NG::TextPattern::EmplaceSymbolColorIndex(int)";
       "OHOS::Ace::NG::TextPattern::DumpAdvanceInfo()";
       "OHOS::Ace::NG::TextPattern::DumpAdvanceInfo(std::__h::unique_ptr<OHOS::Ace::JsonValue, std::__h::default_delete<OHOS::Ace::JsonValue>>&)";
+      "OHOS::Ace::NG::TextPattern::DumpAdvanceInfo(std::__h::unique_ptr<OHOS::Ace::JsonValue, std::__h::default_delete<OHOS::Ace::JsonValue>>&, OHOS::Ace::ParamConfig const&)";
       "OHOS::Ace::NG::TextPattern::DumpInfo()";
       "OHOS::Ace::NG::TextPattern::DumpInfo(std::__h::unique_ptr<OHOS::Ace::JsonValue, std::__h::default_delete<OHOS::Ace::JsonValue>>&)";
       "OHOS::Ace::NG::TextPattern::DumpSimplifyInfo(std::__h::shared_ptr<OHOS::Ace::JsonValue>&)";
@@ -2779,6 +2811,7 @@
       "OHOS::Ace::NG::ToolbarManager::SetSideBarInfo(OHOS::Ace::NG::ToolbarInfo const&)";
       "OHOS::Ace::NG::TossAnimationController::StopTossAnimation()";
       "OHOS::Ace::NG::UiMaterialFilterCreator::ConvertToUiMaterialFilter(OHOS::Ace::ImmersiveMaterialConfig const&)";
+      "OHOS::Ace::NG::UINode::GetChildrenForNativeTreeCheck() const";
       "OHOS::Ace::NG::UINode::~UINode()";
       "OHOS::Ace::NG::UINode::AddChild(OHOS::Ace::RefPtr<OHOS::Ace::NG::UINode> const&, int, bool, bool, bool)";
       "OHOS::Ace::NG::UINode::AdjustLayoutWrapperTree(OHOS::Ace::RefPtr<OHOS::Ace::NG::LayoutWrapperNode> const&, bool, bool)";
@@ -4303,6 +4336,9 @@
       "OHOS::Ace::InteractionInterface::GetInstance()";
       "OHOS::Ace::JankFrameReport::ReportJSAnimation()";
       "OHOS::Ace::JsonUtil::CreateSharedPtrJson(bool)";
+      ThirdProviderTreeExporter::ExportToInspectorJson*;
+      ThirdProviderTreeExporter::ExportFlatToInspectorJson*;
+      ThirdProviderTreeExporter::AccumulateInspectorTree*;
       "OHOS::Ace::JsonValue::Delete(char const*)";
       "OHOS::Ace::JsonValue::GetChild() const";
       "OHOS::Ace::JsonValue::GetKey() const";
@@ -4607,6 +4643,9 @@
       "OHOS::Ace::NG::LazyLayoutUtils::GetLazyLayoutPattern(OHOS::Ace::RefPtr<OHOS::Ace::NG::UINode> const&)";
       "OHOS::Ace::NG::LazyLayoutUtils::GetViewPosReference(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&, std::__h::vector<std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>>, std::__h::allocator<std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>>>> const&)";
       "OHOS::Ace::NG::LazyLayoutPattern::AfterMountToParent()";
+      OHOS::Ace::NG::LazyLayoutPattern::GetPreparedGeometry*;
+      OHOS::Ace::NG::LazyLayoutPattern::RestorePreparedGeometry*;
+      OHOS::Ace::NG::LazyLayoutPattern::SwapPremeasureWrapper*;
       "OHOS::Ace::NG::LazyLayoutPattern::DumpStickyHeaderHandoffInfo() const";
       "OHOS::Ace::NG::LazyLayoutPattern::DumpStickyHeaderHandoffInfo(std::__h::unique_ptr<OHOS::Ace::JsonValue, std::__h::default_delete<OHOS::Ace::JsonValue>>&) const";
       "OHOS::Ace::NG::LazyLayoutPattern::NotifyParentOnStickyHeaderChange()";
@@ -4615,7 +4654,10 @@
       "OHOS::Ace::NG::LazyLayoutPattern::PublishNextStickyHeaderGap(std::__h::optional<float> const&)";
       "OHOS::Ace::NG::LazyLayoutUtils::HasDirectWaterFlowAncestor(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&)";
       "OHOS::Ace::NG::LazyLayoutUtils::IsAllowedIntermediateNode(OHOS::Ace::RefPtr<OHOS::Ace::NG::UINode> const&)";
+      "OHOS::Ace::NG::LazyLayoutUtils::IsChildMeasureComplete(OHOS::Ace::RefPtr<OHOS::Ace::NG::LayoutWrapper> const&)";
+      OHOS::Ace::NG::LazyLayoutUtils::MeasurePreparedBoundary*;
       "OHOS::Ace::NG::LazyLayoutUtils::IsVerticalScrollableParent(OHOS::Ace::RefPtr<OHOS::Ace::NG::UINode> const&)";
+      "OHOS::Ace::NG::LazyLayoutUtils::Premeasure(OHOS::Ace::RefPtr<OHOS::Ace::NG::LayoutWrapper> const&, OHOS::Ace::NG::LayoutConstraintT<float> const&, std::__h::vector<OHOS::Ace::WeakPtr<OHOS::Ace::NG::FrameNode>, std::__h::allocator<OHOS::Ace::WeakPtr<OHOS::Ace::NG::FrameNode>>>*)";
       "OHOS::Ace::NG::LazyLayoutUtils::ResolveMeasureMode(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&, OHOS::Ace::Axis, std::__h::optional<OHOS::Ace::NG::ViewPosReference> const&, int, int, bool)";
       "OHOS::Ace::NG::LazyLayoutUtils::ValidateAndSetLazyLayoutParent(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&, OHOS::Ace::Axis)";
       "OHOS::Ace::NG::LazyLayoutUtils::ValidateLazyLayoutParent(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&, std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>> const&)";
@@ -4926,6 +4968,21 @@
       "OHOS::Ace::NG::SecurityUIExtensionProxy::GetPattern() const";
       "OHOS::Ace::NG::SecurityUIExtensionProxy::SendData(OHOS::AAFwk::WantParams const&)";
       "OHOS::Ace::NG::SecurityUIExtensionProxy::SendDataSync(OHOS::AAFwk::WantParams const&, OHOS::AAFwk::WantParams&)";
+      OHOS::Ace::NG::ModalUIExtensionProxyImpl::*;
+      "OHOS::Ace::NG::ModalUIExtensionProxyImpl::ModalUIExtensionProxyImpl(OHOS::Ace::RefPtr<OHOS::Ace::NG::UIExtensionProxy> const&)";
+      "OHOS::Ace::NG::ModalUIExtensionProxyImpl::SendData(OHOS::AAFwk::WantParams const&)";
+      "OHOS::Ace::NG::ModalUIExtensionProxyImpl::SendDataSync(OHOS::AAFwk::WantParams const&, OHOS::AAFwk::WantParams&)";
+      "OHOS::Ace::NG::ModalUIExtensionProxyImpl::~ModalUIExtensionProxyImpl()";
+      OHOS::Ace::NG::UIExtensionProxy::*;
+      "OHOS::Ace::NG::UIExtensionProxy::UIExtensionProxy(OHOS::Ace::RefPtr<OHOS::Ace::NG::SessionWrapper> const&, OHOS::Ace::RefPtr<OHOS::Ace::NG::UIExtensionPattern> const&)";
+      "OHOS::Ace::NG::UIExtensionProxy::GetPattern() const";
+      "OHOS::Ace::NG::UIExtensionProxy::SendData(OHOS::Ace::AAFwk::WantParams const&)";
+      "OHOS::Ace::NG::UIExtensionProxy::SendData(OHOS::Ace::RefPtr<OHOS::Ace::WantParamsWrap> const&)";
+      "OHOS::Ace::NG::UIExtensionProxy::SendDataSync(OHOS::Ace::AAFwk::WantParams const&, OHOS::Ace::AAFwk::WantParams&)";
+      "OHOS::Ace::NG::UIExtensionProxy::SendDataSync(OHOS::Ace::RefPtr<OHOS::Ace::WantParamsWrap> const&, OHOS::Ace::AAFwk::WantParams&)";
+      "OHOS::Ace::NG::UIExtensionProxy::~UIExtensionProxy()";
+      "OHOS::Ace::NG::UIExtensionPattern::SetSyncCallbacks(std::__h::list<std::__h::function<void (OHOS::Ace::RefPtr<OHOS::Ace::NG::UIExtensionProxy> const&)>, std::__h::allocator<std::__h::function<void (OHOS::Ace::RefPtr<OHOS::Ace::NG::UIExtensionProxy> const&)>>> const&&)";
+      "OHOS::Ace::NG::UIExtensionPattern::SetAsyncCallbacks(std::__h::list<std::__h::function<void (OHOS::Ace::RefPtr<OHOS::Ace::NG::UIExtensionProxy> const&)>, std::__h::allocator<std::__h::function<void (OHOS::Ace::RefPtr<OHOS::Ace::NG::UIExtensionProxy> const&)>>> const&&)";
       "OHOS::Ace::NG::SecurityUIExtensionStatic::CreateSecurityUIExtensionComponent(int, OHOS::Ace::NG::SessionType)";
       "OHOS::Ace::NG::SecurityUIExtensionStatic::SetSecurityOnError(OHOS::Ace::NG::FrameNode*, std::__h::function<void (int, std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>> const&, std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>> const&)>&&)";
       "OHOS::Ace::NG::SecurityUIExtensionStatic::SetSecurityOnReceive(OHOS::Ace::NG::FrameNode*, std::__h::function<void (OHOS::AAFwk::WantParams const&)>&&)";
@@ -5399,6 +5456,7 @@
       GetArkUIAniModifiers;
       GetArkUIAnyFullNodeAPI;
       GetArkUIPageTextAPI;
+      GetArkUITreeAPI;
       GetArkUIDrawableDescriptor;
       GetArkUIFullNodeAPI;
       GetArkUINodeAPI;
@@ -6135,6 +6193,9 @@
       "OHOS::Ace::NG::TextFieldManagerNG::AddAvoidKeyboardCallback(int, bool, std::__h::function<void ()> const&&)";
       "OHOS::Ace::NG::TextFieldManagerNG::IsAskCeliaSupported()";
       "OHOS::Ace::NG::TextFieldManagerNG::SetIsAskCeliaSupported(bool)";
+      "OHOS::Ace::NG::TextFieldManagerNG::GetUserNameNodeInContainer(int const&, int const&)";
+      "OHOS::Ace::NG::TextFieldManagerNG::GetAccountList(int)";
+      "OHOS::Ace::NG::TextFieldManagerNG::RemoveAccountList(int)";
       "OHOS::Ace::NG::TextAdaptFontSizer::DidExceedMaxLines(OHOS::Ace::NG::SizeT<float> const&)";
       "OHOS::Ace::NG::TextAdaptFontSizer::IsAdaptExceedLimit(OHOS::Ace::NG::SizeT<float> const&)";
       "OHOS::Ace::NG::TextAdaptFontSizer::IsNeedAdaptFontSize(OHOS::Ace::TextStyle const&, OHOS::Ace::NG::LayoutConstraintT<float> const&)";

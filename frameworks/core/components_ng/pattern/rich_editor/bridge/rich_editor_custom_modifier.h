@@ -46,7 +46,7 @@ class TextPattern;
 class ServiceCollaborationAceCallback;
 class ServiceCollaborationMenuAceHelper;
 } // namespace NG
-class TokenThemeWrapper;
+class Theme;
 
 struct ArkUIRichEditorCustomModifier {
     RefPtr<NG::FrameNode> (*createRichEditorImpl)(int32_t nodeId);
@@ -69,7 +69,7 @@ struct ArkUIRichEditorCustomModifier {
     std::string (*extractRichEditorText)(const RefPtr<NG::FrameNode>& node);
     std::optional<float> (*getEnvFontScale)(RefPtr<NG::RichEditorBaseController> controller);
     RefPtr<NG::RichEditorTheme> (*buildRichEditorTheme)(const RefPtr<ThemeConstants>& themeConstants);
-    RefPtr<TokenThemeWrapper> (*buildRichEditorThemeWrapper)(const RefPtr<ThemeConstants>& themeConstants);
+    RefPtr<Theme> (*buildRichEditorThemeWrapper)(const RefPtr<ThemeConstants>& themeConstants);
     void (*requestRichEditorKeyboardForStylus)(const RefPtr<NG::FrameNode>& frameNode, int32_t& resultCode);
 };
 }

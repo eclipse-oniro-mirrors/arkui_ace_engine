@@ -14,6 +14,7 @@
  */
 
 #include "common_module.h"
+#include "modal_ui_extension/modal_ui_extension_module.h"
 
 #include <array>
 

@@ -16,13 +16,20 @@
 #include "core/components_ng/pattern/ui_extension/ui_extension_component/modal_ui_extension_proxy_impl.h"
 
 namespace OHOS::Ace::NG {
-ModalUIExtensionProxyImpl::ModalUIExtensionProxyImpl(const RefPtr<SessionWrapper>& sessionWrapper)
-    : sessionWrapper_(sessionWrapper)
+ModalUIExtensionProxyImpl::ModalUIExtensionProxyImpl(const RefPtr<UIExtensionProxy>& innerProxy)
+    : innerProxy_(innerProxy)
 {}
 
 void ModalUIExtensionProxyImpl::SendData(const AAFwk::WantParams& params)
 {
-    CHECK_NULL_VOID(sessionWrapper_);
-    sessionWrapper_->SendDataAsync(params);
+    CHECK_NULL_VOID(innerProxy_);
+    innerProxy_->SendData(params);
 }
+
+int32_t ModalUIExtensionProxyImpl::SendDataSync(const AAFwk::WantParams& params, AAFwk::WantParams& reply)
+{
+    CHECK_NULL_RETURN(innerProxy_, 0);
+    return innerProxy_->SendDataSync(params, reply);
+}
+
 } // namespace OHOS::Ace::NG

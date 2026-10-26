@@ -1396,6 +1396,22 @@ void ListModelNG::SetScrollToIndex(
     pattern->ScrollToIndex(index, animation, static_cast<ScrollAlign>(alignment), extraOffset);
 }
 
+void ListModelNG::SetScrollToIndexWithOptions(FrameNode* frameNode, int32_t index, bool smooth, ScrollAlign align,
+    std::optional<float> extraOffset, FastScrollMode mode)
+{
+    if (!IsFastScrollEnabled(mode) || !smooth) {
+        SetScrollToIndex(frameNode, index, smooth, static_cast<int32_t>(align), extraOffset);
+        return;
+    }
+    CHECK_NULL_VOID(frameNode);
+    FREE_NODE_CHECK(frameNode, SetScrollToIndexWithOptions,
+        frameNode, index, smooth, align, extraOffset, mode);
+    auto pattern = frameNode->GetPattern<ListPattern>();
+    CHECK_NULL_VOID(pattern);
+    pattern->SetAccessibilityScrollSource(AccessibilityScrollSource::API);
+    pattern->ScrollToIndexFastScroll(index, smooth, align, extraOffset, mode);
+}
+
 void ListModelNG::SetScrollBy(FrameNode* frameNode, double x, double y)
 {
     CHECK_NULL_VOID(frameNode);

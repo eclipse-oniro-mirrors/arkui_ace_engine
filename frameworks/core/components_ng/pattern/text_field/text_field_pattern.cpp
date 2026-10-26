@@ -5886,10 +5886,7 @@ bool TextFieldPattern::RequestKeyboard(bool isFocusViewChanged, bool needStartTw
         SendAttachPrivateCommand(inputMethod, textFieldManager);
     }
     UpdateCaretInfoToController(true);
-    auto fillContentMap = textFieldManager->GetFillContentMap(tmpHost->GetId());
-    if (!fillContentMap.empty() && NeedsSendFillContent()) {
-        inputMethod->SendPrivateCommand(fillContentMap);
-    }
+    SendAccountRecommendCommand(textFieldManager);
 #else
     ok = RequestKeyboardCrossPlatForm(isFocusViewChanged);
 #endif
@@ -9973,6 +9970,45 @@ void TextFieldPattern::DumpTextEngineInfo()
         .append(std::to_string(paragraph_->GetLongestLineWithIndent())));
 }
 
+void TextFieldPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if (!config.IsPublicTree()) {
+        Pattern::DumpAdvanceInfo(json);
+        return;
+    }
+    if (config.visualProperties) {
+        DumpAdvanceVisualProperties(json, config);
+    }
+    if (config.functionalProperties) {
+        DumpAdvanceFunctionalProperties(json, config);
+    }
+}
+
+void TextFieldPattern::DumpAdvanceVisualProperties(
+    std::unique_ptr<JsonValue>& json, const ParamConfig& /* config */)
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto theme = GetTheme();
+    CHECK_NULL_VOID(theme);
+    auto property = GetLayoutProperty<TextFieldLayoutProperty>();
+    CHECK_NULL_VOID(property);
+    json->Put("FontColor", property->GetTextColorValue(theme->GetTextColor()).ColorToString().c_str());
+    // Preserve local layout rectangles without adding input-method cursor geometry.
+    json->Put("textRect", textRect_.ToString().c_str());
+    json->Put("contentRect", contentRect_.ToString().c_str());
+}
+
+void TextFieldPattern::DumpAdvanceFunctionalProperties(
+    std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if (config.IsPublicTree()) {
+        json->Put("CustomKeyboard", static_cast<bool>((customKeyboard_ || customKeyboardBuilder_)));
+    } else {
+        json->Put("CustomKeyboard", (customKeyboard_ || customKeyboardBuilder_) ? "true" : "false");
+    }
+}
+
 void TextFieldPattern::DumpAdvanceInfo()
 {
     if (customKeyboard_ || customKeyboardBuilder_) {
@@ -12427,6 +12463,7 @@ TextFieldInfo TextFieldPattern::GenerateTextFieldInfo()
     textFieldInfo.enableAutoFill = layoutProperty->GetEnableAutoFillValue(true);
     textFieldInfo.inputType = layoutProperty->GetTextInputTypeValue(TextInputType::UNSPECIFIED);
     textFieldInfo.contentType = layoutProperty->GetTextContentTypeValue(TextContentType::UNSPECIFIED);
+    textFieldInfo.autoFillType = GetAutoFillType();
     return textFieldInfo;
 }
 
@@ -13355,6 +13392,7 @@ void TextFieldPattern::RemoveFillContentMap()
     CHECK_NULL_VOID(textFieldManager);
     auto nodeId = host->GetId();
     textFieldManager->RemoveFillContentMap(nodeId);
+    textFieldManager->RemoveAccountList(nodeId);
 }
 
 void TextFieldPattern::RemoveMSDPAutoFillType()
@@ -13366,6 +13404,54 @@ void TextFieldPattern::RemoveMSDPAutoFillType()
     auto textFieldManager = DynamicCast<TextFieldManagerNG>(pipeline->GetTextFieldManager());
     CHECK_NULL_VOID(textFieldManager);
     textFieldManager->RemoveMSDPAutoFillType(host->GetId());
+}
+
+void TextFieldPattern::TryRecommendTypedUserName(
+    const RefPtr<TextFieldManagerNG>& textFieldManager, FillContentMap& fillContentMap)
+{
+    auto autoFillContainerNode = firstAutoFillContainerNode_.Upgrade();
+    CHECK_NULL_VOID(autoFillContainerNode);
+    auto containerId = autoFillContainerNode->GetId();
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto userNameNode = textFieldManager->GetUserNameNodeInContainer(containerId, host->GetId());
+    CHECK_NULL_VOID(userNameNode);
+    auto userNamePattern = userNameNode->GetPattern<TextFieldPattern>();
+    CHECK_NULL_VOID(userNamePattern);
+    auto typedName = userNamePattern->GetTextValue();
+    if (typedName.empty()) {
+        return;
+    }
+    auto normTyped = NormalizeAccount(typedName);
+    if (normTyped.empty()) {
+        return;
+    }
+    auto accountList = textFieldManager->GetAccountList(host->GetId());
+    // Prefix match on normalized forms (ignore spaces and case); each cached
+    // entry is {raw, normalized}. Push the raw account so the vault can
+    // resolve it on click.
+    for (const auto& account : accountList) {
+        if (account.second.compare(0, normTyped.size(), normTyped) == 0) {
+            fillContentMap["userName"] = account.first;
+            return;
+        }
+    }
+}
+
+void TextFieldPattern::SendAccountRecommendCommand(const RefPtr<TextFieldManagerNG>& textFieldManager)
+{
+#if defined(ENABLE_STANDARD_INPUT)
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto fillContentMap = textFieldManager->GetFillContentMap(host->GetId());
+    if (fillContentMap.empty() || !NeedsSendFillContent()) {
+        return;
+    }
+    TryRecommendTypedUserName(textFieldManager, fillContentMap);
+    auto inputMethod = MiscServices::InputMethodController::GetInstance();
+    CHECK_NULL_VOID(inputMethod);
+    inputMethod->SendPrivateCommand(fillContentMap);
+#endif
 }
 
 bool TextFieldPattern::NeedsSendFillContent()

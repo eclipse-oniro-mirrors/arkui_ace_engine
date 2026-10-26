@@ -43,6 +43,7 @@ public:
     }
     ~LazyGridLayoutPattern() override;
 
+    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config) override;
     void DumpAdvanceInfo() override;
     void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json) override;
     bool IsAtomicNode() const override
@@ -111,6 +112,7 @@ public:
 
     AdjustOffset GetAdjustOffset() const override;
     AdjustOffset GetAndResetAdjustOffset() override;
+    std::optional<LazyPremeasureResult> Premeasure(LayoutWrapper* wrapper) override;
     bool HasStickyHeader() const override;
 
     void SetOnVisibleIndexesChange(std::function<void(int32_t, int32_t)>&& onVisibleIndexesChange)
@@ -119,6 +121,8 @@ public:
     }
 
 private:
+    bool ApplyPreparedGeometry(const PreparedLayoutGeometry& geometry) override;
+
     bool IsLazyLayoutEnabled() const override
     {
         // DynamicLayout reuses LazyGridLayoutPattern but does not participate in nested lazy prediction.
@@ -126,6 +130,7 @@ private:
     }
 
     bool OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, const DirtySwapConfig& config) override;
+    void ResetPremeasuredMainSizeIfGone(const RefPtr<LayoutWrapper>& dirty);
     // Validate a header / footer candidate. isHeader picks which side is the peerEdge.
     bool IsValidHeaderFooter(const RefPtr<UINode>& edge, bool isHeader) const;
     // Sync header/footer positions in the child sequence (header first, footer last). markDirty controls whether to

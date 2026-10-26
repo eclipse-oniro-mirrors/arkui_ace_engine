@@ -20,7 +20,7 @@
 namespace OHOS::Ace {
 
 ScrollEventInfo::ScrollEventInfo(ScrollEvent type, double scrollX, double scrollY, int32_t scrollState)
-    : BaseEventInfo("scroll"), type_(type), scrollX_(scrollX), scrollY_(scrollY), scrollState_(scrollState)
+    : JSONStringifiableEventInfo("scroll"), type_(type), scrollX_(scrollX), scrollY_(scrollY), scrollState_(scrollState)
 {}
 
 std::string ScrollEventInfo::ToJSONString() const

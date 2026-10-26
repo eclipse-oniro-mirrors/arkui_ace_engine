@@ -1458,5 +1458,70 @@ HWTEST_F(MenuLayout1TestNg, MenuLayoutAlgorithmTestNg036, TestSize.Level1)
     auto resultOffset = menuLayoutAlgorithm->FitToScreen(position, size, true);
     EXPECT_EQ(resultOffset, OffsetF(0.0f, 0.0f));
 }
+
+/**
+ * @tc.name: MenuLayoutAlgorithmTestNg_UpdateConstraintWidthNegativeMaxWidth001
+ * @tc.desc: Test UpdateConstraintWidth guards against a negative computed maxWidth by returning early
+ *           without overwriting the caller's constraint width.
+ * @tc.type: FUNC
+ */
+HWTEST_F(MenuLayout1TestNg, MenuLayoutAlgorithmTestNg_UpdateConstraintWidthNegativeMaxWidth001, TestSize.Level1)
+{
+    MockPipelineContextGetTheme();
+    /**
+     * @tc.steps: step1. set API version below VERSION_TEN so the maxHorizontalSpace branch is taken
+     */
+    int32_t rollbackPlatformVersion = MockPipelineContext::GetCurrent()->GetMinPlatformVersion();
+    MockPipelineContext::GetCurrent()->SetMinPlatformVersion(static_cast<int32_t>(PlatformVersion::VERSION_NINE));
+
+    /**
+     * @tc.steps: step2. create a menu node, a layout wrapper and a MenuLayoutAlgorithm
+     */
+    std::function<void()> action = [] {};
+    std::vector<OptionParam> optionParams;
+    optionParams.emplace_back("MenuItem1", "", action);
+    optionParams.emplace_back("MenuItem2", "", action);
+    MenuParam menuParam;
+    auto menuWrapperNode = MenuView::Create(std::move(optionParams), 1, "", MenuType::MENU, menuParam);
+    ASSERT_NE(menuWrapperNode, nullptr);
+    auto menuNode = AceType::DynamicCast<FrameNode>(menuWrapperNode->GetChildAtIndex(0));
+    ASSERT_NE(menuNode, nullptr);
+
+    RefPtr<MenuLayoutAlgorithm> layoutAlgorithm = AceType::MakeRefPtr<MenuLayoutAlgorithm>();
+    RefPtr<GeometryNode> geometryNode = AceType::MakeRefPtr<GeometryNode>();
+    LayoutWrapperNode layoutWrapper(menuNode, geometryNode, menuNode->GetLayoutProperty());
+    layoutWrapper.GetLayoutProperty()->UpdateUserDefinedIdealSize(
+        CalcSize(CalcLength(FULL_SCREEN_WIDTH), CalcLength(FULL_SCREEN_HEIGHT)));
+    LayoutConstraintF parentLayoutConstraint;
+    parentLayoutConstraint.maxSize = FULL_SCREEN_SIZE;
+    parentLayoutConstraint.percentReference = FULL_SCREEN_SIZE;
+    layoutWrapper.GetLayoutProperty()->UpdateLayoutConstraint(parentLayoutConstraint);
+    layoutWrapper.GetLayoutProperty()->UpdateContentConstraint();
+
+    /**
+     * @tc.steps: step3. give negative leftSpace_/rightSpace_ so maxHorizontalSpace =
+     *           max(leftSpace_, rightSpace_) - 2*padding is negative, which forces maxWidth negative
+     *           after std::min(maxHorizontalSpace, gridColumnWidth) and std::min(constraintWidth, maxWidth).
+     */
+    layoutAlgorithm->wrapperSize_ = FULL_SCREEN_SIZE;
+    layoutAlgorithm->leftSpace_ = -100.0f;
+    layoutAlgorithm->rightSpace_ = -100.0f;
+
+    /**
+     * @tc.steps: step4. build a constraint carrying a known positive width
+     */
+    LayoutConstraintF constraint;
+    constraint.maxSize = SizeF(200.0f, 200.0f);
+
+    /**
+     * @tc.steps: step5. call UpdateConstraintWidth; the LessNotEqual(maxWidth, 0.0f) guard should fire
+     * @tc.expected: the function returns early and constraint.maxSize.Width() stays at 200.0f instead of
+     *               being overwritten by the negative maxWidth.
+     */
+    layoutAlgorithm->UpdateConstraintWidth(&layoutWrapper, constraint);
+    EXPECT_EQ(constraint.maxSize.Width(), 200.0f);
+
+    MockPipelineContext::GetCurrent()->SetMinPlatformVersion(rollbackPlatformVersion);
+}
 } // namespace OHOS::Ace::NG
 

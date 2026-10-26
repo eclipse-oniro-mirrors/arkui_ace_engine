@@ -17,6 +17,7 @@
 #include "base/geometry/ng/rect_t.h"
 #include "base/utils/system_properties.h"
 #include "base/utils/utils.h"
+#include "core/components/common/properties/ui_material.h"
 #include "core/components/common/properties/shadow_config.h"
 #include "core/components_ng/pattern/bubble/bubble_pattern.h"
 #include "core/components_ng/render/canvas_image.h"
@@ -1048,9 +1049,16 @@ void BubblePaintMethod::ClipBubbleWithPath(const RefPtr<FrameNode>& frameNode)
     path->SetBasicShapeType(BasicShapeType::PATH);
     auto renderContext = frameNode->GetRenderContext();
     CHECK_NULL_VOID(renderContext);
-    if (!IsUserSetMaterial()) {
-        renderContext->UpdateClipShape(path);
+    if (IsUserSetMaterial()) {
+        auto systemMaterial = renderContext->GetSystemMaterial();
+        auto materialType =
+            systemMaterial ? static_cast<Ace::MaterialType>(systemMaterial->GetType()) : Ace::MaterialType::NONE;
+        if (materialType != Ace::MaterialType::SEMI_TRANSPARENT &&
+            SystemProperties::GetUiMaterialLevel() != UiMaterialLevel::SMOOTH) {
+            return;
+        }
     }
+    renderContext->UpdateClipShape(path);
 }
 
 } // namespace OHOS::Ace::NG

@@ -394,6 +394,8 @@ public:
 
     virtual void SetContainerModalTitleHeight(int height) {}
 
+    virtual void SetContainerModalTitleHeightWithVp(double heightVp) {}
+
     virtual int32_t GetContainerModalTitleHeight()
     {
         return -1;

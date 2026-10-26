@@ -4480,6 +4480,14 @@
         "name": "OH_ArkUI_NativeModule_AdoptChild"
     },
     {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_AdoptChildWithPolicy"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_SetAdoptedChildOverlayPositionCompensation"
+    },
+    {
         "first_introduced": "22",
         "name": "OH_ArkUI_NativeModule_RemoveAdoptedChild"
     },
@@ -6636,6 +6644,14 @@
         "name": "OH_ArkUI_AccessibilityElementInfoSetComponentIdentifier"
     },
     {
+        "first_introduced": "26",
+        "name": "OH_ArkUI_Accessibility_BindExportTree"
+    },
+    {
+        "first_introduced": "26",
+        "name": "OH_ArkUI_Accessibility_UnbindExportTree"
+    },
+    {
         "first_introduced": "24",
         "name": "OH_ArkUI_TextEditorSelectionMenuOptions_Create"
     },
@@ -7519,5 +7535,49 @@
     {
         "first_introduced": "26.2.0",
         "name": "OH_ArkUI_KeyEvent_SetScrollLockOn"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIAgentTreeRequestCreate"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIAgentTreeRequestDestroy"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIAgentTreeRequestSetFilterPureLayoutNodes"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIAgentTreeRequestSetInteractionInfo"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIAgentTreeRequestSetAccessibilityInfo"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIAgentTreeRequestSetCollectVisualProperties"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIAgentTreeRequestSetCollectFunctionalProperties"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIAgentGetTreeJson"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIAgentGetTreeJsonAsync"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIInfoCollectionRegisterInteractionObserver"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIInfoCollectionUnregisterInteractionObserver"
     }
 ]

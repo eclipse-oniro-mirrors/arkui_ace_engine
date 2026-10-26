@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 
+#include "interfaces/inner_api/ui_session/param_config.h"
 #include "lazy_column_layout_test.h"
 
 #include <vector>
@@ -2252,4 +2253,71 @@ HWTEST_F(LazyColumnLayoutTest, EstimateItemsTotalHeight001, TestSize.Level1)
     EXPECT_FLOAT_EQ(layoutInfo->totalMainSize_, 536.0f);
     EXPECT_FLOAT_EQ(layoutInfo->estimateItemSize_, -1.0f);
 }
+
+/**
+ * @tc.name: PublicDumpPreservesFlatLayoutFields
+ * @tc.desc: Public filtering preserves legacy field values without a layoutInfo wrapper.
+ * @tc.type: FUNC
+ */
+HWTEST_F(LazyColumnLayoutTest, PublicDumpPreservesFlatLayoutFields, TestSize.Level1)
+{
+    auto pattern = AceType::MakeRefPtr<LazyColumnLayoutPattern>();
+    ASSERT_NE(pattern->layoutInfo_, nullptr);
+    pattern->layoutInfo_->headerMainSize_ = 12.0f;
+    pattern->layoutInfo_->footerMainSize_ = 24.0f;
+    pattern->layoutInfo_->totalMainSize_ = 240.0f;
+    auto legacy = JsonUtil::Create();
+    pattern->DumpAdvanceInfo(legacy);
+    ASSERT_TRUE(legacy->Contains("itemStartIndex"));
+    for (bool visual : { false, true }) {
+        for (bool functional : { false, true }) {
+            ParamConfig config;
+            config.dumpMode = TreeDumpMode::PUBLIC_TREE;
+            config.visualProperties = visual;
+            config.functionalProperties = functional;
+            auto json = JsonUtil::Create();
+            pattern->DumpAdvanceInfo(json, config);
+            EXPECT_FALSE(json->Contains("layoutInfo"));
+            EXPECT_FALSE(json->Contains("itemStartIndex"));
+            EXPECT_EQ(json->Contains("headerMainSize"), visual);
+            EXPECT_EQ(json->Contains("totalMainSize"), visual);
+            EXPECT_EQ(json->Contains("space"), visual);
+            if (visual) {
+                EXPECT_EQ(json->GetDouble("headerMainSize"), legacy->GetDouble("headerMainSize"));
+                EXPECT_EQ(json->GetDouble("footerMainSize"), legacy->GetDouble("footerMainSize"));
+                EXPECT_DOUBLE_EQ(json->GetDouble("totalMainSize"), 240.0);
+            } else {
+                EXPECT_EQ(json->ToString(), "{}");
+            }
+        }
+    }
+    auto after = JsonUtil::Create();
+    pattern->DumpAdvanceInfo(after);
+    EXPECT_EQ(after->ToString(), legacy->ToString());
+}
+
+
+/**
+ * @tc.name: LegacyDumpMatchesBaselineSnapshot
+ * @tc.desc: Preserve the baseline layout diagnostic keys, numeric values and insertion order.
+ * @tc.type: FUNC
+ */
+HWTEST_F(LazyColumnLayoutTest, LegacyDumpMatchesBaselineSnapshot, TestSize.Level1)
+{
+    auto info = AceType::MakeRefPtr<LazyColumnLayoutInfo>();
+    info->startIndex_ = 2;
+    info->endIndex_ = 6;
+    info->totalItemCount_ = 9;
+    info->headerMainSize_ = 12.0f;
+    info->footerMainSize_ = 24.0f;
+    info->space_ = 3.0f;
+    info->totalMainSize_ = 240.0f;
+    // Frozen from fdf7d63988ed9fa338051a11c19fadf1f86653dc; compare serialized key order and types.
+    const std::string expected = R"({"itemStartIndex":2,"itemEndIndex":6,"itemTotalCount":9,)"
+        R"("headerMainSize":12,"footerMainSize":24,"space":3,"totalMainSize":240})";
+    auto json = JsonUtil::Create();
+    info->DumpAdvanceInfo(json);
+    EXPECT_EQ(json->ToString(), expected);
+}
+
 } // namespace OHOS::Ace::NG

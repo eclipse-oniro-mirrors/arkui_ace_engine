@@ -46,7 +46,7 @@ es2abc_gen_abc("gen_jsEnumStyle_abc") {
     "//foundation/arkui/ace_engine/adapter/preview/sdk:*",
     "//out/arkui-x/gen/build/ohos/sdk:arkui_x_windows",
     "//out/arkui-x/gen/build/ohos/sdk:arkui_x_linux",
-    "//out/arkui-x/gen/build/ohos/sdk:arkui_x_darwin"
+    "//out/arkui-x/gen/build/ohos/sdk:arkui_x_darwin",
   ]
   src_js = rebase_path(
           "//foundation/arkui/ace_engine/frameworks/bridge/declarative_frontend/engine/jsEnumStyle.js")
@@ -83,7 +83,7 @@ es2abc_gen_abc("gen_jsPreload_abc") {
     "//foundation/arkui/ace_engine/adapter/preview/sdk:*",
     "//out/arkui-x/gen/build/ohos/sdk:arkui_x_windows",
     "//out/arkui-x/gen/build/ohos/sdk:arkui_x_linux",
-    "//out/arkui-x/gen/build/ohos/sdk:arkui_x_darwin"
+    "//out/arkui-x/gen/build/ohos/sdk:arkui_x_darwin",
   ]
   src_js = rebase_path(
           "//foundation/arkui/ace_engine/frameworks/bridge/declarative_frontend/engine/jsPreload.js")
@@ -112,7 +112,7 @@ es2abc_gen_abc("gen_arkCommon_abc") {
     "//foundation/arkui/ace_engine/adapter/preview/sdk:*",
     "//out/arkui-x/gen/build/ohos/sdk:arkui_x_windows",
     "//out/arkui-x/gen/build/ohos/sdk:arkui_x_linux",
-    "//out/arkui-x/gen/build/ohos/sdk:arkui_x_darwin"
+    "//out/arkui-x/gen/build/ohos/sdk:arkui_x_darwin",
   ]
   src_js = rebase_path(
           "//foundation/arkui/ace_engine/frameworks/bridge/declarative_frontend/engine/arkCommon.js")
@@ -141,7 +141,7 @@ es2abc_gen_abc("gen_arkDynamicComponent_abc") {
     "//foundation/arkui/ace_engine/adapter/preview/sdk:*",
     "//out/arkui-x/gen/build/ohos/sdk:arkui_x_windows",
     "//out/arkui-x/gen/build/ohos/sdk:arkui_x_linux",
-    "//out/arkui-x/gen/build/ohos/sdk:arkui_x_darwin"
+    "//out/arkui-x/gen/build/ohos/sdk:arkui_x_darwin",
   ]
   src_js = rebase_path(
           "//foundation/arkui/ace_engine/frameworks/bridge/declarative_frontend/engine/arkDynamicComponent.js")
@@ -182,10 +182,13 @@ es2abc_gen_abc("gen_arkComponent_abc") {
     "//foundation/arkui/ace_engine/adapter/preview/sdk:*",
     "//out/arkui-x/gen/build/ohos/sdk:arkui_x_windows",
     "//out/arkui-x/gen/build/ohos/sdk:arkui_x_linux",
-    "//out/arkui-x/gen/build/ohos/sdk:arkui_x_darwin"
+    "//out/arkui-x/gen/build/ohos/sdk:arkui_x_darwin",
   ]
-  extra_dependencies = [ "../../ark_component:npm_build_ark_component($host_toolchain)" ]
-  basepath = get_label_info("../../ark_component:npm_build_ark_component($host_toolchain)", "target_gen_dir")
+  extra_dependencies =
+      [ "../../ark_component:npm_build_ark_component($host_toolchain)" ]
+  basepath = get_label_info(
+          "../../ark_component:npm_build_ark_component($host_toolchain)",
+          "target_gen_dir")
   src_js = rebase_path("$basepath/arkComponent.js")
   dst_file = rebase_path(base_output_path + "/arkComponent.abc")
   in_puts = [ "$basepath/arkComponent.js" ]
@@ -278,8 +281,7 @@ if (!is_arkui_x && (use_mac || use_mingw_win || use_linux)) {
   gen_obj("abc_ark_component_mock") {
     input = base_output_path + "/arkComponentMock.abc"
     if (use_mac || use_mingw_win || use_linux) {
-      arkcomponentmock_obj_path =
-          base_output_path + "/arkComponentMock.c"
+      arkcomponentmock_obj_path = base_output_path + "/arkComponentMock.c"
     }
     output = arkcomponentmock_obj_path
     snapshot_dep = [ ":gen_arkComponentMock_abc" ]
@@ -288,12 +290,12 @@ if (!is_arkui_x && (use_mac || use_mingw_win || use_linux)) {
 
 if (!is_arkui_x) {
   abc_sources = [
-    "stateMgmt",
-    "jsEnumStyle",
-    "arkComponent",
     "arkCommon",
+    "arkComponent",
     "arkDynamicComponent",
+    "jsEnumStyle",
     "jsPreload",
+    "stateMgmt",
   ]
 } else {
   abc_sources = []
@@ -331,9 +333,9 @@ template("declarative_js_engine_ark") {
 
     sources = [
       "js_converter.cpp",
+      "jsi_class_base.cpp",
       "jsi_container_app_bar_register.cpp",
       "jsi_container_modal_view_register.cpp",
-      "jsi_class_base.cpp",
       "jsi_declarative_engine.cpp",
       "jsi_declarative_group_js_bridge.cpp",
       "jsi_image_generator_dialog_view_register.cpp",
@@ -371,8 +373,8 @@ template("declarative_js_engine_ark") {
       "nativeModule/arkts_native_render_node_bridge.cpp",
       "nativeModule/arkts_native_resource_bridge.cpp",
       "nativeModule/arkts_native_row_bridge.cpp",
-      "nativeModule/arkts_native_scroll_placeholder_bridge.cpp",
       "nativeModule/arkts_native_scroll_bridge.cpp",
+      "nativeModule/arkts_native_scroll_placeholder_bridge.cpp",
       "nativeModule/arkts_native_scrollable_bridge.cpp",
       "nativeModule/arkts_native_scrollbar_bridge.cpp",
       "nativeModule/arkts_native_selection_container_bridge.cpp",
@@ -392,18 +394,26 @@ template("declarative_js_engine_ark") {
       sources += [ "nativeModule/arkts_native_web_bridge.cpp" ]
     }
 
+    if (!build_ohos_sdk && is_ohos_standard_system) {
+      sources += [ "nativeModule/arkts_native_modal_ui_extension_bridge.cpp" ]
+      defines += [ "MODAL_UI_EXTENSION_SUPPORTED" ]
+    }
+
     deps = [ "${ace_root}/frameworks/core/interfaces/native:ace_core_interfaces_native_node_$platform" ]
     if (is_arkui_x) {
-      deps += [ "//foundation/graphic/graphic_2d/interfaces/kits/napi/graphic/drawing:drawing_napi_impl",
-                "//foundation/graphic/graphic_2d/rosen/modules/2d_graphics:2d_graphics" ]
+      deps += [
+        "//foundation/graphic/graphic_2d/interfaces/kits/napi/graphic/drawing:drawing_napi_impl",
+        "//foundation/graphic/graphic_2d/rosen/modules/2d_graphics",
+      ]
     }
-    deps += [
-      "../../../arkts_frontend/arkoala_generator:idlize_gen"
-    ]
-    external_deps = [ 
+    deps += [ "../../../arkts_frontend/arkoala_generator:idlize_gen" ]
+    external_deps = [
       "graphic_2d:drawing_napi_impl",
-      "graphic_2d:librender_service_client"
+      "graphic_2d:librender_service_client",
     ]
+    if (!build_ohos_sdk && is_ohos_standard_system) {
+      external_deps += [ "ability_base:want" ]
+    }
     if (!build_ohos_sdk && !is_arkui_x) {
       external_deps += [
         "ets_utils:console",
@@ -417,9 +427,7 @@ template("declarative_js_engine_ark") {
         config.xcomponent_components_support) {
       if (is_ohos_standard_system) {
         deps += [ "$ace_root/interfaces/inner_api/xcomponent_controller:ace_xcomponent_controller" ]
-        external_deps += [
-          "c_utils:utils",
-        ]
+        external_deps += [ "c_utils:utils" ]
       }
     }
 
@@ -441,8 +449,8 @@ template("declarative_js_engine_ark") {
           "ability_runtime:app_manager",
           "bundle_framework:appexecfwk_core",
           "form_fwk:fmskit_native",
-          "form_fwk:form_render_info",
           "form_fwk:form_common_info",
+          "form_fwk:form_render_info",
           "form_fwk:form_utils",
           "graphic_2d:librender_service_client",
           "input:libmmi-client",
@@ -479,7 +487,7 @@ template("declarative_js_engine_ark") {
     if (defined(global_parts_info.multimedia_image_extension)) {
       sources += [
         "$ace_root/frameworks/core/components_ng/pattern/cached_image/arkts_native_media_cached_image_bridge.cpp",
-        "$ace_root/frameworks/core/components_ng/pattern/cached_image/jsi_extra_view_register.cpp"
+        "$ace_root/frameworks/core/components_ng/pattern/cached_image/jsi_extra_view_register.cpp",
       ]
     } else {
       sources += [ "jsi_extra_view_register.cpp" ]
@@ -547,8 +555,8 @@ template("declarative_js_engine_ark") {
     }
 
     deps += [
-      ":gen_obj_src_abc_proxyclass",
       ":arkComponent_module_info",
+      ":gen_obj_src_abc_proxyclass",
       ":jsEnumStyle_module_info",
     ]
 

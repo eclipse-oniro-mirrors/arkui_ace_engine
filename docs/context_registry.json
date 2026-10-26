@@ -3,6 +3,32 @@
   "last_updated": "2026-08-10",
   "contexts": [
     {
+      "id": "NativeRuntimeCheck",
+      "name": "Native Runtime Check",
+      "name_cn": "C API运行时检查",
+      "kind": "api",
+      "category": "native",
+      "keywords": [
+        "runtime check",
+        "MULTI_THREAD",
+        "NativeNodeTreeScope",
+        "同树并发",
+        "运行时检查"
+      ],
+      "aliases": [
+        "CAPI runtime check"
+      ],
+      "source_paths": {
+        "config": "interfaces/native/node/config_manager.cpp",
+        "scope": "frameworks/core/components_ng/base/native_node_tree_scope.cpp",
+        "entry": "interfaces/native/node/node_model_safely.cpp"
+      },
+      "test_paths": [
+        "test/unittest/core/base/native_node_tree_scope_test.cpp",
+        "test/unittest/capi/runtime_check/capi_runtime_check_test.cpp"
+      ]
+    },
+    {
       "id": "LayoutFramework",
       "name": "Layout Framework",
       "name_cn": "布局框架",
@@ -5452,11 +5478,10 @@
         "theme_attributes": "frameworks/core/components/theme/theme_attributes.h",
         "theme_style": "frameworks/core/components/theme/theme_style.h",
         "token_theme_storage": "frameworks/core/components_ng/token_theme/token_theme_storage.cpp",
-        "token_theme_wrapper": "frameworks/core/components_ng/token_theme/token_theme_wrapper.h",
         "token_theme": "frameworks/core/components_ng/token_theme/token_theme.h",
         "token_colors": "frameworks/core/components_ng/token_theme/token_colors.h",
         "inner_api_token_theme": "interfaces/inner_api/ace_kit/include/ui/view/theme/token_theme.h",
-        "inner_api_token_theme_wrapper": "interfaces/inner_api/ace_kit/include/ui/view/theme/token_theme_wrapper.h"
+        "inner_api_theme": "interfaces/inner_api/ace_kit/include/ui/view/theme/theme.h"
       },
       "api_paths": {
         "resource_manager": "<OH_ROOT>/interface/sdk-js/api/@ohos.resourceManager.d.ts"

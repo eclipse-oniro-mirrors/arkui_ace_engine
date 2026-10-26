@@ -451,6 +451,8 @@ public:
 
     void SetFocusable(bool focusable, bool isExplicit = true);
 
+    bool HasTreeInteraction() const;
+
     bool GetFocusable() const
     {
         return focusable_;

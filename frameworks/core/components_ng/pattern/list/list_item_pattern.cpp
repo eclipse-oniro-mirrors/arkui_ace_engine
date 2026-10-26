@@ -1165,6 +1165,7 @@ void ListItemPattern::MarkIsSelected(bool isSelected)
     if (isSelected_ != isSelected) {
         isSelected_ = isSelected;
         auto eventHub = GetEventHub<ListItemEventHub>();
+        CHECK_NULL_VOID(eventHub);
         eventHub->FireSelectChangeEvent(isSelected);
         auto host = GetHost();
         CHECK_NULL_VOID(host);
@@ -1482,6 +1483,79 @@ bool ListItemPattern::GetLayouted() const
     return isLayouted_;
 }
 
+void ListItemPattern::DumpAdvanceSwipeStateInfo(std::unique_ptr<JsonValue>& json)
+{
+    switch (swipeActionState_) {
+        case SwipeActionState::COLLAPSED:
+            json->Put("SwipeActionState", "COLLAPSED");
+            break;
+        case SwipeActionState::EXPANDED:
+            json->Put("SwipeActionState", "EXPANDED");
+            break;
+        case SwipeActionState::ACTIONING:
+            json->Put("SwipeActionState", "ACTIONING");
+            break;
+    }
+}
+
+void ListItemPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if (!config.IsPublicTree()) {
+        json->Put("indexInList", indexInList_);
+        json->Put("indexInListItemGroup", indexInListItemGroup_);
+        json->Put("swiperAction.startNodeIndex", startNodeIndex_);
+        json->Put("swiperAction.endNodeIndex", endNodeIndex_);
+        json->Put("swiperAction.childNodeIndex", childNodeIndex_);
+    }
+    if (!config.IsPublicTree() || config.visualProperties) {
+        json->Put("curOffset", curOffset_);
+        json->Put("startNodeSize", startNodeSize_);
+        json->Put("endNodeSize", endNodeSize_);
+    }
+    if (!config.IsPublicTree() || config.functionalProperties) {
+        json->Put("startDeleteAreaDistance", startDeleteAreaDistance_);
+        json->Put("endDeleteAreaDistance", endDeleteAreaDistance_);
+    }
+    if (!config.IsPublicTree()) {
+        DumpAdvanceSwipeStateInfo(json);
+    }
+    if (!config.IsPublicTree() || config.functionalProperties) {
+        json->Put("hasStartDeleteArea", hasStartDeleteArea_);
+        json->Put("hasEndDeleteArea", hasEndDeleteArea_);
+    }
+    if (!config.IsPublicTree()) {
+        json->Put("inStartDeleteArea", inStartDeleteArea_);
+        json->Put("inEndDeleteArea", inEndDeleteArea_);
+    }
+    if (!config.IsPublicTree() || config.functionalProperties) {
+        json->Put("selectable", selectable_);
+    }
+    if (!config.IsPublicTree() || config.visualProperties) {
+        json->Put("isSelected", isSelected_);
+        json->Put("isHover", isHover_);
+        json->Put("isPressed", isPressed_);
+        json->Put("isLayouted", isLayouted_);
+    }
+    if (!config.IsPublicTree()) {
+        json->Put("hasStartDeleteArea", hasStartDeleteArea_);
+    }
+    if (!config.IsPublicTree() || config.visualProperties) {
+        DumpAdvanceVisualProperties(json, config);
+    }
+}
+
+void ListItemPattern::DumpAdvanceVisualProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if (!enableOpacity_.has_value()) {
+        return;
+    }
+    if (config.IsPublicTree()) {
+        json->Put("restoredOpacity", enableOpacity_.value());
+    } else {
+        json->Put("enableOpacity", enableOpacity_.value() ? "true:" : "false");
+    }
+}
+
 void ListItemPattern::DumpAdvanceInfo()
 {
     DumpLog::GetInstance().AddDesc("indexInList:" + std::to_string(indexInList_));
@@ -1642,41 +1716,7 @@ FocusPattern ListItemPattern::GetFocusPattern() const
 
 void ListItemPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json)
 {
-    json->Put("indexInList", indexInList_);
-    json->Put("indexInListItemGroup", indexInListItemGroup_);
-    json->Put("swiperAction.startNodeIndex", startNodeIndex_);
-    json->Put("swiperAction.endNodeIndex", endNodeIndex_);
-    json->Put("swiperAction.childNodeIndex", childNodeIndex_);
-    json->Put("curOffset", curOffset_);
-    json->Put("startNodeSize", startNodeSize_);
-    json->Put("endNodeSize", endNodeSize_);
-    json->Put("startDeleteAreaDistance", startDeleteAreaDistance_);
-    json->Put("endDeleteAreaDistance", endDeleteAreaDistance_);
-
-    switch (swipeActionState_) {
-        case SwipeActionState::COLLAPSED:
-            json->Put("SwipeActionState", "COLLAPSED");
-            break;
-        case SwipeActionState::EXPANDED:
-            json->Put("SwipeActionState", "EXPANDED");
-            break;
-        case SwipeActionState::ACTIONING:
-            json->Put("SwipeActionState", "ACTIONING");
-            break;
-    }
-    json->Put("hasStartDeleteArea", hasStartDeleteArea_);
-    json->Put("hasEndDeleteArea", hasEndDeleteArea_);
-    json->Put("inStartDeleteArea", inStartDeleteArea_);
-    json->Put("inEndDeleteArea", inEndDeleteArea_);
-    json->Put("selectable", selectable_);
-    json->Put("isSelected", isSelected_);
-    json->Put("isHover", isHover_);
-    json->Put("isPressed", isPressed_);
-    json->Put("isLayouted", isLayouted_);
-    json->Put("hasStartDeleteArea", hasStartDeleteArea_);
-    if (enableOpacity_.has_value()) {
-        json->Put("enableOpacity", enableOpacity_.value() ? "true:" : "false");
-    }
+    ListItemPattern::DumpAdvanceInfo(json, ParamConfig());
 }
 
 void ListItemPattern::InitOnFocusEvent()

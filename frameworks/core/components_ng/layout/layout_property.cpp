@@ -991,6 +991,9 @@ void LayoutProperty::ConstraintViewPosRef(ViewPosReference& posRef)
     } else {
         posRef.referencePos = posRef.referencePos - adjEnd;
     }
+    if (posRef.knownMainSize) {
+        posRef.knownMainSize = std::max(0.0f, posRef.knownMainSize.value() - adjStart - adjEnd);
+    }
 }
 
 void LayoutProperty::ConstraintContentByPadding()

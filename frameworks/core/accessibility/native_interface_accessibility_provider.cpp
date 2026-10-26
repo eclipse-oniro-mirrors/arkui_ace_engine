@@ -16,6 +16,7 @@
 #include "core/accessibility/native_interface_accessibility_provider.h"
 
 #include "base/log/log.h"
+#include "base/log/log_wrapper.h"
 
 using namespace OHOS::Ace;
 namespace {
@@ -157,10 +158,16 @@ int32_t ArkUI_AccessibilityProvider::FindAccessibilityNodeInfosById(
     auto accessibilityElementInfoList = std::make_unique<ArkUI_AccessibilityElementInfoList>();
     int32_t ret = 0;
     if (accessibilityProviderCallbacksWithInstance_.findAccessibilityNodeInfosById) {
+        LOG_CALLBACK(
+            "OH_ArkUI_AccessibilityProviderRegisterCallbackWithInstance",
+            accessibilityProviderCallbacksWithInstance_.findAccessibilityNodeInfosById);
         ret = accessibilityProviderCallbacksWithInstance_.findAccessibilityNodeInfosById(instanceId_.c_str(),
             elementId, static_cast<ArkUI_AccessibilitySearchMode>(mode),
             requestId, accessibilityElementInfoList.get());
     } else if (accessibilityProviderCallbacks_.findAccessibilityNodeInfosById) {
+        LOG_CALLBACK(
+            "OH_ArkUI_AccessibilityProviderRegisterCallback",
+            accessibilityProviderCallbacks_.findAccessibilityNodeInfosById);
         ret = accessibilityProviderCallbacks_.findAccessibilityNodeInfosById(
             elementId, static_cast<ArkUI_AccessibilitySearchMode>(mode),
             requestId, accessibilityElementInfoList.get());
@@ -182,9 +189,15 @@ int32_t ArkUI_AccessibilityProvider::FindAccessibilityNodeInfosByText(
     auto accessibilityElementInfoList = std::make_unique<ArkUI_AccessibilityElementInfoList>();
     int32_t ret = 0;
     if (accessibilityProviderCallbacksWithInstance_.findAccessibilityNodeInfosByText) {
+        LOG_CALLBACK(
+            "OH_ArkUI_AccessibilityProviderRegisterCallbackWithInstance",
+            accessibilityProviderCallbacksWithInstance_.findAccessibilityNodeInfosByText);
         ret = accessibilityProviderCallbacksWithInstance_.findAccessibilityNodeInfosByText(instanceId_.c_str(),
             elementId, text.c_str(), requestId, accessibilityElementInfoList.get());
     } else if (accessibilityProviderCallbacks_.findAccessibilityNodeInfosByText) {
+        LOG_CALLBACK(
+            "OH_ArkUI_AccessibilityProviderRegisterCallback",
+            accessibilityProviderCallbacks_.findAccessibilityNodeInfosByText);
         ret = accessibilityProviderCallbacks_.findAccessibilityNodeInfosByText(
             elementId, text.c_str(), requestId, accessibilityElementInfoList.get());
     } else {
@@ -203,9 +216,15 @@ int32_t ArkUI_AccessibilityProvider::FindFocusedAccessibilityNode(
     ArkUI_AccessibilityElementInfo& elementInfo)
 {
     if (accessibilityProviderCallbacksWithInstance_.findFocusedAccessibilityNode) {
+        LOG_CALLBACK(
+            "OH_ArkUI_AccessibilityProviderRegisterCallbackWithInstance",
+            accessibilityProviderCallbacksWithInstance_.findFocusedAccessibilityNode);
         return accessibilityProviderCallbacksWithInstance_.findFocusedAccessibilityNode(instanceId_.c_str(),
             elementId, static_cast<ArkUI_AccessibilityFocusType>(focusType), requestId, &elementInfo);
     } else if (accessibilityProviderCallbacks_.findFocusedAccessibilityNode) {
+        LOG_CALLBACK(
+            "OH_ArkUI_AccessibilityProviderRegisterCallback",
+            accessibilityProviderCallbacks_.findFocusedAccessibilityNode);
         return accessibilityProviderCallbacks_.findFocusedAccessibilityNode(elementId,
             static_cast<ArkUI_AccessibilityFocusType>(focusType), requestId, &elementInfo);
     } else {
@@ -219,9 +238,15 @@ int32_t ArkUI_AccessibilityProvider::FindNextFocusAccessibilityNode(
     ArkUI_AccessibilityElementInfo& elementInfo)
 {
     if (accessibilityProviderCallbacksWithInstance_.findNextFocusAccessibilityNode) {
+        LOG_CALLBACK(
+            "OH_ArkUI_AccessibilityProviderRegisterCallbackWithInstance",
+            accessibilityProviderCallbacksWithInstance_.findNextFocusAccessibilityNode);
         return accessibilityProviderCallbacksWithInstance_.findNextFocusAccessibilityNode(instanceId_.c_str(),
             elementId, static_cast<ArkUI_AccessibilityFocusMoveDirection>(direction), requestId, &elementInfo);
     } else if (accessibilityProviderCallbacks_.findNextFocusAccessibilityNode) {
+        LOG_CALLBACK(
+            "OH_ArkUI_AccessibilityProviderRegisterCallback",
+            accessibilityProviderCallbacks_.findNextFocusAccessibilityNode);
         return accessibilityProviderCallbacks_.findNextFocusAccessibilityNode(elementId,
             static_cast<ArkUI_AccessibilityFocusMoveDirection>(direction), requestId, &elementInfo);
     } else {
@@ -236,11 +261,17 @@ int32_t ArkUI_AccessibilityProvider::ExecuteAccessibilityAction(
 {
     auto actionArgumentsUnique = std::make_unique<ArkUI_AccessibilityActionArguments>(actionArguments);
     if (accessibilityProviderCallbacksWithInstance_.executeAccessibilityAction) {
+        LOG_CALLBACK(
+            "OH_ArkUI_AccessibilityProviderRegisterCallbackWithInstance",
+            accessibilityProviderCallbacksWithInstance_.executeAccessibilityAction);
         return accessibilityProviderCallbacksWithInstance_.executeAccessibilityAction(instanceId_.c_str(), elementId,
             static_cast<ArkUI_Accessibility_ActionType>(action),
             actionArgumentsUnique.get(),
             requestId);
     } else if (accessibilityProviderCallbacks_.executeAccessibilityAction) {
+        LOG_CALLBACK(
+            "OH_ArkUI_AccessibilityProviderRegisterCallback",
+            accessibilityProviderCallbacks_.executeAccessibilityAction);
         return accessibilityProviderCallbacks_.executeAccessibilityAction(
             elementId, static_cast<ArkUI_Accessibility_ActionType>(action),
             actionArgumentsUnique.get(), requestId);
@@ -253,8 +284,14 @@ int32_t ArkUI_AccessibilityProvider::ExecuteAccessibilityAction(
 int32_t ArkUI_AccessibilityProvider::ClearFocusedAccessibilityNode()
 {
     if (accessibilityProviderCallbacksWithInstance_.clearFocusedFocusAccessibilityNode) {
+        LOG_CALLBACK(
+            "OH_ArkUI_AccessibilityProviderRegisterCallbackWithInstance",
+            accessibilityProviderCallbacksWithInstance_.clearFocusedFocusAccessibilityNode);
         return accessibilityProviderCallbacksWithInstance_.clearFocusedFocusAccessibilityNode(instanceId_.c_str());
     } else if (accessibilityProviderCallbacks_.clearFocusedFocusAccessibilityNode) {
+        LOG_CALLBACK(
+            "OH_ArkUI_AccessibilityProviderRegisterCallback",
+            accessibilityProviderCallbacks_.clearFocusedFocusAccessibilityNode);
         return accessibilityProviderCallbacks_.clearFocusedFocusAccessibilityNode();
     } else {
         TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY, "clearFocusedFocusAccessibilityNode is null");
@@ -266,9 +303,15 @@ int32_t ArkUI_AccessibilityProvider::GetAccessibilityNodeCursorPosition(
     const int64_t elementId, const int32_t requestId, int32_t &cursorPosition)
 {
     if (accessibilityProviderCallbacksWithInstance_.getAccessibilityNodeCursorPosition) {
+        LOG_CALLBACK(
+            "OH_ArkUI_AccessibilityProviderRegisterCallbackWithInstance",
+            accessibilityProviderCallbacksWithInstance_.getAccessibilityNodeCursorPosition);
         return accessibilityProviderCallbacksWithInstance_.getAccessibilityNodeCursorPosition(instanceId_.c_str(),
             elementId, requestId, &cursorPosition);
     } else if (accessibilityProviderCallbacks_.getAccessibilityNodeCursorPosition) {
+        LOG_CALLBACK(
+            "OH_ArkUI_AccessibilityProviderRegisterCallback",
+            accessibilityProviderCallbacks_.getAccessibilityNodeCursorPosition);
         return accessibilityProviderCallbacks_.getAccessibilityNodeCursorPosition(
             elementId, requestId, &cursorPosition);
     } else {
@@ -284,6 +327,7 @@ int32_t ArkUI_AccessibilityProvider::SendAccessibilityAsyncEvent(
     if (accessibilityEvent == nullptr) {
         TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY, "accessibilityEvent is null");
         if (callback) {
+            LOG_CALLBACK("OH_ArkUI_SendAccessibilityAsyncEvent", callback);
             callback(SEND_EVENT_FAILED);
         }
         return SEND_EVENT_FAILED;
@@ -293,6 +337,7 @@ int32_t ArkUI_AccessibilityProvider::SendAccessibilityAsyncEvent(
     if (accessibilityProvider == nullptr) {
         TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY, "accessibilityProvider is null");
         if (callback) {
+            LOG_CALLBACK("OH_ArkUI_SendAccessibilityAsyncEvent", callback);
             callback(SEND_EVENT_FAILED);
         }
         return SEND_EVENT_FAILED;

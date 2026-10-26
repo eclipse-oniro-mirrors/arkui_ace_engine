@@ -21,6 +21,7 @@
 #include "base/geometry/ng/rect_t.h"
 #include "core/components_ng/base/ui_node.h"
 #include "core/components_ng/manager/uisession_query/component_tree_query.h"
+#include "core/components_ng/pattern/pattern.h"
 #include "core/components_ng/syntax/lazy_for_each_builder.h"
 #include "interfaces/inner_api/ui_session/component_tree_query_type.h"
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
@@ -75,6 +76,33 @@ public:
         errorCode = static_cast<int32_t>(ComponentTreeQueryError::OK);
         return "{\"name\":\"item-" + std::to_string(index) + "\"}";
     }
+};
+
+// FrameNode subclass that reports visible+active (the shared FrameNode mock returns false,
+// which would short-circuit VisitForPointHit at the root and never accumulate the scan quota)
+// and exposes a caller-controlled children list so the traversal actually recurses.
+// rootNode_ on PipelineContext is RefPtr<FrameNode>, so the mock root must be a FrameNode.
+class MockVisibleFrameNode : public FrameNode {
+    DECLARE_ACE_TYPE(MockVisibleFrameNode, FrameNode);
+
+public:
+    explicit MockVisibleFrameNode(int32_t id)
+        : FrameNode("mockVisible", id, AceType::MakeRefPtr<Pattern>(), false) {}
+    bool IsVisibleAndActive() const override
+    {
+        return true;
+    }
+    const std::list<RefPtr<UINode>>& GetChildren(bool = false) const override
+    {
+        return children_;
+    }
+    void SetChildren(std::list<RefPtr<UINode>> children)
+    {
+        children_ = std::move(children);
+    }
+
+private:
+    std::list<RefPtr<UINode>> children_;
 };
 } // namespace
 
@@ -179,5 +207,134 @@ HWTEST_F(ComponentTreeQueryTest, ComponentTreeQueryFrontend, TestSize.Level1)
     data = supported->GetDataByIndexAsJson(3, errorCode);
     EXPECT_EQ(errorCode, static_cast<int32_t>(ComponentTreeQueryError::OK));
     EXPECT_EQ(data, "{\"name\":\"item-3\"}");
+}
+
+/**
+ * @tc.name: ComponentTreeQueryExecuteDefault
+ * @tc.desc: Execute with an unknown query type falls through to default and returns INVALID_PARAMETER.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ComponentTreeQueryTest, ComponentTreeQueryExecuteDefault, TestSize.Level1)
+{
+    ComponentTreeQueryRequest request;
+    request.type = static_cast<ComponentTreeQueryType>(999);
+    request.x = 10.0f;
+    request.y = 10.0f;
+    std::string resultJson;
+    EXPECT_EQ(ComponentTreeQuery::Execute(request, resultJson),
+        static_cast<int32_t>(ComponentTreeQueryError::INVALID_PARAMETER));
+    EXPECT_TRUE(resultJson.empty());
+}
+
+/**
+ * @tc.name: ComponentTreeQueryNavigationNoTarget
+ * @tc.desc: Navigation query traverses the mock root tree; with no NavigationGroupNode present,
+ *           target-not-found maps to OK and a non-empty error payload is produced.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ComponentTreeQueryTest, ComponentTreeQueryNavigationNoTarget, TestSize.Level1)
+{
+    ComponentTreeQueryRequest request;
+    request.type = ComponentTreeQueryType::NAVIGATION_CONTENT_BY_POINT;
+    request.x = 10.0f;
+    request.y = 10.0f;
+    request.pattern = "[a-z]+";
+    std::string resultJson;
+    EXPECT_EQ(ComponentTreeQuery::Execute(request, resultJson),
+        static_cast<int32_t>(ComponentTreeQueryError::OK));
+    EXPECT_FALSE(resultJson.empty());
+    EXPECT_NE(resultJson.find("errorCode"), std::string::npos);
+}
+
+/**
+ * @tc.name: ComponentTreeQueryLazyForEachNoTarget
+ * @tc.desc: LazyForEach query traverses the mock root tree; with no LazyForEachNode present,
+ *           the traversal layer surfaces TARGET_NOT_FOUND via BuildQueryErrorJson.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ComponentTreeQueryTest, ComponentTreeQueryLazyForEachNoTarget, TestSize.Level1)
+{
+    ComponentTreeQueryRequest request;
+    request.type = ComponentTreeQueryType::LAZY_FOREACH_DATA_BY_POINT;
+    request.x = 10.0f;
+    request.y = 10.0f;
+    std::string resultJson;
+    EXPECT_EQ(ComponentTreeQuery::Execute(request, resultJson),
+        static_cast<int32_t>(ComponentTreeQueryError::TARGET_NOT_FOUND));
+    EXPECT_FALSE(resultJson.empty());
+    EXPECT_NE(resultJson.find("errorCode"), std::string::npos);
+}
+
+/**
+ * @tc.name: ComponentTreeQueryNavigationScanLimit
+ * @tc.desc: Navigation query whose traversal exceeds MAX_SCAN_NODES returns RESOURCE_LIMIT.
+ *           Covers ConsumeScanQuota's scan-budget branch and FindNavigationByPoint's
+ *           limitExceeded path (unreachable with the default FrameNode mock because its
+ *           IsVisibleAndActive is false and VisitForPointHit never recurses).
+ * @tc.type: FUNC
+ */
+HWTEST_F(ComponentTreeQueryTest, ComponentTreeQueryNavigationScanLimit, TestSize.Level1)
+{
+    auto ctx = PipelineContext::GetCurrentContextSafely();
+    ASSERT_NE(ctx, nullptr);
+    auto originalRoot = ctx->rootNode_;
+
+    auto mockRoot = AceType::MakeRefPtr<MockVisibleFrameNode>(900001);
+    auto dummy = AceType::MakeRefPtr<MockVisibleFrameNode>(900002);
+    std::list<RefPtr<UINode>> children;
+    constexpr int32_t overScan = COMPONENT_TREE_QUERY_MAX_SCAN_NODES + 2;
+    for (int32_t i = 0; i < overScan; ++i) {
+        children.emplace_back(dummy);
+    }
+    mockRoot->SetChildren(std::move(children));
+    ctx->rootNode_ = mockRoot;
+
+    ComponentTreeQueryRequest request;
+    request.type = ComponentTreeQueryType::NAVIGATION_CONTENT_BY_POINT;
+    request.x = 0.0f;
+    request.y = 0.0f;
+    request.pattern = "[a-z]+";
+    std::string resultJson;
+    EXPECT_EQ(ComponentTreeQuery::Execute(request, resultJson),
+        static_cast<int32_t>(ComponentTreeQueryError::RESOURCE_LIMIT));
+    EXPECT_FALSE(resultJson.empty());
+    EXPECT_NE(resultJson.find("errorCode"), std::string::npos);
+
+    ctx->rootNode_ = originalRoot;
+}
+
+/**
+ * @tc.name: ComponentTreeQueryLazyForEachScanLimit
+ * @tc.desc: LazyForEach query whose traversal exceeds MAX_SCAN_NODES returns RESOURCE_LIMIT
+ *           via FindLazyForEachByPoint's limitExceeded path and BuildQueryErrorJson.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ComponentTreeQueryTest, ComponentTreeQueryLazyForEachScanLimit, TestSize.Level1)
+{
+    auto ctx = PipelineContext::GetCurrentContextSafely();
+    ASSERT_NE(ctx, nullptr);
+    auto originalRoot = ctx->rootNode_;
+
+    auto mockRoot = AceType::MakeRefPtr<MockVisibleFrameNode>(900011);
+    auto dummy = AceType::MakeRefPtr<MockVisibleFrameNode>(900012);
+    std::list<RefPtr<UINode>> children;
+    constexpr int32_t overScan = COMPONENT_TREE_QUERY_MAX_SCAN_NODES + 2;
+    for (int32_t i = 0; i < overScan; ++i) {
+        children.emplace_back(dummy);
+    }
+    mockRoot->SetChildren(std::move(children));
+    ctx->rootNode_ = mockRoot;
+
+    ComponentTreeQueryRequest request;
+    request.type = ComponentTreeQueryType::LAZY_FOREACH_DATA_BY_POINT;
+    request.x = 0.0f;
+    request.y = 0.0f;
+    std::string resultJson;
+    EXPECT_EQ(ComponentTreeQuery::Execute(request, resultJson),
+        static_cast<int32_t>(ComponentTreeQueryError::RESOURCE_LIMIT));
+    EXPECT_FALSE(resultJson.empty());
+    EXPECT_NE(resultJson.find("errorCode"), std::string::npos);
+
+    ctx->rootNode_ = originalRoot;
 }
 } // namespace OHOS::Ace::NG

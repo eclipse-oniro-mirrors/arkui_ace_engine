@@ -748,7 +748,7 @@ HWTEST_F(NativeKeyEventTest, NativeKeyEventTest0020, TestSize.Level1)
 {
     EXPECT_EQ(OH_ArkUI_KeyEvent_Destroy(nullptr), ARKUI_ERROR_CODE_PARAM_INVALID);
     ArkUI_UIInputEvent* nullEvent = nullptr;
-    EXPECT_EQ(OH_ArkUI_KeyEvent_Destroy(&nullEvent), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(OH_ArkUI_KeyEvent_Destroy(&nullEvent), ARKUI_ERROR_CODE_PARAM_INVALID);
     ArkUI_UIInputEvent nonCreate {};
     nonCreate.eventTypeId = C_KEY_EVENT_ID;
     ArkUI_UIInputEvent* nonCreatePtr = &nonCreate;
@@ -1036,5 +1036,21 @@ HWTEST_F(NativeKeyEventTest, NativeKeyEventTest0032, TestSize.Level1)
     EXPECT_EQ(OH_ArkUI_KeyEvent_IsScrollLockOn(event, &flag), ARKUI_ERROR_CODE_NO_ERROR);
     EXPECT_TRUE(flag);
     EXPECT_EQ(OH_ArkUI_KeyEvent_Destroy(&event), ARKUI_ERROR_CODE_NO_ERROR);
+}
+
+/**
+ * @tc.name: NativeKeyEventTest0033
+ * @tc.desc: Test OH_ArkUI_KeyEvent_Create inits inputType/apiVersion so GetType returns KEY (AC-05).
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeKeyEventTest, NativeKeyEventTest0033, TestSize.Level1)
+{
+    ArkUI_UIInputEvent* event = nullptr;
+    ASSERT_EQ(OH_ArkUI_KeyEvent_Create(&event), ARKUI_ERROR_CODE_NO_ERROR);
+    ASSERT_NE(event, nullptr);
+    EXPECT_EQ(OH_ArkUI_UIInputEvent_GetType(event), ARKUI_UIINPUTEVENT_TYPE_KEY);
+    EXPECT_EQ(OH_ArkUI_UIInputEvent_GetLatestStatus(), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(OH_ArkUI_KeyEvent_Destroy(&event), ARKUI_ERROR_CODE_NO_ERROR);
+    EXPECT_EQ(event, nullptr);
 }
 } // namespace OHOS::Ace

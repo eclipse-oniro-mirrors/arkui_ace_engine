@@ -15,6 +15,7 @@
 
 #include "base/log/dump_log.h"
 #include "core/components_ng/pattern/scrollable/scrollable_layout_property.h"
+#include "interfaces/inner_api/ui_session/param_config.h"
 
 namespace OHOS::Ace::NG {
 
@@ -30,10 +31,30 @@ void ScrollableLayoutProperty::DumpInfo()
 
 void ScrollableLayoutProperty::DumpInfo(std::unique_ptr<JsonValue>& json)
 {
-    json->Put("contentStartOffset",
-        propContentStartOffset_.has_value() ? std::to_string(propContentStartOffset_.value_or(0)).c_str() : "None");
-    json->Put("contentEndOffset",
-        propContentEndOffset_.has_value() ? std::to_string(propContentEndOffset_.value_or(0)).c_str() : "None");
+    DumpInfo(json, ParamConfig());
+}
+
+void ScrollableLayoutProperty::DumpInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if (config.IsPublicTree()) {
+        if (propContentStartOffset_.has_value()) {
+            json->Put("contentStartOffset",
+                Dimension(propContentStartOffset_.value(), DimensionUnit::VP).ToString().c_str());
+        }
+        if (propContentEndOffset_.has_value()) {
+            json->Put(
+                "contentEndOffset", Dimension(propContentEndOffset_.value(), DimensionUnit::VP).ToString().c_str());
+        }
+        return;
+    }
+    if (!config.IsPublicTree() || propContentStartOffset_.has_value()) {
+        json->Put("contentStartOffset",
+            propContentStartOffset_.has_value() ? std::to_string(propContentStartOffset_.value()).c_str() : "None");
+    }
+    if (!config.IsPublicTree() || propContentEndOffset_.has_value()) {
+        json->Put("contentEndOffset",
+            propContentEndOffset_.has_value() ? std::to_string(propContentEndOffset_.value()).c_str() : "None");
+    }
 }
 
 void ScrollableLayoutProperty::ToJsonValue(std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const

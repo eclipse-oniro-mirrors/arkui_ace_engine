@@ -166,13 +166,17 @@ UIExtensionPattern::~UIExtensionPattern()
         return;
     }
 
-    auto instanceId = GetInstanceIdFromHost();
+    auto host = GetHost();
+    auto instanceId = host ? host->GetInstanceId() : instanceId_;
     ContainerScope scope(instanceId);
     auto ngPipeline = NG::PipelineContext::GetCurrentContext();
     CHECK_NULL_VOID(ngPipeline);
     auto frontend = ngPipeline->GetFrontend();
     CHECK_NULL_VOID(frontend);
-    auto accessibilityManager = frontend->GetAccessibilityManager();
+    auto mainAccessibilityManager = frontend->GetAccessibilityManager();
+    CHECK_NULL_VOID(mainAccessibilityManager);
+    auto accessibilityManager = host ? mainAccessibilityManager->GetAccessibilityManagerForNode(host)
+                                     : mainAccessibilityManager;
     CHECK_NULL_VOID(accessibilityManager);
     accessibilityManager->DeregisterAccessibilityChildTreeCallback(
         accessibilityChildTreeCallback_->GetAccessibilityId());
@@ -1559,7 +1563,8 @@ void UIExtensionPattern::FireOnRemoteReadyCallback()
         onRemoteReadyCallback_(MakeRefPtr<UIExtensionProxy>(sessionWrapper_, Claim(this)));
     }
     if (onModalRemoteReadyCallback_) {
-        onModalRemoteReadyCallback_(std::make_shared<ModalUIExtensionProxyImpl>(sessionWrapper_));
+        auto innerProxy = MakeRefPtr<UIExtensionProxy>(sessionWrapper_, Claim(this));
+        onModalRemoteReadyCallback_(std::make_shared<ModalUIExtensionProxyImpl>(innerProxy));
     }
 }
 
@@ -1813,10 +1818,12 @@ void UIExtensionPattern::InitializeAccessibility()
     CHECK_NULL_VOID(ngPipeline);
     auto frontend = ngPipeline->GetFrontend();
     CHECK_NULL_VOID(frontend);
-    auto accessibilityManager = frontend->GetAccessibilityManager();
-    CHECK_NULL_VOID(accessibilityManager);
     auto frameNode = frameNode_.Upgrade();
     CHECK_NULL_VOID(frameNode);
+    auto mainAccessibilityManager = frontend->GetAccessibilityManager();
+    CHECK_NULL_VOID(mainAccessibilityManager);
+    auto accessibilityManager = mainAccessibilityManager->GetAccessibilityManagerForNode(frameNode);
+    CHECK_NULL_VOID(accessibilityManager);
     int64_t accessibilityId = frameNode->GetAccessibilityId();
     accessibilityChildTreeCallback_ = std::make_shared<UIExtensionAccessibilityChildTreeCallback>(
         WeakClaim(this), accessibilityId);

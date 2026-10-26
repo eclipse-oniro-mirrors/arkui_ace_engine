@@ -46,6 +46,7 @@ public:
     bool RegisterNavDestinationHiddenChange(const RefPtr<FrameNode>& imageNode,
         OnNavDestinationHiddenChangeCallback&& callback);
     void UnregisterNavDestinationHiddenChange(int32_t imageNodeId);
+    bool CheckNeedSkipRecycle(int32_t imageNodeId);
 
 private:
     void RebuildImage(const RefPtr<UINode>& node);

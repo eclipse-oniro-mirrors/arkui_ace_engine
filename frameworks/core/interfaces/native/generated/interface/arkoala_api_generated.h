@@ -3749,6 +3749,8 @@ typedef struct Ark_TextBackgroundStyle Ark_TextBackgroundStyle;
 typedef struct Opt_TextBackgroundStyle Opt_TextBackgroundStyle;
 typedef struct Ark_TextPickerTextStyle Ark_TextPickerTextStyle;
 typedef struct Opt_TextPickerTextStyle Opt_TextPickerTextStyle;
+typedef struct Ark_TopFloatingTabBarStyle Ark_TopFloatingTabBarStyle;
+typedef struct Opt_TopFloatingTabBarStyle Opt_TopFloatingTabBarStyle;
 typedef struct Ark_TouchEventProxy Ark_TouchEventProxy;
 typedef struct Opt_TouchEventProxy Opt_TouchEventProxy;
 typedef struct Ark_Union_AlertDialogParamWithConfirm_AlertDialogParamWithButtons_AlertDialogParamWithOptions Ark_Union_AlertDialogParamWithConfirm_AlertDialogParamWithButtons_AlertDialogParamWithOptions;
@@ -5176,6 +5178,15 @@ typedef struct Opt_EventQueryType {
     Ark_Tag tag;
     Ark_EventQueryType value;
 } Opt_EventQueryType;
+typedef enum Ark_FastScrollMode {
+    ARK_FAST_SCROLL_MODE_NONE = 0,
+    ARK_FAST_SCROLL_MODE_SKIP_MEASURE = 1,
+    ARK_FAST_SCROLL_MODE_SKIP_CREATE_AND_MEASURE = 2,
+} Ark_FastScrollMode;
+typedef struct Opt_FastScrollMode {
+    Ark_Tag tag;
+    Ark_FastScrollMode value;
+} Opt_FastScrollMode;
 typedef enum Ark_FileSelectorMode {
     ARK_FILE_SELECTOR_MODE_FILE_OPEN_MODE = 0,
     ARK_FILE_SELECTOR_MODE_FILE_OPEN_MULTIPLE_MODE = 1,
@@ -5715,6 +5726,15 @@ typedef struct Opt_ImmersiveMode {
     Ark_Tag tag;
     Ark_ImmersiveMode value;
 } Opt_ImmersiveMode;
+typedef enum Ark_ImmersiveStrategy {
+    ARK_IMMERSIVE_STRATEGY_AVOID_CUTOUT = 0,
+    ARK_IMMERSIVE_STRATEGY_AVOID_FLOAT_NAV = 1,
+    ARK_IMMERSIVE_STRATEGY_BIND_SHEET_EXPAND_SAFE_AREA = 7,
+} Ark_ImmersiveStrategy;
+typedef struct Opt_ImmersiveStrategy {
+    Ark_Tag tag;
+    Ark_ImmersiveStrategy value;
+} Opt_ImmersiveStrategy;
 typedef enum Ark_IncrementalUpdatePolicy {
     ARK_INCREMENTAL_UPDATE_POLICY_NONE = 0,
     ARK_INCREMENTAL_UPDATE_POLICY_PARAGRAPH_CACHE = 1,
@@ -7213,6 +7233,15 @@ typedef struct Opt_SheetSize {
     Ark_Tag tag;
     Ark_SheetSize value;
 } Opt_SheetSize;
+typedef enum Ark_SheetTitleBarHoverMode {
+    ARK_SHEET_TITLE_BAR_HOVER_MODE_STANDARD = 0,
+    ARK_SHEET_TITLE_BAR_HOVER_MODE_STACK = 1,
+    ARK_SHEET_TITLE_BAR_HOVER_MODE_SAFE_AREA_PADDING = 2,
+} Ark_SheetTitleBarHoverMode;
+typedef struct Opt_SheetTitleBarHoverMode {
+    Ark_Tag tag;
+    Ark_SheetTitleBarHoverMode value;
+} Opt_SheetTitleBarHoverMode;
 typedef enum Ark_SheetType {
     ARK_SHEET_TYPE_BOTTOM = 0,
     ARK_SHEET_TYPE_CENTER = 1,
@@ -7484,6 +7513,7 @@ typedef struct Opt_SystemProperties {
 typedef enum Ark_TabBarDisplayMode {
     ARK_TAB_BAR_DISPLAY_MODE_BOTTOM_TABBAR = 0,
     ARK_TAB_BAR_DISPLAY_MODE_SIDEBAR = 1,
+    ARK_TAB_BAR_DISPLAY_MODE_TOP_TABBAR = 2,
 } Ark_TabBarDisplayMode;
 typedef struct Opt_TabBarDisplayMode {
     Ark_Tag tag;
@@ -7493,6 +7523,7 @@ typedef enum Ark_TabBarStyle {
     ARK_TAB_BAR_STYLE_BOTTOM = 0,
     ARK_TAB_BAR_STYLE_SIDEBAR = 1,
     ARK_TAB_BAR_STYLE_SIDEBAR_ADAPTABLE = 2,
+    ARK_TAB_BAR_STYLE_TOP = 3,
 } Ark_TabBarStyle;
 typedef struct Opt_TabBarStyle {
     Ark_Tag tag;
@@ -20989,6 +21020,7 @@ typedef struct Opt_ScrollOptions {
 typedef struct Ark_ScrollToIndexOptions {
     /* kind: Interface */
     Opt_LengthMetricsProxy extraOffset;
+    Opt_FastScrollMode fastScroll;
 } Ark_ScrollToIndexOptions;
 typedef struct Opt_ScrollToIndexOptions {
     Ark_Tag tag;
@@ -23898,6 +23930,8 @@ typedef struct Ark_FloatingTabBarStyle {
     Opt_Length maskHeight;
     Opt_Boolean adaptToHandedness;
     Opt_uiMaterial_ImmersiveMaterial systemMaterial;
+    Opt_Length maxWidth;
+    Opt_Union_Position_Edges_LocalizedEdges offset;
 } Ark_FloatingTabBarStyle;
 typedef struct Opt_FloatingTabBarStyle {
     Ark_Tag tag;
@@ -24237,6 +24271,7 @@ typedef struct Ark_SheetOptions {
     Opt_Boolean placementOnTarget;
     Opt_EdgeLightMode edgeLightMode;
     Opt_BlurSnapshotOptions blurSnapshot;
+    Opt_SheetTitleBarHoverMode titleBarHoverMode;
 } Ark_SheetOptions;
 typedef struct Opt_SheetOptions {
     Ark_Tag tag;
@@ -24298,6 +24333,20 @@ typedef struct Opt_TextPickerTextStyle {
     Ark_Tag tag;
     Ark_TextPickerTextStyle value;
 } Opt_TextPickerTextStyle;
+typedef struct Ark_TopFloatingTabBarStyle {
+    /* kind: Interface */
+    Opt_Length barWidth;
+    Opt_Length barSideMargin;
+    Opt_Length barTopMargin;
+    Opt_ResourceColor maskColor;
+    Opt_Length maskHeight;
+    Opt_Length maxWidth;
+    Opt_Union_Position_Edges_LocalizedEdges offset;
+} Ark_TopFloatingTabBarStyle;
+typedef struct Opt_TopFloatingTabBarStyle {
+    Ark_Tag tag;
+    Ark_TopFloatingTabBarStyle value;
+} Opt_TopFloatingTabBarStyle;
 typedef struct Ark_TouchEventProxy {
     /* kind: Interface */
     Ark_EventTarget target;
@@ -27550,13 +27599,17 @@ typedef struct GENERATED_ArkUISelectModifier {
                                        const Opt_BlurStyle* value);
     void (*setControlSize)(Ark_NativePointer node,
                            const Opt_ControlSize* value);
-    void (*setTextModifier)(Ark_NativePointer node,
+    void (*setTextModifier)(Ark_VMContext vmContext,
+                            Ark_NativePointer node,
                             const Opt_TextModifier* value);
-    void (*setArrowModifier)(Ark_NativePointer node,
+    void (*setArrowModifier)(Ark_VMContext vmContext,
+                             Ark_NativePointer node,
                              const Opt_SymbolGlyphModifier* value);
-    void (*setOptionTextModifier)(Ark_NativePointer node,
+    void (*setOptionTextModifier)(Ark_VMContext vmContext,
+                                  Ark_NativePointer node,
                                   const Opt_TextModifier* value);
-    void (*setSelectedOptionTextModifier)(Ark_NativePointer node,
+    void (*setSelectedOptionTextModifier)(Ark_VMContext vmContext,
+                                          Ark_NativePointer node,
                                           const Opt_TextModifier* value);
     void (*setDividerStyle)(Ark_NativePointer node,
                             const Opt_DividerStyleOptions* value);
@@ -27997,6 +28050,8 @@ typedef struct GENERATED_ArkUITabsModifier {
                                   const Opt_OnTabsContentDidScrollCallback* value);
     void (*setBarFloatingStyle)(Ark_NativePointer node,
                                 const Opt_FloatingTabBarStyle* value);
+    void (*setTopBarFloatingStyle)(Ark_NativePointer node,
+                                   const Opt_TopFloatingTabBarStyle* value);
     void (*setBarStyle)(Ark_NativePointer node,
                         const Opt_TabBarStyle* value);
     void (*setSidebarPosition)(Ark_NativePointer node,
@@ -29213,6 +29268,8 @@ typedef struct GENERATED_ArkUIXComponentModifier {
                                       const Opt_Boolean* value);
     void (*setHdrBrightness0)(Ark_NativePointer node,
                               const Opt_Float64* value);
+    void (*setSetExtraFlag)(Ark_NativePointer node,
+                            Ark_Int32 value);
     void (*setBufferQueueCount)(Ark_NativePointer node,
                                 Ark_Int32 value);
     void (*setHdrBrightness1)(Ark_NativePointer node,

@@ -58,6 +58,9 @@ struct FrameMetrics {
     uint64_t actualStartTime = 0; // Indicates the actual frame processing start time from CLOCK_MONOTONIC, in ns.
                                   // It is captured as early as possible when the VSync is received in RosenWindow.
     uint64_t totalDuration = 0;   // Indicates the duration through ArkUI-to-RS submission; 0 means not submitted.
+    uint64_t animationDuration = 0; // Total UI-thread time spent in DispatchDisplaySync and
+                                   // FlushModifierAnimation, in ns.
+                                   // Excludes render-tree rebuilding and frame callbacks between these stages.
 };
 
 struct NavigateChangeInfo {

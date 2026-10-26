@@ -36,6 +36,7 @@
 #include "base/log/ace_trace.h"
 #include "base/log/log.h"
 #include "base/memory/referenced.h"
+#include "core/components_ng/base/cmp_accessibility_registry.h"
 #include "base/ressched/ressched_click_optimizer.h"
 #include "base/ressched/ressched_report.h"
 #include "base/utils/utils.h"
@@ -6481,6 +6482,20 @@ void WebDelegate::OnAccessibilityEvent(
     if (!accessibilityState_) {
         return;
     }
+    // Page-event suppression for webs inside CMP exported subtrees: the SR's page-change policy re-focuses the first node of the page-event source.
+    if (eventType == AccessibilityEventType::PAGE_CHANGE ||
+        eventType == AccessibilityEventType::PAGE_OPEN ||
+        eventType == AccessibilityEventType::PAGE_CLOSE) {
+        auto webPatternForGate = webPattern_.Upgrade();
+        auto webHost = webPatternForGate ? webPatternForGate->GetHost() : nullptr;
+        if (OHOS::Ace::CmpAccessibility::CmpAccessibilityRegistry::HasAnySubAM() && webHost &&
+            OHOS::Ace::CmpAccessibility::CmpAccessibilityRegistry::HasSubAM(webHost.GetRawPtr())) {
+            TAG_LOGI(AceLogTag::ACE_WEB,
+                "WebPageEvent suppressed (web in exported subtree): type=%{public}d, hostId=%{public}d",
+                static_cast<int32_t>(eventType), webHost->GetId());
+            return;
+        }
+    }
     auto context = context_.Upgrade();
     CHECK_NULL_VOID(context);
     AccessibilityEvent event;
@@ -6695,6 +6710,15 @@ void WebDelegate::SendAccessibilityPageChangeEvent(const RefPtr<NG::FrameNode>& 
     TAG_LOGI(AceLogTag::ACE_WEB,
         "WebDelegate::AccessibilitySendPageChange accessibilityId = %{public}" PRId64,
         webNode->GetAccessibilityId());
+    // Page-event suppression for webs inside CMP exported subtrees: this send path bypasses OnAccessibilityEvent's suppression gate ().
+    if (OHOS::Ace::CmpAccessibility::CmpAccessibilityRegistry::HasAnySubAM() && webNode &&
+        OHOS::Ace::CmpAccessibility::CmpAccessibilityRegistry::HasSubAM(webNode.GetRawPtr())) {
+        TAG_LOGI(AceLogTag::ACE_WEB,
+            "WebPageEvent suppressed (web in exported subtree): pageChange, hostId=%{public}d",
+            webNode->GetId());
+        accessibilityManager->ReleasePageEvent(webNode, true, true);
+        return;
+    }
     accessibilityManager->ReleasePageEvent(webNode, true, true);
     AccessibilityEvent event;
     event.nodeId = webNode->GetAccessibilityId();

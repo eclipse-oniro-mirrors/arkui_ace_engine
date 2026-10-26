@@ -108,6 +108,7 @@ public:
     MOCK_METHOD1(GetContainerModalTitleVisible, bool(bool isImmersive));
     MOCK_METHOD2(SetContainerModalTitleVisible, void(bool customTitleSettedShow, bool floatingTitleSettedShow));
     MOCK_METHOD1(SetContainerModalTitleHeight, void(int height));
+    MOCK_METHOD1(SetContainerModalTitleHeightWithVp, void(double heightVp));
     MOCK_METHOD0(GetContainerModalTitleHeight, int());
     MOCK_METHOD2(GetContainerModalButtonsRect, bool(Rosen::Rect& containerModal, Rosen::Rect& buttons));
     MOCK_METHOD1(SubscribeContainerModalButtonsRectChange, void(

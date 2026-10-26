@@ -14,6 +14,8 @@
  */
 #include "core/interfaces/native/node/node_list_modifier.h"
 
+#include "base/log/log_wrapper.h"
+
 #include "interfaces/native/node/list_option.h"
 #include "interfaces/native/node/node_model.h"
 
@@ -721,6 +723,16 @@ void SetScrollToIndex(
     ListModelNG::SetScrollToIndex(frameNode, index, animation, alignment, extraOffset);
 }
 
+void SetScrollToIndexWithOptions(ArkUINodeHandle node, ArkUI_Int32 index, const ArkUIScrollToIndexOptions* options)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    CHECK_NULL_VOID(options);
+    ListModelNG::SetScrollToIndexWithOptions(frameNode, index, options->smooth,
+        static_cast<ScrollAlign>(options->align), options->extraOffset,
+        static_cast<FastScrollMode>(options->fastScrollMode));
+}
+
 void SetScrollBy(ArkUINodeHandle node, ArkUI_Float64 x, ArkUI_Float64 y)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
@@ -781,6 +793,7 @@ void SetListCloseAllSwipeActions(ArkUINodeHandle node, void* userData, void (onF
     RefPtr<ScrollControllerBase> scrollControllerBase = ListModelNG::GetOrCreateController(frameNode);
     if (onFinish) {
         auto onEvent = [userData, onFinish]() {
+            LOG_CALLBACK("OH_ArkUI_List_CloseAllSwipeActions", onFinish);
             onFinish(userData);
         };
         scrollControllerBase->CloseAllSwipeActions(std::move(onEvent));
@@ -1262,6 +1275,7 @@ const ArkUIListModifier* GetListModifier()
         .resetBackPressCloseSwipeAction = ResetBackPressCloseSwipeAction,
         .getBackPressCloseSwipeAction = GetBackPressCloseSwipeAction,
         .getChainAnimation = GetChainAnimation,
+        .setScrollToIndexWithOptions = SetScrollToIndexWithOptions,
     };
     CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
     return &modifier;

@@ -281,6 +281,14 @@ public:
         DELETABLE,
         FOCUS,
         NODE_TAG,
+        ZINDEX,
+        FONT_SIZE,
+        IMAGE_RENDERING,
+        BG_SIZE_TYPE,
+        BG_COLOR,
+        CSS_VISIBLE,
+        BG_IMG,
+        BG_SIZE
     };
 
     RefPtr<NodePaintMethod> CreateNodePaintMethod() override;
@@ -968,6 +976,8 @@ public:
     std::shared_ptr<Rosen::RSNode> GetSurfaceRSNode() const;
 
     void GetAllWebAccessibilityNodeInfos(WebNodeInfoCallback cb, int32_t webId, bool needFilter = true);
+    void ToJsonValueAccessibility(WebNodeInfoCallback cb, int32_t webId);
+    std::string GetAccessibilityJsonString(int32_t webId);
     void OnAccessibilityHoverEvent(
         const NG::PointF& point, SourceType source, NG::AccessibilityHoverEventType eventType, TimeStamp time);
     std::string GetSurfaceIdByHtmlElementId(const std::string& htmlElementId);
@@ -1406,7 +1416,8 @@ private:
     void ResetDragStateValue();
     void InitTouchEventListener();
     void UninitTouchEventListener();
-    void OnDragFileNameStart(const RefPtr<UnifiedData>& aceUnifiedData, const std::string& fileName);
+    std::string OnDragFileNameStart(const RefPtr<UnifiedData>& aceUnifiedData, const std::string& fileName);
+    void RewriteHtmlImgSrc(std::string& htmlContent, const std::string& fileUri);
     void AdjustRotationRenderFit(WindowSizeChangeReason type);
     void RecoverToTopLeft();
     bool needRestoreMenuForDrag_ = false;
@@ -1557,7 +1568,17 @@ private:
     void WebNodeInfoToJsonValue(std::shared_ptr<OHOS::Ace::JsonValue>& jsonNodeArray,
                                 std::shared_ptr<OHOS::NWeb::NWebAccessibilityNodeInfo> webNodeInfo,
                                 std::string& nodeTag, bool isArray = false);
+    void PutCssAccessibilityFields(std::unique_ptr<OHOS::Ace::JsonValue>& jsonNode,
+        std::shared_ptr<OHOS::NWeb::NWebAccessibilityNodeInfo> webNodeInfo);
+    void PutGridAccessibilityFields(std::unique_ptr<OHOS::Ace::JsonValue>& jsonNode,
+        std::shared_ptr<OHOS::NWeb::NWebAccessibilityNodeInfo> webNodeInfo);
     void GetWebAllInfosImpl(WebNodeInfoCallback cb, int32_t webId, bool needFilter = true);
+    void ToJsonValueAccessibilityImpl(WebNodeInfoCallback cb, int32_t webId);
+    void WebNodeInfoToJsonValueAccessibility(std::shared_ptr<OHOS::Ace::JsonValue>& jsonNode,
+        std::shared_ptr<OHOS::NWeb::NWebAccessibilityNodeInfo> webNodeInfo, int32_t depth = 0);
+    std::string CssBgColorToHexString(uint32_t color);
+    std::string CssFontSizeToString(int32_t fontSize);
+    std::string CssImageRenderingToString(int32_t imageRendering);
     std::string EnumTypeToString(WebAccessibilityType type);
     std::string VectorIntToString(std::vector<int64_t>&& vec);
     void RegisterPageSceneReadyJavaScript();
@@ -1860,7 +1881,6 @@ private:
     bool scrollbarLayoutPolicyChanged_ = false;
     bool isLanguageRtl_ = false;
     bool isEscKeyDownConsumed_ = false;
-    bool isEscKeyFromOverlayOrFullScreen_ = false;
 
 protected:
     OnCreateMenuCallback onCreateMenuCallback_;

@@ -2670,6 +2670,67 @@ HWTEST_F(JsAccessibilityManagerTest, IsSendAccessibilityEventTest003, TestSize.L
 }
 
 /**
+* @tc.name: IsSendAccessibilityEventTest005
+* @tc.desc: IsSendAccessibilityEvent with PAGE_PRE_CHANGE treated as page event
+* @tc.type: FUNC
+*/
+HWTEST_F(JsAccessibilityManagerTest, IsSendAccessibilityEventTest005, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. construct jsAccessibilityManager, test node
+     */
+    auto jsAccessibilityManager = AceType::MakeRefPtr<MockJsAccessibilityManager>();
+    ASSERT_NE(jsAccessibilityManager, nullptr);
+    auto frameNode = FrameNode::CreateFrameNode("framenode", ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<Pattern>(), false);
+    auto context = NG::PipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    auto root = context->GetRootElement();
+    ASSERT_NE(root, nullptr);
+
+    jsAccessibilityManager->SetPipelineContext(context);
+    auto container = Platform::AceContainer::GetContainer(context->GetInstanceId());
+    ASSERT_NE(container, nullptr);
+
+    AccessibilityEvent accessibilityEvent {
+        .nodeId = root->GetAccessibilityId(),
+        .type = AccessibilityEventType::PAGE_PRE_CHANGE
+    };
+
+    jsAccessibilityManager->AddToPageEventController(root);
+    /**
+     * @tc.steps: step2. PAGE_PRE_CHANGE is a page event, cached when touch exploration enabled
+     */
+    AccessibilityWorkMode accessibilityWorkMode { .isTouchExplorationEnabled = true };
+    EXPECT_CALL(*jsAccessibilityManager,
+        GenerateAccessibilityWorkMode()).WillOnce(::testing::Return(accessibilityWorkMode));
+    auto result = jsAccessibilityManager->IsSendAccessibilityEvent(accessibilityEvent);
+    EXPECT_EQ(result, false);
+}
+
+/**
+* @tc.name: IsDetachFocusCacheClearEventTest001
+* @tc.desc: IsDetachFocusCacheClearEvent with PAGE_PRE_CHANGE as cache clear event
+* @tc.type: FUNC
+*/
+HWTEST_F(JsAccessibilityManagerTest, IsDetachFocusCacheClearEventTest001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. construct jsAccessibilityManager
+     */
+    auto jsAccessibilityManager = AceType::MakeRefPtr<MockJsAccessibilityManager>();
+    ASSERT_NE(jsAccessibilityManager, nullptr);
+
+    /**
+     * @tc.steps: step2. PAGE_PRE_CHANGE clears detach focus fallback cache as page family event
+     * @tc.expected: PAGE_PRE_CHANGE and PAGE_CLOSE return true, CLICK returns false
+     */
+    EXPECT_TRUE(jsAccessibilityManager->IsDetachFocusCacheClearEvent(AccessibilityEventType::PAGE_PRE_CHANGE));
+    EXPECT_TRUE(jsAccessibilityManager->IsDetachFocusCacheClearEvent(AccessibilityEventType::PAGE_CLOSE));
+    EXPECT_FALSE(jsAccessibilityManager->IsDetachFocusCacheClearEvent(AccessibilityEventType::CLICK));
+}
+
+/**
 * @tc.name: IsSendAccessibilityEventForHostTest001
 * @tc.desc: IsSendAccessibilityEventForHost
 * @tc.type: FUNC
