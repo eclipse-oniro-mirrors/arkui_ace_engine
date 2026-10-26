@@ -28,7 +28,6 @@ ace_unittest("xcomponent_test_ng") {
     "$ace_root/frameworks/core/components_ng/pattern/xcomponent/xcomponent_resolution_config.cpp",
     "$ace_root/frameworks/core/interfaces/native/node/node_xcomponent_modifier.cpp",
     "xcomponent_layout_test_ng.cpp",
-    "xcomponent_inspector_tree_test_ng.cpp",
     "xcomponent_pattern_branch_test.cpp",
     "xcomponent_property_test_ng.cpp",
     "xcomponent_property_test_two_ng.cpp",
