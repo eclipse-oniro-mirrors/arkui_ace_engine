@@ -36,7 +36,9 @@ public:
     MOCK_METHOD(void, UpdateCalcMaxSize, (const CalcSize& value), (override));
 };
 
-class MockLayoutWrapperParent : public LayoutWrapper {
+class MockLayoutWrapperParent : public LayoutWrapper, public AceType {
+    DECLARE_ACE_TYPE(MockLayoutWrapperParent, LayoutWrapper, AceType);
+
 public:
     explicit MockLayoutWrapperParent(WeakPtr<FrameNode> hostNode) : LayoutWrapper(std::move(hostNode))
     {
@@ -81,9 +83,17 @@ public:
     RefPtr<FrameNode> childFrameNode_;
     RefPtr<MockLayoutWrapperChild> childLayoutWrapper_;
     RefPtr<LayoutProperty> layoutProperty_;
+
+private:
+    AceType* GetLayoutOwner() const override
+    {
+        return const_cast<MockLayoutWrapperParent*>(this);
+    }
 };
 
-class MockLayoutWrapperChild : public LayoutWrapper {
+class MockLayoutWrapperChild : public LayoutWrapper, public AceType {
+    DECLARE_ACE_TYPE(MockLayoutWrapperChild, LayoutWrapper, AceType);
+
 public:
     explicit MockLayoutWrapperChild(WeakPtr<FrameNode> hostNode) : LayoutWrapper(hostNode)
     {
@@ -132,6 +142,12 @@ public:
     MockLayoutPropertyChild* GetMockLayoutProperty()
     {
         return reinterpret_cast<MockLayoutPropertyChild*>(layoutProperty_.GetRawPtr());
+    }
+
+private:
+    AceType* GetLayoutOwner() const override
+    {
+        return const_cast<MockLayoutWrapperChild*>(this);
     }
 };
 

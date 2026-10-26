@@ -710,7 +710,7 @@ void LayoutWrapper::AdjustChildren(const RefPtr<FrameNode>& host, const OffsetF&
 
 void LayoutWrapper::AdjustChild(RefPtr<UINode> childUI, const OffsetF& offset, bool parentScrollable)
 {
-    auto child = DynamicCast<FrameNode>(RawPtr(childUI));
+    auto child = AceType::DynamicCast<FrameNode>(AceType::RawPtr(childUI));
     if (!child) {
         if (!childUI->IsSyntaxNode()) {
             return;

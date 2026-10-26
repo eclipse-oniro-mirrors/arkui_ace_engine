@@ -1500,6 +1500,7 @@
       "OHOS::Ace::NG::FrameNode::GetHitTestMode() const";
       "OHOS::Ace::NG::FrameNode::GetInspectorValue()";
       "OHOS::Ace::NG::FrameNode::GetLayoutAlgorithm(bool)";
+      "OHOS::Ace::NG::FrameNode::GetLayoutOwner() const";
       "OHOS::Ace::NG::FrameNode::GetLayoutPropertyTypeName() const";
       "OHOS::Ace::NG::FrameNode::GetOffsetRelativeToWindow() const";
       "OHOS::Ace::NG::FrameNode::GetOrCreateAccessibilityProperty()";
@@ -4297,6 +4298,7 @@
       "OHOS::Ace::Frontend::GetTaskExecutor() const";
       "OHOS::Ace::Frontend::MaybeRelease()";
       "OHOS::Ace::Frontend::~Frontend()";
+      "vtable for OHOS::Ace::Frontend";
       "OHOS::Ace::GridColumnInfo::GetMaxWidth() const";
       "OHOS::Ace::GridContainerInfo::GetMarginLeft() const";
       "OHOS::Ace::GridContainerInfo::GetMarginRight() const";

@@ -199,7 +199,7 @@ private:
 };
 
 using VisibleRatioCallback = std::function<void(bool, double)>;
-class AccessibilityManager : public AceType {
+class AccessibilityManager : public virtual AceType {
     DECLARE_ACE_TYPE(AccessibilityManager, AceType);
 
 public:

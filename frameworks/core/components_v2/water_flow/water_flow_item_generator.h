@@ -20,7 +20,7 @@
 
 namespace OHOS::Ace::V2 {
 
-class WaterFlowItemGenerator : virtual public Referenced {
+class WaterFlowItemGenerator : virtual public AceType {
 public:
     virtual RefPtr<RenderNode> RequestWaterFlowFooter()
     {

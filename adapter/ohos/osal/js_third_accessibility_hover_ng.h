@@ -62,7 +62,7 @@ struct AccessibilityHoverForThirdConfig {
 
 using AccessibilityHoverTestPathForThird = std::vector<int64_t>;
 
-class AccessibilityHoverManagerForThirdNG : public AceType {
+class AccessibilityHoverManagerForThirdNG : public virtual AceType {
     DECLARE_ACE_TYPE(AccessibilityHoverManagerForThirdNG, AceType);
 
 public:

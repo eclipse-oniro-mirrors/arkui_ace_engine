@@ -110,7 +110,7 @@ public:
     TypeInfoHelper() = delete;
     ~TypeInfoHelper() = delete;
 
-    // Convert pointer of instance inherited from 'TypeInfoBase'.
+    // Convert pointer of an instance with type information (TypeInfoBase or AceType).
     // Notice: Result SHOULD BE checked with 'nullptr', because 'DynamicCast' might be failed.
     template<class T, class O>
     static T* DynamicCast(O* rawPtr)

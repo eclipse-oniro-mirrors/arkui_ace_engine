@@ -21,6 +21,60 @@
 #include "core/components/foreach/for_each_component.h"
 #include "core/components_v2/common/common_def.h"
 
+namespace OHOS::Ace {
+namespace V2 {
+class DataChangeListener;
+}
+
+// A data-change capability shares its owner's lifetime.
+// RefPtr and WeakPtr retain their original storage and public interfaces.
+template<>
+struct RefPtrTraits<V2::DataChangeListener> {
+    static AceType* GetOwner(const V2::DataChangeListener* view);
+
+    template<class T>
+    class ListenerAccess final {
+    public:
+        explicit ListenerAccess(T* view) : guard_(GetOwner(view)), view_(view) {}
+        T* operator->() const
+        {
+            return view_;
+        }
+        ListenerAccess(const ListenerAccess&) = delete;
+        ListenerAccess& operator=(const ListenerAccess&) = delete;
+
+    private:
+        LifeCycleCheckable::PtrHolder<AceType> guard_;
+        T* view_;
+    };
+
+    static ListenerAccess<V2::DataChangeListener> Access(V2::DataChangeListener* view)
+    {
+        return ListenerAccess<V2::DataChangeListener>(view);
+    }
+
+    template<class T>
+    static T* DynamicCast(V2::DataChangeListener* view)
+    {
+        return TypeInfoHelper::DynamicCast<std::remove_const_t<T>>(view);
+    }
+
+    template<class T>
+    static const T* DynamicCast(const V2::DataChangeListener* view)
+    {
+        return TypeInfoHelper::DynamicCast<std::remove_const_t<T>>(view);
+    }
+};
+
+template<>
+struct RefPtrTraits<const V2::DataChangeListener> : RefPtrTraits<V2::DataChangeListener> {
+    static ListenerAccess<const V2::DataChangeListener> Access(const V2::DataChangeListener* view)
+    {
+        return ListenerAccess<const V2::DataChangeListener>(view);
+    }
+};
+} // namespace OHOS::Ace
+
 namespace OHOS::Ace::V2 {
 
 typedef struct Operation {
@@ -34,9 +88,11 @@ typedef struct Operation {
     bool reuseImmediately = false;
 } Operation;
 
-class DataChangeListener : virtual public AceType {
-    DECLARE_ACE_TYPE(DataChangeListener, AceType);
+class DataChangeListener : public virtual TypeInfoBase {
+    DECLARE_ACE_TYPE(DataChangeListener, TypeInfoBase);
 public:
+    ~DataChangeListener() override = default;
+
     virtual void OnDataReloaded(bool reuseImmediately = false) = 0;
     virtual void OnDataAdded(size_t index) = 0;
     virtual void OnDataBulkAdded(size_t index, size_t count) = 0;
@@ -48,6 +104,12 @@ public:
     virtual void OnDatasetChange(const std::list<Operation>& DataOperations) = 0;
     virtual void OnDataBulkChanged(size_t index, size_t count) {}
     virtual void OnDataMoveToNewPlace(size_t from, size_t to) {}
+
+private:
+    friend AceType* RefPtrTraits<DataChangeListener>::GetOwner(const DataChangeListener* view);
+
+    // Stable owner for the entire capability lifetime.
+    virtual AceType* GetDataChangeOwner() const = 0;
 };
 
 class ACE_FORCE_EXPORT LazyForEachComponent : public V1::ForEachComponent {
@@ -89,5 +151,12 @@ private:
 };
 
 } // namespace OHOS::Ace::V2
+
+namespace OHOS::Ace {
+inline AceType* RefPtrTraits<V2::DataChangeListener>::GetOwner(const V2::DataChangeListener* view)
+{
+    return view ? view->GetDataChangeOwner() : nullptr;
+}
+} // namespace OHOS::Ace
 
 #endif // FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_V2_FOREACH_LAZY_FOREACH_COMPONENT_H
