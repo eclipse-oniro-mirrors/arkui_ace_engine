@@ -3765,6 +3765,352 @@ HWTEST_F(ListFastScrollerTestNg, FastScrollLaneChangeKeepsScrollingUsable001, Te
     EXPECT_NEAR(pattern_->GetItemRect(0).Top(), 0.0f, 0.1f);
 }
 
+class ListFastScrollMultiLaneTestNg : public ListFastScrollerTestNg,
+    public testing::WithParamInterface<std::tuple<bool, bool, bool, FastScrollMode, ScrollAlign>> {
+protected:
+    static float UnevenItemHeight(int32_t index)
+    {
+        const int32_t row = index / 3;
+        const float base = row < 6 ? 45.0f : (row < 21 ? 400.0f : (row < 32 ? 75.0f : 180.0f));
+        return base + index % UNEVEN_LANE_COUNT * LANE_SIZE_STEP;
+    }
+
+    void CreateUnevenMultiLaneList(bool known, bool stack, bool backward)
+    {
+        auto model = CreateList();
+        model.SetLanes(UNEVEN_LANE_COUNT);
+        model.SetSpace(Dimension(SPACE));
+        model.SetStackFromEnd(stack);
+        model.SetInitialIndex(backward ? UNEVEN_INITIAL_INDEX : 0);
+        std::vector<float> heights;
+        for (int32_t index = 0; index < UNEVEN_ITEM_COUNT; ++index) {
+            CreateListItem();
+            heights.emplace_back(UnevenItemHeight(index));
+            ViewAbstract::SetHeight(CalcLength(heights.back()));
+            ViewStackProcessor::GetInstance()->Pop();
+            ViewStackProcessor::GetInstance()->StopGetAccessRecording();
+        }
+        if (known) {
+            model.GetOrCreateListChildrenMainSize()->ChangeData(0, heights.size(), heights);
+        }
+        CreateDone();
+    }
+
+    void ExpectUnevenLegacyControl(int32_t target, ScrollAlign align, float extra, const std::vector<float>& actual)
+    {
+        ListScrollerTestNg::TearDown();
+        ListScrollerTestNg::SetUp();
+        CreateUnevenMultiLaneList(true, true, true);
+        pattern_->ScrollToIndex(target, false, align, extra);
+        FlushUITasks();
+        std::ostringstream trace;
+        trace << pattern_->GetItemRect(target).Top();
+        EXPECT_NEAR(pattern_->GetItemRect(target).Top(), actual.front(), 0.1f);
+        size_t step = 1;
+        for (float delta : { 23.0f, -46.0f, 23.0f }) {
+            pattern_->ScrollBy(delta);
+            FlushUITasks();
+            const auto top = pattern_->GetItemRect(target).Top();
+            trace << "," << top;
+            EXPECT_NEAR(top, actual.at(step++), 0.1f);
+        }
+        RecordProperty("legacyControlTargetTops", trace.str());
+    }
+};
+
+class ListFastScrollUnevenRowTestNg : public ListFastScrollMultiLaneTestNg {
+public:
+    static std::vector<ParamType> GetRegressionParameters()
+    {
+        std::vector<ParamType> parameters;
+        for (bool known : { false, true }) {
+            for (bool stack : { false, true }) {
+                for (bool backward : { false, true }) {
+                    for (auto mode : { FastScrollMode::SKIP_MEASURE, FastScrollMode::SKIP_CREATE_AND_MEASURE }) {
+                        for (auto align : { ScrollAlign::START, ScrollAlign::CENTER, ScrollAlign::END }) {
+                            // These ordinary-scroll failures are tracked outside this feature.
+                            if (known && stack && backward && align != ScrollAlign::END) {
+                                continue;
+                            }
+                            parameters.emplace_back(known, stack, backward, mode, align);
+                        }
+                    }
+                }
+            }
+        }
+        return parameters;
+    }
+};
+
+/**
+ * @tc.name: FastScrollMultiLaneUnevenRowContinuesScrolling
+ * @tc.desc: Piecewise uneven rows retain their maximum height, target alignment and normal scrolling after fast scroll.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollUnevenRowTestNg, FastScrollMultiLaneUnevenRowContinuesScrolling, TestSize.Level1)
+{
+    const auto [known, stack, backward, mode, align] = GetParam();
+    CreateUnevenMultiLaneList(known, stack, backward);
+    const int32_t target = backward ? 25 : 70;
+    const float extra = backward ? -35.0f : 35.0f;
+    const float rowHeight = UnevenItemHeight(target / 3 * 3 + 2);
+    float top = -extra;
+    if (align == ScrollAlign::END) {
+        top += HEIGHT - rowHeight;
+    } else if (align == ScrollAlign::CENTER) {
+        top += (HEIGHT - rowHeight) / 2.0f;
+    }
+    MockAnimationManager::GetInstance().SetTicks(4);
+    pattern_->ScrollToIndexFastScroll(target, true, align, extra, mode);
+    ASSERT_NO_FATAL_FAILURE(RunFastScrollFrames(64));
+    EXPECT_NEAR(pattern_->GetItemRect(target).Top(), top, 0.1f);
+    EXPECT_NEAR(pattern_->GetItemRect(target).Height(), UnevenItemHeight(target), 0.1f);
+    const int32_t rowStart = target / 3 * 3;
+    for (int32_t index = rowStart; index < rowStart + 3; ++index) {
+        EXPECT_NEAR(pattern_->GetItemRect(index).Top(), top, 0.1f);
+        EXPECT_NEAR(pattern_->GetItemRect(index).Height(), UnevenItemHeight(index), 0.1f);
+    }
+    std::vector<float> actual = { pattern_->GetItemRect(target).Top() };
+    for (float delta : { 23.0f, -46.0f, 23.0f }) {
+        pattern_->ScrollBy(delta);
+        FlushUITasks();
+        top -= delta;
+        EXPECT_NEAR(pattern_->GetItemRect(target).Top(), top, 0.1f);
+        actual.emplace_back(pattern_->GetItemRect(target).Top());
+        EXPECT_FALSE(pattern_->HasFastScrollRequest());
+    }
+    if (known && stack && backward) {
+        ExpectUnevenLegacyControl(target, align, extra, actual);
+    }
+}
+
+/**
+ * @tc.name: FastScrollMultiLaneAlignment
+ * @tc.desc: Whole-row preparation and skipping preserve alignment in both directions, with known sizes and reversal.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollMultiLaneTestNg, FastScrollMultiLaneAlignment, TestSize.Level1)
+{
+    const auto [known, stack, backward, mode, align] = GetParam();
+    auto model = CreateList();
+    model.SetLanes(3);
+    model.SetStackFromEnd(stack);
+    model.SetInitialIndex(backward ? 90 : 0);
+    if (known) {
+        model.GetOrCreateListChildrenMainSize()->UpdateDefaultSize(ITEM_MAIN_SIZE);
+    }
+    CreateListItems(120);
+    CreateDone();
+    const int32_t target = backward ? 25 : 70;
+    const float extra = backward ? -175.0f : 35.0f;
+    MockAnimationManager::GetInstance().SetTicks(4);
+    pattern_->ScrollToIndexFastScroll(target, true, align, extra, mode);
+    ASSERT_TRUE(pattern_->HasFastScrollRequest());
+    RunFastScrollFrames();
+    float expected = target / 3 * ITEM_MAIN_SIZE + extra;
+    if (align == ScrollAlign::END) {
+        expected -= HEIGHT - ITEM_MAIN_SIZE;
+    } else if (align == ScrollAlign::CENTER) {
+        expected -= (HEIGHT - ITEM_MAIN_SIZE) / 2;
+    }
+    EXPECT_NEAR(pattern_->GetTotalOffset(), expected, 0.1f);
+    EXPECT_FALSE(pattern_->HasFastScrollRequest());
+    EXPECT_FALSE(pattern_->AnimateRunning());
+}
+
+INSTANTIATE_TEST_SUITE_P(KnownAndEstimated, ListFastScrollMultiLaneTestNg,
+    testing::Combine(testing::Bool(), testing::Bool(), testing::Bool(),
+        testing::Values(FastScrollMode::SKIP_MEASURE, FastScrollMode::SKIP_CREATE_AND_MEASURE),
+        testing::Values(ScrollAlign::START, ScrollAlign::CENTER, ScrollAlign::END)));
+
+INSTANTIATE_TEST_SUITE_P(KnownAndEstimated, ListFastScrollUnevenRowTestNg,
+    testing::ValuesIn(ListFastScrollUnevenRowTestNg::GetRegressionParameters()),
+    ([](const testing::TestParamInfo<ListFastScrollUnevenRowTestNg::ParamType>& info) {
+        const auto [known, stack, backward, mode, align] = info.param;
+        const int32_t modeIndex = mode == FastScrollMode::SKIP_MEASURE ? 0 : 1;
+        const int32_t alignIndex = align == ScrollAlign::START ? 0 : (align == ScrollAlign::CENTER ? 1 : 2);
+        const int32_t originalIndex = (((known * 2 + stack) * 2 + backward) * 2 + modeIndex) * 3 + alignIndex;
+        return std::to_string(originalIndex);
+    }));
+
+class ListFastScrollMultiLaneGroupTestNg : public ListFastScrollerTestNg,
+    public testing::WithParamInterface<std::tuple<bool, bool, bool, ScrollAlign>> {};
+
+/**
+ * @tc.name: FastScrollMultiLaneGroupTarget
+ * @tc.desc: A group interrupts a partial outer row and its internal multi-lane geometry survives preparation and skip.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollMultiLaneGroupTestNg, FastScrollMultiLaneGroupTarget, TestSize.Level1)
+{
+    const auto [known, stack, backward, align] = GetParam();
+    auto model = CreateList();
+    model.SetLanes(3);
+    model.SetStackFromEnd(stack);
+    model.SetInitialIndex(backward ? 120 : 0);
+    constexpr int32_t groupIndex = 25;
+    constexpr float groupHeight = 29 * ITEM_MAIN_SIZE;
+    if (known) {
+        auto sizes = model.GetOrCreateListChildrenMainSize();
+        sizes->UpdateDefaultSize(ITEM_MAIN_SIZE);
+        sizes->ChangeData(groupIndex, 1, { groupHeight });
+    }
+    CreateListItems(groupIndex);
+    auto group = CreateListItemGroup();
+    if (known) {
+        group.GetOrCreateListChildrenMainSize()->UpdateDefaultSize(ITEM_MAIN_SIZE);
+    }
+    CreateListItems(85);
+    ViewStackProcessor::GetInstance()->Pop();
+    ViewStackProcessor::GetInstance()->StopGetAccessRecording();
+    CreateListItems(95);
+    CreateDone();
+    MockAnimationManager::GetInstance().SetTicks(4);
+    pattern_->ScrollToIndexFastScroll(groupIndex, true, align, 0.0f, FastScrollMode::SKIP_MEASURE);
+    RunFastScrollFrames(64);
+    const auto rect = pattern_->GetItemRect(groupIndex);
+    const float expected = align == ScrollAlign::START ? 0.0f :
+        (align == ScrollAlign::END ? HEIGHT - groupHeight : (HEIGHT - groupHeight) / 2);
+    EXPECT_NEAR(rect.Height(), groupHeight, 0.1f);
+    EXPECT_NEAR(rect.Top(), expected, 0.1f);
+    EXPECT_FALSE(pattern_->HasFastScrollRequest());
+}
+
+INSTANTIATE_TEST_SUITE_P(MixedOuterRows, ListFastScrollMultiLaneGroupTestNg,
+    testing::Combine(testing::Bool(), testing::Bool(), testing::Bool(),
+        testing::Values(ScrollAlign::START, ScrollAlign::CENTER, ScrollAlign::END)));
+
+class ListFastScrollKnownGroupControlTestNg : public ListFastScrollerTestNg,
+    public testing::WithParamInterface<ScrollAlign> {};
+
+/**
+ * @tc.name: LegacyKnownStackGroupAlignmentControl
+ * @tc.desc: The ordinary API controls the existing CMS reversal geometry without invoking FastScroll.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollKnownGroupControlTestNg, LegacyKnownStackGroupAlignmentControl, TestSize.Level1)
+{
+    auto model = CreateList();
+    model.SetLanes(3);
+    model.SetStackFromEnd(true);
+    model.SetInitialIndex(120);
+    auto sizes = model.GetOrCreateListChildrenMainSize();
+    sizes->UpdateDefaultSize(ITEM_MAIN_SIZE);
+    sizes->ChangeData(25, 1, { 29 * ITEM_MAIN_SIZE });
+    CreateListItems(25);
+    auto group = CreateListItemGroup();
+    group.GetOrCreateListChildrenMainSize()->UpdateDefaultSize(ITEM_MAIN_SIZE);
+    CreateListItems(85);
+    ViewStackProcessor::GetInstance()->Pop();
+    ViewStackProcessor::GetInstance()->StopGetAccessRecording();
+    CreateListItems(95);
+    CreateDone();
+    MockAnimationManager::GetInstance().SetTicks(4);
+    pattern_->ScrollToIndex(25, true, GetParam());
+    FlushUITasks();
+    ASSERT_NO_FATAL_FAILURE(RunFastScrollFrames(64));
+    const auto rect = pattern_->GetItemRect(25);
+    const float expected = GetParam() == ScrollAlign::START ? 0.0f : HEIGHT - 29 * ITEM_MAIN_SIZE;
+    EXPECT_NEAR(rect.Height(), 29 * ITEM_MAIN_SIZE, 0.1f);
+    EXPECT_NEAR(rect.Top(), expected, 0.1f);
+    EXPECT_FALSE(pattern_->HasFastScrollRequest());
+}
+
+INSTANTIATE_TEST_SUITE_P(OriginalCMS, ListFastScrollKnownGroupControlTestNg,
+    testing::Values(ScrollAlign::START, ScrollAlign::END),
+    ([](const testing::TestParamInfo<ScrollAlign>& info) {
+        return std::to_string(info.param == ScrollAlign::START ? 0 : 2);
+    }));
+
+/**
+ * @tc.name: FastScrollMultiLaneHomogeneousGroups
+ * @tc.desc: The no-build mode treats every Group as one outer row and keeps internal lanes, spacing and headers.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollMultiLaneGroupTestNg, FastScrollMultiLaneHomogeneousGroups, TestSize.Level1)
+{
+    const auto [known, stack, backward, align] = GetParam();
+    auto model = CreateList();
+    model.SetLanes(3);
+    model.SetStackFromEnd(stack);
+    model.SetInitialIndex(backward ? 60 : 0);
+    constexpr float groupHeight = 3 * ITEM_MAIN_SIZE + 2 * SPACE + 2 * GROUP_HEADER_LEN;
+    if (known) {
+        model.GetOrCreateListChildrenMainSize()->UpdateDefaultSize(groupHeight);
+    }
+    for (int32_t index = 0; index < 70; ++index) {
+        auto group = CreateListItemGroup();
+        group.SetSpace(Dimension(SPACE));
+        group.SetHeader(GetRowOrColBuilder(FILL_LENGTH, Dimension(GROUP_HEADER_LEN)));
+        group.SetFooter(GetRowOrColBuilder(FILL_LENGTH, Dimension(GROUP_HEADER_LEN)));
+        if (known) {
+            group.GetOrCreateListChildrenMainSize()->UpdateDefaultSize(ITEM_MAIN_SIZE);
+        }
+        CreateListItems(7);
+        ViewStackProcessor::GetInstance()->Pop();
+        ViewStackProcessor::GetInstance()->StopGetAccessRecording();
+    }
+    CreateDone();
+    const int32_t target = backward ? 10 : 40;
+    MockAnimationManager::GetInstance().SetTicks(4);
+    pattern_->ScrollToIndexFastScroll(target, true, align, 0.0f, FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    ASSERT_NO_FATAL_FAILURE(RunFastScrollFrames(64));
+    const float top = align == ScrollAlign::START ? 0.0f :
+        (align == ScrollAlign::END ? HEIGHT - groupHeight : (HEIGHT - groupHeight) / 2.0f);
+    EXPECT_NEAR(pattern_->GetItemRect(target).Top(), top, 0.1f);
+    EXPECT_NEAR(pattern_->GetItemRect(target).Height(), groupHeight, 0.1f);
+    pattern_->ScrollBy(23.0f);
+    FlushUITasks();
+    EXPECT_NEAR(pattern_->GetItemRect(target).Top(), top - 23.0f, 0.1f);
+    EXPECT_FALSE(pattern_->HasFastScrollRequest());
+}
+
+/**
+ * @tc.name: FastScrollWaitingLayoutStop001
+ * @tc.desc: Cancellation after the physical animation ends still closes the logical request.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollerTestNg, FastScrollWaitingLayoutStop001, TestSize.Level1)
+{
+    CreateList();
+    CreateListItems(100);
+    CreateDone();
+    pattern_->ScrollToIndexFastScroll(80, true, ScrollAlign::START, std::nullopt,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    FlushUITasks();
+    pattern_->StopAnimation(pattern_->springAnimation_);
+    ASSERT_FALSE(pattern_->HasFastScrollRequest());
+    EXPECT_TRUE(pattern_->scrollStop_);
+    pattern_->StopAnimate();
+    EXPECT_FALSE(pattern_->HasFastScrollRequest());
+    EXPECT_TRUE(pattern_->scrollStop_);
+    FlushUITasks();
+    EXPECT_FALSE(pattern_->AnimateRunning());
+    EXPECT_FALSE(pattern_->HasFastScrollRequest());
+}
+
+/**
+ * @tc.name: FastScrollLargeGroupCenter001
+ * @tc.desc: A target group may be fully measured for exact center alignment after an estimated start.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollerTestNg, FastScrollLargeGroupCenter001, TestSize.Level1)
+{
+    CreateList();
+    CreateListItems(5);
+    CreateListItemGroups(1, V2::ListItemGroupStyle::NONE, 100);
+    CreateListItems(5);
+    CreateDone();
+    MockAnimationManager::GetInstance().SetTicks(4);
+    pattern_->ScrollToIndexFastScroll(5, true, ScrollAlign::CENTER, std::nullopt,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    RunFastScrollFrames();
+    ASSERT_EQ(pattern_->itemPosition_.count(5), 1);
+    const float alignedTop = (pattern_->contentMainSize_ - 100 * ITEM_MAIN_SIZE) / 2;
+    EXPECT_NEAR(pattern_->GetItemRect(5).Top(), alignedTop, 0.1f);
+    EXPECT_NEAR(pattern_->GetTotalOffset(), 5 * ITEM_MAIN_SIZE - alignedTop, 0.1f);
+}
+
 void ListScrollerTestNg::CreateGroupWithSettingChildrenMainSize(int32_t groupNumber)
 {
     for (int32_t index = 0; index < groupNumber; ++index) {
@@ -5700,6 +6046,1248 @@ HWTEST_F(ListScrollerTestNg, GetBindingFrameNodeId001, TestSize.Level1)
      */
     auto nodeId = positionController_->GetBindingFrameNodeId();
     EXPECT_EQ(nodeId, frameNode_->GetId());
+}
+
+class ListFastScrollLayoutHandoffTestNg : public ListFastScrollerTestNg {
+protected:
+    RefPtr<ListLayoutAlgorithm> CreateHandoffResult(bool complete)
+    {
+        CreateList();
+        CreateListItems(FAST_SCROLL_ITEM_COUNT);
+        CreateDone();
+        pattern_->InitializeFastScrollRequest(FAST_SCROLL_TARGET_INDEX, ScrollAlign::START, 25.0f,
+            FastScrollMode::SKIP_CREATE_AND_MEASURE);
+        auto algorithm = AceType::MakeRefPtr<ListLayoutAlgorithm>();
+        algorithm->SetFastScrollTarget(FAST_SCROLL_TARGET_INDEX, ScrollAlign::START);
+        algorithm->SetFastScrollPreparationOffset(25.0f);
+        algorithm->GetOrCreateFastScrollState().result.measuredSizes[FAST_SCROLL_TARGET_INDEX] = { 250.0f };
+        algorithm->GetOrCreateFastScrollState().result.status = complete ?
+            FastScrollMeasureStatus::COMPLETE : FastScrollMeasureStatus::PENDING;
+        return algorithm;
+    }
+};
+
+/**
+ * @tc.name: FastScrollPartialLayoutPublishesMeasuredSizes001
+ * @tc.desc: Interrupted layout publishes partial sizes without starting an animation or reporting displacement.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollLayoutHandoffTestNg, FastScrollPartialLayoutPublishesMeasuredSizes001, TestSize.Level1)
+{
+    auto algorithm = CreateHandoffResult(false);
+    pattern_->prevMeasureBreak_ = true;
+    EXPECT_FLOAT_EQ(pattern_->UpdateTotalOffset(algorithm, false), 0.0f);
+    EXPECT_FLOAT_EQ(pattern_->posMap_->GetPositionInfo(60).mainSize, 250.0f);
+    EXPECT_EQ(pattern_->GetFastScrollPreparation()->preparation, FastScrollPreparation::NEED_WINDOW);
+    EXPECT_FALSE(pattern_->AnimateRunning());
+    EXPECT_TRUE(pattern_->HasFastScrollRequest());
+}
+
+/**
+ * @tc.name: FastScrollLayoutPublishesAfterNormalReestimate001
+ * @tc.desc: Normal reestimation cannot erase the prepared target size or its connected positions.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollLayoutHandoffTestNg, FastScrollLayoutPublishesAfterNormalReestimate001, TestSize.Level1)
+{
+    auto algorithm = CreateHandoffResult(true);
+    pattern_->needReEstimateOffset_ = true;
+    EXPECT_FLOAT_EQ(pattern_->UpdateTotalOffset(algorithm, false), 0.0f);
+    ASSERT_TRUE(pattern_->HasFastScrollRequest());
+    EXPECT_FLOAT_EQ(pattern_->posMap_->GetPositionInfo(60).mainSize, 250.0f);
+    EXPECT_EQ(pattern_->GetFastScrollPreparation()->preparation, FastScrollPreparation::READY);
+    EXPECT_TRUE(pattern_->GetFastScrollPreparation()->estimated);
+    EXPECT_FALSE(pattern_->AnimateRunning());
+    EXPECT_TRUE(std::isfinite(pattern_->posMap_->GetPositionInfo(60).mainPos));
+}
+
+/**
+ * @tc.name: FastScrollPreparationCorrectionIsNotScrollDisplacement001
+ * @tc.desc: Connecting a negative prepared prefix adjusts the origin without reporting it in this or next frame.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollLayoutHandoffTestNg, FastScrollPreparationCorrectionIsNotScrollDisplacement001, TestSize.Level1)
+{
+    auto algorithm = CreateHandoffResult(true);
+    pattern_->itemPosition_.clear();
+    pattern_->itemPosition_[10] = { -1, 0.0f, 100.0f, false };
+    pattern_->itemPosition_[11] = { -1, 100.0f, 200.0f, false };
+    pattern_->currentOffset_ = 1000.0f;
+    pattern_->posMap_->ClearPosMap();
+    pattern_->posMap_->UpdatePos(10, { 1000.0f, 100.0f });
+    algorithm->GetOrCreateFastScrollState().result.measuredSizes[2] = { 2000.0f };
+    EXPECT_FLOAT_EQ(pattern_->UpdateTotalOffset(algorithm, false), 0.0f);
+    ASSERT_TRUE(pattern_->HasFastScrollRequest());
+    EXPECT_GT(pattern_->GetTotalOffset(), 1000.0f);
+    EXPECT_FLOAT_EQ(pattern_->posMap_->GetPositionInfo(10).mainPos, pattern_->GetTotalOffset());
+    EXPECT_FLOAT_EQ(pattern_->posMap_->GetPositionInfo(2).mainSize, 2000.0f);
+    const float corrected = pattern_->GetTotalOffset();
+    auto next = AceType::MakeRefPtr<ListLayoutAlgorithm>();
+    next->SetFastScrollTarget(60, ScrollAlign::START);
+    EXPECT_FLOAT_EQ(pattern_->UpdateTotalOffset(next, false), 0.0f);
+    EXPECT_FLOAT_EQ(pattern_->GetTotalOffset(), corrected);
+    EXPECT_FALSE(pattern_->AnimateRunning());
+}
+
+/**
+ * @tc.name: FastScrollRunningTargetUpdatesWithoutCoordinateCorrection001
+ * @tc.desc: Running animation checks the refreshed endpoint even when the visible origin is unchanged.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollLayoutHandoffTestNg,
+    FastScrollRunningTargetUpdatesWithoutCoordinateCorrection001, TestSize.Level1)
+{
+    CreateList();
+    CreateListItems(100);
+    CreateDone();
+    pattern_->ScrollToIndexFastScroll(60, true, ScrollAlign::START, 0.0f,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    FlushUITasks();
+    ASSERT_TRUE(pattern_->HasFastScrollRequest());
+    ASSERT_TRUE(pattern_->AnimateRunning());
+    const float endpoint = pattern_->GetFinalPosition();
+    auto info = pattern_->posMap_->GetPositionInfo(60);
+    info.mainPos += 120.0f;
+    pattern_->posMap_->UpdatePos(60, info);
+    auto algorithm = AceType::MakeRefPtr<ListLayoutAlgorithm>();
+    algorithm->SetFastScrollTarget(60, ScrollAlign::START);
+    EXPECT_FLOAT_EQ(pattern_->UpdateTotalOffset(algorithm, false), 0.0f);
+    EXPECT_FLOAT_EQ(pattern_->GetFinalPosition(), endpoint + 120.0f);
+    EXPECT_FALSE(pattern_->GetFastScrollPreparation()->NeedsPreparation());
+    EXPECT_TRUE(pattern_->AnimateRunning());
+}
+
+/**
+ * @tc.name: FastScrollNewCountWaitsForCurrentLayout001
+ * @tc.desc: A target added after the previous layout is not rejected by the previous maximum index.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollerTestNg, FastScrollNewCountWaitsForCurrentLayout001, TestSize.Level1)
+{
+    CreateList();
+    CreateListItems(100);
+    CreateDone();
+    const int32_t oldMaximum = pattern_->maxListItemIndex_;
+    auto added = FrameNode::CreateFrameNode(V2::LIST_ITEM_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<ListItemPattern>(nullptr));
+    added->GetLayoutProperty()->UpdateUserDefinedIdealSize(
+        CalcSize(CalcLength(FILL_LENGTH), CalcLength(ITEM_MAIN_SIZE)));
+    added->MountToParent(frameNode_);
+    frameNode_->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+    ASSERT_EQ(frameNode_->GetTotalChildCount(), oldMaximum + 2);
+    pattern_->ScrollToIndexFastScroll(oldMaximum + 1, true, ScrollAlign::START, 0.0f,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    ASSERT_TRUE(pattern_->HasFastScrollRequest());
+    EXPECT_EQ(pattern_->GetFastScrollRequest()->index, oldMaximum + 1);
+    EXPECT_FALSE(pattern_->AnimateRunning());
+    ASSERT_NO_FATAL_FAILURE(RunFastScrollFrames());
+    EXPECT_EQ(pattern_->GetEndIndexInItemPosition(), oldMaximum + 1);
+    EXPECT_TRUE(pattern_->IsAtBottom());
+}
+
+/**
+ * @tc.name: FastScrollPreparedResultWaitsForStartStage001
+ * @tc.desc: Data handoff prepares positions; the initialized geometry stage starts the first animation.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollLayoutHandoffTestNg, FastScrollPreparedResultWaitsForStartStage001, TestSize.Level1)
+{
+    auto algorithm = CreateHandoffResult(true);
+    pattern_->UpdateTotalOffset(algorithm, false);
+    ASSERT_TRUE(pattern_->HasFastScrollRequest());
+    EXPECT_EQ(pattern_->GetFastScrollPreparation()->preparation, FastScrollPreparation::READY);
+    EXPECT_FALSE(pattern_->AnimateRunning());
+    EXPECT_FLOAT_EQ(pattern_->GetFastScrollRequest()->viewportSize, 0.0f);
+    pattern_->TryStartFastScroll();
+    ASSERT_TRUE(pattern_->AnimateRunning());
+    EXPECT_FLOAT_EQ(pattern_->GetFastScrollRequest()->viewportSize, pattern_->contentMainSize_);
+    EXPECT_NEAR(pattern_->GetFinalPosition(),
+        pattern_->posMap_->GetPositionInfo(60).mainPos + 25.0f, 0.1f);
+}
+
+/**
+ * @tc.name: FastScrollOffscreenTargetUsesPreparedSample001
+ * @tc.desc: Entry does not fill the table; preparation contributes to the mean without replacing measured sizes.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollLayoutHandoffTestNg, FastScrollOffscreenTargetUsesPreparedSample001, TestSize.Level1)
+{
+    auto algorithm = CreateHandoffResult(true);
+    pattern_->posMap_->ClearPosMap();
+    pattern_->UpdatePosMap(pattern_->itemPosition_);
+    pattern_->ScrollToIndexFastScroll(60, true, ScrollAlign::START, 25.0f,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    ASSERT_TRUE(pattern_->HasFastScrollRequest());
+    EXPECT_FALSE(pattern_->AnimateRunning());
+    EXPECT_EQ(pattern_->GetFastScrollPreparation()->preparation, FastScrollPreparation::NEED_WINDOW);
+    EXPECT_TRUE(Negative(pattern_->posMap_->GetPositionInfo(59).mainSize));
+
+    algorithm->GetOrCreateFastScrollState().result.measuredSizes[60] = { 5000.0f };
+    const float count = pattern_->itemPosition_.size();
+    const float sample = (count * ITEM_MAIN_SIZE + 5000.0f) / (count + 1.0f);
+    pattern_->UpdateTotalOffset(algorithm, false);
+    EXPECT_FLOAT_EQ(pattern_->posMap_->GetPositionInfo(59).mainSize, sample);
+    EXPECT_FLOAT_EQ(pattern_->posMap_->GetPositionInfo(0).mainSize, ITEM_MAIN_SIZE);
+    EXPECT_FLOAT_EQ(pattern_->posMap_->GetPositionInfo(60).mainSize, 5000.0f);
+    for (int32_t index = 1; index <= 60; ++index) {
+        const auto previous = pattern_->posMap_->GetPositionInfo(index - 1);
+        EXPECT_NEAR(pattern_->posMap_->GetPositionInfo(index).mainPos,
+            previous.mainPos + previous.mainSize, 0.1f);
+    }
+    EXPECT_EQ(pattern_->GetFastScrollPreparation()->preparation, FastScrollPreparation::READY);
+    EXPECT_FALSE(pattern_->AnimateRunning());
+}
+
+class ListFastScrollPreparedNeighborTestNg : public ListFastScrollLayoutHandoffTestNg,
+    public testing::WithParamInterface<int32_t> {};
+
+/**
+ * @tc.name: FastScrollPreparedLargeNeighborUsesUpdatedSample001
+ * @tc.desc: Ordinary, Group and Lazy whole sizes contribute to missing-item estimates and retain their own sizes.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollPreparedNeighborTestNg, FastScrollPreparedLargeNeighborUsesUpdatedSample001, TestSize.Level1)
+{
+    auto algorithm = CreateHandoffResult(true);
+    pattern_->posMap_->ClearPosMap();
+    pattern_->UpdatePosMap(pattern_->itemPosition_);
+    pattern_->ScrollToIndexFastScroll(60, true, ScrollAlign::START, 25.0f,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    ASSERT_TRUE(pattern_->HasFastScrollRequest());
+    EXPECT_FALSE(pattern_->AnimateRunning());
+    algorithm->GetOrCreateFastScrollState().result.measuredSizes[61] = { 1000000.0f, GetParam() == 1, GetParam() == 2 };
+    const float count = pattern_->itemPosition_.size();
+    const float sample = (count * ITEM_MAIN_SIZE + 250.0f + 1000000.0f) / (count + 2.0f);
+    pattern_->UpdateTotalOffset(algorithm, false);
+    EXPECT_FLOAT_EQ(pattern_->posMap_->GetPositionInfo(59).mainSize, sample);
+    EXPECT_FLOAT_EQ(pattern_->posMap_->GetPositionInfo(0).mainSize, ITEM_MAIN_SIZE);
+    EXPECT_FLOAT_EQ(pattern_->posMap_->GetPositionInfo(60).mainSize, 250.0f);
+    const auto neighbor = pattern_->posMap_->GetPositionInfo(61);
+    EXPECT_FLOAT_EQ(neighbor.mainSize, 1000000.0f);
+    EXPECT_EQ(neighbor.isGroup, GetParam() == 1);
+    EXPECT_EQ(neighbor.isLazyChild, GetParam() == 2);
+    EXPECT_FLOAT_EQ(neighbor.mainPos, pattern_->posMap_->GetPositionInfo(60).mainPos + 250.0f);
+    EXPECT_EQ(pattern_->GetFastScrollPreparation()->preparation, FastScrollPreparation::READY);
+    EXPECT_FALSE(pattern_->AnimateRunning());
+}
+
+INSTANTIATE_TEST_SUITE_P(SectionKind, ListFastScrollPreparedNeighborTestNg, testing::Values(0, 1, 2));
+
+class ListFastScrollKnownStartTestNg : public ListFastScrollerTestNg,
+    public testing::WithParamInterface<std::tuple<bool, ScrollAlign, float, FastScrollMode, int32_t>> {};
+
+/**
+ * @tc.name: FastScrollKnownSizeStartsWithoutPreparation001
+ * @tc.desc: Exact sizes start at entry or the first normal layout, without preparing the target or offset window.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollKnownStartTestNg, FastScrollKnownSizeStartsWithoutPreparation001, TestSize.Level1)
+{
+    const auto [layouted, align, extraOffset, mode, lanes] = GetParam();
+    auto model = CreateList();
+    model.SetLanes(lanes);
+    model.GetOrCreateListChildrenMainSize()->UpdateDefaultSize(ITEM_MAIN_SIZE);
+    CreateListItems(100);
+    if (layouted) {
+        CreateDone();
+    }
+    MockAnimationManager::GetInstance().SetTicks(4);
+    pattern_->ScrollToIndexFastScroll(80, true, align, extraOffset, mode);
+    ASSERT_TRUE(pattern_->HasFastScrollRequest());
+    EXPECT_EQ(pattern_->GetFastScrollPreparation()->preparation, FastScrollPreparation::READY);
+    EXPECT_EQ(pattern_->AnimateRunning(), layouted);
+    auto algorithm = AceType::DynamicCast<ListLayoutAlgorithm>(pattern_->CreateLayoutAlgorithm());
+    ASSERT_NE(algorithm, nullptr);
+    EXPECT_FALSE(algorithm->HasFastScrollPreparationRequest());
+    if (!layouted) {
+        CreateDone();
+        EXPECT_TRUE(pattern_->AnimateRunning());
+    }
+    EXPECT_FALSE(pattern_->GetFastScrollPreparation()->estimated);
+    ASSERT_NO_FATAL_FAILURE(RunFastScrollFrames());
+    float position = (80 / lanes) * ITEM_MAIN_SIZE + extraOffset;
+    if (align == ScrollAlign::END || align == ScrollAlign::AUTO) {
+        position += ITEM_MAIN_SIZE - HEIGHT;
+    } else if (align == ScrollAlign::CENTER) {
+        position += (ITEM_MAIN_SIZE - HEIGHT) / 2.0f;
+    }
+    EXPECT_NEAR(pattern_->GetTotalOffset(), position, 0.1f);
+    EXPECT_FLOAT_EQ(pattern_->posMap_->GetPositionInfo(80).mainSize, ITEM_MAIN_SIZE);
+}
+
+INSTANTIATE_TEST_SUITE_P(ExactTable, ListFastScrollKnownStartTestNg,
+    testing::Combine(testing::Bool(),
+        testing::Values(ScrollAlign::START, ScrollAlign::END, ScrollAlign::CENTER, ScrollAlign::AUTO),
+        testing::Values(0.0f, 25.0f, -25.0f),
+        testing::Values(FastScrollMode::SKIP_MEASURE, FastScrollMode::SKIP_CREATE_AND_MEASURE),
+        testing::Values(1, 2, 3)));
+
+class ListFastScrollKnownMixedStartTestNg : public ListFastScrollerTestNg,
+    public testing::WithParamInterface<std::tuple<int32_t, ScrollAlign, float, FastScrollMode>> {
+protected:
+    void CreateKnownMixedList(int32_t lanes)
+    {
+        if (lanes <= 0) {
+            FAIL() << "Lane count must be positive.";
+        }
+        auto model = CreateList();
+        model.SetLanes(lanes);
+        std::vector<float> sizes(FAST_SCROLL_ITEM_COUNT, ITEM_MAIN_SIZE);
+        for (int32_t index = 0; index < FAST_SCROLL_ITEM_COUNT; ++index) {
+            if (index % KNOWN_GROUP_PERIOD != KNOWN_GROUP_REMAINDER) {
+                CreateListItems(1);
+                continue;
+            }
+            auto group = CreateListItemGroup();
+            group.GetOrCreateListChildrenMainSize()->UpdateDefaultSize(ITEM_MAIN_SIZE);
+            CreateListItems(KNOWN_GROUP_CHILD_COUNT);
+            ViewStackProcessor::GetInstance()->Pop();
+            ViewStackProcessor::GetInstance()->StopGetAccessRecording();
+            sizes[index] = ((KNOWN_GROUP_CHILD_COUNT + lanes - 1) / lanes) * ITEM_MAIN_SIZE;
+        }
+        model.GetOrCreateListChildrenMainSize()->ChangeData(0, 0, sizes);
+        CreateDone();
+    }
+};
+
+/**
+ * @tc.name: FastScrollKnownDirectMixedUsesOriginalTable
+ * @tc.desc: Direct Group and ordinary CMS children use the original exact table without Fast preparation.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollKnownMixedStartTestNg, FastScrollKnownDirectMixedUsesOriginalTable, TestSize.Level1)
+{
+    const auto [lanes, align, extraOffset, mode] = GetParam();
+    CreateKnownMixedList(lanes);
+    const auto target = pattern_->posMap_->GetPositionInfo(80);
+    ASSERT_EQ(GetChildFrameNode(frameNode_, 80)->GetTag(), V2::LIST_ITEM_GROUP_ETS_TAG);
+    ASSERT_FALSE(Negative(target.mainSize));
+    float expected = target.mainPos + extraOffset;
+    if (align == ScrollAlign::END || align == ScrollAlign::AUTO) {
+        expected += target.mainSize - HEIGHT;
+    } else if (align == ScrollAlign::CENTER) {
+        expected += (target.mainSize - HEIGHT) / 2.0f;
+    }
+    MockAnimationManager::GetInstance().SetTicks(4);
+    pattern_->ScrollToIndexFastScroll(80, true, align, extraOffset, mode);
+    ASSERT_TRUE(pattern_->HasFastScrollRequest());
+    ASSERT_NE(pattern_->GetFastScrollPreparation(), nullptr);
+    EXPECT_EQ(pattern_->GetFastScrollPreparation()->preparation, FastScrollPreparation::READY);
+    EXPECT_TRUE(pattern_->AnimateRunning());
+    auto algorithm = AceType::DynamicCast<ListLayoutAlgorithm>(pattern_->CreateLayoutAlgorithm());
+    ASSERT_NE(algorithm, nullptr);
+    EXPECT_FALSE(algorithm->HasFastScrollPreparationRequest());
+    ASSERT_NO_FATAL_FAILURE(RunFastScrollFrames());
+    EXPECT_NEAR(pattern_->GetTotalOffset(), expected, 0.1f);
+    EXPECT_NEAR(pattern_->GetItemRect(80).Top(), target.mainPos - expected, 0.1f);
+}
+
+INSTANTIATE_TEST_SUITE_P(ExactMixedTable, ListFastScrollKnownMixedStartTestNg,
+    testing::Combine(testing::Values(1, 2, 3),
+        testing::Values(ScrollAlign::START, ScrollAlign::END, ScrollAlign::CENTER, ScrollAlign::AUTO),
+        testing::Values(0.0f, 25.0f, -25.0f),
+        testing::Values(FastScrollMode::SKIP_MEASURE, FastScrollMode::SKIP_CREATE_AND_MEASURE)));
+
+class MixedFastScrollLazyBuilder final : public ListItemMockLazy {
+public:
+    explicit MixedFastScrollLazyBuilder(int32_t lanes, bool conditional = false)
+        : ListItemMockLazy(MIXED_ITEM_COUNT, MIXED_DEFAULT_SIZE), lanes_(lanes), conditional_(conditional) {}
+
+protected:
+    std::pair<std::string, RefPtr<UINode>> OnGetChildByIndex(
+        int32_t index, std::unordered_map<std::string, LazyForEachCacheChild>& expiringItems) override
+    {
+        if (index % FIRST_GROUP_PERIOD != FIRST_GROUP_REMAINDER &&
+            index % SECOND_GROUP_PERIOD != SECOND_GROUP_REMAINDER) {
+            return WrapConditional(ListItemMockLazy::OnGetChildByIndex(index, expiringItems));
+        }
+        auto stack = ViewStackProcessor::GetInstance();
+        stack->StartGetAccessRecordingFor(ElementRegister::GetInstance()->MakeUniqueId());
+        ListItemGroupModelNG group;
+        group.Create({});
+        group.GetOrCreateListChildrenMainSize()->UpdateDefaultSize(40.0f);
+        stack->StopGetAccessRecording();
+        for (int32_t child = 0; child < lanes_ * MIXED_GROUP_ROW_COUNT; ++child) {
+            stack->StartGetAccessRecordingFor(ElementRegister::GetInstance()->MakeUniqueId());
+            ListItemModelNG item;
+            item.Create();
+            ViewAbstract::SetHeight(CalcLength(40.0f));
+            stack->Pop();
+            stack->StopGetAccessRecording();
+        }
+        return WrapConditional({ std::to_string(index), stack->Finish() });
+    }
+
+private:
+    std::pair<std::string, RefPtr<UINode>> WrapConditional(std::pair<std::string, RefPtr<UINode>> item) const
+    {
+        if (conditional_) {
+            auto branch = IfElseNode::GetOrCreateIfElseNode(ElementRegister::GetInstance()->MakeUniqueId());
+            item.second->MountToParent(branch);
+            item.second = branch;
+        }
+        return item;
+    }
+
+    int32_t lanes_;
+    bool conditional_;
+};
+
+class ListMixedFastScrollTestNg : public ListFastScrollerTestNg,
+    public testing::WithParamInterface<std::tuple<bool, bool, int32_t>> {
+protected:
+    void RunMixedLazyScroll(bool stackFromEnd);
+
+    std::string DescribeMixedWindow() const
+    {
+        std::ostringstream stream;
+        stream << " offset=" << pattern_->GetTotalOffset();
+        for (const auto& [index, item] : pattern_->itemPosition_) {
+            stream << " [" << index << ":" << item.startPos << "," << item.endPos << "," << item.isGroup << "]";
+        }
+        for (const auto& [start, end] : pattern_->lanesItemRange_) {
+            stream << " rowRange=" << start << "," << end;
+        }
+        return stream.str();
+    }
+};
+
+void ListMixedFastScrollTestNg::RunMixedLazyScroll(bool stackFromEnd)
+{
+    const auto [known, backward, lanes] = GetParam();
+    auto model = CreateList();
+    model.SetLanes(lanes);
+    model.SetStackFromEnd(stackFromEnd);
+    model.SetEdgeEffect(EdgeEffect::NONE, false);
+    model.SetInitialIndex(backward ? MIXED_INITIAL_INDEX : 0);
+    if (known) {
+        model.GetOrCreateListChildrenMainSize()->UpdateDefaultSize(80.0f);
+    }
+    auto builder = AceType::MakeRefPtr<MixedFastScrollLazyBuilder>(lanes, !known);
+    if (known) {
+        CreateDirectBuilderItems(builder, MIXED_ITEM_COUNT);
+    } else {
+        auto stack = ViewStackProcessor::GetInstance();
+        stack->StartGetAccessRecordingFor(GetElmtId());
+        LazyForEachModelNG lazy;
+        lazy.Create(RefPtr<LazyForEachBuilder>(builder));
+        stack->Pop();
+        stack->StopGetAccessRecording();
+    }
+    CreateDone();
+    MockAnimationManager::GetInstance().SetTicks(ANIMATION_TICKS);
+    pattern_->ScrollToIndexFastScroll(MIXED_TARGET_INDEX, true, ScrollAlign::START, 0.0f, FastScrollMode::SKIP_MEASURE);
+    ASSERT_NO_FATAL_FAILURE(RunFastScrollFrames(MIXED_MAX_ANIMATION_FRAMES));
+    ASSERT_FALSE(pattern_->GetFastScrollRequest());
+    EXPECT_NEAR(pattern_->GetItemRect(MIXED_TARGET_INDEX).Top(), 0.0f, 0.1f);
+    for (int32_t step = 0; step < MIXED_ORDINARY_SCROLL_STEPS; ++step) {
+        const int32_t anchor = pattern_->GetEndIndex();
+        const float previous = pattern_->GetItemRect(anchor).Top();
+        SCOPED_TRACE("before" + DescribeMixedWindow());
+        pattern_->UpdateCurrentOffset(-MIXED_SCROLL_STEP, SCROLL_FROM_UPDATE);
+        FlushUITasks();
+        EXPECT_NEAR(pattern_->GetItemRect(anchor).Top(), previous - MIXED_SCROLL_STEP, 0.1f)
+            << "step=" << step << " after" << DescribeMixedWindow();
+        if (step < INITIAL_SCROLL_SAMPLE_COUNT) {
+            EXPECT_NEAR(pattern_->GetItemRect(MIXED_TARGET_INDEX).Top(), -(step + 1) * MIXED_SCROLL_STEP, 0.1f);
+        }
+    }
+}
+
+/**
+ * @tc.name: FastScrollMixedLazyCompletesAndContinues
+ * @tc.desc: Mixed lazy rows finish SKIP_MEASURE and remain scrollable across subsequent Group boundaries.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListMixedFastScrollTestNg, FastScrollMixedLazyCompletesAndContinues, TestSize.Level1)
+{
+    ASSERT_NO_FATAL_FAILURE(RunMixedLazyScroll(false));
+}
+
+INSTANTIATE_TEST_SUITE_P(KnownAndEstimated, ListMixedFastScrollTestNg,
+    testing::Combine(testing::Bool(), testing::Bool(), testing::Values(2, 3, 4)));
+
+class ListMixedFastScrollStackTestNg : public ListMixedFastScrollTestNg {};
+
+/**
+ * @tc.name: FastScrollMixedLazyStackCompletesAndContinues
+ * @tc.desc: Stack-from-end mixed lazy rows also retain confirmed boundaries after FastScroll stops.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListMixedFastScrollStackTestNg, FastScrollMixedLazyStackCompletesAndContinues, TestSize.Level1)
+{
+    ASSERT_NO_FATAL_FAILURE(RunMixedLazyScroll(true));
+}
+
+INSTANTIATE_TEST_SUITE_P(KnownAndEstimated, ListMixedFastScrollStackTestNg,
+    testing::Combine(testing::Bool(), testing::Bool(), testing::Values(2, 3, 4)));
+
+class ListFastScrollKnownLegacyMixedTestNg : public ListFastScrollerTestNg,
+    public testing::WithParamInterface<std::tuple<FastScrollMode, bool>> {};
+
+/**
+ * @tc.name: LegacyKnownDirectMixedStackAlignmentControl001
+ * @tc.desc: Compare the original controller with the same direct CMS mixed rows and initial window.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollerTestNg, LegacyKnownDirectMixedStackAlignmentControl001, TestSize.Level1)
+{
+    auto model = CreateList();
+    model.SetLanes(4);
+    model.SetStackFromEnd(true);
+    model.SetEdgeEffect(EdgeEffect::NONE, false);
+    model.SetInitialIndex(150);
+    model.GetOrCreateListChildrenMainSize()->UpdateDefaultSize(80.0f);
+    CreateDirectBuilderItems(AceType::MakeRefPtr<MixedFastScrollLazyBuilder>(4), 360);
+    CreateDone();
+    MockAnimationManager::GetInstance().SetTicks(ANIMATION_TICKS);
+    pattern_->ScrollToIndex(144, true, ScrollAlign::START);
+    FlushUITasks();
+    ASSERT_NO_FATAL_FAILURE(RunFastScrollFrames(MIXED_MAX_ANIMATION_FRAMES));
+    EXPECT_NEAR(pattern_->GetItemRect(MIXED_TARGET_INDEX).Top(), 0.0f, 0.1f);
+    for (int32_t step = 0; step < MIXED_ORDINARY_SCROLL_STEPS; ++step) {
+        const int32_t anchor = pattern_->GetEndIndex();
+        const float previous = pattern_->GetItemRect(anchor).Top();
+        pattern_->UpdateCurrentOffset(-30.0f, SCROLL_FROM_UPDATE);
+        FlushUITasks();
+        EXPECT_NEAR(pattern_->GetItemRect(anchor).Top(), previous - 30.0f, 0.1f) << "step=" << step;
+    }
+}
+
+/**
+ * @tc.name: FastScrollKnownMixedLazyTerminatesWithoutRebuildingTable
+ * @tc.desc: Legacy homogeneous CMS inference may be inaccurate for mixed Lazy, but must not cause endless retargeting.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollKnownLegacyMixedTestNg,
+    FastScrollKnownMixedLazyTerminatesWithoutRebuildingTable, TestSize.Level1)
+{
+    const auto [mode, backward] = GetParam();
+    auto model = CreateList();
+    model.SetLanes(2);
+    model.SetInitialIndex(backward ? 150 : 0);
+    model.SetEdgeEffect(EdgeEffect::NONE, false);
+    model.GetOrCreateListChildrenMainSize()->UpdateDefaultSize(80.0f);
+    LazyForEachModelNG lazy;
+    lazy.Create(RefPtr<LazyForEachBuilder>(AceType::MakeRefPtr<MixedFastScrollLazyBuilder>(2)));
+    ViewStackProcessor::GetInstance()->Pop();
+    CreateDone();
+    const auto target = pattern_->posMap_->GetPositionInfo(144);
+    int32_t starts = 0;
+    int32_t stops = 0;
+    eventHub_->SetOnScrollStart([&starts]() { ++starts; });
+    eventHub_->SetOnScrollStop([&stops]() { ++stops; });
+    MockAnimationManager::GetInstance().SetTicks(4);
+    pattern_->ScrollToIndexFastScroll(144, true, ScrollAlign::START, 0.0f, mode);
+    ASSERT_NE(pattern_->GetFastScrollPreparation(), nullptr);
+    EXPECT_EQ(pattern_->GetFastScrollPreparation()->preparation, FastScrollPreparation::READY);
+    ASSERT_NO_FATAL_FAILURE(RunFastScrollFrames(64));
+    EXPECT_FALSE(pattern_->HasFastScrollRequest());
+    EXPECT_FALSE(pattern_->AnimateRunning());
+    EXPECT_EQ(starts, 1);
+    EXPECT_EQ(stops, 1);
+    EXPECT_FLOAT_EQ(pattern_->posMap_->GetPositionInfo(144).mainPos, target.mainPos);
+    EXPECT_FLOAT_EQ(pattern_->posMap_->GetPositionInfo(144).mainSize, target.mainSize);
+    eventHub_->SetOnScrollStart(nullptr);
+    eventHub_->SetOnScrollStop(nullptr);
+}
+
+INSTANTIATE_TEST_SUITE_P(LegacyCMSBoundary, ListFastScrollKnownLegacyMixedTestNg,
+    testing::Combine(testing::Values(FastScrollMode::SKIP_MEASURE, FastScrollMode::SKIP_CREATE_AND_MEASURE),
+        testing::Bool()));
+
+/**
+ * @tc.name: FastScrollKnownRowMismatchDoesNotRepairOriginalTable001
+ * @tc.desc: Detect incompatible visible rows without changing the CMS table or affecting
+ * unknown-size/single-lane paths.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollerTestNg, FastScrollKnownRowMismatchDoesNotRepairOriginalTable001, TestSize.Level1)
+{
+    auto model = CreateList();
+    model.SetLanes(2);
+    model.GetOrCreateListChildrenMainSize()->UpdateDefaultSize(ITEM_MAIN_SIZE);
+    CreateListItems(4);
+    CreateDone();
+    ASSERT_EQ(pattern_->itemPosition_.size(), 4u);
+    EXPECT_FALSE(pattern_->HasKnownFastScrollRowMismatch());
+    const auto positions = pattern_->posMap_->posMap_;
+    pattern_->itemPosition_.at(3).startPos += ITEM_MAIN_SIZE;
+    pattern_->itemPosition_.at(3).endPos += ITEM_MAIN_SIZE;
+    EXPECT_TRUE(pattern_->HasKnownFastScrollRowMismatch());
+    EXPECT_EQ(pattern_->posMap_->posMap_.size(), positions.size());
+    for (const auto& [index, expected] : positions) {
+        const auto actual = pattern_->posMap_->GetPositionInfo(index);
+        EXPECT_FLOAT_EQ(actual.mainPos, expected.mainPos);
+        EXPECT_FLOAT_EQ(actual.mainSize, expected.mainSize);
+        EXPECT_EQ(actual.isGroup, expected.isGroup);
+    }
+    pattern_->lanes_ = 1;
+    EXPECT_FALSE(pattern_->HasKnownFastScrollRowMismatch());
+    pattern_->lanes_ = 2;
+    pattern_->childrenSize_.Reset();
+    EXPECT_FALSE(pattern_->HasKnownFastScrollRowMismatch());
+}
+
+class FallingMixedLazyBuilder final : public ListItemMockLazy {
+public:
+    FallingMixedLazyBuilder() : ListItemMockLazy(MIXED_ITEM_COUNT, MIXED_DEFAULT_SIZE) {}
+
+    static bool IsGroup(int32_t index)
+    {
+        return index % FIRST_GROUP_PERIOD == FIRST_GROUP_REMAINDER ||
+            index % SECOND_GROUP_PERIOD == SECOND_GROUP_REMAINDER;
+    }
+
+    static float BaseSize(int32_t index)
+    {
+        constexpr float sizes[] = { 320.0f, 180.0f, 48.0f, 24.0f };
+        return sizes[index / HEIGHT_SECTION_COUNT];
+    }
+
+    static float MainSize(int32_t index)
+    {
+        if (!IsGroup(index)) {
+            return BaseSize(index) + index % ITEM_HEIGHT_PERIOD * ITEM_HEIGHT_STEP;
+        }
+        const int32_t count = FALLING_GROUP_MIN_CHILDREN + index % GROUP_CHILD_COUNT_PERIOD;
+        return (count / MIXED_THREE_LANES) * (BaseSize(index) + MAX_GROUP_HEIGHT_STEP) +
+            (count % MIXED_THREE_LANES ? BaseSize(index) + (count % MIXED_THREE_LANES - 1) * GROUP_HEIGHT_STEP : 0.0f);
+    }
+
+protected:
+    std::pair<std::string, RefPtr<UINode>> OnGetChildByIndex(
+        int32_t index, std::unordered_map<std::string, LazyForEachCacheChild>& expiringItems) override
+    {
+        if (!IsGroup(index)) {
+            auto result = ListItemMockLazy::OnGetChildByIndex(index, expiringItems);
+            auto node = AceType::DynamicCast<FrameNode>(result.second);
+            node->GetLayoutProperty()->UpdateUserDefinedIdealSize(
+                CalcSize(std::nullopt, CalcLength(MainSize(index))));
+            return result;
+        }
+        auto stack = ViewStackProcessor::GetInstance();
+        ListItemGroupModelNG group;
+        group.Create({});
+        auto childrenSize = group.GetOrCreateListChildrenMainSize();
+        childrenSize->UpdateDefaultSize(0.0f);
+        std::vector<float> sizes;
+        for (int32_t child = 0; child < FALLING_GROUP_MIN_CHILDREN + index % GROUP_CHILD_COUNT_PERIOD; ++child) {
+            sizes.emplace_back(BaseSize(index) + child % GROUP_HEIGHT_PERIOD * GROUP_HEIGHT_STEP);
+            ListItemModelNG item;
+            item.Create();
+            ViewAbstract::SetHeight(CalcLength(sizes.back()));
+            stack->Pop();
+        }
+        childrenSize->ChangeData(0, sizes.size(), sizes);
+        return { std::to_string(index), stack->Finish() };
+    }
+};
+
+class ListMixedFastScrollOffsetTestNg : public ListFastScrollerTestNg,
+    public testing::WithParamInterface<ScrollAlign> {
+protected:
+    static std::vector<float> ExpectedTops()
+    {
+        std::vector<float> tops(MIXED_ITEM_COUNT);
+        float position = 0.0f;
+        for (int32_t index = 0; index < MIXED_ITEM_COUNT;) {
+            const int32_t start = index++;
+            if (!FallingMixedLazyBuilder::IsGroup(start)) {
+                while (index < MIXED_ITEM_COUNT && index - start < MIXED_THREE_LANES &&
+                    !FallingMixedLazyBuilder::IsGroup(index)) {
+                    ++index;
+                }
+            }
+            float height = 0.0f;
+            for (int32_t item = start; item < index; ++item) {
+                tops[item] = position;
+                height = std::max(height, FallingMixedLazyBuilder::MainSize(item));
+            }
+            position += height;
+        }
+        return tops;
+    }
+};
+
+/**
+ * @tc.name: FastScrollMixedKnownOffsetBeyondTarget
+ * @tc.desc: Positive extraOffset beyond a confirmed target retains exact mixed rows and one start/stop pair.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListMixedFastScrollOffsetTestNg, FastScrollMixedKnownOffsetBeyondTarget, TestSize.Level1)
+{
+    auto model = CreateList();
+    model.SetLanes(3);
+    model.SetInitialIndex(30);
+    model.SetEdgeEffect(EdgeEffect::NONE, false);
+    std::vector<float> sizes;
+    for (int32_t index = 0; index < 360; ++index) {
+        sizes.emplace_back(FallingMixedLazyBuilder::MainSize(index));
+    }
+    model.GetOrCreateListChildrenMainSize()->ChangeData(0, sizes.size(), sizes);
+    CreateDirectBuilderItems(AceType::MakeRefPtr<FallingMixedLazyBuilder>(), 360);
+    CreateDone();
+    int32_t starts = 0;
+    int32_t stops = 0;
+    eventHub_->SetOnScrollStart([&starts]() { ++starts; });
+    eventHub_->SetOnScrollStop([&stops]() { ++stops; });
+    MockAnimationManager::GetInstance().SetTicks(4);
+    pattern_->ScrollToIndexFastScroll(286, true, GetParam(), 1600.0f, FastScrollMode::SKIP_MEASURE);
+    ASSERT_NO_FATAL_FAILURE(RunFastScrollFrames(64));
+    const auto tops = ExpectedTops();
+    const float adjustment = GetParam() == ScrollAlign::CENTER ? (40.0f - HEIGHT) / 2.0f : 40.0f - HEIGHT;
+    const float offset = tops[286] + adjustment + 1600.0f;
+    ASSERT_FALSE(pattern_->itemPosition_.empty());
+    for (const auto& [index, item] : pattern_->itemPosition_) {
+        EXPECT_NEAR(item.startPos, tops[index] - offset, 0.1f) << "index=" << index;
+    }
+    EXPECT_FALSE(pattern_->HasFastScrollRequest());
+    EXPECT_FALSE(pattern_->AnimateRunning());
+    EXPECT_EQ(starts, 1);
+    EXPECT_EQ(stops, 1);
+}
+
+INSTANTIATE_TEST_SUITE_P(KnownMixed, ListMixedFastScrollOffsetTestNg,
+    testing::Values(ScrollAlign::CENTER, ScrollAlign::END));
+
+class RisingMixedCallbackBuilder final : public ListItemMockLazy {
+public:
+    RisingMixedCallbackBuilder() : ListItemMockLazy(MIXED_ITEM_COUNT, MIXED_DEFAULT_SIZE) {}
+
+    static float BaseSize(int32_t index)
+    {
+        constexpr float sizes[] = { 24.0f, 48.0f, 180.0f, 320.0f };
+        return sizes[index / HEIGHT_SECTION_COUNT];
+    }
+
+    static float MainSize(int32_t index)
+    {
+        if (!FallingMixedLazyBuilder::IsGroup(index)) {
+            return BaseSize(index) + index % ITEM_HEIGHT_PERIOD * ITEM_HEIGHT_STEP;
+        }
+        float height = 0.0f;
+        const int32_t count = RISING_GROUP_MIN_CHILDREN + index % GROUP_CHILD_COUNT_PERIOD;
+        for (int32_t child = 0; child < count; child += MIXED_TWO_LANES) {
+            const float first = BaseSize(index) + child % GROUP_HEIGHT_PERIOD * GROUP_HEIGHT_STEP;
+            const float second = child + 1 < count ?
+                BaseSize(index) + (child + 1) % GROUP_HEIGHT_PERIOD * GROUP_HEIGHT_STEP : 0.0f;
+            height += std::max(first, second);
+        }
+        return height;
+    }
+
+protected:
+    std::pair<std::string, RefPtr<UINode>> OnGetChildByIndex(
+        int32_t index, std::unordered_map<std::string, LazyForEachCacheChild>& expiringItems) override
+    {
+        if (!FallingMixedLazyBuilder::IsGroup(index)) {
+            auto result = ListItemMockLazy::OnGetChildByIndex(index, expiringItems);
+            AceType::DynamicCast<FrameNode>(result.second)->GetLayoutProperty()->UpdateUserDefinedIdealSize(
+                CalcSize(std::nullopt, CalcLength(MainSize(index))));
+            return WithConditionalBranch(std::move(result));
+        }
+        auto stack = ViewStackProcessor::GetInstance();
+        ListItemGroupModelNG group;
+        group.Create({});
+        auto childrenSize = group.GetOrCreateListChildrenMainSize();
+        childrenSize->UpdateDefaultSize(0.0f);
+        std::vector<float> sizes;
+        for (int32_t child = 0; child < RISING_GROUP_MIN_CHILDREN + index % GROUP_CHILD_COUNT_PERIOD; ++child) {
+            sizes.emplace_back(BaseSize(index) + child % GROUP_HEIGHT_PERIOD * GROUP_HEIGHT_STEP);
+            ListItemModelNG item;
+            item.Create();
+            ViewAbstract::SetHeight(CalcLength(sizes.back()));
+            stack->Pop();
+        }
+        childrenSize->ChangeData(0, sizes.size(), sizes);
+        return WithConditionalBranch({ std::to_string(index), stack->Finish() });
+    }
+};
+
+/**
+ * @tc.name: FastScrollMixedKnownCallbackMatchesVisibleMovement001
+ * @tc.desc: Correcting confirmed row coordinates must not enter the physical onDidScroll displacement.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollerTestNg, FastScrollMixedKnownCallbackMatchesVisibleMovement001, TestSize.Level1)
+{
+    auto model = CreateList();
+    model.SetLanes(2);
+    model.SetInitialIndex(300);
+    model.SetEdgeEffect(EdgeEffect::NONE, false);
+    std::vector<float> sizes;
+    for (int32_t index = 0; index < 360; ++index) {
+        sizes.emplace_back(RisingMixedCallbackBuilder::MainSize(index));
+    }
+    model.GetOrCreateListChildrenMainSize()->ChangeData(0, sizes.size(), sizes);
+    CreateDirectBuilderItems(AceType::MakeRefPtr<RisingMixedCallbackBuilder>(), 360);
+    CreateDone();
+    auto previous = std::make_shared<std::map<int32_t, float>>();
+    auto comparisons = std::make_shared<int32_t>(0);
+    eventHub_->SetOnDidScroll([this, previous, comparisons](Dimension offset, ScrollState) {
+        std::map<int32_t, float> current;
+        for (const auto& [index, item] : pattern_->itemPosition_) {
+            if (item.isGroup || !Positive(item.endPos) || GreatOrEqual(item.startPos, HEIGHT)) {
+                continue;
+            }
+            current[index] = item.startPos;
+            if (const auto iter = previous->find(index); iter != previous->end()) {
+                ++*comparisons;
+                EXPECT_NEAR(offset.ConvertToPx(), iter->second - item.startPos, 0.1f) << "index=" << index;
+            }
+        }
+        *previous = std::move(current);
+    });
+    MockAnimationManager::GetInstance().SetTicks(64);
+    pattern_->ScrollToIndexFastScroll(70, true, ScrollAlign::END, -24.0f, FastScrollMode::SKIP_MEASURE);
+    ASSERT_NO_FATAL_FAILURE(RunFastScrollFrames(256));
+    EXPECT_GT(*comparisons, 20);
+    eventHub_->SetOnDidScroll(nullptr);
+}
+
+class RisingGroupLazyBuilder final : public ListItemMockLazy {
+public:
+    RisingGroupLazyBuilder() : ListItemMockLazy(MIXED_ITEM_COUNT, MIXED_DEFAULT_SIZE) {}
+
+    static float ChildTop(int32_t index, int32_t child)
+    {
+        constexpr float sizes[] = { 24.0f, 48.0f, 180.0f, 320.0f };
+        float top = 0.0f;
+        for (int32_t first = 0; first < child / MIXED_TWO_LANES * MIXED_TWO_LANES; first += MIXED_TWO_LANES) {
+            top += sizes[index / HEIGHT_SECTION_COUNT] +
+                std::max(first % GROUP_HEIGHT_PERIOD, (first + 1) % GROUP_HEIGHT_PERIOD) * GROUP_HEIGHT_STEP;
+        }
+        return top;
+    }
+
+    static float MainSize(int32_t index)
+    {
+        constexpr float sizes[] = { 24.0f, 48.0f, 180.0f, 320.0f };
+        const float base = sizes[index / HEIGHT_SECTION_COUNT];
+        float height = 0.0f;
+        const int32_t count = RISING_GROUP_MIN_CHILDREN + index % GROUP_CHILD_COUNT_PERIOD;
+        for (int32_t child = 0; child < count; child += MIXED_TWO_LANES) {
+            const float first = base + child % GROUP_HEIGHT_PERIOD * GROUP_HEIGHT_STEP;
+            const float second = child + 1 < count ?
+                base + (child + 1) % GROUP_HEIGHT_PERIOD * GROUP_HEIGHT_STEP : 0.0f;
+            height += std::max(first, second);
+        }
+        return height;
+    }
+
+protected:
+    std::pair<std::string, RefPtr<UINode>> OnGetChildByIndex(
+        int32_t index, std::unordered_map<std::string, LazyForEachCacheChild>& expiringItems) override
+    {
+        constexpr float sizes[] = { 24.0f, 48.0f, 180.0f, 320.0f };
+        auto stack = ViewStackProcessor::GetInstance();
+        ListItemGroupModelNG group;
+        group.Create({});
+        for (int32_t child = 0; child < RISING_GROUP_MIN_CHILDREN + index % GROUP_CHILD_COUNT_PERIOD; ++child) {
+            ListItemModelNG item;
+            item.Create();
+            ViewAbstract::SetHeight(CalcLength(sizes[index / HEIGHT_SECTION_COUNT] +
+                child % GROUP_HEIGHT_PERIOD * GROUP_HEIGHT_STEP));
+            stack->Pop();
+        }
+        return { std::to_string(index), stack->Finish() };
+    }
+};
+
+class ListGroupFastScrollOffsetTestNg : public ListFastScrollerTestNg,
+    public testing::WithParamInterface<std::tuple<FastScrollMode, int32_t>> {
+protected:
+    std::string DescribeOffsetPositions() const
+    {
+        std::ostringstream trace;
+        trace << "\noffset=" << pattern_->GetTotalOffset() << " endpoint=" << pattern_->GetFinalPosition();
+        for (int32_t index = TRACE_START_INDEX; index < TRACE_END_INDEX; ++index) {
+            const auto info = pattern_->posMap_->GetPositionInfo(index);
+            trace << " [" << index << ":" << info.mainPos << "," << info.mainSize << "]";
+            if (const auto item = pattern_->itemPosition_.find(index); item != pattern_->itemPosition_.end()) {
+                trace << " visible=" << item->second.startPos << ':' << item->second.endPos;
+                if (item->second.groupInfo) {
+                    trace << ':' << item->second.groupInfo->atStart << ':' << item->second.groupInfo->atEnd;
+                }
+            }
+        }
+        return trace.str();
+    }
+
+    void AdvanceRecordedFrames()
+    {
+        FlushUITasks();
+        std::string trace = DescribeOffsetPositions();
+        for (float delta : { -160.4844f, -153.7865f, -396.1224f, -630.5521f }) {
+            MockAnimationManager::GetInstance().TickByVelocity(delta);
+            FlushUITasks();
+            trace += DescribeOffsetPositions();
+        }
+        RecordProperty("groupOffsetPreparationTrace", trace);
+    }
+};
+
+/**
+ * @tc.name: FastScrollVisibleGroupEndWithNegativeOffset
+ * @tc.desc: Preparing a visible uneven Group preserves its real tail before scrolling to preceding Groups.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListGroupFastScrollOffsetTestNg, FastScrollVisibleGroupEndWithNegativeOffset, TestSize.Level1)
+{
+    auto model = CreateList();
+    model.SetLanes(2);
+    model.SetInitialIndex(150);
+    model.SetEdgeEffect(EdgeEffect::NONE, false);
+    LazyForEachModelNG lazy;
+    lazy.Create(RefPtr<LazyForEachBuilder>(AceType::MakeRefPtr<RisingGroupLazyBuilder>()));
+    ViewStackProcessor::GetInstance()->Pop();
+    CreateDone();
+    std::vector<float> tops(361);
+    for (int32_t index = 0; index < 360; ++index) {
+        tops[index + 1] = tops[index] + RisingGroupLazyBuilder::MainSize(index);
+    }
+    ASSERT_EQ(pattern_->GetStartIndex(), 150);
+    EXPECT_NEAR(pattern_->GetItemRect(151).Height(), 204.0f, 0.1f);
+    const auto [mode, ticks] = GetParam();
+    MockAnimationManager::GetInstance().SetTicks(ticks > 0 ? ticks : 32);
+    pattern_->ScrollToIndexFastScroll(151, true, ScrollAlign::END, -1600.0f, mode);
+    if (ticks == 0) {
+        AdvanceRecordedFrames();
+    }
+    ASSERT_NO_FATAL_FAILURE(RunFastScrollFrames(256));
+    RecordProperty("groupOffsetFinalPositions", DescribeOffsetPositions());
+    const float offset = tops[152] - HEIGHT - 1600.0f;
+    ASSERT_FALSE(pattern_->itemPosition_.empty());
+    for (const auto& [index, item] : pattern_->itemPosition_) {
+        const auto group = GetChildPattern<ListItemGroupPattern>(frameNode_, index);
+        ASSERT_NE(group, nullptr);
+        ASSERT_FALSE(group->GetItemPosition().empty());
+        for (const auto& [child, position] : group->GetItemPosition()) {
+            const auto rect = pattern_->GetItemRectInGroup(index, child);
+            EXPECT_NEAR(rect.Top(), tops[index] + RisingGroupLazyBuilder::ChildTop(index, child) - offset, 0.1f)
+                << "index=" << index << " child=" << child;
+        }
+    }
+    EXPECT_FALSE(pattern_->HasFastScrollRequest());
+    EXPECT_FALSE(pattern_->AnimateRunning());
+}
+
+INSTANTIATE_TEST_SUITE_P(EstimatedGroups, ListGroupFastScrollOffsetTestNg,
+    testing::Combine(testing::Values(FastScrollMode::SKIP_MEASURE, FastScrollMode::SKIP_CREATE_AND_MEASURE),
+        testing::Values(0, 4, 12, 32)));
+
+class RisingItemLazyBuilder final : public ListItemMockLazy {
+public:
+    RisingItemLazyBuilder() : ListItemMockLazy(MIXED_ITEM_COUNT, MIXED_DEFAULT_SIZE) {}
+
+protected:
+    std::pair<std::string, RefPtr<UINode>> OnGetChildByIndex(
+        int32_t index, std::unordered_map<std::string, LazyForEachCacheChild>& expiringItems) override
+    {
+        constexpr float sizes[] = { 24.0f, 48.0f, 180.0f, 320.0f };
+        auto result = ListItemMockLazy::OnGetChildByIndex(index, expiringItems);
+        auto node = AceType::DynamicCast<FrameNode>(result.second);
+        node->GetLayoutProperty()->UpdateUserDefinedIdealSize(
+            CalcSize(std::nullopt, CalcLength(sizes[index / HEIGHT_SECTION_COUNT] +
+                index % ITEM_HEIGHT_PERIOD * ITEM_HEIGHT_STEP)));
+        return result;
+    }
+};
+
+class ListMixedFastScrollBoundaryTestNg : public ListFastScrollerTestNg,
+    public testing::WithParamInterface<FastScrollMode> {};
+
+class ListFastScrollIdleLanesTestNg : public ListFastScrollerTestNg,
+    public testing::WithParamInterface<FastScrollMode> {};
+
+class ListMixedFastScrollOrdinaryTestNg : public ListFastScrollerTestNg,
+    public testing::WithParamInterface<std::tuple<FastScrollMode, bool>> {};
+
+/**
+ * @tc.name: CompletedMixedScrollKeepsHeadRowsAligned
+ * @tc.desc: Legacy jumps after a completed mixed request must not split the head row's geometry.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListMixedFastScrollOrdinaryTestNg, CompletedMixedScrollKeepsHeadRowsAligned, TestSize.Level1)
+{
+    const auto [mode, backward] = GetParam();
+    auto model = CreateList();
+    ViewAbstract::SetHeight(CalcLength(400.0f));
+    model.SetLanes(2);
+    model.SetInitialIndex(backward ? 300 : 30);
+    model.SetEdgeEffect(EdgeEffect::NONE, false);
+    LazyForEachModelNG lazy;
+    lazy.Create(RefPtr<LazyForEachBuilder>(AceType::MakeRefPtr<RisingMixedCallbackBuilder>()));
+    ViewStackProcessor::GetInstance()->Pop();
+    CreateDone();
+    MockAnimationManager::GetInstance().SetTicks(32);
+    pattern_->ScrollToIndexFastScroll(backward ? 70 : 286, true, ScrollAlign::END, -24.0f, mode);
+    FlushUITasks();
+    ASSERT_NO_FATAL_FAILURE(RunFastScrollFrames(256));
+    for (int32_t step = 0; backward && step < 8; ++step) {
+        const auto anchor = std::find_if(pattern_->itemPosition_.begin(), pattern_->itemPosition_.end(),
+            [](const auto& item) { return !item.second.isGroup && Positive(item.second.endPos); });
+        ASSERT_NE(anchor, pattern_->itemPosition_.end());
+        const int32_t index = anchor->first;
+        const float previous = pattern_->GetItemRect(index).Top();
+        pattern_->UpdateCurrentOffset(30.0f, SCROLL_FROM_UPDATE);
+        FlushUITasks();
+        EXPECT_NEAR(pattern_->GetItemRect(index).Top(), previous + 30.0f, 0.1f) << "step=" << step;
+    }
+    pattern_->ScrollToIndex(110, false, ScrollAlign::CENTER);
+    FlushUITasks();
+    pattern_->ScrollToEdge(ScrollEdgeType::SCROLL_TOP, false);
+    FlushUITasks();
+    EXPECT_NEAR(pattern_->GetItemRect(0).Top(), 0.0f, 0.1f);
+    EXPECT_NEAR(pattern_->GetItemRect(1).Top(), 0.0f, 0.1f);
+    EXPECT_NEAR(pattern_->GetItemRect(2).Top(), 32.0f, 0.1f);
+    EXPECT_NEAR(pattern_->GetItemRect(3).Top(), 72.0f, 0.1f);
+    EXPECT_NEAR(pattern_->GetItemRect(0).Left(), 0.0f, 0.1f);
+    EXPECT_NEAR(pattern_->GetItemRect(1).Left(), WIDTH / 2.0f, 0.1f);
+}
+
+INSTANTIATE_TEST_SUITE_P(OrdinaryAfterMixed, ListMixedFastScrollOrdinaryTestNg,
+    testing::Combine(testing::Values(FastScrollMode::NONE, FastScrollMode::SKIP_MEASURE), testing::Bool()));
+
+/**
+ * @tc.name: IdleLaneChangeRebuildsHomogeneousRows
+ * @tc.desc: Completed requests must not retain an old row phase across idle lane changes.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollIdleLanesTestNg, IdleLaneChangeRebuildsHomogeneousRows, TestSize.Level1)
+{
+    auto model = CreateList();
+    model.SetLanes(2);
+    model.SetInitialIndex(30);
+    model.SetEdgeEffect(EdgeEffect::NONE, false);
+    LazyForEachModelNG lazy;
+    lazy.Create(RefPtr<LazyForEachBuilder>(AceType::MakeRefPtr<RisingItemLazyBuilder>()));
+    ViewStackProcessor::GetInstance()->Pop();
+    CreateDone();
+    MockAnimationManager::GetInstance().SetTicks(32);
+    pattern_->ScrollToIndexFastScroll(286, true, ScrollAlign::END, -24.0f, GetParam());
+    FlushUITasks();
+    ASSERT_NO_FATAL_FAILURE(RunFastScrollFrames(256));
+    pattern_->ScrollToIndex(155, false, ScrollAlign::CENTER);
+    FlushUITasks();
+    for (int32_t lanes : { 3, 1, 4, 2 }) {
+        SCOPED_TRACE(lanes);
+        layoutProperty_->UpdateLanes(lanes);
+        FlushUITasks();
+        ASSERT_FALSE(pattern_->itemPosition_.empty());
+        EXPECT_EQ(pattern_->itemPosition_.begin()->first % lanes, 0);
+        const int32_t target = lanes == 3 ? 70 : 280;
+        pattern_->ScrollToIndexFastScroll(target, true, ScrollAlign::END, 24.0f, GetParam());
+        FlushUITasks();
+        ASSERT_NO_FATAL_FAILURE(RunFastScrollFrames(256));
+        const int32_t row = target - target % lanes;
+        float height = 0.0f;
+        constexpr float sizes[] = { 24.0f, 48.0f, 180.0f, 320.0f };
+        for (int32_t index = row; index < row + lanes; ++index) {
+            height = std::max(height, sizes[index / 90] + index % 3 * 8.0f);
+        }
+        EXPECT_NEAR(pattern_->GetItemRect(target).Bottom(), HEIGHT - 24.0f - height +
+            sizes[target / 90] + target % 3 * 8.0f, 0.1f);
+        pattern_->ScrollToIndex(155, false, ScrollAlign::CENTER);
+        FlushUITasks();
+    }
+}
+
+INSTANTIATE_TEST_SUITE_P(IdleLanes, ListFastScrollIdleLanesTestNg,
+    testing::Values(FastScrollMode::NONE, FastScrollMode::SKIP_MEASURE, FastScrollMode::SKIP_CREATE_AND_MEASURE));
+
+/**
+ * @tc.name: FastScrollSkipToHeadClampsVisibleWindow
+ * @tc.desc: An estimated skip beyond the head clamps the same frame and reports a visible center index.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListMixedFastScrollBoundaryTestNg, FastScrollSkipToHeadClampsVisibleWindow, TestSize.Level1)
+{
+    auto model = CreateList();
+    model.SetLanes(2);
+    model.SetInitialIndex(325);
+    model.SetEdgeEffect(EdgeEffect::NONE, false);
+    int32_t indexEvents = 0;
+    model.SetOnScrollIndex([&indexEvents](int32_t start, int32_t end, int32_t center) {
+        ++indexEvents;
+        EXPECT_GE(center, start);
+        EXPECT_LE(center, end);
+    });
+    LazyForEachModelNG lazy;
+    lazy.Create(RefPtr<LazyForEachBuilder>(AceType::MakeRefPtr<RisingItemLazyBuilder>()));
+    ViewStackProcessor::GetInstance()->Pop();
+    CreateDone();
+    MockAnimationManager::GetInstance().SetTicks(32);
+    pattern_->ScrollToIndexFastScroll(70, true, ScrollAlign::END, -1600.0f, GetParam());
+    FlushUITasks();
+    for (float delta : { -156.5f, -144.3984f, -550.0f }) {
+        MockAnimationManager::GetInstance().TickByVelocity(delta);
+        FlushUITasks();
+        if (pattern_->GetStartIndex() == 0) {
+            EXPECT_LE(pattern_->GetItemRect(0).Top(), 0.1f);
+        }
+    }
+    ASSERT_NO_FATAL_FAILURE(RunFastScrollFrames(256));
+    EXPECT_GT(indexEvents, 0);
+    EXPECT_NEAR(pattern_->GetItemRect(0).Top(), 0.0f, 0.1f);
+}
+
+INSTANTIATE_TEST_SUITE_P(EstimatedBoundary, ListMixedFastScrollBoundaryTestNg,
+    testing::Values(FastScrollMode::SKIP_MEASURE, FastScrollMode::SKIP_CREATE_AND_MEASURE));
+
+/**
+ * @tc.name: FastScrollSkipHeadWindowWithPositiveAnchor001
+ * @tc.desc: A skip resolving before row zero must not leave a blank head or an unfilled viewport.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollerTestNg, FastScrollSkipHeadWindowWithPositiveAnchor001, TestSize.Level1)
+{
+    CreateList();
+    CreateListItems(20);
+    CreateDone();
+    auto algorithm = AceType::DynamicCast<ListLayoutAlgorithm>(pattern_->CreateLayoutAlgorithm());
+    ASSERT_NE(algorithm, nullptr);
+    algorithm->Measure(AceType::RawPtr(frameNode_));
+    algorithm->currentOffset_ = 0.0f;
+    algorithm->startMainPos_ = 0.0f;
+    algorithm->endMainPos_ = HEIGHT;
+    algorithm->canOverScrollStart_ = false;
+    algorithm->GetOrCreateFastScrollState().skipStart = { 0, 244.0f };
+    algorithm->MeasureFastScrollSkipWindow(AceType::RawPtr(frameNode_));
+    ASSERT_FALSE(algorithm->itemPosition_.empty());
+    EXPECT_NEAR(algorithm->GetStartPosition() - algorithm->currentOffset_, 0.0f, 0.1f);
+    EXPECT_GE(algorithm->GetEndPosition() - algorithm->currentOffset_, HEIGHT);
+}
+
+class FallingTwoLaneMixedBuilder final : public ListItemMockLazy {
+public:
+    FallingTwoLaneMixedBuilder() : ListItemMockLazy(MIXED_ITEM_COUNT, MIXED_DEFAULT_SIZE) {}
+
+    static float MainSize(int32_t index)
+    {
+        constexpr float sizes[] = { 320.0f, 180.0f, 48.0f, 24.0f };
+        const float base = sizes[index / 90];
+        if (!FallingMixedLazyBuilder::IsGroup(index)) {
+            return base + index % ITEM_HEIGHT_PERIOD * ITEM_HEIGHT_STEP;
+        }
+        float size = 0.0f;
+        const int32_t count = 5 + index % 3;
+        for (int32_t child = 0; child < count; child += MIXED_TWO_LANES) {
+            const float first = base + child % 3 * 12.0f;
+            const float second = child + 1 < count ? base + (child + 1) % 3 * 12.0f : 0.0f;
+            size += std::max(first, second);
+        }
+        return size;
+    }
+
+    static std::vector<std::pair<float, float>> ExpectedRows()
+    {
+        std::vector<std::pair<float, float>> rows(MIXED_ITEM_COUNT);
+        float position = 0.0f;
+        for (int32_t index = 0; index < MIXED_ITEM_COUNT;) {
+            const int32_t first = index++;
+            if (!FallingMixedLazyBuilder::IsGroup(first) && index < MIXED_ITEM_COUNT &&
+                !FallingMixedLazyBuilder::IsGroup(index)) {
+                ++index;
+            }
+            float height = MainSize(first);
+            for (int32_t item = first + 1; item < index; ++item) {
+                height = std::max(height, MainSize(item));
+            }
+            for (int32_t item = first; item < index; ++item) {
+                rows[item] = { position, height };
+            }
+            position += height;
+        }
+        return rows;
+    }
+
+protected:
+    std::pair<std::string, RefPtr<UINode>> OnGetChildByIndex(
+        int32_t index, std::unordered_map<std::string, LazyForEachCacheChild>& expiringItems) override
+    {
+        constexpr float sizes[] = { 320.0f, 180.0f, 48.0f, 24.0f };
+        const float base = sizes[index / 90];
+        if (!FallingMixedLazyBuilder::IsGroup(index)) {
+            auto result = ListItemMockLazy::OnGetChildByIndex(index, expiringItems);
+            auto node = AceType::DynamicCast<FrameNode>(result.second);
+            node->GetLayoutProperty()->UpdateUserDefinedIdealSize(
+                CalcSize(std::nullopt, CalcLength(base + index % ITEM_HEIGHT_PERIOD * ITEM_HEIGHT_STEP)));
+            return WithConditionalBranch(std::move(result));
+        }
+        auto stack = ViewStackProcessor::GetInstance();
+        ListItemGroupModelNG group;
+        group.Create({});
+        for (int32_t child = 0; child < RISING_GROUP_MIN_CHILDREN + index % GROUP_CHILD_COUNT_PERIOD; ++child) {
+            ListItemModelNG item;
+            item.Create();
+            ViewAbstract::SetHeight(CalcLength(base + child % GROUP_HEIGHT_PERIOD * GROUP_HEIGHT_STEP));
+            stack->Pop();
+        }
+        return WithConditionalBranch({ std::to_string(index), stack->Finish() });
+    }
+};
+
+/**
+ * @tc.name: FastScrollMixedUnknownPreparationRowContinuesBackward001
+ * @tc.desc: Backfilling a viewport continues confirmed preparation rows instead of splitting a normal row.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollerTestNg, FastScrollMixedUnknownPreparationRowContinuesBackward001, TestSize.Level1)
+{
+    auto model = CreateList();
+    model.SetLanes(2);
+    model.SetInitialIndex(150);
+    model.SetEdgeEffect(EdgeEffect::NONE, false);
+    LazyForEachModelNG lazy;
+    lazy.Create(RefPtr<LazyForEachBuilder>(AceType::MakeRefPtr<FallingTwoLaneMixedBuilder>()));
+    ViewStackProcessor::GetInstance()->Pop();
+    CreateDone();
+    MockAnimationManager::GetInstance().SetTicks(32);
+    pattern_->ScrollToIndexFastScroll(148, true, ScrollAlign::END, -1600.0f, FastScrollMode::SKIP_MEASURE);
+    ASSERT_NO_FATAL_FAILURE(RunFastScrollFrames(256));
+    // Group127 starts segment128; Group139 leaves item138 in the preceding incomplete row.
+    const auto rows = FallingTwoLaneMixedBuilder::ExpectedRows();
+    const float expectedOffset = rows[148].first + rows[148].second - HEIGHT - 1600.0f;
+    for (int32_t index = 136; index <= 138; ++index) {
+        EXPECT_NEAR(pattern_->GetItemRect(index).Top(), rows[index].first - expectedOffset, 0.1f);
+    }
+    EXPECT_NEAR(pattern_->GetItemRect(136).Left(), 0.0f, 0.1f);
+    EXPECT_NEAR(pattern_->GetItemRect(137).Left(), WIDTH / 2.0f, 0.1f);
+}
+
+/**
+ * @tc.name: FastScrollSkipBoundaryHonorsStackAndOverscroll001
+ * @tc.desc: Skip-window clamping respects reverse layout and does not suppress explicitly permitted overscroll.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollerTestNg, FastScrollSkipBoundaryHonorsStackAndOverscroll001, TestSize.Level1)
+{
+    CreateList();
+    CreateListItems(20);
+    CreateDone();
+    for (bool stack : { false, true }) {
+        for (bool overscroll : { false, true }) {
+            SCOPED_TRACE(testing::Message() << "stack=" << stack << ", overscroll=" << overscroll);
+            auto algorithm = AceType::DynamicCast<ListLayoutAlgorithm>(pattern_->CreateLayoutAlgorithm());
+            ASSERT_NE(algorithm, nullptr);
+            algorithm->Measure(AceType::RawPtr(frameNode_));
+            algorithm->currentOffset_ = 0.0f;
+            algorithm->startMainPos_ = 0.0f;
+            algorithm->endMainPos_ = HEIGHT;
+            algorithm->isStackFromEnd_ = stack;
+            algorithm->canOverScrollStart_ = overscroll;
+            algorithm->canOverScrollEnd_ = overscroll;
+            algorithm->GetOrCreateFastScrollState().skipStart = { 0, 244.0f };
+            algorithm->MeasureFastScrollSkipWindow(AceType::RawPtr(frameNode_));
+            ASSERT_FALSE(algorithm->itemPosition_.empty());
+            const float boundary = stack ? algorithm->GetEndPosition() : algorithm->GetStartPosition();
+            const float expected = stack ? HEIGHT - (overscroll ? 244.0f : 0.0f) :
+                (overscroll ? 244.0f : 0.0f);
+            EXPECT_NEAR(boundary, expected, 0.1f);
+        }
+    }
 }
 
 /**
