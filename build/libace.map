@@ -4288,6 +4288,7 @@
       "OHOS::Ace::Framework::JsEngine::UnregisterLayoutInspectorCallback(OHOS::Ace::RefPtr<OHOS::Ace::Framework::InspectorEvent> const&, int)";
       "OHOS::Ace::Framework::JsiValue::IsObject() const";
       "OHOS::Ace::Framework::JsiValue::JsiValue(panda::CopyableGlobal<panda::JSValueRef> const&)";
+      "OHOS::Ace::Framework::JsiValue::JsiValue(panda::Local<panda::JSValueRef>)";
       "OHOS::Ace::Framework::ManifestParser::GetWindowConfig()";
       "OHOS::Ace::Framework::ManifestParser::ManifestParser()";
       "OHOS::Ace::Framework::MediaQueryInfo::GetMediaQueryInfo() const";
