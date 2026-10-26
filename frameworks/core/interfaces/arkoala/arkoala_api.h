@@ -5539,6 +5539,7 @@ struct ArkUIScrollableModifier {
     void (*setEnableScrollWithKeyboard)(ArkUINodeHandle node, ArkUI_Bool value);
     void (*resetEnableScrollWithKeyboard)(ArkUINodeHandle node);
     ArkUI_Int32 (*getEnableScrollWithKeyboard)(ArkUINodeHandle node);
+    ArkUI_Int32 (*getScrollState)(ArkUINodeHandle node);
 };
 
 struct ArkUIScrollModifier {
@@ -5685,7 +5686,6 @@ struct ArkUIScrollerModifier {
     void (*getCurrentOffset)(ArkUINodeHandle node, ArkUI_Float32* out);
     void (*scrollTo)(ArkUINodeHandle node, ArkUI_Float32* xOffsetArray, ArkUI_Float32* yOffsetArray,
         ArkUI_Bool animation, const struct ArkUIScrollerAnimationType* animationType);
-    ArkUI_Int32 (*getScrollState)(ArkUINodeHandle node);
 };
 
 struct ArkUITabsModifier {
