@@ -1691,8 +1691,8 @@ typedef struct Callback_Opt_Object_Void Callback_Opt_Object_Void;
 typedef struct Opt_Callback_Opt_Object_Void Opt_Callback_Opt_Object_Void;
 typedef struct Callback_Opt_OffsetResult_Void Callback_Opt_OffsetResult_Void;
 typedef struct Opt_Callback_Opt_OffsetResult_Void Opt_Callback_Opt_OffsetResult_Void;
-typedef struct Callback_Opt_PlaceholderOptions_Void Callback_Opt_PlaceholderOptions_Void;
-typedef struct Opt_Callback_Opt_PlaceholderOptions_Void Opt_Callback_Opt_PlaceholderOptions_Void;
+typedef struct Callback_Opt_PlaceholderOptions_Void Callback_Opt_PlaceholderOptions_Void;  // NOLINT
+typedef struct Opt_Callback_Opt_PlaceholderOptions_Void Opt_Callback_Opt_PlaceholderOptions_Void;  // NOLINT
 typedef struct Callback_Opt_ScrollResult_Void Callback_Opt_ScrollResult_Void;
 typedef struct Opt_Callback_Opt_ScrollResult_Void Opt_Callback_Opt_ScrollResult_Void;
 typedef struct Callback_Opt_StyledString_Opt_Array_String_Void Callback_Opt_StyledString_Opt_Array_String_Void;
@@ -1915,8 +1915,6 @@ typedef struct OnContentScrollCallback OnContentScrollCallback;
 typedef struct Opt_OnContentScrollCallback Opt_OnContentScrollCallback;
 typedef struct OnContextMenuHideCallback OnContextMenuHideCallback;
 typedef struct Opt_OnContextMenuHideCallback Opt_OnContextMenuHideCallback;
-typedef struct OnContextMenuUpdateCallback OnContextMenuUpdateCallback;
-typedef struct Opt_OnContextMenuUpdateCallback Opt_OnContextMenuUpdateCallback;
 typedef struct OnCreateAISession OnCreateAISession;
 typedef struct Opt_OnCreateAISession Opt_OnCreateAISession;
 typedef struct OnCreateMenuCallback OnCreateMenuCallback;
@@ -1925,6 +1923,8 @@ typedef struct OnDestroyAISession OnDestroyAISession;
 typedef struct Opt_OnDestroyAISession Opt_OnDestroyAISession;
 typedef struct OnDetectBlankScreenCallback OnDetectBlankScreenCallback;
 typedef struct Opt_OnDetectBlankScreenCallback Opt_OnDetectBlankScreenCallback;
+typedef struct OnMonitorBlankScreenCallback OnMonitorBlankScreenCallback;
+typedef struct Opt_OnMonitorBlankScreenCallback Opt_OnMonitorBlankScreenCallback;
 typedef struct OnDidChangeCallback OnDidChangeCallback;
 typedef struct Opt_OnDidChangeCallback Opt_OnDidChangeCallback;
 typedef struct OnDidStopDraggingCallback OnDidStopDraggingCallback;
@@ -1969,8 +1969,6 @@ typedef struct OnMenuItemClickWithTextCallback OnMenuItemClickWithTextCallback;
 typedef struct Opt_OnMenuItemClickWithTextCallback Opt_OnMenuItemClickWithTextCallback;
 typedef struct OnMicrophoneCaptureStateChangeCallback OnMicrophoneCaptureStateChangeCallback;
 typedef struct Opt_OnMicrophoneCaptureStateChangeCallback Opt_OnMicrophoneCaptureStateChangeCallback;
-typedef struct OnMonitorBlankScreenCallback OnMonitorBlankScreenCallback;
-typedef struct Opt_OnMonitorBlankScreenCallback Opt_OnMonitorBlankScreenCallback;
 typedef struct OnMoveHandler OnMoveHandler;
 typedef struct Opt_OnMoveHandler Opt_OnMoveHandler;
 typedef struct OnNativeEmbedObjectParamChangeCallback OnNativeEmbedObjectParamChangeCallback;
@@ -2064,7 +2062,7 @@ typedef struct Opt_PasteButtonCallback Opt_PasteButtonCallback;
 typedef struct PasteEventCallback PasteEventCallback;
 typedef struct Opt_PasteEventCallback Opt_PasteEventCallback;
 typedef struct PlaceholderProvider PlaceholderProvider;
-typedef struct Opt_PlaceholderProvider Opt_PlaceholderProvider;
+typedef struct Opt_PlaceholderProvider Opt_PlaceholderProvider;  // NOLINT
 typedef struct PluginErrorCallback PluginErrorCallback;
 typedef struct Opt_PluginErrorCallback Opt_PluginErrorCallback;
 typedef struct PopupStateChangeCallback PopupStateChangeCallback;
@@ -2541,8 +2539,6 @@ typedef struct Ark_MenuGridStyleOptions Ark_MenuGridStyleOptions;
 typedef struct Opt_MenuGridStyleOptions Opt_MenuGridStyleOptions;
 typedef struct Ark_MessageEvents Ark_MessageEvents;
 typedef struct Opt_MessageEvents Opt_MessageEvents;
-typedef struct Ark_MonitoredBlankScreenEventInfo Ark_MonitoredBlankScreenEventInfo;
-typedef struct Opt_MonitoredBlankScreenEventInfo Opt_MonitoredBlankScreenEventInfo;
 typedef struct Ark_MotionBlurAnchor Ark_MotionBlurAnchor;
 typedef struct Opt_MotionBlurAnchor Opt_MotionBlurAnchor;
 typedef struct Ark_MotionPathOptions Ark_MotionPathOptions;
@@ -2793,6 +2789,8 @@ typedef struct Ark_text_FontVariation Ark_text_FontVariation;
 typedef struct Opt_text_FontVariation Opt_text_FontVariation;
 typedef struct Ark_text_LineMetrics Ark_text_LineMetrics;
 typedef struct Opt_text_LineMetrics Opt_text_LineMetrics;
+typedef struct Ark_text_RectStyle Ark_text_RectStyle;
+typedef struct Opt_text_RectStyle Opt_text_RectStyle;
 typedef struct Ark_text_TextBox Ark_text_TextBox;
 typedef struct Opt_text_TextBox Opt_text_TextBox;
 typedef struct Ark_TextClockOptions Ark_TextClockOptions;
@@ -3019,8 +3017,6 @@ typedef struct Ark_VoiceButtonOptions Ark_VoiceButtonOptions;
 typedef struct Opt_VoiceButtonOptions Opt_VoiceButtonOptions;
 typedef struct Ark_WaterFlowOptions Ark_WaterFlowOptions;
 typedef struct Opt_WaterFlowOptions Opt_WaterFlowOptions;
-typedef struct Ark_WebContextMenuOptions Ark_WebContextMenuOptions;
-typedef struct Opt_WebContextMenuOptions Opt_WebContextMenuOptions;
 typedef struct Ark_WebKeyboardCallbackInfo Ark_WebKeyboardCallbackInfo;
 typedef struct Opt_WebKeyboardCallbackInfo Opt_WebKeyboardCallbackInfo;
 typedef struct Ark_WebKeyboardOptions Ark_WebKeyboardOptions;
@@ -3067,6 +3063,8 @@ typedef struct Ark_BindableResourceStr Ark_BindableResourceStr;
 typedef struct Opt_BindableResourceStr Opt_BindableResourceStr;
 typedef struct Ark_BlankScreenDetectionEventInfo Ark_BlankScreenDetectionEventInfo;
 typedef struct Opt_BlankScreenDetectionEventInfo Opt_BlankScreenDetectionEventInfo;
+typedef struct Ark_MonitoredBlankScreenEventInfo Ark_MonitoredBlankScreenEventInfo;
+typedef struct Opt_MonitoredBlankScreenEventInfo Opt_MonitoredBlankScreenEventInfo;
 typedef struct Ark_ButtonIconOptions Ark_ButtonIconOptions;
 typedef struct Opt_ButtonIconOptions Opt_ButtonIconOptions;
 typedef struct Ark_cacheDownload_DownloadInfo Ark_cacheDownload_DownloadInfo;
@@ -3293,8 +3291,6 @@ typedef struct Ark_TabsSidebarSearchableOptions Ark_TabsSidebarSearchableOptions
 typedef struct Opt_TabsSidebarSearchableOptions Opt_TabsSidebarSearchableOptions;
 typedef struct Ark_text_Decoration Ark_text_Decoration;
 typedef struct Opt_text_Decoration Opt_text_Decoration;
-typedef struct Ark_text_RectStyle Ark_text_RectStyle;
-typedef struct Opt_text_RectStyle Opt_text_RectStyle;
 typedef struct Ark_text_TextShadow Ark_text_TextShadow;
 typedef struct Opt_text_TextShadow Opt_text_TextShadow;
 typedef struct Ark_TextCascadePickerRangeContent Ark_TextCascadePickerRangeContent;
@@ -3727,8 +3723,8 @@ typedef struct Ark_PickerIndicatorStyle Ark_PickerIndicatorStyle;
 typedef struct Opt_PickerIndicatorStyle Opt_PickerIndicatorStyle;
 typedef struct Ark_PickerTextStyle Ark_PickerTextStyle;
 typedef struct Opt_PickerTextStyle Opt_PickerTextStyle;
-typedef struct Ark_PlaceholderOptions Ark_PlaceholderOptions;
-typedef struct Opt_PlaceholderOptions Opt_PlaceholderOptions;
+typedef struct Ark_PlaceholderOptions Ark_PlaceholderOptions;  // NOLINT
+typedef struct Opt_PlaceholderOptions Opt_PlaceholderOptions;  // NOLINT
 typedef struct Ark_PlaceholderStyle Ark_PlaceholderStyle;
 typedef struct Opt_PlaceholderStyle Opt_PlaceholderStyle;
 typedef struct Ark_PopupCommonOptions Ark_PopupCommonOptions;
@@ -5733,9 +5729,7 @@ typedef struct Opt_ImmersiveMode {
 typedef enum Ark_ImmersiveStrategy {
     ARK_IMMERSIVE_STRATEGY_AVOID_CUTOUT = 0,
     ARK_IMMERSIVE_STRATEGY_AVOID_FLOAT_NAV = 1,
-    ARK_IMMERSIVE_STRATEGY_AVOID_WINDOW_CONTROLS = 6,
     ARK_IMMERSIVE_STRATEGY_BIND_SHEET_EXPAND_SAFE_AREA = 7,
-    ARK_IMMERSIVE_STRATEGY_NAVIGATION_EXPAND_SAFE_AREA = 8,
 } Ark_ImmersiveStrategy;
 typedef struct Opt_ImmersiveStrategy {
     Ark_Tag tag;
@@ -6972,15 +6966,6 @@ typedef struct Opt_SafeAreaEdge {
     Ark_Tag tag;
     Ark_SafeAreaEdge value;
 } Opt_SafeAreaEdge;
-typedef enum Ark_SafeAreaInsetAlignment {
-    ARK_SAFE_AREA_INSET_ALIGNMENT_START = 0,
-    ARK_SAFE_AREA_INSET_ALIGNMENT_CENTER = 1,
-    ARK_SAFE_AREA_INSET_ALIGNMENT_END = 2,
-} Ark_SafeAreaInsetAlignment;
-typedef struct Opt_SafeAreaInsetAlignment {
-    Ark_Tag tag;
-    Ark_SafeAreaInsetAlignment value;
-} Opt_SafeAreaInsetAlignment;
 typedef enum Ark_SafeAreaType {
     ARK_SAFE_AREA_TYPE_SYSTEM = 0,
     ARK_SAFE_AREA_TYPE_CUTOUT = 1,
@@ -8122,13 +8107,6 @@ typedef struct Opt_WebCaptureMode {
     Ark_Tag tag;
     Ark_WebCaptureMode value;
 } Opt_WebCaptureMode;
-typedef enum Ark_WebContextMenuItemId {
-    ARK_WEB_CONTEXT_MENU_ITEM_ID_MENU_COPY_LINK = 11,
-} Ark_WebContextMenuItemId;
-typedef struct Opt_WebContextMenuItemId {
-    Ark_Tag tag;
-    Ark_WebContextMenuItemId value;
-} Opt_WebContextMenuItemId;
 typedef enum Ark_WebDarkMode {
     ARK_WEB_DARK_MODE_OFF = 0,
     ARK_WEB_DARK_MODE_ON = 1,
@@ -11792,8 +11770,8 @@ typedef struct Opt_Callback_CopyEvent_Void {
 typedef struct Callback_CreateItem {
     /* kind: Callback */
     Ark_CallbackResource resource;
-    void (*call)(const Ark_Int32 resourceId, const Ark_Int32 index, const Ark_Boolean skipCreate, const Callback_Pointer_Void continuation);
-    void (*callSync)(Ark_VMContext vmContext, const Ark_Int32 resourceId, const Ark_Int32 index, const Ark_Boolean skipCreate, const Callback_Pointer_Void continuation);
+    void (*call)(const Ark_Int32 resourceId, const Ark_Int32 index, Ark_Boolean skipCreate, const Callback_Pointer_Void continuation);
+    void (*callSync)(Ark_VMContext vmContext, const Ark_Int32 resourceId, const Ark_Int32 index, Ark_Boolean skipCreate, const Callback_Pointer_Void continuation);
 } Callback_CreateItem;
 typedef struct Opt_Callback_CreateItem {
     Ark_Tag tag;
@@ -12969,16 +12947,16 @@ typedef struct Opt_Callback_Opt_OffsetResult_Void {
     Ark_Tag tag;
     Callback_Opt_OffsetResult_Void value;
 } Opt_Callback_Opt_OffsetResult_Void;
-typedef struct Callback_Opt_PlaceholderOptions_Void {
+typedef struct Callback_Opt_PlaceholderOptions_Void {  // NOLINT
     /* kind: Callback */
     Ark_CallbackResource resource;
     void (*call)(const Ark_Int32 resourceId, const Opt_PlaceholderOptions value);
     void (*callSync)(Ark_VMContext vmContext, const Ark_Int32 resourceId, const Opt_PlaceholderOptions value);
-} Callback_Opt_PlaceholderOptions_Void;
-typedef struct Opt_Callback_Opt_PlaceholderOptions_Void {
+} Callback_Opt_PlaceholderOptions_Void;  // NOLINT
+typedef struct Opt_Callback_Opt_PlaceholderOptions_Void {  // NOLINT
     Ark_Tag tag;
     Callback_Opt_PlaceholderOptions_Void value;
-} Opt_Callback_Opt_PlaceholderOptions_Void;
+} Opt_Callback_Opt_PlaceholderOptions_Void;  // NOLINT
 typedef struct Callback_Opt_ScrollResult_Void {
     /* kind: Callback */
     Ark_CallbackResource resource;
@@ -14089,16 +14067,6 @@ typedef struct Opt_OnContextMenuHideCallback {
     Ark_Tag tag;
     OnContextMenuHideCallback value;
 } Opt_OnContextMenuHideCallback;
-typedef struct OnContextMenuUpdateCallback {
-    /* kind: Callback */
-    Ark_CallbackResource resource;
-    void (*call)(const Ark_Int32 resourceId, Ark_WebContextMenuItemId menuItemId, const Opt_WebContextMenuOptions options);
-    void (*callSync)(Ark_VMContext vmContext, const Ark_Int32 resourceId, Ark_WebContextMenuItemId menuItemId, const Opt_WebContextMenuOptions options);
-} OnContextMenuUpdateCallback;
-typedef struct Opt_OnContextMenuUpdateCallback {
-    Ark_Tag tag;
-    OnContextMenuUpdateCallback value;
-} Opt_OnContextMenuUpdateCallback;
 typedef struct OnCreateAISession {
     /* kind: Callback */
     Ark_CallbackResource resource;
@@ -14139,6 +14107,16 @@ typedef struct Opt_OnDetectBlankScreenCallback {
     Ark_Tag tag;
     OnDetectBlankScreenCallback value;
 } Opt_OnDetectBlankScreenCallback;
+typedef struct OnMonitorBlankScreenCallback {
+    /* kind: Callback */
+    Ark_CallbackResource resource;
+    void (*call)(const Ark_Int32 resourceId, const Ark_MonitoredBlankScreenEventInfo event);
+    void (*callSync)(Ark_VMContext vmContext, const Ark_Int32 resourceId, const Ark_MonitoredBlankScreenEventInfo event);
+} OnMonitorBlankScreenCallback;
+typedef struct Opt_OnMonitorBlankScreenCallback {
+    Ark_Tag tag;
+    OnMonitorBlankScreenCallback value;
+} Opt_OnMonitorBlankScreenCallback;
 typedef struct OnDidChangeCallback {
     /* kind: Callback */
     Ark_CallbackResource resource;
@@ -14359,16 +14337,6 @@ typedef struct Opt_OnMicrophoneCaptureStateChangeCallback {
     Ark_Tag tag;
     OnMicrophoneCaptureStateChangeCallback value;
 } Opt_OnMicrophoneCaptureStateChangeCallback;
-typedef struct OnMonitorBlankScreenCallback {
-    /* kind: Callback */
-    Ark_CallbackResource resource;
-    void (*call)(const Ark_Int32 resourceId, const Ark_MonitoredBlankScreenEventInfo event);
-    void (*callSync)(Ark_VMContext vmContext, const Ark_Int32 resourceId, const Ark_MonitoredBlankScreenEventInfo event);
-} OnMonitorBlankScreenCallback;
-typedef struct Opt_OnMonitorBlankScreenCallback {
-    Ark_Tag tag;
-    OnMonitorBlankScreenCallback value;
-} Opt_OnMonitorBlankScreenCallback;
 typedef struct OnMoveHandler {
     /* kind: Callback */
     Ark_CallbackResource resource;
@@ -14792,8 +14760,8 @@ typedef struct Opt_OnWillStopDraggingCallback {
 typedef struct OnZoomChangeCallback {
     /* kind: Callback */
     Ark_CallbackResource resource;
-    void (*call)(const Ark_Int32 resourceId, const Ark_OnZoomChangeEvent zoomChangeInfo);
-    void (*callSync)(Ark_VMContext vmContext, const Ark_Int32 resourceId, const Ark_OnZoomChangeEvent zoomChangeInfo);
+    void (*call)(const Ark_Int32 resourceId, const Ark_OnZoomChangeEvent data);
+    void (*callSync)(Ark_VMContext vmContext, const Ark_Int32 resourceId, const Ark_OnZoomChangeEvent data);
 } OnZoomChangeCallback;
 typedef struct Opt_OnZoomChangeCallback {
     Ark_Tag tag;
@@ -14833,10 +14801,10 @@ typedef struct PlaceholderProvider {
     void (*call)(const Ark_Int32 resourceId, const Ark_Int32 index, const Callback_Opt_PlaceholderOptions_Void continuation);
     void (*callSync)(Ark_VMContext vmContext, const Ark_Int32 resourceId, const Ark_Int32 index, const Callback_Opt_PlaceholderOptions_Void continuation);
 } PlaceholderProvider;
-typedef struct Opt_PlaceholderProvider {
+typedef struct Opt_PlaceholderProvider {  // NOLINT
     Ark_Tag tag;
     PlaceholderProvider value;
-} Opt_PlaceholderProvider;
+} Opt_PlaceholderProvider;  // NOLINT
 typedef struct PluginErrorCallback {
     /* kind: Callback */
     Ark_CallbackResource resource;
@@ -17257,16 +17225,6 @@ typedef struct Opt_MessageEvents {
     Ark_Tag tag;
     Ark_MessageEvents value;
 } Opt_MessageEvents;
-typedef struct Ark_MonitoredBlankScreenEventInfo {
-    /* kind: Interface */
-    Ark_String url;
-    Ark_BlankScreenReason reason;
-    Ark_String extraMsg;
-} Ark_MonitoredBlankScreenEventInfo;
-typedef struct Opt_MonitoredBlankScreenEventInfo {
-    Ark_Tag tag;
-    Ark_MonitoredBlankScreenEventInfo value;
-} Opt_MonitoredBlankScreenEventInfo;
 typedef struct Ark_MotionBlurAnchor {
     /* kind: Interface */
     Opt_Float64 x;
@@ -18519,6 +18477,18 @@ typedef struct Opt_text_LineMetrics {
     Ark_Tag tag;
     Ark_text_LineMetrics value;
 } Opt_text_LineMetrics;
+typedef struct Ark_text_RectStyle {
+    /* kind: Interface */
+    Ark_common2D_Color color;
+    Ark_Float64 leftTopRadius;
+    Ark_Float64 rightTopRadius;
+    Ark_Float64 rightBottomRadius;
+    Ark_Float64 leftBottomRadius;
+} Ark_text_RectStyle;
+typedef struct Opt_text_RectStyle {
+    Ark_Tag tag;
+    Ark_text_RectStyle value;
+} Opt_text_RectStyle;
 typedef struct Ark_text_TextBox {
     /* kind: Interface */
     Ark_common2D_Rect rect;
@@ -19862,14 +19832,6 @@ typedef struct Opt_WaterFlowOptions {
     Ark_Tag tag;
     Ark_WaterFlowOptions value;
 } Opt_WaterFlowOptions;
-typedef struct Ark_WebContextMenuOptions {
-    /* kind: Interface */
-    Opt_Boolean enable;
-} Ark_WebContextMenuOptions;
-typedef struct Opt_WebContextMenuOptions {
-    Ark_Tag tag;
-    Ark_WebContextMenuOptions value;
-} Opt_WebContextMenuOptions;
 typedef struct Ark_WebKeyboardCallbackInfo {
     /* kind: Interface */
     Ark_WebKeyboardController controller;
@@ -20132,6 +20094,16 @@ typedef struct Opt_BlankScreenDetectionEventInfo {
     Ark_Tag tag;
     Ark_BlankScreenDetectionEventInfo value;
 } Opt_BlankScreenDetectionEventInfo;
+typedef struct Ark_MonitoredBlankScreenEventInfo {
+    /* kind: Interface */
+    Ark_String url;
+    Ark_BlankScreenReason reason;
+    Ark_String extraMsg;
+} Ark_MonitoredBlankScreenEventInfo;
+typedef struct Opt_MonitoredBlankScreenEventInfo {
+    Ark_Tag tag;
+    Ark_MonitoredBlankScreenEventInfo value;
+} Opt_MonitoredBlankScreenEventInfo;
 typedef struct Ark_ButtonIconOptions {
     /* kind: Interface */
     Ark_Union_String_image_PixelMap_Resource shown;
@@ -21320,20 +21292,6 @@ typedef struct Opt_text_Decoration {
     Ark_Tag tag;
     Ark_text_Decoration value;
 } Opt_text_Decoration;
-typedef struct Ark_text_RectStyle {
-    /* kind: Interface */
-    Ark_common2D_Color color;
-    Ark_Float64 leftTopRadius;
-    Ark_Float64 rightTopRadius;
-    Ark_Float64 rightBottomRadius;
-    Ark_Float64 leftBottomRadius;
-    Opt_common2D_Color borderColor;
-    Opt_Float64 borderWidth;
-} Ark_text_RectStyle;
-typedef struct Opt_text_RectStyle {
-    Ark_Tag tag;
-    Ark_text_RectStyle value;
-} Opt_text_RectStyle;
 typedef struct Ark_text_TextShadow {
     /* kind: Interface */
     Opt_common2D_Color color;
@@ -24168,15 +24126,15 @@ typedef struct Opt_PickerTextStyle {
     Ark_Tag tag;
     Ark_PickerTextStyle value;
 } Opt_PickerTextStyle;
-typedef struct Ark_PlaceholderOptions {
+typedef struct Ark_PlaceholderOptions {  // NOLINT
     /* kind: Interface */
     Opt_String id;
     Opt_SizeOptions size;
-} Ark_PlaceholderOptions;
-typedef struct Opt_PlaceholderOptions {
+} Ark_PlaceholderOptions;  // NOLINT
+typedef struct Opt_PlaceholderOptions {  // NOLINT
     Ark_Tag tag;
     Ark_PlaceholderOptions value;
-} Opt_PlaceholderOptions;
+} Opt_PlaceholderOptions;  // NOLINT
 typedef struct Ark_PlaceholderStyle {
     /* kind: Interface */
     Opt_arkui_component_units_Font font;
@@ -25814,12 +25772,12 @@ typedef struct GENERATED_ArkUICommonMethodModifier {
                                              const Opt_Union_CustomNodeBuilder_Array_MenuElement* content,
                                              const Opt_ResponseType* responseType,
                                              const Opt_ContextMenuOptions* options);
-    void (*setBindContextMenuWithResponse)(Ark_NativePointer node,
-                                           const Opt_CustomNodeBuilderT_ResponseType* content,
-                                           const Opt_ContextMenuOptions* options);
-    void (*setBindContextMenuWithResponseArray)(Ark_NativePointer node,
-                                                const Opt_Union_CustomNodeBuilderT_ResponseType_Array_MenuElement* content,
-                                                const Opt_ContextMenuOptions* options);
+    void (*setBindContextMenuWithResponse0)(Ark_NativePointer node,
+                                            const Opt_CustomNodeBuilderT_ResponseType* content,
+                                            const Opt_ContextMenuOptions* options);
+    void (*setBindContextMenuWithResponse1)(Ark_NativePointer node,
+                                            const Opt_Union_CustomNodeBuilderT_ResponseType_Array_MenuElement* content,
+                                            const Opt_ContextMenuOptions* options);
     void (*setBindContextMenu1)(Ark_NativePointer node,
                                 const Opt_Union_Boolean_Bindable_Boolean* isShow,
                                 const Opt_CustomNodeBuilder* content,
@@ -29046,8 +29004,6 @@ typedef struct GENERATED_ArkUIWebModifier {
                                  const Opt_Callback_OnContextMenuShowEvent_Boolean* value);
     void (*setOnContextMenuHide)(Ark_NativePointer node,
                                  const Opt_OnContextMenuHideCallback* value);
-    void (*setOnContextMenuUpdate)(Ark_NativePointer node,
-                                   const Opt_OnContextMenuUpdateCallback* value);
     void (*setMediaPlayGestureAccess)(Ark_NativePointer node,
                                       const Opt_Boolean* value);
     void (*setOnSearchResultReceive)(Ark_NativePointer node,
@@ -32390,7 +32346,7 @@ typedef struct GENERATED_ArkUIRichEditorControllerAccessor {
                                 const CustomNodeBuilder* value,
                                 const Opt_RichEditorBuilderSpanOptions* options);
     Opt_Int32 (*addRichEditorBuilderSpan)(Ark_RichEditorController peer,
-                                          const Ark_RichEditorBuilderSpan* value,
+                                          const Ark_RichEditorBuilderSpan* builderSpan,
                                           const Opt_BuilderSpanInfo* info);
     Opt_Int32 (*addSymbolSpan)(Ark_RichEditorController peer,
                                const Ark_Resource* value,
@@ -32404,7 +32360,7 @@ typedef struct GENERATED_ArkUIRichEditorControllerAccessor {
     Opt_Array_Union_RichEditorImageSpanResult_RichEditorTextSpanResult (*getSpans)(Ark_RichEditorController peer,
                                                                                    const Opt_RichEditorRange* value);
     Opt_Array_BuilderSpanInfo (*getRichEditorBuilderSpans)(Ark_RichEditorController peer,
-                                                           const Opt_RichEditorRange* value);
+                                                           const Opt_RichEditorRange* range);
     Opt_Array_RichEditorParagraphResult (*getParagraphs)(Ark_RichEditorController peer,
                                                          const Opt_RichEditorRange* value);
     Opt_RichEditorSelection (*getSelection)(Ark_RichEditorController peer);
@@ -32604,7 +32560,7 @@ typedef struct GENERATED_ArkUIScrollerAccessor {
                                   Ark_Scroller peer);
     Opt_FrameNode (*getFrameNode)(Ark_Scroller peer);
     Ark_ScrollState (*getScrollState)(Ark_VMContext vmContext,
-                                      Ark_Scroller peer);
+                                       Ark_Scroller peer);
 } GENERATED_ArkUIScrollerAccessor;
 
 typedef struct GENERATED_ArkUIScrollResultAccessor {
@@ -33468,9 +33424,6 @@ typedef struct GENERATED_ArkUIWebContextMenuParamAccessor {
     Ark_Int32 (*getPreviewWidth)(Ark_WebContextMenuParam peer);
     Ark_Int32 (*getPreviewHeight)(Ark_WebContextMenuParam peer);
     Ark_ContextMenuDataMediaType (*getContextMenuMediaType)(Ark_WebContextMenuParam peer);
-    Ark_Boolean (*shouldOfferLinkToText)(Ark_WebContextMenuParam peer);
-    Ark_String (*getTextFragmentGeneratedLink)(Ark_WebContextMenuParam peer);
-    Ark_Boolean (*isOverTextFragment)(Ark_WebContextMenuParam peer);
 } GENERATED_ArkUIWebContextMenuParamAccessor;
 
 typedef struct GENERATED_ArkUIWebContextMenuResultAccessor {
@@ -33488,8 +33441,6 @@ typedef struct GENERATED_ArkUIWebContextMenuResultAccessor {
     void (*pasteAndMatchStyle)(Ark_WebContextMenuResult peer);
     void (*requestPasswordAutoFill)(Ark_WebContextMenuResult peer);
     void (*saveImage)(Ark_WebContextMenuResult peer);
-    void (*copyLinkToTextMenu)(Ark_WebContextMenuResult peer);
-    void (*removeFragments)(Ark_WebContextMenuResult peer);
 } GENERATED_ArkUIWebContextMenuResultAccessor;
 
 typedef struct GENERATED_ArkUIWebKeyboardControllerAccessor {
@@ -34273,4 +34224,3 @@ struct OH_AnyAPI {
 /* clang-format on */
 
 #endif  // GENERATED_FOUNDATION_ACE_FRAMEWORKS_CORE_INTERFACES_ARKOALA_API_H
-

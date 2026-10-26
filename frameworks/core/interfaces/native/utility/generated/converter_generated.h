@@ -744,21 +744,6 @@ void AssignUnionTo(std::optional<T>& dst,
 
 template<typename T>
 void AssignUnionTo(std::optional<T>& dst,
-                   const Ark_TabBarBadgeType& src)
-{
-    switch (src.selector) {
-        case SELECTOR_ID_0: AssignTo(dst, src.value0); break;
-        case SELECTOR_ID_1: AssignTo(dst, src.value1); break;
-        default:
-        {
-            LOGE("Unexpected src->selector: %{public}d\n", src.selector);
-            return;
-        }
-    }
-}
-
-template<typename T>
-void AssignUnionTo(std::optional<T>& dst,
                    const Ark_TipsMessageType& src)
 {
     switch (src.selector) {
@@ -2280,6 +2265,26 @@ void AssignUnionTo(std::optional<T>& dst,
 
 template<typename T>
 void AssignUnionTo(std::optional<T>& dst,
+                   const Ark_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions& src)
+{
+    switch (src.selector) {
+        case SELECTOR_ID_0: AssignTo(dst, src.value0); break;
+        case SELECTOR_ID_1: AssignTo(dst, src.value1); break;
+        case SELECTOR_ID_2: AssignTo(dst, src.value2); break;
+        case SELECTOR_ID_3: AssignTo(dst, src.value3); break;
+        case SELECTOR_ID_4: AssignTo(dst, src.value4); break;
+        case SELECTOR_ID_5: AssignTo(dst, src.value5); break;
+        case SELECTOR_ID_6: AssignTo(dst, src.value6); break;
+        default:
+        {
+            LOGE("Unexpected src->selector: %{public}d\n", src.selector);
+            return;
+        }
+    }
+}
+
+template<typename T>
+void AssignUnionTo(std::optional<T>& dst,
                    const Ark_Union_Dimension_Array_Dimension& src)
 {
     switch (src.selector) {
@@ -2702,26 +2707,6 @@ void AssignUnionTo(std::optional<T>& dst,
         case SELECTOR_ID_0: AssignTo(dst, src.value0); break;
         case SELECTOR_ID_1: AssignTo(dst, src.value1); break;
         case SELECTOR_ID_2: AssignTo(dst, src.value2); break;
-        default:
-        {
-            LOGE("Unexpected src->selector: %{public}d\n", src.selector);
-            return;
-        }
-    }
-}
-
-template<typename T>
-void AssignUnionTo(std::optional<T>& dst,
-                   const Ark_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions& src)
-{
-    switch (src.selector) {
-        case SELECTOR_ID_0: AssignTo(dst, src.value0); break;
-        case SELECTOR_ID_1: AssignTo(dst, src.value1); break;
-        case SELECTOR_ID_2: AssignTo(dst, src.value2); break;
-        case SELECTOR_ID_3: AssignTo(dst, src.value3); break;
-        case SELECTOR_ID_4: AssignTo(dst, src.value4); break;
-        case SELECTOR_ID_5: AssignTo(dst, src.value5); break;
-        case SELECTOR_ID_6: AssignTo(dst, src.value6); break;
         default:
         {
             LOGE("Unexpected src->selector: %{public}d\n", src.selector);
@@ -3637,7 +3622,6 @@ ASSIGN_OPT(Opt_BaseEvent)
 ASSIGN_OPT(Opt_BaseGestureEvent)
 ASSIGN_OPT(Opt_BaselineOffsetStyle)
 ASSIGN_OPT(Opt_BlankScreenDetectionMethod)
-ASSIGN_OPT(Opt_BlankScreenReason)
 ASSIGN_OPT(Opt_BlendApplyType)
 ASSIGN_OPT(Opt_BlendMode)
 ASSIGN_OPT(Opt_BlurOnKeyboardHideMode)
@@ -3655,7 +3639,6 @@ ASSIGN_OPT(Opt_ButtonStyleMode)
 ASSIGN_OPT(Opt_ButtonType)
 ASSIGN_OPT(Opt_CacheMode)
 ASSIGN_OPT(Opt_CalendarAlign)
-ASSIGN_OPT(Opt_CalendarFirstDayOfWeek)
 ASSIGN_OPT(Opt_CalendarPickerDialog)
 ASSIGN_OPT(Opt_CameraCaptureState)
 ASSIGN_OPT(Opt_CameraCaptureStateChangeInfo)
@@ -4083,7 +4066,6 @@ ASSIGN_OPT(Opt_router_RouterMode)
 ASSIGN_OPT(Opt_RouteType)
 ASSIGN_OPT(Opt_RRect)
 ASSIGN_OPT(Opt_SafeAreaEdge)
-ASSIGN_OPT(Opt_SafeAreaInsetAlignment)
 ASSIGN_OPT(Opt_SafeAreaType)
 ASSIGN_OPT(Opt_SaveButtonOnClickResult)
 ASSIGN_OPT(Opt_SaveDescription)
@@ -4330,7 +4312,6 @@ ASSIGN_OPT(Opt_WaterFlowLayoutMode)
 ASSIGN_OPT(Opt_WaterFlowSectionsInterface)
 ASSIGN_OPT(Opt_WebBypassVsyncCondition)
 ASSIGN_OPT(Opt_WebCaptureMode)
-ASSIGN_OPT(Opt_WebContextMenuItemId)
 ASSIGN_OPT(Opt_WebContextMenuParam)
 ASSIGN_OPT(Opt_WebContextMenuResult)
 ASSIGN_OPT(Opt_WebDarkMode)
@@ -4726,7 +4707,6 @@ ASSIGN_OPT(Opt_OnCheckboxChangeCallback)
 ASSIGN_OPT(Opt_OnCheckboxGroupChangeCallback)
 ASSIGN_OPT(Opt_OnContentScrollCallback)
 ASSIGN_OPT(Opt_OnContextMenuHideCallback)
-ASSIGN_OPT(Opt_OnContextMenuUpdateCallback)
 ASSIGN_OPT(Opt_OnCreateAISession)
 ASSIGN_OPT(Opt_OnCreateMenuCallback)
 ASSIGN_OPT(Opt_OnDestroyAISession)
@@ -4753,7 +4733,6 @@ ASSIGN_OPT(Opt_OnListScrollIndexCallback)
 ASSIGN_OPT(Opt_OnMenuItemClickCallback)
 ASSIGN_OPT(Opt_OnMenuItemClickWithTextCallback)
 ASSIGN_OPT(Opt_OnMicrophoneCaptureStateChangeCallback)
-ASSIGN_OPT(Opt_OnMonitorBlankScreenCallback)
 ASSIGN_OPT(Opt_OnMoveHandler)
 ASSIGN_OPT(Opt_OnNativeEmbedObjectParamChangeCallback)
 ASSIGN_OPT(Opt_OnNativeEmbedVisibilityChangeCallback)
@@ -5039,7 +5018,6 @@ ASSIGN_OPT(Opt_Matrix4Result)
 ASSIGN_OPT(Opt_MaxLinesOptions)
 ASSIGN_OPT(Opt_MenuGridStyleOptions)
 ASSIGN_OPT(Opt_MessageEvents)
-ASSIGN_OPT(Opt_MonitoredBlankScreenEventInfo)
 ASSIGN_OPT(Opt_MotionBlurAnchor)
 ASSIGN_OPT(Opt_MotionPathOptions)
 ASSIGN_OPT(Opt_NativeEmbedMouseInfo)
@@ -5158,13 +5136,13 @@ ASSIGN_OPT(Opt_SurfaceRotationOptions)
 ASSIGN_OPT(Opt_SwiperAutoFill)
 ASSIGN_OPT(Opt_SwiperContentAnimatedTransition)
 ASSIGN_OPT(Opt_SystemAdaptiveOptions)
-ASSIGN_OPT(Opt_TabBarBadgeType)
 ASSIGN_OPT(Opt_TabContentAnimatedTransition)
 ASSIGN_OPT(Opt_TabsBreakpointType_TabBarDisplayMode)
 ASSIGN_OPT(Opt_TargetInfo)
 ASSIGN_OPT(Opt_TerminationInfo)
 ASSIGN_OPT(Opt_text_FontVariation)
 ASSIGN_OPT(Opt_text_LineMetrics)
+ASSIGN_OPT(Opt_text_RectStyle)
 ASSIGN_OPT(Opt_text_TextBox)
 ASSIGN_OPT(Opt_TextClockOptions)
 ASSIGN_OPT(Opt_TextContentControllerOptions)
@@ -5278,7 +5256,6 @@ ASSIGN_OPT(Opt_VisibleAreaEventOptions)
 ASSIGN_OPT(Opt_VisibleListContentInfo)
 ASSIGN_OPT(Opt_VoiceButtonOptions)
 ASSIGN_OPT(Opt_WaterFlowOptions)
-ASSIGN_OPT(Opt_WebContextMenuOptions)
 ASSIGN_OPT(Opt_WebKeyboardCallbackInfo)
 ASSIGN_OPT(Opt_WebKeyboardOptions)
 ASSIGN_OPT(Opt_WebMediaOptions)
@@ -5410,12 +5387,11 @@ ASSIGN_OPT(Opt_SpatialEffectParams)
 ASSIGN_OPT(Opt_StarStyleOptions)
 ASSIGN_OPT(Opt_StyledStringChangeValue)
 ASSIGN_OPT(Opt_SwitchStyle)
-ASSIGN_OPT(Opt_TabBarBadgeStyle)
 ASSIGN_OPT(Opt_TabBarIconStyle)
+ASSIGN_OPT(Opt_TabBarOptions)
 ASSIGN_OPT(Opt_TabsOptions)
 ASSIGN_OPT(Opt_TabsSidebarSearchableOptions)
 ASSIGN_OPT(Opt_text_Decoration)
-ASSIGN_OPT(Opt_text_RectStyle)
 ASSIGN_OPT(Opt_text_TextShadow)
 ASSIGN_OPT(Opt_TextCascadePickerRangeContent)
 ASSIGN_OPT(Opt_TextChangeOptions)
@@ -5439,6 +5415,7 @@ ASSIGN_OPT(Opt_Union_BindableResourceStr_BindableResourceStrArray)
 ASSIGN_OPT(Opt_Union_Boolean_MenuMaskType)
 ASSIGN_OPT(Opt_Union_Boolean_PopupMaskType)
 ASSIGN_OPT(Opt_Union_ColumnOptions_ColumnOptionsV2)
+ASSIGN_OPT(Opt_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions)
 ASSIGN_OPT(Opt_Union_Dimension_Array_Dimension)
 ASSIGN_OPT(Opt_Union_Dimension_OptionWidthMode)
 ASSIGN_OPT(Opt_Union_EdgeColors_ResourceColor_LocalizedEdgeColors)
@@ -5545,7 +5522,6 @@ ASSIGN_OPT(Opt_SizeOptions)
 ASSIGN_OPT(Opt_SubTabBarIndicatorStyle)
 ASSIGN_OPT(Opt_SweepGradientOptions)
 ASSIGN_OPT(Opt_SwipeActionItem)
-ASSIGN_OPT(Opt_TabBarOptions)
 ASSIGN_OPT(Opt_text_TextStyle)
 ASSIGN_OPT(Opt_TextAreaOptions)
 ASSIGN_OPT(Opt_TextDataDetectorConfig)
@@ -5558,7 +5534,6 @@ ASSIGN_OPT(Opt_Union_Array_Rectangle_Rectangle)
 ASSIGN_OPT(Opt_Union_ArrowStyle_Boolean)
 ASSIGN_OPT(Opt_Union_BadgePosition_Position)
 ASSIGN_OPT(Opt_Union_BorderRadiuses_Length_LocalizedBorderRadiuses)
-ASSIGN_OPT(Opt_Union_ComponentContentBase_SubTabBarStyle_BottomTabBarStyle_String_Resource_CustomNodeBuilder_TabBarOptions)
 ASSIGN_OPT(Opt_Union_CustomNodeBuilder_SwipeActionItem)
 ASSIGN_OPT(Opt_Union_Dimension_BorderRadiuses)
 ASSIGN_OPT(Opt_Union_Dimension_BorderRadiuses_LocalizedBorderRadiuses)
