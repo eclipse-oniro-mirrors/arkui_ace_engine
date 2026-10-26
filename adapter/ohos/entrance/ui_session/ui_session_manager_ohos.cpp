@@ -2696,4 +2696,26 @@ void UiSessionManagerOhos::ReportLazyForEachQueryResult(const std::string& data)
     }
     processIter->second.clear();
 }
+
+void UiSessionManagerOhos::ReportNodesInRectQueryResult(const std::string& data)
+{
+    std::shared_lock<std::shared_mutex> reportLock(reportObjectMutex_);
+    std::unique_lock<std::shared_mutex> processMapLock(processMapMutex_);
+    auto processIter = processMap_.find("nodesInRectQuery");
+    if (processIter == processMap_.end() || processIter->second.empty()) {
+        LOGW("ReportNodesInRectQueryResult no report proxy");
+        return;
+    }
+    for (const auto& pid : processIter->second) {
+        auto reportIter = reportObjectMap_.find(pid);
+        auto reportService =
+            (reportIter != reportObjectMap_.end()) ? iface_cast<ReportService>(reportIter->second) : nullptr;
+        if (reportService == nullptr) {
+            LOGW("Report NodesInRectQueryResult failed, process id:%{public}d", pid);
+            continue;
+        }
+        reportService->ReportNodesInRectQueryResult(data);
+    }
+    processIter->second.clear();
+}
 } // namespace OHOS::Ace

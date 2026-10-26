@@ -388,4 +388,18 @@ int32_t UIContentServiceStubImpl::GetLazyForEachDataByPoint(float x, float y,
     UiSessionManager::GetInstance()->ComponentTreeQuery(request);
     return NO_ERROR;
 }
+
+int32_t UIContentServiceStubImpl::GetNodesInRect(float x1, float y1, float x2, float y2,
+    [[maybe_unused]] const std::function<void(const std::string&)>& eventCallback,
+    [[maybe_unused]] int32_t timeout)
+{
+    ComponentTreeQueryRequest request;
+    request.type = ComponentTreeQueryType::NODES_IN_RECT;
+    request.x = x1;
+    request.y = y1;
+    request.extraX = x2;
+    request.extraY = y2;
+    UiSessionManager::GetInstance()->ComponentTreeQuery(request);
+    return NO_ERROR;
+}
 } // namespace OHOS::Ace

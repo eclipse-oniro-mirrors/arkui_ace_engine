@@ -121,6 +121,9 @@ public:
     int32_t GetLazyForEachDataByPoint(float x, float y,
         const std::function<void(const std::string&)>& eventCallback,
         int32_t timeout = DEFAULT_INSPECTOR_TREE_CALLBACK_TIMEOUT_MS) override;
+    int32_t GetNodesInRect(float x1, float y1, float x2, float y2,
+        const std::function<void(const std::string&)>& eventCallback,
+        int32_t timeout = DEFAULT_INSPECTOR_TREE_CALLBACK_TIMEOUT_MS) override;
 };
 } // namespace OHOS::Ace
 #endif // FOUNDATION_ACE_INTERFACE_UI_CONTENT_STUB_IMPL_H

@@ -187,6 +187,87 @@ HWTEST_F(ComponentTreeQueryTest, ComponentTreeQueryInvalidParams002, TestSize.Le
 }
 
 /**
+ * @tc.name: ComponentTreeQueryRectIntersection
+ * @tc.desc: rect/rect positive-area intersection + normalization.
+ */
+HWTEST_F(ComponentTreeQueryTest, ComponentTreeQueryRectIntersection, TestSize.Level1)
+{
+    RectF query(0.0f, 0.0f, 10.0f, 10.0f);
+    EXPECT_TRUE(ComponentTreeQuery::IsPositiveAreaRectIntersection(query, RectF(5.0f, 5.0f, 10.0f, 10.0f)));
+    EXPECT_TRUE(ComponentTreeQuery::IsPositiveAreaRectIntersection(query, RectF(1.0f, 1.0f, 2.0f, 2.0f)));
+    // Touching edges only: zero-area intersection, not a hit.
+    EXPECT_FALSE(ComponentTreeQuery::IsPositiveAreaRectIntersection(query, RectF(10.0f, 0.0f, 5.0f, 5.0f)));
+    EXPECT_FALSE(ComponentTreeQuery::IsPositiveAreaRectIntersection(query, RectF(20.0f, 20.0f, 5.0f, 5.0f)));
+    EXPECT_FALSE(ComponentTreeQuery::IsPositiveAreaRectIntersection(query, RectF(10.0f, 10.0f, 0.0f, 0.0f)));
+
+    // Diagonal corner normalization: any two opposite corners yield the same rect.
+    auto normalized = ComponentTreeQuery::NormalizeRect(10.0f, 10.0f, 0.0f, 4.0f);
+    EXPECT_EQ(normalized.Left(), 0.0f);
+    EXPECT_EQ(normalized.Top(), 4.0f);
+    EXPECT_EQ(normalized.Right(), 10.0f);
+    EXPECT_EQ(normalized.Bottom(), 10.0f);
+    auto normalizedSame = ComponentTreeQuery::NormalizeRect(0.0f, 4.0f, 10.0f, 10.0f);
+    EXPECT_EQ(normalized.Left(), normalizedSame.Left());
+    EXPECT_EQ(normalized.Top(), normalizedSame.Top());
+    EXPECT_EQ(normalized.Right(), normalizedSame.Right());
+    EXPECT_EQ(normalized.Bottom(), normalizedSame.Bottom());
+}
+
+/**
+ * @tc.name: ComponentTreeQueryInvalidParams003
+ * @tc.desc: invalid NodesInRect query parameters return correct error codes.
+ */
+HWTEST_F(ComponentTreeQueryTest, ComponentTreeQueryInvalidParams003, TestSize.Level1)
+{
+    ComponentTreeQueryRequest request;
+    std::string resultJson;
+
+    request.type = ComponentTreeQueryType::NODES_IN_RECT;
+    request.x = std::nanf("");
+    request.y = 0.0f;
+    request.extraX = 10.0f;
+    request.extraY = 10.0f;
+    EXPECT_EQ(ComponentTreeQuery::Execute(request, resultJson),
+        static_cast<int32_t>(ComponentTreeQueryError::INVALID_PARAMETER));
+    EXPECT_FALSE(resultJson.empty());
+
+    request.x = 0.0f;
+    request.y = 0.0f;
+    request.extraX = std::nanf("");
+    request.extraY = 10.0f;
+    EXPECT_EQ(ComponentTreeQuery::Execute(request, resultJson),
+        static_cast<int32_t>(ComponentTreeQueryError::INVALID_PARAMETER));
+    EXPECT_FALSE(resultJson.empty());
+
+    // Zero-area rect after normalization: x1==x2 yields zero width.
+    request.x = 0.0f;
+    request.y = 0.0f;
+    request.extraX = 0.0f;
+    request.extraY = 10.0f;
+    EXPECT_EQ(ComponentTreeQuery::Execute(request, resultJson),
+        static_cast<int32_t>(ComponentTreeQueryError::INVALID_PARAMETER));
+    EXPECT_FALSE(resultJson.empty());
+
+    // Zero-area rect after normalization: y1==y2 yields zero height.
+    request.x = 0.0f;
+    request.y = 5.0f;
+    request.extraX = 10.0f;
+    request.extraY = 5.0f;
+    EXPECT_EQ(ComponentTreeQuery::Execute(request, resultJson),
+        static_cast<int32_t>(ComponentTreeQueryError::INVALID_PARAMETER));
+    EXPECT_FALSE(resultJson.empty());
+
+    // Infinity coords after normalization (not finite).
+    request.x = 0.0f;
+    request.y = 0.0f;
+    request.extraX = HUGE_VALF;
+    request.extraY = 10.0f;
+    EXPECT_EQ(ComponentTreeQuery::Execute(request, resultJson),
+        static_cast<int32_t>(ComponentTreeQueryError::INVALID_PARAMETER));
+    EXPECT_FALSE(resultJson.empty());
+}
+
+/**
  * @tc.name: ComponentTreeQueryFrontend
  * @tc.desc: builder frontend support contract. Base (static
  * ArkTS/CJ/C-API) builders report unsupported, dynamic ArkTS reports supported.

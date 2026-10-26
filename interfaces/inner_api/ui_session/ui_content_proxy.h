@@ -122,6 +122,9 @@ public:
     virtual int32_t GetLazyForEachDataByPoint(float x, float y,
         const std::function<void(const std::string&)>& eventCallback,
         int32_t timeout = DEFAULT_INSPECTOR_TREE_CALLBACK_TIMEOUT_MS) override;
+    virtual int32_t GetNodesInRect(float x1, float y1, float x2, float y2,
+        const std::function<void(const std::string&)>& eventCallback,
+        int32_t timeout = DEFAULT_INSPECTOR_TREE_CALLBACK_TIMEOUT_MS) override;
 
 private:
     int32_t SendPageTranslateRequest(uint32_t code, const char* caller, const std::string& request,
@@ -131,6 +134,9 @@ private:
         const std::function<void(const std::string&)>& eventCallback,
         const std::function<bool(MessageParcel&)>& writeParams,
         int32_t timeout = DEFAULT_INSPECTOR_TREE_CALLBACK_TIMEOUT_MS);
+    bool RegisterQueryCallback(uint32_t code, const std::function<void(const std::string&)>& eventCallback);
+    void UnregisterQueryCallback(uint32_t code);
+    bool PostQueryTimeoutTask(uint32_t code, int32_t timeout);
     static inline BrokerDelegator<UIContentServiceProxy> delegator_;
     sptr<UiReportStub> report_ = nullptr;
     bool isConnected_ = false;

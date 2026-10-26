@@ -7128,6 +7128,8 @@ void UIContentImpl::SaveComponentTreeQueryFunction(const WeakPtr<TaskExecutor>& 
                 NG::ComponentTreeQuery::Execute(request, resultJson);
                 if (request.type == ComponentTreeQueryType::LAZY_FOREACH_DATA_BY_POINT) {
                     UiSessionManager::GetInstance()->ReportLazyForEachQueryResult(resultJson);
+                } else if (request.type == ComponentTreeQueryType::NODES_IN_RECT) {
+                    UiSessionManager::GetInstance()->ReportNodesInRectQueryResult(resultJson);
                 } else {
                     UiSessionManager::GetInstance()->ReportNavigationQueryResult(resultJson);
                 }

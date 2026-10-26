@@ -341,6 +341,7 @@ public:
     virtual void ComponentTreeQuery(const ComponentTreeQueryRequest& request) {};
     virtual void ReportNavigationQueryResult(const std::string& data) {};
     virtual void ReportLazyForEachQueryResult(const std::string& data) {};
+    virtual void ReportNodesInRectQueryResult(const std::string& data) {};
 
     // Internal callback, separate from full page-scene detection and its queues.
     void SaveSearchClickFlushFunction(std::function<void()>&& function)

@@ -1729,6 +1729,33 @@ HWTEST_F(UIContentStubTest, UIContentStubTestGetLazyForEachDataByPoint001, TestS
 }
 
 /**
+ * @tc.name: UIContentStubTestGetNodesInRect001
+ * @tc.desc: Test GET_NODES_IN_RECT IPC dispatch with parameters.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestGetNodesInRect001, TestSize.Level1)
+{
+    sptr<UIContentServiceStubImpl> ptr = std::make_shared<UIContentServiceStubImpl>();
+    MessageParcel data = MessageParcel();
+    MessageParcel reply = MessageParcel();
+    MessageOption option = MessageOption();
+
+    auto res = ptr->OnRemoteRequest(0, data, reply, option);
+    EXPECT_EQ(res, -1);
+
+    Security::AccessToken::AccessTokenKit::mockTokenTypeFlag_ = Security::AccessToken::ATokenTypeEnum::TOKEN_NATIVE;
+    data.WriteInterfaceToken(u"ohos.ace.UIContentService");
+    data.WriteFloat(0.0f);
+    data.WriteFloat(0.0f);
+    data.WriteFloat(100.0f);
+    data.WriteFloat(100.0f);
+
+    res = ptr->OnRemoteRequest(IUiContentService::GET_NODES_IN_RECT, data, reply, option);
+    EXPECT_EQ(res, 0);
+    EXPECT_EQ(reply.ReadInt32(), 0);
+}
+
+/**
  * @tc.name: UIContentStubTestPageSceneDualRuleSet001
  * @tc.desc: A merged presence event dispatches only each callback's registered ruleSet evidence.
  * @tc.type: FUNC
@@ -2309,6 +2336,95 @@ HWTEST_F(UIContentStubTest, UIContentStubTestQueryTimeout001, TestSize.Level1)
     report->HandleNavigationQueryCallbackTimeout();
     EXPECT_EQ(received, R"({"errorCode":8})");
     EXPECT_FALSE(report->navigationQueryCallback_);
+}
+
+/**
+ * @tc.name: UIContentStubTestQueryRegister004
+ * @tc.desc: NodesInRect register succeeds when empty; duplicate rejected; independent of Nav/Lazy.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestQueryRegister004, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    auto rectCb = [](const std::string&) {};
+    auto navCb = [](const std::string&) {};
+    auto lazyCb = [](const std::string&) {};
+
+    EXPECT_TRUE(report->RegisterNodesInRectQueryCallback(rectCb));
+    EXPECT_FALSE(report->RegisterNodesInRectQueryCallback(rectCb));
+    // NodesInRect is independent from Navigation and LazyForEach.
+    EXPECT_TRUE(report->RegisterNavigationQueryCallback(navCb));
+    EXPECT_TRUE(report->RegisterLazyForEachQueryCallback(lazyCb));
+    EXPECT_FALSE(report->RegisterNavigationQueryCallback(navCb));
+    EXPECT_FALSE(report->RegisterLazyForEachQueryCallback(lazyCb));
+    report->UnregisterNodesInRectQueryCallback();
+    report->UnregisterNavigationQueryCallback();
+    report->UnregisterLazyForEachQueryCallback();
+}
+
+/**
+ * @tc.name: UIContentStubTestQueryPostTimeout005
+ * @tc.desc: NodesInRect PostTimeout without event handler returns false and clears callback.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestQueryPostTimeout005, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    auto callback = [](const std::string&) {};
+
+    EXPECT_TRUE(report->RegisterNodesInRectQueryCallback(callback));
+    EXPECT_FALSE(report->PostNodesInRectQueryCallbackRemoveTask(1000));
+    EXPECT_FALSE(report->nodesInRectQueryCallback_);
+    EXPECT_TRUE(report->RegisterNodesInRectQueryCallback(callback));
+    report->UnregisterNodesInRectQueryCallback();
+}
+
+/**
+ * @tc.name: UIContentStubTestQueryReport005
+ * @tc.desc: NodesInRect registered callback receives data; callback cleared after report;
+ * independent from Navigation / LazyForEach reports.
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestQueryReport005, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    std::string rectReceived;
+    std::string navReceived;
+    std::string lazyReceived;
+    auto rectCb = [&rectReceived](const std::string& data) { rectReceived = data; };
+    auto navCb = [&navReceived](const std::string& data) { navReceived = data; };
+    auto lazyCb = [&lazyReceived](const std::string& data) { lazyReceived = data; };
+
+    EXPECT_TRUE(report->RegisterNodesInRectQueryCallback(rectCb));
+    EXPECT_TRUE(report->RegisterNavigationQueryCallback(navCb));
+    EXPECT_TRUE(report->RegisterLazyForEachQueryCallback(lazyCb));
+
+    report->ReportNodesInRectQueryResult("rect-result");
+    EXPECT_EQ(rectReceived, "rect-result");
+    EXPECT_TRUE(navReceived.empty());
+    EXPECT_TRUE(lazyReceived.empty());
+    EXPECT_FALSE(report->nodesInRectQueryCallback_);
+    EXPECT_TRUE(report->navigationQueryCallback_);
+    EXPECT_TRUE(report->lazyForEachQueryCallback_);
+
+    // Navigation / LazyForEach reports do not leak into NodesInRect.
+    report->ReportNavigationQueryResult("nav-result");
+    EXPECT_EQ(navReceived, "nav-result");
+    EXPECT_TRUE(rectReceived == "rect-result");
+    report->ReportLazyForEachQueryResult("lazy-result");
+    EXPECT_EQ(lazyReceived, "lazy-result");
+}
+
+/**
+ * @tc.name: UIContentStubTestQueryReport006
+ * @tc.desc: Without registered NodesInRect callback, Report silently drops data (no crash).
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIContentStubTest, UIContentStubTestQueryReport006, TestSize.Level1)
+{
+    sptr<UiReportStub> report = std::make_shared<UiReportStub>();
+    report->ReportNodesInRectQueryResult("orphan-data");
+    EXPECT_FALSE(report->nodesInRectQueryCallback_);
 }
 
 /**

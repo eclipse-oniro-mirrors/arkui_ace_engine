@@ -113,6 +113,7 @@ public:
     void SendPageText(int32_t nodeId, const std::string& text, int64_t version) override;
     void ReportNavigationQueryResult(const std::string& data) override;
     void ReportLazyForEachQueryResult(const std::string& data) override;
+    void ReportNodesInRectQueryResult(const std::string& data) override;
 
 private:
     void SendQueryResultReport(uint32_t code, const char* caller, const std::string& data);
