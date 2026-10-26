@@ -1880,6 +1880,1891 @@ HWTEST_F(ListFastScrollFreeNodeTestNg, FastScrollPixelOffsetSurvivesContextReatt
     EXPECT_NEAR(pattern_->GetItemRect(80).Top(), -18.0f, 0.1f);
 }
 
+/**
+ * @tc.name: FastScrollLazySkipsMiddle001
+ * @tc.desc: Count every generator invocation, including nodes later recycled, across a long jump.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollerTestNg, FastScrollLazySkipsMiddle001, TestSize.Level1)
+{
+    CreateList();
+    auto builder = AceType::MakeRefPtr<FastScrollCountingLazy>(1000);
+    ViewStackProcessor::GetInstance()->StartGetAccessRecordingFor(GetElmtId());
+    LazyForEachModelNG lazyModel;
+    lazyModel.Create(RefPtr<LazyForEachBuilder>(builder));
+    ViewStackProcessor::GetInstance()->Pop();
+    ViewStackProcessor::GetInstance()->StopGetAccessRecording();
+    CreateDone();
+    const auto initialCount = builder->GetCreatedIndices().size();
+    MockAnimationManager::GetInstance().SetTicks(8);
+    pattern_->ScrollToIndexFastScroll(800, true, ScrollAlign::START, std::nullopt,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    EXPECT_EQ(builder->GetCreatedIndices().size(), initialCount);
+    RunFastScrollFrames();
+    EXPECT_NEAR(pattern_->GetTotalOffset(), 800 * ITEM_MAIN_SIZE, 0.1f);
+    ASSERT_EQ(pattern_->itemPosition_.count(800), 1);
+    EXPECT_NEAR(pattern_->GetItemRect(800).Top(), 0.0f, 0.1f);
+    for (int32_t index : builder->GetCreatedIndices()) {
+        EXPECT_TRUE(index < 100 || index > 700) << "Unexpected intermediate generator call: " << index;
+    }
+}
+
+/**
+ * @tc.name: FastScrollSingleLaneAlignment
+ * @tc.desc: Real layout reaches the target rectangle in both size modes and directions with one start/stop pair.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollTestNg, FastScrollSingleLaneAlignment, TestSize.Level1)
+{
+    const auto [knownSize, backward, align, extraOffset] = GetParam();
+    auto model = CreateList();
+    if (knownSize) {
+        model.GetOrCreateListChildrenMainSize()->UpdateDefaultSize(ITEM_MAIN_SIZE);
+    }
+    CreateListItems(100);
+    CreateDone();
+    if (backward) {
+        ScrollTo(80 * ITEM_MAIN_SIZE);
+    }
+    auto starts = std::make_shared<int32_t>(0);
+    auto stops = std::make_shared<int32_t>(0);
+    eventHub_->SetOnScrollStart([starts]() { ++*starts; });
+    eventHub_->SetOnScrollStop([stops]() { ++*stops; });
+    MockAnimationManager::GetInstance().SetTicks(4);
+    const int32_t targetIndex = backward ? 20 : 80;
+    const float available = pattern_->contentMainSize_ - ITEM_MAIN_SIZE;
+    float alignedTop = align == ScrollAlign::CENTER ? available / 2 : 0.0f;
+    if (align == ScrollAlign::END || (align == ScrollAlign::AUTO && !backward)) {
+        alignedTop = available;
+    }
+    positionController_->ScrollToIndexWithOptions(targetIndex, true, align, extraOffset,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    RunFastScrollFrames();
+    EXPECT_NEAR(pattern_->GetTotalOffset(), targetIndex * ITEM_MAIN_SIZE - alignedTop + extraOffset, 0.1f);
+    ASSERT_EQ(pattern_->itemPosition_.count(targetIndex), 1);
+    EXPECT_NEAR(pattern_->GetItemRect(targetIndex).Top(), alignedTop - extraOffset, 0.1f);
+    EXPECT_EQ(*starts, 1);
+    EXPECT_EQ(*stops, 1);
+    eventHub_->SetOnScrollStart(nullptr);
+    eventHub_->SetOnScrollStop(nullptr);
+}
+
+INSTANTIATE_TEST_SUITE_P(SingleLane, ListFastScrollTestNg,
+    testing::Combine(testing::Bool(), testing::Bool(),
+        testing::Values(ScrollAlign::START, ScrollAlign::CENTER, ScrollAlign::END, ScrollAlign::AUTO),
+        testing::Values(-25.0f, 0.0f, 25.0f)));
+
+/**
+ * @tc.name: FastScrollDirectionAlignment
+ * @tc.desc: Logical target alignment also reaches the correct physical rectangle in RTL and stackFromEnd.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollDirectionTestNg, FastScrollDirectionAlignment, TestSize.Level1)
+{
+    const auto [axis, rtl, stackFromEnd, knownSize, align] = GetParam();
+    auto model = CreateList();
+    model.SetListDirection(axis);
+    model.SetStackFromEnd(stackFromEnd);
+    layoutProperty_->UpdateLayoutDirection(rtl ? TextDirection::RTL : TextDirection::LTR);
+    if (knownSize) {
+        model.GetOrCreateListChildrenMainSize()->UpdateDefaultSize(ITEM_MAIN_SIZE);
+    }
+    CreateListItems(100);
+    CreateDone();
+    MockAnimationManager::GetInstance().SetTicks(4);
+    const int32_t targetIndex = stackFromEnd ? 20 : 80;
+    const float available = pattern_->contentMainSize_ - ITEM_MAIN_SIZE;
+    float alignedStart = align == ScrollAlign::CENTER ? available / 2 : 0.0f;
+    if (align == ScrollAlign::END) {
+        alignedStart = available;
+    }
+    pattern_->ScrollToIndexFastScroll(targetIndex, true, align, std::nullopt, FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    RunFastScrollFrames();
+    EXPECT_NEAR(pattern_->GetTotalOffset(), targetIndex * ITEM_MAIN_SIZE - alignedStart, 0.1f);
+    ASSERT_EQ(pattern_->itemPosition_.count(targetIndex), 1);
+    const auto rect = pattern_->GetItemRect(targetIndex);
+    const float physicalStart = axis == Axis::HORIZONTAL ? rect.Left() : rect.Top();
+    EXPECT_NEAR(physicalStart, axis == Axis::HORIZONTAL && rtl ? available - alignedStart : alignedStart, 0.1f);
+}
+
+INSTANTIATE_TEST_SUITE_P(SingleLane, ListFastScrollDirectionTestNg,
+    testing::Combine(testing::Values(Axis::VERTICAL, Axis::HORIZONTAL), testing::Bool(), testing::Bool(),
+        testing::Bool(), testing::Values(ScrollAlign::START, ScrollAlign::CENTER, ScrollAlign::END)));
+
+/**
+ * @tc.name: FastScrollModelOptions001
+ * @tc.desc: The native model forwards explicit options, while disabled and nonanimated calls stay on the old path.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollerTestNg, FastScrollModelOptions001, TestSize.Level1)
+{
+    CreateList();
+    CreateListItems(100);
+    CreateDone();
+    MockAnimationManager::GetInstance().SetTicks(4);
+    auto* node = AceType::RawPtr(frameNode_);
+    ListModelNG::SetScrollToIndexWithOptions(node, 80, true, ScrollAlign::START, 25.0f,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    ASSERT_TRUE(pattern_->GetFastScrollRequest());
+    RunFastScrollFrames();
+    EXPECT_NEAR(pattern_->GetTotalOffset(), 8025.0f, 0.1f);
+    ListModelNG::SetScrollToIndexWithOptions(node, 20, false, ScrollAlign::START, std::nullopt,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    EXPECT_FALSE(pattern_->GetFastScrollRequest());
+    FlushUITasks();
+    EXPECT_NEAR(pattern_->GetTotalOffset(), 2000.0f, 0.1f);
+    ListModelNG::SetScrollToIndexWithOptions(node, 21, true, ScrollAlign::START, std::nullopt, FastScrollMode::NONE);
+    EXPECT_FALSE(pattern_->GetFastScrollRequest());
+    RunFastScrollFrames();
+    EXPECT_NEAR(pattern_->GetTotalOffset(), 2100.0f, 0.1f);
+}
+
+/**
+ * @tc.name: FastScrollLargeTargetRetargets001
+ * @tc.desc: A much larger unmeasured target corrects the endpoint and may skip again before END alignment.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollerTestNg, FastScrollLargeTargetRetargets001, TestSize.Level1)
+{
+    CreateList();
+    CreateListItems(80);
+    CreateListItem();
+    ViewAbstract::SetHeight(CalcLength(5000.0f));
+    ViewStackProcessor::GetInstance()->Pop();
+    ViewStackProcessor::GetInstance()->StopGetAccessRecording();
+    CreateListItems(19);
+    CreateDone();
+    MockAnimationManager::GetInstance().SetTicks(4);
+    pattern_->ScrollToIndexFastScroll(80, true, ScrollAlign::END, std::nullopt,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    RunFastScrollFrames();
+    ASSERT_EQ(pattern_->itemPosition_.count(80), 1);
+    EXPECT_NEAR(pattern_->GetItemRect(80).Bottom(), pattern_->contentMainSize_, 0.1f);
+    EXPECT_NEAR(pattern_->GetTotalOffset(), 13000.0f - pattern_->contentMainSize_, 0.1f);
+}
+
+/**
+ * @tc.name: FastScrollPreparesLargeTargetBeforeAnimation001
+ * @tc.desc: The large target is measured before animation and does not need a post-stop repair animation.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollerTestNg, FastScrollPreparesLargeTargetBeforeAnimation001, TestSize.Level1)
+{
+    auto model = CreateList();
+    int32_t starts = 0;
+    int32_t stops = 0;
+    model.SetOnScrollStart([&starts]() { ++starts; });
+    model.SetOnScrollStop([&stops]() { ++stops; });
+    CreateListItems(80);
+    CreateListItem();
+    ViewAbstract::SetHeight(CalcLength(5000.0f));
+    ViewStackProcessor::GetInstance()->Pop();
+    ViewStackProcessor::GetInstance()->StopGetAccessRecording();
+    CreateListItems(19);
+    CreateDone();
+    pattern_->ScrollToIndexFastScroll(80, true, ScrollAlign::END, std::nullopt,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    ASSERT_FALSE(pattern_->AnimateRunning());
+    FlushUITasks();
+    ASSERT_TRUE(pattern_->AnimateRunning());
+    EXPECT_FLOAT_EQ(pattern_->posMap_->GetPositionInfo(80).mainSize, 5000.0f);
+    const float preparedEnd = pattern_->GetFinalPosition();
+    EXPECT_NEAR(preparedEnd, 13000.0f - pattern_->contentMainSize_, 0.1f);
+    ASSERT_EQ(pattern_->itemPosition_.count(80), 0);
+    pattern_->ProcessSpringOffsetCallback(preparedEnd);
+    ASSERT_FALSE(pattern_->AnimateRunning());
+    EXPECT_FALSE(pattern_->HasFastScrollRequest());
+    FlushUITasks();
+    EXPECT_FALSE(pattern_->AnimateRunning());
+    EXPECT_EQ(starts, 1);
+    EXPECT_EQ(stops, 1);
+    RunFastScrollFrames();
+    EXPECT_NEAR(pattern_->GetItemRect(80).Bottom(), pattern_->contentMainSize_, 0.1f);
+    EXPECT_EQ(starts, stops);
+    EXPECT_FALSE(pattern_->HasFastScrollRequest());
+}
+
+/**
+ * @tc.name: FastScrollDisabledKeepsSingleCorrection001
+ * @tc.desc: Disabling fast scroll preserves the existing target reset on the first animation correction.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollerTestNg, FastScrollDisabledKeepsSingleCorrection001, TestSize.Level1)
+{
+    CreateList();
+    CreateListItems(20);
+    CreateDone();
+    positionController_->ScrollToIndexWithOptions(3, true, ScrollAlign::START, std::nullopt, FastScrollMode::NONE);
+    ASSERT_TRUE(pattern_->scrollTarget_);
+    auto info = pattern_->posMap_->GetPositionInfo(3);
+    info.mainPos += 50.0f;
+    pattern_->posMap_->UpdatePos(3, info);
+    pattern_->CheckAndUpdateAnimateTo(0.0f, 0.0f);
+    EXPECT_FLOAT_EQ(pattern_->GetFinalPosition(), info.mainPos);
+    EXPECT_FALSE(pattern_->scrollTarget_);
+    info.mainPos += 50.0f;
+    pattern_->posMap_->UpdatePos(3, info);
+    pattern_->CheckAndUpdateAnimateTo(0.0f, 0.0f);
+    EXPECT_FLOAT_EQ(pattern_->GetFinalPosition(), info.mainPos - 50.0f);
+    EXPECT_FALSE(pattern_->HasFastScrollRequest());
+}
+
+/**
+ * @tc.name: FastScrollOnlySkippedBatchUsesPositionMap001
+ * @tc.desc: Large continuous offsets keep normal layout; only a consumed compression skip may use an estimate.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollerTestNg, FastScrollOnlySkippedBatchUsesPositionMap001, TestSize.Level1)
+{
+    CreateList();
+    CreateListItems(100);
+    CreateDone();
+    pattern_->ScrollToIndexFastScroll(80, true, ScrollAlign::START, std::nullopt,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    FlushUITasks();
+    auto algorithm = AceType::DynamicCast<ListLayoutAlgorithm>(pattern_->CreateLayoutAlgorithm());
+    ASSERT_NE(algorithm, nullptr);
+    algorithm->contentMainSize_ = HEIGHT;
+    algorithm->totalItemCount_ = 100;
+    algorithm->currentDelta_ = HEIGHT * 1.5f;
+    algorithm->PrepareFastScrollSkipStart();
+    EXPECT_FALSE(algorithm->GetFastScrollState()->skipStart);
+    algorithm->SetFastScrollSkip(true);
+    algorithm->PrepareFastScrollSkipStart();
+    EXPECT_TRUE(algorithm->GetFastScrollState()->skipStart);
+}
+
+/**
+ * @tc.name: FastScrollSkipSurvivesUntilLayout001
+ * @tc.desc: A normal callback following a skip cannot erase the pending layout's skip marker.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollerTestNg, FastScrollSkipSurvivesUntilLayout001, TestSize.Level1)
+{
+    CreateList();
+    CreateListItems(100);
+    CreateDone();
+    pattern_->ScrollToIndexFastScroll(80, true, ScrollAlign::START, std::nullopt,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    FlushUITasks();
+    const float end = pattern_->GetFinalPosition();
+    const float viewport = pattern_->contentMainSize_;
+    pattern_->ProcessSpringOffsetCallback(end - viewport);
+    ASSERT_TRUE(pattern_->fastScrollSkip_);
+    pattern_->ProcessSpringOffsetCallback(end - viewport / 2.0f);
+    ASSERT_TRUE(pattern_->fastScrollSkip_);
+    auto algorithm = AceType::DynamicCast<ListLayoutAlgorithm>(pattern_->CreateLayoutAlgorithm());
+    ASSERT_NE(algorithm, nullptr);
+    EXPECT_TRUE(algorithm->GetOrCreateFastScrollState().input.skip);
+    EXPECT_FALSE(pattern_->fastScrollSkip_);
+}
+
+/**
+ * @tc.name: FastScrollRetargetPreservesApproachProgress001
+ * @tc.desc: Endpoint corrections cannot repeatedly defer the compressed skip by another two screens.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollerTestNg, FastScrollRetargetPreservesApproachProgress001, TestSize.Level1)
+{
+    CreateList();
+    CreateListItems(100);
+    CreateDone();
+    pattern_->ScrollToIndexFastScroll(80, true, ScrollAlign::START, std::nullopt,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    FlushUITasks();
+    const float viewport = pattern_->contentMainSize_;
+    for (int32_t i = 0; i < 3; ++i) {
+        const float nextPosition = pattern_->lastPosition_ + viewport / 2.0f;
+        pattern_->ProcessSpringOffsetCallback(nextPosition + pattern_->GetFastScrollRequest()->skipDistance);
+        pattern_->StartFastScrollAnimation(pattern_->GetFinalPosition() + 10.0f);
+        EXPECT_FALSE(pattern_->startingFastScroll_);
+        const auto& request = *pattern_->GetFastScrollRequest();
+        EXPECT_NEAR(request.targetOffset - pattern_->lastPosition_ - request.skipDistance,
+            (3.5f - i * 0.5f) * viewport, 0.1f);
+    }
+    const auto& request = *pattern_->GetFastScrollRequest();
+    pattern_->ProcessSpringOffsetCallback(request.targetOffset - 2.0f * viewport);
+    EXPECT_TRUE(pattern_->fastScrollSkip_);
+}
+
+class ListFastScrollSkipWindowTestNg : public ListFastScrollerTestNg,
+    public testing::WithParamInterface<bool> {};
+
+/**
+ * @tc.name: FastScrollRetainsTwoScreensOnEachSide
+ * @tc.desc: Forward and backward compression skip at the boundary of two terminal animation screens.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollSkipWindowTestNg, FastScrollRetainsTwoScreensOnEachSide, TestSize.Level1)
+{
+    auto model = CreateList();
+    model.SetInitialIndex(GetParam() ? 80 : 0);
+    CreateListItems(100);
+    CreateDone();
+    const float direction = GetParam() ? -1.0f : 1.0f;
+    const float viewport = pattern_->contentMainSize_;
+    const float origin = pattern_->GetTotalOffset();
+    ScrollToIndexTarget request;
+    request.fastScrollMode = FastScrollMode::SKIP_CREATE_AND_MEASURE;
+    request.viewportSize = viewport;
+    request.targetOffset = origin + direction * 10.0f * viewport;
+    request.skipDistance = direction * 6.0f * viewport;
+    request.skipPending = true;
+    pattern_->scrollTarget_ = request;
+    const float boundary = request.targetOffset - direction * 2.0f * viewport;
+    const float before = boundary - direction;
+    EXPECT_FLOAT_EQ(pattern_->CalcSpringAdjustOffset(origin), -request.skipDistance);
+    EXPECT_FLOAT_EQ(pattern_->CalcSpringAdjustOffset(before), -request.skipDistance);
+    EXPECT_FLOAT_EQ(pattern_->CalcSpringAdjustOffset(boundary), 0.0f);
+    EXPECT_FLOAT_EQ(pattern_->CalcSpringAdjustOffset(boundary + direction), 0.0f);
+    EXPECT_FLOAT_EQ(pattern_->CalcSpringAdjustOffset(boundary - direction * 0.0005f), 0.0f);
+    EXPECT_FLOAT_EQ(pattern_->CalcSpringAdjustOffset(boundary - direction * 0.0025f), -request.skipDistance);
+    EXPECT_FLOAT_EQ(direction * (boundary - request.skipDistance - origin), 2.0f * viewport);
+    EXPECT_FLOAT_EQ(direction * (request.targetOffset - boundary), 2.0f * viewport);
+}
+
+/**
+ * @tc.name: FastScrollRetargetKeepsTwoTerminalScreens
+ * @tc.desc: A pending skip retains at least two terminal screens after an endpoint correction.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollSkipWindowTestNg, FastScrollRetargetKeepsTwoTerminalScreens, TestSize.Level1)
+{
+    auto model = CreateList();
+    model.SetInitialIndex(GetParam() ? 80 : 0);
+    CreateListItems(100);
+    CreateDone();
+    const float direction = GetParam() ? -1.0f : 1.0f;
+    const float viewport = pattern_->contentMainSize_;
+    const float target = pattern_->GetTotalOffset() + direction * 10.0f * viewport;
+    pattern_->scrollTarget_.emplace();
+    pattern_->scrollTarget_->fastScrollMode = FastScrollMode::SKIP_CREATE_AND_MEASURE;
+    pattern_->StartFastScrollAnimation(target);
+    ASSERT_TRUE(pattern_->AnimateRunning());
+    EXPECT_FALSE(pattern_->startingFastScroll_);
+    ASSERT_TRUE(pattern_->GetFastScrollRequest()->skipPending);
+    pattern_->ProcessSpringOffsetCallback(pattern_->lastPosition_ +
+        pattern_->GetFastScrollRequest()->skipDistance + direction * 1.5f * viewport);
+    ASSERT_TRUE(pattern_->GetFastScrollRequest()->skipPending);
+    // A shorter corrected endpoint leaves less than two screens before the pending skip.
+    pattern_->GetFastScrollRequest()->targetOffset -= direction * viewport;
+    const float origin = pattern_->GetTotalOffset();
+    pattern_->StartFastScrollAnimation(pattern_->GetFastScrollRequest()->targetOffset + direction * 10.0f);
+    EXPECT_FALSE(pattern_->startingFastScroll_);
+    const auto& request = *pattern_->GetFastScrollRequest();
+    EXPECT_FALSE(request.skipPending);
+    EXPECT_TRUE(pattern_->fastScrollSkip_);
+    EXPECT_NEAR(direction * (request.targetOffset - origin - request.skipDistance),
+        2.0f * viewport, 0.1f);
+    EXPECT_NEAR(direction * (request.targetOffset - pattern_->lastPosition_),
+        2.0f * viewport, 0.1f);
+    const float boundary = request.targetOffset - direction * 2.0f * viewport;
+    EXPECT_FLOAT_EQ(pattern_->CalcSpringAdjustOffset(boundary), 0.0f);
+    EXPECT_FLOAT_EQ(pattern_->CalcSpringAdjustOffset(boundary - direction), -request.skipDistance);
+}
+
+INSTANTIATE_TEST_SUITE_P(FastScrollDirections, ListFastScrollSkipWindowTestNg, testing::Bool());
+
+class ListFastScrollPreparationRangeTestNg : public ListFastScrollerTestNg,
+    public testing::WithParamInterface<std::tuple<ScrollAlign, bool, int32_t, bool>> {};
+
+/**
+ * @tc.name: FastScrollPreparesTwoScreensFromAlignmentLine
+ * @tc.desc: Preparation connects extraOffset to the aligned boundary and covers the two-screen approach segment.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollPreparationRangeTestNg, FastScrollPreparesTwoScreensFromAlignmentLine, TestSize.Level1)
+{
+    const auto [align, forward, offsetCase, stackFromEnd] = GetParam();
+    const std::array<float, 5> offsets { -1500.0f, -100.0f, 0.0f, 100.0f, 1500.0f };
+    const std::array<std::pair<float, float>, 5> forwardRanges {
+        std::pair { -2700.0f, 0.0f }, { -1300.0f, 0.0f }, { -1200.0f, 0.0f },
+        { -1100.0f, 100.0f }, { 0.0f, 1500.0f }
+    };
+    const std::array<std::pair<float, float>, 5> backwardRanges {
+        std::pair { -1500.0f, 0.0f }, { -100.0f, 1100.0f }, { 0.0f, 1200.0f },
+        { 0.0f, 1300.0f }, { 0.0f, 2700.0f }
+    };
+    auto algorithm = AceType::MakeRefPtr<ListLayoutAlgorithm>();
+    algorithm->contentMainSize_ = 600.0f;
+    algorithm->contentStartOffset_ = 40.0f;
+    algorithm->contentEndOffset_ = 30.0f;
+    algorithm->isStackFromEnd_ = stackFromEnd;
+    algorithm->posMap_ = AceType::MakeRefPtr<ListPositionMap>();
+    algorithm->posMap_->UpdatePos(10, { 4000.0f, 900.0f });
+    algorithm->SetFastScrollTarget(10, align);
+    algorithm->SetFastScrollPreparationOffset(offsets[offsetCase]);
+    const float alignmentLine = align == ScrollAlign::START ? 0.0f :
+        (align == ScrollAlign::END ? 900.0f : 450.0f);
+    const float viewportLine = align == ScrollAlign::START ? (stackFromEnd ? 30.0f : 40.0f) :
+        (align == ScrollAlign::END ? 600.0f - (stackFromEnd ? 40.0f : 30.0f) : 300.0f);
+    const float finalStart = alignmentLine + offsets[offsetCase] - viewportLine;
+    algorithm->SetTotalOffset(4000.0f + finalStart + (forward ? -5000.0f : 5000.0f));
+    const auto range = algorithm->GetFastScrollPreparationRange(900.0f);
+    const auto expected = forward ? forwardRanges[offsetCase] : backwardRanges[offsetCase];
+    EXPECT_FLOAT_EQ(range.first, alignmentLine + expected.first);
+    EXPECT_FLOAT_EQ(range.second, alignmentLine + expected.second);
+    for (const float remaining : { 0.0f, 600.0f, 1200.0f }) {
+        const float windowStart = finalStart + (forward ? -remaining : remaining);
+        EXPECT_TRUE(LessOrEqual(range.first, windowStart + 600.0f));
+        EXPECT_TRUE(GreatOrEqual(range.second, windowStart));
+    }
+}
+
+INSTANTIATE_TEST_SUITE_P(AlignmentDirectionOffsetStack, ListFastScrollPreparationRangeTestNg,
+    testing::Combine(testing::Values(ScrollAlign::START, ScrollAlign::END, ScrollAlign::CENTER),
+        testing::Bool(), testing::Values(0, 1, 2, 3, 4), testing::Bool()));
+
+/**
+ * @tc.name: FastScrollUnpositionedTargetUsesOffsetDirection001
+ * @tc.desc: Offset can reverse an unpositioned target's approach direction relative to its index order.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollerTestNg, FastScrollUnpositionedTargetUsesOffsetDirection001, TestSize.Level1)
+{
+    auto algorithm = AceType::MakeRefPtr<ListLayoutAlgorithm>();
+    algorithm->contentMainSize_ = 600.0f;
+    algorithm->posMap_ = AceType::MakeRefPtr<ListPositionMap>();
+    algorithm->posMap_->UpdatePos(10, { 1000.0f, 100.0f });
+    algorithm->SetTotalOffset(1000.0f);
+    algorithm->SetFastScrollTarget(20, ScrollAlign::START);
+    algorithm->SetFastScrollPreparationOffset(-1500.0f);
+    EXPECT_EQ(algorithm->GetFastScrollPreparationRange(100.0f), std::make_pair(-1500.0f, 0.0f));
+    algorithm->SetFastScrollTarget(0, ScrollAlign::START);
+    algorithm->SetFastScrollPreparationOffset(1500.0f);
+    EXPECT_EQ(algorithm->GetFastScrollPreparationRange(100.0f), std::make_pair(0.0f, 1500.0f));
+    EXPECT_EQ(algorithm->posMap_->GetEntryAtOrBeforeIndex(20), 10);
+    EXPECT_EQ(algorithm->posMap_->GetEntryAtOrAfterIndex(0), 10);
+}
+
+/**
+ * @tc.name: FastScrollPreparedTargetKeepsPhysicalApproachDirection001
+ * @tc.desc: Measuring a large preceding target moves both its END and the current anchor, not the scroll direction.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollerTestNg, FastScrollPreparedTargetKeepsPhysicalApproachDirection001, TestSize.Level1)
+{
+    auto algorithm = AceType::MakeRefPtr<ListLayoutAlgorithm>();
+    algorithm->contentMainSize_ = 600.0f;
+    algorithm->posMap_ = AceType::MakeRefPtr<ListPositionMap>();
+    algorithm->posMap_->UpdatePos(80, { 8000.0f, 100.0f });
+    algorithm->posMap_->UpdatePos(156, { 15600.0f, 60.0f });
+    algorithm->itemPosition_[156] = { -1, 0.0f, 60.0f };
+    algorithm->SetTotalOffset(15600.0f);
+    algorithm->SetFastScrollTarget(80, ScrollAlign::END);
+    algorithm->SetFastScrollPreparationOffset(6000.0f);
+    algorithm->GetOrCreateFastScrollState().result.measuredSizes[80] = { 5000.0f, false, false };
+    EXPECT_EQ(algorithm->GetFastScrollPreparationRange(5000.0f), std::make_pair(5000.0f, 12200.0f));
+    EXPECT_FLOAT_EQ(algorithm->posMap_->GetPositionInfo(156).mainPos, 15600.0f);
+}
+
+/**
+ * @tc.name: FastScrollCompressionThresholdUsesFloatTolerance
+ * @tc.desc: Four-screen distances within tolerance do not skip, while a larger excess does in either direction.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollSkipWindowTestNg, FastScrollCompressionThresholdUsesFloatTolerance, TestSize.Level1)
+{
+    auto model = CreateList();
+    model.SetInitialIndex(GetParam() ? 80 : 0);
+    CreateListItems(100);
+    CreateDone();
+    const float direction = GetParam() ? -1.0f : 1.0f;
+    const float viewport = pattern_->contentMainSize_;
+    const float origin = pattern_->GetTotalOffset();
+    for (const auto& [excess, skip] : { std::pair { 0.0005f, false }, std::pair { 0.0025f, true } }) {
+        pattern_->scrollTarget_.emplace();
+        pattern_->scrollTarget_->fastScrollMode = FastScrollMode::SKIP_CREATE_AND_MEASURE;
+        pattern_->StartFastScrollAnimation(origin + direction * (4.0f * viewport + excess));
+        ASSERT_TRUE(pattern_->GetFastScrollRequest());
+        EXPECT_EQ(pattern_->GetFastScrollRequest()->skipPending, skip);
+        if (skip) {
+            EXPECT_TRUE(Positive(direction * pattern_->GetFastScrollRequest()->skipDistance));
+        } else {
+            EXPECT_FLOAT_EQ(pattern_->GetFastScrollRequest()->skipDistance, 0.0f);
+        }
+        pattern_->StopAnimate();
+    }
+}
+
+/**
+ * @tc.name: FastScrollZeroOffsetPreparesTwoApproachScreens001
+ * @tc.desc: START preparation covers two screens on the actual approach side, without adding the target extent.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollerTestNg, FastScrollZeroOffsetPreparesTwoApproachScreens001, TestSize.Level1)
+{
+    CreateList();
+    CreateListItems(100);
+    CreateDone();
+    pattern_->ScrollToIndexFastScroll(80, true, ScrollAlign::START, std::nullopt,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    FlushUITasks();
+    auto algorithm = AceType::DynamicCast<ListLayoutAlgorithm>(pattern_->CreateLayoutAlgorithm());
+    ASSERT_NE(algorithm, nullptr);
+    algorithm->contentMainSize_ = 600.0f;
+    algorithm->SetFastScrollPreparationOffset(0.0f);
+    algorithm->SetTotalOffset(0.0f);
+    EXPECT_EQ(algorithm->GetFastScrollPreparationRange(100.0f), std::make_pair(-1200.0f, 0.0f));
+    algorithm->SetTotalOffset(10000.0f);
+    EXPECT_EQ(algorithm->GetFastScrollPreparationRange(100.0f), std::make_pair(0.0f, 1200.0f));
+}
+
+/**
+ * @tc.name: FastScrollOffsetOutsideTarget
+ * @tc.desc: An offset that excludes the target from the final viewport still finishes at its actual aligned position.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollOffsetTestNg, FastScrollOffsetOutsideTarget, TestSize.Level1)
+{
+    const auto [knownSize, extraOffset] = GetParam();
+    auto model = CreateList();
+    if (knownSize) {
+        auto sizes = model.GetOrCreateListChildrenMainSize();
+        sizes->UpdateDefaultSize(ITEM_MAIN_SIZE);
+        sizes->ChangeData(80, 1, { 5000.0f });
+    }
+    CreateListItems(80);
+    CreateListItem();
+    ViewAbstract::SetHeight(CalcLength(5000.0f));
+    ViewStackProcessor::GetInstance()->Pop();
+    ViewStackProcessor::GetInstance()->StopGetAccessRecording();
+    CreateListItems(19);
+    CreateDone();
+    MockAnimationManager::GetInstance().SetTicks(4);
+    pattern_->ScrollToIndexFastScroll(80, true, ScrollAlign::END, extraOffset, FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    RunFastScrollFrames();
+    EXPECT_NEAR(pattern_->GetTotalOffset(), 13000.0f - pattern_->contentMainSize_ + extraOffset, 0.1f);
+    EXPECT_FALSE(pattern_->GetFastScrollRequest());
+    EXPECT_EQ(pattern_->itemPosition_.count(80), 0);
+}
+
+INSTANTIATE_TEST_SUITE_P(SingleLane, ListFastScrollOffsetTestNg,
+    testing::Combine(testing::Bool(), testing::Values(-6000.0f, 1000.0f)));
+
+namespace {
+constexpr int32_t OFFSET_ITEM_COUNT = 160;
+constexpr int32_t OFFSET_TARGET_INDEX = 80;
+constexpr float OFFSET_LARGE_ITEM = 5000.0f;
+constexpr float OFFSET_SHORT_ITEM = 8.0f;
+// Rebased cumulative coordinates below 32768px can differ by one float ULP (1/512px).
+constexpr float OFFSET_POSITION_EPSILON = 0.002f;
+
+enum class FastScrollItemSizes { SHORT_TARGET, LARGE_TARGET, LARGE_PREVIOUS, LARGE_BOTH };
+
+struct FastScrollItemWork {
+    std::vector<int32_t> measures = std::vector<int32_t>(OFFSET_ITEM_COUNT, 0);
+    std::vector<int32_t> layouts = std::vector<int32_t>(OFFSET_ITEM_COUNT, 0);
+};
+
+class FastScrollItemProbeAlgorithm final : public BoxLayoutAlgorithm {
+    DECLARE_ACE_TYPE(FastScrollItemProbeAlgorithm, BoxLayoutAlgorithm);
+public:
+    FastScrollItemProbeAlgorithm(const std::shared_ptr<FastScrollItemWork>& work, int32_t index)
+        : work_(work), index_(index) {}
+
+    void Measure(LayoutWrapper* wrapper) override
+    {
+        ++work_->measures[index_];
+        BoxLayoutAlgorithm::Measure(wrapper);
+    }
+
+    void Layout(LayoutWrapper* wrapper) override
+    {
+        ++work_->layouts[index_];
+        BoxLayoutAlgorithm::Layout(wrapper);
+    }
+
+private:
+    std::shared_ptr<FastScrollItemWork> work_;
+    int32_t index_;
+};
+
+class FastScrollItemProbePattern final : public ListItemPattern {
+    DECLARE_ACE_TYPE(FastScrollItemProbePattern, ListItemPattern);
+public:
+    FastScrollItemProbePattern(const std::shared_ptr<FastScrollItemWork>& work, int32_t index)
+        : ListItemPattern(nullptr), work_(work), index_(index) {}
+
+    RefPtr<LayoutAlgorithm> CreateLayoutAlgorithm() override
+    {
+        // Ordinary items without swipe/edit controls use BoxLayoutAlgorithm in production too.
+        return AceType::MakeRefPtr<FastScrollItemProbeAlgorithm>(work_, index_);
+    }
+
+private:
+    std::shared_ptr<FastScrollItemWork> work_;
+    int32_t index_;
+};
+
+} // namespace
+
+class ListFastScrollItemOffsetFixture : public ListFastScrollerTestNg {
+protected:
+    void SetOffsetItemSizes(FastScrollItemSizes sizes)
+    {
+        for (int32_t index = 0; index < OFFSET_ITEM_COUNT; ++index) {
+            heights_.push_back(index % ALTERNATING_HEIGHT_PERIOD == 0 ? OFFSET_SHORT_HEIGHT : OFFSET_TALL_HEIGHT);
+        }
+        heights_[OFFSET_TARGET_INDEX] =
+            sizes == FastScrollItemSizes::LARGE_TARGET || sizes == FastScrollItemSizes::LARGE_BOTH
+                ? OFFSET_LARGE_ITEM : OFFSET_SHORT_ITEM;
+        if (sizes == FastScrollItemSizes::LARGE_PREVIOUS || sizes == FastScrollItemSizes::LARGE_BOTH) {
+            heights_[OFFSET_TARGET_INDEX - 1] = OFFSET_LARGE_ITEM;
+        }
+        float position = 0.0f;
+        for (float height : heights_) {
+            starts_.push_back(position);
+            position += height + space_;
+        }
+        contentSize_ = position - space_;
+    }
+
+    void CreateOffsetItem(int32_t index)
+    {
+        auto item = FrameNode::CreateFrameNode(V2::LIST_ITEM_ETS_TAG, GetElmtId(),
+            AceType::MakeRefPtr<FastScrollItemProbePattern>(work_, index));
+        ViewStackProcessor::GetInstance()->Push(item);
+        ViewAbstract::SetWidth(CalcLength(FILL_LENGTH));
+        ViewAbstract::SetHeight(CalcLength(heights_[index]));
+        ViewStackProcessor::GetInstance()->Pop();
+        items_.push_back(item);
+    }
+
+    void CreateOffsetList(bool knownSize, bool backward, bool spaced, FastScrollItemSizes sizes)
+    {
+        backward_ = backward;
+        space_ = spaced ? 13.0f : 0.0f;
+        startInset_ = spaced ? 23.0f : 0.0f;
+        endInset_ = spaced ? 37.0f : 0.0f;
+        SetOffsetItemSizes(sizes);
+        auto model = CreateList();
+        model.SetCachedCount(0);
+        model.SetSpace(Dimension(space_));
+        model.SetContentStartOffset(startInset_);
+        model.SetContentEndOffset(endInset_);
+        model.SetInitialIndex(backward ? OFFSET_ITEM_COUNT - 1 : 0);
+        if (knownSize) {
+            auto childrenSize = model.GetOrCreateListChildrenMainSize();
+            childrenSize->UpdateDefaultSize(ITEM_MAIN_SIZE);
+            childrenSize->ChangeData(0, OFFSET_ITEM_COUNT, heights_);
+        }
+        for (int32_t index = 0; index < OFFSET_ITEM_COUNT; ++index) {
+            CreateOffsetItem(index);
+        }
+        CreateDone();
+        ASSERT_EQ(pattern_->itemPosition_.count(OFFSET_TARGET_INDEX), 0);
+        ASSERT_EQ(work_->measures[OFFSET_TARGET_INDEX], 0);
+        ASSERT_NO_FATAL_FAILURE(ExpectOffsetGeometry(
+            backward ? contentSize_ - HEIGHT + endInset_ : -startInset_));
+    }
+
+    float GetOffsetOracle(ScrollAlign align, float extraOffset, float viewport = HEIGHT) const
+    {
+        const float start = starts_[OFFSET_TARGET_INDEX] - startInset_;
+        const float end = starts_[OFFSET_TARGET_INDEX] + heights_[OFFSET_TARGET_INDEX] - viewport + endInset_;
+        float aligned = start;
+        if (align == ScrollAlign::CENTER) {
+            aligned = starts_[OFFSET_TARGET_INDEX] + (heights_[OFFSET_TARGET_INDEX] - viewport) / 2.0f;
+        } else if (align == ScrollAlign::END) {
+            aligned = end;
+        } else if (align == ScrollAlign::AUTO) {
+            // The target starts wholly offscreen: AUTO chooses its nearer real edge.
+            aligned = backward_ ? std::max(start, end) : std::min(start, end);
+        }
+        return std::clamp(aligned + extraOffset, -startInset_, contentSize_ - viewport + endInset_);
+    }
+
+    std::vector<int32_t> GetVisibleOffsetItems(float viewport = HEIGHT) const
+    {
+        std::vector<int32_t> visible;
+        for (int32_t index = 0; index < OFFSET_ITEM_COUNT; ++index) {
+            const auto rect = items_[index]->GetGeometryNode()->GetFrameRect();
+            if (items_[index]->IsActive() && rect.Height() > 0.0f && rect.Bottom() > 0.0f && rect.Top() < viewport) {
+                visible.push_back(index);
+            }
+        }
+        return visible;
+    }
+
+    void ExpectOffsetGeometry(float offset, float viewport = HEIGHT)
+    {
+        SCOPED_TRACE(testing::Message() << "true cumulative offset=" << offset);
+        SCOPED_TRACE(testing::Message() << "observed offset=" << pattern_->GetTotalOffset()
+            << " visible first=" << (pattern_->itemPosition_.empty() ? -1 : pattern_->itemPosition_.begin()->first)
+            << " visible last=" << (pattern_->itemPosition_.empty() ? -1 : pattern_->itemPosition_.rbegin()->first)
+            << " target pos=" << pattern_->posMap_->GetPositionInfo(OFFSET_TARGET_INDEX).mainPos);
+        std::vector<int32_t> expected;
+        for (int32_t index = 0; index < OFFSET_ITEM_COUNT; ++index) {
+            const float top = starts_[index] - offset;
+            const float bottom = top + heights_[index];
+            if (bottom <= 0.0f || top >= viewport) {
+                continue;
+            }
+            SCOPED_TRACE(testing::Message() << "visible item=" << index);
+            expected.push_back(index);
+            ASSERT_EQ(pattern_->itemPosition_.count(index), 1);
+            EXPECT_TRUE(items_[index]->IsActive());
+            const auto rect = items_[index]->GetGeometryNode()->GetFrameRect();
+            EXPECT_NEAR(rect.Top(), top, 0.1f);
+            EXPECT_NEAR(rect.Bottom(), bottom, 0.1f);
+            EXPECT_NEAR(rect.Height(), heights_[index], 0.1f);
+        }
+        ASSERT_FALSE(expected.empty());
+        EXPECT_EQ(GetVisibleOffsetItems(viewport), expected);
+        const float targetTop = starts_[OFFSET_TARGET_INDEX] - offset;
+        if (targetTop >= viewport || targetTop + heights_[OFFSET_TARGET_INDEX] <= 0.0f) {
+            EXPECT_EQ(pattern_->itemPosition_.count(OFFSET_TARGET_INDEX), 0);
+            EXPECT_FALSE(items_[OFFSET_TARGET_INDEX]->IsActive());
+        }
+    }
+
+    void StartOffsetWithoutDisplay(ScrollAlign align, std::optional<float> extraOffset)
+    {
+        const auto visible = GetVisibleOffsetItems();
+        std::vector<RectF> rectangles;
+        for (int32_t index : visible) {
+            rectangles.push_back(items_[index]->GetGeometryNode()->GetFrameRect());
+        }
+        auto notifications = std::make_shared<int32_t>(0);
+        eventHub_->SetOnScrollVisibleContentChange(
+            [notifications](const ListItemIndex&, const ListItemIndex&) { ++*notifications; });
+        const auto measures = work_->measures;
+        const auto layouts = work_->layouts;
+        MockAnimationManager::GetInstance().SetTicks(ANIMATION_TICKS);
+        positionController_->ScrollToIndexWithOptions(OFFSET_TARGET_INDEX, true, align, extraOffset,
+            FastScrollMode::SKIP_CREATE_AND_MEASURE);
+        if (NearZero(extraOffset.value_or(0.0f))) {
+            ASSERT_TRUE(pattern_->GetFastScrollRequest());
+            EXPECT_EQ(pattern_->AnimateRunning(), pattern_->childrenSize_ != nullptr);
+            EXPECT_EQ(work_->measures, measures);
+            EXPECT_EQ(work_->layouts, layouts);
+        }
+        FlushUITasks(); // No animation tick: offscreen preparation must not publish another viewport.
+        EXPECT_EQ(GetVisibleOffsetItems(), visible);
+        for (size_t index = 0; index < visible.size(); ++index) {
+            SCOPED_TRACE(testing::Message() << "unchanged viewport item=" << visible[index]);
+            const auto rect = items_[visible[index]]->GetGeometryNode()->GetFrameRect();
+            EXPECT_EQ(rect.Left(), rectangles[index].Left());
+            EXPECT_EQ(rect.GetSize(), rectangles[index].GetSize());
+            EXPECT_NEAR(rect.Top(), rectangles[index].Top(), OFFSET_POSITION_EPSILON);
+        }
+        EXPECT_EQ(pattern_->itemPosition_.count(OFFSET_TARGET_INDEX), 0);
+        EXPECT_FALSE(items_[OFFSET_TARGET_INDEX]->IsActive());
+        EXPECT_EQ(*notifications, 0);
+        eventHub_->SetOnScrollVisibleContentChange(nullptr);
+    }
+
+    std::shared_ptr<FastScrollItemWork> work_ = std::make_shared<FastScrollItemWork>();
+    std::vector<RefPtr<FrameNode>> items_;
+    std::vector<float> heights_;
+    std::vector<float> starts_;
+    float contentSize_ = 0.0f;
+    float space_ = 0.0f;
+    float startInset_ = 0.0f;
+    float endInset_ = 0.0f;
+    bool backward_ = false;
+};
+
+using FastScrollItemOffsetParameters = std::tuple<bool, bool, ScrollAlign, bool, FastScrollItemSizes, float>;
+
+class ListFastScrollItemOffsetTestNg : public ListFastScrollItemOffsetFixture,
+    public testing::WithParamInterface<FastScrollItemOffsetParameters> {};
+
+/**
+ * @tc.name: FastScrollExtraOffsetItemGeometry
+ * @tc.desc: Unequal ordinary items reach the real final viewport, including an invisible target and boundary clamps.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollItemOffsetTestNg, FastScrollExtraOffsetItemGeometry, TestSize.Level1)
+{
+    const auto [knownSize, backward, align, spaced, sizes, extraOffset] = GetParam();
+    ASSERT_NO_FATAL_FAILURE(CreateOffsetList(knownSize, backward, spaced, sizes));
+    const float expectedOffset = GetOffsetOracle(align, extraOffset);
+    const float initialOffset = pattern_->GetTotalOffset();
+    const auto firstVisible = pattern_->itemPosition_.begin();
+    const auto initialAnchor = pattern_->posMap_->GetPositionInfo(firstVisible->first);
+    SCOPED_TRACE(testing::Message() << "initial offset=" << initialOffset
+        << " first index=" << firstVisible->first << " first viewport pos=" << firstVisible->second.startPos
+        << " first map pos=" << initialAnchor.mainPos << " first map size=" << initialAnchor.mainSize);
+    ASSERT_NO_FATAL_FAILURE(StartOffsetWithoutDisplay(align, extraOffset));
+    RunFastScrollFrames();
+    EXPECT_FALSE(pattern_->GetFastScrollRequest());
+    EXPECT_FALSE(pattern_->AnimateRunning());
+    EXPECT_FALSE(pattern_->scrollStop_);
+    ExpectOffsetGeometry(expectedOffset);
+    FlushUITasks();
+    ExpectOffsetGeometry(expectedOffset);
+}
+
+INSTANTIATE_TEST_SUITE_P(OutsideTarget, ListFastScrollItemOffsetTestNg,
+    testing::Combine(testing::Bool(), testing::Bool(),
+        testing::Values(ScrollAlign::START, ScrollAlign::CENTER, ScrollAlign::END, ScrollAlign::AUTO), testing::Bool(),
+        testing::Values(FastScrollItemSizes::SHORT_TARGET, FastScrollItemSizes::LARGE_TARGET,
+            FastScrollItemSizes::LARGE_PREVIOUS, FastScrollItemSizes::LARGE_BOTH),
+        testing::Values(-50000.0f, -6000.0f, 6000.0f, 50000.0f)));
+
+INSTANTIATE_TEST_SUITE_P(SmallOffset, ListFastScrollItemOffsetTestNg,
+    testing::Combine(testing::Bool(), testing::Bool(),
+        testing::Values(ScrollAlign::START, ScrollAlign::CENTER, ScrollAlign::END, ScrollAlign::AUTO), testing::Bool(),
+        testing::Values(FastScrollItemSizes::SHORT_TARGET, FastScrollItemSizes::LARGE_PREVIOUS),
+        testing::Values(-16.0f, 16.0f)));
+
+class ListFastScrollGapOffsetTestNg : public ListFastScrollItemOffsetFixture,
+    public testing::WithParamInterface<std::tuple<bool, ScrollAlign, bool>> {
+protected:
+    void CreateGapList(bool knownSize)
+    {
+        space_ = HEIGHT - ITEM_MAIN_SIZE;
+        heights_.assign(OFFSET_ITEM_COUNT, ITEM_MAIN_SIZE);
+        auto model = CreateList();
+        model.SetCachedCount(0);
+        model.SetSpace(Dimension(space_));
+        if (knownSize) {
+            model.GetOrCreateListChildrenMainSize()->UpdateDefaultSize(ITEM_MAIN_SIZE);
+        }
+        for (int32_t index = 0; index < OFFSET_ITEM_COUNT; ++index) {
+            starts_.push_back(index * (ITEM_MAIN_SIZE + space_));
+            CreateOffsetItem(index);
+        }
+        contentSize_ = starts_.back() + ITEM_MAIN_SIZE;
+        CreateDone();
+    }
+
+    void ExpectGapPreparation(const FastScrollItemWork& before, const std::vector<int32_t>& visible)
+    {
+        ASSERT_TRUE(pattern_->GetFastScrollRequest());
+        EXPECT_EQ(pattern_->GetFastScrollPreparation()->preparation, FastScrollPreparation::READY);
+        EXPECT_FALSE(pattern_->targetIndex_);
+        EXPECT_TRUE(pattern_->AnimateRunning());
+        EXPECT_EQ(work_->measures[OFFSET_TARGET_INDEX] > before.measures[OFFSET_TARGET_INDEX],
+            !pattern_->childrenSize_);
+        EXPECT_EQ(work_->layouts[OFFSET_TARGET_INDEX], before.layouts[OFFSET_TARGET_INDEX]);
+        for (int32_t index = 0; index < OFFSET_ITEM_COUNT; ++index) {
+            if (index == OFFSET_TARGET_INDEX || std::find(visible.begin(), visible.end(), index) != visible.end()) {
+                continue;
+            }
+            // Two approach screens include two predecessors for START, one for END.
+            const auto align = pattern_->GetFastScrollRequest()->align;
+            const int32_t first = OFFSET_TARGET_INDEX - (align == ScrollAlign::START ? 2 : 1);
+            const int32_t expectedExtra = !pattern_->childrenSize_ && index >= first &&
+                index < OFFSET_TARGET_INDEX ? 1 : 0;
+            EXPECT_EQ(work_->measures[index], before.measures[index] + expectedExtra) << "offscreen measure=" << index;
+            EXPECT_EQ(work_->layouts[index], before.layouts[index]) << "offscreen layout=" << index;
+        }
+    }
+
+    void ExpectGapDestination(float expectedOffset)
+    {
+        // Preparation may measure the approach-side neighbor, but it must not display that neighbor.
+        ASSERT_NO_FATAL_FAILURE(RunFastScrollFrames());
+        EXPECT_FALSE(pattern_->GetFastScrollRequest());
+        EXPECT_FALSE(pattern_->AnimateRunning());
+        EXPECT_FALSE(pattern_->scrollStop_);
+        EXPECT_NEAR(pattern_->GetTotalOffset(), expectedOffset, 0.1f);
+        ASSERT_NO_FATAL_FAILURE(ExpectOffsetGeometry(expectedOffset));
+        EXPECT_EQ(GetVisibleOffsetItems(), std::vector<int32_t> { OFFSET_TARGET_INDEX });
+        FlushUITasks();
+        ExpectOffsetGeometry(expectedOffset);
+    }
+};
+
+/**
+ * @tc.name: FastScrollExtraOffsetGapPreparesApproachNeighbor
+ * @tc.desc: Gaps exclude the opposite neighbor from preparation; the approach neighbor remains offscreen.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollGapOffsetTestNg, FastScrollExtraOffsetGapPreparesApproachNeighbor, TestSize.Level1)
+{
+    const auto [knownSize, align, atBoundary] = GetParam();
+    ASSERT_NO_FATAL_FAILURE(CreateGapList(knownSize));
+    const auto before = *work_;
+    const auto visible = GetVisibleOffsetItems();
+    ASSERT_EQ(before.measures[OFFSET_TARGET_INDEX - 1], 0);
+    ASSERT_EQ(before.measures[OFFSET_TARGET_INDEX], 0);
+    ASSERT_EQ(before.measures[OFFSET_TARGET_INDEX + 1], 0);
+
+    // For the 400px viewport and 300px gaps, neither neighboring item intersects the destination window.
+    const float displacement = atBoundary ? space_ : ITEM_MAIN_SIZE / 2.0f;
+    const float extraOffset = align == ScrollAlign::START ? -displacement : displacement;
+    const float expectedOffset = GetOffsetOracle(align, extraOffset);
+    ASSERT_LE(starts_[OFFSET_TARGET_INDEX - 1] + ITEM_MAIN_SIZE, expectedOffset);
+    ASSERT_GE(starts_[OFFSET_TARGET_INDEX + 1], expectedOffset + HEIGHT);
+    ASSERT_NO_FATAL_FAILURE(StartOffsetWithoutDisplay(align, extraOffset));
+    RecordProperty("preparedTarget",
+        testing::PrintToString(pattern_->posMap_->GetPositionInfo(OFFSET_TARGET_INDEX).mainPos));
+    RecordProperty("preparedOffset", pattern_->GetTotalOffset());
+    ASSERT_NO_FATAL_FAILURE(ExpectGapPreparation(before, visible));
+    ASSERT_NO_FATAL_FAILURE(ExpectGapDestination(expectedOffset));
+}
+
+INSTANTIATE_TEST_SUITE_P(GapBoundary, ListFastScrollGapOffsetTestNg,
+    testing::Combine(testing::Bool(), testing::Values(ScrollAlign::START, ScrollAlign::END), testing::Bool()));
+
+class ListFastScrollZeroOffsetTestNg : public ListFastScrollItemOffsetFixture,
+    public testing::WithParamInterface<std::tuple<bool, bool, ScrollAlign, bool, bool>> {};
+
+/**
+ * @tc.name: FastScrollZeroOffsetPreparesWithoutDisplaying
+ * @tc.desc: Absent and zero offsets prepare the target neighborhood without laying out offscreen items.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollZeroOffsetTestNg, FastScrollZeroOffsetPreparesWithoutDisplaying, TestSize.Level1)
+{
+    const auto [knownSize, backward, align, spaced, explicitZero] = GetParam();
+    ASSERT_NO_FATAL_FAILURE(CreateOffsetList(knownSize, backward, spaced, FastScrollItemSizes::LARGE_BOTH));
+    const auto measures = work_->measures;
+    const auto layouts = work_->layouts;
+    const auto visible = GetVisibleOffsetItems();
+    const std::optional<float> extraOffset = explicitZero ? std::optional<float>(0.0f) : std::nullopt;
+    ASSERT_NO_FATAL_FAILURE(StartOffsetWithoutDisplay(align, extraOffset));
+    for (int32_t index = 0; index < OFFSET_ITEM_COUNT; ++index) {
+        if (std::find(visible.begin(), visible.end(), index) == visible.end()) {
+            if (knownSize) {
+                EXPECT_EQ(work_->measures[index], measures[index]) << "known-size measure=" << index;
+            }
+            EXPECT_EQ(work_->layouts[index], layouts[index]) << "offscreen layout=" << index;
+        }
+    }
+    EXPECT_EQ(work_->measures[OFFSET_TARGET_INDEX] > 0, !knownSize);
+    EXPECT_EQ(pattern_->GetFastScrollPreparation()->preparation, FastScrollPreparation::READY);
+    EXPECT_EQ(work_->measures[10], measures[10]);
+    EXPECT_EQ(work_->measures[120], measures[120]);
+    EXPECT_FALSE(pattern_->targetIndex_);
+    RunFastScrollFrames();
+    EXPECT_FALSE(pattern_->GetFastScrollRequest());
+    EXPECT_GT(work_->measures[OFFSET_TARGET_INDEX], 0);
+}
+
+INSTANTIATE_TEST_SUITE_P(TargetNeighborhood, ListFastScrollZeroOffsetTestNg,
+    testing::Combine(testing::Bool(), testing::Bool(),
+        testing::Values(ScrollAlign::START, ScrollAlign::CENTER, ScrollAlign::END, ScrollAlign::AUTO),
+        testing::Bool(), testing::Bool()));
+
+class ListFastScrollGeometryTestNg : public ListFastScrollItemOffsetFixture {
+protected:
+    void CreatePreparedOffset(ScrollAlign align = ScrollAlign::START, float extraOffset = 900.0f)
+    {
+        ASSERT_NO_FATAL_FAILURE(CreateOffsetList(false, false, false, FastScrollItemSizes::SHORT_TARGET));
+        ASSERT_NO_FATAL_FAILURE(StartOffsetWithoutDisplay(align, extraOffset));
+        ASSERT_TRUE(pattern_->GetFastScrollRequest());
+        ASSERT_EQ(pattern_->GetFastScrollPreparation()->preparation, FastScrollPreparation::READY);
+        ASSERT_GT(work_->measures[OFFSET_TARGET_INDEX], 0);
+        ASSERT_TRUE(pattern_->AnimateRunning());
+    }
+
+    void ChangeOffsetItemHeight(int32_t index, float height)
+    {
+        heights_[index] = height;
+        float position = 0.0f;
+        for (int32_t item = 0; item < OFFSET_ITEM_COUNT; ++item) {
+            starts_[item] = position;
+            position += heights_[item] + space_;
+        }
+        contentSize_ = position - space_;
+        ViewAbstract::SetHeight(AceType::RawPtr(items_[index]), CalcLength(height));
+        items_[index]->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+    }
+
+    void FinishOffsetGeometry(
+        ScrollAlign align = ScrollAlign::START, float extraOffset = 900.0f, float viewport = HEIGHT)
+    {
+        RunFastScrollFrames();
+        EXPECT_FALSE(pattern_->GetFastScrollRequest());
+        EXPECT_FALSE(pattern_->AnimateRunning());
+        ASSERT_NO_FATAL_FAILURE(ExpectOffsetGeometry(GetOffsetOracle(align, extraOffset, viewport), viewport));
+        FlushUITasks();
+        ExpectOffsetGeometry(GetOffsetOracle(align, extraOffset, viewport), viewport);
+    }
+
+    void FinishAfterDataChange()
+    {
+        ASSERT_NO_FATAL_FAILURE(RunFastScrollFrames());
+        EXPECT_FALSE(pattern_->GetFastScrollRequest());
+        EXPECT_FALSE(pattern_->AnimateRunning());
+        EXPECT_TRUE(std::isfinite(pattern_->GetTotalOffset()));
+        for (const auto& [index, position] : pattern_->itemPosition_) {
+            EXPECT_GE(index, 0);
+            EXPECT_LT(index, OFFSET_ITEM_COUNT);
+            EXPECT_TRUE(std::isfinite(position.startPos));
+            EXPECT_TRUE(std::isfinite(position.endPos));
+            EXPECT_GE(position.endPos, position.startPos);
+        }
+        pattern_->ScrollToIndex(0, false, ScrollAlign::START);
+        FlushUITasks();
+        ExpectOffsetGeometry(0.0f);
+    }
+
+    RefPtr<ListLayoutAlgorithm> MakePreparedResult(float height)
+    {
+        auto algorithm = AceType::MakeRefPtr<ListLayoutAlgorithm>();
+        const auto& target = *pattern_->GetFastScrollRequest();
+        algorithm->SetFastScrollTarget(target.index, target.align);
+        algorithm->SetFastScrollPreparationOffset(target.extraOffset);
+        algorithm->GetOrCreateFastScrollState().result.measuredSizes[OFFSET_TARGET_INDEX] = { height, false, false };
+        algorithm->GetOrCreateFastScrollState().result.status = FastScrollMeasureStatus::COMPLETE;
+        return algorithm;
+    }
+
+    RefPtr<ListLayoutAlgorithm> MakeUnsupportedResult()
+    {
+        auto algorithm = MakePreparedResult(heights_[OFFSET_TARGET_INDEX]);
+        algorithm->GetOrCreateFastScrollState().result.measuredSizes.clear();
+        algorithm->GetOrCreateFastScrollState().result.status = FastScrollMeasureStatus::UNSUPPORTED;
+        return algorithm;
+    }
+
+    void ExpectNoOffscreenWork(const FastScrollItemWork& before, const std::vector<int32_t>& visible)
+    {
+        for (int32_t index = 0; index < OFFSET_ITEM_COUNT; ++index) {
+            if (std::find(visible.begin(), visible.end(), index) != visible.end()) {
+                continue;
+            }
+            EXPECT_EQ(work_->measures[index], before.measures[index]) << "offscreen measure=" << index;
+            EXPECT_EQ(work_->layouts[index], before.layouts[index]) << "offscreen layout=" << index;
+        }
+    }
+};
+
+/**
+ * @tc.name: FastScrollExtraOffsetNotifyDataChange001
+ * @tc.desc: Data notification does not reprepare the whole window; the request terminates and scrolling recovers.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollGeometryTestNg, FastScrollExtraOffsetNotifyDataChange001, TestSize.Level1)
+{
+    ASSERT_NO_FATAL_FAILURE(CreatePreparedOffset());
+    ASSERT_FALSE(pattern_->maintainVisibleContentPosition_);
+    const auto before = *work_;
+    ChangeOffsetItemHeight(OFFSET_TARGET_INDEX, 700.0f);
+    pattern_->NotifyDataChange(OFFSET_TARGET_INDEX, 0);
+    ASSERT_TRUE(pattern_->GetFastScrollRequest());
+    EXPECT_EQ(pattern_->GetFastScrollPreparation()->preparation, FastScrollPreparation::READY);
+    EXPECT_EQ(work_->measures, before.measures);
+    FinishAfterDataChange();
+}
+
+/**
+ * @tc.name: FastScrollExtraOffsetChildrenMainSize001
+ * @tc.desc: Switching to supplied child sizes keeps preparation and updates positions through the known-size path.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollGeometryTestNg, FastScrollExtraOffsetChildrenMainSize001, TestSize.Level1)
+{
+    ASSERT_NO_FATAL_FAILURE(CreatePreparedOffset());
+    const auto before = *work_;
+    ChangeOffsetItemHeight(OFFSET_TARGET_INDEX + 1, 700.0f);
+    auto childrenSize = pattern_->GetOrCreateListChildrenMainSize();
+    childrenSize->ChangeData(0, OFFSET_ITEM_COUNT, heights_);
+    MockPipelineContext::GetCurrent()->FlushBuildFinishCallbacks();
+    ASSERT_TRUE(pattern_->GetFastScrollRequest());
+    EXPECT_EQ(pattern_->GetFastScrollPreparation()->preparation, FastScrollPreparation::READY);
+    EXPECT_EQ(work_->measures, before.measures);
+    FinishAfterDataChange();
+}
+
+/**
+ * @tc.name: FastScrollExtraOffsetKnownChildrenMainSize001
+ * @tc.desc: Updating a supplied size table does not synchronously remeasure the prepared window.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollGeometryTestNg, FastScrollExtraOffsetKnownChildrenMainSize001, TestSize.Level1)
+{
+    ASSERT_NO_FATAL_FAILURE(CreateOffsetList(true, false, false, FastScrollItemSizes::SHORT_TARGET));
+    ASSERT_NO_FATAL_FAILURE(StartOffsetWithoutDisplay(ScrollAlign::START, 900.0f));
+    ASSERT_TRUE(pattern_->GetFastScrollRequest());
+    const auto before = *work_;
+    ChangeOffsetItemHeight(OFFSET_TARGET_INDEX + 1, 700.0f);
+    pattern_->childrenSize_->ChangeData(OFFSET_TARGET_INDEX + 1, 1, { heights_[OFFSET_TARGET_INDEX + 1] });
+    MockPipelineContext::GetCurrent()->FlushBuildFinishCallbacks();
+    ASSERT_TRUE(pattern_->GetFastScrollRequest());
+    EXPECT_EQ(pattern_->GetFastScrollPreparation()->preparation, FastScrollPreparation::READY);
+    EXPECT_EQ(work_->measures, before.measures);
+    FinishAfterDataChange();
+}
+
+/**
+ * @tc.name: FastScrollExtraOffsetItemResize001
+ * @tc.desc: One offscreen size change does not remeasure the prepared range and normal layout can finish safely.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollGeometryTestNg, FastScrollExtraOffsetItemResize001, TestSize.Level1)
+{
+    ASSERT_NO_FATAL_FAILURE(CreatePreparedOffset());
+    const auto before = *work_;
+    const auto visible = GetVisibleOffsetItems();
+    ASSERT_GT(work_->measures[OFFSET_TARGET_INDEX + 1], 0);
+    ChangeOffsetItemHeight(OFFSET_TARGET_INDEX + 1, 700.0f);
+    MockPipelineContext::GetCurrent()->FlushUITasks();
+    ASSERT_TRUE(pattern_->GetFastScrollRequest());
+    ExpectNoOffscreenWork(before, visible);
+    FinishAfterDataChange();
+}
+
+/**
+ * @tc.name: FastScrollExtraOffsetViewportResize001
+ * @tc.desc: Resizing the viewport changes END alignment and the actual visible items after preparation.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollGeometryTestNg, FastScrollExtraOffsetViewportResize001, TestSize.Level1)
+{
+    ASSERT_NO_FATAL_FAILURE(CreatePreparedOffset(ScrollAlign::END, -900.0f));
+    constexpr float viewport = HEIGHT / 2.0f;
+    ViewAbstract::SetHeight(AceType::RawPtr(frameNode_), CalcLength(viewport));
+    frameNode_->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+    FlushUITasks();
+    ASSERT_TRUE(pattern_->GetFastScrollRequest());
+    EXPECT_NEAR(pattern_->contentMainSize_, viewport, 0.1f);
+    FinishOffsetGeometry(ScrollAlign::END, -900.0f, viewport);
+}
+
+/**
+ * @tc.name: FastScrollPosMapReestimateKeepsPreparation001
+ * @tc.desc: Reestimating the outer origin does not remeasure the prepared offset range.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollGeometryTestNg, FastScrollPosMapReestimateKeepsPreparation001, TestSize.Level1)
+{
+    ASSERT_NO_FATAL_FAILURE(CreatePreparedOffset());
+    const auto before = *work_;
+    const auto visible = GetVisibleOffsetItems();
+    pattern_->needReEstimateOffset_ = true;
+    pattern_->MarkDirtyNodeSelf();
+    MockPipelineContext::GetCurrent()->FlushUITasks();
+    ASSERT_TRUE(pattern_->GetFastScrollRequest());
+    EXPECT_EQ(pattern_->GetFastScrollPreparation()->preparation, FastScrollPreparation::READY);
+    ExpectNoOffscreenWork(before, visible);
+    FinishAfterDataChange();
+}
+
+/**
+ * @tc.name: FastScrollExtraOffsetCanceledResultIgnored001
+ * @tc.desc: Results delivered after cancellation cannot update the position table or revive the request.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollGeometryTestNg, FastScrollExtraOffsetCanceledResultIgnored001, TestSize.Level1)
+{
+    ASSERT_NO_FATAL_FAILURE(CreatePreparedOffset());
+    auto stale = MakePreparedResult(987.0f);
+    pattern_->StopAnimate();
+    ASSERT_FALSE(pattern_->GetFastScrollRequest());
+    ASSERT_NE(pattern_->posMap_, nullptr);
+    const float size = pattern_->posMap_->GetPositionInfo(OFFSET_TARGET_INDEX).mainSize;
+    pattern_->ApplyFastScrollLayoutResult(stale);
+    EXPECT_FALSE(pattern_->GetFastScrollRequest());
+    EXPECT_FLOAT_EQ(pattern_->posMap_->GetPositionInfo(OFFSET_TARGET_INDEX).mainSize, size);
+    ASSERT_NO_FATAL_FAILURE(RunFastScrollFrames());
+    EXPECT_FALSE(pattern_->GetFastScrollRequest());
+    EXPECT_FALSE(pattern_->AnimateRunning());
+    ExpectOffsetGeometry(0.0f);
+}
+
+class ListFastScrollPreparationTargetTestNg : public ListFastScrollGeometryTestNg,
+    public testing::WithParamInterface<int32_t> {};
+
+/**
+ * @tc.name: FastScrollPreparationMatchesTargetParameters
+ * @tc.desc: Only a matching index, alignment and offset can publish preparation completion for the current target.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollPreparationTargetTestNg, FastScrollPreparationMatchesTargetParameters, TestSize.Level1)
+{
+    ASSERT_NO_FATAL_FAILURE(CreatePreparedOffset());
+    pattern_->GetOrCreateFastScrollPreparation().preparation = FastScrollPreparation::NEED_WINDOW;
+    ASSERT_TRUE(pattern_->GetFastScrollRequest());
+    auto result = MakePreparedResult(987.0f);
+    const auto target = *pattern_->GetFastScrollRequest();
+    const float oldSize = pattern_->posMap_->GetPositionInfo(target.index).mainSize;
+    const auto mode = GetParam();
+    if (mode == 0) {
+        result->SetFastScrollTarget(target.index + 1, target.align);
+    } else if (mode == 1) {
+        result->SetFastScrollTarget(target.index, ScrollAlign::END);
+    } else {
+        result->SetFastScrollPreparationOffset(target.extraOffset + 1.0f);
+    }
+    pattern_->ApplyFastScrollLayoutResult(result);
+    EXPECT_TRUE(pattern_->GetFastScrollPreparation()->NeedsPreparation());
+    EXPECT_FLOAT_EQ(pattern_->posMap_->GetPositionInfo(target.index).mainSize, oldSize);
+    pattern_->ApplyFastScrollLayoutResult(MakePreparedResult(heights_[target.index]));
+    EXPECT_EQ(pattern_->GetFastScrollPreparation()->preparation, FastScrollPreparation::READY);
+    FinishOffsetGeometry();
+}
+
+INSTANTIATE_TEST_SUITE_P(PreparationTarget, ListFastScrollPreparationTargetTestNg, testing::Values(0, 1, 2));
+
+class ListFastScrollLayoutChangeTestNg : public ListFastScrollGeometryTestNg,
+    public testing::WithParamInterface<int32_t> {
+protected:
+    void ChangeLayoutInput(int32_t mode)
+    {
+        auto property = frameNode_->GetLayoutProperty<ListLayoutProperty>();
+        switch (mode) {
+            case 1:
+                ViewAbstract::SetWidth(AceType::RawPtr(frameNode_), CalcLength(WIDTH / 2.0f));
+                break;
+            case CHANGE_STACK_FROM_END:
+                property->UpdateStackFromEnd(!pattern_->isStackFromEnd_);
+                break;
+            case CHANGE_CONTENT_START_OFFSET:
+                property->UpdateContentStartOffset(pattern_->contentStartOffset_ + 1.0f);
+                break;
+            case CHANGE_CONTENT_END_OFFSET:
+                property->UpdateContentEndOffset(pattern_->contentEndOffset_ + 1.0f);
+                break;
+            case CHANGE_ITEM_SPACE:
+                property->UpdateSpace(Dimension(space_ + 1.0f));
+                break;
+            case CHANGE_LIST_HEIGHT:
+                ViewAbstract::SetHeight(AceType::RawPtr(frameNode_), CalcLength(HEIGHT / 2.0f));
+                break;
+            case CHANGE_ESTIMATED_SPACE:
+                pattern_->GetOrCreateFastScrollPreparation().estimatedSpace += 1.0f;
+                break;
+            default:
+                break;
+        }
+        frameNode_->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+    }
+};
+
+/**
+ * @tc.name: FastScrollLayoutChangeDoesNotReprepareOffsetRange
+ * @tc.desc: Normal layout changes do not automatically remeasure the prepared offscreen target.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollLayoutChangeTestNg, FastScrollLayoutChangeDoesNotReprepareOffsetRange, TestSize.Level1)
+{
+    ASSERT_NO_FATAL_FAILURE(CreatePreparedOffset());
+    const auto targetMeasures = work_->measures[OFFSET_TARGET_INDEX];
+    ChangeLayoutInput(GetParam());
+    FlushUITasks();
+    ASSERT_TRUE(pattern_->GetFastScrollRequest());
+    EXPECT_FALSE(pattern_->GetFastScrollPreparation()->NeedsPreparation());
+    EXPECT_EQ(work_->measures[OFFSET_TARGET_INDEX], targetMeasures);
+    EXPECT_TRUE(std::isfinite(pattern_->GetTotalOffset()));
+    pattern_->StopAnimate();
+    FlushUITasks();
+    EXPECT_FALSE(pattern_->GetFastScrollRequest());
+    EXPECT_FALSE(pattern_->AnimateRunning());
+}
+
+INSTANTIATE_TEST_SUITE_P(LayoutChange, ListFastScrollLayoutChangeTestNg, testing::Range(0, 8));
+
+/**
+ * @tc.name: FastScrollExtraOffsetUnsupportedUsesLegacy001
+ * @tc.desc: An unsupported result for the current target transfers the unchanged request to legacy scrolling.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollGeometryTestNg, FastScrollExtraOffsetUnsupportedUsesLegacy001, TestSize.Level1)
+{
+    ASSERT_NO_FATAL_FAILURE(CreatePreparedOffset());
+    auto unsupported = MakeUnsupportedResult();
+    ASSERT_TRUE(unsupported->GetFastScrollMeasureResult()->measuredSizes.empty());
+    pattern_->ApplyFastScrollLayoutResult(unsupported);
+    ASSERT_TRUE(pattern_->GetFastScrollRequest());
+    EXPECT_EQ(pattern_->GetFastScrollPreparation()->preparation, FastScrollPreparation::UNSUPPORTED);
+    EXPECT_TRUE(pattern_->FallbackFastScroll());
+    EXPECT_FALSE(pattern_->GetFastScrollRequest());
+    ASSERT_TRUE(pattern_->targetIndex_);
+    EXPECT_EQ(pattern_->targetIndex_.value(), OFFSET_TARGET_INDEX);
+    EXPECT_EQ(pattern_->scrollAlign_, ScrollAlign::START);
+    ASSERT_TRUE(pattern_->GetExtraOffset());
+    EXPECT_FLOAT_EQ(pattern_->GetExtraOffset().value(), 900.0f);
+    FlushUITasks();
+    EXPECT_TRUE(pattern_->AnimateRunning());
+    FinishOffsetGeometry();
+}
+
+/**
+ * @tc.name: FastScrollExtraOffsetRejectsStaleUnsupported001
+ * @tc.desc: Unsupported results with different target parameters cannot trigger fallback.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollGeometryTestNg, FastScrollExtraOffsetRejectsStaleUnsupported001, TestSize.Level1)
+{
+    ASSERT_NO_FATAL_FAILURE(CreatePreparedOffset());
+    auto stale = MakeUnsupportedResult();
+    constexpr float replacementOffset = 16.0f;
+    pattern_->ScrollToIndexFastScroll(OFFSET_TARGET_INDEX, true, ScrollAlign::START, replacementOffset,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    ASSERT_TRUE(pattern_->GetFastScrollRequest());
+    pattern_->ApplyFastScrollLayoutResult(stale);
+    EXPECT_FALSE(pattern_->FallbackFastScroll());
+    pattern_->TryStartFastScroll();
+    ASSERT_TRUE(pattern_->GetFastScrollRequest());
+    EXPECT_FLOAT_EQ(pattern_->GetFastScrollRequest()->extraOffset, replacementOffset);
+    EXPECT_NE(pattern_->GetFastScrollPreparation()->preparation, FastScrollPreparation::UNSUPPORTED);
+    EXPECT_FALSE(pattern_->targetIndex_);
+    FinishOffsetGeometry(ScrollAlign::START, replacementOffset);
+}
+
+/**
+ * @tc.name: FastScrollCallbackModifiedAnimationDoesNotRestart001
+ * @tc.desc: A callback-modified request awaiting its last layout stops without replaying the remaining distance.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollGeometryTestNg, FastScrollCallbackModifiedAnimationDoesNotRestart001, TestSize.Level1)
+{
+    ASSERT_NO_FATAL_FAILURE(CreatePreparedOffset());
+    auto displacement = std::make_shared<float>(0.0f);
+    eventHub_->SetOnWillScroll([displacement](Dimension offset, ScrollState, ScrollSource) {
+        auto applied = Dimension(offset.Value() * 0.5f, offset.Unit());
+        *displacement += applied.ConvertToPx();
+        return ScrollFrameResult { applied };
+    });
+    constexpr int32_t maxFrames = 24;
+    for (int32_t frame = 0; frame < maxFrames; ++frame) {
+        MockAnimationManager::GetInstance().Tick();
+        if (pattern_->AnimateStoped()) {
+            break;
+        }
+        FlushUITasks();
+    }
+    // A late layout result cannot revive an already completed animation.
+    ASSERT_FALSE(pattern_->GetFastScrollRequest());
+    ASSERT_TRUE(pattern_->AnimateStoped());
+    const float appliedOffset = *displacement;
+    ASSERT_GT(appliedOffset, 0.0f);
+    pattern_->TryStartFastScroll();
+    EXPECT_FALSE(pattern_->GetFastScrollRequest());
+    EXPECT_FALSE(pattern_->targetIndex_);
+    EXPECT_FALSE(pattern_->AnimateRunning());
+    FlushUITasks();
+    const auto visible = GetVisibleOffsetItems();
+    ASSERT_FALSE(visible.empty());
+    // The skipped prefix is estimated, so callback displacement is not a true cumulative item coordinate.
+    const float visibleOffset = starts_[visible.front()] -
+        items_[visible.front()]->GetGeometryNode()->GetFrameRect().Top();
+    ASSERT_NO_FATAL_FAILURE(ExpectOffsetGeometry(visibleOffset));
+    RunFastScrollFrames();
+    EXPECT_FALSE(pattern_->GetFastScrollRequest());
+    EXPECT_FALSE(pattern_->AnimateRunning());
+    EXPECT_NEAR(*displacement, appliedOffset, 0.1f);
+    ExpectOffsetGeometry(visibleOffset);
+}
+
+/**
+ * @tc.name: FastScrollExtraOffsetCancelBeforePrepare001
+ * @tc.desc: Cancelling before preparation prevents offscreen work and stale results cannot revive it.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollGeometryTestNg, FastScrollExtraOffsetCancelBeforePrepare001, TestSize.Level1)
+{
+    ASSERT_NO_FATAL_FAILURE(CreateOffsetList(false, false, false, FastScrollItemSizes::SHORT_TARGET));
+    const auto before = *work_;
+    const auto visible = GetVisibleOffsetItems();
+    pattern_->ScrollToIndexFastScroll(OFFSET_TARGET_INDEX, true, ScrollAlign::START, 900.0f,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    ASSERT_TRUE(pattern_->GetFastScrollRequest());
+    EXPECT_EQ(work_->measures, before.measures);
+    auto stale = MakePreparedResult(heights_[OFFSET_TARGET_INDEX]);
+    pattern_->StopAnimate();
+    pattern_->ApplyFastScrollLayoutResult(stale);
+    FlushUITasks();
+    EXPECT_FALSE(pattern_->GetFastScrollRequest());
+    EXPECT_FALSE(pattern_->AnimateRunning());
+    ExpectNoOffscreenWork(before, visible);
+    ExpectOffsetGeometry(0.0f);
+}
+
+/**
+ * @tc.name: FastScrollZeroOffsetLayoutKeepsPreparation001
+ * @tc.desc: A subsequent layout keeps the zero-offset preparation without remeasuring the offscreen target.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollGeometryTestNg, FastScrollZeroOffsetLayoutKeepsPreparation001, TestSize.Level1)
+{
+    ASSERT_NO_FATAL_FAILURE(CreateOffsetList(false, false, false, FastScrollItemSizes::SHORT_TARGET));
+    ASSERT_NO_FATAL_FAILURE(StartOffsetWithoutDisplay(ScrollAlign::START, 0.0f));
+    const auto before = *work_;
+    const auto visible = GetVisibleOffsetItems();
+    frameNode_->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+    FlushUITasks();
+    ASSERT_TRUE(pattern_->GetFastScrollRequest());
+    EXPECT_EQ(pattern_->GetFastScrollPreparation()->preparation, FastScrollPreparation::READY);
+    EXPECT_EQ(pattern_->GetFastScrollPreparation()->preparedLayouts, nullptr);
+    EXPECT_GT(work_->measures[OFFSET_TARGET_INDEX], 0);
+    EXPECT_EQ(work_->layouts[OFFSET_TARGET_INDEX], 0);
+    ExpectNoOffscreenWork(before, visible);
+    FinishOffsetGeometry(ScrollAlign::START, 0.0f);
+}
+
+/**
+ * @tc.name: FastScrollExtraOffsetSelfDirtyReusesPreparation001
+ * @tc.desc: Animation-style MEASURE_SELF without a geometry change keeps preparation and does no offscreen work.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollGeometryTestNg, FastScrollExtraOffsetSelfDirtyReusesPreparation001, TestSize.Level1)
+{
+    ASSERT_NO_FATAL_FAILURE(CreatePreparedOffset());
+    const auto before = *work_;
+    const auto visible = GetVisibleOffsetItems();
+    for (int32_t frame = 0; frame < 3; ++frame) {
+        frameNode_->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
+        MockPipelineContext::GetCurrent()->FlushUITasks();
+        ASSERT_TRUE(pattern_->GetFastScrollRequest());
+        EXPECT_EQ(pattern_->GetFastScrollPreparation()->preparation, FastScrollPreparation::READY);
+        ExpectNoOffscreenWork(before, visible);
+    }
+    FinishOffsetGeometry();
+}
+
+/**
+ * @tc.name: FastScrollAnimationEndKeepsPreparedWindow001
+ * @tc.desc: Ending an animation segment does not measure the same offscreen target again.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollGeometryTestNg, FastScrollAnimationEndKeepsPreparedWindow001, TestSize.Level1)
+{
+    ASSERT_NO_FATAL_FAILURE(CreatePreparedOffset());
+    const auto measures = work_->measures[OFFSET_TARGET_INDEX];
+    ASSERT_GT(measures, 0);
+    pattern_->StopAnimation(pattern_->springAnimation_);
+    ASSERT_FALSE(pattern_->GetFastScrollRequest());
+    EXPECT_EQ(pattern_->GetFastScrollPreparation()->preparation, FastScrollPreparation::READY);
+    FlushUITasks();
+    EXPECT_EQ(pattern_->itemPosition_.count(OFFSET_TARGET_INDEX), 0);
+    EXPECT_EQ(work_->measures[OFFSET_TARGET_INDEX], measures);
+}
+
+/**
+ * @tc.name: FastScrollEstimateStartsWithoutTarget001
+ * @tc.desc: Estimate an unmeasured target without requesting layout of the complete path.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollerTestNg, FastScrollEstimateStartsWithoutTarget001, TestSize.Level1)
+{
+    CreateList();
+    CreateListItems(100);
+    CreateDone();
+    const auto visibleCount = pattern_->itemPosition_.size();
+    pattern_->ScrollToIndexFastScroll(80, true, ScrollAlign::START, std::nullopt,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    ASSERT_TRUE(pattern_->HasFastScrollRequest());
+    EXPECT_FALSE(pattern_->AnimateRunning());
+    FlushUITasks();
+    EXPECT_TRUE(pattern_->AnimateRunning());
+    EXPECT_FALSE(pattern_->targetIndex_.has_value());
+    EXPECT_EQ(pattern_->itemPosition_.size(), visibleCount);
+    EXPECT_FLOAT_EQ(pattern_->GetFinalPosition(), 80 * ITEM_MAIN_SIZE);
+    EXPECT_EQ(pattern_->itemPosition_.count(80), 0);
+}
+
+/**
+ * @tc.name: FastScrollRetargetsTwice001
+ * @tc.desc: Two geometry corrections retain the target and use normal animation interruption semantics.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollerTestNg, FastScrollRetargetsTwice001, TestSize.Level1)
+{
+    auto model = CreateList();
+    int32_t starts = 0;
+    int32_t stops = 0;
+    model.SetOnScrollStart([&starts]() { ++starts; });
+    model.SetOnScrollStop([&stops]() { ++stops; });
+    CreateListItems(100);
+    CreateDone();
+    pattern_->ScrollToIndexFastScroll(80, true, ScrollAlign::START, std::nullopt,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    FlushUITasks();
+    for (const float correction : { 120.0f, 240.0f }) {
+        auto info = pattern_->posMap_->GetPositionInfo(80);
+        info.mainPos = 80 * ITEM_MAIN_SIZE + correction;
+        pattern_->posMap_->UpdatePos(80, info);
+        pattern_->UpdateFastScrollAnimation();
+        ASSERT_TRUE(pattern_->HasFastScrollRequest());
+        EXPECT_TRUE(pattern_->AnimateRunning());
+        EXPECT_FLOAT_EQ(pattern_->GetFinalPosition(), info.mainPos);
+        EXPECT_TRUE(pattern_->GetScrollAbort());
+        pattern_->OnScrollStop([&stops]() { ++stops; }, nullptr);
+    }
+    EXPECT_EQ(starts, 1);
+    EXPECT_EQ(stops, 0);
+    pattern_->StopAnimate();
+    FlushUITasks();
+    EXPECT_EQ(stops, 1);
+    EXPECT_FALSE(pattern_->HasFastScrollRequest());
+}
+
+/**
+ * @tc.name: FastScrollEndpointStopsBeforeLayout001
+ * @tc.desc: Reaching a segment endpoint performs normal stop handling before the final layout check.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollerTestNg, FastScrollEndpointStopsBeforeLayout001, TestSize.Level1)
+{
+    CreateList();
+    CreateListItems(100);
+    CreateDone();
+    pattern_->ScrollToIndexFastScroll(80, true, ScrollAlign::START, std::nullopt,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    FlushUITasks();
+    ASSERT_TRUE(pattern_->AnimateRunning());
+    pattern_->ProcessSpringOffsetCallback(pattern_->GetFinalPosition());
+    EXPECT_FALSE(pattern_->AnimateRunning());
+    EXPECT_TRUE(pattern_->scrollStop_);
+    EXPECT_FALSE(pattern_->HasFastScrollRequest());
+    FlushUITasks();
+    RunFastScrollFrames();
+    EXPECT_FALSE(pattern_->HasFastScrollRequest());
+    EXPECT_FLOAT_EQ(pattern_->GetTotalOffset(), 80 * ITEM_MAIN_SIZE);
+}
+
+/**
+ * @tc.name: FastScrollStartCallbackOrdinaryAnimation001
+ * @tc.desc: The internal handoff guard must not leak into a public animation started by the start callback.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollerTestNg, FastScrollStartCallbackOrdinaryAnimation001, TestSize.Level1)
+{
+    auto model = CreateList();
+    bool replaced = false;
+    model.SetOnScrollStart([this, &replaced]() {
+        if (!replaced) {
+            replaced = true;
+            pattern_->AnimateTo(250.0f, -1, nullptr, true);
+        }
+    });
+    CreateListItems(100);
+    CreateDone();
+    pattern_->ScrollToIndexFastScroll(80, true, ScrollAlign::START, std::nullopt,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    FlushUITasks();
+    EXPECT_TRUE(replaced);
+    EXPECT_FALSE(pattern_->HasFastScrollRequest());
+    EXPECT_FLOAT_EQ(pattern_->GetFinalPosition(), 250.0f);
+    RunFastScrollFrames();
+    EXPECT_NEAR(pattern_->GetTotalOffset(), 250.0f, 0.1f);
+}
+
+/**
+ * @tc.name: FastScrollEndpointControllerTakeover001
+ * @tc.desc: A legacy index request before the endpoint layout discards the old delta and reaches its own target.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollerTestNg, FastScrollEndpointControllerTakeover001, TestSize.Level1)
+{
+    CreateList();
+    CreateListItems(100);
+    CreateDone();
+    pattern_->ScrollToIndexFastScroll(80, true, ScrollAlign::START, 25.0f,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    FlushUITasks();
+    ASSERT_TRUE(pattern_->AnimateRunning());
+    ASSERT_EQ(pattern_->GetFastScrollPreparation()->preparation, FastScrollPreparation::READY);
+    pattern_->ProcessSpringOffsetCallback(pattern_->GetFinalPosition());
+    ASSERT_FALSE(pattern_->HasFastScrollRequest());
+    ASSERT_FALSE(pattern_->AnimateRunning());
+    ASSERT_EQ(pattern_->GetFastScrollPreparation()->preparation, FastScrollPreparation::READY);
+
+    constexpr int32_t replacementIndex = 20;
+    constexpr float replacementOffset = 35.0f;
+    positionController_->ScrollToIndexWithOptions(replacementIndex, true, ScrollAlign::START, replacementOffset,
+        FastScrollMode::NONE);
+    ASSERT_TRUE(pattern_->targetIndex_);
+    EXPECT_EQ(pattern_->targetIndex_.value(), replacementIndex);
+    EXPECT_EQ(pattern_->scrollAlign_, ScrollAlign::START);
+    EXPECT_FLOAT_EQ(pattern_->GetExtraOffset().value_or(0.0f), replacementOffset);
+    EXPECT_FLOAT_EQ(pattern_->currentDelta_, 0.0f);
+    EXPECT_FALSE(pattern_->HasFastScrollRequest());
+    const bool skipBeforeLayout = pattern_->fastScrollSkip_;
+    FlushUITasks();
+    ASSERT_TRUE(pattern_->AnimateRunning()) << "skipBeforeLayout=" << skipBeforeLayout
+        << ", targetMeasured=" << pattern_->itemPosition_.count(replacementIndex)
+        << ", targetPending=" << pattern_->targetIndex_.has_value()
+        << ", offset=" << pattern_->GetTotalOffset();
+    const float replacementPosition = replacementIndex * ITEM_MAIN_SIZE + replacementOffset;
+    EXPECT_FLOAT_EQ(pattern_->GetFinalPosition(), replacementPosition);
+    EXPECT_EQ(pattern_->GetFastScrollPreparation(), nullptr);
+    EXPECT_FALSE(pattern_->HasFastScrollRequest());
+    ASSERT_NO_FATAL_FAILURE(RunFastScrollFrames());
+    EXPECT_NEAR(pattern_->GetTotalOffset(), replacementPosition, 0.1f);
+    EXPECT_NEAR(pattern_->GetItemRect(replacementIndex).Top(), -replacementOffset, 0.1f);
+    EXPECT_FALSE(pattern_->HasFastScrollRequest());
+    EXPECT_FALSE(pattern_->AnimateRunning());
+    FlushUITasks();
+    EXPECT_NEAR(pattern_->GetTotalOffset(), replacementPosition, 0.1f);
+}
+
+/**
+ * @tc.name: FastScrollDirectStopClearsPendingRequest001
+ * @tc.desc: An animator stop notification clears a waiting request without requiring a spring stop callback.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollerTestNg, FastScrollDirectStopClearsPendingRequest001, TestSize.Level1)
+{
+    CreateList();
+    CreateListItems(100);
+    pattern_->ScrollToIndexFastScroll(80, true, ScrollAlign::START, std::nullopt,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    ASSERT_TRUE(pattern_->HasFastScrollRequest());
+    pattern_->OnAnimateStop();
+    EXPECT_FALSE(pattern_->HasFastScrollRequest());
+    CreateDone();
+    EXPECT_FALSE(pattern_->AnimateRunning());
+}
+
+/**
+ * @tc.name: FastScrollPendingCancellation001
+ * @tc.desc: Stop a request before the first layout, when there is no animation handle yet.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollerTestNg, FastScrollPendingCancellation001, TestSize.Level1)
+{
+    CreateList();
+    CreateListItems(100);
+    pattern_->ScrollToIndexFastScroll(80, true, ScrollAlign::CENTER, std::nullopt,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    ASSERT_TRUE(pattern_->HasFastScrollRequest());
+    EXPECT_FALSE(pattern_->AnimateRunning());
+    pattern_->StopAnimate();
+    EXPECT_FALSE(pattern_->HasFastScrollRequest());
+    CreateDone();
+    EXPECT_FALSE(pattern_->AnimateRunning());
+    EXPECT_FLOAT_EQ(pattern_->GetTotalOffset(), 0.0f);
+}
+
+/**
+ * @tc.name: FastScrollPendingLatestRequest001
+ * @tc.desc: The last valid request starts only after the first viewport has been measured.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollerTestNg, FastScrollPendingLatestRequest001, TestSize.Level1)
+{
+    CreateList();
+    CreateListItems(100);
+    pattern_->ScrollToIndexFastScroll(80, true, ScrollAlign::START, std::nullopt,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    pattern_->ScrollToIndexFastScroll(50, true, ScrollAlign::START, std::nullopt,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    EXPECT_FALSE(pattern_->AnimateRunning());
+    CreateDone();
+    ASSERT_TRUE(pattern_->HasFastScrollRequest());
+    EXPECT_EQ(pattern_->GetFastScrollRequest()->index, 50);
+    EXPECT_TRUE(pattern_->AnimateRunning());
+    EXPECT_FLOAT_EQ(pattern_->GetFinalPosition(), 50 * ITEM_MAIN_SIZE);
+    EXPECT_FALSE(pattern_->targetIndex_.has_value());
+}
+
+/**
+ * @tc.name: FastScrollFirstLayoutStartsBeforeEvents001
+ * @tc.desc: A pending END request starts with current geometry and indexes before first-layout events.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollerTestNg, FastScrollFirstLayoutStartsBeforeEvents001, TestSize.Level1)
+{
+    CreateList();
+    auto events = std::make_shared<std::vector<std::string>>();
+    eventHub_->SetOnScrollStart([this, events]() {
+        events->emplace_back("start");
+        EXPECT_FALSE(pattern_->isInitialized_);
+        EXPECT_FLOAT_EQ(pattern_->contentMainSize_, HEIGHT);
+        EXPECT_EQ(pattern_->startIndex_, 0);
+        EXPECT_EQ(pattern_->endIndex_, 3);
+    });
+    eventHub_->SetOnReachStart([events]() { events->emplace_back("reach"); });
+    CreateListItems(100);
+    pattern_->ScrollToIndexFastScroll(80, true, ScrollAlign::END, std::nullopt,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    EXPECT_FALSE(pattern_->AnimateRunning());
+    CreateDone();
+    ASSERT_GE(events->size(), 2);
+    EXPECT_EQ(events->at(0), "start");
+    EXPECT_EQ(events->at(1), "reach");
+    EXPECT_TRUE(pattern_->isInitialized_);
+    EXPECT_TRUE(pattern_->AnimateRunning());
+    EXPECT_FLOAT_EQ(pattern_->GetFinalPosition(), 81 * ITEM_MAIN_SIZE - HEIGHT);
+    eventHub_->SetOnScrollStart(nullptr);
+    eventHub_->SetOnReachStart(nullptr);
+}
+
+/**
+ * @tc.name: FastScrollWillScrollInterception001
+ * @tc.desc: A zero displacement from the application does not cancel an in-flight animation.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollerTestNg, FastScrollWillScrollInterception001, TestSize.Level1)
+{
+    CreateList();
+    CreateListItems(100);
+    CreateDone();
+    eventHub_->SetOnWillScroll([](Dimension, ScrollState, ScrollSource) {
+        ScrollFrameResult result;
+        result.offset = Dimension(0.0f);
+        return result;
+    });
+    pattern_->ScrollToIndexFastScroll(80, true, ScrollAlign::START, std::nullopt,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    pattern_->UpdateCurrentOffset(-100.0f, SCROLL_FROM_ANIMATION_CONTROLLER);
+    FlushUITasks();
+    EXPECT_TRUE(pattern_->HasFastScrollRequest());
+    EXPECT_TRUE(pattern_->AnimateRunning());
+    EXPECT_FLOAT_EQ(pattern_->GetTotalOffset(), 0.0f);
+    RunFastScrollFrames();
+    EXPECT_FALSE(pattern_->HasFastScrollRequest());
+    EXPECT_FALSE(pattern_->AnimateRunning());
+    EXPECT_FLOAT_EQ(pattern_->GetTotalOffset(), 0.0f);
+}
+
+/**
+ * @tc.name: FastScrollCallbackDoesNotRestart
+ * @tc.desc: Apply callback displacement without replacing the running segment or retrying at its end.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollCallbackTestNg, FastScrollCallbackDoesNotRestart, TestSize.Level1)
+{
+    const auto [knownSize, backward, mode] = GetParam();
+    auto model = CreateList();
+    if (knownSize) {
+        model.GetOrCreateListChildrenMainSize()->UpdateDefaultSize(ITEM_MAIN_SIZE);
+    }
+    CreateListItems(100);
+    CreateDone();
+    const float initialOffset = backward ? 80 * ITEM_MAIN_SIZE : 0.0f;
+    ScrollTo(initialOffset);
+    auto displacement = std::make_shared<float>(0.0f);
+    auto calls = std::make_shared<int32_t>(0);
+    auto stops = std::make_shared<int32_t>(0);
+    eventHub_->SetOnWillScroll([mode = mode, displacement, calls](Dimension offset, ScrollState, ScrollSource) {
+        if (!NearZero(offset.Value())) {
+            ++*calls;
+        }
+        float ratio = mode == FastScrollCallbackMode::ZERO ? 0.0f : 1.0f;
+        if (mode == FastScrollCallbackMode::HALF || (mode == FastScrollCallbackMode::HALF_ONCE && *calls == 1)) {
+            ratio = 0.5f;
+        }
+        auto applied = Dimension(offset.Value() * ratio, offset.Unit());
+        *displacement += applied.ConvertToPx();
+        return ScrollFrameResult { applied };
+    });
+    eventHub_->SetOnScrollStop([stops]() { ++*stops; });
+    MockAnimationManager::GetInstance().SetTicks(4);
+    pattern_->ScrollToIndexFastScroll(backward ? 20 : 80, true, ScrollAlign::START, std::nullopt,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    MockAnimationManager::GetInstance().Tick();
+    FlushUITasks();
+    EXPECT_TRUE(pattern_->AnimateRunning());
+    EXPECT_NEAR(pattern_->GetTotalOffset(), initialOffset + *displacement, 0.1f);
+    RunFastScrollFrames();
+    EXPECT_NEAR(pattern_->GetTotalOffset(), initialOffset + *displacement, 0.1f);
+    EXPECT_EQ(*stops, 1);
+    eventHub_->SetOnWillScroll(nullptr);
+    eventHub_->SetOnScrollStop(nullptr);
+    pattern_->ScrollToIndexFastScroll(backward ? 10 : 90, true, ScrollAlign::START, std::nullopt,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    RunFastScrollFrames();
+    EXPECT_NEAR(pattern_->GetTotalOffset(), (backward ? 10 : 90) * ITEM_MAIN_SIZE, 0.1f);
+}
+
+INSTANTIATE_TEST_SUITE_P(SingleLane, ListFastScrollCallbackTestNg,
+    testing::Combine(testing::Bool(), testing::Bool(), testing::Values(FastScrollCallbackMode::ZERO,
+        FastScrollCallbackMode::HALF, FastScrollCallbackMode::HALF_ONCE, FastScrollCallbackMode::UNCHANGED)));
+
+/**
+ * @tc.name: FastScrollMultiLaneEnabled001
+ * @tc.desc: Multi-lane preparation starts an optimized animation and preserves the target and extra offset.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollerTestNg, FastScrollMultiLaneEnabled001, TestSize.Level1)
+{
+    auto model = CreateList();
+    model.SetLanes(2);
+    CreateListItems(100);
+    CreateDone();
+    pattern_->ScrollToIndexFastScroll(80, true, ScrollAlign::START, 25.0f, FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    EXPECT_TRUE(pattern_->HasFastScrollRequest());
+    FlushUITasks();
+    EXPECT_TRUE(pattern_->AnimateRunning());
+    RunFastScrollFrames();
+    EXPECT_NEAR(pattern_->GetTotalOffset(), 40 * ITEM_MAIN_SIZE + 25.0f, 0.1f);
+}
+
+/**
+ * @tc.name: FastScrollMultiLaneBeforeLayout001
+ * @tc.desc: A multi-lane request before first layout waits for visible row samples.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollerTestNg, FastScrollMultiLaneBeforeLayout001, TestSize.Level1)
+{
+    auto model = CreateList();
+    model.SetLanes(2);
+    CreateListItems(100);
+    pattern_->ScrollToIndexFastScroll(80, true, ScrollAlign::START, std::nullopt,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    EXPECT_TRUE(pattern_->HasFastScrollRequest());
+    EXPECT_FALSE(pattern_->AnimateRunning());
+    CreateDone();
+    RunFastScrollFrames();
+    EXPECT_NEAR(pattern_->GetTotalOffset(), 40 * ITEM_MAIN_SIZE, 0.1f);
+}
+
+/**
+ * @tc.name: FastScrollAutoLanesBeforeLayout001
+ * @tc.desc: A pending request uses the measured lane count, not the default value in the pattern.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollerTestNg, FastScrollAutoLanesBeforeLayout001, TestSize.Level1)
+{
+    auto model = CreateList();
+    model.SetLaneMinLength(Dimension(WIDTH / 2));
+    model.SetLaneMaxLength(Dimension(WIDTH / 2));
+    CreateListItems(100);
+    pattern_->ScrollToIndexFastScroll(80, true, ScrollAlign::START, std::nullopt,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    EXPECT_FALSE(pattern_->AnimateRunning());
+    CreateDone();
+    FlushUITasks();
+    EXPECT_EQ(pattern_->GetLanes(), 2);
+    RunFastScrollFrames();
+    EXPECT_NEAR(pattern_->GetTotalOffset(), 40 * ITEM_MAIN_SIZE, 0.1f);
+}
+
+/**
+ * @tc.name: FastScrollLaneChangeKeepsScrollingUsable001
+ * @tc.desc: Changing lanes during fast scroll can lose alignment but must leave valid layout and scrolling state.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollerTestNg, FastScrollLaneChangeKeepsScrollingUsable001, TestSize.Level1)
+{
+    CreateList();
+    CreateListItems(100);
+    CreateDone();
+    pattern_->ScrollToIndexFastScroll(80, true, ScrollAlign::START, std::nullopt,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    ASSERT_TRUE(pattern_->HasFastScrollRequest());
+    pattern_->currentDelta_ = 5000.0f;
+    layoutProperty_->UpdateLanes(2);
+    frameNode_->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+    FlushUITasks();
+    EXPECT_EQ(pattern_->GetLanes(), 2);
+    ASSERT_NO_FATAL_FAILURE(RunFastScrollFrames());
+    EXPECT_FALSE(pattern_->HasFastScrollRequest());
+    EXPECT_FALSE(pattern_->AnimateRunning());
+    EXPECT_TRUE(std::isfinite(pattern_->GetTotalOffset()));
+    ASSERT_FALSE(pattern_->itemPosition_.empty());
+    for (const auto& [index, position] : pattern_->itemPosition_) {
+        EXPECT_GE(index, 0);
+        EXPECT_LT(index, 100);
+        EXPECT_TRUE(std::isfinite(position.startPos));
+        EXPECT_TRUE(std::isfinite(position.endPos));
+        EXPECT_TRUE(GreatOrEqual(position.endPos, position.startPos));
+    }
+    pattern_->ScrollToIndex(10, false, ScrollAlign::START);
+    FlushUITasks();
+    EXPECT_NEAR(pattern_->GetItemRect(10).Top(), 0.0f, 0.1f);
+    EXPECT_NEAR(pattern_->GetItemRect(11).Top(), 0.0f, 0.1f);
+    const float offsetBeforeScroll = pattern_->GetTotalOffset();
+    pattern_->ScrollBy(25.0f);
+    FlushUITasks();
+    EXPECT_NEAR(pattern_->GetTotalOffset(), offsetBeforeScroll + 25.0f, 0.1f);
+    EXPECT_NEAR(pattern_->GetItemRect(10).Top(), -25.0f, 0.1f);
+    pattern_->ScrollToIndex(0, false, ScrollAlign::START);
+    FlushUITasks();
+    EXPECT_NEAR(pattern_->GetTotalOffset(), 0.0f, 0.1f);
+    EXPECT_NEAR(pattern_->GetItemRect(0).Top(), 0.0f, 0.1f);
+}
+
 void ListScrollerTestNg::CreateGroupWithSettingChildrenMainSize(int32_t groupNumber)
 {
     for (int32_t index = 0; index < groupNumber; ++index) {
