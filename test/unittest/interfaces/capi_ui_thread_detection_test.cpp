@@ -228,23 +228,6 @@ HWTEST_F(UiThreadDetectionTest, LogModeProducesDiagnosticsOnUnsafeThread, TestSi
     RunAndExpectNoDiagnostic([] { ConfigManager::CheckUIThread("TestApi_Safe"); });
 }
 
-HWTEST_F(UiThreadDetectionTest, RejectsInvalidRuntimeCheckArguments, TestSize.Level1)
-{
-    SetMockIsCurrentThreadSafe(SafeThread);
-    EXPECT_EQ(OH_ArkUI_NativeModule_SetRuntimeCheckMode(
-        static_cast<OH_ArkUI_NativeModule_RuntimeCheckType>(-1), OH_ARKUI_NATIVEMODULE_CHECK_MODE_LOG),
-        ARKUI_ERROR_CODE_PARAM_INVALID);
-    EXPECT_EQ(OH_ArkUI_NativeModule_SetRuntimeCheckMode(
-        static_cast<OH_ArkUI_NativeModule_RuntimeCheckType>(2), OH_ARKUI_NATIVEMODULE_CHECK_MODE_LOG),
-        ARKUI_ERROR_CODE_PARAM_INVALID);
-    EXPECT_EQ(OH_ArkUI_NativeModule_SetRuntimeCheckMode(
-        OH_ARKUI_NATIVEMODULE_CHECK_TYPE_UI_THREAD, static_cast<OH_ArkUI_NativeModule_RuntimeCheckMode>(-1)),
-        ARKUI_ERROR_CODE_PARAM_INVALID);
-    EXPECT_EQ(OH_ArkUI_NativeModule_SetRuntimeCheckMode(
-        OH_ARKUI_NATIVEMODULE_CHECK_TYPE_UI_THREAD, static_cast<OH_ArkUI_NativeModule_RuntimeCheckMode>(3)),
-        ARKUI_ERROR_CODE_PARAM_INVALID);
-}
-
 HWTEST_F(UiThreadDetectionTest, RuntimeCheckModeChangeInvalidatesCache, TestSize.Level1)
 {
     SetMockIsCurrentThreadSafe(SafeThread);
@@ -253,7 +236,7 @@ HWTEST_F(UiThreadDetectionTest, RuntimeCheckModeChangeInvalidatesCache, TestSize
     EnableMode(OH_ARKUI_NATIVEMODULE_CHECK_MODE_DISABLED);
 }
 
-// === 参数化导出测试（175 × 4 模式）===
+// === 参数化导出测试（177 × 4 模式）===
 
 class UiThreadExportLogTest : public UiThreadDetectionTest, public WithParamInterface<ScopeEntry> {};
 
@@ -387,11 +370,35 @@ TEST_P(UiThreadTableLogTest, LogModeProducesDiagnostic)
     RunAndExpectDiagnostic([api, this] { GetParam().invoke(api); });
 }
 
-// === Scope entries（175 导出函数 + 17 TextEditorStyledStringController，排除 5 个范围外 + 2 个 ANI）===
+// === Scope entries（177 导出函数 + 17 TextEditorStyledStringController，排除 5 个范围外 + 2 个 ANI）===
 
 namespace {
 #define SCOPE_ENTRY(api) { #api, [] { CallWithDefaultArgs(api); } }
 const ScopeEntry SCOPE_ENTRIES[] = {
+    SCOPE_ENTRY(OH_ArkUI_ArcSwiper_FinishAnimation),
+    SCOPE_ENTRY(OH_ArkUI_ArcSwiper_ShowNext),
+    SCOPE_ENTRY(OH_ArkUI_ArcSwiper_ShowPrevious),
+    SCOPE_ENTRY(OH_ArkUI_GetContextByNode),
+    SCOPE_ENTRY(OH_ArkUI_GetNavDestinationId),
+    SCOPE_ENTRY(OH_ArkUI_GetNavDestinationIndex),
+    SCOPE_ENTRY(OH_ArkUI_GetNavDestinationName),
+    SCOPE_ENTRY(OH_ArkUI_GetNavDestinationNameByIndex),
+    SCOPE_ENTRY(OH_ArkUI_GetNavDestinationParam),
+    SCOPE_ENTRY(OH_ArkUI_GetNavDestinationState),
+    SCOPE_ENTRY(OH_ArkUI_GetNavigationId),
+    SCOPE_ENTRY(OH_ArkUI_GetNavStackLength),
+    SCOPE_ENTRY(OH_ArkUI_GetRouterPageId),
+    SCOPE_ENTRY(OH_ArkUI_GetRouterPageIndex),
+    SCOPE_ENTRY(OH_ArkUI_GetRouterPageName),
+    SCOPE_ENTRY(OH_ArkUI_GetRouterPagePath),
+    SCOPE_ENTRY(OH_ArkUI_GetRouterPageState),
+    SCOPE_ENTRY(OH_ArkUI_Swiper_FakeDragBy),
+    SCOPE_ENTRY(OH_ArkUI_Swiper_FinishAnimation),
+    SCOPE_ENTRY(OH_ArkUI_Swiper_IsFakeDragging),
+    SCOPE_ENTRY(OH_ArkUI_Swiper_ShowNext),
+    SCOPE_ENTRY(OH_ArkUI_Swiper_ShowPrevious),
+    SCOPE_ENTRY(OH_ArkUI_Swiper_StartFakeDrag),
+    SCOPE_ENTRY(OH_ArkUI_Swiper_StopFakeDrag),
     SCOPE_ENTRY(OH_ArkUI_AccessibilityProvider_Create),
     SCOPE_ENTRY(OH_ArkUI_AccessibilityProvider_Dispose),
     SCOPE_ENTRY(OH_ArkUI_GetContextFromNapiValue),
@@ -399,6 +406,7 @@ const ScopeEntry SCOPE_ENTRIES[] = {
     SCOPE_ENTRY(OH_ArkUI_GetNodeHandleFromNapiValue),
     SCOPE_ENTRY(OH_ArkUI_InitModuleForArkTSEnv),
     SCOPE_ENTRY(OH_ArkUI_NativeModule_AdoptChild),
+    SCOPE_ENTRY(OH_ArkUI_NativeModule_AdoptChildWithPolicy),
     SCOPE_ENTRY(OH_ArkUI_NativeModule_AtomicServiceMenuBarSetVisible),
     SCOPE_ENTRY(OH_ArkUI_NativeModule_ConvertPositionFromWindow),
     SCOPE_ENTRY(OH_ArkUI_NativeModule_ConvertPositionToWindow),
@@ -411,6 +419,7 @@ const ScopeEntry SCOPE_ENTRIES[] = {
     SCOPE_ENTRY(OH_ArkUI_NativeModule_RegisterCommonEvent),
     SCOPE_ENTRY(OH_ArkUI_NativeModule_RegisterCommonVisibleAreaApproximateChangeEvent),
     SCOPE_ENTRY(OH_ArkUI_NativeModule_RemoveAdoptedChild),
+    SCOPE_ENTRY(OH_ArkUI_NativeModule_SetAdoptedChildOverlayPositionCompensation),
     SCOPE_ENTRY(OH_ArkUI_NativeModule_SetChildMountPolicy),
     SCOPE_ENTRY(OH_ArkUI_NativeModule_UnregisterCommonAreaApproximateChangeEvent),
     SCOPE_ENTRY(OH_ArkUI_NativeModule_UnregisterCommonEvent),

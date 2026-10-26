@@ -15,8 +15,11 @@
 #ifndef FOUNDATION_ARKUI_ACE_ENGINE_FRAMEWORKS_TEST_UNITTEST_CAPI_MODIFIERS_MODIFIER_TEST_BASE_H
 #define FOUNDATION_ARKUI_ACE_ENGINE_FRAMEWORKS_TEST_UNITTEST_CAPI_MODIFIERS_MODIFIER_TEST_BASE_H
 
+#include <cstdlib>
 #include <iostream>
+#include <atomic>
 #include <set>
+#include <unordered_map>
 
 #include <gtest/gtest.h>
 
@@ -24,14 +27,17 @@
 #include "../capi_gen140_compat.h"
 
 #include "core/components/theme/theme_constants.h"
+#include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/property/flex_property.h"
 #include "core/interfaces/native/utility/peer_utils.h"
 #include "test/mock/adapter/ohos/osal/mock_system_properties.h"
 #include "test/mock/frameworks/base/thread/mock_task_executor.h"
 #include "test/mock/frameworks/core/common/mock_container.h"
+#include "test/mock/frameworks/core/common/mock_resource_adapter_v2.h"
 #include "test/mock/frameworks/core/common/mock_theme_manager.h"
 #include "test/mock/frameworks/core/common/mock_theme_style.h"
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
+#include "test/unittest/capi/utils/mock_resource_registration.h"
 
 namespace OHOS::Ace {
 inline void PrintTo(const Dimension& dim, std::ostream* os)
@@ -93,6 +99,35 @@ MATCHER_P(CompareMarginPadding, expected, "Compare margins and paddings")
         arg.bottom == expected;
 }
 
+class CallbackNodeBinder final {
+public:
+    static int32_t Bind(const RefPtr<FrameNode>& node)
+    {
+        static std::atomic<int32_t> nextToken = 0x60000;
+        const int32_t token = nextToken.fetch_add(1);
+        Map().emplace(token, AceType::WeakClaim(AceType::RawPtr(node)));
+        return token;
+    }
+
+    static RefPtr<FrameNode> Upgrade(int32_t token)
+    {
+        const auto entry = Map().find(token);
+        return entry == Map().end() ? RefPtr<FrameNode>{} : entry->second.Upgrade();
+    }
+
+    static void Unbind(int32_t token)
+    {
+        Map().erase(token);
+    }
+
+private:
+    static std::unordered_map<int32_t, WeakPtr<FrameNode>>& Map()
+    {
+        static std::unordered_map<int32_t, WeakPtr<FrameNode>> map;
+        return map;
+    }
+};
+
 template <typename Modifier, auto GetModifierFunc, GENERATED_Ark_NodeType NodeType>
 class ModifierTestBase : public testing::Test {
 public:
@@ -123,6 +158,7 @@ public:
 
     static void SetUpTestCase()
     {
+        ResetMockResourceData();
         MockPipelineContext::SetUp();
         themeManager_ = AceType::MakeRefPtr<::testing::NiceMock<MockThemeManager>>();
         MockPipelineContext::GetCurrent()->SetThemeManager(themeManager_);
@@ -194,11 +230,18 @@ public:
         }
         ASSERT_NE(type, ThemeConstantsType::ERROR);
         MockThemeStyle::GetInstance()->SetAttr(key, { .type = type, .value = value });
+        uint32_t id = 0;
+        if (TryParseAsResourceId(key, id)) {
+            RegisterResourceById(id, value);
+        } else {
+            RegisterResourceByName(key, value);
+        }
     }
 
     static void AddResource(int64_t key, const ResRawValue& value)
     {
         AddResource(std::to_string(key), value);
+        RegisterResourceById(static_cast<uint32_t>(key), value);
     }
 
     template<typename T, typename U>

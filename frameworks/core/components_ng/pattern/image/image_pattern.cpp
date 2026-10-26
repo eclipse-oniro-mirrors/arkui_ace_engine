@@ -378,7 +378,7 @@ void ImagePattern::CheckHandles(SelectHandleInfo& handleInfo)
     const auto& geometryNode = host->GetGeometryNode();
     auto contentRect = geometryNode->GetContentRect();
     RectF visibleContentRect(contentRect.GetOffset() + parentGlobalOffset_, contentRect.GetSize());
-    auto parent = host->GetAncestorNodeOfFrame(true);
+    auto parent = host->GetCoordinateAncestorNodeOfFrame(true);
     visibleContentRect = GetVisibleContentRect(parent, visibleContentRect);
     auto paintRect = handleInfo.paintRect;
     PointF bottomPoint = { paintRect.Left(), paintRect.Bottom() - BOX_EPSILON };
@@ -2555,6 +2555,60 @@ void ImagePattern::DumpInfo()
     DumpOtherInfo();
 }
 
+void ImagePattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    auto layoutProp = GetLayoutProperty<ImageLayoutProperty>();
+    CHECK_NULL_VOID(layoutProp);
+    auto src = layoutProp->GetImageSourceInfo().value_or(ImageSourceInfo(""));
+    if (!config.IsPublicTree()) {
+        json->Put("url", src.ToString().c_str());
+    } else if (config.functionalProperties) {
+        DumpAdvanceSourceInfo(json, config);
+    }
+    if (!config.IsPublicTree() || config.functionalProperties) {
+        json->Put("syncLoad", syncLoad_);
+    }
+    if (!config.IsPublicTree() && loadingCtx_) {
+        auto currentLoadImageState = loadingCtx_->GetCurrentLoadingState();
+        json->Put("currentLoadImageState", currentLoadImageState.c_str());
+    }
+}
+
+void ImagePattern::DumpAdvanceSourceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& /* config */)
+{
+    auto property = GetLayoutProperty<ImageLayoutProperty>();
+    CHECK_NULL_VOID(property);
+    const auto& source = property->GetImageSourceInfo();
+    if (!source.has_value()) {
+        return;
+    }
+    // Only resource references are allowed; pixel maps, streams and embedded bytes are excluded.
+    switch (source->GetSrcType()) {
+        case SrcType::FILE:
+        case SrcType::ASSET:
+        case SrcType::NETWORK:
+        case SrcType::RESOURCE:
+        case SrcType::DATA_ABILITY:
+        case SrcType::DATA_ABILITY_DECODED:
+            if (!source->GetSrc().empty()) {
+                json->Put("url", source->GetSrc().c_str());
+            }
+            break;
+        case SrcType::RESOURCE_ID: {
+            auto resource = JsonUtil::Create();
+            resource->Put("id", static_cast<int32_t>(source->GetResourceId()));
+            json->PutRef("url", std::move(resource));
+            break;
+        }
+        default: {
+            auto descriptor = JsonUtil::Create();
+            descriptor->Put("sourceType", source->GetSrcTypeName());
+            json->PutRef("url", std::move(descriptor));
+            break;
+        }
+    }
+}
+
 void ImagePattern::DumpAdvanceInfo()
 {
     auto layoutProp = GetLayoutProperty<ImageLayoutProperty>();
@@ -3121,15 +3175,7 @@ void ImagePattern::DumpRenderInfo(std::unique_ptr<JsonValue>& json)
 
 void ImagePattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json)
 {
-    auto layoutProp = GetLayoutProperty<ImageLayoutProperty>();
-    CHECK_NULL_VOID(layoutProp);
-    auto src = layoutProp->GetImageSourceInfo().value_or(ImageSourceInfo(""));
-    json->Put("url", src.ToString().c_str());
-    json->Put("syncLoad", syncLoad_);
-    if (loadingCtx_) {
-        auto currentLoadImageState = loadingCtx_->GetCurrentLoadingState();
-        json->Put("currentLoadImageState", currentLoadImageState.c_str());
-    }
+    ImagePattern::DumpAdvanceInfo(json, ParamConfig());
 }
 
 void ImagePattern::AddPixelMapToUiManager()

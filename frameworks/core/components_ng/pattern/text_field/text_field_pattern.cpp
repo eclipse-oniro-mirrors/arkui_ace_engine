@@ -9970,6 +9970,45 @@ void TextFieldPattern::DumpTextEngineInfo()
         .append(std::to_string(paragraph_->GetLongestLineWithIndent())));
 }
 
+void TextFieldPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if (!config.IsPublicTree()) {
+        Pattern::DumpAdvanceInfo(json);
+        return;
+    }
+    if (config.visualProperties) {
+        DumpAdvanceVisualProperties(json, config);
+    }
+    if (config.functionalProperties) {
+        DumpAdvanceFunctionalProperties(json, config);
+    }
+}
+
+void TextFieldPattern::DumpAdvanceVisualProperties(
+    std::unique_ptr<JsonValue>& json, const ParamConfig& /* config */)
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto theme = GetTheme();
+    CHECK_NULL_VOID(theme);
+    auto property = GetLayoutProperty<TextFieldLayoutProperty>();
+    CHECK_NULL_VOID(property);
+    json->Put("FontColor", property->GetTextColorValue(theme->GetTextColor()).ColorToString().c_str());
+    // Preserve local layout rectangles without adding input-method cursor geometry.
+    json->Put("textRect", textRect_.ToString().c_str());
+    json->Put("contentRect", contentRect_.ToString().c_str());
+}
+
+void TextFieldPattern::DumpAdvanceFunctionalProperties(
+    std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if (config.IsPublicTree()) {
+        json->Put("CustomKeyboard", static_cast<bool>((customKeyboard_ || customKeyboardBuilder_)));
+    } else {
+        json->Put("CustomKeyboard", (customKeyboard_ || customKeyboardBuilder_) ? "true" : "false");
+    }
+}
+
 void TextFieldPattern::DumpAdvanceInfo()
 {
     if (customKeyboard_ || customKeyboardBuilder_) {

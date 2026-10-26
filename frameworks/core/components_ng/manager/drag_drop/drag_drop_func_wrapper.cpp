@@ -832,7 +832,10 @@ OffsetF DragDropFuncWrapper::GetPaintRectCenter(const RefPtr<FrameNode>& frameNo
     auto offset = paintRect.GetOffset();
     PointF pointNode(offset.GetX() + paintRect.Width() / 2.0f, offset.GetY() + paintRect.Height() / 2.0f);
     context->GetPointTransformRotate(pointNode);
-    auto parent = frameNode->GetAncestorNodeOfFrame(false);
+    auto parent = frameNode->GetCoordinateAncestorNodeOfFrame(false);
+    if (parent) {
+        frameNode->ApplyAdoptedCompensationToPoint(pointNode);
+    }
     while (parent) {
         if (checkWindowBoundary && parent->IsWindowBoundary()) {
             break;
@@ -843,7 +846,11 @@ OffsetF DragDropFuncWrapper::GetPaintRectCenter(const RefPtr<FrameNode>& frameNo
         pointNode.SetX(offset.GetX() + pointNode.GetX());
         pointNode.SetY(offset.GetY() + pointNode.GetY());
         renderContext->GetPointTransformRotate(pointNode);
-        parent = parent->GetAncestorNodeOfFrame(false);
+        auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(false);
+        if (ancestor) {
+            parent->ApplyAdoptedCompensationToPoint(pointNode);
+        }
+        parent = ancestor;
     }
     return OffsetF(pointNode.GetX(), pointNode.GetY());
 }
@@ -914,7 +921,10 @@ RectF DragDropFuncWrapper::GetPaintRectToWindowWithoutRotate(const RefPtr<FrameN
     float width = paintRect.Width();
     float height = paintRect.Height();
     context->GetPointTransformRotate(pointNode);
-    auto parent = frameNode->GetAncestorNodeOfFrame(true);
+    auto parent = frameNode->GetCoordinateAncestorNodeOfFrame(true);
+    if (parent) {
+        frameNode->ApplyAdoptedCompensationToCenterAndSize(pointNode, width, height);
+    }
     while (parent) {
         auto scale = parent->GetTransformScale();
         width *= scale.x;
@@ -925,7 +935,11 @@ RectF DragDropFuncWrapper::GetPaintRectToWindowWithoutRotate(const RefPtr<FrameN
         pointNode.SetX(offset.GetX() + pointNode.GetX());
         pointNode.SetY(offset.GetY() + pointNode.GetY());
         renderContext->GetPointTransformRotate(pointNode);
-        parent = parent->GetAncestorNodeOfFrame(true);
+        auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
+        if (ancestor) {
+            parent->ApplyAdoptedCompensationToCenterAndSize(pointNode, width, height);
+        }
+        parent = ancestor;
     }
     auto x = pointNode.GetX() - width * SCALE_HALF;
     auto y = pointNode.GetY() - height * SCALE_HALF;
@@ -952,7 +966,7 @@ void DragDropFuncWrapper::UpdateNodePositionToWindow(const RefPtr<FrameNode>& fr
     CHECK_NULL_VOID(frameNode);
     auto renderContext = frameNode->GetRenderContext();
     CHECK_NULL_VOID(renderContext);
-    RefPtr<FrameNode> parentNode = frameNode->GetAncestorNodeOfFrame(true);
+    RefPtr<FrameNode> parentNode = frameNode->GetCoordinateAncestorNodeOfFrame(true);
     if (parentNode) {
         offset -= parentNode->GetPositionToWindowWithTransform();
     }
@@ -979,7 +993,7 @@ OffsetF DragDropFuncWrapper::GetFrameNodeOffsetToWindow(const RefPtr<FrameNode>&
     offset -= GetCurrentWindowOffset(targetNode->GetContextRefPtr());
     auto renderContext = targetNode->GetRenderContext();
     CHECK_NULL_RETURN(renderContext, OffsetF());
-    RefPtr<FrameNode> parentNode = targetNode->GetAncestorNodeOfFrame(true);
+    RefPtr<FrameNode> parentNode = targetNode->GetCoordinateAncestorNodeOfFrame(true);
     if (parentNode) {
         offset -= parentNode->GetPositionToWindowWithTransform();
     }

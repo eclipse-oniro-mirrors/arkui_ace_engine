@@ -16,11 +16,63 @@
 
 #include <new>
 
+#include "core/interfaces/native/node/content_change_api.h"
 #include "core/interfaces/native/node/ui_tree_api.h"
-
+#include "core/interfaces/native/node/interaction_observer_api.h"
 #include "core/interfaces/native/node/page_text_api.h"
+#include "interfaces/inner_api/ace/node_module_inner.h"
 #include "interfaces/native/native_error_message_wrapper.h"
+#include "interfaces/native/native_error_message_macros.h"
+#include "interfaces/native/node/config_manager.h"
 #include "interfaces/native/node/node_model.h"
+
+struct OH_ArkUI_NativeModule_UIContentChangeEvent {
+    OH_ArkUI_NativeModule_UIContentChangeEventType type;
+    uint64_t timestamp;
+    ArkUI_ContextHandle context;
+    OH_ArkUI_NativeModule_UIJsonWrapper* json;
+};
+
+namespace {
+// Trampolines so that the JSON wrappers handed to the application callback are
+// created and destroyed by the module that defines the wrapper type; the
+// framework-side manager only sees the opaque pointers.
+OH_ArkUI_NativeModule_UIJsonWrapper* CreateInteractionJsonWrapper(const char* data, uint32_t size)
+{
+    OH_ArkUI_NativeModule_UIJsonWrapper* wrapper = nullptr;
+    if (OH_ArkUI_NativeModule_UIJsonWrapperCreate(data, size, &wrapper) != ARKUI_ERROR_CODE_NO_ERROR) {
+        return nullptr;
+    }
+    return wrapper;
+}
+
+void DestroyInteractionJsonWrapper(const OH_ArkUI_NativeModule_UIJsonWrapper* wrapper)
+{
+    OH_ArkUI_NativeModule_UIJsonWrapperDestroy(
+        const_cast<OH_ArkUI_NativeModule_UIJsonWrapper*>(wrapper));
+}
+
+struct ContentChangeCookie {
+    ArkUI_ContextHandle context;
+    void* userData;
+    OH_ArkUI_NativeModule_UIContentChangeEventCallback callback;
+};
+
+void OnContentChangeEvent(uint32_t type, uint64_t timestamp, const char* data, uint32_t size, void* opaque)
+{
+    auto* cookie = static_cast<ContentChangeCookie*>(opaque);
+    OH_ArkUI_NativeModule_UIJsonWrapper* json = nullptr;
+    if (OH_ArkUI_NativeModule_UIJsonWrapperCreate(data, size, &json) != ARKUI_ERROR_CODE_NO_ERROR) {
+        return;
+    }
+    OH_ArkUI_NativeModule_UIContentChangeEvent event {
+        static_cast<OH_ArkUI_NativeModule_UIContentChangeEventType>(type), timestamp, cookie->context, json
+    };
+    cookie->callback(&event, cookie->userData);
+    OH_ArkUI_NativeModule_UIJsonWrapperDestroy(json);
+}
+
+} // namespace
 
 ArkUI_ErrorCode OH_ArkUI_NativeModule_UIAgentGetPageText(
     ArkUI_ContextHandle uiContext, OH_ArkUI_NativeModule_UIJsonWrapper** pageText)
@@ -204,3 +256,194 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_UIAgentGetTreeJsonAsync(ArkUI_ContextHandl
     ArkUITreeCompletion completion { context, callback, userData, DeliverTreeResult };
     return static_cast<ArkUI_ErrorCode>(api->submit(context->id, &options, &completion, requestId));
 }
+
+ArkUI_ErrorCode OH_ArkUI_NativeModule_UIInfoCollectionRegisterInteractionObserver(
+    ArkUI_ContextHandle uiContext, uint32_t eventMask, uint32_t* registerID,
+    OH_ArkUI_NativeModule_UIInfoCollectionInteractionJsonCallback callback, void* userData)
+{
+    CHECK_UI_THREAD("OH_ArkUI_NativeModule_UIInfoCollectionRegisterInteractionObserver");
+    auto fail = [](ArkUI_ErrorCode code, const char* reason) {
+        OHOS::Ace::SetErrorMessageByModifier(
+            code, "OH_ArkUI_NativeModule_UIInfoCollectionRegisterInteractionObserver", reason);
+        return code;
+    };
+    if (!registerID) {
+        return fail(ARKUI_ERROR_CODE_PARAM_INVALID, "Registration ID output slot is null.");
+    }
+    *registerID = 0;
+    if (!callback) {
+        return fail(ARKUI_ERROR_CODE_PARAM_INVALID, "Interaction callback is null.");
+    }
+    const uint32_t supportedMask =
+        OH_ARKUI_NATIVEMODULE_UIINFOCOLLECTION_INTERACTION_EVENT_TAP |
+        OH_ARKUI_NATIVEMODULE_UIINFOCOLLECTION_INTERACTION_EVENT_CLICK |
+        OH_ARKUI_NATIVEMODULE_UIINFOCOLLECTION_INTERACTION_EVENT_LONG_PRESS |
+        OH_ARKUI_NATIVEMODULE_UIINFOCOLLECTION_INTERACTION_EVENT_PAN |
+        OH_ARKUI_NATIVEMODULE_UIINFOCOLLECTION_INTERACTION_EVENT_PINCH |
+        OH_ARKUI_NATIVEMODULE_UIINFOCOLLECTION_INTERACTION_EVENT_ROTATION |
+        OH_ARKUI_NATIVEMODULE_UIINFOCOLLECTION_INTERACTION_EVENT_SWIPE |
+        OH_ARKUI_NATIVEMODULE_UIINFOCOLLECTION_INTERACTION_EVENT_DRAG |
+        OH_ARKUI_NATIVEMODULE_UIINFOCOLLECTION_INTERACTION_EVENT_TOUCH;
+    if ((eventMask & supportedMask) == 0) {
+        return fail(ARKUI_ERROR_CODE_PARAM_INVALID, "Event mask contains no supported event bit.");
+    }
+    if (!uiContext) {
+        return fail(ARKUI_ERROR_CODE_UI_CONTEXT_INVALID, "UI context is null.");
+    }
+    const auto* api = OHOS::Ace::NodeModel::GetInteractionObserverAPI();
+    if (!api || !api->registerObserver || !api->unregisterObserver) {
+        return fail(ARKUI_ERROR_CODE_CAPI_INIT_ERROR, "Interaction observer native support is unavailable.");
+    }
+    auto code = static_cast<ArkUI_ErrorCode>(api->registerObserver(
+        reinterpret_cast<const ArkUI_Context*>(uiContext)->id, eventMask, callback, userData,
+        &CreateInteractionJsonWrapper, &DestroyInteractionJsonWrapper, registerID));
+    if (code != ARKUI_ERROR_CODE_NO_ERROR) {
+        *registerID = 0;
+        return fail(code, "Interaction observer registration failed.");
+    }
+    return ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+ArkUI_ErrorCode OH_ArkUI_NativeModule_UIInfoCollectionUnregisterInteractionObserver(uint32_t registerID)
+{
+    CHECK_UI_THREAD("OH_ArkUI_NativeModule_UIInfoCollectionUnregisterInteractionObserver");
+    auto fail = [](ArkUI_ErrorCode code, const char* reason) {
+        OHOS::Ace::SetErrorMessageByModifier(
+            code, "OH_ArkUI_NativeModule_UIInfoCollectionUnregisterInteractionObserver", reason);
+        return code;
+    };
+    if (registerID == 0) {
+        return fail(ARKUI_ERROR_CODE_PARAM_INVALID, "Registration ID is invalid.");
+    }
+    const auto* api = OHOS::Ace::NodeModel::GetInteractionObserverAPI();
+    if (!api || !api->unregisterObserver) {
+        return fail(ARKUI_ERROR_CODE_CAPI_INIT_ERROR, "Interaction observer native support is unavailable.");
+    }
+    auto code = static_cast<ArkUI_ErrorCode>(api->unregisterObserver(registerID));
+    if (code != ARKUI_ERROR_CODE_NO_ERROR) {
+        return fail(code, "Interaction observer unregistration failed.");
+    }
+    return ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+ArkUI_ErrorCode OH_ArkUI_NativeModule_RegisterUIContentChangeEvent(
+    ArkUI_ContextHandle uiContext, bool withStart, uint32_t eventMask, uint32_t ignoreMask, void* userData,
+    OH_ArkUI_NativeModule_UIContentChangeEventCallback callback, uint64_t* subscriptionId)
+{
+    CHECK_UI_THREAD("OH_ArkUI_NativeModule_RegisterUIContentChangeEvent");
+    CHECK_NULL_RETURN_WITH_MESSAGE(uiContext, ARKUI_ERROR_CODE_UI_CONTEXT_INVALID,
+        __FUNCTION__, "UI context parameter is null");
+    CHECK_NULL_RETURN_WITH_MESSAGE(callback, ARKUI_ERROR_CODE_CALLBACK_INVALID,
+        __FUNCTION__, "Callback parameter is null");
+    if (eventMask == 0) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Event mask is zero");
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    constexpr uint32_t validEventMask = OH_ARKUI_NATIVEMODULE_EVENT_CATEGORY_PAGE |
+        OH_ARKUI_NATIVEMODULE_EVENT_CATEGORY_SCROLL | OH_ARKUI_NATIVEMODULE_EVENT_CATEGORY_OVERLAY;
+    constexpr uint32_t validIgnoreMask = OH_ARKUI_NATIVEMODULE_CONTENTCHANGE_IGNORE_SCROLLBY |
+        OH_ARKUI_NATIVEMODULE_CONTENTCHANGE_IGNORE_SCROLLTO | OH_ARKUI_NATIVEMODULE_CONTENTCHANGE_IGNORE_TOAST;
+    if ((eventMask != OH_ARKUI_NATIVEMODULE_EVENT_CATEGORY_ALL && (eventMask & ~validEventMask)) ||
+        (ignoreMask & ~validIgnoreMask)) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Event or ignore mask contains unknown bits");
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    CHECK_NULL_RETURN_WITH_MESSAGE(subscriptionId, ARKUI_ERROR_CODE_PARAM_INVALID,
+        __FUNCTION__, "Subscription ID output parameter is null");
+    const auto* api = OHOS::Ace::NodeModel::GetContentChangeAPI();
+    CHECK_NULL_RETURN_WITH_MESSAGE(api, ARKUI_ERROR_CODE_CAPI_INIT_ERROR,
+        __FUNCTION__, "Content change native support is unavailable");
+    CHECK_NULL_RETURN_WITH_MESSAGE(api->registerEvent && api->unregisterEvent, ARKUI_ERROR_CODE_CAPI_INIT_ERROR,
+        __FUNCTION__, "Content change subscription is not initialized");
+    auto* cookie = new (std::nothrow) ContentChangeCookie { uiContext, userData, callback };
+    CHECK_NULL_RETURN_WITH_MESSAGE(cookie, ARKUI_ERROR_CODE_CAPI_INIT_ERROR,
+        __FUNCTION__, "Subscription allocation failed");
+    uint64_t id = 0;
+    auto code = static_cast<ArkUI_ErrorCode>(api->registerEvent(
+        uiContext->id, withStart, eventMask, ignoreMask,
+        cookie, OnContentChangeEvent, [](void* opaque) { delete static_cast<ContentChangeCookie*>(opaque); },
+        &id));
+    if (code != ARKUI_ERROR_CODE_NO_ERROR) {
+        delete cookie;
+        SET_ERROR_FUNCTION_NAME(__FUNCTION__);
+        return code;
+    }
+    *subscriptionId = id;
+    return ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+ArkUI_ErrorCode OH_ArkUI_NativeModule_UnRegisterUIContentChangeEvent(
+    ArkUI_ContextHandle uiContext, uint64_t subscriptionId)
+{
+    CHECK_UI_THREAD("OH_ArkUI_NativeModule_UnRegisterUIContentChangeEvent");
+    CHECK_NULL_RETURN_WITH_MESSAGE(uiContext, ARKUI_ERROR_CODE_UI_CONTEXT_INVALID,
+        __FUNCTION__, "UI context parameter is null");
+    if (subscriptionId == 0) {
+        SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "Subscription ID is zero");
+        return ARKUI_ERROR_CODE_PARAM_INVALID;
+    }
+    const auto* api = OHOS::Ace::NodeModel::GetContentChangeAPI();
+    CHECK_NULL_RETURN_WITH_MESSAGE(api, ARKUI_ERROR_CODE_CAPI_INIT_ERROR,
+        __FUNCTION__, "Content change native support is unavailable");
+    CHECK_NULL_RETURN_WITH_MESSAGE(api->unregisterEvent, ARKUI_ERROR_CODE_CAPI_INIT_ERROR,
+        __FUNCTION__, "Content change subscription is not initialized");
+    auto code = static_cast<ArkUI_ErrorCode>(api->unregisterEvent(uiContext->id, subscriptionId));
+    if (code != ARKUI_ERROR_CODE_NO_ERROR) {
+        SET_ERROR_FUNCTION_NAME(__FUNCTION__);
+    }
+    return code;
+}
+
+ArkUI_ErrorCode OH_ArkUI_NativeModule_UIContentChangeEventGetType(
+    const OH_ArkUI_NativeModule_UIContentChangeEvent* event, OH_ArkUI_NativeModule_UIContentChangeEventType* type)
+{
+    CHECK_NULL_RETURN_WITH_MESSAGE(event, ARKUI_ERROR_CODE_PARAM_INVALID,
+        __FUNCTION__, "Event parameter is null");
+    CHECK_NULL_RETURN_WITH_MESSAGE(type, ARKUI_ERROR_CODE_PARAM_INVALID,
+        __FUNCTION__, "Event type output parameter is null");
+    *type = event->type;
+    return ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+ArkUI_ErrorCode OH_ArkUI_NativeModule_UIContentChangeEventGetTimestamp(
+    const OH_ArkUI_NativeModule_UIContentChangeEvent* event, uint64_t* nanoTimestamp)
+{
+    CHECK_NULL_RETURN_WITH_MESSAGE(event, ARKUI_ERROR_CODE_PARAM_INVALID,
+        __FUNCTION__, "Event parameter is null");
+    CHECK_NULL_RETURN_WITH_MESSAGE(nanoTimestamp, ARKUI_ERROR_CODE_PARAM_INVALID,
+        __FUNCTION__, "Timestamp output parameter is null");
+    *nanoTimestamp = event->timestamp;
+    return ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+ArkUI_ErrorCode OH_ArkUI_NativeModule_UIContentChangeEventGetContext(
+    const OH_ArkUI_NativeModule_UIContentChangeEvent* event, ArkUI_ContextHandle* uiContext)
+{
+    CHECK_NULL_RETURN_WITH_MESSAGE(uiContext, ARKUI_ERROR_CODE_PARAM_INVALID,
+        __FUNCTION__, "UI context output parameter is null");
+    *uiContext = nullptr;
+    CHECK_NULL_RETURN_WITH_MESSAGE(event, ARKUI_ERROR_CODE_PARAM_INVALID,
+        __FUNCTION__, "Event parameter is null");
+    *uiContext = event->context;
+    return ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+ArkUI_ErrorCode OH_ArkUI_NativeModule_UIContentChangeEventGetContentChangeEventJson(
+    const OH_ArkUI_NativeModule_UIContentChangeEvent* event, const OH_ArkUI_NativeModule_UIJsonWrapper** json)
+{
+    CHECK_NULL_RETURN_WITH_MESSAGE(json, ARKUI_ERROR_CODE_PARAM_INVALID,
+        __FUNCTION__, "JSON output parameter is null");
+    *json = nullptr;
+    CHECK_NULL_RETURN_WITH_MESSAGE(event, ARKUI_ERROR_CODE_PARAM_INVALID,
+        __FUNCTION__, "Event parameter is null");
+    *json = event->json;
+    return ARKUI_ERROR_CODE_NO_ERROR;
+}
+
+#ifdef __cplusplus
+}
+#endif

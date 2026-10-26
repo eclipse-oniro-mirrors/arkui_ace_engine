@@ -414,10 +414,10 @@ PipelineContext::PipelineContext(std::shared_ptr<Window> window, RefPtr<TaskExec
     touchOptimizer_ = std::make_unique<ResSchedTouchOptimizer>();
     clickOptimizer_ = std::make_shared<ResSchedClickOptimizer>();
     clickOptimizer_->Init();
-    contentChangeMgr_ = MakeRefPtr<ContentChangeManager>(taskExecutor_);
     taihangOptimizer_ = std::make_shared<TaihangOptimizer>();
     taihangOptimizer_->Init();
 #endif
+    contentChangeMgr_ = MakeRefPtr<ContentChangeManager>(taskExecutor_);
     dynamicComponentSafeManager_ = AceType::MakeRefPtr<DynamicComponentSafeManager>();
     // Snapshot the thread's isolated state at pipeline creation time.
     // This determines the pipeline's IsolatedThread identity for its entire lifecycle.
@@ -456,11 +456,11 @@ PipelineContext::PipelineContext(std::shared_ptr<Window> window, RefPtr<TaskExec
 #ifndef CROSS_PLATFORM
     touchOptimizer_ = std::make_unique<ResSchedTouchOptimizer>();
     clickOptimizer_ = std::make_shared<ResSchedClickOptimizer>();
-    contentChangeMgr_ = MakeRefPtr<ContentChangeManager>(taskExecutor_);
     clickOptimizer_->Init();
     taihangOptimizer_ = std::make_shared<TaihangOptimizer>();
     taihangOptimizer_->Init();
 #endif
+    contentChangeMgr_ = MakeRefPtr<ContentChangeManager>(taskExecutor_);
     dynamicComponentSafeManager_ = AceType::MakeRefPtr<DynamicComponentSafeManager>();
     // Snapshot the thread's isolated state at pipeline creation time.
     isIsolatedThread_ = ContainerScope::IsIsolatedThread();
@@ -492,11 +492,11 @@ PipelineContext::PipelineContext()
 #ifndef CROSS_PLATFORM
     touchOptimizer_ = std::make_unique<ResSchedTouchOptimizer>();
     clickOptimizer_ = std::make_shared<ResSchedClickOptimizer>();
-    contentChangeMgr_ = MakeRefPtr<ContentChangeManager>(taskExecutor_);
     clickOptimizer_->Init();
     taihangOptimizer_ = std::make_shared<TaihangOptimizer>();
     taihangOptimizer_->Init();
 #endif
+    contentChangeMgr_ = MakeRefPtr<ContentChangeManager>(taskExecutor_);
     dynamicComponentSafeManager_ = AceType::MakeRefPtr<DynamicComponentSafeManager>();
     // Snapshot the thread's isolated state at pipeline creation time.
     isIsolatedThread_ = ContainerScope::IsIsolatedThread();
@@ -1249,12 +1249,22 @@ void PipelineContext::FlushVsync(uint64_t nanoTimestamp, uint64_t frameCount, in
 #endif
     ProcessDelayTasks();
     if (frameCount != UINT64_MAX) {
+        const int64_t displaySyncStartTime = GetSysTimestamp();
         DispatchDisplaySync(nanoTimestamp);
+        const int64_t displaySyncEndTime = GetSysTimestamp();
+        if (displaySyncEndTime > displaySyncStartTime) {
+            frameMetrics.animationDuration += static_cast<uint64_t>(displaySyncEndTime - displaySyncStartTime);
+        }
     }
     FlushRebuildRenderTree();
     FlushAnimation(nanoTimestamp);
     FlushFrameCallback(nanoTimestamp, frameCount);
+    const int64_t modifierAnimationStartTime = GetSysTimestamp();
     auto hasRunningAnimation = FlushModifierAnimation(nanoTimestamp);
+    const int64_t modifierAnimationEndTime = GetSysTimestamp();
+    if (modifierAnimationEndTime > modifierAnimationStartTime) {
+        frameMetrics.animationDuration += static_cast<uint64_t>(modifierAnimationEndTime - modifierAnimationStartTime);
+    }
 #ifdef RELAXED_INTERACTION_SUPPORT
     FlushRelaxedInteraction();
 #endif
@@ -1419,14 +1429,13 @@ void PipelineContext::FlushVsync(uint64_t nanoTimestamp, uint64_t frameCount, in
     FireFrameMetricsCallBack(frameMetrics);
     TAG_LOGD(AceLogTag::ACE_WINDOW_PIPELINE,
         "FrameMetrics actualStartTime=%{public}" PRIu64 ", totalDuration=%{public}" PRIu64
-        ", vsyncTimestamp=%{public}" PRIu64,
-        frameMetrics.actualStartTime, frameMetrics.totalDuration, frameMetrics.vsyncTimestamp);
+        ", vsyncTimestamp=%{public}" PRIu64 ", animationDuration=%{public}" PRIu64,
+        frameMetrics.actualStartTime, frameMetrics.totalDuration, frameMetrics.vsyncTimestamp,
+        frameMetrics.animationDuration);
     // First vsync may come before rootNode_ is created.
-#ifndef CROSS_PLATFORM
     if (contentChangeMgr_ && rootNode_) {
         contentChangeMgr_->OnVsyncEnd(rootNode_->GetRectWithRender());
     }
-#endif
 }
 
 void PipelineContext::UpdateDrawLayoutChildObserver(
@@ -6067,6 +6076,9 @@ void PipelineContext::Destroy()
     CHECK_RUN_ON(UI);
     CloseUITreeRequests(*this);
     SetDestroyed();
+    if (contentChangeMgr_) {
+        contentChangeMgr_->InvalidateCapiContentChangeSubscriptions();
+    }
     if (rootNode_) {
         rootNode_->DetachFromMainTree();
     }

@@ -4480,6 +4480,14 @@
         "name": "OH_ArkUI_NativeModule_AdoptChild"
     },
     {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_AdoptChildWithPolicy"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_SetAdoptedChildOverlayPositionCompensation"
+    },
+    {
         "first_introduced": "22",
         "name": "OH_ArkUI_NativeModule_RemoveAdoptedChild"
     },
@@ -7418,6 +7426,30 @@
     },
     {
         "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_RegisterUIContentChangeEvent"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UnRegisterUIContentChangeEvent"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIContentChangeEventGetType"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIContentChangeEventGetTimestamp"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIContentChangeEventGetContext"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIContentChangeEventGetContentChangeEventJson"
+    },
+    {
+        "first_introduced": "26.2.0",
         "name": "OH_ArkUI_NativeModule_UIJsonWrapperCreate"
     },
     {
@@ -7563,5 +7595,13 @@
     {
         "first_introduced": "26.2.0",
         "name": "OH_ArkUI_NativeModule_UIAgentGetTreeJsonAsync"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIInfoCollectionRegisterInteractionObserver"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIInfoCollectionUnregisterInteractionObserver"
     }
 ]

@@ -1384,6 +1384,7 @@ ohos_unittest("node_model_safely_test") {
     "$ace_root/interfaces/native/node/style_modifier.cpp",
     "$ace_root/test/mock/adapter/ohos/osal/mock_log_wrapper.cpp",
     "node_model_safely_test.cpp",
+    "callback_dfx_test.cpp",
   ]
 
   configs = [

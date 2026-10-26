@@ -30,6 +30,7 @@
 #include "core/event/crown_event.h"
 #endif
 #include "core/event/mouse_event.h"
+#include "interfaces/inner_api/ace/macros.h"
 #include "interfaces/inner_api/ace/ui_content_config.h"
 
 #define UIEXT_LOGD(fmt, ...)                                                                                      \
@@ -160,9 +161,11 @@ public:
         const std::function<void(const UIExtensionOperationPhase&, int32_t)>&& callback);
     void FireOnAbilityErrorCodeCallback(
         const UIExtensionOperationPhase& operationPhase, int32_t abilityErrorCode);
-    void SetSyncCallbacks(const std::list<std::function<void(const RefPtr<UIExtensionProxy>&)>>&& callbackList);
+    ACE_FORCE_EXPORT void SetSyncCallbacks(
+        const std::list<std::function<void(const RefPtr<UIExtensionProxy>&)>>&& callbackList);
     void FireSyncCallbacks();
-    void SetAsyncCallbacks(const std::list<std::function<void(const RefPtr<UIExtensionProxy>&)>>&& callbackList);
+    ACE_FORCE_EXPORT void SetAsyncCallbacks(
+        const std::list<std::function<void(const RefPtr<UIExtensionProxy>&)>>&& callbackList);
     void FireAsyncCallbacks();
     void SetBindModalCallback(const std::function<void()>&& callback);
     void FireBindModalCallback();

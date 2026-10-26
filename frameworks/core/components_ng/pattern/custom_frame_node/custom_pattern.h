@@ -70,6 +70,8 @@ public:
     RefPtr<VerticalOverflowHandler> GetOrCreateVerticalOverflowHandler(const WeakPtr<FrameNode>& host) override;
 
     void DumpInfo() override;
+    void AddExtraInfoWithParamConfig(
+        std::shared_ptr<JsonValue>& json, ParamConfig config = ParamConfig()) override;
 
     bool GetIsVertical() const override
     {

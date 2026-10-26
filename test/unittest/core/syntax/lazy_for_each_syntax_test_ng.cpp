@@ -77,6 +77,73 @@ constexpr int32_t INDEX_EQUAL_WITH_START_INDEX_DELETED = -1;
 constexpr int32_t LAZY_FOR_EACH_NODE_ID = 1;
 } // namespace
 
+class TrackingLazyForEachBuilder final : public Framework::MockLazyForEachBuilder {
+    DECLARE_ACE_TYPE(TrackingLazyForEachBuilder, Framework::MockLazyForEachBuilder);
+
+public:
+    void RegisterDataChangeListener(const RefPtr<V2::DataChangeListener>& listener) override
+    {
+        listener_ = listener;
+        ++registrations_;
+    }
+    void UnregisterDataChangeListener(V2::DataChangeListener* listener) override
+    {
+        EXPECT_EQ(listener_, listener);
+        ++unregistrations_;
+    }
+    WeakPtr<V2::DataChangeListener> listener_;
+    int32_t registrations_ = 0;
+    int32_t unregistrations_ = 0;
+};
+
+class CountingLazyForEachNode final : public LazyForEachNode {
+    DECLARE_ACE_TYPE(CountingLazyForEachNode, LazyForEachNode);
+
+public:
+    CountingLazyForEachNode() : LazyForEachNode(-1, nullptr) {}
+    void OnDataReloaded(bool reuseImmediately) override
+    {
+        ++calls_[0];
+    }
+    void OnDataAdded(size_t index) override
+    {
+        ++calls_[1];
+    }
+    void OnDataBulkAdded(size_t index, size_t count) override
+    {
+        ++calls_[2];
+    }
+    void OnDataDeleted(size_t index) override
+    {
+        ++calls_[3];
+    }
+    void OnDataBulkDeleted(size_t index, size_t count) override
+    {
+        ++calls_[4];
+    }
+    void OnDataChanged(size_t index) override
+    {
+        ++calls_[5];
+    }
+    void OnDataMoved(size_t from, size_t to) override
+    {
+        ++calls_[6];
+    }
+    void OnDatasetChange(const std::list<V2::Operation>& operations) override
+    {
+        ++calls_[7];
+    }
+    void OnDataBulkChanged(size_t index, size_t count) override
+    {
+        ++calls_[8];
+    }
+    void OnDataMoveToNewPlace(size_t from, size_t to) override
+    {
+        ++calls_[9];
+    }
+    int32_t calls_[10] = {};
+};
+
 class LazyForEachSyntaxTestNg : public testing::Test {
 public:
     void SetUp() override;
@@ -1850,6 +1917,73 @@ HWTEST_F(LazyForEachSyntaxTestNg, LazyForEachUtilsParseMetaData006, TestSize.Lev
      */
     LazyForEachUtils::SetEnableCustomComponentFreeze(false);
     LazyForEachUtils::SetLazyForEachMemOptStrategy("UNDEFINED");
+}
+
+/**
+ * @tc.name: DataChangeListenerOwner_001
+ * @tc.desc: Listener references retain the node; weak listeners expire after the final owner reference is released.
+ * @tc.type: FUNC
+ */
+HWTEST_F(LazyForEachSyntaxTestNg, DataChangeListenerOwner_001, TestSize.Level1)
+{
+    auto builder = AceType::MakeRefPtr<TrackingLazyForEachBuilder>();
+    auto node = AceType::MakeRefPtr<LazyForEachNode>(-1, builder);
+    WeakPtr<LazyForEachNode> weak(node);
+    node->RegisterBuilderListener();
+    auto listener = builder->listener_.Upgrade();
+    ASSERT_NE(listener, nullptr);
+    EXPECT_EQ(listener, node);
+    EXPECT_EQ(listener->GetDataChangeOwner(), AceType::RawPtr(node));
+    EXPECT_EQ(AceType::DynamicCast<LazyForEachNode>(listener), node);
+    WeakPtr<V2::DataChangeListener> weakListener(listener);
+    {
+        RefPtr<const V2::DataChangeListener> constListener = listener;
+        EXPECT_EQ(constListener->GetDataChangeOwner(), AceType::RawPtr(node));
+        EXPECT_EQ(AceType::DynamicCast<LazyForEachNode>(constListener.GetRawPtr()), AceType::RawPtr(node));
+        RefPtr<AceType> owner = listener;
+        EXPECT_EQ(owner, node);
+        EXPECT_EQ(AceType::DynamicCast<V2::DataChangeListener>(owner), listener);
+    }
+    node->RegisterBuilderListener();
+    EXPECT_EQ(builder->registrations_, 1);
+    node->OnDelete();
+    EXPECT_EQ(builder->unregistrations_, 1);
+    node->RegisterBuilderListener();
+    EXPECT_EQ(builder->registrations_, 2);
+    EXPECT_EQ(listener, builder->listener_.Upgrade());
+    node.Reset();
+    EXPECT_NE(weak.Upgrade(), nullptr);
+    EXPECT_EQ(builder->unregistrations_, 1);
+    EXPECT_EQ(weakListener.Upgrade(), listener);
+    listener.Reset();
+    EXPECT_EQ(weak.Upgrade(), nullptr);
+    EXPECT_EQ(weakListener.Upgrade(), nullptr);
+    EXPECT_EQ(builder->unregistrations_, 2);
+}
+
+/**
+ * @tc.name: DataChangeListenerOwner_002
+ * @tc.desc: The listener capability dispatches all ten notifications to the node's virtual handlers.
+ * @tc.type: FUNC
+ */
+HWTEST_F(LazyForEachSyntaxTestNg, DataChangeListenerOwner_002, TestSize.Level1)
+{
+    auto node = AceType::MakeRefPtr<CountingLazyForEachNode>();
+    RefPtr<V2::DataChangeListener> listener = node;
+    ASSERT_NE(listener, nullptr);
+    listener->OnDataReloaded(false);
+    listener->OnDataAdded(0);
+    listener->OnDataBulkAdded(0, 1);
+    listener->OnDataDeleted(0);
+    listener->OnDataBulkDeleted(0, 1);
+    listener->OnDataChanged(0);
+    listener->OnDataMoved(0, 1);
+    listener->OnDatasetChange({});
+    listener->OnDataBulkChanged(0, 1);
+    listener->OnDataMoveToNewPlace(0, 1);
+    for (auto calls : node->calls_) {
+        EXPECT_EQ(calls, 1);
+    }
 }
 
 } // namespace OHOS::Ace::NG

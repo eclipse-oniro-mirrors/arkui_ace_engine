@@ -14,8 +14,10 @@
  */
 
 #include "base/perfmonitor/perf_monitor.h"
+#include <unordered_map>
 
 #include "base/log/event_report.h"
+#include "base/log/log_wrapper.h"
 #include "base/perfmonitor/perf_constants.h"
 #include "base/perfmonitor/perf_interfaces.h"
 #include "base/ressched/ressched_report.h"
@@ -71,6 +73,15 @@ void PerfMonitor::Start(const std::string& sceneId, PerfActionType type, const s
     if (sceneId == PerfConstants::FLOAT_START_FROM_SIDEBAR) {
         ResSchedReport::GetInstance().ResSchedDataReport("float_start_from_sidebar_start");
     }
+    if (sceneId == PerfConstants::LV_INTO_APP_ANIM) {
+        std::unordered_map<std::string, std::string> lvPayload;
+        if (!note.empty()) {
+            lvPayload["bundleName"] = note;
+        }
+        LOGD("PerfMonitor LV_INTO_APP_ANIM start, type=%{public}d note=%{public}s",
+            static_cast<int>(type), note.c_str());
+        ResSchedReport::GetInstance().ResSchedDataReport("lv_into_app_anim_start", lvPayload);
+    }
 }
 
 void PerfMonitor::StartCommercial(const std::string& sceneId, PerfActionType type, const std::string& note)
@@ -99,6 +110,9 @@ void PerfMonitor::End(const std::string& sceneId, bool isRsRender)
     }
     if (sceneId == PerfConstants::FLOAT_START_FROM_SIDEBAR) {
         ResSchedReport::GetInstance().ResSchedDataReport("float_start_from_sidebar_end");
+    }
+    if (sceneId == PerfConstants::LV_INTO_APP_ANIM) {
+        ResSchedReport::GetInstance().ResSchedDataReport("lv_into_app_anim_end");
     }
 }
 

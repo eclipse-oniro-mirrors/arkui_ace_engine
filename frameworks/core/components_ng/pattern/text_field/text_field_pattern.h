@@ -1388,6 +1388,8 @@ public:
 
     void DumpInfo() override;
     void DumpSimplifyInfo(std::shared_ptr<JsonValue>& json) override;
+
+    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config) override;
     void DumpAdvanceInfo() override;
     void DumpPlaceHolderInfo();
     void DumpTextEngineInfo();
@@ -2113,6 +2115,9 @@ protected:
     bool selectDetectEnabled_ = true;
 
 private:
+    void DumpAdvanceVisualProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+    void DumpAdvanceFunctionalProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
     void ReportCaretPositionChangeEvent(int32_t nodeId, int32_t position);
     void ReportRequestKeyboardEvent(const RefPtr<FrameNode>& frameNode);
     bool HandleSelectTextCommand(int32_t start, int32_t end);

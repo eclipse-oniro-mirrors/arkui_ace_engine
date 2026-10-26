@@ -13,6 +13,11 @@
  * limitations under the License.
  */
 
+#include <algorithm>
+#include <cctype>
+#include <set>
+
+#include "interfaces/inner_api/ui_session/param_config.h"
 #include "scroll_bar_test_ng.h"
 #include "core/components_ng/pattern/scrollable/scrollable_theme.h"
 #include "core/components_ng/render/paint_wrapper.h"
@@ -1876,4 +1881,95 @@ HWTEST_F(ScrollBarTestNg, OnCollectTouchTargetRect004, TestSize.Level1)
 
     Container::Current()->SetApiTargetVersion(apiTargetVersion);
 }
+
+/**
+ * @tc.name: PublicDumpPreservesFlatInnerScrollBar
+ * @tc.desc: The inner scrollbar is flattened once, including when both groups are requested.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollBarTestNg, PublicDumpPreservesFlatInnerScrollBar, TestSize.Level1)
+{
+    auto pattern = AceType::MakeRefPtr<ScrollBarPattern>();
+    pattern->hasChild_ = false;
+    pattern->scrollBar_ = AceType::MakeRefPtr<ScrollBar>();
+    pattern->scrollBar_->touchRegion_ = Rect(1, 2, 30, 40);
+    pattern->scrollBar_->hoverRegion_ = Rect(3, 4, 50, 60);
+    pattern->scrollBar_->touchWidth_ = Dimension(12.0, DimensionUnit::VP);
+    pattern->scrollBar_->hoverWidth_ = Dimension(16.0, DimensionUnit::VP);
+    pattern->scrollBar_->activeRect_ = Rect(2, 6, 5, 10);
+    auto legacy = JsonUtil::Create();
+    pattern->DumpAdvanceInfo(legacy);
+    for (bool visual : { false, true }) {
+        for (bool functional : { false, true }) {
+            ParamConfig config;
+            config.dumpMode = TreeDumpMode::PUBLIC_TREE;
+            config.visualProperties = visual;
+            config.functionalProperties = functional;
+            auto json = JsonUtil::Create();
+            pattern->DumpAdvanceInfo(json, config);
+            EXPECT_FALSE(json->Contains("scrollBar"));
+            EXPECT_EQ(json->Contains("activeRect"), visual);
+            for (const char* key : { "touchRegion", "hoverRegion", "touchWidth", "hoverWidth" }) {
+                EXPECT_EQ(json->Contains(key), visual);
+                if (visual) {
+                    EXPECT_EQ(json->GetString(key), legacy->GetString(key));
+                }
+            }
+            EXPECT_EQ(json->Contains("isScrollable"), functional);
+            EXPECT_FALSE(json->Contains("outerScrollBarLayoutInfos"));
+            if (visual) {
+                EXPECT_EQ(json->GetString("activeRect"), legacy->GetString("activeRect"));
+                int count = 0;
+                for (auto item = json->GetChild(); item && item->IsValid(); item = item->GetNext()) {
+                    count += item->GetKey() == "activeRect";
+                }
+                EXPECT_EQ(count, 1);
+            }
+        }
+    }
+    auto after = JsonUtil::Create();
+    pattern->DumpAdvanceInfo(after);
+    EXPECT_EQ(after->ToString(), legacy->ToString());
+}
+
+/**
+ * @tc.name: PublicDumpAxisUsesHostConfiguration
+ * @tc.desc: Public flat keys are case-insensitively unique even when the inner axis is stale.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollBarTestNg, PublicDumpAxisUsesHostConfiguration, TestSize.Level1)
+{
+    auto pattern = AceType::MakeRefPtr<ScrollBarPattern>();
+    pattern->hasChild_ = false;
+    pattern->scrollBar_ = AceType::MakeRefPtr<ScrollBar>();
+    for (auto axis : { Axis::HORIZONTAL, Axis::VERTICAL }) {
+        pattern->axis_ = axis;
+        for (auto innerAxis : { Axis::HORIZONTAL, Axis::VERTICAL }) {
+            pattern->scrollBar_->SetAxis(innerAxis);
+            for (bool visual : { false, true }) {
+                for (bool functional : { false, true }) {
+                    ParamConfig config;
+                    config.dumpMode = TreeDumpMode::PUBLIC_TREE;
+                    config.visualProperties = visual;
+                    config.functionalProperties = functional;
+                    auto json = JsonUtil::Create();
+                    pattern->DumpAdvanceInfo(json, config);
+                    std::set<std::string> keys;
+                    for (auto item = json->GetChild(); item && item->IsValid(); item = item->GetNext()) {
+                        auto key = item->GetKey();
+                        std::transform(key.begin(), key.end(), key.begin(),
+                            [](unsigned char ch) { return std::tolower(ch); });
+                        EXPECT_TRUE(keys.insert(key).second) << key;
+                    }
+                    EXPECT_EQ(json->Contains("axis"), visual);
+                    if (visual) {
+                        EXPECT_EQ(json->GetValue("axis")->GetKey(), "Axis");
+                        EXPECT_EQ(json->GetString("axis"), axis == Axis::HORIZONTAL ? "HORIZONTAL" : "VERTICAL");
+                    }
+                }
+            }
+        }
+    }
+}
+
 } // namespace OHOS::Ace::NG

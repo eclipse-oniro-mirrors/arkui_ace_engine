@@ -14,6 +14,8 @@
  */
 
 #include "core/interfaces/native/node/node_adapter_impl.h"
+
+#include "base/log/log_wrapper.h"
 #include "core/common/container.h"
 
 #include "core/components_ng/pattern/pattern.h"
@@ -28,6 +30,16 @@ struct _ArkUINodeAdapter {
 };
 
 namespace OHOS::Ace::NG {
+namespace {
+void HandleInternalAdapterEvent(ArkUINodeAdapterEvent* event)
+{
+    CHECK_NULL_VOID(event);
+    auto adapter = reinterpret_cast<UINodeAdapter*>(event->extraParam);
+    if (adapter != nullptr) {
+        adapter->OnEventReceived(event);
+    }
+}
+} // namespace
 
 void NativeLazyForEachBuilder::RegisterDataChangeListener(const RefPtr<V2::DataChangeListener>& listener)
 {
@@ -47,7 +59,12 @@ void NativeLazyForEachBuilder::RegisterDataChangeListener(const RefPtr<V2::DataC
             event.handle = reinterpret_cast<ArkUINodeHandle>(RawPtr(parent));
         }
     }
-    receiver_(&event);
+    if (receiver_ == HandleInternalAdapterEvent) {
+        receiver_(&event);
+    } else {
+        LOG_CALLBACK("OH_ArkUI_NodeAdapter_RegisterEventReceiver", receiver_);
+        receiver_(&event);
+    }
 }
 
 void NativeLazyForEachBuilder::RegisterDataChangeListenerHandler()
@@ -64,7 +81,12 @@ void NativeLazyForEachBuilder::RegisterDataChangeListenerHandler()
             event.handle = reinterpret_cast<ArkUINodeHandle>(RawPtr(parent));
         }
     }
-    receiver_(&event);
+    if (receiver_ == HandleInternalAdapterEvent) {
+        receiver_(&event);
+    } else {
+        LOG_CALLBACK("OH_ArkUI_NodeAdapter_RegisterEventReceiver", receiver_);
+        receiver_(&event);
+    }
 }
 void NativeLazyForEachBuilder::UnregisterDataChangeListener(V2::DataChangeListener* listener)
 {
@@ -74,7 +96,12 @@ void NativeLazyForEachBuilder::UnregisterDataChangeListener(V2::DataChangeListen
     }
     ArkUINodeAdapterEvent event { .type = ON_DETACH_FROM_NODE };
     event.extraParam = reinterpret_cast<intptr_t>(userData_);
-    receiver_(&event);
+    if (receiver_ == HandleInternalAdapterEvent) {
+        receiver_(&event);
+    } else {
+        LOG_CALLBACK("OH_ArkUI_NodeAdapter_RegisterEventReceiver", receiver_);
+        receiver_(&event);
+    }
 }
 
 int32_t NativeLazyForEachBuilder::OnGetTotalCount()
@@ -86,18 +113,16 @@ LazyForEachChild NativeLazyForEachBuilder::OnGetChildByIndex(
     int32_t index, std::unordered_map<std::string, LazyForEachCacheChild>& cachedItems)
 {
     LazyForEachChild child;
-    if (!receiver_) {
-        return child;
-    }
+    CHECK_NULL_RETURN(receiver_, child);
     ArkUINodeAdapterEvent getIdevent { .index = index, .idSet = false, .type = ON_GET_NODE_ID, .nodeSet = false };
     getIdevent.extraParam = reinterpret_cast<intptr_t>(userData_);
-    receiver_(&getIdevent);
-    std::string idStr;
-    if (getIdevent.idSet) {
-        idStr = std::to_string(getIdevent.id);
+    if (receiver_ == HandleInternalAdapterEvent) {
+        receiver_(&getIdevent);
     } else {
-        idStr = std::to_string(index);
+        LOG_CALLBACK("OH_ArkUI_NodeAdapter_RegisterEventReceiver", receiver_);
+        receiver_(&getIdevent);
     }
+    std::string idStr = std::to_string(getIdevent.idSet ? getIdevent.id : index);
     child.first = idStr;
     const auto& itemIter = cachedItems.find(idStr);
     if (itemIter != cachedItems.end()) {
@@ -107,10 +132,13 @@ LazyForEachChild NativeLazyForEachBuilder::OnGetChildByIndex(
         if (needUpdateEvent_) {
             getIdevent.type = ON_UPDATE_NODE;
             getIdevent.handle = reinterpret_cast<ArkUINodeHandle>(AceType::RawPtr(child.second));
-            if (!getIdevent.idSet) {
-                getIdevent.id = index;
+            getIdevent.id = getIdevent.idSet ? getIdevent.id : index;
+            if (receiver_ == HandleInternalAdapterEvent) {
+                receiver_(&getIdevent);
+            } else {
+                LOG_CALLBACK("OH_ArkUI_NodeAdapter_RegisterEventReceiver", receiver_);
+                receiver_(&getIdevent);
             }
-            receiver_(&getIdevent);
         }
         FlushDirtyPropertyNodes(child.second);
         return child;
@@ -119,7 +147,12 @@ LazyForEachChild NativeLazyForEachBuilder::OnGetChildByIndex(
         .index = index, .id = getIdevent.id, .idSet = false, .type = ON_ADD_NODE_TO_ADAPTER, .nodeSet = false
     };
     getChildEvent.extraParam = reinterpret_cast<intptr_t>(userData_);
-    receiver_(&getChildEvent);
+    if (receiver_ == HandleInternalAdapterEvent) {
+        receiver_(&getChildEvent);
+    } else {
+        LOG_CALLBACK("OH_ArkUI_NodeAdapter_RegisterEventReceiver", receiver_);
+        receiver_(&getChildEvent);
+    }
     if (getChildEvent.nodeSet) {
         child.second = Claim(reinterpret_cast<UINode*>(getChildEvent.handle));
     }
@@ -145,7 +178,12 @@ void NativeLazyForEachBuilder::OnItemDeleted(UINode* node, const std::string& ke
     };
     event.extraParam = reinterpret_cast<intptr_t>(userData_);
     event.handle = reinterpret_cast<ArkUINodeHandle>(node);
-    receiver_(&event);
+    if (receiver_ == HandleInternalAdapterEvent) {
+        receiver_(&event);
+    } else {
+        LOG_CALLBACK("OH_ArkUI_NodeAdapter_RegisterEventReceiver", receiver_);
+        receiver_(&event);
+    }
 }
 
 ArkUI_Int32 NativeLazyForEachBuilder::GetAllItem(ArkUINodeHandle** items, ArkUI_Uint32* size)
@@ -165,13 +203,7 @@ UINodeAdapter::UINodeAdapter(ArkUINodeAdapterHandle handle) : handle_(handle)
     CHECK_NULL_VOID(handle_);
     CHECK_NULL_VOID(handle_->builder);
     handle_->builder->SetUserData(this);
-    handle_->builder->SetReceiver([](ArkUINodeAdapterEvent* event) {
-        CHECK_NULL_VOID(event);
-        auto adapter = reinterpret_cast<UINodeAdapter*>(event->extraParam);
-        if (adapter != nullptr) {
-            adapter->OnEventReceived(event);
-        }
-    });
+    handle_->builder->SetReceiver(HandleInternalAdapterEvent);
     handle_->builder->SetNeedUpdateEvent(true);
 }
 

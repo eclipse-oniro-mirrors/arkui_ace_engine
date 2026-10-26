@@ -30,6 +30,7 @@
 
 #include "adapter/ohos/osal/thp_extra_manager_impl.h"
 #include "core/accessibility/accessibility_manager_ng.h"
+#include "core/components_ng/manager/display_sync/ui_display_sync_manager.h"
 #include "core/components_ng/pattern/container_modal/container_modal_pattern.h"
 #include "core/components_ng/manager/focus/focus_manager.h"
 #include "core/components_ng/manager/frame_rate/frame_rate_manager.h"
@@ -51,6 +52,31 @@ using namespace testing::ext;
 
 namespace OHOS::Ace {
 namespace NG {
+namespace {
+constexpr uint32_t ANIMATION_TEST_DELAY_US = 1000;
+
+RefPtr<UIDisplaySync> CreateTimedDisplaySync(uint64_t& duration, int32_t& callbackCount)
+{
+    auto displaySync = AceType::MakeRefPtr<UIDisplaySync>();
+    displaySync->RegisterOnFrameWithTimestamp([&duration, &callbackCount](uint64_t) {
+        const int64_t start = GetSysTimestamp();
+        usleep(ANIMATION_TEST_DELAY_US);
+        duration = static_cast<uint64_t>(GetSysTimestamp() - start);
+        ++callbackCount;
+    });
+    return displaySync;
+}
+
+void ExpectTimedModifierAnimation(MockWindow& window, uint64_t& duration)
+{
+    EXPECT_CALL(window, FlushAnimation(_)).Times(2).WillRepeatedly([&duration](uint64_t) {
+        const int64_t start = GetSysTimestamp();
+        usleep(ANIMATION_TEST_DELAY_US);
+        duration = static_cast<uint64_t>(GetSysTimestamp() - start);
+        return false;
+    });
+}
+} // namespace
 
 /**
  * @tc.name: FrameMetricsApiContract
@@ -61,12 +87,15 @@ HWTEST_F(PipelineContextTestNg, FrameMetricsApiContract, TestSize.Level1)
 {
     static_assert(std::is_same_v<decltype(FrameMetrics::actualStartTime), uint64_t>);
     static_assert(std::is_same_v<decltype(FrameMetrics::totalDuration), uint64_t>);
+    static_assert(std::is_same_v<decltype(FrameMetrics::animationDuration), uint64_t>);
 
     FrameMetrics frameMetrics;
     EXPECT_EQ(frameMetrics.actualStartTime, 0);
     EXPECT_EQ(frameMetrics.totalDuration, 0);
+    EXPECT_EQ(frameMetrics.animationDuration, 0);
     EXPECT_LT(offsetof(FrameMetrics, layoutMeasureDuration), offsetof(FrameMetrics, actualStartTime));
     EXPECT_LT(offsetof(FrameMetrics, actualStartTime), offsetof(FrameMetrics, totalDuration));
+    EXPECT_LT(offsetof(FrameMetrics, totalDuration), offsetof(FrameMetrics, animationDuration));
 }
 
 /**
@@ -104,7 +133,8 @@ HWTEST_F(PipelineContextTestNg, FrameMetricsFlushVsyncCallback, TestSize.Level1)
     EXPECT_GT(observedMetrics.actualStartTime, 0);
     EXPECT_GT(observedMetrics.totalDuration, 0);
     EXPECT_GE(
-        observedMetrics.totalDuration, observedMetrics.inputHandlingDuration + observedMetrics.layoutMeasureDuration);
+        observedMetrics.totalDuration, observedMetrics.inputHandlingDuration + observedMetrics.layoutMeasureDuration +
+            observedMetrics.animationDuration);
 
     context_->frameMetricsCallBack_ = nullptr;
     context_->SetIsFreezeFlushMessage(originalFreezeFlushMessage);
@@ -112,6 +142,60 @@ HWTEST_F(PipelineContextTestNg, FrameMetricsFlushVsyncCallback, TestSize.Level1)
     context_->onFocus_ = originalOnFocus;
     context_->backgroundColorModeUpdated_ = originalBackgroundColorModeUpdated;
     ON_CALL(*window, GetRSUIDirector()).WillByDefault(Return(nullptr));
+}
+
+/**
+ * @tc.name: FrameMetricsAnimationDuration
+ * @tc.desc: Verify animation duration sums DisplaySync and modifier stages, including recovery frames.
+ * @tc.type: FUNC
+ */
+HWTEST_F(PipelineContextTestNg, FrameMetricsAnimationDuration, TestSize.Level1)
+{
+    ASSERT_NE(context_, nullptr);
+    auto originalWindow = context_->window_;
+    auto originalCallback = std::move(context_->frameMetricsCallBack_);
+    auto originalDisplaySyncManager = context_->GetOrCreateUIDisplaySyncManager();
+    const auto originalAnimationTimeStamp = context_->animationTimeStamp_;
+    const auto originalRecvTime = context_->recvTime_;
+    auto window = std::make_shared<NiceMock<MockWindow>>();
+    context_->window_ = window;
+    context_->animationTimeStamp_ = 0;
+    context_->recvTime_ = 0;
+    context_->uiDisplaySyncManager_ = AceType::MakeRefPtr<UIDisplaySyncManager>();
+
+    uint64_t displaySyncDuration = 0;
+    int32_t displaySyncCount = 0;
+    auto displaySync = CreateTimedDisplaySync(displaySyncDuration, displaySyncCount);
+    context_->uiDisplaySyncManager_->AddDisplaySync(displaySync);
+    uint64_t modifierAnimationDuration = 0;
+    int32_t callbackCount = 0;
+    ExpectTimedModifierAnimation(*window, modifierAnimationDuration);
+    FrameMetrics observedMetrics;
+    context_->SetFrameMetricsCallBack([&](FrameMetrics info) {
+        observedMetrics = info;
+        ++callbackCount;
+    });
+
+    context_->FlushVsync(NANO_TIME_STAMP, FRAME_COUNT);
+    EXPECT_EQ(callbackCount, 1);
+    EXPECT_EQ(displaySyncCount, 1);
+    EXPECT_GT(displaySyncDuration, 0);
+    EXPECT_GT(modifierAnimationDuration, 0);
+    EXPECT_GE(observedMetrics.animationDuration, displaySyncDuration + modifierAnimationDuration);
+    EXPECT_GE(observedMetrics.totalDuration, observedMetrics.animationDuration);
+
+    context_->FlushVsync(NANO_TIME_STAMP + 1, UINT64_MAX);
+    EXPECT_EQ(callbackCount, 2);
+    EXPECT_EQ(displaySyncCount, 1);
+    EXPECT_GT(modifierAnimationDuration, 0);
+    EXPECT_GE(observedMetrics.animationDuration, modifierAnimationDuration);
+    EXPECT_GE(observedMetrics.totalDuration, observedMetrics.animationDuration);
+
+    context_->frameMetricsCallBack_ = std::move(originalCallback);
+    context_->uiDisplaySyncManager_ = originalDisplaySyncManager;
+    context_->window_ = originalWindow;
+    context_->animationTimeStamp_ = originalAnimationTimeStamp;
+    context_->recvTime_ = originalRecvTime;
 }
 
 /**

@@ -907,6 +907,7 @@ public:
     virtual void GetEventDumpInfo();
     virtual void GetEventDumpInfo(std::unique_ptr<JsonValue>& json);
 
+    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config) override;
     void DumpAdvanceInfo() override;
     void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json) override;
 
@@ -1299,6 +1300,18 @@ protected:
     bool HandleArrowKeyScroll(const KeyEvent& keyEventInfo);
 
 private:
+    void GetEventDumpInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
+    void DumpAdvanceScrollEventInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
+    void DumpAdvancePhysicsInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
+    void DumpAdvanceDiagnostics(std::unique_ptr<JsonValue>& json);
+    void DumpAdvanceDiagnosticsDetails(std::unique_ptr<JsonValue>& json);
+    void DumpAdvanceVisualProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+    void DumpAdvanceFunctionalProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
+
     // Pattern owns target selection; Scrollable owns the animation and queued-task generation.
     std::optional<float> predictedItemSnapTarget_;
     float itemSnapReleaseMotionVelocity_ = 0.0f;

@@ -604,6 +604,19 @@ struct ArkUIAniSafeAreaInsetEdge {
     int32_t unit = 1; // DimensionUnit::VP
     int32_t alignment = 1; // SafeAreaInsetAlignment::CENTER
 };
+namespace OHOS::AAFwk {
+class Want;
+class WantParams;
+} // namespace OHOS::AAFwk
+
+namespace OHOS::Ace {
+struct ModalUIExtensionCallbacks;
+struct ModalUIExtensionConfig;
+class ModalUIExtensionProxy;
+} // namespace OHOS::Ace
+namespace OHOS::Ace::NG {
+struct InnerExtraConfig;
+} // namespace OHOS::Ace::NG
 
 struct ArkUIAniCommonModifier {
     ani_ref* (*getHostContext)(ArkUI_Int32 key);
@@ -703,6 +716,12 @@ struct ArkUIAniCommonModifier {
     void (*setOnNodeDestroyEvent)(ArkUINodeHandle node, std::function<void(int32_t)>&& event);
     void(*fireArkUIObjectLifecycleCallback)(ani_long nodePtr, const std::string& className, void* data);
     std::string (*GetIdString)(ArkUINodeHandle node);
+    int32_t (*createModalUIExtension)(const OHOS::AAFwk::Want& want,
+        const OHOS::Ace::ModalUIExtensionCallbacks& callbacks, const OHOS::Ace::ModalUIExtensionConfig& config,
+        const OHOS::Ace::NG::InnerExtraConfig& extraConfig, ArkUI_Int32 instanceId);
+    void (*closeModalUIExtension)(int32_t sessionId, ArkUI_Int32 instanceId);
+    void (*modalUIExtensionProxySend)(
+        std::shared_ptr<OHOS::Ace::ModalUIExtensionProxy>& proxy, const OHOS::AAFwk::WantParams& params);
     ani_long (*interopProxyNodeConstruct)(ArkUI_Int32 id);
     void (*setSafeAreaInset)(ArkUINodeHandle node, const ArkUIAniSafeAreaInsetEdge* edges, int32_t count);
 };

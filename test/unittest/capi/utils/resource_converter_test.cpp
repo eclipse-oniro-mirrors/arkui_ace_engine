@@ -17,6 +17,7 @@
 #include "core/interfaces/native/utility/reverse_converter.h"
 
 #include "test/mock/adapter/ohos/osal/mock_system_properties.h"
+#include "test/mock/frameworks/core/common/mock_resource_adapter_v2.h"
 #include "test/mock/frameworks/core/common/mock_theme_manager.h"
 #include "test/mock/frameworks/core/common/mock_theme_style.h"
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
@@ -59,6 +60,9 @@ public:
         }
         ASSERT_NE(type, ThemeConstantsType::ERROR);
         MockThemeStyle::GetInstance()->SetAttr(key, { .type = type, .value = value });
+        if (std::holds_alternative<std::string>(value)) {
+            AddMockResourceDataByName(key, std::get<std::string>(value));
+        }
     }
 
     inline static RefPtr<::testing::NiceMock<MockThemeManager>> themeManager_;

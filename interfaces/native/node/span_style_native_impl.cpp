@@ -15,6 +15,8 @@
 
 #include "securec.h"
 
+#include "base/log/log_wrapper.h"
+
 #include "gesture_impl.h"
 #include "node_extened.h"
 #include "node_model.h"
@@ -151,7 +153,10 @@ void ParseGestureStyleLonPress(const OH_ArkUI_GestureStyle& gestureStyle, ArkUIG
         uiEvent->apiVersion = event.apiVersion;
         uiEvent->inputEvent = gestureEvent->eventData.rawPointerEvent;
         gestureEvent->eventData.rawPointerEvent = uiEvent;
-        longPressFunc(gestureEvent);
+        {
+            LOG_CALLBACK("OH_ArkUI_GestureStyle_RegisterOnLongPressCallback", longPressFunc);
+            longPressFunc(gestureEvent);
+        }
         delete uiEvent;
         uiEvent = nullptr;
         gestureEvent->eventData.rawPointerEvent = nullptr;
@@ -174,6 +179,7 @@ ArkUIGestureStyle ConvertToOriginGestureStyle(const OH_ArkUI_GestureStyle& gestu
             uiEvent.inputEvent = &(event.clickEvent);
             uiEvent.apiVersion = event.apiVersion;
             nodeEvent.origin = &uiEvent;
+            LOG_CALLBACK("OH_ArkUI_GestureStyle_RegisterOnClickCallback", clickFunc);
             clickFunc(&nodeEvent);
         };
     }
@@ -193,6 +199,7 @@ ArkUIGestureStyle ConvertToOriginGestureStyle(const OH_ArkUI_GestureStyle& gestu
         uiEvent.inputEvent = &(event.touchEvent);
         uiEvent.apiVersion = event.apiVersion;
         nodeEvent.origin = &uiEvent;
+        LOG_CALLBACK("OH_ArkUI_GestureStyle_RegisterOnTouchCallback", touchFunc);
         touchFunc(&nodeEvent);
     };
     return originStyle;

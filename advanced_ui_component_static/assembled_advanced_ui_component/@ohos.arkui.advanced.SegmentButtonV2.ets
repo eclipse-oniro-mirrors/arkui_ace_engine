@@ -803,7 +803,7 @@ struct SimpleSegmentButtonV2 {
                 realIndex = this.isRTL() ? 0 : this.items.length - 1;
               }
               if (!isMaterialEnabled) {
-                realIndex = this.getIndexByPosition(finger.localX, finger.localY);
+                realIndex = this.getIndexByHorizontalPosition(finger.localX);
               }
               const shouldUpdateSelectedIndex = isMaterialEnabled ||
                 (this.isItemEnabled(realIndex) && realIndex !== this.selectedIndex);
@@ -1160,6 +1160,39 @@ struct SimpleSegmentButtonV2 {
         return index;
       }
       ++index;
+    }
+    return -1;
+  }
+
+  private getIndexByHorizontalPosition(localX: double): int {
+    let leftIndex: int = -1;
+    let rightIndex: int = -1;
+    let minX: double = 0;
+    let maxX: double = 0;
+    for (let index: int = 0; index < this.items.length; index++) {
+      const rect = this.itemRects.get(index);
+      if (!rect) {
+        continue;
+      }
+      const left: double = (rect!.position.x as double);
+      const right: double = left + (rect!.size.width as double);
+      if (localX >= left && localX <= right) {
+        return index;
+      }
+      if (leftIndex === -1 || left < minX) {
+        leftIndex = index;
+        minX = left;
+      }
+      if (rightIndex === -1 || right > maxX) {
+        rightIndex = index;
+        maxX = right;
+      }
+    }
+    if (localX < minX) {
+      return leftIndex;
+    }
+    if (localX > maxX) {
+      return rightIndex;
     }
     return -1;
   }

@@ -76,6 +76,10 @@ public:
     void ApplyDefaultVisibility();
     void RefreshAllTabItemColors();
 
+    // Returns true if the search filter hides the tab at tabIndex.
+    // If no search is active, returns false.
+    bool IsHiddenBySearchFilter(int32_t tabIndex) const;
+
     // Check whether a tab should be hidden by defaultVisibility.
     // Returns true if the tab should be GONE per defaultVisibility rules.
     bool IsHiddenByDefaultVisibility(int32_t tabIndex) const;

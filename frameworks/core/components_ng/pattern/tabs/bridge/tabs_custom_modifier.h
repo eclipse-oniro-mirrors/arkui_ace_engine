@@ -53,6 +53,8 @@ struct ArkUITabsCustomModifier {
     void (*setTabBarOpacity)(ArkUINodeHandle node, ArkUI_Float32 opacity);
     void (*swipeTo)(ArkUINodeHandle node, ArkUI_Int32 index);
     int32_t (*getBarDisplayMode)(ArkUINodeHandle node);
+    void (*setTabBarClickIntercept)(ArkUINodeHandle node, ArkUI_Bool active);
+    void (*tabBarClick)(ArkUINodeHandle node, ArkUI_Int32 index);
 };
 
 #endif // FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_TABS_BRIDGE_TABS_CUSTOM_MODIFIER_H

@@ -51,6 +51,8 @@ build_component_ng("manager_ng") {
     "frame_rate/frame_rate_manager.cpp",
     "full_screen/full_screen_manager.cpp",
     "gesture/active_recognizer_manager.cpp",
+    "interaction_observer/ui_info_collection_manager.cpp",
+    "interaction_observer/ui_interaction_json_builder.cpp",
     "memory/memory_manager.cpp",
     "navigation/navigation_manager.cpp",
     "material/material_processor.cpp",
@@ -79,17 +81,17 @@ build_component_ng("manager_ng") {
     "shared_overlay/shared_transition_effect.cpp",
     "toolbar/toolbar_manager.cpp",
     "uisession_query/component_tree_query.cpp",
+    "content_change_manager/content_change_manager_capi.cpp",
   ]
+
+  if (!is_arkui_x) {
+    sources += [ "content_change_manager/content_change_manager.cpp" ]
+  }
+
   inspector_event_reporting_sources = [
     "event/json_child_report.cpp",
     "drag_drop/drag_drop_behavior_reporter/drag_drop_behavior_reporter.cpp",
   ]
-
-  if(!is_arkui_x){
-    sources += [
-        "content_change_manager/content_change_manager.cpp",
-    ]
-  }
 
   gesture_debug_sources = [ "gesture_debug/gesture_debug_boundary_manager.cpp" ]
 

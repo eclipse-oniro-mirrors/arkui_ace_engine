@@ -182,6 +182,11 @@ private:
     // get [resetFromStart,resetFromUpdate]
     std::pair<bool, bool> GetResetMode(LayoutWrapper* layoutWrapper, int32_t updateIdx);
 
+    // True when CheckReset will discard gridMatrix_ in this measure.
+    // An unset lastCrossCount_ is not a reset: FillGridViewportAndMeasureChildren
+    // assigns it from crossCount_ before CheckReset.
+    bool WillResetMatrixFromStart(LayoutWrapper* layoutWrapper);
+
     void CheckReset(float mainSize, float crossSize, LayoutWrapper* layoutWrapper);
 
     bool CheckLastLineItemFullyShowed(LayoutWrapper* layoutWrapper);

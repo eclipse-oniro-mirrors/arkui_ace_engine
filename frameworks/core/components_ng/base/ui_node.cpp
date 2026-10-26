@@ -510,6 +510,7 @@ bool UINode::RemoveAdoptedChild(const RefPtr<FrameNode>& child)
         return false;
     }
     adoptedChildren_.erase(iter);
+    child->SetUseAdoptedCompensation(false);
     child->SetIsAdopted(false);
     child->SetAdoptParent(nullptr);
     return true;
@@ -1857,6 +1858,7 @@ void UINode::DumpSimplifyTreeWithParamConfig(int32_t depth, std::shared_ptr<Json
         config.collectionState->traversalRoot = previousRoot;
     }
 }
+
 #endif
 
 void UINode::DumpSimplifyTree(int32_t depth, std::shared_ptr<JsonValue>& current)
@@ -3897,6 +3899,11 @@ void CloseUITreeRequests(PipelineContext& pipeline)
     if (state.pending) {
         CompleteTreeRequest(AceType::Claim(&pipeline), state.sequence, ARKUI_ERROR_CODE_UI_CONTEXT_INVALID);
     }
+}
+
+std::vector<RefPtr<UINode>> UINode::GetChildrenForNativeTreeCheck() const
+{
+    return { children_.begin(), children_.end() };
 }
 
 } // namespace OHOS::Ace::NG

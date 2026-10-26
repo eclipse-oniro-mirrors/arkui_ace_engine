@@ -17,6 +17,8 @@
 
 #include "gtest/gtest.h"
 #include "list_test_ng.h"
+#include "core/components_ng/pattern/waterflow/water_flow_pattern.h"
+#include "interfaces/inner_api/ui_session/param_config.h"
 #include "core/components_ng/syntax/repeat_virtual_scroll_2_caches.h"
 #include "core/components_ng/syntax/repeat_virtual_scroll_node.h"
 #include "test/mock/interfaces/inner_api/ui_session/mock_ui_session_manager.h"
@@ -24,6 +26,7 @@
 #include "test/unittest/core/pattern/test_ng.h"
 
 #include "core/components_ng/pattern/list/list_pattern.h"
+#include "core/components_ng/pattern/list/list_item_group_pattern.h"
 
 namespace OHOS::Ace::NG {
 namespace {
@@ -3417,6 +3420,218 @@ HWTEST_F(ListPatternTestNg, ChainAnimationChangeDuringAnimation001, TestSize.Lev
     MockAnimationManager::GetInstance().Tick();
     FlushUITasks();
     EXPECT_NE(pattern_->currentOffset_, offsetBefore);
+}
+
+
+/**
+ * @tc.name: PublicDumpListIndicesRemainDiagnostic
+ * @tc.desc: List indices stay in the legacy dump while geometry follows the visual option.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListPatternTestNg, PublicDumpListIndicesRemainDiagnostic, TestSize.Level1)
+{
+    auto pattern = AceType::MakeRefPtr<ListPattern>();
+    auto host = FrameNode::CreateFrameNode(V2::LIST_ETS_TAG, 1, pattern);
+    pattern->startIndex_ = 2;
+    pattern->endIndex_ = 8;
+    pattern->centerIndex_ = 5;
+    pattern->startMainPos_ = 20.0f;
+    auto legacy = JsonUtil::Create();
+    pattern->DumpAdvanceInfo(legacy);
+    EXPECT_EQ(legacy->GetInt("startIndex"), 2);
+    EXPECT_EQ(legacy->GetInt("endIndex"), 8);
+    EXPECT_EQ(legacy->GetInt("centerIndex"), 5);
+    for (bool visual : { false, true }) {
+        for (bool functional : { false, true }) {
+            ParamConfig config;
+            config.dumpMode = TreeDumpMode::PUBLIC_TREE;
+            config.visualProperties = visual;
+            config.functionalProperties = functional;
+            auto json = JsonUtil::Create();
+            pattern->DumpAdvanceInfo(json, config);
+            EXPECT_FALSE(json->Contains("startIndex"));
+            EXPECT_FALSE(json->Contains("endIndex"));
+            EXPECT_FALSE(json->Contains("centerIndex"));
+            EXPECT_EQ(json->Contains("startMainPos"), visual);
+            if (visual) {
+                EXPECT_DOUBLE_EQ(json->GetDouble("startMainPos"), 20.0);
+            }
+        }
+    }
+    auto after = JsonUtil::Create();
+    pattern->DumpAdvanceInfo(after);
+    EXPECT_EQ(after->ToString(), legacy->ToString());
+}
+
+/**
+ * @tc.name: PublicDumpGroupIndicesRemainDiagnostic
+ * @tc.desc: Group display indices are excluded from both public groups without hiding geometry.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListPatternTestNg, PublicDumpGroupIndicesRemainDiagnostic, TestSize.Level1)
+{
+    auto pattern = AceType::MakeRefPtr<ListItemGroupPattern>(nullptr, V2::ListItemGroupOptions {});
+    auto host = FrameNode::CreateFrameNode(V2::LIST_ITEM_GROUP_ETS_TAG, 1, pattern);
+    pattern->itemDisplayStartIndex_ = 2;
+    pattern->itemDisplayEndIndex_ = 6;
+    pattern->headerMainSize_ = 24.0f;
+    auto legacy = JsonUtil::Create();
+    pattern->DumpAdvanceInfo(legacy);
+    EXPECT_EQ(legacy->GetInt("itemDisplayStartIndex"), 2);
+    EXPECT_EQ(legacy->GetInt("itemDisplayEndIndex"), 6);
+    for (bool visual : { false, true }) {
+        for (bool functional : { false, true }) {
+            ParamConfig config;
+            config.dumpMode = TreeDumpMode::PUBLIC_TREE;
+            config.visualProperties = visual;
+            config.functionalProperties = functional;
+            auto json = JsonUtil::Create();
+            pattern->DumpAdvanceInfo(json, config);
+            EXPECT_FALSE(json->Contains("itemDisplayStartIndex"));
+            EXPECT_FALSE(json->Contains("itemDisplayEndIndex"));
+            EXPECT_EQ(json->Contains("headerMainSize"), visual);
+            if (visual) {
+                EXPECT_DOUBLE_EQ(json->GetDouble("headerMainSize"), 24.0);
+            }
+        }
+    }
+    auto after = JsonUtil::Create();
+    pattern->DumpAdvanceInfo(after);
+    EXPECT_EQ(after->ToString(), legacy->ToString());
+}
+
+/**
+ * @tc.name: PublicDumpItemSeparatesLayoutAndDeleteArea
+ * @tc.desc: Layout completion is visual, delete areas are functional, and swipe state is diagnostic.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListPatternTestNg, PublicDumpItemSeparatesLayoutAndDeleteArea, TestSize.Level1)
+{
+    auto pattern = AceType::MakeRefPtr<ListItemPattern>(nullptr);
+    auto host = FrameNode::CreateFrameNode(V2::LIST_ITEM_ETS_TAG, 1, pattern);
+    for (bool value : { false, true }) {
+        pattern->isLayouted_ = value;
+        pattern->hasStartDeleteArea_ = value;
+        pattern->hasEndDeleteArea_ = value;
+        pattern->swipeActionState_ = SwipeActionState::EXPANDED;
+        auto legacy = JsonUtil::Create();
+        pattern->DumpAdvanceInfo(legacy);
+        EXPECT_EQ(legacy->GetString("SwipeActionState"), "EXPANDED");
+        EXPECT_EQ(legacy->GetBool("isLayouted"), value);
+        for (bool visual : { false, true }) {
+            for (bool functional : { false, true }) {
+                ParamConfig config;
+                config.dumpMode = TreeDumpMode::PUBLIC_TREE;
+                config.visualProperties = visual;
+                config.functionalProperties = functional;
+                auto json = JsonUtil::Create();
+                pattern->DumpAdvanceInfo(json, config);
+                EXPECT_FALSE(json->Contains("SwipeActionState"));
+                EXPECT_EQ(json->Contains("isLayouted"), visual);
+                EXPECT_EQ(json->Contains("hasStartDeleteArea"), functional);
+                EXPECT_EQ(json->Contains("hasEndDeleteArea"), functional);
+                if (visual) {
+                    EXPECT_TRUE(json->GetValue("isLayouted")->IsBool());
+                    EXPECT_EQ(json->GetBool("isLayouted"), value);
+                }
+                if (functional) {
+                    EXPECT_TRUE(json->GetValue("hasStartDeleteArea")->IsBool());
+                    EXPECT_EQ(json->GetBool("hasStartDeleteArea"), value);
+                    EXPECT_EQ(json->GetBool("hasEndDeleteArea"), value);
+                    int count = 0;
+                    for (auto item = json->GetChild(); item && item->IsValid(); item = item->GetNext()) {
+                        count += item->GetKey() == "hasStartDeleteArea";
+                    }
+                    EXPECT_EQ(count, 1);
+                }
+            }
+        }
+        auto after = JsonUtil::Create();
+        pattern->DumpAdvanceInfo(after);
+        EXPECT_EQ(after->ToString(), legacy->ToString());
+    }
+}
+
+
+/**
+ * @tc.name: LegacyDumpListItemMatchesBaselineSnapshot
+ * @tc.desc: Keep the baseline duplicate key, string opacity, field types and ordering.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListPatternTestNg, LegacyDumpListItemMatchesBaselineSnapshot, TestSize.Level1)
+{
+    auto pattern = AceType::MakeRefPtr<ListItemPattern>(nullptr);
+    pattern->indexInList_ = 1;
+    pattern->indexInListItemGroup_ = 2;
+    pattern->startNodeIndex_ = 3;
+    pattern->endNodeIndex_ = 4;
+    pattern->childNodeIndex_ = 5;
+    pattern->curOffset_ = 6.0f;
+    pattern->startNodeSize_ = 7.0f;
+    pattern->endNodeSize_ = 8.0f;
+    pattern->startDeleteAreaDistance_ = 9.0f;
+    pattern->endDeleteAreaDistance_ = 10.0f;
+    pattern->swipeActionState_ = SwipeActionState::EXPANDED;
+    pattern->hasStartDeleteArea_ = true;
+    pattern->hasEndDeleteArea_ = false;
+    pattern->inStartDeleteArea_ = false;
+    pattern->inEndDeleteArea_ = true;
+    pattern->selectable_ = true;
+    pattern->isSelected_ = false;
+    pattern->isHover_ = true;
+    pattern->isPressed_ = false;
+    pattern->isLayouted_ = true;
+    pattern->enableOpacity_ = 0.5f;
+    // Frozen from fdf7d63988ed9fa338051a11c19fadf1f86653dc; compare serialized key order and types.
+    const std::string expected = R"({"indexInList":1,"indexInListItemGroup":2,"swiperAction.startNodeIndex":3,)"
+        R"("swiperAction.endNodeIndex":4,"swiperAction.childNodeIndex":5,"curOffset":6,"startNodeSize":7,)"
+        R"("endNodeSize":8,"startDeleteAreaDistance":9,"endDeleteAreaDistance":10,"SwipeActionState":"EXPANDED",)"
+        R"("hasStartDeleteArea":true,"hasEndDeleteArea":false,"inStartDeleteArea":false,"inEndDeleteArea":true,)"
+        R"("selectable":true,"isSelected":false,"isHover":true,"isPressed":false,"isLayouted":true,)"
+        R"("hasStartDeleteArea":true,"enableOpacity":"true:"})";
+    auto json = JsonUtil::Create();
+    pattern->DumpAdvanceInfo(json);
+    EXPECT_EQ(json->ToString(), expected);
+}
+
+
+/**
+ * @tc.name: PublicDumpWaterFlowReverseIsUnique
+ * @tc.desc: Flattening the scrollbar must retain one boolean WaterFlow reverse configuration.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListPatternTestNg, PublicDumpWaterFlowReverseIsUnique, TestSize.Level1)
+{
+    auto pattern = AceType::MakeRefPtr<WaterFlowPattern>();
+    auto host = FrameNode::CreateFrameNode(V2::WATERFLOW_ETS_TAG, 1, pattern);
+    auto property = host->GetLayoutProperty<WaterFlowLayoutProperty>();
+    ASSERT_NE(property, nullptr);
+    pattern->scrollBar_ = AceType::MakeRefPtr<ScrollBar>();
+    for (bool reverse : { false, true }) {
+        property->UpdateLayoutDirection(TextDirection::LTR);
+        property->UpdateWaterflowDirection(reverse ? FlexDirection::COLUMN_REVERSE : FlexDirection::COLUMN);
+        // The layout callback can run before the scrollbar cache is synchronized.
+        pattern->scrollBar_->SetReverse(!reverse);
+        for (bool visual : { false, true }) {
+            for (bool functional : { false, true }) {
+                ParamConfig config;
+                config.dumpMode = TreeDumpMode::PUBLIC_TREE;
+                config.visualProperties = visual;
+                config.functionalProperties = functional;
+                auto json = JsonUtil::Create();
+                pattern->DumpAdvanceInfo(json, config);
+                int count = 0;
+                for (auto item = json->GetChild(); item && item->IsValid(); item = item->GetNext()) {
+                    if (item->GetKey() == "isReverse") {
+                        ++count;
+                        EXPECT_TRUE(item->IsBool());
+                        EXPECT_EQ(item->GetBool(), reverse);
+                    }
+                }
+                EXPECT_EQ(count, functional ? 1 : 0);
+            }
+        }
+    }
 }
 
 } // namespace OHOS::Ace::NG

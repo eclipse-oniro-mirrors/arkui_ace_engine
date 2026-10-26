@@ -23,6 +23,7 @@
 #include "core/components_ng/manager/force_split/force_split_manager.h"
 #include "core/components_ng/manager/navigation/navigation_manager.h"
 #include "core/components_ng/manager/safe_area/safe_area_manager.h"
+#include "core/components_ng/layout/overlay_safe_area_helper.h"
 #include "core/components_ng/pattern/dialog/dialog_pattern.h"
 #include "core/components_ng/pattern/linear_layout/linear_layout_property.h"
 #include "core/components_ng/pattern/navigation/navdestination_pattern_base.h"
@@ -1294,7 +1295,31 @@ void DialogLayoutAlgorithm::UpdateSafeArea(const RefPtr<FrameNode>& frameNode)
     CHECK_NULL_VOID(pipelineContext);
     auto context = AceType::DynamicCast<NG::PipelineContext>(pipelineContext);
     CHECK_NULL_VOID(context);
-    safeAreaInsets_ = OverlayManager::GetSafeAreaInsets(frameNode);
+    // Safe area insets are sourced from OverlaySafeAreaHelper so Dialog avoids cutout/float-nav
+    // via the same unified path as Toast/Menu (Func-04-02-01-Feat-09). avoidDisplayLimit is
+    // NOT enabled here: the display-limit clip (Step 6 in ComputeDisplayableRect) intersects the
+    // displayable rect with OverlayManager::GetDisplayAvailableRect, which may be in a different
+    // coordinate system than the root rect during orientation change. Since safeAreaInsets_ only
+    // needs the cutout/nav avoidance (Step 5, always in the same coordinate system as base),
+    // skipping the display-limit clip keeps the rect subtraction correct on rotation.
+    AvoidConfig config;
+    config.avoidSafeArea = true;
+    config.avoidDisplayLimit = false;
+    auto displayable = OverlaySafeAreaHelper::ComputeDisplayableRect(
+        frameNode, config, static_cast<int32_t>(SubwindowType::TYPE_DIALOG));
+    auto base = context->GetRootRect();
+    float topShrink = std::max(0.0f, displayable.Top() - base.Top());
+    float bottomShrink = std::max(0.0f, base.Bottom() - displayable.Bottom());
+    float leftShrink = std::max(0.0f, displayable.Left() - base.Left());
+    float rightShrink = std::max(0.0f, base.Right() - displayable.Right());
+    safeAreaInsets_.top_ = SafeAreaInsets::Inset { 0, static_cast<uint32_t>(topShrink) };
+    safeAreaInsets_.bottom_ = SafeAreaInsets::Inset {
+        static_cast<uint32_t>(std::max(0.0f, base.Height() - bottomShrink)),
+        static_cast<uint32_t>(base.Height()) };
+    safeAreaInsets_.left_ = SafeAreaInsets::Inset { 0, static_cast<uint32_t>(leftShrink) };
+    safeAreaInsets_.right_ = SafeAreaInsets::Inset {
+        static_cast<uint32_t>(std::max(0.0f, base.Width() - rightShrink)),
+        static_cast<uint32_t>(base.Width()) };
     if (!IsEmbeddedDialog(frameNode)) {
         safeAreaBottomLength_ = safeAreaInsets_.bottom_.Length();
     }
@@ -1307,6 +1332,15 @@ void DialogLayoutAlgorithm::UpdateSafeArea(const RefPtr<FrameNode>& frameNode)
         }
     }
     TAG_LOGI(AceLogTag::ACE_DIALOG, "safeAreaInsets: %{public}s", safeAreaInsets_.ToString().c_str());
+}
+
+bool DialogLayoutAlgorithm::IsGlobalAvoidEnabled(const RefPtr<FrameNode>& frameNode) const
+{
+    auto pipeline = DialogManager::GetMainPipelineContext(frameNode);
+    CHECK_NULL_RETURN(pipeline, false);
+    auto safeAreaManager = pipeline->GetSafeAreaManager();
+    CHECK_NULL_RETURN(safeAreaManager, false);
+    return safeAreaManager->GetUseCutout();
 }
 
 void DialogLayoutAlgorithm::UpdateIsScrollHeightNegative(LayoutWrapper* layoutWrapper, float height)

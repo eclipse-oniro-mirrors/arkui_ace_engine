@@ -113,6 +113,7 @@ ArkUI_ErrorCode OH_ArkUI_DragEvent_IsRemote(ArkUI_DragEvent* event, bool* isRemo
 
 int32_t OH_ArkUI_DragEvent_GetUdmfData(ArkUI_DragEvent* event, OH_UdmfData* data)
 {
+    CHECK_UI_THREAD("OH_ArkUI_DragEvent_GetUdmfData");
     auto dragEvent = reinterpret_cast<ArkUIDragEvent*>(event);
 
     if (!event || !dragEvent || (dragEvent->unifiedData == nullptr) || !data) {
@@ -193,6 +194,7 @@ int32_t OH_ArkUI_DragEvent_GetSummary(ArkUI_DragEvent* event, OH_UDMF_Summary* s
 
 ArkUI_DragAction* OH_ArkUI_CreateDragActionWithNode(ArkUI_NodeHandle node)
 {
+    CHECK_UI_THREAD("OH_ArkUI_CreateDragActionWithNode");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_CreateDragActionWithNode", "impl is null");
@@ -209,6 +211,7 @@ ArkUI_DragAction* OH_ArkUI_CreateDragActionWithNode(ArkUI_NodeHandle node)
 
 ArkUI_DragAction* OH_ArkUI_CreateDragActionWithContext(ArkUI_ContextHandle uiContext)
 {
+    CHECK_UI_THREAD("OH_ArkUI_CreateDragActionWithContext");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_CreateDragActionWithContext", "impl is null");
@@ -366,6 +369,7 @@ ArkUI_ErrorCode OH_ArkUI_DragAction_SetDataLoadParams(
 int32_t OH_ArkUI_DragAction_RegisterStatusListener(ArkUI_DragAction* dragAction, void* userData,
     void (*listener)(ArkUI_DragAndDropInfo* dragAndDropInfo, void* userData))
 {
+    CHECK_UI_THREAD("OH_ArkUI_DragAction_RegisterStatusListener");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl || !dragAction) {
         return ARKUI_ERROR_CODE_PARAM_INVALID;
@@ -377,6 +381,7 @@ int32_t OH_ArkUI_DragAction_RegisterStatusListener(ArkUI_DragAction* dragAction,
 
 void OH_ArkUI_DragAction_UnregisterStatusListener(ArkUI_DragAction* dragAction)
 {
+    CHECK_UI_THREAD("OH_ArkUI_DragAction_UnregisterStatusListener");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID,
@@ -420,6 +425,7 @@ ArkUI_DragEvent* OH_ArkUI_DragAndDropInfo_GetDragEvent(ArkUI_DragAndDropInfo* dr
 
 int32_t OH_ArkUI_StartDrag(ArkUI_DragAction* dragAction)
 {
+    CHECK_UI_THREAD("OH_ArkUI_StartDrag");
     if (!dragAction) {
         return ARKUI_ERROR_CODE_PARAM_INVALID;
     }
@@ -477,6 +483,7 @@ int32_t OH_ArkUI_DragEvent_DisableDefaultDropAnimation(ArkUI_DragEvent* event, b
 
 int32_t OH_ArkUI_SetNodeDraggable(ArkUI_NodeHandle node, bool enabled)
 {
+    CHECK_UI_THREAD("OH_ArkUI_SetNodeDraggable");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl || !node) {
         return ARKUI_ERROR_CODE_PARAM_INVALID;
@@ -488,6 +495,7 @@ int32_t OH_ArkUI_SetNodeDraggable(ArkUI_NodeHandle node, bool enabled)
 
 ArkUI_DragPreviewOption* OH_ArkUI_CreateDragPreviewOption(void)
 {
+    CHECK_UI_THREAD("OH_ArkUI_CreateDragPreviewOption");
     auto* previewOptions = new ArkUIDragPreViewAndInteractionOptions();
     if (!previewOptions) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, "OH_ArkUI_CreateDragPreviewOption", "previewOptions is null");
@@ -577,6 +585,7 @@ int32_t OH_ArkUI_DragPreviewOption_SetDefaultAnimationBeforeLiftingEnabled(
 
 int32_t OH_ArkUI_SetNodeDragPreviewOption(ArkUI_NodeHandle node, ArkUI_DragPreviewOption* option)
 {
+    CHECK_UI_THREAD("OH_ArkUI_SetNodeDragPreviewOption");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl || !node || !option) {
         return ARKUI_ERROR_CODE_PARAM_INVALID;
@@ -623,6 +632,7 @@ int32_t OH_ArkUI_SetNodeDragPreviewOption(ArkUI_NodeHandle node, ArkUI_DragPrevi
 
 int32_t OH_ArkUI_SetNodeDragPreview(ArkUI_NodeHandle node, OH_PixelmapNative* preview)
 {
+    CHECK_UI_THREAD("OH_ArkUI_SetNodeDragPreview");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl || !node) {
         return ARKUI_ERROR_CODE_PARAM_INVALID;
@@ -639,6 +649,7 @@ int32_t OH_ArkUI_SetNodeDragPreview(ArkUI_NodeHandle node, OH_PixelmapNative* pr
 }
 int32_t OH_ArkUI_SetNodeAllowedDropDataTypes(ArkUI_NodeHandle node, const char* typesArray[], int32_t count)
 {
+    CHECK_UI_THREAD("OH_ArkUI_SetNodeAllowedDropDataTypes");
     auto* fullImpl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!fullImpl || !node || !typesArray) {
         return ARKUI_ERROR_CODE_PARAM_INVALID;
@@ -650,6 +661,7 @@ int32_t OH_ArkUI_SetNodeAllowedDropDataTypes(ArkUI_NodeHandle node, const char* 
 
 int32_t OH_ArkUI_SetDragEventStrictReportWithNode(ArkUI_NodeHandle node, bool enabled)
 {
+    CHECK_UI_THREAD("OH_ArkUI_SetDragEventStrictReportWithNode");
     auto* fullImpl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!fullImpl || !node) {
         return ARKUI_ERROR_CODE_PARAM_INVALID;
@@ -661,6 +673,7 @@ int32_t OH_ArkUI_SetDragEventStrictReportWithNode(ArkUI_NodeHandle node, bool en
 
 int32_t OH_ArkUI_SetDragEventStrictReportWithContext(ArkUI_ContextHandle uiContext, bool enabled)
 {
+    CHECK_UI_THREAD("OH_ArkUI_SetDragEventStrictReportWithContext");
     auto* fullImpl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!fullImpl || !uiContext) {
         return ARKUI_ERROR_CODE_PARAM_INVALID;
@@ -673,6 +686,7 @@ int32_t OH_ArkUI_SetDragEventStrictReportWithContext(ArkUI_ContextHandle uiConte
 
 int32_t OH_ArkUI_DisallowNodeAnyDropDataTypes(ArkUI_NodeHandle node)
 {
+    CHECK_UI_THREAD("OH_ArkUI_DisallowNodeAnyDropDataTypes");
     auto* fullImpl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!fullImpl || !node) {
         return ARKUI_ERROR_CODE_PARAM_INVALID;
@@ -684,6 +698,7 @@ int32_t OH_ArkUI_DisallowNodeAnyDropDataTypes(ArkUI_NodeHandle node)
 
 int32_t OH_ArkUI_AllowNodeAllDropDataTypes(ArkUI_NodeHandle node)
 {
+    CHECK_UI_THREAD("OH_ArkUI_AllowNodeAllDropDataTypes");
     auto* fullImpl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!fullImpl || !node) {
         return ARKUI_ERROR_CODE_PARAM_INVALID;
@@ -871,6 +886,7 @@ float OH_ArkUI_DragEvent_GetVelocity(ArkUI_DragEvent* event)
 int32_t OH_ArkUI_DragEvent_StartDataLoading(
     ArkUI_DragEvent* event, OH_UdmfGetDataParams *options, char* key, unsigned int keyLen)
 {
+    CHECK_UI_THREAD("OH_ArkUI_DragEvent_StartDataLoading");
     ACE_ENGINE_HISTOGRAM_BOOLEAN("NativeDragAndDrop.DragEvent.StartDataLoading", 1);
     if (!event || !options || !key || !keyLen || keyLen < UDMF_KEY_BUFFER_LEN) {
         return ARKUI_ERROR_CODE_PARAM_INVALID;
@@ -918,6 +934,7 @@ ArkUI_ErrorCode OH_ArkUI_DragEvent_SetDataLoadParams(ArkUI_DragEvent* event, OH_
 
 int32_t OH_ArkUI_CancelDataLoading(ArkUI_ContextHandle uiContent, const char* key)
 {
+    CHECK_UI_THREAD("OH_ArkUI_CancelDataLoading");
     ACE_ENGINE_HISTOGRAM_BOOLEAN("NativeDragAndDrop.DragEvent.CancelDataLoading", 1);
     if (!uiContent || !key) {
         return ARKUI_ERROR_CODE_PARAM_INVALID;
@@ -931,6 +948,7 @@ int32_t OH_ArkUI_CancelDataLoading(ArkUI_ContextHandle uiContent, const char* ke
 
 int32_t OH_ArkUI_DisableDropDataPrefetchOnNode(ArkUI_NodeHandle node, bool disable)
 {
+    CHECK_UI_THREAD("OH_ArkUI_DisableDropDataPrefetchOnNode");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl || !node) {
         return ARKUI_ERROR_CODE_PARAM_INVALID;
@@ -942,6 +960,7 @@ int32_t OH_ArkUI_DisableDropDataPrefetchOnNode(ArkUI_NodeHandle node, bool disab
 
 int32_t OH_ArkUI_DragEvent_RequestDragEndPending(ArkUI_DragEvent* event, int32_t* requestIdentify)
 {
+    CHECK_UI_THREAD("OH_ArkUI_DragEvent_RequestDragEndPending");
     if (!event) {
         return ARKUI_ERROR_CODE_PARAM_INVALID;
     }
@@ -963,6 +982,7 @@ int32_t OH_ArkUI_DragEvent_RequestDragEndPending(ArkUI_DragEvent* event, int32_t
 
 int32_t OH_ArkUI_NotifyDragResult(int32_t requestIdentify, ArkUI_DragResult result)
 {
+    CHECK_UI_THREAD("OH_ArkUI_NotifyDragResult");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         return ARKUI_ERROR_CODE_PARAM_INVALID;
@@ -976,6 +996,7 @@ int32_t OH_ArkUI_NotifyDragResult(int32_t requestIdentify, ArkUI_DragResult resu
 
 int32_t OH_ArkUI_NotifySuggestedDropOperation(int32_t requestIdentify, ArkUI_DropOperation operation)
 {
+    CHECK_UI_THREAD("OH_ArkUI_NotifySuggestedDropOperation");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl || ((operation != ARKUI_DROP_OPERATION_COPY) && (operation != ARKUI_DROP_OPERATION_MOVE))) {
         return ARKUI_ERROR_CODE_PARAM_INVALID;
@@ -990,6 +1011,7 @@ int32_t OH_ArkUI_NotifySuggestedDropOperation(int32_t requestIdentify, ArkUI_Dro
 
 int32_t OH_ArkUI_NotifyDisableDefaultDropAnimation(int32_t requestIdentify, bool disable)
 {
+    CHECK_UI_THREAD("OH_ArkUI_NotifyDisableDefaultDropAnimation");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         return ARKUI_ERROR_CODE_PARAM_INVALID;
@@ -1003,6 +1025,7 @@ int32_t OH_ArkUI_NotifyDisableDefaultDropAnimation(int32_t requestIdentify, bool
 
 int32_t OH_ArkUI_NotifyDragEndPendingDone(int32_t requestIdentify)
 {
+    CHECK_UI_THREAD("OH_ArkUI_NotifyDragEndPendingDone");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         return ARKUI_ERROR_CODE_PARAM_INVALID;
@@ -1016,6 +1039,7 @@ int32_t OH_ArkUI_NotifyDragEndPendingDone(int32_t requestIdentify)
 
 int32_t OH_ArkUI_EnableDropDisallowedBadge(ArkUI_ContextHandle uiContext, bool enabled)
 {
+    CHECK_UI_THREAD("OH_ArkUI_EnableDropDisallowedBadge");
     auto* fullImpl = OHOS::Ace::NodeModel::GetFullImpl();
     CHECK_NULL_RETURN_WITH_MESSAGE(fullImpl, ARKUI_ERROR_CODE_PARAM_INVALID,
         "OH_ArkUI_EnableDropDisallowedBadge", "fullImpl is null");

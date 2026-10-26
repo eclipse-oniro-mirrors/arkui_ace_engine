@@ -468,10 +468,6 @@ public:
     {
         return sideBarListItemFocusColor_;
     }
-    const Dimension& GetSideBarListItemFocusWidth() const
-    {
-        return sideBarListItemFocusWidth_;
-    }
     const Dimension& GetSideBarListItemLeftRightPadding() const
     {
         return sideBarListItemLeftRightPadding_;
@@ -491,6 +487,14 @@ public:
     const Color& GetSideBarUnselectedTextColor() const
     {
         return sideBarUnselectedTextColor_;
+    }
+    const Dimension& GetSideBarListItemHeight() const
+    {
+        return sideBarListItemHeight_;
+    }
+    const Dimension& GetSideBarHeaderMarginBottom() const
+    {
+        return sideBarHeaderMarginBottom_;
     }
     const Dimension& GetSideBarPaddingLevel4() const
     {
@@ -611,7 +615,8 @@ protected:
     Color sideBarSelectedTextColor_;
     Color sideBarUnselectedIconColor_;
     Color sideBarUnselectedTextColor_;
-    Dimension sideBarListItemFocusWidth_;
+    Dimension sideBarListItemHeight_;
+    Dimension sideBarHeaderMarginBottom_;
     Dimension sideBarListItemLeftRightPadding_ = 8.0_vp;
     Dimension sideBarPaddingLevel4_ = 8.0_vp;
     Dimension sideBarPaddingLevel8_ = 16.0_vp;

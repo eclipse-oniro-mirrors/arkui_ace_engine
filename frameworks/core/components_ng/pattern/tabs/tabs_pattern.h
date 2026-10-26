@@ -372,6 +372,16 @@ public:
         return isOnDisplayModeSwitchAnimation_;
     }
 
+    void SetTabBarClickIntercept(bool active)
+    {
+        tabBarClickIntercept_ = active;
+    }
+
+    bool GetTabBarClickIntercept() const
+    {
+        return tabBarClickIntercept_;
+    }
+
 private:
     void OnAttachToFrameNode() override;
     void OnAfterModifyDone() override;
@@ -572,6 +582,7 @@ private:
     std::optional<TabBarDisplayMode> displayModeAnimTarget_;
     std::shared_ptr<AnimationUtils::Animation> sidebarTranslateAnim_;
     std::shared_ptr<AnimationUtils::Animation> tabBarEnterExitAnim_;
+    bool tabBarClickIntercept_ = false;
 };
 
 } // namespace OHOS::Ace::NG

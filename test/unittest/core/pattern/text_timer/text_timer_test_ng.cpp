@@ -24,6 +24,7 @@
 
 #include "test/mock/adapter/ohos/osal/mock_system_properties.h"
 #include "test/mock/frameworks/core/common/mock_theme_manager.h"
+#include "test/mock/frameworks/core/common/mock_resource_adapter_v2.h"
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 #include "test/mock/frameworks/core/components_ng/render/mock_paragraph.h"
 
@@ -1164,9 +1165,12 @@ HWTEST_F(TextTimerTestNg, TextTimerPatternTest008, TestSize.Level0)
     Color testColor = theme->GetTextStyle().GetTextColor();
     EXPECT_EQ(layoutProperty->GetTextColor(), testColor);
 
-    ResourceObjectParams params { .value = "test", .type = ResourceObjectParamType::STRING };
+    const std::string textTimerColorResName = "textTimerColor008";
+    const Color textTimerColorResValue(0xFF123456);
+    ResourceObjectParams params { .value = textTimerColorResName, .type = ResourceObjectParamType::STRING };
     std::vector<ResourceObjectParams> resObjParamsList;
     resObjParamsList.push_back(params);
+    AddMockResourceDataByName(textTimerColorResName, textTimerColorResValue);
     RefPtr<ResourceObject> resObjWithId =
         AceType::MakeRefPtr<ResourceObject>(100000, 100001, resObjParamsList, "com.example.test", "entry", 100000);
     RefPtr<ResourceObject> resObjId =
@@ -1178,7 +1182,7 @@ HWTEST_F(TextTimerTestNg, TextTimerPatternTest008, TestSize.Level0)
     jsResourceType = JsTextTimerResourceType::FONTFAMILY;
     textTimerModel.CreateWithResourceObj(jsResourceType, resObjWithId);
     pattern->OnColorModeChange(colorMode);
-    EXPECT_EQ(layoutProperty->GetTextColor(), testColor);
+    EXPECT_EQ(layoutProperty->GetTextColor(), textTimerColorResValue);
 }
 
 /**

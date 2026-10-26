@@ -36,6 +36,7 @@ public:
     RefPtr<GridPaintMethod> UpdateOverlayModifier();
     RefPtr<GridPaintMethod> UpdateContentModifier();
     void SimulateScrollGesture(float mainVelocity, float mainDelta);
+    void ScrollBackToTopBySteps();
 };
 
 void GridScrollLayoutTestFourNg::UpdateLayoutInfo()
@@ -64,6 +65,17 @@ RefPtr<GridPaintMethod> GridScrollLayoutTestFourNg::UpdateContentModifier()
     RefPtr<GridPaintMethod> paintMethod = AceType::DynamicCast<GridPaintMethod>(paintWrapper->nodePaintImpl_);
     paintMethod->UpdateContentModifier(AceType::RawPtr(paintWrapper));
     return paintMethod;
+}
+
+void GridScrollLayoutTestFourNg::ScrollBackToTopBySteps()
+{
+    // One row per frame, below the viewport, so this stays out of SkipForwardLines.
+    // That path is unchanged and is not what these cases cover. At most one step per child.
+    const int32_t maxSteps = pattern_->info_.childrenCount_;
+    for (int32_t step = 0; step < maxSteps && pattern_->info_.startIndex_ > 0; ++step) {
+        pattern_->UpdateCurrentOffset(ITEM_MAIN_SIZE, SCROLL_FROM_UPDATE);
+        FlushUITasks();
+    }
 }
 
 void GridScrollLayoutTestFourNg::SimulateScrollGesture(float mainVelocity, float mainDelta)
@@ -2540,5 +2552,171 @@ HWTEST_F(GridScrollLayoutTestFourNg, SkipLargeOffset001, TestSize.Level1)
     FlushUITasks();
     EXPECT_EQ(pattern_->info_.startIndex_, 15);
     EXPECT_EQ(pattern_->info_.endIndex_, 26);
+}
+
+/**
+ * @tc.name: SkipLargeOffsetWithReload001
+ * @tc.desc: On a full reset, SkipBackwardLines skips only the gridMatrix_ walk.
+ *           SkipLargeLineHeightLines and UpdateEndLine still run. reload + downward
+ *           scrollTo in one frame lands on the same startIndex whether gridMatrix_
+ *           is the initial viewport or still holds rows from a previous jump, and
+ *           currentOffset_ stays within one line.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridScrollLayoutTestFourNg, SkipLargeOffsetWithReload001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Regular layout options, one column, 100px rows, 400px viewport.
+     */
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr");
+    GridLayoutOptions options;
+    options.regularSize = GridItemSize { 1, 1 };
+    model.SetLayoutOptions(options);
+    CreateItemsInLazyForEach(40, [](uint32_t) { return ITEM_MAIN_SIZE; });
+    CreateDone();
+
+    // 1000px downward, larger than the viewport. This is SkipBackwardLines, not SkipForwardLines.
+    const float jumpOffset = ITEM_MAIN_SIZE * 10;
+    auto reloadAndJump = [this, jumpOffset]() {
+        frameNode_->ChildrenUpdatedFrom(0);
+        pattern_->ScrollTo(jumpOffset);
+        FlushUITasks();
+    };
+
+    /**
+     * @tc.steps: step2. Cold matrix: reload and jump together.
+     * @tc.expected: startIndex is the 1000px row and currentOffset_ is a one-line remainder.
+     */
+    reloadAndJump();
+    const int32_t firstStart = pattern_->info_.startIndex_;
+    const int32_t firstEnd = pattern_->info_.endIndex_;
+    const float firstOffset = pattern_->info_.currentOffset_;
+    EXPECT_EQ(firstStart, 10);
+    EXPECT_LT(firstOffset, ITEM_MAIN_SIZE);
+    EXPECT_GT(firstOffset, -ITEM_MAIN_SIZE);
+
+    /**
+     * @tc.steps: step3. Scroll back one row at a time so rows below the viewport stay in gridMatrix_.
+     * @tc.expected: Back at the top, and enough rows remain to absorb this jump down to one screen.
+     */
+    ScrollBackToTopBySteps();
+    EXPECT_EQ(pattern_->info_.startIndex_, 0);
+    const int32_t rowsThatAbsorbJump = static_cast<int32_t>((jumpOffset - HEIGHT) / ITEM_MAIN_SIZE) + 1;
+    EXPECT_NE(pattern_->info_.gridMatrix_.find(pattern_->info_.endMainLineIndex_ + rowsThatAbsorbJump),
+        pattern_->info_.gridMatrix_.end());
+
+    /**
+     * @tc.steps: step4. Warm matrix: reload and jump together again.
+     * @tc.expected: Same start/end index and the same one-line currentOffset_, not a large negative offset.
+     */
+    reloadAndJump();
+    EXPECT_EQ(pattern_->info_.startIndex_, firstStart);
+    EXPECT_EQ(pattern_->info_.endIndex_, firstEnd);
+    EXPECT_LT(pattern_->info_.currentOffset_, ITEM_MAIN_SIZE);
+    EXPECT_GT(pattern_->info_.currentOffset_, -ITEM_MAIN_SIZE);
+    EXPECT_NEAR(pattern_->info_.currentOffset_, firstOffset, 0.5f);
+}
+
+/**
+ * @tc.name: SkipLargeOffsetKeepMatrixOnScroll001
+ * @tc.desc: Downward scrollTo without a data reload still walks gridMatrix_ in SkipBackwardLines
+ *           and does not drop rows above the landing line.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridScrollLayoutTestFourNg, SkipLargeOffsetKeepMatrixOnScroll001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Same regular grid as the reload case, without ChildrenUpdated.
+     */
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr");
+    GridLayoutOptions options;
+    options.regularSize = GridItemSize { 1, 1 };
+    model.SetLayoutOptions(options);
+    CreateItemsInLazyForEach(40, [](uint32_t) { return ITEM_MAIN_SIZE; });
+    CreateDone();
+
+    const float jumpOffset = ITEM_MAIN_SIZE * 10;
+
+    /**
+     * @tc.steps: step2. Jump down, then return to the top while keeping earlier rows.
+     */
+    pattern_->ScrollTo(jumpOffset);
+    FlushUITasks();
+    EXPECT_EQ(pattern_->info_.startIndex_, 10);
+
+    ScrollBackToTopBySteps();
+    EXPECT_EQ(pattern_->info_.startIndex_, 0);
+    ASSERT_NE(pattern_->info_.gridMatrix_.find(0), pattern_->info_.gridMatrix_.end());
+
+    /**
+     * @tc.steps: step3. Jump down again with no reload, so the matrix walk still runs.
+     * @tc.expected: Landing index is unchanged, and line 0 is still in the matrix.
+     *               A full reset would have erased it.
+     */
+    pattern_->ScrollTo(jumpOffset);
+    FlushUITasks();
+    EXPECT_EQ(pattern_->info_.startIndex_, 10);
+    EXPECT_LT(pattern_->info_.currentOffset_, ITEM_MAIN_SIZE);
+    EXPECT_GT(pattern_->info_.currentOffset_, -ITEM_MAIN_SIZE);
+    EXPECT_NE(pattern_->info_.gridMatrix_.find(0), pattern_->info_.gridMatrix_.end());
+}
+
+/**
+ * @tc.name: SkipLargeOffsetTallLineStillCovers001
+ * @tc.desc: The full-reset gate does not wrap SkipLargeLineHeightLines. A first row that
+ *           still covers the viewport returns from that function before the matrix walk
+ *           and before line estimation, same as before this change.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridScrollLayoutTestFourNg, SkipLargeOffsetTallLineStillCovers001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. One column. First row is five viewports tall, the rest are one item tall.
+     *            Short rows are measured so a skipped cover check would average them in.
+     */
+    constexpr int32_t itemCount = 40;
+    constexpr int32_t measuredShortLineCount = 18;
+    constexpr float tallLineHeight = HEIGHT * 5.0f;
+    constexpr float jumpOffset = tallLineHeight / 2.0f;
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr");
+    CreateItemsInLazyForEach(itemCount, [tallLineHeight](uint32_t index) {
+        return index == 0 ? tallLineHeight : ITEM_MAIN_SIZE;
+    });
+    CreateDone();
+
+    /**
+     * @tc.steps: step2. Scroll down one row at a time until the short rows are measured.
+     *            ScrollBackToTopBySteps stops when startIndex_ is 0, while the tall row
+     *            still extends above the viewport. ScrollTo(0) finishes the return.
+     * @tc.expected: Offset is 0 and the short rows are still in lineHeightMap_.
+     */
+    const float distance = tallLineHeight + ITEM_MAIN_SIZE * static_cast<float>(measuredShortLineCount);
+    const int32_t downSteps = static_cast<int32_t>(distance / ITEM_MAIN_SIZE);
+    for (int32_t step = 0; step < downSteps; ++step) {
+        pattern_->UpdateCurrentOffset(-ITEM_MAIN_SIZE, SCROLL_FROM_UPDATE);
+        FlushUITasks();
+    }
+    ScrollBackToTopBySteps();
+    pattern_->ScrollTo(0.0f);
+    FlushUITasks();
+    ASSERT_EQ(pattern_->info_.startIndex_, 0);
+    ASSERT_NEAR(pattern_->GetTotalOffset(), 0.0f, 0.5f);
+    ASSERT_NEAR(pattern_->info_.currentOffset_, 0.0f, 0.5f);
+    ASSERT_NE(pattern_->info_.lineHeightMap_.find(measuredShortLineCount), pattern_->info_.lineHeightMap_.end());
+
+    /**
+     * @tc.steps: step3. From offset 0, reload and scroll halfway into the tall row in the same frame.
+     * @tc.expected: The downward jump enters SkipBackwardLines. The original cover check
+     *               returns before estimation. startIndex stays 0 and currentOffset_ stays at the jump.
+     */
+    frameNode_->ChildrenUpdatedFrom(0);
+    pattern_->ScrollTo(jumpOffset);
+    FlushUITasks();
+    EXPECT_EQ(pattern_->info_.startIndex_, 0);
+    EXPECT_EQ(pattern_->info_.startMainLineIndex_, 0);
+    EXPECT_NEAR(pattern_->info_.currentOffset_, -jumpOffset, 0.5f);
 }
 } // namespace OHOS::Ace::NG

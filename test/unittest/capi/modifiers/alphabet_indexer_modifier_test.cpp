@@ -295,6 +295,9 @@ public:
 
         SetupTheme<IndexerTheme>();
         AddResource(RES_NAME, CHECK_RESOURCE_STR);
+        AddMockResourceDataByName(std::get<0>(RES_COLOR_NAME), Color::FromString(COLOR_RED));
+        AddMockResourceData(static_cast<uint32_t>(std::get<0>(RES_COLOR_ID)), Color::FromString(COLOR_RED));
+        AddMockResourceData(static_cast<uint32_t>(std::get<0>(INVALID_ID_COLOR)), Color::FromString(COLOR_RED));
     }
 };
 

@@ -369,6 +369,7 @@ public:
     void SetIsBackground(bool isBackground) override;
     void SetHDRBrightness(float hdrBrightness) override;
     void SetHDRBrightness(float hdrBrightness, uint32_t type) override;
+    void SetSolidLayerEnabled(bool enabled) override;
     void SetImageHDRBrightness(float hdrBrightness) override;
     void SetImageHDRPresent(bool hdrPresent) override;
     void SetTransparentLayer(bool isTransparentLayer) override;
@@ -451,6 +452,7 @@ public:
     bool HasRenderContent() const override;
     void DumpAdvanceInfo() override;
     void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json) override;
+    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config) override;
     void SetAdvanceInfo(std::unique_ptr<JsonValue>& json);
     void BuildStagingInfo(std::unique_ptr<JsonValue>& json);
     void BuildPositionInfo(std::unique_ptr<JsonValue>& json);
@@ -1059,6 +1061,15 @@ protected:
     ACE_DISALLOW_COPY_AND_MOVE(RosenRenderContext);
 
 private:
+    void DumpAdvanceVisualInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+    void DumpAdvanceBlendAndGradientInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+    void DumpAdvanceBackgroundInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+    void SetAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+    void DumpAdvanceLightInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+    void DumpAdvanceImageAndLightInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+    void DumpAdvanceSourceInfo(std::unique_ptr<JsonValue>& json, const char* key,
+        const ImageSourceInfo& source, const ParamConfig& config);
+
     void ModifyCustomBackground();
     bool ShouldSkipAffineTransformation(std::shared_ptr<RSNode>& rsNode);
     void InsertFrameChildBefore(const RefPtr<UINode>& child, const RefPtr<UINode>& nextSibling);

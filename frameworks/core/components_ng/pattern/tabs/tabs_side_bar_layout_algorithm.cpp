@@ -22,7 +22,6 @@
 
 namespace OHOS::Ace::NG {
 namespace {
-const Dimension TAB_LIST_TOP_MARGIN = 4.0_vp;
 const Dimension TAB_LIST_BOTTOM_MARGIN = 4.0_vp;
 const Dimension SIDEBAR_PADDING = 16.0_vp;
 const Dimension GRADUAL_BLUR_MASK_EXTRA_HEIGHT = 32.0_vp;
@@ -30,6 +29,11 @@ const Dimension GRADUAL_BLUR_MASK_EXTRA_HEIGHT = 32.0_vp;
 
 void TabsSideBarLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
 {
+    CHECK_NULL_VOID(layoutWrapper);
+    auto hostNode = layoutWrapper->GetHostNode();
+    CHECK_NULL_VOID(hostNode);
+    auto theme = hostNode->GetTheme<TabTheme>(true);
+    CHECK_NULL_VOID(theme);
     auto layoutProperty = layoutWrapper->GetLayoutProperty();
     CHECK_NULL_VOID(layoutProperty);
     auto geometryNode = layoutWrapper->GetGeometryNode();
@@ -42,9 +46,8 @@ void TabsSideBarLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
     auto containerHeight = MeasureHeaderContainer(layoutWrapper, size);
     MeasureHeaderContainerMaskNode(layoutWrapper, size, containerHeight);
     float totalFixedHeight = containerHeight;
-    if (!NearEqual(containerHeight, 0.0f)) {
-        totalFixedHeight += TAB_LIST_TOP_MARGIN.ConvertToPx();
-    }
+    auto margin = theme->GetSideBarHeaderMarginBottom();
+    totalFixedHeight += margin.ConvertToPx();
 
     float bottomBarHeight = MeasureBottomBarContainer(layoutWrapper, size);
     MeasureBottomBarMaskNode(layoutWrapper, size, bottomBarHeight);

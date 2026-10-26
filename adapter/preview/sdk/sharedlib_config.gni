@@ -1136,3 +1136,19 @@ if (use_mac || use_mingw_win) {
     },
   ]
 }
+
+if (use_linux) {
+  napi_modules += [
+    {
+      prefix = "net"
+      shard_libs = [
+        {
+          label =
+              "//foundation/communication/netstack/frameworks/js/napi/http:http"
+          subsystem_name = "communication"
+          part_name = "netstack"
+        },
+      ]
+    },
+  ]
+}

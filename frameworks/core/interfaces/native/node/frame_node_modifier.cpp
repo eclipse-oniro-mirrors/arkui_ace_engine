@@ -13,11 +13,13 @@
  * limitations under the License.
  */
 #include "core/interfaces/native/node/frame_node_modifier.h"
+
 #include <cstdlib>
 #include <unistd.h>
 #include <vector>
 
 #include "base/error/error_code.h"
+#include "base/log/log_wrapper.h"
 #include "base/utils/utils.h"
 #include "base/utils/multi_thread.h"
 #include "bridge/common/utils/engine_helper.h"
@@ -723,6 +725,7 @@ ArkUI_Int32 SetSystemColorModeChangeEvent(ArkUINodeHandle node, void* userData, 
     auto onColorChange = [userData, onColorModeChange](int32_t colorMode) {
         using FuncType = float (*)(int32_t, void*);
         FuncType func = reinterpret_cast<FuncType>(onColorModeChange);
+        LOG_CALLBACK("OH_ArkUI_RegisterSystemColorModeChangeEvent", func);
         func(colorMode, userData);
     };
     ViewAbstract::SetSystemColorModeChangeEvent(frameNode, onColorChange);
@@ -746,6 +749,7 @@ ArkUI_Int32 SetDrawCompleteEvent(ArkUINodeHandle node, void* userData, void* onD
         if (!func) {
             return;
         }
+        LOG_CALLBACK("OH_ArkUI_RegisterDrawCallbackOnNodeHandle", func);
         func(userData);
     };
     ViewAbstract::SetDrawCompleteEvent(frameNode, std::move(onDrawCallBack));
@@ -770,6 +774,7 @@ ArkUI_Int32 SetLayoutEvent(ArkUINodeHandle node, void* userData, void* onLayout)
         if (!func) {
             return;
         }
+        LOG_CALLBACK("OH_ArkUI_RegisterLayoutCallbackOnNodeHandle", func);
         func(userData);
     };
     ViewAbstract::SetLayoutEvent(frameNode, std::move(onLayoutCallBack));
@@ -871,6 +876,7 @@ EventBindingInfo GetInteractionEventBindingInfo(ArkUINodeHandle node, int eventT
 void RunScopedTask(ArkUI_Int32 instanceId, void* userData, void (*callback)(void* userData))
 {
     ContainerScope scope(instanceId);
+    LOG_CALLBACK("OH_ArkUI_RunTaskInScope", callback);
     callback(userData);
 }
 
@@ -884,6 +890,7 @@ ArkUI_Int32 SetSystemFontStyleChangeEvent(ArkUINodeHandle node, void* userData, 
         fontStyle->fontWeight = fontWeight;
         using FuncType = float (*)(ArkUISystemFontStyleEvent, void*);
         FuncType func = reinterpret_cast<FuncType>(onFontStyleChange);
+        LOG_CALLBACK("OH_ArkUI_RegisterSystemFontStyleChangeEvent", func);
         func(fontStyle, userData);
     };
     ViewAbstract::SetSystemFontChangeEvent(frameNode, onFontChange);
@@ -1263,7 +1270,11 @@ ArkUI_Int32 SetForceDarkConfig(
     }
     if (forceDark) {
         auto invertFunc = [colorInvertFunc](uint32_t color) {
-            return colorInvertFunc ? colorInvertFunc(color) : ColorInverter::DefaultInverter(color);
+            if (colorInvertFunc) {
+                LOG_CALLBACK("OH_ArkUI_SetForceDarkConfig", colorInvertFunc);
+                return colorInvertFunc(color);
+            }
+            return ColorInverter::DefaultInverter(color);
         };
         ColorInverter::GetInstance().EnableColorInvert(instanceId, nodeTag, std::move(invertFunc));
     } else {

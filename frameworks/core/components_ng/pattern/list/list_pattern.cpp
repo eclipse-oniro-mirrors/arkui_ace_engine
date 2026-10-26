@@ -4659,6 +4659,139 @@ void ListPattern::OnRestoreInfo(const std::string& restoreInfo)
     jumpIndex_ = StringUtils::StringToInt(restoreInfo);
 }
 
+void ListPattern::DumpAdvanceListConfiguration(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    const bool isPublicTree = config.IsPublicTree();
+    const bool visual = !isPublicTree || config.visualProperties;
+    const bool functional = !isPublicTree || config.functionalProperties;
+    if (visual) {
+        if (isPublicTree) {
+            json->Put("lanes", lanes_);
+            json->Put("laneGutter", laneGutter_);
+        } else {
+            json->Put("lanes", std::to_string(lanes_).c_str());
+            json->Put("laneGutter", std::to_string(laneGutter_).c_str());
+        }
+    }
+    if (!isPublicTree) {
+        json->Put("dragFromSpring", dragFromSpring_);
+        json->Put("isScrollEnd", isScrollEnd_);
+    }
+    if (visual) {
+        json->Put("IsAtTop", IsAtTop());
+        json->Put("IsAtBottom", IsAtBottom());
+    }
+    if (functional) {
+        json->Put("multiSelectable", multiSelectable_);
+    }
+    if (visual) {
+        json->Put("chainAnimation", chainAnimation_);
+    }
+    if (functional) {
+        json->Put("maintainVisibleContentPosition", maintainVisibleContentPosition_);
+    }
+    if (!isPublicTree) {
+        auto host = GetHost();
+        CHECK_NULL_VOID(host);
+        auto listLayoutProperty = host->GetLayoutProperty<ListLayoutProperty>();
+        if (listLayoutProperty) {
+            listLayoutProperty->DumpInfo(json);
+        }
+        return;
+    }
+    if (config.visualProperties) {
+        DumpAdvanceVisualProperties(json, config);
+    }
+    if (config.functionalProperties) {
+        DumpAdvanceFunctionalProperties(json, config);
+    }
+}
+
+void ListPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    ScrollablePattern::DumpAdvanceInfo(json, config);
+    if (!config.IsPublicTree()) {
+        json->Put("maxListItemIndex", maxListItemIndex_);
+        json->Put("startIndex", startIndex_);
+        json->Put("endIndex", endIndex_);
+        json->Put("centerIndex", centerIndex_);
+    }
+    if (!config.IsPublicTree() || config.visualProperties) {
+        json->Put("startMainPos", startMainPos_);
+        json->Put("endMainPos", endMainPos_);
+        json->Put("currentOffset", currentOffset_);
+        json->Put("contentMainSize", contentMainSize_);
+        // Preserve resolved offsets over the layout property's configured strings in public output.
+        if (config.IsPublicTree() && json->Contains("contentStartOffset")) {
+            json->Replace("contentStartOffset", contentStartOffset_);
+        } else {
+            json->Put("contentStartOffset", contentStartOffset_);
+        }
+        if (config.IsPublicTree() && json->Contains("contentEndOffset")) {
+            json->Replace("contentEndOffset", contentEndOffset_);
+        } else {
+            json->Put("contentEndOffset", contentEndOffset_);
+        }
+    }
+    if (!config.IsPublicTree()) {
+        DumpAdvanceDiagnostics(json);
+    }
+    DumpAdvanceListConfiguration(json, config);
+}
+
+void ListPattern::DumpAdvanceDiagnostics(std::unique_ptr<JsonValue>& json)
+{
+    json->Put("currentDelta", currentDelta_);
+    json->Put("crossMatchChild", crossMatchChild_);
+    json->Put("smooth", smooth_);
+    json->Put("jumpIndex", jumpIndex_.has_value() ? std::to_string(jumpIndex_.value()).c_str() : "null");
+    json->Put(
+        "jumpIndexInGroup", jumpIndexInGroup_.has_value() ? std::to_string(jumpIndexInGroup_.value()).c_str() : "null");
+    json->Put("targetIndex", targetIndex_.has_value() ? std::to_string(targetIndex_.value()).c_str() : "null");
+    json->Put("predictSnapOffset",
+        predictSnapOffset_.has_value() ? std::to_string(predictSnapOffset_.value()).c_str() : "null");
+    json->Put("predictSnapEndPos",
+        predictSnapEndPos_.has_value() ? std::to_string(predictSnapEndPos_.value()).c_str() : "null");
+    json->Put("paintStateFlag", paintStateFlag_);
+    json->Put("isFramePaintStateValid", isFramePaintStateValid_);
+    CreatePositionInfo(json);
+    json->Put("scrollStop", scrollStop_);
+    std::unique_ptr<JsonValue> lanesChildrenArray = JsonUtil::CreateArray(true);
+    for (auto item : lanesItemRange_) {
+        std::unique_ptr<JsonValue> child = JsonUtil::Create(true);
+        child->Put("lanesItemRange.first", std::to_string(item.first).c_str());
+        child->Put("lanesItemRange.second", std::to_string(item.second).c_str());
+        lanesChildrenArray->Put(child);
+    }
+    json->Put("lanesItemRange", lanesChildrenArray);
+}
+
+void ListPattern::DumpAdvanceVisualProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    auto property = GetLayoutProperty<ListLayoutProperty>();
+    CHECK_NULL_VOID(property);
+    auto visualConfig = config;
+    visualConfig.functionalProperties = false;
+    property->DumpInfo(json, visualConfig);
+}
+
+void ListPattern::DumpAdvanceFunctionalProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    auto property = GetLayoutProperty<ListLayoutProperty>();
+    if (property) {
+        auto functionalConfig = config;
+        functionalConfig.visualProperties = false;
+        property->DumpInfo(json, functionalConfig);
+        json->Put("stackFromEnd", property->GetStackFromEndValue(false));
+    }
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto hub = host->GetEventHub<ListEventHub>();
+    CHECK_NULL_VOID(hub);
+    json->Put("hasOnScrollIndex", static_cast<bool>(hub->GetOnScrollIndex()));
+    json->Put("hasOnScrollChange", static_cast<bool>(hub->GetOnScrollVisibleContentChange()));
+}
+
 void ListPattern::DumpAdvanceInfo()
 {
     ScrollablePattern::DumpAdvanceInfo();
@@ -5363,55 +5496,7 @@ void ListPattern::DumpInfo()
 
 void ListPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json)
 {
-    ScrollablePattern::DumpAdvanceInfo(json);
-    json->Put("maxListItemIndex", maxListItemIndex_);
-    json->Put("startIndex", startIndex_);
-    json->Put("endIndex", endIndex_);
-    json->Put("centerIndex", centerIndex_);
-    json->Put("startMainPos", startMainPos_);
-    json->Put("endMainPos", endMainPos_);
-    json->Put("currentOffset", currentOffset_);
-    json->Put("contentMainSize", contentMainSize_);
-    json->Put("contentStartOffset", contentStartOffset_);
-    json->Put("contentEndOffset", contentEndOffset_);
-    json->Put("currentDelta", currentDelta_);
-    json->Put("crossMatchChild", crossMatchChild_);
-    json->Put("smooth", smooth_);
-    json->Put("jumpIndex", jumpIndex_.has_value() ? std::to_string(jumpIndex_.value()).c_str() : "null");
-    json->Put(
-        "jumpIndexInGroup", jumpIndexInGroup_.has_value() ? std::to_string(jumpIndexInGroup_.value()).c_str() : "null");
-    json->Put("targetIndex", targetIndex_.has_value() ? std::to_string(targetIndex_.value()).c_str() : "null");
-    json->Put("predictSnapOffset",
-        predictSnapOffset_.has_value() ? std::to_string(predictSnapOffset_.value()).c_str() : "null");
-    json->Put("predictSnapEndPos",
-        predictSnapEndPos_.has_value() ? std::to_string(predictSnapEndPos_.value()).c_str() : "null");
-    json->Put("paintStateFlag", paintStateFlag_);
-    json->Put("isFramePaintStateValid", isFramePaintStateValid_);
-    CreatePositionInfo(json);
-    json->Put("scrollStop", scrollStop_);
-    std::unique_ptr<JsonValue> lanesChildrenArray = JsonUtil::CreateArray(true);
-    for (auto item : lanesItemRange_) {
-        std::unique_ptr<JsonValue> child = JsonUtil::Create(true);
-        child->Put("lanesItemRange.first", std::to_string(item.first).c_str());
-        child->Put("lanesItemRange.second", std::to_string(item.second).c_str());
-        lanesChildrenArray->Put(child);
-    }
-    json->Put("lanesItemRange", lanesChildrenArray);
-    json->Put("lanes", std::to_string(lanes_).c_str());
-    json->Put("laneGutter", std::to_string(laneGutter_).c_str());
-    json->Put("dragFromSpring", dragFromSpring_);
-    json->Put("isScrollEnd", isScrollEnd_);
-    json->Put("IsAtTop", IsAtTop());
-    json->Put("IsAtBottom", IsAtBottom());
-    json->Put("multiSelectable", multiSelectable_);
-    json->Put("chainAnimation", chainAnimation_);
-    json->Put("maintainVisibleContentPosition", maintainVisibleContentPosition_);
-    auto host = GetHost();
-    CHECK_NULL_VOID(host);
-    auto listLayoutProperty = host->GetLayoutProperty<ListLayoutProperty>();
-    if (listLayoutProperty) {
-        listLayoutProperty->DumpInfo(json);
-    }
+    ListPattern::DumpAdvanceInfo(json, ParamConfig());
 }
 
 void ListPattern::DumpSimplifyInfo(std::shared_ptr<JsonValue>& json)

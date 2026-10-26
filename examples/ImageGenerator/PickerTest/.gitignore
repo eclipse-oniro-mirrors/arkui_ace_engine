@@ -1,0 +1,19 @@
+/node_modules
+/oh_modules
+/local.properties
+/.idea
+**/build
+/.hvigor
+.cxx
+/.clangd
+/.clang-format
+/.clang-tidy
+**/.test
+/.appanalyzer
+
+# Resource images (local only, not tracked)
+**/resources/base/media/*.svg
+**/resources/base/media/*.png
+
+# Build profile with signing configs (local only)
+/build-profile.json5

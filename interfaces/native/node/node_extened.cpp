@@ -230,11 +230,13 @@ void HandleCustomEvent(ArkUI_NodeCustomEvent* event)
             event->node->customEventListeners);
         if (eventListenersSet) {
             for (const auto& eventlistener : *eventListenersSet) {
+                LOG_CALLBACK("ArkUI_NativeNodeAPI_1.addNodeCustomEventReceiver", eventlistener);
                 (*eventlistener)(event);
             }
         }
     }
     if (g_customEventReceiver) {
+        LOG_CALLBACK("ArkUI_NativeNodeAPI_1.registerNodeCustomEventReceiver", g_customEventReceiver);
         g_customEventReceiver(event);
     }
 }

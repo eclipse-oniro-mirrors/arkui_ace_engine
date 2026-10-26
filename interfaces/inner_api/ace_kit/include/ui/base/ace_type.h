@@ -47,10 +47,14 @@ enum class ColorMode : int32_t {
 };
 
 // Inherit 'AceType' to manager pointers using 'RefPtr', 'WeakPtr' and 'AceType::DynamicCast'.
-class AceType : public virtual TypeInfoBase, public virtual Referenced {
-    DECLARE_ACE_TYPE(AceType, TypeInfoBase);
+class AceType : public Referenced {
+    DECLARE_CLASS_TYPE_INFO(AceType);
+    friend class Referenced;
 
 public:
+    using TypeInfoBase = ::OHOS::Ace::TypeInfoBase;
+    using IdType = TypeInfoBase::IdType;
+
     ~AceType() override = default;
 
     template<class T, class O>
@@ -143,6 +147,28 @@ public:
 
 protected:
     AceType() = default;
+
+    virtual uintptr_t SafeCastById(IdType id) const
+    {
+        return id == TypeId() ? reinterpret_cast<uintptr_t>(this) : 0;
+    }
+
+    virtual IdType GetTypeId() const
+    {
+        return TypeId();
+    }
+
+    virtual const char* GetTypeName() const
+    {
+        return TypeName();
+    }
+
+#ifdef ACE_DEBUG
+    virtual size_t GetTypeSize() const
+    {
+        return TypeSize();
+    }
+#endif
 };
 
 } // namespace OHOS::Ace

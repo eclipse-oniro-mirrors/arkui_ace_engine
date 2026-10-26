@@ -50,7 +50,7 @@ class SymbolEffectOptions;
 extern "C" {
 #endif
 
-#define ARKUI_FULL_API_VERSION 144
+#define ARKUI_FULL_API_VERSION 145
 // When changing ARKUI_BASIC_API_VERSION, ARKUI_FULL_API_VERSION must be
 // increased as well.
 #define ARKUI_NODE_API_VERSION 145
@@ -9827,6 +9827,7 @@ struct ArkUIXComponentModifier {
     void (*setXComponentHdrBrightness)(
         ArkUINodeHandle node, ArkUI_Float32 hdrBrightness, ArkUI_Int32 hdrType);
     void (*resetXComponentHdrBrightness)(ArkUINodeHandle node);
+    void (*setXComponentExtraFlag)(ArkUINodeHandle node, ArkUI_Uint32 flag);
     void (*setXComponentEnableTransparentLayer)(ArkUINodeHandle node, ArkUI_Bool enable);
     void (*resetXComponentEnableTransparentLayer)(ArkUINodeHandle node);
     void (*setXComponentBufferQueueCount)(ArkUINodeHandle node, ArkUI_Int32 bufferQueueCount);
@@ -10416,6 +10417,9 @@ struct ArkUINDKRenderNodeModifier {
     ArkUI_Int32 (*setContentBlurOption)(ArkUIRenderNodeHandle node, ArkUI_Float32 blurRadius);
     ArkUI_Int32 (*resetContentBlurOption)(ArkUIRenderNodeHandle node);
     ArkUIRSNodeHandle (*getRSNode)(ArkUIRenderNodeHandle node);
+    ArkUI_Int32 (*adoptChildWithPolicy)(ArkUINodeHandle node, ArkUINodeHandle child, ArkUI_Int32 policy);
+    ArkUI_Int32 (*setAdoptedChildOverlayPositionCompensation)(ArkUINodeHandle adoptedChild,
+        ArkUI_Float32 offsetX, ArkUI_Float32 offsetY, ArkUIMatrix4Handle transform);
 };
 
 struct ArkUIDynamicLayoutModifier {
@@ -10677,6 +10681,14 @@ struct ArkUIMultiThreadManagerAPI {
     void (*markNodeTreeNotFree)(ArkUINodeHandle node);
     ArkUI_Bool (*debugThreadSafeNodeEnabled)();
     void (*setNeedMarkNodeTreeFree)(ArkUI_Bool needMarkNodeTreeFree);
+    void* (*beginNodeTreeOperation)(ArkUINodeHandle* nodes, ArkUI_Int32 count, const char* apiName);
+    void (*endNodeTreeOperation)(void* operation);
+    void (*setNodeTreeOperationCheckMode)(ArkUI_Int32 mode);
+    ArkUI_Bool (*isThreadSafeNodeScope)();
+    ArkUI_Bool (*isNeedMarkNodeTreeFree)();
+    ArkUI_Bool (*needsNodeTreeOperationCheck)();
+    void (*includeNodeTreeOperationResult)(void* operation, ArkUINodeHandle node);
+    void (*prepareNodeTreeOperationChildren)(void* operation, ArkUINodeHandle parent);
 };
 
 struct ArkUIDialogAPI {

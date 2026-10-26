@@ -1544,4 +1544,17 @@ HWTEST_F(NativeInterfaceXComponentTestNg, NativeXComponent_DetachNativeRootNode_
 
     SUCCEED();
 }
+
+/**
+ * @tc.name: NativeXComponent_GetNativeWindow_NullImpl
+ * @tc.desc: Test GetNativeWindow returns BAD_PARAMETER when xcomponentImpl is nullptr
+ * @tc.type: FUNC
+ */
+HWTEST_F(NativeInterfaceXComponentTestNg, NativeXComponent_GetNativeWindow_NullImpl, TestSize.Level1)
+{
+    auto* comp = new OH_NativeXComponent(nullptr);
+    void* window = nullptr;
+    EXPECT_EQ(comp->GetNativeWindow(&window), BAD_PARAMETER_RESULT);
+    delete comp;
+}
 } // namespace OHOS::Ace::NG

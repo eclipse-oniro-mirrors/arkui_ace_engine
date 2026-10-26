@@ -119,6 +119,14 @@ public:
         json->Put("FlexBetweenSpace", static_cast<double>(layoutResult_.betweenSpace));
     }
 
+    void DumpSimplifyInfo(std::shared_ptr<JsonValue>& json, const InspectorDumpOptions& options) override
+    {
+        DumpSimplifyInfo(json);
+        if (!ShouldIncludeDiagnostic(options)) {
+            json->Delete("FlexMeasureLayoutPaired");
+        }
+    }
+
     bool GetIsWrap() const
     {
         return isWrap_;

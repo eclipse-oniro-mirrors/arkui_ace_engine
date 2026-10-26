@@ -751,7 +751,7 @@ void SessionWrapperImpl::CreateSession(const AAFwk::Want& want, const SessionCon
     pattern->SetLastSentBrandColorStr(brandColorStr);
     UpdateSessionConfig();
     lifecycleListener_ = std::make_shared<UIExtensionLifecycleListener>(AceType::WeakClaim(this));
-    session_->RegisterLifecycleListener(lifecycleListener_);
+    session->RegisterLifecycleListener(lifecycleListener_);
     InitAllCallback();
     RegisterDataConsumer();
 }
@@ -781,6 +781,13 @@ void SessionWrapperImpl::UpdateSessionConfig()
     session_->SetSystemConfig(extConfig);
 }
 
+void SessionWrapperImpl::SetSession(sptr<Rosen::ExtensionSession> session)
+{
+    std::lock_guard<std::mutex> lock(sessionMutex_);
+    session_ = session;
+    persistentId_ = session ? session->GetPersistentId() : 0;
+}
+
 void SessionWrapperImpl::DestroySession()
 {
     CHECK_NULL_VOID(session_);
@@ -792,7 +799,7 @@ void SessionWrapperImpl::DestroySession()
         dataHandler->UnregisterDataConsumer(subSystemId_);
     }
     customWant_ = nullptr;
-    session_ = nullptr;
+    SetSession(nullptr);
 }
 
 void SessionWrapperImpl::UpdateWantPtr(std::shared_ptr<AAFwk::Want>& wantPtr)
@@ -884,7 +891,8 @@ bool SessionWrapperImpl::IsSessionValid()
 
 int32_t SessionWrapperImpl::GetSessionId() const
 {
-    return session_ ? session_->GetPersistentId() : 0;
+    std::lock_guard<std::mutex> lock(sessionMutex_);
+    return persistentId_;
 }
 
 int32_t SessionWrapperImpl::GetInstanceId() const
@@ -1122,7 +1130,7 @@ void SessionWrapperImpl::OnReleaseDone()
         session_->GetPersistentId(), GetFrameNodeId());
     session_->UnregisterLifecycleListener(lifecycleListener_);
     Rosen::ExtensionSessionManager::GetInstance().RequestExtensionSessionDestructionDone(session_);
-    session_ = nullptr;
+    SetSession(nullptr);
 }
 
 void SessionWrapperImpl::NotifyDestroy(bool isHandleError)

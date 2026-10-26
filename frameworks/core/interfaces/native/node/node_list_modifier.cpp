@@ -14,6 +14,8 @@
  */
 #include "core/interfaces/native/node/node_list_modifier.h"
 
+#include "base/log/log_wrapper.h"
+
 #include "interfaces/native/node/list_option.h"
 #include "interfaces/native/node/node_model.h"
 
@@ -791,6 +793,7 @@ void SetListCloseAllSwipeActions(ArkUINodeHandle node, void* userData, void (onF
     RefPtr<ScrollControllerBase> scrollControllerBase = ListModelNG::GetOrCreateController(frameNode);
     if (onFinish) {
         auto onEvent = [userData, onFinish]() {
+            LOG_CALLBACK("OH_ArkUI_List_CloseAllSwipeActions", onFinish);
             onFinish(userData);
         };
         scrollControllerBase->CloseAllSwipeActions(std::move(onEvent));

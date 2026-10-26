@@ -744,6 +744,8 @@ public:
     }
 
 protected:
+    static bool ShouldIncludeDiagnostic(const InspectorDumpOptions& options);
+
     virtual void OnAttachToFrameNode() {}
     virtual void OnDetachFromFrameNode(FrameNode* frameNode) {}
 

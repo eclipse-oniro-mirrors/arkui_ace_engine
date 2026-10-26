@@ -820,8 +820,6 @@ void WebPattern::CloseContextSelectionMenu()
 {
     if (contextSelectOverlay_ && contextSelectOverlay_->IsCurrentMenuVisibile()) {
         contextSelectOverlay_->CloseOverlay(true, CloseReason::CLOSE_REASON_NORMAL);
-        // Set isEscKeyFromOverlayOrFullScreen_ to true, so that the next ESC key event will not be sent to web.
-        isEscKeyFromOverlayOrFullScreen_ = true;
     }
 }
 
@@ -829,8 +827,6 @@ void WebPattern::CloseDefaultContextMenu()
 {
     if (contextMenuOverlay_ && contextMenuOverlay_->IsCurrentMenuVisibile()) {
         contextMenuOverlay_->CloseOverlay(true, CloseReason::CLOSE_REASON_NORMAL);
-        // Set isEscKeyFromOverlayOrFullScreen_ to true, so that the next ESC key event will not be sent to web.
-        isEscKeyFromOverlayOrFullScreen_ = true;
     }
 }
 
@@ -849,8 +845,6 @@ void WebPattern::RemovePreviewMenuNode()
     parent->RemoveChild(previewNode);
     previewImageNodeId_.reset();
     parent->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
-    // Set isEscKeyFromOverlayOrFullScreen_ to true, so that the next ESC key event will not be sent to web.
-    isEscKeyFromOverlayOrFullScreen_ = true;
 }
 
 bool WebPattern::IsPreviewMenuNotNeedShowPreview()
@@ -3717,13 +3711,10 @@ bool WebPattern::IsShouldTriggerBack(const KeyEvent& event, bool isUsed)
     }
     bool shouldTriggerBack = false;
     if (isEscKey && isKeyUp) {
-        if (isEscKeyFromOverlayOrFullScreen_) {
-            shouldTriggerBack = false;
-        } else if (!isEscKeyDownConsumed_ && !isUsed) {
+        if (!isEscKeyDownConsumed_ && !isUsed) {
             shouldTriggerBack = true;
         }
         isEscKeyDownConsumed_ = true;
-        isEscKeyFromOverlayOrFullScreen_ = false;
     }
     return shouldTriggerBack;
 }
@@ -3758,7 +3749,6 @@ bool WebPattern::HandleEscToBackSupport(PipelineContext* pipeline)
 bool WebPattern::HandleKeyEvent(const KeyEvent& keyEvent)
 {
     if (IsContextMenuShow() && keyEvent.code == KeyCode::KEY_ESCAPE && keyEvent.action == KeyAction::DOWN) {
-        isEscKeyFromOverlayOrFullScreen_ = true;
         bool isKeyNull = !(keyEvent.HasKey(KeyCode::KEY_ALT_LEFT) || keyEvent.HasKey(KeyCode::KEY_ALT_RIGHT) ||
                            keyEvent.HasKey(KeyCode::KEY_SHIFT_LEFT) || keyEvent.HasKey(KeyCode::KEY_SHIFT_RIGHT) ||
                            keyEvent.HasKey(KeyCode::KEY_CTRL_LEFT) || keyEvent.HasKey(KeyCode::KEY_CTRL_RIGHT) ||
@@ -3771,6 +3761,14 @@ bool WebPattern::HandleKeyEvent(const KeyEvent& keyEvent)
     }
     if (keyEvent.code == KeyCode::KEY_ESCAPE && keyEvent.action == KeyAction::DOWN) {
         isEscKeyDownConsumed_ = false;
+        auto host = GetHost();
+        CHECK_NULL_RETURN(host, false);
+        auto pipelineContext = host->GetContext();
+        if (pipelineContext) {
+            auto overlayManager = pipelineContext->GetOverlayManager();
+            isEscKeyDownConsumed_ = overlayManager && dataListNodeId_.has_value() &&
+                                    overlayManager->GetMenuNode(dataListNodeId_.value()) != nullptr;
+        }
     }
     bool ret = false;
     auto host = GetHost();
@@ -5854,7 +5852,6 @@ bool WebPattern::ParseTouchInfo(const TouchEventInfo& info, std::list<TouchInfo>
 void WebPattern::RequestFullScreen()
 {
     isFullScreen_ = true;
-    isEscKeyFromOverlayOrFullScreen_ = true;
 }
 
 void WebPattern::ExitFullScreen()
@@ -5953,7 +5950,7 @@ bool WebPattern::IsSelectInfoValid()
 std::optional<RectF> WebPattern::GetViewPort() const
 {
     CHECK_NULL_RETURN(GetHost(), std::nullopt);
-    auto parentNode = GetHost()->GetAncestorNodeOfFrame(true);
+    auto parentNode = GetHost()->GetCoordinateAncestorNodeOfFrame(true);
     while (parentNode) {
         auto scrollablePattern = AceType::DynamicCast<NestableScrollContainer>(parentNode->GetPattern());
         auto geometryNode = parentNode->GetGeometryNode();
@@ -5961,7 +5958,7 @@ std::optional<RectF> WebPattern::GetViewPort() const
             auto offsetRelativeToWindow = parentNode->GetOffsetRelativeToWindow();
             return RectF(offsetRelativeToWindow, geometryNode->GetFrameRect().GetSize());
         }
-        parentNode = parentNode->GetAncestorNodeOfFrame(true);
+        parentNode = parentNode->GetCoordinateAncestorNodeOfFrame(true);
     }
     return std::nullopt;
 }
@@ -9642,7 +9639,6 @@ void WebPattern::OnShowAutofillPopupV2(
     CHECK_NULL_VOID(overlayManager);
     menu->GetOrCreateFocusHub()->SetFocusable(false);
     overlayManager->ShowMenu(dataListNode->GetId(), OffsetF(), menu);
-    isEscKeyFromOverlayOrFullScreen_ = true;
 }
 
 void WebPattern::OnHideAutofillPopup()
@@ -11513,7 +11509,7 @@ bool WebPattern::CheckVisible()
         return false;
     }
 
-    auto parent = host->GetAncestorNodeOfFrame(true);
+    auto parent = host->GetCoordinateAncestorNodeOfFrame(true);
     while (parent) {
         if (parent->IsWindowBoundary()) {
             TAG_LOGI(AceLogTag::ACE_WEB, "WebPattern::CheckVisible IsWindowBoundary is true");
@@ -11523,7 +11519,7 @@ bool WebPattern::CheckVisible()
             TAG_LOGI(AceLogTag::ACE_WEB, "WebPattern::CheckVisible parent is inactive or invisible");
             return false;
         }
-        parent = parent->GetAncestorNodeOfFrame(true);
+        parent = parent->GetCoordinateAncestorNodeOfFrame(true);
     }
     return true;
 }

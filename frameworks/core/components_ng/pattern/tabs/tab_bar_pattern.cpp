@@ -18,6 +18,7 @@
 
 #include <optional>
 #include <string_view>
+#include "ui/base/utils/utils.h"
 
 #include "base/geometry/axis.h"
 #include "base/geometry/dimension.h"
@@ -1634,9 +1635,8 @@ void TabBarPattern::CloseDialog()
     dialogNode_.Reset();
 }
 
-void TabBarPattern::HandleClick(SourceType type, int32_t index)
+void TabBarPattern::DoHandleClick(const RefPtr<FrameNode>& host, int32_t index)
 {
-    auto host = GetHost();
     CHECK_NULL_VOID(host);
     auto layoutProperty = host->GetLayoutProperty<TabBarLayoutProperty>();
     CHECK_NULL_VOID(layoutProperty);
@@ -1674,6 +1674,36 @@ void TabBarPattern::HandleClick(SourceType type, int32_t index)
         return;
     }
     ClickTo(host, index);
+}
+
+bool TabBarPattern::IsTabBarClickIntercepted(const RefPtr<FrameNode>& host) const
+{
+    CHECK_NULL_RETURN(host, false);
+    auto tabsNode = AceType::DynamicCast<TabsNode>(host->GetParent());
+    CHECK_NULL_RETURN(tabsNode, false);
+    auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
+    CHECK_NULL_RETURN(tabsPattern, false);
+    return tabsPattern->GetTabBarClickIntercept();
+}
+
+void TabBarPattern::HandleClick(SourceType type, int32_t index)
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    if (IsTabBarClickIntercepted(host)) {
+        return;
+    }
+    DoHandleClick(host, index);
+}
+
+void TabBarPattern::TapToHandle(int32_t index, bool skipInterceptGuard)
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    if (!skipInterceptGuard && IsTabBarClickIntercepted(host)) {
+        return;
+    }
+    DoHandleClick(host, index);
 }
 
 void TabBarPattern::ClickTo(const RefPtr<FrameNode>& host, int32_t index)
@@ -3558,6 +3588,45 @@ void TabBarPattern::ChangeIndex(int32_t index)
     HandleClick(SourceType::NONE, index);
 }
 
+void TabBarPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if (!config.IsPublicTree() || config.visualProperties) {
+        json->Put("isRTL", isRTL_);
+    }
+    if (!config.IsPublicTree()) {
+        json->Put("touching", touching_);
+        json->Put("isMaskAnimationByCreate", isMaskAnimationByCreate_);
+    }
+    if (!config.IsPublicTree() || config.visualProperties) {
+        if (!config.IsPublicTree() || animationCurve_) {
+            json->Put("animationCurve", animationCurve_ ? animationCurve_->ToString().c_str() : "null");
+        }
+        if (!config.IsPublicTree() || animationDuration_.has_value()) {
+            if (config.IsPublicTree()) {
+                json->Put("animationDuration", animationDuration_.value());
+            } else {
+                json->Put("animationDuration",
+                    animationDuration_.has_value() ? std::to_string(animationDuration_.value()).c_str() : "null");
+            }
+        }
+    }
+    if (!config.IsPublicTree()) {
+        json->Put("isTouchingSwiper", isTouchingSwiper_);
+        json->Put("isAnimating", isAnimating_);
+        json->Put("changeByClick", changeByClick_);
+    }
+    if (!config.IsPublicTree() || config.visualProperties) {
+        json->Put("indicator", indicator_);
+    }
+    if (!config.IsPublicTree()) {
+        json->Put("swiperStartIndex", swiperStartIndex_);
+    }
+    if (!config.IsPublicTree() || config.visualProperties) {
+        json->Put("scrollMargin", scrollMargin_);
+        SetRegionInfo(json, config);
+    }
+}
+
 void TabBarPattern::DumpAdvanceInfo()
 {
     isRTL_ ? DumpLog::GetInstance().AddDesc("isRTL:true") : DumpLog::GetInstance().AddDesc("isRTL:false");
@@ -3652,11 +3721,24 @@ int32_t TabBarPattern::GetLoopIndex(int32_t originalIndex) const
 
 void TabBarPattern::SetRegionInfo(std::unique_ptr<JsonValue>& json)
 {
-    std::string regionString = "";
-    for (auto item : gradientRegions_) {
-        item ? regionString.append("true ") : regionString.append("false ");
+    SetRegionInfo(json, ParamConfig());
+}
+
+void TabBarPattern::SetRegionInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if (config.IsPublicTree()) {
+        auto regions = JsonUtil::CreateArray();
+        for (size_t index = 0; index < gradientRegions_.size(); ++index) {
+            regions->Put(std::to_string(index).c_str(), static_cast<bool>(gradientRegions_[index]));
+        }
+        json->PutRef("region", std::move(regions));
+    } else {
+        std::string regionString;
+        for (auto item : gradientRegions_) {
+            item ? regionString.append("true ") : regionString.append("false ");
+        }
+        json->Put("region", regionString.c_str());
     }
-    json->Put("region", regionString.c_str());
     switch (axis_) {
         case Axis::NONE: {
             json->Put("Axis", "NONE");
@@ -3692,19 +3774,7 @@ const RefPtr<Curve> TabBarPattern::GetAnimationCurve(const RefPtr<Curve>& defaul
 
 void TabBarPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json)
 {
-    json->Put("isRTL", isRTL_);
-    json->Put("touching", touching_);
-    json->Put("isMaskAnimationByCreate", isMaskAnimationByCreate_);
-    json->Put("animationCurve", animationCurve_ ? animationCurve_->ToString().c_str() : "null");
-    json->Put("animationDuration",
-        animationDuration_.has_value() ? std::to_string(animationDuration_.value()).c_str() : "null");
-    json->Put("isTouchingSwiper", isTouchingSwiper_);
-    json->Put("isAnimating", isAnimating_);
-    json->Put("changeByClick", changeByClick_);
-    json->Put("indicator", indicator_);
-    json->Put("swiperStartIndex", swiperStartIndex_);
-    json->Put("scrollMargin", scrollMargin_);
-    SetRegionInfo(json);
+    TabBarPattern::DumpAdvanceInfo(json, ParamConfig());
 }
 
 TabBarParamType TabBarPattern::GetTabBarItemType(int32_t tabBarItemId)

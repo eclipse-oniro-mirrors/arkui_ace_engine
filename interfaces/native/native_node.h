@@ -14476,6 +14476,47 @@ int32_t OH_ArkUI_NodeUtils_GetNodeUniqueId(ArkUI_NodeHandle node, int32_t* uniqu
 int32_t OH_ArkUI_NativeModule_AdoptChild(ArkUI_NodeHandle node, ArkUI_NodeHandle child);
 
 /**
+ * @brief Adopts the target child node and enables compensated window-position calculation across the adoption
+ * boundary. The adopted node must not have an existing parent node. Use
+ * {@link OH_ArkUI_NativeModule_SetAdoptedChildOverlayPositionCompensation} to provide the aggregate position
+ * compensation of intermediate render-only nodes.
+ *
+ * @param node ArkUI_NodeHandle pointer, the parent node that will adopt the child node.
+ * @param child ArkUI_NodeHandle pointer, the target node being adopted.
+ * @param policy The policy to set. Valid values correspond to {@link OH_ArkUI_AdoptPolicy}.
+ * @return Error code.
+ *         {@link ARKUI_ERROR_CODE_NO_ERROR} Success.
+ *         {@link ARKUI_ERROR_CODE_PARAM_INVALID} A parameter is invalid or the policy is invalid.
+ *         {@link ARKUI_ERROR_CODE_CAPI_INIT_ERROR} The CAPI init error.
+ *         {@link ARKUI_ERROR_CODE_NODE_HAS_PARENT} The child already has a parent node.
+ *         {@link ARKUI_ERROR_CODE_NODE_CAN_NOT_BE_ADOPTED} The child can not be adopted.
+ *         {@link ARKUI_ERROR_CODE_NODE_CAN_NOT_ADOPT_TO} The node can not adopt children.
+ * @since 26.2.0
+ */
+int32_t OH_ArkUI_NativeModule_AdoptChildWithPolicy(
+    ArkUI_NodeHandle node, ArkUI_NodeHandle child, OH_ArkUI_AdoptPolicy policy);
+
+/**
+ * @brief Sets the overlay position compensation from an adopted child to its adopt parent. The compensation
+ * represents the aggregate effect of the render-only nodes between them. A point is first translated by
+ * @p compensationOffset and then transformed by @p compensationTransform. The child must have been adopted with
+ * {@link OH_ARKUI_NATIVE_MODULE_ADOPT_POLICY_OVERLAY_POSITION_FOLLOWS_ADOPT_PARENT_CHAIN}.
+ *
+ * @param adoptedChild The adopted child node on which the compensation is stored.
+ * @param compensationOffset The aggregate x/y offset, in px, of the intermediate render-only nodes.
+ * @param compensationTransform The aggregate transform of the intermediate render-only nodes. The matrix is copied
+ * by this call.
+ * @return Error code.
+ *         {@link ARKUI_ERROR_CODE_NO_ERROR} Success.
+ *         {@link ARKUI_ERROR_CODE_PARAM_INVALID} A parameter is invalid.
+ *         {@link ARKUI_ERROR_CODE_CAPI_INIT_ERROR} The CAPI init error.
+ *         {@link ARKUI_ERROR_CODE_NODE_IS_NOT_IN_ADOPTED_CHILDREN} The child is not adopted with the required policy.
+ * @since 26.2.0
+ */
+int32_t OH_ArkUI_NativeModule_SetAdoptedChildOverlayPositionCompensation(ArkUI_NodeHandle adoptedChild,
+    const ArkUI_PointF* compensationOffset, const ArkUI_Matrix4* compensationTransform);
+
+/**
  * @brief Remove the target adopted child node.
  *
  * @param node ArkUI_NodeHandle pointer, the parent node.
