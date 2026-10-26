@@ -59,10 +59,12 @@ public:
     static RefPtr<Tabs> Create(RefPtr<FrameNode>& node);
 
     void SetTabBarWidth(const Dimension& tabBarWidth);
+    void SetTabBarWidth(const Dimension& tabBarWidth, bool updateForSideBar);
     Dimension GetTabBarWidth() const;
     void SetTabBarHeight(const Dimension& tabBarHeight);
     Dimension GetTabBarHeight() const;
     void SetDivider(const TabsItemDivider& divider);
+    void SetDivider(const TabsItemDivider& divider, bool updateForSideBar);
     void SetDividerColorByUser(bool isByUser);
     void SetEffectNodeOption(const TabsEffectNodeOption& option);
     void SetTabBarMode(const TabBarMode& barMode);
@@ -78,9 +80,11 @@ public:
     void SetBarBackgroundBlurStyle(const BlurStyleOption& styleOption);
     void SetBarBackgroundColor(const Color& backgroundColor);
     void SetBarBackgroundEffect(const EffectOption& effectOption);
+    void SetKeepTabBarInSideBar(bool keep);
     uint32_t GetAnimationDuration();
     double GetTabBarTop();
     double GetTabBarBottom();
+    double GetSideBarWidth();
     std::size_t GetTabBarItemSize();
     RefPtr<FrameNode> GetTabBar();
     RefPtr<FrameNode> GetEffectNode();

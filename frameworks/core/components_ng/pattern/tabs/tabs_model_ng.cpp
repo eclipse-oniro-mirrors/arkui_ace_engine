@@ -288,6 +288,7 @@ void TabsModelNG::SetTabBarWidth(const Dimension& tabBarWidth)
 {
     ACE_CHECK_LPX_ATTRIBUTE(tabBarWidth, LpxAttribute::ALWAYS);
     ACE_UPDATE_LAYOUT_PROPERTY(TabsLayoutProperty, BarWidth, tabBarWidth);
+    ACE_UPDATE_LAYOUT_PROPERTY(TabsLayoutProperty, BarWidthForSideBar, tabBarWidth);
     auto tabsNode = AceType::DynamicCast<TabsNode>(ViewStackProcessor::GetInstance()->GetMainFrameNode());
     CHECK_NULL_VOID(tabsNode);
     auto tabBarNode = AceType::DynamicCast<FrameNode>(tabsNode->GetTabBar());
@@ -608,6 +609,7 @@ void TabsModelNG::SetDivider(const TabsItemDivider& divider)
         currentDivider.strokeWidth = Dimension(1.0f);
         currentDivider.isNull = true;
         ACE_UPDATE_LAYOUT_PROPERTY(TabsLayoutProperty, Divider, currentDivider);
+        ACE_UPDATE_LAYOUT_PROPERTY(TabsLayoutProperty, DividerForSideBar, currentDivider);
     } else {
         if (!isOnAnim) {
             dividerRenderContext->UpdateOpacity(1.0f);
@@ -616,6 +618,7 @@ void TabsModelNG::SetDivider(const TabsItemDivider& divider)
         ACE_CHECK_LPX_ATTRIBUTE(divider.endMargin, LpxAttribute::ALWAYS);
         ACE_CHECK_LPX_ATTRIBUTE(divider.strokeWidth, LpxAttribute::ALWAYS);
         ACE_UPDATE_LAYOUT_PROPERTY(TabsLayoutProperty, Divider, divider);
+        ACE_UPDATE_LAYOUT_PROPERTY(TabsLayoutProperty, DividerForSideBar, divider);
     }
 }
 
@@ -934,7 +937,7 @@ void TabsModelNG::SetOnContentDidScroll(FrameNode* frameNode, ContentDidScrollEv
     tabPattern->SetOnContentDidScroll(std::move(onContentDidScroll));
 }
 
-void TabsModelNG::SetDivider(FrameNode* frameNode, const TabsItemDivider& divider)
+void TabsModelNG::SetDivider(FrameNode* frameNode, const TabsItemDivider& divider, bool updateForSideBar)
 {
     CHECK_NULL_VOID(frameNode);
     auto tabsNode = AceType::DynamicCast<TabsNode>(frameNode);
@@ -955,6 +958,9 @@ void TabsModelNG::SetDivider(FrameNode* frameNode, const TabsItemDivider& divide
         currentDivider.strokeWidth = Dimension(1.0f);
         currentDivider.isNull = true;
         ACE_UPDATE_NODE_LAYOUT_PROPERTY(TabsLayoutProperty, Divider, currentDivider, frameNode);
+        if (updateForSideBar) {
+            ACE_UPDATE_NODE_LAYOUT_PROPERTY(TabsLayoutProperty, DividerForSideBar, currentDivider, frameNode);
+        }
     } else {
         if (!isOnAnim) {
             dividerRenderContext->UpdateOpacity(1.0f);
@@ -963,6 +969,9 @@ void TabsModelNG::SetDivider(FrameNode* frameNode, const TabsItemDivider& divide
         ACE_CHECK_NODE_LPX_ATTRIBUTE(divider.endMargin, LpxAttribute::ALWAYS, frameNode);
         ACE_CHECK_NODE_LPX_ATTRIBUTE(divider.strokeWidth, LpxAttribute::ALWAYS, frameNode);
         ACE_UPDATE_NODE_LAYOUT_PROPERTY(TabsLayoutProperty, Divider, divider, frameNode);
+        if (updateForSideBar) {
+            ACE_UPDATE_NODE_LAYOUT_PROPERTY(TabsLayoutProperty, DividerForSideBar, divider, frameNode);
+        }
     }
 }
 
@@ -1102,6 +1111,12 @@ void TabsModelNG::SetBarOverlap(FrameNode* frameNode, bool barOverlap)
     SetBarBackgroundBlurStyle(frameNode, option);
 }
 
+void TabsModelNG::SetKeepTabBarInSideBar(FrameNode* frameNode, bool keepTabBarInSideBar)
+{
+    CHECK_NULL_VOID(frameNode);
+    ACE_UPDATE_NODE_LAYOUT_PROPERTY(TabsLayoutProperty, KeepTabBarInSideBar, keepTabBarInSideBar, frameNode);
+}
+
 void TabsModelNG::SetIsVertical(FrameNode* frameNode, bool isVertical)
 {
     auto axis = isVertical ? Axis::VERTICAL : Axis::HORIZONTAL;
@@ -1170,10 +1185,13 @@ void TabsModelNG::SetScrollable(FrameNode* frameNode, bool scrollable)
     tabPattern->SetIsDisableSwipe(!scrollable);
 }
 
-void TabsModelNG::SetTabBarWidth(FrameNode* frameNode, const Dimension& tabBarWidth)
+void TabsModelNG::SetTabBarWidth(FrameNode* frameNode, const Dimension& tabBarWidth, bool updateForSideBar)
 {
     ACE_CHECK_NODE_LPX_ATTRIBUTE(tabBarWidth, LpxAttribute::ALWAYS, frameNode);
     ACE_UPDATE_NODE_LAYOUT_PROPERTY(TabsLayoutProperty, BarWidth, tabBarWidth, frameNode);
+    if (updateForSideBar) {
+        ACE_UPDATE_NODE_LAYOUT_PROPERTY(TabsLayoutProperty, BarWidthForSideBar, tabBarWidth, frameNode);
+    }
     auto tabsNode = AceType::DynamicCast<TabsNode>(frameNode);
     CHECK_NULL_VOID(tabsNode);
     auto tabBarNode = AceType::DynamicCast<FrameNode>(tabsNode->GetTabBar());
@@ -1531,6 +1549,11 @@ void TabsModelNG::SetCachedMaxCount(
         ACE_RESET_NODE_LAYOUT_PROPERTY(TabsLayoutProperty, CachedMaxCount, frameNode);
         ACE_RESET_NODE_LAYOUT_PROPERTY(TabsLayoutProperty, CacheMode, frameNode);
     }
+}
+
+void TabsModelNG::SetKeepTabBarInSideBar(bool keepTabBarInSideBar)
+{
+    ACE_UPDATE_LAYOUT_PROPERTY(TabsLayoutProperty, KeepTabBarInSideBar, keepTabBarInSideBar);
 }
 
 void TabsModelNG::SetOnChange(FrameNode* frameNode, std::function<void(const BaseEventInfo*)>&& onChange)

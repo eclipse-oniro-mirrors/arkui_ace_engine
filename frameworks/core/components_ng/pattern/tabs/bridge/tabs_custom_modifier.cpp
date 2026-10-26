@@ -107,13 +107,13 @@ void SetTabsBarBackgroundEffect(ArkUINodeHandle node, void* effectOption)
     TabsModelNG::SetBarBackgroundEffect(frameNode, *effect);
 }
 
-void SetTabsTabBarWidth(ArkUINodeHandle node, void* tabBarWidth)
+void SetTabsTabBarWidth(ArkUINodeHandle node, void* tabBarWidth, bool updateForSideBar)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
     auto* width = reinterpret_cast<Dimension*>(tabBarWidth);
     CHECK_NULL_VOID(frameNode);
     CHECK_NULL_VOID(width);
-    TabsModelNG::SetTabBarWidth(frameNode, *width);
+    TabsModelNG::SetTabBarWidth(frameNode, *width, updateForSideBar);
 }
 
 void SetTabsTabBarHeight(ArkUINodeHandle node, void* tabBarHeight)
@@ -125,13 +125,13 @@ void SetTabsTabBarHeight(ArkUINodeHandle node, void* tabBarHeight)
     TabsModelNG::SetTabBarHeight(frameNode, *height);
 }
 
-void SetTabsDivider(ArkUINodeHandle node, void* divider)
+void SetTabsDivider(ArkUINodeHandle node, void* divider, bool updateForSideBar)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
     auto* tabsDivider = reinterpret_cast<TabsItemDivider*>(divider);
     CHECK_NULL_VOID(frameNode);
     CHECK_NULL_VOID(tabsDivider);
-    TabsModelNG::SetDivider(frameNode, *tabsDivider);
+    TabsModelNG::SetDivider(frameNode, *tabsDivider, updateForSideBar);
 }
 
 void SetTabsEffectNodeOption(ArkUINodeHandle node, void* option)
@@ -325,6 +325,13 @@ int32_t GetBarDisplayMode(ArkUINodeHandle node)
     return static_cast<int32_t>(tabsController->GetBarDisplayMode());
 }
 
+void SetTabsKeepTabBarInSideBarCustom(ArkUINodeHandle node, ArkUI_Bool keep)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    TabsModelNG::SetKeepTabBarInSideBar(frameNode, keep);
+}
+
 void SetTabsTabBarClickInterceptCustom(ArkUINodeHandle node, ArkUI_Bool active)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
@@ -387,6 +394,7 @@ const ArkUITabsCustomModifier* GetTabsCustomModifier()
         .setTabBarOpacity = SetTabsTabBarOpacityCustom,
         .swipeTo = SwipeToCustom,
         .getBarDisplayMode = GetBarDisplayMode,
+        .setKeepTabBarInSideBar = SetTabsKeepTabBarInSideBarCustom,
         .setTabBarClickIntercept = SetTabsTabBarClickInterceptCustom,
         .tabBarClick = TabBarClickCustom,
     };

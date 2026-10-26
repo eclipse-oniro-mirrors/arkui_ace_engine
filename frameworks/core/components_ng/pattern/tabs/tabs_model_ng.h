@@ -96,6 +96,7 @@ public:
     void SetSidebarSearchableOptions(const TabsSidebarSearchableOptions& options) override;
     void SetBarDisplayModeBreakpoint(const TabBarDisplayModeBreakpoint& breakpoint) override;
     void SetOnBarDisplayModeChange(std::function<void(NG::TabBarDisplayMode)>&& onBarDisplayModeChange) override;
+    void SetKeepTabBarInSideBar(bool keepTabBarInSideBar) override;
 
     static void ProcessDimensionWithResourceObj(
         FrameNode* frameNode, const std::string& name, const RefPtr<ResourceObject>& resObj);
@@ -115,7 +116,7 @@ public:
     static void SetBarGridAlign(FrameNode* frameNode, const BarGridColumnOptions& BarGridColumnOptions);
     static void SetOnUnselected(FrameNode* frameNode, std::function<void(const BaseEventInfo* info)>&& onUnselected);
     static void SetOnContentDidScroll(FrameNode* frameNode, ContentDidScrollEvent&& onContentDidScroll);
-    static void SetDivider(FrameNode* frameNode, const TabsItemDivider& divider);
+    static void SetDivider(FrameNode* frameNode, const TabsItemDivider& divider, bool updateForSideBar = true);
     static void SetDividerColorByUser(FrameNode* frameNode, bool isByUser);
     static void SetEffectNodeOption(FrameNode* frameNode, const TabsEffectNodeOption& option);
     static void SetFadingEdge(FrameNode* frameNode, bool fadingEdge);
@@ -130,10 +131,11 @@ public:
     static void SetBarBackgroundBlurStyle(FrameNode* frameNode, const BlurStyleOption& styleOption,
         bool updateForSideBar = true);
     static void SetBarOverlap(FrameNode* frameNode, bool barOverlap);
+    static void SetKeepTabBarInSideBar(FrameNode* frameNode, bool keepTabBarInSideBar);
     static void SetIsVertical(FrameNode* frameNode, bool isVertical);
     static void SetTabBarPosition(FrameNode* frameNode, BarPosition tabBarPosition);
     static void SetScrollable(FrameNode* frameNode, bool scrollable);
-    static void SetTabBarWidth(FrameNode* frameNode, const Dimension& tabBarWidth);
+    static void SetTabBarWidth(FrameNode* frameNode, const Dimension& tabBarWidth, bool updateForSideBar = true);
     static void SetTabBarHeight(FrameNode* frameNode, const Dimension& tabBarHeight);
     static void SetAnimationCurve(FrameNode* frameNode, const RefPtr<Curve>& curve);
     static void SetAnimationDuration(FrameNode* frameNode, float duration);

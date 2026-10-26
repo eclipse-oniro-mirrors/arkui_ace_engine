@@ -209,7 +209,12 @@ public:
 
     RefPtr<UINode> GetEffectNode()
     {
-        return GetChildAtIndex(itemIndex_.effectIndex);
+        return GetChildAtIndex(GetEffectNodeIndex());
+    }
+
+    int32_t GetEffectNodeIndex()
+    {
+        return GetChildIndexById(GetEffectId());
     }
 
     ItemIndex GetItemIndex() const
