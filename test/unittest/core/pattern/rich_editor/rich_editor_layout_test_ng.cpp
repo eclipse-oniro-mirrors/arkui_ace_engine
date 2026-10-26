@@ -727,7 +727,7 @@ HWTEST_F(RichEditorLayoutTestNg, UpdateTextFieldManager001, TestSize.Level2)
     ASSERT_NE(richEditorPattern, nullptr);
     auto property = richEditorPattern->GetLayoutProperty<RichEditorLayoutProperty>();
     ASSERT_NE(property, nullptr);
-    property->UpdatePreviewTextStyle("underline");
+    richEditorPattern->ReceivePreviewTextStyle("underline");
     auto richEditorController = richEditorPattern->GetRichEditorController();
     ASSERT_NE(richEditorController, nullptr);
     auto focusHub = richEditorNode_->GetOrCreateFocusHub();
