@@ -3599,7 +3599,8 @@ ScrollResult ScrollablePattern::HandleScroll(float offset, int32_t source, Neste
     }
     bool moved = HandleScrollImpl(offset, source);
     NotifyMoved(moved);
-    if (NearZero(offset) && (source == SCROLL_FROM_UPDATE || source == SCROLL_FROM_AXIS)) {
+    if (NearZero(offset) && (source == SCROLL_FROM_UPDATE || source == SCROLL_FROM_AXIS ||
+        source == SCROLL_FROM_CROWN)) {
         scrollSourceForQuery_ = savedQuerySource;
     }
     return result;
