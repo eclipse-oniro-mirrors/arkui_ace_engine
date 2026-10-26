@@ -46,8 +46,7 @@ void BuildWavyPath(RSPath& path, float left, float width, float baseline, float 
         double x1 = half;
         double y1 = half * sign;
         double x2 = remaining;
-        double y2 = (remaining - remaining * remaining
-            / (quarterWave * WAVE_PERIOD_FACTOR)) * sign;
+        double y2 = (remaining - remaining * remaining / (quarterWave * WAVE_PERIOD_FACTOR)) * sign;
         path.RQuadTo(x1, y1, x2, y2);
     }
 }
