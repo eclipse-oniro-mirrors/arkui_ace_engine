@@ -105,6 +105,7 @@ public:
 
         AddResource(RES_FAMILY_ID, FAMILY_BY_NUMBER);
         AddResource(RES_FAMILY_NAME, FAMILY_BY_STRING);
+        AddMockResourceData(static_cast<uint32_t>(std::get<0>(INVALID_ID_COLOR)), Color(0xFFFF0000));
     }
 };
 
