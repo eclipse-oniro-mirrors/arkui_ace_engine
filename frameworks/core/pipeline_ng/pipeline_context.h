@@ -100,6 +100,7 @@ class ToolbarManager;
 class UIExtensionManager;
 class AccessibilityManagerNG;
 class ForceSplitManager;
+class HandednessManager;
 class RecoverableManager;
 class FormVisibleManager;
 class FormEventManager;
@@ -139,7 +140,7 @@ public:
         RefPtr<AssetManager> assetManager, const RefPtr<Frontend>& frontend, int32_t instanceId);
     PipelineContext();
 
-    ~PipelineContext() override = default;
+    ~PipelineContext() override;
 
     static RefPtr<PipelineContext> GetCurrentContext();
 
@@ -893,6 +894,8 @@ public:
     const RefPtr<NavigationManager>& GetNavigationManager() const;
 
     const RefPtr<ForceSplitManager>& GetForceSplitManager() const;
+
+    const RefPtr<HandednessManager>& GetHandednessManager() const;
 
     const RefPtr<RecoverableManager>& GetRecoverableManager() const;
 
@@ -1699,6 +1702,7 @@ private:
     std::once_flag scrollPlaceholderOnceFlag_;
     RefPtr<NavigationManager> navigationMgr_;
     RefPtr<ForceSplitManager> forceSplitMgr_;
+    RefPtr<HandednessManager> handednessManager_;
     RefPtr<RecoverableManager> recoverableMgr_;
     RefPtr<FormVisibleManager> formVisibleMgr_;
     RefPtr<FormEventManager> formEventMgr_;

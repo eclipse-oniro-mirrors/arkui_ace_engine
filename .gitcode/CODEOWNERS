@@ -2424,6 +2424,7 @@ frameworks/core/components_ng/manager/force_split/ @arkui_navigation
 frameworks/core/components_ng/manager/frame_rate/ @arkui_framework_xnode
 frameworks/core/components_ng/manager/full_screen/ @arkuilayout1
 frameworks/core/components_ng/manager/gesture_debug/ @ArkUI_Event
+frameworks/core/components_ng/manager/handedness/ @arkuilayout1
 frameworks/core/components_ng/manager/memory/ @arkui001
 frameworks/core/components_ng/manager/navigation/ @arkui_navigation
 frameworks/core/components_ng/manager/post_event/ @ArkUI_Event
@@ -3640,6 +3641,7 @@ test/unittest/core/manager/ @ArkUI_Event
 test/unittest/core/manager/avoid_info_manager_test_ng.cpp @arkui_navigation
 test/unittest/core/manager/content_change_manager_test_ng.cpp @arkui_framework_xnode
 test/unittest/core/manager/force_split_manager_test_ng.cpp @arkui_navigation
+test/unittest/core/manager/handedness_manager_test_ng.cpp @arkuilayout1
 test/unittest/core/manager/navigation_manager_test_ng.cpp @arkui_navigation
 test/unittest/core/manager/safe_area_manager_test_ng.cpp @arkuilayout1
 test/unittest/core/manager/component_tree_query_test_ng.cpp @arkuiscroll

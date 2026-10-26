@@ -529,6 +529,8 @@ private:
     void SetResponseLinkRecognizers(
         const TouchTestResult& result, const ResponseLinkResult& responseLinkRecognizers, bool isPostEvent = false);
     void FalsifyHoverCancelEventAndDispatch(const TouchEvent& touchPoint);
+    void UpdateHandednessOnTouchDown(const TouchEvent& event);
+    void UpdateHandednessOnTouchUp(const TouchEvent& event);
     void UpdateDragInfo(TouchEvent& point);
     void UpdateInfoWhenFinishDispatch(const TouchEvent& point, bool sendOnTouch);
     void EraseEventRefereeWithStrategy(const TouchEvent& point);

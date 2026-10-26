@@ -204,6 +204,17 @@ if (!is_host_product) {
   }
 }
 
+if (!is_host_product) {
+  ace_unittest("handedness_manager_test_ng") {
+    module_name = "Component-Layout"
+    type = "new"
+    sources = [
+      "$ace_root/test/mock/frameworks/core/common/mock_window.cpp",
+      "handedness_manager_test_ng.cpp",
+    ]
+  }
+}
+
 ace_unittest("frame_rate_manager_test_ng") {
   module_name = "StateManagement-InComponent"
   type = "new"
@@ -478,6 +489,9 @@ group("core_manager_unittest") {
     ":theme_manager_test_ng",
   ]
   if (!is_host_product) {
-    deps += [ ":force_split_manager_test_ng" ]
+    deps += [
+      ":force_split_manager_test_ng",
+      ":handedness_manager_test_ng",
+    ]
   }
 }

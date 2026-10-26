@@ -50,6 +50,12 @@ template("ace_core_pipeline_ng_source_set") {
 
     deps = []
     external_deps = []
+    if (current_os == "ohos" && defined(global_parts_info.msdp_motion)) {
+      external_deps += [
+        "motion:motion_client",
+        "motion:motion_interface_native",
+      ]
+    }
     if (use_hilog) {
       external_deps += [ "hilog:libhilog" ]
     }
