@@ -1780,4 +1780,1199 @@ HWTEST_F(ListFastScrollLazyGridTestNg, FastScrollColdTargetGridReestablishesSuff
     EXPECT_NE(builder_->GetBuiltItem(2999), nullptr);
 }
 
+/**
+ * @tc.name: FastScrollColdTargetGroupReestablishesSuffix001
+ * @tc.desc: A newly built target Group restores its measured tail before laying out a distant viewport.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollLayoutTestNg, FastScrollColdTargetGroupReestablishesSuffix001, TestSize.Level1)
+{
+    auto builder = CreateLargeLazyGroup(false, 80, false);
+    ASSERT_TRUE(builder->GetCreatedIndices().empty());
+    auto group = GetChildFrameNode(frameNode_, 80);
+    ASSERT_NE(group, nullptr);
+    auto algorithm = AceType::MakeRefPtr<ListLayoutAlgorithm>();
+    algorithm->axis_ = Axis::VERTICAL;
+    algorithm->contentMainSize_ = HEIGHT;
+    algorithm->startMainPos_ = 0.0f;
+    algorithm->endMainPos_ = HEIGHT;
+    algorithm->listLayoutProperty_ = layoutProperty_;
+    algorithm->childLayoutConstraint_ = layoutProperty_->CreateChildConstraint();
+    OptionalSizeF listSize;
+    listSize.SetWidth(WIDTH);
+    listSize.SetHeight(HEIGHT);
+    algorithm->UpdateListItemConstraint(Axis::VERTICAL, listSize, algorithm->childLayoutConstraint_);
+    algorithm->SetFastScrollTarget(80, ScrollAlign::END);
+    float size = 0.0f;
+    ASSERT_TRUE(algorithm->MeasureFastScrollItem(AceType::RawPtr(frameNode_), 80, 2500.0f, false, size));
+    auto prepared = algorithm->GetFastScrollPreparedLayouts();
+    ASSERT_NE(prepared, nullptr);
+    ASSERT_EQ(prepared->count(80), 1u);
+    algorithm->ResetLayoutItem(AceType::RawPtr(frameNode_));
+    algorithm->SetListItemGroupParam(group, 80, -97500.0f, true, layoutProperty_, false);
+    auto groupAlgorithm = AceType::DynamicCast<ListItemGroupLayoutAlgorithm>(
+        group->GetLayoutAlgorithm()->GetLayoutAlgorithm());
+    ASSERT_NE(groupAlgorithm, nullptr);
+    EXPECT_EQ(groupAlgorithm->GetPreparedGeometry(), prepared->at(80));
+    group->Measure(algorithm->childLayoutConstraint_);
+    EXPECT_TRUE(algorithm->GetFastScrollState()->premeasuredItems.empty());
+    EXPECT_FALSE(groupAlgorithm->IsPremeasureOnly());
+    const auto& created = builder->GetCreatedIndices();
+    EXPECT_EQ(std::count_if(created.begin(), created.end(), [](int32_t index) {
+        return index >= 100 && index < 900;
+    }), 0);
+    EXPECT_NE(created.count(INNER_ITEM_COUNT - 1), 0);
+}
+
+/**
+ * @tc.name: FastScrollColdOuterGroupEndOffsetSkipsInnerMiddle001
+ * @tc.desc: A distant Group retains its suffix across the full animated extra-offset request.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollLayoutTestNg, FastScrollColdOuterGroupEndOffsetSkipsInnerMiddle001, TestSize.Level1)
+{
+    auto builder = CreateLargeLazyGroup(false, 80, false);
+    ASSERT_TRUE(builder->GetCreatedIndices().empty());
+    MockAnimationManager::GetInstance().SetTicks(4);
+    pattern_->ScrollToIndexFastScroll(80, true, ScrollAlign::END, -2100.0f, FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    DriveFastScroll();
+    EXPECT_FALSE(pattern_->GetFastScrollRequest());
+    const auto& created = builder->GetCreatedIndices();
+    EXPECT_EQ(std::count_if(created.begin(), created.end(), [](int32_t index) {
+        return index >= 100 && index < 900;
+    }), 0);
+    EXPECT_NEAR(pattern_->GetItemRectInGroup(80, 975).Top(), 0.0f, 0.1f);
+}
+
+/**
+ * @tc.name: FastScrollOuterGroupRebuildRestoresSuffix001
+ * @tc.desc: Actual LazyForEach recycling rebuilds an uneven Group and restores its suffix without the middle.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollLayoutTestNg, FastScrollOuterGroupRebuildRestoresSuffix001, TestSize.Level1)
+{
+    auto model = CreateList();
+    model.SetCachedCount(0);
+    auto inner = AceType::MakeRefPtr<FastScrollInnerBuilder>(true);
+    auto outer = AceType::MakeRefPtr<FastScrollOuterGroupBuilder>(inner);
+    auto stack = ViewStackProcessor::GetInstance();
+    stack->StartGetAccessRecordingFor(GetElmtId());
+    LazyForEachModelNG lazy;
+    lazy.Create(RefPtr<LazyForEachBuilder>(outer));
+    stack->Pop();
+    stack->StopGetAccessRecording();
+    CreateDone();
+    ASSERT_TRUE(outer->GetGroupIds().empty());
+    MockAnimationManager::GetInstance().SetTicks(4);
+    pattern_->ScrollToIndexFastScroll(80, true, ScrollAlign::END, -2100.0f, FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    DriveFastScroll();
+    ASSERT_FALSE(pattern_->GetFastScrollRequest());
+    EXPECT_EQ(outer->GetGroupIds().size(), 2);
+    EXPECT_EQ(outer->GetGroupIds().count(ElementRegister::UndefinedElementId), 0);
+    EXPECT_EQ(std::count_if(inner->GetCreatedIndices().begin(), inner->GetCreatedIndices().end(),
+        [](int32_t index) { return index >= 100 && index < 900; }), 0);
+    const auto item = pattern_->GetItemRectInGroup(80, 994);
+    EXPECT_NEAR(item.Height(), 300.0f, 0.1f);
+    EXPECT_NEAR(item.Top(), HEIGHT - 300.0f, 1.0f);
+}
+
+/**
+ * @tc.name: FastScrollUnevenGroupEndOffsetKeepsVisibleSuffix001
+ * @tc.desc: The Group's own tail coordinates keep the real suffix aligned as its size estimate changes.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollLayoutTestNg, FastScrollUnevenGroupEndOffsetKeepsVisibleSuffix001, TestSize.Level1)
+{
+    auto builder = CreateLargeLazyGroup(false, 80, false, true);
+    MockAnimationManager::GetInstance().SetTicks(4);
+    pattern_->ScrollToIndexFastScroll(80, true, ScrollAlign::END, -2100.0f, FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    DriveFastScroll();
+    EXPECT_FALSE(pattern_->GetFastScrollRequest());
+    EXPECT_EQ(std::count_if(builder->GetCreatedIndices().begin(), builder->GetCreatedIndices().end(),
+        [](int32_t index) { return index >= 100 && index < 900; }), 0);
+    EXPECT_NEAR(pattern_->GetItemRectInGroup(80, 994).Top(), HEIGHT - 300.0f, 1.0f);
+}
+
+class ListFastScrollGroupBoundaryTestNg : public ListFastScrollLayoutTestNg,
+    public testing::WithParamInterface<std::tuple<Axis, TextDirection, bool, bool>> {
+public:
+    RefPtr<FastScrollInnerBuilder> CreateBoundaryGroup()
+    {
+        const auto [axis, direction, stackFromEnd, decorated] = GetParam();
+        auto model = CreateList();
+        model.SetListDirection(axis);
+        model.SetStackFromEnd(stackFromEnd);
+        ViewAbstract::SetLayoutDirection(direction);
+        CreateListItems(OUTER_TARGET_INDEX);
+        auto group = CreateListItemGroup();
+        if (decorated) {
+            group.SetSpace(Dimension(SPACE));
+            group.SetHeader(GetRowOrColBuilder(FILL_LENGTH, Dimension(30.0f)));
+            group.SetFooter(GetRowOrColBuilder(FILL_LENGTH, Dimension(70.0f)));
+            SetBoundaryInsets(axis);
+        }
+        auto builder = AceType::MakeRefPtr<FastScrollInnerBuilder>(true, axis);
+        auto stack = ViewStackProcessor::GetInstance();
+        stack->StartGetAccessRecordingFor(GetElmtId());
+        LazyForEachModelNG lazy;
+        lazy.Create(RefPtr<LazyForEachBuilder>(builder));
+        stack->Pop();
+        stack->StopGetAccessRecording();
+        stack->Pop();
+        stack->StopGetAccessRecording();
+        CreateListItems(TRAILING_ITEM_COUNT);
+        CreateDone();
+        MockAnimationManager::GetInstance().SetTicks(PREMEASURE_ANIMATION_TICKS);
+        return builder;
+    }
+
+    void SetBoundaryInsets(Axis axis)
+    {
+        auto property = ViewStackProcessor::GetInstance()->GetMainFrameNode()->GetLayoutProperty();
+        MarginProperty margin;
+        PaddingProperty padding;
+        if (axis == Axis::VERTICAL) {
+            margin.top = CalcLength(11.0f);
+            margin.bottom = CalcLength(17.0f);
+            padding.top = CalcLength(13.0f);
+            padding.bottom = CalcLength(19.0f);
+        } else {
+            margin.left = CalcLength(11.0f);
+            margin.right = CalcLength(17.0f);
+            padding.left = CalcLength(13.0f);
+            padding.right = CalcLength(19.0f);
+        }
+        property->UpdateMargin(margin);
+        property->UpdatePadding(padding);
+    }
+
+    void ExpectSuffix(float extraOffset)
+    {
+        constexpr float sizes[] = { 200.0f, 600.0f, 300.0f, 500.0f };
+        const auto [axis, direction, stackFromEnd, decorated] = GetParam();
+        const float viewport = pattern_->contentMainSize_;
+        const bool reverse = axis == Axis::HORIZONTAL && direction == TextDirection::RTL;
+        const float trailingInset = reverse ? 11.0f + 13.0f : 17.0f + 19.0f;
+        float suffix = decorated ? 70.0f + trailingInset : 0.0f;
+        int32_t checked = 0;
+        for (int32_t index = INNER_ITEM_COUNT - 1; index >= SUFFIX_START_INDEX; --index) {
+            const float size = sizes[index % 4];
+            suffix += size;
+            const float start = viewport - extraOffset - suffix;
+            if (start < viewport && start + size > 0.0f) {
+                const auto rect = pattern_->GetItemRectInGroup(80, index);
+                EXPECT_NEAR(axis == Axis::VERTICAL ? rect.Height() : rect.Width(), size, 0.1f) << index;
+                EXPECT_NEAR(axis == Axis::VERTICAL ? rect.Top() : rect.Left(),
+                    reverse ? viewport - start - size : start, 1.0f) << index;
+                ++checked;
+            }
+            suffix += decorated ? SPACE : 0.0f;
+        }
+        EXPECT_GT(checked, 0);
+    }
+};
+
+/**
+ * @tc.name: FastScrollUnevenGroupBoundaryRoundTrip001
+ * @tc.desc: Real suffix geometry survives repeated END offsets, both axes, RTL and stack-from-end.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollGroupBoundaryTestNg, FastScrollUnevenGroupBoundaryRoundTrip001, TestSize.Level1)
+{
+    auto builder = CreateBoundaryGroup();
+    for (float extraOffset : { -2100.0f, -900.0f, -2100.0f }) {
+        SCOPED_TRACE(testing::Message() << "extraOffset=" << extraOffset);
+        pattern_->ScrollToIndexFastScroll(80, true, ScrollAlign::END, extraOffset,
+            FastScrollMode::SKIP_CREATE_AND_MEASURE);
+        DriveFastScroll();
+        ASSERT_FALSE(pattern_->GetFastScrollRequest());
+        ExpectSuffix(extraOffset);
+        EXPECT_EQ(std::count_if(builder->GetCreatedIndices().begin(), builder->GetCreatedIndices().end(),
+            [](int32_t index) { return index >= 100 && index < 900; }), 0)
+            << testing::PrintToString(builder->GetCreatedIndices());
+    }
+}
+
+INSTANTIATE_TEST_SUITE_P(Direction, ListFastScrollGroupBoundaryTestNg,
+    testing::Combine(testing::Values(Axis::VERTICAL, Axis::HORIZONTAL),
+        testing::Values(TextDirection::LTR, TextDirection::RTL), testing::Bool(), testing::Bool()));
+
+/**
+ * @tc.name: FastScrollLazySuffixPreparationMeasuresBody001
+ * @tc.desc: Suffix preparation measures real body nodes without displaying them or replacing the current viewport.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollLazyGridTestNg, FastScrollLazySuffixPreparationMeasuresBody001, TestSize.Level1)
+{
+    CreateUnevenLazyGrid(false);
+    auto first = builder_->GetBuiltItem(0);
+    ASSERT_NE(first, nullptr);
+    const auto firstRect = first->GetGeometryNode()->GetFrameRect();
+    const auto info = grid_->GetPattern<LazyGridLayoutPattern>()->layoutInfo_;
+    const auto visible = std::make_pair(info->visibleStartIndex_, info->visibleEndIndex_);
+    MockAnimationManager::GetInstance().SetTicks(4);
+    pattern_->ScrollToIndexFastScroll(0, true, ScrollAlign::END, -2100.0f, FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    FlushUITasks();
+    ASSERT_TRUE(pattern_->GetFastScrollRequest());
+    ASSERT_EQ(pattern_->GetFastScrollPreparation()->preparation, FastScrollPreparation::READY);
+    EXPECT_FLOAT_EQ(pattern_->GetTotalOffset(), 0.0f);
+    EXPECT_EQ(std::make_pair(info->visibleStartIndex_, info->visibleEndIndex_), visible);
+    EXPECT_EQ(first->GetGeometryNode()->GetFrameRect(), firstRect);
+    for (int32_t index = INNER_ITEM_COUNT - 5; index < INNER_ITEM_COUNT; ++index) {
+        auto item = builder_->GetBuiltItem(index);
+        ASSERT_NE(item, nullptr) << "prepared suffix item=" << index;
+        EXPECT_FALSE(item->IsActive()) << "prepared suffix item=" << index;
+        EXPECT_NEAR(item->GetGeometryNode()->GetFrameSize().Height(), TALL_ITEM_SIZE, 0.1f) << "item=" << index;
+        EXPECT_TRUE(item->GetGeometryNode()->GetParentLayoutConstraint().has_value()) << "item=" << index;
+    }
+    DriveFastScroll(grid_, builder_);
+    EXPECT_FALSE(pattern_->GetFastScrollRequest());
+    EXPECT_FALSE(info->NeedPredict());
+    ExpectLazyItemAt(INNER_ITEM_COUNT - 5, 0.0f);
+}
+
+class ListLazyGridStraddlingTestNg : public ListFastScrollLazyGridTestNg,
+    public testing::WithParamInterface<bool> {};
+
+/**
+ * @tc.name: FastScrollLazyStartOffsetStraddlesPreviousItem
+ * @tc.desc: A START offset keeps both the preceding ordinary item and the lazy prefix at their real coordinates.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListLazyGridStraddlingTestNg, FastScrollLazyStartOffsetStraddlesPreviousItem, TestSize.Level1)
+{
+    CreateUnevenLazyGrid(GetParam(), 2);
+    MockAnimationManager::GetInstance().SetTicks(4);
+    pattern_->ScrollToIndexFastScroll(2, true, ScrollAlign::START, -50.0f, FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    DriveFastScroll(grid_, builder_);
+    ASSERT_FALSE(pattern_->GetFastScrollRequest());
+    auto previous = GetChildFrameNode(frameNode_, 1);
+    ASSERT_NE(previous, nullptr);
+    EXPECT_TRUE(previous->IsActive());
+    EXPECT_NEAR(previous->GetGeometryNode()->GetFrameRect().Top(), -50.0f, 0.1f);
+    EXPECT_NEAR(previous->GetGeometryNode()->GetFrameRect().Bottom(), 50.0f, 0.1f);
+    for (int32_t index = 0; index < 4; ++index) {
+        ExpectLazyItemAt(index, 50.0f + index * ITEM_MAIN_SIZE);
+    }
+}
+
+/**
+ * @tc.name: FastScrollLazyEndOffsetStraddlesFollowingItems
+ * @tc.desc: An END offset keeps the real lazy suffix and the following ordinary items in the same viewport.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListLazyGridStraddlingTestNg, FastScrollLazyEndOffsetStraddlesFollowingItems, TestSize.Level1)
+{
+    CreateUnevenLazyGrid(GetParam(), 2);
+    MockAnimationManager::GetInstance().SetTicks(4);
+    pattern_->ScrollToIndexFastScroll(2, true, ScrollAlign::END, 150.0f, FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    DriveFastScroll(grid_, builder_);
+    ASSERT_FALSE(pattern_->GetFastScrollRequest());
+    ExpectLazyItemAt(INNER_ITEM_COUNT - 1, HEIGHT - 150.0f - TALL_ITEM_SIZE);
+    for (int32_t index = 0; index < 2; ++index) {
+        auto following = GetChildFrameNode(frameNode_, 3 + index);
+        ASSERT_NE(following, nullptr);
+        EXPECT_TRUE(following->IsActive());
+        EXPECT_NEAR(following->GetGeometryNode()->GetFrameRect().Top(),
+            HEIGHT - 150.0f + index * ITEM_MAIN_SIZE, 0.1f);
+        EXPECT_NEAR(following->GetGeometryNode()->GetFrameSize().Height(), ITEM_MAIN_SIZE, 0.1f);
+    }
+}
+
+INSTANTIATE_TEST_SUITE_P(OuterSize, ListLazyGridStraddlingTestNg, testing::Bool());
+
+/**
+ * @tc.name: FastScrollLazyChildCompletesWithPendingCache001
+ * @tc.desc: A reached target finishes without waiting for its own or a neighboring lazy cache to be filled.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollLazyGridTestNg, FastScrollLazyChildCompletesWithPendingCache001, TestSize.Level1)
+{
+    CreateUnevenLazyGrid();
+    auto gridPattern = grid_->GetPattern<LazyGridLayoutPattern>();
+    ASSERT_NE(gridPattern, nullptr);
+    auto info = gridPattern->layoutInfo_;
+    ASSERT_NE(info, nullptr);
+    info->totalItemCount_ = INNER_ITEM_COUNT;
+    info->layoutedEndIndex_ = 0;
+    info->layoutedEnd_ = 0.0f;
+    info->cacheEndPos_ = ITEM_MAIN_SIZE;
+    auto lazyItem = pattern_->itemPosition_.at(0);
+    pattern_->itemPosition_.at(0).isLazyChild = false;
+    pattern_->itemPosition_[1] = lazyItem;
+
+    ASSERT_TRUE(info->NeedPredict());
+    pattern_->InitializeFastScrollRequest(0, ScrollAlign::START, 0.0f, FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    pattern_->GetOrCreateFastScrollPreparation().preparation = FastScrollPreparation::READY;
+    EXPECT_TRUE(pattern_->HandleFastScrollTargetReached(pattern_->currentOffset_));
+    EXPECT_FALSE(pattern_->GetFastScrollRequest());
+    EXPECT_TRUE(info->NeedPredict());
+
+    pattern_->itemPosition_.erase(1);
+    pattern_->itemPosition_.at(0) = lazyItem;
+    pattern_->InitializeFastScrollRequest(0, ScrollAlign::START, 0.0f, FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    pattern_->GetOrCreateFastScrollPreparation().preparation = FastScrollPreparation::READY;
+    EXPECT_TRUE(pattern_->HandleFastScrollTargetReached(pattern_->currentOffset_));
+    EXPECT_FALSE(pattern_->GetFastScrollRequest());
+    EXPECT_TRUE(info->NeedPredict());
+}
+
+/**
+ * @tc.name: FastScrollLayoutRebaseKeepsCompressedSegment001
+ * @tc.desc: Estimation rebasing must not restart an active compressed animation segment.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollLayoutTestNg, FastScrollLayoutRebaseKeepsCompressedSegment001, TestSize.Level1)
+{
+    CreateList();
+    CreateListItems(TOTAL_ITEM_NUMBER);
+    CreateDone();
+    pattern_->InitializeFastScrollRequest(TOTAL_ITEM_NUMBER - 1, ScrollAlign::END, 0.0f,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    ASSERT_TRUE(pattern_->EstimateFastScrollPositions());
+    pattern_->StartFastScrollAnimation(TOTAL_ITEM_NUMBER * ITEM_MAIN_SIZE - HEIGHT);
+    pattern_->currentOffset_ = ITEM_MAIN_SIZE;
+
+    pattern_->CheckAndUpdateAnimateTo(0.0f, 0.0f);
+
+    EXPECT_TRUE(pattern_->AnimateRunning());
+    EXPECT_NEAR(pattern_->GetFastScrollRequest()->targetOffset,
+        TOTAL_ITEM_NUMBER * ITEM_MAIN_SIZE - HEIGHT, 0.1f);
+}
+
+/**
+ * @tc.name: FastScrollRetainedAnimationRequeues001
+ * @tc.desc: Restarting a property after its finished animation was pruned must drive the new segment.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollLayoutTestNg, FastScrollRetainedAnimationRequeues001, TestSize.Level1)
+{
+    auto& manager = MockAnimationManager::GetInstance();
+    auto property = AceType::MakeRefPtr<AnimatablePropertyFloat>(0.0f);
+    manager.SetTicks(1);
+    manager.OpenAnimation();
+    manager.AddActiveProp(property);
+    const auto firstHandles = manager.CloseAnimation();
+    ASSERT_EQ(firstHandles.size(), 1);
+    manager.Tick();
+    ASSERT_TRUE(manager.AllFinished());
+    manager.OpenAnimation();
+    manager.AddActiveProp(property);
+    const auto nextHandles = manager.CloseAnimation();
+    EXPECT_EQ(nextHandles.size(), 1);
+    EXPECT_FALSE(manager.AllFinished());
+    EXPECT_FALSE(firstHandles.front()->Finished());
+    manager.Tick();
+    EXPECT_TRUE(firstHandles.front()->Finished());
+    EXPECT_TRUE(manager.AllFinished());
+}
+
+class ListFastScrollGroupTestNg : public ListFastScrollLayoutTestNg,
+    public testing::WithParamInterface<bool> {
+protected:
+    RefPtr<FastScrollInnerBuilder> CreateSpacedGroup()
+    {
+        auto model = CreateList();
+        if (GetParam()) {
+            auto sizes = model.GetOrCreateListChildrenMainSize();
+            sizes->UpdateDefaultSize(ITEM_MAIN_SIZE);
+            sizes->ChangeData(0, 1, { INNER_ITEM_COUNT * ITEM_MAIN_SIZE + (INNER_ITEM_COUNT - 1) * SPACE });
+        }
+        auto group = CreateListItemGroup();
+        group.SetSpace(Dimension(SPACE));
+        if (GetParam()) {
+            group.GetOrCreateListChildrenMainSize()->UpdateDefaultSize(ITEM_MAIN_SIZE);
+        }
+        auto builder = AceType::MakeRefPtr<FastScrollInnerBuilder>();
+        auto stack = ViewStackProcessor::GetInstance();
+        stack->StartGetAccessRecordingFor(GetElmtId());
+        LazyForEachModelNG lazyModel;
+        lazyModel.Create(RefPtr<LazyForEachBuilder>(builder));
+        stack->Pop();
+        stack->StopGetAccessRecording();
+        stack->Pop();
+        stack->StopGetAccessRecording();
+        CreateListItems(TRAILING_ITEM_COUNT);
+        CreateDone();
+        return builder;
+    }
+
+    int32_t CountMiddleItems(const RefPtr<FastScrollInnerBuilder>& builder) const
+    {
+        const auto& created = builder->GetCreatedIndices();
+        return std::count_if(created.begin(), created.end(), [](int32_t index) {
+            return index >= MIDDLE_START_INDEX && index < SUFFIX_START_INDEX;
+        });
+    }
+};
+
+/**
+ * @tc.name: FastScrollGroupEndSkipsInnerMiddle001
+ * @tc.desc: A fast END request skips inner lazy items while aligning the actual last child.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollGroupTestNg, FastScrollGroupEndSkipsInnerMiddle001, TestSize.Level1)
+{
+    const auto builder = CreateLargeLazyGroup(GetParam(), 0, GetParam());
+    ASSERT_EQ(builder->GetCreatedIndices().count(0), 1);
+    ASSERT_EQ(builder->GetCreatedIndices().count(INNER_ITEM_COUNT - 1), 0);
+    MockAnimationManager::GetInstance().SetTicks(4);
+    pattern_->ScrollToIndexFastScroll(0, true, ScrollAlign::END, std::nullopt, FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    DriveFastScroll();
+    EXPECT_FALSE(pattern_->GetFastScrollRequest());
+    const auto lastItem = pattern_->GetItemRectInGroup(0, INNER_ITEM_COUNT - 1);
+    EXPECT_NEAR(lastItem.Height(), ITEM_MAIN_SIZE, 0.1f);
+    EXPECT_NEAR(lastItem.Bottom(), pattern_->contentMainSize_, 0.1f);
+    EXPECT_EQ(builder->GetCreatedIndices().count(INNER_ITEM_COUNT - 1), 1);
+    const auto& created = builder->GetCreatedIndices();
+    const auto middleCount = std::count_if(created.begin(), created.end(), [](int32_t index) {
+        return index >= 100 && index < 900;
+    });
+    EXPECT_EQ(middleCount, 0) << "Intermediate group children were created during the skipped interval";
+}
+
+/**
+ * @tc.name: FastScrollGroupStartSkipsInnerMiddle001
+ * @tc.desc: A backward fast request uses the group end reference without creating skipped children.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollGroupTestNg, FastScrollGroupStartSkipsInnerMiddle001, TestSize.Level1)
+{
+    const auto builder = CreateLargeLazyGroup(GetParam(), 0, GetParam());
+    pattern_->ScrollToItemInGroup(0, INNER_ITEM_COUNT - 1, false, ScrollAlign::END);
+    FlushUITasks();
+    ASSERT_NEAR(pattern_->GetItemRectInGroup(0, INNER_ITEM_COUNT - 1).Bottom(), pattern_->contentMainSize_, 0.1f);
+    ASSERT_EQ(CountMiddleItems(builder), 0);
+    MockAnimationManager::GetInstance().SetTicks(4);
+    pattern_->ScrollToIndexFastScroll(0, true, ScrollAlign::START, std::nullopt,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    DriveFastScroll();
+    EXPECT_FALSE(pattern_->GetFastScrollRequest());
+    const auto firstItem = pattern_->GetItemRectInGroup(0, 0);
+    EXPECT_NEAR(firstItem.Height(), ITEM_MAIN_SIZE, 0.1f);
+    EXPECT_NEAR(firstItem.Top(), 0.0f, 0.1f);
+    EXPECT_EQ(CountMiddleItems(builder), 0);
+}
+
+/**
+ * @tc.name: FastScrollGroupSpacedRoundTrip001
+ * @tc.desc: Forward and backward window anchors include group spacing and retain the correct edge rows.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollGroupTestNg, FastScrollGroupSpacedRoundTrip001, TestSize.Level1)
+{
+    const auto builder = CreateSpacedGroup();
+    MockAnimationManager::GetInstance().SetTicks(4);
+    pattern_->ScrollToIndexFastScroll(0, true, ScrollAlign::END, std::nullopt, FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    DriveFastScroll();
+    const auto lastItem = pattern_->GetItemRectInGroup(0, INNER_ITEM_COUNT - 1);
+    EXPECT_NEAR(lastItem.Height(), ITEM_MAIN_SIZE, 0.1f);
+    EXPECT_NEAR(lastItem.Bottom(), pattern_->contentMainSize_, 0.1f);
+    EXPECT_EQ(CountMiddleItems(builder), 0);
+    pattern_->ScrollToIndexFastScroll(0, true, ScrollAlign::START, std::nullopt,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    DriveFastScroll();
+    const auto firstItem = pattern_->GetItemRectInGroup(0, 0);
+    EXPECT_NEAR(firstItem.Height(), ITEM_MAIN_SIZE, 0.1f);
+    EXPECT_NEAR(firstItem.Top(), 0.0f, 0.1f);
+    EXPECT_EQ(CountMiddleItems(builder), 0);
+}
+
+/**
+ * @tc.name: FastScrollGroupSmallDistance001
+ * @tc.desc: A sub-viewport request retains normal group layout with known and unknown sizes.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollGroupTestNg, FastScrollGroupSmallDistance001, TestSize.Level1)
+{
+    const auto builder = CreateSpacedGroup();
+    pattern_->ScrollToItemInGroup(0, 2, false, ScrollAlign::START);
+    FlushUITasks();
+    ASSERT_NEAR(pattern_->GetItemRectInGroup(0, 2).Top(), 0.0f, 0.1f);
+    ASSERT_LT(pattern_->GetTotalOffset(), pattern_->contentMainSize_);
+    MockAnimationManager::GetInstance().SetTicks(4);
+    pattern_->ScrollToIndexFastScroll(0, true, ScrollAlign::START, std::nullopt,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    DriveFastScroll();
+    EXPECT_NEAR(pattern_->GetItemRectInGroup(0, 0).Top(), 0.0f, 0.1f);
+    EXPECT_NEAR(pattern_->GetItemRectInGroup(0, 0).Height(), ITEM_MAIN_SIZE, 0.1f);
+    EXPECT_EQ(CountMiddleItems(builder), 0);
+}
+
+/**
+ * @tc.name: BackToTopGroupKeepsLegacyTraversal001
+ * @tc.desc: BackToTop must not acquire the new known-size fast-scroll group optimization.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollGroupTestNg, BackToTopGroupKeepsLegacyTraversal001, TestSize.Level1)
+{
+    const auto builder = CreateLargeLazyGroup(GetParam());
+    pattern_->ScrollToItemInGroup(0, INNER_ITEM_COUNT - 1, false, ScrollAlign::END);
+    FlushUITasks();
+    ASSERT_EQ(CountMiddleItems(builder), 0);
+    MockAnimationManager::GetInstance().SetTicks(4);
+    pattern_->isBackToTopRunning_ = true;
+    pattern_->StartBackToTopAnimation();
+    DriveFastScroll();
+    EXPECT_NEAR(pattern_->GetItemRectInGroup(0, 0).Top(), 0.0f, 0.1f);
+    EXPECT_NEAR(pattern_->GetItemRectInGroup(0, 0).Height(), ITEM_MAIN_SIZE, 0.1f);
+    EXPECT_EQ(CountMiddleItems(builder), GetParam() ? 800 : 0);
+}
+
+INSTANTIATE_TEST_SUITE_P(InnerSize, ListFastScrollGroupTestNg, testing::Bool());
+
+class FastScrollStackGroupBuilder final : public ListItemMockLazy {
+public:
+    explicit FastScrollStackGroupBuilder(bool uneven)
+        : ListItemMockLazy(INNER_ITEM_COUNT, ITEM_MAIN_SIZE), uneven_(uneven) {}
+
+    float GetItemSize(int32_t index) const
+    {
+        return uneven_ && index >= INNER_ITEM_COUNT / HEIGHT_SECTION_COUNT ?
+            HEIGHT_SECTION_COUNT * ITEM_MAIN_SIZE : ITEM_MAIN_SIZE;
+    }
+
+    int32_t CountMiddleItems() const
+    {
+        return std::count_if(createdIndices_.begin(), createdIndices_.end(), [](int32_t index) {
+            return index >= MIDDLE_START_INDEX && index < SUFFIX_START_INDEX;
+        });
+    }
+
+protected:
+    std::pair<std::string, RefPtr<UINode>> OnGetChildByIndex(
+        int32_t index, std::unordered_map<std::string, LazyForEachCacheChild>& expiringItems) override
+    {
+        createdIndices_.insert(index);
+        ListItemModelNG model;
+        model.Create();
+        ViewAbstract::SetWidth(CalcLength(FILL_LENGTH));
+        ViewAbstract::SetHeight(CalcLength(GetItemSize(index)));
+        return { std::to_string(index), ViewStackProcessor::GetInstance()->Finish() };
+    }
+
+private:
+    bool uneven_ = false;
+    std::set<int32_t> createdIndices_;
+};
+
+class ListFastScrollStackGroupTestNg : public ListFastScrollLayoutTestNg,
+    public testing::WithParamInterface<std::tuple<bool, bool>> {
+protected:
+    void CheckGroupExtraOffset(bool knownOuterSize);
+    void VerifyGroupExtraOffsetGeometry(ScrollAlign align, float extraOffset);
+
+    void CreateStackGroup(bool knownOuterSize = true, bool boxed = false)
+    {
+        const auto [known, uneven] = GetParam();
+        auto model = CreateList();
+        model.SetStackFromEnd(true);
+        model.SetCachedCount(0);
+        builder_ = AceType::MakeRefPtr<FastScrollStackGroupBuilder>(uneven);
+        std::vector<float> itemSizes;
+        float groupSize = headerSize + footerSize + (INNER_ITEM_COUNT - 1) * SPACE;
+        for (int32_t index = 0; index < INNER_ITEM_COUNT; ++index) {
+            itemSizes.emplace_back(builder_->GetItemSize(index));
+            groupSize += itemSizes.back();
+        }
+        if (boxed) {
+            groupSize += topMargin + bottomMargin + topPadding + bottomPadding;
+        }
+        if (knownOuterSize) {
+            model.GetOrCreateListChildrenMainSize()->ChangeData(0, 1, { groupSize });
+        }
+        auto group = CreateListItemGroup();
+        group.SetSpace(Dimension(SPACE));
+        group.SetHeader(GetRowOrColBuilder(FILL_LENGTH, Dimension(headerSize)));
+        group.SetFooter(GetRowOrColBuilder(FILL_LENGTH, Dimension(footerSize)));
+        if (boxed) {
+            SetGroupInsets();
+        }
+        if (known) {
+            group.GetOrCreateListChildrenMainSize()->ChangeData(0, INNER_ITEM_COUNT, itemSizes);
+        }
+        auto stack = ViewStackProcessor::GetInstance();
+        stack->StartGetAccessRecordingFor(GetElmtId());
+        LazyForEachModelNG lazyModel;
+        lazyModel.Create(RefPtr<LazyForEachBuilder>(builder_));
+        stack->Pop();
+        stack->StopGetAccessRecording();
+        stack->Pop();
+        stack->StopGetAccessRecording();
+        CreateDone();
+        MockAnimationManager::GetInstance().SetTicks(PREMEASURE_ANIMATION_TICKS);
+    }
+
+    void ScrollToGroupEdge(ScrollAlign align, float extraOffset = 0.0f)
+    {
+        pattern_->ScrollToIndexFastScroll(0, true, align, extraOffset, FastScrollMode::SKIP_CREATE_AND_MEASURE);
+        DriveFastScroll();
+        EXPECT_FALSE(pattern_->GetFastScrollRequest());
+        EXPECT_EQ(builder_->CountMiddleItems(), 0);
+    }
+
+    void ExpectGroupEdge(ScrollAlign align, bool boxed = false)
+    {
+        const bool start = align == ScrollAlign::START;
+        const int32_t index = start ? 0 : INNER_ITEM_COUNT - 1;
+        const auto item = pattern_->GetItemRectInGroup(0, index);
+        const float startInset = boxed ? topMargin + topPadding : 0.0f;
+        const float endInset = boxed ? bottomMargin + bottomPadding : 0.0f;
+        EXPECT_NEAR(item.Height(), builder_->GetItemSize(index), 0.1f);
+        EXPECT_NEAR(start ? item.Top() : item.Bottom(),
+            start ? headerSize + startInset : pattern_->contentMainSize_ - footerSize - endInset, 0.1f);
+    }
+
+    void SetGroupInsets()
+    {
+        auto property = ViewStackProcessor::GetInstance()->GetMainFrameNode()->GetLayoutProperty();
+        MarginProperty margin;
+        margin.top = CalcLength(topMargin);
+        margin.bottom = CalcLength(bottomMargin);
+        property->UpdateMargin(margin);
+        PaddingProperty padding;
+        padding.top = CalcLength(topPadding);
+        padding.bottom = CalcLength(bottomPadding);
+        property->UpdatePadding(padding);
+    }
+
+    void CheckBoxedGroup(bool knownOuterSize)
+    {
+        CreateStackGroup(knownOuterSize, true);
+        ASSERT_EQ(builder_->CountMiddleItems(), 0);
+        for (auto align : { ScrollAlign::START, ScrollAlign::END, ScrollAlign::START }) {
+            SCOPED_TRACE(testing::Message() << "align=" << static_cast<int32_t>(align));
+            ScrollToGroupEdge(align);
+            ExpectGroupEdge(align, true);
+        }
+    }
+
+    static constexpr float headerSize = 30.0f;
+    static constexpr float footerSize = 70.0f;
+    static constexpr float topMargin = 11.0f;
+    static constexpr float bottomMargin = 17.0f;
+    static constexpr float topPadding = 13.0f;
+    static constexpr float bottomPadding = 19.0f;
+    RefPtr<FastScrollStackGroupBuilder> builder_;
+};
+
+/**
+ * @tc.name: FastScrollStackGroupRoundTrip001
+ * @tc.desc: Stack-from-end skips both directions using physical item indices and unequal header/footer sizes.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollStackGroupTestNg, FastScrollStackGroupRoundTrip001, TestSize.Level1)
+{
+    CreateStackGroup();
+    ASSERT_EQ(builder_->CountMiddleItems(), 0);
+    ScrollToGroupEdge(ScrollAlign::START);
+    ExpectGroupEdge(ScrollAlign::START);
+    ScrollToGroupEdge(ScrollAlign::END);
+    ExpectGroupEdge(ScrollAlign::END);
+    ScrollToGroupEdge(ScrollAlign::START);
+    ExpectGroupEdge(ScrollAlign::START);
+}
+
+/**
+ * @tc.name: FastScrollStackGroupRowBoundary001
+ * @tc.desc: Mirrored row boundaries and spacing retain the actual first visible physical row.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollStackGroupTestNg, FastScrollStackGroupRowBoundary001, TestSize.Level1)
+{
+    CreateStackGroup();
+    const float firstRowEnd = headerSize + builder_->GetItemSize(0);
+    for (float gapOffset : { 0.0f, SPACE / 2, SPACE }) {
+        SCOPED_TRACE(testing::Message() << "gapOffset=" << gapOffset);
+        ScrollToGroupEdge(ScrollAlign::START, firstRowEnd + gapOffset);
+        const auto second = pattern_->GetItemRectInGroup(0, 1);
+        EXPECT_NEAR(second.Height(), builder_->GetItemSize(1), 0.1f);
+        EXPECT_NEAR(second.Top(), SPACE - gapOffset, 0.1f);
+        ScrollToGroupEdge(ScrollAlign::END);
+        ExpectGroupEdge(ScrollAlign::END);
+    }
+}
+
+/**
+ * @tc.name: FastScrollStackGroupInsets001
+ * @tc.desc: Supplied outer size includes asymmetric group margin, padding, header and footer.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollStackGroupTestNg, FastScrollStackGroupInsets001, TestSize.Level1)
+{
+    CheckBoxedGroup(true);
+}
+
+INSTANTIATE_TEST_SUITE_P(InnerSize, ListFastScrollStackGroupTestNg,
+    testing::Values(std::make_tuple(true, false), std::make_tuple(true, true)));
+
+class ListFastScrollUnknownOuterGroupTestNg : public ListFastScrollStackGroupTestNg {};
+
+/**
+ * @tc.name: FastScrollUnknownOuterStackGroupRoundTrip001
+ * @tc.desc: Without outer supplied sizes, stack Group START/END retains actual geometry and skips the middle.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollUnknownOuterGroupTestNg, FastScrollUnknownOuterStackGroupRoundTrip001, TestSize.Level1)
+{
+    CreateStackGroup(false);
+    ASSERT_EQ(pattern_->childrenSize_, nullptr);
+    ASSERT_EQ(builder_->CountMiddleItems(), 0);
+    for (auto align : { ScrollAlign::START, ScrollAlign::END, ScrollAlign::START }) {
+        SCOPED_TRACE(testing::Message() << "align=" << static_cast<int32_t>(align));
+        ScrollToGroupEdge(align);
+        ExpectGroupEdge(align);
+    }
+}
+
+/**
+ * @tc.name: FastScrollUnknownOuterStackGroupInsets001
+ * @tc.desc: Estimated outer size applies asymmetric group insets once in START and END coordinates.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollUnknownOuterGroupTestNg, FastScrollUnknownOuterStackGroupInsets001, TestSize.Level1)
+{
+    CheckBoxedGroup(false);
+}
+
+/**
+ * @tc.name: FastScrollGroupExtraOffsetBoundary001
+ * @tc.desc: An unknown outer group retains the real offset window with reverse layout and unequal padded items.
+ * @tc.type: FUNC
+ */
+void ListFastScrollStackGroupTestNg::CheckGroupExtraOffset(bool knownOuterSize)
+{
+    CreateStackGroup(knownOuterSize, true);
+    VerifyGroupExtraOffsetGeometry(ScrollAlign::START, 900.0f);
+    VerifyGroupExtraOffsetGeometry(ScrollAlign::END, -900.0f);
+}
+
+void ListFastScrollStackGroupTestNg::VerifyGroupExtraOffsetGeometry(ScrollAlign align, float extraOffset)
+{
+    const float leading = topMargin + topPadding + headerSize;
+    const float trailing = bottomMargin + bottomPadding + footerSize;
+    float groupSize = leading + trailing + (INNER_ITEM_COUNT - 1) * SPACE;
+    for (int32_t index = 0; index < INNER_ITEM_COUNT; ++index) {
+        groupSize += builder_->GetItemSize(index);
+    }
+    const float windowStart = (align == ScrollAlign::START ? 0.0f : groupSize - HEIGHT) + extraOffset;
+    pattern_->ScrollToIndexFastScroll(0, true, align, extraOffset, FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    FlushUITasks();
+    EXPECT_EQ(builder_->CountMiddleItems(), 0) << "Preparing a new target must retain the current group window";
+    DriveFastScroll();
+    ASSERT_FALSE(pattern_->GetFastScrollRequest());
+    auto group = frameNode_->GetChildByIndex(0);
+    ASSERT_NE(group, nullptr);
+    auto groupPattern = group->GetHostNode()->GetPattern<ListItemGroupPattern>();
+    ASSERT_NE(groupPattern, nullptr);
+    ASSERT_FALSE(groupPattern->itemPosition_.empty());
+    SCOPED_TRACE(testing::Message() << "align=" << static_cast<int32_t>(align) << ", window=" << windowStart
+        << ", offset=" << pattern_->GetTotalOffset() << ", group=" << pattern_->GetItemRect(0).ToString()
+        << ", header=" << groupPattern->headerMainSize_ << ", footer=" << groupPattern->footerMainSize_
+        << ", first=" << groupPattern->itemPosition_.begin()->first << ":"
+        << groupPattern->itemPosition_.begin()->second.startPos);
+    float position = leading;
+    for (int32_t index = 0; index < INNER_ITEM_COUNT; ++index) {
+        const float top = position - windowStart;
+        const float height = builder_->GetItemSize(index);
+        if (top < HEIGHT && top + height > 0.0f) {
+            const auto rect = pattern_->GetItemRectInGroup(0, index);
+            EXPECT_NEAR(rect.Top(), top, 0.1f) << "inner item=" << index;
+            EXPECT_NEAR(rect.Height(), height, 0.1f);
+        }
+        position += height + SPACE;
+    }
+    EXPECT_EQ(builder_->CountMiddleItems(), 0);
+}
+
+HWTEST_P(ListFastScrollUnknownOuterGroupTestNg, FastScrollGroupExtraOffsetBoundary001, TestSize.Level1)
+{
+    CheckGroupExtraOffset(false);
+}
+
+/**
+ * @tc.name: FastScrollGroupExtraOffsetBeyondRetainedWindow001
+ * @tc.desc: A large END offset reaches the real inner window beyond the retained animation screens.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollUnknownOuterGroupTestNg, FastScrollGroupExtraOffsetBeyondRetainedWindow001, TestSize.Level1)
+{
+    CreateStackGroup(false, true);
+    VerifyGroupExtraOffsetGeometry(ScrollAlign::END, -2100.0f);
+}
+
+/**
+ * @tc.name: FastScrollKnownGroupExtraOffsetBoundary001
+ * @tc.desc: Supplied outer sizes retain the same real offset window as the measured-size path.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollStackGroupTestNg, FastScrollKnownGroupExtraOffsetBoundary001, TestSize.Level1)
+{
+    CheckGroupExtraOffset(true);
+}
+
+/**
+ * @tc.name: FastScrollKnownGroupCenterUsesWindowLayout001
+ * @tc.desc: Exact outer and inner sizes start immediately and only lay out the visible center window.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollStackGroupTestNg, FastScrollKnownGroupCenterUsesWindowLayout001, TestSize.Level1)
+{
+    CreateStackGroup();
+    pattern_->ScrollToIndexFastScroll(0, true, ScrollAlign::CENTER, 0.0f,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    ASSERT_TRUE(pattern_->AnimateRunning());
+    EXPECT_EQ(builder_->CountMiddleItems(), 0);
+    auto algorithm = AceType::DynamicCast<ListLayoutAlgorithm>(pattern_->CreateLayoutAlgorithm());
+    ASSERT_NE(algorithm, nullptr);
+    EXPECT_FALSE(algorithm->HasFastScrollPreparationRequest());
+    DriveFastScroll();
+    EXPECT_NEAR(pattern_->GetTotalOffset(),
+        (pattern_->childrenSize_->GetChildSize(0, false) - HEIGHT) / 2.0f, 0.1f);
+    EXPECT_GT(builder_->CountMiddleItems(), 0);
+    EXPECT_LT(builder_->CountMiddleItems(), 40);
+    algorithm = AceType::DynamicCast<ListLayoutAlgorithm>(pattern_->CreateLayoutAlgorithm());
+    ASSERT_NE(algorithm, nullptr);
+    EXPECT_FALSE(algorithm->GetOrCreateFastScrollState().input.useKnownMainSize);
+}
+
+class ListFastScrollOffsetCrossGroupTestNg : public ListFastScrollLayoutTestNg,
+    public testing::WithParamInterface<std::tuple<int32_t, ScrollAlign, float>> {};
+
+/**
+ * @tc.name: FastScrollExtraOffsetCrossesGroup001
+ * @tc.desc: The final window can lie before, after or inside a group while the requested item is offscreen.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollOffsetCrossGroupTestNg, FastScrollExtraOffsetCrossesGroup001, TestSize.Level1)
+{
+    const auto [target, align, extraOffset] = GetParam();
+    CreateList();
+    CreateListItems(20);
+    CreateListItemGroups(1, V2::ListItemGroupStyle::NONE, 30);
+    CreateListItems(80);
+    CreateDone();
+    const float targetStart = (target > 20 ? target + 29 : target) * ITEM_MAIN_SIZE;
+    const float targetSize = (target == 20 ? 30 : 1) * ITEM_MAIN_SIZE;
+    float destination = targetStart + extraOffset;
+    if (align == ScrollAlign::END) {
+        destination += targetSize - HEIGHT;
+    } else if (align == ScrollAlign::CENTER) {
+        destination += (targetSize - HEIGHT) / 2.0f;
+    }
+    destination = std::clamp(destination, 0.0f, 130 * ITEM_MAIN_SIZE - HEIGHT);
+    MockAnimationManager::GetInstance().SetTicks(4);
+    pattern_->ScrollToIndexFastScroll(target, true, align, extraOffset, FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    DriveFastScroll();
+    ASSERT_FALSE(pattern_->GetFastScrollRequest());
+    for (int32_t item = 0; item < 130; ++item) {
+        const float top = item * ITEM_MAIN_SIZE - destination;
+        if (top >= HEIGHT || top + ITEM_MAIN_SIZE <= 0.0f) {
+            continue;
+        }
+        const auto rect = item >= 20 && item < 50 ? pattern_->GetItemRectInGroup(20, item - 20) :
+            pattern_->GetItemRect(item < 20 ? item : item - 29);
+        EXPECT_NEAR(rect.Top(), top, 0.1f) << "flat item=" << item;
+        EXPECT_NEAR(rect.Height(), ITEM_MAIN_SIZE, 0.1f);
+    }
+}
+
+INSTANTIATE_TEST_SUITE_P(CrossGroup, ListFastScrollOffsetCrossGroupTestNg,
+    testing::Values(std::make_tuple(20, ScrollAlign::START, 3500.0f),
+        std::make_tuple(20, ScrollAlign::START, -1500.0f), std::make_tuple(20, ScrollAlign::END, -3500.0f),
+        std::make_tuple(20, ScrollAlign::CENTER, 3000.0f), std::make_tuple(21, ScrollAlign::START, -2000.0f),
+        std::make_tuple(19, ScrollAlign::START, 2000.0f)));
+
+INSTANTIATE_TEST_SUITE_P(OuterUnknown, ListFastScrollUnknownOuterGroupTestNg,
+    testing::Values(std::make_tuple(false, false), std::make_tuple(true, false), std::make_tuple(true, true),
+        std::make_tuple(false, true)));
+
+/**
+ * @tc.name: FastScrollNeighborSuffixSummaryAfterInvalidation001
+ * @tc.desc: Repreparing a widened uneven suffix must not merge coordinates from different size estimates.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollLayoutTestNg, FastScrollNeighborSuffixSummaryAfterInvalidation001, TestSize.Level1)
+{
+    auto builder = CreateLargeLazyGroup(false, 80, false, true);
+    auto group = GetChildFrameNode(frameNode_, 80);
+    ASSERT_NE(group, nullptr);
+    auto algorithm = CreateOffsetPremeasureAlgorithm();
+    ASSERT_NE(algorithm, nullptr);
+    algorithm->SetFastScrollTarget(81, ScrollAlign::START);
+    ASSERT_TRUE(algorithm->PremeasureFastScrollGroup(group, 80, 2100.0f, false));
+    auto groupAlgorithm = AceType::DynamicCast<ListItemGroupLayoutAlgorithm>(
+        group->GetLayoutAlgorithm()->GetLayoutAlgorithm());
+    ASSERT_NE(groupAlgorithm, nullptr);
+    ASSERT_EQ(groupAlgorithm->GetItemPosition().size(), 6u);
+    ASSERT_FLOAT_EQ(groupAlgorithm->totalMainSize_, 400000.0f);
+
+    // The animation reserve exposes row 993 without changing the prepared total size.
+    ASSERT_EQ(algorithm->GetFastScrollPreparedLayouts()->count(80), 1u);
+    algorithm->SetListItemGroupParam(group, 80, -397400.0f, true, layoutProperty_, false);
+    group->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+    group->Measure(algorithm->childLayoutConstraint_);
+    ASSERT_TRUE(groupAlgorithm->layoutedItemInfo_);
+    ASSERT_EQ(groupAlgorithm->layoutedItemInfo_->startIndex, 993);
+    ASSERT_EQ(groupAlgorithm->layoutedItemInfo_->endIndex, 999);
+    ASSERT_FLOAT_EQ(groupAlgorithm->layoutedItemInfo_->startPos, 397000.0f);
+    ASSERT_FLOAT_EQ(groupAlgorithm->layoutedItemInfo_->endPos, 400000.0f);
+
+    // Discard request-local preparation, then verify that a later suffix preparation keeps its measured origin.
+    algorithm->GetOrCreateFastScrollState().preparedLayouts.reset();
+    for (int32_t attempt = 0; attempt < 3; ++attempt) {
+        SCOPED_TRACE(attempt);
+        group->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+        ASSERT_TRUE(algorithm->PremeasureFastScrollGroup(group, 80, 2100.0f, false));
+        EXPECT_FLOAT_EQ(groupAlgorithm->totalMainSize_, 400000.0f);
+        EXPECT_FLOAT_EQ(group->GetGeometryNode()->GetFrameSize().Height(), 400000.0f);
+        EXPECT_FLOAT_EQ(groupAlgorithm->GetLayoutInfo().averageHeight, 400.0f);
+        ASSERT_EQ(groupAlgorithm->GetItemPosition().count(995), 1u);
+        EXPECT_FLOAT_EQ(groupAlgorithm->GetItemPosition().at(995).startPos, 397900.0f);
+        EXPECT_FLOAT_EQ(groupAlgorithm->GetItemPosition().rbegin()->second.endPos, 400000.0f);
+        EXPECT_EQ(builder->GetCreatedIndices().size(), 7u);
+        EXPECT_EQ(*builder->GetCreatedIndices().begin(), 993);
+    }
+}
+
+/**
+ * @tc.name: FastScrollSuffixKeepsUnchangedSummary001
+ * @tc.desc: A suffix remeasure keeps complete size knowledge when its coordinate origin has not changed.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollLayoutTestNg, FastScrollSuffixKeepsUnchangedSummary001, TestSize.Level1)
+{
+    CreateList();
+    CreateListItems(8);
+    CreateListItemGroups(1, V2::ListItemGroupStyle::NONE, 10);
+    CreateDone();
+    auto group = GetChildFrameNode(frameNode_, 8);
+    ASSERT_NE(group, nullptr);
+    auto algorithm = CreateOffsetPremeasureAlgorithm();
+    ASSERT_NE(algorithm, nullptr);
+    algorithm->SetFastScrollTarget(9, ScrollAlign::START);
+    ASSERT_TRUE(algorithm->PremeasureFastScrollGroup(group, 8, 2000.0f, false));
+    auto groupAlgorithm = AceType::DynamicCast<ListItemGroupLayoutAlgorithm>(
+        group->GetLayoutAlgorithm()->GetLayoutAlgorithm());
+    ASSERT_NE(groupAlgorithm, nullptr);
+    ASSERT_EQ(groupAlgorithm->GetItemPosition().size(), 10u);
+    group->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+    ASSERT_TRUE(algorithm->PremeasureFastScrollGroup(group, 8, 50.0f, false));
+    ASSERT_EQ(groupAlgorithm->GetItemPosition().size(), 1u);
+    ASSERT_TRUE(groupAlgorithm->layoutedItemInfo_);
+    EXPECT_EQ(groupAlgorithm->layoutedItemInfo_->startIndex, 0);
+    EXPECT_EQ(groupAlgorithm->layoutedItemInfo_->endIndex, 9);
+    EXPECT_FLOAT_EQ(groupAlgorithm->layoutedItemInfo_->startPos, 0.0f);
+    EXPECT_FLOAT_EQ(groupAlgorithm->layoutedItemInfo_->endPos, 1000.0f);
+    EXPECT_FLOAT_EQ(groupAlgorithm->GetLayoutInfo().averageHeight, 100.0f);
+    EXPECT_FLOAT_EQ(groupAlgorithm->totalMainSize_, 1000.0f);
+}
+
+/**
+ * @tc.name: FastScrollUnevenNeighborStartOffsetStaysInSuffix001
+ * @tc.desc: A START offset into the previous Group's suffix keeps geometry and direction stable on every frame.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollLayoutTestNg, FastScrollUnevenNeighborStartOffsetStaysInSuffix001, TestSize.Level1)
+{
+    auto builder = CreateLargeLazyGroup(false, 80, false, true);
+    MockAnimationManager::GetInstance().SetTicks(4);
+    pattern_->ScrollToIndexFastScroll(81, true, ScrollAlign::START, -2100.0f, FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    int32_t previousStart = 0;
+    bool finished = false;
+    for (int32_t frame = 0; frame < 24; ++frame) {
+        SCOPED_TRACE(frame);
+        MockAnimationManager::GetInstance().Tick();
+        FlushUITasks();
+        ASSERT_NO_FATAL_FAILURE(FlushFastScrollIdleTasks());
+        ASSERT_FALSE(pattern_->itemPosition_.empty());
+        EXPECT_GE(pattern_->GetStartIndexInItemPosition(), previousStart);
+        EXPECT_LE(pattern_->GetEndIndexInItemPosition(), 81);
+        previousStart = pattern_->GetStartIndexInItemPosition();
+        auto group = pattern_->itemPosition_.find(80);
+        if (group != pattern_->itemPosition_.end()) {
+            const float estimatedSize = group->second.endPos - group->second.startPos;
+            EXPECT_GE(estimatedSize, INNER_ITEM_COUNT * ITEM_MAIN_SIZE);
+            EXPECT_LE(estimatedSize, INNER_ITEM_COUNT * 500.0f);
+        }
+        const auto& created = builder->GetCreatedIndices();
+        EXPECT_EQ(std::count_if(created.begin(), created.end(), [](int32_t index) { return index < 990; }), 0);
+        if (!pattern_->GetFastScrollRequest() && !pattern_->AnimateRunning() && !pattern_->scrollStop_) {
+            finished = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(finished);
+    EXPECT_EQ(pattern_->GetStartIndexInItemPosition(), 80);
+    EXPECT_EQ(pattern_->GetEndIndexInItemPosition(), 80);
+    EXPECT_NEAR(pattern_->GetItemRectInGroup(80, 995).Top(), 0.0f, 0.1f);
+    EXPECT_FLOAT_EQ(pattern_->GetItemRectInGroup(80, 995).Height(), 500.0f);
+}
+/**
+ * @tc.name: FastScrollPremeasuredItemKeepsCleanupUntilLayout001
+ * @tc.desc: Restarting preparation clears only pending Lazy adjustments, not measured-node ownership.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollLayoutTestNg, FastScrollPremeasuredItemKeepsCleanupUntilLayout001, TestSize.Level1)
+{
+    CreateList();
+    CreateListItems(2);
+    CreateDone();
+    auto algorithm = CreateOffsetPremeasureAlgorithm();
+    auto item = GetChildFrameNode(frameNode_, 0);
+    auto child = GetChildFrameNode(frameNode_, 1);
+    algorithm->TrackFastScrollPremeasuredItem(item, 0, true);
+    auto& record = algorithm->GetOrCreateFastScrollState().premeasuredItems.at(0);
+    record.measuredNodes.emplace_back(child);
+    record.pendingLazyAdjustment = AdjustOffset { 25.0f, 50.0f };
+    algorithm->PrepareFastScrollTargetWindow(AceType::RawPtr(frameNode_));
+    ASSERT_EQ(algorithm->GetOrCreateFastScrollState().premeasuredItems.size(), 1);
+    EXPECT_EQ(record.wrapper, item);
+    EXPECT_TRUE(record.clearEntireTree);
+    EXPECT_FALSE(record.pendingLazyAdjustment.has_value());
+    ASSERT_EQ(record.measuredNodes.size(), 1);
+    EXPECT_EQ(record.measuredNodes.front().Upgrade(), child);
+    algorithm->ResetLayoutItem(AceType::RawPtr(frameNode_));
+    EXPECT_TRUE(algorithm->GetOrCreateFastScrollState().premeasuredItems.empty());
+}
+
+/**
+ * @tc.name: FastScrollPremeasuredItemReplacesRebuiltNode001
+ * @tc.desc: Re-registering one wrapper preserves cleanup; changing its host replaces frame-local state without an ID.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollLayoutTestNg, FastScrollPremeasuredItemReplacesRebuiltNode001, TestSize.Level1)
+{
+    CreateList();
+    CreateListItems(2);
+    CreateDone();
+    auto algorithm = CreateOffsetPremeasureAlgorithm();
+    auto first = GetChildFrameNode(frameNode_, 0);
+    auto rebuilt = GetChildFrameNode(frameNode_, 1);
+    algorithm->TrackFastScrollPremeasuredItem(first, 0, true);
+    auto& record = algorithm->GetOrCreateFastScrollState().premeasuredItems.at(0);
+    record.measuredNodes.emplace_back(first);
+    record.pendingLazyAdjustment = AdjustOffset { 25.0f, 50.0f };
+    algorithm->TrackFastScrollPremeasuredItem(first, 0, true);
+    EXPECT_EQ(record.measuredNodes.size(), 1);
+    EXPECT_TRUE(record.pendingLazyAdjustment.has_value());
+    algorithm->TrackFastScrollPremeasuredItem(rebuilt, 0, false);
+    EXPECT_EQ(record.wrapper, rebuilt);
+    EXPECT_FALSE(record.clearEntireTree);
+    EXPECT_TRUE(record.measuredNodes.empty());
+    EXPECT_FALSE(record.pendingLazyAdjustment.has_value());
+}
+/**
+ * @tc.name: FastScrollKnownLazySizeHintIsScoped001
+ * @tc.desc: Normal Lazy layout receives no known size; fast layout consumes it even after clearing the target.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollLazyGridTestNg, FastScrollKnownLazySizeHintIsScoped001, TestSize.Level1)
+{
+    CreateUnevenLazyGrid();
+    auto algorithm = CreateOffsetPremeasureAlgorithm();
+    ASSERT_NE(algorithm, nullptr);
+    EXPECT_FALSE(algorithm->GetOrCreateFastScrollState().input.useKnownMainSize);
+    float referencePos = 0.0f;
+    algorithm->MeasureLazyChild(grid_, 0, referencePos, true);
+    auto constraint = grid_->GetGeometryNode()->GetParentLayoutConstraint();
+    ASSERT_TRUE(constraint);
+    ASSERT_TRUE(constraint->viewPosRef);
+    EXPECT_FALSE(constraint->viewPosRef->knownMainSize);
+
+    algorithm->SetFastScrollTarget(0, ScrollAlign::END);
+    EXPECT_TRUE(algorithm->GetOrCreateFastScrollState().input.useKnownMainSize);
+    algorithm->GetOrCreateFastScrollState().input.targetIndex.reset();
+    EXPECT_TRUE(algorithm->GetOrCreateFastScrollState().input.useKnownMainSize);
+    EXPECT_FALSE(algorithm->HasFastScrollPreparationRequest());
+    algorithm->MeasureLazyChild(grid_, 0, referencePos, true);
+    constraint = grid_->GetGeometryNode()->GetParentLayoutConstraint();
+    ASSERT_TRUE(constraint);
+    ASSERT_TRUE(constraint->viewPosRef);
+    ASSERT_TRUE(constraint->viewPosRef->knownMainSize);
+    const float totalSize = INNER_ITEM_COUNT / 2 * (ITEM_MAIN_SIZE + TALL_ITEM_SIZE);
+    EXPECT_FLOAT_EQ(constraint->viewPosRef->knownMainSize.value(), totalSize);
+    EXPECT_NEAR(grid_->GetGeometryNode()->GetFrameSize().Height(), totalSize, 0.1f);
+    algorithm->SetFastScrollPreparationOffset(0.0f);
+    EXPECT_TRUE(algorithm->HasFastScrollPreparationRequest());
+    grid_->ClearSubtreeLayoutAlgorithm();
+}
+
+/**
+ * @tc.name: FastScrollPreparationResetsUnsupportedResult001
+ * @tc.desc: Starting another preparation pass clears the previous pass's unsupported result.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollLayoutTestNg, FastScrollPreparationResetsUnsupportedResult001, TestSize.Level1)
+{
+    CreateList();
+    CreateListItems(2);
+    CreateDone();
+    auto algorithm = CreateOffsetPremeasureAlgorithm();
+    algorithm->GetOrCreateFastScrollState().result.status = FastScrollMeasureStatus::UNSUPPORTED;
+    algorithm->PrepareFastScrollTargetWindow(AceType::RawPtr(frameNode_));
+    EXPECT_NE(algorithm->GetFastScrollMeasureResult()->status, FastScrollMeasureStatus::UNSUPPORTED);
+}
+
+/**
+ * @tc.name: FastScrollSkipKeepsPreparedGroupPosition001
+ * @tc.desc: An overestimated preceding item must not displace a prepared Group into an unrelated internal window.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollLayoutTestNg, FastScrollSkipKeepsPreparedGroupPosition001, TestSize.Level1)
+{
+    CreateList();
+    auto builder = AceType::MakeRefPtr<FastScrollInnerBuilder>();
+    auto outer = AceType::MakeRefPtr<FastScrollOuterGroupBuilder>(builder);
+    auto stack = ViewStackProcessor::GetInstance();
+    stack->StartGetAccessRecordingFor(GetElmtId());
+    LazyForEachModelNG lazy;
+    lazy.Create(RefPtr<LazyForEachBuilder>(outer));
+    stack->Pop();
+    stack->StopGetAccessRecording();
+    CreateDone();
+    pattern_->ScrollToIndexFastScroll(80, true, ScrollAlign::START, 500.0f,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    FlushUITasks();
+    ASSERT_NE(pattern_->GetFastScrollRequest(), nullptr);
+    ASSERT_TRUE(Positive(pattern_->GetFastScrollRequest()->viewportSize));
+    const auto target = pattern_->posMap_->GetPositionInfo(80);
+    auto previous = pattern_->posMap_->GetPositionInfo(79);
+    previous.mainSize = 5000.0f;
+    pattern_->posMap_->UpdatePos(79, previous);
+    ASSERT_GT(pattern_->posMap_->GetPositionInfo(79).mainSize, ITEM_MAIN_SIZE);
+    ASSERT_TRUE(pattern_->UpdateCurrentOffset(pattern_->GetTotalOffset() - target.mainPos + 300.0f,
+        SCROLL_FROM_ANIMATION_CONTROLLER));
+    pattern_->fastScrollSkip_ = true;
+    FlushUITasks();
+    EXPECT_NEAR(pattern_->GetItemRectInGroup(80, 0).Top(), 300.0f, 0.1f);
+    EXPECT_EQ(std::count_if(builder->GetCreatedIndices().begin(), builder->GetCreatedIndices().end(),
+        [](int32_t index) { return index >= 100 && index < 900; }), 0);
+}
+
+/**
+ * @tc.name: FastScrollSkipKeepsPreparedLazyGridPosition001
+ * @tc.desc: A skip entering a prepared LazyGrid keeps its global start while preceding estimates are measured.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListFastScrollLazyGridTestNg, FastScrollSkipKeepsPreparedLazyGridPosition001, TestSize.Level1)
+{
+    auto outer = CreateOuterLazyGrid();
+    pattern_->ScrollToIndexFastScroll(80, true, ScrollAlign::START, 500.0f,
+        FastScrollMode::SKIP_CREATE_AND_MEASURE);
+    FlushUITasks();
+    ASSERT_NO_FATAL_FAILURE(FlushFastScrollIdleTasks());
+    ASSERT_NE(pattern_->GetFastScrollRequest(), nullptr);
+    ASSERT_TRUE(Positive(pattern_->GetFastScrollRequest()->viewportSize));
+    const auto target = pattern_->posMap_->GetPositionInfo(80);
+    ASSERT_GT(pattern_->posMap_->GetPositionInfo(79).mainSize, ITEM_MAIN_SIZE);
+    ASSERT_TRUE(pattern_->UpdateCurrentOffset(pattern_->GetTotalOffset() - target.mainPos + 300.0f,
+        SCROLL_FROM_ANIMATION_CONTROLLER));
+    pattern_->fastScrollSkip_ = true;
+    FlushUITasks();
+    EXPECT_NEAR(pattern_->GetItemRect(80).Top(), 300.0f, 0.1f);
+    EXPECT_EQ(std::count_if(builder_->GetCreatedIndices().begin(), builder_->GetCreatedIndices().end(),
+        [](int32_t index) { return index >= 100 && index < 2900; }), 0);
+}
+
 } // namespace OHOS::Ace::NG
