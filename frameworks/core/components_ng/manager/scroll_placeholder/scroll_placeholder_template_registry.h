@@ -37,6 +37,12 @@ struct ScrollPlaceholderTemplateSnapshot {
     ScrollPlaceholderBuilder builder;
 };
 
+// Product end-of-life notification: invoked with every builder product the registry
+// drops (source replacement, unregister, instance-pool rejection, LRU demotion) so the
+// owner of the product's detached-root bookkeeping (the ANI register path) can release
+// it. UI-thread only; background clone caching must pass notifyOnReject = false.
+using ScrollPlaceholderProductReleaseNotifier = std::function<void(const RefPtr<UINode>&)>;
+
 // Per container template registry:
 // - registration relation (id + builder handle + generation) persists without bound;
 // - built placeholder instances are retained per template entry under an LRU of hot entries
@@ -71,7 +77,11 @@ public:
     // copies (at most capacity - 1) are what acquire consumes.
     void SetTemplateSourceInstance(const std::string& templateId, const RefPtr<UINode>& instance);
     RefPtr<UINode> GetTemplateSourceInstance(const std::string& templateId) const;
-    void CacheTemplateInstance(const std::string& templateId, const RefPtr<UINode>& instance);
+    // notifyOnReject releases a rejected instance through the product notifier; the
+    // background clone path passes false (its products have no detached-root owner
+    // and the notifier is not thread-safe to invoke off the UI thread).
+    void CacheTemplateInstance(
+        const std::string& templateId, const RefPtr<UINode>& instance, bool notifyOnReject = true);
     RefPtr<UINode> AcquireTemplateInstance(const std::string& templateId);
     size_t GetCachedInstanceCount(const std::string& templateId) const;
     size_t GetHotTemplateCount() const;
@@ -79,6 +89,11 @@ public:
 
     // Releases everything (container destroy).
     void Clear();
+
+    // Installs the product end-of-life notification (see the notifier alias). Not
+    // invoked by Clear(): at container teardown the detached-root owner dies with
+    // the same UIContext, so notifying is both unsafe and pointless.
+    void SetProductReleaseNotifier(ScrollPlaceholderProductReleaseNotifier notifier);
 
 private:
     struct TemplateEntry {
@@ -93,14 +108,16 @@ private:
     };
 
     void TouchLruLocked(TemplateEntry& entry);
-    void EvictOverCapacityLocked();
+    void EvictOverCapacityLocked(std::vector<RefPtr<UINode>>& dropped);
     static ScrollPlaceholderTemplateSnapshot MakeSnapshot(const TemplateEntry& entry);
+    void NotifyProductDropped(const std::vector<RefPtr<UINode>>& dropped) const;
 
     mutable std::mutex mutex_;
     std::unordered_map<std::string, TemplateEntry> entries_;
     std::unordered_map<std::string, uint64_t> generationIndex_;
     std::list<std::string> lruOrder_; // front = most recently used
     size_t evictedTemplateCount_ = 0;
+    ScrollPlaceholderProductReleaseNotifier productReleaseNotifier_;
 };
 
 } // namespace OHOS::Ace::NG

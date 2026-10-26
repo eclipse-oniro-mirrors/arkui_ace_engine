@@ -1391,13 +1391,9 @@ declare interface ItemDragInfo {
   y: number;
 }
 declare interface EditModeOptions {}
-declare interface PlaceholderSizeOptions {
-  width?: number;
-  height?: number;
-}
 declare interface PlaceholderOptions {
   id?: string;
-  size?: PlaceholderSizeOptions;
+  size?: SizeOptions;
 }
 declare type PlaceholderProvider = (index: number) => PlaceholderOptions | undefined;
 declare interface Scroller {}

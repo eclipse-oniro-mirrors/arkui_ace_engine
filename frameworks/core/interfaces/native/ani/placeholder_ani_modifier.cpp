@@ -115,6 +115,77 @@ private:
 
 using AniTemplateBuilderHandlePtr = std::shared_ptr<AniTemplateBuilderHandle>;
 
+// Module-side destroy callback of one registration's detached roots, held the same
+// way as the execution closure: the engine invokes it with the raw product pointer
+// whenever the template registry drops a product (source replacement, unregister,
+// pool rejection, LRU demotion), mirroring the dialog/snapshot/drag destroy-callback
+// contract. The callback is ptr-keyed, so one handle serves every product of the
+// registration across re-registers.
+class AniProductReleaseHandle {
+public:
+    AniProductReleaseHandle(ani_vm* vm, ani_ref globalRef) : vm_(vm), globalRef_(globalRef) {}
+
+    ~AniProductReleaseHandle()
+    {
+        CHECK_NULL_VOID(vm_);
+        CHECK_NULL_VOID(globalRef_);
+        ani_env* env = nullptr;
+        auto attachCurrentThreadStatus = GetAniEnv(vm_, &env);
+        CHECK_NULL_VOID(env);
+        env->GlobalReference_Delete(globalRef_);
+        if (attachCurrentThreadStatus == ANI_OK) {
+            vm_->DetachCurrentThread();
+        }
+    }
+
+    void ReleaseProduct(int64_t productPtr)
+    {
+        ani_env* env = nullptr;
+        auto attachCurrentThreadStatus = GetAniEnv(vm_, &env);
+        CHECK_NULL_VOID(env);
+        do {
+            ani_class longClass = nullptr;
+            if (env->FindClass("std.core.Long", &longClass) != ANI_OK) {
+                TAG_LOGW(AceLogTag::ACE_SCROLL, "ScrollPH release: std.core.Long not found");
+                break;
+            }
+            ani_method longCtor;
+            if (env->Class_FindMethod(longClass, "<ctor>", "l:", &longCtor) != ANI_OK) {
+                TAG_LOGW(AceLogTag::ACE_SCROLL, "ScrollPH release: Long ctor not found");
+                env->ResetError();
+                break;
+            }
+            ani_object longObject = nullptr;
+            if (env->Object_New(longClass, longCtor, &longObject, static_cast<ani_long>(productPtr)) != ANI_OK ||
+                longObject == nullptr) {
+                TAG_LOGW(AceLogTag::ACE_SCROLL, "ScrollPH release: Long boxing failed");
+                env->ResetError();
+                break;
+            }
+            ani_ref args[1] = { longObject };
+            ani_ref result = nullptr;
+            ani_status status =
+                env->FunctionalObject_Call(reinterpret_cast<ani_fn_object>(globalRef_), 1, args, &result);
+            if (status != ANI_OK) {
+                // A throwing release callback must not propagate into the engine's
+                // registry bookkeeping; the detached root stays until the UIContext
+                // dies, which is the pre-contract behavior for this product.
+                TAG_LOGW(AceLogTag::ACE_SCROLL,
+                    "ScrollPH release: callback failed (ani status=%{public}d), ptr=%{public}p",
+                    status, reinterpret_cast<void*>(productPtr));
+                env->ResetError();
+            }
+        } while (false);
+        if (attachCurrentThreadStatus == ANI_OK) {
+            vm_->DetachCurrentThread();
+        }
+    }
+
+private:
+    ani_vm* vm_ = nullptr;
+    ani_ref globalRef_ = nullptr;
+};
+
 // Same admission protocol as the declarative registration bridge, but the
 // isolated creation context is owned by the ArkTS execution closure: it swaps
 // an InteropViewStackProcessor in, runs the compiled builder in the canonical
@@ -198,7 +269,8 @@ ScrollPlaceholderBuilder MakeTemplateBuilder(const AniTemplateBuilderHandlePtr& 
     };
 }
 
-ani_int RegisterTemplate(ani_env* env, const std::string& templateId, ani_object builderArg, ani_object executionArg)
+ani_int RegisterTemplate(ani_env* env, const std::string& templateId, ani_object builderArg,
+    ani_object executionArg, ani_object releaseArg)
 {
     TAG_LOGI(AceLogTag::ACE_SCROLL,
         "PlaceholderRegister.register: enter, id=%{public}s, builderObj=%{public}p, executionObj=%{public}p",
@@ -255,6 +327,21 @@ ani_int RegisterTemplate(ani_env* env, const std::string& templateId, ani_object
     ani_vm* vm = nullptr;
     env->GetVM(&vm);
     auto handle = std::make_shared<AniTemplateBuilderHandle>(vm, globalRef);
+    // Detached-root destroy callback of the registration's products; installed before
+    // RegisterTemplate so the re-publish drop of a previous registration already
+    // releases through it.
+    ani_ref releaseRef = nullptr;
+    if (releaseArg == nullptr ||
+        env->GlobalReference_Create(releaseArg, &releaseRef) != ANI_OK || releaseRef == nullptr) {
+        TAG_LOGW(AceLogTag::ACE_SCROLL,
+            "PlaceholderRegister.register: release callback missing or global reference failed, id=%{public}s",
+            templateId.c_str());
+        return REGISTER_PARAM_INVALID;
+    }
+    auto releaseHandle = std::make_shared<AniProductReleaseHandle>(vm, releaseRef);
+    manager->SetProductReleaseNotifier([releaseHandle](const RefPtr<UINode>& product) {
+        releaseHandle->ReleaseProduct(reinterpret_cast<int64_t>(AceType::RawPtr(product)));
+    });
     auto admission = std::make_shared<ScrollPlaceholderRestrictedScope::Probe>();
     auto builderClosure = MakeTemplateBuilder(handle, admission);
     TAG_LOGI(AceLogTag::ACE_SCROLL,

@@ -44,12 +44,13 @@ const ArkUIAniPlaceholderRegisterModifier* GetPlaceholderRegisterModifier()
 } // namespace
 
 ani_int PlaceholderRegisterRegister(ani_env* env, [[maybe_unused]] ani_object aniClass, ani_string id,
-    ani_object builder, ani_object execution)
+    ani_object builder, ani_object execution, ani_object release)
 {
     const auto* placeholderModifier = GetPlaceholderRegisterModifier();
     CHECK_NULL_RETURN(placeholderModifier, REGISTER_MODIFIER_UNAVAILABLE);
     CHECK_NULL_RETURN(placeholderModifier->registerTemplate, REGISTER_MODIFIER_UNAVAILABLE);
-    return placeholderModifier->registerTemplate(env, AniUtils::ANIStringToStdString(env, id), builder, execution);
+    return placeholderModifier->registerTemplate(
+        env, AniUtils::ANIStringToStdString(env, id), builder, execution, release);
 }
 
 void PlaceholderRegisterUnregister(ani_env* env, [[maybe_unused]] ani_object aniClass, ani_string id)

@@ -242,6 +242,7 @@ template("ace_core_interfaces_native_node") {
           "ani/node_adapter_ani_modifier.cpp",
           "ani/node_ani_modifier.cpp",
           "ani/paste_button_ani_modifier.cpp",
+          "ani/placeholder_ani_modifier.cpp",
           "ani/safe_area_inset_ani_modifier.cpp",
           "ani/save_button_ani_modifier.cpp",
           "ani/security_component_ani_method.cpp",

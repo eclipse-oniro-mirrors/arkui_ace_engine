@@ -81,6 +81,9 @@ public:
 
     // Template registry facade.
     uint64_t RegisterTemplate(const std::string& templateId, ScrollPlaceholderBuilder&& builder);
+    // Installs the product end-of-life notification forwarded to the registry; the ANI
+    // register path uses it to release the detached roots of dropped builder products.
+    void SetProductReleaseNotifier(ScrollPlaceholderProductReleaseNotifier notifier);
     bool UnregisterTemplate(const std::string& templateId);
     bool IsTemplateRegistered(const std::string& templateId) const;
     // Registration probe: synchronously runs one restricted-protocol subtree

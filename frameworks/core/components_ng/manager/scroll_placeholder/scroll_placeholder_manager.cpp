@@ -90,6 +90,11 @@ uint64_t ScrollPlaceholderManager::RegisterTemplate(
     return generation;
 }
 
+void ScrollPlaceholderManager::SetProductReleaseNotifier(ScrollPlaceholderProductReleaseNotifier notifier)
+{
+    registry_.SetProductReleaseNotifier(std::move(notifier));
+}
+
 bool ScrollPlaceholderManager::UnregisterTemplate(const std::string& templateId)
 {
     if (destroyed_.load(std::memory_order_relaxed)) {
@@ -327,7 +332,9 @@ void ScrollPlaceholderManager::RunBackgroundClone(const std::string& templateId,
             skipReason = "stale generation";
             break;
         }
-        registry_.CacheTemplateInstance(templateId, instance);
+        // Background-thread product: no detached-root owner, so a rejection must not
+        // invoke the (UI-thread-only) release notifier.
+        registry_.CacheTemplateInstance(templateId, instance, /*notifyOnReject=*/false);
     } while (false);
     if (skipReason != nullptr) {
         TAG_LOGD(AceLogTag::ACE_SCROLL,

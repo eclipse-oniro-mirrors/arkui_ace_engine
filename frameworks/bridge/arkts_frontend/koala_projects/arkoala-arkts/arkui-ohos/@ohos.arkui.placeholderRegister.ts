@@ -56,16 +56,6 @@ export interface PlaceholderOptions {
  */
 export type PlaceholderProvider = (index: int) => PlaceholderOptions | undefined;
 
-// Bookkeeping of one register call: the native admission executes the closure
-// synchronously inside _PlaceholderRegisterRegister, and ran/ptr tell the
-// caller whether that execution built a detached root that must be retired
-// when the registration is rejected (the native registry drops the template
-// either way, so the root would otherwise linger until the UIContext dies).
-interface RegisterAttempt {
-    ran: boolean;
-    ptr: KPointer | undefined;
-}
-
 /**
  * Provides the methods for registering, unregistering, and querying scroll
  * placeholder builders. Each UI instance holds its own registry: builders
@@ -76,10 +66,6 @@ interface RegisterAttempt {
 export class PlaceholderRegister {
     private builders_: Map<string, WrappedBuilder<CustomBuilder>> = new Map<string, WrappedBuilder<CustomBuilder>>();
     private instanceId_: int32;
-    // Latest detached-root pointer per template id. Roots replaced by a newer
-    // execution are retired at replacement time, so this map only ever holds
-    // live roots torn down by unregister or a rejected register.
-    private roots_: Map<string, KPointer> = new Map<string, KPointer>();
 
     constructor(instanceId: int32) {
         this.instanceId_ = instanceId;
@@ -97,9 +83,21 @@ export class PlaceholderRegister {
             prLog(`register: rejected before native call, invalid argument (id or builder is null/undefined)`);
             throw new BusinessError(401, 'Parameter error.');
         }
-        const attempt: RegisterAttempt = { ran: false, ptr: undefined };
+        // Detached-root destroy callback of every product this registration's
+        // execution builds (the resident source and the acquire instances): the
+        // engine holds it with the registration and invokes it with the raw
+        // product pointer at each product end-of-life point - source replacement,
+        // unregister, instance-pool rejection and LRU demotion - the same
+        // contract as the dialog/snapshot/drag destroy callbacks. The TS side
+        // keeps no per-product bookkeeping: it cannot know instance lifetimes,
+        // and disposing a still-mounted product root would tear live placeholder
+        // content out of the tree.
+        const release = (ptr: KPointer): void => {
+            const destroyed = destroyUiDetachedRoot(ptr, this.instanceId_);
+            prLog(`release: product detached root ptr=${ptr}, destroyed=${destroyed}`);
+        };
         const result: number =
-            ArkUIAniModule._PlaceholderRegisterRegister(id, builder, this.makeExecution(id, builder, attempt));
+            ArkUIAniModule._PlaceholderRegisterRegister(id, builder, this.makeExecution(id, builder), release);
         prLog(`register: native result=${result}, id='${id}'`);
         if (result === REGISTER_RESULT_ADMITTED) {
             this.builders_.set(id, builder);
@@ -107,7 +105,6 @@ export class PlaceholderRegister {
             return;
         }
         if (result === REGISTER_RESULT_PARAM_INVALID) {
-            this.retireAttemptRoot(id, attempt, 'parameter rejected');
             prLog(`register: rejected, native parameter validation failed, id='${id}'`);
             throw new BusinessError(401, 'Parameter error.');
         }
@@ -124,7 +121,6 @@ export class PlaceholderRegister {
             prLog(`register: rejected, native registration failed (no pipeline context / manager / template ` +
                 `registry), result=${result}, id='${id}'`);
         }
-        this.retireAttemptRoot(id, attempt, 'registration rejected');
         throw new BusinessError(100031, cause);
     }
 
@@ -135,15 +131,12 @@ export class PlaceholderRegister {
      * ComponentSnapshot.createFromBuilder and NavDestination): the manager
      * builds the template subtree on a detached root under a proper memo
      * context with instance scoping, registers the root in detachedRoots_
-     * (lifetime hosted by the UIContext), and the product pointer crosses to
-     * the native registration through an explicit channel - it arrives as an
-     * int64 argument instead of an ani return value, so it never depends on
-     * primitive boxing.
+     * (lifetime hosted by the UIContext until the engine's release callback
+     * destroys it), and the product pointer crosses to the native registration
+     * through an explicit channel - it arrives as an int64 argument instead of
+     * an ani return value, so it never depends on primitive boxing.
      */
-    private makeExecution(
-        id: string,
-        builder: WrappedBuilder<CustomBuilder>,
-        attempt: RegisterAttempt): () => void {
+    private makeExecution(id: string, builder: WrappedBuilder<CustomBuilder>): () => void {
         const instanceId = this.instanceId_;
         return (): void => {
             prLog(`execution: begin, id='${id}', instanceId=${instanceId}`);
@@ -152,13 +145,6 @@ export class PlaceholderRegister {
                 prLog(`execution: ABORT, no UIContext for instanceId=${instanceId}`);
                 return;
             }
-            attempt.ran = true;
-            // The native registry replaced this template's entry before running
-            // this closure (re-register) or already lost its source (re-seed):
-            // the previous root is unreferenced from here on and is retired
-            // after the new product is published, instead of leaking until the
-            // UIContext goes away.
-            const stalePtr = this.roots_.get(id);
             const manager = GlobalStateManager.instance;
             const savedRendering = ObserveSingleton.instance.renderingComponent;
             ObserveSingleton.instance.renderingComponent = ObserveSingleton.RenderingComponentV1;
@@ -174,14 +160,8 @@ export class PlaceholderRegister {
                     builder.builder,
                     instanceId);
                 const productPtr = peerNode.peer.ptr;
-                this.roots_.set(id, productPtr);
-                attempt.ptr = productPtr;
                 prLog(`execution: detached root built, productPtr=${productPtr}`);
                 ArkUIAniModule._PlaceholderRegisterPublishProduct(productPtr);
-                if (stalePtr !== undefined && stalePtr !== productPtr) {
-                    const retired = destroyUiDetachedRoot(stalePtr, instanceId);
-                    prLog(`execution: retired replaced detached root ptr=${stalePtr}, destroyed=${retired}`);
-                }
                 prLog(`execution: product published natively, end`);
             } catch (e) {
                 // Surface the failure reason of the isolated execution; the
@@ -197,24 +177,6 @@ export class PlaceholderRegister {
         };
     }
 
-    // The admission execution may have built a detached root before the native
-    // side rejected the template; the registry entry is gone either way, so the
-    // root must not linger in the UIContext's DetachedRootEntryManager. On a
-    // throwing execution (ran without ptr) the roots_ entry still holds the
-    // root of the replaced previous registration, equally unreferenced now.
-    private retireAttemptRoot(id: string, attempt: RegisterAttempt, reason: string): void {
-        if (!attempt.ran) {
-            return;
-        }
-        const orphanPtr = attempt.ptr !== undefined ? attempt.ptr : this.roots_.get(id);
-        if (orphanPtr === undefined) {
-            return;
-        }
-        this.roots_.delete(id);
-        const destroyed = destroyUiDetachedRoot(orphanPtr, this.instanceId_);
-        prLog(`register: retired orphan detached root (${reason}), ptr=${orphanPtr}, destroyed=${destroyed}`);
-    }
-
     /**
      * Unregisters the placeholder builder registered under the given ID for this
      * UI instance. Unregistering an ID that is not registered is a silent no-op.
@@ -222,16 +184,10 @@ export class PlaceholderRegister {
     public unregister(id: string): void {
         prLog(`unregister: enter, id='${id}'`);
         this.builders_.delete(id);
+        // Dropping the registry entry releases every product of the
+        // registration through the engine's release callback, including the
+        // resident source root - nothing is torn down here.
         ArkUIAniModule._PlaceholderRegisterUnregister(id);
-        // Tear down the latest template source tree; roots replaced by newer
-        // executions were already retired at replacement time, so this is the
-        // only live root left for this id.
-        const rootPtr = this.roots_.get(id);
-        if (rootPtr !== undefined) {
-            this.roots_.delete(id);
-            const destroyed = destroyUiDetachedRoot(rootPtr, this.instanceId_);
-            prLog(`unregister: detached root destroyed=${destroyed}, ptr=${rootPtr}, id='${id}'`);
-        }
         prLog(`unregister: done, id='${id}'`);
     }
 

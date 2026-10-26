@@ -20,7 +20,7 @@
 
 namespace OHOS::Ace::Ani {
 ani_int PlaceholderRegisterRegister(
-    ani_env* env, ani_object aniClass, ani_string id, ani_object builder, ani_object execution);
+    ani_env* env, ani_object aniClass, ani_string id, ani_object builder, ani_object execution, ani_object release);
 void PlaceholderRegisterUnregister(ani_env* env, ani_object aniClass, ani_string id);
 ani_boolean PlaceholderRegisterIsRegistered(ani_env* env, ani_object aniClass, ani_string id);
 void PlaceholderRegisterPublishProduct(ani_env* env, ani_object aniClass, ani_long productPtr);

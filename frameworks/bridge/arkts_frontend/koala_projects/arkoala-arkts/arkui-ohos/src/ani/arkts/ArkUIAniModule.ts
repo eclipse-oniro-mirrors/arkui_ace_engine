@@ -575,7 +575,10 @@ export class ArkUIAniModule {
 
     // for PlaceholderRegister (scroll placeholder template registry). The
     // engine face is the ArkUIAniPlaceholderRegisterModifier of libace.
-    native static _PlaceholderRegisterRegister(id: string, builder: Object, execution: Object): int32;
+    // release is the detached-root destroy callback: the engine invokes it with
+    // the raw product pointer whenever the registry drops a product.
+    native static _PlaceholderRegisterRegister(id: string, builder: Object, execution: Object,
+        release: (ptr: KPointer) => void): int32;
     native static _PlaceholderRegisterUnregister(id: string): void;
     native static _PlaceholderRegisterIsRegistered(id: string): boolean;
     // Product hand-off of one isolated execution: the execution closure pops
