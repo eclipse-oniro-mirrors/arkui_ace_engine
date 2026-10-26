@@ -17,14 +17,17 @@
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMMON_IME_TEXT_INPUT_CLIENT_H
 
 #include <cstdint>
+#include <optional>
+#include <vector>
 
 #include "base/memory/ace_type.h"
 #include "base/utils/string_utils.h"
 #include "base/utils/utf_helper.h"
 #include "core/common/ime/text_editing_value.h"
 #include "core/common/ime/text_input_action.h"
-#include "core/event/key_code.h"
+#include "core/common/ime/text_input_type.h"
 #include "core/components_ng/pattern/text_field/text_field_model.h"
+#include "core/event/key_code.h"
 
 namespace OHOS::Ace {
 struct KeyEvent;
@@ -65,6 +68,11 @@ struct PreviewRange {
         start = startValue;
         end = endValue;
     }
+};
+
+struct PreviewTextStyling {
+    std::optional<uint32_t> underlineColor = std::nullopt;
+    PreviewTextStyle underlineShape = PreviewTextStyle::NORMAL;
 };
 
 struct KeyComb final {
@@ -263,8 +271,26 @@ public:
         return 0;
     }
 
+    virtual void OnFinishTextPreview()
+    {
+        if (isNeedPreviewTextStyling) {
+            previewStyling_ = {};
+        }
+        isNeedPreviewTextStyling = false;
+    }
+
     virtual void FinishTextPreview() {}
-    virtual void ReceivePreviewTextStyle (const std::string& style) {}
+    virtual void ReceivePreviewTextStyle(const std::string& style) {}
+
+    virtual void SetPreviewTextStyling(const PreviewTextStyling& styling)
+    {
+        previewStyling_ = styling;
+    }
+
+    const PreviewTextStyling& GetPreviewStyling() const
+    {
+        return previewStyling_;
+    }
 
     virtual int32_t CheckPreviewTextValidate(const std::string& previewValue, const PreviewRange range)
     {
@@ -301,6 +327,8 @@ public:
 protected:
     int32_t instanceId_ = -1;
     bool shiftFlag_ = false;
+    PreviewTextStyling previewStyling_;
+    bool isNeedPreviewTextStyling = false;
 };
 
 } // namespace OHOS::Ace

@@ -163,7 +163,6 @@ const auto MAGNIFIER_ANIMATION_CURVE = AceType::MakeRefPtr<InterpolatingSpring>(
 constexpr int32_t MAGNIFIER_ANIMATION_DURATION = 100;
 
 constexpr int32_t ERROR_BAD_PARAMETERS = -1;
-constexpr char PREVIEW_STYLE_NORMAL[] = "normal";
 constexpr char PREVIEW_STYLE_UNDERLINE[] = "underline";
 static constexpr char16_t LINE_SEPARATOR[] = u"\n";
 // hen do ai anaylsis, we should limit the left an right limit of the string
@@ -7448,32 +7447,13 @@ std::vector<RectF> RichEditorPattern::GetPreviewTextRects()
     return rects;
 }
 
-PreviewTextStyle RichEditorPattern::GetPreviewTextStyle() const
-{
-    auto previewTextStyle = PreviewTextStyle::NORMAL;
-    auto property = GetLayoutProperty<RichEditorLayoutProperty>();
-    if (property && property->HasPreviewTextStyle()) {
-        auto style = property->GetPreviewTextStyle();
-        CHECK_NULL_RETURN(style.has_value(), previewTextStyle);
-        if (style.value() == PREVIEW_STYLE_NORMAL) {
-            previewTextStyle = PreviewTextStyle::NORMAL;
-        } else if (style.value() == PREVIEW_STYLE_UNDERLINE) {
-            previewTextStyle = PreviewTextStyle::UNDERLINE;
-        } else {
-            TAG_LOGW(
-                AceLogTag::ACE_RICH_TEXT, "invalid previewTextStyle of RichEditorLayoutProperty");
-        }
-    }
-    return previewTextStyle;
-}
-
 const Color& RichEditorPattern::GetPreviewTextDecorationColor() const
 {
     auto pipeline = PipelineBase::GetCurrentContextSafelyWithCheck();
     CHECK_NULL_RETURN(pipeline, Color::TRANSPARENT);
     auto theme = pipeline->GetTheme<RichEditorTheme>();
     CHECK_NULL_RETURN(theme, Color::TRANSPARENT);
-    if (GetPreviewTextStyle() == PreviewTextStyle::UNDERLINE) {
+    if (GetPreviewStyling().underlineShape == PreviewTextStyle::UNDERLINE) {
         return theme->GetPreviewUnderLineColor();
     }
     return Color::TRANSPARENT;
@@ -15427,7 +15407,11 @@ void RichEditorPattern::ReceivePreviewTextStyle(const std::string& style)
     TAG_LOGI(AceLogTag::ACE_RICH_TEXT, "previewTextStyle: [%{public}s]", style.c_str());
     auto property = GetLayoutProperty<RichEditorLayoutProperty>();
     CHECK_NULL_VOID(property && !style.empty());
-    property->UpdatePreviewTextStyle(style);
+    PreviewTextStyling previewTextStyling;
+    if (style == PREVIEW_STYLE_UNDERLINE) {
+        previewTextStyling.underlineShape = PreviewTextStyle::UNDERLINE;
+    }
+    SetPreviewTextStyling(previewTextStyling);
 }
 
 bool RichEditorPattern::IsPreviewTextInputting()
