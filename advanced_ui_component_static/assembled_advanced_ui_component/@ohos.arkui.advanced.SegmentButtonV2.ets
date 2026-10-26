@@ -546,6 +546,10 @@ struct SimpleSegmentButtonV2 {
     this.layoutAlgorithm = this.layoutAlgorithm.cloneWith(this.normalizedSelectedIndex);
   }
 
+  aboutToReuse(): void {
+    this.layoutAlgorithm = this.layoutAlgorithm.cloneWith(this.normalizedSelectedIndex);
+  }
+
   private prepareBackplateTransition(index: int): void {
     const oldRect = this.layoutAlgorithm.getItemRect(this.layoutAlgorithm.selectedIndex);
     const targetRect = this.layoutAlgorithm.getItemRect(index);

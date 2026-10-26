@@ -2061,6 +2061,7 @@ class SimpleSegmentButtonV2 extends ViewV2 {
     this.selectedItemOffsetX = 0;
     this.resetComputed('normalizedSelectedIndex');
     this.resetComputed('selectedItemRect');
+    this.resetMonitorsOnReuse();
   }
   get normalizedSelectedIndex() {
     const items = this.getItems();
@@ -2532,6 +2533,9 @@ class SimpleSegmentButtonV2 extends ViewV2 {
   }
 
   aboutToAppear() {
+    this.layoutAlgorithm = this.layoutAlgorithm.cloneWith(this.normalizedSelectedIndex);
+  }
+  aboutToReuse() {
     this.layoutAlgorithm = this.layoutAlgorithm.cloneWith(this.normalizedSelectedIndex);
   }
 
