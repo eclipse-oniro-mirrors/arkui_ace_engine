@@ -6328,7 +6328,8 @@ protected:
     void CreateKnownMixedList(int32_t lanes)
     {
         if (lanes <= 0) {
-            FAIL() << "Lane count must be positive.";
+            ADD_FAILURE() << "Lane count must be positive.";
+            return;
         }
         auto model = CreateList();
         model.SetLanes(lanes);

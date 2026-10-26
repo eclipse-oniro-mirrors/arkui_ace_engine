@@ -62,8 +62,8 @@ public:
     explicit FastScrollCountingWrapper(const RefPtr<FrameNode>& host)
         : LayoutWrapperNode(host, host->GetGeometryNode(), host->GetLayoutProperty()) {}
 
-    RefPtr<LayoutWrapper> GetOrCreateChildByIndex(
-        uint32_t index, bool addToRenderTree = true, bool isCache = false, bool allowPlaceholderSubstitution = false) override
+    RefPtr<LayoutWrapper> GetOrCreateChildByIndex(uint32_t index, bool addToRenderTree = true,
+        bool isCache = false, bool allowPlaceholderSubstitution = false) override
     {
         ++requests;
         requestedIndices.push_back(index);

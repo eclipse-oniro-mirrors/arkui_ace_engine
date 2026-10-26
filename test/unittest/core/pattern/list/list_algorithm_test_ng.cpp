@@ -192,7 +192,8 @@ public:
         if (index == missingIndex_) {
             return nullptr;
         }
-        return LayoutWrapperNode::GetOrCreateChildByIndex(index, addToRenderTree, isCache, allowPlaceholderSubstitution);
+        return LayoutWrapperNode::GetOrCreateChildByIndex(
+            index, addToRenderTree, isCache, allowPlaceholderSubstitution);
     }
 
     std::vector<std::tuple<uint32_t, bool, bool>> calls_;
