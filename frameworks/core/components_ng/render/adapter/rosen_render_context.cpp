@@ -3222,6 +3222,7 @@ void RosenRenderContext::GetPointWithTransform(PointF& point)
     if (ShouldSkipAffineTransformation(rsNode_)) {
         return;
     }
+    gRect = GetPaintRectWithTransform();
     GetPointWithTransformInner(point);
 }
 
