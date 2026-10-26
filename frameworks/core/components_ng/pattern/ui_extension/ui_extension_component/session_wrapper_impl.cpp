@@ -1421,7 +1421,7 @@ void SessionWrapperImpl::NotifyOriginAvoidArea(const Rosen::AvoidArea& avoidArea
     session_->UpdateRectWithLayoutInfo({ std::round(displayArea_.Left()), std::round(displayArea_.Top()),
         std::round(displayArea_.Width()), std::round(displayArea_.Height()) },
         Rosen::SizeChangeReason::AVOID_AREA_CHANGE, "NotifyOriginAvoidArea",
-        nullptr, avoidAreas);
+        nullptr, avoidAreas, true);
 }
 
 bool SessionWrapperImpl::RefreshOccupiedAreaChangeInfo()
