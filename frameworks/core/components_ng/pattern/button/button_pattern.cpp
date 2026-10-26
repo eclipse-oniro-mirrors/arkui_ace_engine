@@ -1189,10 +1189,8 @@ void ButtonPattern::HandleShadowStyle(ButtonStyleMode buttonStyle, ShadowStyle s
     RefPtr<RenderContext>& renderContext, RefPtr<ButtonTheme>& buttonTheme)
 {
     if (shadowStyle != ShadowStyle::None && isApplyShadow_) {
-        auto&& graphics = renderContext->GetOrCreateGraphics();
-        CHECK_NULL_VOID(graphics);
         auto normalShadow = GetShadowFromTheme(static_cast<ShadowStyle>(buttonTheme->GetShadowNormal()));
-        if (!graphics->HasBackShadow() || graphics->GetBackShadowValue() == normalShadow) {
+        if (!renderContext->HasBackShadow() || renderContext->GetBackShadowValue(Shadow()) == normalShadow) {
             auto shadow = GetShadowFromTheme(
                 buttonStyle == ButtonStyleMode::TEXT ? ShadowStyle::None : shadowStyle);
             renderContext->UpdateBackShadow(shadow);

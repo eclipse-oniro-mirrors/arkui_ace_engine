@@ -601,6 +601,40 @@ class ShadowModifier extends ModifierWithKey<ShadowOptions | ArkShadowStyle> {
   }
 }
 
+class ShadowShapeModifier extends ModifierWithKey<object | undefined> {
+  constructor(value: object | undefined) {
+    super(value);
+  }
+  static identity: Symbol = Symbol('shadowShape');
+  applyPeer(node: KNode, reset: boolean): void {
+    if (reset) {
+      getUINativeModule().common.resetShadowShape(node);
+    } else {
+      getUINativeModule().common.setShadowShape(node, this.value);
+    }
+  }
+  checkObjectDiff(): boolean {
+    return true;
+  }
+}
+
+class ShadowClipModeModifier extends ModifierWithKey<ShadowClipMode | undefined> {
+  constructor(value: ShadowClipMode | undefined) {
+    super(value);
+  }
+  static identity: Symbol = Symbol('shadowClipMode');
+  applyPeer(node: KNode, reset: boolean): void {
+    if (reset) {
+      getUINativeModule().common.resetShadowClipMode(node);
+    } else {
+      getUINativeModule().common.setShadowClipMode(node, this.value);
+    }
+  }
+  checkObjectDiff(): boolean {
+    return this.stageValue !== this.value;
+  }
+}
+
 class HitTestBehaviorModifier extends ModifierWithKey<number> {
   constructor(value: number) {
     super(value);
@@ -5775,6 +5809,16 @@ class ArkComponent {
       return this;
     }
     modifierWithKey(this._modifiersWithKeys, ShadowModifier.identity, ShadowModifier, value);
+    return this;
+  }
+
+  shadowShape(shape: CircleShape | EllipseShape | PathShape | RectShape | undefined): this {
+    modifierWithKey(this._modifiersWithKeys, ShadowShapeModifier.identity, ShadowShapeModifier, shape);
+    return this;
+  }
+
+  shadowClipMode(mode: ShadowClipMode | undefined): this {
+    modifierWithKey(this._modifiersWithKeys, ShadowClipModeModifier.identity, ShadowClipModeModifier, mode);
     return this;
   }
 

@@ -9142,6 +9142,31 @@ void JSViewAbstract::JsShadow(const JSCallbackInfo& info)
     ViewAbstractModel::GetInstance()->SetBackShadow(shadows);
 }
 
+void JSViewAbstract::JsShadowShape(const JSCallbackInfo& info)
+{
+    if (info[0]->IsObject()) {
+        JSShapeAbstract* shape = JSRef<JSObject>::Cast(info[0])->Unwrap<JSShapeAbstract>();
+        if (shape != nullptr) {
+            ViewAbstractModel::GetInstance()->SetShadowShape(shape->GetBasicShape());
+            return;
+        }
+    }
+    ViewAbstractModel::GetInstance()->SetShadowShape(nullptr);
+}
+
+void JSViewAbstract::JsShadowClipMode(const JSCallbackInfo& info)
+{
+    ShadowClipMode mode = ShadowClipMode::DEFAULT_SHAPE;
+    if (info[0]->IsNumber()) {
+        auto modeInt = info[0]->ToNumber<int32_t>();
+        if (modeInt >= static_cast<int32_t>(ShadowClipMode::DEFAULT_SHAPE) &&
+            modeInt <= static_cast<int32_t>(ShadowClipMode::BOUNDS_SHAPE)) {
+            mode = static_cast<ShadowClipMode>(modeInt);
+        }
+    }
+    ViewAbstractModel::GetInstance()->SetShadowClipMode(mode);
+}
+
 bool JSViewAbstract::ParseBlendMode(const JSCallbackInfo& info, BlendMode& blendMode, BlendApplyType& blendApplyType)
 {
     if (info.Length() == 0) {
@@ -10389,6 +10414,8 @@ void JSViewAbstract::JSBind(BindingTarget globalObj)
     JSClass<JSViewAbstract>::StaticMethod("gridOffset", &JSViewAbstract::JsGridOffset);
     JSClass<JSViewAbstract>::StaticMethod("useSizeType", &JSViewAbstract::JsUseSizeType);
     JSClass<JSViewAbstract>::StaticMethod("shadow", &JSViewAbstract::JsShadow);
+    JSClass<JSViewAbstract>::StaticMethod("shadowShape", &JSViewAbstract::JsShadowShape);
+    JSClass<JSViewAbstract>::StaticMethod("shadowClipMode", &JSViewAbstract::JsShadowClipMode);
     JSClass<JSViewAbstract>::StaticMethod("blendMode", &JSViewAbstract::JsBlendMode);
     JSClass<JSViewAbstract>::StaticMethod("advancedBlendMode", &JSViewAbstract::JsAdvancedBlendMode);
     JSClass<JSViewAbstract>::StaticMethod("grayscale", &JSViewAbstract::JsGrayScale);

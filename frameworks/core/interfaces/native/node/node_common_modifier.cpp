@@ -2117,6 +2117,24 @@ void ResetBackShadow(ArkUINodeHandle node)
     ViewAbstract::SetBackShadow(frameNode, shadow);
 }
 
+void SetShadowClipMode(ArkUINodeHandle node, ArkUI_Int32 clipMode)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    if (clipMode < 0 || clipMode > static_cast<ArkUI_Int32>(ShadowClipMode::BOUNDS_SHAPE)) {
+        ViewAbstract::ResetShadowClipMode(frameNode);
+        return;
+    }
+    ViewAbstract::SetShadowClipMode(frameNode, static_cast<ShadowClipMode>(clipMode));
+}
+
+void ResetShadowClipMode(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    ViewAbstract::ResetShadowClipMode(frameNode);
+}
+
 void SetHitTestBehavior(ArkUINodeHandle node, uint32_t value)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
@@ -12105,7 +12123,9 @@ const ArkUICommonModifier* GetCommonModifier()
         .resetDoubleSided = ResetDoubleSided,
         .getNextFocus = GetNextFocus,
         .getFocusBoxStyle = GetFocusBoxStyle,
-        .getLinearGradientBlur = GetLinearGradientBlur
+        .getLinearGradientBlur = GetLinearGradientBlur,
+        .setShadowClipMode = SetShadowClipMode,
+        .resetShadowClipMode = ResetShadowClipMode,
     };
     CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
 

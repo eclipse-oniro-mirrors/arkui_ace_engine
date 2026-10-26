@@ -2323,4 +2323,14 @@ void ViewAbstractModelNG::ResetAccessibilityCustomActions()
     CHECK_NULL_VOID(frameNode);
     ResetAccessibilityCustomActions(frameNode);
 }
+
+void ViewAbstractModelNG::SetShadowShape(const RefPtr<BasicShape>& basicShape)
+{
+    ViewAbstract::SetShadowShape(basicShape);
+}
+
+void ViewAbstractModelNG::SetShadowClipMode(ShadowClipMode clipMode)
+{
+    ViewAbstract::SetShadowClipMode(clipMode);
+}
 } // namespace OHOS::Ace::NG

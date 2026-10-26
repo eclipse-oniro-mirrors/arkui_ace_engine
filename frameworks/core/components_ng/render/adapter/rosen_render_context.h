@@ -288,6 +288,8 @@ public:
 
     Rosen::SHADOW_COLOR_STRATEGY ToShadowColorStrategy(ShadowColorStrategy shadowColorStrategy);
     void OnBackShadowUpdate(const Shadow& shadow) override;
+    void OnShadowShapeUpdate(const RefPtr<BasicShape>& basicShape) override;
+    void OnShadowClipModeUpdate(ShadowClipMode clipMode) override;
     void OnBackBlendModeUpdate(BlendMode blendMode) override;
     void OnBackBlendApplyTypeUpdate(BlendApplyType applyType) override;
     void UpdateBorderWidthF(const BorderWidthPropertyF& value) override;
@@ -811,6 +813,7 @@ protected:
     void PaintClipShape(const std::unique_ptr<ClipProperty>& clip, const SizeF& frameSize);
     void PaintClipMask(const std::unique_ptr<ClipProperty>& clip, const SizeF& frameSize);
     void PaintClip(const SizeF& frameSize);
+    void PaintShadowShape(const RefPtr<BasicShape>& basicShape, const SizeF& frameSize);
     void PaintProgressMask();
     void PaintSideBarContentMask(const Color& maskColor);
     void PaintGradient(const SizeF& frameSize);

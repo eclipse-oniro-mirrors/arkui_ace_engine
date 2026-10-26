@@ -884,6 +884,14 @@ class ArkSpanComponent {
     throw new BusinessError(100201, 'shadow function not supported in attributeModifier scenario.');
   }
 
+  shadowShape(shape: CircleShape | EllipseShape | PathShape | RectShape | undefined): this {
+    throw new BusinessError(100201, 'shadowShape function not supported in attributeModifier scenario.');
+  }
+
+  shadowClipMode(mode: ShadowClipMode | undefined): this {
+    throw new BusinessError(100201, 'shadowClipMode function not supported in attributeModifier scenario.');
+  }
+
   mask(value: CircleAttribute | EllipseAttribute | PathAttribute | RectAttribute | ProgressMask): this {
     throw new BusinessError(100201, 'mask function not supported in attributeModifier scenario.');
   }

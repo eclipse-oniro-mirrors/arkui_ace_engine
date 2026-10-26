@@ -325,6 +325,8 @@ public:
     virtual void SetBackShadow(const std::vector<Shadow>& shadows) = 0;
     virtual void SetBlendMode(BlendMode blendMode) = 0;
     virtual void SetBlendApplyType(BlendApplyType blendApplyType) = 0;
+    virtual void SetShadowShape(const RefPtr<BasicShape>& shape) {}
+    virtual void SetShadowClipMode(ShadowClipMode clipMode) {}
     virtual void SetColorBlend(const Color& value) = 0;
     virtual void CreateWithColorBlendResourceObj(const RefPtr<ResourceObject>& resobj) {};
     virtual void SetWindowBlur(float progress, WindowBlurStyle blurStyle) = 0;
