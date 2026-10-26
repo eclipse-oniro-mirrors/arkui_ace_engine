@@ -13,9 +13,12 @@
  * limitations under the License.
  */
 
-#include "core/components_ng/manager/content_change_manager/content_change_manager.h"
+#include "core/components_ng/manager/content_change_manager/content_change_manager_impl.h"
 namespace OHOS::Ace::NG {
-ContentChangeManager::ContentChangeManager(const RefPtr<TaskExecutor>& taskExecutor) {}
+ContentChangeManager::ContentChangeManager(const RefPtr<TaskExecutor>& taskExecutor)
+    : capiImpl_(std::make_unique<CapiImpl>())
+{}
+ContentChangeManager::~ContentChangeManager() = default;
 void ContentChangeManager::OnImageChangeEnd(const WeakPtr<FrameNode>&, const std::string&, const RectF&) {}
 void ContentChangeManager::OnVsyncStart() {}
 void ContentChangeManager::OnVsyncEnd(const RectF& rootRect) {}

@@ -602,6 +602,11 @@ public:
         return nullptr;
     }
 
+    const std::list<std::tuple<RefPtr<UINode>, uint32_t, int32_t>>& GetDisappearingChildren() const
+    {
+        return disappearingChildren_;
+    }
+
     // utility function for adding child to disappearingChildren_
     void AddDisappearingChild(const RefPtr<UINode>& child, uint32_t index = UINT32_MAX, int32_t branchId = -1);
     // utility function for removing child from disappearingChildren_, return true if child is removed

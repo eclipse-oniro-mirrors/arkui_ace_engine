@@ -14,6 +14,7 @@
  */
 
 #include "node_model.h"
+#include "core/interfaces/native/node/content_change_api.h"
 #include "core/interfaces/native/node/page_text_api.h"
 #include "core/interfaces/native/node/ui_tree_api.h"
 #include "core/interfaces/native/node/interaction_observer_api.h"
@@ -226,6 +227,17 @@ const ArkUIInteractionObserverAPI* GetInteractionObserverAPI()
     }
     auto entry = reinterpret_cast<Entry>(FindFunction(module, "GetArkUIInteractionObserverAPI"));
     return entry ? entry(1) : nullptr;
+}
+
+const ArkUIContentChangeAPI* GetContentChangeAPI()
+{
+    using Entry = const ArkUIContentChangeAPI* (*)(int32_t);
+    auto* module = FindModule();
+    if (!module) {
+        return nullptr;
+    }
+    auto entry = reinterpret_cast<Entry>(FindFunction(module, "GetArkUIContentChangeAPI"));
+    return entry ? entry(ARKUI_CONTENT_CHANGE_API_VERSION) : nullptr;
 }
 
 ArkUIFullNodeAPI* GetFullImpl()

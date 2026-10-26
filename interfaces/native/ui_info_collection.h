@@ -411,6 +411,53 @@ ArkUI_ErrorCode OH_ArkUI_NativeModule_UIInfoCollectionRegisterInteractionObserve
  */
 ArkUI_ErrorCode OH_ArkUI_NativeModule_UIInfoCollectionUnregisterInteractionObserver(uint32_t registerID);
 
+typedef struct OH_ArkUI_NativeModule_UIContentChangeEvent OH_ArkUI_NativeModule_UIContentChangeEvent;
+
+typedef enum OH_ArkUI_NativeModule_UIContentChangeEventCategory {
+    OH_ARKUI_NATIVEMODULE_EVENT_CATEGORY_PAGE = 1U << 0,
+    OH_ARKUI_NATIVEMODULE_EVENT_CATEGORY_SCROLL = 1U << 1,
+    OH_ARKUI_NATIVEMODULE_EVENT_CATEGORY_OVERLAY = 1U << 2,
+    OH_ARKUI_NATIVEMODULE_EVENT_CATEGORY_ALL = ~0U
+} OH_ArkUI_NativeModule_UIContentChangeEventCategory;
+
+typedef enum OH_ArkUI_NativeModule_UIContentChangeIgnoreType {
+    OH_ARKUI_NATIVEMODULE_CONTENTCHANGE_IGNORE_SCROLLBY = 1U << 0,
+    OH_ARKUI_NATIVEMODULE_CONTENTCHANGE_IGNORE_SCROLLTO = 1U << 1,
+    OH_ARKUI_NATIVEMODULE_CONTENTCHANGE_IGNORE_TOAST = 1U << 2
+} OH_ArkUI_NativeModule_UIContentChangeIgnoreType;
+
+typedef enum OH_ArkUI_NativeModule_UIContentChangeEventType {
+    OH_ARKUI_NATIVEMODULE_EVENT_PAGE_CHANGE_START = 0,
+    OH_ARKUI_NATIVEMODULE_EVENT_PAGE_CHANGE_END = 1,
+    OH_ARKUI_NATIVEMODULE_EVENT_SCROLL_START = 2,
+    OH_ARKUI_NATIVEMODULE_EVENT_SCROLL_END = 3,
+    OH_ARKUI_NATIVEMODULE_EVENT_OVERLAY_SHOW = 4,
+    OH_ARKUI_NATIVEMODULE_EVENT_OVERLAY_HIDE = 5,
+    OH_ARKUI_NATIVEMODULE_EVENT_SWIPER_START = 6,
+    OH_ARKUI_NATIVEMODULE_EVENT_SWIPER_END = 7,
+    OH_ARKUI_NATIVEMODULE_EVENT_SWIPER_CANCEL = 8,
+    OH_ARKUI_NATIVEMODULE_EVENT_TABS_START = 9,
+    OH_ARKUI_NATIVEMODULE_EVENT_TABS_END = 10,
+    OH_ARKUI_NATIVEMODULE_EVENT_TABS_CANCEL = 11
+} OH_ArkUI_NativeModule_UIContentChangeEventType;
+
+typedef void (*OH_ArkUI_NativeModule_UIContentChangeEventCallback)(
+    const OH_ArkUI_NativeModule_UIContentChangeEvent* event, void* userData);
+
+ArkUI_ErrorCode OH_ArkUI_NativeModule_RegisterUIContentChangeEvent(
+    ArkUI_ContextHandle uiContext, bool withStart, uint32_t eventMask, uint32_t ignoreMask, void* userData,
+    OH_ArkUI_NativeModule_UIContentChangeEventCallback callback, uint64_t* subscriptionId);
+ArkUI_ErrorCode OH_ArkUI_NativeModule_UnRegisterUIContentChangeEvent(
+    ArkUI_ContextHandle uiContext, uint64_t subscriptionId);
+ArkUI_ErrorCode OH_ArkUI_NativeModule_UIContentChangeEventGetType(
+    const OH_ArkUI_NativeModule_UIContentChangeEvent* event, OH_ArkUI_NativeModule_UIContentChangeEventType* type);
+ArkUI_ErrorCode OH_ArkUI_NativeModule_UIContentChangeEventGetTimestamp(
+    const OH_ArkUI_NativeModule_UIContentChangeEvent* event, uint64_t* nanoTimestamp);
+ArkUI_ErrorCode OH_ArkUI_NativeModule_UIContentChangeEventGetContext(
+    const OH_ArkUI_NativeModule_UIContentChangeEvent* event, ArkUI_ContextHandle* uiContext);
+ArkUI_ErrorCode OH_ArkUI_NativeModule_UIContentChangeEventGetContentChangeEventJson(
+    const OH_ArkUI_NativeModule_UIContentChangeEvent* event, const OH_ArkUI_NativeModule_UIJsonWrapper** json);
+
 #ifdef __cplusplus
 }
 #endif

@@ -7426,6 +7426,30 @@
     },
     {
         "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_RegisterUIContentChangeEvent"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UnRegisterUIContentChangeEvent"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIContentChangeEventGetType"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIContentChangeEventGetTimestamp"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIContentChangeEventGetContext"
+    },
+    {
+        "first_introduced": "26.2.0",
+        "name": "OH_ArkUI_NativeModule_UIContentChangeEventGetContentChangeEventJson"
+    },
+    {
+        "first_introduced": "26.2.0",
         "name": "OH_ArkUI_NativeModule_UIJsonWrapperCreate"
     },
     {
