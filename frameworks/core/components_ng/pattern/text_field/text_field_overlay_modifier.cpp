@@ -474,10 +474,10 @@ void TextFieldOverlayModifier::PaintPreviewTextDecoration(DrawingContext& contex
     brush.SetColor(color);
     canvas.AttachBrush(brush);
     for (const auto& rect : previewTextRect) {
-        PreviewDecorationParams p { rect.Left() + offsetX, rect.Right() + offsetX,
+        PreviewDecorationParams params { rect.Left() + offsetX, rect.Right() + offsetX,
             rect.Bottom() + offsetY, underlineWidth, styling.underlineShape,
             &rect == &previewTextRect.back(), color };
-        DrawPreviewTextUnderline(canvas, p);
+        DrawPreviewTextUnderline(canvas, params);
     }
     canvas.DetachBrush();
     canvas.Restore();

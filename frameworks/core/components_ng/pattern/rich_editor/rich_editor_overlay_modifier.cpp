@@ -206,10 +206,10 @@ void RichEditorOverlayModifier::PaintPreviewTextDecoration(DrawingContext& drawi
     brush.SetColor(color);
     drawingContext.canvas.AttachBrush(brush);
     for (const auto& rect : previewTextRects) {
-        PreviewDecorationParams p { rect.Left(), rect.Right(), rect.Bottom(),
+        PreviewDecorationParams params { rect.Left(), rect.Right(), rect.Bottom(),
             underlineWidth, styling.underlineShape,
             &rect == &previewTextRects.back(), RSColor(color) };
-        DrawPreviewTextUnderline(drawingContext.canvas, p);
+        DrawPreviewTextUnderline(drawingContext.canvas, params);
     }
     drawingContext.canvas.DetachBrush();
     drawingContext.canvas.Restore();

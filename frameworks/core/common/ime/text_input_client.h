@@ -273,10 +273,10 @@ public:
 
     virtual void OnFinishTextPreview()
     {
-        if (isNeedPreviewTextStyling) {
+        if (isNeedPreviewTextStyling_) {
             previewStyling_ = {};
         }
-        isNeedPreviewTextStyling = false;
+        isNeedPreviewTextStyling_ = false;
     }
 
     virtual void FinishTextPreview() {}
@@ -328,7 +328,7 @@ protected:
     int32_t instanceId_ = -1;
     bool shiftFlag_ = false;
     PreviewTextStyling previewStyling_;
-    bool isNeedPreviewTextStyling = false;
+    bool isNeedPreviewTextStyling_ = false;
 };
 
 } // namespace OHOS::Ace
