@@ -741,7 +741,7 @@ void SetTextPickerIconRangeStr(
     if (arry->rangeContentArraySize <= 0) {
         return;
     }
-    TextPickerModelNG::SetTextPickerSingeRange(static_cast<bool>(isSingleRange));
+    TextPickerModelNG::SetTextPickerSingeRange(frameNode, static_cast<bool>(isSingleRange));
     std::vector<NG::RangeContent> result;
     for (int i = 0; i < arry->rangeContentArraySize; i++) {
         NG::RangeContent content;
@@ -763,7 +763,7 @@ void SetTextPickerRangeStr(
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
     CHECK_NULL_VOID(frameNode);
-    TextPickerModelNG::SetTextPickerSingeRange(static_cast<bool>(isSingleRange));
+    TextPickerModelNG::SetTextPickerSingeRange(frameNode, static_cast<bool>(isSingleRange));
     std::vector<std::string> getRangeVector;
     StringUtils::StringSplitter(std::string(rangeStr), ';', getRangeVector);
     if (isSingleRange) {
@@ -806,7 +806,7 @@ void SetTextPickerValue(ArkUINodeHandle node, ArkUI_CharPtr valueStr)
     CHECK_NULL_VOID(frameNode);
     std::vector<std::string> getValueVector;
     StringUtils::StringSplitter(std::string(valueStr), ';', getValueVector);
-    if (TextPickerModelNG::GetTextPickerSingeRange()) {
+    if (TextPickerModelNG::GetTextPickerSingeRange(frameNode)) {
         TextPickerModelNG::SetValue(frameNode, valueStr);
     } else {
         TextPickerModelNG::SetValues(frameNode, getValueVector);
