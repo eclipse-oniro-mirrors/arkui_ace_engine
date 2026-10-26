@@ -1480,24 +1480,28 @@ void GridScrollLayoutAlgorithm::SkipBackwardLines(float mainSize, LayoutWrapper*
     if (!SkipLargeLineHeightLines(mainSize)) {
         return;
     }
-
     // grid size change from big to small
     info_.UpdateEndLine(mainSize, mainGap_);
 
-    // skip lines in matrix
-    while (GreatOrEqual(-info_.currentOffset_, mainSize)) {
-        auto line = info_.gridMatrix_.find(info_.endMainLineIndex_ + 1);
-        if (line == info_.gridMatrix_.end()) {
-            break;
+    // A full reset in this measure discards gridMatrix_. Walking those rows stops
+    // once the remainder is within one viewport and leaves currentOffset_ largely
+    // negative; ReloadToStartIndex does not repair it.
+    if (!WillResetMatrixFromStart(layoutWrapper)) {
+        // skip lines in matrix
+        while (GreatOrEqual(-info_.currentOffset_, mainSize)) {
+            auto line = info_.gridMatrix_.find(info_.endMainLineIndex_ + 1);
+            if (line == info_.gridMatrix_.end()) {
+                break;
+            }
+            auto lineHeight = info_.lineHeightMap_.find(info_.endMainLineIndex_ + 1);
+            if (lineHeight == info_.lineHeightMap_.end()) {
+                break;
+            }
+            ++info_.startMainLineIndex_;
+            ++info_.endMainLineIndex_;
+            info_.currentOffset_ += lineHeight->second + mainGap_;
+            info_.currentHeight_ += lineHeight->second + mainGap_;
         }
-        auto lineHeight = info_.lineHeightMap_.find(info_.endMainLineIndex_ + 1);
-        if (lineHeight == info_.lineHeightMap_.end()) {
-            break;
-        }
-        ++info_.startMainLineIndex_;
-        ++info_.endMainLineIndex_;
-        info_.currentOffset_ += lineHeight->second + mainGap_;
-        info_.currentHeight_ += lineHeight->second + mainGap_;
     }
     info_.UpdateStartIndexByStartLine();
 
@@ -2588,6 +2592,20 @@ void GridScrollLayoutAlgorithm::UpdateMainLineOnReload(int32_t startIdx)
     if (!info.hasBigItem_) {
         info.startMainLineIndex_ = startIdx / info.crossCount_;
     }
+}
+
+bool GridScrollLayoutAlgorithm::WillResetMatrixFromStart(LayoutWrapper* layoutWrapper)
+{
+    CHECK_NULL_RETURN(layoutWrapper, false);
+    auto host = layoutWrapper->GetHostNode();
+    CHECK_NULL_RETURN(host, false);
+    // Unset lastCrossCount_ is assigned from crossCount_ before CheckReset, so it
+    // must not be treated as a cross-count change here.
+    const int32_t effectiveLastCrossCount = info_.lastCrossCount_.value_or(info_.crossCount_);
+    if (effectiveLastCrossCount != info_.crossCount_ || info_.IsResetted()) {
+        return true;
+    }
+    return GetResetMode(layoutWrapper, host->GetChildrenUpdated()).first;
 }
 
 std::pair<bool, bool> GridScrollLayoutAlgorithm::GetResetMode(LayoutWrapper* layoutWrapper, int32_t updateIdx)
