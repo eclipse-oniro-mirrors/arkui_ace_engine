@@ -379,9 +379,9 @@ void DisposeNode(ArkUINodeHandle node)
         }
         const auto& componentId = uiNode->GetInspectorId();
         const std::string componentInfo = componentId.has_value() ? ", ComponentID: " + componentId.value() : "";
-        LOGW("DisposeNode: nodeId: %{public}d, tag: %{public}s, rect [%{public}s]%{public}s",
+        LOGD("DisposeNode: nodeId: %{public}d, tag: %{public}s, rect [%{public}s]%{public}s",
             uiNode->GetId(), uiNode->GetTag().c_str(), rectInfo.c_str(), componentInfo.c_str());
-        LOGW("The node to be disposed still has a parent. "
+        LOGD("The node to be disposed still has a parent. "
             "Accessing this node through a NodeHandle obtained by tree traversal after disposal "
             "may result in undefined behavior, including application crashes.");
     }
