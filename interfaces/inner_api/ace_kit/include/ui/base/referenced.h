@@ -245,7 +245,11 @@ public:
 
     auto operator->() const
     {
+#ifdef ACE_DEBUG
         return RefPtrTraits<T>::Access(rawPtr_);
+#else
+        return rawPtr_;
+#endif
     }
     T& operator*() const
     {
