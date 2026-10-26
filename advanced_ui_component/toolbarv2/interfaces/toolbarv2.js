@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024-2026 Huawei Device Co., Ltd.
+ * Copyright (c) 2024-2025 Huawei Device Co., Ltd.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -2987,7 +2987,6 @@ export class ToolBarV2 extends ViewV2 {
         this.ifElseBranchUpdateFunction(0, () => {
           this.observeComponentCreation2((elmtId, isInitialRender) => {
             Column.create();
-            Column.width('100%');
           }, Column);
           this.advToolbarContent.bind(this)();
           Column.pop();
@@ -3069,7 +3068,7 @@ export class ToolBarV2 extends ViewV2 {
               this.toolBarList,
               forEachItemGenFunction,
               (item, index) => {
-                return `${this.getUniqueId}__${index}`;
+                return `${this.getUniqueId}__${index}}`;
               },
               true,
               true

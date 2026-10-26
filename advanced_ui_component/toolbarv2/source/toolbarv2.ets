@@ -2029,7 +2029,6 @@ export struct ToolBarV2 {
       Column() {
         this.advToolbarContent()
       }
-      .width('100%')
     } else {
       Column() {
         Divider()
@@ -2045,7 +2044,7 @@ export struct ToolBarV2 {
               .flexShrink(1)
             }
           }, (item: ToolBarV2Item, index: number) => {
-            return `${this.getUniqueId}__${index}`;
+            return `${this.getUniqueId}__${index}}`;
           })
           if (this.toolBarList.length > TOOLBAR_MAX_LENGTH) {
             Row() {
