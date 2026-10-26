@@ -44,7 +44,7 @@ ScrollPlaceholderOptions MakeDefaultPlaceholderOptions()
 {
     ScrollPlaceholderOptions options;
     ScrollPlaceholderSizeOption sizeOption;
-    sizeOption.height = ITEM_MAIN_SIZE;
+    sizeOption.height = Dimension(ITEM_MAIN_SIZE, DimensionUnit::VP);
     options.size = sizeOption;
     return options;
 }
@@ -54,8 +54,8 @@ ScrollPlaceholderOptions MakeSizedPlaceholderOptions(const std::string& id)
     ScrollPlaceholderOptions options;
     options.id = id;
     ScrollPlaceholderSizeOption sizeOption;
-    sizeOption.width = ITEM_MAIN_SIZE;
-    sizeOption.height = ITEM_MAIN_SIZE;
+    sizeOption.width = Dimension(ITEM_MAIN_SIZE, DimensionUnit::VP);
+    sizeOption.height = Dimension(ITEM_MAIN_SIZE, DimensionUnit::VP);
     options.size = sizeOption;
     return options;
 }
