@@ -510,6 +510,9 @@ HWTEST_F(NodeAdapterImplTest, NativeLazyForEachBuilderRegisterDataChangeListener
     ASSERT_NE(builder, nullptr);
     auto lazyNode = NG::LazyForEachNode::CreateLazyForEachNode(1, nullptr);
     ASSERT_NE(lazyNode, nullptr);
+    auto parent = FrameNode::CreateFrameNode("AdapterParent", -1, AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(parent, nullptr);
+    parent->AddChild(lazyNode);
     builder->RegisterDataChangeListener(lazyNode);
 
     static ArkUINodeAdapterEvent sentEvent;

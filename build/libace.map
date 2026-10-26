@@ -1488,6 +1488,7 @@
       "OHOS::Ace::NG::FrameNode::GetHitTestMode() const";
       "OHOS::Ace::NG::FrameNode::GetInspectorValue()";
       "OHOS::Ace::NG::FrameNode::GetLayoutAlgorithm(bool)";
+      "OHOS::Ace::NG::FrameNode::GetLayoutOwner() const";
       "OHOS::Ace::NG::FrameNode::GetLayoutPropertyTypeName() const";
       "OHOS::Ace::NG::FrameNode::GetOffsetRelativeToWindow() const";
       "OHOS::Ace::NG::FrameNode::GetOrCreateAccessibilityProperty()";

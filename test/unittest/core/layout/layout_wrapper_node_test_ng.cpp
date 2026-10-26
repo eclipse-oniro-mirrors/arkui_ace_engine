@@ -15,6 +15,7 @@
 
 #include <memory>
 #include <optional>
+#include <type_traits>
 
 #include "gtest/gtest.h"
 
@@ -45,6 +46,11 @@ using namespace testing::ext;
 
 namespace OHOS::Ace::NG {
 namespace {
+static_assert(!std::is_base_of_v<AceType, LayoutWrapper>);
+static_assert(std::is_base_of_v<TypeInfoBase, LayoutWrapper>);
+static_assert(sizeof(RefPtr<LayoutWrapper>) == sizeof(LayoutWrapper*));
+static_assert(sizeof(WeakPtr<LayoutWrapper>) == sizeof(WeakPtr<FrameNode>));
+
 constexpr int32_t NODE_ID_0 = 0;
 constexpr int32_t NODE_ID_1 = 1;
 constexpr int32_t NODE_ID_2 = 2;
@@ -321,4 +327,136 @@ HWTEST_F(LayoutWrapperNodeTestNg, LayoutWrapperNodeTestNg09, TestSize.Level0)
     EXPECT_TRUE(geometryTransition->IsRunning(layoutWrapper->GetHostNode()));
     EXPECT_TRUE(geometryTransition->IsNodeInAndActive(layoutWrapper->GetHostNode()));
 }
+/**
+ * @tc.name: LayoutWrapperRef_001
+ * @tc.desc: The original smart-pointer API retains the real owner and adjusts the capability address.
+ * @tc.type: FUNC
+ */
+HWTEST_F(LayoutWrapperNodeTestNg, LayoutWrapperRef_001, TestSize.Level1)
+{
+    auto [node, wrapper] = CreateNodeAndWrapper(ROW_FRAME_NODE, NODE_ID_0);
+    WeakPtr<FrameNode> weak(node);
+    auto* rawNode = node.GetRawPtr();
+    auto count = node->RefCount();
+    RefPtr<LayoutWrapper> view(node);
+    EXPECT_EQ(node->RefCount(), count + 1);
+    const RefPtr<LayoutWrapper>& constView = view;
+    EXPECT_EQ(AceType::RawPtr(constView), static_cast<LayoutWrapper*>(rawNode));
+    EXPECT_EQ(constView->GetLayoutOwner(), static_cast<AceType*>(rawNode));
+    EXPECT_EQ(view, node);
+    EXPECT_EQ(node, view);
+    EXPECT_EQ(view, rawNode);
+    EXPECT_EQ(node, view.GetRawPtr());
+    EXPECT_EQ(AceType::DynamicCast<FrameNode>(view), node);
+    EXPECT_EQ(AceType::DynamicCast<LayoutWrapper>(node), view);
+    EXPECT_EQ(AceType::DynamicCast<LayoutWrapperNode>(view), nullptr);
+    EXPECT_TRUE(AceType::InstanceOf<FrameNode>(view));
+    auto claimed = AceType::Claim(view.GetRawPtr());
+    EXPECT_EQ(view, claimed);
+    RefPtr<AceType> owner(view);
+    EXPECT_EQ(owner, node);
+    owner.Reset();
+    node.Reset();
+    EXPECT_NE(weak.Upgrade(), nullptr);
+    view.Reset();
+    EXPECT_NE(weak.Upgrade(), nullptr);
+    claimed.Reset();
+    EXPECT_EQ(weak.Upgrade(), nullptr);
+}
+
+/**
+ * @tc.name: LayoutWrapperRef_002
+ * @tc.desc: A standalone wrapper outlives its host; weak views expire with the wrapper rather than the host.
+ * @tc.type: FUNC
+ */
+HWTEST_F(LayoutWrapperNodeTestNg, LayoutWrapperRef_002, TestSize.Level1)
+{
+    auto [node, wrapper] = CreateNodeAndWrapper(ROW_FRAME_NODE, NODE_ID_0);
+    WeakPtr<FrameNode> weakHost(node);
+    WeakPtr<LayoutWrapperNode> weakWrapper(wrapper);
+    RefPtr<LayoutWrapper> view(wrapper);
+    WeakPtr<LayoutWrapper> weakView(view);
+    auto claimedWeak = AceType::WeakClaim(view.GetRawPtr());
+    WeakPtr<AceType> weakOwner(view);
+    auto weakOwnerFromView = AceType::DynamicCast<AceType>(weakView);
+    EXPECT_EQ(weakOwner.Upgrade(), wrapper);
+    EXPECT_EQ(weakOwnerFromView.Upgrade(), wrapper);
+    EXPECT_EQ(view.GetRawPtr(), static_cast<LayoutWrapper*>(wrapper.GetRawPtr()));
+    EXPECT_EQ(AceType::DynamicCast<FrameNode>(view), nullptr);
+    EXPECT_EQ(AceType::DynamicCast<LayoutWrapperNode>(view), wrapper);
+    EXPECT_EQ(weakView, weakWrapper);
+    EXPECT_EQ(weakView, wrapper);
+    EXPECT_EQ(wrapper, weakView);
+    EXPECT_EQ(view, weakWrapper);
+    EXPECT_EQ(WeakPtr<LayoutWrapper>::Hash()(weakView), WeakPtr<LayoutWrapperNode>::Hash()(weakWrapper));
+    node.Reset();
+    EXPECT_TRUE(weakHost.Invalid());
+    EXPECT_EQ(view->GetHostNode(), nullptr);
+    wrapper.Reset();
+    auto upgraded = weakView.Upgrade();
+    EXPECT_EQ(upgraded, view);
+    EXPECT_EQ(claimedWeak.Upgrade(), view);
+    view.Reset();
+    EXPECT_FALSE(weakView.Invalid());
+    upgraded.Reset();
+    EXPECT_TRUE(weakView.Invalid());
+    EXPECT_EQ(weakView.Upgrade(), nullptr);
+    EXPECT_EQ(claimedWeak.Upgrade(), nullptr);
+    EXPECT_EQ(weakWrapper.Upgrade(), nullptr);
+    auto expiredOwner = AceType::DynamicCast<AceType>(weakView);
+    EXPECT_TRUE(expiredOwner.Invalid());
+    EXPECT_EQ(expiredOwner.Upgrade(), nullptr);
+    auto expiredCopy = weakView;
+    EXPECT_TRUE(expiredCopy.Invalid());
+    EXPECT_EQ(expiredCopy.Upgrade(), nullptr);
+}
+
+/**
+ * @tc.name: LayoutWrapperRef_003
+ * @tc.desc: Copy/move, ordering and dynamic transfer preserve the owner's reference count and identity.
+ * @tc.type: FUNC
+ */
+HWTEST_F(LayoutWrapperNodeTestNg, LayoutWrapperRef_003, TestSize.Level1)
+{
+    auto [node, wrapper] = CreateNodeAndWrapper(ROW_FRAME_NODE, NODE_ID_0);
+    RefPtr<LayoutWrapper> original(wrapper);
+    auto count = wrapper->RefCount();
+    RefPtr<LayoutWrapper> copied(original);
+    EXPECT_EQ(wrapper->RefCount(), count + 1);
+    RefPtr<LayoutWrapper> moved(std::move(original));
+    EXPECT_EQ(original, nullptr);
+    EXPECT_EQ(wrapper->RefCount(), count + 1);
+    EXPECT_EQ(copied, moved);
+    RefPtr<LayoutWrapper> nodeView(node);
+    EXPECT_EQ(nodeView < copied, node < wrapper);
+    EXPECT_EQ(copied < nodeView, wrapper < node);
+    EXPECT_FALSE(copied < wrapper);
+    EXPECT_FALSE(wrapper < copied);
+    nodeView.Swap(moved);
+    EXPECT_EQ(moved, node);
+    nodeView.Reset();
+    count = node->RefCount();
+    auto failed = AceType::DynamicCast<LayoutWrapperNode>(std::move(moved));
+    EXPECT_EQ(failed, nullptr);
+    EXPECT_EQ(moved, node);
+    EXPECT_EQ(node->RefCount(), count);
+    auto transferred = AceType::DynamicCast<FrameNode>(std::move(moved));
+    EXPECT_EQ(moved, nullptr);
+    EXPECT_EQ(transferred, node);
+    EXPECT_EQ(node->RefCount(), count);
+    RefPtr<LayoutWrapper> ownerView(std::move(transferred));
+    EXPECT_EQ(transferred, nullptr);
+    EXPECT_EQ(node->RefCount(), count);
+    RefPtr<AceType> owner(std::move(ownerView));
+    EXPECT_EQ(ownerView, nullptr);
+    EXPECT_EQ(owner, node);
+    EXPECT_EQ(node->RefCount(), count);
+    copied = nullptr;
+    EXPECT_FALSE(copied);
+    EXPECT_EQ(AceType::Claim(static_cast<LayoutWrapper*>(nullptr)), nullptr);
+    WeakPtr<LayoutWrapper> empty;
+    EXPECT_TRUE(empty.Invalid());
+    EXPECT_EQ(empty.Upgrade(), nullptr);
+}
+
 } // namespace OHOS::Ace::NG

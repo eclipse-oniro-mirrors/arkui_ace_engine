@@ -131,7 +131,7 @@ enum class UINodeType {
 };
 
 // UINode is the base class of FrameNode and SyntaxNode.
-class ACE_FORCE_EXPORT UINode : public virtual AceType {
+class ACE_FORCE_EXPORT UINode : public AceType {
     DECLARE_ACE_TYPE(UINode, AceType);
 
 public:

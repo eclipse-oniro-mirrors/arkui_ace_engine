@@ -344,6 +344,11 @@ class ACE_FORCE_EXPORT FrameNode : public UINode, public LayoutWrapper {
 private:
     class FrameProxy;
 
+    AceType* GetLayoutOwner() const override
+    {
+        return const_cast<FrameNode*>(this);
+    }
+
 public:
     // create a new child element with new element tree.
     static RefPtr<FrameNode> CreateFrameNodeWithTree(

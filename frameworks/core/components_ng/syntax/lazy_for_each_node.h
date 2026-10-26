@@ -257,6 +257,11 @@ protected:
     void UpdateChildrenFreezeState(bool isFreeze, bool isForceUpdateFreezeVaule = false) override;
     void DumpInfo() override;
 private:
+    AceType* GetDataChangeOwner() const override
+    {
+        return const_cast<LazyForEachNode*>(this);
+    }
+
     void OnAttachToMainTree(bool recursive) override
     {
         UINode::OnAttachToMainTree(recursive);

@@ -33,7 +33,9 @@ public:
     ~MockLayoutProperty() override = default;
 };
 
-class MockLayoutWrapper : public LayoutWrapper {
+class MockLayoutWrapper : public LayoutWrapper, public AceType {
+    DECLARE_ACE_TYPE(MockLayoutWrapper, LayoutWrapper, AceType);
+
 public:
     explicit MockLayoutWrapper(WeakPtr<FrameNode> hostNode) : LayoutWrapper(hostNode)
     {
@@ -81,6 +83,12 @@ public:
     MockLayoutProperty* GetMockLayoutProperty()
     {
         return reinterpret_cast<MockLayoutProperty*>(layoutProperty_.GetRawPtr());
+    }
+
+private:
+    AceType* GetLayoutOwner() const override
+    {
+        return const_cast<MockLayoutWrapper*>(this);
     }
 };
 

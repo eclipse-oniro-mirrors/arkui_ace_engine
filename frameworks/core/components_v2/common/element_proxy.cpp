@@ -942,6 +942,11 @@ public:
     }
 
 private:
+    AceType* GetDataChangeOwner() const override
+    {
+        return const_cast<LazyForEachElementProxy*>(this);
+    }
+
     class LazyForEachCache final {
     public:
         explicit LazyForEachCache(const RefPtr<LazyForEachComponent>& component) : lazyForEachComponent_(component)

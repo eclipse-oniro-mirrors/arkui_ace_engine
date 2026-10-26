@@ -34,6 +34,27 @@ class RefPtr;
 template<class T>
 class WeakPtr;
 
+// Specialize only for capability views whose lifetime belongs to another object.
+// The default policy preserves intrusive ownership and in-use diagnostics.
+template<class T>
+struct RefPtrTraits {
+    static T* GetOwner(T* ptr)
+    {
+        return ptr;
+    }
+
+    static LifeCycleCheckable::PtrHolder<T> Access(T* ptr)
+    {
+        return ptr;
+    }
+
+    template<class Target>
+    static Target* DynamicCast(T* ptr)
+    {
+        return T::template DynamicCast<Target>(ptr);
+    }
+};
+
 // Inherit this class to use 'RefPtr' and 'WeakPtr' to manage pointer of instance.
 class ACE_FORCE_EXPORT Referenced : public LifeCycleCheckable {
 public:
@@ -41,23 +62,24 @@ public:
     template<class T, bool isNewOrRecycle = false>
     static RefPtr<T> Claim(T* rawPtr)
     {
+        auto* owner = RefPtrTraits<T>::GetOwner(rawPtr);
         if constexpr (isNewOrRecycle) {
-            if (rawPtr && rawPtr->RefCount()) {
-                rawPtr->OnDetectedClaimDeathObj(isNewOrRecycle);
+            if (owner && owner->RefCount()) {
+                owner->OnDetectedClaimDeathObj(isNewOrRecycle);
             }
         } else {
-            if constexpr (HasMaybeOnDeleteFunc<T>::value) {
-                if (rawPtr && rawPtr->MaybeOnDelete()) {
+            if constexpr (HasMaybeOnDeleteFunc<std::remove_pointer_t<decltype(owner)>>::value) {
+                if (owner && owner->MaybeOnDelete()) {
                     return RefPtr<T>(nullptr);
                 }
             }
-            if (rawPtr && !rawPtr->RefCount()) {
-                rawPtr->OnDetectedClaimDeathObj(isNewOrRecycle);
+            if (owner && !owner->RefCount()) {
+                owner->OnDetectedClaimDeathObj(isNewOrRecycle);
             }
         }
 #ifdef ACE_DEBUG
         if (MemoryMonitor::IsEnable()) {
-            MemoryMonitor::GetInstance().Update(rawPtr, static_cast<Referenced*>(rawPtr));
+            MemoryMonitor::GetInstance().Update(owner, static_cast<Referenced*>(owner));
         }
 #endif
         return RefPtr<T>(rawPtr);
@@ -135,7 +157,7 @@ protected:
     template<class T, class O>
     static RefPtr<T> Transfer(RefPtr<O>& ptr)
     {
-        auto p = O::template DynamicCast<T>(ptr.rawPtr_);
+        auto p = RefPtrTraits<O>::template DynamicCast<T>(ptr.rawPtr_);
         if (p) {
             ptr.rawPtr_ = nullptr;
         }
@@ -192,9 +214,9 @@ public:
     }
     // Construct instance by other 'RefPtr' that inherited from type 'T'.
     template<class O>
-    ACE_REMOVE(explicit) RefPtr(const RefPtr<O>& other) : RefPtr(other.rawPtr_) {}
+    ACE_REMOVE(explicit) RefPtr(const RefPtr<O>& other) : RefPtr(ConvertPointer(other.rawPtr_)) {}
     template<class O>
-    ACE_REMOVE(explicit) RefPtr(RefPtr<O>&& other) : rawPtr_(other.rawPtr_)
+    ACE_REMOVE(explicit) RefPtr(RefPtr<O>&& other) : rawPtr_(ConvertPointer(other.rawPtr_))
     {
         other.rawPtr_ = nullptr;
     }
@@ -203,7 +225,7 @@ public:
     {
         if (rawPtr_ != nullptr) {
             // Decrease strong reference count.
-            rawPtr_->DecRefCount();
+            RefPtrTraits<T>::GetOwner(rawPtr_)->DecRefCount();
             rawPtr_ = nullptr;
         }
     }
@@ -221,9 +243,9 @@ public:
         Swap(RefPtr());
     }
 
-    typename LifeCycleCheckable::PtrHolder<T> operator->() const
+    auto operator->() const
     {
-        return rawPtr_;
+        return RefPtrTraits<T>::Access(rawPtr_);
     }
     T& operator*() const
     {
@@ -261,7 +283,7 @@ public:
     template<class O>
     RefPtr& operator=(O* rawPtr)
     {
-        Swap(RefPtr(rawPtr));
+        Swap(RefPtr(ConvertPointer(rawPtr)));
         return *this;
     }
     template<class O>
@@ -284,7 +306,8 @@ public:
         if (rawPtr_ == nullptr) {
             return rawPtr == nullptr;
         }
-        return rawPtr != nullptr && rawPtr_->refCounter_ == rawPtr->refCounter_;
+        return rawPtr != nullptr &&
+            RefPtrTraits<T>::GetOwner(rawPtr_)->refCounter_ == RefPtrTraits<const O>::GetOwner(rawPtr)->refCounter_;
     }
     template<class O>
     bool operator!=(const O* rawPtr) const
@@ -330,10 +353,21 @@ public:
         if (rawPtr_ == nullptr) {
             return other.rawPtr_ != nullptr;
         }
-        return other.rawPtr_ != nullptr && rawPtr_->refCounter_ < other.rawPtr_->refCounter_;
+        return other.rawPtr_ != nullptr &&
+            RefPtrTraits<T>::GetOwner(rawPtr_)->refCounter_ < RefPtrTraits<O>::GetOwner(other.rawPtr_)->refCounter_;
     }
 
 private:
+    template<class O>
+    static T* ConvertPointer(O* ptr)
+    {
+        if constexpr (std::is_convertible_v<O*, T*>) {
+            return ptr;
+        } else {
+            return RefPtrTraits<O>::GetOwner(ptr);
+        }
+    }
+
     // Construct instance by raw pointer.
     // 'WeakPtr' may construct 'RefPtr' without increasing its strong reference count,
     // because strong reference count is already increased in 'WeakPtr' while upgrading.
@@ -342,7 +376,7 @@ private:
     {
         if (rawPtr_ != nullptr && forceIncRef) {
             // Increase strong reference count for holding instance.
-            rawPtr_->IncRefCount();
+            RefPtrTraits<T>::GetOwner(rawPtr_)->IncRefCount();
         }
     }
 
@@ -382,7 +416,7 @@ public:
     }
     // Construct instance by 'RefPtr' that inherited from type 'T' or 'T' itself.
     template<class O>
-    ACE_REMOVE(explicit) WeakPtr(const RefPtr<O>& other) : WeakPtr(other.rawPtr_) {}
+    ACE_REMOVE(explicit) WeakPtr(const RefPtr<O>& other) : WeakPtr(RefPtr<T>::ConvertPointer(other.rawPtr_)) {}
     ACE_REMOVE(explicit) WeakPtr(const RefPtr<T>& other) : WeakPtr(other.rawPtr_) {}
 
     ~WeakPtr()
@@ -438,7 +472,7 @@ public:
     template<class O>
     WeakPtr& operator=(O* rawPtr)
     {
-        Swap(WeakPtr(rawPtr));
+        Swap(WeakPtr(RefPtr<T>::ConvertPointer(rawPtr)));
         return *this;
     }
     template<class O>
@@ -456,7 +490,7 @@ public:
     template<class O>
     WeakPtr& operator=(const RefPtr<O>& other)
     {
-        Swap(WeakPtr(other.rawPtr_));
+        Swap(WeakPtr(RefPtr<T>::ConvertPointer(other.rawPtr_)));
         return *this;
     }
 
@@ -467,7 +501,7 @@ public:
         if (refCounter_ == nullptr) {
             return rawPtr == nullptr;
         }
-        return rawPtr != nullptr && refCounter_ == rawPtr->refCounter_;
+        return rawPtr != nullptr && refCounter_ == RefPtrTraits<const O>::GetOwner(rawPtr)->refCounter_;
     }
     template<class O>
     bool operator!=(const O* rawPtr) const
@@ -489,7 +523,9 @@ public:
     template<class O>
     bool operator==(const RefPtr<O>& strong) const
     {
-        return strong.rawPtr_ != nullptr ? strong.rawPtr_->refCounter_ == refCounter_ : refCounter_ == nullptr;
+        return strong.rawPtr_ != nullptr
+            ? RefPtrTraits<O>::GetOwner(strong.rawPtr_)->refCounter_ == refCounter_
+            : refCounter_ == nullptr;
     }
     template<class O>
     bool operator!=(const RefPtr<O>& strong) const
@@ -517,7 +553,9 @@ public:
 
 private:
     // Construct instance by raw pointer.
-    explicit WeakPtr(T* rawPtr) : WeakPtr(rawPtr, rawPtr != nullptr ? rawPtr->refCounter_ : nullptr) {}
+    explicit WeakPtr(T* rawPtr)
+        : WeakPtr(rawPtr, rawPtr != nullptr ? RefPtrTraits<T>::GetOwner(rawPtr)->refCounter_ : nullptr)
+    {}
     template<class O>
     WeakPtr(O* rawPtr, RefCounter* aceRef) : unsafeRawPtr_(rawPtr), refCounter_(aceRef)
     {
