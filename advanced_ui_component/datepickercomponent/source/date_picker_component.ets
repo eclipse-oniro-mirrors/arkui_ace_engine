@@ -47,7 +47,8 @@ export class DatePickerComponentResult {
 export class CommonOptions {
   public start?: Date;
   public end?: Date;
-  public selected?: Date | DatePickerComponentResult;
+  public selected?: Date;
+  public extendSelected?: Date | DatePickerComponentResult;
   public loop?: boolean;
   public onChange?: Callback<DatePickerComponentResult>;
   public onScrollStop?: Callback<DatePickerComponentResult>;
@@ -1383,15 +1384,21 @@ private formatHour(hour24: number): string {
     let selectedValid = false;
     let selectedIsResult = false;
 
-    if (dateOptions.selected !== undefined && dateOptions.selected !== null) {
-      if (dateOptions.selected instanceof Date) {
-        selectedDate = this.validateDate(dateOptions.selected);
+    // extendSelected takes priority over selected; when both are set, selected does not take effect.
+    const effectiveSelected: Date | DatePickerComponentResult | undefined =
+      (dateOptions.extendSelected !== undefined && dateOptions.extendSelected !== null)
+        ? dateOptions.extendSelected
+        : dateOptions.selected;
+
+    if (effectiveSelected !== undefined && effectiveSelected !== null) {
+      if (effectiveSelected instanceof Date) {
+        selectedDate = this.validateDate(effectiveSelected);
         if (selectedDate !== undefined) {
           selectedValid = true;
         }
       } else {
-        // selected is a DatePickerComponentResult: restore a prior selection result.
-        const result: DatePickerComponentResult = dateOptions.selected as DatePickerComponentResult;
+        // effectiveSelected is a DatePickerComponentResult: restore a prior selection result.
+        const result: DatePickerComponentResult = effectiveSelected as DatePickerComponentResult;
         // Each set field takes effect; each omitted field uses the corresponding
         // part of the system date.
         const m = result.month ?? now.getMonth();
@@ -1587,15 +1594,21 @@ private formatHour(hour24: number): string {
     let selectedTime: Date | undefined = undefined;
     let selectedValid = false;
 
-    if (timeOptions.selected !== undefined && timeOptions.selected !== null) {
-      if (timeOptions.selected instanceof Date) {
-        selectedTime = this.validateTime(timeOptions.selected);
+    // extendSelected takes priority over selected; when both are set, selected does not take effect.
+    const effectiveSelected: Date | DatePickerComponentResult | undefined =
+      (timeOptions.extendSelected !== undefined && timeOptions.extendSelected !== null)
+        ? timeOptions.extendSelected
+        : timeOptions.selected;
+
+    if (effectiveSelected !== undefined && effectiveSelected !== null) {
+      if (effectiveSelected instanceof Date) {
+        selectedTime = this.validateTime(effectiveSelected);
         if (selectedTime !== undefined) {
           selectedValid = true;
         }
       } else {
-        // selected is a DatePickerComponentResult: restore a prior selection result.
-        const result: DatePickerComponentResult = timeOptions.selected as DatePickerComponentResult;
+        // effectiveSelected is a DatePickerComponentResult: restore a prior selection result.
+        const result: DatePickerComponentResult = effectiveSelected as DatePickerComponentResult;
         // Each set field takes effect; each omitted field uses the corresponding
         // part of the system time.
         const h = result.hour ?? now.getHours();
