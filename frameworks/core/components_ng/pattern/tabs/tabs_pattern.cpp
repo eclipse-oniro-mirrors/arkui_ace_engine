@@ -2270,6 +2270,14 @@ void TabsPattern::UpdateSideBarIfNeeded()
     // adaptable/sidebar -> bottom/top
     if (newIsNonSidebar) {
         ClearDividerDragEvent();
+        // Remove CollapseButton (direct child of tabsNode) when leaving sidebar mode.
+        // sideBarNode_ and sideBarDividerNode_ are kept for reuse on the next switch;
+        // their visibility is managed by the layout algorithm's Measure().
+        if (collapseButtonNode_) {
+            host->RemoveChild(collapseButtonNode_);
+            host->MarkNeedSyncRenderTree();
+            collapseButtonNode_ = nullptr;
+        }
         // Keep sideBarTabBarItemId on each TabContentNode so that GetOrCreateTabItemNode
         // can reuse existing tab item nodes on the next bottom->sidebar switch.
         // Resetting the ids here would cause fresh ids to be generated, leading to
@@ -2301,6 +2309,8 @@ void TabsPattern::UpdateSideBarIfNeeded()
     }
     // Sync properties to SideBarPattern, then trigger its OnModifyDone
     SyncPropertiesToSideBar();
+    // Create or remove collapse button based on showSidebarControlButton_
+    UpdateCollapseButtonIfNeeded();
     // Register all existing TabContent tab items.
     // First time: update=false to create items and bind click events.
     // Subsequent switches: update=true to update existing items in place
@@ -2557,14 +2567,17 @@ void TabsPattern::SyncPropertiesToSideBar()
     // 5. Sync searchable
     sideBarPattern->SetSideBarSearchableOptions(searchableOptions_);
 
-    // 4. Replay bar modifier on the sidebar node first (matches tabBar execution order
+    // 4. Sync showSidebarControlButton
+    sideBarPattern->SetShowSidebarControlButton(showSidebarControlButton_);
+
+    // 5. Replay bar modifier on the sidebar node first (matches tabBar execution order
     // where barModifier is applied before bar* properties, so bar* can override modifier)
     if (barModifierApply_) {
         auto apply = barModifierApply_;
         apply(sideBarNode_);
     }
 
-    // 5. Sync bar* attributes (divider, background color, background blur style) to the sidebar.
+    // 6. Sync bar* attributes (divider, background color, background blur style) to the sidebar.
     // Applied after modifier so that bar* properties take precedence, consistent with tabBar.
     UpdateSideBarAttributes();
 
@@ -2587,6 +2600,31 @@ void TabsPattern::SyncPropertiesToSideBar()
     // After all properties are synced, explicitly trigger SideBar Pattern's OnModifyDone
     sideBarNode_->MarkModifyDone();
     sideBarNode_->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+}
+
+void TabsPattern::UpdateCollapseButtonIfNeeded()
+{
+    auto host = AceType::DynamicCast<TabsNode>(GetHost());
+    CHECK_NULL_VOID(host);
+    CHECK_NULL_VOID(sideBarNode_);
+    auto sideBarPattern = sideBarNode_->GetPattern<TabsSideBarPattern>();
+    CHECK_NULL_VOID(sideBarPattern);
+
+    if (showSidebarControlButton_ && !collapseButtonNode_) {
+        collapseButtonNode_ = sideBarPattern->CreateCollapseButton(host);
+        if (collapseButtonNode_) {
+            sideBarPattern->UpdateCollapseButtonIcon();
+            collapseButtonNode_->MarkModifyDone();
+            host->MarkNeedSyncRenderTree();
+            host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+        }
+    } else if (!showSidebarControlButton_ && collapseButtonNode_) {
+        host->RemoveChild(collapseButtonNode_);
+        host->MarkNeedSyncRenderTree();
+        host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+        collapseButtonNode_ = nullptr;
+        sideBarPattern->ClearCollapseButtonState();
+    }
 }
 
 void TabsPattern::RegisterSideBarTabItems(bool update)

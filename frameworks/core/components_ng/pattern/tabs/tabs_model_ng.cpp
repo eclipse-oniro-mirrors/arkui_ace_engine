@@ -2754,6 +2754,21 @@ void TabsModelNG::SetSidebarSearchableOptions(FrameNode* frameNode, const TabsSi
     tabsPattern->SetTabsSidebarSearchableOptions(options);
 }
 
+void TabsModelNG::SetShowSidebarControlButton(bool showControlButton)
+{
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    CHECK_NULL_VOID(frameNode);
+    SetShowSidebarControlButton(frameNode, showControlButton);
+}
+
+void TabsModelNG::SetShowSidebarControlButton(FrameNode* frameNode, bool showControlButton)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto pattern = frameNode->GetPattern<TabsPattern>();
+    CHECK_NULL_VOID(pattern);
+    pattern->SetShowSidebarControlButton(showControlButton);
+}
+
 void TabsModelNG::SetBarDisplayModeBreakpoint(const TabBarDisplayModeBreakpoint& breakpoint)
 {
     auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();

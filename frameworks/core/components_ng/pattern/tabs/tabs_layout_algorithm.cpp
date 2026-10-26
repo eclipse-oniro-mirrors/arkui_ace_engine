@@ -74,6 +74,9 @@ const Dimension FLOATING_BAR_PADDING_4 = Dimension(4, Ace::DimensionUnit::VP);
 const Dimension FLOATING_BAR_PADDING_12 = Dimension(12, Ace::DimensionUnit::VP);
 
 const Dimension SIDE_BAR_DEFAULT_WIDTH = 240.0_vp;
+const Dimension COLLAPSE_BUTTON_SIZE = 40.0_vp;
+const Dimension COLLAPSE_BUTTON_PADDING = 16.0_vp;
+const Dimension COLLAPSE_BUTTON_VERTICAL_PADDING = 8.0_vp;
 
 constexpr int32_t SWIPER_INDEX = 0;
 constexpr int32_t SIDEBAR_DIVIDER_INDEX = 1;
@@ -88,24 +91,35 @@ void TabsLayoutAlgorithm::UpdateSideBarAndSideBarDividerVisibility(LayoutWrapper
     CHECK_NULL_VOID(host);
     auto tabsPattern = host->GetPattern<TabsPattern>();
     CHECK_NULL_VOID(tabsPattern);
+    auto sideBar = tabsPattern->GetSideBarNode();
+    CHECK_NULL_VOID(sideBar);
+    // If the sidebar was collapsed by the showSidebarControlButton, keep it collapsed
+    // when the layout algorithm restores visibility (e.g. switching back from bottom tab bar).
+    // However, during the collapse/expand animation, keep sidebar VISIBLE so RSNode can
+    // animate the transform translate. The animation handler manages visibility separately.
+    bool isCollapsed = false;
+    bool isCollapseAnimating = false;
+    auto sideBarPattern = sideBar->GetPattern<TabsSideBarPattern>();
+    if (sideBarPattern) {
+        isCollapsed = sideBarPattern->IsCollapsed();
+        isCollapseAnimating = sideBarPattern->IsCollapseAnimating();
+    }
+    bool effectiveVisible = isCollapseAnimating || (isVisible && !isCollapsed);
     auto sideBarDivider = tabsPattern->GetSideBarDividerNode();
     if (sideBarDivider) {
         auto property = sideBarDivider->GetLayoutProperty();
         if (property) {
-            property->UpdateVisibility(isVisible ? VisibleType::VISIBLE : VisibleType::GONE);
+            property->UpdateVisibility(effectiveVisible ? VisibleType::VISIBLE : VisibleType::GONE);
         }
     }
-    auto sideBar = tabsPattern->GetSideBarNode();
-    CHECK_NULL_VOID(sideBar);
     auto property = sideBar->GetLayoutProperty();
     if (property) {
-        property->UpdateVisibility(isVisible ? VisibleType::VISIBLE : VisibleType::GONE);
+        property->UpdateVisibility(effectiveVisible ? VisibleType::VISIBLE : VisibleType::GONE);
     }
     if (!isVisible) {
         return;
     }
     // When sidebar becomes visible, apply per-item defaultVisibility filtering
-    auto sideBarPattern = sideBar->GetPattern<TabsSideBarPattern>();
     CHECK_NULL_VOID(sideBarPattern);
     auto tabListNode = sideBarPattern->GetTabListNode();
     CHECK_NULL_VOID(tabListNode);
@@ -174,6 +188,10 @@ float TabsLayoutAlgorithm::MeasureSideBar(
     CHECK_NULL_RETURN(sideBarWrapper, 0.0f);
     auto geometryNode = sideBarWrapper->GetGeometryNode();
     CHECK_NULL_RETURN(geometryNode, 0.0f);
+    if (sideBar->GetLayoutProperty()->GetVisibilityValue(VisibleType::VISIBLE) != VisibleType::VISIBLE) {
+        geometryNode->SetFrameSize(SizeF(0.0f, 0.0f));
+        return 0.0f;
+    }
     auto childLayoutConstraint = layoutProperty->CreateChildConstraint();
     // Calculate effective sidebar width:
     // 1. If a drag width has been set (realSideBarWidthPx has value), use it
@@ -220,6 +238,10 @@ float TabsLayoutAlgorithm::MeasureSideBarDivider(
     auto geometryNode = sideBarDividerWrapper->GetGeometryNode();
     CHECK_NULL_RETURN(geometryNode, 0.0f);
     auto childLayoutConstraint = layoutProperty->CreateChildConstraint();
+    if (sideBarDivider->GetLayoutProperty()->GetVisibilityValue(VisibleType::VISIBLE) != VisibleType::VISIBLE) {
+        geometryNode->SetFrameSize(SizeF(0.0f, 0.0f));
+        return 0.0f;
+    }
     // Sidebar divider spec:
     // - not set / undefined / null → not shown (width 0)
     // - valid DividerStyle (strokeWidth is required) → width = strokeWidth
@@ -330,6 +352,22 @@ void TabsLayoutAlgorithm::MeasureInSideBarMode(LayoutWrapper* layoutWrapper,
             layoutProperty, swiperWrapper, idealSize, sideBarWidth, dividerStrokeWidth);
     } else if (swiperWrapper && swiperWrapper->GetGeometryNode()) {
         swiperWrapper->GetGeometryNode()->SetFrameSize(SizeF());
+    }
+    // Measure collapse button (direct child of tabsNode, stays visible when sidebar collapsed)
+    auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
+    CHECK_NULL_VOID(tabsPattern);
+    auto buttonNode = tabsPattern->GetCollapseButtonNode();
+    if (buttonNode) {
+        auto buttonIndex = tabsNode->GetChildIndexById(buttonNode->GetId());
+        if (buttonIndex >= 0) {
+            auto buttonWrapper = layoutWrapper->GetOrCreateChildByIndex(buttonIndex);
+            if (buttonWrapper) {
+                auto buttonLayoutConstraint = layoutProperty->CreateChildConstraint();
+                buttonLayoutConstraint.selfIdealSize.SetWidth(COLLAPSE_BUTTON_SIZE.ConvertToPx());
+                buttonLayoutConstraint.selfIdealSize.SetHeight(COLLAPSE_BUTTON_SIZE.ConvertToPx());
+                buttonWrapper->Measure(buttonLayoutConstraint);
+            }
+        }
     }
     if (tabsNode->HasEffectNode()) {
         auto effectWrapper = layoutWrapper->GetChildByIndex(itemIndex_.effectIndex);
@@ -623,6 +661,38 @@ void TabsLayoutAlgorithm::LayoutInSideBarMode(LayoutWrapper* layoutWrapper)
     if (sideBarGeo) {
         sideBarGeo->SetMarginFrameOffset(offsetList[SIDEBAR_INDEX]);
         sideBarWrapper->Layout();
+    }
+
+    // Layout collapse button (top corner of tabsNode, independent of sidebar)
+    auto buttonNode = tabsPattern->GetCollapseButtonNode();
+    if (buttonNode) {
+        auto buttonIndex = tabsNode->GetChildIndexById(buttonNode->GetId());
+        if (buttonIndex >= 0) {
+            auto buttonWrapper = layoutWrapper->GetOrCreateChildByIndex(buttonIndex);
+            if (buttonWrapper) {
+                auto buttonGeo = buttonWrapper->GetGeometryNode();
+                if (buttonGeo) {
+                    float buttonSize = COLLAPSE_BUTTON_SIZE.ConvertToPx();
+                    float padding = COLLAPSE_BUTTON_PADDING.ConvertToPx();
+                    float verticalPadding = COLLAPSE_BUTTON_VERTICAL_PADDING.ConvertToPx();
+                    auto paddingOffset = layoutProperty->CreatePaddingAndBorder().Offset();
+                    auto sideBarPosition = layoutProperty->GetSidebarPositionValue(BarPosition::START);
+                    bool isRTL = layoutProperty->GetNonAutoLayoutDirection() == TextDirection::RTL;
+                    bool isEnd = (isRTL && sideBarPosition == BarPosition::START) ||
+                                (!isRTL && sideBarPosition == BarPosition::END);
+                    OffsetF buttonOffset;
+                    if (isEnd) {
+                        buttonOffset = OffsetF(frameSize.Width() - buttonSize - padding + paddingOffset.GetX(),
+                            verticalPadding + paddingOffset.GetY());
+                    } else {
+                        buttonOffset = OffsetF(padding + paddingOffset.GetX(),
+                            verticalPadding + paddingOffset.GetY());
+                    }
+                    buttonGeo->SetMarginFrameOffset(buttonOffset);
+                    buttonWrapper->Layout();
+                }
+            }
+        }
     }
     if (measuringForAnimStart_ || tabsPattern->IsOnDisplayModeSwitchAnimation()) {
         // Animation-start or re-entrant layout: also layout the bottom-mode components

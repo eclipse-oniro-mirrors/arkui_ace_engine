@@ -1254,6 +1254,18 @@ void SetSidebarBottomBarImpl(Ark_NativePointer node,
         TabsModelNG::SetSidebarBottomBar(frameNode, nullptr);
     }
 }
+void SetShowSideBarControlButtonImpl(Ark_NativePointer node,
+                                     const Opt_Boolean* value)
+{
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto convValue = Converter::OptConvertPtr<bool>(value);
+    if (!convValue) {
+        TabsModelNG::SetShowSidebarControlButton(frameNode, false);
+        return;
+    }
+    TabsModelNG::SetShowSidebarControlButton(frameNode, *convValue);
+}
 } // TabsAttributeModifier
 const GENERATED_ArkUITabsModifier* GetTabsModifier()
 {
@@ -1311,6 +1323,7 @@ const GENERATED_ArkUITabsModifier* GetTabsModifier()
         TabsAttributeModifier::SetSidebarDisplayStyleImpl,
         TabsAttributeModifier::SetSidebarFooterImpl,
         TabsAttributeModifier::SetSidebarBottomBarImpl,
+        TabsAttributeModifier::SetShowSideBarControlButtonImpl,
         TabsAttributeModifier::SetBarModeImpl,
         TabsAttributeModifier::SetBarHeight1Impl,
         TabsAttributeModifier::SetBarBackgroundBlurStyle1Impl,

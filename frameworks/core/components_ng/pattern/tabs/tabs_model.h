@@ -261,6 +261,7 @@ public:
     virtual void SetSidebarFooter(const RefPtr<AceType>& footer) {}
     virtual void SetSidebarBottomBar(const RefPtr<AceType>& bottomBar) {}
     virtual void SetSidebarSearchableOptions(const NG::TabsSidebarSearchableOptions& options) {}
+    virtual void SetShowSidebarControlButton(bool showControlButton) {}
     virtual void SetBarDisplayModeBreakpoint(const NG::TabBarDisplayModeBreakpoint& breakpoint) {}
     virtual void SetOnBarDisplayModeChange(std::function<void(NG::TabBarDisplayMode)>&& onBarDisplayModeChange) {}
 

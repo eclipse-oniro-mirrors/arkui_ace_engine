@@ -141,6 +141,10 @@ void TabsNode::SidebarInfoToJsonValue(std::unique_ptr<JsonValue>& json, const In
     json->PutExtAttr("sidebarPosition",
         sidebarPosition == BarPosition::START ? "BarPosition.Start" : "BarPosition.End", filter);
 
+    // showSidebarControlButton
+    json->PutExtAttr("showSidebarControlButton",
+        tabsPattern->GetShowSidebarControlButton() ? "true" : "false", filter);
+
     // sidebarHeader
     json->PutExtAttr("sidebarHeader", tabsPattern->GetSidebarHeaderNode() ? "hasHeader" : "noHeader", filter);
 
