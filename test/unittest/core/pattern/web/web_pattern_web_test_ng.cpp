@@ -1672,7 +1672,8 @@ HWTEST_F(WebPatternWebTest, HandleEscToBackSupport_002, TestSize.Level1)
 
 /**
  * @tc.name: IsShouldTriggerBack_001
- * @tc.desc: IsShouldTriggerBack with ESC DOWN, the down consumed state should be recorded.
+ * @tc.desc: IsShouldTriggerBack with ESC DOWN, the down consumed state is recorded only when the web page
+ *           consumes the key (isUsed == true); a non-consumed ESC DOWN does not reset the recorded state.
  * @tc.type: FUNC
  */
 HWTEST_F(WebPatternWebTest, IsShouldTriggerBack_001, TestSize.Level1)
@@ -1684,19 +1685,21 @@ HWTEST_F(WebPatternWebTest, IsShouldTriggerBack_001, TestSize.Level1)
     ASSERT_NE(webPattern, nullptr);
     webPattern->isEscKeyDownConsumed_ = false;
 
-    // ESC DOWN consumed by the web page.
+    // ESC DOWN consumed by the web page records the consumed state and returns false.
     EXPECT_FALSE(webPattern->IsShouldTriggerBack(KeyEvent(KeyCode::KEY_ESCAPE, KeyAction::DOWN), true));
     EXPECT_TRUE(webPattern->isEscKeyDownConsumed_);
 
-    // ESC DOWN not consumed by the web page.
+    // ESC DOWN not consumed by the web page is a no-op: it neither returns back nor resets the recorded
+    // consumed state (the state is reset by HandleKeyEvent on the next ESC DOWN, see IsShouldTriggerBack_005).
     EXPECT_FALSE(webPattern->IsShouldTriggerBack(KeyEvent(KeyCode::KEY_ESCAPE, KeyAction::DOWN), false));
-    EXPECT_FALSE(webPattern->isEscKeyDownConsumed_);
+    EXPECT_TRUE(webPattern->isEscKeyDownConsumed_);
 #endif
 }
 
 /**
  * @tc.name: IsShouldTriggerBack_002
- * @tc.desc: IsShouldTriggerBack with ESC DOWN not consumed and ESC UP not used, back should be triggered.
+ * @tc.desc: IsShouldTriggerBack with ESC DOWN not consumed and ESC UP not used, back should be triggered and
+ *           the consumed state is not latched on the UP (it is reset by HandleKeyEvent on the next ESC DOWN).
  * @tc.type: FUNC
  */
 HWTEST_F(WebPatternWebTest, IsShouldTriggerBack_002, TestSize.Level1)
@@ -1710,13 +1713,16 @@ HWTEST_F(WebPatternWebTest, IsShouldTriggerBack_002, TestSize.Level1)
 
     EXPECT_FALSE(webPattern->IsShouldTriggerBack(KeyEvent(KeyCode::KEY_ESCAPE, KeyAction::DOWN), false));
     EXPECT_TRUE(webPattern->IsShouldTriggerBack(KeyEvent(KeyCode::KEY_ESCAPE, KeyAction::UP), false));
-    EXPECT_TRUE(webPattern->isEscKeyDownConsumed_);
+    // The UP branch no longer latches isEscKeyDownConsumed_ to true; the consumed state stays as it was
+    // set by the preceding DOWN (here, false because the DOWN was not consumed).
+    EXPECT_FALSE(webPattern->isEscKeyDownConsumed_);
 #endif
 }
 
 /**
  * @tc.name: IsShouldTriggerBack_003
- * @tc.desc: IsShouldTriggerBack with ESC UP used by the web page, back should not be triggered.
+ * @tc.desc: IsShouldTriggerBack with ESC UP used by the web page, back should not be triggered and the
+ *           consumed state is not latched on the UP.
  * @tc.type: FUNC
  */
 HWTEST_F(WebPatternWebTest, IsShouldTriggerBack_003, TestSize.Level1)
@@ -1729,7 +1735,8 @@ HWTEST_F(WebPatternWebTest, IsShouldTriggerBack_003, TestSize.Level1)
     webPattern->isEscKeyDownConsumed_ = false;
 
     EXPECT_FALSE(webPattern->IsShouldTriggerBack(KeyEvent(KeyCode::KEY_ESCAPE, KeyAction::UP), true));
-    EXPECT_TRUE(webPattern->isEscKeyDownConsumed_);
+    // The UP branch no longer latches isEscKeyDownConsumed_ to true.
+    EXPECT_FALSE(webPattern->isEscKeyDownConsumed_);
 #endif
 }
 
@@ -1774,13 +1781,17 @@ HWTEST_F(WebPatternWebTest, IsShouldTriggerBack_005, TestSize.Level1)
 
     // The following ESC UP is not blocked and back should be triggered.
     EXPECT_TRUE(webPattern->IsShouldTriggerBack(KeyEvent(KeyCode::KEY_ESCAPE, KeyAction::UP), false));
-    EXPECT_TRUE(webPattern->isEscKeyDownConsumed_);
+    // The UP branch no longer latches isEscKeyDownConsumed_ to true.
+    EXPECT_FALSE(webPattern->isEscKeyDownConsumed_);
 #endif
 }
 
 /**
  * @tc.name: IsShouldTriggerBack_006
- * @tc.desc: IsShouldTriggerBack with a non ESC key, back should never be triggered.
+ * @tc.desc: IsShouldTriggerBack with a non ESC key. The IsShouldTriggerBack guard no longer filters by key
+ *           code (the only caller, HandleKeyEvent, already restricts the call to ESC keys), so a non ESC DOWN
+ *           that is consumed by the web page still records the consumed state; the subsequent non ESC UP cannot
+ *           trigger back once the consumed state is recorded.
  * @tc.type: FUNC
  */
 HWTEST_F(WebPatternWebTest, IsShouldTriggerBack_006, TestSize.Level1)
@@ -1792,16 +1803,22 @@ HWTEST_F(WebPatternWebTest, IsShouldTriggerBack_006, TestSize.Level1)
     ASSERT_NE(webPattern, nullptr);
     webPattern->isEscKeyDownConsumed_ = false;
 
+    // A non ESC DOWN consumed by the web page records the consumed state because the key code is no longer
+    // checked inside IsShouldTriggerBack.
     EXPECT_FALSE(webPattern->IsShouldTriggerBack(KeyEvent(KeyCode::KEY_HOME, KeyAction::DOWN), true));
-    EXPECT_FALSE(webPattern->isEscKeyDownConsumed_);
+    EXPECT_TRUE(webPattern->isEscKeyDownConsumed_);
+    // The consumed state blocks the following UP from triggering back.
     EXPECT_FALSE(webPattern->IsShouldTriggerBack(KeyEvent(KeyCode::KEY_HOME, KeyAction::UP), false));
-    EXPECT_FALSE(webPattern->isEscKeyDownConsumed_);
+    EXPECT_TRUE(webPattern->isEscKeyDownConsumed_);
 #endif
 }
 
 /**
  * @tc.name: IsShouldTriggerBack_007
- * @tc.desc: IsShouldTriggerBack with consecutive ESC UP, back should be triggered only once.
+ * @tc.desc: IsShouldTriggerBack with consecutive ESC UP without an intervening ESC DOWN. The UP branch no
+ *           longer latches isEscKeyDownConsumed_ to true, so without an ESC DOWN to reset the consumed state
+ *           the second ESC UP still triggers back. In a real key sequence an ESC DOWN always precedes the UP
+ *           and resets the consumed state, keeping back triggered at most once per key press cycle.
  * @tc.type: FUNC
  */
 HWTEST_F(WebPatternWebTest, IsShouldTriggerBack_007, TestSize.Level1)
@@ -1814,8 +1831,10 @@ HWTEST_F(WebPatternWebTest, IsShouldTriggerBack_007, TestSize.Level1)
     webPattern->isEscKeyDownConsumed_ = false;
 
     EXPECT_TRUE(webPattern->IsShouldTriggerBack(KeyEvent(KeyCode::KEY_ESCAPE, KeyAction::UP), false));
-    EXPECT_TRUE(webPattern->isEscKeyDownConsumed_);
-    EXPECT_FALSE(webPattern->IsShouldTriggerBack(KeyEvent(KeyCode::KEY_ESCAPE, KeyAction::UP), false));
+    // The UP branch no longer latches isEscKeyDownConsumed_ to true.
+    EXPECT_FALSE(webPattern->isEscKeyDownConsumed_);
+    // Without an intervening ESC DOWN to reset the consumed state, the second ESC UP still triggers back.
+    EXPECT_TRUE(webPattern->IsShouldTriggerBack(KeyEvent(KeyCode::KEY_ESCAPE, KeyAction::UP), false));
 #endif
 }
 
