@@ -13,7 +13,9 @@
  * limitations under the License.
  */
 
+#include <atomic>
 #include <optional>
+#include <thread>
 #include "gtest/gtest.h"
 #define private public
 #define protected public
@@ -552,5 +554,98 @@ HWTEST_F(EventRecorderTestTwo, PutString009, TestSize.Level1)
     std::string value = "value";
     bool result = Recorder::NodeDataCache::Get().PutString(pageNode, id, value);
     EXPECT_FALSE(result);
+}
+/**
+ * @tc.name: WebNodeCache001
+ * @tc.desc: Test OnAttachWeb/GetWebNode/OnDetachWeb basic flow.
+ * @tc.type: FUNC
+ */
+HWTEST_F(EventRecorderTestTwo, WebNodeCache001, TestSize.Level1)
+{
+    auto& recorder = EventRecorder::Get();
+    recorder.weakNodeCache_.clear();
+    auto node = CreatePageNode("pages/WebCache001");
+    ASSERT_NE(node, nullptr);
+    int32_t nodeId = node->GetId();
+
+    recorder.OnAttachWeb(node);
+    auto weakNode = recorder.GetWebNode(nodeId);
+    auto upgraded = weakNode.Upgrade();
+    EXPECT_EQ(upgraded, node);
+
+    recorder.OnDetachWeb(nodeId);
+    auto weakNodeAfterDetach = recorder.GetWebNode(nodeId);
+    auto upgradedAfterDetach = weakNodeAfterDetach.Upgrade();
+    EXPECT_EQ(upgradedAfterDetach, nullptr);
+}
+
+/**
+ * @tc.name: WebNodeCache002
+ * @tc.desc: Test GetWebNode returns empty for non-existent node.
+ * @tc.type: FUNC
+ */
+HWTEST_F(EventRecorderTestTwo, WebNodeCache002, TestSize.Level1)
+{
+    auto& recorder = EventRecorder::Get();
+    auto weakNode = recorder.GetWebNode(-999999);
+    auto upgraded = weakNode.Upgrade();
+    EXPECT_EQ(upgraded, nullptr);
+}
+
+/**
+ * @tc.name: WebNodeCache003
+ * @tc.desc: Test concurrent access to weakNodeCache_ does not crash.
+ * @tc.type: FUNC
+ */
+HWTEST_F(EventRecorderTestTwo, WebNodeCache003, TestSize.Level1)
+{
+    auto& recorder = EventRecorder::Get();
+    recorder.weakNodeCache_.clear();
+    constexpr int32_t THREAD_COUNT = 8;
+    constexpr int32_t ITERATIONS = 100;
+
+    std::vector<int32_t> nodeIds;
+    std::vector<RefPtr<NG::FrameNode>> nodes;
+    for (int32_t i = 0; i < THREAD_COUNT; ++i) {
+        auto node = CreatePageNode("pages/WebCache003");
+        ASSERT_NE(node, nullptr);
+        nodeIds.push_back(node->GetId());
+        nodes.push_back(node);
+    }
+
+    std::atomic<bool> ready(false);
+    std::vector<std::thread> threads;
+
+    for (int32_t i = 0; i < THREAD_COUNT; ++i) {
+        threads.emplace_back([&recorder, &nodes, &nodeIds, i, &ready]() {
+            while (!ready.load()) {}
+            auto& node = nodes[i];
+            int32_t id = nodeIds[i];
+            for (int32_t j = 0; j < ITERATIONS; ++j) {
+                recorder.OnAttachWeb(node);
+                recorder.OnDetachWeb(id);
+            }
+        });
+    }
+
+    threads.emplace_back([&recorder, &nodeIds, &ready]() {
+        while (!ready.load()) {}
+        for (int32_t j = 0; j < ITERATIONS; ++j) {
+            for (int32_t id : nodeIds) {
+                auto weak = recorder.GetWebNode(id);
+                (void)weak.Upgrade();
+            }
+        }
+    });
+
+    ready.store(true);
+    for (auto& t : threads) {
+        t.join();
+    }
+
+    for (int32_t id : nodeIds) {
+        recorder.OnDetachWeb(id);
+    }
+    EXPECT_TRUE(true);
 }
 } // namespace OHOS::Ace
