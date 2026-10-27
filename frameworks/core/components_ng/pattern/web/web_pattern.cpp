@@ -18,8 +18,10 @@
 
 #include <securec.h>
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <filesystem>
+#include <fstream>
 #include <iomanip>
 
 #include <string>
@@ -170,6 +172,7 @@ constexpr int32_t MAXIMUM_ROTATION_DELAY_TIME = 800;
 // SerializeWebState serializes the web back-forward navigation history (access stack).
 // The official @ohos.web.webview API documentation recommends not restoring state > 512KB.
 constexpr size_t MAX_WEB_STATE_SIZE = 512 * 1024; // 512KB, per SDK restoreWebState recommendation
+constexpr size_t MAX_DATA_URI_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 constexpr int32_t RESERVED_DEVICEID1 = 0xAAAAAAFF;
 constexpr int32_t RESERVED_DEVICEID2 = 0xAAAAAAFE;
 constexpr int32_t LONG_PRESS_DURATION_MS = 650;
@@ -2884,13 +2887,35 @@ NG::DragDropInfo WebPattern::HandleOnDragStart(const RefPtr<OHOS::Ace::DragEvent
         std::string linkUrl = delegate_->dragData_->GetLinkURL();
         std::string linkTitle = delegate_->dragData_->GetLinkTitle();
         std::string fileUri;
+        std::string fullName;
         if (!fileName.empty()) {
+            // Only build a data: URI when we know the exact dir Blink wrote to. When tempDir_ is
+            // empty the hardcoded fallback path may not match Blink's actual write location, so
+            // skip BuildImageDataUri (fullName stays empty) and rely on the file:// fallback below.
+            if (!delegate_->tempDir_.empty()) {
+                fullName = delegate_->tempDir_ + "/dragdrop/" + fileName;
+            }
             fileUri = OnDragFileNameStart(aceUnifiedData, fileName);
         } else {
             TAG_LOGW(AceLogTag::ACE_WEB, "DragDrop event start, dragdata has no image file uri, just pass");
         }
-        if (!fileUri.empty() && !htmlContent.empty()) {
-            RewriteHtmlImgSrc(htmlContent, fileUri);
+        // Embed the image as a data: URI in the HTML so the <img src> is self-contained.
+        // A file:// URI baked into HTML is not portable: it points into the source app's sandbox
+        // and is unreachable on a cross-device drop target (UDMF cannot transform URIs inside HTML
+        // text). The data: URI is decoded the same way on both same-device and cross-device targets.
+        // When fullName is unknown (tempDir_ empty) or BuildImageDataUri fails (file missing / too
+        // large), fall back to the file:// URI so the same-device behavior of the prior fix is
+        // preserved rather than silently dropping the rewrite.
+        if (!htmlContent.empty()) {
+            std::string dataUri;
+            if (!fullName.empty()) {
+                dataUri = BuildImageDataUri(fullName, fileName);
+            }
+            if (!dataUri.empty()) {
+                RewriteHtmlImgSrc(htmlContent, dataUri);
+            } else if (!fileUri.empty()) {
+                RewriteHtmlImgSrc(htmlContent, fileUri);
+            }
         }
         if (!plainContent.empty()) {
             isDragEndMenuShow_ = true;
@@ -2954,6 +2979,79 @@ std::string WebPattern::OnDragFileNameStart(const RefPtr<UnifiedData>& aceUnifie
         return "";
     }
     return udmfUri;
+}
+
+std::string WebPattern::BuildImageDataUri(const std::string& fullName, const std::string& fileName)
+{
+    // Read back the temp file Blink wrote and embed it as a base64 data: URI so the HTML <img src>
+    // is self-contained and portable across devices. UDMF cannot transform URIs baked into HTML
+    // text, so a file:// URI here would be unreachable on a cross-device drop target.
+    std::ifstream file(fullName, std::ifstream::binary);
+    if (!file.is_open()) {
+        TAG_LOGW(AceLogTag::ACE_WEB, "BuildImageDataUri open failed, path:%{public}s", fullName.c_str());
+        return "";
+    }
+    file.seekg(0, std::ios::end);
+    auto endPos = file.tellg();
+    // tellg() returns -1 on failure; casting that to size_t yields SIZE_MAX and the subsequent
+    // vector allocation would abort (OpenHarmony disables exceptions). Bail out and let the
+    // caller fall back to the file:// path.
+    if (endPos < 0 || file.fail()) {
+        TAG_LOGW(AceLogTag::ACE_WEB, "BuildImageDataUri tellg failed, path:%{public}s", fullName.c_str());
+        return "";
+    }
+    auto size = static_cast<size_t>(endPos);
+    file.seekg(0, std::ios::beg);
+    if (size == 0) {
+        TAG_LOGW(AceLogTag::ACE_WEB, "BuildImageDataUri empty file, path:%{public}s", fullName.c_str());
+        return "";
+    }
+    // Cap the inlined image to avoid OOM and UI-thread jank: the raw bytes, the base64 string
+    // (~1.33x) and the final HTML all live in memory at once. Beyond the threshold, fall back
+    // to file:// (same-device still works; cross-device stays at the prior behavior).
+    if (size > MAX_DATA_URI_FILE_SIZE) {
+        TAG_LOGW(AceLogTag::ACE_WEB,
+            "BuildImageDataUri skip, file too large:%{public}zu, max:%{public}zu, path:%{public}s",
+            size, MAX_DATA_URI_FILE_SIZE, fullName.c_str());
+        return "";
+    }
+    std::vector<uint8_t> buffer(size);
+    if (!file.read(reinterpret_cast<char*>(buffer.data()), size)) {
+        TAG_LOGW(AceLogTag::ACE_WEB, "BuildImageDataUri read failed, path:%{public}s", fullName.c_str());
+        return "";
+    }
+    // Map the file extension to a mime type. Blink's GetSafeFilenameForImageFileContents
+    // produces extensions matching the source image format (bmp/png/webp/jpeg/etc.).
+    std::string ext;
+    auto dotPos = fileName.rfind('.');
+    if (dotPos != std::string::npos) {
+        ext = fileName.substr(dotPos + 1);
+        // Cast through unsigned char before calling ::tolower — passing a negative char value
+        // (non-ASCII byte) directly to std::tolower is undefined behavior.
+        std::transform(ext.begin(), ext.end(), ext.begin(),
+            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    }
+    std::string mime = "image/png"; // fallback; PNG is a safe default for unknown extensions
+    if (ext == "bmp") {
+        mime = "image/bmp";
+    } else if (ext == "webp") {
+        mime = "image/webp";
+    } else if (ext == "jpg" || ext == "jpeg") {
+        mime = "image/jpeg";
+    } else if (ext == "gif") {
+        mime = "image/gif";
+    } else if (ext == "png") {
+        mime = "image/png";
+    }
+    std::string encoded = Base64Util::Encode(buffer.data(), size);
+    if (encoded.empty()) {
+        TAG_LOGW(AceLogTag::ACE_WEB, "BuildImageDataUri base64 encode failed, path:%{public}s", fullName.c_str());
+        return "";
+    }
+    TAG_LOGI(AceLogTag::ACE_WEB,
+        "BuildImageDataUri mime:%{public}s, file size:%{public}zu, data uri size:%{public}zu",
+        mime.c_str(), size, encoded.size() + mime.size() + sizeof("data:;base64,") - 1);
+    return "data:" + mime + ";base64," + encoded;
 }
 
 void WebPattern::HandleOnDropMove(const RefPtr<OHOS::Ace::DragEvent>& info)
