@@ -456,32 +456,59 @@ export struct FoldSplitContainer {
   private isHoverMode: boolean | undefined = undefined;
 
   aboutToAppear() {
-    this.foldStatus = display.getFoldStatus();
-    display.on('foldStatusChange', (foldStatus) => {
-      if (this.foldStatus !== foldStatus) {
-        this.foldStatus = foldStatus;
-        this.updateLayout();
+    try {
+      this.foldStatus = display.getFoldStatus();
+    } catch (exception) {
+      Logger.error('Failed getFoldStatus. code:%{public}d, message:%{public}s',
+        exception.code, exception.message);
+    }
+    try {
+      display.on('foldStatusChange', (foldStatus) => {
+        if (this.foldStatus !== foldStatus) {
+          this.foldStatus = foldStatus;
+          this.updateLayout();
+          this.updatePreferredOrientation();
+        }
+      });
+    } catch (exception) {
+      Logger.error('Failed display.on foldStatusChange. code:%{public}d, message:%{public}s',
+        exception.code, exception.message);
+    }
+
+    try {
+      window.getLastWindow(this.getUIContext().getHostContext(), (error, windowInstance) => {
+        if (error && error.code) {
+          Logger.error('Failed to get window instance, error code: %{public}d', error.code);
+          return;
+        }
+
+        const windowId = windowInstance.getWindowProperties().id;
+        if (windowId < 0) {
+          Logger.error('Failed to get window instance because the window id is invalid. window id: %{public}d', windowId);
+          return;
+        }
+
+        this.windowInstance = windowInstance;
+        try {
+          this.windowStatusType = windowInstance.getWindowStatus();
+        } catch (exception) {
+          // The previewer does not support getWindowStatus, fallback to UNDEFINED
+          Logger.error('Failed getWindowStatus. code:%{public}d, message:%{public}s',
+            exception.code, exception.message);
+          this.windowStatusType = window.WindowStatusType.UNDEFINED;
+        }
         this.updatePreferredOrientation();
-      }
-    });
+        this.updateLayout();
+        this.dealWindowStatusChange();
+      });
+    } catch (exception) {
+      Logger.error('Failed getLastWindow code:%{public}d, message:%{public}s', exception.code, exception.message);
+    }
+  }
 
-    window.getLastWindow(this.getUIContext().getHostContext(), (error, windowInstance) => {
-      if (error && error.code) {
-        Logger.error('Failed to get window instance, error code: %{public}d', error.code);
-        return;
-      }
-
-      const windowId = windowInstance.getWindowProperties().id;
-      if (windowId < 0) {
-        Logger.error('Failed to get window instance because the window id is invalid. window id: %{public}d', windowId);
-        return;
-      }
-
-      this.windowInstance = windowInstance;
-      this.windowStatusType = windowInstance.getWindowStatus();
-      this.updatePreferredOrientation();
-      this.updateLayout();
-      this.windowInstance.on('windowStatusChange', (status) => {
+  private dealWindowStatusChange() {
+    try {
+      this.windowInstance?.on('windowStatusChange', (status) => {
         const wasFullScreen = this.windowStatusType === window.WindowStatusType.FULL_SCREEN;
         const isFullScreen = status === window.WindowStatusType.FULL_SCREEN;
         this.windowStatusType = status;
@@ -489,13 +516,26 @@ export struct FoldSplitContainer {
           this.updateLayout();
         }
       });
-    });
+    } catch (exception) {
+      Logger.error('Failed windowInstance.on windowStatusChange. code:%{public}d, message:%{public}s',
+        exception.code, exception.message);
+    }
   }
 
   aboutToDisappear() {
-    display.off('foldStatusChange');
+    try {
+      display.off('foldStatusChange');
+    } catch (exception) {
+      Logger.error('Failed display.off foldStatusChange. code:%{public}d, message:%{public}s',
+        exception.code, exception.message);
+    }
     if (this.windowInstance) {
-      this.windowInstance.off('windowStatusChange');
+      try {
+        this.windowInstance.off('windowStatusChange');
+      } catch (exception) {
+        Logger.error('Failed windowInstance.off windowStatusChange. code:%{public}d, message:%{public}s',
+          exception.code, exception.message);
+      }
     }
   }
 
@@ -551,10 +591,18 @@ export struct FoldSplitContainer {
 
   private dispatchHoverStatusChange(isHoverMode: boolean) {
     if (this.onHoverStatusChange) {
+      let rotation = 0;
+      try {
+        rotation = display.getDefaultDisplaySync().rotation;
+      } catch (exception) {
+        // The previewer does not support getDefaultDisplaySync, fallback to 0
+        Logger.error('Failed display.getDefaultDisplaySync(). code:%{public}d, message:%{public}s',
+          exception.code, exception.message);
+      }
       this.onHoverStatusChange({
         foldStatus: this.foldStatus,
         isHoverMode: isHoverMode,
-        appRotation: display.getDefaultDisplaySync().rotation,
+        appRotation: rotation,
         windowStatusType: this.windowStatusType,
       });
     }
