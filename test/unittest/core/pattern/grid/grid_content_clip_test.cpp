@@ -475,6 +475,60 @@ HWTEST_F(GridContentClipTest, GridClipRepeatReportNonNegative001, TestSize.Level
     EXPECT_GE(info.ReportEndIndex(), -1) << "report end never below -1";
 }
 
+// ===================== multi-column irregular item start-row report =====================
+// FindStartIdx must keep the same-row rule for horizontal continuation cells:
+// a multi-column item's start row holds its origin (+idx) AND continuation
+// cells (-idx) to its right. Those cells start in the current row; walking up
+// (FindItemStartRow) returns the row above and the spanned item would outrank
+// same-row items with smaller indexes, breaking parity with the
+// unset-contentClip anchor (CheckMultiRow reports the leftmost same-row item).
+//
+// Layout (4 columns): row0 = 0..3; row1 = { 4 | 5 5 | 6 } with item 5 spanning
+// 2 rows x 2 cols; row2 = { 7 | (5) | 8 }. Scrolling row1 to the content top
+// must report 4 (not 5); once row1 leaves the content area the straddling
+// item 5 is the first visible child and must be reported.
+
+HWTEST_F(GridContentClipTest, GridClipIrregularMultiColumnStartRowReport001, TestSize.Level1)
+{
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr 1fr 1fr");
+    model.SetRowsGap(Dimension(0));
+    model.SetColumnsGap(Dimension(0));
+    GridLayoutOptions opt;
+    opt.regularSize = GridItemSize { 1, 1 };
+    opt.irregularIndexes = { 5 };
+    opt.getSizeByIndex = [](int32_t index) {
+        return index == 5 ? GridItemSize { 2, 2 } : GridItemSize { 1, 1 };
+    };
+    model.SetLayoutOptions(opt);
+    model.SetOnScrollIndex([this](int32_t s, int32_t e) {
+        cbStart_ = s;
+        cbEnd_ = e;
+    });
+    // Bottom padding activates the end extension so ReportStartIndex resolves
+    // through SyncReportRange/FindStartIdx instead of the layout startIndex_.
+    layoutProperty_->UpdatePadding(CreatePadding(0.0f, 0.0f, 0.0f, 300.0f));
+    SetClip(ContentClipMode::BOUNDARY);
+    CreateFixedHeightItems(5, ITEM_HEIGHT);
+    CreateFixedHeightItems(1, ITEM_HEIGHT * 2); // item 5 spans two rows
+    CreateFixedHeightItems(ITEM_COUNT - 6, ITEM_HEIGHT);
+    CreateDone();
+
+    const auto& info = pattern_->GetGridLayoutInfo();
+    EXPECT_EQ(info.ReportStartIndex(), 0) << "initial report start is item 0";
+
+    // Row1 (4 | 5 5 | 6) becomes the first content-area row: report the
+    // leftmost same-row item 4, not the spanned item 5.
+    UpdateCurrentOffset(-ITEM_HEIGHT);
+    EXPECT_EQ(cbStart_, 4) << "start row of a multi-column item reports its leftmost item";
+    EXPECT_EQ(info.ReportStartIndex(), 4);
+
+    // Row1 fully scrolled out: the straddling item 5 is the first visible child.
+    UpdateCurrentOffset(-ITEM_HEIGHT);
+    EXPECT_EQ(cbStart_, 5) << "straddling multi-row item is reported once its start row left";
+    EXPECT_EQ(info.ReportStartIndex(), 5);
+}
+
 // ===================== F-8: report range must stay inside the content area =====================
 // SyncReportRange's report ends (start/end) are bounded by the content area:
 // with the end extension active, report end never falls onto items outside
