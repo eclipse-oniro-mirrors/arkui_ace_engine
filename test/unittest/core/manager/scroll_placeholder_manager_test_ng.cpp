@@ -643,8 +643,9 @@ HWTEST_F(ScrollPlaceholderManagerTestNg, PlaceholderPoolParallelReplenishLoop001
 
 /**
  * @tc.name: PlaceholderPoolParallelStaleDrop001
- * @tc.desc: A re-register racing an in-flight worker clone leaves exactly one spare of the
- *           current generation; stale clones are dropped by the generation guard.
+ * @tc.desc: A re-register racing in-flight worker clones refills the spare pool to capacity
+ *           for the current generation; stale-generation clones are dropped by the
+ *           generation guard without consuming the pending slots of the new generation.
  * @tc.type: FUNC
  */
 HWTEST_F(ScrollPlaceholderManagerTestNg, PlaceholderPoolParallelStaleDrop001, TestSize.Level1)

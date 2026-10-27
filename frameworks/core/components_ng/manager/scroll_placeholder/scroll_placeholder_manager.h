@@ -224,11 +224,17 @@ private:
     // Task body running off the UI thread; never invokes the builder. Every exit path
     // releases its pending slot.
     void RunBackgroundClone(const std::string& templateId, uint64_t generation);
-    void ReleasePendingCloneSlot(const std::string& templateId);
-    // Re-register/unregister invalidates in-flight clone slots of the previous generation;
-    // their late releases are floor-guarded, worst case one extra clone that the pool cap
-    // discards at commit time.
+    // Releases the slot booked for one clone of the given generation. Slots are keyed by
+    // generation on purpose: after a re-register reset, a late release of the superseded
+    // generation finds its own entry gone and becomes a no-op instead of consuming a slot
+    // freshly booked for the current generation.
+    void ReleasePendingCloneSlot(const std::string& templateId, uint64_t templateGeneration);
+    // Re-register/unregister drops the slot bookings of every generation of the template;
+    // clones still in flight of the old generation are stale by the generation guard and
+    // their late releases become no-ops.
     void ResetPendingCloneSlots(const std::string& templateId);
+    // Caller holds cloneMutex_.
+    size_t SumPendingClonesLocked(const std::string& templateId) const;
 
     void RequestFrameIfAlive();
     void PurgeTemplateRealBuilds(const std::string& templateId, ScrollPlaceholderCancelReason reason);
@@ -260,7 +266,11 @@ private:
     // Guards pendingCloneCount_, which is read and written from both the UI thread and the
     // background clone tasks.
     mutable std::mutex cloneMutex_;
-    std::unordered_map<std::string, uint32_t> pendingCloneCount_;
+    // templateId -> (generation -> booked clone slots). The generation key keeps the
+    // in-flight count truthful across a re-register: bookings and releases always meet in
+    // the same generation entry, so a reset cannot let stale releases eat the slots of the
+    // freshly registered generation.
+    std::unordered_map<std::string, std::unordered_map<uint64_t, uint32_t>> pendingCloneCount_;
 
     // (hostId, index) -> mounted shell of a deferred index. Weak so a leaked pattern
     // bookkeeping bug can never keep a retired shell alive through this table.
