@@ -63,7 +63,8 @@ const noop = (result: DatePickerComponentResult) => {};
 export class CommonOptions {
   public start?: Date;
   public end?: Date;
-  public selected?: Date | DatePickerComponentResult;
+  public selected?: Date;
+  public extendSelected?: Date | DatePickerComponentResult;
   public loop?: boolean;
   public onChange?: Callback<DatePickerComponentResult>;
   public onScrollStop?: Callback<DatePickerComponentResult>;
@@ -1416,16 +1417,22 @@ export struct DatePickerComponent {
     let selectedValid: boolean = false;
     let selectedIsResult: boolean = false;
 
-    if (dateOptions.selected !== undefined && dateOptions.selected !== null) {
-      if (dateOptions.selected instanceof Date) {
-        // selected is a Date: validate and reuse the normal flow.
-        selectedDate = this.validateDate(dateOptions.selected as Date);
+    // extendSelected takes priority over selected; when both are set, selected does not take effect.
+    const effectiveSelected: Date | DatePickerComponentResult | undefined =
+      (dateOptions.extendSelected !== undefined && dateOptions.extendSelected !== null)
+        ? dateOptions.extendSelected
+        : dateOptions.selected;
+
+    if (effectiveSelected !== undefined && effectiveSelected !== null) {
+      if (effectiveSelected instanceof Date) {
+        // effectiveSelected is a Date: validate and reuse the normal flow.
+        selectedDate = this.validateDate(effectiveSelected as Date);
         if (selectedDate !== undefined) {
           selectedValid = true;
         }
       } else {
-        // selected is a DatePickerComponentResult: restore a prior selection result.
-        const result: DatePickerComponentResult = dateOptions.selected as DatePickerComponentResult;
+        // effectiveSelected is a DatePickerComponentResult: restore a prior selection result.
+        const result: DatePickerComponentResult = effectiveSelected as DatePickerComponentResult;
         // Each set field takes effect; each omitted field uses the corresponding
         // part of the system date.
         const m: int = result.month ?? now.getMonth().toInt();
@@ -1621,16 +1628,22 @@ export struct DatePickerComponent {
     let selectedTime: Date | undefined = undefined;
     let selectedValid: boolean = false;
 
-    if (timeOptions.selected !== undefined && timeOptions.selected !== null) {
-      if (timeOptions.selected instanceof Date) {
-        // selected is a Date: validate and reuse the normal flow.
-        selectedTime = this.validateTime(timeOptions.selected as Date);
+    // extendSelected takes priority over selected; when both are set, selected does not take effect.
+    const effectiveSelected: Date | DatePickerComponentResult | undefined =
+      (timeOptions.extendSelected !== undefined && timeOptions.extendSelected !== null)
+        ? timeOptions.extendSelected
+        : timeOptions.selected;
+
+    if (effectiveSelected !== undefined && effectiveSelected !== null) {
+      if (effectiveSelected instanceof Date) {
+        // effectiveSelected is a Date: validate and reuse the normal flow.
+        selectedTime = this.validateTime(effectiveSelected as Date);
         if (selectedTime !== undefined) {
           selectedValid = true;
         }
       } else {
-        // selected is a DatePickerComponentResult: restore a prior selection result.
-        const result: DatePickerComponentResult = timeOptions.selected as DatePickerComponentResult;
+        // effectiveSelected is a DatePickerComponentResult: restore a prior selection result.
+        const result: DatePickerComponentResult = effectiveSelected as DatePickerComponentResult;
         // Each set field takes effect; each omitted field uses the corresponding
         // part of the system time.
         const h: int = result.hour ?? now.getHours().toInt();
