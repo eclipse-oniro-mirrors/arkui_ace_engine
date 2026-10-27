@@ -427,6 +427,7 @@ void TabsLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
 
     bool preIsDisableSwipe = tabsPattern->GetIsRealDisableSwipe();
     TabBarDisplayMode effectiveMode = curDisplayMode;
+    bool keepMode = layoutProperty->GetKeepTabBarInSideBarValue(false);
 
     if (shouldAnimate) {
         // Animate path: keep layout in the old mode for this pass so the "from" state is
@@ -440,7 +441,9 @@ void TabsLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
         // element can render during the animation. The entering components were previously
         // GONE because they belonged to the non-active mode.
         UpdateSideBarAndSideBarDividerVisibility(layoutWrapper, true);
-        UpdateTabBarAndDividerVisibility(layoutWrapper, true);
+        if (!keepMode) {
+            UpdateTabBarAndDividerVisibility(layoutWrapper, true);
+        }
         UpdateBgMaskNodeVisibility(layoutWrapper, true);
         auto context = tabsNode->GetContext();
         CHECK_NULL_VOID(context);
@@ -465,8 +468,10 @@ void TabsLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
         tabsPattern->SetCurrentBarDisplayMode(curDisplayMode);
         if (needUpdateVisibility) {
             UpdateSideBarAndSideBarDividerVisibility(layoutWrapper, curDisplayMode == TabBarDisplayMode::SIDEBAR);
-            UpdateTabBarAndDividerVisibility(layoutWrapper,
-                curDisplayMode == TabBarDisplayMode::BOTTOMTABBAR || curDisplayMode == TabBarDisplayMode::TOP_TABBAR);
+            if (!keepMode) {
+                UpdateTabBarAndDividerVisibility(layoutWrapper, curDisplayMode == TabBarDisplayMode::BOTTOMTABBAR ||
+                                                                    curDisplayMode == TabBarDisplayMode::TOP_TABBAR);
+            }
             UpdateBgMaskNodeVisibility(layoutWrapper,
                 curDisplayMode == TabBarDisplayMode::BOTTOMTABBAR || curDisplayMode == TabBarDisplayMode::TOP_TABBAR);
         }
@@ -494,7 +499,8 @@ void TabsLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
         });
     }
     if (effectiveMode == TabBarDisplayMode::SIDEBAR) {
-        MeasureInSideBarMode(layoutWrapper, layoutProperty, idealSize, shouldAnimate || isReentrantDuringAnim);
+        MeasureInSideBarMode(
+            layoutWrapper, layoutProperty, idealSize, shouldAnimate || isReentrantDuringAnim || keepMode);
         return;
     }
 
@@ -631,10 +637,15 @@ void TabsLayoutAlgorithm::LayoutInSideBarMode(LayoutWrapper* layoutWrapper)
         LayoutBackgroundMask(layoutWrapper);
         measuringForAnimStart_ = false;
     } else if (effectWrapper) {
-        auto geometryNode = effectWrapper->GetGeometryNode();
-        CHECK_NULL_VOID(geometryNode);
-        geometryNode->SetMarginFrameOffset(offsetList[EFFECT_NODE_INDEX]);
-        effectWrapper->Layout();
+        bool keepMode = layoutProperty->GetKeepTabBarInSideBarValue(false);
+        if (keepMode) {
+            LayoutBottomComponentsForAnimation(layoutWrapper, layoutProperty, tabsNode, geometryNode);
+        } else {
+            auto geometryNode = effectWrapper->GetGeometryNode();
+            CHECK_NULL_VOID(geometryNode);
+            geometryNode->SetMarginFrameOffset(offsetList[EFFECT_NODE_INDEX]);
+            effectWrapper->Layout();
+        }
     }
 }
 
