@@ -54,6 +54,7 @@
 #include "core/components_ng/manager/form_visible/form_visible_manager.h"
 #include "core/components_ng/manager/frame_rate/frame_rate_manager.h"
 #include "core/components_ng/manager/full_screen/full_screen_manager.h"
+#include "core/components_ng/manager/handedness/handedness_manager.h"
 #include "core/components_ng/manager/memory/memory_manager.h"
 #include "core/components_ng/manager/post_event/post_event_manager.h"
 #include "core/components_ng/manager/privacy_sensitive/privacy_sensitive_manager.h"
@@ -356,6 +357,8 @@ PipelineContext::PipelineContext()
         recycleManager_ = std::make_unique<RecycleManager>();
     }
 }
+
+PipelineContext::~PipelineContext() = default;
 
 // Host test binary does not link the real pipeline_context.cpp; provide the same lazy
 // creation so syntax-side observation hooks resolve and exercise the real manager.
@@ -1514,6 +1517,11 @@ const RefPtr<ForceSplitManager>& PipelineContext::GetForceSplitManager() const
     return forceSplitMgr_;
 }
 
+const RefPtr<HandednessManager>& PipelineContext::GetHandednessManager() const
+{
+    return handednessManager_;
+}
+
 const RefPtr<RecoverableManager>& PipelineContext::GetRecoverableManager() const
 {
     return recoverableMgr_;
@@ -1546,6 +1554,7 @@ void PipelineContext::InitManagers()
     toolbarManager_ = MakeRefPtr<ToolbarManager>();
     navigationMgr_ = MakeRefPtr<NavigationManager>();
     forceSplitMgr_ = MakeRefPtr<ForceSplitManager>();
+    handednessManager_ = MakeRefPtr<HandednessManager>(WeakClaim(this));
     recoverableMgr_ = MakeRefPtr<RecoverableManager>();
     formVisibleMgr_ = MakeRefPtr<FormVisibleManager>();
     formEventMgr_ = MakeRefPtr<FormEventManager>();

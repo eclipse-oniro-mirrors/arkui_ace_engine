@@ -98,6 +98,7 @@
                 "audio_framework",
                 "access_token",
                 "input",
+                "motion",
                 "webview",
                 "imf",
                 "device_status",

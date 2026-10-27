@@ -36,6 +36,7 @@
 #include "core/event/crown_event.h"
 #include "core/event/coasting_axis_event_generator.h"
 #include "core/event/resample_algo.h"
+#include "core/components_ng/manager/handedness/handedness_manager.h"
 #include "core/pipeline/base/render_node.h"
 #include "core/pipeline_ng/pipeline_context.h"
 #ifdef RELAXED_INTERACTION_SUPPORT
@@ -1109,6 +1110,34 @@ void EventManager::CheckUpEvent(const TouchEvent& touchEvent)
     }
 }
 
+void EventManager::UpdateHandednessOnTouchDown(const TouchEvent& event)
+{
+    auto container = Container::GetContainer(instanceId_);
+    CHECK_NULL_VOID(container);
+    auto pipeline = AceType::DynamicCast<NG::PipelineContext>(container->GetPipelineContext());
+    CHECK_NULL_VOID(pipeline);
+    auto handednessMgr = pipeline->GetHandednessManager();
+    CHECK_NULL_VOID(handednessMgr);
+    const auto& resultIter = touchTestResults_.find(event.id);
+    if (resultIter != touchTestResults_.end() && !resultIter->second.empty()) {
+        auto frameNode = resultIter->second.front()->GetAttachedNode().Upgrade();
+        if (frameNode) {
+            handednessMgr->SetLastFocusNodeId(frameNode->GetId());
+        }
+    }
+}
+
+void EventManager::UpdateHandednessOnTouchUp(const TouchEvent& event)
+{
+    auto container = Container::GetContainer(instanceId_);
+    CHECK_NULL_VOID(container);
+    auto pipeline = AceType::DynamicCast<NG::PipelineContext>(container->GetPipelineContext());
+    CHECK_NULL_VOID(pipeline);
+    auto handednessMgr = pipeline->GetHandednessManager();
+    CHECK_NULL_VOID(handednessMgr);
+    handednessMgr->SetOperatingHand(event.operatingHand);
+}
+
 void EventManager::UpdateDragInfo(TouchEvent& point)
 {
     if (point.type == TouchType::PULL_MOVE || point.pullType == TouchType::PULL_MOVE ||
@@ -1278,6 +1307,11 @@ bool EventManager::DispatchTouchEvent(const TouchEvent& event, bool sendOnTouch)
 #ifdef ENABLE_INSPECTOR_EVENT_REPORTING
     AddDumpTouchInfo(event);
 #endif
+    if (event.type == TouchType::DOWN) {
+        UpdateHandednessOnTouchDown(event);
+    } else if (event.type == TouchType::UP) {
+        UpdateHandednessOnTouchUp(event);
+    }
     if (event.sourceType == SourceType::TOUCH) {
         NG::GestureExtraHandler::NotifiyTouchEvent(event);
     }
