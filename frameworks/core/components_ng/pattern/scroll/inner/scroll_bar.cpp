@@ -494,48 +494,70 @@ void ScrollBar::SetGestureEvent()
     if (!touchEvent_) {
         touchEvent_ = MakeRefPtr<TouchEventImpl>([weak = WeakClaim(this)](const TouchEventInfo& info) {
             auto scrollBar = weak.Upgrade();
-            CHECK_NULL_VOID(scrollBar && scrollBar->IsScrollable());
-            CHECK_NULL_VOID(scrollBar->GetScrollBarInteractive());
-            if (info.GetTouches().empty()) {
-                return;
-            }
-            auto touch = info.GetTouches().front();
-            if (touch.GetTouchType() == TouchType::DOWN) {
-                TAG_LOGI(AceLogTag::ACE_SCROLL_BAR, "inner scrollBar touch down, panDirection: %{public}u",
-                    scrollBar->GetPanDirection());
-                Point point(touch.GetLocalLocation().GetX(), touch.GetLocalLocation().GetY());
-                bool inRegion = false;
-                if (info.GetSourceDevice() == SourceType::TOUCH) {
-                    inRegion = scrollBar->InBarTouchRegion(point);
-                } else if (info.GetSourceDevice() == SourceType::MOUSE) {
-                    inRegion = scrollBar->InBarHoverRegion(point);
-                    scrollBar->MarkNeedRender();
-                }
-                if (inRegion) {
-                    scrollBar->fingerId_ = touch.GetFingerId();
-                }
-                if (!scrollBar->IsPressed()) {
-                    scrollBar->SetPressed(inRegion);
-                }
-                if (inRegion && !scrollBar->IsHover()) {
-                    scrollBar->PlayScrollBarGrowAnimation();
-                }
-            }
-            if ((info.GetTouches().front().GetTouchType() == TouchType::UP ||
-                    info.GetTouches().front().GetTouchType() == TouchType::CANCEL) &&
-                    (scrollBar->fingerId_ == info.GetTouches().front().GetFingerId())) {
-                if (scrollBar->IsPressed() && !scrollBar->IsHover()) {
-                    scrollBar->PlayScrollBarShrinkAnimation();
-                    scrollBar->ScheduleDisappearDelayTask();
-                }
-                scrollBar->SetPressed(false);
-                scrollBar->fingerId_ = OGN_FIGNERID;
-                scrollBar->MarkNeedRender();
-            }
+            CHECK_NULL_VOID(scrollBar);
+            scrollBar->HandleTouchEvent(info);
         });
     }
     if (!panRecognizer_) {
         InitPanRecognizer();
+    }
+}
+
+void ScrollBar::HandleTouchEvent(const TouchEventInfo& info)
+{
+    CHECK_NULL_VOID(IsScrollable() && GetScrollBarInteractive());
+    if (info.GetTouches().empty()) {
+        return;
+    }
+    const auto& touch = info.GetTouches().front();
+    if (touch.GetTouchType() == TouchType::DOWN) {
+        HandleTouchDown(info, touch);
+    } else if (touch.GetTouchType() == TouchType::UP || touch.GetTouchType() == TouchType::CANCEL) {
+        HandleTouchUp(touch);
+    }
+}
+
+void ScrollBar::HandleTouchDown(const TouchEventInfo& info, const TouchLocationInfo& touch)
+{
+    TAG_LOGI(AceLogTag::ACE_SCROLL_BAR, "inner scrollBar touch down, panDirection: %{public}u", GetPanDirection());
+    Point point(touch.GetLocalLocation().GetX(), touch.GetLocalLocation().GetY());
+    bool inRegion = false;
+    if (info.GetSourceDevice() == SourceType::TOUCH) {
+        inRegion = InBarTouchRegion(point);
+    } else if (info.GetSourceDevice() == SourceType::MOUSE) {
+        inRegion = InBarHoverRegion(point);
+        MarkNeedRender();
+    }
+    if (inRegion) {
+        fingerId_ = touch.GetFingerId();
+    }
+    if (!IsPressed()) {
+        SetPressed(inRegion);
+    }
+    if (!inRegion || IsHover()) {
+        return;
+    }
+    NotifyTouchState(true);
+    PlayScrollBarGrowAnimation();
+}
+
+void ScrollBar::HandleTouchUp(const TouchLocationInfo& touch)
+{
+    CHECK_NE_VOID(fingerId_, touch.GetFingerId());
+    if (IsPressed() && !IsHover()) {
+        PlayScrollBarShrinkAnimation();
+        ScheduleDisappearDelayTask();
+        NotifyTouchState(false);
+    }
+    SetPressed(false);
+    fingerId_ = OGN_FIGNERID;
+    MarkNeedRender();
+}
+
+void ScrollBar::NotifyTouchState(bool isPressed)
+{
+    if (touchStateCallback_) {
+        touchStateCallback_(isPressed);
     }
 }
 

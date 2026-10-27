@@ -14,6 +14,7 @@
  */
 
 #include "scroll_bar_test_ng.h"
+#include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 #include "test/mock/frameworks/base/thread/mock_task_executor.h"
 
 namespace OHOS::Ace::NG {
@@ -42,6 +43,44 @@ public:
     {
         auto handleMouseEvent = pattern_->mouseEvent_->GetOnMouseEventFunc();
         handleMouseEvent(info);
+    }
+
+    void HandleTouchEvent(TouchEventInfo& info)
+    {
+        auto touchEvent = pattern_->scrollBar_->GetTouchEvent();
+        ASSERT_NE(touchEvent, nullptr);
+        (*touchEvent)(info);
+    }
+
+    void PrepareTouchEventTest()
+    {
+        CreateStack();
+        CreateScroll();
+        CreateScrollBar(true, true, Axis::VERTICAL, DisplayMode::AUTO);
+        CreateScrollBarChild();
+        CreateDone();
+        ASSERT_NE(pattern_, nullptr);
+        ASSERT_NE(pattern_->scrollBar_, nullptr);
+        pattern_->UpdateScrollBarOffset(SCROLL_FROM_NONE);
+        pattern_->scrollBar_->SetScrollable(true);
+    }
+
+    Offset GetScrollBarActiveCenter() const
+    {
+        auto activeRect = pattern_->scrollBar_->GetActiveRect();
+        return Offset(activeRect.Left() + activeRect.Width() / 2.f, activeRect.Top() + activeRect.Height() / 2.f);
+    }
+
+    void SendTouchEvent(TouchType type, int32_t fingerId, const Offset& point,
+        SourceType source = SourceType::TOUCH)
+    {
+        TouchEventInfo info("touch");
+        info.SetSourceDevice(source);
+        TouchLocationInfo touch(fingerId);
+        touch.SetTouchType(type);
+        touch.SetLocalLocation(point);
+        info.AddTouchLocationInfo(std::move(touch));
+        HandleTouchEvent(info);
     }
 
     void HandleClickEvent()
@@ -1021,6 +1060,469 @@ HWTEST_F(ScrollBarEventTestNg, HandleLongPress004, TestSize.Level1)
     scrollBar->HandleLongPress(true);
     // CHECK_NULL_VOID(GetScrollBarInteractive()) early-returns, callback must NOT be called
     EXPECT_FALSE(callbackCalled);
+
+    Container::Current()->SetApiTargetVersion(apiTargetVersion);
+}
+
+/**
+ * @tc.name: TouchStateCallbackTouchDownAndUp001
+ * @tc.desc: Rect scroll bar invokes the registered touch state callback with true on touch down and false on
+ *           touch up when the touch point is inside the bar touch region.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollBarEventTestNg, TouchStateCallbackTouchDownAndUp001, TestSize.Level1)
+{
+    auto apiTargetVersion = Container::Current()->GetApiTargetVersion();
+    Container::Current()->SetApiTargetVersion(static_cast<int32_t>(PlatformVersion::VERSION_TWELVE));
+    CreateStack();
+    CreateScroll();
+    CreateScrollBar(true, true, Axis::VERTICAL, DisplayMode::AUTO);
+    CreateScrollBarChild();
+    CreateDone();
+
+    ASSERT_NE(pattern_, nullptr);
+    ASSERT_NE(pattern_->scrollBar_, nullptr);
+    auto scrollBar = pattern_->scrollBar_;
+    pattern_->UpdateScrollBarOffset(SCROLL_FROM_NONE);
+    scrollBar->SetScrollable(true);
+    ASSERT_TRUE(scrollBar->IsScrollable());
+    ASSERT_TRUE(scrollBar->GetScrollBarInteractive());
+    auto touchRegion = scrollBar->GetTouchRegion();
+    ASSERT_GT(touchRegion.Width(), 0.0f);
+    ASSERT_GT(touchRegion.Height(), 0.0f);
+    auto touchPoint = Offset(touchRegion.Left() + touchRegion.Width() / 2.f,
+        touchRegion.Top() + touchRegion.Height() / 2.f);
+
+    std::vector<bool> pressedStates;
+    scrollBar->SetTouchStateCallback([&pressedStates](bool isPressed) {
+        pressedStates.push_back(isPressed);
+    });
+
+    TouchEventInfo downInfo("touch");
+    downInfo.SetSourceDevice(SourceType::TOUCH);
+    TouchLocationInfo downTouch(0);
+    downTouch.SetTouchType(TouchType::DOWN);
+    downTouch.SetLocalLocation(touchPoint);
+    downInfo.AddTouchLocationInfo(std::move(downTouch));
+    HandleTouchEvent(downInfo);
+
+    ASSERT_EQ(pressedStates.size(), 1);
+    EXPECT_TRUE(pressedStates[0]);
+    EXPECT_TRUE(scrollBar->IsPressed());
+
+    TouchEventInfo upInfo("touch");
+    upInfo.SetSourceDevice(SourceType::TOUCH);
+    TouchLocationInfo upTouch(0);
+    upTouch.SetTouchType(TouchType::UP);
+    upTouch.SetLocalLocation(touchPoint);
+    upInfo.AddTouchLocationInfo(std::move(upTouch));
+    HandleTouchEvent(upInfo);
+
+    ASSERT_EQ(pressedStates.size(), 2);
+    EXPECT_FALSE(pressedStates[1]);
+    EXPECT_FALSE(scrollBar->IsPressed());
+
+    Container::Current()->SetApiTargetVersion(apiTargetVersion);
+}
+
+/**
+ * @tc.name: TouchStateCallbackNullOnTouch001
+ * @tc.desc: Touch handling still updates the pressed state and does not crash when no touch state callback is
+ *           registered, covering the null callback branch.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollBarEventTestNg, TouchStateCallbackNullOnTouch001, TestSize.Level1)
+{
+    auto apiTargetVersion = Container::Current()->GetApiTargetVersion();
+    Container::Current()->SetApiTargetVersion(static_cast<int32_t>(PlatformVersion::VERSION_TWELVE));
+    CreateStack();
+    CreateScroll();
+    CreateScrollBar(true, true, Axis::VERTICAL, DisplayMode::AUTO);
+    CreateScrollBarChild();
+    CreateDone();
+
+    ASSERT_NE(pattern_, nullptr);
+    ASSERT_NE(pattern_->scrollBar_, nullptr);
+    auto scrollBar = pattern_->scrollBar_;
+    pattern_->UpdateScrollBarOffset(SCROLL_FROM_NONE);
+    scrollBar->SetScrollable(true);
+    ASSERT_TRUE(scrollBar->IsScrollable());
+    scrollBar->touchStateCallback_ = nullptr;
+    auto touchRegion = scrollBar->GetTouchRegion();
+    ASSERT_GT(touchRegion.Width(), 0.0f);
+    ASSERT_GT(touchRegion.Height(), 0.0f);
+    auto touchPoint = Offset(touchRegion.Left() + touchRegion.Width() / 2.f,
+        touchRegion.Top() + touchRegion.Height() / 2.f);
+
+    TouchEventInfo downInfo("touch");
+    downInfo.SetSourceDevice(SourceType::TOUCH);
+    TouchLocationInfo downTouch(0);
+    downTouch.SetTouchType(TouchType::DOWN);
+    downTouch.SetLocalLocation(touchPoint);
+    downInfo.AddTouchLocationInfo(std::move(downTouch));
+    HandleTouchEvent(downInfo);
+    EXPECT_TRUE(scrollBar->IsPressed());
+
+    TouchEventInfo upInfo("touch");
+    upInfo.SetSourceDevice(SourceType::TOUCH);
+    TouchLocationInfo upTouch(0);
+    upTouch.SetTouchType(TouchType::UP);
+    upTouch.SetLocalLocation(touchPoint);
+    upInfo.AddTouchLocationInfo(std::move(upTouch));
+    HandleTouchEvent(upInfo);
+    EXPECT_FALSE(scrollBar->IsPressed());
+
+    Container::Current()->SetApiTargetVersion(apiTargetVersion);
+}
+
+/**
+ * @tc.name: TouchStateCallbackDisappearAnimator001
+ * @tc.desc: The touch state callback registered by ScrollBarPattern stops the disappear delay task on press and
+ *           restarts it on release only for AUTO mode while not scrolling.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollBarEventTestNg, TouchStateCallbackDisappearAnimator001, TestSize.Level1)
+{
+    auto apiTargetVersion = Container::Current()->GetApiTargetVersion();
+    Container::Current()->SetApiTargetVersion(static_cast<int32_t>(PlatformVersion::VERSION_TWELVE));
+    CreateStack();
+    CreateScroll();
+    CreateScrollBar(true, true, Axis::VERTICAL, DisplayMode::AUTO);
+    CreateScrollBarChild();
+    CreateDone();
+
+    ASSERT_NE(pattern_, nullptr);
+    ASSERT_NE(pattern_->scrollBar_, nullptr);
+    auto scrollBar = pattern_->scrollBar_;
+    ASSERT_TRUE(scrollBar->touchStateCallback_);
+    ASSERT_GT(pattern_->GetControlDistance(), 0.0f);
+
+    auto context = MockPipelineContext::GetCurrentContext();
+    ASSERT_NE(context, nullptr);
+    auto oldTaskExecutor = context->taskExecutor_;
+    context->taskExecutor_ = AceType::MakeRefPtr<MockTaskExecutor>(true);
+
+    pattern_->StartDisappearAnimator();
+    EXPECT_TRUE(pattern_->disapplearDelayTask_);
+
+    scrollBar->touchStateCallback_(true);
+    EXPECT_FALSE(pattern_->disapplearDelayTask_);
+
+    scrollBar->touchStateCallback_(false);
+    EXPECT_TRUE(pattern_->disapplearDelayTask_);
+
+    pattern_->disapplearDelayTask_.Cancel();
+    EXPECT_FALSE(pattern_->disapplearDelayTask_);
+    pattern_->isScrolling_ = true;
+    scrollBar->touchStateCallback_(false);
+    EXPECT_FALSE(pattern_->disapplearDelayTask_);
+    pattern_->isScrolling_ = false;
+
+    pattern_->displayMode_ = DisplayMode::ON;
+    scrollBar->touchStateCallback_(false);
+    EXPECT_FALSE(pattern_->disapplearDelayTask_);
+
+    context->taskExecutor_ = oldTaskExecutor;
+    Container::Current()->SetApiTargetVersion(apiTargetVersion);
+}
+
+/**
+ * @tc.name: HandleTouchEventEmptyTouches001
+ * @tc.desc: HandleTouchEvent ignores an event without touch points and keeps the scroll bar unpressed.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollBarEventTestNg, HandleTouchEventEmptyTouches001, TestSize.Level1)
+{
+    auto apiTargetVersion = Container::Current()->GetApiTargetVersion();
+    Container::Current()->SetApiTargetVersion(static_cast<int32_t>(PlatformVersion::VERSION_TWELVE));
+    PrepareTouchEventTest();
+
+    auto scrollBar = pattern_->scrollBar_;
+    bool called = false;
+    scrollBar->SetTouchStateCallback([&called](bool) { called = true; });
+
+    TouchEventInfo emptyInfo("touch");
+    emptyInfo.SetSourceDevice(SourceType::TOUCH);
+    HandleTouchEvent(emptyInfo);
+
+    EXPECT_FALSE(called);
+    EXPECT_FALSE(scrollBar->IsPressed());
+
+    Container::Current()->SetApiTargetVersion(apiTargetVersion);
+}
+
+/**
+ * @tc.name: HandleTouchEventGuardBranches001
+ * @tc.desc: HandleTouchEvent ignores touch events when the scroll bar is not scrollable or not interactive.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollBarEventTestNg, HandleTouchEventGuardBranches001, TestSize.Level1)
+{
+    auto apiTargetVersion = Container::Current()->GetApiTargetVersion();
+    Container::Current()->SetApiTargetVersion(static_cast<int32_t>(PlatformVersion::VERSION_TWELVE));
+    PrepareTouchEventTest();
+
+    auto scrollBar = pattern_->scrollBar_;
+    int32_t callbackCount = 0;
+    scrollBar->SetTouchStateCallback([&callbackCount](bool) { ++callbackCount; });
+    auto touchPoint = GetScrollBarActiveCenter();
+
+    scrollBar->SetScrollable(false);
+    ASSERT_FALSE(scrollBar->IsScrollable());
+    SendTouchEvent(TouchType::DOWN, 0, touchPoint);
+    EXPECT_EQ(callbackCount, 0);
+    EXPECT_FALSE(scrollBar->IsPressed());
+
+    scrollBar->SetScrollable(true);
+    scrollBar->SetScrollBarInteractive(false);
+    ASSERT_FALSE(scrollBar->GetScrollBarInteractive());
+    SendTouchEvent(TouchType::DOWN, 0, touchPoint);
+    EXPECT_EQ(callbackCount, 0);
+    EXPECT_FALSE(scrollBar->IsPressed());
+
+    Container::Current()->SetApiTargetVersion(apiTargetVersion);
+}
+
+/**
+ * @tc.name: HandleTouchDownMouseSource001
+ * @tc.desc: A mouse press inside the hover region also reports pressed state and releases it on mouse up.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollBarEventTestNg, HandleTouchDownMouseSource001, TestSize.Level1)
+{
+    auto apiTargetVersion = Container::Current()->GetApiTargetVersion();
+    Container::Current()->SetApiTargetVersion(static_cast<int32_t>(PlatformVersion::VERSION_TWELVE));
+    PrepareTouchEventTest();
+
+    auto scrollBar = pattern_->scrollBar_;
+    std::vector<bool> pressedStates;
+    scrollBar->SetTouchStateCallback([&pressedStates](bool isPressed) { pressedStates.push_back(isPressed); });
+    auto touchPoint = GetScrollBarActiveCenter();
+    ASSERT_TRUE(scrollBar->InBarHoverRegion(Point(touchPoint.GetX(), touchPoint.GetY())));
+
+    SendTouchEvent(TouchType::DOWN, 5, touchPoint, SourceType::MOUSE);
+    ASSERT_EQ(pressedStates.size(), 1);
+    EXPECT_TRUE(pressedStates[0]);
+    EXPECT_TRUE(scrollBar->IsPressed());
+    EXPECT_EQ(scrollBar->fingerId_, 5);
+
+    SendTouchEvent(TouchType::UP, 5, touchPoint, SourceType::MOUSE);
+    ASSERT_EQ(pressedStates.size(), 2);
+    EXPECT_FALSE(pressedStates[1]);
+    EXPECT_FALSE(scrollBar->IsPressed());
+
+    Container::Current()->SetApiTargetVersion(apiTargetVersion);
+}
+
+/**
+ * @tc.name: HandleTouchDownUnknownSource001
+ * @tc.desc: A touch down from an unsupported source device is ignored without changing the pressed state.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollBarEventTestNg, HandleTouchDownUnknownSource001, TestSize.Level1)
+{
+    auto apiTargetVersion = Container::Current()->GetApiTargetVersion();
+    Container::Current()->SetApiTargetVersion(static_cast<int32_t>(PlatformVersion::VERSION_TWELVE));
+    PrepareTouchEventTest();
+
+    auto scrollBar = pattern_->scrollBar_;
+    int32_t callbackCount = 0;
+    scrollBar->SetTouchStateCallback([&callbackCount](bool) { ++callbackCount; });
+    auto touchPoint = GetScrollBarActiveCenter();
+
+    SendTouchEvent(TouchType::DOWN, 0, touchPoint, SourceType::NONE);
+    EXPECT_EQ(callbackCount, 0);
+    EXPECT_FALSE(scrollBar->IsPressed());
+
+    Container::Current()->SetApiTargetVersion(apiTargetVersion);
+}
+
+/**
+ * @tc.name: HandleTouchDownWhenHovered001
+ * @tc.desc: A touch down while the mouse is hovering over the bar sets pressed but skips the touch state callback.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollBarEventTestNg, HandleTouchDownWhenHovered001, TestSize.Level1)
+{
+    auto apiTargetVersion = Container::Current()->GetApiTargetVersion();
+    Container::Current()->SetApiTargetVersion(static_cast<int32_t>(PlatformVersion::VERSION_TWELVE));
+    PrepareTouchEventTest();
+
+    auto scrollBar = pattern_->scrollBar_;
+    int32_t callbackCount = 0;
+    scrollBar->SetTouchStateCallback([&callbackCount](bool) { ++callbackCount; });
+    auto touchPoint = GetScrollBarActiveCenter();
+
+    scrollBar->SetHover(true);
+    SendTouchEvent(TouchType::DOWN, 0, touchPoint);
+    EXPECT_EQ(callbackCount, 0);
+    EXPECT_TRUE(scrollBar->IsPressed());
+    scrollBar->SetHover(false);
+
+    Container::Current()->SetApiTargetVersion(apiTargetVersion);
+}
+
+/**
+ * @tc.name: HandleTouchDownRepeated001
+ * @tc.desc: A repeated touch down keeps the pressed state and reports the pressed callback again.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollBarEventTestNg, HandleTouchDownRepeated001, TestSize.Level1)
+{
+    auto apiTargetVersion = Container::Current()->GetApiTargetVersion();
+    Container::Current()->SetApiTargetVersion(static_cast<int32_t>(PlatformVersion::VERSION_TWELVE));
+    PrepareTouchEventTest();
+
+    auto scrollBar = pattern_->scrollBar_;
+    std::vector<bool> pressedStates;
+    scrollBar->SetTouchStateCallback([&pressedStates](bool isPressed) { pressedStates.push_back(isPressed); });
+    auto touchPoint = GetScrollBarActiveCenter();
+
+    SendTouchEvent(TouchType::DOWN, 2, touchPoint);
+    SendTouchEvent(TouchType::DOWN, 2, touchPoint);
+    ASSERT_EQ(pressedStates.size(), 2);
+    EXPECT_TRUE(pressedStates[0]);
+    EXPECT_TRUE(pressedStates[1]);
+    EXPECT_TRUE(scrollBar->IsPressed());
+    EXPECT_EQ(scrollBar->fingerId_, 2);
+
+    Container::Current()->SetApiTargetVersion(apiTargetVersion);
+}
+
+/**
+ * @tc.name: HandleTouchUpFingerMismatch001
+ * @tc.desc: A touch up from a different finger is ignored and does not release the pressed scroll bar.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollBarEventTestNg, HandleTouchUpFingerMismatch001, TestSize.Level1)
+{
+    auto apiTargetVersion = Container::Current()->GetApiTargetVersion();
+    Container::Current()->SetApiTargetVersion(static_cast<int32_t>(PlatformVersion::VERSION_TWELVE));
+    PrepareTouchEventTest();
+
+    auto scrollBar = pattern_->scrollBar_;
+    std::vector<bool> pressedStates;
+    scrollBar->SetTouchStateCallback([&pressedStates](bool isPressed) { pressedStates.push_back(isPressed); });
+    auto touchPoint = GetScrollBarActiveCenter();
+
+    SendTouchEvent(TouchType::DOWN, 7, touchPoint);
+    ASSERT_EQ(pressedStates.size(), 1);
+
+    SendTouchEvent(TouchType::UP, 8, touchPoint);
+    EXPECT_EQ(pressedStates.size(), 1);
+    EXPECT_TRUE(scrollBar->IsPressed());
+    EXPECT_EQ(scrollBar->fingerId_, 7);
+
+    SendTouchEvent(TouchType::UP, 7, touchPoint);
+    ASSERT_EQ(pressedStates.size(), 2);
+    EXPECT_FALSE(pressedStates[1]);
+    EXPECT_FALSE(scrollBar->IsPressed());
+
+    Container::Current()->SetApiTargetVersion(apiTargetVersion);
+}
+
+/**
+ * @tc.name: HandleTouchUpInactiveBranches001
+ * @tc.desc: A touch up while the bar is not pressed or is hovered does not report a released touch state.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollBarEventTestNg, HandleTouchUpInactiveBranches001, TestSize.Level1)
+{
+    auto apiTargetVersion = Container::Current()->GetApiTargetVersion();
+    Container::Current()->SetApiTargetVersion(static_cast<int32_t>(PlatformVersion::VERSION_TWELVE));
+    PrepareTouchEventTest();
+
+    auto scrollBar = pattern_->scrollBar_;
+    std::vector<bool> pressedStates;
+    scrollBar->SetTouchStateCallback([&pressedStates](bool isPressed) { pressedStates.push_back(isPressed); });
+    auto touchPoint = GetScrollBarActiveCenter();
+
+    SendTouchEvent(TouchType::DOWN, 4, touchPoint);
+    ASSERT_EQ(pressedStates.size(), 1);
+    scrollBar->SetPressed(false);
+    SendTouchEvent(TouchType::UP, 4, touchPoint);
+    EXPECT_EQ(pressedStates.size(), 1);
+    EXPECT_EQ(scrollBar->fingerId_, -1);
+
+    SendTouchEvent(TouchType::DOWN, 4, touchPoint);
+    ASSERT_EQ(pressedStates.size(), 2);
+    scrollBar->SetHover(true);
+    SendTouchEvent(TouchType::UP, 4, touchPoint);
+    EXPECT_EQ(pressedStates.size(), 2);
+    EXPECT_FALSE(scrollBar->IsPressed());
+    EXPECT_EQ(scrollBar->fingerId_, -1);
+    scrollBar->SetHover(false);
+
+    Container::Current()->SetApiTargetVersion(apiTargetVersion);
+}
+
+/**
+ * @tc.name: HandleTouchEventCancel001
+ * @tc.desc: A CANCEL event releases the pressed scroll bar and reports the released touch state.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollBarEventTestNg, HandleTouchEventCancel001, TestSize.Level1)
+{
+    auto apiTargetVersion = Container::Current()->GetApiTargetVersion();
+    Container::Current()->SetApiTargetVersion(static_cast<int32_t>(PlatformVersion::VERSION_TWELVE));
+    PrepareTouchEventTest();
+
+    auto scrollBar = pattern_->scrollBar_;
+    std::vector<bool> pressedStates;
+    scrollBar->SetTouchStateCallback([&pressedStates](bool isPressed) { pressedStates.push_back(isPressed); });
+    auto touchPoint = GetScrollBarActiveCenter();
+
+    SendTouchEvent(TouchType::DOWN, 3, touchPoint);
+    SendTouchEvent(TouchType::CANCEL, 3, touchPoint);
+    ASSERT_EQ(pressedStates.size(), 2);
+    EXPECT_TRUE(pressedStates[0]);
+    EXPECT_FALSE(pressedStates[1]);
+    EXPECT_FALSE(scrollBar->IsPressed());
+
+    Container::Current()->SetApiTargetVersion(apiTargetVersion);
+}
+
+/**
+ * @tc.name: HandleTouchEventOtherTypeIgnored001
+ * @tc.desc: A touch event whose type is neither down nor up/cancel leaves the pressed state unchanged.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollBarEventTestNg, HandleTouchEventOtherTypeIgnored001, TestSize.Level1)
+{
+    auto apiTargetVersion = Container::Current()->GetApiTargetVersion();
+    Container::Current()->SetApiTargetVersion(static_cast<int32_t>(PlatformVersion::VERSION_TWELVE));
+    PrepareTouchEventTest();
+
+    auto scrollBar = pattern_->scrollBar_;
+    std::vector<bool> pressedStates;
+    scrollBar->SetTouchStateCallback([&pressedStates](bool isPressed) { pressedStates.push_back(isPressed); });
+    auto touchPoint = GetScrollBarActiveCenter();
+
+    SendTouchEvent(TouchType::DOWN, 3, touchPoint);
+    ASSERT_EQ(pressedStates.size(), 1);
+    SendTouchEvent(TouchType::MOVE, 3, touchPoint);
+    EXPECT_EQ(pressedStates.size(), 1);
+    EXPECT_TRUE(scrollBar->IsPressed());
+
+    Container::Current()->SetApiTargetVersion(apiTargetVersion);
+}
+
+/**
+ * @tc.name: InitTouchStateCallbackNullScrollBar001
+ * @tc.desc: InitTouchStateCallback returns safely when the scroll bar instance has not been created.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollBarEventTestNg, InitTouchStateCallbackNullScrollBar001, TestSize.Level1)
+{
+    auto apiTargetVersion = Container::Current()->GetApiTargetVersion();
+    Container::Current()->SetApiTargetVersion(static_cast<int32_t>(PlatformVersion::VERSION_TWELVE));
+    PrepareTouchEventTest();
+
+    auto scrollBar = pattern_->scrollBar_;
+    pattern_->scrollBar_ = nullptr;
+    pattern_->InitTouchStateCallback();
+    EXPECT_EQ(pattern_->scrollBar_, nullptr);
+    pattern_->scrollBar_ = scrollBar;
 
     Container::Current()->SetApiTargetVersion(apiTargetVersion);
 }
