@@ -24,7 +24,7 @@ import { int32, int64 } from '@koalaui/common'
 import { ModifierState } from './CommonModifier'
 import { Length, Resource as arkui_component_units_Resource, SizeOptions, ConstraintSizeOptions, ChainWeightOptions, Padding, LocalizedPadding, Margin, LocalizedMargin, ResourceColor, ColorMetrics as arkui_component_units_ColorMetrics, ResourceStr, Position, BorderOptions, EdgeStyles, EdgeWidths, LocalizedEdgeWidths, EdgeColors, LocalizedEdgeColors, OutlineOptions, EdgeOutlineStyles, Dimension, EdgeOutlineWidths, OutlineRadiuses, VoidCallback, Area, Edges, LocalizedEdges, LocalizedPosition, AccessibilityActionOptions, BorderRadiuses, LocalizedBorderRadiuses, AccessibilityOptions, AccessibilityCustomAction, AccessibilityNextFocusParams } from './component/units'
 import { Resource as global_resource_Resource } from 'global.resource'
-import { HitTestMode, Color as arkui_component_enums_Color, ImageSize, Alignment, BorderStyle, ColoringStrategy, HoverEffect, Visibility, ItemAlign, LocalizedAlignment, Direction, ObscuredReasons, RenderFit, FocusDrawLevel, ImageRepeat, RenderStrategy, Axis, ResponseType, FunctionKey, ModifierKey } from './component/enums'
+import { HitTestMode, Color as arkui_component_enums_Color, ImageSize, Alignment, BorderStyle, ColoringStrategy, HoverEffect, Visibility, ItemAlign, LocalizedAlignment, Direction, ShadowClipMode, ObscuredReasons, RenderFit, FocusDrawLevel, ImageRepeat, RenderStrategy, Axis, ResponseType, FunctionKey, ModifierKey } from './component/enums'
 import { LengthMetrics as arkui_Graphics_LengthMetrics, ColorMetrics as arkui_Graphics_ColorMetrics } from 'arkui.Graphics'
 import { default as image } from '@ohos.multimedia.image'
 import { ResizableOptions } from './component/image'
@@ -178,6 +178,8 @@ export class CommonMethodModifier implements CommonMethod {
     public _radialGradient_0_0value?: RadialGradientOptions | undefined
     public _motionPath_0_0value?: MotionPathOptions | undefined
     public _shadow_0_0value?: ShadowOptions | ShadowStyle | undefined
+    public _CommonMethod_shadowShape_0_0value?: CircleShape | EllipseShape | PathShape | RectShape | undefined
+    public _CommonMethod_shadowClipMode_0_0value?: ShadowClipMode | undefined
     public _clip_0_0value?: boolean | undefined
     public _clipShape_0_0value?: CircleShape | EllipseShape | PathShape | RectShape | undefined
     public _mask_0_0value?: ProgressMask | undefined
@@ -365,6 +367,7 @@ export class CommonMethodModifier implements CommonMethod {
         this.applyModifierPatch8(peer, flagArray);
         this.applyModifierPatch9(peer, flagArray);
         this.applyModifierPatch10(peer, flagArray);
+        this.applyModifierPatch11(peer, flagArray);
     }
     applyModifierPatch0(peer: ArkCommonMethodPeer, flagArray: Uint8Array): void {
         if (flagArray[0] != 0) {
@@ -4269,6 +4272,42 @@ export class CommonMethodModifier implements CommonMethod {
             }
         }
     }
+    applyModifierPatch11(peer: ArkCommonMethodPeer, flagArray: Uint8Array): void {
+        if (flagArray[229] != 0) {
+            switch (flagArray[229]) {
+                case 1: {
+                    peer.setShadowShapeAttribute((this._CommonMethod_shadowShape_0_0value as CircleShape | EllipseShape | PathShape | RectShape | undefined));
+                    flagArray[229] = 2;
+                    break;
+                }
+                case 3: {
+                    flagArray[229] = 2;
+                    break;
+                }
+                default: {
+                    flagArray[229] = 0;
+                    peer.setShadowShapeAttribute((undefined as CircleShape | EllipseShape | PathShape | RectShape | undefined));
+                }
+            }
+        }
+        if (flagArray[230] != 0) {
+            switch (flagArray[230]) {
+                case 1: {
+                    peer.setShadowClipModeAttribute((this._CommonMethod_shadowClipMode_0_0value as ShadowClipMode | undefined));
+                    flagArray[230] = 2;
+                    break;
+                }
+                case 3: {
+                    flagArray[230] = 2;
+                    break;
+                }
+                default: {
+                    flagArray[230] = 0;
+                    peer.setShadowClipModeAttribute((undefined as ShadowClipMode | undefined));
+                }
+            }
+        }
+    }
     mergeModifier(modifier: CommonMethodModifier): void {
         this._state = modifier._state;
         const flagArray = modifier._flagArray;
@@ -4283,6 +4322,7 @@ export class CommonMethodModifier implements CommonMethod {
         this.mergeModifier8(modifier, flagArray);
         this.mergeModifier9(modifier, flagArray);
         this.mergeModifier10(modifier, flagArray);
+        this.mergeModifier11(modifier, flagArray);
     }
     mergeModifier0(modifier: CommonMethodModifier, flagArray: Uint8Array): void {
         if (flagArray[0] != 0) {
@@ -7052,6 +7092,32 @@ export class CommonMethodModifier implements CommonMethod {
             }
         }
     }
+    mergeModifier11(modifier: CommonMethodModifier, flagArray: Uint8Array): void {
+        if (flagArray[229] != 0) {
+            switch (flagArray[229]) {
+                case 1:
+                case 3: {
+                    this.shadowShape((modifier._CommonMethod_shadowShape_0_0value as CircleShape | EllipseShape | PathShape | RectShape | undefined));
+                    break;
+                }
+                default: {
+                    this.shadowShape((undefined as CircleShape | EllipseShape | PathShape | RectShape | undefined));
+                }
+            }
+        }
+        if (flagArray[230] != 0) {
+            switch (flagArray[230]) {
+                case 1:
+                case 3: {
+                    this.shadowClipMode((modifier._CommonMethod_shadowClipMode_0_0value as ShadowClipMode | undefined));
+                    break;
+                }
+                default: {
+                    this.shadowClipMode((undefined as ShadowClipMode | undefined));
+                }
+            }
+        }
+    }
     width(value: Length | LayoutPolicy | undefined): this {
         if (((this._flagArray[0]) == (0)) || (true)) {
             this._flagArray[0] = 1
@@ -8279,6 +8345,26 @@ export class CommonMethodModifier implements CommonMethod {
             this._state.fireChange()
         } else {
             this._flagArray[121] = 3
+        }
+        return this
+    }
+    shadowShape(value: CircleShape | EllipseShape | PathShape | RectShape | undefined): this {
+        if (((this._flagArray[229]) == (0)) || (true)) {
+            this._flagArray[229] = 1
+            this._CommonMethod_shadowShape_0_0value = value
+            this._state.fireChange()
+        } else {
+            this._flagArray[229] = 3
+        }
+        return this
+    }
+    shadowClipMode(value: ShadowClipMode | undefined): this {
+        if (((this._flagArray[230]) == (0)) || (true)) {
+            this._flagArray[230] = 1
+            this._CommonMethod_shadowClipMode_0_0value = value
+            this._state.fireChange()
+        } else {
+            this._flagArray[230] = 3
         }
         return this
     }

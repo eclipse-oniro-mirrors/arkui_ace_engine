@@ -5015,6 +5015,30 @@ void SetShadowImpl(Ark_NativePointer node,
     }
     ViewAbstract::SetBackShadow(frameNode, shadow.value());
 }
+void SetShadowShapeImpl(Ark_NativePointer node,
+                        const Opt_Union_CircleShape_EllipseShape_PathShape_RectShape* value)
+{
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto convValue = Converter::OptConvertPtr<RefPtr<BasicShape>>(value);
+    if (convValue.has_value()) {
+        ViewAbstract::SetShadowShape(frameNode, convValue.value());
+    } else {
+        ViewAbstract::SetShadowShape(frameNode, nullptr);
+    }
+}
+void SetShadowClipModeImpl(Ark_NativePointer node,
+                           const Opt_ShadowClipMode* value)
+{
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto convValue = Converter::OptConvertPtr<ShadowClipMode>(value);
+    if (convValue.has_value()) {
+        ViewAbstract::SetShadowClipMode(frameNode, convValue.value());
+    } else {
+        ViewAbstract::ResetShadowClipMode(frameNode);
+    }
+}
 void SetEdgeLightImpl(Ark_NativePointer node,
                       const Opt_EdgeLightParams* value)
 {
@@ -7573,6 +7597,8 @@ const GENERATED_ArkUICommonMethodModifier* GetCommonMethodModifier()
         CommonMethodModifier::SetRadialGradientImpl,
         CommonMethodModifier::SetMotionPathImpl,
         CommonMethodModifier::SetShadowImpl,
+        CommonMethodModifier::SetShadowShapeImpl,
+        CommonMethodModifier::SetShadowClipModeImpl,
         CommonMethodModifier::SetEdgeLightImpl,
         CommonMethodModifier::SetClipImpl,
         CommonMethodModifier::SetClipShapeImpl,
