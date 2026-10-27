@@ -1178,6 +1178,8 @@ public:
 
     void ContentChangeReport(const RefPtr<FrameNode>& keyNode, uint32_t type = ContentChangeManager::NONE);
     void ContentChangeReport(const RefPtr<FrameNode>& keyNode, uint32_t type, bool reportCapi);
+    void ContentChangeOnTouchDown();
+    void ContentChangeOnTouchEnd();
 
     ACE_FORCE_EXPORT void ContentChangeOnScrollStart(const RefPtr<FrameNode>& keyNode);
 
@@ -1220,6 +1222,7 @@ protected:
     void FireObserverOnReachEnd();
     void FireObserverOnScrollStart();
     void FireObserverOnScrollStop();
+    void ContentChangeOnScrollUpdate();
     void FireObserverOnDidScroll(float finalOffset);
     void FireObserverOnScrollerAreaChange(float finalOffset);
     float FireObserverOnWillScroll(float offset);
@@ -1508,6 +1511,9 @@ private:
     RefPtr<Animator> animator_;
     bool scrollAbort_ = false;
     bool capiScrollDetached_ = false;
+    bool capiScrollStartPending_ = false;
+    bool capiScrollStarted_ = false;
+    bool capiSnapTakeover_ = false;
     bool capiBlockedCommandStart_ = false;
     bool capiBlockedCommandEnd_ = false;
     std::optional<double> capiCommandOffset_;

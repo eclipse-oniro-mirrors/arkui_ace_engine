@@ -19,6 +19,10 @@
 #include "core/components_ng/manager/content_change_manager/content_change_manager.h"
 
 namespace OHOS::Ace::NG {
+namespace {
+constexpr int32_t CUSTOM_TRANSITION_TIMEOUT_MS = 3000;
+} // namespace
+
 class TabsLayoutTestNg : public TabsTestNg {
 public:
     void CheckCustomTabsAttributeEnd(bool validTransition);
@@ -521,7 +525,7 @@ void TabsLayoutTestNg::CheckCustomTabsAttributeEnd(bool validTransition)
         ++transitions;
         TabContentAnimatedTransition transition;
         if (validTransition) {
-            transition.timeout = 3000;
+            transition.timeout = CUSTOM_TRANSITION_TIMEOUT_MS;
             transition.transition = [](const RefPtr<TabContentTransitionProxy>&) {};
         }
         return transition;
@@ -593,7 +597,7 @@ HWTEST_F(TabsLayoutTestNg, CustomTabsControllerEndIsNotDuplicatedByLayout, TestS
     RefPtr<TabContentTransitionProxy> proxy;
     model.SetOnCustomAnimation([&proxy](int32_t, int32_t) {
         TabContentAnimatedTransition transition;
-        transition.timeout = 3000;
+        transition.timeout = CUSTOM_TRANSITION_TIMEOUT_MS;
         transition.transition = [&proxy](const RefPtr<TabContentTransitionProxy>& value) { proxy = value; };
         return transition;
     });

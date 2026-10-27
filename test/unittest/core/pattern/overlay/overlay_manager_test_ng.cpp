@@ -6170,6 +6170,75 @@ HWTEST_F(OverlayContentChangeTestNg, CapiOverlayTransientAndOrderedContent, Test
 }
 
 /**
+ * @tc.name: CapiOverlayRemovalDoesNotRetainContent
+ * @tc.desc: Normal and ordered overlays release before after-render; HIDE retains target metadata only.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OverlayContentChangeTestNg, CapiOverlayRemovalDoesNotRetainContent, TestSize.Level1)
+{
+    for (bool ordered : { false, true }) {
+        for (int32_t mode : { -1, 0, 1 }) {
+            OverlayContentEnvironment env;
+            CapiTestState state { env.manager };
+            uint64_t subscription = 0;
+            if (mode >= 0) {
+                subscription = env.manager->RegisterCapiContentChangeEvent(mode == 1, OVERLAY_CATEGORY,
+                    NO_IGNORED_EVENTS, new CapiTestCookie { &state }, CapiContentChangeTestSink,
+                    ReleaseCapiContentChangeTestCookie);
+            }
+            auto node = FrameNode::CreateFrameNode("Text", ElementRegister::GetInstance()->MakeUniqueId(),
+                AceType::MakeRefPtr<Pattern>());
+            const auto nodeId = node->GetId();
+            if (ordered) {
+                env.overlay->AddFrameNodeWithOrder(node, 1.0);
+            } else {
+                env.overlay->AddFrameNodeToOverlay(node, std::nullopt);
+            }
+            env.Flush();
+            WeakPtr<FrameNode> weakNode(node);
+            env.overlay->RemoveFrameNodeOnOverlay(node);
+            node.Reset();
+            EXPECT_EQ(weakNode.Upgrade(), nullptr);
+            env.Flush();
+            env.Flush();
+            if (subscription) {
+                EXPECT_EQ(state.types, (std::vector<uint32_t> { OVERLAY_SHOW, OVERLAY_HIDE }));
+                auto json = JsonUtil::ParseJsonString(state.json);
+                EXPECT_EQ(json->GetValue("targetNode")->GetString("id"), std::to_string(nodeId));
+                EXPECT_EQ(json->GetString("overlayType"), "overlay");
+                EXPECT_TRUE(env.manager->UnregisterCapiContentChangeEvent(subscription));
+            } else {
+                EXPECT_TRUE(state.types.empty());
+            }
+        }
+    }
+}
+
+/**
+ * @tc.name: CapiTransientOverlayCanDieBeforeRender
+ * @tc.desc: Adding and destroying unseen overlay content in one frame emits neither SHOW nor HIDE.
+ * @tc.type: FUNC
+ */
+HWTEST_F(OverlayContentChangeTestNg, CapiTransientOverlayCanDieBeforeRender, TestSize.Level1)
+{
+    OverlayContentEnvironment env;
+    CapiTestState state { env.manager };
+    auto subscription = env.manager->RegisterCapiContentChangeEvent(true, OVERLAY_CATEGORY,
+        NO_IGNORED_EVENTS, new CapiTestCookie { &state }, CapiContentChangeTestSink,
+        ReleaseCapiContentChangeTestCookie);
+    auto node = FrameNode::CreateFrameNode("Text", ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<Pattern>());
+    WeakPtr<FrameNode> weakNode(node);
+    env.overlay->AddFrameNodeToOverlay(node, std::nullopt);
+    env.overlay->RemoveFrameNodeOnOverlay(node);
+    node.Reset();
+    EXPECT_EQ(weakNode.Upgrade(), nullptr);
+    env.Flush();
+    EXPECT_TRUE(state.types.empty());
+    EXPECT_TRUE(env.manager->UnregisterCapiContentChangeEvent(subscription));
+}
+
+/**
  * @tc.name: CapiSubmenuDoesNotRepeatParentShow
  * @tc.desc: Submenu display reports its own SHOW once and preserves legacy IPC updates.
  * @tc.type: FUNC

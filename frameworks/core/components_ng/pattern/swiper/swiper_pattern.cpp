@@ -234,6 +234,7 @@ void SwiperPattern::OnDetachFromFrameNode(FrameNode* node)
 
 void SwiperPattern::OnAttachToMainTree()
 {
+    contentChangeDetached_ = false;
     auto host = GetHost();
     THREAD_SAFE_NODE_CHECK(host, OnAttachToMainTree);
     if (!isInit_) {
@@ -1374,6 +1375,31 @@ bool SwiperPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty,
 
     // set tabs invisible item freeze state.
     HandleTabsAncestor();
+    if (hasTabsAncestor_) {
+        auto host = GetHost();
+        auto item = TotalCount() > 0 ? GetCurrentFrameNode(props->GetIndexValue(0)) : nullptr;
+        const auto itemId = item ? item->GetId() : -1;
+        const bool replaced = !isInit && lastTabContentId_ != -1 && itemId != -1 &&
+            lastTabContentId_ != itemId && props->GetIndexValue(0) == changeEndOldIndex;
+        lastTabContentId_ = itemId;
+        if (replaced) {
+            auto pipeline = GetContext();
+            auto manager = pipeline ? pipeline->GetContentChangeManager() : nullptr;
+            if (manager) {
+                manager->ReportCapiSwiperStartEvent(host, true);
+                pipeline->AddAfterRenderTask([weak = WeakClaim(this)]() {
+                    auto pattern = weak.Upgrade();
+                    if (pattern && !pattern->contentChangeDetached_) {
+                        auto pipeline = pattern->GetContext();
+                        auto manager = pipeline ? pipeline->GetContentChangeManager() : nullptr;
+                        if (manager) {
+                            manager->OnSwiperChangeEnd(pattern->GetHost(), true);
+                        }
+                    }
+                });
+            }
+        }
+    }
 
     if (props->GetIsCustomAnimation().value_or(false)) {
         needUnmountIndexs_ = algo->GetNeedUnmountIndexs();
@@ -1445,7 +1471,7 @@ bool SwiperPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty,
         ResetAnimationParam();
         auto pipeline = GetContext();
         if (pipeline) {
-            bool needSwiperChangeEnd = isInit || jumpIndex_.value() != changeEndOldIndex;
+            bool needSwiperChangeEnd = TotalCount() > 0 && (isInit || jumpIndex_.value() != changeEndOldIndex);
             if (isInit && TotalCount() > 0) {
                 auto manager = pipeline->GetContentChangeManager();
                 if (manager) {
@@ -1781,6 +1807,7 @@ bool SwiperPattern::AutoLinearAnimationNeedReset(float translate) const
 
 void SwiperPattern::OnAnimationTranslateZero(int32_t nextIndex, bool stopAutoPlay)
 {
+    ContentChangeReport(GetHost(), GetLoopIndex(currentIndex_) != GetLoopIndex(nextIndex));
     ResetAndUpdateIndexOnAnimationEnd(nextIndex);
 
     if (!NeedAutoPlay() || !isUserFinish_) {
@@ -1961,7 +1988,7 @@ void SwiperPattern::NotifyScrollStateEvent(ScrollState scrollState)
     auto mgr = pipeline->GetContentChangeManager();
     CHECK_NULL_VOID(mgr);
     auto host = GetHost();
-    if (scrollState_ == ScrollState::IDLE) {
+    if (scrollState_ == ScrollState::IDLE && TotalCount() > 0 && !contentChangeDetached_) {
         mgr->OnSwiperScrollStart(host, hasTabsAncestor_);
     }
     if (scrollState == ScrollState::IDLE) {
@@ -3520,6 +3547,13 @@ bool SwiperPattern::FadeOverScroll(float offset)
             HandleSwiperCustomAnimation(realOffset);
         }
         fadeOffset_ += offset;
+        if (!NearZero(fadeOffset_) && TotalCount() > 0 && !contentChangeDetached_) {
+            auto pipeline = GetContext();
+            auto manager = pipeline ? pipeline->GetContentChangeManager() : nullptr;
+            if (manager) {
+                manager->ReportCapiSwiperStartEvent(GetHost(), hasTabsAncestor_);
+            }
+        }
         auto host = GetHost();
         CHECK_NULL_RETURN(host, false);
         host->MarkDirtyNode(PROPERTY_UPDATE_RENDER);
@@ -8529,6 +8563,9 @@ std::vector<SwiperItemInfoNG> SwiperPattern::GetShownItemInfoFromIndex(int32_t i
 
 void SwiperPattern::ContentChangeReport(const RefPtr<FrameNode>& keyNode, bool needSwiperChangeEnd)
 {
+    if (contentChangeDetached_) {
+        return;
+    }
     auto pipeline = GetContext();
     CHECK_NULL_VOID(pipeline);
     auto mgr = pipeline->GetContentChangeManager();
@@ -8577,6 +8614,7 @@ void SwiperPattern::ContentChangeOnTransitionEnd(const RefPtr<FrameNode>& keyNod
 
 void SwiperPattern::ContentChangeByDetaching(PipelineContext* pipeline)
 {
+    contentChangeDetached_ = true;
     CHECK_NULL_VOID(pipeline);
     auto mgr = pipeline->GetContentChangeManager();
     CHECK_NULL_VOID(mgr);

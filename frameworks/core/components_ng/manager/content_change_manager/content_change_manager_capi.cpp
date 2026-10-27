@@ -759,12 +759,14 @@ ContentChangeManager::ContentChangeManager(const RefPtr<TaskExecutor>& taskExecu
 {}
 #endif
 
-void ContentChangeManager::OnScrollChangeStart(const RefPtr<FrameNode>& node)
+void ContentChangeManager::OnScrollChangeStart(const RefPtr<FrameNode>& node, bool reportCapi)
 {
 #ifndef CROSS_PLATFORM
     OnScrollChangeStartInner(node);
 #endif
-    capiImpl_->OnScrollChangeStart(node);
+    if (reportCapi) {
+        capiImpl_->OnScrollChangeStart(node);
+    }
 }
 
 void ContentChangeManager::OnSwiperScrollStart(const RefPtr<FrameNode>& node, bool hasTabsAncestor)
@@ -901,10 +903,49 @@ void ContentChangeManager::CompleteCapiSwiperChangeAfterAutoPlay(
     capiImpl_->CompleteCapiSwiperChangeAfterAutoPlay(node, hasTabsAncestor, canceled);
 }
 
+void ContentChangeManager::ReportCapiPageEndEventFromCache(int32_t transitionId)
+{
+    capiImpl_->QueueCapiCachedEndEvent(transitionId, PAGE_START);
+    capiImpl_->DrainCapiDeliveries();
+}
+
+std::function<void()> ContentChangeManager::BuildCapiOverlayContentHideCallback(const RefPtr<FrameNode>& target)
+{
+    // Keep only metadata: reporting must not extend the lifetime of removed overlay content.
+    auto json = std::make_shared<const std::string>(
+        BuildCapiContentChangeEventJson(OVERLAY_HIDE, target, "overlay", nullptr, false));
+    return [weak = WeakClaim(this), json]() {
+        auto manager = weak.Upgrade();
+        CHECK_NULL_VOID(manager);
+        auto& impl = *manager->capiImpl_;
+        CapiImpl::CapiDelivery delivery { OVERLAY_HIDE, static_cast<uint64_t>(GetSysTimestamp()), {} };
+        for (const auto& [id, record] : impl.capiSubscriptions_) {
+            if (record->eventMask & OVERLAY_CATEGORY) {
+                delivery.receivers.push_back({ record, json });
+            }
+        }
+        if (!delivery.receivers.empty()) {
+            impl.capiDeliveries_.emplace_back(std::move(delivery));
+            impl.DrainCapiDeliveries();
+        }
+    };
+}
+
 void ContentChangeManager::ReportCapiOverlayEvent(const RefPtr<FrameNode>& target, bool isShow,
     const char* overlayType, const RefPtr<FrameNode>& trigger)
 {
     capiImpl_->ReportCapiOverlayEvent(target, isShow, overlayType, trigger);
+}
+
+void ContentChangeManager::ReportCapiScrollStartEvent(const RefPtr<FrameNode>& node)
+{
+    capiImpl_->OnScrollChangeStart(node);
+    capiImpl_->OnContentChangeStart(node, ChangeType::SCROLL);
+}
+
+void ContentChangeManager::ReportCapiScrollEndEvent(const RefPtr<FrameNode>& node)
+{
+    capiImpl_->ReportCapiScrollEndEvent(node, NO_SCROLL_EVENT_SOURCE, true);
 }
 
 void ContentChangeManager::ReportCapiScrollCommand(const RefPtr<FrameNode>& node, uint32_t source)

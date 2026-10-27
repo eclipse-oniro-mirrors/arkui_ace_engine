@@ -6282,17 +6282,27 @@ void OverlayManager::ScheduleOverlayContentVisibilityReport(const RefPtr<FrameNo
     CHECK_NULL_VOID(node);
     auto pipeline = GetPipelineContext();
     CHECK_NULL_VOID(pipeline);
-    // Retain the content until this frame is checked so removal can still provide its target metadata.
-    pipeline->AddAfterRenderTask([weak = WeakClaim(this), content = node]() {
+    auto reportPipeline = pipeline;
+    if (reportPipeline->IsSubPipeline()) {
+        auto parentId = SubwindowManager::GetInstance()->GetParentContainerId(reportPipeline->GetInstanceId());
+        reportPipeline = PipelineContext::GetContextByContainerId(parentId);
+    }
+    auto manager = reportPipeline ? reportPipeline->GetContentChangeManager() : nullptr;
+    auto reportHide = manager ? manager->BuildCapiOverlayContentHideCallback(node) : nullptr;
+    pipeline->AddAfterRenderTask([weak = WeakClaim(this), weakContent = WeakPtr(node), id = node->GetId(),
+        reportHide = std::move(reportHide)]() {
         auto overlay = weak.Upgrade();
         CHECK_NULL_VOID(overlay);
-        auto id = content->GetId();
-        const bool visible = (overlay->frameNodeMapOnOverlay_.count(id) || overlay->orderOverlayMap_.count(id)) &&
+        auto content = weakContent.Upgrade();
+        const bool visible = content &&
+            (overlay->frameNodeMapOnOverlay_.count(id) || overlay->orderOverlayMap_.count(id)) &&
             content->IsOnMainTree() && content->IsVisible();
         const bool changed = visible ? overlay->capiVisibleOverlayContents_.insert(id).second :
             overlay->capiVisibleOverlayContents_.erase(id) != 0;
-        if (changed) {
+        if (changed && content) {
             overlay->ReportCapiOverlayEvent(content, visible, "overlay");
+        } else if (changed && reportHide) {
+            reportHide();
         }
     });
 }

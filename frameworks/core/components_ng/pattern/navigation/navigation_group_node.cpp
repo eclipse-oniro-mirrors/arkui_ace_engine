@@ -1092,6 +1092,11 @@ void NavigationGroupNode::TransitionWithPop(const RefPtr<FrameNode>& preNode, co
 #endif
             navigation->CleanPopAnimations();
             auto preNavDesNode = weakPreNode.Upgrade();
+            if (!preNavDesNode && preUseCustomTransition) {
+                // A custom exit may remove the old page before the entering animation finishes.
+                navigation->ContentChangeReport(weakCurNode.Upgrade(), true);
+                return;
+            }
             CHECK_NULL_VOID(preNavDesNode);
             auto preNavdestination = AceType::DynamicCast<NavDestinationGroupNode>(preNavDesNode);
             CHECK_NULL_VOID(preNavdestination);

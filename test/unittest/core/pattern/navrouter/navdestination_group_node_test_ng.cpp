@@ -1073,8 +1073,7 @@ HWTEST_F(NavDestinationGroupNodeTestNg, StartCustomTransitionAnimation001, TestS
     navDestinationTransition.curve = Curves::EASE_IN_OUT;
     bool hasResetProperties = true;
 
-    navDestinationNode->StartCustomTransitionAnimation(navDestinationTransition, false, hasResetProperties,
-        std::make_shared<size_t>(2));
+    navDestinationNode->StartCustomTransitionAnimation(navDestinationTransition, false, hasResetProperties, 100);
     EXPECT_TRUE(hasResetProperties);
 }
 
@@ -1097,8 +1096,7 @@ HWTEST_F(NavDestinationGroupNodeTestNg, StartCustomTransitionAnimation002, TestS
     navDestinationTransition.curve = Curves::EASE_IN_OUT;
     bool hasResetProperties = false;
 
-    navDestinationNode->StartCustomTransitionAnimation(navDestinationTransition, false, hasResetProperties,
-        std::make_shared<size_t>(2));
+    navDestinationNode->StartCustomTransitionAnimation(navDestinationTransition, false, hasResetProperties, 100);
     EXPECT_FALSE(hasResetProperties);
 }
 
@@ -1122,8 +1120,7 @@ HWTEST_F(NavDestinationGroupNodeTestNg, StartCustomTransitionAnimation003, TestS
     navDestinationTransition.curve = Curves::EASE_IN_OUT;
     bool hasResetProperties = false;
 
-    navDestinationNode->StartCustomTransitionAnimation(navDestinationTransition, true, hasResetProperties,
-        std::make_shared<size_t>(2));
+    navDestinationNode->StartCustomTransitionAnimation(navDestinationTransition, true, hasResetProperties, 100);
     EXPECT_TRUE(hasResetProperties);
     auto navDestinationPattern = navDestinationNode->GetPattern<NavDestinationPattern>();
     ASSERT_NE(navDestinationPattern, nullptr);
@@ -1162,8 +1159,7 @@ HWTEST_F(NavDestinationGroupNodeTestNg, StartCustomTransitionAnimation004, TestS
     ASSERT_NE(navDestinationRenderContext, nullptr);
     navDestinationRenderContext->translateXY_ = AceType::MakeRefPtr<AnimatablePropertyOffsetF>(OffsetF(100.0f, 60.0f));
 
-    navDestinationNode->StartCustomTransitionAnimation(navDestinationTransition, true, hasResetProperties,
-        std::make_shared<size_t>(2));
+    navDestinationNode->StartCustomTransitionAnimation(navDestinationTransition, true, hasResetProperties, 100);
     EXPECT_TRUE(hasResetProperties);
     EXPECT_EQ(navDestinationRenderContext->GetTranslateXYProperty().GetX(), 0.0f);
     EXPECT_EQ(navDestinationRenderContext->GetTranslateXYProperty().GetY(), 0.0f);
@@ -1527,7 +1523,6 @@ HWTEST_F(NavDestinationGroupNodeTestNg, DoCustomTransition002, TestSize.Level1)
  */
 HWTEST_F(NavDestinationGroupNodeTestNg, DoCustomTransition003, TestSize.Level1)
 {
-    NavDestinationGroupNodeTestNg::SetUpTestCase();
     auto navDestinationNode = NavDestinationGroupNode::GetOrCreateGroupNode(V2::NAVDESTINATION_VIEW_ETS_TAG,
         ElementRegister::GetInstance()->MakeUniqueId(), []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
     navDestinationNode->navDestinationTransitionDelegate_ = [](NavigationOperation operation, bool isEnter) {
@@ -1549,7 +1544,6 @@ HWTEST_F(NavDestinationGroupNodeTestNg, DoCustomTransition003, TestSize.Level1)
     int32_t ret = navDestinationNode->DoCustomTransition(NavigationOperation::PUSH, false);
     EXPECT_EQ(ret, -1);
     navDestinationNode->pattern_ = navDestinationPattern;
-    NavDestinationGroupNodeTestNg::TearDownTestCase();
 }
 
 /**
@@ -1564,7 +1558,6 @@ HWTEST_F(NavDestinationGroupNodeTestNg, DoCustomTransition003, TestSize.Level1)
  */
 HWTEST_F(NavDestinationGroupNodeTestNg, DoCustomTransition004, TestSize.Level1)
 {
-    NavDestinationGroupNodeTestNg::SetUpTestCase();
     auto navDestinationNode = NavDestinationGroupNode::GetOrCreateGroupNode(V2::NAVDESTINATION_VIEW_ETS_TAG,
         ElementRegister::GetInstance()->MakeUniqueId(), []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
     auto navDestinationPattern = navDestinationNode->GetPattern<NavDestinationPattern>();
@@ -1594,7 +1587,6 @@ HWTEST_F(NavDestinationGroupNodeTestNg, DoCustomTransition004, TestSize.Level1)
 
     int32_t ret = navDestinationNode->DoCustomTransition(NavigationOperation::PUSH, false);
     EXPECT_EQ(ret, 1);
-    NavDestinationGroupNodeTestNg::TearDownTestCase();
 }
 
 /**
@@ -1607,7 +1599,6 @@ HWTEST_F(NavDestinationGroupNodeTestNg, DoCustomTransition004, TestSize.Level1)
  */
 HWTEST_F(NavDestinationGroupNodeTestNg, TitleAnimationElapsedTimeTest001, TestSize.Level1)
 {
-    NavDestinationGroupNodeTestNg::SetUpTestCase();
     /**
      * @tc.steps: step1. create navDestination and set elpased time.
      */
@@ -1862,39 +1853,58 @@ HWTEST_F(NavDestinationGroupNodeTestNg, EmptyCustomTransitionCompletesPageChange
     auto manager = pipeline->GetContentChangeManager();
     manager->StopContentChangeReport();
     manager->InvalidateCapiContentChangeSubscriptions();
-    auto navigation = CreateNavigationNode(AceType::MakeRefPtr<MockNavigationStack>());
-    ASSERT_NE(navigation, nullptr);
-    auto destination = NavDestinationGroupNode::GetOrCreateGroupNode(V2::NAVDESTINATION_VIEW_ETS_TAG,
-        ElementRegister::GetInstance()->MakeUniqueId(), []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
-    SetNavigationToNavDestination(destination, navigation);
-    destination->MountToParent(navigation);
-    navigation->AttachToMainTree();
-    destination->inCurrentStack_ = true;
-    destination->SetNavDestinationTransitionDelegate([](NavigationOperation, bool) {
-        return std::vector<NavDestinationTransition> {};
-    });
-    std::vector<uint32_t> events;
-    auto id = manager->RegisterCapiContentChangeEvent(
-        true, OH_ARKUI_NATIVEMODULE_EVENT_CATEGORY_PAGE, 0, &events,
-        [](uint32_t type, uint64_t, const char*, uint32_t, void* data) {
-            static_cast<std::vector<uint32_t>*>(data)->push_back(type);
-        }, nullptr);
-    auto pattern = navigation->GetPattern<NavigationPattern>();
-    destination->SetOnStartTransitionAnimationCallback([weak = WeakPtr(pattern)]() {
-        auto navigationPattern = weak.Upgrade();
-        if (navigationPattern) {
-            navigationPattern->OnStartOneTransitionAnimation();
+    // No subscription, END-only, and START+END must have identical component behavior.
+    for (int32_t mode : { -1, 0, 1 }) {
+        auto navigation = CreateNavigationNode(AceType::MakeRefPtr<MockNavigationStack>());
+        ASSERT_NE(navigation, nullptr);
+        auto destination = NavDestinationGroupNode::GetOrCreateGroupNode(V2::NAVDESTINATION_VIEW_ETS_TAG,
+            ElementRegister::GetInstance()->MakeUniqueId(), []() {
+                return AceType::MakeRefPtr<NavDestinationPattern>();
+            });
+        SetNavigationToNavDestination(destination, navigation);
+        destination->MountToParent(navigation);
+        navigation->AttachToMainTree();
+        destination->inCurrentStack_ = true;
+        destination->SetIsOnAnimation(true);
+        destination->SetNavDestinationTransitionDelegate([](NavigationOperation, bool) {
+            return std::vector<NavDestinationTransition> {};
+        });
+        std::vector<uint32_t> events;
+        uint64_t id = 0;
+        if (mode >= 0) {
+            id = manager->RegisterCapiContentChangeEvent(mode == 1, OH_ARKUI_NATIVEMODULE_EVENT_CATEGORY_PAGE,
+                0, &events, [](uint32_t type, uint64_t, const char*, uint32_t, void* data) {
+                    static_cast<std::vector<uint32_t>*>(data)->push_back(type);
+                }, nullptr);
         }
-    });
-    pattern->ContentChangeOnTransitionStart(destination);
-    EXPECT_NE(destination->DoTransition(NavigationOperation::PUSH, true), INVALID_ANIMATION_ID);
-    EXPECT_EQ(events, (std::vector<uint32_t> { OH_ARKUI_NATIVEMODULE_EVENT_PAGE_CHANGE_START }));
-    pipeline->taskScheduler_->FlushAfterRenderTask();
-    pipeline->taskScheduler_->FlushAfterRenderTask();
-    EXPECT_EQ(events, (std::vector<uint32_t> {
-        OH_ARKUI_NATIVEMODULE_EVENT_PAGE_CHANGE_START, OH_ARKUI_NATIVEMODULE_EVENT_PAGE_CHANGE_END }));
-    EXPECT_EQ(pattern->runningTransitionCount_, 0);
-    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+        auto pattern = navigation->GetPattern<NavigationPattern>();
+        int32_t businessStarts = 0;
+        destination->SetOnStartTransitionAnimationCallback([&businessStarts]() { ++businessStarts; });
+        pattern->ContentChangeOnTransitionStart(destination);
+        EXPECT_NE(destination->DoTransition(NavigationOperation::PUSH, true), INVALID_ANIMATION_ID);
+        EXPECT_EQ(events.size(), mode == 1 ? 1U : 0U);
+        pipeline->taskScheduler_->FlushAfterRenderTask();
+        pipeline->taskScheduler_->FlushAfterRenderTask();
+        auto expected = mode == 1 ? std::vector<uint32_t> { 0U, 1U } :
+            (mode == 0 ? std::vector<uint32_t> { 1U } : std::vector<uint32_t> {});
+        EXPECT_EQ(events, expected);
+        EXPECT_EQ(businessStarts, 0);
+        EXPECT_EQ(pattern->runningTransitionCount_, 0);
+        EXPECT_TRUE(destination->IsOnAnimation());
+        EXPECT_EQ(destination->GetParent(), navigation);
+        EXPECT_TRUE(destination->IsVisible());
+        // An empty exit must not acquire the node-removal behavior of a business animation finish.
+        destination->SetInCurrentStack(false);
+        EXPECT_NE(destination->DoTransition(NavigationOperation::POP, false), INVALID_ANIMATION_ID);
+        pipeline->taskScheduler_->FlushAfterRenderTask();
+        EXPECT_EQ(destination->GetParent(), navigation);
+        EXPECT_TRUE(destination->IsOnAnimation());
+        EXPECT_EQ(businessStarts, 0);
+        EXPECT_EQ(events, expected);
+        if (id) {
+            EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+        }
+    }
     pipeline->SetUseFlushUITasks(oldFlush);
 }
 
@@ -1911,46 +1921,64 @@ HWTEST_F(NavDestinationGroupNodeTestNg, EqualCustomTransitionsCompleteOnce, Test
     auto manager = pipeline->GetContentChangeManager();
     manager->StopContentChangeReport();
     manager->InvalidateCapiContentChangeSubscriptions();
-    auto navigation = CreateNavigationNode(AceType::MakeRefPtr<MockNavigationStack>());
-    ASSERT_NE(navigation, nullptr);
-    auto destination = NavDestinationGroupNode::GetOrCreateGroupNode(V2::NAVDESTINATION_VIEW_ETS_TAG,
-        ElementRegister::GetInstance()->MakeUniqueId(), []() { return AceType::MakeRefPtr<NavDestinationPattern>(); });
-    SetNavigationToNavDestination(destination, navigation);
-    destination->MountToParent(navigation);
-    navigation->AttachToMainTree();
-    destination->inCurrentStack_ = true;
-    int32_t callbacks = 0;
-    destination->SetNavDestinationTransitionDelegate([&callbacks](NavigationOperation, bool) {
-        NavDestinationTransition transition;
-        transition.duration = 0;
-        transition.delay = 0;
-        transition.curve = Curves::LINEAR;
-        transition.event = []() {};
-        transition.onTransitionEnd = [&callbacks]() { ++callbacks; };
-        return std::vector<NavDestinationTransition> { transition, transition };
-    });
-    std::vector<uint32_t> events;
-    auto id = manager->RegisterCapiContentChangeEvent(
-        true, OH_ARKUI_NATIVEMODULE_EVENT_CATEGORY_PAGE, 0, &events,
-        [](uint32_t type, uint64_t, const char*, uint32_t, void* data) {
-            static_cast<std::vector<uint32_t>*>(data)->push_back(type);
-        }, nullptr);
-    auto pattern = navigation->GetPattern<NavigationPattern>();
-    destination->SetOnStartTransitionAnimationCallback([weak = WeakPtr(pattern)]() {
-        auto navigationPattern = weak.Upgrade();
-        if (navigationPattern) {
-            navigationPattern->OnStartOneTransitionAnimation();
+    for (int32_t mode : { -1, 0, 1 }) {
+        auto navigation = CreateNavigationNode(AceType::MakeRefPtr<MockNavigationStack>());
+        ASSERT_NE(navigation, nullptr);
+        auto destination = NavDestinationGroupNode::GetOrCreateGroupNode(V2::NAVDESTINATION_VIEW_ETS_TAG,
+            ElementRegister::GetInstance()->MakeUniqueId(), []() {
+                return AceType::MakeRefPtr<NavDestinationPattern>();
+            });
+        SetNavigationToNavDestination(destination, navigation);
+        destination->MountToParent(navigation);
+        navigation->AttachToMainTree();
+        destination->inCurrentStack_ = true;
+        int32_t callbacks = 0;
+        std::vector<bool> animationStates;
+        destination->SetNavDestinationTransitionDelegate(
+            [&callbacks, &animationStates, weak = WeakPtr(destination)](NavigationOperation, bool) {
+            NavDestinationTransition transition;
+            transition.duration = 0;
+            transition.delay = 0;
+            transition.curve = Curves::LINEAR;
+            transition.event = []() {};
+            transition.onTransitionEnd = [&callbacks, &animationStates, weak]() {
+                ++callbacks;
+                auto node = weak.Upgrade();
+                ASSERT_NE(node, nullptr);
+                animationStates.push_back(node->IsOnAnimation());
+            };
+            return std::vector<NavDestinationTransition> { transition, transition };
+        });
+        std::vector<uint32_t> events;
+        uint64_t id = 0;
+        if (mode >= 0) {
+            id = manager->RegisterCapiContentChangeEvent(mode == 1,
+                OH_ARKUI_NATIVEMODULE_EVENT_CATEGORY_PAGE, 0, &events,
+                [](uint32_t type, uint64_t, const char*, uint32_t, void* data) {
+                    static_cast<std::vector<uint32_t>*>(data)->push_back(type);
+                }, nullptr);
         }
-    });
-    pattern->ContentChangeOnTransitionStart(destination);
-    EXPECT_NE(destination->DoTransition(NavigationOperation::PUSH, true), INVALID_ANIMATION_ID);
-    EXPECT_EQ(callbacks, 2);
-    pipeline->taskScheduler_->FlushAfterRenderTask();
-    pipeline->taskScheduler_->FlushAfterRenderTask();
-    EXPECT_EQ(events, (std::vector<uint32_t> {
-        OH_ARKUI_NATIVEMODULE_EVENT_PAGE_CHANGE_START, OH_ARKUI_NATIVEMODULE_EVENT_PAGE_CHANGE_END }));
-    EXPECT_EQ(pattern->runningTransitionCount_, 0);
-    EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+        auto pattern = navigation->GetPattern<NavigationPattern>();
+        destination->SetOnStartTransitionAnimationCallback([weak = WeakPtr(pattern)]() {
+            auto navigationPattern = weak.Upgrade();
+            if (navigationPattern) {
+                navigationPattern->OnStartOneTransitionAnimation();
+            }
+        });
+        pattern->ContentChangeOnTransitionStart(destination);
+        EXPECT_NE(destination->DoTransition(NavigationOperation::PUSH, true), INVALID_ANIMATION_ID);
+        EXPECT_EQ(callbacks, 2);
+        EXPECT_EQ(animationStates, (std::vector<bool> { true, false }));
+        pipeline->taskScheduler_->FlushAfterRenderTask();
+        pipeline->taskScheduler_->FlushAfterRenderTask();
+        auto expected = mode == 1 ? std::vector<uint32_t> { 0U, 1U } :
+            (mode == 0 ? std::vector<uint32_t> { 1U } : std::vector<uint32_t> {});
+        EXPECT_EQ(events, expected);
+        EXPECT_EQ(pattern->runningTransitionCount_, 0);
+        if (id) {
+            EXPECT_TRUE(manager->UnregisterCapiContentChangeEvent(id));
+        }
+    }
     pipeline->SetUseFlushUITasks(oldFlush);
 }
 

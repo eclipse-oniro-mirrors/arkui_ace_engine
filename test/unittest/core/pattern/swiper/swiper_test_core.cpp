@@ -385,6 +385,7 @@ HWTEST_F(SwiperTestCore, ContentChangeNestedSwiperTest001, TestSize.Level1)
     auto innerPattern = AceType::MakeRefPtr<SwiperPattern>();
     auto innerSwiper = FrameNode::CreateFrameNode(V2::SWIPER_ETS_TAG, 464, innerPattern, true);
     innerSwiper->MountToParent(tabContent);
+    innerSwiper->AddChild(FrameNode::CreateFrameNode("Text", 465, AceType::MakeRefPtr<Pattern>()));
     auto mockUiSessionManager = reinterpret_cast<MockUiSessionManager*>(UiSessionManager::GetInstance());
 
     EXPECT_CALL(*mockUiSessionManager, ReportContentChangeEvent(ChangeType::TABS_START, _)).Times(0);
@@ -618,6 +619,192 @@ HWTEST_F(SwiperTestCore, EdgeAnimationCompletesWithCancel, TestSize.Level1)
     }
     manager->UnregisterCapiContentChangeEvent(aid);
     manager->UnregisterCapiContentChangeEvent(bid);
+}
+
+class SwiperDeviceRegressionTest : public SwiperTestCore {
+public:
+    void SetUp() override
+    {
+        manager_ = MockPipelineContext::GetCurrent()->GetContentChangeManager();
+        manager_->StopContentChangeReport();
+        manager_->InvalidateCapiContentChangeSubscriptions();
+        auto sink = [](uint32_t type, uint64_t, const char*, uint32_t, void* data) {
+            static_cast<std::vector<uint32_t>*>(data)->push_back(type);
+        };
+        aid_ = manager_->RegisterCapiContentChangeEvent(true, 1, 0, &a_, sink, nullptr);
+        bid_ = manager_->RegisterCapiContentChangeEvent(false, 1, 0, &b_, sink, nullptr);
+    }
+
+    void TearDown() override
+    {
+        manager_->UnregisterCapiContentChangeEvent(aid_);
+        manager_->UnregisterCapiContentChangeEvent(bid_);
+    }
+
+    RefPtr<FrameNode> CreateSwiper(bool tabs, int count)
+    {
+        auto node = FrameNode::CreateFrameNode(V2::SWIPER_ETS_TAG,
+            ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<SwiperPattern>());
+        parent_ = FrameNode::CreateFrameNode(V2::TABS_ETS_TAG,
+            ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>());
+        if (tabs) {
+            node->MountToParent(parent_);
+        }
+        node->GetPattern<SwiperPattern>()->hasTabsAncestor_ = tabs;
+        auto layout = node->GetLayoutProperty<SwiperLayoutProperty>();
+        layout->UpdateShowIndicator(false);
+        layout->UpdateLoop(false);
+        for (int i = 0; i < count; ++i) {
+            node->AddChild(FrameNode::CreateFrameNode("Text",
+                ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<Pattern>()));
+        }
+        return node;
+    }
+
+    RefPtr<ContentChangeManager> manager_;
+    RefPtr<FrameNode> parent_;
+    std::vector<uint32_t> a_;
+    std::vector<uint32_t> b_;
+    uint64_t aid_ = 0;
+    uint64_t bid_ = 0;
+};
+
+/**
+ * @tc.name: EmptyLayoutAndDragStaySilent
+ * @tc.desc: Empty Swiper and Tabs neither report initial END nor accept a gesture cycle.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SwiperDeviceRegressionTest, EmptyLayoutAndDragStaySilent, TestSize.Level1)
+{
+    for (bool tabs : { false, true }) {
+        auto node = CreateSwiper(tabs, 0);
+        auto pattern = node->GetPattern<SwiperPattern>();
+        pattern->jumpIndex_ = 0;
+        FinishNoAnimationLayout(node, 0);
+        pattern->FireScrollStateEvent(ScrollState::SCROLL);
+        pattern->OnSpringAndFadeAnimationFinish();
+        manager_->OnVsyncEnd(RectF());
+        EXPECT_TRUE(a_.empty());
+        EXPECT_TRUE(b_.empty());
+    }
+}
+
+/**
+ * @tc.name: FadeBoundaryReportsCancel
+ * @tc.desc: Visible Fade at either edge starts a cycle and restoring that edge cancels it once.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SwiperDeviceRegressionTest, FadeBoundaryReportsCancel, TestSize.Level1)
+{
+    for (bool tabs : { false, true }) {
+        for (int index : { 0, 2 }) {
+            auto node = CreateSwiper(tabs, 3);
+            auto pattern = node->GetPattern<SwiperPattern>();
+            pattern->contentMainSize_ = 480.0f;
+            pattern->currentIndex_ = index;
+            pattern->nextIndex_ = index;
+            pattern->itemPosition_[index] = { 0.0f, 480.0f };
+            node->GetPaintProperty<SwiperPaintProperty>()->UpdateEdgeEffect(EdgeEffect::FADE);
+            int businessStateChanges = 0;
+            node->GetEventHub<SwiperEventHub>()->AddOnScrollStateChangedEvent(
+                std::make_shared<ChangeEvent>([&businessStateChanges](int32_t) { ++businessStateChanges; }));
+            const auto previousState = pattern->scrollState_;
+            EXPECT_TRUE(pattern->FadeOverScroll(index == 0 ? 100.0f : -100.0f));
+            EXPECT_EQ(pattern->scrollState_, previousState);
+            EXPECT_EQ(businessStateChanges, 0);
+            EXPECT_FALSE(NearZero(pattern->fadeOffset_));
+            EXPECT_EQ(a_, (std::vector<uint32_t> { tabs ? 9U : 6U }));
+            pattern->OnSpringAndFadeAnimationFinish();
+            pattern->OnSpringAndFadeAnimationFinish();
+            manager_->OnVsyncEnd(RectF());
+            EXPECT_EQ(a_, (std::vector<uint32_t> { tabs ? 9U : 6U, tabs ? 11U : 8U }));
+            EXPECT_TRUE(b_.empty());
+            a_.clear();
+        }
+    }
+}
+
+/**
+ * @tc.name: ZeroDistanceCompletionClosesFakeDrag
+ * @tc.desc: Returning to the original index completes an accepted drag with CANCEL, never END.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SwiperDeviceRegressionTest, ZeroDistanceCompletionClosesFakeDrag, TestSize.Level1)
+{
+    auto node = CreateSwiper(false, 3);
+    auto pattern = node->GetPattern<SwiperPattern>();
+    pattern->contentMainSize_ = 480.0f;
+    pattern->itemPosition_[0] = { 0.0f, 480.0f };
+    pattern->itemPosition_[1] = { 480.0f, 960.0f };
+    pattern->isFakeDragging_ = true;
+    EXPECT_TRUE(pattern->FakeDragBy(-180.0f));
+    pattern->lastDragByOffset_.reset();
+    pattern->itemPosition_[0] = { -180.0f, 300.0f };
+    EXPECT_TRUE(pattern->FakeDragBy(180.0f));
+    pattern->PlayTranslateAnimation(0.0f, 0.0f, 0, false, 0.0f);
+    manager_->OnVsyncEnd(RectF());
+    EXPECT_EQ(a_, (std::vector<uint32_t> { 6U, 8U }));
+    EXPECT_TRUE(b_.empty());
+    a_.clear();
+    pattern->PlayTranslateAnimation(0.0f, 0.0f, 0, false, 0.0f);
+    manager_->OnVsyncEnd(RectF());
+    EXPECT_TRUE(a_.empty());
+}
+
+/**
+ * @tc.name: RetainedDetachedSwiperIgnoresLateFinish
+ * @tc.desc: Removing a live Swiper or its Tabs ancestor ends once even when the retained animation finishes later.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SwiperDeviceRegressionTest, RetainedDetachedSwiperIgnoresLateFinish, TestSize.Level1)
+{
+    for (bool tabs : { false, true }) {
+        auto node = CreateSwiper(tabs, 3);
+        auto pattern = node->GetPattern<SwiperPattern>();
+        auto root = tabs ? parent_ : node;
+        auto pipeline = MockPipelineContext::GetCurrent();
+        root->AttachToMainTree(true, AceType::RawPtr(pipeline));
+        pattern->FireScrollStateEvent(ScrollState::SCROLL);
+        root->DetachFromMainTree();
+        manager_->OnVsyncEnd(RectF());
+        pattern->ContentChangeReport(node, true);
+        manager_->OnVsyncEnd(RectF());
+        EXPECT_EQ(a_, (std::vector<uint32_t> { tabs ? 9U : 6U, tabs ? 10U : 7U }));
+        EXPECT_EQ(b_, (std::vector<uint32_t> { tabs ? 10U : 7U }));
+        a_.clear();
+        b_.clear();
+    }
+}
+
+/**
+ * @tc.name: SelectedTabIdentityChangesAtSameIndex
+ * @tc.desc: Replacing the visible child reports once; deleting another child is silent in normal/custom modes.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SwiperDeviceRegressionTest, SelectedTabIdentityChangesAtSameIndex, TestSize.Level1)
+{
+    for (bool custom : { false, true }) {
+        auto node = CreateSwiper(true, 3);
+        auto pattern = node->GetPattern<SwiperPattern>();
+        node->GetLayoutProperty<SwiperLayoutProperty>()->UpdateIsCustomAnimation(custom);
+        pattern->jumpIndex_ = 0;
+        FinishNoAnimationLayout(node, 0);
+        a_.clear();
+        b_.clear();
+        node->RemoveChild(node->GetChildAtIndex(2));
+        FinishNoAnimationLayout(node, 0);
+        EXPECT_TRUE(a_.empty());
+        EXPECT_TRUE(b_.empty());
+        node->RemoveChild(node->GetChildAtIndex(0));
+        FinishNoAnimationLayout(node, 0);
+        EXPECT_EQ(a_, (std::vector<uint32_t> { 9U, 10U }));
+        EXPECT_EQ(b_, (std::vector<uint32_t> { 10U }));
+        FinishNoAnimationLayout(node, 0);
+        EXPECT_EQ(a_.size(), 2U);
+        EXPECT_EQ(b_.size(), 1U);
+        a_.clear();
+        b_.clear();
+    }
 }
 
 } // namespace OHOS::Ace::NG

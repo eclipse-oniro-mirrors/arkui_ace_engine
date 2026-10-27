@@ -3071,6 +3071,14 @@ void NavigationPattern::DialogAnimation(const RefPtr<NavDestinationGroupNode>& p
         TransitionWithDialogAnimation(preTopNavDestination, newTopNavDestination, isPopPage);
     } else {
         TransitionWithOutAnimation(preTopNavDestination, newTopNavDestination, isPopPage, isNeedVisible);
+        auto pipeline = GetContext();
+        CHECK_NULL_VOID(pipeline);
+        pipeline->AddAfterRenderTask([weak = WeakClaim(this),
+            target = WeakPtr<NavDestinationGroupNode>(newTopNavDestination), isPopPage]() {
+            auto pattern = weak.Upgrade();
+            CHECK_NULL_VOID(pattern);
+            pattern->ContentChangeReport(target.Upgrade(), isPopPage);
+        });
     }
 }
 
@@ -8560,13 +8568,13 @@ void NavigationPattern::ReportCapiPageTransitionEnd(const RefPtr<FrameNode>& nod
         return;
     }
     // Dialog and destination animations complete separately but describe the same page transition.
-    pendingCapiPageEnds_[transitionId] = node;
+    pendingCapiPageEnds_[transitionId] = WeakPtr(node);
     FlushCapiPageTransitionEnds();
 }
 
-void NavigationPattern::FlushCapiPageTransitionEnds()
+void NavigationPattern::FlushCapiPageTransitionEnds(bool forceDeferred)
 {
-    if (runningTransitionCount_ != 0 || pendingCapiPageEnds_.empty() || capiPageEndTaskPending_) {
+    if (runningTransitionCount_ != 0 || (!forceDeferred && pendingCapiPageEnds_.empty()) || capiPageEndTaskPending_) {
         return;
     }
     auto pipeline = GetContext();
@@ -8584,9 +8592,12 @@ void NavigationPattern::FlushCapiPageTransitionEnds()
         CHECK_NULL_VOID(manager);
         auto ends = std::move(pattern->pendingCapiPageEnds_);
         pattern->pendingCapiPageEnds_.clear();
-        for (const auto& [id, node] : ends) {
-            if (node->IsOnMainTree()) {
+        for (const auto& [id, weakNode] : ends) {
+            auto node = weakNode.Upgrade();
+            if (node && node->IsOnMainTree()) {
                 manager->ReportCapiPageEndEvent(node, id);
+            } else {
+                manager->ReportCapiPageEndEventFromCache(id);
             }
         }
     });

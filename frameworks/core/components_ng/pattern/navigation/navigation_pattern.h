@@ -56,6 +56,7 @@ class NavigationPattern : public Pattern, public IAvoidInfoListener, public Cust
 public:
     void ContentChangeReport(const RefPtr<FrameNode>& keyNode, bool isPopPage = false);
     void ReportCapiPageTransitionEnd(const RefPtr<FrameNode>& node, int32_t transitionId);
+    void FlushCapiPageTransitionEnds(bool forceDeferred = false);
     NavigationPattern();
     ~NavigationPattern() override = default;
 
@@ -1003,7 +1004,6 @@ private:
     bool GetHomeDestinationName(const RefPtr<FrameNode>& hostNode, std::string& name);
     void TriggerPerformanceCheck(const RefPtr<NavDestinationGroupNode>& topDestination, std::string fromPath);
     NavigateChangeInfo ConvertNavDestinationContext(const RefPtr<NavDestinationContext>& context);
-    void FlushCapiPageTransitionEnds();
     void ContentChangeOnTransitionStart(const RefPtr<FrameNode>& keyNode, bool isPopPage = false);
     void UpdatePlaceholderVisibilityIfNeeded();
     bool CheckIfLastDestWillBeFullScreenOverlay(const std::vector<RefPtr<NavDestinationGroupNode>>& destList);
@@ -1167,7 +1167,7 @@ private:
 
     std::vector<WeakPtr<NavDestinationNodeBase>> preVisibleNodes_;
     int32_t runningTransitionCount_ = 0;
-    std::map<int32_t, RefPtr<FrameNode>> pendingCapiPageEnds_;
+    std::map<int32_t, WeakPtr<FrameNode>> pendingCapiPageEnds_;
     bool capiPageEndTaskPending_ = false;
     bool windowSizeChangedDuringTransition_ = false;
     bool enableVisibilityLifecycleWithContentCover_ = true;
