@@ -478,9 +478,16 @@ export struct FoldSplitContainer {
       }
 
       this.windowInstance = windowInstance;
+      this.windowStatusType = windowInstance.getWindowStatus();
       this.updatePreferredOrientation();
+      this.updateLayout();
       this.windowInstance.on('windowStatusChange', (status) => {
+        const wasFullScreen = this.windowStatusType === window.WindowStatusType.FULL_SCREEN;
+        const isFullScreen = status === window.WindowStatusType.FULL_SCREEN;
         this.windowStatusType = status;
+        if (wasFullScreen !== isFullScreen) {
+          this.updateLayout();
+        }
       });
     });
   }
@@ -591,7 +598,9 @@ export struct FoldSplitContainer {
       regionLayout = this.getExpandedRegionLayouts();
     } else if (this.foldStatus === display.FoldStatus.FOLD_STATUS_HALF_FOLDED) {
       const creaseRegion = this.getLiveFoldCreaseRegion();
-      if (this.isHorizontalCrease(creaseRegion)) {
+      const isHorizontal = this.isHorizontalCrease(creaseRegion);
+      const isFullScreen = this.windowStatusType === window.WindowStatusType.FULL_SCREEN;
+      if (isHorizontal && isFullScreen) {
         regionLayout = this.getHoverModeRegionLayouts(creaseRegion);
         isHoverMode = true;
       } else {
