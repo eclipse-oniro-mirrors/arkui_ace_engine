@@ -994,9 +994,9 @@ void setGestureInterrupterToNodeWithUserData(
         auto touchRecognizers = CreateTouchRecognizers(AceType::RawPtr(node), info, interruptInfo);
         ArkUI_Int32 result {};
         {
-            LOG_CALLBACK(
-                "ArkUI_NativeGestureAPI_1.setGestureInterrupterToNode / "
-                "ArkUI_NativeGestureAPI_2.setGestureInterrupterToNode",
+            LOG_CALLBACK(userData ?
+                "ArkUI_NativeGestureAPI_2.setGestureInterrupterToNode" :
+                "ArkUI_NativeGestureAPI_1.setGestureInterrupterToNode",
                 interrupter);
             result = interrupter(&interruptInfo);
         }

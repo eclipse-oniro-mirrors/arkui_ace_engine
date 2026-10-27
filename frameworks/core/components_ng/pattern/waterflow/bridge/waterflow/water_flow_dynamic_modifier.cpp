@@ -639,9 +639,9 @@ void SetWaterFlowSectionOptions(ArkUINodeHandle node, ArkUI_Int32 start, ArkUIWa
                 // onGetItemMainSizeByIndex是一个返回float的函数指针
                 using FuncType = float (*)(int32_t, void*);
                 FuncType func = reinterpret_cast<FuncType>(sectionData.onGetItemMainSizeByIndex);
-                LOG_CALLBACK(
-                    "OH_ArkUI_WaterFlowSectionOption_RegisterGetItemMainSizeCallbackByIndex / "
-                    "OH_ArkUI_WaterFlowSectionOption_RegisterGetItemMainSizeCallbackByIndexWithUserData",
+                LOG_CALLBACK(sectionData.userData ?
+                    "OH_ArkUI_WaterFlowSectionOption_RegisterGetItemMainSizeCallbackByIndexWithUserData" :
+                    "OH_ArkUI_WaterFlowSectionOption_RegisterGetItemMainSizeCallbackByIndex",
                     func);
                 float result = func(value, sectionData.userData);
                 return result;
