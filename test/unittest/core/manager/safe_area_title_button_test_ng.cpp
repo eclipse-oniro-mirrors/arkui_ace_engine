@@ -248,4 +248,84 @@ HWTEST_F(SafeAreaManagerTest, TitleButtonNoDataNoEffectTest, TestSize.Level0)
     EXPECT_EQ(safeArea.right_.start, SYSTEM_RIGHT_START);
     EXPECT_EQ(safeArea.right_.end, SYSTEM_RIGHT_END);
 }
+
+/**
+ * @tc.name: TitleButtonGetSafeAreaNotValidButStrategySetTest
+ * @tc.desc: IsSafeAreaValid()==false (non-fullscreen, non-avoid-window) + AVOID_WINDOW_CONTROLS set
+ *           -> GetSafeArea still returns titleButtonSafeArea.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SafeAreaManagerTest, TitleButtonGetSafeAreaNotValidButStrategySetTest, TestSize.Level0)
+{
+    EXPECT_FALSE(safeAreaManager_->IsFullScreen());
+    EXPECT_FALSE(safeAreaManager_->IsNeedAvoidWindow());
+    EXPECT_FALSE(safeAreaManager_->IsSafeAreaValid());
+    NG::OptionalSize<uint32_t> rootSize(
+        static_cast<uint32_t>(DISPLAY_WIDTH), static_cast<uint32_t>(DISPLAY_HEIGHT));
+    safeAreaManager_->ApplyDefaultImmersiveStrategy({ ImmersiveStrategy::AVOID_WINDOW_CONTROLS });
+    safeAreaManager_->UpdateTitleButtonSafeArea(titleButtonArea, rootSize);
+    auto safeArea = safeAreaManager_->GetSafeArea();
+    EXPECT_EQ(safeArea.right_.start, titleButtonAreaWithRoot.right_.start);
+    EXPECT_EQ(safeArea.right_.end, titleButtonAreaWithRoot.right_.end);
+    EXPECT_EQ(safeArea.top_.start, titleButtonAreaWithRoot.top_.start);
+    EXPECT_EQ(safeArea.top_.end, titleButtonAreaWithRoot.top_.end);
+    EXPECT_EQ(safeArea.left_.IsValid(), false);
+    EXPECT_EQ(safeArea.bottom_.IsValid(), false);
+}
+
+/**
+ * @tc.name: TitleButtonGetSafeAreaNotValidNoStrategyTest
+ * @tc.desc: IsSafeAreaValid()==false + no AVOID_WINDOW_CONTROLS -> GetSafeArea returns empty.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SafeAreaManagerTest, TitleButtonGetSafeAreaNotValidNoStrategyTest, TestSize.Level0)
+{
+    EXPECT_FALSE(safeAreaManager_->IsSafeAreaValid());
+    NG::OptionalSize<uint32_t> rootSize(
+        static_cast<uint32_t>(DISPLAY_WIDTH), static_cast<uint32_t>(DISPLAY_HEIGHT));
+    safeAreaManager_->UpdateTitleButtonSafeArea(titleButtonArea, rootSize);
+    auto safeArea = safeAreaManager_->GetSafeArea();
+    EXPECT_EQ(safeArea.left_.IsValid(), false);
+    EXPECT_EQ(safeArea.right_.IsValid(), false);
+    EXPECT_EQ(safeArea.top_.IsValid(), false);
+    EXPECT_EQ(safeArea.bottom_.IsValid(), false);
+}
+
+/**
+ * @tc.name: TitleButtonGetSafeAreaIgnoreSafeAreaOverridesTest
+ * @tc.desc: ignoreSafeArea_=true + AVOID_WINDOW_CONTROLS set -> GetSafeArea returns empty
+ *           (ignoreSafeArea takes priority over titleButton).
+ * @tc.type: FUNC
+ */
+HWTEST_F(SafeAreaManagerTest, TitleButtonGetSafeAreaIgnoreSafeAreaOverridesTest, TestSize.Level0)
+{
+    EXPECT_TRUE(safeAreaManager_->SetIgnoreSafeArea(true));
+    EXPECT_FALSE(safeAreaManager_->IsSafeAreaValid());
+    NG::OptionalSize<uint32_t> rootSize(
+        static_cast<uint32_t>(DISPLAY_WIDTH), static_cast<uint32_t>(DISPLAY_HEIGHT));
+    safeAreaManager_->ApplyDefaultImmersiveStrategy({ ImmersiveStrategy::AVOID_WINDOW_CONTROLS });
+    safeAreaManager_->UpdateTitleButtonSafeArea(titleButtonArea, rootSize);
+    auto safeArea = safeAreaManager_->GetSafeArea();
+    EXPECT_EQ(safeArea.left_.IsValid(), false);
+    EXPECT_EQ(safeArea.right_.IsValid(), false);
+    EXPECT_EQ(safeArea.top_.IsValid(), false);
+    EXPECT_EQ(safeArea.bottom_.IsValid(), false);
+}
+
+/**
+ * @tc.name: TitleButtonGetSafeAreaNotValidStrategySetNoDataTest
+ * @tc.desc: IsSafeAreaValid()==false + AVOID_WINDOW_CONTROLS set but no title button data
+ *           -> GetSafeArea returns empty.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SafeAreaManagerTest, TitleButtonGetSafeAreaNotValidStrategySetNoDataTest, TestSize.Level0)
+{
+    EXPECT_FALSE(safeAreaManager_->IsSafeAreaValid());
+    safeAreaManager_->ApplyDefaultImmersiveStrategy({ ImmersiveStrategy::AVOID_WINDOW_CONTROLS });
+    auto safeArea = safeAreaManager_->GetSafeArea();
+    EXPECT_EQ(safeArea.left_.IsValid(), false);
+    EXPECT_EQ(safeArea.right_.IsValid(), false);
+    EXPECT_EQ(safeArea.top_.IsValid(), false);
+    EXPECT_EQ(safeArea.bottom_.IsValid(), false);
+}
 } // namespace OHOS::Ace::NG

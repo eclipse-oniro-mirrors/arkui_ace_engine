@@ -353,6 +353,9 @@ public:
 
     bool IsSafeAreaValid() const;
 
+    SafeAreaInsets GetTitleButtonSafeAreaInternal() const;
+    SafeAreaInsets::Inset GetKeyboardBottomInset(bool withoutProcess, const SafeAreaInsets::Inset& current) const;
+
     // check if the page node needs to be avoid keyboard
     bool CheckPageNeedAvoidKeyboard(const RefPtr<FrameNode>& frameNode);
 
@@ -446,8 +449,8 @@ private:
     std::optional<bool> useCutout_;
 
     KeyBoardAvoidMode keyboardAvoidMode_ = KeyBoardAvoidMode::OFFSET;
-    bool IsModeResize();
-    bool IsModeOffset();
+    bool IsModeResize() const;
+    bool IsModeOffset() const;
 
     std::function<void(bool)> floatNavPullDelegate_;
 
