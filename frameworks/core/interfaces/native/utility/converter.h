@@ -1165,6 +1165,7 @@ namespace Converter {
     template<> void AssignCast(std::optional<BlurSnapshotOptions>& dst, const Ark_BlurSnapshotOptions& src);
     template<> void AssignCast(std::optional<LightEffectOptions>& dst, const Ark_LightEffectOptionsInner& src);
     template<> void AssignCast(std::optional<SheetTitleBarHoverMode>& dst, const Ark_SheetTitleBarHoverMode& src);
+    template<> void AssignCast(std::optional<ShadowClipMode>& dst, const Ark_ShadowClipMode& src);
 #ifndef WINDOWS_PLATFORM
 #if defined(ARKUI_CAPI_UNITTEST) || defined(LINUX_PLATFORM) || defined(MAC_PLATFORM) || defined(CROSS_PLATFORM)
     template<> void AssignCast(std::optional<WebContextMenuItemId>& dst, const WebContextMenuItemId& src);

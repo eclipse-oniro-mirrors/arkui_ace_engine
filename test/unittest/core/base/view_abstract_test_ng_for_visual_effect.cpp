@@ -1231,6 +1231,27 @@ HWTEST_F(ViewAbstractTestNg, SetShadowClipModeForVisualEffect003, TestSize.Level
 }
 
 /**
+ * @tc.name: SetShadowClipModeForVisualEffect004
+ * @tc.desc: Test SetShadowClipMode and ResetShadowClipMode return early when IsCurrentVisualStateProcess is false
+ * @tc.type: FUNC
+ */
+HWTEST_F(ViewAbstractTestNg, SetShadowClipModeForVisualEffect004, TestSize.Level1)
+{
+    auto stack = ViewStackProcessor::GetInstance();
+    ASSERT_NE(stack, nullptr);
+    auto node = AceType::MakeRefPtr<FrameNode>("testNode", -1, AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(node, nullptr);
+    stack->Push(node);
+    stack->SetVisualState(VisualState::DISABLED);
+    ViewAbstract::SetShadowClipMode(ShadowClipMode::BOUNDS_SHAPE);
+    EXPECT_FALSE(node->GetRenderContext()->HasShadowClipMode());
+    ViewAbstract::ResetShadowClipMode();
+    stack->ClearVisualState();
+    stack->Finish();
+    EXPECT_FALSE(node->GetRenderContext()->HasShadowClipMode());
+}
+
+/**
  * @tc.name: ResetShadowShapeForVisualEffect001
  * @tc.desc: Test ResetShadowShape clears the property
  * @tc.type: FUNC

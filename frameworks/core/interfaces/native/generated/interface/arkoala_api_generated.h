@@ -7177,6 +7177,14 @@ typedef struct Opt_SelectStatus {
     Ark_Tag tag;
     Ark_SelectStatus value;
 } Opt_SelectStatus;
+typedef enum Ark_ShadowClipMode {
+    ARK_SHADOW_CLIP_MODE_DEFAULT_SHAPE = 0,
+    ARK_SHADOW_CLIP_MODE_BOUNDS_SHAPE = 1,
+} Ark_ShadowClipMode;
+typedef struct Opt_ShadowClipMode {
+    Ark_Tag tag;
+    Ark_ShadowClipMode value;
+} Opt_ShadowClipMode;
 typedef enum Ark_ShadowStyle {
     ARK_SHADOW_STYLE_OUTER_DEFAULT_XS = 0,
     ARK_SHADOW_STYLE_OUTER_DEFAULT_SM = 1,
@@ -25563,6 +25571,10 @@ typedef struct GENERATED_ArkUICommonMethodModifier {
                           const Opt_MotionPathOptions* value);
     void (*setShadow)(Ark_NativePointer node,
                       const Opt_Union_ShadowOptions_ShadowStyle* value);
+    void (*setShadowShape)(Ark_NativePointer node,
+                           const Opt_Union_CircleShape_EllipseShape_PathShape_RectShape* value);
+    void (*setShadowClipMode)(Ark_NativePointer node,
+                              const Opt_ShadowClipMode* value);
     void (*setEdgeLight)(Ark_NativePointer node,
                          const Opt_EdgeLightParams* value);
     void (*setClip)(Ark_NativePointer node,

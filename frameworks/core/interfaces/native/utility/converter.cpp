@@ -4709,4 +4709,14 @@ void AssignCast(std::optional<SheetTitleBarHoverMode>& dst, const Ark_SheetTitle
         default: LOGE("Unexpected enum value in Ark_SheetTitleBarHoverMode: %{public}d", src);
     }
 }
+
+template<>
+void AssignCast(std::optional<ShadowClipMode>& dst, const Ark_ShadowClipMode& src)
+{
+    switch (src) {
+        case ARK_SHADOW_CLIP_MODE_DEFAULT_SHAPE: dst = ShadowClipMode::DEFAULT_SHAPE; break;
+        case ARK_SHADOW_CLIP_MODE_BOUNDS_SHAPE: dst = ShadowClipMode::BOUNDS_SHAPE; break;
+        default: LOGE("Unexpected enum value in Ark_ShadowClipMode: %{public}d", src);
+    }
+}
 } // namespace OHOS::Ace::NG::Converter
