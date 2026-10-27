@@ -397,7 +397,7 @@ HWTEST_F(DialogLayoutTwoTestNg, DialogLayoutAlgorithmAdjustHeightForKeyboard001,
     RefPtr<LayoutWrapper> child = customNode->CreateLayoutWrapper(true, true);
     ASSERT_NE(child, nullptr);
     auto layoutWrapperNode = dialogWithCustom->CreateLayoutWrapper(true, true);
-    auto layoutWrapper = reinterpret_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
+    auto layoutWrapper = static_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
     ASSERT_NE(layoutWrapper, nullptr);
     /**
      * @tc.steps: step2. test DialogLayoutAlgorithm functions.
@@ -448,7 +448,7 @@ HWTEST_F(DialogLayoutTwoTestNg, DialogLayoutAlgorithmAdjustHeightForKeyboard002,
     RefPtr<LayoutWrapper> child = customNode->CreateLayoutWrapper(true, true);
     ASSERT_NE(child, nullptr);
     auto layoutWrapperNode = dialogWithCustom->CreateLayoutWrapper(true, true);
-    auto layoutWrapper = reinterpret_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
+    auto layoutWrapper = static_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
     ASSERT_NE(layoutWrapper, nullptr);
     /**
      * @tc.steps: step2. test DialogLayoutAlgorithm functions.
@@ -522,7 +522,7 @@ HWTEST_F(DialogLayoutTwoTestNg, DialogLayoutAlgorithmUpdateIsScrollHeightNegativ
     RefPtr<LayoutWrapper> child = frameNode->CreateLayoutWrapper(true, true);
     ASSERT_NE(child, nullptr);
     auto layoutWrapperNode = frameNode->CreateLayoutWrapper(true, true);
-    auto layoutWrapper = reinterpret_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
+    auto layoutWrapper = static_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
     ASSERT_NE(layoutWrapper, nullptr);
     /**
      * @tc.steps: step2. test DialogLayoutAlgorithm functions.
