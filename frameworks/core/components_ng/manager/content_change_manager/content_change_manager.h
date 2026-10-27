@@ -70,14 +70,16 @@ public:
     }
 
     void OnPageTransitionEnd(const RefPtr<FrameNode>& keyNode);
-    void OnPageTransitionEnd(const RefPtr<FrameNode>& keyNode, int32_t transitionId);
+    void OnPageTransitionEnd(const RefPtr<FrameNode>& keyNode, int32_t transitionId, bool reportCapi = true);
     void ReportCapiPageEndEvent(const RefPtr<FrameNode>& keyNode, int32_t transitionId);
+    void ReportCapiPageEndEventFromCache(int32_t transitionId);
+    std::function<void()> BuildCapiOverlayContentHideCallback(const RefPtr<FrameNode>& target);
     void OnContentChangeStart(const RefPtr<FrameNode>& keyNode, ChangeType type);
     void OnContentChangeStart(const RefPtr<FrameNode>& keyNode, ChangeType type, bool reportCapi);
     void ReportCapiPageStartEvent(const RefPtr<FrameNode>& node);
-    void OnContentChangeInterrupted(const RefPtr<FrameNode>& keyNode, ChangeType type);
+    void OnContentChangeInterrupted(const RefPtr<FrameNode>& keyNode, ChangeType type, bool reportCapiEnd = true);
     void OnContentChangeNodeDestroyed(int32_t nodeId);
-    void OnScrollChangeStart(const RefPtr<FrameNode>& keyNode);
+    void OnScrollChangeStart(const RefPtr<FrameNode>& keyNode, bool reportCapi = true);
     void OnScrollChangeEnd(const RefPtr<FrameNode>& keyNode, uint32_t type = NONE);
     void OnScrollChangeEnd(const RefPtr<FrameNode>& keyNode, uint32_t type, bool reportCapi);
     void OnSwiperChangeStart(const RefPtr<FrameNode>& keyNode, bool hasTabsAncestor);
@@ -117,6 +119,8 @@ public:
     void OnSwiperChangeInterrupted(const RefPtr<FrameNode>& node, bool hasTabsAncestor);
     void ReportCapiOverlayEvent(const RefPtr<FrameNode>& target, bool isShow, const char* overlayType,
         const RefPtr<FrameNode>& trigger = nullptr);
+    void ReportCapiScrollStartEvent(const RefPtr<FrameNode>& node);
+    void ReportCapiScrollEndEvent(const RefPtr<FrameNode>& node);
     void ReportCapiScrollCommand(const RefPtr<FrameNode>& node, uint32_t source);
     void MarkCapiScrollByEventSource(int32_t nodeId);
     void MarkCapiScrollToEventSource(int32_t nodeId);

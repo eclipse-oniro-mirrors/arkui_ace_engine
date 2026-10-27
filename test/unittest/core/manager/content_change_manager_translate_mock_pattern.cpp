@@ -13,9 +13,23 @@
  * limitations under the License.
  */
 
+#include <cstdlib>
+
 #include "core/components_ng/pattern/pattern.h"
+#include "core/components_ng/pattern/overlay/overlay_content_change_report.h"
 
 namespace OHOS::Ace::NG {
+// Unexpected Overlay use fails this text-only suite; the manager suite uses the real implementation.
+const char* GetOverlayContentChangeType(const RefPtr<FrameNode>&)
+{
+    std::abort();
+}
+
+RefPtr<FrameNode> GetMenuContentChangeTrigger(const RefPtr<FrameNode>&)
+{
+    std::abort();
+}
+
 int32_t Pattern::OnRecvCommand(const std::string& command)
 {
     (void)command;

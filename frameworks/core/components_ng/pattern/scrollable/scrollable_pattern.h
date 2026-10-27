@@ -520,6 +520,24 @@ public:
     virtual void OnAnimateStop();
     virtual void ScrollTo(float position);
     void SmartGesturePerformScroll(float position);
+    // Preserve the virtual AnimateTo ABI; consume the request before entering callbacks.
+    void AnimateToFromController(float position, float duration, const RefPtr<Curve>& curve,
+        bool smooth, bool canOverScroll)
+    {
+        auto previous = capiScrollToRequest_;
+        capiScrollToRequest_ = true;
+        AnimateTo(position, duration, curve, smooth, canOverScroll);
+        capiScrollToRequest_ = previous;
+    }
+    bool TakeCapiScrollToEventReportRequest()
+    {
+        auto requested = capiScrollToRequest_;
+        capiScrollToRequest_ = false;
+        return requested;
+    }
+    void UpdateCapiScrollEventSource(bool isScrollTo);
+    void ScheduleCapiScrollCommand(bool isScrollTo, bool isScrollBy = false);
+    void MarkCapiScrollByEventSource();
     virtual void AnimateTo(
         float position, float duration, const RefPtr<Curve>& curve, bool smooth, bool canOverScroll = false,
         bool useTotalOffset = true);
@@ -1158,8 +1176,10 @@ public:
 
     void SetCanOverScroll(bool val);
 
-    void ContentChangeReport(
-        const RefPtr<FrameNode>& keyNode, uint32_t type = ContentChangeManager::NONE);
+    void ContentChangeReport(const RefPtr<FrameNode>& keyNode, uint32_t type = ContentChangeManager::NONE);
+    void ContentChangeReport(const RefPtr<FrameNode>& keyNode, uint32_t type, bool reportCapi);
+    void ContentChangeOnTouchDown();
+    void ContentChangeOnTouchEnd();
 
     ACE_FORCE_EXPORT void ContentChangeOnScrollStart(const RefPtr<FrameNode>& keyNode);
 
@@ -1202,6 +1222,7 @@ protected:
     void FireObserverOnReachEnd();
     void FireObserverOnScrollStart();
     void FireObserverOnScrollStop();
+    void ContentChangeOnScrollUpdate();
     void FireObserverOnDidScroll(float finalOffset);
     void FireObserverOnScrollerAreaChange(float finalOffset);
     float FireObserverOnWillScroll(float offset);
@@ -1489,6 +1510,15 @@ private:
     // scroller
     RefPtr<Animator> animator_;
     bool scrollAbort_ = false;
+    bool capiScrollDetached_ = false;
+    bool capiScrollStartPending_ = false;
+    bool capiScrollStarted_ = false;
+    bool capiSnapTakeover_ = false;
+    bool capiBlockedCommandStart_ = false;
+    bool capiBlockedCommandEnd_ = false;
+    std::optional<double> capiCommandOffset_;
+    uint32_t capiCommandSource_ = 0;
+    bool capiScrollToRequest_ = false;
     bool isAnimateOverScroll_ = false;
     bool isScrollToOverAnimation_ = false;
     bool isScrollToSafeAreaHelper_ = true;

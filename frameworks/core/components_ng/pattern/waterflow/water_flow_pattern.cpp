@@ -830,6 +830,7 @@ void WaterFlowPattern::ScrollPage(bool reverse, bool smooth, AccessibilityScroll
             ScrollablePattern::AnimateTo(-position, -1, nullptr, true, false, false);
         }
     } else {
+        ScheduleCapiScrollCommand(false);
         UpdateCurrentOffset(distance, SCROLL_FROM_JUMP);
     }
     // AccessibilityEventType::SCROLL_END
@@ -951,6 +952,9 @@ void WaterFlowPattern::ResetSections()
 
 void WaterFlowPattern::ScrollToIndex(int32_t index, bool smooth, ScrollAlign align, std::optional<float> extraOffset)
 {
+    if (!smooth) {
+        ScheduleCapiScrollCommand(true);
+    }
     SetScrollSource(SCROLL_FROM_JUMP);
     SetScrollAlign(align);
     StopAnimate();
@@ -972,7 +976,7 @@ void WaterFlowPattern::ScrollToIndex(int32_t index, bool smooth, ScrollAlign ali
             if (extraOffset.has_value()) {
                 layoutInfo_->extraOffset_ = -extraOffset.value();
             }
-            ContentChangeReport(GetHost(), ContentChangeManager::SCROLL_TO_INDEX);
+            ContentChangeReport(GetHost(), ContentChangeManager::SCROLL_TO_INDEX, false);
         }
     }
     FireAndCleanScrollingListener();

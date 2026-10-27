@@ -148,6 +148,8 @@ protected:
     bool MoveAccessibilityIndexByStep(int32_t step);
     void FireOnSelect(int32_t selectIndex, bool fromPress);
     void RemoveBubble();
+    void ReportCapiBubbleEvent(bool isShow);
+    void OnDetachFromMainTree() override;
     void StartCollapseDelayTask(RefPtr<FrameNode>& hostNode, uint32_t duration = INDEXER_COLLAPSE_WAIT_DURATION);
     void OnSelect();
     void ItemSelectedChangedAnimation();
@@ -262,6 +264,7 @@ private:
     int32_t lastCollapsedIndex_ = 0;
    
 protected:
+    bool capiBubbleVisible_ = false;
     RefPtr<FrameNode> popupNode_;
     RefPtr<TouchEventImpl> touchListener_;
     RefPtr<PanEvent> panEvent_;

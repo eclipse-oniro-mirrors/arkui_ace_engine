@@ -15,6 +15,8 @@
 
 #include "core/components_ng/pattern/menu/menu_pattern.h"
 
+#include "core/components_ng/pattern/overlay/overlay_content_change_report.h"
+
 #include "base/perfmonitor/perf_constants.h"
 #include "base/perfmonitor/perf_monitor.h"
 #include "base/subwindow/subwindow_manager.h"
@@ -3927,6 +3929,7 @@ void MenuPattern::UpdateMenuPathParams(std::optional<MenuPathParams> pathParams)
 
 void MenuPattern::OnDetachFromMainTree()
 {
+    ReportCapiSubMenuEvent(GetHost(), false);
     auto wrapperNode = GetMenuWrapper();
     CHECK_NULL_VOID(wrapperNode);
     auto pattern = wrapperNode->GetPattern<MenuWrapperPattern>();

@@ -145,7 +145,8 @@ private:
         bool showComponentContent);
     void DeleteDialogHotAreas(const RefPtr<FrameNode>& dialogNode);
     void OnDialogCloseEvent(const RefPtr<OverlayManager>& overlayManager, const RefPtr<FrameNode>& node);
-    void PostDialogFinishEvent(const RefPtr<OverlayManager>& overlayManager, const WeakPtr<FrameNode>& nodeWk);
+    void PostDialogFinishEvent(
+        const RefPtr<OverlayManager>& overlayManager, const WeakPtr<FrameNode>& nodeWk, bool reportCapiHide);
     void UpdateChildInvisible(
         const RefPtr<OverlayManager>& overlayManager, const RefPtr<FrameNode>& node, const RefPtr<FrameNode>& child);
     void CloseMaskAndContentMatchTransition(

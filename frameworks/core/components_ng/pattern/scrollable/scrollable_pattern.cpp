@@ -1709,6 +1709,7 @@ void ScrollablePattern::InitTouchEvent(const RefPtr<GestureEventHub>& gestureHub
         switch (changedTouch.GetTouchType()) {
             case TouchType::DOWN:
                 pattern->activeTouchFingerIds_.insert(fingerId);
+                pattern->ContentChangeOnTouchDown();
                 scrollable->HandleTouchDown();
                 pattern->OnTouchDown(info);
                 break;
@@ -1718,6 +1719,7 @@ void ScrollablePattern::InitTouchEvent(const RefPtr<GestureEventHub>& gestureHub
                     pattern->activeTouchFingerIds_.empty()) {
                     scrollable->HandleTouchUp();
                 }
+                pattern->ContentChangeOnTouchEnd();
                 break;
             case TouchType::CANCEL:
                 pattern->activeTouchFingerIds_.erase(fingerId);
@@ -1725,6 +1727,7 @@ void ScrollablePattern::InitTouchEvent(const RefPtr<GestureEventHub>& gestureHub
                     pattern->activeTouchFingerIds_.empty()) {
                     scrollable->HandleTouchCancel();
                 }
+                pattern->ContentChangeOnTouchEnd();
                 break;
             default:
                 break;
@@ -1839,6 +1842,10 @@ void ScrollablePattern::SetEdgeEffect(EdgeEffect edgeEffect)
             CHECK_NULL_VOID(pattern);
             auto host = pattern->GetHost();
             CHECK_NULL_VOID(host);
+            auto fade = AceType::DynamicCast<ScrollFadeEffect>(pattern->scrollEffect_);
+            if (fade && fade->HasVisibleEffect()) {
+                pattern->ContentChangeOnScrollUpdate();
+            }
             host->MarkDirtyNode(PROPERTY_UPDATE_RENDER);
         });
         SetEdgeEffectCallback(fadeEdgeEffect);
@@ -2686,13 +2693,71 @@ void ScrollablePattern::StopAnimate()
     }
 }
 
+void ScrollablePattern::UpdateCapiScrollEventSource(bool isScrollTo)
+{
+    auto host = GetHost();
+    auto context = GetContext();
+    auto manager = context ? context->GetContentChangeManager() : nullptr;
+    if (host && manager) {
+        if (isScrollTo) {
+            manager->MarkCapiScrollToEventSource(host->GetId());
+        } else {
+            manager->ClearCapiScrollEventSource(host->GetId());
+        }
+    }
+}
+
+void ScrollablePattern::ScheduleCapiScrollCommand(bool isScrollTo, bool isScrollBy)
+{
+    auto context = GetContext();
+    auto manager = context ? context->GetContentChangeManager() : nullptr;
+    if (capiScrollDetached_ || !manager || !manager->HasCapiContentChangeSubscriptions()) {
+        return;
+    }
+    constexpr uint32_t SCROLL_BY_SOURCE = 1;
+    constexpr uint32_t SCROLL_TO_SOURCE = 2;
+    capiCommandSource_ = isScrollTo ? SCROLL_TO_SOURCE : (isScrollBy ? SCROLL_BY_SOURCE : 0);
+    if (capiCommandOffset_) {
+        return;
+    }
+    capiCommandOffset_ = GetTotalOffset();
+    context->AddAfterLayoutTask([weak = WeakClaim(this)]() {
+        auto pattern = weak.Upgrade();
+        if (!pattern || !pattern->capiCommandOffset_) {
+            return;
+        }
+        const auto previous = pattern->capiCommandOffset_.value();
+        const auto source = pattern->capiCommandSource_;
+        pattern->capiCommandOffset_.reset();
+        if (NearEqual(previous, pattern->GetTotalOffset())) {
+            return;
+        }
+        auto context = pattern->GetContext();
+        auto manager = context ? context->GetContentChangeManager() : nullptr;
+        if (manager) {
+            manager->ReportCapiScrollCommand(pattern->GetHost(), source);
+        }
+    });
+}
+
+void ScrollablePattern::MarkCapiScrollByEventSource()
+{
+    auto host = GetHost();
+    auto context = GetContext();
+    if (host && context && context->GetContentChangeManager()) {
+        context->GetContentChangeManager()->MarkCapiScrollByEventSource(host->GetId());
+    }
+}
+
 void ScrollablePattern::ScrollTo(float position)
 {
     StopAnimate();
+    auto host = GetHost();
+    ScheduleCapiScrollCommand(true);
     SetAnimateCanOverScroll(GetCanStayOverScroll());
     UpdateCurrentOffset(GetTotalOffset() - position, SCROLL_FROM_JUMP);
     SetIsOverScroll(GetCanStayOverScroll());
-    ContentChangeReport(GetHost(), ContentChangeManager::SCROLL_TO);
+    ContentChangeReport(host, ContentChangeManager::SCROLL_TO, false);
 }
 
 void ScrollablePattern::HandleAnimateFromUserStop()
@@ -2751,6 +2816,7 @@ void ScrollablePattern::SmartGesturePerformScroll(float position)
 void ScrollablePattern::AnimateTo(
     float position, float duration, const RefPtr<Curve>& curve, bool smooth, bool canOverScroll, bool useTotalOffset)
 {
+    const bool isScrollTo = TakeCapiScrollToEventReportRequest();
     StopScrollableAndAnimate();
     startingFastScroll_ = false;
     if (NearEqual(position, GetTotalOffset())) {
@@ -2776,7 +2842,15 @@ void ScrollablePattern::AnimateTo(
         PlayCurveAnimation(position, duration, curve, canOverScroll);
     }
     if (!GetIsDragging()) {
+        capiScrollToRequest_ = isScrollTo;
+        capiBlockedCommandStart_ = !canOverScroll && !GetCanStayOverScroll() &&
+            ((GreatNotEqual(position, GetTotalOffset()) && IsAtBottom()) ||
+                (LessNotEqual(position, GetTotalOffset()) && IsAtTop()));
         FireOnScrollStart(false);
+        capiBlockedCommandStart_ = false;
+        capiScrollToRequest_ = false;
+    } else {
+        UpdateCapiScrollEventSource(isScrollTo);
     }
 #ifndef CROSS_PLATFORM
     PerfMonitor::GetPerfMonitor()->EndCommercial(PerfConstants::APP_LIST_FLING, false);
@@ -4006,6 +4080,7 @@ void ScrollablePattern::NotifyFRCSceneInfo(const std::string& scene, double velo
 
 void ScrollablePattern::FireOnScrollStart(bool withPerfMonitor)
 {
+    const bool isScrollTo = TakeCapiScrollToEventReportRequest();
     auto host = GetHost();
     CHECK_NULL_VOID(host);
     auto hub = host->GetEventHub<ScrollableEventHub>();
@@ -4014,6 +4089,7 @@ void ScrollablePattern::FireOnScrollStart(bool withPerfMonitor)
     if (scrollStop_ && !GetScrollAbort()) {
         OnScrollStop(hub->GetOnScrollStop(), hub->GetJSFrameNodeOnScrollStop());
     }
+    UpdateCapiScrollEventSource(isScrollTo);
 #ifndef CROSS_PLATFORM
     RecordScrollEvent(Recorder::EventType::SCROLL_START);
     UiSessionManager::GetInstance()->ReportScrollEvent("onScrollStart");
@@ -4155,8 +4231,24 @@ void ScrollablePattern::FireObserverOnScrollStop()
     }
 }
 
+void ScrollablePattern::ContentChangeOnScrollUpdate()
+{
+    if (capiScrollStartPending_ && !capiScrollDetached_) {
+        capiScrollStartPending_ = false;
+        capiScrollStarted_ = true;
+        auto pipeline = GetContext();
+        auto manager = pipeline ? pipeline->GetContentChangeManager() : nullptr;
+        if (manager) {
+            manager->ReportCapiScrollStartEvent(GetHost());
+        }
+    }
+}
+
 void ScrollablePattern::FireObserverOnDidScroll(float finalOffset)
 {
+    if (!NearZero(finalOffset)) {
+        ContentChangeOnScrollUpdate();
+    }
     CHECK_NULL_VOID(positionController_);
     auto obsMgr = positionController_->GetObserverManager();
     auto observer = positionController_->GetObserver();
@@ -4312,15 +4404,15 @@ void ScrollablePattern::OnScrollStop(
     } else {
         ACE_SCOPED_TRACE("ScrollAbort, no OnScrollStop, id:%d, tag:%s",
             static_cast<int32_t>(host->GetAccessibilityId()), host->GetTag().c_str());
-#ifndef CROSS_PLATFORM
         if (pipeline) {
             auto mgr = pipeline->GetContentChangeManager();
-            if (mgr && mgr->IsStartEventReportEnabled() && AnimateStoped() && IsScrollableStopped() &&
+            if (mgr && AnimateStoped() && IsScrollableStopped() &&
                 !GetIsDragging() && ScrollBarIdle() && InnerScrollBarIdle()) {
-                mgr->OnContentChangeInterrupted(host, ChangeType::SCROLL);
+                capiScrollStartPending_ = false;
+                capiScrollStarted_ = false;
+                mgr->OnScrollInterrupted(host, mgr->IsStartEventReportEnabled());
             }
         }
-#endif
     }
     if (pipeline) {
         pipeline->GetFocusManager()->SetNeedTriggerScroll(false);
@@ -5613,6 +5705,7 @@ void ScrollablePattern::OnAttachToMainTree()
     auto host = GetHost();
     // call OnAttachToMainTreeMultiThread by multi thread
     THREAD_SAFE_NODE_CHECK(host, OnAttachToMainTree);
+    capiScrollDetached_ = false;
     CHECK_NULL_VOID(host);
     if (refreshCoordination_ && !refreshCoordination_->IsValid()) {
         refreshCoordination_->UpdateRefreshNode();
@@ -5923,38 +6016,86 @@ void ScrollablePattern::OnSyncGeometryNode(const DirtySwapConfig& config)
 
 void ScrollablePattern::ContentChangeReport(const RefPtr<FrameNode>& keyNode, uint32_t type)
 {
-#ifndef CROSS_PLATFORM
+    ContentChangeReport(keyNode, type, true);
+}
+
+void ScrollablePattern::ContentChangeReport(const RefPtr<FrameNode>& keyNode, uint32_t type, bool reportCapi)
+{
     auto pipeline = GetContext();
     CHECK_NULL_VOID(pipeline);
     auto mgr = pipeline->GetContentChangeManager();
     CHECK_NULL_VOID(mgr);
-    mgr->OnScrollChangeEnd(keyNode, type);
-#endif
+    const bool blocked = type == ContentChangeManager::NONE && capiBlockedCommandEnd_;
+    if (type == ContentChangeManager::NONE) {
+        capiBlockedCommandEnd_ = false;
+    }
+    const bool hasMovement = type != ContentChangeManager::NONE || capiScrollStarted_;
+    const bool deferCapiEnd = type == ContentChangeManager::NONE && capiSnapTakeover_ &&
+        (!activeTouchFingerIds_.empty() || !IsScrollableStopped() || !AnimateStoped() || GetIsDragging());
+    if (type == ContentChangeManager::NONE && !deferCapiEnd) {
+        capiScrollStartPending_ = false;
+        capiScrollStarted_ = false;
+        capiSnapTakeover_ = false;
+    }
+    mgr->OnScrollChangeEnd(
+        keyNode, type, reportCapi && hasMovement && !blocked && !capiScrollDetached_ && !deferCapiEnd);
+    if (!deferCapiEnd && (blocked || !hasMovement) && keyNode) {
+        mgr->ClearCapiScrollEventSource(keyNode->GetId());
+    }
+}
+
+void ScrollablePattern::ContentChangeOnTouchDown()
+{
+    auto scrollable = GetScrollable();
+    if (capiScrollStarted_ && scrollable && scrollable->IsSnapAnimationRunning()) {
+        capiSnapTakeover_ = true;
+    }
+}
+
+void ScrollablePattern::ContentChangeOnTouchEnd()
+{
+    if (!capiSnapTakeover_ || !activeTouchFingerIds_.empty() ||
+        !IsScrollableStopped() || !AnimateStoped() || GetIsDragging()) {
+        return;
+    }
+    capiSnapTakeover_ = false;
+    capiScrollStartPending_ = false;
+    capiScrollStarted_ = false;
+    auto pipeline = GetContext();
+    auto manager = pipeline ? pipeline->GetContentChangeManager() : nullptr;
+    if (manager && !capiScrollDetached_) {
+        manager->ReportCapiScrollEndEvent(GetHost());
+    }
 }
 
 void ScrollablePattern::ContentChangeByDetaching(PipelineContext* pipeline)
 {
-#ifndef CROSS_PLATFORM
+    capiScrollDetached_ = true;
+    capiSnapTakeover_ = false;
+    capiScrollStartPending_ = false;
+    capiScrollStarted_ = false;
+    capiCommandOffset_.reset();
     CHECK_NULL_VOID(pipeline);
     auto mgr = pipeline->GetContentChangeManager();
     CHECK_NULL_VOID(mgr);
     auto host = GetHost();
     CHECK_NULL_VOID(host);
     mgr->OnScrollRemoved(host->GetId());
-#endif
 }
 
 void ScrollablePattern::ContentChangeOnScrollStart(const RefPtr<FrameNode>& keyNode)
 {
-#ifndef CROSS_PLATFORM
     CHECK_NULL_VOID(keyNode);
+    // A new continuous interaction supersedes any command that has not reached layout yet.
+    capiCommandOffset_.reset();
     auto pipeline = GetContext();
     CHECK_NULL_VOID(pipeline);
     auto mgr = pipeline->GetContentChangeManager();
     CHECK_NULL_VOID(mgr);
-    mgr->OnScrollChangeStart(keyNode);
-    mgr->OnContentChangeStart(keyNode, ChangeType::SCROLL);
-#endif
+    mgr->OnScrollChangeStart(keyNode, false);
+    capiBlockedCommandEnd_ = capiBlockedCommandStart_;
+    capiScrollStartPending_ = !capiBlockedCommandStart_ && !capiScrollStarted_;
+    mgr->OnContentChangeStart(keyNode, ChangeType::SCROLL, false);
 }
 
 std::string ScrollablePattern::ParseCommand(const std::string& command, ScrollOnInjectionEventInfo& info)

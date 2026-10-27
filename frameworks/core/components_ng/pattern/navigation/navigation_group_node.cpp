@@ -94,10 +94,11 @@ void UpdateTransitionAnimationId(const RefPtr<FrameNode>& node, int32_t id)
 }
 
 int32_t TriggerNavDestinationTransition(const RefPtr<NavDestinationGroupNode>& navDestination,
-    NavigationOperation operation, bool isEnter, bool reportHomeTransition = false)
+    NavigationOperation operation, bool isEnter, bool reportHomeTransition = false,
+    bool reportCapiHomeTransition = false)
 {
     CHECK_NULL_RETURN(navDestination, INVALID_ANIMATION_ID);
-    return navDestination->DoTransition(operation, isEnter, reportHomeTransition);
+    return navDestination->DoTransition(operation, isEnter, reportHomeTransition, reportCapiHomeTransition);
 }
 
 bool IsFullScreenOverlayNode(const RefPtr<FrameNode>& node)
@@ -1059,7 +1060,8 @@ void NavigationGroupNode::TransitionWithPop(const RefPtr<FrameNode>& preNode, co
         mgr && mgr->IsStartEventReportEnabled();
 #endif
     int32_t curAnimationId = TriggerNavDestinationTransition(
-        curDestination, NavigationOperation::POP, true, reportHomeTransition);
+        curDestination, NavigationOperation::POP, true, reportHomeTransition,
+        preUseCustomTransition && curDestination && curDestination->IsHomeDestination());
     if (curAnimationId == INVALID_ANIMATION_ID) {
         curAnimationId = popAnimationId;
         curUseCustomTransition = false;
@@ -1090,6 +1092,11 @@ void NavigationGroupNode::TransitionWithPop(const RefPtr<FrameNode>& preNode, co
 #endif
             navigation->CleanPopAnimations();
             auto preNavDesNode = weakPreNode.Upgrade();
+            if (!preNavDesNode && preUseCustomTransition) {
+                // A custom exit may remove the old page before the entering animation finishes.
+                navigation->ContentChangeReport(weakCurNode.Upgrade(), true);
+                return;
+            }
             CHECK_NULL_VOID(preNavDesNode);
             auto preNavdestination = AceType::DynamicCast<NavDestinationGroupNode>(preNavDesNode);
             CHECK_NULL_VOID(preNavdestination);
@@ -3485,19 +3492,9 @@ RefPtr<FrameNode> NavigationGroupNode::GetContentChangeNode(const RefPtr<FrameNo
 
 void NavigationGroupNode::ContentChangeReport(const RefPtr<FrameNode>& keyNode, bool isPopPage)
 {
-#ifndef CROSS_PLATFORM
-    auto context = GetContextWithCheck();
-    CHECK_NULL_VOID(context);
-    auto mgr = context->GetContentChangeManager();
-    CHECK_NULL_VOID(mgr);
-    if (isPopPage) {
-        auto reportNode = keyNode || mgr->IsStartEventReportEnabled() ?
-            GetContentChangeNode(keyNode) : nullptr;
-        mgr->OnPageTransitionEnd(reportNode, GetId());
-    } else {
-        mgr->OnPageTransitionEnd(keyNode);
-    }
-#endif
+    auto pattern = GetPattern<NavigationPattern>();
+    CHECK_NULL_VOID(pattern);
+    pattern->ContentChangeReport(keyNode, isPopPage);
 }
 
 RefPtr<FrameNode> NavigationGroupNode::GetOrCreateMaskNode(bool isLeft)

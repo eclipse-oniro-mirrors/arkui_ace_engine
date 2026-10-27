@@ -14,9 +14,19 @@
  */
 
 #include "tabs_test_ng.h"
+#include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
+#include "test/mock/frameworks/base/thread/mock_task_executor.h"
+#include "core/components_ng/manager/content_change_manager/content_change_manager.h"
 
 namespace OHOS::Ace::NG {
-class TabsLayoutTestNg : public TabsTestNg {};
+namespace {
+constexpr int32_t CUSTOM_TRANSITION_TIMEOUT_MS = 3000;
+} // namespace
+
+class TabsLayoutTestNg : public TabsTestNg {
+public:
+    void CheckCustomTabsAttributeEnd(bool validTransition);
+};
 
 /**
  * @tc.name: TabsSize001
@@ -497,4 +507,134 @@ HWTEST_F(TabsLayoutTestNg, SetWidthAuto002, TestSize.Level1)
     FlushUITasks();
     EXPECT_TRUE(IsEqual(frameNode_->GetGeometryNode()->GetFrameSize(), SizeF(TABS_WIDTH, TABS_HEIGHT)));
 }
+/**
+ * @tc.name: CustomTabsAttributeChangeReportsEnd
+ * @tc.desc: Attribute jumps in custom mode report after layout without invoking a transition proxy.
+ * @tc.type: FUNC
+ */
+void TabsLayoutTestNg::CheckCustomTabsAttributeEnd(bool validTransition)
+{
+    auto pipeline = MockPipelineContext::GetCurrent();
+    auto manager = pipeline->GetContentChangeManager();
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    auto model = CreateTabs();
+    model.SetIsCustomAnimation(true);
+    int transitions = 0;
+    model.SetOnCustomAnimation([&transitions, validTransition](int32_t, int32_t) {
+        ++transitions;
+        TabContentAnimatedTransition transition;
+        if (validTransition) {
+            transition.timeout = CUSTOM_TRANSITION_TIMEOUT_MS;
+            transition.transition = [](const RefPtr<TabContentTransitionProxy>&) {};
+        }
+        return transition;
+    });
+    CreateTabContents();
+    CreateTabsDone(model);
+    std::vector<uint32_t> a;
+    std::vector<uint32_t> b;
+    auto sink = [](uint32_t type, uint64_t, const char*, uint32_t, void* data) {
+        static_cast<std::vector<uint32_t>*>(data)->push_back(type);
+    };
+    auto aid = manager->RegisterCapiContentChangeEvent(true, 1, 0, &a, sink, nullptr);
+    auto bid = manager->RegisterCapiContentChangeEvent(false, 1, 0, &b, sink, nullptr);
+    for (int index : { 1, 2 }) {
+        a.clear();
+        b.clear();
+        layoutProperty_->UpdateIndexSetByUser(index);
+        FlushUITasks();
+        manager->OnVsyncEnd(RectF());
+        EXPECT_TRUE(CurrentIndex(index));
+        EXPECT_EQ(transitions, 0);
+        EXPECT_EQ(a, (std::vector<uint32_t> { 9, 10 }));
+        EXPECT_EQ(b, (std::vector<uint32_t> { 10 }));
+        a.clear();
+        b.clear();
+        layoutProperty_->UpdateIndexSetByUser(index);
+        FlushUITasks();
+        manager->OnVsyncEnd(RectF());
+        EXPECT_TRUE(a.empty());
+        EXPECT_TRUE(b.empty());
+    }
+    manager->UnregisterCapiContentChangeEvent(aid);
+    manager->UnregisterCapiContentChangeEvent(bid);
+}
+
+/**
+ * @tc.name: CustomTabsAttributeChangeReportsEnd
+ * @tc.desc: Preserve the original delegate-returning-undefined property path.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsLayoutTestNg, CustomTabsAttributeChangeReportsEnd, TestSize.Level1)
+{
+    CheckCustomTabsAttributeEnd(false);
+}
+
+/**
+ * @tc.name: ValidCustomTabsAttributeChangeReportsEnd
+ * @tc.desc: A valid transition delegate must not suppress property-driven END.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsLayoutTestNg, ValidCustomTabsAttributeChangeReportsEnd, TestSize.Level1)
+{
+    CheckCustomTabsAttributeEnd(true);
+}
+
+/**
+ * @tc.name: CustomTabsControllerEndIsNotDuplicatedByLayout
+ * @tc.desc: The controller creates a real proxy; only its completion produces END.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsLayoutTestNg, CustomTabsControllerEndIsNotDuplicatedByLayout, TestSize.Level1)
+{
+    auto pipeline = MockPipelineContext::GetCurrent();
+    auto manager = pipeline->GetContentChangeManager();
+    manager->StopContentChangeReport();
+    manager->InvalidateCapiContentChangeSubscriptions();
+    auto model = CreateTabs();
+    model.SetIsCustomAnimation(true);
+    RefPtr<TabContentTransitionProxy> proxy;
+    model.SetOnCustomAnimation([&proxy](int32_t, int32_t) {
+        TabContentAnimatedTransition transition;
+        transition.timeout = CUSTOM_TRANSITION_TIMEOUT_MS;
+        transition.transition = [&proxy](const RefPtr<TabContentTransitionProxy>& value) { proxy = value; };
+        return transition;
+    });
+    CreateTabContents();
+    CreateTabsDone(model);
+    auto oldExecutor = pipeline->GetTaskExecutor();
+    pipeline->SetTaskExecutor(AceType::MakeRefPtr<MockTaskExecutor>(true));
+    std::vector<uint32_t> a;
+    std::vector<uint32_t> b;
+    auto sink = [](uint32_t type, uint64_t, const char*, uint32_t, void* data) {
+        static_cast<std::vector<uint32_t>*>(data)->push_back(type);
+    };
+    auto aid = manager->RegisterCapiContentChangeEvent(true, 1, 0, &a, sink, nullptr);
+    auto bid = manager->RegisterCapiContentChangeEvent(false, 1, 0, &b, sink, nullptr);
+    swiperPattern_->SwipeTo(1);
+    FlushUITasks();
+    manager->OnVsyncEnd(RectF());
+    EXPECT_EQ(a, (std::vector<uint32_t> { 9 }));
+    EXPECT_TRUE(b.empty());
+    EXPECT_NE(proxy, nullptr);
+    if (proxy) {
+        proxy->FinishTransition();
+        FlushUITasks();
+        manager->OnVsyncEnd(RectF());
+        EXPECT_TRUE(CurrentIndex(1));
+        EXPECT_EQ(a, (std::vector<uint32_t> { 9, 10 }));
+        EXPECT_EQ(b, (std::vector<uint32_t> { 10 }));
+        // Repeated completion and a later layout cannot synthesize another END.
+        proxy->FinishTransition();
+        FlushUITasks();
+        manager->OnVsyncEnd(RectF());
+        EXPECT_EQ(a, (std::vector<uint32_t> { 9, 10 }));
+        EXPECT_EQ(b, (std::vector<uint32_t> { 10 }));
+    }
+    manager->UnregisterCapiContentChangeEvent(aid);
+    manager->UnregisterCapiContentChangeEvent(bid);
+    pipeline->SetTaskExecutor(oldExecutor);
+}
+
 } // namespace OHOS::Ace::NG

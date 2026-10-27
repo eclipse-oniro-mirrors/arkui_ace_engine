@@ -734,7 +734,20 @@ void NavigationPattern::ReportTopDestinationInForceSplit()
     auto stack = GetNavigationStack();
     CHECK_NULL_VOID(stack);
     auto topDest = AceType::DynamicCast<FrameNode>(NavigationGroupNode::GetNavDestinationNode(stack->Get()));
-    CHECK_NULL_VOID(topDest);
+    auto pipeline = GetContext();
+    auto manager = pipeline ? pipeline->GetContentChangeManager() : nullptr;
+    if (!topDest) {
+        // Hiding the home NavBar changes the empty split view as well.
+        auto host = GetHost();
+        if (manager && host && host->IsOnMainTree() && host->IsVisible()) {
+            manager->ReportCapiPageStartEvent(host);
+            ReportCapiPageTransitionEnd(host, host->GetId());
+        }
+        return;
+    }
+    if (manager && topDest->IsOnMainTree() && topDest->IsVisible()) {
+        manager->ReportCapiPageStartEvent(topDest);
+    }
     ContentChangeReport(topDest);
 }
 
@@ -1865,12 +1878,29 @@ void NavigationPattern::UpdateColorModeForNodes(
 void NavigationPattern::ReportPrimaryTopChangeIfNeeded(const WeakPtr<NavDestinationGroupNode>& prePrimaryTop)
 {
     if (primaryNodes_.empty()) {
+        if (!prePrimaryTop.Upgrade()) {
+            return;
+        }
+        auto navigation = AceType::DynamicCast<NavigationGroupNode>(GetHost());
+        CHECK_NULL_VOID(navigation);
+        auto home = AceType::DynamicCast<FrameNode>(navigation->GetNavBarOrHomeDestinationNode());
+        auto pipeline = GetContext();
+        auto manager = pipeline ? pipeline->GetContentChangeManager() : nullptr;
+        if (manager && home && home->IsOnMainTree() && home->IsVisible()) {
+            manager->ReportCapiPageStartEvent(home);
+            ReportCapiPageTransitionEnd(home, home->GetId());
+        }
         return;
     }
     auto curPrimaryTop = primaryNodes_.back().Upgrade();
     CHECK_NULL_VOID(curPrimaryTop);
     if (curPrimaryTop == prePrimaryTop.Upgrade()) {
         return;
+    }
+    auto pipeline = GetContext();
+    auto manager = pipeline ? pipeline->GetContentChangeManager() : nullptr;
+    if (manager && curPrimaryTop->IsOnMainTree() && curPrimaryTop->IsVisible()) {
+        manager->ReportCapiPageStartEvent(curPrimaryTop);
     }
     ContentChangeReport(curPrimaryTop);
 }
@@ -3047,6 +3077,14 @@ void NavigationPattern::DialogAnimation(const RefPtr<NavDestinationGroupNode>& p
         TransitionWithDialogAnimation(preTopNavDestination, newTopNavDestination, isPopPage);
     } else {
         TransitionWithOutAnimation(preTopNavDestination, newTopNavDestination, isPopPage, isNeedVisible);
+        auto pipeline = GetContext();
+        CHECK_NULL_VOID(pipeline);
+        pipeline->AddAfterRenderTask([weak = WeakClaim(this),
+            target = WeakPtr<NavDestinationGroupNode>(newTopNavDestination), isPopPage]() {
+            auto pattern = weak.Upgrade();
+            CHECK_NULL_VOID(pattern);
+            pattern->ContentChangeReport(target.Upgrade(), isPopPage);
+        });
     }
 }
 
@@ -4227,26 +4265,21 @@ bool NavigationPattern::TriggerCustomAnimation(RefPtr<NavDestinationGroupNode> p
             } else {
                 // fire page cancel transition
                 TAG_LOGI(AceLogTag::ACE_NAVIGATION, "interactive animation canceled");
-#ifndef CROSS_PLATFORM
                 auto pipeline = pattern->GetContext();
                 auto mgr = pipeline ? pipeline->GetContentChangeManager() : nullptr;
                 if (mgr && contentChangeTransitionId >= 0) {
                     mgr->OnTransitionRemoved(contentChangeTransitionId);
                 }
-#else
-                (void)contentChangeTransitionId;
-#endif
+                pattern->pendingCapiPageEnds_.erase(contentChangeTransitionId);
                 pattern->RecoveryToLastStack(preDestination, topDestination);
                 pattern->SyncWithJsStackIfNeeded();
-#ifndef CROSS_PLATFORM
                 if (mgr) {
                     RefPtr<FrameNode> reportNode = topDestination;
                     if (isPopTransition) {
                         reportNode = pattern->GetHost();
                     }
-                    mgr->OnContentChangeInterrupted(reportNode, ChangeType::PAGE);
+                    mgr->OnContentChangeInterrupted(reportNode, ChangeType::PAGE, false);
                 }
-#endif
             }
             proxy->FireEndCallback();
             pattern->RemoveProxyById(proxyId);
@@ -6762,6 +6795,7 @@ void NavigationPattern::GetAllNodes(
 
 void NavigationPattern::OnAllTransitionAnimationFinish()
 {
+    FlushCapiPageTransitionEnds();
     ShowOrRestoreSystemBarIfNeeded();
     SetRequestedOrientationIfNeeded();
     HandleAllPendingToClean();
@@ -8509,7 +8543,6 @@ void NavigationPattern::UpdateCanForceSplitLayout()
 
 void NavigationPattern::ContentChangeReport(const RefPtr<FrameNode>& keyNode, bool isPopPage)
 {
-#ifndef CROSS_PLATFORM
     auto pipeline = GetContext();
     CHECK_NULL_VOID(pipeline);
     auto mgr = pipeline->GetContentChangeManager();
@@ -8519,28 +8552,78 @@ void NavigationPattern::ContentChangeReport(const RefPtr<FrameNode>& keyNode, bo
         CHECK_NULL_VOID(navigation);
         auto reportNode = keyNode || mgr->IsStartEventReportEnabled() ?
             navigation->GetContentChangeNode(keyNode) : nullptr;
-        mgr->OnPageTransitionEnd(reportNode, navigation->GetId());
-    } else {
-        mgr->OnPageTransitionEnd(keyNode);
+        mgr->OnPageTransitionEnd(reportNode, navigation->GetId(), false);
+        ReportCapiPageTransitionEnd(navigation->GetContentChangeNode(keyNode), navigation->GetId());
+    } else if (keyNode) {
+        mgr->OnPageTransitionEnd(keyNode, keyNode->GetId(), false);
+        ReportCapiPageTransitionEnd(keyNode, keyNode->GetId());
     }
-#endif
+}
+
+void NavigationPattern::ReportCapiPageTransitionEnd(const RefPtr<FrameNode>& node, int32_t transitionId)
+{
+    if (!node || !node->IsOnMainTree()) {
+        return;
+    }
+    auto pipeline = GetContext();
+    CHECK_NULL_VOID(pipeline);
+    auto manager = pipeline->GetContentChangeManager();
+    CHECK_NULL_VOID(manager);
+    if (runningTransitionCount_ == 0 && pendingCapiPageEnds_.empty() && !capiPageEndTaskPending_) {
+        manager->ReportCapiPageEndEvent(node, transitionId);
+        return;
+    }
+    // Dialog and destination animations complete separately but describe the same page transition.
+    pendingCapiPageEnds_[transitionId] = WeakPtr(node);
+    FlushCapiPageTransitionEnds();
+}
+
+void NavigationPattern::FlushCapiPageTransitionEnds(bool forceDeferred)
+{
+    if (runningTransitionCount_ != 0 || (!forceDeferred && pendingCapiPageEnds_.empty()) || capiPageEndTaskPending_) {
+        return;
+    }
+    auto pipeline = GetContext();
+    CHECK_NULL_VOID(pipeline);
+    capiPageEndTaskPending_ = true;
+    pipeline->AddAfterRenderTask([weak = WeakClaim(this)]() {
+        auto pattern = weak.Upgrade();
+        CHECK_NULL_VOID(pattern);
+        pattern->capiPageEndTaskPending_ = false;
+        if (pattern->runningTransitionCount_ != 0) {
+            return;
+        }
+        auto pipeline = pattern->GetContext();
+        auto manager = pipeline ? pipeline->GetContentChangeManager() : nullptr;
+        CHECK_NULL_VOID(manager);
+        auto ends = std::move(pattern->pendingCapiPageEnds_);
+        pattern->pendingCapiPageEnds_.clear();
+        for (const auto& [id, weakNode] : ends) {
+            auto node = weakNode.Upgrade();
+            if (node && node->IsOnMainTree()) {
+                manager->ReportCapiPageEndEvent(node, id);
+            } else {
+                manager->ReportCapiPageEndEventFromCache(id);
+            }
+        }
+    });
 }
 
 void NavigationPattern::ContentChangeOnTransitionStart(const RefPtr<FrameNode>& keyNode, bool isPopPage)
 {
-#ifndef CROSS_PLATFORM
     auto pipeline = GetContext();
     CHECK_NULL_VOID(pipeline);
     auto mgr = pipeline->GetContentChangeManager();
     CHECK_NULL_VOID(mgr);
-    if (!keyNode && (!isPopPage || !mgr->IsStartEventReportEnabled())) {
+    if (!keyNode && !isPopPage) {
         return;
     }
     auto reportNode = isPopPage ? GetHost() : keyNode;
     CHECK_NULL_VOID(reportNode);
-    mgr->OnTransitionAdded(reportNode->GetId());
+    if (keyNode || mgr->IsStartEventReportEnabled()) {
+        mgr->OnTransitionAdded(reportNode->GetId());
+    }
     mgr->OnContentChangeStart(reportNode, ChangeType::PAGE);
-#endif
 }
 
 void NavigationPattern::FireNavigateChangeCallback()

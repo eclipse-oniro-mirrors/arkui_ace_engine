@@ -782,7 +782,7 @@ void DialogInnerManager::OnDialogCloseEvent(const RefPtr<OverlayManager>& overla
 }
 
 void DialogInnerManager::PostDialogFinishEvent(
-    const RefPtr<OverlayManager>& overlayManager, const WeakPtr<FrameNode>& nodeWk)
+    const RefPtr<OverlayManager>& overlayManager, const WeakPtr<FrameNode>& nodeWk, bool reportCapiHide)
 {
     TAG_LOGI(AceLogTag::ACE_DIALOG, "post dialog finish event enter");
     auto context = GetPipelineContext();
@@ -792,7 +792,7 @@ void DialogInnerManager::PostDialogFinishEvent(
     // animation finish event should be posted to UI thread.
     taskExecutor->PostTask(
         [DialogInnerManagerWeak = WeakClaim(this), overlayManagerWeak = WeakClaim(RawPtr(overlayManager)), nodeWk,
-            id = Container::CurrentId()]() {
+            id = Container::CurrentId(), reportCapiHide]() {
             ContainerScope scope(id);
             auto DialogInnerManager = DialogInnerManagerWeak.Upgrade();
             auto overlayManager = overlayManagerWeak.Upgrade();
@@ -801,6 +801,10 @@ void DialogInnerManager::PostDialogFinishEvent(
             SafeAreaExpandOpts opts = { .type = SAFE_AREA_TYPE_NONE };
             node->GetLayoutProperty()->UpdateSafeAreaExpandOpts(opts);
             DialogInnerManager->OnDialogCloseEvent(overlayManager, node);
+            // Common close paths already report through ContentChangeReport at animation completion.
+            if (reportCapiHide && !node->GetParent()) {
+                overlayManager->ReportCapiOverlayEvent(node, false, nullptr);
+            }
         },
         TaskExecutor::TaskType::UI, "ArkUIOverlayDialogCloseEvent");
 }
@@ -826,7 +830,7 @@ void DialogInnerManager::UpdateChildInvisible(
                 CHECK_NULL_VOID(DialogInnerManager && overlayManager && node);
                 node->RemoveChild(childWK.Upgrade());
                 if (node->GetChildren().empty()) {
-                    DialogInnerManager->PostDialogFinishEvent(overlayManager, nodeWk);
+                    DialogInnerManager->PostDialogFinishEvent(overlayManager, nodeWk, true);
                     auto dialogPattern = node->GetPattern<DialogPattern>();
                     CHECK_NULL_VOID(dialogPattern);
                     dialogPattern->CallDialogDidDisappearCallback();
@@ -869,7 +873,7 @@ void DialogInnerManager::CloseMaskAndContentMatchTransition(
         auto id = Container::CurrentId();
         ContainerScope scope(id);
         auto nodeWk = WeakPtr<FrameNode>(node);
-        PostDialogFinishEvent(overlayManager, nodeWk);
+        PostDialogFinishEvent(overlayManager, nodeWk, true);
         dialogPattern->CallDialogDidDisappearCallback();
     }
 }
@@ -900,7 +904,7 @@ void DialogInnerManager::CloseDialogMatchTransition(
                 auto DialogInnerManager = DialogInnerManagerWeak.Upgrade();
                 auto overlayManager = overlayManagerWeak.Upgrade();
                 CHECK_NULL_VOID(DialogInnerManager && overlayManager);
-                DialogInnerManager->PostDialogFinishEvent(overlayManager, nodeWk);
+                DialogInnerManager->PostDialogFinishEvent(overlayManager, nodeWk, false);
                 auto node = nodeWk.Upgrade();
                 CHECK_NULL_VOID(node);
                 auto dialogPattern = node->GetPattern<DialogPattern>();
@@ -911,7 +915,7 @@ void DialogInnerManager::CloseDialogMatchTransition(
         auto id = Container::CurrentId();
         ContainerScope scope(id);
         auto nodeWk = WeakPtr<FrameNode>(node);
-        PostDialogFinishEvent(overlayManager, nodeWk);
+        PostDialogFinishEvent(overlayManager, nodeWk, true);
         dialogPattern->CallDialogDidDisappearCallback();
     }
 }
@@ -946,7 +950,7 @@ void DialogInnerManager::CloseDialogAnimation(
             auto DialogInnerManager = DialogInnerManagerWeak.Upgrade();
             auto overlayManager = overlayManagerWeak.Upgrade();
             CHECK_NULL_VOID(DialogInnerManager && overlayManager);
-            DialogInnerManager->PostDialogFinishEvent(overlayManager, nodeWk);
+            DialogInnerManager->PostDialogFinishEvent(overlayManager, nodeWk, false);
             auto node = nodeWk.Upgrade();
             CHECK_NULL_VOID(node);
             auto dialogPattern = node->GetPattern<DialogPattern>();
