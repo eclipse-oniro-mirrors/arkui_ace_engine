@@ -14,12 +14,16 @@
  */
 
 #include "core/components_ng/pattern/menu/menu_layout_algorithm.h"
+
+#include <atomic>
+
 #include "core/components_ng/layout/overlay_safe_area_helper.h"
 #include "core/components_ng/manager/safe_area/safe_area_manager.h"
 #include "core/pipeline/container_window_manager.h"
 
 #include "base/subwindow/subwindow_manager.h"
 #include "core/common/ace_engine.h"
+#include "base/log/event_report.h"
 #include "core/components_ng/pattern/menu/menu_layout_property.h"
 #include "core/components_ng/pattern/menu/menu_paint_property.h"
 #include "core/components/common/layout/grid_system_manager.h"
@@ -39,6 +43,9 @@
 namespace OHOS::Ace::NG {
 
 namespace {
+// Process-level once-guard: report the menu invalid-maxWidth exception at most
+// once per process lifetime to avoid repeated big-data uploads.
+std::atomic_bool g_menuInvalidMaxWidthReported { false };
 // Derives per-edge safe area insets from the OverlaySafeAreaHelper result
 // (avoidSafeArea for own-window data plus avoidDisplayLimit for screen-level
 // data of subwindow-hosted menus, Func-04-02-01-Feat-09 ADR-3).
@@ -2727,32 +2734,36 @@ void MenuLayoutAlgorithm::UpdateConstraintWidth(LayoutWrapper* layoutWrapper, La
     }
     maxWidth = std::min(constraint.maxSize.Width(), maxWidth);
     if (LessNotEqual(maxWidth, 0.0f)) {
-        auto parentInfo = columnInfo->GetParent();
-        TAG_LOGW(AceLogTag::ACE_MENU,
-            "UpdateConstraintWidth invalid maxWidth: %{public}f, maxHorizontalSpace: %{public}f, "
-            "leftSpace: %{public}f, rightSpace: %{public}f, paddingWidth: %{public}f, "
-            "constraintMaxWidth: %{public}f, wrapperWidth: %{public}f, gridColumnWidth: %{public}f, "
-            "maxGridCounts: %{public}u, parentColumns: %{public}d, isLessThanAPITen: %{public}d",
-            maxWidth, maxHorizontalSpace, leftSpace_, rightSpace_, padding.Width(),
-            constraint.maxSize.Width(), wrapperSize_.Width(),
-            static_cast<float>(columnInfo->GetWidth(GetMaxGridCounts(columnInfo))),
-            GetMaxGridCounts(columnInfo), parentInfo ? parentInfo->GetColumns() : -1,
-            !Container::GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TEN) ? 1 : 0);
-        TAG_LOGW(AceLogTag::ACE_MENU,
-            "columnInfo grid context: density: %{public}f, dipScale: %{public}f, screenWidth: %{public}f, "
-            "currentSizeType: %{public}d, columnType: %{public}d, parentColumnWidth: %{public}f, "
-            "parentGutterWidth: %{public}s, parentMarginLeft: %{public}s, parentMarginRight: %{public}s, "
-            "parentSizeType: %{public}d",
-            GridSystemManager::GetInstance().GetDensity(),
-            GridSystemManager::GetInstance().GetDipScale(),
-            GridSystemManager::GetInstance().GetScreenWidth(),
-            static_cast<int32_t>(GridSystemManager::GetInstance().GetCurrentSize()),
-            parentInfo ? static_cast<int32_t>(parentInfo->GetColumnType()) : -1,
-            parentInfo ? parentInfo->GetColumnWidth() : -1.0,
-            parentInfo ? parentInfo->GetGutterWidth().ToString().c_str() : "null",
-            parentInfo ? parentInfo->GetMarginLeft().ToString().c_str() : "null",
-            parentInfo ? parentInfo->GetMarginRight().ToString().c_str() : "null",
-            parentInfo ? static_cast<int32_t>(parentInfo->GetSizeType()) : -1);
+        if (!g_menuInvalidMaxWidthReported.exchange(true)) {
+            auto parentInfo = columnInfo->GetParent();
+            std::string message = "maxWidth:" + std::to_string(maxWidth) +
+                " maxHorizontalSpace:" + std::to_string(maxHorizontalSpace) +
+                " leftSpace:" + std::to_string(leftSpace_) +
+                " rightSpace:" + std::to_string(rightSpace_) +
+                " paddingWidth:" + std::to_string(padding.Width()) +
+                " constraintMaxWidth:" + std::to_string(constraint.maxSize.Width()) +
+                " wrapperWidth:" + std::to_string(wrapperSize_.Width()) +
+                " gridColumnWidth:" + std::to_string(columnInfo->GetWidth(GetMaxGridCounts(columnInfo))) +
+                " maxGridCounts:" + std::to_string(GetMaxGridCounts(columnInfo)) +
+                " parentColumns:" + std::to_string(parentInfo ? parentInfo->GetColumns() : -1) +
+                " isLessThanAPITen:" + std::to_string(
+                    !Container::GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TEN) ? 1 : 0) +
+                " density:" + std::to_string(GridSystemManager::GetInstance().GetDensity()) +
+                " dipScale:" + std::to_string(GridSystemManager::GetInstance().GetDipScale()) +
+                " screenWidth:" + std::to_string(GridSystemManager::GetInstance().GetScreenWidth()) +
+                " currentSizeType:" + std::to_string(
+                    static_cast<int32_t>(GridSystemManager::GetInstance().GetCurrentSize())) +
+                " columnType:" + std::to_string(
+                    parentInfo ? static_cast<int32_t>(parentInfo->GetColumnType()) : -1) +
+                " parentColumnWidth:" + std::to_string(parentInfo ? parentInfo->GetColumnWidth() : -1.0) +
+                " parentGutterWidth:" + (parentInfo ? std::to_string(parentInfo->GetGutterWidth().Value()) : "null") +
+                " parentMarginLeft:" + (parentInfo ? std::to_string(parentInfo->GetMarginLeft().Value()) : "null") +
+                " parentMarginRight:" + (parentInfo ? std::to_string(parentInfo->GetMarginRight().Value()) : "null") +
+                " parentSizeType:" + std::to_string(
+                    parentInfo ? static_cast<int32_t>(parentInfo->GetSizeType()) : -1);
+            EventReport::SendComponentExceptionNG(ComponentExcepTypeNG::MENU_INVALID_MAX_WIDTH_ERR,
+                0, menuNode->GetId(), message);
+        }
         return;
     }
     constraint.maxSize.SetWidth(maxWidth);
