@@ -2072,6 +2072,7 @@ class SimpleSegmentButtonV2 extends ViewV2 {
     this.hoveredItemIndex = -1;
     this.mousePressedItemIndex = -1;
     this.touchPressedItemIndex = -1;
+    this.followingDragActive = false;
     this.resetParam(
       'enableStateAnimation',
       params && 'enableStateAnimation' in params ? params.enableStateAnimation : false
