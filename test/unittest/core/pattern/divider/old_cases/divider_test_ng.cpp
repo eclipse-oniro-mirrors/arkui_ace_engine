@@ -206,7 +206,7 @@ HWTEST_F(DividerTestNg, DividerPatternTest003, TestSize.Level0)
  */
 HWTEST_F(DividerTestNg, DividerModifierTest001, TestSize.Level0)
 {
-    DividerModifier dividerModifier;
+    DividerModifier dividerModifier(LinearColor::BLUE);
     Testing::MockCanvas rsCanvas;
     EXPECT_CALL(rsCanvas, AttachPen(_)).WillOnce(ReturnRef(rsCanvas));
     EXPECT_CALL(rsCanvas, DetachPen()).WillRepeatedly(ReturnRef(rsCanvas));

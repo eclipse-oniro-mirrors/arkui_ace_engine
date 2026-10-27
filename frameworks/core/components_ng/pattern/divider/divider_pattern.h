@@ -36,7 +36,7 @@ public:
         auto host = GetHost();
         ACE_UINODE_TRACE(host);
         if (!dividerModifier_) {
-            dividerModifier_ = AceType::MakeRefPtr<DividerModifier>();
+            dividerModifier_ = AceType::MakeRefPtr<DividerModifier>(GetInitialColor(host));
         }
         return MakeRefPtr<DividerPaintMethod>(
             constrainStrokeWidth_, dividerLength_, vertical_, strokeWidthLimitation_, dividerModifier_);
@@ -89,6 +89,19 @@ public:
     }
 
 private:
+    static LinearColor GetInitialColor(const RefPtr<FrameNode>& host)
+    {
+        CHECK_NULL_RETURN(host, LinearColor::BLUE);
+        auto paintProperty = host->GetPaintProperty<DividerRenderProperty>();
+        auto pipeline = host->GetContext();
+        CHECK_NULL_RETURN(pipeline, LinearColor::BLUE);
+        auto theme = pipeline->GetTheme<DividerTheme>(host->GetThemeScopeId());
+        if (!paintProperty || !theme) {
+            return LinearColor::BLUE;
+        }
+        return LinearColor(paintProperty->GetDividerColor().value_or(theme->GetColor()));
+    }
+
     bool OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, const DirtySwapConfig& config) override;
     float constrainStrokeWidth_ = 0;
     float dividerLength_ = 0;
