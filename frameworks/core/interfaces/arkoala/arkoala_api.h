@@ -129,6 +129,7 @@ struct _ArkUIRenderModifier;
 struct _ArkUIRSProperty;
 struct ArkUI_GridLayoutOptions;
 struct ArkUI_AccessibilityProvider;
+struct ArkUI_AccessibilityElementInfo;
 struct OH_ArkUI_AnimationGroup;
 typedef struct ArkUI_InnerColor ArkUI_InnerColor;
 typedef struct ArkUI_ImmersiveMaterial ArkUI_ImmersiveMaterial;
@@ -10077,6 +10078,9 @@ struct ArkUIFrameNodeModifier {
         ArkUINodeHandle exportedRoot);
     ArkUI_Int32 (*unbindAccessibilityExportTree)(ArkUINodeHandle owner, ArkUI_Int64 bindId);
     ArkUI_Int32 (*injectCompositeCommand)(const ArkUIInjectCommandParams* params);
+    ArkUI_Int32 (*registerAccessibilityHoverEventHandler)(ArkUINodeHandle node, void* userData,
+        void (*handler)(void*, int32_t, int32_t, int32_t, ArkUI_AccessibilityElementInfo*));
+    ArkUI_Int32 (*unregisterAccessibilityHoverEventHandler)(ArkUINodeHandle node);
 };
 
 struct ArkUINodeContentEvent {

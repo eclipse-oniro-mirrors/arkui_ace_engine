@@ -1363,6 +1363,33 @@ bool JsThirdProviderInteractionOperation::SendAccessibilitySyncEventToService(
     return true;
 }
 
+bool JsThirdProviderInteractionOperation::SendNativeHoverEvent(
+    const ArkUI_AccessibilityElementInfo& info, NG::AccessibilityHoverEventType eventType)
+{
+    Accessibility::AccessibilityEventInfo event;
+    return BuildNativeHoverEvent(info, eventType, event) && SendAccessibilitySyncEventToService(event, nullptr);
+}
+
+bool JsThirdProviderInteractionOperation::BuildNativeHoverEvent(const ArkUI_AccessibilityElementInfo& info,
+    NG::AccessibilityHoverEventType eventType, Accessibility::AccessibilityEventInfo& event)
+{
+    CHECK_NULL_RETURN(host_.Upgrade(), false);
+    if (eventType != NG::AccessibilityHoverEventType::ENTER && eventType != NG::AccessibilityHoverEventType::EXIT) {
+        return false;
+    }
+    Accessibility::AccessibilityElementInfo elementInfo;
+    AccessibilityThirdProviderUtils::TransformAccessibilityElementInfo(info, elementInfo);
+    event.SetElementInfo(elementInfo);
+    event.SetEventType(eventType == NG::AccessibilityHoverEventType::ENTER ?
+        Accessibility::EventType::TYPE_VIEW_HOVER_ENTER_EVENT : Accessibility::EventType::TYPE_VIEW_HOVER_EXIT_EVENT);
+    event.SetTimeStamp(GetMicroTickCount());
+    event.SetWindowChangeTypes(Accessibility::WindowUpdateType::WINDOW_UPDATE_INVALID);
+    event.SetWindowContentChangeTypes(Accessibility::WindowsContentChangeTypes::CONTENT_CHANGE_TYPE_INVALID);
+    event.SetBundleName(AceApplicationInfo::GetInstance().GetPackageName());
+    GetAccessibilityEventInfoFromNativeEvent(event, false);
+    return true;
+}
+
 void JsThirdProviderInteractionOperation::CheckAndSendHoverEnterByReadableRules(int64_t thirdElementId)
 {
     int64_t splitElementId = AccessibilityElementInfo::UNDEFINED_ACCESSIBILITY_ID;

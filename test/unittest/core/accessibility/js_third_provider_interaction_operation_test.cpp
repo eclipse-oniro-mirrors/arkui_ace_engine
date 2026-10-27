@@ -1355,4 +1355,43 @@ HWTEST_F(JsThirdProviderInteractionOperationTest, RemovedMountNoLongerHandsFocus
     EXPECT_FALSE(operation->HasChildTree(mountId));
 }
 
+// Native hover must preserve the provider tree identity and use the supplied result without another query.
+HWTEST_F(JsThirdProviderInteractionOperationTest, NativeHoverEventKeepsProviderTree, TestSize.Level1)
+{
+    auto provider = AceType::MakeRefPtr<MockOhAccessibilityProvider>();
+    auto host = FrameNode::CreateFrameNode("framenode", 8001, AceType::MakeRefPtr<Pattern>(), true);
+    auto manager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
+    manager->SetPipelineContext(NG::PipelineContext::GetCurrentContext());
+    auto operation = std::make_shared<Framework::JsThirdProviderInteractionOperation>(provider, manager, host);
+    operation->SetBelongTreeId(7);
+    ArkUI_AccessibilityElementInfo info;
+    info.SetElementId(123);
+    info.SetComponentType("Button");
+    info.SetContents("hover target");
+    Accessibility::AccessibilityEventInfo event;
+    ASSERT_TRUE(operation->BuildNativeHoverEvent(info, AccessibilityHoverEventType::ENTER, event));
+    int64_t elementId = -1;
+    int32_t treeId = -1;
+    AccessibilitySystemAbilityClient::GetTreeIdAndElementIdBySplitElementId(
+        event.GetAccessibilityId(), elementId, treeId);
+    EXPECT_EQ(elementId, 123);
+    EXPECT_EQ(treeId, 7);
+    EXPECT_EQ(event.GetEventType(), Accessibility::EventType::TYPE_VIEW_HOVER_ENTER_EVENT);
+    EXPECT_EQ(event.GetElementInfo().GetContent(), "hover target");
+    ASSERT_TRUE(operation->BuildNativeHoverEvent(info, AccessibilityHoverEventType::EXIT, event));
+    EXPECT_EQ(event.GetEventType(), Accessibility::EventType::TYPE_VIEW_HOVER_EXIT_EVENT);
+    EXPECT_FALSE(operation->BuildNativeHoverEvent(info, AccessibilityHoverEventType::MOVE, event));
+    EXPECT_FALSE(operation->BuildNativeHoverEvent(info, AccessibilityHoverEventType::CANCEL, event));
+}
+
+HWTEST_F(JsThirdProviderInteractionOperationTest, NativeHoverMissingHostIsRejected, TestSize.Level1)
+{
+    auto provider = AceType::MakeRefPtr<MockOhAccessibilityProvider>();
+    auto manager = AceType::MakeRefPtr<Framework::JsAccessibilityManager>();
+    auto operation = std::make_shared<Framework::JsThirdProviderInteractionOperation>(provider, manager, nullptr);
+    ArkUI_AccessibilityElementInfo info;
+    info.SetElementId(123);
+    EXPECT_FALSE(operation->SendNativeHoverEvent(info, AccessibilityHoverEventType::ENTER));
+}
+
 } // namespace OHOS::Ace::NG

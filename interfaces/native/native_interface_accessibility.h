@@ -1209,6 +1209,48 @@ int32_t OH_ArkUI_Accessibility_BindExportTree(
 int32_t OH_ArkUI_Accessibility_UnbindExportTree(
     ArkUI_NodeHandle owner, int64_t bindId);
 
+/**
+ * @brief Registers a handler for third-party accessibility hover hit testing.
+ *
+ * When screen reading is enabled, ArkUI calls the handler with coordinates relative to the host,
+ * in px. The third-party framework fills the output elementInfo with the hit component information.
+ * After the callback returns, ArkUI reports the corresponding hover event. Event types are managed
+ * by ArkUI and are not passed to the callback. The registered host's subtree is not hit-tested by ArkUI.
+ * Re-registering the same host replaces both the handler and userData.
+ * This function is not thread-safe. The handler runs synchronously on the UI thread and must return promptly.
+ *
+ * @param node [in] Host of type ARKUI_NODE_XCOMPONENT, ARKUI_NODE_CUSTOM or ARKUI_NODE_XCOMPONENT_TEXTURE.
+ * @param userData [in] Custom data passed unchanged to the handler. ArkUI does not own or release it.
+ * @param handleAccessibilityHoverEvent [in] Non-null handler. x/y are host-relative coordinates in px;
+ *     requestId identifies the current ArkUI request. elementInfo is an output object owned by ArkUI,
+ *     valid for the handler only during the callback. Fill it using the existing element-info setters;
+ *     do not retain or release the pointer. Leaving it unfilled means no hit.
+ * @return ARKUI_ERROR_CODE_NO_ERROR on success; ARKUI_ERROR_CODE_PARAM_INVALID if node is null;
+ *     ARKUI_ERROR_CODE_PARAM_ERROR if handleAccessibilityHoverEvent is null;
+ *     ARKUI_ERROR_CODE_ATTRIBUTE_OR_EVENT_NOT_SUPPORTED if the node type is unsupported.
+ * @see OH_ArkUI_Accessibility_UnregisterAccessibilityHoverEventHandler
+ * @since 26.1.0
+ */
+int32_t OH_ArkUI_Accessibility_RegisterAccessibilityHoverEventHandler(ArkUI_NodeHandle node, void* userData,
+    void (*handleAccessibilityHoverEvent)(void *userData, int32_t x, int32_t y,
+        int32_t requestId, ArkUI_AccessibilityElementInfo *elementInfo));
+
+/**
+ * @brief Unregisters a third-party accessibility hover handler and restores the existing hover rules.
+ *
+ * Unregistering a supported host without a handler succeeds. ArkUI no longer calls the removed handler and does
+ * not release userData; the caller manages its lifetime. This function is not thread-safe.
+ *
+ * @param node [in] Host of type ARKUI_NODE_XCOMPONENT, ARKUI_NODE_CUSTOM or ARKUI_NODE_XCOMPONENT_TEXTURE
+ *     from which the handler is removed.
+ * @return ARKUI_ERROR_CODE_NO_ERROR on success, including an unregistered node;
+ *     ARKUI_ERROR_CODE_PARAM_INVALID if node is null;
+ *     ARKUI_ERROR_CODE_ATTRIBUTE_OR_EVENT_NOT_SUPPORTED if the node type is unsupported.
+ * @see OH_ArkUI_Accessibility_RegisterAccessibilityHoverEventHandler
+ * @since 26.1.0
+ */
+int32_t OH_ArkUI_Accessibility_UnregisterAccessibilityHoverEventHandler(ArkUI_NodeHandle node);
+
 #ifdef __cplusplus
 };
 #endif

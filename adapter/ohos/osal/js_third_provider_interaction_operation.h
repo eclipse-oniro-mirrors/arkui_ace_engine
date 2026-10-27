@@ -125,6 +125,7 @@ public:
         std::shared_ptr<ArkUI_AccessibilityElementInfo>& nativeInfo);
 
     void CheckAndSendHoverEnterByReadableRules(int64_t thirdElementId);
+    bool SendNativeHoverEvent(const ArkUI_AccessibilityElementInfo& info, NG::AccessibilityHoverEventType eventType);
 
     void SetThirdCustomProperty(int64_t elementId, const RefPtr<NG::CustomAccessibilityProperty>& property);
     RefPtr<NG::CustomAccessibilityProperty> GetThirdCustomProperty(int64_t elementId) override;
@@ -137,6 +138,8 @@ public:
         Accessibility::AccessibilityElementInfo& info);
 
 private:
+    bool BuildNativeHoverEvent(const ArkUI_AccessibilityElementInfo& info,
+        NG::AccessibilityHoverEventType eventType, Accessibility::AccessibilityEventInfo& event);
     void GetHostRectTranslateInfo(NodeConfig& config);
     void GetNodeConfig(NodeConfig& nodeConfig);
     void ApplyChildTreeIdAndWinId(Accessibility::AccessibilityElementInfo& info);

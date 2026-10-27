@@ -23,6 +23,7 @@
 #include "base/utils/utils.h"
 #include "base/utils/multi_thread.h"
 #include "bridge/common/utils/engine_helper.h"
+#include "core/accessibility/native_interface_accessibility_impl.h"
 #include "core/common/builder_util.h"
 #include "core/common/color_inverter.h"
 #include "core/components_ng/base/inspector.h"
@@ -1310,6 +1311,19 @@ ArkUI_AccessibilityProvider* GetAccessibilityProvider(ArkUINodeHandle node)
     return pattern->GetNativeAccessibilityProvider();
 }
 
+ArkUI_Int32 RegisterAccessibilityHoverEventHandler(ArkUINodeHandle node, void* userData,
+    void (*handler)(void*, int32_t, int32_t, int32_t, ArkUI_AccessibilityElementInfo*))
+{
+    auto host = AceType::DynamicCast<FrameNode>(AceType::Claim(reinterpret_cast<UINode*>(node)));
+    return NativeAccessibilityHoverRegistry::GetInstance().Register(host, userData, handler);
+}
+
+ArkUI_Int32 UnregisterAccessibilityHoverEventHandler(ArkUINodeHandle node)
+{
+    auto host = AceType::DynamicCast<FrameNode>(AceType::Claim(reinterpret_cast<UINode*>(node)));
+    return NativeAccessibilityHoverRegistry::GetInstance().Unregister(host);
+}
+
 // CMP mixed-rendering: frame node modifier route for OH_ArkUI_Accessibility_BindExportTree / OH_ArkUI_Accessibility_UnbindExportTree.
 ArkUI_Int32 BindAccessibilityExportTree(ArkUINodeHandle owner, ArkUI_Int64 bindId, ArkUINodeHandle exportedRoot)
 {
@@ -1515,6 +1529,8 @@ const ArkUIFrameNodeModifier* GetFrameNodeModifier()
         .bindAccessibilityExportTree = BindAccessibilityExportTree,
         .unbindAccessibilityExportTree = UnbindAccessibilityExportTree,
         .injectCompositeCommand = InjectCompositeCommandImpl,
+        .registerAccessibilityHoverEventHandler = RegisterAccessibilityHoverEventHandler,
+        .unregisterAccessibilityHoverEventHandler = UnregisterAccessibilityHoverEventHandler,
     };
     CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
     return &modifier;
