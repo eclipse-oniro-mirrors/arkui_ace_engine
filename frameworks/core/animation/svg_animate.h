@@ -88,6 +88,17 @@ public:
         double y1 = StringUtils::StringToDouble(params.at(1));
         double x2 = StringUtils::StringToDouble(params.at(2));
         double y2 = StringUtils::StringToDouble(params.at(3));
+        // Validate control points: all four values must be finite (reject nan/inf which strtod accepts),
+        // x component must be in [0,1] (aligns with W3C/Skia cubic-bezier constraints, ensures monotonic bisection
+        // convergence). Fall back to LINEAR if invalid, preventing corrupted values from entering CubicCurve and
+        // causing MoveInternal infinite loop.
+        auto isValidControl = [](double x, double y) {
+            return std::isfinite(x) && std::isfinite(y) && x >= 0.0 && x <= 1.0;
+        };
+        if (!isValidControl(x1, y1) || !isValidControl(x2, y2)) {
+            LOGE("cubic curve control points invalid (nan/inf/x out of [0,1]), fallback to LINEAR");
+            return Curves::LINEAR;
+        }
         return AceType::MakeRefPtr<CubicCurve>(x1, y1, x2, y2);
     }
 
