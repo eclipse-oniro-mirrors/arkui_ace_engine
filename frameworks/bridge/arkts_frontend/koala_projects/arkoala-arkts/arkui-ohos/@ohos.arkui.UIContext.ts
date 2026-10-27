@@ -727,6 +727,10 @@ export enum KeyboardAvoidMode {
 export enum ImmersiveStrategy {
     AVOID_CUTOUT = 0,
     AVOID_FLOAT_NAV = 1,
+    GRID_EXPAND_SAFE_AREA = 2,
+    LIST_EXPAND_SAFE_AREA = 3,
+    SCROLL_EXPAND_SAFE_AREA = 4,
+    WATER_FLOW_EXPAND_SAFE_AREA = 5,
     AVOID_WINDOW_CONTROLS = 6,
     NAVIGATION_EXPAND_SAFE_AREA = 8,
 }

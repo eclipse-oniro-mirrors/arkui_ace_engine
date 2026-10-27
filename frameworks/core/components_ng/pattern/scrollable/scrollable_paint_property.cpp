@@ -16,16 +16,33 @@
 #include "core/components_ng/pattern/scrollable/scrollable_paint_property.h"
 
 #include "core/components/scroll/scroll_bar_theme.h"
+#include "core/components_ng/base/frame_node.h"
+#include "core/components_ng/pattern/scrollable/scrollable_utils.h"
 #include "core/pipeline_ng/pipeline_context.h"
 #include "base/log/dump_log.h"
 #include "interfaces/inner_api/ui_session/param_config.h"
 
 namespace OHOS::Ace::NG {
+namespace {
+// True when the unified immersive strategy promotes this node's effective default
+// clipContent to SAFE_AREA. Built-in defaults are never SAFE_AREA, so this is
+// exactly the "strategy enabled" signal, which keeps the un-enabled dump output
+// byte-identical (INV-2).
+bool IsImmersiveSafeAreaDefault(const ScrollablePaintProperty& props)
+{
+    const auto& clip = props.GetContentClip();
+    if (clip.has_value() && clip->first != ContentClipMode::DEFAULT) {
+        return false;
+    }
+    return ScrollableUtils::ResolveEffectiveDefaultContentClip(props.GetHost(), &props) == ContentClipMode::SAFE_AREA;
+}
+} // namespace
+
 std::string ScrollablePaintProperty::ContentClipToStr() const
 {
     auto mode = propContentClip_ ? propContentClip_->first : ContentClipMode::DEFAULT;
     if (mode == ContentClipMode::DEFAULT) {
-        mode = GetDefaultContentClip();
+        mode = ScrollableUtils::ResolveEffectiveDefaultContentClip(GetHost(), this);
     }
     switch (mode) {
         case ContentClipMode::CONTENT_ONLY:
@@ -75,6 +92,10 @@ void ScrollablePaintProperty::DumpInfo()
     fadingEdgeLength.has_value() ? DumpLog::GetInstance().AddDesc(std::string("fadingEdgeLength: ")
         .append(fadingEdgeLength.value().ToString()))
         : DumpLog::GetInstance().AddDesc("fadingEdgeLength: None");
+    if (IsImmersiveSafeAreaDefault(*this)) {
+        DumpLog::GetInstance().AddDesc("clipContent: SAFE_AREA");
+        return;
+    }
     auto clipContent = GetContentClip();
     clipContent.has_value() ? DumpLog::GetInstance().AddDesc(std::string("clipContent: ").append(
         clipContent.value().first == ContentClipMode::CONTENT_ONLY ? "CONTENT_ONLY" :
@@ -147,7 +168,8 @@ void ScrollablePaintProperty::DumpContentClipInfo(std::unique_ptr<JsonValue>& js
         }
         json->Put("clipContent", clipMode);
     } else if (!config.IsPublicTree()) {
-        json->Put("clipContent", "None");
+        IsImmersiveSafeAreaDefault(*this) ? json->Put("clipContent", "SAFE_AREA") :
+            json->Put("clipContent", "None");
     }
 }
 

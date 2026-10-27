@@ -216,6 +216,108 @@ protected:
     }
 };
 
+// ===================== Unified immersive strategy: promoted default =====================
+// AC-1.1/AC-1.2 (VM-1/VM-4): with GRID_EXPAND_SAFE_AREA applied and clipContent
+// never set explicitly, the Grid resolves its effective default to SAFE_AREA and
+// reuses the whole explicit-SAFE_AREA extension chain - the assertions mirror
+// GridClipScrollSafeAreaPaddingExtension001 field by field (INV-4).
+
+HWTEST_F(GridContentClipTest, GridClipImmersiveStrategyDefaultSafeArea001, TestSize.Level1)
+{
+    ImmersiveStrategyScope scope({ ImmersiveStrategy::GRID_EXPAND_SAFE_AREA });
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetRowsGap(Dimension(0));
+    model.SetColumnsGap(Dimension(0));
+    CreateGridItems(ITEM_COUNT, GRID_ITEM_WIDTH, ITEM_HEIGHT);
+    CreateDone();
+
+    EXPECT_EQ(ScrollableModelNG::GetContentClip(AceType::RawPtr(frameNode_)), ContentClipMode::SAFE_AREA);
+
+    layoutProperty_->UpdateSafeAreaPadding(CreatePadding(0.0f, 100.0f, 0.0f, 100.0f));
+    FlushUITasks();
+    const auto& info = pattern_->GetGridLayoutInfo();
+    EXPECT_EQ(info.startFixOffset_, 100.0f) << "promoted default reuses the SAFE_AREA start extension";
+    EXPECT_EQ(info.endFixOffset_, 100.0f) << "promoted default reuses the SAFE_AREA end extension";
+    EXPECT_GT(info.endIndex_, info.ReportEndIndex()) << "extension items laid out beyond content area";
+}
+
+// AC-2.1 (VM-2): an explicit value is never overridden by the enabled strategy.
+// Mirrors GridClipScrollContentOnlyNoExtension001 exactly (INV-1).
+HWTEST_F(GridContentClipTest, GridClipImmersiveStrategyExplicitContentOnlyWins001, TestSize.Level1)
+{
+    ImmersiveStrategyScope scope({ ImmersiveStrategy::GRID_EXPAND_SAFE_AREA });
+    BuildGrid(LayoutKind::SCROLL, ContentClipMode::CONTENT_ONLY, { .bottomPadding = 300.0f });
+    EXPECT_EQ(ScrollableModelNG::GetContentClip(AceType::RawPtr(frameNode_)), ContentClipMode::CONTENT_ONLY);
+    VerifyNoExtension();
+    EXPECT_EQ(pattern_->GetGridLayoutInfo().endIndex_, 1);
+}
+
+// AC-2.1/R-3: an explicit "restore default" resolves to the promoted default.
+HWTEST_F(GridContentClipTest, GridClipImmersiveStrategyExplicitDefaultPromotes001, TestSize.Level1)
+{
+    ImmersiveStrategyScope scope({ ImmersiveStrategy::GRID_EXPAND_SAFE_AREA });
+    BuildGrid(LayoutKind::SCROLL, ContentClipMode::DEFAULT, {});
+    EXPECT_EQ(ScrollableModelNG::GetContentClip(AceType::RawPtr(frameNode_)), ContentClipMode::SAFE_AREA);
+    layoutProperty_->UpdateSafeAreaPadding(CreatePadding(0.0f, 100.0f, 0.0f, 100.0f));
+    FlushUITasks();
+    EXPECT_EQ(pattern_->GetGridLayoutInfo().startFixOffset_, 100.0f);
+    EXPECT_EQ(pattern_->GetGridLayoutInfo().endFixOffset_, 100.0f);
+}
+
+// AC-3.1 (VM-3): with no strategy applied the unset Grid keeps its built-in
+// BOUNDARY default and the ADR-1 gate keeps the extension inactive.
+HWTEST_F(GridContentClipTest, GridClipImmersiveStrategyDisabledKeepsBuiltInDefault001, TestSize.Level1)
+{
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetRowsGap(Dimension(0));
+    model.SetColumnsGap(Dimension(0));
+    layoutProperty_->UpdatePadding(CreatePadding(0.0f, 0.0f, 0.0f, 300.0f));
+    CreateGridItems(ITEM_COUNT, GRID_ITEM_WIDTH, ITEM_HEIGHT);
+    CreateDone();
+
+    EXPECT_EQ(ScrollableModelNG::GetContentClip(AceType::RawPtr(frameNode_)), ContentClipMode::BOUNDARY);
+    VerifyNoExtension();
+}
+
+// AC-1.3: a strategy for another component type never touches the Grid.
+HWTEST_F(GridContentClipTest, GridClipImmersiveStrategyOtherComponentIsolated001, TestSize.Level1)
+{
+    ImmersiveStrategyScope scope({ ImmersiveStrategy::LIST_EXPAND_SAFE_AREA });
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    model.SetRowsGap(Dimension(0));
+    model.SetColumnsGap(Dimension(0));
+    layoutProperty_->UpdatePadding(CreatePadding(0.0f, 0.0f, 0.0f, 300.0f));
+    CreateGridItems(ITEM_COUNT, GRID_ITEM_WIDTH, ITEM_HEIGHT);
+    CreateDone();
+
+    EXPECT_EQ(ScrollableModelNG::GetContentClip(AceType::RawPtr(frameNode_)), ContentClipMode::BOUNDARY);
+    VerifyNoExtension();
+}
+
+// AC-1.1 dump surface: the promoted default is observable through the property
+// dump, while the un-enabled dump text stays byte-identical (INV-2).
+HWTEST_F(GridContentClipTest, GridClipImmersiveStrategyDumpSurface001, TestSize.Level1)
+{
+    GridModelNG model = CreateGrid();
+    model.SetColumnsTemplate("1fr 1fr");
+    CreateGridItems(ITEM_COUNT, GRID_ITEM_WIDTH, ITEM_HEIGHT);
+    CreateDone();
+
+    auto paintProperty = frameNode_->GetPaintProperty<ScrollablePaintProperty>();
+    ASSERT_NE(paintProperty, nullptr);
+    auto disabledJson = JsonUtil::Create(true);
+    paintProperty->DumpInfo(disabledJson);
+    EXPECT_EQ(disabledJson->GetString("clipContent"), "None") << "un-enabled dump output unchanged";
+
+    ImmersiveStrategyScope scope({ ImmersiveStrategy::GRID_EXPAND_SAFE_AREA });
+    auto enabledJson = JsonUtil::Create(true);
+    paintProperty->DumpInfo(enabledJson);
+    EXPECT_EQ(enabledJson->GetString("clipContent"), "SAFE_AREA");
+}
+
 // ===================== AC-1.1: BOUNDARY extension item layout =====================
 
 HWTEST_F(GridContentClipTest, GridClipScrollBoundaryBottomExtension001, TestSize.Level1)

@@ -22,6 +22,7 @@ COMMON_SRC = [
 
 CONTENT_CLIP_SRC = [
   "water_flow_content_clip_test.cpp",
+  "$ace_root/test/unittest/core/pattern/scrollable/scrollable_test_utils.cpp",
   "$ace_root/frameworks/core/components_ng/pattern/lazy_column_layout/lazy_column_layout_algorithm.cpp",
   "$ace_root/frameworks/core/components_ng/pattern/lazy_column_layout/lazy_column_layout_info.cpp",
   "$ace_root/frameworks/core/components_ng/pattern/lazy_column_layout/lazy_column_layout_model.cpp",

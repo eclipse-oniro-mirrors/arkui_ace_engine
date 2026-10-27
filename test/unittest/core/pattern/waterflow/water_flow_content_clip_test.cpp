@@ -1002,4 +1002,106 @@ HWTEST_F(WaterFlowContentClipTest, ContentClipBoundaryLazyVWaterFlow001, TestSiz
     EXPECT_EQ(visibleStart, 0);
     EXPECT_GT(lazyWaterFlowPattern->layoutInfo_->endIndex_, visibleEnd);
 }
+
+// ===================== Unified immersive strategy: promoted default =====================
+// AC-1.1/AC-1.2 (VM-1/VM-4): with WATER_FLOW_EXPAND_SAFE_AREA applied and
+// clipContent never set explicitly, the WaterFlow resolves its effective default
+// to SAFE_AREA and reuses the explicit-SAFE_AREA extension chain. The assertions
+// mirror ContentClipSafeAreaCachedPad001 field by field (INV-4).
+
+/**
+ * @tc.name: ContentClipImmersiveStrategyDefaultSafeArea001
+ * @tc.desc: Enabled WATER_FLOW_EXPAND_SAFE_AREA promotes the unset default to SAFE_AREA.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowContentClipTest, ContentClipImmersiveStrategyDefaultSafeArea001, TestSize.Level1)
+{
+    ImmersiveStrategyScope scope({ ImmersiveStrategy::WATER_FLOW_EXPAND_SAFE_AREA });
+    WaterFlowModelNG model = CreateWaterFlow();
+    model.SetColumnsTemplate("1fr 1fr");
+    // clipContent is deliberately never set: the strategy promotes the default.
+    layoutProperty_->UpdateSafeAreaPadding(CreatePadding(0.0f, 0.0f, 0.0f, 300.0f));
+    for (int32_t i = 0; i < 40; ++i) {
+        CreateItemWithHeight(100.0f);
+    }
+    CreateDone();
+    FlushUITasks(frameNode_);
+
+    // AC-1.1 query surface.
+    EXPECT_EQ(ScrollableModelNG::GetContentClip(AceType::RawPtr(frameNode_)), ContentClipMode::SAFE_AREA);
+    // Same extension as the explicit SAFE_AREA case.
+    auto info = pattern_->layoutInfo_;
+    EXPECT_EQ(info->startFixOffset_, 0.0f);
+    EXPECT_EQ(info->endFixOffset_, 300.0f);
+    EXPECT_GT(info->endIndex_, info->reportEndIndex_);
+}
+
+/**
+ * @tc.name: ContentClipImmersiveStrategyExplicitContentOnlyWins001
+ * @tc.desc: AC-2.1 - an explicit clipContent is never overridden by the enabled strategy.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowContentClipTest, ContentClipImmersiveStrategyExplicitContentOnlyWins001, TestSize.Level1)
+{
+    ImmersiveStrategyScope scope({ ImmersiveStrategy::WATER_FLOW_EXPAND_SAFE_AREA });
+    WaterFlowModelNG model = CreateWaterFlow();
+    model.SetColumnsTemplate("1fr 1fr");
+    ScrollableModelNG::SetContentClip(AceType::RawPtr(frameNode_), ContentClipMode::CONTENT_ONLY, nullptr);
+    layoutProperty_->UpdateSafeAreaPadding(CreatePadding(0.0f, 0.0f, 0.0f, 300.0f));
+    for (int32_t i = 0; i < 40; ++i) {
+        CreateItemWithHeight(100.0f);
+    }
+    CreateDone();
+    FlushUITasks(frameNode_);
+
+    EXPECT_EQ(ScrollableModelNG::GetContentClip(AceType::RawPtr(frameNode_)), ContentClipMode::CONTENT_ONLY);
+    auto info = pattern_->layoutInfo_;
+    EXPECT_EQ(info->startFixOffset_, 0.0f);
+    EXPECT_EQ(info->endFixOffset_, 0.0f);
+}
+
+/**
+ * @tc.name: ContentClipImmersiveStrategyDisabledKeepsBuiltInDefault001
+ * @tc.desc: AC-3.1 - with no strategy applied the WaterFlow keeps its built-in CONTENT_ONLY default.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowContentClipTest, ContentClipImmersiveStrategyDisabledKeepsBuiltInDefault001, TestSize.Level1)
+{
+    WaterFlowModelNG model = CreateWaterFlow();
+    model.SetColumnsTemplate("1fr 1fr");
+    layoutProperty_->UpdateSafeAreaPadding(CreatePadding(0.0f, 0.0f, 0.0f, 300.0f));
+    for (int32_t i = 0; i < 40; ++i) {
+        CreateItemWithHeight(100.0f);
+    }
+    CreateDone();
+    FlushUITasks(frameNode_);
+
+    EXPECT_EQ(ScrollableModelNG::GetContentClip(AceType::RawPtr(frameNode_)), ContentClipMode::CONTENT_ONLY);
+    auto info = pattern_->layoutInfo_;
+    EXPECT_EQ(info->startFixOffset_, 0.0f);
+    EXPECT_EQ(info->endFixOffset_, 0.0f);
+    EXPECT_EQ(info->endIndex_, info->reportEndIndex_);
+}
+
+/**
+ * @tc.name: ContentClipImmersiveStrategyOtherComponentIsolated001
+ * @tc.desc: AC-1.3 - a strategy for another component type never touches the WaterFlow.
+ * @tc.type: FUNC
+ */
+HWTEST_F(WaterFlowContentClipTest, ContentClipImmersiveStrategyOtherComponentIsolated001, TestSize.Level1)
+{
+    ImmersiveStrategyScope scope({ ImmersiveStrategy::SCROLL_EXPAND_SAFE_AREA });
+    WaterFlowModelNG model = CreateWaterFlow();
+    model.SetColumnsTemplate("1fr 1fr");
+    layoutProperty_->UpdateSafeAreaPadding(CreatePadding(0.0f, 0.0f, 0.0f, 300.0f));
+    for (int32_t i = 0; i < 40; ++i) {
+        CreateItemWithHeight(100.0f);
+    }
+    CreateDone();
+    FlushUITasks(frameNode_);
+
+    EXPECT_EQ(ScrollableModelNG::GetContentClip(AceType::RawPtr(frameNode_)), ContentClipMode::CONTENT_ONLY);
+    auto info = pattern_->layoutInfo_;
+    EXPECT_EQ(info->endFixOffset_, 0.0f);
+}
 } // namespace OHOS::Ace::NG

@@ -28,6 +28,7 @@
 #include "core/components_ng/pattern/scroll/inner/scroll_bar_overlay_modifier.h"
 #include "core/components_ng/pattern/scroll/scroll_edge_effect.h"
 #include "core/components_ng/pattern/scrollable/scrollable_paint_property.h"
+#include "core/components_ng/pattern/scrollable/scrollable_utils.h"
 #include "core/components_ng/pattern/scrollable/scroll_snap_strategy.h"
 #include "core/components_ng/pattern/scrollable/scroll_snap_utils.h"
 #include "core/components_ng/pattern/waterflow/layout/sliding_window/water_flow_layout_sw.h"
@@ -461,17 +462,26 @@ RefPtr<NodePaintMethod> WaterFlowPattern::CreateNodePaintMethod()
 void WaterFlowPattern::SetLayoutAlgorithmContentClip(const RefPtr<WaterFlowLayoutBase>& algorithm)
 {
     CHECK_NULL_VOID(algorithm);
+    // Activation gate: List reads the clip value from the paint property, while Grid gates through
+    // the layout property (ADR-1). A stored DEFAULT (written by ResetContentClip) is resolved
+    // dynamically here, so both follow a change of the immersive strategy set.
     auto paintProperty = GetPaintProperty<ScrollablePaintProperty>();
-    if (!paintProperty || !paintProperty->HasContentClip()) {
+    const bool hasClip = paintProperty && paintProperty->HasContentClip();
+    auto mode = ContentClipMode::DEFAULT;
+    RefPtr<ShapeRect> clipShape;
+    if (hasClip) {
+        const auto& clip = paintProperty->GetContentClipValue();
+        mode = clip.first;
+        clipShape = clip.second;
+    }
+    if (mode == ContentClipMode::DEFAULT) {
+        mode = ScrollableUtils::ResolveEffectiveDefaultContentClip(GetHost(), AceType::RawPtr(paintProperty));
+    }
+    if (!hasClip && mode != ContentClipMode::SAFE_AREA) {
         safeAreaPad_.reset();
         return;
     }
 
-    auto clip = paintProperty->GetContentClipValue();
-    auto mode = clip.first;
-    if (mode == ContentClipMode::DEFAULT) {
-        mode = paintProperty->GetDefaultContentClip();
-    }
     algorithm->SetContentClipMode(mode);
     if (mode != ContentClipMode::SAFE_AREA) {
         safeAreaPad_.reset();
@@ -479,7 +489,7 @@ void WaterFlowPattern::SetLayoutAlgorithmContentClip(const RefPtr<WaterFlowLayou
     if (mode == ContentClipMode::SAFE_AREA && safeAreaPad_.has_value()) {
         algorithm->SetContentClipSafeAreaPad(safeAreaPad_);
     } else if (mode == ContentClipMode::CUSTOM) {
-        algorithm->SetContentClipShape(clip.second);
+        algorithm->SetContentClipShape(clipShape);
     }
 }
 
