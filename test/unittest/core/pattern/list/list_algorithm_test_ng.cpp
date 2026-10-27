@@ -19,6 +19,7 @@
 
 #include "gtest/gtest.h"
 #include "test/unittest/core/pattern/test_ng.h"
+#include "test/unittest/core/syntax/mock_lazy_for_each_builder.h"
 
 #include "core/components_ng/layout/layout_wrapper_node.h"
 #include "core/components_ng/pattern/list/list_item_group_pattern.h"
@@ -29,17 +30,85 @@
 #include "core/components_ng/pattern/list/list_lanes_layout_algorithm.h"
 #include "core/components_ng/pattern/list/list_pattern.h"
 #include "core/components_ng/pattern/list/list_properties.h"
+#include "core/components_ng/syntax/if_else_node.h"
+#include "core/components_ng/syntax/lazy_for_each_node.h"
+#include "core/components_ng/syntax/repeat_virtual_scroll_node.h"
+#include "core/components_ng/syntax/repeat_virtual_scroll_2_node.h"
 #include "core/common/text_field_manager_ng.h"
 #include "core/components_ng/pattern/text_field/text_field_pattern.h"
 #include "core/pipeline_ng/pipeline_context.h"
 
 namespace OHOS::Ace::NG {
+namespace {
+constexpr int32_t FIRST_SEGMENT_GROUP_INDEX = 5;
+constexpr int32_t SECOND_SEGMENT_GROUP_INDEX = 17;
+constexpr int32_t TYPE_SCAN_LANES = 3;
+constexpr int32_t TYPE_SCAN_ITEM_COUNT = 24;
+constexpr int32_t SYNTAX_RANGE_ITEM_COUNT = 8;
+constexpr int32_t SYNTAX_LIST_ITEM_COUNT = 13;
+constexpr int32_t SYNTAX_ROW_END_DELTA = 2;
+} // namespace
+
 using namespace testing;
 using namespace testing::ext;
 
 class ListAlgorithmTestNg : public TestNG {
 public:
 };
+
+/**
+ * @tc.name: LayoutIndexUpdateUsesMinimumPlatformVersion001
+ * @tc.desc: Index callbacks retain the minimum platform gate when it differs from the target API.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListAlgorithmTestNg, LayoutIndexUpdateUsesMinimumPlatformVersion001, TestSize.Level1)
+{
+    auto pipeline = PipelineBase::GetCurrentContext();
+    auto container = Container::Current();
+    ASSERT_NE(pipeline, nullptr);
+    ASSERT_NE(container, nullptr);
+    const auto oldMinimum = pipeline->GetMinPlatformVersion();
+    const auto oldTarget = container->GetApiTargetVersion();
+    for (const auto& versions : {
+        std::make_pair(PlatformVersion::VERSION_NINE, PlatformVersion::VERSION_TWENTY_SIX),
+        std::make_pair(PlatformVersion::VERSION_TEN, PlatformVersion::VERSION_NINE) }) {
+        SCOPED_TRACE(static_cast<int32_t>(versions.first));
+        pipeline->SetMinPlatformVersion(static_cast<int32_t>(versions.first));
+        container->SetApiTargetVersion(static_cast<int32_t>(versions.second));
+        auto pattern = AceType::MakeRefPtr<ListPattern>();
+        auto list = FrameNode::CreateFrameNode(V2::LIST_ETS_TAG, GetElmtId(), pattern);
+        auto algorithm = AceType::DynamicCast<ListLayoutAlgorithm>(pattern->CreateLayoutAlgorithm());
+        auto wrapper = AceType::MakeRefPtr<LayoutWrapperNode>(list,
+            list->GetGeometryNode(), list->GetLayoutProperty());
+        wrapper->SetLayoutAlgorithm(AceType::MakeRefPtr<LayoutAlgorithmWrapper>(algorithm));
+        pattern->startIndex_ = 0;
+        pattern->endIndex_ = 0;
+        pattern->centerIndex_ = -1;
+        pattern->targetIndex_ = 0;
+        EXPECT_TRUE(pattern->OnDirtyLayoutWrapperSwap(wrapper, {}));
+        const bool legacyUpdate = versions.first == PlatformVersion::VERSION_NINE;
+        EXPECT_EQ(pattern->startIndex_, legacyUpdate ? -1 : 0);
+        EXPECT_EQ(pattern->endIndex_, legacyUpdate ? -1 : 0);
+    }
+    pipeline->SetMinPlatformVersion(oldMinimum);
+    container->SetApiTargetVersion(oldTarget);
+}
+
+/**
+ * @tc.name: FastScrollTargetOffsetMatchingRemainsExact001
+ * @tc.desc: Parameter matching must reject a different offset even when it lies within geometric tolerance.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListAlgorithmTestNg, FastScrollTargetOffsetMatchingRemainsExact001, TestSize.Level1)
+{
+    ListLayoutAlgorithm algorithm;
+    algorithm.SetFastScrollTarget(10, ScrollAlign::START);
+    algorithm.SetFastScrollPreparationOffset(1.0f);
+    EXPECT_TRUE(algorithm.MatchesFastScrollTarget(10, ScrollAlign::START, 1.0f));
+    EXPECT_FALSE(algorithm.MatchesFastScrollTarget(10, ScrollAlign::START, 1.0001f));
+    EXPECT_FALSE(algorithm.MatchesFastScrollTarget(11, ScrollAlign::START, 1.0f));
+    EXPECT_FALSE(algorithm.MatchesFastScrollTarget(10, ScrollAlign::END, 1.0f));
+}
 
 namespace {
 enum class PredictScanOutcome { POSITION, PREDICT_AND_POSITION, WAIT_FOR_PARENT };
@@ -89,7 +158,939 @@ public:
         return GetOrCreateChildByIndex(index, false, isCache);
     }
 };
+
+class LanesTypeScanItem : public LayoutWrapperNode {
+    DECLARE_ACE_TYPE(LanesTypeScanItem, LayoutWrapperNode);
+public:
+    explicit LanesTypeScanItem(const RefPtr<FrameNode>& node)
+        : LayoutWrapperNode(node, node->GetGeometryNode(), node->GetLayoutProperty()) {}
+
+    void Measure(const std::optional<LayoutConstraintF>&) override
+    {
+        ++measureCount_;
+    }
+
+    void Layout() override
+    {
+        ++layoutCount_;
+    }
+
+    int32_t measureCount_ = 0;
+    int32_t layoutCount_ = 0;
+};
+
+class LanesTypeScanWrapper : public LayoutWrapperNode {
+    DECLARE_ACE_TYPE(LanesTypeScanWrapper, LayoutWrapperNode);
+public:
+    explicit LanesTypeScanWrapper(const RefPtr<FrameNode>& node)
+        : LayoutWrapperNode(node, node->GetGeometryNode(), node->GetLayoutProperty()) {}
+
+    RefPtr<LayoutWrapper> GetOrCreateChildByIndex(uint32_t index, bool addToRenderTree, bool isCache,
+        bool allowPlaceholderSubstitution = false) override
+    {
+        calls_.emplace_back(index, addToRenderTree, isCache);
+        if (index == missingIndex_) {
+            return nullptr;
+        }
+        return LayoutWrapperNode::GetOrCreateChildByIndex(
+            index, addToRenderTree, isCache, allowPlaceholderSubstitution);
+    }
+
+    std::vector<std::tuple<uint32_t, bool, bool>> calls_;
+    uint32_t missingIndex_ = UINT32_MAX;
+};
+
+struct LanesTypeScanCase {
+    const char* name;
+    std::vector<bool> groups;
+    int32_t lanes;
+    int32_t target;
+    int32_t firstScanned;
+    int32_t lastScanned;
+    ListPositionMap::EstimateRange targetRow;
+};
+
+class ListFastScrollSegmentOriginTestNg : public TestNG,
+    public testing::WithParamInterface<std::tuple<bool, bool, bool, int32_t>> {
+public:
+    bool IsGroup(int32_t index) const
+    {
+        const int32_t physical = stack_ ? itemCount_ - index - 1 : index;
+        return !homogeneous_ && (physical == FIRST_SEGMENT_GROUP_INDEX || physical == SECOND_SEGMENT_GROUP_INDEX);
+    }
+
+    int32_t SegmentStart(int32_t index) const
+    {
+        if (IsGroup(index)) {
+            return index;
+        }
+        while (index > 0 && !IsGroup(index - 1)) {
+            --index;
+        }
+        return index;
+    }
+
+    std::pair<int32_t, int32_t> Row(int32_t index, int32_t lanes) const
+    {
+        EXPECT_GT(lanes, 0);
+        CHECK_NULL_RETURN(lanes > 0, (std::pair<int32_t, int32_t> { -1, -1 }));
+        if (IsGroup(index)) {
+            return { index, index };
+        }
+        const int32_t first = index - (index - SegmentStart(index)) % lanes;
+        int32_t last = first;
+        while (last + 1 < itemCount_ && last - first + 1 < lanes && !IsGroup(last + 1)) {
+            ++last;
+        }
+        return { first, last };
+    }
+
+    void Prepare()
+    {
+        const auto [stack, backward, homogeneous, lanes] = GetParam();
+        stack_ = stack;
+        homogeneous_ = homogeneous;
+        algorithm_.SetLanes(lanes);
+        algorithm_.totalItemCount_ = itemCount_;
+        algorithm_.isStackFromEnd_ = stack;
+        algorithm_.SetFastScrollMode(homogeneous ? FastScrollMode::SKIP_CREATE_AND_MEASURE :
+            FastScrollMode::SKIP_MEASURE);
+        algorithm_.posMap_ = AceType::MakeRefPtr<ListPositionMap>();
+        auto list = FrameNode::CreateFrameNode(V2::LIST_ETS_TAG, GetElmtId(), AceType::MakeRefPtr<ListPattern>());
+        nodes_.push_back(list);
+        parent_ = AceType::MakeRefPtr<LanesTypeScanWrapper>(list);
+        for (int32_t physical = 0; physical < itemCount_; ++physical) {
+            const bool group = !homogeneous && (physical == 5 || physical == 17);
+            RefPtr<Pattern> pattern = AceType::MakeRefPtr<ListItemPattern>(nullptr);
+            if (group) {
+                pattern = AceType::MakeRefPtr<ListItemGroupPattern>(nullptr, V2::ListItemGroupOptions {});
+            }
+            auto node = FrameNode::CreateFrameNode(group ? V2::LIST_ITEM_GROUP_ETS_TAG : V2::LIST_ITEM_ETS_TAG,
+                GetElmtId(), pattern);
+            nodes_.push_back(node);
+            auto wrapper = AceType::MakeRefPtr<LanesTypeScanItem>(node);
+            items_.push_back(wrapper);
+            parent_->AppendChild(wrapper);
+        }
+        const auto [first, last] = Row(15, lanes);
+        for (int32_t index = first; index <= last; ++index) {
+            const int32_t physical = stack ? itemCount_ - index - 1 : index;
+            algorithm_.itemPosition_[physical] = { physical, 0.0f, 100.0f, IsGroup(index) };
+        }
+    }
+
+protected:
+    static constexpr int32_t itemCount_ = 30;
+    bool stack_ = false;
+    bool homogeneous_ = false;
+    ListLanesLayoutAlgorithm algorithm_;
+    RefPtr<LanesTypeScanWrapper> parent_;
+    std::vector<RefPtr<FrameNode>> nodes_;
+    std::vector<RefPtr<LanesTypeScanItem>> items_;
+};
+
+/**
+ * @tc.name: FastScrollSegmentsRemainValidAfterLaneChange
+ * @tc.desc: Build-only preparation writes true segment origins that the original lane queries can reuse.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollSegmentOriginTestNg, FastScrollSegmentsRemainValidAfterLaneChange, TestSize.Level1)
+{
+    Prepare();
+    const auto [stack, backward, homogeneous, lanes] = GetParam();
+    const int32_t logicalTarget = backward ? 2 : 26;
+    const int32_t target = stack ? itemCount_ - logicalTarget - 1 : logicalTarget;
+    ASSERT_TRUE(algorithm_.BuildFastScrollLanesRange(AceType::RawPtr(parent_), target));
+    for (const auto& [start, end] : algorithm_.lanesItemRange_) {
+        EXPECT_EQ(start, SegmentStart(start));
+        EXPECT_GE(end, start);
+        for (int32_t index = start; index <= end; ++index) {
+            EXPECT_EQ(SegmentStart(index), start);
+        }
+    }
+    const auto ranges = algorithm_.lanesItemRange_;
+    const int32_t newLanes = lanes == 2 ? 3 : 2;
+    const auto property = parent_->GetHostNode()->GetLayoutProperty<ListLayoutProperty>();
+    property->UpdateLanes(newLanes);
+    LayoutConstraintF constraint;
+    property->UpdateLayoutConstraint(constraint);
+    property->UpdateContentConstraint();
+    algorithm_.CalculateLanes(property, constraint, 360.0f, Axis::VERTICAL);
+    EXPECT_EQ(algorithm_.lanesItemRange_, ranges);
+    const auto expected = Row(logicalTarget, newLanes);
+    EXPECT_EQ(algorithm_.GetLanesFloor(AceType::RawPtr(parent_), logicalTarget), expected.first);
+    EXPECT_EQ(algorithm_.GetLanesCeil(AceType::RawPtr(parent_), logicalTarget), expected.second);
+    for (const auto& item : items_) {
+        EXPECT_EQ(item->measureCount_, 0);
+        EXPECT_EQ(item->layoutCount_, 0);
+    }
+}
+
+INSTANTIATE_TEST_SUITE_P(DirectionsAndModes, ListFastScrollSegmentOriginTestNg,
+    testing::Combine(testing::Bool(), testing::Bool(), testing::Bool(), testing::Values(2, 3)));
+
+const LanesTypeScanCase LANES_TYPE_SCAN_CASES[] = {
+    { "OrdinaryComplete", { false, false, false, false, false, false, false }, 3, 4, 0, 5, { 3, 5 } },
+    { "GroupTarget", { false, true, false, false, false }, 3, 1, 1, 1, { 1, 1 } },
+    { "GroupBreaksPartial", { false, true, false, false, false, true, false }, 3, 3, 1, 4, { 2, 4 } },
+    { "GroupAfterTarget", { false, false, true, false }, 3, 1, 0, 2, { 0, 1 } },
+    { "AdjacentGroups", { true, true, false, false, false, true }, 3, 3, 1, 4, { 2, 4 } },
+    { "AllGroups", { true, true, true, true, true }, 2, 2, 2, 2, { 2, 2 } },
+    { "PartialTail", { false, true, false, false }, 3, 3, 1, 3, { 2, 3 } },
+    { "TargetZero", { false, false, false, false }, 2, 0, 0, 1, { 0, 1 } },
+};
 } // namespace
+
+class ListFastScrollLanesTypeTestNg : public TestNG, public testing::WithParamInterface<LanesTypeScanCase> {
+public:
+    void PrepareTypes(int32_t itemStartIndex = 0, bool stackFromEnd = false);
+    void CheckBuildOnly();
+
+protected:
+    RefPtr<ListLanesLayoutAlgorithm> algorithm_;
+    RefPtr<LanesTypeScanWrapper> parent_;
+    std::vector<RefPtr<FrameNode>> nodes_;
+    std::vector<RefPtr<LanesTypeScanItem>> items_;
+};
+
+void ListFastScrollLanesTypeTestNg::PrepareTypes(int32_t itemStartIndex, bool stackFromEnd)
+{
+    const auto& testCase = GetParam();
+    algorithm_ = AceType::MakeRefPtr<ListLanesLayoutAlgorithm>();
+    algorithm_->SetLanes(testCase.lanes);
+    algorithm_->totalItemCount_ = static_cast<int32_t>(testCase.groups.size());
+    algorithm_->itemStartIndex_ = itemStartIndex;
+    algorithm_->isStackFromEnd_ = stackFromEnd;
+    algorithm_->SetFastScrollMode(FastScrollMode::SKIP_MEASURE);
+    algorithm_->posMap_ = AceType::MakeRefPtr<ListPositionMap>();
+    algorithm_->posMap_->UpdateTotalCount(algorithm_->totalItemCount_);
+    auto list = FrameNode::CreateFrameNode(V2::LIST_ETS_TAG, GetElmtId(), AceType::MakeRefPtr<ListPattern>());
+    nodes_.push_back(list);
+    parent_ = AceType::MakeRefPtr<LanesTypeScanWrapper>(list);
+    algorithm_->listLayoutProperty_ = AceType::DynamicCast<ListLayoutProperty>(list->GetLayoutProperty());
+    for (int32_t index = 0; index < algorithm_->totalItemCount_ + itemStartIndex; ++index) {
+        const int32_t physical = index - itemStartIndex;
+        const int32_t logical = stackFromEnd ? algorithm_->totalItemCount_ - physical - 1 : physical;
+        const bool isGroup = physical >= 0 && testCase.groups[logical];
+        RefPtr<Pattern> pattern = AceType::MakeRefPtr<ListItemPattern>(nullptr);
+        if (isGroup) {
+            pattern = AceType::MakeRefPtr<ListItemGroupPattern>(nullptr, V2::ListItemGroupOptions {});
+        }
+        auto node = FrameNode::CreateFrameNode(isGroup ? V2::LIST_ITEM_GROUP_ETS_TAG : V2::LIST_ITEM_ETS_TAG,
+            GetElmtId(), pattern);
+        nodes_.push_back(node);
+        auto item = AceType::MakeRefPtr<LanesTypeScanItem>(node);
+        item->SetActive(false);
+        item->GetGeometryNode()->SetFrameSize(SizeF(90.0f, 70.0f));
+        items_.push_back(item);
+        parent_->AppendChild(item);
+    }
+}
+
+void ListFastScrollLanesTypeTestNg::CheckBuildOnly()
+{
+    const auto& testCase = GetParam();
+    std::set<int32_t> visited;
+    for (const auto& [child, render, cache] : parent_->calls_) {
+        const int32_t physical = static_cast<int32_t>(child) - algorithm_->itemStartIndex_;
+        ASSERT_GE(physical, 0);
+        ASSERT_LT(physical, algorithm_->totalItemCount_);
+        const int32_t logical = algorithm_->isStackFromEnd_ ? algorithm_->totalItemCount_ - physical - 1 : physical;
+        visited.insert(logical);
+        const bool visible = algorithm_->itemPosition_.count(physical) ||
+            (algorithm_->listLayoutProperty_->GetShowCachedItemsValue(false) &&
+                algorithm_->cachedItemPosition_.count(physical));
+        EXPECT_EQ(render, visible);
+        EXPECT_EQ(cache, !visible);
+    }
+    std::set<int32_t> expected;
+    for (int32_t index = testCase.firstScanned; index <= testCase.lastScanned; ++index) {
+        expected.insert(index);
+    }
+    EXPECT_EQ(visited, expected);
+    for (const auto& item : items_) {
+        EXPECT_EQ(item->measureCount_, 0);
+        EXPECT_EQ(item->layoutCount_, 0);
+        EXPECT_EQ(item->GetGeometryNode()->GetFrameSize(), SizeF(90.0f, 70.0f));
+    }
+    EXPECT_TRUE(algorithm_->itemPosition_.empty());
+    EXPECT_TRUE(algorithm_->noLayoutedItems_.empty());
+}
+
+/**
+ * @tc.name: FastScrollLanesBuildTypes
+ * @tc.desc: Build-only preparation confirms mixed types and completes the target row without measuring.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollLanesTypeTestNg, FastScrollLanesBuildTypes, TestSize.Level1)
+{
+    const auto& testCase = GetParam();
+    PrepareTypes();
+    ASSERT_TRUE(algorithm_->BuildFastScrollLanesRange(AceType::RawPtr(parent_), testCase.target));
+    const auto row = algorithm_->GetPhysicalLanesRow(testCase.target);
+    ASSERT_TRUE(row);
+    EXPECT_EQ(row->startIndex, testCase.targetRow.startIndex);
+    EXPECT_EQ(row->endIndex, testCase.targetRow.endIndex);
+    ASSERT_NO_FATAL_FAILURE(CheckBuildOnly());
+    for (int32_t index = testCase.firstScanned; index <= testCase.lastScanned; ++index) {
+        const auto info = algorithm_->posMap_->GetPositionInfo(index);
+        EXPECT_EQ(info.mainPos, -1.0f);
+        EXPECT_EQ(info.mainSize, -1.0f);
+        EXPECT_EQ(info.isGroup, testCase.groups[index]);
+        EXPECT_FALSE(items_[index]->IsActive());
+    }
+    const auto calls = parent_->calls_.size();
+    for (int32_t index = row->startIndex; index <= row->endIndex; ++index) {
+        EXPECT_EQ(algorithm_->GetLanesFloor(AceType::RawPtr(parent_), index), row->startIndex);
+    }
+    EXPECT_EQ(parent_->calls_.size(), calls);
+}
+
+/**
+ * @tc.name: FastScrollLanesBuildTypesReversed
+ * @tc.desc: Mirrored physical nodes produce the same logical type segments, excluding the List header.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollLanesTypeTestNg, FastScrollLanesBuildTypesReversed, TestSize.Level1)
+{
+    constexpr int32_t itemStartIndex = 1;
+    const auto& testCase = GetParam();
+    PrepareTypes(itemStartIndex, true);
+    const int32_t target = algorithm_->totalItemCount_ - testCase.target - 1;
+    ASSERT_TRUE(algorithm_->BuildFastScrollLanesRange(AceType::RawPtr(parent_), target));
+    ASSERT_NO_FATAL_FAILURE(CheckBuildOnly());
+    const auto row = algorithm_->GetFastScrollLanesRow(testCase.target);
+    ASSERT_TRUE(row);
+    EXPECT_EQ(row->startIndex, testCase.targetRow.startIndex);
+    EXPECT_EQ(row->endIndex, testCase.targetRow.endIndex);
+    const auto physical = algorithm_->GetPhysicalLanesRow(target);
+    ASSERT_TRUE(physical);
+    EXPECT_EQ(physical->startIndex, algorithm_->totalItemCount_ - row->endIndex - 1);
+    EXPECT_EQ(physical->endIndex, algorithm_->totalItemCount_ - row->startIndex - 1);
+    for (int32_t index = row->startIndex; index <= row->endIndex; ++index) {
+        EXPECT_EQ(algorithm_->GetLanesFloor(AceType::RawPtr(parent_), index), row->startIndex);
+    }
+}
+
+/**
+ * @tc.name: FastScrollLanesBuildTypesKeepsVisibleIntent
+ * @tc.desc: Visible and shown cached items stay active while offscreen items use cache acquisition.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollLanesTypeTestNg, FastScrollLanesBuildTypesKeepsVisibleIntent, TestSize.Level1)
+{
+    const auto& testCase = GetParam();
+    PrepareTypes();
+    algorithm_->listLayoutProperty_->UpdateShowCachedItems(true);
+    algorithm_->itemPosition_[0] = { -1, 0.0f, 70.0f, testCase.groups[0] };
+    algorithm_->cachedItemPosition_[1] = { -1, 70.0f, 140.0f, testCase.groups[1] };
+    items_[0]->SetActive(true);
+    items_[1]->SetActive(true);
+    algorithm_->posMap_->UpdatePos(0, { 120.0f, 70.0f, !testCase.groups[0], true });
+    for (int32_t index = 0; index < algorithm_->totalItemCount_; ++index) {
+        ASSERT_NE(algorithm_->GetFastScrollLanesItem(AceType::RawPtr(parent_), index), nullptr);
+    }
+    ASSERT_EQ(parent_->calls_.size(), static_cast<size_t>(algorithm_->totalItemCount_));
+    for (int32_t index = 0; index < algorithm_->totalItemCount_; ++index) {
+        const bool visible = index <= 1;
+        EXPECT_EQ(parent_->calls_[index], std::make_tuple(static_cast<uint32_t>(index), visible, !visible));
+        EXPECT_EQ(items_[index]->IsActive(), visible);
+        EXPECT_EQ(items_[index]->measureCount_, 0);
+        EXPECT_EQ(items_[index]->layoutCount_, 0);
+    }
+    const auto info = algorithm_->posMap_->GetPositionInfo(0);
+    EXPECT_EQ(info.mainPos, 120.0f);
+    EXPECT_EQ(info.mainSize, 70.0f);
+    EXPECT_EQ(info.isGroup, !testCase.groups[0]);
+    EXPECT_TRUE(info.isLazyChild);
+    EXPECT_EQ(algorithm_->itemPosition_.size(), 1);
+    EXPECT_EQ(algorithm_->cachedItemPosition_.size(), 1);
+}
+
+/**
+ * @tc.name: FastScrollLanesBuildTypesHiddenCache
+ * @tc.desc: Cached items that are not shown must not be promoted to the render tree by type preparation.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollLanesTypeTestNg, FastScrollLanesBuildTypesHiddenCache, TestSize.Level1)
+{
+    const auto& testCase = GetParam();
+    PrepareTypes();
+    algorithm_->listLayoutProperty_->UpdateShowCachedItems(false);
+    algorithm_->itemPosition_[0] = { -1, 0.0f, 70.0f, testCase.groups[0] };
+    algorithm_->cachedItemPosition_[1] = { -1, 70.0f, 140.0f, testCase.groups[1] };
+    items_[0]->SetActive(true);
+    for (int32_t index = 0; index < algorithm_->totalItemCount_; ++index) {
+        ASSERT_NE(algorithm_->GetFastScrollLanesItem(AceType::RawPtr(parent_), index), nullptr);
+    }
+    ASSERT_EQ(parent_->calls_.size(), static_cast<size_t>(algorithm_->totalItemCount_));
+    for (int32_t index = 0; index < algorithm_->totalItemCount_; ++index) {
+        const bool visible = index == 0;
+        EXPECT_EQ(parent_->calls_[index], std::make_tuple(static_cast<uint32_t>(index), visible, !visible));
+        EXPECT_EQ(items_[index]->IsActive(), visible);
+        EXPECT_EQ(items_[index]->measureCount_, 0);
+        EXPECT_EQ(items_[index]->layoutCount_, 0);
+    }
+    EXPECT_EQ(algorithm_->itemPosition_.size(), 1);
+    EXPECT_EQ(algorithm_->cachedItemPosition_.size(), 1);
+}
+
+/**
+ * @tc.name: FastScrollLanesBuildTypesFailureKeepsRanges
+ * @tc.desc: A missing requested node cannot confirm a segment or replace previously measured geometry.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollLanesTypeTestNg, FastScrollLanesBuildTypesFailureKeepsRanges, TestSize.Level1)
+{
+    const auto& testCase = GetParam();
+    PrepareTypes();
+    algorithm_->listLayoutProperty_->UpdateSupportLazyLoadingEmptyBranch(true);
+    algorithm_->lanesItemRange_ = { { 0, 0 } };
+    const auto ranges = algorithm_->lanesItemRange_;
+    algorithm_->posMap_->UpdatePos(0, { 120.0f, 70.0f, testCase.groups[0], true });
+    parent_->missingIndex_ = testCase.groups[testCase.target] ? testCase.target : 1;
+    EXPECT_FALSE(algorithm_->BuildFastScrollLanesRange(AceType::RawPtr(parent_), testCase.target));
+    EXPECT_EQ(algorithm_->lanesItemRange_, ranges);
+    EXPECT_EQ(algorithm_->posMap_->posMap_.size(), 1);
+    EXPECT_EQ(algorithm_->posMap_->GetPositionInfo(0).mainPos, 120.0f);
+    EXPECT_EQ(algorithm_->posMap_->GetPositionInfo(0).mainSize, 70.0f);
+    EXPECT_EQ(algorithm_->posMap_->GetPositionInfo(0).isGroup, testCase.groups[0]);
+    EXPECT_TRUE(algorithm_->posMap_->GetPositionInfo(0).isLazyChild);
+    ASSERT_FALSE(parent_->calls_.empty());
+    EXPECT_EQ(parent_->calls_.back(), std::make_tuple(parent_->missingIndex_, false, true));
+    if (!testCase.groups[0]) {
+        EXPECT_FALSE(algorithm_->GetFastScrollLanesRow(0));
+    }
+    for (const auto& item : items_) {
+        EXPECT_EQ(item->measureCount_, 0);
+        EXPECT_EQ(item->layoutCount_, 0);
+        EXPECT_FALSE(item->IsActive());
+        EXPECT_EQ(item->GetGeometryNode()->GetFrameSize(), SizeF(90.0f, 70.0f));
+    }
+    EXPECT_TRUE(algorithm_->itemPosition_.empty());
+    EXPECT_TRUE(algorithm_->noLayoutedItems_.empty());
+}
+
+class ListFastScrollVisibleRowsTestNg : public TestNG,
+    public testing::WithParamInterface<std::tuple<bool, bool, bool>> {
+public:
+    void CreateRows()
+    {
+        const auto [backward, homogeneous, stack] = GetParam();
+        algorithm_.SetLanes(TYPE_SCAN_LANES);
+        algorithm_.totalItemCount_ = TYPE_SCAN_ITEM_COUNT;
+        algorithm_.itemStartIndex_ = 1;
+        algorithm_.isStackFromEnd_ = stack;
+        algorithm_.SetFastScrollMode(homogeneous ? FastScrollMode::SKIP_CREATE_AND_MEASURE :
+            FastScrollMode::SKIP_MEASURE);
+        algorithm_.posMap_ = AceType::MakeRefPtr<ListPositionMap>();
+        auto list = FrameNode::CreateFrameNode(V2::LIST_ETS_TAG, GetElmtId(), AceType::MakeRefPtr<ListPattern>());
+        nodes_.push_back(list);
+        parent_ = AceType::MakeRefPtr<LanesTypeScanWrapper>(list);
+        for (int32_t child = 0; child <= TYPE_SCAN_ITEM_COUNT; ++child) {
+            const int32_t physical = child - 1;
+            const int32_t logical = stack ? 23 - physical : physical;
+            const bool group = physical >= 0 && !homogeneous && (logical == 6 || logical == 19);
+            RefPtr<Pattern> pattern = AceType::MakeRefPtr<ListItemPattern>(nullptr);
+            if (group) {
+                pattern = AceType::MakeRefPtr<ListItemGroupPattern>(nullptr, V2::ListItemGroupOptions {});
+            }
+            auto node = FrameNode::CreateFrameNode(group ? V2::LIST_ITEM_GROUP_ETS_TAG : V2::LIST_ITEM_ETS_TAG,
+                GetElmtId(), pattern);
+            nodes_.push_back(node);
+            auto item = AceType::MakeRefPtr<LanesTypeScanItem>(node);
+            items_.push_back(item);
+            parent_->AppendChild(item);
+        }
+        const int32_t visibleStart = homogeneous ? 12 : 13;
+        for (int32_t index = visibleStart; index < visibleStart + TYPE_SCAN_LANES; ++index) {
+            const int32_t physical = stack ? 23 - index : index;
+            algorithm_.itemPosition_[physical] = { physical, 0.0f, 100.0f, false };
+            items_[physical + 1]->SetActive(true);
+        }
+    }
+
+protected:
+    ListLanesLayoutAlgorithm algorithm_;
+    RefPtr<LanesTypeScanWrapper> parent_;
+    std::vector<RefPtr<FrameNode>> nodes_;
+    std::vector<RefPtr<LanesTypeScanItem>> items_;
+};
+
+/**
+ * @tc.name: FastScrollBuildsFromVisibleRows
+ * @tc.desc: Preparation may extend to the true segment head and remains usable by the original lane queries.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollVisibleRowsTestNg, FastScrollBuildsFromVisibleRows, TestSize.Level1)
+{
+    CreateRows();
+    const auto [backward, homogeneous, stack] = GetParam();
+    const int32_t logicalTarget = backward ? 5 : 20;
+    const int32_t target = stack ? 23 - logicalTarget : logicalTarget;
+    ASSERT_TRUE(algorithm_.BuildFastScrollLanesRange(AceType::RawPtr(parent_), target));
+    const auto row = algorithm_.GetFastScrollLanesRow(logicalTarget);
+    ASSERT_TRUE(row);
+    EXPECT_EQ(row->startIndex, backward ? 3 : (homogeneous ? 18 : 20));
+    EXPECT_EQ(row->endIndex, backward ? 5 : (homogeneous ? 20 : 22));
+    if (homogeneous) {
+        EXPECT_TRUE(parent_->calls_.empty());
+    } else {
+        std::set<int32_t> visited;
+        for (const auto& [child, render, cache] : parent_->calls_) {
+            ASSERT_GE(child, 1u);
+            ASSERT_LE(child, 24u);
+            const int32_t physical = static_cast<int32_t>(child) - 1;
+            visited.insert(stack ? 23 - physical : physical);
+            const bool visible = algorithm_.itemPosition_.count(physical) != 0;
+            EXPECT_EQ(render, visible);
+            EXPECT_EQ(cache, !visible);
+        }
+        std::set<int32_t> expected;
+        for (int32_t index = backward ? 0 : 6; index <= (backward ? 15 : 22); ++index) {
+            expected.insert(index);
+        }
+        EXPECT_EQ(visited, expected);
+    }
+    ListLanesLayoutAlgorithm next;
+    next.posMap_ = algorithm_.posMap_;
+    next.totalItemCount_ = 24;
+    next.isStackFromEnd_ = stack;
+    next.SetLanes(3);
+    algorithm_.SwapLanesItemRange(next.lanesItemRange_);
+    EXPECT_EQ(next.GetLanesFloor(AceType::RawPtr(parent_), logicalTarget), row->startIndex);
+    EXPECT_EQ(next.GetLanesCeil(AceType::RawPtr(parent_), logicalTarget), row->endIndex);
+    for (const auto& item : items_) {
+        EXPECT_EQ(item->measureCount_, 0);
+        EXPECT_EQ(item->layoutCount_, 0);
+    }
+}
+
+INSTANTIATE_TEST_SUITE_P(DirectionsAndModes, ListFastScrollVisibleRowsTestNg,
+    testing::Combine(testing::Bool(), testing::Bool(), testing::Bool()));
+
+/**
+ * @tc.name: FastScrollUsesSegmentCacheWithoutRowAllocation001
+ * @tc.desc: Extending a true segment retains one origin, while consecutive Groups remain independent.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListAlgorithmTestNg, FastScrollUsesSegmentCacheWithoutRowAllocation001, TestSize.Level1)
+{
+    ListLanesLayoutAlgorithm algorithm;
+    algorithm.SetLanes(3);
+    algorithm.totalItemCount_ = 20;
+    algorithm.posMap_ = AceType::MakeRefPtr<ListPositionMap>();
+    algorithm.posMap_->UpdateTotalCount(20);
+    for (int32_t index = 0; index < 20; ++index) {
+        algorithm.RecordFastScrollItemType(index, false);
+    }
+    algorithm.RecordFastScrollLanesRange(0, 4);
+    algorithm.RecordFastScrollLanesRange(0, 8);
+    algorithm.RecordFastScrollLanesRange(0, 11);
+    EXPECT_EQ(algorithm.lanesItemRange_, (std::map<int32_t, int32_t> { { 0, 11 } }));
+    const auto first = algorithm.GetFastScrollLanesRow(2);
+    const auto middle = algorithm.GetFastScrollLanesRow(7);
+    ASSERT_TRUE(first);
+    ASSERT_TRUE(middle);
+    EXPECT_EQ(first->endIndex, 2);
+    EXPECT_EQ(middle->startIndex, 6);
+    algorithm.RecordFastScrollItemType(12, true);
+    algorithm.RecordFastScrollLanesRange(12, 12);
+    algorithm.RecordFastScrollItemType(13, true);
+    algorithm.RecordFastScrollLanesRange(13, 13);
+    algorithm.RecordFastScrollLanesRange(14, 19);
+    EXPECT_EQ(algorithm.lanesItemRange_,
+        (std::map<int32_t, int32_t> { { 0, 11 }, { 12, 12 }, { 13, 13 }, { 14, 19 } }));
+    EXPECT_TRUE(algorithm.posMap_->GetPositionInfo(12).isGroup);
+    EXPECT_TRUE(algorithm.posMap_->GetPositionInfo(13).isGroup);
+}
+
+/**
+ * @tc.name: FastScrollSegmentExtensionKeepsUnclassifiedGroupBoundary001
+ * @tc.desc: Reusing a true segment origin preserves cached Group boundaries absent from the position map.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListAlgorithmTestNg, FastScrollSegmentExtensionKeepsUnclassifiedGroupBoundary001, TestSize.Level1)
+{
+    ListLanesLayoutAlgorithm algorithm;
+    algorithm.SetLanes(3);
+    algorithm.totalItemCount_ = 12;
+    algorithm.posMap_ = AceType::MakeRefPtr<ListPositionMap>();
+    algorithm.posMap_->UpdateTotalCount(12);
+    const std::map<int32_t, int32_t> ranges { { 0, 3 }, { 4, 4 }, { 5, 11 } };
+    algorithm.lanesItemRange_ = ranges;
+    EXPECT_EQ(algorithm.posMap_->posMap_.count(4), 0u);
+
+    algorithm.RecordFastScrollLanesRange(0, 2);
+
+    EXPECT_EQ(algorithm.lanesItemRange_, ranges);
+    EXPECT_EQ(algorithm.posMap_->posMap_.count(4), 0u);
+    EXPECT_EQ(algorithm.GetLanesFloor(nullptr, 4), 4);
+    EXPECT_EQ(algorithm.GetLanesCeil(nullptr, 4), 4);
+}
+
+/**
+ * @tc.name: FastScrollPartialRangeKeepsLegacyQuerySemantics001
+ * @tc.desc: Fast preparation confirms a partial row without imposing its completeness rule on legacy queries.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListAlgorithmTestNg, FastScrollPartialRangeKeepsLegacyQuerySemantics001, TestSize.Level1)
+{
+    ListLanesLayoutAlgorithm algorithm;
+    algorithm.SetLanes(3);
+    algorithm.totalItemCount_ = 12;
+    algorithm.posMap_ = AceType::MakeRefPtr<ListPositionMap>();
+    algorithm.posMap_->UpdateTotalCount(12);
+    algorithm.lanesItemRange_ = { { 0, 4 } };
+    EXPECT_FALSE(algorithm.GetFastScrollLanesRow(4));
+    EXPECT_EQ(algorithm.GetLanesFloor(nullptr, 4), 3);
+    const auto complete = algorithm.GetFastScrollLanesRow(2);
+    ASSERT_TRUE(complete);
+    EXPECT_EQ(complete->endIndex, 2);
+    algorithm.RecordFastScrollItemType(5, true);
+    algorithm.RecordFastScrollLanesRange(5, 5);
+    const auto partial = algorithm.GetFastScrollLanesRow(4);
+    const auto group = algorithm.GetFastScrollLanesRow(5);
+    ASSERT_TRUE(partial);
+    ASSERT_TRUE(group);
+    EXPECT_EQ(partial->startIndex, 3);
+    EXPECT_EQ(partial->endIndex, 4);
+    EXPECT_EQ(group->startIndex, 5);
+    EXPECT_EQ(group->endIndex, 5);
+    EXPECT_EQ(algorithm.GetLanesFloor(nullptr, 4), 3);
+    EXPECT_EQ(algorithm.GetLanesCeil(nullptr, 4), 4);
+}
+
+/**
+ * @tc.name: FastScrollKnownReverseWorksAfterTargetCleared001
+ * @tc.desc: Final-frame coordinate bookkeeping leaves the public table canonical; scoped layout owns its mirror.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListAlgorithmTestNg, FastScrollKnownReverseWorksAfterTargetCleared001, TestSize.Level1)
+{
+    ListLayoutAlgorithm algorithm;
+    algorithm.totalItemCount_ = 3;
+    algorithm.isStackFromEnd_ = true;
+    algorithm.childrenSize_ = AceType::MakeRefPtr<ListChildrenMainSize>();
+    algorithm.posMap_ = AceType::MakeRefPtr<ListPositionMap>();
+    algorithm.posMap_->UpdateTotalCount(3);
+    algorithm.posMap_->totalHeight_ = 300.0f;
+    algorithm.posMap_->UpdatePos(0, { 0.0f, 50.0f });
+    algorithm.posMap_->UpdatePos(1, { 60.0f, 200.0f, true });
+    algorithm.posMap_->UpdatePos(2, { 270.0f, 30.0f });
+    algorithm.SetFastScrollKnownMainSize(true);
+    ASSERT_FALSE(algorithm.GetFastScrollState()->input.targetIndex);
+    const auto shared = algorithm.posMap_;
+    algorithm.ProcessStackFromEnd();
+    EXPECT_EQ(algorithm.posMap_, shared);
+    EXPECT_FLOAT_EQ(algorithm.posMap_->GetPositionInfo(1).mainPos, 60.0f);
+    EXPECT_TRUE(algorithm.posMap_->GetPositionInfo(1).isGroup);
+    algorithm.ProcessStackFromEnd();
+    EXPECT_FLOAT_EQ(algorithm.posMap_->GetPositionInfo(0).mainPos, 0.0f);
+    EXPECT_FLOAT_EQ(algorithm.posMap_->GetPositionInfo(1).mainPos, 60.0f);
+    EXPECT_FLOAT_EQ(algorithm.posMap_->GetPositionInfo(2).mainPos, 270.0f);
+    EXPECT_TRUE(algorithm.posMap_->GetPositionInfo(1).isGroup);
+    EXPECT_FLOAT_EQ(algorithm.posMap_->GetTotalHeight(), 300.0f);
+}
+
+/**
+ * @tc.name: FastScrollLanesBuildTypesGuards001
+ * @tc.desc: Invalid inputs do not acquire nodes or change existing cached geometry.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ListAlgorithmTestNg, FastScrollLanesBuildTypesGuards001, TestSize.Level1)
+{
+    ListLanesLayoutAlgorithm algorithm;
+    algorithm.SetLanes(2);
+    algorithm.totalItemCount_ = 1;
+    algorithm.posMap_ = AceType::MakeRefPtr<ListPositionMap>();
+    auto list = FrameNode::CreateFrameNode(V2::LIST_ETS_TAG, GetElmtId(), AceType::MakeRefPtr<ListPattern>());
+    auto parent = AceType::MakeRefPtr<LanesTypeScanWrapper>(list);
+    auto node = FrameNode::CreateFrameNode(V2::LIST_ITEM_ETS_TAG, GetElmtId(),
+        AceType::MakeRefPtr<ListItemPattern>(nullptr));
+    auto item = AceType::MakeRefPtr<LanesTypeScanItem>(node);
+    item->GetGeometryNode()->SetFrameSize(SizeF(90.0f, 70.0f));
+    item->SetActive(false);
+    parent->AppendChild(item);
+    algorithm.lanesItemRange_ = { { 0, 0 } };
+    const auto ranges = algorithm.lanesItemRange_;
+    algorithm.posMap_->UpdatePos(0, { 120.0f, 70.0f, true });
+    EXPECT_FALSE(algorithm.BuildFastScrollLanesRange(nullptr, 0));
+    EXPECT_FALSE(algorithm.BuildFastScrollLanesRange(AceType::RawPtr(parent), -1));
+    EXPECT_FALSE(algorithm.BuildFastScrollLanesRange(AceType::RawPtr(parent), algorithm.totalItemCount_));
+    algorithm.SetLanes(1);
+    EXPECT_FALSE(algorithm.BuildFastScrollLanesRange(AceType::RawPtr(parent), 0));
+    ASSERT_TRUE(parent->calls_.empty());
+    EXPECT_FLOAT_EQ(algorithm.posMap_->GetPositionInfo(0).mainPos, 120.0f);
+    EXPECT_FLOAT_EQ(algorithm.posMap_->GetPositionInfo(0).mainSize, 70.0f);
+    EXPECT_TRUE(algorithm.posMap_->GetPositionInfo(0).isGroup);
+    algorithm.SetLanes(2);
+    algorithm.posMap_.Reset();
+    EXPECT_FALSE(algorithm.BuildFastScrollLanesRange(AceType::RawPtr(parent), 0));
+    EXPECT_EQ(algorithm.lanesItemRange_, ranges);
+    EXPECT_TRUE(parent->calls_.empty());
+    EXPECT_EQ(item->measureCount_, 0);
+    EXPECT_EQ(item->layoutCount_, 0);
+    EXPECT_EQ(item->GetGeometryNode()->GetFrameSize(), SizeF(90.0f, 70.0f));
+    EXPECT_FALSE(item->IsActive());
+    EXPECT_TRUE(algorithm.itemPosition_.empty());
+    EXPECT_TRUE(algorithm.noLayoutedItems_.empty());
+}
+
+INSTANTIATE_TEST_SUITE_P(MixedAndHomogeneous, ListFastScrollLanesTypeTestNg,
+    testing::ValuesIn(LANES_TYPE_SCAN_CASES), [](const testing::TestParamInfo<LanesTypeScanCase>& info) {
+        return info.param.name;
+    });
+
+namespace {
+RefPtr<UINode> CreateFastScrollSyntaxItem(bool group, bool wrapped)
+{
+    RefPtr<Pattern> pattern = AceType::MakeRefPtr<ListItemPattern>(nullptr);
+    if (group) {
+        pattern = AceType::MakeRefPtr<ListItemGroupPattern>(nullptr, V2::ListItemGroupOptions {});
+    }
+    auto item = FrameNode::CreateFrameNode(group ? V2::LIST_ITEM_GROUP_ETS_TAG : V2::LIST_ITEM_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), pattern);
+    item->GetGeometryNode()->SetFrameSize(SizeF(90.0f, 70.0f));
+    if (!wrapped) {
+        return item;
+    }
+    auto branch = AceType::MakeRefPtr<IfElseNode>(ElementRegister::GetInstance()->MakeUniqueId());
+    branch->AddChild(item);
+    return branch;
+}
+
+class FastScrollSyntaxLazyBuilder final : public Framework::MockLazyForEachBuilder {
+    DECLARE_ACE_TYPE(FastScrollSyntaxLazyBuilder, Framework::MockLazyForEachBuilder);
+public:
+    explicit FastScrollSyntaxLazyBuilder(bool mixed) : mixed_(mixed) {}
+
+    std::vector<int32_t> createdIndices_;
+
+protected:
+    int32_t OnGetTotalCount() override
+    {
+        return SYNTAX_RANGE_ITEM_COUNT;
+    }
+
+    std::pair<std::string, RefPtr<UINode>> OnGetChildByIndex(
+        int32_t index, std::unordered_map<std::string, LazyForEachCacheChild>&) override
+    {
+        createdIndices_.push_back(index);
+        return { std::to_string(index), CreateFastScrollSyntaxItem(mixed_ && (index == 2 || index == 6), mixed_) };
+    }
+
+private:
+    bool mixed_;
+};
+
+class FastScrollSyntaxScanWrapper final : public LanesTypeScanWrapper {
+    DECLARE_ACE_TYPE(FastScrollSyntaxScanWrapper, LanesTypeScanWrapper);
+public:
+    explicit FastScrollSyntaxScanWrapper(const RefPtr<FrameNode>& host) : LanesTypeScanWrapper(host) {}
+
+    RefPtr<LayoutWrapper> GetOrCreateChildByIndex(uint32_t index, bool render, bool cache,
+        bool allowPlaceholderSubstitution = false) override
+    {
+        calls_.emplace_back(index, render, cache);
+        auto child = GetHostNode()->GetOrCreateChildByIndex(index, render, cache, allowPlaceholderSubstitution);
+        CHECK_NULL_RETURN(child && child->GetHostNode(), nullptr);
+        auto node = child->GetHostNode();
+        auto found = items_.find(node->GetId());
+        if (found == items_.end()) {
+            found = items_.emplace(node->GetId(), AceType::MakeRefPtr<LanesTypeScanItem>(node)).first;
+        }
+        return found->second;
+    }
+
+    std::map<int32_t, RefPtr<LanesTypeScanItem>> items_;
+};
+} // namespace
+
+class ListFastScrollSyntaxTestBase : public TestNG {
+protected:
+    void PrepareProvider(const RefPtr<UINode>& provider, bool stack)
+    {
+        list_ = FrameNode::CreateFrameNode(V2::LIST_ETS_TAG, GetElmtId(), AceType::MakeRefPtr<ListPattern>());
+        list_->AddChild(CreateFastScrollSyntaxItem(false, false)); // Excluded by itemStartIndex_.
+        list_->AddChild(CreateFastScrollSyntaxItem(true, false));
+        list_->AddChild(CreateFastScrollSyntaxItem(false, false));
+        list_->AddChild(CreateFastScrollSyntaxItem(false, false));
+        list_->AddChild(provider);
+        list_->AddChild(CreateFastScrollSyntaxItem(false, false));
+        list_->AddChild(CreateFastScrollSyntaxItem(true, false));
+        parent_ = AceType::MakeRefPtr<FastScrollSyntaxScanWrapper>(list_);
+        algorithm_ = AceType::MakeRefPtr<ListLanesLayoutAlgorithm>();
+        algorithm_->SetLanes(TYPE_SCAN_LANES);
+        algorithm_->totalItemCount_ = SYNTAX_LIST_ITEM_COUNT;
+        algorithm_->itemStartIndex_ = 1;
+        algorithm_->isStackFromEnd_ = stack;
+        algorithm_->SetFastScrollMode(FastScrollMode::SKIP_MEASURE);
+        algorithm_->posMap_ = AceType::MakeRefPtr<ListPositionMap>();
+        algorithm_->posMap_->UpdateTotalCount(SYNTAX_LIST_ITEM_COUNT);
+        algorithm_->listLayoutProperty_ = list_->GetLayoutProperty<ListLayoutProperty>();
+    }
+
+    void CheckPreparedSyntaxRow(bool stack, int32_t segmentStart)
+    {
+        const int32_t target = stack ? 4 : 8;
+        const int32_t rowStart = target - (target - segmentStart) % 3;
+        const auto row = algorithm_->GetFastScrollLanesRow(target);
+        ASSERT_TRUE(row);
+        EXPECT_EQ(row->startIndex, rowStart);
+        EXPECT_EQ(row->endIndex, rowStart + SYNTAX_ROW_END_DELTA);
+        auto segment = algorithm_->lanesItemRange_.upper_bound(target);
+        ASSERT_NE(segment, algorithm_->lanesItemRange_.begin());
+        EXPECT_EQ(std::prev(segment)->first, segmentStart);
+        EXPECT_EQ(algorithm_->GetLanesFloor(AceType::RawPtr(parent_), target), rowStart);
+        EXPECT_TRUE(algorithm_->noLayoutedItems_.empty());
+        for (const auto& [id, item] : parent_->items_) {
+            EXPECT_EQ(item->measureCount_, 0) << "node=" << id;
+            EXPECT_EQ(item->layoutCount_, 0) << "node=" << id;
+        }
+    }
+
+    RefPtr<UINode> CreateRepeatProvider(bool secondVersion)
+    {
+        const auto create = [created = created_](uint32_t index) {
+            created->push_back(index);
+            ViewStackProcessor::GetInstance()->Push(CreateFastScrollSyntaxItem(false, true));
+        };
+        if (secondVersion) {
+            auto getRid = [create](IndexType index, bool, bool) -> std::pair<RIDType, uint32_t> {
+                create(index);
+                return { static_cast<RIDType>(index + 1), OnGetRid4IndexResult::CREATED_NEW_NODE };
+            };
+            return RepeatVirtualScroll2Node::GetOrCreateRepeatNode(GetElmtId(), SYNTAX_RANGE_ITEM_COUNT,
+                SYNTAX_RANGE_ITEM_COUNT, 0, getRid,
+                [](IndexType, IndexType) {}, [](int32_t, int32_t, int32_t, int32_t, bool, bool) {},
+                [](IndexType, IndexType) {}, []() {}, []() {}, []() {});
+        }
+        auto keys = [](uint32_t first, uint32_t last) {
+            std::list<std::string> result;
+            for (uint32_t index = first; index <= last; ++index) {
+                result.emplace_back(std::to_string(index));
+            }
+            return result;
+        };
+        auto types = [](uint32_t first, uint32_t last) {
+            return std::list<std::string>(last - first + 1, "item");
+        };
+        return RepeatVirtualScrollNode::GetOrCreateRepeatNode(GetElmtId(), SYNTAX_RANGE_ITEM_COUNT, { { "item",
+            { true, SYNTAX_RANGE_ITEM_COUNT } } },
+            create, [](const std::string&, uint32_t) {}, keys, types, [](int32_t, int32_t) {}, false);
+    }
+
+    RefPtr<FrameNode> list_;
+    RefPtr<FastScrollSyntaxScanWrapper> parent_;
+    RefPtr<ListLanesLayoutAlgorithm> algorithm_;
+    std::shared_ptr<std::vector<int32_t>> created_ = std::make_shared<std::vector<int32_t>>();
+};
+
+class ListFastScrollLazySyntaxTestNg : public ListFastScrollSyntaxTestBase,
+    public testing::WithParamInterface<bool> {};
+
+/**
+ * @tc.name: FastScrollDirectLazyUsesActiveAndExpiringIndices
+ * @tc.desc: A real homogeneous Lazy resolves both cache states and extends through ordinary container prefixes.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollLazySyntaxTestNg, FastScrollDirectLazyUsesActiveAndExpiringIndices, TestSize.Level1)
+{
+    const bool stack = GetParam();
+    for (bool cache : { false, true }) {
+        SCOPED_TRACE(cache);
+        auto builder = AceType::MakeRefPtr<FastScrollSyntaxLazyBuilder>(false);
+        auto lazy = LazyForEachNode::CreateLazyForEachNode(GetElmtId(), builder);
+        PrepareProvider(lazy, stack);
+        auto child = parent_->GetOrCreateChildByIndex(9, !cache, cache);
+        ASSERT_NE(child, nullptr);
+        auto node = child->GetHostNode();
+        ASSERT_EQ(node->GetParent(), lazy);
+        EXPECT_EQ(lazy->GetFrameNodeIndex(node), 5);
+        EXPECT_EQ(lazy->GetIndexByUINode(node), cache ? -1 : 5);
+        ASSERT_EQ(builder->GetAllChildren().count(5), 1u);
+        EXPECT_EQ(builder->GetAllChildren().at(5).second == nullptr, cache);
+        const auto range = algorithm_->GetFastScrollLazyRange(node, 8);
+        ASSERT_TRUE(range);
+        EXPECT_EQ(range->startIndex, 3);
+        EXPECT_EQ(range->endIndex, 10);
+        if (!cache) {
+            algorithm_->itemPosition_[8] = { node->GetId(), 0.0f, 70.0f, false };
+        }
+        ASSERT_TRUE(algorithm_->BuildFastScrollLanesRange(AceType::RawPtr(parent_), 8));
+        ASSERT_NO_FATAL_FAILURE(CheckPreparedSyntaxRow(stack, 1));
+        EXPECT_EQ(builder->createdIndices_, (std::vector<int32_t> { 5 }));
+        EXPECT_GT(parent_->calls_.size(), builder->createdIndices_.size());
+        const uint32_t prefix = stack ? 12 : 3;
+        EXPECT_TRUE(std::any_of(parent_->calls_.begin(), parent_->calls_.end(), [prefix](const auto& call) {
+            return std::get<0>(call) == prefix;
+        }));
+    }
+}
+
+/**
+ * @tc.name: FastScrollWrappedLazyDoesNotInferMixedTypes
+ * @tc.desc: An IfElse between Lazy and FrameNode requires actual mixed-node classification in either direction.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollLazySyntaxTestNg, FastScrollWrappedLazyDoesNotInferMixedTypes, TestSize.Level1)
+{
+    const bool stack = GetParam();
+    auto builder = AceType::MakeRefPtr<FastScrollSyntaxLazyBuilder>(true);
+    auto lazy = LazyForEachNode::CreateLazyForEachNode(GetElmtId(), builder);
+    PrepareProvider(lazy, stack);
+    auto child = parent_->GetOrCreateChildByIndex(9, false, true);
+    ASSERT_NE(child, nullptr);
+    ASSERT_TRUE(AceType::InstanceOf<IfElseNode>(child->GetHostNode()->GetParent()));
+    EXPECT_EQ(lazy->GetFrameNodeIndex(child->GetHostNode()), 5);
+    EXPECT_FALSE(algorithm_->GetFastScrollLazyRange(child->GetHostNode(), 8));
+    ASSERT_TRUE(algorithm_->BuildFastScrollLanesRange(AceType::RawPtr(parent_), 8));
+    ASSERT_NO_FATAL_FAILURE(CheckPreparedSyntaxRow(stack, stack ? 4 : 6));
+    const std::set<int32_t> created(builder->createdIndices_.begin(), builder->createdIndices_.end());
+    EXPECT_EQ(created, (stack ? std::set<int32_t> { 3, 4, 5, 6 } : std::set<int32_t> { 2, 3, 4, 5 }));
+    EXPECT_EQ(builder->createdIndices_.size(), created.size());
+    EXPECT_TRUE(algorithm_->posMap_->GetPositionInfo(stack ? 9 : 5).isGroup);
+    EXPECT_FALSE(algorithm_->posMap_->GetPositionInfo(8).isGroup);
+}
+
+INSTANTIATE_TEST_SUITE_P(NormalAndStack, ListFastScrollLazySyntaxTestNg, testing::Bool());
+
+class ListFastScrollRepeatSyntaxTestNg : public ListFastScrollSyntaxTestBase,
+    public testing::WithParamInterface<std::tuple<bool, bool>> {};
+
+/**
+ * @tc.name: FastScrollRepeatUsesRealVirtualCacheIndex
+ * @tc.desc: Both Repeat versions resolve their real cache index through a non-Frame ancestor without prefix creation.
+ * @tc.type: FUNC
+ */
+HWTEST_P(ListFastScrollRepeatSyntaxTestNg, FastScrollRepeatUsesRealVirtualCacheIndex, TestSize.Level1)
+{
+    const auto [secondVersion, stack] = GetParam();
+    auto repeat = CreateRepeatProvider(secondVersion);
+    PrepareProvider(repeat, stack);
+    auto child = parent_->GetOrCreateChildByIndex(9, false, true);
+    ASSERT_NE(child, nullptr);
+    auto node = child->GetHostNode();
+    ASSERT_TRUE(AceType::InstanceOf<IfElseNode>(node->GetParent()));
+    EXPECT_EQ(repeat->GetFrameNodeIndex(node), 5);
+    const auto range = algorithm_->GetFastScrollLazyRange(node, 8);
+    ASSERT_TRUE(range);
+    EXPECT_EQ(range->startIndex, 3);
+    EXPECT_EQ(range->endIndex, 10);
+    const auto types = algorithm_->GetFastScrollTypeRange(AceType::RawPtr(parent_), stack ? 4 : 8);
+    ASSERT_TRUE(types);
+    EXPECT_EQ(types->startIndex, stack ? 2 : 3);
+    EXPECT_EQ(types->endIndex, stack ? 9 : 10);
+    EXPECT_FALSE(types->isGroup);
+    ASSERT_TRUE(algorithm_->BuildFastScrollLanesRange(AceType::RawPtr(parent_), 8));
+    ASSERT_NO_FATAL_FAILURE(CheckPreparedSyntaxRow(stack, 1));
+    EXPECT_EQ(*created_, (std::vector<int32_t> { 5 }));
+    EXPECT_GT(parent_->calls_.size(), created_->size());
+}
+
+INSTANTIATE_TEST_SUITE_P(VersionsAndStack, ListFastScrollRepeatSyntaxTestNg,
+    testing::Combine(testing::Bool(), testing::Bool()));
 
 class ListPredictScanTestNg : public TestNG, public testing::WithParamInterface<PredictScanParam> {
 public:
