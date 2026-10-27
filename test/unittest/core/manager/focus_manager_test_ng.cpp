@@ -3071,7 +3071,7 @@ HWTEST_F(FocusManagerTestNg, FocusManagerTest119, TestSize.Level1)
 /**
  * @tc.name: FocusManagerTest120
  * @tc.desc: Test FocusViewShow early-return path: same view shown again should
- *           refresh stack position and set state to SHOW.
+ *           refresh stack position without changing focusViewStackState_.
  * @tc.type: FUNC
  */
 HWTEST_F(FocusManagerTestNg, FocusManagerTest120, TestSize.Level1)
@@ -3087,11 +3087,12 @@ HWTEST_F(FocusManagerTestNg, FocusManagerTest120, TestSize.Level1)
     ASSERT_EQ(focusManager->lastFocusView_.Upgrade(), pagePattern);
     ASSERT_EQ(focusManager->focusViewStackState_, FocusViewStackState::SHOW);
 
+    focusManager->focusViewStackState_ = FocusViewStackState::CLOSE;
     focusManager->FocusViewShow(pagePattern);
     EXPECT_EQ(focusManager->focusViewStack_.size(), SIZE_1);
     EXPECT_EQ(focusManager->focusViewStack_.back().Upgrade(), pagePattern);
     EXPECT_EQ(focusManager->lastFocusView_.Upgrade(), pagePattern);
-    EXPECT_EQ(focusManager->focusViewStackState_, FocusViewStackState::SHOW);
+    EXPECT_EQ(focusManager->focusViewStackState_, FocusViewStackState::CLOSE);
 }
 
 /**
@@ -3118,18 +3119,19 @@ HWTEST_F(FocusManagerTestNg, FocusManagerTest121, TestSize.Level1)
     ASSERT_EQ(focusManager->focusViewStack_.back().Upgrade(), otherPattern);
 
     focusManager->lastFocusView_ = AceType::WeakClaim(AceType::RawPtr(pagePattern));
+    focusManager->focusViewStackState_ = FocusViewStackState::CLOSE;
     focusManager->FocusViewShow(pagePattern);
     EXPECT_EQ(focusManager->focusViewStack_.size(), 2);
     EXPECT_EQ(focusManager->focusViewStack_.back().Upgrade(), pagePattern);
     EXPECT_EQ(focusManager->focusViewStack_.front().Upgrade(), otherPattern);
     EXPECT_EQ(focusManager->lastFocusView_.Upgrade(), pagePattern);
-    EXPECT_EQ(focusManager->focusViewStackState_, FocusViewStackState::SHOW);
+    EXPECT_EQ(focusManager->focusViewStackState_, FocusViewStackState::CLOSE);
 }
 
 /**
  * @tc.name: FocusManagerTest122
  * @tc.desc: Test FocusViewShow early-return path: parent shown after child should
- *           move parent to top while lastFocusView stays as child.
+ *           keep stack unchanged (ancestor branch preserves base behavior).
  * @tc.type: FUNC
  */
 HWTEST_F(FocusManagerTestNg, FocusManagerTest122, TestSize.Level1)
@@ -3154,12 +3156,13 @@ HWTEST_F(FocusManagerTestNg, FocusManagerTest122, TestSize.Level1)
         GTEST_SKIP() << "focus hub hierarchy not set up in test env";
     }
 
+    focusManager->focusViewStackState_ = FocusViewStackState::CLOSE;
     focusManager->FocusViewShow(parentPattern);
     EXPECT_EQ(focusManager->focusViewStack_.size(), 2);
-    EXPECT_EQ(focusManager->focusViewStack_.back().Upgrade(), parentPattern);
-    EXPECT_EQ(focusManager->focusViewStack_.front().Upgrade(), childPattern);
+    EXPECT_EQ(focusManager->focusViewStack_.front().Upgrade(), parentPattern);
+    EXPECT_EQ(focusManager->focusViewStack_.back().Upgrade(), childPattern);
     EXPECT_EQ(focusManager->lastFocusView_.Upgrade(), childPattern);
-    EXPECT_EQ(focusManager->focusViewStackState_, FocusViewStackState::SHOW);
+    EXPECT_EQ(focusManager->focusViewStackState_, FocusViewStackState::CLOSE);
 }
 
 /**
