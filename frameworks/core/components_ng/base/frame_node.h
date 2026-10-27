@@ -545,7 +545,7 @@ public:
         if (ACE_UNLIKELY(pattern_ && ShouldDetectAceObjTypeConvertion() && !DynamicCast<T>(pattern_))) {
             LOGF_ABORT("bad type conversion: from [%{public}s] to [%{public}s]", GetPatternTypeName(), T::TypeName());
         }
-        return reinterpret_cast<T*>(RawPtr(pattern_));
+        return CastComponentPtr<T>(RawPtr(pattern_), 0);
     }
 
     template<typename T>
@@ -576,7 +576,7 @@ public:
             LOGF_ABORT(
                 "bad type conversion: from [%{public}s] to [%{public}s]", GetLayoutPropertyTypeName(), T::TypeName());
         }
-        return reinterpret_cast<T*>(RawPtr(layoutProperty_));
+        return CastComponentPtr<T>(RawPtr(layoutProperty_), 0);
     }
 
     template<typename T>
@@ -593,7 +593,7 @@ public:
             LOGF_ABORT(
                 "bad type conversion: from [%{public}s] to [%{public}s]", GetPaintPropertyTypeName(), T::TypeName());
         }
-        return reinterpret_cast<T*>(RawPtr(paintProperty_));
+        return CastComponentPtr<T>(RawPtr(paintProperty_), 0);
     }
 
     template<typename T>
@@ -1733,6 +1733,19 @@ protected:
 
 private:
     void NotifyVisibleChange(VisibleType preVisibility, VisibleType currentVisibility, bool notifyPageScene);
+
+    // Preserve the static fast path; virtual-base downcasts require type information.
+    template<typename T, typename O>
+    static auto CastComponentPtr(O* ptr, int) -> decltype(static_cast<T*>(ptr))
+    {
+        return static_cast<T*>(ptr);
+    }
+
+    template<typename T, typename O>
+    static T* CastComponentPtr(O* ptr, long)
+    {
+        return DynamicCast<T>(ptr);
+    }
 
     static bool ShouldDetectAceObjTypeConvertion();
     void DispatchAreaChangeWithThrottle(const RectF& currFrameRect, const OffsetF& currParentOffsetToWindow);
