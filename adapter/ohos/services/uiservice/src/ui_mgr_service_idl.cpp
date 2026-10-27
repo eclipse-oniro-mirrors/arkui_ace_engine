@@ -84,6 +84,7 @@ void UIMgrServiceIdl::OnStart()
 
 bool UIMgrServiceIdl::Init()
 {
+    std::lock_guard<std::recursive_mutex> lock(uiMutex_);
     eventLoop_ = AppExecFwk::EventRunner::Create("UIMgrServiceIdl");
     if (eventLoop_ == nullptr) {
         return false;
@@ -106,6 +107,7 @@ bool UIMgrServiceIdl::Init()
 
 void UIMgrServiceIdl::OnStop()
 {
+    std::lock_guard<std::recursive_mutex> lock(uiMutex_);
     eventLoop_->Stop();
     eventLoop_.reset();
     handler_.reset();
@@ -120,6 +122,7 @@ UIServiceRunningState UIMgrServiceIdl::QueryServiceState() const
 
 int32_t UIMgrServiceIdl::RegisterCallBack(const AAFwk::Want& want, const sptr<IUIServiceNew>& uiService)
 {
+    std::lock_guard<std::recursive_mutex> lock(uiMutex_);
     if (uiService == nullptr) {
         return UI_SERVICE_IS_NULL;
     }
@@ -138,6 +141,7 @@ int32_t UIMgrServiceIdl::RegisterCallBack(const AAFwk::Want& want, const sptr<IU
 
 int32_t UIMgrServiceIdl::UnregisterCallBack(const AAFwk::Want& want)
 {
+    std::lock_guard<std::recursive_mutex> lock(uiMutex_);
     if (handler_ == nullptr) {
         return UI_SERVICE_HANDLER_IS_NULL;
     }
@@ -287,6 +291,7 @@ bool UIMgrServiceIdl::IsSystemApp()
 int32_t UIMgrServiceIdl::ReportStatisticEvents(const AppInfoParcel& appInfo,
     const std::vector<StatisticEventInfoParcel>& events)
 {
+    std::lock_guard<std::recursive_mutex> lock(uiMutex_);
     if (handler_ == nullptr) {
         return UI_SERVICE_HANDLER_IS_NULL;
     }

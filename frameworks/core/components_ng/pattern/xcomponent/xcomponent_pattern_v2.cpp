@@ -751,6 +751,10 @@ void XComponentPatternV2::ResetAndInitializeNodeHandleAccessibility()
 
 ArkUI_AccessibilityProvider* XComponentPatternV2::CreateAccessibilityProvider()
 {
+    if (ACE_UNLIKELY(SystemProperties::DetectContainerMultiThread() &&
+                     !CheckThread(TaskExecutor::TaskType::UI))) {
+        TAG_LOGW(AceLogTag::ACE_XCOMPONENT, "CreateAccessibilityProvider: CheckThread fail: expected [UI]");
+    }
     if (hasGotNativeXComponent_) {
         return nullptr;
     }
@@ -769,6 +773,10 @@ ArkUI_AccessibilityProvider* XComponentPatternV2::CreateAccessibilityProvider()
 
 void XComponentPatternV2::DisposeAccessibilityProvider(ArkUI_AccessibilityProvider* provider)
 {
+    if (ACE_UNLIKELY(SystemProperties::DetectContainerMultiThread() &&
+                     !CheckThread(TaskExecutor::TaskType::UI))) {
+        TAG_LOGW(AceLogTag::ACE_XCOMPONENT, "DisposeAccessibilityProvider: CheckThread fail: expected [UI]");
+    }
     if (hasGotNativeXComponent_ || (provider != arkuiAccessibilityProvider_)) {
         return;
     }
@@ -785,6 +793,10 @@ std::unordered_map<void*, WeakPtr<FrameNode>> XComponentPatternV2::XComponentAcc
 
 FrameNode* XComponentPatternV2::QueryAccessibilityProviderHost(void* provider, bool& isProviderValied)
 {
+    if (ACE_UNLIKELY(SystemProperties::DetectContainerMultiThread() &&
+                     !CheckThread(TaskExecutor::TaskType::UI))) {
+        TAG_LOGW(AceLogTag::ACE_XCOMPONENT, "QueryAccessibilityProviderHost: CheckThread fail: expected [UI]");
+    }
     auto it = XComponentAccessibilityProviderMap.find(provider);
     if (it == XComponentAccessibilityProviderMap.end()) {
         isProviderValied = false;
