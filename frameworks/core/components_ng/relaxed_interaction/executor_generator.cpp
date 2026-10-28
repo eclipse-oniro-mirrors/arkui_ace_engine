@@ -20,13 +20,15 @@
 #include "core/components_ng/relaxed_interaction/parsers/click_command_parser.h"
 #include "core/components_ng/relaxed_interaction/parsers/content_switch_command_parser.h"
 #include "core/components_ng/relaxed_interaction/parsers/fallback_command_parser.h"
+#include "core/components_ng/relaxed_interaction/parsers/key_command_parser.h"
 #include "core/components_ng/relaxed_interaction/parsers/scroll_command_parser.h"
 #include "core/components_ng/relaxed_interaction/parsers/tap_command_parser.h"
 #include "core/components_ng/relaxed_interaction/parsers/slide_command_parser.h"
 
 namespace OHOS::Ace::NG {
 
-ExecutorGenerator::ExecutorGenerator(WeakPtr<PipelineContext> context) : context_(context)
+ExecutorGenerator::ExecutorGenerator(WeakPtr<PipelineContext> context)
+    : context_(context)
 {
     RegisterDefaultParsers();
 }
@@ -42,6 +44,32 @@ void ExecutorGenerator::RegisterDefaultParsers()
     parserRegistry_[SCROLL] = std::make_unique<ScrollCommandParser>(context_);
     parserRegistry_[TAP] = std::make_unique<TapCommandParser>(context_);
     parserRegistry_[SLIDE] = std::make_unique<SlideCommandParser>(context_);
+    parserRegistry_[KEY] = std::make_unique<KeyCommandParser>(context_);
+}
+
+bool ExecutorGenerator::ValidateCommand(const std::unique_ptr<JsonValue>& json)
+{
+    if (!json || !json->IsObject()) {
+        return false;
+    }
+    auto cmd = json->GetValue(CMD_KEY);
+    if (!cmd || !cmd->IsObject()) {
+        return false;
+    }
+    const auto type = cmd->GetString(TYPE_KEY);
+    if (type == CLICK) {
+        return ClickCommandParser::Validate(cmd);
+    }
+    if (type == CONTENT_SWITCH) {
+        return ContentSwitchCommandParser::Validate(cmd);
+    }
+    if (type == SCROLL) {
+        return ScrollCommandParser::Validate(cmd);
+    }
+    if (type == KEY) {
+        return KeyCommandParser::Validate(cmd);
+    }
+    return type == BACKPRESS;
 }
 
 std::vector<std::unique_ptr<BaseExecutor>> ExecutorGenerator::ParseCommand(const std::unique_ptr<JsonValue>& json)

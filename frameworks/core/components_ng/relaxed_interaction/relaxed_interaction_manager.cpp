@@ -25,6 +25,13 @@
 #include "core/pipeline_ng/pipeline_context.h"
 
 namespace OHOS::Ace::NG {
+namespace {
+bool IsSupportedCommandType(const std::string& type)
+{
+    return type == BACKPRESS || type == CLICK || type == CONTENT_SWITCH || type == SCROLL ||
+        type == TAP || type == SLIDE || type == KEY;
+}
+}
 
 RelaxedInteractionManager::RelaxedInteractionManager(WeakPtr<PipelineContext> context) : context_(context)
 {
@@ -64,8 +71,7 @@ ProcessResult RelaxedInteractionManager::ProcessCommandInternal(const std::strin
             return ProcessResult::VALIDATION_ERROR;
         }
         auto name = type->GetString();
-        if (name != BACKPRESS && name != CLICK && name != CONTENT_SWITCH && name != SCROLL &&
-            name != TAP && name != SLIDE) {
+        if (!IsSupportedCommandType(name)) {
             return ProcessResult::NO_VALID_CMD;
         }
     }
@@ -112,7 +118,15 @@ bool RelaxedInteractionManager::HasPendingWorkflow() const
 ExecutionState RelaxedInteractionManager::DoExecuteNextStep(
     std::function<void(ExecutionState)>& finishCallback)
 {
+    executing_ = true;
     ExecutorResult result = choreographer_->ExecuteNext();
+    executing_ = false;
+    if (clearRequested_) {
+        auto reason = clearReason_;
+        clearRequested_ = false;
+        Clear(reason);
+        return HasPendingWorkflow() ? ExecutionState::RUNNING : reason;
+    }
 
     if (workflowStates_.empty()) {
         switch (result) {
@@ -154,7 +168,7 @@ ExecutionState RelaxedInteractionManager::DoExecuteNextStep(
             } else {
                 finishCallback = std::move(workflow.finishCallback);
                 workflowStates_.pop_front();
-                return ExecutionState::FAILED;
+                return choreographer_->GetFailureState();
             }
     }
 
@@ -189,10 +203,29 @@ ExecutionState RelaxedInteractionManager::ExecuteLegacyWorkflow(ExecutorResult r
 
 void RelaxedInteractionManager::Clear()
 {
+    for (auto& workflow : workflowStates_) {
+        workflow.finishCallback = nullptr;
+    }
+    Clear(ExecutionState::FAILED);
+}
+
+void RelaxedInteractionManager::Clear(ExecutionState reason)
+{
+    if (executing_) {
+        clearRequested_ = true;
+        clearReason_ = reason;
+        return;
+    }
+    std::deque<WorkflowState> cancelledWorkflows;
+    cancelledWorkflows.swap(workflowStates_);
     if (choreographer_) {
         choreographer_->Clear();
     }
-    workflowStates_.clear();
+    for (auto& workflow : cancelledWorkflows) {
+        if (workflow.finishCallback) {
+            workflow.finishCallback(reason);
+        }
+    }
 }
 
 std::string RelaxedInteractionManager::ExecutorsToString(
@@ -219,6 +252,10 @@ std::string RelaxedInteractionManager::ExecutionStateToString(ExecutionState sta
             return "SUCCESS";
         case ExecutionState::FAILED:
             return "FAILED";
+        case ExecutionState::TARGET_NOT_FOUND:
+            return "TARGET_NOT_FOUND";
+        case ExecutionState::INTERRUPTED_BY_USER:
+            return "INTERRUPTED_BY_USER";
         default:
             return "UNKNOWN";
     }

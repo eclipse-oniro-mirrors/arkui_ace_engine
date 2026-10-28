@@ -48,6 +48,7 @@ public:
     bool HasPendingWorkflow() const;
 
     void Clear();
+    void Clear(ExecutionState reason);
 
 private:
     ProcessResult ProcessCommandInternal(const std::string& jsonStr,
@@ -66,6 +67,9 @@ private:
         bool preserveLegacySemantics = false;
     };
     std::deque<WorkflowState> workflowStates_;
+    bool executing_ = false;
+    bool clearRequested_ = false;
+    ExecutionState clearReason_ = ExecutionState::FAILED;
 };
 
 } // namespace OHOS::Ace::NG

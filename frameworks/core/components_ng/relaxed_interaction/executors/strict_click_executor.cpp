@@ -32,7 +32,7 @@ ExecutorResult StrictClickExecutor::ExecuteStep()
     auto context = context_.Upgrade();
     if (!context) {
         TAG_LOGE(AceLogTag::ACE_UIEVENT, "Pipeline context is null");
-        return ExecutorResult::FAILED;
+        return SetFailureState(ExecutionState::TARGET_NOT_FOUND);
     }
 
     // Use FrameNodeFinder to query FrameNode at coordinates
@@ -40,7 +40,7 @@ ExecutorResult StrictClickExecutor::ExecuteStep()
     if (!result.GetNode()) {
         TAG_LOGD(AceLogTag::ACE_UIEVENT, "No FrameNode found at coordinates (%{private}.2f, %{private}.2f)",
                  coordinates_.GetX(), coordinates_.GetY());
-        return ExecutorResult::FAILED;
+        return SetFailureState(ExecutionState::TARGET_NOT_FOUND);
     }
     if (!result.GetClickFunc()) {
         TAG_LOGD(AceLogTag::ACE_UIEVENT, "StrictClickExecutor GetClickFun failed.");

@@ -112,6 +112,15 @@ const std::string VALID_CONTENT_SWITCH_JSON = R"({
     }
 })";
 
+const std::string VALID_KEY_JSON = R"({
+    "cmd": {
+        "type": "key",
+        "action_info": {
+            "code": 2049
+        }
+    }
+})";
+
 const std::string VALID_FALLBACK_JSON = R"({
     "fallback_cmd": {
         "identity": "test_id",
@@ -182,6 +191,26 @@ class ExecutorGeneratorConstructorTest : public ExecutorGeneratorTest {};
 class ExecutorGeneratorParseCommandTest : public ExecutorGeneratorTest {};
 class ExecutorGeneratorParseFallbackCmdTest : public ExecutorGeneratorTest {};
 class ExecutorGeneratorParseRegularCmdTest : public ExecutorGeneratorTest {};
+
+HWTEST_F(ExecutorGeneratorParseCommandTest, ValidateCommand_MatchesExecutionParameterRules, TestSize.Level1)
+{
+    ExecutorGenerator generator(mockPipelineContext_);
+    for (const auto& command : { VALID_BACKPRESS_JSON, VALID_CLICK_JSON, VALID_CONTENT_SWITCH_JSON,
+             VALID_SCROLL_JSON, VALID_KEY_JSON }) {
+        auto json = JsonUtil::ParseJsonString(command);
+        EXPECT_TRUE(ExecutorGenerator::ValidateCommand(json)) << command;
+        EXPECT_FALSE(generator.ParseCommand(json).empty()) << command;
+    }
+    for (const auto* command : {
+             R"({"cmd":{"type":"click","action_info":{"coordinates":{"x1":1}}}})",
+             R"({"cmd":{"type":"content_switch","action_info":{"coordinates":{"pos":{"x":1,"y":2}}}}})",
+             R"({"cmd":{"type":"scroll","action_info":{"distance":-1,"coordinates":{"x1":1,"y1":2}}}})",
+             R"({"cmd":{"type":"key","action_info":{"code":999}}})" }) {
+        auto json = JsonUtil::ParseJsonString(command);
+        EXPECT_FALSE(ExecutorGenerator::ValidateCommand(json)) << command;
+        EXPECT_TRUE(generator.ParseCommand(json).empty()) << command;
+    }
+}
 
 // ============ Constructor Tests ============
 
@@ -275,6 +304,15 @@ HWTEST_F(ExecutorGeneratorParseRegularCmdTest, ParseRegularCmd_TapType, TestSize
     // Tap always creates SmartGestureExecutor, may add StrictClickExecutor depending on context
     EXPECT_GE(result.size(), EXPECTED_SINGLE_EXECUTOR_COUNT);
     EXPECT_EQ(result[0]->GetType(), "smart_gesture");
+}
+
+HWTEST_F(ExecutorGeneratorParseRegularCmdTest, ParseRegularCmd_KeyType, TestSize.Level1)
+{
+    ExecutorGenerator generator(mockPipelineContext_);
+    auto json = JsonUtil::ParseJsonString(VALID_KEY_JSON);
+    auto result = generator.ParseCommand(json);
+    EXPECT_EQ(result.size(), EXPECTED_SINGLE_EXECUTOR_COUNT);
+    EXPECT_EQ(result[0]->GetType(), KEY);
 }
 
 HWTEST_F(ExecutorGeneratorParseRegularCmdTest, ParseRegularCmd_SlideType, TestSize.Level1)
@@ -454,7 +492,7 @@ HWTEST_F(ExecutorGeneratorParseRegularCmdTest, ParseRegularCmd_TypeNotString_Ret
 HWTEST_F(ExecutorGeneratorConstructorTest, Constructor_RegisterDefaultParsers_AllRegistered, TestSize.Level1)
 {
     ExecutorGenerator generator(mockPipelineContext_);
-    EXPECT_EQ(generator.parserRegistry_.size(), 7u);
+    EXPECT_EQ(generator.parserRegistry_.size(), 8u);
     EXPECT_NE(generator.parserRegistry_.find(BACKPRESS), generator.parserRegistry_.end());
     EXPECT_NE(generator.parserRegistry_.find(FALLBACK), generator.parserRegistry_.end());
     EXPECT_NE(generator.parserRegistry_.find(CLICK), generator.parserRegistry_.end());
@@ -462,6 +500,7 @@ HWTEST_F(ExecutorGeneratorConstructorTest, Constructor_RegisterDefaultParsers_Al
     EXPECT_NE(generator.parserRegistry_.find(SCROLL), generator.parserRegistry_.end());
     EXPECT_NE(generator.parserRegistry_.find(TAP), generator.parserRegistry_.end());
     EXPECT_NE(generator.parserRegistry_.find(SLIDE), generator.parserRegistry_.end());
+    EXPECT_NE(generator.parserRegistry_.find(KEY), generator.parserRegistry_.end());
 }
 
 HWTEST_F(ExecutorGeneratorConstructorTest, Destructor_Cleanup_Success, TestSize.Level1)

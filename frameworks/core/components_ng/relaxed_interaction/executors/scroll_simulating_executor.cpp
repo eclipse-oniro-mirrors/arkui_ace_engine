@@ -77,7 +77,27 @@ int32_t ScrollSimulatingExecutor::TouchEventBuilder::SumSteps(double x1, double 
 ScrollSimulatingExecutor::ScrollSimulatingExecutor(WeakPtr<PipelineContext> context, const Command& cmd)
     : BaseExecutor(context), cmd_(cmd)
 {
-    touchEvents_ = TouchEventBuilder().Build(cmd_.actionInfo.coordinates);
+    auto coordinates = cmd_.actionInfo.coordinates;
+    if (!cmd_.isY2Set) {
+        coordinates.x2 = coordinates.x1;
+        coordinates.y2 = coordinates.y1;
+        switch (cmd_.actionInfo.direction) {
+            case RelaxedScrollDirection::LEFT:
+                coordinates.x2 += cmd_.actionInfo.distance;
+                break;
+            case RelaxedScrollDirection::RIGHT:
+                coordinates.x2 -= cmd_.actionInfo.distance;
+                break;
+            case RelaxedScrollDirection::BACKWARD:
+            case RelaxedScrollDirection::UP:
+                coordinates.y2 += cmd_.actionInfo.distance;
+                break;
+            default:
+                coordinates.y2 -= cmd_.actionInfo.distance;
+                break;
+        }
+    }
+    touchEvents_ = TouchEventBuilder().Build(coordinates);
 }
 
 ExecutorResult ScrollSimulatingExecutor::ExecuteStep()
@@ -85,24 +105,34 @@ ExecutorResult ScrollSimulatingExecutor::ExecuteStep()
     auto context = context_.Upgrade();
     if (!context) {
         TAG_LOGD(AceLogTag::ACE_UIEVENT, "ScrollSimulatingExecutor failed.");
-        return ExecutorResult::FAILED;
+        return SetFailureState(ExecutionState::TARGET_NOT_FOUND);
     }
 
-    if (!cmd_.isY2Set && cmd_.mode != ExecuteMode::TARGET) {
-        TAG_LOGD(AceLogTag::ACE_UIEVENT, "x2 or y2 is invalid, SimulatingExecutor failed.");
-        return ExecutorResult::FAILED;
-    }
     if (touchEvents_.empty()) {
         TAG_LOGD(AceLogTag::ACE_UIEVENT, "ScrollSimulatingExecutor failed, touchEvents is empty.");
         return ExecutorResult::FAILED;
     }
     auto event = touchEvents_.front();
+    touchActive_ = event.type == TouchType::DOWN || event.type == TouchType::MOVE;
+    lastPosition_ = PointF(event.x, event.y);
     context->OnTouchEvent(event);
     touchEvents_.pop();
     if (touchEvents_.empty()) {
         return ExecutorResult::SUCCESS;
     }
     return ExecutorResult::PENDING;
+}
+
+void ScrollSimulatingExecutor::Cancel()
+{
+    if (!touchActive_) {
+        return;
+    }
+    touchActive_ = false;
+    auto context = context_.Upgrade();
+    if (context && !context->IsDestroyed()) {
+        context->OnTouchEvent(RelaxedEventFactory::CreateTouchEvent(lastPosition_, TouchType::CANCEL));
+    }
 }
 
 } // namespace OHOS::Ace::NG

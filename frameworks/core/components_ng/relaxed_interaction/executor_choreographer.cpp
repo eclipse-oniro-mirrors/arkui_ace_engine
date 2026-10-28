@@ -37,6 +37,7 @@ ExecutorResult ExecutorChoreographer::ExecuteNext()
     ExecutorResult result = currentExecutor_->ExecuteStep();
     WorkflowDumper::GetInstance().AddLog("Executor '" + currentExecutor_->GetDescription() + "' execution result: " +
         ExecutorResultToString(result));
+    failureState_ = currentExecutor_->GetFailureState();
     if (result != ExecutorResult::PENDING) {
         currentExecutor_.reset();
     }
@@ -46,8 +47,11 @@ ExecutorResult ExecutorChoreographer::ExecuteNext()
 
 void ExecutorChoreographer::Clear()
 {
+    auto current = std::move(currentExecutor_);
     executorQueue_.clear();
-    currentExecutor_.reset();
+    if (current) {
+        current->Cancel();
+    }
 }
 
 void ExecutorChoreographer::DiscardFront(size_t count)

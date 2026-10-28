@@ -48,6 +48,7 @@
 #include "core/components_ng/manager/shared_overlay/shared_overlay_manager.h"
 #include "core/components_ng/manager/toolbar/toolbar_manager.h"
 #include "core/event/key_event.h"
+#include "core/components_ng/relaxed_interaction/relaxed_interaction_types.h"
 
 #ifdef ENABLE_ROSEN_BACKEND
 #include "render_service_client/core/transaction/rs_transaction.h"
@@ -189,6 +190,16 @@ constexpr char PID_FLAG[] = "pidflag";
 namespace OHOS::Ace::NG {
 namespace {
 constexpr Dimension CARET_AVOID_OFFSET = 24.0_vp;
+
+bool InterruptRelaxedInteractionByMouse(const MouseEvent& event, const RefPtr<EventManager>& eventManager)
+{
+    if (!event.isInjected && (event.action == MouseAction::PRESS || event.action == MouseAction::PULL_DOWN) &&
+        eventManager) {
+        eventManager->ClearRelaxedInteraction(ExecutionState::INTERRUPTED_BY_USER);
+        return true;
+    }
+    return false;
+}
 
 void ShouldAddToHistory(std::vector<TouchEvent>& history, const TouchEvent& event, const TouchEvent& movePoint)
 {
@@ -3905,6 +3916,12 @@ void PipelineContext::OnAxisEvent(const AxisEvent& event)
 void PipelineContext::OnTouchEvent(const TouchEvent& point, const RefPtr<FrameNode>& node, bool isSubPipe)
 {
     CHECK_RUN_ON(UI);
+    if (!point.isInjected && !point.isGenerate && eventManager_) {
+        eventManager_->ClearRelaxedInteraction(ExecutionState::INTERRUPTED_BY_USER);
+        if (IsDestroyed()) {
+            return;
+        }
+    }
     ACE_BENCH_MARK_TRACE("OnTouchEvent_start type:%d", static_cast<int32_t>(point.type));
 
     TAG_LOGD(AceLogTag::ACE_INPUTKEYFLOW, "OnTouchEvent type:%{public}d, isGenerate:%{public}d",
@@ -5228,6 +5245,9 @@ void PipelineContext::UpdateLastMoveEvent(const MouseEvent& event)
 void PipelineContext::OnMouseEvent(const MouseEvent& event, const RefPtr<FrameNode>& node)
 {
     CHECK_RUN_ON(UI);
+    if (InterruptRelaxedInteractionByMouse(event, eventManager_) && IsDestroyed()) {
+        return;
+    }
     ACE_BENCH_MARK_TRACE("OnMouseEvent_start type:%d button:%d", static_cast<int32_t>(event.action),
         static_cast<int32_t>(event.button));
 
@@ -5550,6 +5570,12 @@ void PipelineContext::ReDispatch(KeyEvent& keyEvent)
 
 bool PipelineContext::OnNonPointerEvent(const NonPointerEvent& event)
 {
+    if (!event.isInjected && eventManager_) {
+        eventManager_->ClearRelaxedInteraction(ExecutionState::INTERRUPTED_BY_USER);
+        if (IsDestroyed()) {
+            return false;
+        }
+    }
     ContainerScope scope(instanceId_);
     return eventManager_->OnNonPointerEvent(event);
 }
@@ -5636,6 +5662,12 @@ MouseEvent ConvertAxisToMouse(const AxisEvent& event)
 
 void PipelineContext::OnAxisEvent(const AxisEvent& event, const RefPtr<FrameNode>& node)
 {
+    if (!event.isInjected && eventManager_) {
+        eventManager_->ClearRelaxedInteraction(ExecutionState::INTERRUPTED_BY_USER);
+        if (IsDestroyed()) {
+            return;
+        }
+    }
     ACE_BENCH_MARK_TRACE("OnAxisEvent_start type:%d", event.action);
     eventManager_->NotifyAxisEvent(event);
     if (!axisEventChecker_.IsAxisEventSequenceCorrect(event)) {
@@ -6128,6 +6160,9 @@ void PipelineContext::Destroy()
     CHECK_RUN_ON(UI);
     CloseUITreeRequests(*this);
     SetDestroyed();
+    if (eventManager_) {
+        eventManager_->ClearRelaxedInteraction(ExecutionState::TARGET_NOT_FOUND);
+    }
     if (contentChangeMgr_) {
         contentChangeMgr_->InvalidateCapiContentChangeSubscriptions();
     }
@@ -8905,6 +8940,17 @@ void PipelineContext::ProcessCommand(const std::string& command)
 #ifdef RELAXED_INTERACTION_SUPPORT
     CHECK_NULL_VOID(eventManager_);
     eventManager_->ProcessCommand(command, [this]() { RequestFrame(); });
+#endif
+}
+
+ProcessResult PipelineContext::ProcessCommand(const std::string& command,
+    const std::function<void(ExecutionState)>& completion)
+{
+#ifdef RELAXED_INTERACTION_SUPPORT
+    CHECK_NULL_RETURN(eventManager_, ProcessResult::NO_VALID_CMD);
+    return eventManager_->ProcessCommand(command, [this]() { RequestFrame(); }, completion);
+#else
+    return ProcessResult::NO_VALID_CMD;
 #endif
 }
 

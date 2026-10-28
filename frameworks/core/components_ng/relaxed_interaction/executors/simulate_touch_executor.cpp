@@ -35,7 +35,7 @@ ExecutorResult SimulateTouchExecutor::ExecuteStep()
     auto context = context_.Upgrade();
     if (!context) {
         TAG_LOGE(AceLogTag::ACE_UIEVENT, "Pipeline context is null");
-        return ExecutorResult::FAILED;
+        return SetFailureState(ExecutionState::TARGET_NOT_FOUND);
     }
 
     // Create touch event
@@ -44,6 +44,9 @@ ExecutorResult SimulateTouchExecutor::ExecuteStep()
 
     // Dispatch touch events
     context->OnTouchEvent(downEvent);
+    if (context->IsDestroyed()) {
+        return SetFailureState(ExecutionState::TARGET_NOT_FOUND);
+    }
     context->OnTouchEvent(upEvent);
 
     return ExecutorResult::SUCCESS;

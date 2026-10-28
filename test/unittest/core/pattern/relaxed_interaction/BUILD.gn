@@ -13,6 +13,15 @@
 
 import("//foundation/arkui/ace_engine/test/unittest/ace_unittest.gni")
 
+config("relaxed_interaction_destruction_config") {
+  ldflags = [ "-Wl,--wrap=_ZN4OHOS3Ace12PipelineBase11IsDestroyedEv" ]
+}
+
+source_set("relaxed_interaction_destruction_mock") {
+  testonly = true
+  public_configs = [ ":relaxed_interaction_destruction_config" ]
+}
+
 ace_unittest("relaxed_interaction_manager_test_ng") {
   module_name = "Gesture-BasicAndCombinationGesture"
   type = "new"
@@ -21,13 +30,19 @@ ace_unittest("relaxed_interaction_manager_test_ng") {
     "$ace_root/frameworks/core/components_ng/relaxed_interaction/executor_choreographer.cpp",
     "$ace_root/frameworks/core/components_ng/relaxed_interaction/executor_generator.cpp",
     "$ace_root/frameworks/core/components_ng/relaxed_interaction/parsers/backpress_command_parser.cpp",
+    "$ace_root/frameworks/core/components_ng/relaxed_interaction/parsers/key_command_parser.cpp",
     "$ace_root/frameworks/core/components_ng/relaxed_interaction/relaxed_interaction_manager.cpp",
+    "$ace_root/frameworks/core/event/key_event_recognizer.cpp",
+    "$ace_root/frameworks/core/interfaces/native/node/relaxed_command_processor.cpp",
+    "$ace_root/frameworks/core/interfaces/native/utility/error_message_manager.cpp",
+    "relaxed_command_processor_test.cpp",
     "relaxed_interaction_manager_test_ng.cpp",
   ]
 
   sources += [
     "$ace_root/frameworks/core/components_ng/relaxed_interaction/base_executor.cpp",
     "$ace_root/frameworks/core/components_ng/relaxed_interaction/executors/fallback_executor.cpp",
+    "$ace_root/frameworks/core/components_ng/relaxed_interaction/executors/key_executor.cpp",
     "$ace_root/frameworks/core/components_ng/relaxed_interaction/executors/scroll_simulating_executor.cpp",
     "$ace_root/frameworks/core/components_ng/relaxed_interaction/executors/scroll_touch_executor.cpp",
     "$ace_root/frameworks/core/components_ng/relaxed_interaction/executors/simulate_touch_executor.cpp",
@@ -72,6 +87,7 @@ ace_unittest("relaxed_interaction_manager_test_ng") {
     sources = []
     sources = [ "relaxed_interaction_manager_test_core.cpp" ]
   } else {
+    extra_deps = [ ":relaxed_interaction_destruction_mock" ]
     sources += [ "relaxed_interaction_manager_test_core.cpp" ]
   }
 

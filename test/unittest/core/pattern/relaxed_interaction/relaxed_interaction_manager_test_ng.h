@@ -29,7 +29,10 @@ class RelaxedInteractionManagerTestBase : public testing::Test {
 public:
     static void SetUpTestCase()
     {
-        mockPipelineContext_ = AceType::MakeRefPtr<MockPipelineContext>();
+        auto context = AceType::MakeRefPtr<MockPipelineContext>();
+        EXPECT_CALL(*context, OnNonPointerEvent(testing::_)).Times(testing::AnyNumber())
+            .WillRepeatedly(testing::Return(true));
+        mockPipelineContext_ = context;
         ASSERT_NE(mockPipelineContext_, nullptr);
     }
 

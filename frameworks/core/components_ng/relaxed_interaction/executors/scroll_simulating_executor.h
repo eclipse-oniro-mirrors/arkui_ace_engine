@@ -45,6 +45,8 @@ public:
 
     ExecutorResult ExecuteStep() override;
 
+    void Cancel() override;
+
     virtual std::string GetType() const override
     {
         return "scroll_simulating";
@@ -62,6 +64,8 @@ public:
 
 private:
     Command cmd_;
+    bool touchActive_ = false;
+    PointF lastPosition_;
     std::queue<TouchEvent> touchEvents_;
 };
 

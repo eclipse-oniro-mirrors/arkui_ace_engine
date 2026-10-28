@@ -14,7 +14,9 @@
  */
 
 #include "gtest/gtest.h"
+#include <vector>
 
+#include "mock_pipeline_destruction.h"
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 
 #include "base/geometry/ng/point_t.h"
@@ -27,6 +29,25 @@ using namespace testing;
 using namespace testing::ext;
 
 namespace OHOS::Ace::NG {
+
+namespace {
+PipelineBase* g_destroyedContext = nullptr;
+}
+
+void SetDestroyedContextForTest(PipelineBase* context)
+{
+    g_destroyedContext = context;
+}
+
+extern "C" bool RealPipelineIsDestroyed(PipelineBase* context)
+    asm("__real__ZN4OHOS3Ace12PipelineBase11IsDestroyedEv");
+extern "C" bool WrapPipelineIsDestroyed(PipelineBase* context)
+    asm("__wrap__ZN4OHOS3Ace12PipelineBase11IsDestroyedEv");
+
+extern "C" bool WrapPipelineIsDestroyed(PipelineBase* context)
+{
+    return context == g_destroyedContext || RealPipelineIsDestroyed(context);
+}
 
 class SimulateTouchExecutorTest : public testing::Test {
 public:
@@ -50,6 +71,26 @@ class SimulateTouchExecutorExecuteStepTest : public SimulateTouchExecutorTest {}
 class SimulateTouchExecutorGetTypeTest : public SimulateTouchExecutorTest {};
 class SimulateTouchExecutorGetDescriptionTest : public SimulateTouchExecutorTest {};
 class SimulateTouchExecutorIsSingleStepTest : public SimulateTouchExecutorTest {};
+
+HWTEST_F(SimulateTouchExecutorExecuteStepTest, DestructionDuringDownStopsDispatch, TestSize.Level1)
+{
+    auto context = AceType::MakeRefPtr<MockPipelineContext>();
+    std::vector<TouchEvent> events;
+    EXPECT_CALL(*context, OnTouchEvent(testing::_, testing::_)).WillOnce([&](const TouchEvent& event, bool) {
+        events.push_back(event);
+        SetDestroyedContextForTest(context.GetRawPtr());
+        EXPECT_FALSE(mockPipelineContext_->IsDestroyed());
+    });
+    SimulateTouchExecutor executor(context, PointF(10.0f, 20.0f));
+    const auto result = executor.ExecuteStep();
+    SetDestroyedContextForTest(nullptr);
+    EXPECT_FALSE(context->IsDestroyed());
+    EXPECT_EQ(result, ExecutorResult::FAILED);
+    EXPECT_EQ(executor.GetFailureState(), ExecutionState::TARGET_NOT_FOUND);
+    ASSERT_EQ(events.size(), 1u);
+    EXPECT_EQ(events[0].type, TouchType::DOWN);
+    EXPECT_TRUE(events[0].isInjected);
+}
 
 HWTEST_F(SimulateTouchExecutorConstructorTest, SimulateTouchExecutor_Constructor, TestSize.Level1)
 {
