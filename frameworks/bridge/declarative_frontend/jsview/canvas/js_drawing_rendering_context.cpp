@@ -129,7 +129,7 @@ void JSDrawingRenderingContext::SetRSCanvasCallback(WeakPtr<AceType>& canvasPatt
         CHECK_NULL_VOID(modifier);
         CHECK_NULL_VOID(modifier->setRSCanvasCallback);
         modifier->setRSCanvasCallback(
-            reinterpret_cast<ArkUINodeHandle>(AceType::RawPtr(frameNode)), &callback);
+            reinterpret_cast<ArkUINodeHandle>(static_cast<AceType*>(AceType::RawPtr(frameNode))), &callback);
     }
 }
 
@@ -142,7 +142,7 @@ void JSDrawingRenderingContext::SetInvalidate(const JSCallbackInfo& info)
     auto* modifier = NG::NodeModifier::GetCanvasModifier();
     CHECK_NULL_VOID(modifier);
     CHECK_NULL_VOID(modifier->setInvalidate);
-    modifier->setInvalidate(reinterpret_cast<ArkUINodeHandle>(AceType::RawPtr(frameNode)));
+    modifier->setInvalidate(reinterpret_cast<ArkUINodeHandle>(static_cast<AceType*>(AceType::RawPtr(frameNode))));
 }
 
 void JSDrawingRenderingContext::SetUnit(CanvasUnit unit)
