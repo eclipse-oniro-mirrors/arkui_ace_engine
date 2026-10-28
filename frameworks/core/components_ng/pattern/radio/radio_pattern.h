@@ -225,10 +225,7 @@ public:
     }
 
     int32_t OnInjectionEvent(const std::string& command) override;
-    CommandResult OnInjectionEventWithResult(const std::string& command) override
-    {
-        return ConvertLegacyInjectionEventResult(command, { "checked" });
-    }
+    CommandResult OnInjectionEventWithResult(const std::string& command) override;
     bool ReportInitOnChangeEvent(int32_t nodeId, bool isChecked);
     bool ReportOnChangeEvent(int32_t nodeId, bool isChecked, bool force = false);
     static bool IsJsonValid(const std::unique_ptr<JsonValue>& json);

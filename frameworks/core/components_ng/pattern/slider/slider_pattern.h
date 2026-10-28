@@ -230,10 +230,7 @@ public:
     void UpdateSliderComponentString(const bool isShowTips, const std::string& value);
     Axis GetDirection() const;
     int32_t OnInjectionEvent(const std::string& command) override;
-    CommandResult OnInjectionEventWithResult(const std::string& command) override
-    {
-        return ConvertLegacyInjectionEventResult(command, { "onSliderChange" }, CommandErrorType::EXECUTE_FAIL);
-    }
+    CommandResult OnInjectionEventWithResult(const std::string& command) override;
     bool IsContentModifierNode(const RefPtr<FrameNode>& node);
     bool IsMaterialNode(const RefPtr<FrameNode>& node);
     bool IsPrefixOrSuffixNode(const RefPtr<FrameNode>& node);

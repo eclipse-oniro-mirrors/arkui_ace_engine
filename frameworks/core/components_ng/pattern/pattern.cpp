@@ -29,6 +29,16 @@
 #include "core/pipeline_ng/pipeline_context.h"
 
 namespace OHOS::Ace::NG {
+CommandResult CommandResult::Success()
+{
+    return { true, CommandErrorType::NONE, "" };
+}
+
+CommandResult CommandResult::Error(CommandErrorType type, std::string message)
+{
+    return { false, type, std::move(message) };
+}
+
 bool Pattern::ShouldIncludeDiagnostic(const InspectorDumpOptions& options)
 {
     return options.includeDiagnostic;
@@ -109,7 +119,7 @@ CommandResult Pattern::OnRecvCommandWithResult(const std::string& command)
 }
 
 CommandResult Pattern::ConvertLegacyInjectionEventResult(const std::string& command,
-    std::initializer_list<std::string_view> supportedCommands, CommandErrorType legacyFailureType,
+    std::initializer_list<std::string_view> commands, CommandErrorType failure,
     const std::function<CommandResult(const std::unique_ptr<JsonValue>&)>& preflight)
 {
     auto json = JsonUtil::ParseJsonString(command);
@@ -121,8 +131,7 @@ CommandResult Pattern::ConvertLegacyInjectionEventResult(const std::string& comm
         return CommandResult::Error(CommandErrorType::INVALID_PARAM);
     }
     const auto commandName = commandValue->GetString();
-    const auto supported = std::find(supportedCommands.begin(), supportedCommands.end(), commandName) !=
-        supportedCommands.end();
+    const auto supported = std::find(commands.begin(), commands.end(), commandName) != commands.end();
     if (!supported) {
         return CommandResult::Error(CommandErrorType::INVALID_COMMAND);
     }
@@ -142,11 +151,11 @@ CommandResult Pattern::ConvertLegacyInjectionEventResult(const std::string& comm
         }
     }
     if (commandName == "copy" || commandName == "cut" || commandName == "requestKeyboard") {
-        legacyFailureType = CommandErrorType::EXECUTE_FAIL;
+        failure = CommandErrorType::EXECUTE_FAIL;
     }
     return OnInjectionEvent(command) == RET_SUCCESS
         ? CommandResult::Success()
-        : CommandResult::Error(legacyFailureType);
+        : CommandResult::Error(failure);
 }
 
 void Pattern::OnColorModeChange(uint32_t colorMode)

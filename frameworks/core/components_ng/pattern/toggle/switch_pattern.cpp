@@ -1864,6 +1864,11 @@ bool SwitchPattern::ParseCommand(const std::string& command, bool& isOn)
     return true;
 }
 
+CommandResult SwitchPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return ConvertLegacyInjectionEventResult(command, { "onToggleChange" }, CommandErrorType::EXECUTE_FAIL);
+}
+
 int32_t SwitchPattern::OnInjectionEvent(const std::string& command)
 {
     bool isOn = false;

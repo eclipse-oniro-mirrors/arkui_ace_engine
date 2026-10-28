@@ -132,10 +132,7 @@ public:
     void ToJsonValue(std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const override;
     void FromJson(const std::unique_ptr<JsonValue>& json) override;
     int32_t OnInjectionEvent(const std::string& command) override;
-    CommandResult OnInjectionEventWithResult(const std::string& command) override
-    {
-        return ConvertLegacyInjectionEventResult(command, { "change" }, CommandErrorType::EXECUTE_FAIL);
-    }
+    CommandResult OnInjectionEventWithResult(const std::string& command) override;
 
     virtual std::string GetArcDotIndicatorStyle() const { return ""; }
     // ArcSwiper will implement this interface in order to set transitionAnimation disable

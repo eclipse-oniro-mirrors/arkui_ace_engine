@@ -13,8 +13,6 @@
  * limitations under the License.
  */
 
-
-#include "test/unittest/core/base/frame_node_test_ng.h"
 #include "core/components_ng/pattern/rating/rating_pattern.h"
 
 namespace OHOS::Ace::NG {

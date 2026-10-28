@@ -67,7 +67,6 @@ template("ace_ohos_standard_source_set") {
       "$ace_root/adapter/ohos/entrance/ui_event_impl.cpp",
       "$ace_root/adapter/ohos/entrance/ui_session/ui_session_batch_command.cpp",
       "$ace_root/adapter/ohos/entrance/ui_session/ui_session_command_result.cpp",
-      "$ace_root/adapter/ohos/entrance/ui_session/ui_session_manager.cpp",
       "$ace_root/adapter/ohos/entrance/utils.cpp",
 
       # drag window

@@ -13,8 +13,6 @@
  * limitations under the License.
  */
 
-
-#include "test/unittest/core/base/frame_node_test_ng.h"
 #include "core/components_ng/pattern/tabs/tabs_pattern.h"
 #include "core/components_ng/pattern/swiper/swiper_pattern.h"
 #include "core/components_ng/pattern/grid/grid_pattern.h"

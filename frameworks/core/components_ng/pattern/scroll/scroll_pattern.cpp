@@ -2144,6 +2144,11 @@ void ScrollPattern::FillReportOnItemStopParams(std::unique_ptr<JsonValue>& param
     params->Put("offset", GetCurrentPosition());
 }
 
+CommandResult ScrollPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return OnInjectionEventByRatioWithResult(command);
+}
+
 int32_t ScrollPattern::OnInjectionEvent(const std::string& command)
 {
     return OnInjectionEventByRatio(command);

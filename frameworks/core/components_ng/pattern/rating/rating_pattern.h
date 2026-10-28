@@ -132,10 +132,7 @@ public:
     void LoadBackground(const RefPtr<RatingLayoutProperty>& layoutProperty, const RefPtr<RatingTheme>& ratingTheme,
         const RefPtr<IconTheme>& iconTheme);
     int32_t OnInjectionEvent(const std::string& command) override;
-    CommandResult OnInjectionEventWithResult(const std::string& command) override
-    {
-        return ConvertLegacyInjectionEventResult(command, { "onRatingChange" }, CommandErrorType::EXECUTE_FAIL);
-    }
+    CommandResult OnInjectionEventWithResult(const std::string& command) override;
 
     // Theme star count, used as accessibility range fallback when stars property is not set.
     int32_t GetThemeStarNum() const

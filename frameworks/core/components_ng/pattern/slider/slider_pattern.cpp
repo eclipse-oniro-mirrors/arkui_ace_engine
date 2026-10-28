@@ -3416,6 +3416,11 @@ bool SliderPattern::ParseCommand(const std::string& command, float& value)
     return true;
 }
 
+CommandResult SliderPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return ConvertLegacyInjectionEventResult(command, { "onSliderChange" }, CommandErrorType::EXECUTE_FAIL);
+}
+
 int32_t SliderPattern::OnInjectionEvent(const std::string& command)
 {
     float value = 0.0f;

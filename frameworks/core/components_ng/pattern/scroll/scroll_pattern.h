@@ -461,10 +461,7 @@ private:
     void BeforeSyncGeometryProperties(const DirtySwapConfig& config) override;
     void ReportOnItemScrollEvent(const std::string& event);
     int32_t OnInjectionEvent(const std::string& command) override;
-    CommandResult OnInjectionEventWithResult(const std::string& command) override
-    {
-        return OnInjectionEventByRatioWithResult(command);
-    }
+    CommandResult OnInjectionEventWithResult(const std::string& command) override;
 
     double currentOffset_ = 0.0;
     double lastOffset_ = 0.0;

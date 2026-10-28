@@ -44,9 +44,6 @@ class PixelMap;
 } // namespace OHOS
 namespace OHOS::Ace {
 struct ComponentTreeQueryRequest;
-class TaskExecutor;
-template<typename T>
-class WeakPtr;
 class ACE_FORCE_EXPORT UiSessionManager {
 public:
     using InspectorFunction = std::function<void(bool onlyNeedVisible, ParamConfig config)>;
@@ -97,8 +94,6 @@ public:
      * @return The return value is ui_manager singleton
      */
     static UiSessionManager* GetInstance();
-    void RegisterNodeCommandWithResultCallback(const WeakPtr<TaskExecutor>& taskExecutor);
-    void RegisterSendCommandWithResultCallback(const WeakPtr<TaskExecutor>& taskExecutor);
 
     /**
      * @description: execute click callback when component click event occurs

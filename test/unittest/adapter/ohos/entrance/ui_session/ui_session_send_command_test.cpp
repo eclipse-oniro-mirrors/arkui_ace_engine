@@ -335,7 +335,13 @@ TEST(CommandResultTest, NumericAndIndexBoundariesRetainTheirContract)
         R"({"cmd":"setVideoPlaybackSpeed", "value":0.125})",
         R"({"cmd":"setVideoPlaybackSpeed", "value":8.0})",
         R"({"cmd":"changeIndex", "params":{"index":"0"}})",
+        R"({"cmd":"changeIndex", "params":{"index":"-0"}})",
+        R"({"cmd":"changeIndex", "params":{"index":"0002"}})",
+        R"({"cmd":"changeIndex", "params":{"index":"2147483647"}})",
+        R"({"cmd":"changeIndex", "params":{"index":"0002147483647"}})",
         R"({"cmd":"change", "params":{"type":"forward"}})",
+        R"({"cmd":"change", "params":{"type":"index", "index":"-0"}})",
+        R"({"cmd":"change", "params":{"type":"index", "index":"2147483647"}})",
         R"({"cmd":"change", "params":{"type":"index", "index":"0"}})" }) {
         SCOPED_TRACE(command);
         auto json = JsonUtil::ParseJsonString(command);
@@ -347,7 +353,23 @@ TEST(CommandResultTest, NumericAndIndexBoundariesRetainTheirContract)
         R"({"cmd":"changeIndex", "params":{"index":"-1"}})",
         R"({"cmd":"changeIndex", "params":{"index":"2147483648"}})",
         R"({"cmd":"changeIndex", "params":{"index":"1x"}})",
+        R"({"cmd":"changeIndex", "params":{"index":""}})",
+        R"({"cmd":"changeIndex", "params":{"index":"-"}})",
+        R"({"cmd":"changeIndex", "params":{"index":" 1"}})",
+        R"({"cmd":"changeIndex", "params":{"index":"1 "}})",
+        R"({"cmd":"changeIndex", "params":{"index":"\t1"}})",
+        R"({"cmd":"changeIndex", "params":{"index":"+1"}})",
+        R"({"cmd":"changeIndex", "params":{"index":"+0"}})",
+        R"({"cmd":"changeIndex", "params":{"index":"1.0"}})",
+        R"({"cmd":"changeIndex", "params":{"index":"1e2"}})",
+        R"({"cmd":"changeIndex", "params":{"index":"0x10"}})",
+        R"({"cmd":"changeIndex", "params":{"index":"9223372036854775808"}})",
+        R"({"cmd":"changeIndex", "params":{"index":"-9223372036854775809"}})",
+        R"({"cmd":"changeIndex", "params":{"index":1}})",
         R"({"cmd":"change", "params":{"type":"index"}})",
+        R"({"cmd":"change", "params":{"type":"index", "index":" 1"}})",
+        R"({"cmd":"change", "params":{"type":"index", "index":"-1"}})",
+        R"({"cmd":"change", "params":{"type":"index", "index":"2147483648"}})",
         R"({"cmd":"setCaretPosition", "position":2147483648})",
         R"({"cmd":"setCaretPosition", "position":0.5})" }) {
         SCOPED_TRACE(command);

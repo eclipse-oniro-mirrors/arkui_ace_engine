@@ -13,8 +13,8 @@
  * limitations under the License.
  */
 
-
-#include "test/unittest/core/base/frame_node_test_ng.h"
+#include "core/components_ng/event/click_event.h"
+#include "core/components_ng/event/input_event.h"
 #include "core/components_ng/pattern/radio/radio_pattern.h"
 
 namespace OHOS::Ace::NG {

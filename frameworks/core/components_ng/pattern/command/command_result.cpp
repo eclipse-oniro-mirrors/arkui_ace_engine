@@ -13,11 +13,11 @@
  * limitations under the License.
  */
 
-#include "core/components_ng/pattern/pattern.h"
-
-#include <charconv>
-
 #include "core/components_ng/pattern/command/command_validation.h"
+
+#include <cerrno>
+#include <cstdlib>
+#include <limits>
 
 namespace OHOS::Ace::NG {
 namespace {
@@ -31,9 +31,14 @@ bool IsCommandIndexString(const std::unique_ptr<JsonValue>& params)
         return false;
     }
     auto text = index->GetString();
-    int32_t number = -1;
-    auto result = std::from_chars(text.data(), text.data() + text.size(), number);
-    return result.ec == std::errc() && result.ptr == text.data() + text.size() && number >= 0;
+    if (text.empty() || text.find_first_not_of("0123456789", text.front() == '-' ? 1 : 0) != std::string::npos) {
+        return false;
+    }
+    errno = 0;
+    char* end = nullptr;
+    auto number = std::strtol(text.c_str(), &end, 10);
+    return errno != ERANGE && end == text.c_str() + text.size() && number >= 0 &&
+        number <= std::numeric_limits<int32_t>::max();
 }
 
 bool ValidatePickerCommand(const std::unique_ptr<JsonValue>& json, const std::string& command)
@@ -192,13 +197,4 @@ bool ValidateCommandParameters(const std::unique_ptr<JsonValue>& json, const std
     return true;
 }
 
-CommandResult CommandResult::Success()
-{
-    return { true, CommandErrorType::NONE, "" };
-}
-
-CommandResult CommandResult::Error(CommandErrorType type, std::string message)
-{
-    return { false, type, std::move(message) };
-}
 } // namespace OHOS::Ace::NG

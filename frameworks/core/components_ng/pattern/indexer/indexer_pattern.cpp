@@ -2503,6 +2503,11 @@ bool IndexerPattern::ParseCommand(const std::string& command, int32_t& selected)
     return true;
 }
 
+CommandResult IndexerPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return ConvertLegacyInjectionEventResult(command, { "setAlphabetIndexer" });
+}
+
 int32_t IndexerPattern::OnInjectionEvent(const std::string& command)
 {
     int select = selected_;

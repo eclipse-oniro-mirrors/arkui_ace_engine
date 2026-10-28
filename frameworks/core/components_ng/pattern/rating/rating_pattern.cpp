@@ -1292,6 +1292,11 @@ void RatingPattern::ReportChangeEvent(const std::string& index)
 #endif
 }
 
+CommandResult RatingPattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return ConvertLegacyInjectionEventResult(command, { "onRatingChange" }, CommandErrorType::EXECUTE_FAIL);
+}
+
 int32_t RatingPattern::OnInjectionEvent(const std::string& command)
 {
     auto commandObj = JsonUtil::ParseJsonString(command);

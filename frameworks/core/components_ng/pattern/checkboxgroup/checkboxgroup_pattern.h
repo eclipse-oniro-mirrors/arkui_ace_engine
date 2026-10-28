@@ -182,10 +182,7 @@ public:
     void DumpInfo() override;
 
     int32_t OnInjectionEvent(const std::string& command) override;
-    CommandResult OnInjectionEventWithResult(const std::string& command) override
-    {
-        return ConvertLegacyInjectionEventResult(command, { "selectCheckBoxGroup" }, CommandErrorType::EXECUTE_FAIL);
-    }
+    CommandResult OnInjectionEventWithResult(const std::string& command) override;
     void ReportChangeEvent(bool selectStatus);
     std::optional<bool> ParseSelectStatus(const std::string& command);
 

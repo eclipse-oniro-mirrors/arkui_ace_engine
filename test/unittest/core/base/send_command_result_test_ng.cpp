@@ -13,8 +13,10 @@
  * limitations under the License.
  */
 
+#include "gtest/gtest.h"
 
-#include "test/unittest/core/base/frame_node_test_ng.h"
+#include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
+#include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/pattern/command/command_validation.h"
 #include "core/components_ng/pattern/button/button_pattern.h"
 #include "core/components_ng/pattern/button/toggle_button_pattern.h"
@@ -53,6 +55,19 @@
 using namespace testing;
 using namespace testing::ext;
 namespace OHOS::Ace::NG {
+class SendCommandResultTestNg : public testing::Test {
+public:
+    static void SetUpTestSuite()
+    {
+        MockPipelineContext::SetUp();
+    }
+
+    static void TearDownTestSuite()
+    {
+        MockPipelineContext::TearDown();
+    }
+};
+
 // Keep conflicting legacy component header aliases in separate translation units.
 RefPtr<Pattern> CreateSendCommandRatingTestPattern();
 RefPtr<Pattern> CreateSendCommandRadioTestPattern();
@@ -132,7 +147,7 @@ std::vector<CommandErrorTestItem> CreateContainerCommandErrorCases()
 }
 } // namespace
 
-HWTEST_F(FrameNodeTestNg, SendCommandComponentStructuredErrorMatrix, TestSize.Level1)
+HWTEST_F(SendCommandResultTestNg, SendCommandComponentStructuredErrorMatrix, TestSize.Level1)
 {
     for (const auto& items : { CreateBasicCommandErrorCases(), CreateContainerCommandErrorCases() }) {
         for (const auto& item : items) {
@@ -153,7 +168,7 @@ HWTEST_F(FrameNodeTestNg, SendCommandComponentStructuredErrorMatrix, TestSize.Le
 #endif
 }
 
-HWTEST_F(FrameNodeTestNg, SendCommandComponentSuccessAndDisabledMatrix, TestSize.Level1)
+HWTEST_F(SendCommandResultTestNg, SendCommandComponentSuccessAndDisabledMatrix, TestSize.Level1)
 {
     struct Item {
         const char* tag;
@@ -184,7 +199,7 @@ HWTEST_F(FrameNodeTestNg, SendCommandComponentSuccessAndDisabledMatrix, TestSize
     }
 }
 
-HWTEST_F(FrameNodeTestNg, SendCommandClickExecutesExactlyOnceAndHonorsDisabledState, TestSize.Level1)
+HWTEST_F(SendCommandResultTestNg, SendCommandClickExecutesExactlyOnceAndHonorsDisabledState, TestSize.Level1)
 {
     auto pattern = AceType::MakeRefPtr<ButtonPattern>();
     auto node = FrameNode::CreateFrameNode("Button", ElementRegister::GetInstance()->MakeUniqueId(), pattern);
@@ -198,7 +213,7 @@ HWTEST_F(FrameNodeTestNg, SendCommandClickExecutesExactlyOnceAndHonorsDisabledSt
     EXPECT_EQ(clicks, 1);
 }
 
-HWTEST_F(FrameNodeTestNg, SendCommandRejectsWrongParameterTypesBeforeExecuting, TestSize.Level1)
+HWTEST_F(SendCommandResultTestNg, SendCommandRejectsWrongParameterTypesBeforeExecuting, TestSize.Level1)
 {
     for (const auto& command : {
         R"({"cmd":"setText","params":{"value":123}})",
@@ -212,7 +227,7 @@ HWTEST_F(FrameNodeTestNg, SendCommandRejectsWrongParameterTypesBeforeExecuting, 
     }
 }
 
-HWTEST_F(FrameNodeTestNg, SendCommandRichEditorDeniedCopyDoesNotReportSuccess, TestSize.Level1)
+HWTEST_F(SendCommandResultTestNg, SendCommandRichEditorDeniedCopyDoesNotReportSuccess, TestSize.Level1)
 {
     auto pattern = AceType::MakeRefPtr<RichEditorPattern>();
     auto node = FrameNode::CreateFrameNode("RichEditor", ElementRegister::GetInstance()->MakeUniqueId(), pattern);
@@ -226,7 +241,7 @@ HWTEST_F(FrameNodeTestNg, SendCommandRichEditorDeniedCopyDoesNotReportSuccess, T
     }
 }
 
-HWTEST_F(FrameNodeTestNg, SendCommandTextInputAndPickerSuccessMatrix, TestSize.Level1)
+HWTEST_F(SendCommandResultTestNg, SendCommandTextInputAndPickerSuccessMatrix, TestSize.Level1)
 {
     struct Item { const char* tag; RefPtr<Pattern> pattern; const char* command; };
     const std::vector<Item> items {
@@ -257,7 +272,7 @@ HWTEST_F(FrameNodeTestNg, SendCommandTextInputAndPickerSuccessMatrix, TestSize.L
     }
 }
 
-HWTEST_F(FrameNodeTestNg, SendCommandSearchUsesItsTextFieldAndRejectsBadValue, TestSize.Level1)
+HWTEST_F(SendCommandResultTestNg, SendCommandSearchUsesItsTextFieldAndRejectsBadValue, TestSize.Level1)
 {
     auto pattern = AceType::MakeRefPtr<SearchPattern>();
     auto node = FrameNode::CreateFrameNode("Search", ElementRegister::GetInstance()->MakeUniqueId(), pattern);
@@ -272,7 +287,7 @@ HWTEST_F(FrameNodeTestNg, SendCommandSearchUsesItsTextFieldAndRejectsBadValue, T
         CommandErrorType::EXECUTE_FAIL);
 }
 
-HWTEST_F(FrameNodeTestNg, SendCommandCounterAndDialogDispatchExactlyOnce, TestSize.Level1)
+HWTEST_F(SendCommandResultTestNg, SendCommandCounterAndDialogDispatchExactlyOnce, TestSize.Level1)
 {
     auto counter = AceType::MakeRefPtr<CounterPattern>();
     auto node = FrameNode::CreateFrameNode("Counter", ElementRegister::GetInstance()->MakeUniqueId(), counter);
@@ -306,7 +321,7 @@ HWTEST_F(FrameNodeTestNg, SendCommandCounterAndDialogDispatchExactlyOnce, TestSi
     EXPECT_EQ(count, 2);
 }
 
-HWTEST_F(FrameNodeTestNg, SendCommandIndexerAndHyperlinkReachSuccess, TestSize.Level1)
+HWTEST_F(SendCommandResultTestNg, SendCommandIndexerAndHyperlinkReachSuccess, TestSize.Level1)
 {
     auto indexer = AceType::MakeRefPtr<IndexerPattern>();
     auto node = FrameNode::CreateFrameNode("AlphabetIndexer", ElementRegister::GetInstance()->MakeUniqueId(), indexer);
@@ -325,7 +340,7 @@ HWTEST_F(FrameNodeTestNg, SendCommandIndexerAndHyperlinkReachSuccess, TestSize.L
     EXPECT_EQ(clicks, 1);
 }
 
-HWTEST_F(FrameNodeTestNg, SendCommandRejectsFailedFocusRequest, TestSize.Level1)
+HWTEST_F(SendCommandResultTestNg, SendCommandRejectsFailedFocusRequest, TestSize.Level1)
 {
     auto field = FrameNode::CreateFrameNode("TextInput", ElementRegister::GetInstance()->MakeUniqueId(),
         AceType::MakeRefPtr<TextFieldPattern>());
@@ -342,7 +357,7 @@ HWTEST_F(FrameNodeTestNg, SendCommandRejectsFailedFocusRequest, TestSize.Level1)
 }
 
 
-HWTEST_F(FrameNodeTestNg, SendCommandTimePickerUsesInitializedColumns, TestSize.Level1)
+HWTEST_F(SendCommandResultTestNg, SendCommandTimePickerUsesInitializedColumns, TestSize.Level1)
 {
     auto context = MockPipelineContext::GetCurrent();
     ASSERT_NE(context, nullptr);

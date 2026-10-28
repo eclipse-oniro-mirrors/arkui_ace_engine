@@ -165,10 +165,7 @@ public:
         return true;
     }
     int32_t OnInjectionEvent(const std::string& command) override;
-    CommandResult OnInjectionEventWithResult(const std::string& command) override
-    {
-        return ConvertLegacyInjectionEventResult(command, { "onToggleChange" }, CommandErrorType::EXECUTE_FAIL);
-    }
+    CommandResult OnInjectionEventWithResult(const std::string& command) override;
 
     bool HasSystemMaterial() const;
     bool IsHighGradeMaterial() const;
