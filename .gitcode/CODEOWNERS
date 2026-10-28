@@ -1056,6 +1056,8 @@ frameworks/bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_row_
 frameworks/bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_row_bridge.h @arkuilayout1
 frameworks/bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_scroll_bridge.cpp @arkuiscroll
 frameworks/bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_scroll_bridge.h @arkuiscroll
+frameworks/bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_scroll_placeholder_bridge.cpp @arkuiscroll
+frameworks/bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_scroll_placeholder_bridge.h @arkuiscroll
 frameworks/bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_scrollable_bridge.cpp @arkuiscroll
 frameworks/bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_scrollable_bridge.h @arkuiscroll
 frameworks/bridge/declarative_frontend/engine/jsi/nativeModule/arkts_native_scrollbar_bridge.cpp @arkuiscroll
@@ -2431,6 +2433,7 @@ frameworks/core/components_ng/manager/navigation/ @arkui_navigation
 frameworks/core/components_ng/manager/post_event/ @ArkUI_Event
 frameworks/core/components_ng/manager/privacy_sensitive/privacy_sensitive_manager.h @huawei_g_five
 frameworks/core/components_ng/manager/safe_area/ @arkuilayout1
+frameworks/core/components_ng/manager/scroll_placeholder/ @arkuiscroll
 frameworks/core/components_ng/manager/select_content_overlay/ @huawei_g_five
 frameworks/core/components_ng/manager/select_overlay/ @huawei_g_five
 frameworks/core/components_ng/manager/select_overlay/service_collaboration_menu_ace_helper.cpp @arkui_rich_editor
@@ -3258,6 +3261,7 @@ frameworks/bridge/arkts_frontend/koala_projects/arkoala-arkts/arkui-ohos/@ohos.a
 frameworks/bridge/arkts_frontend/koala_projects/arkoala-arkts/arkui-ohos/@ohos.arkui.ArcScrollBar.ets @arkuiscroll
 frameworks/bridge/arkts_frontend/koala_projects/arkoala-arkts/arkui-ohos/@ohos.arkui.components.ArkLazyColumnLayout.ets @arkuiscroll
 frameworks/bridge/arkts_frontend/koala_projects/arkoala-arkts/arkui-ohos/@ohos.arkui.dragController.ts @ArkUI_Event
+frameworks/bridge/arkts_frontend/koala_projects/arkoala-arkts/arkui-ohos/@ohos.arkui.placeholderRegister.ts @arkuiscroll
 frameworks/bridge/arkts_frontend/koala_projects/arkoala-arkts/arkui-ohos/@ohos.arkui.UIContext.ts @arkui_framework_xnode
 frameworks/bridge/arkts_frontend/koala_projects/arkoala-arkts/arkui-ohos/@ohos.arkui.uiMaterial @arkuicodepulse
 frameworks/bridge/arkts_frontend/koala_projects/arkoala-arkts/arkui-ohos/src/ani/arkts/ArkUIAniCustomNodeModule.ts @arkuilayout1
@@ -3270,6 +3274,7 @@ frameworks/bridge/arkts_frontend/koala_projects/arkoala-arkts/arkui-ohos/src/ani
 frameworks/bridge/arkts_frontend/koala_projects/arkoala-arkts/arkui-ohos/src/ani/native/dragController/drag_controller_module.h @ArkUI_Event
 frameworks/bridge/arkts_frontend/koala_projects/arkoala-arkts/arkui-ohos/src/ani/native/dragController/drag_preview.h @ArkUI_Event
 frameworks/bridge/arkts_frontend/koala_projects/arkoala-arkts/arkui-ohos/src/ani/native/module.cpp @arkui_architecture
+frameworks/bridge/arkts_frontend/koala_projects/arkoala-arkts/arkui-ohos/src/ani/native/placeholder_register/ @arkuiscroll
 frameworks/bridge/arkts_frontend/koala_projects/arkoala-arkts/arkui-ohos/src/ani/native/text_based_modifier/ @huawei_g_five
 frameworks/bridge/arkts_frontend/koala_projects/arkoala-arkts/arkui-ohos/src/ani/native/ui_extension/ @ArkUI_ability_group
 frameworks/bridge/arkts_frontend/koala_projects/arkoala-arkts/arkui-ohos/src/ani/native/utils/ani_utils.cpp @arkui_framework_xnode
@@ -3647,6 +3652,7 @@ test/unittest/core/manager/force_split_manager_test_ng.cpp @arkui_navigation
 test/unittest/core/manager/handedness_manager_test_ng.cpp @arkuilayout1
 test/unittest/core/manager/navigation_manager_test_ng.cpp @arkui_navigation
 test/unittest/core/manager/safe_area_manager_test_ng.cpp @arkuilayout1
+test/unittest/core/manager/scroll_placeholder_manager_test_ng.cpp @arkuiscroll
 test/unittest/core/manager/component_tree_query_test_ng.cpp @arkuiscroll
 test/unittest/core/pattern/animator/ @arkuicodepulse
 test/unittest/core/pattern/app_bar/ @ArkUI_ability_group
@@ -4745,6 +4751,8 @@ frameworks/core/interfaces/native/ani/list_item_group_ani_modifier.h @arkuiscrol
 frameworks/core/interfaces/native/ani/node_ani_modifier.cpp @arkui_framework_xnode
 frameworks/core/interfaces/native/ani/parallelize_ui_ani_modifier.cpp @arkui_framework_xnode
 frameworks/core/interfaces/native/ani/parallelize_ui_ani_modifier.h @arkui_framework_xnode
+frameworks/core/interfaces/native/ani/placeholder_ani_modifier.cpp @arkuiscroll
+frameworks/core/interfaces/native/ani/placeholder_ani_modifier.h @arkuiscroll
 frameworks/core/interfaces/native/ani/stateMgmt_ani_modifier.cpp @arkui_statemgmt
 frameworks/core/interfaces/native/ani/stateMgmt_ani_modifier.h @arkui_statemgmt
 frameworks/core/interfaces/native/ani/styled_string_ani_modifier.cpp @huawei_g_five
