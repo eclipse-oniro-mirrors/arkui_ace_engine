@@ -22,7 +22,9 @@
 #include "core/components_ng/base/ui_node.h"
 #include "core/components_ng/manager/uisession_query/component_tree_query.h"
 #include "core/components_ng/pattern/pattern.h"
+#include "core/components_ng/render/render_context.h"
 #include "core/components_ng/syntax/lazy_for_each_builder.h"
+#include "core/components_ng/syntax/lazy_for_each_node.h"
 #include "interfaces/inner_api/ui_session/component_tree_query_type.h"
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 
@@ -78,6 +80,53 @@ public:
     }
 };
 
+// Builder whose GetDataByIndexAsJson returns a caller-configured error code + data string.
+// Supports per-index results via SetItemResult; indexes not configured fall back to SetResult.
+class MockDataErrorBuilder : public MockUnsupportedFrontendBuilder {
+    DECLARE_ACE_TYPE(MockDataErrorBuilder, MockUnsupportedFrontendBuilder);
+
+public:
+    bool IsDataExtractionSupported() const override
+    {
+        return true;
+    }
+    std::string GetDataByIndexAsJson(int32_t index, int32_t& errorCode) override
+    {
+        auto it = itemResults_.find(index);
+        if (it != itemResults_.end()) {
+            errorCode = it->second.first;
+            return it->second.second;
+        }
+        errorCode = errorCode_;
+        return dataJson_;
+    }
+    void SetResult(int32_t code, const std::string& data)
+    {
+        errorCode_ = code;
+        dataJson_ = data;
+    }
+    void SetItemResult(int32_t index, int32_t code, const std::string& data)
+    {
+        itemResults_[index] = { code, data };
+    }
+    void SetTotalCount(int32_t count)
+    {
+        totalCount_ = count;
+    }
+
+protected:
+    int32_t OnGetTotalCount() override
+    {
+        return totalCount_;
+    }
+
+private:
+    int32_t errorCode_ = static_cast<int32_t>(ComponentTreeQueryError::OK);
+    std::string dataJson_;
+    int32_t totalCount_ = 1;
+    std::map<int32_t, std::pair<int32_t, std::string>> itemResults_;
+};
+
 // FrameNode subclass that reports visible+active (the shared FrameNode mock returns false,
 // which would short-circuit VisitForPointHit at the root and never accumulate the scan quota)
 // and exposes a caller-controlled children list so the traversal actually recurses.
@@ -103,6 +152,91 @@ public:
 
 private:
     std::list<RefPtr<UINode>> children_;
+};
+
+// RenderContext that returns a caller-controlled paint rect so that
+// GetTransformRectRelativeToWindowOnlyVisible yields a non-empty rect and
+// VisitForPointHit's point-in-rect check can succeed.
+class MockRenderContext : public RenderContext {
+    DECLARE_ACE_TYPE(MockRenderContext, RenderContext);
+
+public:
+    RectF GetPaintRectWithTransform() override
+    {
+        return paintRect_;
+    }
+    void SetPaintRect(const RectF& rect)
+    {
+        paintRect_ = rect;
+    }
+
+private:
+    RectF paintRect_;
+};
+
+// LazyForEachNode subclass that overrides GetChildren to bypass the complex
+// LoadChildren / TryTriggleAdditionalLayout machinery in the base class.
+class MockLazyForEachNode : public LazyForEachNode {
+    DECLARE_ACE_TYPE(MockLazyForEachNode, LazyForEachNode);
+
+public:
+    MockLazyForEachNode(int32_t nodeId, const RefPtr<LazyForEachBuilder>& builder)
+        : LazyForEachNode(nodeId, builder) {}
+    const std::list<RefPtr<UINode>>& GetChildren(bool = false) const override
+    {
+        return children_;
+    }
+    void SetChildren(std::list<RefPtr<UINode>> children)
+    {
+        children_ = std::move(children);
+    }
+
+private:
+    std::list<RefPtr<UINode>> children_;
+};
+
+// Helper: builds a mock tree where a point-hit on hitChild traverses up to a
+// LazyForEachNode with the given builder, then calls Execute.
+struct LazyForEachMockTree {
+    RefPtr<MockVisibleFrameNode> root;
+    RefPtr<MockLazyForEachNode> lazyForEach;
+    RefPtr<MockVisibleFrameNode> hitChild;
+    RefPtr<MockRenderContext> hitChildRenderContext;
+
+    void Install(int32_t rootId, int32_t lazyId, int32_t hitId,
+        const RefPtr<LazyForEachBuilder>& builder, float hitX, float hitY)
+    {
+        root = AceType::MakeRefPtr<MockVisibleFrameNode>(rootId);
+        lazyForEach = AceType::MakeRefPtr<MockLazyForEachNode>(lazyId, builder);
+        hitChild = AceType::MakeRefPtr<MockVisibleFrameNode>(hitId);
+        hitChildRenderContext = AceType::MakeRefPtr<MockRenderContext>();
+        // 200×200 rect centred on (100,100); hit at (hitX, hitY) inside it.
+        hitChildRenderContext->SetPaintRect(RectF(0.0f, 0.0f, 200.0f, 200.0f));
+        hitChild->renderContext_ = hitChildRenderContext;
+        hitChild->SetActive(true);
+        hitChild->SetParent(AceType::WeakClaim(AceType::RawPtr(lazyForEach)));
+
+        lazyForEach->SetChildren({ hitChild });
+        lazyForEach->SetParent(AceType::WeakClaim(AceType::RawPtr(root)));
+
+        root->SetChildren({ lazyForEach });
+
+        auto ctx = PipelineContext::GetCurrentContextSafely();
+        ASSERT_NE(ctx, nullptr);
+        originalRoot = ctx->rootNode_;
+        ctx->rootNode_ = root;
+    }
+
+    void Restore()
+    {
+        auto ctx = PipelineContext::GetCurrentContextSafely();
+        if (ctx) {
+            ctx->rootNode_ = originalRoot;
+        }
+    }
+
+private:
+    RefPtr<FrameNode> originalRoot;
 };
 } // namespace
 
@@ -310,7 +444,7 @@ HWTEST_F(ComponentTreeQueryTest, ComponentTreeQueryExecuteDefault, TestSize.Leve
 /**
  * @tc.name: ComponentTreeQueryNavigationNoTarget
  * @tc.desc: Navigation query traverses the mock root tree; with no NavigationGroupNode present,
- *           target-not-found maps to OK and a non-empty error payload is produced.
+ *           returns TARGET_NOT_FOUND with errorCode in resultJson.
  * @tc.type: FUNC
  */
 HWTEST_F(ComponentTreeQueryTest, ComponentTreeQueryNavigationNoTarget, TestSize.Level1)
@@ -322,7 +456,7 @@ HWTEST_F(ComponentTreeQueryTest, ComponentTreeQueryNavigationNoTarget, TestSize.
     request.pattern = "[a-z]+";
     std::string resultJson;
     EXPECT_EQ(ComponentTreeQuery::Execute(request, resultJson),
-        static_cast<int32_t>(ComponentTreeQueryError::OK));
+        static_cast<int32_t>(ComponentTreeQueryError::TARGET_NOT_FOUND));
     EXPECT_FALSE(resultJson.empty());
     EXPECT_NE(resultJson.find("errorCode"), std::string::npos);
 }
@@ -417,5 +551,182 @@ HWTEST_F(ComponentTreeQueryTest, ComponentTreeQueryLazyForEachScanLimit, TestSiz
     EXPECT_NE(resultJson.find("errorCode"), std::string::npos);
 
     ctx->rootNode_ = originalRoot;
+}
+
+/**
+ * @tc.name: ComponentTreeQueryLazyForEachDataSuccess
+ * @tc.desc: getData returns OK + valid JSON → OK + results array contains data.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ComponentTreeQueryTest, ComponentTreeQueryLazyForEachDataSuccess, TestSize.Level1)
+{
+    auto builder = AceType::MakeRefPtr<MockDataErrorBuilder>();
+    builder->SetResult(static_cast<int32_t>(ComponentTreeQueryError::OK), "{\"name\":\"item-0\"}");
+    // Populate cachedItems_ so GetAllChildren() returns non-empty.
+    builder->cachedItems_[0] = { "key_0", nullptr };
+
+    LazyForEachMockTree tree;
+    tree.Install(900101, 900102, 900103, builder, 50.0f, 50.0f);
+
+    ComponentTreeQueryRequest request;
+    request.type = ComponentTreeQueryType::LAZY_FOREACH_DATA_BY_POINT;
+    request.x = 50.0f;
+    request.y = 50.0f;
+    std::string resultJson;
+    EXPECT_EQ(ComponentTreeQuery::Execute(request, resultJson),
+        static_cast<int32_t>(ComponentTreeQueryError::OK));
+    EXPECT_FALSE(resultJson.empty());
+    EXPECT_NE(resultJson.find("item-0"), std::string::npos);
+
+    tree.Restore();
+}
+
+/**
+ * @tc.name: ComponentTreeQueryLazyForEachDataSourceError
+ * @tc.desc: getData throws → DATA_SOURCE_ERROR (4) returned immediately (fail-fast).
+ * @tc.type: FUNC
+ */
+HWTEST_F(ComponentTreeQueryTest, ComponentTreeQueryLazyForEachDataSourceError, TestSize.Level1)
+{
+    auto builder = AceType::MakeRefPtr<MockDataErrorBuilder>();
+    builder->SetResult(static_cast<int32_t>(ComponentTreeQueryError::DATA_SOURCE_ERROR), "");
+    builder->cachedItems_[0] = { "key_0", nullptr };
+
+    LazyForEachMockTree tree;
+    tree.Install(900111, 900112, 900113, builder, 50.0f, 50.0f);
+
+    ComponentTreeQueryRequest request;
+    request.type = ComponentTreeQueryType::LAZY_FOREACH_DATA_BY_POINT;
+    request.x = 50.0f;
+    request.y = 50.0f;
+    std::string resultJson;
+    EXPECT_EQ(ComponentTreeQuery::Execute(request, resultJson),
+        static_cast<int32_t>(ComponentTreeQueryError::DATA_SOURCE_ERROR));
+    EXPECT_FALSE(resultJson.empty());
+    EXPECT_NE(resultJson.find("errorCode"), std::string::npos);
+
+    tree.Restore();
+}
+
+/**
+ * @tc.name: ComponentTreeQueryLazyForEachSerializationError
+ * @tc.desc: getData returns non-serializable data → SERIALIZATION_ERROR (5) returned immediately (fail-fast).
+ * @tc.type: FUNC
+ */
+HWTEST_F(ComponentTreeQueryTest, ComponentTreeQueryLazyForEachSerializationError, TestSize.Level1)
+{
+    auto builder = AceType::MakeRefPtr<MockDataErrorBuilder>();
+    builder->SetResult(static_cast<int32_t>(ComponentTreeQueryError::SERIALIZATION_ERROR), "");
+    builder->cachedItems_[0] = { "key_0", nullptr };
+
+    LazyForEachMockTree tree;
+    tree.Install(900121, 900122, 900123, builder, 50.0f, 50.0f);
+
+    ComponentTreeQueryRequest request;
+    request.type = ComponentTreeQueryType::LAZY_FOREACH_DATA_BY_POINT;
+    request.x = 50.0f;
+    request.y = 50.0f;
+    std::string resultJson;
+    EXPECT_EQ(ComponentTreeQuery::Execute(request, resultJson),
+        static_cast<int32_t>(ComponentTreeQueryError::SERIALIZATION_ERROR));
+    EXPECT_FALSE(resultJson.empty());
+    EXPECT_NE(resultJson.find("errorCode"), std::string::npos);
+
+    tree.Restore();
+}
+
+/**
+ * @tc.name: ComponentTreeQueryLazyForEachEmptyData
+ * @tc.desc: getData returns OK but empty string → DATA_SOURCE_ERROR (4).
+ * @tc.type: FUNC
+ */
+HWTEST_F(ComponentTreeQueryTest, ComponentTreeQueryLazyForEachEmptyData, TestSize.Level1)
+{
+    auto builder = AceType::MakeRefPtr<MockDataErrorBuilder>();
+    builder->SetResult(static_cast<int32_t>(ComponentTreeQueryError::OK), "");
+    builder->cachedItems_[0] = { "key_0", nullptr };
+
+    LazyForEachMockTree tree;
+    tree.Install(900131, 900132, 900133, builder, 50.0f, 50.0f);
+
+    ComponentTreeQueryRequest request;
+    request.type = ComponentTreeQueryType::LAZY_FOREACH_DATA_BY_POINT;
+    request.x = 50.0f;
+    request.y = 50.0f;
+    std::string resultJson;
+    EXPECT_EQ(ComponentTreeQuery::Execute(request, resultJson),
+        static_cast<int32_t>(ComponentTreeQueryError::DATA_SOURCE_ERROR));
+    EXPECT_FALSE(resultJson.empty());
+    EXPECT_NE(resultJson.find("errorCode"), std::string::npos);
+
+    tree.Restore();
+}
+
+/**
+ * @tc.name: ComponentTreeQueryLazyForEachFailFastDiscardsPriorData
+ * @tc.desc: Multi-item fail-fast: item 0 succeeds, item 1 returns DATA_SOURCE_ERROR.
+ *           Execute must return 4 immediately and NOT include item 0's data in results.
+ *           Verifies the BestEffort→FailFast behavior change: previously extracted data
+ *           is discarded on the first error.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ComponentTreeQueryTest, ComponentTreeQueryLazyForEachFailFastDiscardsPriorData, TestSize.Level1)
+{
+    auto builder = AceType::MakeRefPtr<MockDataErrorBuilder>();
+    builder->SetTotalCount(2);
+    builder->SetItemResult(0, static_cast<int32_t>(ComponentTreeQueryError::OK), "{\"name\":\"item-0\"}");
+    builder->SetItemResult(1, static_cast<int32_t>(ComponentTreeQueryError::DATA_SOURCE_ERROR), "");
+    builder->cachedItems_[0] = { "key_0", nullptr };
+    builder->cachedItems_[1] = { "key_1", nullptr };
+
+    LazyForEachMockTree tree;
+    tree.Install(900141, 900142, 900143, builder, 50.0f, 50.0f);
+
+    ComponentTreeQueryRequest request;
+    request.type = ComponentTreeQueryType::LAZY_FOREACH_DATA_BY_POINT;
+    request.x = 50.0f;
+    request.y = 50.0f;
+    std::string resultJson;
+    EXPECT_EQ(ComponentTreeQuery::Execute(request, resultJson),
+        static_cast<int32_t>(ComponentTreeQueryError::DATA_SOURCE_ERROR));
+    EXPECT_FALSE(resultJson.empty());
+    // Error response must not contain a results array — item 0's data is discarded.
+    EXPECT_EQ(resultJson.find("results"), std::string::npos);
+    // item-0 data must not leak into the error response.
+    EXPECT_EQ(resultJson.find("item-0"), std::string::npos);
+
+    tree.Restore();
+}
+
+/**
+ * @tc.name: ComponentTreeQueryLazyForEachFailFastSerializationMidStream
+ * @tc.desc: Multi-item fail-fast: item 0 succeeds, item 1 returns SERIALIZATION_ERROR.
+ *           Execute must return 5 immediately and discard item 0's data.
+ * @tc.type: FUNC
+ */
+HWTEST_F(ComponentTreeQueryTest, ComponentTreeQueryLazyForEachFailFastSerializationMidStream, TestSize.Level1)
+{
+    auto builder = AceType::MakeRefPtr<MockDataErrorBuilder>();
+    builder->SetTotalCount(2);
+    builder->SetItemResult(0, static_cast<int32_t>(ComponentTreeQueryError::OK), "{\"name\":\"item-0\"}");
+    builder->SetItemResult(1, static_cast<int32_t>(ComponentTreeQueryError::SERIALIZATION_ERROR), "");
+    builder->cachedItems_[0] = { "key_0", nullptr };
+    builder->cachedItems_[1] = { "key_1", nullptr };
+
+    LazyForEachMockTree tree;
+    tree.Install(900151, 900152, 900153, builder, 50.0f, 50.0f);
+
+    ComponentTreeQueryRequest request;
+    request.type = ComponentTreeQueryType::LAZY_FOREACH_DATA_BY_POINT;
+    request.x = 50.0f;
+    request.y = 50.0f;
+    std::string resultJson;
+    EXPECT_EQ(ComponentTreeQuery::Execute(request, resultJson),
+        static_cast<int32_t>(ComponentTreeQueryError::SERIALIZATION_ERROR));
+    EXPECT_FALSE(resultJson.empty());
+    EXPECT_EQ(resultJson.find("results"), std::string::npos);
+    EXPECT_EQ(resultJson.find("item-0"), std::string::npos);
+
+    tree.Restore();
 }
 } // namespace OHOS::Ace::NG
