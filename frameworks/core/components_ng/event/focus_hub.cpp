@@ -531,7 +531,7 @@ bool FocusHub::RequestFocusImmediately(FocusReason focusReason)
     }
 
     auto frameNode = GetFrameNode();
-    TAG_LOGI(AceLogTag::ACE_FOCUS, "%{public}s/" SEC_PLD(%{public}d)
+    TAG_LOGD(AceLogTag::ACE_FOCUS, "%{public}s/" SEC_PLD(%{public}d)
         " RequestFocusImmediately isOnMainTree:%{public}d",
         GetFrameName().c_str(), SEC_PARAM(GetFrameId()), frameNode ? frameNode->IsOnMainTree() : -1);
     return RequestFocusImmediatelyInner(focusReason);
@@ -1805,7 +1805,7 @@ void FocusHub::OnBlurScope()
     if (lastFocusNode) {
         lastFocusNode->LostFocus(blurReason_);
     } else {
-        TAG_LOGI(AceLogTag::ACE_FOCUS, "Scope(%{public}s/%{public}d) has no last focusNode.",
+        TAG_LOGI(AceLogTag::ACE_FOCUS, "Scope(%{public}s/%{public}d) no last focusNode.",
             GetFrameName().c_str(), GetFrameId());
     }
 }
@@ -2537,7 +2537,7 @@ bool FocusHub::RequestFocusImmediatelyById(const std::string& id, bool isSyncReq
         (!isSyncRequest && !focusNode->IsFocusable())) {
         result = false;
     }
-    TAG_LOGI(AceLogTag::ACE_FOCUS, "%{public}s/" SEC_PLD(%{public}d) "Request focus %{public}s by id",
+    TAG_LOGI(AceLogTag::ACE_FOCUS, "%{public}s/" SEC_PLD(%{public}d) "Req focus %{public}s by id",
         focusNode->GetFrameName().c_str(), SEC_PARAM(focusNode->GetFrameId()), isSyncRequest ? "sync" : "async");
     if (result || !isSyncRequest) {
         pipeline->AddDirtyRequestFocus(focusNode->GetFrameNode());

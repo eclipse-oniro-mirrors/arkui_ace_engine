@@ -493,7 +493,7 @@ void FocusManager::FocusSwitchingEnd(SwitchingEndReason reason)
         auto lastHub = currentFocus_.Upgrade();
         TAG_LOGI(AceLogTag::ACE_FOCUS, "FocusSwitch end, %{public}s/" SEC_PLD(%{public}d) " onBlur, "
             "%{public}s/" SEC_PLD(%{public}d) " onFocus, "
-            "start: %{public}d, end: %{public}d, update: %{public}d",
+            "s:%{public}d e:%{public}d u:%{public}d",
             lastHub ? lastHub->GetFrameName().c_str() : "NULL",
             SEC_PARAM(lastHub ? lastHub->GetFrameId() : -1),
             switchingFocus_ ? switchingFocus_->GetFrameName().c_str() : "NULL",
