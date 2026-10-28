@@ -1,5 +1,5 @@
-/*
- * Copyright (c) 2021-2022 Huawei Device Co., Ltd.
+/**
+ * Copyright (c) 2021-2026 Huawei Device Co., Ltd.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -23,6 +23,26 @@
 
 namespace OHOS::Ace::Framework {
 
+inline void JsiReleaseConstructorBinding(void* env, void* nativePtr, void* data)
+{
+    std::unique_ptr<JsiClassConstructorBindingRef> binding(static_cast<JsiClassConstructorBindingRef*>(data));
+}
+
+inline panda::Local<panda::FunctionRef> JsiNewClassFunction(EcmaVM* vm, const JsiClassConstructorBindingRef& binding)
+{
+    auto owner = std::make_unique<JsiClassConstructorBindingRef>(binding);
+    auto function = panda::FunctionRef::NewClassFunction(
+        vm, JsiJSConstructorInterceptor, JsiReleaseConstructorBinding, owner.get());
+    if (function.IsEmpty() || !function->IsFunction(vm)) {
+        // No constructor was created; the VM has not taken ownership of data.
+        // Keep RAII cleanup, including the non-empty undefined failure result.
+        return function;
+    }
+    // The constructor owns data; its finalizer releases this holder exactly once.
+    owner.release();
+    return function;
+}
+
 template<typename C>
 thread_local std::unordered_map<std::string, panda::Global<panda::FunctionRef>> JsiClass<C>::staticFunctions_;
 
@@ -37,9 +57,6 @@ thread_local std::unordered_map<std::string, panda::Global<panda::FunctionRef>> 
 
 template<typename C>
 thread_local FunctionCallback JsiClass<C>::constructor_ = nullptr;
-
-template<typename C>
-thread_local JsiClassConstructorBinding JsiClass<C>::jsConstructorBinding_;
 
 template<typename C>
 thread_local std::string JsiClass<C>::className_;
@@ -78,7 +95,6 @@ void JsiClass<C>::UnDeclare()
     classFunction_.Empty();
     className_.clear();
     constructor_ = nullptr;
-    jsConstructorBinding_ = JsiClassConstructorBinding();
 }
 
 template<typename C>
@@ -212,17 +228,20 @@ template<typename C>
 void JsiClass<C>::Bind(
     BindingTarget t, JSFunctionCallback ctor, JSDestructorCallback<C> dtor, JSGCMarkCallback<C> gcMark)
 {
-    jsConstructorBinding_.jsConstructor = ctor;
-    jsConstructorBinding_.jsDestructorErased =
-        dtor == nullptr ? nullptr : reinterpret_cast<JSDestructorCallbackErased>(dtor);
-    jsConstructorBinding_.jsGcMarkErased =
-        gcMark == nullptr ? nullptr : reinterpret_cast<JSGCMarkCallbackErased>(gcMark);
     auto runtime = std::static_pointer_cast<ArkJSRuntime>(JsiDeclarativeEngineInstance::GetCurrentRuntime());
-    auto vm = const_cast<EcmaVM*>(runtime->GetEcmaVm());
+    Bind(const_cast<EcmaVM*>(runtime->GetEcmaVm()), t, ctor, dtor, gcMark);
+}
+
+template<typename C>
+void JsiClass<C>::Bind(
+    EcmaVM* vm, BindingTarget t, JSFunctionCallback ctor, JSDestructorCallback<C> dtor, JSGCMarkCallback<C> gcMark)
+{
+    auto binding = MakeJsiClassConstructorBinding<C>(ctor, dtor, gcMark);
     LocalScope scope(vm);
-    classFunction_ = panda::Global<panda::FunctionRef>(
-        vm, panda::FunctionRef::NewClassFunction(vm, JsiJSConstructorInterceptor, nullptr,
-            reinterpret_cast<void*>(&JsiClass<C>::jsConstructorBinding_)));
+    classFunction_ = panda::Global<panda::FunctionRef>(vm, JsiNewClassFunction(vm, binding));
+    if (classFunction_.IsEmpty() || !classFunction_->IsFunction(vm)) {
+        return;
+    }
     classFunction_->SetName(vm, StringRef::NewFromUtf8(vm, className_.c_str()));
     auto prototype = panda::Local<panda::ObjectRef>(classFunction_->GetFunctionPrototype(vm));
     prototype->Set(vm, panda::StringRef::NewFromUtf8(vm, "constructor"),
@@ -251,10 +270,6 @@ template<typename C>
 template<typename... Args>
 void JsiClass<C>::Bind(BindingTarget t, JSDestructorCallback<C> dtor, JSGCMarkCallback<C> gcMark)
 {
-    jsConstructorBinding_.jsDestructorErased =
-        dtor == nullptr ? nullptr : reinterpret_cast<JSDestructorCallbackErased>(dtor);
-    jsConstructorBinding_.jsGcMarkErased =
-        gcMark == nullptr ? nullptr : reinterpret_cast<JSGCMarkCallbackErased>(gcMark);
     auto runtime = std::static_pointer_cast<ArkJSRuntime>(JsiDeclarativeEngineInstance::GetCurrentRuntime());
     auto vm = const_cast<EcmaVM*>(runtime->GetEcmaVm());
     LocalScope scope(vm);
@@ -311,6 +326,14 @@ void JsiClass<C>::InheritAndBind(
 {
     auto runtime = std::static_pointer_cast<ArkJSRuntime>(JsiDeclarativeEngineInstance::GetCurrentRuntime());
     auto vm = const_cast<EcmaVM*>(runtime->GetEcmaVm());
+    InheritAndBind<Base>(vm, t, ctor, dtor, gcMark);
+}
+
+template<typename C>
+template<typename Base>
+void JsiClass<C>::InheritAndBind(
+    EcmaVM* vm, BindingTarget t, JSFunctionCallback ctor, JSDestructorCallback<C> dtor, JSGCMarkCallback<C> gcMark)
+{
     LocalScope scope(vm);
     panda::Local<panda::JSValueRef> hasExistRef =
         t->Get(vm, panda::Local<panda::JSValueRef>(panda::StringRef::NewFromUtf8(vm, ThisJSClass::JSName())));
@@ -318,14 +341,11 @@ void JsiClass<C>::InheritAndBind(
         return;
     }
 
-    jsConstructorBinding_.jsConstructor = ctor;
-    jsConstructorBinding_.jsDestructorErased =
-        dtor == nullptr ? nullptr : reinterpret_cast<JSDestructorCallbackErased>(dtor);
-    jsConstructorBinding_.jsGcMarkErased =
-        gcMark == nullptr ? nullptr : reinterpret_cast<JSGCMarkCallbackErased>(gcMark);
-    classFunction_ = panda::Global<panda::FunctionRef>(
-        vm, panda::FunctionRef::NewClassFunction(vm, JsiJSConstructorInterceptor, nullptr,
-            reinterpret_cast<void*>(&JsiClass<C>::jsConstructorBinding_)));
+    auto binding = MakeJsiClassConstructorBinding<C>(ctor, dtor, gcMark);
+    classFunction_ = panda::Global<panda::FunctionRef>(vm, JsiNewClassFunction(vm, binding));
+    if (classFunction_.IsEmpty() || !classFunction_->IsFunction(vm)) {
+        return;
+    }
     classFunction_->SetName(vm, StringRef::NewFromUtf8(vm, className_.c_str()));
 
     panda::Local<panda::JSValueRef> getResult = t->Get(
@@ -582,12 +602,13 @@ panda::Local<panda::JSValueRef> JsiJSConstructorInterceptor(panda::JsiRuntimeCal
 {
     EcmaVM* vm = runtimeCallInfo->GetVM();
     panda::Local<panda::JSValueRef> newTarget = runtimeCallInfo->GetNewTargetRef();
-    auto* binding = reinterpret_cast<JsiClassConstructorBinding*>(runtimeCallInfo->GetData());
-    if (binding == nullptr) {
+    auto* owner = static_cast<JsiClassConstructorBindingRef*>(runtimeCallInfo->GetData());
+    if (owner == nullptr || !*owner) {
         panda::JSNApi::ThrowException(
             vm, panda::Exception::TypeError(vm, panda::StringRef::NewFromUtf8(vm, "Constructor binding is null")));
         return panda::Local<panda::JSValueRef>(panda::JSValueRef::Undefined(vm));
     }
+    auto binding = *owner;
     if (newTarget->IsFunction(vm) && binding->jsConstructor != nullptr) {
         JsiCallbackInfo info(runtimeCallInfo);
         binding->jsConstructor(info);
@@ -597,12 +618,22 @@ panda::Local<panda::JSValueRef> JsiJSConstructorInterceptor(panda::JsiRuntimeCal
         }
         auto instance = std::get_if<void*>(&retVal);
         if (instance != nullptr) {
+            if (panda::JSNApi::HasPendingException(vm)) {
+                if (*instance != nullptr && binding->jsDestructorErased) {
+                    binding->jsDestructorErased(*instance);
+                }
+                return panda::JSValueRef::Undefined(vm);
+            }
             panda::Local<panda::JSValueRef> thisObj = runtimeCallInfo->GetThisRef();
             Local<ObjectRef>(thisObj)->SetNativePointerFieldCount(vm, 1);
             size_t nativeSize = info.GetSize();
-            Local<ObjectRef>(thisObj)->SetNativePointerField(vm, 0, *instance,
-                JsiJSNativePointerDestructorInterceptor,
-                binding, nativeSize);
+            auto instanceOwner = std::make_unique<JsiClassConstructorBindingRef>(binding);
+            Local<ObjectRef>(thisObj)->SetNativePointerField(
+                vm, 0, *instance, JsiJSNativePointerDestructorInterceptor, instanceOwner.get(), nativeSize);
+            if (!panda::JSNApi::HasPendingException(vm)) {
+                // Instances can outlive their constructor and the registering thread.
+                instanceOwner.release();
+            }
             return thisObj;
         }
     }
@@ -611,9 +642,9 @@ panda::Local<panda::JSValueRef> JsiJSConstructorInterceptor(panda::JsiRuntimeCal
 
 inline void JsiJSNativePointerDestructorInterceptor(void* env, void* nativePtr, void* data)
 {
-    auto* binding = static_cast<JsiClassConstructorBinding*>(data);
-    if (binding != nullptr && binding->jsDestructorErased != nullptr) {
-        binding->jsDestructorErased(nativePtr);
+    std::unique_ptr<JsiClassConstructorBindingRef> owner(static_cast<JsiClassConstructorBindingRef*>(data));
+    if (owner && *owner && (*owner)->jsDestructorErased) {
+        (*owner)->jsDestructorErased(nativePtr);
     }
 }
 
