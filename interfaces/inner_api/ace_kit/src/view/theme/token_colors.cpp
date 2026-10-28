@@ -17,10 +17,17 @@
 
 #include <vector>
 
+#include "ui/base/utils/utils.h"
+#include "base/log/log_wrapper.h"
+#include "core/common/container.h"
 #include "core/common/resource/resource_parse_utils.h"
+#include "core/components_ng/token_theme/token_theme_storage.h"
 
 namespace OHOS::Ace {
 
+static const double TERTIARY = 0.4;
+static const double FOURTH = 0.2;
+static const double FIFTH = 0.1;
 static const std::vector<TokenColorData> colorData = {
     { "brand", 125830976 }, /* BRAND = 0 */
     { "warning", 125830979 }, /* WARNING = 1; */
@@ -121,8 +128,42 @@ Color TokenColors::GetColorWithResourceObject(int32_t colorIndex) const
     return colors_[colorIndex];
 }
 
+std::optional<Color> TokenColors::GetInstanceBrandColorOverride(int32_t colorIndex, double opacity) const
+{
+    auto instanceId = Container::CurrentIdSafelyWithCheck();
+    if (instanceId < 0) {
+        return std::nullopt;
+    }
+    auto* storage = NG::TokenThemeStorage::GetInstance();
+    if (!storage) {
+        TAG_LOGW(AceLogTag::ACE_THEME, "TokenThemeStorage is null");
+        return std::nullopt;
+    }
+    bool isDark = colorMode_ == ColorMode::DARK;
+    bool colorSetByUser = storage->GetIsThemeColorSetByUser(themeId_, isDark, colorIndex);
+    if (colorSetByUser) {
+        return std::nullopt;
+    }
+    auto info = storage->GetInstanceBrandColor(instanceId);
+    auto strategy = info.colorStrategy.value_or(NG::BrandColorStrategy::BRAND_COLOR_FOLLOW_SYSTEM);
+    if (strategy == NG::BrandColorStrategy::BRAND_COLOR_FOLLOW_SYSTEM || !info.brandColor.has_value()) {
+        return std::nullopt;
+    }
+    TAG_LOGD(AceLogTag::ACE_THEME,
+        "instanceId: %{public}d, themeId: %{public}d, isDark: %{public}d, opacity: %{public}f, brandColor applied",
+        instanceId, themeId_, isDark, opacity);
+    if (LessNotEqual(opacity, 0.0)) {
+        return info.brandColor.value();
+    }
+    return info.brandColor.value().BlendOpacity(opacity);
+}
+
 Color TokenColors::Brand() const
 {
+    auto override = GetInstanceBrandColorOverride();
+    if (override.has_value()) {
+        return override.value();
+    }
     return GetColorWithResourceObject(BRAND);
 }
 
@@ -178,6 +219,10 @@ Color TokenColors::FontFourth() const
 
 Color TokenColors::FontEmphasize() const
 {
+    auto override = GetInstanceBrandColorOverride(FONT_EMPHASIZE);
+    if (override.has_value()) {
+        return override.value();
+    }
     return GetColorWithResourceObject(FONT_EMPHASIZE);
 }
 
@@ -223,11 +268,19 @@ Color TokenColors::IconFourth() const
 
 Color TokenColors::IconEmphasize() const
 {
+    auto override = GetInstanceBrandColorOverride(ICON_EMPHASIZE);
+    if (override.has_value()) {
+        return override.value();
+    }
     return GetColorWithResourceObject(ICON_EMPHASIZE);
 }
 
 Color TokenColors::IconSubEmphasize() const
 {
+    auto override = GetInstanceBrandColorOverride(ICON_SUB_EMPHASIZE, TERTIARY);
+    if (override.has_value()) {
+        return override.value();
+    }
     return GetColorWithResourceObject(ICON_SUB_EMPHASIZE);
 }
 
@@ -273,6 +326,10 @@ Color TokenColors::BackgroundFourth() const
 
 Color TokenColors::BackgroundEmphasize() const
 {
+    auto override = GetInstanceBrandColorOverride(BACKGROUND_EMPHASIZE);
+    if (override.has_value()) {
+        return override.value();
+    }
     return GetColorWithResourceObject(BACKGROUND_EMPHASIZE);
 }
 
@@ -313,6 +370,10 @@ Color TokenColors::CompBackgroundTertiary() const
 
 Color TokenColors::CompBackgroundEmphasize() const
 {
+    auto override = GetInstanceBrandColorOverride(COMP_BACKGROUND_EMPHASIZE);
+    if (override.has_value()) {
+        return override.value();
+    }
     return GetColorWithResourceObject(COMP_BACKGROUND_EMPHASIZE);
 }
 
@@ -323,11 +384,19 @@ Color TokenColors::CompBackgroundNeutral() const
 
 Color TokenColors::CompEmphasizeSecondary() const
 {
+    auto override = GetInstanceBrandColorOverride(COMP_EMPHASIZE_SECONDARY, FOURTH);
+    if (override.has_value()) {
+        return override.value();
+    }
     return GetColorWithResourceObject(COMP_EMPHASIZE_SECONDARY);
 }
 
 Color TokenColors::CompEmphasizeTertiary() const
 {
+    auto override = GetInstanceBrandColorOverride(COMP_EMPHASIZE_TERTIARY, FIFTH);
+    if (override.has_value()) {
+        return override.value();
+    }
     return GetColorWithResourceObject(COMP_EMPHASIZE_TERTIARY);
 }
 
@@ -373,11 +442,19 @@ Color TokenColors::InteractivePressed() const
 
 Color TokenColors::InteractiveFocus() const
 {
+    auto override = GetInstanceBrandColorOverride(INTERACTIVE_FOCUS);
+    if (override.has_value()) {
+        return override.value();
+    }
     return GetColorWithResourceObject(INTERACTIVE_FOCUS);
 }
 
 Color TokenColors::InteractiveActive() const
 {
+    auto override = GetInstanceBrandColorOverride(INTERACTIVE_ACTIVE);
+    if (override.has_value()) {
+        return override.value();
+    }
     return GetColorWithResourceObject(INTERACTIVE_ACTIVE);
 }
 

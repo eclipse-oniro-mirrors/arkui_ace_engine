@@ -167,6 +167,8 @@
 #include "core/components_ng/pattern/ui_extension/ui_extension_component/ui_extension_pattern.h"
 #include "core/components_ng/pattern/ui_extension/ui_extension_config.h"
 #include "core/components_ng/pattern/ui_extension/ui_extension_container_handler.h"
+#include "core/components_ng/token_theme/brand_color_info.h"
+#include "core/components_ng/token_theme/token_theme_storage.h"
 #include "core/components_ng/render/adapter/rosen_render_context.h"
 #include "core/image/image_file_cache.h"
 #include "core/pipeline_ng/pipeline_context.h"
@@ -718,6 +720,14 @@ extern "C" ACE_FORCE_EXPORT char* OHOS_ACE_GetCurrentUIStackInfo()
 extern "C" ACE_FORCE_EXPORT int32_t OHOS_ACE_GetUIContentWindowID(int32_t instanceId)
 {
     return UIContentImpl::GetUIContentWindowID(instanceId);
+}
+
+extern "C" ACE_FORCE_EXPORT bool OHOS_ACE_IsBrandColorValid(const char* brandColorStr)
+{
+    if (brandColorStr == nullptr) {
+        return false;
+    }
+    return UIContentImpl::IsBrandColorValid(brandColorStr);
 }
 
 extern "C" ACE_FORCE_EXPORT void OHOS_ACE_ScopeErrorHivewReport()
@@ -3105,6 +3115,7 @@ UIContentErrorCode UIContentImpl::CommonInitialize(
             fontManager->UpdateStyleOptimizeFlagInCurrentLanguage();
         }
     }
+    InitBrandColor();
     return errorCode;
 }
 
@@ -3815,12 +3826,17 @@ void UIContentImpl::UpdateConfiguration(const std::shared_ptr<OHOS::AppExecFwk::
     bool formFontUseDefault = isFormRender_ && !fontScaleFollowSystem_;
     taskExecutor->PostTask(
         [weakContainer = WeakPtr<Platform::AceContainer>(container), config, instanceId = instanceId_,
-            bundleName = bundleName_, moduleName = moduleName_, formFontUseDefault]() {
+            bundleName = bundleName_, moduleName = moduleName_, formFontUseDefault, weakContext = context_]() {
             auto container = weakContainer.Upgrade();
             CHECK_NULL_VOID(container);
             Platform::ParsedConfig parsedConfig;
             BuildParsedConfig(parsedConfig, config, formFontUseDefault);
             container->UpdateConfiguration(parsedConfig, config->GetName());
+            auto brandColorChanged =
+                !config->GetItem(OHOS::AAFwk::GlobalConfigurationKey::BRAND_COLOR_CHANGED).empty();
+            if (brandColorChanged) {
+                HandleBrandColorChanged(weakContext, instanceId);
+            }
             LOGI("[%{public}d][%{public}s][%{public}s] UpdateConfiguration, name:%{public}s",
                 instanceId, bundleName.c_str(), moduleName.c_str(), config->GetName().c_str());
         },
@@ -3850,12 +3866,17 @@ void UIContentImpl::UpdateConfiguration(const std::shared_ptr<OHOS::AppExecFwk::
     bool formFontUseDefault = isFormRender_ && !fontScaleFollowSystem_;
     taskExecutor->PostTask(
         [weakContainer = WeakPtr<Platform::AceContainer>(container), config, instanceId = instanceId_,
-            bundleName = bundleName_, moduleName = moduleName_, formFontUseDefault]() {
+            bundleName = bundleName_, moduleName = moduleName_, formFontUseDefault, weakContext = context_]() {
             auto container = weakContainer.Upgrade();
             CHECK_NULL_VOID(container);
             Platform::ParsedConfig parsedConfig;
             BuildParsedConfig(parsedConfig, config, formFontUseDefault);
             container->UpdateConfiguration(parsedConfig, config->GetName(), true);
+            auto brandColorChanged =
+                !config->GetItem(OHOS::AAFwk::GlobalConfigurationKey::BRAND_COLOR_CHANGED).empty();
+            if (brandColorChanged) {
+                HandleBrandColorChanged(weakContext, instanceId);
+            }
             LOGI("[%{public}d][%{public}s][%{public}s] UpdateConfiguration, name:%{public}s", instanceId,
                 bundleName.c_str(), moduleName.c_str(), config->GetName().c_str());
         },
@@ -7806,5 +7827,104 @@ const std::shared_ptr<const OHOS::MMI::PointerEvent> UIContentImpl::GetPointerEv
         return touchEventInfo->GetPointerEvent();
     }
     return nullptr;
+}
+
+void UIContentImpl::InitBrandColor()
+{
+    auto context = context_.lock();
+    CHECK_NULL_VOID(context);
+    auto brandColorStr = context->GetBrandColorValue();
+    auto abilityStrategy = context->GetBrandColorStrategy();
+    if (brandColorStr.empty() ||
+        static_cast<NG::BrandColorStrategy>(abilityStrategy) == NG::BrandColorStrategy::BRAND_COLOR_FOLLOW_SYSTEM) {
+        return;
+    }
+    NG::BrandColorInfo info;
+    info.brandColor = Color::FromString(brandColorStr);
+    info.colorStrategy = static_cast<NG::BrandColorStrategy>(abilityStrategy);
+    auto* storage = NG::TokenThemeStorage::GetInstance();
+    CHECK_NULL_VOID(storage);
+    storage->StoreInstanceBrandColor(instanceId_, info);
+    NotifyBrandColorChangeToUEC(instanceId_, info.brandColor, info.colorStrategy);
+}
+
+void UIContentImpl::HandleBrandColorChanged(
+    const std::weak_ptr<OHOS::AbilityRuntime::Context>& weakContext, int32_t instanceId)
+{
+    TAG_LOGI(AceLogTag::ACE_THEME, "HandleBrandColorChanged instanceId: %{public}d", instanceId);
+    UpdateBrandColor(weakContext, instanceId);
+}
+
+void UIContentImpl::UpdateBrandColor(
+    const std::weak_ptr<OHOS::AbilityRuntime::Context>& weakContext, int32_t instanceId)
+{
+    auto context = weakContext.lock();
+    CHECK_NULL_VOID(context);
+    auto brandColorStr = context->GetBrandColorValue();
+    auto* storage = NG::TokenThemeStorage::GetInstance();
+    CHECK_NULL_VOID(storage);
+    if (brandColorStr.empty()) {
+        storage->RemoveInstanceBrandColor(instanceId);
+        NotifyBrandColorChangeToUEC(instanceId, std::nullopt, std::nullopt);
+        return;
+    }
+    NG::BrandColorInfo info;
+    info.brandColor = Color::FromString(brandColorStr);
+    info.colorStrategy = static_cast<NG::BrandColorStrategy>(context->GetBrandColorStrategy());
+    storage->StoreInstanceBrandColor(instanceId, info);
+    auto pipelineContext = NG::PipelineContext::GetContextByContainerId(instanceId);
+    CHECK_NULL_VOID(pipelineContext);
+    auto rootNode = pipelineContext->GetRootElement();
+    CHECK_NULL_VOID(rootNode);
+    ContainerScope scope(instanceId);
+    rootNode->UpdateThemeScopeUpdate(0); // 0 means default theme scope id
+}
+
+void UIContentImpl::NotifyBrandColorChangeToUEC(
+    int32_t instanceId, const std::optional<Color>& brandColor,
+    const std::optional<NG::BrandColorStrategy>& colorStrategy)
+{
+    auto* storage = NG::TokenThemeStorage::GetInstance();
+    CHECK_NULL_VOID(storage);
+    storage->NotifyBrandColorChange(instanceId, brandColor, colorStrategy);
+}
+
+void UIContentImpl::RegisterBrandColorChangeListener(const BrandColorChangeCallback& callback)
+{
+    auto* storage = NG::TokenThemeStorage::GetInstance();
+    CHECK_NULL_VOID(storage);
+    NG::BrandColorChangeCallback internalCallback =
+        [callback](int32_t instanceId, const std::optional<Color>& brandColor,
+            const std::optional<NG::BrandColorStrategy>& colorStrategy) {
+            if (!callback) {
+                return;
+            }
+            std::optional<uint32_t> rawColor;
+            if (brandColor.has_value()) {
+                rawColor = brandColor.value().GetValue();
+            }
+            std::optional<int32_t> rawStrategy;
+            if (colorStrategy.has_value()) {
+                rawStrategy = static_cast<int32_t>(colorStrategy.value());
+            }
+            callback(instanceId, rawColor, rawStrategy);
+        };
+    storage->RegisterBrandColorChangeListener(instanceId_, internalCallback);
+}
+
+void UIContentImpl::UnregisterBrandColorChangeListener()
+{
+    auto* storage = NG::TokenThemeStorage::GetInstance();
+    CHECK_NULL_VOID(storage);
+    storage->UnregisterBrandColorChangeListener(instanceId_);
+}
+
+bool UIContentImpl::IsBrandColorValid(const std::string& brandColorStr)
+{
+    if (brandColorStr.empty()) {
+        return false;
+    }
+    auto color = Color::FromString(brandColorStr);
+    return color.GetAlpha() != 0;
 }
 } // namespace OHOS::Ace

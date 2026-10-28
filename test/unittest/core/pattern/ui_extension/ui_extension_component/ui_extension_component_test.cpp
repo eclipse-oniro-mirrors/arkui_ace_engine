@@ -2515,4 +2515,116 @@ HWTEST_F(UIExtensionComponentTestNg, UIExtensionPatternDpiWhitelist001, TestSize
     pattern->SetDpiFollowStrategy(DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI, true);
     EXPECT_EQ(pattern->GetEffectiveDpiFollowStrategy(), DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
 }
+
+/**
+ * @tc.name: UIExtensionBrandColorTest001
+ * @tc.desc: Test NotifyBrandColorChangeToUEA with null sessionWrapper
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest001, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = AceType::MakeRefPtr<UIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->sessionWrapper_ = nullptr;
+    pattern->NotifyBrandColorChangeToUEA(100, "");
+    EXPECT_EQ(pattern->sessionWrapper_, nullptr);
+#endif
+}
+
+/**
+ * @tc.name: UIExtensionBrandColorTest002
+ * @tc.desc: Test NotifyBrandColorChangeToUEA with valid sessionWrapper and brand color
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest002, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = AceType::MakeRefPtr<UIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    ValidSessionWrapper(pattern);
+    auto sessionWrapper = AceType::DynamicCast<SessionWrapperImpl>(pattern->sessionWrapper_);
+    ASSERT_NE(sessionWrapper, nullptr);
+
+    Color testColor(0xFF0000FF);
+    pattern->NotifyBrandColorChangeToUEA(100, testColor.ToString());
+    EXPECT_EQ(pattern->lastSentBrandColorStr_, "");
+#endif
+}
+
+/**
+ * @tc.name: UIExtensionBrandColorTest003
+ * @tc.desc: Test OnThemeScopeUpdate returns true even with no theme
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest003, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = AceType::MakeRefPtr<UIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    ValidSessionWrapper(pattern);
+    auto result = pattern->OnThemeScopeUpdate(999);
+    EXPECT_TRUE(result);
+#endif
+}
+
+/**
+ * @tc.name: UIExtensionBrandColorTest004
+ * @tc.desc: Test OnThemeScopeUpdate with null sessionWrapper still returns true
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest004, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = AceType::MakeRefPtr<UIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->sessionWrapper_ = nullptr;
+    auto result = pattern->OnThemeScopeUpdate(999);
+    EXPECT_TRUE(result);
+#endif
+}
+
+/**
+ * @tc.name: UIExtensionBrandColorTest005
+ * @tc.desc: Test NOTIFY_BRAND_COLOR_CHANGE business code value
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest005, TestSize.Level1)
+{
+    EXPECT_EQ(static_cast<uint32_t>(UIContentBusinessCode::NOTIFY_BRAND_COLOR_CHANGE), 4001u);
+}
+
+/**
+ * @tc.name: UIExtensionBrandColorTest006
+ * @tc.desc: Test brandColorStr_ is empty by default and FireOnRemoteReadyCallback does not crash
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest006, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = AceType::MakeRefPtr<UIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    EXPECT_TRUE(pattern->brandColorStr_.empty());
+    ValidSessionWrapper(pattern);
+    pattern->FireOnRemoteReadyCallback();
+    EXPECT_TRUE(pattern->brandColorStr_.empty());
+#endif
+}
+
+/**
+ * @tc.name: UIExtensionBrandColorTest007
+ * @tc.desc: Test FireOnRemoteReadyCallback with brandColorStr_ set calls NotifyBrandColorChangeToUEA
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestNg, UIExtensionBrandColorTest007, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    auto pattern = AceType::MakeRefPtr<UIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    ValidSessionWrapper(pattern);
+    pattern->brandColorStr_ = "#FF0000FF";
+    pattern->FireOnRemoteReadyCallback();
+    EXPECT_EQ(pattern->brandColorStr_, "#FF0000FF");
+#endif
+}
 } // namespace OHOS::Ace::NG
