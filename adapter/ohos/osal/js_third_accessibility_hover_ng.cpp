@@ -25,6 +25,10 @@
 #include "core/components_ng/property/accessibility_property.h"
 
 #include <algorithm>
+#include <cmath>
+#include <limits>
+
+#include "core/accessibility/native_interface_accessibility_impl.h"
 
 using namespace OHOS::Accessibility;
 using namespace OHOS::AccessibilityConfig;
@@ -231,6 +235,9 @@ void AccessibilityHoverManagerForThirdNG::ResetHoverForThirdState()
     hoverForThirdState_.idle = true;
     hoverForThirdState_.thirdOperationIdle = true;
     hoverForThirdState_.nodesHovering.clear();
+    hoverForThirdState_.hostElementId = INVALID_NODE_ID;
+    hoverForThirdState_.nativeHoverInfo.reset();
+    hoverForThirdState_.nativeHoverGeneration = 0;
 }
 
 namespace {
@@ -406,9 +413,96 @@ void AccessibilityHoverManagerForThirdNG::UpdateHoverTransferOnUI(
     config.context->OnAccessibilityHoverEvent(event, exportedRoot);
 }
 
+void AccessibilityHoverManagerForThirdNG::PrepareNativeHoverResult(AccessibilityHoverForThirdConfig& config)
+{
+    config.nativeHoverInfo.reset();
+    config.nativeHoverGeneration = 0;
+    if (config.eventType != NG::AccessibilityHoverEventType::ENTER &&
+        config.eventType != NG::AccessibilityHoverEventType::MOVE) {
+        return;
+    }
+    auto host = config.nativeHoverHost.Upgrade();
+    CHECK_NULL_VOID(host);
+    auto& registry = NG::NativeAccessibilityHoverRegistry::GetInstance();
+    if (!registry.HasHandler(host)) {
+        return;
+    }
+    CHECK_NULL_VOID(config.context);
+    auto executor = config.context->GetTaskExecutor();
+    CHECK_NULL_VOID(executor);
+    if (!executor->WillRunOnCurrentThread(TaskExecutor::TaskType::UI)) {
+        return;
+    }
+    auto validCoordinate = [](float value) {
+        return std::isfinite(value) && static_cast<double>(value) >= std::numeric_limits<int32_t>::min() &&
+            static_cast<double>(value) <= std::numeric_limits<int32_t>::max();
+    };
+    if (!validCoordinate(config.point.GetX()) || !validCoordinate(config.point.GetY())) {
+        return;
+    }
+    ArkUI_AccessibilityElementInfo info;
+    if (registry.Invoke(host, static_cast<int32_t>(config.point.GetX()), static_cast<int32_t>(config.point.GetY()),
+        info, config.nativeHoverGeneration)) {
+        // The callback's borrowed pointer ends here; only an owned copy enters the background task.
+        config.nativeHoverInfo = std::make_shared<const ArkUI_AccessibilityElementInfo>(info);
+    }
+}
+
+void AccessibilityHoverManagerForThirdNG::SendHoverExitForThird()
+{
+    if (hoverForThirdState_.nodesHovering.empty()) {
+        return;
+    }
+    auto operation = GetJsThirdProviderInteractionOperation(hoverForThirdState_.hostElementId).lock();
+    CHECK_NULL_VOID(operation);
+    if (hoverForThirdState_.nativeHoverInfo) {
+        operation->SendNativeHoverEvent(*hoverForThirdState_.nativeHoverInfo, NG::AccessibilityHoverEventType::EXIT);
+    } else {
+        operation->SendAccessibilityAsyncEventForThird(hoverForThirdState_.nodesHovering.back(),
+            Accessibility::EventType::TYPE_VIEW_HOVER_EXIT_EVENT);
+    }
+}
+
+void AccessibilityHoverManagerForThirdNG::HandleNativeHoverForThird(const AccessibilityHoverForThirdConfig& config)
+{
+    bool sameTarget = config.eventType != NG::AccessibilityHoverEventType::ENTER &&
+        hoverForThirdState_.nativeHoverInfo && hoverForThirdState_.hostElementId == config.hostElementId &&
+        hoverForThirdState_.nativeHoverGeneration == config.nativeHoverGeneration &&
+        hoverForThirdState_.nativeHoverInfo->GetElementId() == config.nativeHoverInfo->GetElementId();
+    if (!sameTarget) {
+        SendHoverExitForThird();
+        ResetHoverForThirdState();
+        auto operation = GetJsThirdProviderInteractionOperation(config.hostElementId).lock();
+        CHECK_NULL_VOID(operation);
+        if (!operation->SendNativeHoverEvent(*config.nativeHoverInfo, NG::AccessibilityHoverEventType::ENTER)) {
+            return;
+        }
+    }
+    hoverForThirdState_.hostElementId = config.hostElementId;
+    hoverForThirdState_.nodesHovering = { config.nativeHoverInfo->GetElementId() };
+    hoverForThirdState_.nativeHoverInfo = config.nativeHoverInfo;
+    hoverForThirdState_.nativeHoverGeneration = config.nativeHoverGeneration;
+    hoverForThirdState_.time = config.time;
+    hoverForThirdState_.source = config.sourceType;
+    hoverForThirdState_.idle = false;
+}
+
 void AccessibilityHoverManagerForThirdNG::HandleAccessibilityHoverForThirdInner(
     const AccessibilityHoverForThirdConfig& config)
 {
+    if (config.nativeHoverInfo && NG::NativeAccessibilityHoverRegistry::GetInstance().IsCurrent(
+        config.nativeHoverHost.Upgrade(), config.nativeHoverGeneration)) {
+        HandleNativeHoverForThird(config);
+        return;
+    }
+    if (hoverForThirdState_.nativeHoverInfo) {
+        SendHoverExitForThird();
+        ResetHoverForThirdState();
+        if (config.eventType == NG::AccessibilityHoverEventType::EXIT ||
+            config.eventType == NG::AccessibilityHoverEventType::CANCEL) {
+            return;
+        }
+    }
     if (config.eventType == NG::AccessibilityHoverEventType::ENTER) {
         ResetHoverForThirdState();
     }
@@ -455,6 +549,7 @@ void AccessibilityHoverManagerForThirdNG::HandleAccessibilityHoverForThirdInner(
     if ((currentHoveringId != INVALID_NODE_ID) && (currentHoveringId != lastHoveringId)) {
         jsThirdProviderOperator->CheckAndSendHoverEnterByReadableRules(currentHoveringId);
     }
+    hoverForThirdState_.hostElementId = config.hostElementId;
     hoverForThirdState_.nodesHovering = std::move(currentNodesHovering);
     hoverForThirdState_.time = config.time;
     hoverForThirdState_.source = config.sourceType;

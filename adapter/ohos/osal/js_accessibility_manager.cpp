@@ -10706,6 +10706,9 @@ void JsAccessibilityManager::TransferThirdProviderHoverEvent(
     config.eventType = eventType;
     config.time = time;
     config.context = ngPipeline;
+    config.nativeHoverHost = hostNode;
+    // Session adapters call here on UI, before the existing background hover task.
+    PrepareNativeHoverResult(config);
     HandleAccessibilityHoverForThird(config);
 }
 

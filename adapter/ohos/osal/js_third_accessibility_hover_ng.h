@@ -16,6 +16,7 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_BRIDGE_COMMON_ACCESSIBILITY_JS_THIRD_ACCESSIBILITY_HOVER_NG_H
 #define FOUNDATION_ACE_FRAMEWORKS_BRIDGE_COMMON_ACCESSIBILITY_JS_THIRD_ACCESSIBILITY_HOVER_NG_H
 
+#include <memory>
 #include <vector>
 
 #include "accessibility_config.h"
@@ -29,6 +30,8 @@
 #include "core/accessibility/accessibility_utils.h"
 #include "core/event/ace_events.h"
 #include "frameworks/bridge/common/accessibility/accessibility_node_manager.h"
+
+struct ArkUI_AccessibilityElementInfo;
 
 namespace OHOS::Ace {
 struct MouseEvent;
@@ -47,6 +50,9 @@ struct AccessibilityHoverForThirdState {
     TimeStamp time;
     bool idle = true;
     bool thirdOperationIdle = true;
+    int64_t hostElementId = -1;
+    std::shared_ptr<const ArkUI_AccessibilityElementInfo> nativeHoverInfo;
+    uint64_t nativeHoverGeneration = 0;
 };
 
 struct AccessibilityHoverForThirdConfig {
@@ -58,6 +64,9 @@ struct AccessibilityHoverForThirdConfig {
     RefPtr<NG::PipelineContext> context;
     std::vector<int64_t> mountBindIds {};
     int32_t ownerNodeId = -1;
+    WeakPtr<NG::FrameNode> nativeHoverHost;
+    std::shared_ptr<const ArkUI_AccessibilityElementInfo> nativeHoverInfo;
+    uint64_t nativeHoverGeneration = 0;
 };
 
 using AccessibilityHoverTestPathForThird = std::vector<int64_t>;
@@ -66,6 +75,7 @@ class AccessibilityHoverManagerForThirdNG : public virtual AceType {
     DECLARE_ACE_TYPE(AccessibilityHoverManagerForThirdNG, AceType);
 
 public:
+    void PrepareNativeHoverResult(AccessibilityHoverForThirdConfig& config);
     void HandleAccessibilityHoverForThird(
         const AccessibilityHoverForThirdConfig& config);
     bool GetElementInfoForThird(
@@ -99,6 +109,8 @@ public:
 private:
     void HandleAccessibilityHoverForThirdInner(
         const AccessibilityHoverForThirdConfig& config);
+    void SendHoverExitForThird();
+    void HandleNativeHoverForThird(const AccessibilityHoverForThirdConfig& config);
     // CMP mixed-rendering: if hit node is a bindId mount node within an exported subtree, transfer hover to native.
     void TransferHoverToExportedSubtreeIfNeeded(
         int64_t hitElementId,

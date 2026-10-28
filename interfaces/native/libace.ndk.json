@@ -7041,6 +7041,14 @@
         "name": "OH_ArkUI_NodeUtils_SetUiDvsyncSwitch"
     },
     {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_Accessibility_RegisterAccessibilityHoverEventHandler"
+    },
+    {
+        "first_introduced": "26.1.0",
+        "name": "OH_ArkUI_Accessibility_UnregisterAccessibilityHoverEventHandler"
+    },
+    {
         "first_introduced": "26.0.0",
         "name": "OH_ArkUI_NativeModule_LineSpacingOptions_Create"
     },
