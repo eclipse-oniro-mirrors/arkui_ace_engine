@@ -34,7 +34,7 @@
 extern "C" {
 #endif
 
-#define ARKUI_ANI_API_VERSION 100
+#define ARKUI_ANI_API_VERSION 102
 #define EXTRA_INFO_MAX_LENGTH 1024
 #define ARKUI_ANI_MODIFIER_FUNCTION_NAME "GetArkUIAniModifiers"
 const float DEFAULT_SNAPSHOT_SCALE = 1.f;
@@ -1081,6 +1081,28 @@ struct ArkUIAniGestureEventUIObserverModifier {
         ani_int type, ani_int resourceId, bool isRemoveAll);
 };
 
+// Scroll placeholder registry of the static track. The registry lives in the
+// per-pipeline ScrollPlaceholderManager; the ANI library converts the ani
+// arguments (id strings) and reaches these entries through
+// getPlaceholderRegisterAniModifier like every other static ANI API.
+// registerTemplate still receives the ani execution closure because its
+// global reference and the isolated invocation belong to the engine, which
+// may re-execute the template on any later frame. release is the module-side
+// destroy callback of the detached roots the execution products live in: the
+// engine invokes it with the raw product pointer whenever the registry drops
+// a product (source replacement, unregister, pool rejection or LRU demotion),
+// mirroring the destroyFunc/destroyCallback contract of the dialog, snapshot
+// and drag APIs.
+struct ArkUIAniPlaceholderRegisterModifier {
+    ani_int (*registerTemplate)(
+        ani_env* env, const std::string& id, ani_object builder, ani_object execution, ani_object release);
+    void (*unregisterTemplate)(const std::string& id);
+    ani_boolean (*isTemplateRegistered)(const std::string& id);
+    void (*publishProduct)(ani_long productPtr);
+    void (*beginScrollPlaceholder)();
+    void (*endScrollPlaceholder)();
+};
+
 struct ArkUIAniModifiers {
     ArkUI_Int32 version;
     const ArkUIAniImageModifier* (*getImageAniModifier)();
@@ -1127,6 +1149,7 @@ struct ArkUIAniModifiers {
     const ArkUIAniDetachedFreeRootModifier* (*getArkUIAniDetachedFreeRootModifier)();
     const ArkUIAniGestureEventUIObserverModifier* (*getArkUIAniGestureEventUIObserverModifier)();
     const ArkUIAniWithEnvModifier* (*getArkUIAniWithEnvModifier)();
+    const ArkUIAniPlaceholderRegisterModifier* (*getPlaceholderRegisterAniModifier)();
 };
 
 __attribute__((visibility("default"))) const ArkUIAniModifiers* GetArkUIAniModifiers(void);

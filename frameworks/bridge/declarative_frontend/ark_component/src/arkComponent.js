@@ -12260,6 +12260,19 @@ class ListSyncLoadModifier extends ModifierWithKey {
   }
 }
 ListSyncLoadModifier.identity = Symbol('listSyncLoad');
+class ListScrollPlaceholderModifier extends ModifierWithKey {
+  constructor(value) {
+    super(value);
+  }
+  applyPeer(node, reset) {
+    if (reset) {
+      getUINativeModule().list.resetListScrollPlaceholder(node);
+    } else {
+      getUINativeModule().list.setListScrollPlaceholder(node, this.value);
+    }
+  }
+}
+ListScrollPlaceholderModifier.identity = Symbol('listScrollPlaceholder');
 class ListEditModeOptionsModifier extends ModifierWithKey {
   constructor(value) {
     super(value);
@@ -12822,6 +12835,11 @@ class ArkListComponent extends ArkScrollable {
   syncLoad(value) {
     modifierWithKey(this._modifiersWithKeys, ListSyncLoadModifier.identity,
       ListSyncLoadModifier, value);
+    return this;
+  }
+  scrollPlaceholder(provider) {
+    modifierWithKey(this._modifiersWithKeys, ListScrollPlaceholderModifier.identity,
+      ListScrollPlaceholderModifier, provider);
     return this;
   }
   editModeOptions(options) {

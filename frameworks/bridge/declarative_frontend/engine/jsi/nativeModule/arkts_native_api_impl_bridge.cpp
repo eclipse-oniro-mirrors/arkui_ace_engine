@@ -1941,6 +1941,10 @@ void ArkUINativeModule::RegisterListAttributes(Local<panda::ObjectRef> object, E
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), ListBridge::ResetListSyncLoad));
     list->Set(vm, panda::StringRef::NewFromUtf8(vm, "setListSyncLoad"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), ListBridge::SetListSyncLoad));
+    list->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetListScrollPlaceholder"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), ListBridge::ResetListScrollPlaceholder));
+    list->Set(vm, panda::StringRef::NewFromUtf8(vm, "setListScrollPlaceholder"),
+        panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), ListBridge::SetListScrollPlaceholder));
     list->Set(vm, panda::StringRef::NewFromUtf8(vm, "setEditModeOptions"),
         panda::FunctionRef::New(const_cast<panda::EcmaVM*>(vm), ListBridge::SetEditModeOptions));
     list->Set(vm, panda::StringRef::NewFromUtf8(vm, "resetEditModeOptions"),

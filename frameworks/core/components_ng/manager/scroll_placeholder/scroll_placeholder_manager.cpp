@@ -90,6 +90,11 @@ uint64_t ScrollPlaceholderManager::RegisterTemplate(
     return generation;
 }
 
+void ScrollPlaceholderManager::SetProductReleaseNotifier(ScrollPlaceholderProductReleaseNotifier notifier)
+{
+    registry_.SetProductReleaseNotifier(std::move(notifier));
+}
+
 bool ScrollPlaceholderManager::UnregisterTemplate(const std::string& templateId)
 {
     if (destroyed_.load(std::memory_order_relaxed)) {
@@ -327,7 +332,9 @@ void ScrollPlaceholderManager::RunBackgroundClone(const std::string& templateId,
             skipReason = "stale generation";
             break;
         }
-        registry_.CacheTemplateInstance(templateId, instance);
+        // Background-thread product: no detached-root owner, so a rejection must not
+        // invoke the (UI-thread-only) release notifier.
+        registry_.CacheTemplateInstance(templateId, instance, /*notifyOnReject=*/false);
     } while (false);
     if (skipReason != nullptr) {
         TAG_LOGD(AceLogTag::ACE_SCROLL,
@@ -474,6 +481,10 @@ void ScrollPlaceholderManager::EnqueueRealBuild(const ScrollPlaceholderPredictPa
     pendingTask.priority = priority;
     pendingTask.task = std::move(task);
     pendingRealBuilds_.emplace_back(std::move(pendingTask));
+    // Guarantee a consuming frame exists: the current frame may have already spent
+    // its OnIdle slot, in which case nothing would flush the queue until the next
+    // unrelated frame arrives.
+    RequestFrameIfAlive();
 }
 
 void ScrollPlaceholderManager::FlushRealBuild(int64_t deadlineNs)
@@ -491,23 +502,42 @@ void ScrollPlaceholderManager::FlushRealBuild(int64_t deadlineNs)
     while (!pendingRealBuilds_.empty()) {
         RealBuildTask pendingTask = std::move(pendingRealBuilds_.front());
         pendingRealBuilds_.pop_front();
+        // Starvation escape: a task that already survived three flush rounds runs
+        // now, budget aside — the estimate only calibrates after a successful
+        // commit, so without this an over-budget loop can spin forever.
+        bool forced = ++pendingTask.requeueCount >= 3;
         int64_t remaining = deadlineNs - GetSysTimestamp() - FRAMEWORK_SAFETY_MARGIN_NS;
-        if (remaining <= 0) {
+        if (!forced && remaining <= 0) {
+            TAG_LOGD(AceLogTag::ACE_SCROLL,
+                "ScrollPH flush: no budget, remaining=%{public}lldns, requeue task idx=%{public}d",
+                static_cast<long long>(remaining), pendingTask.params.index);
             requeued.push_back(std::move(pendingTask));
             budgetExhausted = true;
             break;
         }
         if (!pendingTask.params.templateId.empty() &&
             registry_.GetCurrentGeneration(pendingTask.params.templateId) != pendingTask.templateGeneration) {
+            TAG_LOGD(AceLogTag::ACE_SCROLL,
+                "ScrollPH flush: drop stale generation idx=%{public}d, templateId='%{public}s'",
+                pendingTask.params.index, pendingTask.params.templateId.c_str());
             realBuildDropped_.fetch_add(1, std::memory_order_relaxed);
             continue;
         }
         int64_t estimate = costModel_.EstimateRealBuildDuration(
             pendingTask.params.componentType, pendingTask.params.templateId);
-        if (estimate > remaining) {
+        if (!forced && estimate > remaining) {
+            TAG_LOGD(AceLogTag::ACE_SCROLL,
+                "ScrollPH flush: estimate %{public}lldns > remaining %{public}lldns, requeue idx=%{public}d",
+                static_cast<long long>(estimate), static_cast<long long>(remaining),
+                pendingTask.params.index);
             requeued.push_back(std::move(pendingTask));
             budgetExhausted = true;
             break;
+        }
+        if (forced) {
+            TAG_LOGI(AceLogTag::ACE_SCROLL,
+                "ScrollPH flush: forced commit after requeues, idx=%{public}d",
+                pendingTask.params.index);
         }
         int64_t start = GetSysTimestamp();
         bool committed = pendingTask.task();
@@ -515,8 +545,12 @@ void ScrollPlaceholderManager::FlushRealBuild(int64_t deadlineNs)
         costModel_.RecordRealBuildDuration(pendingTask.params.componentType, pendingTask.params.templateId, duration);
         if (committed) {
             realBuildExecuted_.fetch_add(1, std::memory_order_relaxed);
+            TAG_LOGD(AceLogTag::ACE_SCROLL, "ScrollPH flush: committed idx=%{public}d, cost=%{public}lldns",
+                pendingTask.params.index, static_cast<long long>(duration));
         } else {
             realBuildDropped_.fetch_add(1, std::memory_order_relaxed);
+            TAG_LOGD(AceLogTag::ACE_SCROLL,
+                "ScrollPH flush: commit returned false, drop idx=%{public}d", pendingTask.params.index);
         }
     }
     if (budgetExhausted) {

@@ -584,4 +584,17 @@ export class ArkUIAniModule {
     native static _ModalUIExtensionProxyOnSyncReceiverRegister(proxyPtr: KPointer, callback: Callback<UIExtensionProxy>): void
     native static _ModalUIExtensionProxyOffAsyncReceiverRegister(proxyPtr: KPointer, callback?: Callback<UIExtensionProxy>): void
     native static _ModalUIExtensionProxyOffSyncReceiverRegister(proxyPtr: KPointer, callback?: Callback<UIExtensionProxy>): void
+
+    // for PlaceholderRegister (scroll placeholder template registry). The
+    // engine face is the ArkUIAniPlaceholderRegisterModifier of libace.
+    // release is the detached-root destroy callback: the engine invokes it with
+    // the raw product pointer whenever the registry drops a product.
+    native static _PlaceholderRegisterRegister(id: string, builder: Object, execution: Object,
+        release: (ptr: KPointer) => void): int32;
+    native static _PlaceholderRegisterUnregister(id: string): void;
+    native static _PlaceholderRegisterIsRegistered(id: string): boolean;
+    // Product hand-off of one isolated execution: the execution closure pops
+    // the built subtree root from its isolated view stack and publishes the
+    // pointer here, so the value never depends on ani primitive return boxing.
+    native static _PlaceholderRegisterPublishProduct(ptr: KPointer): void;
 }

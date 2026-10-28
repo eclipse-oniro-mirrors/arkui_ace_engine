@@ -27,6 +27,7 @@
 #include "base/log/log_wrapper.h"
 #include "base/utils/multi_thread.h"
 #include "base/utils/system_properties.h"
+#include "base/utils/time_util.h"
 #include "base/memory/referenced.h"
 #include "core/animation/curves.h"
 #include "core/common/vibrator/vibrator_utils.h"
@@ -394,17 +395,15 @@ RefPtr<FrameNode> CreatePlaceholderShellNode(
         }
     }
     if (options.size.has_value()) {
-        // The provider size is a plain northbound number, so it carries the ArkTS
-        // Length convention (vp). CalcLength's single-argument constructor defaults
-        // to DimensionUnit::PX, which would reserve 100 physical px for a
-        // {width:100, height:100} option (one third of the intended 100vp slot on a
-        // 3.16-density screen), so the unit must be stated explicitly here.
+        // Options carry unit-preserving Dimensions (bridges map plain numbers to vp;
+        // strings keep PERCENT/PX/...). Pass through untranslated so PERCENT resolves
+        // against the List cross-axis constraint at measure.
         CalcSize idealSize;
         if (options.size->width.has_value()) {
-            idealSize.SetWidth(CalcLength(options.size->width.value(), DimensionUnit::VP));
+            idealSize.SetWidth(CalcLength(options.size->width.value()));
         }
         if (options.size->height.has_value()) {
-            idealSize.SetHeight(CalcLength(options.size->height.value(), DimensionUnit::VP));
+            idealSize.SetHeight(CalcLength(options.size->height.value()));
         }
         shell->GetLayoutProperty()->UpdateUserDefinedIdealSize(idealSize);
     }
@@ -477,6 +476,15 @@ void MountPlaceholderShellOnHost(const RefPtr<FrameNode>& host, const RefPtr<Fra
 std::optional<ScrollPlaceholderOptions> ListPattern::PredictScrollPlaceholderDefer(
     const RefPtr<ScrollPlaceholderManager>& manager, const RefPtr<FrameNode>& host, int32_t index)
 {
+    // Placeholder deferral is a scroll-time feature. The initial viewport (no scroll
+    // event yet) and a settled list must always build real items: deferring there
+    // mounts invisible shells the real-build queue can never deliver on (the startup
+    // frame is the one frame that is guaranteed to be over budget).
+    constexpr int64_t SCROLL_ACTIVE_WINDOW_NS = 200000000; // 200ms, covers fling frame gaps
+    int64_t nowNs = GetSysTimestamp();
+    if (lastScrollCallbackNs_ <= 0 || nowNs - lastScrollCallbackNs_ > SCROLL_ACTIVE_WINDOW_NS) {
+        return std::nullopt;
+    }
     ScrollPlaceholderPredictParams params;
     params.componentType = ScrollPlaceholderComponentType::LIST;
     params.hostNodeId = host->GetId();
@@ -622,17 +630,22 @@ bool ListPattern::CommitScrollPlaceholderRealBuild(int32_t index)
         return false;
     }
     ACE_SCOPED_TRACE("ScrollPlaceholder::BuildReal hostId:%d index:%d", host->GetId(), index);
+    // Take the entry out FIRST: the acquisition below re-enters
+    // CreateScrollPlaceholderShell, whose dedup check must not resolve to our own shell.
+    ScrollPlaceholderItemInfo info = iter->second;
+    scrollPlaceholderItems_.erase(iter);
     auto realWrapper = host->GetOrCreateChildByIndex(static_cast<uint32_t>(index), true);
     if (!realWrapper) {
-        // Keep the placeholder; the item rebuilds through the layout path.
+        // The queue task is consumed either way: retire the orphan shell so future
+        // acquisitions take the normal path instead of hitting the shell forever.
+        RetireScrollPlaceholderShell(info.shell, info.templateId);
         return false;
     }
     // Transaction: the real node is in the tree; the remeasure re-lays the item
-    // range (anchors follow the existing item size-change rules). The shell stays
+    // range (anchors follow the existing item-size change rules). The shell stays
     // mounted until that layout completes, then the reconcile retires it (content
     // back to the pool, shell unmounted outside the transaction).
-    retiringPlaceholderShells_.emplace_back(iter->second.shell, iter->second.templateId);
-    scrollPlaceholderItems_.erase(iter);
+    retiringPlaceholderShells_.emplace_back(info.shell, info.templateId);
     host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
     return true;
 }
@@ -2044,6 +2057,7 @@ bool ListPattern::IsOutOfBoundary(bool useCurrentDelta)
 
 bool ListPattern::OnScrollCallback(float offset, int32_t source)
 {
+    lastScrollCallbackNs_ = GetSysTimestamp();
     if (source == SCROLL_FROM_START) {
         auto item = swiperItem_.Upgrade();
         if (item) {
