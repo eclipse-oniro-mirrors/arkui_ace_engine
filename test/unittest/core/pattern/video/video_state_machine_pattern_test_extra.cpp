@@ -561,6 +561,115 @@ HWTEST_F(VideoStateMachinePatternTestNg, RecoverState001, TestSize.Level1)
     EXPECT_TRUE(pattern2->isEnableAnalyzer_);
 }
 
+HWTEST_F(VideoStateMachinePatternTestNg, FullScreen_SharedStateAndExit001, TestSize.Level1)
+{
+    auto frameNode = CreateVideoNode(g_testProperty);
+    ASSERT_TRUE(frameNode);
+    auto pattern = frameNode->GetPattern<VideoStateMachinePattern>();
+    ASSERT_TRUE(pattern);
+    auto mediaPlayer = pattern->mediaPlayer_;
+    auto renderSurface = pattern->renderSurface_;
+    auto renderContext = pattern->renderContextForMediaPlayer_;
+    auto stateManager = pattern->stateManager_;
+    ASSERT_TRUE(mediaPlayer);
+    ASSERT_TRUE(renderSurface);
+    ASSERT_TRUE(renderContext);
+    ASSERT_TRUE(stateManager);
+
+    stateManager->state_ = VideoPlaybackState::PREPARED;
+    stateManager->ClearPendingCommand();
+    stateManager->SetPendingCommand(VideoPlaybackCommand::PLAY, nullptr);
+    pattern->FullScreen();
+
+    auto fullScreenNode = pattern->GetFullScreenNode();
+    ASSERT_TRUE(fullScreenNode);
+    auto fullScreenPattern = AceType::DynamicCast<VideoStateMachineFullScreenPattern>(fullScreenNode->GetPattern());
+    ASSERT_TRUE(fullScreenPattern);
+    EXPECT_EQ(fullScreenPattern->stateManager_.GetRawPtr(), stateManager.GetRawPtr());
+    EXPECT_EQ(stateManager->GetCurrentPattern().GetRawPtr(), fullScreenPattern.GetRawPtr());
+    EXPECT_EQ(fullScreenPattern->mediaPlayer_.GetRawPtr(), mediaPlayer.GetRawPtr());
+    EXPECT_EQ(fullScreenPattern->renderSurface_.GetRawPtr(), renderSurface.GetRawPtr());
+    EXPECT_EQ(fullScreenPattern->renderContextForMediaPlayer_.GetRawPtr(), renderContext.GetRawPtr());
+    EXPECT_FALSE(pattern->mediaPlayer_);
+    EXPECT_FALSE(pattern->renderSurface_);
+    EXPECT_FALSE(pattern->renderContextForMediaPlayer_);
+    EXPECT_EQ(pattern->GetTargetVideoPattern().GetRawPtr(), fullScreenPattern.GetRawPtr());
+    EXPECT_EQ(fullScreenPattern->GetTargetVideoPattern().GetRawPtr(), fullScreenPattern.GetRawPtr());
+
+    EXPECT_TRUE(fullScreenPattern->ExitFullScreen());
+    EXPECT_EQ(stateManager->GetCurrentPattern().GetRawPtr(), pattern.GetRawPtr());
+    EXPECT_EQ(pattern->mediaPlayer_.GetRawPtr(), mediaPlayer.GetRawPtr());
+    EXPECT_EQ(pattern->renderSurface_.GetRawPtr(), renderSurface.GetRawPtr());
+    EXPECT_EQ(pattern->renderContextForMediaPlayer_.GetRawPtr(), renderContext.GetRawPtr());
+    EXPECT_FALSE(fullScreenPattern->mediaPlayer_);
+    EXPECT_FALSE(fullScreenPattern->renderSurface_);
+    EXPECT_FALSE(fullScreenPattern->renderContextForMediaPlayer_);
+    EXPECT_EQ(stateManager->GetPendingCommand(), VideoPlaybackCommand::PLAY);
+    EXPECT_EQ(pattern->GetTargetVideoPattern().GetRawPtr(), pattern.GetRawPtr());
+    EXPECT_FALSE(pattern->IsFullScreen());
+}
+
+HWTEST_F(VideoStateMachinePatternTestNg, FullScreen_UpdateState001, TestSize.Level1)
+{
+    auto frameNode = CreateVideoNode(g_testProperty);
+    ASSERT_TRUE(frameNode);
+    auto pattern = frameNode->GetPattern<VideoStateMachinePattern>();
+    ASSERT_TRUE(pattern);
+    auto videoLayout = frameNode->GetLayoutProperty<VideoLayoutProperty>();
+    ASSERT_TRUE(videoLayout);
+    auto videoSrcInfo = videoLayout->GetVideoSourceValue(VideoSourceInfo());
+    videoSrcInfo.src_ = VIDEO_SRC_TEST;
+    videoLayout->UpdateVideoSource(videoSrcInfo);
+    videoLayout->UpdatePosterImageInfo(ImageSourceInfo(VIDEO_POSTER_TEST));
+
+    pattern->FullScreen();
+    auto fullScreenNode = pattern->GetFullScreenNode();
+    ASSERT_TRUE(fullScreenNode);
+    auto fullScreenPattern = AceType::DynamicCast<VideoStateMachineFullScreenPattern>(fullScreenNode->GetPattern());
+    ASSERT_TRUE(fullScreenPattern);
+    auto fullScreenLayout = fullScreenNode->GetLayoutProperty<VideoLayoutProperty>();
+    ASSERT_TRUE(fullScreenLayout);
+
+    pattern->UpdateLoop(true);
+    pattern->UpdateMuted(true);
+    pattern->UpdateProgressRate(1.5);
+    pattern->SetShortcutKeyEnabled(true);
+    pattern->SetCurrentVolume(0.35f);
+    auto imageAnalyzerManager =
+        std::make_shared<MockImageAnalyzerManager>(frameNode, ImageAnalyzerHolder::VIDEO_CUSTOM);
+    imageAnalyzerManager->SetOverlayCreated(true);
+    pattern->imageAnalyzerManager_ = imageAnalyzerManager;
+    videoLayout->UpdateObjectFit(ImageFit::CONTAIN);
+    videoLayout->UpdateControls(false);
+
+    fullScreenPattern->UpdateLoop(false);
+    fullScreenPattern->UpdateMuted(false);
+    fullScreenPattern->UpdateAutoPlay(true);
+    fullScreenPattern->UpdateProgressRate(0.5);
+    fullScreenPattern->UpdateAnalyzerState(false);
+    fullScreenPattern->SetShortcutKeyEnabled(false);
+    fullScreenPattern->SetCurrentVolume(0.9f);
+    fullScreenLayout->UpdateObjectFit(ImageFit::COVER);
+    videoSrcInfo.src_ = "";
+    fullScreenLayout->UpdateVideoSource(videoSrcInfo);
+    fullScreenLayout->UpdatePosterImageInfo(ImageSourceInfo(""));
+    fullScreenLayout->UpdateControls(true);
+
+    fullScreenPattern->UpdateState();
+    EXPECT_TRUE(fullScreenPattern->GetLoop());
+    EXPECT_TRUE(fullScreenPattern->GetMuted());
+    EXPECT_FALSE(fullScreenPattern->GetAutoPlay());
+    EXPECT_DOUBLE_EQ(fullScreenPattern->GetProgressRate(), 1.5);
+    EXPECT_EQ(fullScreenPattern->isAnalyzerCreated_, pattern->GetAnalyzerState());
+    EXPECT_TRUE(fullScreenPattern->GetShortcutKeyEnabled());
+    EXPECT_FLOAT_EQ(fullScreenPattern->GetCurrentVolume(), 0.35f);
+    EXPECT_EQ(fullScreenLayout->GetObjectFit().value(), ImageFit::CONTAIN);
+    EXPECT_EQ(fullScreenLayout->GetVideoSource().value().src_, VIDEO_SRC_TEST);
+    EXPECT_EQ(fullScreenLayout->GetPosterImageInfo().value(), ImageSourceInfo(VIDEO_POSTER_TEST));
+    EXPECT_FALSE(fullScreenLayout->GetControls().value());
+    EXPECT_TRUE(fullScreenPattern->ExitFullScreen());
+}
+
 // Group 4: Image Analysis (26-35)
 
 /**
@@ -1003,6 +1112,56 @@ HWTEST_F(VideoStateMachinePatternTestNg, ParseCommand001, TestSize.Level1)
     // setVideoPlaybackSpeed non-number
     EXPECT_EQ(VideoStateMachinePattern::ParseCommand(
         R"({"cmd":"setVideoPlaybackSpeed","value":"fast"})", status, speed), RET_FAILED_VAL);
+}
+
+HWTEST_F(VideoStateMachinePatternTestNg, OnInjectionEvent_Play001, TestSize.Level1)
+{
+    auto frameNode = CreateVideoNode(g_testProperty);
+    ASSERT_TRUE(frameNode);
+    auto pattern = frameNode->GetPattern<VideoStateMachinePattern>();
+    ASSERT_TRUE(pattern);
+    pattern->stateManager_->state_ = VideoPlaybackState::PREPARED;
+    pattern->stateManager_->ClearPendingCommand();
+
+    auto ret = pattern->OnInjectionEvent(R"({"cmd":"setVideoPlayerStatus","value":"play"})");
+    EXPECT_EQ(ret, RET_SUCCESS_VAL);
+    EXPECT_EQ(pattern->currentInjectedStatusCmd_, "play");
+    EXPECT_EQ(pattern->stateManager_->GetPendingCommand(), VideoPlaybackCommand::PLAY);
+}
+
+HWTEST_F(VideoStateMachinePatternTestNg, OnInjectionEvent_Pause001, TestSize.Level1)
+{
+    auto frameNode = CreateVideoNode(g_testProperty);
+    ASSERT_TRUE(frameNode);
+    auto pattern = frameNode->GetPattern<VideoStateMachinePattern>();
+    ASSERT_TRUE(pattern);
+    pattern->stateManager_->state_ = VideoPlaybackState::PLAYING;
+    pattern->stateManager_->ClearPendingCommand();
+
+    auto ret = pattern->OnInjectionEvent(R"({"cmd":"setVideoPlayerStatus","value":"paused"})");
+    EXPECT_EQ(ret, RET_SUCCESS_VAL);
+    EXPECT_EQ(pattern->currentInjectedStatusCmd_, "pause");
+    EXPECT_EQ(pattern->stateManager_->GetPendingCommand(), VideoPlaybackCommand::PAUSE);
+}
+
+HWTEST_F(VideoStateMachinePatternTestNg, OnInjectionEvent_PlaybackSpeed001, TestSize.Level1)
+{
+    auto frameNode = CreateVideoNode(g_testProperty);
+    ASSERT_TRUE(frameNode);
+    auto pattern = frameNode->GetPattern<VideoStateMachinePattern>();
+    ASSERT_TRUE(pattern);
+    pattern->UpdateProgressRate(1.0);
+    pattern->SetIsProgressInjectCmd(false);
+
+    auto unchangedRet = pattern->OnInjectionEvent(R"({"cmd":"setVideoPlaybackSpeed","value":1.0})");
+    EXPECT_EQ(unchangedRet, RET_FAILED_VAL);
+    EXPECT_DOUBLE_EQ(pattern->GetLastSetProgressRate(), 1.0);
+    EXPECT_FALSE(pattern->GetsIsProgressInjectCmd());
+
+    auto changedRet = pattern->OnInjectionEvent(R"({"cmd":"setVideoPlaybackSpeed","value":2.0})");
+    EXPECT_EQ(changedRet, RET_SUCCESS_VAL);
+    EXPECT_DOUBLE_EQ(pattern->GetProgressRate(), 2.0);
+    EXPECT_TRUE(pattern->GetsIsProgressInjectCmd());
 }
 
 // Group 6: State Machine Callbacks (46-53)

@@ -16,6 +16,7 @@
 #ifndef VIDEO_STATE_MACHINE_PATTERN_TEST_COMMON_H
 #define VIDEO_STATE_MACHINE_PATTERN_TEST_COMMON_H
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <memory>
@@ -29,6 +30,7 @@
 
 #define private public
 #define protected public
+#include "test/mock/frameworks/base/thread/mock_task_executor.h"
 #include "test/mock/frameworks/core/common/mock_theme_manager.h"
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 #include "test/mock/frameworks/core/components_ng/render/mock_media_player.h"
@@ -84,6 +86,128 @@ public:
 
     MOCK_METHOD0(GetVideoWidth, int32_t());
     MOCK_METHOD0(GetVideoHeight, int32_t());
+};
+
+class TestCallbackMediaPlayer : public TestableMockMediaPlayer {
+    DECLARE_ACE_TYPE(TestCallbackMediaPlayer, TestableMockMediaPlayer);
+public:
+    void CreateMediaPlayer() override
+    {
+        createCount_++;
+    }
+
+    void ResetMediaPlayer() override
+    {
+        resetCount_++;
+    }
+
+    void RegisterMediaPlayerEvent(PositionUpdatedEvent&& positionUpdatedEvent,
+        StateChangedEvent&& stateChangedEvent, CommonEvent&& errorEvent, CommonEvent&& resolutionChangeEvent,
+        CommonEvent&& startRenderFrameEvent, VideoErrorEvent&& videoErrorEvent = {},
+        SeekDoneEvent&& seekDoneEvent = {}) override
+    {
+        positionUpdatedEvent_ = std::move(positionUpdatedEvent);
+        stateChangedEvent_ = std::move(stateChangedEvent);
+        errorEvent_ = std::move(errorEvent);
+        resolutionChangeEvent_ = std::move(resolutionChangeEvent);
+        startRenderFrameEvent_ = std::move(startRenderFrameEvent);
+        videoErrorEvent_ = std::move(videoErrorEvent);
+        seekDoneEvent_ = std::move(seekDoneEvent);
+    }
+
+    int32_t createCount_ = 0;
+    int32_t resetCount_ = 0;
+    PositionUpdatedEvent positionUpdatedEvent_;
+    StateChangedEvent stateChangedEvent_;
+    CommonEvent errorEvent_;
+    CommonEvent resolutionChangeEvent_;
+    CommonEvent startRenderFrameEvent_;
+    VideoErrorEvent videoErrorEvent_;
+    SeekDoneEvent seekDoneEvent_;
+};
+
+class RecordingTaskExecutor : public MockTaskExecutor {
+    DECLARE_ACE_TYPE(RecordingTaskExecutor, MockTaskExecutor);
+public:
+    struct RecordedTask {
+        TaskExecutor::Task task;
+        TaskExecutor::TaskType type;
+        std::string name;
+    };
+
+    bool OnPostTask(Task&& task, TaskType type, uint32_t delayTime, const std::string& name,
+        PriorityType priorityType = PriorityType::LOW,
+        VsyncBarrierOption barrierOption = VsyncBarrierOption::NO_BARRIER) const override
+    {
+        if (!task) {
+            return false;
+        }
+        tasks_.push_back({ std::move(task), type, name });
+        return true;
+    }
+
+    bool OnPostTaskWithoutTraceId(Task&& task, TaskType type, uint32_t delayTime, const std::string& name,
+        PriorityType priorityType = PriorityType::LOW) const override
+    {
+        return OnPostTask(std::move(task), type, delayTime, name, priorityType);
+    }
+
+    bool RunNext(TaskType type)
+    {
+        auto it = std::find_if(tasks_.begin(), tasks_.end(), [type](const RecordedTask& recorded) {
+            return recorded.type == type;
+        });
+        if (it == tasks_.end()) {
+            return false;
+        }
+        auto task = std::move(it->task);
+        tasks_.erase(it);
+        task();
+        return true;
+    }
+
+    mutable std::vector<RecordedTask> tasks_;
+};
+
+class ScopedRecordingTaskExecutor {
+public:
+    explicit ScopedRecordingTaskExecutor(const RefPtr<PipelineContext>& context)
+        : context_(context), originalExecutor_(context->GetTaskExecutor()),
+          executor_(AceType::MakeRefPtr<RecordingTaskExecutor>())
+    {
+        context_->taskExecutor_ = executor_;
+    }
+
+    ~ScopedRecordingTaskExecutor()
+    {
+        context_->taskExecutor_ = originalExecutor_;
+    }
+
+    const RefPtr<RecordingTaskExecutor>& Get() const
+    {
+        return executor_;
+    }
+
+private:
+    RefPtr<PipelineContext> context_;
+    RefPtr<TaskExecutor> originalExecutor_;
+    RefPtr<RecordingTaskExecutor> executor_;
+};
+
+class ScopedExtSurfaceEnabled {
+public:
+    explicit ScopedExtSurfaceEnabled(bool enabled) : original_(SystemProperties::GetExtSurfaceEnabled())
+    {
+        SystemProperties::SetExtSurfaceEnabled(enabled);
+    }
+
+    ~ScopedExtSurfaceEnabled()
+    {
+        SystemProperties::SetExtSurfaceEnabled(original_);
+    }
+
+private:
+    bool original_;
 };
 
 namespace {

@@ -14,6 +14,9 @@
  */
 
 #include "video_state_machine_pattern_test_common.h"
+#include "base/log/dump_log.h"
+#include "core/common/container.h"
+#include "test/mock/frameworks/core/common/mock_container.h"
 #include "test/mock/frameworks/core/common/mock_image_analyzer_manager.h"
 
 using namespace testing;
@@ -1403,10 +1406,18 @@ HWTEST_F(VideoStateMachinePatternTestNg, Start_CannotSetPending001, TestSize.Lev
     EXPECT_CALL(*mockMediaPlayer, IsMediaPlayerValid()).WillRepeatedly(Return(true));
     pattern->mediaPlayer_ = mockMediaPlayer;
 
-    pattern->stateManager_->state_ = VideoPlaybackState::PLAYING;
+    pattern->stateManager_->state_ = VideoPlaybackState::PREPARED;
     pattern->stateManager_->SetPendingCommand(VideoPlaybackCommand::PLAY, nullptr);
 
-    pattern->Start();
+    bool callbackCalled = false;
+    pattern->Start([&callbackCalled](bool success, const std::string& reason) {
+        callbackCalled = true;
+        EXPECT_FALSE(success);
+        EXPECT_EQ(reason, "command conflict");
+    });
+    EXPECT_TRUE(callbackCalled);
+    EXPECT_EQ(pattern->stateManager_->GetPendingCommand(), VideoPlaybackCommand::PLAY);
+    EXPECT_TRUE(pattern->stateManager_->serialBgTaskQueue_.empty());
 }
 
 /**
@@ -1529,10 +1540,18 @@ HWTEST_F(VideoStateMachinePatternTestNg, Pause_CannotSetPending001, TestSize.Lev
     EXPECT_CALL(*mockMediaPlayer, IsMediaPlayerValid()).WillRepeatedly(Return(true));
     pattern->mediaPlayer_ = mockMediaPlayer;
 
-    pattern->stateManager_->state_ = VideoPlaybackState::PAUSED;
+    pattern->stateManager_->state_ = VideoPlaybackState::PLAYING;
     pattern->stateManager_->SetPendingCommand(VideoPlaybackCommand::PAUSE, nullptr);
 
-    pattern->Pause();
+    bool callbackCalled = false;
+    pattern->Pause([&callbackCalled](bool success, const std::string& reason) {
+        callbackCalled = true;
+        EXPECT_FALSE(success);
+        EXPECT_EQ(reason, "command conflict");
+    });
+    EXPECT_TRUE(callbackCalled);
+    EXPECT_EQ(pattern->stateManager_->GetPendingCommand(), VideoPlaybackCommand::PAUSE);
+    EXPECT_TRUE(pattern->stateManager_->serialBgTaskQueue_.empty());
 }
 
 
@@ -1593,10 +1612,18 @@ HWTEST_F(VideoStateMachinePatternTestNg, Stop_CannotSetPending001, TestSize.Leve
     EXPECT_CALL(*mockMediaPlayer, IsMediaPlayerValid()).WillRepeatedly(Return(true));
     pattern->mediaPlayer_ = mockMediaPlayer;
 
-    pattern->stateManager_->state_ = VideoPlaybackState::STOPPED;
+    pattern->stateManager_->state_ = VideoPlaybackState::PLAYING;
     pattern->stateManager_->SetPendingCommand(VideoPlaybackCommand::STOP, nullptr);
 
-    pattern->Stop();
+    bool callbackCalled = false;
+    pattern->Stop([&callbackCalled](bool success, const std::string& reason) {
+        callbackCalled = true;
+        EXPECT_FALSE(success);
+        EXPECT_EQ(reason, "command conflict");
+    });
+    EXPECT_TRUE(callbackCalled);
+    EXPECT_EQ(pattern->stateManager_->GetPendingCommand(), VideoPlaybackCommand::STOP);
+    EXPECT_TRUE(pattern->stateManager_->serialBgTaskQueue_.empty());
 }
 
 
@@ -2341,6 +2368,618 @@ HWTEST_F(VideoStateMachinePatternTestNg, Pause_FailTaskBody001, TestSize.Level0)
     ASSERT_TRUE(task.task);
     task.task();
     EXPECT_EQ(pattern->stateManager_->GetPendingCommand(), VideoPlaybackCommand::PAUSE);
+}
+
+HWTEST_F(VideoStateMachinePatternTestNg, MediaPlayerCallback_PositionAndSeekDone001, TestSize.Level0)
+{
+    auto frameNode = CreateVideoNode(g_testProperty);
+    ASSERT_TRUE(frameNode);
+    auto pattern = frameNode->GetPattern<VideoStateMachinePattern>();
+    ASSERT_TRUE(pattern);
+    ScopedRecordingTaskExecutor taskExecutor(MockPipelineContext::GetCurrent());
+    auto player = AceType::MakeRefPtr<TestCallbackMediaPlayer>();
+    EXPECT_CALL(*player, IsMediaPlayerValid()).WillRepeatedly(Return(true));
+    pattern->mediaPlayer_ = player;
+    pattern->RegisterMediaPlayerEvent(AceType::WeakClaim(AceType::RawPtr(pattern)), player, VIDEO_SRC, pattern->instanceId_);
+    ASSERT_TRUE(player->positionUpdatedEvent_);
+    ASSERT_TRUE(player->seekDoneEvent_);
+
+    auto eventHub = pattern->GetEventHub<VideoEventHub>();
+    ASSERT_TRUE(eventHub);
+    int32_t updateCount = 0;
+    eventHub->SetOnUpdate([&updateCount](const std::string&) { updateCount++; });
+    pattern->stateManager_->state_ = VideoPlaybackState::PLAYING;
+    pattern->duration_ = 100;
+    pattern->currentPos_ = 0;
+    pattern->SetIsSeeking(false);
+
+    player->positionUpdatedEvent_(50);
+    EXPECT_EQ(pattern->currentPos_, 50u);
+    EXPECT_EQ(updateCount, 1);
+
+    pattern->SetIsSeeking(true);
+    player->seekDoneEvent_(25);
+    EXPECT_FALSE(pattern->GetIsSeeking());
+    EXPECT_EQ(pattern->currentPos_, 25u);
+    EXPECT_EQ(updateCount, 2);
+}
+
+HWTEST_F(VideoStateMachinePatternTestNg, MediaPlayerCallback_StateChangedSequence001, TestSize.Level0)
+{
+    auto frameNode = CreateVideoNode(g_testProperty);
+    ASSERT_TRUE(frameNode);
+    auto pattern = frameNode->GetPattern<VideoStateMachinePattern>();
+    ASSERT_TRUE(pattern);
+    ScopedRecordingTaskExecutor taskExecutor(MockPipelineContext::GetCurrent());
+    auto player = AceType::MakeRefPtr<TestCallbackMediaPlayer>();
+    EXPECT_CALL(*player, IsMediaPlayerValid()).WillRepeatedly(Return(true));
+    pattern->mediaPlayer_ = player;
+    pattern->RegisterMediaPlayerEvent(AceType::WeakClaim(AceType::RawPtr(pattern)), player, VIDEO_SRC, pattern->instanceId_);
+    ASSERT_TRUE(player->stateChangedEvent_);
+
+    auto eventHub = pattern->GetEventHub<VideoEventHub>();
+    ASSERT_TRUE(eventHub);
+    int32_t startCount = 0;
+    int32_t pauseCount = 0;
+    int32_t stopCount = 0;
+    eventHub->SetOnStart([&startCount](const std::string&) { startCount++; });
+    eventHub->SetOnPause([&pauseCount](const std::string&) { pauseCount++; });
+    eventHub->SetOnStop([&stopCount](const std::string&) { stopCount++; });
+
+    pattern->stateManager_->state_ = VideoPlaybackState::PREPARED;
+    pattern->stateManager_->SetPendingCommand(VideoPlaybackCommand::PLAY, nullptr);
+    player->stateChangedEvent_(PlaybackStatus::STARTED);
+    ASSERT_TRUE(taskExecutor.Get()->RunNext(TaskExecutor::TaskType::UI));
+    EXPECT_EQ(pattern->stateManager_->GetCurrentState(), VideoPlaybackState::PLAYING);
+    EXPECT_EQ(pattern->stateManager_->GetPendingCommand(), VideoPlaybackCommand::NONE);
+    EXPECT_EQ(startCount, 1);
+
+    pattern->stateManager_->SetPendingCommand(VideoPlaybackCommand::PAUSE, nullptr);
+    player->stateChangedEvent_(PlaybackStatus::PAUSED);
+    ASSERT_TRUE(taskExecutor.Get()->RunNext(TaskExecutor::TaskType::UI));
+    EXPECT_EQ(pattern->stateManager_->GetCurrentState(), VideoPlaybackState::PAUSED);
+    EXPECT_EQ(pattern->stateManager_->GetPendingCommand(), VideoPlaybackCommand::NONE);
+    EXPECT_EQ(pauseCount, 1);
+
+    pattern->currentPos_ = 20;
+    pattern->stateManager_->SetPendingCommand(VideoPlaybackCommand::STOP, nullptr);
+    player->stateChangedEvent_(PlaybackStatus::STOPPED);
+    ASSERT_TRUE(taskExecutor.Get()->RunNext(TaskExecutor::TaskType::UI));
+    EXPECT_EQ(pattern->stateManager_->GetCurrentState(), VideoPlaybackState::STOPPED);
+    EXPECT_EQ(pattern->stateManager_->GetPendingCommand(), VideoPlaybackCommand::NONE);
+    EXPECT_EQ(pattern->currentPos_, 0u);
+    EXPECT_EQ(pattern->currentPlaybackStatus_, PlaybackStatus::STOPPED);
+    EXPECT_EQ(stopCount, 1);
+}
+
+HWTEST_F(VideoStateMachinePatternTestNg, MediaPlayerCallback_ErrorEvents001, TestSize.Level0)
+{
+    auto frameNode = CreateVideoNode(g_testProperty);
+    ASSERT_TRUE(frameNode);
+    auto pattern = frameNode->GetPattern<VideoStateMachinePattern>();
+    ASSERT_TRUE(pattern);
+    ScopedRecordingTaskExecutor taskExecutor(MockPipelineContext::GetCurrent());
+    auto player = AceType::MakeRefPtr<TestCallbackMediaPlayer>();
+    EXPECT_CALL(*player, IsMediaPlayerValid()).WillRepeatedly(Return(true));
+    pattern->mediaPlayer_ = player;
+    pattern->RegisterMediaPlayerEvent(AceType::WeakClaim(AceType::RawPtr(pattern)), player, VIDEO_SRC, pattern->instanceId_);
+    ASSERT_TRUE(player->errorEvent_);
+    ASSERT_TRUE(player->videoErrorEvent_);
+
+    auto eventHub = pattern->GetEventHub<VideoEventHub>();
+    ASSERT_TRUE(eventHub);
+    int32_t errorCount = 0;
+    eventHub->SetOnError([&errorCount](const std::string&) { errorCount++; });
+    pattern->stateManager_->state_ = VideoPlaybackState::PREPARED;
+
+    player->errorEvent_();
+    ASSERT_TRUE(taskExecutor.Get()->RunNext(TaskExecutor::TaskType::UI));
+    EXPECT_EQ(pattern->stateManager_->GetCurrentState(), VideoPlaybackState::ERROR);
+    EXPECT_EQ(pattern->lastErrorCode_, ERROR_CODE_VIDEO_SOURCE_INVALID);
+    EXPECT_EQ(pattern->lastErrorMessage_, "Unknown error");
+    EXPECT_EQ(errorCount, 1);
+
+    player->videoErrorEvent_(ERROR_CODE_INVALID_VAL, "bad source");
+    ASSERT_TRUE(taskExecutor.Get()->RunNext(TaskExecutor::TaskType::UI));
+    EXPECT_EQ(pattern->stateManager_->GetCurrentState(), VideoPlaybackState::ERROR);
+    EXPECT_EQ(pattern->lastErrorCode_, ERROR_CODE_INVALID_VAL);
+    EXPECT_EQ(pattern->lastErrorMessage_, "bad source");
+    EXPECT_EQ(errorCount, 2);
+}
+
+HWTEST_F(VideoStateMachinePatternTestNg, MediaPlayerCallback_ResolutionAndStartRender001, TestSize.Level0)
+{
+    TestProperty testProperty;
+    testProperty.posterUrl = VIDEO_POSTER_URL;
+    auto frameNode = CreateVideoNode(testProperty);
+    ASSERT_TRUE(frameNode);
+    auto pattern = frameNode->GetPattern<VideoStateMachinePattern>();
+    ASSERT_TRUE(pattern);
+    ScopedRecordingTaskExecutor taskExecutor(MockPipelineContext::GetCurrent());
+    auto player = AceType::MakeRefPtr<TestCallbackMediaPlayer>();
+    EXPECT_CALL(*player, IsMediaPlayerValid()).WillRepeatedly(Return(true));
+    player->videoWidth_ = 640;
+    player->videoHeight_ = 360;
+    pattern->mediaPlayer_ = player;
+    pattern->RegisterMediaPlayerEvent(AceType::WeakClaim(AceType::RawPtr(pattern)), player, VIDEO_SRC, pattern->instanceId_);
+    ASSERT_TRUE(player->resolutionChangeEvent_);
+    ASSERT_TRUE(player->startRenderFrameEvent_);
+
+    auto videoLayout = frameNode->GetLayoutProperty<VideoLayoutProperty>();
+    ASSERT_TRUE(videoLayout);
+    videoLayout->ResetVideoSize();
+    player->resolutionChangeEvent_();
+    ASSERT_TRUE(videoLayout->GetVideoSize().has_value());
+    EXPECT_EQ(videoLayout->GetVideoSize().value(), SizeF(640.0f, 360.0f));
+
+    auto video = AceType::DynamicCast<VideoNode>(frameNode);
+    ASSERT_TRUE(video);
+    auto image = AceType::DynamicCast<FrameNode>(video->GetPreviewImage());
+    ASSERT_TRUE(image);
+    auto posterLayout = image->GetLayoutProperty<ImageLayoutProperty>();
+    ASSERT_TRUE(posterLayout);
+    posterLayout->UpdateVisibility(VisibleType::VISIBLE);
+    videoLayout->ResetVideoSize();
+    player->videoWidth_ = 1280;
+    player->videoHeight_ = 720;
+    pattern->stateManager_->ClearPendingCommand();
+    pattern->isInitialState_ = true;
+
+    player->startRenderFrameEvent_();
+    EXPECT_FALSE(pattern->isInitialState_);
+    EXPECT_EQ(posterLayout->GetVisibilityValue(VisibleType::VISIBLE), VisibleType::INVISIBLE);
+    ASSERT_TRUE(videoLayout->GetVideoSize().has_value());
+    EXPECT_EQ(videoLayout->GetVideoSize().value(), SizeF(1280.0f, 720.0f));
+}
+
+HWTEST_F(VideoStateMachinePatternTestNg, PrepareSurface_Branches001, TestSize.Level0)
+{
+    auto frameNode = CreateVideoNode(g_testProperty);
+    ASSERT_TRUE(frameNode);
+    auto pattern = frameNode->GetPattern<VideoStateMachinePattern>();
+    ASSERT_TRUE(pattern);
+    pattern->mediaPlayer_.Reset();
+    pattern->PrepareSurface();
+
+    ScopedExtSurfaceEnabled extSurface(false);
+    auto player = AceType::MakeRefPtr<TestableMockMediaPlayer>();
+    EXPECT_CALL(*player, SetRenderSurface(_)).Times(1);
+    EXPECT_CALL(*player, SetSurface()).WillOnce(Return(-1)).WillOnce(Return(0));
+    pattern->mediaPlayer_ = player;
+    auto surface = AceType::DynamicCast<MockRenderSurface>(pattern->renderSurface_);
+    ASSERT_TRUE(surface);
+    EXPECT_CALL(*surface, SetRenderContext(pattern->renderContextForMediaPlayer_)).Times(2);
+    EXPECT_CALL(*surface, IsSurfaceValid()).WillOnce(Return(false)).WillOnce(Return(true));
+    EXPECT_CALL(*surface, InitSurface()).Times(1);
+
+    pattern->PrepareSurface();
+    pattern->PrepareSurface();
+}
+
+HWTEST_F(VideoStateMachinePatternTestNg, UpdateLooping_ExecuteBackgroundTask001, TestSize.Level0)
+{
+    auto frameNode = CreateVideoNode(g_testProperty);
+    ASSERT_TRUE(frameNode);
+    auto pattern = frameNode->GetPattern<VideoStateMachinePattern>();
+    ASSERT_TRUE(pattern);
+    ScopedRecordingTaskExecutor taskExecutor(MockPipelineContext::GetCurrent());
+    auto player = AceType::MakeRefPtr<TestableMockMediaPlayer>();
+    EXPECT_CALL(*player, IsMediaPlayerValid()).WillRepeatedly(Return(true));
+    EXPECT_CALL(*player, SetLooping(true)).WillOnce(Return(0));
+    pattern->mediaPlayer_ = player;
+    pattern->loop_ = true;
+
+    pattern->UpdateLooping();
+    ASSERT_TRUE(taskExecutor.Get()->RunNext(TaskExecutor::TaskType::BACKGROUND));
+    EXPECT_TRUE(pattern->loop_);
+    EXPECT_TRUE(pattern->stateManager_->serialBgTaskQueue_.empty());
+}
+
+HWTEST_F(VideoStateMachinePatternTestNg, UpdateMuted_ExecuteMutedAndNormalTasks001, TestSize.Level0)
+{
+    auto frameNode = CreateVideoNode(g_testProperty);
+    ASSERT_TRUE(frameNode);
+    auto pattern = frameNode->GetPattern<VideoStateMachinePattern>();
+    ASSERT_TRUE(pattern);
+    ScopedRecordingTaskExecutor taskExecutor(MockPipelineContext::GetCurrent());
+    auto player = AceType::MakeRefPtr<TestableMockMediaPlayer>();
+    EXPECT_CALL(*player, IsMediaPlayerValid()).WillRepeatedly(Return(true));
+    Sequence sequence;
+    EXPECT_CALL(*player, SetMediaMuted(0, true)).InSequence(sequence);
+    EXPECT_CALL(*player, SetVolume(0.0f, 0.0f)).InSequence(sequence);
+    EXPECT_CALL(*player, SetMediaMuted(0, false)).InSequence(sequence);
+    EXPECT_CALL(*player, SetVolume(0.5f, 0.5f)).InSequence(sequence);
+    pattern->mediaPlayer_ = player;
+    pattern->currentVolume_ = 0.5f;
+
+    pattern->muted_ = true;
+    pattern->UpdateMuted();
+    ASSERT_TRUE(taskExecutor.Get()->RunNext(TaskExecutor::TaskType::BACKGROUND));
+    pattern->muted_ = false;
+    pattern->UpdateMuted();
+    ASSERT_TRUE(taskExecutor.Get()->RunNext(TaskExecutor::TaskType::BACKGROUND));
+    EXPECT_TRUE(pattern->stateManager_->serialBgTaskQueue_.empty());
+}
+
+HWTEST_F(VideoStateMachinePatternTestNg, Stop_SuccessTaskBody001, TestSize.Level0)
+{
+    auto frameNode = CreateVideoNode(g_testProperty);
+    ASSERT_TRUE(frameNode);
+    auto pattern = frameNode->GetPattern<VideoStateMachinePattern>();
+    ASSERT_TRUE(pattern);
+    ScopedRecordingTaskExecutor taskExecutor(MockPipelineContext::GetCurrent());
+    auto player = AceType::MakeRefPtr<TestableMockMediaPlayer>();
+    EXPECT_CALL(*player, IsMediaPlayerValid()).WillRepeatedly(Return(true));
+    EXPECT_CALL(*player, Stop()).WillOnce(Return(0));
+    pattern->mediaPlayer_ = player;
+    auto eventHub = pattern->GetEventHub<VideoEventHub>();
+    ASSERT_TRUE(eventHub);
+    int32_t stopCount = 0;
+    eventHub->SetOnStop([&stopCount](const std::string&) { stopCount++; });
+
+    pattern->stateManager_->state_ = VideoPlaybackState::PLAYING;
+    pattern->stateManager_->ClearPendingCommand();
+    pattern->currentPos_ = 30;
+    pattern->SetIsSeeking(true);
+    pattern->Stop();
+    EXPECT_EQ(pattern->stateManager_->GetPendingCommand(), VideoPlaybackCommand::STOP);
+    ASSERT_TRUE(taskExecutor.Get()->RunNext(TaskExecutor::TaskType::BACKGROUND));
+    EXPECT_TRUE(pattern->GetIsSeeking());
+    ASSERT_TRUE(taskExecutor.Get()->RunNext(TaskExecutor::TaskType::UI));
+    EXPECT_FALSE(pattern->GetIsSeeking());
+    EXPECT_EQ(pattern->stateManager_->GetPendingCommand(), VideoPlaybackCommand::STOP);
+
+    pattern->OnPlayerStatus(PlaybackStatus::STOPPED);
+    EXPECT_EQ(pattern->stateManager_->GetCurrentState(), VideoPlaybackState::STOPPED);
+    EXPECT_EQ(pattern->stateManager_->GetPendingCommand(), VideoPlaybackCommand::NONE);
+    EXPECT_EQ(pattern->currentPos_, 0u);
+    EXPECT_EQ(stopCount, 1);
+}
+
+HWTEST_F(VideoStateMachinePatternTestNg, Stop_FailureClearsPending001, TestSize.Level0)
+{
+    auto frameNode = CreateVideoNode(g_testProperty);
+    ASSERT_TRUE(frameNode);
+    auto pattern = frameNode->GetPattern<VideoStateMachinePattern>();
+    ASSERT_TRUE(pattern);
+    ScopedRecordingTaskExecutor taskExecutor(MockPipelineContext::GetCurrent());
+    auto player = AceType::MakeRefPtr<TestableMockMediaPlayer>();
+    EXPECT_CALL(*player, IsMediaPlayerValid()).WillRepeatedly(Return(true));
+    EXPECT_CALL(*player, Stop()).WillOnce(Return(-1));
+    pattern->mediaPlayer_ = player;
+    pattern->stateManager_->state_ = VideoPlaybackState::PLAYING;
+    pattern->stateManager_->ClearPendingCommand();
+    pattern->SetIsSeeking(true);
+
+    bool callbackCalled = false;
+    bool callbackSuccess = true;
+    std::string callbackReason;
+    pattern->Stop([&callbackCalled, &callbackSuccess, &callbackReason](bool success, const std::string& reason) {
+        callbackCalled = true;
+        callbackSuccess = success;
+        callbackReason = reason;
+    });
+    ASSERT_TRUE(taskExecutor.Get()->RunNext(TaskExecutor::TaskType::BACKGROUND));
+    ASSERT_TRUE(taskExecutor.Get()->RunNext(TaskExecutor::TaskType::UI));
+    EXPECT_TRUE(callbackCalled);
+    EXPECT_FALSE(callbackSuccess);
+    EXPECT_EQ(callbackReason, "Media player Stop() failed");
+    EXPECT_EQ(pattern->stateManager_->GetPendingCommand(), VideoPlaybackCommand::NONE);
+    EXPECT_EQ(pattern->stateManager_->GetCurrentState(), VideoPlaybackState::PLAYING);
+    EXPECT_TRUE(pattern->GetIsSeeking());
+}
+
+HWTEST_F(VideoStateMachinePatternTestNg, UpdateSpeed_SuccessResultWithoutInjection001, TestSize.Level0)
+{
+    auto frameNode = CreateVideoNode(g_testProperty);
+    ASSERT_TRUE(frameNode);
+    auto pattern = frameNode->GetPattern<VideoStateMachinePattern>();
+    ASSERT_TRUE(pattern);
+    ScopedRecordingTaskExecutor taskExecutor(MockPipelineContext::GetCurrent());
+    auto player = AceType::MakeRefPtr<TestableMockMediaPlayer>();
+    EXPECT_CALL(*player, IsMediaPlayerValid()).WillRepeatedly(Return(true));
+    EXPECT_CALL(*player, SetPlaybackRate(2.0f, _, _)).WillOnce(Return(0));
+    pattern->mediaPlayer_ = player;
+    pattern->progressRate_ = 2.0;
+    pattern->lastProgressRate_ = 0.0;
+    pattern->lastSetProgressRate_ = 1.0;
+    pattern->isProgressInjectCmd_ = false;
+
+    pattern->UpdateSpeed();
+    ASSERT_TRUE(taskExecutor.Get()->RunNext(TaskExecutor::TaskType::BACKGROUND));
+    ASSERT_TRUE(taskExecutor.Get()->RunNext(TaskExecutor::TaskType::UI));
+    EXPECT_DOUBLE_EQ(pattern->lastProgressRate_, 2.0);
+    EXPECT_DOUBLE_EQ(pattern->lastSetProgressRate_, 2.0);
+    EXPECT_FALSE(pattern->isProgressInjectCmd_);
+}
+
+HWTEST_F(VideoStateMachinePatternTestNg, ResetMediaPlayerOnBg_SuccessChain001, TestSize.Level0)
+{
+    auto frameNode = CreateVideoNode(g_testProperty);
+    ASSERT_TRUE(frameNode);
+    auto pattern = frameNode->GetPattern<VideoStateMachinePattern>();
+    ASSERT_TRUE(pattern);
+    ScopedRecordingTaskExecutor taskExecutor(MockPipelineContext::GetCurrent());
+    ScopedExtSurfaceEnabled extSurface(false);
+    auto player = AceType::MakeRefPtr<TestCallbackMediaPlayer>();
+    EXPECT_CALL(*player, IsMediaPlayerValid()).WillRepeatedly(Return(true));
+    EXPECT_CALL(*player, SetSource(VIDEO_SRC, "", "")).WillOnce(Return(true));
+    EXPECT_CALL(*player, SetSurface()).WillOnce(Return(0));
+    EXPECT_CALL(*player, SetRenderFirstFrame(false)).WillOnce(Return(0));
+    EXPECT_CALL(*player, PrepareAsync()).WillOnce(Return(0));
+    EXPECT_CALL(*player, GetDuration(_)).WillRepeatedly(DoAll(SetArgReferee<0>(65000), Return(0)));
+    EXPECT_CALL(*player, SetLooping(_)).WillRepeatedly(Return(0));
+    EXPECT_CALL(*player, SetPlaybackRate(_, _, _)).WillRepeatedly(Return(0));
+    pattern->mediaPlayer_ = player;
+    auto surface = AceType::DynamicCast<MockRenderSurface>(pattern->renderSurface_);
+    ASSERT_TRUE(surface);
+    EXPECT_CALL(*surface, SetRenderContext(_)).Times(1);
+    EXPECT_CALL(*surface, IsSurfaceValid()).WillRepeatedly(Return(true));
+    pattern->videoSrcInfo_.src_ = VIDEO_SRC;
+    pattern->showFirstFrame_ = false;
+    pattern->stateManager_->state_ = VideoPlaybackState::PREPARED;
+    pattern->stateManager_->ClearPendingCommand();
+
+    auto eventHub = pattern->GetEventHub<VideoEventHub>();
+    ASSERT_TRUE(eventHub);
+    int32_t preparedCount = 0;
+    eventHub->SetOnPrepared([&preparedCount](const std::string&) { preparedCount++; });
+    bool callbackCalled = false;
+    bool callbackSuccess = false;
+    pattern->ResetMediaPlayerOnBg([&callbackCalled, &callbackSuccess](bool success, const std::string&) {
+        callbackCalled = true;
+        callbackSuccess = success;
+    });
+    EXPECT_EQ(pattern->stateManager_->GetPendingCommand(), VideoPlaybackCommand::RESET);
+    ASSERT_TRUE(taskExecutor.Get()->RunNext(TaskExecutor::TaskType::BACKGROUND));
+    EXPECT_EQ(player->resetCount_, 1);
+    EXPECT_EQ(player->createCount_, 0);
+    ASSERT_TRUE(player->stateChangedEvent_);
+
+    ASSERT_TRUE(taskExecutor.Get()->RunNext(TaskExecutor::TaskType::UI));
+    ASSERT_TRUE(taskExecutor.Get()->RunNext(TaskExecutor::TaskType::UI));
+    EXPECT_EQ(pattern->stateManager_->GetCurrentState(), VideoPlaybackState::CREATED);
+    EXPECT_EQ(pattern->stateManager_->GetPendingCommand(), VideoPlaybackCommand::PREPARE);
+    EXPECT_EQ(pattern->stateManager_->GetOriginalIntent(), VideoPlaybackCommand::RESET);
+    ASSERT_TRUE(taskExecutor.Get()->RunNext(TaskExecutor::TaskType::BACKGROUND));
+
+    player->stateChangedEvent_(PlaybackStatus::PREPARED);
+    ASSERT_TRUE(taskExecutor.Get()->RunNext(TaskExecutor::TaskType::UI));
+    EXPECT_EQ(pattern->stateManager_->GetCurrentState(), VideoPlaybackState::PREPARED);
+    EXPECT_EQ(pattern->stateManager_->GetPendingCommand(), VideoPlaybackCommand::NONE);
+    EXPECT_EQ(pattern->stateManager_->GetOriginalIntent(), VideoPlaybackCommand::NONE);
+    EXPECT_EQ(pattern->duration_, 65u);
+    EXPECT_EQ(preparedCount, 1);
+    EXPECT_TRUE(callbackCalled);
+    EXPECT_TRUE(callbackSuccess);
+}
+
+HWTEST_F(VideoStateMachinePatternTestNg, DumpInfo_TextAndJson001, TestSize.Level0)
+{
+    auto frameNode = CreateVideoNode(g_testProperty);
+    ASSERT_TRUE(frameNode);
+    auto pattern = frameNode->GetPattern<VideoStateMachinePattern>();
+    ASSERT_TRUE(pattern);
+    pattern->duration_ = 65;
+    pattern->loop_ = true;
+    pattern->muted_ = false;
+    pattern->progressRate_ = 1.5;
+
+    auto expected = pattern->GetDumpInfo();
+    EXPECT_NE(expected.find("Video[" + std::to_string(pattern->hostId_) + "]"), std::string::npos);
+    EXPECT_NE(expected.find("duration: 65"), std::string::npos);
+    EXPECT_NE(expected.find("loop: 1"), std::string::npos);
+    EXPECT_NE(expected.find("muted: 0"), std::string::npos);
+    EXPECT_NE(expected.find("Speed: 1.500000"), std::string::npos);
+
+    auto& dumpLog = DumpLog::GetInstance();
+    dumpLog.description_.clear();
+    ASSERT_TRUE(pattern->renderContextForMediaPlayer_);
+    pattern->DumpInfo();
+    ASSERT_EQ(dumpLog.description_.size(), 2u);
+    EXPECT_EQ(dumpLog.description_[0], expected + "\n");
+    auto renderContext = pattern->renderContextForMediaPlayer_;
+    pattern->renderContextForMediaPlayer_.Reset();
+    pattern->DumpInfo();
+    ASSERT_EQ(dumpLog.description_.size(), 3u);
+    EXPECT_EQ(dumpLog.description_[2], expected + "\n");
+    pattern->renderContextForMediaPlayer_ = renderContext;
+
+    auto json = JsonUtil::Create();
+    pattern->DumpInfo(json);
+    ASSERT_TRUE(json->Contains("VideoPattern"));
+    EXPECT_EQ(json->GetString("VideoPattern"), expected);
+}
+
+HWTEST_F(VideoStateMachinePatternTestNg, DumpSimplifyInfo_NestedJson001, TestSize.Level0)
+{
+    auto frameNode = CreateVideoNode(g_testProperty);
+    ASSERT_TRUE(frameNode);
+    auto pattern = frameNode->GetPattern<VideoStateMachinePattern>();
+    ASSERT_TRUE(pattern);
+    pattern->duration_ = 90;
+    pattern->loop_ = false;
+    pattern->muted_ = true;
+    pattern->progressRate_ = 2.0;
+    auto expected = pattern->GetDumpInfo();
+
+    auto json = JsonUtil::CreateSharedPtrJson();
+    pattern->DumpSimplifyInfo(json);
+    ASSERT_TRUE(json->Contains("CanvasPattern"));
+    auto videoJson = json->GetObject("CanvasPattern");
+    ASSERT_TRUE(videoJson);
+    EXPECT_EQ(videoJson->GetString("VideoPattern"), expected);
+}
+
+HWTEST_F(VideoStateMachinePatternTestNg, BindControllerAsync_CommandRoutes001, TestSize.Level0)
+{
+    auto frameNode = CreateVideoNode(g_testProperty);
+    ASSERT_TRUE(frameNode);
+    auto pattern = frameNode->GetPattern<VideoStateMachinePattern>();
+    ASSERT_TRUE(pattern);
+    ScopedRecordingTaskExecutor taskExecutor(MockPipelineContext::GetCurrent());
+    auto player = AceType::MakeRefPtr<TestableMockMediaPlayer>();
+    EXPECT_CALL(*player, IsMediaPlayerValid()).WillRepeatedly(Return(true));
+    EXPECT_CALL(*player, Seek(5500, SeekMode::SEEK_CLOSEST)).WillOnce(Return(0));
+    pattern->mediaPlayer_ = player;
+    pattern->showFirstFrame_ = true;
+    auto controller = pattern->videoControllerAsync_;
+    ASSERT_TRUE(controller);
+    ASSERT_TRUE(controller->IsBound());
+    auto stateManager = pattern->stateManager_;
+
+    auto clearTasks = [&stateManager, &taskExecutor]() {
+        while (!stateManager->serialBgTaskQueue_.empty()) {
+            stateManager->serialBgTaskQueue_.pop();
+        }
+        taskExecutor.Get()->tasks_.clear();
+        stateManager->isDrainingSerialBgQueue_ = false;
+        stateManager->ClearPendingCommand();
+    };
+
+    stateManager->state_ = VideoPlaybackState::PREPARED;
+    clearTasks();
+    controller->Start(nullptr);
+    EXPECT_EQ(stateManager->GetPendingCommand(), VideoPlaybackCommand::PLAY);
+    ASSERT_EQ(stateManager->serialBgTaskQueue_.size(), 1u);
+    EXPECT_EQ(stateManager->serialBgTaskQueue_.front().name, "ArkUIVideoPlay");
+
+    stateManager->state_ = VideoPlaybackState::PLAYING;
+    clearTasks();
+    controller->Pause(nullptr);
+    EXPECT_EQ(stateManager->GetPendingCommand(), VideoPlaybackCommand::PAUSE);
+    ASSERT_EQ(stateManager->serialBgTaskQueue_.size(), 1u);
+    EXPECT_EQ(stateManager->serialBgTaskQueue_.front().name, "ArkUIVideoPause");
+
+    stateManager->state_ = VideoPlaybackState::PLAYING;
+    clearTasks();
+    controller->Stop(nullptr);
+    EXPECT_EQ(stateManager->GetPendingCommand(), VideoPlaybackCommand::STOP);
+    ASSERT_EQ(stateManager->serialBgTaskQueue_.size(), 1u);
+    EXPECT_EQ(stateManager->serialBgTaskQueue_.front().name, "ArkUIVideoStop");
+
+    stateManager->state_ = VideoPlaybackState::CREATED;
+    clearTasks();
+    controller->Reset(nullptr);
+    EXPECT_EQ(stateManager->GetPendingCommand(), VideoPlaybackCommand::RESET);
+    ASSERT_EQ(stateManager->serialBgTaskQueue_.size(), 1u);
+    EXPECT_EQ(stateManager->serialBgTaskQueue_.front().name, "ArkUIVideoMediaPlayerReset");
+
+    stateManager->state_ = VideoPlaybackState::PREPARED;
+    clearTasks();
+    controller->SeekTo(5.5f, SeekMode::SEEK_CLOSEST);
+    ASSERT_TRUE(taskExecutor.Get()->RunNext(TaskExecutor::TaskType::UI));
+    EXPECT_TRUE(pattern->GetIsSeeking());
+    EXPECT_TRUE(controller->IsBound());
+
+    controller->RequestFullscreen(true);
+    ASSERT_TRUE(taskExecutor.Get()->RunNext(TaskExecutor::TaskType::UI));
+    EXPECT_TRUE(pattern->IsFullScreen());
+    controller->RequestFullscreen(false);
+    while (taskExecutor.Get()->RunNext(TaskExecutor::TaskType::UI)) {
+    }
+    EXPECT_FALSE(pattern->IsFullScreen());
+}
+
+HWTEST_F(VideoStateMachinePatternTestNg, SetVideoControllerAsync_ReplacesBinding001, TestSize.Level0)
+{
+    auto frameNode = CreateVideoNode(g_testProperty);
+    ASSERT_TRUE(frameNode);
+    auto pattern = frameNode->GetPattern<VideoStateMachinePattern>();
+    ASSERT_TRUE(pattern);
+    auto original = pattern->videoControllerAsync_;
+    ASSERT_TRUE(original);
+    ASSERT_TRUE(original->IsBound());
+    auto replacement = AceType::MakeRefPtr<VideoControllerAsync>();
+
+    pattern->SetVideoControllerAsync(replacement);
+    EXPECT_EQ(pattern->videoControllerAsync_.GetRawPtr(), replacement.GetRawPtr());
+    EXPECT_FALSE(original->IsBound());
+    EXPECT_TRUE(replacement->IsBound());
+
+    pattern->SetVideoControllerAsync(replacement);
+    EXPECT_TRUE(replacement->IsBound());
+    pattern->SetVideoControllerAsync(original);
+    EXPECT_TRUE(original->IsBound());
+    EXPECT_FALSE(replacement->IsBound());
+}
+
+HWTEST_F(VideoStateMachinePatternTestNg, OnDirtyLayoutWrapperSwap_Api12PixelRounding001, TestSize.Level0)
+{
+    auto frameNode = CreateVideoNode(g_testProperty);
+    ASSERT_TRUE(frameNode);
+    auto pattern = frameNode->GetPattern<VideoStateMachinePattern>();
+    ASSERT_TRUE(pattern);
+    auto videoLayoutProperty = frameNode->GetLayoutProperty<VideoLayoutProperty>();
+    ASSERT_TRUE(videoLayoutProperty);
+    auto geometryNode = AceType::MakeRefPtr<GeometryNode>();
+    auto layoutWrapper = AceType::MakeRefPtr<LayoutWrapperNode>(frameNode, geometryNode, videoLayoutProperty);
+    layoutWrapper->skipMeasureContent_ = false;
+    layoutWrapper->layoutAlgorithm_ =
+        AceType::MakeRefPtr<LayoutAlgorithmWrapper>(AceType::MakeRefPtr<LayoutAlgorithm>());
+    layoutWrapper->layoutAlgorithm_->skipMeasure_ = false;
+    auto renderContext = AceType::MakeRefPtr<MockRenderContext>();
+    pattern->renderContextForMediaPlayer_ = renderContext;
+    DirtySwapConfig config;
+    config.skipMeasure = false;
+
+    MockContainer::SetUp();
+    auto container = Container::Current();
+    auto oldVersion = container->GetApiTargetVersion();
+    container->SetApiTargetVersion(12);
+    videoLayoutProperty->UpdateObjectFit(ImageFit::FILL);
+    videoLayoutProperty->UpdateVideoSize(SizeF(50.0f, 50.0f));
+    geometryNode->SetContentSize(SizeF(100.4f, 80.4f));
+    EXPECT_CALL(*renderContext, SetBounds(0.0f, 0.0f, 100.0f, 80.0f)).Times(1);
+    EXPECT_FALSE(pattern->OnDirtyLayoutWrapperSwap(layoutWrapper, config));
+    EXPECT_FLOAT_EQ(pattern->lastMediaPlayerBounds_.Width(), 100.0f);
+    EXPECT_FLOAT_EQ(pattern->lastMediaPlayerBounds_.Height(), 80.0f);
+
+    videoLayoutProperty->UpdateObjectFit(ImageFit::CONTAIN);
+    videoLayoutProperty->UpdateVideoSize(SizeF(50.8f, 100.0f));
+    geometryNode->SetContentSize(SizeF(52.0f, 100.0f));
+    EXPECT_CALL(*renderContext, SetBounds(1.0f, 0.0f, 51.0f, 100.0f)).Times(1);
+    EXPECT_FALSE(pattern->OnDirtyLayoutWrapperSwap(layoutWrapper, config));
+    EXPECT_FLOAT_EQ(pattern->lastMediaPlayerBounds_.GetX(), 1.0f);
+    EXPECT_FLOAT_EQ(pattern->lastMediaPlayerBounds_.Width(), 51.0f);
+
+    videoLayoutProperty->UpdateVideoSize(SizeF(100.0f, 50.8f));
+    geometryNode->SetContentSize(SizeF(100.0f, 52.0f));
+    EXPECT_CALL(*renderContext, SetBounds(0.0f, 1.0f, 100.0f, 51.0f)).Times(1);
+    EXPECT_FALSE(pattern->OnDirtyLayoutWrapperSwap(layoutWrapper, config));
+    container->SetApiTargetVersion(oldVersion);
+    MockContainer::TearDown();
+    EXPECT_FLOAT_EQ(pattern->lastMediaPlayerBounds_.GetY(), 1.0f);
+    EXPECT_FLOAT_EQ(pattern->lastMediaPlayerBounds_.Height(), 51.0f);
+}
+
+HWTEST_F(VideoStateMachinePatternTestNg, OnDirtyLayoutWrapperSwap_InvalidFitUsesCover001, TestSize.Level0)
+{
+    auto frameNode = CreateVideoNode(g_testProperty);
+    ASSERT_TRUE(frameNode);
+    auto pattern = frameNode->GetPattern<VideoStateMachinePattern>();
+    ASSERT_TRUE(pattern);
+    auto videoLayoutProperty = frameNode->GetLayoutProperty<VideoLayoutProperty>();
+    ASSERT_TRUE(videoLayoutProperty);
+    videoLayoutProperty->UpdateVideoSize(SizeF(100.0f, 200.0f));
+    videoLayoutProperty->UpdateObjectFit(static_cast<ImageFit>(999));
+    auto geometryNode = AceType::MakeRefPtr<GeometryNode>();
+    geometryNode->SetContentSize(SizeF(400.0f, 200.0f));
+    auto layoutWrapper = AceType::MakeRefPtr<LayoutWrapperNode>(frameNode, geometryNode, videoLayoutProperty);
+    layoutWrapper->skipMeasureContent_ = false;
+    layoutWrapper->layoutAlgorithm_ =
+        AceType::MakeRefPtr<LayoutAlgorithmWrapper>(AceType::MakeRefPtr<LayoutAlgorithm>());
+    layoutWrapper->layoutAlgorithm_->skipMeasure_ = false;
+    auto renderContext = AceType::MakeRefPtr<MockRenderContext>();
+    pattern->renderContextForMediaPlayer_ = renderContext;
+    DirtySwapConfig config;
+    config.skipMeasure = false;
+
+    EXPECT_CALL(*renderContext, SetBounds(0.0f, -300.0f, 400.0f, 800.0f)).Times(1);
+    EXPECT_FALSE(pattern->OnDirtyLayoutWrapperSwap(layoutWrapper, config));
+    EXPECT_FLOAT_EQ(pattern->lastMediaPlayerBounds_.GetY(), -300.0f);
+    EXPECT_FLOAT_EQ(pattern->lastMediaPlayerBounds_.Width(), 400.0f);
+    EXPECT_FLOAT_EQ(pattern->lastMediaPlayerBounds_.Height(), 800.0f);
 }
 
 } // namespace OHOS::Ace::NG
