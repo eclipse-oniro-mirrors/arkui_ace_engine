@@ -516,6 +516,10 @@ void TabsSideBarTabListPattern::UpdateTabBarItemTextProperties(
         textLayoutProperty->UpdateTextAlign(TextAlign::START); // Left-aligned (Row layout)
         textLayoutProperty->UpdateMaxFontScale(SIDEBAR_TAB_MAX_FONT_SCALE);
         textLayoutProperty->UpdateFontWeight(FontWeight::MEDIUM);
+        // Default to single-line with ellipsis for long tab labels.
+        // UpdateLabelStyle below can override these if the user set them.
+        textLayoutProperty->UpdateMaxLines(1);
+        textLayoutProperty->UpdateTextOverflow(TextOverflow::ELLIPSIS);
     }
     if (!isFrameNode) {
         TabContentModelNG::UpdateLabelStyle(labelStyle, textLayoutProperty);

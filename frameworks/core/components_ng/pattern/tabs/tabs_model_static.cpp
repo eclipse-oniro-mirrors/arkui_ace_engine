@@ -365,8 +365,10 @@ void TabsModelStatic::SetTabBarWidth(FrameNode* frameNode, const std::optional<D
 {
     if (tabBarWidthOpt) {
         ACE_UPDATE_NODE_LAYOUT_PROPERTY(TabsLayoutProperty, BarWidth, tabBarWidthOpt.value(), frameNode);
+        ACE_UPDATE_NODE_LAYOUT_PROPERTY(TabsLayoutProperty, BarWidthForSideBar, tabBarWidthOpt.value(), frameNode);
     } else {
         ACE_RESET_NODE_LAYOUT_PROPERTY(TabsLayoutProperty, BarWidth, frameNode);
+        ACE_RESET_NODE_LAYOUT_PROPERTY(TabsLayoutProperty, BarWidthForSideBar, frameNode);
     }
     auto tabsNode = AceType::DynamicCast<TabsNode>(frameNode);
     CHECK_NULL_VOID(tabsNode);
