@@ -1138,16 +1138,20 @@ HWTEST_F(SheetECTestNg, SheetECSetSheetBorderWidth002, TestSize.Level1)
         V2::STAGE_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<StagePattern>());
     auto rootNode = FrameNode::CreateFrameNode(V2::ROOT_ETS_TAG, 1, AceType::MakeRefPtr<RootPattern>());
     stageNode->MountToParent(rootNode);
+
     targetNode->MountToParent(stageNode);
+
     rootNode->MarkDirtyNode();
 
     SheetStyle sheetStyle;
     sheetStyle.sheetHeight.sheetMode = SheetMode::MEDIUM;
+
     sheetStyle.showDragBar = true;
     sheetStyle.borderWidth = NG::BorderWidthProperty({ 2.0_vp, 2.0_vp, 2.0_vp, 2.0_vp });
 
     auto overlayManager = AceType::MakeRefPtr<OverlayManager>(rootNode);
     CreateSheetBuilder();
+
     overlayManager->OnBindSheet(true, nullptr, std::move(builderFunc_), std::move(titleBuilderFunc_), sheetStyle,
         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, targetNode);
 
@@ -1194,6 +1198,7 @@ HWTEST_F(SheetECTestNg, SheetECIsSheetBottom002, TestSize.Level1)
     EXPECT_TRUE(pattern->IsSheetBottomStyle());
 
     pattern->sheetType_ = SheetType::SHEET_BOTTOMLANDSPACE;
+
     auto backupApiVersion = AceApplicationInfo::GetInstance().GetApiTargetVersion();
     AceApplicationInfo::GetInstance().SetApiTargetVersion(static_cast<int32_t>(PlatformVersion::VERSION_TWELVE));
     EXPECT_TRUE(pattern->IsSheetBottomStyle());
@@ -1215,6 +1220,7 @@ HWTEST_F(SheetECTestNg, SheetECSheetPresentationProperty001, TestSize.Level1)
     auto stageNode = FrameNode::CreateFrameNode(
         V2::STAGE_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(), AceType::MakeRefPtr<StagePattern>());
     auto rootNode = FrameNode::CreateFrameNode(V2::ROOT_ETS_TAG, 1, AceType::MakeRefPtr<RootPattern>());
+
     stageNode->MountToParent(rootNode);
     targetNode->MountToParent(stageNode);
     rootNode->MarkDirtyNode();

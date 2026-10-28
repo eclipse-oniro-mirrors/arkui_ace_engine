@@ -55,6 +55,7 @@
 #include "core/components_ng/property/measure_utils.h"
 #include "core/components_ng/render/animation_utils.h"
 #include "base/log/ace_checker.h"
+#include "core/components_ng/manager/material/material_processor.h"
 #include "interfaces/inner_api/ace/ui_content_config.h"
 #include "core/components_ng/manager/navigation/navigation_manager.h"
 #include "core/components_ng/pattern/stage/stage_manager.h"
@@ -5255,12 +5256,17 @@ void NavigationPattern::StartTransition(const RefPtr<NavDestinationGroupNode>& p
                     topNode = AceType::DynamicCast<FrameNode>(navigationNode->GetNavBarOrHomeDestinationNode());
                 }
                 navigationPattern->ContentChangeReport(topNode, isPopTransition);
+                if (topNode) {
+                    if (auto ctx = navigationPattern->GetContext()) {
+                        ctx->ReportPageContextStats(topNode->GetId(), PageLogContainerType::NavContainer);
+                    }
+                }
             });
         return;
     }
 
     pipeline->AddAfterLayoutTask([weakNavigation = WeakClaim(this),
-        weakPreDestination = WeakPtr<NavDestinationGroupNode>(preDestination),
+                                     weakPreDestination = WeakPtr<NavDestinationGroupNode>(preDestination),
         weakTopDestination = WeakPtr<NavDestinationGroupNode>(topDestination),
         isPopPage, isNeedVisible, fromPath, isPopTransition]() {
         auto navigationPattern = AceType::DynamicCast<NavigationPattern>(weakNavigation.Upgrade());
@@ -5270,6 +5276,15 @@ void NavigationPattern::StartTransition(const RefPtr<NavDestinationGroupNode>& p
 
         auto forceSplitSuccess = navigationPattern->IsForceSplitSuccess();
         auto forceSplitUseNavBar = navigationPattern->IsForceSplitUseNavBar();
+
+        RefPtr<FrameNode> topNode = topDestination;
+        auto ctx = navigationPattern->GetContext();
+        if (!topNode) {
+            auto navNode = AceType::DynamicCast<NavigationGroupNode>(navigationPattern->GetHost());
+            CHECK_NULL_VOID(navNode);
+            topNode = AceType::DynamicCast<FrameNode>(navNode->GetNavBarOrHomeDestinationNode());
+        }
+
         if (forceSplitSuccess && !forceSplitUseNavBar &&
             ((preDestination && preDestination->GetNavDestinationType() == NavDestinationType::HOME) ||
             (topDestination && topDestination->GetNavDestinationType() == NavDestinationType::HOME))) {
@@ -5280,6 +5295,9 @@ void NavigationPattern::StartTransition(const RefPtr<NavDestinationGroupNode>& p
             navigationPattern->primaryNodesToBeRemoved_.clear();
             navigationPattern->RemoveRedundantPrimaryNavDestination();
             navigationPattern->ContentChangeReport(topDestination, isPopTransition);
+            if (topNode && ctx) {
+                ctx->ReportPageContextStats(topNode->GetId(), PageLogContainerType::NavContainer);
+            }
             return;
         }
 
@@ -5289,6 +5307,9 @@ void NavigationPattern::StartTransition(const RefPtr<NavDestinationGroupNode>& p
         navigationPattern->prePrimaryNodes_.clear();
         navigationPattern->primaryNodesToBeRemoved_.clear();
         navigationPattern->RemoveRedundantPrimaryNavDestination();
+        if (topNode && ctx) {
+            ctx->ReportPageContextStats(topNode->GetId(), PageLogContainerType::NavContainer);
+        }
     });
 }
 

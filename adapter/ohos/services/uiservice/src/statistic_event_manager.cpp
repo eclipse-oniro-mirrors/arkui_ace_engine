@@ -64,6 +64,19 @@ void StatisticEventManager::SendStatisticEvents(const AppInfoParcel& appInfo,
     }
 }
 
+void StatisticEventManager::SendRichStatisticEvents(
+    const AppInfoParcel& appInfo, const std::vector<MaterialStatisticEventInfoParcel>& eventInfos)
+{
+    for (const auto& eventParcel : eventInfos) {
+        MaterialStatisticEventInfo info = eventParcel.GetInfo();
+        info.bundleName = appInfo.GetBundleName();
+        if (!richEvent_) {
+            richEvent_ = std::make_unique<MaterialStatisticEvent>();
+        }
+        richEvent_->Append(info);
+    }
+}
+
 void StatisticEventManager::StartTimedEvent()
 {
     for (auto& interval : timedSet_) {

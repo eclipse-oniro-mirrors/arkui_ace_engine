@@ -36,4 +36,20 @@ void StatisticEventAdapter::ReportStatisticEvents(
     TAG_LOGE(AceLogTag::ACE_UI_SERVICE, "ui service not implement");
 #endif
 }
+
+void StatisticEventAdapter::ReportMaterialStatisticEvents(
+    const StatisticAppInfo& appInfo, const std::vector<MaterialStatisticEventInfo>& events)
+{
+#ifdef UI_SERVICE_WITH_IDL
+    AppInfoParcel appInfoParcel(appInfo.bundleName);
+    std::vector<MaterialStatisticEventInfoParcel> eventParcelList;
+    eventParcelList.reserve(events.size());
+    for (const auto& eventInfo : events) {
+        eventParcelList.emplace_back(eventInfo);
+    }
+    Ace::UIServiceMgrClientIdl::GetInstance()->ReportMaterialStatisticEvents(appInfoParcel, eventParcelList);
+#else
+    TAG_LOGE(AceLogTag::ACE_UI_SERVICE, "ui service not implement");
+#endif
+}
 } // namespace OHOS::Ace

@@ -17,7 +17,9 @@
 
 #include <mutex>
 
+#include "base/log/log.h"
 #include "base/thread/task_executor.h"
+#include "base/utils/time_util.h"
 #include "core/common/ace_application_info.h"
 #include "core/common/container.h"
 #include "core/common/statistic_event_adapter.h"
@@ -26,6 +28,7 @@
 namespace OHOS::Ace {
 namespace {
 constexpr int32_t MAX_PENDING_EVENT_COUNT = 20;
+constexpr int32_t MAX_PENDING_MATERIAL_EVENT_COUNT = 20;
 }
 StatisticEventReporter::StatisticEventReporter()
 {
@@ -221,35 +224,57 @@ void StatisticEventReporter::ReportStatisticEvents(const std::map<StatisticEvent
 void StatisticEventReporter::TryReportStatisticEvents(PipelineBase* pipeline)
 {
     CHECK_NULL_VOID(pipeline);
-    if ((totalEventCount_ + concurrentEventCount_) < MAX_PENDING_EVENT_COUNT) {
+    auto materialEvents = TryReportMaterialEvents();
+    if (materialEvents.empty() && (totalEventCount_ + concurrentEventCount_) < MAX_PENDING_EVENT_COUNT) {
         return;
     }
     auto executor = pipeline->GetTaskExecutor();
     CHECK_NULL_VOID(executor);
 
     std::map<StatisticEventType, StatisticEventInfo> statisitcEvents;
-    std::swap(statisitcEvents, statisitcEventMap_);
-    totalEventCount_ = 0;
-
-    std::map<StatisticEventType, StatisticEventInfo> concurrentEvents;
-    {
-        std::lock_guard<std::mutex> lock(concurrentMutex_);
-        std::swap(concurrentEvents, concurrentEventMap_);
-        concurrentEventCount_ = 0;
+    if ((totalEventCount_ + concurrentEventCount_) >= MAX_PENDING_EVENT_COUNT) {
+        std::swap(statisitcEvents, statisitcEventMap_);
+        totalEventCount_ = 0;
+        std::map<StatisticEventType, StatisticEventInfo> concurrentEvents;
+        {
+            std::lock_guard<std::mutex> lock(concurrentMutex_);
+            std::swap(concurrentEvents, concurrentEventMap_);
+            concurrentEventCount_ = 0;
+        }
+        MergeEvents(statisitcEvents, concurrentEvents);
     }
 
-    MergeEvents(statisitcEvents, concurrentEvents);
-
     executor->PostTask(
-        [statisitcEvents = std::move(statisitcEvents), reporter = shared_from_this()] () {
+        [statisitcEvents = std::move(statisitcEvents), materialEvents = std::move(materialEvents),
+            reporter = shared_from_this()]() {
             if (reporter) {
-                reporter->ReportStatisticEvents(statisitcEvents);
+                if (!statisitcEvents.empty()) {
+                    reporter->ReportStatisticEvents(statisitcEvents);
+                }
+                if (!materialEvents.empty()) {
+                    reporter->ReportMaterialStatisticEvents(materialEvents);
+                }
             }
-        }, TaskExecutor::TaskType::BACKGROUND, "ReportStatisticEvents");
+        },
+        TaskExecutor::TaskType::BACKGROUND, "ReportStatisticEvents");
+}
+
+std::vector<MaterialStatisticEventInfo> StatisticEventReporter::TryReportMaterialEvents()
+{
+    std::vector<MaterialStatisticEventInfo> materialEvents;
+    {
+        std::lock_guard<std::mutex> lock(materialMutex_);
+        if (pendingMaterialEvents_.size() < MAX_PENDING_MATERIAL_EVENT_COUNT) {
+            return materialEvents;
+        }
+        std::swap(materialEvents, pendingMaterialEvents_);
+    }
+    return materialEvents;
 }
 
 void StatisticEventReporter::ForceReportStatisticEvents()
 {
+    ForceReportMaterialEvents();
     if (totalEventCount_ == 0 && concurrentEventCount_ == 0) {
         return;
     }
@@ -267,5 +292,50 @@ void StatisticEventReporter::ForceReportStatisticEvents()
 
     MergeEvents(statisitcEvents, concurrentEvents);
     ReportStatisticEvents(statisitcEvents);
+}
+
+void StatisticEventReporter::ForceReportMaterialEvents()
+{
+    std::vector<MaterialStatisticEventInfo> materialEvents;
+    {
+        std::lock_guard<std::mutex> lock(materialMutex_);
+        if (pendingMaterialEvents_.empty()) {
+            return;
+        }
+        std::swap(materialEvents, pendingMaterialEvents_);
+    }
+    ReportMaterialStatisticEvents(materialEvents);
+}
+
+void StatisticEventReporter::SendMaterialNodeStat(const RichMaterialNodeStatData& data)
+{
+    std::lock_guard<std::mutex> lock(materialMutex_);
+    if (pendingMaterialEvents_.size() > MAX_PENDING_MATERIAL_EVENT_COUNT) {
+        return;
+    }
+    MaterialStatisticEventInfo info;
+    info.type = MaterialStatisticEventType::MATERIAL_NODE_STAT;
+    info.materialNodeStat = data;
+    pendingMaterialEvents_.emplace_back(std::move(info));
+}
+
+void StatisticEventReporter::SendOverlayMaterialArea(const RichOverlayMaterialAreaData& data)
+{
+    std::lock_guard<std::mutex> lock(materialMutex_);
+    if (pendingMaterialEvents_.size() > MAX_PENDING_MATERIAL_EVENT_COUNT) {
+        return;
+    }
+    MaterialStatisticEventInfo info;
+    info.type = MaterialStatisticEventType::MATERIAL_OVERLAY_AREA;
+    info.overlayMaterialArea = data;
+    pendingMaterialEvents_.emplace_back(std::move(info));
+}
+
+void StatisticEventReporter::ReportMaterialStatisticEvents(const std::vector<MaterialStatisticEventInfo>& events)
+{
+    if (events.empty()) {
+        return;
+    }
+    StatisticEventAdapter::ReportMaterialStatisticEvents(appInfo_, events);
 }
 } // namespace OHOS::Ace

@@ -32,6 +32,7 @@
 #include "core/components_ng/pattern/tabs/tab_content_node.h"
 #include "core/components_ng/pattern/tabs/tabs_node.h"
 #include "core/pipeline_ng/pipeline_context.h"
+#include "core/components_ng/pattern/swiper/swiper_pattern.h"
 
 namespace OHOS::Ace::NG {
 const char TABS_ETS_TAG_PATTERN[] = "Tabs";
@@ -161,6 +162,7 @@ public:
 
         if (shallowBuilder_ && !shallowBuilder_->IsExecuteDeepRenderDone()) {
             shallowBuilder_->ExecuteDeepRender();
+
             if (secondTimeLayout_) {
                 auto host = GetHost();
                 CHECK_NULL_VOID(host);

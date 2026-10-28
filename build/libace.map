@@ -4938,6 +4938,11 @@
       "OHOS::Ace::NG::PipelineContext::UnregisterSurfaceChangedCallback(int)";
       "OHOS::Ace::NG::PipelineContext::UnregisterSurfacePositionChangedCallback(int)";
       "OHOS::Ace::NG::PipelineContext::UnregisterTransformHintChangedCallback(int)";
+      "OHOS::Ace::NG::PipelineContext::RegisterPageContextNode(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&)";
+      "OHOS::Ace::NG::PipelineContext::UnregisterPageContextNode(int)";
+      "OHOS::Ace::NG::PipelineContext::ReportPageContextStats(int, OHOS::Ace::NG::PageLogContainerType, int)";
+      "OHOS::Ace::NG::PipelineContext::AddTaskOverlayNodeMaterialArea(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&, std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>> const&)";
+      "OHOS::Ace::NG::PipelineContext::ReportOverlayNodeMaterialArea(OHOS::Ace::RefPtr<OHOS::Ace::NG::FrameNode> const&, std::__h::basic_string<char, std::__h::char_traits<char>, std::__h::allocator<char>> const&)";
       "OHOS::Ace::NG::RecycleDummyNode::WrapRecycleDummyNode(OHOS::Ace::RefPtr<OHOS::Ace::AceType> const&, int)";
       "OHOS::Ace::NG::RenderContext::Create()";
       "OHOS::Ace::NG::RenderContext::GetBackBlurRadius() const";

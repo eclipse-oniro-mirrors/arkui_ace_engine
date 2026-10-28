@@ -1313,6 +1313,7 @@ void SwitchPattern::ShowMaterialNode()
 
     RegisterMaterialNodePositionCallback();
     ApplyDragFrameNodeSystemMaterial();
+
 #ifndef ACE_UNITTEST
     ApplyBlendMode();
 #endif
@@ -1549,6 +1550,8 @@ void SwitchPattern::ApplyDragFrameNodeSystemMaterial()
             auto shadow = MaterialUtils::GetImmersiveShadow(dipScale * 0.8);
             shadow.SetColor(Color(0x1F050505));
             renderContext->UpdateBackShadow(shadow);
+
+            pipeline->AddTaskOverlayNodeMaterialArea(dragFrameNode_, "Switch ShowMaterialNode");
         }
     }
     ResetHostMaterialEffects();

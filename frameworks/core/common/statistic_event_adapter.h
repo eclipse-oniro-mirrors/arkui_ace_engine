@@ -17,6 +17,9 @@
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMMON_STATISTIC_EVENT_ADAPTER_H
 
 #include <map>
+#include <vector>
+
+#include "base/log/material_statistic_event_info.h"
 
 namespace OHOS::Ace {
 struct StatisticAppInfo;
@@ -28,6 +31,8 @@ public:
     ~StatisticEventAdapter() = default;
     static void ReportStatisticEvents(
         const StatisticAppInfo& appInfo, const std::map<StatisticEventType, StatisticEventInfo>& events);
+    static void ReportMaterialStatisticEvents(
+        const StatisticAppInfo& appInfo, const std::vector<MaterialStatisticEventInfo>& events);
 };
 } // namespace OHOS::Ace
 

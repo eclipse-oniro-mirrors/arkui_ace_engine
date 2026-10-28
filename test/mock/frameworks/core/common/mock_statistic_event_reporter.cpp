@@ -30,4 +30,18 @@ void StatisticEventReporter::ReportStatisticEvents(const std::map<StatisticEvent
 void StatisticEventReporter::TryReportStatisticEvents(PipelineBase* pipeline) {}
 
 void StatisticEventReporter::ForceReportStatisticEvents() {}
+
+void StatisticEventReporter::SendMaterialNodeStat(const RichMaterialNodeStatData& data) {}
+
+void StatisticEventReporter::SendOverlayMaterialArea(const RichOverlayMaterialAreaData& data) {}
+
+void StatisticEventReporter::ReportMaterialStatisticEvents(
+    const std::vector<MaterialStatisticEventInfo>& events) {}
+
+std::vector<MaterialStatisticEventInfo> StatisticEventReporter::TryReportMaterialEvents()
+{
+    return {};
+}
+
+void StatisticEventReporter::ForceReportMaterialEvents() {}
 } // namespace OHOS::Ace

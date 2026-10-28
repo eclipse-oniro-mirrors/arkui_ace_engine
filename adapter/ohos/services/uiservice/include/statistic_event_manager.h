@@ -23,6 +23,7 @@
 
 #include "event_handler.h"
 #include "event_runner.h"
+#include "material_statistic_event.h"
 #include "ui_service_statistic_event.h"
 
 namespace OHOS {
@@ -34,6 +35,8 @@ class StatisticEventManager final {
     DECLARE_DELAYED_SINGLETON(StatisticEventManager)
 public:
     void SendStatisticEvents(const AppInfoParcel& appInfo, const std::vector<StatisticEventInfoParcel>& eventInfos);
+    void SendRichStatisticEvents(
+        const AppInfoParcel& appInfo, const std::vector<MaterialStatisticEventInfoParcel>& eventInfos);
     void PostTimedEvent(int32_t interval);
     void ReportTimedStatisticEvent(int32_t interval);
     void Init(std::shared_ptr<EventHandler>& handler);
@@ -46,6 +49,7 @@ private:
     std::shared_ptr<EventHandler> handler_;
     std::set<int32_t> timedSet_;
     std::map<std::string, StatisticEvent> eventMap_;
+    std::unique_ptr<MaterialStatisticEvent> richEvent_;
 };
 }  // namespace Ace
 }  // namespace OHOS

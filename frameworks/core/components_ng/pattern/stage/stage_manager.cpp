@@ -29,6 +29,7 @@
 #include "core/common/ime/input_method_manager.h"
 #include "core/components_ng/manager/memory/memory_manager.h"
 #include "core/components_ng/manager/shared_overlay/shared_overlay_manager.h"
+#include "core/components_ng/manager/material/material_processor.h"
 
 #if !defined(ACE_UNITTEST)
 #include "core/components_ng/base/transparent_node_detector.h"
@@ -565,6 +566,12 @@ void StageManager::FirePageShow(const RefPtr<UINode>& node, PageTransitionType t
 
     auto context = PipelineContext::GetCurrentContext();
     CHECK_NULL_VOID(context);
+    auto pageId = pageNode->GetId();
+    context->AddAfterLayoutTask([pageId, ctxWk = WeakPtr<PipelineContext>(context)]() {
+        auto ctx = ctxWk.Upgrade();
+        CHECK_NULL_VOID(ctx);
+        ctx->ReportPageContextStats(pageId, PageLogContainerType::Page);
+    });
     context->MarkNeedFlushMouseEvent();
 #ifdef UICAST_COMPONENT_SUPPORTED
     do {

@@ -372,6 +372,7 @@ void SelectPattern::ShowSelectMenu()
     CHECK_NULL_VOID(host);
     auto context = host->GetContext();
     CHECK_NULL_VOID(context);
+    context->AddTaskOverlayNodeMaterialArea(host, "Select ShowSelectMenu");
     auto overlayManager = context->GetOverlayManager();
     CHECK_NULL_VOID(overlayManager);
     UpdateTargetSize();

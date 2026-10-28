@@ -24,6 +24,7 @@
 #include <string>
 
 #include "base/utils/macros.h"
+#include "base/log/material_statistic_event_info.h"
 
 namespace OHOS::Ace {
 class PipelineBase;
@@ -133,8 +134,14 @@ public:
     void SendEventSafe(StatisticEventType eventType);
     void TryReportStatisticEvents(PipelineBase* pipeline);
     void ForceReportStatisticEvents();
+
+    void SendMaterialNodeStat(const RichMaterialNodeStatData& data);
+    void SendOverlayMaterialArea(const RichOverlayMaterialAreaData& data);
 private:
     void ReportStatisticEvents(const std::map<StatisticEventType, StatisticEventInfo>& events);
+    void ReportMaterialStatisticEvents(const std::vector<MaterialStatisticEventInfo>& events);
+    std::vector<MaterialStatisticEventInfo> TryReportMaterialEvents();
+    void ForceReportMaterialEvents();
     StatisticEventInfo ConvertToEvent(StatisticEventType eventType);
     void MergeEvents(std::map<StatisticEventType, StatisticEventInfo>& target,
                      const std::map<StatisticEventType, StatisticEventInfo>& source);
@@ -143,7 +150,9 @@ private:
     StatisticAppInfo appInfo_;
     std::map<StatisticEventType, StatisticEventInfo> statisitcEventMap_;
     std::map<StatisticEventType, StatisticEventInfo> concurrentEventMap_;
+    std::vector<MaterialStatisticEventInfo> pendingMaterialEvents_;
     std::mutex concurrentMutex_;
+    std::mutex materialMutex_;
 };
 } // namespace OHOS::Ace
 #endif // FOUNDATION_ACE_FRAMEWORKS_CORE_COMMON_STATISTIC_EVENT_REPORTRE_H

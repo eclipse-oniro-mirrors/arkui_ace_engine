@@ -19,7 +19,9 @@
 #include <map>
 #include <queue>
 #include <string>
+#include <vector>
 
+#include "base/log/material_statistic_event_info.h"
 #include "parcel.h"
 
 namespace OHOS::Ace {
@@ -48,6 +50,18 @@ private:
     std::string eventName_;
     std::string subEventName_;
     int32_t eventCount_ = 0;
+};
+
+class MaterialStatisticEventInfoParcel : public Parcelable {
+public:
+    MaterialStatisticEventInfoParcel() = default;
+    explicit MaterialStatisticEventInfoParcel(const MaterialStatisticEventInfo& info) : info_(info) {}
+    bool Marshalling(Parcel& parcel) const override;
+    static MaterialStatisticEventInfoParcel* Unmarshalling(Parcel& parcel);
+    const MaterialStatisticEventInfo& GetInfo() const { return info_; }
+
+private:
+    MaterialStatisticEventInfo info_;
 };
 } // namespace OHOS::Ace
 #endif  // FOUNDATION_ARKUI_ACE_ENGINE_INTERFACES_INNER_API_UI_SERVICE_MANAGER_UI_SERVICE_STATISTIC_EVENT_H

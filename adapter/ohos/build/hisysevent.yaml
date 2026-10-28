@@ -267,3 +267,7 @@ UI_STATISTIC_EVENT:
   EVENT_COUNT: {type: INT32, arrsize: 100, desc: event count}
   BUNDLE_NAME: {type: STRING, arrsize: 100, desc: bundle name}
 
+MATERIAL_NODE_STAT:
+  __BASE: {type: STATISTIC, level: MINOR, desc: per-page immersive material node statistic batched by container}
+  MATERIAL_PAGE_INFO: {type: STRING, desc: material node stat info in JSON format}
+
