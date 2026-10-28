@@ -48,6 +48,7 @@
 #include "base/utils/utils.h"
 
 #include "core/common/window.h"
+#include "core/components_ng/base/inspector_tree_request_context.h"
 #include "core/components_ng/event/event_hub.h"
 #include "core/components_ng/manager/avoid_info/avoid_info_manager.h"
 #include "core/components_ng/pattern/pattern.h"
@@ -329,6 +330,118 @@ HWTEST_F(UIExtensionComponentTestTwoNg, RegisterVisibleAreaChangeTest001, TestSi
     ASSERT_NE(pattern->frameNode_.Upgrade(), nullptr);
     ASSERT_NE(pattern->GetHost(), nullptr);
     pattern->RegisterVisibleAreaChange();
+#endif
+}
+
+/**
+ * @tc.name: UIExtensionComponentTestTwoNg
+ * @tc.desc: Test RegisterVisibleAreaChange registers inner visible area callback with inner clip calculation
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestTwoNg, RegisterVisibleAreaChangeTest002, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    /**
+     * @tc.steps: step1. construct a UIExtensionComponent Node
+     */
+    auto uiExtensionNodeId = ElementRegister::GetInstance()->MakeUniqueId();
+    auto uiExtensionNode = FrameNode::GetOrCreateFrameNode(
+        UI_EXTENSION_COMPONENT_ETS_TAG, uiExtensionNodeId, []() {
+            return AceType::MakeRefPtr<UIExtensionPattern>();
+        });
+    ASSERT_NE(uiExtensionNode, nullptr);
+    EXPECT_EQ(uiExtensionNode->GetTag(), V2::UI_EXTENSION_COMPONENT_ETS_TAG);
+    auto pattern = uiExtensionNode->GetPattern<UIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+
+    /**
+     * @tc.steps: step2. register visible area change with valid host
+     */
+    pattern->frameNode_ = uiExtensionNode;
+    ASSERT_NE(pattern->GetHost(), nullptr);
+    pattern->RegisterVisibleAreaChange();
+
+    /**
+     * @tc.steps: step3. verify inner callback registered instead of user callback
+     * @tc.expected: isCalculateInnerVisibleRectClip_ is true, inner callback with ratios {0.0, 1.0}
+     */
+    EXPECT_TRUE(uiExtensionNode->isCalculateInnerVisibleRectClip_);
+    auto eventHub = uiExtensionNode->GetEventHub<EventHub>();
+    ASSERT_NE(eventHub, nullptr);
+    ASSERT_NE(eventHub->visibleAreaChangeCallbackSet_, nullptr);
+    ASSERT_NE(eventHub->visibleAreaChangeCallbackSet_->innerVisibleAreaChange, nullptr);
+    const auto& innerConfig = eventHub->visibleAreaChangeCallbackSet_->innerVisibleAreaChange;
+    EXPECT_EQ(innerConfig->ratios.size(), 2);
+    EXPECT_EQ(innerConfig->ratios[0], 0.0);
+    EXPECT_EQ(innerConfig->ratios[1], 1.0);
+    EXPECT_NE(innerConfig->callbackInfo.callback, nullptr);
+    EXPECT_EQ(eventHub->visibleAreaChangeCallbackSet_->userVisibleAreaChange, nullptr);
+    EXPECT_EQ(eventHub->visibleAreaChangeCallbackSet_->throttledVisibleAreaChange, nullptr);
+
+    /**
+     * @tc.steps: step4. verify node registered into pipeline visible area change set
+     */
+    auto pipeline = MockPipelineContext::GetCurrent();
+    ASSERT_NE(pipeline, nullptr);
+    EXPECT_TRUE(pipeline->isNeedCallbackAreaChange_);
+    EXPECT_NE(pipeline->onVisibleAreaChangeNodeIds_.find(uiExtensionNodeId),
+        pipeline->onVisibleAreaChangeNodeIds_.end());
+#endif
+}
+
+/**
+ * @tc.name: UIExtensionComponentTestTwoNg
+ * @tc.desc: Test registered inner visible area callback drives HandleVisibleAreaChange
+ * @tc.type: FUNC
+ */
+HWTEST_F(UIExtensionComponentTestTwoNg, RegisterVisibleAreaChangeTest003, TestSize.Level1)
+{
+#ifdef OHOS_STANDARD_SYSTEM
+    /**
+     * @tc.steps: step1. construct a UIExtensionComponent Node and register visible area change
+     */
+    auto uiExtensionNodeId = ElementRegister::GetInstance()->MakeUniqueId();
+    auto uiExtensionNode = FrameNode::GetOrCreateFrameNode(
+        UI_EXTENSION_COMPONENT_ETS_TAG, uiExtensionNodeId, []() {
+            return AceType::MakeRefPtr<UIExtensionPattern>();
+        });
+    ASSERT_NE(uiExtensionNode, nullptr);
+    auto pattern = uiExtensionNode->GetPattern<UIExtensionPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->frameNode_ = uiExtensionNode;
+    pattern->RegisterVisibleAreaChange();
+
+    auto eventHub = uiExtensionNode->GetEventHub<EventHub>();
+    ASSERT_NE(eventHub, nullptr);
+    ASSERT_NE(eventHub->visibleAreaChangeCallbackSet_, nullptr);
+    ASSERT_NE(eventHub->visibleAreaChangeCallbackSet_->innerVisibleAreaChange, nullptr);
+    const auto& innerCallback =
+        eventHub->visibleAreaChangeCallbackSet_->innerVisibleAreaChange->callbackInfo.callback;
+    ASSERT_NE(innerCallback, nullptr);
+
+    /**
+     * @tc.steps: step2. fire inner callback with invisible state
+     * @tc.expected: curVisible_ becomes false
+     */
+    EXPECT_FALSE(pattern->curVisible_);
+    innerCallback(false, 0.0);
+    EXPECT_FALSE(pattern->curVisible_);
+    EXPECT_FALSE(pattern->isVisible_);
+
+    /**
+     * @tc.steps: step3. fire inner callback with visible state
+     * @tc.expected: curVisible_ becomes true
+     */
+    innerCallback(true, 1.0);
+    EXPECT_TRUE(pattern->curVisible_);
+    EXPECT_TRUE(pattern->isVisible_);
+
+    /**
+     * @tc.steps: step4. fire inner callback with visible=true but ratio=0.0
+     * @tc.expected: curVisible_ becomes false again
+     */
+    innerCallback(true, 0.0);
+    EXPECT_FALSE(pattern->curVisible_);
 #endif
 }
 
@@ -1623,7 +1736,7 @@ HWTEST_F(UIExtensionComponentTestTwoNg, EmbeddedComponentTest001, TestSize.Level
 
 /**
  * @tc.name: ExecuteDumpTask001
- * @tc.desc: Test Func AddExtraInfoWithParamConfig
+ * @tc.desc: UIExtension dump timeout preserves the native inspector result.
  * @tc.type: FUNC
  */
 HWTEST_F(UIExtensionComponentTestTwoNg, ExecuteDumpTask001, TestSize.Level1)
@@ -1636,12 +1749,17 @@ HWTEST_F(UIExtensionComponentTestTwoNg, ExecuteDumpTask001, TestSize.Level1)
     ASSERT_NE(uiextensionNode, nullptr);
     auto pattern = uiextensionNode->GetPattern<UIExtensionPattern>();
     ASSERT_NE(pattern, nullptr);
+    pattern->Initialize();
+    ASSERT_NE(pattern->sessionWrapper_, nullptr);
 
     /**
      * @tc.steps: step2. Test Func AddExtraInfoWithParamConfig
      */
     auto json = JsonUtil::CreateSharedPtrJson();
+    json->Put("$type", "UIExtensionComponent");
     ParamConfig config;
+    config.withResponseRegion = true;
+    InspectorTreeRequestContext request(config, {});
     std::vector<std::string> params;
     params.push_back("-allInfoWithParamConfigTotal");
     params.push_back("1");
@@ -1650,8 +1768,17 @@ HWTEST_F(UIExtensionComponentTestTwoNg, ExecuteDumpTask001, TestSize.Level1)
     params.push_back(config.cacheNodes ? "1" : "0");
     params.push_back(config.withWeb ? "1" : "0");
     params.push_back(config.withUIExtension ? "1" : "0");
-    pattern->ExecuteDumpTask(json, params, uiextensionNode);
-    EXPECT_EQ(json->GetString("$child-uec"), "");
+    auto pipeline = MockPipelineContext::GetCurrent();
+    auto savedExecutor = pipeline->GetTaskExecutor();
+    pipeline->SetTaskExecutor(AceType::MakeRefPtr<MockTaskExecutor>(true));
+    pattern->ExecuteDumpTask(json, params, uiextensionNode, &request);
+    pipeline->SetTaskExecutor(savedExecutor);
+    EXPECT_FALSE(request.ShouldStop());
+    EXPECT_FALSE(json->Contains("$child-uec"));
+    auto result = request.FinalizeResult(json);
+    ASSERT_NE(result, nullptr);
+    EXPECT_EQ(result->GetString("$type"), "UIExtensionComponent");
+    EXPECT_EQ(result->GetString("errorMessage"), "no error");
 }
 
 /**

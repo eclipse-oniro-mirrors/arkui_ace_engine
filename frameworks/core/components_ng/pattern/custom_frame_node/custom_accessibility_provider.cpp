@@ -15,6 +15,7 @@
 
 #include "core/components_ng/pattern/custom_frame_node/custom_accessibility_provider.h"
 
+#include "base/log/log_wrapper.h"
 #include "base/utils/utils.h"
 #include "core/accessibility/native_interface_accessibility_impl.h"
 #include "core/accessibility/native_interface_accessibility_provider.h"
@@ -119,6 +120,7 @@ int32_t CustomAccessibilityProvider::SendAccessibilityAsyncEvent(
     auto mgr = thirdAccessibilityManager_.lock();
     if (mgr == nullptr) {
         if (callback) {
+            LOG_CALLBACK("OH_ArkUI_SendAccessibilityAsyncEvent", callback);
             callback(SEND_EVENT_FAILED);
         }
         return SEND_EVENT_FAILED;

@@ -147,6 +147,12 @@ Opt_FrameNode GetFrameNodeImpl(Ark_Scroller peer)
     auto arkFrameNode = static_cast<Ark_FrameNode>(FrameNodePeer::Create(frameNode));
     return Converter::ArkValue<Opt_FrameNode>(arkFrameNode);
 }
+Ark_ScrollState GetScrollStateImpl(Ark_VMContext vmContext,
+                                   Ark_Scroller peer)
+{
+    CHECK_NULL_RETURN(peer, static_cast<Ark_ScrollState>(ScrollState::IDLE));
+    return peer->TriggerGetScrollState(vmContext);
+}
 } // ScrollerAccessor
 const GENERATED_ArkUIScrollerAccessor* GetScrollerAccessor()
 {
@@ -167,6 +173,7 @@ const GENERATED_ArkUIScrollerAccessor* GetScrollerAccessor()
         ScrollerAccessor::GetItemIndexImpl,
         ScrollerAccessor::ContentSizeImpl,
         ScrollerAccessor::GetFrameNodeImpl,
+        ScrollerAccessor::GetScrollStateImpl,
     };
     return &ScrollerAccessorImpl;
 }

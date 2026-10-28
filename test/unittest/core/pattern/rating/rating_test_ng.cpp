@@ -129,6 +129,16 @@ void RatingTestNg::SetUpTestCase()
             return nullptr;
         }
     });
+    EXPECT_CALL(*themeManager, GetTheme(_, _))
+        .WillRepeatedly([](ThemeType type, int32_t themeScopeId) -> RefPtr<Theme> {
+        if (type == RatingTheme::TypeId()) {
+            return AceType::MakeRefPtr<RatingTheme>();
+        } else if (type == IconTheme::TypeId()) {
+            return AceType::MakeRefPtr<IconTheme>();
+        } else {
+            return nullptr;
+        }
+    });
     MockPipelineContext::GetCurrent()->SetThemeManager(themeManager);
 }
 

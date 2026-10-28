@@ -639,7 +639,7 @@ struct PathArgs {
     double para8 = 0.0;
 };
 
-class ACE_FORCE_EXPORT CanvasPath2D : virtual public AceType {
+class ACE_FORCE_EXPORT CanvasPath2D : public AceType {
     DECLARE_ACE_TYPE(CanvasPath2D, AceType);
 public:
     CanvasPath2D() = default;

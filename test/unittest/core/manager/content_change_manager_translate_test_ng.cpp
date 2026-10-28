@@ -342,7 +342,8 @@ HWTEST_F(ContentChangeManagerTranslateTestNg, ContentChangeManagerTranslateTest0
 
     contentChangeMgr->ResetTranslateTextNode();
 
-    EXPECT_TRUE(contentChangeMgr->translateTextNodes_.empty());
+    // Reset-all resets node states but keeps the tracking set; versions are cleared.
+    EXPECT_EQ(contentChangeMgr->translateTextNodes_.size(), 1U);
     EXPECT_TRUE(contentChangeMgr->translateTextVersions_.empty());
     EXPECT_TRUE(contentChangeMgr->translateTextSnapshotNodes_.empty());
     EXPECT_TRUE(contentChangeMgr->translateTextSnapshotVersions_.empty());

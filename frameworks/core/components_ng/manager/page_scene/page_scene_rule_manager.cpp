@@ -17,10 +17,13 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
+#include <cstdlib>
 
 #include "base/geometry/ng/rect_t.h"
 #include "base/json/json_util.h"
 #include "base/log/log_wrapper.h"
+#include "base/utils/time_util.h"
 #include "base/utils/utf_helper.h"
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/base/ui_node.h"
@@ -47,6 +50,192 @@ const char EXIT_EVENT_SUFFIX[] = "_EXIT";
 const char COUNT_GTE_OPERATOR[] = "COUNT_GTE";
 const char SOURCE_ARKUI[] = "ARKUI";
 const char SEARCH_FIELD_TAG[] = "SearchField";
+
+constexpr int32_t MAX_SEARCH_RULE_SETS_PER_PROCESS = 2;
+constexpr int32_t MAX_SEARCH_RULES_PER_RULE_SET = 10;
+constexpr int32_t MAX_SEARCH_REGIONS_PER_RULE = 5;
+constexpr int32_t MAX_SEARCH_KEYWORDS_PER_RULE = 5;
+constexpr int32_t MAX_SEARCH_KEYWORD_UTF8_BYTES = 20;
+constexpr int32_t SEARCH_COMPONENT_TYPES = 5;
+// Bound retained input when the next stable detection point is delayed or never arrives.
+constexpr size_t MAX_PENDING_SEARCH_CLICKS = 256;
+constexpr int64_t SEARCH_CLICK_EXPIRATION_MS = 5000;
+constexpr int64_t NANOSECONDS_PER_MILLISECOND = 1000000;
+const char PAGE_TYPE_NAVIGATION[] = "Navigation";
+const char PAGE_TYPE_ROUTER[] = "Router";
+const char SEARCH_COMPONENT_IMAGE[] = "Image";
+const char SEARCH_COMPONENT_SWIPER[] = "Swiper";
+const char SEARCH_COMPONENT_SEARCH[] = "Search";
+const char SEARCH_COMPONENT_BUTTON[] = "Button";
+const char SEARCH_COMPONENT_TEXT_INPUT[] = "TextInput";
+
+bool IsValidSearchComponentType(const std::string& type)
+{
+    return type == SEARCH_COMPONENT_IMAGE || type == SEARCH_COMPONENT_SWIPER ||
+           type == SEARCH_COMPONENT_SEARCH || type == SEARCH_COMPONENT_BUTTON ||
+           type == SEARCH_COMPONENT_TEXT_INPUT;
+}
+
+bool IsPositiveFiniteNumber(double value)
+{
+    return value > 0.0 && std::isfinite(value);
+}
+
+std::unique_ptr<JsonValue> GetObjectValue(const std::unique_ptr<JsonValue>& json, const std::string& key);
+
+bool HasPositiveAreaOverlap(const PageSceneRectInfo& left, const PageSceneRectInfo& right)
+{
+    float overlapWidth = std::min(left.x + left.width, right.x + right.width) - std::max(left.x, right.x);
+    float overlapHeight = std::min(left.y + left.height, right.y + right.height) - std::max(left.y, right.y);
+    return overlapWidth > 0.0f && overlapHeight > 0.0f;
+}
+
+std::optional<SearchComponentFeature> ParseSearchComponent(const std::unique_ptr<JsonValue>& component)
+{
+    if (!component || !component->IsObject()) {
+        return std::nullopt;
+    }
+    SearchComponentFeature feature;
+    feature.type = component->GetString("type");
+    if (!IsValidSearchComponentType(feature.type)) {
+        return std::nullopt;
+    }
+    auto maxSize = GetObjectValue(component, "maxSize");
+    if (maxSize) {
+        auto width = maxSize->GetValue("width");
+        auto height = maxSize->GetValue("height");
+        if (!width || !width->IsNumber() || !height || !height->IsNumber() ||
+            !IsPositiveFiniteNumber(width->GetDouble()) || !IsPositiveFiniteNumber(height->GetDouble())) {
+            return std::nullopt;
+        }
+        feature.maxWidth = static_cast<float>(width->GetDouble());
+        feature.maxHeight = static_cast<float>(height->GetDouble());
+    }
+    auto maxRatio = component->GetValue("maxRatio");
+    if (maxRatio && !maxRatio->IsNull()) {
+        if (!maxRatio->IsNumber() || !IsPositiveFiniteNumber(maxRatio->GetDouble())) {
+            return std::nullopt;
+        }
+        feature.maxRatio = static_cast<float>(maxRatio->GetDouble());
+    }
+    auto autoPlay = component->GetValue("autoPlay");
+    if (autoPlay && !autoPlay->IsNull()) {
+        if (!autoPlay->IsBool()) {
+            return std::nullopt;
+        }
+        feature.autoPlay = autoPlay->GetBool();
+    }
+    return feature;
+}
+
+bool ParseSearchRegions(const std::unique_ptr<JsonValue>& ruleJson, SearchSceneRule& rule)
+{
+    auto regions = ruleJson->GetValue("regions");
+    if (!regions || !regions->IsArray() || regions->GetArraySize() <= 0 ||
+        regions->GetArraySize() > MAX_SEARCH_REGIONS_PER_RULE) {
+        return false;
+    }
+    for (int32_t index = 0; index < regions->GetArraySize(); ++index) {
+        auto region = regions->GetArrayItem(index);
+        if (!region || !region->IsObject()) {
+            return false;
+        }
+        auto x = region->GetValue("x");
+        auto y = region->GetValue("y");
+        auto width = region->GetValue("width");
+        auto height = region->GetValue("height");
+        if (!x || !x->IsNumber() || !y || !y->IsNumber() ||
+            !width || !width->IsNumber() || !height || !height->IsNumber()) {
+            return false;
+        }
+        PageSceneRectInfo rect;
+        rect.x = static_cast<float>(x->GetDouble());
+        rect.y = static_cast<float>(y->GetDouble());
+        rect.width = static_cast<float>(width->GetDouble());
+        rect.height = static_cast<float>(height->GetDouble());
+        if (!IsPositiveFiniteNumber(rect.width) || !IsPositiveFiniteNumber(rect.height)) {
+            return false;
+        }
+        for (const auto& existing : rule.regions) {
+            if (HasPositiveAreaOverlap(existing, rect)) {
+                return false;
+            }
+        }
+        rule.regions.emplace_back(rect);
+    }
+    return true;
+}
+
+bool ParseSearchKeywords(const std::unique_ptr<JsonValue>& ruleJson, SearchSceneRule& rule)
+{
+    auto keywords = ruleJson->GetValue("keywords");
+    if (keywords && !keywords->IsNull()) {
+        if (!keywords->IsArray() || keywords->GetArraySize() > MAX_SEARCH_KEYWORDS_PER_RULE) {
+            return false;
+        }
+        for (int32_t index = 0; index < keywords->GetArraySize(); ++index) {
+            auto item = keywords->GetArrayItem(index);
+            if (!item || !item->IsString()) {
+                return false;
+            }
+            auto keyword = item->GetString();
+            if (keyword.empty() || keyword.size() > MAX_SEARCH_KEYWORD_UTF8_BYTES) {
+                return false;
+            }
+            rule.keywords.emplace_back(keyword);
+        }
+    }
+    return true;
+}
+
+bool ParseSearchComponents(const std::unique_ptr<JsonValue>& ruleJson, SearchSceneRule& rule)
+{
+    auto components = ruleJson->GetValue("components");
+    if (components && !components->IsNull()) {
+        if (!components->IsArray() || components->GetArraySize() > SEARCH_COMPONENT_TYPES) {
+            return false;
+        }
+        std::set<std::string> componentTypes;
+        for (int32_t index = 0; index < components->GetArraySize(); ++index) {
+            auto feature = ParseSearchComponent(components->GetArrayItem(index));
+            if (!feature.has_value()) {
+                return false;
+            }
+            if (componentTypes.find(feature->type) != componentTypes.end()) {
+                return false;
+            }
+            componentTypes.insert(feature->type);
+            rule.components.emplace_back(feature.value());
+        }
+    }
+    return true;
+}
+
+bool ParseSearchInspectorIds(const std::unique_ptr<JsonValue>& ruleJson, SearchSceneRule& rule)
+{
+    auto inspectorIds = ruleJson->GetValue("inspectorIds");
+    if (inspectorIds && !inspectorIds->IsNull()) {
+        if (!inspectorIds->IsArray()) {
+            return false;
+        }
+        std::set<std::string> idSet;
+        for (int32_t index = 0; index < inspectorIds->GetArraySize(); ++index) {
+            auto item = inspectorIds->GetArrayItem(index);
+            if (!item || !item->IsString()) {
+                return false;
+            }
+            auto id = item->GetString();
+            if (id.empty()) {
+                return false;
+            }
+            if (idSet.find(id) == idSet.end()) {
+                idSet.insert(id);
+                rule.inspectorIds.emplace_back(id);
+            }
+        }
+    }
+    return true;
+}
 
 std::string ExtractTextFieldText(const RefPtr<FrameNode>& node)
 {
@@ -325,8 +514,20 @@ std::optional<PageSceneNodeInfo> PageSceneInputCountTracker::BuildNodeInfo(
     return info;
 }
 
+PageSceneRuleManager::~PageSceneRuleManager()
+{
+    UnregisterSearchClickObserver(searchClickObserverId_);
+}
+
 int32_t PageSceneRuleManager::RegisterRuleSet(int32_t processId, const std::string& ruleJson)
 {
+    // Search scene ruleJson (frozen schema) carries no "version" field; the legacy
+    // TEXT_EDITOR ruleJson requires version == 1. Route by presence of "version".
+    auto root = JsonUtil::ParseJsonString(ruleJson);
+    auto version = (root && root->IsObject()) ? root->GetValue("version") : nullptr;
+    if (!version || version->IsNull()) {
+        return RegisterSearchRuleSet(processId, ruleJson);
+    }
     auto ruleSet = ParseRuleSet(ruleJson);
     if (!ruleSet.has_value()) {
         return PAGE_SCENE_PARAM_INVALID;
@@ -361,6 +562,345 @@ int32_t PageSceneRuleManager::UnregisterRuleSet(int32_t processId, const std::st
     return PAGE_SCENE_NO_ERROR;
 }
 
+int32_t PageSceneRuleManager::RegisterSearchRuleSet(int32_t processId, const std::string& ruleJson)
+{
+    auto ruleSet = ParseSearchRuleSet(ruleJson);
+    if (!ruleSet.has_value()) {
+        return PAGE_SCENE_PARAM_INVALID;
+    }
+    std::lock_guard<std::mutex> lock(mutex_);
+    auto processIter = searchRuleSets_.find(processId);
+    if (processIter == searchRuleSets_.end()) {
+        searchRuleSets_[processId][ruleSet->ruleSetId] = ruleSet.value();
+        return PAGE_SCENE_NO_ERROR;
+    }
+    auto existing = processIter->second.find(ruleSet->ruleSetId);
+    if (existing != processIter->second.end()) {
+        const auto& currentGeneration = existing->second.registrationGeneration;
+        const auto& newGeneration = ruleSet->registrationGeneration;
+        // The adapter uses canonical decimal generations. Permit a newer
+        // registration to replace a cache entry whose cleanup is still queued.
+        bool isNewer = !newGeneration.empty() && (newGeneration.size() > currentGeneration.size() ||
+            (newGeneration.size() == currentGeneration.size() && newGeneration > currentGeneration));
+        if (!isNewer) {
+            return PAGE_SCENE_PARAM_INVALID;
+        }
+        existing->second = ruleSet.value();
+        std::lock_guard<std::mutex> presenceLock(presenceStateMutex_);
+        presenceStateMachine_.ClearRuleSet(std::to_string(processId), ruleSet->ruleSetId);
+        return PAGE_SCENE_NO_ERROR;
+    }
+    if (static_cast<int32_t>(processIter->second.size()) >= MAX_SEARCH_RULE_SETS_PER_PROCESS) {
+        // A third ruleSet for the same SA is rejected (AC-1.15).
+        return PAGE_SCENE_PARAM_INVALID;
+    }
+    processIter->second[ruleSet->ruleSetId] = ruleSet.value();
+    return PAGE_SCENE_NO_ERROR;
+}
+
+int32_t PageSceneRuleManager::UnregisterSearchRuleSet(
+    int32_t processId, const std::string& ruleSetId, const std::string& generation)
+{
+    if (ruleSetId.empty()) {
+        return PAGE_SCENE_PARAM_INVALID;
+    }
+    std::lock_guard<std::mutex> lock(mutex_);
+    auto processIter = searchRuleSets_.find(processId);
+    if (processIter == searchRuleSets_.end()) {
+        return PAGE_SCENE_PARAM_INVALID;
+    }
+    auto setIter = processIter->second.find(ruleSetId);
+    if (setIter == processIter->second.end()) {
+        return PAGE_SCENE_PARAM_INVALID;
+    }
+    if (!generation.empty() && setIter->second.registrationGeneration != generation) {
+        return PAGE_SCENE_PARAM_INVALID;
+    }
+    {
+        std::lock_guard<std::mutex> presenceLock(presenceStateMutex_);
+        presenceStateMachine_.ClearRuleSet(std::to_string(processId), ruleSetId);
+    }
+    processIter->second.erase(setIter);
+    if (processIter->second.empty()) {
+        searchRuleSets_.erase(processIter);
+        std::lock_guard<std::mutex> presenceLock(presenceStateMutex_);
+        presenceStateMachine_.ClearPrefix(std::to_string(processId) + ":");
+    }
+    StopSearchClickObservationIfIdleLocked();
+    return PAGE_SCENE_NO_ERROR;
+}
+
+std::optional<SearchRuleSet> PageSceneRuleManager::GetSearchRuleSet(
+    int32_t processId, const std::string& ruleSetId) const
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    auto processIter = searchRuleSets_.find(processId);
+    if (processIter == searchRuleSets_.end()) {
+        return std::nullopt;
+    }
+    auto setIter = processIter->second.find(ruleSetId);
+    if (setIter == processIter->second.end()) {
+        return std::nullopt;
+    }
+    return setIter->second;
+}
+
+bool PageSceneRuleManager::HasRegisteredSearchRule(int32_t processId) const
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    auto iter = searchRuleSets_.find(processId);
+    return iter != searchRuleSets_.end() && !iter->second.empty();
+}
+
+std::vector<SearchMatchEvidence> PageSceneRuleManager::MatchSearchScene(
+    int32_t processId, const SearchSceneSnapshot& snapshot) const
+{
+    SearchSnapshotMatcher matcher;
+    std::vector<SearchMatchEvidence> hits;
+    std::lock_guard<std::mutex> lock(mutex_);
+    auto processIter = searchRuleSets_.find(processId);
+    if (processIter == searchRuleSets_.end()) {
+        return hits;
+    }
+    for (const auto& [ruleSetId, ruleSet] : processIter->second) {
+        auto ruleHits = matcher.Match(snapshot, ruleSet);
+        hits.insert(hits.end(), ruleHits.begin(), ruleHits.end());
+    }
+    return hits;
+}
+
+std::vector<SearchPresenceStateMachine::PresenceEvent> PageSceneRuleManager::UpdateSearchPresence(
+    int32_t processId, const SearchSceneSnapshot& snapshot, const std::vector<SearchMatchEvidence>& hits)
+{
+    std::lock_guard<std::mutex> presenceLock(presenceStateMutex_);
+    std::vector<SearchPresenceStateMachine::PresenceEvent> events;
+    // Derive pageName by pageType instead of the concatenated snapshot.pageName.
+    // Navigation → navDestinationName; Router → pageUrl; fallback → pageName.
+    std::string pageName = !snapshot.navDestinationName.empty()
+        ? snapshot.navDestinationName : (!snapshot.pageUrl.empty() ? snapshot.pageUrl : snapshot.pageName);
+    if (pageName.empty()) {
+        return events;
+    }
+    std::map<std::string, std::vector<SearchMatchEvidence>> hitsBySuffix {
+        { "", {} }, { SUBWINDOW_DIALOG_SUFFIX, {} }, { SUBWINDOW_SHEET_SUFFIX, {} }
+    };
+    for (const auto& hit : hits) {
+        const auto suffix = hit.isSubwindow
+            ? (hit.subwindowSuffix.empty() ? std::string(SUBWINDOW_DIALOG_SUFFIX) : hit.subwindowSuffix) : "";
+        hitsBySuffix[suffix].emplace_back(hit);
+    }
+    // Update every supported state even on a miss or after a window closes.
+    // Dialog and Sheet must have independent evidence and exit transitions.
+    std::map<std::string, std::vector<SearchMatchEvidence>> hitsByPage;
+    for (const auto& [suffix, pageHits] : hitsBySuffix) {
+        const auto name = suffix.empty() ? pageName : BuildSearchSubwindowPageName(pageName, suffix);
+        auto& combined = hitsByPage[name];
+        combined.insert(combined.end(), pageHits.begin(), pageHits.end());
+    }
+    for (const auto& [eventPageName, pageHits] : hitsByPage) {
+        const auto key = std::to_string(processId) + ":" + eventPageName;
+        auto event = presenceStateMachine_.Update(key, eventPageName, !pageHits.empty(), pageHits);
+        if (event) {
+            events.emplace_back(std::move(*event));
+        }
+    }
+    return events;
+}
+
+std::optional<SearchPresenceStateMachine::PresenceEvent> PageSceneRuleManager::ExitSearchPresence(
+    int32_t processId, const std::string& pageName)
+{
+    std::lock_guard<std::mutex> presenceLock(presenceStateMutex_);
+    if (pageName.empty()) {
+        return std::nullopt;
+    }
+    return presenceStateMachine_.Exit(std::to_string(processId) + ":" + pageName, pageName);
+}
+
+std::vector<SearchPresenceStateMachine::PresenceEvent> PageSceneRuleManager::ExitOtherSearchPresence(
+    int32_t processId, const std::string& currentPageName)
+{
+    std::lock_guard<std::mutex> presenceLock(presenceStateMutex_);
+    // Do not exit any PRESENT state when there is no current page identity
+    // (subwindow UIContent / transition), to avoid subwindow focus detection
+    // clearing the main-window presence (AC-5.1).
+    if (currentPageName.empty()) {
+        return {};
+    }
+    std::string prefix = std::to_string(processId) + ":";
+    return presenceStateMachine_.ExitOtherPages(prefix, currentPageName);
+}
+
+std::vector<std::pair<int32_t, SearchPresenceStateMachine::PresenceEvent>> PageSceneRuleManager::ExitAllSearchPresence()
+{
+    std::vector<std::pair<int32_t, SearchPresenceStateMachine::PresenceEvent>> events;
+    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::mutex> presenceLock(presenceStateMutex_);
+    for (const auto& [pid, ruleSets] : searchRuleSets_) {
+        auto pidEvents = presenceStateMachine_.ExitAllExcept(std::to_string(pid) + ":", "");
+        for (auto& event : pidEvents) {
+            events.emplace_back(pid, std::move(event));
+        }
+    }
+    return events;
+}
+
+uint32_t PageSceneRuleManager::RegisterSearchClickObserver(
+    const std::weak_ptr<PageSceneRuleManager>& weakManager)
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (searchRuleSets_.empty() || weakManager.expired()) {
+        return 0;
+    }
+    if (searchClickObserverId_ != 0) {
+        return searchClickObserverId_;
+    }
+    searchClickObserverId_ = SearchClickObserver::GetInstance().AddHandler(
+        [weakManager](const SearchClickCandidate& candidate) {
+            auto manager = weakManager.lock();
+            if (manager) {
+                manager->AddPendingClickCandidate(candidate);
+            }
+        });
+    return searchClickObserverId_;
+}
+
+void PageSceneRuleManager::UnregisterSearchClickObserver(uint32_t handlerId)
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (handlerId != 0) {
+        SearchClickObserver::GetInstance().RemoveHandler(handlerId);
+    }
+    if (handlerId == searchClickObserverId_) {
+        searchClickObserverId_ = 0;
+    }
+}
+
+void PageSceneRuleManager::StopSearchClickObservationIfIdleLocked()
+{
+    if (!searchRuleSets_.empty()) {
+        return;
+    }
+    pendingClickCandidates_.clear();
+    recentClickOperations_.clear();
+    if (searchClickObserverId_ != 0) {
+        SearchClickObserver::GetInstance().RemoveHandler(searchClickObserverId_);
+        searchClickObserverId_ = 0;
+    }
+}
+
+void PageSceneRuleManager::PrunePendingClickCandidatesLocked(int64_t nowMs)
+{
+    for (auto iter = pendingClickCandidates_.begin(); iter != pendingClickCandidates_.end();) {
+        auto timestamp = iter->second.operationTimestampMs;
+        if (timestamp > nowMs || nowMs - timestamp > SEARCH_CLICK_EXPIRATION_MS) {
+            iter = pendingClickCandidates_.erase(iter);
+        } else {
+            ++iter;
+        }
+    }
+    for (auto iter = recentClickOperations_.begin(); iter != recentClickOperations_.end();) {
+        if (iter->second > nowMs || nowMs - iter->second > SEARCH_CLICK_EXPIRATION_MS) {
+            iter = recentClickOperations_.erase(iter);
+        } else {
+            ++iter;
+        }
+    }
+}
+
+void PageSceneRuleManager::AddPendingClickCandidate(const SearchClickCandidate& candidate)
+{
+    if (candidate.operationId.empty() || candidate.nodeId < 0) {
+        return;
+    }
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (searchRuleSets_.empty()) {
+        return;
+    }
+    auto nowMs = GetSysTimestamp() / NANOSECONDS_PER_MILLISECOND;
+    if (candidate.operationTimestampMs < 0 || candidate.operationTimestampMs > nowMs ||
+        nowMs - candidate.operationTimestampMs > SEARCH_CLICK_EXPIRATION_MS) {
+        return;
+    }
+    PrunePendingClickCandidatesLocked(nowMs);
+    if (recentClickOperations_.find(candidate.operationId) != recentClickOperations_.end() ||
+        pendingClickCandidates_.find(candidate.operationId) != pendingClickCandidates_.end()) {
+        return;
+    }
+    if (pendingClickCandidates_.size() >= MAX_PENDING_SEARCH_CLICKS) {
+        auto oldest = std::min_element(pendingClickCandidates_.begin(), pendingClickCandidates_.end(),
+            [](const auto& left, const auto& right) {
+                return left.second.operationTimestampMs < right.second.operationTimestampMs;
+            });
+        pendingClickCandidates_.erase(oldest);
+    }
+    if (recentClickOperations_.size() >= MAX_PENDING_SEARCH_CLICKS) {
+        auto oldest = std::min_element(recentClickOperations_.begin(), recentClickOperations_.end(),
+            [](const auto& left, const auto& right) { return left.second < right.second; });
+        recentClickOperations_.erase(oldest);
+    }
+    recentClickOperations_[candidate.operationId] = nowMs;
+    pendingClickCandidates_[candidate.operationId] = candidate;
+}
+
+std::vector<SearchClickMatchResult> PageSceneRuleManager::ConsumeSearchClickCandidates(
+    const SearchClickPageContext& page)
+{
+    std::vector<SearchClickCandidate> candidates;
+    std::vector<std::pair<int32_t, SearchRuleSet>> ruleSets;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        PrunePendingClickCandidatesLocked(GetSysTimestamp() / NANOSECONDS_PER_MILLISECOND);
+        for (const auto& [operationId, candidate] : pendingClickCandidates_) {
+            candidates.emplace_back(candidate);
+        }
+        pendingClickCandidates_.clear();
+        for (const auto& [processId, processRuleSets] : searchRuleSets_) {
+            for (const auto& [ruleSetId, ruleSet] : processRuleSets) {
+                ruleSets.emplace_back(processId, ruleSet);
+            }
+        }
+    }
+    SearchClickMatcher matcher;
+    std::vector<SearchClickMatchResult> results;
+    for (const auto& [processId, ruleSet] : ruleSets) {
+        for (const auto& candidate : candidates) {
+            auto responseNode = candidate.responseNode.Upgrade();
+            auto ruleResults = matcher.Match(candidate, page, ruleSet, responseNode);
+            for (auto& result : ruleResults) {
+                result.processId = processId;
+                result.operationId = candidate.operationId;
+            }
+            results.insert(results.end(), ruleResults.begin(), ruleResults.end());
+        }
+    }
+    return results;
+}
+
+void PageSceneRuleManager::SetIsContentStableFunction(IsContentStableFunction&& func)
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    isContentStableFunc_ = std::move(func);
+}
+
+std::vector<SearchClickMatchResult> PageSceneRuleManager::FlushPendingSearchClicksIfStable(
+    const SearchClickPageContext& page)
+{
+    // Check the stability gate first (reusing ContentChangeManager's
+    // IsScrolling/IsTransitioning/IsSwiperScrolling); if not stable, skip
+    // consumption and leave candidates for the ContentChange flush path (AC-7.11).
+    IsContentStableFunction isStable;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        isStable = isContentStableFunc_;
+    }
+    if (isStable && !isStable()) {
+        return {};
+    }
+    auto clickResults = ConsumeSearchClickCandidates(page);
+    return clickResults;
+}
+
 int32_t PageSceneRuleManager::BeginGetPageScene(
     int32_t processId, const std::string& ruleJsonOrRuleSetId, std::string& ruleJson)
 {
@@ -391,10 +931,16 @@ void PageSceneRuleManager::CompleteGetPageScene(int32_t processId)
     pendingGetProcesses_.erase(processId);
 }
 
-void PageSceneRuleManager::ClearProcess(int32_t processId)
+void PageSceneRuleManager::ClearProcess(int32_t processId, bool clearSearchRules)
 {
     std::lock_guard<std::mutex> lock(mutex_);
     registeredRuleSets_.erase(processId);
+    if (clearSearchRules) {
+        searchRuleSets_.erase(processId);
+        std::lock_guard<std::mutex> presenceLock(presenceStateMutex_);
+        presenceStateMachine_.ClearPrefix(std::to_string(processId) + ":");
+    }
+    StopSearchClickObservationIfIdleLocked();
     pendingGetProcesses_.erase(processId);
     for (auto stateIter = reportStates_.begin(); stateIter != reportStates_.end();) {
         if (stateIter->first.find(std::to_string(processId) + ":") == 0) {
@@ -616,6 +1162,65 @@ std::optional<PageSceneRule> PageSceneRuleManager::ParseRule(const std::unique_p
         if (rule.minReportIntervalMs < 0) {
             rule.minReportIntervalMs = DEFAULT_MIN_REPORT_INTERVAL_MS;
         }
+    }
+    return rule;
+}
+
+std::optional<SearchRuleSet> PageSceneRuleManager::ParseSearchRuleSet(const std::string& ruleJson) const
+{
+    auto root = JsonUtil::ParseJsonString(ruleJson);
+    if (!root || !root->IsObject()) {
+        LOGW("Parse search rule failed, invalid json");
+        return std::nullopt;
+    }
+    SearchRuleSet ruleSet;
+    ruleSet.rawJson = ruleJson;
+    ruleSet.registrationGeneration = root->GetString("_pageSceneGeneration");
+    ruleSet.ruleSetId = root->GetString("ruleSetId");
+    if (!IsValidId(ruleSet.ruleSetId)) {
+        return std::nullopt;
+    }
+    auto rules = root->GetValue("rules");
+    if (!rules || !rules->IsArray() || rules->GetArraySize() <= 0 ||
+        rules->GetArraySize() > MAX_SEARCH_RULES_PER_RULE_SET) {
+        return std::nullopt;
+    }
+    std::set<std::string> ruleIds;
+    for (int32_t index = 0; index < rules->GetArraySize(); ++index) {
+        auto rule = ParseSearchRule(rules->GetArrayItem(index), ruleIds);
+        if (!rule.has_value()) {
+            return std::nullopt;
+        }
+        ruleSet.rules.emplace_back(rule.value());
+    }
+    return ruleSet;
+}
+
+std::optional<SearchSceneRule> PageSceneRuleManager::ParseSearchRule(
+    const std::unique_ptr<JsonValue>& ruleJson, std::set<std::string>& ruleIds) const
+{
+    if (!ruleJson || !ruleJson->IsObject()) {
+        return std::nullopt;
+    }
+    SearchSceneRule rule;
+    rule.ruleId = ruleJson->GetString("ruleId");
+    if (rule.ruleId.empty() || !IsValidId(rule.ruleId) || ruleIds.find(rule.ruleId) != ruleIds.end()) {
+        return std::nullopt;
+    }
+    ruleIds.insert(rule.ruleId);
+
+    rule.pageType = ruleJson->GetString("pageType");
+    if (rule.pageType != PAGE_TYPE_NAVIGATION && rule.pageType != PAGE_TYPE_ROUTER) {
+        return std::nullopt;
+    }
+    rule.pageName = ruleJson->GetString("pageName");
+    if (rule.pageName.empty()) {
+        return std::nullopt;
+    }
+
+    if (!ParseSearchRegions(ruleJson, rule) || !ParseSearchKeywords(ruleJson, rule) ||
+        !ParseSearchComponents(ruleJson, rule) || !ParseSearchInspectorIds(ruleJson, rule)) {
+        return std::nullopt;
     }
     return rule;
 }

@@ -55,6 +55,7 @@ class RSNGShapeBase;
 } // namespace OHOS::Rosen
 
 namespace OHOS::Ace {
+struct ParamConfig;
 struct SharedTransitionOption;
 class ShapeRect;
 class UiMaterial;
@@ -311,6 +312,7 @@ public:
     virtual void SetIsBackground(bool isBackground) {}
     virtual void SetHDRBrightness(float hdrBrightness) {}
     virtual void SetHDRBrightness(float hdrBrightness, uint32_t type) {}
+    virtual void SetSolidLayerEnabled(bool enabled) {}
     virtual void SetImageHDRBrightness(float hdrBrightness) {}
     virtual void SetImageHDRPresent(bool hdrPresent) {}
     virtual void SetHDRColorHeadRoom(float headRoom) {}
@@ -487,8 +489,12 @@ public:
     virtual void DumpInfo() {}
     virtual void DumpInfo(std::unique_ptr<JsonValue>& json) {}
     virtual void DumpSimplifyInfo(std::shared_ptr<JsonValue>& json) {}
+
+    virtual bool HasRenderContent() const { return false; }
+
     virtual void DumpAdvanceInfo() {}
     virtual void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json) {}
+    virtual void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config) {}
 
     void ObscuredToJsonValue(std::unique_ptr<JsonValue>& json, const InspectorFilter& filter) const;
 
@@ -679,19 +685,24 @@ public:
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Graphics, DynamicLightUpDegree, float);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Graphics, BgDynamicBrightnessOption, BrightnessOption);
     ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Graphics, FgDynamicBrightnessOption, BrightnessOption);
-    ACE_DEFINE_PROPERTY_ITEM_WITH_GROUP_GET(Graphics, BackShadow, Shadow);
+    ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Graphics, BackBlendMode, BlendMode);
+    ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Graphics, BackBlendApplyType, BlendApplyType);
+
+    // Visual
+    ACE_DEFINE_PROPERTY_GROUP(Visual, VisualProperty);
+    ACE_DEFINE_PROPERTY_ITEM_WITH_GROUP_GET(Visual, BackShadow, Shadow);
     void UpdateBackShadow(const Shadow& value)
     {
         UpdatePreBackShadow(value);
-        auto& groupProperty = GetOrCreateGraphics();
+        auto& groupProperty = GetOrCreateVisual();
         if (groupProperty->CheckBackShadow(value)) {
             return;
         }
         groupProperty->UpdateBackShadow(value);
         OnBackShadowUpdate(value);
     }
-    ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Graphics, BackBlendMode, BlendMode);
-    ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Graphics, BackBlendApplyType, BlendApplyType);
+    ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Visual, ShadowShape, RefPtr<BasicShape>);
+    ACE_DEFINE_PROPERTY_FUNC_WITH_GROUP(Visual, ShadowClipMode, ShadowClipMode);
 
     // BorderRadius.
     ACE_DEFINE_PROPERTY_GROUP(Border, BorderProperty);
@@ -745,7 +756,7 @@ public:
     }
     void UpdateMaterialBackShadow(const Shadow& value)
     {
-        auto& groupProperty = GetOrCreateGraphics();
+        auto& groupProperty = GetOrCreateVisual();
         if (groupProperty->CheckBackShadow(value)) {
             return;
         }
@@ -1116,6 +1127,8 @@ protected:
     virtual void OnFgDynamicBrightnessOptionUpdate(const std::optional<BrightnessOption>& brightnessOption) {}
     virtual void OnBackShadowUpdate(const Shadow& shadow) {}
     virtual void OnPreBackShadowUpdate(const Shadow& shadow) {}
+    virtual void OnShadowShapeUpdate(const RefPtr<BasicShape>& basicShape) {}
+    virtual void OnShadowClipModeUpdate(ShadowClipMode clipMode) {}
     virtual void OnBackBlendModeUpdate(BlendMode blendMode) {}
     virtual void OnBackBlendApplyTypeUpdate(BlendApplyType blendApplyType) {}
 

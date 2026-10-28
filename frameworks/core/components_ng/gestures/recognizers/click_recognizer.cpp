@@ -13,15 +13,20 @@
  * limitations under the License.
  */
 
+#include <chrono>
+
 #include "core/components_ng/base/observer_handler.h"
 #include "core/components_ng/gestures/recognizers/click_recognizer.h"
 #include "core/components_ng/manager/event/json_child_report.h"
 #include "core/components_ng/manager/event/json_report.h"
+#include "core/components_ng/manager/page_scene/search_scene_click_matcher.h"
+#include "core/components_ng/manager/interaction_observer/ui_info_collection_manager.h"
 #include "core/accessibility/accessibility_utils.h"
 #include "core/common/container.h"
 #include "core/common/event_manager.h"
 #include "core/common/reporter/reporter.h"
 #include "core/components_ng/event/event_constants.h"
+#include "interfaces/inner_api/ui_session/ui_session_manager.h"
 #include "core/components_ng/property/accessibility_property.h"
 
 #ifndef CROSS_PLATFORM
@@ -37,10 +42,10 @@ namespace OHOS::Ace::NG {
 
 namespace {
 
-int32_t MULTI_FINGER_TIMEOUT = 300;
+int32_t g_multiFingerTimeout = 300;
 constexpr int32_t MULTI_FINGER_TIMEOUT_TOUCH = 300;
 constexpr int32_t MULTI_FINGER_TIMEOUT_MOUSE = 300;
-int32_t MULTI_TAP_TIMEOUT = 300;
+int32_t g_multiTapTimeout = 300;
 constexpr int32_t MULTI_TAP_TIMEOUT_TOUCH = 300;
 constexpr int32_t MULTI_TAP_TIMEOUT_MOUSE = 300;
 constexpr int32_t MAX_THRESHOLD_MANYTAP = 60;
@@ -141,13 +146,13 @@ void ClickRecognizer::InitGlobalValue(SourceType sourceType)
 {
     switch (sourceType) {
         case SourceType::TOUCH:
-            MULTI_FINGER_TIMEOUT = MULTI_FINGER_TIMEOUT_TOUCH;
-            MULTI_TAP_TIMEOUT = MULTI_TAP_TIMEOUT_TOUCH;
+            g_multiFingerTimeout = MULTI_FINGER_TIMEOUT_TOUCH;
+            g_multiTapTimeout = MULTI_TAP_TIMEOUT_TOUCH;
             break;
         case SourceType::MOUSE:
         case SourceType::TOUCH_PAD:
-            MULTI_FINGER_TIMEOUT = MULTI_FINGER_TIMEOUT_MOUSE;
-            MULTI_TAP_TIMEOUT = MULTI_TAP_TIMEOUT_MOUSE;
+            g_multiFingerTimeout = MULTI_FINGER_TIMEOUT_MOUSE;
+            g_multiTapTimeout = MULTI_TAP_TIMEOUT_MOUSE;
             break;
         default:
             break;
@@ -203,6 +208,40 @@ ClickInfo ClickRecognizer::GetClickInfo()
     return info;
 }
 
+void ClickRecognizer::PublishSearchClickCandidate(const TouchEvent& touchPoint)
+{
+    if (!SearchClickObserver::GetInstance().HasHandlers()) {
+        return;
+    }
+    auto effectivePoint = touchPoint;
+    if (effectivePoint.time.time_since_epoch().count() <= 0) {
+        effectivePoint = lastSearchClickPoint_;
+    }
+    auto responseNode = GetAttachedNode().Upgrade();
+    if (!responseNode) {
+        return;
+    }
+    SearchClickCandidate candidate;
+    candidate.nodeId = responseNode->GetId();
+    candidate.inspectorId = responseNode->GetInspectorId().value_or("");
+    candidate.nodeType = responseNode->GetTag();
+    int64_t now = GetSysTimestamp();
+    candidate.operationTimestampMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::nanoseconds(now)).count();
+    auto pressedTime = effectivePoint.pressedTime.time_since_epoch().count();
+    if (pressedTime <= 0) {
+        pressedTime = effectivePoint.time.time_since_epoch().count();
+    }
+    candidate.operationId = SearchClickObserver::BuildOperationId(
+        effectivePoint.deviceId, effectivePoint.id, pressedTime > 0 ? pressedTime : now, candidate.nodeId);
+    candidate.responseNode = WeakPtr<FrameNode>(responseNode);
+    SearchClickObserver::GetInstance().Publish(candidate);
+    auto session = UiSessionManager::GetInstance();
+    if (session) {
+        session->FlushPendingSearchClicksIfStable();
+    }
+}
+
 void ClickRecognizer::OnAccepted()
 {
     int64_t acceptTime = GetSysTimestamp();
@@ -245,6 +284,7 @@ void ClickRecognizer::OnAccepted()
     if (onClick_) {
         ClickInfo info = GetClickInfo();
         onClick_(info);
+        PublishSearchClickCandidate(touchPoint);
     }
 
     if (remoteMessage_) {
@@ -255,6 +295,9 @@ void ClickRecognizer::OnAccepted()
     }
     UpdateFingerListInfo();
     SendCallbackMsg(onAction_, GestureCallbackType::ACTION);
+    if (!onClick_ && onAction_) {
+        PublishSearchClickCandidate(touchPoint);
+    }
 
     int64_t overTime = GetSysTimestamp();
     if (SystemProperties::GetTraceInputEventEnabled()) {
@@ -290,6 +333,7 @@ void ClickRecognizer::OnRejected()
 
 void ClickRecognizer::HandleTouchDownEvent(const TouchEvent& event)
 {
+    lastSearchClickPoint_ = event;
     lastAction_ = inputEventType_ == InputEventType::TOUCH_SCREEN ? static_cast<int32_t>(TouchType::DOWN)
         : static_cast<int32_t>(MouseAction::PRESS);
     extraInfo_ = "ETF: " + std::to_string(equalsToFingers_) + " CFP: " + std::to_string(currentTouchPointsNum_);
@@ -342,7 +386,7 @@ void ClickRecognizer::UpdateInfoWithDownEvent(const TouchEvent& event)
     UpdateFingerListInfo();
     if (fingers_ > currentTouchPointsNum_) {
         // waiting for multi-finger press
-        DeadlineTimer(fingerDeadlineTimer_, MULTI_FINGER_TIMEOUT);
+        DeadlineTimer(fingerDeadlineTimer_, g_multiFingerTimeout);
     } else {
         // Turn off the multi-finger press deadline timer
         fingerDeadlineTimer_.Cancel();
@@ -436,7 +480,7 @@ void ClickRecognizer::HandleTouchUpEvent(const TouchEvent& event)
         }
         equalsToFingers_ = false;
         // waiting for multi-finger lift
-        DeadlineTimer(tapDeadlineTimer_, MULTI_TAP_TIMEOUT);
+        DeadlineTimer(tapDeadlineTimer_, g_multiTapTimeout);
     }
     if (refereeState_ != RefereeState::PENDING && refereeState_ != RefereeState::FAIL) {
         if (fingersNumberSatisfied) {
@@ -448,7 +492,7 @@ void ClickRecognizer::HandleTouchUpEvent(const TouchEvent& event)
         }
     }
     if (currentTouchPointsNum_ < fingers_ && equalsToFingers_) {
-        DeadlineTimer(fingerDeadlineTimer_, MULTI_FINGER_TIMEOUT);
+        DeadlineTimer(fingerDeadlineTimer_, g_multiFingerTimeout);
     }
 }
 
@@ -642,8 +686,8 @@ void ClickRecognizer::SendCallbackMsg(const std::unique_ptr<GestureEventFunc>& o
     if (gestureInfo_ && gestureInfo_->GetDisposeTag()) {
         return;
     }
+    GestureEvent info = GetGestureEventInfo();
     if (onAction && *onAction) {
-        GestureEvent info = GetGestureEventInfo();
         info.SetGestureTypeName(GestureTypeName::TAP_GESTURE);
         // onAction may be overwritten in its invoke so we copy it first
         auto onActionFunction = *onAction;
@@ -665,6 +709,10 @@ void ClickRecognizer::SendCallbackMsg(const std::unique_ptr<GestureEventFunc>& o
         RecordClickEventIfNeed(info);
 #endif
     }
+    // Always-on delivery for NDK interaction observers; the manager drops the
+    // notification when no observer is registered.
+    UIInfoCollectionManager::GetInstance().NotifyTapOrClick(
+        GetAttachedNode().Upgrade(), GetRecognizerType() == GestureTypeName::CLICK, count_, info);
 #ifdef GESTURE_DEBUG_BOUNDARY_SUPPORTED
     ReportToGestureDebugManager(type, GestureListenerType::TAP);
 #endif

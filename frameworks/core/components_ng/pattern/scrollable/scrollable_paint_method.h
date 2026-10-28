@@ -22,6 +22,7 @@
 #include "core/components_ng/render/node_paint_method.h"
 
 namespace OHOS::Ace::NG {
+class PaintWrapper;
 class RenderContext;
 class ACE_FORCE_EXPORT ScrollablePaintMethod : public NodePaintMethod {
     DECLARE_ACE_TYPE(ScrollablePaintMethod, NodePaintMethod);
@@ -78,6 +79,7 @@ protected:
     bool isVerticalReverse_ = false;
 
 private:
+    void ApplySafeAreaClip(const RefPtr<RenderContext>& renderContext, PaintWrapper* wrapper);
     RefPtr<RenderContext> overlayRenderContext_;
     bool isFadingTop_ = false;
     bool isFadingBottom_ = false;

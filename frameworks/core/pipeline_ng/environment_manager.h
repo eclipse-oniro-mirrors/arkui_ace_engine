@@ -65,7 +65,7 @@ enum class EnvironmentPropertyKind : uint8_t {
 using EnvironmentValueChangedCallback =
     void (*)(const RefPtr<UINode>& node, EnvironmentPropertyKind kind, const std::string& key);
 
-class ACE_FORCE_EXPORT EnvironmentManager : public virtual AceType {
+class ACE_FORCE_EXPORT EnvironmentManager : public AceType {
     DECLARE_ACE_TYPE(EnvironmentManager, AceType);
 
 public:

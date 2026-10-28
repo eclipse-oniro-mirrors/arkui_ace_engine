@@ -20,6 +20,7 @@
 #include "core/event/touch_event.h"
 #include "interfaces/native/node/event_converter.h"
 #include "interfaces/native/node/node_model.h"
+#include "interfaces/native/node/config_manager.h"
 #include "base/error/error_code.h"
 #include "base/log/log_wrapper.h"
 #include "frameworks/core/common/ace_application_info.h"
@@ -76,6 +77,7 @@ bool isHistoryCTouchEventParamValid(const ArkUITouchEvent* touchEvent, uint32_t 
 
 int32_t OH_ArkUI_UIInputEvent_GetType(const ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_UIInputEvent_GetType");
     const int32_t supportedScenario = S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_MOUSE |
                                       S_NODE_ON_KEY_EVENT | S_NODE_ON_KEY_PRE_IME | S_NODE_ON_FOCUS_AXIS |
                                       S_NODE_DISPATCH_KEY_EVENT | S_NODE_ON_AXIS | S_NODE_ON_HOVER_MOVE |
@@ -193,6 +195,7 @@ int32_t OH_ArkUI_UIInputEvent_GetAction_Ext(const ArkUI_UIInputEvent* event)
 
 int32_t OH_ArkUI_UIInputEvent_GetAction(const ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_UIInputEvent_GetAction");
     const int32_t supportedScenario = S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_MOUSE |
                                       S_NODE_ON_AXIS | S_NODE_ON_HOVER_MOVE | S_GESTURE_TOUCH_EVENT |
                                       S_GESTURE_AXIS_EVENT | S_GESTURE_MOUSE_EVENT | S_GESTURE_CLICK_EVENT |
@@ -306,6 +309,7 @@ int32_t HandleAxisEventSourceType(const ArkUI_UIInputEvent* event)
 
 int32_t OH_ArkUI_UIInputEvent_GetSourceType(const ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_UIInputEvent_GetSourceType");
     const int32_t supportedScenario = S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_MOUSE |
                                       S_NODE_ON_FOCUS_AXIS | S_NODE_ON_AXIS | S_NODE_ON_CLICK_EVENT |
                                       S_NODE_ON_HOVER_EVENT | S_NODE_ON_HOVER_MOVE | S_GESTURE_TOUCH_EVENT |
@@ -416,6 +420,7 @@ int32_t HandleAxisEventToolType(const ArkUI_UIInputEvent* event)
 
 int32_t OH_ArkUI_UIInputEvent_GetToolType(const ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_UIInputEvent_GetToolType");
     const int32_t supportedScenario = S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_MOUSE |
                                       S_NODE_ON_FOCUS_AXIS | S_NODE_ON_AXIS | S_NODE_ON_CLICK_EVENT |
                                       S_NODE_ON_HOVER_EVENT | S_NODE_ON_HOVER_MOVE | S_GESTURE_TOUCH_EVENT |
@@ -528,6 +533,7 @@ int64_t HandleCClickEventTimestamp(ArkUI_UIInputEvent* event)
 
 int64_t OH_ArkUI_UIInputEvent_GetEventTime(const ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_UIInputEvent_GetEventTime");
     const int32_t supportedScenario =
         S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_MOUSE | S_NODE_ON_KEY_EVENT | S_NODE_ON_KEY_PRE_IME |
         S_NODE_ON_FOCUS_AXIS | S_NODE_DISPATCH_KEY_EVENT | S_NODE_ON_AXIS | S_NODE_ON_CLICK_EVENT |
@@ -664,6 +670,7 @@ int32_t GetTouchEventDeviceId(ArkUI_UIInputEvent* event)
 
 int32_t OH_ArkUI_UIInputEvent_GetDeviceId(const ArkUI_UIInputEvent *event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_UIInputEvent_GetDeviceId");
     const int32_t supportedScenario =
         S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_MOUSE | S_NODE_ON_KEY_EVENT | S_NODE_ON_KEY_PRE_IME |
         S_NODE_ON_FOCUS_AXIS | S_NODE_DISPATCH_KEY_EVENT | S_NODE_ON_AXIS | S_NODE_ON_CLICK_EVENT |
@@ -695,6 +702,7 @@ int32_t OH_ArkUI_UIInputEvent_GetDeviceId(const ArkUI_UIInputEvent *event)
 int32_t OH_ArkUI_UIInputEvent_GetPressedKeys(
     const ArkUI_UIInputEvent* event, int32_t* pressedKeyCodes, int32_t* length)
 {
+    CHECK_UI_THREAD("OH_ArkUI_UIInputEvent_GetPressedKeys");
     CheckSupportedScenarioAndResetEventStatus(
         S_NODE_ON_KEY_EVENT | S_NODE_ON_KEY_PRE_IME | S_NODE_DISPATCH_KEY_EVENT, event);
     if (!event || !pressedKeyCodes || !length) {
@@ -718,6 +726,7 @@ int32_t OH_ArkUI_UIInputEvent_GetPressedKeys(
 
 uint32_t OH_ArkUI_PointerEvent_GetPointerCount(const ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetPointerCount");
     CheckSupportedScenarioAndResetEventStatus(S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_MOUSE |
                                                   S_NODE_ON_HOVER_MOVE | S_NODE_ON_AXIS | S_NODE_ON_CLICK_EVENT |
                                                   S_GESTURE_TOUCH_EVENT,
@@ -765,6 +774,7 @@ uint32_t OH_ArkUI_PointerEvent_GetPointerCount(const ArkUI_UIInputEvent* event)
 
 int32_t OH_ArkUI_PointerEvent_GetPointerId(const ArkUI_UIInputEvent* event, uint32_t pointerIndex)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetPointerId");
     const int32_t supportedScenario = S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_MOUSE |
                                       S_NODE_ON_HOVER_MOVE | S_NODE_ON_AXIS | S_GESTURE_TOUCH_EVENT |
                                       S_GESTURE_AXIS_EVENT | S_GESTURE_MOUSE_EVENT;
@@ -862,6 +872,7 @@ float HandleAxisEventX(const ArkUI_UIInputEvent* event)
 
 float OH_ArkUI_PointerEvent_GetX(const ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetX");
     const int32_t supportedScenario = S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_MOUSE |
                                       S_NODE_ON_AXIS | S_NODE_ON_CLICK_EVENT | S_NODE_ON_HOVER_MOVE |
                                       S_GESTURE_TOUCH_EVENT | S_GESTURE_AXIS_EVENT | S_GESTURE_MOUSE_EVENT |
@@ -888,6 +899,7 @@ float OH_ArkUI_PointerEvent_GetX(const ArkUI_UIInputEvent* event)
 
 float OH_ArkUI_PointerEvent_GetXByIndex(const ArkUI_UIInputEvent* event, uint32_t pointerIndex)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetXByIndex");
     const int32_t supportedScenario = S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_MOUSE |
                                       S_NODE_ON_AXIS | S_NODE_ON_HOVER_MOVE | S_GESTURE_TOUCH_EVENT |
                                       S_GESTURE_AXIS_EVENT | S_GESTURE_MOUSE_EVENT;
@@ -985,6 +997,7 @@ float HandleAxisEventY(const ArkUI_UIInputEvent* event)
 
 float OH_ArkUI_PointerEvent_GetY(const ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetY");
     const int32_t supportedScenario = S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_MOUSE |
                                       S_NODE_ON_AXIS | S_NODE_ON_CLICK_EVENT | S_NODE_ON_HOVER_MOVE |
                                       S_GESTURE_TOUCH_EVENT | S_GESTURE_AXIS_EVENT | S_GESTURE_MOUSE_EVENT |
@@ -1012,6 +1025,7 @@ float OH_ArkUI_PointerEvent_GetY(const ArkUI_UIInputEvent* event)
 
 float OH_ArkUI_PointerEvent_GetYByIndex(const ArkUI_UIInputEvent* event, uint32_t pointerIndex)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetYByIndex");
     const int32_t supportedScenario = S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_MOUSE |
                                       S_NODE_ON_AXIS | S_NODE_ON_HOVER_MOVE | S_GESTURE_TOUCH_EVENT |
                                       S_GESTURE_AXIS_EVENT | S_GESTURE_MOUSE_EVENT;
@@ -1165,6 +1179,7 @@ PointerEventResult HandleCTouchEventCurrentLocalXByIndex(const ArkUI_UIInputEven
 
 float OH_ArkUI_PointerEvent_GetCurrentLocalX(const ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetCurrentLocalX");
     const int32_t supportedScenario = S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_MOUSE |
                                       S_NODE_ON_AXIS | S_NODE_ON_CLICK_EVENT | S_GESTURE_CLICK_EVENT |
                                       S_GESTURE_TOUCH_EVENT | S_GESTURE_AXIS_EVENT | S_GESTURE_MOUSE_EVENT |
@@ -1191,6 +1206,7 @@ float OH_ArkUI_PointerEvent_GetCurrentLocalX(const ArkUI_UIInputEvent* event)
 
 float OH_ArkUI_PointerEvent_GetCurrentLocalXByIndex(const ArkUI_UIInputEvent* event, uint32_t pointerIndex)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetCurrentLocalXByIndex");
     const int32_t supportedScenario = S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_MOUSE |
                                       S_NODE_ON_AXIS | S_GESTURE_CLICK_EVENT | S_GESTURE_TOUCH_EVENT |
                                       S_GESTURE_AXIS_EVENT | S_GESTURE_MOUSE_EVENT;
@@ -1361,6 +1377,7 @@ PointerEventResult HandleCTouchEventCurrentLocalYByIndex(const ArkUI_UIInputEven
 
 float OH_ArkUI_PointerEvent_GetCurrentLocalY(const ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetCurrentLocalY");
     const int32_t supportedScenario = S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_MOUSE |
                                       S_NODE_ON_AXIS | S_NODE_ON_CLICK_EVENT | S_GESTURE_CLICK_EVENT |
                                       S_GESTURE_TOUCH_EVENT | S_GESTURE_AXIS_EVENT | S_GESTURE_MOUSE_EVENT |
@@ -1387,6 +1404,7 @@ float OH_ArkUI_PointerEvent_GetCurrentLocalY(const ArkUI_UIInputEvent* event)
 
 float OH_ArkUI_PointerEvent_GetCurrentLocalYByIndex(const ArkUI_UIInputEvent* event, uint32_t pointerIndex)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetCurrentLocalYByIndex");
     const int32_t supportedScenario = S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_MOUSE |
                                       S_NODE_ON_AXIS | S_GESTURE_CLICK_EVENT | S_GESTURE_TOUCH_EVENT |
                                       S_GESTURE_AXIS_EVENT | S_GESTURE_MOUSE_EVENT;
@@ -1492,6 +1510,7 @@ float HandleCClickEventWindowX(const ArkUI_UIInputEvent* event)
 
 float OH_ArkUI_PointerEvent_GetWindowX(const ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetWindowX");
     const int32_t supportedScenario = S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_MOUSE |
                                       S_NODE_ON_AXIS | S_NODE_ON_CLICK_EVENT | S_NODE_ON_HOVER_MOVE |
                                       S_GESTURE_TOUCH_EVENT | S_GESTURE_AXIS_EVENT | S_GESTURE_MOUSE_EVENT |
@@ -1519,6 +1538,7 @@ float OH_ArkUI_PointerEvent_GetWindowX(const ArkUI_UIInputEvent* event)
 
 float OH_ArkUI_PointerEvent_GetWindowXByIndex(const ArkUI_UIInputEvent* event, uint32_t pointerIndex)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetWindowXByIndex");
     const int32_t supportedScenario = S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_MOUSE |
                                       S_NODE_ON_AXIS | S_NODE_ON_HOVER_MOVE | S_GESTURE_TOUCH_EVENT |
                                       S_GESTURE_AXIS_EVENT | S_GESTURE_MOUSE_EVENT;
@@ -1616,6 +1636,7 @@ float HandleAxisEventWindowY(const ArkUI_UIInputEvent* event)
 
 float OH_ArkUI_PointerEvent_GetWindowY(const ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetWindowY");
     const int32_t supportedScenario = S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_MOUSE |
                                       S_NODE_ON_AXIS | S_NODE_ON_CLICK_EVENT | S_NODE_ON_HOVER_MOVE |
                                       S_GESTURE_TOUCH_EVENT | S_GESTURE_AXIS_EVENT | S_GESTURE_MOUSE_EVENT |
@@ -1643,6 +1664,7 @@ float OH_ArkUI_PointerEvent_GetWindowY(const ArkUI_UIInputEvent* event)
 
 float OH_ArkUI_PointerEvent_GetWindowYByIndex(const ArkUI_UIInputEvent* event, uint32_t pointerIndex)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetWindowYByIndex");
     const int32_t supportedScenario = S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_MOUSE |
                                       S_NODE_ON_AXIS | S_NODE_ON_HOVER_MOVE | S_GESTURE_TOUCH_EVENT |
                                       S_GESTURE_AXIS_EVENT | S_GESTURE_MOUSE_EVENT;
@@ -1740,6 +1762,7 @@ float HandleAxisEventDisplayX(const ArkUI_UIInputEvent* event)
 
 float OH_ArkUI_PointerEvent_GetDisplayX(const ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetDisplayX");
     const int32_t supportedScenario = S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_MOUSE |
                                       S_NODE_ON_AXIS | S_NODE_ON_CLICK_EVENT | S_NODE_ON_HOVER_MOVE |
                                       S_GESTURE_TOUCH_EVENT | S_GESTURE_AXIS_EVENT | S_GESTURE_MOUSE_EVENT |
@@ -1767,6 +1790,7 @@ float OH_ArkUI_PointerEvent_GetDisplayX(const ArkUI_UIInputEvent* event)
 
 float OH_ArkUI_PointerEvent_GetDisplayXByIndex(const ArkUI_UIInputEvent* event, uint32_t pointerIndex)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetDisplayXByIndex");
     const int32_t supportedScenario = S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_MOUSE |
                                       S_NODE_ON_AXIS | S_NODE_ON_HOVER_MOVE | S_GESTURE_TOUCH_EVENT |
                                       S_GESTURE_AXIS_EVENT | S_GESTURE_MOUSE_EVENT;
@@ -1864,6 +1888,7 @@ float HandleAxisEventDisplayY(const ArkUI_UIInputEvent* event)
 
 float OH_ArkUI_PointerEvent_GetDisplayY(const ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetDisplayY");
     const int32_t supportedScenario = S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_MOUSE |
                                       S_NODE_ON_AXIS | S_NODE_ON_CLICK_EVENT | S_NODE_ON_HOVER_MOVE |
                                       S_GESTURE_TOUCH_EVENT | S_GESTURE_AXIS_EVENT | S_GESTURE_MOUSE_EVENT |
@@ -1891,6 +1916,7 @@ float OH_ArkUI_PointerEvent_GetDisplayY(const ArkUI_UIInputEvent* event)
 
 float OH_ArkUI_PointerEvent_GetDisplayYByIndex(const ArkUI_UIInputEvent* event, uint32_t pointerIndex)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetDisplayYByIndex");
     const int32_t supportedScenario = S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_MOUSE |
                                       S_NODE_ON_AXIS | S_NODE_ON_HOVER_MOVE | S_GESTURE_TOUCH_EVENT |
                                       S_GESTURE_AXIS_EVENT | S_GESTURE_MOUSE_EVENT;
@@ -2000,6 +2026,7 @@ float HandleAxisEventGlobalDisplayX(const ArkUI_UIInputEvent* event)
 
 float OH_ArkUI_PointerEvent_GetGlobalDisplayX(const ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetGlobalDisplayX");
     const int32_t supportedScenario = S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_MOUSE |
                                       S_NODE_ON_AXIS | S_NODE_ON_CLICK_EVENT | S_NODE_ON_HOVER_MOVE |
                                       S_GESTURE_TOUCH_EVENT | S_GESTURE_AXIS_EVENT | S_GESTURE_MOUSE_EVENT |
@@ -2028,6 +2055,7 @@ float OH_ArkUI_PointerEvent_GetGlobalDisplayX(const ArkUI_UIInputEvent* event)
 
 float OH_ArkUI_PointerEvent_GetGlobalDisplayXByIndex(const ArkUI_UIInputEvent* event, uint32_t pointerIndex)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetGlobalDisplayXByIndex");
     const int32_t supportedScenario = S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_MOUSE |
                                       S_NODE_ON_AXIS | S_NODE_ON_HOVER_MOVE | S_GESTURE_TOUCH_EVENT |
                                       S_GESTURE_AXIS_EVENT | S_GESTURE_MOUSE_EVENT;
@@ -2140,6 +2168,7 @@ float HandleAxisEventGlobalDisplayY(const ArkUI_UIInputEvent* event)
 
 float OH_ArkUI_PointerEvent_GetGlobalDisplayY(const ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetGlobalDisplayY");
     const int32_t supportedScenario = S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_MOUSE |
                                       S_NODE_ON_AXIS | S_NODE_ON_CLICK_EVENT | S_NODE_ON_HOVER_MOVE |
                                       S_GESTURE_TOUCH_EVENT | S_GESTURE_AXIS_EVENT | S_GESTURE_MOUSE_EVENT |
@@ -2168,6 +2197,7 @@ float OH_ArkUI_PointerEvent_GetGlobalDisplayY(const ArkUI_UIInputEvent* event)
 
 float OH_ArkUI_PointerEvent_GetGlobalDisplayYByIndex(const ArkUI_UIInputEvent* event, uint32_t pointerIndex)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetGlobalDisplayYByIndex");
     const int32_t supportedScenario = S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_MOUSE |
                                       S_NODE_ON_AXIS | S_NODE_ON_HOVER_MOVE | S_GESTURE_TOUCH_EVENT |
                                       S_GESTURE_AXIS_EVENT | S_GESTURE_MOUSE_EVENT;
@@ -2214,6 +2244,7 @@ float OH_ArkUI_PointerEvent_GetGlobalDisplayYByIndex(const ArkUI_UIInputEvent* e
 
 float OH_ArkUI_PointerEvent_GetPressure(const ArkUI_UIInputEvent* event, uint32_t pointerIndex)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetPressure");
     CheckSupportedScenarioAndResetEventStatus(S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_MOUSE |
         S_GESTURE_TOUCH_EVENT | S_GESTURE_MOUSE_EVENT, event);
     if (!event) {
@@ -2253,6 +2284,7 @@ float OH_ArkUI_PointerEvent_GetPressure(const ArkUI_UIInputEvent* event, uint32_
 
 float OH_ArkUI_PointerEvent_GetTiltX(const ArkUI_UIInputEvent* event, uint32_t pointerIndex)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetTiltX");
     const int32_t supportedScenario = S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_CLICK_EVENT |
                                       S_NODE_ON_HOVER_EVENT | S_NODE_ON_HOVER_MOVE | S_GESTURE_TOUCH_EVENT;
     CheckSupportedScenarioAndResetEventStatus(supportedScenario, event);
@@ -2293,6 +2325,7 @@ float OH_ArkUI_PointerEvent_GetTiltX(const ArkUI_UIInputEvent* event, uint32_t p
 
 float OH_ArkUI_PointerEvent_GetTiltY(const ArkUI_UIInputEvent* event, uint32_t pointerIndex)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetTiltY");
     const int32_t supportedScenario = S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_CLICK_EVENT |
                                       S_NODE_ON_HOVER_EVENT | S_NODE_ON_HOVER_MOVE | S_GESTURE_TOUCH_EVENT;
     CheckSupportedScenarioAndResetEventStatus(supportedScenario, event);
@@ -2333,6 +2366,7 @@ float OH_ArkUI_PointerEvent_GetTiltY(const ArkUI_UIInputEvent* event, uint32_t p
 
 int32_t OH_ArkUI_PointerEvent_GetRollAngle(const ArkUI_UIInputEvent* event, double* rollAngle)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetRollAngle");
     const int32_t supportedScenario = S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_CLICK_EVENT |
                                       S_NODE_ON_HOVER_EVENT | S_NODE_ON_HOVER_MOVE | S_GESTURE_TOUCH_EVENT;
     CheckSupportedScenarioAndResetEventStatus(supportedScenario, event);
@@ -2380,6 +2414,7 @@ int32_t OH_ArkUI_PointerEvent_GetRollAngle(const ArkUI_UIInputEvent* event, doub
 
 int32_t OH_ArkUI_PointerEvent_GetInteractionHand(const ArkUI_UIInputEvent *event, ArkUI_InteractionHand *hand)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetInteractionHand");
     CheckSupportedScenarioAndResetEventStatus(
         S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_GESTURE_TOUCH_EVENT, event);
     if (!event || !hand) {
@@ -2401,6 +2436,7 @@ int32_t OH_ArkUI_PointerEvent_GetInteractionHand(const ArkUI_UIInputEvent *event
 int32_t OH_ArkUI_PointerEvent_GetInteractionHandByIndex(const ArkUI_UIInputEvent *event, int32_t pointerIndex,
     ArkUI_InteractionHand *hand)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetInteractionHandByIndex");
     CheckSupportedScenarioAndResetEventStatus(
         S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_GESTURE_TOUCH_EVENT, event);
     if (!event || !hand) {
@@ -2425,6 +2461,7 @@ int32_t OH_ArkUI_PointerEvent_GetInteractionHandByIndex(const ArkUI_UIInputEvent
 
 float OH_ArkUI_PointerEvent_GetTouchAreaWidth(const ArkUI_UIInputEvent* event, uint32_t pointerIndex)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetTouchAreaWidth");
     CheckSupportedScenarioAndResetEventStatus(S_NODE_TOUCH_EVENT | S_NODE_ON_HOVER_MOVE, event);
     if (!event) {
         RETURN_RET_WITH_STATUS_CHECK(0.0f, ARKUI_ERROR_CODE_PARAM_INVALID);
@@ -2446,6 +2483,7 @@ float OH_ArkUI_PointerEvent_GetTouchAreaWidth(const ArkUI_UIInputEvent* event, u
 
 float OH_ArkUI_PointerEvent_GetTouchAreaHeight(const ArkUI_UIInputEvent* event, uint32_t pointerIndex)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetTouchAreaHeight");
     CheckSupportedScenarioAndResetEventStatus(S_NODE_TOUCH_EVENT | S_NODE_ON_HOVER_MOVE, event);
     if (!event) {
         RETURN_RET_WITH_STATUS_CHECK(0.0f, ARKUI_ERROR_CODE_PARAM_INVALID);
@@ -2467,6 +2505,7 @@ float OH_ArkUI_PointerEvent_GetTouchAreaHeight(const ArkUI_UIInputEvent* event, 
 
 int32_t OH_ArkUI_PointerEvent_GetChangedPointerId(const ArkUI_UIInputEvent* event, uint32_t* pointerIndex)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetChangedPointerId");
     CheckSupportedScenarioAndResetEventStatus(
         S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_GESTURE_TOUCH_EVENT, event);
     if (!event || !pointerIndex) {
@@ -2489,6 +2528,7 @@ int32_t OH_ArkUI_PointerEvent_GetChangedPointerId(const ArkUI_UIInputEvent* even
 
 uint32_t OH_ArkUI_PointerEvent_GetHistorySize(const ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetHistorySize");
     CheckSupportedScenarioAndResetEventStatus(
         S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_HOVER_MOVE | S_NODE_ON_MOUSE, event);
     if (!event) {
@@ -2517,6 +2557,7 @@ uint32_t OH_ArkUI_PointerEvent_GetHistorySize(const ArkUI_UIInputEvent* event)
 
 int64_t OH_ArkUI_PointerEvent_GetHistoryEventTime(const ArkUI_UIInputEvent* event, uint32_t historyIndex)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetHistoryEventTime");
     CheckSupportedScenarioAndResetEventStatus(
         S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_HOVER_MOVE | S_NODE_ON_MOUSE, event);
     if (!event) {
@@ -2546,6 +2587,7 @@ int64_t OH_ArkUI_PointerEvent_GetHistoryEventTime(const ArkUI_UIInputEvent* even
 
 uint32_t OH_ArkUI_PointerEvent_GetHistoryPointerCount(const ArkUI_UIInputEvent* event, uint32_t historyIndex)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetHistoryPointerCount");
     CheckSupportedScenarioAndResetEventStatus(
         S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_HOVER_MOVE, event);
     if (!event) {
@@ -2570,6 +2612,7 @@ uint32_t OH_ArkUI_PointerEvent_GetHistoryPointerCount(const ArkUI_UIInputEvent* 
 int32_t OH_ArkUI_PointerEvent_GetHistoryPointerId(
     const ArkUI_UIInputEvent* event, uint32_t pointerIndex, uint32_t historyIndex)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetHistoryPointerId");
     CheckSupportedScenarioAndResetEventStatus(
         S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_HOVER_MOVE, event);
     if (!event) {
@@ -2592,6 +2635,7 @@ int32_t OH_ArkUI_PointerEvent_GetHistoryPointerId(
 
 float OH_ArkUI_PointerEvent_GetHistoryX(const ArkUI_UIInputEvent* event, uint32_t pointerIndex, uint32_t historyIndex)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetHistoryX");
     CheckSupportedScenarioAndResetEventStatus(
         S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_HOVER_MOVE | S_NODE_ON_MOUSE, event);
     if (!event) {
@@ -2622,6 +2666,7 @@ float OH_ArkUI_PointerEvent_GetHistoryX(const ArkUI_UIInputEvent* event, uint32_
 
 float OH_ArkUI_PointerEvent_GetHistoryY(const ArkUI_UIInputEvent* event, uint32_t pointerIndex, uint32_t historyIndex)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetHistoryY");
     CheckSupportedScenarioAndResetEventStatus(
         S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_HOVER_MOVE | S_NODE_ON_MOUSE, event);
     if (!event) {
@@ -2653,6 +2698,7 @@ float OH_ArkUI_PointerEvent_GetHistoryY(const ArkUI_UIInputEvent* event, uint32_
 float OH_ArkUI_PointerEvent_GetHistoryWindowX(
     const ArkUI_UIInputEvent* event, uint32_t pointerIndex, uint32_t historyIndex)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetHistoryWindowX");
     CheckSupportedScenarioAndResetEventStatus(
         S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_HOVER_MOVE | S_NODE_ON_MOUSE, event);
     if (!event) {
@@ -2684,6 +2730,7 @@ float OH_ArkUI_PointerEvent_GetHistoryWindowX(
 float OH_ArkUI_PointerEvent_GetHistoryWindowY(
     const ArkUI_UIInputEvent* event, uint32_t pointerIndex, uint32_t historyIndex)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetHistoryWindowY");
     CheckSupportedScenarioAndResetEventStatus(
         S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_HOVER_MOVE | S_NODE_ON_MOUSE, event);
     if (!event) {
@@ -2715,6 +2762,7 @@ float OH_ArkUI_PointerEvent_GetHistoryWindowY(
 float OH_ArkUI_PointerEvent_GetHistoryDisplayX(
     const ArkUI_UIInputEvent* event, uint32_t pointerIndex, uint32_t historyIndex)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetHistoryDisplayX");
     CheckSupportedScenarioAndResetEventStatus(
         S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_HOVER_MOVE | S_NODE_ON_MOUSE, event);
     if (!event) {
@@ -2746,6 +2794,7 @@ float OH_ArkUI_PointerEvent_GetHistoryDisplayX(
 float OH_ArkUI_PointerEvent_GetHistoryDisplayY(
     const ArkUI_UIInputEvent* event, uint32_t pointerIndex, uint32_t historyIndex)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetHistoryDisplayY");
     CheckSupportedScenarioAndResetEventStatus(
         S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_HOVER_MOVE | S_NODE_ON_MOUSE, event);
     if (!event) {
@@ -2777,6 +2826,7 @@ float OH_ArkUI_PointerEvent_GetHistoryDisplayY(
 float OH_ArkUI_PointerEvent_GetHistoryGlobalDisplayX(
     const ArkUI_UIInputEvent* event, uint32_t pointerIndex, uint32_t historyIndex)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetHistoryGlobalDisplayX");
     CheckSupportedScenarioAndResetEventStatus(
         S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_HOVER_MOVE | S_NODE_ON_MOUSE, event);
     if (!event) {
@@ -2810,6 +2860,7 @@ float OH_ArkUI_PointerEvent_GetHistoryGlobalDisplayX(
 float OH_ArkUI_PointerEvent_GetHistoryGlobalDisplayY(
     const ArkUI_UIInputEvent* event, uint32_t pointerIndex, uint32_t historyIndex)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetHistoryGlobalDisplayY");
     CheckSupportedScenarioAndResetEventStatus(
         S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_HOVER_MOVE | S_NODE_ON_MOUSE, event);
     if (!event) {
@@ -2843,6 +2894,7 @@ float OH_ArkUI_PointerEvent_GetHistoryGlobalDisplayY(
 float OH_ArkUI_PointerEvent_GetHistoryPressure(
     const ArkUI_UIInputEvent* event, uint32_t pointerIndex, uint32_t historyIndex)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetHistoryPressure");
     CheckSupportedScenarioAndResetEventStatus(
         S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_HOVER_MOVE, event);
     if (!event) {
@@ -2866,6 +2918,7 @@ float OH_ArkUI_PointerEvent_GetHistoryPressure(
 float OH_ArkUI_PointerEvent_GetHistoryTiltX(
     const ArkUI_UIInputEvent* event, uint32_t pointerIndex, uint32_t historyIndex)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetHistoryTiltX");
     CheckSupportedScenarioAndResetEventStatus(
         S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_HOVER_MOVE, event);
     if (!event) {
@@ -2889,6 +2942,7 @@ float OH_ArkUI_PointerEvent_GetHistoryTiltX(
 float OH_ArkUI_PointerEvent_GetHistoryTiltY(
     const ArkUI_UIInputEvent* event, uint32_t pointerIndex, uint32_t historyIndex)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetHistoryTiltY");
     CheckSupportedScenarioAndResetEventStatus(
         S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_HOVER_MOVE, event);
     if (!event) {
@@ -2912,6 +2966,7 @@ float OH_ArkUI_PointerEvent_GetHistoryTiltY(
 float OH_ArkUI_PointerEvent_GetHistoryTouchAreaWidth(
     const ArkUI_UIInputEvent* event, uint32_t pointerIndex, uint32_t historyIndex)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetHistoryTouchAreaWidth");
     CheckSupportedScenarioAndResetEventStatus(
         S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_HOVER_MOVE, event);
     if (!event) {
@@ -2936,6 +2991,7 @@ float OH_ArkUI_PointerEvent_GetHistoryTouchAreaWidth(
 float OH_ArkUI_PointerEvent_GetHistoryTouchAreaHeight(
     const ArkUI_UIInputEvent* event, uint32_t pointerIndex, uint32_t historyIndex)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetHistoryTouchAreaHeight");
     CheckSupportedScenarioAndResetEventStatus(
         S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_HOVER_MOVE, event);
     if (!event) {
@@ -2959,6 +3015,7 @@ float OH_ArkUI_PointerEvent_GetHistoryTouchAreaHeight(
 
 double OH_ArkUI_AxisEvent_GetVerticalAxisValue(const ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_AxisEvent_GetVerticalAxisValue");
     CheckSupportedScenarioAndResetEventStatus(S_NODE_ON_AXIS | S_GESTURE_AXIS_EVENT | S_NXC_DISPATCH_AXIS_EVENT, event);
     if (!event) {
         RETURN_RET_WITH_STATUS_CHECK(0.0, ARKUI_ERROR_CODE_PARAM_INVALID);
@@ -2986,6 +3043,7 @@ double OH_ArkUI_AxisEvent_GetVerticalAxisValue(const ArkUI_UIInputEvent* event)
 
 double OH_ArkUI_AxisEvent_GetHorizontalAxisValue(const ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_AxisEvent_GetHorizontalAxisValue");
     CheckSupportedScenarioAndResetEventStatus(S_GESTURE_AXIS_EVENT | S_NXC_DISPATCH_AXIS_EVENT, event);
     if (!event) {
         RETURN_RET_WITH_STATUS_CHECK(0.0, ARKUI_ERROR_CODE_PARAM_INVALID);
@@ -3013,6 +3071,7 @@ double OH_ArkUI_AxisEvent_GetHorizontalAxisValue(const ArkUI_UIInputEvent* event
 
 double OH_ArkUI_AxisEvent_GetPinchAxisScaleValue(const ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_AxisEvent_GetPinchAxisScaleValue");
     CheckSupportedScenarioAndResetEventStatus(S_GESTURE_AXIS_EVENT | S_NXC_DISPATCH_AXIS_EVENT, event);
     if (!event) {
         RETURN_RET_WITH_STATUS_CHECK(0.0, ARKUI_ERROR_CODE_PARAM_INVALID);
@@ -3040,6 +3099,7 @@ double OH_ArkUI_AxisEvent_GetPinchAxisScaleValue(const ArkUI_UIInputEvent* event
 
 int32_t OH_ArkUI_AxisEvent_GetAxisAction(const ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_AxisEvent_GetAxisAction");
     CheckSupportedScenarioAndResetEventStatus(S_GESTURE_AXIS_EVENT | S_NXC_DISPATCH_AXIS_EVENT, event);
     if (!event) {
         RETURN_RET_WITH_STATUS_CHECK(UI_AXIS_EVENT_ACTION_NONE, ARKUI_ERROR_CODE_PARAM_INVALID);
@@ -3070,6 +3130,7 @@ int32_t OH_ArkUI_AxisEvent_GetAxisAction(const ArkUI_UIInputEvent* event)
 
 int32_t OH_ArkUI_AxisEvent_HasAxis(const ArkUI_UIInputEvent* event, int32_t axis)
 {
+    CHECK_UI_THREAD("OH_ArkUI_AxisEvent_HasAxis");
     CheckSupportedScenarioAndResetEventStatus(S_NODE_ON_AXIS | S_GESTURE_AXIS_EVENT | S_NXC_DISPATCH_AXIS_EVENT, event);
     if (!event) {
         RETURN_RET_WITH_STATUS_CHECK(false, ARKUI_ERROR_CODE_PARAM_INVALID);
@@ -3107,6 +3168,7 @@ int32_t OH_ArkUI_AxisEvent_HasAxis(const ArkUI_UIInputEvent* event, int32_t axis
 
 int32_t OH_ArkUI_PointerEvent_SetInterceptHitTestMode(const ArkUI_UIInputEvent* event, HitTestMode mode)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_SetInterceptHitTestMode");
     CheckSupportedScenarioAndResetEventStatus(S_NODE_ON_TOUCH_INTERCEPT, event);
     if (!event) {
         RETURN_RET_WITH_STATUS_CHECK(OHOS::Ace::ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
@@ -3133,6 +3195,7 @@ int32_t OH_ArkUI_PointerEvent_SetInterceptHitTestMode(const ArkUI_UIInputEvent* 
 
 int32_t OH_ArkUI_PointerEvent_SetStopPropagation(const ArkUI_UIInputEvent* event, bool stopPropagation)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_SetStopPropagation");
     CheckSupportedScenarioAndResetEventStatus(S_NODE_TOUCH_EVENT | S_NODE_ON_MOUSE | S_NODE_ON_HOVER_EVENT, event);
     if (!event) {
         RETURN_RET_WITH_STATUS_CHECK(OHOS::Ace::ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
@@ -3161,6 +3224,7 @@ int32_t OH_ArkUI_PointerEvent_SetStopPropagation(const ArkUI_UIInputEvent* event
 
 int32_t OH_ArkUI_MouseEvent_GetMouseButton(const ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_MouseEvent_GetMouseButton");
     CheckSupportedScenarioAndResetEventStatus(S_NODE_ON_MOUSE, event);
     if (!event) {
         RETURN_RET_WITH_STATUS_CHECK(-1, ARKUI_ERROR_CODE_PARAM_INVALID);
@@ -3182,6 +3246,7 @@ int32_t OH_ArkUI_MouseEvent_GetMouseButton(const ArkUI_UIInputEvent* event)
 
 int32_t OH_ArkUI_MouseEvent_GetMouseAction(const ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_MouseEvent_GetMouseAction");
     CheckSupportedScenarioAndResetEventStatus(S_NODE_ON_MOUSE | S_GESTURE_MOUSE_EVENT, event);
     if (!event) {
         RETURN_RET_WITH_STATUS_CHECK(-1, ARKUI_ERROR_CODE_PARAM_INVALID);
@@ -3203,6 +3268,7 @@ int32_t OH_ArkUI_MouseEvent_GetMouseAction(const ArkUI_UIInputEvent* event)
 
 int64_t OH_ArkUI_PointerEvent_GetPressedTimeByIndex(const ArkUI_UIInputEvent* event, uint32_t pointerIndex)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_GetPressedTimeByIndex");
     CheckSupportedScenarioAndResetEventStatus(
         S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_GESTURE_TOUCH_EVENT, event);
     if (!event) {
@@ -3224,6 +3290,7 @@ int64_t OH_ArkUI_PointerEvent_GetPressedTimeByIndex(const ArkUI_UIInputEvent* ev
 
 float OH_ArkUI_MouseEvent_GetRawDeltaX(const ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_MouseEvent_GetRawDeltaX");
     CheckSupportedScenarioAndResetEventStatus(S_NODE_ON_MOUSE, event);
     if (!event) {
         RETURN_RET_WITH_STATUS_CHECK(0.0f, ARKUI_ERROR_CODE_PARAM_INVALID);
@@ -3244,6 +3311,7 @@ float OH_ArkUI_MouseEvent_GetRawDeltaX(const ArkUI_UIInputEvent* event)
 
 float OH_ArkUI_MouseEvent_GetRawDeltaY(const ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_MouseEvent_GetRawDeltaY");
     CheckSupportedScenarioAndResetEventStatus(S_NODE_ON_MOUSE, event);
     if (!event) {
         RETURN_RET_WITH_STATUS_CHECK(0.0f, ARKUI_ERROR_CODE_PARAM_INVALID);
@@ -3264,6 +3332,7 @@ float OH_ArkUI_MouseEvent_GetRawDeltaY(const ArkUI_UIInputEvent* event)
 
 int32_t OH_ArkUI_UIInputEvent_GetTargetDisplayId(const ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_UIInputEvent_GetTargetDisplayId");
     const int32_t supportedScenario =
         S_NODE_TOUCH_EVENT | S_NODE_ON_TOUCH_INTERCEPT | S_NODE_ON_MOUSE | S_NODE_ON_FOCUS_AXIS | S_NODE_ON_AXIS |
         S_NODE_ON_CLICK_EVENT | S_NODE_ON_HOVER_EVENT | S_NODE_ON_HOVER_MOVE | S_GESTURE_TOUCH_EVENT |
@@ -3312,6 +3381,7 @@ int32_t OH_ArkUI_UIInputEvent_GetTargetDisplayId(const ArkUI_UIInputEvent* event
 
 int32_t OH_ArkUI_MouseEvent_GetPressedButtons(const ArkUI_UIInputEvent* event, int32_t* pressedButtons, int32_t* length)
 {
+    CHECK_UI_THREAD("OH_ArkUI_MouseEvent_GetPressedButtons");
     CheckSupportedScenarioAndResetEventStatus(S_NODE_ON_MOUSE, event);
     if (!event || !pressedButtons || !length) {
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
@@ -3342,6 +3412,7 @@ int32_t OH_ArkUI_MouseEvent_GetPressedButtons(const ArkUI_UIInputEvent* event, i
 
 double OH_ArkUI_FocusAxisEvent_GetAxisValue(const ArkUI_UIInputEvent* event, int32_t axis)
 {
+    CHECK_UI_THREAD("OH_ArkUI_FocusAxisEvent_GetAxisValue");
     CheckSupportedScenarioAndResetEventStatus(S_NODE_ON_FOCUS_AXIS, event);
     if (!event) {
         RETURN_RET_WITH_STATUS_CHECK(0.0, ARKUI_ERROR_CODE_PARAM_INVALID);
@@ -3383,6 +3454,7 @@ double OH_ArkUI_FocusAxisEvent_GetAxisValue(const ArkUI_UIInputEvent* event, int
 
 int32_t OH_ArkUI_FocusAxisEvent_SetStopPropagation(const ArkUI_UIInputEvent* event, bool stopPropagation)
 {
+    CHECK_UI_THREAD("OH_ArkUI_FocusAxisEvent_SetStopPropagation");
     CheckSupportedScenarioAndResetEventStatus(S_NODE_ON_FOCUS_AXIS, event);
     if (!event) {
         RETURN_RET_WITH_STATUS_CHECK(OHOS::Ace::ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
@@ -3473,6 +3545,7 @@ float HandleTouchEventTargetWidth(const ArkUI_UIInputEvent* event)
 
 float OH_ArkUI_UIInputEvent_GetEventTargetWidth(const ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_UIInputEvent_GetEventTargetWidth");
     CheckSupportedScenarioAndResetEventStatus(
         S_NODE_TOUCH_EVENT | S_NODE_ON_MOUSE | S_NODE_ON_FOCUS_AXIS | S_NODE_ON_CLICK_EVENT | S_NODE_ON_HOVER_EVENT |
         S_GESTURE_TOUCH_EVENT | S_GESTURE_AXIS_EVENT | S_GESTURE_MOUSE_EVENT | S_NXC_DISPATCH_AXIS_EVENT, event);
@@ -3571,6 +3644,7 @@ float HandleTouchEventTargetHeight(const ArkUI_UIInputEvent* event)
 
 float OH_ArkUI_UIInputEvent_GetEventTargetHeight(const ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_UIInputEvent_GetEventTargetHeight");
     CheckSupportedScenarioAndResetEventStatus(
         S_NODE_TOUCH_EVENT | S_NODE_ON_MOUSE | S_NODE_ON_FOCUS_AXIS | S_NODE_ON_CLICK_EVENT | S_NODE_ON_HOVER_EVENT |
         S_GESTURE_TOUCH_EVENT | S_GESTURE_AXIS_EVENT | S_GESTURE_MOUSE_EVENT | S_NXC_DISPATCH_AXIS_EVENT, event);
@@ -3669,6 +3743,7 @@ float HandleTouchEventTargetPositionX(const ArkUI_UIInputEvent* event)
 
 float OH_ArkUI_UIInputEvent_GetEventTargetPositionX(const ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_UIInputEvent_GetEventTargetPositionX");
     CheckSupportedScenarioAndResetEventStatus(S_NODE_TOUCH_EVENT | S_NODE_ON_MOUSE | S_NODE_ON_FOCUS_AXIS |
                                                   S_NODE_ON_CLICK_EVENT | S_NODE_ON_HOVER_EVENT | S_NODE_ON_HOVER_MOVE |
                                                   S_GESTURE_TOUCH_EVENT | S_GESTURE_AXIS_EVENT | S_GESTURE_MOUSE_EVENT |
@@ -3769,6 +3844,7 @@ float HandleTouchEventTargetPositionY(const ArkUI_UIInputEvent* event)
 
 float OH_ArkUI_UIInputEvent_GetEventTargetPositionY(const ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_UIInputEvent_GetEventTargetPositionY");
     CheckSupportedScenarioAndResetEventStatus(S_NODE_TOUCH_EVENT | S_NODE_ON_MOUSE | S_NODE_ON_FOCUS_AXIS |
                                                   S_NODE_ON_CLICK_EVENT | S_NODE_ON_HOVER_EVENT | S_NODE_ON_HOVER_MOVE |
                                                   S_GESTURE_TOUCH_EVENT | S_GESTURE_AXIS_EVENT | S_GESTURE_MOUSE_EVENT |
@@ -3869,6 +3945,7 @@ float HandleTouchEventTargetGlobalPositionX(const ArkUI_UIInputEvent* event)
 
 float OH_ArkUI_UIInputEvent_GetEventTargetGlobalPositionX(const ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_UIInputEvent_GetEventTargetGlobalPositionX");
     CheckSupportedScenarioAndResetEventStatus(S_NODE_TOUCH_EVENT | S_NODE_ON_MOUSE | S_NODE_ON_FOCUS_AXIS |
                                                   S_NODE_ON_CLICK_EVENT | S_NODE_ON_HOVER_EVENT | S_NODE_ON_HOVER_MOVE |
                                                   S_GESTURE_TOUCH_EVENT | S_GESTURE_AXIS_EVENT | S_GESTURE_MOUSE_EVENT |
@@ -3969,6 +4046,7 @@ float HandleTouchEventTargetGlobalPositionY(const ArkUI_UIInputEvent* event)
 
 float OH_ArkUI_UIInputEvent_GetEventTargetGlobalPositionY(const ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_UIInputEvent_GetEventTargetGlobalPositionY");
     CheckSupportedScenarioAndResetEventStatus(S_NODE_TOUCH_EVENT | S_NODE_ON_MOUSE | S_NODE_ON_FOCUS_AXIS |
                                                   S_NODE_ON_CLICK_EVENT | S_NODE_ON_HOVER_EVENT | S_NODE_ON_HOVER_MOVE |
                                                   S_GESTURE_TOUCH_EVENT | S_GESTURE_AXIS_EVENT | S_GESTURE_MOUSE_EVENT |
@@ -4060,6 +4138,7 @@ int32_t HandleTouchEventModifierKeyStates(const ArkUI_UIInputEvent* event, uint6
 
 int32_t OH_ArkUI_UIInputEvent_GetModifierKeyStates(const ArkUI_UIInputEvent* event, uint64_t* keys)
 {
+    CHECK_UI_THREAD("OH_ArkUI_UIInputEvent_GetModifierKeyStates");
     const int32_t supportedScenario = S_NODE_TOUCH_EVENT | S_NODE_ON_MOUSE | S_NODE_ON_KEY_EVENT |
                                       S_NODE_ON_FOCUS_AXIS | S_NODE_ON_CLICK_EVENT | S_NODE_ON_HOVER_EVENT |
                                       S_NODE_ON_HOVER_MOVE | S_GESTURE_TOUCH_EVENT | S_GESTURE_AXIS_EVENT |
@@ -4090,6 +4169,7 @@ int32_t OH_ArkUI_UIInputEvent_GetModifierKeyStates(const ArkUI_UIInputEvent* eve
 
 bool OH_ArkUI_HoverEvent_IsHovered(const ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_HoverEvent_IsHovered");
     CheckSupportedScenarioAndResetEventStatus(S_NODE_ON_HOVER_EVENT, event);
     if (!event) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "event is null");
@@ -4113,6 +4193,7 @@ bool OH_ArkUI_HoverEvent_IsHovered(const ArkUI_UIInputEvent* event)
 
 int32_t OH_ArkUI_AxisEvent_SetPropagation(const ArkUI_UIInputEvent* event, bool propagation)
 {
+    CHECK_UI_THREAD("OH_ArkUI_AxisEvent_SetPropagation");
     CheckSupportedScenarioAndResetEventStatus(S_NODE_ON_AXIS, event);
     if (!event) {
         RETURN_RET_WITH_STATUS_CHECK(OHOS::Ace::ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
@@ -4134,6 +4215,7 @@ int32_t OH_ArkUI_AxisEvent_SetPropagation(const ArkUI_UIInputEvent* event, bool 
 
 int32_t OH_ArkUI_AxisEvent_GetScrollStep(const ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_AxisEvent_GetScrollStep");
     CheckSupportedScenarioAndResetEventStatus(S_NODE_ON_AXIS | S_GESTURE_AXIS_EVENT | S_NXC_DISPATCH_AXIS_EVENT, event);
     int32_t scroll_step_value = 0;
 
@@ -4163,6 +4245,7 @@ int32_t OH_ArkUI_AxisEvent_GetScrollStep(const ArkUI_UIInputEvent* event)
 
 ArkUI_ErrorCode OH_ArkUI_ClonedEvent_SetActionType(const ArkUI_UIInputEvent* event, int32_t type)
 {
+    CHECK_UI_THREAD("OH_ArkUI_ClonedEvent_SetActionType");
     const int32_t supportedScenario = S_NODE_TOUCH_EVENT | S_NODE_ON_MOUSE | S_NODE_ON_AXIS;
     CheckSupportedScenarioAndResetEventStatus(supportedScenario, event);
     if (!event) {
@@ -5394,6 +5477,7 @@ ArkUI_ErrorCode OH_ArkUI_ClonedEvent_SetPressedButtons(
 ArkUI_ErrorCode OH_ArkUI_PointerEvent_CreateClonedPointerEvent(
     const ArkUI_UIInputEvent* event, ArkUI_UIInputEvent** clonedEvent)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_CreateClonedPointerEvent");
     if (!event) {
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
     }
@@ -5468,6 +5552,7 @@ ArkUI_ErrorCode OH_ArkUI_PointerEvent_CreateClonedPointerEvent(
 
 ArkUI_ErrorCode OH_ArkUI_PointerEvent_CreatePointerEvent(ArkUI_UIInputEvent** event, ArkUI_UIInputEvent_Type type)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_CreatePointerEvent");
     if (!event) {
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
     }
@@ -5513,6 +5598,7 @@ ArkUI_ErrorCode OH_ArkUI_PointerEvent_CreatePointerEvent(ArkUI_UIInputEvent** ev
 
 ArkUI_ErrorCode OH_ArkUI_PointerEvent_DestroyClonedPointerEvent(const ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_DestroyClonedPointerEvent");
     if (!event) {
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
     }
@@ -5597,6 +5683,7 @@ ArkUI_ErrorCode ConvertToArkUIErrorCode(int32_t code)
 ArkUI_ErrorCode OH_ArkUI_PointerEvent_PostClonedEventWithStrategy(ArkUI_NodeHandle node,
     const ArkUI_UIInputEvent* event, ArkUI_CompetitionStrategy strategy)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_PostClonedEventWithStrategy");
     if (!event) {
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
     }
@@ -5613,6 +5700,7 @@ ArkUI_ErrorCode OH_ArkUI_PointerEvent_PostClonedEventWithStrategy(ArkUI_NodeHand
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_POST_CLONED_COMPONENT_STATUS_ABNORMAL,
             ARKUI_ERROR_CODE_POST_CLONED_COMPONENT_STATUS_ABNORMAL);
     }
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     int32_t competitionStrategy = 0;
     if (strategy == ArkUI_CompetitionStrategy::ARKUI_COMPETITION_STRATEGY_COMPETITION) {
         competitionStrategy = 1;
@@ -5659,6 +5747,7 @@ ArkUI_ErrorCode OH_ArkUI_PointerEvent_PostClonedEventWithStrategy(ArkUI_NodeHand
 
 int32_t OH_ArkUI_PointerEvent_CreateClonedEvent(const ArkUI_UIInputEvent* event, ArkUI_UIInputEvent** clonedEvent)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_CreateClonedEvent");
     CheckSupportedScenarioAndResetEventStatus(S_NODE_TOUCH_EVENT, event);
     if (!event) {
         RETURN_RET_WITH_STATUS_CHECK(OHOS::Ace::ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
@@ -5700,6 +5789,7 @@ int32_t OH_ArkUI_PointerEvent_CreateClonedEvent(const ArkUI_UIInputEvent* event,
 
 int32_t OH_ArkUI_PointerEvent_DestroyClonedEvent(const ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_DestroyClonedEvent");
     CheckSupportedScenarioAndResetEventStatus(S_NODE_TOUCH_EVENT, event);
     if (!event) {
         RETURN_RET_WITH_STATUS_CHECK(OHOS::Ace::ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
@@ -5720,6 +5810,7 @@ int32_t OH_ArkUI_PointerEvent_DestroyClonedEvent(const ArkUI_UIInputEvent* event
 
 int32_t OH_ArkUI_PointerEvent_SetClonedEventLocalPosition(const ArkUI_UIInputEvent* event, float x, float y)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_SetClonedEventLocalPosition");
     CheckSupportedScenarioAndResetEventStatus(S_NODE_TOUCH_EVENT, event);
     if (!event) {
         RETURN_RET_WITH_STATUS_CHECK(OHOS::Ace::ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
@@ -5740,6 +5831,7 @@ int32_t OH_ArkUI_PointerEvent_SetClonedEventLocalPosition(const ArkUI_UIInputEve
 int32_t OH_ArkUI_PointerEvent_SetClonedEventLocalPositionByIndex(
     const ArkUI_UIInputEvent* event, float x, float y, int32_t pointerIndex)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_SetClonedEventLocalPositionByIndex");
     CheckSupportedScenarioAndResetEventStatus(S_NODE_TOUCH_EVENT, event);
     if (!event) {
         RETURN_RET_WITH_STATUS_CHECK(OHOS::Ace::ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
@@ -5762,6 +5854,7 @@ int32_t OH_ArkUI_PointerEvent_SetClonedEventLocalPositionByIndex(
 
 int32_t OH_ArkUI_PointerEvent_SetClonedEventActionType(const ArkUI_UIInputEvent* event, int32_t actionType)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_SetClonedEventActionType");
     CheckSupportedScenarioAndResetEventStatus(S_NODE_TOUCH_EVENT, event);
     if (!event) {
         RETURN_RET_WITH_STATUS_CHECK(OHOS::Ace::ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
@@ -5780,6 +5873,7 @@ int32_t OH_ArkUI_PointerEvent_SetClonedEventActionType(const ArkUI_UIInputEvent*
 
 int32_t OH_ArkUI_PointerEvent_SetClonedEventChangedFingerId(const ArkUI_UIInputEvent* event, int32_t fingerId)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_SetClonedEventChangedFingerId");
     CheckSupportedScenarioAndResetEventStatus(S_NODE_TOUCH_EVENT, event);
     if (!event) {
         RETURN_RET_WITH_STATUS_CHECK(OHOS::Ace::ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
@@ -5799,6 +5893,7 @@ int32_t OH_ArkUI_PointerEvent_SetClonedEventChangedFingerId(const ArkUI_UIInputE
 int32_t OH_ArkUI_PointerEvent_SetClonedEventFingerIdByIndex(
     const ArkUI_UIInputEvent* event, int32_t fingerId, int32_t pointerIndex)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_SetClonedEventFingerIdByIndex");
     CheckSupportedScenarioAndResetEventStatus(S_NODE_TOUCH_EVENT, event);
     if (!event) {
         RETURN_RET_WITH_STATUS_CHECK(OHOS::Ace::ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
@@ -5820,6 +5915,7 @@ int32_t OH_ArkUI_PointerEvent_SetClonedEventFingerIdByIndex(
 
 int32_t OH_ArkUI_PointerEvent_PostClonedEvent(ArkUI_NodeHandle node, const ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_PointerEvent_PostClonedEvent");
     CheckSupportedScenarioAndResetEventStatus(S_NODE_TOUCH_EVENT, event);
     if (!event) {
         RETURN_RET_WITH_STATUS_CHECK(OHOS::Ace::ERROR_CODE_PARAM_INVALID, ARKUI_ERROR_CODE_PARAM_INVALID);
@@ -5841,6 +5937,7 @@ int32_t OH_ArkUI_PointerEvent_PostClonedEvent(ArkUI_NodeHandle node, const ArkUI
         RETURN_RET_WITH_STATUS_CHECK(ARKUI_ERROR_CODE_POST_CLONED_COMPONENT_STATUS_ABNORMAL,
             ARKUI_ERROR_CODE_POST_CLONED_COMPONENT_STATUS_ABNORMAL);
     }
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     int32_t res = fullImpl->getNodeModifiers()->getCommonModifier()->postTouchEvent(node->uiNodeHandle, touchEvent);
     RETURN_RET_WITH_STATUS_CHECK(res, ARKUI_ERROR_CODE_NO_ERROR);
 }
@@ -5988,11 +6085,13 @@ ArkUI_ErrorCode CheckIsSupportedScenario(uint32_t scenarioExpr, const ArkUI_UIIn
 
 ArkUI_ErrorCode OH_ArkUI_UIInputEvent_GetLatestStatus()
 {
+    CHECK_UI_THREAD("OH_ArkUI_UIInputEvent_GetLatestStatus");
     return g_latestEventStatus;
 }
 
 ArkUI_CoastingAxisEvent* OH_ArkUI_UIInputEvent_GetCoastingAxisEvent(ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_UIInputEvent_GetCoastingAxisEvent");
     CheckSupportedScenarioAndResetEventStatus(S_NODE_ON_COASTING_AXIS_EVENT, event);
     if (!event) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "event is null");
@@ -6244,6 +6343,7 @@ ArkUI_ErrorCode OH_ArkUI_TouchTestInfo_SetTouchResultId(ArkUI_TouchTestInfo* inf
 
 int64_t OH_ArkUI_DigitalCrownEvent_GetEventTime(const ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_DigitalCrownEvent_GetEventTime");
     CheckSupportedScenarioAndResetEventStatus(S_NODE_ON_DIGITAL_CROWN, event);
     int64_t crownEventTime = 0;
     if (!event) {
@@ -6266,6 +6366,7 @@ int64_t OH_ArkUI_DigitalCrownEvent_GetEventTime(const ArkUI_UIInputEvent* event)
 
 double OH_ArkUI_DigitalCrownEvent_GetAngularVelocity(const ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_DigitalCrownEvent_GetAngularVelocity");
     CheckSupportedScenarioAndResetEventStatus(S_NODE_ON_DIGITAL_CROWN, event);
     double crownEventAngularVelocity = 0.0;
     if (!event) {
@@ -6288,6 +6389,7 @@ double OH_ArkUI_DigitalCrownEvent_GetAngularVelocity(const ArkUI_UIInputEvent* e
 
 double OH_ArkUI_DigitalCrownEvent_GetDegree(const ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_DigitalCrownEvent_GetDegree");
     CheckSupportedScenarioAndResetEventStatus(S_NODE_ON_DIGITAL_CROWN, event);
     double crownEventDegree = 0.0;
     if (!event) {
@@ -6310,6 +6412,7 @@ double OH_ArkUI_DigitalCrownEvent_GetDegree(const ArkUI_UIInputEvent* event)
 
 ArkUI_CrownEvent_Action OH_ArkUI_DigitalCrownEvent_GetAction(const ArkUI_UIInputEvent* event)
 {
+    CHECK_UI_THREAD("OH_ArkUI_DigitalCrownEvent_GetAction");
     CheckSupportedScenarioAndResetEventStatus(S_NODE_ON_DIGITAL_CROWN, event);
     ArkUI_CrownEvent_Action crownEventAction = ArkUI_CrownEvent_Action::ARKUI_CROWNEVENT_ACTION_UNKNOWN;
     if (!event) {
@@ -6335,6 +6438,7 @@ ArkUI_CrownEvent_Action OH_ArkUI_DigitalCrownEvent_GetAction(const ArkUI_UIInput
 
 ArkUI_ErrorCode OH_ArkUI_DigitalCrownEvent_SetStopPropagation(const ArkUI_UIInputEvent* event, bool stopPropagation)
 {
+    CHECK_UI_THREAD("OH_ArkUI_DigitalCrownEvent_SetStopPropagation");
     CheckSupportedScenarioAndResetEventStatus(S_NODE_ON_DIGITAL_CROWN, event);
     if (!event) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_PARAM_INVALID, __FUNCTION__, "event is null");

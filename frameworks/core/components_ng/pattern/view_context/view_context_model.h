@@ -41,10 +41,6 @@ public:
         const RefPtr<NG::FrameNode>& bindContentNode, const NG::SheetStyle& sheetStyle, bool isPartialUpdate,
         int32_t currentInstanceId) = 0;
     virtual int32_t CloseBindSheet(const RefPtr<NG::FrameNode>& bindContentNode, int32_t currentInstanceId) = 0;
-
-private:
-    static std::unique_ptr<ViewContextModel> instance_;
-    static std::mutex mutex_;
 };
 } // namespace OHOS::Ace
 

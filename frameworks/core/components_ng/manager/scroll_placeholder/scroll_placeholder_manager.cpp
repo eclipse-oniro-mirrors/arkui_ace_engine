@@ -90,6 +90,11 @@ uint64_t ScrollPlaceholderManager::RegisterTemplate(
     return generation;
 }
 
+void ScrollPlaceholderManager::SetProductReleaseNotifier(ScrollPlaceholderProductReleaseNotifier notifier)
+{
+    registry_.SetProductReleaseNotifier(std::move(notifier));
+}
+
 bool ScrollPlaceholderManager::UnregisterTemplate(const std::string& templateId)
 {
     if (destroyed_.load(std::memory_order_relaxed)) {
@@ -107,6 +112,74 @@ bool ScrollPlaceholderManager::UnregisterTemplate(const std::string& templateId)
 bool ScrollPlaceholderManager::IsTemplateRegistered(const std::string& templateId) const
 {
     return registry_.IsRegistered(templateId);
+}
+
+bool ScrollPlaceholderManager::ProbeTemplateClone(const std::string& templateId, std::string& subtreePath)
+{
+    subtreePath.clear();
+    if (destroyed_.load(std::memory_order_relaxed)) {
+        return false;
+    }
+    auto source = registry_.GetTemplateSourceInstance(templateId);
+    if (!source) {
+        subtreePath = "<no source instance>";
+        return false;
+    }
+    // Validation is the clone itself: the real production copy path runs here on the
+    // UI thread, so probe success and later background-clone success share behavior.
+    // A walk over the copy fn accumulates the failing node's tag path so the
+    // rejection diagnostic pinpoints the offending subtree location.
+    std::function<bool(const RefPtr<UINode>&, std::string&)> probeNode =
+        [&probeNode](const RefPtr<UINode>& node, std::string& path) -> bool {
+        auto frame = AceType::DynamicCast<FrameNode>(node);
+        if (!frame) {
+            path = node->GetTag();
+            return false;
+        }
+        const auto& pattern = frame->GetPattern();
+        if (!pattern || !pattern->CloneForPlaceholder()) {
+            path = node->GetTag();
+            return false;
+        }
+        for (const auto& child : node->GetChildren()) {
+            std::string childPath;
+            if (!probeNode(child, childPath)) {
+                path = node->GetTag() + " > " + childPath;
+                return false;
+            }
+        }
+        return true;
+    };
+    if (!probeNode(source, subtreePath)) {
+        registerRejected_.fetch_add(1, std::memory_order_relaxed);
+        TAG_LOGW(AceLogTag::ACE_SCROLL,
+            "ScrollPlaceholder register probe rejected: unsupported component at %{public}s, "
+            "templateId=%{public}s, instanceId=%{public}d",
+            subtreePath.c_str(), templateId.c_str(), instanceId_);
+        return false;
+    }
+    // Successful probe: the clone itself joins the instance pool (probing and
+    // production share the copy path, so the product is a valid spare).
+    auto copy = CloneScrollPlaceholderSubtreeTopDown(
+        source, [this](const RefPtr<UINode>& node) { return CreatePlaceholderNodeCopy(node); });
+    if (!copy) {
+        subtreePath = source->GetTag();
+        registerRejected_.fetch_add(1, std::memory_order_relaxed);
+        return false;
+    }
+    registry_.CacheTemplateInstance(templateId, copy);
+    ScheduleBackgroundReplenish(templateId);
+    // One-shot source shape log: an empty or unexpectedly tiny source subtree here
+    // means the template itself produced no visual content, which no shell-side log
+    // can distinguish later.
+    int32_t nodeCount = 0;
+    int32_t depth = 0;
+    CountScrollPlaceholderSubtree(source, nodeCount, depth);
+    TAG_LOGI(AceLogTag::ACE_SCROLL,
+        "ScrollPlaceholder template source admitted: templateId=%{public}s, rootTag=%{public}s, "
+        "nodeCount=%{public}d, depth=%{public}d, instanceId=%{public}d",
+        templateId.c_str(), source->GetTag().c_str(), nodeCount, depth, instanceId_);
+    return true;
 }
 
 std::optional<ScrollPlaceholderTemplateSnapshot> ScrollPlaceholderManager::LookupTemplateForCreate(
@@ -137,20 +210,32 @@ RefPtr<UINode> ScrollPlaceholderManager::AcquireTemplateInstance(const std::stri
     if (destroyed_.load(std::memory_order_relaxed) || templateId.empty()) {
         return nullptr;
     }
-    auto cached = registry_.AcquireTemplateInstance(templateId);
-    if (cached) {
-        ScheduleBackgroundReplenish(templateId);
-        return cached;
-    }
-    // No spare copy: synchronously create one instance from the current template on the UI
-    // thread (the builder only ever runs here) so the request is served right away;
-    // background clones of the resident source refill the spares afterwards.
+    // The instance pool stays maintained (registration seeds it, retirement returns
+    // content to it) but an acquire always executes the template builder
+    // synchronously on the UI thread: the restricted clone protocol copies layout
+    // properties only, so a pooled clone renders without paint properties such as
+    // the background color, while a builder product is full fidelity. Serve acquires
+    // from the pool again once the clone protocol covers paint properties.
     auto snapshot = registry_.LookupForCreate(templateId);
     if (!snapshot.has_value() || !snapshot->builder) {
+        TAG_LOGW(AceLogTag::ACE_SCROLL,
+            "ScrollPlaceholder acquire missed: template not in registry, templateId=%{public}s, "
+            "instanceId=%{public}d", templateId.c_str(), instanceId_);
         return nullptr;
     }
+    int64_t buildStartNs = GetSysTimestamp();
     auto instance = snapshot->builder();
-    ScheduleBackgroundReplenish(templateId);
+    int64_t buildCostUs = (GetSysTimestamp() - buildStartNs) / 1000;
+    if (!instance) {
+        TAG_LOGW(AceLogTag::ACE_SCROLL,
+            "ScrollPlaceholder acquire failed: builder produced no product, "
+            "templateId=%{public}s, instanceId=%{public}d (see the builder-exception log)",
+            templateId.c_str(), instanceId_);
+        return nullptr;
+    }
+    TAG_LOGD(AceLogTag::ACE_SCROLL,
+        "ScrollPlaceholder instance built synchronously: templateId=%{public}s, costUs=%{public}" PRId64
+        ", instanceId=%{public}d", templateId.c_str(), buildCostUs, instanceId_);
     return instance;
 }
 
@@ -167,8 +252,7 @@ size_t ScrollPlaceholderManager::GetHotTemplateCount() const
 size_t ScrollPlaceholderManager::GetPendingCloneCount(const std::string& templateId) const
 {
     std::lock_guard<std::mutex> guard(cloneMutex_);
-    auto it = pendingCloneCount_.find(templateId);
-    return it == pendingCloneCount_.end() ? 0 : it->second;
+    return SumPendingClonesLocked(templateId);
 }
 
 void ScrollPlaceholderManager::ScheduleBackgroundReplenish(const std::string& templateId)
@@ -189,11 +273,11 @@ void ScrollPlaceholderManager::ScheduleBackgroundReplenish(const std::string& te
     size_t toSubmit = 0;
     {
         std::lock_guard<std::mutex> guard(cloneMutex_);
-        size_t held = registry_.GetCachedInstanceCount(templateId) + pendingCloneCount_[templateId];
+        size_t held = registry_.GetCachedInstanceCount(templateId) + SumPendingClonesLocked(templateId);
         size_t spareTarget = SCROLL_PLACEHOLDER_INSTANCE_CACHE_CAPACITY - 1;
         if (held < spareTarget) {
             toSubmit = spareTarget - held;
-            pendingCloneCount_[templateId] += static_cast<uint32_t>(toSubmit);
+            pendingCloneCount_[templateId][snapshot->generation] += static_cast<uint32_t>(toSubmit);
         }
     }
     // The RefPtr keeps the manager alive until every submitted task finishes; the task never
@@ -206,7 +290,7 @@ void ScrollPlaceholderManager::ScheduleBackgroundReplenish(const std::string& te
             })) {
             // Executor rejected the task: release the slot booked for it, otherwise the pool
             // would consider it in flight forever.
-            ReleasePendingCloneSlot(templateId);
+            ReleasePendingCloneSlot(templateId, snapshot->generation);
         }
     }
 }
@@ -219,13 +303,17 @@ void ScrollPlaceholderManager::RunBackgroundClone(const std::string& templateId,
     // same-type node with the source properties copied over. The traversal runs inside a
     // thread-safe node scope, so the created nodes register into the mutex-guarded
     // multi-thread registry instead of racing the global element register. Every exit path
-    // releases the pending slot.
+    // releases the pending slot; the skip reason is logged because a silently never
+    // refilling pool turns every acquire into a synchronous UI-thread rebuild.
+    const char* skipReason = nullptr;
     do {
         if (destroyed_.load(std::memory_order_relaxed)) {
+            skipReason = "manager destroyed";
             break;
         }
         auto source = registry_.GetTemplateSourceInstance(templateId);
         if (!source) {
+            skipReason = "no resident source";
             break;
         }
         bool previousScope = MultiThreadBuildManager::IsThreadSafeNodeScope();
@@ -234,29 +322,59 @@ void ScrollPlaceholderManager::RunBackgroundClone(const std::string& templateId,
             source, [this](const RefPtr<UINode>& node) { return CreatePlaceholderNodeCopy(node); });
         MultiThreadBuildManager::SetIsThreadSafeNodeScope(previousScope);
         if (!instance) {
+            skipReason = "clone produced no instance";
             break;
         }
         if (registry_.GetCurrentGeneration(templateId) != generation) {
             // Template re-registered or unregistered while the clone was in flight: the
             // stale result is dropped and never cached.
+            skipReason = "stale generation";
             break;
         }
-        registry_.CacheTemplateInstance(templateId, instance);
+        // Background-thread product: no detached-root owner, so a rejection must not
+        // invoke the (UI-thread-only) release notifier.
+        registry_.CacheTemplateInstance(templateId, instance, /*notifyOnReject=*/false);
     } while (false);
-    ReleasePendingCloneSlot(templateId);
+    if (skipReason != nullptr) {
+        TAG_LOGD(AceLogTag::ACE_SCROLL,
+            "ScrollPlaceholder background clone skipped: reason=%{public}s, templateId=%{public}s, "
+            "instanceId=%{public}d", skipReason, templateId.c_str(), instanceId_);
+    }
+    ReleasePendingCloneSlot(templateId, generation);
 }
 
-void ScrollPlaceholderManager::ReleasePendingCloneSlot(const std::string& templateId)
+void ScrollPlaceholderManager::ReleasePendingCloneSlot(
+    const std::string& templateId, uint64_t templateGeneration)
 {
     std::lock_guard<std::mutex> guard(cloneMutex_);
     auto it = pendingCloneCount_.find(templateId);
     if (it == pendingCloneCount_.end()) {
         return;
     }
-    it->second = it->second > 0 ? it->second - 1 : 0;
-    if (it->second == 0) {
-        pendingCloneCount_.erase(it);
+    auto generationIt = it->second.find(templateGeneration);
+    if (generationIt == it->second.end()) {
+        return;
     }
+    generationIt->second = generationIt->second > 0 ? generationIt->second - 1 : 0;
+    if (generationIt->second == 0) {
+        it->second.erase(generationIt);
+        if (it->second.empty()) {
+            pendingCloneCount_.erase(it);
+        }
+    }
+}
+
+size_t ScrollPlaceholderManager::SumPendingClonesLocked(const std::string& templateId) const
+{
+    auto it = pendingCloneCount_.find(templateId);
+    if (it == pendingCloneCount_.end()) {
+        return 0;
+    }
+    size_t total = 0;
+    for (const auto& entry : it->second) {
+        total += entry.second;
+    }
+    return total;
 }
 
 void ScrollPlaceholderManager::ResetPendingCloneSlots(const std::string& templateId)
@@ -275,19 +393,32 @@ RefPtr<UINode> ScrollPlaceholderManager::CreatePlaceholderNodeCopy(const RefPtr<
     // Same-type creation through the frame node creation interface, then property copy from
     // the source node. The caller runs this inside a thread-safe node scope, so the created
     // node registers into the mutex-guarded multi-thread registry instead of racing the
-    // global element register; no JS VM is involved. Stage scope: plain frame nodes of the
-    // restricted render-only placeholder subtree copy their (concrete) layout property —
-    // pattern-specific paint state and JS custom nodes are covered by the compiler
-    // restricted factory contract (step2) plugging into this hook; until then such nodes
-    // make the whole clone fail and the pool degrades to the UI-thread paths.
+    // global element register; no JS VM is involved.
+    // Restricted copy protocol (step2): the pattern participates through
+    // Pattern::CloneForPlaceholder — the base returns nullptr (component not on the
+    // restricted whitelist), which fails the whole subtree copy; whitelisted
+    // render-only components return a fresh pattern that restores their
+    // self-measure/layout algorithms without any callbacks or cross-thread state.
+    // The layout property (text content / image src / border width) is copied
+    // wholesale — a placeholder is a snapshot of the template — and the
+    // layout-relevant render geometry (zIndex, stacking order) is carried over.
     auto source = AceType::DynamicCast<FrameNode>(node);
     CHECK_NULL_RETURN(source, nullptr);
+    const auto& sourcePattern = source->GetPattern();
+    CHECK_NULL_RETURN(sourcePattern, nullptr);
+    auto clonedPattern = sourcePattern->CloneForPlaceholder();
+    CHECK_NULL_RETURN(clonedPattern, nullptr);
     auto copy = FrameNode::CreateFrameNode(
-        source->GetTag(), ElementRegister::GetInstance()->MakeUniqueId(), MakeRefPtr<Pattern>());
+        source->GetTag(), ElementRegister::GetInstance()->MakeUniqueId(), std::move(clonedPattern));
     CHECK_NULL_RETURN(copy, nullptr);
     const auto& layoutProperty = source->GetLayoutProperty();
     if (layoutProperty) {
         copy->SetLayoutProperty(layoutProperty->Clone());
+    }
+    const auto& sourceRenderContext = source->GetRenderContext();
+    auto copyRenderContext = copy->GetRenderContext();
+    if (sourceRenderContext && copyRenderContext && sourceRenderContext->HasZIndex()) {
+        copyRenderContext->UpdateZIndex(sourceRenderContext->GetZIndex().value_or(0));
     }
     return copy;
 }
@@ -370,6 +501,10 @@ void ScrollPlaceholderManager::EnqueueRealBuild(const ScrollPlaceholderPredictPa
     pendingTask.priority = priority;
     pendingTask.task = std::move(task);
     pendingRealBuilds_.emplace_back(std::move(pendingTask));
+    // Guarantee a consuming frame exists: the current frame may have already spent
+    // its OnIdle slot, in which case nothing would flush the queue until the next
+    // unrelated frame arrives.
+    RequestFrameIfAlive();
 }
 
 void ScrollPlaceholderManager::FlushRealBuild(int64_t deadlineNs)
@@ -387,23 +522,42 @@ void ScrollPlaceholderManager::FlushRealBuild(int64_t deadlineNs)
     while (!pendingRealBuilds_.empty()) {
         RealBuildTask pendingTask = std::move(pendingRealBuilds_.front());
         pendingRealBuilds_.pop_front();
+        // Starvation escape: a task that already survived three flush rounds runs
+        // now, budget aside — the estimate only calibrates after a successful
+        // commit, so without this an over-budget loop can spin forever.
+        bool forced = ++pendingTask.requeueCount >= 3;
         int64_t remaining = deadlineNs - GetSysTimestamp() - FRAMEWORK_SAFETY_MARGIN_NS;
-        if (remaining <= 0) {
+        if (!forced && remaining <= 0) {
+            TAG_LOGD(AceLogTag::ACE_SCROLL,
+                "ScrollPH flush: no budget, remaining=%{public}lldns, requeue task idx=%{public}d",
+                static_cast<long long>(remaining), pendingTask.params.index);
             requeued.push_back(std::move(pendingTask));
             budgetExhausted = true;
             break;
         }
         if (!pendingTask.params.templateId.empty() &&
             registry_.GetCurrentGeneration(pendingTask.params.templateId) != pendingTask.templateGeneration) {
+            TAG_LOGD(AceLogTag::ACE_SCROLL,
+                "ScrollPH flush: drop stale generation idx=%{public}d, templateId='%{public}s'",
+                pendingTask.params.index, pendingTask.params.templateId.c_str());
             realBuildDropped_.fetch_add(1, std::memory_order_relaxed);
             continue;
         }
         int64_t estimate = costModel_.EstimateRealBuildDuration(
             pendingTask.params.componentType, pendingTask.params.templateId);
-        if (estimate > remaining) {
+        if (!forced && estimate > remaining) {
+            TAG_LOGD(AceLogTag::ACE_SCROLL,
+                "ScrollPH flush: estimate %{public}lldns > remaining %{public}lldns, requeue idx=%{public}d",
+                static_cast<long long>(estimate), static_cast<long long>(remaining),
+                pendingTask.params.index);
             requeued.push_back(std::move(pendingTask));
             budgetExhausted = true;
             break;
+        }
+        if (forced) {
+            TAG_LOGI(AceLogTag::ACE_SCROLL,
+                "ScrollPH flush: forced commit after requeues, idx=%{public}d",
+                pendingTask.params.index);
         }
         int64_t start = GetSysTimestamp();
         bool committed = pendingTask.task();
@@ -411,8 +565,12 @@ void ScrollPlaceholderManager::FlushRealBuild(int64_t deadlineNs)
         costModel_.RecordRealBuildDuration(pendingTask.params.componentType, pendingTask.params.templateId, duration);
         if (committed) {
             realBuildExecuted_.fetch_add(1, std::memory_order_relaxed);
+            TAG_LOGD(AceLogTag::ACE_SCROLL, "ScrollPH flush: committed idx=%{public}d, cost=%{public}lldns",
+                pendingTask.params.index, static_cast<long long>(duration));
         } else {
             realBuildDropped_.fetch_add(1, std::memory_order_relaxed);
+            TAG_LOGD(AceLogTag::ACE_SCROLL,
+                "ScrollPH flush: commit returned false, drop idx=%{public}d", pendingTask.params.index);
         }
     }
     if (budgetExhausted) {
@@ -461,6 +619,10 @@ void ScrollPlaceholderManager::Destroy()
     }
     size_t dropped = pendingRealBuilds_.size();
     pendingRealBuilds_.clear();
+    if (!deferrals_.empty()) {
+        liveDeferralCount_.fetch_sub(static_cast<int32_t>(deferrals_.size()), std::memory_order_relaxed);
+        deferrals_.clear();
+    }
     if (dropped > 0) {
         cancelledByReason_[static_cast<size_t>(ScrollPlaceholderCancelReason::PIPELINE_DESTROYED)]
             .fetch_add(dropped, std::memory_order_relaxed);
@@ -475,6 +637,75 @@ bool ScrollPlaceholderManager::IsDestroyed() const
 {
     return destroyed_.load(std::memory_order_relaxed);
 }
+
+bool ScrollPlaceholderManager::TakeDeferralEntry(uint64_t key)
+{
+    if (deferrals_.erase(key) == 0) {
+        return false;
+    }
+    liveDeferralCount_.fetch_sub(1, std::memory_order_relaxed);
+    return true;
+}
+
+void ScrollPlaceholderManager::RecordDeferral(int32_t hostNodeId, int32_t index, const RefPtr<FrameNode>& shell)
+{
+    CHECK_NULL_VOID(shell);
+    auto key = DeferralKey(hostNodeId, index);
+    auto iter = deferrals_.find(key);
+    if (iter != deferrals_.end()) {
+        iter->second = WeakPtr<FrameNode>(shell);
+        return;
+    }
+    deferrals_.emplace(key, WeakPtr<FrameNode>(shell));
+    liveDeferralCount_.fetch_add(1, std::memory_order_relaxed);
+}
+
+void ScrollPlaceholderManager::ClearDeferral(int32_t hostNodeId, int32_t index)
+{
+    TakeDeferralEntry(DeferralKey(hostNodeId, index));
+}
+
+void ScrollPlaceholderManager::RemoveDeferralsByShell(int32_t hostNodeId, const RefPtr<FrameNode>& shell)
+{
+    // The table is keyed by (hostId, index) but the retirement funnel (RetireShell ->
+    // sweep) does not know the index, so entries are matched by shell identity; the
+    // host parameter only documents intent — a shell is only ever mounted on its own
+    // host. Dead weak references are swept on the way through.
+    (void)hostNodeId;
+    for (auto iter = deferrals_.begin(); iter != deferrals_.end();) {
+        auto recorded = iter->second.Upgrade();
+        if (!recorded || recorded == shell) {
+            auto key = iter->first;
+            ++iter;
+            TakeDeferralEntry(key);
+            continue;
+        }
+        ++iter;
+    }
+}
+
+RefPtr<FrameNode> ScrollPlaceholderManager::QueryDeferredShell(int32_t hostNodeId, int32_t index)
+{
+    auto key = DeferralKey(hostNodeId, index);
+    auto iter = deferrals_.find(key);
+    if (iter == deferrals_.end()) {
+        return nullptr;
+    }
+    auto shell = iter->second.Upgrade();
+    if (!shell) {
+        // The retired shell's cleanup missed this entry: sweep it now so the index
+        // resolves through the normal acquisition again.
+        TakeDeferralEntry(key);
+        return nullptr;
+    }
+    return shell;
+}
+
+bool ScrollPlaceholderManager::HasAnyDeferrals()
+{
+    return liveDeferralCount_.load(std::memory_order_relaxed) > 0;
+}
+
 
 ScrollPlaceholderPredictResult ScrollPlaceholderManager::NotifyRealBuildStart(
     const ScrollPlaceholderPredictParams& params)

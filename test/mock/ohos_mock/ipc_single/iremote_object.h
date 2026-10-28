@@ -21,10 +21,14 @@
 #include "refbase.h"
 
 namespace OHOS {
-class IRemoteObject {
+class MessageParcel;
+class MessageOption;
+class IRemoteObject : public std::enable_shared_from_this<IRemoteObject> {
 public:
     explicit IRemoteObject(const std::u16string& descriptor = std::u16string()) {}
     virtual ~IRemoteObject() = default;
+
+    virtual int32_t SendRequest(uint32_t, MessageParcel&, MessageParcel&, MessageOption&) { return 0; }
 
     void IncStrongRef(const void* objectId = nullptr)
     {

@@ -16,14 +16,18 @@
 #include "core/components_ng/pattern/list/list_pattern.h"
 
 #include <limits>
+#include <set>
+#include <vector>
 #include "core/common/container.h"
 #include "core/common/statistic_event_reporter.h"
 
 #include "base/geometry/rect.h"
 #include "base/log/dump_log.h"
 #include "base/log/event_report.h"
+#include "base/log/log_wrapper.h"
 #include "base/utils/multi_thread.h"
 #include "base/utils/system_properties.h"
+#include "base/utils/time_util.h"
 #include "base/memory/referenced.h"
 #include "core/animation/curves.h"
 #include "core/common/vibrator/vibrator_utils.h"
@@ -31,12 +35,19 @@
 #include "core/components/list/list_theme.h"
 #include "core/components_ng/base/inspector_filter.h"
 #include "core/components_ng/manager/content_change_manager/content_change_manager.h"
+#include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_manager.h"
+#include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_node_clone.h"
+#include "core/components_ng/manager/scroll_placeholder/scroll_placeholder_shell_node.h"
+#include "core/components_ng/pattern/lazy_layout/lazy_layout_utils.h"
+#include "core/components_ng/pattern/list/list_item_pattern.h"
+#include "core/components_v2/inspector/inspector_constants.h"
+#include "core/pipeline/base/element_register.h"
+#include "base/log/ace_trace.h"
 #include "core/components_ng/pattern/list/list_accessibility_property.h"
 #include "core/components_ng/pattern/list/list_content_modifier.h"
 #include "core/components_ng/pattern/list/list_event_hub.h"
 #include "core/components_ng/pattern/list/list_height_offset_calculator.h"
 #include "core/components_ng/pattern/list/list_item_group_pattern.h"
-#include "core/components_ng/pattern/list/list_item_pattern.h"
 #include "core/components_ng/pattern/list/list_lanes_layout_algorithm.h"
 #include "core/components_ng/pattern/list/list_layout_algorithm.h"
 #include "core/components_ng/pattern/list/list_layout_property.h"
@@ -45,10 +56,13 @@
 #include "core/components_ng/pattern/scrollable/scrollable.h"
 #include "core/components_ng/pattern/scrollable/scrollable_accessibility_utils.h"
 #include "core/components_ng/pattern/scrollable/scrollable_animation_consts.h"
+#include "core/components_ng/pattern/scrollable/scrollable_utils.h"
 #include "core/components_ng/pattern/scrollable/scrollable_properties.h"
 #include "core/components_ng/pattern/scrollable/selectable_theme.h"
-#include "core/components_ng/pattern/scrollable/scrollable_utils.h"
 #include "core/components_ng/property/measure_utils.h"
+#ifndef ACE_UNITTEST
+#include "core/components_ng/render/adapter/rosen_render_context.h"
+#endif
 #include "core/components_ng/syntax/lazy_for_each_node.h"
 #include "core/components_ng/syntax/repeat_virtual_scroll_2_node.h"
 #include "core/components_ng/syntax/repeat_virtual_scroll_node.h"
@@ -179,7 +193,565 @@ PaddingPropertyF* GetPaddingFromHost(RefPtr<FrameNode> node)
     return nullptr;
 }
 
-ListPattern::~ListPattern() = default;
+ListPattern::~ListPattern()
+{
+    ResetScrollPlaceholder();
+}
+
+void ListPattern::SetScrollPlaceholder(ScrollPlaceholderProvider&& provider)
+{
+    // Provider replacement bumps the host fact implicitly: pending real-build tasks
+    // carry the host node id and are cancelled below, already-created real nodes
+    // stay under the normal component management, and unfilled placeholder slots
+    // rebuild through the existing path. syncLoad keeps its semantics: prediction
+    // only ever defers builds the lazy path would have deferred as well.
+    scrollPlaceholderProvider_ = std::move(provider);
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    if (!scrollPlaceholderProvider_) {
+        ResetScrollPlaceholder();
+        return;
+    }
+    auto* context = host->GetContext();
+    if (context) {
+        const auto& manager = context->GetOrCreateScrollPlaceholderManager();
+        if (manager) {
+            // Selector replacement invalidates in-flight placeholder work of this
+            // host; the new provider's decisions start from a clean queue.
+            manager->CancelHostRealBuilds(host->GetId(), ScrollPlaceholderCancelReason::RE_REGISTER);
+        }
+    }
+    host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
+}
+
+void ListPattern::ResetScrollPlaceholder()
+{
+    scrollPlaceholderProvider_ = nullptr;
+    // Host reset/destroy: retire every mounted placeholder shell (unmount +
+    // content back to the pool); unfilled slots rebuild through the existing path.
+    for (auto& [index, info] : scrollPlaceholderItems_) {
+        RetireScrollPlaceholderShell(info.shell, info.templateId);
+    }
+    scrollPlaceholderItems_.clear();
+    for (auto& [shell, templateId] : retiringPlaceholderShells_) {
+        // Shells of committed items awaiting the layout-round reconcile are mounted
+        // too; the reset must retire them, not just forget them.
+        RetireScrollPlaceholderShell(shell, templateId);
+    }
+    retiringPlaceholderShells_.clear();
+    SweepOrphanPlaceholderShells();
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto* context = host->GetContext();
+    CHECK_NULL_VOID(context);
+    const auto& manager = context->GetOrCreateScrollPlaceholderManager();
+    CHECK_NULL_VOID(manager);
+    // Pending placeholder real-builds of this host turn stale immediately; the
+    // manager never calls back into a detached pattern.
+    manager->CancelHostRealBuilds(host->GetId(), ScrollPlaceholderCancelReason::HOST_RESET);
+}
+namespace {
+// The instance subtree is built offline (isolated view stack at registration or a
+// background clone): every node still carries the default inactive flag, and
+// FrameNode::SetActive - unlike the UINode base - activates only the node itself.
+// An inactive subtree is dropped from layout participation and render sync
+// (SetRerenderable gates on IsActive): a shell subtree left inactive renders
+// blank inside the sized shell. Activate the whole subtree on mount.
+void ActivatePlaceholderSubtree(const RefPtr<UINode>& node)
+{
+    auto frame = AceType::DynamicCast<FrameNode>(node);
+    if (frame) {
+        frame->SetActive(true);
+    }
+    for (const auto& child : node->GetChildren()) {
+        ActivatePlaceholderSubtree(child);
+    }
+}
+
+// Offline-built instance subtrees also never went through the pipeline dirty flow
+// (their patterns never ran OnModifyDone). In the node-as-wrapper architecture the
+// list algorithm drives the shell node itself through FrameNode::Measure, which
+// covers the whole subtree; the earlier extra dirty mark on the instance root is
+// no longer needed and only caused a redundant standalone layout round.
+
+// Post-layout state of one live shell for diagnostics: distinguishes "content
+// never mounted" (none), "content never measured" (zero-size content) and
+// "measured but not painted" (non-zero size; shellRs/contentRs report whether each
+// node ever entered the render-tree lifecycle via AttachToRenderTree).
+// The attach-gate contrast fields: isPendingState_ and painting are independent
+// gates — painting needs a slot in the host rebuild's collected children plus a
+// live RS node (GetChildrenRSNodes silently drops children whose render context
+// has none), while isPendingState_ only propagates from hosts that already carry
+// it. The realPending/realRsNode contrast against a built neighbor item separates
+// the gate layers in one line: realPending=0 → the pending-state metric is inert
+// on this pipeline; shellRsNode=0 while realRsNode=1 → the shell holds no RS node;
+// both 1 while the shell stays invisible → collection exclusion.
+// RS-node probe: 1 = render context holds a live RS node, 0 = none (the
+// GetChildrenRSNodes drop condition), -1 = probe unavailable in this build
+// (host TDD: mocked render layer, no Rosen headers).
+int32_t ProbeRsNodeState(const RefPtr<FrameNode>& node)
+{
+#ifndef ACE_UNITTEST
+    auto rosen = AceType::DynamicCast<RosenRenderContext>(node->GetRenderContext());
+    return (rosen && rosen->GetRSNode() != nullptr) ? 1 : 0;
+#else
+    (void)node;
+    return -1;
+#endif
+}
+
+// Deferral-blind probe around the shell's index for an already-built real item of
+// the same host (GetFrameNodeChildByIndexWithoutBuild never resolves a deferral or
+// a shell, and never builds). Raw pointer: the host tree owns the node, the
+// caller only reads state within one log statement.
+FrameNode* FindNeighborRealItem(const RefPtr<FrameNode>& host, int32_t index)
+{
+    constexpr int32_t probeRadius = 3;
+    const int32_t totalCount = host->GetTotalChildCount();
+    for (int32_t step = 1; step <= probeRadius; step++) {
+        for (int32_t probe : { index - step, index + step }) {
+            if (probe < 0 || probe >= totalCount) {
+                continue;
+            }
+            auto* real = host->GetFrameNodeChildByIndexWithoutBuild(static_cast<uint32_t>(probe));
+            if (real != nullptr) {
+                return real;
+            }
+        }
+    }
+    return nullptr;
+}
+
+void LogScrollPlaceholderShellState(const RefPtr<FrameNode>& host, int32_t index, const RefPtr<FrameNode>& shell)
+{
+    auto shellSize = shell->GetGeometryNode()->GetFrameSize();
+    bool shellOnRenderTree = shell->IsPendingOnMainRenderTree();
+    auto* realItem = host ? FindNeighborRealItem(host, index) : nullptr;
+    if (shell->GetChildren().empty()) {
+        TAG_LOGD(AceLogTag::ACE_SCROLL,
+            "ScrollPlaceholder shell live: index=%{public}d, shellId=%{public}d, "
+            "shellSize=%{public}fx%{public}f, shellRs=%{public}d, content=none, "
+            "shellActive=%{public}d, shellRsNode=%{public}d, realIdx=%{public}d, realPending=%{public}d, "
+            "realRsNode=%{public}d",
+            index, shell->GetId(), shellSize.Width(), shellSize.Height(),
+            static_cast<int32_t>(shellOnRenderTree), static_cast<int32_t>(shell->IsActive()),
+            ProbeRsNodeState(shell), realItem ? realItem->GetId() : -1,
+            static_cast<int32_t>(realItem && realItem->IsPendingOnMainRenderTree()),
+            (realItem ? ProbeRsNodeState(AceType::Claim(realItem)) : -1));
+        return;
+    }
+    auto content = AceType::DynamicCast<FrameNode>(shell->GetChildren().front());
+    CHECK_NULL_VOID(content);
+    auto contentSize = content->GetGeometryNode()->GetFrameSize();
+    TAG_LOGD(AceLogTag::ACE_SCROLL,
+        "ScrollPlaceholder shell live: index=%{public}d, shellId=%{public}d, "
+        "shellSize=%{public}fx%{public}f, shellRs=%{public}d, contentTag=%{public}s, contentActive=%{public}d, "
+        "contentSize=%{public}fx%{public}f, contentRs=%{public}d, shellActive=%{public}d, shellRsNode=%{public}d, "
+        "realIdx=%{public}d, realPending=%{public}d, realRsNode=%{public}d",
+        index, shell->GetId(), shellSize.Width(), shellSize.Height(), static_cast<int32_t>(shellOnRenderTree),
+        content->GetTag().c_str(), static_cast<int32_t>(content->IsActive()), contentSize.Width(),
+        contentSize.Height(), static_cast<int32_t>(content->IsPendingOnMainRenderTree()),
+        static_cast<int32_t>(shell->IsActive()), ProbeRsNodeState(shell),
+        realItem ? realItem->GetId() : -1,
+        static_cast<int32_t>(realItem && realItem->IsPendingOnMainRenderTree()),
+        (realItem ? ProbeRsNodeState(AceType::Claim(realItem)) : -1));
+}
+
+// Placeholder shell: a plain ListItem carrying only the placeholder visual
+// subtree (template instance) or just the suggested size - no swipe/sticky
+// business logic, no business events by construction. The shell node type keeps
+// a zero FrameCount so host-level child-slot enumerations never count it as an
+// item (index-space integrity, see ScrollPlaceholderShellNode).
+RefPtr<FrameNode> CreatePlaceholderShellNode(
+    const ScrollPlaceholderOptions& options, const RefPtr<ScrollPlaceholderManager>& manager)
+{
+    auto shell = ScrollPlaceholderShellNode::CreateScrollPlaceholderShellNode(V2::SCROLL_PLACEHOLDER_SHELL_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<ListItemPattern>(nullptr, V2::ListItemStyle::NONE));
+    CHECK_NULL_RETURN(shell, nullptr);
+    // Distinguish the three content-less shell causes in the mount log: a
+    // size-only default shell is a designed provider choice, the other two are
+    // wiring anomalies (acquire failures log on the manager side).
+    if (options.id.empty()) {
+        TAG_LOGD(AceLogTag::ACE_SCROLL,
+            "ScrollPlaceholder size-only default shell mounted: provider returned no template id");
+    } else if (!manager->IsTemplateRegistered(options.id)) {
+        TAG_LOGW(AceLogTag::ACE_SCROLL,
+            "ScrollPlaceholder shell mounted without template content: templateId=%{public}s "
+            "is not registered (check the provider id matches PlaceholderRegister.register)",
+            options.id.c_str());
+    } else {
+        auto instance = manager->AcquireTemplateInstance(options.id);
+        if (instance) {
+            shell->AddChild(instance);
+            ActivatePlaceholderSubtree(instance);
+            int32_t nodeCount = 0;
+            int32_t depth = 0;
+            CountScrollPlaceholderSubtree(instance, nodeCount, depth);
+            TAG_LOGD(AceLogTag::ACE_SCROLL,
+                "ScrollPlaceholder shell mounted with template content: templateId=%{public}s, "
+                "rootTag=%{public}s, nodeCount=%{public}d, depth=%{public}d",
+                options.id.c_str(), instance->GetTag().c_str(), nodeCount, depth);
+        }
+    }
+    if (options.size.has_value()) {
+        // Options carry unit-preserving Dimensions (bridges map plain numbers to vp;
+        // strings keep PERCENT/PX/...). Pass through untranslated so PERCENT resolves
+        // against the List cross-axis constraint at measure.
+        CalcSize idealSize;
+        if (options.size->width.has_value()) {
+            idealSize.SetWidth(CalcLength(options.size->width.value()));
+        }
+        if (options.size->height.has_value()) {
+            idealSize.SetHeight(CalcLength(options.size->height.value()));
+        }
+        shell->GetLayoutProperty()->UpdateUserDefinedIdealSize(idealSize);
+    }
+    // Node-as-wrapper: the list algorithm will drive this shell through
+    // FrameNode::Measure directly. The measure flag is consumed by that first
+    // measure (CheckNeedMeasure in the item loop), so it is set once here — later
+    // layout rounds keep returning the shell without re-measuring it.
+    shell->GetLayoutProperty()->UpdatePropertyChangeFlag(PROPERTY_UPDATE_MEASURE);
+    return shell;
+}
+
+// Mounted as a direct child of the List host, like other non-item direct
+// children; indexing is unaffected (syntax proxies own index resolution).
+void MountPlaceholderShellOnHost(const RefPtr<FrameNode>& host, const RefPtr<FrameNode>& shell)
+{
+    auto* context = host->GetContext();
+    CHECK_NULL_VOID(context);
+    // AddChild assigns parent and depth (UINode::DoAddChild).
+    host->AddChild(shell);
+    if (host->IsOnMainTree()) {
+        shell->AttachToMainTree(false, context);
+    }
+    shell->MarkNeedSyncRenderTree();
+    shell->SetActive(true);
+    // Explicit render-tree materialization for the freshly mounted subtree.
+    // The layout-time AddChild only sets sync flags, and no consumer is
+    // guaranteed to pick them up for the shell within the same frame: the RS
+    // node tree of a newly mounted subtree only takes shape when a rebuild
+    // actually runs. Schedule it after layout — the host
+    // rebuild enters the shell into the host's RS tree (ProcessRenderTreeDiff
+    // -> AttachToRenderTree), the shell rebuild enters the content into the
+    // shell's RS tree (the shell's frameChildren_ only fill during its own
+    // rebuild, so skipping it would strand the content one level down).
+    // All shells of a frame mount during the layout pass and the tasks drain
+    // after it, so the FIRST host rebuild of a drain already collects every
+    // pending shell: no force-mark on the host here, its natural
+    // needSyncRenderTree_ flag (set by AddChild) dedups the remaining tasks
+    // to a one-line guard, instead of N full host rebuilds for N shells.
+    // The shell rebuild stays per-shell — nothing else ever consumes a
+    // shell's own flag, so it is force-marked here.
+    auto weakHost = AceType::WeakClaim(AceType::RawPtr(host));
+    auto weakShell = AceType::WeakClaim(AceType::RawPtr(shell));
+    context->AddAfterLayoutTask([weakHost, weakShell]() {
+        auto host = weakHost.Upgrade();
+        auto shell = weakShell.Upgrade();
+        if (!host || !shell) {
+            return;
+        }
+        // Framework pattern (z-index path, RosenRenderContext::OnZIndexUpdate): the
+        // rebuild must be preceded by MarkNeedSyncRenderTree — the flag set at AddChild
+        // may already have been consumed by a mid-layout rebuild, and a bare rebuild
+        // silently no-ops on the stale flag.
+        host->MarkNeedSyncRenderTree();
+        host->RebuildRenderContextTree();
+        shell->MarkNeedSyncRenderTree();
+        shell->RebuildRenderContextTree();
+    });
+}
+} // namespace
+
+// Two-stage budget decision for one not-yet-built index: the provider callback
+// crosses into ArkTS (VM entry + object marshalling),
+// so it must only run under real budget pressure. Stage 1 predicts with the
+// empty-templateId component-aggregate estimate — no JS. Light load / no vsync anchor
+// keeps the synchronous build path without the provider ever being consulted. Stage 2,
+// under pressure only, asks the item provider (nullopt keeps the synchronous path) and
+// the template-specific estimate may flip the decision back to BUILD_REAL_NOW
+// (per-template precision is preserved for the final decision and the flush queue).
+// Returns the provider options when the index should defer to a placeholder.
+std::optional<ScrollPlaceholderOptions> ListPattern::PredictScrollPlaceholderDefer(
+    const RefPtr<ScrollPlaceholderManager>& manager, const RefPtr<FrameNode>& host, int32_t index)
+{
+    // Placeholder deferral is a scroll-time feature. The initial viewport (no scroll
+    // event yet) and a settled list must always build real items: deferring there
+    // mounts invisible shells the real-build queue can never deliver on (the startup
+    // frame is the one frame that is guaranteed to be over budget).
+    constexpr int64_t SCROLL_ACTIVE_WINDOW_NS = 200000000; // 200ms, covers fling frame gaps
+    int64_t nowNs = GetSysTimestamp();
+    if (lastScrollCallbackNs_ <= 0 || nowNs - lastScrollCallbackNs_ > SCROLL_ACTIVE_WINDOW_NS) {
+        return std::nullopt;
+    }
+    ScrollPlaceholderPredictParams params;
+    params.componentType = ScrollPlaceholderComponentType::LIST;
+    params.hostNodeId = host->GetId();
+    params.index = index;
+    params.cacheBuild = false;
+    auto deadline = manager->GetVsyncDerivedFrameDeadlineNs();
+    if (manager->Predict(params, deadline).decision != ScrollPlaceholderDecision::USE_PLACEHOLDER) {
+        return std::nullopt;
+    }
+    auto options = scrollPlaceholderProvider_(index);
+    if (!options.has_value()) {
+        return std::nullopt;
+    }
+    params.templateId = options->id;
+    if (manager->Predict(params, deadline).decision != ScrollPlaceholderDecision::USE_PLACEHOLDER) {
+        return std::nullopt;
+    }
+    return options;
+}
+
+RefPtr<FrameNode> ListPattern::CreateScrollPlaceholderShell(int32_t index)
+{
+    // Component call-site decision: called from the List layout child
+    // acquisition for a not-yet-built visible index. Predicts with the remaining
+    // frame budget before the real builder would run; on USE_PLACEHOLDER mounts a
+    // placeholder shell on the List host and defers the real build into the
+    // pipeline framed queue. Returns null to keep the existing acquisition.
+    CHECK_NULL_RETURN(scrollPlaceholderProvider_, nullptr);
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, nullptr);
+    if (scrollPlaceholderItems_.find(index) != scrollPlaceholderItems_.end()) {
+        // Safety: never stack a second placeholder on the same index.
+        return scrollPlaceholderItems_[index].shell;
+    }
+    if (index < 0 || index >= host->GetTotalChildCount()) {
+        return nullptr;
+    }
+    // Deferral-blind built-probe (UINode window walk, no FrameProxy): once a deferral
+    // for this index is recorded, the index acquisition itself resolves to the shell,
+    // so the plain GetChildByIndex here would mistake our own shell for a real child.
+    if (host->GetFrameNodeChildByIndexWithoutBuild(static_cast<uint32_t>(index))) {
+        // The real child at this index is already built (a committed real-build or a
+        // normal-path rebuild): never place a placeholder over it.
+        return nullptr;
+    }
+    auto* context = host->GetContext();
+    CHECK_NULL_RETURN(context, nullptr);
+    const auto& manager = context->GetOrCreateScrollPlaceholderManager();
+    CHECK_NULL_RETURN(manager, nullptr);
+    auto options = PredictScrollPlaceholderDefer(manager, host, index);
+    CHECK_NULL_RETURN(options.has_value(), nullptr);
+
+    auto shell = CreatePlaceholderShellNode(*options, manager);
+    CHECK_NULL_RETURN(shell, nullptr);
+    MountPlaceholderShellOnHost(host, shell);
+    ACE_SCOPED_TRACE("ScrollPlaceholder::Defer hostId:%d index:%d", host->GetId(), index);
+
+    ScrollPlaceholderItemInfo info;
+    info.shell = shell;
+    info.templateId = options->id;
+    if (!info.templateId.empty()) {
+        auto snapshot = manager->LookupTemplateForCreate(info.templateId);
+        info.templateGen = snapshot.has_value() ? snapshot->generation : 0;
+    }
+    scrollPlaceholderItems_[index] = info;
+    mountedPlaceholderShells_[shell] = info.templateId;
+    // Acquisition substitution table: FrameProxy::GetFrameNodeByIndex
+    // resolves this index to the shell until the real build commits and clears it.
+    manager->RecordDeferral(host->GetId(), index, shell);
+    ScrollPlaceholderPredictParams params;
+    params.componentType = ScrollPlaceholderComponentType::LIST;
+    params.templateId = options->id;
+    params.hostNodeId = host->GetId();
+    params.index = index;
+    params.cacheBuild = false;
+    EnqueueScrollPlaceholderRealBuild(manager, params, info.templateGen);
+    return shell;
+}
+
+void ListPattern::EnqueueScrollPlaceholderRealBuild(
+    const RefPtr<ScrollPlaceholderManager>& manager,
+    const ScrollPlaceholderPredictParams& params, uint64_t templateGen)
+{
+    auto weak = WeakClaim(this);
+    manager->EnqueueRealBuild(params, templateGen,
+        [weak, index = params.index]() -> bool {
+            auto pattern = weak.Upgrade();
+            CHECK_NULL_RETURN(pattern, false);
+            return pattern->CommitScrollPlaceholderRealBuild(index);
+        },
+        ScrollPlaceholderRealBuildPriority::VISIBLE);
+}
+
+void ListPattern::PrepareScrollPlaceholderForAcquisition(int32_t index)
+{
+    // Decision-side pre-check for the FrameProxy acquisition substitution: predicts
+    // with the remaining frame budget and, on defer, mounts the shell and records the
+    // deferral. The wrapper substitution is deliberately NOT done here — the normal
+    // acquisition right after this call flows through GetOrCreateChildByIndex ->
+    // FrameProxy::GetFrameNodeByIndex, which resolves the deferral so the shell picks
+    // up the same skip-flag inheritance and activation as a real item.
+    CreateScrollPlaceholderShell(index);
+}
+
+bool ListPattern::HasScrollPlaceholderItem(int32_t index) const
+{
+    return scrollPlaceholderItems_.find(index) != scrollPlaceholderItems_.end();
+}
+
+bool ListPattern::CommitScrollPlaceholderRealBuild(int32_t index)
+{
+    // Framed real-build closure (UI thread, pipeline OnIdle flush). The real item
+    // is produced by the existing build-style acquisition — the syntax layer path
+    // is untouched — and enters the tree there; the replacement completes with
+    // the next local remeasure (List's existing item-size anchor rules), after
+    // which the shell is retired (ReconcileScrollPlaceholderItems).
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, false);
+    auto iter = scrollPlaceholderItems_.find(index);
+    if (iter == scrollPlaceholderItems_.end()) {
+        return false;
+    }
+    auto* context = host->GetContext();
+    const auto& manager = context ? context->GetOrCreateScrollPlaceholderManager() : nullptr;
+    // Drop the acquisition deferral FIRST: the real acquisition below must resolve
+    // through FrameProxy's normal path, not back into this shell.
+    if (manager) {
+        manager->ClearDeferral(host->GetId(), index);
+    }
+    if (index < 0 || index >= host->GetTotalChildCount()) {
+        // Data shrank below this index: drop the placeholder, never mount.
+        RetireScrollPlaceholderShell(iter->second.shell, iter->second.templateId);
+        scrollPlaceholderItems_.erase(iter);
+        return false;
+    }
+    // A real child already present at the index (built through the normal path
+    // after a data change): keep it, retire the placeholder. Deferral-blind probe —
+    // plain GetChildByIndex would still see this index's own shell without the
+    // clear above, and any other deferred index must not resolve here either.
+    if (host->GetFrameNodeChildByIndexWithoutBuild(static_cast<uint32_t>(index))) {
+        RetireScrollPlaceholderShell(iter->second.shell, iter->second.templateId);
+        scrollPlaceholderItems_.erase(iter);
+        return false;
+    }
+    ACE_SCOPED_TRACE("ScrollPlaceholder::BuildReal hostId:%d index:%d", host->GetId(), index);
+    // Take the entry out FIRST: the acquisition below re-enters
+    // CreateScrollPlaceholderShell, whose dedup check must not resolve to our own shell.
+    ScrollPlaceholderItemInfo info = iter->second;
+    scrollPlaceholderItems_.erase(iter);
+    auto realWrapper = host->GetOrCreateChildByIndex(static_cast<uint32_t>(index), true);
+    if (!realWrapper) {
+        // The queue task is consumed either way: retire the orphan shell so future
+        // acquisitions take the normal path instead of hitting the shell forever.
+        RetireScrollPlaceholderShell(info.shell, info.templateId);
+        return false;
+    }
+    // Transaction: the real node is in the tree; the remeasure re-lays the item
+    // range (anchors follow the existing item-size change rules). The shell stays
+    // mounted until that layout completes, then the reconcile retires it (content
+    // back to the pool, shell unmounted outside the transaction).
+    retiringPlaceholderShells_.emplace_back(info.shell, info.templateId);
+    host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
+    return true;
+}
+
+void ListPattern::RetireScrollPlaceholderShell(const RefPtr<FrameNode>& shell, const std::string& templateId)
+{
+    CHECK_NULL_VOID(shell);
+    mountedPlaceholderShells_.erase(shell);
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto* context = host->GetContext();
+    const auto& manager = context ? context->GetOrCreateScrollPlaceholderManager() : nullptr;
+    // Retirement funnel for every path (commit drops, reconcile drops, the retiring
+    // list and the orphan sweep): drop any deferral still pointing at this shell so
+    // the index resolves through the normal acquisition again.
+    if (manager) {
+        manager->RemoveDeferralsByShell(host->GetId(), shell);
+    }
+    // Return the template content subtree to the per-template instance pool —
+    // the expensive part (builder/clone) — and drop the cheap shell.
+    bool contentPooled = false;
+    if (!templateId.empty() && shell->GetChildren().size() == 1) {
+        if (manager) {
+            auto content = shell->GetChildren().front();
+            shell->RemoveChild(content);
+            manager->CacheTemplateInstance(templateId, content);
+            contentPooled = true;
+        }
+    }
+    if (!templateId.empty() && !contentPooled && !shell->GetChildren().empty()) {
+        // Content existed but missed the pool (unexpected child count or no manager):
+        // it degrades to the re-clone cost path; log to make pool anomalies visible.
+        TAG_LOGD(AceLogTag::ACE_SCROLL,
+            "ScrollPlaceholder content dropped without pooling: children=%{public}d, templateId=%{public}s",
+            static_cast<int32_t>(shell->GetChildren().size()), templateId.c_str());
+    }
+    host->RemoveChild(shell);
+    shell->DetachFromMainTree();
+}
+
+void ListPattern::ReconcileScrollPlaceholderItems()
+{
+    // Layout-round reconcile: placeholders whose index already holds a
+    // real child (normal-path rebuild after data change) or fell out of range are
+    // dropped; shells of committed items are retired after the replacement
+    // layout finished (removed outside the transaction, per the commit ordering).
+    // The orphan sweep at the end also runs with both tables empty: an empty
+    // table with a mounted shell is exactly the residual it exists to catch.
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    int32_t totalCount = host->GetTotalChildCount();
+    for (auto iter = scrollPlaceholderItems_.begin(); iter != scrollPlaceholderItems_.end();) {
+        if (iter->second.shell) {
+            LogScrollPlaceholderShellState(host, iter->first, iter->second.shell);
+        }
+        bool drop = iter->first >= totalCount ||
+            (host->GetFrameNodeChildByIndexWithoutBuild(static_cast<uint32_t>(iter->first)) != nullptr);
+        if (drop) {
+            RetireScrollPlaceholderShell(iter->second.shell, iter->second.templateId);
+            iter = scrollPlaceholderItems_.erase(iter);
+        } else {
+            ++iter;
+        }
+    }
+    for (auto& [shell, templateId] : retiringPlaceholderShells_) {
+        RetireScrollPlaceholderShell(shell, templateId);
+    }
+    retiringPlaceholderShells_.clear();
+    SweepOrphanPlaceholderShells();
+}
+
+void ListPattern::SweepOrphanPlaceholderShells()
+{
+    // Shells carry a zero frame count, so index-based cleanup (data shrink child
+    // removal, syntax rebuilds) never touches them: every retirement goes through
+    // the two tables. This sweep closes the residual path — a shell still mounted
+    // on the host (per the mounted-shell registry) that neither table tracks (a
+    // missed erase/retire somewhere) is retired here, with the template id from the
+    // registry so the content still finds its way back to the instance pool.
+    if (mountedPlaceholderShells_.empty()) {
+        return;
+    }
+    std::set<const FrameNode*> tracked;
+    for (const auto& [index, info] : scrollPlaceholderItems_) {
+        if (info.shell) {
+            tracked.insert(AceType::RawPtr(info.shell));
+        }
+    }
+    for (const auto& [shell, templateId] : retiringPlaceholderShells_) {
+        if (shell) {
+            tracked.insert(AceType::RawPtr(shell));
+        }
+    }
+    std::vector<std::pair<RefPtr<FrameNode>, std::string>> orphans;
+    for (const auto& [shell, templateId] : mountedPlaceholderShells_) {
+        if (shell && tracked.find(AceType::RawPtr(shell)) == tracked.end()) {
+            orphans.emplace_back(shell, templateId);
+        }
+    }
+    for (const auto& [shell, templateId] : orphans) {
+        TAG_LOGD(AceLogTag::ACE_SCROLL, "ScrollPlaceholder orphan shell swept: shellId=%{public}d",
+            shell->GetId());
+        RetireScrollPlaceholderShell(shell, templateId);
+    }
+}
+
 
 RefPtr<LayoutProperty> ListPattern::CreateLayoutProperty()
 {
@@ -272,10 +844,10 @@ void ListPattern::OnModifyDone()
 bool ListPattern::GetIsAllowMouse() const
 {
     auto host = GetHost();
-    CHECK_NULL_RETURN(host, isAllowMouse_);
+    CHECK_NULL_RETURN(host, ScrollablePattern::GetIsAllowMouse());
     auto listEventHub = host->GetEventHub<ListEventHub>();
-    CHECK_NULL_RETURN(listEventHub, isAllowMouse_);
-    return listEventHub->GetOnItemDragStart() ? false : isAllowMouse_;
+    CHECK_NULL_RETURN(listEventHub, ScrollablePattern::GetIsAllowMouse());
+    return listEventHub->GetOnItemDragStart() ? false : ScrollablePattern::GetIsAllowMouse();
 }
 
 bool ListPattern::GetFadingEdge(RefPtr<ScrollablePaintProperty>& paintProperty)
@@ -350,6 +922,9 @@ bool ListPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, c
     if (config.skipMeasure && config.skipLayout) {
         return false;
     }
+    // Scroll placeholder layout-round reconcile: retire shells whose replacement
+    // layout finished and drop placeholders overtaken by real children.
+    ReconcileScrollPlaceholderItems();
     auto layoutAlgorithmWrapper = DynamicCast<LayoutAlgorithmWrapper>(dirty->GetLayoutAlgorithm());
     CHECK_NULL_RETURN(layoutAlgorithmWrapper, false);
     auto listLayoutAlgorithm = DynamicCast<ListLayoutAlgorithm>(layoutAlgorithmWrapper->GetLayoutAlgorithm());
@@ -459,6 +1034,13 @@ bool ListPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, c
             endIndex_ = listLayoutAlgorithm->GetEndIndex(true);
             centerIndex_ = listLayoutAlgorithm->GetMidIndex(AceType::RawPtr(dirty));
         }
+        const auto* request = GetFastScrollRequest();
+        if (request && !FallbackFastScroll() && !Positive(request->viewportSize)) {
+            TryStartFastScroll();
+        }
+        if (!GetFastScrollRequest()) {
+            fastScrollPreparation_.reset();
+        }
         ProcessEvent(indexChanged, relativeOffset, isJump);
         HandleScrollBarOutBoundary();
         UpdateScrollBarOffset();
@@ -480,7 +1062,7 @@ bool ListPattern::OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, c
     DrivenRender(dirty);
 
     ChangeAnimateOverScroll();
-    SetScrollSource(SCROLL_FROM_NONE);
+    SetScrollSourceLayout(SCROLL_FROM_NONE);
     ResetAccessibilityScrollSourceIfIdle();
     MarkSelectedItems();
     UpdateListDirectionInCardStyle();
@@ -987,6 +1569,7 @@ void ListPattern::SetLayoutAlgorithmParams(
     SetLayoutAlgorithmSnapParam(listLayoutAlgorithm);
     listLayoutAlgorithm->SetCurrentDelta(currentDelta_);
     listLayoutAlgorithm->SetIsNeedCheckOffset(isNeedCheckOffset_);
+    SetLayoutAlgorithmFastScrollParams(listLayoutAlgorithm);
     listLayoutAlgorithm->SetItemsPosition(itemPosition_);
     listLayoutAlgorithm->SetPrevContentMainSize(contentMainSize_);
     listLayoutAlgorithm->SetPrevContentStartOffset(contentStartOffset_);
@@ -1090,20 +1673,34 @@ void ListPattern::SetLayoutAlgorithmSnapParam(const RefPtr<ListLayoutAlgorithm>&
 
 void ListPattern::SetLayoutAlgorithmClipContent(const RefPtr<ListLayoutAlgorithm>& listLayoutAlgorithm)
 {
+    CHECK_NULL_VOID(listLayoutAlgorithm);
+    // Activation gate: List reads the clip value from the paint property, while Grid gates through
+    // the layout property (ADR-1). A stored DEFAULT (written by ResetContentClip) is resolved
+    // dynamically here, so both follow a change of the immersive strategy set.
     auto paintProperty = GetPaintProperty<ScrollablePaintProperty>();
-    if (!paintProperty || !paintProperty->HasContentClip()) {
+    const bool hasClip = paintProperty && paintProperty->HasContentClip();
+    auto mode = ContentClipMode::DEFAULT;
+    RefPtr<ShapeRect> clipShape;
+    if (hasClip) {
+        const auto& clip = paintProperty->GetContentClipValue();
+        mode = clip.first;
+        clipShape = clip.second;
+    }
+    if (mode == ContentClipMode::DEFAULT) {
+        mode = ScrollableUtils::ResolveEffectiveDefaultContentClip(GetHost(), AceType::RawPtr(paintProperty));
+    }
+    if (!hasClip && mode != ContentClipMode::SAFE_AREA) {
         safeAreaPad_.reset();
         return;
     }
-    auto clip = paintProperty->GetContentClipValue();
-    listLayoutAlgorithm->SetContentClipMode(clip.first);
-    if (clip.first != ContentClipMode::SAFE_AREA) {
+    listLayoutAlgorithm->SetContentClipMode(mode);
+    if (mode != ContentClipMode::SAFE_AREA) {
         safeAreaPad_.reset();
     }
-    if (clip.first == ContentClipMode::SAFE_AREA && safeAreaPad_.has_value()) {
+    if (mode == ContentClipMode::SAFE_AREA && safeAreaPad_.has_value()) {
         listLayoutAlgorithm->SetContentClipExpend(safeAreaPad_.value());
-    } else if (clip.first == ContentClipMode::CUSTOM) {
-        listLayoutAlgorithm->SetContentClipShape(clip.second);
+    } else if (mode == ContentClipMode::CUSTOM) {
+        listLayoutAlgorithm->SetContentClipShape(clipShape);
     }
 }
 
@@ -1364,6 +1961,11 @@ OverScrollOffset ListPattern::GetOutBoundaryOffset(float delta, bool useChainDel
 
 bool ListPattern::UpdateCurrentOffset(float offset, int32_t source)
 {
+    if (GetFastScrollRequest() && source != SCROLL_FROM_ANIMATION_CONTROLLER) {
+        StopAnimate();
+    } else if (source != SCROLL_FROM_ANIMATION_CONTROLLER && fastScrollPreparation_) {
+        CancelFastScroll();
+    }
     // check edgeEffect is not springEffect
     if (!jumpIndex_.has_value() && !targetIndex_.has_value() && !HandleEdgeEffect(offset, source, GetContentSize())) {
         if (IsOutOfBoundary(false)) {
@@ -1455,6 +2057,7 @@ bool ListPattern::IsOutOfBoundary(bool useCurrentDelta)
 
 bool ListPattern::OnScrollCallback(float offset, int32_t source)
 {
+    lastScrollCallbackNs_ = GetSysTimestamp();
     if (source == SCROLL_FROM_START) {
         auto item = swiperItem_.Upgrade();
         if (item) {
@@ -1578,55 +2181,38 @@ void ListPattern::StartListSnapAnimation(float scrollSnapDelta, float scrollSnap
 
 void ListPattern::SetEdgeEffectCallback(const RefPtr<ScrollEdgeEffect>& scrollEffect)
 {
+    auto leadingCallback = [weak = AceType::WeakClaim(this)]() -> double {
+        auto list = weak.Upgrade();
+        CHECK_NULL_RETURN(list, 0.0);
+        auto endPos = list->endMainPos_;
+        auto startPos = list->startMainPos_;
+        float leading = list->contentMainSize_ - (endPos - startPos) - list->contentEndOffset_;
+        if (list->isStackFromEnd_) {
+            return leading;
+        }
+        return (list->startIndex_ == 0) ? std::min(leading, list->contentStartOffset_) : leading;
+    };
+    auto trailingCallback = [weak = AceType::WeakClaim(this)]() -> double {
+        auto list = weak.Upgrade();
+        CHECK_NULL_RETURN(list, 0.0);
+        auto startMainPos = list->startMainPos_;
+        auto endMainPos = list->endMainPos_;
+        auto contentMainSize = list->contentMainSize_ - list->contentEndOffset_ - list->contentStartOffset_;
+        if (list->startIndex_ == 0 && GreatNotEqual(contentMainSize, endMainPos - startMainPos) &&
+            list->isStackFromEnd_) {
+            return contentMainSize - endMainPos + startMainPos;
+        }
+        return list->contentStartOffset_;
+    };
     scrollEffect->SetCurrentPositionCallback([weak = AceType::WeakClaim(this)]() -> double {
         auto list = weak.Upgrade();
         CHECK_NULL_RETURN(list, 0.0);
         return list->startMainPos_ - list->currentDelta_;
     });
-    scrollEffect->SetLeadingCallback([weak = AceType::WeakClaim(this)]() -> double {
-        auto list = weak.Upgrade();
-        auto endPos = list->endMainPos_;
-        auto startPos = list->startMainPos_;
-        float leading = list->contentMainSize_ - (endPos - startPos) - list->contentEndOffset_;
-        if (list->isStackFromEnd_) {
-            return leading;
-        }
-        return (list->startIndex_ == 0) ? std::min(leading, list->contentStartOffset_) : leading;
-    });
-    scrollEffect->SetTrailingCallback([weak = AceType::WeakClaim(this)]() -> double {
-        auto list = weak.Upgrade();
-        CHECK_NULL_RETURN(list, 0.0);
-        auto startMainPos = list->startMainPos_;
-        auto endMainPos = list->endMainPos_;
-        auto contentMainSize = list->contentMainSize_ - list->contentEndOffset_ - list->contentStartOffset_;
-        if (list->startIndex_ == 0 && GreatNotEqual(contentMainSize, endMainPos - startMainPos) &&
-            list->isStackFromEnd_) {
-            return contentMainSize - endMainPos + startMainPos;
-        }
-        return list->contentStartOffset_;
-    });
-    scrollEffect->SetInitLeadingCallback([weak = AceType::WeakClaim(this)]() -> double {
-        auto list = weak.Upgrade();
-        auto endPos = list->endMainPos_;
-        auto startPos = list->startMainPos_;
-        float leading = list->contentMainSize_ - (endPos - startPos) - list->contentEndOffset_;
-        if (list->isStackFromEnd_) {
-            return leading;
-        }
-        return (list->startIndex_ == 0) ? std::min(leading, list->contentStartOffset_) : leading;
-    });
-    scrollEffect->SetInitTrailingCallback([weak = AceType::WeakClaim(this)]() -> double {
-        auto list = weak.Upgrade();
-        CHECK_NULL_RETURN(list, 0.0);
-        auto startMainPos = list->startMainPos_;
-        auto endMainPos = list->endMainPos_;
-        auto contentMainSize = list->contentMainSize_ - list->contentEndOffset_ - list->contentStartOffset_;
-        if (list->startIndex_ == 0 && GreatNotEqual(contentMainSize, endMainPos - startMainPos) &&
-            list->isStackFromEnd_) {
-            return contentMainSize - endMainPos + startMainPos;
-        }
-        return list->contentStartOffset_;
-    });
+    scrollEffect->SetLeadingCallback(leadingCallback);
+    scrollEffect->SetTrailingCallback(trailingCallback);
+    scrollEffect->SetInitLeadingCallback(leadingCallback);
+    scrollEffect->SetInitTrailingCallback(trailingCallback);
 }
 
 void ListPattern::InitOnKeyEvent(const RefPtr<FocusHub>& focusHub)
@@ -1652,14 +2238,12 @@ bool ListPattern::OnKeyEvent(const KeyEvent& event)
         ScrollPage(true);
         return true;
     }
-    if (FocusHub::IsFocusStepKey(event.code)) {
-        return ScrollToLastFocusIndex(event);
+    if (FocusHub::IsFocusStepKey(event.code) && ScrollToLastFocusIndex(event)) {
+        return true;
     }
-    return HandleDirectionKey(event);
-}
-
-bool ListPattern::HandleDirectionKey(const KeyEvent& event)
-{
+    if (HandleArrowKeyScroll(event)) {
+        return true;
+    }
     return false;
 }
 
@@ -2103,12 +2687,15 @@ bool ListPattern::ScrollListItemGroupForFocus(int32_t nextIndex, int32_t curInde
 
 void ListPattern::OnAnimateStop()
 {
+    if (!startingFastScroll_ && fastScrollPreparation_ && !childrenSize_ && posMap_) {
+        posMap_->RemoveUnpositionedEntries();
+    }
     if (!GetIsDragging() || GetScrollAbort()) {
         scrollStop_ = true;
         MarkDirtyNodeSelf();
         isScrollEnd_ = true;
     }
-    scrollTarget_.reset();
+    ScrollablePattern::OnAnimateStop();
 }
 
 int32_t ListPattern::GetFirstIndex() const
@@ -2119,6 +2706,7 @@ int32_t ListPattern::GetFirstIndex() const
 void ListPattern::ScrollTo(float position)
 {
     StopAnimate();
+    ScheduleCapiScrollCommand(true);
     jumpIndex_.reset();
     targetIndex_.reset();
     currentDelta_ = 0.0f;
@@ -2129,7 +2717,7 @@ void ListPattern::ScrollTo(float position)
     isScrollEnd_ = true;
     auto host = GetHost();
     CHECK_NULL_VOID(host);
-    ContentChangeReport(host, ContentChangeManager::SCROLL_TO);
+    ContentChangeReport(host, ContentChangeManager::SCROLL_TO, false);
 }
 
 void ListPattern::ResetScrollToIndexParams()
@@ -2139,8 +2727,377 @@ void ListPattern::ResetScrollToIndexParams()
     scrollAlign_ = ScrollAlign::START;
 }
 
+ListFastScrollPreparation& ListPattern::GetOrCreateFastScrollPreparation()
+{
+    if (!fastScrollPreparation_) {
+        fastScrollPreparation_ = std::make_unique<ListFastScrollPreparation>();
+    }
+    return *fastScrollPreparation_;
+}
+
+void ListPattern::CancelFastScrollForTargetChange()
+{
+    if (HasFastScrollRequest()) {
+        StopScrollableAndAnimate();
+    }
+    CancelFastScroll();
+}
+
+void ListPattern::CancelFastScroll()
+{
+    if (fastScrollPreparation_ && !childrenSize_ && posMap_) {
+        posMap_->RemoveUnpositionedEntries();
+    }
+    ScrollablePattern::CancelFastScroll();
+    fastScrollPreparation_.reset();
+}
+
+void ListPattern::SetLayoutAlgorithmFastScrollParams(const RefPtr<ListLayoutAlgorithm>& algorithm)
+{
+    algorithm->SetFastScrollSkip(std::exchange(fastScrollSkip_, false));
+    const auto* preparation = GetFastScrollPreparation();
+    // The final animation frame still needs the nested known-size coordinates after clearing its target.
+    algorithm->SetFastScrollKnownMainSize(
+        childrenSize_ && preparation && preparation->preparation == FastScrollPreparation::READY);
+    if (const auto* request = GetFastScrollRequest()) {
+        algorithm->SetFastScrollTarget(request->index, request->align);
+        algorithm->SetFastScrollMode(request->fastScrollMode);
+        if (preparation && preparation->NeedsPreparation()) {
+            algorithm->SetFastScrollPreparationOffset(request->extraOffset);
+        }
+    }
+    if (preparation && preparation->preparedLayouts && !preparation->NeedsPreparation()) {
+        algorithm->SetFastScrollPreparedLayouts(preparation->preparedLayouts);
+    }
+}
+
+void ListPattern::ScrollToIndexFastScroll(int32_t index, bool smooth, ScrollAlign align,
+    std::optional<float> extraOffset, FastScrollMode mode)
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    if (!IsFastScrollEnabled(mode) || !smooth || host->GetTag() != V2::LIST_ETS_TAG) {
+        ScrollToIndex(index, smooth, align, extraOffset);
+        return;
+    }
+    int32_t count = host->GetTotalChildCount() - itemStartIndex_;
+    if (index == ListLayoutAlgorithm::LAST_ITEM) {
+        index = count - 1;
+    }
+    if (index < 0 || index >= count || !std::isfinite(extraOffset.value_or(0.0f))) {
+        return;
+    }
+    StopScrollableAndAnimate();
+    InitializeFastScrollRequest(index, align, extraOffset.value_or(0.0f), mode);
+    if (childrenSize_ || MarkFastScrollVisibleTargetPrepared()) {
+        TryStartFastScroll();
+    }
+    MarkDirtyNodeSelf();
+}
+
+void ListPattern::InitializeFastScrollRequest(int32_t index, ScrollAlign align, float extraOffset, FastScrollMode mode)
+{
+    CancelFastScroll();
+    ResetScrollToIndexParams();
+    jumpIndex_.reset();
+    jumpIndexInGroup_.reset();
+    scrollTarget_.reset();
+    ResetExtraOffset();
+    ResetLastSnapTargetIndex();
+    predictSnapOffset_.reset();
+    currentDelta_ = 0.0f;
+    smooth_ = true;
+    scrollTarget_ = ScrollToIndexTarget { index, extraOffset, align, 0.0f };
+    scrollTarget_->fastScrollMode = mode;
+    if (childrenSize_) {
+        GetOrCreateFastScrollPreparation().preparation = FastScrollPreparation::READY;
+    } else {
+        GetOrCreateFastScrollPreparation().preparation = align == ScrollAlign::AUTO ?
+            FastScrollPreparation::NEED_TARGET : FastScrollPreparation::NEED_WINDOW;
+    }
+}
+
+bool ListPattern::MarkFastScrollVisibleTargetPrepared()
+{
+    const auto& request = *GetFastScrollRequest();
+    if (!isInitialized_ || prevMeasureBreak_ ||
+        !Positive(contentMainSize_) || !NearZero(request.extraOffset)) {
+        return false;
+    }
+    auto item = itemPosition_.find(request.index);
+    if (item == itemPosition_.end() || item->second.isGroup || item->second.isLazyChild) {
+        return false;
+    }
+    GetOrCreateFastScrollPreparation().preparation = FastScrollPreparation::READY;
+    return true;
+}
+
+bool ListPattern::EstimateFastScrollPositions(int32_t firstMeasured, int32_t lastMeasured)
+{
+    CHECK_NULL_RETURN(posMap_, false);
+    auto& request = *GetFastScrollRequest();
+    if (childrenSize_) {
+        return !Negative(posMap_->GetPositionInfo(request.index).mainSize);
+    }
+    if (GetFastScrollPreparation()->preparation == FastScrollPreparation::READY &&
+        NearZero(request.extraOffset) && itemPosition_.count(request.index)) {
+        return true;
+    }
+    if (GetFastScrollPreparation()->estimated && NearEqual(GetFastScrollPreparation()->estimatedSpace, spaceWidth_) &&
+        !Negative(posMap_->GetPositionInfo(request.index).mainSize)) {
+        return true;
+    }
+    posMap_->UpdateTotalCount(maxListItemIndex_ + 1);
+    const auto anchor = itemPosition_.begin();
+    const auto previous = posMap_->GetPositionInfo(anchor->first);
+    const float previousPos = NonNegative(previous.mainPos) ? previous.mainPos :
+        std::max(0.0f, static_cast<float>(currentOffset_ + anchor->second.startPos));
+    ListPositionMap::EstimateRange range {
+        std::min(anchor->first, request.index), std::max(anchor->first, request.index)
+    };
+    if (firstMeasured >= 0) {
+        range.startIndex = std::min(range.startIndex, firstMeasured);
+    }
+    range.endIndex = std::max(range.endIndex, lastMeasured);
+    const auto sample = posMap_->GetAverageRowHeight(lanes_);
+    if (!sample || !posMap_->EstimatePositions(range, sample.value(), lanes_, spaceWidth_,
+        lanesItemRange_, isStackFromEnd_)) {
+        return false;
+    }
+    currentOffset_ += posMap_->GetPositionInfo(anchor->first).mainPos - previousPos;
+    GetOrCreateFastScrollPreparation().estimated = true;
+    GetOrCreateFastScrollPreparation().estimatedSpace = spaceWidth_;
+    return true;
+}
+
+void ListPattern::ResolveFastScrollAlign()
+{
+    auto& request = *GetFastScrollRequest();
+    if (request.align != ScrollAlign::AUTO ||
+        GetFastScrollPreparation()->preparation == FastScrollPreparation::NEED_TARGET) {
+        return;
+    }
+    auto info = posMap_->GetPositionInfo(request.index);
+    float start = info.mainPos - currentOffset_;
+    float end = start + info.mainSize;
+    auto iter = itemPosition_.find(request.index);
+    if (iter != itemPosition_.end() && (!childrenSize_ || iter->second.isGroup)) {
+        start = iter->second.startPos;
+        end = iter->second.endPos;
+    }
+    float target = CalculateTargetPos(start, end);
+    float endTarget = 0.0f;
+    GetListItemAnimatePos(start, end, ScrollAlign::END, endTarget);
+    request.align = NearEqual(target, endTarget) ? ScrollAlign::END : ScrollAlign::START;
+    if (NearZero(target) && request.align == ScrollAlign::START) {
+        float startTarget = 0.0f;
+        GetListItemAnimatePos(start, end, ScrollAlign::START, startTarget);
+        // AUTO keeps an already visible item in place; do not reapply extraOffset each frame.
+        request.extraOffset -= startTarget;
+    }
+}
+
+bool ListPattern::GetFastScrollTargetPosition(float& position) const
+{
+    const auto& target = *GetFastScrollRequest();
+    auto info = posMap_->GetPositionInfo(target.index);
+    if (Negative(info.mainSize)) {
+        return false;
+    }
+    float start = info.mainPos - currentOffset_;
+    float end = start + info.mainSize;
+    auto iter = itemPosition_.find(target.index);
+    if (iter != itemPosition_.end() && (!childrenSize_ || iter->second.isGroup)) {
+        start = iter->second.startPos;
+        end = iter->second.endPos;
+    }
+    GetListItemAnimatePos(start, end, target.align, position);
+    position += target.extraOffset;
+    if ((Positive(position) && IsAtBottom()) || (Negative(position) && IsAtTop())) {
+        position = 0.0f;
+    }
+    position += currentOffset_;
+    return std::isfinite(position);
+}
+
+bool ListPattern::HandleFastScrollTargetReached(float position)
+{
+    if (!NearEqual(position, currentOffset_, 0.1f)) {
+        return false;
+    }
+    if (AnimateRunning()) {
+        StopAnimate();
+    } else {
+        CancelFastScroll();
+    }
+    return true;
+}
+
+void ListPattern::UpdateFastScrollPositionMap()
+{
+    if (!GetFastScrollRequest() || prevMeasureBreak_) {
+        return;
+    }
+    auto& request = *GetFastScrollRequest();
+    if (request.index > maxListItemIndex_) {
+        StopAnimate();
+        return;
+    }
+    if (GetFastScrollPreparation()->preparation == FastScrollPreparation::UNSUPPORTED ||
+        (lanes_ > 1 && GetFastScrollPreparation()->NeedsPreparation()) ||
+        itemPosition_.empty()) {
+        return;
+    }
+    if (lanes_ > 1 && !childrenSize_ && lanesItemRange_.empty()) {
+        return;
+    }
+    if (!EstimateFastScrollPositions()) {
+        TAG_LOGW(AceLogTag::ACE_LIST, "Fast scroll position estimation failed; cancel request.");
+        CancelFastScroll();
+    }
+}
+
+bool ListPattern::FallbackFastScroll()
+{
+    const auto* request = GetFastScrollRequest();
+    if (!request || prevMeasureBreak_ ||
+        GetFastScrollPreparation()->preparation != FastScrollPreparation::UNSUPPORTED) {
+        return false;
+    }
+    const auto target = *request;
+    ScrollToIndex(target.index, true, target.align, target.extraOffset);
+    return true;
+}
+
+void ListPattern::TryStartFastScroll()
+{
+    const auto* request = GetFastScrollRequest();
+    if (!request || prevMeasureBreak_ || itemPosition_.empty() || !Positive(contentMainSize_)) {
+        return;
+    }
+    ResolveFastScrollAlign();
+    if (GetFastScrollPreparation()->NeedsPreparation()) {
+        MarkDirtyNodeSelf();
+        return;
+    }
+    if (Positive(request->viewportSize) || GetFastScrollPreparation()->preparation != FastScrollPreparation::READY) {
+        return;
+    }
+    float position = 0.0f;
+    if (GetFastScrollTargetPosition(position) && !HandleFastScrollTargetReached(position)) {
+        StartFastScrollAnimation(position);
+    }
+}
+
+void ListPattern::UpdateFastScrollAnimation(float coordinateCorrection)
+{
+    const auto& request = *GetFastScrollRequest();
+    if (!Positive(request.viewportSize) || GetFastScrollPreparation()->preparation != FastScrollPreparation::READY) {
+        return;
+    }
+    float position = 0.0f;
+    if (!GetFastScrollTargetPosition(position)) {
+        return;
+    }
+    if (HandleFastScrollTargetReached(position)) {
+        return;
+    }
+    if (!NearZero(coordinateCorrection, 0.1f) ||
+        !NearEqual(request.targetOffset, position, 0.1f) ||
+        !NearEqual(request.viewportSize, contentMainSize_)) {
+        if (HasKnownFastScrollRowMismatch()) {
+            return;
+        }
+        StartFastScrollAnimation(position);
+    }
+}
+
+bool ListPattern::HasKnownFastScrollRowMismatch() const
+{
+    if (!childrenSize_ || lanes_ <= 1 || itemPosition_.empty()) {
+        return false;
+    }
+    auto previous = itemPosition_.begin();
+    auto previousInfo = posMap_->GetPositionInfo(previous->first);
+    for (auto item = std::next(previous); item != itemPosition_.end(); ++item) {
+        const auto info = posMap_->GetPositionInfo(item->first);
+        if (item->first == previous->first + 1 &&
+            NearEqual(previous->second.startPos, item->second.startPos) !=
+            NearEqual(previousInfo.mainPos, info.mainPos)) {
+            // Keep legacy CMS topology unchanged, but do not endlessly retarget across incompatible rows.
+            return true;
+        }
+        previous = item;
+        previousInfo = info;
+    }
+    return false;
+}
+
+void ListPattern::ApplyFastScrollLayoutResult(const RefPtr<ListLayoutAlgorithm>& algorithm)
+{
+    if (childrenSize_ || !GetFastScrollRequest() || !posMap_) {
+        return;
+    }
+    const auto& target = *GetFastScrollRequest();
+    if (!algorithm->MatchesFastScrollTarget(target.index, target.align, target.extraOffset)) {
+        return;
+    }
+    const auto* result = algorithm->GetFastScrollMeasureResult();
+    CHECK_NULL_VOID(result);
+    if (result->status == FastScrollMeasureStatus::INVALID) {
+        TAG_LOGW(AceLogTag::ACE_LIST, "Invalid fast scroll measurement; cancel request.");
+        CancelFastScroll();
+        return;
+    }
+    const auto& measuredPositions = result->measuredSizes;
+    for (const auto& [index, measured] : measuredPositions) {
+        // The visible layout runs after preparation and may have refined a lazy section again.
+        if (itemPosition_.count(index)) {
+            continue;
+        }
+        auto info = posMap_->GetPositionInfo(index);
+        info.mainSize = measured.mainSize;
+        info.isGroup = measured.isGroup;
+        info.isLazyChild = measured.isLazyChild;
+        posMap_->UpdatePos(index, info);
+    }
+    if (algorithm->HasFastScrollPreparationRequest() || result->status == FastScrollMeasureStatus::UNSUPPORTED) {
+        ApplyFastScrollPreparationResult(algorithm);
+    }
+}
+
+void ListPattern::ApplyFastScrollPreparationResult(const RefPtr<ListLayoutAlgorithm>& algorithm)
+{
+    auto& request = *GetFastScrollRequest();
+    const auto* result = algorithm->GetFastScrollMeasureResult();
+    CHECK_NULL_VOID(result);
+    const auto& measuredPositions = result->measuredSizes;
+    const bool targetMeasured = measuredPositions.count(request.index);
+    if (result->status == FastScrollMeasureStatus::UNSUPPORTED) {
+        GetOrCreateFastScrollPreparation().preparation = FastScrollPreparation::UNSUPPORTED;
+    } else if (result->status == FastScrollMeasureStatus::COMPLETE) {
+        GetOrCreateFastScrollPreparation().preparation = FastScrollPreparation::READY;
+    } else {
+        GetOrCreateFastScrollPreparation().preparation = targetMeasured ?
+            FastScrollPreparation::NEED_WINDOW : FastScrollPreparation::NEED_TARGET;
+    }
+    GetOrCreateFastScrollPreparation().preparedLayouts = algorithm->GetFastScrollPreparedLayouts();
+    GetOrCreateFastScrollPreparation().estimated = false;
+    if (!measuredPositions.empty() && !itemPosition_.empty()) {
+        const bool positioned = EstimateFastScrollPositions(
+            measuredPositions.begin()->first, measuredPositions.rbegin()->first);
+        if (!positioned) {
+            TAG_LOGW(AceLogTag::ACE_LIST, "Fast scroll prepared position estimation failed; cancel request.");
+            CancelFastScroll();
+        }
+    }
+}
+
 void ListPattern::ScrollToIndex(int32_t index, bool smooth, ScrollAlign align, std::optional<float> extraOffset)
 {
+    if (!smooth) {
+        ScheduleCapiScrollCommand(true);
+    }
     SetScrollSource(SCROLL_FROM_JUMP);
     // When snap align scrolling with the mouse wheel, do not interrupt the animation.
     if (!smooth && !lastSnapTargetIndex_.has_value()) {
@@ -2152,7 +3109,10 @@ void ListPattern::ScrollToIndex(int32_t index, bool smooth, ScrollAlign align, s
         smooth_ = smooth;
         if (smooth_) {
             SetExtraOffset(extraOffset);
+            // Smooth animation scrolling: updates only the session-level query state (FLING semantics)
+            SetScrollSourceForQuery(SCROLL_FROM_ANIMATION_SPRING);
             if (!AnimateToTarget(index, std::nullopt, align)) {
+                CancelFastScrollForTargetChange();
                 targetIndex_ = index;
                 scrollAlign_ = align;
             }
@@ -2165,7 +3125,7 @@ void ListPattern::ScrollToIndex(int32_t index, bool smooth, ScrollAlign align, s
             jumpIndexInGroup_.reset();
             auto host = GetHost();
             CHECK_NULL_VOID(host);
-            ContentChangeReport(host, ContentChangeManager::SCROLL_TO_INDEX);
+            ContentChangeReport(host, ContentChangeManager::SCROLL_TO_INDEX, false);
         }
         MarkDirtyNodeSelf();
     }
@@ -2199,6 +3159,9 @@ bool ListPattern::CheckTargetValid(int32_t index, int32_t indexInGroup)
 
 void ListPattern::ScrollToItemInGroup(int32_t index, int32_t indexInGroup, bool smooth, ScrollAlign align)
 {
+    if (!smooth) {
+        ScheduleCapiScrollCommand(true);
+    }
     SetScrollSource(SCROLL_FROM_JUMP);
     if (!smooth) {
         StopAnimate();
@@ -2210,6 +3173,7 @@ void ListPattern::ScrollToItemInGroup(int32_t index, int32_t indexInGroup, bool 
         smooth_ = smooth;
         if (smooth_) {
             if (!AnimateToTarget(index, indexInGroup, align) && CheckTargetValid(index, indexInGroup)) {
+                CancelFastScrollForTargetChange();
                 targetIndex_ = index;
                 currentDelta_ = 0;
                 targetIndexInGroup_ = indexInGroup;
@@ -2434,6 +3398,7 @@ void ListPattern::ScrollPage(bool reverse, bool smooth, AccessibilityScrollType 
         }
     } else {
         StopAnimate();
+        ScheduleCapiScrollCommand(false);
         UpdateCurrentOffset(distance, SCROLL_FROM_JUMP);
         isScrollEnd_ = true;
     }
@@ -2892,6 +3857,7 @@ bool ListPattern::CalculateJumpOffset()
 float ListPattern::UpdateTotalOffset(const RefPtr<ListLayoutAlgorithm>& listLayoutAlgorithm, bool isJump)
 {
     if (prevMeasureBreak_) {
+        ApplyFastScrollLayoutResult(listLayoutAlgorithm);
         return 0;
     }
     float relativeOffset = listLayoutAlgorithm->GetCurrentOffset();
@@ -2909,25 +3875,44 @@ float ListPattern::UpdateTotalOffset(const RefPtr<ListLayoutAlgorithm>& listLayo
             }
         }
         if (needReEstimateOffset_) {
+            const auto* request = GetFastScrollRequest();
+            const auto groupFlags =
+                request && lanes_ > 1 ? posMap_->GetItemGroupFlags() : ListPositionMap::ItemGroupFlags {};
+            if (request) {
+                GetOrCreateFastScrollPreparation().estimated = false;
+            }
             posMap_->ClearPosMap();
             auto calculate = ListHeightOffsetCalculator(itemPosition_, spaceWidth_, lanes_, GetAxis(), itemStartIndex_);
             calculate.SetPosMap(posMap_, true);
             calculate.GetEstimateHeightAndOffset(GetHost());
             currentOffset_ = calculate.GetEstimateOffset();
             listTotalHeight_ = calculate.GetEstimateHeight();
-            relativeOffset = 0;
+            posMap_->UpdateItemGroupFlags(groupFlags); // Preserve scanned types after the LazyForEach estimate.
             needReEstimateOffset_ = false;
             heightEstimated_ = true;
+            relativeOffset = 0;
         }
         CalculateCurrentOffset(relativeOffset, listLayoutAlgorithm->GetRecycledItemPosition());
     }
+    float preparationCorrection = 0.0f;
+    if (GetFastScrollRequest()) {
+        const double offsetBeforePreparation = currentOffset_;
+        ApplyFastScrollLayoutResult(listLayoutAlgorithm);
+        UpdateFastScrollPositionMap();
+        preparationCorrection = currentOffset_ - offsetBeforePreparation;
+    }
     CheckAndUpdateAnimateTo(relativeOffset, prevOffset);
-    
-    return currentOffset_ - prevOffset;
+    return currentOffset_ - prevOffset - preparationCorrection;
 }
 
 void ListPattern::CheckAndUpdateAnimateTo(float relativeOffset, float prevOffset)
 {
+    if (const auto* request = GetFastScrollRequest()) {
+        if (Positive(request->viewportSize)) {
+            UpdateFastScrollAnimation(currentOffset_ - relativeOffset - prevOffset);
+        }
+        return;
+    }
     if (!scrollTarget_) {
         return;
     }
@@ -2987,7 +3972,12 @@ void ListPattern::CalculateCurrentOffset(float delta, const ListLayoutAlgorithm:
         if (iter != itemPos.end()) {
             groupAtStart = iter->second.groupInfo ? iter->second.groupInfo.value().atStart : true;
             startPos = iter->second.startPos;
-            posMap_->UpdatePosMapStart(delta, currentOffset_, spaceWidth_, iter->first, startPos, groupAtStart);
+            if (GetFastScrollRequest()) {
+                posMap_->UpdateFastScrollPosMapStart(
+                    delta, currentOffset_, spaceWidth_, iter->first, startPos, groupAtStart);
+            } else {
+                posMap_->UpdatePosMapStart(delta, currentOffset_, spaceWidth_, iter->first, startPos, groupAtStart);
+            }
         }
     }
     UpdatePosMap(itemPos);
@@ -3011,7 +4001,11 @@ void ListPattern::UpdatePosMap(const ListLayoutAlgorithm::PositionMap& itemPos)
     }
     auto& endGroupInfo = itemPos.rbegin()->second.groupInfo;
     bool groupAtEnd = (!endGroupInfo || endGroupInfo.value().atEnd);
-    posMap_->UpdatePosMapEnd(itemPos.rbegin()->first, spaceWidth_, groupAtEnd);
+    if (GetFastScrollRequest()) {
+        posMap_->UpdateFastScrollPosMapEnd(itemPos.rbegin()->first, spaceWidth_, groupAtEnd);
+    } else {
+        posMap_->UpdatePosMapEnd(itemPos.rbegin()->first, spaceWidth_, groupAtEnd);
+    }
 }
 
 void ListPattern::UpdateChildPosInfo(int32_t index, float delta, float sizeChange)
@@ -3699,6 +4693,139 @@ void ListPattern::CloseAllSwipeActions(OnFinishFunc&& onFinishCallback)
 void ListPattern::OnRestoreInfo(const std::string& restoreInfo)
 {
     jumpIndex_ = StringUtils::StringToInt(restoreInfo);
+}
+
+void ListPattern::DumpAdvanceListConfiguration(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    const bool isPublicTree = config.IsPublicTree();
+    const bool visual = !isPublicTree || config.visualProperties;
+    const bool functional = !isPublicTree || config.functionalProperties;
+    if (visual) {
+        if (isPublicTree) {
+            json->Put("lanes", lanes_);
+            json->Put("laneGutter", laneGutter_);
+        } else {
+            json->Put("lanes", std::to_string(lanes_).c_str());
+            json->Put("laneGutter", std::to_string(laneGutter_).c_str());
+        }
+    }
+    if (!isPublicTree) {
+        json->Put("dragFromSpring", dragFromSpring_);
+        json->Put("isScrollEnd", isScrollEnd_);
+    }
+    if (visual) {
+        json->Put("IsAtTop", IsAtTop());
+        json->Put("IsAtBottom", IsAtBottom());
+    }
+    if (functional) {
+        json->Put("multiSelectable", multiSelectable_);
+    }
+    if (visual) {
+        json->Put("chainAnimation", chainAnimation_);
+    }
+    if (functional) {
+        json->Put("maintainVisibleContentPosition", maintainVisibleContentPosition_);
+    }
+    if (!isPublicTree) {
+        auto host = GetHost();
+        CHECK_NULL_VOID(host);
+        auto listLayoutProperty = host->GetLayoutProperty<ListLayoutProperty>();
+        if (listLayoutProperty) {
+            listLayoutProperty->DumpInfo(json);
+        }
+        return;
+    }
+    if (config.visualProperties) {
+        DumpAdvanceVisualProperties(json, config);
+    }
+    if (config.functionalProperties) {
+        DumpAdvanceFunctionalProperties(json, config);
+    }
+}
+
+void ListPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    ScrollablePattern::DumpAdvanceInfo(json, config);
+    if (!config.IsPublicTree()) {
+        json->Put("maxListItemIndex", maxListItemIndex_);
+        json->Put("startIndex", startIndex_);
+        json->Put("endIndex", endIndex_);
+        json->Put("centerIndex", centerIndex_);
+    }
+    if (!config.IsPublicTree() || config.visualProperties) {
+        json->Put("startMainPos", startMainPos_);
+        json->Put("endMainPos", endMainPos_);
+        json->Put("currentOffset", currentOffset_);
+        json->Put("contentMainSize", contentMainSize_);
+        // Preserve resolved offsets over the layout property's configured strings in public output.
+        if (config.IsPublicTree() && json->Contains("contentStartOffset")) {
+            json->Replace("contentStartOffset", contentStartOffset_);
+        } else {
+            json->Put("contentStartOffset", contentStartOffset_);
+        }
+        if (config.IsPublicTree() && json->Contains("contentEndOffset")) {
+            json->Replace("contentEndOffset", contentEndOffset_);
+        } else {
+            json->Put("contentEndOffset", contentEndOffset_);
+        }
+    }
+    if (!config.IsPublicTree()) {
+        DumpAdvanceDiagnostics(json);
+    }
+    DumpAdvanceListConfiguration(json, config);
+}
+
+void ListPattern::DumpAdvanceDiagnostics(std::unique_ptr<JsonValue>& json)
+{
+    json->Put("currentDelta", currentDelta_);
+    json->Put("crossMatchChild", crossMatchChild_);
+    json->Put("smooth", smooth_);
+    json->Put("jumpIndex", jumpIndex_.has_value() ? std::to_string(jumpIndex_.value()).c_str() : "null");
+    json->Put(
+        "jumpIndexInGroup", jumpIndexInGroup_.has_value() ? std::to_string(jumpIndexInGroup_.value()).c_str() : "null");
+    json->Put("targetIndex", targetIndex_.has_value() ? std::to_string(targetIndex_.value()).c_str() : "null");
+    json->Put("predictSnapOffset",
+        predictSnapOffset_.has_value() ? std::to_string(predictSnapOffset_.value()).c_str() : "null");
+    json->Put("predictSnapEndPos",
+        predictSnapEndPos_.has_value() ? std::to_string(predictSnapEndPos_.value()).c_str() : "null");
+    json->Put("paintStateFlag", paintStateFlag_);
+    json->Put("isFramePaintStateValid", isFramePaintStateValid_);
+    CreatePositionInfo(json);
+    json->Put("scrollStop", scrollStop_);
+    std::unique_ptr<JsonValue> lanesChildrenArray = JsonUtil::CreateArray(true);
+    for (auto item : lanesItemRange_) {
+        std::unique_ptr<JsonValue> child = JsonUtil::Create(true);
+        child->Put("lanesItemRange.first", std::to_string(item.first).c_str());
+        child->Put("lanesItemRange.second", std::to_string(item.second).c_str());
+        lanesChildrenArray->Put(child);
+    }
+    json->Put("lanesItemRange", lanesChildrenArray);
+}
+
+void ListPattern::DumpAdvanceVisualProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    auto property = GetLayoutProperty<ListLayoutProperty>();
+    CHECK_NULL_VOID(property);
+    auto visualConfig = config;
+    visualConfig.functionalProperties = false;
+    property->DumpInfo(json, visualConfig);
+}
+
+void ListPattern::DumpAdvanceFunctionalProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    auto property = GetLayoutProperty<ListLayoutProperty>();
+    if (property) {
+        auto functionalConfig = config;
+        functionalConfig.visualProperties = false;
+        property->DumpInfo(json, functionalConfig);
+        json->Put("stackFromEnd", property->GetStackFromEndValue(false));
+    }
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto hub = host->GetEventHub<ListEventHub>();
+    CHECK_NULL_VOID(hub);
+    json->Put("hasOnScrollIndex", static_cast<bool>(hub->GetOnScrollIndex()));
+    json->Put("hasOnScrollChange", static_cast<bool>(hub->GetOnScrollVisibleContentChange()));
 }
 
 void ListPattern::DumpAdvanceInfo()
@@ -4405,55 +5532,7 @@ void ListPattern::DumpInfo()
 
 void ListPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json)
 {
-    ScrollablePattern::DumpAdvanceInfo(json);
-    json->Put("maxListItemIndex", maxListItemIndex_);
-    json->Put("startIndex", startIndex_);
-    json->Put("endIndex", endIndex_);
-    json->Put("centerIndex", centerIndex_);
-    json->Put("startMainPos", startMainPos_);
-    json->Put("endMainPos", endMainPos_);
-    json->Put("currentOffset", currentOffset_);
-    json->Put("contentMainSize", contentMainSize_);
-    json->Put("contentStartOffset", contentStartOffset_);
-    json->Put("contentEndOffset", contentEndOffset_);
-    json->Put("currentDelta", currentDelta_);
-    json->Put("crossMatchChild", crossMatchChild_);
-    json->Put("smooth", smooth_);
-    json->Put("jumpIndex", jumpIndex_.has_value() ? std::to_string(jumpIndex_.value()).c_str() : "null");
-    json->Put(
-        "jumpIndexInGroup", jumpIndexInGroup_.has_value() ? std::to_string(jumpIndexInGroup_.value()).c_str() : "null");
-    json->Put("targetIndex", targetIndex_.has_value() ? std::to_string(targetIndex_.value()).c_str() : "null");
-    json->Put("predictSnapOffset",
-        predictSnapOffset_.has_value() ? std::to_string(predictSnapOffset_.value()).c_str() : "null");
-    json->Put("predictSnapEndPos",
-        predictSnapEndPos_.has_value() ? std::to_string(predictSnapEndPos_.value()).c_str() : "null");
-    json->Put("paintStateFlag", paintStateFlag_);
-    json->Put("isFramePaintStateValid", isFramePaintStateValid_);
-    CreatePositionInfo(json);
-    json->Put("scrollStop", scrollStop_);
-    std::unique_ptr<JsonValue> lanesChildrenArray = JsonUtil::CreateArray(true);
-    for (auto item : lanesItemRange_) {
-        std::unique_ptr<JsonValue> child = JsonUtil::Create(true);
-        child->Put("lanesItemRange.first", std::to_string(item.first).c_str());
-        child->Put("lanesItemRange.second", std::to_string(item.second).c_str());
-        lanesChildrenArray->Put(child);
-    }
-    json->Put("lanesItemRange", lanesChildrenArray);
-    json->Put("lanes", std::to_string(lanes_).c_str());
-    json->Put("laneGutter", std::to_string(laneGutter_).c_str());
-    json->Put("dragFromSpring", dragFromSpring_);
-    json->Put("isScrollEnd", isScrollEnd_);
-    json->Put("IsAtTop", IsAtTop());
-    json->Put("IsAtBottom", IsAtBottom());
-    json->Put("multiSelectable", multiSelectable_);
-    json->Put("chainAnimation", chainAnimation_);
-    json->Put("maintainVisibleContentPosition", maintainVisibleContentPosition_);
-    auto host = GetHost();
-    CHECK_NULL_VOID(host);
-    auto listLayoutProperty = host->GetLayoutProperty<ListLayoutProperty>();
-    if (listLayoutProperty) {
-        listLayoutProperty->DumpInfo(json);
-    }
+    ListPattern::DumpAdvanceInfo(json, ParamConfig());
 }
 
 void ListPattern::DumpSimplifyInfo(std::shared_ptr<JsonValue>& json)

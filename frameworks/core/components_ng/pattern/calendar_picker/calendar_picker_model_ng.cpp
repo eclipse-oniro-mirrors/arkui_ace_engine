@@ -16,9 +16,11 @@
 #include "core/components_ng/pattern/calendar_picker/calendar_picker_model_ng.h"
 
 #include "core/components_ng/pattern/calendar_picker/calendar_picker_event_hub.h"
+#include "core/components_ng/pattern/calendar_picker/calendar_picker_i18n.h"
 #include "core/components_ng/pattern/calendar_picker/calendar_picker_pattern.h"
 
 #include "base/i18n/localization.h"
+#include "base/log/log_wrapper.h"
 #include "core/components/calendar/calendar_theme.h"
 #include "core/components/theme/icon_theme.h"
 #include "core/components_ng/pattern/date_picker/picker_theme.h"
@@ -40,11 +42,14 @@ constexpr int32_t ONE_DIGIT_BOUNDARY = 10;
 constexpr uint32_t MAX_MONTH = 12;
 constexpr float DEFAULT_HINT_RADIUS = 16.0f;
 constexpr uint32_t YEAR_LENGTH = 4;
+constexpr int32_t MONTH_DAY_DIGITS = 2;
 static int32_t yearNodeIndex_ = 0;
 static int32_t monthNodeIndex_ = 2;
 static int32_t dayNodeIndex_ = 4;
 const bool DEFAULT_MARK_TODAY = false;
+const int32_t DEFAULT_FIRST_DAY_OF_WEEK = 0;
 const char BUTTON_ETS_TAG[] = "Button";
+
 void CalendarPickerModelNG::Create(const CalendarSettingData& settingData)
 {
     auto* stack = ViewStackProcessor::GetInstance();
@@ -120,9 +125,7 @@ RefPtr<FrameNode> CalendarPickerModelNG::CreateButtonChild(
     auto buttonNode = FrameNode::GetOrCreateFrameNode(BUTTON_ETS_TAG, id, []() -> RefPtr<Pattern> {
         auto* buttonModifier = NodeModifier::GetButtonCustomModifier();
         CHECK_NULL_RETURN(buttonModifier, nullptr);
-        auto* rawPattern = reinterpret_cast<Pattern*>(buttonModifier->createButtonPattern());
-        CHECK_NULL_RETURN(rawPattern, nullptr);
-        return AceType::Claim(rawPattern);
+        return buttonModifier->createButtonPattern();
     });
     CHECK_NULL_RETURN(buttonNode, nullptr);
     auto* btnModifier = NodeModifier::GetButtonCustomModifier();
@@ -224,7 +227,6 @@ RefPtr<FrameNode> CalendarPickerModelNG::CreateCalendarNodeChild(int32_t content
     padding.right = CalcLength(theme->GetEntryDateLeftRightMargin());
     padding.bottom = CalcLength(theme->GetEntryDateTopBottomMargin());
     linearLayoutProperty->UpdatePadding(padding);
-    linearLayoutProperty->UpdateLayoutDirection(TextDirection::LTR);
 
     CreateDateNode(contentNode, settingData);
     contentNode->MarkModifyDone();
@@ -235,17 +237,21 @@ void CalendarPickerModelNG::CreateDateNode(RefPtr<FrameNode>& contentNode, const
 {
     CHECK_NULL_VOID(contentNode);
     std::map<std::size_t, std::string> order = GetDateNodeOrder(settingData);
+    auto locale = Localization::GetInstance()->GetLanguage();
+    auto separators = CalendarPickerI18n::GetDateSeparators(locale);
+    std::string sep1 = separators.size() > 0 ? separators[0] : "/";
+    std::string sep2 = separators.size() > 1 ? separators[1] : "/";
 
     auto firstDateNode = CreateDateTextNode(order[0]);
     CHECK_NULL_VOID(firstDateNode);
     firstDateNode->MountToParent(contentNode);
-    auto textNode1 = CreateDateTextNode("/");
+    auto textNode1 = CreateDateTextNode(sep1);
     CHECK_NULL_VOID(textNode1);
     textNode1->MountToParent(contentNode);
     auto secondDateNode = CreateDateTextNode(order[1]);
     CHECK_NULL_VOID(secondDateNode);
     secondDateNode->MountToParent(contentNode);
-    auto textNode2 = CreateDateTextNode("/");
+    auto textNode2 = CreateDateTextNode(sep2);
     CHECK_NULL_VOID(textNode2);
     textNode2->MountToParent(contentNode);
     auto thirdDateNode = CreateDateTextNode(order[2]);
@@ -846,29 +852,30 @@ std::map<std::size_t, std::string> CalendarPickerModelNG::GetDateNodeOrder(const
         PickerDate::AdjustDateToRange(settingData.selectedDate, settingData.startDate, settingData.endDate);
     std::vector<std::string> outOrder;
     bool result = Localization::GetInstance()->GetDateOrder(outOrder);
+    auto locale = Localization::GetInstance()->GetLanguage();
     std::map<std::size_t, std::string> order;
     if (!result || outOrder.size() < DATE_NODE_COUNT) {
         yearNodeIndex_ = YEAR_NODE_INDEX;
         monthNodeIndex_ = MONTH_NODE_INDEX;
         dayNodeIndex_ = DAY_NODE_INDEX;
         auto num = 0;
-        order[num++] = AddLeadingZeroToYear(date.GetYear());
-        order[num++] = (date.GetMonth() < ONE_DIGIT_BOUNDARY ? "0" : "") + std::to_string(date.GetMonth());
-        order[num] = (date.GetDay() < ONE_DIGIT_BOUNDARY ? "0" : "") + std::to_string(date.GetDay());
+        order[num++] = CalendarPickerI18n::LocalizeDateNumber(date.GetYear(), YEAR_LENGTH, locale);
+        order[num++] = CalendarPickerI18n::LocalizeDateNumber(date.GetMonth(), MONTH_DAY_DIGITS, locale);
+        order[num] = CalendarPickerI18n::LocalizeDateNumber(date.GetDay(), MONTH_DAY_DIGITS, locale);
     } else {
         size_t index = 0;
         for (size_t i = 0; i < outOrder.size(); ++i) {
             if (outOrder[i] == "year") {
                 yearNodeIndex_ = static_cast<int32_t>(i + index);
-                order[i] = AddLeadingZeroToYear(date.GetYear());
+                order[i] = CalendarPickerI18n::LocalizeDateNumber(date.GetYear(), YEAR_LENGTH, locale);
             }
             if (outOrder[i] == "month") {
                 monthNodeIndex_ = static_cast<int32_t>(i + index);
-                order[i] = (date.GetMonth() < ONE_DIGIT_BOUNDARY ? "0" : "") + std::to_string(date.GetMonth());
+                order[i] = CalendarPickerI18n::LocalizeDateNumber(date.GetMonth(), MONTH_DAY_DIGITS, locale);
             }
             if (outOrder[i] == "day") {
                 dayNodeIndex_ = static_cast<int32_t>(i + index);
-                order[i] = (date.GetDay() < ONE_DIGIT_BOUNDARY ? "0" : "") + std::to_string(date.GetDay());
+                order[i] = CalendarPickerI18n::LocalizeDateNumber(date.GetDay(), MONTH_DAY_DIGITS, locale);
             }
             index++;
         }
@@ -882,6 +889,15 @@ std::string CalendarPickerModelNG::AddLeadingZeroToYear(uint32_t year)
     std::string yearStr = std::string(YEAR_LENGTH - std::to_string(year).length(), '0');
     yearStr += std::to_string(year);
     return yearStr;
+}
+
+std::string CalendarPickerModelNG::AddLeadingZeroToDate(uint32_t value, int32_t minDigits)
+{
+    std::string str = std::to_string(value);
+    if (static_cast<int32_t>(str.length()) < minDigits) {
+        str = std::string(minDigits - str.length(), '0') + str;
+    }
+    return str;
 }
 
 void CalendarPickerModelNG::SetMarkToday(bool isMarkToday)
@@ -907,6 +923,31 @@ bool CalendarPickerModelNG::GetMarkToday(FrameNode* frameNode)
     auto pickerPattern = frameNode->GetPattern<CalendarPickerPattern>();
     CHECK_NULL_RETURN(pickerPattern, DEFAULT_MARK_TODAY);
     return pickerPattern->GetMarkToday();
+}
+
+void CalendarPickerModelNG::SetFirstDayOfWeek(int32_t firstDayOfWeek)
+{
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    CHECK_NULL_VOID(frameNode);
+    auto pickerPattern = frameNode->GetPattern<CalendarPickerPattern>();
+    CHECK_NULL_VOID(pickerPattern);
+    pickerPattern->SetFirstDayOfWeek(firstDayOfWeek);
+}
+
+void CalendarPickerModelNG::SetFirstDayOfWeek(FrameNode* frameNode, int32_t firstDayOfWeek)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto pickerPattern = frameNode->GetPattern<CalendarPickerPattern>();
+    CHECK_NULL_VOID(pickerPattern);
+    pickerPattern->SetFirstDayOfWeek(firstDayOfWeek);
+}
+
+int32_t CalendarPickerModelNG::GetFirstDayOfWeek(FrameNode* frameNode)
+{
+    CHECK_NULL_RETURN(frameNode, DEFAULT_FIRST_DAY_OF_WEEK);
+    auto pickerPattern = frameNode->GetPattern<CalendarPickerPattern>();
+    CHECK_NULL_RETURN(pickerPattern, DEFAULT_FIRST_DAY_OF_WEEK);
+    return pickerPattern->GetFirstDayOfWeek();
 }
 
 void CalendarPickerModelNG::SetDisabledDateRange(

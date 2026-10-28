@@ -192,7 +192,7 @@ void TextBase::RevertLocalPointWithTransform(const RefPtr<FrameNode>& targetNode
     std::stack<RefPtr<FrameNode>> nodeStack;
     while (parent) {
         nodeStack.push(parent);
-        parent = parent->GetAncestorNodeOfFrame(true);
+        parent = parent->GetCoordinateAncestorNodeOfFrame(true);
     }
     CHECK_NULL_VOID(!nodeStack.empty());
     PointF localPoint(point.GetX(), point.GetY());
@@ -205,6 +205,9 @@ void TextBase::RevertLocalPointWithTransform(const RefPtr<FrameNode>& targetNode
         renderContext->GetPointWithRevert(localPoint);
         auto rectOffset = renderContext->GetPaintRectWithoutTransform().GetOffset();
         localPoint = localPoint - rectOffset;
+        if (!nodeStack.empty()) {
+            nodeStack.top()->RevertAdoptedCompensationFromPoint(localPoint);
+        }
     }
     point.SetX(localPoint.GetX());
     point.SetY(localPoint.GetY());
@@ -227,10 +230,13 @@ bool TextBase::HasRenderTransform(const RefPtr<FrameNode>& targetNode)
             auto noTransformRect = renderContext->GetPaintRectWithoutTransform();
             auto transformRect = renderContext->GetPaintRectWithTransform();
             hasTransform = noTransformRect != transformRect;
+            if (!hasTransform && host->IsAdopted() && host->UseAdoptedCompensation()) {
+                hasTransform = !host->GetAdoptedCompensationTransform().IsIdentityMatrix();
+            }
         } else {
             break;
         }
-        host = host->GetAncestorNodeOfFrame(true);
+        host = host->GetCoordinateAncestorNodeOfFrame(true);
     }
     return hasTransform;
 }
@@ -310,7 +316,13 @@ VectorF TextBase::GetHostScale(const RefPtr<FrameNode>& host) const
             scaleX *= std::abs(transform.scale[0]);
             scaleY *= std::abs(transform.scale[1]);
         }
-        parent = parent->GetAncestorNodeOfFrame(true);
+        auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
+        if (ancestor && parent->HasAdoptedCompensation()) {
+            auto compensationScale = parent->GetAdoptedCompensationScale();
+            scaleX *= std::abs(compensationScale.x);
+            scaleY *= std::abs(compensationScale.y);
+        }
+        parent = ancestor;
     }
     return VectorF(scaleX, scaleY);
 }

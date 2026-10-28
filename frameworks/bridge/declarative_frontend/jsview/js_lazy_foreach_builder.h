@@ -264,6 +264,13 @@ public:
         JSLazyForEachActuator::UnregisterListener(listener);
     }
 
+    bool IsDataExtractionSupported() const override
+    {
+        return !getDataFunc_.IsEmpty();
+    }
+
+    std::string GetDataByIndexAsJson(int32_t index, int32_t& errorCode) override;
+
     ACE_DISALLOW_COPY_AND_MOVE(JSLazyForEachBuilder);
 
 private:

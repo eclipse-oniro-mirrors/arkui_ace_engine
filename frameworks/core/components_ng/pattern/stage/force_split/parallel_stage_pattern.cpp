@@ -534,6 +534,9 @@ void ParallelStagePattern::InitTouchEvent(const RefPtr<GestureEventHub>& gesture
 
 void ParallelStagePattern::HandleTouchEvent(const TouchEventInfo& info)
 {
+    if (info.GetTouches().empty()) {
+        return;
+    }
     auto touchType = info.GetTouches().front().GetTouchType();
     if (touchType == TouchType::DOWN) {
         HandleTouchDown();

@@ -90,28 +90,6 @@ struct TestProperty {
     std::optional<Dimension> arrowOffset = std::nullopt;
 };
 
-class MockBubbleTheme : public PopupTheme, public ButtonTheme {
-    DECLARE_ACE_TYPE(MockBubbleTheme, PopupTheme, ButtonTheme);
-
-public:
-    class Builder {
-    public:
-        Builder() = default;
-        ~Builder() = default;
-
-        RefPtr<MockBubbleTheme> Build(const RefPtr<ThemeConstants>& themeConstants) const
-        {
-            RefPtr<MockBubbleTheme> theme = AceType::MakeRefPtr<MockBubbleTheme>();
-            return theme;
-        }
-    };
-
-    ~MockBubbleTheme() override = default;
-
-protected:
-    MockBubbleTheme() = default;
-};
-
 class BubbleFiveTestNg : public testing::Test {
 public:
     static void SetUpTestCase();
@@ -2161,6 +2139,6 @@ HWTEST_F(BubbleFiveTestNg, BubblePatternPopOnAreaChange001, TestSize.Level0)
     bubblePattern->OnAttachToFrameNode();
     auto eventHub = targetNode->GetEventHub<EventHub>();
     ASSERT_NE(eventHub, nullptr);
-    EXPECT_FALSE(eventHub->onAreaChangedInnerCallbacks_.empty());
+    EXPECT_TRUE(eventHub->HasInnerOnAreaChanged());
 }
 } // namespace OHOS::Ace::NG

@@ -727,6 +727,7 @@ std::string JSNavigationStack::GetNameByIndex(int32_t index)
 
 JSRef<JSVal> JSNavigationStack::GetParamByIndex(int32_t index) const
 {
+    JAVASCRIPT_EXECUTION_SCOPE_WITH_CHECK(executionContext_, JSRef<JSVal>::Make());
     if (dataSourceObj_->IsEmpty()) {
         return JSRef<JSVal>::Make();
     }
@@ -742,6 +743,7 @@ JSRef<JSVal> JSNavigationStack::GetParamByIndex(int32_t index) const
 
 JSRef<JSVal> JSNavigationStack::GetOnPopByIndex(int32_t index) const
 {
+    JAVASCRIPT_EXECUTION_SCOPE_WITH_CHECK(executionContext_, JSRef<JSVal>::Make());
     if (dataSourceObj_->IsEmpty()) {
         return JSRef<JSVal>::Make();
     }
@@ -1064,6 +1066,7 @@ void JSNavigationStack::UpdateOnStateChangedCallback(JSRef<JSObject> obj, std::f
 
 void JSNavigationStack::PreloadNodeBefore()
 {
+    JAVASCRIPT_EXECUTION_SCOPE_WITH_CHECK(executionContext_);
     if (preloadItem_.has_value()) {
         return;
     }
@@ -1151,6 +1154,7 @@ void JSNavigationStack::AddPreloadItem(const std::string& name, const std::strin
 
 RefPtr<NG::UINode> JSNavigationStack::GetFromPreloadItem(const std::string& name, const std::string& paramString)
 {
+    JAVASCRIPT_EXECUTION_SCOPE_WITH_CHECK(executionContext_, nullptr);
     if (!preloadItem_.has_value()) {
         return nullptr;
     }
@@ -1186,6 +1190,7 @@ void JSNavigationStack::RemovePreloadItem()
 
 void JSNavigationStack::PreloadItemOnDestroy()
 {
+    JAVASCRIPT_EXECUTION_SCOPE_WITH_CHECK(executionContext_);
     if (dataSourceObj_->IsEmpty()) {
         return;
     }
@@ -2281,6 +2286,7 @@ bool JSNavigationStack::CreateNodeFromRecovery(int32_t index, const WeakPtr<NG::
 
 std::string JSNavigationStack::GetComponentInfo(int32_t index)
 {
+    JAVASCRIPT_EXECUTION_SCOPE_WITH_CHECK(executionContext_, "");
     if (dataSourceObj_->IsEmpty()) {
         return "";
     }

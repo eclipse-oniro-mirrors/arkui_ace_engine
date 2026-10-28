@@ -20,6 +20,7 @@
 
 #include "base/log/ace_trace.h"
 #include "core/components/common/properties/animation_option.h"
+#include "core/components_ng/pattern/text_field/password_icon_host.h"
 #include "core/components/text_field/textfield_theme.h"
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/layout/layout_wrapper_node.h"
@@ -193,9 +194,15 @@ float CounterDecorator::MeasureTextNodeHeight()
     UpdateCounterContentAndStyle(textLength, maxLength);
     // Both the non-backend rendering process and the backend rendering process will be called.
 	// note using this statement have any impact on the back-end rendering process.
+    auto restoreConstraint = host->NeedRestoreMeasureConstraint();
+    auto constraint = counterGeometryNode->GetParentLayoutConstraint();
     ScopedLayout scope(decoratedNode->GetContext());
     textNode->Measure(LayoutConstraintF());
-    return counterGeometryNode->GetFrameRect().Height();
+    auto height = counterGeometryNode->GetFrameRect().Height();
+    if (restoreConstraint) {
+        textNode->Measure(constraint);
+    }
+    return height;
 }
 
 void CounterDecorator::UpdateCounterContentAndStyle(uint32_t textLength, uint32_t maxLength, bool isVisible)
@@ -318,13 +325,18 @@ float CounterDecorator::MeasureDecorator(float contentWidth, const std::u16strin
     CHECK_NULL_RETURN(host, 0.0f);
 
     auto isInlineStyle = host->IsNormalInlineState();
-    auto isShowPassword = host->IsShowPasswordIcon();
+    auto passwordHost = DynamicCast<IPasswordIconHost>(host);
+    bool isShowPassword = passwordHost && passwordHost->IsShowPasswordIcon();
     if (host->GetShowCounterValue() && host->HasMaxLength() &&
         !isInlineStyle && !isShowPassword) {
         auto counterNodeLayoutWrapper = decoratedNode->GetOrCreateChildByIndex(decoratedNode->GetChildIndex(textNode));
         if (counterNodeLayoutWrapper) {
-            auto textLength =
-                static_cast<uint32_t>(showPlaceHolder ? 0 : textContent.length());
+            uint32_t textLength = 0;
+            if (!showPlaceHolder) {
+                textLength = host->ShouldUseHostTextLength()
+                    ? host->GetTextLength()
+                    : static_cast<uint32_t>(textContent.length());
+            }
             auto maxLength = host->GetRealMaxLength();
             LayoutConstraintF textContentConstraint;
             textContentConstraint.UpdateIllegalSelfIdealSizeWithCheck(OptionalSizeF(contentWidth, std::nullopt));
@@ -392,7 +404,8 @@ void CounterDecorator::LayoutDecorator()
     CHECK_NULL_VOID(host);
 
     bool isInlineStyle = host->IsNormalInlineState();
-    bool isShowPassword = host->IsShowPasswordIcon();
+    auto passwordHost = DynamicCast<IPasswordIconHost>(host);
+    bool isShowPassword = passwordHost && passwordHost->IsShowPasswordIcon();
     if (!isShowPassword && !isInlineStyle) {
         // ShowCounter is inside of TextArea, while outside of TextInput
         if (!host->IsTextAreaOnCounter()) {

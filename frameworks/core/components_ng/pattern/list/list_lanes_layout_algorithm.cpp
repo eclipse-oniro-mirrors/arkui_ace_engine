@@ -175,9 +175,7 @@ int32_t ListLanesLayoutAlgorithm::LayoutALineForward(LayoutWrapper* layoutWrappe
             ReportGetChildError("LayoutALineForwardLanes", currentIndex + 1);
             break;
         }
-        auto childNode = wrapper->GetHostNode();
         isGroup = wrapper->GetHostTag() == V2::LIST_ITEM_GROUP_ETS_TAG;
-        bool isLazyChild = !isGroup && CanSupportNestedLazy(childNode, layoutWrapper->GetHostNode(), GetLanes());
         if (isGroup && cnt > 0) {
             wrapper->SetActive(false);
             isGroup = false;
@@ -185,17 +183,7 @@ int32_t ListLanesLayoutAlgorithm::LayoutALineForward(LayoutWrapper* layoutWrappe
         }
         cnt++;
         ++currentIndex;
-        int32_t id = childNode ? childNode->GetId() : -1;
-        SetItemInfo(currentIndex, { id, 0.0f, 0.0f, isGroup, isLazyChild });
-        if (isGroup) {
-            MeasureGroup(layoutWrapper, wrapper, currentIndex, startPos, true);
-        } else if (isLazyChild) {
-            MeasureLazyChild(wrapper, currentIndex, startPos, true);
-        } else if (CheckNeedMeasure(wrapper)) {
-            MeasureItem(wrapper, currentIndex, true);
-        }
-        mainLen = std::max(mainLen, childrenSize_ ? childrenSize_->GetChildSize(currentIndex, isStackFromEnd_) :
-            GetMainAxisSize(wrapper->GetGeometryNode()->GetMarginFrameSize(), axis_));
+        mainLen = std::max(mainLen, MeasureLineItem(layoutWrapper, wrapper, currentIndex, startPos, true, isGroup));
     }
     if (cnt > 0) {
         endPos = startPos + mainLen;
@@ -223,9 +211,7 @@ int32_t ListLanesLayoutAlgorithm::LayoutALineBackward(LayoutWrapper* layoutWrapp
             ReportGetChildError("LayoutALineBackwardLanes", currentIndex - 1);
             break;
         }
-        auto childNode = wrapper->GetHostNode();
         bool isGroup = wrapper->GetHostTag() == V2::LIST_ITEM_GROUP_ETS_TAG;
-        bool isLazyChild = !isGroup && CanSupportNestedLazy(childNode, layoutWrapper->GetHostNode(), GetLanes());
         if (isGroup && cnt > 0) {
             wrapper->SetActive(false);
             isGroup = false;
@@ -233,17 +219,7 @@ int32_t ListLanesLayoutAlgorithm::LayoutALineBackward(LayoutWrapper* layoutWrapp
         }
         --currentIndex;
         cnt++;
-        int32_t id = childNode ? childNode->GetId() : -1;
-        SetItemInfo(currentIndex, { id, 0.0f, 0.0f, isGroup, isLazyChild });
-        if (isGroup) {
-            MeasureGroup(layoutWrapper, wrapper, currentIndex, endPos, false);
-        } else if (isLazyChild) {
-            MeasureLazyChild(wrapper, currentIndex, endPos, false);
-        } else if (CheckNeedMeasure(wrapper)) {
-            MeasureItem(wrapper, currentIndex, false);
-        }
-        mainLen = std::max(mainLen, childrenSize_ ? childrenSize_->GetChildSize(currentIndex, isStackFromEnd_) :
-            GetMainAxisSize(wrapper->GetGeometryNode()->GetMarginFrameSize(), axis_));
+        mainLen = std::max(mainLen, MeasureLineItem(layoutWrapper, wrapper, currentIndex, endPos, false, isGroup));
         if (CheckCurRowMeasureFinished(layoutWrapper, currentIndex, isGroup)) {
             break;
         }
@@ -393,6 +369,365 @@ float ListLanesLayoutAlgorithm::CalculateLaneCrossOffset(float crossSize, float 
     }
     return ListLayoutAlgorithm::CalculateLaneCrossOffset((crossSize + GetLaneGutter()) / lanes_,
         childCrossSize / lanes_, isGroup);
+}
+
+float ListLanesLayoutAlgorithm::MeasureLineItem(LayoutWrapper* layoutWrapper, const RefPtr<LayoutWrapper>& wrapper,
+    int32_t index, float& referencePos, bool forward, bool isGroup)
+{
+    auto childNode = wrapper->GetHostNode();
+    const bool isLazyChild = !isGroup && CanSupportNestedLazy(childNode, layoutWrapper->GetHostNode(), GetLanes());
+    const int32_t id = childNode ? childNode->GetId() : -1;
+    SetItemInfo(index, { id, 0.0f, 0.0f, isGroup, isLazyChild });
+    if (isGroup) {
+        MeasureGroup(layoutWrapper, wrapper, index, referencePos, forward);
+    } else if (isLazyChild) {
+        MeasureLazyChild(wrapper, index, referencePos, forward);
+    } else if (CheckNeedMeasure(wrapper)) {
+        MeasureItem(wrapper, index, forward);
+    }
+    return childrenSize_ ? childrenSize_->GetChildSize(index, isStackFromEnd_) :
+        GetMainAxisSize(wrapper->GetGeometryNode()->GetMarginFrameSize(), axis_);
+}
+
+RefPtr<LayoutWrapper> ListLanesLayoutAlgorithm::GetFastScrollLanesItem(
+    LayoutWrapper* layoutWrapper, int32_t index) const
+{
+    const bool visible = itemPosition_.count(index) ||
+        (listLayoutProperty_ && listLayoutProperty_->GetShowCachedItemsValue(false) &&
+            cachedItemPosition_.count(index));
+    const int32_t childIndex = index + itemStartIndex_;
+    // An empty-branch placeholder cannot confirm the actual item type.
+    return layoutWrapper->GetOrCreateChildByIndex(childIndex, visible, !visible);
+}
+
+bool ListLanesLayoutAlgorithm::BuildFastScrollLanesRange(LayoutWrapper* layoutWrapper, int32_t endIndex)
+{
+    if (!layoutWrapper || !posMap_ || lanes_ <= 1 || endIndex < 0 || endIndex >= totalItemCount_) {
+        return false;
+    }
+    posMap_->UpdateTotalCount(totalItemCount_);
+    const int32_t firstPhysical = itemPosition_.empty() ? endIndex :
+        std::min(endIndex, itemPosition_.begin()->first);
+    const int32_t lastPhysical = itemPosition_.empty() ? endIndex :
+        std::max(endIndex, itemPosition_.rbegin()->first);
+    const int32_t first = isStackFromEnd_ ? totalItemCount_ - lastPhysical - 1 : firstPhysical;
+    const int32_t last = isStackFromEnd_ ? totalItemCount_ - firstPhysical - 1 : lastPhysical;
+    auto types = GetFastScrollTypeRange(layoutWrapper, first);
+    CHECK_NULL_RETURN(types, false);
+    auto start = FindFastScrollSegmentStart(layoutWrapper, first, types.value());
+    CHECK_NULL_RETURN(start, false);
+    if (!ConfirmFastScrollLanesRange(layoutWrapper, first, last, start.value(), types.value())) {
+        return false;
+    }
+    return GetPhysicalLanesRow(endIndex).has_value();
+}
+
+std::optional<ListPositionMap::EstimateRange> ListLanesLayoutAlgorithm::GetFastScrollLazyRange(
+    const RefPtr<FrameNode>& node, int32_t index) const
+{
+    auto parent = node->GetParent();
+    int32_t localIndex = -1;
+    if (const auto lazy = AceType::DynamicCast<LazyForEachNode>(parent)) {
+        localIndex = lazy->GetFrameNodeIndex(node);
+    } else {
+        while (parent && !AceType::InstanceOf<FrameNode>(parent)) {
+            if (AceType::InstanceOf<RepeatVirtualScrollNode>(parent) ||
+                AceType::InstanceOf<RepeatVirtualScroll2Node>(parent)) {
+                localIndex = parent->GetFrameNodeIndex(node);
+                break;
+            }
+            parent = parent->GetParent();
+        }
+    }
+    if (localIndex < 0 || !parent) {
+        return std::nullopt;
+    }
+    const int32_t count = parent->FrameCount();
+    const int32_t start = index - localIndex;
+    if (localIndex >= count || start < 0 || count > totalItemCount_ - start) {
+        return std::nullopt;
+    }
+    return ListPositionMap::EstimateRange { start, start + count - 1 };
+}
+
+std::optional<ListLanesLayoutAlgorithm::FastScrollTypeRange> ListLanesLayoutAlgorithm::GetFastScrollTypeRange(
+    LayoutWrapper* layoutWrapper, int32_t index) const
+{
+    const auto* state = GetFastScrollState();
+    if (state && state->input.mode == FastScrollMode::SKIP_CREATE_AND_MEASURE && !itemPosition_.empty()) {
+        return FastScrollTypeRange { 0, totalItemCount_ - 1, itemPosition_.begin()->second.isGroup };
+    }
+    const int32_t physical = isStackFromEnd_ ? totalItemCount_ - index - 1 : index;
+    const auto wrapper = GetFastScrollLanesItem(layoutWrapper, physical);
+    CHECK_NULL_RETURN(wrapper && wrapper->GetHostNode(), std::nullopt);
+    FastScrollTypeRange types { index, index, wrapper->GetHostTag() == V2::LIST_ITEM_GROUP_ETS_TAG };
+    if (const auto range = GetFastScrollLazyRange(wrapper->GetHostNode(), physical)) {
+        types.startIndex = isStackFromEnd_ ? totalItemCount_ - range->endIndex - 1 : range->startIndex;
+        types.endIndex = isStackFromEnd_ ? totalItemCount_ - range->startIndex - 1 : range->endIndex;
+    }
+    return types;
+}
+
+std::optional<int32_t> ListLanesLayoutAlgorithm::FindFastScrollSegmentStart(
+    LayoutWrapper* layoutWrapper, int32_t index, const FastScrollTypeRange& types)
+{
+    auto current = types;
+    while (index >= 0) {
+        if (current.isGroup) {
+            RecordFastScrollItemTypes(index, index, true);
+            RecordFastScrollLanesRange(index, index);
+            return types.isGroup ? index : index + 1;
+        }
+        auto cached = lanesItemRange_.upper_bound(index);
+        if (cached != lanesItemRange_.begin() && (--cached)->second >= index) {
+            return cached->first;
+        }
+        if (current.startIndex == 0) {
+            return 0;
+        }
+        index = current.startIndex - 1;
+        auto previous = GetFastScrollTypeRange(layoutWrapper, index);
+        CHECK_NULL_RETURN(previous, std::nullopt);
+        current = previous.value();
+    }
+    return std::nullopt;
+}
+
+bool ListLanesLayoutAlgorithm::ConfirmFastScrollLanesRange(LayoutWrapper* layoutWrapper,
+    int32_t first, int32_t last, int32_t segmentStart, FastScrollTypeRange types)
+{
+    int32_t index = first;
+    while (index < totalItemCount_) {
+        if (types.isGroup) {
+            const int32_t end = std::min(types.endIndex, std::max(index, last));
+            RecordFastScrollItemTypes(index, end, true);
+            for (; index <= end; ++index) {
+                RecordFastScrollLanesRange(index, index);
+            }
+            segmentStart = index;
+        } else {
+            const int32_t rowStart = std::max(index, last) - (std::max(index, last) - segmentStart) % lanes_;
+            const int32_t rowEnd = rowStart + std::min(lanes_ - 1, totalItemCount_ - rowStart - 1);
+            const int32_t end = std::min(types.endIndex, rowEnd);
+            RecordFastScrollItemTypes(index, end, false);
+            RecordFastScrollLanesRange(segmentStart, end);
+            index = end + 1;
+        }
+        if (index == totalItemCount_ || (index > last && (index - segmentStart) % lanes_ == 0)) {
+            break;
+        }
+        auto next = GetFastScrollTypeRange(layoutWrapper, index);
+        CHECK_NULL_RETURN(next, false);
+        types = next.value();
+    }
+    return true;
+}
+
+void ListLanesLayoutAlgorithm::RecordFastScrollItemType(int32_t index, bool isGroup)
+{
+    auto info = posMap_->GetPositionInfo(index);
+    info.isGroup = isGroup;
+    posMap_->UpdatePos(index, info);
+}
+
+void ListLanesLayoutAlgorithm::RecordFastScrollItemTypes(int32_t start, int32_t end, bool isGroup)
+{
+    for (int32_t index = start; index <= end; ++index) {
+        RecordFastScrollItemType(isStackFromEnd_ ? totalItemCount_ - index - 1 : index, isGroup);
+    }
+}
+
+std::map<int32_t, int32_t>::iterator ListLanesLayoutAlgorithm::ReplaceFastScrollLanesRange(
+    int32_t start, int32_t& end)
+{
+    auto suffix = lanesItemRange_.upper_bound(end);
+    if (suffix != lanesItemRange_.begin()) {
+        --suffix;
+        if (suffix->second > end) {
+            const int32_t physical = isStackFromEnd_ ? totalItemCount_ - start - 1 : start;
+            if (!posMap_->GetPositionInfo(physical).isGroup) {
+                end = suffix->second;
+            } else {
+                // A confirmed Group establishes the next ordinary segment's true origin.
+                lanesItemRange_.emplace(end + 1, suffix->second);
+            }
+        }
+    }
+    auto first = lanesItemRange_.upper_bound(start);
+    if (first != lanesItemRange_.begin()) {
+        auto previous = std::prev(first);
+        if (previous->second >= start) {
+            if (previous->first < start) {
+                previous->second = start - 1;
+            } else {
+                first = previous;
+            }
+        }
+    }
+    while (first != lanesItemRange_.end() && first->first <= end) {
+        first = lanesItemRange_.erase(first);
+    }
+    return first;
+}
+
+void ListLanesLayoutAlgorithm::RecordFastScrollLanesRange(int32_t start, int32_t end)
+{
+    const int32_t physical = isStackFromEnd_ ? totalItemCount_ - start - 1 : start;
+    auto segment = lanesItemRange_.find(start);
+    if (segment != lanesItemRange_.end() && !posMap_->GetPositionInfo(physical).isGroup) {
+        segment->second = std::max(segment->second, end);
+        auto next = std::next(segment);
+        while (next != lanesItemRange_.end() && next->first <= segment->second) {
+            next = lanesItemRange_.erase(next);
+        }
+        return;
+    }
+    const auto next = ReplaceFastScrollLanesRange(start, end);
+    lanesItemRange_.emplace_hint(next, start, end);
+}
+
+bool ListLanesLayoutAlgorithm::ExtendFastScrollLanesRange(LayoutWrapper* layoutWrapper, int32_t index)
+{
+    if (GetPhysicalLanesRow(index)) {
+        return true;
+    }
+    const int32_t logical = isStackFromEnd_ ? totalItemCount_ - index - 1 : index;
+    auto types = GetFastScrollTypeRange(layoutWrapper, logical);
+    CHECK_NULL_RETURN(types, false);
+    auto start = FindFastScrollSegmentStart(layoutWrapper, logical, types.value());
+    return start && ConfirmFastScrollLanesRange(layoutWrapper, logical, logical, start.value(), types.value()) &&
+        GetPhysicalLanesRow(index).has_value();
+}
+
+bool ListLanesLayoutAlgorithm::PrepareFastScrollRows(LayoutWrapper* layoutWrapper)
+{
+    if (lanes_ == 1) {
+        return true;
+    }
+    const auto* state = GetFastScrollState();
+    return state && state->input.targetIndex && !itemPosition_.empty() &&
+        BuildFastScrollLanesRange(layoutWrapper, state->input.targetIndex.value());
+}
+
+bool ListLanesLayoutAlgorithm::MeasureFastScrollRow(
+    LayoutWrapper* layoutWrapper, int32_t index, float extent, bool forward, float& size)
+{
+    if (lanes_ == 1) {
+        return MeasureFastScrollItem(layoutWrapper, index, extent, forward, size);
+    }
+    if (!ExtendFastScrollLanesRange(layoutWrapper, index)) {
+        return false;
+    }
+    const auto row = GetPhysicalLanesRow(index).value();
+    size = 0.0f;
+    for (int32_t item = row.startIndex; item <= row.endIndex; ++item) {
+        float itemSize = 0.0f;
+        if (!MeasureFastScrollItem(layoutWrapper, item, extent, forward, itemSize)) {
+            return false;
+        }
+        size = std::max(size, itemSize);
+    }
+    return true;
+}
+
+bool ListLanesLayoutAlgorithm::MeasureFastScrollNeighbors(LayoutWrapper* layoutWrapper, float size)
+{
+    if (lanes_ == 1) {
+        return ListLayoutAlgorithm::MeasureFastScrollNeighbors(layoutWrapper, size);
+    }
+    const auto target = GetPhysicalLanesRow(GetFastScrollState()->input.targetIndex.value()).value();
+    const auto [start, end] = GetFastScrollPreparationRange(size);
+    if (!std::isfinite(start) || !std::isfinite(end)) {
+        GetOrCreateFastScrollState().result.status = FastScrollMeasureStatus::INVALID;
+        return false;
+    }
+    float position = size + spaceWidth_;
+    int32_t index = target.endIndex + 1;
+    while (index < totalItemCount_ && LessNotEqual(position, end)) {
+        if (!MeasureFastScrollRow(layoutWrapper, index, end - position, true, size)) {
+            return false;
+        }
+        position += size + spaceWidth_;
+        index = GetPhysicalLanesRow(index)->endIndex + 1;
+    }
+    position = -spaceWidth_;
+    index = target.startIndex - 1;
+    while (index >= 0 && GreatNotEqual(position, start)) {
+        if (!MeasureFastScrollRow(layoutWrapper, index, position - start, false, size)) {
+            return false;
+        }
+        position -= size + spaceWidth_;
+        index = GetPhysicalLanesRow(index)->startIndex - 1;
+    }
+    return true;
+}
+
+float ListLanesLayoutAlgorithm::GetFastScrollRowHeight(int32_t start, int32_t end) const
+{
+    const float sample = posMap_->GetAverageRowHeight(lanes_).value_or(0.0f);
+    const auto* result = GetFastScrollMeasureResult();
+    float size = 0.0f;
+    for (int32_t index = start; index <= end; ++index) {
+        const float previous = posMap_->GetPositionInfo(index).mainSize;
+        float itemSize = Negative(previous) ? sample : previous;
+        if (result) {
+            const auto measured = result->measuredSizes.find(index);
+            if (measured != result->measuredSizes.end()) {
+                itemSize = measured->second.mainSize;
+            }
+        }
+        size = std::max(size, itemSize);
+    }
+    return size;
+}
+
+bool ListLanesLayoutAlgorithm::IsFastScrollForward(float size) const
+{
+    if (lanes_ == 1 || childrenSize_ || itemPosition_.empty() || lanesItemRange_.empty()) {
+        return ListLayoutAlgorithm::IsFastScrollForward(size);
+    }
+    const auto* state = GetFastScrollState();
+    if (!state || !state->input.targetIndex) {
+        return false;
+    }
+    const auto target = GetPhysicalLanesRow(state->input.targetIndex.value());
+    if (!target) {
+        return ListLayoutAlgorithm::IsFastScrollForward(size);
+    }
+    const int32_t visible = itemPosition_.begin()->first;
+    float position = itemPosition_.begin()->second.startPos;
+    const int32_t first = std::min(visible, target->startIndex);
+    const int32_t last = std::max(visible, target->startIndex);
+    for (int32_t index = first; index < last;) {
+        const auto row = GetPhysicalLanesRow(index);
+        CHECK_NULL_RETURN(row, ListLayoutAlgorithm::IsFastScrollForward(size));
+        const float height = GetFastScrollRowHeight(row->startIndex, row->endIndex) + spaceWidth_;
+        position += target->startIndex >= visible ? height : -height;
+        index = row->endIndex + 1;
+    }
+    return NonNegative(position + GetFastScrollWindowStart(size));
+}
+
+std::optional<ListPositionMap::EstimateRange> ListLanesLayoutAlgorithm::GetFastScrollLanesRow(int32_t index) const
+{
+    if (!posMap_ || lanesItemRange_.empty()) {
+        return std::nullopt;
+    }
+    const int32_t physical = isStackFromEnd_ ? totalItemCount_ - index - 1 : index;
+    auto row = posMap_->GetLanesRow(physical, lanes_, lanesItemRange_, isStackFromEnd_);
+    if (row && isStackFromEnd_) {
+        row = ListPositionMap::EstimateRange {
+            totalItemCount_ - row->endIndex - 1, totalItemCount_ - row->startIndex - 1 };
+    }
+    if (!row || posMap_->GetPositionInfo(physical).isGroup || row->endIndex == totalItemCount_ - 1 ||
+        row->endIndex - row->startIndex + 1 == lanes_) {
+        return row;
+    }
+    const int32_t next = isStackFromEnd_ ? totalItemCount_ - row->endIndex - 2 : row->endIndex + 1;
+    if (posMap_->GetPositionInfo(next).isGroup) {
+        return row;
+    }
+    return std::nullopt;
 }
 
 int32_t ListLanesLayoutAlgorithm::GetLazyForEachIndex(const RefPtr<FrameNode>& host)

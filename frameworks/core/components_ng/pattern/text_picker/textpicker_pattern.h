@@ -49,6 +49,8 @@ class TextPickerPattern : public LinearLayoutPattern {
     DECLARE_ACE_TYPE(TextPickerPattern, LinearLayoutPattern);
 
 public:
+    void DumpInspectorTreeInfo(std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context) override;
+
     TextPickerPattern() : LinearLayoutPattern(false) {};
 
     ~TextPickerPattern() override = default;
@@ -164,6 +166,13 @@ public:
     {
         columnsKind_ = columnKind;
     }
+
+    uint32_t GetColumnsKind() const
+    {
+        return columnsKind_;
+    }
+
+    uint32_t GetShowCount() const;
 
     void ClearOption()
     {
@@ -539,6 +548,11 @@ public:
         isSingleRange_ = isSingleRange;
     }
 
+    inline bool GetIsSingleRange() const
+    {
+        return isSingleRange_;
+    }
+
     void UpdateDisappearTextStyle(const PickerTextStyle& textStyle);
     void UpdateNormalTextStyle(const PickerTextStyle& textStyle);
     void UpdateSelectedTextStyle(const PickerTextStyle& textStyle);
@@ -653,7 +667,7 @@ private:
     uint32_t selectedIndex_ = 0;
     std::vector<NG::RangeContent> range_;
     std::vector<NG::RangeContent> options_;
-    uint32_t columnsKind_ = 0;
+    uint32_t columnsKind_ = TEXT;
     std::vector<NG::TextCascadePickerOptions> cascadeOptions_;
     std::map<WeakPtr<FrameNode>, std::vector<NG::RangeContent>> optionsWithNode_;
     std::vector<NG::TextCascadePickerOptions> cascadeOriginptions_;

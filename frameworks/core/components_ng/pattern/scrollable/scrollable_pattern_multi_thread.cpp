@@ -42,11 +42,17 @@ void ScrollablePattern::OnAttachToFrameNodeMultiThread()
 void ScrollablePattern::OnDetachFromMainTreeMultiThread()
 {
     auto host = GetHost();
-    CHECK_NULL_VOID(host);
-    UnRegister2DragDropManager(AceType::RawPtr(host));
-    auto context = host->GetContextWithCheck();
-    CHECK_NULL_VOID(context);
-    context->RemoveWindowStateChangedCallback(host->GetId());
+    if (host) {
+        UnRegister2DragDropManager(AceType::RawPtr(host));
+        auto context = host->GetContextWithCheck();
+        if (context) {
+            context->RemoveWindowStateChangedCallback(host->GetId());
+        }
+    }
+    // Cancel on UI-tree detach, not in the potentially off-thread frame-node destructor.
+    if (GetFastScrollRequest()) {
+        StopAnimate();
+    }
 }
 
 void ScrollablePattern::OnAttachToMainTreeMultiThread()

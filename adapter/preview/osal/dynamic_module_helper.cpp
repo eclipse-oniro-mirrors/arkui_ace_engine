@@ -40,6 +40,10 @@ const std::string DYNAMIC_MODULE_LIB_POSTFIX = ".dll";
 const std::string COMPATIABLE_LIB = "libace_compatible_components.dylib";
 const std::string DYNAMIC_MODULE_LIB_PREFIX = "libarkui_";
 const std::string DYNAMIC_MODULE_LIB_POSTFIX = ".dylib";
+#elif defined(LINUX_PLATFORM)
+const std::string COMPATIABLE_LIB = "libace_compatible_components.so";
+const std::string DYNAMIC_MODULE_LIB_PREFIX = "libarkui_";
+const std::string DYNAMIC_MODULE_LIB_POSTFIX = ".so";
 #else
 const std::string COMPATIABLE_LIB = "libace_compatible_components.z.so";
 const std::string DYNAMIC_MODULE_LIB_PREFIX = "libarkui_";

@@ -55,6 +55,23 @@ inline RefPtr<UINode> CloneScrollPlaceholderSubtreeTopDown(
     return copy;
 }
 
+// Subtree shape for diagnostics: accumulates the total node count and the maximum depth.
+// Placeholder templates are small whitelisted render-only subtrees, so the walk is cheap.
+inline void CountScrollPlaceholderSubtree(
+    const RefPtr<UINode>& node, int32_t& count, int32_t& depth, int32_t level = 1)
+{
+    if (!node) {
+        return;
+    }
+    ++count;
+    if (level > depth) {
+        depth = level;
+    }
+    for (const auto& child : node->GetChildren()) {
+        CountScrollPlaceholderSubtree(child, count, depth, level + 1);
+    }
+}
+
 } // namespace OHOS::Ace::NG
 
 #endif // FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_MANAGER_SCROLL_PLACEHOLDER_SCROLL_PLACEHOLDER_NODE_CLONE_H

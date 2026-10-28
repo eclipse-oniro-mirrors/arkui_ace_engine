@@ -33,7 +33,7 @@ namespace  {
     const auto ATTRIBUTE_IMAGES_DEFAULT_VALUE = "[]";
     const auto ATTRIBUTE_IMAGES_SRC_NAME = "src";
     const auto ATTRIBUTE_IMAGES_SRC_TEST_VALUE = "test";
-    const std::string IMAGES_OK_STR = "img_public_ok";
+    const int64_t IMAGES_OK_ID = 9876;
     const auto ATTRIBUTE_IMAGES_LEFT_NAME = "left";
     const auto ATTRIBUTE_IMAGES_LEFT_TEST_VALUE = "100.00vp";
     const auto ATTRIBUTE_IMAGES_TOP_NAME = "top";
@@ -58,7 +58,7 @@ public:
     static void SetUpTestCase()
     {
         ModifierTestBase::SetUpTestCase();
-        AddResource(IMAGES_OK_STR, ATTRIBUTE_IMAGES_SRC_TEST_VALUE);
+        AddResource(IMAGES_OK_ID, ATTRIBUTE_IMAGES_SRC_TEST_VALUE);
     }
 
     void InitPattern(OHOS::Ace::RefPtr<ImageAnimatorPattern> pattern)
@@ -121,7 +121,7 @@ HWTEST_F(ImageAnimatorModifierTest, setImagesTestValidValues, TestSize.Level1)
         },
         {
             .src = Converter::ArkUnion<Ark_Union_String_Resource_PixelMap, Ark_Resource>(
-                CreateResource(IMAGES_OK_STR.c_str(), ResourceType::STRING)),
+                CreateResource(IMAGES_OK_ID, ResourceType::STRING)),
             .width = Converter::ArkUnion<Opt_Union_F64_String, Ark_String>("auto"),
             .height = Converter::ArkUnion<Opt_Union_F64_String, Ark_String>("100px"),
             .top = Converter::ArkUnion<Opt_Union_F64_String, Ark_Float64>(ATTRIBUTE_SIZE_TEST_VALUE),

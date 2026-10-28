@@ -170,19 +170,19 @@ void SubwindowManager::OnDestroyContainer(int32_t subInstanceId)
     instanceSubwindowMap_.erase(subInstanceId);
 }
 
-void SubwindowManager::AddSubwindow(int32_t instanceId, RefPtr<Subwindow> subwindow)
+bool SubwindowManager::AddSubwindow(int32_t instanceId, RefPtr<Subwindow> subwindow)
 {
-    AddSubwindow(instanceId, SubwindowType::TYPE_DIALOG, subwindow);
+    return AddSubwindow(instanceId, SubwindowType::TYPE_DIALOG, subwindow);
 }
 
-void SubwindowManager::AddToastSubwindow(int32_t instanceId, RefPtr<Subwindow> subwindow)
+bool SubwindowManager::AddToastSubwindow(int32_t instanceId, RefPtr<Subwindow> subwindow)
 {
-    AddSubwindow(instanceId, SubwindowType::TYPE_TOP_MOST_TOAST, subwindow);
+    return AddSubwindow(instanceId, SubwindowType::TYPE_TOP_MOST_TOAST, subwindow);
 }
 
-void SubwindowManager::AddSystemToastWindow(int32_t instanceId, RefPtr<Subwindow> subwindow)
+bool SubwindowManager::AddSystemToastWindow(int32_t instanceId, RefPtr<Subwindow> subwindow)
 {
-    AddSubwindow(instanceId, SubwindowType::TYPE_SYSTEM_TOP_MOST_TOAST, subwindow);
+    return AddSubwindow(instanceId, SubwindowType::TYPE_SYSTEM_TOP_MOST_TOAST, subwindow);
 }
 
 void SubwindowManager::DeleteHotAreas(int32_t instanceId, int32_t nodeId, SubwindowType type)
@@ -1055,19 +1055,20 @@ void SubwindowManager::HideDialogSubWindow(int32_t instanceId)
     }
 }
 
-void SubwindowManager::AddDialogSubwindow(int32_t instanceId, const RefPtr<Subwindow>& subwindow)
+bool SubwindowManager::AddDialogSubwindow(int32_t instanceId, const RefPtr<Subwindow>& subwindow)
 {
     if (!subwindow) {
         TAG_LOGW(AceLogTag::ACE_SUB_WINDOW, "Add dialog subwindow failed, the subwindow is null.");
-        return;
+        return false;
     }
     std::lock_guard<std::mutex> lock(dialogSubwindowMutex_);
     auto result = dialogSubwindowMap_.try_emplace(instanceId, subwindow);
     if (!result.second) {
         TAG_LOGW(AceLogTag::ACE_SUB_WINDOW, "Add dialog failed of this instance %{public}d", instanceId);
-        return;
+        return false;
     }
     AddInstanceSubwindowMap(subwindow->GetChildContainerId(), subwindow);
+    return true;
 }
 
 const RefPtr<Subwindow> SubwindowManager::GetDialogSubwindow(int32_t instanceId)
@@ -1107,7 +1108,12 @@ RefPtr<Subwindow> SubwindowManager::GetOrCreateSubWindow(bool isDialog)
         if (isDialog) {
             CHECK_NULL_RETURN(subwindow->CheckHostWindowStatus(), nullptr);
         }
-        AddDialogSubwindow(containerId, subwindow);
+        if (!AddDialogSubwindow(containerId, subwindow)) {
+            // Another thread won the race and registered this instance first. Destroy our
+            // orphan window and return the in-map instance to avoid an unrecoverable leak.
+            subwindow->DestroyWindow();
+            subwindow = GetDialogSubwindow(containerId);
+        }
     }
     return subwindow;
 }
@@ -1118,7 +1124,12 @@ RefPtr<Subwindow> SubwindowManager::GetOrCreateSystemSubWindow(int32_t container
     if (!subwindow) {
         subwindow = Subwindow::CreateSubwindow(containerId);
         CHECK_NULL_RETURN(subwindow, nullptr);
-        AddSystemToastWindow(containerId, subwindow);
+        if (!AddSystemToastWindow(containerId, subwindow)) {
+            // Another thread won the race and registered this container first. Destroy our
+            // orphan window and return the in-map instance to avoid an unrecoverable leak.
+            subwindow->DestroyWindow();
+            subwindow = GetSystemToastWindow(containerId);
+        }
     }
     return subwindow;
 }
@@ -1256,10 +1267,13 @@ RefPtr<Subwindow> SubwindowManager::GetOrCreateToastWindow(int32_t containerId, 
         subwindow->SetAboveApps(showMode == NG::ToastShowMode::TOP_MOST);
         subwindow->InitContainer();
         CHECK_NULL_RETURN(subwindow->GetIsRosenWindowCreate(), nullptr);
-        if (isSystemTopMost) {
-            AddSystemToastWindow(containerId, subwindow);
-        } else {
-            AddSubwindow(containerId, subwindow);
+        bool added = isSystemTopMost ? AddSystemToastWindow(containerId, subwindow)
+                                     : AddSubwindow(containerId, subwindow);
+        if (!added) {
+            // Another thread won the race and registered this container first. Destroy our
+            // orphan window and return the in-map instance to avoid an unrecoverable leak.
+            subwindow->DestroyWindow();
+            subwindow = isSystemTopMost ? GetSystemToastWindow(containerId) : GetSubwindow(containerId);
         }
     }
 
@@ -1898,17 +1912,17 @@ RefPtr<Subwindow> SubwindowManager::GetSubwindowBySearchkey(int32_t instanceId, 
     return nullptr;
 }
 
-void SubwindowManager::AddSubwindow(
+bool SubwindowManager::AddSubwindow(
     int32_t instanceId, SubwindowType windowType, RefPtr<Subwindow> subwindow, int32_t nodeId)
 {
     if (!subwindow) {
         TAG_LOGW(AceLogTag::ACE_SUB_WINDOW, "add subwindow is nullptr.");
-        return;
+        return false;
     }
     auto index = static_cast<int32_t>(windowType);
     if (index >= static_cast<int32_t>(SubwindowType::SUB_WINDOW_TYPE_COUNT)) {
         TAG_LOGW(AceLogTag::ACE_SUB_WINDOW, "add subwindow window scene/%{public}d is error.", index);
-        return;
+        return false;
     }
     SubwindowKey searchKey = GetCurrentSubwindowKey(instanceId, windowType, nodeId);
     TAG_LOGI(AceLogTag::ACE_SUB_WINDOW, "Add subwindow into map, searchKey is %{public}s, subwindow id is %{public}d.",
@@ -1918,9 +1932,10 @@ void SubwindowManager::AddSubwindow(
     if (!result.second) {
         TAG_LOGD(AceLogTag::ACE_SUB_WINDOW, "Add failed of this searchKey, searchKey is %{public}s.",
             searchKey.ToString().c_str());
-        return;
+        return false;
     }
     AddInstanceSubwindowMap(subwindow->GetChildContainerId(), subwindow);
+    return true;
 }
 
 const std::vector<RefPtr<Subwindow>> SubwindowManager::GetSortSubwindow(int32_t instanceId)
@@ -2023,7 +2038,12 @@ RefPtr<Subwindow> SubwindowManager::GetOrCreateSubWindowByType(SubwindowType win
         subWindow->InitContainer();
         CHECK_NULL_RETURN(subWindow->GetIsRosenWindowCreate(), nullptr);
         if (!notReuseFlag) {
-            AddSubwindowBySearchKey(searchKey, subWindow);
+            if (!AddSubwindowBySearchKey(searchKey, subWindow)) {
+                // Another thread won the race and registered this key first. Destroy our
+                // orphan window and return the in-map instance to avoid an unrecoverable leak.
+                subWindow->DestroyWindow();
+                subWindow = GetSubwindowBySearchkey(containerId, searchKey);
+            }
         }
     }
     return subWindow;
@@ -2038,7 +2058,12 @@ RefPtr<Subwindow> SubwindowManager::GetOrCreateMenuSubWindow(int32_t instanceId,
         CHECK_NULL_RETURN(subwindow, nullptr);
         subwindow->InitContainer();
         CHECK_NULL_RETURN(subwindow->GetIsRosenWindowCreate(), nullptr);
-        AddSubwindowBySearchKey(searchKey, subwindow);
+        if (!AddSubwindowBySearchKey(searchKey, subwindow)) {
+            // Another thread won the race and registered this key first. Destroy our
+            // orphan window and return the in-map instance to avoid an unrecoverable leak.
+            subwindow->DestroyWindow();
+            subwindow = GetSubwindowBySearchKey(searchKey);
+        }
     } else if (subwindow->GetDetachState() == MenuWindowState::DETACHING || !reuse) {
         TAG_LOGI(AceLogTag::ACE_SUB_WINDOW, "recreate subwindow");
         // Remove the subwindow to avoid reuse
@@ -2059,7 +2084,12 @@ RefPtr<Subwindow> SubwindowManager::GetOrCreateMenuSubWindow(int32_t instanceId,
         CHECK_NULL_RETURN(subwindow, nullptr);
         subwindow->InitContainer();
         CHECK_NULL_RETURN(subwindow->GetIsRosenWindowCreate(), nullptr);
-        AddSubwindowBySearchKey(searchKey, subwindow);
+        if (!AddSubwindowBySearchKey(searchKey, subwindow)) {
+            // Another thread won the race and registered this key first. Destroy our
+            // orphan window and return the in-map instance to avoid an unrecoverable leak.
+            subwindow->DestroyWindow();
+            subwindow = GetSubwindowBySearchKey(searchKey);
+        }
     }
     return subwindow;
 }
@@ -2100,11 +2130,11 @@ void SubwindowManager::RemoveSubwindowBySearchKey(const SubwindowKey& searchKey)
     subwindowMap_.erase(searchKey);
 }
 
-void SubwindowManager::AddSubwindowBySearchKey(const SubwindowKey& searchKey, const RefPtr<Subwindow>& subwindow)
+bool SubwindowManager::AddSubwindowBySearchKey(const SubwindowKey& searchKey, const RefPtr<Subwindow>& subwindow)
 {
     if (!subwindow) {
         TAG_LOGW(AceLogTag::ACE_SUB_WINDOW, "add subwindow is nullptr.");
-        return;
+        return false;
     }
     TAG_LOGI(AceLogTag::ACE_SUB_WINDOW, "Add subwindow into map, searchKey is %{public}s, subwindow id is %{public}d.",
         searchKey.ToString().c_str(), subwindow->GetSubwindowId());
@@ -2113,8 +2143,9 @@ void SubwindowManager::AddSubwindowBySearchKey(const SubwindowKey& searchKey, co
     if (!result.second) {
         TAG_LOGW(AceLogTag::ACE_SUB_WINDOW, "Add failed of this searchkey, searchKey is %{public}s.",
             searchKey.ToString().c_str());
-        return;
+        return false;
     }
     AddInstanceSubwindowMap(subwindow->GetChildContainerId(), subwindow);
+    return true;
 }
 } // namespace OHOS::Ace

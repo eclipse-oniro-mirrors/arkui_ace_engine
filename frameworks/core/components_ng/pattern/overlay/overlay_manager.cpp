@@ -15,6 +15,7 @@
 
 #include "core/components_ng/pattern/overlay/overlay_manager.h"
 
+#include <cstring>
 #include <string>
 #include <utility>
 #include <vector>
@@ -70,10 +71,12 @@
 #include "core/components_ng/pattern/container_modal/container_modal_pattern.h"
 #include "core/components_ng/pattern/date_picker/datepicker_dialog_view.h"
 #include "core/components_ng/pattern/date_picker/picker_setting_data.h"
+#include "core/components_ng/pattern/dialog/dialog_pattern.h"
 #ifdef ENABLE_ROSEN_BACKEND
 #include "core/components_ng/pattern/effect_component/effect_component_pattern.h"
 #endif
 #include "core/components_ng/pattern/menu/menu_theme.h"
+#include "core/components_ng/pattern/menu/menu_pattern.h"
 #include "core/components_ng/pattern/menu/preview/menu_preview_pattern.h"
 #include "core/components_ng/pattern/menu/wrapper/menu_wrapper_pattern.h"
 #include "core/components_ng/pattern/navigation/navigation_pattern.h"
@@ -83,6 +86,7 @@
 #include "core/components_ng/pattern/overlay/level_order.h"
 #include "core/components_ng/pattern/overlay/modal_presentation_pattern.h"
 #include "core/components_ng/pattern/overlay/overlay_container_pattern.h"
+#include "core/components_ng/pattern/overlay/overlay_content_change_report.h"
 #include "core/components_ng/pattern/sheet/sheet_style.h"
 #include "core/components_ng/pattern/select_overlay/magnifier_pattern.h"
 #include "core/components_ng/pattern/stage/stage_manager.h"
@@ -355,7 +359,7 @@ std::unordered_map<SheetKey, WeakPtr<FrameNode>, SheetKeyHash> OverlayManager::G
 
 void OverlayManager::SetFilterActive(bool actived)
 {
-    hasFilterActived = actived;
+    hasFilterActived_ = actived;
 }
 
 void OverlayManager::SetDismissPopupId(int32_t targetId)
@@ -588,7 +592,9 @@ void OverlayManager::ShowToast(const NG::ToastInfo& toastInfo, const std::functi
     // only one toast
     for (auto [id, toastNodeWeak] : toastMap_) {
         PopLevelOrder(id);
-        rootNode->RemoveChild(toastNodeWeak.Upgrade());
+        auto oldToast = toastNodeWeak.Upgrade();
+        rootNode->RemoveChild(oldToast);
+        ReportCapiOverlayEvent(oldToast, false, "toast");
     }
     toastMap_.clear();
     auto toastNode = ToastView::CreateToastNode(toastInfo);
@@ -651,6 +657,7 @@ void OverlayManager::CloseToast(int32_t toastId, const std::function<void(int32_
     auto topOrderNode = GetTopOrderNode();
     PopLevelOrder(node->GetId());
     parent->RemoveChild(node);
+    ReportCapiOverlayEvent(node, false, "toast");
     rootNode->MarkDirtyNode(PROPERTY_UPDATE_BY_CHILD_REQUEST);
     toastMap_.erase(toastId);
     callback(ERROR_CODE_NO_ERROR);
@@ -677,8 +684,14 @@ void OverlayManager::OpenToastAnimation(const RefPtr<FrameNode>& toastNode, int3
             TAG_LOGW(AceLogTag::ACE_OVERLAY, "Can not get overlayManager, pop toast failed");
         }
     });
-    option.SetOnFinishEvent([task = continuousTask_, duration, id = containerId, weak = WeakClaim(RawPtr(toastNode))] {
+    option.SetOnFinishEvent([task = continuousTask_, duration, id = containerId,
+        weak = WeakClaim(RawPtr(toastNode)), overlayWeak = WeakClaim(this)] {
         ContainerScope scope(id);
+        auto overlay = overlayWeak.Upgrade();
+        auto node = weak.Upgrade();
+        if (overlay && node && node->GetParent()) {
+            overlay->ReportCapiOverlayEvent(node, true, "toast");
+        }
         auto context = GetPipeContextByWeakPtr(weak);
         if (!context) {
             TAG_LOGW(AceLogTag::ACE_OVERLAY, "Can not get context before posting delayedtask");
@@ -736,6 +749,7 @@ void OverlayManager::PopToast(int32_t toastId)
         CHECK_NULL_VOID(rootNode);
         TAG_LOGI(AceLogTag::ACE_OVERLAY, "toast remove from root");
         rootNode->RemoveChild(toastUnderPop);
+        overlayManager->ReportCapiOverlayEvent(toastUnderPop, false, "toast");
         overlayManager->toastMap_.erase(toastId);
         rootNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
 
@@ -879,6 +893,10 @@ void OverlayManager::ShowPopupAnimation(const RefPtr<FrameNode>& popupNode)
         if (isNeedFocus) {
             overlayManager->FocusOverlayNode(popupNode);
         }
+        if (popupNode->GetParent() && popupPattern &&
+            popupPattern->GetTransitionStatus() == TransitionStatus::NORMAL) {
+            overlayManager->ReportCapiOverlayEvent(popupNode, true, "popup");
+        }
     };
     if (modifier) {
         modifier->startEnteringAnimationOrTransition(popupPattern, popupNode, onFinish);
@@ -901,7 +919,7 @@ void OverlayManager::ShowPopupAnimationNG(const RefPtr<FrameNode>& popupNode)
     }
 
     // Create onFinish callback to fire onDidAppear
-    auto onFinish = [popupNodeWk = WeakPtr<FrameNode>(popupNode)]() {
+    auto onFinish = [popupNodeWk = WeakPtr<FrameNode>(popupNode), overlayWeak = WeakClaim(this)]() {
         auto popupNode = popupNodeWk.Upgrade();
         CHECK_NULL_VOID(popupNode);
         auto popupPattern = popupNode->GetPattern<BubblePattern>();
@@ -913,6 +931,11 @@ void OverlayManager::ShowPopupAnimationNG(const RefPtr<FrameNode>& popupNode)
         }
         if (popupParam) {
             popupParam->FireOnDidAppear();
+        }
+        auto overlay = overlayWeak.Upgrade();
+        if (overlay && popupNode->GetParent() &&
+            popupPattern->GetTransitionStatus() == TransitionStatus::NORMAL) {
+            overlay->ReportCapiOverlayEvent(popupNode, true, "popup");
         }
     };
 
@@ -1583,6 +1606,7 @@ void OverlayManager::ErasePopup(int32_t targetId)
             subwindowMgr->DeleteHotAreas(Container::CurrentId(), popupNode->GetId(), SubwindowType::TYPE_POPUP);
         }
         RemoveChildWithService(rootNode, popupNode);
+        ReportCapiOverlayEvent(popupNode, false, "popup");
         rootNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
         popupMap_.erase(targetId);
     }
@@ -1679,6 +1703,13 @@ RefPtr<FrameNode> OverlayManager::GetMenuNode(int32_t targetId)
     const auto* modifier = NG::NodeModifier::GetMenuManagerInnerModifier();
     CHECK_NULL_RETURN(modifier, nullptr);
     return modifier->getMenuNode(menuManager_, targetId);
+}
+
+bool OverlayManager::IsMenuShowForTarget(int32_t targetId)
+{
+    auto wrapperNode = GetMenuNode(targetId);
+    auto wrapper = wrapperNode ? wrapperNode->GetPattern<MenuWrapperPattern>() : nullptr;
+    return wrapper && wrapper->IsShow();
 }
 
 void OverlayManager::HideMenu(
@@ -1796,6 +1827,7 @@ void OverlayManager::CleanPopupInSubWindow(bool isForceClear)
             popupMap_[target].isCurrentOnShow = false;
             modifier->cleanupPopupInSubWindowElse(bubblePattern);
             rootNode->RemoveChild(removeNode);
+            ReportCapiOverlayEvent(removeNode, false, "popup");
             auto subwindowMgr = SubwindowManager::GetInstance();
             subwindowMgr->DeleteHotAreas(Container::CurrentId(), removeNode->GetId(), SubwindowType::TYPE_POPUP);
             ErasePopupInfo(target);
@@ -3370,22 +3402,7 @@ void OverlayManager::HandleModalPop(
         false, static_cast<int32_t>(NavDestinationActiveReason::CONTENT_COVER));
     topModalNode->OnAccessibilityEvent(
         AccessibilityEventType::PAGE_CLOSE, WindowsContentChangeTypes::CONTENT_CHANGE_TYPE_SUBTREE);
-    if (modalPresentationPattern->HasTransitionEffect()) {
-        PlayTransitionEffectOut(topModalNode);
-    } else if (modalTransition == ModalTransition::DEFAULT) {
-        PlayDefaultModalTransition(topModalNode, false);
-    } else if (modalTransition == ModalTransition::ALPHA) {
-        PlayAlphaModalTransition(topModalNode, false);
-    } else if (!builder->GetRenderContext()->HasDisappearTransition()) {
-        if (!modalPresentationPattern->IsExecuteOnDisappear()) {
-            modalPresentationPattern->OnDisappear();
-            // Fire hidden event of navdestination on the disappeared modal
-            FireNavigationStateChange(false, topModalNode);
-        }
-        FireAutoSave(topModalNode);
-        RemoveChildWithService(rootNode, topModalNode);
-        rootNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
-    }
+    ExecuteModalTransitionOut(topModalNode, modalPresentationPattern, modalTransition, builder, rootNode);
     RemoveModal(targetId);
     if (modalTransition == ModalTransition::NONE || builder->GetRenderContext()->HasDisappearTransition()) {
         // Fire shown event of navdestination under the disappeared modal
@@ -3393,6 +3410,29 @@ void OverlayManager::HandleModalPop(
     }
     FireModalPageHide();
     SaveLastModalNode();
+}
+
+void OverlayManager::ExecuteModalTransitionOut(const RefPtr<FrameNode>& topModalNode,
+    const RefPtr<ModalPresentationPattern>& pattern, ModalTransition modalTransition,
+    const RefPtr<FrameNode>& builder, const RefPtr<UINode>& rootNode)
+{
+    CHECK_NULL_VOID(pattern);
+    if (pattern->HasTransitionEffect()) {
+        PlayTransitionEffectOut(topModalNode);
+    } else if (modalTransition == ModalTransition::DEFAULT) {
+        PlayDefaultModalTransition(topModalNode, false);
+    } else if (modalTransition == ModalTransition::ALPHA) {
+        PlayAlphaModalTransition(topModalNode, false);
+    } else if (!builder->GetRenderContext()->HasDisappearTransition()) {
+        if (!pattern->IsExecuteOnDisappear()) {
+            pattern->OnDisappear();
+            // Fire hidden event of navdestination on the disappeared modal
+            FireNavigationStateChange(false, topModalNode);
+        }
+        FireAutoSave(topModalNode);
+        RemoveChildWithService(rootNode, topModalNode);
+        rootNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF);
+    }
 }
 
 void OverlayManager::FireModalPageShow()
@@ -5646,6 +5686,13 @@ void OverlayManager::RemoveFilterAnimation()
         return;
     }
 
+    if (hasFilterActived_) {
+        TAG_LOGI(AceLogTag::ACE_OVERLAY,
+            "filter show animation still active (hasFilterActived_=true), skip disappear for filterId=%{public}d",
+            filterNode->GetId());
+        return;
+    }
+
     ShowFilterDisappearAnimation(filterNode);
 }
 
@@ -5660,6 +5707,8 @@ void OverlayManager::RemoveFilterWithNode(const RefPtr<FrameNode>& filterNode)
     } else {
         TAG_LOGI(AceLogTag::ACE_OVERLAY, "filter has no parent, skip remove filterId: %{public}d", filterNode->GetId());
     }
+
+    RemoveFilterOnDisappear(filterNode->GetId());
 
     auto columnNode = filterColumnNodeWeak_.Upgrade();
     auto isRemoveCurrentFilter = columnNode && columnNode->GetId() == filterNode->GetId();
@@ -5741,10 +5790,11 @@ bool OverlayManager::AddCurSessionId(int32_t sessionId)
 }
 
 int32_t OverlayManager::CreateModalUIExtension(const RefPtr<WantWrap>& wantWrap,
-    const ModalUIExtensionCallbacks& callbacks, const ModalUIExtensionConfig& config)
+    const ModalUIExtensionCallbacks& callbacks, const ModalUIExtensionConfig& config,
+    const InnerExtraConfig& extraConfig)
 {
     auto& want = wantWrap->GetWant();
-    return CreateModalUIExtension(want, callbacks, config);
+    return CreateModalUIExtension(want, callbacks, config, extraConfig);
 }
 
 bool OverlayManager::HandleUIExtNodeSize(const AAFwk::Want& want, RefPtr<FrameNode> uiExtNode)
@@ -5838,13 +5888,15 @@ bool OverlayManager::UIExtNodeAngleValid(int32_t uiExtNodeAngle)
 
 int32_t OverlayManager::CreateModalUIExtension(
     const AAFwk::Want& want, const ModalUIExtensionCallbacks& callbacks,
-    const ModalUIExtensionConfig& config)
+    const ModalUIExtensionConfig& config, const InnerExtraConfig& extraConfig)
 {
     isProhibitBack_ = config.isProhibitBack;
     NG::InnerModalUIExtensionConfig innerModalUIExtensionConfig = { .isAsyncModalBinding = config.isAsyncModalBinding,
         .isDensityFollowHost = config.isDensityFollowHost, .isWindowModeFollowHost = config.isWindowModeFollowHost,
         .isModalRequestFocus = config.isModalRequestFocus, .isModalFixFocus = config.isModalFixFocus };
+    innerModalUIExtensionConfig.transition = extraConfig.transition;
     auto uiExtNode = ModalUIExtension::Create(want, callbacks, innerModalUIExtensionConfig);
+    CHECK_NULL_RETURN(uiExtNode, 0);
     if (!HandleUIExtNodeTransform(want, uiExtNode)) {
         return 0;
     }
@@ -5853,13 +5905,23 @@ int32_t OverlayManager::CreateModalUIExtension(
         return uiExtNode;
     };
     auto sessionId = ModalUIExtension::GetSessionId(uiExtNode);
+    BindModalUIExtensionContentCover(config, sessionId, std::move(buildNodeFunc), extraConfig.transition, uiExtNode);
+    return sessionId;
+}
+
+void OverlayManager::BindModalUIExtensionContentCover(const ModalUIExtensionConfig& config,
+    int32_t sessionId, std::function<RefPtr<UINode>()>&& buildNodeFunc,
+    const RefPtr<NG::ChainedTransitionEffect>& transitionEffect, const RefPtr<NG::FrameNode>& uiExtNode)
+{
     if (!config.isAsyncModalBinding) {
-        ModalStyle modalStyle = OverlayManager::SetUIExtensionModalStyleAndGet(config.prohibitedRemoveByRouter,
+        ModalStyle modalStyle = SetUIExtensionModalStyleAndGet(config.prohibitedRemoveByRouter,
             config.isAllowAddChildBelowModalUec, config.prohibitedRemoveByNavigation, config.isModalRequestFocus);
         SetIsAllowedBeCovered(config.isAllowedBeCovered);
         // Convert the sessionId into a negative number to distinguish it from the targetId of other modal pages
+        NG::ContentCoverParam contentCoverParam;
+        contentCoverParam.transitionEffect = transitionEffect;
         BindContentCover(true, nullptr, std::move(buildNodeFunc), modalStyle, nullptr, nullptr, nullptr, nullptr,
-            ContentCoverParam(), nullptr, -(sessionId));
+            contentCoverParam, nullptr, -(sessionId));
         SetIsAllowedBeCovered(true); // Reset isAllowedBeCovered
     } else {
         auto bindModalCallback = [weak = WeakClaim(this), buildNodeFunc, sessionId, id = Container::CurrentId(),
@@ -5868,15 +5930,18 @@ int32_t OverlayManager::CreateModalUIExtension(
             isAllowAddChildBelowModalUec = config.isAllowAddChildBelowModalUec,
             prohibitedRemoveByNavigation = config.prohibitedRemoveByNavigation,
             isModalRequestFocus = config.isModalRequestFocus,
-            doAfterAsyncModalBinding = std::move(config.doAfterAsyncModalBinding)]() {
+            transitionEffect = transitionEffect,
+            doAfterAsyncModalBinding = std::move(config.doAfterAsyncModalBinding)]() mutable {
             ContainerScope scope(id);
             auto overlayManager = weak.Upgrade();
             CHECK_NULL_VOID(overlayManager);
             overlayManager->SetIsAllowedBeCovered(isAllowedBeCovered);
-            ModalStyle modalStyle = OverlayManager::SetUIExtensionModalStyleAndGet(prohibitedRemoveByRouter,
+            ModalStyle modalStyle = overlayManager->SetUIExtensionModalStyleAndGet(prohibitedRemoveByRouter,
                 isAllowAddChildBelowModalUec, prohibitedRemoveByNavigation, isModalRequestFocus);
+            NG::ContentCoverParam contentCoverParam;
+            contentCoverParam.transitionEffect = transitionEffect;
             overlayManager->BindContentCover(true, nullptr, std::move(buildNodeFunc), modalStyle, nullptr, nullptr,
-                nullptr, nullptr, ContentCoverParam(), nullptr, -(sessionId));
+                nullptr, nullptr, contentCoverParam, nullptr, -(sessionId));
             overlayManager->SetIsAllowedBeCovered(true);
             if (doAfterAsyncModalBinding) {
                 doAfterAsyncModalBinding();
@@ -5885,7 +5950,6 @@ int32_t OverlayManager::CreateModalUIExtension(
         ModalUIExtension::SetBindModalCallback(uiExtNode, std::move(bindModalCallback));
         uiExtNodes_[sessionId] = WeakClaim(RawPtr(uiExtNode));
     }
-    return sessionId;
 }
 
 ModalStyle OverlayManager::SetUIExtensionModalStyleAndGet(bool prohibitedRemoveByRouter,
@@ -6066,6 +6130,7 @@ void OverlayManager::AddFrameNodeToOverlay(const RefPtr<NG::FrameNode>& node, st
     }
     overlayNode_->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF_AND_CHILD);
     frameNodeMapOnOverlay_[node->GetId()] = level;
+    ScheduleOverlayContentVisibilityReport(node);
     auto focusHub = node->GetFocusHub();
     CHECK_NULL_VOID(focusHub);
     focusHub->RequestFocus();
@@ -6120,6 +6185,7 @@ void OverlayManager::AddFrameNodeWithOrder(const RefPtr<FrameNode>& node, std::o
     orderOverlayNode->AddChild(node, 0);
     orderOverlayNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF_AND_CHILD);
     orderOverlayMap_[node->GetId()] = orderOverlayNode->GetId();
+    ScheduleOverlayContentVisibilityReport(node);
     if (IsTopOrder(levelOrder)) {
         auto focusHub = node->GetFocusHub();
         CHECK_NULL_VOID(focusHub);
@@ -6174,6 +6240,7 @@ void OverlayManager::RemoveFrameNodeOnOverlay(const RefPtr<NG::FrameNode>& node)
     CHECK_NULL_VOID(overlayNode_);
     overlayNode_->RemoveChild(node);
     frameNodeMapOnOverlay_.erase(node->GetId());
+    ScheduleOverlayContentVisibilityReport(node);
     if (overlayNode_->GetChildren().empty()) {
         FireNavigationLifecycle(overlayNode_, static_cast<int32_t>(NavDestinationLifecycle::ON_ACTIVE), true,
             static_cast<int32_t>(NavDestinationActiveReason::OVERLAY));
@@ -6201,12 +6268,43 @@ void OverlayManager::RemoveFrameNodeWithOrder(const RefPtr<NG::FrameNode>& node)
     PopLevelOrder(orderOverlayNode->GetId());
     orderOverlayNode->RemoveChild(node);
     orderOverlayMap_.erase(node->GetId());
+    ScheduleOverlayContentVisibilityReport(node);
     auto rootNode = orderOverlayNode->GetParent();
     CHECK_NULL_VOID(rootNode);
     rootNode->RemoveChild(orderOverlayNode);
     orderOverlayNode.Reset();
     rootNode->MarkDirtyNode(PROPERTY_UPDATE_BY_CHILD_REQUEST);
     FocusNextOrderNode(topFocusableNode);
+}
+
+void OverlayManager::ScheduleOverlayContentVisibilityReport(const RefPtr<FrameNode>& node)
+{
+    CHECK_NULL_VOID(node);
+    auto pipeline = GetPipelineContext();
+    CHECK_NULL_VOID(pipeline);
+    auto reportPipeline = pipeline;
+    if (reportPipeline->IsSubPipeline()) {
+        auto parentId = SubwindowManager::GetInstance()->GetParentContainerId(reportPipeline->GetInstanceId());
+        reportPipeline = PipelineContext::GetContextByContainerId(parentId);
+    }
+    auto manager = reportPipeline ? reportPipeline->GetContentChangeManager() : nullptr;
+    auto reportHide = manager ? manager->BuildCapiOverlayContentHideCallback(node) : nullptr;
+    pipeline->AddAfterRenderTask([weak = WeakClaim(this), weakContent = WeakPtr(node), id = node->GetId(),
+        reportHide = std::move(reportHide)]() {
+        auto overlay = weak.Upgrade();
+        CHECK_NULL_VOID(overlay);
+        auto content = weakContent.Upgrade();
+        const bool visible = content &&
+            (overlay->frameNodeMapOnOverlay_.count(id) || overlay->orderOverlayMap_.count(id)) &&
+            content->IsOnMainTree() && content->IsVisible();
+        const bool changed = visible ? overlay->capiVisibleOverlayContents_.insert(id).second :
+            overlay->capiVisibleOverlayContents_.erase(id) != 0;
+        if (changed && content) {
+            overlay->ReportCapiOverlayEvent(content, visible, "overlay");
+        } else if (changed && reportHide) {
+            reportHide();
+        }
+    });
 }
 
 void OverlayManager::ShowNodeOnOverlay(const RefPtr<NG::FrameNode>& node)
@@ -6233,6 +6331,7 @@ void OverlayManager::ShowNodeOnOverlay(const RefPtr<NG::FrameNode>& node)
     }
     layoutProperty->UpdateVisibility(VisibleType::VISIBLE);
     node->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF_AND_CHILD);
+    ScheduleOverlayContentVisibilityReport(node);
     auto focusHub = node->GetFocusHub();
     CHECK_NULL_VOID(focusHub);
     focusHub->RequestFocus();
@@ -6254,6 +6353,7 @@ void OverlayManager::HideNodeOnOverlay(const RefPtr<NG::FrameNode>& node)
     }
     layoutProperty->UpdateVisibility(VisibleType::GONE);
     node->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF_AND_CHILD);
+    ScheduleOverlayContentVisibilityReport(node);
     auto focusHub = node->GetFocusHub();
     CHECK_NULL_VOID(focusHub);
     focusHub->LostFocus();
@@ -6290,6 +6390,7 @@ void OverlayManager::ShowAllNodesOnOverlay()
         auto layoutProperty = frameNode->GetLayoutProperty();
         CHECK_NULL_VOID(layoutProperty);
         layoutProperty->UpdateVisibility(VisibleType::VISIBLE);
+        ScheduleOverlayContentVisibilityReport(frameNode);
     }
     overlayNode_->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF_AND_CHILD);
     auto focusView = overlayNode_->GetPattern<FocusView>();
@@ -6309,6 +6410,7 @@ void OverlayManager::HideAllNodesOnOverlay()
         auto layoutProperty = frameNode->GetLayoutProperty();
         CHECK_NULL_VOID(layoutProperty);
         layoutProperty->UpdateVisibility(VisibleType::GONE);
+        ScheduleOverlayContentVisibilityReport(frameNode);
     }
     overlayNode_->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF_AND_CHILD);
     auto focusView = overlayNode_->GetPattern<FocusView>();
@@ -7353,7 +7455,41 @@ bool OverlayManager::IsSceneBoardWindow()
     return container->IsSceneBoardWindow();
 }
 
+const char* GetOverlayContentChangeType(const RefPtr<FrameNode>& target)
+{
+    CHECK_NULL_RETURN(target, nullptr);
+    const auto& tag = target->GetTag();
+    auto dialog = target->GetPattern<DialogPattern>();
+    if (tag == V2::MENU_WRAPPER_ETS_TAG || tag == V2::MENU_ETS_TAG || tag == V2::SELECT_OVERLAY_ETS_TAG) {
+        return "menu";
+    }
+    if (dialog && dialog->GetDialogProperties().type == DialogType::ACTION_SHEET) {
+        return "actionSheet";
+    }
+    if (dialog && (dialog->GetCustomNode() || tag == V2::CUSTOM_DIALOG_ETS_TAG)) {
+        return "customDialog";
+    }
+    if (dialog || tag == V2::SHEET_PAGE_TAG || tag == V2::MODAL_PAGE_TAG) {
+        return "dialog";
+    }
+    return nullptr;
+}
+
+RefPtr<FrameNode> GetMenuContentChangeTrigger(const RefPtr<FrameNode>& target)
+{
+    CHECK_NULL_RETURN(target, nullptr);
+    auto menu = target->GetTag() == V2::MENU_ETS_TAG ? target :
+        AceType::DynamicCast<FrameNode>(target->GetChildAtIndex(0));
+    auto pattern = menu ? menu->GetPattern<MenuPattern>() : nullptr;
+    return pattern ? FrameNode::GetFrameNode(pattern->GetTargetTag(), pattern->GetTargetId()) : nullptr;
+}
+
 void OverlayManager::ContentChangeReport(const RefPtr<FrameNode>& keyNode, bool isShow)
+{
+    ContentChangeReport(keyNode, isShow, true);
+}
+
+void OverlayManager::ContentChangeReport(const RefPtr<FrameNode>& keyNode, bool isShow, bool reportCapi)
 {
     auto pipeline = GetPipelineContext();
     CHECK_NULL_VOID(pipeline);
@@ -7362,11 +7498,56 @@ void OverlayManager::ContentChangeReport(const RefPtr<FrameNode>& keyNode, bool 
         pipeline = PipelineContext::GetContextByContainerId(parentId);
         CHECK_NULL_VOID(pipeline);
     }
-#ifndef CROSS_PLATFORM
     auto mgr = pipeline->GetContentChangeManager();
     CHECK_NULL_VOID(mgr);
-    mgr->OnDialogChangeEnd(keyNode, isShow);
-#endif
+    mgr->OnDialogChangeEnd(keyNode, isShow, reportCapi);
+}
+
+void ReportCapiSubMenuEvent(const RefPtr<FrameNode>& node, bool isShow)
+{
+    if (!node || (isShow && !node->IsOnMainTree())) {
+        return;
+    }
+    auto pipeline = node ? node->GetContext() : nullptr;
+    auto overlay = pipeline ? pipeline->GetOverlayManager() : nullptr;
+    if (overlay) {
+        overlay->ReportSubMenuEvent(node, isShow);
+    }
+}
+
+void OverlayManager::ReportSubMenuEvent(const RefPtr<FrameNode>& node, bool isShow)
+{
+    CHECK_NULL_VOID(node);
+    // Track the visible instance even without a listener: late subscriptions can receive HIDE.
+    if (isShow ? !capiVisibleSubMenus_.insert(node->GetId()).second : !capiVisibleSubMenus_.erase(node->GetId())) {
+        return;
+    }
+    ReportCapiOverlayEvent(node, isShow, "menu");
+}
+
+void OverlayManager::ReportCapiOverlayEvent(const RefPtr<FrameNode>& keyNode, bool isShow, const char* overlayType,
+    const RefPtr<FrameNode>& trigger)
+{
+    auto pipeline = GetPipelineContext();
+    CHECK_NULL_VOID(pipeline);
+    if (pipeline->IsSubPipeline()) {
+        auto parentId = SubwindowManager::GetInstance()->GetParentContainerId(pipeline->GetInstanceId());
+        pipeline = PipelineContext::GetContextByContainerId(parentId);
+        CHECK_NULL_VOID(pipeline);
+    }
+    auto manager = pipeline->GetContentChangeManager();
+    if (manager && manager->HasCapiContentChangeSubscriptions()) {
+        auto triggerNode = trigger;
+        if (!triggerNode && overlayType && std::strcmp(overlayType, "popup") == 0) {
+            for (const auto& [id, info] : popupMap_) {
+                if (info.popupNode == keyNode) {
+                    triggerNode = AceType::DynamicCast<FrameNode>(info.target.Upgrade());
+                    break;
+                }
+            }
+        }
+        manager->ReportCapiOverlayEvent(keyNode, isShow, overlayType, triggerNode);
+    }
 }
 
 void OverlayManager::UpdateImageGeneratorSheetKey(const RefPtr<UINode>& sheetNode, int32_t rootId)
@@ -7441,6 +7622,28 @@ void OverlayManager::ResetDetachedFreeRootProxy(int32_t targetId)
     if (iter != detachedProxyMap_.end()) {
         detachedProxyMap_.erase(iter);
     }
+}
+
+bool OverlayManager::GetMenuWrapperState(const RefPtr<FrameNode>& node, int32_t& targetId, bool& isShown)
+{
+    targetId = -1;
+    isShown = false;
+    CHECK_NULL_RETURN(node, false);
+    auto menu = node->GetPattern<MenuWrapperPattern>();
+    CHECK_NULL_RETURN(menu, false);
+    targetId = menu->GetTargetId();
+    isShown = menu->IsShow();
+    return true;
+}
+
+bool OverlayManager::GetPopupTargetId(const RefPtr<FrameNode>& node, int32_t& targetId)
+{
+    targetId = -1;
+    CHECK_NULL_RETURN(node, false);
+    auto bubble = node->GetPattern<BubblePattern>();
+    CHECK_NULL_RETURN(bubble, false);
+    targetId = bubble->GetPopupTargetId();
+    return true;
 }
 
 PopupInfo OverlayManager::GetPopupInfo(int32_t targetId) const

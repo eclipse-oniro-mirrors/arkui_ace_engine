@@ -13,9 +13,10 @@
  * limitations under the License.
  */
 
-#include "content_change_manager.h"
+#include "content_change_manager_impl.h"
 
 #include <cinttypes>
+#include <map>
 #include <sstream>
 
 #include "base/log/ace_trace.h"
@@ -238,7 +239,8 @@ private:
 };
 #endif
 
-ContentChangeManager::ContentChangeManager(const RefPtr<TaskExecutor>& taskExecutor) : taskExecutor_(taskExecutor)
+ContentChangeManager::ContentChangeManager(const RefPtr<TaskExecutor>& taskExecutor)
+    : capiImpl_(std::make_unique<CapiImpl>()), taskExecutor_(taskExecutor)
 {
 #ifndef IS_RELEASE_VERSION
     dumpMgr_ = std::make_shared<ContentChangeDumpManager>();
@@ -370,7 +372,7 @@ std::optional<ChangeType> ContentChangeManager::GetStartChangeType(ChangeType ty
     }
 }
 
-void ContentChangeManager::OnContentChangeStart(const RefPtr<FrameNode>& keyNode, ChangeType type)
+void ContentChangeManager::OnContentChangeStartInner(const RefPtr<FrameNode>& keyNode, ChangeType type)
 {
     if (!keyNode || !currentContentChangeConfig_.has_value() || !currentContentChangeConfig_->reportStartEvent) {
         return;
@@ -425,7 +427,7 @@ void ContentChangeManager::ReportContentChangeEnd(const ActiveContentChange& act
     UiSessionManager::GetInstance()->ReportContentChangeEvent(activeChange.endType, endJson->ToString());
 }
 
-void ContentChangeManager::OnContentChangeInterrupted(const RefPtr<FrameNode>& keyNode, ChangeType type)
+void ContentChangeManager::OnContentChangeInterruptedInner(const RefPtr<FrameNode>& keyNode, ChangeType type)
 {
     CHECK_NULL_VOID(keyNode);
     bool shouldReportEnd = true;
@@ -456,7 +458,7 @@ void ContentChangeManager::OnContentChangeInterrupted(const RefPtr<FrameNode>& k
     }
 }
 
-void ContentChangeManager::OnContentChangeNodeDestroyed(int32_t nodeId)
+void ContentChangeManager::OnContentChangeNodeDestroyedInner(int32_t nodeId)
 {
     scrollingNodes_.erase(nodeId);
     transitioningNodes_.erase(nodeId);
@@ -555,6 +557,7 @@ void ContentChangeManager::MarkSwiperNormalEndPending(
 {
     CHECK_NULL_VOID(reportNode);
     CHECK_NULL_VOID(logicalNode);
+    pendingSwiperChanges_[reportNode->GetId()][type] = { logicalNode->GetId(), false, reportNode };
     auto nodeIter = activeContentChanges_.find(logicalNode->GetId());
     if (nodeIter == activeContentChanges_.end()) {
         return;
@@ -565,7 +568,6 @@ void ContentChangeManager::MarkSwiperNormalEndPending(
     }
     typeIter->second.normalEndPending = true;
     typeIter->second.pendingReportNodeId = reportNode->GetId();
-    pendingSwiperChanges_[reportNode->GetId()][type] = { logicalNode->GetId(), false };
 }
 
 bool ContentChangeManager::ConsumeCanceledSwiperEnd(int32_t reportNodeId, ChangeType type)
@@ -850,6 +852,8 @@ void ContentChangeManager::ResetTranslateTextNode(int32_t nodeId)
     ResetTranslateNodes(translateTextNodes_, nodeId);
     ResetTranslateNodes(translateTextSnapshotNodes_, nodeId);
     if (nodeId < 0) {
+        // Reset-all keeps the live-node tracking set but clears the snapshot cache.
+        translateTextSnapshotNodes_.clear();
         translateTextVersions_.clear();
         translateTextSnapshotVersions_.clear();
         return;
@@ -858,10 +862,14 @@ void ContentChangeManager::ResetTranslateTextNode(int32_t nodeId)
     translateTextSnapshotVersions_.erase(nodeId);
 }
 
-void ContentChangeManager::OnPageTransitionEnd(const RefPtr<FrameNode>& keyNode)
+void ContentChangeManager::OnPageTransitionEndInner(const RefPtr<FrameNode>& keyNode, int32_t transitionId)
 {
-    CHECK_NULL_VOID(keyNode);
-    OnTransitionRemoved(keyNode->GetId());
+    // The saved transition ID also permits cleanup when the report node has expired.
+    OnTransitionRemoved(transitionId);
+    if (!keyNode) {
+        CompleteContentChange(transitionId, ChangeType::PAGE);
+        return;
+    }
     bool contentChangeEnabled = IsContentChangeDetectEnable();
     bool pageSceneEnabled = NeedPageSceneDetect();
     if (!contentChangeEnabled && !pageSceneEnabled) {
@@ -872,7 +880,7 @@ void ContentChangeManager::OnPageTransitionEnd(const RefPtr<FrameNode>& keyNode)
         auto simpleTree = JsonUtil::CreateSharedPtrJson(true);
         keyNode->DumpSimplifyTreeWithParamConfig(0, simpleTree, false, { false, false, false });
         UiSessionManager::GetInstance()->ReportContentChangeEvent(ChangeType::PAGE, simpleTree->ToString());
-        CompleteContentChange(keyNode->GetId(), ChangeType::PAGE);
+        CompleteContentChange(transitionId, ChangeType::PAGE);
         lastTransitionReportTime_ = static_cast<uint64_t>(GetSysTimestamp());
 #ifndef IS_RELEASE_VERSION
         dumpMgr_->AddReportRecord(std::make_tuple(ChangeType::PAGE, keyNode->GetId(), keyNode->GetTag()));
@@ -881,14 +889,14 @@ void ContentChangeManager::OnPageTransitionEnd(const RefPtr<FrameNode>& keyNode)
     NotifyPageSceneContentChanged(true);
 }
 
-void ContentChangeManager::OnScrollChangeEnd(const RefPtr<FrameNode>& keyNode, uint32_t type)
+void ContentChangeManager::OnScrollChangeEndInner(const RefPtr<FrameNode>& keyNode, uint32_t type)
 {
     CHECK_NULL_VOID(keyNode);
     bool ignored = IsIgnoringEventType(type);
     bool contentChangeEnabled = IsContentChangeDetectEnable();
     bool pageSceneEnabled = NeedPageSceneDetect();
     if (!contentChangeEnabled && !pageSceneEnabled) {
-        OnScrollRemoved(keyNode->GetId());
+        OnScrollRemovedInner(keyNode->GetId());
         return;
     }
     ACE_SCOPED_TRACE("[ContentChangeManager] OnScrollChangeEnd");
@@ -916,24 +924,8 @@ void ContentChangeManager::OnScrollChangeEnd(const RefPtr<FrameNode>& keyNode, u
     NotifyPageSceneContentChanged(true);
 }
 
-namespace {
-RefPtr<FrameNode> GetSwiperContentChangeNode(const RefPtr<FrameNode>& keyNode, bool hasTabsAncestor)
-{
-    if (hasTabsAncestor) {
-        auto parent = keyNode->GetParent();
-        while (parent) {
-            auto frameNode = AceType::DynamicCast<FrameNode>(parent);
-            if (frameNode && frameNode->GetTag() == V2::TABS_ETS_TAG) {
-                return frameNode;
-            }
-            parent = parent->GetParent();
-        }
-    }
-    return keyNode;
-}
-} // namespace
 
-void ContentChangeManager::OnSwiperChangeStart(const RefPtr<FrameNode>& keyNode, bool hasTabsAncestor)
+void ContentChangeManager::OnSwiperChangeStartInner(const RefPtr<FrameNode>& keyNode, bool hasTabsAncestor)
 {
     if (!keyNode || !IsStartEventReportEnabled()) {
         return;
@@ -942,11 +934,11 @@ void ContentChangeManager::OnSwiperChangeStart(const RefPtr<FrameNode>& keyNode,
     if (paintProperty && paintProperty->GetAutoPlay().value_or(false)) {
         return;
     }
-    OnContentChangeStart(
+    OnContentChangeStartInner(
         GetSwiperContentChangeNode(keyNode, hasTabsAncestor), hasTabsAncestor ? ChangeType::TABS : ChangeType::SWIPER);
 }
 
-void ContentChangeManager::OnSwiperChangeEnd(const RefPtr<FrameNode>& keyNode, bool hasTabsAncestor)
+void ContentChangeManager::OnSwiperChangeEndInner(const RefPtr<FrameNode>& keyNode, bool hasTabsAncestor)
 {
     CHECK_NULL_VOID(keyNode);
     OnTransitionRemoved(keyNode->GetId());
@@ -965,8 +957,18 @@ void ContentChangeManager::OnSwiperChangeEnd(const RefPtr<FrameNode>& keyNode, b
     NotifyPageSceneContentChanged(false);
 }
 
-void ContentChangeManager::OnSwiperChangeCancel(const RefPtr<FrameNode>& keyNode, bool hasTabsAncestor)
+void ContentChangeManager::OnSwiperChangeCancelInner(const RefPtr<FrameNode>& keyNode, bool hasTabsAncestor)
 {
+    if (keyNode) {
+        auto pending = pendingSwiperChanges_.find(keyNode->GetId());
+        if (pending != pendingSwiperChanges_.end()) {
+            auto type = hasTabsAncestor ? ChangeType::TABS : ChangeType::SWIPER;
+            auto change = pending->second.find(type);
+            if (change != pending->second.end()) {
+                change->second.canceled = true;
+            }
+        }
+    }
     if (!keyNode || !IsStartEventReportEnabled()) {
         return;
     }
@@ -993,7 +995,7 @@ void ContentChangeManager::OnSwiperChangeCancel(const RefPtr<FrameNode>& keyNode
     UiSessionManager::GetInstance()->ReportContentChangeEvent(cancelType, json->ToString());
 }
 
-void ContentChangeManager::OnDialogChangeEnd(const RefPtr<FrameNode>& keyNode, bool isShow)
+void ContentChangeManager::OnDialogChangeEndInner(const RefPtr<FrameNode>& keyNode, bool isShow)
 {
     bool contentChangeEnabled = IsContentChangeDetectEnable();
     bool pageSceneEnabled = NeedPageSceneDetect();
@@ -1041,7 +1043,7 @@ void ContentChangeManager::OnVsyncStart()
     StartTextAABBCollecting();
 }
 
-void ContentChangeManager::OnVsyncEnd(const RectF& rootRect)
+void ContentChangeManager::OnVsyncEndInner(const RectF& rootRect)
 {
     bool contentChangeEnabled = IsContentChangeDetectEnable();
     bool pageSceneEnabled = NeedPageSceneDetect();
@@ -1062,11 +1064,25 @@ void ContentChangeManager::ProcessSwiperNodes()
 {
     std::set<std::pair<WeakPtr<FrameNode>, bool>> changedSwiperNodes;
     changedSwiperNodes_.swap(changedSwiperNodes);
+    bool hasExpiredReportNode = false;
     for (auto [weak, hasTabsAncestor] : changedSwiperNodes) {
         auto node = weak.Upgrade();
-        CHECK_NULL_CONTINUE(node);
+        if (!node) {
+            hasExpiredReportNode = true;
+            continue;
+        }
 
         ReportSwiperEvent(node, hasTabsAncestor);
+    }
+    if (hasExpiredReportNode) {
+        // Detach alone must preserve normal END. Only reclaim records whose reporting node no longer exists.
+        for (auto iter = pendingSwiperChanges_.begin(); iter != pendingSwiperChanges_.end();) {
+            if (iter->second.empty() || iter->second.begin()->second.reportNode.Invalid()) {
+                iter = pendingSwiperChanges_.erase(iter);
+            } else {
+                ++iter;
+            }
+        }
     }
 }
 
@@ -1210,19 +1226,11 @@ void ContentChangeManager::FlushPageSceneNodeChanged()
     }
 }
 
-void ContentChangeManager::OnSwiperScrollEnd(const RefPtr<FrameNode>& keyNode)
-{
-    CHECK_NULL_VOID(keyNode);
-    ACE_SCOPED_TRACE("[ContentChangeManager] OnSwiperScrollEnd");
-    scrollingSwiperNodes_.erase(keyNode->GetId());
-}
-
-void ContentChangeManager::OnSwiperScrollStart(const RefPtr<FrameNode>& keyNode, bool hasTabsAncestor)
+void ContentChangeManager::OnSwiperScrollStartInner(const RefPtr<FrameNode>& keyNode)
 {
     CHECK_NULL_VOID(keyNode);
     ACE_SCOPED_TRACE("[ContentChangeManager] OnSwiperScrollStart");
     scrollingSwiperNodes_.emplace(keyNode->GetId());
-    OnSwiperChangeStart(keyNode, hasTabsAncestor);
 }
 
 bool ContentChangeManager::IsSwiperScrolling() const
@@ -1230,7 +1238,7 @@ bool ContentChangeManager::IsSwiperScrolling() const
     return !scrollingSwiperNodes_.empty();
 }
 
-void ContentChangeManager::OnScrollChangeStart(const RefPtr<FrameNode>& keyNode)
+void ContentChangeManager::OnScrollChangeStartInner(const RefPtr<FrameNode>& keyNode)
 {
     bool contentChangeEnabled = IsContentChangeDetectEnable();
     bool pageSceneEnabled = NeedPageSceneDetect();
@@ -1245,25 +1253,10 @@ void ContentChangeManager::OnScrollChangeStart(const RefPtr<FrameNode>& keyNode)
 #endif
 }
 
-void ContentChangeManager::OnScrollRemoved(int32_t nodeId)
+void ContentChangeManager::OnScrollRemovedInner(int32_t nodeId)
 {
     if (scrollingNodes_.count(nodeId)) {
         scrollingNodes_.erase(nodeId);
-    }
-}
-
-void ContentChangeManager::OnTransitionAdded(int32_t nodeId)
-{
-    if (!NeedContentChangeReportOrPageSceneDetect()) {
-        return;
-    }
-    transitioningNodes_.emplace(nodeId);
-}
-
-void ContentChangeManager::OnTransitionRemoved(int32_t nodeId)
-{
-    if (transitioningNodes_.count(nodeId)) {
-        transitioningNodes_.erase(nodeId);
     }
 }
 

@@ -16,11 +16,19 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_SCROLLABLE_SCROLLABLE_UTILS_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_SCROLLABLE_SCROLLABLE_UTILS_H
 
+#include <optional>
+#include <string>
+
 #include "base/geometry/axis.h"
+#include "base/memory/referenced.h"
+#include "base/utils/macros.h"
+#include "core/components/common/layout/constants.h"
 #include "core/components_ng/layout/layout_property.h"
 
 namespace OHOS::Ace::NG {
 class LayoutWrapper;
+class ScrollablePaintProperty;
+enum class ContentClipMode : int;
 
 struct MoveOffsetParam {
     bool isVertical = false;
@@ -86,6 +94,14 @@ struct ScrollableUtils {
      * @param frameNode The scrollable frame node.
      */
     static bool IsChildLazy(const RefPtr<FrameNode>& frameNode, int32_t index);
+
+    ACE_FORCE_EXPORT static std::optional<ImmersiveStrategy> StrategyForClipHostTag(const std::string& tag);
+
+    ACE_FORCE_EXPORT static ContentClipMode ResolveEffectiveDefaultContentClip(
+        const RefPtr<FrameNode>& host, const ScrollablePaintProperty* props);
+
+    ACE_FORCE_EXPORT static ContentClipMode ResolveEffectiveDefaultContentClip(
+        FrameNode* host, const ScrollablePaintProperty* props);
 };
 } // namespace OHOS::Ace::NG
 

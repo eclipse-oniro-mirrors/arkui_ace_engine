@@ -104,6 +104,8 @@ public:
     bool HasOnStyledStringDidChange() const;
     void SetOnInputFilterError(const std::function<void(const std::u16string&)>& onInputFilterError);
     void FireOnInputFilterError(const std::u16string& value) const;
+    void SetOnSecurityStateChange(std::function<void(bool)>&& func);
+    void FireOnSecurityStateChanged(bool isSecure);
 
 private:
     long long timestamp_ = 0;
@@ -128,6 +130,7 @@ private:
     std::function<bool(const StyledStringChangeValue&)> onStyledStringWillChange_;
     std::function<void(const StyledStringChangeValue&)> onStyledStringDidChange_;
     std::function<void(const std::u16string&)> onInputFilterError_;
+    std::function<void(bool)> onSecurityStateChanged_;
     IMEAttachCallback onWillAttachIME_;
     ACE_DISALLOW_COPY_AND_MOVE(RichEditorEventHub);
 };

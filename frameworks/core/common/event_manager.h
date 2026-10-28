@@ -44,6 +44,7 @@
 
 namespace OHOS::Ace {
 namespace NG {
+struct CommandResult;
 class FrameNode;
 class GestureDebugBoundaryManager;
 class SelectOverlayManager;
@@ -53,7 +54,7 @@ class ActiveRecognizerManager;
 #ifdef RELAXED_INTERACTION_SUPPORT
 class RelaxedInteractionManager;
 #endif
-class TouchDelegate : public virtual AceType {
+class TouchDelegate : public AceType {
     DECLARE_ACE_TYPE(TouchDelegate, AceType);
 public:
     virtual void DelegateTouchEvent(const TouchEvent& point) {};
@@ -103,7 +104,7 @@ struct HitTestRecordInfo {
     TouchType type;
 };
 
-class EventManager : virtual public NG::KeyEventManager {
+class EventManager : public NG::KeyEventManager {
     DECLARE_ACE_TYPE(EventManager, KeyEventManager);
 
 public:
@@ -496,6 +497,8 @@ public:
     
     RefPtr<NG::ActiveRecognizerManager> GetOrCreateActiveRecognizerManager();
     void ProcessCommand(const std::string& command, std::function<void()> requestFrameCallback);
+    void ProcessCommandWithResult(const std::string& command, std::function<void()> requestFrameCallback,
+        const std::function<void(const NG::CommandResult&)>& finishCallback);
     void FlushRelaxedInteraction(std::function<void()> requestFrameCallback);
 
 private:
@@ -519,6 +522,7 @@ private:
     bool DispatchMultiContainerEvent(const TouchEvent& point);
     void DispatchTouchEventAndCheck(const TouchEvent& event, bool sendOnTouch = true);
     void DispatchTouchEventInOldPipeline(const TouchEvent& point, bool dispatchSuccess);
+    bool DispatchTouchEventToPipelines(TouchEvent& point, bool sendOnTouch);
     void DispatchTouchEventToTouchTestResult(const TouchEvent& touchEvent, TouchTestResult touchTestResult,
         bool sendOnTouch);
     void HandleEscapeRecognizer(const TouchEvent& touchEvent);
@@ -529,6 +533,8 @@ private:
     void SetResponseLinkRecognizers(
         const TouchTestResult& result, const ResponseLinkResult& responseLinkRecognizers, bool isPostEvent = false);
     void FalsifyHoverCancelEventAndDispatch(const TouchEvent& touchPoint);
+    void UpdateHandednessOnTouchDown(const TouchEvent& event);
+    void UpdateHandednessOnTouchUp(const TouchEvent& event);
     void UpdateDragInfo(TouchEvent& point);
     void UpdateInfoWhenFinishDispatch(const TouchEvent& point, bool sendOnTouch);
     void EraseEventRefereeWithStrategy(const TouchEvent& point);

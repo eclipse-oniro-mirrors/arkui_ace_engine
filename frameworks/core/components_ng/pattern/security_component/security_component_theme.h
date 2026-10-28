@@ -29,7 +29,7 @@
 #include "core/components_ng/pattern/security_component/security_component_log.h"
 
 namespace OHOS::Ace::NG {
-class SecurityComponentTheme : public virtual Theme {
+class SecurityComponentTheme : public Theme {
     DECLARE_ACE_TYPE(SecurityComponentTheme, Theme);
 
 public:

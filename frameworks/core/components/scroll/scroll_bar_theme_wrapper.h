@@ -18,7 +18,7 @@
 
 #include "core/components/common/properties/color.h"
 #include "core/components/scroll/scroll_bar_theme.h"
-#include "core/components_ng/token_theme/token_theme_wrapper.h"
+#include "core/components_ng/token_theme/token_theme.h"
 
 namespace OHOS::Ace::NG {
 
@@ -26,7 +26,7 @@ namespace OHOS::Ace::NG {
  * ScrollBarThemeWrapper defines color and styles of ScrollBar basing on TokenTheme's data.
  * ScrollBarThemeWrapper should be built using ScrollBarThemeWrapper::WrapperBuilder.
  */
-class ScrollBarThemeWrapper : public ScrollBarTheme, public TokenThemeWrapper {
+class ScrollBarThemeWrapper : public ScrollBarTheme {
     DECLARE_ACE_TYPE(ScrollBarThemeWrapper, ScrollBarTheme);
 
 public:
@@ -35,7 +35,7 @@ public:
         WrapperBuilder() = default;
         ~WrapperBuilder() = default;
 
-        RefPtr<TokenThemeWrapper> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
+        RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
         {
             auto wrapper = AceType::MakeRefPtr<ScrollBarThemeWrapper>();
             auto theme = AceType::DynamicCast<ScrollBarTheme>(wrapper);

@@ -16,6 +16,7 @@
 #include "core/components_ng/pattern/pattern.h"
 
 #include "core/common/resource/resource_parse_utils.h"
+#include "core/components_ng/base/inspector_dump_options.h"
 #include "core/components_ng/event/focus_hub.h"
 #include "core/components_ng/event/gesture_event_hub.h"
 #include "core/components_ng/layout/box_layout_algorithm.h"
@@ -25,6 +26,11 @@
 #include "core/pipeline_ng/pipeline_context.h"
 
 namespace OHOS::Ace::NG {
+bool Pattern::ShouldIncludeDiagnostic(const InspectorDumpOptions& options)
+{
+    return options.includeDiagnostic;
+}
+
 int32_t Pattern::OnRecvCommand(const std::string& command)
 {
     auto json = JsonUtil::ParseJsonString(command);
@@ -57,6 +63,46 @@ int32_t Pattern::OnRecvCommand(const std::string& command)
         return OnInjectionEvent(command);
     }
     return RET_FAILED;
+}
+
+CommandResult Pattern::OnInjectionEventWithResult(const std::string& command)
+{
+    return CommandResult::Error(CommandErrorType::INVALID_COMMAND);
+}
+
+CommandResult Pattern::OnRecvCommandWithResult(const std::string& command)
+{
+    auto json = JsonUtil::ParseJsonString(command);
+    if (!json || !json->IsValid() || (!json->IsObject() && !json->IsArray())) {
+        return CommandResult::Error(CommandErrorType::INVALID_PARAM, "Invalid command JSON.");
+    }
+    auto event = json->GetString("cmd");
+    if (event == "click") {
+        auto host = GetHost();
+        CHECK_NULL_RETURN(host, CommandResult::Error(CommandErrorType::EXECUTE_FAIL));
+        auto eventHub = host->GetEventHub<EventHub>();
+        CHECK_NULL_RETURN(eventHub, CommandResult::Error(CommandErrorType::EXECUTE_FAIL));
+        if (!eventHub->IsEnabled()) {
+            return CommandResult::Error(CommandErrorType::EXECUTE_FAIL, "Component is disabled.");
+        }
+        auto gestureHub = host->GetOrCreateGestureEventHub();
+        CHECK_NULL_RETURN(gestureHub, CommandResult::Error(CommandErrorType::EXECUTE_FAIL));
+        auto clickEventFunc = gestureHub->GetClickEvent();
+        CHECK_NULL_RETURN(clickEventFunc, CommandResult::Error(CommandErrorType::EXECUTE_FAIL));
+        GestureEvent info;
+        clickEventFunc(info);
+        return CommandResult::Success();
+    }
+    if (event == "ShowCornerMark") {
+        auto host = GetHost();
+        CHECK_NULL_RETURN(host, CommandResult::Error(CommandErrorType::EXECUTE_FAIL));
+        auto cornerMark = AceType::MakeRefPtr<CornerMark>();
+        CHECK_NULL_RETURN(cornerMark, CommandResult::Error(CommandErrorType::EXECUTE_FAIL));
+        return cornerMark->ResponseShowCornerMarkEvent(host, command) == RET_SUCCESS
+            ? CommandResult::Success()
+            : CommandResult::Error(CommandErrorType::INVALID_PARAM);
+    }
+    return OnInjectionEventWithResult(command);
 }
 
 void Pattern::OnColorModeChange(uint32_t colorMode)
@@ -190,6 +236,7 @@ void Pattern::CheckLocalized()
     // Reset for safeAreaExpand's Cache in GeometryNode
     host->ResetSafeAreaPadding();
     layoutProperty->CheckLocalizedSafeAreaPadding(layoutDirection);
+    layoutProperty->CheckLocalizedSafeAreaInset(layoutDirection);
     layoutProperty->CheckIgnoreLayoutSafeArea(layoutDirection);
     layoutProperty->CheckBackgroundLayoutSafeAreaEdges(layoutDirection);
 }

@@ -26,7 +26,7 @@ namespace OHOS::Ace {
  * ArcListItemTheme defines styles of arc list or grid item. ArcListItemTheme should be built
  * using ArcListItemTheme::Builder.
  */
-class ArcListItemTheme : public virtual Theme {
+class ArcListItemTheme : public Theme {
     DECLARE_ACE_TYPE(ArcListItemTheme, Theme);
 
 public:

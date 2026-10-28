@@ -29,6 +29,7 @@ import { Axis, FocusWrapMode, ScrollSource, PresetFillType, Color as arkui_compo
 import { Resource as global_resource_Resource } from 'global.resource'
 import { ChildrenMainSize, AttributeModifier, hookListChildrenMainSizeImpl, hookListAttributeModifier, AttributeUpdater } from '#handwritten'
 import { OnScrollFrameBeginCallback, Scroller, Scroller_serializer, ScrollerInternal, ScrollAlign } from './scroll'
+import { PlaceholderProvider } from '@ohos.arkui.placeholderRegister'
 import { CustomBuilder, ConstructorT, CustomBuilderT } from './builder'
 import { CallbackKind } from './../framework/peers/CallbackKind'
 import { CallbackTransformer } from './../CallbackTransformer'
@@ -462,6 +463,18 @@ export class ArkListPeer extends ArkScrollableCommonMethodPeer {
             thisSerializer.writeInt8(RuntimeType.UNDEFINED)
         }
         ArkUIGeneratedNativeModule._ListAttribute_setOnDidScroll(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
+        thisSerializer.release()
+    }
+    setScrollPlaceholderAttribute(value: PlaceholderProvider | undefined): void {
+        const thisSerializer: SerializerBase = SerializerBase.hold()
+        if (value !== undefined) {
+            thisSerializer.writeInt8(RuntimeType.OBJECT)
+            const valueTmpValue = value!
+            thisSerializer.holdAndWriteCallback(valueTmpValue)
+        } else {
+            thisSerializer.writeInt8(RuntimeType.UNDEFINED)
+        }
+        ArkUIGeneratedNativeModule._ListAttribute_setScrollPlaceholder(this.peer.ptr, thisSerializer.asBuffer(), thisSerializer.length())
         thisSerializer.release()
     }
     setLanesAttribute(value: int32 | LengthConstrain | ItemFillPolicy | undefined, gutter?: Dimension): void {
@@ -992,6 +1005,18 @@ export interface ListAttribute extends ScrollableCommonMethod {
         }
         throw new Error('Unimplemented method onDidScroll')
     }
+    scrollPlaceholder(value: PlaceholderProvider | undefined): this {
+        const commonStyle: Array<(instance: CommonMethod) => void> | undefined = this.__get__commonStyles__Internal();
+        if (commonStyle) {
+            (commonStyle as Array<(instance: CommonMethod) => void>).push((instance: CommonMethod): void => (instance as ListAttribute).scrollPlaceholder(value));
+            return this;
+        } else {
+            if (this.__is_CustomComponent__Internal()) {
+                throw new Error('List attribute scrollPlaceholder can only be set when creating an extendable component.')
+            }
+        }
+        throw new Error('Unimplemented method scrollPlaceholder')
+    }
     lanes(value: int32 | LengthConstrain | ItemFillPolicy | undefined, gutter?: Dimension): this {
         const commonStyle: Array<(instance: CommonMethod) => void> | undefined = this.__get__commonStyles__Internal();
         if (commonStyle) {
@@ -1250,6 +1275,11 @@ export class ArkListComponent extends ArkScrollableCommonMethodComponent impleme
     public onDidScroll(value: OnScrollCallback | undefined): this {
         const value_casted = value as (OnScrollCallback | undefined)
         this.getPeer()?.setOnDidScrollAttribute(value_casted)
+        return this
+    }
+    public scrollPlaceholder(value: PlaceholderProvider | undefined): this {
+        const value_casted = value as (PlaceholderProvider | undefined)
+        this.getPeer()?.setScrollPlaceholderAttribute(value_casted)
         return this
     }
     public lanes(value: int32 | LengthConstrain | ItemFillPolicy | undefined, gutter?: Dimension): this {

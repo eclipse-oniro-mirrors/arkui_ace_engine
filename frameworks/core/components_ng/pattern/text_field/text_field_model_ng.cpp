@@ -3256,6 +3256,7 @@ void TextFieldModelNG::SetIncludeFontPadding(FrameNode* frameNode, bool enabled)
 
 bool TextFieldModelNG::GetIncludeFontPadding(FrameNode* frameNode)
 {
+    CHECK_NULL_RETURN(frameNode, false);
     bool value = false;
     ACE_GET_NODE_LAYOUT_PROPERTY_WITH_DEFAULT_VALUE(
         TextFieldLayoutProperty, IncludeFontPadding, value, frameNode, value);
@@ -3274,6 +3275,7 @@ void TextFieldModelNG::SetFallbackLineSpacing(FrameNode* frameNode, bool enabled
 
 bool TextFieldModelNG::GetFallbackLineSpacing(FrameNode* frameNode)
 {
+    CHECK_NULL_RETURN(frameNode, false);
     bool value = false;
     ACE_GET_NODE_LAYOUT_PROPERTY_WITH_DEFAULT_VALUE(
         TextFieldLayoutProperty, FallbackLineSpacing, value, frameNode, value);

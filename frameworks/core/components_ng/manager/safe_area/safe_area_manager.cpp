@@ -42,13 +42,13 @@ SafeAreaInsets GenerateEdgeSafeAreaWithRoot(const SafeAreaInsets& safeArea, NG::
     return edgeArea;
 }
 
-bool SafeAreaManager::IsModeResize()
+bool SafeAreaManager::IsModeResize() const
 {
     return (
         keyboardAvoidMode_ == KeyBoardAvoidMode::RESIZE || keyboardAvoidMode_ == KeyBoardAvoidMode::RESIZE_WITH_CARET);
 }
 
-bool SafeAreaManager::IsModeOffset()
+bool SafeAreaManager::IsModeOffset() const
 {
     return (
         keyboardAvoidMode_ == KeyBoardAvoidMode::OFFSET || keyboardAvoidMode_ == KeyBoardAvoidMode::OFFSET_WITH_CARET);
@@ -116,6 +116,24 @@ bool SafeAreaManager::UpdateFloatNavSafeArea(const SafeAreaInsets& safeArea, NG:
     return true;
 }
 
+bool SafeAreaManager::UpdateTitleButtonSafeArea(
+    const SafeAreaInsets& safeArea, NG::OptionalSize<uint32_t> rootSize)
+{
+    auto safeAreaWithRoot = GenerateEdgeSafeAreaWithRoot(safeArea, rootSize);
+    if (titleButtonSafeArea_ == safeAreaWithRoot) {
+        return false;
+    }
+    ACE_SCOPED_TRACE("SafeAreaManager::UpdateTitleButtonSafeArea %s", safeAreaWithRoot.ToString().c_str());
+    titleButtonSafeArea_ = safeAreaWithRoot;
+    return true;
+}
+
+bool SafeAreaManager::CheckTitleButtonSafeArea(
+    const SafeAreaInsets& safeArea, NG::OptionalSize<uint32_t> rootSize)
+{
+    return titleButtonSafeArea_ != GenerateEdgeSafeAreaWithRoot(safeArea, rootSize);
+}
+
 bool SafeAreaManager::UpdateKeyboardSafeArea(float keyboardHeight, std::optional<uint32_t> rootHeight)
 {
     uint32_t bottom;
@@ -157,14 +175,16 @@ bool SafeAreaManager::UpdateKeyboardWebSafeArea(float keyboardHeight, std::optio
 SafeAreaInsets SafeAreaManager::GetCombinedSafeArea(const SafeAreaExpandOpts& opts) const
 {
     SafeAreaInsets res;
+    auto titleButtonSafeArea = GetTitleButtonSafeAreaInternal();
     if (!IsSafeAreaValid()) {
-        return {};
+        return (opts.type & SAFE_AREA_TYPE_SYSTEM) ? titleButtonSafeArea : res;
     }
     if ((opts.type & SAFE_AREA_TYPE_CUTOUT) && GetUseCutout()) {
         res = res.Combine(cutoutSafeArea_);
     }
     if (opts.type & SAFE_AREA_TYPE_SYSTEM) {
-        res = res.Combine(systemSafeArea_).Combine(navSafeArea_).Combine(floatNavSafeArea_);
+        res = res.Combine(systemSafeArea_).Combine(navSafeArea_).Combine(floatNavSafeArea_)
+            .Combine(titleButtonSafeArea);
     }
     if (keyboardAvoidMode_ == KeyBoardAvoidMode::NONE) {
         return res;
@@ -214,6 +234,29 @@ bool SafeAreaManager::IsSafeAreaValid() const
 #else
     return !(ignoreSafeArea_ || (!isFullScreen_ && !isNeedAvoidWindow_));
 #endif
+}
+
+SafeAreaInsets SafeAreaManager::GetTitleButtonSafeAreaInternal() const
+{
+    return (IsImmersiveStrategySet(ImmersiveStrategy::AVOID_WINDOW_CONTROLS) && !ignoreSafeArea_)
+        ? titleButtonSafeArea_ : SafeAreaInsets();
+}
+
+SafeAreaInsets::Inset SafeAreaManager::GetKeyboardBottomInset(
+    bool withoutProcess, const SafeAreaInsets::Inset& current) const
+{
+    if (IsModeResize()) {
+        return current.Combine(keyboardInset_);
+    }
+    if (IsModeOffset()) {
+        auto keyboardHeight = keyboardInset_.Length();
+        auto bottomLength = GetSafeArea().bottom_.Length();
+        auto distance = bottomLength - GetKeyboardOffset(withoutProcess);
+        if (GreatNotEqual(keyboardHeight, 0.0f) && distance <= keyboardHeight) {
+            return GetSafeArea().bottom_;
+        }
+    }
+    return current;
 }
 
 bool SafeAreaManager::SetIsFullScreen(bool value)
@@ -333,28 +376,41 @@ SafeAreaInsets SafeAreaManager::GetFloatNavSafeArea() const
     return {};
 }
 
+SafeAreaInsets SafeAreaManager::GetTitleButtonSafeArea() const
+{
+    if (IsSafeAreaValid()) {
+        return titleButtonSafeArea_;
+    }
+    return {};
+}
+
 SafeAreaInsets SafeAreaManager::GetSafeArea() const
 {
+    auto titleButtonSafeArea = GetTitleButtonSafeAreaInternal();
     if (!IsSafeAreaValid()) {
-        return {};
+        return titleButtonSafeArea;
     }
     auto cutoutSafeArea = GetUseCutout() ? cutoutSafeArea_ : SafeAreaInsets();
-    return systemSafeArea_.Combine(cutoutSafeArea).Combine(navSafeArea_).Combine(floatNavSafeArea_);
+    return systemSafeArea_.Combine(cutoutSafeArea).Combine(navSafeArea_).Combine(floatNavSafeArea_)
+        .Combine(titleButtonSafeArea);
 }
 
 SafeAreaInsets SafeAreaManager::GetSafeAreaWithoutCutout() const
 {
+    auto titleButtonSafeArea = GetTitleButtonSafeAreaInternal();
     if (!IsSafeAreaValid()) {
-        return {};
+        return titleButtonSafeArea;
     }
-    return systemSafeArea_.Combine(navSafeArea_).Combine(floatNavSafeArea_);
+    return systemSafeArea_.Combine(navSafeArea_).Combine(floatNavSafeArea_).Combine(titleButtonSafeArea);
 }
 
 SafeAreaInsets SafeAreaManager::GetSafeAreaWithoutProcess() const
 {
     auto cutoutSafeArea = GetUseCutout() ? cutoutSafeArea_ : SafeAreaInsets();
+    auto titleButtonSafeArea = GetTitleButtonSafeAreaInternal();
     if (!windowTypeConfig_.isSceneBoardWindow) {
-        return systemSafeArea_.Combine(cutoutSafeArea).Combine(navSafeArea_).Combine(floatNavSafeArea_);
+        return systemSafeArea_.Combine(cutoutSafeArea).Combine(navSafeArea_).Combine(floatNavSafeArea_)
+            .Combine(titleButtonSafeArea);
     }
     SafeAreaInsets scbSafeArea;
     if (scbSystemSafeArea_.has_value()) {
@@ -371,35 +427,18 @@ SafeAreaInsets SafeAreaManager::GetSafeAreaWithoutProcess() const
 
 PaddingPropertyF SafeAreaManager::SafeAreaToPadding(bool withoutProcess, LayoutSafeAreaType ignoreType)
 {
-    if (!withoutProcess) {
-#ifdef PREVIEW
-        if (ignoreSafeArea_) {
-            return {};
-        }
-#else
-        if (ignoreSafeArea_ || (!isFullScreen_ && !isNeedAvoidWindow_)) {
-            return {};
-        }
-#endif
-    }
+    auto titleButtonSafeArea = GetTitleButtonSafeAreaInternal();
     SafeAreaInsets combinedSafeArea;
-    auto cutoutSafeArea = GetUseCutout() ? cutoutSafeArea_ : SafeAreaInsets();
-
-    bool includeSystem = ignoreType & LAYOUT_SAFE_AREA_TYPE_SYSTEM;
-    bool includeKeyboard = ignoreType & LAYOUT_SAFE_AREA_TYPE_KEYBOARD;
-    if (includeSystem) {
-        combinedSafeArea = systemSafeArea_.Combine(cutoutSafeArea).Combine(navSafeArea_).Combine(floatNavSafeArea_);
-    }
-    if (includeKeyboard) {
-        if (IsModeResize()) {
-            combinedSafeArea.bottom_ = combinedSafeArea.bottom_.Combine(keyboardInset_);
-        } else if (IsModeOffset()) {
-            auto keyboardHeight = keyboardInset_.Length();
-            auto bottomLength = GetSafeArea().bottom_.Length();
-            auto distance = bottomLength - GetKeyboardOffset(withoutProcess);
-            if (GreatNotEqual(keyboardHeight, 0.0f) && distance <= keyboardHeight) {
-                combinedSafeArea.bottom_ = GetSafeArea().bottom_;
-            }
+    if (!withoutProcess && !IsSafeAreaValid()) {
+        combinedSafeArea = (ignoreType & LAYOUT_SAFE_AREA_TYPE_SYSTEM) ? titleButtonSafeArea : SafeAreaInsets();
+    } else {
+        auto cutoutSafeArea = GetUseCutout() ? cutoutSafeArea_ : SafeAreaInsets();
+        if (ignoreType & LAYOUT_SAFE_AREA_TYPE_SYSTEM) {
+            combinedSafeArea = systemSafeArea_.Combine(cutoutSafeArea).Combine(navSafeArea_)
+                .Combine(floatNavSafeArea_).Combine(titleButtonSafeArea);
+        }
+        if (ignoreType & LAYOUT_SAFE_AREA_TYPE_KEYBOARD) {
+            combinedSafeArea.bottom_ = GetKeyboardBottomInset(withoutProcess, combinedSafeArea.bottom_);
         }
     }
 
@@ -518,5 +557,10 @@ bool SafeAreaManager::CheckPageNeedAvoidKeyboard(const RefPtr<FrameNode>& frameN
     }
     CHECK_NULL_RETURN(overlay, true);
     return overlay->CheckPageNeedAvoidKeyboard();
+}
+
+bool SafeAreaManager::IsImmersiveEffectEnabled() const
+{
+    return false;
 }
 } // namespace OHOS::Ace::NG

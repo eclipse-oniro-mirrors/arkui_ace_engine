@@ -210,22 +210,22 @@ void UiMaterialDestroyMaterial(ani_env* env, ani_object aniClass, ani_long ptr)
     modifier->getVisualEffectAniModifier()->destroyMaterial(pointer);
 }
 
-ani_long UiMaterialConvertToECMaterial(ani_env* env, ani_object aniClass, ani_long ptr)
+void UiMaterialConvertToECMaterial(ani_env* env, ani_object aniClass, ani_long srcPtr, ani_long dstPtr)
 {
-    auto* pointer = reinterpret_cast<OHOS::Ace::UiMaterial*>(ptr);
+    auto* src = reinterpret_cast<OHOS::Ace::UiMaterial*>(srcPtr);
+    auto* dst = reinterpret_cast<OHOS::Ace::UiMaterial*>(dstPtr);
     const auto* modifier = GetNodeAniModifier();
-    CHECK_NULL_RETURN(modifier, 0);
-    auto* result = modifier->getVisualEffectAniModifier()->convertToECMaterial(pointer);
-    return reinterpret_cast<ani_long>(result);
+    CHECK_NULL_VOID(modifier);
+    modifier->getVisualEffectAniModifier()->convertToECMaterial(src, dst);
 }
 
-ani_long UiMaterialConvertToECSubMaterial(ani_env* env, ani_object aniClass, ani_long ptr)
+void UiMaterialConvertToECSubMaterial(ani_env* env, ani_object aniClass, ani_long srcPtr, ani_long dstPtr)
 {
-    auto* pointer = reinterpret_cast<OHOS::Ace::UiMaterial*>(ptr);
+    auto* src = reinterpret_cast<OHOS::Ace::UiMaterial*>(srcPtr);
+    auto* dst = reinterpret_cast<OHOS::Ace::UiMaterial*>(dstPtr);
     const auto* modifier = GetNodeAniModifier();
-    CHECK_NULL_RETURN(modifier, 0);
-    auto* result = modifier->getVisualEffectAniModifier()->convertToECSubMaterial(pointer);
-    return reinterpret_cast<ani_long>(result);
+    CHECK_NULL_VOID(modifier);
+    modifier->getVisualEffectAniModifier()->convertToECSubMaterial(src, dst);
 }
 
 ani_int UiMaterialGetGlobalMaterialLevel(ani_env* env, ani_object aniClass)
@@ -256,12 +256,11 @@ ani_int UiMaterialGetMaterialType(ani_env* env, ani_object aniClass)
     return modifier->getVisualEffectAniModifier()->getMaterialType();
 }
 
-ani_long UiMaterialGetEmpty(ani_env* env, ani_object aniClass, ani_object obj)
+void UiMaterialGetEmpty(ani_env* env, ani_object aniClass, ani_long dstPtr)
 {
+    auto* dst = reinterpret_cast<OHOS::Ace::UiMaterial*>(dstPtr);
     const auto* modifier = GetNodeAniModifier();
-    CHECK_NULL_RETURN(modifier, 0);
-    auto* material = modifier->getVisualEffectAniModifier()->constructMaterial(0);
-    material->SetEmpty(true);
-    return reinterpret_cast<ani_long>(material);
+    CHECK_NULL_VOID(modifier);
+    modifier->getVisualEffectAniModifier()->getEmpty(dst);
 }
 } // namespace OHOS::Ace::Ani

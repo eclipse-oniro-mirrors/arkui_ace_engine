@@ -14,6 +14,8 @@
  */
 #include "core/interfaces/native/node/drag_adapter_impl.h"
 
+#include "base/log/log_wrapper.h"
+
 #include "core/common/udmf/udmf_client.h"
 #include "core/components_ng/base/view_abstract.h"
 #include "core/components_ng/manager/drag_drop/drag_drop_func_wrapper.h"
@@ -73,20 +75,14 @@ ArkUI_Int32 StartDrag(ArkUIDragAction* dragAction)
                          instanceId = dragAction->instanceId](const DragNotifyMsg& dragNotifyMsg, int32_t status) {
         auto pipelineContext = NG::PipelineContext::GetContextByContainerId(instanceId);
         CHECK_NULL_VOID(pipelineContext);
-        auto manager = pipelineContext->GetDragDropManager();
-        CHECK_NULL_VOID(manager);
         ArkUIDragEvent dragEvent;
         dragEvent.dragResult = static_cast<int32_t>(dragNotifyMsg.result);
         dragEvent.dragBehavior = static_cast<int32_t>(dragNotifyMsg.dragBehavior);
-
-        auto action = manager->GetDragAction();
-        if (action != nullptr) {
-            action->hasHandle = false;
-        }
         ArkUIDragAndDropInfo outInfo;
         outInfo.status = status;
         outInfo.dragEvent = &dragEvent;
         CHECK_NULL_VOID(listener);
+        LOG_CALLBACK("OH_ArkUI_DragAction_RegisterStatusListener", listener);
         listener(&outInfo, userData);
     };
     internalDragAction->callback = callbacks;

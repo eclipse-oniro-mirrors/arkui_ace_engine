@@ -1309,9 +1309,7 @@ RefPtr<FrameNode> BuildButton(const std::shared_ptr<SelectOverlayInfo>& info, st
         []() -> RefPtr<Pattern> {
             auto* buttonModifier = NodeModifier::GetButtonCustomModifier();
             CHECK_NULL_RETURN(buttonModifier, nullptr);
-            auto* rawPattern = reinterpret_cast<Pattern*>(buttonModifier->createButtonPattern());
-            CHECK_NULL_RETURN(rawPattern, nullptr);
-            return AceType::Claim(rawPattern);
+            return buttonModifier->createButtonPattern();
         });
     auto text = FrameNode::GetOrCreateFrameNode("SelectMenuButtonText", ElementRegister::GetInstance()->MakeUniqueId(),
         []() { return AceType::MakeRefPtr<TextPattern>(); });
@@ -1410,9 +1408,7 @@ RefPtr<FrameNode> BuildButton(const MenuOptionsParam& menuOption, int32_t overla
         []() -> RefPtr<Pattern> {
             auto* buttonModifier = NodeModifier::GetButtonCustomModifier();
             CHECK_NULL_RETURN(buttonModifier, nullptr);
-            auto* rawPattern = reinterpret_cast<Pattern*>(buttonModifier->createButtonPattern());
-            CHECK_NULL_RETURN(rawPattern, nullptr);
-            return AceType::Claim(rawPattern);
+            return buttonModifier->createButtonPattern();
         });
     auto text = FrameNode::GetOrCreateFrameNode("SelectMenuButtonText", ElementRegister::GetInstance()->MakeUniqueId(),
         []() { return AceType::MakeRefPtr<TextPattern>(); });
@@ -1519,9 +1515,7 @@ RefPtr<FrameNode> BuildCreateMenuItemButton(const MenuOptionsParam& menuOptionsP
         []() -> RefPtr<Pattern> {
             auto* buttonModifier = NodeModifier::GetButtonCustomModifier();
             CHECK_NULL_RETURN(buttonModifier, nullptr);
-            auto* rawPattern = reinterpret_cast<Pattern*>(buttonModifier->createButtonPattern());
-            CHECK_NULL_RETURN(rawPattern, nullptr);
-            return AceType::Claim(rawPattern);
+            return buttonModifier->createButtonPattern();
         });
     auto text = FrameNode::GetOrCreateFrameNode("SelectMenuButtonText", ElementRegister::GetInstance()->MakeUniqueId(),
         []() { return AceType::MakeRefPtr<TextPattern>(); });
@@ -1652,9 +1646,7 @@ RefPtr<FrameNode> BuildMoreOrBackButton(const std::shared_ptr<SelectOverlayInfo>
         ElementRegister::GetInstance()->MakeUniqueId(), []() -> RefPtr<Pattern> {
             auto* buttonModifier = NodeModifier::GetButtonCustomModifier();
             CHECK_NULL_RETURN(buttonModifier, nullptr);
-            auto* rawPattern = reinterpret_cast<Pattern*>(buttonModifier->createButtonPattern());
-            CHECK_NULL_RETURN(rawPattern, nullptr);
-            return AceType::Claim(rawPattern);
+            return buttonModifier->createButtonPattern();
         });
     CHECK_NULL_RETURN(button, button);
     auto pipeline = PipelineContext::GetCurrentContextSafelyWithCheck();

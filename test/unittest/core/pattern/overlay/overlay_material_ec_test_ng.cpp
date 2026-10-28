@@ -1569,35 +1569,6 @@ HWTEST_F(OverlayMaterialECTestNg, SheetKeyHash001, TestSize.Level1)
 }
 
 /**
- * @tc.name: MaterialUtilsGetGlobalMaterialLevel001
- * @tc.desc: Test MaterialUtils::GetGlobalMaterialLevel
- * @tc.type: FUNC
- */
-HWTEST_F(OverlayMaterialECTestNg, MaterialUtilsGetGlobalMaterialLevel001, TestSize.Level1)
-{
-    UiMaterialLevel level;
-    bool result = MaterialUtils::GetGlobalMaterialLevel(level);
-    if (result) {
-        EXPECT_TRUE(level == UiMaterialLevel::EXQUISITE || level == UiMaterialLevel::GENTLE ||
-                    level == UiMaterialLevel::SMOOTH);
-    }
-}
-
-/**
- * @tc.name: MaterialUtilsGetDeviceUiMaterialEnabled001
- * @tc.desc: Test MaterialUtils::GetDeviceUiMaterialEnabled
- * @tc.type: FUNC
- */
-HWTEST_F(OverlayMaterialECTestNg, MaterialUtilsGetDeviceUiMaterialEnabled001, TestSize.Level1)
-{
-    bool enabled;
-    bool result = MaterialUtils::GetDeviceUiMaterialEnabled(enabled);
-    if (result) {
-        EXPECT_TRUE(enabled || !enabled);
-    }
-}
-
-/**
  * @tc.name: MaterialUtilsGetImmersiveShadow001
  * @tc.desc: Test MaterialUtils::GetImmersiveShadow
  * @tc.type: FUNC

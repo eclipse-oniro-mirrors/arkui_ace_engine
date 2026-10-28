@@ -417,6 +417,12 @@ __decorate([Computed], SegmentButtonV2Items.prototype, 'hasHybrid', null);
 SegmentButtonV2Items = __decorate([ObservedV2], SegmentButtonV2Items);
 export { SegmentButtonV2Items };
 const EMPTY_ITEMS = new SegmentButtonV2Items([]);
+export var SegmentButtonV2InteractionMode;
+(function (SegmentButtonV2InteractionMode) {
+  SegmentButtonV2InteractionMode[SegmentButtonV2InteractionMode['FOLLOWING_DRAG'] = 0] = 'FOLLOWING_DRAG';
+  SegmentButtonV2InteractionMode[SegmentButtonV2InteractionMode['NORMAL_DRAG'] = 1] = 'NORMAL_DRAG';
+})(SegmentButtonV2InteractionMode || (SegmentButtonV2InteractionMode = {}));
+
 export class TabSegmentButtonV2 extends ViewV2 {
   constructor(parent, params, __localStorage, elmtId = -1, paramsLambda, extraInfo) {
     super(parent, elmtId, extraInfo);
@@ -494,6 +500,10 @@ export class TabSegmentButtonV2 extends ViewV2 {
     this.initParam(
       'backgroundSystemMaterial',
       params && 'backgroundSystemMaterial' in params ? params.backgroundSystemMaterial : undefined
+    );
+    this.initParam(
+      'interactionMode',
+      params && 'interactionMode' in params ? params.interactionMode : undefined
     );
     this.initParam(
       'enableStateAnimation',
@@ -584,6 +594,10 @@ export class TabSegmentButtonV2 extends ViewV2 {
       params && 'backgroundSystemMaterial' in params ? params.backgroundSystemMaterial : undefined
     );
     this.resetParam(
+      'interactionMode',
+      params && 'interactionMode' in params ? params.interactionMode : undefined
+    );
+    this.resetParam(
       'enableStateAnimation',
       params && 'enableStateAnimation' in params ? params.enableStateAnimation : false
     );
@@ -633,6 +647,7 @@ export class TabSegmentButtonV2 extends ViewV2 {
                 buttonPadding: this.buttonPadding,
                 languageDirection: this.languageDirection,
                 backgroundSystemMaterial: this.backgroundSystemMaterial,
+                interactionMode: this.interactionMode,
                 enableStateAnimation: this.enableStateAnimation,
               },
               undefined,
@@ -679,6 +694,7 @@ export class TabSegmentButtonV2 extends ViewV2 {
                 buttonPadding: this.buttonPadding,
                 languageDirection: this.languageDirection,
                 backgroundSystemMaterial: this.backgroundSystemMaterial,
+                interactionMode: this.interactionMode,
                 enableStateAnimation: this.enableStateAnimation,
               };
             };
@@ -717,6 +733,7 @@ export class TabSegmentButtonV2 extends ViewV2 {
               buttonPadding: this.buttonPadding,
               languageDirection: this.languageDirection,
               backgroundSystemMaterial: this.backgroundSystemMaterial,
+              interactionMode: this.interactionMode,
               enableStateAnimation: this.enableStateAnimation,
             });
           }
@@ -823,6 +840,9 @@ export class TabSegmentButtonV2 extends ViewV2 {
     if ('backgroundSystemMaterial' in params) {
       this.updateParam('backgroundSystemMaterial', params.backgroundSystemMaterial);
     }
+    if ('interactionMode' in params) {
+      this.updateParam('interactionMode', params.interactionMode);
+    }
     if ('enableStateAnimation' in params) {
       this.updateParam('enableStateAnimation', params.enableStateAnimation);
     }
@@ -866,6 +886,7 @@ __decorate([Param], TabSegmentButtonV2.prototype, 'buttonMinHeight', void 0);
 __decorate([Param], TabSegmentButtonV2.prototype, 'buttonPadding', void 0);
 __decorate([Param], TabSegmentButtonV2.prototype, 'languageDirection', void 0);
 __decorate([Param], TabSegmentButtonV2.prototype, 'backgroundSystemMaterial', void 0);
+__decorate([Param], TabSegmentButtonV2.prototype, 'interactionMode', void 0);
 __decorate([Param], TabSegmentButtonV2.prototype, 'enableStateAnimation', void 0);
 export class CapsuleSegmentButtonV2 extends ViewV2 {
   constructor(parent, params, __localStorage, elmtId = -1, paramsLambda, extraInfo) {
@@ -946,6 +967,10 @@ export class CapsuleSegmentButtonV2 extends ViewV2 {
       params && 'backgroundSystemMaterial' in params ? params.backgroundSystemMaterial : undefined
     );
     this.initParam(
+      'interactionMode',
+      params && 'interactionMode' in params ? params.interactionMode : undefined
+    );
+    this.initParam(
       'enableStateAnimation',
       params && 'enableStateAnimation' in params ? params.enableStateAnimation : false
     );
@@ -1034,6 +1059,10 @@ export class CapsuleSegmentButtonV2 extends ViewV2 {
       params && 'backgroundSystemMaterial' in params ? params.backgroundSystemMaterial : undefined
     );
     this.resetParam(
+      'interactionMode',
+      params && 'interactionMode' in params ? params.interactionMode : undefined
+    );
+    this.resetParam(
       'enableStateAnimation',
       params && 'enableStateAnimation' in params ? params.enableStateAnimation : false
     );
@@ -1083,6 +1112,7 @@ export class CapsuleSegmentButtonV2 extends ViewV2 {
                 buttonPadding: this.buttonPadding,
                 languageDirection: this.languageDirection,
                 backgroundSystemMaterial: this.backgroundSystemMaterial,
+                interactionMode: this.interactionMode,
                 enableStateAnimation: this.enableStateAnimation,
               },
               undefined,
@@ -1129,6 +1159,7 @@ export class CapsuleSegmentButtonV2 extends ViewV2 {
                 buttonPadding: this.buttonPadding,
                 languageDirection: this.languageDirection,
                 backgroundSystemMaterial: this.backgroundSystemMaterial,
+                interactionMode: this.interactionMode,
                 enableStateAnimation: this.enableStateAnimation,
               };
             };
@@ -1167,6 +1198,7 @@ export class CapsuleSegmentButtonV2 extends ViewV2 {
               buttonPadding: this.buttonPadding,
               languageDirection: this.languageDirection,
               backgroundSystemMaterial: this.backgroundSystemMaterial,
+              interactionMode: this.interactionMode,
               enableStateAnimation: this.enableStateAnimation,
             });
           }
@@ -1273,6 +1305,9 @@ export class CapsuleSegmentButtonV2 extends ViewV2 {
     if ('backgroundSystemMaterial' in params) {
       this.updateParam('backgroundSystemMaterial', params.backgroundSystemMaterial);
     }
+    if ('interactionMode' in params) {
+      this.updateParam('interactionMode', params.interactionMode);
+    }
     if ('enableStateAnimation' in params) {
       this.updateParam('enableStateAnimation', params.enableStateAnimation);
     }
@@ -1316,6 +1351,7 @@ __decorate([Param], CapsuleSegmentButtonV2.prototype, 'buttonMinHeight', void 0)
 __decorate([Param], CapsuleSegmentButtonV2.prototype, 'buttonPadding', void 0);
 __decorate([Param], CapsuleSegmentButtonV2.prototype, 'languageDirection', void 0);
 __decorate([Param], CapsuleSegmentButtonV2.prototype, 'backgroundSystemMaterial', void 0);
+__decorate([Param], CapsuleSegmentButtonV2.prototype, 'interactionMode', void 0);
 __decorate([Param], CapsuleSegmentButtonV2.prototype, 'enableStateAnimation', void 0);
 class SimpleSegmentButtonV2 extends ViewV2 {
   constructor(parent, params, __localStorage, elmtId = -1, paramsLambda, extraInfo) {
@@ -1340,7 +1376,7 @@ class SimpleSegmentButtonV2 extends ViewV2 {
         GestureGroup.create(GestureMode.Parallel);
         LongPressGesture.create({ repeat: false, duration: 200 });
         LongPressGesture.onAction(event => {
-          if (!this.isBackgroundSystemMaterialEnabled()) {
+          if (!this.isMaterialInteractionEnabled()) {
             return;
           }
           const finger = event.fingerList.find(Boolean);
@@ -1359,7 +1395,12 @@ class SimpleSegmentButtonV2 extends ViewV2 {
           }
         });
         LongPressGesture.onActionCancel(event => {
-          if (!this.isBackgroundSystemMaterialEnabled()) {
+          if (!this.isMaterialInteractionEnabled()) {
+            if (this.interactionMode === SegmentButtonV2InteractionMode.NORMAL_DRAG) {
+              this.isPressing = false;
+              this.openSelectedItemSystemMaterial = false;
+              this.selectedItemScale = undefined;
+            }
             return;
           }
           const finger = event.fingerList.find(Boolean);
@@ -1372,7 +1413,12 @@ class SimpleSegmentButtonV2 extends ViewV2 {
           this.isPressing = false;
         });
         LongPressGesture.onActionEnd(event => {
-          if (!this.isBackgroundSystemMaterialEnabled()) {
+          if (!this.isMaterialInteractionEnabled()) {
+            if (this.interactionMode === SegmentButtonV2InteractionMode.NORMAL_DRAG) {
+              this.isPressing = false;
+              this.openSelectedItemSystemMaterial = false;
+              this.selectedItemScale = undefined;
+            }
             return;
           }
           const finger = event.fingerList.find(Boolean);
@@ -1407,7 +1453,14 @@ class SimpleSegmentButtonV2 extends ViewV2 {
           }
           this.panStartGlobalX = finger.localX;
           this.panStartIndex = index;
-          if (this.isBackgroundSystemMaterialEnabled() && this.isDragging) {
+          if (!this.isBackgroundSystemMaterialEnabled() && this.isDragging && this.isFollowingDragEnabled()) {
+            this.followingDragActive = true;
+            this.backplatePosition = {
+              x: this.selectedItemRect.position.x,
+              y: this.selectedItemRect.position.y,
+            };
+          }
+          if (this.isMaterialInteractionEnabled() && this.isDragging) {
             this.backplatePosition = {
               x: this.selectedItemRect.position.x,
               y: this.selectedItemRect.position.y,
@@ -1441,7 +1494,7 @@ class SimpleSegmentButtonV2 extends ViewV2 {
           if (!finger) {
             return;
           }
-          if (this.isBackgroundSystemMaterialEnabled()) {
+          if (this.isFollowingDragEnabled()) {
             let nowX = finger.localX - this.panStartGlobalX + this.selectedItemRect.position.x;
             let startX = this.itemRects[0].position.x;
             let endX = this.itemRects[this.items.length - 1].position.x;
@@ -1456,8 +1509,12 @@ class SimpleSegmentButtonV2 extends ViewV2 {
               y: this.backplatePosition.y,
             };
           } else {
+            const isNormalDrag = this.interactionMode === SegmentButtonV2InteractionMode.NORMAL_DRAG;
             const index = this.getIndexByPosition(finger.localX, finger.localY);
             this.updateSelectedIndex(index);
+            if (isNormalDrag) {
+              this.panStartGlobalX = finger.localX;
+            }
           }
         });
         PanGesture.onActionEnd(event => {
@@ -1472,9 +1529,15 @@ class SimpleSegmentButtonV2 extends ViewV2 {
             return;
           }
           if (this.isDragging) {
-            if (this.isBackgroundSystemMaterialEnabled()) {
+            const isMaterialEnabled = this.isBackgroundSystemMaterialEnabled();
+            if (this.isFollowingDragEnabled()) {
               const finger = event.fingerList.find(Boolean);
               if (!finger) {
+                if (!isMaterialEnabled) {
+                  this.isDragging = false;
+                  this.followingDragActive = false;
+                  this.dragWithPress = false;
+                }
                 return;
               }
               let realIndex = -1;
@@ -1489,14 +1552,37 @@ class SimpleSegmentButtonV2 extends ViewV2 {
               if (realIndex === -1) {
                 realIndex = this.isRTL() ? 0 : this.items.length - 1;
               }
+              if (!isMaterialEnabled) {
+                realIndex = this.getIndexByHorizontalPosition(finger.localX);
+              }
+              const shouldUpdateSelectedIndex = isMaterialEnabled ||
+                (this.isItemEnabled(realIndex) && realIndex !== this.selectedIndex);
+              if (!shouldUpdateSelectedIndex) {
+                realIndex = this.normalizedSelectedIndex;
+              }
               this.tempDisableAnimation = true;
-              this.getUIContext().animateTo({ curve: curves.springMotion(0.347, 0.99) }, () => {
-                this.$selectedIndex?.(realIndex);
+              this.getUIContext().animateTo({
+                curve: curves.springMotion(0.347, 0.99),
+                onFinish: () => {
+                  if (!isMaterialEnabled) {
+                    this.tempDisableAnimation = false;
+                  }
+                }
+              }, () => {
+                const targetRect = !isMaterialEnabled ? this.itemRects[realIndex] : undefined;
+                if (!isMaterialEnabled && !targetRect) {
+                  return;
+                }
+                if (shouldUpdateSelectedIndex) {
+                  this.$selectedIndex?.(realIndex);
+                }
                 this.backplatePosition = {
-                  x: this.itemRects[realIndex].position.x,
-                  y: this.itemRects[realIndex].position.y,
+                  x: isMaterialEnabled ? this.itemRects[realIndex].position.x : targetRect.position.x,
+                  y: isMaterialEnabled ? this.itemRects[realIndex].position.y : targetRect.position.y,
                 };
               });
+            }
+            if (isMaterialEnabled) {
               if (!this.dragWithPress) {
                 this.getUIContext().animateTo(
                   {
@@ -1515,6 +1601,7 @@ class SimpleSegmentButtonV2 extends ViewV2 {
               }
             }
             this.isDragging = false;
+            this.followingDragActive = false;
             this.dragWithPress = false;
             return;
           }
@@ -1533,6 +1620,7 @@ class SimpleSegmentButtonV2 extends ViewV2 {
         });
         PanGesture.onActionCancel(() => {
           this.isDragging = false;
+          this.followingDragActive = false;
           this.isMouseWheelScroll = false;
           this.panStartIndex = -1;
           this.dragWithPress = false;
@@ -1864,6 +1952,10 @@ class SimpleSegmentButtonV2 extends ViewV2 {
       'backgroundSystemMaterial',
       params && 'backgroundSystemMaterial' in params ? params.backgroundSystemMaterial : undefined
     );
+    this.initParam(
+      'interactionMode',
+      params && 'interactionMode' in params ? params.interactionMode : undefined
+    );
     this.itemRects = [];
     this.itemScale = 1;
     this.hoveredItemIndex = -1;
@@ -1871,6 +1963,7 @@ class SimpleSegmentButtonV2 extends ViewV2 {
     this.touchPressedItemIndex = -1;
     this.isMouseWheelScroll = false;
     this.isDragging = false;
+    this.followingDragActive = false;
     this.isPressing = false;
     this.panStartGlobalX = 0;
     this.panStartIndex = -1;
@@ -1970,11 +2063,16 @@ class SimpleSegmentButtonV2 extends ViewV2 {
       'backgroundSystemMaterial',
       params && 'backgroundSystemMaterial' in params ? params.backgroundSystemMaterial : undefined
     );
+    this.resetParam(
+      'interactionMode',
+      params && 'interactionMode' in params ? params.interactionMode : undefined
+    );
     this.itemRects = [];
     this.itemScale = 1;
     this.hoveredItemIndex = -1;
     this.mousePressedItemIndex = -1;
     this.touchPressedItemIndex = -1;
+    this.followingDragActive = false;
     this.resetParam(
       'enableStateAnimation',
       params && 'enableStateAnimation' in params ? params.enableStateAnimation : false
@@ -2046,6 +2144,17 @@ class SimpleSegmentButtonV2 extends ViewV2 {
       );
     }
   }
+  isFollowingDragEnabled() {
+    return this.interactionMode === SegmentButtonV2InteractionMode.FOLLOWING_DRAG ||
+      (this.isBackgroundSystemMaterialEnabled() &&
+        this.interactionMode !== SegmentButtonV2InteractionMode.NORMAL_DRAG);
+  }
+
+  isMaterialInteractionEnabled() {
+    // Material feedback is independent of drag positioning and selection timing.
+    return this.isBackgroundSystemMaterialEnabled();
+  }
+
   isBackgroundSystemMaterialEnabled() {
     return this.backgroundSystemMaterial !== undefined;
   }
@@ -2057,7 +2166,11 @@ class SimpleSegmentButtonV2 extends ViewV2 {
     return items[index].enabled;
   }
   getBackplatePosition() {
-    if (this.openSelectedItemSystemMaterial) {
+    const interactionMode = this.interactionMode;
+    if ((this.openSelectedItemSystemMaterial &&
+      interactionMode !== SegmentButtonV2InteractionMode.NORMAL_DRAG) ||
+      ((this.followingDragActive || this.isDragging) &&
+        interactionMode === SegmentButtonV2InteractionMode.FOLLOWING_DRAG)) {
       return this.backplatePosition;
     } else {
       return {
@@ -2230,6 +2343,39 @@ class SimpleSegmentButtonV2 extends ViewV2 {
     }
     return -1;
   }
+  getIndexByHorizontalPosition(localX) {
+    let leftIndex = -1;
+    let rightIndex = -1;
+    let minX = 0;
+    let maxX = 0;
+    for (let index = 0; index < this.items.length; index++) {
+      const rect = this.itemRects[index];
+      if (!rect) {
+        continue;
+      }
+      const left = rect.position.x;
+      const right = left + rect.size.width;
+      if (localX >= left && localX <= right) {
+        return index;
+      }
+      if (leftIndex === -1 || left < minX) {
+        leftIndex = index;
+        minX = left;
+      }
+      if (rightIndex === -1 || right > maxX) {
+        rightIndex = index;
+        maxX = right;
+      }
+    }
+    if (localX < minX) {
+      return leftIndex;
+    }
+    if (localX > maxX) {
+      return rightIndex;
+    }
+    return -1;
+  }
+
   isPointOnRect(localX, localY, rect) {
     return (
       localX >= rect.position.x &&
@@ -2243,7 +2389,10 @@ class SimpleSegmentButtonV2 extends ViewV2 {
       this.isTapGesture = false;
       return;
     }
-    if (this.isBackgroundSystemMaterialEnabled() && !this.tempDisableAnimation) {
+    // Cross-item selection must not replay material press/release while dragging.
+    const isNormalDragSelection = this.interactionMode === SegmentButtonV2InteractionMode.NORMAL_DRAG &&
+      this.isDragging && !this.isTapGesture;
+    if (this.isBackgroundSystemMaterialEnabled() && !this.tempDisableAnimation && !isNormalDragSelection) {
       if (this.isTapGesture) {
         this.openSelectedItemSystemMaterial = true;
       } else {
@@ -2269,7 +2418,7 @@ class SimpleSegmentButtonV2 extends ViewV2 {
         y: targetRect.position.y,
       };
     });
-    if (this.isBackgroundSystemMaterialEnabled() && !this.tempDisableAnimation) {
+    if (this.isBackgroundSystemMaterialEnabled() && !this.tempDisableAnimation && !isNormalDragSelection) {
       if (this.isTapGesture) {
         this.openSelectedItemSystemMaterial = false;
       } else {
@@ -2428,6 +2577,9 @@ class SimpleSegmentButtonV2 extends ViewV2 {
     if ('backgroundSystemMaterial' in params) {
       this.updateParam('backgroundSystemMaterial', params.backgroundSystemMaterial);
     }
+    if ('interactionMode' in params) {
+      this.updateParam('interactionMode', params.interactionMode);
+    }
     if ('enableStateAnimation' in params) {
       this.updateParam('enableStateAnimation', params.enableStateAnimation);
     }
@@ -2472,6 +2624,7 @@ __decorate([Param], SimpleSegmentButtonV2.prototype, 'buttonMinHeight', void 0);
 __decorate([Param], SimpleSegmentButtonV2.prototype, 'buttonPadding', void 0);
 __decorate([Param], SimpleSegmentButtonV2.prototype, 'languageDirection', void 0);
 __decorate([Param], SimpleSegmentButtonV2.prototype, 'backgroundSystemMaterial', void 0);
+__decorate([Param], SimpleSegmentButtonV2.prototype, 'interactionMode', void 0);
 __decorate([Local], SimpleSegmentButtonV2.prototype, 'itemRects', void 0);
 __decorate([Local], SimpleSegmentButtonV2.prototype, 'itemScale', void 0);
 __decorate([Local], SimpleSegmentButtonV2.prototype, 'hoveredItemIndex', void 0);
@@ -2482,6 +2635,7 @@ __decorate([Local], SimpleSegmentButtonV2.prototype, 'openSelectedItemSystemMate
 __decorate([Local], SimpleSegmentButtonV2.prototype, 'selectedItemScale', void 0);
 __decorate([Local], SimpleSegmentButtonV2.prototype, 'tempDisableAnimation', void 0);
 __decorate([Local], SimpleSegmentButtonV2.prototype, 'backplatePosition', void 0);
+__decorate([Local], SimpleSegmentButtonV2.prototype, 'followingDragActive', void 0);
 __decorate([Computed], SimpleSegmentButtonV2.prototype, 'normalizedSelectedIndex', null);
 __decorate([Computed], SimpleSegmentButtonV2.prototype, 'selectedItemRect', null);
 const multiplyCapsuleTheme = {
@@ -3643,6 +3797,7 @@ class GroupIdGenerator {
 GroupIdGenerator.instance = null;
 
 export default {
+  SegmentButtonV2InteractionMode,
   SegmentButtonV2Item,
   SegmentButtonV2Items,
   TabSegmentButtonV2,

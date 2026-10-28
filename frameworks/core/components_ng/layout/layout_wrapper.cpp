@@ -15,9 +15,12 @@
 
 #include "core/components_ng/layout/layout_wrapper.h"
 #include "core/common/container.h"
+#include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/manager/safe_area/safe_area_manager.h"
+#include "core/components_ng/property/measure_utils.h"
 
 #include "base/log/ace_checker.h"
+#include "core/components_ng/pattern/safe_area_inset/safe_area_inset_pattern.h"
 #include "core/components_ng/pattern/scrollable/scrollable_pattern.h"
 #include "core/pipeline_ng/pipeline_context.h"
 #include "core/components_ng/pattern/stage/stage_manager.h"
@@ -32,6 +35,22 @@ bool InRangeStart(float number, float boundaryStart, float boundaryEnd)
 bool InRangeEnd(float number, float boundaryStart, float boundaryEnd)
 {
     return GreatOrEqual(number, boundaryStart - 1.0f) && LessOrEqual(number, boundaryEnd);
+}
+
+RefPtr<LayoutWrapper> GetSafeAreaInsetContentWrapper(
+    LayoutWrapper* container, SafeAreaInsetEdge edge)
+{
+    CHECK_NULL_RETURN(container, nullptr);
+    auto host = container->GetHostNode();
+    CHECK_NULL_RETURN(host, nullptr);
+    auto pattern = host->GetPattern<SafeAreaInsetPattern>();
+    CHECK_NULL_RETURN(pattern, nullptr);
+    auto content = pattern->GetEdgeContent(edge);
+    CHECK_NULL_RETURN(content, nullptr);
+    if (content->FrameCount() == 0) {
+        return nullptr;
+    }
+    return container->GetChildByIndex(pattern->GetContentFrameIndex(edge));
 }
 
 bool CheckPaddingBorderGap(ExpandEdges& incomingExpand, const PaddingPropertyF& innerSpace)
@@ -691,7 +710,7 @@ void LayoutWrapper::AdjustChildren(const RefPtr<FrameNode>& host, const OffsetF&
 
 void LayoutWrapper::AdjustChild(RefPtr<UINode> childUI, const OffsetF& offset, bool parentScrollable)
 {
-    auto child = DynamicCast<FrameNode>(RawPtr(childUI));
+    auto child = AceType::DynamicCast<FrameNode>(AceType::RawPtr(childUI));
     if (!child) {
         if (!childUI->IsSyntaxNode()) {
             return;
@@ -840,6 +859,129 @@ void LayoutWrapper::CreateRootConstraint()
         layoutConstraint.percentReference.SetHeight(PipelineContext::GetCurrentRootHeight());
     }
     layoutProperty->UpdateLayoutConstraint(layoutConstraint);
+}
+
+void LayoutWrapper::MeasureSafeAreaInsetContainer(LayoutWrapper* insetContainer)
+{
+    auto layoutProperty = GetLayoutProperty();
+    CHECK_NULL_VOID(layoutProperty);
+    const auto& options = layoutProperty->GetSafeAreaInset();
+    if (!insetContainer || !options.has_value() || options->Empty()) {
+        layoutProperty->UpdateSafeAreaInsetContribution({});
+        return;
+    }
+
+    // The container algorithm measures every stable edge wrapper once with this
+    // same preliminary observation constraint. No measured edge feeds another.
+    insetContainer->Measure(layoutProperty->CreateSafeAreaInsetConstraint());
+
+    const auto& constraint = layoutProperty->GetLayoutConstraint();
+    CHECK_NULL_VOID(constraint);
+    PaddingPropertyF contribution;
+    constexpr std::array<SafeAreaInsetEdge, SAFE_AREA_INSET_EDGE_COUNT> EDGES = {
+        SafeAreaInsetEdge::TOP, SafeAreaInsetEdge::END, SafeAreaInsetEdge::BOTTOM, SafeAreaInsetEdge::START };
+    for (const auto edge : EDGES) {
+        const auto& edgeOptions = options->GetEdge(edge);
+        if (!edgeOptions.has_value()) {
+            continue;
+        }
+        auto contentWrapper = GetSafeAreaInsetContentWrapper(insetContainer, edge);
+        CHECK_NULL_CONTINUE(contentWrapper);
+        const auto& contentGeometry = contentWrapper->GetGeometryNode();
+        CHECK_NULL_CONTINUE(contentGeometry);
+        const auto edgeSize = contentGeometry->GetMarginFrameSize();
+        const auto spacing = ConvertToPx(edgeOptions->spacing, constraint->scaleProperty).value_or(0.0f);
+        switch (layoutProperty->GetResolvedSafeAreaInsetEdge(edge).edge) {
+            case SafeAreaInsetPhysicalEdge::TOP:
+                contribution.top = edgeSize.Height() + spacing;
+                break;
+            case SafeAreaInsetPhysicalEdge::RIGHT:
+                contribution.right = edgeSize.Width() + spacing;
+                break;
+            case SafeAreaInsetPhysicalEdge::BOTTOM:
+                contribution.bottom = edgeSize.Height() + spacing;
+                break;
+            case SafeAreaInsetPhysicalEdge::LEFT:
+                contribution.left = edgeSize.Width() + spacing;
+                break;
+        }
+    }
+    layoutProperty->UpdateSafeAreaInsetContribution(contribution);
+}
+
+void LayoutWrapper::LayoutSafeAreaInsetContainer(LayoutWrapper* insetContainer)
+{
+    CHECK_NULL_VOID(insetContainer);
+    auto layoutProperty = GetLayoutProperty();
+    auto geometryNode = GetGeometryNode();
+    CHECK_NULL_VOID(layoutProperty);
+    CHECK_NULL_VOID(geometryNode);
+    const auto& options = layoutProperty->GetSafeAreaInset();
+    CHECK_NULL_VOID(options);
+
+    const auto frameSize = geometryNode->GetFrameSize();
+    const auto outerSpace = layoutProperty->CreatePaddingAndBorder(false);
+    const auto left = outerSpace.left.value_or(0.0f);
+    const auto right = outerSpace.right.value_or(0.0f);
+    const auto top = outerSpace.top.value_or(0.0f);
+    const auto bottom = outerSpace.bottom.value_or(0.0f);
+    const SizeF trackSize(
+        std::max(frameSize.Width() - left - right, 0.0f),
+        std::max(frameSize.Height() - top - bottom, 0.0f));
+
+    const auto& containerGeometry = insetContainer->GetGeometryNode();
+    CHECK_NULL_VOID(containerGeometry);
+    containerGeometry->SetFrameSize(trackSize);
+    containerGeometry->SetMarginFrameOffset(OffsetF(left, top));
+
+    constexpr std::array<SafeAreaInsetEdge, SAFE_AREA_INSET_EDGE_COUNT> EDGES = {
+        SafeAreaInsetEdge::TOP, SafeAreaInsetEdge::END, SafeAreaInsetEdge::BOTTOM, SafeAreaInsetEdge::START };
+    for (const auto edge : EDGES) {
+        const auto& edgeOptions = options->GetEdge(edge);
+        if (!edgeOptions.has_value()) {
+            continue;
+        }
+        auto contentWrapper = GetSafeAreaInsetContentWrapper(insetContainer, edge);
+        CHECK_NULL_CONTINUE(contentWrapper);
+        const auto& contentGeometry = contentWrapper->GetGeometryNode();
+        CHECK_NULL_CONTINUE(contentGeometry);
+        const auto edgeSize = contentGeometry->GetMarginFrameSize();
+        float x = 0.0f;
+        float y = 0.0f;
+        const auto& resolved = layoutProperty->GetResolvedSafeAreaInsetEdge(edge);
+        if (resolved.edge == SafeAreaInsetPhysicalEdge::TOP || resolved.edge == SafeAreaInsetPhysicalEdge::BOTTOM) {
+            switch (resolved.alignment) {
+                case SafeAreaInsetAlignment::START:
+                    x = 0.0f;
+                    break;
+                case SafeAreaInsetAlignment::END:
+                    x = trackSize.Width() - edgeSize.Width();
+                    break;
+                case SafeAreaInsetAlignment::CENTER:
+                default:
+                    x = (trackSize.Width() - edgeSize.Width()) / 2.0f;
+                    break;
+            }
+            y = resolved.edge == SafeAreaInsetPhysicalEdge::TOP ? 0.0f : trackSize.Height() - edgeSize.Height();
+        } else {
+            switch (resolved.alignment) {
+                case SafeAreaInsetAlignment::START:
+                    y = 0.0f;
+                    break;
+                case SafeAreaInsetAlignment::END:
+                    y = trackSize.Height() - edgeSize.Height();
+                    break;
+                case SafeAreaInsetAlignment::CENTER:
+                default:
+                    y = (trackSize.Height() - edgeSize.Height()) / 2.0f;
+                    break;
+            }
+            const bool isPhysicalLeft = resolved.edge == SafeAreaInsetPhysicalEdge::LEFT;
+            x = isPhysicalLeft ? 0.0f : trackSize.Width() - edgeSize.Width();
+        }
+        contentGeometry->SetMarginFrameOffset(OffsetF(x, y));
+    }
+    insetContainer->Layout();
 }
 
 RefPtr<FrameNode> LayoutWrapper::GetHostNode() const

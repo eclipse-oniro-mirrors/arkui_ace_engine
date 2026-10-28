@@ -51,6 +51,7 @@ ace_unittest("pipeline_context_test_ng") {
     "$ace_root/test/mock/adapter/ohos/osal/mock_system_properties.cpp",
     "$ace_root/test/mock/adapter/ohos/osal/mock_trace_id_impl.cpp",
     "$ace_root/test/mock/adapter/ohos/osal/mock_view_data_wrap_ohos.cpp",
+    "$ace_root/test/mock/frameworks/base/display_manager/mock_display_manager.cpp",
     "$ace_root/test/mock/frameworks/base/i18n/mock_localization.cpp",
     "$ace_root/test/mock/frameworks/base/image/mock_image_perf.cpp",
     "$ace_root/test/mock/frameworks/base/image/mock_image_source.cpp",

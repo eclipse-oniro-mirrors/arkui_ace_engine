@@ -775,7 +775,7 @@ HWTEST_F(VideoStateMachinePatternTestNg, HandleSetPlaybackRateResult_Success001,
     ASSERT_TRUE(pattern);
 
     std::string errorMsg = "";
-    pattern->HandleSetPlaybackRateResult(1.0, ERROR_CODE_SUCCESS, errorMsg);
+    pattern->HandleSetPlaybackRateResult(pattern->mediaPlayer_, pattern->hostId_, 1.0, ERROR_CODE_SUCCESS, errorMsg);
 }
 
 /**
@@ -796,7 +796,7 @@ HWTEST_F(VideoStateMachinePatternTestNg, HandleSetPlaybackRateResult_InvalidVal0
     pattern->mediaPlayer_ = mockMediaPlayer;
 
     std::string errorMsg = "";
-    pattern->HandleSetPlaybackRateResult(1.0, ERROR_CODE_INVALID_VAL, errorMsg);
+    pattern->HandleSetPlaybackRateResult(mockMediaPlayer, pattern->hostId_, 1.0, ERROR_CODE_INVALID_VAL, errorMsg);
 }
 
 /**
@@ -812,7 +812,8 @@ HWTEST_F(VideoStateMachinePatternTestNg, HandleSetPlaybackRateResult_InvalidOper
     ASSERT_TRUE(pattern);
 
     std::string errorMsg = "";
-    pattern->HandleSetPlaybackRateResult(1.0, ERROR_CODE_INVALID_OPERATION, errorMsg);
+    pattern->HandleSetPlaybackRateResult(
+        pattern->mediaPlayer_, pattern->hostId_, 1.0, ERROR_CODE_INVALID_OPERATION, errorMsg);
 }
 
 /**
@@ -833,7 +834,7 @@ HWTEST_F(VideoStateMachinePatternTestNg, HandleSetPlaybackRateResult_Default001,
     pattern->mediaPlayer_ = mockMediaPlayer;
 
     std::string errorMsg = "";
-    pattern->HandleSetPlaybackRateResult(1.0, ERROR_CODE_UNKNOWN, errorMsg);
+    pattern->HandleSetPlaybackRateResult(mockMediaPlayer, pattern->hostId_, 1.0, ERROR_CODE_UNKNOWN, errorMsg);
 }
 
 

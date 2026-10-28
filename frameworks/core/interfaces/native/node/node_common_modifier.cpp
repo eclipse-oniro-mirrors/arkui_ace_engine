@@ -13,8 +13,11 @@
  * limitations under the License.
  */
 #include "core/interfaces/native/node/node_common_modifier.h"
+
+#include "base/log/log_wrapper.h"
 #include "core/common/container.h"
 
+#include "interfaces/native/node/native_type_visual_impl.h"
 #include "interfaces/native/node/node_model.h"
 
 #include "base/log/event_report.h"
@@ -2114,6 +2117,24 @@ void ResetBackShadow(ArkUINodeHandle node)
     ViewAbstract::SetBackShadow(frameNode, shadow);
 }
 
+void SetShadowClipMode(ArkUINodeHandle node, ArkUI_Int32 clipMode)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    if (clipMode < 0 || clipMode > static_cast<ArkUI_Int32>(ShadowClipMode::BOUNDS_SHAPE)) {
+        ViewAbstract::ResetShadowClipMode(frameNode);
+        return;
+    }
+    ViewAbstract::SetShadowClipMode(frameNode, static_cast<ShadowClipMode>(clipMode));
+}
+
+void ResetShadowClipMode(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    ViewAbstract::ResetShadowClipMode(frameNode);
+}
+
 void SetHitTestBehavior(ArkUINodeHandle node, uint32_t value)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
@@ -2868,6 +2889,28 @@ void ResetLinearGradientBlur(ArkUINodeHandle node)
     Dimension dimensionRadius(0.0f, DimensionUnit::PX);
     NG::LinearGradientBlurPara blurPara(dimensionRadius, fractionStops, GradientDirection::BOTTOM);
     ViewAbstract::SetLinearGradientBlur(frameNode, blurPara);
+}
+
+ArkUI_Bool GetLinearGradientBlur(ArkUINodeHandle node, OH_ArkUI_LinearGradientBlurOptions* options)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_RETURN(frameNode, false);
+    CHECK_NULL_RETURN(options, false);
+    auto renderContext = frameNode->GetRenderContext();
+    CHECK_NULL_RETURN(renderContext, false);
+    auto blurPara = renderContext->GetLinearGradientBlur();
+    if (!blurPara.has_value()) {
+        return false;
+    }
+    options->blurRadius = blurPara->blurRadius_.Value();
+    options->fractionStops.clear();
+    options->fractionStops.reserve(blurPara->fractionStops_.size() * NUM_2);
+    for (const auto& stop : blurPara->fractionStops_) {
+        options->fractionStops.push_back(stop.first);
+        options->fractionStops.push_back(stop.second);
+    }
+    options->direction = static_cast<OH_ArkUI_LinearGradientBlurDirection>(static_cast<int32_t>(blurPara->direction_));
+    return true;
 }
 
 void CheckBackgroundBlurStyleResObj(void* inactiveColorRawPtr, BlurStyleOption& bgBlurStyle)
@@ -9593,6 +9636,9 @@ ArkUI_Int32 PostTouchEvent(ArkUINodeHandle node, const ArkUITouchEvent* arkUITou
         TimeStamp downTime(downNanoseconds);
         point.downTime = downTime;
         point.force = touchPointes[index].pressure;
+        point.tiltX = static_cast<float>(touchPointes[index].tiltX);
+        point.tiltY = static_cast<float>(touchPointes[index].tiltY);
+        point.rollAngle = static_cast<float>(touchPointes[index].rollAngle);
         touchEvent.pointers.emplace_back(point);
     }
     touchEvent.id = arkUITouchEvent->actionTouchPoint.id;
@@ -11181,6 +11227,7 @@ ArkUI_Int32 SetOnTouchTestDoneCallback(ArkUINodeHandle node, void* userData,
         ArkUIGestureRecognizerHandleArray recognizerArray = nullptr;
         auto count = static_cast<int32_t>(recognizers.size());
         if (count <= 0) {
+            LOG_CALLBACK("OH_ArkUI_SetTouchTestDoneCallback", touchTestDone);
             touchTestDone(&arkUIGestureEvent, recognizerArray, count, userData);
             return;
         }
@@ -11193,7 +11240,10 @@ ArkUI_Int32 SetOnTouchTestDoneCallback(ArkUINodeHandle node, void* userData,
             recognizerArray[index] = NodeModifier::CreateGestureRecognizer(value.Upgrade());
             index++;
         }
-        touchTestDone(&arkUIGestureEvent, recognizerArray, count, userData);
+        {
+            LOG_CALLBACK("OH_ArkUI_SetTouchTestDoneCallback", touchTestDone);
+            touchTestDone(&arkUIGestureEvent, recognizerArray, count, userData);
+        }
         delete[] recognizerArray;
     };
     ViewAbstract::SetOnTouchTestDone(frameNode, callback);
@@ -12072,7 +12122,10 @@ const ArkUICommonModifier* GetCommonModifier()
         .setDoubleSided = SetDoubleSided,
         .resetDoubleSided = ResetDoubleSided,
         .getNextFocus = GetNextFocus,
-        .getFocusBoxStyle = GetFocusBoxStyle
+        .getFocusBoxStyle = GetFocusBoxStyle,
+        .getLinearGradientBlur = GetLinearGradientBlur,
+        .setShadowClipMode = SetShadowClipMode,
+        .resetShadowClipMode = ResetShadowClipMode,
     };
     CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
 

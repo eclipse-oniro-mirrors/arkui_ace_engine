@@ -1249,6 +1249,120 @@ HWTEST_F(DatePickerTestOne, LinearFontSize005, TestSize.Level1)
 }
 
 /**
+ * @tc.name: LinearFontSize006
+ * @tc.desc: Test DatePickerColumnPattern LinearFontSize with VP unit (non-PX, non-LPX) converted to PX
+ * @tc.type: FUNC
+ */
+HWTEST_F(DatePickerTestOne, LinearFontSize006, TestSize.Level1)
+{
+    CreateDatePickerColumnNode();
+    ASSERT_NE(columnPattern_, nullptr);
+
+    Dimension startFontSize(10.0, DimensionUnit::VP);
+    Dimension endFontSize(20.0, DimensionUnit::VP);
+    auto result = columnPattern_->LinearFontSize(startFontSize, endFontSize, 0.5);
+    EXPECT_EQ(result.Unit(), DimensionUnit::PX);
+    EXPECT_NEAR(result.Value(), 15.0, 0.01);
+}
+
+/**
+ * @tc.name: LinearFontSize008
+ * @tc.desc: Test DatePickerColumnPattern LinearFontSize with FP unit converted to PX
+ * @tc.type: FUNC
+ */
+HWTEST_F(DatePickerTestOne, LinearFontSize008, TestSize.Level1)
+{
+    CreateDatePickerColumnNode();
+    ASSERT_NE(columnPattern_, nullptr);
+
+    Dimension startFontSize(10.0, DimensionUnit::FP);
+    Dimension endFontSize(20.0, DimensionUnit::FP);
+    auto result = columnPattern_->LinearFontSize(startFontSize, endFontSize, 0.5);
+    EXPECT_EQ(result.Unit(), DimensionUnit::PX);
+    EXPECT_NEAR(result.Value(), 15.0, 0.01);
+}
+
+/**
+ * @tc.name: LinearFontSize009
+ * @tc.desc: Test DatePickerColumnPattern LinearFontSize start=LPX end=PX, only start converts
+ * @tc.type: FUNC
+ */
+HWTEST_F(DatePickerTestOne, LinearFontSize009, TestSize.Level1)
+{
+    CreateDatePickerColumnNode();
+    ASSERT_NE(columnPattern_, nullptr);
+    Dimension startFontSize(10.0, DimensionUnit::LPX);
+    Dimension endFontSize(20.0, DimensionUnit::PX);
+    auto result = columnPattern_->LinearFontSize(startFontSize, endFontSize, 0.5);
+    EXPECT_EQ(result.Unit(), DimensionUnit::PX);
+    EXPECT_NEAR(result.Value(), 15.0, 0.01);
+}
+
+/**
+ * @tc.name: LinearFontSize010
+ * @tc.desc: Test DatePickerColumnPattern LinearFontSize start=PX end=LPX, only end converts
+ * @tc.type: FUNC
+ */
+HWTEST_F(DatePickerTestOne, LinearFontSize010, TestSize.Level1)
+{
+    CreateDatePickerColumnNode();
+    ASSERT_NE(columnPattern_, nullptr);
+    Dimension startFontSize(10.0, DimensionUnit::PX);
+    Dimension endFontSize(20.0, DimensionUnit::LPX);
+    auto result = columnPattern_->LinearFontSize(startFontSize, endFontSize, 0.5);
+    EXPECT_EQ(result.Unit(), DimensionUnit::PX);
+    EXPECT_NEAR(result.Value(), 15.0, 0.01);
+}
+
+/**
+ * @tc.name: LinearFontSize011
+ * @tc.desc: Test DatePickerColumnPattern LinearFontSize start=LPX end=LPX, both convert
+ * @tc.type: FUNC
+ */
+HWTEST_F(DatePickerTestOne, LinearFontSize011, TestSize.Level1)
+{
+    CreateDatePickerColumnNode();
+    ASSERT_NE(columnPattern_, nullptr);
+    Dimension startFontSize(10.0, DimensionUnit::LPX);
+    Dimension endFontSize(20.0, DimensionUnit::LPX);
+    auto result = columnPattern_->LinearFontSize(startFontSize, endFontSize, 0.5);
+    EXPECT_EQ(result.Unit(), DimensionUnit::PX);
+    EXPECT_NEAR(result.Value(), 15.0, 0.01);
+}
+
+/**
+ * @tc.name: LinearFontSize012
+ * @tc.desc: Test DatePickerColumnPattern LinearFontSize start=PX end=PX, neither converts
+ * @tc.type: FUNC
+ */
+HWTEST_F(DatePickerTestOne, LinearFontSize012, TestSize.Level1)
+{
+    CreateDatePickerColumnNode();
+    ASSERT_NE(columnPattern_, nullptr);
+    Dimension startFontSize(10.0, DimensionUnit::PX);
+    Dimension endFontSize(20.0, DimensionUnit::PX);
+    auto result = columnPattern_->LinearFontSize(startFontSize, endFontSize, 0.5);
+    EXPECT_EQ(result.Unit(), DimensionUnit::PX);
+    EXPECT_NEAR(result.Value(), 15.0, 0.01);
+}
+
+/**
+ * @tc.name: LinearFontSize013
+ * @tc.desc: Test DatePickerColumnPattern LinearFontSize start=LPX end=LPX, percent>1 returns end
+ * @tc.type: FUNC
+ */
+HWTEST_F(DatePickerTestOne, LinearFontSize013, TestSize.Level1)
+{
+    CreateDatePickerColumnNode();
+    ASSERT_NE(columnPattern_, nullptr);
+    Dimension startFontSize(10.0, DimensionUnit::LPX);
+    Dimension endFontSize(20.0, DimensionUnit::LPX);
+    auto result = columnPattern_->LinearFontSize(startFontSize, endFontSize, 2.0);
+    EXPECT_EQ(result.Unit(), DimensionUnit::PX);
+    EXPECT_NEAR(result.Value(), 20.0, 0.01);
+}
+
+/**
  * @tc.name: ResetAlgorithmOffset001
  * @tc.desc: Test DatePickerColumnPattern ResetAlgorithmOffset
  * @tc.type: FUNC

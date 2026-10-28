@@ -16,6 +16,7 @@
 #include "node_component_snapshot.h"
 
 #include "node/node_model.h"
+#include "node/config_manager.h"
 #include "pixelmap_native_impl.h"
 
 #include "base/utils/utils.h"
@@ -29,6 +30,7 @@ extern "C" {
 
 ArkUI_SnapshotOptions* OH_ArkUI_CreateSnapshotOptions()
 {
+    CHECK_UI_THREAD("OH_ArkUI_CreateSnapshotOptions");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_INTERNAL_ERROR,
@@ -41,6 +43,7 @@ ArkUI_SnapshotOptions* OH_ArkUI_CreateSnapshotOptions()
 
 void OH_ArkUI_DestroySnapshotOptions(ArkUI_SnapshotOptions* snapshotOptions)
 {
+    CHECK_UI_THREAD("OH_ArkUI_DestroySnapshotOptions");
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     if (!impl) {
         SET_ERROR_MESSAGE(ARKUI_ERROR_CODE_INTERNAL_ERROR,
@@ -53,6 +56,7 @@ void OH_ArkUI_DestroySnapshotOptions(ArkUI_SnapshotOptions* snapshotOptions)
 
 int32_t OH_ArkUI_SnapshotOptions_SetScale(ArkUI_SnapshotOptions* snapshotOptions, float scale)
 {
+    CHECK_UI_THREAD("OH_ArkUI_SnapshotOptions_SetScale");
     CHECK_NULL_RETURN(snapshotOptions, ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID);
     if (!OHOS::Ace::GreatNotEqual(scale, 0.0)) {
         return ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID;
@@ -66,6 +70,7 @@ int32_t OH_ArkUI_SnapshotOptions_SetScale(ArkUI_SnapshotOptions* snapshotOptions
 
 int32_t OH_ArkUI_SnapshotOptions_SetColorMode(ArkUI_SnapshotOptions* snapshotOptions, int32_t colorSpace, bool isAuto)
 {
+    CHECK_UI_THREAD("OH_ArkUI_SnapshotOptions_SetColorMode");
     CHECK_NULL_RETURN(snapshotOptions, ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID);
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     CHECK_NULL_RETURN(impl, ARKUI_ERROR_CODE_INTERNAL_ERROR);
@@ -77,6 +82,7 @@ int32_t OH_ArkUI_SnapshotOptions_SetColorMode(ArkUI_SnapshotOptions* snapshotOpt
 int32_t OH_ArkUI_SnapshotOptions_SetDynamicRangeMode(
     ArkUI_SnapshotOptions* snapshotOptions, int32_t dynamicRangeMode, bool isAuto)
 {
+    CHECK_UI_THREAD("OH_ArkUI_SnapshotOptions_SetDynamicRangeMode");
     CHECK_NULL_RETURN(snapshotOptions, ArkUI_ErrorCode::ARKUI_ERROR_CODE_PARAM_INVALID);
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     CHECK_NULL_RETURN(impl, ARKUI_ERROR_CODE_INTERNAL_ERROR);
@@ -88,10 +94,12 @@ int32_t OH_ArkUI_SnapshotOptions_SetDynamicRangeMode(
 int32_t OH_ArkUI_GetNodeSnapshot(
     ArkUI_NodeHandle node, ArkUI_SnapshotOptions* snapshotOptions, OH_PixelmapNative** pixelmap)
 {
+    CHECK_UI_THREAD("OH_ArkUI_GetNodeSnapshot");
     CHECK_NULL_RETURN(node, ARKUI_ERROR_CODE_PARAM_INVALID);
     CHECK_NULL_RETURN(pixelmap, ARKUI_ERROR_CODE_PARAM_INVALID);
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();
     CHECK_NULL_RETURN(impl, ARKUI_ERROR_CODE_INTERNAL_ERROR);
+    CHECK_NODE_DISPOSED(node, "Node has been disposed");
     auto options = reinterpret_cast<ArkUISnapshotOptions*>(snapshotOptions);
     std::shared_ptr<OHOS::Media::PixelMap> tmpPixel;
     auto result = impl->getSnapshotAPI()->getSyncSnapshot(node->uiNodeHandle, options, &tmpPixel);
@@ -120,6 +128,7 @@ int32_t OH_ArkUI_GetNodeSnapshot(
 
 int32_t OH_ArkUI_GetNodeSnapshotSizeLimitation(int32_t* maxWidth, int32_t* maxHeight)
 {
+    CHECK_UI_THREAD("OH_ArkUI_GetNodeSnapshotSizeLimitation");
     CHECK_NULL_RETURN(maxWidth, ARKUI_ERROR_CODE_PARAM_INVALID);
     CHECK_NULL_RETURN(maxHeight, ARKUI_ERROR_CODE_PARAM_INVALID);
     const auto* impl = OHOS::Ace::NodeModel::GetFullImpl();

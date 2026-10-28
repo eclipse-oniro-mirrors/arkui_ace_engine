@@ -18,11 +18,11 @@
 
 #include "base/log/dump_log.h"
 #include "core/components/button/button_theme.h"
-#include "core/components_ng/token_theme/token_theme_wrapper.h"
+#include "core/components_ng/token_theme/token_theme.h"
 
 namespace OHOS::Ace::NG {
 
-class ButtonThemeWrapper : public ButtonTheme, public TokenThemeWrapper {
+class ButtonThemeWrapper : public ButtonTheme {
     DECLARE_ACE_TYPE(ButtonThemeWrapper, ButtonTheme);
 
 public:
@@ -31,7 +31,7 @@ public:
         WrapperBuilder() = default;
         ~WrapperBuilder() = default;
 
-        RefPtr<TokenThemeWrapper> BuildWrapper(const RefPtr<ThemeConstants> &themeConstants) const
+        RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants> &themeConstants) const
         {
             auto themeWrapper = AceType::Claim(new ButtonThemeWrapper());
             auto theme = AceType::DynamicCast<ButtonTheme>(themeWrapper);

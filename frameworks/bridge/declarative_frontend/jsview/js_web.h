@@ -91,7 +91,9 @@ public:
     static void OnScroll(const JSCallbackInfo& args);
     static void WebRotate(const JSCallbackInfo& args);
     static void BackgroundColor(const JSCallbackInfo& info);
+    static void CaretColor(const JSCallbackInfo& info);
     static void InitialScale(float scale);
+    static void FlingSpeedLimit(float speedLimit);
     static void Password(bool password);
     static void TableData(bool tableData);
     static void OnFileSelectorShowAbandoned(const JSCallbackInfo& args);
@@ -105,6 +107,7 @@ public:
     static void BindSelectionMenu(const JSCallbackInfo& info);
     static void OnContextMenuHide(const JSCallbackInfo& args);
     static void OnContextMenuShow(const JSCallbackInfo& args);
+    static void OnContextMenuUpdate(const JSCallbackInfo& args);
     static void OnSearchResultReceive(const JSCallbackInfo& args);
     static void MediaPlayGestureAccess(bool isNeedGestureAccess);
     static void OnKeyEvent(const JSCallbackInfo& args);
@@ -240,7 +243,9 @@ public:
     static void GestureFocusMode(int32_t gestureFocusMode);
     static void RotateRenderEffect(int32_t webRotateEffect);
     static void OnDetectedBlankScreen(const JSCallbackInfo& args);
+    static void OnMonitoredBlankScreen(const JSCallbackInfo& args);
     static void BlankScreenDetectionConfig(const JSCallbackInfo& args);
+    static void EnableBlankScreenMonitor(const JSCallbackInfo& args);
     static void OnFirstScreenPaint(const JSCallbackInfo& args);
     static void OnTextSelectionChange(const JSCallbackInfo& args);
     static void EnableImageAnalyzer(const JSCallbackInfo& args);

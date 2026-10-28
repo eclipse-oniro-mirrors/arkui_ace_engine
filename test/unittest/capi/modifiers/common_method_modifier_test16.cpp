@@ -333,6 +333,9 @@ public:
 
     static void TearDownTestCase()
     {
+        if (uiNode && *uiNode) {
+            (*uiNode)->DetachFromMainTree();
+        }
         MockContainer::Current()->SetTaskExecutor(nullptr);
         ModifierTestBase::TearDownTestCase();
     }

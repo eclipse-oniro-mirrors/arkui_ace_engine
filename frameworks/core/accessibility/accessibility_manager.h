@@ -199,7 +199,7 @@ private:
 };
 
 using VisibleRatioCallback = std::function<void(bool, double)>;
-class AccessibilityManager : public AceType {
+class AccessibilityManager : public virtual AceType {
     DECLARE_ACE_TYPE(AccessibilityManager, AceType);
 
 public:
@@ -281,7 +281,6 @@ public:
     virtual void SendExtensionAccessibilityEvent(
         const Accessibility::AccessibilityEventInfo& eventInfo, int64_t uiExtensionOffset) {}
 #endif
-#ifdef WEB_SUPPORTED
     virtual bool RegisterWebInteractionOperationAsChildTree(int64_t accessibilityId,
         const WeakPtr<NG::WebPattern>& webPattern)
     {
@@ -292,7 +291,6 @@ public:
     {
         return false;
     }
-#endif
     void SetVersion(AccessibilityVersion version)
     {
         version_ = version;
@@ -306,6 +304,12 @@ public:
         int64_t elementId, const std::shared_ptr<AccessibilityChildTreeCallback> &callback) {};
 
     virtual void DeregisterAccessibilityChildTreeCallback(int64_t elementId) {};
+
+    // CMP mixed-rendering: returns the accessibility manager that owns the given node.
+    virtual RefPtr<AccessibilityManager> GetAccessibilityManagerForNode(const RefPtr<NG::FrameNode>& node)
+    {
+        return Claim(this);
+    }
 
     virtual void RegisterInteractionOperationAsChildTree(
         uint32_t parentWindowId, int32_t parentTreeId, int64_t parentElementId) {};

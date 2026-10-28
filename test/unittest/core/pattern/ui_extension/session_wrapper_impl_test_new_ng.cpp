@@ -25,7 +25,7 @@
 #include "core/components_ng/pattern/ui_extension/ui_extension_component/session_wrapper_impl.h"
 #include "core/components_ng/pattern/ui_extension/ui_extension_component/ui_extension_pattern.h"
 #include "core/components_ng/pattern/ui_extension/ui_extension_component/ui_extension_proxy.h"
-#include "core/components_ng/pattern/ui_extension/ui_extension_config.h"
+#include "core/components_ng/pattern/ui_extension/ui_extension_utils.h"
 #include "core/components_ng/pattern/ui_extension/ui_extension_model.h"
 #include "core/components_ng/pattern/ui_extension/ui_extension_model_ng.h"
 #include "core/event/ace_events.h"
@@ -69,6 +69,17 @@
 using namespace testing;
 using namespace testing::ext;
 
+namespace OHOS::Rosen {
+// libwm hides its compiler-generated virtual destructor thunks, so a test-defined ExtensionSession
+// subclass cannot link against the construction vtable unless the key function is defined locally
+// (same as mock_extension_session.cpp in the security/preview test targets).
+ExtensionSession::~ExtensionSession()
+{
+    channelListener_ = nullptr;
+    channelDeath_ = nullptr;
+}
+} // namespace OHOS::Rosen
+
 namespace OHOS::Ace::NG {
 namespace {
     const std::string UI_EXTENSION_COMPONENT_ETS_TAG = "UIExtensionComponent";
@@ -76,6 +87,45 @@ namespace {
     const std::string EMBEDDED_UI("embeddedUI");
     const char UIEXTENSION_HOST_UICONTENT_ALLOW_CROSS_PROCESS_NESTING[] =
         "ohos.ace.uiextension.allowCrossProcessNesting";
+
+    // Records parameters of UpdateRectWithLayoutInfo called by SessionWrapperImpl notify paths.
+    struct UpdateRectWithLayoutInfoRecord {
+        bool called = false;
+        Rosen::WSRect rect;
+        Rosen::SizeChangeReason reason = Rosen::SizeChangeReason::UNDEFINED;
+        std::string updateReason;
+        std::map<Rosen::AvoidAreaType, Rosen::AvoidArea> avoidAreas;
+        bool registerCallback = false;
+
+        void Reset()
+        {
+            called = false;
+            rect = {};
+            reason = Rosen::SizeChangeReason::UNDEFINED;
+            updateReason.clear();
+            avoidAreas.clear();
+            registerCallback = false;
+        }
+    };
+    UpdateRectWithLayoutInfoRecord g_updateRectWithLayoutInfoRecord;
+
+    class UpdateRectSession : public Rosen::ExtensionSession {
+    public:
+        explicit UpdateRectSession(const Rosen::SessionInfo& info) : ExtensionSession(info) {}
+
+        Rosen::WSError UpdateRectWithLayoutInfo(const Rosen::WSRect& rect, Rosen::SizeChangeReason reason,
+            const std::string& updateReason, const std::shared_ptr<Rosen::RSTransaction>& rsTransaction,
+            const std::map<Rosen::AvoidAreaType, Rosen::AvoidArea>& avoidAreas, bool registerCallback) override
+        {
+            g_updateRectWithLayoutInfoRecord.called = true;
+            g_updateRectWithLayoutInfoRecord.rect = rect;
+            g_updateRectWithLayoutInfoRecord.reason = reason;
+            g_updateRectWithLayoutInfoRecord.updateReason = updateReason;
+            g_updateRectWithLayoutInfoRecord.avoidAreas = avoidAreas;
+            g_updateRectWithLayoutInfoRecord.registerCallback = registerCallback;
+            return Rosen::WSError::WS_OK;
+        }
+    };
 } // namespace
 
 #ifdef WINDOW_SCENE_SUPPORTED
@@ -700,6 +750,170 @@ HWTEST_F(SessionWrapperImplNewTestNg, SessionWrapperImplNewTestNg014, TestSize.L
     sessionWrapper->sessionType_ = SessionType::UI_EXTENSION_ABILITY;
     sessionWrapper->CreateSession(want, config);
     EXPECT_EQ(parentWindowType, container->GetWindowType());
+}
+
+/**
+ * @tc.name: SessionWrapperImplNewDpiWhitelist001
+ * @tc.desc: Test CreateSession composes dpiFollowStrategy_ and derived effective value (VM-3/VM-10).
+ * @tc.type: FUNC
+ */
+HWTEST_F(SessionWrapperImplNewTestNg, SessionWrapperImplNewDpiWhitelist001, TestSize.Level1)
+{
+    auto sessionWrapper = GenerateSessionWrapperImpl();
+    auto pattern = sessionWrapper->hostPattern_.Upgrade();
+    ASSERT_NE(pattern, nullptr);
+    AAFwk::Want want;
+    SessionConfig config;
+    sessionWrapper->sessionType_ = SessionType::UI_EXTENSION_ABILITY;
+    auto pipeline = MockPipelineContext::GetCurrentContext();
+    ASSERT_NE(pipeline, nullptr);
+
+    /**
+     * @tc.steps: step1. developer strategy not configured, host strategy not set (default)
+     * @tc.expected: config carries default strategy, effective value is default
+     */
+    pipeline->SetUIExtensionDensityFollowHost(DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
+    pattern->SetDpiFollowStrategy(DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI, false);
+    sessionWrapper->CreateSession(want, config);
+    EXPECT_EQ(pattern->GetSessionViewportConfig().dpiFollowStrategy_,
+        DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
+    EXPECT_EQ(pattern->GetEffectiveDpiFollowStrategy(), DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
+
+    /**
+     * @tc.steps: step2. developer strategy not configured, host strategy FOLLOW_HOST_DPI_ALL (whitelist)
+     * @tc.expected: effective value follows the host saved strategy
+     */
+    pipeline->SetUIExtensionDensityFollowHost(DpiFollowStrategy::FOLLOW_HOST_DPI_ALL);
+    sessionWrapper->CreateSession(want, config);
+    EXPECT_EQ(pattern->GetSessionViewportConfig().dpiFollowStrategy_, DpiFollowStrategy::FOLLOW_HOST_DPI_ALL);
+    EXPECT_EQ(pattern->GetEffectiveDpiFollowStrategy(), DpiFollowStrategy::FOLLOW_HOST_DPI_ALL);
+
+    /**
+     * @tc.steps: step3. developer strategy FOLLOW_HOST_DPI, host strategy FOLLOW_HOST_DPI_ALL
+     * @tc.expected: developer-configured strategy takes precedence over host strategy
+     */
+    pattern->SetDpiFollowStrategy(DpiFollowStrategy::FOLLOW_HOST_DPI);
+    sessionWrapper->CreateSession(want, config);
+    EXPECT_EQ(pattern->GetSessionViewportConfig().dpiFollowStrategy_, DpiFollowStrategy::FOLLOW_HOST_DPI);
+    EXPECT_EQ(pattern->GetEffectiveDpiFollowStrategy(), DpiFollowStrategy::FOLLOW_HOST_DPI);
+
+    /**
+     * @tc.steps: step4. developer strategy FOLLOW_HOST_DPI_ALL, host strategy default
+     * @tc.expected: developer-configured strategy takes precedence over default
+     */
+    pipeline->SetUIExtensionDensityFollowHost(DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
+    pattern->SetDpiFollowStrategy(DpiFollowStrategy::FOLLOW_HOST_DPI_ALL);
+    sessionWrapper->CreateSession(want, config);
+    EXPECT_EQ(pattern->GetSessionViewportConfig().dpiFollowStrategy_, DpiFollowStrategy::FOLLOW_HOST_DPI_ALL);
+    EXPECT_EQ(pattern->GetEffectiveDpiFollowStrategy(), DpiFollowStrategy::FOLLOW_HOST_DPI_ALL);
+
+    /**
+     * @tc.steps: step5. developer strategy not configured, host strategy replaced with FOLLOW_HOST_DPI
+     * @tc.expected: saved value is replaced by the passed one and becomes the effective strategy
+     */
+    pattern->SetDpiFollowStrategy(DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI, false);
+    pipeline->SetUIExtensionDensityFollowHost(DpiFollowStrategy::FOLLOW_HOST_DPI);
+    sessionWrapper->CreateSession(want, config);
+    EXPECT_EQ(pattern->GetSessionViewportConfig().dpiFollowStrategy_, DpiFollowStrategy::FOLLOW_HOST_DPI);
+    EXPECT_EQ(pattern->GetEffectiveDpiFollowStrategy(), DpiFollowStrategy::FOLLOW_HOST_DPI);
+    EXPECT_EQ(pattern->GetDpiFollowStrategy(), DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
+
+    /**
+     * @tc.steps: step6. developer explicitly configured the default strategy (opt-out), host FOLLOW_HOST_DPI_ALL
+     * @tc.expected: developer explicit configuration takes precedence, effective value is the default strategy
+     */
+    pipeline->SetUIExtensionDensityFollowHost(DpiFollowStrategy::FOLLOW_HOST_DPI_ALL);
+    pattern->SetDpiFollowStrategy(DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI, true);
+    sessionWrapper->CreateSession(want, config);
+    EXPECT_EQ(pattern->GetEffectiveDpiFollowStrategy(), DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
+}
+
+/**
+ * @tc.name: SessionWrapperImplNewParseDpiFollowStrategy001
+ * @tc.desc: Test ParseDpiFollowStrategy maps raw strategy values to enum with default fallback.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SessionWrapperImplNewTestNg, SessionWrapperImplNewParseDpiFollowStrategy001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. valid enum values (dts DpiFollowStrategy members)
+     * @tc.expected: mapped to corresponding native strategy
+     */
+    EXPECT_EQ(ParseDpiFollowStrategy(DTS_FOLLOW_HOST_DPI), DpiFollowStrategy::FOLLOW_HOST_DPI);
+    EXPECT_EQ(ParseDpiFollowStrategy(DTS_FOLLOW_UI_EXTENSION_ABILITY_DPI),
+        DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
+    EXPECT_EQ(ParseDpiFollowStrategy(DTS_FOLLOW_HOST_DPI_ALL), DpiFollowStrategy::FOLLOW_HOST_DPI_ALL);
+
+    /**
+     * @tc.steps: step2. invalid values (unset static frontend default -1, out-of-range)
+     * @tc.expected: fall back to default provider strategy
+     */
+    EXPECT_EQ(ParseDpiFollowStrategy(DTS_DPI_FOLLOW_STRATEGY_UNSET),
+        DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
+    EXPECT_EQ(ParseDpiFollowStrategy(DTS_FOLLOW_HOST_DPI_ALL + 1), DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
+}
+
+/**
+ * @tc.name: SessionWrapperImplNewConvertFromRosenDpiFollowStrategy001
+ * @tc.desc: Test ConvertFromRosenDpiFollowStrategy maps Rosen strategy values to native enum
+ *           with default fallback (mirrors window_manager wm_layout_common.h values).
+ * @tc.type: FUNC
+ */
+HWTEST_F(SessionWrapperImplNewTestNg, SessionWrapperImplNewConvertFromRosenDpiFollowStrategy001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. valid Rosen enum values (NONE = 0, FOLLOW_HOST_DPI_UEA = 1, FOLLOW_HOST_DPI_ALL = 2)
+     * @tc.expected: mapped to corresponding native strategy
+     */
+    EXPECT_EQ(ConvertFromRosenDpiFollowStrategy(static_cast<Rosen::DpiFollowStrategy>(ROSEN_NONE)),
+        DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
+    EXPECT_EQ(ConvertFromRosenDpiFollowStrategy(static_cast<Rosen::DpiFollowStrategy>(ROSEN_FOLLOW_HOST_DPI_UEA)),
+        DpiFollowStrategy::FOLLOW_HOST_DPI);
+    EXPECT_EQ(ConvertFromRosenDpiFollowStrategy(static_cast<Rosen::DpiFollowStrategy>(ROSEN_FOLLOW_HOST_DPI_ALL)),
+        DpiFollowStrategy::FOLLOW_HOST_DPI_ALL);
+
+    /**
+     * @tc.steps: step2. invalid value (out-of-range)
+     * @tc.expected: fall back to default provider strategy
+     */
+    EXPECT_EQ(ConvertFromRosenDpiFollowStrategy(static_cast<Rosen::DpiFollowStrategy>(ROSEN_FOLLOW_HOST_DPI_ALL + 1)),
+        DpiFollowStrategy::FOLLOW_UI_EXTENSION_ABILITY_DPI);
+}
+
+/**
+ * @tc.name: SessionWrapperImplNewDpiWhitelist003
+ * @tc.desc: Test UEC in UIExtension subwindow and EC in UIExtension window both keep FORBID_CASCADE guard (VM-7/VM-8).
+ * @tc.type: FUNC
+ */
+HWTEST_F(SessionWrapperImplNewTestNg, SessionWrapperImplNewDpiWhitelist003, TestSize.Level1)
+{
+    auto sessionWrapper = GenerateSessionWrapperImpl();
+    auto pattern = sessionWrapper->hostPattern_.Upgrade();
+    ASSERT_NE(pattern, nullptr);
+    int32_t errorCode = 0;
+    pattern->SetOnErrorCallback(
+        [&errorCode](int32_t code, const std::string& name, const std::string& message) { errorCode = code; });
+    AAFwk::Want want;
+    SessionConfig config;
+
+    /**
+     * @tc.steps: step1. UEC created in UIExtension ability host subwindow (mock instanceId 4 injects flags)
+     * @tc.expected: FORBID_CASCADE error 100013 still fired (nesting restriction kept, relaxation reverted)
+     */
+    sessionWrapper->instanceId_ = 4;
+    sessionWrapper->sessionType_ = SessionType::UI_EXTENSION_ABILITY;
+    sessionWrapper->CreateSession(want, config);
+    EXPECT_EQ(errorCode, 100013);
+
+    /**
+     * @tc.steps: step2. EC created in UIExtension window (mock IsUIExtensionWindow returns true)
+     * @tc.expected: FORBID_CASCADE error 100013 still fired (EC guard remains)
+     */
+    errorCode = 0;
+    sessionWrapper->instanceId_ = 3;
+    sessionWrapper->sessionType_ = SessionType::EMBEDDED_UI_EXTENSION;
+    sessionWrapper->CreateSession(want, config);
+    EXPECT_EQ(errorCode, 100013);
 }
 
 /**
@@ -1627,5 +1841,61 @@ HWTEST_F(SessionWrapperImplNewTestNg, SessionWrapperImplNewTestNg047, TestSize.L
     sessionWrapper->foregroundCallback_(OHOS::Rosen::WSError::WS_DO_NOTHING, 100);
     EXPECT_FALSE(isAbilityErrorCodeCallbackInvoked);
     EXPECT_FALSE(isErrorCallbackInvoked);
+}
+
+/**
+ * @tc.name: SessionWrapperImplNewTestNg048
+ * @tc.desc: Test NotifyOriginAvoidArea forwards avoid areas and register-callback flag to session
+ * @tc.type: FUNC
+ */
+HWTEST_F(SessionWrapperImplNewTestNg, SessionWrapperImplNewTestNg048, TestSize.Level1)
+{
+    auto sessionWrapper = GenerateSessionWrapperImpl();
+    Rosen::SessionInfo sessionInfo;
+    sessionWrapper->session_ = new UpdateRectSession(sessionInfo);
+    RectF displayArea(10.5f, 20.4f, 300.6f, 400.2f);
+    sessionWrapper->displayArea_ = displayArea;
+
+    Rosen::AvoidArea systemAvoidArea;
+    systemAvoidArea.topRect_ = { 0, 100, 720, 100 };
+    systemAvoidArea.bottomRect_ = { 0, 800, 720, 100 };
+    auto avoidAreaType = Rosen::AvoidAreaType::TYPE_SYSTEM;
+    auto& record = g_updateRectWithLayoutInfoRecord;
+
+    /**
+     * @tc.steps: step1. NotifyOriginAvoidArea should update session rect with avoid areas
+     * and enable the register callback flag
+     */
+    record.Reset();
+    sessionWrapper->NotifyOriginAvoidArea(systemAvoidArea,
+        static_cast<uint32_t>(avoidAreaType), WindowSizeChangeReason::UNDEFINED);
+    ASSERT_TRUE(record.called);
+    EXPECT_EQ(record.reason, Rosen::SizeChangeReason::AVOID_AREA_CHANGE);
+    EXPECT_EQ(record.updateReason, "NotifyOriginAvoidArea");
+    EXPECT_TRUE(record.registerCallback);
+    EXPECT_EQ(record.rect.posX_, 11);
+    EXPECT_EQ(record.rect.posY_, 20);
+    EXPECT_EQ(record.rect.width_, 301);
+    EXPECT_EQ(record.rect.height_, 400);
+    auto avoidAreaIt = record.avoidAreas.find(avoidAreaType);
+    ASSERT_NE(avoidAreaIt, record.avoidAreas.end());
+    EXPECT_TRUE(avoidAreaIt->second == systemAvoidArea);
+
+    /**
+     * @tc.steps: step2. rotation reasons should skip the avoid area notification
+     */
+    record.Reset();
+    sessionWrapper->NotifyOriginAvoidArea(systemAvoidArea,
+        static_cast<uint32_t>(avoidAreaType), WindowSizeChangeReason::ROTATION);
+    EXPECT_FALSE(record.called);
+
+    /**
+     * @tc.steps: step3. null session should not update rect
+     */
+    record.Reset();
+    sessionWrapper->session_ = nullptr;
+    sessionWrapper->NotifyOriginAvoidArea(systemAvoidArea,
+        static_cast<uint32_t>(avoidAreaType), WindowSizeChangeReason::UNDEFINED);
+    EXPECT_FALSE(record.called);
 }
 } // namespace OHOS::Ace::NG

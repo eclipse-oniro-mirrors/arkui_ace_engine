@@ -38,13 +38,33 @@ void ScrollableController::ScrollToIndex(
     pattern->ScrollToIndex(index, smooth, align, extraOffset);
 }
 
+void ScrollableController::ScrollToIndexWithOptions(int32_t index, bool smooth, ScrollAlign align,
+    std::optional<float> extraOffset, FastScrollMode mode)
+{
+    if (!IsFastScrollEnabled(mode) || !smooth) {
+        ScrollToIndex(index, smooth, align, extraOffset);
+        return;
+    }
+    auto pattern = scroll_.Upgrade();
+    CHECK_NULL_VOID(pattern);
+    CHECK_NULL_VOID(pattern->SupportScrollToIndex());
+    if (align == ScrollAlign::NONE) {
+        align = pattern->GetDefaultScrollAlign();
+    }
+    auto host = pattern->GetHost();
+    CHECK_NULL_VOID(host);
+    FREE_NODE_CHECK(host, ScrollToIndexWithOptions, index, smooth, align, extraOffset, mode);
+    pattern->SetAccessibilityScrollSource(AccessibilityScrollSource::API);
+    pattern->ScrollToIndexFastScroll(index, smooth, align, extraOffset, mode);
+}
+
 bool ScrollableController::AnimateTo(
     const Dimension& position, float duration, const RefPtr<Curve>& curve, bool smooth, bool canOverScroll)
 {
     auto pattern = scroll_.Upgrade();
     CHECK_NULL_RETURN(pattern, false);
     auto host = pattern->GetHost();
-    // call AnimateToMultiThread by multi thread
+    // call AnimateToMultiThread by multiple threads
     FREE_NODE_CHECK(host, AnimateTo, position, duration, curve, smooth, canOverScroll);
     CHECK_NULL_RETURN(host, false);
     if (pattern->GetAxis() != Axis::NONE) {
@@ -57,7 +77,7 @@ bool ScrollableController::AnimateTo(
                 "ScrollTo with animation, position:%f, duration:%f, smooth:%u, canOverScroll:%u, id:%d, tag:%s",
                 position.ConvertToPx(), duration, smooth, canOverScroll,
                 static_cast<int32_t>(host->GetAccessibilityId()), host->GetTag().c_str());
-            pattern->AnimateTo(position.ConvertToPx(), duration, curve, smooth, canOverScroll);
+            pattern->AnimateToFromController(position.ConvertToPx(), duration, curve, smooth, canOverScroll);
         } else {
             ACE_SCOPED_TRACE("ScrollTo without animation, position:%f, id:%d, tag:%s", position.ConvertToPx(),
                 static_cast<int32_t>(host->GetAccessibilityId()), host->GetTag().c_str());
@@ -73,6 +93,13 @@ void ScrollableController::SetCanStayOverScroll(bool canStayOverScroll)
     auto pattern = scroll_.Upgrade();
     CHECK_NULL_VOID(pattern);
     pattern->SetCanStayOverScroll(canStayOverScroll);
+}
+
+ScrollState ScrollableController::GetScrollState() const
+{
+    auto pattern = scroll_.Upgrade();
+    CHECK_NULL_RETURN(pattern, ScrollState::IDLE);
+    return pattern->GetScrollStateForQuery();
 }
 
 Offset ScrollableController::GetCurrentOffset() const
@@ -116,6 +143,7 @@ void ScrollableController::ScrollBy(double pixelX, double pixelY, bool smooth)
         return;
     }
     pattern->SetIsOverScroll(false);
+    pattern->ScheduleCapiScrollCommand(false, true);
     pattern->UpdateCurrentOffset(static_cast<float>(-offset), SCROLL_FROM_JUMP);
 }
 
@@ -202,6 +230,7 @@ void ScrollableController::ScrollPage(bool reverse, bool smooth)
         pattern->StopAnimate();
         ACE_SCOPED_TRACE("ScrollPage without animation, offset:%f, id:%d, tag:%s", offset,
             static_cast<int32_t>(host->GetAccessibilityId()), host->GetTag().c_str());
+        pattern->ScheduleCapiScrollCommand(false);
         pattern->UpdateCurrentOffset(offset, SCROLL_FROM_JUMP);
     }
 }

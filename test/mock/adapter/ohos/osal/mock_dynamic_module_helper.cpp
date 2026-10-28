@@ -14,6 +14,9 @@
  */
 
 #include "core/common/dynamic_module_helper.h"
+#include "test/mock/frameworks/core/common/mock_canvas_dynamic_module.h"
+#include "test/mock/frameworks/core/common/mock_swiper_dynamic_module.h"
+#include "test/mock/frameworks/core/common/mock_tabs_dynamic_module.h"
 
 namespace OHOS::Ace {
 
@@ -30,6 +33,20 @@ std::unique_ptr<ComponentLoader> DynamicModuleHelper::GetLoaderByName(const char
 
 DynamicModule* DynamicModuleHelper::GetDynamicModule(const std::string& name)
 {
+#ifdef MOCK_DYNAMIC_MODULE_COMPONENTS
+    static MockSwiperDynamicModule swiperModule;
+    static MockTabsDynamicModule tabsModule;
+    static MockCanvasDynamicModule canvasModule;
+    if (name == "Swiper") {
+        return &swiperModule;
+    }
+    if (name == "TabContent") {
+        return &tabsModule;
+    }
+    if (name == "Canvas") {
+        return &canvasModule;
+    }
+#endif
     return nullptr;
 }
 

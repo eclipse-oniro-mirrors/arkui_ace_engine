@@ -17,6 +17,7 @@
 #define TEST_MOCK_ADAPTER_MOCK_UI_SESSION_MANAGER_H
 
 #include "interfaces/inner_api/ui_session/ui_session_manager.h"
+#include "interfaces/inner_api/ui_session/component_tree_query_type.h"
 
 #include "gmock/gmock.h"
 
@@ -26,12 +27,17 @@ public:
     MockUiSessionManager() = default;
     ~MockUiSessionManager() override = default;
 
+    MOCK_METHOD3(NotifySendCommandPatternWithResult,
+        void(int32_t, const std::string&, const CommandResultCallback&));
+    MOCK_METHOD2(SendCommandWithResult, void(const std::string&, const CommandResultCallback&));
+    MOCK_METHOD2(MakeCommandResultCallback, CommandResultCallback(int32_t, uint64_t));
     MOCK_METHOD2(OnRouterChange, void(const std::string& path, const std::string& event));
     MOCK_METHOD0(GetSelectTextEventRegistered, bool());
     MOCK_METHOD2(ReportContentChangeEvent, void(ChangeType type, const std::string& simpleTree));
     MOCK_METHOD0(GetPageSceneRulesRegistered, bool());
     MOCK_METHOD0(NotifyPageSceneContentChanged, void());
     MOCK_METHOD0(FlushPageSceneNodeChanged, void());
+    MOCK_METHOD0(FlushPendingSearchClicksIfStable, void());
     MOCK_METHOD0(GetComponentChangeEventRegistered, bool());
     MOCK_METHOD3(SendPageTextToAI, void(int32_t nodeId, const std::string& text, int64_t version));
     MOCK_METHOD1(GetPageTranslateText, int32_t(const std::string& request));
@@ -40,6 +46,10 @@ public:
     MOCK_METHOD1(ResetPageTranslate, void(int32_t nodeId));
     MOCK_METHOD1(SendPageTranslateResult, void(const std::string& result));
     MOCK_METHOD2(GetCurrentAbilityLanguageInfo, int32_t(std::string&, std::string&));
+    MOCK_METHOD2(SaveProcessId, void(std::string key, int32_t id));
+    MOCK_METHOD1(GetInspectorTree, void(ParamConfig config));
+    MOCK_METHOD1(GetVisibleInspectorTree, void(ParamConfig config));
+    MOCK_METHOD1(ComponentTreeQuery, void(const ComponentTreeQueryRequest& request));
 };
 }
 #endif

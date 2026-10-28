@@ -15,6 +15,8 @@
 
 #include "core/components_ng/pattern/menu/wrapper/menu_wrapper_pattern.h"
 
+#include "core/components_ng/pattern/overlay/overlay_content_change_report.h"
+
 #include "base/log/dump_log.h"
 #include "base/subwindow/subwindow_manager.h"
 #include "base/utils/multi_thread.h"
@@ -547,11 +549,13 @@ void MenuWrapperPattern::ShowSubMenuDisappearAnimation(const RefPtr<FrameNode>& 
                 if (wrapperPattern) {
                     wrapperPattern->SendToAccessibility(subMenu, false);
                 }
+                ReportCapiSubMenuEvent(DynamicCast<FrameNode>(subMenu), false);
                 host->RemoveChild(subMenu);
                 host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF_AND_CHILD);
             }, nullptr, host->GetContextRefPtr());
     } else {
         SendToAccessibility(subMenu, false);
+        ReportCapiSubMenuEvent(DynamicCast<FrameNode>(subMenu), false);
         host->RemoveChild(subMenu);
         host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE_SELF_AND_CHILD);
     }

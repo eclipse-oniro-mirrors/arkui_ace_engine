@@ -16,6 +16,10 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_OVERLAY_DIALOG_MANAGER_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_OVERLAY_DIALOG_MANAGER_H
 
+#include <mutex>
+#include <shared_mutex>
+#include <string>
+
 #include "base/utils/singleton.h"
 #include "core/components_ng/pattern/overlay/overlay_manager.h"
 #include "core/components/dialog/dialog_theme.h"
@@ -51,17 +55,20 @@ public:
 
     void SetDismissDialogInfo(int32_t id, const std::string& name)
     {
+        std::unique_lock<std::shared_mutex> lock(dismissMutex_);
         dismissDialogId_ = id;
         dialogTag_ = name;
     }
 
     int32_t GetDismissDialogId() const
     {
+        std::shared_lock<std::shared_mutex> lock(dismissMutex_);
         return dismissDialogId_;
     }
 
-    std::string& GetDialogTag()
+    std::string GetDialogTag()
     {
+        std::shared_lock<std::shared_mutex> lock(dismissMutex_);
         return dialogTag_;
     }
 
@@ -70,6 +77,7 @@ public:
 private:
     int32_t dismissDialogId_ = 0;
     std::string dialogTag_;
+    mutable std::shared_mutex dismissMutex_;
 };
 } // namespace OHOS::Ace::NG
 #endif // FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_OVERLAY_DIALOG_MANAGER_H

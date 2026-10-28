@@ -720,6 +720,7 @@ public:
     bool IsSceneBoardEnabled() override;
     bool IsMainWindow() const override;
     bool IsSubWindow() const override;
+    bool IsPipWindow() const override;
     bool IsDialogWindow() const override;
     bool IsSystemWindow() const override;
     bool IsHostMainWindow() const override;
@@ -928,6 +929,10 @@ public:
     {
         foldStatusFromListener_ = GetCurrentFoldStatus();
     }
+
+    void RefreshLiveFoldCreaseRegion() override;
+
+    void RefreshFoldCreaseDirection() override;
 
     void DispatchExtensionDataToHostWindow(uint32_t code, const AAFwk::Want& data, int32_t persistentId);
 

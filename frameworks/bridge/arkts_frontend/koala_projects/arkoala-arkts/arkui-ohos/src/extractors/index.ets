@@ -14,6 +14,7 @@
  */
 
 import { int32 } from "@koalaui/common";
+import { ScrollSnapOffsetProvider, ScrollSnapOffsetProviderProxy } from '../component/scrollCommon';
 import { KPointer, nullptr, MaterializedBaseTag } from '@koalaui/interop';
 import { default as image } from "@ohos.multimedia.image";
 import { ColorMetrics, DrawContext, LengthMetrics, LengthUnit, LengthMetricsUnit, Size } from "arkui.Graphics";
@@ -123,6 +124,26 @@ import { XComponentControllerWrapper } from '../component/idlize'
 import { LengthMetricsProxy } from '../component/idlize'
 
 export namespace extractors {
+  export function transform_Ark_ScrollSnapOffsetProvider_to_Ark_ScrollSnapOffsetProviderProxy(
+    provider: ScrollSnapOffsetProvider): ScrollSnapOffsetProviderProxy {
+    return {
+      calculateApproachOffset: (velocity: double, decayOffset: double): double => {
+        try {
+          return provider.calculateApproachOffset(velocity, decayOffset);
+        } catch (error) {
+          return Double.NaN;
+        }
+      },
+      calculateSnapOffset: (velocity: double): double => {
+        try {
+          return provider.calculateSnapOffset(velocity);
+        } catch (error) {
+          return Double.NaN;
+        }
+      }
+    };
+  }
+
   export function toImagePixelMapPtr(value: image.PixelMap): KPointer {
     return ArkUIAniModule._Extractors_ToImagePixelMapPtr(value);
   }

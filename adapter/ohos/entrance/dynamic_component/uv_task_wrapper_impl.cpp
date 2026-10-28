@@ -180,6 +180,21 @@ void UVTaskWrapperImpl::Call(
     Call(callInWorkerTask, priorityType);
 }
 
+void UVTaskWrapperImpl::PostTaskToWorker(napi_env env, const TaskExecutor::Task& task)
+{
+    if (env == nullptr) {
+        LOGE("env is null");
+        return;
+    }
+    napi_status status = napi_send_event(env, [task]() {
+        ContainerScope scope(ContainerScope::CurrentLocalId());
+        task();
+    }, napi_eprio_high);
+    if (status != napi_ok) {
+        LOGE("napi_send_event failed, status: %{public}d", status);
+    }
+}
+
 void UVTaskWrapperImpl::CallInWorker(const TaskExecutor::Task& task, uint32_t delayTime, napi_env env)
 {
     LOGD("CallInWorker delayTime: %{public}u", delayTime);

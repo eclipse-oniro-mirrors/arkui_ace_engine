@@ -14,6 +14,8 @@
  */
 
 #include "core/components_ng/pattern/menu/menu_item/menu_item_pattern.h"
+
+#include "core/components_ng/pattern/overlay/overlay_content_change_report.h"
 #include "core/accessibility/accessibility_manager.h"
 #include "core/components_ng/pattern/menu/menu_item/menu_item_model_ng.h"
 
@@ -480,14 +482,12 @@ void MenuItemPattern::SetFocusStyle()
     CHECK_NULL_VOID(host);
     auto renderContext = host->GetRenderContext();
     CHECK_NULL_VOID(renderContext);
-    auto&& graphics = renderContext->GetOrCreateGraphics();
-    CHECK_NULL_VOID(graphics);
     if (!selectTheme_->GetoptionApplyFocusedStyle()) {
         return;
     }
 
     Shadow shadow = Shadow::CreateShadow(static_cast<ShadowStyle>(NONE_SHADOW_VALUE));
-    if (!graphics->HasBackShadow() || graphics->GetBackShadowValue() == shadow) {
+    if (!renderContext->HasBackShadow() || renderContext->GetBackShadowValue(Shadow()) == shadow) {
         ShadowStyle shadowStyle = static_cast<ShadowStyle>(selectTheme_->GetOptionFocusedShadow());
         renderContext->UpdateBackShadow(Shadow::CreateShadow(shadowStyle));
         isFocusShadowSet_ = true;
@@ -726,7 +726,7 @@ void MenuItemPattern::ShowSubMenu(ShowSubMenuType type)
         CHECK_NULL_VOID(pipeline);
         auto overlayManager = pipeline->GetOverlayManager();
         CHECK_NULL_VOID(overlayManager);
-        overlayManager->ContentChangeReport(GetMenuWrapper(), true);
+        overlayManager->ContentChangeReport(GetMenuWrapper(), true, false);
         SetDetachedFreeRootProxy(customNode);
         return;
     }
@@ -798,11 +798,17 @@ void MenuItemPattern::ShowSubMenuWithAnimation(const RefPtr<FrameNode>& subMenu)
                 renderContext->UpdateTransformScale(VectorF(MENU_ANIMATION_MAX_SCALE, MENU_ANIMATION_MAX_SCALE));
                 renderContext->UpdateOpacity(MENU_ANIMATION_MAX_OPACITY);
             },
-            animationOption.GetOnFinishEvent(), nullptr, subMenu->GetContextRefPtr());
+            [weak = WeakPtr<FrameNode>(subMenu)]() {
+                ReportCapiSubMenuEvent(weak.Upgrade(), true);
+            }, nullptr, subMenu->GetContextRefPtr());
+    } else {
+        pipeline->AddAfterLayoutTask([weak = WeakPtr<FrameNode>(subMenu)]() {
+            ReportCapiSubMenuEvent(weak.Upgrade(), true);
+        });
     }
     auto overlayManager = pipeline->GetOverlayManager();
     CHECK_NULL_VOID(overlayManager);
-    overlayManager->ContentChangeReport(GetMenuWrapper(), true);
+    overlayManager->ContentChangeReport(GetMenuWrapper(), true, false);
 }
 
 void MenuItemPattern::SendSubMenuOpenToAccessibility(RefPtr<FrameNode>& subMenu, ShowSubMenuType type)
@@ -1112,7 +1118,9 @@ void MenuItemPattern::ShowEmbeddedExpandMenu(const RefPtr<FrameNode>& expandable
             pattern->SetShowEmbeddedMenuParams(expandableNode);
             menuRenderContext->UpdateSubmenuDistortionParam();
         },
-        nullptr, nullptr, host->GetContextRefPtr());
+        [weak = WeakPtr<FrameNode>(expandableNode)]() {
+            ReportCapiSubMenuEvent(weak.Upgrade(), true);
+        }, nullptr, host->GetContextRefPtr());
 }
 
 void MenuItemPattern::SetShowEmbeddedMenuParams(const RefPtr<FrameNode>& expandableNode)
@@ -1208,7 +1216,9 @@ void MenuItemPattern::HideEmbeddedExpandMenu(const RefPtr<FrameNode>& expandable
         CHECK_NULL_VOID(menuItemPattern);
         menuItemPattern->UpdatePreviewPosition(oldMenuSize, menuGeometryNode->GetFrameSize());
         menuRenderContext->UpdateSubmenuDistortionParam();
-    }, nullptr, nullptr, host->GetContextRefPtr());
+    }, [weak = WeakPtr<FrameNode>(expandableNode)]() {
+        ReportCapiSubMenuEvent(weak.Upgrade(), false);
+    }, nullptr, host->GetContextRefPtr());
 }
 
 void MenuItemPattern::CloseMenu()
@@ -1561,23 +1571,37 @@ void CustomMenuItemPattern::OnTouch(const TouchEventInfo& info)
 
     // close menu when touch up
     // can't use onClick because that conflicts with interactions developers might set to the customNode
-    // Treat the gesture as a click iff the finger stays inside the item bounds during the whole touch
-    // sequence (down/move/up). This mirrors ClickRecognizer::IsPointInRegion so that "onClick fires" and
-    // "menu closes" share the same hit criterion, instead of the old down->up straight-line distance check
-    // which is stricter than onClick and caused the menu not to close on an in-bounds swipe before lift-up.
+    // Treat the gesture as a click iff the finger is still inside the item bounds on lift AND the touch
+    // sequence is not a predominantly-vertical swipe. Only a predominantly-vertical move beyond
+    // DEFAULT_CLICK_DISTANCE disqualifies a click, because the parent Scroll only claims vertical swipes
+    // (its PanRecognizer direction is VERTICAL). A horizontal move — even with vertical jitter beyond
+    // DEFAULT_CLICK_DISTANCE — must NOT disqualify a click: the developer's custom node (e.g. a Button
+    // inside the customMenuItem) registers its own ClickRecognizer that uses response-region hit testing
+    // and will still fire on a horizontal swipe, so OnTouch must stay aligned and close the menu.
+    // A synthesized DOWN+UP with no MOVE leaves movedOutOfRegion_ false. The straight-line distance
+    // fallback below covers the case where the UP point drifts slightly outside the item bounds
+    // (so IsOffsetInNodeBounds fails) but is still within DEFAULT_CLICK_DISTANCE of the DOWN point —
+    // a legitimate tap.
     if (touchType == TouchType::DOWN) {
         lastTouchOffset_ = std::make_unique<Offset>(touches.front().GetLocalLocation());
         movedOutOfRegion_ = false;
     } else if (touchType == TouchType::MOVE) {
-        // mirror ClickRecognizer: once the finger leaves the item bounds, it is no longer a click
-        if (!movedOutOfRegion_ &&
-            !MenuPattern::IsOffsetInNodeBounds(GetHost(), touches.front().GetLocalLocation())) {
-            movedOutOfRegion_ = true;
+        // A swipe is detected only when the vertical component dominates (offsetY > offsetX) AND exceeds
+        // DEFAULT_CLICK_DISTANCE. This distinguishes a true vertical scroll swipe from a horizontal
+        // swipe that has some vertical hand jitter.
+        if (!movedOutOfRegion_ && lastTouchOffset_) {
+            auto current = touches.front().GetLocalLocation();
+            auto offsetX = std::abs(current.GetX() - lastTouchOffset_->GetX());
+            auto offsetY = std::abs(current.GetY() - lastTouchOffset_->GetY());
+            if (offsetY > DEFAULT_CLICK_DISTANCE && offsetY > offsetX) {
+                movedOutOfRegion_ = true;
+            }
         }
     } else if (touchType == TouchType::UP) {
         auto touchUpOffset = touches.front().GetLocalLocation();
-        bool isClick = lastTouchOffset_ && !movedOutOfRegion_ &&
-            MenuPattern::IsOffsetInNodeBounds(GetHost(), touchUpOffset);
+        bool isClick =
+            (!movedOutOfRegion_ && MenuPattern::IsOffsetInNodeBounds(GetHost(), touchUpOffset)) ||
+            (lastTouchOffset_ && (touchUpOffset - *lastTouchOffset_).GetDistance() <= DEFAULT_CLICK_DISTANCE);
         if (isClick) {
             if (Container::GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TWELVE)) {
                 HandleOnChange();
@@ -3086,7 +3110,18 @@ void MenuItemPattern::UpdateNextNodeDivider(bool needDivider)
     CHECK_NULL_VOID(host);
     auto parent = host->GetParent();
     CHECK_NULL_VOID(parent);
-    auto nextNode = parent->GetChildAtIndex(index_ + 1);
+    // For array grid menus, index_ is the relative index in listParams and doesn't account
+    // for the grid section and section divider nodes prepended to the column. Use the actual
+    // child index in the parent to find the correct next sibling.
+    auto menu = GetMenu();
+    int32_t nextIndex = index_ + 1;
+    if (menu) {
+        auto menuPattern = menu->GetPattern<MenuPattern>();
+        if (menuPattern && menuPattern->GetIsArrayGridMenu()) {
+            nextIndex = parent->GetChildIndex(host) + 1;
+        }
+    }
+    auto nextNode = parent->GetChildAtIndex(nextIndex);
     if (nextNode) {
         auto pattern = DynamicCast<FrameNode>(nextNode)->GetPattern<MenuItemPattern>();
         CHECK_NULL_VOID(pattern);
@@ -3960,4 +3995,14 @@ void MenuItemPattern::ReportEvent()
         ComponentEventType::COMPONENT_EVENT_MENU);
 #endif
 }
+void MenuItemPattern::DumpInspectorTreeInfo(
+    std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context)
+{
+    Pattern::DumpInspectorTreeInfo(attrs, context);
+    if (!subBuilderFunc_ && !subSelectMenuBuilderFunc_) {
+        return;
+    }
+    attrs->Put("expanded", expandingMode_ == SubMenuExpandingMode::EMBEDDED ? isExpanded_ : isSubMenuShowed_);
+}
+
 } // namespace OHOS::Ace::NG

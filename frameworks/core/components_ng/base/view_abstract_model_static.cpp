@@ -292,6 +292,8 @@ void ViewAbstractModelStatic::BindMenu(FrameNode* frameNode,
     auto targetId = targetNode->GetId();
     ACE_UPDATE_NODE_LAYOUT_PROPERTY(LayoutProperty, IsBindOverlay, true, frameNode);
     bool isBuildFuncNull = (buildFunc == nullptr && params.empty());
+    targetNode->SetInspectorMenuBinding(isBuildFuncNull ? std::nullopt :
+        std::make_optional(menuParam.isShowInSubWindow));
     if (CheckMenuIsShow(menuParam, targetId, targetNode, isBuildFuncNull)) {
         TAG_LOGI(AceLogTag::ACE_MENU, "hide menu done %{public}d %{public}d.", menuParam.isShowInSubWindow, targetId);
     } else if (menuParam.isShow) {
@@ -870,6 +872,18 @@ RefPtr<PipelineContext> ViewAbstractModelStatic::GetSheetContext(NG::SheetStyle&
     return context;
 }
 
+void ViewAbstractModelStatic::ApplySheetImmersiveStrategyDefaults(
+    const RefPtr<PipelineContext>& context, SheetStyle& sheetStyle)
+{
+    CHECK_NULL_VOID(context);
+    if (!context->IsImmersiveStrategySet(ImmersiveStrategy::BIND_SHEET_EXPAND_SAFE_AREA)) {
+        return;
+    }
+    if (!sheetStyle.titleBarHoverMode.has_value()) {
+        sheetStyle.titleBarHoverMode = SheetTitleBarHoverMode::SAFE_AREA_PADDING;
+    }
+}
+
 void ViewAbstractModelStatic::BindSheet(FrameNode* frameNode, bool isShow,
     std::function<void(const std::string&)>&& callback,
     std::function<void()>&& buildFunc, std::function<void()>&& titleBuildFunc, NG::SheetStyle& sheetStyle,
@@ -899,6 +913,7 @@ void ViewAbstractModelStatic::BindSheet(FrameNode* frameNode, bool isShow,
     };
     auto context = GetSheetContext(sheetStyle);
     CHECK_NULL_VOID(context);
+    ApplySheetImmersiveStrategyDefaults(context, sheetStyle);
     auto overlayManager = context->GetOverlayManager();
     auto* sheetModifier = NodeModifier::GetSheetManagerInnerModifier();
     CHECK_NULL_VOID(sheetModifier);

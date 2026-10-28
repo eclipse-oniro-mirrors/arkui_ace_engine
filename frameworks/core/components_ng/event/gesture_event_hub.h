@@ -436,6 +436,9 @@ public:
     bool parallelCombineClick = false;
     RefPtr<ParallelRecognizer> innerParallelRecognizer_;
 
+    // Empty hubs can be created by inspection; their existence alone is not interaction semantics.
+    bool HasTreeInteraction() const;
+
     bool IsGestureEmpty() const;
     bool IsGestureHierarchyEmpty() const;
 

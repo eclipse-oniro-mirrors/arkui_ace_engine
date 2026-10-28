@@ -189,7 +189,9 @@ constexpr float EDGE_FRICTION = 10;
 void FreeScrollController::HandlePanStart(const GestureEvent& event)
 {
     state_ = State::DRAG;
-    FireOnScrollStart();
+    if (!Scrollable::IsMouseWheelScroll(event)) {
+        FireOnScrollStart();
+    }
     if (axisAnimator_ && !Scrollable::IsMouseWheelScroll(event)) {
         axisAnimator_->StopAxisAnimation();
     }
@@ -217,7 +219,10 @@ void FreeScrollController::HandlePanUpdate(const GestureEvent& event)
     const auto newOffset = offset_->Get() + deltaF;
     CheckCrashEdge(newOffset, scrollableArea);
     if (Scrollable::IsMouseWheelScroll(event)) {
-        AnimateOnMouseScroll(deltaF); // use animation to make mouse wheel scroll smoother
+        // wheel animates via the shared 2D entry (edge friction + onWillScroll
+        // already applied above; keep single fire per event)
+        InitAxisAnimator();
+        axisAnimator_->OnAxis2D(deltaF, offset_->Get());
         return;
     }
     offset_->Set(newOffset);
@@ -228,7 +233,8 @@ void FreeScrollController::HandlePanEndOrCancel(const GestureEvent& event)
 {
     state_ = State::IDLE;
     if (Scrollable::IsMouseWheelScroll(event)) {
-        FireOnScrollEnd(); // no fling animation in mouse wheel scroll
+        // onScrollStart/onScrollStop for wheel follow the 2D animation lifecycle
+        // (animator start/finish callbacks), not the gesture lifecycle.
         return;
     }
     const auto& src = event.GetVelocity();
@@ -369,31 +375,60 @@ void FreeScrollController::HandleTouchUpOrCancel()
     }
 }
 
-void FreeScrollController::HandleAxisAnimationFrame(float newOffset)
+void FreeScrollController::InitAxisAnimator()
 {
-    if (InAnimation(state_)) { // can't update offset if in animation
+    if (axisAnimator_) {
         return;
     }
-    auto offset = offset_->Get();
-    mouseWheelScrollIsVertical_ ? offset.SetY(newOffset) : offset.SetX(newOffset);
-    offset_->Set(ClampPosition(offset));
+    axisAnimator_ = MakeRefPtr<AxisAnimator>(
+        [wk = WeakClaim(this)](OffsetF offset) {
+            auto self = wk.Upgrade();
+            CHECK_NULL_VOID(self);
+            if (InAnimation(self->state_)) {
+                return;
+            }
+            self->offset_->Set(self->ClampPosition(offset));
+        },
+        [wk = WeakClaim(this)](OffsetF pos) {
+            auto self = wk.Upgrade();
+            CHECK_NULL_VOID(self);
+            // onScrollStart fires exactly when the 2D animation starts (OnAxis2D
+            // start branch runs only for a fresh animation), for both keyboard and
+            // mouse wheel; presses accumulating into a running animation never
+            // re-fire it.
+            self->FireOnScrollStart();
+        },
+        [wk = WeakClaim(this)]() {
+            auto self = wk.Upgrade();
+            CHECK_NULL_VOID(self);
+            // Pairs with the start closure: fires once per animation run, when the
+            // animator stops (completed, or interrupted by a drag).
+            self->FireOnScrollEnd();
+        });
+    axisAnimator_->Initialize(WeakClaim(pattern_.GetContext()));
 }
 
-void FreeScrollController::AnimateOnMouseScroll(const OffsetF& delta)
+void FreeScrollController::ScrollWithAnimation2D(const OffsetF& delta)
 {
-    mouseWheelScrollIsVertical_ = NearZero(delta.GetX());
-    if (!axisAnimator_) {
-        axisAnimator_ = MakeRefPtr<AxisAnimator>(
-            [wk = WeakClaim(this)](float newOffset) { // animation frame callback
-                auto self = wk.Upgrade();
-                CHECK_NULL_VOID(self);
-                self->HandleAxisAnimationFrame(newOffset);
-            },
-            nullptr, nullptr);
-        axisAnimator_->Initialize(WeakClaim(pattern_.GetContext()));
-    }
-    Axis axis = mouseWheelScrollIsVertical_ ? Axis::VERTICAL : Axis::HORIZONTAL;
-    axisAnimator_->OnAxis(delta.GetMainOffset(axis), offset_->Get().GetMainOffset(axis));
+    InitAxisAnimator();
+    auto dx = delta.GetX();
+    auto dy = delta.GetY();
+    const auto scrollableArea = pattern_.GetViewPortExtent() - pattern_.GetViewSize();
+    const float newX = offset_->Get().GetX() + dx;
+    const float newY = offset_->Get().GetY() + dy;
+    const float gammaX = GetGamma(newX, scrollableArea.Width(), pattern_.GetViewSize().Width());
+    const float gammaY = GetGamma(newY, scrollableArea.Height(), pattern_.GetViewSize().Height());
+    OffsetF deltaF {
+        NearZero(gammaX) ? dx : dx * pattern_.CalculateFriction(gammaX),
+        NearZero(gammaY) ? dy : dy * pattern_.CalculateFriction(gammaY)
+    };
+    deltaF = FireOnWillScroll(deltaF, ScrollState::SCROLL, ScrollSource::DRAG);
+    CheckCrashEdge(offset_->Get() + deltaF, scrollableArea);
+    axisAnimator_->OnAxis2D(deltaF, offset_->Get());
+    // onScrollStart fires from the animator start closure when the animation
+    // begins; onScrollStop from the finish closure. Keyboard and mouse wheel
+    // share this entry, so both get identical event timing. Presses/wheels
+    // accumulating into a running animation add no extra start/stop events.
 }
 
 OffsetF FreeScrollController::GetOffset() const

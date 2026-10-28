@@ -21,6 +21,7 @@
 
 #include "base/geometry/axis.h"
 #include "base/memory/referenced.h"
+#include "core/components/scroll/scroll_controller_base.h"
 #include "core/common/window_size_breakpoint.h"
 #include "core/components_ng/layout/layout_algorithm.h"
 #include "core/components_ng/layout/layout_wrapper.h"
@@ -55,6 +56,21 @@ struct ListItemInfo {
     float scale = 1.0f;
     float offsetY = 0.0f;
     std::optional<ListItemGroupLayoutInfo> groupInfo = std::nullopt;
+};
+
+using FastScrollPreparedLayouts = std::map<int32_t, std::shared_ptr<const PreparedLayoutGeometry>>;
+
+struct FastScrollMeasuredSize {
+    float mainSize = 0.0f;
+    bool isGroup = false;
+    bool isLazyChild = false;
+};
+
+enum class FastScrollMeasureStatus : uint8_t { PENDING, COMPLETE, UNSUPPORTED, INVALID };
+
+struct FastScrollMeasureResult {
+    std::map<int32_t, FastScrollMeasuredSize> measuredSizes;
+    FastScrollMeasureStatus status = FastScrollMeasureStatus::PENDING;
 };
 
 struct ListPredictLayoutParam {
@@ -223,6 +239,40 @@ public:
     void SetIsNeedCheckOffset(bool isNeedCheckOffset)
     {
         isNeedCheckOffset_ = isNeedCheckOffset;
+    }
+
+    void SetFastScrollTarget(int32_t index, ScrollAlign align);
+    void SetFastScrollMode(FastScrollMode mode);
+    void SetFastScrollKnownMainSize(bool useKnownMainSize)
+    {
+        if (useKnownMainSize || fastScrollState_) {
+            GetOrCreateFastScrollState().input.useKnownMainSize = useKnownMainSize;
+        }
+    }
+    void SetFastScrollPreparationOffset(float extraOffset);
+    void SetFastScrollSkip(bool skip)
+    {
+        if (skip || fastScrollState_) {
+            GetOrCreateFastScrollState().input.skip = skip;
+        }
+    }
+    void SetFastScrollPreparedLayouts(std::shared_ptr<FastScrollPreparedLayouts> items);
+
+    std::shared_ptr<FastScrollPreparedLayouts> GetFastScrollPreparedLayouts() const
+    {
+        return fastScrollState_ ? fastScrollState_->preparedLayouts : nullptr;
+    }
+
+    bool HasFastScrollPreparationRequest() const
+    {
+        return fastScrollState_ && fastScrollState_->input.preparationOffset.has_value();
+    }
+
+    bool MatchesFastScrollTarget(int32_t index, ScrollAlign align, float extraOffset) const;
+
+    const FastScrollMeasureResult* GetFastScrollMeasureResult() const
+    {
+        return fastScrollState_ ? &fastScrollState_->result : nullptr;
     }
 
     void SetTotalOffset(float totalOffset)
@@ -575,7 +625,7 @@ protected:
     LayoutConstraintF CreateLazyChildConstraint(float referencePos, bool forward) const;
     void MeasureLazyChild(
         const RefPtr<LayoutWrapper>& wrapper, int32_t index, float& referencePos, bool forward);
-    void ApplyLazyVGridAdjustOffset(const RefPtr<LayoutWrapper>& wrapper, float& referencePos, bool forward);
+    void ApplyLazyVGridAdjustOffset(const AdjustOffset& adjustOffset, float& referencePos, bool forward) const;
     AdjustOffset GetAdjustOffset(const RefPtr<LayoutWrapper>& item);
     void SetItemInfo(int32_t index, ListItemInfo&& info)
     {
@@ -618,6 +668,73 @@ protected:
     virtual void MeasureList(LayoutWrapper* layoutWrapper);
     LayoutDirection LayoutDirectionForTargetIndex(LayoutWrapper* layoutWrapper, int startIndex);
     void CheckJumpToIndex();
+    void PrepareFastScrollSkipStart();
+    void PrepareFastScrollTargetWindow(LayoutWrapper* layoutWrapper);
+    bool MeasureFastScrollItem(
+        LayoutWrapper* layoutWrapper, int32_t index, float extent, bool forward, float& size);
+    virtual std::optional<ListPositionMap::EstimateRange> GetFastScrollLanesRow(int32_t index) const
+    {
+        return std::nullopt;
+    }
+    std::optional<ListPositionMap::EstimateRange> GetPhysicalLanesRow(int32_t index) const;
+    virtual bool PrepareFastScrollRows(LayoutWrapper* layoutWrapper)
+    {
+        return true;
+    }
+    virtual bool MeasureFastScrollRow(
+        LayoutWrapper* layoutWrapper, int32_t index, float extent, bool forward, float& size)
+    {
+        return MeasureFastScrollItem(layoutWrapper, index, extent, forward, size);
+    }
+    bool PremeasureFastScrollGroup(const RefPtr<LayoutWrapper>& wrapper, int32_t index, float extent, bool forward);
+    bool PremeasureFastScrollLazy(
+        const RefPtr<LayoutWrapper>& wrapper, int32_t index, float extent, bool forward, float& size,
+        std::vector<WeakPtr<FrameNode>>* measuredNodes = nullptr);
+    void TrackFastScrollPremeasuredItem(const RefPtr<LayoutWrapper>& wrapper, int32_t index, bool clearEntireTree);
+    void ResetFastScrollPremeasuredItems();
+    void SaveFastScrollPreparedLayout(int32_t index, const std::shared_ptr<const PreparedLayoutGeometry>& geometry);
+    void ApplyFastScrollPreparedGeometry(const RefPtr<LayoutWrapper>& wrapper, int32_t index);
+    virtual bool MeasureFastScrollNeighbors(LayoutWrapper* layoutWrapper, float size);
+    float GetFastScrollWindowStart(float size) const;
+    virtual bool IsFastScrollForward(float size) const;
+    float GetFastScrollPreparedOffsetCorrection(int32_t index) const;
+    float GetFastScrollTargetExtent(float size, bool forward) const;
+    bool CompleteFastScrollPreparation(LayoutWrapper* layoutWrapper, float size, float extent);
+    std::pair<float, float> GetFastScrollPreparationRange(float size) const;
+    void MeasureFastScrollSkipWindow(LayoutWrapper* layoutWrapper);
+    struct FastScrollMeasureInput {
+        std::optional<int32_t> targetIndex;
+        ScrollAlign align = ScrollAlign::START;
+        std::optional<float> preparationOffset;
+        bool useKnownMainSize = false;
+        bool skip = false;
+        FastScrollMode mode = FastScrollMode::SKIP_MEASURE;
+    };
+    // Frame-local cleanup and pending adjustment, not request-owned prepared geometry.
+    struct FastScrollPremeasuredItem {
+        RefPtr<LayoutWrapper> wrapper;
+        bool clearEntireTree = false;
+        std::vector<WeakPtr<FrameNode>> measuredNodes;
+        std::optional<AdjustOffset> pendingLazyAdjustment;
+        float pendingLazyStartInset = 0.0f;
+    };
+    void ResetFastScrollPremeasuredItem(int32_t index, const FastScrollPremeasuredItem& premeasured);
+    struct FastScrollLayoutState {
+        FastScrollMeasureInput input;
+        FastScrollMeasureResult result;
+        std::optional<std::pair<int32_t, float>> skipStart;
+        std::map<int32_t, FastScrollPremeasuredItem> premeasuredItems;
+        std::shared_ptr<FastScrollPreparedLayouts> preparedLayouts;
+    };
+
+    const FastScrollLayoutState* GetFastScrollState() const
+    {
+        return fastScrollState_.get();
+    }
+
+    FastScrollLayoutState& GetOrCreateFastScrollState();
+
+    std::unique_ptr<FastScrollLayoutState> fastScrollState_;
 
     void OnSurfaceChanged(LayoutWrapper* layoutWrapper);
 
@@ -647,12 +764,17 @@ protected:
     virtual void UpdateSnapCenterContentOffset(LayoutWrapper* layoutWrapper);
     std::optional<ListItemGroupLayoutInfo> GetListItemGroupLayoutInfo(
         const RefPtr<LayoutWrapper>& wrapper) const;
+    void ConfigureFastScrollGroup(
+        const RefPtr<ListItemGroupLayoutAlgorithm>& group, const RefPtr<LayoutWrapper>& wrapper, int32_t index);
+    bool NeedAllListItemGroupLayout(int32_t index, bool groupNeedAllLayout) const;
     void GetStartIndexInfo(int32_t& index, float& pos, bool& isGroup);
     void GetEndIndexInfo(int32_t& index, float& pos, bool& isGroup);
     int32_t GetListItemGroupItemCount(const RefPtr<LayoutWrapper>& wrapper) const;
 
     RefPtr<LayoutWrapper> GetListItem(
         LayoutWrapper* layoutWrapper, int32_t index, bool addToRenderTree = true, bool isCache = false) const;
+    bool ReuseFastScrollVisibleItem(LayoutWrapper* layoutWrapper, int32_t index, float& size) const;
+    bool MeasureFastScrollRegularItem(const RefPtr<LayoutWrapper>& wrapper, int32_t index);
     RefPtr<LayoutWrapper> GetChildByIndex(LayoutWrapper* layoutWrapper, uint32_t index, bool isCache = false) const
     {
         index =  !isStackFromEnd_ ? index : totalItemCount_ - index - 1;

@@ -1921,6 +1921,7 @@ ArkUINativeModuleValue TextInputBridge::SetPlaceholderFont(ArkUIRuntimeCallInfo 
     Local<JSValueRef> jsStyle = runtimeCallInfo->GetCallArgRef(4);
     ArkUINodeHandle nativeNode = nullptr;
     CHECK_NE_RETURN(ArkTSUtils::GetNativeNode(nativeNode, firstArg, vm), true, panda::JSValueRef::Undefined(vm));
+    bool isJsView = ArkTSUtils::IsJsView(firstArg, vm);
     ArkUILengthType length{ nullptr, DEFAULT_FONT_SIZE, static_cast<int8_t>(DimensionUnit::FP) };
     CalcDimension size(DEFAULT_FONT_SIZE, DimensionUnit::FP);
     RefPtr<ResourceObject> fontSizeObject;
@@ -1936,8 +1937,10 @@ ArkUINativeModuleValue TextInputBridge::SetPlaceholderFont(ArkUIRuntimeCallInfo 
     } else {
         length.number = size.Value();
     }
-    
-    std::string weight = DEFAULT_FONT_WEIGHT;
+    std::string weight;
+    if (!isJsView) {
+        weight = DEFAULT_FONT_WEIGHT;
+    }
     if (!jsWeight->IsNull()) {
         if (jsWeight->IsString(vm)) {
             weight = jsWeight->ToString(vm)->ToString(vm);
@@ -1972,7 +1975,7 @@ ArkUINativeModuleValue TextInputBridge::SetPlaceholderFont(ArkUIRuntimeCallInfo 
     }
     
     GetArkUINodeModifiers()->getTextInputModifier()->setTextInputPlaceholderFont(
-        nativeNode, &placeholderFont, AceType::RawPtr(fontSizeObject), AceType::RawPtr(fontFamiliesObj));
+        nativeNode, &placeholderFont, AceType::RawPtr(fontSizeObject), AceType::RawPtr(fontFamiliesObj), isJsView);
     return panda::JSValueRef::Undefined(vm);
 }
 

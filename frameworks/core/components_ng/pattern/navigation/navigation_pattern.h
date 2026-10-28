@@ -16,6 +16,7 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_NAVIGATION_NAVIGATION_PATTERN_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERNS_NAVIGATION_NAVIGATION_PATTERN_H
 
+#include <map>
 #include <set>
 
 #include "base/memory/referenced.h"
@@ -53,6 +54,9 @@ class NavigationPattern : public Pattern, public IAvoidInfoListener, public Cust
     DECLARE_ACE_TYPE(NavigationPattern, Pattern, IAvoidInfoListener, CustomSafeAreaExpander);
 
 public:
+    void ContentChangeReport(const RefPtr<FrameNode>& keyNode, bool isPopPage = false);
+    void ReportCapiPageTransitionEnd(const RefPtr<FrameNode>& node, int32_t transitionId);
+    void FlushCapiPageTransitionEnds(bool forceDeferred = false);
     NavigationPattern();
     ~NavigationPattern() override = default;
 
@@ -887,6 +891,9 @@ private:
     void StartTransition(const RefPtr<NavDestinationGroupNode>& preDestination,
     const RefPtr<NavDestinationGroupNode>& topDestination,
     bool isAnimated, bool isPopPage, bool isNeedVisible = false);
+    void HandlePreTransition(const RefPtr<NavigationGroupNode>& hostNode,
+        const RefPtr<NavDestinationGroupNode>& topDestination,
+        const std::string& fromPathInfo, const std::string& toPathInfo);
     void ProcessAutoSave(const RefPtr<FrameNode>& node);
     void InitPreloadNodeInfo(int32_t index, const RefPtr<UINode>& uiNode);
 
@@ -918,6 +925,8 @@ private:
     void RegisterAvoidInfoChangeListener(const RefPtr<FrameNode>& hostNode);
     void UnregisterAvoidInfoChangeListener(const RefPtr<FrameNode>& hostNode);
     virtual void MarkAllNavDestinationDirtyIfNeeded(const RefPtr<FrameNode>& hostNode, bool skipCheck = false);
+    void MarkNavDestinationDirty(const RefPtr<NavDestinationGroupNode>& navDestination);
+    RefPtr<NavDestinationGroupNode> FindFirstNavDestination(const RefPtr<UINode>& node);
     void UpdateToobarFocusColor();
     void GenerateLastStandardPage(NavPathList& navPathList);
     RefPtr<UINode> FindNavDestinationNodeInPreList(const uint64_t navDestinationId) const;
@@ -995,8 +1004,7 @@ private:
     bool GetHomeDestinationName(const RefPtr<FrameNode>& hostNode, std::string& name);
     void TriggerPerformanceCheck(const RefPtr<NavDestinationGroupNode>& topDestination, std::string fromPath);
     NavigateChangeInfo ConvertNavDestinationContext(const RefPtr<NavDestinationContext>& context);
-    void ContentChangeReport(const RefPtr<FrameNode>& keyNode);
-    void ContentChangeOnTransitionStart(const RefPtr<FrameNode>& keyNode);
+    void ContentChangeOnTransitionStart(const RefPtr<FrameNode>& keyNode, bool isPopPage = false);
     void UpdatePlaceholderVisibilityIfNeeded();
     bool CheckIfLastDestWillBeFullScreenOverlay(const std::vector<RefPtr<NavDestinationGroupNode>>& destList);
 
@@ -1159,6 +1167,8 @@ private:
 
     std::vector<WeakPtr<NavDestinationNodeBase>> preVisibleNodes_;
     int32_t runningTransitionCount_ = 0;
+    std::map<int32_t, WeakPtr<FrameNode>> pendingCapiPageEnds_;
+    bool capiPageEndTaskPending_ = false;
     bool windowSizeChangedDuringTransition_ = false;
     bool enableVisibilityLifecycleWithContentCover_ = true;
     bool enableLockOrientation_ = false;

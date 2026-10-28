@@ -133,6 +133,9 @@
             "@ohos.arkui.stateManagement": [
                 "./arkui/stateManagement"
             ],
+            "@ohos.arkui.placeholderRegister": [
+                "./@ohos.arkui.placeholderRegister.ets"
+            ],
             "@ohos.arkui.ArcAlphabetIndexer": [
                 "./@ohos.arkui.ArcAlphabetIndexer.ets"
             ],

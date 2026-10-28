@@ -392,6 +392,90 @@ void GridItemPattern::GetInnerFocusPaintRect(RoundRect& paintRect)
         static_cast<float>(radius.radiusBottomRight->ConvertToPx() + focusPaintPadding));
 }
 
+void GridItemPattern::DumpAdvanceItemRangeInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    auto property = GetLayoutProperty<GridItemLayoutProperty>();
+    CHECK_NULL_VOID(property);
+    if (!config.IsPublicTree()) {
+        json->Put("RowStart",
+            property->GetRowStart().has_value() ? std::to_string(property->GetRowStart().value()).c_str() : "null");
+        json->Put("RowEnd",
+            property->GetRowEnd().has_value() ? std::to_string(property->GetRowEnd().value()).c_str() : "null");
+        json->Put("ColumnStart", property->GetColumnStart().has_value()
+                                     ? std::to_string(property->GetColumnStart().value()).c_str() : "null");
+        json->Put("ColumnEnd",
+            property->GetColumnEnd().has_value() ? std::to_string(property->GetColumnEnd().value()).c_str() : "null");
+        return;
+    }
+    if (property->GetRowStart().has_value()) {
+        json->Put("RowStart", property->GetRowStart().value());
+    }
+    if (property->GetRowEnd().has_value()) {
+        json->Put("RowEnd", property->GetRowEnd().value());
+    }
+    if (property->GetColumnStart().has_value()) {
+        json->Put("ColumnStart", property->GetColumnStart().value());
+    }
+    if (property->GetColumnEnd().has_value()) {
+        json->Put("ColumnEnd", property->GetColumnEnd().value());
+    }
+}
+
+void GridItemPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if (!config.IsPublicTree() && !GetLayoutProperty<GridItemLayoutProperty>()) {
+        return;
+    }
+    if (!config.IsPublicTree()) {
+        DumpAdvanceDiagnostics(json);
+    }
+    if (!config.IsPublicTree() || config.functionalProperties) {
+        json->Put("selectable", selectable_);
+    }
+    if (!config.IsPublicTree() || config.visualProperties) {
+        json->Put("isSelected", isSelected_);
+        json->Put("isHover", isHover_);
+        json->Put("isPressed", isPressed_);
+        switch (gridItemStyle_) {
+            case GridItemStyle::NONE: {
+                json->Put("GridItemStyle", "NONE");
+                break;
+            }
+            case GridItemStyle::PLAIN: {
+                json->Put("GridItemStyle", "PLAIN");
+                break;
+            }
+            default: {
+                break;
+            }
+        }
+    }
+    if (!config.IsPublicTree()) {
+        return;
+    }
+    if (config.visualProperties) {
+        DumpAdvanceVisualProperties(json, config);
+    }
+}
+
+void GridItemPattern::DumpAdvanceDiagnostics(std::unique_ptr<JsonValue>& json)
+{
+    auto property = GetLayoutProperty<GridItemLayoutProperty>();
+    CHECK_NULL_VOID(property);
+    json->Put("MainIndex",
+        property->GetMainIndex().has_value() ? std::to_string(property->GetMainIndex().value()).c_str() : "null");
+    json->Put("CrossIndex",
+        property->GetCrossIndex().has_value() ? std::to_string(property->GetCrossIndex().value()).c_str() : "null");
+    DumpAdvanceItemRangeInfo(json, ParamConfig());
+
+    json->Put("needStretch", property->GetNeedStretch());
+}
+
+void GridItemPattern::DumpAdvanceVisualProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    DumpAdvanceItemRangeInfo(json, config);
+}
+
 void GridItemPattern::DumpAdvanceInfo()
 {
     auto property = GetLayoutProperty<GridItemLayoutProperty>();
@@ -439,39 +523,7 @@ void GridItemPattern::DumpAdvanceInfo()
 
 void GridItemPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json)
 {
-    auto property = GetLayoutProperty<GridItemLayoutProperty>();
-    CHECK_NULL_VOID(property);
-    json->Put("MainIndex",
-        property->GetMainIndex().has_value() ? std::to_string(property->GetMainIndex().value()).c_str() : "null");
-    json->Put("CrossIndex",
-        property->GetCrossIndex().has_value() ? std::to_string(property->GetCrossIndex().value()).c_str() : "null");
-    json->Put("RowStart",
-        property->GetRowStart().has_value() ? std::to_string(property->GetRowStart().value()).c_str() : "null");
-    json->Put(
-        "RowEnd", property->GetRowEnd().has_value() ? std::to_string(property->GetRowEnd().value()).c_str() : "null");
-    json->Put("ColumnStart",
-        property->GetColumnStart().has_value() ? std::to_string(property->GetColumnStart().value()).c_str() : "null");
-    json->Put("ColumnEnd",
-        property->GetColumnEnd().has_value() ? std::to_string(property->GetColumnEnd().value()).c_str() : "null");
-
-    json->Put("needStretch", property->GetNeedStretch());
-    json->Put("selectable", selectable_);
-    json->Put("isSelected", isSelected_);
-    json->Put("isHover", isHover_);
-    json->Put("isPressed", isPressed_);
-    switch (gridItemStyle_) {
-        case GridItemStyle::NONE: {
-            json->Put("GridItemStyle", "NONE");
-            break;
-        }
-        case GridItemStyle::PLAIN: {
-            json->Put("GridItemStyle", "PLAIN");
-            break;
-        }
-        default: {
-            break;
-        }
-    }
+    GridItemPattern::DumpAdvanceInfo(json, ParamConfig());
 }
 
 void GridItemPattern::UpdateGridItemStyle(GridItemStyle gridItemStyle)

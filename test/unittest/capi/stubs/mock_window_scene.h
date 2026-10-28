@@ -22,7 +22,7 @@
 #include "core/components_ng/base/view_stack_processor.h"
 
 namespace OHOS::Rosen {
-class ScreenSession : public virtual Ace::AceType {
+class ScreenSession : public Ace::AceType {
     DECLARE_ACE_TYPE(ScreenSession, Ace::AceType);
 
 public:

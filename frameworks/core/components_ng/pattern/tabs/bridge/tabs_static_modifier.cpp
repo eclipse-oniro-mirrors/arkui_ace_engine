@@ -248,12 +248,41 @@ BarFloatingStyleParameters Convert(const Ark_FloatingTabBarStyle& src)
 }
 
 template<>
+BarTopFloatingStyleParameters Convert(const Ark_TopFloatingTabBarStyle& src)
+{
+    BarTopFloatingStyleParameters dst;
+    dst.barWidth = Converter::OptConvert<Dimension>(src.barWidth);
+    dst.barSideMargin = Converter::OptConvert<Dimension>(src.barSideMargin);
+    dst.barTopMargin = Converter::OptConvert<Dimension>(src.barTopMargin);
+    dst.maskColor = Converter::OptConvert<Color>(src.maskColor);
+    dst.maskHeight = Converter::OptConvert<Dimension>(src.maskHeight);
+    dst.maxWidth = Converter::OptConvert<Dimension>(src.maxWidth);
+    dst.barWidthObject = GetResourceObjectFromOptLength(src.barWidth);
+    dst.barSideMarginObject = GetResourceObjectFromOptLength(src.barSideMargin);
+    dst.barTopMarginObject = GetResourceObjectFromOptLength(src.barTopMargin);
+    dst.maskColorObject = GetResourceObjectFromOptResourceColor(src.maskColor);
+    dst.maskHeightObject = GetResourceObjectFromOptLength(src.maskHeight);
+    dst.maxWidthObject = GetResourceObjectFromOptLength(src.maxWidth);
+    if (src.offset.tag != InteropTag::INTEROP_TAG_UNDEFINED) {
+        const auto& offsetValue = src.offset.value;
+        if (offsetValue.selector == SELECTOR_ID_0) {
+            dst.offsetX = Converter::OptConvert<Dimension>(offsetValue.value0.x);
+            dst.offsetY = Converter::OptConvert<Dimension>(offsetValue.value0.y);
+            dst.offsetXObject = GetResourceObjectFromOptLength(offsetValue.value0.x);
+            dst.offsetYObject = GetResourceObjectFromOptLength(offsetValue.value0.y);
+        }
+    }
+    return dst;
+}
+
+template<>
 void AssignCast(std::optional<TabBarLayoutStyle>& dst, const Ark_TabBarStyle& src)
 {
     switch (src) {
         case ARK_TAB_BAR_STYLE_BOTTOM: dst = TabBarLayoutStyle::BOTTOM; break;
         case ARK_TAB_BAR_STYLE_SIDEBAR: dst = TabBarLayoutStyle::SIDEBAR; break;
         case ARK_TAB_BAR_STYLE_SIDEBAR_ADAPTABLE: dst = TabBarLayoutStyle::SIDEBAR_ADAPTABLE; break;
+        case ARK_TAB_BAR_STYLE_TOP: dst = TabBarLayoutStyle::TOP; break;
         default: LOGE("Unexpected enum value in Ark_TabBarStyle: %{public}d", src);
     }
 }
@@ -619,9 +648,11 @@ void SetBarBackgroundColorImpl(Ark_NativePointer node,
     auto convValue = Converter::OptConvertPtr<Color>(value);
     if (!convValue) {
         TabsModelStatic::SetBarBackgroundColor(frameNode, Color::TRANSPARENT);
+        TabsModelStatic::SetBarBackgroundColorByUser(frameNode, false);
         return;
     }
     TabsModelStatic::SetBarBackgroundColor(frameNode, convValue);
+    TabsModelStatic::SetBarBackgroundColorByUser(frameNode, true);
 }
 void SetBarGridAlignImpl(Ark_NativePointer node,
                          const Opt_BarGridColumnOptions* value)
@@ -773,6 +804,19 @@ void SetBarFloatingStyleImpl(Ark_NativePointer node,
     }
     auto parameters = Converter::Convert<BarFloatingStyleParameters>(value->value);
     TabsModelNG::SetBarFloatingStyle(frameNode, parameters);
+}
+
+void SetTopBarFloatingStyleImpl(Ark_NativePointer node, const Opt_TopFloatingTabBarStyle* value)
+{
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    CHECK_NULL_VOID(value);
+    if (value->tag == InteropTag::INTEROP_TAG_UNDEFINED) {
+        TabsModelNG::ResetBarTopFloatingStyle(frameNode);
+        return;
+    }
+    auto parameters = Converter::Convert<BarTopFloatingStyleParameters>(value->value);
+    TabsModelNG::SetBarTopFloatingStyle(frameNode, parameters);
 }
 
 void SetBarModeImpl(Ark_NativePointer node,
@@ -1170,6 +1214,58 @@ void SetSidebarDisplayStyleImpl(Ark_NativePointer node,
     }
     TabsModelNG::SetSidebarDisplayStyle(frameNode, sidebarDisplayStyle);
 }
+void SetSidebarFooterImpl(Ark_NativePointer node,
+                          const Opt_ComponentContentBase* value)
+{
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    if (!value || value->tag == InteropTag::INTEROP_TAG_UNDEFINED) {
+        TabsModelNG::SetSidebarFooter(frameNode, nullptr);
+        return;
+    }
+    auto contentPeer = reinterpret_cast<FrameNodePeer*>(value->value);
+    if (!contentPeer) {
+        TabsModelNG::SetSidebarFooter(frameNode, nullptr);
+        return;
+    }
+    if (auto footerNode = FrameNodePeer::GetFrameNodeByPeer(contentPeer)) {
+        TabsModelNG::SetSidebarFooter(frameNode, footerNode);
+    } else {
+        TabsModelNG::SetSidebarFooter(frameNode, nullptr);
+    }
+}
+void SetSidebarBottomBarImpl(Ark_NativePointer node,
+                             const Opt_ComponentContentBase* value)
+{
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    if (!value || value->tag == InteropTag::INTEROP_TAG_UNDEFINED) {
+        TabsModelNG::SetSidebarBottomBar(frameNode, nullptr);
+        return;
+    }
+    auto contentPeer = reinterpret_cast<FrameNodePeer*>(value->value);
+    if (!contentPeer) {
+        TabsModelNG::SetSidebarBottomBar(frameNode, nullptr);
+        return;
+    }
+    if (auto bottomBarNode = FrameNodePeer::GetFrameNodeByPeer(contentPeer)) {
+        TabsModelNG::SetSidebarBottomBar(frameNode, bottomBarNode);
+    } else {
+        TabsModelNG::SetSidebarBottomBar(frameNode, nullptr);
+    }
+}
+void SetShowSideBarControlButtonImpl(Ark_NativePointer node,
+                                     const Opt_Boolean* value)
+{
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    auto convValue = Converter::OptConvertPtr<bool>(value);
+    if (!convValue) {
+        TabsModelNG::SetShowSidebarControlButton(frameNode, false);
+        return;
+    }
+    TabsModelNG::SetShowSidebarControlButton(frameNode, *convValue);
+}
 } // TabsAttributeModifier
 const GENERATED_ArkUITabsModifier* GetTabsModifier()
 {
@@ -1205,6 +1301,7 @@ const GENERATED_ArkUITabsModifier* GetTabsModifier()
         TabsAttributeModifier::SetOnContentWillChangeImpl,
         TabsAttributeModifier::SetOnContentDidScrollImpl,
         TabsAttributeModifier::SetBarFloatingStyleImpl,
+        TabsAttributeModifier::SetTopBarFloatingStyleImpl,
         TabsAttributeModifier::SetBarStyleImpl,
         TabsAttributeModifier::SetSidebarPositionImpl,
         TabsAttributeModifier::SetSidebarHeaderImpl,
@@ -1224,6 +1321,9 @@ const GENERATED_ArkUITabsModifier* GetTabsModifier()
         TabsAttributeModifier::SetSidebarBackgroundBlurStyleImpl,
         TabsAttributeModifier::SetSidebarDividerImpl,
         TabsAttributeModifier::SetSidebarDisplayStyleImpl,
+        TabsAttributeModifier::SetSidebarFooterImpl,
+        TabsAttributeModifier::SetSidebarBottomBarImpl,
+        TabsAttributeModifier::SetShowSideBarControlButtonImpl,
         TabsAttributeModifier::SetBarModeImpl,
         TabsAttributeModifier::SetBarHeight1Impl,
         TabsAttributeModifier::SetBarBackgroundBlurStyle1Impl,

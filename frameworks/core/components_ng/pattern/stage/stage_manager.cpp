@@ -15,6 +15,8 @@
 
 #include "core/components_ng/pattern/stage/stage_manager.h"
 
+#include "core/components_ng/manager/content_change_manager/content_change_manager.h"
+
 #include "base/log/ace_performance_check.h"
 #include "core/common/container.h"
 
@@ -38,6 +40,26 @@ namespace OHOS::Ace::NG {
 std::string KEY_PAGE_TRANSITION_PROPERTY = "pageTransitionProperty";
 namespace {
 constexpr char EMPTY_PAGE_INFO[] = "NA";
+
+void ReportCapiPopWithoutTransition(const RefPtr<FrameNode>& outPage, const RefPtr<FrameNode>& inPage)
+{
+    if (!outPage || !inPage || outPage == inPage) {
+        return;
+    }
+    auto context = inPage->GetContext();
+    auto manager = context ? context->GetContentChangeManager() : nullptr;
+    if (!manager || !manager->HasCapiContentChangeSubscriptions()) {
+        return;
+    }
+    manager->ReportCapiPageStartEvent(inPage);
+    context->AddAfterLayoutTask([weak = WeakPtr<FrameNode>(inPage), weakManager = WeakPtr(manager)]() {
+        auto page = weak.Upgrade();
+        auto manager = weakManager.Upgrade();
+        if (page && manager) {
+            manager->ReportCapiPageEndEvent(page, page->GetId());
+        }
+    });
+}
 
 void FirePageTransition(const RefPtr<FrameNode>& page, PageTransitionType transitionType)
 {
@@ -361,6 +383,7 @@ bool StageManager::PopPage(const RefPtr<FrameNode>& inPage, bool needShowNext, b
         stageNode_->RemoveChild(pageNode);
         pageNode->SetChildrenInDestroying();
     }
+    ReportCapiPopWithoutTransition(outPageNode, inPageNode);
     stageNode_->RebuildRenderContextTree();
     pipeline->RequestFrame();
     return true;
@@ -435,6 +458,7 @@ bool StageManager::PopPageToIndex(int32_t index, bool needShowNext, bool needTra
         auto pageNode = children.back();
         stageNode_->RemoveChild(pageNode);
     }
+    ReportCapiPopWithoutTransition(outPageNode, inPageNode);
     stageNode_->RebuildRenderContextTree();
     pipeline->RequestFrame();
     return true;

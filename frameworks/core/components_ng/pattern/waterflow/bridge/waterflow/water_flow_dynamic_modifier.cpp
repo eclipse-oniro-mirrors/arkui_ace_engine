@@ -13,6 +13,8 @@
  * limitations under the License.
  */
 #include "interfaces/native/node/node_model.h"
+
+#include "base/log/log_wrapper.h"
 #include "interfaces/native/node/waterflow_section_option.h"
 #include "ui/base/utils/utils.h"
 
@@ -637,6 +639,10 @@ void SetWaterFlowSectionOptions(ArkUINodeHandle node, ArkUI_Int32 start, ArkUIWa
                 // onGetItemMainSizeByIndex是一个返回float的函数指针
                 using FuncType = float (*)(int32_t, void*);
                 FuncType func = reinterpret_cast<FuncType>(sectionData.onGetItemMainSizeByIndex);
+                LOG_CALLBACK(
+                    "OH_ArkUI_WaterFlowSectionOption_RegisterGetItemMainSizeCallbackByIndex / "
+                    "OH_ArkUI_WaterFlowSectionOption_RegisterGetItemMainSizeCallbackByIndexWithUserData",
+                    func);
                 float result = func(value, sectionData.userData);
                 return result;
             };

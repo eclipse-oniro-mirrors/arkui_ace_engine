@@ -50,7 +50,7 @@ struct MouseEventState {
 
 enum class PostInputEventType : uint8_t { TOUCH = 0, MOUSE = 1, AXIS = 2 };
 
-class ACE_FORCE_EXPORT PostEventManager : public virtual AceType {
+class ACE_FORCE_EXPORT PostEventManager : public AceType {
     DECLARE_ACE_TYPE(PostEventManager, AceType);
 
 public:

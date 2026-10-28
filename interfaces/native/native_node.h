@@ -2408,6 +2408,31 @@ typedef enum {
     NODE_TRANSFORM_3D = 128,
 
     /**
+     * @brief Defines the linear gradient blur attribute, which can be set, reset, and obtained
+     * as required through APIs.
+     *
+     * **Format of the {@link ArkUI_AttributeItem} parameter for setting the attribute:**
+     * <ul>
+     * <li>.object: linear gradient blur options object. The parameter type is
+     * {@link OH_ArkUI_LinearGradientBlurOptions*}.</li>
+     * </ul>
+     *
+     * **Format of the return value {@link ArkUI_AttributeItem}:**
+     * <ul>
+     * <li>.object: linear gradient blur options object. The type is
+     * {@link OH_ArkUI_LinearGradientBlurOptions*}. The object is an internal static object;
+     * do not release it by calling {@link OH_ArkUI_NativeModule_LinearGradientBlurOptions_Destroy}.
+     * When the attribute is not set or has been reset, the returned object contains default values
+     * (blurRadius = 0, fractionStops = {0.0, 0.0, 0.0, 1.0}, direction =
+     * {@link OH_ARKUI_LINEAR_GRADIENT_BLUR_DIRECTION_BOTTOM}).</li>
+     * </ul>
+     *
+     * @ingroup Visual
+     * @since 26.2.0
+     */
+    NODE_LINEAR_GRADIENT_BLUR = 129,
+
+    /**
      * @brief Defines the text content attribute, which can be set, reset, and obtained as required through APIs.
      *
      * Format of the {@link ArkUI_AttributeItem} parameter for setting the attribute:\n
@@ -5603,6 +5628,21 @@ typedef enum {
     NODE_XCOMPONENT_ENABLE_ANALYZER,
 
     /**
+     * @brief Defines the buffer queue size for the <b><XComponent></b> component.
+     * This attribute can be set, reset, and obtained as required through APIs.
+     *
+     * Format of the {@link ArkUI_AttributeItem} parameter for setting the attribute:\n
+     * value[0].i32: the buffer queue size, in the range [2, 5]. If the value is less than <b>2</b>,
+     * <b>2</b> is used; if the value is greater than <b>5</b>, <b>5</b> is used.
+     * If this attribute is not set, the default value <b>5</b> is used. \n
+     * \n
+     * Format of the return value {@link ArkUI_AttributeItem}:\n
+     * value[0].i32: the buffer queue size currently in effect.
+     * @since 26
+     */
+    NODE_XCOMPONENT_BUFFER_QUEUE_SIZE,
+
+    /**
      * @brief Defines whether to display the lunar calendar in the date picker.
      * This attribute can be set, reset, and obtained as required through APIs.
      *
@@ -8242,6 +8282,43 @@ typedef enum {
     NODE_SCROLL_BAR_HEIGHT = 1002029,
 
     /**
+     * @brief Obtains the current scroll state.
+     * This attribute can be obtained as required through APIs.
+     *
+     * **Format of the return value {@link ArkUI_AttributeItem}:**
+     * <ul>
+     * <li>.value[0].i32: current scroll state. The parameter type is {@link ArkUI_ScrollState}.</li>
+     * </ul>
+     *
+     * @ingroup Scrollable Container Component
+     * @since 26.2.0
+     */
+    NODE_SCROLL_STATE = 1002030,
+
+    /**
+     * @brief Sets whether to enable scrolling with keyboard arrow keys. When enabled, the component will scroll
+     * in response to arrow key presses when focused but not in active focus state. This attribute can be set,
+     * reset, and obtained as required through APIs.
+     * <br>The format of the {@link ArkUI_AttributeItem} parameter for setting the attribute and the format of the
+     * return value **ArkUI_AttributeItem** are as follows.
+     *
+     * **Format of the {@link ArkUI_AttributeItem} parameter for setting the attribute:**
+     * <ul>
+     * <li>.value[0].i32 Whether to enable scrolling with keyboard arrow keys, 0: no, 1: yes. The default value is 1.
+     * </li>
+     * </ul>
+     *
+     * **Format of the return value {@link ArkUI_AttributeItem}:**
+     * <ul>
+     * <li>.value[0].i32 Whether to enable scrolling with keyboard arrow keys, 0: no, 1: yes.</li>
+     * </ul>
+     *
+     * @ingroup Scrollable Container Component
+     * @since 26.2.0
+     */
+    NODE_SCROLL_ENABLE_SCROLL_WITH_KEYBOARD = 1002031,
+
+    /**
      * @brief Defines the direction in which the list items are arranged. This attribute can be set, reset, and
      * obtained as required through APIs.
      *
@@ -8314,8 +8391,8 @@ typedef enum {
     /**
      * @brief Scroll to the specified index.
      * 
-     * When activating the smooth animation, all items passed through will be loaded and layout calculated, which can
-     * lead to performance issues when loading a large number of items.\n
+     * When smooth animation is enabled without fast scrolling, all items passed through will be loaded and laid out,
+     * which can lead to performance issues when loading a large number of items.\n
      * \n
      * Format of the {@link ArkUI_AttributeItem} parameter for setting the attribute:\n
      * .value[0].i32：The index value of the target element to be slid to in the current container.\n
@@ -8325,6 +8402,11 @@ typedef enum {
      * {@link ArkUI_ScrollAlignment}, default value is ARKUI_SCROLL_ALIGNMENT_START. \n
      * .value[3]?.f32: extra offset, in vp. The default value is <b>0</b>.
      * This parameter is supported since API version 15. \n
+     * .value[4]?.i32: fast scroll mode for List. The value <b>0</b> disables optimization, <b>1</b> skips
+     * intermediate item measurement, and <b>2</b> skips intermediate item creation and measurement.
+     * Other values disable optimization. The default value is <b>0</b>. This option takes effect only when
+     * .value[1] is <b>1</b>. When enabled, intermediate items may be skipped using estimated positions.
+     * This parameter is supported since API version 26.2.0. \n
      *
      */
     NODE_LIST_SCROLL_TO_INDEX,
@@ -9968,6 +10050,17 @@ typedef enum {
     */
     NODE_IMAGE_ANIMATOR_ITERATION = 19006,
     /**
+     * @brief 设置帧动画中帧图片缩放时的插值质量。支持属性设置，属性重置和属性获取接口。
+     *
+     * 属性设置方法参数{@link ArkUI_AttributeItem}格式： \n
+     * .value[0].i32：图片缩放插值质量，参数类型为{@link ArkUI_ImageInterpolation}，默认值为LOW。 \n
+     *
+     * 属性获取方法返回值{@link ArkUI_AttributeItem}格式： \n
+     * .value[0].i32：图片缩放插值质量，参数类型为{@link ArkUI_ImageInterpolation}。 \n
+     *
+    */
+    NODE_IMAGE_ANIMATOR_INTERPOLATION = 19007,
+    /**
      * @brief Defines the disabled date range of the calendar picker.
      * This attribute can be set, reset, and obtained as required through APIs.
      *
@@ -9995,6 +10088,26 @@ typedef enum {
      * @since 19
      */
     NODE_CALENDAR_PICKER_MARK_TODAY = 16007,
+    /**
+     * @brief Defines the first day of the week for the calendar picker.
+     * This attribute can be set, reset, and obtained as required through APIs.
+     *
+     * **Format of the {@link ArkUI_AttributeItem} parameter for setting the attribute:**
+     * <ul>
+     * <li>value[0].i32: first day of the week. The value range is [0, 7].
+     * <b>0</b>: follows the system region. <b>1</b>: Monday. <b>2</b>: Tuesday. <b>3</b>: Wednesday. <b>4</b>: Thursday.
+     * <b>5</b>: Friday. <b>6</b>: Saturday. <b>7</b>: Sunday. The default value is <b>0</b> (follows the system region).</li>
+     * </ul>
+     *
+     * **Format of the return value {@link ArkUI_AttributeItem}:**
+     * <ul>
+     * <li>value[0].i32: first day of the week.</li>
+     * </ul>
+     *
+     * @ingroup Calendarpicker
+     * @since 26.2.0
+     */
+    NODE_CALENDAR_PICKER_FIRST_DAY_OF_WEEK = 16008,
 
     /**
      * @brief Defines the want used to start EmbeddedAbility.
@@ -14361,6 +14474,47 @@ int32_t OH_ArkUI_NodeUtils_GetNodeUniqueId(ArkUI_NodeHandle node, int32_t* uniqu
  * @since 22
  */
 int32_t OH_ArkUI_NativeModule_AdoptChild(ArkUI_NodeHandle node, ArkUI_NodeHandle child);
+
+/**
+ * @brief Adopts the target child node and enables compensated window-position calculation across the adoption
+ * boundary. The adopted node must not have an existing parent node. Use
+ * {@link OH_ArkUI_NativeModule_SetAdoptedChildOverlayPositionCompensation} to provide the aggregate position
+ * compensation of intermediate render-only nodes.
+ *
+ * @param node ArkUI_NodeHandle pointer, the parent node that will adopt the child node.
+ * @param child ArkUI_NodeHandle pointer, the target node being adopted.
+ * @param policy The policy to set. Valid values correspond to {@link OH_ArkUI_AdoptPolicy}.
+ * @return Error code.
+ *         {@link ARKUI_ERROR_CODE_NO_ERROR} Success.
+ *         {@link ARKUI_ERROR_CODE_PARAM_INVALID} A parameter is invalid or the policy is invalid.
+ *         {@link ARKUI_ERROR_CODE_CAPI_INIT_ERROR} The CAPI init error.
+ *         {@link ARKUI_ERROR_CODE_NODE_HAS_PARENT} The child already has a parent node.
+ *         {@link ARKUI_ERROR_CODE_NODE_CAN_NOT_BE_ADOPTED} The child can not be adopted.
+ *         {@link ARKUI_ERROR_CODE_NODE_CAN_NOT_ADOPT_TO} The node can not adopt children.
+ * @since 26.2.0
+ */
+int32_t OH_ArkUI_NativeModule_AdoptChildWithPolicy(
+    ArkUI_NodeHandle node, ArkUI_NodeHandle child, OH_ArkUI_AdoptPolicy policy);
+
+/**
+ * @brief Sets the overlay position compensation from an adopted child to its adopt parent. The compensation
+ * represents the aggregate effect of the render-only nodes between them. A point is first translated by
+ * @p compensationOffset and then transformed by @p compensationTransform. The child must have been adopted with
+ * {@link OH_ARKUI_NATIVE_MODULE_ADOPT_POLICY_OVERLAY_POSITION_FOLLOWS_ADOPT_PARENT_CHAIN}.
+ *
+ * @param adoptedChild The adopted child node on which the compensation is stored.
+ * @param compensationOffset The aggregate x/y offset, in px, of the intermediate render-only nodes.
+ * @param compensationTransform The aggregate transform of the intermediate render-only nodes. The matrix is copied
+ * by this call.
+ * @return Error code.
+ *         {@link ARKUI_ERROR_CODE_NO_ERROR} Success.
+ *         {@link ARKUI_ERROR_CODE_PARAM_INVALID} A parameter is invalid.
+ *         {@link ARKUI_ERROR_CODE_CAPI_INIT_ERROR} The CAPI init error.
+ *         {@link ARKUI_ERROR_CODE_NODE_IS_NOT_IN_ADOPTED_CHILDREN} The child is not adopted with the required policy.
+ * @since 26.2.0
+ */
+int32_t OH_ArkUI_NativeModule_SetAdoptedChildOverlayPositionCompensation(ArkUI_NodeHandle adoptedChild,
+    const ArkUI_PointF* compensationOffset, const ArkUI_Matrix4* compensationTransform);
 
 /**
  * @brief Remove the target adopted child node.

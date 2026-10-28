@@ -14,6 +14,7 @@
  */
 
 #include "core/components_ng/event/event_hub.h"
+#include "core/components_ng/event/event_hub_callback_sets.h"
 #include "core/components_ng/event/state_style_manager.h"
 
 #include "core/common/event_manager.h"
@@ -24,9 +25,70 @@ namespace OHOS::Ace::NG {
 
 EventHub::EventHub() = default;
 
-EventHub::~EventHub()
+EventHub::~EventHub() = default;
+
+RefPtr<AppearCallbackSet> EventHub::GetOrCreateAppearCallbackSet()
 {
-    keyboardShortcut_.clear();
+    if (appearCallbackSet_) {
+        return appearCallbackSet_;
+    }
+    appearCallbackSet_ = MakeRefPtr<AppearCallbackSet>();
+    return appearCallbackSet_;
+}
+
+RefPtr<AreaCallbackSet> EventHub::GetOrCreateAreaCallbackSet()
+{
+    if (areaCallbackSet_) {
+        return areaCallbackSet_;
+    }
+    areaCallbackSet_ = MakeRefPtr<AreaCallbackSet>();
+    return areaCallbackSet_;
+}
+
+RefPtr<SizeCallbackSet> EventHub::GetOrCreateSizeCallbackSet()
+{
+    if (sizeCallbackSet_) {
+        return sizeCallbackSet_;
+    }
+    sizeCallbackSet_ = MakeRefPtr<SizeCallbackSet>();
+    return sizeCallbackSet_;
+}
+
+RefPtr<AttachDetachCallbackSet> EventHub::GetOrCreateAttachDetachCallbackSet()
+{
+    if (attachDetachCallbackSet_) {
+        return attachDetachCallbackSet_;
+    }
+    attachDetachCallbackSet_ = MakeRefPtr<AttachDetachCallbackSet>();
+    return attachDetachCallbackSet_;
+}
+
+RefPtr<EnabledNdkCallbackSet> EventHub::GetOrCreateEnabledNdkCallbackSet()
+{
+    if (enabledNdkCallbackSet_) {
+        return enabledNdkCallbackSet_;
+    }
+    enabledNdkCallbackSet_ = MakeRefPtr<EnabledNdkCallbackSet>();
+    return enabledNdkCallbackSet_;
+}
+
+RefPtr<KeyboardShortcutSet> EventHub::GetOrCreateKeyboardShortcutSet()
+{
+    if (keyboardShortcutSet_) {
+        return keyboardShortcutSet_;
+    }
+    keyboardShortcutSet_ = MakeRefPtr<KeyboardShortcutSet>();
+    return keyboardShortcutSet_;
+}
+
+std::function<void()> EventHub::GetOnAppear() const
+{
+    return appearCallbackSet_ ? appearCallbackSet_->onAppear : nullptr;
+}
+
+std::function<void()> EventHub::GetOnJSFrameNodeAppear() const
+{
+    return appearCallbackSet_ ? appearCallbackSet_->onJSFrameNodeAppear : nullptr;
 }
 
 void EventHub::AttachHost(const WeakPtr<FrameNode>& host)
@@ -176,7 +238,7 @@ void EventHub::PostEnabledTask()
         eventHub->UpdateCurrentUIState(UI_STATE_DISABLED);
     };
     if (!host->IsOnMainTree()) {
-        enabledFunc_ = callback;
+        GetOrCreateEnabledNdkCallbackSet()->enabledFunc = callback;
         return;
     }
     taskExecutor->PostTask(callback, TaskExecutor::TaskType::UI, "ArkUIUpdateCurrentUIState");
@@ -184,9 +246,9 @@ void EventHub::PostEnabledTask()
 
 void EventHub::FireEnabledTask()
 {
-    if (enabledFunc_) {
-        enabledFunc_();
-        enabledFunc_ = nullptr;
+    if (enabledNdkCallbackSet_ && enabledNdkCallbackSet_->enabledFunc) {
+        enabledNdkCallbackSet_->enabledFunc();
+        enabledNdkCallbackSet_->enabledFunc = nullptr;
     }
 }
 
@@ -450,49 +512,52 @@ void EventHub::AddInnerOnAreaChangedCallback(int32_t id, OnAreaChangedFunc&& cal
     CHECK_NULL_VOID(frameNode);
     pipeline->AddOnAreaChangeNode(frameNode->GetId());
     frameNode->InitLastArea();
-    if (onAreaChangedInnerCallbacks_.find(id) == onAreaChangedInnerCallbacks_.end()) {
-        hasInnerAreaChangeUntriggered_.emplace_back(id);
+    auto areaCallbackSet = GetOrCreateAreaCallbackSet();
+    if (areaCallbackSet->onAreaChangedInnerCallbacks.find(id) == areaCallbackSet->onAreaChangedInnerCallbacks.end()) {
+        areaCallbackSet->hasInnerAreaChangeUntriggered.emplace_back(id);
     }
-    onAreaChangedInnerCallbacks_[id] = std::move(callback);
+    areaCallbackSet->onAreaChangedInnerCallbacks[id] = std::move(callback);
 }
 
 void EventHub::RemoveInnerOnAreaChangedCallback(int32_t id)
 {
-    onAreaChangedInnerCallbacks_.erase(id);
+    if (areaCallbackSet_) {
+        areaCallbackSet_->onAreaChangedInnerCallbacks.erase(id);
+    }
 }
 
 void EventHub::SetOnSizeChanged(OnSizeChangedFunc&& onSizeChanged)
 {
-    onSizeChanged_ = std::move(onSizeChanged);
+    GetOrCreateSizeCallbackSet()->onSizeChanged = std::move(onSizeChanged);
 }
 
 void EventHub::FireOnSizeChanged(const RectF& oldRect, const RectF& rect)
 {
-    if (onSizeChanged_) {
+    if (sizeCallbackSet_ && sizeCallbackSet_->onSizeChanged) {
         // callback may be overwritten in its invoke so we copy it first
-        auto onSizeChanged = onSizeChanged_;
+        auto onSizeChanged = sizeCallbackSet_->onSizeChanged;
         onSizeChanged(oldRect, rect);
     }
 }
 
 void EventHub::SetFrameNodeCommonOnSizeChangeCallback(OnSizeChangedFunc&& onSizeChanged)
 {
-    onJsFrameNodeSizeChanged_ = std::move(onSizeChanged);
+    GetOrCreateSizeCallbackSet()->onJsFrameNodeSizeChanged = std::move(onSizeChanged);
 }
 
 void EventHub::FireJSFrameNodeOnSizeChanged(const RectF& oldRect, const RectF& rect)
 {
-    if (onJsFrameNodeSizeChanged_) {
+    if (sizeCallbackSet_ && sizeCallbackSet_->onJsFrameNodeSizeChanged) {
         // callback may be overwritten in its invoke so we copy it first
-        auto onSizeChanged = onJsFrameNodeSizeChanged_;
+        auto onSizeChanged = sizeCallbackSet_->onJsFrameNodeSizeChanged;
         onSizeChanged(oldRect, rect);
     }
 }
 
 void EventHub::ClearJSFrameNodeOnSizeChange()
 {
-    if (onJsFrameNodeSizeChanged_) {
-        onJsFrameNodeSizeChanged_ = nullptr;
+    if (sizeCallbackSet_ && sizeCallbackSet_->onJsFrameNodeSizeChanged) {
+        sizeCallbackSet_->onJsFrameNodeSizeChanged = nullptr;
     }
     auto host = GetFrameNode();
     CHECK_NULL_VOID(host);
@@ -501,7 +566,8 @@ void EventHub::ClearJSFrameNodeOnSizeChange()
 
 bool EventHub::HasOnSizeChanged() const
 {
-    return static_cast<bool>(onSizeChanged_) || static_cast<bool>(onJsFrameNodeSizeChanged_);
+    return sizeCallbackSet_ && (static_cast<bool>(sizeCallbackSet_->onSizeChanged) ||
+        static_cast<bool>(sizeCallbackSet_->onJsFrameNodeSizeChanged));
 }
 
 bool EventHub::HasImmediatelyVisibleCallback()
@@ -513,7 +579,9 @@ bool EventHub::HasImmediatelyVisibleCallback()
 
 void EventHub::ClearOnAreaChangedInnerCallbacks()
 {
-    onAreaChangedInnerCallbacks_.clear();
+    if (areaCallbackSet_) {
+        areaCallbackSet_->onAreaChangedInnerCallbacks.clear();
+    }
 }
 
 void EventHub::ClearCustomerOnDragFunc()
@@ -583,31 +651,32 @@ void EventHub::ClearCustomerOnDragEnd()
 
 void EventHub::SetFrameNodeCommonOnAppear(std::function<void()>&& onAppear)
 {
-    onJSFrameNodeAppear_ = std::move(onAppear);
+    GetOrCreateAppearCallbackSet()->onJSFrameNodeAppear = std::move(onAppear);
 }
 
 void EventHub::ClearJSFrameNodeOnAppear()
 {
-    if (onJSFrameNodeAppear_) {
-        onJSFrameNodeAppear_ = nullptr;
+    if (appearCallbackSet_ && appearCallbackSet_->onJSFrameNodeAppear) {
+        appearCallbackSet_->onJSFrameNodeAppear = nullptr;
     }
 }
 
 void EventHub::SetFrameNodeCommonOnDisappear(std::function<void()>&& onDisappear)
 {
-    onJSFrameNodeDisappear_ = std::move(onDisappear);
+    GetOrCreateAppearCallbackSet()->onJSFrameNodeDisappear = std::move(onDisappear);
 }
 
 void EventHub::ClearJSFrameNodeOnDisappear()
 {
-    if (onJSFrameNodeDisappear_) {
-        onJSFrameNodeDisappear_ = nullptr;
+    if (appearCallbackSet_ && appearCallbackSet_->onJSFrameNodeDisappear) {
+        appearCallbackSet_->onJSFrameNodeDisappear = nullptr;
     }
 }
 
 void EventHub::FireOnAppear()
 {
-    if (onAppear_ || onJSFrameNodeAppear_) {
+    if (appearCallbackSet_ &&
+        (appearCallbackSet_->onAppear || appearCallbackSet_->onJSFrameNodeAppear)) {
         auto pipeline = PipelineBase::GetCurrentContextSafelyWithCheck();
         CHECK_NULL_VOID(pipeline);
         auto taskScheduler = pipeline->GetTaskExecutor();
@@ -616,14 +685,14 @@ void EventHub::FireOnAppear()
             [weak = WeakClaim(this)]() {
                 auto eventHub = weak.Upgrade();
                 CHECK_NULL_VOID(eventHub);
-                if (eventHub->onAppear_) {
+                if (eventHub->appearCallbackSet_ && eventHub->appearCallbackSet_->onAppear) {
                     // callback may be overwritten in its invoke so we copy it first
-                    auto onAppear = eventHub->onAppear_;
+                    auto onAppear = eventHub->appearCallbackSet_->onAppear;
                     onAppear();
                 }
-                if (eventHub->onJSFrameNodeAppear_) {
+                if (eventHub->appearCallbackSet_ && eventHub->appearCallbackSet_->onJSFrameNodeAppear) {
                     // callback may be overwritten in its invoke so we copy it first
-                    auto onJSFrameNodeAppear = eventHub->onJSFrameNodeAppear_;
+                    auto onJSFrameNodeAppear = eventHub->appearCallbackSet_->onJSFrameNodeAppear;
                     onJSFrameNodeAppear();
                 }
             },
@@ -633,26 +702,29 @@ void EventHub::FireOnAppear()
 
 void EventHub::FireOnDisappear()
 {
-    if (onDisappear_) {
+    if (appearCallbackSet_ && appearCallbackSet_->onDisappear) {
         // callback may be overwritten in its invoke so we copy it first
-        auto onDisappear = onDisappear_;
+        auto onDisappear = appearCallbackSet_->onDisappear;
         onDisappear();
     }
-    if (onJSFrameNodeDisappear_) {
+    if (appearCallbackSet_ && appearCallbackSet_->onJSFrameNodeDisappear) {
         // callback may be overwritten in its invoke so we copy it first
-        auto onJSFrameNodeDisappear = onJSFrameNodeDisappear_;
+        auto onJSFrameNodeDisappear = appearCallbackSet_->onJSFrameNodeDisappear;
         onJSFrameNodeDisappear();
     }
 }
 
 void EventHub::AddInnerOnSizeChanged(int32_t id, OnSizeChangedFunc&& callback)
 {
-    onSizeChangedInnerCallbacks_[id] = std::move(callback);
+    GetOrCreateSizeCallbackSet()->onSizeChangedInnerCallbacks[id] = std::move(callback);
 }
 
 void EventHub::FireInnerOnSizeChanged(const RectF& oldRect, const RectF& rect)
 {
-    for (auto& innerCallbackInfo : onSizeChangedInnerCallbacks_) {
+    if (!sizeCallbackSet_) {
+        return;
+    }
+    for (auto& innerCallbackInfo : sizeCallbackSet_->onSizeChangedInnerCallbacks) {
         if (innerCallbackInfo.second) {
             auto innerOnSizeCallback = innerCallbackInfo.second;
             innerOnSizeCallback(oldRect, rect);
@@ -662,40 +734,46 @@ void EventHub::FireInnerOnSizeChanged(const RectF& oldRect, const RectF& rect)
 
 bool EventHub::HasInnerOnSizeChanged() const
 {
-    return !onSizeChangedInnerCallbacks_.empty();
+    return sizeCallbackSet_ && !sizeCallbackSet_->onSizeChangedInnerCallbacks.empty();
 }
 
 void EventHub::ClearInnerOnSizeChanged()
 {
-    onSizeChangedInnerCallbacks_.clear();
+    if (sizeCallbackSet_) {
+        sizeCallbackSet_->onSizeChangedInnerCallbacks.clear();
+    }
 }
 
 void EventHub::SetOnAttach(std::function<void()>&& onAttach)
 {
-    onAttach_ = std::move(onAttach);
+    GetOrCreateAttachDetachCallbackSet()->onAttach = std::move(onAttach);
 }
 
 void EventHub::ClearOnAttach()
 {
-    onAttach_ = nullptr;
+    if (attachDetachCallbackSet_) {
+        attachDetachCallbackSet_->onAttach = nullptr;
+    }
 }
 
 void EventHub::FireOnAttach()
 {
-    if (onAttach_) {
-        auto onAttach = onAttach_;
+    if (attachDetachCallbackSet_ && attachDetachCallbackSet_->onAttach) {
+        auto onAttach = attachDetachCallbackSet_->onAttach;
         onAttach();
     }
 }
 
 void EventHub::SetOnDetach(std::function<void()>&& onDetach)
 {
-    onDetach_ = std::move(onDetach);
+    GetOrCreateAttachDetachCallbackSet()->onDetach = std::move(onDetach);
 }
 
 void EventHub::ClearOnDetach()
 {
-    onDetach_ = nullptr;
+    if (attachDetachCallbackSet_) {
+        attachDetachCallbackSet_->onDetach = nullptr;
+    }
 }
 
 void EventHub::ClearOnPreDrag()
@@ -707,8 +785,8 @@ void EventHub::ClearOnPreDrag()
 
 void EventHub::FireOnDetach()
 {
-    if (onDetach_) {
-        auto onDetach = onDetach_;
+    if (attachDetachCallbackSet_ && attachDetachCallbackSet_->onDetach) {
+        auto onDetach = attachDetachCallbackSet_->onDetach;
         onDetach();
     }
 }
@@ -794,46 +872,46 @@ void EventHub::OnContextAttached()
 
 void EventHub::ClearUserOnAppear()
 {
-    if (onAppear_) {
-        onAppear_ = nullptr;
+    if (appearCallbackSet_ && appearCallbackSet_->onAppear) {
+        appearCallbackSet_->onAppear = nullptr;
     }
 }
 
 void EventHub::SetOnAppear(std::function<void()>&& onAppear)
 {
-    onAppear_ = std::move(onAppear);
+    GetOrCreateAppearCallbackSet()->onAppear = std::move(onAppear);
 }
 
 void EventHub::ClearUserOnDisAppear()
 {
-    if (onDisappear_) {
-        onDisappear_ = nullptr;
+    if (appearCallbackSet_ && appearCallbackSet_->onDisappear) {
+        appearCallbackSet_->onDisappear = nullptr;
     }
 }
 
 void EventHub::SetOnDisappear(std::function<void()>&& onDisappear)
 {
-    onDisappear_ = std::move(onDisappear);
+    GetOrCreateAppearCallbackSet()->onDisappear = std::move(onDisappear);
 }
 
 void EventHub::ClearUserOnAreaChanged()
 {
-    if (onAreaChanged_) {
-        onAreaChanged_ = nullptr;
+    if (areaCallbackSet_ && areaCallbackSet_->onAreaChanged) {
+        areaCallbackSet_->onAreaChanged = nullptr;
     }
 }
 
 void EventHub::SetOnAreaChanged(OnAreaChangedFunc&& onAreaChanged)
 {
-    onAreaChanged_ = std::move(onAreaChanged);
+    GetOrCreateAreaCallbackSet()->onAreaChanged = std::move(onAreaChanged);
 }
 
 void EventHub::FireOnAreaChanged(
     const RectF& oldRect, const OffsetF& oldOrigin, const RectF& rect, const OffsetF& origin)
 {
-    if (onAreaChanged_) {
+    if (areaCallbackSet_ && areaCallbackSet_->onAreaChanged) {
         // callback may be overwritten in its invoke so we copy it first
-        auto onAreaChanged = onAreaChanged_;
+        auto onAreaChanged = areaCallbackSet_->onAreaChanged;
         onAreaChanged(oldRect, oldOrigin, rect, origin);
     }
 }
@@ -841,24 +919,27 @@ void EventHub::FireOnAreaChanged(
 void EventHub::FireInnerOnAreaChanged(
     const RectF& oldRect, const OffsetF& oldOrigin, const RectF& rect, const OffsetF& origin)
 {
-    auto callbacks = onAreaChangedInnerCallbacks_;
+    if (!areaCallbackSet_) {
+        return;
+    }
+    auto callbacks = areaCallbackSet_->onAreaChangedInnerCallbacks;
     for (auto& innerCallbackInfo : callbacks) {
         if (innerCallbackInfo.second) {
             auto innerOnAreaCallback = innerCallbackInfo.second;
             innerOnAreaCallback(oldRect, oldOrigin, rect, origin);
         }
     }
-    hasInnerAreaChangeUntriggered_.clear();
+    areaCallbackSet_->hasInnerAreaChangeUntriggered.clear();
 }
 
 bool EventHub::HasOnAreaChanged() const
 {
-    return static_cast<bool>(onAreaChanged_);
+    return areaCallbackSet_ && static_cast<bool>(areaCallbackSet_->onAreaChanged);
 }
 
 bool EventHub::HasInnerOnAreaChanged() const
 {
-    return !onAreaChangedInnerCallbacks_.empty();
+    return areaCallbackSet_ && !areaCallbackSet_->onAreaChangedInnerCallbacks.empty();
 }
 
 void EventHub::SetOnPreDrag(OnPreDragFunc&& onPreDragFunc)
@@ -1159,30 +1240,39 @@ void EventHub::SetKeyboardShortcut(
     keyboardShortcut.keys = keys;
     keyboardShortcut.onKeyboardShortcutAction = onKeyboardShortcutAction;
 
-    for (auto& shortCut : keyboardShortcut_) {
+    auto keyboardShortcutSet = GetOrCreateKeyboardShortcutSet();
+    for (auto& shortCut : keyboardShortcutSet->keyboardShortcut) {
         if (shortCut.IsEqualTrigger(keyboardShortcut)) {
             shortCut.onKeyboardShortcutAction = onKeyboardShortcutAction;
             return;
         }
     }
-    keyboardShortcut_.emplace_back(keyboardShortcut);
+    keyboardShortcutSet->keyboardShortcut.emplace_back(keyboardShortcut);
 }
 
 void EventHub::ClearSingleKeyboardShortcut()
 {
-    if (keyboardShortcut_.size() == 1) {
-        keyboardShortcut_.clear();
+    if (keyboardShortcutSet_ && keyboardShortcutSet_->keyboardShortcut.size() == 1) {
+        keyboardShortcutSet_->keyboardShortcut.clear();
     }
 }
 
 void EventHub::ClearSingleKeyboardShortcutAll()
 {
-    keyboardShortcut_.clear();
+    if (keyboardShortcutSet_) {
+        keyboardShortcutSet_->keyboardShortcut.clear();
+    }
 }
 
-std::vector<KeyboardShortcut>& EventHub::GetKeyboardShortcut()
+bool EventHub::HasKeyboardShortcut() const
 {
-    return keyboardShortcut_;
+    return keyboardShortcutSet_ && !keyboardShortcutSet_->keyboardShortcut.empty();
+}
+
+const std::vector<KeyboardShortcut>& EventHub::GetKeyboardShortcut() const
+{
+    static const std::vector<KeyboardShortcut> EMPTY_KEYBOARD_SHORTCUT;
+    return keyboardShortcutSet_ ? keyboardShortcutSet_->keyboardShortcut : EMPTY_KEYBOARD_SHORTCUT;
 }
 
 void EventHub::SetDefaultOnDragStart(OnDragStartFunc&& defaultOnDragStart)
@@ -1309,7 +1399,7 @@ bool EventHub::HandleOnAreaChange(const std::unique_ptr<RectF>& lastFrameRect,
         *lastParentOffsetToWindow = currParentOffsetToWindow;
     }
 
-    if (!hasInnerAreaChangeUntriggered_.empty()) {
+    if (areaCallbackSet_ && !areaCallbackSet_->hasInnerAreaChangeUntriggered.empty()) {
         FireUntriggeredInnerOnAreaChanged(
             *lastFrameRect, *lastParentOffsetToWindow, currFrameRect, currParentOffsetToWindow);
         return true;
@@ -1320,21 +1410,24 @@ bool EventHub::HandleOnAreaChange(const std::unique_ptr<RectF>& lastFrameRect,
 void EventHub::FireUntriggeredInnerOnAreaChanged(
     const RectF& oldRect, const OffsetF& oldOrigin, const RectF& rect, const OffsetF& origin)
 {
-    for (auto& id : hasInnerAreaChangeUntriggered_) {
-        auto it = onAreaChangedInnerCallbacks_.find(id);
-        if (it != onAreaChangedInnerCallbacks_.end()) {
+    if (!areaCallbackSet_) {
+        return;
+    }
+    for (auto& id : areaCallbackSet_->hasInnerAreaChangeUntriggered) {
+        auto it = areaCallbackSet_->onAreaChangedInnerCallbacks.find(id);
+        if (it != areaCallbackSet_->onAreaChangedInnerCallbacks.end()) {
             auto innerOnAreaCallback = it->second;
             if (innerOnAreaCallback) {
                 innerOnAreaCallback(oldRect, oldOrigin, rect, origin);
             }
         }
     }
-    hasInnerAreaChangeUntriggered_.clear();
+    areaCallbackSet_->hasInnerAreaChangeUntriggered.clear();
 }
 
 void EventHub::FireDrawCompletedNDKCallback(PipelineContext* pipeline)
 {
-    if (!ndkDrawCompletedCallback_) {
+    if (!enabledNdkCallbackSet_ || !enabledNdkCallbackSet_->ndkDrawCompletedCallback) {
         return;
     }
     if (pipeline == nullptr) {
@@ -1350,7 +1443,10 @@ void EventHub::FireDrawCompletedNDKCallback(PipelineContext* pipeline)
         [weak = WeakClaim(this)]() {
             auto eventHub = weak.Upgrade();
             CHECK_NULL_VOID(eventHub);
-            auto cb = eventHub->ndkDrawCompletedCallback_;
+            if (!eventHub->enabledNdkCallbackSet_) {
+                return;
+            }
+            auto cb = eventHub->enabledNdkCallbackSet_->ndkDrawCompletedCallback;
             if (cb) {
                 cb();
             }
@@ -1360,7 +1456,7 @@ void EventHub::FireDrawCompletedNDKCallback(PipelineContext* pipeline)
 
 void EventHub::FireLayoutNDKCallback(const PipelineContext* pipeline)
 {
-    if (!ndkLayoutCallback_) {
+    if (!enabledNdkCallbackSet_ || !enabledNdkCallbackSet_->ndkLayoutCallback) {
         return;
     }
     if (!pipeline) {
@@ -1376,7 +1472,10 @@ void EventHub::FireLayoutNDKCallback(const PipelineContext* pipeline)
         [weak = WeakClaim(this)]() {
             auto eventHub = weak.Upgrade();
             CHECK_NULL_VOID(eventHub);
-            auto cb = eventHub->ndkLayoutCallback_;
+            if (!eventHub->enabledNdkCallbackSet_) {
+                return;
+            }
+            auto cb = eventHub->enabledNdkCallbackSet_->ndkLayoutCallback;
             if (cb) {
                 cb();
             }
@@ -1390,17 +1489,17 @@ bool KeyboardShortcut::IsEqualTrigger(const KeyboardShortcut& other)
 
 void EventHub::SetNDKDrawCompletedCallback(std::function<void()>&& callback)
 {
-    ndkDrawCompletedCallback_ = std::move(callback);
+    GetOrCreateEnabledNdkCallbackSet()->ndkDrawCompletedCallback = std::move(callback);
 }
 
 void EventHub::SetNDKLayoutCallback(std::function<void()>&& callback)
 {
-    ndkLayoutCallback_ = std::move(callback);
+    GetOrCreateEnabledNdkCallbackSet()->ndkLayoutCallback = std::move(callback);
 }
 
 bool EventHub::HasNDKDrawCompletedCallback()
 {
-    return !!ndkDrawCompletedCallback_;
+    return enabledNdkCallbackSet_ && static_cast<bool>(enabledNdkCallbackSet_->ndkDrawCompletedCallback);
 }
 
 void EventHub::SetCompensateOnSizeChangeEvent(bool compensateOnSizeChangeEvent)
@@ -1411,6 +1510,29 @@ void EventHub::SetCompensateOnSizeChangeEvent(bool compensateOnSizeChangeEvent)
 bool EventHub::IsCompensateOnSizeChangeEvent() const
 {
     return compensateOnSizeChangeEvent_;
+}
+
+bool EventHub::HasTreeCallbacks() const
+{
+    return (appearCallbackSet_ && (appearCallbackSet_->onAppear || appearCallbackSet_->onJSFrameNodeAppear ||
+                                      appearCallbackSet_->onDisappear || appearCallbackSet_->onJSFrameNodeDisappear)) ||
+           (attachDetachCallbackSet_ && (attachDetachCallbackSet_->onAttach || attachDetachCallbackSet_->onDetach)) ||
+           HasOnAreaChanged() || HasInnerOnAreaChanged() || HasOnSizeChanged() || HasInnerOnSizeChanged() ||
+           (sizeCallbackSet_ && sizeCallbackSet_->onJsFrameNodeSizeChanged) ||
+           (enabledNdkCallbackSet_ &&
+               (enabledNdkCallbackSet_->ndkDrawCompletedCallback || enabledNdkCallbackSet_->ndkLayoutCallback)) ||
+           dragDropCallbackSet_ || visibleAreaChangeCallbackSet_ || stateStyleMgr_;
+}
+
+bool EventHub::HasTreeInteraction() const
+{
+    auto gesture = GetGestureEventHub();
+    auto input = GetInputEventHub();
+    auto focus = GetFocusHub();
+    return (gesture && gesture->HasTreeInteraction()) || (input && input->HasTreeInteraction()) ||
+           (focus && focus->HasTreeInteraction()) || HasTreeCallbacks() || !IsEnabled() || HasOnAreaChanged() ||
+           HasOnSizeChanged() || HasOnDragStart() || HasOnDragMove() || HasOnDragEnter() || HasOnDragLeave() ||
+           HasOnDragEnd() || HasOnDrop() || HasKeyboardShortcut();
 }
 
 } // namespace OHOS::Ace::NG

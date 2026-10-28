@@ -30,7 +30,7 @@ class FrameNode;
 // non-system apps only inside a Navigation titleBar or a bottom Tabs TabBar
 // subtree (or on overlay-exempt components). Non-scope material is suppressed
 // (removed) and restored on re-entry. Re-evaluated every frame after layout.
-class ACE_FORCE_EXPORT MaterialProcessor : public virtual AceType {
+class ACE_FORCE_EXPORT MaterialProcessor : public AceType {
     DECLARE_ACE_TYPE(MaterialProcessor, AceType);
 
 public:

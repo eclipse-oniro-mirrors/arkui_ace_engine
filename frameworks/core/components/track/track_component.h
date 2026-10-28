@@ -35,7 +35,7 @@ enum class SliderMode {
 
 inline const Dimension TRACK_HEIGHT_DP = Dimension(2.0, DimensionUnit::VP);
 
-class RingTrackInfo : public virtual AceType {
+class RingTrackInfo : public AceType {
     DECLARE_ACE_TYPE(RingTrackInfo, AceType);
 
 public:

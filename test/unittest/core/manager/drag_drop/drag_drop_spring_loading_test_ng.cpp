@@ -345,6 +345,90 @@ void DragSpringLoadingTestNg::SetupTestCaseConditions(const DragDropSpringLoadin
 }
 
 /**
+ * @tc.name: SpringLoadingSummaryPropagation001
+ * @tc.desc: Preserve complete file summaries in each spring loading notification state.
+ * @tc.type: FUNC
+ */
+HWTEST_F(DragSpringLoadingTestNg, SpringLoadingSummaryPropagation001, TestSize.Level1)
+{
+    auto pipeline = dropFrameNode_->GetContextWithCheck();
+    ASSERT_NE(pipeline, nullptr);
+    auto manager = pipeline->GetDragDropManager();
+    ASSERT_NE(manager, nullptr);
+    const auto originalSummary = manager->GetSummaryInfo();
+    DragSummaryInfo summary;
+    summary.summary = { { "general.file", 2 } };
+    summary.detailedSummary = { { "general.image", 2 } };
+    summary.summaryFormat = { { "general.image", { 1, 2 } } };
+    summary.version = 1;
+    summary.totalSize = 100;
+    summary.tag = "spring-loading";
+    summary.filenameExtensions = { ".jpg", ".png" };
+    detector_->preTargetFrameNode_ = dropFrameNode_;
+    auto machine = detector_->stateMachine_;
+    ASSERT_NE(machine, nullptr);
+    auto handler = AceType::MakeRefPtr<DragDropSpringLoadingStateBase>(machine);
+    auto context = AceType::MakeRefPtr<DragSpringLoadingContext>();
+    manager->SetSummaryInfo(summary);
+    for (auto state : { DragDropSpringLoadingState::BEGIN, DragDropSpringLoadingState::UPDATE,
+             DragDropSpringLoadingState::END, DragDropSpringLoadingState::CANCEL }) {
+        machine->currentState_ = state;
+        handler->UpdateDragSpringLoadingContext(context, DROP_INFO);
+        const auto& actual = context->GetSummaryInfo();
+        EXPECT_EQ(actual.summary, summary.summary);
+        EXPECT_EQ(actual.detailedSummary, summary.detailedSummary);
+        EXPECT_EQ(actual.summaryFormat, summary.summaryFormat);
+        EXPECT_EQ(actual.version, summary.version);
+        EXPECT_EQ(actual.totalSize, summary.totalSize);
+        EXPECT_EQ(actual.tag, summary.tag);
+        EXPECT_EQ(actual.filenameExtensions, summary.filenameExtensions);
+        EXPECT_EQ(context->GetSummary(), summary.summary);
+    }
+    manager->SetSummaryInfo(originalSummary);
+}
+
+/**
+ * @tc.name: SpringLoadingSummaryReplacement001
+ * @tc.desc: Text and empty summaries clear file extensions without altering an earlier context snapshot.
+ * @tc.type: FUNC
+ */
+HWTEST_F(DragSpringLoadingTestNg, SpringLoadingSummaryReplacement001, TestSize.Level1)
+{
+    auto pipeline = dropFrameNode_->GetContextWithCheck();
+    ASSERT_NE(pipeline, nullptr);
+    auto manager = pipeline->GetDragDropManager();
+    ASSERT_NE(manager, nullptr);
+    const auto originalSummary = manager->GetSummaryInfo();
+    detector_->preTargetFrameNode_ = dropFrameNode_;
+    auto machine = detector_->stateMachine_;
+    ASSERT_NE(machine, nullptr);
+    auto handler = AceType::MakeRefPtr<DragDropSpringLoadingStateBase>(machine);
+    auto fileContext = AceType::MakeRefPtr<DragSpringLoadingContext>();
+    machine->currentState_ = DragDropSpringLoadingState::UPDATE;
+    DragSummaryInfo fileSummary;
+    fileSummary.summary = { { "general.file", 1 } };
+    fileSummary.filenameExtensions = { ".png" };
+    manager->SetSummaryInfo(fileSummary);
+    handler->UpdateDragSpringLoadingContext(fileContext, DROP_INFO);
+
+    DragSummaryInfo textSummary;
+    textSummary.summary = { { "general.text", 1 } };
+    manager->SetSummaryInfo(textSummary);
+    EXPECT_EQ(fileContext->GetSummaryInfo().filenameExtensions, fileSummary.filenameExtensions);
+    auto context = AceType::MakeRefPtr<DragSpringLoadingContext>();
+    context->SetSummaryInfo(fileSummary);
+    handler->UpdateDragSpringLoadingContext(context, DROP_INFO);
+    EXPECT_EQ(context->GetSummary(), textSummary.summary);
+    EXPECT_TRUE(context->GetSummaryInfo().filenameExtensions.empty());
+
+    manager->SetSummaryInfo(DragSummaryInfo {});
+    handler->UpdateDragSpringLoadingContext(context, DROP_INFO);
+    EXPECT_TRUE(context->GetSummary().empty());
+    EXPECT_TRUE(context->GetSummaryInfo().filenameExtensions.empty());
+    manager->SetSummaryInfo(originalSummary);
+}
+
+/**
  * @tc.name: DragSpringLoadingTest001
  * @tc.desc: Test State Machine RegisterStateHandler
  * @tc.type: FUNC

@@ -24,7 +24,7 @@
 
 namespace OHOS::Ace::NG {
 
-class LinearIndicatorTheme : public virtual Theme {
+class LinearIndicatorTheme : public Theme {
     DECLARE_ACE_TYPE(LinearIndicatorTheme, Theme);
 
 public:

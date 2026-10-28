@@ -30,6 +30,7 @@
 #include "core/components_ng/pattern/scrollable/scrollable_pattern.h"
 #include "core/components_ng/pattern/navigation/nav_bar_pattern.h"
 #include "core/components_ng/pattern/text/text_base.h"
+#include "core/pipeline/base/element_register.h"
 #include "core/interfaces/native/node/node_text_input_modifier.h"
 #include "core/interfaces/native/node/sheet_modifier.h"
 
@@ -37,6 +38,7 @@ namespace OHOS::Ace::NG {
 namespace {
 constexpr Dimension RESERVE_BOTTOM_HEIGHT = 24.0_vp;
 constexpr int32_t MAX_FILL_CONTENT_SIZE = 5;
+constexpr int32_t MAX_ACCOUNT_LIST_SIZE = 100;
 constexpr char NAVBAR_ETS_TAG[] = "NavBar";
 constexpr char NAVDESTINATION_VIEW_ETS_TAG[] = "NavDestination";
 constexpr char NAVIGATION_VIEW_ETS_TAG[] = "Navigation";
@@ -595,6 +597,47 @@ bool TextFieldManagerNG::IsAutoFillPasswordType(const TextFieldInfo& textFieldIn
            textFieldInfo.contentType == TextContentType::NEW_PASSWORD;
 }
 
+RefPtr<FrameNode> TextFieldManagerNG::GetUserNameNodeInContainer(
+    const int32_t& autoFillContainerNodeId, const int32_t& nodeId)
+{
+    auto containerNodeIter = textFieldInfoMap_.find(autoFillContainerNodeId);
+    if (containerNodeIter == textFieldInfoMap_.end()) {
+        return nullptr;
+    }
+    const auto& innerTextFieldInfoMap = containerNodeIter->second;
+    // Two-pass lookup: self-check first (O(1)), then sibling-search (O(n)).
+    // Not merged into a single loop because self-priority matters: when the
+    // calling field is itself a username field (user typing in username field),
+    // we must return self to read its own text, not a non-deterministic sibling
+    // from the unordered_map iteration order.
+    // Callers (RequestKeyboard via IsTriggerAutoFillPassword, AutoFillValueChanged
+    // via IsAutoFillUserName) already guarantee HasAutoFillPasswordNodeInContainer,
+    // so it is not re-checked here.
+    auto selfIter = innerTextFieldInfoMap.find(nodeId);
+    if (selfIter != innerTextFieldInfoMap.end()) {
+        const auto& selfInfo = selfIter->second;
+        bool selfIsUserName = (selfInfo.autoFillType == AceAutoFillType::ACE_USER_NAME
+                            || selfInfo.autoFillType == AceAutoFillType::ACE_UNSPECIFIED)
+                           && selfInfo.enableAutoFill;
+        if (selfIsUserName) {
+            return DynamicCast<FrameNode>(ElementRegister::GetInstance()->GetUINodeById(nodeId));
+        }
+    }
+    // Self is not a username field → find the username sibling.
+    for (const auto& textField : innerTextFieldInfoMap) {
+        if (textField.first == nodeId) {
+            continue;
+        }
+        const auto& textFieldInfo = textField.second;
+        bool isUserNameType = textFieldInfo.autoFillType == AceAutoFillType::ACE_USER_NAME
+                          || textFieldInfo.autoFillType == AceAutoFillType::ACE_UNSPECIFIED;
+        if (isUserNameType && textFieldInfo.enableAutoFill) {
+            return DynamicCast<FrameNode>(ElementRegister::GetInstance()->GetUINodeById(textField.first));
+        }
+    }
+    return nullptr;
+}
+
 void TextFieldManagerNG::SetOnFocusTextField(const WeakPtr<Pattern>& onFocusTextField)
 {
     const auto& pattern = onFocusTextField.Upgrade();
@@ -641,6 +684,7 @@ TextFieldManagerNG::~TextFieldManagerNG()
 {
     textFieldInfoMap_.clear();
     textFieldFillContentMaps_.clear();
+    textFieldAccountLists_.clear();
     textFieldMSDPAutoFillTypes_.clear();
 }
 
@@ -665,15 +709,20 @@ bool TextFieldManagerNG::ParseFillContentJsonValue(const std::unique_ptr<JsonVal
         if (!fillContent) {
             continue;
         }
-        GenerateFillContentMap(fillContent->GetString(), fillContentMap);
+        std::vector<std::pair<std::string, std::string>> accountList;
+        GenerateFillContentMap(fillContent->GetString(), fillContentMap, accountList);
         if (!fillContentMap.empty()) {
             textFieldFillContentMaps_[nodeId] = fillContentMap;
+        }
+        if (!accountList.empty()) {
+            textFieldAccountLists_[nodeId] = std::move(accountList);
         }
     }
     return true;
 }
 
-void TextFieldManagerNG::GenerateFillContentMap(const std::string& fillContent, FillContentMap& map)
+void TextFieldManagerNG::GenerateFillContentMap(const std::string& fillContent, FillContentMap& map,
+    std::vector<std::pair<std::string, std::string>>& accountList)
 {
     auto jsonObject = JsonUtil::ParseJsonString(fillContent);
     CHECK_NULL_VOID(jsonObject);
@@ -696,6 +745,19 @@ void TextFieldManagerNG::GenerateFillContentMap(const std::string& fillContent, 
                 TAG_LOGW(AceLogTag::ACE_AUTO_FILL, "fillContent is more than 5");
                 break;
             }
+        } else if (child->IsArray() && child->GetKey() == "accountList") {
+            if (child->GetArraySize() > MAX_ACCOUNT_LIST_SIZE) {
+                TAG_LOGW(AceLogTag::ACE_AUTO_FILL,
+                    "accountList size %{public}d exceeds limit %{public}d, truncated",
+                    static_cast<int32_t>(child->GetArraySize()), MAX_ACCOUNT_LIST_SIZE);
+            }
+            for (int32_t k = 0; k < child->GetArraySize() && k < MAX_ACCOUNT_LIST_SIZE; ++k) {
+                auto elem = child->GetArrayItem(k);
+                if (elem && elem->IsString()) {
+                    auto raw = elem->GetString();
+                    accountList.emplace_back(raw, NormalizeAccount(raw));
+                }
+            }
         }
         child = child->GetNext();
     }
@@ -716,6 +778,23 @@ void TextFieldManagerNG::RemoveFillContentMap(int32_t id)
     auto fillContentMapIter = textFieldFillContentMaps_.find(id);
     if (fillContentMapIter != textFieldFillContentMaps_.end()) {
         textFieldFillContentMaps_.erase(fillContentMapIter);
+    }
+}
+
+std::vector<std::pair<std::string, std::string>> TextFieldManagerNG::GetAccountList(int32_t id)
+{
+    auto iter = textFieldAccountLists_.find(id);
+    if (iter != textFieldAccountLists_.end()) {
+        return iter->second;
+    }
+    return {};
+}
+
+void TextFieldManagerNG::RemoveAccountList(int32_t id)
+{
+    auto iter = textFieldAccountLists_.find(id);
+    if (iter != textFieldAccountLists_.end()) {
+        textFieldAccountLists_.erase(iter);
     }
 }
 

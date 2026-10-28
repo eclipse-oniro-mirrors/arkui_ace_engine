@@ -531,6 +531,24 @@ void OnDetectedBlankScreen(const CallbackHelper<OnDetectBlankScreenCallback>& ar
     arkCallback.InvokeSync(parameter);
 }
 
+void OnMonitoredBlankScreen(const CallbackHelper<OnMonitorBlankScreenCallback>& arkCallback,
+    WeakPtr<FrameNode> weakNode, int32_t instanceId, const BaseEventInfo* info)
+{
+    const auto refNode = weakNode.Upgrade();
+    CHECK_NULL_VOID(refNode);
+    ContainerScope scope(instanceId);
+    auto pipelineContext = PipelineContext::GetCurrentContextSafelyWithCheck();
+    CHECK_NULL_VOID(pipelineContext);
+    pipelineContext->UpdateCurrentActiveNode(weakNode);
+    auto* eventInfo = TypeInfoHelper::DynamicCast<MonitoredBlankScreenEvent>(info);
+    CHECK_NULL_VOID(eventInfo);
+    Ark_MonitoredBlankScreenEventInfo parameter;
+    parameter.url = Converter::ArkValue<Ark_String>(eventInfo->GetUrl());
+    parameter.reason = static_cast<Ark_BlankScreenReason>(eventInfo->GetReason());
+    parameter.extraMsg = Converter::ArkValue<Ark_String>(eventInfo->GetExtraMsg());
+    arkCallback.InvokeSync(parameter);
+}
+
 void OnTextSelectionChange(const CallbackHelper<TextSelectionChangeCallback>& arkCallback,
     WeakPtr<FrameNode> weakNode, int32_t instanceId, const BaseEventInfo* info)
 {
@@ -778,6 +796,20 @@ void OnContextMenuHide(const CallbackHelper<OnContextMenuHideCallback>& arkCallb
     auto pipelineContext = callbackContext.GetPipelineContext();
     CHECK_NULL_VOID(pipelineContext);
     arkCallback.InvokeSync();
+}
+
+void OnContextMenuUpdate(const CallbackHelper<OnContextMenuUpdateCallback>& arkCallback,
+    WeakPtr<FrameNode> weakNode, int32_t instanceId, WebContextMenuItemId menuItemId,
+    const WebContextMenuOptions& options)
+{
+    ContainerScope scope(instanceId);
+    auto pipelineContext = PipelineContext::GetCurrentContextSafelyWithCheck();
+    CHECK_NULL_VOID(pipelineContext);
+    pipelineContext->UpdateCurrentActiveNode(weakNode);
+    auto arkMenuItemId = static_cast<Ark_WebContextMenuItemId>(menuItemId);
+    Opt_WebContextMenuOptions arkOptions;
+    arkOptions.value.enable = Converter::ArkValue<Opt_Boolean>(options.enable);
+    arkCallback.InvokeSync(arkMenuItemId, arkOptions);
 }
 
 void OnSearchResultReceive(const CallbackHelper<Callback_OnSearchResultReceiveEvent_Void>& arkCallback,

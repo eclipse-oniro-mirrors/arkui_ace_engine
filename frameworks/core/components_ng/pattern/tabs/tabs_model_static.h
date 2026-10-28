@@ -63,8 +63,10 @@ public:
     static void SetDividerColorByUser(FrameNode* frameNode, bool isByUser);
     static void InitDivider(FrameNode* frameNode);
     static void SetBarOverlap(FrameNode* frameNode, bool barOverlap);
+    static void SetKeepTabBarInSideBar(FrameNode* frameNode, bool keepTabBarInSideBar);
     static void SetBarBackgroundBlurStyle(FrameNode* frameNode, const BlurStyleOption& styleOption);
     static void SetBarBackgroundColor(FrameNode* frameNode,  const std::optional<Color>& backgroundColorOpt);
+    static void SetBarBackgroundColorByUser(FrameNode* frameNode, bool isByUser);
     static void SetBarGridAlign(FrameNode* frameNode, const BarGridColumnOptions& BarGridColumnOptions);
     static void SetIsCustomAnimation(FrameNode* frameNode, bool isCustom);
     static void SetOnCustomAnimation(FrameNode* frameNode, TabsCustomAnimationEvent&& onCustomAnimation);

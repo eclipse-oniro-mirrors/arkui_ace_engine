@@ -645,13 +645,13 @@ const RefPtr<ScrollablePattern> TextSelectOverlay::FindScrollableParent()
 {
     auto host = GetOwner();
     CHECK_NULL_RETURN(host, nullptr);
-    auto parent = host->GetAncestorNodeOfFrame(true);
+    auto parent = host->GetCoordinateAncestorNodeOfFrame(true);
     while (parent) {
         auto scrollablePattern = parent->GetPattern<ScrollablePattern>();
         if (scrollablePattern && scrollablePattern->IsScrollable()) {
             return scrollablePattern;
         }
-        parent = parent->GetAncestorNodeOfFrame(true);
+        parent = parent->GetCoordinateAncestorNodeOfFrame(true);
     }
     return nullptr;
 }

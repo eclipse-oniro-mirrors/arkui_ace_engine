@@ -26,14 +26,19 @@ action("page_text_error_getter") {
 }
 
 # Keep NodeModel stubs local to this executable.
-ohos_unittest("capi_page_text_test") {
-  module_out_path = "ace_engine/C-API-Main"
+ace_unittest("capi_page_text_test") {
+  module_name = "C-API-Main"
+  type = "new"
+  if (is_host_product) {
+    type = "host_components"
+  }
   sources = [
     "$ace_root/frameworks/core/interfaces/native/utility/error_message_manager.cpp",
     "$ace_root/interfaces/native/native_error_message_wrapper.cpp",
     "$ace_root/interfaces/native/ui_info_collection.cpp",
     "$ace_root/interfaces/native/ui_json_wrapper.cpp",
     "../page_text_capi_test.cpp",
+    "../page_text_collector_test_ng.cpp",
   ]
   sources += get_target_outputs(":page_text_error_getter")
   deps = [ ":page_text_error_getter" ]
@@ -43,7 +48,9 @@ ohos_unittest("capi_page_text_test") {
     "$ace_root/interfaces/native",
     "$ace_root/interfaces/inner_api/ace_kit/include",
   ]
+  if (!is_host_product) {
+    include_dirs += [ "$ace_root/test/mock/ohos_mock/ipc_single" ]
+  }
   external_deps = [ "bounds_checking_function:libsec_static" ]
   defines = [ "ARKUI_CAPI_UNITTEST" ]
-  cflags_cc = [ "-std=c++17" ]
 }

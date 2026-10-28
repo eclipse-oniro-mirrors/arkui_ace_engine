@@ -299,6 +299,7 @@ public:
     static void JsPadding(const JSCallbackInfo& info);
     static void JsMargin(const JSCallbackInfo& info);
     static void SetSafeAreaPadding(const JSCallbackInfo& info);
+    static void SetSafeAreaInset(const JSCallbackInfo& info);
     static void ParseMarginOrPadding(const JSCallbackInfo& info, EdgeType type);
     static void ParseMarginOrPaddingCorner(JSRef<JSObject> obj, std::optional<CalcDimension>& top,
         std::optional<CalcDimension>& bottom, std::optional<CalcDimension>& left, std::optional<CalcDimension>& right);
@@ -601,6 +602,8 @@ public:
     static void JsMotionPath(const JSCallbackInfo& info);
     static void JsMotionBlur(const JSCallbackInfo& info);
     static void JsShadow(const JSCallbackInfo& info);
+    static void JsShadowShape(const JSCallbackInfo& info);
+    static void JsShadowClipMode(const JSCallbackInfo& info);
     static bool ParseBlendMode(const JSCallbackInfo& info, BlendMode& blendMode, BlendApplyType& blendApplyType);
     static void JsBlendMode(const JSCallbackInfo& info);
     static void JsAdvancedBlendMode(const JSCallbackInfo& info);

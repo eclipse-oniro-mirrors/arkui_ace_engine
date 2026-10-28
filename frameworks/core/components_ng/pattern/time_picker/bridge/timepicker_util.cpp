@@ -189,6 +189,10 @@ bool CreateTimeNode(ElementIdType nodeId, TimePickerNodeInfo& info, bool isEnabl
     timePickerRowPattern->SetIsShowInDialog(true);
     timePickerRowPattern->SetIsShowInDatePickerDialog(true);
     timePickerRowPattern->SetIsEnableHaptic(isEnableHapticFeedback);
+    auto timePickerLayout = timePickerNode->GetLayoutProperty<TimePickerLayoutProperty>();
+    if (timePickerLayout) {
+        timePickerLayout->UpdateLayoutDirection(TextDirection::LTR);
+    }
     info.hasHourNode = timePickerRowPattern->HasHourNode();
     info.hasMinuteNode = timePickerRowPattern->HasMinuteNode();
     info.hourId = timePickerRowPattern->GetHourId();

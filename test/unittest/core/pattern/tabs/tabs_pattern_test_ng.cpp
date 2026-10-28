@@ -26,6 +26,7 @@
 #include "core/components_ng/base/observer_handler.h"
 #include "core/components_ng/pattern/divider/divider_layout_property.h"
 #include "core/components_ng/pattern/pattern.h"
+#include "core/components_ng/pattern/tabs/tabs_declaration.h"
 #include "core/components_ng/pattern/tabs/tabs_model_ng.h"
 #include "core/components_ng/pattern/tabs/tabs_node.h"
 #include "core/pipeline_ng/pipeline_context.h"
@@ -1989,10 +1990,15 @@ HWTEST_F(TabPatternTestNg, UpdateSideBarDividerTest002, TestSize.Level1)
     ASSERT_TRUE(strokeWidth.has_value());
     EXPECT_FLOAT_EQ(strokeWidth.value().Value(), 5.0f);
 
-    // Verify color is updated on DividerRenderProperty
+    // After UpdateSidebarDividerColor, DividerColor is set to TRANSPARENT and the
+    // actual color is applied via RenderContext BackgroundColor so that it fills
+    // the entire safe-area-expanded Bounds.
     auto dividerRenderProp = pattern_->sideBarDividerNode_->GetPaintProperty<DividerRenderProperty>();
     ASSERT_NE(dividerRenderProp, nullptr);
-    EXPECT_EQ(dividerRenderProp->GetDividerColor().value_or(Color::BLACK), Color::RED);
+    EXPECT_EQ(dividerRenderProp->GetDividerColor().value_or(Color::BLACK), Color::TRANSPARENT);
+    auto dividerRenderContext = pattern_->sideBarDividerNode_->GetRenderContext();
+    ASSERT_NE(dividerRenderContext, nullptr);
+    EXPECT_EQ(dividerRenderContext->GetBackgroundColor().value_or(Color::BLACK), Color::RED);
 }
 
 /**
@@ -2142,4 +2148,217 @@ HWTEST_F(TabPatternTestNg, GetRealSideBarWidthPxTest001, TestSize.Level1)
     EXPECT_FLOAT_EQ(pattern_->GetRealSideBarWidthPx().value(), 250.0f);
 }
 
+/**
+ * @tc.name: ShouldHide001
+ * @tc.desc: Test ShouldHide function
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabPatternTestNg, ShouldHide001, TestSize.Level1)
+{
+    TabContentDefaultVisibility vis;
+    vis.isNull = true;
+    EXPECT_FALSE(vis.ShouldHide(TabBarDisplayMode::SIDEBAR));
+    EXPECT_FALSE(vis.ShouldHide(TabBarDisplayMode::BOTTOMTABBAR));
+
+    vis.isNull = false;
+    vis.visibility = TabVisibility::VISIBLE;
+    vis.displayMode = TabBarDisplayMode::SIDEBAR;
+    EXPECT_FALSE(vis.ShouldHide(TabBarDisplayMode::SIDEBAR));
+
+    vis.isNull = false;
+    vis.visibility = TabVisibility::HIDDEN;
+    vis.displayMode = std::nullopt;
+    EXPECT_TRUE(vis.ShouldHide(TabBarDisplayMode::SIDEBAR));
+    EXPECT_TRUE(vis.ShouldHide(TabBarDisplayMode::BOTTOMTABBAR));
+
+    vis.isNull = false;
+    vis.visibility = TabVisibility::HIDDEN;
+    vis.displayMode = TabBarDisplayMode::SIDEBAR;
+    EXPECT_TRUE(vis.ShouldHide(TabBarDisplayMode::SIDEBAR));
+
+    vis.isNull = false;
+    vis.visibility = TabVisibility::HIDDEN;
+    vis.displayMode = TabBarDisplayMode::BOTTOMTABBAR;
+    EXPECT_FALSE(vis.ShouldHide(TabBarDisplayMode::SIDEBAR));
+    EXPECT_TRUE(vis.ShouldHide(TabBarDisplayMode::BOTTOMTABBAR));
+}
+
+/**
+ * @tc.name: ResetDisplayModeSwitchTransforms001
+ * @tc.desc: Test tabBarDivider opacity is 0.0 when divider is set but isNull=true
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabPatternTestNg, ResetDisplayModeSwitchTransforms001, TestSize.Level1)
+{
+    auto model = CreateTabs();
+    CreateTabContents();
+    GetTabs();
+    CreateTabsDone(model);
+    ASSERT_NE(pattern_, nullptr);
+
+    // Set null divider so HasDivider()==true && GetDividerValue().isNull==true
+    TabsModelNG modelNG;
+    TabsItemDivider nullDivider;
+    nullDivider.isNull = true;
+    modelNG.SetDivider(AceType::RawPtr(frameNode_), nullDivider);
+
+    pattern_->ResetDisplayModeSwitchTransforms();
+
+    auto tabBarDivider = AceType::DynamicCast<FrameNode>(frameNode_->GetDivider());
+    ASSERT_NE(tabBarDivider, nullptr);
+    auto renderContext = tabBarDivider->GetRenderContext();
+    ASSERT_NE(renderContext, nullptr);
+    EXPECT_FLOAT_EQ(renderContext->GetOpacity().value_or(1.0f), 0.0f);
+}
+
+/**
+ * @tc.name: ResetDisplayModeSwitchTransforms002
+ * @tc.desc: Test tabBarDivider opacity is 1.0 when divider is set and isNull=false
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabPatternTestNg, ResetDisplayModeSwitchTransforms002, TestSize.Level1)
+{
+    auto model = CreateTabs();
+    CreateTabContents();
+    GetTabs();
+    CreateTabsDone(model);
+    ASSERT_NE(pattern_, nullptr);
+
+    TabsModelNG modelNG;
+    TabsItemDivider divider;
+    divider.isNull = false;
+    divider.strokeWidth = Dimension(5.0f);
+    modelNG.SetDivider(AceType::RawPtr(frameNode_), divider);
+
+    pattern_->ResetDisplayModeSwitchTransforms();
+
+    auto tabBarDivider = AceType::DynamicCast<FrameNode>(frameNode_->GetDivider());
+    ASSERT_NE(tabBarDivider, nullptr);
+    auto renderContext = tabBarDivider->GetRenderContext();
+    ASSERT_NE(renderContext, nullptr);
+    EXPECT_FLOAT_EQ(renderContext->GetOpacity().value_or(0.0f), 1.0f);
+}
+
+/**
+ * @tc.name: ResetDisplayModeSwitchTransforms003
+ * @tc.desc: Test tabBarDivider opacity is 1.0 when divider is not set at all
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabPatternTestNg, ResetDisplayModeSwitchTransforms003, TestSize.Level1)
+{
+    auto model = CreateTabs();
+    CreateTabContents();
+    GetTabs();
+    CreateTabsDone(model);
+    ASSERT_NE(pattern_, nullptr);
+
+    // No divider set — HasDivider()==false
+    pattern_->ResetDisplayModeSwitchTransforms();
+
+    auto tabBarDivider = AceType::DynamicCast<FrameNode>(frameNode_->GetDivider());
+    ASSERT_NE(tabBarDivider, nullptr);
+    auto renderContext = tabBarDivider->GetRenderContext();
+    ASSERT_NE(renderContext, nullptr);
+    EXPECT_FLOAT_EQ(renderContext->GetOpacity().value_or(0.0f), 1.0f);
+}
+
+/**
+ * @tc.name: CalcSidebarOutsideTranslateX001
+ * @tc.desc: Test CalcSidebarOutsideTranslateX returns negative offset for LTR + START
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabPatternTestNg, CalcSidebarOutsideTranslateX001, TestSize.Level1)
+{
+    auto model = CreateTabs();
+    CreateTabContents();
+    GetTabs();
+    CreateTabsDone(model);
+    ASSERT_NE(pattern_, nullptr);
+
+    pattern_->sideBarNode_ = FrameNode::CreateFrameNode(
+        V2::TABS_SIDE_BAR_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<Pattern>());
+    pattern_->sideBarDividerNode_ = pattern_->CreateSideBarDividerNode();
+    ASSERT_NE(pattern_->sideBarNode_, nullptr);
+    ASSERT_NE(pattern_->sideBarDividerNode_, nullptr);
+
+    // Set geometry: sideBar width=200, divider width=10
+    auto sideBarGeo = pattern_->sideBarNode_->GetGeometryNode();
+    sideBarGeo->SetFrameSize(SizeF(200.0f, 400.0f));
+    auto dividerGeo = pattern_->sideBarDividerNode_->GetGeometryNode();
+    dividerGeo->SetFrameSize(SizeF(10.0f, 400.0f));
+
+    // LTR + START → sideBarOnLeft → negative offset
+    layoutProperty_->UpdateSidebarPosition(BarPosition::START);
+    layoutProperty_->UpdateLayoutDirection(TextDirection::LTR);
+
+    float result = pattern_->CalcSidebarOutsideTranslateX();
+    EXPECT_FLOAT_EQ(result, -210.0f);
+}
+
+/**
+ * @tc.name: CalcSidebarOutsideTranslateX002
+ * @tc.desc: Test CalcSidebarOutsideTranslateX returns positive offset for LTR + END
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabPatternTestNg, CalcSidebarOutsideTranslateX002, TestSize.Level1)
+{
+    auto model = CreateTabs();
+    CreateTabContents();
+    GetTabs();
+    CreateTabsDone(model);
+    ASSERT_NE(pattern_, nullptr);
+
+    pattern_->sideBarNode_ = FrameNode::CreateFrameNode(
+        V2::TABS_SIDE_BAR_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<Pattern>());
+    pattern_->sideBarDividerNode_ = pattern_->CreateSideBarDividerNode();
+    ASSERT_NE(pattern_->sideBarNode_, nullptr);
+    ASSERT_NE(pattern_->sideBarDividerNode_, nullptr);
+
+    auto sideBarGeo = pattern_->sideBarNode_->GetGeometryNode();
+    sideBarGeo->SetFrameSize(SizeF(200.0f, 400.0f));
+    auto dividerGeo = pattern_->sideBarDividerNode_->GetGeometryNode();
+    dividerGeo->SetFrameSize(SizeF(10.0f, 400.0f));
+
+    // LTR + END → sideBarOnRight → positive offset
+    layoutProperty_->UpdateSidebarPosition(BarPosition::END);
+    layoutProperty_->UpdateLayoutDirection(TextDirection::LTR);
+
+    float result = pattern_->CalcSidebarOutsideTranslateX();
+    EXPECT_FLOAT_EQ(result, 210.0f);
+}
+
+/**
+ * @tc.name: CalcSidebarOutsideTranslateX003
+ * @tc.desc: Test CalcSidebarOutsideTranslateX with RTL + END → sideBarOnLeft → negative
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabPatternTestNg, CalcSidebarOutsideTranslateX003, TestSize.Level1)
+{
+    auto model = CreateTabs();
+    CreateTabContents();
+    GetTabs();
+    CreateTabsDone(model);
+    ASSERT_NE(pattern_, nullptr);
+
+    pattern_->sideBarNode_ = FrameNode::CreateFrameNode(
+        V2::TABS_SIDE_BAR_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+        AceType::MakeRefPtr<Pattern>());
+    pattern_->sideBarDividerNode_ = pattern_->CreateSideBarDividerNode();
+    ASSERT_NE(pattern_->sideBarNode_, nullptr);
+    ASSERT_NE(pattern_->sideBarDividerNode_, nullptr);
+
+    auto sideBarGeo = pattern_->sideBarNode_->GetGeometryNode();
+    sideBarGeo->SetFrameSize(SizeF(200.0f, 400.0f));
+    auto dividerGeo = pattern_->sideBarDividerNode_->GetGeometryNode();
+    dividerGeo->SetFrameSize(SizeF(10.0f, 400.0f));
+
+    // RTL + END → sideBarOnLeft → negative offset
+    layoutProperty_->UpdateSidebarPosition(BarPosition::END);
+    layoutProperty_->UpdateLayoutDirection(TextDirection::RTL);
+
+    float result = pattern_->CalcSidebarOutsideTranslateX();
+    EXPECT_FLOAT_EQ(result, -210.0f);
+}
 } // namespace OHOS::Ace::NG

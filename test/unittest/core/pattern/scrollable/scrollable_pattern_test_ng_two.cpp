@@ -18,6 +18,7 @@
 #include "gtest/gtest.h"
 #include "test/unittest/core/pattern/test_ng.h"
 
+#include "core/animation/animator.h"
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/pattern/list/list_pattern.h"
 #include "core/components_ng/pattern/scroll/scroll_pattern.h"

@@ -1334,4 +1334,182 @@ HWTEST_F(NativeXComponentUafTest, XComponentUafGuard003, TestSize.Level1)
     EXPECT_EQ(OH_NativeXComponent_DetachNativeRootNode(nullptr, &node), EXPECTED_BAD_PARAMETER);
     RestoreRuntimeCheckMode();
 }
+
+// ===== Navigation C API NodeHandle disposed-state (UAF) detection tests =====
+
+class NavigationUafTest : public testing::Test {
+public:
+    static void SetUpTestSuite()
+    {
+        NG::MockPipelineContext::SetUp();
+        MockContainer::SetUp(NG::MockPipelineContext::GetCurrent());
+        MockContainer::Current()->SetTaskExecutor(AceType::MakeRefPtr<MockTaskExecutor>());
+        auto themeManager = AceType::MakeRefPtr<MockThemeManager>();
+        PipelineBase::GetCurrentContext()->SetThemeManager(themeManager);
+    }
+    static void TearDownTestSuite()
+    {
+        NG::MockPipelineContext::TearDown();
+        MockContainer::TearDown();
+    }
+    void SetUp() {}
+    void TearDown() {}
+};
+
+namespace {
+// Slot index of each navigation/router C API in the result arrays below.
+enum NavigationApiSlot : size_t {
+    SLOT_GET_NAVIGATION_ID = 0,
+    SLOT_GET_NAV_DESTINATION_NAME,
+    SLOT_GET_NAV_STACK_LENGTH,
+    SLOT_GET_NAV_DESTINATION_NAME_BY_INDEX,
+    SLOT_GET_NAV_DESTINATION_ID,
+    SLOT_GET_NAV_DESTINATION_STATE,
+    SLOT_GET_NAV_DESTINATION_INDEX,
+    SLOT_GET_NAV_DESTINATION_PARAM,
+    SLOT_GET_ROUTER_PAGE_INDEX,
+    SLOT_GET_ROUTER_PAGE_NAME,
+    SLOT_GET_ROUTER_PAGE_PATH,
+    SLOT_GET_ROUTER_PAGE_STATE,
+    SLOT_GET_ROUTER_PAGE_ID,
+    NAV_SLOT_COUNT,
+};
+
+// Calls all 13 navigation/router C APIs and records their observable results:
+// int32 return codes are stored as-is; OH_ArkUI_GetNavDestinationParam returns a
+// pointer that is encoded as 1 (non-null) or 0 (null).
+std::array<int32_t, NAV_SLOT_COUNT> CallAllNavigationApis(ArkUI_NodeHandle node)
+{
+    std::array<int32_t, NAV_SLOT_COUNT> results {};
+    char buffer[128] = { 0 };
+    int32_t writeLength = 0;
+    int32_t intValue = 0;
+    ArkUI_NavDestinationState navState = ARKUI_NAV_DESTINATION_STATE_ON_SHOW;
+    ArkUI_RouterPageState routerState = ARKUI_ROUTER_PAGE_STATE_ABOUT_TO_APPEAR;
+    results[SLOT_GET_NAVIGATION_ID] =
+        OH_ArkUI_GetNavigationId(node, buffer, sizeof(buffer), &writeLength);
+    results[SLOT_GET_NAV_DESTINATION_NAME] =
+        OH_ArkUI_GetNavDestinationName(node, buffer, sizeof(buffer), &writeLength);
+    results[SLOT_GET_NAV_STACK_LENGTH] = OH_ArkUI_GetNavStackLength(node, &intValue);
+    results[SLOT_GET_NAV_DESTINATION_NAME_BY_INDEX] =
+        OH_ArkUI_GetNavDestinationNameByIndex(node, 0, buffer, sizeof(buffer), &writeLength);
+    results[SLOT_GET_NAV_DESTINATION_ID] =
+        OH_ArkUI_GetNavDestinationId(node, buffer, sizeof(buffer), &writeLength);
+    results[SLOT_GET_NAV_DESTINATION_STATE] =
+        OH_ArkUI_GetNavDestinationState(node, &navState);
+    results[SLOT_GET_NAV_DESTINATION_INDEX] =
+        OH_ArkUI_GetNavDestinationIndex(node, &intValue);
+    results[SLOT_GET_NAV_DESTINATION_PARAM] =
+        EncodePointerResult(OH_ArkUI_GetNavDestinationParam(node));
+    results[SLOT_GET_ROUTER_PAGE_INDEX] = OH_ArkUI_GetRouterPageIndex(node, &intValue);
+    results[SLOT_GET_ROUTER_PAGE_NAME] =
+        OH_ArkUI_GetRouterPageName(node, buffer, sizeof(buffer), &writeLength);
+    results[SLOT_GET_ROUTER_PAGE_PATH] =
+        OH_ArkUI_GetRouterPagePath(node, buffer, sizeof(buffer), &writeLength);
+    results[SLOT_GET_ROUTER_PAGE_STATE] = OH_ArkUI_GetRouterPageState(node, &routerState);
+    results[SLOT_GET_ROUTER_PAGE_ID] =
+        OH_ArkUI_GetRouterPageId(node, buffer, sizeof(buffer), &writeLength);
+    return results;
+}
+} // namespace
+
+/**
+ * @tc.name: NavigationUafGuard001
+ * @tc.desc: Controlled disposed samples hit the entry guard on all 13 listed
+ *           navigation/router APIs; LOG mode keeps the same return values as
+ *           DISABLED and never pollutes the error message channel.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NavigationUafTest, NavigationUafGuard001, TestSize.Level1)
+{
+    ASSERT_TRUE(NodeModel::InitialFullImpl());
+    // A still-alive local object with invalid magic simulates a disposed handle
+    // whose memory is still readable.
+    ArkUI_Node node;
+    node.type = ARKUI_NODE_STACK;
+    node.cNode = true;
+    node.uiNodeHandle = nullptr;
+    node.magic = ARKUI_NODE_MAGIC_INVALID;
+
+    ASSERT_TRUE(NodeModel::ConfigManager::SetRuntimeCheckMode(
+        RUNTIME_CHECK_TYPE_NODE_DISPOSED_VALUE, static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_DISABLED)));
+    const auto disabledResults = CallAllNavigationApis(&node);
+
+    ASSERT_TRUE(NodeModel::ConfigManager::SetRuntimeCheckMode(
+        RUNTIME_CHECK_TYPE_NODE_DISPOSED_VALUE, static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_LOG)));
+    const auto logResults = CallAllNavigationApis(&node);
+    // LOG only diagnoses and never short-circuits: the return values of all 13
+    // entries are identical to DISABLED.
+    for (size_t i = 0; i < logResults.size(); i++) {
+        EXPECT_EQ(logResults[i], disabledResults[i]) << "slot " << i;
+    }
+    // The error message query channel does not carry disposed content from this check.
+    const char* errorMessage = OH_ArkUI_NativeModule_GetErrorMessage();
+    if (errorMessage != nullptr) {
+        EXPECT_EQ(std::string(errorMessage).find("has been disposed"), std::string::npos);
+    }
+    RestoreRuntimeCheckMode();
+}
+
+/**
+ * @tc.name: NavigationUafGuard002
+ * @tc.desc: Valid magic never triggers the guard: LOG/DISABLED/CRASH modes keep
+ *           identical return values on all 13 listed APIs for a valid handle.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NavigationUafTest, NavigationUafGuard002, TestSize.Level1)
+{
+    ASSERT_TRUE(NodeModel::InitialFullImpl());
+    ArkUI_Node node;
+    node.type = ARKUI_NODE_STACK;
+    node.cNode = true;
+    node.uiNodeHandle = nullptr;
+    node.magic = ARKUI_NODE_MAGIC_VALID;
+
+    ASSERT_TRUE(NodeModel::ConfigManager::SetRuntimeCheckMode(
+        RUNTIME_CHECK_TYPE_NODE_DISPOSED_VALUE, static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_LOG)));
+    const auto logResults = CallAllNavigationApis(&node);
+
+    ASSERT_TRUE(NodeModel::ConfigManager::SetRuntimeCheckMode(
+        RUNTIME_CHECK_TYPE_NODE_DISPOSED_VALUE, static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_DISABLED)));
+    const auto disabledResults = CallAllNavigationApis(&node);
+
+    // A valid handle does not trigger the check in CRASH mode either (no termination).
+    ASSERT_TRUE(NodeModel::ConfigManager::SetRuntimeCheckMode(
+        RUNTIME_CHECK_TYPE_NODE_DISPOSED_VALUE, static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_CRASH)));
+    const auto crashResults = CallAllNavigationApis(&node);
+
+    for (size_t i = 0; i < logResults.size(); i++) {
+        EXPECT_EQ(disabledResults[i], logResults[i]) << "slot " << i;
+        EXPECT_EQ(crashResults[i], logResults[i]) << "slot " << i;
+    }
+    RestoreRuntimeCheckMode();
+}
+
+/**
+ * @tc.name: NavigationUafGuard003
+ * @tc.desc: Null inputs keep the existing parameter-error contracts on all 13
+ *           listed navigation/router APIs; the entry guard is null-safe and
+ *           stays silent.
+ * @tc.type: FUNC
+ */
+HWTEST_F(NavigationUafTest, NavigationUafGuard003, TestSize.Level1)
+{
+    ASSERT_TRUE(NodeModel::InitialFullImpl());
+    ASSERT_TRUE(NodeModel::ConfigManager::SetRuntimeCheckMode(
+        RUNTIME_CHECK_TYPE_NODE_DISPOSED_VALUE, static_cast<int32_t>(OH_ARKUI_NATIVEMODULE_CHECK_MODE_LOG)));
+    // The guard macro returns silently for a null pointer, and the existing null
+    // validation keeps the original ARKUI_ERROR_CODE_PARAM_INVALID / nullptr
+    // contracts for null parameters.
+    const auto nullResults = CallAllNavigationApis(nullptr);
+    for (size_t i = 0; i < nullResults.size(); i++) {
+        if (i == SLOT_GET_NAV_DESTINATION_PARAM) {
+            // OH_ArkUI_GetNavDestinationParam returns nullptr for a null node.
+            EXPECT_EQ(nullResults[i], 0) << "slot " << i;
+        } else {
+            EXPECT_EQ(nullResults[i], ARKUI_ERROR_CODE_PARAM_INVALID) << "slot " << i;
+        }
+    }
+    RestoreRuntimeCheckMode();
+}
 } // namespace OHOS::Ace

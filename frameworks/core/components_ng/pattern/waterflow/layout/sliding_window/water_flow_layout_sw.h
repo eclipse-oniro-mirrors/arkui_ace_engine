@@ -16,12 +16,35 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_WATERFLOW_WATER_FLOW_SW_LAYOUT_H
 #define FOUNDATION_ACE_FRAMEWORKS_CORE_COMPONENTS_NG_PATTERN_WATERFLOW_WATER_FLOW_SW_LAYOUT_H
 
+#include <memory>
+
 #include "core/components/scroll/scroll_controller_base.h"
 #include "core/components_ng/layout/layout_wrapper.h"
 #include "core/components_ng/pattern/waterflow/layout/sliding_window/water_flow_layout_info_sw.h"
 #include "core/components_ng/pattern/waterflow/layout/top_down/water_flow_segmented_layout.h"
 
 namespace OHOS::Ace::NG {
+
+// Kept alive by an in-flight layout; cancellation invalidates its result before it can be consumed.
+struct WaterFlowFastScrollState {
+    int32_t index = -1;
+    int32_t builtCount = 0;
+    bool releaseToggle = false;
+    ScrollAlign align = ScrollAlign::START;
+    float extraOffset = 0.0f;
+    FastScrollMode mode = FastScrollMode::NONE;
+    std::optional<float> targetOffset;
+    RefPtr<WaterFlowLayoutInfoSW> preparedWindow;
+    std::vector<std::vector<float>> itemCrossSizes;
+    std::vector<float> mainGaps;
+    float mainSize = 0.0f;
+    float startInset = 0.0f;
+    float endInset = 0.0f;
+    Axis axis = Axis::VERTICAL;
+    bool reverse = false;
+    bool cancelled = false;
+    bool finishing = false;
+};
 
 class ACE_EXPORT WaterFlowLayoutSW : public WaterFlowSegmentLayoutBase {
     DECLARE_ACE_TYPE(WaterFlowLayoutSW, WaterFlowSegmentLayoutBase);
@@ -40,12 +63,37 @@ public:
         canSkip_ = value;
     }
 
+    void SetFastScrollState(const std::shared_ptr<WaterFlowFastScrollState>& state, bool skip, uint64_t serial)
+    {
+        fastScrollState_ = state;
+        fastScrollSkip_ = skip;
+        fastScrollSerial_ = serial;
+    }
+
+    uint64_t GetFastScrollSerial() const
+    {
+        return fastScrollSerial_;
+    }
+
     bool MeasureInNextFrame() const override
     {
         return info_->measureInNextFrame_;
     }
 
 private:
+    void InvalidateFastScrollIfNeeded();
+    void CancelFastScroll();
+    void MeasureItems();
+    bool PrepareFastScrollItems();
+    void ReleaseFastScrollRoute(bool toggleCache);
+    void PrepareFastScroll();
+    void MeasureFastScrollOffset(const RefPtr<WaterFlowLayoutInfoSW>& window, float target);
+    void ApplyFastScrollWindow();
+    RefPtr<WaterFlowLayoutInfoSW> BuildFastScrollWindow(int32_t index, float position);
+    std::shared_ptr<WaterFlowFastScrollState> fastScrollState_;
+    bool fastScrollSkip_ = false;
+    uint64_t fastScrollSerial_ = 0;
+
     void Init(const SizeF& frameSize, double originalWidth);
     /* init WaterFlow without Sections */
     void SingleInit(const SizeF& frameSize, double originalWidth);

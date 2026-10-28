@@ -30,17 +30,37 @@ RectF TabBarLayoutProperty::GetIndicatorRect(int32_t index)
     CHECK_NULL_RETURN(tabTheme, RectF());
     auto childColumn = DynamicCast<FrameNode>(node->GetChildAtIndex(index));
     CHECK_NULL_RETURN(childColumn && !childColumn->GetChildren().empty(), RectF());
-    auto grandChildren = DynamicCast<FrameNode>(childColumn->GetChildren().back());
+    auto grandChildren = TabBarPattern::GetTextNodeFromColumn(childColumn);
     CHECK_NULL_RETURN(grandChildren, RectF());
     auto geometryNode = grandChildren->GetGeometryNode();
     RectF indicator = geometryNode->GetFrameRect(true);
 
+    /* Accumulate offset from textNode up to the tabBarNode (host).
+     * When badge wraps the content, the path is:
+     *   tabBarNode -> columnNode -> badgeNode -> contentChild -> textNode
+     * We need to sum offsets from textNode's parent chain up to (but not including) childColumn,
+     * then add childColumn's offset relative to tabBarNode.
+     */
+    float accumulatedX = 0.0f;
+    float accumulatedY = 0.0f;
+    auto current = grandChildren->GetParent();
+    while (current && current != childColumn) {
+        auto currentFrame = DynamicCast<FrameNode>(current);
+        if (currentFrame) {
+            auto currentGeo = currentFrame->GetGeometryNode();
+            if (currentGeo) {
+                auto currentRect = currentGeo->GetFrameRect(true);
+                accumulatedX += currentRect.GetX();
+                accumulatedY += currentRect.GetY();
+            }
+        }
+        current = current->GetParent();
+    }
+
     /* Set indicator at the bottom of columnNode's last child */
     auto childColumnRect = childColumn->GetGeometryNode()->GetFrameRect(true);
-    auto tabBarPattern = node->GetPattern<TabBarPattern>();
-    CHECK_NULL_RETURN(node, RectF());
-    indicator.SetLeft(indicator.GetX() + childColumnRect.GetX());
-    indicator.SetTop(indicator.Bottom() + childColumnRect.GetY());
+    indicator.SetLeft(indicator.GetX() + accumulatedX + childColumnRect.GetX());
+    indicator.SetTop(indicator.Bottom() + accumulatedY + childColumnRect.GetY());
     return indicator;
 }
 

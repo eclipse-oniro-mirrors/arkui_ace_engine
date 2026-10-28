@@ -16,6 +16,7 @@
 
 #include "base/geometry/shape.h"
 #include "core/components/select/select_theme.h"
+#include "core/components/common/properties/ui_material.h"
 #include "core/components_ng/pattern/menu/menu_paint_property.h"
 #include "core/components_ng/render/paint_wrapper.h"
 #include "core/components_ng/render/render_context.h"
@@ -34,16 +35,19 @@ CanvasDrawFunction MenuPaintMethod::GetContentDrawFunction(PaintWrapper* paintWr
         }
         auto renderContext = paintWrapper->GetRenderContext();
         CHECK_NULL_VOID(renderContext);
+#if defined(ENABLE_ROSEN_BACKEND)
+        auto systemMaterial = renderContext->GetSystemMaterial();
+        auto materialType =
+            systemMaterial ? static_cast<Ace::MaterialType>(systemMaterial->GetType()) : Ace::MaterialType::NONE;
+        if (props->GetIsUserSetMaterial().value_or(false) && materialType != Ace::MaterialType::SEMI_TRANSPARENT &&
+            SystemProperties::GetUiMaterialLevel() != UiMaterialLevel::SMOOTH) {
+            return;
+        }
+#endif
         auto clipPath = props->GetClipPath().value_or("");
         if (clipPath == "") {
             return;
         }
-#if defined(ENABLE_ROSEN_BACKEND)
-        if (props->GetIsUserSetMaterial().value_or(false)) {
-            renderContext->SetShadowPath(clipPath);
-            return;
-        }
-#endif
         auto path = AceType::MakeRefPtr<Path>();
         path->SetValue(clipPath);
         path->SetBasicShapeType(BasicShapeType::PATH);

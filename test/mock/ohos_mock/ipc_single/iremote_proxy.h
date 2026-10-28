@@ -17,6 +17,9 @@
 #define OHOS_IPC_IREMOTE_PROXY_H
 
 #include "refbase.h"
+#include "message_parcel.h"
+#include "message_option.h"
+#include "ipc_types.h"
 #include "iremote_broker.h"
 #include "iremote_object.h"
 
@@ -28,6 +31,7 @@ public:
     ~IRemoteProxy() override = default;
 
 protected:
+    sptr<IRemoteObject> Remote() const { return remote_; }
     sptr<IRemoteObject> AsObject()
     {
         return remote_;

@@ -28,7 +28,7 @@ class Element;
 class RenderFocusAnimation;
 class RenderShadow;
 
-class FocusAnimationManager : public virtual AceType {
+class FocusAnimationManager : public AceType {
     DECLARE_ACE_TYPE(FocusAnimationManager, AceType);
 
 public:

@@ -32,6 +32,7 @@
 #include "core/components_ng/pattern/tabs/tab_bar_pattern.h"
 #include "core/components_ng/pattern/tabs/tabs_layout_property.h"
 #include "core/components_ng/pattern/tabs/tabs_node.h"
+#include "core/components_ng/pattern/badge/badge_model_ng.h"
 #include "core/components_ng/pattern/text/text_layout_property.h"
 #include "core/components_ng/property/layout_constraint.h"
 #include "core/components_ng/property/measure_property.h"
@@ -157,6 +158,21 @@ void TabBarLayoutAlgorithm::Measure(LayoutWrapper* layoutWrapper)
     } else {
         MeasureScrollableMode(layoutWrapper, contentSize);
     }
+    if (isFloatingTopBar_ && axis_ == Axis::HORIZONTAL && !visibleItemPosition_.empty()) {
+        float contentStart = visibleItemPosition_.begin()->second.startPos;
+        float contentEnd = visibleItemPosition_.rbegin()->second.endPos;
+        float contentWidth = contentEnd - contentStart + padding.Width();
+        if (contentWidth > 0.0f && contentWidth < frameSize.Width()) {
+            frameSize.SetWidth(contentWidth);
+            float offset = 0.0f;
+            for (auto& [index, pos] : visibleItemPosition_) {
+                float itemWidth = pos.endPos - pos.startPos;
+                pos.startPos = offset;
+                pos.endPos = offset + itemWidth;
+                offset += itemWidth;
+            }
+        }
+    }
     if (visibleItemPosition_.empty()) {
         layoutWrapper->SetActiveChildRange(-1, -1);
     } else {
@@ -228,13 +244,15 @@ void TabBarLayoutAlgorithm::MeasureFixedMode(LayoutWrapper* layoutWrapper, SizeF
                 break;
             }
         }
-        if (!isApplySymmetricExtensible) {
+        if (!isApplySymmetricExtensible && !isFloatingTopBar_) {
             childLayoutConstraint.selfIdealSize.SetWidth(allocatedWidth);
         }
         for (int32_t index = 0; index < effectiveChildCount; index++) {
             auto childIndex = effectiveChildIndices_[index];
             MeasureItem(layoutWrapper, childLayoutConstraint, childIndex);
-            visibleItemPosition_[childIndex] = { allocatedWidth * index, allocatedWidth * (index + 1) };
+            if (!isFloatingTopBar_) {
+                visibleItemPosition_[childIndex] = { allocatedWidth * index, allocatedWidth * (index + 1) };
+            }
         }
         if (isApplySymmetricExtensible) {
             ApplySymmetricExtensible(layoutWrapper, allocatedWidth);
@@ -709,33 +727,11 @@ void TabBarLayoutAlgorithm::MeasureItem(LayoutWrapper* layoutWrapper, LayoutCons
     auto layoutProperty = AceType::DynamicCast<TabBarLayoutProperty>(layoutWrapper->GetLayoutProperty());
     CHECK_NULL_VOID(layoutProperty);
     if (tabBarPattern->GetTabBarStyle(index) == TabBarStyle::BOTTOMTABBATSTYLE && axis_ == Axis::HORIZONTAL) {
-        auto iconWrapper = childWrapper->GetOrCreateChildByIndex(0);
-        CHECK_NULL_VOID(iconWrapper);
-        if (iconWrapper->GetHostNode()->GetTag() == V2::SYMBOL_ETS_TAG) {
-            auto symbolLayoutProperty = AceType::DynamicCast<TextLayoutProperty>(iconWrapper->GetLayoutProperty());
-            CHECK_NULL_VOID(symbolLayoutProperty);
-            symbolLayoutProperty->UpdateMargin({ CalcLength(0.0_vp), CalcLength(0.0_vp), {}, {}, {}, {} });
-        } else {
-            auto imageLayoutProperty = AceType::DynamicCast<ImageLayoutProperty>(iconWrapper->GetLayoutProperty());
-            CHECK_NULL_VOID(imageLayoutProperty);
-            imageLayoutProperty->UpdateMargin({ CalcLength(0.0_vp), CalcLength(0.0_vp), {}, {}, {}, {} });
-        }
-        auto textWrapper = childWrapper->GetOrCreateChildByIndex(1);
-        CHECK_NULL_VOID(textWrapper);
-        auto textLayoutProperty = AceType::DynamicCast<TextLayoutProperty>(textWrapper->GetLayoutProperty());
-        CHECK_NULL_VOID(textLayoutProperty);
-        textLayoutProperty->UpdateMargin({ CalcLength(0.0_vp), CalcLength(0.0_vp), {}, {}, {}, {} });
+        ResetBottomTabItemMargin(childWrapper->GetHostNode());
     }
     if (layoutProperty->GetTabBarMode().value_or(TabBarMode::FIXED) == TabBarMode::SCROLLABLE &&
         axis_ == Axis::HORIZONTAL) {
-        auto textWrapper = childWrapper->GetOrCreateChildByIndex(1);
-        if (textWrapper) {
-            auto textLayoutProperty = AceType::DynamicCast<TextLayoutProperty>(textWrapper->GetLayoutProperty());
-            if (textLayoutProperty &&
-                textLayoutProperty->GetTextOverflow().value_or(TextOverflow::NONE) == TextOverflow::MARQUEE) {
-                textLayoutProperty->UpdateTextOverflow(TextOverflow::NONE);
-            }
-        }
+        ResetScrollableMarqueeOverflow(childWrapper->GetHostNode());
     }
     UpdateMaxLines(layoutWrapper, index);
     SetTabBarMargin(childWrapper, index);
@@ -795,9 +791,12 @@ void TabBarLayoutAlgorithm::MeasureItemSecond(LayoutWrapper* layoutWrapper, Layo
         childLayoutConstraint.selfIdealSize.SetWidth(visibleItemLength_[iter.first]);
         auto childWrapper = layoutWrapper->GetOrCreateChildByIndex(iter.first);
         CHECK_NULL_VOID(childWrapper);
-        auto iconWrapper = childWrapper->GetOrCreateChildByIndex(0);
-        if (iconWrapper && iconWrapper->GetHostNode() && iconWrapper->GetHostNode()->GetTag() == V2::SYMBOL_ETS_TAG) {
-            childWrapper->GetLayoutProperty()->UpdatePropertyChangeFlag(PROPERTY_UPDATE_MEASURE);
+        auto columnFrameNode = childWrapper->GetHostNode();
+        if (columnFrameNode) {
+            auto iconFrameNode = TabBarPattern::GetIconNodeFromColumn(columnFrameNode);
+            if (iconFrameNode && iconFrameNode->GetTag() == V2::SYMBOL_ETS_TAG) {
+                childWrapper->GetLayoutProperty()->UpdatePropertyChangeFlag(PROPERTY_UPDATE_MEASURE);
+            }
         }
         childWrapper->Measure(childLayoutConstraint);
         auto geometryNode = childWrapper->GetGeometryNode();
@@ -917,34 +916,124 @@ void TabBarLayoutAlgorithm::ApplyLayoutMode(LayoutWrapper* layoutWrapper, float 
         }
         auto childWrapper = layoutWrapper->GetOrCreateChildByIndex(childIndex);
         CHECK_NULL_VOID(childWrapper);
+        auto childNode = childWrapper->GetHostNode();
+        CHECK_NULL_VOID(childNode);
         auto linearLayoutProperty = AceType::DynamicCast<LinearLayoutProperty>(childWrapper->GetLayoutProperty());
         CHECK_NULL_VOID(linearLayoutProperty);
-        auto textWrapper = childWrapper->GetOrCreateChildByIndex(1);
-        CHECK_NULL_VOID(textWrapper);
-        auto textLayoutProperty = AceType::DynamicCast<TextLayoutProperty>(textWrapper->GetLayoutProperty());
-        CHECK_NULL_VOID(textLayoutProperty);
+        auto textFrameNode = TabBarPattern::GetTextNodeFromColumn(childNode);
+        auto textLayoutProperty = textFrameNode ? textFrameNode->GetLayoutProperty<TextLayoutProperty>() : nullptr;
         if (isVertical) {
             linearLayoutProperty->UpdateFlexDirection(FlexDirection::COLUMN);
             linearLayoutProperty->UpdateSpace(tabTheme->GetBottomTabBarSpace());
             linearLayoutProperty->UpdateMainAxisAlign(bottomTabBarStyle.verticalAlign);
             linearLayoutProperty->UpdateCrossAxisAlign(FlexAlign::CENTER);
             linearLayoutProperty->SetIsVertical(true);
-            textLayoutProperty->UpdateTextAlign(TextAlign::CENTER);
+            if (textLayoutProperty) {
+                textLayoutProperty->UpdateTextAlign(TextAlign::CENTER);
+            }
         } else {
             linearLayoutProperty->UpdateFlexDirection(FlexDirection::ROW);
             linearLayoutProperty->UpdateSpace(tabTheme->GetHorizontalBottomTabBarSpace());
             linearLayoutProperty->UpdateMainAxisAlign(FlexAlign::CENTER);
             linearLayoutProperty->UpdateCrossAxisAlign(bottomTabBarStyle.verticalAlign);
             linearLayoutProperty->SetIsVertical(false);
-            textLayoutProperty->UpdateTextAlign(TextAlign::LEFT);
+            if (textLayoutProperty) {
+                textLayoutProperty->UpdateTextAlign(TextAlign::LEFT);
+            }
         }
-        auto childNode = childWrapper->GetHostNode();
-        CHECK_NULL_VOID(childNode);
+        // Sync layout direction to contentChild when badge is present
+        SyncBadgeContentChildLayout(childNode, isVertical, tabTheme, bottomTabBarStyle);
         if (!tabBarPattern->GetBottomTabLabelStyle(childNode->GetId()).fontSize.has_value() &&
             Container::GreatOrEqualAPITargetVersion(PlatformVersion::VERSION_TWELVE)) {
             textLayoutProperty->UpdateFontSize(
                 isVertical ? tabTheme->GetBottomTabTextSize() : tabTheme->GetBottomTabHorizontalTextSize());
         }
+    }
+}
+
+void TabBarLayoutAlgorithm::ResetBottomTabItemMargin(const RefPtr<FrameNode>& columnFrameNode)
+{
+    CHECK_NULL_VOID(columnFrameNode);
+    ResetIconMargin(TabBarPattern::GetIconNodeFromColumn(columnFrameNode));
+    auto textFrameNode = TabBarPattern::GetTextNodeFromColumn(columnFrameNode);
+    if (textFrameNode) {
+        auto textLayoutProperty = textFrameNode->GetLayoutProperty<TextLayoutProperty>();
+        if (textLayoutProperty) {
+            textLayoutProperty->UpdateMargin(
+                { CalcLength(0.0_vp), CalcLength(0.0_vp), {}, {}, {}, {} });
+        }
+    }
+}
+
+void TabBarLayoutAlgorithm::ResetIconMargin(const RefPtr<FrameNode>& iconFrameNode)
+{
+    CHECK_NULL_VOID(iconFrameNode);
+    static const MarginProperty zeroMargin = { CalcLength(0.0_vp), CalcLength(0.0_vp), {}, {}, {}, {} };
+    if (iconFrameNode->GetTag() == V2::SYMBOL_ETS_TAG) {
+        auto symbolLayoutProperty = iconFrameNode->GetLayoutProperty<TextLayoutProperty>();
+        if (symbolLayoutProperty) {
+            symbolLayoutProperty->UpdateMargin(zeroMargin);
+        }
+    } else {
+        auto imageLayoutProperty = iconFrameNode->GetLayoutProperty<ImageLayoutProperty>();
+        if (imageLayoutProperty) {
+            imageLayoutProperty->UpdateMargin(zeroMargin);
+        }
+    }
+}
+
+void TabBarLayoutAlgorithm::ResetScrollableMarqueeOverflow(const RefPtr<FrameNode>& columnFrameNode)
+{
+    CHECK_NULL_VOID(columnFrameNode);
+    auto textFrameNode = TabBarPattern::GetTextNodeFromColumn(columnFrameNode);
+    CHECK_NULL_VOID(textFrameNode);
+    auto textLayoutProperty = textFrameNode->GetLayoutProperty<TextLayoutProperty>();
+    if (textLayoutProperty &&
+        textLayoutProperty->GetTextOverflow().value_or(TextOverflow::NONE) == TextOverflow::MARQUEE) {
+        textLayoutProperty->UpdateTextOverflow(TextOverflow::NONE);
+    }
+}
+
+void TabBarLayoutAlgorithm::SyncBadgeContentChildLayout(const RefPtr<FrameNode>& childNode, bool isVertical,
+    const RefPtr<TabTheme>& tabTheme, const BottomTabBarStyle& bottomTabBarStyle)
+{
+    CHECK_NULL_VOID(childNode);
+    CHECK_NULL_VOID(tabTheme);
+    auto& columnChildren = childNode->GetChildren();
+    if (columnChildren.empty()) {
+        return;
+    }
+    auto firstChild = AceType::DynamicCast<FrameNode>(columnChildren.front());
+    if (!firstChild || firstChild->GetTag() != BADGE_ETS_TAG) {
+        return;
+    }
+    auto& badgeChildren = firstChild->GetChildren();
+    if (badgeChildren.empty()) {
+        return;
+    }
+    auto contentChild = AceType::DynamicCast<FrameNode>(badgeChildren.front());
+    CHECK_NULL_VOID(contentChild);
+    auto contentChildLayout = contentChild->GetLayoutProperty<LinearLayoutProperty>();
+    CHECK_NULL_VOID(contentChildLayout);
+    if (isVertical) {
+        contentChildLayout->UpdateFlexDirection(FlexDirection::COLUMN);
+        contentChildLayout->UpdateSpace(tabTheme->GetBottomTabBarSpace());
+        contentChildLayout->UpdateMainAxisAlign(bottomTabBarStyle.verticalAlign);
+        contentChildLayout->UpdateCrossAxisAlign(FlexAlign::CENTER);
+        contentChildLayout->SetIsVertical(true);
+    } else {
+        contentChildLayout->UpdateFlexDirection(FlexDirection::ROW);
+        contentChildLayout->UpdateSpace(tabTheme->GetHorizontalBottomTabBarSpace());
+        contentChildLayout->UpdateMainAxisAlign(FlexAlign::CENTER);
+        contentChildLayout->UpdateCrossAxisAlign(bottomTabBarStyle.verticalAlign);
+        contentChildLayout->SetIsVertical(false);
+    }
+    // Sync RTL direction to badge node on every layout pass so that runtime direction
+    // changes are reflected without requiring a badge property update. contentChild direction
+    // is intentionally left to system/app-level resolution for consistency with non-badge items.
+    auto badgeLayoutProp = firstChild->GetLayoutProperty<BadgeLayoutProperty>();
+    if (badgeLayoutProp) {
+        badgeLayoutProp->UpdateLayoutDirection(isRTL_ ? TextDirection::RTL : TextDirection::LTR);
     }
 }
 
@@ -1058,31 +1147,35 @@ void TabBarLayoutAlgorithm::UpdateChildMarginProperty(
 {
     auto linearLayoutProperty = AceType::DynamicCast<LinearLayoutProperty>(childWrapper->GetLayoutProperty());
     CHECK_NULL_VOID(linearLayoutProperty);
-    auto textWrapper = childWrapper->GetOrCreateChildByIndex(1);
-    CHECK_NULL_VOID(textWrapper);
-    auto textLayoutProperty = AceType::DynamicCast<TextLayoutProperty>(textWrapper->GetLayoutProperty());
+    auto columnFrameNode = childWrapper->GetHostNode();
+    CHECK_NULL_VOID(columnFrameNode);
+    auto textFrameNode = TabBarPattern::GetTextNodeFromColumn(columnFrameNode);
+    CHECK_NULL_VOID(textFrameNode);
+    auto textLayoutProperty = textFrameNode->GetLayoutProperty<TextLayoutProperty>();
     CHECK_NULL_VOID(textLayoutProperty);
     textLayoutProperty->UpdateMargin(
         { CalcLength(Dimension(leftMargin)), CalcLength(Dimension(rightMargin)), {}, {}, {}, {} });
-    auto iconWrapper = childWrapper->GetOrCreateChildByIndex(0);
-    CHECK_NULL_VOID(iconWrapper);
-    if (iconWrapper->GetHostNode()->GetTag() == V2::SYMBOL_ETS_TAG) {
-        auto symbolLayoutProperty = AceType::DynamicCast<TextLayoutProperty>(iconWrapper->GetLayoutProperty());
-        CHECK_NULL_VOID(symbolLayoutProperty);
-        symbolLayoutProperty->UpdateMargin(
-            { CalcLength(Dimension(leftMargin)), CalcLength(Dimension(rightMargin)), {}, {}, {}, {} });
-        if (linearLayoutProperty->GetFlexDirection().value_or(FlexDirection::COLUMN) == FlexDirection::ROW) {
-            symbolLayoutProperty->UpdateMargin({ CalcLength(Dimension(leftMargin)), {}, {}, {}, {}, {} });
-            textLayoutProperty->UpdateMargin({ {}, CalcLength(Dimension(rightMargin)), {}, {}, {}, {} });
+    auto iconFrameNode = TabBarPattern::GetIconNodeFromColumn(columnFrameNode);
+    CHECK_NULL_VOID(iconFrameNode);
+    if (iconFrameNode->GetTag() == V2::SYMBOL_ETS_TAG) {
+        auto symbolLayoutProperty = iconFrameNode->GetLayoutProperty<TextLayoutProperty>();
+        if (symbolLayoutProperty) {
+            symbolLayoutProperty->UpdateMargin(
+                { CalcLength(Dimension(leftMargin)), CalcLength(Dimension(rightMargin)), {}, {}, {}, {} });
+            if (linearLayoutProperty->GetFlexDirection().value_or(FlexDirection::COLUMN) == FlexDirection::ROW) {
+                symbolLayoutProperty->UpdateMargin({ CalcLength(Dimension(leftMargin)), {}, {}, {}, {}, {} });
+                textLayoutProperty->UpdateMargin({ {}, CalcLength(Dimension(rightMargin)), {}, {}, {}, {} });
+            }
         }
     } else {
-        auto imageLayoutProperty = AceType::DynamicCast<ImageLayoutProperty>(iconWrapper->GetLayoutProperty());
-        CHECK_NULL_VOID(imageLayoutProperty);
-        imageLayoutProperty->UpdateMargin(
-            { CalcLength(Dimension(leftMargin)), CalcLength(Dimension(rightMargin)), {}, {}, {}, {} });
-        if (linearLayoutProperty->GetFlexDirection().value_or(FlexDirection::COLUMN) == FlexDirection::ROW) {
-            imageLayoutProperty->UpdateMargin({ CalcLength(Dimension(leftMargin)), {}, {}, {}, {}, {} });
-            textLayoutProperty->UpdateMargin({ {}, CalcLength(Dimension(rightMargin)), {}, {}, {}, {} });
+        auto imageLayoutProperty = iconFrameNode->GetLayoutProperty<ImageLayoutProperty>();
+        if (imageLayoutProperty) {
+            imageLayoutProperty->UpdateMargin(
+                { CalcLength(Dimension(leftMargin)), CalcLength(Dimension(rightMargin)), {}, {}, {}, {} });
+            if (linearLayoutProperty->GetFlexDirection().value_or(FlexDirection::COLUMN) == FlexDirection::ROW) {
+                imageLayoutProperty->UpdateMargin({ CalcLength(Dimension(leftMargin)), {}, {}, {}, {}, {} });
+                textLayoutProperty->UpdateMargin({ {}, CalcLength(Dimension(rightMargin)), {}, {}, {}, {} });
+            }
         }
     }
 }

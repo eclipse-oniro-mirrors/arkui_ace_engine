@@ -31,6 +31,8 @@
 #include "core/components_ng/pattern/image/image_layout_property.h"
 #include "core/components_ng/pattern/image/image_pattern.h"
 #include "core/components_ng/pattern/linear_layout/linear_layout_pattern.h"
+#include "core/components_ng/pattern/menu/menu_item/menu_item_layout_property.h"
+#include "core/components_ng/pattern/menu/menu_item/menu_item_paint_property.h"
 #include "core/components_ng/pattern/menu/menu_item/menu_item_row_pattern.h"
 #include "core/components_ng/pattern/menu/menu_layout_property.h"
 #include "core/components_ng/pattern/menu/menu_pattern.h"
@@ -54,6 +56,7 @@
 #include "core/components/common/properties/placement.h"
 #include "core/components/theme/shadow_theme.h"
 #include "interfaces/inner_api/ace_kit/include/ui/view/theme/token_colors.h"
+#include "core/components_ng/token_theme/token_theme_storage.h"
 
 namespace OHOS::Ace::NG {
 /**
@@ -1222,38 +1225,37 @@ bool MenuView::ShouldHandleLowEndImmersiveMaterial(const RefPtr<UiMaterial>& sys
 bool MenuView::HandleLowEndImmersiveMaterialForMenu(const RefPtr<FrameNode>& menuNode,
     const RefPtr<UiMaterial>& systemMaterial, const RefPtr<RenderContext>& renderContext)
 {
-    auto pipelineContext = menuNode->GetContextRefPtr();
-    CHECK_NULL_RETURN(pipelineContext, false);
-    auto themeManager = pipelineContext->GetThemeManager();
-    CHECK_NULL_RETURN(themeManager, false);
-    auto themeConstants = themeManager->GetThemeConstants();
-    CHECK_NULL_RETURN(themeConstants, false);
-
-    SetLowEndImmersiveBackgroundForMenu(renderContext, themeConstants);
-    SetLowEndImmersiveShadowForMenu(menuNode, systemMaterial, renderContext, pipelineContext);
-    return true;
-}
-
-void MenuView::SetLowEndImmersiveBackgroundForMenu(
-    const RefPtr<RenderContext>& renderContext, const RefPtr<ThemeConstants>& themeConstants)
-{
-    auto resId = Ace::TokenColors::GetSystemColorResIdByIndex(Ace::TokenColors::COMP_BACKGROUND_PRIMARY);
-    auto backgroundColor = themeConstants->GetColor(resId);
-    renderContext->UpdateBackgroundColor(backgroundColor);
-}
-
-void MenuView::SetLowEndImmersiveShadowForMenu(const RefPtr<FrameNode>& menuNode,
-    const RefPtr<UiMaterial>& systemMaterial, const RefPtr<RenderContext>& renderContext,
-    const RefPtr<PipelineContext>& pipelineContext)
-{
-    auto immersiveOptions = systemMaterial->GetImmersiveOptions();
-    if (!immersiveOptions || !immersiveOptions->applyShadow) {
-        return;
+    CHECK_NULL_RETURN(systemMaterial, false);
+    auto options = systemMaterial->GetImmersiveOptions();
+    if (options && !options->materialColor.has_value() && !options->colorResObj) {
+        // Resolve COMP_BACKGROUND_PRIMARY honoring WithTheme scope on the menu node first,
+        // because ThemeConstants::GetColor only reads global resources and ignores themeScopeId.
+        auto backgroundColor = Color::TRANSPARENT;
+        auto themeScopeId = menuNode->GetThemeScopeId();
+        auto tokenTheme = TokenThemeStorage::GetInstance()->GetTheme(themeScopeId);
+        if (tokenTheme && tokenTheme->Colors()) {
+            backgroundColor = tokenTheme->Colors()->CompBackgroundPrimary();
+        } else {
+            auto pipelineContext = menuNode->GetContext();
+            CHECK_NULL_RETURN(pipelineContext, false);
+            auto themeManager = pipelineContext->GetThemeManager();
+            CHECK_NULL_RETURN(themeManager, false);
+            auto themeConstants = themeManager->GetThemeConstants();
+            CHECK_NULL_RETURN(themeConstants, false);
+            auto resId = Ace::TokenColors::GetSystemColorResIdByIndex(Ace::TokenColors::COMP_BACKGROUND_PRIMARY);
+            backgroundColor = themeConstants->GetColor(resId);
+        }
+        auto copiedMaterial = systemMaterial->Copy();
+        CHECK_NULL_RETURN(copiedMaterial, false);
+        auto copiedOptions = copiedMaterial->GetImmersiveOptions();
+        CHECK_NULL_RETURN(copiedOptions, false);
+        copiedOptions->materialColor = backgroundColor;
+        renderContext->UpdateBackgroundColor(Color::TRANSPARENT);
+        ViewAbstract::SetSystemMaterial(AceType::RawPtr(menuNode), AceType::RawPtr(copiedMaterial));
+    } else {
+        ViewAbstract::SetSystemMaterial(AceType::RawPtr(menuNode), AceType::RawPtr(systemMaterial));
     }
-
-    auto dipScale = pipelineContext->GetDipScale();
-    auto shadow = Ace::MaterialUtils::GetImmersiveShadow(dipScale);
-    renderContext->UpdateBackShadow(shadow);
+    return true;
 }
 
 bool MenuView::ApplySystemMaterialForMenu(const RefPtr<FrameNode>& menuNode, const RefPtr<UiMaterial>& systemMaterial,
@@ -2610,6 +2612,31 @@ RefPtr<FrameNode> CreateGridItemContent(const OptionParam& param, int32_t themeS
     return columnNode;
 }
 
+// Apply disabled visual style to grid item, mirroring MenuItemPattern::UpdateDisabledStyle().
+// When enabled is false, set opacity to disabledFontColorAlpha on every child (icon / text) so
+// the grid item shows the same greyed-out appearance as a normal disabled MenuItem.
+void UpdateGridItemDisabledStyle(const RefPtr<FrameNode>& itemNode, const RefPtr<SelectTheme>& theme,
+    bool enabled)
+{
+    CHECK_NULL_VOID(itemNode);
+    CHECK_NULL_VOID(theme);
+    if (enabled) {
+        return;
+    }
+    auto alpha = theme->GetDisabledFontColorAlpha();
+    for (const auto& child : itemNode->GetChildren()) {
+        auto childFrame = AceType::DynamicCast<FrameNode>(child);
+        if (!childFrame) {
+            continue;
+        }
+        auto renderContext = childFrame->GetRenderContext();
+        CHECK_NULL_VOID(renderContext);
+        auto originalOpacity = renderContext->GetOpacityValue(1.0);
+        renderContext->OnOpacityUpdate(alpha * originalOpacity);
+        childFrame->MarkModifyDone();
+    }
+}
+
 void InitGridItemFeedback(const RefPtr<FrameNode>& itemNode, const RefPtr<SelectTheme>& theme)
 {
     CHECK_NULL_VOID(itemNode);
@@ -2624,7 +2651,9 @@ void InitGridItemFeedback(const RefPtr<FrameNode>& itemNode, const RefPtr<Select
     auto inputHub = itemNode->GetOrCreateInputEventHub();
     auto initialMenuHoverColor = theme->GetGridMenuHoverColor();
     if (inputHub) {
-        inputHub->SetHoverEvent(
+        // Use AddOnHoverEvent (append) instead of SetHoverEvent (replace) so that user-bound
+        // onHover callbacks transferred from the original builder MenuItem are preserved.
+        OnHoverFunc hoverFunc =
             [initialMenuHoverColor, weakItem = AceType::WeakClaim(AceType::RawPtr(itemNode))](
                 bool isHover, HoverInfo& info) {
                 auto item = weakItem.Upgrade();
@@ -2634,11 +2663,15 @@ void InitGridItemFeedback(const RefPtr<FrameNode>& itemNode, const RefPtr<Select
                 auto rc = item->GetRenderContext();
                 CHECK_NULL_VOID(rc);
                 rc->UpdateBackgroundColor(isHover ? gridMenuHoverColor : Color::TRANSPARENT);
-            });
+            };
+        auto hoverEvent = AceType::MakeRefPtr<InputEvent>(std::move(hoverFunc));
+        inputHub->AddOnHoverEvent(hoverEvent);
     }
 
     auto initialMenuClickedColor = theme->GetGridMenuClickedColor();
-    gestureHub->SetTouchEvent(
+    // Use AddTouchEvent (append) instead of SetTouchEvent (replace) so that user-bound
+    // onTouch callbacks transferred from the original builder MenuItem are preserved.
+    TouchEventFunc touchFunc =
         [initialMenuClickedColor, weakItem = AceType::WeakClaim(AceType::RawPtr(itemNode))](
             TouchEventInfo& info) {
             auto item = weakItem.Upgrade();
@@ -2656,7 +2689,9 @@ void InitGridItemFeedback(const RefPtr<FrameNode>& itemNode, const RefPtr<Select
                     rc->UpdateBackgroundColor(Color::TRANSPARENT);
                 }
             }
-        });
+        };
+    auto touchEvent = AceType::MakeRefPtr<TouchEventImpl>(std::move(touchFunc));
+    gestureHub->AddTouchEvent(touchEvent);
 }
 
 void InitGridItemClick(const RefPtr<FrameNode>& itemNode, const std::function<void()>& action,
@@ -2665,7 +2700,9 @@ void InitGridItemClick(const RefPtr<FrameNode>& itemNode, const std::function<vo
     CHECK_NULL_VOID(itemNode);
     auto gestureHub = itemNode->GetOrCreateGestureEventHub();
     CHECK_NULL_VOID(gestureHub);
-    gestureHub->SetUserOnClick([action, menuWeak](GestureEvent& info) {
+    // Use AddClickEvent (append) instead of SetUserOnClick (replace) so that user-bound onClick
+    // callbacks transferred from the original builder MenuItem node via CopyEvent are preserved.
+    auto clickEvent = AceType::MakeRefPtr<ClickEvent>([action, menuWeak](GestureEvent& info) {
         if (action) {
             action();
         }
@@ -2675,12 +2712,41 @@ void InitGridItemClick(const RefPtr<FrameNode>& itemNode, const std::function<vo
         CHECK_NULL_VOID(menuPattern);
         menuPattern->HideMenu();
     });
+    gestureHub->AddClickEvent(clickEvent);
+}
+
+// Transfer all user-registered events from a builder-created MenuItem node to a rebuilt grid item
+// node. This preserves onClick / onTouch / onHover / onMouse / onKeyEvent / etc. that would
+// otherwise be lost when the original node is destroyed during grid layout rebuild.
+void TransferMenuItemEvents(const RefPtr<FrameNode>& srcNode, const RefPtr<FrameNode>& dstNode)
+{
+    CHECK_NULL_VOID(srcNode);
+    CHECK_NULL_VOID(dstNode);
+    // 1. Gesture events: onClick / onTouch / longPress / drag
+    auto srcGestureHub = srcNode->GetOrCreateGestureEventHub();
+    auto dstGestureHub = dstNode->GetOrCreateGestureEventHub();
+    if (srcGestureHub && dstGestureHub) {
+        dstGestureHub->CopyEvent(srcGestureHub);
+    }
+    // 2. Input events: onHover / onMouse / onAxis
+    auto srcInputHub = srcNode->GetOrCreateInputEventHub();
+    auto dstInputHub = dstNode->GetOrCreateInputEventHub();
+    if (srcInputHub && dstInputHub) {
+        dstInputHub->CopyEvent(srcInputHub);
+    }
+    // 3. Focus events: onKeyEvent / onFocus / onBlur
+    auto srcFocusHub = srcNode->GetFocusHub();
+    auto dstFocusHub = dstNode->GetOrCreateFocusHub();
+    if (srcFocusHub && dstFocusHub) {
+        dstFocusHub->CopyEvent(srcFocusHub);
+    }
 }
 
 } // namespace
 
 RefPtr<FrameNode> MenuView::CreateGridItem(const OptionParam& param, int32_t index,
-    const WeakPtr<FrameNode>& menuWeak, int32_t themeScopeId, RefPtr<MenuPattern> customMenuPattern)
+    const WeakPtr<FrameNode>& menuWeak, int32_t themeScopeId, RefPtr<MenuPattern> customMenuPattern,
+    const RefPtr<FrameNode>& srcNode)
 {
     auto contentColumn = CreateGridItemContent(param, themeScopeId, false);
     CHECK_NULL_RETURN(contentColumn, nullptr);
@@ -2689,6 +2755,9 @@ RefPtr<FrameNode> MenuView::CreateGridItem(const OptionParam& param, int32_t ind
     if (customMenuPattern) {
         auto customGridPasteItem = customMenuPattern->BuildGridMenuPasteItem(param, contentColumn, themeScopeId);
         if (customGridPasteItem) {
+            if (srcNode) {
+                TransferMenuItemEvents(srcNode, customGridPasteItem);
+            }
             InitGridItemFeedback(customGridPasteItem, theme);
             customGridPasteItem->MarkModifyDone();
             return customGridPasteItem;
@@ -2697,6 +2766,13 @@ RefPtr<FrameNode> MenuView::CreateGridItem(const OptionParam& param, int32_t ind
     auto eventHub = contentColumn->GetEventHub<EventHub>();
     CHECK_NULL_RETURN(eventHub, nullptr);
     eventHub->SetEnabled(param.enabled);
+    UpdateGridItemDisabledStyle(contentColumn, theme, param.enabled);
+    // Transfer events first, then set feedback and click. CopyEvent overwrites touch/click
+    // actuators, so it must run before InitGridItemFeedback (which appends touch/hover via
+    // AddTouchEvent/AddOnHoverEvent) and InitGridItemClick (which appends via AddClickEvent).
+    if (srcNode) {
+        TransferMenuItemEvents(srcNode, contentColumn);
+    }
     InitGridItemFeedback(contentColumn, theme);
     InitGridItemClick(contentColumn, param.action, menuWeak);
     contentColumn->MarkModifyDone();
@@ -2704,7 +2780,8 @@ RefPtr<FrameNode> MenuView::CreateGridItem(const OptionParam& param, int32_t ind
 }
 
 void MenuView::MountGridSection(std::vector<OptionParam>& params, const RefPtr<FrameNode>& menuNode,
-    const MenuParam& menuParam, const RefPtr<FrameNode>& outerColumn, RefPtr<MenuPattern> customMenuPattern)
+    const MenuParam& menuParam, const RefPtr<FrameNode>& outerColumn, RefPtr<MenuPattern> customMenuPattern,
+    const std::vector<RefPtr<FrameNode>>& originalNodes)
 {
     CHECK_NULL_VOID(menuParam.gridStyle);
     const auto& gridStyle = menuParam.gridStyle.value();
@@ -2762,7 +2839,12 @@ void MenuView::MountGridSection(std::vector<OptionParam>& params, const RefPtr<F
         float percentWidth = 1.0f / static_cast<float>(horizontalSize);
 
         for (int32_t col = 0; col < horizontalSize && itemIndex < gridCount; ++col, ++itemIndex) {
-            auto gridItem = CreateGridItem(params[itemIndex], itemIndex, weakMenu, themeScopeId, customMenuPattern);
+            RefPtr<FrameNode> srcNode;
+            if (itemIndex < static_cast<int32_t>(originalNodes.size())) {
+                srcNode = originalNodes[itemIndex];
+            }
+            auto gridItem = CreateGridItem(params[itemIndex], itemIndex, weakMenu, themeScopeId,
+                customMenuPattern, srcNode);
             CHECK_NULL_CONTINUE(gridItem);
             auto itemLayoutProps = gridItem->GetLayoutProperty();
             CHECK_NULL_CONTINUE(itemLayoutProps);
@@ -3464,6 +3546,64 @@ static OptionParam ExtractOneMenuItemParam(const RefPtr<FrameNode>& customChildN
     return param;
 }
 
+// Whether the previous list item carries a start icon/symbol. The divider is drawn at the top
+// of the current item, so its start margin follows the *previous* item: align after the icon
+// when present, otherwise use the default start margin.
+static bool PrevItemHasStartIconOrSymbol(const RefPtr<FrameNode>& prevItemFrame)
+{
+    if (!prevItemFrame) {
+        return false;
+    }
+    auto prevLayoutProp = prevItemFrame->GetLayoutProperty<MenuItemLayoutProperty>();
+    if (!prevLayoutProp) {
+        return false;
+    }
+    const auto& startIconOpt = prevLayoutProp->GetStartIcon();
+    bool hasStartIcon = startIconOpt.has_value() && !startIconOpt->GetSrc().empty();
+    bool hasStartSymbol = static_cast<bool>(prevLayoutProp->GetStartSymbol());
+    return hasStartIcon || hasStartSymbol;
+}
+
+// Set dividers on remaining MenuItems in the column. The divider is drawn at the top of each
+// item, so its alignment follows the *previous* item: if the previous item has a start
+// icon/symbol the divider starts after the icon; otherwise it aligns to the content.
+static void SetRemainingItemDividers(const RefPtr<FrameNode>& customMenuNode, const RefPtr<SelectTheme>& theme)
+{
+    CHECK_NULL_VOID(customMenuNode);
+    CHECK_NULL_VOID(theme);
+    if (theme->GetExpandDisplay() || SystemProperties::IsPCMode()) {
+        return;
+    }
+    int listIndex = 0;
+    RefPtr<FrameNode> prevItemFrame;
+    for (const auto& child : customMenuNode->GetChildren()) {
+        auto childFrame = AceType::DynamicCast<FrameNode>(child);
+        if (!childFrame || childFrame->GetTag() != MENU_ITEM_ETS_TAG) {
+            continue;
+        }
+        if (listIndex > 0) {
+            auto paintProperty = childFrame->GetPaintProperty<MenuItemPaintProperty>();
+            CHECK_NULL_VOID(paintProperty);
+            auto strokeWidth = theme->GetDefaultDividerWidth();
+            auto startMargin = theme->GetDefaultDividerStartMargin();
+            auto endMargin = theme->GetDefaultDividerEndMargin();
+            auto color = theme->GetLineColor();
+            if (PrevItemHasStartIconOrSymbol(prevItemFrame)) {
+                auto horInterval = theme->GetMenuItemHorIntervalPadding();
+                startMargin = horInterval + theme->GetIconSideLength() + theme->GetIconContentPadding();
+            }
+            paintProperty->UpdateStrokeWidth(strokeWidth);
+            paintProperty->UpdateStartMargin(startMargin);
+            paintProperty->UpdateEndMargin(endMargin);
+            paintProperty->UpdateDividerColor(color);
+            childFrame->MarkModifyDone();
+            childFrame->MarkDirtyNode(PROPERTY_UPDATE_RENDER);
+        }
+        prevItemFrame = childFrame;
+        listIndex++;
+    }
+}
+
 RefPtr<FrameNode> MenuView::BuildGridListColumn(const RefPtr<FrameNode>& customMenuNode,
     const RefPtr<FrameNode>& menuNode, const MenuParam& menuParam, int32_t themeScopeId)
 {
@@ -3479,11 +3619,14 @@ RefPtr<FrameNode> MenuView::BuildGridListColumn(const RefPtr<FrameNode>& customM
 
     // Take first gridCount items as grid params, remove them from parent
     std::vector<OptionParam> gridParams;
+    std::vector<RefPtr<FrameNode>> originalNodes;
     auto childIter = childrenSnapshot.begin();
     for (int32_t gridIdx = 0; gridIdx < gridCount && childIter != childrenSnapshot.end(); gridIdx++, ++childIter) {
         auto childFrame = AceType::DynamicCast<FrameNode>(*childIter);
         if (childFrame) {
             gridParams.push_back(ExtractOneMenuItemParam(childFrame));
+            // Save the inner MenuItem node (not the wrapper) for event transfer
+            originalNodes.push_back(GetMenuItemNodeFromCustomChild(childFrame));
             customMenuNode->RemoveChild(childFrame);
         }
     }
@@ -3500,7 +3643,7 @@ RefPtr<FrameNode> MenuView::BuildGridListColumn(const RefPtr<FrameNode>& customM
     CHECK_NULL_RETURN(gridContainer, nullptr);
     UpdateGridNodeThemeScopeId(gridContainer, themeScopeId);
     auto customMenuPattern = customMenuNode->GetPattern<MenuPattern>();
-    MountGridSection(gridParams, menuNode, menuParam, gridContainer, customMenuPattern);
+    MountGridSection(gridParams, menuNode, menuParam, gridContainer, customMenuPattern, originalNodes);
     gridContainer->MarkModifyDone();
 
     bool hasListContent = !customMenuNode->GetChildren().empty();
@@ -3524,38 +3667,9 @@ RefPtr<FrameNode> MenuView::BuildGridListColumn(const RefPtr<FrameNode>& customM
         gridContainer->MountToParent(customMenuNode);
     }
 
-    // Set dividers on remaining MenuItems
-    int listIndex = 0;
     auto theme = menuNode->GetTheme<SelectTheme>(true);
     CHECK_NULL_RETURN(theme, nullptr);
-    for (const auto& child : customMenuNode->GetChildren()) {
-        if (theme->GetExpandDisplay() || SystemProperties::IsPCMode()) {
-            break;
-        }
-        auto childFrame = AceType::DynamicCast<FrameNode>(child);
-        if (!childFrame || childFrame->GetTag() != MENU_ITEM_ETS_TAG) {
-            continue;
-        }
-        if (listIndex > 0) {
-            auto paintProperty = childFrame->GetPaintProperty<MenuItemPaintProperty>();
-            CHECK_NULL_RETURN(paintProperty, nullptr);
-            auto strokeWidth = theme->GetDefaultDividerWidth();
-            auto startMargin = theme->GetDefaultDividerStartMargin();
-            auto endMargin = theme->GetDefaultDividerEndMargin();
-            auto color = theme->GetLineColor();
-            auto iconContentPadding = theme->GetIconContentPadding();
-            auto endIconWidth = theme->GetEndIconWidth();
-            auto menuIconPadding = theme->GetMenuIconPadding();
-            auto finalStartMargin = startMargin + iconContentPadding + endIconWidth + menuIconPadding;
-            paintProperty->UpdateStrokeWidth(strokeWidth);
-            paintProperty->UpdateStartMargin(finalStartMargin);
-            paintProperty->UpdateEndMargin(endMargin);
-            paintProperty->UpdateDividerColor(color);
-            childFrame->MarkModifyDone();
-            childFrame->MarkDirtyNode(PROPERTY_UPDATE_RENDER);
-        }
-        listIndex++;
-    }
+    SetRemainingItemDividers(customMenuNode, theme);
 
     customMenuNode->MarkModifyDone();
     return customMenuNode;

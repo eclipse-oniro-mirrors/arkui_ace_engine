@@ -22,6 +22,7 @@
 #include "core/components_ng/pattern/xcomponent/inner_xcomponent_controller.h"
 #include "core/components_ng/pattern/xcomponent/xcomponent_model_ng.h"
 #include "core/components_ng/pattern/xcomponent/xcomponent_model_static.h"
+#include "core/components_ng/pattern/xcomponent/xcomponent_pattern.h"
 #include "core/components_ng/pattern/xcomponent/bridge/xcomponent_controller_peer_impl.h"
 #include "core/interfaces/native/utility/callback_helper.h"
 
@@ -218,6 +219,17 @@ void SetHdrBrightness1Impl(Ark_NativePointer node, const Opt_Float64* brightness
     }
 #endif // XCOMPONENT_SUPPORTED
 }
+void SetExtraFlagImpl(Ark_NativePointer node, Ark_Int32 value)
+{
+    TAG_LOGI(AceLogTag::ACE_XCOMPONENT, "XComponent SetExtraFlag (static modifier) entry, flag: 0x%{public}x",
+        static_cast<int32_t>(value));
+    auto frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    ACE_UINODE_TRACE(frameNode);
+#ifdef XCOMPONENT_SUPPORTED
+    XComponentModelNG::SetExtraFlag(frameNode, static_cast<uint32_t>(value));
+#endif // XCOMPONENT_SUPPORTED
+}
 void SetEnableTransparentLayerImpl(Ark_NativePointer node,
                                    const Opt_Boolean* value)
 {
@@ -229,20 +241,50 @@ void SetEnableTransparentLayerImpl(Ark_NativePointer node,
     XComponentModelNG::EnableTransparentLayer(frameNode, convValue.value_or(false));
     #endif // XCOMPONENT_SUPPORTED
 }
+void SetBufferQueueCountImpl(Ark_NativePointer node,
+                             Ark_Int32 value)
+{
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    ACE_UINODE_TRACE(frameNode);
+    #ifdef XCOMPONENT_SUPPORTED
+    XComponentModelNG::SetBufferQueueCount(frameNode, value);
+    #endif // XCOMPONENT_SUPPORTED
+}
 } // XComponentAttributeModifier
+namespace {
+// Older SDK-generated tables do not contain setSetExtraFlag.
+template<typename Modifier>
+constexpr auto SetExtraFlagIfSupported(Modifier& modifier, int)
+    -> decltype(modifier.setSetExtraFlag = XComponentAttributeModifier::SetExtraFlagImpl, void())
+{
+    modifier.setSetExtraFlag = XComponentAttributeModifier::SetExtraFlagImpl;
+}
+
+template<typename Modifier>
+constexpr void SetExtraFlagIfSupported(Modifier&, long)
+{}
+} // namespace
+
 const GENERATED_ArkUIXComponentModifier* GetXComponentStaticModifier()
 {
-    static const GENERATED_ArkUIXComponentModifier ArkUIXComponentModifierImpl {
-        XComponentModifier::ConstructImpl,
-        XComponentInterfaceModifier::SetXComponentOptionsImpl,
-        XComponentAttributeModifier::SetOnLoadImpl,
-        XComponentAttributeModifier::SetOnDestroyImpl,
-        XComponentAttributeModifier::SetEnableAnalyzerImpl,
-        XComponentAttributeModifier::SetEnableSecureImpl,
-        XComponentAttributeModifier::SetEnableTransparentLayerImpl,
-        XComponentAttributeModifier::SetHdrBrightness0Impl,
-        XComponentAttributeModifier::SetHdrBrightness1Impl,
-    };
+    static constexpr GENERATED_ArkUIXComponentModifier ArkUIXComponentModifierImpl = [] {
+        GENERATED_ArkUIXComponentModifier modifier {};
+        modifier.construct = XComponentModifier::ConstructImpl;
+        modifier.setXComponentOptions = XComponentInterfaceModifier::SetXComponentOptionsImpl;
+        modifier.setOnLoad = XComponentAttributeModifier::SetOnLoadImpl;
+        modifier.setOnDestroy = XComponentAttributeModifier::SetOnDestroyImpl;
+        modifier.setEnableAnalyzer = XComponentAttributeModifier::SetEnableAnalyzerImpl;
+        modifier.setEnableSecure = XComponentAttributeModifier::SetEnableSecureImpl;
+        modifier.setEnableTransparentLayer = XComponentAttributeModifier::SetEnableTransparentLayerImpl;
+        modifier.setHdrBrightness0 = XComponentAttributeModifier::SetHdrBrightness0Impl;
+        modifier.setBufferQueueCount = XComponentAttributeModifier::SetBufferQueueCountImpl;
+        modifier.setHdrBrightness1 = XComponentAttributeModifier::SetHdrBrightness1Impl;
+        // The int literal 0 prefers the SFINAE overload when the SDK table has the
+        // field; if that overload is removed, 0 converts to the long no-op instead.
+        SetExtraFlagIfSupported(modifier, 0);
+        return modifier;
+    }();
     return &ArkUIXComponentModifierImpl;
 }
 

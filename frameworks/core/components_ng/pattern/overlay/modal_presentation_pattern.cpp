@@ -137,12 +137,12 @@ void ModalPresentationPattern::OnAppear()
 #ifndef CROSS_PLATFORM
     UiSessionManager::GetInstance()->ReportComponentChangeEvent("event", "ModalPresentation.onAppear",
         ComponentEventType::COMPONENT_EVENT_MODAL_PRESENTATION);
+#endif
     auto pipeline = GetContext();
     CHECK_NULL_VOID(pipeline);
     auto mgr = pipeline->GetContentChangeManager();
     CHECK_NULL_VOID(mgr);
     mgr->OnDialogChangeEnd(GetHost(), true);
-#endif
 }
 
 void ModalPresentationPattern::OnDisappear()
@@ -155,12 +155,12 @@ void ModalPresentationPattern::OnDisappear()
 #ifndef CROSS_PLATFORM
     UiSessionManager::GetInstance()->ReportComponentChangeEvent("event", "ModalPresentation.onDisappear",
         ComponentEventType::COMPONENT_EVENT_MODAL_PRESENTATION);
+#endif
     auto pipeline = GetContext();
     CHECK_NULL_VOID(pipeline);
     auto mgr = pipeline->GetContentChangeManager();
     CHECK_NULL_VOID(mgr);
     mgr->OnDialogChangeEnd(GetHost(), false);
-#endif
 }
 
 int32_t ModalPresentationPattern::ParseCommand(const std::string& command, std::string& comValue)

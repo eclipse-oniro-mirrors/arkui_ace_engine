@@ -498,7 +498,7 @@ void SetControlSizeImpl(Ark_NativePointer node,
     CHECK_NULL_VOID(frameNode);
     SelectModelStatic::SetControlSize(frameNode, Converter::OptConvertPtr<ControlSize>(value));
 }
-void SetTextModifierImpl(Ark_NativePointer node,
+void SetTextModifierImpl(Ark_VMContext vmContext, Ark_NativePointer node,
                          const Opt_TextModifier* value)
 {
     auto frameNode = reinterpret_cast<FrameNode *>(node);
@@ -509,7 +509,7 @@ void SetTextModifierImpl(Ark_NativePointer node,
     }
     SelectModelStatic::SetTextModifierApply(frameNode, value->value->textApply);
 }
-void SetArrowModifierImpl(Ark_NativePointer node,
+void SetArrowModifierImpl(Ark_VMContext vmContext, Ark_NativePointer node,
                           const Opt_SymbolGlyphModifier* value)
 {
     auto frameNode = reinterpret_cast<FrameNode *>(node);
@@ -522,7 +522,7 @@ void SetArrowModifierImpl(Ark_NativePointer node,
     }
     SelectModelStatic::SetArrowModifierApply(frameNode, nullptr);
 }
-void SetOptionTextModifierImpl(Ark_NativePointer node,
+void SetOptionTextModifierImpl(Ark_VMContext vmContext, Ark_NativePointer node,
                                const Opt_TextModifier* value)
 {
     auto frameNode = reinterpret_cast<FrameNode *>(node);
@@ -533,7 +533,7 @@ void SetOptionTextModifierImpl(Ark_NativePointer node,
     }
     SelectModelStatic::SetOptionTextModifier(frameNode, value->value->textApply);
 }
-void SetSelectedOptionTextModifierImpl(Ark_NativePointer node,
+void SetSelectedOptionTextModifierImpl(Ark_VMContext vmContext, Ark_NativePointer node,
                                        const Opt_TextModifier* value)
 {
     auto frameNode = reinterpret_cast<FrameNode *>(node);

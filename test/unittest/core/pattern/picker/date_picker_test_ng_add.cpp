@@ -31,6 +31,9 @@
 #include "core/components_ng/pattern/date_picker/datepicker_pattern.h"
 #include "core/components_ng/pattern/time_picker/timepicker_row_accessibility_property.h"
 #include "core/components_ng/pattern/time_picker/timepicker_row_pattern.h"
+#include "core/components_ng/pattern/picker_utils/picker_column_pattern.h"
+#include "adapter/ohos/entrance/picker/picker_haptic_interface.h"
+#include "test/mock/frameworks/base/thread/mock_task_executor.h"
 #undef private
 #undef protected
 
@@ -1618,4 +1621,150 @@ HWTEST_F(DatePickerTestNgAdd, DatePickerDialogViewShow0050, TestSize.Level1)
     MockContainer::Current()->SetApiTargetVersion(rollbackApiVersion);
 }
 
+class MockPickerAudioHaptic : public IPickerAudioHaptic {
+public:
+    void Play(size_t speed) {}
+    void PlayOnce() {}
+    void Stop() { stopCalled_ = true; }
+    void HandleDelta(double dy) {}
+    bool stopCalled_ = false;
+};
+
+/**
+ * @tc.name: IsTossPlayingAtomicStore001
+ * @tc.desc: Test isTossPlaying_ is std::atomic<bool> and store/load works.
+ */
+HWTEST_F(DatePickerTestNgAdd, IsTossPlayingAtomicStore001, TestSize.Level1)
+{
+    auto columnNode = FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG, 1,
+        AceType::MakeRefPtr<DatePickerColumnPattern>());
+    ASSERT_NE(columnNode, nullptr);
+    auto columnPattern = columnNode->GetPattern<DatePickerColumnPattern>();
+    ASSERT_NE(columnPattern, nullptr);
+
+    columnPattern->isTossPlaying_.store(true);
+    EXPECT_TRUE(columnPattern->isTossPlaying_.load());
+
+    columnPattern->isTossPlaying_.store(false);
+    EXPECT_FALSE(columnPattern->isTossPlaying_.load());
+}
+
+/**
+ * @tc.name: OnDetachFromMainTreeMultiThread001
+ * @tc.desc: Test OnDetachFromMainTreeMultiThread, PostTask to UI thread, callback unregistered.
+ */
+HWTEST_F(DatePickerTestNgAdd, OnDetachFromMainTreeMultiThread001, TestSize.Level1)
+{
+    auto columnNode = FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG, 2,
+        AceType::MakeRefPtr<DatePickerColumnPattern>());
+    ASSERT_NE(columnNode, nullptr);
+    auto columnPattern = columnNode->GetPattern<DatePickerColumnPattern>();
+    ASSERT_NE(columnPattern, nullptr);
+
+    auto pipeline = columnNode->GetContext();
+    ASSERT_NE(pipeline, nullptr);
+    auto taskExecutor = AceType::MakeRefPtr<MockTaskExecutor>();
+    EXPECT_CALL(*taskExecutor, PostTask(_, _, _, _))
+        .Times(testing::AtLeast(0))
+        .WillRepeatedly([](std::function<void()>&& task, TaskExecutor::TaskType,
+                     const std::string&, PriorityType) -> bool {
+            if (task) { task(); }
+            return true;
+        });
+    pipeline->taskExecutor_ = taskExecutor;
+
+    auto mockHaptic = std::make_shared<MockPickerAudioHaptic>();
+    columnPattern->hapticController_ = mockHaptic;
+    columnPattern->RegisterWindowStateChangedCallback();
+    auto callbackCount = pipeline->onWindowStateChangedCallbacks_.size();
+    columnPattern->isTossPlaying_.store(true);
+    columnPattern->OnDetachFromMainTreeMultiThread();
+    EXPECT_FALSE(columnPattern->isTossPlaying_.load());
+    EXPECT_TRUE(mockHaptic->stopCalled_);
+    EXPECT_EQ(pipeline->onWindowStateChangedCallbacks_.size(), callbackCount - 1);
+}
+
+/**
+ * @tc.name: OnDetachFromMainTreeMultiThreadNoHaptic001
+ * @tc.desc: Test OnDetachFromMainTreeMultiThread when hapticController_ is null, early return.
+ */
+HWTEST_F(DatePickerTestNgAdd, OnDetachFromMainTreeMultiThreadNoHaptic001, TestSize.Level1)
+{
+    auto columnNode = FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG, 3,
+        AceType::MakeRefPtr<DatePickerColumnPattern>());
+    ASSERT_NE(columnNode, nullptr);
+    auto columnPattern = columnNode->GetPattern<DatePickerColumnPattern>();
+    ASSERT_NE(columnPattern, nullptr);
+
+    columnPattern->hapticController_ = nullptr;
+    columnPattern->OnDetachFromMainTreeMultiThread();
+    EXPECT_FALSE(columnPattern->isTossPlaying_.load());
+}
+
+/**
+ * @tc.name: OnDetachFromMainTreeMultiThreadNullHost001
+ * @tc.desc: Test OnDetachFromMainTreeMultiThread when GetHost returns null.
+ */
+HWTEST_F(DatePickerTestNgAdd, OnDetachFromMainTreeMultiThreadNullHost001, TestSize.Level1)
+{
+    auto columnPattern = AceType::MakeRefPtr<DatePickerColumnPattern>();
+    ASSERT_NE(columnPattern, nullptr);
+    columnPattern->isTossPlaying_.store(true);
+    columnPattern->OnDetachFromMainTreeMultiThread();
+    EXPECT_FALSE(columnPattern->isTossPlaying_.load());
+}
+
+/**
+ * @tc.name: OnDetachFromMainTreeMultiThreadNoPostTask001
+ * @tc.desc: Test OnDetach when PostTask not executed, hapticController_->Stop() not called.
+ */
+HWTEST_F(DatePickerTestNgAdd, OnDetachFromMainTreeMultiThreadNoPostTask001, TestSize.Level1)
+{
+    auto columnNode = FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG, 7,
+        AceType::MakeRefPtr<DatePickerColumnPattern>());
+    ASSERT_NE(columnNode, nullptr);
+    auto columnPattern = columnNode->GetPattern<DatePickerColumnPattern>();
+    ASSERT_NE(columnPattern, nullptr);
+
+    auto pipeline = columnNode->GetContext();
+    ASSERT_NE(pipeline, nullptr);
+    pipeline->taskExecutor_ = nullptr;
+
+    auto mockHaptic = std::make_shared<MockPickerAudioHaptic>();
+    columnPattern->hapticController_ = mockHaptic;
+    columnPattern->isTossPlaying_.store(true);
+    columnPattern->OnDetachFromMainTreeMultiThread();
+    EXPECT_FALSE(columnPattern->isTossPlaying_.load());
+    EXPECT_FALSE(mockHaptic->stopCalled_);
+}
+
+/**
+ * @tc.name: IsTossPlayingAtomicConcurrent001
+ * @tc.desc: Test isTossPlaying_ atomic concurrent access from multiple threads.
+ */
+HWTEST_F(DatePickerTestNgAdd, IsTossPlayingAtomicConcurrent001, TestSize.Level1)
+{
+    auto columnNode = FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG, 6,
+        AceType::MakeRefPtr<DatePickerColumnPattern>());
+    ASSERT_NE(columnNode, nullptr);
+    auto columnPattern = columnNode->GetPattern<DatePickerColumnPattern>();
+    ASSERT_NE(columnPattern, nullptr);
+
+    columnPattern->isTossPlaying_.store(false);
+
+    std::thread writer([&]() {
+        columnPattern->isTossPlaying_.store(true);
+    });
+    std::thread reader([&]() {
+        volatile bool val = columnPattern->isTossPlaying_.load();
+        (void)val;
+    });
+
+    writer.join();
+    reader.join();
+
+    EXPECT_TRUE(columnPattern->isTossPlaying_.load());
+    columnPattern->isTossPlaying_.store(false);
+    EXPECT_FALSE(columnPattern->isTossPlaying_.load());
+}
 } // namespace OHOS::Ace::NG

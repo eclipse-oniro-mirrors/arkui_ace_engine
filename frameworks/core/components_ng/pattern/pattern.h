@@ -54,9 +54,22 @@ using GestureEventFunc = std::function<void(GestureEvent& info)>;
 }
 
 namespace OHOS::Ace::NG {
+enum class CommandErrorType : uint8_t { NONE, NODE_NOT_FOUND, INVALID_COMMAND, INVALID_PARAM, EXECUTE_FAIL };
+
+struct ACE_FORCE_EXPORT CommandResult {
+    bool success = false;
+    CommandErrorType errorType = CommandErrorType::EXECUTE_FAIL;
+    std::string errorMessage;
+
+    static CommandResult Success();
+    static CommandResult Error(CommandErrorType type, std::string message = "");
+};
+
+struct InspectorDumpOptions;
 class AccessibilitySessionAdapter;
 class InspectorFilter;
 class VerticalOverflowHandler;
+struct InspectorDumpOptions;
 
 class ScrollingListener : public AceType {
     DECLARE_ACE_TYPE(ScrollingListener, AceType);
@@ -193,6 +206,19 @@ public:
 
     virtual RefPtr<LayoutAlgorithm> CreateLayoutAlgorithm();
 
+    // Restricted scroll-placeholder copy protocol: clones an offline-renderable
+    // placeholder counterpart of this pattern for the template instance pool
+    // (background traversal clones copy the node's layout property wholesale —
+    // text content / image src ride along — plus the layout-relevant render
+    // geometry). The base returns nullptr = the component does not support
+    // placeholder templates; only restricted render-only components override it.
+    // Implementations must not copy callbacks, closures, cross-thread handles
+    // or weak pointers to other nodes.
+    virtual RefPtr<Pattern> CloneForPlaceholder()
+    {
+        return nullptr;
+    }
+
     virtual RefPtr<NodePaintMethod> CreateNodePaintMethod()
     {
         return nullptr;
@@ -316,13 +342,32 @@ public:
 
     RenderContext* GetRenderContext() const;
 
+    virtual void DumpInspectorTreeInfo(std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context)
+    {
+        DumpSimplifyInfo(attrs);
+    }
+    virtual void AddInspectorTreeInfo(std::shared_ptr<JsonValue>& node, InspectorTreeRequestContext& context) {}
+    virtual bool HasInspectorSelection() const { return false; }
+    // Components that generate default touch regions expose their configuration state here.
+    virtual bool HasInspectorResponseRegion() const
+    {
+        return true;
+    }
+
     virtual void DumpInfo() {}
     virtual void DumpInfo(std::unique_ptr<JsonValue>& json) {}
     virtual void DumpSimplifyInfo(std::unique_ptr<JsonValue>& json) {}
+
     virtual void DumpAdvanceInfo() {}
     virtual void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json) {}
+    virtual void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config) {}
     virtual void DumpViewDataPageNode(RefPtr<ViewDataWrap> viewDataWrap, bool needsRecordData = false) {}
     virtual void DumpSimplifyInfo(std::shared_ptr<JsonValue>& json) {}
+    // Preserve existing component output until component-specific options are implemented.
+    virtual void DumpSimplifyInfo(std::shared_ptr<JsonValue>& json, const InspectorDumpOptions& /* options */)
+    {
+        DumpSimplifyInfo(json);
+    }
     virtual void DumpSimplifyInfoOnlyForParamConfig(
         std::shared_ptr<JsonValue>& json, ParamConfig config = ParamConfig())
     {}
@@ -579,6 +624,7 @@ public:
     virtual void OnFocusNodeChange(FocusReason focusReason) {}
     virtual void OnCollectRemoved() {}
     int32_t OnRecvCommand(const std::string& command);
+    CommandResult OnRecvCommandWithResult(const std::string& command);
     virtual std::vector<std::pair<float, float>> GetSpecifiedContentOffsets(const std::string& content)
     {
         return std::vector<std::pair<float, float>> {};
@@ -590,6 +636,7 @@ public:
     {
         return RET_SUCCESS;
     };
+    virtual CommandResult OnInjectionEventWithResult(const std::string& command);
 
     bool HandleTextBoxComponentCommand(const std::string& command, std::string& cmd, std::unique_ptr<JsonValue>& json,
         std::unique_ptr<JsonValue>& params);
@@ -722,6 +769,8 @@ public:
     }
 
 protected:
+    static bool ShouldIncludeDiagnostic(const InspectorDumpOptions& options);
+
     virtual void OnAttachToFrameNode() {}
     virtual void OnDetachFromFrameNode(FrameNode* frameNode) {}
 

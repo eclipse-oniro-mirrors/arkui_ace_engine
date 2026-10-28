@@ -32,8 +32,7 @@
 
 #include "ui_report_proxy.h"
 
-#include "adapter/ohos/entrance/ui_session/include/ui_session_log.h"
-#include "base/memory/ace_type.h"
+#include "base/utils/macros.h"
 namespace OHOS::Ace {
 class UiSessionManagerOhos : public UiSessionManager {
 public:
@@ -168,11 +167,27 @@ public:
         const std::string& nodeTag, PageSceneNodeStateChange stateChange) override;
     void NotifyPageSceneContentChanged() override;
     void FlushPageSceneNodeChanged() override;
+    void FlushPendingSearchClicksIfStable() override;
     void SavePageSceneDetectFunction(PageSceneDetectFunction&& function) override;
     void SaveWebPageSceneFunction(WebPageSceneFunction&& function) override;
     bool IsWebSourceEnabled(const std::string& ruleJson);
+    void SaveComponentTreeQueryFunction(ComponentTreeQueryFunction&& function) override;
+    void ComponentTreeQuery(const ComponentTreeQueryRequest& request) override;
+    void ReportNavigationQueryResult(const std::string& data) override;
+    void ReportLazyForEachQueryResult(const std::string& data) override;
+    void ReportNodesInRectQueryResult(const std::string& data) override;
 
     void SaveReportProxy(sptr<IRemoteObject> reportProxy, int32_t processId);
+    // UI-thread validation of an internal detection request; does not change IPC.
+    ACE_FORCE_EXPORT bool IsSearchPageSceneRuleCurrent(
+        int32_t processId, const std::string& ruleSetId, const std::string& generation) override;
+    void SaveForSendCommandWithResultFunction(NotifySendCommandWithResultFunction&& function) override;
+    void NotifySendCommandPatternWithResult(
+        int32_t id, const std::string& command, const CommandResultCallback& finishCallback) override;
+    void SaveSendCommandWithResultFunction(SendCommandWithResultFunction&& function) override;
+    void SendCommandWithResult(
+        const std::string& command, const CommandResultCallback& finishCallback) override;
+    CommandResultCallback MakeCommandResultCallback(int32_t processId, uint64_t requestId) override;
 
 private:
     bool PostToCurrentTranslateManager(const char* caller,
@@ -203,8 +218,21 @@ private:
         std::vector<PageSceneRuleInfo> rules;
     };
 
+    // Search scene (UISession PageScene 搜索功能识别): per-process dual ruleSet.
+    struct SearchPageSceneRuleSetInfo {
+        std::string ruleSetId;
+        std::string ruleJson;
+        std::string generation;
+    };
+
     PageSceneRuleSetInfo ExtractPageSceneRuleSetInfo(const std::string& ruleJson) const;
     std::string ExtractPageSceneRuleSetId(const std::string& ruleJson) const;
+    bool IsSearchPageSceneRuleJson(const std::string& ruleJson) const;
+    std::string ExtractSearchPageSceneRuleSetId(const std::string& ruleJson) const;
+    int32_t RegisterSearchPageSceneRules(int32_t processId, const std::string& ruleJson);
+    int32_t StoreSearchPageSceneRules(
+        int32_t processId, const sptr<IRemoteObject>& reportObject, SearchPageSceneRuleSetInfo& ruleSetInfo);
+    int32_t UnregisterSearchPageSceneRules(int32_t processId, const std::string& ruleSetId);
     bool IsPageSceneRuleMatched(const PageSceneRuleInfo& rule, const std::string& sceneType,
         bool requireRegisterPolicy, const std::string& nodeType) const;
     bool HasPageSceneRule(
@@ -222,6 +250,8 @@ private:
         const PageSceneRuleSetInfo& ruleSetInfo, const PageSceneRuleInfo& rule,
         PageSceneNodeStateChange stateChange) const;
     void ErasePendingPageSceneRulesLocked(int32_t processId);
+    void ErasePendingLegacyPageSceneRulesLocked(int32_t processId);
+    void ErasePendingSearchPageSceneRulesLocked(int32_t processId, const std::string& ruleSetId);
     void TriggerPageSceneDetect(int32_t processId, const std::string& ruleJson, bool isGetResult);
     int32_t ExtractRuleJsonAndWebEnabled(int32_t processId,
         const std::string& ruleJsonOrRuleSetId, std::string& ruleJson, bool& webEnabled);
@@ -234,8 +264,11 @@ private:
     std::shared_mutex reportObjectMutex_;
     std::mutex pageSceneMutex_;
     std::unordered_map<int32_t, PageSceneRuleSetInfo> pageSceneRuleSets_;
+    std::unordered_map<int32_t, std::unordered_map<std::string, SearchPageSceneRuleSetInfo>> searchPageSceneRuleSets_;
+    uint64_t nextSearchRuleGeneration_ = 0;
     std::set<int32_t> pendingPageSceneGets_;
     std::set<std::pair<int32_t, std::string>> pendingPageSceneDetectRules_;
+    std::set<std::pair<int32_t, std::string>> pendingSearchPageSceneDetectRules_;
 };
 
 } // namespace OHOS::Ace

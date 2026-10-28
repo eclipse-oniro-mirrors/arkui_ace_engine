@@ -16,6 +16,8 @@
 #define FOUNDATION_ARKUI_ACE_ENGINE_FRAMEWORKS_TEST_UNITTEST_CAPI_MODIFIERS_ACCESSOR_TEST_BASE_H
 
 #include <gtest/gtest.h>
+#include <cstdlib>
+#include <variant>
 
 #include "arkoala_api_generated.h"
 #include "../capi_gen140_compat.h"
@@ -26,7 +28,9 @@
 #include "test/mock/frameworks/core/common/mock_container.h"
 #include "test/mock/frameworks/core/common/mock_theme_manager.h"
 #include "test/mock/frameworks/core/common/mock_theme_style.h"
+#include "test/mock/frameworks/core/common/mock_resource_adapter_v2.h"
 #include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
+#include "test/unittest/capi/utils/mock_resource_registration.h"
 
 using testing::NiceMock;
 
@@ -103,6 +107,7 @@ class AccessorTestBaseParent : public testing::Test {
 public:
     static void SetUpTestCase()
     {
+        ResetMockResourceData();
         fullAPI_ = reinterpret_cast<const GENERATED_ArkUIFullNodeAPI *>(
             GENERATED_GetArkAnyAPI(GENERATED_Ark_APIVariantKind::GENERATED_FULL, GENERATED_ARKUI_FULL_API_VERSION)
         );
@@ -168,6 +173,12 @@ public:
         }
         ASSERT_NE(type, ThemeConstantsType::ERROR);
         MockThemeStyle::GetInstance()->SetAttr(key, { .type = type, .value = value });
+        uint32_t id = 0;
+        if (TryParseAsResourceId(key, id)) {
+            RegisterResourceById(id, value);
+        } else {
+            RegisterResourceByName(key, value);
+        }
     }
 
     static void AddResource(int64_t key, const ResRawValue& value)

@@ -27,7 +27,7 @@ class NavDestinationPattern;
 
 class NavPathInfoScope {};
 
-class NavPathInfo : public virtual AceType {
+class NavPathInfo : public AceType {
     DECLARE_ACE_TYPE(NavPathInfo, AceType);
 public:
     NavPathInfo() = default;
@@ -89,7 +89,7 @@ protected:
     bool isEntry_ = false;
 };
 
-class NavDestinationContext : public virtual AceType {
+class NavDestinationContext : public AceType {
     DECLARE_ACE_TYPE(NavDestinationContext, AceType);
 public:
     NavDestinationContext() = default;

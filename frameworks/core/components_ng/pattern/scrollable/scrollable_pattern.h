@@ -48,9 +48,15 @@
 #endif
 
 namespace OHOS::Ace {
+class Animator;
 class BezierVariableVelocityMotion;
 class ScrollControllerBase;
 class VelocityMotion;
+// Item snap types are defined in scroll_snap_strategy.h and scroll_snap_utils.h;
+// keep them incomplete here to avoid spreading their dependencies.
+struct ScrollSnapStrategy;
+struct SnapCandidate;
+struct SnapSelectResult;
 enum class ScrollAlign : int;
 enum class ScrollEdgeType : size_t;
 } // namespace OHOS::Ace
@@ -127,6 +133,17 @@ struct ScrollOnInjectionEventInfo {
     int32_t targetId = -1;
     float ratio = 0.0f;
     double scrollOffset = 0.0;
+};
+
+struct ScrollToIndexTarget {
+    int32_t index = -1;
+    float extraOffset = 0.0f;
+    ScrollAlign align = ScrollAlign::START;
+    float targetOffset = 0.0f;
+    float skipDistance = 0.0f;
+    float viewportSize = 0.0f;
+    FastScrollMode fastScrollMode = FastScrollMode::NONE;
+    bool skipPending = false;
 };
 
 class ACE_FORCE_EXPORT ScrollablePattern : public NestableScrollContainer, public virtual StatusBarClickListener {
@@ -447,27 +464,10 @@ public:
     double GetMaxFlingVelocity() const;
 
     virtual void StopAnimate();
-    bool AnimateRunning() const
-    {
-        return (animator_ && animator_->IsRunning()) || !isAnimationStop_;
-    }
-    bool AnimateStoped() const
-    {
-        return (!animator_ || animator_->IsStopped()) && isAnimationStop_;
-    }
+    bool AnimateRunning() const;
+    bool AnimateStoped() const;
 
-    void AbortScrollAnimator()
-    {
-        if (animator_ && !animator_->IsStopped()) {
-            scrollAbort_ = true;
-            animator_->Stop();
-        }
-        if (!isAnimationStop_) {
-            scrollAbort_ = true;
-            StopAnimation(springAnimation_);
-            StopAnimation(curveAnimation_);
-        }
-    }
+    void AbortScrollAnimator();
     bool GetScrollAbort() const
     {
         return scrollAbort_;
@@ -517,9 +517,27 @@ public:
     {
         return 0.0f;
     }
-    virtual void OnAnimateStop() {}
+    virtual void OnAnimateStop();
     virtual void ScrollTo(float position);
     void SmartGesturePerformScroll(float position);
+    // Preserve the virtual AnimateTo ABI; consume the request before entering callbacks.
+    void AnimateToFromController(float position, float duration, const RefPtr<Curve>& curve,
+        bool smooth, bool canOverScroll)
+    {
+        auto previous = capiScrollToRequest_;
+        capiScrollToRequest_ = true;
+        AnimateTo(position, duration, curve, smooth, canOverScroll);
+        capiScrollToRequest_ = previous;
+    }
+    bool TakeCapiScrollToEventReportRequest()
+    {
+        auto requested = capiScrollToRequest_;
+        capiScrollToRequest_ = false;
+        return requested;
+    }
+    void UpdateCapiScrollEventSource(bool isScrollTo);
+    void ScheduleCapiScrollCommand(bool isScrollTo, bool isScrollBy = false);
+    void MarkCapiScrollByEventSource();
     virtual void AnimateTo(
         float position, float duration, const RefPtr<Curve>& curve, bool smooth, bool canOverScroll = false,
         bool useTotalOffset = true);
@@ -605,6 +623,18 @@ public:
 
     void SetScrollSource(int32_t scrollSource)
     {
+        scrollSourceForQuery_ = scrollSource;      // Session-level: updated only by event/stop-chain entries
+        SetScrollSourceInternal(scrollSource);
+    }
+
+    // Layout entry: updates only the frame-level scrollSource_, does not touch the session-level source
+    void SetScrollSourceLayout(int32_t scrollSource)
+    {
+        SetScrollSourceInternal(scrollSource);
+    }
+
+    void SetScrollSourceInternal(int32_t scrollSource)
+    {
         if (scrollSource == SCROLL_FROM_NONE) {
             if (lastScrollSource_ != scrollSource_) {
                 AddScrollableFrameInfo(scrollSource_);
@@ -612,6 +642,12 @@ public:
             lastScrollSource_ = scrollSource_;
         }
         scrollSource_ = scrollSource;
+    }
+
+    // Direct write to the session-level source only (does not touch the frame-level scrollSource_)
+    void SetScrollSourceForQuery(int32_t scrollSource)
+    {
+        scrollSourceForQuery_ = scrollSource;
     }
 
     void SetAccessibilityScrollSource(AccessibilityScrollSource source)
@@ -645,9 +681,19 @@ public:
 
     ScrollState GetScrollState() const;
 
+    // Query API: reads the session-level scrollSourceForQuery_, unaffected by layout-level resets.
+    ScrollState GetScrollStateForQuery() const;
+
     static ScrollState GetScrollState(int32_t scrollSource);
 
     static ScrollSource ConvertScrollSource(int32_t source);
+
+    struct ItemLazySyntax {
+        bool arkoala = false;
+        bool repeatV2 = false;
+    };
+    // Lazy syntax kinds that directly provide items of host.
+    ACE_FORCE_EXPORT static ItemLazySyntax FindItemLazySyntax(const RefPtr<UINode>& host);
 
     static int32_t ScrollToTarget(
         RefPtr<FrameNode>& scrollable, RefPtr<FrameNode>& target, float targetOffset, ScrollAlign targetAlign);
@@ -668,6 +714,12 @@ public:
     virtual void ScrollToIndex(int32_t index, bool smooth = false, ScrollAlign align = ScrollAlign::START,
         std::optional<float> extraOffset = std::nullopt)
     {}
+
+    virtual void ScrollToIndexFastScroll(int32_t index, bool smooth, ScrollAlign align,
+        std::optional<float> extraOffset, FastScrollMode mode)
+    {
+        ScrollToIndex(index, smooth, align, extraOffset);
+    }
 
     void SetExtraOffset(std::optional<float> extraOffset)
     {
@@ -786,6 +838,38 @@ public:
         return SnapType::NONE_SNAP;
     }
 
+    // Feat-20260806915268 item snap contract. Value types are forward-declared above;
+    // defaults are out-of-line in scrollable_pattern.cpp
+    // so this widely-included header stays lean. Overridden by List/Grid/WaterFlow properties.
+    virtual ScrollSnapStrategy GetScrollSnapStrategy() const;
+    // Snap candidates from the currently materialized (visible + cached) items only.
+    virtual std::vector<SnapCandidate> BuildItemSnapCandidates(ScrollSnapAlign align);
+    // Axis fallback anchor one row beyond the materialized window (details in the .cpp default).
+    virtual std::optional<float> GetItemSnapNeighborAnchor(ScrollSnapAlign align, bool towardSmaller);
+    // Legal scroll range bounds for clamping item snap targets (R-3/R-7; AC-2.4 leading gap).
+    // Live content offset for snap selection and animation origins. Layouts that defer
+    // applying motion deltas must include those deltas without changing GetTotalOffset().
+    virtual double GetItemSnapCurrentOffset() const
+    {
+        return GetTotalOffset();
+    }
+    virtual float GetItemSnapMaxOffset() const;
+    virtual float GetItemSnapCalibrationMargin() const
+    {
+        return 0.0f;
+    }
+
+    virtual float GetItemSnapMinOffset() const;
+    virtual bool SupportsTrackedItemSnap() const
+    {
+        return false;
+    }
+    virtual void BeginTrackedItemSnap(float) {}
+    virtual std::vector<SnapCandidate> BuildTrackedItemSnapCandidates(ScrollSnapAlign align);
+    // Shared item snap execution for align strategies and custom providers; false = capability off.
+    bool StartItemSnapAnimation(const SnapAnimationOptions& snapAnimationOptions);
+    void RunPendingItemSnapProvider(const SnapAnimationOptions& snapAnimationOptions);
+
     virtual bool IsScrollSnap()
     {
         // When setting snap or enablePaging in scroll, the PARENT_FIRST in nestedScroll_ is invalid
@@ -848,6 +932,7 @@ public:
     virtual void GetEventDumpInfo();
     virtual void GetEventDumpInfo(std::unique_ptr<JsonValue>& json);
 
+    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config) override;
     void DumpAdvanceInfo() override;
     void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json) override;
 
@@ -1021,9 +1106,23 @@ public:
     {
         isAllowMouse_ = enableScrollWithMouse;
     }
-    virtual bool GetIsAllowMouse() const
+    virtual bool GetIsAllowMouse() const;
+    void ResetIsAllowMouse();
+    // Whether the container supports mouse multi-select (e.g. multiSelectable Grid/List).
+    virtual bool MultiSelectable() const;
+    // Whether the container is in edit mode.
+    virtual bool GetEnableEditMode() const;
+    // Direction-aware default of enableScrollWithMouse: enabled only when scrolling horizontally.
+    // FREE mode (free scroll) containers keep the default disabled.
+    virtual bool IsMouseDragScrollDefaultEnabled() const;
+
+    void SetIsAllowKeyboard(bool enableScrollWithKeyboard)
     {
-        return isAllowMouse_;
+        isAllowKeyboard_ = enableScrollWithKeyboard;
+    }
+    bool GetIsAllowKeyboard() const
+    {
+        return isAllowKeyboard_;
     }
 
     void GetRepeatCountInfo(
@@ -1084,12 +1183,29 @@ public:
 
     void SetCanOverScroll(bool val);
 
-    void ContentChangeReport(
-        const RefPtr<FrameNode>& keyNode, uint32_t type = ContentChangeManager::NONE);
+    void ContentChangeReport(const RefPtr<FrameNode>& keyNode, uint32_t type = ContentChangeManager::NONE);
+    void ContentChangeReport(const RefPtr<FrameNode>& keyNode, uint32_t type, bool reportCapi);
+    void ContentChangeOnTouchDown();
+    void ContentChangeOnTouchEnd();
 
     ACE_FORCE_EXPORT void ContentChangeOnScrollStart(const RefPtr<FrameNode>& keyNode);
 
 protected:
+    float CalcSpringAdjustOffset(float offset) const;
+    void StartFastScrollAnimation(float position);
+    virtual void CancelFastScroll();
+    const ScrollToIndexTarget* GetFastScrollRequest() const
+    {
+        return scrollTarget_ && IsFastScrollEnabled(scrollTarget_->fastScrollMode) ? &*scrollTarget_ : nullptr;
+    }
+    ScrollToIndexTarget* GetFastScrollRequest()
+    {
+        return scrollTarget_ && IsFastScrollEnabled(scrollTarget_->fastScrollMode) ? &*scrollTarget_ : nullptr;
+    }
+    std::optional<ScrollToIndexTarget> scrollTarget_;
+    bool fastScrollSkip_ = false;
+    bool startingFastScroll_ = false;
+    uint64_t animationGeneration_ = 0;
     ACE_FORCE_EXPORT void SuggestOpIncGroup(bool flag);
     void OnAttachToFrameNode() override;
     void OnAttachToFrameNodeMultiThread();
@@ -1114,6 +1230,7 @@ protected:
     void FireObserverOnReachEnd();
     void FireObserverOnScrollStart();
     void FireObserverOnScrollStop();
+    void ContentChangeOnScrollUpdate();
     void FireObserverOnDidScroll(float finalOffset);
     void FireObserverOnScrollerAreaChange(float finalOffset);
     float FireObserverOnWillScroll(float offset);
@@ -1154,7 +1271,10 @@ protected:
     bool GetCanOverScroll() const;
     bool lastCanOverScroll_ = false;
     bool lastScrollFromInjection_ = false;
-    bool isAllowMouse_ = false;
+    // Explicit value of enableScrollWithMouse set by the developer.
+    // nullopt means not explicitly set: the direction-aware default applies.
+    std::optional<bool> isAllowMouse_;
+    bool isAllowKeyboard_ = true;
 
     void CheckScrollBarOff();
 
@@ -1205,8 +1325,42 @@ protected:
     void HotZoneScroll(const float offset);
     void StopHotzoneScroll();
 
+    virtual bool ScrollByArrowKey(KeyCode code, float delta);
+    bool HandleArrowKeyScroll(const KeyEvent& keyEventInfo);
+
 private:
+    void GetEventDumpInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
+    void DumpAdvanceScrollEventInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
+    void DumpAdvancePhysicsInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
+    void DumpAdvanceDiagnostics(std::unique_ptr<JsonValue>& json);
+    void DumpAdvanceDiagnosticsDetails(std::unique_ptr<JsonValue>& json);
+    void DumpAdvanceVisualProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+    void DumpAdvanceFunctionalProperties(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
+
+    // Pattern owns target selection; Scrollable owns the animation and queued-task generation.
+    std::optional<float> predictedItemSnapTarget_;
+    float itemSnapReleaseMotionVelocity_ = 0.0f;
+    void RefreshTrackedItemSnap();
+    void PrepareItemSnapFling(float motionVelocity, float motionDelta);
+    SnapSelectResult SelectItemSnapForAxis(ScrollSnapAlign align, const std::vector<SnapCandidate>& candidates,
+        float currentOffset, SnapDirection snapDirection);
+    SnapSelectResult SelectItemSnapForAlign(const ScrollSnapStrategy& strategy,
+        const SnapAnimationOptions& snapAnimationOptions, std::vector<SnapCandidate>& candidates,
+        float currentOffset, bool& forward, bool tracked);
+
     virtual void OnScrollEndCallback() {};
+
+    // Feat-20260806915268 item snap paths, split out of StartItemSnapAnimation (drag-frame targets).
+    bool StartItemSnapWithProvider(const ScrollSnapStrategy& strategy, const SnapAnimationOptions& snapAnimationOptions,
+        float currentOffset, float maxOffset, float motionVelocity, float motionDelta);
+    bool StartItemSnapWithAlign(const ScrollSnapStrategy& strategy, const SnapAnimationOptions& snapAnimationOptions,
+        float currentOffset, float maxOffset, float motionVelocity, float motionDelta);
+    float ResolveItemSnapTarget(const ScrollSnapStrategy& strategy, float currentOffset, float minOffset,
+        float maxOffset, float velocityPos, float predictDeltaPos);
 
     void RegisterScrollBarEventTask();
     void RegisterScrollBarOverDragEventTask();
@@ -1230,7 +1384,6 @@ private:
     float GetScrollDelta(float offset, bool& stopAnimation);
     // Process spring offset animation callback
     void ProcessSpringOffsetCallback(float offset);
-    float CalcSpringAdjustOffset(float offset) const;
 
     void InitTouchEvent(const RefPtr<GestureEventHub>& gestureHub);
     void RegisterTouchpadInteractionCallback();
@@ -1331,6 +1484,10 @@ private:
     void OnSyncGeometryNode(const DirtySwapConfig& config) override;
     void ReportOnItemStopEvent();
 
+    bool IsArrowKeyMatchAxis(KeyCode code) const;
+    int32_t GetMouseScrollRows();
+    float CalculateScrollDelta(int32_t rows);
+
     Axis axis_ = Axis::VERTICAL;
     RefPtr<ScrollableEvent> scrollableEvent_;
     RefPtr<TouchEventImpl> touchEvent_;
@@ -1338,6 +1495,7 @@ private:
     RefPtr<ScrollEdgeEffect> scrollEffect_;
     RefPtr<RefreshCoordination> refreshCoordination_;
     int32_t scrollSource_ = SCROLL_FROM_NONE;
+    int32_t scrollSourceForQuery_ = SCROLL_FROM_NONE;
     int32_t lastScrollSource_ = SCROLL_FROM_NONE;
     AccessibilityScrollSource accessibilityScrollSource_ = AccessibilityScrollSource::NONE;
     // scrollBar
@@ -1360,6 +1518,15 @@ private:
     // scroller
     RefPtr<Animator> animator_;
     bool scrollAbort_ = false;
+    bool capiScrollDetached_ = false;
+    bool capiScrollStartPending_ = false;
+    bool capiScrollStarted_ = false;
+    bool capiSnapTakeover_ = false;
+    bool capiBlockedCommandStart_ = false;
+    bool capiBlockedCommandEnd_ = false;
+    std::optional<double> capiCommandOffset_;
+    uint32_t capiCommandSource_ = 0;
+    bool capiScrollToRequest_ = false;
     bool isAnimateOverScroll_ = false;
     bool isScrollToOverAnimation_ = false;
     bool isScrollToSafeAreaHelper_ = true;

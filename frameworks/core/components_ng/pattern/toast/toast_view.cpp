@@ -228,7 +228,9 @@ void ToastView::UpdateToastContext(const RefPtr<FrameNode>& toastNode)
     BorderRadiusProperty borderRadius;
     borderRadius.SetRadius(Dimension(radius.GetX().ConvertToPx()));
     toastContext->UpdateBorderRadius(borderRadius);
-    if (toastTheme->GetToastDoubleBorderEnable()) {
+    auto toastInfo = pattern->GetToastInfo();
+    ToastView::UpdateToastNodeStyle(toastNode);
+    if (toastTheme->GetToastDoubleBorderEnable() && !pattern->IsUserSetMaterial()) {
         toastContext->UpdateOuterBorderRadius(borderRadius);
         auto toastProperty = toastNode->GetLayoutProperty<ToastLayoutProperty>();
         CHECK_NULL_VOID(toastProperty);
@@ -248,8 +250,6 @@ void ToastView::UpdateToastContext(const RefPtr<FrameNode>& toastNode)
         outerColorProp.SetColor(toastTheme->GetToastOuterBorderColor());
         toastContext->UpdateOuterBorderColor(outerColorProp);
     }
-    auto toastInfo = pattern->GetToastInfo();
-    ToastView::UpdateToastNodeStyle(toastNode);
 }
 
 void ToastView::UpdateToastNodeStyle(const RefPtr<FrameNode>& toastNode)
@@ -267,6 +267,7 @@ void ToastView::UpdateToastNodeStyle(const RefPtr<FrameNode>& toastNode)
 
     // Set SystemMaterial first, before updating background color, blur style and shadow
     bool isUserSetMaterial = SetToastSystemMaterial(toastNode, toastInfo);
+    pattern->SetIsUserSetMaterial(isUserSetMaterial);
 
     // Update background color and blur style only if SystemMaterial is not set
     UpdateToastBackgroundAndBlur(toastContext, toastInfo, toastTheme, isUserSetMaterial);

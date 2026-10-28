@@ -98,20 +98,18 @@ ArkUINodeHandle CreateFrameNodeForCustom(ArkUI_Int32 nodeId)
     return reinterpret_cast<ArkUINodeHandle>(AceType::RawPtr(frameNode));
 }
 
-void* CreateButtonPatternForCustom()
+RefPtr<Pattern> CreateButtonPatternForCustom()
 {
     auto pattern = AceType::MakeRefPtr<ButtonPattern>();
     CHECK_NULL_RETURN(pattern, nullptr);
-    AceType::RawPtr(pattern)->IncRefCount();
-    return AceType::RawPtr(pattern);
+    return pattern;
 }
 
-void* CreateToggleButtonPatternForCustom()
+RefPtr<Pattern> CreateToggleButtonPatternForCustom()
 {
     auto pattern = AceType::MakeRefPtr<ToggleButtonPattern>();
     CHECK_NULL_RETURN(pattern, nullptr);
-    AceType::RawPtr(pattern)->IncRefCount();
-    return AceType::RawPtr(pattern);
+    return pattern;
 }
 
 void SetComponentButtonTypeForCustom(ArkUINodeHandle node, OHOS::Ace::ComponentButtonType buttonType)

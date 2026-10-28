@@ -21,6 +21,7 @@
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/base/view_stack_processor.h"
 #include "core/components_ng/pattern/scroll/inner/scroll_bar.h"
+#include "core/components_ng/pattern/scrollable/scrollable_utils.h"
 #include "core/components_ng/pattern/scrollable/scrollable_event_hub.h"
 #include "core/components_ng/pattern/scrollable/scrollable_layout_property.h"
 #include "core/components_ng/pattern/scrollable/scrollable_pattern.h"
@@ -478,8 +479,11 @@ ContentClipMode ScrollableModelNG::GetContentClip(FrameNode* frameNode)
     CHECK_NULL_RETURN(paintProperty, ContentClipMode::CONTENT_ONLY);
     const auto& clip = paintProperty->GetContentClip();
     const auto mode = clip ? clip->first : ContentClipMode::DEFAULT;
-    if (mode >= ContentClipMode::CUSTOM) {
+    if (mode == ContentClipMode::CUSTOM) {
         return paintProperty->GetDefaultContentClip();
+    }
+    if (mode == ContentClipMode::DEFAULT) {
+        return ScrollableUtils::ResolveEffectiveDefaultContentClip(frameNode, AceType::RawPtr(paintProperty));
     }
     return mode;
 }
@@ -502,7 +506,10 @@ void ScrollableModelNG::ResetContentClip(FrameNode* frameNode)
     CHECK_NULL_VOID(frameNode);
     auto paintProperty = frameNode->GetPaintProperty<ScrollablePaintProperty>();
     CHECK_NULL_VOID(paintProperty);
-    paintProperty->UpdateContentClip(ContentClip(paintProperty->GetDefaultContentClip(), nullptr));
+    // Store DEFAULT instead of the resolved value, so that the effective default stays a dynamic
+    // query and a later change of the immersive strategy set is observed by Grid / List / Scroll /
+    // WaterFlow alike instead of being frozen into the paint property.
+    paintProperty->UpdateContentClip(ContentClip(ContentClipMode::DEFAULT, nullptr));
     auto layoutProperty = frameNode->GetLayoutProperty<ScrollableLayoutProperty>();
     CHECK_NULL_VOID(layoutProperty);
     layoutProperty->UpdateContentClip(std::nullopt);
@@ -627,7 +634,7 @@ void ScrollableModelNG::ResetEnableScrollWithMouse(FrameNode* frameNode)
     CHECK_NULL_VOID(frameNode);
     auto pattern = frameNode->GetPattern<ScrollablePattern>();
     CHECK_NULL_VOID(pattern);
-    pattern->SetIsAllowMouse(false);
+    pattern->ResetIsAllowMouse();
 }
 
 bool ScrollableModelNG::GetEnableScrollWithMouse(FrameNode* frameNode)
@@ -636,6 +643,46 @@ bool ScrollableModelNG::GetEnableScrollWithMouse(FrameNode* frameNode)
     auto pattern = frameNode->GetPattern<ScrollablePattern>();
     CHECK_NULL_RETURN(pattern, false);
     return pattern->GetIsAllowMouse();
+}
+
+void ScrollableModelNG::SetEnableScrollWithKeyboard(bool enableScrollWithKeyboard)
+{
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    CHECK_NULL_VOID(frameNode);
+    auto pattern = frameNode->GetPattern<ScrollablePattern>();
+    CHECK_NULL_VOID(pattern);
+    pattern->SetIsAllowKeyboard(enableScrollWithKeyboard);
+}
+
+void ScrollableModelNG::ResetEnableScrollWithKeyboard()
+{
+    auto frameNode = ViewStackProcessor::GetInstance()->GetMainFrameNode();
+    CHECK_NULL_VOID(frameNode);
+    ResetEnableScrollWithKeyboard(frameNode);
+}
+
+void ScrollableModelNG::SetEnableScrollWithKeyboard(FrameNode* frameNode, bool enableScrollWithKeyboard)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto pattern = frameNode->GetPattern<ScrollablePattern>();
+    CHECK_NULL_VOID(pattern);
+    pattern->SetIsAllowKeyboard(enableScrollWithKeyboard);
+}
+
+void ScrollableModelNG::ResetEnableScrollWithKeyboard(FrameNode* frameNode)
+{
+    CHECK_NULL_VOID(frameNode);
+    auto pattern = frameNode->GetPattern<ScrollablePattern>();
+    CHECK_NULL_VOID(pattern);
+    pattern->SetIsAllowKeyboard(true);
+}
+
+bool ScrollableModelNG::GetEnableScrollWithKeyboard(FrameNode* frameNode)
+{
+    CHECK_NULL_RETURN(frameNode, true);
+    auto pattern = frameNode->GetPattern<ScrollablePattern>();
+    CHECK_NULL_RETURN(pattern, true);
+    return pattern->GetIsAllowKeyboard();
 }
 
 void ScrollableModelNG::SetScrollBarMargin(const ScrollBarMargin& scrollBarMargin)

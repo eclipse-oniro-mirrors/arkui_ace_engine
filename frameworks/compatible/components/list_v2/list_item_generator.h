@@ -20,7 +20,7 @@
 
 namespace OHOS::Ace::V2 {
 
-class ListItemGenerator : virtual public Referenced {
+class ListItemGenerator : virtual public AceType {
 public:
     static constexpr size_t INVALID_INDEX = std::numeric_limits<size_t>::max();
 

@@ -72,6 +72,10 @@ RichEditorOverlayModifier::RichEditorOverlayModifier(const WeakPtr<OHOS::Ace::NG
     AttachProperty(changeOverlay_);
     hoverColor_ = AceType::MakeRefPtr<PropertyInt>(0);
     AttachProperty(hoverColor_);
+    underlineColor_ = AceType::MakeRefPtr<PropertyColor>(Color());
+    AttachProperty(underlineColor_);
+    underlineWidth_ = AceType::MakeRefPtr<PropertyFloat>(0.0f);
+    AttachProperty(underlineWidth_);
 }
 
 void RichEditorOverlayModifier::SetPreviewTextDecorationColor(const Color& value)
@@ -87,6 +91,16 @@ void RichEditorOverlayModifier::SetPreviewTextUnderlineWidth(float value)
 void RichEditorOverlayModifier::SetShowPreviewTextDecoration(bool value)
 {
     showPreviewTextDecoration_->Set(value);
+}
+
+void RichEditorOverlayModifier::SetUnderlineColor(const Color& value)
+{
+    underlineColor_->Set(value);
+}
+
+void RichEditorOverlayModifier::SetUnderlineWidth(float value)
+{
+    underlineWidth_->Set(value);
 }
 
 void RichEditorOverlayModifier::SetPreviewTextStyle(const PreviewTextStyle& value)
@@ -215,15 +229,49 @@ void RichEditorOverlayModifier::PaintPreviewTextDecoration(DrawingContext& drawi
     drawingContext.canvas.Restore();
 }
 
-void RichEditorOverlayModifier::PaintCaret(DrawingContext& drawingContext) const
+void RichEditorOverlayModifier::PaintUnderline(RSCanvas& canvas) const
 {
-    if (!caretVisible_->Get()) {
+    auto richEditorPattern = AceType::DynamicCast<RichEditorPattern>(pattern_.Upgrade());
+    CHECK_NULL_VOID(richEditorPattern);
+    if (!richEditorPattern->IsUnderlineMode() || isContentNode_) {
         return;
     }
-    bool isShowOriginCaret = floatingCaretVisible_->Get() && originCaretVisible_->Get();
-    CHECK_NULL_VOID(!floatingCaretVisible_->Get() || isShowOriginCaret);
-    auto& canvas = drawingContext.canvas;
-    auto offset = caretOffset_->Get();
+    auto layoutProperty = richEditorPattern->GetLayoutProperty<RichEditorLayoutProperty>();
+    CHECK_NULL_VOID(layoutProperty);
+    if (!(layoutProperty->GetShowUnderlineValue(false))) {
+        return;
+    }
+    auto contentRect = richEditorPattern->GetTextContentRect();
+    auto frameHeight = frameSize_->Get().Height();
+    auto frameRect = richEditorPattern->GetFrameRect();
+    auto responseAreaWidth = richEditorPattern->GetAllResponseAreaWidth();
+    auto hasResponseArea = GreatNotEqual(responseAreaWidth, 0.0f);
+    auto isRTL = layoutProperty->GetNonAutoLayoutDirection() == TextDirection::RTL;
+    PointF leftPoint(contentRect.Left(), frameHeight);
+    PointF rightPoint(contentRect.Right(), frameHeight);
+    auto isNeedToAddPadding = richEditorPattern->IsUnderlineAndButtonMode();
+    if (isRTL) {
+        auto contentLeft = isNeedToAddPadding ? contentRect.Left() - richEditorPattern->GetPaddingLeft() :
+            contentRect.Left();
+        leftPoint.SetX(hasResponseArea ? 0.0f : contentLeft);
+        rightPoint.SetX(contentRect.Right());
+    } else {
+        auto contentRight = isNeedToAddPadding ? contentRect.Right() + richEditorPattern->GetPaddingRight() :
+            contentRect.Right();
+        leftPoint.SetX(contentRect.Left());
+        rightPoint.SetX(hasResponseArea ? frameRect.Width() : contentRight);
+    }
+    RSPen pen;
+    pen.SetColor(ToRSColor(underlineColor_->Get()));
+    pen.SetWidth(underlineWidth_->Get());
+    pen.SetAntiAlias(true);
+    canvas.AttachPen(pen);
+    canvas.DrawLine(ToRSPoint(leftPoint), ToRSPoint(rightPoint));
+    canvas.DetachPen();
+}
+
+void RichEditorOverlayModifier::DrawCaretInternal(RSCanvas& canvas, const OffsetF& offset, int32_t caretColor) const
+{
     canvas.Save();
     RSPen pen;
     pen.SetAntiAlias(true);
@@ -231,7 +279,7 @@ void RichEditorOverlayModifier::PaintCaret(DrawingContext& drawingContext) const
     float caretHeight = caretHeight_->Get();
     pen.SetWidth(caretWidth);
     pen.SetCapStyle(RSPen::CapStyle::ROUND_CAP);
-    pen.SetColor(isShowOriginCaret ? originCaretColor_->Get() : caretColor_->Get());
+    pen.SetColor(caretColor);
     canvas.AttachPen(pen);
     float midPosX = offset.GetX() + caretWidth / 2;
     float startPosY = offset.GetY();
@@ -242,27 +290,22 @@ void RichEditorOverlayModifier::PaintCaret(DrawingContext& drawingContext) const
     canvas.Restore();
 }
 
+void RichEditorOverlayModifier::PaintCaret(DrawingContext& drawingContext) const
+{
+    if (!caretVisible_->Get()) {
+        return;
+    }
+    bool isShowOriginCaret = floatingCaretVisible_->Get() && originCaretVisible_->Get();
+    CHECK_NULL_VOID(!floatingCaretVisible_->Get() || isShowOriginCaret);
+    auto offset = caretOffset_->Get();
+    auto caretColor = isShowOriginCaret ? originCaretColor_->Get() : caretColor_->Get();
+    DrawCaretInternal(drawingContext.canvas, offset, caretColor);
+}
+
 void RichEditorOverlayModifier::PaintFloatingCaret(DrawingContext& drawingContext) const
 {
     CHECK_NULL_VOID(floatingCaretVisible_->Get());
-    auto& canvas = drawingContext.canvas;
-    auto floatingCaretOffset = floatingCaretOffset_->Get();
-    canvas.Save();
-    RSPen pen;
-    pen.SetAntiAlias(true);
-    float caretWidth = caretWidth_->Get();
-    float caretHeight = caretHeight_->Get();
-    pen.SetWidth(caretWidth);
-    pen.SetCapStyle(RSPen::CapStyle::ROUND_CAP);
-    pen.SetColor(caretColor_->Get());
-    canvas.AttachPen(pen);
-    float midPosX = floatingCaretOffset.GetX() + caretWidth / 2;
-    float startPosY = floatingCaretOffset.GetY();
-    float endPosY = startPosY + caretHeight;
-    float roundCapRadius = caretWidth / 2;
-    canvas.DrawLine(RSPoint(midPosX, startPosY + roundCapRadius), RSPoint(midPosX, endPosY - roundCapRadius));
-    canvas.DetachPen();
-    canvas.Restore();
+    DrawCaretInternal(drawingContext.canvas, floatingCaretOffset_->Get(), caretColor_->Get());
 }
 
 void RichEditorOverlayModifier::PaintScrollBar(DrawingContext& context)
@@ -299,6 +342,7 @@ void RichEditorOverlayModifier::onDraw(DrawingContext& drawingContext)
     if (isContentNode_) {
         DrawContent(drawingContext);
     } else {
+        PaintUnderline(drawingContext.canvas);
         DrawScrollBar(drawingContext);
         // Draw hover/press circle for cancelButton (same as TextFieldOverlayModifier)
         if (!hoverRects_.empty()) {

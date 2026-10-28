@@ -34,7 +34,7 @@ enum class AutoFillContentLengthMode { INVALID, SHORT, MEDIUM, LONG, EXTRA_LONG 
 
 enum class AutoFillInsertStatus { INIT, PENDING, INSERTING };
 
-class AutoFillController : public virtual AceType {
+class AutoFillController : public AceType {
     DECLARE_ACE_TYPE(AutoFillController, AceType);
 
 public:

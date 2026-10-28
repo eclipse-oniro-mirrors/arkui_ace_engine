@@ -20,11 +20,11 @@
 
 namespace OHOS::Ace::V2 {
 
-class ACE_FORCE_EXPORT GridEventInfo : public BaseEventInfo, public EventToJSONStringAdapter {
-    DECLARE_RELATIONSHIP_OF_CLASSES(GridEventInfo, BaseEventInfo, EventToJSONStringAdapter);
+class ACE_FORCE_EXPORT GridEventInfo : public JSONStringifiableEventInfo {
+    DECLARE_RELATIONSHIP_OF_CLASSES(GridEventInfo, JSONStringifiableEventInfo);
 
 public:
-    explicit GridEventInfo(int32_t scrollIndex) : BaseEventInfo("grid"), scrollIndex_(scrollIndex) {}
+    explicit GridEventInfo(int32_t scrollIndex) : JSONStringifiableEventInfo("grid"), scrollIndex_(scrollIndex) {}
 
     ~GridEventInfo() override = default;
 

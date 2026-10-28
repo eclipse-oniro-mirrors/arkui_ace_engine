@@ -40,7 +40,10 @@ void FolderStackPattern::OnAttachToFrameNode()
     CHECK_NULL_VOID(pipeline);
     auto container = Container::Current();
     CHECK_NULL_VOID(container);
-    CHECK_NULL_VOID(container->IsFoldable());
+    if (!(OHOS::Ace::SystemProperties::IsPortraitFoldProduct() ||
+            container->IsFoldable())) {
+        return;
+    }
     auto callbackId = pipeline->RegisterFoldStatusChangedCallback([weak = WeakClaim(this)](FoldStatus folderStatus) {
         auto pattern = weak.Upgrade();
         if (pattern) {
@@ -167,6 +170,10 @@ void FolderStackPattern::RefreshStack(FoldStatus foldStatus)
         auto pipeline = DynamicCast<PipelineContext>(container->GetPipelineContext());
         CHECK_NULL_VOID(pipeline);
         auto displayInfo = container->GetDisplayInfo();
+        if (currentFoldStatus == FoldStatus::HALF_FOLD) {
+            container->RefreshLiveFoldCreaseRegion();
+            container->RefreshFoldCreaseDirection();
+        }
         if (displayInfo->GetFoldStatus() != FoldStatus::HALF_FOLD) {
             pattern->RestoreScreenState();
         } else {
@@ -272,6 +279,10 @@ void FolderStackPattern::SetAutoRotate()
     displayInfo_ = displayInfo;
     auto foldStatus = displayInfo->GetFoldStatus();
     auto orientation = container->GetOrientation();
+    if (foldStatus == FoldStatus::HALF_FOLD) {
+        container->RefreshLiveFoldCreaseRegion();
+        container->RefreshFoldCreaseDirection();
+    }
     TAG_LOGI(AceLogTag::ACE_FOLDER_STACK,
         "the autoHalfFold state is:%{public}d, direction of rotation is:%{public}d",
         autoHalfFold, orientation);

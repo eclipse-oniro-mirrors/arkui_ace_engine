@@ -761,7 +761,7 @@ void DialogPattern::BuildChild(const DialogProperties& props)
     columnProp->UpdateMeasureType(measureType);
 
     // build ActionSheet child
-    if (props.type == DialogType::ACTION_SHEET && !props.sheetsInfo.empty()) {
+    if (!props.sheetsInfo.empty()) {
         auto sheetContainer = BuildSheet(props.sheetsInfo);
         contentNodeMap_[DialogContentNode::SHEET] = sheetContainer;
         CHECK_NULL_VOID(sheetContainer);
@@ -863,7 +863,7 @@ void DialogPattern::BuildCustomChild(const DialogProperties& props, const RefPtr
 
 bool IsAlertDialog(const DialogProperties& props)
 {
-    return props.type == DialogType::ALERT_DIALOG;
+    return props.type != DialogType::ACTION_SHEET && props.sheetsInfo.empty();
 }
 
 RefPtr<FrameNode> DialogPattern::BuildMainTitle(const DialogProperties& dialogProperties)

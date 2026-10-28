@@ -29,7 +29,7 @@ class FrameNode;
 class FocusView;
 struct FocusAxisEvent;
 
-class KeyEventManager : public virtual AceType {
+class KeyEventManager : public AceType {
     DECLARE_ACE_TYPE(KeyEventManager, AceType);
 
 public:

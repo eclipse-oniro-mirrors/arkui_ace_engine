@@ -628,28 +628,36 @@ void DatePickerPattern::UpdateLunarSwitch()
     lunarSwitchCheckbox->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
 }
 
+bool DatePickerPattern::IsAtStartYear() const
+{
+    auto currentDate = GetCurrentDate();
+    return currentDate.GetYear() == startDateSolar_.GetYear();
+}
+
+bool DatePickerPattern::IsAtEndYear() const
+{
+    auto currentDate = GetCurrentDate();
+    return currentDate.GetYear() == endDateSolar_.GetYear();
+}
+
+bool DatePickerPattern::IsAtStartMonth() const
+{
+    auto currentDate = GetCurrentDate();
+    return IsAtStartYear() && currentDate.GetMonth() == startDateSolar_.GetMonth();
+}
+
+bool DatePickerPattern::IsAtEndMonth() const
+{
+    auto currentDate = GetCurrentDate();
+    return IsAtEndYear() && currentDate.GetMonth() == endDateSolar_.GetMonth();
+}
+
 void DatePickerPattern::UpdateDateOrder()
 {
     auto language = AceApplicationInfo::GetInstance().GetLanguage();
-    std::string dateOrder = "y-d-M";
-    if (language != "ug") {
-        DateTimeSequence sequence;
-        OrderResult orderResult = sequence.GetDateOrder(language);
-        dateOrder = orderResult.dateOrder;
-    }
-    SetDateOrder(dateOrder);
-
-    auto host = GetHost();
-    CHECK_NULL_VOID(host);
-    auto layoutProperty = host->GetLayoutProperty();
-    CHECK_NULL_VOID(layoutProperty);
-    if (language == "ar" && layoutProperty->GetLayoutDirection() != TextDirection::RTL) {
-        layoutProperty->UpdateLayoutDirection(TextDirection::LTR);
-        isDirectionSetByAr = true;
-    } else if (isDirectionSetByAr) {
-        layoutProperty->UpdateLayoutDirection(TextDirection::AUTO);
-        isDirectionSetByAr = false;
-    }
+    DateTimeSequence sequence;
+    OrderResult orderResult = sequence.GetDateOrder(language);
+    SetDateOrder(orderResult.dateOrder);
 }
 
 void DatePickerPattern::UpdateDialogAgingButton(const RefPtr<FrameNode>& buttonNode, bool isNext)
@@ -1086,7 +1094,7 @@ bool DatePickerPattern::HandleDirectionKey(KeyCode code)
     return ParseDirectionKey(pattern, code, totalOptionCount, static_cast<int32_t>(childSize));
 }
 
-std::unordered_map<std::string, RefPtr<FrameNode>> DatePickerPattern::GetAllChildNode()
+std::unordered_map<std::string, RefPtr<FrameNode>> DatePickerPattern::GetAllChildNode() const
 {
     std::unordered_map<std::string, RefPtr<FrameNode>> allChildNode;
     RefPtr<FrameNode> stackYear;
@@ -1115,7 +1123,7 @@ std::unordered_map<std::string, RefPtr<FrameNode>> DatePickerPattern::GetAllChil
 }
 
 void DatePickerPattern::OrderAllChildNode(
-    RefPtr<FrameNode>& stackYear, RefPtr<FrameNode>& stackMonth, RefPtr<FrameNode>& stackDay)
+    RefPtr<FrameNode>& stackYear, RefPtr<FrameNode>& stackMonth, RefPtr<FrameNode>& stackDay) const
 {
     auto host = GetHost();
     CHECK_NULL_VOID(host);
@@ -1141,6 +1149,12 @@ void DatePickerPattern::OrderAllChildNode(
         processDateNode(month, day, year);
     } else if (dateOrder_ == "y-d-M") {
         processDateNode(year, day, month);
+    } else if (dateOrder_ == "d-M-y") {
+        processDateNode(day, month, year);
+    } else if (dateOrder_ == "d-y-M") {
+        processDateNode(day, year, month);
+    } else if (dateOrder_ == "M-y-d") {
+        processDateNode(month, year, day);
     } else {
         processDateNode(year, month, day);
     }
@@ -2095,6 +2109,12 @@ void DatePickerPattern::OrderCurrentLunarDate(
         processDateNode(month, day, year);
     } else if (dateOrder_ == "y-d-M") {
         processDateNode(year, day, month);
+    } else if (dateOrder_ == "d-M-y") {
+        processDateNode(day, month, year);
+    } else if (dateOrder_ == "d-y-M") {
+        processDateNode(day, year, month);
+    } else if (dateOrder_ == "M-y-d") {
+        processDateNode(month, year, day);
     } else {
         processDateNode(year, month, day);
     }
@@ -2188,6 +2208,12 @@ void DatePickerPattern::OrderCurrentDateByYearMonthDayColumn(
         processDateNode(month, day, year);
     } else if (dateOrder_ == "y-d-M") {
         processDateNode(year, day, month);
+    } else if (dateOrder_ == "d-M-y") {
+        processDateNode(day, month, year);
+    } else if (dateOrder_ == "d-y-M") {
+        processDateNode(day, year, month);
+    } else if (dateOrder_ == "M-y-d") {
+        processDateNode(month, year, day);
     } else {
         processDateNode(year, month, day);
     }
@@ -2367,6 +2393,18 @@ void DatePickerPattern::InitColumnsOrder(RefPtr<FrameNode> (*columns)[COLUMNS_SI
         order[COLUMNS_ZERO] = INDEX_YEAR;
         order[COLUMNS_ONE] = INDEX_DAY;
         order[COLUMNS_TWO] = INDEX_MONTH;
+    } else if (dateOrder_ == "d-M-y") {
+        order[COLUMNS_ZERO] = INDEX_DAY;
+        order[COLUMNS_ONE] = INDEX_MONTH;
+        order[COLUMNS_TWO] = INDEX_YEAR;
+    } else if (dateOrder_ == "d-y-M") {
+        order[COLUMNS_ZERO] = INDEX_DAY;
+        order[COLUMNS_ONE] = INDEX_YEAR;
+        order[COLUMNS_TWO] = INDEX_MONTH;
+    } else if (dateOrder_ == "M-y-d") {
+        order[COLUMNS_ZERO] = INDEX_MONTH;
+        order[COLUMNS_ONE] = INDEX_YEAR;
+        order[COLUMNS_TWO] = INDEX_DAY;
     } else {
         order[COLUMNS_ZERO] = INDEX_YEAR;
         order[COLUMNS_ONE] = INDEX_MONTH;
@@ -3089,15 +3127,16 @@ const std::string DatePickerPattern::GetFormatString(PickerDateF date)
         DateTimeSequence sequence;
         auto language = AceApplicationInfo::GetInstance().GetLanguage();
         OrderResult orderResult = sequence.GetDateOrder(language);
-        if (language == "ug") {
-            return date.month.has_value() ? (dayStr + "-" + monthStr) : dayStr;
-        } else if (language == "en") {
-            return date.month.has_value() ? (monthStr + " " + dayStr) : dayStr;
-        } else if (language == "ar") {
-            return date.month.has_value() ? (dayStr + " " + monthStr) : dayStr;
-        } else {
-            return date.month.has_value() ? (monthStr + dayStr) : dayStr;
+        const auto& dateOrder = orderResult.dateOrder;
+        if (!date.month.has_value()) {
+            return dayStr;
         }
+        auto monthPos = dateOrder.find('M');
+        auto dayPos = dateOrder.find('d');
+        if (monthPos != std::string::npos && dayPos != std::string::npos && dayPos < monthPos) {
+            return dayStr + " " + monthStr;
+        }
+        return monthStr + " " + dayStr;
     }
 
     return "";
@@ -3863,4 +3902,13 @@ void DatePickerPattern::OnWindowSizeChanged(int32_t width, int32_t height, Windo
         }
     }
 }
+void DatePickerPattern::DumpInspectorTreeInfo(
+    std::shared_ptr<JsonValue>& attrs, InspectorTreeRequestContext& context)
+{
+    Pattern::DumpInspectorTreeInfo(attrs, context);
+    if (!GetIsShowInDialog()) {
+        attrs->Put("expanded", true);
+    }
+}
+
 } // namespace OHOS::Ace::NG

@@ -66,6 +66,8 @@ template("ace_ohos_standard_source_set") {
       "$ace_root/adapter/ohos/entrance/ui_event_tracker.cpp",
       "$ace_root/adapter/ohos/entrance/ui_event_impl.cpp",
       "$ace_root/adapter/ohos/entrance/ui_session/ui_session_batch_command.cpp",
+      "$ace_root/adapter/ohos/entrance/ui_session/ui_session_command_result.cpp",
+      "$ace_root/adapter/ohos/entrance/ui_session/ui_session_manager.cpp",
       "$ace_root/adapter/ohos/entrance/utils.cpp",
 
       # drag window
@@ -219,6 +221,10 @@ template("ace_ohos_standard_source_set") {
 
     if (defined(config.accessibility_support) && config.accessibility_support) {
       external_deps += [ "accessibility:accessibilityconfig" ]
+    }
+
+    if (defined(config.enable_standard_input) && config.enable_standard_input) {
+      external_deps += [ "imf:inputmethod_client" ]
     }
 
     deps +=

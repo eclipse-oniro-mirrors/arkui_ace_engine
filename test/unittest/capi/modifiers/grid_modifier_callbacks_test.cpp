@@ -15,12 +15,15 @@
 
 #include <gtest/gtest.h>
 #include <climits>
+#include <cmath>
 
 #include "modifier_test_base.h"
 #include "modifiers_test_utils.h"
 
 #include "core/components/common/layout/constants.h"
 #include "core/components_ng/pattern/grid/grid_event_hub.h"
+#include "core/components_ng/pattern/grid/grid_layout_property.h"
+#include "core/components_ng/pattern/scrollable/scroll_snap_strategy.h"
 
 #include "core/interfaces/native/utility/converter.h"
 #include "core/interfaces/native/utility/reverse_converter.h"
@@ -550,4 +553,128 @@ HWTEST_F(GridModifierCallbacksTest, setOnScrollFrameBeginTest, TestSize.Level1)
     ScrollFrameResult result = eventHub->GetOnScrollFrameBegin()(dimension, state);
     EXPECT_EQ(result.offset.ConvertToPx(), dimension.ConvertToPx());
 }
+/**
+ * @tc.name: ScrollSnapStrategyAlignAndReset
+ * @tc.desc: The static modifier maps all built-in alignments and clears an omitted strategy.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridModifierCallbacksTest, ScrollSnapStrategyAlignAndReset, TestSize.Level1)
+{
+    auto frameNode = reinterpret_cast<FrameNode*>(node_);
+    auto property = frameNode->GetLayoutProperty<GridLayoutProperty>();
+    ASSERT_NE(property, nullptr);
+    for (auto align : { ARK_SCROLL_SNAP_ALIGN_NONE, ARK_SCROLL_SNAP_ALIGN_START,
+             ARK_SCROLL_SNAP_ALIGN_CENTER, ARK_SCROLL_SNAP_ALIGN_END }) {
+        auto value = Converter::ArkUnion<Opt_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy,
+            Ark_ScrollSnapAlign>(align);
+        modifier_->setScrollSnapStrategy(node_, &value);
+        ASSERT_TRUE(property->GetScrollSnapStrategy().has_value());
+        EXPECT_EQ(property->GetScrollSnapStrategy()->align, static_cast<ScrollSnapAlign>(align));
+        EXPECT_FALSE(property->GetScrollSnapStrategy()->hasProvider);
+    }
+    auto reset = Converter::ArkValue<Opt_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy>();
+    modifier_->setScrollSnapStrategy(node_, &reset);
+    EXPECT_FALSE(property->GetScrollSnapStrategy().has_value());
+    modifier_->setScrollSnapStrategy(nullptr, &reset);
+}
+
+/**
+ * @tc.name: ScrollSnapStrategyProviderConvertsUnits
+ * @tc.desc: Both provider callbacks are synchronous and convert px inputs and vp results at the bridge.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridModifierCallbacksTest, ScrollSnapStrategyProviderConvertsUnits, TestSize.Level1)
+{
+    auto frameNode = reinterpret_cast<FrameNode*>(node_);
+    auto property = frameNode->GetLayoutProperty<GridLayoutProperty>();
+    auto approach = [](Ark_VMContext, Ark_Int32, Ark_Float64 velocity, Ark_Float64 decay,
+                        synthetic_Callback_F64_Void continuation) {
+        EXPECT_DOUBLE_EQ(velocity, -300.0);
+        EXPECT_DOUBLE_EQ(decay, 150.0);
+        CallbackHelper(continuation).InvokeSync(125.0);
+    };
+    auto target = [](Ark_VMContext, Ark_Int32, Ark_Float64 velocity, synthetic_Callback_F64_Void continuation) {
+        EXPECT_DOUBLE_EQ(velocity, -300.0);
+        CallbackHelper(continuation).InvokeSync(250.0);
+    };
+    Ark_ScrollSnapOffsetProviderProxy provider {
+        .calculateApproachOffset = Converter::ArkValue<ScrollSnapApproachCallback>(nullptr, approach),
+        .calculateSnapOffset = Converter::ArkValue<ScrollSnapTargetCallback>(nullptr, target),
+    };
+    auto value = Converter::ArkUnion<Opt_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy,
+        Ark_ScrollSnapOffsetProviderProxy>(provider);
+    modifier_->setScrollSnapStrategy(node_, &value);
+    ASSERT_TRUE(property->GetScrollSnapStrategy().has_value());
+    const auto strategy = property->GetScrollSnapStrategy().value();
+    ASSERT_TRUE(strategy.hasProvider);
+    ASSERT_TRUE(strategy.calculateApproachOffset);
+    ASSERT_TRUE(strategy.calculateSnapOffset);
+    auto pipeline = MockPipelineContext::GetCurrent();
+    const double scale = pipeline->GetDipScale();
+    pipeline->SetDipScale(2.0);
+    EXPECT_DOUBLE_EQ(strategy.calculateApproachOffset(-600.0, 300.0), 250.0);
+    EXPECT_DOUBLE_EQ(strategy.calculateSnapOffset(-600.0), 500.0);
+    pipeline->SetDipScale(scale);
+}
+
+/**
+ * @tc.name: ScrollSnapStrategyProviderMissingResultUsesFallback
+ * @tc.desc: A callback with no continuation result must yield NaN rather than a valid zero target.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridModifierCallbacksTest, ScrollSnapStrategyProviderMissingResultUsesFallback, TestSize.Level1)
+{
+    auto frameNode = reinterpret_cast<FrameNode*>(node_);
+    auto property = frameNode->GetLayoutProperty<GridLayoutProperty>();
+    auto approach = [](Ark_VMContext, Ark_Int32, Ark_Float64, Ark_Float64, synthetic_Callback_F64_Void) {};
+    auto target = [](Ark_VMContext, Ark_Int32, Ark_Float64, synthetic_Callback_F64_Void) {};
+    Ark_ScrollSnapOffsetProviderProxy provider {
+        .calculateApproachOffset = Converter::ArkValue<ScrollSnapApproachCallback>(nullptr, approach),
+        .calculateSnapOffset = Converter::ArkValue<ScrollSnapTargetCallback>(nullptr, target),
+    };
+    auto value = Converter::ArkUnion<Opt_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy,
+        Ark_ScrollSnapOffsetProviderProxy>(provider);
+    modifier_->setScrollSnapStrategy(node_, &value);
+    ASSERT_TRUE(property->GetScrollSnapStrategy().has_value());
+    const auto strategy = property->GetScrollSnapStrategy().value();
+    EXPECT_TRUE(std::isnan(strategy.calculateApproachOffset(600.0, 300.0)));
+    EXPECT_TRUE(std::isnan(strategy.calculateSnapOffset(600.0)));
+    provider.calculateSnapOffset.callSync = nullptr;
+    value = Converter::ArkUnion<Opt_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy,
+        Ark_ScrollSnapOffsetProviderProxy>(provider);
+    modifier_->setScrollSnapStrategy(node_, &value);
+    EXPECT_FALSE(property->GetScrollSnapStrategy().has_value());
+}
+
+/**
+ * @tc.name: ScrollSnapStrategyProviderDoesNotRetainNode
+ * @tc.desc: Saved callbacks must not keep the Grid alive and must not invoke providers after disposal.
+ * @tc.type: FUNC
+ */
+HWTEST_F(GridModifierCallbacksTest, ScrollSnapStrategyProviderDoesNotRetainNode, TestSize.Level1)
+{
+    auto frameNode = reinterpret_cast<FrameNode*>(node_);
+    auto weak = AceType::WeakClaim(frameNode);
+    auto property = frameNode->GetLayoutProperty<GridLayoutProperty>();
+    auto approach = [](Ark_VMContext, Ark_Int32, Ark_Float64, Ark_Float64, synthetic_Callback_F64_Void) {
+        ADD_FAILURE() << "disposed Grid invoked approach provider";
+    };
+    auto target = [](Ark_VMContext, Ark_Int32, Ark_Float64, synthetic_Callback_F64_Void) {
+        ADD_FAILURE() << "disposed Grid invoked snap provider";
+    };
+    Ark_ScrollSnapOffsetProviderProxy provider {
+        .calculateApproachOffset = Converter::ArkValue<ScrollSnapApproachCallback>(nullptr, approach),
+        .calculateSnapOffset = Converter::ArkValue<ScrollSnapTargetCallback>(nullptr, target),
+    };
+    auto value = Converter::ArkUnion<Opt_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy,
+        Ark_ScrollSnapOffsetProviderProxy>(provider);
+    modifier_->setScrollSnapStrategy(node_, &value);
+    ASSERT_TRUE(property->GetScrollSnapStrategy().has_value());
+    const auto strategy = property->GetScrollSnapStrategy().value();
+    DisposeNode(node_);
+    EXPECT_EQ(weak.Upgrade(), nullptr);
+    EXPECT_TRUE(std::isnan(strategy.calculateApproachOffset(600.0, 300.0)));
+    EXPECT_TRUE(std::isnan(strategy.calculateSnapOffset(600.0)));
+}
+
 } // namespace OHOS::Ace::NG

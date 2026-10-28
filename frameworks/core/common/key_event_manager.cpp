@@ -244,6 +244,9 @@ bool KeyEventManager::IsSameKeyboardShortcutNode(const std::string& value, uint8
         if (!eventHub) {
             continue;
         }
+        if (!eventHub->HasKeyboardShortcut()) {
+            continue;
+        }
         auto keyboardShortcuts = eventHub->GetKeyboardShortcut();
         for (auto& keyboardShortcut : keyboardShortcuts) {
             if (keyboardShortcut.value == value && keyboardShortcut.keys == keys) {
@@ -532,6 +535,9 @@ bool KeyEventManager::DispatchKeyboardShortcut(const KeyEvent& event)
             continue;
         }
 
+        if (!eventHub->HasKeyboardShortcut()) {
+            continue;
+        }
         auto keyboardShortcuts = eventHub->GetKeyboardShortcut();
         if (TriggerKeyboardShortcut(event, keyboardShortcuts, node, eventHub)) {
             return true;

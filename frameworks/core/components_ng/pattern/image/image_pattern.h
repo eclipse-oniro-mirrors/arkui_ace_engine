@@ -75,6 +75,14 @@ public:
     RefPtr<LayoutAlgorithm> CreateLayoutAlgorithm() override;
     RefPtr<EventHub> CreateEventHub() override;
 
+    // Restricted scroll-placeholder whitelist clone: image src lives in the
+    // layout property cloned by the copy protocol; the fresh pattern restores
+    // the self-measure algorithm without load callbacks or loader handles.
+    RefPtr<Pattern> CloneForPlaceholder() override
+    {
+        return MakeRefPtr<ImagePattern>();
+    }
+
     // Called on main thread to check if need rerender of the content.
     bool OnDirtyLayoutWrapperSwap(const RefPtr<LayoutWrapper>& dirty, const DirtySwapConfig& config) override;
 
@@ -180,6 +188,8 @@ public:
     inline void DumpOtherInfo();
     inline void DumpMenmoryNameId();
     void DumpRenderInfo(std::unique_ptr<JsonValue>& json);
+
+    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config) override;
     void DumpAdvanceInfo() override;
     void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json) override;
     void DumpSvgInfo();
@@ -258,6 +268,8 @@ protected:
     RefPtr<ImageContentModifier> contentMod_;
 
 private:
+    void DumpAdvanceSourceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
+
     class ObscuredImage : public CanvasImage {
         void DrawToRSCanvas(
             RSCanvas& canvas, const RSRect& srcRect, const RSRect& dstRect, const BorderRadiusArray& radiusXY) override
@@ -453,7 +465,7 @@ private:
     ImageType imageType_ = ImageType::BASE;
     ContentTransitionType contentTransitionType_ = ContentTransitionType::IDENTITY;
     std::shared_ptr<CancelableCallback<void()>> navDestRecycleCallback_;
-    static constexpr uint32_t NAV_DEST_RECYCLE_DELAY_MS = 500;
+    static constexpr uint32_t NAV_DEST_RECYCLE_DELAY_MS = 1000;
     int64_t lastDrawTime_ = 0;
 
     ACE_DISALLOW_COPY_AND_MOVE(ImagePattern);

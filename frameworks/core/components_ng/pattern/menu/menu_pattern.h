@@ -39,6 +39,7 @@
 #include "core/components_ng/pattern/select/select_model_ng.h"
 #include "core/pipeline_ng/pipeline_context.h"
 
+constexpr int32_t DEFAULT_CLICK_DISTANCE = 15;
 constexpr uint32_t MAX_SEARCH_DEPTH = 5;
 constexpr double MENU_ANIMATION_MAX_SCALE = 1.0f;
 constexpr double MENU_ANIMATION_MIN_OPACITY = 0.0f;
@@ -546,6 +547,16 @@ public:
         return targetOffset_;
     }
 
+    void SetWrapperParentOffset(const OffsetF& offset)
+    {
+        wrapperParentOffset_ = offset;
+    }
+
+    OffsetF GetWrapperParentOffset() const
+    {
+        return wrapperParentOffset_;
+    }
+
     void SetIsHeightModifiedBySelect(bool isModified)
     {
         isHeightModifiedBySelect_ = isModified;
@@ -971,8 +982,6 @@ private:
     RefPtr<ClickEvent> onClick_;
     RefPtr<TouchEventImpl> onTouch_;
     std::optional<Offset> lastTouchOffset_;
-    // true once the finger has moved out of the menu bounds during the current touch sequence
-    bool movedOutOfRegion_ = false;
     const int32_t targetId_ = -1;
     const std::string targetTag_;
     MenuType type_ = MenuType::MENU;
@@ -987,6 +996,8 @@ private:
     std::vector<RefPtr<FrameNode>> menuItems_;
     std::optional<int32_t> foldStatusChangedCallbackId_;
     std::optional<int32_t> halfFoldHoverCallbackId_;
+    WeakPtr<PipelineContext> foldStatusPipeline_;
+    WeakPtr<PipelineContext> halfFoldHoverPipeline_;
 
     bool isSelectMenu_ = false;
     bool isSelectMenuBackgroundColorJsview_ = true;
@@ -1022,6 +1033,7 @@ private:
     bool hasOptionWidth_ = false;
     OffsetF targetOffset_;
     SizeF targetSize_;
+    OffsetF wrapperParentOffset_;
     bool expandDisplay_ = false;
     RefPtr<FrameNode> lastSelectedItem_ = nullptr;
     bool isEmbedded_ = false;

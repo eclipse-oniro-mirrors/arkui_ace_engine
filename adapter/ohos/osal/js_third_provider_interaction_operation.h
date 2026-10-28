@@ -16,6 +16,7 @@
 #ifndef FOUNDATION_ACE_FRAMEWORKS_BRIDGE_COMMON_ACCESSIBILITY_JS_THIRD_PROVIDER_INTERATION_OPERATION_H
 #define FOUNDATION_ACE_FRAMEWORKS_BRIDGE_COMMON_ACCESSIBILITY_JS_THIRD_PROVIDER_INTERATION_OPERATION_H
 
+#include <atomic>
 #include <mutex>
 #include <unordered_map>
 
@@ -78,6 +79,7 @@ public:
         Accessibility::AccessibilityElementOperatorCallback &callback) override;
     void SetChildTreeIdAndWinId(
         const int64_t nodeId, const int32_t treeId, const int32_t childWindowId) override;
+    void RemoveChildTreeIdAndWinId(int64_t rawElementId);
     void SetBelongTreeId(const int32_t treeId) override;
     void FocusMoveSearchWithCondition(const AccessibilityElementInfo& info, const AccessibilityFocusMoveParam param,
         const int32_t requestId, AccessibilityElementOperatorCallback &callback) override;
@@ -112,7 +114,7 @@ public:
 
     int32_t GetBelongTreeId() const
     {
-        return belongTreeId_;
+        return belongTreeId_.load();
     }
 
     static void FillNodeConfig(const NodeConfig& config, Accessibility::AccessibilityElementInfo& info);
@@ -126,12 +128,19 @@ public:
 
     void SetThirdCustomProperty(int64_t elementId, const RefPtr<NG::CustomAccessibilityProperty>& property);
     RefPtr<NG::CustomAccessibilityProperty> GetThirdCustomProperty(int64_t elementId) override;
+    bool HasChildTree(int64_t elementId) override;
     void RemoveThirdCustomProperty(int64_t elementId);
     void ClearAllThirdCustomProperties();
+    // Synchronous WithCondition focus-move search: the provider strategy walk and the id splicing run on the CALLING.
+    Accessibility::FocusMoveResult SearchFocusMoveWithConditionSync(
+        int64_t elementId, const Accessibility::AccessibilityFocusMoveParam& param,
+        Accessibility::AccessibilityElementInfo& info);
 
 private:
     void GetHostRectTranslateInfo(NodeConfig& config);
     void GetNodeConfig(NodeConfig& nodeConfig);
+    void ApplyChildTreeIdAndWinId(Accessibility::AccessibilityElementInfo& info);
+    void ApplyChildTreeIdAndWinId(std::list<Accessibility::AccessibilityElementInfo>& infos);
     void SetSearchElementInfoByAccessibilityIdResult(
         AccessibilityElementOperatorCallback& callback,
         std::list<AccessibilityElementInfo>&& infos,
@@ -187,11 +196,16 @@ private:
     void HandleActionWhenFindNodeFail(const int32_t action);
 
     int32_t GetParentWindowId();
+    void NotifyCmpTreeDeregistered(int32_t treeId);
 
     WeakPtr<AccessibilityProvider> accessibilityProvider_;
     WeakPtr<JsAccessibilityManager> jsAccessibilityManager_;
     WeakPtr<NG::FrameNode> host_;
-    int32_t belongTreeId_ = AccessibilityElementInfo::UNDEFINED_TREE_ID;
+    std::atomic<int32_t> belongTreeId_ { AccessibilityElementInfo::UNDEFINED_TREE_ID };
+
+    mutable std::mutex childTreeIdWinIdMapMutex_;
+    // Raw element id -> (childTreeId, childWindowId), recorded by SetChildTreeIdAndWinId when AAMS registers a child tree (e.g.
+    std::unordered_map<int64_t, std::pair<int32_t, int32_t>> childTreeIdWinIdMap_;
 
     mutable std::mutex thirdCustomPropertiesMutex_;
     std::unordered_map<int64_t, RefPtr<NG::CustomAccessibilityProperty>> thirdCustomProperties_;

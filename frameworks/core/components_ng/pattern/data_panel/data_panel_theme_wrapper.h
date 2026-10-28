@@ -21,7 +21,7 @@
 #include "base/memory/ace_type.h"
 #include "base/utils/device_config.h"
 #include "core/components/data_panel/data_panel_theme.h"
-#include "core/components_ng/token_theme/token_theme_wrapper.h"
+#include "core/components_ng/token_theme/token_theme.h"
 
 namespace OHOS::Ace::NG {
 
@@ -34,7 +34,7 @@ constexpr size_t DATA_PANEL_THEME_COLOR_COUNT = 9;
  * basing on TokenTheme's data.
  * DataPanelThemeWrapper should be built using DataPanelThemeWrapper::WrapperBuilder.
  */
-class DataPanelThemeWrapper : public DataPanelTheme, public TokenThemeWrapper {
+class DataPanelThemeWrapper : public DataPanelTheme {
     DECLARE_ACE_TYPE(DataPanelThemeWrapper, DataPanelTheme);
 
 public:
@@ -43,7 +43,7 @@ public:
         WrapperBuilder() = default;
         ~WrapperBuilder() override = default;
 
-        RefPtr<TokenThemeWrapper> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
+        RefPtr<Theme> BuildWrapper(const RefPtr<ThemeConstants>& themeConstants) const
         {
             auto wrapper = AceType::MakeRefPtr<DataPanelThemeWrapper>();
             auto theme = AceType::DynamicCast<DataPanelTheme>(wrapper);

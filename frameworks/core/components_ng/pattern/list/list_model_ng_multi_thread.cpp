@@ -35,6 +35,19 @@ void ListModelNG::SetScrollToIndexMultiThread(
         });
 }
 
+void ListModelNG::SetScrollToIndexWithOptionsMultiThread(FrameNode* frameNode, int32_t index, bool smooth,
+    ScrollAlign align, std::optional<float> extraOffset, FastScrollMode mode)
+{
+    CHECK_NULL_VOID(frameNode);
+    frameNode->PostAfterAttachMainTreeTask([weak = AceType::WeakClaim(frameNode),
+        index, smooth, align, extraOffset, mode]() {
+        auto node = weak.Upgrade();
+        CHECK_NULL_VOID(node);
+        SetScrollToIndexWithOptions(AceType::RawPtr(node), index, smooth, align,
+            extraOffset, mode);
+    });
+}
+
 void ListModelNG::ScrollToItemInGroupMultiThread(
     FrameNode* frameNode, int32_t index, int32_t indexInGroup, bool smooth, ScrollAlign align)
 {

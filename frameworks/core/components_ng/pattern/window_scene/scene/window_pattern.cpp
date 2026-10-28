@@ -302,6 +302,8 @@ void WindowPattern::OnAttachToFrameNode()
         return;
     }
 
+    CHECK_EQUAL_VOID(CheckAndHandleStartWithSnapshot(), true);
+
     if (session_->GetAppLockControl()) {
         CreateSnapshotWindow();
         AddChild(host, snapshotWindow_, snapshotWindowName_);
@@ -579,6 +581,20 @@ void WindowPattern::UpdateStartingWindowProperty(const Rosen::SessionInfo& sessi
     }
 }
 
+bool WindowPattern::CheckAndHandleStartWithSnapshot()
+{
+    CHECK_EQUAL_RETURN(session_->GetStartWithSnapshot(), false, false);
+    CHECK_NULL_RETURN(session_->GetScenePersistence(), false);
+    CHECK_EQUAL_RETURN(session_->GetScenePersistence()->HasSnapshot() || session_->HasSnapshot(), false, false);
+    auto host = GetHost();
+    CHECK_NULL_RETURN(host, false);
+    TAG_LOGI(AceLogTag::ACE_WINDOW_SCENE, "start with snapshot");
+    CreateSnapshotWindow();
+    AddChild(host, snapshotWindow_, snapshotWindowName_);
+    attachToFrameNodeFlag_ = true;
+    return true;
+}
+
 bool WindowPattern::CheckAndHandleRestartApp()
 {
     CHECK_EQUAL_RETURN(session_->GetSessionInfo().isRestartApp_, false, false);
@@ -640,7 +656,11 @@ void WindowPattern::HideStartingWindow()
         bool debugMode = false;
         if (abilityInfo) {
             debugMode = abilityInfo->applicationInfo.debug;
-            TAG_LOGE(AceLogTag::ACE_WINDOW_SCENE, "HideStartingWindow time out, debug mode: %{public}d", debugMode);
+            TAG_LOGE(AceLogTag::ACE_WINDOW_SCENE,
+                "HideStartingWindow time out, timeout: %{public}u ms, sessionId: %{public}d, bundleName: %{public}s, "
+                "debug mode: %{public}d",
+                STARTING_WINDOW_TIMEOUT_MS, session->GetPersistentId(),
+                session->GetSessionInfo().bundleName_.c_str(), debugMode);
         }
         CHECK_EQUAL_VOID(debugMode, true);
         auto ret = session->Clear();
@@ -691,6 +711,9 @@ void WindowPattern::CreateStartingWindow()
     CHECK_NULL_VOID(imageLayoutProperty);
     imageLayoutProperty->UpdateMeasureType(MeasureType::MATCH_PARENT);
     startingWindow_->SetHitTestMode(HitTestMode::HTMNONE);
+    auto imagePaintProperty = startingWindow_->GetPaintProperty<ImageRenderProperty>();
+    CHECK_NULL_VOID(imagePaintProperty);
+    imagePaintProperty->UpdateImageInterpolation(ImageInterpolation::MEDIUM);
     ImageSourceInfo sourceInfo;
     std::shared_ptr<Media::PixelMap> preloadPixelMap = nullptr;
     std::pair<std::shared_ptr<uint8_t[]>, size_t> preloadBufferInfo = {nullptr, 0};
@@ -814,7 +837,8 @@ void WindowPattern::CreateSnapshotWindow(std::optional<std::shared_ptr<Media::Pi
         auto pixelMap = PixelMap::CreatePixelMap(&snapshot.value());
         imageLayoutProperty->UpdateImageSourceInfo(ImageSourceInfo(pixelMap));
         pattern->SetSyncLoad(true);
-    } else if (auto preloadSnapshot = session_->GetPreloadSnapshot(); preloadSnapshot != nullptr) {
+    } else if (auto preloadSnapshot = session_->GetPreloadSnapshot();
+        preloadSnapshot != nullptr && !session_->GetAppLockControl()) {
         auto pixelMap = PixelMap::CreatePixelMap(&preloadSnapshot);
         imageLayoutProperty->UpdateImageSourceInfo(ImageSourceInfo(pixelMap));
         pattern->SetSyncLoad(true);

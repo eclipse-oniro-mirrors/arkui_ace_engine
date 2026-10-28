@@ -34,7 +34,7 @@ constexpr const char *SETTING_COLUMN_KEYWORD = "KEYWORD";
 constexpr const char *SETTING_COLUMN_VALUE = "VALUE";
 constexpr const char *SETTINGS_DATA_SMART_EDGE_KEY = "luo_shu_state_info"; //sceneboard.smartedge.status
 constexpr const char *SETTINGS_DATA_SMART_EDGE_VALUE = "luoShuState"; //smartEdgeState
-constexpr const int WAIT_TIME = 100; // 100ms
+constexpr const int WAIT_TIME = 2; // 2s
 
 // SettingsDataObserver implementation
 DataShareObserverHelper::SettingsDataObserver::SettingsDataObserver(

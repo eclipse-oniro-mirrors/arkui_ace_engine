@@ -37,6 +37,7 @@
 #include "core/components_ng/pattern/stack/stack_pattern.h"
 #include "core/components_ng/pattern/text/text_pattern.h"
 #include "core/components_ng/pattern/text_picker/textpicker_column_pattern.h"
+#include "adapter/ohos/entrance/picker/picker_haptic_interface.h"
 #include "core/components_ng/pattern/text_picker/textpicker_model_ng.h"
 #include "core/components_ng/pattern/text_picker/textpicker_event_hub.h"
 #include "core/components_ng/pattern/text_picker/textpicker_pattern.h"
@@ -1405,4 +1406,146 @@ HWTEST_F(TextPickerPatternTestNg, TextPickerPatternOnWindowSizeChanged003, TestS
     EXPECT_FALSE(columnNodes.empty());
 }
 
+/**
+ * @tc.name: LinearFontSizeVP001
+ * @tc.desc: Test TextPickerColumnPattern LinearFontSize with VP unit converted to PX
+ */
+HWTEST_F(TextPickerPatternTestNg, LinearFontSizeVP001, TestSize.Level1)
+{
+    InitTextPickerPatternTestNg();
+    ASSERT_NE(textPickerColumnPattern_, nullptr);
+    Dimension startFontSize(10.0, DimensionUnit::VP);
+    Dimension endFontSize(20.0, DimensionUnit::VP);
+    auto result = textPickerColumnPattern_->LinearFontSize(startFontSize, endFontSize, 0.5);
+    EXPECT_EQ(result.Unit(), DimensionUnit::PX);
+}
+
+/**
+ * @tc.name: LinearFontSizeFP001
+ * @tc.desc: Test TextPickerColumnPattern LinearFontSize with FP unit converted to PX
+ */
+HWTEST_F(TextPickerPatternTestNg, LinearFontSizeFP001, TestSize.Level1)
+{
+    InitTextPickerPatternTestNg();
+    ASSERT_NE(textPickerColumnPattern_, nullptr);
+    Dimension startFontSize(10.0, DimensionUnit::FP);
+    Dimension endFontSize(20.0, DimensionUnit::FP);
+    auto result = textPickerColumnPattern_->LinearFontSize(startFontSize, endFontSize, 0.5);
+    EXPECT_EQ(result.Unit(), DimensionUnit::PX);
+}
+
+class MockPickerAudioHaptic : public IPickerAudioHaptic {
+public:
+    void Play(size_t speed) {}
+    void PlayOnce() {}
+    void Stop() { stopCalled_ = true; }
+    void HandleDelta(double dy) {}
+    bool stopCalled_ = false;
+};
+
+/**
+ * @tc.name: TextPickerOnDetachFromMainTreeMultiThread001
+ * @tc.desc: Test OnDetachFromMainTreeMultiThread, PostTask to UI thread, callback unregistered.
+ */
+HWTEST_F(TextPickerPatternTestNg, TextPickerOnDetachFromMainTreeMultiThread001, TestSize.Level1)
+{
+    auto columnNode = FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG, 101,
+        AceType::MakeRefPtr<TextPickerColumnPattern>());
+    ASSERT_NE(columnNode, nullptr);
+    auto columnPattern = columnNode->GetPattern<TextPickerColumnPattern>();
+    ASSERT_NE(columnPattern, nullptr);
+
+    auto pipeline = columnNode->GetContext();
+    ASSERT_NE(pipeline, nullptr);
+    auto taskExecutor = AceType::MakeRefPtr<MockTaskExecutor>();
+    EXPECT_CALL(*taskExecutor, PostTask(_, _, _, _))
+        .Times(testing::AtLeast(0))
+        .WillRepeatedly([](std::function<void()>&& task, TaskExecutor::TaskType,
+                     const std::string&, PriorityType) -> bool {
+            if (task) { task(); }
+            return true;
+        });
+    pipeline->taskExecutor_ = taskExecutor;
+
+    auto mockHaptic = std::make_shared<MockPickerAudioHaptic>();
+    columnPattern->hapticController_ = mockHaptic;
+    columnPattern->RegisterWindowStateChangedCallback();
+    auto callbackCount = pipeline->onWindowStateChangedCallbacks_.size();
+    columnPattern->OnDetachFromMainTreeMultiThread();
+    EXPECT_TRUE(mockHaptic->stopCalled_);
+    EXPECT_EQ(pipeline->onWindowStateChangedCallbacks_.size(), callbackCount - 1);
+}
+
+/**
+ * @tc.name: TextPickerOnDetachFromMainTreeMultiThreadNoHaptic001
+ * @tc.desc: Test OnDetachFromMainTreeMultiThread when hapticController_ is null.
+ */
+HWTEST_F(TextPickerPatternTestNg, TextPickerOnDetachFromMainTreeMultiThreadNoHaptic001, TestSize.Level1)
+{
+    auto columnNode = FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG, 102,
+        AceType::MakeRefPtr<TextPickerColumnPattern>());
+    ASSERT_NE(columnNode, nullptr);
+    auto columnPattern = columnNode->GetPattern<TextPickerColumnPattern>();
+    ASSERT_NE(columnPattern, nullptr);
+
+    columnPattern->hapticController_ = nullptr;
+    columnPattern->OnDetachFromMainTreeMultiThread();
+    EXPECT_EQ(columnPattern->hapticController_, nullptr);
+}
+
+/**
+ * @tc.name: TextPickerOnDetachNullHost001
+ * @tc.desc: Test OnDetach when GetHost returns null.
+ */
+HWTEST_F(TextPickerPatternTestNg, TextPickerOnDetachNullHost001, TestSize.Level1)
+{
+    auto columnPattern = AceType::MakeRefPtr<TextPickerColumnPattern>();
+    ASSERT_NE(columnPattern, nullptr);
+    columnPattern->OnDetachFromMainTreeMultiThread();
+    EXPECT_EQ(columnPattern->hapticController_, nullptr);
+}
+
+/**
+ * @tc.name: TextPickerOnDetachNoPostTask001
+ * @tc.desc: Test OnDetach when PostTask not executed, hapticController_->Stop() not called.
+ */
+HWTEST_F(TextPickerPatternTestNg, TextPickerOnDetachNoPostTask001, TestSize.Level1)
+{
+    auto columnNode = FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG, 105,
+        AceType::MakeRefPtr<TextPickerColumnPattern>());
+    ASSERT_NE(columnNode, nullptr);
+    auto columnPattern = columnNode->GetPattern<TextPickerColumnPattern>();
+    ASSERT_NE(columnPattern, nullptr);
+
+    auto pipeline = columnNode->GetContext();
+    ASSERT_NE(pipeline, nullptr);
+    pipeline->taskExecutor_ = nullptr;
+
+    auto mockHaptic = std::make_shared<MockPickerAudioHaptic>();
+    columnPattern->hapticController_ = mockHaptic;
+    columnPattern->OnDetachFromMainTreeMultiThread();
+    EXPECT_FALSE(mockHaptic->stopCalled_);
+}
+
+/**
+ * @tc.name: GetShowCount001
+ * @tc.desc: Test GetShowCount returns correct value from theme
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextPickerPatternTestNg, GetShowCount001, TestSize.Level1)
+{
+    InitTextPickerPatternTestNg();
+    ASSERT_NE(textPickerPattern_, nullptr);
+
+    auto host = textPickerPattern_->GetHost();
+    ASSERT_NE(host, nullptr);
+    auto context = host->GetContext();
+    ASSERT_NE(context, nullptr);
+    auto pickerTheme = context->GetTheme<PickerTheme>(host->GetThemeScopeId());
+    ASSERT_NE(pickerTheme, nullptr);
+
+    constexpr int32_t BUFFER_NODE_NUMBER = 2;
+    uint32_t expected = BUFFER_NODE_NUMBER + pickerTheme->GetShowOptionCount();
+    EXPECT_EQ(textPickerPattern_->GetShowCount(), expected);
+}
 } // namespace OHOS::Ace::NG

@@ -1886,6 +1886,13 @@ void FormPattern::FireFormSurfaceDetachCallback()
 {
     TAG_LOGI(AceLogTag::ACE_FORM, "FireFormSurfaceDetachCallback isFrsNodeDetached:%{public}d", isFrsNodeDetached_);
     isFrsNodeDetached_ = true;
+    // Remove the stale frsNode so the next rebuild re-adds it when rendering falls back to this host.
+    CHECK_NULL_VOID(formTaskExecutor_);
+    formTaskExecutor_->PostUITask([weak = WeakClaim(this)] {
+        auto formPattern = weak.Upgrade();
+        CHECK_NULL_VOID(formPattern);
+        formPattern->RemoveFrsNode();
+        }, "ArkUIFormRemoveFrsNodeOnDetach");
 }
 
 void FormPattern::CreateCardContainer()

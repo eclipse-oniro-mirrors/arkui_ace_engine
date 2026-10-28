@@ -686,4 +686,270 @@ HWTEST_F(ScrollControllerTestNg, GetBindingFrameNodeId003, TestSize.Level1)
     auto baseController = AceType::MakeRefPtr<ScrollControllerBase>();
     EXPECT_EQ(baseController->GetBindingFrameNodeId(), -1);
 }
+/**
+ * @tc.name: GetScrollState001
+ * @tc.desc: Test GetScrollState returns IDLE by default
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollControllerTestNg, GetScrollState001, TestSize.Level1)
+{
+    CreateScroll();
+    CreateContent();
+    CreateScrollDone();
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::IDLE);
+}
+
+/**
+ * @tc.name: GetScrollState002
+ * @tc.desc: Test GetScrollState returns SCROLL when scrollSource is UPDATE
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollControllerTestNg, GetScrollState002, TestSize.Level1)
+{
+    CreateScroll();
+    CreateContent();
+    CreateScrollDone();
+    pattern_->SetScrollSource(SCROLL_FROM_UPDATE);
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::SCROLL);
+}
+
+/**
+ * @tc.name: GetScrollState003
+ * @tc.desc: Test GetScrollState returns FLING when scrollSource is ANIMATION
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollControllerTestNg, GetScrollState003, TestSize.Level1)
+{
+    CreateScroll();
+    CreateContent();
+    CreateScrollDone();
+    pattern_->SetScrollSource(SCROLL_FROM_ANIMATION);
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::FLING);
+}
+
+/**
+ * @tc.name: GetScrollState004
+ * @tc.desc: Test ScrollableController GetScrollState delegates to pattern
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollControllerTestNg, GetScrollState004, TestSize.Level1)
+{
+    auto controller = AceType::MakeRefPtr<ScrollableController>();
+    ASSERT_NE(controller, nullptr);
+    EXPECT_EQ(controller->GetScrollState(), ScrollState::IDLE);
+}
+
+/**
+ * @tc.name: GetScrollState005
+ * @tc.desc: Test ScrollControllerBase default GetScrollState returns IDLE
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollControllerTestNg, GetScrollState005, TestSize.Level1)
+{
+    auto baseController = AceType::MakeRefPtr<ScrollControllerBase>();
+    EXPECT_EQ(baseController->GetScrollState(), ScrollState::IDLE);
+}
+
+/**
+ * @tc.name: GetScrollState006
+ * @tc.desc: Test GetScrollState returns SCROLL for all event-driven scroll sources
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollControllerTestNg, GetScrollState006, TestSize.Level1)
+{
+    CreateScroll();
+    CreateContent();
+    CreateScrollDone();
+    const std::vector<int32_t> scrollSources = { SCROLL_FROM_UPDATE, SCROLL_FROM_AXIS, SCROLL_FROM_BAR,
+        SCROLL_FROM_CROWN, SCROLL_FROM_BAR_OVER_DRAG };
+    for (auto source : scrollSources) {
+        pattern_->SetScrollSource(source);
+        EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::SCROLL);
+    }
+}
+
+/**
+ * @tc.name: GetScrollState007
+ * @tc.desc: Test GetScrollState returns FLING for all animation-driven scroll sources
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollControllerTestNg, GetScrollState007, TestSize.Level1)
+{
+    CreateScroll();
+    CreateContent();
+    CreateScrollDone();
+    const std::vector<int32_t> animationSources = { SCROLL_FROM_ANIMATION, SCROLL_FROM_ANIMATION_SPRING,
+        SCROLL_FROM_ANIMATION_CONTROLLER, SCROLL_FROM_BAR_FLING };
+    for (auto source : animationSources) {
+        pattern_->SetScrollSource(source);
+        EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::FLING);
+    }
+}
+
+/**
+ * @tc.name: GetScrollState008
+ * @tc.desc: Test GetScrollState returns IDLE for non-scrolling sources and default scrollSource_
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollControllerTestNg, GetScrollState008, TestSize.Level1)
+{
+    CreateScroll();
+    CreateContent();
+    CreateScrollDone();
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::IDLE);
+    const std::vector<int32_t> idleSources = { SCROLL_FROM_NONE, SCROLL_FROM_JUMP, SCROLL_FROM_CHILD,
+        SCROLL_FROM_FOCUS_JUMP, SCROLL_FROM_ROTATE, SCROLL_FROM_INDEXER, SCROLL_FROM_START, SCROLL_FROM_STATUSBAR,
+        SCROLL_FROM_LAYOUT };
+    for (auto source : idleSources) {
+        pattern_->SetScrollSource(source);
+        EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::IDLE);
+    }
+}
+
+/**
+ * @tc.name: GetScrollState009
+ * @tc.desc: Test scrollSource_ persists across frames and switches with source changes
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollControllerTestNg, GetScrollState009, TestSize.Level1)
+{
+    CreateScroll();
+    CreateContent();
+    CreateScrollDone();
+    pattern_->SetScrollSource(SCROLL_FROM_UPDATE);
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::SCROLL);
+    pattern_->SetScrollSource(SCROLL_FROM_ANIMATION);
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::FLING);
+    pattern_->SetScrollSource(SCROLL_FROM_AXIS);
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::SCROLL);
+}
+
+/**
+ * @tc.name: GetScrollState010
+ * @tc.desc: Test FireOnScrollStop resets scroll state to IDLE
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollControllerTestNg, GetScrollState010, TestSize.Level1)
+{
+    CreateScroll();
+    CreateContent();
+    CreateScrollDone();
+    pattern_->SetScrollSource(SCROLL_FROM_UPDATE);
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::SCROLL);
+    pattern_->FireOnScrollStop([]() {}, []() {});
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::IDLE);
+}
+
+/**
+ * @tc.name: GetScrollState011
+ * @tc.desc: Test JUMP source maps to IDLE for query API
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollControllerTestNg, GetScrollState011, TestSize.Level1)
+{
+    CreateScroll();
+    CreateContent();
+    CreateScrollDone();
+    pattern_->SetScrollSource(SCROLL_FROM_JUMP);
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::IDLE);
+}
+
+/**
+ * @tc.name: GetScrollState012
+ * @tc.desc: Test layout-level reset affects GetScrollState only, GetScrollStateForQuery keeps session-level state
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollControllerTestNg, GetScrollState012, TestSize.Level1)
+{
+    CreateScroll();
+    CreateContent();
+    CreateScrollDone();
+    pattern_->SetScrollSource(SCROLL_FROM_UPDATE);
+    EXPECT_EQ(pattern_->GetScrollState(), ScrollState::SCROLL);
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::SCROLL);
+    /**
+     * @tc.steps: Layout reset touches only the frame-level source.
+     * @tc.expected: GetScrollState becomes IDLE while GetScrollStateForQuery stays SCROLL.
+     */
+    pattern_->SetScrollSourceLayout(SCROLL_FROM_NONE);
+    EXPECT_EQ(pattern_->GetScrollState(), ScrollState::IDLE);
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::SCROLL);
+}
+
+/**
+ * @tc.name: GetScrollState013
+ * @tc.desc: Test zero-delta nested delegation frame does not pollute query state
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollControllerTestNg, GetScrollState013, TestSize.Level1)
+{
+    CreateScroll();
+    CreateContent();
+    CreateScrollDone();
+    /**
+     * @tc.steps: step1. Simulate nested delegation: child hands a zero-delta UPDATE frame to parent.
+     * @tc.expected: Query state stays IDLE because no real scroll happened,
+     * while frame-level state keeps original behavior.
+     */
+    pattern_->HandleScroll(0.0f, SCROLL_FROM_UPDATE, NestedState::CHILD_SCROLL, 0.0f);
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::IDLE);
+    EXPECT_EQ(pattern_->GetScrollState(), ScrollState::SCROLL);
+}
+
+/**
+ * @tc.name: GetScrollState014
+ * @tc.desc: Test zero-delta frame preserves previous session-level query state
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollControllerTestNg, GetScrollState014, TestSize.Level1)
+{
+    CreateScroll();
+    CreateContent();
+    CreateScrollDone();
+    pattern_->SetScrollSource(SCROLL_FROM_UPDATE);
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::SCROLL);
+    /**
+     * @tc.steps: step1. A zero-delta delegation frame arrives during an active drag session.
+     * @tc.expected: Query state keeps SCROLL, neither polluted nor reset.
+     */
+    pattern_->HandleScroll(0.0f, SCROLL_FROM_UPDATE, NestedState::CHILD_SCROLL, 0.0f);
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::SCROLL);
+}
+
+/**
+ * @tc.name: GetScrollState015
+ * @tc.desc: Test zero-delta AXIS delegation frame does not pollute query state
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollControllerTestNg, GetScrollState015, TestSize.Level1)
+{
+    CreateScroll();
+    CreateContent();
+    CreateScrollDone();
+    /**
+     * @tc.steps: step1. Simulate a zero-delta AXIS frame delegated from child.
+     * @tc.expected: Query state stays IDLE.
+     */
+    pattern_->HandleScroll(0.0f, SCROLL_FROM_AXIS, NestedState::CHILD_SCROLL, 0.0f);
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::IDLE);
+}
+
+/**
+ * @tc.name: GetScrollState016
+ * @tc.desc: Test zero-delta CROWN delegation frame does not pollute query state
+ * @tc.type: FUNC
+ */
+HWTEST_F(ScrollControllerTestNg, GetScrollState016, TestSize.Level1)
+{
+    CreateScroll();
+    CreateContent();
+    CreateScrollDone();
+    /**
+     * @tc.steps: step1. Simulate a zero-delta CROWN frame delegated from child on wearables.
+     * @tc.expected: Query state stays IDLE, same as UPDATE/AXIS drag frames.
+     */
+    pattern_->HandleScroll(0.0f, SCROLL_FROM_CROWN, NestedState::CHILD_SCROLL, 0.0f);
+    EXPECT_EQ(pattern_->GetScrollStateForQuery(), ScrollState::IDLE);
+}
+
 } // namespace OHOS::Ace::NG

@@ -28,7 +28,7 @@
 #include "core/pipeline/pipeline_base.h"
 namespace OHOS::Ace::Framework {
 
-class JSSpanString : public virtual AceType {
+class JSSpanString : public AceType {
     DECLARE_ACE_TYPE(JSSpanString, AceType);
 
 public:

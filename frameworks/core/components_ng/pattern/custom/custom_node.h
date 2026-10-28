@@ -297,6 +297,11 @@ public:
     void DisableReleaseExpiringNode(const WeakPtr<LazyForEachNode>& node);
     bool ReleaseExpiringNode(std::string reuseId);
 private:
+    UINode* GetCustomNodeOwner() const override
+    {
+        return const_cast<CustomNode*>(this);
+    }
+
     // for DFX
     void DumpComponentInfo(std::unique_ptr<JsonValue>& componentInfo);
     void DumpDecoratorInfo(std::unique_ptr<JsonValue>& decoratorInfo);

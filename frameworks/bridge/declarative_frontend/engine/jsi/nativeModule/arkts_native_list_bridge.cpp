@@ -21,6 +21,7 @@
 #include "frameworks/bridge/declarative_frontend/jsview/js_view_abstract.h"
 #include "frameworks/bridge/declarative_frontend/engine/functions/js_drag_function.h"
 #include "frameworks/core/components/list/list_theme.h"
+#include "frameworks/core/components_ng/manager/scroll_placeholder/scroll_placeholder_types.h"
 #include "frameworks/core/components_ng/pattern/list/list_model.h"
 #include "frameworks/core/components_ng/pattern/list/list_model_ng.h"
 #include "frameworks/core/components_ng/pattern/scroll_bar/proxy/scroll_bar_proxy.h"
@@ -608,6 +609,84 @@ ArkUINativeModuleValue ListBridge::ResetListSyncLoad(ArkUIRuntimeCallInfo* runti
     Local<JSValueRef> firstArg = runtimeCallInfo->GetCallArgRef(LIST_ARG_INDEX_0);
     auto nativeNode = nodePtr(firstArg->ToNativePointer(vm)->Value());
     GetArkUINodeModifiers()->getListModifier()->resetListSyncLoad(nativeNode);
+    return panda::JSValueRef::Undefined(vm);
+}
+
+// Same provider contract as JSList::SetScrollPlaceholder: a non-function or
+// undefined argument clears the provider (capability off), a function is wrapped
+// into the synchronous northbound provider called while scrolling.
+ArkUINativeModuleValue ListBridge::SetListScrollPlaceholder(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> node = runtimeCallInfo->GetCallArgRef(LIST_ARG_INDEX_0);
+    Local<JSValueRef> providerArg = runtimeCallInfo->GetCallArgRef(LIST_ARG_INDEX_1);
+    CHECK_NULL_RETURN(node->IsNativePointer(vm), panda::JSValueRef::Undefined(vm));
+    auto nativeNode = nodePtr(node->ToNativePointer(vm)->Value());
+    auto frameNode = reinterpret_cast<FrameNode*>(nativeNode);
+    CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
+    if (!providerArg->IsFunction(vm)) {
+        ListModelNG::SetScrollPlaceholder(frameNode, nullptr);
+        return panda::JSValueRef::Undefined(vm);
+    }
+    panda::Local<panda::FunctionRef> providerFuncLocal = providerArg->ToObject(vm);
+    auto providerFunc = panda::CopyableGlobal(vm, providerFuncLocal);
+    ScrollPlaceholderProvider provider =
+        [vm, providerFunc = std::move(providerFunc)](int32_t index) -> std::optional<ScrollPlaceholderOptions> {
+        panda::LocalScope localScope(vm);
+        panda::TryCatch tryCatch(vm);
+        panda::Local<panda::JSValueRef> params[1] = { panda::IntegerRef::New(vm, index) };
+        auto result = providerFunc->Call(vm, providerFunc.ToLocal(), params, 1);
+        if (tryCatch.HasCaught() || !result->IsObject(vm)) {
+            // A throwing provider is treated like "no placeholder for this item":
+            // the scroll path must stay a pure calculation without error fences.
+            return std::nullopt;
+        }
+        auto obj = result->ToObject(vm);
+        ScrollPlaceholderOptions options;
+        auto id = obj->Get(vm, panda::StringRef::NewFromUtf8(vm, "id"));
+        if (id->IsString(vm)) {
+            options.id = id->ToString(vm)->ToString(vm);
+        }
+        auto size = obj->Get(vm, panda::StringRef::NewFromUtf8(vm, "size"));
+        if (size->IsObject(vm)) {
+            auto sizeObj = size->ToObject(vm);
+            ScrollPlaceholderSizeOption sizeOption;
+            auto width = sizeObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "width"));
+            if (width->IsNumber()) {
+                sizeOption.width =
+                    Dimension(static_cast<float>(width->ToNumber(vm)->Value()), DimensionUnit::VP);
+            } else if (width->IsString(vm)) {
+                // Bare numbers mean vp; suffixed strings ("100%", "10px") keep their unit.
+                sizeOption.width =
+                    StringUtils::StringToDimension(width->ToString(vm)->ToString(vm), true);
+            }
+            auto height = sizeObj->Get(vm, panda::StringRef::NewFromUtf8(vm, "height"));
+            if (height->IsNumber()) {
+                sizeOption.height =
+                    Dimension(static_cast<float>(height->ToNumber(vm)->Value()), DimensionUnit::VP);
+            } else if (height->IsString(vm)) {
+                sizeOption.height =
+                    StringUtils::StringToDimension(height->ToString(vm)->ToString(vm), true);
+            }
+            options.size = sizeOption;
+        }
+        return options;
+    };
+    ListModelNG::SetScrollPlaceholder(frameNode, std::move(provider));
+    return panda::JSValueRef::Undefined(vm);
+}
+
+ArkUINativeModuleValue ListBridge::ResetListScrollPlaceholder(ArkUIRuntimeCallInfo* runtimeCallInfo)
+{
+    EcmaVM* vm = runtimeCallInfo->GetVM();
+    CHECK_NULL_RETURN(vm, panda::JSValueRef::Undefined(vm));
+    Local<JSValueRef> node = runtimeCallInfo->GetCallArgRef(LIST_ARG_INDEX_0);
+    CHECK_NULL_RETURN(node->IsNativePointer(vm), panda::JSValueRef::Undefined(vm));
+    auto nativeNode = nodePtr(node->ToNativePointer(vm)->Value());
+    auto frameNode = reinterpret_cast<FrameNode*>(nativeNode);
+    CHECK_NULL_RETURN(frameNode, panda::JSValueRef::Undefined(vm));
+    ListModelNG::SetScrollPlaceholder(frameNode, nullptr);
     return panda::JSValueRef::Undefined(vm);
 }
 

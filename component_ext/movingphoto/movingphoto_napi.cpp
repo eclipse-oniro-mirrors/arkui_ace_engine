@@ -15,6 +15,7 @@
 
 #include "movingphoto_napi.h"
 
+#include "base/utils/napi_scope_raii.h"
 #include "ext_napi_utils.h"
 #include "movingphoto_model_ng.h"
 
@@ -179,6 +180,7 @@ napi_value JsOnComplete(napi_env env, napi_callback_info info)
     }
     auto asyncEvent = std::make_shared<NapiAsyncEvent>(env, argv[0]);
     auto onComplete = [asyncEvent]() {
+        ScopeRAII scope(asyncEvent->GetEnv());
         asyncEvent->Call(0, nullptr);
     };
     NG::MovingPhotoModelNG::GetInstance()->SetOnComplete(std::move(onComplete));
@@ -197,6 +199,7 @@ napi_value JsOnStart(napi_env env, napi_callback_info info)
     }
     auto asyncEvent = std::make_shared<NapiAsyncEvent>(env, argv[0]);
     auto onStart = [asyncEvent]() {
+        ScopeRAII scope(asyncEvent->GetEnv());
         asyncEvent->Call(0, nullptr);
     };
     NG::MovingPhotoModelNG::GetInstance()->SetOnStart(std::move(onStart));
@@ -215,6 +218,7 @@ napi_value JsOnStop(napi_env env, napi_callback_info info)
     }
     auto asyncEvent = std::make_shared<NapiAsyncEvent>(env, argv[0]);
     auto onStop = [asyncEvent]() {
+        ScopeRAII scope(asyncEvent->GetEnv());
         asyncEvent->Call(0, nullptr);
     };
     NG::MovingPhotoModelNG::GetInstance()->SetOnStop(std::move(onStop));
@@ -233,6 +237,7 @@ napi_value JsOnPause(napi_env env, napi_callback_info info)
     }
     auto asyncEvent = std::make_shared<NapiAsyncEvent>(env, argv[0]);
     auto onPause = [asyncEvent]() {
+        ScopeRAII scope(asyncEvent->GetEnv());
         asyncEvent->Call(0, nullptr);
     };
     NG::MovingPhotoModelNG::GetInstance()->SetOnPause(std::move(onPause));
@@ -251,6 +256,7 @@ napi_value JsOnFinish(napi_env env, napi_callback_info info)
     }
     auto asyncEvent = std::make_shared<NapiAsyncEvent>(env, argv[0]);
     auto onFinish = [asyncEvent]() {
+        ScopeRAII scope(asyncEvent->GetEnv());
         asyncEvent->Call(0, nullptr);
     };
     NG::MovingPhotoModelNG::GetInstance()->SetOnFinish(std::move(onFinish));
@@ -269,6 +275,7 @@ napi_value JsOnError(napi_env env, napi_callback_info info)
     }
     auto asyncEvent = std::make_shared<NapiAsyncEvent>(env, argv[0]);
     auto onError = [asyncEvent]() {
+        ScopeRAII scope(asyncEvent->GetEnv());
         asyncEvent->Call(0, nullptr);
     };
     NG::MovingPhotoModelNG::GetInstance()->SetOnError(std::move(onError));
@@ -287,6 +294,7 @@ napi_value JsOnPrepared(napi_env env, napi_callback_info info)
     }
     auto asyncEvent = std::make_shared<NapiAsyncEvent>(env, argv[0]);
     auto onPrepared = [asyncEvent]() {
+        ScopeRAII scope(asyncEvent->GetEnv());
         asyncEvent->Call(0, nullptr);
     };
     NG::MovingPhotoModelNG::GetInstance()->SetOnPrepared(std::move(onPrepared));

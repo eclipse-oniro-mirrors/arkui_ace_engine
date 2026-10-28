@@ -127,7 +127,9 @@ void TabsNode::SidebarInfoToJsonValue(std::unique_ptr<JsonValue>& json, const In
     // barStyle
     auto barLayoutStyle = layoutProperty->GetBarLayoutStyleValue(TabBarLayoutStyle::BOTTOM);
     std::string barStyleStr = "TabBarStyle.BOTTOM";
-    if (barLayoutStyle == TabBarLayoutStyle::SIDEBAR) {
+    if (barLayoutStyle == TabBarLayoutStyle::TOP) {
+        barStyleStr = "TabBarStyle.TOP";
+    } else if (barLayoutStyle == TabBarLayoutStyle::SIDEBAR) {
         barStyleStr = "TabBarStyle.SIDEBAR";
     } else if (barLayoutStyle == TabBarLayoutStyle::SIDEBAR_ADAPTABLE) {
         barStyleStr = "TabBarStyle.SIDEBAR_ADAPTABLE";
@@ -138,6 +140,10 @@ void TabsNode::SidebarInfoToJsonValue(std::unique_ptr<JsonValue>& json, const In
     auto sidebarPosition = layoutProperty->GetSidebarPositionValue(BarPosition::START);
     json->PutExtAttr("sidebarPosition",
         sidebarPosition == BarPosition::START ? "BarPosition.Start" : "BarPosition.End", filter);
+
+    // showSidebarControlButton
+    json->PutExtAttr("showSidebarControlButton",
+        tabsPattern->GetShowSidebarControlButton() ? "true" : "false", filter);
 
     // sidebarHeader
     json->PutExtAttr("sidebarHeader", tabsPattern->GetSidebarHeaderNode() ? "hasHeader" : "noHeader", filter);
@@ -160,7 +166,13 @@ void TabsNode::SidebarInfoToJsonValue(std::unique_ptr<JsonValue>& json, const In
     if (!breakpoint.isNull) {
         auto breakpointJson = JsonUtil::Create(true);
         auto displayModeStr = [](TabBarDisplayMode mode) -> std::string {
-            return mode == TabBarDisplayMode::SIDEBAR ? "TabBarDisplayMode.SIDEBAR" : "TabBarDisplayMode.BOTTOM_TABBAR";
+            if (mode == TabBarDisplayMode::SIDEBAR) {
+                return "TabBarDisplayMode.SIDEBAR";
+            }
+            if (mode == TabBarDisplayMode::TOP_TABBAR) {
+                return "TabBarDisplayMode.TOP_TABBAR";
+            }
+            return "TabBarDisplayMode.BOTTOM_TABBAR";
         };
         breakpointJson->Put("sm", displayModeStr(breakpoint.sm).c_str());
         breakpointJson->Put("md", displayModeStr(breakpoint.md).c_str());

@@ -88,7 +88,8 @@ enum class ComponentExcepType {
 enum class ComponentExcepTypeNG {
     RELATIVE_CONTAINER_LOOP_ERR = 0,
     TEXT_DRAW_CMD_LIST_ERR,
-    SAFE_AREA_TYPE_NODE_ERR
+    SAFE_AREA_TYPE_NODE_ERR,
+    MENU_INVALID_MAX_WIDTH_ERR
 };
 
 // EXCEPTION_API_CHANNEL

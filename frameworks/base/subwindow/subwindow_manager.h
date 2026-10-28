@@ -91,7 +91,7 @@ public:
     int32_t GetSubContainerId(int32_t parentContainerId);
     const std::vector<int32_t> GetAllSubContainerId(int32_t parentContainerId);
 
-    void AddSubwindow(int32_t instanceId, RefPtr<Subwindow>);
+    bool AddSubwindow(int32_t instanceId, RefPtr<Subwindow>);
     void RemoveSubwindow(int32_t instanceId, SubwindowType windowType);
 
     // Get the subwindow of parent instance, return the window or nullptr.
@@ -163,7 +163,7 @@ public:
     ACE_FORCE_EXPORT void HideDialogSubWindow(int32_t instanceId);
     ACE_FORCE_EXPORT void SetHotAreas(
         const std::vector<Rect>& rects, SubwindowType type, int32_t nodeId = -1, int32_t instanceId = -1);
-    void AddDialogSubwindow(int32_t instanceId, const RefPtr<Subwindow>& subwindow);
+    bool AddDialogSubwindow(int32_t instanceId, const RefPtr<Subwindow>& subwindow);
     // Get the dialog subwindow of instance, return the window or nullptr.
     int32_t GetDialogSubwindowInstanceId(int32_t SubwindowId);
     const RefPtr<Subwindow> GetDialogSubwindow(int32_t instanceId);
@@ -177,7 +177,7 @@ public:
         const int32_t toastId, const NG::ToastShowMode& showMode, std::function<void(int32_t)>&& callback);
     void ShowToastNG(const NG::ToastInfo& toastInfo, std::function<void(int32_t)>&& callback);
     const RefPtr<Subwindow> GetToastSubwindow(int32_t instanceId);
-    void AddToastSubwindow(int32_t instanceId, RefPtr<Subwindow> subwindow);
+    bool AddToastSubwindow(int32_t instanceId, RefPtr<Subwindow> subwindow);
     void HideSubWindowNG(int32_t instanceId);
     ToastWindowType GetToastWindowType(int32_t instanceId);
     ACE_FORCE_EXPORT void ShowDialog(const std::string& title, const std::string& message,
@@ -197,7 +197,7 @@ public:
     void OnWindowSizeChanged(int32_t containerId, Rect windowRect, WindowSizeChangeReason reason);
     void HideSystemTopMostWindow();
     const RefPtr<Subwindow> GetSystemToastWindow(int32_t instanceId);
-    void AddSystemToastWindow(int32_t instanceId, RefPtr<Subwindow> subwindow);
+    bool AddSystemToastWindow(int32_t instanceId, RefPtr<Subwindow> subwindow);
     void ClearToastInSystemSubwindow();
     ACE_FORCE_EXPORT bool IsSubwindowExist(RefPtr<Subwindow> subwindow);
     bool IsFreeMultiWindow(int32_t instanceId) const;
@@ -249,7 +249,7 @@ public:
     ACE_FORCE_EXPORT bool GetIsExpandDisplay();
     ACE_FORCE_EXPORT const RefPtr<Subwindow> GetSubwindowByType(
         int32_t instanceId, SubwindowType windowType, int32_t nodeId = -1);
-    void AddSubwindow(int32_t instanceId, SubwindowType windowType, RefPtr<Subwindow> subwindow, int32_t nodeId = -1);
+    bool AddSubwindow(int32_t instanceId, SubwindowType windowType, RefPtr<Subwindow> subwindow, int32_t nodeId = -1);
     const std::vector<RefPtr<Subwindow>> GetSortSubwindow(int32_t instanceId);
     ACE_FORCE_EXPORT void RemoveSubwindowByNodeId(const int32_t nodeId);
     ACE_FORCE_EXPORT void SetWindowAnchorInfo(
@@ -285,7 +285,7 @@ private:
     RefPtr<Subwindow> GetSubwindowBySearchKey(const SubwindowKey& searchKey);
     RefPtr<Subwindow> CheckSubwindowDisplayId(const SubwindowKey& searchKey, const RefPtr<Subwindow>& subwindow);
     void RemoveSubwindowBySearchKey(const SubwindowKey& searchKey);
-    void AddSubwindowBySearchKey(const SubwindowKey& searchKey, const RefPtr<Subwindow>& subwindow);
+    bool AddSubwindowBySearchKey(const SubwindowKey& searchKey, const RefPtr<Subwindow>& subwindow);
     RefPtr<Subwindow> RemoveSubwindowMapByNodeId(const int32_t nodeId);
     const std::vector<RefPtr<Subwindow>> RemoveSubwindowMapByInstanceId(const int32_t instanceId);
     const std::vector<RefPtr<Subwindow>> GetAllSubWindow();

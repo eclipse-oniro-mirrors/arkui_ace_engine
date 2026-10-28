@@ -17,6 +17,8 @@
 
 #include "core/components_ng/pattern/tabs/tab_content_model_ng.h"
 #include "core/components_ng/pattern/tabs/tabs_layout_property.h"
+#include "core/components_ng/pattern/tabs/tabs_side_bar_pattern.h"
+#include "core/components_ng/pattern/tabs/tabs_side_bar_tab_list_pattern.h"
 
 namespace OHOS::Ace::NG {
 
@@ -54,8 +56,8 @@ void TabContentPattern::OnModifyDone()
     auto tabsPattern = tabsNode->GetPattern<TabsPattern>();
     CHECK_NULL_VOID(tabsPattern);
     auto activeDisplayMode = tabsPattern->GetActiveBarDisplayMode();
-    bool shouldHide = tabsPattern->IsTabShouldHideByVisibility(defaultVisibility);
-    if (activeDisplayMode == TabBarDisplayMode::BOTTOMTABBAR) {
+    bool shouldHide = defaultVisibility.ShouldHide(activeDisplayMode);
+    if (activeDisplayMode == TabBarDisplayMode::BOTTOMTABBAR || activeDisplayMode == TabBarDisplayMode::TOP_TABBAR) {
         // Bottom tab bar is currently visible — update this tab's columnNode directly
         if (!tabContentNode->HasTabBarItemId()) {
             return;
@@ -79,9 +81,52 @@ void TabContentPattern::OnModifyDone()
     CHECK_NULL_VOID(tabItemNode);
     auto property = tabItemNode->GetLayoutProperty();
     CHECK_NULL_VOID(property);
+    do {
+        if (shouldHide) {
+            break;
+        }
+        // defaultVisibility says visible — but if a search filter is active, the tab
+        // may still need to be hidden by the search criteria.
+        auto sideBarNode = tabsPattern->GetSideBarNode();
+        CHECK_NULL_BREAK(sideBarNode);
+        auto sidebarPattern = sideBarNode->GetPattern<TabsSideBarPattern>();
+        CHECK_NULL_BREAK(sidebarPattern);
+        auto tabListNode = sidebarPattern->GetTabListNode();
+        CHECK_NULL_BREAK(tabListNode);
+        auto tabListPattern = tabListNode->GetPattern<TabsSideBarTabListPattern>();
+        CHECK_NULL_BREAK(tabListPattern);
+        auto swiperNode = AceType::DynamicCast<FrameNode>(tabsNode->GetTabs());
+        CHECK_NULL_BREAK(swiperNode);
+        int32_t tabIndex = swiperNode->GetChildIndex(tabContentNode);
+        shouldHide = tabListPattern->IsHiddenBySearchFilter(tabIndex);
+    } while (false);
     property->UpdateVisibility(shouldHide ? VisibleType::GONE : VisibleType::VISIBLE);
     tabItemNode->MarkNeedSyncRenderTree();
     tabItemNode->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
+}
+
+void TabContentPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json)
+{
+    TabContentPattern::DumpAdvanceInfo(json, ParamConfig());
+}
+
+void TabContentPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    if (!config.IsPublicTree() || config.visualProperties) {
+        switch (selectedMode_) {
+            case SelectedMode::INDICATOR: {
+                json->Put("SelectedMode", "INDICATOR");
+                break;
+            }
+            case SelectedMode::BOARD: {
+                json->Put("SelectedMode", "BOARD");
+                break;
+            }
+            default: {
+                break;
+            }
+        }
+    }
 }
 
 } // namespace OHOS::Ace::NG

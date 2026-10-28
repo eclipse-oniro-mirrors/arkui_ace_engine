@@ -16,8 +16,8 @@
 #include "gtest/gtest.h"
 #include "tabs_test_ng.h"
 #include "test/mock/adapter/ohos/osal/mock_system_properties.h"
-#include "test/mock/core/common/mock_theme_manager.h"
-#include "test/mock/core/pipeline/mock_pipeline_context.h"
+#include "test/mock/frameworks/core/common/mock_theme_manager.h"
+#include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
 
 #include "core/components/dialog/dialog_theme.h"
 #include "core/components/tab_bar/tab_theme.h"
@@ -26,6 +26,11 @@
 #include "core/components_ng/pattern/image/image_pattern.h"
 #include "core/components_ng/pattern/linear_layout/linear_layout_pattern.h"
 #include "core/components_ng/pattern/linear_layout/linear_layout_property.h"
+#include "core/components_ng/pattern/swiper/swiper_pattern.h"
+#include "core/components_ng/pattern/tabs/tab_content_model_ng.h"
+#include "core/components_ng/pattern/tabs/tab_content_pattern.h"
+#include "core/components_ng/pattern/tabs/tabs_declaration.h"
+#include "core/components_ng/syntax/shallow_builder.h"
 #include "core/components_ng/pattern/tabs/tabs_layout_property.h"
 #include "core/components_ng/pattern/tabs/tabs_model_ng.h"
 #include "core/components_ng/pattern/tabs/tabs_node.h"
@@ -125,6 +130,41 @@ std::optional<CalcLength> GetTextNodeMarginTop(const RefPtr<FrameNode>& textNode
     }
     return margin->top;
 }
+
+// Build a minimal TabsNode with a swiper containing tabContentCount TabContentNodes.
+// Each TabContentPattern gets the provided defaultVisibility.
+// Returns the TabsNode and the tab list pattern wired to it.
+struct SideBarVisibilityTestTree {
+    RefPtr<TabsNode> tabsNode;
+    RefPtr<FrameNode> swiperNode;
+    RefPtr<TabsSideBarTabListPattern> tabListPattern;
+
+    void Build(int32_t tabContentCount, const std::vector<TabContentDefaultVisibility>& visibilities)
+    {
+        auto nodeId = ElementRegister::GetInstance()->MakeUniqueId();
+        tabsNode = AceType::MakeRefPtr<TabsNode>(
+            V2::TABS_ETS_TAG, nodeId, AceType::MakeRefPtr<TabsPattern>(), false);
+        tabsNode->InitializePatternAndContext();
+        ElementRegister::GetInstance()->AddUINode(tabsNode);
+
+        swiperNode = FrameNode::GetOrCreateFrameNode(
+            V2::SWIPER_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+            []() { return AceType::MakeRefPtr<SwiperPattern>(); });
+        swiperNode->MountToParent(tabsNode);
+
+        for (int32_t i = 0; i < tabContentCount && i < static_cast<int32_t>(visibilities.size()); ++i) {
+            auto shallowBuilder = AceType::MakeRefPtr<ShallowBuilder>(nullptr);
+            auto tabContentNode = FrameNode::CreateFrameNode(
+                V2::TAB_CONTENT_ITEM_ETS_TAG, ElementRegister::GetInstance()->MakeUniqueId(),
+                AceType::MakeRefPtr<TabContentPattern>(shallowBuilder));
+            tabContentNode->GetPattern<TabContentPattern>()->SetDefaultVisibility(visibilities[i]);
+            tabContentNode->MountToParent(swiperNode);
+        }
+
+        tabListPattern = AceType::MakeRefPtr<TabsSideBarTabListPattern>();
+        tabListPattern->SetTabsNode(tabsNode);
+    }
+};
 } // namespace
 
 class TabsSideBarTabListTestNg : public TabsTestNg {
@@ -341,4 +381,72 @@ HWTEST_F(TabsSideBarTabListTestNg, InitCurrentIndexSequential001, TestSize.Level
     EXPECT_EQ(pattern->GetCurrentIndex(), 3);
 }
 
+/**
+ * @tc.name: IsHiddenByDefaultVisibility001
+ * @tc.desc: Test IsHiddenByDefaultVisibility returns true when tab is HIDDEN in SIDEBAR mode
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsSideBarTabListTestNg, IsHiddenByDefaultVisibility001, TestSize.Level1)
+{
+    SideBarVisibilityTestTree tree;
+    TabContentDefaultVisibility hiddenInSidebar;
+    hiddenInSidebar.isNull = false;
+    hiddenInSidebar.visibility = TabVisibility::HIDDEN;
+    hiddenInSidebar.displayMode = TabBarDisplayMode::SIDEBAR;
+    tree.Build(1, { hiddenInSidebar });
+    ASSERT_NE(tree.tabListPattern, nullptr);
+
+    EXPECT_TRUE(tree.tabListPattern->IsHiddenByDefaultVisibility(0));
+}
+
+/**
+ * @tc.name: IsHiddenByDefaultVisibility002
+ * @tc.desc: Test IsHiddenByDefaultVisibility returns false when tab is HIDDEN in BOTTOMTABBAR but active is SIDEBAR
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsSideBarTabListTestNg, IsHiddenByDefaultVisibility002, TestSize.Level1)
+{
+    SideBarVisibilityTestTree tree;
+    TabContentDefaultVisibility hiddenInBottom;
+    hiddenInBottom.isNull = false;
+    hiddenInBottom.visibility = TabVisibility::HIDDEN;
+    hiddenInBottom.displayMode = TabBarDisplayMode::BOTTOMTABBAR;
+    tree.Build(1, { hiddenInBottom });
+    ASSERT_NE(tree.tabListPattern, nullptr);
+
+    EXPECT_FALSE(tree.tabListPattern->IsHiddenByDefaultVisibility(0));
+}
+
+/**
+ * @tc.name: IsHiddenByDefaultVisibility003
+ * @tc.desc: Test IsHiddenByDefaultVisibility returns false when tab is VISIBLE
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsSideBarTabListTestNg, IsHiddenByDefaultVisibility003, TestSize.Level1)
+{
+    SideBarVisibilityTestTree tree;
+    TabContentDefaultVisibility visible;
+    visible.isNull = false;
+    visible.visibility = TabVisibility::VISIBLE;
+    tree.Build(1, { visible });
+    ASSERT_NE(tree.tabListPattern, nullptr);
+
+    EXPECT_FALSE(tree.tabListPattern->IsHiddenByDefaultVisibility(0));
+}
+
+/**
+ * @tc.name: IsHiddenByDefaultVisibility004
+ * @tc.desc: Test IsHiddenByDefaultVisibility returns false for out-of-range tabIndex
+ * @tc.type: FUNC
+ */
+HWTEST_F(TabsSideBarTabListTestNg, IsHiddenByDefaultVisibility004, TestSize.Level1)
+{
+    SideBarVisibilityTestTree tree;
+    TabContentDefaultVisibility vis;
+    vis.isNull = true;
+    tree.Build(1, { vis });
+    ASSERT_NE(tree.tabListPattern, nullptr);
+
+    EXPECT_FALSE(tree.tabListPattern->IsHiddenByDefaultVisibility(5));
+}
 } // namespace OHOS::Ace::NG

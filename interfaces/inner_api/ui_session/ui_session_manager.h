@@ -43,6 +43,10 @@ class PixelMap;
 } // namespace Media
 } // namespace OHOS
 namespace OHOS::Ace {
+struct ComponentTreeQueryRequest;
+class TaskExecutor;
+template<typename T>
+class WeakPtr;
 class ACE_FORCE_EXPORT UiSessionManager {
 public:
     using InspectorFunction = std::function<void(bool onlyNeedVisible, ParamConfig config)>;
@@ -51,6 +55,11 @@ public:
     using NotifySendCommandFunction = std::function<void(int32_t id, const std::string& command)>;
     using NotifySendCommandSyncFunction = std::function<int32_t(int32_t id, const std::string& command)>;
     using SendCommandFunction = std::function<void(int32_t value)>;
+    using CommandResultCallback = std::function<void(const std::string& resultJson)>;
+    using NotifySendCommandWithResultFunction =
+        std::function<void(int32_t id, const std::string& command, const CommandResultCallback& finishCallback)>;
+    using SendCommandWithResultFunction =
+        std::function<void(const std::string& command, const CommandResultCallback& finishCallback)>;
     using RelaxedCommandFunction = std::function<void(const std::string& command)>;
     using ExeAppAIFunctionFunction = std::function<std::pair<uint32_t, std::string>(
         const std::string&, const std::string&, const sptr<IRemoteObject>&, int32_t)>;
@@ -67,6 +76,7 @@ public:
     using PageTranslateResetFunction = std::function<void(int32_t)>;
     using PageTranslateResultFunction = std::function<void(const std::vector<TranslateResult>&)>;
     using PageSceneDetectFunction = std::function<void(int32_t, const std::string&, bool)>;
+    using ComponentTreeQueryFunction = std::function<void(const ComponentTreeQueryRequest&)>;
 
     enum class WebPageSceneOp {
         RegisterRules,    // Register rules + match for reportOnRegister
@@ -87,6 +97,8 @@ public:
      * @return The return value is ui_manager singleton
      */
     static UiSessionManager* GetInstance();
+    void RegisterNodeCommandWithResultCallback(const WeakPtr<TaskExecutor>& taskExecutor);
+    void RegisterSendCommandWithResultCallback(const WeakPtr<TaskExecutor>& taskExecutor);
 
     /**
      * @description: execute click callback when component click event occurs
@@ -313,12 +325,47 @@ public:
     virtual void NotifyPageSceneNodeChanged(const std::string& nodeTag, bool isAttach) {};
     virtual void NotifyPageSceneContentChanged() {};
     virtual void FlushPageSceneNodeChanged() {};
+    // Request a coalesced click-only flush. The registered UI callback checks
+    // content stability at consumption time and preserves pending input on a miss.
+    virtual void FlushPendingSearchClicksIfStable()
+    {
+        std::function<void()> flush;
+        {
+            std::lock_guard<std::mutex> lock(searchClickFlushMutex_);
+            flush = searchClickFlushFunction_;
+        }
+        if (flush) {
+            flush();
+        }
+    };
     virtual void SavePageSceneDetectFunction(PageSceneDetectFunction&& function) {};
     virtual void SaveWebPageSceneFunction(WebPageSceneFunction&& function) {};
+    virtual bool IsSearchPageSceneRuleCurrent(
+        int32_t processId, const std::string& ruleSetId, const std::string& generation) { return false; }
     // Internal PageScene scheduling hook. Keep it at the end of the virtual interface to preserve
     // the slot order of the existing UiSessionManager methods.
     virtual void NotifyPageSceneNodeStateChanged(
         const std::string& nodeTag, PageSceneNodeStateChange stateChange) {};
+    virtual void SaveComponentTreeQueryFunction(ComponentTreeQueryFunction&& function) {};
+    virtual void ComponentTreeQuery(const ComponentTreeQueryRequest& request) {};
+    virtual void ReportNavigationQueryResult(const std::string& data) {};
+    virtual void ReportLazyForEachQueryResult(const std::string& data) {};
+    virtual void ReportNodesInRectQueryResult(const std::string& data) {};
+
+    virtual void SaveForSendCommandWithResultFunction(NotifySendCommandWithResultFunction&& function) {};
+    virtual void NotifySendCommandPatternWithResult(
+        int32_t id, const std::string& command, const CommandResultCallback& finishCallback) {};
+    virtual void SaveSendCommandWithResultFunction(SendCommandWithResultFunction&& function) {};
+    virtual void SendCommandWithResult(
+        const std::string& command, const CommandResultCallback& finishCallback) {};
+    virtual CommandResultCallback MakeCommandResultCallback(int32_t processId, uint64_t requestId) { return {}; }
+
+    // Internal callback, separate from full page-scene detection and its queues.
+    void SaveSearchClickFlushFunction(std::function<void()>&& function)
+    {
+        std::lock_guard<std::mutex> lock(searchClickFlushMutex_);
+        searchClickFlushFunction_ = std::move(function);
+    }
 
 protected:
     UiSessionManager() = default;
@@ -395,6 +442,14 @@ protected:
     std::mutex pageSceneDetectFunctionMutex_;
     WebPageSceneFunction webPageSceneFunction_;
     std::mutex webPageSceneMutex_;
+    ComponentTreeQueryFunction componentTreeQueryFunction_;
+    std::mutex componentTreeQueryFunctionMutex_;
+    NotifySendCommandWithResultFunction notifySendCommandWithResultFunction_;
+    std::mutex notifySendCommandWithResultFunctionMutex_;
+    SendCommandWithResultFunction sendCommandWithResultFunction_;
+    std::mutex sendCommandWithResultFunctionMutex_;
+    std::function<void()> searchClickFlushFunction_;
+    std::mutex searchClickFlushMutex_;
 };
 } // namespace OHOS::Ace
 #endif // FOUNDATION_ACE_INTERFACE_UI_SESSION_MANAGER_H

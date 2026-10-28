@@ -29,6 +29,7 @@ public:
     static void SetColumnsTemplate(FrameNode* frameNode, const std::optional<std::string>& value);
     static void SetRowsTemplate(FrameNode* frameNode, const std::optional<std::string>& value);
     static void SetScrollEnabled(FrameNode* frameNode, bool scrollEnabled);
+    static void SetScrollSnapStrategy(FrameNode* frameNode, const std::optional<ScrollSnapStrategy>& strategy);
     static void SetColumnsGap(FrameNode* frameNode, const std::optional<Dimension>& value);
     static void SetRowsGap(FrameNode* frameNode, const std::optional<Dimension>& value);
     static void SetItemMinWidth(FrameNode* frameNode, const std::optional<CalcLength>& minWidth);

@@ -37,6 +37,12 @@ if (use_mac) {
 
 common_bin = [
   {
+    label = "//third_party/zlib:shared_libz"
+    subsystem_name = "thirdparty"
+    part_name = "zlib"
+    lib_names = [ "shared_libz" ]
+  },
+  {
     label = "//third_party/curl:curl_shared"
     subsystem_name = "thirdparty"
     part_name = "curl"
@@ -1035,6 +1041,86 @@ if (defined(use_rosen_drawing) && use_rosen_drawing) {
   ]
 }
 
+if (use_linux) {
+  common_bin += [
+    {
+      label =
+          "//foundation/window/window_manager/previewer:previewer_window_napi"
+      subsystem_name = "window"
+      part_name = "window_manager"
+      lib_names = [ "previewer_window_napi" ]
+    },
+    {
+      label = "//base/hiviewdfx/hilog/interfaces/native/innerkits:libhilog"
+      subsystem_name = "hiviewdfx"
+      part_name = "hilog"
+      lib_names = [ "hilog" ]
+    },
+    {
+      label = "//third_party/cares:c_ares"
+      subsystem_name = "thirdparty"
+      part_name = "cares"
+      lib_names = [ "c_ares" ]
+    },
+    {
+      label = "//third_party/brotli:brotli_shared"
+      subsystem_name = "thirdparty"
+      part_name = "brotli"
+      lib_names = [ "brotli_shared" ]
+    },
+    {
+      label = "//third_party/openhitls:openhitls_bsl"
+      subsystem_name = "thirdparty"
+      part_name = "openhitls"
+      lib_names = [ "openhitls_bsl" ]
+    },
+    {
+      label = "//third_party/openhitls:openhitls_crypto"
+      subsystem_name = "thirdparty"
+      part_name = "openhitls"
+      lib_names = [ "openhitls_crypto" ]
+    },
+    {
+      label = "//third_party/openhitls:openhitls_pki"
+      subsystem_name = "thirdparty"
+      part_name = "openhitls"
+      lib_names = [ "openhitls_pki" ]
+    },
+    {
+      label = "//third_party/openhitls:openhitls_tls"
+      subsystem_name = "thirdparty"
+      part_name = "openhitls"
+      lib_names = [ "openhitls_tls" ]
+    },
+    {
+      label = "//third_party/openhitls:openhitls_auth"
+      subsystem_name = "thirdparty"
+      part_name = "openhitls"
+      lib_names = [ "openhitls_auth" ]
+    },
+    {
+      label =
+          "//foundation/distributeddatamgr/preferences/interfaces/inner_api:native_preferences"
+      subsystem_name = "distributeddatamgr"
+      part_name = "preferences"
+    },
+  ]
+
+  napi_modules += [
+    {
+      prefix = "data"
+      shard_libs = [
+        {
+          label =
+              "//foundation/distributeddatamgr/preferences/frameworks/js/napi/preferences:preferences"
+          subsystem_name = "distributeddatamgr"
+          part_name = "preferences"
+        },
+      ]
+    },
+  ]
+}
+
 if (use_mac || use_mingw_win) {
   common_bin += [
     {
@@ -1066,12 +1152,6 @@ if (use_mac || use_mingw_win) {
       label = "//foundation/distributeddatamgr/kv_store/kvstoremock/distributeddb:distributeddb_mock"
       subsystem_name = "distributeddatamgr"
       part_name = "kv_store"
-    },
-    {
-      label = "//third_party/zlib:shared_libz"
-      subsystem_name = "thirdparty"
-      part_name = "zlib"
-      lib_names = [ "shared_libz" ]
     },
     {
       label = "//foundation/filemanagement/file_api/utils/filemgmt_libhilog:filemgmt_libhilog"
@@ -1133,6 +1213,39 @@ if (use_mac || use_mingw_win) {
           part_name = "file_api"
         },
       ]
+    },
+  ]
+}
+
+if (use_linux) {
+  napi_modules += [
+    {
+      prefix = "net"
+      shard_libs = [
+        {
+          label =
+              "//foundation/communication/netstack/frameworks/js/napi/http:http"
+          subsystem_name = "communication"
+          part_name = "netstack"
+        },
+      ]
+    },
+  ]
+}
+
+if (use_linux) {
+  common_bin += [
+    {
+      label = "//foundation/filemanagement/file_api/utils/filemgmt_libhilog:filemgmt_libhilog"
+      subsystem_name = "filemanagement"
+      part_name = "file_api"
+      lib_names = [ "filemgmt_libhilog" ]
+    },
+    {
+      label = "//foundation/filemanagement/file_api/utils/filemgmt_libn:filemgmt_libn"
+      subsystem_name = "filemanagement"
+      part_name = "file_api"
+      lib_names = [ "filemgmt_libn" ]
     },
   ]
 }

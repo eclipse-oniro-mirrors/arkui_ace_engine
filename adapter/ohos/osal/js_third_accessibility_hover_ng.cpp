@@ -14,12 +14,17 @@
  */
 #include "js_third_provider_interaction_operation.h"
 #include "core/accessibility/accessibility_manager.h"
+#include "js_accessibility_manager.h"
+#include "core/pipeline_ng/pipeline_context.h"
+#include "frameworks/core/common/frontend.h"
 
 #include "accessibility_system_ability_client.h"
 #include "base/log/dump_log.h"
 #include "frameworks/core/accessibility/hidumper/accessibility_hidumper.h"
 #include "js_third_accessibility_hover_ng.h"
 #include "core/components_ng/property/accessibility_property.h"
+
+#include <algorithm>
 
 using namespace OHOS::Accessibility;
 using namespace OHOS::AccessibilityConfig;
@@ -38,52 +43,6 @@ bool IsTouchExplorationEnabled(const RefPtr<NG::PipelineContext>& context)
     CHECK_NULL_RETURN(jsAccessibilityManager, true);
     auto accessibilityWorkMode = jsAccessibilityManager->GenerateAccessibilityWorkMode();
     return accessibilityWorkMode.isTouchExplorationEnabled;
-}
-
-void ClearThirdProviderFocusIfScreenReaderEnabled(
-    const RefPtr<NG::PipelineContext>& context,
-    const RefPtr<NG::FrameNode>& currentHostNode,
-    const std::unordered_map<int64_t, std::weak_ptr<JsThirdProviderInteractionOperation>>& jsThirdProviderOperator)
-{
-    CHECK_NULL_VOID(context);
-
-    {
-        auto jsAccessibilityManager =
-            AceType::DynamicCast<JsAccessibilityManager>(context->GetAccessibilityManager());
-        if (!jsAccessibilityManager || !jsAccessibilityManager->IsScreenReaderEnabled()) {
-            return;
-        }
-    }
-
-    std::vector<int64_t> focusedIds;
-    for (const auto& [hostAccessibilityId, weakOperator] : jsThirdProviderOperator) {
-        auto jsThirdProviderOperatorPtr = weakOperator.lock();
-        CHECK_NULL_CONTINUE(jsThirdProviderOperatorPtr);
-        auto hostNode = jsThirdProviderOperatorPtr->GetHost();
-        if (hostNode == nullptr || hostNode == currentHostNode) {
-            continue;
-        }
-        auto renderContext = hostNode->GetRenderContext();
-        CHECK_NULL_CONTINUE(renderContext);
-        if (!renderContext->GetAccessibilityFocus().value_or(false)) {
-            continue;
-        }
-        focusedIds.push_back(hostAccessibilityId);
-        jsThirdProviderOperatorPtr->ClearFocus();
-    }
-
-    if (focusedIds.empty()) {
-        return;
-    }
-    std::string idsStr;
-    for (size_t idx = 0; idx < focusedIds.size(); ++idx) {
-        if (idx > 0) {
-            idsStr += ",";
-        }
-        idsStr += std::to_string(focusedIds[idx]);
-    }
-    TAG_LOGI(AceLogTag::ACE_ACCESSIBILITY, "ClearThirdProviderFocusIfScreenReaderEnabled, ids: [%{public}s]",
-        idsStr.c_str());
 }
 } // namespace
 
@@ -199,12 +158,12 @@ std::pair<bool, bool> AccessibilityHoverManagerForThirdNG::GetSearchStrategyForT
     return std::make_pair(shouldSearchSelf, shouldSearchChildren);
 }
 
-
 bool AccessibilityHoverManagerForThirdNG::HoverPathForThirdRecursive(
     const int64_t hostElementId,
     const NG::PointF& hoverPoint,
     const AccessibilityElementInfo& nodeInfo,
-    AccessibilityHoverTestPathForThird& path)
+    AccessibilityHoverTestPathForThird& path,
+    const std::vector<int64_t>& mountBindIds)
 {
     bool hitTarget = false;
     auto [shouldSearchSelf, shouldSearchChildren]
@@ -218,14 +177,17 @@ bool AccessibilityHoverManagerForThirdNG::HoverPathForThirdRecursive(
         rectInScreen.GetRightBottomYScreenPostion() - rectInScreen.GetLeftTopYScreenPostion());
     NG::RectF rect { left, right, width, height };
     bool hitSelf = rect.IsInnerRegion(hoverPoint);
-    if (hitSelf && shouldSearchSelf) {
+    // REGISTERED exported-subtree mounts are hover anchors regardless of their own accessibility level: the mount.
+    int64_t splitNodeId = AccessibilityElementInfo::UNDEFINED_ACCESSIBILITY_ID;
+    int32_t splitNodeTreeId = AccessibilityElementInfo::UNDEFINED_TREE_ID;
+    AccessibilitySystemAbilityClient::GetTreeIdAndElementIdBySplitElementId(
+        nodeInfo.GetAccessibilityId(), splitNodeId, splitNodeTreeId);
+    bool isRegisteredMount =
+        std::find(mountBindIds.begin(), mountBindIds.end(), splitNodeId) != mountBindIds.end();
+    if (hitSelf && (shouldSearchSelf || isRegisteredMount)) {
         hitTarget = true;
         path.push_back(nodeInfo.GetAccessibilityId());
     }
-    TAG_LOGD(AceLogTag::ACE_ACCESSIBILITY,
-            "third hover elementId :%{public}" PRId64\
-            ", shouldSearchSelf: %{public}d shouldSearchChildren: %{public}d hitTarget: %{public}d ",
-            nodeInfo.GetAccessibilityId(), shouldSearchSelf, shouldSearchChildren, hitTarget);
     if (shouldSearchChildren) {
         auto childrenIds = nodeInfo.GetChildIds();
         for (auto childId = childrenIds.rbegin(); childId != childrenIds.rend(); ++childId) {
@@ -234,7 +196,7 @@ bool AccessibilityHoverManagerForThirdNG::HoverPathForThirdRecursive(
                 break;
             }
             if (HoverPathForThirdRecursive(
-                hostElementId, hoverPoint, childInfo, path)) {
+                hostElementId, hoverPoint, childInfo, path, mountBindIds)) {
                 return true;
             }
         }
@@ -245,11 +207,22 @@ bool AccessibilityHoverManagerForThirdNG::HoverPathForThirdRecursive(
 AccessibilityHoverTestPathForThird AccessibilityHoverManagerForThirdNG::HoverPathForThird(
     const int64_t hostElementId,
     const NG::PointF& point,
-    AccessibilityElementInfo& rootInfo)
+    AccessibilityElementInfo& rootInfo,
+    const std::vector<int64_t>& mountBindIds)
 {
+    TAG_LOGI(AceLogTag::ACE_ACCESSIBILITY,
+        "third hover hit-test: host=%{public}" PRId64 ", point=(%{public}f,%{public}f)"
+        ", rootId=%{public}" PRId64 ", rootChildren=%{public}zu, level=%{public}s, hitTest=%{public}s"
+        ", mounts=%{public}zu",
+        hostElementId, point.GetX(), point.GetY(), rootInfo.GetAccessibilityId(),
+        rootInfo.GetChildIds().size(), rootInfo.GetAccessibilityLevel().c_str(),
+        rootInfo.GetHitTestBehavior().c_str(), mountBindIds.size());
     AccessibilityHoverTestPathForThird path;
     HoverPathForThirdRecursive(
-        hostElementId, point, rootInfo, path);
+        hostElementId, point, rootInfo, path, mountBindIds);
+    TAG_LOGI(AceLogTag::ACE_ACCESSIBILITY,
+        "third hover hit-test result: pathSize=%{public}zu, hitId=%{public}" PRId64,
+        path.size(), path.empty() ? INVALID_NODE_ID : path.back());
     return path;
 }
 
@@ -258,6 +231,179 @@ void AccessibilityHoverManagerForThirdNG::ResetHoverForThirdState()
     hoverForThirdState_.idle = true;
     hoverForThirdState_.thirdOperationIdle = true;
     hoverForThirdState_.nodesHovering.clear();
+}
+
+namespace {
+// Resolves the exported root behind a hover hit endpoint: the hit id is split and looked up in the main AM's.
+bool ResolveHoverTransferExportedRoot(const RefPtr<JsAccessibilityManager>& mainAM,
+    const AccessibilityHoverForThirdConfig& config,
+    int64_t hitElementId, int64_t& splitHitId, RefPtr<NG::FrameNode>& exportedRoot)
+{
+    CHECK_NULL_RETURN(config.context, false);
+    if (hitElementId == INVALID_NODE_ID) {
+        return false;
+    }
+    CHECK_NULL_RETURN(mainAM, false);
+    // The hit id comes from the walk's infos (belongTreeId high bits spliced by FillNodeConfig) while binding keys are raw bindIds.
+    int32_t splitHitTreeId = AccessibilityElementInfo::UNDEFINED_TREE_ID;
+    AccessibilitySystemAbilityClient::GetTreeIdAndElementIdBySplitElementId(
+        hitElementId, splitHitId, splitHitTreeId);
+    auto bindingInfo = mainAM->GetCmpBindingForHover(config.ownerNodeId, splitHitId);
+    if (!bindingInfo) {
+        return false;
+    }
+    exportedRoot = bindingInfo->exportedRoot.Upgrade();
+    return exportedRoot != nullptr;
+}
+
+// Maps the accessibility hover event type onto the TouchEvent type carried by the transfer.
+bool SetHoverTransferEventType(TouchEvent& event, NG::AccessibilityHoverEventType eventType)
+{
+    switch (eventType) {
+        case NG::AccessibilityHoverEventType::ENTER:
+            event.type = TouchType::HOVER_ENTER;
+            return true;
+        case NG::AccessibilityHoverEventType::MOVE:
+            event.type = TouchType::HOVER_MOVE;
+            return true;
+        case NG::AccessibilityHoverEventType::EXIT:
+            event.type = TouchType::HOVER_EXIT;
+            return true;
+        default:
+            return false;
+    }
+}
+} // namespace
+
+bool AccessibilityHoverManagerForThirdNG::ComputeHoverTransferOffsets(
+    const RefPtr<NG::FrameNode>& exportedRoot, bool adoptedMount, int64_t splitHitId,
+    const AccessibilityHoverForThirdConfig& config, HoverTransferGeometry& geometry)
+{
+    // Coordinate-space conversion.
+    auto renderContext = exportedRoot->GetRenderContext();
+    CHECK_NULL_RETURN(renderContext, false);
+    auto rootPaintRect = renderContext->GetPaintRectWithoutTransform();
+    geometry.paintOriginX = rootPaintRect.Left();
+    geometry.paintOriginY = rootPaintRect.Top();
+    if (adoptedMount) {
+        AccessibilityElementInfo mountInfo;
+        if (!GetElementInfoForThird(splitHitId, mountInfo, config.hostElementId)) {
+            TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY,
+                "TransferHoverToExportedSubtree: mount info fetch failed, bindId=%{public}" PRId64,
+                splitHitId);
+            return false;
+        }
+        auto mountRect = mountInfo.GetRectInScreen();
+        geometry.rootWinX = static_cast<float>(mountRect.GetLeftTopXScreenPostion());
+        geometry.rootWinY = static_cast<float>(mountRect.GetLeftTopYScreenPostion());
+        // The (config.point + hostRect) window mapping and the ②+③ root position share the same hostRect term.
+        geometry.hostOffsetX = 0.0f;
+        geometry.hostOffsetY = 0.0f;
+    } else {
+        auto rootRect = exportedRoot->GetTransformRectRelativeToWindow();
+        geometry.rootWinX = rootRect.Left();
+        geometry.rootWinY = rootRect.Top();
+        auto jsThirdProviderOperator = GetJsThirdProviderInteractionOperation(config.hostElementId).lock();
+        CHECK_NULL_RETURN(jsThirdProviderOperator, false);
+        auto hostNode = jsThirdProviderOperator->GetHost();
+        CHECK_NULL_RETURN(hostNode, false);
+        auto hostRect = hostNode->GetTransformRectRelativeToWindow();
+        geometry.hostOffsetX = hostRect.Left();
+        geometry.hostOffsetY = hostRect.Top();
+    }
+    return true;
+}
+
+void AccessibilityHoverManagerForThirdNG::TransferHoverToExportedSubtreeIfNeeded(
+    int64_t hitElementId, const AccessibilityHoverForThirdConfig& config)
+{
+    CHECK_NULL_VOID(config.context);
+    auto executor = config.context->GetTaskExecutor();
+    CHECK_NULL_VOID(executor);
+    executor->PostTask([weak = WeakClaim(this), hitElementId, config] {
+        auto manager = weak.Upgrade();
+        CHECK_NULL_VOID(manager);
+        manager->TransferHoverToExportedSubtreeOnUI(hitElementId, config);
+    }, TaskExecutor::TaskType::UI, "CmpHoverTransferToNativePipeline");
+}
+
+void AccessibilityHoverManagerForThirdNG::TransferHoverToExportedSubtreeOnUI(
+    int64_t hitElementId, const AccessibilityHoverForThirdConfig& config)
+{
+    // Resolve the hit element as a bindId mount node: check the main AM's binding map for a REGISTERED binding with this bindId.
+    int64_t splitHitId = AccessibilityElementInfo::UNDEFINED_ACCESSIBILITY_ID;
+    RefPtr<NG::FrameNode> exportedRoot;
+    auto provider = GetJsThirdProviderInteractionOperation(config.hostElementId).lock();
+    auto mainAM = provider ? provider->GetHandler().Upgrade() : nullptr;
+    if (config.eventType == NG::AccessibilityHoverEventType::EXIT ||
+        !ResolveHoverTransferExportedRoot(mainAM, config, hitElementId, splitHitId, exportedRoot)) {
+        UpdateHoverTransferOnUI(nullptr, {}, config);
+        return;
+    }
+    bool adoptedMount = JsAccessibilityManager::IsUnderAdoptedMount(exportedRoot);
+    HoverTransferGeometry geometry;
+    if (!ComputeHoverTransferOffsets(exportedRoot, adoptedMount, splitHitId, config, geometry)) {
+        UpdateHoverTransferOnUI(nullptr, {}, config);
+        return;
+    }
+    // Construct a TouchEvent from the hover config (EventType → TouchType mapping).
+    TouchEvent event;
+    event.SetX(config.point.GetX() + geometry.hostOffsetX - geometry.rootWinX + geometry.paintOriginX)
+        .SetY(config.point.GetY() + geometry.hostOffsetY - geometry.rootWinY + geometry.paintOriginY);
+    event.time = config.time;
+    event.sourceType = config.sourceType;
+    if (!SetHoverTransferEventType(event, config.eventType)) {
+        return;
+    }
+
+    UpdateHoverTransferOnUI(exportedRoot, { event.x, event.y }, config);
+    TAG_LOGI(AceLogTag::ACE_ACCESSIBILITY,
+        "TransferHoverToExportedSubtree: bindId=%{public}" PRId64 " → native pipeline"
+        ", adopted=%{public}d, surfacePoint=(%{public}f,%{public}f), hostOffset=(%{public}f,%{public}f)"
+        ", rootWinPos=(%{public}f,%{public}f), rootPaintOrigin=(%{public}f,%{public}f)"
+        ", hoverPoint=(%{public}f,%{public}f)"
+        ", rootActive=%{public}d, rootVisible=%{public}d, rootInternal=%{public}d",
+        hitElementId, adoptedMount ? 1 : 0,
+        config.point.GetX(), config.point.GetY(), geometry.hostOffsetX, geometry.hostOffsetY,
+        geometry.rootWinX, geometry.rootWinY, geometry.paintOriginX, geometry.paintOriginY,
+        event.x, event.y,
+        exportedRoot->IsActive() ? 1 : 0, exportedRoot->IsVisible() ? 1 : 0,
+        exportedRoot->IsInternal() ? 1 : 0);
+}
+
+void AccessibilityHoverManagerForThirdNG::UpdateHoverTransferOnUI(
+    const RefPtr<NG::FrameNode>& exportedRoot, const NG::PointF& point,
+    const AccessibilityHoverForThirdConfig& config)
+{
+    auto previousRoot = nativeHoverRoot_.Upgrade();
+    bool restart = previousRoot != exportedRoot || nativeHoverSource_ != config.sourceType ||
+        config.eventType == NG::AccessibilityHoverEventType::ENTER;
+    if (restart || config.eventType == NG::AccessibilityHoverEventType::EXIT) {
+        auto previousContext = nativeHoverContext_.Upgrade();
+        nativeHoverRoot_.Reset();
+        nativeHoverContext_.Reset();
+        if (previousRoot && previousContext) {
+            TouchEvent exitEvent;
+            exitEvent.SetX(nativeHoverPoint_.GetX()).SetY(nativeHoverPoint_.GetY());
+            exitEvent.time = config.time;
+            exitEvent.sourceType = nativeHoverSource_;
+            exitEvent.type = TouchType::HOVER_EXIT;
+            previousContext->OnAccessibilityHoverEvent(exitEvent, previousRoot);
+        }
+    }
+    if (!exportedRoot || !config.context || config.eventType == NG::AccessibilityHoverEventType::EXIT) {
+        return;
+    }
+    TouchEvent event;
+    event.SetX(point.GetX()).SetY(point.GetY());
+    event.time = config.time;
+    event.sourceType = config.sourceType;
+    event.type = !previousRoot || restart ? TouchType::HOVER_ENTER : TouchType::HOVER_MOVE;
+    nativeHoverRoot_ = exportedRoot;
+    nativeHoverContext_ = config.context;
+    nativeHoverPoint_ = point;
+    nativeHoverSource_ = config.sourceType;
+    config.context->OnAccessibilityHoverEvent(event, exportedRoot);
 }
 
 void AccessibilityHoverManagerForThirdNG::HandleAccessibilityHoverForThirdInner(
@@ -272,15 +418,20 @@ void AccessibilityHoverManagerForThirdNG::HandleAccessibilityHoverForThirdInner(
     if (config.eventType != NG::AccessibilityHoverEventType::EXIT) {
         AccessibilityElementInfo rootInfo;
         if (GetElementInfoForThird(-1, rootInfo, config.hostElementId) == false) {
+            TransferHoverToExportedSubtreeIfNeeded(INVALID_NODE_ID, config);
             ResetHoverForThirdState();
             return;
         }
         AccessibilityHoverTestPathForThird path =
-            HoverPathForThird(config.hostElementId, config.point, rootInfo);
+            HoverPathForThird(config.hostElementId, config.point, rootInfo, config.mountBindIds);
         for (const auto& node: path) {
             currentNodesHovering.push_back(node);
         }
     }
+    // Transfer hover to the native pipeline when the hit endpoint is a bindId mount.
+    TransferHoverToExportedSubtreeIfNeeded(
+        currentNodesHovering.empty() ? INVALID_NODE_ID : currentNodesHovering.back(), config);
+
     int64_t lastHoveringId = INVALID_NODE_ID;
     if (!lastNodesHovering.empty()) {
         lastHoveringId = lastNodesHovering.back();
@@ -318,14 +469,30 @@ void AccessibilityHoverManagerForThirdNG::HandleAccessibilityHoverForThird(
         return;
     }
     CHECK_NULL_VOID(config.context);
-    config.context->GetTaskExecutor()->PostTask(
-        [weak = WeakClaim(this), config] {
-            auto accessibilityHoverManagerForThirdNG = weak.Upgrade();
-            CHECK_NULL_VOID(accessibilityHoverManagerForThirdNG);
-            AccessibilityHoverForThirdConfig asyncConfig = config;
-            accessibilityHoverManagerForThirdNG->HandleAccessibilityHoverForThirdInner(asyncConfig);
-        },
-        TaskExecutor::TaskType::BACKGROUND, "ArkUIHandleAccessibilityHoverForThird");
+    auto executor = config.context->GetTaskExecutor();
+    CHECK_NULL_VOID(executor);
+    if (!executor->WillRunOnCurrentThread(TaskExecutor::TaskType::UI)) {
+        executor->PostTask([weak = WeakClaim(this), config] {
+            auto manager = weak.Upgrade();
+            CHECK_NULL_VOID(manager);
+            manager->HandleAccessibilityHoverForThird(config);
+        }, TaskExecutor::TaskType::UI, "ArkUIPrepareAccessibilityHoverForThird");
+        return;
+    }
+    AccessibilityHoverForThirdConfig asyncConfig = config;
+    auto provider = GetJsThirdProviderInteractionOperation(config.hostElementId).lock();
+    auto owner = provider ? provider->GetHost() : nullptr;
+    auto mainAM = provider ? provider->GetHandler().Upgrade() : nullptr;
+    if (mainAM && owner) {
+        asyncConfig.ownerNodeId = owner->GetId();
+        asyncConfig.mountBindIds = mainAM->GetCmpBindingBindIdsForHover(asyncConfig.ownerNodeId);
+    }
+    executor->PostTask(
+        [weak = WeakClaim(this), asyncConfig] {
+            auto manager = weak.Upgrade();
+            CHECK_NULL_VOID(manager);
+            manager->HandleAccessibilityHoverForThirdInner(asyncConfig);
+        }, TaskExecutor::TaskType::BACKGROUND, "ArkUIHandleAccessibilityHoverForThird");
 }
 
 bool AccessibilityHoverManagerForThirdNG::ClearThirdAccessibilityFocus(
@@ -356,22 +523,10 @@ bool AccessibilityHoverManagerForThirdNG::ActThirdAccessibilityFocus(
     CHECK_NULL_RETURN(renderContext, false);
     if (isNeedClear) {
         renderContext->UpdateAccessibilityFocus(false);
-        TAG_LOGD(AceLogTag::ACE_ACCESSIBILITY, "third act Accessibility element Id %{public}" PRId64 "Focus clear",
+        TAG_LOGD(AceLogTag::ACE_ACCESSIBILITY,
+            "third act Accessibility element Id %{public}" PRId64 "Focus clear",
             nodeInfo.GetAccessibilityId());
         return true;
-    }
-    auto taskExecutor = context ? context->GetTaskExecutor() : nullptr;
-    if (taskExecutor) {
-        taskExecutor->PostTask(
-            [weak = WeakClaim(this), context, hostNode] {
-                auto self = weak.Upgrade();
-                CHECK_NULL_VOID(self);
-                ClearThirdProviderFocusIfScreenReaderEnabled(
-                    context, hostNode, self->jsThirdProviderOperator_);
-            },
-            TaskExecutor::TaskType::UI, "ClearThirdProviderAccessibilityFocus");
-    } else {
-        TAG_LOGW(AceLogTag::ACE_ACCESSIBILITY, "task executor is null, skip clear third provider focus");
     }
     renderContext->UpdateAccessibilityFocus(false);
     auto rectInScreen = nodeInfo.GetRectInScreen();

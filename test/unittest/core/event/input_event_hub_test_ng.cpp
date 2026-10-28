@@ -17,6 +17,8 @@
 
 #include "gtest/gtest.h"
 
+#include "base/utils/time_util.h"
+
 #define private public
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/event/event_hub.h"
@@ -43,6 +45,15 @@ constexpr bool HOVER_VALUE = true;
 const std::string RESULT_SUCCESS_ONE = "sucess1";
 const std::string RESULT_SUCCESS_TWO = "sucess2";
 bool accessibilityHover = false;
+constexpr int64_t ACCESSIBILITY_EVENT_TIMESTAMP = 1234567890;
+constexpr int32_t ACCESSIBILITY_TARGET_DISPLAY_ID = 2;
+constexpr float ACCESSIBILITY_EVENT_X = 100.0f;
+constexpr float ACCESSIBILITY_EVENT_Y = 200.0f;
+constexpr float ACCESSIBILITY_EVENT_SCREEN_X = 1000.0f;
+constexpr float ACCESSIBILITY_EVENT_SCREEN_Y = 2000.0f;
+constexpr float ACCESSIBILITY_EVENT_GLOBAL_DISPLAY_X = 3000.0f;
+constexpr float ACCESSIBILITY_EVENT_GLOBAL_DISPLAY_Y = 4000.0f;
+const std::string ACCESSIBILITY_TARGET_NODE_NAME = "accessibility_hover_test";
 } // namespace
 
 class InputEventHubTestNg : public testing::Test {
@@ -405,6 +416,7 @@ HWTEST_F(InputEventHubTestNg, HandleMouseEvent001, TestSize.Level1)
      */
     OnMouseEventFunc onMouse2 = onMouse;
     inputEventHub->SetMouseEvent(std::move(onMouse2));
+    inputEventHub->CreateMouseEventActuator();
     EXPECT_NE(inputEventHub->mouseEventActuator_->userCallback_, nullptr);
 
     /**
@@ -413,6 +425,7 @@ HWTEST_F(InputEventHubTestNg, HandleMouseEvent001, TestSize.Level1)
     const OnHoverFunc onHover = [](bool, HoverInfo) {};
     OnHoverFunc onHover1 = onHover;
     inputEventHub->SetHoverEvent(std::move(onHover1));
+    inputEventHub->CreateHoverEventActuator();
     EXPECT_NE(inputEventHub->hoverEventActuator_->userCallback_, nullptr);
 
     /**
@@ -584,6 +597,204 @@ HWTEST_F(InputEventHubTestNg, InputEventHubProcessMouseTest008, TestSize.Level1)
     inputEventHub->accessibilityHoverEventActuator_->accessibilityHoverEventTarget_->HandleAccessibilityHoverEvent(
         HOVER_VALUE, event);
     EXPECT_EQ(accessibilityHover, true);
+}
+
+/**
+ * @tc.name: InputEventHubAccessibilityHoverEvent001
+ * @tc.desc: Test HandleAccessibilityHoverEvent maps all TouchEvent fields into
+ *           AccessibilityHoverInfo, which is the data source of the JS event object
+ *           exposed by JsHoverFunction::AccessibilityHoverExecute.
+ * @tc.type: FUNC
+ */
+HWTEST_F(InputEventHubTestNg, InputEventHubAccessibilityHoverEvent001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create TouchEvent with all fields consumed by the JS event object.
+     */
+    TouchEvent touchEvent;
+    touchEvent.type = TouchType::HOVER_MOVE;
+    std::chrono::nanoseconds nanoseconds(ACCESSIBILITY_EVENT_TIMESTAMP);
+    TimeStamp timeStamp(nanoseconds);
+    touchEvent.time = timeStamp;
+    touchEvent.sourceType = SourceType::MOUSE;
+    touchEvent.sourceTool = SourceTool::MOUSE;
+    touchEvent.pressedKeyCodes_ = { KeyCode::KEY_CTRL_LEFT, KeyCode::KEY_CTRL_RIGHT };
+    touchEvent.x = ACCESSIBILITY_EVENT_X;
+    touchEvent.y = ACCESSIBILITY_EVENT_Y;
+    touchEvent.screenX = ACCESSIBILITY_EVENT_SCREEN_X;
+    touchEvent.screenY = ACCESSIBILITY_EVENT_SCREEN_Y;
+    touchEvent.globalDisplayX = ACCESSIBILITY_EVENT_GLOBAL_DISPLAY_X;
+    touchEvent.globalDisplayY = ACCESSIBILITY_EVENT_GLOBAL_DISPLAY_Y;
+    touchEvent.targetDisplayId = ACCESSIBILITY_TARGET_DISPLAY_ID;
+
+    /**
+     * @tc.steps: step2. Register callback and invoke HandleAccessibilityHoverEvent.
+     * @tc.expected: Every app-visible field of AccessibilityHoverInfo keeps the value
+     *               of the current event.
+     */
+    bool callbackInvoked = false;
+    OnAccessibilityHoverFunc callback = [&callbackInvoked](bool isHover, AccessibilityHoverInfo& info) {
+        callbackInvoked = true;
+        EXPECT_TRUE(isHover);
+        EXPECT_EQ(static_cast<int64_t>(info.GetTimeStamp().time_since_epoch().count()),
+            ACCESSIBILITY_EVENT_TIMESTAMP);
+        EXPECT_EQ(info.GetSourceDevice(), SourceType::MOUSE);
+        EXPECT_EQ(info.GetSourceTool(), SourceTool::MOUSE);
+        EXPECT_EQ(info.GetActionType(), AccessibilityHoverAction::HOVER_MOVE);
+        EXPECT_EQ(static_cast<int32_t>(info.GetTargetDisplayId()), ACCESSIBILITY_TARGET_DISPLAY_ID);
+        EXPECT_EQ(info.GetGlobalLocation(), Offset(ACCESSIBILITY_EVENT_X, ACCESSIBILITY_EVENT_Y));
+        EXPECT_EQ(info.GetLocalLocation(), Offset(ACCESSIBILITY_EVENT_X, ACCESSIBILITY_EVENT_Y));
+        EXPECT_EQ(info.GetScreenLocation(), Offset(ACCESSIBILITY_EVENT_SCREEN_X, ACCESSIBILITY_EVENT_SCREEN_Y));
+        EXPECT_EQ(info.GetGlobalDisplayLocation(),
+            Offset(ACCESSIBILITY_EVENT_GLOBAL_DISPLAY_X, ACCESSIBILITY_EVENT_GLOBAL_DISPLAY_Y));
+    };
+    auto hoverTarget = AceType::MakeRefPtr<HoverEventTarget>(ACCESSIBILITY_TARGET_NODE_NAME, 0);
+    hoverTarget->SetAccessibilityHoverCallback(callback);
+    hoverTarget->HandleAccessibilityHoverEvent(true, touchEvent);
+    EXPECT_TRUE(callbackInvoked);
+}
+
+/**
+ * @tc.name: InputEventHubAccessibilityHoverEvent002
+ * @tc.desc: Test TouchType to AccessibilityHoverAction conversion of the accessibility
+ *           hover event.
+ * @tc.type: FUNC
+ */
+HWTEST_F(InputEventHubTestNg, InputEventHubAccessibilityHoverEvent002, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Dispatch each hover TouchType through HandleAccessibilityHoverEvent.
+     * @tc.expected: Hover actions are mapped one to one into AccessibilityHoverInfo.
+     */
+    auto hoverTarget = AceType::MakeRefPtr<HoverEventTarget>(ACCESSIBILITY_TARGET_NODE_NAME, 0);
+    std::pair<TouchType, AccessibilityHoverAction> hoverPlans[] = {
+        { TouchType::HOVER_ENTER, AccessibilityHoverAction::HOVER_ENTER },
+        { TouchType::HOVER_MOVE, AccessibilityHoverAction::HOVER_MOVE },
+        { TouchType::HOVER_EXIT, AccessibilityHoverAction::HOVER_EXIT },
+        { TouchType::HOVER_CANCEL, AccessibilityHoverAction::HOVER_CANCEL },
+    };
+    for (const auto& plan : hoverPlans) {
+        AccessibilityHoverAction action = AccessibilityHoverAction::UNKNOWN;
+        OnAccessibilityHoverFunc callback = [&action](bool, AccessibilityHoverInfo& info) {
+            action = info.GetActionType();
+        };
+        hoverTarget->SetAccessibilityHoverCallback(callback);
+        TouchEvent touchEvent;
+        touchEvent.type = plan.first;
+        hoverTarget->HandleAccessibilityHoverEvent(true, touchEvent);
+        EXPECT_EQ(action, plan.second);
+    }
+
+    /**
+     * @tc.steps: step2. Convert non-hover touch types.
+     * @tc.expected: Non-hover touch types fall back to AccessibilityHoverAction::UNKNOWN.
+     */
+    TouchType fallbackTypes[] = {
+        TouchType::DOWN,
+        TouchType::UP,
+        TouchType::MOVE,
+        TouchType::CANCEL,
+        TouchType::UNKNOWN,
+    };
+    for (auto type : fallbackTypes) {
+        EXPECT_EQ(hoverTarget->ConvertAccessibilityHoverAction(type), AccessibilityHoverAction::UNKNOWN);
+    }
+}
+
+/**
+ * @tc.name: InputEventHubAccessibilityHoverEvent003
+ * @tc.desc: Test HandleAccessibilityHoverEvent without registered callback and the
+ *           accessibility hover target state.
+ * @tc.type: FUNC
+ */
+HWTEST_F(InputEventHubTestNg, InputEventHubAccessibilityHoverEvent003, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Invoke HandleAccessibilityHoverEvent without a callback.
+     * @tc.expected: Return early without crash and target is not an accessibility hover target.
+     */
+    auto hoverTarget = AceType::MakeRefPtr<HoverEventTarget>(ACCESSIBILITY_TARGET_NODE_NAME, 0);
+    EXPECT_FALSE(hoverTarget->IsAccessibilityHoverTarget());
+    TouchEvent touchEvent;
+    touchEvent.type = TouchType::HOVER_ENTER;
+    hoverTarget->HandleAccessibilityHoverEvent(true, touchEvent);
+
+    /**
+     * @tc.steps: step2. Register the callback and dispatch again.
+     * @tc.expected: Target becomes an accessibility hover target and the callback is invoked.
+     */
+    bool callbackInvoked = false;
+    OnAccessibilityHoverFunc callback = [&callbackInvoked](bool, AccessibilityHoverInfo&) { callbackInvoked = true; };
+    hoverTarget->SetAccessibilityHoverCallback(callback);
+    EXPECT_TRUE(hoverTarget->IsAccessibilityHoverTarget());
+    hoverTarget->HandleAccessibilityHoverEvent(true, touchEvent);
+    EXPECT_TRUE(callbackInvoked);
+}
+
+/**
+ * @tc.name: InputEventHubAccessibilityHoverEvent004
+ * @tc.desc: Test the copy-before-invoke protection of the accessibility hover callback,
+ *           which is the same invocation path guarded by the native pointer unbind fix.
+ * @tc.type: FUNC
+ */
+HWTEST_F(InputEventHubTestNg, InputEventHubAccessibilityHoverEvent004, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Replace the callback from inside the callback invocation.
+     * @tc.expected: The current dispatch still finishes with the old callback and the new
+     *               callback only takes effect from the next dispatch.
+     */
+    auto hoverTarget = AceType::MakeRefPtr<HoverEventTarget>(ACCESSIBILITY_TARGET_NODE_NAME, 0);
+    int32_t firstCallbackCount = 0;
+    int32_t secondCallbackCount = 0;
+    TouchEvent touchEvent;
+    touchEvent.type = TouchType::HOVER_MOVE;
+    OnAccessibilityHoverFunc secondCallback = [&secondCallbackCount](bool, AccessibilityHoverInfo&) {
+        secondCallbackCount++;
+    };
+    OnAccessibilityHoverFunc firstCallback =
+        [hoverTarget, &firstCallbackCount, &secondCallback](bool, AccessibilityHoverInfo&) {
+            firstCallbackCount++;
+            hoverTarget->SetAccessibilityHoverCallback(secondCallback);
+        };
+    hoverTarget->SetAccessibilityHoverCallback(firstCallback);
+    hoverTarget->HandleAccessibilityHoverEvent(true, touchEvent);
+    EXPECT_EQ(firstCallbackCount, 1);
+    EXPECT_EQ(secondCallbackCount, 0);
+    hoverTarget->HandleAccessibilityHoverEvent(true, touchEvent);
+    EXPECT_EQ(firstCallbackCount, 1);
+    EXPECT_EQ(secondCallbackCount, 1);
+}
+
+/**
+ * @tc.name: InputEventHubAccessibilityHoverEvent005
+ * @tc.desc: Test the isHovered passthrough of HandleAccessibilityHoverEvent, which drives
+ *           the hover in and hover out dispatch in EventManager.
+ * @tc.type: FUNC
+ */
+HWTEST_F(InputEventHubTestNg, InputEventHubAccessibilityHoverEvent005, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Dispatch with isHovered true and false.
+     * @tc.expected: Both states are passed through to the callback unchanged.
+     */
+    auto hoverTarget = AceType::MakeRefPtr<HoverEventTarget>(ACCESSIBILITY_TARGET_NODE_NAME, 0);
+    bool receivedHoverIn = false;
+    bool receivedHoverOut = true;
+    OnAccessibilityHoverFunc callback = [&receivedHoverIn, &receivedHoverOut](bool isHover, AccessibilityHoverInfo&) {
+        if (isHover) {
+            receivedHoverIn = true;
+        } else {
+            receivedHoverOut = false;
+        }
+    };
+    hoverTarget->SetAccessibilityHoverCallback(callback);
+    TouchEvent touchEvent;
+    touchEvent.type = TouchType::HOVER_ENTER;
+    hoverTarget->HandleAccessibilityHoverEvent(true, touchEvent);
+    hoverTarget->HandleAccessibilityHoverEvent(false, touchEvent);
+    EXPECT_TRUE(receivedHoverIn);
+    EXPECT_FALSE(receivedHoverOut);
 }
 
 /**
@@ -1248,5 +1459,134 @@ HWTEST_F(InputEventHubTestNg, GetFrameNode002, TestSize.Level1)
     auto inputEventHub = AceType::MakeRefPtr<InputEventHub>(AceType::WeakClaim(AceType::RawPtr(eventHub)));
     EXPECT_NE(inputEventHub->GetFrameNode(), nullptr);
     EXPECT_EQ(inputEventHub->GetFrameNode()->GetTag(), V2::TEXT_ETS_TAG);
+}
+
+/**
+ * @tc.name: AddOnHoverEventAfterRemoveWithActuator001
+ * @tc.desc: When hoverEventActuator_ exists, re-adding tips hover event after
+ *           RemoveAllTipsHoverEvents must register directly to actuator instead
+ *           of being stranded in the staging cache, otherwise hoverTask(false)
+ *           (tips hide on hover-leave) is lost.
+ * @tc.type: FUNC
+ */
+HWTEST_F(InputEventHubTestNg, AddOnHoverEventAfterRemoveWithActuator001, TestSize.Level1)
+{
+    auto eventHub = AceType::MakeRefPtr<EventHub>();
+    auto frameNode = AceType::MakeRefPtr<FrameNode>(V2::TEXT_ETS_TAG, -1, AceType::MakeRefPtr<Pattern>());
+    eventHub->AttachHost(frameNode);
+    auto inputEventHub = AceType::MakeRefPtr<InputEventHub>(AceType::WeakClaim(AceType::RawPtr(eventHub)));
+    ASSERT_NE(inputEventHub, nullptr);
+
+    inputEventHub->hoverEventActuator_ =
+        AceType::MakeRefPtr<InputEventActuator>(AceType::WeakClaim(AceType::RawPtr(inputEventHub)));
+
+    bool hoverFalseCalled = false;
+    auto hoverTask = [&hoverFalseCalled](bool isHover) {
+        if (!isHover) {
+            hoverFalseCalled = true;
+        }
+    };
+    auto hoverEvent = AceType::MakeRefPtr<InputEvent>(std::move(hoverTask));
+    hoverEvent->SetIstips(true);
+
+    inputEventHub->RemoveAllTipsHoverEvents();
+    inputEventHub->AddOnHoverEvent(hoverEvent);
+
+    EXPECT_EQ(inputEventHub->hoverInputEvents_.size(), INPUT_EVENTS_SIZE_0);
+    ASSERT_NE(inputEventHub->hoverEventActuator_, nullptr);
+    EXPECT_EQ(inputEventHub->hoverEventActuator_->inputEvents_.size(), INPUT_EVENTS_SIZE);
+
+    for (const auto& callback : inputEventHub->hoverEventActuator_->inputEvents_) {
+        (*callback)(false);
+    }
+    EXPECT_TRUE(hoverFalseCalled);
+}
+
+/**
+ * @tc.name: AddOnMouseEventAfterRemoveWithActuator001
+ * @tc.desc: When mouseEventActuator_ exists, re-adding tips mouse event after
+ *           RemoveAllTipsMouseEvents must register directly to actuator instead
+ *           of being stranded in the staging cache (follow-cursor callback lost).
+ * @tc.type: FUNC
+ */
+HWTEST_F(InputEventHubTestNg, AddOnMouseEventAfterRemoveWithActuator001, TestSize.Level1)
+{
+    auto eventHub = AceType::MakeRefPtr<EventHub>();
+    auto frameNode = AceType::MakeRefPtr<FrameNode>(V2::TEXT_ETS_TAG, -1, AceType::MakeRefPtr<Pattern>());
+    eventHub->AttachHost(frameNode);
+    auto inputEventHub = AceType::MakeRefPtr<InputEventHub>(AceType::WeakClaim(AceType::RawPtr(eventHub)));
+    ASSERT_NE(inputEventHub, nullptr);
+
+    inputEventHub->mouseEventActuator_ =
+        AceType::MakeRefPtr<InputEventActuator>(AceType::WeakClaim(AceType::RawPtr(inputEventHub)));
+
+    bool mouseCalled = false;
+    auto mouseTask = [&mouseCalled](MouseInfo& info) { mouseCalled = true; };
+    auto mouseEvent = AceType::MakeRefPtr<InputEvent>(std::move(mouseTask));
+    mouseEvent->SetIstips(true);
+    mouseEvent->SetTipsFollowCursor(true);
+
+    inputEventHub->RemoveAllTipsMouseEvents();
+    inputEventHub->AddOnMouseEvent(mouseEvent);
+
+    EXPECT_EQ(inputEventHub->mouseInputEvents_.size(), INPUT_EVENTS_SIZE_0);
+    ASSERT_NE(inputEventHub->mouseEventActuator_, nullptr);
+    EXPECT_EQ(inputEventHub->mouseEventActuator_->inputEvents_.size(), INPUT_EVENTS_SIZE);
+}
+
+/**
+ * @tc.name: AddOnHoverMoveEventWithActuator001
+ * @tc.desc: When hoverMoveEventActuator_ exists, AddOnHoverMoveEvent must register
+ *           directly to actuator instead of being stranded in the staging cache.
+ * @tc.type: FUNC
+ */
+HWTEST_F(InputEventHubTestNg, AddOnHoverMoveEventWithActuator001, TestSize.Level1)
+{
+    auto eventHub = AceType::MakeRefPtr<EventHub>();
+    auto frameNode = AceType::MakeRefPtr<FrameNode>(V2::TEXT_ETS_TAG, -1, AceType::MakeRefPtr<Pattern>());
+    eventHub->AttachHost(frameNode);
+    auto inputEventHub = AceType::MakeRefPtr<InputEventHub>(AceType::WeakClaim(AceType::RawPtr(eventHub)));
+    ASSERT_NE(inputEventHub, nullptr);
+
+    inputEventHub->hoverMoveEventActuator_ =
+        AceType::MakeRefPtr<InputEventActuator>(AceType::WeakClaim(AceType::RawPtr(inputEventHub)));
+
+    bool hoverMoveCalled = false;
+    auto hoverMoveTask = [&hoverMoveCalled](HoverInfo& info) { hoverMoveCalled = true; };
+    auto hoverMoveEvent = AceType::MakeRefPtr<InputEvent>(std::move(hoverMoveTask));
+
+    inputEventHub->AddOnHoverMoveEvent(hoverMoveEvent);
+
+    EXPECT_EQ(inputEventHub->hoverMoveInputEvents_.size(), INPUT_EVENTS_SIZE_0);
+    ASSERT_NE(inputEventHub->hoverMoveEventActuator_, nullptr);
+    EXPECT_EQ(inputEventHub->hoverMoveEventActuator_->inputEvents_.size(), INPUT_EVENTS_SIZE);
+}
+
+/**
+ * @tc.name: AddOnAxisEventWithActuator001
+ * @tc.desc: When axisEventActuator_ exists, AddOnAxisEvent must register directly
+ *           to actuator instead of being stranded in the staging cache.
+ * @tc.type: FUNC
+ */
+HWTEST_F(InputEventHubTestNg, AddOnAxisEventWithActuator001, TestSize.Level1)
+{
+    auto eventHub = AceType::MakeRefPtr<EventHub>();
+    auto frameNode = AceType::MakeRefPtr<FrameNode>(V2::TEXT_ETS_TAG, -1, AceType::MakeRefPtr<Pattern>());
+    eventHub->AttachHost(frameNode);
+    auto inputEventHub = AceType::MakeRefPtr<InputEventHub>(AceType::WeakClaim(AceType::RawPtr(eventHub)));
+    ASSERT_NE(inputEventHub, nullptr);
+
+    inputEventHub->axisEventActuator_ =
+        AceType::MakeRefPtr<InputEventActuator>(AceType::WeakClaim(AceType::RawPtr(inputEventHub)));
+
+    bool axisCalled = false;
+    auto axisTask = [&axisCalled](AxisInfo& info) { axisCalled = true; };
+    auto axisEvent = AceType::MakeRefPtr<InputEvent>(std::move(axisTask));
+
+    inputEventHub->AddOnAxisEvent(axisEvent);
+
+    EXPECT_EQ(inputEventHub->axisInputEvents_.size(), INPUT_EVENTS_SIZE_0);
+    ASSERT_NE(inputEventHub->axisEventActuator_, nullptr);
+    EXPECT_EQ(inputEventHub->axisEventActuator_->inputEvents_.size(), INPUT_EVENTS_SIZE);
 }
 } // namespace OHOS::Ace::NG

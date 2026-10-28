@@ -99,10 +99,18 @@ RefPtr<LayoutAlgorithm> ContainerPickerPattern::CreateLayoutAlgorithm()
     auto host = GetHost();
     CHECK_NULL_RETURN(host, nullptr);
     ACE_UINODE_TRACE(host);
+    
+    // Sync selectedIndex from LayoutProperty when item count changes
+    auto props = host->GetLayoutProperty<ContainerPickerLayoutProperty>();
+    int32_t prevTotalCount = totalItemCount_;
+    totalItemCount_ = GetRealTotalItemCount();
+    if (props && props->HasSelectedIndex() && prevTotalCount > 0 && prevTotalCount != totalItemCount_) {
+        selectedIndex_ = props->GetSelectedIndex().value();
+    }
+    
     SyncPickerParamsFromLayout();
     auto layoutAlgorithm = MakeRefPtr<ContainerPickerLayoutAlgorithm>();
     CHECK_NULL_RETURN(layoutAlgorithm, nullptr);
-    totalItemCount_ = GetRealTotalItemCount();
     isLoop_ = IsLoop();
 
     layoutAlgorithm->SetTotalItemCount(totalItemCount_);

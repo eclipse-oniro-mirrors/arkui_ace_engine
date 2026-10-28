@@ -37,16 +37,6 @@ RefPtr<Curve> GetCurveFromHandle(ArkUI_CurveHandle curveHandle)
     return AceType::Claim(reinterpret_cast<Curve*>(curveHandle->curve));
 }
 
-bool IsDurationIndependentCurve(ArkUI_CurveHandle curveHandle)
-{
-    if (!curveHandle || !curveHandle->curve) {
-        return false;
-    }
-    auto* aceCurve = reinterpret_cast<Curve*>(curveHandle->curve);
-    return AceType::InstanceOf<InterpolatingSpring>(aceCurve) ||
-           AceType::InstanceOf<ResponsiveSpringMotion>(aceCurve);
-}
-
 AnimationOption BuildGroupAnimationOption(const OH_ArkUI_AnimationGroup* group)
 {
     AnimationOption option;
@@ -84,23 +74,14 @@ AnimationOption BuildChildAnimationOption(const OH_ArkUI_AnimationGroup* group, 
     return option;
 }
 
-bool HasInvalidKeyframeCurve(const OH_ArkUI_KeyframeAnimationHandle& handle)
+bool HasInvalidKeyframeOrder(const OH_ArkUI_KeyframeAnimationHandle& handle)
 {
+    float prevKeyTime = -1.0f;
     for (const auto& keyframe : handle->keyframes) {
-        if (keyframe.curve && IsDurationIndependentCurve(keyframe.curve)) {
+        if (keyframe.keyTime < prevKeyTime) {
             return true;
         }
-    }
-    return false;
-}
-
-bool HasInvalidChildCurve(const ChildAnimation& child)
-{
-    if (const auto* keyframeAnim = std::get_if<OH_ArkUI_KeyframeAnimationHandle>(&child)) {
-        return *keyframeAnim && HasInvalidKeyframeCurve(*keyframeAnim);
-    }
-    if (const auto* pathAnim = std::get_if<OH_ArkUI_PathAnimationHandle>(&child)) {
-        return *pathAnim && IsDurationIndependentCurve((*pathAnim)->curve);
+        prevKeyTime = keyframe.keyTime;
     }
     return false;
 }
@@ -108,8 +89,10 @@ bool HasInvalidChildCurve(const ChildAnimation& child)
 ArkUI_ErrorCode ValidateChildAnimations(const OH_ArkUI_AnimationGroup* group)
 {
     for (const auto& child : group->childAnimations) {
-        if (HasInvalidChildCurve(child)) {
-            return ARKUI_ERROR_CODE_SUB_ANIMATION_INVALID;
+        if (const auto* keyframeAnim = std::get_if<OH_ArkUI_KeyframeAnimationHandle>(&child)) {
+            if (*keyframeAnim && HasInvalidKeyframeOrder(*keyframeAnim)) {
+                return ARKUI_ERROR_CODE_SUB_ANIMATION_INVALID;
+            }
         }
     }
     return ARKUI_ERROR_CODE_NO_ERROR;
@@ -198,7 +181,10 @@ ArkUI_ErrorCode BuildAnimationGroupView(ArkUIAnimationGroupHandle group, Animati
     if (group->onFinish) {
         auto onFinish = group->onFinish;
         auto userData = group->userData;
-        out.onFinish = [onFinish, userData]() { onFinish(userData); };
+        out.onFinish = [onFinish, userData]() {
+            LOG_CALLBACK("OH_ArkUI_NativeModule_AnimationGroup_RegisterOnFinishCallback", onFinish);
+            onFinish(userData);
+        };
     } else {
         out.onFinish = nullptr;
     }

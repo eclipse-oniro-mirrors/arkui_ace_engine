@@ -25,7 +25,7 @@ namespace OHOS::Ace {
 
 constexpr int64_t INVALID_ID = -1;
 
-class HyperlinkResources : public virtual AceType {
+class HyperlinkResources : public AceType {
     DECLARE_ACE_TYPE(HyperlinkResources, AceType);
 
 public:

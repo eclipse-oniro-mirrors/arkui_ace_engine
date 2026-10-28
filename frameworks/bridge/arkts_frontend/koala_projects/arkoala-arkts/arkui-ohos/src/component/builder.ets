@@ -1,5 +1,5 @@
 import { int32, int64, float32 } from '@koalaui/common';
-import { KInt, KPointer, KBoolean, NativeBuffer, KStringPtr, wrapCallback } from '@koalaui/interop';
+import { KInt, KPointer, KBoolean, NativeBuffer, KStringPtr, wrapCallback, loadNativeModuleLibrary } from '@koalaui/interop';
 import { memo, memo_stable } from '@koalaui/runtime/annotations';
 import { ComponentBuilder } from '@koalaui/builderLambda';
 import { isDynamicObject } from './interop';
@@ -15,6 +15,31 @@ export class WrappedBuilder<T> {
 
 export function wrapBuilder<T>(builder: T): WrappedBuilder<T> {
     return new WrappedBuilder<T>(builder);
+}
+
+// Restricted-builder instrumentation hooks of @Builder({ isPlaceholder: true })
+// conversion products: the static counterpart of the globalThis entries the
+// declarative engine mounts in JsRegisterViews. Self-contained native binding:
+// the same ArkUINativeModule library, declared here so the hooks stay in the
+// handwritten source instead of a generated module. The native side only
+// drives the re-entrant scope counter, so both stay cheap no-ops outside an
+// admission probe or a runtime rebuild.
+class AcePlaceholderScopeModule {
+    static {
+        loadNativeModuleLibrary("ArkUINativeModule")
+    }
+    @ani.unsafe.Direct
+    native static _AceBeginScrollPlaceholder(): void
+    @ani.unsafe.Direct
+    native static _AceEndScrollPlaceholder(): void
+}
+
+export function __aceBeginScrollPlaceholder__(): void {
+    AcePlaceholderScopeModule._AceBeginScrollPlaceholder()
+}
+
+export function __aceEndScrollPlaceholder__(): void {
+    AcePlaceholderScopeModule._AceEndScrollPlaceholder()
 }
 
 export function makeBuilderParameterProxy<T extends Object>(

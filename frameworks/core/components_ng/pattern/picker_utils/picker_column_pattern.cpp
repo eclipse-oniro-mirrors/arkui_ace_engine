@@ -383,11 +383,13 @@ Dimension PickerColumnPattern::LinearFontSize(
 {
     Dimension start = startFontSize;
     Dimension end = endFontSize;
-    if (start.Unit() == DimensionUnit::LPX) {
+    if (start.Unit() == DimensionUnit::VP || start.Unit() == DimensionUnit::FP ||
+        start.Unit() == DimensionUnit::LPX) {
         start = Dimension(start.ConvertToPx());
     }
 
-    if (end.Unit() == DimensionUnit::LPX) {
+    if (end.Unit() == DimensionUnit::VP || end.Unit() == DimensionUnit::FP ||
+        end.Unit() == DimensionUnit::LPX) {
         end = Dimension(end.ConvertToPx());
     }
 

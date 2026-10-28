@@ -934,6 +934,15 @@ void SetResizableLattice(ArkUINodeHandle node, void* lattice, bool isCapi)
     }
 }
 
+void* GetResizableLattice(ArkUINodeHandle node)
+{
+    auto* frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_RETURN(frameNode, nullptr);
+    auto lattice = ImageModelNG::GetResizableLattice(frameNode);
+    CHECK_NULL_RETURN(lattice, nullptr);
+    return lattice->GetDrawingLatticeNative();
+}
+
 void ResetResizableLattice(ArkUINodeHandle node)
 {
     auto* frameNode = reinterpret_cast<FrameNode*>(node);
@@ -1546,6 +1555,7 @@ const ArkUIImageModifier* GetImageModifier()
         .getAntiAlias = GetAntiAlias,
         .setImageFillSetByUser = SetImageFillSetByUser,
         .setReloadKey = SetReloadKey,
+        .getResizableLattice = GetResizableLattice,
     };
     CHECK_INITIALIZED_FIELDS_END(modifier, 0, 0, 0); // don't move this line
     return &modifier;

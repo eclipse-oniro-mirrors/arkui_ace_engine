@@ -18,11 +18,73 @@
 #include "base/log/dump_log.h"
 #include "core/components_ng/pattern/pattern.h"
 #include "core/components_ng/pattern/lazy_layout/lazy_layout_utils.h"
+#include "core/components_ng/pattern/lazy_layout/prepared_layout_geometry.h"
 #include "core/components_ng/pattern/lazy_layout/header_footer_utils.h"
 #include "core/components_ng/pattern/scrollable/scrollable_pattern.h"
 #include "core/pipeline_ng/pipeline_context.h"
 
 namespace OHOS::Ace::NG {
+
+bool LazyColumnLayoutPattern::ApplyPreparedGeometry(const PreparedLayoutGeometry& geometry)
+{
+    if (geometry.type != PreparedLayoutType::COLUMN || !layoutInfo_) {
+        return false;
+    }
+    layoutInfo_->posMap_.clear();
+    const float origin = geometry.fromEnd ? geometry.bodyMainSize : 0.0f;
+    for (const auto& [index, item] : geometry.positions) {
+        layoutInfo_->posMap_[index] = { item.startPos + origin, item.endPos + origin };
+    }
+    layoutInfo_->totalItemCount_ = geometry.itemCount;
+    layoutInfo_->space_ = geometry.space;
+    layoutInfo_->estimateItemSize_ = geometry.estimatedItemSize;
+    layoutInfo_->headerMainSize_ = geometry.headerMainSize;
+    layoutInfo_->footerMainSize_ = geometry.footerMainSize;
+    layoutInfo_->totalMainSize_ = geometry.bodyMainSize + geometry.headerMainSize + geometry.footerMainSize;
+    layoutInfo_->premeasuredMainSize_ = layoutInfo_->totalMainSize_;
+    layoutInfo_->startIndex_ = -1;
+    layoutInfo_->endIndex_ = -1;
+    layoutInfo_->cachedStartIndex_ = -1;
+    layoutInfo_->cachedEndIndex_ = -1;
+    layoutInfo_->layoutedStartIndex_ = -1;
+    layoutInfo_->layoutedEndIndex_ = -1;
+    layoutInfo_->updatedStart_ = INT_MAX;
+    layoutInfo_->updatedEnd_ = -1;
+    layoutInfo_->cachedUpdatedStart_ = INT_MAX;
+    layoutInfo_->cachedUpdatedEnd_ = -1;
+    layoutInfo_->visibleStartIndex_ = -1;
+    layoutInfo_->visibleEndIndex_ = -1;
+    layoutInfo_->referencePos_ = 0.0f;
+    layoutInfo_->layoutedStart_ = 0.0f;
+    layoutInfo_->layoutedEnd_ = 0.0f;
+    layoutInfo_->cacheStartPos_ = 0.0f;
+    layoutInfo_->cacheEndPos_ = 0.0f;
+    layoutInfo_->deadline_.reset();
+    layoutInfo_->spaceUpdated_ = false;
+    layoutInfo_->adjustOffset_ = {};
+    return true;
+}
+
+std::optional<LazyPremeasureResult> LazyColumnLayoutPattern::Premeasure(LayoutWrapper* wrapper)
+{
+    CHECK_NULL_RETURN(wrapper, LazyPremeasureResult());
+    auto algorithmWrapper = wrapper->GetLayoutAlgorithm();
+    CHECK_NULL_RETURN(algorithmWrapper, LazyPremeasureResult());
+    auto algorithm = DynamicCast<LazyColumnLayoutAlgorithm>(algorithmWrapper->GetLayoutAlgorithm());
+    CHECK_NULL_RETURN(algorithm, LazyPremeasureResult());
+    return algorithm->Premeasure(wrapper);
+}
+
+void LazyColumnLayoutPattern::ResetPremeasuredMainSizeIfGone(const RefPtr<LayoutWrapper>& dirty)
+{
+    CHECK_NULL_VOID(layoutInfo_->premeasuredMainSize_);
+    auto host = dirty ? dirty->GetHostNode() : nullptr;
+    if (host && !host->IsLayoutDirtyMarked() &&
+        dirty->GetLayoutProperty()->GetVisibilityValue(VisibleType::VISIBLE) == VisibleType::GONE &&
+        dirty->GetGeometryNode()->GetFrameSize() == SizeF()) {
+        layoutInfo_->premeasuredMainSize_.reset();
+    }
+}
 
 bool LazyColumnLayoutPattern::IsAtomicNode() const
 {
@@ -107,6 +169,7 @@ void LazyColumnLayoutPattern::SetOnVisibleIndexesChange(std::function<void(int32
 bool LazyColumnLayoutPattern::OnDirtyLayoutWrapperSwap(
     const RefPtr<LayoutWrapper>& dirty, const DirtySwapConfig& config)
 {
+    ResetPremeasuredMainSizeIfGone(dirty);
     if (config.skipMeasure && config.skipLayout) {
         return false;
     }
@@ -304,6 +367,19 @@ void LazyColumnLayoutPattern::OnAttachToMainTree()
     LazyLayoutUtils::ValidateLazyLayoutParent(GetHost(), "LazyColumnLayout");
 }
 
+void LazyColumnLayoutPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config)
+{
+    CHECK_NULL_VOID(layoutInfo_);
+    if (!config.IsPublicTree()) {
+        layoutInfo_->DumpAdvanceInfo(json, config);
+        DumpStickyHeaderHandoffInfo(json);
+        return;
+    }
+    if (config.visualProperties) {
+        layoutInfo_->DumpAdvanceInfo(json, config);
+    }
+}
+
 void LazyColumnLayoutPattern::DumpAdvanceInfo()
 {
     CHECK_NULL_VOID(layoutInfo_);
@@ -313,8 +389,6 @@ void LazyColumnLayoutPattern::DumpAdvanceInfo()
 
 void LazyColumnLayoutPattern::DumpAdvanceInfo(std::unique_ptr<JsonValue>& json)
 {
-    CHECK_NULL_VOID(layoutInfo_);
-    layoutInfo_->DumpAdvanceInfo(json);
-    DumpStickyHeaderHandoffInfo(json);
+    LazyColumnLayoutPattern::DumpAdvanceInfo(json, ParamConfig());
 }
 } // namespace OHOS::Ace::NG

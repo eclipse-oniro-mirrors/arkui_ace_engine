@@ -58,9 +58,11 @@ class RSUIDirector;
 namespace OHOS::Ace::NG {
     class RecycleManager;
     class RenderContext;
+    struct UITreeRequestState;
 }
 
 namespace OHOS::Ace {
+struct InspectorWindowSnapshot;
 class AIWriteAdapter;
 class RRect;
 #ifndef CROSS_PLATFORM
@@ -89,6 +91,7 @@ class InspectorOffscreenNodesMgr;
 class OverlayManager;
 class PostEventManager;
 class PrivacySensitiveManager;
+class ContainerModalPattern;
 class SafeAreaManager;
 class SelectOverlayManager;
 class SharedOverlayManager;
@@ -98,6 +101,7 @@ class ToolbarManager;
 class UIExtensionManager;
 class AccessibilityManagerNG;
 class ForceSplitManager;
+class HandednessManager;
 class RecoverableManager;
 class FormVisibleManager;
 class FormEventManager;
@@ -137,7 +141,7 @@ public:
         RefPtr<AssetManager> assetManager, const RefPtr<Frontend>& frontend, int32_t instanceId);
     PipelineContext();
 
-    ~PipelineContext() override = default;
+    ~PipelineContext() override;
 
     static RefPtr<PipelineContext> GetCurrentContext();
 
@@ -230,6 +234,11 @@ public:
 
     std::string GetCurrentPageName();
 
+    // Search scene page matching by pageType: top NavDestination name and top
+    // pageUrl fetched independently, never the concatenated string (ADR-2).
+    std::string GetCurrentNavDestinationName();
+    std::string GetCurrentPageUrl();
+
     void OnTouchEvent(const TouchEvent& point, const RefPtr<NG::FrameNode>& node, bool isSubPipe = false) override;
 
     void OnAccessibilityHoverEvent(const TouchEvent& point, const RefPtr<NG::FrameNode>& node) override;
@@ -264,6 +273,7 @@ public:
     bool OnNonPointerEvent(const NonPointerEvent& event) override;
 
     void ProcessCommand(const std::string& command);
+    void ProcessCommandWithResult(const std::string& command, const std::function<void(const CommandResult&)>& finish);
 
     // ReDispatch KeyEvent from Web process.
     void ReDispatch(KeyEvent& keyEvent);
@@ -462,6 +472,7 @@ public:
     void UpdateCutoutSafeArea(const SafeAreaInsets& cutoutSafeArea, bool checkSystemWindow = false) override;
     void UpdateNavSafeArea(const SafeAreaInsets& navSafeArea, bool checkSystemWindow = false) override;
     void UpdateFloatNavSafeArea(const SafeAreaInsets& floatNavSafeArea) override;
+    void UpdateTitleButtonSafeArea(const SafeAreaInsets& titleButtonSafeArea) override;
 
     void UpdateSystemSafeAreaWithoutAnimation(
         const SafeAreaInsets& systemSafeArea, bool checkSceneBoardWindow = false) override;
@@ -473,6 +484,8 @@ public:
         const SafeAreaInsets& navSafeArea, bool checkSceneBoardWindow = false) override;
     
     void UpdateFloatNavSafeAreaWithoutAnimation(const SafeAreaInsets& floatNavSafeArea) override;
+
+    void UpdateTitleButtonSafeAreaWithoutAnimation(const SafeAreaInsets& titleButtonSafeArea) override;
 
     void UpdateOriginAvoidArea(const Rosen::AvoidArea& avoidArea, uint32_t type,
         WindowSizeChangeReason reason) override;
@@ -658,10 +671,11 @@ public:
         return taskScheduler_->IsLayouting();
     }
 
-    bool IsFirstRootLayout() const
+    bool IsFirstFlushMessages() const
     {
-        return isFirstRootLayout_;
+        return isFirstFlushMessages_;
     }
+
     // end pipeline, exit app
     void Finish(bool autoFinish) const override;
     RectF GetRootRect();
@@ -833,6 +847,7 @@ public:
     RefPtr<FrameNode> GetContainerModalNode() const;
     void SetContainerModalTitleVisible(bool customTitleSettedShow, bool floatingTitleSettedShow);
     void SetContainerModalTitleHeight(int32_t height);
+    void SetContainerModalTitleHeightWithVp(double heightVp);
     int32_t GetContainerModalTitleHeight();
     bool GetContainerModalButtonsRect(RectF& containerModal, RectF& buttons);
     void SubscribeContainerModalButtonsRectChange(
@@ -881,6 +896,8 @@ public:
     const RefPtr<NavigationManager>& GetNavigationManager() const;
 
     const RefPtr<ForceSplitManager>& GetForceSplitManager() const;
+
+    const RefPtr<HandednessManager>& GetHandednessManager() const;
 
     const RefPtr<RecoverableManager>& GetRecoverableManager() const;
 
@@ -1031,7 +1048,8 @@ public:
     }
 
     void GetOverlayInfo(bool hasOverlay, std::shared_ptr<JsonValue>& root, std::shared_ptr<JsonValue>& overlayContent,
-        std::unique_ptr<JsonValue>& overlayChildrenArray, std::unique_ptr<JsonValue>& overlayArray) const;
+        std::unique_ptr<JsonValue>& overlayChildrenArray, std::unique_ptr<JsonValue>& overlayArray,
+        ParamConfig config = {}) const;
 
     // Collect Inspector-style visible starting nodes. Delegates the pure
     // algorithm to DumpUtil so both Inspector dump and PageScene
@@ -1042,7 +1060,11 @@ public:
     void GetComponentOverlayInspector(std::shared_ptr<JsonValue>& root, RefPtr<NG::FrameNode> startNode,
         ParamConfig config, bool isInSubWindow, double parentFinalOpacity = 1.0) const;
 
+    void SetInspectorWindowSnapshotCallback(std::function<std::optional<InspectorWindowSnapshot>()>&& callback);
+    const std::string& GetInspectorAppTitle() const { return inspectorAppTitle_; }
     void GetInspectorTree(bool onlyNeedVisible, ParamConfig config = ParamConfig());
+    void CollectInspectorTreeInto(std::shared_ptr<JsonValue>& root, bool onlyNeedVisible, ParamConfig config);
+    UITreeRequestState& GetUITreeRequestState();
 
     void GetHitTestInfos(InteractionParamConfig config);
 
@@ -1376,6 +1398,10 @@ protected:
     void PostKeyboardAvoidTask();
 
 private:
+    std::function<std::optional<InspectorWindowSnapshot>()> inspectorWindowSnapshot_;
+    std::string inspectorAppTitle_;
+    RefPtr<ContainerModalPattern> GetContainerModalPatternForTitleHeight();
+
     void ExecuteSurfaceChangedCallbacks(int32_t newWidth, int32_t newHeight, WindowSizeChangeReason type);
 
     void FlushWindowStateChangedCallback(bool isShow);
@@ -1682,6 +1708,7 @@ private:
     std::once_flag scrollPlaceholderOnceFlag_;
     RefPtr<NavigationManager> navigationMgr_;
     RefPtr<ForceSplitManager> forceSplitMgr_;
+    RefPtr<HandednessManager> handednessManager_;
     RefPtr<RecoverableManager> recoverableMgr_;
     RefPtr<FormVisibleManager> formVisibleMgr_;
     RefPtr<FormEventManager> formEventMgr_;
@@ -1747,6 +1774,7 @@ private:
     RefPtr<MaterialProcessor> materialProcessor_;
     bool isRightMouseMappingActive_ = false;
     std::function<void()> onRightMouseMappingCancel_;
+    std::unique_ptr<NG::UITreeRequestState> uiTreeRequestState_;
 };
 
 /**

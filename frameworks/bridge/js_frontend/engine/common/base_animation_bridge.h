@@ -60,7 +60,7 @@ public:
         std::unordered_map<std::string, std::string>& animationStringParams);
 };
 
-class BaseAnimationBridge : public virtual AceType {
+class BaseAnimationBridge : public AceType {
     DECLARE_ACE_TYPE(BaseAnimationBridge, AceType);
 public:
     virtual void OnJsEngineDestroy() {}

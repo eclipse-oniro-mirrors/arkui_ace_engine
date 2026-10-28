@@ -244,8 +244,23 @@ class LazyArkTabsComponent extends ArkComponent {
     return this;
   }
 
+  sidebarFooter(value: ComponentContent): this {
+    this.lazyComponent.sidebarFooter(value);
+    return this;
+  }
+
+  sidebarBottomBar(value: ComponentContent): this {
+    this.lazyComponent.sidebarBottomBar(value);
+    return this;
+  }
+
   sidebarSearchable(value: TabsSidebarSearchableOptions): this {
     this.lazyComponent.sidebarSearchable(value);
+    return this;
+  }
+
+  showSidebarControlButton(value: boolean): this {
+    this.lazyComponent.showSidebarControlButton(value);
     return this;
   }
 

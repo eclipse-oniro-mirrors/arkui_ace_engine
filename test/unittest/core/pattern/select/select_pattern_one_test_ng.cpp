@@ -43,6 +43,7 @@
 #include "core/components_ng/pattern/menu/menu_layout_property.h"
 #include "core/components_ng/pattern/menu/menu_pattern.h"
 #include "core/components_ng/pattern/menu/menu_view.h"
+#include "core/components_ng/pattern/node_container/node_container_node.h"
 #include "core/components_ng/pattern/scroll/scroll_layout_property.h"
 #include "core/components_ng/pattern/scroll/scroll_pattern.h"
 #include "core/components_ng/pattern/select/select_model_ng.h"
@@ -111,6 +112,7 @@ public:
 protected:
     static RefPtr<FrameNode> CreateSelect(const std::vector<SelectParam>& value, const TestProperty& test);
     static FrameNode* CreateSelect(const std::vector<SelectParam>& value);
+    static RefPtr<FrameNode> BuildNodeContainerSubtree(RefPtr<SelectPattern>& outPattern);
 };
 
 void SelectPatternOneTestNg::SetUpTestCase()
@@ -1164,5 +1166,217 @@ HWTEST_F(SelectPatternOneTestNg, BindMenuTouch010, TestSize.Level1)
 
     auto touchCallback = touchEvents.front()->GetTouchEventCallback();
     EXPECT_NO_FATAL_FAILURE(touchCallback(touchInfo));
+}
+
+RefPtr<FrameNode> SelectPatternOneTestNg::BuildNodeContainerSubtree(RefPtr<SelectPattern>& outPattern)
+{
+    auto rootNode = FrameNode::CreateFrameNode(V2::STACK_ETS_TAG,
+        ViewStackProcessor::GetInstance()->ClaimNodeId(), AceType::MakeRefPtr<Pattern>());
+    auto nodeContainer = NodeContainerNode::GetOrCreateNodeContainerNode(
+        ViewStackProcessor::GetInstance()->ClaimNodeId());
+    auto builderRoot = FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG,
+        ViewStackProcessor::GetInstance()->ClaimNodeId(), AceType::MakeRefPtr<LinearLayoutPattern>(false));
+    std::vector<SelectParam> params = { { OPTION_TEXT, FILE_SOURCE }, { OPTION_TEXT_2, INTERNAL_SOURCE } };
+    auto* selectNode = CreateSelect(params);
+    outPattern = selectNode->GetPattern<SelectPattern>();
+    outPattern->GetHost()->SetActive(true);
+    builderRoot->AddChild(outPattern->GetHost());
+    builderRoot->SetActive(true);
+    nodeContainer->AddChild(builderRoot);
+    nodeContainer->SetActive(true);
+    rootNode->AddChild(nodeContainer);
+    rootNode->SetActive(true);
+    return rootNode;
+}
+
+/**
+ * @tc.name: SelectColorModeChange001
+ * @tc.desc: Test Select value text color follows theme when NotifyColorModeChange dispatched
+ * @tc.type: FUNC
+ */
+HWTEST_F(SelectPatternOneTestNg, SelectColorModeChange001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Prepare theme manager with light theme font color.
+     */
+    auto themeManager = AceType::MakeRefPtr<MockThemeManager>();
+    MockPipelineContext::GetCurrent()->SetThemeManager(themeManager);
+    auto lightTheme = AceType::MakeRefPtr<SelectTheme>();
+    lightTheme->SetFontColor(Color::RED);
+    EXPECT_CALL(*themeManager, GetTheme(_)).WillRepeatedly(Return(lightTheme));
+    EXPECT_CALL(*themeManager, GetTheme(_, _)).WillRepeatedly(Return(lightTheme));
+
+    /**
+     * @tc.steps: step2. Create select under a root node, value text uses light theme color.
+     */
+    auto rootNode = FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG,
+        ViewStackProcessor::GetInstance()->ClaimNodeId(), AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(rootNode, nullptr);
+    std::vector<SelectParam> params = { { OPTION_TEXT, FILE_SOURCE }, { OPTION_TEXT_2, INTERNAL_SOURCE } };
+    auto* selectNode = CreateSelect(params);
+    ASSERT_NE(selectNode, nullptr);
+    auto selectPattern = selectNode->GetPattern<SelectPattern>();
+    ASSERT_NE(selectPattern, nullptr);
+    selectPattern->GetHost()->SetActive(true);
+    rootNode->AddChild(selectPattern->GetHost());
+    rootNode->SetActive(true);
+    ASSERT_NE(selectPattern->text_, nullptr);
+    auto textProps = selectPattern->text_->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_NE(textProps, nullptr);
+    EXPECT_EQ(textProps->GetTextColorValue(Color::BLACK), Color::RED);
+
+    /**
+     * @tc.steps: step3. Switch theme to dark and notify color mode change from root.
+     * @tc.expected: Value text color is refreshed to the dark theme font color.
+     */
+    auto darkTheme = AceType::MakeRefPtr<SelectTheme>();
+    darkTheme->SetFontColor(Color::WHITE);
+    EXPECT_CALL(*themeManager, GetTheme(_)).WillRepeatedly(Return(darkTheme));
+    EXPECT_CALL(*themeManager, GetTheme(_, _)).WillRepeatedly(Return(darkTheme));
+    rootNode->NotifyColorModeChange(static_cast<uint32_t>(ColorMode::DARK));
+    EXPECT_EQ(textProps->GetTextColorValue(Color::BLACK), Color::WHITE);
+}
+
+/**
+ * @tc.name: SelectColorModeChange002
+ * @tc.desc: Test Select value text color update when select is hosted by NodeContainer subtree
+ * @tc.type: FUNC
+ */
+HWTEST_F(SelectPatternOneTestNg, SelectColorModeChange002, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Prepare theme manager with light theme font color.
+     */
+    auto themeManager = AceType::MakeRefPtr<MockThemeManager>();
+    MockPipelineContext::GetCurrent()->SetThemeManager(themeManager);
+    auto lightTheme = AceType::MakeRefPtr<SelectTheme>();
+    lightTheme->SetFontColor(Color::RED);
+    EXPECT_CALL(*themeManager, GetTheme(_)).WillRepeatedly(Return(lightTheme));
+    EXPECT_CALL(*themeManager, GetTheme(_, _)).WillRepeatedly(Return(lightTheme));
+
+    /**
+     * @tc.steps: step2. Build NodeContainer-hosted subtree: root -> NodeContainer -> builder root
+     * -> select, simulating NodeController.makeNode hosting.
+     */
+    auto rootNode = FrameNode::CreateFrameNode(V2::STACK_ETS_TAG,
+        ViewStackProcessor::GetInstance()->ClaimNodeId(), AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(rootNode, nullptr);
+    auto nodeContainer = NodeContainerNode::GetOrCreateNodeContainerNode(
+        ViewStackProcessor::GetInstance()->ClaimNodeId());
+    ASSERT_NE(nodeContainer, nullptr);
+    auto builderRoot = FrameNode::CreateFrameNode(V2::COLUMN_ETS_TAG,
+        ViewStackProcessor::GetInstance()->ClaimNodeId(), AceType::MakeRefPtr<LinearLayoutPattern>(false));
+    ASSERT_NE(builderRoot, nullptr);
+    std::vector<SelectParam> params = { { OPTION_TEXT, FILE_SOURCE }, { OPTION_TEXT_2, INTERNAL_SOURCE } };
+    auto* selectNode = CreateSelect(params);
+    ASSERT_NE(selectNode, nullptr);
+    auto selectPattern = selectNode->GetPattern<SelectPattern>();
+    ASSERT_NE(selectPattern, nullptr);
+    selectPattern->GetHost()->SetActive(true);
+    builderRoot->AddChild(selectPattern->GetHost());
+    builderRoot->SetActive(true);
+    nodeContainer->AddChild(builderRoot);
+    nodeContainer->SetActive(true);
+    rootNode->AddChild(nodeContainer);
+    rootNode->SetActive(true);
+    ASSERT_NE(selectPattern->text_, nullptr);
+    auto textProps = selectPattern->text_->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_NE(textProps, nullptr);
+    EXPECT_EQ(textProps->GetTextColorValue(Color::BLACK), Color::RED);
+
+    /**
+     * @tc.steps: step3. Switch theme to dark and notify color mode change from root.
+     * @tc.expected: Value text color inside NodeContainer subtree is refreshed.
+     */
+    auto darkTheme = AceType::MakeRefPtr<SelectTheme>();
+    darkTheme->SetFontColor(Color::WHITE);
+    EXPECT_CALL(*themeManager, GetTheme(_)).WillRepeatedly(Return(darkTheme));
+    EXPECT_CALL(*themeManager, GetTheme(_, _)).WillRepeatedly(Return(darkTheme));
+    rootNode->NotifyColorModeChange(static_cast<uint32_t>(ColorMode::DARK));
+    EXPECT_EQ(textProps->GetTextColorValue(Color::BLACK), Color::WHITE);
+}
+
+/**
+ * @tc.name: SelectColorModeChange003
+ * @tc.desc: Test Select value text color update via configuration-update walk, which is
+ *           the only notification path when ConfigChangePerform is off (the default).
+ * @tc.type: FUNC
+ */
+HWTEST_F(SelectPatternOneTestNg, SelectColorModeChange003, TestSize.Level1)
+{
+    auto themeManager = AceType::MakeRefPtr<MockThemeManager>();
+    MockPipelineContext::GetCurrent()->SetThemeManager(themeManager);
+    auto lightTheme = AceType::MakeRefPtr<SelectTheme>();
+    lightTheme->SetFontColor(Color::RED);
+    EXPECT_CALL(*themeManager, GetTheme(_)).WillRepeatedly(Return(lightTheme));
+    EXPECT_CALL(*themeManager, GetTheme(_, _)).WillRepeatedly(Return(lightTheme));
+
+    RefPtr<SelectPattern> selectPattern;
+    auto rootNode = BuildNodeContainerSubtree(selectPattern);
+    ASSERT_NE(rootNode, nullptr);
+    ASSERT_NE(selectPattern, nullptr);
+    ASSERT_NE(selectPattern->text_, nullptr);
+    auto textProps = selectPattern->text_->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_NE(textProps, nullptr);
+    EXPECT_EQ(textProps->GetTextColorValue(Color::BLACK), Color::RED);
+
+    auto darkTheme = AceType::MakeRefPtr<SelectTheme>();
+    darkTheme->SetFontColor(Color::WHITE);
+    EXPECT_CALL(*themeManager, GetTheme(_)).WillRepeatedly(Return(darkTheme));
+    EXPECT_CALL(*themeManager, GetTheme(_, _)).WillRepeatedly(Return(darkTheme));
+    g_isConfigChangePerform = true;
+    ConfigurationChange configurationChange;
+    configurationChange.colorModeUpdate = true;
+    rootNode->UpdateConfigurationUpdate(configurationChange);
+    g_isConfigChangePerform = false;
+    EXPECT_EQ(textProps->GetTextColorValue(Color::BLACK), Color::WHITE);
+}
+
+/**
+ * @tc.name: SelectColorModeChange004
+ * @tc.desc: Test Select spinner color follows theme via configuration-update walk when
+ *           hosted by NodeContainer subtree.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SelectPatternOneTestNg, SelectColorModeChange004, TestSize.Level1)
+{
+    int32_t backupApiVersion = AceApplicationInfo::GetInstance().GetApiTargetVersion();
+    AceApplicationInfo::GetInstance().SetApiTargetVersion(static_cast<int32_t>(PlatformVersion::VERSION_TWELVE));
+    auto themeManager = AceType::MakeRefPtr<MockThemeManager>();
+    MockPipelineContext::GetCurrent()->SetThemeManager(themeManager);
+    auto lightTheme = AceType::MakeRefPtr<SelectTheme>();
+    lightTheme->SetFontColor(Color::RED);
+    lightTheme->spinnerColor_ = Color::RED;
+    lightTheme->spinnerSymbolColor_ = Color::RED;
+    EXPECT_CALL(*themeManager, GetTheme(_)).WillRepeatedly(Return(lightTheme));
+    EXPECT_CALL(*themeManager, GetTheme(_, _)).WillRepeatedly(Return(lightTheme));
+
+    RefPtr<SelectPattern> selectPattern;
+    auto rootNode = BuildNodeContainerSubtree(selectPattern);
+    ASSERT_NE(rootNode, nullptr);
+    ASSERT_NE(selectPattern, nullptr);
+    ASSERT_NE(selectPattern->spinner_, nullptr);
+
+    auto darkTheme = AceType::MakeRefPtr<SelectTheme>();
+    darkTheme->SetFontColor(Color::WHITE);
+    darkTheme->spinnerColor_ = Color::WHITE;
+    darkTheme->spinnerSymbolColor_ = Color::WHITE;
+    EXPECT_CALL(*themeManager, GetTheme(_)).WillRepeatedly(Return(darkTheme));
+    EXPECT_CALL(*themeManager, GetTheme(_, _)).WillRepeatedly(Return(darkTheme));
+    g_isConfigChangePerform = true;
+    ConfigurationChange configurationChange;
+    configurationChange.colorModeUpdate = true;
+    rootNode->UpdateConfigurationUpdate(configurationChange);
+    g_isConfigChangePerform = false;
+    if (selectPattern->spinner_->GetTag() == V2::SYMBOL_ETS_TAG) {
+        auto spinnerLayoutProperty = selectPattern->spinner_->GetLayoutProperty<TextLayoutProperty>();
+        ASSERT_NE(spinnerLayoutProperty, nullptr);
+        EXPECT_EQ(spinnerLayoutProperty->GetSymbolColorListValue({}).front(), Color::WHITE);
+    } else {
+        auto spinnerRenderProperty = selectPattern->spinner_->GetPaintProperty<ImageRenderProperty>();
+        ASSERT_NE(spinnerRenderProperty, nullptr);
+        EXPECT_EQ(spinnerRenderProperty->GetSvgFillColorValue(Color::BLACK), Color::WHITE);
+    }
+    AceApplicationInfo::GetInstance().SetApiTargetVersion(backupApiVersion);
 }
 } // namespace OHOS::Ace::NG

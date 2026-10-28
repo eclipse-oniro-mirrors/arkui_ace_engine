@@ -245,6 +245,23 @@ function loadComponent(): ComponentObj | undefined {
         }
       }
     }
+    class GridScrollSnapStrategyModifier extends ModifierWithKey<ScrollSnapAlign | ScrollSnapOffsetProvider> {
+      constructor(value: ScrollSnapAlign | ScrollSnapOffsetProvider) {
+        super(value);
+      }
+      static identity: Symbol = Symbol('gridScrollSnapStrategy');
+      applyPeer(node: KNode, reset: boolean): void {
+        if (reset) {
+          getUINativeModule().grid.resetScrollSnapStrategy(node);
+        }
+        else {
+          getUINativeModule().grid.setScrollSnapStrategy(node, this.value);
+        }
+      }
+      checkObjectDiff(): boolean {
+        return !isBaseOrResourceEqual(this.stageValue, this.value);
+      }
+    }
     class GridFrictionModifier extends ModifierWithKey<number | Resource> {
       constructor(value: number | Resource) {
         super(value);
@@ -773,6 +790,11 @@ function loadComponent(): ComponentObj | undefined {
         modifierWithKey(this._modifiersWithKeys, GridNestedScrollModifier.identity, GridNestedScrollModifier, value);
         return this;
       }
+      scrollSnapStrategy(value: ScrollSnapAlign | ScrollSnapOffsetProvider): this {
+        modifierWithKey(
+            this._modifiersWithKeys, GridScrollSnapStrategyModifier.identity, GridScrollSnapStrategyModifier, value);
+        return this;
+      }
       enableScrollInteraction(value: boolean): this {
         modifierWithKey(this._modifiersWithKeys, GridEnableScrollModifier.identity, GridEnableScrollModifier, value);
         return this;
@@ -955,6 +977,9 @@ class JSGrid extends JSContainerBase {
   static nestedScroll(value: any): JSGrid {
     getUINativeModule().grid.setNestedScroll(true, value);
     return this;
+  }
+  static scrollSnapStrategy(value: ScrollSnapAlign | ScrollSnapOffsetProvider | undefined): void {
+    getUINativeModule().grid.setScrollSnapStrategy(true, value);
   }
   static enableScrollInteraction(value: any): void {
     getUINativeModule().grid.setEnableScroll(true, value);

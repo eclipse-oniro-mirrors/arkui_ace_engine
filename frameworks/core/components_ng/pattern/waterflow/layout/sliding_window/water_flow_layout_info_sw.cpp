@@ -13,6 +13,8 @@
  * limitations under the License.
  */
 #include "core/components_ng/pattern/waterflow/layout/sliding_window/water_flow_layout_info_sw.h"
+
+#include <cmath>
 #include "base/log/event_report.h"
 
 #include <numeric>
@@ -882,6 +884,7 @@ void WaterFlowLayoutInfoSW::EndCacheUpdate()
 
 void WaterFlowLayoutInfoSW::ClearData()
 {
+    fastScrollEstimation_ = false;
     segmentCache_.clear();
     segmentTails_.clear();
     lanes_.clear();
@@ -1013,13 +1016,107 @@ float WaterFlowLayoutInfoSW::EstimateSectionHeight(
     const size_t crossCnt = std::max(lanes_[section].size(), (size_t)1); // prevent division by 0
 
     float height = 0.0f;
-    for (int32_t i = startBound; i <= endBound; ++i) {
-        height += GetCachedHeight(i).value_or(average) + mainGap_[section];
+    if (IsFastScrollEstimating()) {
+        const auto count = std::max<int64_t>(0, static_cast<int64_t>(endBound) - startBound + 1);
+        height = static_cast<float>(count) * (average + mainGap_[section]);
+    } else {
+        for (int32_t i = startBound; i <= endBound; ++i) {
+            height += GetCachedHeight(i).value_or(average) + mainGap_[section];
+        }
     }
     height /= static_cast<float>(crossCnt);
     height += average; // to compensate half-filled last row
     height += axis_ == Axis::VERTICAL ? margins_[section].Height() : margins_[section].Width();
     return height;
+}
+
+RefPtr<WaterFlowLayoutInfoSW> WaterFlowLayoutInfoSW::CreateFastScrollWindow() const
+{
+    auto window = MakeRefPtr<WaterFlowLayoutInfoSW>();
+    window->axis_ = axis_;
+    window->footerIndex_ = footerIndex_;
+    window->lastMainSize_ = lastMainSize_;
+    window->expandHeight_ = expandHeight_;
+    window->startFixOffset_ = startFixOffset_;
+    window->endFixOffset_ = endFixOffset_;
+    window->contentStartOffset_ = contentStartOffset_;
+    window->contentEndOffset_ = contentEndOffset_;
+    window->segmentTails_ = segmentTails_;
+    window->margins_ = margins_;
+    window->mainGap_ = mainGap_;
+    window->repeatDifference_ = repeatDifference_;
+    window->firstRepeatCount_ = firstRepeatCount_;
+    window->childrenCount_ = childrenCount_;
+    window->lanes_.resize(lanes_.size());
+    for (size_t section = 0; section < lanes_.size(); ++section) {
+        window->lanes_[section].resize(lanes_[section].size());
+    }
+    window->fastScrollEstimation_ = true;
+    return window;
+}
+
+std::optional<float> WaterFlowLayoutInfoSW::EstimateFastScrollPosition(int32_t index) const
+{
+    if (index < 0 || idxToHeight_.empty() || startIndex_ > endIndex_ ||
+        lanes_.size() != segmentTails_.size() || mainGap_.size() != lanes_.size() ||
+        margins_.size() != lanes_.size()) {
+        return std::nullopt;
+    }
+    if (ItemInView(index)) {
+        return DistanceToTop(index, mainGap_[GetSegment(index)]) - totalOffset_;
+    }
+    const float average = heightSum_ / static_cast<float>(idxToHeight_.size());
+    if (!Positive(average) || !std::isfinite(average)) {
+        return std::nullopt;
+    }
+    auto prefix = [this, average](int32_t target) {
+        float position = 0.0f;
+        int32_t first = 0;
+        for (size_t section = 0; section < lanes_.size(); ++section) {
+            const int32_t count = std::max(0, std::min(target, segmentTails_[section] + 1) - first);
+            const size_t columns = std::max<size_t>(1, lanes_[section].size());
+            const float margin = axis_ == Axis::VERTICAL ? margins_[section].Height() : margins_[section].Width();
+            if (target <= segmentTails_[section]) {
+                // Items of the target section start after that section's leading margin.
+                const auto& start = axis_ == Axis::VERTICAL ? margins_[section].top : margins_[section].left;
+                position += static_cast<float>(count / columns) * (average + mainGap_[section]) + start.value_or(0.0f);
+                break;
+            }
+            position += std::ceil(static_cast<float>(count) / columns) * (average + mainGap_[section]) + margin;
+            first = segmentTails_[section] + 1;
+        }
+        return position;
+    };
+    const float anchor = DistanceToTop(startIndex_, mainGap_[GetSegment(startIndex_)]) - totalOffset_;
+    const float position = anchor + prefix(index) - prefix(startIndex_);
+    return std::isfinite(position) ? std::optional<float>(position) : std::nullopt;
+}
+
+void WaterFlowLayoutInfoSW::ApplyFastScrollWindow(const WaterFlowLayoutInfoSW& window, float totalOffset)
+{
+    lanes_ = window.lanes_;
+    idxToLane_ = window.idxToLane_;
+    idxToHeight_ = window.idxToHeight_;
+    heightSum_ = window.heightSum_;
+    segmentCache_.clear();
+    totalOffset_ = totalOffset;
+    const float shift = totalOffset - window.totalOffset_;
+    for (auto& section : lanes_) {
+        for (auto& lane : section) {
+            lane.startPos += shift;
+            lane.endPos += shift;
+        }
+    }
+    synced_ = false;
+    startIndex_ = StartIndex();
+    endIndex_ = EndIndex();
+    delta_ = 0.0f;
+    jumpIndex_ = EMPTY_JUMP_INDEX;
+    targetIndex_.reset();
+    extraOffset_.reset();
+    maxHeight_ = std::max(maxHeight_, window.maxHeight_);
+    needFixOffsetCache_ = true;
+    fastScrollEstimation_ = true;
 }
 
 std::optional<float> WaterFlowLayoutInfoSW::GetCachedHeight(int32_t idx) const

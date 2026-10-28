@@ -25,6 +25,7 @@
 #include "core/components/common/layout/grid_system_manager.h"
 #include "core/components/dialog/dialog_theme.h"
 #include "core/components/toast/toast_theme.h"
+#include "core/components_ng/layout/overlay_safe_area_helper.h"
 #include "core/components_ng/pattern/text/text_layout_property.h"
 #include "core/components_ng/pattern/overlay/dialog_manager.h"
 #include "core/components_ng/pattern/overlay/overlay_manager.h"
@@ -39,6 +40,41 @@ constexpr int32_t API_VERSION_9 = 9;
 constexpr Dimension ADAPT_TOAST_MIN_FONT_SIZE = 12.0_fp;
 constexpr Dimension LIMIT_SPACING = 8.0_vp;
 
+// Derives per-edge safe area insets from the OverlaySafeAreaHelper result.
+// Toast uses avoidSafeArea for own-window safe area data plus avoidDisplayLimit for screen-level
+// data of subwindow-hosted toasts, matching the Menu path (Func-04-02-01-Feat-09 ADR-3).
+// subwindowType is selected by ShowMode so the display-limit clip (super-fold branch)
+// resolves the correct subwindow: SYSTEM_TOP_MOST_TOAST for system top-most toasts,
+// TOP_MOST_TOAST for top-most toasts. DEFAULT toast is not a sub-container, so
+// GetDisplayAvailableRect returns early before consulting subwindowType — TYPE_TOP_MOST_TOAST
+// is a safe fallback that is never consumed for DEFAULT.
+SafeAreaInsets DeriveInsetsFromHelper(
+    const RefPtr<FrameNode>& frameNode, const RectF& base, ToastShowMode showMode)
+{
+    AvoidConfig config;
+    config.avoidSafeArea = true;
+    config.avoidDisplayLimit = false;
+    SubwindowType subwindowType = SubwindowType::TYPE_TOP_MOST_TOAST;
+    if (showMode == ToastShowMode::SYSTEM_TOP_MOST) {
+        subwindowType = SubwindowType::TYPE_SYSTEM_TOP_MOST_TOAST;
+    }
+    auto displayable = OverlaySafeAreaHelper::ComputeDisplayableRect(frameNode, config,
+        static_cast<int32_t>(subwindowType));
+    float topShrink = std::max(0.0f, displayable.Top() - base.Top());
+    float bottomShrink = std::max(0.0f, base.Bottom() - displayable.Bottom());
+    float leftShrink = std::max(0.0f, displayable.Left() - base.Left());
+    float rightShrink = std::max(0.0f, base.Right() - displayable.Right());
+    SafeAreaInsets insets;
+    insets.top_ = SafeAreaInsets::Inset { .start = 0, .end = static_cast<uint32_t>(topShrink) };
+    insets.bottom_ = SafeAreaInsets::Inset {
+        .start = static_cast<uint32_t>(std::max(0.0f, base.Height() - bottomShrink)),
+        .end = static_cast<uint32_t>(base.Height()) };
+    insets.left_ = SafeAreaInsets::Inset { .start = 0, .end = static_cast<uint32_t>(leftShrink) };
+    insets.right_ = SafeAreaInsets::Inset {
+        .start = static_cast<uint32_t>(std::max(0.0f, base.Width() - rightShrink)),
+        .end = static_cast<uint32_t>(base.Width()) };
+    return insets;
+}
 } // namespace
 
 int32_t ToastPattern::GetToastParentContainerId(const RefPtr<FrameNode>& host)
@@ -189,10 +225,16 @@ void ToastPattern::InitWrapperRect(LayoutWrapper* layoutWrapper, const RefPtr<To
     ACE_UINODE_TRACE(host);
     auto pipelineContext = IsDefaultToast() ? host->GetContextRefPtr() : DialogManager::GetMainPipelineContext(host);
     CHECK_NULL_VOID(pipelineContext);
-    auto safeAreaInsets = OverlayManager::GetSafeAreaInsets(host);
-    float safeAreaTop = safeAreaInsets.top_.Length();
     auto toastProp = DynamicCast<ToastLayoutProperty>(layoutWrapper->GetLayoutProperty());
     CHECK_NULL_VOID(toastProp);
+    // Safe area insets are sourced from OverlaySafeAreaHelper so Toast avoids cutout/float-nav via
+    // the same unified path as Menu/Dialog (Func-04-02-01-Feat-09). The base rect is the root rect
+    // of the pipeline the helper resolves to (pipelineContext for DEFAULT is the toast's own pipeline
+    // which equals the main pipeline; for non-DEFAULT it is DialogManager::GetMainPipelineContext),
+    // keeping the shrink coordinates consistent with ComputeDisplayableRect's internal base.
+    auto showMode = toastProp->GetShowModeValue(ToastShowMode::DEFAULT);
+    auto safeAreaInsets = DeriveInsetsFromHelper(host, pipelineContext->GetRootRect(), showMode);
+    float safeAreaTop = safeAreaInsets.top_.Length();
     Alignment alignment = toastProp->GetToastAlignmentValue(Alignment::BOTTOM_CENTER);
     if (alignment == Alignment::TOP_LEFT || alignment == Alignment::TOP_CENTER || alignment == Alignment::TOP_RIGHT) {
         auto toastTheme = pipelineContext->GetTheme<ToastTheme>();
@@ -812,7 +854,12 @@ double ToastPattern::GetTextMaxHeight()
         TAG_LOGE(AceLogTag::ACE_OVERLAY, "Device height is invalid when show toast.");
         deviceHeight = static_cast<double>(SystemProperties::GetDeviceHeight());
     }
-    auto safeAreaInsets = OverlayManager::GetSafeAreaInsets(host);
+    SafeAreaInsets safeAreaInsets;
+    if (pipelineContext) {
+        auto toastProp = DynamicCast<ToastLayoutProperty>(host->GetLayoutProperty());
+        auto showMode = toastProp ? toastProp->GetShowModeValue(ToastShowMode::DEFAULT) : ToastShowMode::DEFAULT;
+        safeAreaInsets = DeriveInsetsFromHelper(host, pipelineContext->GetRootRect(), showMode);
+    }
     auto bottom = safeAreaInsets.bottom_.Length();
     auto top = safeAreaInsets.top_.Length();
     auto toastTheme = pipelineContext->GetTheme<ToastTheme>();

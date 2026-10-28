@@ -1120,7 +1120,8 @@ HWTEST_F(CustomMenuItemPatternTestNg, CustomMenuItemPatternTestNg_OnTouchRegionI
 
 /**
  * @tc.name: CustomMenuItemPatternTestNg_OnTouchRegionMoveOutNoClick001
- * @tc.desc: Test CustomMenuItem OnTouch drops the click once the finger leaves the item bounds on MOVE
+ * @tc.desc: Test CustomMenuItem OnTouch drops the click once the vertical move distance exceeds
+ *           DEFAULT_CLICK_DISTANCE (simulating a vertical swipe consumed by the parent Scroll)
  * @tc.type: FUNC
  */
 HWTEST_F(CustomMenuItemPatternTestNg, CustomMenuItemPatternTestNg_OnTouchRegionMoveOutNoClick001, TestSize.Level1)
@@ -1150,18 +1151,180 @@ HWTEST_F(CustomMenuItemPatternTestNg, CustomMenuItemPatternTestNg_OnTouchRegionM
     info.touches_.emplace_back(locationInfo);
     pattern->OnTouch(info);
 
-    // MOVE out of the item bounds marks the gesture as no longer a click
+    // MOVE vertically beyond DEFAULT_CLICK_DISTANCE (15px) marks the gesture as a swipe, not a click
     info.touches_.pop_front();
     locationInfo.SetTouchType(TouchType::MOVE);
-    locationInfo.SetLocalLocation(Offset(200.0, 10.0));
+    locationInfo.SetLocalLocation(Offset(10.0, 40.0));
     info.touches_.emplace_back(locationInfo);
     pattern->OnTouch(info);
     EXPECT_TRUE(pattern->movedOutOfRegion_);
 
-    // UP -> not a click, onChange must not fire
+    // UP inside the item bounds -> still not a click because the vertical swipe was detected
     info.touches_.pop_front();
     locationInfo.SetTouchType(TouchType::UP);
+    locationInfo.SetLocalLocation(Offset(10.0, 40.0));
+    info.touches_.emplace_back(locationInfo);
+    pattern->OnTouch(info);
+    EXPECT_FALSE(onChangeFired);
+
+    MockContainer::Current()->SetApiTargetVersion(rollbackApiVersion);
+}
+
+/**
+ * @tc.name: CustomMenuItemPatternTestNg_OnTouchHorizontalSwipeStillClick001
+ * @tc.desc: Test CustomMenuItem OnTouch treats a horizontal swipe (small vertical displacement) as a
+ *           click, because the vertical Scroll does not claim horizontal swipes
+ * @tc.type: FUNC
+ */
+HWTEST_F(CustomMenuItemPatternTestNg, CustomMenuItemPatternTestNg_OnTouchHorizontalSwipeStillClick001, TestSize.Level1)
+{
+    int32_t rollbackApiVersion = MockContainer::Current()->GetApiTargetVersion();
+    MockContainer::Current()->SetApiTargetVersion(12);
+
+    MenuItemModelNG model;
+    auto customNode = FrameNode::CreateFrameNode("", -1, AceType::MakeRefPtr<Pattern>());
+    model.Create(customNode);
+    auto itemNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
+    ASSERT_TRUE(itemNode);
+    itemNode->GetGeometryNode()->SetFrameSize(SizeF(100.0f, 100.0f));
+    auto pattern = itemNode->GetPattern<CustomMenuItemPattern>();
+    ASSERT_TRUE(pattern);
+
+    bool onChangeFired = false;
+    auto hub = itemNode->GetEventHub<MenuItemEventHub>();
+    ASSERT_TRUE(hub);
+    hub->SetOnChange([&onChangeFired](bool /*selected*/) { onChangeFired = true; });
+
+    TouchEventInfo info(MENU_TOUCH_EVENT_TYPE);
+    TouchLocationInfo locationInfo(TARGET_ID);
+
+    locationInfo.SetTouchType(TouchType::DOWN);
     locationInfo.SetLocalLocation(Offset(10.0, 10.0));
+    info.touches_.emplace_back(locationInfo);
+    pattern->OnTouch(info);
+
+    // MOVE horizontally with vertical displacement within DEFAULT_CLICK_DISTANCE stays a click candidate
+    info.touches_.pop_front();
+    locationInfo.SetTouchType(TouchType::MOVE);
+    locationInfo.SetLocalLocation(Offset(80.0, 12.0));
+    info.touches_.emplace_back(locationInfo);
+    pattern->OnTouch(info);
+    EXPECT_FALSE(pattern->movedOutOfRegion_);
+
+    // UP inside the item bounds -> recognized as a click -> onChange fires
+    info.touches_.pop_front();
+    locationInfo.SetTouchType(TouchType::UP);
+    locationInfo.SetLocalLocation(Offset(80.0, 12.0));
+    info.touches_.emplace_back(locationInfo);
+    pattern->OnTouch(info);
+    EXPECT_TRUE(onChangeFired);
+
+    MockContainer::Current()->SetApiTargetVersion(rollbackApiVersion);
+}
+
+/**
+ * @tc.name: CustomMenuItemPatternTestNg_OnTouchHorizontalSwipeWithVerticalJitterStillClick001
+ * @tc.desc: Test CustomMenuItem OnTouch treats a predominantly horizontal swipe (offsetX > offsetY) as a click
+ *           even when the vertical jitter exceeds DEFAULT_CLICK_DISTANCE, because the child Button's
+ *           ClickRecognizer (using response-region hit testing) still fires in this case and OnTouch
+ *           must stay aligned. Reproduces the field scenario where a horizontal swipe with hand jitter
+ *           triggered the developer's onClick but did not close the menu.
+ * @tc.type: FUNC
+ */
+HWTEST_F(CustomMenuItemPatternTestNg,
+    CustomMenuItemPatternTestNg_OnTouchHorizontalSwipeWithVerticalJitterStillClick001, TestSize.Level1)
+{
+    int32_t rollbackApiVersion = MockContainer::Current()->GetApiTargetVersion();
+    MockContainer::Current()->SetApiTargetVersion(12);
+
+    MenuItemModelNG model;
+    auto customNode = FrameNode::CreateFrameNode("", -1, AceType::MakeRefPtr<Pattern>());
+    model.Create(customNode);
+    auto itemNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
+    ASSERT_TRUE(itemNode);
+    itemNode->GetGeometryNode()->SetFrameSize(SizeF(100.0f, 100.0f));
+    auto pattern = itemNode->GetPattern<CustomMenuItemPattern>();
+    ASSERT_TRUE(pattern);
+
+    bool onChangeFired = false;
+    auto hub = itemNode->GetEventHub<MenuItemEventHub>();
+    ASSERT_TRUE(hub);
+    hub->SetOnChange([&onChangeFired](bool /*selected*/) { onChangeFired = true; });
+
+    TouchEventInfo info(MENU_TOUCH_EVENT_TYPE);
+    TouchLocationInfo locationInfo(TARGET_ID);
+
+    locationInfo.SetTouchType(TouchType::DOWN);
+    locationInfo.SetLocalLocation(Offset(10.0, 10.0));
+    info.touches_.emplace_back(locationInfo);
+    pattern->OnTouch(info);
+
+    // Horizontal swipe with vertical jitter beyond DEFAULT_CLICK_DISTANCE: offsetX (70) > offsetY (20) > 15.
+    // The gesture is predominantly horizontal, so movedOutOfRegion_ must NOT be set.
+    info.touches_.pop_front();
+    locationInfo.SetTouchType(TouchType::MOVE);
+    locationInfo.SetLocalLocation(Offset(80.0, 30.0));
+    info.touches_.emplace_back(locationInfo);
+    pattern->OnTouch(info);
+    EXPECT_FALSE(pattern->movedOutOfRegion_);
+
+    // UP inside the item bounds -> recognized as a click -> onChange fires (aligned with child
+    // ClickRecognizer which also fires on a horizontal swipe that stays in the response region)
+    info.touches_.pop_front();
+    locationInfo.SetTouchType(TouchType::UP);
+    locationInfo.SetLocalLocation(Offset(80.0, 30.0));
+    info.touches_.emplace_back(locationInfo);
+    pattern->OnTouch(info);
+    EXPECT_TRUE(onChangeFired);
+
+    MockContainer::Current()->SetApiTargetVersion(rollbackApiVersion);
+}
+
+/**
+ * @tc.name: CustomMenuItemPatternTestNg_OnTouchUpOutOfBoundsNoClick001
+ * @tc.desc: Test CustomMenuItem OnTouch does not recognize a click when UP lands outside the item
+ *           bounds, even if the vertical displacement is within DEFAULT_CLICK_DISTANCE
+ * @tc.type: FUNC
+ */
+HWTEST_F(CustomMenuItemPatternTestNg, CustomMenuItemPatternTestNg_OnTouchUpOutOfBoundsNoClick001, TestSize.Level1)
+{
+    int32_t rollbackApiVersion = MockContainer::Current()->GetApiTargetVersion();
+    MockContainer::Current()->SetApiTargetVersion(12);
+
+    MenuItemModelNG model;
+    auto customNode = FrameNode::CreateFrameNode("", -1, AceType::MakeRefPtr<Pattern>());
+    model.Create(customNode);
+    auto itemNode = AceType::DynamicCast<FrameNode>(ViewStackProcessor::GetInstance()->Finish());
+    ASSERT_TRUE(itemNode);
+    itemNode->GetGeometryNode()->SetFrameSize(SizeF(100.0f, 100.0f));
+    auto pattern = itemNode->GetPattern<CustomMenuItemPattern>();
+    ASSERT_TRUE(pattern);
+
+    bool onChangeFired = false;
+    auto hub = itemNode->GetEventHub<MenuItemEventHub>();
+    ASSERT_TRUE(hub);
+    hub->SetOnChange([&onChangeFired](bool /*selected*/) { onChangeFired = true; });
+
+    TouchEventInfo info(MENU_TOUCH_EVENT_TYPE);
+    TouchLocationInfo locationInfo(TARGET_ID);
+
+    locationInfo.SetTouchType(TouchType::DOWN);
+    locationInfo.SetLocalLocation(Offset(10.0, 10.0));
+    info.touches_.emplace_back(locationInfo);
+    pattern->OnTouch(info);
+
+    // MOVE horizontally out of the item bounds; vertical displacement is within threshold
+    info.touches_.pop_front();
+    locationInfo.SetTouchType(TouchType::MOVE);
+    locationInfo.SetLocalLocation(Offset(120.0, 12.0));
+    info.touches_.emplace_back(locationInfo);
+    pattern->OnTouch(info);
+    EXPECT_FALSE(pattern->movedOutOfRegion_);
+
+    // UP outside the item bounds -> not a click because UP point is out of bounds
+    info.touches_.pop_front();
+    locationInfo.SetTouchType(TouchType::UP);
+    locationInfo.SetLocalLocation(Offset(120.0, 12.0));
     info.touches_.emplace_back(locationInfo);
     pattern->OnTouch(info);
     EXPECT_FALSE(onChangeFired);

@@ -29,6 +29,7 @@
 #include "interfaces/inner_api/ace_kit/include/ui/view/ai_caller_helper.h"
 #include "ui/base/modifier_property.h"
 
+#include "base/geometry/matrix4.h"
 #include "base/geometry/ng/offset_t.h"
 #include "base/geometry/ng/rect_t.h"
 #include "base/geometry/ng/vector.h"
@@ -93,6 +94,7 @@ class ExposureProcessor;
 }
 
 namespace OHOS::Ace::NG {
+struct CommandResult;
 class InspectorFilter;
 class PipelineContext;
 class Pattern;
@@ -333,6 +335,8 @@ enum class LpxAttribute {
     LPX_STROKE_WIDTH,
     LPX_TEXT_INDENT,
     LPX_TEXT_SPAN,
+    LPX_SAFE_AREA_INSET_SPACING,
+    LPX_SHADOW_SHAPE,
     ALWAYS
 };
 
@@ -342,6 +346,11 @@ class ACE_FORCE_EXPORT FrameNode : public UINode, public LayoutWrapper {
 
 private:
     class FrameProxy;
+
+    AceType* GetLayoutOwner() const override
+    {
+        return const_cast<FrameNode*>(this);
+    }
 
 public:
     // create a new child element with new element tree.
@@ -537,7 +546,7 @@ public:
         if (ACE_UNLIKELY(pattern_ && ShouldDetectAceObjTypeConvertion() && !DynamicCast<T>(pattern_))) {
             LOGF_ABORT("bad type conversion: from [%{public}s] to [%{public}s]", GetPatternTypeName(), T::TypeName());
         }
-        return reinterpret_cast<T*>(RawPtr(pattern_));
+        return CastComponentPtr<T>(RawPtr(pattern_), 0);
     }
 
     template<typename T>
@@ -568,7 +577,7 @@ public:
             LOGF_ABORT(
                 "bad type conversion: from [%{public}s] to [%{public}s]", GetLayoutPropertyTypeName(), T::TypeName());
         }
-        return reinterpret_cast<T*>(RawPtr(layoutProperty_));
+        return CastComponentPtr<T>(RawPtr(layoutProperty_), 0);
     }
 
     template<typename T>
@@ -585,7 +594,7 @@ public:
             LOGF_ABORT(
                 "bad type conversion: from [%{public}s] to [%{public}s]", GetPaintPropertyTypeName(), T::TypeName());
         }
-        return reinterpret_cast<T*>(RawPtr(paintProperty_));
+        return CastComponentPtr<T>(RawPtr(paintProperty_), 0);
     }
 
     template<typename T>
@@ -611,6 +620,30 @@ public:
     MountPolicy GetMountPolicy();
 
     void SetMountPolicy(MountPolicy mountPolicy);
+
+    bool UseAdoptedCompensation() const
+    {
+        return adoptedCompensationInfo_ && adoptedCompensationInfo_->useAdoptedCompensation;
+    }
+
+    void SetUseAdoptedCompensation(bool useAdoptedCompensation);
+    void SetAdoptedCompensation(const OffsetF& offset, const Matrix4& transform);
+    bool HasAdoptedCompensation() const;
+
+    OffsetF GetAdoptedCompensationOffset() const;
+    Matrix4 GetAdoptedCompensationTransform() const;
+    OffsetF GetTransformedAdoptedCompensationOffset() const;
+    VectorF GetAdoptedCompensationScale() const;
+
+    void ApplyAdoptedCompensationToPoints(std::vector<Point>& points) const;
+    void ApplyAdoptedCompensationToPoints(std::vector<PointF>& points) const;
+    void ApplyAdoptedCompensationToRect(RectF& rect) const;
+    void ApplyAdoptedCompensationToPoint(Point& point) const;
+    void ApplyAdoptedCompensationToPoint(PointF& point) const;
+    void RevertAdoptedCompensationFromPoint(PointF& point) const;
+    void ApplyAdoptedCompensationToCenterAndSize(PointF& center, float& width, float& height) const;
+
+    RefPtr<FrameNode> GetCoordinateAncestorNodeOfFrame(bool checkBoundary = false) const;
 
     void OnMixedMountChildAdded(const RefPtr<UINode>& child) override;
     void OnMixedMountChildRemoved(const RefPtr<UINode>& child) override;
@@ -922,6 +955,11 @@ public:
 
     void SetBackgroundFunction(std::function<RefPtr<UINode>()>&& buildFunc);
 
+    const RefPtr<FrameNode>& GetBackgroundNode() const
+    {
+        return backgroundNode_;
+    }
+
     void SetIsNeedRefreshBackgroundBuilder(bool isNeedRefreshBackgroundBuilder)
     {
         isNeedRefreshBackgroundBuilder_ = isNeedRefreshBackgroundBuilder;
@@ -998,6 +1036,13 @@ public:
     RefPtr<FrameNode> GetOverlayNode() const
     {
         return overlayNode_;
+    }
+
+    void SetSafeAreaInsetNode(const RefPtr<FrameNode>& safeAreaInsetNode);
+
+    RefPtr<FrameNode> GetSafeAreaInsetNode() const
+    {
+        return safeAreaInsetNode_;
     }
 
     RefPtr<FrameNode> FindChildByPosition(float x, float y);
@@ -1122,8 +1167,8 @@ public:
         return layoutProperty_;
     }
 
-    RefPtr<LayoutWrapper> GetOrCreateChildByIndex(
-        uint32_t index, bool addToRenderTree = true, bool isCache = false) override;
+    RefPtr<LayoutWrapper> GetOrCreateChildByIndex(uint32_t index, bool addToRenderTree = true,
+        bool isCache = false, bool allowPlaceholderSubstitution = false) override;
     RefPtr<LayoutWrapper> GetChildByIndex(uint32_t index, bool isCache = false) override;
 
     FrameNode* GetFrameNodeChildByIndex(uint32_t index, bool isCache = false, bool isExpand = true);
@@ -1615,6 +1660,7 @@ public:
     }
 
     int32_t OnRecvCommand(const std::string& command) override;
+    CommandResult OnRecvCommandWithResult(const std::string& command);
 
     std::vector<std::pair<float, float>> GetSpecifiedContentOffsets(const std::string& content);
     void HighlightSpecifiedContent(
@@ -1665,9 +1711,20 @@ public:
     void UnRegisterLpxAttribute(LpxAttribute attribute);
     void RegisterLpxUpdateCallback(LpxAttribute attribute, std::function<void()>&& callback);
     void UnRegisterLpxUpdateCallback(LpxAttribute attribute);
+    void DumpInspectorTreeInfo(std::shared_ptr<JsonValue>& json, ParamConfig config) override;
+    void SetInspectorMenuBinding(std::optional<bool> showInSubWindow)
+    {
+        inspectorMenuShowInSubWindow_ = showInSubWindow;
+    }
+    void DumpInspectorResponseRegions(std::shared_ptr<JsonValue>& json, const InspectorTreeRequestContext& context);
     void FireLpxUpdateCallbacks();
     bool IsNeedLazyLayout() const;
+    void MeasureSafeAreaInset() override;
+    void DumpSimplifyInfoWithParamConfig(std::shared_ptr<JsonValue>& json, ParamConfig config = ParamConfig()) override;
+
 protected:
+    void LayoutSafeAreaInset() override;
+
     void DumpInfo() override;
     std::unordered_map<std::string, std::function<void()>> destroyCallbacksMap_;
     void DumpInfo(std::unique_ptr<JsonValue>& json) override;
@@ -1678,6 +1735,19 @@ protected:
 
 private:
     void NotifyVisibleChange(VisibleType preVisibility, VisibleType currentVisibility, bool notifyPageScene);
+
+    // Preserve the static fast path; virtual-base downcasts require type information.
+    template<typename T, typename O>
+    static auto CastComponentPtr(O* ptr, int) -> decltype(static_cast<T*>(ptr))
+    {
+        return static_cast<T*>(ptr);
+    }
+
+    template<typename T, typename O>
+    static T* CastComponentPtr(O* ptr, long)
+    {
+        return DynamicCast<T>(ptr);
+    }
 
     static bool ShouldDetectAceObjTypeConvertion();
     void DispatchAreaChangeWithThrottle(const RectF& currFrameRect, const OffsetF& currParentOffsetToWindow);
@@ -1735,6 +1805,7 @@ private:
     void DumpCommonInfo();
     void DumpCommonInfo(std::unique_ptr<JsonValue>& json);
     void DumpSimplifyCommonInfo(std::shared_ptr<JsonValue>& json);
+    void DumpSimplifyCommonInfo(std::shared_ptr<JsonValue>& json, const TreeCollectionState* state);
     void DumpSimplifyCommonInfoOnlyForParamConfig(std::shared_ptr<JsonValue>& json, ParamConfig config = ParamConfig());
     void DumpSimplifySafeAreaInfo(std::unique_ptr<JsonValue>& json);
     void DumpSimplifyOverlayInfo(std::unique_ptr<JsonValue>& json);
@@ -1870,6 +1941,12 @@ private:
     RefPtr<AccessibilityProperty>& GetOrCreateAccessibilityProperty();
     void OnHoverWithHightLight(bool isHover) const;
     bool IsPreMakeAndScroll();
+    struct AdoptedCompensationInfo {
+        bool useAdoptedCompensation = false;
+        OffsetF offset;
+        Matrix4 transform;
+    };
+
     bool isAccessibilityPropertyInitialized_ = false;
     bool isTrimMemRecycle_ = false;
     // sort in ZIndex.
@@ -1899,6 +1976,7 @@ private:
     std::shared_ptr<OffsetF> lastHostParentOffsetToWindow_;
     std::unique_ptr<RectF> lastFrameNodeRect_;
     std::unique_ptr<FrameNodeExtension> extensionData_;
+    std::unique_ptr<AdoptedCompensationInfo> adoptedCompensationInfo_;
     std::set<std::string> allowDrop_;
     std::optional<RectF> viewPort_;
     NG::DragDropInfo dragPreviewInfo_;
@@ -1916,6 +1994,8 @@ private:
     bool isMeasureBoundary_ = false;
     bool hasPendingRequest_ = false;
     bool isPrivacySensitive_ = false;
+    // Only ordinary bindMenu sets this preference; no value means no ordinary menu binding.
+    std::optional<bool> inspectorMenuShowInSubWindow_;
 
     // for container, this flag controls only the last child in touch area is consuming event.
     bool exclusiveEventForChild_ = false;
@@ -1988,6 +2068,8 @@ private:
     bool hasPreMake_ = false;
 
     RefPtr<FrameNode> overlayNode_;
+
+    RefPtr<FrameNode> safeAreaInsetNode_;
 
     RefPtr<FrameNode> paintNode_;
 

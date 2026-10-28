@@ -139,7 +139,7 @@ protected:
     float HorizontalLayout(const SizeF& size, float clickPosition, bool IsSelectMenu = false);
 
     RefPtr<MenuPaintProperty> GetPaintProperty(const LayoutWrapper* layoutWrapper);
-    OffsetF GetMenuWrapperOffset(const LayoutWrapper* layoutWrapper);
+    OffsetF GetMenuWrapperOffset(const LayoutWrapper* layoutWrapper, const RefPtr<MenuPattern>& menuPattern);
     void ClipMenuPath(LayoutWrapper* layoutWrapper);
     float GetFirstItemBottomPositionY(const RefPtr<FrameNode>& menu);
     float GetLastItemTopPositionY(const RefPtr<FrameNode>& menu);
@@ -182,7 +182,8 @@ private:
     void InitializeSecurityPadding();
     void InitializeParam(const RefPtr<MenuPattern>& menuPattern);
     void InitializeLayoutRegionMargin(const RefPtr<MenuPattern>& menuPattern);
-    void InitWrapperRect(const RefPtr<MenuLayoutProperty>& props, const RefPtr<MenuPattern>& menuPattern);
+    void InitWrapperRect(const RefPtr<MenuLayoutProperty>& props, const RefPtr<MenuPattern>& menuPattern,
+        const SafeAreaInsets& safeAreaInsets);
     void CalcWrapperRectForHoverMode(const RefPtr<MenuPattern>& menuPattern, bool isAvoidKeyboard);
     void UpdateWrapperRectForHoverMode(const RefPtr<MenuLayoutProperty>& props, const RefPtr<MenuPattern>& menuPattern,
         double creaseHeightOffset, bool isAvoidKeyboard);
@@ -219,6 +220,7 @@ private:
     void UpdateArrowOffsetWithMenuLimit(const SizeF& menuSize, const LayoutWrapper* layoutWrapper);
     void UpdatePropArrowOffset();
     void LimitContainerModalMenuRect(double& rectWidth, double& rectHeight, const RefPtr<MenuPattern>& menuPattern);
+    OffsetF GetParentOffset(const RefPtr<FrameNode>& host, const RefPtr<MenuPattern>& menuPattern);
 
     // get option LayoutWrapper for measure get max width
     std::list<RefPtr<LayoutWrapper>> GetOptionsLayoutWrappper(LayoutWrapper* layoutWrapper);
@@ -433,12 +435,6 @@ private:
     float optionPadding_ = 0.0f;
     float selectMenuAdditionX_ = 0.0f;
     float selectMenuAdditionY_ = 0.0f;
-    float top_ = 0.0;
-    float bottom_ = 0.0;
-    float left_ = 0.0;
-    float right_ = 0.0;
-    double width_ = 0.0;
-    double height_ = 0.0;
     OffsetF targetCenterOffset_;
     OffsetF previewOriginOffset_;
     OffsetF previewOffset_;

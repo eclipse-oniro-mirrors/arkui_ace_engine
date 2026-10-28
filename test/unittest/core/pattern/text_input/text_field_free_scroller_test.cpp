@@ -1280,4 +1280,169 @@ HWTEST_F(TextFieldFreeScrollerTest, TextFieldFreeScroller_CheckMousePressedOverS
     SUCCEED();
     (void)result;
 }
+
+/**
+ * @tc.name: TextFieldPatternHandleMouseEventByScrollBar_001
+ * @tc.desc: Test TextFieldPattern HandleMouseEventByScrollBar with no scroll bar and free scroll disabled
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldFreeScrollerTest, TextFieldPatternHandleMouseEventByScrollBar_001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create TextField without scroll bar and free scroller
+     */
+    CreateTextField();
+    ASSERT_NE(pattern_, nullptr);
+
+    /**
+     * @tc.steps: step2. Call HandleMouseEventByScrollBar
+     * @tc.expected: Should return false when event is not handled
+     */
+    MouseInfo info;
+    EXPECT_FALSE(pattern_->HandleMouseEventByScrollBar(info));
+}
+
+/**
+ * @tc.name: TextFieldPatternHandleMouseEventByScrollBar_002
+ * @tc.desc: Test TextFieldPattern HandleMouseEventByScrollBar with pattern scroll bar pressed
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldFreeScrollerTest, TextFieldPatternHandleMouseEventByScrollBar_002, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create TextField and attach a pressed scroll bar
+     */
+    CreateTextField();
+    ASSERT_NE(pattern_, nullptr);
+    pattern_->scrollBar_ = AceType::MakeRefPtr<ScrollBar>();
+    ASSERT_NE(pattern_->scrollBar_, nullptr);
+    pattern_->scrollBar_->SetPressed(true);
+
+    /**
+     * @tc.steps: step2. Call HandleMouseEventByScrollBar
+     * @tc.expected: Should return true when scroll bar is pressed
+     */
+    MouseInfo info;
+    EXPECT_TRUE(pattern_->HandleMouseEventByScrollBar(info));
+}
+
+/**
+ * @tc.name: TextFieldPatternHandleMouseEventByScrollBar_003
+ * @tc.desc: Test TextFieldPattern HandleMouseEventByScrollBar with pattern scroll bar hovered
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldFreeScrollerTest, TextFieldPatternHandleMouseEventByScrollBar_003, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create TextField and attach a hovered scroll bar
+     */
+    CreateTextField();
+    ASSERT_NE(pattern_, nullptr);
+    pattern_->scrollBar_ = AceType::MakeRefPtr<ScrollBar>();
+    ASSERT_NE(pattern_->scrollBar_, nullptr);
+    pattern_->scrollBar_->SetHover(true);
+
+    /**
+     * @tc.steps: step2. Call HandleMouseEventByScrollBar
+     * @tc.expected: Should return true when scroll bar is hovered
+     */
+    MouseInfo info;
+    EXPECT_TRUE(pattern_->HandleMouseEventByScrollBar(info));
+}
+
+/**
+ * @tc.name: TextFieldPatternHandleMouseEventByScrollBar_004
+ * @tc.desc: Test TextFieldPattern HandleMouseEventByScrollBar handled by free scroller without release
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldFreeScrollerTest, TextFieldPatternHandleMouseEventByScrollBar_004, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create a TextArea pattern with free scroll enabled and pressed bar
+     */
+    auto frameNode = FrameNode::GetOrCreateFrameNode(V2::TEXTAREA_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), []() { return AceType::MakeRefPtr<TextFieldPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<TextFieldPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->isHorizontalScrolling_ = true;
+    pattern->freeScroller_ = AceType::MakeRefPtr<TextFieldFreeScroller>(pattern);
+    ASSERT_NE(pattern->freeScroller_, nullptr);
+    pattern->contentRect_ = RectF(0.0f, 0.0f, CONTENT_WIDTH, CONTENT_HEIGHT);
+    pattern->textRect_ = RectF(0.0f, 0.0f, TEXT_WIDTH, TEXT_HEIGHT);
+    pattern->frameRect_ = RectF(0.0f, 0.0f, CONTENT_WIDTH, CONTENT_HEIGHT);
+    pattern->freeScroller_->scrollBar_ = AceType::MakeRefPtr<TextScrollBar2D>(pattern);
+    auto verticalBar = pattern->freeScroller_->scrollBar_->GetVerticalBar();
+    ASSERT_NE(verticalBar, nullptr);
+    verticalBar->SetPressed(true);
+
+    /**
+     * @tc.steps: step2. Call HandleMouseEventByScrollBar with non-release action
+     * @tc.expected: Should return true when free scroller handles the event
+     */
+    MouseInfo info;
+    EXPECT_TRUE(pattern->HandleMouseEventByScrollBar(info));
+}
+
+/**
+ * @tc.name: TextFieldPatternHandleMouseEventByScrollBar_005
+ * @tc.desc: Test TextFieldPattern HandleMouseEventByScrollBar handled by free scroller with release action
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldFreeScrollerTest, TextFieldPatternHandleMouseEventByScrollBar_005, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create a TextArea pattern with free scroll enabled and pressed bar
+     */
+    auto frameNode = FrameNode::GetOrCreateFrameNode(V2::TEXTAREA_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), []() { return AceType::MakeRefPtr<TextFieldPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<TextFieldPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->isHorizontalScrolling_ = true;
+    pattern->freeScroller_ = AceType::MakeRefPtr<TextFieldFreeScroller>(pattern);
+    ASSERT_NE(pattern->freeScroller_, nullptr);
+    pattern->contentRect_ = RectF(0.0f, 0.0f, CONTENT_WIDTH, CONTENT_HEIGHT);
+    pattern->textRect_ = RectF(0.0f, 0.0f, TEXT_WIDTH, TEXT_HEIGHT);
+    pattern->frameRect_ = RectF(0.0f, 0.0f, CONTENT_WIDTH, CONTENT_HEIGHT);
+    pattern->freeScroller_->scrollBar_ = AceType::MakeRefPtr<TextScrollBar2D>(pattern);
+    auto verticalBar = pattern->freeScroller_->scrollBar_->GetVerticalBar();
+    ASSERT_NE(verticalBar, nullptr);
+    verticalBar->SetPressed(true);
+
+    /**
+     * @tc.steps: step2. Call HandleMouseEventByScrollBar with release action
+     * @tc.expected: Should return true and stop content scroll
+     */
+    MouseInfo info;
+    info.SetAction(MouseAction::RELEASE);
+    EXPECT_TRUE(pattern->HandleMouseEventByScrollBar(info));
+}
+
+/**
+ * @tc.name: TextFieldPatternHandleMouseEventByScrollBar_006
+ * @tc.desc: Test TextFieldPattern HandleMouseEventByScrollBar when free scroller does not handle event
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextFieldFreeScrollerTest, TextFieldPatternHandleMouseEventByScrollBar_006, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Create a TextArea pattern with free scroll enabled but no scroll bar
+     */
+    auto frameNode = FrameNode::GetOrCreateFrameNode(V2::TEXTAREA_ETS_TAG,
+        ElementRegister::GetInstance()->MakeUniqueId(), []() { return AceType::MakeRefPtr<TextFieldPattern>(); });
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<TextFieldPattern>();
+    ASSERT_NE(pattern, nullptr);
+    pattern->isHorizontalScrolling_ = true;
+    pattern->freeScroller_ = AceType::MakeRefPtr<TextFieldFreeScroller>(pattern);
+    ASSERT_NE(pattern->freeScroller_, nullptr);
+
+    /**
+     * @tc.steps: step2. Call HandleMouseEventByScrollBar
+     * @tc.expected: Should return false when free scroller does not handle the event
+     */
+    MouseInfo info;
+    EXPECT_FALSE(pattern->HandleMouseEventByScrollBar(info));
+}
 } // namespace OHOS::Ace::NG

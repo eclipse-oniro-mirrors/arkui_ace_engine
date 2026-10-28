@@ -36,7 +36,6 @@ namespace {
 constexpr int32_t NO_NEED_RESTART_SINGLE_HANDLE = 100;
 constexpr FrameNodeChangeInfoFlag AVOID_KEYBOARD_END_FALG = 1 << 8;
 const char *SYSTEM_CAPABILITY_OF_SHARE = "SystemCapability.Collaboration.SystemShare";
-
 } // namespace
 void BaseTextSelectOverlay::ProcessOverlay(const OverlayRequest& request)
 {
@@ -557,7 +556,7 @@ void BaseTextSelectOverlay::RevertLocalPointWithTransform(OffsetF& point)
     std::stack<RefPtr<FrameNode>> nodeStack;
     while (parent) {
         nodeStack.push(parent);
-        parent = parent->GetAncestorNodeOfFrame(true);
+        parent = parent->GetCoordinateAncestorNodeOfFrame(true);
     }
     CHECK_NULL_VOID(!nodeStack.empty());
     PointF localPoint(point.GetX(), point.GetY());
@@ -570,6 +569,9 @@ void BaseTextSelectOverlay::RevertLocalPointWithTransform(OffsetF& point)
         renderContext->GetPointWithRevert(localPoint);
         auto rectOffset = renderContext->GetPaintRectWithoutTransform().GetOffset();
         localPoint = localPoint - rectOffset;
+        if (!nodeStack.empty()) {
+            nodeStack.top()->RevertAdoptedCompensationFromPoint(localPoint);
+        }
     }
     point.SetX(localPoint.GetX());
     point.SetY(localPoint.GetY());
@@ -599,7 +601,11 @@ OffsetF BaseTextSelectOverlay::GetPaintOffsetWithoutTransform()
         auto renderContext = parent->GetRenderContext();
         CHECK_NULL_RETURN(renderContext, OffsetF());
         offset += renderContext->GetPaintRectWithoutTransform().GetOffset();
-        parent = parent->GetAncestorNodeOfFrame(true);
+        auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
+        if (ancestor && parent->IsAdopted() && parent->UseAdoptedCompensation()) {
+            offset += parent->GetAdoptedCompensationOffset();
+        }
+        parent = ancestor;
     }
     return offset;
 }
@@ -668,13 +674,13 @@ std::optional<RectF> BaseTextSelectOverlay::GetAncestorNodeViewPort()
     CHECK_NULL_RETURN(pattern, std::nullopt);
     auto host = pattern->GetHost();
     CHECK_NULL_RETURN(host, std::nullopt);
-    auto parent = host->GetAncestorNodeOfFrame(true);
+    auto parent = host->GetCoordinateAncestorNodeOfFrame(true);
     while (parent) {
         auto scrollableContainer = parent->GetPattern<NestableScrollContainer>();
         if (scrollableContainer) {
             return parent->GetTransformRectRelativeToWindow();
         }
-        parent = parent->GetAncestorNodeOfFrame(true);
+        parent = parent->GetCoordinateAncestorNodeOfFrame(true);
     }
     return std::nullopt;
 }
@@ -733,7 +739,13 @@ VectorF BaseTextSelectOverlay::GetHostScale()
             scaleX *= std::abs(transform.scale[0]);
             scaleY *= std::abs(transform.scale[1]);
         }
-        host = host->GetAncestorNodeOfFrame(true);
+        auto ancestor = host->GetCoordinateAncestorNodeOfFrame(true);
+        if (ancestor && host->HasAdoptedCompensation()) {
+            auto compensationScale = host->GetAdoptedCompensationScale();
+            scaleX *= std::abs(compensationScale.x);
+            scaleY *= std::abs(compensationScale.y);
+        }
+        host = ancestor;
     }
     return VectorF(1.0f / scaleX, 1.0f / scaleY);
 }
@@ -824,7 +836,12 @@ bool BaseTextSelectOverlay::CheckHandleCanPaintInHost(const RectF& firstRect, co
             point = point + paintOffset;
             renderContext->GetPointTransform(point);
         }
-        parent = parent->GetAncestorNodeOfFrame(true);
+        auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
+        if (ancestor) {
+            parent->ApplyAdoptedCompensationToPoints(firstPoints);
+            parent->ApplyAdoptedCompensationToPoints(secondPoints);
+        }
+        parent = ancestor;
     }
     return false;
 }
@@ -1006,12 +1023,12 @@ void BaseTextSelectOverlay::RegisterScrollingListener(const RefPtr<FrameNode> sc
     ACE_UINODE_TRACE(host);
     auto scrollingNode = scrollableNode;
     if (!scrollingNode) {
-        scrollingNode = host->GetAncestorNodeOfFrame(true);
+        scrollingNode = host->GetCoordinateAncestorNodeOfFrame(true);
         while (scrollingNode) {
             if (scrollingNode->GetTag() == V2::SWIPER_ETS_TAG) {
                 break;
             }
-            scrollingNode = scrollingNode->GetAncestorNodeOfFrame(true);
+            scrollingNode = scrollingNode->GetCoordinateAncestorNodeOfFrame(true);
         }
     }
     if (scrollingNode) {
@@ -1101,7 +1118,9 @@ bool BaseTextSelectOverlay::GetFrameNodeContentRect(const RefPtr<FrameNode>& nod
 void BaseTextSelectOverlay::MarkOverlayDirty()
 {
     if (SelectOverlayIsOn()) {
-        auto host = GetOwner();
+        // The overlay node is held by the mount node, which may be an
+        // ancestor of the owner (see GetSelectOverlayMountNode).
+        auto host = GetSelectOverlayMountNode(GetOwner());
         CHECK_NULL_VOID(host);
         auto overlayNode = host->GetOverlayNode();
         CHECK_NULL_VOID(overlayNode);
@@ -1365,7 +1384,13 @@ bool BaseTextSelectOverlay::IsHandleInParentSafeAreaPadding(const RectF& firstRe
         CHECK_NULL_RETURN(context, false);
         firstHandlePaint += context->GetPaintRectWithTransform().GetOffset();
         secondHandlePaint += context->GetPaintRectWithTransform().GetOffset();
-        parent = parent->GetAncestorNodeOfFrame(true);
+        auto ancestor = parent->GetCoordinateAncestorNodeOfFrame(true);
+        if (ancestor) {
+            auto compensationOffset = parent->GetTransformedAdoptedCompensationOffset();
+            firstHandlePaint += compensationOffset;
+            secondHandlePaint += compensationOffset;
+        }
+        parent = ancestor;
     }
     return false;
 }

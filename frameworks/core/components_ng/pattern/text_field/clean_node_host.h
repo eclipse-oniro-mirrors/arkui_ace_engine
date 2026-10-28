@@ -21,6 +21,7 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 #include "base/geometry/calc_dimension.h"
 #include "base/memory/ace_type.h"
@@ -285,6 +286,20 @@ public:
             return false;
         }
         return self->HandleSwithFocus(next->second) || HandleFocusBackwardImpl(next->second);
+    }
+
+    // Overlay modifier bridge: set/clear hover color and rects. Default impl delegates to
+    // Derived::SetOverlayHoverColorAndRects so clean-button and password-icon hover share
+    // one hook (see PasswordIconHostBase). The single rect is wrapped into a 1-element vector.
+    void SetCleanHoverColorAndRect(const RoundRect& rect, uint32_t color) override
+    {
+        std::vector<RoundRect> rects;
+        rects.push_back(rect);
+        static_cast<Derived*>(this)->SetOverlayHoverColorAndRects(rects, color);
+    }
+    void ClearCleanHoverColorAndRects() override
+    {
+        static_cast<Derived*>(this)->ClearOverlayHoverColorAndRects();
     }
 };
 } // namespace OHOS::Ace::NG

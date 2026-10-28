@@ -41,6 +41,7 @@ if (is_host_product) {
   }
 } else {
   ace_unittest("lazy_grid_layout_test") {
+    cflags = [ "-fno-access-control" ]
     module_name = "ScrollingSet-LazyVGridLayout"
     type = "new"
     sources = [

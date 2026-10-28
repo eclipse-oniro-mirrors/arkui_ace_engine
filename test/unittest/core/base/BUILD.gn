@@ -40,12 +40,18 @@ ace_unittest("frame_node_test_ng") {
   }
   sources = [
     "frame_node_test_ng.cpp",
+    "inspector_tree_context_test_ng.cpp",
+    "inspector_tree_native_fields_test_ng.cpp",
+    "inspector_tree_response_region_test_ng.cpp",
     "frame_node_test_ng_coverage.cpp",
     "frame_node_test_ng_coverage_new.cpp",
     "frame_node_test_ng_dump.cpp",
     "frame_node_test_ng_new.cpp",
     "frame_node_test_ng_v3.cpp",
   ]
+  if (is_host_product) {
+    sources += [ "$ace_root/test/unittest/core/pattern/menu/menu_inspector_tree_test.cpp" ]
+  }
 }
 
 ace_unittest("frame_node_drop_test_ng") {
@@ -97,6 +103,7 @@ ace_unittest("ui_node_test_ng") {
     type = "host_components"
   }
   sources = [
+    "native_node_tree_scope_test.cpp",
     "ui_node_multi_thread_test.cpp",
     "ui_node_test_ng.cpp",
     "ui_node_test_ng_two.cpp",
@@ -150,7 +157,10 @@ ace_unittest("observer_test_ng") {
   if (is_host_product) {
     type = "host_components"
   }
-  sources = [ "observer_test_ng.cpp" ]
+  sources = [
+    "observer_draw_callback_test.cpp",
+    "observer_test_ng.cpp",
+  ]
 }
 
 ace_unittest("view_abstract_model_test_ng") {
@@ -247,6 +257,25 @@ ace_unittest("modifier_test_ng") {
   sources = [ "modifier_test_ng.cpp" ]
 }
 
+ace_unittest("material_registry_test_ng") {
+  module_name = "Animation-TransitionEffect"
+  type = "new"
+  if (defined(is_host_product) && is_host_product) {
+    type = "host_components"
+  }
+  sources = [ "material_registry_test_ng.cpp" ]
+  cflags = [ "-fno-access-control" ]
+}
+
+ace_unittest("ui_tree_collector_test") {
+  module_name = "Debugger-inspector"
+  type = "new"
+  if (defined(is_host_product) && is_host_product) {
+    type = "host_components"
+  }
+  sources = [ "ui_tree_collector_test.cpp" ]
+}
+
 group("core_base_unittest") {
   testonly = true
   if (is_host_product) {
@@ -256,12 +285,14 @@ group("core_base_unittest") {
       ":frame_node_test_ng",
       ":geometry_node_test_ng",
       ":inspector_test_ng",
+      ":material_registry_test_ng",
       ":modifier_test_ng",
       ":node_render_status_monitor_test_ng",
       ":observer_test_ng",
       ":simplified_inspector_test_ng",
       ":thread_safe_node_test_ng",
       ":ui_node_gc_test_ng",
+      ":ui_tree_collector_test",
       ":ui_node_test_ng",
       ":view_abstract_model_static_test_ng",
       ":view_abstract_test_ng",
@@ -274,6 +305,7 @@ group("core_base_unittest") {
       ":frame_node_test_ng",
       ":geometry_node_test_ng",
       ":inspector_test_ng",
+      ":material_registry_test_ng",
       ":node_render_status_monitor_test_ng",
       ":observer_test_ng",
       ":short_cuts_little_test_ng",
@@ -282,6 +314,7 @@ group("core_base_unittest") {
       ":thread_safe_node_test_ng",
       ":transparent_node_detector_test_ng",
       ":ui_node_gc_test_ng",
+      ":ui_tree_collector_test",
       ":ui_node_test_ng",
       ":view_abstract_model_static_test_ng",
       ":view_abstract_model_test_ng",

@@ -14,6 +14,21 @@
  */
 
 
+class WaterFlowScrollSnapStrategyModifier extends ModifierWithKey<ScrollSnapAlign | ScrollSnapOffsetProvider> {
+  static identity: Symbol = Symbol('waterFlowScrollSnapStrategy');
+  applyPeer(node: KNode, reset: boolean): void {
+    if (reset) {
+      getUINativeModule().waterFlow.resetScrollSnapStrategy(node);
+    } else {
+      getUINativeModule().waterFlow.setScrollSnapStrategy(node, this.value);
+    }
+  }
+  checkObjectDiff(): boolean {
+    // Provider methods can be replaced in the same object; callback identity is not comparable.
+    return typeof this.value === 'object' || this.stageValue !== this.value;
+  }
+}
+
 class ItemConstraintSizeModifier extends ModifierWithKey<ArkConstraintSizeOptions> {
   constructor(value: ArkConstraintSizeOptions) {
     super(value);
@@ -478,6 +493,11 @@ class ArkWaterFlowComponent extends ArkScrollable<WaterFlowAttribute> implements
     modifierWithKey(this._modifiersWithKeys, WaterFlowSyncLoadModifier.identity, WaterFlowSyncLoadModifier, value);
     return this;
   }
+  scrollSnapStrategy(strategy?: ScrollSnapAlign | ScrollSnapOffsetProvider): this {
+    modifierWithKey(this._modifiersWithKeys, WaterFlowScrollSnapStrategyModifier.identity,
+      WaterFlowScrollSnapStrategyModifier, strategy);
+    return this;
+  }
   onReachStart(event: () => void): this {
     modifierWithKey(this._modifiersWithKeys, WaterFlowOnReachStartModifier.identity, WaterFlowOnReachStartModifier, event);
     return this;
@@ -562,6 +582,10 @@ globalThis.WaterFlow.attributeModifier = function (modifier: ArkComponent): void
 globalThis.WaterFlow.onWillStopDragging = function (value: (velocity: number) => void): void {
   let nodePtr = getUINativeModule().frameNode.getStackTopNode();
   getUINativeModule().scrollable.setOnWillStopDragging(nodePtr, value);
+};
+
+globalThis.WaterFlow.scrollSnapStrategy = function (strategy?: ScrollSnapAlign | ScrollSnapOffsetProvider): void {
+  getUINativeModule().waterFlow.setScrollSnapStrategy(true, strategy);
 };
 
 globalThis.WaterFlow.onWillStartDragging = function (value: () => void): void {

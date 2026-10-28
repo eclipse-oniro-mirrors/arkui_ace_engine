@@ -13,6 +13,10 @@
  * limitations under the License.
  */
 
+#include <algorithm>
+#include <array>
+#include <chrono>
+
 #define private public
 #define protected public
 
@@ -25,7 +29,15 @@
 #include "core/components_ng/render/drawing.h"
 
 #include "core/components_ng/pattern/stage/page_pattern.h"
+#include "core/components_ng/pattern/safe_area_inset/safe_area_inset_pattern.h"
+#include "core/components_ng/base/mount_policy.h"
+#include "core/components_ng/base/view_abstract.h"
+#include "core/components_ng/event/gesture_event_hub.h"
+#include "core/components_ng/pattern/button/button_pattern.h"
+#include "core/common/event_manager.h"
 #include "modifier_ng/background/rs_background_shader_modifier.h"
+#include "base/geometry/shape.h"
+#include "core/components/common/properties/shadow.h"
 
 #undef private
 #undef protected
@@ -59,6 +71,410 @@ HWTEST_F(RosenRenderContextTest, RosenRenderContextTestNew001, TestSize.Level1)
     Rosen::Vector2f dstPoint = { 1.0, 1.0 };
     EXPECT_EQ(rosenRenderContext->GetRSNode()->GetStagingProperties().GetAttractionFractionValue(), 1.0);
     EXPECT_EQ(rosenRenderContext->GetRSNode()->GetStagingProperties().GetAttractionDstPointValue(), dstPoint);
+}
+
+/**
+ * @tc.name: RosenRenderContextSafeAreaInsetMixedMount001
+ * @tc.desc: Verify the dedicated safeAreaInset slot is retained by the mixed-mount RS target list.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RosenRenderContextTest, RosenRenderContextSafeAreaInsetMixedMount001, TestSize.Level0)
+{
+    auto host = FrameNode::CreateFrameNode("safeAreaInsetHost", -101, AceType::MakeRefPtr<Pattern>());
+    auto inset = FrameNode::CreateFrameNode("safeAreaInsetSlot", -102, AceType::MakeRefPtr<Pattern>());
+    auto overlay = FrameNode::CreateFrameNode("safeAreaInsetOverlay", -103, AceType::MakeRefPtr<Pattern>());
+    auto focus = FrameNode::CreateFrameNode("safeAreaInsetFocus", -104, AceType::MakeRefPtr<Pattern>());
+    ASSERT_NE(host, nullptr);
+    ASSERT_NE(inset, nullptr);
+    ASSERT_NE(overlay, nullptr);
+    ASSERT_NE(focus, nullptr);
+    auto hostContext = InitRosenRenderContext(host);
+    auto insetContext = InitRosenRenderContext(inset);
+    auto overlayContext = InitRosenRenderContext(overlay);
+    auto focusContext = InitRosenRenderContext(focus);
+    ASSERT_NE(hostContext, nullptr);
+    ASSERT_NE(insetContext, nullptr);
+    ASSERT_NE(overlayContext, nullptr);
+    ASSERT_NE(focusContext, nullptr);
+    host->renderContext_ = hostContext;
+    inset->renderContext_ = insetContext;
+    overlay->renderContext_ = overlayContext;
+    focus->renderContext_ = focusContext;
+    host->SetMountPolicy(MountPolicy::MIXED);
+    host->SetSafeAreaInsetNode(inset);
+    host->SetOverlayNode(overlay);
+    host->SetFocusPaintNode(focus);
+
+    auto targetNodes = hostContext->BuildMixedTargetRSNodes(AceType::RawPtr(host));
+    auto insetIter = std::find(targetNodes.begin(), targetNodes.end(), insetContext->GetRSNode());
+    auto overlayIter = std::find(targetNodes.begin(), targetNodes.end(), overlayContext->GetRSNode());
+    auto focusIter = std::find(targetNodes.begin(), targetNodes.end(), focusContext->GetRSNode());
+    ASSERT_NE(insetIter, targetNodes.end());
+    ASSERT_NE(overlayIter, targetNodes.end());
+    ASSERT_NE(focusIter, targetNodes.end());
+    EXPECT_LT(insetIter, overlayIter);
+    EXPECT_LT(overlayIter, focusIter);
+
+    std::vector<RefPtr<FrameNode>> liveChildren;
+    hostContext->GetLiveChildren(host, liveChildren);
+    auto liveInset = std::find(liveChildren.begin(), liveChildren.end(), inset);
+    auto liveOverlay = std::find(liveChildren.begin(), liveChildren.end(), overlay);
+    auto liveFocus = std::find(liveChildren.begin(), liveChildren.end(), focus);
+    ASSERT_NE(liveInset, liveChildren.end());
+    ASSERT_NE(liveOverlay, liveChildren.end());
+    ASSERT_NE(liveFocus, liveChildren.end());
+    EXPECT_LT(liveInset, liveOverlay);
+    EXPECT_LT(liveInset, liveFocus);
+    EXPECT_LT(liveFocus, liveOverlay);
+}
+
+// The fixture supplies ordinary parent-relative geometry; layout computation is
+// covered by SafeAreaInsetTestNg. Rendering and input use real Rosen contexts
+// and EventManager rather than invoking application callbacks directly.
+class SafeAreaInsetRosenTest : public RosenRenderContextTest {
+public:
+    void TearDown() override
+    {
+        if (host_) {
+            host_->DetachFromMainTree(true);
+            host_.Reset();
+        }
+        RosenRenderContextTest::TearDown();
+    }
+
+    RefPtr<FrameNode> MakeNode(const char* tag, const RectF& rect, bool button = false)
+    {
+        RefPtr<Pattern> pattern = AceType::MakeRefPtr<Pattern>();
+        if (button) {
+            pattern = AceType::MakeRefPtr<ButtonPattern>();
+        }
+        auto node = FrameNode::CreateFrameNode(tag, ElementRegister::GetInstance()->MakeUniqueId(), pattern);
+        node->renderContext_ = InitRosenRenderContext(node);
+        SetRect(node, rect);
+        node->SetActive(true);
+        return node;
+    }
+
+    void SetRect(const RefPtr<FrameNode>& node, const RectF& rect)
+    {
+        node->GetGeometryNode()->SetFrameOffset(rect.GetOffset());
+        node->GetGeometryNode()->SetFrameSize(rect.GetSize());
+        auto context = AceType::DynamicCast<RosenRenderContext>(node->GetRenderContext());
+        ASSERT_NE(context, nullptr);
+        context->UpdatePaintRect(rect);
+        context->SyncGeometryProperties(rect);
+    }
+
+    void Install(const SafeAreaInsetOptions& options, const SafeAreaInsetContentArray& contents)
+    {
+        ViewAbstract::SetSafeAreaInset(AceType::RawPtr(host_), options, contents);
+        auto container = host_->GetSafeAreaInsetNode();
+        ASSERT_NE(container, nullptr);
+        container->renderContext_ = InitRosenRenderContext(container);
+        SetRect(container, RectF(10.0f, 10.0f, 280.0f, 220.0f));
+        container->SetActive(true);
+        container->MarkNeedSyncRenderTree(true);
+        container->RebuildRenderContextTree();
+        host_->MarkNeedSyncRenderTree(true);
+        host_->RebuildRenderContextTree();
+    }
+
+    void Tap(float x, float y)
+    {
+        auto manager = PipelineContext::GetCurrentContext()->GetEventManager();
+        ASSERT_NE(manager, nullptr);
+        TouchEvent event;
+        event.id = ++touchId_;
+        event.originalId = event.id;
+        event.x = x;
+        event.y = y;
+        event.screenX = x;
+        event.screenY = y;
+        event.sourceType = SourceType::TOUCH;
+        event.sourceTool = SourceTool::FINGER;
+        event.type = TouchType::DOWN;
+        event.time = TimeStamp(std::chrono::milliseconds(touchId_ * 100));
+        TouchPoint pointer;
+        pointer.id = event.id;
+        pointer.originalId = event.id;
+        pointer.x = x;
+        pointer.y = y;
+        pointer.screenX = x;
+        pointer.screenY = y;
+        pointer.downTime = event.time;
+        pointer.sourceTool = SourceTool::FINGER;
+        pointer.isPressed = true;
+        event.pointers.push_back(pointer);
+        TouchRestrict restrict;
+        restrict.sourceType = SourceType::TOUCH;
+        restrict.sourceTool = SourceTool::FINGER;
+        restrict.touchEvent = event;
+        manager->TouchTest(event, host_, restrict);
+        manager->DispatchTouchEvent(event);
+        event.type = TouchType::MOVE;
+        event.time += std::chrono::milliseconds(10);
+        manager->DispatchTouchEvent(event);
+        event.type = TouchType::UP;
+        event.time += std::chrono::milliseconds(10);
+        event.pointers.front().isPressed = false;
+        manager->DispatchTouchEvent(event);
+    }
+
+    RefPtr<FrameNode> host_;
+    int32_t touchId_ = 0;
+};
+
+/**
+ * @tc.name: OrdinaryButtonControl001
+ * @tc.desc: Verify the same real input fixture can click an ordinary Button.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SafeAreaInsetRosenTest, OrdinaryButtonControl001, TestSize.Level0)
+{
+    host_ = MakeNode("ordinaryHost", RectF(20.0f, 30.0f, 300.0f, 240.0f));
+    auto button = MakeNode("Button", RectF(90.0f, 200.0f, 40.0f, 20.0f), true);
+    button->MountToParent(host_);
+    host_->AttachToMainTree(true, PipelineContext::GetCurrentContext().GetRawPtr());
+    int32_t clicks = 0;
+    button->GetOrCreateGestureEventHub()->SetUserOnClick([&](GestureEvent& info) {
+        ++clicks;
+        EXPECT_NEAR(info.GetLocalLocation().GetX(), 5.0, 0.01);
+        EXPECT_NEAR(info.GetLocalLocation().GetY(), 5.0, 0.01);
+    });
+    host_->MarkNeedSyncRenderTree(true);
+    host_->RebuildRenderContextTree();
+    Tap(115.0f, 235.0f);
+    EXPECT_EQ(clicks, 1);
+}
+
+/**
+ * @tc.name: DirectContentPositionAndClick001
+ * @tc.desc: Click all four direct content roots at their visible positions and verify local touch coordinates.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SafeAreaInsetRosenTest, DirectContentPositionAndClick001, TestSize.Level0)
+{
+    host_ = MakeNode("insetHost", RectF(20.0f, 30.0f, 300.0f, 240.0f));
+    host_->AttachToMainTree(true, PipelineContext::GetCurrentContext().GetRawPtr());
+    const std::array<OffsetF, SAFE_AREA_INSET_EDGE_COUNT> offsets = {
+        OffsetF(80.0f, 0.0f), OffsetF(240.0f, 50.0f), OffsetF(90.0f, 190.0f), OffsetF(0.0f, 60.0f) };
+    for (size_t index = 0; index < offsets.size(); ++index) {
+        auto rect = RectF(offsets[index], SizeF(30.0f, 20.0f));
+        auto button = MakeNode("Button", rect, true);
+        int32_t clicks = 0;
+        std::vector<TouchType> touches;
+        button->GetOrCreateGestureEventHub()->SetUserOnClick([&](GestureEvent& info) {
+            ++clicks;
+            EXPECT_NEAR(info.GetLocalLocation().GetX(), 5.0, 0.01);
+            EXPECT_NEAR(info.GetLocalLocation().GetY(), 5.0, 0.01);
+            EXPECT_NEAR(info.GetCurrentLocalLocation().GetX(), 5.0, 0.01);
+            EXPECT_NEAR(info.GetCurrentLocalLocation().GetY(), 5.0, 0.01);
+        });
+        button->GetOrCreateGestureEventHub()->AddTouchEvent(AceType::MakeRefPtr<TouchEventImpl>(
+            [&](TouchEventInfo& info) {
+                ASSERT_FALSE(info.GetChangedTouches().empty());
+                const auto& touch = info.GetChangedTouches().front();
+                touches.push_back(touch.GetTouchType());
+                EXPECT_NEAR(touch.GetLocalLocation().GetX(), 5.0, 0.01);
+                EXPECT_NEAR(touch.GetLocalLocation().GetY(), 5.0, 0.01);
+            }));
+        SafeAreaInsetOptions options;
+        options.edges[index] = SafeAreaInsetEdgeOptions {};
+        SafeAreaInsetContentArray contents;
+        contents[index] = button;
+        Install(options, contents);
+        auto container = host_->GetSafeAreaInsetNode();
+        EXPECT_EQ(button->GetParent(), container);
+        auto context = AceType::DynamicCast<RosenRenderContext>(button->GetRenderContext());
+        EXPECT_FALSE(context->extraOffset_.has_value());
+        auto bounds = context->GetRSNode()->GetStagingProperties().GetBounds();
+        EXPECT_FLOAT_EQ(bounds.data_[0], rect.Left());
+        EXPECT_FLOAT_EQ(bounds.data_[1], rect.Top());
+        EXPECT_EQ(context->GetPaintRectWithoutTransform(), rect);
+        Tap(30.0f + rect.Left() + 5.0f, 40.0f + rect.Top() + 5.0f);
+        EXPECT_EQ(clicks, 1);
+        EXPECT_EQ(touches, (std::vector<TouchType> { TouchType::DOWN, TouchType::MOVE, TouchType::UP }));
+        ViewAbstract::ResetSafeAreaInset(AceType::RawPtr(host_));
+    }
+}
+
+/**
+ * @tc.name: NestedSingleRootClick001
+ * @tc.desc: A Button inside one developer-owned root container uses normal ancestor coordinates.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SafeAreaInsetRosenTest, NestedSingleRootClick001, TestSize.Level0)
+{
+    host_ = MakeNode("insetHost", RectF(20.0f, 30.0f, 300.0f, 240.0f));
+    host_->AttachToMainTree(true, PipelineContext::GetCurrentContext().GetRawPtr());
+    auto root = MakeNode("singleContainer", RectF(80.0f, 190.0f, 80.0f, 30.0f));
+    auto button = MakeNode("Button", RectF(10.0f, 5.0f, 40.0f, 20.0f), true);
+    button->MountToParent(root);
+    int32_t clicks = 0;
+    button->GetOrCreateGestureEventHub()->SetUserOnClick([&](GestureEvent& info) {
+        ++clicks;
+        EXPECT_NEAR(info.GetLocalLocation().GetX(), 5.0, 0.01);
+        EXPECT_NEAR(info.GetLocalLocation().GetY(), 5.0, 0.01);
+    });
+    SafeAreaInsetOptions options;
+    options.edges[2] = SafeAreaInsetEdgeOptions {};
+    SafeAreaInsetContentArray contents;
+    contents[2] = root;
+    Install(options, contents);
+    root->MarkNeedSyncRenderTree(true);
+    root->RebuildRenderContextTree();
+    Tap(125.0f, 240.0f);
+    EXPECT_EQ(clicks, 1);
+}
+
+/**
+ * @tc.name: DirectContentZIndexAndBlank001
+ * @tc.desc: Root zIndex determines the target and carrier-only hits do not block business content.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SafeAreaInsetRosenTest, DirectContentZIndexAndBlank001, TestSize.Level0)
+{
+    host_ = MakeNode("insetHost", RectF(20.0f, 30.0f, 300.0f, 240.0f));
+    auto business = MakeNode("Button", RectF(0.0f, 0.0f, 300.0f, 240.0f), true);
+    business->MountToParent(host_);
+    host_->AttachToMainTree(true, PipelineContext::GetCurrentContext().GetRawPtr());
+    int32_t businessClicks = 0;
+    business->GetOrCreateGestureEventHub()->SetUserOnClick([&](GestureEvent&) { ++businessClicks; });
+    auto first = MakeNode("Button", RectF(80.0f, 80.0f, 40.0f, 30.0f), true);
+    auto last = MakeNode("Button", RectF(80.0f, 80.0f, 40.0f, 30.0f), true);
+    int32_t firstClicks = 0;
+    int32_t lastClicks = 0;
+    first->GetOrCreateGestureEventHub()->SetUserOnClick([&](GestureEvent&) { ++firstClicks; });
+    last->GetOrCreateGestureEventHub()->SetUserOnClick([&](GestureEvent&) { ++lastClicks; });
+    SafeAreaInsetOptions options;
+    options.edges[0] = SafeAreaInsetEdgeOptions {};
+    options.edges[3] = SafeAreaInsetEdgeOptions {};
+    SafeAreaInsetContentArray contents;
+    contents[0] = first;
+    contents[3] = last;
+    Install(options, contents);
+    Tap(115.0f, 125.0f);
+    EXPECT_EQ(firstClicks, 0);
+    EXPECT_EQ(lastClicks, 1);
+    first->GetRenderContext()->UpdateZIndex(5);
+    auto container = host_->GetSafeAreaInsetNode();
+    container->MarkNeedSyncRenderTree(true);
+    container->RebuildRenderContextTree();
+    Tap(115.0f, 125.0f);
+    EXPECT_EQ(firstClicks, 1);
+    EXPECT_EQ(lastClicks, 1);
+    Tap(40.0f, 50.0f);
+    EXPECT_EQ(businessClicks, 1);
+    EXPECT_EQ(container->GetHitTestMode(), HitTestMode::HTMTRANSPARENT_SELF);
+}
+
+/**
+ * @tc.name: DirectContentMoveReplaceReset001
+ * @tc.desc: Moved, disabled, hidden, replaced and cleared content follows ordinary input rules.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SafeAreaInsetRosenTest, DirectContentMoveReplaceReset001, TestSize.Level0)
+{
+    host_ = MakeNode("insetHost", RectF(20.0f, 30.0f, 300.0f, 240.0f));
+    host_->AttachToMainTree(true, PipelineContext::GetCurrentContext().GetRawPtr());
+    auto button = MakeNode("Button", RectF(80.0f, 190.0f, 40.0f, 20.0f), true);
+    int32_t clicks = 0;
+    button->GetOrCreateGestureEventHub()->SetUserOnClick([&](GestureEvent&) { ++clicks; });
+    SafeAreaInsetOptions options;
+    options.edges[2] = SafeAreaInsetEdgeOptions {};
+    SafeAreaInsetContentArray contents;
+    contents[2] = button;
+    Install(options, contents);
+    Tap(115.0f, 235.0f);
+    EXPECT_EQ(clicks, 1);
+    SetRect(button, RectF(150.0f, 190.0f, 40.0f, 20.0f));
+    Tap(115.0f, 235.0f);
+    EXPECT_EQ(clicks, 1);
+    Tap(185.0f, 235.0f);
+    EXPECT_EQ(clicks, 2);
+    button->GetEventHub<EventHub>()->SetEnabled(false);
+    Tap(185.0f, 235.0f);
+    EXPECT_EQ(clicks, 2);
+    auto replacement = MakeNode("Button", RectF(150.0f, 190.0f, 40.0f, 20.0f), true);
+    int32_t replacementClicks = 0;
+    replacement->GetOrCreateGestureEventHub()->SetUserOnClick([&](GestureEvent&) { ++replacementClicks; });
+    contents[2] = replacement;
+    Install(options, contents);
+    EXPECT_EQ(button->GetParent(), nullptr);
+    Tap(185.0f, 235.0f);
+    EXPECT_EQ(clicks, 2);
+    EXPECT_EQ(replacementClicks, 1);
+    auto container = host_->GetSafeAreaInsetNode();
+    replacement->GetLayoutProperty()->UpdateVisibility(VisibleType::INVISIBLE);
+    container->MarkNeedSyncRenderTree(true);
+    container->RebuildRenderContextTree();
+    Tap(185.0f, 235.0f);
+    EXPECT_EQ(replacementClicks, 1);
+    replacement->GetLayoutProperty()->UpdateVisibility(VisibleType::VISIBLE);
+    container->MarkNeedSyncRenderTree(true);
+    container->RebuildRenderContextTree();
+    Tap(185.0f, 235.0f);
+    EXPECT_EQ(replacementClicks, 2);
+    ViewAbstract::ResetSafeAreaInset(AceType::RawPtr(host_));
+    host_->RebuildRenderContextTree();
+    Tap(185.0f, 235.0f);
+    EXPECT_EQ(replacementClicks, 2);
+}
+
+/**
+ * @tc.name: DirectContentSingleMixedMount001
+ * @tc.desc: Direct content remains mounted in the common container in both render modes.
+ * @tc.type: FUNC
+ */
+HWTEST_F(SafeAreaInsetRosenTest, DirectContentSingleMixedMount001, TestSize.Level0)
+{
+    host_ = MakeNode("insetHost", RectF(0.0f, 0.0f, 300.0f, 240.0f));
+    host_->AttachToMainTree(true, PipelineContext::GetCurrentContext().GetRawPtr());
+    auto button = MakeNode("Button", RectF(80.0f, 190.0f, 40.0f, 20.0f), true);
+    SafeAreaInsetOptions options;
+    options.edges[2] = SafeAreaInsetEdgeOptions {};
+    SafeAreaInsetContentArray contents;
+    contents[2] = button;
+    Install(options, contents);
+    auto container = host_->GetSafeAreaInsetNode();
+    auto context = AceType::DynamicCast<RosenRenderContext>(container->GetRenderContext());
+    for (auto policy : { MountPolicy::SINGLE_IF_RENDER_NODE, MountPolicy::MIXED }) {
+        container->SetMountPolicy(policy);
+        container->MarkNeedSyncRenderTree(true);
+        container->RebuildRenderContextTree();
+        EXPECT_EQ(context->GetRSNode()->GetChildren().size(), 1);
+        auto targets = context->BuildMixedTargetRSNodes(AceType::RawPtr(container));
+        ASSERT_EQ(targets.size(), 1);
+        EXPECT_EQ(targets.front(), AceType::DynamicCast<RosenRenderContext>(button->GetRenderContext())->GetRSNode());
+    }
+}
+
+/**
+ * @tc.name: RosenRenderContextSafeAreaInsetAbsentPosition001
+ * @tc.desc: Non-inset layout nodes retain their paint and deferred extra-offset sync behavior (AC-6.14).
+ * @tc.type: FUNC
+ */
+HWTEST_F(RosenRenderContextTest, RosenRenderContextSafeAreaInsetAbsentPosition001, TestSize.Level0)
+{
+    auto wrapper = FrameNode::CreateCommonNode("legacyLayoutNode", -130, true, AceType::MakeRefPtr<Pattern>());
+    auto edgeContext = AceType::MakeRefPtr<RosenRenderContext>();
+    edgeContext->SetHostNode(wrapper);
+    wrapper->renderContext_ = edgeContext;
+    wrapper->GetGeometryNode()->SetFrameOffset(OffsetF(80.0f, 60.0f));
+    wrapper->GetGeometryNode()->SetPixelGridRoundOffset(OffsetF(11.0f, 12.0f));
+    EXPECT_EQ(edgeContext->AdjustPaintRectInner(wrapper), RectF());
+    EXPECT_EQ(wrapper->GetGeometryNode()->GetPixelGridRoundOffset(), OffsetF(11.0f, 12.0f));
+
+    auto content = FrameNode::CreateFrameNode("legacyContent", -131, AceType::MakeRefPtr<Pattern>());
+    content->MountToParent(wrapper);
+    auto context = InitRosenRenderContext(content);
+    content->renderContext_ = context;
+    const RectF localRect(3.0f, 4.0f, 50.0f, 10.0f);
+    context->UpdatePaintRect(localRect);
+    context->SyncGeometryProperties(localRect);
+    const auto bounds = context->GetRSNode()->GetStagingProperties().GetBounds();
+    context->SetExtraOffset(OffsetF(80.0f, 60.0f));
+    EXPECT_EQ(context->GetRSNode()->GetStagingProperties().GetBounds(), bounds);
 }
 
 /**
@@ -1380,5 +1796,72 @@ HWTEST_F(RosenRenderContextTest, RosenRenderContextTestNew051, TestSize.Level1)
     ASSERT_NE(rosenRenderContext->drawRegionRects_[DRAW_REGION_OVERLAY_TEXT_INDEX], nullptr);
     EXPECT_TRUE(*rosenRenderContext->drawRegionRects_[DRAW_REGION_OVERLAY_TEXT_INDEX] == *expectedTextRect);
     EXPECT_FALSE(*rosenRenderContext->drawRegionRects_[DRAW_REGION_OVERLAY_TEXT_INDEX] == *expectedClearRect);
+}
+
+/**
+ * @tc.name: RosenRenderContextTestNewShadowClipMode001
+ * @tc.desc: UpdateShadowClipMode.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RosenRenderContextTest, RosenRenderContextTestNewShadowClipMode001, TestSize.Level1)
+{
+    auto frameNode = FrameNode::GetOrCreateFrameNode("parent", -1, []() { return AceType::MakeRefPtr<Pattern>(); });
+    auto rosenRenderContext = InitRosenRenderContext(frameNode);
+    ASSERT_NE(rosenRenderContext, nullptr);
+
+    /**
+     * @tc.steps: step1. UpdateShadowClipMode with BOUNDS_SHAPE.
+     * @tc.expected: SHADOW modifier is set.
+     */
+    rosenRenderContext->UpdateShadowClipMode(ShadowClipMode::BOUNDS_SHAPE);
+    auto modifier = rosenRenderContext->GetRSNode()->GetModifierByType(
+        Rosen::ModifierNG::RSModifierType::SHADOW);
+    EXPECT_NE(modifier, nullptr);
+
+    /**
+     * @tc.steps: step2. UpdateShadowClipMode with DEFAULT_SHAPE.
+     * @tc.expected: SHADOW modifier is set.
+     */
+    rosenRenderContext->UpdateShadowClipMode(ShadowClipMode::DEFAULT_SHAPE);
+    modifier = rosenRenderContext->GetRSNode()->GetModifierByType(
+        Rosen::ModifierNG::RSModifierType::SHADOW);
+    EXPECT_NE(modifier, nullptr);
+}
+
+/**
+ * @tc.name: RosenRenderContextTestNewShadowShape001
+ * @tc.desc: UpdateShadowShape.
+ * @tc.type: FUNC
+ */
+HWTEST_F(RosenRenderContextTest, RosenRenderContextTestNewShadowShape001, TestSize.Level1)
+{
+    auto frameNode = FrameNode::GetOrCreateFrameNode("parent", -1, []() { return AceType::MakeRefPtr<Pattern>(); });
+    auto rosenRenderContext = InitRosenRenderContext(frameNode);
+    ASSERT_NE(rosenRenderContext, nullptr);
+
+    /**
+     * @tc.steps: step1. UpdateShadowShape with nullptr basicShape.
+     * @tc.expected: shadowPath is null.
+     */
+    rosenRenderContext->UpdateShadowShape(nullptr);
+    EXPECT_EQ(rosenRenderContext->GetRSNode()->GetStagingProperties().GetShadowPath(), nullptr);
+
+    /**
+     * @tc.steps: step2. UpdateShadowShape with valid Circle but rect is null.
+     * @tc.expected: shadowPath is null (not painted).
+     */
+    auto circle = AceType::MakeRefPtr<Circle>();
+    circle->SetRadius(Dimension(5.0, DimensionUnit::PX));
+    rosenRenderContext->UpdateShadowShape(circle);
+
+    /**
+     * @tc.steps: step3. UpdateShadowShape with valid Circle and valid rect.
+     * @tc.expected: shadowPath is not null.
+     */
+    RectF paintRect(0.0f, 0.0f, 10.0f, 10.0f);
+    rosenRenderContext->paintRect_ = paintRect;
+    rosenRenderContext->SyncGeometryProperties(paintRect);
+    rosenRenderContext->OnShadowShapeUpdate(circle);
+    EXPECT_NE(rosenRenderContext->GetRSNode()->GetStagingProperties().GetShadowPath(), nullptr);
 }
 } // namespace OHOS::Ace::NG

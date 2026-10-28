@@ -74,7 +74,7 @@ void AnimatorModelImpl::AddEventListener(
     auto animatorInfo = GetAnimatorInfo(animatorId);
     CHECK_NULL_VOID(animatorInfo);
     auto animator = animatorInfo->GetAnimator();
-    CHECK_NULL_VOID(animatorInfo);
+    CHECK_NULL_VOID(animator);
     auto pipelineContext = AceType::DynamicCast<PipelineContext>(PipelineBase::GetCurrentContext());
     CHECK_NULL_VOID(pipelineContext);
     WeakPtr<PipelineContext> weakContext = WeakPtr<PipelineContext>(pipelineContext);

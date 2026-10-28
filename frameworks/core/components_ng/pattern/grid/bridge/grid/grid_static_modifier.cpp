@@ -13,17 +13,23 @@
  * limitations under the License.
  */
 
+#include <limits>
+
+#include "base/geometry/dimension.h"
+#include "core/common/container_scope.h"
 #include "core/components/common/layout/constants.h"
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/pattern/grid/grid_model_ng.h"
 #include "core/components_ng/pattern/grid/grid_model_static.h"
 #include "core/components_ng/pattern/scrollable/selectable_container_pattern.h"
+#include "core/components_ng/pattern/scrollable/scroll_snap_strategy.h"
 #include "core/components_ng/pattern/scrollable/scrollable_model_static.h"
 #include "core/interfaces/native/utility/callback_helper.h"
 #include "core/interfaces/native/utility/converter.h"
 #include "core/interfaces/native/utility/reverse_converter.h"
 #include "core/interfaces/native/utility/validators.h"
 #include "core/interfaces/native/implementation/scroller_peer_impl.h"
+#include "core/pipeline_ng/pipeline_context.h"
 
 namespace OHOS::Ace::NG::Converter {
 
@@ -191,6 +197,21 @@ void SetGridOptionsImpl(Ark_VMContext vmContext, Ark_NativePointer node,
 }
 } // GridInterfaceModifier
 namespace GridAttributeModifier {
+template<typename Callback, typename... Args>
+double InvokeSnapProvider(const CallbackHelper<Callback>& callback, const WeakPtr<FrameNode>& weakNode,
+    int32_t instanceId, Args... args)
+{
+    auto node = weakNode.Upgrade();
+    CHECK_NULL_RETURN(node, std::numeric_limits<double>::quiet_NaN());
+    ContainerScope scope(instanceId);
+    PipelineContext::SetCallBackNode(weakNode);
+    // The public provider uses vp and vp/s; the scroll runtime uses px and px/s.
+    auto result = callback.template InvokeWithOptConvertResult<double, Ark_Float64, synthetic_Callback_F64_Void>(
+        Converter::ArkValue<Ark_Float64>(Dimension(args).ConvertToVp())...);
+    return result ? Dimension(result.value(), DimensionUnit::VP).ConvertToPx()
+                  : std::numeric_limits<double>::quiet_NaN();
+}
+
 void SetColumnsTemplateImpl(Ark_NativePointer node,
                             const Opt_Union_String_ItemFillPolicy* value)
 {
@@ -537,6 +558,48 @@ void SetNestedScrollImpl(Ark_NativePointer node,
     auto backward = Converter::OptConvert<NestedScrollMode>(convValue->scrollBackward);
     ScrollableModelStatic::SetNestedScroll(frameNode, forward, backward);
 }
+void SetScrollSnapStrategyImpl(Ark_NativePointer node,
+    const Opt_Union_ScrollSnapAlign_ScrollSnapOffsetProviderProxy* value)
+{
+    auto frameNode = reinterpret_cast<FrameNode*>(node);
+    CHECK_NULL_VOID(frameNode);
+    Converter::VisitUnionPtr(value,
+        [frameNode](const Ark_ScrollSnapAlign& align) {
+            ScrollSnapStrategy strategy;
+            switch (align) {
+                case ARK_SCROLL_SNAP_ALIGN_NONE: strategy.align = ScrollSnapAlign::NONE; break;
+                case ARK_SCROLL_SNAP_ALIGN_START: strategy.align = ScrollSnapAlign::START; break;
+                case ARK_SCROLL_SNAP_ALIGN_CENTER: strategy.align = ScrollSnapAlign::CENTER; break;
+                case ARK_SCROLL_SNAP_ALIGN_END: strategy.align = ScrollSnapAlign::END; break;
+                default:
+                    GridModelStatic::SetScrollSnapStrategy(frameNode, std::nullopt);
+                    return;
+            }
+            GridModelStatic::SetScrollSnapStrategy(frameNode, strategy);
+        },
+        [frameNode](const Ark_ScrollSnapOffsetProviderProxy& provider) {
+            if (!provider.calculateApproachOffset.callSync || !provider.calculateSnapOffset.callSync) {
+                GridModelStatic::SetScrollSnapStrategy(frameNode, std::nullopt);
+                return;
+            }
+            const auto weakNode = AceType::WeakClaim(frameNode);
+            const auto instanceId = frameNode->GetInstanceId();
+            ScrollSnapStrategy strategy;
+            strategy.hasProvider = true;
+            strategy.calculateApproachOffset =
+                [callback = CallbackHelper(provider.calculateApproachOffset), weakNode, instanceId](
+                    double velocity, double decayOffset) {
+                    return InvokeSnapProvider(callback, weakNode, instanceId, velocity, decayOffset);
+                };
+            strategy.calculateSnapOffset =
+                [callback = CallbackHelper(provider.calculateSnapOffset), weakNode, instanceId](double velocity) {
+                    return InvokeSnapProvider(callback, weakNode, instanceId, velocity);
+                };
+            GridModelStatic::SetScrollSnapStrategy(frameNode, strategy);
+        },
+        [frameNode]() { GridModelStatic::SetScrollSnapStrategy(frameNode, std::nullopt); });
+}
+
 void SetEnableScrollInteractionImpl(Ark_NativePointer node,
                                     const Opt_Boolean* value)
 {
@@ -698,6 +761,14 @@ void SetOnDidScrollImpl(Ark_NativePointer node,
     };
     ScrollableModelStatic::SetOnDidScroll(frameNode, std::move(onDidScroll));
 }
+void SetScrollPlaceholderImpl(Ark_NativePointer node,
+                              const Opt_PlaceholderProvider* value)
+{
+    auto frameNode = reinterpret_cast<FrameNode *>(node);
+    CHECK_NULL_VOID(frameNode);
+    //auto convValue = value ? Converter::OptConvert<type>(*value) : std::nullopt;
+    // GridModelNG::SetSetScrollPlaceholder(frameNode, convValue);
+}
 void SetCachedCount1Impl(Ark_NativePointer node,
                          const Opt_Int32* count,
                          const Opt_Boolean* show)
@@ -783,6 +854,7 @@ const GENERATED_ArkUIGridModifier* GetGridStaticModifier()
         GridAttributeModifier::SetOnItemDragLeaveImpl,
         GridAttributeModifier::SetOnItemDropImpl,
         GridAttributeModifier::SetNestedScrollImpl,
+        GridAttributeModifier::SetScrollSnapStrategyImpl,
         GridAttributeModifier::SetEnableScrollInteractionImpl,
         GridAttributeModifier::SetFrictionImpl,
         GridAttributeModifier::SetAlignItemsImpl,
@@ -794,6 +866,7 @@ const GENERATED_ArkUIGridModifier* GetGridStaticModifier()
         GridAttributeModifier::SetOnScrollFrameBeginImpl,
         GridAttributeModifier::SetOnWillScrollImpl,
         GridAttributeModifier::SetOnDidScrollImpl,
+        GridAttributeModifier::SetScrollPlaceholderImpl,
         GridAttributeModifier::SetCachedCount1Impl,
         GridAttributeModifier::SetEdgeEffectImpl,
     };

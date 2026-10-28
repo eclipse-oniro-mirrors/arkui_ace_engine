@@ -41,17 +41,22 @@ class ACE_EXPORT LazyColumnLayoutInfo : public AceType {
     DECLARE_ACE_TYPE(LazyColumnLayoutInfo, AceType);
 public:
     float GetEstimateItemSize();
-    void UpdatePosMap(float prevBodyMainSize);
+    // False rejects an inconsistent known extent; the normal posMap update still runs.
+    bool UpdatePosMap(float prevBodyMainSize, std::optional<float> knownBodyMainSize = std::nullopt);
     void SetPosMap(int32_t index, const ColumnItemMainPos& pos);
     void SetCachedPosMap(int32_t index, const ColumnItemMainPos& pos);
     void SetSpace(float space);
     void SetTotalItemCount(int32_t count);
+
+    void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json, const ParamConfig& config);
     void DumpAdvanceInfo();
     void DumpAdvanceInfo(std::unique_ptr<JsonValue>& json);
 
     bool NeedPredict() const;
 
 private:
+    bool ApplyKnownBodySize(float prevBodyMainSize, float knownBodyMainSize);
+    void RebaseKnownItems(double estimateSize, float knownBodyMainSize);
     float UpdatePosMapStart(int32_t updateStart, int32_t updateEnd);
     void UpdatePosMapEnd(int32_t updateEnd);
     void UpdateTotalMainSize();
@@ -90,6 +95,8 @@ private:
     int32_t cachedUpdatedStart_ = INT_MAX;
     int32_t cachedUpdatedEnd_ = -1;
     std::optional<int64_t> deadline_;
+    // Committed content extent whose container geometry has not been published by normal Measure yet.
+    std::optional<float> premeasuredMainSize_;
 
     friend class LazyColumnLayoutAlgorithm;
     friend class LazyColumnLayoutPattern;

@@ -16,11 +16,22 @@
 #include "gtest/gtest.h"
 #include "swiper_test_ng.h"
 
+#include "test/mock/frameworks/core/pipeline/mock_pipeline_context.h"
+
+#include "core/components_ng/pattern/stage/page_info.h"
 #include "core/components_ng/syntax/repeat_virtual_scroll_2_caches.h"
 #include "core/components_ng/syntax/repeat_virtual_scroll_2_node.h"
 #include "core/components_ng/syntax/repeat_virtual_scroll_node.h"
 
+namespace OHOS::Ace {
+const std::unordered_map<std::string, std::string>& GetLastSwiperChangePayload();
+}
+
 namespace OHOS::Ace::NG {
+constexpr int32_t COMPONENT_STATE_CHANGE_IDX = 0;
+constexpr int32_t COMPONENT_STATE_SHOW = 1;
+constexpr int32_t COMPONENT_STATE_HIDDEN = 2;
+
 class SwiperPatternTestNg : public SwiperTestNg {
 public:
 };
@@ -3247,4 +3258,199 @@ HWTEST_F(SwiperPatternTestNg, StopPropertyTranslateAnimation002, TestSize.Level1
     EXPECT_TRUE(swiperPattern->fastAnimationRunning_);
     EXPECT_TRUE(swiperPattern->syncCancelAniIsFailed_);
 }
+
+/**
+ * @tc.name: SwiperReportSwiperChangeContent005
+ * @tc.desc: test ReportSwiperChangeContent reports change index and is suppressed in auto play
+ * @tc.type: FUNC
+ */
+HWTEST_F(SwiperPatternTestNg, SwiperReportSwiperChangeContent005, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Init Swiper node.
+     */
+    SwiperModelNG model = CreateSwiper();
+    CreateSwiperItems(4);
+    CreateSwiperDone();
+
+    auto host = pattern_->GetHost();
+    auto geometryNode = host->GetGeometryNode();
+    auto frame = geometryNode->frame_;
+    auto rect = frame.rect_;
+    rect.width_ = 100.0;
+    rect.height_ = 100.0;
+
+    auto context = pattern_->GetContext();
+    CHECK_NULL_VOID(context);
+    context->rootWidth_ = 180.0;
+    context->rootHeight_ = 180.0;
+
+    auto pageInfo = AceType::MakeRefPtr<PageInfo>();
+    pageInfo->SetFullPath("entry/pages/index");
+    MockPipelineContext::SetLastPageInfo(pageInfo);
+
+    /**
+     * @tc.steps: step2. Report change index (value=0) when not in auto play.
+     * @tc.expected: Payload is reported with value "0".
+     */
+    pattern_->isInAutoPlay_ = false;
+    pattern_->ReportSwiperChangeContent(0, COMPONENT_STATE_CHANGE_IDX);
+    const auto& payload = GetLastSwiperChangePayload();
+    EXPECT_EQ(payload.at("componentSwiperState"), std::to_string(COMPONENT_STATE_CHANGE_IDX));
+    EXPECT_EQ(payload.at("currentIndex"), "0");
+    EXPECT_EQ(payload.size(), 4);
+
+    /**
+     * @tc.steps: step3. Report show (value=1) first, then report change index
+     *             (value=0) when in auto play.
+     * @tc.expected: Change index report is suppressed in auto play and the
+     *             payload keeps the show value reported just before.
+     */
+    pattern_->isInAutoPlay_ = true;
+    pattern_->ReportSwiperChangeContent(0, COMPONENT_STATE_SHOW);
+    pattern_->ReportSwiperChangeContent(0, COMPONENT_STATE_CHANGE_IDX);
+    EXPECT_EQ(GetLastSwiperChangePayload().at("componentSwiperState"),
+        std::to_string(COMPONENT_STATE_SHOW));
+}
+
+/**
+ * @tc.name: SwiperReportSwiperChangeContent006
+ * @tc.desc: test ReportSwiperChangeContent with show/hidden value bypasses auto play guard
+ * @tc.type: FUNC
+ */
+HWTEST_F(SwiperPatternTestNg, SwiperReportSwiperChangeContent006, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Init Swiper node.
+     */
+    SwiperModelNG model = CreateSwiper();
+    CreateSwiperItems(4);
+    CreateSwiperDone();
+
+    auto host = pattern_->GetHost();
+    auto geometryNode = host->GetGeometryNode();
+    auto frame = geometryNode->frame_;
+    auto rect = frame.rect_;
+    rect.width_ = 100.0;
+    rect.height_ = 100.0;
+
+    auto context = pattern_->GetContext();
+    CHECK_NULL_VOID(context);
+    context->rootWidth_ = 180.0;
+    context->rootHeight_ = 180.0;
+
+    auto pageInfo = AceType::MakeRefPtr<PageInfo>();
+    pageInfo->SetFullPath("entry/pages/index");
+    MockPipelineContext::SetLastPageInfo(pageInfo);
+
+    /**
+     * @tc.steps: step2. Report show (value=1) while in auto play.
+     * @tc.expected: Payload is reported with value "1".
+     */
+    pattern_->isInAutoPlay_ = true;
+    pattern_->ReportSwiperChangeContent(0, COMPONENT_STATE_SHOW);
+    EXPECT_EQ(GetLastSwiperChangePayload().at("componentSwiperState"),
+        std::to_string(COMPONENT_STATE_SHOW));
+
+    /**
+     * @tc.steps: step3. Report hidden (value=2) while in auto play.
+     * @tc.expected: Payload is reported with value "2".
+     */
+    pattern_->ReportSwiperChangeContent(0, COMPONENT_STATE_HIDDEN);
+    EXPECT_EQ(GetLastSwiperChangePayload().at("componentSwiperState"),
+        std::to_string(COMPONENT_STATE_HIDDEN));
+}
+
+/**
+ * @tc.name: SwiperHandleVisibleChange001
+ * @tc.desc: test HandleVisibleChange reports SHOW when swiper becomes visible
+ * @tc.type: FUNC
+ */
+HWTEST_F(SwiperPatternTestNg, SwiperHandleVisibleChange001, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Init Swiper node.
+     */
+    SwiperModelNG model = CreateSwiper();
+    CreateSwiperItems(4);
+    CreateSwiperDone();
+
+    auto host = pattern_->GetHost();
+    auto geometryNode = host->GetGeometryNode();
+    auto frame = geometryNode->frame_;
+    auto rect = frame.rect_;
+    rect.width_ = 100.0;
+    rect.height_ = 100.0;
+
+    auto context = pattern_->GetContext();
+    CHECK_NULL_VOID(context);
+    context->rootWidth_ = 180.0;
+    context->rootHeight_ = 180.0;
+
+    auto pageInfo = AceType::MakeRefPtr<PageInfo>();
+    pageInfo->SetFullPath("entry/pages/index");
+    MockPipelineContext::SetLastPageInfo(pageInfo);
+
+    /**
+     * @tc.steps: step2. Set a baseline report and make swiper visible.
+     * @tc.expected: SHOW (value=1) is reported and isVisibleArea_ is true.
+     */
+    pattern_->ReportSwiperChangeContent(0, COMPONENT_STATE_CHANGE_IDX);
+    pattern_->isVisibleArea_ = false;
+    pattern_->HandleVisibleChange(true);
+    EXPECT_TRUE(pattern_->isVisibleArea_);
+    EXPECT_EQ(GetLastSwiperChangePayload().at("componentSwiperState"),
+        std::to_string(COMPONENT_STATE_SHOW));
+
+    /**
+     * @tc.steps: step3. HandleVisibleChange(true) again while visibility is unchanged.
+     * @tc.expected: No duplicate report; payload keeps the SHOW value from step2.
+     */
+    pattern_->HandleVisibleChange(true);
+    EXPECT_EQ(GetLastSwiperChangePayload().at("componentSwiperState"),
+        std::to_string(COMPONENT_STATE_SHOW));
+}
+
+/**
+ * @tc.name: SwiperHandleVisibleChange002
+ * @tc.desc: test HandleVisibleChange reports HIDDEN when swiper becomes hidden
+ * @tc.type: FUNC
+ */
+HWTEST_F(SwiperPatternTestNg, SwiperHandleVisibleChange002, TestSize.Level1)
+{
+    /**
+     * @tc.steps: step1. Init Swiper node.
+     */
+    SwiperModelNG model = CreateSwiper();
+    CreateSwiperItems(4);
+    CreateSwiperDone();
+
+    auto host = pattern_->GetHost();
+    auto geometryNode = host->GetGeometryNode();
+    auto frame = geometryNode->frame_;
+    auto rect = frame.rect_;
+    rect.width_ = 100.0;
+    rect.height_ = 100.0;
+
+    auto context = pattern_->GetContext();
+    CHECK_NULL_VOID(context);
+    context->rootWidth_ = 180.0;
+    context->rootHeight_ = 180.0;
+
+    auto pageInfo = AceType::MakeRefPtr<PageInfo>();
+    pageInfo->SetFullPath("entry/pages/index");
+    MockPipelineContext::SetLastPageInfo(pageInfo);
+
+    /**
+     * @tc.steps: step2. Set a baseline report and make swiper hidden.
+     * @tc.expected: HIDDEN (value=2) is reported and isVisibleArea_ is false.
+     */
+    pattern_->ReportSwiperChangeContent(0, COMPONENT_STATE_CHANGE_IDX);
+    pattern_->isVisibleArea_ = true;
+    pattern_->HandleVisibleChange(false);
+    EXPECT_FALSE(pattern_->isVisibleArea_);
+    EXPECT_EQ(GetLastSwiperChangePayload().at("componentSwiperState"),
+        std::to_string(COMPONENT_STATE_HIDDEN));
+}
+
 } // namespace OHOS::Ace::NG
