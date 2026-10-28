@@ -252,8 +252,7 @@ size_t ScrollPlaceholderManager::GetHotTemplateCount() const
 size_t ScrollPlaceholderManager::GetPendingCloneCount(const std::string& templateId) const
 {
     std::lock_guard<std::mutex> guard(cloneMutex_);
-    auto it = pendingCloneCount_.find(templateId);
-    return it == pendingCloneCount_.end() ? 0 : it->second;
+    return SumPendingClonesLocked(templateId);
 }
 
 void ScrollPlaceholderManager::ScheduleBackgroundReplenish(const std::string& templateId)
@@ -274,11 +273,11 @@ void ScrollPlaceholderManager::ScheduleBackgroundReplenish(const std::string& te
     size_t toSubmit = 0;
     {
         std::lock_guard<std::mutex> guard(cloneMutex_);
-        size_t held = registry_.GetCachedInstanceCount(templateId) + pendingCloneCount_[templateId];
+        size_t held = registry_.GetCachedInstanceCount(templateId) + SumPendingClonesLocked(templateId);
         size_t spareTarget = SCROLL_PLACEHOLDER_INSTANCE_CACHE_CAPACITY - 1;
         if (held < spareTarget) {
             toSubmit = spareTarget - held;
-            pendingCloneCount_[templateId] += static_cast<uint32_t>(toSubmit);
+            pendingCloneCount_[templateId][snapshot->generation] += static_cast<uint32_t>(toSubmit);
         }
     }
     // The RefPtr keeps the manager alive until every submitted task finishes; the task never
@@ -291,7 +290,7 @@ void ScrollPlaceholderManager::ScheduleBackgroundReplenish(const std::string& te
             })) {
             // Executor rejected the task: release the slot booked for it, otherwise the pool
             // would consider it in flight forever.
-            ReleasePendingCloneSlot(templateId);
+            ReleasePendingCloneSlot(templateId, snapshot->generation);
         }
     }
 }
@@ -341,20 +340,41 @@ void ScrollPlaceholderManager::RunBackgroundClone(const std::string& templateId,
             "ScrollPlaceholder background clone skipped: reason=%{public}s, templateId=%{public}s, "
             "instanceId=%{public}d", skipReason, templateId.c_str(), instanceId_);
     }
-    ReleasePendingCloneSlot(templateId);
+    ReleasePendingCloneSlot(templateId, generation);
 }
 
-void ScrollPlaceholderManager::ReleasePendingCloneSlot(const std::string& templateId)
+void ScrollPlaceholderManager::ReleasePendingCloneSlot(
+    const std::string& templateId, uint64_t templateGeneration)
 {
     std::lock_guard<std::mutex> guard(cloneMutex_);
     auto it = pendingCloneCount_.find(templateId);
     if (it == pendingCloneCount_.end()) {
         return;
     }
-    it->second = it->second > 0 ? it->second - 1 : 0;
-    if (it->second == 0) {
-        pendingCloneCount_.erase(it);
+    auto generationIt = it->second.find(templateGeneration);
+    if (generationIt == it->second.end()) {
+        return;
     }
+    generationIt->second = generationIt->second > 0 ? generationIt->second - 1 : 0;
+    if (generationIt->second == 0) {
+        it->second.erase(generationIt);
+        if (it->second.empty()) {
+            pendingCloneCount_.erase(it);
+        }
+    }
+}
+
+size_t ScrollPlaceholderManager::SumPendingClonesLocked(const std::string& templateId) const
+{
+    auto it = pendingCloneCount_.find(templateId);
+    if (it == pendingCloneCount_.end()) {
+        return 0;
+    }
+    size_t total = 0;
+    for (const auto& entry : it->second) {
+        total += entry.second;
+    }
+    return total;
 }
 
 void ScrollPlaceholderManager::ResetPendingCloneSlots(const std::string& templateId)
