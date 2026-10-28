@@ -1186,6 +1186,82 @@ HWTEST_F(TextTimerTestNg, TextTimerPatternTest008, TestSize.Level0)
 }
 
 /**
+ * @tc.name: TextTimerPatternTest009
+ * @tc.desc: Test OnLanguageConfigurationUpdate in stopwatch (non-countdown) mode.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextTimerTestNg, TextTimerPatternTest009, TestSize.Level0)
+{
+    /**
+     * @tc.steps: step1. create texttimer frameNode in stopwatch mode.
+     */
+    TestProperty testProperty;
+    testProperty.format = std::make_optional(TEXT_TIMER_FORMAT);
+    testProperty.isCountDown = std::make_optional(IS_COUNT_DOWN);
+    testProperty.startTime = std::make_optional(START_TIME);
+    auto frameNode = CreateTextTimerParagraph(testProperty);
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<TextTimerPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto textNode = AceType::DynamicCast<FrameNode>(frameNode->GetLastChild());
+    ASSERT_NE(textNode, nullptr);
+    auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_NE(textLayoutProperty, nullptr);
+
+    /**
+     * @tc.steps: step2. init pattern and set elapsed time.
+     */
+    pattern->InitTextTimerController();
+    pattern->OnModifyDone();
+    pattern->elapsedTime_ = ELAPSED_TIME_1;
+
+    /**
+     * @tc.steps: step3. call OnLanguageConfigurationUpdate.
+     * @tc.expected: text content refreshed through FormatDurationLocalized (mock returns "08:00:00").
+     */
+    pattern->OnLanguageConfigurationUpdate();
+    EXPECT_EQ(textLayoutProperty->GetContent(), FORMAT_DATA);
+}
+
+/**
+ * @tc.name: TextTimerPatternTest010
+ * @tc.desc: Test OnLanguageConfigurationUpdate in countdown mode.
+ * @tc.type: FUNC
+ */
+HWTEST_F(TextTimerTestNg, TextTimerPatternTest010, TestSize.Level0)
+{
+    /**
+     * @tc.steps: step1. create texttimer frameNode in countdown mode.
+     */
+    TestProperty testProperty;
+    testProperty.format = std::make_optional(TEXT_TIMER_FORMAT);
+    testProperty.isCountDown = std::make_optional(IS_COUNT_DOWN_2);
+    testProperty.inputCount = std::make_optional(INPUT_COUNT);
+    auto frameNode = CreateTextTimerParagraph(testProperty);
+    ASSERT_NE(frameNode, nullptr);
+    auto pattern = frameNode->GetPattern<TextTimerPattern>();
+    ASSERT_NE(pattern, nullptr);
+    auto textNode = AceType::DynamicCast<FrameNode>(frameNode->GetLastChild());
+    ASSERT_NE(textNode, nullptr);
+    auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
+    ASSERT_NE(textLayoutProperty, nullptr);
+
+    /**
+     * @tc.steps: step2. init pattern and set elapsed time within inputCount.
+     */
+    pattern->InitTextTimerController();
+    pattern->OnModifyDone();
+    pattern->elapsedTime_ = ELAPSED_TIME_1;
+
+    /**
+     * @tc.steps: step3. call OnLanguageConfigurationUpdate.
+     * @tc.expected: remaining time computed and text content refreshed (mock returns "08:00:00").
+     */
+    pattern->OnLanguageConfigurationUpdate();
+    EXPECT_EQ(textLayoutProperty->GetContent(), FORMAT_DATA);
+}
+
+/**
  * @tc.name: TextTimerSetTextColorByUserTest002
  * @tc.desc: Test SetTextColorByUser with different conditions
  * @tc.type: FUNC

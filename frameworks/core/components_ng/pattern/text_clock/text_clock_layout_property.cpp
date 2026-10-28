@@ -15,6 +15,7 @@
 
 #include "core/components_ng/pattern/text_clock/text_clock_layout_property.h"
 #include "core/pipeline_ng/pipeline_context.h"
+#include "base/utils/string_utils.h"
 
 namespace OHOS::Ace::NG {
 namespace {
@@ -114,5 +115,14 @@ void TextClockLayoutProperty::ToJsonValue(std::unique_ptr<JsonValue>& json, cons
         ConvertTextShadow(GetTextShadow().value_or(std::vector<Shadow>())).c_str(), filter);
     json->PutExtAttr("fontFeature",
         ConvertFeature(GetFontFeature().value_or(FONT_FEATURES_LIST())).c_str(), filter);
+    for (const auto& child : host->GetChildren()) {
+        auto textNode = AceType::DynamicCast<FrameNode>(child);
+        CHECK_NULL_CONTINUE(textNode);
+        auto textLayoutProperty = textNode->GetLayoutProperty<TextLayoutProperty>();
+        CHECK_NULL_CONTINUE(textLayoutProperty);
+        json->PutExtAttr("localizedTime",
+            StringUtils::Str16ToStr8(textLayoutProperty->GetContent().value_or(u"")).c_str(), filter);
+        break;
+    }
 }
 } // namespace OHOS::Ace::NG

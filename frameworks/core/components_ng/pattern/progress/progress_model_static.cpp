@@ -16,6 +16,7 @@
 #include "core/components_ng/pattern/progress/progress_model_static.h"
 
 #include "base/geometry/dimension.h"
+#include "base/i18n/localization.h"
 #include "core/components_ng/base/frame_node.h"
 #include "core/components_ng/base/view_abstract_model_static.h"
 #include "core/components_ng/base/view_stack_processor.h"
@@ -191,8 +192,11 @@ void ProgressModelStatic::SetText(FrameNode* frameNode, const std::optional<std:
         auto maxValue = progressPaintProperty->GetMaxValue();
         auto curValue = progressPaintProperty->GetValue();
         if (maxValue.has_value() && curValue.has_value()) {
-            int32_t curPercent = curValue.value() * 100 / maxValue.value();
-            std::string number = std::to_string(curPercent) + "%";
+            int32_t curPercent = NearZero(maxValue.value()) ? 0
+                : static_cast<int32_t>(curValue.value() * 100 / maxValue.value());
+            std::string number = Localization::GetInstance()->GetLanguage() != "zh"
+                ? Localization::GetInstance()->FormatPercent(curPercent)
+                : std::to_string(curPercent) + "%";
             bool isShowText = progressPaintProperty->GetEnableShowText().value_or(false);
             if (!isShowText) {
                 number = "";
@@ -410,11 +414,10 @@ void ProgressModelStatic::SetTextDefaultStyle(FrameNode* frameNode, const RefPtr
     CHECK_NULL_VOID(progressTheme);
     auto progressPaintProperty = frameNode->GetPaintProperty<NG::ProgressPaintProperty>();
     CHECK_NULL_VOID(progressPaintProperty);
-    int32_t curPercent = 0;
-    if (!NearZero(maxValue)) {
-        curPercent = value * 100 / maxValue;
-    }
-    std::string number = std::to_string(curPercent) + "%";
+    int32_t curPercent = NearZero(maxValue) ? 0 : static_cast<int32_t>(value * 100 / maxValue);
+    std::string number = Localization::GetInstance()->GetLanguage() != "zh"
+        ? Localization::GetInstance()->FormatPercent(curPercent)
+        : std::to_string(curPercent) + "%";
     textProps->UpdateContent(number);
     textProps->UpdateFontSize(progressTheme->GetTextSize());
     textProps->UpdateTextColor(progressTheme->GetTextColor());

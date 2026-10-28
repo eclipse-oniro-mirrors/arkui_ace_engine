@@ -291,10 +291,19 @@ void TextTimerPattern::UpdateTextTimer(double elapsedTime)
         elapsedTime = -elapsedTime;
         isNegative = true;
     }
-    std::string timerText =
-        Localization::GetInstance()->FormatDuration(static_cast<uint32_t>(elapsedTime), GetFormat());
+    std::string timerText;
+    auto textTimerLayoutProperty = host->GetLayoutProperty<TextTimerLayoutProperty>();
+    CHECK_NULL_VOID(textTimerLayoutProperty);
+    if (!textTimerLayoutProperty->HasFormat() && Localization::GetInstance()->GetLanguage() != "zh") {
+        timerText = Localization::GetInstance()->FormatDurationLocalized(
+            static_cast<uint32_t>(elapsedTime), std::string(DEFAULT_FORMAT));
+    } else {
+        timerText = Localization::GetInstance()->FormatDuration(static_cast<uint32_t>(elapsedTime),
+            textTimerLayoutProperty->GetFormat().value_or(std::string(DEFAULT_FORMAT)));
+    }
     if (timerText.empty()) {
-        timerText = Localization::GetInstance()->FormatDuration(elapsedTime, std::string(DEFAULT_FORMAT));
+        timerText = Localization::GetInstance()->FormatDurationLocalized(
+            static_cast<uint32_t>(elapsedTime), std::string(DEFAULT_FORMAT));
     }
     if (isNegative) {
         timerText.insert(0, "-");
@@ -586,5 +595,21 @@ void TextTimerPattern::OnColorConfigurationUpdate()
     if (!pops->GetTextFontFamilySetByUserValue(false)) {
         UpdateFontFamily(theme->GetTextStyle().GetFontFamilies(), false);
     }
+}
+
+void TextTimerPattern::OnLanguageConfigurationUpdate()
+{
+    auto host = GetHost();
+    CHECK_NULL_VOID(host);
+    auto tmpValue = static_cast<double>(elapsedTime_);
+    if (isCountDown_) {
+        auto elapsedTime = GetMillisecondsDuration(GetFormatDuration(elapsedTime_));
+        tmpValue =
+            (inputCount_ >= static_cast<double>(elapsedTime_)) ? (inputCount_ - static_cast<double>(elapsedTime)) : 0;
+    } else {
+        tmpValue += startTime_;
+    }
+    UpdateTextTimer(tmpValue);
+    host->MarkDirtyNode(PROPERTY_UPDATE_MEASURE);
 }
 } // namespace OHOS::Ace::NG

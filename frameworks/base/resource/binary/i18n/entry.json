@@ -2670,6 +2670,12 @@
         },
         "sheet":{
             "close":"關閉"
+        },
+        "textclock":{
+            "week":"週",
+            "year":"年",
+            "month":"月",
+            "day":"日"
         }
     },
     "zh-TW":{
@@ -2714,6 +2720,12 @@
         },
         "sheet":{
             "close":"關閉"
+        },
+        "textclock":{
+            "week":"週",
+            "year":"年",
+            "month":"月",
+            "day":"日"
         }
     },
     "hr":{

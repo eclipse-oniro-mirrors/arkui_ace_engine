@@ -54,6 +54,7 @@ inline const std::string UTC_1 = "1000000000000";
 inline const std::string UTC_2 = "2000000000000";
 inline const std::string FORMAT_DATA = "08:00:00";
 inline const std::string FORM_FORMAT = "hh:mm";
+inline const std::string FORM_FORMAT_HIDE = "h:mm";
 inline const std::vector<std::string> FONT_FAMILY_VALUE = { "cursive" };
 const std::string EMPTY_TEXT = "";
 const std::string TEXTCLOCK_CONTENT = "08:00:00";
@@ -692,7 +693,7 @@ HWTEST_F(TextClockTestNG, TextClockTest010, TestSize.Level1)
     EXPECT_TRUE(pattern->isForm_);
     // textClockLayoutProperty.format is std::nullopt
     auto format = pattern->GetFormat();
-    EXPECT_EQ(format, FORM_FORMAT);
+    EXPECT_EQ(format, FORM_FORMAT_HIDE);
 
     /**
      * @tc.steps: step5. check time format in card.
@@ -700,10 +701,10 @@ HWTEST_F(TextClockTestNG, TextClockTest010, TestSize.Level1)
      */
     textClockLayoutProperty->UpdateFormat(CLOCK_FORMAT);
     format = pattern->GetFormat();
-    EXPECT_EQ(format, FORM_FORMAT);
+    EXPECT_EQ(format, FORM_FORMAT_HIDE);
     textClockLayoutProperty->UpdateFormat("mm:SS");
     format = pattern->GetFormat();
-    EXPECT_EQ(format, FORM_FORMAT);
+    EXPECT_EQ(format, FORM_FORMAT_HIDE);
     pattern->GetWeek(true, 3);
     pattern->GetWeek(false, 5);
     pattern->ParseInputFormat();
