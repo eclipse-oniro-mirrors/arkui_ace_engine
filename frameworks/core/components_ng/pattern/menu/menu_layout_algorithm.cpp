@@ -3549,6 +3549,9 @@ bool MenuLayoutAlgorithm::CheckPositionInPlacementRect(
             positionOffset_ = { 0.0f, 0.0f };
             return false;
         }
+        if (!outside) {
+            return true;
+        }
         return CheckPlacement(childSize);
     }
     if (outside) {
