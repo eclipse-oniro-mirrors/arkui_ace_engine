@@ -28,6 +28,8 @@ test_sources = [
   "toggle_switch_pattern_test_ng.cpp",
   "toggle_button_pattern_test_ng.cpp",
   "toggle_checkbox_pattern_test_ng.cpp",
+  "switch_theme_wrapper_test_ng.cpp",
+  "$ace_root/frameworks/core/components/checkable/checkable_theme.cpp",
 ]
 
 if (is_host_product) {
