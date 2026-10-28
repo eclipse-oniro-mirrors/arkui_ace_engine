@@ -329,6 +329,7 @@ arkui_files = [
   "arkui-preprocessed/arkui/component/screen.ets",
   "arkui-preprocessed/arkui/component/scroll.ets",
   "arkui-preprocessed/arkui/component/scrollBar.ets",
+  "arkui-preprocessed/arkui/component/scrollCommon.ets",
   "arkui-preprocessed/arkui/component/search.ets",
   "arkui-preprocessed/arkui/component/securityComponent.ets",
   "arkui-preprocessed/arkui/component/securityUIExtensionComponent.ets",
