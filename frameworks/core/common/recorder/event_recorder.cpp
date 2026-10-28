@@ -569,11 +569,23 @@ void EventRecorder::OnWebEvent(const RefPtr<NG::FrameNode>& node, const std::vec
 void EventRecorder::OnAttachWeb(const RefPtr<NG::FrameNode>& node)
 {
     CHECK_NULL_VOID(node);
+    std::unique_lock<std::shared_mutex> lock(nodeCacheMutex_);
     weakNodeCache_[node->GetId()] = Referenced::WeakClaim(Referenced::RawPtr(node));
 }
 
 void EventRecorder::OnDetachWeb(int32_t nodeId)
 {
+    std::unique_lock<std::shared_mutex> lock(nodeCacheMutex_);
     weakNodeCache_.erase(nodeId);
+}
+
+WeakPtr<NG::FrameNode> EventRecorder::GetWebNode(int32_t nodeId)
+{
+    std::shared_lock<std::shared_mutex> lock(nodeCacheMutex_);
+    auto iter = weakNodeCache_.find(nodeId);
+    if (iter == weakNodeCache_.end()) {
+        return WeakPtr<NG::FrameNode>();
+    }
+    return iter->second;
 }
 } // namespace OHOS::Ace::Recorder

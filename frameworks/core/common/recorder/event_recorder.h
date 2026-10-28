@@ -139,10 +139,7 @@ public:
     void OnWebEvent(const RefPtr<NG::FrameNode>& node, const std::vector<std::string>& params);
     void OnAttachWeb(const RefPtr<NG::FrameNode>& node);
     void OnDetachWeb(int32_t nodeId);
-    std::unordered_map<int32_t, WeakPtr<NG::FrameNode>>& GetWeakNodeMap()
-    {
-        return weakNodeCache_;
-    }
+    WeakPtr<NG::FrameNode> GetWebNode(int32_t nodeId);
 
 private:
     EventRecorder();
@@ -165,6 +162,7 @@ private:
 
     RefPtr<TaskExecutor> taskExecutor_;
 
+    std::shared_mutex nodeCacheMutex_;
     std::unordered_map<int32_t, WeakPtr<NG::FrameNode>> weakNodeCache_;
 
     ACE_DISALLOW_COPY_AND_MOVE(EventRecorder);
