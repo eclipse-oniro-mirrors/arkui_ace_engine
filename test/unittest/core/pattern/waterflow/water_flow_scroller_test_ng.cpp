@@ -14,7 +14,7 @@
  */
 
 #include "test/mock/frameworks/core/animation/mock_animation_manager.h"
-#include "water_flow_test_ng.h"
+#include "water_flow_scroller_test_ng.h"
 
 #include "core/animation/velocity_motion.h"
 #include "core/components/common/layout/constants.h"
@@ -25,7 +25,6 @@
 #include "interfaces/inner_api/ui_session/param_config.h"
 
 namespace OHOS::Ace::NG {
-class WaterFlowScrollerTestNg : public WaterFlowTestNg {};
 
 /**
  * @tc.name: UpdateCurrentOffset001

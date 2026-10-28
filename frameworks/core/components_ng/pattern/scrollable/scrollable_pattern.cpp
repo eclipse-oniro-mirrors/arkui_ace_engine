@@ -2850,6 +2850,7 @@ void ScrollablePattern::OnAnimateFinish()
 void ScrollablePattern::PlaySpringAnimation(float position, const SpringCurveOption& curveOption, bool useTotalOffset,
     bool isFormUser)
 {
+    ++animationGeneration_;
     if (!springOffsetProperty_) {
         InitSpringOffsetProperty();
         CHECK_NULL_VOID(springOffsetProperty_);
@@ -2978,6 +2979,7 @@ void ScrollablePattern::ProcessSpringOffsetCallback(float offset)
     }
 
     bool stopAnimation = false;
+    const auto generation = animationGeneration_;
     // Check if we should trigger the skip for back to top optimization
     // Add skip distance to delta when reaching animation midpoint
     const float adjustment = CalcSpringAdjustOffset(offset);
@@ -3004,6 +3006,9 @@ void ScrollablePattern::ProcessSpringOffsetCallback(float offset)
         delta = 0;
     }
     const bool updated = UpdateCurrentOffset(delta, source);
+    if (generation != animationGeneration_) {
+        return;
+    }
     fastScrollSkip_ = fastScrollSkip_ || (skipped && updated && !NearZero(delta));
     if (!updated || stopAnimation || isAnimateOverScroll_) {
         if (isAnimateOverScroll_ && GetCanStayOverScroll()) {
@@ -3092,6 +3097,7 @@ void ScrollablePattern::InitOption(AnimationOption& option, float duration, cons
 
 void ScrollablePattern::StopAnimation(std::shared_ptr<AnimationUtils::Animation> animation)
 {
+    ++animationGeneration_;
     SetAnimateCanOverScroll(false);
     isAnimationStop_ = true;
     currentVelocity_ = 0.0;
@@ -3280,6 +3286,24 @@ ScrollSource ScrollablePattern::ConvertScrollSource(int32_t source)
         sourceType = scrollSourceMap[idx].value;
     }
     return sourceType;
+}
+
+ScrollablePattern::ItemLazySyntax ScrollablePattern::FindItemLazySyntax(const RefPtr<UINode>& host)
+{
+    ItemLazySyntax found;
+    CHECK_NULL_RETURN(host, found);
+    for (const auto& child : host->GetChildren()) {
+        found.arkoala = found.arkoala || AceType::InstanceOf<ArkoalaLazyNode>(child);
+        found.repeatV2 = found.repeatV2 || AceType::InstanceOf<RepeatVirtualScroll2Node>(child);
+        // Lazy syntax nested inside an item belongs to that item's own layout.
+        if (AceType::InstanceOf<FrameNode>(child) || AceType::InstanceOf<LazyForEachNode>(child)) {
+            continue;
+        }
+        const auto nested = FindItemLazySyntax(child);
+        found.arkoala = found.arkoala || nested.arkoala;
+        found.repeatV2 = found.repeatV2 || nested.repeatV2;
+    }
+    return found;
 }
 
 int32_t ScrollablePattern::ScrollToTarget(

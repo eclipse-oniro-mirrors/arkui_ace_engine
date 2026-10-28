@@ -2312,6 +2312,8 @@
       "OHOS::Ace::NG::ScrollablePattern::ScrollablePattern()";
       "OHOS::Ace::NG::ScrollablePattern::ScrollablePattern(OHOS::Ace::EdgeEffect, bool)";
       "OHOS::Ace::NG::ScrollablePattern::StartItemSnapAnimation(OHOS::Ace::SnapAnimationOptions const&)";
+      "OHOS::Ace::NG::ScrollablePattern::StartFastScrollAnimation(float)";
+      "OHOS::Ace::NG::ScrollablePattern::FindItemLazySyntax(OHOS::Ace::RefPtr<OHOS::Ace::NG::UINode> const&)";
       "OHOS::Ace::NG::Scrollable::StartItemSnapTwoStageAnimation(float, float, bool, std::__h::function<float (float)>&&, int)";
       "OHOS::Ace::NG::CalculateItemSnapTakeoverDistance(float, float, float)";
       "OHOS::Ace::NG::ScrollSnapUtils::ClampSnapOffset(float, float, float)";
@@ -2340,6 +2342,7 @@
       "OHOS::Ace::NG::ScrollablePattern::SetScrollBarProxy(OHOS::Ace::RefPtr<OHOS::Ace::NG::ScrollBarProxy> const&)";
       "OHOS::Ace::NG::ScrollablePattern::StopAnimate()";
       "OHOS::Ace::NG::ScrollablePattern::StopScrollAnimation()";
+      "OHOS::Ace::NG::ScrollablePattern::StopScrollableAndAnimate()";
       "OHOS::Ace::NG::ScrollablePattern::SuggestOpIncGroup(bool)";
       "OHOS::Ace::NG::ScrollablePattern::ToJsonValue(std::__h::unique_ptr<OHOS::Ace::JsonValue, std::__h::default_delete<OHOS::Ace::JsonValue>>&, OHOS::Ace::NG::InspectorFilter const&) const";
       "OHOS::Ace::NG::ScrollablePattern::UpdateFadingEdge(OHOS::Ace::RefPtr<OHOS::Ace::NG::ScrollablePaintMethod> const&)";

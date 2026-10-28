@@ -213,6 +213,20 @@ public:
 
     float EstimateTotalHeight() const override;
 
+    // Fast-scroll preparation copies configuration only, never the full historical item cache.
+    RefPtr<WaterFlowLayoutInfoSW> CreateFastScrollWindow() const;
+    std::optional<float> EstimateFastScrollPosition(int32_t index) const;
+    void ApplyFastScrollWindow(const WaterFlowLayoutInfoSW& window, float totalOffset);
+    // Only an in-flight request uses average estimation; it does not outlive the request.
+    void SetFastScrollActive(bool active)
+    {
+        fastScrollActive_ = active;
+    }
+    bool IsFastScrollEstimating() const
+    {
+        return fastScrollEstimation_ || fastScrollActive_;
+    }
+
     bool EstimateVirtualTotalHeight(float average, float& virtualTotalHeight) const;
 
     /**
@@ -368,6 +382,10 @@ private:
     bool knowTotalHeight_ = false; // set to true when content end is reached. no longer need to estimate totalHeight
 
     bool isPrevOffsetValid_ = true;
+
+    // Remains valid after a fast jump; normal scrolling refines the active window as before.
+    bool fastScrollEstimation_ = false;
+    bool fastScrollActive_ = false;
 
     struct ItemInfo;
 };

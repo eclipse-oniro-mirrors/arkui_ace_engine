@@ -27,12 +27,14 @@ class WaterFlowAccessibilityProperty;
 class WaterFlowEventHub;
 class WaterFlowLayoutProperty;
 class WaterFlowSections;
+struct WaterFlowFastScrollState;
 
 class ACE_EXPORT WaterFlowPattern : public ScrollablePattern {
     DECLARE_ACE_TYPE(WaterFlowPattern, ScrollablePattern);
 
 public:
     ~WaterFlowPattern() override;
+    void OnDetachFromMainTree() override;
 
     bool UpdateCurrentOffset(float delta, int32_t source) override;
     bool IsScrollable() const override;
@@ -147,6 +149,9 @@ public:
 
     void ScrollToIndex(int32_t index, bool smooth = false, ScrollAlign align = ScrollAlign::START,
         std::optional<float> extraOffset = std::nullopt) override;
+    void ScrollToIndexFastScroll(int32_t index, bool smooth, ScrollAlign align,
+        std::optional<float> extraOffset, FastScrollMode mode) override;
+    void OnTouchDown(const TouchEventInfo& info) override;
 
     double GetStoredOffset() const
     {
@@ -293,6 +298,13 @@ private:
     void CheckBackToTopFallback();
     void OnScrollEndCallback() override;
     bool ScrollToTargetIndex(int32_t index);
+    void CancelFastScroll() override;
+    bool AdjustOffsetForEdgeEffect(float& delta, int32_t source);
+    void UpdateScrollTargetsAfterLayout(const RefPtr<LayoutWrapper>& dirty);
+    void ResumeFastScrollAnimation(float position, float coordinateCorrection);
+    void UpdateFastScroll(float coordinateCorrection);
+    std::shared_ptr<WaterFlowFastScrollState> fastScrollState_;
+    uint64_t fastScrollSerial_ = 0;
     bool NeedRender();
     void FireOnReachStart(const OnReachEvent& onReachStart, const OnReachEvent& onJSFrameNodeReachStart) override;
     void FireOnReachEnd(const OnReachEvent& onReachEnd, const OnReachEvent& onJSFrameNodeReachEnd) override;

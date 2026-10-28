@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <cfloat>
+#include <cmath>
 #include <queue>
 
 #include "base/utils/feature_param.h"
@@ -34,6 +35,7 @@ namespace OHOS::Ace::NG {
 void WaterFlowLayoutSW::Measure(LayoutWrapper* wrapper)
 {
     info_->BeginUpdate();
+    info_->SetFastScrollActive(fastScrollState_ && !fastScrollState_->cancelled);
 
     // Initialize unlayouted items if not layouted
     InitUnlayoutedItems();
@@ -45,7 +47,7 @@ void WaterFlowLayoutSW::Measure(LayoutWrapper* wrapper)
 
     auto [size, matchChildren, originalWidth] = WaterFlowLayoutUtils::PreMeasureSelf(wrapper_, axis_);
     syncLoad_ = props_->GetSyncLoad().value_or(true) || matchChildren ||
-                !NearZero(info_->delta_) || info_->targetIndex_.has_value();
+                !NearZero(info_->delta_) || info_->targetIndex_.has_value() || fastScrollState_;
     Init(size, originalWidth);
     CalculateContentClipFixOffset(wrapper_, info_);
 
@@ -53,26 +55,22 @@ void WaterFlowLayoutSW::Measure(LayoutWrapper* wrapper)
         info_->isDataValid_ = false;
         return;
     }
+    InvalidateFastScrollIfNeeded();
     if (int32_t change = CheckReset(); change > -1) {
         FillBack(info_->GetViewEndBound(mainLen_), change, itemCnt_ - 1);
     }
 
-    if (!info_->measureInNextFrame_) {
-        if (info_->jumpIndex_ != WaterFlowLayoutInfoBase::EMPTY_JUMP_INDEX) {
-            MeasureOnJump(info_->jumpIndex_, info_->align_);
-        } else if (info_->targetIndex_) {
-            MeasureBeforeAnimation(*info_->targetIndex_);
-        } else if (canSkip_ && info_->TryConvertLargeDeltaToJump(mainLen_, itemCnt_)) {
-            MeasureOnJump(info_->jumpIndex_, ScrollAlign::START);
-        } else {
-            MeasureOnOffset(info_->delta_);
-        }
-    }
+    MeasureItems();
     if (matchChildren) {
         PostMeasureSelf(size.CrossSize(axis_));
     }
 
     info_->Sync(itemCnt_, mainLen_, mainGaps_);
+
+    if (fastScrollState_ && !fastScrollState_->cancelled && !fastScrollState_->targetOffset &&
+        !info_->measureInNextFrame_) {
+        PrepareFastScroll();
+    }
 
     if (info_->measureInNextFrame_) {
         isLayouted_ = false;
@@ -90,6 +88,201 @@ void WaterFlowLayoutSW::Measure(LayoutWrapper* wrapper)
     measuredStartIndex_ = info_->StartIndex();
     measuredEndIndex_ = info_->EndIndex();
     isLayouted_ = false;
+}
+
+void WaterFlowLayoutSW::InvalidateFastScrollIfNeeded()
+{
+    CHECK_NULL_VOID(fastScrollState_);
+    const auto& state = *fastScrollState_;
+    if ((state.targetOffset || state.builtCount > 0) && (wrapper_->ConstraintChanged() ||
+        GetUpdateIdx(wrapper_, info_->footerIndex_) >= 0 || state.axis != axis_ ||
+        state.reverse != props_->IsReverse() || state.itemCrossSizes != itemsCrossSize_ ||
+        state.mainGaps != mainGaps_ || !NearEqual(state.mainSize, mainLen_) ||
+        !NearEqual(state.startInset, info_->contentStartOffset_) ||
+        !NearEqual(state.endInset, info_->contentEndOffset_))) {
+        CancelFastScroll();
+        info_->delta_ = 0.0f;
+    }
+}
+
+void WaterFlowLayoutSW::CancelFastScroll()
+{
+    fastScrollState_->cancelled = true;
+    // Later measurement in this frame must use cached heights again.
+    info_->SetFastScrollActive(false);
+}
+
+void WaterFlowLayoutSW::MeasureItems()
+{
+    if (info_->measureInNextFrame_) {
+        return;
+    }
+    if (fastScrollState_ && !fastScrollState_->cancelled && fastScrollSkip_ &&
+        fastScrollState_->preparedWindow) {
+        ApplyFastScrollWindow();
+    } else if (info_->jumpIndex_ != WaterFlowLayoutInfoBase::EMPTY_JUMP_INDEX) {
+        MeasureOnJump(info_->jumpIndex_, info_->align_);
+    } else if (info_->targetIndex_) {
+        MeasureBeforeAnimation(*info_->targetIndex_);
+    } else if (canSkip_ && info_->TryConvertLargeDeltaToJump(mainLen_, itemCnt_)) {
+        MeasureOnJump(info_->jumpIndex_, ScrollAlign::START);
+    } else {
+        MeasureOnOffset(info_->delta_);
+    }
+}
+
+void WaterFlowLayoutSW::ReleaseFastScrollRoute(bool toggleCache)
+{
+    auto& state = *fastScrollState_;
+    const int32_t cacheCount = props_->GetCachedCountValue(info_->defCachedCount_);
+    const bool showCache = props_->GetShowCachedItemsValue(false);
+    int32_t activeStart = info_->startIndex_;
+    int32_t activeEnd = info_->endIndex_;
+    if (!showCache) {
+        ExpandActiveRangeInFixOffset(cacheCount, activeStart, activeEnd);
+    }
+    // Keep the visible window. Static lazy syntax skips an unchanged range, so alternate its
+    // trailing cache count; otherwise it would never dispose the roots built on the route.
+    state.releaseToggle = toggleCache && !state.releaseToggle;
+    wrapper_->SetActiveChildRange(nodeIdx(activeStart), nodeIdx(activeEnd), cacheCount,
+        cacheCount + (state.releaseToggle ? 1 : 0), showCache);
+}
+
+bool WaterFlowLayoutSW::PrepareFastScrollItems()
+{
+    auto& state = *fastScrollState_;
+    const int32_t first = std::min(state.index, info_->startIndex_);
+    const int32_t last = std::max(state.index, info_->endIndex_);
+    const auto host = wrapper_->GetHostNode();
+    // Only static lazy roots need route release during preparation; dynamic sources keep
+    // their own release timing, which otherwise adds frontend cleanup to the animation.
+    const auto lazySyntax = ScrollablePattern::FindItemLazySyntax(host);
+    const bool staticLazy = lazySyntax.arkoala;
+    const bool recycleRepeat = !staticLazy && lazySyntax.repeatV2;
+    // Static routes are built toward the target so its neighborhood is created last and
+    // stays alive for the window.
+    const int32_t step = staticLazy && state.index < info_->startIndex_ ? -1 : 1;
+    const int32_t begin = step > 0 ? first : last;
+    const int32_t total = last - first + 1;
+    const int32_t batchSize = std::max(info_->endIndex_ - info_->startIndex_ + 1, 1);
+    // Static roots within two viewports of the target are kept for the target window.
+    const int32_t releasable = total - 2 * batchSize;
+    for (int32_t built = state.builtCount; built < total && !state.cancelled; ++built) {
+        WaterFlowLayoutUtils::GetWaterFlowItem(wrapper_, nodeIdx(begin + built * step), false);
+        state.builtCount = built + 1;
+        const bool yield = state.builtCount < total && wrapper_->ReachResponseDeadline();
+        const bool batchEnd = yield || (batchSize > 0 && state.builtCount % batchSize == 0);
+        if (staticLazy && state.builtCount <= releasable && batchEnd) {
+            ReleaseFastScrollRoute(true);
+        } else if (recycleRepeat && (batchEnd || state.builtCount == total)) {
+            // Release offscreen Repeat roots in bounded batches so reuse does not
+            // accumulate the whole route for cleanup in the first animation layout.
+            ReleaseFastScrollRoute(false);
+        }
+        if (yield && !state.cancelled) {
+            // Frontend creation can be expensive even without measurement.
+            // Resume this request next frame while keeping the visible window.
+            info_->measureInNextFrame_ = true;
+            return false;
+        }
+    }
+    return !state.cancelled;
+}
+
+RefPtr<WaterFlowLayoutInfoSW> WaterFlowLayoutSW::BuildFastScrollWindow(int32_t index, float position)
+{
+    auto active = info_;
+    info_ = active->CreateFastScrollWindow();
+    Jump(index, ScrollAlign::CENTER, false);
+    info_->Sync(itemCnt_, mainLen_, mainGaps_);
+    const float localPosition = info_->DistanceToTop(index, mainGaps_[info_->GetSegment(index)]);
+    info_->totalOffset_ = localPosition - position;
+    auto window = info_;
+    info_ = active;
+    return window;
+}
+
+void WaterFlowLayoutSW::PrepareFastScroll()
+{
+    auto& state = *fastScrollState_;
+    if (state.index < 0 || state.index >= itemCnt_ || !Positive(mainLen_)) {
+        CancelFastScroll();
+        return;
+    }
+    state.itemCrossSizes = itemsCrossSize_;
+    state.mainGaps = mainGaps_;
+    state.mainSize = mainLen_;
+    state.startInset = info_->contentStartOffset_;
+    state.endInset = info_->contentEndOffset_;
+    state.axis = axis_;
+    state.reverse = props_->IsReverse();
+    if (state.align == ScrollAlign::AUTO) {
+        state.align = ParseAutoAlign(state.index, info_->ItemInView(state.index));
+    }
+    if (state.mode == FastScrollMode::SKIP_MEASURE && !PrepareFastScrollItems()) {
+        return;
+    }
+    info_->align_ = state.align;
+    if (info_->ItemInView(state.index)) {
+        state.targetOffset = info_->CalcTargetPosition(state.index, 0) + state.extraOffset;
+        return;
+    }
+    const auto position = info_->EstimateFastScrollPosition(state.index);
+    if (!position) {
+        CancelFastScroll();
+        return;
+    }
+    auto window = BuildFastScrollWindow(state.index, *position);
+    window->align_ = state.align;
+    const float target = window->CalcTargetPosition(state.index, 0) + state.extraOffset;
+    if (state.cancelled || !std::isfinite(target)) {
+        CancelFastScroll();
+        return;
+    }
+    MeasureFastScrollOffset(window, target);
+}
+
+void WaterFlowLayoutSW::MeasureFastScrollOffset(const RefPtr<WaterFlowLayoutInfoSW>& window, float target)
+{
+    auto& state = *fastScrollState_;
+    // Keep the measured target as the anchor. A large extraOffset requires measuring
+    // its covered region: an estimated arrival index loses accuracy for mixed sizes.
+    auto active = info_;
+    info_ = window;
+    const bool overStart = canOverScrollStart_;
+    const bool overEnd = canOverScrollEnd_;
+    canOverScrollStart_ = false;
+    canOverScrollEnd_ = false;
+    info_->BeginUpdate();
+    MeasureOnOffset(-target - info_->totalOffset_);
+    info_->Sync(itemCnt_, mainLen_, mainGaps_);
+    state.targetOffset = -info_->totalOffset_;
+    state.preparedWindow = window;
+    info_ = active;
+    canOverScrollStart_ = overStart;
+    canOverScrollEnd_ = overEnd;
+}
+
+void WaterFlowLayoutSW::ApplyFastScrollWindow()
+{
+    const auto window = fastScrollState_->preparedWindow;
+    info_->ApplyFastScrollWindow(*window, info_->totalOffset_ + info_->delta_);
+    // Idle recycling can release the prepared nodes while retaining this geometry.
+    // Reacquire and measure the bounded window before Layout consumes its items.
+    for (const auto& section : info_->lanes_) {
+        for (size_t lane = 0; lane < section.size(); ++lane) {
+            for (const auto& item : section[lane].items_) {
+                MeasureChild(item.idx, lane);
+            }
+        }
+    }
+    // The shared animation retains at most two viewports on either side of its skip.
+    FillFront(info_->GetViewStartBound(), info_->StartIndex() - 1, 0);
+    FillBack(info_->GetViewEndBound(mainLen_), info_->EndIndex() + 1, itemCnt_ - 1);
+    AdjustOverScroll();
+    ClearFront();
+    ClearBack(info_->GetViewEndBound(mainLen_));
+    fastScrollState_->preparedWindow.Reset();
 }
 
 void WaterFlowLayoutSW::Layout(LayoutWrapper* wrapper)
@@ -297,6 +490,10 @@ int32_t WaterFlowLayoutSW::CheckReset()
 
     const bool childDirty = props_->GetPropertyChangeFlag() & PROPERTY_UPDATE_BY_CHILD_REQUEST;
     if (CheckItemSizeChanged(childDirty)) {
+        if (fastScrollState_ && fastScrollState_->targetOffset) {
+            CancelFastScroll();
+            info_->delta_ = 0.0f;
+        }
         info_->ResetWithLaneOffset(std::nullopt);
         info_->needFixOffsetCache_ = hasValidItemRange;
         return info_->startIndex_;
