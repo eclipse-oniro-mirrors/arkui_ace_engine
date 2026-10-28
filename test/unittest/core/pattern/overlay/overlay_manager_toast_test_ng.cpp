@@ -743,7 +743,7 @@ HWTEST_F(OverlayManagerToastTestNg, ToastLayoutAlgorithmLayout001, TestSize.Leve
     auto toastNode = ToastView::CreateToastNode(toastInfo);
     ASSERT_NE(toastNode, nullptr);
     auto layoutWrapperNode = toastNode->CreateLayoutWrapper(true, true);
-    auto layoutWrapper = reinterpret_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
+    auto layoutWrapper = static_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
     ASSERT_NE(layoutWrapper, nullptr);
     auto frameNode = layoutWrapper->GetHostNode();
     ASSERT_NE(frameNode, nullptr);
@@ -793,7 +793,7 @@ HWTEST_F(OverlayManagerToastTestNg, ToastLayoutAlgorithmLayout002, TestSize.Leve
     auto toastNode = ToastView::CreateToastNode(toastInfo);
     ASSERT_NE(toastNode, nullptr);
     auto layoutWrapperNode = toastNode->CreateLayoutWrapper(true, true);
-    auto layoutWrapper = reinterpret_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
+    auto layoutWrapper = static_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
     ASSERT_NE(layoutWrapper, nullptr);
     auto frameNode = layoutWrapper->GetHostNode();
     ASSERT_NE(frameNode, nullptr);
@@ -850,7 +850,7 @@ HWTEST_F(OverlayManagerToastTestNg, ToastLayoutAlgorithmGetTextLayoutConstraint0
     auto toastNode = ToastView::CreateToastNode(toastInfo);
     ASSERT_NE(toastNode, nullptr);
     auto layoutWrapperNode = toastNode->CreateLayoutWrapper(true, true);
-    auto layoutWrapper = reinterpret_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
+    auto layoutWrapper = static_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
     ASSERT_NE(layoutWrapper, nullptr);
 
     auto frameNode = layoutWrapper->GetHostNode();
@@ -898,7 +898,7 @@ HWTEST_F(OverlayManagerToastTestNg, ToastLayoutAlgorithmGetTextLayoutConstraint0
     auto toastNode = ToastView::CreateToastNode(toastInfo);
     ASSERT_NE(toastNode, nullptr);
     auto layoutWrapperNode = toastNode->CreateLayoutWrapper(true, true);
-    auto layoutWrapper = reinterpret_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
+    auto layoutWrapper = static_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
     ASSERT_NE(layoutWrapper, nullptr);
     auto frameNode = layoutWrapper->GetHostNode();
     ASSERT_NE(frameNode, nullptr);
@@ -954,7 +954,7 @@ HWTEST_F(OverlayManagerToastTestNg, ToastLayoutAlgorithmGetTextLayoutConstraint0
     auto toastNode = ToastView::CreateToastNode(toastInfo);
     ASSERT_NE(toastNode, nullptr);
     auto layoutWrapperNode = toastNode->CreateLayoutWrapper(true, true);
-    auto layoutWrapper = reinterpret_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
+    auto layoutWrapper = static_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
     ASSERT_NE(layoutWrapper, nullptr);
 
     auto frameNode = layoutWrapper->GetHostNode();
@@ -1152,7 +1152,7 @@ HWTEST_F(OverlayManagerToastTestNg, ToastPatternInitWrapperRect001, TestSize.Lev
     ASSERT_NE(layoutWrapper, nullptr);
     auto toastProp = AceType::DynamicCast<ToastLayoutProperty>(layoutWrapper->GetLayoutProperty());
     ASSERT_NE(toastProp, nullptr);
-    auto layoutWrapperPtr = reinterpret_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapper));
+    auto layoutWrapperPtr = static_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapper));
     ASSERT_NE(layoutWrapperPtr, nullptr);
 
     auto containerId = MockContainer::CurrentId();
@@ -1193,7 +1193,7 @@ HWTEST_F(OverlayManagerToastTestNg, ToastPatternInitWrapperRect002, TestSize.Lev
     ASSERT_NE(layoutWrapper, nullptr);
     auto toastProps = AceType::DynamicCast<ToastLayoutProperty>(layoutWrapper->GetLayoutProperty());
     ASSERT_NE(toastProps, nullptr);
-    auto layoutWrapperPtr = reinterpret_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapper));
+    auto layoutWrapperPtr = static_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapper));
     ASSERT_NE(layoutWrapperPtr, nullptr);
 
     auto containerId = MockContainer::CurrentId();

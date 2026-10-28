@@ -232,7 +232,7 @@ HWTEST_F(TimePickerAlgorithmTest, TimePickerAlgorithmTest002, TestSize.Level1)
     auto layoutWrapperNode = AceType::MakeRefPtr<LayoutWrapperNode>(
         weakNode, AceType::MakeRefPtr<GeometryNode>(), AceType::MakeRefPtr<LayoutProperty>());
 
-    auto layoutWrapper = reinterpret_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
+    auto layoutWrapper = static_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapperNode));
     auto customNode = FrameNode::CreateFrameNode(V2::BLANK_ETS_TAG, 100, AceType::MakeRefPtr<Pattern>());
     EXPECT_NE(customNode, nullptr);
     auto childLayoutWrapper = AceType::MakeRefPtr<LayoutWrapperNode>(

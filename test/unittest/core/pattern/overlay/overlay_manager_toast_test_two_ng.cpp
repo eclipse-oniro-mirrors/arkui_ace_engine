@@ -1000,7 +1000,7 @@ HWTEST_F(OverlayManagerToastTestTwoNg, ToastPatternInitWrapperRectWithSafeArea00
     ASSERT_NE(layoutWrapper, nullptr);
     auto toastProp = AceType::DynamicCast<ToastLayoutProperty>(layoutWrapper->GetLayoutProperty());
     ASSERT_NE(toastProp, nullptr);
-    auto layoutWrapperPtr = reinterpret_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapper));
+    auto layoutWrapperPtr = static_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapper));
     ASSERT_NE(layoutWrapperPtr, nullptr);
     // Should not crash and should execute the helper path
     toastPattern->InitWrapperRect(layoutWrapperPtr, toastProp);
@@ -1040,7 +1040,7 @@ HWTEST_F(OverlayManagerToastTestTwoNg, ToastPatternInitWrapperRectWithSafeArea00
     ASSERT_NE(layoutWrapper, nullptr);
     auto toastProp = AceType::DynamicCast<ToastLayoutProperty>(layoutWrapper->GetLayoutProperty());
     ASSERT_NE(toastProp, nullptr);
-    auto layoutWrapperPtr = reinterpret_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapper));
+    auto layoutWrapperPtr = static_cast<LayoutWrapper*>(Referenced::RawPtr(layoutWrapper));
     ASSERT_NE(layoutWrapperPtr, nullptr);
     // Should not crash with switch off
     toastPattern->InitWrapperRect(layoutWrapperPtr, toastProp);
